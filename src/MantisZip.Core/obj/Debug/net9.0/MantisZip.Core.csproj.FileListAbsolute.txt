@@ -1,0 +1,14 @@
+E:\github\MantisZip\src\MantisZip.Core\bin\Debug\net9.0\MantisZip.Core.deps.json
+E:\github\MantisZip\src\MantisZip.Core\bin\Debug\net9.0\MantisZip.Core.dll
+E:\github\MantisZip\src\MantisZip.Core\bin\Debug\net9.0\MantisZip.Core.pdb
+E:\github\MantisZip\src\MantisZip.Core\obj\Debug\net9.0\MantisZip.Core.GeneratedMSBuildEditorConfig.editorconfig
+E:\github\MantisZip\src\MantisZip.Core\obj\Debug\net9.0\MantisZip.Core.AssemblyInfoInputs.cache
+E:\github\MantisZip\src\MantisZip.Core\obj\Debug\net9.0\MantisZip.Core.AssemblyInfo.cs
+E:\github\MantisZip\src\MantisZip.Core\obj\Debug\net9.0\MantisZip.Core.csproj.CoreCompileInputs.cache
+E:\github\MantisZip\src\MantisZip.Core\obj\Debug\net9.0\MantisZip.Core.dll
+E:\github\MantisZip\src\MantisZip.Core\obj\Debug\net9.0\refint\MantisZip.Core.dll
+E:\github\MantisZip\src\MantisZip.Core\obj\Debug\net9.0\MantisZip.Core.pdb
+E:\github\MantisZip\src\MantisZip.Core\obj\Debug\net9.0\ref\MantisZip.Core.dll
+E:\github\MantisZip\src\MantisZip.Core\bin\Debug\net9.0\x64\7z.dll
+E:\github\MantisZip\src\MantisZip.Core\bin\Debug\net9.0\x86\7z.dll
+E:\github\MantisZip\src\MantisZip.Core\obj\Debug\net9.0\MantisZip.Core.csproj.AssemblyReference.cache

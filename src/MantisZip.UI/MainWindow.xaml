@@ -1,0 +1,200 @@
+﻿<Window x:Class="MantisZip.UI.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d"
+        Title="MantisZip - 解压缩软件" Height="650" Width="950"
+        MinHeight="450" MinWidth="600"
+        WindowStartupLocation="CenterScreen"
+        AllowDrop="True"
+        Drop="Window_Drop"
+        DragOver="Window_DragOver"
+        Background="#F5F5F5">
+
+    <Window.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVisibilityConverter"/>
+        <Style x:Key="TreeViewItemStyle" TargetType="TreeViewItem">
+            <Setter Property="IsExpanded" Value="True"/>
+        </Style>
+    </Window.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Menu Bar -->
+        <Menu Grid.Row="0" Background="White">
+            <MenuItem Header="文件(_F)">
+                <MenuItem Header="打开压缩包(_O)..." Click="OpenArchive_Click" InputGestureText="Ctrl+O"/>
+                <Separator/>
+                <MenuItem Header="解压缩(_E)..." Click="Extract_Click" InputGestureText="Ctrl+E"/>
+                <MenuItem Header="压缩(_C)..." Click="Compress_Click" InputGestureText="Ctrl+C"/>
+                <Separator/>
+                <MenuItem Header="退出(_X)" Click="Exit_Click" InputGestureText="Alt+F4"/>
+            </MenuItem>
+            <MenuItem Header="视图(_V)">
+                <MenuItem Header="刷新(_R)" Click="Refresh_Click" InputGestureText="F5"/>
+            </MenuItem>
+            <MenuItem Header="工具(_T)">
+                <MenuItem Header="密码管理器(_P)..." Click="PasswordManager_Click"/>
+            </MenuItem>
+            <MenuItem Header="帮助(_H)">
+                <MenuItem Header="关于(_A)" Click="About_Click"/>
+            </MenuItem>
+        </Menu>
+
+        <!-- Toolbar -->
+        <ToolBarTray Grid.Row="1" Background="White">
+            <ToolBar Band="0" BandIndex="0">
+                <Button ToolTip="打开压缩包 (Ctrl+O)" Click="OpenArchive_Click" Padding="8,4">
+                    <TextBlock Text="📂" FontSize="18"/>
+                </Button>
+                <Button ToolTip="解压缩 (Ctrl+E)" Click="Extract_Click" Padding="8,4">
+                    <TextBlock Text="📤" FontSize="18"/>
+                </Button>
+                <Button ToolTip="压缩 (Ctrl+C)" Click="Compress_Click" Padding="8,4">
+                    <TextBlock Text="📥" FontSize="18"/>
+                </Button>
+                <Separator/>
+                <Button ToolTip="测试压缩包" Click="TestArchive_Click" Padding="8,4">
+                    <TextBlock Text="✓" FontSize="18" Foreground="Green"/>
+                </Button>
+                <Separator/>
+                <ComboBox x:Name="CompressionLevelCombo" Width="100" SelectedIndex="4" ToolTip="压缩级别">
+                    <ComboBoxItem Content="1 - 最快"/>
+                    <ComboBoxItem Content="2"/>
+                    <ComboBoxItem Content="3"/>
+                    <ComboBoxItem Content="4"/>
+                    <ComboBoxItem Content="5 - 平衡" IsSelected="True"/>
+                    <ComboBoxItem Content="6"/>
+                    <ComboBoxItem Content="7"/>
+                    <ComboBoxItem Content="8"/>
+                    <ComboBoxItem Content="9 - 最小"/>
+                </ComboBox>
+                <Separator/>
+                <CheckBox x:Name="ShowSubFoldersCheck" Content="显示子目录" ToolTip="切换是否显示子目录文件" 
+                         Click="ShowSubFolders_Click" VerticalAlignment="Center"/>
+            </ToolBar>
+        </ToolBarTray>
+
+        <!-- Main Content Area -->
+        <Grid Grid.Row="2" Margin="8">
+            <Border Background="White" CornerRadius="4" Padding="8">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+
+                    <!-- No Archive Loaded - Drop Hint -->
+                    <Border x:Name="DropHint" Grid.Row="1" Visibility="Visible"
+                            Background="#FAFAFA" BorderBrush="#AAA" BorderThickness="2" CornerRadius="8">
+                        <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
+                            <TextBlock Text="📁" FontSize="64" HorizontalAlignment="Center" Opacity="0.3"/>
+                            <TextBlock Text="拖放压缩包到此处，或点击" FontSize="16" Foreground="Gray" Margin="0,16,0,4"/>
+                            <Button Content="[ 打开压缩包 ]" FontSize="14" Click="OpenArchive_Click" 
+                                    Background="Transparent" BorderThickness="0" Foreground="#2196F3" Cursor="Hand"/>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Archive Loaded - File List -->
+                    <Grid x:Name="FileListPanel" Grid.Row="1" Visibility="Collapsed">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                        </Grid.RowDefinitions>
+
+                        <!-- Archive Info -->
+                        <Border Grid.Row="0" Background="#E3F2FD" CornerRadius="4" Padding="12" Margin="0,0,0,8">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="📦" FontSize="24" VerticalAlignment="Center" Margin="0,0,12,0"/>
+                                <StackPanel>
+                                    <TextBlock x:Name="ArchiveNameText" Text="" FontWeight="Bold" FontSize="14"/>
+                                    <TextBlock x:Name="ArchiveInfoText" Text="" FontSize="11" Foreground="Gray"/>
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- TreeView + FileList -->
+                        <Grid Grid.Row="1">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="200" MinWidth="100"/>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+
+                            <!-- Directory Tree -->
+                            <TreeView x:Name="FolderTree" Grid.Column="0" 
+                                      BorderThickness="1" BorderBrush="#DDD"
+                                      SelectedItemChanged="FolderTree_SelectedItemChanged"
+                                      ItemContainerStyle="{StaticResource TreeViewItemStyle}">
+                                <TreeView.ItemTemplate>
+                                    <HierarchicalDataTemplate ItemsSource="{Binding Children}">
+                                        <TextBlock Text="{Binding Name}"/>
+                                    </HierarchicalDataTemplate>
+                                </TreeView.ItemTemplate>
+                            </TreeView>
+
+                            <GridSplitter Grid.Column="1" Width="4" Background="Transparent" 
+                                        HorizontalAlignment="Center" VerticalAlignment="Stretch"/>
+
+                            <!-- File List -->
+                            <DataGrid x:Name="FileListGrid" Grid.Column="2"
+                                      AutoGenerateColumns="False"
+                                      IsReadOnly="True"
+                                      SelectionMode="Extended"
+                                      CanUserAddRows="False"
+                                      CanUserDeleteRows="False"
+                                      GridLinesVisibility="Horizontal"
+                                      HeadersVisibility="Column"
+                                      RowHeaderWidth="0"
+                                      Background="White"
+                                      BorderThickness="1"
+                                      BorderBrush="#DDD"
+                                      MouseDoubleClick="FileListGrid_MouseDoubleClick">
+                                <DataGrid.Columns>
+                                    <DataGridTextColumn Header="名称" Binding="{Binding NameDisplay}" Width="*"/>
+                                    <DataGridTextColumn Header="大小" Binding="{Binding SizeDisplay}" Width="100"/>
+                                    <DataGridTextColumn Header="压缩后" Binding="{Binding CompressedSizeDisplay}" Width="100"/>
+                                    <DataGridTextColumn Header="修改日期" Binding="{Binding LastModified, StringFormat='yyyy-MM-dd HH:mm'}" Width="150"/>
+                                    <DataGridTemplateColumn Header="加密" Width="50">
+                                        <DataGridTemplateColumn.CellTemplate>
+                                            <DataTemplate>
+                                                <TextBlock Text="🔒" HorizontalAlignment="Center" 
+                                                           Visibility="{Binding IsEncrypted, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                                            </DataTemplate>
+                                        </DataGridTemplateColumn.CellTemplate>
+                                    </DataGridTemplateColumn>
+                                </DataGrid.Columns>
+                            </DataGrid>
+                        </Grid>
+                    </Grid>
+                </Grid>
+            </Border>
+        </Grid>
+
+<!-- Status Bar -->
+        <StatusBar Grid.Row="3" Background="#E0E0E0">
+            <StatusBarItem>
+                <TextBlock x:Name="StatusText" Text="就绪"/>
+            </StatusBarItem>
+            <Separator/>
+            <StatusBarItem HorizontalAlignment="Right">
+                <TextBlock Text="v0.1.0" Foreground="#666"/>
+            </StatusBarItem>
+            <Separator/>
+            <StatusBarItem HorizontalAlignment="Right">
+                <ProgressBar x:Name="ProgressBar" Width="200" Height="14" Visibility="Collapsed"/>
+            </StatusBarItem>
+            <Separator/>
+            <StatusBarItem HorizontalAlignment="Right">
+                <TextBlock x:Name="ProgressText" Text="" Visibility="Collapsed"/>
+            </StatusBarItem>
+        </StatusBar>
+    </Grid>
+</Window>

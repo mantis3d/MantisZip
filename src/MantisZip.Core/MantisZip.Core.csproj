@@ -1,0 +1,14 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="SevenZipExtractor" Version="1.0.19" />
+    <PackageReference Include="SharpZipLib" Version="1.4.0" />
+  </ItemGroup>
+
+</Project>
