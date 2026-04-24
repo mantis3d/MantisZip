@@ -1,0 +1,31 @@
+# Build output
+bin/
+obj/
+out/
+
+# IDE
+.vs/
+.vscode/
+*.user
+*.suo
+
+# .NET
+*.dll
+*.pdb
+*.exe
+*.cache
+
+# Logs
+*.log
+debug.log
+
+# Test
+TestResults/
+
+# Packages
+packages/
+*.nupkg
+
+# OS
+.DS_Store
+Thumbs.db
