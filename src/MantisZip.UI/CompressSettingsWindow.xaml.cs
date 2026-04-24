@@ -174,15 +174,14 @@ public CompressSettingsWindow()
 
         App.Log("outputPath: {0}, format: {1}, level: {2}", outputPath, format, level);
 
-        try
+try
         {
-            // 关闭设置窗口，打开进度窗口
+            // 隐藏设置窗口，显示进度窗口
+            this.Hide();
+            
             var progressWindow = new ProgressWindow();
-            progressWindow.Owner = this;
             progressWindow.InitCancellation();
             progressWindow.Show();
-
-            App.Log("进度窗口已显示");
 
             // 让 UI 渲染后再开始压缩
             await Task.Delay(100);
@@ -212,12 +211,11 @@ public CompressSettingsWindow()
                 }
                 App.Log("【UI】Progress 回调 END");
             });
-App.Log("Progress 对象已创建");
+            App.Log("Progress 对象已创建");
 
             var engine = ArchiveEngineFactory.GetEngineByExtension(outputPath);
             if (engine == null)
             {
-                // 不支持的格式，使用 ZIP
                 outputPath = Path.ChangeExtension(outputPath, ".zip");
                 engine = new ZipEngine();
             }
@@ -229,15 +227,19 @@ App.Log("Progress 对象已创建");
             App.Log("压缩完成");
 
             progressWindow.SetComplete("压缩完成");
-            await Task.Delay(500); // 让用户看到完成状态
-            Close();
+            await Task.Delay(500);
+            
+            // 关闭进度窗口
+            progressWindow.Close();
         }
-        catch (OperationCanceledException)
+catch (OperationCanceledException)
         {
-            // 用户取消
+            // 用户取消后恢复设置窗口
+            this.Show();
         }
         catch (Exception ex)
         {
+            this.Show(); // 显示错误前先恢复窗口
             MessageBox.Show($"压缩失败: {ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
