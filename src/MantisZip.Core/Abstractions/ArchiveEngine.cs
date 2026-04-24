@@ -116,6 +116,7 @@ public static class ArchiveEngineFactory
         // 注册引擎
         _engines.Add(new MantisZip.Core.Engines.ZipEngine());
         _engines.Add(new MantisZip.Core.Engines.SevenZipEngine());
+        _engines.Add(new MantisZip.Core.Engines.TarGzEngine());
     }
 
     public static IArchiveEngine? GetEngine(ArchiveFormat format)

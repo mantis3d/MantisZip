@@ -1,0 +1,10 @@
+{
+  "version": 2,
+  "dgSpecHash": "NGqoIcVyawU=",
+  "success": true,
+  "projectFilePath": "E:\\github\\MantisZip\\test_encoding\\test.csproj",
+  "expectedPackageFiles": [
+    "C:\\Users\\Admin\\.nuget\\packages\\sharpziplib\\1.4.0\\sharpziplib.1.4.0.nupkg.sha512"
+  ],
+  "logs": []
+}

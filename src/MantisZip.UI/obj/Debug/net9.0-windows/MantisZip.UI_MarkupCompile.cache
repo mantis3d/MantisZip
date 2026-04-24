@@ -10,11 +10,11 @@ none
 false
 TRACE;DEBUG;NET;NET9_0;NETCOREAPP;WINDOWS;WINDOWS7_0;NET5_0_OR_GREATER;NET6_0_OR_GREATER;NET7_0_OR_GREATER;NET8_0_OR_GREATER;NET9_0_OR_GREATER;NETCOREAPP3_0_OR_GREATER;NETCOREAPP3_1_OR_GREATER;WINDOWS7_0_OR_GREATER
 E:\github\MantisZip\src\MantisZip.UI\App.xaml
-4279258672
+6373691644
 
-7341660352
+9-1629271406
 2151389464939
-MainWindow.xaml;PasswordDialog.xaml;PasswordEditDialog.xaml;PasswordManagerWindow.xaml;
+CompressSettingsWindow.xaml;MainWindow.xaml;PasswordDialog.xaml;PasswordEditDialog.xaml;PasswordManagerWindow.xaml;ProgressWindow.xaml;
 
 False
 

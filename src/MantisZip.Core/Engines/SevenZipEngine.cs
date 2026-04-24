@@ -1,3 +1,5 @@
+using System.Diagnostics;
+using System.Linq;
 using SevenZipExtractor;
 using MantisZip.Core.Abstractions;
 using System.IO;
@@ -9,6 +11,8 @@ namespace MantisZip.Core.Engines;
 /// </summary>
 public class SevenZipEngine : IArchiveEngine
 {
+    private const string SevenZipPath = @"C:\Program Files\7-Zip\7z.exe";
+
     public bool CanHandle(ArchiveFormat format) => format == ArchiveFormat.SevenZip;
 
     public async Task ExtractAsync(string archivePath, string destinationPath, string? password = null, IProgress<ArchiveProgress>? progress = null, CancellationToken cancellationToken = default)
@@ -35,9 +39,70 @@ public class SevenZipEngine : IArchiveEngine
 
     public async Task CompressAsync(string[] sourcePaths, string outputPath, ArchiveOptions options, IProgress<ArchiveProgress>? progress = null, CancellationToken cancellationToken = default)
     {
-        // SevenZipExtractor 主要用于解压
-        // 压缩功能暂时返回空操作，后续可以使用 Process 调用 7z.exe 或其他方式实现
-        await Task.CompletedTask;
+        await Task.Run(() =>
+        {
+            // 7z.exe 命令: 7z a -t7z output files [-mxN] [-p"password"]
+            var args = new List<string>
+            {
+                "a",                    // 添加
+                "-t7z",                  // 7z 格式
+                outputPath                 // 输出文件
+            };
+            args.AddRange(sourcePaths);
+
+            // 压缩级别
+            args.Add(options.CompressionLevel switch
+            {
+                1 => "-mx1",   //  fastest
+                5 => "-mx5",   //  fast
+                9 => "-mx9",   //  ultra
+                _ => "-mx5"    //  normal (default)
+            });
+
+            // 加密 (必须放在文件列表之后)
+            if (options.Encrypt && !string.IsNullOrEmpty(options.Password))
+            {
+                args.Add($"-p{options.Password}");
+                args.Add("-mhe=on"); // 加密头部
+            }
+
+            var psi = new ProcessStartInfo
+            {
+                FileName = SevenZipPath,
+                Arguments = string.Join(" ", args.Select(a => a.Contains(" ") ? $"\"{a}\"" : a)),
+                UseShellExecute = false,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                CreateNoWindow = true
+            };
+
+            using var process = Process.Start(psi);
+            if (process == null) return;
+
+            // 简单的进度轮询
+            while (!process.HasExited)
+            {
+                if (cancellationToken.IsCancellationRequested)
+                {
+                    process.Kill();
+                    throw new OperationCanceledException();
+                }
+                Thread.Sleep(100);
+            }
+
+            var exitCode = process.ExitCode;
+            if (exitCode != 0)
+            {
+                var error = process.StandardError.ReadToEnd();
+                throw new Exception($"7z.exe 错误 (code {exitCode}): {error}");
+            }
+
+            progress?.Report(new ArchiveProgress
+            {
+                CurrentFile = string.Empty,
+                PercentComplete = 100
+            });
+        }, cancellationToken);
     }
 
     public async Task<IReadOnlyList<ArchiveItem>> ListEntriesAsync(string archivePath, string? password = null, CancellationToken cancellationToken = default)

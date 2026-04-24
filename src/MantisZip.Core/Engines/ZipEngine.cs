@@ -1,7 +1,9 @@
 using ICSharpCode.SharpZipLib.Core;
 using ICSharpCode.SharpZipLib.Zip;
 using MantisZip.Core.Abstractions;
+using System.Diagnostics;
 using System.IO;
+using System.Text;
 
 namespace MantisZip.Core.Engines;
 
@@ -10,6 +12,12 @@ namespace MantisZip.Core.Engines;
 /// </summary>
 public class ZipEngine : IArchiveEngine
 {
+    // 注册 GBK 编码支持（.NET Core/5+ 需要）
+    static ZipEngine()
+    {
+        Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
+    }
+
     public bool CanHandle(ArchiveFormat format) => format == ArchiveFormat.Zip;
 
     public async Task ExtractAsync(string archivePath, string destinationPath, string? password = null, IProgress<ArchiveProgress>? progress = null, CancellationToken cancellationToken = default)
@@ -73,11 +81,33 @@ public class ZipEngine : IArchiveEngine
 
     public async Task CompressAsync(string[] sourcePaths, string outputPath, ArchiveOptions options, IProgress<ArchiveProgress>? progress = null, CancellationToken cancellationToken = default)
     {
-        await Task.Run(() =>
+        var files = new List<(string FullPath, string RelativePath)>();
+        foreach (var sourcePath in sourcePaths)
+        {
+            if (Directory.Exists(sourcePath))
+            {
+                var dirName = Path.GetFileName(sourcePath);
+                foreach (var file in Directory.GetFiles(sourcePath, "*", SearchOption.AllDirectories))
+                {
+                    var relativePath = Path.Combine(dirName, Path.GetRelativePath(sourcePath, file));
+                    files.Add((file, relativePath));
+                }
+            }
+            else if (File.Exists(sourcePath))
+            {
+                files.Add((sourcePath, Path.GetFileName(sourcePath)));
+            }
+        }
+
+        if (files.Count == 0) return;
+
+        var totalBytes = files.Sum(f => new FileInfo(f.FullPath).Length);
+        long processedBytes = 0;
+        
+        try
         {
             using var fsOut = File.Create(outputPath);
             using var zipStream = new ZipOutputStream(fsOut);
-
             zipStream.SetLevel(options.CompressionLevel);
 
             if (options.Encrypt && !string.IsNullOrEmpty(options.Password))
@@ -85,27 +115,8 @@ public class ZipEngine : IArchiveEngine
                 zipStream.Password = options.Password;
             }
 
-            var files = new List<(string FullPath, string RelativePath)>();
-            foreach (var sourcePath in sourcePaths)
-            {
-                if (Directory.Exists(sourcePath))
-                {
-                    var dirName = Path.GetFileName(sourcePath);
-                    foreach (var file in Directory.GetFiles(sourcePath, "*", SearchOption.AllDirectories))
-                    {
-                        var relativePath = Path.Combine(dirName, Path.GetRelativePath(sourcePath, file));
-                        files.Add((file, relativePath));
-                    }
-                }
-                else if (File.Exists(sourcePath))
-                {
-                    files.Add((sourcePath, Path.GetFileName(sourcePath)));
-                }
-            }
-
-            var totalBytes = files.Sum(f => new FileInfo(f.FullPath).Length);
-            var processedBytes = 0L;
-            var processedFiles = 0;
+            var lastReportTime = DateTime.Now;
+            var reportInterval = TimeSpan.FromMilliseconds(100);
 
             foreach (var (fullPath, relativePath) in files)
             {
@@ -115,7 +126,7 @@ public class ZipEngine : IArchiveEngine
                 var entry = new ZipEntry(ZipEntry.CleanName(relativePath))
                 {
                     DateTime = fi.LastWriteTime,
-                    Size = fi.Length,
+                    // 不设置 Size，让库自动计算（加密时会不同）
                     AESKeySize = options.Encrypt ? 256 : 0
                 };
 
@@ -123,40 +134,55 @@ public class ZipEngine : IArchiveEngine
 
                 var buffer = new byte[4096];
                 using var fsInput = File.OpenRead(fullPath);
-                StreamUtils.Copy(fsInput, zipStream, buffer);
-                zipStream.CloseEntry();
-
-                var progressReport = new ArchiveProgress
+                var totalRead = 0;
+                
+                while (totalRead < fi.Length)
                 {
-                    CurrentFile = relativePath,
-                    TotalFiles = files.Count,
-                    ProcessedFiles = processedFiles,
-                    TotalBytes = totalBytes,
-                    ProcessedBytes = processedBytes,
-                    PercentComplete = totalBytes > 0 ? (double)processedBytes / totalBytes * 100 : 0
-                };
-                progress?.Report(progressReport);
+                    cancellationToken.ThrowIfCancellationRequested();
+                    
+                    var read = await fsInput.ReadAsync(buffer, 0, buffer.Length, cancellationToken);
+                    if (read <= 0) break;
+                    
+                    await zipStream.WriteAsync(buffer.AsMemory(0, read), cancellationToken);
+                    totalRead += read;
+                    processedBytes += read;
 
-                processedBytes += fi.Length;
-                processedFiles++;
+                    var now = DateTime.Now;
+                    if (now - lastReportTime >= reportInterval || totalRead >= fi.Length)
+                    {
+                        var pct = totalBytes > 0 ? (double)processedBytes / (double)totalBytes * 100 : 0;
+                        progress?.Report(new ArchiveProgress
+                        {
+                            CurrentFile = "正在压缩: " + relativePath,
+                            PercentComplete = pct
+                        });
+                        lastReportTime = now;
+                    }
+                }
+                
+                zipStream.CloseEntry();
             }
 
-            progress?.Report(new ArchiveProgress
+            progress?.Report(new ArchiveProgress { PercentComplete = 100 });
+        }
+        catch (OperationCanceledException)
+        {
+            // 取消时删除未完成的文件
+            if (File.Exists(outputPath))
             {
-                CurrentFile = string.Empty,
-                TotalFiles = files.Count,
-                ProcessedFiles = processedFiles,
-                TotalBytes = totalBytes,
-                ProcessedBytes = processedBytes,
-                PercentComplete = 100
-            });
-        }, cancellationToken);
+                try { File.Delete(outputPath); } catch { }
+            }
+            throw;
+        }
     }
 
     public async Task<IReadOnlyList<ArchiveItem>> ListEntriesAsync(string archivePath, string? password = null, CancellationToken cancellationToken = default)
     {
         return await Task.Run(() =>
         {
+            // 读取 ZIP 文件条目
+            // 支持 GBK 编码（解决中文文件名乱码问题）
+            ZipStrings.CodePage = 936; // GBK
             using var zipFile = new ZipFile(archivePath);
             if (!string.IsNullOrEmpty(password))
             {

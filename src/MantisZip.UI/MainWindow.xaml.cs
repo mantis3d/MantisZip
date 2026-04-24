@@ -27,14 +27,14 @@ public partial class MainWindow : Window
         InitializeComponent();
     }
 
-    #region 拖拽事件
+#region 拖拽事件
 
     private void Window_DragOver(object sender, DragEventArgs e)
     {
         if (e.Data.GetDataPresent(DataFormats.FileDrop))
         {
             var files = (string[])e.Data.GetData(DataFormats.FileDrop);
-            if (files.Length > 0 && IsArchiveFile(files[0]))
+            if (files.Length > 0)
             {
                 e.Effects = DragDropEffects.Copy;
                 e.Handled = true;
@@ -45,14 +45,29 @@ public partial class MainWindow : Window
         e.Handled = true;
     }
 
-    private async void Window_Drop(object sender, DragEventArgs e)
+    private void Window_Drop(object sender, DragEventArgs e)
     {
         if (e.Data.GetDataPresent(DataFormats.FileDrop))
         {
             var files = (string[])e.Data.GetData(DataFormats.FileDrop);
-            if (files.Length > 0 && IsArchiveFile(files[0]))
+            if (files.Length > 0)
             {
-                await LoadArchiveAsync(files[0]);
+                var path = files[0];
+                // 拖入压缩包 → 解压，拖入普通文件/文件夹 → 压缩设置窗口
+                if (IsArchiveFile(path))
+                {
+                    _ = LoadArchiveAsync(path);
+                }
+                else
+                {
+                    var window = new CompressSettingsWindow();
+                    foreach (var f in files)
+                    {
+                        window.AddSourcePath(f);
+                    }
+                    window.Show();
+                    window.Activate();
+                }
             }
         }
     }

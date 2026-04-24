@@ -1,0 +1,5 @@
+E:\github\MantisZip\test_encoding\obj\Debug\net9.0\test_encoding.csproj.AssemblyReference.cache
+E:\github\MantisZip\test_encoding\obj\Debug\net9.0\test_encoding.GeneratedMSBuildEditorConfig.editorconfig
+E:\github\MantisZip\test_encoding\obj\Debug\net9.0\test_encoding.AssemblyInfoInputs.cache
+E:\github\MantisZip\test_encoding\obj\Debug\net9.0\test_encoding.AssemblyInfo.cs
+E:\github\MantisZip\test_encoding\obj\Debug\net9.0\test_encoding.csproj.CoreCompileInputs.cache

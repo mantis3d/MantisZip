@@ -1,0 +1,17 @@
+E:\github\MantisZip\test_encoding\bin\Debug\net9.0\test.exe
+E:\github\MantisZip\test_encoding\bin\Debug\net9.0\test.deps.json
+E:\github\MantisZip\test_encoding\bin\Debug\net9.0\test.runtimeconfig.json
+E:\github\MantisZip\test_encoding\bin\Debug\net9.0\test.dll
+E:\github\MantisZip\test_encoding\bin\Debug\net9.0\test.pdb
+E:\github\MantisZip\test_encoding\bin\Debug\net9.0\ICSharpCode.SharpZipLib.dll
+E:\github\MantisZip\test_encoding\obj\Debug\net9.0\test.csproj.AssemblyReference.cache
+E:\github\MantisZip\test_encoding\obj\Debug\net9.0\test.GeneratedMSBuildEditorConfig.editorconfig
+E:\github\MantisZip\test_encoding\obj\Debug\net9.0\test.AssemblyInfoInputs.cache
+E:\github\MantisZip\test_encoding\obj\Debug\net9.0\test.AssemblyInfo.cs
+E:\github\MantisZip\test_encoding\obj\Debug\net9.0\test.csproj.CoreCompileInputs.cache
+E:\github\MantisZip\test_encoding\obj\Debug\net9.0\test.csproj.Up2Date
+E:\github\MantisZip\test_encoding\obj\Debug\net9.0\test.dll
+E:\github\MantisZip\test_encoding\obj\Debug\net9.0\refint\test.dll
+E:\github\MantisZip\test_encoding\obj\Debug\net9.0\test.pdb
+E:\github\MantisZip\test_encoding\obj\Debug\net9.0\test.genruntimeconfig.cache
+E:\github\MantisZip\test_encoding\obj\Debug\net9.0\ref\test.dll
