@@ -28,6 +28,23 @@ public partial class App : Application
         Log("程序启动");
     }
 
+    protected override void OnExit(ExitEventArgs e)
+    {
+        // 清理预览临时文件
+        try
+        {
+            var tempDir = Path.Combine(Path.GetTempPath(), "MantisZip");
+            if (Directory.Exists(tempDir))
+            {
+                Directory.Delete(tempDir, recursive: true);
+                Log("已清理预览临时目录");
+            }
+        }
+        catch { }
+
+        base.OnExit(e);
+    }
+
     public static void Log(string msg)
     {
         try

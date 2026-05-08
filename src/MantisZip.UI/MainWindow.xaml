@@ -120,58 +120,110 @@
                             </StackPanel>
                         </Border>
 
-                        <!-- TreeView + FileList -->
+                        <!-- TreeView + FileList + Preview -->
                         <Grid Grid.Row="1">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="200" MinWidth="100"/>
-                                <ColumnDefinition Width="Auto"/>
-                                <ColumnDefinition Width="*"/>
-                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="*"/>
+                                <RowDefinition x:Name="PreviewSplitterRow" Height="0"/>
+                                <RowDefinition x:Name="PreviewRow" Height="0"/>
+                            </Grid.RowDefinitions>
 
-                            <!-- Directory Tree -->
-                            <TreeView x:Name="FolderTree" Grid.Column="0" 
-                                      BorderThickness="1" BorderBrush="#DDD"
-                                      SelectedItemChanged="FolderTree_SelectedItemChanged"
-                                      ItemContainerStyle="{StaticResource TreeViewItemStyle}">
-                                <TreeView.ItemTemplate>
-                                    <HierarchicalDataTemplate ItemsSource="{Binding Children}">
-                                        <TextBlock Text="{Binding Name}"/>
-                                    </HierarchicalDataTemplate>
-                                </TreeView.ItemTemplate>
-                            </TreeView>
+                            <!-- TreeView + DataGrid -->
+                            <Grid Grid.Row="0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="200" MinWidth="100"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
 
-                            <GridSplitter Grid.Column="1" Width="4" Background="Transparent" 
-                                        HorizontalAlignment="Center" VerticalAlignment="Stretch"/>
+                                <!-- Directory Tree -->
+                                <TreeView x:Name="FolderTree" Grid.Column="0" 
+                                          BorderThickness="1" BorderBrush="#DDD"
+                                          SelectedItemChanged="FolderTree_SelectedItemChanged"
+                                          ItemContainerStyle="{StaticResource TreeViewItemStyle}">
+                                    <TreeView.ItemTemplate>
+                                        <HierarchicalDataTemplate ItemsSource="{Binding Children}">
+                                            <TextBlock Text="{Binding Name}"/>
+                                        </HierarchicalDataTemplate>
+                                    </TreeView.ItemTemplate>
+                                </TreeView>
 
-                            <!-- File List -->
-                            <DataGrid x:Name="FileListGrid" Grid.Column="2"
-                                      AutoGenerateColumns="False"
-                                      IsReadOnly="True"
-                                      SelectionMode="Extended"
-                                      CanUserAddRows="False"
-                                      CanUserDeleteRows="False"
-                                      GridLinesVisibility="Horizontal"
-                                      HeadersVisibility="Column"
-                                      RowHeaderWidth="0"
-                                      Background="White"
-                                      BorderThickness="1"
-                                      BorderBrush="#DDD"
-                                      MouseDoubleClick="FileListGrid_MouseDoubleClick">
-                                <DataGrid.Columns>
-                                    <DataGridTextColumn Header="名称" Binding="{Binding NameDisplay}" Width="*"/>
-                                    <DataGridTextColumn Header="大小" Binding="{Binding SizeDisplay}" Width="100"/>
-                                    <DataGridTextColumn Header="压缩后" Binding="{Binding CompressedSizeDisplay}" Width="100"/>
-                                    <DataGridTextColumn Header="修改日期" Binding="{Binding LastModified, StringFormat='yyyy-MM-dd HH:mm'}" Width="150"/>
-                                    <DataGridTemplateColumn Header="加密" Width="50">
-                                        <DataGridTemplateColumn.CellTemplate>
-                                            <DataTemplate>
-                                                <TextBlock Text="🔒" HorizontalAlignment="Center" 
-                                                           Visibility="{Binding IsEncrypted, Converter={StaticResource BoolToVisibilityConverter}}"/>
-                                            </DataTemplate>
-                                        </DataGridTemplateColumn.CellTemplate>
-                                    </DataGridTemplateColumn>
-                                </DataGrid.Columns>
-                            </DataGrid>
+                                <GridSplitter Grid.Column="1" Width="4" Background="Transparent" 
+                                            HorizontalAlignment="Center" VerticalAlignment="Stretch"/>
+
+                                <!-- File List -->
+                                <DataGrid x:Name="FileListGrid" Grid.Column="2"
+                                          AutoGenerateColumns="False"
+                                          IsReadOnly="True"
+                                          SelectionMode="Single"
+                                          CanUserAddRows="False"
+                                          CanUserDeleteRows="False"
+                                          GridLinesVisibility="Horizontal"
+                                          HeadersVisibility="Column"
+                                          RowHeaderWidth="0"
+                                          Background="White"
+                                          BorderThickness="1"
+                                          BorderBrush="#DDD"
+                                          SelectionChanged="FileListGrid_SelectionChanged"
+                                          MouseDoubleClick="FileListGrid_MouseDoubleClick">
+                                    <DataGrid.Columns>
+                                        <DataGridTextColumn Header="名称" Binding="{Binding NameDisplay}" Width="*"/>
+                                        <DataGridTextColumn Header="大小" Binding="{Binding SizeDisplay}" Width="100"/>
+                                        <DataGridTextColumn Header="压缩后" Binding="{Binding CompressedSizeDisplay}" Width="100"/>
+                                        <DataGridTextColumn Header="修改日期" Binding="{Binding LastModified, StringFormat='yyyy-MM-dd HH:mm'}" Width="150"/>
+                                        <DataGridTemplateColumn Header="加密" Width="50">
+                                            <DataGridTemplateColumn.CellTemplate>
+                                                <DataTemplate>
+                                                    <TextBlock Text="🔒" HorizontalAlignment="Center" 
+                                                               Visibility="{Binding IsEncrypted, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                                                </DataTemplate>
+                                            </DataGridTemplateColumn.CellTemplate>
+                                        </DataGridTemplateColumn>
+                                    </DataGrid.Columns>
+                                </DataGrid>
+                            </Grid>
+
+                            <!-- Preview Splitter -->
+                            <GridSplitter x:Name="PreviewSplitter" Grid.Row="1" Height="4" 
+                                        Background="Transparent" HorizontalAlignment="Stretch"
+                                        VerticalAlignment="Center" Visibility="Collapsed"/>
+
+                            <!-- Preview Panel -->
+                            <Border x:Name="PreviewPanel" Grid.Row="2" 
+                                    Background="#FAFAFA" BorderBrush="#DDD" BorderThickness="1"
+                                    CornerRadius="4" Visibility="Collapsed">
+                                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto"
+                                            Padding="8">
+                                    <Grid>
+                                        <!-- Header -->
+                                        <TextBlock x:Name="PreviewHeader" 
+                                                  FontWeight="SemiBold" FontSize="12" Foreground="#666"
+                                                  VerticalAlignment="Top" HorizontalAlignment="Left"/>
+
+                                        <!-- Image Preview -->
+                                        <Image x:Name="PreviewImage" Stretch="Uniform" 
+                                               MaxWidth="600" MaxHeight="400"
+                                               Visibility="Collapsed" Margin="0,20,0,0"/>
+
+                                        <!-- Text Preview -->
+                                        <TextBox x:Name="PreviewTextBox" 
+                                                IsReadOnly="True" 
+                                                FontFamily="Cascadia Code, Consolas, monospace"
+                                                FontSize="12"
+                                                BorderThickness="0"
+                                                Background="Transparent"
+                                                TextWrapping="Wrap"
+                                                Visibility="Collapsed" Margin="0,20,0,0"/>
+
+                                        <!-- Unsupported -->
+                                        <TextBlock x:Name="PreviewUnsupported"
+                                                  Text="🔍 无法预览此文件"
+                                                  FontSize="14" Foreground="#999"
+                                                  HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                  Visibility="Collapsed" Margin="0,20,0,0"/>
+                                    </Grid>
+                                </ScrollViewer>
+                            </Border>
                         </Grid>
                     </Grid>
                 </Grid>

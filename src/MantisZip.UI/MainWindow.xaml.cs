@@ -8,6 +8,7 @@ using System.Linq;
 using MantisZip.Core;
 using MantisZip.Core.Abstractions;
 using MantisZip.Core.Engines;
+using MantisZip.Core.Utils;
 using Microsoft.Win32;
 
 namespace MantisZip.UI;
@@ -21,6 +22,7 @@ public partial class MainWindow : Window
     private ArchiveFormat _currentFormat;
     private List<ArchiveItem> _allItems = new();  // 存储所有文件项
     private string _currentFolder = "";  // 当前目录
+    private string? _previewTempDir;        // 预览临时目录
 
     public MainWindow()
     {
@@ -146,7 +148,7 @@ public partial class MainWindow : Window
     private void About_Click(object sender, RoutedEventArgs e)
     {
         MessageBox.Show(
-            "MantisZip - 全功能解压缩软件\n\n版本: 0.1.1\n基于 .NET 9 + WPF\n\n支持格式: ZIP, 7z, TAR, GZ, RAR (只读)\n\n7-Zip 组件遵循 GNU LGPL 许可证\nhttps://www.7-zip.org",
+            "MantisZip - 全功能解压缩软件\n\n版本: 0.1.2\n基于 .NET 9 + WPF\n\n支持格式: ZIP, 7z, TAR, GZ, RAR (只读)\n\n7-Zip 组件遵循 GNU LGPL 许可证\nhttps://www.7-zip.org",
             "关于 MantisZip",
             MessageBoxButton.OK,
             MessageBoxImage.Information);
@@ -191,6 +193,9 @@ public partial class MainWindow : Window
     {
         try
         {
+            ClearPreviewTemp();
+            HidePreview();
+
             SetStatus("正在加载压缩包...");
             _currentArchivePath = archivePath;
 
@@ -592,12 +597,202 @@ private void FolderTree_SelectedItemChanged(object sender, RoutedPropertyChanged
     }
 
     /// <summary>
+    /// 文件选择变化 → 预览
+    /// </summary>
+    private async void FileListGrid_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (FileListGrid.SelectedItem is ArchiveItem item && !item.IsDirectory && !string.IsNullOrEmpty(_currentArchivePath))
+        {
+            await ShowPreviewAsync(item);
+        }
+        else
+        {
+            HidePreview();
+        }
+    }
+
+    /// <summary>
     /// 在目录树中选中指定路径
     /// </summary>
     private void SelectFolderInTree(string path)
     {
         // 简化实现：刷新目录树
         BuildFolderTree();
+    }
+
+    #endregion
+
+    #region 文件预览
+
+    private static readonly HashSet<string> ImageExtensions = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ".jpg", ".jpeg", ".png", ".gif", ".bmp", ".ico", ".webp"
+    };
+
+    private static readonly HashSet<string> TextExtensions = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ".txt", ".log", ".ini", ".cfg", ".conf", ".csv", ".xml", ".json",
+        ".cs", ".csproj", ".md", ".yaml", ".yml", ".toml",
+        ".sh", ".bat", ".cmd", ".ps1", ".py", ".js", ".ts", ".tsx",
+        ".html", ".htm", ".css", ".scss", ".less",
+        ".sql", ".gitignore", ".editorconfig", ".sln", ".props", ".targets",
+        ".ruleset", ".rc", ".resx", ".nuspec", ".gradle", ".dockerfile",
+        ".env", ".yml", ".yaml", ".json5", ".h", ".c", ".cpp", ".hpp",
+        ".swift", ".kt", ".java", ".rb", ".go", ".rs", ".php", ".vue"
+    };
+
+    /// <summary>
+    /// 文本预览最大大小 (5 MB)
+    /// </summary>
+    private const long MaxTextPreviewSize = 5 * 1024 * 1024;
+
+    private async Task ShowPreviewAsync(ArchiveItem item)
+    {
+        try
+        {
+            // 清理上次预览
+            ClearPreviewTemp();
+            HidePreview();
+
+            var ext = Path.GetExtension(item.Name);
+
+            // 检查文件大小（仅非目录文件）
+            if (item.Size > MaxTextPreviewSize && TextExtensions.Contains(ext))
+            {
+                ShowUnsupportedPreview(item, $"📄 文件过大 ({(double)item.Size / 1024 / 1024:F1} MB)，超过文本预览限制 (5 MB)");
+                return;
+            }
+
+            if (ImageExtensions.Contains(ext))
+            {
+                _previewTempDir = Path.Combine(Path.GetTempPath(), "MantisZip", Guid.NewGuid().ToString());
+                Directory.CreateDirectory(_previewTempDir);
+                var tempFile = Path.Combine(_previewTempDir, Path.GetFileName(item.Name) ?? "preview" + ext);
+
+                await Core.Utils.ArchiveEntryExtractor.ExtractEntryAsync(
+                    _currentArchivePath!, item.Name, tempFile, _currentFormat);
+
+                ShowImagePreview(tempFile);
+            }
+            else if (TextExtensions.Contains(ext))
+            {
+                _previewTempDir = Path.Combine(Path.GetTempPath(), "MantisZip", Guid.NewGuid().ToString());
+                Directory.CreateDirectory(_previewTempDir);
+                var tempFile = Path.Combine(_previewTempDir, Path.GetFileName(item.Name) ?? "preview.txt");
+
+                await Core.Utils.ArchiveEntryExtractor.ExtractEntryAsync(
+                    _currentArchivePath!, item.Name, tempFile, _currentFormat);
+
+                ShowTextPreview(tempFile, ext);
+            }
+            else
+            {
+                ShowUnsupportedPreview(item);
+            }
+        }
+        catch (Exception ex)
+        {
+            ShowUnsupportedPreview(item, $"预览失败: {ex.Message}");
+        }
+    }
+
+    private void ShowImagePreview(string filePath)
+    {
+        try
+        {
+            var bitmap = new System.Windows.Media.Imaging.BitmapImage();
+            bitmap.BeginInit();
+            bitmap.CacheOption = System.Windows.Media.Imaging.BitmapCacheOption.OnLoad;
+            bitmap.UriSource = new Uri(filePath);
+            bitmap.EndInit();
+            bitmap.Freeze(); // 跨线程安全
+
+            PreviewImage.Source = bitmap;
+            PreviewImage.Visibility = Visibility.Visible;
+            PreviewTextBox.Visibility = Visibility.Collapsed;
+            PreviewUnsupported.Visibility = Visibility.Collapsed;
+            PreviewHeader.Text = $"🔍 预览: {Path.GetFileName(filePath)}";
+            ShowPreviewPanel();
+        }
+        catch
+        {
+            ShowUnsupportedPreview(null, "无法加载此图像");
+        }
+    }
+
+    private void ShowTextPreview(string filePath, string extension)
+    {
+        try
+        {
+            // 尝试多种编码读取文本
+            string content;
+            try
+            {
+                content = File.ReadAllText(filePath, System.Text.Encoding.UTF8);
+            }
+            catch
+            {
+                content = File.ReadAllText(filePath, System.Text.Encoding.GetEncoding("GBK"));
+            }
+
+            PreviewTextBox.Text = content;
+            PreviewTextBox.Visibility = Visibility.Visible;
+            PreviewImage.Visibility = Visibility.Collapsed;
+            PreviewUnsupported.Visibility = Visibility.Collapsed;
+            PreviewHeader.Text = $"📄 预览: {Path.GetFileName(filePath)} ({content.Length} 字符)";
+            ShowPreviewPanel();
+        }
+        catch
+        {
+            ShowUnsupportedPreview(null, "无法读取此文件");
+        }
+    }
+
+    private void ShowUnsupportedPreview(ArchiveItem? item, string? message = null)
+    {
+        PreviewUnsupported.Text = message ?? "🔍 无法预览此文件";
+        PreviewUnsupported.Visibility = Visibility.Visible;
+        PreviewImage.Visibility = Visibility.Collapsed;
+        PreviewTextBox.Visibility = Visibility.Collapsed;
+        PreviewHeader.Text = item != null ? $"📄 {item.Name}" : "预览";
+        ShowPreviewPanel();
+    }
+
+    private void ShowPreviewPanel()
+    {
+        PreviewSplitterRow.Height = new GridLength(4);
+        PreviewRow.Height = new GridLength(1, GridUnitType.Star);
+        PreviewSplitter.Visibility = Visibility.Visible;
+        PreviewPanel.Visibility = Visibility.Visible;
+    }
+
+    private void HidePreview()
+    {
+        PreviewImage.Source = null;
+        PreviewTextBox.Text = "";
+        PreviewSplitterRow.Height = new GridLength(0);
+        PreviewRow.Height = new GridLength(0);
+        PreviewSplitter.Visibility = Visibility.Collapsed;
+        PreviewPanel.Visibility = Visibility.Collapsed;
+    }
+
+    /// <summary>
+    /// 清理预览临时文件
+    /// </summary>
+    private void ClearPreviewTemp()
+    {
+        try
+        {
+            if (!string.IsNullOrEmpty(_previewTempDir) && Directory.Exists(_previewTempDir))
+            {
+                Directory.Delete(_previewTempDir, recursive: true);
+                _previewTempDir = null;
+            }
+        }
+        catch
+        {
+            // 临时文件清理失败不影响主功能
+        }
     }
 
     #endregion
