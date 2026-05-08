@@ -3,6 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:app="clr-namespace:MantisZip.UI"
         mc:Ignorable="d"
         Title="MantisZip - 解压缩软件" Height="650" Width="950"
         MinHeight="450" MinWidth="600"
@@ -237,7 +238,7 @@
             </StatusBarItem>
             <Separator/>
             <StatusBarItem HorizontalAlignment="Right">
-                <TextBlock Text="v0.1.0" Foreground="#666"/>
+                <TextBlock Text="{x:Static app:AppConstants.VersionDisplay}" Foreground="#666"/>
             </StatusBarItem>
             <Separator/>
             <StatusBarItem HorizontalAlignment="Right">

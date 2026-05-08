@@ -37,3 +37,4 @@ E:\github\MantisZip\src\MantisZip.UI\obj\Debug\net9.0-windows\refint\MantisZip.U
 E:\github\MantisZip\src\MantisZip.UI\obj\Debug\net9.0-windows\MantisZip.UI.pdb
 E:\github\MantisZip\src\MantisZip.UI\obj\Debug\net9.0-windows\MantisZip.UI.genruntimeconfig.cache
 E:\github\MantisZip\src\MantisZip.UI\obj\Debug\net9.0-windows\ref\MantisZip.UI.dll
+E:\github\MantisZip\src\MantisZip.UI\obj\Debug\net9.0-windows\MantisZip.UI_MarkupCompile.lref

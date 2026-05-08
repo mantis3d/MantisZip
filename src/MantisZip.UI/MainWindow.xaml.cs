@@ -149,7 +149,7 @@ public partial class MainWindow : Window
     private void About_Click(object sender, RoutedEventArgs e)
     {
         MessageBox.Show(
-            "MantisZip - 全功能解压缩软件\n\n版本: 0.1.2\n基于 .NET 9 + WPF\n\n支持格式: ZIP, 7z, TAR, GZ, RAR (只读)\n\n7-Zip 组件遵循 GNU LGPL 许可证\nhttps://www.7-zip.org",
+            $"MantisZip - 全功能解压缩软件\n\n版本: {AppConstants.Version}\n基于 .NET 9 + WPF\n\n支持格式: ZIP, 7z, TAR, GZ, RAR (只读)\n\n7-Zip 组件遵循 GNU LGPL 许可证\nhttps://www.7-zip.org",
             "关于 MantisZip",
             MessageBoxButton.OK,
             MessageBoxImage.Information);
