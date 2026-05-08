@@ -23,6 +23,7 @@ public partial class MainWindow : Window
     private List<ArchiveItem> _allItems = new();  // 存储所有文件项
     private string _currentFolder = "";  // 当前目录
     private string? _previewTempDir;        // 预览临时目录
+    private GridLength? _savedPreviewRowHeight; // 保存用户拖拽后的预览行高度
 
     public MainWindow()
     {
@@ -761,13 +762,24 @@ private void FolderTree_SelectedItemChanged(object sender, RoutedPropertyChanged
     private void ShowPreviewPanel()
     {
         PreviewSplitterRow.Height = new GridLength(4);
-        PreviewRow.Height = new GridLength(1, GridUnitType.Star);
+        PreviewRow.Height = _savedPreviewRowHeight ?? new GridLength(1, GridUnitType.Star);
         PreviewSplitter.Visibility = Visibility.Visible;
         PreviewPanel.Visibility = Visibility.Visible;
     }
 
     private void HidePreview()
     {
+        // 保存用户拖拽后的实际高度（非 0 才保存）
+        if (PreviewRow.Height.GridUnitType == GridUnitType.Pixel && PreviewRow.Height.Value > 0)
+        {
+            _savedPreviewRowHeight = PreviewRow.Height;
+        }
+        else if (PreviewRow.Height.GridUnitType == GridUnitType.Star && PreviewRow.Height.Value > 0)
+        {
+            // 首次打开时存一个比例，但后续会被用户拖拽值覆盖
+            _savedPreviewRowHeight ??= PreviewRow.Height;
+        }
+
         PreviewImage.Source = null;
         PreviewTextBox.Text = "";
         PreviewSplitterRow.Height = new GridLength(0);
