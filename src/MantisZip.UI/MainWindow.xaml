@@ -11,7 +11,8 @@
         AllowDrop="True"
         Drop="Window_Drop"
         DragOver="Window_DragOver"
-        Background="#F5F5F5">
+        Background="#F5F5F5"
+        Closing="Window_Closing">
 
     <Window.Resources>
         <BooleanToVisibilityConverter x:Key="BoolToVisibilityConverter"/>

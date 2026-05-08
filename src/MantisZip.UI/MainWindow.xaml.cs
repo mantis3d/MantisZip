@@ -10,6 +10,7 @@ using MantisZip.Core.Abstractions;
 using MantisZip.Core.Engines;
 using MantisZip.Core.Utils;
 using Microsoft.Win32;
+using System.Text.Json;
 
 namespace MantisZip.UI;
 
@@ -28,7 +29,73 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        LoadWindowSettings();
     }
+
+#region 窗口大小持久化
+
+    private void LoadWindowSettings()
+    {
+        try
+        {
+            var configPath = GetWindowConfigPath();
+            if (File.Exists(configPath))
+            {
+                var json = File.ReadAllText(configPath);
+                var obj = JsonSerializer.Deserialize<WindowSize>(json);
+                if (obj?.Width > 0 && obj?.Height > 0)
+                {
+                    Width = obj.Width;
+                    Height = obj.Height;
+                }
+            }
+        }
+        catch
+        {
+            // 如果读取失败，使用默认大小
+        }
+    }
+
+    private void SaveWindowSettings()
+    {
+        try
+        {
+            var configPath = GetWindowConfigPath();
+            var dir = Path.GetDirectoryName(configPath);
+            if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
+            {
+                Directory.CreateDirectory(dir);
+            }
+
+            var obj = new WindowSize { Width = Width, Height = Height };
+            var json = JsonSerializer.Serialize(obj, new JsonSerializerOptions { WriteIndented = true });
+            File.WriteAllText(configPath, json);
+        }
+        catch
+        {
+            // 如果保存失败，忽略
+        }
+    }
+
+    private string GetWindowConfigPath()
+    {
+        var localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+        var folder = Path.Combine(localAppData, "MantisZip");
+        return Path.Combine(folder, "window.json");
+    }
+
+    private class WindowSize
+    {
+        public double Width { get; set; }
+        public double Height { get; set; }
+    }
+
+    private void Window_Closing(object sender, System.ComponentModel.CancelEventArgs e)
+    {
+        SaveWindowSettings();
+    }
+
+#endregion
 
 #region 拖拽事件
 
@@ -75,7 +142,7 @@ public partial class MainWindow : Window
         }
     }
 
-    #endregion
+#endregion
 
     #region 菜单事件
 
