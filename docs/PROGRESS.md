@@ -14,8 +14,15 @@
 
 ### v0.1.2 (2026-05-08)
 1. **文件预览** - 选中文件后预览图片/文本内容
-2. **ArchiveEntryExtractor** - 单文件提取工具类 (Core)
-3. **退出清理** - 程序退出时清理预览临时文件
+2. **预览信息面板** - 图片预览时右侧显示文件名、大小、压缩率等信息
+3. **ArchiveEntryExtractor** - 单文件提取工具类 (Core)
+4. **退出清理** - 程序退出时清理预览临时文件
+5. **目录树绑定** - IsExpanded/IsSelected 改为 INotifyPropertyChanged 绑定
+6. **智能目录树选择** - 双击进入子目录时不重建树，而是查找展开并选中已有节点
+7. **多选支持** - 文件列表改为 Extended 选择模式，状态栏显示多选统计
+8. **状态栏增强** - 添加目录统计、选中统计、压缩包概览
+9. **预览行高 Star 支持** - 预览行高保存 GridLength 类型，支持 Star/Pixel 两种模式
+10. **过滤保护** - 添加 _isProgrammaticFilter 防止编程切换目录触发预览
 
 ### v0.1.1 (2026-04-24)
 1. **7z 压缩** - 基于 7z.exe
@@ -130,6 +137,16 @@ MantisZip/
 - **ArchiveEntryExtractor** - 单文件提取工具类
 - **退出清理** - 程序退出时清理预览临时文件
 - 更新版本到 0.1.2
+
+### 2026-05-09
+- **预览信息面板** - 图片预览右侧显示文件名、大小、压缩率、修改日期
+- **图片/文本预览分离** - 仅图片显示信息面板，文本/不支持类型自动隐藏
+- **目录树重构** - FolderNode 实现 INotifyPropertyChanged，IsExpanded/IsSelected 绑定 TreeView
+- **智能目录树选择** - 双击进入子目录时查找并展开已有节点，不再重建树
+- **多选扩展** - 文件列表改为 Extended 模式，支持 Crtl/Shift 多选
+- **状态栏增强** - 添加目录统计、选中统计（含文件数/目录数/总大小）、压缩包概览
+- **预览行高持久化** - 支持 Pixel 和 Star 两种 GridLength 类型的保存/恢复
+- **过滤保护** - 添加 _isProgrammaticFilter 开关，防止 FilterFiles 误触 SelectionChanged 预览
 
 ---
 

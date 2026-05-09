@@ -17,8 +17,13 @@
     <Window.Resources>
         <BooleanToVisibilityConverter x:Key="BoolToVisibilityConverter"/>
         <Style x:Key="TreeViewItemStyle" TargetType="TreeViewItem">
-            <Setter Property="IsExpanded" Value="True"/>
+            <Setter Property="IsExpanded" Value="{Binding IsExpanded}"/>
+            <Setter Property="IsSelected" Value="{Binding IsSelected}"/>
         </Style>
+
+        <!-- 选中项失焦时的高亮颜色（默认浅灰几乎看不见） -->
+        <SolidColorBrush x:Key="{x:Static SystemColors.InactiveSelectionHighlightBrushKey}" Color="#CCE0F0"/>
+        <SolidColorBrush x:Key="{x:Static SystemColors.InactiveSelectionHighlightTextBrushKey}" Color="Black"/>
     </Window.Resources>
 
     <Grid>
@@ -157,7 +162,7 @@
                                 <DataGrid x:Name="FileListGrid" Grid.Column="2"
                                           AutoGenerateColumns="False"
                                           IsReadOnly="True"
-                                          SelectionMode="Single"
+                                           SelectionMode="Extended"
                                           CanUserAddRows="False"
                                           CanUserDeleteRows="False"
                                           GridLinesVisibility="Horizontal"
@@ -166,8 +171,8 @@
                                           Background="White"
                                           BorderThickness="1"
                                           BorderBrush="#DDD"
-                                          SelectionChanged="FileListGrid_SelectionChanged"
-                                          MouseDoubleClick="FileListGrid_MouseDoubleClick">
+                                           SelectionChanged="FileListGrid_SelectionChanged"
+                                           PreviewMouseDoubleClick="FileListGrid_PreviewMouseDoubleClick">
                                     <DataGrid.Columns>
                                         <DataGridTextColumn Header="名称" Binding="{Binding NameDisplay}" Width="*"/>
                                         <DataGridTextColumn Header="大小" Binding="{Binding SizeDisplay}" Width="100"/>
@@ -197,32 +202,61 @@
                                 <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto"
                                             Padding="8">
                                     <Grid>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="*"/>
+                                        </Grid.RowDefinitions>
+
                                         <!-- Header -->
-                                        <TextBlock x:Name="PreviewHeader" 
+                                        <TextBlock x:Name="PreviewHeader" Grid.Row="0"
                                                   FontWeight="SemiBold" FontSize="12" Foreground="#666"
                                                   VerticalAlignment="Top" HorizontalAlignment="Left"/>
 
-                                        <!-- Image Preview -->
-                                        <Image x:Name="PreviewImage" Stretch="Uniform" 
-                                               MaxWidth="600" MaxHeight="400"
-                                               Visibility="Collapsed" Margin="0,20,0,0"/>
+                                        <!-- Content area: Image/Text/Unsupported + Info Panel -->
+                                        <Grid Grid.Row="1" Margin="0,16,0,0">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
 
-                                        <!-- Text Preview -->
-                                        <TextBox x:Name="PreviewTextBox" 
-                                                IsReadOnly="True" 
-                                                FontFamily="Cascadia Code, Consolas, monospace"
-                                                FontSize="12"
-                                                BorderThickness="0"
-                                                Background="Transparent"
-                                                TextWrapping="Wrap"
-                                                Visibility="Collapsed" Margin="0,20,0,0"/>
+                                            <!-- Image Preview -->
+                                            <Image x:Name="PreviewImage" Grid.Column="0" Stretch="Uniform" 
+                                                   MaxWidth="600" MaxHeight="400"
+                                                   Visibility="Collapsed"/>
 
-                                        <!-- Unsupported -->
-                                        <TextBlock x:Name="PreviewUnsupported"
-                                                  Text="🔍 无法预览此文件"
-                                                  FontSize="14" Foreground="#999"
-                                                  HorizontalAlignment="Center" VerticalAlignment="Center"
-                                                  Visibility="Collapsed" Margin="0,20,0,0"/>
+                                            <!-- Image Info Panel (right side, only for images) -->
+                                            <Border x:Name="PreviewInfoPanel" Grid.Column="1"
+                                                    Visibility="Collapsed"
+                                                    Background="#F0F0F0" CornerRadius="4" 
+                                                    Padding="10" Margin="12,0,0,0"
+                                                    MinWidth="140">
+                                                <StackPanel>
+                                                    <TextBlock Text="图片信息" FontWeight="SemiBold" 
+                                                               Foreground="#666" FontSize="12"
+                                                               Margin="0,0,0,8"/>
+                                                    <TextBlock x:Name="PreviewInfoText" 
+                                                               Foreground="#555" FontSize="12"
+                                                               LineHeight="20" LineStackingStrategy="BlockLineHeight"/>
+                                                </StackPanel>
+                                            </Border>
+
+                                            <!-- Text Preview -->
+                                            <TextBox x:Name="PreviewTextBox" Grid.Column="0" Grid.ColumnSpan="2"
+                                                    IsReadOnly="True" 
+                                                    FontFamily="Cascadia Code, Consolas, monospace"
+                                                    FontSize="12"
+                                                    BorderThickness="0"
+                                                    Background="Transparent"
+                                                    TextWrapping="Wrap"
+                                                    Visibility="Collapsed"/>
+
+                                            <!-- Unsupported -->
+                                            <TextBlock x:Name="PreviewUnsupported" Grid.Column="0" Grid.ColumnSpan="2"
+                                                      Text="🔍 无法预览此文件"
+                                                      FontSize="14" Foreground="#999"
+                                                      HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                      Visibility="Collapsed"/>
+                                        </Grid>
                                     </Grid>
                                 </ScrollViewer>
                             </Border>
@@ -234,20 +268,55 @@
 
 <!-- Status Bar -->
         <StatusBar Grid.Row="3" Background="#E0E0E0">
-            <StatusBarItem>
+            <StatusBar.ItemsPanel>
+                <ItemsPanelTemplate>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                    </Grid>
+                </ItemsPanelTemplate>
+            </StatusBar.ItemsPanel>
+
+            <!-- Status Text (left) -->
+            <StatusBarItem Grid.Column="0">
                 <TextBlock x:Name="StatusText" Text="就绪"/>
             </StatusBarItem>
-            <Separator/>
-            <StatusBarItem HorizontalAlignment="Right">
+
+            <!-- Column 1 = spacer (*) fills center -->
+
+            <!-- Dir Stats -->
+            <StatusBarItem Grid.Column="2">
+                <TextBlock x:Name="DirStatsText" Margin="4,0,4,0" Foreground="#555"/>
+            </StatusBarItem>
+
+            <!-- Selection Stats -->
+            <StatusBarItem Grid.Column="3">
+                <TextBlock x:Name="SelectionStatsText" Margin="4,0,4,0" Foreground="#555"/>
+            </StatusBarItem>
+
+            <!-- Archive Overview -->
+            <StatusBarItem Grid.Column="4">
+                <TextBlock x:Name="ArchiveStatsText" Margin="4,0,4,0" Foreground="#555"/>
+            </StatusBarItem>
+
+            <!-- Progress -->
+            <StatusBarItem Grid.Column="5">
+                <StackPanel Orientation="Horizontal">
+                    <ProgressBar x:Name="ProgressBar" Width="120" Height="14" Visibility="Collapsed"/>
+                    <TextBlock x:Name="ProgressText" Margin="4,0,0,0" Visibility="Collapsed"/>
+                </StackPanel>
+            </StatusBarItem>
+
+            <!-- Version (far right) -->
+            <StatusBarItem Grid.Column="6">
                 <TextBlock Text="{x:Static app:AppConstants.VersionDisplay}" Foreground="#666"/>
-            </StatusBarItem>
-            <Separator/>
-            <StatusBarItem HorizontalAlignment="Right">
-                <ProgressBar x:Name="ProgressBar" Width="200" Height="14" Visibility="Collapsed"/>
-            </StatusBarItem>
-            <Separator/>
-            <StatusBarItem HorizontalAlignment="Right">
-                <TextBlock x:Name="ProgressText" Text="" Visibility="Collapsed"/>
             </StatusBarItem>
         </StatusBar>
     </Grid>

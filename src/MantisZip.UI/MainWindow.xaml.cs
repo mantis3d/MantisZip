@@ -5,6 +5,7 @@ using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Collections.Generic;
 using System.Linq;
+using System.ComponentModel;
 using MantisZip.Core;
 using MantisZip.Core.Abstractions;
 using MantisZip.Core.Engines;
@@ -24,7 +25,8 @@ public partial class MainWindow : Window
     private List<ArchiveItem> _allItems = new();  // 存储所有文件项
     private string _currentFolder = "";  // 当前目录
     private string? _previewTempDir;        // 预览临时目录
-    private double _lastPreviewHeight;      // 上次的预览行高度（像素），0 = 未设置
+    private GridLength? _lastPreviewHeight;  // 上次的预览行高度（保存 GridLength 以保留 Star/Pixel 类型）
+    private bool _isProgrammaticFilter;      // 编程触发的 FilterFiles，应跳过 SelectionChanged 预览
 
     public MainWindow()
     {
@@ -77,7 +79,7 @@ public partial class MainWindow : Window
                 // 恢复预览行高度（仅在有存档加载时使用）
                 if (obj?.PreviewRowHeight > 0)
                 {
-                    _lastPreviewHeight = obj.PreviewRowHeight;
+                    _lastPreviewHeight = new GridLength(obj.PreviewRowHeight);
                 }
             }
         }
@@ -116,9 +118,9 @@ public partial class MainWindow : Window
             {
                 previewHeight = PreviewRow.Height.Value;
             }
-            else if (_lastPreviewHeight > 0)
+            else if (_lastPreviewHeight?.Value > 0)
             {
-                previewHeight = _lastPreviewHeight;
+                previewHeight = _lastPreviewHeight.Value.Value;
             }
 
             var obj = new WindowSize
@@ -311,6 +313,11 @@ public partial class MainWindow : Window
             ClearPreviewTemp();
             HidePreview();
 
+            // 清空状态栏统计
+            DirStatsText.Text = "";
+            SelectionStatsText.Text = "";
+            ArchiveStatsText.Text = "";
+
             SetStatus("正在加载压缩包...");
             _currentArchivePath = archivePath;
 
@@ -351,12 +358,16 @@ public partial class MainWindow : Window
             var totalSize = items.Sum(i => i.Size);
             var totalCompressed = items.Sum(i => i.CompressedSize);
             ArchiveInfoText.Text = $"{items.Count} 个文件 | 原始: {FormatSize(totalSize)} | 压缩后: {FormatSize(totalCompressed)}";
+            ArchiveStatsText.Text = $"总 {items.Count} 项 | 原始 {FormatSize(totalSize)} → 压缩 {FormatSize(totalCompressed)}";
 
             SetStatus($"已加载: {Path.GetFileName(archivePath)}");
         }
         catch (Exception ex)
         {
             MessageBox.Show($"加载失败: {ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+            DirStatsText.Text = "";
+            SelectionStatsText.Text = "";
+            ArchiveStatsText.Text = "";
             SetStatus("加载失败");
         }
     }
@@ -572,18 +583,11 @@ public partial class MainWindow : Window
 
         FolderTree.ItemsSource = new List<FolderNode> { root };
 
-        // 延迟选中根目录（等待 TreeView 完成加载）
+        // 通过绑定展开并选中根目录（等待 TreeViewItem 生成）
         Dispatcher.BeginInvoke(new Action(() =>
         {
-            if (FolderTree.Items.Count > 0)
-            {
-                var container = FolderTree.ItemContainerGenerator.ContainerFromIndex(0) as TreeViewItem;
-                if (container != null)
-                {
-                    container.IsExpanded = true;
-                    container.IsSelected = true;
-                }
-            }
+            root.IsExpanded = true;
+            root.IsSelected = true;
         }), System.Windows.Threading.DispatcherPriority.Background);
     }
 
@@ -624,89 +628,102 @@ private void FolderTree_SelectedItemChanged(object sender, RoutedPropertyChanged
     /// </summary>
     private void FilterFiles(string folderPath)
     {
-        _currentFolder = folderPath;
-
-        IEnumerable<ArchiveItem> filtered;
-
-        if (string.IsNullOrEmpty(folderPath))
+        _isProgrammaticFilter = true;
+        try
         {
-            // 根目录：计算 / 的层数，只有 1 层的就是直接子项
-            filtered = _allItems.Where(i => 
-            {
-                // 文件：不含 /
-                if (!i.Name.Contains("/")) return true;
-                
-                // 目录：去掉最后的 /，然后看被分成几部分
-                var trimmed = i.Name.TrimEnd('/');
-                var parts = trimmed.Split('/');
-                return parts.Length == 1;  // 只有 1 部分 = 直接子目录
-            });
-        }
-        else
-        {
-            // 非根目录
-            var prefix = folderPath + "/";
-            filtered = _allItems.Where(i => 
-            {
-                // 1. 以 prefix 开头
-                if (!i.Name.StartsWith(prefix)) return false;
-                
-                // 2. 排除目录本身（FullPath == folderPath）
-                if (i.FullPath == folderPath) return false;
-                
-                // 3. 去掉 prefix 后，看被分成几部分
-                var trimmed = i.Name.Substring(prefix.Length).TrimEnd('/');
-                var parts = trimmed.Split('/');
-                return parts.Length == 1;  // 只有 1 部分 = 直接子项
-            });
-        }
+            _currentFolder = folderPath;
 
-        var sortedItems = filtered
-            .OrderBy(i => i.SortOrder)
-            .ThenBy(i => i.Name)
-            .ToList();
+            IEnumerable<ArchiveItem> filtered;
 
-        // 设置显示名称
-        foreach (var item in sortedItems)
-        {
             if (string.IsNullOrEmpty(folderPath))
             {
-                // 根目录：只显示文件名（去掉最后的 /）
-                item.DisplayName = item.Name.TrimEnd('/');
+                // 根目录：计算 / 的层数，只有 1 层的就是直接子项
+                filtered = _allItems.Where(i =>
+                {
+                    // 文件：不含 /
+                    if (!i.Name.Contains("/")) return true;
+
+                    // 目录：去掉最后的 /，然后看被分成几部分
+                    var trimmed = i.Name.TrimEnd('/');
+                    var parts = trimmed.Split('/');
+                    return parts.Length == 1;  // 只有 1 部分 = 直接子目录
+                });
             }
             else
             {
-                // 子目录：显示文件名（去掉前缀和最后的 /）
-                var prefixToRemove = folderPath + "/";
-                if (item.Name.StartsWith(prefixToRemove))
+                // 非根目录
+                var prefix = folderPath + "/";
+                filtered = _allItems.Where(i =>
                 {
-                    item.DisplayName = item.Name.Substring(prefixToRemove.Length).TrimEnd('/');
+                    // 1. 以 prefix 开头
+                    if (!i.Name.StartsWith(prefix)) return false;
+
+                    // 2. 排除目录本身（FullPath == folderPath）
+                    if (i.FullPath == folderPath) return false;
+
+                    // 3. 去掉 prefix 后，看被分成几部分
+                    var trimmed = i.Name.Substring(prefix.Length).TrimEnd('/');
+                    var parts = trimmed.Split('/');
+                    return parts.Length == 1;  // 只有 1 部分 = 直接子项
+                });
+            }
+
+            var sortedItems = filtered
+                .OrderBy(i => i.SortOrder)
+                .ThenBy(i => i.Name)
+                .ToList();
+
+            // 设置显示名称
+            foreach (var item in sortedItems)
+            {
+                if (string.IsNullOrEmpty(folderPath))
+                {
+                    // 根目录：只显示文件名（去掉最后的 /）
+                    item.DisplayName = item.Name.TrimEnd('/');
                 }
                 else
                 {
-                    item.DisplayName = item.Name;
+                    // 子目录：显示文件名（去掉前缀和最后的 /）
+                    var prefixToRemove = folderPath + "/";
+                    if (item.Name.StartsWith(prefixToRemove))
+                    {
+                        item.DisplayName = item.Name.Substring(prefixToRemove.Length).TrimEnd('/');
+                    }
+                    else
+                    {
+                        item.DisplayName = item.Name;
+                    }
                 }
             }
-        }
 
-        FileListGrid.ItemsSource = sortedItems;
-        FileListGrid.Items.Refresh();
+            FileListGrid.ItemsSource = sortedItems;
+            FileListGrid.Items.Refresh();
+
+            // 更新状态栏目录统计
+            var fileCount = sortedItems.Count(i => !i.IsDirectory);
+            var dirCount = sortedItems.Count(i => i.IsDirectory);
+            DirStatsText.Text = $"{sortedItems.Count} 项 (文件 {fileCount}, 目录 {dirCount})";
+        }
+        finally
+        {
+            _isProgrammaticFilter = false;
+        }
     }
 
     /// <summary>
-    /// 双击进入子目录
+    /// 双击进入子目录（使用 Preview 事件避免 Extended 模式下被 DataGrid 内部消费）
     /// </summary>
-    private void FileListGrid_MouseDoubleClick(object sender, MouseButtonEventArgs e)
+    private void FileListGrid_PreviewMouseDoubleClick(object sender, MouseButtonEventArgs e)
     {
         if (FileListGrid.SelectedItem is ArchiveItem item)
         {
             if (item.IsDirectory)
             {
-                // 进入子目录
                 FilterFiles(item.FullPath);
-                
-                // 更新目录树选中状态
+
+                // 更新目录树选中状态（不重建树，只选中已有节点）
                 SelectFolderInTree(item.FullPath);
+                e.Handled = true;
             }
         }
     }
@@ -716,14 +733,73 @@ private void FolderTree_SelectedItemChanged(object sender, RoutedPropertyChanged
     /// </summary>
     private async void FileListGrid_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        if (FileListGrid.SelectedItem is ArchiveItem item && !item.IsDirectory && !string.IsNullOrEmpty(_currentArchivePath))
+        // 编程切换目录时（FilterFiles），不触发预览
+        if (_isProgrammaticFilter)
         {
-            await ShowPreviewAsync(item);
+            HidePreview();
+            UpdateSelectionStats();
+            return;
+        }
+
+        // 从 SelectionChanged 事件参数中推断"鼠标最后点击的文件"：
+        //   - 加选：e.AddedItems 最后一项
+        //   - 减选（Ctrl+click 取消选中）：e.RemovedItems 唯一的一项
+        ArchiveItem? lastClicked = e.AddedItems.Count > 0
+            ? e.AddedItems[e.AddedItems.Count - 1] as ArchiveItem
+            : e.RemovedItems.Count == 1
+                ? e.RemovedItems[0] as ArchiveItem
+                : null;
+
+        if (lastClicked != null && !lastClicked.IsDirectory && !string.IsNullOrEmpty(_currentArchivePath))
+        {
+            await ShowPreviewAsync(lastClicked);
         }
         else
         {
             HidePreview();
         }
+
+        UpdateSelectionStats();
+    }
+
+    private void UpdateSelectionStats()
+    {
+        if (string.IsNullOrEmpty(_currentArchivePath))
+        {
+            SelectionStatsText.Text = "";
+            return;
+        }
+
+        var count = FileListGrid.SelectedItems.Count;
+        if (count == 0)
+        {
+            SelectionStatsText.Text = "";
+            return;
+        }
+
+        if (count == 1 && FileListGrid.SelectedItems[0] is ArchiveItem single)
+        {
+            SelectionStatsText.Text = single.IsDirectory
+                ? $"📁 {single.Name.TrimEnd('/')}"
+                : $"📄 {single.Name} ({FormatSize(single.Size)})";
+            return;
+        }
+
+        // 多选：统计数量和总大小
+        int fileCount = 0, dirCount = 0;
+        long totalSize = 0;
+        foreach (ArchiveItem ai in FileListGrid.SelectedItems)
+        {
+            if (ai.IsDirectory)
+                dirCount++;
+            else
+            {
+                fileCount++;
+                totalSize += ai.Size;
+            }
+        }
+
+        SelectionStatsText.Text = $"已选 {count} 项 (文件 {fileCount}, 目录 {dirCount}) | 共 {FormatSize(totalSize)}";
     }
 
     /// <summary>
@@ -731,8 +807,52 @@ private void FolderTree_SelectedItemChanged(object sender, RoutedPropertyChanged
     /// </summary>
     private void SelectFolderInTree(string path)
     {
-        // 简化实现：刷新目录树
-        BuildFolderTree();
+        if (string.IsNullOrEmpty(path)) return;
+
+        FolderNode? root = FolderTree.Items.Count > 0
+            ? FolderTree.Items[0] as FolderNode
+            : null;
+        if (root == null) return;
+
+        var target = FindFolderNode(root, path);
+        if (target == null) return;
+
+        // 展开从根到目标的各级父节点，让目标 TreeViewItem 可见
+        ExpandAncestors(root, target);
+
+        // 通过绑定选中目标节点（Binding 自动更新 TreeViewItem）
+        target.IsSelected = true;
+    }
+
+    private static FolderNode? FindFolderNode(FolderNode node, string targetPath)
+    {
+        if (node.FullPath == targetPath) return node;
+        foreach (var child in node.Children)
+        {
+            var found = FindFolderNode(child, targetPath);
+            if (found != null) return found;
+        }
+        return null;
+    }
+
+    private static void ExpandAncestors(FolderNode current, FolderNode target)
+    {
+        if (current == target) return;
+        foreach (var child in current.Children)
+        {
+            if (ContainsNode(child, target))
+            {
+                child.IsExpanded = true;
+                ExpandAncestors(child, target);
+                return;
+            }
+        }
+    }
+
+    private static bool ContainsNode(FolderNode parent, FolderNode target)
+    {
+        if (parent == target) return true;
+        return parent.Children.Any(c => ContainsNode(c, target));
     }
 
     #endregion
@@ -787,7 +907,7 @@ private void FolderTree_SelectedItemChanged(object sender, RoutedPropertyChanged
                 await Core.Utils.ArchiveEntryExtractor.ExtractEntryAsync(
                     _currentArchivePath!, item.Name, tempFile, _currentFormat);
 
-                ShowImagePreview(tempFile);
+                ShowImagePreview(tempFile, item);
             }
             else if (TextExtensions.Contains(ext))
             {
@@ -798,7 +918,7 @@ private void FolderTree_SelectedItemChanged(object sender, RoutedPropertyChanged
                 await Core.Utils.ArchiveEntryExtractor.ExtractEntryAsync(
                     _currentArchivePath!, item.Name, tempFile, _currentFormat);
 
-                ShowTextPreview(tempFile, ext);
+                ShowTextPreview(tempFile, ext, item);
             }
             else
             {
@@ -811,7 +931,7 @@ private void FolderTree_SelectedItemChanged(object sender, RoutedPropertyChanged
         }
     }
 
-    private void ShowImagePreview(string filePath)
+    private void ShowImagePreview(string filePath, ArchiveItem item)
     {
         try
         {
@@ -827,6 +947,19 @@ private void FolderTree_SelectedItemChanged(object sender, RoutedPropertyChanged
             PreviewTextBox.Visibility = Visibility.Collapsed;
             PreviewUnsupported.Visibility = Visibility.Collapsed;
             PreviewHeader.Text = $"🔍 预览: {Path.GetFileName(filePath)}";
+
+            // 构建图片信息
+            var ratio = item.Size > 0
+                ? $"{(double)item.CompressedSize / item.Size * 100:F1}%"
+                : "--";
+            PreviewInfoText.Text =
+                $"文件名: {item.Name}\n" +
+                $"大小: {FormatSize(item.Size)}\n" +
+                $"压缩后: {FormatSize(item.CompressedSize)}\n" +
+                $"压缩率: {ratio}\n" +
+                $"修改日期: {item.LastModified:yyyy-MM-dd HH:mm}";
+            PreviewInfoPanel.Visibility = Visibility.Visible;
+
             ShowPreviewPanel();
         }
         catch
@@ -835,7 +968,7 @@ private void FolderTree_SelectedItemChanged(object sender, RoutedPropertyChanged
         }
     }
 
-    private void ShowTextPreview(string filePath, string extension)
+    private void ShowTextPreview(string filePath, string extension, ArchiveItem item)
     {
         try
         {
@@ -854,6 +987,7 @@ private void FolderTree_SelectedItemChanged(object sender, RoutedPropertyChanged
             PreviewTextBox.Visibility = Visibility.Visible;
             PreviewImage.Visibility = Visibility.Collapsed;
             PreviewUnsupported.Visibility = Visibility.Collapsed;
+            PreviewInfoPanel.Visibility = Visibility.Collapsed;
             PreviewHeader.Text = $"📄 预览: {Path.GetFileName(filePath)} ({content.Length} 字符)";
             ShowPreviewPanel();
         }
@@ -869,6 +1003,7 @@ private void FolderTree_SelectedItemChanged(object sender, RoutedPropertyChanged
         PreviewUnsupported.Visibility = Visibility.Visible;
         PreviewImage.Visibility = Visibility.Collapsed;
         PreviewTextBox.Visibility = Visibility.Collapsed;
+        PreviewInfoPanel.Visibility = Visibility.Collapsed;
         PreviewHeader.Text = item != null ? $"📄 {item.Name}" : "预览";
         ShowPreviewPanel();
     }
@@ -876,19 +1011,17 @@ private void FolderTree_SelectedItemChanged(object sender, RoutedPropertyChanged
     private void ShowPreviewPanel()
     {
         PreviewSplitterRow.Height = new GridLength(4);
-        PreviewRow.Height = _lastPreviewHeight > 0
-            ? new GridLength(_lastPreviewHeight)
-            : new GridLength(1, GridUnitType.Star);
+        PreviewRow.Height = _lastPreviewHeight ?? new GridLength(1, GridUnitType.Star);
         PreviewSplitter.Visibility = Visibility.Visible;
         PreviewPanel.Visibility = Visibility.Visible;
     }
 
     private void HidePreview()
     {
-        // 保存当前预览行高度（必须在清 0 之前）
-        if (PreviewRow.Height.GridUnitType == GridUnitType.Pixel && PreviewRow.Height.Value > 1)
+        // 保存当前预览行高度（必须在清 0 之前），支持 Pixel 和 Star 两种类型
+        if (PreviewRow.Height.Value > 0)
         {
-            _lastPreviewHeight = PreviewRow.Height.Value;
+            _lastPreviewHeight = PreviewRow.Height;
         }
 
         PreviewImage.Source = null;
@@ -924,11 +1057,41 @@ private void FolderTree_SelectedItemChanged(object sender, RoutedPropertyChanged
 /// <summary>
 /// 文件夹树节点
 /// </summary>
-public class FolderNode
+public class FolderNode : INotifyPropertyChanged
 {
     public string Name { get; set; } = string.Empty;
     public string FullPath { get; set; } = string.Empty;
     public List<FolderNode> Children { get; set; } = new();
+
+    private bool _isExpanded;
+    public bool IsExpanded
+    {
+        get => _isExpanded;
+        set
+        {
+            if (_isExpanded != value)
+            {
+                _isExpanded = value;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsExpanded)));
+            }
+        }
+    }
+
+    private bool _isSelected;
+    public bool IsSelected
+    {
+        get => _isSelected;
+        set
+        {
+            if (_isSelected != value)
+            {
+                _isSelected = value;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsSelected)));
+            }
+        }
+    }
+
+    public event PropertyChangedEventHandler? PropertyChanged;
 }
 
 // 本地扩展 ArchiveItem（因为 Core 的没有这些属性）

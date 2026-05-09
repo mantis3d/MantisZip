@@ -4,7 +4,7 @@
 
 **项目状态**: 🟡 开发中 (Phase 2)  
 **创建日期**: 2026-04-23  
-**最后更新**: 2026-04-24  
+**最后更新**: 2026-05-09  
 **当前版本**: 0.1.2
 
 ---
@@ -222,6 +222,10 @@ Phase 4: ░░░░░░░░░░░░░  0%
 | 2026-04-24 | 修复中文文件名乱码 | Sisyphus | 注册 GBK 编码 + CodePage=936 |
 | 2026-04-24 | 实现 TAR/GZ 支持 | Sisyphus | TarGzEngine |
 | 2026-04-24 | 实现拖拽压缩 | Sisyphus | 拖入文件生成 ZIP |
+| 2026-05-09 | 预览信息面板 | Sisyphus | 图片预览右侧显示元数据 |
+| 2026-05-09 | 目录树绑定 + 智能选择 | Sisyphus | FolderNode INotifyPropertyChanged |
+| 2026-05-09 | 多选 + 状态栏增强 | Sisyphus | Extended 模式 + 统计显示 |
+| 2026-05-09 | 预览行高持久化修复 | Sisyphus | GridLength 类型 + Star 支持 |
 
 ---
 
