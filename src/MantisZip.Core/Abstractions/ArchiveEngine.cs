@@ -105,6 +105,11 @@ public interface IArchiveEngine
     /// 测试压缩包完整性
     /// </summary>
     Task<bool> TestArchiveAsync(string archivePath, string? password = null, IProgress<ArchiveProgress>? progress = null, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// 向已存在的压缩包中添加文件（原地更新）
+    /// </summary>
+    Task AddToArchiveAsync(string archivePath, string[] sourcePaths, ArchiveOptions options, IProgress<ArchiveProgress>? progress = null, CancellationToken cancellationToken = default);
 }
 
 /// <summary>

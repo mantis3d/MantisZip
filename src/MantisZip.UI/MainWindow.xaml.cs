@@ -29,6 +29,8 @@ public partial class MainWindow : Window
     private string? _previewTempDir;        // 预览临时目录
     private GridLength? _lastPreviewHeight;  // 上次的预览行高度（保存 GridLength 以保留 Star/Pixel 类型）
     private bool _isProgrammaticFilter;      // 编程触发的 FilterFiles，应跳过 SelectionChanged 预览
+    private Point _dragStartPoint;           // 文件列表拖拽起点
+    private string? _dragTempDir;            // 拖拽提取临时目录
 
     public MainWindow()
     {
@@ -149,49 +151,277 @@ public partial class MainWindow : Window
 
 #endregion
 
-#region 拖拽事件
+#region 窗口拖入事件
 
     private void Window_DragOver(object sender, DragEventArgs e)
     {
         if (e.Data.GetDataPresent(DataFormats.FileDrop))
         {
-            var files = (string[])e.Data.GetData(DataFormats.FileDrop);
-            if (files.Length > 0)
-            {
-                e.Effects = DragDropEffects.Copy;
-                e.Handled = true;
-                return;
-            }
+            e.Effects = DragDropEffects.Copy;
+            e.Handled = true;
+            return;
         }
         e.Effects = DragDropEffects.None;
         e.Handled = true;
     }
 
-    private void Window_Drop(object sender, DragEventArgs e)
+    private async void Window_Drop(object sender, DragEventArgs e)
     {
-        if (e.Data.GetDataPresent(DataFormats.FileDrop))
+        if (!e.Data.GetDataPresent(DataFormats.FileDrop)) return;
+
+        var files = (string[])e.Data.GetData(DataFormats.FileDrop);
+        if (files.Length == 0) return;
+
+        // 当前有打开压缩包 → 询问是否添加到压缩包
+        if (_currentArchivePath != null && File.Exists(_currentArchivePath))
         {
-            var files = (string[])e.Data.GetData(DataFormats.FileDrop);
-            if (files.Length > 0)
+            // 如果拖入的是压缩包 → 打开它
+            if (files.Length == 1 && IsArchiveFile(files[0]))
             {
-                var path = files[0];
-                // 拖入压缩包 → 解压，拖入普通文件/文件夹 → 压缩设置窗口
-                if (IsArchiveFile(path))
+                _ = LoadArchiveAsync(files[0]);
+                return;
+            }
+
+            // 否则询问是否添加到当前压缩包
+            var result = MessageBox.Show(
+                $"将 {files.Length} 个文件/文件夹添加到「{Path.GetFileName(_currentArchivePath)}」？",
+                "添加到压缩包",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Question);
+
+            if (result == MessageBoxResult.Yes)
+            {
+                await AddFilesToCurrentArchiveAsync(files);
+            }
+            return;
+        }
+
+        // 没有打开压缩包 → 原有行为
+        var path = files[0];
+        if (IsArchiveFile(path))
+        {
+            _ = LoadArchiveAsync(path);
+        }
+        else
+        {
+            var window = new CompressSettingsWindow();
+            foreach (var f in files)
+            {
+                window.AddSourcePath(f);
+            }
+            window.Show();
+            window.Activate();
+        }
+    }
+
+    /// <summary>
+    /// 将文件添加到当前打开的压缩包，然后刷新列表。
+    /// </summary>
+    private async Task AddFilesToCurrentArchiveAsync(string[] files)
+    {
+        var engine = ArchiveEngineFactory.GetEngine(_currentFormat);
+        if (engine == null)
+        {
+            SetStatus("不支持的压缩格式");
+            return;
+        }
+
+        try
+        {
+            SetStatus("正在添加文件到压缩包...");
+            ShowProgress(true);
+
+            var progress = new Progress<ArchiveProgress>(p =>
+            {
+                Dispatcher.BeginInvoke(() =>
                 {
-                    _ = LoadArchiveAsync(path);
-                }
-                else
-                {
-                    var window = new CompressSettingsWindow();
-                    foreach (var f in files)
-                    {
-                        window.AddSourcePath(f);
-                    }
-                    window.Show();
-                    window.Activate();
-                }
+                    ProgressBar.Value = p.PercentComplete;
+                    ProgressText.Text = p.CurrentFile;
+                });
+            });
+
+            await engine.AddToArchiveAsync(
+                _currentArchivePath!,
+                files,
+                new ArchiveOptions { CompressionLevel = AppSettings.Instance.DefaultLevel },
+                progress);
+
+            // 刷新文件列表
+            await LoadArchiveAsync(_currentArchivePath!);
+            SetStatus("文件已添加到压缩包");
+        }
+        catch (NotSupportedException ex)
+        {
+            MessageBox.Show(ex.Message, "提示", MessageBoxButton.OK, MessageBoxImage.Information);
+            SetStatus("就绪");
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"添加文件失败: {ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+            SetStatus("添加失败");
+        }
+        finally
+        {
+            ShowProgress(false);
+        }
+    }
+
+#endregion
+
+#region 文件列表拖出
+
+    private void FileListGrid_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        _dragStartPoint = e.GetPosition(FileListGrid);
+    }
+
+    private async void FileListGrid_PreviewMouseMove(object sender, MouseEventArgs e)
+    {
+        // 未按下左键或没有打开压缩包 → 忽略
+        if (e.LeftButton != MouseButtonState.Pressed || _currentArchivePath == null)
+            return;
+
+        // 检查是否超过拖拽阈值
+        var pos = e.GetPosition(FileListGrid);
+        if (Math.Abs(pos.X - _dragStartPoint.X) < SystemParameters.MinimumHorizontalDragDistance &&
+            Math.Abs(pos.Y - _dragStartPoint.Y) < SystemParameters.MinimumHorizontalDragDistance)
+            return;
+
+        // 收集选中项
+        var selectedItems = FileListGrid.SelectedItems.Cast<ArchiveItem>().ToList();
+        if (selectedItems.Count == 0) return;
+
+        // 检查拖动起点所在的行的选中状态
+        var hitTest = FileListGrid.InputHitTest(_dragStartPoint) as DependencyObject;
+        var row = FindVisualParent<DataGridRow>(hitTest);
+        if (row?.Item is ArchiveItem rowItem && !selectedItems.Contains(rowItem))
+        {
+            // 点击了未选中的行 → 只选中它再拖
+            FileListGrid.SelectedItem = rowItem;
+            selectedItems = new List<ArchiveItem> { rowItem };
+        }
+
+        // 排除目录（只拖文件）
+        var filesToDrag = selectedItems.Where(i => !i.IsDirectory).ToList();
+        if (filesToDrag.Count == 0) return;
+
+        // 准备临时提取目录
+        _dragTempDir = Path.Combine(Path.GetTempPath(), "MantisZip", "DragDrop", Guid.NewGuid().ToString());
+        Directory.CreateDirectory(_dragTempDir);
+        SetStatus($"正在提取 {filesToDrag.Count} 个文件...");
+
+        try
+        {
+            // 逐个提取到临时目录
+            var extractedPaths = new List<string>();
+            foreach (var item in filesToDrag)
+            {
+                var outputPath = Path.Combine(_dragTempDir, item.Name);
+                await ExtractEntryForDragAsync(item, outputPath);
+                extractedPaths.Add(outputPath);
+            }
+
+            // 启动拖拽（阻塞直到拖拽操作结束）
+            var data = new DataObject(DataFormats.FileDrop, extractedPaths.ToArray());
+            DragDrop.DoDragDrop(FileListGrid, data, DragDropEffects.Copy);
+        }
+        catch (NotSupportedException ex)
+        {
+            MessageBox.Show(ex.Message, "提示", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"提取文件失败: {ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+        finally
+        {
+            CleanupDragTempDir();
+            SetStatus("就绪");
+        }
+    }
+
+    /// <summary>
+    /// 提取压缩包内单个条目到临时文件，供拖拽使用。
+    /// 支持 ZIP、7z 快速单条提取，TarGz 通过顺序扫描提取。
+    /// </summary>
+    private async Task ExtractEntryForDragAsync(ArchiveItem item, string outputPath)
+    {
+        var dir = Path.GetDirectoryName(outputPath);
+        if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
+            Directory.CreateDirectory(dir);
+
+        switch (_currentFormat)
+        {
+            case ArchiveFormat.Zip:
+            case ArchiveFormat.SevenZip:
+                await ArchiveEntryExtractor.ExtractEntryAsync(
+                    _currentArchivePath!, item.FullPath, outputPath, _currentFormat);
+                break;
+
+            case ArchiveFormat.Tar:
+            case ArchiveFormat.GZip:
+                ExtractTarGzSingleEntry(_currentArchivePath!, item.FullPath, outputPath);
+                break;
+
+            default:
+                throw new NotSupportedException($"格式 {_currentFormat} 不支持拖拽提取");
+        }
+    }
+
+    /// <summary>
+    /// 从 TAR/GZ 压缩包中提取单个条目（顺序扫描到目标后停止）。
+    /// </summary>
+    private static void ExtractTarGzSingleEntry(string archivePath, string entryName, string outputPath)
+    {
+        using var inputStream = File.OpenRead(archivePath);
+        var isTarGz = archivePath.EndsWith(".tgz", StringComparison.OrdinalIgnoreCase)
+                   || archivePath.EndsWith(".tar.gz", StringComparison.OrdinalIgnoreCase);
+
+        Stream tarStream = inputStream;
+        if (isTarGz || Path.GetExtension(archivePath).Equals(".gz", StringComparison.OrdinalIgnoreCase))
+            tarStream = new ICSharpCode.SharpZipLib.GZip.GZipInputStream(inputStream);
+
+        using var tarIn = new ICSharpCode.SharpZipLib.Tar.TarInputStream(tarStream);
+        ICSharpCode.SharpZipLib.Tar.TarEntry? entry;
+        while ((entry = tarIn.GetNextEntry()) != null)
+        {
+            if (entry.IsDirectory) continue;
+            if (entry.Name == entryName)
+            {
+                var dir = Path.GetDirectoryName(outputPath);
+                if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
+                    Directory.CreateDirectory(dir);
+                using var outStream = File.Create(outputPath);
+                tarIn.CopyEntryContents(outStream);
+                return;
             }
         }
+        throw new FileNotFoundException($"在压缩包中未找到条目: {entryName}");
+    }
+
+    private void CleanupDragTempDir()
+    {
+        if (_dragTempDir == null) return;
+        try
+        {
+            if (Directory.Exists(_dragTempDir))
+                Directory.Delete(_dragTempDir, recursive: true);
+        }
+        catch { }
+        _dragTempDir = null;
+    }
+
+    /// <summary>
+    /// 从 DependencyObject 向上查找指定类型的父级。
+    /// </summary>
+    private static T? FindVisualParent<T>(DependencyObject? element) where T : DependencyObject
+    {
+        while (element != null)
+        {
+            if (element is T t) return t;
+            element = System.Windows.Media.VisualTreeHelper.GetParent(element);
+        }
+        return null;
     }
 
 #endregion

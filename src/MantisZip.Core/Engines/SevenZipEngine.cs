@@ -149,4 +149,70 @@ public class SevenZipEngine : IArchiveEngine
             }
         }, cancellationToken);
     }
+
+    public async Task AddToArchiveAsync(string archivePath, string[] sourcePaths, ArchiveOptions options, IProgress<ArchiveProgress>? progress = null, CancellationToken cancellationToken = default)
+    {
+        await Task.Run(() =>
+        {
+            // 7z.exe 命令: 7z u archive.7z file1 file2
+            var args = new List<string>
+            {
+                "u",                     // 更新
+                archivePath               // 目标压缩包
+            };
+            args.AddRange(sourcePaths);
+
+            // 压缩级别
+            args.Add(options.CompressionLevel switch
+            {
+                1 => "-mx1",
+                5 => "-mx5",
+                9 => "-mx9",
+                _ => "-mx5"
+            });
+
+            // 加密
+            if (options.Encrypt && !string.IsNullOrEmpty(options.Password))
+            {
+                args.Add($"-p{options.Password}");
+                args.Add("-mhe=on");
+            }
+
+            var psi = new ProcessStartInfo
+            {
+                FileName = SevenZipPath,
+                Arguments = string.Join(" ", args.Select(a => a.Contains(" ") ? $"\"{a}\"" : a)),
+                UseShellExecute = false,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                CreateNoWindow = true
+            };
+
+            using var process = Process.Start(psi);
+            if (process == null) return;
+
+            while (!process.HasExited)
+            {
+                if (cancellationToken.IsCancellationRequested)
+                {
+                    process.Kill();
+                    throw new OperationCanceledException();
+                }
+                Thread.Sleep(100);
+            }
+
+            var exitCode = process.ExitCode;
+            if (exitCode != 0)
+            {
+                var error = process.StandardError.ReadToEnd();
+                throw new Exception($"7z.exe 错误 (code {exitCode}): {error}");
+            }
+
+            progress?.Report(new ArchiveProgress
+            {
+                CurrentFile = string.Empty,
+                PercentComplete = 100
+            });
+        }, cancellationToken);
+    }
 }

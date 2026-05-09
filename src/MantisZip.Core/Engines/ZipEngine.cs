@@ -287,4 +287,66 @@ public class ZipEngine : IArchiveEngine
             }
         }, cancellationToken);
     }
+
+    public async Task AddToArchiveAsync(string archivePath, string[] sourcePaths, ArchiveOptions options, IProgress<ArchiveProgress>? progress = null, CancellationToken cancellationToken = default)
+    {
+        await Task.Run(() =>
+        {
+            ZipStrings.CodePage = 936;
+
+            // 收集需要添加的文件
+            var files = new List<(string FullPath, string EntryName)>();
+            foreach (var sourcePath in sourcePaths)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+
+                if (Directory.Exists(sourcePath))
+                {
+                    var dirName = Path.GetFileName(sourcePath.TrimEnd('\\', '/'));
+                    foreach (var file in Directory.GetFiles(sourcePath, "*", SearchOption.AllDirectories))
+                    {
+                        var entryName = Path.Combine(dirName, Path.GetRelativePath(sourcePath, file));
+                        files.Add((file, entryName));
+                    }
+                }
+                else if (File.Exists(sourcePath))
+                {
+                    files.Add((sourcePath, Path.GetFileName(sourcePath)));
+                }
+            }
+
+            if (files.Count == 0) return;
+
+            // 使用 SharpZipLib 的原地更新功能
+            using var zipFile = new ZipFile(archivePath);
+            zipFile.BeginUpdate();
+
+            var totalFiles = files.Count;
+            for (int i = 0; i < totalFiles; i++)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+
+                var (fullPath, entryName) = files[i];
+                zipFile.Add(fullPath, entryName);
+
+                progress?.Report(new ArchiveProgress
+                {
+                    CurrentFile = "正在添加: " + entryName,
+                    ProcessedFiles = i + 1,
+                    TotalFiles = totalFiles,
+                    PercentComplete = (double)(i + 1) / totalFiles * 100,
+                    FilePercentComplete = 100
+                });
+            }
+
+            zipFile.CommitUpdate();
+
+            progress?.Report(new ArchiveProgress
+            {
+                CurrentFile = string.Empty,
+                PercentComplete = 100,
+                FilePercentComplete = 100
+            });
+        }, cancellationToken);
+    }
 }

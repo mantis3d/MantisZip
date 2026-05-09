@@ -207,6 +207,14 @@ public class TarGzEngine : IArchiveEngine
         }, cancellationToken);
     }
 
+    public async Task AddToArchiveAsync(string archivePath, string[] sourcePaths, ArchiveOptions options, IProgress<ArchiveProgress>? progress = null, CancellationToken cancellationToken = default)
+    {
+        await Task.Run(() =>
+        {
+            throw new NotSupportedException("TAR/GZ 格式不支持直接添加文件，请重新创建压缩包");
+        }, cancellationToken);
+    }
+
     public async Task<bool> TestArchiveAsync(string archivePath, string? password = null, IProgress<ArchiveProgress>? progress = null, CancellationToken cancellationToken = default)
     {
         return await Task.Run(() =>

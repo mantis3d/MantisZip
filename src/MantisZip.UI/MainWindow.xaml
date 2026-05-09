@@ -176,8 +176,10 @@
                                           Background="White"
                                           BorderThickness="1"
                                           BorderBrush="#DDD"
-                                           SelectionChanged="FileListGrid_SelectionChanged"
-                                           PreviewMouseDoubleClick="FileListGrid_PreviewMouseDoubleClick">
+                                            SelectionChanged="FileListGrid_SelectionChanged"
+                                           PreviewMouseDoubleClick="FileListGrid_PreviewMouseDoubleClick"
+                                           PreviewMouseLeftButtonDown="FileListGrid_PreviewMouseLeftButtonDown"
+                                           PreviewMouseMove="FileListGrid_PreviewMouseMove">
                                     <DataGrid.Columns>
                                         <DataGridTemplateColumn Header="名称" Width="*">
                                             <DataGridTemplateColumn.CellTemplate>
