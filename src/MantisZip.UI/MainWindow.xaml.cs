@@ -184,6 +184,7 @@ public partial class MainWindow : Window
 
             // 否则询问是否添加到当前压缩包
             var result = MessageBox.Show(
+                this,
                 $"将 {files.Length} 个文件/文件夹添加到「{Path.GetFileName(_currentArchivePath)}」？",
                 "添加到压缩包",
                 MessageBoxButton.YesNo,
