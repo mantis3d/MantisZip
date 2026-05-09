@@ -133,7 +133,7 @@
                             <!-- TreeView + DataGrid -->
                             <Grid Grid.Row="0">
                                 <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="200" MinWidth="100"/>
+                                    <ColumnDefinition x:Name="TreeColumn" Width="200" MinWidth="100"/>
                                     <ColumnDefinition Width="Auto"/>
                                     <ColumnDefinition Width="*"/>
                                 </Grid.ColumnDefinitions>

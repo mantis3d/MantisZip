@@ -24,7 +24,7 @@ public partial class MainWindow : Window
     private List<ArchiveItem> _allItems = new();  // 存储所有文件项
     private string _currentFolder = "";  // 当前目录
     private string? _previewTempDir;        // 预览临时目录
-    private GridLength? _savedPreviewRowHeight; // 保存用户拖拽后的预览行高度
+    private double _lastPreviewHeight;      // 上次的预览行高度（像素），0 = 未设置
 
     public MainWindow()
     {
@@ -33,6 +33,21 @@ public partial class MainWindow : Window
     }
 
 #region 窗口大小持久化
+
+    private string GetWindowConfigPath()
+    {
+        var localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+        var folder = Path.Combine(localAppData, "MantisZip");
+        return Path.Combine(folder, "window.json");
+    }
+
+    private class WindowSize
+    {
+        public double Width { get; set; }
+        public double Height { get; set; }
+        public double TreeColumnWidth { get; set; }
+        public double PreviewRowHeight { get; set; }
+    }
 
     private void LoadWindowSettings()
     {
@@ -47,6 +62,22 @@ public partial class MainWindow : Window
                 {
                     Width = obj.Width;
                     Height = obj.Height;
+                }
+
+                // 恢复目录树列宽度
+                if (obj?.TreeColumnWidth > 0)
+                {
+                    var treeGrid = FolderTree.Parent as Grid;
+                    if (treeGrid?.ColumnDefinitions.Count > 0)
+                    {
+                        treeGrid.ColumnDefinitions[0].Width = new GridLength(obj.TreeColumnWidth);
+                    }
+                }
+
+                // 恢复预览行高度（仅在有存档加载时使用）
+                if (obj?.PreviewRowHeight > 0)
+                {
+                    _lastPreviewHeight = obj.PreviewRowHeight;
                 }
             }
         }
@@ -67,7 +98,36 @@ public partial class MainWindow : Window
                 Directory.CreateDirectory(dir);
             }
 
-            var obj = new WindowSize { Width = Width, Height = Height };
+            // 保存目录树列宽
+            double treeWidth = 200;
+            var treeGrid = FolderTree.Parent as Grid;
+            if (treeGrid?.ColumnDefinitions.Count > 0)
+            {
+                var col = treeGrid.ColumnDefinitions[0];
+                if (col.Width.GridUnitType == GridUnitType.Pixel)
+                {
+                    treeWidth = col.Width.Value;
+                }
+            }
+
+            // 保存预览行高度（如果当前可见且是像素值）
+            double previewHeight = 0;
+            if (PreviewPanel.Visibility == Visibility.Visible && PreviewRow.Height.GridUnitType == GridUnitType.Pixel)
+            {
+                previewHeight = PreviewRow.Height.Value;
+            }
+            else if (_lastPreviewHeight > 0)
+            {
+                previewHeight = _lastPreviewHeight;
+            }
+
+            var obj = new WindowSize
+            {
+                Width = Width,
+                Height = Height,
+                TreeColumnWidth = treeWidth,
+                PreviewRowHeight = previewHeight
+            };
             var json = JsonSerializer.Serialize(obj, new JsonSerializerOptions { WriteIndented = true });
             File.WriteAllText(configPath, json);
         }
@@ -75,19 +135,6 @@ public partial class MainWindow : Window
         {
             // 如果保存失败，忽略
         }
-    }
-
-    private string GetWindowConfigPath()
-    {
-        var localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
-        var folder = Path.Combine(localAppData, "MantisZip");
-        return Path.Combine(folder, "window.json");
-    }
-
-    private class WindowSize
-    {
-        public double Width { get; set; }
-        public double Height { get; set; }
     }
 
     private void Window_Closing(object sender, System.ComponentModel.CancelEventArgs e)
@@ -829,28 +876,25 @@ private void FolderTree_SelectedItemChanged(object sender, RoutedPropertyChanged
     private void ShowPreviewPanel()
     {
         PreviewSplitterRow.Height = new GridLength(4);
-        PreviewRow.Height = _savedPreviewRowHeight ?? new GridLength(1, GridUnitType.Star);
+        PreviewRow.Height = _lastPreviewHeight > 0
+            ? new GridLength(_lastPreviewHeight)
+            : new GridLength(1, GridUnitType.Star);
         PreviewSplitter.Visibility = Visibility.Visible;
         PreviewPanel.Visibility = Visibility.Visible;
     }
 
     private void HidePreview()
     {
-        // 保存用户拖拽后的实际高度（非 0 才保存）
-        if (PreviewRow.Height.GridUnitType == GridUnitType.Pixel && PreviewRow.Height.Value > 0)
+        // 保存当前预览行高度（必须在清 0 之前）
+        if (PreviewRow.Height.GridUnitType == GridUnitType.Pixel && PreviewRow.Height.Value > 1)
         {
-            _savedPreviewRowHeight = PreviewRow.Height;
-        }
-        else if (PreviewRow.Height.GridUnitType == GridUnitType.Star && PreviewRow.Height.Value > 0)
-        {
-            // 首次打开时存一个比例，但后续会被用户拖拽值覆盖
-            _savedPreviewRowHeight ??= PreviewRow.Height;
+            _lastPreviewHeight = PreviewRow.Height.Value;
         }
 
         PreviewImage.Source = null;
         PreviewTextBox.Text = "";
-        PreviewSplitterRow.Height = new GridLength(0);
         PreviewRow.Height = new GridLength(0);
+        PreviewSplitterRow.Height = new GridLength(0);
         PreviewSplitter.Visibility = Visibility.Collapsed;
         PreviewPanel.Visibility = Visibility.Collapsed;
     }

@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("MantisZip.Core")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+9b52dc9492b7f08cf744636705153a0648873005")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+413554f1d67726f64f64c12da88f7453dc42bed5")]
 [assembly: System.Reflection.AssemblyProductAttribute("MantisZip.Core")]
 [assembly: System.Reflection.AssemblyTitleAttribute("MantisZip.Core")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
