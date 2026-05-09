@@ -13,7 +13,7 @@ public class SevenZipEngine : IArchiveEngine
 {
     private const string SevenZipPath = @"C:\Program Files\7-Zip\7z.exe";
 
-    public bool CanHandle(ArchiveFormat format) => format == ArchiveFormat.SevenZip;
+    public bool CanHandle(ArchiveFormat format) => format is ArchiveFormat.SevenZip or ArchiveFormat.Rar;
 
     public async Task ExtractAsync(string archivePath, string destinationPath, string? password = null, IProgress<ArchiveProgress>? progress = null, CancellationToken cancellationToken = default)
     {
@@ -114,9 +114,8 @@ public class SevenZipEngine : IArchiveEngine
             using var archiveFile = new ArchiveFile(archivePath);
             foreach (var entry in archiveFile.Entries)
             {
-                // 检查是否目录（以 / 结尾或没有扩展名的是目录）
                 string fileName = entry.FileName;
-                bool isDir = string.IsNullOrEmpty(Path.GetExtension(fileName)) || fileName.EndsWith("/");
+                bool isDir = entry.IsFolder;
 
                 items.Add(new ArchiveItem
                 {
