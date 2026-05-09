@@ -7,8 +7,9 @@
 - **技术栈**: .NET 9 + WPF + SharpZipLib + SevenZipExtractor
 
 ## 版本
-- **当前版本**: 0.2.0
+- **当前版本**: 0.1.3
 - **发布日期**: 2026-05-09
+- **开发中**: 设置系统、Shell 集成、per-file 进度、CLI 入口点（即将发布为 v0.2.0）
 
 ## 功能列表
 
@@ -51,7 +52,7 @@
 ### v0.1.3 (2026-05-09)
 1. **修复 `_currentFormat` bug** - 非 ZIP 格式预览改用扩展名映射，不再误判为 SevenZip
 
-### v0.2.0 (2026-05-09)
+### 开发中 (即将发布为 v0.2.0)
 1. **AppSettings 设置系统** - 持久化用户偏好 JSON（压缩/解压/菜单/预览/高级），`AppSettings` 单例
 2. **SettingsWindow 设置窗口** - 五标签页 UI（压缩、解压、上下文菜单、预览、高级），Shell 状态检测 + 即时应用
 3. **ShellIntegration 右键菜单** - HKCU 无管理员注册，层叠子菜单/独立动词双模式，per-verb 开关（压缩/快速压缩/打开/解压），AppliesTo 过滤器，shell32.dll 图标
@@ -68,7 +69,6 @@
 - 分卷压缩
 - 开放加密压缩 UI（引擎已支持 AES-256）
 - 压缩方式选择 (Store/Deflate/BZip2/LZMA) - 需换 SharpCompress 库
-- 修复 `_currentFormat` bug（TarGz/Rar 预览仍受影响）
 - TarGzEngine 保留原始时间戳
 - 安装包与发布
 
@@ -85,7 +85,7 @@ MantisZip/
 │   │   │   └── ArchiveEngine.cs     # IArchiveEngine 接口 + Models
 │   │   ├── Engines/
 │   │   │   ├── ZipEngine.cs      # ZIP 引擎
-│   │   │   ├── SevenZipEngine.cs # 7z/RAR 只读引擎
+│   │   │   ├── SevenZipEngine.cs # 7z/RAR 解压 + 7z 压缩
 │   │   │   └── TarGzEngine.cs # TAR/GZ 引擎
 │   │   ├── Models/
 │   │   └── Utils/
@@ -94,6 +94,7 @@ MantisZip/
 │   └── MantisZip.UI/
 │       ├── MantisZip.UI.csproj
 │       ├── App.xaml / App.xaml.cs   # 应用入口 + CLI 处理 + 全局初始化
+│       ├── AppConstants.cs         # 版本号常量
 │       ├── AppSettings.cs          # 用户设置（JSON 持久化）
 │       ├── MainWindow.xaml / .cs   # 主窗口 + FolderNode
 │       ├── SettingsWindow.xaml / .cs   # 设置窗口（五标签页）
@@ -119,7 +120,7 @@ MantisZip/
 | ArchiveProgress | Core/Abstractions | 进度报告（含 FilePercentComplete）|
 | ArchiveFormat | Core/Abstractions | 压缩格式枚举 |
 | ZipEngine | Core/Engines | ZIP 压缩/解压，GBK 编码，per-file 进度 |
-| SevenZipEngine | Core/Engines | 7z/RAR 解压；7z.exe 压缩 |
+| SevenZipEngine | Core/Engines | 7z/RAR 解压（SevenZipExtractor）；7z 压缩（7z.exe） |
 | TarGzEngine | Core/Engines | TAR/GZ 压缩/解压 |
 | PasswordManager | Core/Utils | 密码管理工具 |
 | ArchiveEntryExtractor | Core/Utils | 单文件提取工具 (预览) |
@@ -178,7 +179,7 @@ MantisZip/
 
 ---
 
-### 2026-05-09 (v0.2.0)
+### 2026-05-09 (开发中)
 - **AppSettings 设置系统** - JSON 持久化单例，支持压缩/解压/菜单/预览/高级五组配置
 - **SettingsWindow 设置窗口** - 五标签页 UI，Shell 状态检测 + 即时应用按钮
 - **ShellIntegration 右键菜单** - 层叠/独立双模式，per-verb 开关，AppliesTo 过滤器，shell32.dll 图标

@@ -5,7 +5,7 @@
 **项目状态**: 🟡 开发中 (Phase 4)  
 **创建日期**: 2026-04-23  
 **最后更新**: 2026-05-09  
-**当前版本**: 0.2.0
+**当前版本**: 0.1.3
 
 ---
 
@@ -15,11 +15,11 @@
 |--------|------|------|
 | 开发语言 | C# (.NET 9, Windows) | 2026-04-23 |
 | UI 框架 | WPF | 2026-04-23 |
-| 架构模式 | MVVM | 2026-04-23 |
+| 架构模式 | Code-behind（非 MVVM） | 2026-04-23 |
 | 目标用户 | 普通用户 | 2026-04-23 |
 | 压缩格式 | 全部（ZIP + 7z + TAR/GZ + RAR只读） | 2026-04-23 |
 | 加密 | AES-256 | 2026-04-23 |
-| 界面语言 | 中文 + 英文 可切换 | 2026-04-23 |
+| 界面语言 | 中文 | 2026-04-23 |
 | 发布形式 | 安装包 + 便携版 | 2026-04-23 |
 | 最低系统 | Windows 10 (1809+)+ | .NET 9 支持的最低版本 |
 | 界面风格 | 现代风格 | 2026-04-23 |
@@ -47,7 +47,7 @@
 |------|------|------|
 | 开发语言 | C# (.NET 9, Windows) | 现代 .NET，CLI 直接支持 |
 | UI 框架 | WPF | Windows 原生体验，高性能 |
-| 架构模式 | MVVM | 分离关注点，易于测试和维护 |
+| 架构模式 | Code-behind | 所有逻辑在 MainWindow.xaml.cs，FolderNode 实现 INotifyPropertyChanged |
 | 压缩库 | SharpZipLib (ZIP) + SevenZipExtractor (7z/RAR) | 功能成熟，社区支持好 |
 
 ### 1.2 项目结构
@@ -61,12 +61,15 @@ MantisZip/
 │   │   ├── Models/        # 数据模型
 │   │   └── Utils/         # 工具类
 │   └── MantisZip.UI/       # WPF 桌面应用
-│       ├── AppSettings.cs         # 用户设置（JSON 持久化）
-│       ├── SettingsWindow.xaml    # 设置窗口（Tabbed UI）
-│       ├── ShellIntegration.cs    # 右键菜单（HKCU 无需管理员）
-│       ├── SystemIconHelper.cs    # SHGetFileInfo 系统图标
-│       ├── ProgressWindow.xaml    # 双进度条进度窗口
-│       └── CompressSettingsWindow.xaml # 压缩配置面板
+│       ├── App.xaml / App.xaml.cs     # 应用入口 + CLI 处理 + 全局初始化
+│       ├── AppConstants.cs           # 版本号常量
+│       ├── AppSettings.cs            # 用户设置（JSON 持久化）
+│       ├── MainWindow.xaml / .cs     # 主窗口 + FolderNode
+│       ├── SettingsWindow.xaml / .cs # 设置窗口
+│       ├── ShellIntegration.cs       # 右键菜单（HKCU 无需管理员）
+│       ├── SystemIconHelper.cs       # SHGetFileInfo 系统图标
+│       ├── ProgressWindow.xaml / .cs # 双进度条
+│       └── CompressSettingsWindow.xaml / .cs # 压缩配置
 ├── docs/
 │   ├── PLAN.md            # 本文档
 │   └── PROGRESS.md        # 开发进度文档
@@ -99,26 +102,34 @@ MantisZip/
 | P0 | 密码管理器 | ✅ 完成 |
 | P0 | 目录树导航 | ✅ 完成 |
 | P0 | 文件列表（仅显示直接子项） | ✅ 完成 |
-| P1 | 7z 格式压缩 | ⬜ 待开发 |
-| P1 | TAR 格式支持 | ⬜ 待开发 |
-| P1 | GZ 格式支持 | ⬜ 待开发 |
+| P1 | 7z 格式压缩 | ✅ 完成 | 基于 7z.exe |
+| P1 | TAR 格式支持 | ✅ 完成 | TarGzEngine |
+| P1 | GZ 格式支持 | ✅ 完成 | 含 .tgz/.tar.gz |
 | P1 | AES-256 加密压缩 | 🔶 引擎已支持 | 引擎支持 AESKeySize=256，UI 未开放加密选项 |
 | P1 | 分卷压缩 | ⬜ 待开发 |
 | P1 | 压缩级别设置（1-9，默认5） | ✅ 完成 |
 | P2 | 压缩包内文件/图片预览 | ✅ 完成 |
+| P1 | 设置系统 | ✅ 完成 | AppSettings JSON 持久化 + SettingsWindow 五标签页 |
+| P1 | Shell 右键菜单 | ✅ 完成 | 层叠/独立双模式，per-verb 开关，AppliesTo 过滤器 |
+| P1 | CLI 入口点 | ✅ 完成 | --compress, --extract, --open, --compress-quick, --install/uninstall-shell |
+| P2 | 系统文件图标 | ✅ 完成 | SHGetFileInfo 获取原生 Windows 图标 |
+| P2 | 逐文件进度 | ✅ 完成 | ZipEngine per-file 0%→100%，双进度条展示 |
 
 ### 2.3 用户交互
 
 | 优先级 | 功能 | 状态 |
 |--------|------|------|
 | P0 | 拖拽解压 | ✅ 完成 |
-| P0 | 拖拽压缩 | ⬜ 待开发 |
+| P0 | 拖拽压缩 | ✅ 完成 | 拖入文件/文件夹生成 ZIP |
 | P0 | 进度条显示 | ✅ 完成 |
 | P0 | 可取消操作 | ✅ 完成 |
 | P0 | 版本号显示 | ✅ 完成 |
 | P1 | 压缩配置面板 | ✅ 完成 |
+| P1 | 设置系统 | ✅ 完成 | AppSettings JSON + SettingsWindow 五标签页 |
 | P1 | 右键菜单集成 | ✅ 完成 | 层叠/独立双模式，Per-verb 开关，图标 |
+| P1 | CLI 快速压缩/解压/浏览 | ✅ 完成 | --compress-quick, --extract, --open |
 | P2 | 文件关联 | ✅ 完成 | 通过 Shell 注册 AppliesTo 过滤器 |
+| P2 | 系统文件图标 | ✅ 完成 | SHGetFileInfo 原生图标 |
 | P2 | 中/英文界面切换 | ⬜ 待开发 |
 | P2 | 亮/暗主题切换 | ⬜ 待开发 |
 
@@ -237,7 +248,7 @@ Phase 4: ████████░░░░░░ 60%
 | 2026-05-09 | v0.1.3 版本升级 | Sisyphus | |
 | 2026-05-09 | 修复 `_currentFormat` bug | Sisyphus | 改用扩展名映射格式 |
 | 2026-05-09 | 更新 PLAN.md 同步实际状态 | Sisyphus | Phase 2 全部标记完成 |
-| 2026-05-09 | v0.2.0: 设置系统 + Shell 集成 + per-file 进度 + CLI 入口 | Sisyphus | AppSettings, SettingsWindow, ShellIntegration, SystemIconHelper, 双进度条, --compress-quick, --extract 直连, --open |
+| 2026-05-09 | 设置系统 + Shell 集成 + per-file 进度 + CLI 入口 | Sisyphus | AppSettings, SettingsWindow, ShellIntegration, SystemIconHelper, 双进度条, --compress-quick, --extract 直连, --open |
 
 ---
 
@@ -247,9 +258,9 @@ Phase 4: ████████░░░░░░ 60%
 |--------|------|------|
 | P1 | 实现分卷压缩 | ArchiveOptions.SplitSize 参数已定义 |
 | P1 | 开放加密压缩 UI | 引擎已支持 AES-256，需在压缩对话框添加加密选项 |
-| P2 | 修复 `_currentFormat` bug | 非 ZIP 格式预览走错代码路径（TarGz/Rar） |
 | P2 | 压缩方式选择 | Store/Deflate/BZip2/LZMA，需换 SharpCompress 库 |
 | P2 | TarGzEngine 元数据修复 | 保留原始时间戳、支持压缩级别 |
+| P2 | 中/英文界面切换 | 技术决策记录已修正 |
 | P3 | 安装包与发布 | |
 
 ---
