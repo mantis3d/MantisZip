@@ -7,7 +7,7 @@
 - **技术栈**: .NET 9 + WPF + SharpZipLib + SevenZipExtractor
 
 ## 版本
-- **当前版本**: 0.1.3
+- **当前版本**: 0.2.0
 - **发布日期**: 2026-05-09
 
 ## 功能列表
@@ -50,13 +50,26 @@
 
 ### v0.1.3 (2026-05-09)
 1. **修复 `_currentFormat` bug** - 非 ZIP 格式预览改用扩展名映射，不再误判为 SevenZip
-2. **PLAN.md 同步** - Phase 2 全部标记完成，更新进度至 60%
+
+### v0.2.0 (2026-05-09)
+1. **AppSettings 设置系统** - 持久化用户偏好 JSON（压缩/解压/菜单/预览/高级），`AppSettings` 单例
+2. **SettingsWindow 设置窗口** - 五标签页 UI（压缩、解压、上下文菜单、预览、高级），Shell 状态检测 + 即时应用
+3. **ShellIntegration 右键菜单** - HKCU 无管理员注册，层叠子菜单/独立动词双模式，per-verb 开关（压缩/快速压缩/打开/解压），AppliesTo 过滤器，shell32.dll 图标
+4. **SystemIconHelper 系统图标** - SHGetFileInfo 获取 16x16 文件类型图标，ConcurrentDictionary 缓存，支持虚拟文件
+5. **ProgressWindow 双进度条** - 文件级进度（顶部）+ 总体进度（底部），`SetProgress(ArchiveProgress)` 重载
+6. **ArchiveProgress.FilePercentComplete** - Core 层新增 per-file 粒度字段
+7. **ZipEngine per-file 进度** - ExtractAsync/CompressAsync 逐文件汇报 0%→100%，100ms 节流
+8. **CLI 入口点** - `--compress`（多实例 IPC 合并路径）、`--compress-quick`（默认设置直接压缩）、`--extract`（绕过主窗口直连解压）、`--open`（主窗口浏览）、`--install-shell` / `--uninstall-shell`
+9. **MainWindow 增强** - 预览设置感知（EnableImagePreview/EnableTextPreview/MaxTextPreviewBytes），异步图片解码 DecodePixelWidth=1920，提取后打开文件夹
+10. **全局初始化 App.InitializeApp()** - 所有 CLI 入口点统一执行 GBK 编码注册
+11. **ZipEngine 目录条目修复** - ExtractAsync 创建空目录条目而非跳过（修复点号目录名问题）
 
 ### 待实现功能
 - 分卷压缩
 - 开放加密压缩 UI（引擎已支持 AES-256）
 - 压缩方式选择 (Store/Deflate/BZip2/LZMA) - 需换 SharpCompress 库
-- Shell 右键菜单集成
+- 修复 `_currentFormat` bug（TarGz/Rar 预览仍受影响）
+- TarGzEngine 保留原始时间戳
 - 安装包与发布
 
 ## 技术架构
@@ -80,13 +93,18 @@ MantisZip/
 │   │       └── ArchiveEntryExtractor.cs # 单文件提取 (预览用)
 │   └── MantisZip.UI/
 │       ├── MantisZip.UI.csproj
-│       ├── MainWindow.xaml        # 主窗口
-│       ├── MainWindow.xaml.cs  # 主窗口逻辑 + FolderNode
-│       ├── PasswordDialog.xaml  # 密码输入对话框
-│       ├── PasswordDialog.xaml.cs
-│       ├── PasswordEditDialog.xaml # 密码编辑对话框
-│       ├── PasswordEditDialog.xaml.cs
-│       └── PasswordManagerWindow.xaml # 密码管理窗口
+│       ├── App.xaml / App.xaml.cs   # 应用入口 + CLI 处理 + 全局初始化
+│       ├── AppSettings.cs          # 用户设置（JSON 持久化）
+│       ├── MainWindow.xaml / .cs   # 主窗口 + FolderNode
+│       ├── SettingsWindow.xaml / .cs   # 设置窗口（五标签页）
+│       ├── ShellIntegration.cs     # 右键菜单（HKCU 无管理员）
+│       ├── SystemIconHelper.cs     # SHGetFileInfo 系统图标
+│       ├── ProgressWindow.xaml / .cs   # 双进度条进度窗口
+│       ├── CompressSettingsWindow.xaml / .cs # 压缩配置面板
+│       ├── PasswordDialog.xaml / .cs
+│       ├── PasswordEditDialog.xaml / .cs
+│       └── PasswordManagerWindow.xaml / .cs
+├── AGENTS.md                  # AI 代理开发指南
 └── docs/
     ├── PLAN.md                # 开发计划
     └── PROGRESS.md            # 本文档
@@ -95,15 +113,20 @@ MantisZip/
 ### 核心类
 | 类 | 位置 | 说明 |
 |-----|------|------|
-| IArchiveEngine | Abstractions | 压缩引擎接口 |
-| ArchiveItem | Abstractions | 文件项模型 |
-| ArchiveOptions | Abstractions | 压缩选项 |
-| ArchiveFormat | Abstractions | 压缩格式枚举 |
-| ZipEngine | Engines | ZIP 压缩/解压，GBK 编码支持 |
-| SevenZipEngine | Engines | 7z/RAR 解压（只读）|
-| TarGzEngine | Engines | TAR/GZ 压缩/解压 |
-| PasswordManager | Utils | 密码管理工具 |
-| ArchiveEntryExtractor | Utils | 单文件提取工具 (预览) |
+| IArchiveEngine | Core/Abstractions | 压缩引擎接口 |
+| ArchiveItem | Core/Abstractions | 文件项模型 |
+| ArchiveOptions | Core/Abstractions | 压缩选项 |
+| ArchiveProgress | Core/Abstractions | 进度报告（含 FilePercentComplete）|
+| ArchiveFormat | Core/Abstractions | 压缩格式枚举 |
+| ZipEngine | Core/Engines | ZIP 压缩/解压，GBK 编码，per-file 进度 |
+| SevenZipEngine | Core/Engines | 7z/RAR 解压；7z.exe 压缩 |
+| TarGzEngine | Core/Engines | TAR/GZ 压缩/解压 |
+| PasswordManager | Core/Utils | 密码管理工具 |
+| ArchiveEntryExtractor | Core/Utils | 单文件提取工具 (预览) |
+| AppSettings | UI | 用户设置 JSON 持久化单例 |
+| ShellIntegration | UI | 右键菜单注册/卸载 |
+| SystemIconHelper | UI | SHGetFileInfo 系统图标缓存 |
+| ProgressWindow | UI | 双进度条进度窗口 |
 
 ## 开发日志
 
@@ -154,6 +177,20 @@ MantisZip/
 - **过滤保护** - 添加 _isProgrammaticFilter 开关，防止 FilterFiles 误触 SelectionChanged 预览
 
 ---
+
+### 2026-05-09 (v0.2.0)
+- **AppSettings 设置系统** - JSON 持久化单例，支持压缩/解压/菜单/预览/高级五组配置
+- **SettingsWindow 设置窗口** - 五标签页 UI，Shell 状态检测 + 即时应用按钮
+- **ShellIntegration 右键菜单** - 层叠/独立双模式，per-verb 开关，AppliesTo 过滤器，shell32.dll 图标
+- **SystemIconHelper 系统图标** - SHGetFileInfo + ConcurrentDictionary 缓存
+- **ProgressWindow 双进度条** - 文件级进度 + 总体进度，ArchiveProgress 重载
+- **ArchiveProgress.FilePercentComplete** - Core 层新增 per-file 进度粒度
+- **ZipEngine per-file 进度** - ExtractAsync/CompressAsync 逐文件 0%→100%，100ms 节流
+- **CLI 入口点** - --compress（多实例 IPC）、--compress-quick、--extract（直连）、--open、--install/uninstall-shell
+- **MainWindow 增强** - 预览设置感知、异步图片解码 DecodePixelWidth=1920、提取后打开文件夹
+- **全局初始化 App.InitializeApp()** - 所有入口统一 GBK 编码注册
+- **ZipEngine 目录条目** - ExtractAsync 创建空目录而非跳过
+- **移除 bin/obj git 跟踪** - 清理已跟踪的构建产物
 
 ## 已知问题
 

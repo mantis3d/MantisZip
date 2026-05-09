@@ -2,10 +2,10 @@
 
 > 详细开发计划及进度跟踪文档
 
-**项目状态**: 🟡 开发中 (Phase 2)  
+**项目状态**: 🟡 开发中 (Phase 4)  
 **创建日期**: 2026-04-23  
 **最后更新**: 2026-05-09  
-**当前版本**: 0.1.3
+**当前版本**: 0.2.0
 
 ---
 
@@ -61,9 +61,16 @@ MantisZip/
 │   │   ├── Models/        # 数据模型
 │   │   └── Utils/         # 工具类
 │   └── MantisZip.UI/       # WPF 桌面应用
+│       ├── AppSettings.cs         # 用户设置（JSON 持久化）
+│       ├── SettingsWindow.xaml    # 设置窗口（Tabbed UI）
+│       ├── ShellIntegration.cs    # 右键菜单（HKCU 无需管理员）
+│       ├── SystemIconHelper.cs    # SHGetFileInfo 系统图标
+│       ├── ProgressWindow.xaml    # 双进度条进度窗口
+│       └── CompressSettingsWindow.xaml # 压缩配置面板
 ├── docs/
 │   ├── PLAN.md            # 本文档
 │   └── PROGRESS.md        # 开发进度文档
+├── AGENTS.md              # AI 代理开发指南
 └── MantisZip.sln          # 解决方案文件
 ```
 
@@ -76,9 +83,9 @@ MantisZip/
 | 格式 | 压缩 | 解压 | 加密 | 备注 |
 |------|:----:|:----:|:----:|------|
 | ZIP | ✅ | ✅ | ✅ | 默认 |
-| 7z | ❌ | ✅ | ✅ | 待开发压缩 |
-| TAR | ⬜ 待开发 | ⬜ 待开发 | ❌ | |
-| GZ (tar.gz) | ⬜ 待开发 | ⬜ 待开发 | ❌ | |
+| 7z | ✅ | ✅ | ✅ | 基于 7z.exe |
+| TAR | ✅ | ✅ | ❌ | |
+| GZ (tar.gz) | ✅ | ✅ | ❌ | |
 | RAR | ❌ | ✅ | ✅ | 需要 SevenZipExtractor |
 
 ### 2.2 核心功能
@@ -110,8 +117,8 @@ MantisZip/
 | P0 | 可取消操作 | ✅ 完成 |
 | P0 | 版本号显示 | ✅ 完成 |
 | P1 | 压缩配置面板 | ✅ 完成 |
-| P1 | 右键菜单集成 | ⬜ 待开发 |
-| P2 | 文件关联 | ⬜ 待开发 |
+| P1 | 右键菜单集成 | ✅ 完成 | 层叠/独立双模式，Per-verb 开关，图标 |
+| P2 | 文件关联 | ✅ 完成 | 通过 Shell 注册 AppliesTo 过滤器 |
 | P2 | 中/英文界面切换 | ⬜ 待开发 |
 | P2 | 亮/暗主题切换 | ⬜ 待开发 |
 
@@ -119,8 +126,9 @@ MantisZip/
 
 | 优先级 | 功能 | 状态 |
 |--------|------|------|
-| P1 | 发送到菜单 | ⬜ 待开发 |
-| P1 | 打开方式注册 | ⬜ 待开发 |
+| P1 | Shell 右键菜单 | ✅ 完成 |
+| P1 | 打开方式注册 | ✅ 完成 |
+| P2 | --compress-quick 快速压缩 | ✅ 完成 |
 | P2 | 桌面剪贴板监控 | ⬜ 待开发 |
 
 ---
@@ -175,9 +183,9 @@ MantisZip/
 
 | 序号 | 任务 | 状态 | 备注 |
 |------|------|------|------|
-| 4.1 | Shell 扩展安装程序 | ⬜ 待开发 | 右键菜单 |
-| 4.2 | 文件关联设置 | ⬜ 待开发 | |
-| 4.3 | "发送到" 菜单 | ⬜ 待开发 | |
+| 4.1 | Shell 右键菜单 | ✅ 完成 | 层叠/独立双模式，per-verb 开关，AppliesTo 过滤器，图标 |
+| 4.2 | 文件关联设置 | ✅ 完成 | 通过 Shell AppliesTo 实现 |
+| 4.3 | --compress-quick CLI | ✅ 完成 | 右键「压缩为 .zip」一键压缩 |
 | 4.4 | 安装包制作 | ⬜ 待开发 | |
 | 4.5 | 发布 Release | ⬜ 待开发 | |
 
@@ -189,9 +197,9 @@ MantisZip/
 Phase 1: ██████████████ 100%
 Phase 2: ██████████████ 100%
 Phase 3: ████░░░░░░░░░░ 40%
-Phase 4: ░░░░░░░░░░░░░  0%
+Phase 4: ████████░░░░░░ 60%
 
-总体进度: ██████████░░░░ 60%
+总体进度: ████████████░░ 75%
 ```
 
 ---
@@ -229,6 +237,7 @@ Phase 4: ░░░░░░░░░░░░░  0%
 | 2026-05-09 | v0.1.3 版本升级 | Sisyphus | |
 | 2026-05-09 | 修复 `_currentFormat` bug | Sisyphus | 改用扩展名映射格式 |
 | 2026-05-09 | 更新 PLAN.md 同步实际状态 | Sisyphus | Phase 2 全部标记完成 |
+| 2026-05-09 | v0.2.0: 设置系统 + Shell 集成 + per-file 进度 + CLI 入口 | Sisyphus | AppSettings, SettingsWindow, ShellIntegration, SystemIconHelper, 双进度条, --compress-quick, --extract 直连, --open |
 
 ---
 
@@ -236,11 +245,11 @@ Phase 4: ░░░░░░░░░░░░░  0%
 
 | 优先级 | 任务 | 说明 |
 |--------|------|------|
-| P0 | 修复 `_currentFormat` bug | 非 ZIP 格式预览走错代码路径 |
 | P1 | 实现分卷压缩 | ArchiveOptions.SplitSize 参数已定义 |
 | P1 | 开放加密压缩 UI | 引擎已支持 AES-256，需在压缩对话框添加加密选项 |
+| P2 | 修复 `_currentFormat` bug | 非 ZIP 格式预览走错代码路径（TarGz/Rar） |
 | P2 | 压缩方式选择 | Store/Deflate/BZip2/LZMA，需换 SharpCompress 库 |
-| P2 | Shell 右键菜单集成 | |
+| P2 | TarGzEngine 元数据修复 | 保留原始时间戳、支持压缩级别 |
 | P3 | 安装包与发布 | |
 
 ---
