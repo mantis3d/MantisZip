@@ -306,6 +306,20 @@ public partial class MainWindow : Window
         return ext is ".zip" or ".7z" or ".rar" or ".tar" or ".tgz" or ".gz" or ".bz2" or ".cab" or ".iso";
     }
 
+    private static ArchiveFormat GetFormatByExtension(string path)
+    {
+        var ext = Path.GetExtension(path).ToLowerInvariant();
+        if (path.EndsWith(".tar.gz", StringComparison.OrdinalIgnoreCase)) return ArchiveFormat.Tar;
+        return ext switch
+        {
+            ".zip" => ArchiveFormat.Zip,
+            ".7z" => ArchiveFormat.SevenZip,
+            ".tar" or ".tgz" or ".gz" => ArchiveFormat.Tar,
+            ".rar" => ArchiveFormat.Rar,
+            _ => ArchiveFormat.Zip
+        };
+    }
+
     private async Task LoadArchiveAsync(string archivePath)
     {
         try
@@ -329,7 +343,7 @@ public partial class MainWindow : Window
                 return;
             }
 
-            _currentFormat = engine.CanHandle(ArchiveFormat.Zip) ? ArchiveFormat.Zip : ArchiveFormat.SevenZip;
+            _currentFormat = GetFormatByExtension(archivePath);
 
             var items = await engine.ListEntriesAsync(archivePath);
 
