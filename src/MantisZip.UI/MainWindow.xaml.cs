@@ -245,7 +245,8 @@ public partial class MainWindow : Window
                 _currentArchivePath!,
                 files,
                 new ArchiveOptions { CompressionLevel = AppSettings.Instance.DefaultLevel },
-                progress);
+                progress,
+                entryBasePath: string.IsNullOrEmpty(_currentFolder) ? null : _currentFolder);
 
             // 刷新文件列表
             await LoadArchiveAsync(_currentArchivePath!);
@@ -309,18 +310,24 @@ public partial class MainWindow : Window
         // 准备临时提取目录
         _dragTempDir = Path.Combine(Path.GetTempPath(), "MantisZip", "DragDrop", Guid.NewGuid().ToString());
         Directory.CreateDirectory(_dragTempDir);
+        ShowProgress(true);
         SetStatus($"正在提取 {filesToDrag.Count} 个文件...");
 
         try
         {
             // 逐个提取到临时目录
             var extractedPaths = new List<string>();
-            foreach (var item in filesToDrag)
+            var totalDrag = filesToDrag.Count;
+            for (int i = 0; i < totalDrag; i++)
             {
+                var item = filesToDrag[i];
                 var outputPath = Path.Combine(_dragTempDir, item.Name);
+                ProgressBar.Value = (double)i / totalDrag * 100;
+                ProgressText.Text = $"正在提取: {item.NameDisplay ?? item.Name}";
                 await ExtractEntryForDragAsync(item, outputPath);
                 extractedPaths.Add(outputPath);
             }
+            ShowProgress(false);
 
             // 启动拖拽（阻塞直到拖拽操作结束）
             var data = new DataObject(DataFormats.FileDrop, extractedPaths.ToArray());

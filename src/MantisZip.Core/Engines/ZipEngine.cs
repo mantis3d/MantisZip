@@ -288,7 +288,7 @@ public class ZipEngine : IArchiveEngine
         }, cancellationToken);
     }
 
-    public async Task AddToArchiveAsync(string archivePath, string[] sourcePaths, ArchiveOptions options, IProgress<ArchiveProgress>? progress = null, CancellationToken cancellationToken = default)
+    public async Task AddToArchiveAsync(string archivePath, string[] sourcePaths, ArchiveOptions options, IProgress<ArchiveProgress>? progress = null, CancellationToken cancellationToken = default, string? entryBasePath = null)
     {
         await Task.Run(() =>
         {
@@ -305,13 +305,15 @@ public class ZipEngine : IArchiveEngine
                     var dirName = Path.GetFileName(sourcePath.TrimEnd('\\', '/'));
                     foreach (var file in Directory.GetFiles(sourcePath, "*", SearchOption.AllDirectories))
                     {
-                        var entryName = Path.Combine(dirName, Path.GetRelativePath(sourcePath, file));
+                        var relativePath = Path.Combine(dirName, Path.GetRelativePath(sourcePath, file));
+                        var entryName = string.IsNullOrEmpty(entryBasePath) ? relativePath : entryBasePath + "/" + relativePath;
                         files.Add((file, entryName));
                     }
                 }
                 else if (File.Exists(sourcePath))
                 {
-                    files.Add((sourcePath, Path.GetFileName(sourcePath)));
+                    var entryName = string.IsNullOrEmpty(entryBasePath) ? Path.GetFileName(sourcePath) : entryBasePath + "/" + Path.GetFileName(sourcePath);
+                    files.Add((sourcePath, entryName));
                 }
             }
 

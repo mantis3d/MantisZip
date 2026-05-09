@@ -150,7 +150,7 @@ public class SevenZipEngine : IArchiveEngine
         }, cancellationToken);
     }
 
-    public async Task AddToArchiveAsync(string archivePath, string[] sourcePaths, ArchiveOptions options, IProgress<ArchiveProgress>? progress = null, CancellationToken cancellationToken = default)
+    public async Task AddToArchiveAsync(string archivePath, string[] sourcePaths, ArchiveOptions options, IProgress<ArchiveProgress>? progress = null, CancellationToken cancellationToken = default, string? entryBasePath = null)
     {
         await Task.Run(() =>
         {

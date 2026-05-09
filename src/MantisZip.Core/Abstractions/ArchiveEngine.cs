@@ -109,7 +109,8 @@ public interface IArchiveEngine
     /// <summary>
     /// 向已存在的压缩包中添加文件（原地更新）
     /// </summary>
-    Task AddToArchiveAsync(string archivePath, string[] sourcePaths, ArchiveOptions options, IProgress<ArchiveProgress>? progress = null, CancellationToken cancellationToken = default);
+    /// <param name="entryBasePath">压缩包内的目标路径，例如 "subdir/" 表示添加到 subdir 目录下，null 或 "" 表示根目录。</param>
+    Task AddToArchiveAsync(string archivePath, string[] sourcePaths, ArchiveOptions options, IProgress<ArchiveProgress>? progress = null, CancellationToken cancellationToken = default, string? entryBasePath = null);
 }
 
 /// <summary>
