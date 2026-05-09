@@ -56,7 +56,7 @@
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
-                    <TextBox x:Name="OutputPathTextBox" Grid.Column="0" Height="24"/>
+                    <TextBox x:Name="OutputPathTextBox" Grid.Column="0" Height="24" TextChanged="OutputPathTextBox_TextChanged"/>
                     <Button x:Name="BrowseOutputButton" Content="浏览" Width="60" Height="24" Grid.Column="1" Click="BrowseOutputButton_Click"/>
                 </Grid>
 

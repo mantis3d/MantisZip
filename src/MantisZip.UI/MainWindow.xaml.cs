@@ -1,4 +1,5 @@
-﻿using System.IO;
+﻿using System.Diagnostics;
+using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
@@ -6,6 +7,7 @@ using System.Windows.Input;
 using System.Collections.Generic;
 using System.Linq;
 using System.ComponentModel;
+using System.Windows.Media;
 using MantisZip.Core;
 using MantisZip.Core.Abstractions;
 using MantisZip.Core.Engines;
@@ -32,9 +34,10 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
         LoadWindowSettings();
+        UpdateShellMenuItems();
     }
 
-#region 窗口大小持久化
+    #region 窗口大小持久化
 
     private string GetWindowConfigPath()
     {
@@ -213,14 +216,10 @@ public partial class MainWindow : Window
     {
         if (string.IsNullOrEmpty(_currentArchivePath)) return;
 
-        var dialog = new Ookii.Dialogs.Wpf.VistaFolderBrowserDialog
+        var dest = ResolveExtractDestination(_currentArchivePath);
+        if (dest != null)
         {
-            Description = "选择解压目录"
-        };
-
-        if (dialog.ShowDialog() == true)
-        {
-            await ExtractAsync(_currentArchivePath, dialog.SelectedPath);
+            await ExtractAsync(_currentArchivePath, dest);
         }
     }
 
@@ -271,6 +270,14 @@ public partial class MainWindow : Window
             MessageBoxImage.Information);
     }
 
+    private void Settings_Click(object sender, RoutedEventArgs e)
+    {
+        var window = new SettingsWindow();
+        window.ShowDialog();
+        // 设置可能已变更，刷新 Shell 菜单状态
+        UpdateShellMenuItems();
+    }
+
     private void ShowSubFolders_Click(object sender, RoutedEventArgs e)
     {
         // 刷新当前目录
@@ -281,6 +288,48 @@ public partial class MainWindow : Window
     {
         var window = new PasswordManagerWindow();
         window.ShowDialog();
+    }
+
+    private void InstallShell_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            ShellIntegration.Install();
+            MessageBox.Show(
+                "Shell 右键菜单已安装。\n\n" +
+                "• 右键任意文件/文件夹 → 用 MantisZip 压缩\n" +
+                "• 右键压缩包 (.zip/.7z/.rar 等) → 用 MantisZip 解压",
+                "MantisZip", MessageBoxButton.OK, MessageBoxImage.Information);
+            UpdateShellMenuItems();
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"安装失败: {ex.Message}", "错误",
+                MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
+    private void UninstallShell_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            ShellIntegration.Uninstall();
+            MessageBox.Show("Shell 右键菜单已卸载", "MantisZip",
+                MessageBoxButton.OK, MessageBoxImage.Information);
+            UpdateShellMenuItems();
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"卸载失败: {ex.Message}", "错误",
+                MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
+    private void UpdateShellMenuItems()
+    {
+        var installed = ShellIntegration.IsInstalled;
+        ShellInstallMenuItem.IsEnabled = !installed;
+        ShellUninstallMenuItem.IsEnabled = installed;
     }
 
     private void TestArchive_Click(object sender, RoutedEventArgs e)
@@ -320,7 +369,7 @@ public partial class MainWindow : Window
         };
     }
 
-    private async Task LoadArchiveAsync(string archivePath)
+    internal async Task LoadArchiveAsync(string archivePath)
     {
         try
         {
@@ -356,7 +405,10 @@ public partial class MainWindow : Window
                 CompressedSize = i.CompressedSize,
                 LastModified = i.LastModified,
                 IsDirectory = i.IsDirectory,
-                IsEncrypted = i.IsEncrypted
+                IsEncrypted = i.IsEncrypted,
+                IconSource = i.IsDirectory
+                    ? SystemIconHelper.GetFolderIcon()
+                    : SystemIconHelper.GetFileIcon(Path.GetExtension(i.Name))
             }).ToList();
 
             // 构建目录树
@@ -416,6 +468,9 @@ public partial class MainWindow : Window
             SetStatus($"解压完成: {Path.GetFileName(archivePath)}");
             ProgressBar.Value = 100;
             ProgressText.Text = "100%";
+
+            if (AppSettings.Instance.OpenFolderAfterExtract)
+                OpenInExplorer(destinationPath);
         }
         catch (Exception ex)
         {
@@ -447,6 +502,9 @@ public partial class MainWindow : Window
                             await engine.ExtractAsync(archivePath, destinationPath, password, progress);
 
                             SetStatus($"解压完成: {Path.GetFileName(archivePath)}");
+
+                            if (AppSettings.Instance.OpenFolderAfterExtract)
+                                OpenInExplorer(destinationPath);
 
                             // 如果选择记住密码，保存
                             if (dialog.RememberPassword)
@@ -567,6 +625,45 @@ public partial class MainWindow : Window
     {
         ProgressBar.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
         ProgressText.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    /// <summary>
+    /// 根据设置或用户选择返回解压目标目录。返回 null 表示用户取消了操作。
+    /// </summary>
+    private string? ResolveExtractDestination(string archivePath)
+    {
+        var settings = AppSettings.Instance;
+        var destSetting = settings.ExtractDestination;
+
+        if (destSetting == "same-dir")
+        {
+            var dir = Path.GetDirectoryName(archivePath);
+            if (!string.IsNullOrEmpty(dir)) return dir;
+        }
+        else if (destSetting == "desktop")
+        {
+            return Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
+        }
+
+        // "ask" 或未知值 → 弹出选择对话框
+        var dialog = new Ookii.Dialogs.Wpf.VistaFolderBrowserDialog
+        {
+            Description = "选择解压目录"
+        };
+        return dialog.ShowDialog() == true ? dialog.SelectedPath : null;
+    }
+
+    /// <summary>
+    /// 在文件资源管理器中打开指定路径。
+    /// </summary>
+    private static void OpenInExplorer(string path)
+    {
+        try
+        {
+            if (Directory.Exists(path))
+                Process.Start("explorer.exe", path);
+        }
+        catch { /* 忽略打开失败 */ }
     }
 
     private string FormatSize(long bytes)
@@ -890,11 +987,6 @@ private void FolderTree_SelectedItemChanged(object sender, RoutedPropertyChanged
         ".swift", ".kt", ".java", ".rb", ".go", ".rs", ".php", ".vue"
     };
 
-    /// <summary>
-    /// 文本预览最大大小 (5 MB)
-    /// </summary>
-    private const long MaxTextPreviewSize = 5 * 1024 * 1024;
-
     private async Task ShowPreviewAsync(ArchiveItem item)
     {
         try
@@ -903,17 +995,17 @@ private void FolderTree_SelectedItemChanged(object sender, RoutedPropertyChanged
             ClearPreviewTemp();
             HidePreview();
 
+            var s = AppSettings.Instance;
             var ext = Path.GetExtension(item.Name);
-
-            // 检查文件大小（仅非目录文件）
-            if (item.Size > MaxTextPreviewSize && TextExtensions.Contains(ext))
-            {
-                ShowUnsupportedPreview(item, $"📄 文件过大 ({(double)item.Size / 1024 / 1024:F1} MB)，超过文本预览限制 (5 MB)");
-                return;
-            }
 
             if (ImageExtensions.Contains(ext))
             {
+                if (!s.EnableImagePreview)
+                {
+                    ShowUnsupportedPreview(item, "🔍 图片预览已禁用（可在设置中启用）");
+                    return;
+                }
+
                 _previewTempDir = Path.Combine(Path.GetTempPath(), "MantisZip", Guid.NewGuid().ToString());
                 Directory.CreateDirectory(_previewTempDir);
                 var tempFile = Path.Combine(_previewTempDir, Path.GetFileName(item.Name) ?? "preview" + ext);
@@ -921,10 +1013,24 @@ private void FolderTree_SelectedItemChanged(object sender, RoutedPropertyChanged
                 await Core.Utils.ArchiveEntryExtractor.ExtractEntryAsync(
                     _currentArchivePath!, item.Name, tempFile, _currentFormat);
 
-                ShowImagePreview(tempFile, item);
+                await ShowImagePreviewAsync(tempFile, item);
             }
             else if (TextExtensions.Contains(ext))
             {
+                if (!s.EnableTextPreview)
+                {
+                    ShowUnsupportedPreview(item, "📄 文本预览已禁用（可在设置中启用）");
+                    return;
+                }
+
+                // 检查文件大小
+                if (item.Size > s.MaxTextPreviewBytes)
+                {
+                    var limitMb = s.MaxTextPreviewBytes / (1024.0 * 1024.0);
+                    ShowUnsupportedPreview(item, $"📄 文件过大 ({(double)item.Size / 1024 / 1024:F1} MB)，超过文本预览限制 ({limitMb:F0} MB)");
+                    return;
+                }
+
                 _previewTempDir = Path.Combine(Path.GetTempPath(), "MantisZip", Guid.NewGuid().ToString());
                 Directory.CreateDirectory(_previewTempDir);
                 var tempFile = Path.Combine(_previewTempDir, Path.GetFileName(item.Name) ?? "preview.txt");
@@ -945,16 +1051,26 @@ private void FolderTree_SelectedItemChanged(object sender, RoutedPropertyChanged
         }
     }
 
-    private void ShowImagePreview(string filePath, ArchiveItem item)
+    /// <summary>
+    /// 异步加载并显示图片预览。在后台线程解码以避免卡 UI，
+    /// 并限制解码尺寸 (DecodePixelWidth=1920) 减少内存开销。
+    /// </summary>
+    private async Task ShowImagePreviewAsync(string filePath, ArchiveItem item)
     {
         try
         {
-            var bitmap = new System.Windows.Media.Imaging.BitmapImage();
-            bitmap.BeginInit();
-            bitmap.CacheOption = System.Windows.Media.Imaging.BitmapCacheOption.OnLoad;
-            bitmap.UriSource = new Uri(filePath);
-            bitmap.EndInit();
-            bitmap.Freeze(); // 跨线程安全
+            // 后台线程解码，不阻塞 UI
+            var bitmap = await Task.Run(() =>
+            {
+                var bmp = new System.Windows.Media.Imaging.BitmapImage();
+                bmp.BeginInit();
+                bmp.CacheOption = System.Windows.Media.Imaging.BitmapCacheOption.OnLoad;
+                bmp.UriSource = new Uri(filePath);
+                bmp.DecodePixelWidth = 1920; // 限制解码尺寸，避免大图全分辨率解码
+                bmp.EndInit();
+                bmp.Freeze(); // 跨线程安全
+                return bmp;
+            });
 
             PreviewImage.Source = bitmap;
             PreviewImage.Visibility = Visibility.Visible;
@@ -1114,22 +1230,26 @@ public class ArchiveItem : Core.Abstractions.ArchiveItem
     public string DisplayName { get; set; } = string.Empty;  // 显示用的名称
     public string NameForSort { get; set; } = string.Empty;  // 排序用的名称
 
-    public new string SizeDisplay => IsDirectory ? "--" : FormatSize(Size);
-    public new string CompressedSizeDisplay => IsDirectory ? "--" : FormatSize(CompressedSize);
+    /// <summary>
+    /// 文件系统图标，由 SystemIconHelper 按扩展名加载。
+    /// 在 LoadArchiveAsync 中设置后不再变更。
+    /// </summary>
+    public ImageSource? IconSource { get; set; }
 
-    public new string NameDisplay 
+    public string SizeDisplay => IsDirectory ? "--" : FormatSize(Size);
+    public string CompressedSizeDisplay => IsDirectory ? "--" : FormatSize(CompressedSize);
+
+    public string NameDisplay 
     { 
         get 
         {
             if (!string.IsNullOrEmpty(DisplayName))
-            {
-                return (IsDirectory ? "📁 " : "📄 ") + DisplayName;
-            }
-            return (IsDirectory ? "📁 " : "📄 ") + Name;
+                return DisplayName;
+            return Name;
         } 
     }
 
-    public new int SortOrder => IsDirectory ? 0 : 1;
+    public int SortOrder => IsDirectory ? 0 : 1;
 
     private static string FormatSize(long bytes)
     {

@@ -49,6 +49,11 @@
             </MenuItem>
             <MenuItem Header="工具(_T)">
                 <MenuItem Header="密码管理器(_P)..." Click="PasswordManager_Click"/>
+                <Separator/>
+                <MenuItem Header="设置(_S)..." Click="Settings_Click"/>
+                <Separator/>
+                <MenuItem x:Name="ShellInstallMenuItem" Header="安装 Shell 右键菜单" Click="InstallShell_Click"/>
+                <MenuItem x:Name="ShellUninstallMenuItem" Header="卸载 Shell 右键菜单" Click="UninstallShell_Click"/>
             </MenuItem>
             <MenuItem Header="帮助(_H)">
                 <MenuItem Header="关于(_A)" Click="About_Click"/>
@@ -174,7 +179,16 @@
                                            SelectionChanged="FileListGrid_SelectionChanged"
                                            PreviewMouseDoubleClick="FileListGrid_PreviewMouseDoubleClick">
                                     <DataGrid.Columns>
-                                        <DataGridTextColumn Header="名称" Binding="{Binding NameDisplay}" Width="*"/>
+                                        <DataGridTemplateColumn Header="名称" Width="*">
+                                            <DataGridTemplateColumn.CellTemplate>
+                                                <DataTemplate>
+                                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                                        <Image Source="{Binding IconSource}" Width="16" Height="16" Margin="0,0,6,0"/>
+                                                        <TextBlock Text="{Binding NameDisplay}" VerticalAlignment="Center"/>
+                                                    </StackPanel>
+                                                </DataTemplate>
+                                            </DataGridTemplateColumn.CellTemplate>
+                                        </DataGridTemplateColumn>
                                         <DataGridTextColumn Header="大小" Binding="{Binding SizeDisplay}" Width="100"/>
                                         <DataGridTextColumn Header="压缩后" Binding="{Binding CompressedSizeDisplay}" Width="100"/>
                                         <DataGridTextColumn Header="修改日期" Binding="{Binding LastModified, StringFormat='yyyy-MM-dd HH:mm'}" Width="150"/>

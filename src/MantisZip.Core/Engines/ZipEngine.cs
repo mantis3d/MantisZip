@@ -24,6 +24,8 @@ public class ZipEngine : IArchiveEngine
     {
         await Task.Run(() =>
         {
+            // 支持 GBK 编码（解决中文文件名乱码问题）
+            ZipStrings.CodePage = 936;
             using var zipFile = new ZipFile(archivePath);
             if (!string.IsNullOrEmpty(password))
             {
@@ -39,7 +41,14 @@ public class ZipEngine : IArchiveEngine
             {
                 cancellationToken.ThrowIfCancellationRequested();
 
-                if (entry.IsDirectory) continue;
+                if (entry.IsDirectory)
+                {
+                    // 主动创建目录条目，否则带 "." 的目录名或空目录会丢失
+                    var dirPath = Path.Combine(destinationPath, entry.Name);
+                    if (!Directory.Exists(dirPath))
+                        Directory.CreateDirectory(dirPath);
+                    continue;
+                }
 
                 var outputPath = Path.Combine(destinationPath, entry.Name);
                 var outputDir = Path.GetDirectoryName(outputPath);
@@ -48,22 +57,53 @@ public class ZipEngine : IArchiveEngine
                     Directory.CreateDirectory(outputDir);
                 }
 
-                var progressReport = new ArchiveProgress
+                progress?.Report(new ArchiveProgress
                 {
                     CurrentFile = entry.Name,
                     TotalFiles = entries.Count,
                     ProcessedFiles = processedFiles,
                     TotalBytes = totalBytes,
                     ProcessedBytes = processedBytes,
-                    PercentComplete = totalBytes > 0 ? (double)processedBytes / totalBytes * 100 : 0
-                };
-                progress?.Report(progressReport);
+                    PercentComplete = totalBytes > 0 ? (double)processedBytes / totalBytes * 100 : 0,
+                    FilePercentComplete = 0
+                });
 
                 using var inputStream = zipFile.GetInputStream(entry);
                 using var outputStream = new FileStream(outputPath, FileMode.Create, FileAccess.Write);
-                inputStream.CopyTo(outputStream);
 
-                processedBytes += entry.Size;
+                // 逐块拷贝，上报当前文件进度
+                var entrySize = entry.Size;
+                var entryProcessed = 0L;
+                var buffer = new byte[81920];
+                var lastReportTime = DateTime.Now;
+                var reportInterval = TimeSpan.FromMilliseconds(100);
+                int read;
+                while ((read = inputStream.Read(buffer, 0, buffer.Length)) > 0)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    outputStream.Write(buffer, 0, read);
+                    entryProcessed += read;
+
+                    var now = DateTime.Now;
+                    if (now - lastReportTime >= reportInterval || entryProcessed >= entrySize)
+                    {
+                        var filePct = entrySize > 0 ? (double)entryProcessed / entrySize * 100 : 100;
+                        var overallPct = totalBytes > 0 ? (double)(processedBytes + entryProcessed) / totalBytes * 100 : 0;
+                        progress?.Report(new ArchiveProgress
+                        {
+                            CurrentFile = entry.Name,
+                            TotalFiles = entries.Count,
+                            ProcessedFiles = processedFiles,
+                            TotalBytes = totalBytes,
+                            ProcessedBytes = processedBytes + entryProcessed,
+                            PercentComplete = overallPct,
+                            FilePercentComplete = filePct
+                        });
+                        lastReportTime = now;
+                    }
+                }
+
+                processedBytes += entrySize;
                 processedFiles++;
             }
 
@@ -74,7 +114,8 @@ public class ZipEngine : IArchiveEngine
                 ProcessedFiles = processedFiles,
                 TotalBytes = totalBytes,
                 ProcessedBytes = processedBytes,
-                PercentComplete = 100
+                PercentComplete = 100,
+                FilePercentComplete = 100
             });
         }, cancellationToken);
     }
@@ -135,8 +176,17 @@ public class ZipEngine : IArchiveEngine
                 var buffer = new byte[4096];
                 using var fsInput = File.OpenRead(fullPath);
                 var totalRead = 0;
-                
-                while (totalRead < fi.Length)
+                var fiLen = fi.Length;
+
+                // 开始压缩当前文件
+                progress?.Report(new ArchiveProgress
+                {
+                    CurrentFile = "正在压缩: " + relativePath,
+                    PercentComplete = totalBytes > 0 ? (double)processedBytes / totalBytes * 100 : 0,
+                    FilePercentComplete = 0
+                });
+
+                while (totalRead < fiLen)
                 {
                     cancellationToken.ThrowIfCancellationRequested();
                     
@@ -148,13 +198,15 @@ public class ZipEngine : IArchiveEngine
                     processedBytes += read;
 
                     var now = DateTime.Now;
-                    if (now - lastReportTime >= reportInterval || totalRead >= fi.Length)
+                    if (now - lastReportTime >= reportInterval || totalRead >= fiLen)
                     {
                         var pct = totalBytes > 0 ? (double)processedBytes / (double)totalBytes * 100 : 0;
+                        var filePct = fiLen > 0 ? (double)totalRead / fiLen * 100 : 100;
                         progress?.Report(new ArchiveProgress
                         {
                             CurrentFile = "正在压缩: " + relativePath,
-                            PercentComplete = pct
+                            PercentComplete = pct,
+                            FilePercentComplete = filePct
                         });
                         lastReportTime = now;
                     }
@@ -163,7 +215,7 @@ public class ZipEngine : IArchiveEngine
                 zipStream.CloseEntry();
             }
 
-            progress?.Report(new ArchiveProgress { PercentComplete = 100 });
+            progress?.Report(new ArchiveProgress { PercentComplete = 100, FilePercentComplete = 100 });
         }
         catch (OperationCanceledException)
         {
@@ -211,6 +263,7 @@ public class ZipEngine : IArchiveEngine
         {
             try
             {
+                ZipStrings.CodePage = 936;
                 using var zipFile = new ZipFile(archivePath);
                 if (!string.IsNullOrEmpty(password))
                 {

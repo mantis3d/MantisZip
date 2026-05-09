@@ -1,9 +1,11 @@
 using System.Windows;
+using MantisZip.Core.Abstractions;
 
 namespace MantisZip.UI;
 
 /// <summary>
 /// 进度窗口 - 解压/压缩共用
+/// 显示两个进度条：当前文件进度（上）+ 总体进度（下）
 /// </summary>
 public partial class ProgressWindow : Window
 {
@@ -17,69 +19,86 @@ public partial class ProgressWindow : Window
     }
 
     /// <summary>
-    /// 设置进度
+    /// 从 ArchiveProgress 更新两个进度条。
     /// </summary>
-    public void SetProgress(double percent, string currentFile)
+    public void SetProgress(ArchiveProgress p)
     {
-        App.Log("【ProgressWindow】SetProgress: {0}% - {1}", percent, currentFile);
-        
-        // 尝试 BeginInvoke 代替 Invoke
         if (Dispatcher.CheckAccess())
         {
-            App.Log("【ProgressWindow】同线程，直接执行");
-            ProgressBar.Value = percent;
-            PercentText.Text = $"{percent:F1}%";
-            FileNameText.Text = currentFile;
+            TotalProgressBar.Value = p.PercentComplete;
+            PercentText.Text = $"{p.PercentComplete:F1}%";
+            FileNameText.Text = p.CurrentFile;
+
+            if (p.FilePercentComplete.HasValue)
+            {
+                FileProgressBar.Value = p.FilePercentComplete.Value;
+                FilePercentText.Text = $"{p.FilePercentComplete.Value:F0}%";
+            }
         }
         else
         {
-            App.Log("【ProgressWindow】BeginInvoke...");
             Dispatcher.BeginInvoke(() =>
             {
-                App.Log("【ProgressWindow】BeginInvoke 执行");
-                ProgressBar.Value = percent;
-                PercentText.Text = $"{percent:F1}%";
-                FileNameText.Text = currentFile;
+                TotalProgressBar.Value = p.PercentComplete;
+                PercentText.Text = $"{p.PercentComplete:F1}%";
+                FileNameText.Text = p.CurrentFile;
+
+                if (p.FilePercentComplete.HasValue)
+                {
+                    FileProgressBar.Value = p.FilePercentComplete.Value;
+                    FilePercentText.Text = $"{p.FilePercentComplete.Value:F0}%";
+                }
             });
         }
     }
 
     /// <summary>
-    /// 设置完成状态
+    /// 兼容旧调用：只设总体进度。
+    /// </summary>
+    public void SetProgress(double percent, string currentFile)
+    {
+        SetProgress(new ArchiveProgress
+        {
+            PercentComplete = percent,
+            CurrentFile = currentFile
+        });
+    }
+
+    /// <summary>
+    /// 设置完成状态。
     /// </summary>
     public void SetComplete(string message)
     {
         Dispatcher.Invoke(() =>
         {
-            ProgressBar.Value = 100;
+            TotalProgressBar.Value = 100;
             PercentText.Text = "100%";
-            StatusText.Text = message;
+            FileProgressBar.Value = 100;
+            FilePercentText.Text = "100%";
             FileNameText.Text = "完成";
             CancelButton.Content = "关闭";
         });
     }
 
     /// <summary>
-    /// 设置错误状态
+    /// 设置错误状态。
     /// </summary>
     public void SetError(string message)
     {
         Dispatcher.Invoke(() =>
         {
-            StatusText.Text = message;
             CancelButton.Content = "关闭";
         });
     }
 
     private void CancelButton_Click(object sender, RoutedEventArgs e)
     {
-        // 取消操作
         _cts?.Cancel();
         Close();
     }
 
     /// <summary>
-    /// 初始化取消令牌
+    /// 初始化取消令牌。
     /// </summary>
     public void InitCancellation()
     {

@@ -13,9 +13,35 @@ public partial class CompressSettingsWindow : Window
 {
     private readonly List<string> _sourcePaths = new();
 
-public CompressSettingsWindow()
+    /// <summary>
+    /// 是否为独立模式（由 --compress 直接启动，无主窗口）。
+    /// 独立模式下压缩完成后自动关闭窗口并退出程序。
+    /// </summary>
+    public bool StandaloneMode { get; set; }
+
+    public CompressSettingsWindow()
     {
         InitializeComponent();
+        LoadDefaultsFromSettings();
+    }
+
+    private void LoadDefaultsFromSettings()
+    {
+        var s = AppSettings.Instance;
+
+        // 默认格式
+        foreach (System.Windows.Controls.ComboBoxItem item in FormatComboBox.Items)
+        {
+            if ((string)item.Tag == s.DefaultFormat)
+            {
+                FormatComboBox.SelectedItem = item;
+                break;
+            }
+        }
+
+        // 默认压缩级别
+        LevelSlider.Value = s.DefaultLevel;
+        LevelText.Text = s.DefaultLevel.ToString();
     }
 
     /// <summary>
@@ -202,7 +228,7 @@ try
                 App.Log("【UI】Progress 回调 BEGIN: {0}%", p.PercentComplete);
                 try
                 {
-                    progressWindow.SetProgress(p.PercentComplete, p.CurrentFile);
+                    progressWindow.SetProgress(p);
                     App.Log("【UI】SetProgress 调用成功");
                 }
                 catch (Exception ex)
@@ -231,6 +257,7 @@ try
             
             // 关闭进度窗口
             progressWindow.Close();
+            this.Close();
         }
 catch (OperationCanceledException)
         {

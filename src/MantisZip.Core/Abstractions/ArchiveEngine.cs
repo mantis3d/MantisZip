@@ -71,6 +71,9 @@ public class ArchiveProgress
     public int TotalFiles { get; set; }
     public int ProcessedFiles { get; set; }
     public double PercentComplete { get; set; }
+
+    /// <summary>当前文件的解压/压缩进度 (0–100)，null 表示无此信息。</summary>
+    public double? FilePercentComplete { get; set; }
 }
 
 /// <summary>
