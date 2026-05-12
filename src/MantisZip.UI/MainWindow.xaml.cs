@@ -1,4 +1,4 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
 using System.IO;
 using System.Windows;
 using System.Windows.Controls;
@@ -14,6 +14,7 @@ using MantisZip.Core.Engines;
 using MantisZip.Core.Utils;
 using Microsoft.Win32;
 using System.Text.Json;
+using Markdig;
 
 namespace MantisZip.UI;
 
@@ -27,16 +28,47 @@ public partial class MainWindow : Window
     private List<ArchiveItem> _allItems = new();  // 存储所有文件项
     private string _currentFolder = "";  // 当前目录
     private string? _previewTempDir;        // 预览临时目录
-    private GridLength? _lastPreviewHeight;  // 上次的预览行高度（保存 GridLength 以保留 Star/Pixel 类型）
+    private readonly Dictionary<int, double> _lastPreviewSizes = new()
+    {
+        { 1, 0 }, { 2, 0 }, { 3, 0 }, { 4, 0 }
+    }; // 每个位置独立记忆大小（高度:位置1/2/3, 宽度:位置4）
+    private int _lastAppliedPosition = 1;    // 上次应用的布局位置，用于检测变更
     private bool _isProgrammaticFilter;      // 编程触发的 FilterFiles，应跳过 SelectionChanged 预览
+    private bool _previewPanelEnabled = true; // 工具栏预览开关状态
     private Point _dragStartPoint;           // 文件列表拖拽起点
     private string? _dragTempDir;            // 拖拽提取临时目录
+    private bool _isOwnDrag;                 // 当前拖拽是否来自本窗口
 
     public MainWindow()
     {
         InitializeComponent();
         LoadWindowSettings();
-        UpdateShellMenuItems();
+        ApplyPreviewPosition(AppSettings.Instance.PreviewPosition);
+        ApplyInfoPanelOrientation(AppSettings.Instance.InfoPanelOrientation);
+        _previewPanelEnabled = AppSettings.Instance.ShowPreviewPanel;
+        PreviewToggleBtn.IsChecked = _previewPanelEnabled;
+        if (!_previewPanelEnabled)
+            PreviewPanel.Visibility = Visibility.Collapsed;
+        Activated += MainWindow_Activated;
+    }
+
+    private void MainWindow_Activated(object? sender, EventArgs e)
+    {
+        var currentPos = AppSettings.Instance.PreviewPosition;
+        if (currentPos != _lastAppliedPosition)
+        {
+            _lastAppliedPosition = currentPos;
+            if (PreviewPanel.Visibility == Visibility.Visible)
+            {
+                ShowPreviewPanel();
+            }
+            else
+            {
+                ApplyPreviewPosition(currentPos);
+            }
+        }
+        // 始终刷新信息面板方向（可能从 SettingsWindow 更改）
+        ApplyInfoPanelOrientation(AppSettings.Instance.InfoPanelOrientation);
     }
 
     #region 窗口大小持久化
@@ -54,6 +86,9 @@ public partial class MainWindow : Window
         public double Height { get; set; }
         public double TreeColumnWidth { get; set; }
         public double PreviewRowHeight { get; set; }
+        public double PreviewColumnWidth { get; set; }
+        public double PreviewTreeHeight { get; set; }   // 位置2
+        public double PreviewFilesHeight { get; set; }  // 位置3
     }
 
     private void LoadWindowSettings()
@@ -81,16 +116,19 @@ public partial class MainWindow : Window
                     }
                 }
 
-                // 恢复预览行高度（仅在有存档加载时使用）
-                if (obj?.PreviewRowHeight > 0)
+                // 恢复各位置的预览大小
+                if (obj != null)
                 {
-                    _lastPreviewHeight = new GridLength(obj.PreviewRowHeight);
+                    if (obj.PreviewRowHeight > 0) _lastPreviewSizes[1] = obj.PreviewRowHeight;
+                    if (obj.PreviewTreeHeight > 0) _lastPreviewSizes[2] = obj.PreviewTreeHeight;
+                    if (obj.PreviewFilesHeight > 0) _lastPreviewSizes[3] = obj.PreviewFilesHeight;
+                    if (obj.PreviewColumnWidth > 0) _lastPreviewSizes[4] = obj.PreviewColumnWidth;
                 }
             }
         }
-        catch
+        catch (Exception ex)
         {
-            // 如果读取失败，使用默认大小
+            App.LogDebug("LoadWindowConfig: failed to read config: {0}", ex.Message);
         }
     }
 
@@ -117,30 +155,28 @@ public partial class MainWindow : Window
                 }
             }
 
-            // 保存预览行高度（如果当前可见且是像素值）
-            double previewHeight = 0;
-            if (PreviewPanel.Visibility == Visibility.Visible && PreviewRow.Height.GridUnitType == GridUnitType.Pixel)
-            {
-                previewHeight = PreviewRow.Height.Value;
-            }
-            else if (_lastPreviewHeight?.Value > 0)
-            {
-                previewHeight = _lastPreviewHeight.Value.Value;
-            }
+            // 保存预览大小（从 per-position 字典读取）
+            double previewHeight = _lastPreviewSizes[1];
+            double previewTreeHeight = _lastPreviewSizes[2];
+            double previewFilesHeight = _lastPreviewSizes[3];
+            double previewColumnWidth = _lastPreviewSizes[4];
 
             var obj = new WindowSize
             {
                 Width = Width,
                 Height = Height,
                 TreeColumnWidth = treeWidth,
-                PreviewRowHeight = previewHeight
+                PreviewRowHeight = previewHeight,
+                PreviewColumnWidth = previewColumnWidth,
+                PreviewTreeHeight = previewTreeHeight,
+                PreviewFilesHeight = previewFilesHeight
             };
             var json = JsonSerializer.Serialize(obj, new JsonSerializerOptions { WriteIndented = true });
             File.WriteAllText(configPath, json);
         }
-        catch
+        catch (Exception ex)
         {
-            // 如果保存失败，忽略
+            App.LogDebug("SaveWindowConfig: failed to save: {0}", ex.Message);
         }
     }
 
@@ -168,6 +204,9 @@ public partial class MainWindow : Window
     private async void Window_Drop(object sender, DragEventArgs e)
     {
         if (!e.Data.GetDataPresent(DataFormats.FileDrop)) return;
+
+        // 来自本窗口的拖拽 → 忽略（自己拖给自己的文件已经在临时目录了）
+        if (_isOwnDrag) return;
 
         var files = (string[])e.Data.GetData(DataFormats.FileDrop);
         if (files.Length == 0) return;
@@ -197,7 +236,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        // 没有打开压缩包 → 原有行为
+        // 没有打开压缩包 → 原有行为（延后到拖放事件完全结束后再创建窗口，避免 WPF 拖放消息循环中创建新窗口导致死锁）
         var path = files[0];
         if (IsArchiveFile(path))
         {
@@ -205,13 +244,20 @@ public partial class MainWindow : Window
         }
         else
         {
-            var window = new CompressSettingsWindow();
-            foreach (var f in files)
+            var capturedFiles = files.ToArray(); // 拷贝避免闭包捕获可变变量
+#pragma warning disable CS4014 // 在 async void 中故意 fire-and-forget
+            Dispatcher.BeginInvoke(new Action(() =>
+#pragma warning restore CS4014
             {
-                window.AddSourcePath(f);
-            }
-            window.Show();
-            window.Activate();
+                var window = new CompressSettingsWindow();
+                foreach (var f in capturedFiles)
+                {
+                    window.AddSourcePath(f);
+                }
+                window.Owner = this;
+                window.Show();
+                window.Activate();
+            }));
         }
     }
 
@@ -310,69 +356,72 @@ public partial class MainWindow : Window
         // 准备临时提取目录
         _dragTempDir = Path.Combine(Path.GetTempPath(), "MantisZip", "DragDrop", Guid.NewGuid().ToString());
         Directory.CreateDirectory(_dragTempDir);
-        ShowProgress(true);
-        SetStatus($"正在提取 {filesToDrag.Count} 个文件...");
+
+        // 阶段 1：提取文件到临时目录（弹出 ProgressWindow 显示进度）
+        var pw = new ProgressWindow();
+        pw.InitCancellation();
+        pw.Owner = this;
+        pw.Show();
+        var ct = pw.CancellationToken;
 
         try
         {
-            // 逐个提取到临时目录
             var extractedPaths = new List<string>();
-            var totalDrag = filesToDrag.Count;
-            for (int i = 0; i < totalDrag; i++)
+            for (int i = 0; i < filesToDrag.Count; i++)
             {
+                if (ct.IsCancellationRequested) break;
+
                 var item = filesToDrag[i];
-                var outputPath = Path.Combine(_dragTempDir, item.Name);
-                ProgressBar.Value = (double)i / totalDrag * 100;
-                ProgressText.Text = $"正在提取: {item.NameDisplay ?? item.Name}";
+                // 使用 FullPath 保留目录结构，避免不同子目录中同名文件互相覆盖
+                var outputPath = Path.Combine(_dragTempDir, item.FullPath);
+
+                pw.SetProgress(
+                    (double)i / filesToDrag.Count * 100,
+                    $"正在提取: {item.NameDisplay ?? item.Name}");
+
                 await ExtractEntryForDragAsync(item, outputPath);
                 extractedPaths.Add(outputPath);
             }
-            ShowProgress(false);
 
-            // 启动拖拽（阻塞直到拖拽操作结束）
-            var data = new DataObject(DataFormats.FileDrop, extractedPaths.ToArray());
-            DragDrop.DoDragDrop(FileListGrid, data, DragDropEffects.Copy);
+            if (ct.IsCancellationRequested)
+            {
+                SetStatus("已取消");
+                return;
+            }
+
+            if (extractedPaths.Count == 0)
+            {
+                SetStatus("没有可拖拽的文件");
+                return;
+            }
+
+            // 阶段 2：启动拖拽，进度窗口转为拖拽提示
+            pw.SetProgress(100, "⏳ 正在拖拽 — 放到目标位置以复制文件");
+
+            _isOwnDrag = true;
+            try
+            {
+                var data = new DataObject(DataFormats.FileDrop, extractedPaths.ToArray());
+                DragDrop.DoDragDrop(FileListGrid, data, DragDropEffects.Copy);
+            }
+            finally
+            {
+                _isOwnDrag = false;
+            }
         }
         catch (NotSupportedException ex)
         {
-            MessageBox.Show(ex.Message, "提示", MessageBoxButton.OK, MessageBoxImage.Information);
+            MessageBox.Show(this, ex.Message, "提示", MessageBoxButton.OK, MessageBoxImage.Information);
         }
         catch (Exception ex)
         {
-            MessageBox.Show($"提取文件失败: {ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+            MessageBox.Show(this, $"提取文件失败: {ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
         }
         finally
         {
+            try { if (pw.IsVisible) pw.Close(); } catch (Exception pwEx) { App.LogDebug("DragDrop finally: close pw failed: {0}", pwEx.Message); }
             CleanupDragTempDir();
             SetStatus("就绪");
-        }
-    }
-
-    /// <summary>
-    /// 提取压缩包内单个条目到临时文件，供拖拽使用。
-    /// 支持 ZIP、7z 快速单条提取，TarGz 通过顺序扫描提取。
-    /// </summary>
-    private async Task ExtractEntryForDragAsync(ArchiveItem item, string outputPath)
-    {
-        var dir = Path.GetDirectoryName(outputPath);
-        if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
-            Directory.CreateDirectory(dir);
-
-        switch (_currentFormat)
-        {
-            case ArchiveFormat.Zip:
-            case ArchiveFormat.SevenZip:
-                await ArchiveEntryExtractor.ExtractEntryAsync(
-                    _currentArchivePath!, item.FullPath, outputPath, _currentFormat);
-                break;
-
-            case ArchiveFormat.Tar:
-            case ArchiveFormat.GZip:
-                ExtractTarGzSingleEntry(_currentArchivePath!, item.FullPath, outputPath);
-                break;
-
-            default:
-                throw new NotSupportedException($"格式 {_currentFormat} 不支持拖拽提取");
         }
     }
 
@@ -389,7 +438,7 @@ public partial class MainWindow : Window
         if (isTarGz || Path.GetExtension(archivePath).Equals(".gz", StringComparison.OrdinalIgnoreCase))
             tarStream = new ICSharpCode.SharpZipLib.GZip.GZipInputStream(inputStream);
 
-        using var tarIn = new ICSharpCode.SharpZipLib.Tar.TarInputStream(tarStream);
+        using var tarIn = new ICSharpCode.SharpZipLib.Tar.TarInputStream(tarStream, System.Text.Encoding.UTF8);
         ICSharpCode.SharpZipLib.Tar.TarEntry? entry;
         while ((entry = tarIn.GetNextEntry()) != null)
         {
@@ -415,8 +464,35 @@ public partial class MainWindow : Window
             if (Directory.Exists(_dragTempDir))
                 Directory.Delete(_dragTempDir, recursive: true);
         }
-        catch { }
+        catch (Exception dragCleanupEx) { App.LogDebug("CleanupDragTempDir: failed: {0}", dragCleanupEx.Message); }
         _dragTempDir = null;
+    }
+
+    /// <summary>
+    /// 拖拽提取单个条目到临时目录。
+    /// </summary>
+    private async Task ExtractEntryForDragAsync(ArchiveItem item, string outputPath)
+    {
+        var dir = Path.GetDirectoryName(outputPath);
+        if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
+            Directory.CreateDirectory(dir);
+
+        switch (_currentFormat)
+        {
+            case ArchiveFormat.Zip:
+            case ArchiveFormat.SevenZip:
+                await ArchiveEntryExtractor.ExtractEntryAsync(
+                    _currentArchivePath!, item.FullPath, outputPath, _currentFormat);
+                break;
+
+            case ArchiveFormat.Tar:
+            case ArchiveFormat.GZip:
+                ExtractTarGzSingleEntry(_currentArchivePath!, item.FullPath, outputPath);
+                break;
+
+            default:
+                throw new NotSupportedException($"格式 {_currentFormat} 不支持拖拽提取");
+        }
     }
 
     /// <summary>
@@ -511,14 +587,21 @@ public partial class MainWindow : Window
     private void Settings_Click(object sender, RoutedEventArgs e)
     {
         var window = new SettingsWindow();
+        // 实时同步字号到预览窗格
+        window.OnTextFontSizeChanged = size =>
+        {
+            if (PreviewTextBox.Visibility == Visibility.Visible)
+                PreviewTextBox.FontSize = size;
+        };
         window.ShowDialog();
-        // 设置可能已变更，刷新 Shell 菜单状态
-        UpdateShellMenuItems();
+        // 关闭设置后也应用最终值
+        if (PreviewTextBox.Visibility == Visibility.Visible)
+            PreviewTextBox.FontSize = AppSettings.Instance.TextPreviewFontSize;
     }
 
     private void ShowSubFolders_Click(object sender, RoutedEventArgs e)
     {
-        // 刷新当前目录
+        // 切换子目录显示，重新过滤当前目录
         FilterFiles(_currentFolder);
     }
 
@@ -528,53 +611,36 @@ public partial class MainWindow : Window
         window.ShowDialog();
     }
 
-    private void InstallShell_Click(object sender, RoutedEventArgs e)
-    {
-        try
-        {
-            ShellIntegration.Install();
-            MessageBox.Show(
-                "Shell 右键菜单已安装。\n\n" +
-                "• 右键任意文件/文件夹 → 用 MantisZip 压缩\n" +
-                "• 右键压缩包 (.zip/.7z/.rar 等) → 用 MantisZip 解压",
-                "MantisZip", MessageBoxButton.OK, MessageBoxImage.Information);
-            UpdateShellMenuItems();
-        }
-        catch (Exception ex)
-        {
-            MessageBox.Show($"安装失败: {ex.Message}", "错误",
-                MessageBoxButton.OK, MessageBoxImage.Error);
-        }
-    }
-
-    private void UninstallShell_Click(object sender, RoutedEventArgs e)
-    {
-        try
-        {
-            ShellIntegration.Uninstall();
-            MessageBox.Show("Shell 右键菜单已卸载", "MantisZip",
-                MessageBoxButton.OK, MessageBoxImage.Information);
-            UpdateShellMenuItems();
-        }
-        catch (Exception ex)
-        {
-            MessageBox.Show($"卸载失败: {ex.Message}", "错误",
-                MessageBoxButton.OK, MessageBoxImage.Error);
-        }
-    }
-
-    private void UpdateShellMenuItems()
-    {
-        var installed = ShellIntegration.IsInstalled;
-        ShellInstallMenuItem.IsEnabled = !installed;
-        ShellUninstallMenuItem.IsEnabled = installed;
-    }
-
     private void TestArchive_Click(object sender, RoutedEventArgs e)
     {
         if (!string.IsNullOrEmpty(_currentArchivePath))
         {
             _ = TestArchiveAsync(_currentArchivePath);
+        }
+    }
+
+    private void PreviewToggleBtn_Click(object sender, RoutedEventArgs e)
+    {
+        _previewPanelEnabled = PreviewToggleBtn.IsChecked == true;
+        AppSettings.Instance.ShowPreviewPanel = _previewPanelEnabled;
+        AppSettings.Instance.Save();
+        PreviewToggleIcon.Text = _previewPanelEnabled ? "👁" : "🚫";
+
+        if (_previewPanelEnabled)
+        {
+            ShowPreviewPanel();
+            // 重新显示当前选中项的预览
+            if (FileListGrid.SelectedItem is ArchiveItem selected && !string.IsNullOrEmpty(_currentArchivePath))
+            {
+                if (selected.IsDirectory)
+                    ShowDirectoryPreview(selected);
+                else
+                    _ = ShowPreviewAsync(selected);
+            }
+        }
+        else
+        {
+            HidePreview();
         }
     }
 
@@ -612,7 +678,7 @@ public partial class MainWindow : Window
         try
         {
             ClearPreviewTemp();
-            HidePreview();
+            ClearPreviewContent();
 
             // 清空状态栏统计
             DirStatsText.Text = "";
@@ -665,6 +731,11 @@ public partial class MainWindow : Window
             ArchiveStatsText.Text = $"总 {items.Count} 项 | 原始 {FormatSize(totalSize)} → 压缩 {FormatSize(totalCompressed)}";
 
             SetStatus($"已加载: {Path.GetFileName(archivePath)}");
+
+            // 应用预览面板位置设置
+            ApplyPreviewPosition(AppSettings.Instance.PreviewPosition);
+            // 显示压缩包信息
+            ShowArchiveInfo();
         }
         catch (Exception ex)
         {
@@ -745,14 +816,15 @@ public partial class MainWindow : Window
                                 OpenInExplorer(destinationPath);
 
                             // 如果选择记住密码，保存
-                            if (dialog.RememberPassword)
+                            if (dialog.RememberPassword && !string.IsNullOrEmpty(password))
                             {
                                 var patterns = new List<string> { Path.GetFileName(archivePath) };
                                 PasswordManager.Instance.AddPassword(password, "", patterns);
                             }
                         }
-                        catch
+                        catch (Exception pwdEx)
                         {
+                            App.LogDebug("ExtractAsync: wrong password: {0}", pwdEx.Message);
                             ShowProgress(false);
                             MessageBox.Show("密码错误", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
                             SetStatus("解压失败");
@@ -901,7 +973,7 @@ public partial class MainWindow : Window
             if (Directory.Exists(path))
                 Process.Start("explorer.exe", path);
         }
-        catch { /* 忽略打开失败 */ }
+        catch (Exception explorerEx) { App.LogDebug("OpenInExplorer: failed: {0}", explorerEx.Message); }
     }
 
     private string FormatSize(long bytes)
@@ -1082,10 +1154,9 @@ private void FolderTree_SelectedItemChanged(object sender, RoutedPropertyChanged
     /// </summary>
     private async void FileListGrid_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        // 编程切换目录时（FilterFiles），不触发预览
+        // 编程切换目录时（FilterFiles），不触发预览，也不关闭现有的预览
         if (_isProgrammaticFilter)
         {
-            HidePreview();
             UpdateSelectionStats();
             return;
         }
@@ -1099,13 +1170,16 @@ private void FolderTree_SelectedItemChanged(object sender, RoutedPropertyChanged
                 ? e.RemovedItems[0] as ArchiveItem
                 : null;
 
-        if (lastClicked != null && !lastClicked.IsDirectory && !string.IsNullOrEmpty(_currentArchivePath))
+        if (lastClicked != null && !string.IsNullOrEmpty(_currentArchivePath))
         {
-            await ShowPreviewAsync(lastClicked);
-        }
-        else
-        {
-            HidePreview();
+            if (lastClicked.IsDirectory)
+            {
+                ShowDirectoryPreview(lastClicked);
+            }
+            else
+            {
+                await ShowPreviewAsync(lastClicked);
+            }
         }
 
         UpdateSelectionStats();
@@ -1216,13 +1290,23 @@ private void FolderTree_SelectedItemChanged(object sender, RoutedPropertyChanged
     private static readonly HashSet<string> TextExtensions = new(StringComparer.OrdinalIgnoreCase)
     {
         ".txt", ".log", ".ini", ".cfg", ".conf", ".csv", ".xml", ".json",
-        ".cs", ".csproj", ".md", ".yaml", ".yml", ".toml",
+        ".cs", ".csproj", ".yaml", ".yml", ".toml",
         ".sh", ".bat", ".cmd", ".ps1", ".py", ".js", ".ts", ".tsx",
-        ".html", ".htm", ".css", ".scss", ".less",
+        ".css", ".scss", ".less",
         ".sql", ".gitignore", ".editorconfig", ".sln", ".props", ".targets",
         ".ruleset", ".rc", ".resx", ".nuspec", ".gradle", ".dockerfile",
         ".env", ".yml", ".yaml", ".json5", ".h", ".c", ".cpp", ".hpp",
         ".swift", ".kt", ".java", ".rb", ".go", ".rs", ".php", ".vue"
+    };
+
+    private static readonly HashSet<string> HtmlExtensions = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ".html", ".htm"
+    };
+
+    private static readonly HashSet<string> MarkdownExtensions = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ".md", ".markdown"
     };
 
     private async Task ShowPreviewAsync(ArchiveItem item)
@@ -1231,7 +1315,7 @@ private void FolderTree_SelectedItemChanged(object sender, RoutedPropertyChanged
         {
             // 清理上次预览
             ClearPreviewTemp();
-            HidePreview();
+            ClearPreviewContent();
 
             var s = AppSettings.Instance;
             var ext = Path.GetExtension(item.Name);
@@ -1252,6 +1336,34 @@ private void FolderTree_SelectedItemChanged(object sender, RoutedPropertyChanged
                     _currentArchivePath!, item.Name, tempFile, _currentFormat);
 
                 await ShowImagePreviewAsync(tempFile, item);
+            }
+            else if (HtmlExtensions.Contains(ext) || MarkdownExtensions.Contains(ext))
+            {
+                if (!s.EnableTextPreview)
+                {
+                    ShowUnsupportedPreview(item, "📄 文本预览已禁用（可在设置中启用）");
+                    return;
+                }
+
+                // 检查文件大小
+                if (item.Size > s.MaxTextPreviewBytes)
+                {
+                    var limitMb = s.MaxTextPreviewBytes / (1024.0 * 1024.0);
+                    ShowUnsupportedPreview(item, $"📄 文件过大 ({(double)item.Size / 1024 / 1024:F1} MB)，超过文本预览限制 ({limitMb:F0} MB)");
+                    return;
+                }
+
+                _previewTempDir = Path.Combine(Path.GetTempPath(), "MantisZip", Guid.NewGuid().ToString());
+                Directory.CreateDirectory(_previewTempDir);
+                var tempFile = Path.Combine(_previewTempDir, Path.GetFileName(item.Name) ?? "preview.html");
+
+                await Core.Utils.ArchiveEntryExtractor.ExtractEntryAsync(
+                    _currentArchivePath!, item.Name, tempFile, _currentFormat);
+
+                if (MarkdownExtensions.Contains(ext))
+                    ShowMarkdownPreview(tempFile, item);
+                else
+                    ShowHtmlPreview(tempFile, item);
             }
             else if (TextExtensions.Contains(ext))
             {
@@ -1300,38 +1412,46 @@ private void FolderTree_SelectedItemChanged(object sender, RoutedPropertyChanged
             // 后台线程解码，不阻塞 UI
             var bitmap = await Task.Run(() =>
             {
+                // 先获取实际尺寸，仅对超过 1920px 的图做降采样
+                var decoder = System.Windows.Media.Imaging.BitmapDecoder.Create(
+                    new Uri(filePath),
+                    System.Windows.Media.Imaging.BitmapCreateOptions.DelayCreation,
+                    System.Windows.Media.Imaging.BitmapCacheOption.None);
+                int actualWidth = decoder.Frames[0].PixelWidth;
+
                 var bmp = new System.Windows.Media.Imaging.BitmapImage();
                 bmp.BeginInit();
                 bmp.CacheOption = System.Windows.Media.Imaging.BitmapCacheOption.OnLoad;
                 bmp.UriSource = new Uri(filePath);
-                bmp.DecodePixelWidth = 1920; // 限制解码尺寸，避免大图全分辨率解码
+                // 只有大图才降采样，小图保持原生清晰度
+                if (actualWidth > 1920)
+                    bmp.DecodePixelWidth = 1920;
                 bmp.EndInit();
                 bmp.Freeze(); // 跨线程安全
                 return bmp;
             });
 
             PreviewImage.Source = bitmap;
+            PreviewImage.MaxWidth = bitmap.PixelWidth;
+            PreviewImage.MaxHeight = bitmap.PixelHeight;
             PreviewImage.Visibility = Visibility.Visible;
             PreviewTextBox.Visibility = Visibility.Collapsed;
+            PreviewFileIcon.Visibility = Visibility.Collapsed;
             PreviewUnsupported.Visibility = Visibility.Collapsed;
             PreviewHeader.Text = $"🔍 预览: {Path.GetFileName(filePath)}";
 
-            // 构建图片信息
-            var ratio = item.Size > 0
-                ? $"{(double)item.CompressedSize / item.Size * 100:F1}%"
-                : "--";
-            PreviewInfoText.Text =
-                $"文件名: {item.Name}\n" +
-                $"大小: {FormatSize(item.Size)}\n" +
-                $"压缩后: {FormatSize(item.CompressedSize)}\n" +
-                $"压缩率: {ratio}\n" +
-                $"修改日期: {item.LastModified:yyyy-MM-dd HH:mm}";
+            // 图片信息
+            PreviewInfoTitle.Text = "图片信息";
+            var imgInfo = BuildInfoText(item);
+            imgInfo += $"\n尺寸: {bitmap.PixelWidth} × {bitmap.PixelHeight}";
+            PreviewInfoText.Text = imgInfo;
             PreviewInfoPanel.Visibility = Visibility.Visible;
 
             ShowPreviewPanel();
         }
-        catch
+        catch (Exception imgEx)
         {
+            App.LogDebug("ShowImagePreviewAsync: failed: {0}", imgEx.Message);
             ShowUnsupportedPreview(null, "无法加载此图像");
         }
     }
@@ -1346,58 +1466,445 @@ private void FolderTree_SelectedItemChanged(object sender, RoutedPropertyChanged
             {
                 content = File.ReadAllText(filePath, System.Text.Encoding.UTF8);
             }
-            catch
+            catch (Exception utfEx)
             {
+                App.LogDebug("ShowTextPreview: UTF8 failed, trying GBK: {0}", utfEx.Message);
                 content = File.ReadAllText(filePath, System.Text.Encoding.GetEncoding("GBK"));
             }
 
             PreviewTextBox.Text = content;
+            PreviewTextBox.FontSize = AppSettings.Instance.TextPreviewFontSize;
             PreviewTextBox.Visibility = Visibility.Visible;
             PreviewImage.Visibility = Visibility.Collapsed;
+            PreviewFileIcon.Visibility = Visibility.Collapsed;
             PreviewUnsupported.Visibility = Visibility.Collapsed;
-            PreviewInfoPanel.Visibility = Visibility.Collapsed;
+            PreviewInfoTitle.Text = "文本信息";
+            PreviewInfoText.Text = BuildInfoText(item) + $"\n字符数: {content.Length}";
+            PreviewInfoPanel.Visibility = Visibility.Visible;
             PreviewHeader.Text = $"📄 预览: {Path.GetFileName(filePath)} ({content.Length} 字符)";
             ShowPreviewPanel();
         }
-        catch
+        catch (Exception textEx)
         {
+            App.LogDebug("ShowTextPreview: failed: {0}", textEx.Message);
             ShowUnsupportedPreview(null, "无法读取此文件");
+        }
+    }
+
+    private void ShowHtmlPreview(string filePath, ArchiveItem item)
+    {
+        // WebBrowser 需要绝对路径或 URL
+        PreviewWebBrowser.Navigate(new Uri(filePath));
+        PreviewWebBrowser.Visibility = Visibility.Visible;
+        PreviewImage.Visibility = Visibility.Collapsed;
+        PreviewTextBox.Visibility = Visibility.Collapsed;
+        PreviewFileIcon.Visibility = Visibility.Collapsed;
+        PreviewUnsupported.Visibility = Visibility.Collapsed;
+        PreviewInfoTitle.Text = "文件信息";
+        PreviewInfoText.Text = BuildInfoText(item);
+        PreviewInfoPanel.Visibility = Visibility.Visible;
+        PreviewHeader.Text = $"🌐 预览: {Path.GetFileName(filePath)}";
+        ShowPreviewPanel();
+    }
+
+    private void ShowMarkdownPreview(string filePath, ArchiveItem item)
+    {
+        try
+        {
+            var mdContent = File.ReadAllText(filePath);
+            var html = Markdig.Markdown.ToHtml(mdContent);
+            // 包裹基本样式以便阅读
+            var styledHtml = $@"<!DOCTYPE html>
+<html>
+<head><meta charset='utf-8'/>
+<style>
+  body {{ font-family: system-ui, sans-serif; font-size: 14px; line-height: 1.6; padding: 16px; color: #222; }}
+  pre {{ background: #f4f4f4; padding: 12px; border-radius: 4px; overflow-x: auto; }}
+  code {{ background: #f0f0f0; padding: 2px 4px; border-radius: 2px; font-family: Consolas, monospace; }}
+  pre code {{ background: none; padding: 0; }}
+  img {{ max-width: 100%; }}
+  table {{ border-collapse: collapse; }}
+  td, th {{ border: 1px solid #ccc; padding: 6px 10px; }}
+</style></head>
+<body>{html}</body></html>";
+
+            var tempHtml = Path.Combine(Path.GetDirectoryName(filePath) ?? _previewTempDir!, "markdown_preview.html");
+            File.WriteAllText(tempHtml, styledHtml);
+            PreviewWebBrowser.Navigate(new Uri(tempHtml));
+            PreviewWebBrowser.Visibility = Visibility.Visible;
+            PreviewImage.Visibility = Visibility.Collapsed;
+            PreviewTextBox.Visibility = Visibility.Collapsed;
+            PreviewFileIcon.Visibility = Visibility.Collapsed;
+            PreviewUnsupported.Visibility = Visibility.Collapsed;
+            PreviewInfoTitle.Text = "文件信息";
+            PreviewInfoText.Text = BuildInfoText(item);
+            PreviewInfoPanel.Visibility = Visibility.Visible;
+            PreviewHeader.Text = $"📝 预览: {Path.GetFileName(filePath)}";
+            ShowPreviewPanel();
+        }
+        catch (Exception mdEx)
+        {
+            App.LogDebug("ShowMarkdownPreview: failed: {0}", mdEx.Message);
+            ShowUnsupportedPreview(null, "无法解析 Markdown 文件");
         }
     }
 
     private void ShowUnsupportedPreview(ArchiveItem? item, string? message = null)
     {
-        PreviewUnsupported.Text = message ?? "🔍 无法预览此文件";
-        PreviewUnsupported.Visibility = Visibility.Visible;
+        PreviewUnsupported.Visibility = Visibility.Collapsed; // hide text fallback
         PreviewImage.Visibility = Visibility.Collapsed;
         PreviewTextBox.Visibility = Visibility.Collapsed;
-        PreviewInfoPanel.Visibility = Visibility.Collapsed;
-        PreviewHeader.Text = item != null ? $"📄 {item.Name}" : "预览";
+        PreviewWebBrowser.Visibility = Visibility.Collapsed;
+        PreviewInfoPanel.Visibility = Visibility.Visible;
+
+        if (item != null)
+        {
+            // 显示系统图标
+            var ext = Path.GetExtension(item.Name);
+            var icon = SystemIconHelper.GetFileIcon(ext);
+            PreviewFileIcon.Source = icon;
+            PreviewFileIcon.Visibility = Visibility.Visible;
+
+            PreviewInfoTitle.Text = "文件信息";
+            var info = BuildInfoText(item);
+            if (!string.IsNullOrEmpty(message))
+                info += $"\n\n{message}";
+            PreviewInfoText.Text = info;
+            PreviewHeader.Text = $"📄 {item.Name}";
+        }
+        else
+        {
+            PreviewFileIcon.Visibility = Visibility.Collapsed;
+            PreviewInfoTitle.Text = "";
+            PreviewInfoText.Text = message ?? "";
+            PreviewHeader.Text = "预览";
+        }
+
         ShowPreviewPanel();
+    }
+
+    /// <summary>
+    /// 显示目录预览：系统文件夹图标 + 目录名
+    /// </summary>
+    private void ShowDirectoryPreview(ArchiveItem item)
+    {
+        if (!item.IsDirectory) return;
+
+        PreviewHeader.Text = $"📁 {item.Name.TrimEnd('/')}";
+
+        // 内容区：文件夹图标
+        PreviewFileIcon.Source = SystemIconHelper.GetFolderIcon();
+        PreviewFileIcon.Visibility = Visibility.Visible;
+        PreviewImage.Visibility = Visibility.Collapsed;
+        PreviewTextBox.Visibility = Visibility.Collapsed;
+        PreviewWebBrowser.Visibility = Visibility.Collapsed;
+        PreviewUnsupported.Visibility = Visibility.Collapsed;
+
+        // 信息面板
+        PreviewInfoTitle.Text = "目录信息";
+        PreviewInfoText.Text = $"目录名: {item.Name.TrimEnd('/')}\n" +
+                               $"原始大小: {FormatSize(item.Size)}";
+        PreviewInfoPanel.Visibility = Visibility.Visible;
+
+        ShowPreviewPanel();
+    }
+
+    /// <summary>
+    /// 显示压缩包总览信息（首次打开时）。
+    /// </summary>
+    private void ShowArchiveInfo()
+    {
+        if (string.IsNullOrEmpty(_currentArchivePath) || _allItems.Count == 0)
+            return;
+
+        var totalSize = _allItems.Sum(i => i.Size);
+        var totalCompressed = _allItems.Sum(i => i.CompressedSize);
+        int fileCount = _allItems.Count(i => !i.IsDirectory);
+        int dirCount = _allItems.Count(i => i.IsDirectory);
+
+        PreviewHeader.Text = $"📦 {Path.GetFileName(_currentArchivePath)}";
+
+        // 内容区：压缩包图标
+        PreviewFileIcon.Source = SystemIconHelper.GetFileIcon(Path.GetExtension(_currentArchivePath));
+        PreviewFileIcon.Visibility = Visibility.Visible;
+        PreviewImage.Visibility = Visibility.Collapsed;
+        PreviewTextBox.Visibility = Visibility.Collapsed;
+        PreviewWebBrowser.Visibility = Visibility.Collapsed;
+        PreviewUnsupported.Visibility = Visibility.Collapsed;
+
+        // 信息面板
+        PreviewInfoTitle.Text = "压缩包信息";
+        var ratio = totalSize > 0 ? $"{(double)totalCompressed / totalSize * 100:F1}%" : "--";
+        PreviewInfoText.Text =
+            $"文件名: {Path.GetFileName(_currentArchivePath)}\n" +
+            $"文件数: {fileCount} 个文件, {dirCount} 个目录\n" +
+            $"原始大小: {FormatSize(totalSize)}\n" +
+            $"压缩后: {FormatSize(totalCompressed)}\n" +
+            $"压缩率: {ratio}";
+        PreviewInfoPanel.Visibility = Visibility.Visible;
+
+        ShowPreviewPanel();
+    }
+
+    /// <summary>
+    /// 确保 PreviewPanel 位于正确的父 Grid 中。
+    /// 位置 1/4 → 外层 ContentGrid；位置 2/3 → 内层 InnerContentGrid。
+    /// </summary>
+    private void EnsurePreviewInCorrectGrid(int position)
+    {
+        var currentParent = VisualTreeHelper.GetParent(PreviewPanel) as Grid;
+        var target = (position == 2 || position == 3) ? InnerContentGrid : ContentGrid;
+
+        if (currentParent == target) return;
+
+        // 从当前父 Grid 中移除
+        currentParent?.Children.Remove(PreviewPanel);
+        // 添加到目标父 Grid（保持 z-order 合理：最后添加）
+        target.Children.Add(PreviewPanel);
+    }
+
+    /// <summary>
+    /// 根据 AppSettings.PreviewPosition 重新布局预览面板位置。
+    /// 1=底部, 2=目录树下方, 3=文件列表下方, 4=文件列表右侧
+    /// </summary>
+    private void ApplyPreviewPosition(int position)
+    {
+        // 移动 PreviewPanel 到正确的父 Grid
+        EnsurePreviewInCorrectGrid(position);
+
+        // 先重置所有元素到默认状态
+        PreviewSplitter.Visibility = Visibility.Collapsed;
+        PreviewColSplitter.Visibility = Visibility.Collapsed;
+        InnerPreviewSplitter.Visibility = Visibility.Collapsed;
+        PreviewSplitterRow.Height = new GridLength(0);
+        PreviewRow.Height = new GridLength(0);
+        InnerPreviewSplitterRow.Height = new GridLength(0);
+        InnerPreviewRow.Height = new GridLength(0);
+        PreviewColumnDef.Width = new GridLength(0);
+        PreviewColSplitterDef.Width = new GridLength(0);
+        Grid.SetRowSpan(FolderTree, 1);
+        Grid.SetRowSpan(TreeFileSplitter, 1);
+        Grid.SetRowSpan(FileListGrid, 1);
+        Grid.SetColumnSpan(FileListGrid, 1);
+        Grid.SetColumnSpan(PreviewPanel, 1);
+        Grid.SetRowSpan(PreviewPanel, 1);
+        Grid.SetRowSpan(InnerPreviewSplitter, 1);
+        Grid.SetColumnSpan(InnerPreviewSplitter, 5);
+        Grid.SetRow(InnerPreviewSplitter, 1);
+        Grid.SetColumn(InnerPreviewSplitter, 0);
+        // 默认 InnerContentGrid 横跨全部5列
+        Grid.SetColumnSpan(InnerContentGrid, 5);
+
+        switch (position)
+        {
+            case 1: // 底部（当前默认）
+                PreviewSplitter.Visibility = Visibility.Visible;
+                PreviewSplitterRow.Height = new GridLength(4);
+                Grid.SetRow(PreviewPanel, 2);
+                Grid.SetColumn(PreviewPanel, 0);
+                Grid.SetColumnSpan(PreviewPanel, 5);
+                break;
+
+            case 2: // 目录树下方
+                Grid.SetRowSpan(FileListGrid, 3);
+                Grid.SetColumnSpan(FileListGrid, 3);
+                Grid.SetRowSpan(TreeFileSplitter, 3);
+                Grid.SetRow(PreviewPanel, 2);
+                Grid.SetColumn(PreviewPanel, 0);
+                Grid.SetColumnSpan(PreviewPanel, 1);
+                // 内部分隔条 Row 1
+                InnerPreviewSplitter.Visibility = Visibility.Visible;
+                InnerPreviewSplitterRow.Height = new GridLength(4);
+                Grid.SetColumnSpan(InnerPreviewSplitter, 1);
+                Grid.SetColumn(InnerPreviewSplitter, 0);
+                break;
+
+            case 3: // 文件列表下方
+                Grid.SetRowSpan(FolderTree, 3);
+                Grid.SetRowSpan(TreeFileSplitter, 3);
+                Grid.SetColumnSpan(FileListGrid, 1);
+                Grid.SetRow(PreviewPanel, 2);
+                Grid.SetColumn(PreviewPanel, 2);
+                Grid.SetColumnSpan(PreviewPanel, 3);
+                // 内部分隔条 Row 1
+                InnerPreviewSplitter.Visibility = Visibility.Visible;
+                InnerPreviewSplitterRow.Height = new GridLength(4);
+                Grid.SetColumnSpan(InnerPreviewSplitter, 3);
+                Grid.SetColumn(InnerPreviewSplitter, 2);
+                break;
+
+            case 4: // 文件列表右侧
+                PreviewColSplitter.Visibility = Visibility.Visible;
+                PreviewColSplitterDef.Width = new GridLength(4);
+                Grid.SetRow(PreviewPanel, 0);
+                Grid.SetColumn(PreviewPanel, 4);
+                Grid.SetColumnSpan(PreviewPanel, 1);
+                // 限制 InnerContentGrid 只占 Col 0-2（不延伸到预览列）
+                Grid.SetColumnSpan(InnerContentGrid, 3);
+                break;
+        }
+    }
+
+    /// <summary>
+    /// 根据 AppSettings.InfoPanelOrientation 切换信息面板布局。
+    /// Horizontal = 内容区右侧；Vertical = 内容区下方
+    /// </summary>
+    private void ApplyInfoPanelOrientation(string orientation)
+    {
+        if (orientation == "Vertical")
+        {
+            // 信息面板在内容区下方
+            PreviewContentGrid.ColumnDefinitions[0].Width = new GridLength(1, GridUnitType.Star);
+            PreviewContentGrid.ColumnDefinitions[1].Width = new GridLength(0);
+            PreviewContentGrid.RowDefinitions[1].Height = new GridLength(1, GridUnitType.Auto);
+            Grid.SetRow(PreviewInfoPanel, 1);
+            Grid.SetColumn(PreviewInfoPanel, 0);
+            PreviewInfoPanel.Margin = new Thickness(0, 12, 0, 0);
+        }
+        else
+        {
+            // 信息面板在内容区右侧（默认）
+            PreviewContentGrid.ColumnDefinitions[0].Width = new GridLength(1, GridUnitType.Star);
+            PreviewContentGrid.ColumnDefinitions[1].Width = new GridLength(1, GridUnitType.Auto);
+            PreviewContentGrid.RowDefinitions[1].Height = new GridLength(0);
+            Grid.SetRow(PreviewInfoPanel, 0);
+            Grid.SetColumn(PreviewInfoPanel, 1);
+            PreviewInfoPanel.Margin = new Thickness(12, 0, 0, 0);
+        }
     }
 
     private void ShowPreviewPanel()
     {
-        PreviewSplitterRow.Height = new GridLength(4);
-        PreviewRow.Height = _lastPreviewHeight ?? new GridLength(1, GridUnitType.Star);
-        PreviewSplitter.Visibility = Visibility.Visible;
-        PreviewPanel.Visibility = Visibility.Visible;
+        var pos = AppSettings.Instance.PreviewPosition;
+
+        // 如果位置变了，保存旧位置大小并应用新布局
+        if (pos != _lastAppliedPosition)
+        {
+            SaveCurrentPreviewSize(_lastAppliedPosition);
+            _lastAppliedPosition = pos;
+            ApplyPreviewPosition(pos);
+        }
+        else
+        {
+            ApplyPreviewPosition(pos);
+        }
+
+        if (pos == 4)
+        {
+            // 右侧模式：靠列宽度控制
+            var colWidth = _lastPreviewSizes[4] > 0 ? _lastPreviewSizes[4] : 350;
+            PreviewColumnDef.Width = new GridLength(colWidth, GridUnitType.Pixel);
+            PreviewColSplitterDef.Width = new GridLength(4);
+            PreviewColSplitter.Visibility = Visibility.Visible;
+            PreviewRow.Height = new GridLength(0);
+            PreviewSplitterRow.Height = new GridLength(0);
+            PreviewSplitter.Visibility = Visibility.Collapsed;
+            InnerPreviewRow.Height = new GridLength(0);
+        }
+        else if (pos == 2 || pos == 3)
+        {
+            // 目录树下方 / 文件列表下方：内层 Grid 的预览行控制高度
+            var h = _lastPreviewSizes[pos] > 0 ? _lastPreviewSizes[pos] : 200;
+            InnerPreviewRow.Height = new GridLength(h, GridUnitType.Pixel);
+            PreviewRow.Height = new GridLength(0);
+            PreviewSplitterRow.Height = new GridLength(0);
+            PreviewSplitter.Visibility = Visibility.Collapsed;
+        }
+        else
+        {
+            // 底部模式：外层 Grid 的预览行控制高度
+                var h = _lastPreviewSizes[1] > 0
+                ? new GridLength(_lastPreviewSizes[1], GridUnitType.Pixel)
+                : new GridLength(1, GridUnitType.Star);
+            PreviewSplitterRow.Height = new GridLength(4);
+            PreviewRow.Height = h;
+            PreviewSplitter.Visibility = Visibility.Visible;
+        }
+        if (_previewPanelEnabled)
+            PreviewPanel.Visibility = Visibility.Visible;
+        ApplyInfoPanelOrientation(AppSettings.Instance.InfoPanelOrientation);
+    }
+
+    /// <summary>
+    /// 保存指定位置的当前预览大小到独立记忆字典。
+    /// </summary>
+    private void SaveCurrentPreviewSize(int position)
+    {
+        if (position == 4)
+        {
+            if (PreviewColumnDef.Width.GridUnitType == GridUnitType.Pixel)
+                _lastPreviewSizes[4] = PreviewColumnDef.Width.Value;
+        }
+        else if (position == 2 || position == 3)
+        {
+            if (InnerPreviewRow.Height.GridUnitType == GridUnitType.Pixel)
+                _lastPreviewSizes[position] = InnerPreviewRow.Height.Value;
+            else if (InnerPreviewRow.Height.Value > 0)
+                _lastPreviewSizes[position] = 300; // Star 模式切 Pixel 时给个默认值
+        }
+        else // position 1
+        {
+            if (PreviewRow.Height.GridUnitType == GridUnitType.Pixel)
+                _lastPreviewSizes[1] = PreviewRow.Height.Value;
+        }
+    }
+
+    /// <summary>
+    /// 仅清除预览内容，不隐藏面板（用于文件间切换，避免闪烁）。
+    /// </summary>
+    private void ClearPreviewContent()
+    {
+        if (PreviewPanel.Visibility == Visibility.Visible)
+            SaveCurrentPreviewSize(AppSettings.Instance.PreviewPosition);
+
+        PreviewImage.Source = null;
+        PreviewFileIcon.Source = null;
+        PreviewTextBox.Text = "";
+        PreviewWebBrowser.Navigate("about:blank");
+        PreviewWebBrowser.Visibility = Visibility.Collapsed;
     }
 
     private void HidePreview()
     {
-        // 保存当前预览行高度（必须在清 0 之前），支持 Pixel 和 Star 两种类型
-        if (PreviewRow.Height.Value > 0)
-        {
-            _lastPreviewHeight = PreviewRow.Height;
-        }
+        // 只在预览面板可见时保存大小，避免重复 HidePreview 覆盖已保存的值
+        if (PreviewPanel.Visibility == Visibility.Visible)
+            SaveCurrentPreviewSize(AppSettings.Instance.PreviewPosition);
 
         PreviewImage.Source = null;
+        PreviewFileIcon.Source = null;
         PreviewTextBox.Text = "";
+        // 清除 WebBrowser 内容并隐藏
+        PreviewWebBrowser.Navigate("about:blank");
+        PreviewWebBrowser.Visibility = Visibility.Collapsed;
         PreviewRow.Height = new GridLength(0);
         PreviewSplitterRow.Height = new GridLength(0);
         PreviewSplitter.Visibility = Visibility.Collapsed;
         PreviewPanel.Visibility = Visibility.Collapsed;
+        InnerPreviewRow.Height = new GridLength(0);
+        InnerPreviewSplitterRow.Height = new GridLength(0);
+        InnerPreviewSplitter.Visibility = Visibility.Collapsed;
+        // 重置右侧模式（位置4）的列宽
+        PreviewColumnDef.Width = new GridLength(0);
+        PreviewColSplitterDef.Width = new GridLength(0);
+        PreviewColSplitter.Visibility = Visibility.Collapsed;
+    }
+
+    /// <summary>
+    /// 构建通用文件信息文本
+    /// </summary>
+    private string BuildInfoText(ArchiveItem item)
+    {
+        var ratio = item.Size > 0
+            ? $"{(double)item.CompressedSize / item.Size * 100:F1}%"
+            : "--";
+        var info = $"文件名: {item.Name}\n" +
+                   $"大小: {FormatSize(item.Size)}\n" +
+                   $"压缩后: {FormatSize(item.CompressedSize)}\n" +
+                   $"压缩率: {ratio}\n" +
+                   $"修改日期: {item.LastModified:yyyy-MM-dd HH:mm}";
+        if (item.IsEncrypted)
+            info += "\n🔒 已加密";
+        return info;
     }
 
     /// <summary>
@@ -1413,9 +1920,9 @@ private void FolderTree_SelectedItemChanged(object sender, RoutedPropertyChanged
                 _previewTempDir = null;
             }
         }
-        catch
+        catch (Exception cleanupEx)
         {
-            // 临时文件清理失败不影响主功能
+            App.LogDebug("ClearPreviewTemp: failed: {0}", cleanupEx.Message);
         }
     }
 

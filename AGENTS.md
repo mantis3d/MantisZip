@@ -55,12 +55,16 @@ Despite using `CommunityToolkit.Mvvm`, **all logic lives in `MainWindow.xaml.cs`
 
 ### Preview subsystem
 
-- Trigger: `FileListGrid_SelectionChanged` → `ShowPreviewAsync(item)`
+- Trigger: `FileListGrid_SelectionChanged` → files via `ShowPreviewAsync(item)`, directories via `ShowDirectoryPreview(item)` (system folder icon + directory info panel)
 - Extract: `ArchiveEntryExtractor.ExtractEntryAsync(...)` → temp file under `%TEMP%\MantisZip\{GUID}\`
-- Display: `ShowImagePreviewAsync` (BitmapImage with `DecodePixelWidth=1920` on background thread), `ShowTextPreview` (UTF-8/GBK fallback), `ShowUnsupportedPreview`
+- Display: 
+  - `ShowImagePreviewAsync`: checks actual image dimensions first via `BitmapDecoder.Create(DelayCreation)` — only sets `DecodePixelWidth=1920` for images wider than 1920px (no upscaling); constrains `PreviewImage.MaxWidth`/`MaxHeight` to pixel dimensions to prevent `Stretch="Uniform"` from enlarging small images
+  - `ShowTextPreview` (UTF-8/GBK fallback), `ShowUnsupportedPreview`, `ShowDirectoryPreview`
+- Toolbar toggle button (`PreviewToggleBtn`) controls `_previewPanelEnabled` / `AppSettings.ShowPreviewPanel`; toggling calls `HidePreview()` (resets grid layout) or `ShowPreviewPanel()` (restores layout + re-previews selected item)
+- `ClearPreviewContent()` clears image/text/icon/webview sources without resetting grid layout (used during file-to-file switching to avoid flicker); `HidePreview()` does full cleanup including grid rows/columns reset
 - Image side panel: `PreviewInfoPanel` shows name, size, compression ratio, date — only for images
 - Cleanup: `ClearPreviewTemp()` before each new preview; `App.OnExit` deletes `%TEMP%\MantisZip`
-- Respects `AppSettings.EnableImagePreview`, `EnableTextPreview`, `MaxTextPreviewBytes`
+- Respects `AppSettings.EnableImagePreview`, `EnableTextPreview`, `MaxTextPreviewBytes`, `ShowPreviewPanel`
 
 ### Window persistence
 
@@ -73,7 +77,7 @@ Window size, tree column width, and preview row height saved to `%LOCALAPPDATA%\
 - **压缩**: DefaultFormat (zip/7z/tar.gz), DefaultLevel (1–9), CloseAfterCompress, KeepOriginalExtension
 - **解压**: ExtractDestination (ask/same-dir/desktop), FileConflictAction (ask/overwrite/rename/skip), OpenFolderAfterExtract
 - **上下文菜单**: EnableCompressMenu, EnableExtractMenu, EnableOpenMenu, EnableQuickCompress, EnableCascadingMenu, ShowMenuIcons
-- **预览**: EnableImagePreview, EnableTextPreview, MaxTextPreviewBytes
+- **预览**: EnableImagePreview, EnableTextPreview, MaxTextPreviewBytes, ShowPreviewPanel, TextPreviewFontSize
 - **高级**: SevenZipPath
 
 `SettingsWindow` (tabbed UI) provides GUI editing; `CompressSettingsWindow` loads defaults from `AppSettings`.
@@ -168,6 +172,58 @@ No CI workflows, no pre-commit hooks, no linter/analyzer config. `test_encoding/
 ### --compress IPC multi-instance
 
 The `--compress` handler uses a `Mutex` + `NamedPipeServerStream` pattern. Windows launches one process per selected file; the first process acts as collector, subsequent instances send their paths via named pipe then exit. 800ms collection window. Only the first instance shows the compress dialog.
+
+## Drag-drop (drag-out to Explorer)
+
+Implements the **7-Zip eager-extraction model**: extract files to temp before `DoDragDrop`, show `ProgressWindow` during extraction + drag.
+
+### Architecture
+
+1. `FileListGrid_PreviewMouseMove` detects drag start (threshold: `MinimumHorizontalDragDistance`)
+2. Creates temp dir at `%TEMP%\MantisZip\DragDrop\{GUID}\`
+3. Opens `ProgressWindow` and extracts files (all engines supported: ZIP/7z via `ArchiveEntryExtractor`, Tar/Gz via `TarInputStream`)
+4. Creates standard `DataObject(FileDrop, paths)` — no custom `IDataObject`
+5. Sets `_isOwnDrag = true`, starts `DoDragDrop`, keeps ProgressWindow with "正在拖拽 — 放到目标位置以复制文件"
+6. After drop: closes ProgressWindow, cleans up temp dir, resets `_isOwnDrag = false`
+
+### Own-window drop protection
+
+`_isOwnDrag` flag prevents `Window_Drop` from reacting to files dragged out of and back into the app window (the temp paths are meaningless for add-to-archive).
+
+### Subdirectory preservation
+
+Uses `ArchiveItem.FullPath` for the output temp path so files from subdirectories retain their relative structure. `ExtractEntryForDragAsync` creates intermediate directories as needed.
+
+### Cancellation
+
+`ProgressWindow` provides cancel via `CancellationToken`. If cancelled before extraction finishes, `DoDragDrop` is skipped entirely.
+
+### Custom `IDataObject` attempt (archived)
+
+**Tried**: `System.Windows.IDataObject` (`DragDropDataObject` nested class) for delayed rendering — extraction in `GetData()` at drop time so ProgressWindow would show only after mouse release. **Result**: crashes Explorer.
+
+**Root cause**: WPF OLE bridge (`IComDataObject`) has an internal bug when converting `string[]` → `CF_HDROP` for non-`DataStore` `_innerData` implementations. Confirmed by WPF source code (v8.0.1). Not fixable from app side.
+
+**Status**: Abandoned. Code removed. If a delayed-rendering solution is needed in the future, use `VirtualFileDataObject` (Microsoft.VisualStudio.OLE.Interop / Shell32 community wrappers) instead of `System.Windows.IDataObject`.
+
+### Future: COM context menu + VirtualFileDataObject
+
+Both improvements require COM component integration:
+
+**Dynamic shell context menu** — Replace static registry verbs with a COM `IContextMenu` handler:
+- Right-click file name is available at menu-build time → dynamic display text (e.g. "添加到 (文件名).zip")
+- Full control over menu ordering, icons, submenus
+- Registration via `*\shellex\ContextMenuHandlers\{GUID}`
+- Effort: medium (COM registration, `IContextMenu` / `IShellExtInit` implementation)
+
+**VirtualFileDataObject** (drag-out delayed rendering):
+- Delayed rendering without Explorer crash
+- Files appear in Explorer before fully extracted
+- Explorer requests data chunk by chunk via `GetData`
+- Works around WPF OLE bridge bug by implementing `System.Runtime.InteropServices.ComTypes.IDataObject` directly in COM
+- Effort: medium (P/Invoke for `COMStreamWrapper`, `FORMATETC`, `STGMEDIUM`)
+
+Both can be packaged as a single helper library if desired.
 
 ## Build output
 

@@ -51,9 +51,6 @@
                 <MenuItem Header="密码管理器(_P)..." Click="PasswordManager_Click"/>
                 <Separator/>
                 <MenuItem Header="设置(_S)..." Click="Settings_Click"/>
-                <Separator/>
-                <MenuItem x:Name="ShellInstallMenuItem" Header="安装 Shell 右键菜单" Click="InstallShell_Click"/>
-                <MenuItem x:Name="ShellUninstallMenuItem" Header="卸载 Shell 右键菜单" Click="UninstallShell_Click"/>
             </MenuItem>
             <MenuItem Header="帮助(_H)">
                 <MenuItem Header="关于(_A)" Click="About_Click"/>
@@ -91,6 +88,10 @@
                 <Separator/>
                 <CheckBox x:Name="ShowSubFoldersCheck" Content="显示子目录" ToolTip="切换是否显示子目录文件" 
                          Click="ShowSubFolders_Click" VerticalAlignment="Center"/>
+                <Separator/>
+                <ToggleButton x:Name="PreviewToggleBtn" ToolTip="切换预览面板" Click="PreviewToggleBtn_Click" Padding="8,4">
+                    <TextBlock x:Name="PreviewToggleIcon" Text="👁" FontSize="16"/>
+                </ToggleButton>
             </ToolBar>
         </ToolBarTray>
 
@@ -133,7 +134,14 @@
                         </Border>
 
                         <!-- TreeView + FileList + Preview -->
-                        <Grid Grid.Row="1">
+                        <Grid Grid.Row="1" x:Name="ContentGrid">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="200" MinWidth="100"/>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*" MinWidth="100"/>
+                                <ColumnDefinition x:Name="PreviewColSplitterDef" Width="Auto" MinWidth="0"/>
+                                <ColumnDefinition x:Name="PreviewColumnDef" Width="0" MinWidth="0"/>
+                            </Grid.ColumnDefinitions>
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="*"/>
                                 <RowDefinition x:Name="PreviewSplitterRow" Height="0"/>
@@ -141,11 +149,18 @@
                             </Grid.RowDefinitions>
 
                             <!-- TreeView + DataGrid -->
-                            <Grid Grid.Row="0">
+                            <Grid x:Name="InnerContentGrid" Grid.Row="0" Grid.ColumnSpan="5">
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="*"/>
+                                    <RowDefinition x:Name="InnerPreviewSplitterRow" Height="0"/>
+                                    <RowDefinition x:Name="InnerPreviewRow" Height="0"/>
+                                </Grid.RowDefinitions>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition x:Name="TreeColumn" Width="200" MinWidth="100"/>
                                     <ColumnDefinition Width="Auto"/>
-                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition x:Name="FileListColumn" Width="*" MinWidth="100"/>
+                                    <ColumnDefinition x:Name="InnerPreviewColSplitterDef" Width="Auto" MinWidth="0"/>
+                                    <ColumnDefinition x:Name="InnerPreviewColumnDef" Width="0" MinWidth="0"/>
                                 </Grid.ColumnDefinitions>
 
                                 <!-- Directory Tree -->
@@ -160,7 +175,7 @@
                                     </TreeView.ItemTemplate>
                                 </TreeView>
 
-                                <GridSplitter Grid.Column="1" Width="4" Background="Transparent" 
+                                <GridSplitter x:Name="TreeFileSplitter" Grid.Column="1" Width="4" Background="Transparent" 
                                             HorizontalAlignment="Center" VerticalAlignment="Stretch"/>
 
                                 <!-- File List -->
@@ -204,50 +219,87 @@
                                         </DataGridTemplateColumn>
                                     </DataGrid.Columns>
                                 </DataGrid>
+
+                                <!-- Inner preview row splitter (Pos 2/3) -->
+                                <GridSplitter x:Name="InnerPreviewSplitter" Grid.Row="1"
+                                            Height="4" Background="Transparent"
+                                            HorizontalAlignment="Stretch" VerticalAlignment="Center"
+                                            Visibility="Collapsed" Grid.ColumnSpan="5"/>
                             </Grid>
 
+                            <!-- Vertical Splitter for Pos 4 (Right preview) -->
+                            <GridSplitter x:Name="PreviewColSplitter" Grid.Row="0" Grid.Column="3"
+                                        Width="4" Background="Transparent"
+                                        HorizontalAlignment="Center" VerticalAlignment="Stretch"
+                                        Visibility="Collapsed"/>
+
                             <!-- Preview Splitter -->
-                            <GridSplitter x:Name="PreviewSplitter" Grid.Row="1" Height="4" 
+                            <GridSplitter x:Name="PreviewSplitter" Grid.Row="1" Grid.ColumnSpan="5" Height="4" 
                                         Background="Transparent" HorizontalAlignment="Stretch"
                                         VerticalAlignment="Center" Visibility="Collapsed"/>
 
                             <!-- Preview Panel -->
-                            <Border x:Name="PreviewPanel" Grid.Row="2" 
+                            <Border x:Name="PreviewPanel" Grid.Row="2" Grid.ColumnSpan="5"
                                     Background="#FAFAFA" BorderBrush="#DDD" BorderThickness="1"
                                     CornerRadius="4" Visibility="Collapsed">
-                                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto"
-                                            Padding="8">
-                                    <Grid>
-                                        <Grid.RowDefinitions>
-                                            <RowDefinition Height="Auto"/>
-                                            <RowDefinition Height="*"/>
-                                        </Grid.RowDefinitions>
+                                <Grid Margin="8">
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="*"/>
+                                    </Grid.RowDefinitions>
 
-                                        <!-- Header -->
-                                        <TextBlock x:Name="PreviewHeader" Grid.Row="0"
-                                                  FontWeight="SemiBold" FontSize="12" Foreground="#666"
-                                                  VerticalAlignment="Top" HorizontalAlignment="Left"/>
+                                    <!-- Header -->
+                                    <TextBlock x:Name="PreviewHeader" Grid.Row="0"
+                                              FontWeight="SemiBold" FontSize="12" Foreground="#666"
+                                              VerticalAlignment="Top" HorizontalAlignment="Left"/>
 
-                                        <!-- Content area: Image/Text/Unsupported + Info Panel -->
-                                        <Grid Grid.Row="1" Margin="0,16,0,0">
+                                    <!-- Content area + Info Panel (dual orientation) -->
+                                    <Grid x:Name="PreviewContentGrid" Grid.Row="1" Margin="0,16,0,0">
+                                            <Grid.RowDefinitions>
+                                                <RowDefinition Height="*"/>
+                                                <RowDefinition Height="Auto"/>
+                                            </Grid.RowDefinitions>
                                             <Grid.ColumnDefinitions>
                                                 <ColumnDefinition Width="*"/>
                                                 <ColumnDefinition Width="Auto"/>
                                             </Grid.ColumnDefinitions>
 
                                             <!-- Image Preview -->
-                                            <Image x:Name="PreviewImage" Grid.Column="0" Stretch="Uniform" 
-                                                   MaxWidth="600" MaxHeight="400"
-                                                   Visibility="Collapsed"/>
+                                            <Image x:Name="PreviewImage" Stretch="Uniform" Visibility="Collapsed"/>
 
-                                            <!-- Image Info Panel (right side, only for images) -->
-                                            <Border x:Name="PreviewInfoPanel" Grid.Column="1"
-                                                    Visibility="Collapsed"
+                                            <!-- File Icon (for non-previewable files) -->
+                                            <Image x:Name="PreviewFileIcon" Width="64" Height="64" Visibility="Collapsed"
+                                                   HorizontalAlignment="Center" VerticalAlignment="Center"/>
+
+                                            <!-- Text Preview -->
+                                            <TextBox x:Name="PreviewTextBox"
+                                                     IsReadOnly="True" 
+                                                     FontFamily="Cascadia Code, Consolas, monospace"
+                                                     FontSize="12"
+                                                     BorderThickness="0"
+                                                     Background="Transparent"
+                                                     TextWrapping="Wrap"
+                                                     ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                                                     ScrollViewer.VerticalScrollBarVisibility="Auto"
+                                                     Visibility="Collapsed"/>
+
+                                            <!-- HTML/Markdown Preview -->
+                                            <WebBrowser x:Name="PreviewWebBrowser" Visibility="Collapsed"/>
+
+                                            <!-- Unsupported fallback -->
+                                            <TextBlock x:Name="PreviewUnsupported"
+                                                       Text="🔍 无法预览此文件"
+                                                       FontSize="14" Foreground="#999"
+                                                       HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                       Visibility="Collapsed"/>
+
+                                            <!-- Info Panel (universal) -->
+                                            <Border x:Name="PreviewInfoPanel"
                                                     Background="#F0F0F0" CornerRadius="4" 
                                                     Padding="10" Margin="12,0,0,0"
                                                     MinWidth="140">
                                                 <StackPanel>
-                                                    <TextBlock Text="图片信息" FontWeight="SemiBold" 
+                                                    <TextBlock x:Name="PreviewInfoTitle" FontWeight="SemiBold" 
                                                                Foreground="#666" FontSize="12"
                                                                Margin="0,0,0,8"/>
                                                     <TextBlock x:Name="PreviewInfoText" 
@@ -255,26 +307,8 @@
                                                                LineHeight="20" LineStackingStrategy="BlockLineHeight"/>
                                                 </StackPanel>
                                             </Border>
-
-                                            <!-- Text Preview -->
-                                            <TextBox x:Name="PreviewTextBox" Grid.Column="0" Grid.ColumnSpan="2"
-                                                    IsReadOnly="True" 
-                                                    FontFamily="Cascadia Code, Consolas, monospace"
-                                                    FontSize="12"
-                                                    BorderThickness="0"
-                                                    Background="Transparent"
-                                                    TextWrapping="Wrap"
-                                                    Visibility="Collapsed"/>
-
-                                            <!-- Unsupported -->
-                                            <TextBlock x:Name="PreviewUnsupported" Grid.Column="0" Grid.ColumnSpan="2"
-                                                      Text="🔍 无法预览此文件"
-                                                      FontSize="14" Foreground="#999"
-                                                      HorizontalAlignment="Center" VerticalAlignment="Center"
-                                                      Visibility="Collapsed"/>
                                         </Grid>
                                     </Grid>
-                                </ScrollViewer>
                             </Border>
                         </Grid>
                     </Grid>

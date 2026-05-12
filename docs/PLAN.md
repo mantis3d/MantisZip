@@ -4,8 +4,8 @@
 
 **项目状态**: 🟡 开发中 (Phase 4)  
 **创建日期**: 2026-04-23  
-**最后更新**: 2026-05-09  
-**当前版本**: 0.1.3
+**最后更新**: 2026-05-12  
+**当前版本**: 0.1.6
 
 ---
 
@@ -105,8 +105,8 @@ MantisZip/
 | P1 | 7z 格式压缩 | ✅ 完成 | 基于 7z.exe |
 | P1 | TAR 格式支持 | ✅ 完成 | TarGzEngine |
 | P1 | GZ 格式支持 | ✅ 完成 | 含 .tgz/.tar.gz |
-| P1 | AES-256 加密压缩 | 🔶 引擎已支持 | 引擎支持 AESKeySize=256，UI 未开放加密选项 |
-| P1 | 分卷压缩 | ⬜ 待开发 |
+| P1 | AES-256 加密压缩 | ✅ 完成 | 引擎 + UI 均已实现（密码验证、加密头、AESKeySize=256） |
+| P1 | 分卷压缩 | ✅ 完成 | ZIP: SplitOutputStream 分卷写入 (.zip.001/.002)；7z: 7z.exe -v{size}b |
 | P1 | 压缩级别设置（1-9，默认5） | ✅ 完成 |
 | P2 | 压缩包内文件/图片预览 | ✅ 完成 |
 | P1 | 设置系统 | ✅ 完成 | AppSettings JSON 持久化 + SettingsWindow 五标签页 |
@@ -119,8 +119,9 @@ MantisZip/
 
 | 优先级 | 功能 | 状态 |
 |--------|------|------|
-| P0 | 拖拽解压 | ✅ 完成 |
-| P0 | 拖拽压缩 | ✅ 完成 | 拖入文件/文件夹生成 ZIP |
+| P0 | 拖拽解压（拖入窗口） | ✅ 完成 |
+| P0 | 拖拽压缩（拖入文件） | ✅ 完成 | 拖入文件/文件夹生成 ZIP |
+| P0 | 拖拽解压（拖出到 Explorer） | ✅ 完成 | 7-Zip 模式：提取后拖拽，ProgressWindow 全程展示 |
 | P0 | 进度条显示 | ✅ 完成 |
 | P0 | 可取消操作 | ✅ 完成 |
 | P0 | 版本号显示 | ✅ 完成 |
@@ -182,9 +183,9 @@ MantisZip/
 
 | 序号 | 任务 | 状态 | 备注 |
 |------|------|------|------|
-| 3.1 | AES-256 加密压缩 | 🔶 部分完成 | 引擎支持 AESKeySize=256，UI 未开放加密选项 |
+| 3.1 | AES-256 加密压缩 | ✅ 完成 | 引擎支持 AESKeySize=256，压缩对话框已开放加密选项 |
 | 3.2 | 密码解密解压 | ✅ 完成 | 密码输入对话框 |
-| 3.3 | 分卷压缩 | ⬜ 待开发 | |
+| 3.3 | 分卷压缩 | ✅ 完成 | ZIP: SplitOutputStream；7z: 7z.exe -v 参数 |
 | 3.4 | 文件预览功能 | ✅ 完成 | 图片 (jpg/png/gif/bmp/webp) + 文本 (txt/log/code) + 信息面板 |
 | 3.5 | 压缩方式选择 (Store/Deflate/BZip2/LZMA) | ⬜ 待开发 | 需换 SharpCompress 库 |
 
@@ -207,10 +208,10 @@ MantisZip/
 ```
 Phase 1: ██████████████ 100%
 Phase 2: ██████████████ 100%
-Phase 3: ████░░░░░░░░░░ 40%
+Phase 3: █████████░░░░░ 70%
 Phase 4: ████████░░░░░░ 60%
 
-总体进度: ████████████░░ 75%
+总体进度: █████████████░ 80%
 ```
 
 ---
@@ -225,6 +226,8 @@ Phase 4: ████████░░░░░░ 60%
 | 2026-04-24 | PLAN 状态与实际不符 | 修正 TAR/GZ/RAR/7z压缩为待开发 | ✅ 已修复 |
 | 2026-04-24 | 压缩时进度条始终为 0% | processedBytes 在报告前进度更新 | ✅ 已修复 |
 | 2026-04-24 | ZIP 中文文件名乱码 | 注册 GBK 编码 + ZipStrings.CodePage=936 | ✅ 已修复 |
+| 2026-05-11 | 拖出到 Explorer 延迟渲染方案 | 自定义 IDataObject 因 WPF OLE bridge bug 崩溃；改用 7-Zip 急切提取模型 | ✅ 已解决 |
+| 2026-05-11 | VirtualFileDataObject 远期方案 | 使用 COM 原生 IDataObject 替代 WPF 包装，实现延迟渲染且不崩溃 | ⬜ 未来计划 |
 
 ---
 
@@ -249,6 +252,11 @@ Phase 4: ████████░░░░░░ 60%
 | 2026-05-09 | 修复 `_currentFormat` bug | Sisyphus | 改用扩展名映射格式 |
 | 2026-05-09 | 更新 PLAN.md 同步实际状态 | Sisyphus | Phase 2 全部标记完成 |
 | 2026-05-09 | 设置系统 + Shell 集成 + per-file 进度 + CLI 入口 | Sisyphus | AppSettings, SettingsWindow, ShellIntegration, SystemIconHelper, 双进度条, --compress-quick, --extract 直连, --open |
+| 2026-05-11 | 拖出到 Explorer 拖拽提取 | Sisyphus | 7-Zip 急切提取模型：拖拽时立即提取 → ProgressWindow 显示进度 → DoDragDrop 标准 DataObject |
+| 2026-05-11 | v0.1.4 版本升级 | Sisyphus | |
+| 2026-05-11 | 更新文档 + VirtualFileDataObject 列入未来计划 | Sisyphus | AGENTS.md, PLAN.md, PROGRESS.md |
+| 2026-05-11 | HTML/Markdown 预览 + 文本预览字号 + Shell 菜单重构 + 分卷压缩 | Sisyphus | v0.1.5：WebBrowser 预览、Markdig、字号滑块、Shell 三按钮、split-volume |
+| 2026-05-12 | 目录预览 + 预览开关按钮 + 图片解码降采样修复 | Sisyphus | v0.1.6：ShowDirectoryPreview、PreviewToggleBtn、DecodePixelWidth 条件设置、MaxWidth/MaxHeight 防拉伸 |
 
 ---
 
@@ -256,11 +264,11 @@ Phase 4: ████████░░░░░░ 60%
 
 | 优先级 | 任务 | 说明 |
 |--------|------|------|
-| P1 | 实现分卷压缩 | ArchiveOptions.SplitSize 参数已定义 |
-| P1 | 开放加密压缩 UI | 引擎已支持 AES-256，需在压缩对话框添加加密选项 |
-| P2 | 压缩方式选择 | Store/Deflate/BZip2/LZMA，需换 SharpCompress 库 |
 | P2 | TarGzEngine 元数据修复 | 保留原始时间戳、支持压缩级别 |
+| P2 | 压缩方式选择 | Store/Deflate/BZip2/LZMA，需换 SharpCompress 库 |
 | P2 | 中/英文界面切换 | 技术决策记录已修正 |
+| P3 | COM 右键菜单 + VirtualFileDataObject | 动态菜单名（显示文件名）、目录结构预览、拖拽延迟渲染，打包成一个 COM 辅助库 |
+| P4 | 右键菜单目录结构预览 | 在 COM 菜单中读取压缩包 entry 列表，展示文件树（Bandizip 风格） |
 | P3 | 安装包与发布 | |
 
 ---

@@ -7,9 +7,9 @@
 - **技术栈**: .NET 9 + WPF + SharpZipLib + SevenZipExtractor
 
 ## 版本
-- **当前版本**: 0.1.3
-- **发布日期**: 2026-05-09
-- **开发中**: 设置系统、Shell 集成、per-file 进度、CLI 入口点（即将发布为 v0.2.0）
+- **当前版本**: 0.1.6
+- **发布日期**: 2026-05-12
+- **开发中**: 目录预览、预览开关按钮、图片解码降采样优化
 
 ## 功能列表
 
@@ -65,11 +65,28 @@
 10. **全局初始化 App.InitializeApp()** - 所有 CLI 入口点统一执行 GBK 编码注册
 11. **ZipEngine 目录条目修复** - ExtractAsync 创建空目录条目而非跳过（修复点号目录名问题）
 
+### v0.1.6 (2026-05-12)
+1. **目录预览** - 选中文件夹时显示系统文件夹图标 + 目录信息
+2. **工具栏预览开关** - ToggleButton 控制预览面板显隐，状态持久化 ShowPreviewPanel
+3. **图片解码降采样优化** - 仅对宽度 >1920px 的图片设 DecodePixelWidth=1920，小图保持原生清晰度
+4. **MaxWidth/MaxHeight 约束** - 设 PreviewImage.MaxWidth/MaxHeight 为实际像素尺寸，防止 Stretch="Uniform" 拉伸小图
+5. **预览开关收起残留空白修复** - 收起时调用 HidePreview() 复位 Grid 行/列尺寸
+6. **预览开关重显修复** - 打开时调用 ShowPreviewPanel() 恢复布局 + 重显选中项预览
+
+### v0.1.5 (2026-05-11)
+1. **HTML 预览** - WebBrowser 加载 .html/.htm 文件预览
+2. **Markdown 预览** - Markdig 渲染 .md/.markdown 为带样式的 HTML
+3. **文本预览字号** - AppSettings.TextPreviewFontSize + SettingsWindow 滑块 + 实时预览
+4. **Shell 菜单重构** - 新增 --extract-here / --extract-to-name CLI；菜单项重命名排序：打开压缩包 / 解压到此处 / 解压到压缩包名 / 解压到…… / 压缩为（文件名）.zip / 压缩
+5. **Shell 安装移至设置** - 工具菜单移除安装/卸载，改为设置窗口三按钮（安装/卸载/应用）
+6. **拖拽提取增强** - ProgressWindow 全程展示 + 子目录结构保留 + _isOwnDrag 防自投
+7. **分卷压缩** - CompressSettingsWindow 分卷大小 ComboBox（1MB~4GB+自定义）；7z 引擎传 -v{size}b；ZIP 引擎 SplitOutputStream 生成 .zip.001/.002/...
+
 ### 待实现功能
-- 分卷压缩
-- 开放加密压缩 UI（引擎已支持 AES-256）
 - 压缩方式选择 (Store/Deflate/BZip2/LZMA) - 需换 SharpCompress 库
 - TarGzEngine 保留原始时间戳
+- COM 右键菜单（动态文件名、目录结构预览、自定义排序）+ VirtualFileDataObject 延迟渲染（打包为一个 COM 辅助库）
+- 右键菜单目录结构预览（Bandizip 风格，靠后）
 - 安装包与发布
 
 ## 技术架构
@@ -178,6 +195,15 @@ MantisZip/
 - **过滤保护** - 添加 _isProgrammaticFilter 开关，防止 FilterFiles 误触 SelectionChanged 预览
 
 ---
+
+### v0.1.4 (2026-05-11)
+1. **拖出到 Explorer 拖拽提取** - 7-Zip 急切提取模型：提取后拖拽
+2. **ProgressWindow 拖拽集成** - 提取时显示进度 → 拖拽时显示"正在拖拽"提示
+3. **_isOwnDrag 防自投** - 拖回自己窗口时忽略，不弹添加到压缩包
+4. **子目录结构保留** - 使用 FullPath 保留目录层次
+5. **自定义 IDataObject 实验（废弃）** - 确认 WPF OLE bridge bug，不可修复
+6. **VirtualFileDataObject 列入未来计划** - COM 原生 IDataObject，可实现延迟渲染不崩溃
+7. **AGENTS.md 拖拽交互详述** - 架构、关键决策、已知限制
 
 ### 2026-05-09 (开发中)
 - **AppSettings 设置系统** - JSON 持久化单例，支持压缩/解压/菜单/预览/高级五组配置
