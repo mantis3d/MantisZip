@@ -1,5 +1,7 @@
+using System.Diagnostics;
 using ICSharpCode.SharpZipLib.Zip;
 using MantisZip.Core.Abstractions;
+using MantisZip.Core.Utils;
 using SevenZipExtractor;
 
 namespace MantisZip.Core.Utils;
@@ -20,6 +22,10 @@ public static class ArchiveEntryExtractor
         string? password = null,
         CancellationToken cancellationToken = default)
     {
+        CoreLog.Entry();
+        CoreLog.Info($"ExtractEntryAsync: {archivePath} ! {entryName} -> {outputPath}, format={format}, password={(password != null ? "***" : "null")}");
+        var sw = Stopwatch.StartNew();
+
         switch (format)
         {
             case ArchiveFormat.Zip:
@@ -34,15 +40,18 @@ public static class ArchiveEntryExtractor
             case ArchiveFormat.GZip:
             case ArchiveFormat.Rar:
             default:
-                // 不支持的格式 - 使用完整引擎提取到临时目录
+                CoreLog.Info($"ExtractEntryAsync: format {format} not supported for single-entry extract");
                 throw new NotSupportedException($"格式 {format} 不支持单文件预览提取");
         }
 
+        CoreLog.Info($"ExtractEntryAsync: done, {sw.ElapsedMilliseconds}ms");
         await Task.CompletedTask;
+        CoreLog.Exit();
     }
 
     private static void ExtractZipEntry(string archivePath, string entryName, string outputPath, string? password)
     {
+        CoreLog.Info($"ExtractZipEntry: archive={archivePath}, entry={entryName}");
         using var zipFile = new ZipFile(archivePath);
         if (!string.IsNullOrEmpty(password))
         {
@@ -67,10 +76,12 @@ public static class ArchiveEntryExtractor
         using var inStream = zipFile.GetInputStream(entry);
         using var outStream = new FileStream(outputPath, FileMode.Create, FileAccess.Write);
         inStream.CopyTo(outStream);
+        CoreLog.Info($"ExtractZipEntry: done");
     }
 
     private static void ExtractSevenZipEntry(string archivePath, string entryName, string outputPath, string? password)
     {
+        CoreLog.Info($"ExtractSevenZipEntry: archive={archivePath}, entry={entryName}");
         using var archiveFile = new ArchiveFile(archivePath);
         var entry = archiveFile.Entries.FirstOrDefault(e => e.FileName == entryName);
         if (entry == null)
@@ -94,5 +105,6 @@ public static class ArchiveEntryExtractor
             using var fileStream = new FileStream(outputPath, FileMode.Create, FileAccess.Write);
             entry.Extract(fileStream);
         }
+        CoreLog.Info($"ExtractSevenZipEntry: done");
     }
 }

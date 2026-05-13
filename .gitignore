@@ -2,6 +2,8 @@
 bin/
 obj/
 out/
+publish_output/
+installer/
 
 # IDE
 .vs/
