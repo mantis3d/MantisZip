@@ -1,11 +1,13 @@
 ﻿using System.Diagnostics;
 using System.IO;
 using System.IO.Pipes;
+using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Windows;
 using System.Windows.Threading;
 using ICSharpCode.SharpZipLib.Zip;
+using MantisZip.Core;
 using MantisZip.Core.Abstractions;
 using MantisZip.Core.Engines;
 
@@ -36,7 +38,21 @@ public partial class App : Application
         ZipStrings.CodePage = 936; // GBK
 #pragma warning restore CS0618
 
-        // 后续若有其他全局初始化（如 7z 路径检测、临时目录清理等）加在这里
+        // 从用户设置加载 7z.exe 路径，覆盖 SevenZipEngine 的默认值
+        try
+        {
+            var s = AppSettings.Instance;
+            if (!string.IsNullOrEmpty(s.SevenZipPath))
+            {
+                SevenZipEngine.SevenZipPath = s.SevenZipPath;
+                LogDebug("InitializeApp: SevenZipPath set to {0}", s.SevenZipPath);
+            }
+        }
+        catch (Exception initEx)
+        {
+            LogDebug("InitializeApp: failed to load AppSettings: {0}", initEx.Message);
+            // 使用默认 7z 路径继续运行
+        }
     }
 
     protected override void OnStartup(StartupEventArgs e)
@@ -351,6 +367,7 @@ public partial class App : Application
 
     /// <summary>
     /// 公共解压逻辑：获取引擎、显示进度窗口、执行解压，完成后退出。
+    /// 支持从 PasswordManager 加载已保存密码，以及在加密时弹出密码输入框。
     /// </summary>
     private static void RunExtractStatic(string archivePath, string dest)
     {
@@ -381,23 +398,153 @@ public partial class App : Application
         // 后台解压，完成后自动退出
         Task.Run(async () =>
         {
+            LogStartup("RunExtractStatic: Task.Run started");
             try
             {
-                await engine.ExtractAsync(archivePath, dest, null, progress, progressWindow.CancellationToken);
-                await progressWindow.Dispatcher.InvokeAsync(() => progressWindow.SetComplete("解压完成"));
+                // 收集所有匹配的已保存密码，逐个尝试（可能有多个规则匹配同一文件）
+                var savedPasswords = PasswordManager.Instance.FindMatchingPasswords(archivePath);
+                var triedPasswords = new HashSet<string>();
+                var lastError = (Exception?)null;
 
-                if (settings.OpenFolderAfterExtract)
-                    OpenInExplorerStatic(dest);
+                LogStartup($"RunExtractStatic: savedPasswords={savedPasswords.Count}");
 
-                await Task.Delay(800);
-                await progressWindow.Dispatcher.InvokeAsync(() => Current.Shutdown());
+                if (savedPasswords.Count > 0)
+                {
+                    foreach (var entry in savedPasswords)
+                    {
+                        var pwd = entry.Password;
+                        if (!triedPasswords.Add(pwd)) continue;
+
+                        var desc = !string.IsNullOrEmpty(entry.Description) ? entry.Description : pwd;
+                        LogStartup($"RunExtractStatic: trying password '{pwd}' (desc={desc})...");
+                        progressWindow.CancellationToken.ThrowIfCancellationRequested();
+
+                        // 显示密码区：正在尝试状态（受 ShowPasswordMatchNotification 设置控制）
+                        bool showPwdSection = AppSettings.Instance.ShowPasswordMatchNotification;
+                        if (showPwdSection) progressWindow.ShowPasswordAttempt(desc);
+
+                        // Quick Verify：读 1 字节快速验证密码，不对立即跳过
+                        progressWindow.CancellationToken.ThrowIfCancellationRequested();
+                        if (!QuickVerifyPassword(archivePath, pwd, engine))
+                        {
+                            lastError = new Exception("QuickVerify failed");
+                            LogStartup($"RunExtractStatic: QuickVerify failed for '{pwd}'");
+                            Log("--extract: 密码 '{0}' 快速验证失败", pwd);
+                            continue;
+                        }
+
+                        // 快速验证通过 → 更新密码区为已匹配状态
+                        LogStartup("RunExtractStatic: QuickVerify SUCCEEDED");
+                        if (showPwdSection) progressWindow.ShowPasswordMatched(pwd, desc);
+
+                        // 全量解压
+                        await engine.ExtractAsync(archivePath, dest, pwd, progress, progressWindow.CancellationToken);
+                        LogStartup("RunExtractStatic: ExtractAsync SUCCEEDED");
+
+                        // 解压完成
+                        await progressWindow.Dispatcher.InvokeAsync(() =>
+                        {
+                            Current.ShutdownMode = ShutdownMode.OnExplicitShutdown;
+                            progressWindow.SetComplete("解压完成");
+                        });
+
+                        if (settings.OpenFolderAfterExtract) OpenInExplorerStatic(dest);
+                        await Task.Delay(2500);
+                        await progressWindow.Dispatcher.InvokeAsync(() => Current.Shutdown());
+                        return;
+                    }
+                }
+
+                LogStartup($"RunExtractStatic: all saved passwords exhausted. lastError={lastError?.Message ?? "none"}");
+                // 所有已保存密码都失败了 → 弹出密码输入框
+                Log("--extract: 所有已保存密码失败，需要用户输入: {0}", lastError?.Message ?? "unknown");
+
+                var passwordResult = await progressWindow.Dispatcher.InvokeAsync(() =>
+                {
+                    // 在弹密码框前隐藏进度窗口，避免挡住对话框
+                    progressWindow.Hide();
+
+                    var dialog = new PasswordDialog(Path.GetFileName(archivePath));
+                    dialog.Owner = null;
+                    dialog.WindowStartupLocation = WindowStartupLocation.CenterScreen;
+                    dialog.Topmost = true;
+                    var result = dialog.ShowDialog() == true
+                        ? (Password: dialog.ResultPassword, Remember: dialog.RememberPassword)
+                        : default((string? Password, bool Remember)?);
+
+                    progressWindow.Show();
+                    return result;
+                });
+
+                if (passwordResult == null)
+                {
+                    LogStartup("RunExtractStatic: user cancelled password dialog");
+                    await progressWindow.Dispatcher.InvokeAsync(() => Current.Shutdown());
+                    return;
+                }
+
+                var (userPassword, remember) = passwordResult.Value;
+                LogStartup($"RunExtractStatic: user entered password (remember={remember})");
+
+                // Quick Verify 用户输入的密码
+                bool showPwdManual = AppSettings.Instance.ShowPasswordMatchNotification;
+                if (showPwdManual) progressWindow.ShowPasswordAttempt("手动输入");
+                if (!QuickVerifyPassword(archivePath, userPassword, engine))
+                {
+                    LogStartup("RunExtractStatic: user password QuickVerify failed");
+                    await progressWindow.Dispatcher.InvokeAsync(() =>
+                    {
+                        MessageBox.Show("密码错误", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+                        Current.Shutdown();
+                    });
+                    return;
+                }
+
+                // 快速验证通过 → 更新密码区 + 全量解压
+                if (showPwdManual) progressWindow.ShowPasswordMatched(userPassword, "手动输入");
+
+                try
+                {
+                    LogStartup("RunExtractStatic: user password ExtractAsync starting...");
+                    await engine.ExtractAsync(archivePath, dest, userPassword, progress, progressWindow.CancellationToken);
+                    LogStartup("RunExtractStatic: user password ExtractAsync succeeded");
+
+                    if (remember && !string.IsNullOrEmpty(userPassword))
+                    {
+                        var patterns = new List<string> { Path.GetFileName(archivePath) };
+                        PasswordManager.Instance.AddPassword(userPassword, "", patterns);
+                    }
+
+                    await progressWindow.Dispatcher.InvokeAsync(() =>
+                    {
+                        Current.ShutdownMode = ShutdownMode.OnExplicitShutdown;
+                        progressWindow.SetComplete("解压完成");
+                    });
+
+                    if (settings.OpenFolderAfterExtract)
+                        OpenInExplorerStatic(dest);
+
+                    await Task.Delay(2500);
+                    await progressWindow.Dispatcher.InvokeAsync(() => Current.Shutdown());
+                }
+                catch (Exception retryEx)
+                {
+                    Log("--extract: 用户密码错误: {0}", retryEx.Message);
+                    await progressWindow.Dispatcher.InvokeAsync(() =>
+                    {
+                        MessageBox.Show("密码错误", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+                        Current.Shutdown();
+                    });
+                }
             }
             catch (OperationCanceledException)
             {
+                LogStartup("RunExtractStatic: OperationCanceledException");
                 await progressWindow.Dispatcher.InvokeAsync(() => Current.Shutdown());
             }
             catch (Exception ex)
             {
+                LogStartup($"RunExtractStatic: outer catch: {ex.GetType().Name}: {ex.Message}");
                 Log("--extract 失败: {0}", ex.Message);
                 await progressWindow.Dispatcher.InvokeAsync(() =>
                 {
@@ -406,6 +553,53 @@ public partial class App : Application
                 });
             }
         });
+    }
+
+    /// <summary>
+    /// 快速验证密码是否正确——读第一个加密条目 1 字节，
+    /// 密码不对时 SharpZipLib / SevenZipExtractor 会在读字节前抛异常。
+    /// </summary>
+    internal static bool QuickVerifyPassword(string archivePath, string password, IArchiveEngine engine)
+    {
+        try
+        {
+            if (engine is ZipEngine)
+            {
+                using var zipFile = new ZipFile(archivePath);
+                zipFile.Password = password;
+                var entry = zipFile.Cast<ZipEntry>().FirstOrDefault(e => e.IsCrypted || e.AESKeySize > 0);
+                if (entry == null) return true; // 没有加密条目（理论上不会发生）
+                using var s = zipFile.GetInputStream(entry);
+                s.ReadByte(); // 密码不对会在此抛异常
+                return true;
+            }
+            else if (engine is SevenZipEngine)
+            {
+                using var archiveFile = new global::SevenZipExtractor.ArchiveFile(archivePath, password);
+                // 7z 构造器传入密码后，访问 Entries 即可验证密码
+                _ = archiveFile.Entries.Count;
+                return true;
+            }
+            // TarGzEngine 不支持加密
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// 判断异常是否表示需要密码。
+    /// 与 <see cref="MainWindow.ExtractAsync"/> 中的逻辑保持一致。
+    /// </summary>
+    private static bool IsPasswordError(Exception ex)
+    {
+        var msg = ex.Message.ToLower();
+        return msg.Contains("password") || msg.Contains("密码") ||
+               msg.Contains("encrypted") || msg.Contains("decrypt") ||
+               msg.Contains("encryption") || ex is InvalidOperationException ||
+               (ex is ZipException && (msg.Contains("password") || msg.Contains("decrypt")));
     }
 
     /// <summary>

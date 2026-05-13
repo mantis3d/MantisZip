@@ -31,10 +31,15 @@ public class AppSettings
     public bool EnableImagePreview { get; set; } = true;
     public bool EnableTextPreview { get; set; } = true;
     public long MaxTextPreviewBytes { get; set; } = 5 * 1024 * 1024;
+    public long MaxPreviewFileSize { get; set; } = 100 * 1024 * 1024; // 默认 100 MB
     public int TextPreviewFontSize { get; set; } = 12;
     public int PreviewPosition { get; set; } = 4; // 1=Bottom, 2=Below tree, 3=Below file list, 4=Right
     public string InfoPanelOrientation { get; set; } = "Vertical"; // Horizontal / Vertical
     public bool ShowPreviewPanel { get; set; } = true;
+
+    // ===== 密码管理 =====
+    public bool ShowPasswordMatchNotification { get; set; } = true;
+    public bool PasswordRevealByDefault { get; set; } = false;
 
     // ===== 高级 =====
     public string SevenZipPath { get; set; } = @"C:\Program Files\7-Zip\7z.exe";

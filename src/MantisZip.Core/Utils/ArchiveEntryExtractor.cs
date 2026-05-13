@@ -14,7 +14,7 @@ public static class ArchiveEntryExtractor
     /// <summary>
     /// 将压缩包中的指定条目提取到目标文件
     /// </summary>
-    public static async Task ExtractEntryAsync(
+    public static Task ExtractEntryAsync(
         string archivePath,
         string entryName,
         string outputPath,
@@ -26,27 +26,31 @@ public static class ArchiveEntryExtractor
         CoreLog.Info($"ExtractEntryAsync: {archivePath} ! {entryName} -> {outputPath}, format={format}, password={(password != null ? "***" : "null")}");
         var sw = Stopwatch.StartNew();
 
-        switch (format)
+        return Task.Run(() =>
         {
-            case ArchiveFormat.Zip:
-                ExtractZipEntry(archivePath, entryName, outputPath, password);
-                break;
+            cancellationToken.ThrowIfCancellationRequested();
 
-            case ArchiveFormat.SevenZip:
-                ExtractSevenZipEntry(archivePath, entryName, outputPath, password);
-                break;
+            switch (format)
+            {
+                case ArchiveFormat.Zip:
+                    ExtractZipEntry(archivePath, entryName, outputPath, password);
+                    break;
 
-            case ArchiveFormat.Tar:
-            case ArchiveFormat.GZip:
-            case ArchiveFormat.Rar:
-            default:
-                CoreLog.Info($"ExtractEntryAsync: format {format} not supported for single-entry extract");
-                throw new NotSupportedException($"格式 {format} 不支持单文件预览提取");
-        }
+                case ArchiveFormat.SevenZip:
+                    ExtractSevenZipEntry(archivePath, entryName, outputPath, password);
+                    break;
 
-        CoreLog.Info($"ExtractEntryAsync: done, {sw.ElapsedMilliseconds}ms");
-        await Task.CompletedTask;
-        CoreLog.Exit();
+                case ArchiveFormat.Tar:
+                case ArchiveFormat.GZip:
+                case ArchiveFormat.Rar:
+                default:
+                    CoreLog.Info($"ExtractEntryAsync: format {format} not supported for single-entry extract");
+                    throw new NotSupportedException($"格式 {format} 不支持单文件预览提取");
+            }
+
+            CoreLog.Info($"ExtractEntryAsync: done, {sw.ElapsedMilliseconds}ms");
+        }, cancellationToken);
+        // Note: CoreLog.Exit() not reached on exception path; OK for DEBUG-only logging
     }
 
     private static void ExtractZipEntry(string archivePath, string entryName, string outputPath, string? password)
@@ -81,8 +85,10 @@ public static class ArchiveEntryExtractor
 
     private static void ExtractSevenZipEntry(string archivePath, string entryName, string outputPath, string? password)
     {
-        CoreLog.Info($"ExtractSevenZipEntry: archive={archivePath}, entry={entryName}");
-        using var archiveFile = new ArchiveFile(archivePath);
+        CoreLog.Info($"ExtractSevenZipEntry: archive={archivePath}, entry={entryName}, password={(password != null ? "***" : "null")}");
+        using var archiveFile = string.IsNullOrEmpty(password)
+            ? new ArchiveFile(archivePath)
+            : new ArchiveFile(archivePath, password);
         var entry = archiveFile.Entries.FirstOrDefault(e => e.FileName == entryName);
         if (entry == null)
         {
@@ -95,16 +101,8 @@ public static class ArchiveEntryExtractor
             Directory.CreateDirectory(dir);
         }
 
-        // SevenZipExtractor Entry.Extract 只接受 Stream
-        if (!string.IsNullOrEmpty(password))
-        {
-            throw new NotSupportedException("7z 加密条目的预览暂不支持密码");
-        }
-        else
-        {
-            using var fileStream = new FileStream(outputPath, FileMode.Create, FileAccess.Write);
-            entry.Extract(fileStream);
-        }
+        using var fileStream = new FileStream(outputPath, FileMode.Create, FileAccess.Write);
+        entry.Extract(fileStream);
         CoreLog.Info($"ExtractSevenZipEntry: done");
     }
 }

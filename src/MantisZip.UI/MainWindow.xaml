@@ -86,6 +86,13 @@
                     </StackPanel>
                 </Button>
                 <Separator/>
+                <Button x:Name="EnterPasswordBtn" ToolTip="输入压缩包密码" Click="EnterPassword_Click" Padding="6,4" IsEnabled="False">
+                    <StackPanel Orientation="Vertical" HorizontalAlignment="Center">
+                        <TextBlock Text="🔑" FontSize="18" HorizontalAlignment="Center"/>
+                        <TextBlock Text="密码" FontSize="10" HorizontalAlignment="Center"/>
+                    </StackPanel>
+                </Button>
+                <Separator/>
                 <ToggleButton x:Name="PreviewToggleBtn" ToolTip="切换预览面板" Click="PreviewToggleBtn_Click" Padding="6,4">
                     <StackPanel Orientation="Vertical" HorizontalAlignment="Center">
                         <TextBlock x:Name="PreviewToggleIcon" Text="👁" FontSize="16" HorizontalAlignment="Center"/>
@@ -286,6 +293,26 @@
                                             <!-- HTML/Markdown Preview -->
                                             <WebBrowser x:Name="PreviewWebBrowser" Visibility="Collapsed"/>
 
+                                            <!-- Loading progress -->
+                                            <StackPanel x:Name="PreviewLoadingPanel"
+                                                        Visibility="Collapsed"
+                                                        HorizontalAlignment="Center"
+                                                        VerticalAlignment="Center">
+                                                <TextBlock x:Name="PreviewLoadingText"
+                                                           Text="正在加载预览…"
+                                                           FontSize="13" Foreground="#888"
+                                                           HorizontalAlignment="Center"/>
+                                                <ProgressBar Width="200" Height="8"
+                                                             IsIndeterminate="True"
+                                                             Margin="0,8,0,0"
+                                                             Foreground="#2196F3"/>
+                                                <TextBlock x:Name="PreviewLoadingPercent"
+                                                           Text=""
+                                                           FontSize="11" Foreground="#AAA"
+                                                           HorizontalAlignment="Center"
+                                                           Margin="0,4,0,0"/>
+                                            </StackPanel>
+
                                             <!-- Unsupported fallback -->
                                             <TextBlock x:Name="PreviewUnsupported"
                                                        Text="🔍 无法预览此文件"
@@ -329,6 +356,7 @@
                             <ColumnDefinition Width="Auto"/>
                             <ColumnDefinition Width="Auto"/>
                             <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
                     </Grid>
                 </ItemsPanelTemplate>
@@ -356,8 +384,13 @@
                 <TextBlock x:Name="ArchiveStatsText" Margin="4,0,4,0" Foreground="#555"/>
             </StatusBarItem>
 
-            <!-- Progress -->
+            <!-- Password Status -->
             <StatusBarItem Grid.Column="5">
+                <TextBlock x:Name="PasswordStatusText" Margin="4,0,4,0" Foreground="#555" FontSize="11"/>
+            </StatusBarItem>
+
+            <!-- Progress -->
+            <StatusBarItem Grid.Column="6">
                 <StackPanel Orientation="Horizontal">
                     <ProgressBar x:Name="ProgressBar" Width="120" Height="14" Visibility="Collapsed"/>
                     <TextBlock x:Name="ProgressText" Margin="4,0,0,0" Visibility="Collapsed"/>
@@ -365,7 +398,7 @@
             </StatusBarItem>
 
             <!-- Version (far right) -->
-            <StatusBarItem Grid.Column="6">
+            <StatusBarItem Grid.Column="7">
                 <TextBlock Text="{x:Static app:AppConstants.VersionDisplay}" Foreground="#666"/>
             </StatusBarItem>
         </StatusBar>

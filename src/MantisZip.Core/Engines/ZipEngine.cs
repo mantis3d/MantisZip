@@ -34,7 +34,8 @@ public class ZipEngine : IArchiveEngine
             }
 
             // 检查是否有加密条目但未提供密码
-            var hasEncrypted = zipFile.Cast<ZipEntry>().Any(e => e.IsCrypted);
+            // 同时检测 ZIP 传统加密 (IsCrypted) 和 AES 加密 (AESKeySize > 0)
+            var hasEncrypted = zipFile.Cast<ZipEntry>().Any(e => e.IsCrypted || e.AESKeySize > 0);
             if (hasEncrypted && string.IsNullOrEmpty(password))
             {
                 CoreLog.Info("ExtractAsync: archive has encrypted entries but no password provided");
@@ -292,7 +293,7 @@ public class ZipEngine : IArchiveEngine
                 CompressedSize = entry.CompressedSize,
                 LastModified = entry.DateTime,
                 IsDirectory = entry.IsDirectory,
-                IsEncrypted = entry.IsCrypted
+                IsEncrypted = entry.IsCrypted || entry.AESKeySize > 0
             }).ToList();
 
             CoreLog.Info($"ListEntriesAsync: {items.Count} entries, {sw.ElapsedMilliseconds}ms");

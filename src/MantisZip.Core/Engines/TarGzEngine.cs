@@ -274,21 +274,15 @@ public class TarGzEngine : IArchiveEngine
                 try
                 {
                     using var inputStream = File.OpenRead(archivePath);
-                    TarArchive tarArchive;
+                    Stream tarStream = inputStream;
 
                     if (isTarGz)
                     {
-                        var gzipInput = new GZipInputStream(inputStream);
-                        tarArchive = TarArchive.CreateInputTarArchive(gzipInput, Encoding.UTF8);
-                    }
-                    else
-                    {
-                        tarArchive = TarArchive.CreateInputTarArchive(inputStream, Encoding.UTF8);
+                        // tar.gz: 先解压 GZip 流，再读取 Tar
+                        tarStream = new GZipInputStream(inputStream);
                     }
 
-                    // 直接从文件流创建 TarInputStream
-                    inputStream.Position = 0;
-                    var tarIn = new TarInputStream(inputStream, Encoding.UTF8);
+                    using var tarIn = new TarInputStream(tarStream, Encoding.UTF8);
                     TarEntry entry;
                     while ((entry = tarIn.GetNextEntry()) != null)
                     {
@@ -350,23 +344,22 @@ public class TarGzEngine : IArchiveEngine
         CoreLog.Entry();
         CoreLog.Info($"TestArchiveAsync: {archivePath}");
 
-        var result = await Task.Run(() =>
+        try
         {
-            try
-            {
-                var items = ListEntriesAsync(archivePath, password, cancellationToken).Result;
-                var ok = items.Count >= 0;
-                CoreLog.Info($"TestArchiveAsync: passed, {items.Count} entries");
-                return ok;
-            }
-            catch (Exception ex)
-            {
-                CoreLog.Error($"TestArchiveAsync: failed", ex);
-                return false;
-            }
-        }, cancellationToken);
-
-        CoreLog.Exit();
-        return result;
+            // ListEntriesAsync 内部已做 Task.Run，无需再包一层
+            var items = await ListEntriesAsync(archivePath, password, cancellationToken);
+            var ok = items.Count >= 0;
+            CoreLog.Info($"TestArchiveAsync: passed, {items.Count} entries");
+            return ok;
+        }
+        catch (Exception ex)
+        {
+            CoreLog.Error($"TestArchiveAsync: failed", ex);
+            return false;
+        }
+        finally
+        {
+            CoreLog.Exit();
+        }
     }
 }

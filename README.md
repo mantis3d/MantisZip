@@ -19,9 +19,11 @@
 
 ## ✨ 功能亮点 | Features
 
-文件内预览（图片 / 文本 / HTML / Markdown）
+### 文件内预览
+图片、文本、HTML、Markdown 格式，将来会加入更多支持的格式。
 
-密码管理器（保存常用密码）
+### 密码管理器
+保存常用密码，可以根据规则自动尝试匹配密码。
 
 ---
 
@@ -29,7 +31,6 @@
 
 如果 MantisZip 对你有帮助，欢迎请我喝杯咖啡 ☕  
 
-If MantisZip helps you, consider buying me a coffee ☕
 
 <p align="center">
   <a href="https://afdian.com"><img src="https://img.shields.io/badge/爱发电-支持我-blue?style=for-the-badge" alt="爱发电"></a>
@@ -37,8 +38,6 @@ If MantisZip helps you, consider buying me a coffee ☕
   <a href="https://www.paypal.com"><img src="https://img.shields.io/badge/PayPal-Donate-blue?style=for-the-badge" alt="PayPal"></a>
 </p>
 
-> 以上链接为占位符，请替换为你自己的收款链接。  
-> The links above are placeholders — replace with your own.
 
 ---
 

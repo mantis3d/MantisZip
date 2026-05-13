@@ -17,6 +17,9 @@ public partial class SettingsWindow : Window
         MaxTextSizeSlider.ValueChanged += (_, _) =>
             MaxTextSizeText.Text = $"{(int)MaxTextSizeSlider.Value} MB";
 
+        MaxPreviewSizeSlider.ValueChanged += (_, _) =>
+            MaxPreviewSizeText.Text = $"{(int)MaxPreviewSizeSlider.Value} MB";
+
         TextFontSizeSlider.ValueChanged += (_, _) =>
         {
             var size = (int)TextFontSizeSlider.Value;
@@ -76,7 +79,12 @@ public partial class SettingsWindow : Window
         EnableImagePreviewCheck.IsChecked = s.EnableImagePreview;
         EnableTextPreviewCheck.IsChecked = s.EnableTextPreview;
         MaxTextSizeSlider.Value = s.MaxTextPreviewBytes / (1024 * 1024);
+        MaxPreviewSizeSlider.Value = s.MaxPreviewFileSize / (1024 * 1024);
         TextFontSizeSlider.Value = s.TextPreviewFontSize;
+
+        // 密码管理
+        ShowPasswordNotifCheck.IsChecked = s.ShowPasswordMatchNotification;
+        RevealPasswordCheck.IsChecked = s.PasswordRevealByDefault;
 
         // 预览位置
         foreach (ComboBoxItem item in PreviewPositionCombo.Items)
@@ -114,9 +122,13 @@ public partial class SettingsWindow : Window
         s.EnableImagePreview = EnableImagePreviewCheck.IsChecked == true;
         s.EnableTextPreview = EnableTextPreviewCheck.IsChecked == true;
         s.MaxTextPreviewBytes = (long)MaxTextSizeSlider.Value * 1024 * 1024;
+        s.MaxPreviewFileSize = (long)MaxPreviewSizeSlider.Value * 1024 * 1024;
         s.TextPreviewFontSize = (int)TextFontSizeSlider.Value;
         s.PreviewPosition = int.TryParse((PreviewPositionCombo.SelectedItem as ComboBoxItem)?.Tag?.ToString(), out var pos) ? pos : 1;
         s.InfoPanelOrientation = (InfoPanelOrientationCombo.SelectedItem as ComboBoxItem)?.Tag as string ?? "Horizontal";
+
+        s.ShowPasswordMatchNotification = ShowPasswordNotifCheck.IsChecked == true;
+        s.PasswordRevealByDefault = RevealPasswordCheck.IsChecked == true;
 
         s.SevenZipPath = SevenZipPathBox.Text;
 
