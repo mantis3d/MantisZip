@@ -144,10 +144,10 @@ _currentFormat = engine.CanHandle(ArchiveFormat.Zip) ? ArchiveFormat.Zip : Archi
 ```
 This always classifies non-ZIP formats as `SevenZip`. Tar/GZip/Rar archives get wrong format, causing preview extraction (`ArchiveEntryExtractor`) to fail or use wrong code paths. **Fix**: derive `_currentFormat` from the file extension instead.
 
-### TarGzEngine metadata issues
+### TarGzEngine metadata (previously broken, now fixed)
 
-- `ListEntriesAsync` sets `LastModified = DateTime.Now` (actual timestamp lost)
-- `CompressAsync` ignores `ArchiveOptions.CompressionLevel` (uses fixed gzip level 5)
+- ~~`ListEntriesAsync` sets `LastModified = DateTime.Now` (actual timestamp lost)~~ → now uses `entry.ModTime`
+- ~~`CompressAsync` ignores `ArchiveOptions.CompressionLevel` (uses fixed gzip level 5)~~ → now uses `options.CompressionLevel`
 
 ### "Subfolder display" toggle semantics
 
@@ -165,9 +165,9 @@ No CI workflows, no pre-commit hooks, no linter/analyzer config. `test_encoding/
 
 `PasswordManager` (singleton) saves passwords as **plaintext JSON** at `%APPDATA%\MantisZip\passwords.json`. No encryption, no DPAPI.
 
-### No RAR engine registered
+### RAR support
 
-`ArchiveEngineFactory.GetEngineByExtension` maps `.rar` to `ArchiveFormat.Rar`, but no engine registers itself for `Rar`. Opening a `.rar` archive returns `null` from the factory — the UI shows "不支持的压缩格式".
+`SevenZipEngine.CanHandle` returns `true` for `ArchiveFormat.Rar`, and `ArchiveEngineFactory.GetEngineByExtension` maps `.rar` to `SevenZipEngine`. RAR archives open and extract normally via `SevenZipExtractor` (wraps 7z.dll which supports RAR).
 
 ### --compress IPC multi-instance
 
