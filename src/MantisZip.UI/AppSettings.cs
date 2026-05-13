@@ -31,6 +31,10 @@ public class AppSettings
     public bool EnableImagePreview { get; set; } = true;
     public bool EnableTextPreview { get; set; } = true;
     public long MaxTextPreviewBytes { get; set; } = 5 * 1024 * 1024;
+    public int TextPreviewFontSize { get; set; } = 12;
+    public int PreviewPosition { get; set; } = 4; // 1=Bottom, 2=Below tree, 3=Below file list, 4=Right
+    public string InfoPanelOrientation { get; set; } = "Vertical"; // Horizontal / Vertical
+    public bool ShowPreviewPanel { get; set; } = true;
 
     // ===== 高级 =====
     public string SevenZipPath { get; set; } = @"C:\Program Files\7-Zip\7z.exe";
@@ -52,7 +56,7 @@ public class AppSettings
             var json = JsonSerializer.Serialize(this, new JsonSerializerOptions { WriteIndented = true });
             File.WriteAllText(SettingsFile, json);
         }
-        catch { /* 忽略保存失败 */ }
+        catch (Exception ex) { App.LogDebug("AppSettings.Save: failed: {0}", ex.Message); }
     }
 
     private static AppSettings Load()
@@ -66,7 +70,7 @@ public class AppSettings
                 if (settings != null) return settings;
             }
         }
-        catch { /* 忽略加载失败，使用默认值 */ }
+        catch (Exception ex) { App.LogDebug("AppSettings.Load: failed: {0}", ex.Message); }
         return new AppSettings();
     }
 }
