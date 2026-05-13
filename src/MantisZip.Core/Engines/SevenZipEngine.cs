@@ -19,9 +19,9 @@ public class SevenZipEngine : IArchiveEngine
     /// </summary>
     public static string SevenZipPath { get; set; } = @"C:\Program Files\7-Zip\7z.exe";
 
-    public bool CanHandle(ArchiveFormat format) => format is ArchiveFormat.SevenZip or ArchiveFormat.Rar;
+    public bool CanHandle(ArchiveFormat format) => format is ArchiveFormat.SevenZip or ArchiveFormat.Rar or ArchiveFormat.Iso;
 
-    public async Task ExtractAsync(string archivePath, string destinationPath, string? password = null, IProgress<ArchiveProgress>? progress = null, CancellationToken cancellationToken = default)
+    public async Task ExtractAsync(string archivePath, string destinationPath, string? password = null, IProgress<ArchiveProgress>? progress = null, CancellationToken cancellationToken = default, ArchiveOptions? options = null)
     {
         CoreLog.Entry();
         CoreLog.Info($"ExtractAsync: {archivePath} -> {destinationPath}, password={(password != null ? "***" : "null")}");
@@ -29,7 +29,10 @@ public class SevenZipEngine : IArchiveEngine
 
         await Task.Run(() =>
         {
-            using var archiveFile = new ArchiveFile(archivePath);
+            // 有密码时用带密码的构造器，这样才能解密每个条目
+            using var archiveFile = string.IsNullOrEmpty(password)
+                ? new ArchiveFile(archivePath)
+                : new ArchiveFile(archivePath, password);
             var entries = archiveFile.Entries.ToList();
             CoreLog.Info($"ExtractAsync: {entries.Count} entries in archive");
 
@@ -41,20 +44,8 @@ public class SevenZipEngine : IArchiveEngine
                 throw new InvalidOperationException("此压缩包已加密，请输入密码 (This archive is encrypted, password required)");
             }
 
-            if (!string.IsNullOrEmpty(password))
             {
-                // 有密码时用批量 API（逐条目提取不支持密码）
-                archiveFile.Extract(destinationPath, overwrite: true, password: password);
-
-                progress?.Report(new ArchiveProgress
-                {
-                    CurrentFile = string.Empty,
-                    PercentComplete = 100
-                });
-            }
-            else
-            {
-                // 无加密时的逐条目提取并报告进度
+                // 逐条目提取（支持密码 + 冲突处理）
                 var lastReportTime = DateTime.Now;
                 var reportInterval = TimeSpan.FromMilliseconds(100);
                 int fileIndex = 0;
@@ -75,6 +66,11 @@ public class SevenZipEngine : IArchiveEngine
                     if (!string.IsNullOrEmpty(outDir) && !Directory.Exists(outDir))
                         Directory.CreateDirectory(outDir);
 
+                    // 冲突处理
+                    var resolvedPath = FileConflictHelper.ResolvePath(outputPath, options);
+                    if (resolvedPath == null)
+                        continue; // Skip
+
                     // 报告当前文件
                     var now = DateTime.Now;
                     progress?.Report(new ArchiveProgress
@@ -84,8 +80,8 @@ public class SevenZipEngine : IArchiveEngine
                         FilePercentComplete = 0
                     });
 
-                    // 用流方式提取（支持覆盖写入）
-                    using var fileStream = new FileStream(outputPath, FileMode.Create, FileAccess.Write);
+                    // 用流方式提取
+                    using var fileStream = new FileStream(resolvedPath, FileMode.Create, FileAccess.Write);
                     entry.Extract(fileStream);
 
                     // 文件完成时再报告一次

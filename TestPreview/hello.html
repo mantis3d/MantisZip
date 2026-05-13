@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>MantisZip - 欢迎</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+  }
+  .card {
+    background: white;
+    border-radius: 16px;
+    padding: 40px;
+    max-width: 680px;
+    width: 100%;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+  }
+  .logo {
+    font-size: 56px;
+    text-align: center;
+    margin-bottom: 8px;
+  }
+  h1 {
+    text-align: center;
+    font-size: 32px;
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin-bottom: 4px;
+  }
+  .subtitle {
+    text-align: center;
+    color: #888;
+    font-size: 14px;
+    margin-bottom: 28px;
+  }
+  .version {
+    text-align: center;
+    color: #aaa;
+    font-size: 12px;
+    margin-bottom: 24px;
+  }
+  .features {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 24px;
+  }
+  .feature {
+    background: #f5f7ff;
+    border-radius: 10px;
+    padding: 14px;
+    text-align: center;
+    font-size: 14px;
+    color: #444;
+    transition: transform 0.2s;
+  }
+  .feature:hover { transform: translateY(-2px); }
+  .feature-icon { font-size: 24px; margin-bottom: 4px; }
+  .footer {
+    text-align: center;
+    color: #aaa;
+    font-size: 12px;
+    border-top: 1px solid #eee;
+    padding-top: 16px;
+  }
+  .badge {
+    display: inline-block;
+    background: #667eea;
+    color: white;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    margin: 0 2px;
+  }
+  @media (max-width: 480px) {
+    .features { grid-template-columns: 1fr; }
+    .card { padding: 24px; }
+  }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="logo">📦</div>
+  <h1>MantisZip</h1>
+  <p class="subtitle">轻量级全功能 Windows 压缩/解压软件</p>
+  <p class="version"><span class="badge">v0.2.2</span> <span class="badge">MIT License</span> <span class="badge">.NET 9 + WPF</span></p>
+
+  <div class="features">
+    <div class="feature">
+      <div class="feature-icon">🔓</div>
+      <strong>智能密码</strong><br>
+      自动匹配保存的密码
+    </div>
+    <div class="feature">
+      <div class="feature-icon">👁</div>
+      <strong>文件预览</strong><br>
+      图片 / 文本 / HTML / Markdown
+    </div>
+    <div class="feature">
+      <div class="feature-icon">📂</div>
+      <strong>格式支持</strong><br>
+      ZIP · 7z · TAR · GZ · RAR
+    </div>
+    <div class="feature">
+      <div class="feature-icon">🖱</div>
+      <strong>Shell 集成</strong><br>
+      右键菜单 + 文件关联
+    </div>
+    <div class="feature">
+      <div class="feature-icon">⏸</div>
+      <strong>暂停/继续</strong><br>
+      大文件解压随时暂停
+    </div>
+    <div class="feature">
+      <div class="feature-icon">📋</div>
+      <strong>密码复制</strong><br>
+      匹配到的密码一键复制
+    </div>
+  </div>
+
+  <div style="background:#f9f9f9; border-radius:10px; padding:14px; margin-bottom:20px;">
+    <p style="font-size:13px; color:#555; line-height:1.8;">
+      <strong>🤖 关于 Sisyphus</strong><br>
+      Sisyphus 是 OhMyOpenCode 平台的 AI Agent 系统。
+      像西西弗斯推动巨石一样，Sisyphus 不断地迭代代码——不写"AI 废料"，
+      只产出有工程水准的代码。这个 HTML 文件就是用它生成的。
+    </p>
+  </div>
+
+  <div class="footer">
+    Made with ❤️ by Sisyphus Agent &middot; OhMyOpenCode
+  </div>
+</div>
+</body>
+</html>

@@ -100,7 +100,7 @@
         </Grid>
 
         <!-- 总体进度条（下面） -->
-        <Grid Grid.Row="3" Margin="0,4,0,6">
+        <Grid Grid.Row="3" Margin="0,4,0,2">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="Auto"/>
@@ -115,10 +115,26 @@
                        FontWeight="Bold" Foreground="#333"/>
         </Grid>
 
-        <!-- 取消按钮 -->
-        <Button x:Name="CancelButton" Grid.Row="5"
-                Content="取消" Width="80" Height="28"
-                HorizontalAlignment="Right"
-                Click="CancelButton_Click"/>
+        <!-- 文件计数 -->
+        <TextBlock x:Name="FileCountText" Grid.Row="4"
+                   Text=""
+                   FontSize="11" Foreground="#888"
+                   Margin="0,0,0,4"
+                   Visibility="Collapsed"/>
+
+        <!-- 底部按钮行 -->
+        <Grid Grid.Row="6">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <Button x:Name="PauseButton" Grid.Column="1"
+                    Content="⏸ 暂停" Width="80" Height="28" Margin="0,0,8,0"
+                    Click="PauseButton_Click"/>
+            <Button x:Name="CancelButton" Grid.Column="2"
+                    Content="取消" Width="80" Height="28"
+                    Click="CancelButton_Click"/>
+        </Grid>
     </Grid>
 </Window>

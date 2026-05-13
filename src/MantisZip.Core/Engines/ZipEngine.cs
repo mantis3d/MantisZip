@@ -15,7 +15,7 @@ public class ZipEngine : IArchiveEngine
 {
     public bool CanHandle(ArchiveFormat format) => format == ArchiveFormat.Zip;
 
-    public async Task ExtractAsync(string archivePath, string destinationPath, string? password = null, IProgress<ArchiveProgress>? progress = null, CancellationToken cancellationToken = default)
+    public async Task ExtractAsync(string archivePath, string destinationPath, string? password = null, IProgress<ArchiveProgress>? progress = null, CancellationToken cancellationToken = default, ArchiveOptions? options = null)
     {
         CoreLog.Entry();
         CoreLog.Info($"ExtractAsync: {archivePath} -> {destinationPath}, password={(password != null ? "***" : "null")}");
@@ -69,9 +69,18 @@ public class ZipEngine : IArchiveEngine
                     Directory.CreateDirectory(outputDir);
                 }
 
+                // 冲突处理
+                var resolvedPath = FileConflictHelper.ResolvePath(outputPath, options);
+                if (resolvedPath == null)
+                {
+                    // Skip: 不提取此文件
+                    processedBytes += entry.Size;
+                    continue;
+                }
+
                 var entrySize = entry.Size;
                 using var inputStream = zipFile.GetInputStream(entry);
-                using var outputStream = File.Create(outputPath);
+                using var outputStream = File.Create(resolvedPath);
 
                 var buffer = new byte[81920];
                 var entryProcessed = 0L;

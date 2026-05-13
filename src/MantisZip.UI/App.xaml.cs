@@ -101,6 +101,20 @@ public partial class App : Application
                         Shutdown();
                         return;
 
+                    case "--install-assoc":
+                        ShellIntegration.InstallAssociations();
+                        MessageBox.Show("文件关联已安装。\n\n现在双击 .zip/.7z/.rar 等文件将默认用 MantisZip 打开。",
+                            "MantisZip", MessageBoxButton.OK, MessageBoxImage.Information);
+                        Shutdown();
+                        return;
+
+                    case "--uninstall-assoc":
+                        ShellIntegration.UninstallAssociations();
+                        MessageBox.Show("文件关联已卸载", "MantisZip",
+                            MessageBoxButton.OK, MessageBoxImage.Information);
+                        Shutdown();
+                        return;
+
                     case "--compress":
                         HandleCompress(e.Args.Skip(1).ToArray());
                         return; // HandleCompress 内部会 Shutdown 或继续运行
@@ -387,11 +401,12 @@ public partial class App : Application
         progressWindow.Show();
         progressWindow.SetProgress(0, "正在解压...");
 
-        var progress = new Progress<ArchiveProgress>(p =>
+        var baseProgress = new Progress<ArchiveProgress>(p =>
         {
             progressWindow.Dispatcher.BeginInvoke(() =>
                 progressWindow.SetProgress(p));
         });
+        var progress = progressWindow.CreatePauseAwareProgress(baseProgress);
 
         Log("--extract: {0} → {1}", archivePath, dest);
 
@@ -437,8 +452,9 @@ public partial class App : Application
                         LogStartup("RunExtractStatic: QuickVerify SUCCEEDED");
                         if (showPwdSection) progressWindow.ShowPasswordMatched(pwd, desc);
 
-                        // 全量解压
-                        await engine.ExtractAsync(archivePath, dest, pwd, progress, progressWindow.CancellationToken);
+                        // 全量解压（带冲突处理设置）
+                        var extractOpts = CreateExtractOptions();
+                        await engine.ExtractAsync(archivePath, dest, pwd, progress, progressWindow.CancellationToken, extractOpts);
                         LogStartup("RunExtractStatic: ExtractAsync SUCCEEDED");
 
                         // 解压完成
@@ -506,7 +522,8 @@ public partial class App : Application
                 try
                 {
                     LogStartup("RunExtractStatic: user password ExtractAsync starting...");
-                    await engine.ExtractAsync(archivePath, dest, userPassword, progress, progressWindow.CancellationToken);
+                    var extractOpts = CreateExtractOptions();
+                    await engine.ExtractAsync(archivePath, dest, userPassword, progress, progressWindow.CancellationToken, extractOpts);
                     LogStartup("RunExtractStatic: user password ExtractAsync succeeded");
 
                     if (remember && !string.IsNullOrEmpty(userPassword))
@@ -553,6 +570,63 @@ public partial class App : Application
                 });
             }
         });
+    }
+
+    /// <summary>
+    /// 从 AppSettings 读取解压冲突策略。
+    /// </summary>
+    /// <summary>
+    /// 创建解压选项，包含冲突处理设置和 Ask 弹窗回调。
+    /// 回调会在后台线程调用，使用 Dispatcher 调度到 UI 线程显示对话框。
+    /// </summary>
+    internal static ArchiveOptions CreateExtractOptions()
+    {
+        bool applyToAll = false;
+        FileConflictAction? chosenAction = null;
+
+        return new ArchiveOptions
+        {
+            ConflictAction = GetConflictActionFromSettings(),
+            ConflictResolver = path =>
+            {
+                // 已勾选"应用到全部" → 直接返回记忆的选择
+                if (applyToAll && chosenAction.HasValue)
+                    return chosenAction.Value;
+
+                var fileName = Path.GetFileName(path);
+
+                // 调度到 UI 线程显示模态对话框
+                var dispatcher = Current?.Dispatcher;
+                if (dispatcher == null) return FileConflictAction.Overwrite;
+
+                var result = dispatcher.Invoke(() =>
+                {
+                    var dialog = new ConflictDialog(fileName);
+                    dialog.ShowDialog();
+                    return (Action: dialog.ResultAction, All: dialog.ApplyToAll);
+                });
+
+                if (result.All)
+                {
+                    applyToAll = true;
+                    chosenAction = result.Action;
+                }
+
+                return result.Action;
+            }
+        };
+    }
+
+    internal static FileConflictAction GetConflictActionFromSettings()
+    {
+        return AppSettings.Instance.FileConflictAction switch
+        {
+            "overwrite" => FileConflictAction.Overwrite,
+            "rename" => FileConflictAction.Rename,
+            "skip" => FileConflictAction.Skip,
+            "ask" => FileConflictAction.Ask,
+            _ => FileConflictAction.Overwrite
+        };
     }
 
     /// <summary>
@@ -624,7 +698,7 @@ public partial class App : Application
     /// <summary>
     /// 根据设置或用户选择返回解压目标目录。返回 null 表示用户取消。
     /// </summary>
-    private static string? ResolveExtractDestinationStatic(string archivePath, AppSettings settings)
+    internal static string? ResolveExtractDestinationStatic(string archivePath, AppSettings settings)
     {
         var destSetting = settings.ExtractDestination;
 
@@ -647,7 +721,7 @@ public partial class App : Application
     }
 
     [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
-    private static void OpenInExplorerStatic(string path)
+    internal static void OpenInExplorerStatic(string path)
     {
         try
         {

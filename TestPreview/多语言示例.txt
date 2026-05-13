@@ -1,0 +1,74 @@
+====================================
+  MantisZip 多语言预览测试文件
+  Multi-language Preview Test File
+====================================
+
+此文件包含多种语言文字，用于测试 MantisZip 的文本预览功能。
+以下展示来自世界各地的文字：
+
+--- 中文（简体）---
+MantisZip 是一款免费开源的全功能 Windows 压缩/解压软件。
+它基于 .NET 9 + WPF 构建，支持 ZIP、7z、TAR、GZ、RAR 等常见格式。
+由 Sisyphus Agent 辅助开发，目前版本 0.2.2。
+
+--- 日本語 (Japanese) ---
+MantisZipは、無料でオープンソースの Windows 向け圧縮・解凍ソフトウェアです。
+ZIP、7z、TAR、GZ、RAR などの一般的な形式をサポートしています。
+Sisyphus Agent の支援を受けて開発されています。
+
+--- 한국어 (Korean) ---
+MantisZip은 무료 오픈 소스 Windows 압축/해제 소프트웨어입니다.
+ZIP, 7z, TAR, GZ, RAR 등 일반적인 형식을 지원합니다.
+Sisyphus Agent의 도움을 받아 개발되었습니다.
+
+--- Русский (Russian) ---
+MantisZip — это бесплатное программное обеспечение с открытым исходным кодом
+для сжатия и распаковки файлов на Windows. Оно поддерживает ZIP, 7z, TAR,
+GZ, RAR и другие популярные форматы. Разработано при поддержке Sisyphus Agent.
+
+--- العربية (Arabic) ---
+مانتيس زيب هو برنامج مجاني ومفتوح المصدر لضغط وفك ضغط الملفات على نظام ويندوز.
+يدعم الصيغ الشائعة مثل ZIP و 7z و TAR و GZ و RAR.
+تم تطويره بمساعدة وكيل Sisyphus.
+
+--- עברית (Hebrew) ---
+MantisZip היא תוכנת קוד פתוח חינמית לדחיסה ושחרור קבצים ב-Windows.
+היא תומכת בפורמטים נפוצים כמו ZIP, 7z, TAR, GZ, RAR.
+פותחה בסיוע Sisyphus Agent.
+
+--- हिन्दी (Hindi) ---
+MantisZip एक मुफ्त और ओपन-सोर्स विंडोज संपीड़न/डीकंप्रेसन सॉफ्टवेयर है।
+यह ZIP, 7z, TAR, GZ, RAR जैसे सामान्य प्रारूपों का समर्थन करता है।
+इसे Sisyphus Agent की सहायता से विकसित किया गया है।
+
+--- ภาษาไทย (Thai) ---
+MantisZip เป็นซอฟต์แวร์บีบอัดและขยายไฟล์บน Windows แบบฟรีและโอเพนซอร์ส
+รองรับรูปแบบทั่วไป เช่น ZIP, 7z, TAR, GZ, RAR
+พัฒนาโดยความช่วยเหลือของ Sisyphus Agent
+
+--- Tiếng Việt (Vietnamese) ---
+MantisZip là phần mềm nén và giải nén mã nguồn mở miễn phí trên Windows.
+Nó hỗ trợ các định dạng phổ biến như ZIP, 7z, TAR, GZ, RAR.
+Được phát triển với sự hỗ trợ của Sisyphus Agent.
+
+--- English ---
+MantisZip is a free and open-source file compression/decompression software for Windows.
+It supports popular formats including ZIP, 7z, TAR, GZ, and RAR.
+Built with .NET 9 + WPF, assisted by Sisyphus Agent.
+
+====================================
+  功能特性 | Features
+====================================
+
+✓ 文件内预览（图片 / 文本 / HTML / Markdown）
+✓ 密码管理器（保存常用密码，glob/regex 匹配）
+✓ 快速密码验证（读 1 字节即可确认密码）
+✓ 解压冲突处理（覆盖/重命名/跳过/询问）
+✓ Shell 右键菜单 + 文件关联
+✓ 拖拽提取到 Explorer
+✓ CLI 命令行操作
+✓ 分卷压缩
+✓ AES-256 加密
+
+  当前版本: v0.2.2
+====================================

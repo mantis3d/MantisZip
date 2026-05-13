@@ -153,6 +153,25 @@
                 </ScrollViewer>
             </TabItem>
 
+            <!-- ═══════ 文件关联 ═══════ -->
+            <TabItem Header="文件关联">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel Margin="10">
+                        <GroupBox Header="压缩格式关联" Padding="8" Margin="0,0,0,12">
+                            <StackPanel>
+                                <TextBlock TextWrapping="Wrap" Foreground="#555" FontSize="12" Margin="0,0,0,10">
+                                    安装后，双击 .zip / .7z / .rar / .tar / .gz 等文件将自动用 MantisZip 打开浏览。</TextBlock>
+                                <Button x:Name="InstallAssocBtn" Content="安装文件关联" Width="140" Height="28"
+                                        HorizontalAlignment="Left" Click="InstallAssoc_Click"/>
+                                <Button x:Name="UninstallAssocBtn" Content="卸载文件关联" Width="140" Height="28"
+                                        HorizontalAlignment="Left" Margin="0,8,0,0" Click="UninstallAssoc_Click"/>
+                                <TextBlock x:Name="AssocStatusText" Text="" FontSize="11" Foreground="#555" Margin="0,8,0,0"/>
+                            </StackPanel>
+                        </GroupBox>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
             <!-- ═══════ 密码管理 ═══════ -->
             <TabItem Header="密码管理">
                 <ScrollViewer VerticalScrollBarVisibility="Auto">

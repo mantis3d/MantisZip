@@ -94,6 +94,9 @@ public partial class SettingsWindow : Window
         foreach (ComboBoxItem item in InfoPanelOrientationCombo.Items)
             if ((string)item.Tag == s.InfoPanelOrientation) { InfoPanelOrientationCombo.SelectedItem = item; break; }
 
+        // 文件关联
+        UpdateAssocStatus();
+
         // 高级
         SevenZipPathBox.Text = s.SevenZipPath;
         AboutVersionText.Text = AppConstants.Version;
@@ -163,6 +166,49 @@ public partial class SettingsWindow : Window
             MessageBox.Show($"安装失败: {ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
+
+    #region 文件关联
+
+    private void UpdateAssocStatus()
+    {
+        var installed = ShellIntegration.AreAssociationsInstalled;
+        AssocStatusText.Text = installed
+            ? "✅ 文件关联已安装"
+            : "❌ 文件关联未安装";
+        InstallAssocBtn.IsEnabled = !installed;
+        UninstallAssocBtn.IsEnabled = installed;
+    }
+
+    private void InstallAssoc_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            ShellIntegration.UninstallAssociations();
+            ShellIntegration.InstallAssociations();
+            UpdateAssocStatus();
+            MessageBox.Show("文件关联已安装", "MantisZip", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"安装失败: {ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
+    private void UninstallAssoc_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            ShellIntegration.UninstallAssociations();
+            UpdateAssocStatus();
+            MessageBox.Show("文件关联已卸载", "MantisZip", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"卸载失败: {ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
+    #endregion
 
     private void UninstallBtn_Click(object sender, RoutedEventArgs e)
     {

@@ -46,6 +46,33 @@ public class ArchiveOptions
     /// 压缩格式
     /// </summary>
     public ArchiveFormat Format { get; set; } = ArchiveFormat.Zip;
+
+    /// <summary>
+    /// 解压时文件已存在的处理方式
+    /// </summary>
+    public FileConflictAction ConflictAction { get; set; } = FileConflictAction.Overwrite;
+
+    /// <summary>
+    /// 文件冲突时的回调。参数为冲突文件路径，返回处理方式。
+    /// 当 <see cref="ConflictAction"/> 为 <see cref="FileConflictAction.Ask"/> 时调用。
+    /// 可在后台线程调用，回调需自行处理 UI 线程问题。
+    /// </summary>
+    public Func<string, FileConflictAction>? ConflictResolver { get; set; }
+}
+
+/// <summary>
+/// 解压时文件已存在的处理方式
+/// </summary>
+public enum FileConflictAction
+{
+    /// <summary>覆盖已有文件（默认）</summary>
+    Overwrite,
+    /// <summary>自动重命名新文件（如 file (1).txt）</summary>
+    Rename,
+    /// <summary>跳过不解压</summary>
+    Skip,
+    /// <summary>每次询问用户</summary>
+    Ask
 }
 
 /// <summary>
@@ -57,7 +84,8 @@ public enum ArchiveFormat
     SevenZip,
     Tar,
     GZip,
-    Rar
+    Rar,
+    Iso
 }
 
 /// <summary>
@@ -89,7 +117,7 @@ public interface IArchiveEngine
     /// <summary>
     /// 解压到指定目录
     /// </summary>
-    Task ExtractAsync(string archivePath, string destinationPath, string? password = null, IProgress<ArchiveProgress>? progress = null, CancellationToken cancellationToken = default);
+    Task ExtractAsync(string archivePath, string destinationPath, string? password = null, IProgress<ArchiveProgress>? progress = null, CancellationToken cancellationToken = default, ArchiveOptions? options = null);
 
     /// <summary>
     /// 压缩指定目录/文件
@@ -142,6 +170,7 @@ public static class ArchiveEngineFactory
             ".7z" => GetEngine(ArchiveFormat.SevenZip),
             ".tar" or ".tgz" or ".tar.gz" or ".gz" => GetEngine(ArchiveFormat.Tar),
             ".rar" => GetEngine(ArchiveFormat.Rar),
+            ".iso" => GetEngine(ArchiveFormat.Iso),
             _ => null
         };
     }

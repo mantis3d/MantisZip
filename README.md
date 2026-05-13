@@ -6,7 +6,7 @@
 > 
 > 基于 .NET 9 + WPF 
 > 
-> 🤖 由 [OhMyOpenCode](https://ohmyopencode.com) 的 Sisyphus Agent 辅助开发
+> 🤖 由[OpenCode](https://opencode.ai) 及 [OhMyOpenCode](https://ohmyopencode.com) 的 Sisyphus Agent 辅助开发
 
 
 ---
@@ -20,23 +20,36 @@
 ## ✨ 功能亮点 | Features
 
 ### 文件内预览
-图片、文本、HTML、Markdown 格式，将来会加入更多支持的格式。
+可以在压缩包内直接预览 图片、文本、HTML、Markdown 格式，将来会加入更多支持的格式。
 
 ### 密码管理器
 保存常用密码，可以根据规则自动尝试匹配密码。
 
+
 ---
 
-## 💖 支持项目 | Support
+## 🖼️ 功能截图 | Screenshots
 
-如果 MantisZip 对你有帮助，欢迎请我喝杯咖啡 ☕  
+### 文件内预览
+
+图片
+
+文本
+
+HTML
+
+Markdown
+
+可以更改预览窗格位置
 
 
-<p align="center">
-  <a href="https://afdian.com"><img src="https://img.shields.io/badge/爱发电-支持我-blue?style=for-the-badge" alt="爱发电"></a>
-  <a href="https://ko-fi.com"><img src="https://img.shields.io/badge/Ko--fi-Buy%20me%20a%20coffee-orange?style=for-the-badge" alt="Ko-fi"></a>
-  <a href="https://www.paypal.com"><img src="https://img.shields.io/badge/PayPal-Donate-blue?style=for-the-badge" alt="PayPal"></a>
-</p>
+### 密码管理器
+保存常用密码匹配规则。
+
+解压时自动尝试匹配密码。
+
+密码输入
+
 
 
 ---
@@ -132,9 +145,17 @@ MantisZip/
 
 ---
 
-## 🖼️ 功能截图 | Screenshots
+## 💖 支持项目 | Support
 
-*(待添加 — 欢迎贡献!)*
+如果 MantisZip 对你有帮助，欢迎请我喝杯咖啡 ☕  
+
+
+<p align="center">
+  <a href="https://afdian.com"><img src="https://img.shields.io/badge/爱发电-支持我-blue?style=for-the-badge" alt="爱发电"></a>
+  <a href="https://ko-fi.com"><img src="https://img.shields.io/badge/Ko--fi-Buy%20me%20a%20coffee-orange?style=for-the-badge" alt="Ko-fi"></a>
+  <a href="https://www.paypal.com"><img src="https://img.shields.io/badge/PayPal-Donate-blue?style=for-the-badge" alt="PayPal"></a>
+</p>
+
 
 ---
 
@@ -147,12 +168,12 @@ MantisZip/
 ## 📄 许可证 | License
 
 本项目使用 **MIT 许可证** — 详见 [LICENSE](LICENSE) 文件。  
-This project is licensed under the **MIT License** — see the [LICENSE](LICENSE) file for details.
+This project is licensed under the 
 
 **第三方组件 | Third-party components**:
 
 - 7-Zip (GNU LGPL) — https://www.7-zip.org  
-- 其他依赖见 | Other dependencies see [docs/PLAN.md](docs/PLAN.md)
+- 其他依赖见 [docs/PLAN.md](docs/PLAN.md)
 
 ---
 

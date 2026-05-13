@@ -15,7 +15,7 @@ public class TarGzEngine : IArchiveEngine
 {
     public bool CanHandle(ArchiveFormat format) => format == ArchiveFormat.Tar || format == ArchiveFormat.GZip;
 
-    public async Task ExtractAsync(string archivePath, string destinationPath, string? password = null, IProgress<ArchiveProgress>? progress = null, CancellationToken cancellationToken = default)
+    public async Task ExtractAsync(string archivePath, string destinationPath, string? password = null, IProgress<ArchiveProgress>? progress = null, CancellationToken cancellationToken = default, ArchiveOptions? options = null)
     {
         CoreLog.Entry();
         CoreLog.Info($"ExtractAsync: {archivePath} -> {destinationPath}");
@@ -89,8 +89,18 @@ public class TarGzEngine : IArchiveEngine
                         FilePercentComplete = 0
                     });
 
+                    // 冲突处理
+                    var resolved = FileConflictHelper.ResolvePath(outputFilePath, options);
+                    if (resolved == null)
+                    {
+                        // 跳过文件但需要消费 Tar 流数据以推进到下一个条目
+                        var discardBuf = new byte[81920];
+                        while (tarIn.Read(discardBuf, 0, discardBuf.Length) > 0) { }
+                        continue;
+                    }
+
                     // 带 per-file 进度的复制
-                    using var outStream = File.Create(outputFilePath);
+                    using var outStream = File.Create(resolved);
                     var buffer = new byte[81920];
                     long totalRead = 0;
                     long entrySize = entry.Size;
@@ -125,8 +135,12 @@ public class TarGzEngine : IArchiveEngine
                 // 单纯 GZip 解压单个文件
                 using var gzip = new GZipInputStream(File.OpenRead(archivePath));
                 var outputPath = Path.Combine(destinationPath, Path.GetFileNameWithoutExtension(archivePath));
-                using var output = File.Create(outputPath);
-                gzip.CopyTo(output);
+                var resolved = FileConflictHelper.ResolvePath(outputPath, options);
+                if (resolved != null)
+                {
+                    using var output = File.Create(resolved);
+                    gzip.CopyTo(output);
+                }
 
                 progress?.Report(new ArchiveProgress
                 {

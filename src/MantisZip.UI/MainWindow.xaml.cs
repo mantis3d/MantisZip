@@ -526,7 +526,7 @@ public partial class MainWindow : Window
     {
         var dialog = new OpenFileDialog
         {
-            Filter = "压缩文件|*.zip;*.7z;*.rar;*.tar;*.tar.gz;*.gz;*.bz2;*.cab;*.iso|所有文件|*.*",
+            Filter = "压缩文件|*.zip;*.7z;*.rar;*.tar;*.tar.gz;*.gz;*.iso|所有文件|*.*",
             Title = "打开压缩包"
         };
 
@@ -698,7 +698,7 @@ public partial class MainWindow : Window
     private bool IsArchiveFile(string path)
     {
         var ext = Path.GetExtension(path).ToLowerInvariant();
-        return ext is ".zip" or ".7z" or ".rar" or ".tar" or ".tgz" or ".gz" or ".bz2" or ".cab" or ".iso";
+        return ext is ".zip" or ".7z" or ".rar" or ".tar" or ".tgz" or ".gz" or ".iso";
     }
 
     private static ArchiveFormat GetFormatByExtension(string path)
@@ -711,6 +711,7 @@ public partial class MainWindow : Window
             ".7z" => ArchiveFormat.SevenZip,
             ".tar" or ".tgz" or ".gz" => ArchiveFormat.Tar,
             ".rar" => ArchiveFormat.Rar,
+            ".iso" => ArchiveFormat.Iso,
             _ => ArchiveFormat.Zip
         };
     }
@@ -845,11 +846,12 @@ public partial class MainWindow : Window
             if (engine == null) return;
 
             var ct = progressWindow.CancellationToken;
-            var progress = new Progress<ArchiveProgress>(p =>
+            var baseProgress = new Progress<ArchiveProgress>(p =>
             {
                 progressWindow.Dispatcher.BeginInvoke(() =>
                     progressWindow.SetProgress(p));
             });
+            var progress = progressWindow.CreatePauseAwareProgress(baseProgress);
 
             // 收集所有匹配的已保存密码，逐个尝试（可能有多个规则匹配同一文件）
             var savedPasswords = PasswordManager.Instance.FindMatchingPasswords(archivePath);
@@ -877,8 +879,9 @@ public partial class MainWindow : Window
                     // 快速验证通过
                     if (showPwdSection) progressWindow.ShowPasswordMatched(pwd, desc);
 
-                    // 全量解压
-                    await engine.ExtractAsync(archivePath, destinationPath, pwd, progress, ct);
+                    // 全量解压（带冲突处理设置）
+                    var extractOpts = App.CreateExtractOptions();
+                    await engine.ExtractAsync(archivePath, destinationPath, pwd, progress, ct, extractOpts);
                     progressWindow.Close();
                     SetStatus($"解压完成: {Path.GetFileName(archivePath)}");
                     if (AppSettings.Instance.OpenFolderAfterExtract) OpenInExplorer(destinationPath);
@@ -915,15 +918,17 @@ public partial class MainWindow : Window
 
                     if (showPwdSection) progressWindow.ShowPasswordMatched(userPassword, "手动输入");
 
-                    var progress2 = new Progress<ArchiveProgress>(p =>
+                    var baseProgress2 = new Progress<ArchiveProgress>(p =>
                     {
                         progressWindow.Dispatcher.BeginInvoke(() =>
                             progressWindow.SetProgress(p));
                     });
+                    var progress2 = progressWindow.CreatePauseAwareProgress(baseProgress2);
 
                     try
                     {
-                        await engine2.ExtractAsync(archivePath, destinationPath, userPassword, progress2);
+                        var extractOpts2 = App.CreateExtractOptions();
+                        await engine2.ExtractAsync(archivePath, destinationPath, userPassword, progress2, ct, extractOpts2);
 
                         progressWindow.Close();
                         SetStatus($"解压完成: {Path.GetFileName(archivePath)}");
@@ -1111,29 +1116,10 @@ public partial class MainWindow : Window
 
     /// <summary>
     /// 根据设置或用户选择返回解压目标目录。返回 null 表示用户取消了操作。
+    /// 委托到 <see cref="App.ResolveExtractDestinationStatic"/>。
     /// </summary>
     private string? ResolveExtractDestination(string archivePath)
-    {
-        var settings = AppSettings.Instance;
-        var destSetting = settings.ExtractDestination;
-
-        if (destSetting == "same-dir")
-        {
-            var dir = Path.GetDirectoryName(archivePath);
-            if (!string.IsNullOrEmpty(dir)) return dir;
-        }
-        else if (destSetting == "desktop")
-        {
-            return Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
-        }
-
-        // "ask" 或未知值 → 弹出选择对话框
-        var dialog = new Ookii.Dialogs.Wpf.VistaFolderBrowserDialog
-        {
-            Description = "选择解压目录"
-        };
-        return dialog.ShowDialog() == true ? dialog.SelectedPath : null;
-    }
+        => App.ResolveExtractDestinationStatic(archivePath, AppSettings.Instance);
 
     /// <summary>
     /// 根据当前压缩包的加密状态和密码匹配情况更新状态栏。
@@ -1170,31 +1156,9 @@ public partial class MainWindow : Window
             && _currentPassword == null;
     }
 
-    /// <summary>
-    /// 在文件资源管理器中打开指定路径。
-    /// </summary>
-    private static void OpenInExplorer(string path)
-    {
-        try
-        {
-            if (Directory.Exists(path))
-                Process.Start("explorer.exe", path);
-        }
-        catch (Exception explorerEx) { App.LogDebug("OpenInExplorer: failed: {0}", explorerEx.Message); }
-    }
+    private static void OpenInExplorer(string path) => App.OpenInExplorerStatic(path);
 
-    private string FormatSize(long bytes)
-    {
-        string[] sizes = { "B", "KB", "MB", "GB", "TB" };
-        double len = bytes;
-        int order = 0;
-        while (len >= 1024 && order < sizes.Length - 1)
-        {
-            order++;
-            len /= 1024;
-        }
-        return $"{len:0.##} {sizes[order]}";
-    }
+    private string FormatSize(long bytes) => ArchiveItem.FormatSize(bytes);
 
     /// <summary>
     /// 构建目录树：从显式目录条目 + 文件路径推导出所有目录节点。
@@ -2347,7 +2311,7 @@ public class ArchiveItem : Core.Abstractions.ArchiveItem
 
     public int SortOrder => IsDirectory ? 0 : 1;
 
-    private static string FormatSize(long bytes)
+    internal static string FormatSize(long bytes)
     {
         string[] sizes = { "B", "KB", "MB", "GB", "TB" };
         double len = bytes;

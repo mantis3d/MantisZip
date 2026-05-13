@@ -1,3 +1,4 @@
+using System.IO;
 using Microsoft.Win32;
 
 namespace MantisZip.UI;
@@ -17,9 +18,10 @@ namespace MantisZip.UI;
 internal static class ShellIntegration
 {
     private static readonly string[] ArchiveExtensions =
-        [".zip", ".7z", ".rar", ".tar", ".tgz", ".tar.gz", ".gz", ".bz2", ".cab", ".iso"];
+        [".zip", ".7z", ".rar", ".tar", ".tgz", ".tar.gz", ".gz", ".iso"];
 
     private const string CascadeRoot = "MantisZip";
+    private const string ProgId = "MantisZip.Archive";
 
     // Verb names (numbered prefix for verb-mode alphabetical order)
     private const string OpenVerb = "01_MantisZipOpen";
@@ -267,6 +269,90 @@ internal static class ShellIntegration
         if (appliesTo != null)
             SetRegistryValue(key, "AppliesTo", appliesTo);
         SetRegistryValue($@"{key}\command", null, command);
+    }
+
+    #endregion
+
+    #region 文件关联
+
+    /// <summary>检查文件关联是否已安装。</summary>
+    public static bool AreAssociationsInstalled
+    {
+        get
+        {
+            // OpenWithProgids 下存的是值（REG_NONE），不是子项
+            using var key = Registry.CurrentUser.OpenSubKey($@"Software\Classes\.zip\OpenWithProgids");
+            if (key == null) return false;
+            return key.GetValue(ProgId) != null;
+        }
+    }
+
+    /// <summary>
+    /// 注册 ProgId 并将压缩格式扩展名与之关联。
+    /// 写入 HKCU\Software\Classes，无需管理员权限。
+    /// </summary>
+    public static void InstallAssociations()
+    {
+        App.LogDebug("ShellIntegration.InstallAssociations: starting");
+        var exePath = GetExePath();
+
+        // 1. 注册 ProgId
+        var progIdKey = $@"Software\Classes\{ProgId}";
+        SetRegistryValue(progIdKey, null, "MantisZip 压缩包");
+        SetRegistryValue($@"{progIdKey}\shell\open", null, "用 MantisZip 打开");
+        SetRegistryValue($@"{progIdKey}\shell\open\command", null, $@"""{exePath}"" --open ""%1""");
+        SetRegistryValue($@"{progIdKey}\DefaultIcon", null, $@"""{exePath},0""");
+
+        // 2. 注册 Applications 条目（控制"打开方式"列表中的显示名称）
+        var appKey = $@"Software\Classes\Applications\{Path.GetFileName(exePath)}";
+        SetRegistryValue(appKey, "FriendlyAppName", "MantisZip");
+        SetRegistryValue($@"{appKey}\shell\open\command", null, $@"""{exePath}"" --open ""%1""");
+        foreach (var ext in ArchiveExtensions)
+        {
+            if (ext == ".tar.gz") continue;
+            SetRegistryValue($@"{appKey}\SupportedTypes", ext, "");
+        }
+
+        // 3. 每个扩展名写 OpenWithProgids
+        foreach (var ext in ArchiveExtensions)
+        {
+            if (ext == ".tar.gz") continue; // .tar.gz 由 .gz 覆盖
+            var extKey = $@"Software\Classes\{ext}\OpenWithProgids";
+            using var key = Registry.CurrentUser.CreateSubKey(extKey);
+            key?.SetValue(ProgId, Array.Empty<byte>(), RegistryValueKind.None);
+        }
+
+        App.LogDebug("ShellIntegration.InstallAssociations: done");
+    }
+
+    /// <summary>
+    /// 卸载文件关联：删除 ProgId 和扩展名的 OpenWithProgids 条目。
+    /// </summary>
+    public static void UninstallAssociations()
+    {
+        App.LogDebug("ShellIntegration.UninstallAssociations: starting");
+
+        // 删除每个扩展名的 ProgId 条目
+        foreach (var ext in ArchiveExtensions)
+        {
+            if (ext == ".tar.gz") continue;
+            try
+            {
+                using var key = Registry.CurrentUser.OpenSubKey($@"Software\Classes\{ext}\OpenWithProgids", writable: true);
+                key?.DeleteValue(ProgId, throwOnMissingValue: false);
+            }
+            catch { /* 该扩展可能没有 OpenWithProgids 键 */ }
+        }
+
+        // 删除 Applications 条目
+        var exeName = Path.GetFileName(Environment.ProcessPath ?? "");
+        if (!string.IsNullOrEmpty(exeName))
+            DeleteRegistryKey($@"Software\Classes\Applications\{exeName}");
+
+        // 删除 ProgId
+        DeleteRegistryKey($@"Software\Classes\{ProgId}");
+
+        App.LogDebug("ShellIntegration.UninstallAssociations: done");
     }
 
     #endregion

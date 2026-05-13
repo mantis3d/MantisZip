@@ -19,7 +19,7 @@ public class AppSettings
     public string FileConflictAction { get; set; } = "ask"; // overwrite / rename / skip / ask
     public bool OpenFolderAfterExtract { get; set; } = false;
 
-    // ===== 上下文菜单 =====
+    // ===== 上下文菜单 / 文件关联 =====
     public bool EnableCompressMenu { get; set; } = true;
     public bool EnableExtractMenu { get; set; } = true;
     public bool EnableOpenMenu { get; set; } = true;     // 用 MantisZip 打开

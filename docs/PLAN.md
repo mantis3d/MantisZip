@@ -2,10 +2,10 @@
 
 > 详细开发计划及进度跟踪文档
 
-**项目状态**: 🟡 开发中 (Phase 4)  
+**项目状态**: 🟢 开发中 (Phase 4 收尾)  
 **创建日期**: 2026-04-23  
-**最后更新**: 2026-05-12  
-**当前版本**: 0.2.1
+**最后更新**: 2026-05-13 (v0.2.3)  
+**当前版本**: 0.2.3
 
 ---
 
@@ -21,7 +21,7 @@
 | 加密 | AES-256 | 2026-04-23 |
 | 界面语言 | 中文 | 2026-04-23 |
 | 发布形式 | 安装包 + 便携版 | 2026-04-23 |
-| 最低系统 | Windows 10 (1809+)+ | .NET 9 支持的最低版本 |
+| 最低系统 | Windows 10 (1809+) | .NET 9 支持的最低版本 |
 | 界面风格 | 现代风格 | 2026-04-23 |
 | 主题切换 | 需要（亮色/暗色） | 2026-04-23 |
 | 默认压缩级 | 5（平衡） | 2026-04-23 |
@@ -36,8 +36,10 @@
 |------|------|------|
 | SharpZipLib | 1.4.0 | ZIP 压缩/解压 |
 | SevenZipExtractor | 1.0.19 | 7z/RAR 等解压 |
-| CommunityToolkit.Mvvm | 8.3.2 | MVVM 框架 |
+| CommunityToolkit.Mvvm | 8.3.2 | MVVM 框架（实际未用）|
 | Ookii.Dialogs.Wpf | 5.0.1 | 文件夹选择对话框 |
+| Markdig | 1.1.3 | Markdown 渲染 |
+| Ude.NetStandard | 1.2.0 | 字符编码检测 |
 
 ## 一、技术选型
 
@@ -47,34 +49,33 @@
 |------|------|------|
 | 开发语言 | C# (.NET 9, Windows) | 现代 .NET，CLI 直接支持 |
 | UI 框架 | WPF | Windows 原生体验，高性能 |
-| 架构模式 | Code-behind | 所有逻辑在 MainWindow.xaml.cs，FolderNode 实现 INotifyPropertyChanged |
-| 压缩库 | SharpZipLib (ZIP) + SevenZipExtractor (7z/RAR) | 功能成熟，社区支持好 |
+| 架构模式 | Code-behind | 所有逻辑在 MainWindow.xaml.cs |
+| 压缩库 | SharpZipLib (ZIP/TAR/GZ) + SevenZipExtractor (7z/RAR) | 功能成熟 |
 
 ### 1.2 项目结构
 
 ```
 MantisZip/
 ├── src/
-│   ├── MantisZip.Core/          # 核心业务逻辑 - 压缩/解压引擎
-│   │   ├── Abstractions/      # 接口定义
-│   │   ├── Engines/        # 压缩引擎
-│   │   ├── Models/        # 数据模型
-│   │   └── Utils/         # 工具类
-│   └── MantisZip.UI/       # WPF 桌面应用
-│       ├── App.xaml / App.xaml.cs     # 应用入口 + CLI 处理 + 全局初始化
-│       ├── AppConstants.cs           # 版本号常量
-│       ├── AppSettings.cs            # 用户设置（JSON 持久化）
-│       ├── MainWindow.xaml / .cs     # 主窗口 + FolderNode
-│       ├── SettingsWindow.xaml / .cs # 设置窗口
-│       ├── ShellIntegration.cs       # 右键菜单（HKCU 无需管理员）
-│       ├── SystemIconHelper.cs       # SHGetFileInfo 系统图标
-│       ├── ProgressWindow.xaml / .cs # 双进度条
-│       └── CompressSettingsWindow.xaml / .cs # 压缩配置
+│   ├── MantisZip.Core/          # 核心业务逻辑
+│   │   ├── Abstractions/      # IArchiveEngine + Models
+│   │   ├── Engines/           # ZipEngine / SevenZipEngine / TarGzEngine
+│   │   ├── Models/
+│   │   └── Utils/             # PasswordManager, ArchiveEntryExtractor, FileConflictHelper
+│   └── MantisZip.UI/          # WPF 桌面应用
+│       ├── App.xaml / .cs     # 应用入口 + CLI 处理
+│       ├── AppConstants.cs    # 版本号常量
+│       ├── AppSettings.cs     # 用户设置（JSON 持久化）
+│       ├── MainWindow.xaml / .cs  # 主窗口 + FolderNode
+│       ├── SettingsWindow.xaml / .cs  # 设置窗口（六标签页）
+│       ├── ShellIntegration.cs    # 右键菜单 + 文件关联
+│       ├── ProgressWindow.xaml / .cs  # 双进度条 + 密码区 + 暂停
+│       └── ConflictDialog.xaml / .cs  # 文件冲突弹窗
 ├── docs/
-│   ├── PLAN.md            # 本文档
-│   └── PROGRESS.md        # 开发进度文档
-├── AGENTS.md              # AI 代理开发指南
-└── MantisZip.sln          # 解决方案文件
+│   ├── PLAN.md
+│   └── PROGRESS.md
+├── AGENTS.md
+└── MantisZip.sln
 ```
 
 ---
@@ -85,133 +86,132 @@ MantisZip/
 
 | 格式 | 压缩 | 解压 | 加密 | 备注 |
 |------|:----:|:----:|:----:|------|
-| ZIP | ✅ | ✅ | ✅ | 默认 |
-| 7z | ✅ | ✅ | ✅ | 基于 7z.exe |
+| ZIP | ✅ | ✅ | ✅ | AES-256 |
+| 7z | ✅ | ✅ | ✅ | 压缩依赖 7z.exe |
 | TAR | ✅ | ✅ | ❌ | |
 | GZ (tar.gz) | ✅ | ✅ | ❌ | |
-| RAR | ❌ | ✅ | ✅ | 需要 SevenZipExtractor |
+| RAR | ❌ | ✅ | ✅ | 只读 |
 
 ### 2.2 核心功能
 
 | 优先级 | 功能 | 状态 |
 |--------|------|------|
-| P0 | ZIP 格式解压 | ✅ 完成 |
-| P0 | ZIP 格式压缩 | ✅ 完成 |
-| P0 | 7z 格式解压 | ✅ 完成 |
-| P0 | RAR 格式解压（只读） | ✅ 完成 |
+| P0 | ZIP 解压 | ✅ 完成 |
+| P0 | ZIP 压缩 | ✅ 完成 |
+| P0 | 7z 解压 | ✅ 完成 |
+| P0 | RAR 解压（只读） | ✅ 完成 |
 | P0 | 密码管理器 | ✅ 完成 |
 | P0 | 目录树导航 | ✅ 完成 |
-| P0 | 文件列表（仅显示直接子项） | ✅ 完成 |
-| P1 | 7z 格式压缩 | ✅ 完成 | 基于 7z.exe |
-| P1 | TAR 格式支持 | ✅ 完成 | TarGzEngine |
-| P1 | GZ 格式支持 | ✅ 完成 | 含 .tgz/.tar.gz |
-| P1 | AES-256 加密压缩 | ✅ 完成 | 引擎 + UI 均已实现（密码验证、加密头、AESKeySize=256） |
-| P1 | 分卷压缩 | ✅ 完成 | ZIP: SplitOutputStream 分卷写入 (.zip.001/.002)；7z: 7z.exe -v{size}b |
-| P1 | 压缩级别设置（1-9，默认5） | ✅ 完成 |
-| P2 | 压缩包内文件/图片预览 | ✅ 完成 |
-| P1 | 设置系统 | ✅ 完成 | AppSettings JSON 持久化 + SettingsWindow 五标签页 |
-| P1 | Shell 右键菜单 | ✅ 完成 | 层叠/独立双模式，per-verb 开关，AppliesTo 过滤器 |
-| P1 | CLI 入口点 | ✅ 完成 | --compress, --extract, --open, --compress-quick, --install/uninstall-shell |
-| P2 | 系统文件图标 | ✅ 完成 | SHGetFileInfo 获取原生 Windows 图标 |
-| P2 | 逐文件进度 | ✅ 完成 | ZipEngine per-file 0%→100%，双进度条展示 |
+| P0 | 文件列表（仅直接子项） | ✅ 完成 |
+| P1 | 7z 压缩 | ✅ 完成 |
+| P1 | TAR/GZ 格式 | ✅ 完成 |
+| P1 | AES-256 加密 | ✅ 完成 |
+| P1 | 分卷压缩 | ✅ 完成 |
+| P1 | 压缩级别设置 | ✅ 完成 |
+| P2 | 文件/图片预览 | ✅ 完成 |
+| P1 | 设置系统 | ✅ 完成 |
+| P1 | Shell 右键菜单 | ✅ 完成 |
+| P1 | CLI 入口点 | ✅ 完成 |
+| P2 | 系统图标 | ✅ 完成 |
+| P2 | 逐文件进度 | ✅ 完成 |
+| P2 | 文件冲突处理 | ✅ 完成 |
+| P2 | 文件关联 | ✅ 完成 |
+| P2 | 暂停/继续 | ✅ 完成 |
+| P2 | 快速密码验证 | ✅ 完成 |
 
 ### 2.3 用户交互
 
 | 优先级 | 功能 | 状态 |
 |--------|------|------|
 | P0 | 拖拽解压（拖入窗口） | ✅ 完成 |
-| P0 | 拖拽压缩（拖入文件） | ✅ 完成 | 拖入文件/文件夹生成 ZIP |
-| P0 | 拖拽解压（拖出到 Explorer） | ✅ 完成 | 7-Zip 模式：提取后拖拽，ProgressWindow 全程展示 |
-| P0 | 进度条显示 | ✅ 完成 |
-| P0 | 可取消操作 | ✅ 完成 |
+| P0 | 拖拽压缩（拖入文件） | ✅ 完成 |
+| P0 | 拖拽解压（拖出到 Explorer） | ✅ 完成 |
+| P0 | 进度条 | ✅ 完成 |
+| P0 | 可取消 | ✅ 完成 |
 | P0 | 版本号显示 | ✅ 完成 |
 | P1 | 压缩配置面板 | ✅ 完成 |
-| P1 | 设置系统 | ✅ 完成 | AppSettings JSON + SettingsWindow 五标签页 |
-| P1 | 右键菜单集成 | ✅ 完成 | 层叠/独立双模式，Per-verb 开关，图标 |
-| P1 | CLI 快速压缩/解压/浏览 | ✅ 完成 | --compress-quick, --extract, --open |
-| P2 | 文件关联 | ✅ 完成 | 通过 Shell 注册 AppliesTo 过滤器 |
-| P2 | 系统文件图标 | ✅ 完成 | SHGetFileInfo 原生图标 |
-| P2 | 中/英文界面切换 | ⬜ 待开发 |
-| P2 | 亮/暗主题切换 | ⬜ 待开发 |
+| P1 | 设置窗口 | ✅ 完成 |
+| P1 | 右键菜单集成 | ✅ 完成 |
+| P1 | CLI 快速压缩/解压/浏览 | ✅ 完成 |
+| P2 | 暂停/继续 | ✅ 完成 |
+| P2 | 密码匹配进度提示 | ✅ 完成 |
+| P2 | 暗色主题 | ⬜ 待开发 |
+| P2 | 国际化 | ⬜ 待开发 |
 
 ### 2.4 系统集成
 
 | 优先级 | 功能 | 状态 |
 |--------|------|------|
 | P1 | Shell 右键菜单 | ✅ 完成 |
-| P1 | 打开方式注册 | ✅ 完成 |
-| P2 | --compress-quick 快速压缩 | ✅ 完成 |
-| P2 | 桌面剪贴板监控 | ⬜ 待开发 |
+| P1 | 文件关联（打开方式） | ✅ 完成 |
+| P2 | 快速压缩 | ✅ 完成 |
+| P3 | 桌面剪贴板监控 | ⬜ 待开发 |
 
 ---
 
 ## 三、开发计划
 
 ### Phase 1: 项目初始化与基础架构
+**目标**: 建立项目结构，实现基础 ZIP 压缩/解压 — **100%**
 
-**目标**: 建立项目结构，实现基础 ZIP 压缩/解压
-
-| 序号 | 任务 | 状态 | 备注 |
-|------|------|------|------|
-| 1.1 | 创建解决方案与项目结构 | ✅ 完成 | |
-| 1.2 | 配置 NuGet 依赖 | ✅ 完成 | SharpZipLib, SevenZipExtractor |
-| 1.3 | 实现 Core 层架构 | ✅ 完成 | ArchiveEngine 抽象 |
-| 1.4 | 实现 ZIP 解压功能 | ✅ 完成 | |
-| 1.5 | 实现 ZIP 压缩功能 | ✅ 完成 | |
-| 1.6 | 实现基本 UI 框架 | ✅ 完成 | |
-| 1.7 | 目录树导航 | ✅ 完成 | 左侧菜单显示目录结构 |
-| 1.8 | 文件列表（仅直接子项） | ✅ 完成 | 过滤逻辑 |
-| 1.9 | 密码管理器 | ✅ 完成 | glob/regex 匹配 |
-| 1.10 | 版本号显示 | ✅ 完成 | 右下角 v0.1.0 |
+| 序号 | 任务 | 状态 |
+|------|------|------|
+| 1.1 | 创建解决方案与项目结构 | ✅ 完成 |
+| 1.2 | 配置 NuGet 依赖 | ✅ 完成 |
+| 1.3 | 实现 Core 层架构 | ✅ 完成 |
+| 1.4 | 实现 ZIP 解压 | ✅ 完成 |
+| 1.5 | 实现 ZIP 压缩 | ✅ 完成 |
+| 1.6 | 实现基本 UI 框架 | ✅ 完成 |
+| 1.7 | 目录树导航 | ✅ 完成 |
+| 1.8 | 文件列表 | ✅ 完成 |
+| 1.9 | 密码管理器 | ✅ 完成 |
+| 1.10 | 版本号显示 | ✅ 完成 |
 
 ### Phase 2: 扩展格式支持与 UI 完善
+**目标**: 支持更多压缩格式 — **100%**
 
-**目标**: 支持更多压缩格式，完善用户体验
-
-| 序号 | 任务 | 状态 | 备注 |
-|------|------|------|------|
-| 2.1 | 7z 格式压缩 | ✅ 完成 | 基于 7z.exe |
-| 2.2 | TAR 格式支持 | ✅ 完成 | TarGzEngine 基于 SharpZipLib |
-| 2.3 | GZ 格式支持 | ✅ 完成 | 含 .tgz/.tar.gz |
-| 2.4 | 拖拽压缩 | ✅ 完成 | |
-| 2.5 | 进度对话框 | ✅ 完成 | |
-| 2.6 | 压缩配置面板 | ✅ 完成 | |
+| 序号 | 任务 | 状态 |
+|------|------|------|
+| 2.1 | 7z 压缩 | ✅ 完成 |
+| 2.2 | TAR 格式 | ✅ 完成 |
+| 2.3 | GZ 格式 | ✅ 完成 |
+| 2.4 | 拖拽压缩 | ✅ 完成 |
+| 2.5 | 进度对话框 | ✅ 完成 |
+| 2.6 | 压缩配置面板 | ✅ 完成 |
 
 ### Phase 3: 高级功能
+**目标**: 加密、分卷等高级功能 — **90%**
 
-**目标**: 加密、分卷等高级功能
-
-| 序号 | 任务 | 状态 | 备注 |
-|------|------|------|------|
-| 3.1 | AES-256 加密压缩 | ✅ 完成 | 引擎支持 AESKeySize=256，压缩对话框已开放加密选项 |
-| 3.2 | 密码解密解压 | ✅ 完成 | 密码输入对话框 |
-| 3.3 | 分卷压缩 | ✅ 完成 | ZIP: SplitOutputStream；7z: 7z.exe -v 参数 |
-| 3.4 | 文件预览功能 | ✅ 完成 | 图片 (jpg/png/gif/bmp/webp) + 文本 (txt/log/code) + 信息面板 |
-| 3.5 | 压缩方式选择 (Store/Deflate/BZip2/LZMA) | ⬜ 待开发 | 需换 SharpCompress 库 |
+| 序号 | 任务 | 状态 |
+|------|------|------|
+| 3.1 | AES-256 加密压缩 | ✅ 完成 |
+| 3.2 | 密码解密解压 | ✅ 完成 |
+| 3.3 | 分卷压缩 | ✅ 完成 |
+| 3.4 | 文件预览 | ✅ 完成 |
+| 3.5 | 压缩方式选择 | ⬜ 待开发 |
 
 ### Phase 4: 系统集成与发布
+**目标**: Shell 集成、发布与打包 — **90%**
 
-**目标**: Shell 集成、发布与打包
-
-| 序号 | 任务 | 状态 | 备注 |
-|------|------|------|------|
-| 4.1 | Shell 右键菜单 | ✅ 完成 | 层叠/独立双模式，per-verb 开关，AppliesTo 过滤器，图标 |
-| 4.2 | 文件关联设置 | ✅ 完成 | 通过 Shell AppliesTo 实现 |
-| 4.3 | --compress-quick CLI | ✅ 完成 | 右键「压缩为 .zip」一键压缩 |
-| 4.4 | 安装包制作 | ✅ 完成 | Inno Setup 安装程序 |
-| 4.5 | 发布 Release | ⬜ 待开发 | |
+| 序号 | 任务 | 状态 |
+|------|------|------|
+| 4.1 | Shell 右键菜单 | ✅ 完成 |
+| 4.2 | 文件关联 | ✅ 完成 |
+| 4.3 | CLI 快速压缩 | ✅ 完成 |
+| 4.4 | 安装包制作 | ✅ 完成 |
+| 4.5 | 发布 Release | ⬜ 待开发 |
 
 ---
 
 ## 四、进度概览
 
 ```
-Phase 1: ██████████████ 100%
-Phase 2: ██████████████ 100%
-Phase 3: █████████░░░░░ 70%
-Phase 4: ██████████░░░░ 70%
+Phase 1: ████████████████████ 100%
+Phase 2: ████████████████████ 100%
+Phase 3: ██████████████████░░ 90%
+Phase 4: ██████████████████░░ 90%
 
-总体进度: █████████████░ 83%
+总体进度: ██████████████████░ 90%
 ```
 
 ---
@@ -220,58 +220,69 @@ Phase 4: ██████████░░░░ 70%
 
 | 日期 | 问题 | 决策 | 状态 |
 |------|------|------|------|
-| 2026-04-24 | 目录树显示重复图标 📁📁 | 移除 XAML 中的重复 📁 | ✅ 已修复 |
-| 2026-04-24 | 子目录显示自身（如 folder1/ 出现在 folder1 视图） | FullPath 去除末尾 / 再比较 | ✅ 已修复 |
-| 2026-04-24 | 根目录显示所有嵌套层级 | FilterFiles 使用 Name.Split('/').Length == 1 | ✅ 已修复 |
-| 2026-04-24 | PLAN 状态与实际不符 | 修正 TAR/GZ/RAR/7z压缩为待开发 | ✅ 已修复 |
+| 2026-04-24 | 目录树显示重复图标 | 移除 XAML 中的重复 📁 | ✅ 已修复 |
+| 2026-04-24 | 子目录显示自身 | FullPath 去除末尾 / 再比较 | ✅ 已修复 |
+| 2026-04-24 | 根目录显示所有嵌套层级 | FilterFiles Name.Split.Length == 1 | ✅ 已修复 |
 | 2026-04-24 | 压缩时进度条始终为 0% | processedBytes 在报告前进度更新 | ✅ 已修复 |
-| 2026-04-24 | ZIP 中文文件名乱码 | 注册 GBK 编码 + ZipStrings.CodePage=936 | ✅ 已修复 |
-| 2026-05-11 | 拖出到 Explorer 延迟渲染方案 | 自定义 IDataObject 因 WPF OLE bridge bug 崩溃；改用 7-Zip 急切提取模型 | ✅ 已解决 |
-| 2026-05-11 | VirtualFileDataObject 远期方案 | 使用 COM 原生 IDataObject 替代 WPF 包装，实现延迟渲染且不崩溃 | ⬜ 未来计划 |
+| 2026-04-24 | ZIP 中文文件名乱码 | GBK 编码 + ZipStrings.CodePage=936 | ✅ 已修复 |
+| 2026-05-11 | 拖出到 Explorer 延迟渲染 | 改用 7-Zip 急切提取模型 | ✅ 已解决 |
+| 2026-05-13 | 子目录不显示（无显式条目 ZIP） | BuildFolderTree + FilterFiles 推导隐式目录 | ✅ v0.2.2 已修复 |
+| 2026-05-13 | CLI 密码对话框不显示 | ShutdownMode OnExplicitShutdown | ✅ v0.2.2 已修复 |
+| 2026-05-13 | 多条密码规则只试第一条 | 改为遍历所有 | ✅ v0.2.2 已修复 |
 
 ---
 
 ## 六、变更日志
 
-| 日期 | 变更内容 | 变更人 | 备注 |
-|------|----------|--------|------|
-| 2026-04-23 | 初始化文档 | Sisyphus | 初始版本 |
-| 2026-04-24 | 修复目录树重复图标 | Sisyphus | XAML 移除 "📁 " |
-| 2026-04-24 | 修复子目录自引用问题 | Sisyphus | FullPath 去除 / |
-| 2026-04-24 | 修复根目录显示所有层级 | Sisyphus | FilterFiles 逻辑调整 |
-| 2026-04-24 | 添加版本号显示 | Sisyphus | 右下角 v0.1.0 |
-| 2026-04-24 | 修正功能状态 | Sisyphus | TAR/GZ/RAR/7z压缩改为待开发 |
-| 2026-04-24 | 修复中文文件名乱码 | Sisyphus | 注册 GBK 编码 + CodePage=936 |
-| 2026-04-24 | 实现 TAR/GZ 支持 | Sisyphus | TarGzEngine |
-| 2026-04-24 | 实现拖拽压缩 | Sisyphus | 拖入文件生成 ZIP |
-| 2026-05-09 | 预览信息面板 | Sisyphus | 图片预览右侧显示元数据 |
-| 2026-05-09 | 目录树绑定 + 智能选择 | Sisyphus | FolderNode INotifyPropertyChanged |
-| 2026-05-09 | 多选 + 状态栏增强 | Sisyphus | Extended 模式 + 统计显示 |
-| 2026-05-09 | 预览行高持久化修复 | Sisyphus | GridLength 类型 + Star 支持 |
-| 2026-05-09 | v0.1.3 版本升级 | Sisyphus | |
-| 2026-05-09 | 修复 `_currentFormat` bug | Sisyphus | 改用扩展名映射格式 |
-| 2026-05-09 | 更新 PLAN.md 同步实际状态 | Sisyphus | Phase 2 全部标记完成 |
-| 2026-05-09 | 设置系统 + Shell 集成 + per-file 进度 + CLI 入口 | Sisyphus | AppSettings, SettingsWindow, ShellIntegration, SystemIconHelper, 双进度条, --compress-quick, --extract 直连, --open |
-| 2026-05-11 | 拖出到 Explorer 拖拽提取 | Sisyphus | 7-Zip 急切提取模型：拖拽时立即提取 → ProgressWindow 显示进度 → DoDragDrop 标准 DataObject |
-| 2026-05-11 | v0.1.4 版本升级 | Sisyphus | |
-| 2026-05-11 | 更新文档 + VirtualFileDataObject 列入未来计划 | Sisyphus | AGENTS.md, PLAN.md, PROGRESS.md |
-| 2026-05-11 | HTML/Markdown 预览 + 文本预览字号 + Shell 菜单重构 + 分卷压缩 | Sisyphus | v0.1.5：WebBrowser 预览、Markdig、字号滑块、Shell 三按钮、split-volume |
-| 2026-05-12 | 目录预览 + 预览开关按钮 + 图片解码降采样修复 | Sisyphus | v0.1.6：ShowDirectoryPreview、PreviewToggleBtn、DecodePixelWidth 条件设置、MaxWidth/MaxHeight 防拉伸 |
-| 2026-05-12 | MIT 开源 + 应用图标 + 默认布局 + 滚动条修复 + 压缩扫描进度 + 安装包 | Sisyphus | v0.2.0: LICENSE, App.ico, PreviewPosition=4, InfoOrientation=Vertical, ScrollBar 守卫, EnumerateFiles 扫描进度, Inno Setup 打包 |
-| 2026-05-12 | 加密 ZIP 解压密码提示修复 + 密码管理器帮助窗口 | Sisyphus | v0.2.1: ZipEngine IsCrypted 预检 + UI 层多关键词/类型检测；PasswordHelpDialog |
+| 日期 | 变更内容 | 变更人 |
+|------|----------|--------|
+| 2026-04-23 | 初始化文档 | Sisyphus |
+| 2026-04-24 | Phase 1 完成 + 各种 bug 修复 | Sisyphus |
+| 2026-05-09 | 设置系统 + Shell 集成 + per-file 进度 + CLI 入口 | Sisyphus |
+| 2026-05-11 | 拖拽提取 + HTML/MD 预览 + 分卷压缩 | Sisyphus |
+| 2026-05-12 | MIT 开源 + 图标 + 布局优化 + 安装包 | Sisyphus |
+| 2026-05-13 | v0.2.2: 密码重写 + QuickVerify + 文件关联 + 冲突处理 + 暂停 + 去重 | Sisyphus |
+| 2026-05-13 | v0.2.3: ISO 支持 + 文件计数 + 文档整理 + 预览规划 + ConflictDialog + 暂停/继续 | Sisyphus |
 
 ---
 
 ## 七、下一步工作
 
-| 优先级 | 任务 | 说明 |
-|--------|------|------|
-| P2 | 压缩方式选择 | Store/Deflate/BZip2/LZMA，需换 SharpCompress 库 |
-| P2 | 中/英文界面切换 | |
-| P2 | 亮/暗主题切换 | |
-| P3 | COM 右键菜单 + VirtualFileDataObject | 动态菜单名（显示文件名）、目录结构预览、拖拽延迟渲染，打包成一个 COM 辅助库 |
-| P4 | 右键菜单目录结构预览 | 在 COM 菜单中读取压缩包 entry 列表，展示文件树（Bandizip 风格） |
-| P3 | 发布 Release | |
+### 近期（P2）
+
+| 任务 | 说明 |
+|------|------|
+| 文件列表右键菜单 | 右键压缩包内的文件/目录时弹出菜单：解压到…、预览、复制文件名、复制完整路径等。直接在现有 DataGrid 上挂 ContextMenu 即可，工作量低 |
+| 文本预览语法高亮 | 用 AvalonEdit 替换当前 TextBox，支持 20+ 语言语法高亮（C#/Python/XML/HTML/SQL/JS 等）。加一个 NuGet 包 + 改控件名 + 两行配置即可 |
+| 压缩方式选择 | Store/Deflate/BZip2/LZMA，需换 SharpCompress 库 |
+| 国际化 | 中文/英文界面切换 |
+| 暗色主题 | 亮色/暗色切换 |
+| 文件列表筛选 | 搜索框实时过滤当前目录 + 子目录显示切换 |
+
+### 预览格式扩展（P2-P3）
+
+| 格式 | 难度 | 方案 |
+|------|:----:|------|
+| RTF | 🟢 低 | WPF RichTextBox 原生支持 RTF 解析 |
+| CSV | 🟢 低 | 按逗号/制表符分行分列，DataGrid 展示 |
+| SVG | 🟢 低 | WebBrowser 直接渲染 |
+| EXE / DLL | 🟢 低 | ExtractIconEx 获取专属图标 + FileVersionInfo 显示版本信息 |
+| LNK | 🟢 低 | IShellLink 读快捷方式目标路径 |
+| PDF | 🟡 中 | Windows.Data.Pdf 系统 API，第一页渲染为图片 |
+| XLSX（文本） | 🟡 中 | 本质 ZIP，读 sharedStrings.xml 拿文本 |
+| TTF / OTF | 🟡 中 | GlyphTypeface 加载字体，Canvas 绘制示例文字 |
+| SQLite | 🟡 中 | Microsoft.Data.Sqlite 读表结构和数据 |
+| ZIP 嵌套 | 🟡 中 | 提取内部压缩包到临时目录 → 再次 LoadArchiveAsync |
+
+### 远期（P3）
+
+| 任务 | 说明 | 工作量 |
+|------|------|--------|
+| COM 右键菜单 | 动态菜单名（显示文件名）、菜单排序、自定义图标。注册 `*\shellex\ContextMenuHandlers\{GUID}` | 中 |
+| VirtualFileDataObject | COM 原生 IDataObject 替代 WPF 包装，拖拽延迟渲染不崩溃。需 P/Invoke：COMStreamWrapper、FORMATETC、STGMEDIUM | 中 |
+| 右键菜单目录结构预览 | 在 COM 菜单中读取压缩包 entry 列表，展示文件树（Bandizip 风格） | 高 |
+| 外部工具视频元数据 | ffprobe 提取时长/分辨率/编码，显示在信息面板。需用户安装 FFmpeg | 低 |
+| 发布 Release | GitHub Releases + 自动构建 | 低 |
 
 ---
 
@@ -280,7 +291,12 @@ Phase 4: ██████████░░░░ 70%
 ### 中文编码支持
 - .NET 9+ 需要显式注册 GBK 编码：`Encoding.RegisterProvider(CodePagesEncodingProvider.Instance)`
 - 设置 SharpZipLib 使用 GBK：`ZipStrings.CodePage = 936`
-- ZIP 文件无 Unicode 标志位时使用 GBK 编码读取文件名
+
+### 快速密码验证
+- `QuickVerifyPassword` 读第一个加密条目 1 字节验证密码
+- ZIP AES: PVV 2 字节校验 → 密码不对立即抛异常
+- 7z: 构造 `ArchiveFile(path, password)` + 访问 `Entries` 计数
+- 失败自动跳到下一条规则，全部失败再弹密码输入框
 
 ---
 

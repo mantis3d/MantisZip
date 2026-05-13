@@ -1,3 +1,4 @@
+using System.Threading;
 using System.Windows;
 using System.Windows.Media;
 using MantisZip.Core.Abstractions;
@@ -11,8 +12,16 @@ namespace MantisZip.UI;
 public partial class ProgressWindow : Window
 {
     private CancellationTokenSource? _cts;
+    private readonly ManualResetEventSlim _pauseEvent = new(initialState: true);
 
+    /// <summary>取消令牌</summary>
     public CancellationToken CancellationToken => _cts?.Token ?? CancellationToken.None;
+
+    /// <summary>暂停事件。Set = 运行中，Reset = 已暂停。提取循环通过此事件阻塞。</summary>
+    public ManualResetEventSlim PauseEvent => _pauseEvent;
+
+    /// <summary>当前是否暂停</summary>
+    public bool IsPaused => !_pauseEvent.IsSet;
 
     public ProgressWindow()
     {
@@ -24,7 +33,7 @@ public partial class ProgressWindow : Window
     /// </summary>
     public void SetProgress(ArchiveProgress p)
     {
-        if (Dispatcher.CheckAccess())
+        void UpdateUI()
         {
             TotalProgressBar.Value = p.PercentComplete;
             PercentText.Text = $"{p.PercentComplete:F1}%";
@@ -35,22 +44,19 @@ public partial class ProgressWindow : Window
                 FileProgressBar.Value = p.FilePercentComplete.Value;
                 FilePercentText.Text = $"{p.FilePercentComplete.Value:F0}%";
             }
-        }
-        else
-        {
-            Dispatcher.BeginInvoke(() =>
-            {
-                TotalProgressBar.Value = p.PercentComplete;
-                PercentText.Text = $"{p.PercentComplete:F1}%";
-                FileNameText.Text = p.CurrentFile;
 
-                if (p.FilePercentComplete.HasValue)
-                {
-                    FileProgressBar.Value = p.FilePercentComplete.Value;
-                    FilePercentText.Text = $"{p.FilePercentComplete.Value:F0}%";
-                }
-            });
+            // 文件计数：TotalFiles > 0 时才显示，否则保持空白
+            if (p.TotalFiles > 0)
+            {
+                FileCountText.Text = $"文件 {p.ProcessedFiles}/{p.TotalFiles}";
+                FileCountText.Visibility = Visibility.Visible;
+            }
         }
+
+        if (Dispatcher.CheckAccess())
+            UpdateUI();
+        else
+            Dispatcher.BeginInvoke((Action)UpdateUI);
     }
 
     /// <summary>
@@ -96,6 +102,24 @@ public partial class ProgressWindow : Window
     {
         _cts?.Cancel();
         Close();
+    }
+
+    private void PauseButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (_pauseEvent.IsSet)
+        {
+            // 正在运行 → 暂停
+            _pauseEvent.Reset();
+            PauseButton.Content = "▶ 继续";
+            FileNameText.Text = "⏸ 已暂停 — 点击「继续」恢复";
+        }
+        else
+        {
+            // 已暂停 → 恢复
+            _pauseEvent.Set();
+            PauseButton.Content = "⏸ 暂停";
+            FileNameText.Text = "正在恢复…";
+        }
     }
 
     #region 密码匹配区
@@ -208,9 +232,40 @@ public partial class ProgressWindow : Window
         _cts = new CancellationTokenSource();
     }
 
+    /// <summary>
+    /// 将 IProgress 包装为暂停感知版本。提取循环中的 Report 调用会在暂停时阻塞。
+    /// </summary>
+    public IProgress<ArchiveProgress> CreatePauseAwareProgress(IProgress<ArchiveProgress> inner)
+    {
+        return new PauseAwareProgress(inner, _pauseEvent);
+    }
+
     protected override void OnClosed(EventArgs e)
     {
         _cts?.Dispose();
+        _pauseEvent.Set(); // 确保不会阻塞后台线程
+        _pauseEvent.Dispose();
         base.OnClosed(e);
+    }
+}
+
+/// <summary>
+/// 暂停感知的 IProgress 包装器。Report 时会先等待 PauseEvent（若已重置则阻塞）。
+/// </summary>
+internal class PauseAwareProgress : IProgress<ArchiveProgress>
+{
+    private readonly IProgress<ArchiveProgress> _inner;
+    private readonly ManualResetEventSlim _pauseEvent;
+
+    public PauseAwareProgress(IProgress<ArchiveProgress> inner, ManualResetEventSlim pauseEvent)
+    {
+        _inner = inner;
+        _pauseEvent = pauseEvent;
+    }
+
+    public void Report(ArchiveProgress value)
+    {
+        _pauseEvent.Wait(); // 暂停时阻塞，恢复后继续
+        _inner.Report(value);
     }
 }
