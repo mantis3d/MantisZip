@@ -5,7 +5,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:app="clr-namespace:MantisZip.UI"
         mc:Ignorable="d"
-        Title="MantisZip - 解压缩软件" Height="650" Width="950"
+        Title="MantisZip - 解压缩软件" Icon="/Resources/App.ico" Height="800" Width="1200"
         MinHeight="450" MinWidth="600"
         WindowStartupLocation="CenterScreen"
         AllowDrop="True"
@@ -60,37 +60,37 @@
         <!-- Toolbar -->
         <ToolBarTray Grid.Row="1" Background="White">
             <ToolBar Band="0" BandIndex="0">
-                <Button ToolTip="打开压缩包 (Ctrl+O)" Click="OpenArchive_Click" Padding="8,4">
-                    <TextBlock Text="📂" FontSize="18"/>
+                <Button ToolTip="打开压缩包 (Ctrl+O)" Click="OpenArchive_Click" Padding="6,4">
+                    <StackPanel Orientation="Vertical" HorizontalAlignment="Center">
+                        <TextBlock Text="📂" FontSize="18" HorizontalAlignment="Center"/>
+                        <TextBlock Text="打开" FontSize="10" HorizontalAlignment="Center"/>
+                    </StackPanel>
                 </Button>
-                <Button ToolTip="解压缩 (Ctrl+E)" Click="Extract_Click" Padding="8,4">
-                    <TextBlock Text="📤" FontSize="18"/>
+                <Button ToolTip="解压缩 (Ctrl+E)" Click="Extract_Click" Padding="6,4">
+                    <StackPanel Orientation="Vertical" HorizontalAlignment="Center">
+                        <TextBlock Text="📤" FontSize="18" HorizontalAlignment="Center"/>
+                        <TextBlock Text="解压" FontSize="10" HorizontalAlignment="Center"/>
+                    </StackPanel>
                 </Button>
-                <Button ToolTip="压缩 (Ctrl+C)" Click="Compress_Click" Padding="8,4">
-                    <TextBlock Text="📥" FontSize="18"/>
+                <Button ToolTip="压缩 (Ctrl+C)" Click="Compress_Click" Padding="6,4">
+                    <StackPanel Orientation="Vertical" HorizontalAlignment="Center">
+                        <TextBlock Text="📥" FontSize="18" HorizontalAlignment="Center"/>
+                        <TextBlock Text="压缩" FontSize="10" HorizontalAlignment="Center"/>
+                    </StackPanel>
                 </Button>
                 <Separator/>
-                <Button ToolTip="测试压缩包" Click="TestArchive_Click" Padding="8,4">
-                    <TextBlock Text="✓" FontSize="18" Foreground="Green"/>
+                <Button ToolTip="测试压缩包" Click="TestArchive_Click" Padding="6,4">
+                    <StackPanel Orientation="Vertical" HorizontalAlignment="Center">
+                        <TextBlock Text="✓" FontSize="18" Foreground="Green" HorizontalAlignment="Center"/>
+                        <TextBlock Text="测试" FontSize="10" HorizontalAlignment="Center"/>
+                    </StackPanel>
                 </Button>
                 <Separator/>
-                <ComboBox x:Name="CompressionLevelCombo" Width="100" SelectedIndex="4" ToolTip="压缩级别">
-                    <ComboBoxItem Content="1 - 最快"/>
-                    <ComboBoxItem Content="2"/>
-                    <ComboBoxItem Content="3"/>
-                    <ComboBoxItem Content="4"/>
-                    <ComboBoxItem Content="5 - 平衡" IsSelected="True"/>
-                    <ComboBoxItem Content="6"/>
-                    <ComboBoxItem Content="7"/>
-                    <ComboBoxItem Content="8"/>
-                    <ComboBoxItem Content="9 - 最小"/>
-                </ComboBox>
-                <Separator/>
-                <CheckBox x:Name="ShowSubFoldersCheck" Content="显示子目录" ToolTip="切换是否显示子目录文件" 
-                         Click="ShowSubFolders_Click" VerticalAlignment="Center"/>
-                <Separator/>
-                <ToggleButton x:Name="PreviewToggleBtn" ToolTip="切换预览面板" Click="PreviewToggleBtn_Click" Padding="8,4">
-                    <TextBlock x:Name="PreviewToggleIcon" Text="👁" FontSize="16"/>
+                <ToggleButton x:Name="PreviewToggleBtn" ToolTip="切换预览面板" Click="PreviewToggleBtn_Click" Padding="6,4">
+                    <StackPanel Orientation="Vertical" HorizontalAlignment="Center">
+                        <TextBlock x:Name="PreviewToggleIcon" Text="👁" FontSize="16" HorizontalAlignment="Center"/>
+                        <TextBlock Text="预览" FontSize="10" HorizontalAlignment="Center"/>
+                    </StackPanel>
                 </ToggleButton>
             </ToolBar>
         </ToolBarTray>
@@ -156,7 +156,7 @@
                                     <RowDefinition x:Name="InnerPreviewRow" Height="0"/>
                                 </Grid.RowDefinitions>
                                 <Grid.ColumnDefinitions>
-                                    <ColumnDefinition x:Name="TreeColumn" Width="200" MinWidth="100"/>
+                                    <ColumnDefinition x:Name="TreeColumn" Width="396" MinWidth="100"/>
                                     <ColumnDefinition Width="Auto"/>
                                     <ColumnDefinition x:Name="FileListColumn" Width="*" MinWidth="100"/>
                                     <ColumnDefinition x:Name="InnerPreviewColSplitterDef" Width="Auto" MinWidth="0"/>

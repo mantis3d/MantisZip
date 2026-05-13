@@ -14,7 +14,9 @@ using MantisZip.Core.Engines;
 using MantisZip.Core.Utils;
 using Microsoft.Win32;
 using System.Text.Json;
+using System.Text;
 using Markdig;
+using Ude;
 
 namespace MantisZip.UI;
 
@@ -30,7 +32,7 @@ public partial class MainWindow : Window
     private string? _previewTempDir;        // 预览临时目录
     private readonly Dictionary<int, double> _lastPreviewSizes = new()
     {
-        { 1, 0 }, { 2, 0 }, { 3, 0 }, { 4, 0 }
+        { 1, 341 }, { 2, 416 }, { 3, 479 }, { 4, 678 }
     }; // 每个位置独立记忆大小（高度:位置1/2/3, 宽度:位置4）
     private int _lastAppliedPosition = 1;    // 上次应用的布局位置，用于检测变更
     private bool _isProgrammaticFilter;      // 编程触发的 FilterFiles，应跳过 SelectionChanged 预览
@@ -320,6 +322,10 @@ public partial class MainWindow : Window
 
     private void FileListGrid_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
+        // 点击滚动条不触发拖拽（避免拖滚动条被识别为拖拽文件）
+        if (FindVisualParent<System.Windows.Controls.Primitives.ScrollBar>(e.OriginalSource as DependencyObject) != null)
+            return;
+
         _dragStartPoint = e.GetPosition(FileListGrid);
     }
 
@@ -599,12 +605,6 @@ public partial class MainWindow : Window
             PreviewTextBox.FontSize = AppSettings.Instance.TextPreviewFontSize;
     }
 
-    private void ShowSubFolders_Click(object sender, RoutedEventArgs e)
-    {
-        // 切换子目录显示，重新过滤当前目录
-        FilterFiles(_currentFolder);
-    }
-
     private void PasswordManager_Click(object sender, RoutedEventArgs e)
     {
         var window = new PasswordManagerWindow();
@@ -785,8 +785,10 @@ public partial class MainWindow : Window
         {
             var errorMsg = ex.Message.ToLower();
 
-            // 检查是否需要密码
-            if (errorMsg.Contains("password") || errorMsg.Contains("密码") || errorMsg.Contains("encrypted"))
+            // 检查是否需要密码（覆盖多种引擎的错误消息）
+            if (errorMsg.Contains("password") || errorMsg.Contains("密码") || 
+                errorMsg.Contains("encrypted") || errorMsg.Contains("decrypt") ||
+                errorMsg.Contains("encryption") || ex is InvalidOperationException)
             {
                 // 显示密码输入框
                 var dialog = new PasswordDialog(Path.GetFileName(archivePath));
@@ -860,7 +862,7 @@ public partial class MainWindow : Window
 
             var options = new ArchiveOptions
             {
-                CompressionLevel = CompressionLevelCombo.SelectedIndex + 1,
+                CompressionLevel = AppSettings.Instance.DefaultLevel,
                 Format = ArchiveFormat.Zip
             };
 
@@ -1456,21 +1458,69 @@ private void FolderTree_SelectedItemChanged(object sender, RoutedPropertyChanged
         }
     }
 
+    /// <summary>
+    /// 用 Ude.NetStandard 检测文件编码并读取全文。
+    /// 支持 GBK、Shift-JIS、Big5、EUC-KR、UTF-8 等数十种编码。
+    /// 置信度不足时退化为 UTF-8 → GBK 回退。
+    /// </summary>
+    private static string DetectAndReadText(string filePath)
+    {
+        // 读取文件头供编码检测（不需要全文）
+        byte[] header;
+        using (var fs = new FileStream(filePath, FileMode.Open, FileAccess.Read))
+        {
+            int len = (int)Math.Min(fs.Length, 4096);
+            header = new byte[len];
+            fs.ReadExactly(header, 0, len);
+        }
+
+        var detector = new CharsetDetector();
+        detector.Feed(header, 0, header.Length);
+        detector.DataEnd();
+
+        string detected = detector.Charset;
+        double confidence = detector.Confidence;
+
+        App.LogDebug("DetectAndReadText: detected={0}, confidence={1:P1}", detected, confidence);
+
+        // 置信度 >= 50% 且编码名有效 → 用检测到的编码读取
+        if (confidence >= 0.5 && !string.IsNullOrEmpty(detected))
+        {
+            try
+            {
+                // Ude 返回的编码名与 .NET 兼容（如 "GB-18030"、"Shift_JIS"）
+                var enc = Encoding.GetEncoding(detected);
+                return File.ReadAllText(filePath, enc);
+            }
+            catch (Exception ex)
+            {
+                App.LogDebug("DetectAndReadText: detected encoding {0} failed: {1}", detected, ex.Message);
+                // 降级到回退逻辑
+            }
+        }
+
+        // 回退：UTF-8 → GBK
+        try
+        {
+            var utf8 = File.ReadAllText(filePath, Encoding.UTF8);
+            if (!utf8.Contains('\uFFFD'))
+                return utf8;
+            App.LogDebug("DetectAndReadText: UTF8 fallback produced replacement chars, trying GBK");
+        }
+        catch (Exception utfEx)
+        {
+            App.LogDebug("DetectAndReadText: UTF8 fallback failed: {0}", utfEx.Message);
+        }
+
+        return File.ReadAllText(filePath, Encoding.GetEncoding("GBK"));
+    }
+
     private void ShowTextPreview(string filePath, string extension, ArchiveItem item)
     {
         try
         {
-            // 尝试多种编码读取文本
-            string content;
-            try
-            {
-                content = File.ReadAllText(filePath, System.Text.Encoding.UTF8);
-            }
-            catch (Exception utfEx)
-            {
-                App.LogDebug("ShowTextPreview: UTF8 failed, trying GBK: {0}", utfEx.Message);
-                content = File.ReadAllText(filePath, System.Text.Encoding.GetEncoding("GBK"));
-            }
+            // 用 Ude.NetStandard 检测文本编码（支持 GBK、Shift-JIS、Big5、EUC-KR 等数十种）
+            string content = DetectAndReadText(filePath);
 
             PreviewTextBox.Text = content;
             PreviewTextBox.FontSize = AppSettings.Instance.TextPreviewFontSize;
