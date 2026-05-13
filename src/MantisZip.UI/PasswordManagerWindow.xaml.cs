@@ -75,6 +75,13 @@ public partial class PasswordManagerWindow : Window
             LoadPasswords();
         }
     }
+
+    private void Help_Click(object sender, RoutedEventArgs e)
+    {
+        var dialog = new PasswordHelpDialog();
+        dialog.Owner = this;
+        dialog.ShowDialog();
+    }
 }
 
 public class PasswordEntryView
