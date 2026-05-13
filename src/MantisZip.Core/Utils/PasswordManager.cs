@@ -1,7 +1,8 @@
+using System.IO;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using System.IO;
 using System.Text.RegularExpressions;
+using MantisZip.Core.Utils;
 
 namespace MantisZip.Core;
 
@@ -63,16 +64,24 @@ public class PasswordManager
     /// </summary>
     public void Load()
     {
+        CoreLog.Info($"PasswordManager.Load: path={PasswordFilePath}");
         try
         {
             if (File.Exists(PasswordFilePath))
             {
                 var json = File.ReadAllText(PasswordFilePath);
                 _data = JsonSerializer.Deserialize<PasswordData>(json) ?? new PasswordData();
+                CoreLog.Info($"PasswordManager.Load: loaded {_data.Passwords.Count} entries");
+            }
+            else
+            {
+                CoreLog.Info("PasswordManager.Load: file not found, using empty data");
+                _data = new PasswordData();
             }
         }
-        catch
+        catch (Exception ex)
         {
+            CoreLog.Error("PasswordManager.Load: failed, resetting to empty", ex);
             _data = new PasswordData();
         }
     }
@@ -85,16 +94,15 @@ public class PasswordManager
         try
         {
             if (!Directory.Exists(AppDataPath))
-            {
                 Directory.CreateDirectory(AppDataPath);
-            }
 
             var json = JsonSerializer.Serialize(_data, new JsonSerializerOptions { WriteIndented = true });
             File.WriteAllText(PasswordFilePath, json);
+            CoreLog.Info($"PasswordManager.Save: saved {_data.Passwords.Count} entries");
         }
-        catch
+        catch (Exception ex)
         {
-            // 忽略保存错误
+            CoreLog.Error("PasswordManager.Save: failed", ex);
         }
     }
 
@@ -108,17 +116,16 @@ public class PasswordManager
     /// </summary>
     public List<PasswordEntry> FindMatchingPasswords(string fileName)
     {
-        var results = new List<PasswordEntry>();
         var name = Path.GetFileName(fileName);
+        var results = new List<PasswordEntry>();
 
         foreach (var entry in _data.Passwords)
         {
             if (MatchPattern(entry.Patterns, name))
-            {
                 results.Add(entry);
-            }
         }
 
+        CoreLog.Info($"PasswordManager.FindMatchingPasswords: file={fileName} -> {results.Count} matches");
         return results;
     }
 
@@ -135,20 +142,16 @@ public class PasswordManager
             try
             {
                 if (Regex.IsMatch(fileName, pattern, RegexOptions.IgnoreCase))
-                {
                     return true;
-                }
             }
-            catch
+            catch (Exception ex)
             {
-                // 正则表达式无效，尝试 Glob 匹配
+                CoreLog.Info($"PasswordManager: invalid regex pattern='{pattern}', falling back to glob: {ex.Message}");
             }
 
             // Glob 匹配（支持 * 和 ?）
             if (GlobMatch(fileName, pattern))
-            {
                 return true;
-            }
         }
 
         return false;
@@ -176,13 +179,9 @@ public class PasswordManager
                     break;
                 default:
                     if ("\\+^$|{}()[]".Contains(c))
-                    {
                         regexPattern += "\\" + c;
-                    }
                     else
-                    {
                         regexPattern += c;
-                    }
                     break;
             }
         }
@@ -192,8 +191,9 @@ public class PasswordManager
         {
             return Regex.IsMatch(input, regexPattern, RegexOptions.IgnoreCase);
         }
-        catch
+        catch (Exception ex)
         {
+            CoreLog.Info($"PasswordManager: GlobMatch regex failed pattern='{regexPattern}', input='{input}': {ex.Message}");
             return false;
         }
     }
@@ -203,6 +203,7 @@ public class PasswordManager
     /// </summary>
     public void AddPassword(string password, string description, List<string> patterns)
     {
+        CoreLog.Info($"PasswordManager.AddPassword: patterns=[{string.Join("; ", patterns)}]");
         var entry = new PasswordEntry
         {
             Password = password,
@@ -211,6 +212,7 @@ public class PasswordManager
         };
 
         _data.Passwords.Add(entry);
+        CoreLog.Info($"PasswordManager.AddPassword: id={entry.Id}");
         Save();
     }
 
@@ -219,12 +221,14 @@ public class PasswordManager
     /// </summary>
     public void UpdatePassword(string id, string password, string description, List<string> patterns)
     {
+        CoreLog.Info($"PasswordManager.UpdatePassword: id={id}");
         var entry = _data.Passwords.FirstOrDefault(p => p.Id == id);
         if (entry != null)
         {
             entry.Password = password;
             entry.Description = description;
             entry.Patterns = patterns;
+            CoreLog.Info($"PasswordManager.UpdatePassword: updated id={entry.Id}");
             Save();
         }
     }
@@ -234,10 +238,12 @@ public class PasswordManager
     /// </summary>
     public void DeletePassword(string id)
     {
+        CoreLog.Info($"PasswordManager.DeletePassword: id={id}");
         var entry = _data.Passwords.FirstOrDefault(p => p.Id == id);
         if (entry != null)
         {
             _data.Passwords.Remove(entry);
+            CoreLog.Info($"PasswordManager.DeletePassword: removed id={entry.Id}");
             Save();
         }
     }
