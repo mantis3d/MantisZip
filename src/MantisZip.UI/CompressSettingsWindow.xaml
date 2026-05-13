@@ -44,6 +44,7 @@
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="80"/>
@@ -68,11 +69,30 @@
                 </ComboBox>
 
                 <TextBlock Grid.Row="2" Grid.Column="0" Text="压缩级别:" VerticalAlignment="Center" Margin="0,10,0,0"/>
-                <StackPanel Grid.Row="2" Grid.Column="1" Orientation="Horizontal" Margin="0,10,0,0">
-                    <Slider x:Name="LevelSlider" Width="120" Minimum="1" Maximum="9" Value="5" 
-                            TickFrequency="1" IsSnapToTickEnabled="True" TickPlacement="None"
-                            ValueChanged="LevelSlider_ValueChanged"/>
-                    <TextBlock x:Name="LevelText" Text="5" Width="25" Margin="5,0,0,0" VerticalAlignment="Center"/>
+                <ComboBox x:Name="LevelCombo" Grid.Row="2" Grid.Column="1" Height="24" Margin="0,10,0,0" SelectedIndex="2">
+                    <ComboBoxItem Tag="0">0 - 仅存储</ComboBoxItem>
+                    <ComboBoxItem Tag="3">3 - 快速压缩</ComboBoxItem>
+                    <ComboBoxItem Tag="5">5 - 正常压缩</ComboBoxItem>
+                    <ComboBoxItem Tag="9">9 - 极限压缩</ComboBoxItem>
+                </ComboBox>
+
+                <TextBlock Grid.Row="3" Grid.Column="0" Text="分卷大小:" VerticalAlignment="Center" Margin="0,10,0,0"/>
+                <StackPanel Grid.Row="3" Grid.Column="1" Orientation="Horizontal" Margin="0,10,0,0">
+                    <ComboBox x:Name="SplitSizeCombo" Width="130" Height="24" SelectedIndex="0"
+                              SelectionChanged="SplitSizeCombo_SelectionChanged">
+                        <ComboBoxItem Tag="0">不分割</ComboBoxItem>
+                        <ComboBoxItem Tag="1048576">1 MB</ComboBoxItem>
+                        <ComboBoxItem Tag="10485760">10 MB</ComboBoxItem>
+                        <ComboBoxItem Tag="52428800">50 MB</ComboBoxItem>
+                        <ComboBoxItem Tag="104857600">100 MB</ComboBoxItem>
+                        <ComboBoxItem Tag="681574400">650 MB (CD)</ComboBoxItem>
+                        <ComboBoxItem Tag="4294967296">4 GB (FAT32)</ComboBoxItem>
+                        <ComboBoxItem Tag="-1">自定义...</ComboBoxItem>
+                    </ComboBox>
+                    <TextBox x:Name="CustomSplitSizeBox" Width="80" Height="24" Margin="6,0,0,0"
+                             IsEnabled="False" Visibility="Collapsed"/>
+                    <TextBlock x:Name="CustomSplitUnit" Text="MB" VerticalAlignment="Center" Margin="4,0,0,0"
+                               Visibility="Collapsed"/>
                 </StackPanel>
             </Grid>
         </GroupBox>

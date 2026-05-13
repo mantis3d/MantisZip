@@ -40,8 +40,14 @@ public partial class CompressSettingsWindow : Window
         }
 
         // 默认压缩级别
-        LevelSlider.Value = s.DefaultLevel;
-        LevelText.Text = s.DefaultLevel.ToString();
+        foreach (System.Windows.Controls.ComboBoxItem item in LevelCombo.Items)
+        {
+            if (int.TryParse(item.Tag?.ToString(), out var level) && level == s.DefaultLevel)
+            {
+                LevelCombo.SelectedItem = item;
+                break;
+            }
+        }
     }
 
     /// <summary>
@@ -54,15 +60,6 @@ public partial class CompressSettingsWindow : Window
             _sourcePaths.Add(path);
         }
         UpdateSourceList();
-    }
-
-    private void LevelSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
-    {
-        // UI 加载完成前 LevelText 可能为 null
-        if (LevelText != null)
-        {
-            LevelText.Text = ((int)LevelSlider.Value).ToString();
-        }
     }
 
     private void AddFileButton_Click(object sender, RoutedEventArgs e)
@@ -154,6 +151,35 @@ public partial class CompressSettingsWindow : Window
         PasswordGrid.IsEnabled = EncryptCheckBox.IsChecked == true;
     }
 
+    private void SplitSizeCombo_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
+    {
+        // InitializeComponent 时 SelectedIndex=0 会触发此事件，但 CustomSplitSizeBox 尚未创建
+        if (CustomSplitSizeBox == null) return;
+
+        var tag = (SplitSizeCombo.SelectedItem as System.Windows.Controls.ComboBoxItem)?.Tag?.ToString();
+        var isCustom = tag == "-1";
+        CustomSplitSizeBox.IsEnabled = isCustom;
+        CustomSplitSizeBox.Visibility = isCustom ? Visibility.Visible : Visibility.Collapsed;
+        CustomSplitUnit.Visibility = isCustom ? Visibility.Visible : Visibility.Collapsed;
+        if (isCustom)
+            CustomSplitSizeBox.Focus();
+    }
+
+    private long GetSplitSize()
+    {
+        var tag = (SplitSizeCombo.SelectedItem as System.Windows.Controls.ComboBoxItem)?.Tag?.ToString();
+        if (tag == "-1")
+        {
+            // 自定义分卷大小（以 MB 为单位）
+            if (long.TryParse(CustomSplitSizeBox.Text, out var mb) && mb > 0)
+                return mb * 1024L * 1024L;
+            return 0;
+        }
+        if (long.TryParse(tag, out var size) && size > 0)
+            return size;
+        return 0;
+    }
+
     private void CancelButton_Click(object sender, RoutedEventArgs e)
     {
         Close();
@@ -196,7 +222,7 @@ public partial class CompressSettingsWindow : Window
         // 开始压缩
         var outputPath = OutputPathTextBox.Text;
         var format = (FormatComboBox.SelectedItem as System.Windows.Controls.ComboBoxItem)?.Tag?.ToString() ?? "zip";
-        var level = (int)LevelSlider.Value;
+        var level = int.TryParse((LevelCombo.SelectedItem as System.Windows.Controls.ComboBoxItem)?.Tag?.ToString(), out var l) ? l : 5;
 
         App.Log("outputPath: {0}, format: {1}, level: {2}", outputPath, format, level);
 
@@ -218,7 +244,8 @@ try
             {
                 CompressionLevel = level,
                 Encrypt = EncryptCheckBox.IsChecked == true,
-                Password = PasswordBox.Password
+                Password = PasswordBox.Password,
+                SplitSize = GetSplitSize()
             };
             App.Log("options: level={0}, encrypt={1}", options.CompressionLevel, options.Encrypt);
 

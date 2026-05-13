@@ -25,11 +25,12 @@
                         </ComboBox>
 
                         <TextBlock Text="默认压缩级别" FontWeight="SemiBold" Margin="0,16,0,4"/>
-                        <StackPanel Orientation="Horizontal">
-                            <Slider x:Name="DefaultLevelSlider" Width="200" Minimum="1" Maximum="9"
-                                    Value="5" TickFrequency="1" IsSnapToTickEnabled="True"/>
-                            <TextBlock x:Name="DefaultLevelText" Text="5" Width="25" Margin="8,0,0,0" VerticalAlignment="Center"/>
-                        </StackPanel>
+                        <ComboBox x:Name="DefaultLevelCombo" Width="200" HorizontalAlignment="Left">
+                            <ComboBoxItem Tag="0">0 - 仅存储</ComboBoxItem>
+                            <ComboBoxItem Tag="3">3 - 快速压缩</ComboBoxItem>
+                            <ComboBoxItem Tag="5">5 - 正常压缩</ComboBoxItem>
+                            <ComboBoxItem Tag="9">9 - 极限压缩</ComboBoxItem>
+                        </ComboBox>
 
                         <CheckBox x:Name="CloseAfterCompressCheck" Content="压缩完成后关闭压缩窗口" Margin="0,16,0,0"/>
                         <CheckBox x:Name="KeepExtCheck" Content="保留源文件扩展名（abc.max → abc.max.zip）" Margin="0,8,0,0"/>
@@ -67,10 +68,10 @@
                     <StackPanel Margin="10">
                         <GroupBox Header="右键菜单项目" Padding="8" Margin="0,0,0,12">
                             <StackPanel>
-                                <CheckBox x:Name="EnableCompressCheck" Content="启用「用 MantisZip 压缩」菜单" Margin="0,4"/>
-                                <CheckBox x:Name="EnableQuickCheck" Content="启用「压缩为 .zip」快速压缩菜单" Margin="0,4"/>
-                                <CheckBox x:Name="EnableOpenCheck" Content="启用「用 MantisZip 打开」菜单（压缩包浏览）" Margin="0,4"/>
-                                <CheckBox x:Name="EnableExtractCheck" Content="启用「用 MantisZip 解压」菜单" Margin="0,4"/>
+                                <CheckBox x:Name="EnableCompressCheck" Content="启用「压缩」菜单" Margin="0,4"/>
+                                <CheckBox x:Name="EnableQuickCheck" Content="启用「压缩为（文件名）.zip」快速压缩菜单" Margin="0,4"/>
+                                <CheckBox x:Name="EnableOpenCheck" Content="启用「打开压缩包」菜单（压缩包浏览）" Margin="0,4"/>
+                                <CheckBox x:Name="EnableExtractCheck" Content="启用解压菜单（解压到此处 / 解压到压缩包名 / 解压到……）" Margin="0,4"/>
                             </StackPanel>
                         </GroupBox>
 
@@ -85,8 +86,12 @@
                             <StackPanel>
                                 <TextBlock x:Name="ShellStatusText" Text="检测中..." Margin="0,0,0,8" Foreground="#555"/>
                                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                                    <Button x:Name="InstallShellBtn" Content="应用" Width="80" Height="26"
-                                            Click="InstallShellBtn_Click" IsEnabled="False"/>
+                                    <Button x:Name="InstallBtn" Content="安装" Width="60" Height="26"
+                                            Click="InstallBtn_Click" IsEnabled="False"/>
+                                    <Button x:Name="UninstallBtn" Content="卸载" Width="60" Height="26" Margin="6,0,0,0"
+                                            Click="UninstallBtn_Click" IsEnabled="False"/>
+                                    <Button x:Name="ApplyShellBtn" Content="应用" Width="60" Height="26" Margin="6,0,0,0"
+                                            Click="ApplyShellBtn_Click" IsEnabled="False"/>
                                 </StackPanel>
                             </StackPanel>
                         </GroupBox>
@@ -101,12 +106,40 @@
                         <CheckBox x:Name="EnableImagePreviewCheck" Content="启用图片预览（jpg/png/gif/bmp/webp/ico）" Margin="0,4"/>
                         <CheckBox x:Name="EnableTextPreviewCheck" Content="启用文本预览（txt/log/code 等）" Margin="0,16,0,4"/>
 
+                        <TextBlock Text="预览面板位置" FontWeight="SemiBold" Margin="0,16,0,4"/>
+                        <ComboBox x:Name="PreviewPositionCombo" Width="220" HorizontalAlignment="Left" Margin="0,0,0,8">
+                            <ComboBoxItem Tag="1" IsSelected="True">底部（当前默认）</ComboBoxItem>
+                            <ComboBoxItem Tag="2">目录树下方</ComboBoxItem>
+                            <ComboBoxItem Tag="3">文件列表下方</ComboBoxItem>
+                            <ComboBoxItem Tag="4">文件列表右侧</ComboBoxItem>
+                        </ComboBox>
+
+                        <TextBlock Text="信息面板方向" FontWeight="SemiBold" Margin="0,8,0,4"/>
+                        <ComboBox x:Name="InfoPanelOrientationCombo" Width="180" HorizontalAlignment="Left" Margin="0,0,0,8">
+                            <ComboBoxItem Tag="Horizontal" IsSelected="True">内容右侧（左右）</ComboBoxItem>
+                            <ComboBoxItem Tag="Vertical">内容下方（上下）</ComboBoxItem>
+                        </ComboBox>
+
                         <TextBlock Text="文本预览最大大小 (MB)" FontWeight="SemiBold" Margin="0,12,0,4"/>
                         <StackPanel Orientation="Horizontal">
                             <Slider x:Name="MaxTextSizeSlider" Width="200" Minimum="1" Maximum="50"
                                     Value="5" TickFrequency="1" IsSnapToTickEnabled="True"/>
                             <TextBlock x:Name="MaxTextSizeText" Text="5 MB" Width="50" Margin="8,0,0,0" VerticalAlignment="Center"/>
                         </StackPanel>
+
+                        <TextBlock Text="文本预览字号" FontWeight="SemiBold" Margin="0,16,0,4"/>
+                        <StackPanel Orientation="Horizontal">
+                            <Slider x:Name="TextFontSizeSlider" Width="200" Minimum="8" Maximum="36"
+                                    Value="12" TickFrequency="1" IsSnapToTickEnabled="True"/>
+                            <TextBlock x:Name="TextFontSizeText" Text="12" Width="30" Margin="8,0,0,0" VerticalAlignment="Center"/>
+                        </StackPanel>
+                        <Border BorderBrush="#CCC" BorderThickness="1" Padding="8" Margin="0,8,0,0"
+                                Background="#F9F9F9" CornerRadius="4">
+                            <TextBlock x:Name="TextFontSizeSample" FontSize="12"
+                                       FontFamily="Cascadia Code, Consolas, monospace"
+                                       Text="示例文本 — The quick brown fox jumps over the lazy dog."
+                                       TextWrapping="Wrap"/>
+                        </Border>
                     </StackPanel>
                 </ScrollViewer>
             </TabItem>

@@ -1,4 +1,5 @@
 using System.IO;
+using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 
@@ -6,23 +7,35 @@ namespace MantisZip.UI;
 
 public partial class SettingsWindow : Window
 {
+    /// <summary>字号变更时回调主窗口，实时同步预览字号。</summary>
+    public Action<int>? OnTextFontSizeChanged { get; set; }
+
     public SettingsWindow()
     {
         InitializeComponent();
-        LoadSettings();
-
-        DefaultLevelSlider.ValueChanged += (_, _) =>
-            DefaultLevelText.Text = ((int)DefaultLevelSlider.Value).ToString();
 
         MaxTextSizeSlider.ValueChanged += (_, _) =>
             MaxTextSizeText.Text = $"{(int)MaxTextSizeSlider.Value} MB";
 
+        TextFontSizeSlider.ValueChanged += (_, _) =>
+        {
+            var size = (int)TextFontSizeSlider.Value;
+            TextFontSizeText.Text = size.ToString();
+            TextFontSizeSample.FontSize = size;
+            OnTextFontSizeChanged?.Invoke(size);
+        };
+
+        // 先绑定事件再加载设置，确保所有 UI 跟随加载值刷新
+        LoadSettings();
+
         // 任何上下文菜单项变更都要启用"应用"按钮
-        void OnChanged(object? s, RoutedEventArgs e) => InstallShellBtn.IsEnabled = true;
+        void OnChanged(object? s, RoutedEventArgs e) => ApplyShellBtn.IsEnabled = true;
         EnableCompressCheck.Checked += OnChanged;
         EnableCompressCheck.Unchecked += OnChanged;
         EnableQuickCheck.Checked += OnChanged;
         EnableQuickCheck.Unchecked += OnChanged;
+        EnableOpenCheck.Checked += OnChanged;
+        EnableOpenCheck.Unchecked += OnChanged;
         EnableExtractCheck.Checked += OnChanged;
         EnableExtractCheck.Unchecked += OnChanged;
         CascadeCheck.Checked += OnChanged;
@@ -38,7 +51,8 @@ public partial class SettingsWindow : Window
         // 压缩
         foreach (ComboBoxItem item in DefaultFormatCombo.Items)
             if ((string)item.Tag == s.DefaultFormat) { DefaultFormatCombo.SelectedItem = item; break; }
-        DefaultLevelSlider.Value = s.DefaultLevel;
+        DefaultLevelCombo.SelectedItem = DefaultLevelCombo.Items.Cast<ComboBoxItem>()
+            .FirstOrDefault(i => int.TryParse(i.Tag?.ToString(), out var l) && l == s.DefaultLevel) ?? DefaultLevelCombo.Items[2];
         CloseAfterCompressCheck.IsChecked = s.CloseAfterCompress;
         KeepExtCheck.IsChecked = s.KeepOriginalExtension;
 
@@ -62,6 +76,15 @@ public partial class SettingsWindow : Window
         EnableImagePreviewCheck.IsChecked = s.EnableImagePreview;
         EnableTextPreviewCheck.IsChecked = s.EnableTextPreview;
         MaxTextSizeSlider.Value = s.MaxTextPreviewBytes / (1024 * 1024);
+        TextFontSizeSlider.Value = s.TextPreviewFontSize;
+
+        // 预览位置
+        foreach (ComboBoxItem item in PreviewPositionCombo.Items)
+            if ((string)item.Tag == s.PreviewPosition.ToString()) { PreviewPositionCombo.SelectedItem = item; break; }
+
+        // 信息面板方向
+        foreach (ComboBoxItem item in InfoPanelOrientationCombo.Items)
+            if ((string)item.Tag == s.InfoPanelOrientation) { InfoPanelOrientationCombo.SelectedItem = item; break; }
 
         // 高级
         SevenZipPathBox.Text = s.SevenZipPath;
@@ -73,7 +96,7 @@ public partial class SettingsWindow : Window
         var s = AppSettings.Instance;
 
         s.DefaultFormat = ((ComboBoxItem)DefaultFormatCombo.SelectedItem)?.Tag as string ?? "zip";
-        s.DefaultLevel = (int)DefaultLevelSlider.Value;
+        s.DefaultLevel = int.TryParse((DefaultLevelCombo.SelectedItem as ComboBoxItem)?.Tag?.ToString(), out var l) ? l : 5;
         s.CloseAfterCompress = CloseAfterCompressCheck.IsChecked == true;
         s.KeepOriginalExtension = KeepExtCheck.IsChecked == true;
 
@@ -91,21 +114,59 @@ public partial class SettingsWindow : Window
         s.EnableImagePreview = EnableImagePreviewCheck.IsChecked == true;
         s.EnableTextPreview = EnableTextPreviewCheck.IsChecked == true;
         s.MaxTextPreviewBytes = (long)MaxTextSizeSlider.Value * 1024 * 1024;
+        s.TextPreviewFontSize = (int)TextFontSizeSlider.Value;
+        s.PreviewPosition = int.TryParse((PreviewPositionCombo.SelectedItem as ComboBoxItem)?.Tag?.ToString(), out var pos) ? pos : 1;
+        s.InfoPanelOrientation = (InfoPanelOrientationCombo.SelectedItem as ComboBoxItem)?.Tag as string ?? "Horizontal";
 
         s.SevenZipPath = SevenZipPathBox.Text;
 
         s.Save();
     }
 
+    /// <summary>
+    /// 更新状态文字及三个按钮的启用状态。
+    /// </summary>
     private void UpdateShellStatus()
     {
         var installed = ShellIntegration.IsInstalled;
         ShellStatusText.Text = installed
             ? "✅ Shell 右键菜单已安装"
             : "❌ Shell 右键菜单未安装";
+        InstallBtn.IsEnabled = !installed;
+        UninstallBtn.IsEnabled = installed;
+        // 应用按钮的状态由 OnChanged 事件单独管理
     }
 
-    private void InstallShellBtn_Click(object sender, RoutedEventArgs e)
+    private void InstallBtn_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            ShellIntegration.Uninstall();
+            ShellIntegration.Install();
+            UpdateShellStatus();
+            MessageBox.Show("Shell 右键菜单已安装", "MantisZip", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"安装失败: {ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
+    private void UninstallBtn_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            ShellIntegration.Uninstall();
+            UpdateShellStatus();
+            MessageBox.Show("Shell 右键菜单已卸载", "MantisZip", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"卸载失败: {ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
+    private void ApplyShellBtn_Click(object sender, RoutedEventArgs e)
     {
         try
         {
@@ -113,7 +174,7 @@ public partial class SettingsWindow : Window
             ShellIntegration.Uninstall();
             ShellIntegration.Install();
             UpdateShellStatus();
-            InstallShellBtn.IsEnabled = false;
+            ApplyShellBtn.IsEnabled = false;
             MessageBox.Show("上下文菜单已更新", "MantisZip", MessageBoxButton.OK, MessageBoxImage.Information);
         }
         catch (Exception ex)
@@ -126,7 +187,7 @@ public partial class SettingsWindow : Window
     {
         SaveSettings();
         // 上下文菜单有改动则同步安装
-        if (InstallShellBtn.IsEnabled)
+        if (ApplyShellBtn.IsEnabled)
         {
             ShellIntegration.Uninstall();
             ShellIntegration.Install();
