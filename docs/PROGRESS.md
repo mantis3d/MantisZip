@@ -7,9 +7,9 @@
 - **技术栈**: .NET 9 + WPF + SharpZipLib + SevenZipExtractor
 
 ## 版本
-- **当前版本**: 0.1.6
+- **当前版本**: 0.2.1
 - **发布日期**: 2026-05-12
-- **开发中**: 目录预览、预览开关按钮、图片解码降采样优化
+- **开发中**: 加密 ZIP 解压密码提示、密码管理器帮助窗口
 
 ## 功能列表
 
@@ -52,18 +52,27 @@
 ### v0.1.3 (2026-05-09)
 1. **修复 `_currentFormat` bug** - 非 ZIP 格式预览改用扩展名映射，不再误判为 SevenZip
 
-### 开发中 (即将发布为 v0.2.0)
-1. **AppSettings 设置系统** - 持久化用户偏好 JSON（压缩/解压/菜单/预览/高级），`AppSettings` 单例
-2. **SettingsWindow 设置窗口** - 五标签页 UI（压缩、解压、上下文菜单、预览、高级），Shell 状态检测 + 即时应用
-3. **ShellIntegration 右键菜单** - HKCU 无管理员注册，层叠子菜单/独立动词双模式，per-verb 开关（压缩/快速压缩/打开/解压），AppliesTo 过滤器，shell32.dll 图标
-4. **SystemIconHelper 系统图标** - SHGetFileInfo 获取 16x16 文件类型图标，ConcurrentDictionary 缓存，支持虚拟文件
-5. **ProgressWindow 双进度条** - 文件级进度（顶部）+ 总体进度（底部），`SetProgress(ArchiveProgress)` 重载
-6. **ArchiveProgress.FilePercentComplete** - Core 层新增 per-file 粒度字段
-7. **ZipEngine per-file 进度** - ExtractAsync/CompressAsync 逐文件汇报 0%→100%，100ms 节流
-8. **CLI 入口点** - `--compress`（多实例 IPC 合并路径）、`--compress-quick`（默认设置直接压缩）、`--extract`（绕过主窗口直连解压）、`--open`（主窗口浏览）、`--install-shell` / `--uninstall-shell`
-9. **MainWindow 增强** - 预览设置感知（EnableImagePreview/EnableTextPreview/MaxTextPreviewBytes），异步图片解码 DecodePixelWidth=1920，提取后打开文件夹
-10. **全局初始化 App.InitializeApp()** - 所有 CLI 入口点统一执行 GBK 编码注册
-11. **ZipEngine 目录条目修复** - ExtractAsync 创建空目录条目而非跳过（修复点号目录名问题）
+### v0.2.0 (2026-05-12)
+1. **MIT 许可证 + LICENSE 文件** - 项目切换为 MIT 开源，创建正式 LICENSE 文件
+2. **OpenCode 声明 + 捐赠链接** - README 添加 Sisyphus Agent 致谢和捐赠按钮（爱发电/Ko-fi/PayPal）
+3. **512x512 应用图标** - App.ico 嵌入 EXE，标题栏 + 任务栏 + 右键菜单全部使用自定义图标
+4. **默认布局优化** - 预览面板默认右侧、信息面板默认纵向、窗口 1200×800、目录树默认 396px
+5. **滚动条拖拽冲突修复** - 点击滚动条不再误触文件拖拽（FindVisualParent<ScrollBar> 守卫）
+6. **压缩扫描进度** - 大目录压缩时实时显示扫描进度（EnumerateFiles + 100ms 报告），不再卡"正在准备..."
+7. **Inno Setup 安装包** - 自动生成 MantisZip-0.2.0-Setup.exe 安装程序
+
+### AppSettings 设置系统 (v0.1.3 开发中移入)
+- **AppSettings 设置系统** - 持久化用户偏好 JSON（压缩/解压/菜单/预览/高级），`AppSettings` 单例
+- **SettingsWindow 设置窗口** - 五标签页 UI（压缩、解压、上下文菜单、预览、高级），Shell 状态检测 + 即时应用
+- **ShellIntegration 右键菜单** - HKCU 无管理员注册，层叠子菜单/独立动词双模式，per-verb 开关（压缩/快速压缩/打开/解压），AppliesTo 过滤器，shell32.dll 图标
+- **SystemIconHelper 系统图标** - SHGetFileInfo 获取 16x16 文件类型图标，ConcurrentDictionary 缓存，支持虚拟文件
+- **ProgressWindow 双进度条** - 文件级进度（顶部）+ 总体进度（底部），`SetProgress(ArchiveProgress)` 重载
+- **ArchiveProgress.FilePercentComplete** - Core 层新增 per-file 粒度字段
+- **ZipEngine per-file 进度** - ExtractAsync/CompressAsync 逐文件汇报 0%→100%，100ms 节流
+- **CLI 入口点** - `--compress`（多实例 IPC 合并路径）、`--compress-quick`（默认设置直接压缩）、`--extract`（绕过主窗口直连解压）、`--open`（主窗口浏览）、`--install-shell` / `--uninstall-shell`
+- **MainWindow 增强** - 预览设置感知（EnableImagePreview/EnableTextPreview/MaxTextPreviewBytes），异步图片解码 DecodePixelWidth=1920，提取后打开文件夹
+- **全局初始化 App.InitializeApp()** - 所有 CLI 入口点统一执行 GBK 编码注册
+- **ZipEngine 目录条目修复** - ExtractAsync 创建空目录条目而非跳过（修复点号目录名问题）
 
 ### v0.1.6 (2026-05-12)
 1. **目录预览** - 选中文件夹时显示系统文件夹图标 + 目录信息
@@ -84,10 +93,10 @@
 
 ### 待实现功能
 - 压缩方式选择 (Store/Deflate/BZip2/LZMA) - 需换 SharpCompress 库
-- TarGzEngine 保留原始时间戳
 - COM 右键菜单（动态文件名、目录结构预览、自定义排序）+ VirtualFileDataObject 延迟渲染（打包为一个 COM 辅助库）
 - 右键菜单目录结构预览（Bandizip 风格，靠后）
-- 安装包与发布
+- 中/英文界面切换
+- 亮/暗主题切换
 
 ## 技术架构
 
@@ -219,6 +228,20 @@ MantisZip/
 - **ZipEngine 目录条目** - ExtractAsync 创建空目录而非跳过
 - **移除 bin/obj git 跟踪** - 清理已跟踪的构建产物
 
+### 2026-05-12 (v0.2.0)
+- **MIT 开源许可证** — 创建 LICENSE 文件，完善 README 许可证声明
+- **OpenCode 声明 + 捐赠链接** — README 添加 Sisyphus Agent 致谢和捐赠按钮
+- **应用图标** — 512×512 自定义图标嵌入 EXE，标题栏 + 右键菜单全部替换
+- **默认布局优化** — 预览右侧、信息面板纵向、窗口 1200×800
+- **滚动条拖拽冲突修复** — FileListGrid 滚动条点击忽略拖拽检测
+- **压缩扫描进度** — ZipEngine/TarGzEngine EnumerateFiles + 100ms 进度报告
+- **7z/TarGz/Rar 解压进度** — 逐文件/逐条目实时百分比报告
+- **Inno Setup 安装包** — 自动构建 MantisZip-0.2.0-Setup.exe
+- **密码管理器帮助窗口** — PasswordHelpDialog 讲解匹配规则 + 范例
+
+### 2026-05-12 (v0.2.1)
+- **加密 ZIP 解压密码提示修复** — ZipEngine `ListEntriesAsync` 设置 `IsEncrypted`；`ExtractAsync` 预检 `IsCrypted` 抛出中文异常；UI 层关键词扩展 + `InvalidOperationException` 类型检测，确保加密 ZIP 无密码时弹出密码输入框而非直接报错
+
 ## 已知问题
 
 | 问题 | 状态 |
@@ -229,4 +252,8 @@ MantisZip/
 | 编码乱码问题 | ✅ 已修复 |
 | 拖拽时卡死 | ✅ 已修复 |
 | 取消后报错 | ✅ 已修复 |
-| 压缩方法选择 | 待 Phase 3 |
+| 滚动条拖拽冲突 | ✅ v0.2.0 已修复 |
+| 大目录压缩无响应 | ✅ v0.2.0 已修复（实时扫描进度） |
+| 加密 ZIP 解压无密码提示 | ✅ v0.2.1 已修复 |
+| 压缩方法选择 | 待开发 |
+| 界面国际化 | 待开发 |

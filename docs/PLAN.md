@@ -5,7 +5,7 @@
 **项目状态**: 🟡 开发中 (Phase 4)  
 **创建日期**: 2026-04-23  
 **最后更新**: 2026-05-12  
-**当前版本**: 0.1.6
+**当前版本**: 0.2.1
 
 ---
 
@@ -198,7 +198,7 @@ MantisZip/
 | 4.1 | Shell 右键菜单 | ✅ 完成 | 层叠/独立双模式，per-verb 开关，AppliesTo 过滤器，图标 |
 | 4.2 | 文件关联设置 | ✅ 完成 | 通过 Shell AppliesTo 实现 |
 | 4.3 | --compress-quick CLI | ✅ 完成 | 右键「压缩为 .zip」一键压缩 |
-| 4.4 | 安装包制作 | ⬜ 待开发 | |
+| 4.4 | 安装包制作 | ✅ 完成 | Inno Setup 安装程序 |
 | 4.5 | 发布 Release | ⬜ 待开发 | |
 
 ---
@@ -209,9 +209,9 @@ MantisZip/
 Phase 1: ██████████████ 100%
 Phase 2: ██████████████ 100%
 Phase 3: █████████░░░░░ 70%
-Phase 4: ████████░░░░░░ 60%
+Phase 4: ██████████░░░░ 70%
 
-总体进度: █████████████░ 80%
+总体进度: █████████████░ 83%
 ```
 
 ---
@@ -257,6 +257,8 @@ Phase 4: ████████░░░░░░ 60%
 | 2026-05-11 | 更新文档 + VirtualFileDataObject 列入未来计划 | Sisyphus | AGENTS.md, PLAN.md, PROGRESS.md |
 | 2026-05-11 | HTML/Markdown 预览 + 文本预览字号 + Shell 菜单重构 + 分卷压缩 | Sisyphus | v0.1.5：WebBrowser 预览、Markdig、字号滑块、Shell 三按钮、split-volume |
 | 2026-05-12 | 目录预览 + 预览开关按钮 + 图片解码降采样修复 | Sisyphus | v0.1.6：ShowDirectoryPreview、PreviewToggleBtn、DecodePixelWidth 条件设置、MaxWidth/MaxHeight 防拉伸 |
+| 2026-05-12 | MIT 开源 + 应用图标 + 默认布局 + 滚动条修复 + 压缩扫描进度 + 安装包 | Sisyphus | v0.2.0: LICENSE, App.ico, PreviewPosition=4, InfoOrientation=Vertical, ScrollBar 守卫, EnumerateFiles 扫描进度, Inno Setup 打包 |
+| 2026-05-12 | 加密 ZIP 解压密码提示修复 + 密码管理器帮助窗口 | Sisyphus | v0.2.1: ZipEngine IsCrypted 预检 + UI 层多关键词/类型检测；PasswordHelpDialog |
 
 ---
 
@@ -264,12 +266,12 @@ Phase 4: ████████░░░░░░ 60%
 
 | 优先级 | 任务 | 说明 |
 |--------|------|------|
-| P2 | TarGzEngine 元数据修复 | 保留原始时间戳、支持压缩级别 |
 | P2 | 压缩方式选择 | Store/Deflate/BZip2/LZMA，需换 SharpCompress 库 |
-| P2 | 中/英文界面切换 | 技术决策记录已修正 |
+| P2 | 中/英文界面切换 | |
+| P2 | 亮/暗主题切换 | |
 | P3 | COM 右键菜单 + VirtualFileDataObject | 动态菜单名（显示文件名）、目录结构预览、拖拽延迟渲染，打包成一个 COM 辅助库 |
 | P4 | 右键菜单目录结构预览 | 在 COM 菜单中读取压缩包 entry 列表，展示文件树（Bandizip 风格） |
-| P3 | 安装包与发布 | |
+| P3 | 发布 Release | |
 
 ---
 
