@@ -7,6 +7,7 @@ installer/
 
 # IDE
 .vs/
+.history/
 .vscode/
 *.user
 *.suo
