@@ -1,4 +1,6 @@
 using System.IO;
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
@@ -40,8 +42,9 @@ public class PasswordData
 }
 
 /// <summary>
-/// 密码管理器
+/// 密码管理器（DPAPI 加密存储，仅 Windows）
 /// </summary>
+[System.Runtime.Versioning.SupportedOSPlatform("windows")]
 public class PasswordManager
 {
     private static readonly string AppDataPath = Path.Combine(
@@ -69,9 +72,23 @@ public class PasswordManager
         {
             if (File.Exists(PasswordFilePath))
             {
-                var json = File.ReadAllText(PasswordFilePath);
-                _data = JsonSerializer.Deserialize<PasswordData>(json) ?? new PasswordData();
-                CoreLog.Info($"PasswordManager.Load: loaded {_data.Passwords.Count} entries");
+                var raw = File.ReadAllText(PasswordFilePath);
+
+                // 旧格式 (未加密的 JSON) — 以 '{' 开头
+                if (raw.TrimStart().StartsWith("{") || raw.TrimStart().StartsWith("["))
+                {
+                    _data = JsonSerializer.Deserialize<PasswordData>(raw) ?? new PasswordData();
+                    CoreLog.Info($"PasswordManager.Load: loaded {_data.Passwords.Count} entries (plaintext, will migrate on save)");
+                }
+                else
+                {
+                    // 新格式：Base64 → DPAPI 解密 → JSON
+                    var ciphertext = Convert.FromBase64String(raw);
+                    var decrypted = ProtectedData.Unprotect(ciphertext, null, DataProtectionScope.CurrentUser);
+                    var json = Encoding.UTF8.GetString(decrypted);
+                    _data = JsonSerializer.Deserialize<PasswordData>(json) ?? new PasswordData();
+                    CoreLog.Info($"PasswordManager.Load: loaded {_data.Passwords.Count} entries (encrypted)");
+                }
             }
             else
             {
@@ -87,7 +104,7 @@ public class PasswordManager
     }
 
     /// <summary>
-    /// 保存密码数据
+    /// 保存密码数据（DPAPI 加密）
     /// </summary>
     public void Save()
     {
@@ -97,8 +114,11 @@ public class PasswordManager
                 Directory.CreateDirectory(AppDataPath);
 
             var json = JsonSerializer.Serialize(_data, new JsonSerializerOptions { WriteIndented = true });
-            File.WriteAllText(PasswordFilePath, json);
-            CoreLog.Info($"PasswordManager.Save: saved {_data.Passwords.Count} entries");
+            var plaintext = Encoding.UTF8.GetBytes(json);
+            var encrypted = ProtectedData.Protect(plaintext, null, DataProtectionScope.CurrentUser);
+            var base64 = Convert.ToBase64String(encrypted);
+            File.WriteAllText(PasswordFilePath, base64);
+            CoreLog.Info($"PasswordManager.Save: saved {_data.Passwords.Count} entries (encrypted)");
         }
         catch (Exception ex)
         {

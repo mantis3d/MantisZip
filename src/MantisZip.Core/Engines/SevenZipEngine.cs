@@ -1,5 +1,4 @@
 using System.Diagnostics;
-using System.Linq;
 using SevenZipExtractor;
 using MantisZip.Core.Abstractions;
 using MantisZip.Core.Utils;
@@ -33,11 +32,18 @@ public class SevenZipEngine : IArchiveEngine
             using var archiveFile = string.IsNullOrEmpty(password)
                 ? new ArchiveFile(archivePath)
                 : new ArchiveFile(archivePath, password);
-            var entries = archiveFile.Entries.ToList();
-            CoreLog.Info($"ExtractAsync: {entries.Count} entries in archive");
+            // 第一遍：统计条目数 + 检查加密（避免 ToList() 全量加载到内存）
+            int totalEntries = 0;
+            bool hasEncrypted = false;
+            foreach (var entry in archiveFile.Entries)
+            {
+                totalEntries++;
+                if (!entry.IsFolder && entry.IsEncrypted)
+                    hasEncrypted = true;
+            }
 
-            // 检查是否有加密条目但未提供密码
-            var hasEncrypted = entries.Any(e => !e.IsFolder && e.IsEncrypted);
+            CoreLog.Info($"ExtractAsync: {totalEntries} entries in archive");
+
             if (hasEncrypted && string.IsNullOrEmpty(password))
             {
                 CoreLog.Info("ExtractAsync: archive has encrypted entries but no password provided");
@@ -45,31 +51,33 @@ public class SevenZipEngine : IArchiveEngine
             }
 
             {
-                // 逐条目提取（支持密码 + 冲突处理）
+                // 第二遍：逐条目提取（支持密码 + 冲突处理）
                 var lastReportTime = DateTime.Now;
                 var reportInterval = TimeSpan.FromMilliseconds(100);
                 int fileIndex = 0;
-                int totalEntries = entries.Count;
+                int i = 0;
 
-                for (int i = 0; i < totalEntries; i++)
+                foreach (var entry in archiveFile.Entries)
                 {
                     cancellationToken.ThrowIfCancellationRequested();
 
-                    var entry = entries[i];
-                    if (entry.IsFolder) continue;
+                    if (entry.IsFolder) { i++; continue; }
 
                     fileIndex++;
                     var pct = totalEntries > 0 ? (double)i / totalEntries * 100 : 0;
 
-                    var outputPath = Path.Combine(destinationPath, entry.FileName);
+                    var outputPath = FileConflictHelper.GetSafePath(destinationPath, entry.FileName);
                     var outDir = Path.GetDirectoryName(outputPath);
                     if (!string.IsNullOrEmpty(outDir) && !Directory.Exists(outDir))
                         Directory.CreateDirectory(outDir);
 
                     // 冲突处理
-                    var resolvedPath = FileConflictHelper.ResolvePath(outputPath, options);
+                    var resolvedPath = FileConflictHelper.ResolvePath(outputPath, options, entry.LastWriteTime, (long)entry.Size);
                     if (resolvedPath == null)
+                    {
+                        i++;
                         continue; // Skip
+                    }
 
                     // 报告当前文件
                     var now = DateTime.Now;
@@ -81,8 +89,13 @@ public class SevenZipEngine : IArchiveEngine
                     });
 
                     // 用流方式提取
-                    using var fileStream = new FileStream(resolvedPath, FileMode.Create, FileAccess.Write);
-                    entry.Extract(fileStream);
+                    var entryModified = entry.LastWriteTime;
+                    using (var fileStream = new FileStream(resolvedPath, FileMode.Create, FileAccess.Write))
+                    {
+                        entry.Extract(fileStream);
+                    }
+                    // 恢复文件原始修改时间（流已关闭）
+                    try { File.SetLastWriteTime(resolvedPath, entryModified); } catch { }
 
                     // 文件完成时再报告一次
                     now = DateTime.Now;
@@ -96,6 +109,8 @@ public class SevenZipEngine : IArchiveEngine
                         });
                         lastReportTime = now;
                     }
+
+                    i++;
                 }
 
                 progress?.Report(new ArchiveProgress
@@ -119,56 +134,52 @@ public class SevenZipEngine : IArchiveEngine
 
         await Task.Run(() =>
         {
-            // 检查 7z.exe 是否存在
-            if (!File.Exists(SevenZipPath))
+            var sevenZipPath = SevenZipPath; // 快照，防止设置窗口在压缩中修改路径
+            if (!File.Exists(sevenZipPath))
             {
                 throw new FileNotFoundException(
-                    $"找不到 7z.exe，请确保已安装 7-Zip 或在设置中正确配置路径。当前路径: {SevenZipPath}",
-                    SevenZipPath);
+                    $"找不到 7z.exe，请确保已安装 7-Zip 或在设置中正确配置路径。当前路径: {sevenZipPath}",
+                    sevenZipPath);
             }
 
-            // 7z.exe 命令: 7z a -t7z output files [-mxN] [-p"password"]
-            var args = new List<string>
-            {
-                "a",                    // 添加
-                "-t7z",                  // 7z 格式
-                outputPath                 // 输出文件
-            };
-            args.AddRange(sourcePaths);
-
-            // 压缩级别 (0-9, 0=store, 1=fastest, 9=ultra)
-            var mx = Math.Clamp(options.CompressionLevel, 0, 9);
-            args.Add($"-mx{mx}");
-
-            // 加密 (必须放在文件列表之后)
-            if (options.Encrypt && !string.IsNullOrEmpty(options.Password))
-            {
-                // 注意: 密码通过命令行参数传递，在进程列表中可见。
-                // 为降低特殊字符导致的问题，密码参数整体用双引号包裹。
-                args.Add($"-p\"{options.Password}\"");
-                args.Add("-mhe=on"); // 加密头部
-            }
-
-            // 分卷压缩
-            if (options.SplitSize > 0)
-            {
-                args.Add($"-v{options.SplitSize}b");
-            }
-
+            // 使用 ArgumentList 而非手动拼装 Arguments 字符串，以消除命令注入风险
+            // 注: 密码仍可通过进程列表看到（7z.exe 未提供 stdin 密码输入），但至少 shell 参数注入被消除
             var psi = new ProcessStartInfo
             {
-                FileName = SevenZipPath,
-                Arguments = string.Join(" ", args.Select(a => a.Contains(" ") ? $"\"{a}\"" : a)),
+                FileName = sevenZipPath,
                 UseShellExecute = false,
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
                 CreateNoWindow = true
             };
 
-            CoreLog.Info($"CompressAsync: 7z.exe args: {psi.Arguments}");
+            psi.ArgumentList.Add("a");                    // 添加
+            psi.ArgumentList.Add("-t7z");                  // 7z 格式
+            psi.ArgumentList.Add(outputPath);               // 输出文件
+            foreach (var src in sourcePaths)
+                psi.ArgumentList.Add(src);
+
+            // 压缩级别 (0-9, 0=store, 1=fastest, 9=ultra)
+            var mx = Math.Clamp(options.CompressionLevel, 0, 9);
+            psi.ArgumentList.Add($"-mx{mx}");
+
+            // 加密 (必须放在文件列表之后)
+            if (options.Encrypt && !string.IsNullOrEmpty(options.Password))
+            {
+                psi.ArgumentList.Add($"-p{options.Password}");
+                psi.ArgumentList.Add("-mhe=on"); // 加密头部
+            }
+
+            // 分卷压缩
+            if (options.SplitSize > 0)
+            {
+                psi.ArgumentList.Add($"-v{options.SplitSize}b");
+            }
+
+            CoreLog.Info($"CompressAsync: 7z.exe output={outputPath}, mx={mx}, encrypt={options.Encrypt}");
 
             using var process = Process.Start(psi)
-                ?? throw new InvalidOperationException($"无法启动 7z.exe: {SevenZipPath}");
+                ?? throw new InvalidOperationException($"无法启动 7z.exe: {sevenZipPath}");
 
             // 简单的进度轮询
             while (!process.HasExited)
@@ -211,7 +222,9 @@ public class SevenZipEngine : IArchiveEngine
         {
             var items = new List<ArchiveItem>();
 
-            using var archiveFile = new ArchiveFile(archivePath);
+            using var archiveFile = string.IsNullOrEmpty(password)
+                ? new ArchiveFile(archivePath)
+                : new ArchiveFile(archivePath, password);
             foreach (var entry in archiveFile.Entries)
             {
                 string fileName = entry.FileName;
@@ -249,9 +262,12 @@ public class SevenZipEngine : IArchiveEngine
                 using var archiveFile = string.IsNullOrEmpty(password)
                     ? new ArchiveFile(archivePath)
                     : new ArchiveFile(archivePath, password);
+
+                // SevenZipExtractor 构造器验证压缩包签名，访问 Entries 读取目录。
+                // 两者都通过说明压缩包结构完整。
                 var count = archiveFile.Entries.Count;
                 CoreLog.Info($"TestArchiveAsync: passed, {count} entries");
-                return count >= 0;
+                return true;
             }
             catch (Exception ex)
             {
@@ -272,47 +288,43 @@ public class SevenZipEngine : IArchiveEngine
 
         await Task.Run(() =>
         {
-            // 检查 7z.exe 是否存在
-            if (!File.Exists(SevenZipPath))
+            var sevenZipPath = SevenZipPath; // 快照，防止设置窗口在修改路径
+            if (!File.Exists(sevenZipPath))
             {
                 throw new FileNotFoundException(
-                    $"找不到 7z.exe，请确保已安装 7-Zip 或在设置中正确配置路径。当前路径: {SevenZipPath}",
-                    SevenZipPath);
-            }
-
-            // 7z.exe 命令: 7z u archive.7z file1 file2
-            var args = new List<string>
-            {
-                "u",                     // 更新
-                archivePath               // 目标压缩包
-            };
-            args.AddRange(sourcePaths);
-
-            // 压缩级别 (0-9)
-            var mx = Math.Clamp(options.CompressionLevel, 0, 9);
-            args.Add($"-mx{mx}");
-
-            // 加密
-            if (options.Encrypt && !string.IsNullOrEmpty(options.Password))
-            {
-                args.Add($"-p\"{options.Password}\"");
-                args.Add("-mhe=on");
+                    $"找不到 7z.exe，请确保已安装 7-Zip 或在设置中正确配置路径。当前路径: {sevenZipPath}",
+                    sevenZipPath);
             }
 
             var psi = new ProcessStartInfo
             {
-                FileName = SevenZipPath,
-                Arguments = string.Join(" ", args.Select(a => a.Contains(" ") ? $"\"{a}\"" : a)),
+                FileName = sevenZipPath,
                 UseShellExecute = false,
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
                 CreateNoWindow = true
             };
 
-            CoreLog.Info($"AddToArchiveAsync: 7z.exe args: {psi.Arguments}");
+            psi.ArgumentList.Add("u");                     // 更新
+            psi.ArgumentList.Add(archivePath);              // 目标压缩包
+            foreach (var src in sourcePaths)
+                psi.ArgumentList.Add(src);
+
+            // 压缩级别 (0-9)
+            var mx = Math.Clamp(options.CompressionLevel, 0, 9);
+            psi.ArgumentList.Add($"-mx{mx}");
+
+            // 加密
+            if (options.Encrypt && !string.IsNullOrEmpty(options.Password))
+            {
+                psi.ArgumentList.Add($"-p{options.Password}");
+                psi.ArgumentList.Add("-mhe=on");
+            }
+
+            CoreLog.Info($"AddToArchiveAsync: 7z.exe archive={archivePath}, mx={mx}, encrypt={options.Encrypt}");
 
             using var process = Process.Start(psi)
-                ?? throw new InvalidOperationException($"无法启动 7z.exe: {SevenZipPath}");
+                ?? throw new InvalidOperationException($"无法启动 7z.exe: {sevenZipPath}");
 
             while (!process.HasExited)
             {

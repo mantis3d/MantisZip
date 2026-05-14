@@ -53,11 +53,14 @@
                         <ComboBox x:Name="ConflictCombo" Width="200" HorizontalAlignment="Left">
                             <ComboBoxItem Content="询问我" Tag="ask"/>
                             <ComboBoxItem Content="覆盖" Tag="overwrite"/>
+                            <ComboBoxItem Content="仅覆盖更旧的文件" Tag="overwrite-if-older"/>
+                            <ComboBoxItem Content="仅覆盖更小的文件" Tag="overwrite-if-smaller"/>
                             <ComboBoxItem Content="自动重命名" Tag="rename"/>
                             <ComboBoxItem Content="跳过" Tag="skip"/>
                         </ComboBox>
 
                         <CheckBox x:Name="OpenFolderCheck" Content="解压后打开目标文件夹" Margin="0,16,0,0"/>
+                        <CheckBox x:Name="EnableDragExtractCheck" Content="启用文件列表拖拽解压（拖出到资源管理器）" Margin="0,8,0,0"/>
                     </StackPanel>
                 </ScrollViewer>
             </TabItem>
@@ -200,7 +203,20 @@
                             <Button Grid.Column="1" Content="浏览" Width="60" Height="24" Margin="6,0,0,0" Click="BrowseSevenZip_Click"/>
                         </Grid>
 
-                        <Button Content="清理预览临时文件" Width="140" Height="26" Margin="0,20,0,0"
+                        <Separator Margin="0,16,0,10"/>
+                        <CheckBox x:Name="EnableDebugLogCheck" Content="启用调试日志（用于排查问题）" Margin="0,0,0,2"/>
+                        <TextBlock FontSize="11" Foreground="#888" Margin="24,0,0,0">
+                            <Run Text="日志文件:"/>
+                            <Run x:Name="LogPathText" Foreground="#555"/>
+                        </TextBlock>
+                        <StackPanel Orientation="Horizontal" Margin="24,4,0,0">
+                            <Button Content="打开日志文件" Width="90" Height="22" FontSize="11"
+                                    Click="OpenLogFolder_Click"/>
+                            <Button Content="打开启动日志" Width="100" Height="22" Margin="8,0,0,0" FontSize="11"
+                                    Click="OpenStartupLog_Click"/>
+                        </StackPanel>
+
+                        <Button Content="清理预览临时文件" Width="140" Height="26" Margin="0,16,0,0"
                                 HorizontalAlignment="Left" Click="CleanTemp_Click"/>
 
                         <Separator Margin="0,20,0,10"/>

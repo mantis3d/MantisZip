@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Windows;
@@ -65,6 +66,7 @@ public partial class SettingsWindow : Window
         foreach (ComboBoxItem item in ConflictCombo.Items)
             if ((string)item.Tag == s.FileConflictAction) { ConflictCombo.SelectedItem = item; break; }
         OpenFolderCheck.IsChecked = s.OpenFolderAfterExtract;
+        EnableDragExtractCheck.IsChecked = s.EnableDragExtract;
 
         // 上下文菜单
         EnableCompressCheck.IsChecked = s.EnableCompressMenu;
@@ -98,6 +100,8 @@ public partial class SettingsWindow : Window
         UpdateAssocStatus();
 
         // 高级
+        EnableDebugLogCheck.IsChecked = s.EnableDebugLogging;
+        LogPathText.Text = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "debug.log");
         SevenZipPathBox.Text = s.SevenZipPath;
         AboutVersionText.Text = AppConstants.Version;
     }
@@ -114,6 +118,7 @@ public partial class SettingsWindow : Window
         s.ExtractDestination = ((ComboBoxItem)ExtractDestCombo.SelectedItem)?.Tag as string ?? "ask";
         s.FileConflictAction = ((ComboBoxItem)ConflictCombo.SelectedItem)?.Tag as string ?? "ask";
         s.OpenFolderAfterExtract = OpenFolderCheck.IsChecked == true;
+        s.EnableDragExtract = EnableDragExtractCheck.IsChecked == true;
 
         s.EnableCompressMenu = EnableCompressCheck.IsChecked == true;
         s.EnableQuickCompress = EnableQuickCheck.IsChecked == true;
@@ -132,6 +137,8 @@ public partial class SettingsWindow : Window
 
         s.ShowPasswordMatchNotification = ShowPasswordNotifCheck.IsChecked == true;
         s.PasswordRevealByDefault = RevealPasswordCheck.IsChecked == true;
+
+        s.EnableDebugLogging = EnableDebugLogCheck.IsChecked == true;
 
         s.SevenZipPath = SevenZipPathBox.Text;
 
@@ -270,6 +277,35 @@ public partial class SettingsWindow : Window
             SevenZipPathBox.Text = dialog.FileName;
         }
     }
+
+    #region 调试日志
+
+    private void OpenLogFolder_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            var dir = Path.GetDirectoryName(LogPathText.Text);
+            if (!string.IsNullOrEmpty(dir) && Directory.Exists(dir))
+                Process.Start("explorer.exe", $"/select,\"{LogPathText.Text}\"");
+        }
+        catch { }
+    }
+
+    private void OpenStartupLog_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            var startupLog = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                "MantisZip", "startup.log");
+            var dir = Path.GetDirectoryName(startupLog);
+            if (!string.IsNullOrEmpty(dir) && Directory.Exists(dir))
+                Process.Start("explorer.exe", $"/select,\"{startupLog}\"");
+        }
+        catch { }
+    }
+
+    #endregion
 
     private void CleanTemp_Click(object sender, RoutedEventArgs e)
     {

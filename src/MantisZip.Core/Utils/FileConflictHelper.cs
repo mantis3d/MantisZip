@@ -12,7 +12,7 @@ internal static class FileConflictHelper
     /// 根据冲突策略返回实际写入路径。可能返回 null（表示跳过）。
     /// 遇 Ask 时调用 options.ConflictResolver 回调决定处理方式。
     /// </summary>
-    public static string? ResolvePath(string outputPath, ArchiveOptions? options)
+    public static string? ResolvePath(string outputPath, ArchiveOptions? options, DateTime? entryModified = null, long? entrySize = null)
     {
         if (!File.Exists(outputPath))
             return outputPath;
@@ -22,33 +22,91 @@ internal static class FileConflictHelper
         // Ask → 调用外部回调
         if (action == FileConflictAction.Ask && options?.ConflictResolver != null)
         {
-            action = options.ConflictResolver(outputPath);
+            var info = new FileConflictInfo
+            {
+                FilePath = outputPath,
+                EntrySize = entrySize,
+                EntryModified = entryModified,
+            };
+            try
+            {
+                var fi = new FileInfo(outputPath);
+                if (fi.Exists)
+                {
+                    info.ExistingSize = fi.Length;
+                    info.ExistingModified = fi.LastWriteTime;
+                }
+            }
+            catch { }
+            action = options.ConflictResolver(info);
         }
 
-        return action switch
-        {
-            FileConflictAction.Overwrite => outputPath,
-            FileConflictAction.Skip => null,
-            FileConflictAction.Rename => GetUniquePath(outputPath),
-            _ => outputPath
-        };
+        return ResolveByAction(outputPath, action, entryModified, entrySize);
     }
 
     /// <summary>
     /// 根据冲突策略返回实际写入路径。可能返回 null（表示跳过）。
     /// </summary>
-    public static string? ResolvePath(string outputPath, FileConflictAction action)
+    public static string? ResolvePath(string outputPath, FileConflictAction action, DateTime? entryModified = null, long? entrySize = null)
     {
         if (!File.Exists(outputPath))
             return outputPath;
 
+        return ResolveByAction(outputPath, action, entryModified, entrySize);
+    }
+
+    private static string? ResolveByAction(string outputPath, FileConflictAction action, DateTime? entryModified, long? entrySize)
+    {
         return action switch
         {
             FileConflictAction.Overwrite => outputPath,
             FileConflictAction.Skip => null,
             FileConflictAction.Rename => GetUniquePath(outputPath),
+            FileConflictAction.OverwriteIfOlder => ShouldOverwriteByTime(outputPath, entryModified) ? outputPath : null,
+            FileConflictAction.OverwriteIfSmaller => ShouldOverwriteBySize(outputPath, entrySize) ? outputPath : null,
             _ => outputPath
         };
+    }
+
+    private static bool ShouldOverwriteBySize(string outputPath, long? entrySize)
+    {
+        if (entrySize == null) return true;
+        try
+        {
+            var existingSize = new FileInfo(outputPath).Length;
+            // "覆盖较小"：压缩包内的文件更大 → 覆盖掉磁盘上较小的文件
+            return entrySize.Value > existingSize;
+        }
+        catch
+        {
+            return true;
+        }
+    }
+
+    private static bool ShouldOverwriteByTime(string outputPath, DateTime? entryModified)
+    {
+        if (entryModified == null) return true; // 没有时间信息时直接覆盖
+        try
+        {
+            var existingTime = File.GetLastWriteTime(outputPath);
+            return entryModified.Value > existingTime;
+        }
+        catch
+        {
+            return true; // 读不到时间时覆盖
+        }
+    }
+
+    /// <summary>
+    /// 防止路径遍历攻击 (Zip Slip) — 确保解压路径在目标目录内
+    /// </summary>
+    public static string GetSafePath(string destinationDir, string entryName)
+    {
+        var fullPath = Path.GetFullPath(Path.Combine(destinationDir, entryName));
+        var destFullPath = Path.GetFullPath(destinationDir);
+        if (!fullPath.StartsWith(destFullPath, StringComparison.Ordinal))
+            throw new InvalidOperationException($"压缩条目包含非法路径: {entryName}");
+        return fullPath;
     }
 
     private static string GetUniquePath(string path)
@@ -63,6 +121,6 @@ internal static class FileConflictHelper
             if (!File.Exists(candidate))
                 return candidate;
         }
-        return path; // 1000 个同名文件后直接覆盖
+        return path;
     }
 }

@@ -339,6 +339,10 @@ public partial class MainWindow : Window
         if (e.LeftButton != MouseButtonState.Pressed || _currentArchivePath == null)
             return;
 
+        // 设置中禁用了拖拽解压 → 忽略
+        if (!AppSettings.Instance.EnableDragExtract)
+            return;
+
         // 检查是否超过拖拽阈值
         var pos = e.GetPosition(FileListGrid);
         if (Math.Abs(pos.X - _dragStartPoint.X) < SystemParameters.MinimumHorizontalDragDistance &&
@@ -521,6 +525,14 @@ public partial class MainWindow : Window
 #endregion
 
     #region 菜单事件
+
+    private void NewArchive_Click(object sender, RoutedEventArgs e)
+    {
+        var window = new CompressSettingsWindow();
+        window.Owner = this;
+        window.Show();
+        window.Activate();
+    }
 
     private async void OpenArchive_Click(object sender, RoutedEventArgs e)
     {
@@ -748,25 +760,16 @@ public partial class MainWindow : Window
             _hasEncryptedArchive = items.Any(i => i.IsEncrypted);
             if (_hasEncryptedArchive)
             {
-                var savedPasswords = PasswordManager.Instance.FindMatchingPasswords(archivePath);
-                var tried = new HashSet<string>();
-                foreach (var entry in savedPasswords)
+                var match = App.TryMatchPassword(archivePath, engine, null, false);
+                if (match != null)
                 {
-                    if (!tried.Add(entry.Password)) continue;
-                    if (App.QuickVerifyPassword(archivePath, entry.Password, engine))
-                    {
-                        _currentPassword = entry.Password;
-                        App.LogDebug("LoadArchiveAsync: matched password '{0}' (desc={1})",
-                            entry.Password,
-                            !string.IsNullOrEmpty(entry.Description) ? entry.Description : "?");
-                        break;
-                    }
+                    _currentPassword = match.Value.Password;
+                    App.LogDebug("LoadArchiveAsync: matched password desc={0}", match.Value.Description);
                 }
-                App.LogDebug("LoadArchiveAsync: hasEncrypted={0}, passwordFound={1}", _hasEncryptedArchive, _currentPassword != null);
-
-                // 所有保存密码都失败 → 弹密码输入框让用户输入
-                if (_currentPassword == null)
+                else
                 {
+                    // 所有保存密码都失败 → 弹密码输入框让用户输入
+                    App.LogDebug("LoadArchiveAsync: no saved password matched, showing dialog");
                     var pwdDialog = new PasswordDialog(Path.GetFileName(archivePath));
                     pwdDialog.Owner = this;
                     if (pwdDialog.ShowDialog() == true)
@@ -853,109 +856,49 @@ public partial class MainWindow : Window
             });
             var progress = progressWindow.CreatePauseAwareProgress(baseProgress);
 
-            // 收集所有匹配的已保存密码，逐个尝试（可能有多个规则匹配同一文件）
-            var savedPasswords = PasswordManager.Instance.FindMatchingPasswords(archivePath);
-            var triedPasswords = new HashSet<string>();
+            bool showPwd = _hasEncryptedArchive && AppSettings.Instance.ShowPasswordMatchNotification;
 
-            if (savedPasswords.Count > 0)
+            // 先试已保存密码
+            var match = App.TryMatchPassword(archivePath, engine, progressWindow, showPwd);
+            if (match != null)
             {
-                foreach (var entry in savedPasswords)
-                {
-                    var pwd = entry.Password;
-                    if (!triedPasswords.Add(pwd)) continue;
+                var (pwd, desc) = match.Value;
+                if (showPwd) progressWindow.ShowPasswordMatched(pwd, desc);
 
-                    var desc = !string.IsNullOrEmpty(entry.Description) ? entry.Description : pwd;
-                    bool showPwdSection = AppSettings.Instance.ShowPasswordMatchNotification;
-                    if (showPwdSection) progressWindow.ShowPasswordAttempt(desc);
+                var opts = App.CreateExtractOptions();
+                await engine.ExtractAsync(archivePath, destinationPath, pwd, progress, ct, opts);
 
-                    // Quick Verify
-                    ct.ThrowIfCancellationRequested();
-                    if (!App.QuickVerifyPassword(archivePath, pwd, engine))
-                    {
-                        App.LogDebug("ExtractAsync: QuickVerify failed for '{0}'", pwd);
-                        continue;
-                    }
-
-                    // 快速验证通过
-                    if (showPwdSection) progressWindow.ShowPasswordMatched(pwd, desc);
-
-                    // 全量解压（带冲突处理设置）
-                    var extractOpts = App.CreateExtractOptions();
-                    await engine.ExtractAsync(archivePath, destinationPath, pwd, progress, ct, extractOpts);
-                    progressWindow.Close();
-                    SetStatus($"解压完成: {Path.GetFileName(archivePath)}");
-                    if (AppSettings.Instance.OpenFolderAfterExtract) OpenInExplorer(destinationPath);
-                    return;
-                }
+                progressWindow.Close();
+                SetStatus($"解压完成: {Path.GetFileName(archivePath)}");
+                if (AppSettings.Instance.OpenFolderAfterExtract) OpenInExplorer(destinationPath);
+                return;
             }
 
-            // 所有已保存密码都失败 → 弹出密码输入框
-            progressWindow.Hide();
-            var dialog = new PasswordDialog(Path.GetFileName(archivePath));
-            dialog.Owner = this;
-
-            if (dialog.ShowDialog() == true)
-            {
-                var userPassword = dialog.ResultPassword;
-
-                var engine2 = ArchiveEngineFactory.GetEngineByExtension(archivePath);
-                if (engine2 != null)
-                {
-                    progressWindow.Show();
-                    bool showPwdSection = AppSettings.Instance.ShowPasswordMatchNotification;
-                    if (showPwdSection) progressWindow.ShowPasswordAttempt("手动输入");
-
-                    // Quick Verify
-                    if (string.IsNullOrEmpty(userPassword) || !App.QuickVerifyPassword(archivePath, userPassword, engine2))
-                    {
-                        progressWindow.Close();
-                        App.LogDebug("ExtractAsync: user password QuickVerify failed");
-                        MessageBox.Show("密码错误", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
-                        SetStatus("解压失败");
-                        if (engine is null) return; // never null here but satisfies nullable
-                        return;
-                    }
-
-                    if (showPwdSection) progressWindow.ShowPasswordMatched(userPassword, "手动输入");
-
-                    var baseProgress2 = new Progress<ArchiveProgress>(p =>
-                    {
-                        progressWindow.Dispatcher.BeginInvoke(() =>
-                            progressWindow.SetProgress(p));
-                    });
-                    var progress2 = progressWindow.CreatePauseAwareProgress(baseProgress2);
-
-                    try
-                    {
-                        var extractOpts2 = App.CreateExtractOptions();
-                        await engine2.ExtractAsync(archivePath, destinationPath, userPassword, progress2, ct, extractOpts2);
-
-                        progressWindow.Close();
-                        SetStatus($"解压完成: {Path.GetFileName(archivePath)}");
-
-                        if (AppSettings.Instance.OpenFolderAfterExtract)
-                            OpenInExplorer(destinationPath);
-
-                        if (dialog.RememberPassword && !string.IsNullOrEmpty(userPassword))
-                        {
-                            var patterns = new List<string> { Path.GetFileName(archivePath) };
-                            PasswordManager.Instance.AddPassword(userPassword, "", patterns);
-                        }
-                    }
-                    catch (Exception pwdEx)
-                    {
-                        progressWindow.Close();
-                        App.LogDebug("ExtractAsync: wrong password: {0}", pwdEx.Message);
-                        MessageBox.Show("密码错误", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
-                        SetStatus("解压失败");
-                    }
-                }
-            }
-            else
+            // 所有已保存密码都失败 → 弹密码输入框
+            var pwdResult = App.PromptForPassword(archivePath, progressWindow, this);
+            if (pwdResult == null)
             {
                 progressWindow.Close();
                 SetStatus("取消解压");
+                return;
             }
+
+            var (userPwd, remember) = pwdResult.Value;
+            if (string.IsNullOrEmpty(userPwd)) { progressWindow.Close(); SetStatus("取消解压"); return; }
+            bool showPwdManual = _hasEncryptedArchive && AppSettings.Instance.ShowPasswordMatchNotification;
+
+            if (!await App.ExtractWithPasswordAsync(archivePath, destinationPath, engine,
+                    userPwd, "手动输入", progressWindow, progress, ct, showPwdManual, remember))
+            {
+                progressWindow.Close();
+                MessageBox.Show("密码错误", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+                SetStatus("解压失败");
+                return;
+            }
+
+            progressWindow.Close();
+            SetStatus($"解压完成: {Path.GetFileName(archivePath)}");
+            if (AppSettings.Instance.OpenFolderAfterExtract) OpenInExplorer(destinationPath);
         }
         catch (OperationCanceledException)
         {
@@ -968,14 +911,12 @@ public partial class MainWindow : Window
             if (IsPasswordErrorLocal(ex))
             {
                 App.LogDebug("ExtractAsync: 密码错误且用户未提供密码: {0}", ex.Message);
-                if (string.IsNullOrEmpty(StatusText.Text) || StatusText.Text == "就绪")
-                    SetStatus("解压失败");
             }
             else
             {
                 MessageBox.Show($"解压失败: {ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
-                SetStatus("解压失败");
             }
+            SetStatus("解压失败");
         }
     }
 
@@ -998,11 +939,9 @@ public partial class MainWindow : Window
             SetStatus("正在压缩...");
             ShowProgress(true);
 
-            var options = new ArchiveOptions
-            {
-                CompressionLevel = AppSettings.Instance.DefaultLevel,
-                Format = ArchiveFormat.Zip
-            };
+            var options = App.CreateCompressOptions();
+            options.CompressionLevel = AppSettings.Instance.DefaultLevel;
+            options.Format = ArchiveFormat.Zip;
 
             var engine = new ZipEngine();
             var progress = new Progress<ArchiveProgress>(p =>
@@ -1689,11 +1628,7 @@ private void FolderTree_SelectedItemChanged(object sender, RoutedPropertyChanged
             PreviewHeader.Text = $"🔍 预览: {Path.GetFileName(filePath)}";
 
             // 图片信息
-            PreviewInfoTitle.Text = "图片信息";
-            var imgInfo = BuildInfoText(item);
-            imgInfo += $"\n尺寸: {bitmap.PixelWidth} × {bitmap.PixelHeight}";
-            PreviewInfoText.Text = imgInfo;
-            PreviewInfoPanel.Visibility = Visibility.Visible;
+            SetPreviewInfo(item, $"📐 {bitmap.PixelWidth} × {bitmap.PixelHeight}");
 
             ShowPreviewPanel();
         }
@@ -1774,9 +1709,7 @@ private void FolderTree_SelectedItemChanged(object sender, RoutedPropertyChanged
             PreviewImage.Visibility = Visibility.Collapsed;
             PreviewFileIcon.Visibility = Visibility.Collapsed;
             PreviewUnsupported.Visibility = Visibility.Collapsed;
-            PreviewInfoTitle.Text = "文本信息";
-            PreviewInfoText.Text = BuildInfoText(item) + $"\n字符数: {content.Length}";
-            PreviewInfoPanel.Visibility = Visibility.Visible;
+            SetPreviewInfo(item, $"📄 {content.Length} 字符");
             PreviewHeader.Text = $"📄 预览: {Path.GetFileName(filePath)} ({content.Length} 字符)";
             ShowPreviewPanel();
         }
@@ -1796,9 +1729,7 @@ private void FolderTree_SelectedItemChanged(object sender, RoutedPropertyChanged
         PreviewTextBox.Visibility = Visibility.Collapsed;
         PreviewFileIcon.Visibility = Visibility.Collapsed;
         PreviewUnsupported.Visibility = Visibility.Collapsed;
-        PreviewInfoTitle.Text = "文件信息";
-        PreviewInfoText.Text = BuildInfoText(item);
-        PreviewInfoPanel.Visibility = Visibility.Visible;
+        SetPreviewInfo(item, "🌐 HTML 文件");
         PreviewHeader.Text = $"🌐 预览: {Path.GetFileName(filePath)}";
         ShowPreviewPanel();
     }
@@ -1832,9 +1763,7 @@ private void FolderTree_SelectedItemChanged(object sender, RoutedPropertyChanged
             PreviewTextBox.Visibility = Visibility.Collapsed;
             PreviewFileIcon.Visibility = Visibility.Collapsed;
             PreviewUnsupported.Visibility = Visibility.Collapsed;
-            PreviewInfoTitle.Text = "文件信息";
-            PreviewInfoText.Text = BuildInfoText(item);
-            PreviewInfoPanel.Visibility = Visibility.Visible;
+            SetPreviewInfo(item, "📝 Markdown");
             PreviewHeader.Text = $"📝 预览: {Path.GetFileName(filePath)}";
             ShowPreviewPanel();
         }
@@ -1861,18 +1790,20 @@ private void FolderTree_SelectedItemChanged(object sender, RoutedPropertyChanged
             PreviewFileIcon.Source = icon;
             PreviewFileIcon.Visibility = Visibility.Visible;
 
-            PreviewInfoTitle.Text = "文件信息";
-            var info = BuildInfoText(item);
-            if (!string.IsNullOrEmpty(message))
-                info += $"\n\n{message}";
-            PreviewInfoText.Text = info;
+            SetPreviewInfo(item, message);
             PreviewHeader.Text = $"📄 {item.Name}";
         }
         else
         {
             PreviewFileIcon.Visibility = Visibility.Collapsed;
-            PreviewInfoTitle.Text = "";
-            PreviewInfoText.Text = message ?? "";
+            PreviewFormatInfo.Text = message ?? "";
+            PreviewFileNameText.Text = "";
+            PreviewSizeText.Text = "";
+            PreviewRatioText.Text = "";
+            PreviewCompressedText.Text = "";
+            PreviewDateText.Text = "";
+            PreviewEncryptedText.Text = "";
+            PreviewInfoPanel.Visibility = Visibility.Visible;
             PreviewHeader.Text = "预览";
         }
 
@@ -1897,10 +1828,8 @@ private void FolderTree_SelectedItemChanged(object sender, RoutedPropertyChanged
         PreviewUnsupported.Visibility = Visibility.Collapsed;
 
         // 信息面板
-        PreviewInfoTitle.Text = "目录信息";
-        PreviewInfoText.Text = $"目录名: {item.Name.TrimEnd('/')}\n" +
-                               $"原始大小: {FormatSize(item.Size)}";
-        PreviewInfoPanel.Visibility = Visibility.Visible;
+        SetPreviewInfo(item, "📁 目录");
+        PreviewFileNameText.Text = item.Name.TrimEnd('/');
 
         ShowPreviewPanel();
     }
@@ -1928,15 +1857,15 @@ private void FolderTree_SelectedItemChanged(object sender, RoutedPropertyChanged
         PreviewWebBrowser.Visibility = Visibility.Collapsed;
         PreviewUnsupported.Visibility = Visibility.Collapsed;
 
-        // 信息面板
-        PreviewInfoTitle.Text = "压缩包信息";
+        // 信息面板（压缩包概览）
         var ratio = totalSize > 0 ? $"{(double)totalCompressed / totalSize * 100:F1}%" : "--";
-        PreviewInfoText.Text =
-            $"文件名: {Path.GetFileName(_currentArchivePath)}\n" +
-            $"文件数: {fileCount} 个文件, {dirCount} 个目录\n" +
-            $"原始大小: {FormatSize(totalSize)}\n" +
-            $"压缩后: {FormatSize(totalCompressed)}\n" +
-            $"压缩率: {ratio}";
+        PreviewFormatInfo.Text = $"📦 {fileCount} 个文件 · {dirCount} 个目录";
+        PreviewFileNameText.Text = Path.GetFileName(_currentArchivePath);
+        PreviewSizeText.Text = $"原始: {FormatSize(totalSize)}";
+        PreviewCompressedText.Text = $"压缩后: {FormatSize(totalCompressed)}";
+        PreviewRatioText.Text = $"压缩率: {ratio}";
+        PreviewDateText.Text = "";
+        PreviewEncryptedText.Text = "";
         PreviewInfoPanel.Visibility = Visibility.Visible;
 
         ShowPreviewPanel();
@@ -2158,6 +2087,13 @@ private void FolderTree_SelectedItemChanged(object sender, RoutedPropertyChanged
         PreviewTextBox.Text = "";
         PreviewWebBrowser.Navigate("about:blank");
         PreviewWebBrowser.Visibility = Visibility.Collapsed;
+        PreviewFormatInfo.Text = "";
+        PreviewFileNameText.Text = "";
+        PreviewSizeText.Text = "";
+        PreviewRatioText.Text = "";
+        PreviewCompressedText.Text = "";
+        PreviewDateText.Text = "";
+        PreviewEncryptedText.Text = "";
     }
 
     private void HidePreview()
@@ -2186,21 +2122,28 @@ private void FolderTree_SelectedItemChanged(object sender, RoutedPropertyChanged
     }
 
     /// <summary>
-    /// 构建通用文件信息文本
+    /// 填充预览信息面板（通用信息 + 格式特定信息）。
     /// </summary>
-    private string BuildInfoText(ArchiveItem item)
+    private void SetPreviewInfo(ArchiveItem item, string? formatInfo = null)
     {
         var ratio = item.Size > 0
             ? $"{(double)item.CompressedSize / item.Size * 100:F1}%"
             : "--";
-        var info = $"文件名: {item.Name}\n" +
-                   $"大小: {FormatSize(item.Size)}\n" +
-                   $"压缩后: {FormatSize(item.CompressedSize)}\n" +
-                   $"压缩率: {ratio}\n" +
-                   $"修改日期: {item.LastModified:yyyy-MM-dd HH:mm}";
-        if (item.IsEncrypted)
-            info += "\n🔒 已加密";
-        return info;
+
+        PreviewFormatInfo.Text = formatInfo ?? "";
+        PreviewFormatInfo.Visibility = string.IsNullOrEmpty(formatInfo) ? Visibility.Collapsed : Visibility.Visible;
+
+        PreviewFileNameText.Text = item.Name;
+
+        PreviewSizeText.Text = $"原始大小: {FormatSize(item.Size)}";
+        PreviewCompressedText.Text = $"压缩后: {FormatSize(item.CompressedSize)}";
+        PreviewRatioText.Text = $"压缩率: {ratio}";
+
+        PreviewDateText.Text = item.LastModified > DateTime.MinValue
+            ? $"修改: {item.LastModified:yyyy-MM-dd HH:mm}"
+            : "修改: ---";
+        PreviewEncryptedText.Text = item.IsEncrypted ? "🔒 已加密" : "";
+        PreviewInfoPanel.Visibility = Visibility.Visible;
     }
 
     /// <summary>
@@ -2310,6 +2253,10 @@ public class ArchiveItem : Core.Abstractions.ArchiveItem
     }
 
     public int SortOrder => IsDirectory ? 0 : 1;
+
+    public string DateDisplay => LastModified > DateTime.MinValue
+        ? LastModified.ToString("yyyy-MM-dd HH:mm")
+        : "---";
 
     internal static string FormatSize(long bytes)
     {

@@ -67,7 +67,7 @@ public class TarGzEngine : IArchiveEngine
                     if (entry.IsDirectory)
                     {
                         // 创建空目录
-                        var dirPath = Path.Combine(destinationPath, entry.Name);
+                        var dirPath = FileConflictHelper.GetSafePath(destinationPath, entry.Name);
                         if (!Directory.Exists(dirPath))
                             Directory.CreateDirectory(dirPath);
                         continue;
@@ -75,7 +75,7 @@ public class TarGzEngine : IArchiveEngine
 
                     fileIndex++;
 
-                    var outputFilePath = Path.Combine(destinationPath, entry.Name);
+                    var outputFilePath = FileConflictHelper.GetSafePath(destinationPath, entry.Name);
                     var outDir = Path.GetDirectoryName(outputFilePath);
                     if (!string.IsNullOrEmpty(outDir) && !Directory.Exists(outDir))
                         Directory.CreateDirectory(outDir);
@@ -90,7 +90,7 @@ public class TarGzEngine : IArchiveEngine
                     });
 
                     // 冲突处理
-                    var resolved = FileConflictHelper.ResolvePath(outputFilePath, options);
+                    var resolved = FileConflictHelper.ResolvePath(outputFilePath, options, entry.ModTime, entry.Size);
                     if (resolved == null)
                     {
                         // 跳过文件但需要消费 Tar 流数据以推进到下一个条目
@@ -100,34 +100,39 @@ public class TarGzEngine : IArchiveEngine
                     }
 
                     // 带 per-file 进度的复制
-                    using var outStream = File.Create(resolved);
-                    var buffer = new byte[81920];
-                    long totalRead = 0;
-                    long entrySize = entry.Size;
-
-                    while (true)
+                    var entryModified = entry.ModTime;
+                    using (var outStream = File.Create(resolved))
                     {
-                        cancellationToken.ThrowIfCancellationRequested();
-                        var read = tarIn.Read(buffer, 0, buffer.Length);
-                        if (read <= 0) break;
-                        outStream.Write(buffer, 0, read);
-                        totalRead += read;
+                        var buffer = new byte[81920];
+                        long totalRead = 0;
+                        long entrySize = entry.Size;
 
-                        var now = DateTime.Now;
-                        if (now - lastReportTime >= reportInterval || totalRead >= entrySize)
+                        while (true)
                         {
-                            var filePct = entrySize > 0 ? (double)totalRead / entrySize * 100 : 100;
-                            progress?.Report(new ArchiveProgress
+                            cancellationToken.ThrowIfCancellationRequested();
+                            var read = tarIn.Read(buffer, 0, buffer.Length);
+                            if (read <= 0) break;
+                            outStream.Write(buffer, 0, read);
+                            totalRead += read;
+
+                            var now = DateTime.Now;
+                            if (now - lastReportTime >= reportInterval || totalRead >= entrySize)
                             {
-                                CurrentFile = entry.Name,
-                                PercentComplete = totalFiles > 0
-                                    ? (double)(fileIndex - 1 + totalRead / (double)Math.Max(entrySize, 1)) / totalFiles * 100
-                                    : 0,
-                                FilePercentComplete = filePct
-                            });
-                            lastReportTime = now;
+                                var filePct = entrySize > 0 ? (double)totalRead / entrySize * 100 : 100;
+                                progress?.Report(new ArchiveProgress
+                                {
+                                    CurrentFile = entry.Name,
+                                    PercentComplete = totalFiles > 0
+                                        ? (double)(fileIndex - 1 + totalRead / (double)Math.Max(entrySize, 1)) / totalFiles * 100
+                                        : 0,
+                                    FilePercentComplete = filePct
+                                });
+                                lastReportTime = now;
+                            }
                         }
                     }
+                    // 恢复文件原始修改时间（流已关闭）
+                    try { File.SetLastWriteTime(resolved, entryModified); } catch { }
                 }
             }
             else if (ext == ".gz")
@@ -211,36 +216,25 @@ public class TarGzEngine : IArchiveEngine
 
             CoreLog.Info($"CompressAsync: {files.Count} files to compress");
 
-            if (isTarGz)
+            if (isTarGz || ext == ".tar")
             {
-                // TAR.GZ 压缩
                 using var fileStream = File.Create(outputPath);
-                using var gzipOutput = new GZipOutputStream(fileStream);
-                gzipOutput.SetLevel(options.CompressionLevel);
-                using var tarArchive = TarArchive.CreateOutputTarArchive(gzipOutput);
+                using var gzipOutput = isTarGz ? new GZipOutputStream(fileStream) : null;
+                using var tarArchive = gzipOutput != null
+                    ? TarArchive.CreateOutputTarArchive(gzipOutput)
+                    : TarArchive.CreateOutputTarArchive(fileStream);
+
+                if (gzipOutput != null) gzipOutput.SetLevel(options.CompressionLevel);
 
                 foreach (var (fullPath, relativePath) in files)
                 {
                     cancellationToken.ThrowIfCancellationRequested();
-                    var entry = TarEntry.CreateEntryFromFile(fullPath);
-                    entry.Name = relativePath;
-                    tarArchive.WriteEntry(entry, false);
-                }
 
-                tarArchive.Close();
-            }
-            else if (ext == ".tar")
-            {
-                // 纯 TAR 压缩
-                using var fileStream = File.Create(outputPath);
-                using var tarArchive = TarArchive.CreateOutputTarArchive(fileStream);
-
-                foreach (var (fullPath, relativePath) in files)
-                {
-                    cancellationToken.ThrowIfCancellationRequested();
-                    var entry = TarEntry.CreateEntryFromFile(fullPath);
-                    entry.Name = relativePath;
-                    tarArchive.WriteEntry(entry, false);
+                    if (!TarReadFileWithRetry(fullPath, relativePath, options, tarArchive, cancellationToken))
+                    {
+                        if (cancellationToken.IsCancellationRequested) break;
+                        continue;
+                    }
                 }
 
                 tarArchive.Close();
@@ -269,6 +263,48 @@ public class TarGzEngine : IArchiveEngine
         }, cancellationToken);
 
         CoreLog.Exit();
+    }
+
+    /// <summary>
+    /// 带重试/跳过/中止的 TAR 文件压缩。返回 false 表示跳过此文件。
+    /// </summary>
+    private static bool TarReadFileWithRetry(string fullPath, string relativePath,
+        ArchiveOptions options, TarArchive tarArchive, CancellationToken ct)
+    {
+        int retries = 3;
+        while (retries > 0)
+        {
+            try
+            {
+                ct.ThrowIfCancellationRequested();
+                var entry = TarEntry.CreateEntryFromFile(fullPath);
+                entry.Name = relativePath;
+                tarArchive.WriteEntry(entry, false);
+                return true;
+            }
+            catch (OperationCanceledException) { throw; }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                retries--;
+                if (options?.ErrorResolver == null)
+                {
+                    if (retries <= 0) throw;
+                    continue;
+                }
+
+                var action = options.ErrorResolver(new FileErrorInfo
+                {
+                    FilePath = fullPath,
+                    ErrorMessage = ex.Message,
+                    RetriesRemaining = retries
+                });
+
+                if (action == FileErrorAction.Retry) continue;
+                if (action == FileErrorAction.Skip) return false;
+                throw;
+            }
+        }
+        return false;
     }
 
     public async Task<IReadOnlyList<ArchiveItem>> ListEntriesAsync(string archivePath, string? password = null, CancellationToken cancellationToken = default)
@@ -362,8 +398,8 @@ public class TarGzEngine : IArchiveEngine
         {
             // ListEntriesAsync 内部已做 Task.Run，无需再包一层
             var items = await ListEntriesAsync(archivePath, password, cancellationToken);
-            var ok = items.Count >= 0;
-            CoreLog.Info($"TestArchiveAsync: passed, {items.Count} entries");
+            var ok = items.Count > 0;
+            CoreLog.Info($"TestArchiveAsync: {(ok ? "passed" : "failed (no entries)")}, {items.Count} entries");
             return ok;
         }
         catch (Exception ex)

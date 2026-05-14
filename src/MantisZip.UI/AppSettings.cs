@@ -27,6 +27,9 @@ public class AppSettings
     public bool EnableCascadingMenu { get; set; } = false;  // 层叠子菜单
     public bool ShowMenuIcons { get; set; } = true;
 
+    // ===== 交互 =====
+    public bool EnableDragExtract { get; set; } = true;
+
     // ===== 预览 =====
     public bool EnableImagePreview { get; set; } = true;
     public bool EnableTextPreview { get; set; } = true;
@@ -40,6 +43,9 @@ public class AppSettings
     // ===== 密码管理 =====
     public bool ShowPasswordMatchNotification { get; set; } = true;
     public bool PasswordRevealByDefault { get; set; } = false;
+
+    // ===== 调试 =====
+    public bool EnableDebugLogging { get; set; } = false;
 
     // ===== 高级 =====
     public string SevenZipPath { get; set; } = @"C:\Program Files\7-Zip\7z.exe";

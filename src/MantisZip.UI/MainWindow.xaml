@@ -38,6 +38,7 @@
         <Menu Grid.Row="0" Background="White">
             <MenuItem Header="文件(_F)">
                 <MenuItem Header="打开压缩包(_O)..." Click="OpenArchive_Click" InputGestureText="Ctrl+O"/>
+                <MenuItem Header="新建压缩包(_N)..." Click="NewArchive_Click" InputGestureText="Ctrl+N"/>
                 <Separator/>
                 <MenuItem Header="解压缩(_E)..." Click="Extract_Click" InputGestureText="Ctrl+E"/>
                 <MenuItem Header="压缩(_C)..." Click="Compress_Click" InputGestureText="Ctrl+C"/>
@@ -60,6 +61,12 @@
         <!-- Toolbar -->
         <ToolBarTray Grid.Row="1" Background="White">
             <ToolBar Band="0" BandIndex="0">
+                <Button ToolTip="新建压缩包 (Ctrl+N)" Click="NewArchive_Click" Padding="6,4">
+                    <StackPanel Orientation="Vertical" HorizontalAlignment="Center">
+                        <TextBlock Text="🆕" FontSize="18" HorizontalAlignment="Center"/>
+                        <TextBlock Text="新建" FontSize="10" HorizontalAlignment="Center"/>
+                    </StackPanel>
+                </Button>
                 <Button ToolTip="打开压缩包 (Ctrl+O)" Click="OpenArchive_Click" Padding="6,4">
                     <StackPanel Orientation="Vertical" HorizontalAlignment="Center">
                         <TextBlock Text="📂" FontSize="18" HorizontalAlignment="Center"/>
@@ -215,7 +222,7 @@
                                         </DataGridTemplateColumn>
                                         <DataGridTextColumn Header="大小" Binding="{Binding SizeDisplay}" Width="100"/>
                                         <DataGridTextColumn Header="压缩后" Binding="{Binding CompressedSizeDisplay}" Width="100"/>
-                                        <DataGridTextColumn Header="修改日期" Binding="{Binding LastModified, StringFormat='yyyy-MM-dd HH:mm'}" Width="150"/>
+                                        <DataGridTextColumn Header="修改日期" Binding="{Binding DateDisplay}" Width="150"/>
                                         <DataGridTemplateColumn Header="加密" Width="50">
                                             <DataGridTemplateColumn.CellTemplate>
                                                 <DataTemplate>
@@ -324,15 +331,57 @@
                                             <Border x:Name="PreviewInfoPanel"
                                                     Background="#F0F0F0" CornerRadius="4" 
                                                     Padding="10" Margin="12,0,0,0"
-                                                    MinWidth="140">
-                                                <StackPanel>
-                                                    <TextBlock x:Name="PreviewInfoTitle" FontWeight="SemiBold" 
-                                                               Foreground="#666" FontSize="12"
-                                                               Margin="0,0,0,8"/>
-                                                    <TextBlock x:Name="PreviewInfoText" 
-                                                               Foreground="#555" FontSize="12"
-                                                               LineHeight="20" LineStackingStrategy="BlockLineHeight"/>
-                                                </StackPanel>
+                                                    MinWidth="160" MinHeight="60">
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*"/>
+                                                        <ColumnDefinition Width="Auto"/>
+                                                        <ColumnDefinition Width="*"/>
+                                                    </Grid.ColumnDefinitions>
+                                                    <Grid.RowDefinitions>
+                                                        <RowDefinition Height="Auto"/>
+                                                        <RowDefinition Height="Auto"/>
+                                                        <RowDefinition Height="Auto"/>
+                                                        <RowDefinition Height="Auto"/>
+                                                        <RowDefinition Height="Auto"/>
+                                                        <RowDefinition Height="Auto"/>
+                                                    </Grid.RowDefinitions>
+
+                                                    <!-- Row 0: Format-specific info -->
+                                                    <TextBlock x:Name="PreviewFormatInfo" Grid.Row="0" Grid.ColumnSpan="3"
+                                                               FontSize="12" Foreground="#555"
+                                                               TextWrapping="Wrap" Margin="0,0,0,4"/>
+
+                                                    <!-- Row 1: Separator -->
+                                                    <Rectangle Grid.Row="1" Grid.ColumnSpan="3"
+                                                               Height="1" Fill="#DDD" Margin="0,0,0,4"/>
+
+                                                    <!-- Row 2: File name -->
+                                                    <TextBlock x:Name="PreviewFileNameText" Grid.Row="2" Grid.ColumnSpan="3"
+                                                               FontWeight="SemiBold" Foreground="#333" FontSize="12"
+                                                               TextTrimming="CharacterEllipsis" Margin="0,0,0,4"/>
+
+                                                    <!-- Row 3: Separator -->
+                                                    <Rectangle Grid.Row="3" Grid.ColumnSpan="3"
+                                                               Height="1" Fill="#DDD" Margin="0,0,0,4"/>
+
+                                                    <!-- Row 4: Size / Ratio / Compressed -->
+                                                    <TextBlock x:Name="PreviewSizeText" Grid.Row="4" Grid.Column="0"
+                                                               FontSize="11" Foreground="#555"/>
+                                                    <TextBlock x:Name="PreviewCompressedText" Grid.Row="4" Grid.Column="1"
+                                                               FontSize="11" Foreground="#555"
+                                                               HorizontalAlignment="Center"/>
+                                                    <TextBlock x:Name="PreviewRatioText" Grid.Row="4" Grid.Column="2"
+                                                               FontSize="11" Foreground="#555"
+                                                               HorizontalAlignment="Right"/>
+
+                                                    <!-- Row 5: Date + Encrypted -->
+                                                    <TextBlock x:Name="PreviewDateText" Grid.Row="5" Grid.Column="0"
+                                                               FontSize="11" Foreground="#555"/>
+                                                    <TextBlock x:Name="PreviewEncryptedText" Grid.Row="5" Grid.Column="2"
+                                                               FontSize="11" Foreground="#555"
+                                                               HorizontalAlignment="Right"/>
+                                                </Grid>
                                             </Border>
                                         </Grid>
                                     </Grid>

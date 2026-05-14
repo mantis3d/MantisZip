@@ -240,13 +240,11 @@ try
 
             App.Log("准备调用引擎");
 
-            var options = new ArchiveOptions
-            {
-                CompressionLevel = level,
-                Encrypt = EncryptCheckBox.IsChecked == true,
-                Password = PasswordBox.Password,
-                SplitSize = GetSplitSize()
-            };
+            var options = App.CreateCompressOptions();
+            options.CompressionLevel = level;
+            options.Encrypt = EncryptCheckBox.IsChecked == true;
+            options.Password = PasswordBox.Password;
+            options.SplitSize = GetSplitSize();
             App.Log("options: level={0}, encrypt={1}", options.CompressionLevel, options.Encrypt);
 
             App.Log("创建 Progress 对象...");

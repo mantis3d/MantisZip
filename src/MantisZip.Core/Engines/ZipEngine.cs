@@ -56,13 +56,13 @@ public class ZipEngine : IArchiveEngine
                 if (entry.IsDirectory)
                 {
                     // 主动创建目录条目，否则带 "." 的目录名或空目录会丢失
-                    var dirPath = Path.Combine(destinationPath, entry.Name);
+                    var dirPath = FileConflictHelper.GetSafePath(destinationPath, entry.Name);
                     if (!Directory.Exists(dirPath))
                         Directory.CreateDirectory(dirPath);
                     continue;
                 }
 
-                var outputPath = Path.Combine(destinationPath, entry.Name);
+                var outputPath = FileConflictHelper.GetSafePath(destinationPath, entry.Name);
                 var outputDir = Path.GetDirectoryName(outputPath);
                 if (!string.IsNullOrEmpty(outputDir) && !Directory.Exists(outputDir))
                 {
@@ -70,7 +70,7 @@ public class ZipEngine : IArchiveEngine
                 }
 
                 // 冲突处理
-                var resolvedPath = FileConflictHelper.ResolvePath(outputPath, options);
+                var resolvedPath = FileConflictHelper.ResolvePath(outputPath, options, entry.DateTime, entry.Size);
                 if (resolvedPath == null)
                 {
                     // Skip: 不提取此文件
@@ -79,41 +79,45 @@ public class ZipEngine : IArchiveEngine
                 }
 
                 var entrySize = entry.Size;
-                using var inputStream = zipFile.GetInputStream(entry);
-                using var outputStream = File.Create(resolvedPath);
-
-                var buffer = new byte[81920];
-                var entryProcessed = 0L;
-                var lastReportTime = DateTime.Now;
-                var reportInterval = TimeSpan.FromMilliseconds(100);
-
-                while (true)
+                var entryModified = entry.DateTime;
+                using (var inputStream = zipFile.GetInputStream(entry))
+                using (var outputStream = File.Create(resolvedPath))
                 {
-                    cancellationToken.ThrowIfCancellationRequested();
-                    var read = inputStream.Read(buffer, 0, buffer.Length);
-                    if (read <= 0) break;
+                    var buffer = new byte[81920];
+                    var entryProcessed = 0L;
+                    var lastReportTime = DateTime.Now;
+                    var reportInterval = TimeSpan.FromMilliseconds(100);
 
-                    outputStream.Write(buffer, 0, read);
-                    entryProcessed += read;
-
-                    var now = DateTime.Now;
-                    if (now - lastReportTime >= reportInterval || entryProcessed >= entrySize)
+                    while (true)
                     {
-                        var filePct = entrySize > 0 ? (double)entryProcessed / entrySize * 100 : 100;
-                        var overallPct = totalBytes > 0 ? (double)(processedBytes + entryProcessed) / totalBytes * 100 : 0;
-                        progress?.Report(new ArchiveProgress
+                        cancellationToken.ThrowIfCancellationRequested();
+                        var read = inputStream.Read(buffer, 0, buffer.Length);
+                        if (read <= 0) break;
+
+                        outputStream.Write(buffer, 0, read);
+                        entryProcessed += read;
+
+                        var now = DateTime.Now;
+                        if (now - lastReportTime >= reportInterval || entryProcessed >= entrySize)
                         {
-                            CurrentFile = entry.Name,
-                            TotalFiles = entries.Count,
-                            ProcessedFiles = processedFiles,
-                            TotalBytes = totalBytes,
-                            ProcessedBytes = processedBytes + entryProcessed,
-                            PercentComplete = overallPct,
-                            FilePercentComplete = filePct
-                        });
-                        lastReportTime = now;
+                            var filePct = entrySize > 0 ? (double)entryProcessed / entrySize * 100 : 100;
+                            var overallPct = totalBytes > 0 ? (double)(processedBytes + entryProcessed) / totalBytes * 100 : 0;
+                            progress?.Report(new ArchiveProgress
+                            {
+                                CurrentFile = entry.Name,
+                                TotalFiles = entries.Count,
+                                ProcessedFiles = processedFiles,
+                                TotalBytes = totalBytes,
+                                ProcessedBytes = processedBytes + entryProcessed,
+                                PercentComplete = overallPct,
+                                FilePercentComplete = filePct
+                            });
+                            lastReportTime = now;
+                        }
                     }
                 }
+                // 恢复文件原始修改时间（流已关闭，才能设置）
+                try { File.SetLastWriteTime(resolvedPath, entryModified); } catch { }
 
                 processedBytes += entrySize;
                 processedFiles++;
@@ -211,42 +215,13 @@ public class ZipEngine : IArchiveEngine
                 {
                     cancellationToken.ThrowIfCancellationRequested();
 
-                    var fi = new FileInfo(fullPath);
-                    var entry = new ZipEntry(ZipEntry.CleanName(relativePath))
+                    // 带重试/跳过/中止的文件读取
+                    if (!ReadFileWithRetry(fullPath, relativePath, options, zipStream,
+                            ref processedBytes, totalBytes, cancellationToken, progress, ref lastReportTime))
                     {
-                        DateTime = fi.LastWriteTime,
-                        AESKeySize = options.Encrypt ? 256 : 0
-                    };
-
-                    zipStream.PutNextEntry(entry);
-
-                    var buffer = new byte[81920];
-                    long totalRead = 0;
-                    var fiLen = fi.Length;
-
-                    using var fsInput = File.OpenRead(fullPath);
-                    while (totalRead < fiLen)
-                    {
-                        cancellationToken.ThrowIfCancellationRequested();
-                        var read = fsInput.Read(buffer, 0, buffer.Length);
-                        if (read <= 0) break;
-                        zipStream.Write(buffer, 0, read);
-                        totalRead += read;
-                        processedBytes += read;
-
-                        var now = DateTime.Now;
-                        if (now - lastReportTime >= reportInterval || totalRead >= fiLen)
-                        {
-                            var pct = totalBytes > 0 ? (double)processedBytes / totalBytes * 100 : 0;
-                            var filePct = fiLen > 0 ? (double)totalRead / fiLen * 100 : 100;
-                            progress?.Report(new ArchiveProgress
-                            {
-                                CurrentFile = "正在压缩: " + relativePath,
-                                PercentComplete = pct,
-                                FilePercentComplete = filePct
-                            });
-                            lastReportTime = now;
-                        }
+                        if (cancellationToken.IsCancellationRequested) break;
+                        // skip 此文件，继续下一个
+                        continue;
                     }
                 }
             }
@@ -441,5 +416,92 @@ public class ZipEngine : IArchiveEngine
         }, cancellationToken);
 
         CoreLog.Exit();
+    }
+
+    /// <summary>
+    /// 带重试/跳过/中止的文件压缩读取。返回 false 表示跳过此文件。
+    /// </summary>
+    private bool ReadFileWithRetry(string fullPath, string relativePath,
+        ArchiveOptions options, ZipOutputStream zipStream, ref long processedBytes, long totalBytes,
+        CancellationToken ct, IProgress<ArchiveProgress>? progress, ref DateTime lastReportTime)
+    {
+        int retries = 3;
+        while (retries > 0)
+        {
+            try
+            {
+                var fi = new FileInfo(fullPath);
+                var entry = new ZipEntry(ZipEntry.CleanName(relativePath))
+                {
+                    DateTime = fi.LastWriteTime,
+                    AESKeySize = options?.Encrypt == true ? 256 : 0
+                };
+
+                zipStream.PutNextEntry(entry);
+
+                var buffer = new byte[81920];
+                long totalRead = 0;
+                var fiLen = fi.Length;
+
+                using (var fsInput = File.OpenRead(fullPath))
+                {
+                    while (totalRead < fiLen)
+                    {
+                        ct.ThrowIfCancellationRequested();
+                        var read = fsInput.Read(buffer, 0, buffer.Length);
+                        if (read <= 0) break;
+                        zipStream.Write(buffer, 0, read);
+                        totalRead += read;
+                        processedBytes += read;
+
+                        var now = DateTime.Now;
+                        if (now - lastReportTime >= TimeSpan.FromMilliseconds(100) || totalRead >= fiLen)
+                        {
+                            var pct = totalBytes > 0 ? (double)processedBytes / totalBytes * 100 : 0;
+                            var filePct = fiLen > 0 ? (double)totalRead / fiLen * 100 : 100;
+                            progress?.Report(new ArchiveProgress
+                            {
+                                CurrentFile = "正在压缩: " + relativePath,
+                                PercentComplete = pct,
+                                FilePercentComplete = filePct
+                            });
+                            lastReportTime = now;
+                        }
+                    }
+                }
+                return true; // success
+            }
+            catch (OperationCanceledException) { throw; }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                retries--;
+                if (options?.ErrorResolver == null)
+                {
+                    // 没有回调 → 直接重试
+                    if (retries <= 0) throw;
+                    continue;
+                }
+
+                var action = options.ErrorResolver(new FileErrorInfo
+                {
+                    FilePath = fullPath,
+                    ErrorMessage = ex.Message,
+                    RetriesRemaining = retries
+                });
+
+                if (action == FileErrorAction.Retry)
+                {
+                    // 已减 retries，直接继续循环
+                    continue;
+                }
+                if (action == FileErrorAction.Skip)
+                {
+                    return false; // 跳过此文件
+                }
+                // Abort
+                throw;
+            }
+        }
+        return false;
     }
 }

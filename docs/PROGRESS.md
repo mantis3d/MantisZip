@@ -7,7 +7,7 @@
 - **技术栈**: .NET 9 + WPF + SharpZipLib + SevenZipExtractor
 
 ## 版本
-- **当前版本**: 0.2.3
+- **当前版本**: 0.2.4
 - **发布日期**: 2026-05-13 (updated)
 
 ## 版本历史（按日期排序）
@@ -100,15 +100,18 @@
 1. **加密 ZIP 解压密码提示修复** - ZipEngine `ListEntriesAsync` 设置 `IsEncrypted`；`ExtractAsync` 预检 `IsCrypted` 抛出中文异常
 2. **密码管理器帮助窗口** - PasswordHelpDialog 讲解匹配规则 + 范例
 
-### v0.2.3 (2026-05-13)
-1. **ISO 格式支持** - SevenZipExtractor 底层 7z.dll 原生支持 ISO，加 `ArchiveFormat.Iso` 枚举 + 引擎注册即可，几乎零成本
-2. **文件计数显示** - 进度窗口添加"文件 42/100"计数，从 `ArchiveProgress.TotalFiles`/`ProcessedFiles` 读取
-3. **文件关联清理** - 移除不支持的 `.bz2`/`.cab` 扩展名注册；`.iso` 因已支持加回
-4. **文档排序** - PROGRESS.md 版本历史按日期排序，`future.md` 合并入 PLAN.md 后删除
-5. **预览格式扩展规划** - 在 PLAN.md 新增 RTF/CSV/SVG/EXE/PDF/XLSX/TTF/SQLite/嵌套 ZIP 等预览方案的难度评估
-6. **文件冲突 Ask 弹窗** - 新增 ConflictDialog 自定义窗口，支持覆盖/重命名/跳过 + "应用到全部"
-7. **暂停/继续** - ProgressWindow 添加暂停按钮，ManualResetEventSlim + PauseAwareProgress 包装器
-8. **版本升级** - 0.2.3
+### v0.2.4 (2026-05-13)
+1. **预览信息面板重构** - 三列布局（原始大小|压缩后|压缩率），格式信息在上/通用信息在下，文件名跨三列
+2. **共享解压逻辑抽取** - `TryMatchPassword` / `PromptForPassword` / `ExtractWithPasswordAsync`，三处入口统一
+3. **压缩目标文件冲突** - CompressConflictDialog，支持覆盖/添加到压缩包/自动重命名/取消
+4. **压缩文件读取错误处理** - ErrorDialog，重试/跳过/中止 + 应用到全部
+5. **调试日志开关** - 设置→高级，默认关闭，开启后记录详细日志，含打开日志文件按钮
+6. **还原文件修改时间** - 解压后用 `File.SetLastWriteTime` 恢复条目原始时间
+7. **拖拽解压开关** - 设置→解压，可禁用文件列表拖拽提取
+8. **OverwriteIfSmaller** - 新增冲突策略，仅当压缩包内文件更大时覆盖
+9. **目录日期修复** - `DateTime.MinValue` 显示 `---` 而非 `0001-01-01`
+10. **无密码压缩包密码区修复** - `HasEncryptedEntries` 预检，无加密不显示
+11. **版本升级** - 0.2.4
 
 ### v0.2.2 (2026-05-13)
 1. **SevenZipEngine 路径可配置** - 从 `private const` 改为 `static` 属性，启动时从 AppSettings 加载
@@ -283,6 +286,19 @@ MantisZip/
 - 代码去重 + 各种 bug 修复
 - 更新版本到 0.2.2
 
+### 2026-05-13（v0.2.4）
+- 预览信息面板重构：三列布局 + 格式/通用信息分离
+- 共享解压逻辑抽取（TryMatchPassword / PromptForPassword / ExtractWithPasswordAsync）
+- 压缩目标文件冲突弹窗（CompressConflictDialog：覆盖/添加到压缩包/重命名/取消）
+- 压缩文件读取错误弹窗（ErrorDialog：重试/跳过/中止）
+- 调试日志开关（设置→高级，含打开日志文件按钮）
+- 还原文件修改时间（File.SetLastWriteTime）
+- 拖拽解压开关（设置→解压）
+- OverwriteIfSmaller 冲突策略
+- 目录日期 0001 → --- 修复
+- 无密码压缩包密码区不显示修复
+- 更新版本到 0.2.4
+
 ## 已知问题
 
 | 问题 | 状态 |
@@ -302,3 +318,4 @@ MantisZip/
 | 冲突处理未实现 | ✅ v0.2.2 已修复 |
 | 压缩方法选择 | 待开发 |
 | 界面国际化 | 待开发 |
+

@@ -379,6 +379,89 @@ public partial class App : Application
         RunExtractStatic(archivePath, dest);
     }
 
+    #region 共享解压逻辑
+
+    /// <summary>
+    /// 从已保存密码中匹配并快速验证。返回 (密码, 描述) 或 null。
+    /// </summary>
+    internal static (string Password, string Description)? TryMatchPassword(
+        string archivePath, IArchiveEngine engine, ProgressWindow? progressWindow,
+        bool showPwdSection)
+    {
+        var savedPasswords = PasswordManager.Instance.FindMatchingPasswords(archivePath);
+        var tried = new HashSet<string>();
+
+        foreach (var entry in savedPasswords)
+        {
+            var pwd = entry.Password;
+            if (!tried.Add(pwd)) continue;
+
+            var desc = !string.IsNullOrEmpty(entry.Description) ? entry.Description : pwd;
+            if (showPwdSection) progressWindow?.ShowPasswordAttempt(desc);
+
+            if (QuickVerifyPassword(archivePath, pwd, engine))
+            {
+                if (showPwdSection) progressWindow?.ShowPasswordMatched(pwd, desc);
+                return (pwd, desc);
+            }
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// 弹出密码输入框，返回 (用户密码, 是否记住) 或 null（用户取消）。
+    /// 会隐藏并恢复 progressWindow 避免被挡住。
+    /// </summary>
+    internal static (string? Password, bool Remember)? PromptForPassword(
+        string archivePath, ProgressWindow progressWindow, Window? owner)
+    {
+        return progressWindow.Dispatcher.Invoke(() =>
+        {
+            progressWindow.Hide();
+            var dialog = new PasswordDialog(Path.GetFileName(archivePath));
+            dialog.Owner = owner;
+            if (owner == null)
+            {
+                dialog.WindowStartupLocation = WindowStartupLocation.CenterScreen;
+                dialog.Topmost = true;
+            }
+            var result = dialog.ShowDialog() == true
+                ? (Password: dialog.ResultPassword, Remember: dialog.RememberPassword)
+                : default((string? Password, bool Remember)?);
+            progressWindow.Show();
+            return result;
+        });
+    }
+
+    /// <summary>
+    /// QuickVerify + 全量解压 + 密码区 UI 更新。
+    /// 解压成功返回 true，密码错误弹窗后返回 false。
+    /// </summary>
+    internal static async Task<bool> ExtractWithPasswordAsync(
+        string archivePath, string destinationPath, IArchiveEngine engine,
+        string password, string description, ProgressWindow progressWindow,
+        IProgress<ArchiveProgress> progress, CancellationToken ct,
+        bool showPwdSection, bool? rememberPwd = null)
+    {
+        if (showPwdSection) progressWindow.ShowPasswordAttempt(description);
+        if (!QuickVerifyPassword(archivePath, password, engine))
+            return false;
+
+        if (showPwdSection) progressWindow.ShowPasswordMatched(password, description);
+
+        var opts = CreateExtractOptions();
+        await engine.ExtractAsync(archivePath, destinationPath, password, progress, ct, opts);
+
+        if (rememberPwd == true && !string.IsNullOrEmpty(password))
+        {
+            var patterns = new List<string> { Path.GetFileName(archivePath) };
+            PasswordManager.Instance.AddPassword(password, "", patterns);
+        }
+        return true;
+    }
+
+    #endregion
+
     /// <summary>
     /// 公共解压逻辑：获取引擎、显示进度窗口、执行解压，完成后退出。
     /// 支持从 PasswordManager 加载已保存密码，以及在加密时弹出密码输入框。
@@ -411,162 +494,87 @@ public partial class App : Application
         Log("--extract: {0} → {1}", archivePath, dest);
 
         // 后台解压，完成后自动退出
+        var appRef = Current; // capture for lambdas
         Task.Run(async () =>
         {
-            LogStartup("RunExtractStatic: Task.Run started");
             try
             {
-                // 收集所有匹配的已保存密码，逐个尝试（可能有多个规则匹配同一文件）
-                var savedPasswords = PasswordManager.Instance.FindMatchingPasswords(archivePath);
-                var triedPasswords = new HashSet<string>();
-                var lastError = (Exception?)null;
+                bool hasEncrypted = HasEncryptedEntries(archivePath, engine);
+                bool showPwd = hasEncrypted && AppSettings.Instance.ShowPasswordMatchNotification;
 
-                LogStartup($"RunExtractStatic: savedPasswords={savedPasswords.Count}");
-
-                if (savedPasswords.Count > 0)
+                // 先试已保存密码
+                var match = TryMatchPassword(archivePath, engine, progressWindow, showPwd);
+                if (match != null)
                 {
-                    foreach (var entry in savedPasswords)
-                    {
-                        var pwd = entry.Password;
-                        if (!triedPasswords.Add(pwd)) continue;
+                    var (pwd, desc) = match.Value;
+                    LogStartup($"RunExtractStatic: matched saved password desc={desc}");
 
-                        var desc = !string.IsNullOrEmpty(entry.Description) ? entry.Description : pwd;
-                        LogStartup($"RunExtractStatic: trying password '{pwd}' (desc={desc})...");
-                        progressWindow.CancellationToken.ThrowIfCancellationRequested();
-
-                        // 显示密码区：正在尝试状态（受 ShowPasswordMatchNotification 设置控制）
-                        bool showPwdSection = AppSettings.Instance.ShowPasswordMatchNotification;
-                        if (showPwdSection) progressWindow.ShowPasswordAttempt(desc);
-
-                        // Quick Verify：读 1 字节快速验证密码，不对立即跳过
-                        progressWindow.CancellationToken.ThrowIfCancellationRequested();
-                        if (!QuickVerifyPassword(archivePath, pwd, engine))
-                        {
-                            lastError = new Exception("QuickVerify failed");
-                            LogStartup($"RunExtractStatic: QuickVerify failed for '{pwd}'");
-                            Log("--extract: 密码 '{0}' 快速验证失败", pwd);
-                            continue;
-                        }
-
-                        // 快速验证通过 → 更新密码区为已匹配状态
-                        LogStartup("RunExtractStatic: QuickVerify SUCCEEDED");
-                        if (showPwdSection) progressWindow.ShowPasswordMatched(pwd, desc);
-
-                        // 全量解压（带冲突处理设置）
-                        var extractOpts = CreateExtractOptions();
-                        await engine.ExtractAsync(archivePath, dest, pwd, progress, progressWindow.CancellationToken, extractOpts);
-                        LogStartup("RunExtractStatic: ExtractAsync SUCCEEDED");
-
-                        // 解压完成
-                        await progressWindow.Dispatcher.InvokeAsync(() =>
-                        {
-                            Current.ShutdownMode = ShutdownMode.OnExplicitShutdown;
-                            progressWindow.SetComplete("解压完成");
-                        });
-
-                        if (settings.OpenFolderAfterExtract) OpenInExplorerStatic(dest);
-                        await Task.Delay(2500);
-                        await progressWindow.Dispatcher.InvokeAsync(() => Current.Shutdown());
-                        return;
-                    }
-                }
-
-                LogStartup($"RunExtractStatic: all saved passwords exhausted. lastError={lastError?.Message ?? "none"}");
-                // 所有已保存密码都失败了 → 弹出密码输入框
-                Log("--extract: 所有已保存密码失败，需要用户输入: {0}", lastError?.Message ?? "unknown");
-
-                var passwordResult = await progressWindow.Dispatcher.InvokeAsync(() =>
-                {
-                    // 在弹密码框前隐藏进度窗口，避免挡住对话框
-                    progressWindow.Hide();
-
-                    var dialog = new PasswordDialog(Path.GetFileName(archivePath));
-                    dialog.Owner = null;
-                    dialog.WindowStartupLocation = WindowStartupLocation.CenterScreen;
-                    dialog.Topmost = true;
-                    var result = dialog.ShowDialog() == true
-                        ? (Password: dialog.ResultPassword, Remember: dialog.RememberPassword)
-                        : default((string? Password, bool Remember)?);
-
-                    progressWindow.Show();
-                    return result;
-                });
-
-                if (passwordResult == null)
-                {
-                    LogStartup("RunExtractStatic: user cancelled password dialog");
-                    await progressWindow.Dispatcher.InvokeAsync(() => Current.Shutdown());
-                    return;
-                }
-
-                var (userPassword, remember) = passwordResult.Value;
-                LogStartup($"RunExtractStatic: user entered password (remember={remember})");
-
-                // Quick Verify 用户输入的密码
-                bool showPwdManual = AppSettings.Instance.ShowPasswordMatchNotification;
-                if (showPwdManual) progressWindow.ShowPasswordAttempt("手动输入");
-                if (!QuickVerifyPassword(archivePath, userPassword, engine))
-                {
-                    LogStartup("RunExtractStatic: user password QuickVerify failed");
-                    await progressWindow.Dispatcher.InvokeAsync(() =>
-                    {
-                        MessageBox.Show("密码错误", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
-                        Current.Shutdown();
-                    });
-                    return;
-                }
-
-                // 快速验证通过 → 更新密码区 + 全量解压
-                if (showPwdManual) progressWindow.ShowPasswordMatched(userPassword, "手动输入");
-
-                try
-                {
-                    LogStartup("RunExtractStatic: user password ExtractAsync starting...");
-                    var extractOpts = CreateExtractOptions();
-                    await engine.ExtractAsync(archivePath, dest, userPassword, progress, progressWindow.CancellationToken, extractOpts);
-                    LogStartup("RunExtractStatic: user password ExtractAsync succeeded");
-
-                    if (remember && !string.IsNullOrEmpty(userPassword))
-                    {
-                        var patterns = new List<string> { Path.GetFileName(archivePath) };
-                        PasswordManager.Instance.AddPassword(userPassword, "", patterns);
-                    }
+                    if (showPwd) progressWindow.ShowPasswordMatched(pwd, desc);
+                    var opts = CreateExtractOptions();
+                    await engine.ExtractAsync(archivePath, dest, pwd, progress, progressWindow.CancellationToken, opts);
 
                     await progressWindow.Dispatcher.InvokeAsync(() =>
                     {
-                        Current.ShutdownMode = ShutdownMode.OnExplicitShutdown;
+                        appRef.ShutdownMode = ShutdownMode.OnExplicitShutdown;
                         progressWindow.SetComplete("解压完成");
                     });
-
-                    if (settings.OpenFolderAfterExtract)
-                        OpenInExplorerStatic(dest);
-
+                    if (settings.OpenFolderAfterExtract) OpenInExplorerStatic(dest);
                     await Task.Delay(2500);
-                    await progressWindow.Dispatcher.InvokeAsync(() => Current.Shutdown());
+                    await progressWindow.Dispatcher.InvokeAsync(() => appRef.Shutdown());
+                    return;
                 }
-                catch (Exception retryEx)
+
+                // 所有已保存密码失败 → 弹密码输入框
+                LogStartup("RunExtractStatic: all saved passwords failed, showing PasswordDialog");
+                var pwdResult = PromptForPassword(archivePath, progressWindow, null);
+                if (pwdResult == null)
                 {
-                    Log("--extract: 用户密码错误: {0}", retryEx.Message);
+                    await progressWindow.Dispatcher.InvokeAsync(() => appRef.Shutdown());
+                    return;
+                }
+
+                var (userPwd, remember) = pwdResult.Value;
+                if (string.IsNullOrEmpty(userPwd))
+                {
+                    await progressWindow.Dispatcher.InvokeAsync(() => appRef.Shutdown());
+                    return;
+                }
+                LogStartup($"RunExtractStatic: user entered password (remember={remember})");
+
+                // QuickVerify + 解压
+                bool showPwdManual = AppSettings.Instance.ShowPasswordMatchNotification;
+                if (!await ExtractWithPasswordAsync(archivePath, dest, engine, userPwd, "手动输入",
+                        progressWindow, progress, progressWindow.CancellationToken, showPwdManual, remember))
+                {
                     await progressWindow.Dispatcher.InvokeAsync(() =>
                     {
                         MessageBox.Show("密码错误", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
-                        Current.Shutdown();
+                        appRef.Shutdown();
                     });
+                    return;
                 }
+
+                await progressWindow.Dispatcher.InvokeAsync(() =>
+                {
+                    appRef.ShutdownMode = ShutdownMode.OnExplicitShutdown;
+                    progressWindow.SetComplete("解压完成");
+                });
+                if (settings.OpenFolderAfterExtract) OpenInExplorerStatic(dest);
+                await Task.Delay(2500);
+                await progressWindow.Dispatcher.InvokeAsync(() => appRef.Shutdown());
             }
             catch (OperationCanceledException)
             {
-                LogStartup("RunExtractStatic: OperationCanceledException");
-                await progressWindow.Dispatcher.InvokeAsync(() => Current.Shutdown());
+                await progressWindow.Dispatcher.InvokeAsync(() => appRef.Shutdown());
             }
             catch (Exception ex)
             {
-                LogStartup($"RunExtractStatic: outer catch: {ex.GetType().Name}: {ex.Message}");
+                LogStartup($"RunExtractStatic: exception: {ex.Message}");
                 Log("--extract 失败: {0}", ex.Message);
                 await progressWindow.Dispatcher.InvokeAsync(() =>
                 {
                     MessageBox.Show($"解压失败: {ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
-                    Current.Shutdown();
+                    appRef.Shutdown();
                 });
             }
         });
@@ -587,13 +595,11 @@ public partial class App : Application
         return new ArchiveOptions
         {
             ConflictAction = GetConflictActionFromSettings(),
-            ConflictResolver = path =>
+            ConflictResolver = info =>
             {
                 // 已勾选"应用到全部" → 直接返回记忆的选择
                 if (applyToAll && chosenAction.HasValue)
                     return chosenAction.Value;
-
-                var fileName = Path.GetFileName(path);
 
                 // 调度到 UI 线程显示模态对话框
                 var dispatcher = Current?.Dispatcher;
@@ -601,7 +607,7 @@ public partial class App : Application
 
                 var result = dispatcher.Invoke(() =>
                 {
-                    var dialog = new ConflictDialog(fileName);
+                    var dialog = new ConflictDialog(info);
                     dialog.ShowDialog();
                     return (Action: dialog.ResultAction, All: dialog.ApplyToAll);
                 });
@@ -617,6 +623,59 @@ public partial class App : Application
         };
     }
 
+    /// <summary>
+    /// 创建压缩选项，包含文件读取错误的处理回调。
+    /// </summary>
+    internal static ArchiveOptions CreateCompressOptions()
+    {
+        bool applyToAll = false;
+        FileErrorAction? chosenAction = null;
+
+        return new ArchiveOptions
+        {
+            ErrorResolver = info =>
+            {
+                if (applyToAll && chosenAction.HasValue)
+                    return chosenAction.Value;
+
+                var dispatcher = Current?.Dispatcher;
+                if (dispatcher == null) return FileErrorAction.Abort;
+
+                var result = dispatcher.Invoke(() =>
+                {
+                    var dialog = new ErrorDialog(info);
+                    dialog.ShowDialog();
+                    return (Action: dialog.ResultAction, All: dialog.ApplyToAll);
+                });
+
+                if (result.All)
+                {
+                    applyToAll = true;
+                    chosenAction = result.Action;
+                }
+
+                return result.Action;
+            }
+        };
+    }
+
+    /// <summary>
+    /// 自动生成唯一的文件名：重复时加 (1),(2)... 后缀。
+    /// </summary>
+    private static string GetUniquePath(string path)
+    {
+        var dir = Path.GetDirectoryName(path) ?? ".";
+        var name = Path.GetFileNameWithoutExtension(path);
+        var ext = Path.GetExtension(path);
+        for (int i = 1; i < 1000; i++)
+        {
+            var candidate = Path.Combine(dir, $"{name} ({i}){ext}");
+            if (!File.Exists(candidate))
+                return candidate;
+        }
+        return path;
+    }
+
     internal static FileConflictAction GetConflictActionFromSettings()
     {
         return AppSettings.Instance.FileConflictAction switch
@@ -625,6 +684,8 @@ public partial class App : Application
             "rename" => FileConflictAction.Rename,
             "skip" => FileConflictAction.Skip,
             "ask" => FileConflictAction.Ask,
+            "overwrite-if-older" => FileConflictAction.OverwriteIfOlder,
+            "overwrite-if-smaller" => FileConflictAction.OverwriteIfSmaller,
             _ => FileConflictAction.Overwrite
         };
     }
@@ -632,7 +693,33 @@ public partial class App : Application
     /// <summary>
     /// 快速验证密码是否正确——读第一个加密条目 1 字节，
     /// 密码不对时 SharpZipLib / SevenZipExtractor 会在读字节前抛异常。
+    /// 只捕获密码相关异常，系统级错误（FileNotFoundException、UnauthorizedAccessException 等）向上传播。
     /// </summary>
+    /// <summary>
+    /// 快速检查压缩包是否有加密条目（不验证密码，只检查有无加密标志）。
+    /// </summary>
+    internal static bool HasEncryptedEntries(string archivePath, IArchiveEngine engine)
+    {
+        try
+        {
+            if (engine is ZipEngine)
+            {
+                using var zipFile = new ZipFile(archivePath);
+                return zipFile.Cast<ZipEntry>().Any(e => e.IsCrypted || e.AESKeySize > 0);
+            }
+            if (engine is SevenZipEngine)
+            {
+                using var archiveFile = new global::SevenZipExtractor.ArchiveFile(archivePath);
+                return archiveFile.Entries.Any(e => !e.IsFolder && e.IsEncrypted);
+            }
+            return false;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
     internal static bool QuickVerifyPassword(string archivePath, string password, IArchiveEngine engine)
     {
         try
@@ -657,7 +744,7 @@ public partial class App : Application
             // TarGzEngine 不支持加密
             return true;
         }
-        catch
+        catch (Exception ex) when (IsPasswordError(ex))
         {
             return false;
         }
@@ -737,10 +824,13 @@ public partial class App : Application
     private static void HandleCompressQuick(string[] paths)
     {
         LogStartup($"HandleCompressQuick: paths=[{string.Join(";", paths)}]");
+        var app = Current; // Application.Current, never null after startup
+        if (app == null) return;
+
         var myPaths = paths.Where(p => File.Exists(p) || Directory.Exists(p)).ToList();
         if (myPaths.Count == 0)
         {
-            Current.Shutdown();
+            app.Shutdown();
             return;
         }
 
@@ -761,17 +851,91 @@ public partial class App : Application
         var ext = settings.DefaultFormat == "tar.gz" ? ".tar.gz" : "." + settings.DefaultFormat;
         var outputPath = Path.Combine(dir, baseName + ext);
 
-        // 直接显示进度窗口并压缩
+        // 目标文件已存在 → 弹冲突对话框
+        string finalPath = outputPath;
+        bool addMode = false;
+        if (File.Exists(outputPath))
+        {
+            var engine = ArchiveEngineFactory.GetEngineByExtension(outputPath);
+            bool canAdd = engine is not null and not TarGzEngine;
+            var dispatcher = app.Dispatcher;
+            if (dispatcher == null) { app.Shutdown(); return; }
+
+            var conflictResult = dispatcher.Invoke(() =>
+            {
+                var dlg = new CompressConflictDialog(outputPath, canAdd);
+                return dlg.ShowDialog() == true ? dlg.ResultAction : CompressConflictAction.Cancel;
+            });
+
+            switch (conflictResult)
+            {
+                case CompressConflictAction.Cancel:
+                    app.Shutdown();
+                    return;
+                case CompressConflictAction.Rename:
+                    finalPath = GetUniquePath(outputPath);
+                    break;
+                case CompressConflictAction.Add:
+                    addMode = true;
+                    break;
+                case CompressConflictAction.Overwrite:
+                default:
+                    break;
+            }
+        }
+
+        // 选择添加到已存在的压缩包
+        if (addMode)
+        {
+            var addEngine = ArchiveEngineFactory.GetEngineByExtension(finalPath);
+            if (addEngine == null) { app.Shutdown(); return; }
+
+            var pw = new ProgressWindow();
+            pw.InitCancellation();
+            pw.Show();
+            pw.SetProgress(0, "正在添加到压缩包...");
+
+            var addProgress = new Progress<ArchiveProgress>(p =>
+            {
+                pw.Dispatcher.BeginInvoke(() => pw.SetProgress(p));
+            });
+
+            Task.Run(async () =>
+            {
+                try
+                {
+                    await addEngine.AddToArchiveAsync(finalPath, myPaths.ToArray(),
+                        new ArchiveOptions { CompressionLevel = settings.DefaultLevel },
+                        addProgress, pw.CancellationToken);
+                    await pw.Dispatcher.InvokeAsync(() => pw.SetComplete("添加完成"));
+                    await Task.Delay(800);
+                    await pw.Dispatcher.InvokeAsync(() => app.Shutdown());
+                }
+                catch (OperationCanceledException)
+                {
+                    await pw.Dispatcher.InvokeAsync(() => app.Shutdown());
+                }
+                catch (Exception ex)
+                {
+                    Log("--compress-quick add failed: {0}", ex.Message);
+                    await pw.Dispatcher.InvokeAsync(() =>
+                    {
+                        MessageBox.Show($"添加到压缩包失败: {ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+                        app.Shutdown();
+                    });
+                }
+            });
+            return;
+        }
+
+        // 直接压缩
         var progressWindow = new ProgressWindow();
         progressWindow.InitCancellation();
         progressWindow.Show();
         progressWindow.SetProgress(0, "准备压缩...");
 
-        var options = new ArchiveOptions
-        {
-            CompressionLevel = settings.DefaultLevel,
-            Encrypt = false
-        };
+        var options = App.CreateCompressOptions();
+        options.CompressionLevel = settings.DefaultLevel;
 
         var progress = new Progress<ArchiveProgress>(p =>
         {
@@ -779,22 +943,22 @@ public partial class App : Application
                 progressWindow.SetProgress(p));
         });
 
-        var engine = ArchiveEngineFactory.GetEngineByExtension(outputPath) ?? new ZipEngine();
-        Log("--compress-quick: {0} → {1}", string.Join(", ", myPaths), outputPath);
+        var compressEngine = ArchiveEngineFactory.GetEngineByExtension(finalPath) ?? new ZipEngine();
+        Log("--compress-quick: {0} → {1}", string.Join(", ", myPaths), finalPath);
 
         // 异步压缩，完成后自动退出
         Task.Run(async () =>
         {
             try
             {
-                await engine.CompressAsync(myPaths.ToArray(), outputPath, options, progress, progressWindow.CancellationToken);
+                await compressEngine.CompressAsync(myPaths.ToArray(), finalPath, options, progress, progressWindow.CancellationToken);
                 await progressWindow.Dispatcher.InvokeAsync(() => progressWindow.SetComplete("压缩完成"));
                 await Task.Delay(800);
-                await progressWindow.Dispatcher.InvokeAsync(() => Current.Shutdown());
+                await progressWindow.Dispatcher.InvokeAsync(() => app.Shutdown());
             }
             catch (OperationCanceledException)
             {
-                await progressWindow.Dispatcher.InvokeAsync(() => Current.Shutdown());
+                await progressWindow.Dispatcher.InvokeAsync(() => app.Shutdown());
             }
             catch (Exception ex)
             {
@@ -802,7 +966,7 @@ public partial class App : Application
                 await progressWindow.Dispatcher.InvokeAsync(() =>
                 {
                     MessageBox.Show($"压缩失败: {ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
-                    Current.Shutdown();
+                    app.Shutdown();
                 });
             }
         });
@@ -845,6 +1009,10 @@ public partial class App : Application
     {
         try
         {
+            if (!AppSettings.Instance.EnableDebugLogging) return;
+            var dir = Path.GetDirectoryName(LogFile);
+            if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
+                Directory.CreateDirectory(dir);
             File.AppendAllText(LogFile, $"[{DateTime.Now:HH:mm:ss.fff}] {msg}\n");
             Debug.WriteLine(msg);
         }
@@ -857,20 +1025,23 @@ public partial class App : Application
     }
 
     /// <summary>
-    /// DEBUG-only 日志：编译到 RELEASE 中会消失（如同 CoreLog）。
-    /// 用于调试期间捕获细粒度信息而不影响 RELEASE 性能。
+    /// 调试日志：仅当 AppSettings.EnableDebugLogging 开启时写入。
+    /// 用于用户开启后帮助排查问题。
     /// </summary>
-    [Conditional("DEBUG")]
     public static void LogDebug(string msg)
     {
         try
         {
+            if (!AppSettings.Instance.EnableDebugLogging) return;
+            var dir = Path.GetDirectoryName(LogFile);
+            if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
+                Directory.CreateDirectory(dir);
             File.AppendAllText(LogFile, $"[DBG] [{DateTime.Now:HH:mm:ss.fff}] {msg}\n");
+            Debug.WriteLine(msg);
         }
         catch { }
     }
 
-    [Conditional("DEBUG")]
     public static void LogDebug(string fmt, params object[] args)
     {
         LogDebug(string.Format(fmt, args));

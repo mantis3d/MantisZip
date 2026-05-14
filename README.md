@@ -2,22 +2,20 @@
 
 **轻量级全功能 Windows 压缩/解压软件** 
 
-> 免费开源
-> 
-> 基于 .NET 9 + WPF 
-> 
+> 免费开源  
+> 基于 .NET 9 + WPF    
 > 🤖 由[OpenCode](https://opencode.ai) 及 [OhMyOpenCode](https://ohmyopencode.com) 的 Sisyphus Agent 辅助开发
 
 
 ---
 
 <p align="center">
-  <b>📂 打开</b> &nbsp;·&nbsp; <b>📤 解压</b> &nbsp;·&nbsp; <b>📥 压缩</b> &nbsp;·&nbsp; <b>👁 预览</b>
+  <b>📂 打开</b> &nbsp;·&nbsp; <b>📤 解压</b> &nbsp;·&nbsp; <b>📥 压缩</b> &nbsp;·&nbsp; <b>👁 预览</b> &nbsp;·&nbsp; <b>🔑 密码</b> 
 </p>
 
 ---
 
-## ✨ 功能亮点 | Features
+## ✨ 功能亮点
 
 ### 文件内预览
 可以在压缩包内直接预览 图片、文本、HTML、Markdown 格式，将来会加入更多支持的格式。
@@ -25,10 +23,24 @@
 ### 密码管理器
 保存常用密码，可以根据规则自动尝试匹配密码。
 
+### 解压文件冲突选项
+
+
+### 调试日志
+
 
 ---
 
-## 🖼️ 功能截图 | Screenshots
+## 🤔 已知问题
+- 本软件亮点是功能和易用性，所以性能上稍逊于主流压缩软件。将来会逐渐优化。
+- 从压缩包内往外拖拽文件有时会有问题，谨慎使用。将来这部分会完全重写。
+- 7z压缩需要安装7-zip，解压不受影响，将来可能会把这部分完全重写。
+- 有些压缩文件内部文件结构显示会有问题，正在修。
+
+
+---
+
+## 🖼️ 功能截图
 
 ### 文件内预览
 
@@ -54,7 +66,7 @@ Markdown
 
 ---
 
-## 📋 系统要求 | Requirements
+## 📋 系统要求
 
 - **操作系统**: Windows 10 (1809+) / Windows 11
 - **运行时**: [.NET 9 Runtime](https://dotnet.microsoft.com/download/dotnet/9.0)
@@ -62,7 +74,7 @@ Markdown
 
 ---
 
-## 🔧 构建方法 | Build
+## 🔧 构建方法
 
 ```powershell
 # 克隆仓库
@@ -80,7 +92,7 @@ dotnet run --project src\MantisZip.UI\MantisZip.UI.csproj
 
 ---
 
-## ⌨️ 命令行 | CLI
+## ⌨️ 命令行
 
 | 参数 | 说明 |
 |------|------|

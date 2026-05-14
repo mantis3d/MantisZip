@@ -53,11 +53,61 @@ public class ArchiveOptions
     public FileConflictAction ConflictAction { get; set; } = FileConflictAction.Overwrite;
 
     /// <summary>
-    /// 文件冲突时的回调。参数为冲突文件路径，返回处理方式。
+    /// 文件冲突时的回调。参数为冲突信息，返回处理方式。
     /// 当 <see cref="ConflictAction"/> 为 <see cref="FileConflictAction.Ask"/> 时调用。
     /// 可在后台线程调用，回调需自行处理 UI 线程问题。
     /// </summary>
-    public Func<string, FileConflictAction>? ConflictResolver { get; set; }
+    public Func<FileConflictInfo, FileConflictAction>? ConflictResolver { get; set; }
+
+    /// <summary>
+    /// 文件读取错误时的回调（如文件被占用无法读取）。
+    /// 参数为错误信息，返回处理方式。返回 <see cref="FileErrorAction.Retry"/> 可重试。
+    /// 可在后台线程调用，回调需自行处理 UI 线程问题。
+    /// </summary>
+    public Func<FileErrorInfo, FileErrorAction>? ErrorResolver { get; set; }
+}
+
+/// <summary>
+/// 文件操作错误的处理方式
+/// </summary>
+public enum FileErrorAction
+{
+    /// <summary>重试</summary>
+    Retry,
+    /// <summary>跳过此文件，继续压缩</summary>
+    Skip,
+    /// <summary>中止整个操作</summary>
+    Abort
+}
+
+/// <summary>
+/// 文件操作错误时传递给回调的信息
+/// </summary>
+public class FileErrorInfo
+{
+    /// <summary>出问题的文件路径</summary>
+    public string FilePath { get; set; } = string.Empty;
+    /// <summary>异常信息</summary>
+    public string ErrorMessage { get; set; } = string.Empty;
+    /// <summary>剩余的尝试次数（超过后自动跳过）</summary>
+    public int RetriesRemaining { get; set; } = 3;
+}
+
+/// <summary>
+/// 文件冲突时传递给回调的信息
+/// </summary>
+public class FileConflictInfo
+{
+    /// <summary>目标文件路径</summary>
+    public string FilePath { get; set; } = string.Empty;
+    /// <summary>压缩包内条目的大小（字节）</summary>
+    public long? EntrySize { get; set; }
+    /// <summary>压缩包内条目的修改时间</summary>
+    public DateTime? EntryModified { get; set; }
+    /// <summary>磁盘上已有文件的大小</summary>
+    public long? ExistingSize { get; set; }
+    /// <summary>磁盘上已有文件的修改时间</summary>
+    public DateTime? ExistingModified { get; set; }
 }
 
 /// <summary>
@@ -72,7 +122,11 @@ public enum FileConflictAction
     /// <summary>跳过不解压</summary>
     Skip,
     /// <summary>每次询问用户</summary>
-    Ask
+    Ask,
+    /// <summary>仅当压缩包内的文件比磁盘上的文件更新时覆盖</summary>
+    OverwriteIfOlder,
+    /// <summary>仅当压缩包内的文件比磁盘上的文件更小时覆盖</summary>
+    OverwriteIfSmaller
 }
 
 /// <summary>
