@@ -34,7 +34,7 @@ public class AppSettings
     public bool EnableImagePreview { get; set; } = true;
     public bool EnableTextPreview { get; set; } = true;
     public long MaxTextPreviewBytes { get; set; } = 5 * 1024 * 1024;
-    public long MaxPreviewFileSize { get; set; } = 100 * 1024 * 1024; // 默认 100 MB
+    public long MaxPreviewFileSize { get; set; } = 15 * 1024 * 1024; // 默认 15 MB
     public int TextPreviewFontSize { get; set; } = 12;
     public int PreviewPosition { get; set; } = 4; // 1=Bottom, 2=Below tree, 3=Below file list, 4=Right
     public string InfoPanelOrientation { get; set; } = "Vertical"; // Horizontal / Vertical

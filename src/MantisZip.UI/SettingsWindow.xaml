@@ -111,9 +111,13 @@
 
                         <TextBlock Text="预览文件大小上限 (MB)" FontWeight="SemiBold" Margin="0,16,0,4"/>
                         <StackPanel Orientation="Horizontal">
-                            <Slider x:Name="MaxPreviewSizeSlider" Width="250" Minimum="1" Maximum="500"
-                                    Value="100" TickFrequency="10" IsSnapToTickEnabled="True"/>
-                            <TextBlock x:Name="MaxPreviewSizeText" Text="100 MB" Width="60" Margin="8,0,0,0" VerticalAlignment="Center"/>
+                            <Slider x:Name="MaxPreviewSizeSlider" Width="220" Minimum="1" Maximum="100"
+                                    Value="15" TickFrequency="1" IsSnapToTickEnabled="True"/>
+                            <TextBox x:Name="MaxPreviewSizeInput" Width="50" Height="22" Margin="8,0,0,0"
+                                     VerticalAlignment="Center" Text="15"
+                                     PreviewTextInput="MaxPreviewSizeInput_PreviewTextInput"
+                                     TextChanged="MaxPreviewSizeInput_TextChanged"/>
+                            <TextBlock Text="MB" FontSize="12" Foreground="#555" VerticalAlignment="Center" Margin="4,0,0,0"/>
                         </StackPanel>
                         <TextBlock Foreground="#888" FontSize="11" Margin="0,4,0,0">
                             超过此大小的文件不会进行预览（包括图片和文本）。</TextBlock>

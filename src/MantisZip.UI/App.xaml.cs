@@ -32,11 +32,10 @@ public partial class App : Application
     /// </summary>
     private static void InitializeApp()
     {
-        // ZIP 中文文件名编码支持（进程级）
+        // 注册编码提供程序，支持 GBK 等非系统预装编码
         Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
-#pragma warning disable CS0618 // StringCodec public API not available in SharpZipLib 1.4.0
-        ZipStrings.CodePage = 936; // GBK
-#pragma warning restore CS0618
+        // 不再全局设置 ZipStrings.CodePage。
+        // ZipEngine 会按压缩包检测 UTF-8 标记，自动选择合适的编码。
 
         // 从用户设置加载 7z.exe 路径，覆盖 SevenZipEngine 的默认值
         try
@@ -409,10 +408,10 @@ public partial class App : Application
     }
 
     /// <summary>
-    /// 弹出密码输入框，返回 (用户密码, 是否记住) 或 null（用户取消）。
+    /// 弹出密码输入框，返回 (密码, 是否记住, 描述, 规则列表) 或 null（用户取消）。
     /// 会隐藏并恢复 progressWindow 避免被挡住。
     /// </summary>
-    internal static (string? Password, bool Remember)? PromptForPassword(
+    internal static (string? Password, bool Remember, string? Description, List<string>? Patterns)? PromptForPassword(
         string archivePath, ProgressWindow progressWindow, Window? owner)
     {
         return progressWindow.Dispatcher.Invoke(() =>
@@ -425,12 +424,30 @@ public partial class App : Application
                 dialog.WindowStartupLocation = WindowStartupLocation.CenterScreen;
                 dialog.Topmost = true;
             }
-            var result = dialog.ShowDialog() == true
-                ? (Password: dialog.ResultPassword, Remember: dialog.RememberPassword)
-                : default((string? Password, bool Remember)?);
+            PasswordDialogResult? result = null;
+            if (dialog.ShowDialog() == true)
+            {
+                result = new PasswordDialogResult
+                {
+                    Password = dialog.ResultPassword,
+                    Remember = dialog.RememberPassword,
+                    Description = dialog.Description,
+                    Patterns = dialog.Patterns
+                };
+            }
             progressWindow.Show();
-            return result;
+            return result != null
+                ? (result.Password, result.Remember, result.Description, result.Patterns)
+                : default((string? Password, bool Remember, string? Description, List<string>? Patterns)?);
         });
+    }
+
+    internal class PasswordDialogResult
+    {
+        public string? Password { get; set; }
+        public bool Remember { get; set; }
+        public string? Description { get; set; }
+        public List<string> Patterns { get; set; } = new();
     }
 
     /// <summary>
@@ -441,7 +458,8 @@ public partial class App : Application
         string archivePath, string destinationPath, IArchiveEngine engine,
         string password, string description, ProgressWindow progressWindow,
         IProgress<ArchiveProgress> progress, CancellationToken ct,
-        bool showPwdSection, bool? rememberPwd = null)
+        bool showPwdSection, bool? rememberPwd = null,
+        string? pwdDesc = null, List<string>? pwdPatterns = null)
     {
         if (showPwdSection) progressWindow.ShowPasswordAttempt(description);
         if (!QuickVerifyPassword(archivePath, password, engine))
@@ -454,8 +472,11 @@ public partial class App : Application
 
         if (rememberPwd == true && !string.IsNullOrEmpty(password))
         {
-            var patterns = new List<string> { Path.GetFileName(archivePath) };
-            PasswordManager.Instance.AddPassword(password, "", patterns);
+            var savePatterns = (pwdPatterns != null && pwdPatterns.Count > 0)
+                ? pwdPatterns
+                : new List<string> { Path.GetFileName(archivePath) };
+            var saveDesc = !string.IsNullOrEmpty(pwdDesc) ? pwdDesc : "";
+            PasswordManager.Instance.AddPassword(password, saveDesc, savePatterns);
         }
         return true;
     }
@@ -525,6 +546,23 @@ public partial class App : Application
                 }
 
                 // 所有已保存密码失败 → 弹密码输入框
+                if (!hasEncrypted)
+                {
+                    // 非加密压缩包：直接解压，不需要密码
+                    LogStartup("RunExtractStatic: no saved passwords and not encrypted, extracting without password");
+                    var opts = CreateExtractOptions();
+                    await engine.ExtractAsync(archivePath, dest, null, progress, progressWindow.CancellationToken, opts);
+                    await progressWindow.Dispatcher.InvokeAsync(() =>
+                    {
+                        appRef.ShutdownMode = ShutdownMode.OnExplicitShutdown;
+                        progressWindow.SetComplete("解压完成");
+                    });
+                    if (settings.OpenFolderAfterExtract) OpenInExplorerStatic(dest);
+                    await Task.Delay(2500);
+                    await progressWindow.Dispatcher.InvokeAsync(() => appRef.Shutdown());
+                    return;
+                }
+
                 LogStartup("RunExtractStatic: all saved passwords failed, showing PasswordDialog");
                 var pwdResult = PromptForPassword(archivePath, progressWindow, null);
                 if (pwdResult == null)
@@ -533,7 +571,7 @@ public partial class App : Application
                     return;
                 }
 
-                var (userPwd, remember) = pwdResult.Value;
+                var (userPwd, remember, pwdDesc, pwdPatterns) = pwdResult.Value;
                 if (string.IsNullOrEmpty(userPwd))
                 {
                     await progressWindow.Dispatcher.InvokeAsync(() => appRef.Shutdown());
@@ -541,10 +579,11 @@ public partial class App : Application
                 }
                 LogStartup($"RunExtractStatic: user entered password (remember={remember})");
 
-                // QuickVerify + 解压
+                // QuickVerify + 解压（带保存密码）
                 bool showPwdManual = AppSettings.Instance.ShowPasswordMatchNotification;
                 if (!await ExtractWithPasswordAsync(archivePath, dest, engine, userPwd, "手动输入",
-                        progressWindow, progress, progressWindow.CancellationToken, showPwdManual, remember))
+                        progressWindow, progress, progressWindow.CancellationToken, showPwdManual, remember,
+                        pwdDesc, pwdPatterns))
                 {
                     await progressWindow.Dispatcher.InvokeAsync(() =>
                     {

@@ -8,11 +8,12 @@ public static class AppConstants
     /// <summary>
     /// 版本号（仅数字）
     /// </summary>
-    public const string Version = "0.2.4";
+    public const string Version = "0.2.5";
 
     /// <summary>
-    /// 状态栏显示的版本号
+    /// 状态栏显示的版本号（自动加 v 前缀）
     /// </summary>
-    public const string VersionDisplay = "v0.2.4";
+    public static string VersionDisplay => "v" + Version;
 }
+
 

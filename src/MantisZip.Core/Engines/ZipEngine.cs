@@ -23,113 +23,138 @@ public class ZipEngine : IArchiveEngine
 
         await Task.Run(() =>
         {
-            // 支持 GBK 编码（解决中文文件名乱码问题）
+            ZipFile? zipFile = null;
+            try
+            {
+                // 先以 UTF-8 模式打开
 #pragma warning disable CS0618
-            ZipStrings.CodePage = 936;
+                ZipStrings.CodePage = 65001;
 #pragma warning restore CS0618
-            using var zipFile = new ZipFile(archivePath);
-            if (!string.IsNullOrEmpty(password))
-            {
-                zipFile.Password = password;
-            }
-
-            // 检查是否有加密条目但未提供密码
-            // 同时检测 ZIP 传统加密 (IsCrypted) 和 AES 加密 (AESKeySize > 0)
-            var hasEncrypted = zipFile.Cast<ZipEntry>().Any(e => e.IsCrypted || e.AESKeySize > 0);
-            if (hasEncrypted && string.IsNullOrEmpty(password))
-            {
-                CoreLog.Info("ExtractAsync: archive has encrypted entries but no password provided");
-                throw new InvalidOperationException("此压缩包已加密，请输入密码 (This archive is encrypted, password required)");
-            }
-
-            var entries = zipFile.Cast<ZipEntry>().Where(e => !e.IsDirectory).ToList();
-            var totalBytes = entries.Sum(e => e.Size);
-            var processedBytes = 0L;
-            var processedFiles = 0;
-
-            CoreLog.Info($"ExtractAsync: {entries.Count} entries, {totalBytes} total bytes");
-
-            foreach (ZipEntry entry in zipFile)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-
-                if (entry.IsDirectory)
+                zipFile = new ZipFile(archivePath);
+                if (!string.IsNullOrEmpty(password))
                 {
-                    // 主动创建目录条目，否则带 "." 的目录名或空目录会丢失
-                    var dirPath = FileConflictHelper.GetSafePath(destinationPath, entry.Name);
-                    if (!Directory.Exists(dirPath))
-                        Directory.CreateDirectory(dirPath);
-                    continue;
+                    zipFile.Password = password;
                 }
 
-                var outputPath = FileConflictHelper.GetSafePath(destinationPath, entry.Name);
-                var outputDir = Path.GetDirectoryName(outputPath);
-                if (!string.IsNullOrEmpty(outputDir) && !Directory.Exists(outputDir))
+                // 检查是否有条目缺少 UTF-8 标记（旧版中文压缩工具产生的文件）。
+                // 若存在这样的条目，切换到 GBK 编码重新打开。
+                if (zipFile.Cast<ZipEntry>().Any(e => !e.IsUnicodeText))
                 {
-                    Directory.CreateDirectory(outputDir);
-                }
-
-                // 冲突处理
-                var resolvedPath = FileConflictHelper.ResolvePath(outputPath, options, entry.DateTime, entry.Size);
-                if (resolvedPath == null)
-                {
-                    // Skip: 不提取此文件
-                    processedBytes += entry.Size;
-                    continue;
-                }
-
-                var entrySize = entry.Size;
-                var entryModified = entry.DateTime;
-                using (var inputStream = zipFile.GetInputStream(entry))
-                using (var outputStream = File.Create(resolvedPath))
-                {
-                    var buffer = new byte[81920];
-                    var entryProcessed = 0L;
-                    var lastReportTime = DateTime.Now;
-                    var reportInterval = TimeSpan.FromMilliseconds(100);
-
-                    while (true)
+                    CoreLog.Info("ExtractAsync: detected non-UTF-8 entries, switching to GBK encoding");
+                    zipFile.Close();
+#pragma warning disable CS0618
+                    ZipStrings.CodePage = 936;
+#pragma warning restore CS0618
+                    zipFile = new ZipFile(archivePath);
+                    if (!string.IsNullOrEmpty(password))
                     {
-                        cancellationToken.ThrowIfCancellationRequested();
-                        var read = inputStream.Read(buffer, 0, buffer.Length);
-                        if (read <= 0) break;
-
-                        outputStream.Write(buffer, 0, read);
-                        entryProcessed += read;
-
-                        var now = DateTime.Now;
-                        if (now - lastReportTime >= reportInterval || entryProcessed >= entrySize)
-                        {
-                            var filePct = entrySize > 0 ? (double)entryProcessed / entrySize * 100 : 100;
-                            var overallPct = totalBytes > 0 ? (double)(processedBytes + entryProcessed) / totalBytes * 100 : 0;
-                            progress?.Report(new ArchiveProgress
-                            {
-                                CurrentFile = entry.Name,
-                                TotalFiles = entries.Count,
-                                ProcessedFiles = processedFiles,
-                                TotalBytes = totalBytes,
-                                ProcessedBytes = processedBytes + entryProcessed,
-                                PercentComplete = overallPct,
-                                FilePercentComplete = filePct
-                            });
-                            lastReportTime = now;
-                        }
+                        zipFile.Password = password;
                     }
                 }
-                // 恢复文件原始修改时间（流已关闭，才能设置）
-                try { File.SetLastWriteTime(resolvedPath, entryModified); } catch { }
 
-                processedBytes += entrySize;
-                processedFiles++;
+                // 检查是否有加密条目但未提供密码
+                // 同时检测 ZIP 传统加密 (IsCrypted) 和 AES 加密 (AESKeySize > 0)
+                var hasEncrypted = zipFile.Cast<ZipEntry>().Any(e => e.IsCrypted || e.AESKeySize > 0);
+                if (hasEncrypted && string.IsNullOrEmpty(password))
+                {
+                    CoreLog.Info("ExtractAsync: archive has encrypted entries but no password provided");
+                    throw new InvalidOperationException("此压缩包已加密，请输入密码 (This archive is encrypted, password required)");
+                }
+
+                var entries = zipFile.Cast<ZipEntry>().Where(e => !e.IsDirectory).ToList();
+                var totalBytes = entries.Sum(e => e.Size);
+                var processedBytes = 0L;
+                var processedFiles = 0;
+
+                CoreLog.Info($"ExtractAsync: {entries.Count} entries, {totalBytes} total bytes");
+
+                foreach (ZipEntry entry in zipFile)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+
+                    if (entry.IsDirectory)
+                    {
+                        // 主动创建目录条目，否则带 "." 的目录名或空目录会丢失
+                        var dirPath = FileConflictHelper.GetSafePath(destinationPath, entry.Name);
+                        if (!Directory.Exists(dirPath))
+                            Directory.CreateDirectory(dirPath);
+                        continue;
+                    }
+
+                    var outputPath = FileConflictHelper.GetSafePath(destinationPath, entry.Name);
+                    var outputDir = Path.GetDirectoryName(outputPath);
+                    if (!string.IsNullOrEmpty(outputDir) && !Directory.Exists(outputDir))
+                    {
+                        Directory.CreateDirectory(outputDir);
+                    }
+
+                    // 冲突处理
+                    var resolvedPath = FileConflictHelper.ResolvePath(outputPath, options, entry.DateTime, entry.Size);
+                    if (resolvedPath == null)
+                    {
+                        // Skip: 不提取此文件
+                        processedBytes += entry.Size;
+                        continue;
+                    }
+
+                    var entrySize = entry.Size;
+                    var entryModified = entry.DateTime;
+                    using (var inputStream = zipFile.GetInputStream(entry))
+                    using (var outputStream = File.Create(resolvedPath))
+                    {
+                        var buffer = new byte[81920];
+                        var entryProcessed = 0L;
+                        var lastReportTime = DateTime.Now;
+                        var reportInterval = TimeSpan.FromMilliseconds(100);
+
+                        while (true)
+                        {
+                            cancellationToken.ThrowIfCancellationRequested();
+                            var read = inputStream.Read(buffer, 0, buffer.Length);
+                            if (read <= 0) break;
+
+                            outputStream.Write(buffer, 0, read);
+                            entryProcessed += read;
+
+                            var now = DateTime.Now;
+                            if (now - lastReportTime >= reportInterval || entryProcessed >= entrySize)
+                            {
+                                var filePct = entrySize > 0 ? (double)entryProcessed / entrySize * 100 : 100;
+                                var overallPct = totalBytes > 0 ? (double)(processedBytes + entryProcessed) / totalBytes * 100 : 0;
+                                progress?.Report(new ArchiveProgress
+                                {
+                                    CurrentFile = entry.Name,
+                                    TotalFiles = entries.Count,
+                                    ProcessedFiles = processedFiles,
+                                    TotalBytes = totalBytes,
+                                    ProcessedBytes = processedBytes + entryProcessed,
+                                    PercentComplete = overallPct,
+                                    FilePercentComplete = filePct
+                                });
+                                lastReportTime = now;
+                            }
+                        }
+                    }
+                    // 恢复文件原始修改时间（流已关闭，才能设置）
+                    try { File.SetLastWriteTime(resolvedPath, entryModified); } catch { }
+
+                    processedBytes += entrySize;
+                    processedFiles++;
+                }
+
+                progress?.Report(new ArchiveProgress
+                {
+                    CurrentFile = string.Empty,
+                    PercentComplete = 100
+                });
+
+                CoreLog.Info($"ExtractAsync: done, {processedFiles} files, {processedBytes} bytes, {sw.ElapsedMilliseconds}ms");
             }
-
-            progress?.Report(new ArchiveProgress
+            finally
             {
-                CurrentFile = string.Empty,
-                PercentComplete = 100
-            });
-
-            CoreLog.Info($"ExtractAsync: done, {processedFiles} files, {processedBytes} bytes, {sw.ElapsedMilliseconds}ms");
+                zipFile?.Close();
+                ((IDisposable?)zipFile)?.Dispose();
+            }
         }, cancellationToken);
 
         CoreLog.Exit();

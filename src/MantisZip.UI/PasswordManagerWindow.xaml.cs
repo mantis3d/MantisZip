@@ -5,18 +5,21 @@ using MantisZip.Core;
 namespace MantisZip.UI;
 
 /// <summary>
-/// 密码管理器窗口
+/// 密码管理器窗口。密码默认以掩码显示，可切换明文。
 /// </summary>
 public partial class PasswordManagerWindow : Window
 {
+    private bool _showPasswords;
+
     public PasswordManagerWindow()
     {
         InitializeComponent();
-        LoadPasswords();
+        LoadPasswords(showPasswords: false);
     }
 
-    private void LoadPasswords()
+    private void LoadPasswords(bool showPasswords)
     {
+        _showPasswords = showPasswords;
         var passwords = new ObservableCollection<PasswordEntryView>();
 
         foreach (var entry in PasswordManager.Instance.GetAllPasswords())
@@ -24,7 +27,7 @@ public partial class PasswordManagerWindow : Window
             passwords.Add(new PasswordEntryView
             {
                 Id = entry.Id,
-                Password = entry.Password,
+                Password = showPasswords ? entry.Password : "••••••••",
                 Description = entry.Description,
                 PatternDisplay = string.Join(", ", entry.Patterns),
                 CreatedAt = entry.CreatedAt,
@@ -35,6 +38,16 @@ public partial class PasswordManagerWindow : Window
         PasswordGrid.ItemsSource = passwords;
     }
 
+    /// <summary>
+    /// 切换密码明文/掩码显示。
+    /// </summary>
+    private void ToggleShowPasswords_Click(object sender, RoutedEventArgs e)
+    {
+        var show = !_showPasswords;
+        LoadPasswords(show);
+        ShowPwdBtn.Content = show ? "👁 隐藏密码" : "👁 显示密码";
+    }
+
     private void Add_Click(object sender, RoutedEventArgs e)
     {
         var dialog = new PasswordEditDialog();
@@ -42,7 +55,7 @@ public partial class PasswordManagerWindow : Window
         if (dialog.ShowDialog() == true)
         {
             PasswordManager.Instance.AddPassword(dialog.ResultPassword, dialog.ResultDescription, dialog.ResultPatterns);
-            LoadPasswords();
+            LoadPasswords(_showPasswords);
         }
     }
 
@@ -55,7 +68,7 @@ public partial class PasswordManagerWindow : Window
         if (dialog.ShowDialog() == true)
         {
             PasswordManager.Instance.UpdatePassword(entry.Id, dialog.ResultPassword, dialog.ResultDescription, dialog.ResultPatterns);
-            LoadPasswords();
+            LoadPasswords(_showPasswords);
         }
     }
 
@@ -72,7 +85,7 @@ public partial class PasswordManagerWindow : Window
         if (result == MessageBoxResult.Yes)
         {
             PasswordManager.Instance.DeletePassword(entry.Id);
-            LoadPasswords();
+            LoadPasswords(_showPasswords);
         }
     }
 

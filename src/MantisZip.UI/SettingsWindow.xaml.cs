@@ -19,7 +19,7 @@ public partial class SettingsWindow : Window
             MaxTextSizeText.Text = $"{(int)MaxTextSizeSlider.Value} MB";
 
         MaxPreviewSizeSlider.ValueChanged += (_, _) =>
-            MaxPreviewSizeText.Text = $"{(int)MaxPreviewSizeSlider.Value} MB";
+            MaxPreviewSizeInput.Text = ((int)MaxPreviewSizeSlider.Value).ToString();
 
         TextFontSizeSlider.ValueChanged += (_, _) =>
         {
@@ -81,7 +81,9 @@ public partial class SettingsWindow : Window
         EnableImagePreviewCheck.IsChecked = s.EnableImagePreview;
         EnableTextPreviewCheck.IsChecked = s.EnableTextPreview;
         MaxTextSizeSlider.Value = s.MaxTextPreviewBytes / (1024 * 1024);
-        MaxPreviewSizeSlider.Value = s.MaxPreviewFileSize / (1024 * 1024);
+        var mbVal = (int)(s.MaxPreviewFileSize / (1024 * 1024));
+        MaxPreviewSizeSlider.Value = mbVal;
+        MaxPreviewSizeInput.Text = mbVal.ToString();
         TextFontSizeSlider.Value = s.TextPreviewFontSize;
 
         // 密码管理
@@ -212,6 +214,30 @@ public partial class SettingsWindow : Window
         catch (Exception ex)
         {
             MessageBox.Show($"卸载失败: {ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
+    #endregion
+
+    #region 预览大小输入
+
+    private void MaxPreviewSizeInput_PreviewTextInput(object sender, System.Windows.Input.TextCompositionEventArgs e)
+    {
+        // 只允许输入数字
+        foreach (var c in e.Text)
+        {
+            if (!char.IsDigit(c)) { e.Handled = true; return; }
+        }
+    }
+
+    private void MaxPreviewSizeInput_TextChanged(object sender, System.Windows.Controls.TextChangedEventArgs e)
+    {
+        if (int.TryParse(MaxPreviewSizeInput.Text, out var val))
+        {
+            if (val < 1) { MaxPreviewSizeInput.Text = "1"; val = 1; }
+            if (val > 100) { MaxPreviewSizeInput.Text = "100"; val = 100; }
+            if (val != (int)MaxPreviewSizeSlider.Value)
+                MaxPreviewSizeSlider.Value = val;
         }
     }
 

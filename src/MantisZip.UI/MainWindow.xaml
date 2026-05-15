@@ -209,6 +209,15 @@
                                            PreviewMouseDoubleClick="FileListGrid_PreviewMouseDoubleClick"
                                            PreviewMouseLeftButtonDown="FileListGrid_PreviewMouseLeftButtonDown"
                                            PreviewMouseMove="FileListGrid_PreviewMouseMove">
+                                    <DataGrid.ContextMenu>
+                                        <ContextMenu>
+                                            <MenuItem Header="解压到…" Click="FileListCtx_ExtractTo"/>
+                                            <MenuItem Header="解压到压缩包所在文件夹" Click="FileListCtx_ExtractHere"/>
+                                            <Separator/>
+                                            <MenuItem Header="复制文件名" Click="FileListCtx_CopyName"/>
+                                            <MenuItem Header="复制完整路径" Click="FileListCtx_CopyPath"/>
+                                        </ContextMenu>
+                                    </DataGrid.ContextMenu>
                                     <DataGrid.Columns>
                                         <DataGridTemplateColumn Header="名称" Width="*">
                                             <DataGridTemplateColumn.CellTemplate>

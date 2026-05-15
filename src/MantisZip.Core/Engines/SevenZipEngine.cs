@@ -227,7 +227,8 @@ public class SevenZipEngine : IArchiveEngine
                 : new ArchiveFile(archivePath, password);
             foreach (var entry in archiveFile.Entries)
             {
-                string fileName = entry.FileName;
+                // 统一路径分隔符为 /（RAR 文件可能使用 \）
+                string fileName = entry.FileName.Replace('\\', '/');
                 bool isDir = entry.IsFolder;
 
                 items.Add(new ArchiveItem

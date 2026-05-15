@@ -2,7 +2,7 @@
 ; Requires Inno Setup 6
 
 #define MyAppName "MantisZip"
-#define MyAppVersion "0.2.4"
+#define MyAppVersion "0.2.5"
 #define MyAppPublisher "MantisZip Contributors"
 #define MyAppURL "https://github.com/yourusername/MantisZip"
 #define MyAppExeName "MantisZip.UI.exe"
@@ -71,4 +71,5 @@ begin
     // This is left as a manual operation via the Settings window
   end;
 end;
+
 

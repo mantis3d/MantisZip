@@ -1,3 +1,5 @@
+using System.IO;
+using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -6,13 +8,17 @@ using MantisZip.Core;
 namespace MantisZip.UI;
 
 /// <summary>
-/// 密码输入对话框
+/// 密码输入对话框。
+/// 下拉框只显示密码描述，选中后填入 PasswordBox。
+/// 支持保存到密码库：描述 + 匹配规则（自动填入文件名）。
 /// </summary>
 public partial class PasswordDialog : Window
 {
     public string FileName { get; set; } = string.Empty;
     public string? ResultPassword { get; private set; }
-    public bool RememberPassword { get; private set; } = true;
+    public bool RememberPassword { get; private set; }
+    public string? Description => DescTextBox.Text;
+    public List<string> Patterns { get; private set; } = new();
 
     public PasswordDialog()
     {
@@ -23,75 +29,119 @@ public partial class PasswordDialog : Window
     {
         InitializeComponent();
         FileName = fileName;
+        FileNameText.Text = fileName;
+        // 自动将文件名填入匹配规则第一行
+        var nameOnly = Path.GetFileName(fileName);
+        PatternsTextBox.Text = nameOnly;
         LoadSavedPasswords(fileName);
     }
 
     private void LoadSavedPasswords(string fileName)
     {
-        PasswordCombo.Items.Clear();
+        PasswordSelector.Items.Clear();
+        PasswordSelector.Items.Add(new ComboBoxItem { Content = "(输入新密码)" });
 
-        // 加载匹配的密码
         var matches = PasswordManager.Instance.FindMatchingPasswords(fileName);
-
         if (matches.Count > 0)
         {
-            // 添加匹配的密码（高亮显示）
             foreach (var entry in matches)
             {
-                var item = new ComboBoxItem
+                PasswordSelector.Items.Add(new ComboBoxItem
                 {
-                    Content = $"🔑 {entry.Description}  ({entry.Password})",
-                    Tag = entry.Id
-                };
-                PasswordCombo.Items.Add(item);
+                    Content = $"🔑 {entry.Description}",
+                    Tag = entry
+                });
             }
-
-            PasswordCombo.Items.Add(new Separator());
+            PasswordSelector.Items.Add(new Separator());
         }
 
-        // 添加所有保存的密码
-        var all = PasswordManager.Instance.GetAllPasswords();
-        foreach (var entry in all)
+        foreach (var entry in PasswordManager.Instance.GetAllPasswords())
         {
-            var item = new ComboBoxItem
+            var display = !string.IsNullOrEmpty(entry.Description)
+                ? entry.Description
+                : "（无描述）";
+            PasswordSelector.Items.Add(new ComboBoxItem
             {
-                Content = entry.Description != "" 
-                    ? $"{entry.Description}: {entry.Password}" 
-                    : entry.Password,
-                Tag = entry.Id
-            };
-            PasswordCombo.Items.Add(item);
+                Content = display,
+                Tag = entry
+            });
         }
 
-        // 输入新密码选项
-        PasswordCombo.Items.Add(new ComboBoxItem { Content = "(输入新密码)" });
+        if (PasswordSelector.Items.Count > 0)
+            PasswordSelector.SelectedIndex = 0;
+    }
 
-        // 默认选择第一个
-        if (PasswordCombo.Items.Count > 0)
+    private void PasswordSelector_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (PasswordSelector.SelectedItem is ComboBoxItem item && item.Tag is PasswordEntry entry)
         {
-            PasswordCombo.SelectedIndex = 0;
+            PasswordBox.Password = entry.Password;
+            if (PasswordPlainBox.Visibility == Visibility.Visible)
+                PasswordPlainBox.Text = entry.Password;
+            // 选中已保存密码时自动勾选并填入描述
+            RememberCheckBox.IsChecked = true;
+            DescTextBox.Text = entry.Description;
+            PatternsTextBox.Text = string.Join("\n", entry.Patterns);
+        }
+        else
+        {
+            PasswordBox.Password = "";
+            if (PasswordPlainBox.Visibility == Visibility.Visible)
+                PasswordPlainBox.Text = "";
         }
     }
 
-    private void PasswordCombo_KeyDown(object sender, KeyEventArgs e)
+    private void ShowPasswordToggle_Changed(object? sender, RoutedEventArgs e)
     {
-        if (e.Key == Key.Enter)
+        if (ShowPasswordToggle.IsChecked == true)
         {
-            Ok_Click(sender, e);
+            PasswordPlainBox.Text = PasswordBox.Password;
+            PasswordBox.Visibility = Visibility.Collapsed;
+            PasswordPlainBox.Visibility = Visibility.Visible;
+            PasswordPlainBox.Focus();
+            PasswordPlainBox.Select(PasswordPlainBox.Text.Length, 0);
         }
+        else
+        {
+            PasswordBox.Password = PasswordPlainBox.Text;
+            PasswordPlainBox.Visibility = Visibility.Collapsed;
+            PasswordBox.Visibility = Visibility.Visible;
+            PasswordBox.Focus();
+        }
+    }
+
+    private void RememberCheckBox_Changed(object? sender, RoutedEventArgs e)
+    {
+        if (RememberCheckBox.IsChecked == true && string.IsNullOrEmpty(DescTextBox.Text))
+        {
+            DescTextBox.Text = Path.GetFileNameWithoutExtension(FileName);
+        }
+    }
+
+    private void PasswordBox_KeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.Enter) Ok_Click(sender, e);
     }
 
     private void Ok_Click(object sender, RoutedEventArgs e)
     {
-        var text = PasswordCombo.Text;
-        if (string.IsNullOrWhiteSpace(text))
+        var password = ShowPasswordToggle.IsChecked == true
+            ? PasswordPlainBox.Text
+            : PasswordBox.Password;
+
+        if (string.IsNullOrWhiteSpace(password))
         {
             MessageBox.Show("请输入密码", "提示", MessageBoxButton.OK, MessageBoxImage.Warning);
             return;
         }
 
-        ResultPassword = text;
+        ResultPassword = password;
         RememberPassword = RememberCheckBox.IsChecked == true;
+        Patterns = PatternsTextBox.Text
+            .Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)
+            .Select(p => p.Trim())
+            .Where(p => !string.IsNullOrWhiteSpace(p))
+            .ToList();
         DialogResult = true;
     }
 

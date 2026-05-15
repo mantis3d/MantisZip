@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Linq;
 using ICSharpCode.SharpZipLib.Zip;
 using MantisZip.Core.Abstractions;
 using MantisZip.Core.Utils;
@@ -56,31 +57,55 @@ public static class ArchiveEntryExtractor
     private static void ExtractZipEntry(string archivePath, string entryName, string outputPath, string? password)
     {
         CoreLog.Info($"ExtractZipEntry: archive={archivePath}, entry={entryName}");
-        using var zipFile = new ZipFile(archivePath);
-        if (!string.IsNullOrEmpty(password))
+
+        ZipFile? zipFile = null;
+        try
         {
-            zipFile.Password = password;
-        }
+            // 先以 UTF-8 模式打开，遇非 UTF-8 标记条目则切换到 GBK
+#pragma warning disable CS0618
+            ZipStrings.CodePage = 65001;
+#pragma warning restore CS0618
+            zipFile = new ZipFile(archivePath);
+            if (zipFile.Cast<ZipEntry>().Any(e => !e.IsUnicodeText))
+            {
+                CoreLog.Info("ExtractZipEntry: detected non-UTF-8 entries, switching to GBK encoding");
+                zipFile.Close();
+#pragma warning disable CS0618
+                ZipStrings.CodePage = 936;
+#pragma warning restore CS0618
+                zipFile = new ZipFile(archivePath);
+            }
 
-        var entry = zipFile.GetEntry(entryName);
-        if (entry == null)
+            if (!string.IsNullOrEmpty(password))
+            {
+                zipFile.Password = password;
+            }
+
+            var entry = zipFile.GetEntry(entryName);
+            if (entry == null)
+            {
+                throw new FileNotFoundException($"在压缩包中未找到条目: {entryName}");
+            }
+
+            if (entry.IsDirectory)
+                return;
+
+            var dir = Path.GetDirectoryName(outputPath);
+            if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
+            {
+                Directory.CreateDirectory(dir);
+            }
+
+            using var inStream = zipFile.GetInputStream(entry);
+            using var outStream = new FileStream(outputPath, FileMode.Create, FileAccess.Write);
+            inStream.CopyTo(outStream);
+            CoreLog.Info($"ExtractZipEntry: done");
+        }
+        finally
         {
-            throw new FileNotFoundException($"在压缩包中未找到条目: {entryName}");
+            zipFile?.Close();
+            ((IDisposable?)zipFile)?.Dispose();
         }
-
-        if (entry.IsDirectory)
-            return;
-
-        var dir = Path.GetDirectoryName(outputPath);
-        if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
-        {
-            Directory.CreateDirectory(dir);
-        }
-
-        using var inStream = zipFile.GetInputStream(entry);
-        using var outStream = new FileStream(outputPath, FileMode.Create, FileAccess.Write);
-        inStream.CopyTo(outStream);
-        CoreLog.Info($"ExtractZipEntry: done");
     }
 
     private static void ExtractSevenZipEntry(string archivePath, string entryName, string outputPath, string? password)
