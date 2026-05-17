@@ -1,225 +1,414 @@
-# 引擎统一计划：SharpCompress + SevenZipSharp
+# 引擎统一计划：SharpZipLib → SharpCompress + 7z.exe → SevenZipSharp
 
-> 替换 SharpZipLib + SevenZipExtractor + 7z.exe 调用
-> 状态: 📋 计划（未开始）
+> 替换 SharpZipLib + 外置 7z.exe 进程调用，统一所有格式的压缩/解压实现
+> 状态: 📋 待定（SharpZipLib 已升级到 1.4.2，无紧急问题）
 
 ---
 
-## 目标
+## 动机
 
-- 移除 SharpZipLib 依赖
-- 移除 SevenZipExtractor 依赖（以及它对原生 7z.dll 的依赖）
-- 移除 `SevenZipEngine.CompressAsync` 中 `Process.Start("7z.exe")` 的 Shell 调用
-- 统一三个引擎为一个通用实现
-- 获得真正的 async I/O
-
-## 方案
-
-```
-SharpCompress → 所有格式的读取 + ZIP/TAR/GZ 写入
-                   取代：SharpZipLib + SevenZipExtractor
-
-SevenZipSharp → 仅在用户选 7z 格式时用于压缩（包装 7z.dll）
-                   取代：Process.Start("7z.exe")
-```
-
-依赖变更：
-
-| 当前 | 未来 |
+| 现状（SharpZipLib） | 目标（SharpCompress） |
 |------|------|
-| SharpZipLib 1.4.0 | ❌ 移除 |
-| SevenZipExtractor 1.0.19 | ❌ 移除 |
-| 7z.exe (外置进程调用) | ❌ 移除 |
-| (无) | ➕ SharpCompress 最新版 |
-| (无) | ➕ SevenZipSharp (或维护中的 fork) |
-| (无) | ➕ 7z.dll (随应用分发, LGPL) |
+| 最后一次发布 2023 年（1.4.2） | 仍在积极维护 |
+| ZIP 解析严格，碰到非标准 Zip64 直接抛异常 | 解析更宽容，兼容各种工具生成的 ZIP |
+| 每种格式不同 API（ZipFile / TarInputStream / GZipInputStream） | 统一 `IArchive` / `IReader` 接口 |
+| `ZipStrings.CodePage` 是进程级全局副作用 | `ReaderOptions.ArchiveEncoding` 按实例设置 |
+| 阻塞 I/O | 原生 async/await |
+| 不支持原地修改压缩包 | 同样不支持（方案一致） |
+
+> **同时替换 7z.exe 外置进程调用** — 见 Phase 4，作为可选项
 
 ---
 
 ## 改动范围
 
-### 1. 新增文件
+涉及 **7 个文件**：
 
-| 文件 | 说明 |
-|------|------|
-| `Core/Engines/SharpCompressEngine.cs` | 新的通用引擎，替代三个引擎 |
-| `Core/Utils/SevenZipCompressor.cs` | 包装 SevenZipSharp 做 7z 压缩 |
-| `Core/Utils/ArchiveEncodingHelper.cs` | GBK/UTF-8 编码辅助 |
+| 文件 | 依赖度 | 预估工时 |
+|------|--------|---------|
+| `Core/Engines/ZipEngine.cs` | 🔴 最重 — 读写、更新、测试全用 SharpZipLib | 2-3h |
+| `Core/Engines/SevenZipEngine.cs` | 🟡 中等 — 7z 压缩（CompressAsync / AddToArchiveAsync） | ~3h |
+| `Core/Engines/TarGzEngine.cs` | 🟢 轻 — Tar/GZip 流操作 | 30min |
+| `Core/Utils/ArchiveEntryExtractor.cs` | 🟢 轻 — 仅单文件提取 | 15min |
+| `UI/App.xaml.cs` | 🟢 轻 — QuickVerifyPassword | 10min |
+| `UI/MainWindow.DragDrop.cs` | 🟢 轻 — 拖拽时 GZip 提取 | 10min |
+| `UI/MainWindow.xaml.cs` | 🟢 轻 — 只有引用/调用 | — |
 
-### 2. 修改文件
+**依赖变更：**
 
-| 文件 | 改动 |
-|------|------|
-| `Core/Abstractions/ArchiveEngine.cs` | `ArchiveEngineFactory` 注册新引擎；`ArchiveItem` 可能微调 |
-| `Core/Utils/ArchiveEntryExtractor.cs` | 改为基于 SharpCompress 的单条目提取 |
-| `.csproj` | 移除 SharpZipLib/SevenZipExtractor，添加 SharpCompress/SevenZipSharp |
-
-### 3. 删除文件
-
-| 文件 | 替代 |
-|------|------|
-| `Core/Engines/ZipEngine.cs` | SharpCompressEngine |
-| `Core/Engines/SevenZipEngine.cs` | SharpCompressEngine + SevenZipCompressor |
-| `Core/Engines/TarGzEngine.cs` | SharpCompressEngine |
-| `Core/Utils/SplitOutputStream.cs` | SharpCompress 内置分卷支持 |
-
-### 4. UI 层影响
-
-| 位置 | 改动 |
-|------|------|
-| `MainWindow.xaml.cs` 中 `ExtractTarGzSingleEntry` | 改为 SharpCompress 实现 |
-| `MainWindow.xaml.cs` 中拖拽提取路径 | 检查统一 |
-| `App.xaml.cs` 中 `QuickVerifyPassword` | 异常类型可能需要调整 |
+| 包 | 操作 |
+|----|------|
+| `SharpZipLib 1.4.2` | ❌ 移除 |
+| `SharpCompress` | ➕ 新增（替代 SharpZipLib） |
+| `SevenZipSharp`（或兼容 fork） | ➕ 新增（替代 7z.exe，Phase 4） |
+| `7z.dll` | ➕ 随应用分发（LGPL，Phase 4） |
 
 ---
 
-## 实现步骤
+## 分阶段实现
 
-### Step 1：添加 SharpCompress + SevenZipSharp 依赖
+### Phase 1：TarGzEngine + DragDrop GZip
 
-```xml
-<PackageReference Include="SharpCompress" Version="0.38.0" />
-<PackageReference Include="SevenZipSharp" Version="1.0.0" />
-```
+**文件：** `TarGzEngine.cs` + `MainWindow.DragDrop.cs`
 
-同时将 `7z.dll` 纳入项目资源（`Resources/7z.dll`，生成操作为 `Content` + `Copy to Output`）。
+**SharpZipLib → SharpCompress API 映射：**
 
-### Step 2：实现 SharpCompressEngine
+| SharpZipLib | SharpCompress |
+|------------|---------------|
+| `GZipOutputStream` | `GZipStream` (writer mode) |
+| `GZipInputStream` | `GZipStream` (reader mode) |
+| `TarOutputStream` | `TarWriter` |
+| `TarInputStream` | `TarReader` |
+| `TarArchive.CreateOutputTarArchive` | `TarWriter.Create` |
+| `TarArchive.CreateInputTarArchive` | `TarReader.Open` |
 
-统一接口，用 `ArchiveFactory.Open` / `WriterFactory.OpenWriter` / `ReaderFactory.OpenReader` 处理所有格式。
+**编码量：** 两个文件各约 150 行重写。
 
-核心 API 映射：
-
-| 当前方法 | SharpCompress 实现 |
-|---------|-------------------|
-| `ListEntriesAsync` | `ArchiveFactory.Open` → `archive.Entries` → 映射为 `ArchiveItem` |
-| `ExtractAsync` | `archive.WriteToDirectory` 或逐条目 `entry.WriteTo` |
-| `CompressAsync` (zip/tar.gz) | `WriterFactory.OpenWriter` + `writer.WriteAll` / `writer.Write` |
-| `TestArchiveAsync` | `ArchiveFactory.Open` + 遍历读取每个条目 |
-| `CompressAsync` (7z) | 委托给 `SevenZipCompressor` |
-
-### Step 3：实现 SevenZipCompressor
-
-包装 SevenZipSharp，专门处理 7z 格式压缩：
-
-```csharp
-public static class SevenZipCompressor
-{
-    public static async Task CompressAsync(
-        string[] sourcePaths,
-        string outputPath,
-        ArchiveOptions options,
-        IProgress<ArchiveProgress>? progress = null,
-        CancellationToken ct = default)
-    {
-        // 1. 设置 7z.dll 路径（从嵌入资源释放）
-        SevenZipBase.SetLibraryPath(EmbeddedDllPath);
-        
-        // 2. 配置压缩器
-        var compressor = new SevenZipCompressor
-        {
-            CompressionLevel = options.CompressionLevel,
-            CompressionMethod = CompressionMethod.Lzma2,
-        };
-        
-        // 3. 挂载进度事件
-        compressor.Compressing += (_, e) => { /* 映射到 ArchiveProgress */ };
-        
-        // 4. 压缩
-        await Task.Run(() => compressor.CompressFiles(outputPath, sourcePaths), ct);
-    }
-}
-```
-
-### Step 4：更新 ArchiveEngineFactory
-
-```csharp
-static ArchiveEngineFactory()
-{
-    _engines.Add(new SharpCompressEngine()); // 处理 zip/7z/rar/tar/gz
-}
-```
-
-删除 ZipEngine、SevenZipEngine、TarGzEngine 的注册。
-
-### Step 5：更新 ArchiveEntryExtractor
-
-将 `ExtractZipEntry` / `ExtractSevenZipEntry` 合并为一个基于 SharpCompress 的方法：
-
-```csharp
-public static async Task ExtractEntryAsync(/* ... */)
-{
-    using var archive = ArchiveFactory.Open(archivePath, options);
-    var entry = archive.Entries.FirstOrDefault(e => e.Key == entryName);
-    entry?.WriteToFile(outputPath);
-}
-```
-
-### Step 6：删除旧文件 + 清理
-
-- 删除 `ZipEngine.cs`、`SevenZipEngine.cs`、`TarGzEngine.cs`
-- 删除 `SplitOutputStream.cs`（SharpCompress 自带分卷支持）
-- 删除 `System.Linq`（如果原代码因 `entries.Any(...)` 引入已不再需要）
-
-### Step 7：验证
-
-| 检查项 | 方法 |
-|--------|------|
-| 所有格式读取 | 打开测试 zip/7z/rar/tar/tar.gz |
-| 中文编码 | 测试 GBK 编码的 ZIP 文件 |
-| 压缩 | 创建 zip/tar.gz/7z |
-| 加密 | 创建带密码的 zip，验证打开需要密码 |
-| 预览 | 预览 zip/7z 内文件 |
-| 拖拽 | 拖出文件到资源管理器 |
-| 进度 | 验证两个进度条正常显示 |
-| 编码注册 | 不再需要 `Encoding.RegisterProvider(CodePagesEncodingProvider.Instance)` 和 `ZipStrings.CodePage = 936` |
+**验证：** 打开 `.tar.gz` 正常列出/提取/预览；拖拽 tar.gz 内文件正常。
 
 ---
 
-## 注意事项
+### Phase 2：ArchiveEntryExtractor + QuickVerifyPassword
 
-### 中文编码
+**文件：** `ArchiveEntryExtractor.cs` + `App.xaml.cs` + `MainWindow.xaml.cs`
 
-SharpCompress 每个 `ReaderOptions` 可以独立设置编码：
+**ArchiveEntryExtractor：**
 
 ```csharp
-new ReaderOptions
+// 当前 (SharpZipLib)
+using var zipFile = new ZipFile(archivePath);
+var entry = zipFile.GetEntry(entryName);
+using var inStream = zipFile.GetInputStream(entry);
+inStream.CopyTo(outStream);
+
+// 替换为 (SharpCompress)
+using var archive = ArchiveFactory.Open(archivePath);
+var entry = archive.Entries.FirstOrDefault(e => e.Key == entryName);
+if (entry != null) entry.WriteTo(outputPath);
+```
+
+SharpCompress 的 `WriteTo(Stream)` 使单条目提取变得极简。
+
+**QuickVerifyPassword：**
+
+```csharp
+// 当前: ZipFile + ZipEntry.IsCrypted / AESKeySize
+// 替换: SharpCompress 的 ZipArchive + ZipArchiveEntry
+```
+
+`App.xaml.cs` 中 `using ICSharpCode.SharpZipLib.Zip` 和 `MainWindow.xaml.cs` 中的对应引用均删除。
+
+**验证：** 预览 ZIP/7z 内文件正常；密码匹配正常。
+
+---
+
+### Phase 3：ZipEngine（重头戏）
+
+**文件：** `ZipEngine.cs`（~350 行完整重写）
+
+#### 3.1 读取（ListEntriesAsync / ExtractAsync / TestArchiveAsync）
+
+| SharpZipLib | SharpCompress |
+|------------|---------------|
+| `ZipFile(archivePath)` | `ArchiveFactory.Open(path, readerOptions)` |
+| `zipFile.Cast<ZipEntry>()` | `archive.Entries` |
+| `entry.Name` / `entry.IsDirectory` / `entry.Size` / `entry.CompressedSize` / `entry.DateTime` | `entry.Key` / `entry.IsDirectory` / `entry.Size` / `entry.CachedSize` / `entry.LastModifiedTime` |
+| `zipFile.GetInputStream(entry)` | `entry.OpenEntryStream()` |
+| `TestZipFile.TestArchive(zipFile)` | 遍历所有条目读取验证 |
+| `entry.IsCrypted` / `entry.AESKeySize` | `entry.IsEncrypted` |
+
+**编码处理对比：**
+
+```csharp
+// SharpZipLib（全局副作用）
+ZipStrings.CodePage = 65001;
+var zip = new ZipFile(path);
+if (entries.Any(e => !e.IsUnicodeText))
+{
+    zip.Close();
+    ZipStrings.CodePage = 936;
+    zip = new ZipFile(path);
+}
+
+// SharpCompress（按实例设置，无副作用）
+var options = new ReaderOptions
 {
     ArchiveEncoding = new ArchiveEncoding
     {
-        Default = Encoding.GetEncoding("gbk")
+        Default = Encoding.GetEncoding("gbk") // 或 UTF-8
     }
-}
+};
+using var archive = ArchiveFactory.Open(path, options);
 ```
 
-这比当前 `ZipStrings.CodePage = 936`（进程级全局副作用）更干净。
+SharpCompress 需要一个 UTF-8 → GBK 回退策略。目前方案：
 
-但需要注意：
-- 并非所有 ZIP 文件都是 GBK 编码——现代工具创建的是 UTF-8
-- 需要尝试 UTF-8 → GBK 回退策略
-- 7z 文件使用 Unicode，不需要编码处理
+```csharp
+// 1. 先以 UTF-8 尝试打开
+// 2. 如果条目名有乱码特征（高位 ASCII），回退到 GBK
+// 3. 回退需要重新打开 archive（ArchiveFactory.Open 是只读的）
+```
 
-### 7z.dll 分发的法律问题
+也可以参考 SharpCompress 的 `ZipArchive` 直接调用 `ZipArchive.DetectEncoding()` 辅助方法。
+
+#### 3.2 压缩（CompressAsync）
+
+| SharpZipLib | SharpCompress |
+|------------|---------------|
+| `ZipOutputStream` + `ZipEntry` | `ZipWriter` + `writer.Write(entryName, stream)` |
+| `ZipEntry.DateTime = ...` | `writer.Write(entryName, stream, modifiedTime)` |
+| `SetLevel(compressionLevel)` | `ZipWriterOptions.CompressionLevel` / `DeflateCompressionLevel` |
+
+```csharp
+// SharpCompress 压缩示例
+using var zipWriter = ZipWriter.Open(outputStream, new ZipWriterOptions
+{
+    CompressionType = CompressionType.Deflate,
+    DeflateCompressionLevel = options.CompressionLevel switch
+    {
+        <= 3 => DeflateCompressionLevel.Level1,
+        <= 6 => DeflateCompressionLevel.Level3,
+        _ => DeflateCompressionLevel.Level9,
+    }
+});
+await foreach (var file in sourceFiles)
+    zipWriter.Write(file.RelativePath, File.OpenRead(file.FullPath));
+```
+
+进度提醒替换：
+- 当前：手动 100ms throttle + 循环报告
+- SharpCompress 无内置进度事件，仍需要手动报告
+
+#### 3.3 更新（AddFilesToCurrentArchiveAsync）— 最大改动点
+
+**SharpZipLib 做法（伪原地）：**
+
+```csharp
+using var zipFile = new ZipFile(archivePath);
+zipFile.BeginUpdate();
+zipFile.Add(newFile, entryName);
+zipFile.CommitUpdate();
+```
+
+**SharpCompress 做法：解压全量 → 合并 → 重压缩**
+
+```csharp
+// 1. 解压所有现有文件到临时目录
+// 2. 复制新文件到临时目录
+// 3. 用 ZipWriter 重新压缩临时目录为 outputPath
+// 4. 用 outputPath 覆盖原文件
+```
+
+流程细节：
+
+```
+原始: archive.zip
+  ├── a.txt
+  └── dir/b.txt
+
+添加: c.txt
+
+Step 1: 解压 archive.zip → %TEMP%\MantisZip\Rebuild\{guid}\
+  ├── a.txt
+  └── dir/
+       └── b.txt
+
+Step 2: 复制 c.txt → 同一临时目录
+
+Step 3: 压缩临时目录 → archive.zip.new
+
+Step 4: archive.zip.new → archive.zip (覆盖原文件)
+
+Step 5: 清理临时目录
+```
+
+**注意事项：**
+- 加密 + 进度回调在重新压缩时需要重新应用
+- 大文件时临时空间翻倍
+- 需要确保原子覆盖（写 .new → 覆盖原文件）
+- 取消时清理临时目录
+
+**编码估算：** `AddFilesToCurrentArchiveAsync` 当前在 `MainWindow.xaml.cs`，约 100 行。重写后提取到 `ZipEngine` 中作为 `AddEntriesAsync` 方法，UI 层调用简化。
+
+#### 3.4 移除进程级编码设置
+
+当前全局初始化：
+```csharp
+// App.InitializeApp()
+Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
+```
+和每个 ZipEngine 方法中：
+```csharp
+ZipStrings.CodePage = 936; // 安全冗余
+```
+
+替换后：
+- 保留 `Encoding.RegisterProvider(CodePagesEncodingProvider.Instance)`（可能被其他组件使用）
+- 删除所有 `ZipStrings.CodePage = ...` 调用
+- SharpCompress 的编码通过 `ReaderOptions` 按实例设置
+
+---
+
+### Phase 4：7z.exe → SevenZipSharp
+
+**文件：** `Core/Engines/SevenZipEngine.cs`
+
+**预估工时：** ~3h（含 fork 调研验证）
+
+**覆盖方法：** `CompressAsync` + `AddToArchiveAsync`
+
+#### 前置工作：验证 SevenZipSharp fork
+
+需要选择一个兼容 .NET 9 的 fork，并验证：
+- 7z.dll 加载正常（随应用分发 vs 系统已安装）
+- 压缩 API 可用
+- 进度事件正常触发
+- 取消支持
+
+候选：
+- `Squid-Box.SevenZipSharp` — 社区 fork，较新
+- 其他 GitHub fork
+
+#### 替换内容
+
+当前 7z.exe 两个方法结构相同：
+1. 检查 `7z.exe` 路径
+2. 拼装 `ProcessStartInfo` 参数
+3. `Process.Start` 启动进程
+4. 异步读 stderr
+5. 循环轮询 `cancellationToken`
+6. 检查退出码
+
+替换后的通用模式：
+
+```csharp
+await Task.Run(() =>
+{
+    SevenZipBase.SetLibraryPath(sevenZipDllPath);
+    var compressor = new SevenZipCompressor
+    {
+        CompressionLevel = options.CompressionLevel,
+        CompressionMethod = CompressionMethod.Lzma2,
+        ArchiveFormat = OutArchiveFormat.SevenZip,
+    };
+
+    // 进度事件
+    compressor.Compressing += (_, e) =>
+    {
+        progress?.Report(new ArchiveProgress
+        {
+            PercentComplete = e.PercentDone,
+            Message = $"压缩中: {e.FileName ?? "..."}"
+        });
+    };
+
+    compressor.FilesFound += (_, e) =>
+    {
+        progress?.Report(new ArchiveProgress
+        {
+            Message = $"找到 {e.Value} 个文件"
+        });
+    };
+
+    // 加密
+    if (options.Encrypt && !string.IsNullOrEmpty(options.Password))
+    {
+        compressor.EncryptHeaders = true;
+        compressor.Password = options.Password;
+    }
+
+    // 压缩
+    compressor.CompressFiles(outputPath, sourcePaths);
+}, cancellationToken);
+```
+
+#### 设置项清理
+
+删除 `SettingsWindow` 中的 `7z.exe` 路径设置，替换为 `7z.dll` 路径（或自动检测）。
+
+#### 备选方案
+
+如果 SevenZipSharp fork 不可用，**保持 7z.exe 不变**，只走 Phase 1-3。
+
+---
+
+## 测试清单
+
+| 测试项 | Phase 1 | Phase 2 | Phase 3 | Phase 4 |
+|--------|---------|---------|---------|---------|
+| 打开 tar.gz 文件 | ✅ | — | — | — |
+| 打开 zip 文件（UTF-8） | — | — | ✅ | — |
+| 打开 zip 文件（GBK 中文名） | — | — | ✅ | — |
+| 打开 zip 文件（Zip64 大文件） | — | — | ✅ | — |
+| 打开 7z/RAR 文件 | — | ✅ | — | — |
+| 打开加密 zip | — | ✅ | ✅ | — |
+| 压缩为 zip（各级压缩比） | — | — | ✅ | — |
+| 压缩为 tar.gz | ✅ | — | — | — |
+| 压缩为 7z（加密/分卷） | — | — | — | ✅ |
+| 添加文件到已有 zip | — | — | ✅ | — |
+| 添加文件到已有 7z | — | — | — | ✅ |
+| 预览 zip 内文件 | — | ✅ | ✅ | — |
+| 预览 tar.gz 内文件 | ✅ | — | — | — |
+| 预览 7z 内文件 | — | ✅ | — | — |
+| 拖拽 zip 内文件 | — | — | ✅ | — |
+| 拖拽 tar.gz 内文件 | ✅ | — | — | — |
+| 密码匹配（QuickVerify） | — | ✅ | ✅ | — |
+| 测试压缩包完整性 | — | — | ✅ | — |
+| 无需安装 7-Zip | — | — | — | ✅ |
+
+---
+
+## 总工时
+
+| Phase | 内容 | 工时 |
+|-------|------|------|
+| 1 | TarGzEngine + DragDrop | 30min |
+| 2 | ArchiveEntryExtractor + QuickVerifyPassword | 25min |
+| 3 | ZipEngine 全量重写 | 2-3h |
+| 4 | 7z.exe → SevenZipSharp | ~3h |
+| **合计** | | **~6-7h** |
+
+---
+
+## 风险与注意事项
+
+### 1. 编码回退策略
+
+SharpCompress 不支持像 SharpZipLib 那样用 `IsUnicodeText` 标记判断编码。建议策略：先以 UTF-8 打开并遍历条目，检查是否有编码异常，有则回退 GBK 重新打开。这与当前 `ZipEngine` 的检测模式一致。
+
+### 2. 大文件临时空间
+
+Phase 3 的"添加文件"重构需要 ±100% 的临时空间。对于超大压缩包（10GB+），需要考虑流式写入而非常规临时目录。初始实现不做优化，后续可按需处理。
+
+### 3. 进度报告粒度
+
+SharpCompress 和 SevenZipSharp 都没有细粒度进度事件（如当前 `ZipEngine` 的 buffer copy 循环 + 100ms 报告）。替换后维持当前的手动报告模式。
+
+### 4. 并行执行
+
+Phase 3 涉及大量文件 I/O（解压全部 → 重压缩），是 CPU + I/O 密集操作。`ZipEngine` 中的 `CompressAsync` 和 `AddFilesAsync` 应使用 `Task.Run` 避免阻塞 UI，与当前模式一致。
+
+### 5. 7z.dll 分发法律问题
 
 - 7-Zip 使用 LGPL 许可证
 - 允许与专有软件一起分发，前提是动态链接
 - 需要在应用中包含 LGPL 声明
 - 不能静态链接或修改 DLL 本身
+- 7z.dll 约 1.5MB，可作为 `Content` 资源内嵌到输出目录
 
-### SevenZipSharp 兼容性
+### 6. SevenZipSharp 备选方案
 
-- 原版 SevenZipSharp 最后一次更新是 ~2016 年
-- 社区有 `.NET Core` / `.NET 5+` 的 fork
-- 如果 fork 也不维护，替代方案：用 `Process.Start` 调用自带的 `7z.exe`（方案 B），但那是备选
-
-> **备选**：如果 SevenZipSharp 不可用，7z 压缩回退到自带 7z.exe 方案。其他格式走 SharpCompress。
+如果 SevenZipSharp fork 不可用或有问题，**跳過 Phase 4**，只走 Phase 1-3。影响：用户仍需安装 7-Zip，但 ZIP/TAR/GZ 的体验已统一提升。
 
 ---
 
 ## 相关文件
 
-- [AGENTS.md](../../AGENTS.md) — 当前引擎模式说明
+- [AGENTS.md](../../AGENTS.md) — 当前引擎架构说明
 - [ArchiveEngine.cs](../../src/MantisZip.Core/Abstractions/ArchiveEngine.cs) — 接口定义 + 工厂
-- [ZipEngine.cs](../../src/MantisZip.Core/Engines/ZipEngine.cs) — 待删除
-- [SevenZipEngine.cs](../../src/MantisZip.Core/Engines/SevenZipEngine.cs) — 待删除
-- [TarGzEngine.cs](../../src/MantisZip.Core/Engines/TarGzEngine.cs) — 待删除
+- [ZipEngine.cs](../../src/MantisZip.Core/Engines/ZipEngine.cs) — Phase 3 替换
+- [TarGzEngine.cs](../../src/MantisZip.Core/Engines/TarGzEngine.cs) — Phase 1 替换
+- [SevenZipEngine.cs](../../src/MantisZip.Core/Engines/SevenZipEngine.cs) — Phase 4 替换
+- [ArchiveEntryExtractor.cs](../../src/MantisZip.Core/Utils/ArchiveEntryExtractor.cs) — Phase 2 替换
+- [App.xaml.cs](../../src/MantisZip.UI/App.xaml.cs) — Phase 2 QuickVerifyPassword 改造 + Phase 3 清理
+- [MainWindow.DragDrop.cs](../../src/MantisZip.UI/MainWindow.DragDrop.cs) — Phase 1 GZip 替换

@@ -4,8 +4,8 @@
 
 **项目状态**: 🟢 开发中 (Phase 4 收尾)  
 **创建日期**: 2026-04-23  
-**最后更新**: 2026-05-13 (v0.2.5)  
-**当前版本**: 0.2.5
+**最后更新**: 2026-05-17 (v0.2.6)  
+**当前版本**: 0.2.6
 
 ---
 
@@ -91,6 +91,7 @@ MantisZip/
 | TAR | ✅ | ✅ | ❌ | |
 | GZ (tar.gz) | ✅ | ✅ | ❌ | |
 | RAR | ❌ | ✅ | ✅ | 只读 |
+| ISO | ❌ | ✅ | ❌ | 基于 SevenZipExtractor，只读 |
 
 ### 2.2 核心功能
 
@@ -234,16 +235,7 @@ Phase 4: ██████████████████░░ 90%
 
 ## 六、变更日志
 
-| 日期 | 变更内容 | 变更人 |
-|------|----------|--------|
-| 2026-04-23 | 初始化文档 | Sisyphus |
-| 2026-04-24 | Phase 1 完成 + 各种 bug 修复 | Sisyphus |
-| 2026-05-09 | 设置系统 + Shell 集成 + per-file 进度 + CLI 入口 | Sisyphus |
-| 2026-05-11 | 拖拽提取 + HTML/MD 预览 + 分卷压缩 | Sisyphus |
-| 2026-05-12 | MIT 开源 + 图标 + 布局优化 + 安装包 | Sisyphus |
-| 2026-05-13 | v0.2.2: 密码重写 + QuickVerify + 文件关联 + 冲突处理 + 暂停 + 去重 | Sisyphus |
-| 2026-05-13 | v0.2.4: 信息面板重构 + 共享解压逻辑 + 压缩冲突/错误弹窗 + 调试日志 + 拖拽开关 | Sisyphus |
-| 2026-05-13 | v0.2.5: MainWindow 文件拆分 + RAR 路径修复 + 目录去重 + 密码对话框增强 + 右键菜单 | Sisyphus |
+逐版本详细变更记录见 [docs/PROGRESS.md](docs/PROGRESS.md)「版本历史」。
 
 ---
 
@@ -259,6 +251,7 @@ Phase 4: ██████████████████░░ 90%
 | 国际化 | 中文/英文界面切换 |
 | 暗色主题 | 亮色/暗色切换 |
 | 文件列表筛选 | 搜索框实时过滤当前目录 + 子目录显示切换 |
+| 文件大小进度条 | 大小列背景按文件体积比例填充，一眼看出大文件 |
 
 ### 预览格式扩展（P2-P3）
 
@@ -274,6 +267,19 @@ Phase 4: ██████████████████░░ 90%
 | TTF / OTF | 🟡 中 | GlyphTypeface 加载字体，Canvas 绘制示例文字 |
 | SQLite | 🟡 中 | Microsoft.Data.Sqlite 读表结构和数据 |
 | ZIP 嵌套 | 🟡 中 | 提取内部压缩包到临时目录 → 再次 LoadArchiveAsync |
+
+### 详细设计方案
+
+以下功能已有独立方案设计文档，见 `.sisyphus/plans/`：
+
+| 功能 | 设计文档 | 说明 |
+|------|----------|------|
+| 提取日志与解压「后悔药」 | [extract-journal-undo.md](.sisyphus/plans/extract-journal-undo.md) | 解压记录 + 一键回滚 |
+| 压缩包对比 (Archive Diff) | [archive-diff.md](.sisyphus/plans/archive-diff.md) | 压缩包文件级差异对比 |
+| 压缩预估 (Compression Estimator) | [compression-estimator.md](.sisyphus/plans/compression-estimator.md) | 压缩前估算大小/耗时 |
+| 引擎统一 (SharpZipLib → SharpCompress) | [engine-unification-sharpcompress.md](.sisyphus/plans/engine-unification-sharpcompress.md) | 统一引擎架构，含压缩方式选择 (见上方 P2「压缩方式选择」) |
+| 预览格式识别与元数据展示 | [preview-format-detection.md](.sisyphus/plans/preview-format-detection.md) | 魔数识别 + 差异化元数据 |
+| 文件大小进度条 | [file-size-progress-bar.md](.sisyphus/plans/file-size-progress-bar.md) | 大小列背景按文件体积比例填充 |
 
 ### 远期（P3）
 

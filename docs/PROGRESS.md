@@ -7,8 +7,8 @@
 - **技术栈**: .NET 9 + WPF + SharpZipLib + SevenZipExtractor
 
 ## 版本
-- **当前版本**: 0.2.5
-- **发布日期**: 2026-05-13 (updated)
+- **当前版本**: 0.2.6
+- **发布日期**: 2026-05-17 (updated)
 
 ## 版本历史（按日期排序）
 
@@ -100,15 +100,33 @@
 1. **加密 ZIP 解压密码提示修复** - ZipEngine `ListEntriesAsync` 设置 `IsEncrypted`；`ExtractAsync` 预检 `IsCrypted` 抛出中文异常
 2. **密码管理器帮助窗口** - PasswordHelpDialog 讲解匹配规则 + 范例
 
-### v0.2.5 (2026-05-13)
-1. **MainWindow 文件拆分** - 92 KB / 2400 行拆为 5 个文件，编译零警告零错误
-2. **RAR 路径分隔符修复** - SevenZipEngine 将 `\` 转为 `/`，解决 RAR 文件目录不显示的问题
-3. **目录重复显示修复** - FilterFiles 通用去重 + Houdini ZIP 的重复目录问题
-4. **密码对话框增强** - 新增"保存到密码库"区域，支持描述和匹配规则输入
-5. **文件列表右键菜单** - 解压到…/解压到所在文件夹/复制文件名/复制完整路径
-6. **预览大小滑块改进** - 范围 1-100 MB、默认 15 MB、可输入精确数值
-7. **版本号简化** - VersionDisplay改为属性 `=> "v" + Version`，只维护一处
-8. **版本升级** - 0.2.5
+### v0.2.2 (2026-05-13)
+1. **SevenZipEngine 路径可配置** - 从 `private const` 改为 `static` 属性，启动时从 AppSettings 加载
+2. **ZIP AES-256 加密检测** - `IsCrypted || AESKeySize > 0` 覆盖传统加密和 AES 加密
+3. **7z 加密检测** - `entry.IsEncrypted` 替代硬编码 `false`
+4. **QuickVerifyPassword** - 读 1 字节快速验证密码，不等完整解压
+5. **密码区集成到进度条窗口** - 显示尝试/匹配状态、显示/隐藏密码、复制按钮，取代旧独立密码对话框
+6. **自动匹配密码** - 打开压缩包时自动遍历已保存密码规则，匹配后预览/拖拽直接使用
+7. **工具栏密码按钮** - 加密压缩包未匹配密码时可点击输入
+8. **状态栏密码指示** - 显示 🔑 已匹配密码 / 🔒 需要密码
+9. **密码对话框自动弹出** - 打开加密压缩包且无匹配密码时弹窗输入
+10. **预览加载进度** - 预览窗格显示不确定进度条
+11. **预览文件大小上限** - 设置中可配置，超过上限不预览
+12. **测试加密压缩包** - TestArchiveAsync 传递 `_currentPassword`，加密时先弹密码框
+13. **隐式目录推导** - BuildFolderTree + FilterFiles 从文件路径推导目录节点，解决无显式目录条目的 ZIP 不显示子目录
+14. **预览竞态修复** - 添加 `_previewCts` 取消令牌，切换文件时取消旧预览
+15. **代码去重** - FormatSize、ResolveExtractDestination、OpenInExplorer 统一入口
+16. **ShutdownMode 修复** - CLI 模式关进度条不自动退出，密码对话框能正常显示
+17. **版本升级** - 0.2.2
+
+### v0.2.3 (2026-05-13)
+1. **ISO 格式支持** - SevenZipEngine 扩展处理 `.iso` 镜像文件
+2. **文件冲突处理系统** - `FileConflictAction` 枚举 (Overwrite/Rename/Skip/Ask) + `FileConflictHelper.ResolvePath` + `ConflictDialog` 弹窗，全引擎集成
+3. **暂停/继续功能** - ProgressWindow `ManualResetEventSlim` + `PauseAwareProgress` 包装器，支持解压中暂停/继续
+4. **文件关联** - 注册 `.zip/.7z/.rar` 等格式的 ProgId + OpenWithProgids，设置页管理
+5. **CLI 文件关联参数** - `--install-assoc` / `--uninstall-assoc` 命令行安装/卸载文件关联
+6. **共享解压选项萃取** - `CreateExtractOptions()` + `ConflictResolver` 回调，三方解压入口统一
+7. **版本升级** - 0.2.3
 
 ### v0.2.4 (2026-05-13)
 1. **预览信息面板重构** - 三列布局（原始大小|压缩后|压缩率），格式信息在上/通用信息在下，文件名跨三列
@@ -123,220 +141,25 @@
 10. **无密码压缩包密码区修复** - `HasEncryptedEntries` 预检，无加密不显示
 11. **版本升级** - 0.2.4
 
-### v0.2.2 (2026-05-13)
-1. **SevenZipEngine 路径可配置** - 从 `private const` 改为 `static` 属性，启动时从 AppSettings 加载
-2. **ZIP AES-256 加密检测** - `IsCrypted || AESKeySize > 0` 覆盖传统加密和 AES 加密
-3. **7z 加密检测** - `entry.IsEncrypted` 替代硬编码 `false`
-4. **QuickVerifyPassword** - 读 1 字节快速验证密码，不等完整解压
-5. **密码区集成到进度条窗口** - 显示尝试/匹配状态、显示/隐藏密码、复制按钮，取代旧独立密码对话框
-6. **自动匹配密码** - 打开压缩包时自动遍历已保存密码规则，匹配后预览/拖拽直接使用
-7. **工具栏密码按钮** - 加密压缩包未匹配密码时可点击输入
-8. **状态栏密码指示** - 显示 🔑 已匹配密码 / 🔒 需要密码
-9. **密码对话框自动弹出** - 打开加密压缩包且无匹配密码时弹窗输入
-10. **预览加载进度** - 预览窗格显示不确定进度条
-11. **预览文件大小上限** - 设置中可配置，超过上限不预览
-12. **FileConflictAction 实现** - 设置中覆盖/重命名/跳过/询问全部实现，询问支持"应用到全部"
-13. **暂停/继续按钮** - 进度条窗口添加暂停功能，`ManualResetEventSlim` + `PauseAwareProgress` 包装器
-14. **文件关联** - 注册 `.zip/.7z/.rar` 等格式的 ProgId + OpenWithProgids，设置页管理
-15. **测试加密压缩包** - TestArchiveAsync 传递 `_currentPassword`，加密时先弹密码框
-16. **隐式目录推导** - BuildFolderTree + FilterFiles 从文件路径推导目录节点，解决无显式目录条目的 ZIP 不显示子目录
-17. **预览竞态修复** - 添加 `_previewCts` 取消令牌，切换文件时取消旧预览
-18. **代码去重** - FormatSize、ResolveExtractDestination、OpenInExplorer 统一入口
-19. **ShutdownMode 修复** - CLI 模式关进度条不自动退出，密码对话框能正常显示
-20. **版本升级** - 0.2.2
+### v0.2.6 (2026-05-17)
+1. **README 重写** - 「未来计划」升级为「开发计划」全景路线图，按功能域分 6 组，已完成/规划中状态标记，链接指向详细设计文档
+2. **文档冗余清理** - PROGRESS.md 移除待实现功能/技术架构/重复开发日志/已知问题章节；PLAN.md 变更日志缩短为引用 PROGRESS.md
+3. **恢复 v0.2.3 版本历史** - 填补被 v0.2.4 覆盖时误删的版本条目，修正 v0.2.2 条目归属
+4. **ISO 格式正式记录** - PLAN.md 格式支持表 + README 核心引擎表新增 ISO 解压
+5. **新增计划文档** - engine-unification-sharpcompress.md、preview-format-detection.md、file-size-progress-bar.md
+6. **文件大小进度条方案** - 纳入开发计划，纯 UI 改动
+7. **版本升级** - 0.2.6
 
-## 待实现功能
-- 压缩方式选择 (Store/Deflate/BZip2/LZMA) - 需换 SharpCompress 库
-- COM 右键菜单（动态文件名、目录结构预览、自定义排序）+ VirtualFileDataObject 延迟渲染
-- 右键菜单目录结构预览（Bandizip 风格）
-- 中/英文界面切换
-- 亮/暗主题切换
+### v0.2.5 (2026-05-13)
+1. **MainWindow 文件拆分** - 92 KB / 2400 行拆为 5 个文件，编译零警告零错误
+2. **RAR 路径分隔符修复** - SevenZipEngine 将 `\` 转为 `/`，解决 RAR 文件目录不显示的问题
+3. **目录重复显示修复** - FilterFiles 通用去重 + Houdini ZIP 的重复目录问题
+4. **密码对话框增强** - 新增"保存到密码库"区域，支持描述和匹配规则输入
+5. **文件列表右键菜单** - 解压到…/解压到所在文件夹/复制文件名/复制完整路径
+6. **预览大小滑块改进** - 范围 1-100 MB、默认 15 MB、可输入精确数值
+7. **版本号简化** - VersionDisplay改为属性 `=> "v" + Version`，只维护一处
+8. **版本升级** - 0.2.5
 
-## 技术架构
 
-### 项目结构
-```
-MantisZip/
-├── MantisZip.sln
-├── src/
-│   ├── MantisZip.Core/
-│   │   ├── MantisZip.Core.csproj
-│   │   ├── Abstractions/
-│   │   │   └── ArchiveEngine.cs     # IArchiveEngine 接口 + Models
-│   │   ├── Engines/
-│   │   │   ├── ZipEngine.cs         # ZIP 引擎
-│   │   │   ├── SevenZipEngine.cs    # 7z/RAR 解压 + 7z 压缩
-│   │   │   └── TarGzEngine.cs       # TAR/GZ 引擎
-│   │   ├── Models/
-│   │   └── Utils/
-│   │       ├── PasswordManager.cs   # 密码管理
-│   │       ├── ArchiveEntryExtractor.cs  # 单文件提取 (预览用)
-│   │       └── FileConflictHelper.cs     # 解压冲突处理
-│   └── MantisZip.UI/
-│       ├── MantisZip.UI.csproj
-│       ├── App.xaml / App.xaml.cs   # 应用入口 + CLI 处理
-│       ├── AppConstants.cs          # 版本号常量
-│       ├── AppSettings.cs           # 用户设置（JSON 持久化）
-│       ├── MainWindow.xaml / .cs    # 主窗口 + FolderNode
-│       ├── SettingsWindow.xaml / .cs    # 设置窗口（六标签页）
-│       ├── ShellIntegration.cs      # 右键菜单 + 文件关联
-│       ├── SystemIconHelper.cs      # SHGetFileInfo 系统图标
-│       ├── ProgressWindow.xaml / .cs    # 双进度条 + 密码区 + 暂停
-│       ├── ConflictDialog.xaml / .cs    # 文件冲突对话框
-│       ├── CompressSettingsWindow.xaml / .cs
-│       ├── PasswordDialog.xaml / .cs
-│       ├── PasswordEditDialog.xaml / .cs
-│       └── PasswordManagerWindow.xaml / .cs
-├── AGENTS.md
-└── docs/
-    ├── PLAN.md
-    └── PROGRESS.md
-```
-
-### 核心类
-| 类 | 位置 | 说明 |
-|-----|------|------|
-| IArchiveEngine | Core/Abstractions | 压缩引擎接口 |
-| ArchiveItem | Core/Abstractions | 文件项模型 |
-| ArchiveOptions | Core/Abstractions | 压缩选项 + ConflictAction |
-| ArchiveProgress | Core/Abstractions | 进度报告 |
-| FileConflictAction | Core/Abstractions | 解压冲突策略枚举 |
-| ZipEngine | Core/Engines | ZIP 压缩/解压，GBK 编码，per-file 进度 |
-| SevenZipEngine | Core/Engines | 7z/RAR 解压（SevenZipExtractor）；7z 压缩（7z.exe） |
-| TarGzEngine | Core/Engines | TAR/GZ 压缩/解压 |
-| PasswordManager | Core/Utils | 密码管理工具 |
-| ArchiveEntryExtractor | Core/Utils | 单文件提取工具 (预览) |
-| FileConflictHelper | Core/Utils | 解压冲突处理（Rename/Skip） |
-| AppSettings | UI | 用户设置 JSON 持久化单例 |
-| ShellIntegration | UI | 右键菜单 + 文件关联注册/卸载 |
-| SystemIconHelper | UI | SHGetFileInfo 系统图标缓存 |
-| ProgressWindow | UI | 双进度条 + 密码匹配区 + 暂停/继续 |
-| ConflictDialog | UI | 文件冲突对话框（覆盖/重命名/跳过/应用到全部）|
-
-## 开发日志
-
-### 2026-04-22
-- 创建解决方案 MantisZip.sln
-- 实现 ZIP 压缩/解压引擎
-- 基础 UI 框架
-
-### 2026-04-23
-- 实现目录树 + 文件列表布局
-- 实现密码管理器 glob/regex 匹配
-- 实现密码输入对话框
-- 实现拖拽解压
-
-### 2026-04-24
-- 添加版本号显示 v0.1.0
-- 修复目录树重复图标问题
-- 修复子目录自引用问题
-- 修复根目录过滤问题
-- 实现 TAR/GZ 格式支持
-- 实现拖拽压缩功能
-- **修复 ZIP 中文文件名乱码问题** - GBK 编码 + CodePage=936
-- 实现 7z 压缩（7z.exe）
-- 修复压缩进度条不更新（100ms 异步报告）
-- 修复取消功能
-- 修复拖拽 Explorer 卡死
-- 添加 7-Zip LGPL 许可证声明
-- 更新版本到 0.1.1
-
-### 2026-05-08
-- **实现文件预览** - 选中文件后预览图片/文本
-- **ArchiveEntryExtractor** - 单文件提取工具类
-- **退出清理** - 程序退出时清理预览临时文件
-- 更新版本到 0.1.2
-
-### 2026-05-09
-- **预览信息面板** - 图片预览右侧显示元数据
-- **目录树重构** - FolderNode INotifyPropertyChanged
-- **智能目录树选择** - 双击进入子目录查找已有节点
-- **多选扩展** - Extended 模式 + 状态栏统计
-- **预览行高持久化** - GridLength 类型 + Star 支持
-- **_isProgrammaticFilter** - 防止 FilterFiles 误触预览
-- AppSettings + SettingsWindow + ShellIntegration + CLI 入口
-- SystemIconHelper + ProgressWindow 双进度条
-- ZipEngine per-file 进度
-- 修复 `_currentFormat` bug
-
-### 2026-05-11
-- **拖出到 Explorer 拖拽提取** - 7-Zip 急切提取模型
-- ProgressWindow 拖拽集成 + _isOwnDrag
-- 自定义 IDataObject 实验（废弃），WPF OLE bridge bug 确认
-- HTML/Markdown 预览 + 文本预览字号
-- Shell 菜单重构（--extract-here / --extract-to-name）
-- 分卷压缩（ZIP SplitOutputStream + 7z -v）
-- 更新文档 + VirtualFileDataObject 未来计划
-
-### 2026-05-12
-- **目录预览** - ShowDirectoryPreview
-- **预览开关** - PreviewToggleBtn
-- **图片解码降采样优化** - DecodePixelWidth=1920 条件设置
-- **MIT 开源** - LICENSE 文件 + 捐赠链接
-- **应用图标** - 512×512 自定义图标
-- **默认布局优化** - 预览右侧、信息面板纵向
-- **滚动条拖拽冲突修复** - ScrollBar 守卫
-- **压缩扫描进度** - EnumerateFiles + 100ms
-- **Inno Setup 安装包** - 自动构建 Setup.exe
-- **加密 ZIP 密码提示修复** - IsCrypted 预检 + UI 关键词检测
-- **密码管理器帮助窗口** - PasswordHelpDialog
-- 更新版本到 0.2.0 / 0.2.1
-
-### 2026-05-13（v0.2.2）
-- SevenZipEngine 路径可配置（AppSettings 联动）
-- ZIP AES 加密检测（IsCrypted + AESKeySize）
-- QuickVerifyPassword 快速密码验证
-- 密码区集成到 ProgressWindow（替代独立密码对话框）
-- 打开时自动匹配密码 + 预览拖拽直接用
-- 工具栏密码按钮 + 状态栏密码指示
-- 文件冲突处理（Rename/Skip/Ask + 应用到全部）
-- 暂停/继续按钮（ManualResetEventSlim）
-- 文件关联（ProgId + OpenWithProgids + Applications）
-- 隐式目录推导 + 预览竞态修复
-- 代码去重 + 各种 bug 修复
-- 更新版本到 0.2.2
-
-### 2026-05-13（v0.2.4）
-- 预览信息面板重构：三列布局 + 格式/通用信息分离
-- 共享解压逻辑抽取（TryMatchPassword / PromptForPassword / ExtractWithPasswordAsync）
-- 压缩目标文件冲突弹窗（CompressConflictDialog：覆盖/添加到压缩包/重命名/取消）
-- 压缩文件读取错误弹窗（ErrorDialog：重试/跳过/中止）
-- 调试日志开关（设置→高级，含打开日志文件按钮）
-- 还原文件修改时间（File.SetLastWriteTime）
-- 拖拽解压开关（设置→解压）
-- OverwriteIfSmaller 冲突策略
-- 目录日期 0001 → --- 修复
-- 无密码压缩包密码区不显示修复
-- 更新版本到 0.2.4
-
-### 2026-05-13（v0.2.5）
-- MainWindow 文件拆分（92KB → 5 文件）
-- RAR 路径分隔符修复（\ 转 /）
-- 目录重复显示修复（FilterFiles 通用去重）
-- 密码对话框增强（保存到密码库 + 描述/规则输入）
-- 文件列表右键菜单（提取/复制）
-- 预览大小滑块改进（1-100 MB + 可输入）
-- 版本号简化（VersionDisplay 改为计算属性）
-- 更新版本到 0.2.5
-
-## 已知问题
-
-| 问题 | 状态 |
-|------|------|
-| 7z 压缩已完成 | ✅ 已修复 |
-| 压缩进度条不更新 | ✅ 已修复 |
-| 拖拽 Explorer 卡死 | ✅ 已修复 |
-| 编码乱码问题 | ✅ 已修复 |
-| 拖拽时卡死 | ✅ 已修复 |
-| 取消后报错 | ✅ 已修复 |
-| 滚动条拖拽冲突 | ✅ v0.2.0 已修复 |
-| 大目录压缩无响应 | ✅ v0.2.0 已修复 |
-| 加密 ZIP 解压无密码提示 | ✅ v0.2.1 已修复 |
-| 子目录不显示（无显式目录条目的 ZIP） | ✅ v0.2.2 已修复 |
-| 预览竞态条件（点 B 显示 A） | ✅ v0.2.2 已修复 |
-| CLI 模式密码对话框不弹出 | ✅ v0.2.2 已修复 |
-| 冲突处理未实现 | ✅ v0.2.2 已修复 |
-| 压缩方法选择 | 待开发 |
-| 界面国际化 | 待开发 |
 
 
