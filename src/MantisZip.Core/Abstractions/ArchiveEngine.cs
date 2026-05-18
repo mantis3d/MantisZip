@@ -93,22 +93,32 @@ public class FileErrorInfo
     public int RetriesRemaining { get; set; } = 3;
 }
 
-/// <summary>
-/// 文件冲突时传递给回调的信息
-/// </summary>
-public class FileConflictInfo
-{
-    /// <summary>目标文件路径</summary>
-    public string FilePath { get; set; } = string.Empty;
-    /// <summary>压缩包内条目的大小（字节）</summary>
-    public long? EntrySize { get; set; }
-    /// <summary>压缩包内条目的修改时间</summary>
-    public DateTime? EntryModified { get; set; }
-    /// <summary>磁盘上已有文件的大小</summary>
-    public long? ExistingSize { get; set; }
-    /// <summary>磁盘上已有文件的修改时间</summary>
-    public DateTime? ExistingModified { get; set; }
-}
+    /// <summary>
+    /// 文件冲突时传递给回调的信息
+    /// </summary>
+    public class FileConflictInfo
+    {
+        /// <summary>目标文件路径</summary>
+        public string FilePath { get; set; } = string.Empty;
+        /// <summary>压缩包内条目的大小（字节）</summary>
+        public long? EntrySize { get; set; }
+        /// <summary>压缩包内条目的修改时间</summary>
+        public DateTime? EntryModified { get; set; }
+        /// <summary>磁盘上已有文件的大小</summary>
+        public long? ExistingSize { get; set; }
+        /// <summary>磁盘上已有文件的修改时间</summary>
+        public DateTime? ExistingModified { get; set; }
+        /// <summary>
+        /// 自动重命名的建议文件名（不含路径），由调用方在弹窗前预计算。
+        /// 对话框用此值预填文本框。
+        /// </summary>
+        public string? SuggestedName { get; set; }
+        /// <summary>
+        /// 用户在对话框中输入的自定义文件名（不含路径）。
+        /// null 或空字符串表示用户未修改，使用自动生成逻辑。
+        /// </summary>
+        public string? CustomName { get; set; }
+    }
 
 /// <summary>
 /// 解压时文件已存在的处理方式

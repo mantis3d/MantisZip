@@ -104,26 +104,20 @@ public class PasswordManager
     }
 
     /// <summary>
-    /// 保存密码数据（DPAPI 加密）
+    /// 保存密码数据（DPAPI 加密）。
+    /// 保存失败时抛出异常，由调用方（UI 层）处理并通知用户。
     /// </summary>
     public void Save()
     {
-        try
-        {
-            if (!Directory.Exists(AppDataPath))
-                Directory.CreateDirectory(AppDataPath);
+        if (!Directory.Exists(AppDataPath))
+            Directory.CreateDirectory(AppDataPath);
 
-            var json = JsonSerializer.Serialize(_data, new JsonSerializerOptions { WriteIndented = true });
-            var plaintext = Encoding.UTF8.GetBytes(json);
-            var encrypted = ProtectedData.Protect(plaintext, null, DataProtectionScope.CurrentUser);
-            var base64 = Convert.ToBase64String(encrypted);
-            File.WriteAllText(PasswordFilePath, base64);
-            CoreLog.Info($"PasswordManager.Save: saved {_data.Passwords.Count} entries (encrypted)");
-        }
-        catch (Exception ex)
-        {
-            CoreLog.Error("PasswordManager.Save: failed", ex);
-        }
+        var json = JsonSerializer.Serialize(_data, new JsonSerializerOptions { WriteIndented = true });
+        var plaintext = Encoding.UTF8.GetBytes(json);
+        var encrypted = ProtectedData.Protect(plaintext, null, DataProtectionScope.CurrentUser);
+        var base64 = Convert.ToBase64String(encrypted);
+        File.WriteAllText(PasswordFilePath, base64);
+        CoreLog.Info($"PasswordManager.Save: saved {_data.Passwords.Count} entries (encrypted)");
     }
 
     /// <summary>

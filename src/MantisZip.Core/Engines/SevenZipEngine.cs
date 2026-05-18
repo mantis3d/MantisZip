@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Text;
 using SevenZipExtractor;
 using MantisZip.Core.Abstractions;
 using MantisZip.Core.Utils;
@@ -95,7 +96,8 @@ public class SevenZipEngine : IArchiveEngine
                         entry.Extract(fileStream);
                     }
                     // 恢复文件原始修改时间（流已关闭）
-                    try { File.SetLastWriteTime(resolvedPath, entryModified); } catch { }
+                    try { File.SetLastWriteTime(resolvedPath, entryModified); }
+                    catch (Exception tsEx) { CoreLog.Info($"ExtractAsync: failed to set timestamp on {resolvedPath}: {tsEx.Message}"); }
 
                     // 文件完成时再报告一次
                     now = DateTime.Now;
@@ -132,7 +134,7 @@ public class SevenZipEngine : IArchiveEngine
         CoreLog.Info($"CompressAsync: [{string.Join("; ", sourcePaths)}] -> {outputPath}, level={options.CompressionLevel}");
         var sw = Stopwatch.StartNew();
 
-        await Task.Run(() =>
+        await Task.Run(async () =>
         {
             var sevenZipPath = SevenZipPath; // 快照，防止设置窗口在压缩中修改路径
             if (!File.Exists(sevenZipPath))
@@ -148,7 +150,7 @@ public class SevenZipEngine : IArchiveEngine
             {
                 FileName = sevenZipPath,
                 UseShellExecute = false,
-                RedirectStandardOutput = true,
+                RedirectStandardOutput = false,  // 不重定向 stdout（不使用输出内容，避免管道阻塞）
                 RedirectStandardError = true,
                 CreateNoWindow = true
             };
@@ -163,50 +165,70 @@ public class SevenZipEngine : IArchiveEngine
             var mx = Math.Clamp(options.CompressionLevel, 0, 9);
             psi.ArgumentList.Add($"-mx{mx}");
 
-            // 加密 (必须放在文件列表之后)
-            if (options.Encrypt && !string.IsNullOrEmpty(options.Password))
+            string? passwordFile = null;
+            try
             {
-                psi.ArgumentList.Add($"-p{options.Password}");
-                psi.ArgumentList.Add("-mhe=on"); // 加密头部
-            }
-
-            // 分卷压缩
-            if (options.SplitSize > 0)
-            {
-                psi.ArgumentList.Add($"-v{options.SplitSize}b");
-            }
-
-            CoreLog.Info($"CompressAsync: 7z.exe output={outputPath}, mx={mx}, encrypt={options.Encrypt}");
-
-            using var process = Process.Start(psi)
-                ?? throw new InvalidOperationException($"无法启动 7z.exe: {sevenZipPath}");
-
-            // 简单的进度轮询
-            while (!process.HasExited)
-            {
-                if (cancellationToken.IsCancellationRequested)
+                // 加密：用临时响应文件传递密码，避免出现在进程命令行（Process Explorer 可见）
+                if (options.Encrypt && !string.IsNullOrEmpty(options.Password))
                 {
-                    process.Kill();
-                    throw new OperationCanceledException();
+                    passwordFile = Path.Combine(Path.GetTempPath(), $"MantisZip_pwd_{Guid.NewGuid()}.tmp");
+                    await File.WriteAllTextAsync(passwordFile, $"-p{options.Password}", CancellationToken.None).ConfigureAwait(false);
+                    psi.ArgumentList.Add($"@{passwordFile}");
+                    psi.ArgumentList.Add("-mhe=on"); // 加密头部
                 }
-                Thread.Sleep(100);
+
+                // 分卷压缩
+                if (options.SplitSize > 0)
+                {
+                    psi.ArgumentList.Add($"-v{options.SplitSize}b");
+                }
+
+                CoreLog.Info($"CompressAsync: 7z.exe output={outputPath}, mx={mx}, encrypt={options.Encrypt}");
+
+                using var process = Process.Start(psi)
+                    ?? throw new InvalidOperationException($"无法启动 7z.exe: {sevenZipPath}");
+
+                // 异步读取 stderr，防止管道缓冲区满导致进程阻塞
+                var errorBuilder = new StringBuilder();
+                process.ErrorDataReceived += (_, e) => { if (e.Data != null) errorBuilder.AppendLine(e.Data); };
+                process.BeginErrorReadLine();
+
+                // 取消时立即终止 7z 进程
+                using (cancellationToken.Register(() =>
+                {
+                    try { if (!process.HasExited) process.Kill(entireProcessTree: true); } catch { }
+                }))
+                {
+                    await process.WaitForExitAsync(CancellationToken.None).ConfigureAwait(false);
+                }
+
+                process.WaitForExit(); // 刷新异步输出缓冲区
+
+                cancellationToken.ThrowIfCancellationRequested();
+
+                var exitCode = process.ExitCode;
+                if (exitCode != 0)
+                {
+                    var error = errorBuilder.ToString();
+                    CoreLog.Error($"CompressAsync: 7z.exe exited with code {exitCode}: {error}");
+                    throw new Exception($"7z.exe 错误 (code {exitCode}): {error}");
+                }
+
+                progress?.Report(new ArchiveProgress
+                {
+                    CurrentFile = string.Empty,
+                    PercentComplete = 100
+                });
+
+                CoreLog.Info($"CompressAsync: done, exitCode=0, {sw.ElapsedMilliseconds}ms");
             }
-
-            var exitCode = process.ExitCode;
-            if (exitCode != 0)
+            finally
             {
-                var error = process.StandardError.ReadToEnd();
-                CoreLog.Error($"CompressAsync: 7z.exe exited with code {exitCode}: {error}");
-                throw new Exception($"7z.exe 错误 (code {exitCode}): {error}");
+                if (passwordFile != null)
+                {
+                    try { File.Delete(passwordFile); } catch { }
+                }
             }
-
-            progress?.Report(new ArchiveProgress
-            {
-                CurrentFile = string.Empty,
-                PercentComplete = 100
-            });
-
-            CoreLog.Info($"CompressAsync: done, exitCode=0, {sw.ElapsedMilliseconds}ms");
         }, cancellationToken);
 
         CoreLog.Exit();
@@ -287,7 +309,7 @@ public class SevenZipEngine : IArchiveEngine
         CoreLog.Info($"AddToArchiveAsync: {archivePath}, sources=[{string.Join("; ", sourcePaths)}]");
         var sw = Stopwatch.StartNew();
 
-        await Task.Run(() =>
+        await Task.Run(async () =>
         {
             var sevenZipPath = SevenZipPath; // 快照，防止设置窗口在修改路径
             if (!File.Exists(sevenZipPath))
@@ -301,7 +323,7 @@ public class SevenZipEngine : IArchiveEngine
             {
                 FileName = sevenZipPath,
                 UseShellExecute = false,
-                RedirectStandardOutput = true,
+                RedirectStandardOutput = false,  // 不重定向 stdout，避免管道阻塞
                 RedirectStandardError = true,
                 CreateNoWindow = true
             };
@@ -315,43 +337,63 @@ public class SevenZipEngine : IArchiveEngine
             var mx = Math.Clamp(options.CompressionLevel, 0, 9);
             psi.ArgumentList.Add($"-mx{mx}");
 
-            // 加密
-            if (options.Encrypt && !string.IsNullOrEmpty(options.Password))
+            string? passwordFile = null;
+            try
             {
-                psi.ArgumentList.Add($"-p{options.Password}");
-                psi.ArgumentList.Add("-mhe=on");
-            }
-
-            CoreLog.Info($"AddToArchiveAsync: 7z.exe archive={archivePath}, mx={mx}, encrypt={options.Encrypt}");
-
-            using var process = Process.Start(psi)
-                ?? throw new InvalidOperationException($"无法启动 7z.exe: {sevenZipPath}");
-
-            while (!process.HasExited)
-            {
-                if (cancellationToken.IsCancellationRequested)
+                // 加密：用临时响应文件传递密码，避免出现在进程命令行（Process Explorer 可见）
+                if (options.Encrypt && !string.IsNullOrEmpty(options.Password))
                 {
-                    process.Kill();
-                    throw new OperationCanceledException();
+                    passwordFile = Path.Combine(Path.GetTempPath(), $"MantisZip_pwd_{Guid.NewGuid()}.tmp");
+                    await File.WriteAllTextAsync(passwordFile, $"-p{options.Password}", CancellationToken.None).ConfigureAwait(false);
+                    psi.ArgumentList.Add($"@{passwordFile}");
+                    psi.ArgumentList.Add("-mhe=on");
                 }
-                Thread.Sleep(100);
+
+                CoreLog.Info($"AddToArchiveAsync: 7z.exe archive={archivePath}, mx={mx}, encrypt={options.Encrypt}");
+
+                using var process = Process.Start(psi)
+                    ?? throw new InvalidOperationException($"无法启动 7z.exe: {sevenZipPath}");
+
+                // 异步读取 stderr，防止管道缓冲区满导致进程阻塞
+                var errorBuilder = new StringBuilder();
+                process.ErrorDataReceived += (_, e) => { if (e.Data != null) errorBuilder.AppendLine(e.Data); };
+                process.BeginErrorReadLine();
+
+                while (!process.HasExited)
+                {
+                    if (cancellationToken.IsCancellationRequested)
+                    {
+                        process.Kill();
+                        throw new OperationCanceledException();
+                    }
+                    await Task.Delay(100, cancellationToken).ConfigureAwait(false);
+                }
+
+                process.WaitForExit(); // 确保异步读取完成
+
+                var exitCode = process.ExitCode;
+                if (exitCode != 0)
+                {
+                    var error = errorBuilder.ToString();
+                    CoreLog.Error($"AddToArchiveAsync: 7z.exe exited with code {exitCode}: {error}");
+                    throw new Exception($"7z.exe 错误 (code {exitCode}): {error}");
+                }
+
+                progress?.Report(new ArchiveProgress
+                {
+                    CurrentFile = string.Empty,
+                    PercentComplete = 100
+                });
+
+                CoreLog.Info($"AddToArchiveAsync: done, exitCode=0, {sw.ElapsedMilliseconds}ms");
             }
-
-            var exitCode = process.ExitCode;
-            if (exitCode != 0)
+            finally
             {
-                var error = process.StandardError.ReadToEnd();
-                CoreLog.Error($"AddToArchiveAsync: 7z.exe exited with code {exitCode}: {error}");
-                throw new Exception($"7z.exe 错误 (code {exitCode}): {error}");
+                if (passwordFile != null)
+                {
+                    try { File.Delete(passwordFile); } catch { }
+                }
             }
-
-            progress?.Report(new ArchiveProgress
-            {
-                CurrentFile = string.Empty,
-                PercentComplete = 100
-            });
-
-            CoreLog.Info($"AddToArchiveAsync: done, exitCode=0, {sw.ElapsedMilliseconds}ms");
         }, cancellationToken);
 
         CoreLog.Exit();

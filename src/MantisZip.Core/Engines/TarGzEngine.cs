@@ -29,32 +29,16 @@ public class TarGzEngine : IArchiveEngine
 
             if (isTarGz || ext == ".tar")
             {
-                // TAR 或 TAR.GZ 解压 - 使用 TarInputStream 逐文件处理，支持进度
+                // TAR 或 TAR.GZ 解压 - 单遍扫描，使用压缩流位置估算总体进度
+                // 不预扫描文件数（避免对 .tar.gz 重复解压缩），进度基于已读取的压缩字节数
                 using var inputStream = File.OpenRead(archivePath);
+                var totalCompressedBytes = inputStream.Length;
                 Stream tarStream = isTarGz
                     ? new GZipInputStream(inputStream)
                     : inputStream;
 
                 using var tarIn = new TarInputStream(tarStream, Encoding.UTF8);
 
-                // 第一遍：预扫描文件数（用于百分比计算）
-                // TarInputStream 只能向前，需重新打开
-                int totalFiles = 0;
-                using (var scanStream = File.OpenRead(archivePath))
-                {
-                    Stream scanTarStream = isTarGz
-                        ? new GZipInputStream(scanStream)
-                        : scanStream;
-                    using var scanTarIn = new TarInputStream(scanTarStream, Encoding.UTF8);
-                    TarEntry scanEntry;
-                    while ((scanEntry = scanTarIn.GetNextEntry()) != null)
-                    {
-                        if (!scanEntry.IsDirectory) totalFiles++;
-                    }
-                }
-                CoreLog.Info($"ExtractAsync: {totalFiles} files to extract");
-
-                // 第二遍：实际解压并报告进度
                 TarEntry entry;
                 int fileIndex = 0;
                 var lastReportTime = DateTime.Now;
@@ -74,6 +58,10 @@ public class TarGzEngine : IArchiveEngine
                     }
 
                     fileIndex++;
+                    // 总体进度基于已读取的压缩字节（对于 .tar.gz 是合理的近似，避免了双遍扫描）
+                    var compressedProgress = totalCompressedBytes > 0
+                        ? (double)inputStream.Position / totalCompressedBytes * 100
+                        : 0;
 
                     var outputFilePath = FileConflictHelper.GetSafePath(destinationPath, entry.Name);
                     var outDir = Path.GetDirectoryName(outputFilePath);
@@ -81,11 +69,10 @@ public class TarGzEngine : IArchiveEngine
                         Directory.CreateDirectory(outDir);
 
                     // 逐文件报告
-                    var overallPct = totalFiles > 0 ? (double)(fileIndex - 1) / totalFiles * 100 : 0;
                     progress?.Report(new ArchiveProgress
                     {
                         CurrentFile = entry.Name,
-                        PercentComplete = overallPct,
+                        PercentComplete = Math.Min(compressedProgress, 99.9), // 留到结束报告 100%
                         FilePercentComplete = 0
                     });
 
@@ -119,12 +106,13 @@ public class TarGzEngine : IArchiveEngine
                             if (now - lastReportTime >= reportInterval || totalRead >= entrySize)
                             {
                                 var filePct = entrySize > 0 ? (double)totalRead / entrySize * 100 : 100;
+                                compressedProgress = totalCompressedBytes > 0
+                                    ? (double)inputStream.Position / totalCompressedBytes * 100
+                                    : 0;
                                 progress?.Report(new ArchiveProgress
                                 {
                                     CurrentFile = entry.Name,
-                                    PercentComplete = totalFiles > 0
-                                        ? (double)(fileIndex - 1 + totalRead / (double)Math.Max(entrySize, 1)) / totalFiles * 100
-                                        : 0,
+                                    PercentComplete = Math.Min(compressedProgress, 99.9),
                                     FilePercentComplete = filePct
                                 });
                                 lastReportTime = now;
@@ -132,7 +120,7 @@ public class TarGzEngine : IArchiveEngine
                         }
                     }
                     // 恢复文件原始修改时间（流已关闭）
-                    try { File.SetLastWriteTime(resolved, entryModified); } catch { }
+                    try { File.SetLastWriteTime(resolved, entryModified); } catch (Exception tsEx) { CoreLog.Info($"ExtractAsync: failed to set timestamp on {resolved}: {tsEx.Message}"); }
                 }
             }
             else if (ext == ".gz")

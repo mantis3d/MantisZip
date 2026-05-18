@@ -11,6 +11,7 @@ internal static class FileConflictHelper
     /// <summary>
     /// 根据冲突策略返回实际写入路径。可能返回 null（表示跳过）。
     /// 遇 Ask 时调用 options.ConflictResolver 回调决定处理方式。
+    /// 回调通过 <see cref="FileConflictInfo.CustomName"/> 支持用户自定义文件名。
     /// </summary>
     public static string? ResolvePath(string outputPath, ArchiveOptions? options, DateTime? entryModified = null, long? entrySize = null)
     {
@@ -37,8 +38,19 @@ internal static class FileConflictHelper
                     info.ExistingModified = fi.LastWriteTime;
                 }
             }
-            catch { }
+            catch (Exception fiEx) { CoreLog.Info($"FileConflictHelper: failed to get file info for {outputPath}: {fiEx.Message}"); }
+
+            // 预计算自动重命名的建议名，供对话框预填
+            info.SuggestedName = Path.GetFileName(GetUniquePath(outputPath));
+
             action = options.ConflictResolver(info);
+
+            // 回调选择了 Rename 且用户填写了自定义名 → 直接使用
+            if (action == FileConflictAction.Rename && !string.IsNullOrWhiteSpace(info.CustomName))
+            {
+                var dir = Path.GetDirectoryName(outputPath) ?? ".";
+                return Path.Combine(dir, SanitizeFileName(info.CustomName));
+            }
         }
 
         return ResolveByAction(outputPath, action, entryModified, entrySize);
@@ -122,5 +134,21 @@ internal static class FileConflictHelper
                 return candidate;
         }
         return path;
+    }
+
+    /// <summary>
+    /// 净化用户输入的文件名：防止路径穿越，剔除非法字符，空名回退。
+    /// </summary>
+    internal static string SanitizeFileName(string fileName)
+    {
+        // 防止路径穿越（丢弃目录部分，只保留文件名）
+        fileName = Path.GetFileName(fileName);
+
+        // 剔除 Windows 文件名非法字符
+        var invalid = Path.GetInvalidFileNameChars();
+        foreach (var c in invalid)
+            fileName = fileName.Replace(c.ToString(), "");
+
+        return string.IsNullOrWhiteSpace(fileName) ? "renamed" : fileName.Trim();
     }
 }

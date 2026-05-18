@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Linq;
 using ICSharpCode.SharpZipLib.Zip;
 using MantisZip.Core.Abstractions;
+using MantisZip.Core.Engines;
 using MantisZip.Core.Utils;
 using SevenZipExtractor;
 
@@ -38,12 +39,12 @@ public static class ArchiveEntryExtractor
                     break;
 
                 case ArchiveFormat.SevenZip:
+                case ArchiveFormat.Rar:
                     ExtractSevenZipEntry(archivePath, entryName, outputPath, password);
                     break;
 
                 case ArchiveFormat.Tar:
                 case ArchiveFormat.GZip:
-                case ArchiveFormat.Rar:
                 default:
                     CoreLog.Info($"ExtractEntryAsync: format {format} not supported for single-entry extract");
                     throw new NotSupportedException($"格式 {format} 不支持单文件预览提取");
@@ -61,20 +62,8 @@ public static class ArchiveEntryExtractor
         ZipFile? zipFile = null;
         try
         {
-            // 先以 UTF-8 模式打开，遇非 UTF-8 标记条目则切换到 GBK
-#pragma warning disable CS0618
-            ZipStrings.CodePage = 65001;
-#pragma warning restore CS0618
-            zipFile = new ZipFile(archivePath);
-            if (zipFile.Cast<ZipEntry>().Any(e => !e.IsUnicodeText))
-            {
-                CoreLog.Info("ExtractZipEntry: detected non-UTF-8 entries, switching to GBK encoding");
-                zipFile.Close();
-#pragma warning disable CS0618
-                ZipStrings.CodePage = 936;
-#pragma warning restore CS0618
-                zipFile = new ZipFile(archivePath);
-            }
+            // 使用 OpenZipFile 自动检测编码（UTF-8 → 系统默认编码 fallback），per-instance StringCodec
+            zipFile = ZipEngine.OpenZipFile(archivePath);
 
             if (!string.IsNullOrEmpty(password))
             {
@@ -114,7 +103,8 @@ public static class ArchiveEntryExtractor
         using var archiveFile = string.IsNullOrEmpty(password)
             ? new ArchiveFile(archivePath)
             : new ArchiveFile(archivePath, password);
-        var entry = archiveFile.Entries.FirstOrDefault(e => e.FileName == entryName);
+        // 统一路径分隔符为 /（RAR 文件可能使用 \），与 SevenZipEngine.ListEntriesAsync 保持一致
+        var entry = archiveFile.Entries.FirstOrDefault(e => e.FileName.Replace('\\', '/') == entryName);
         if (entry == null)
         {
             throw new FileNotFoundException($"在压缩包中未找到条目: {entryName}");

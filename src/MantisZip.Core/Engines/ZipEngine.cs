@@ -1,7 +1,6 @@
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
-using System.Text;
 using ICSharpCode.SharpZipLib.Zip;
 using MantisZip.Core.Abstractions;
 using MantisZip.Core.Utils;
@@ -13,6 +12,35 @@ namespace MantisZip.Core.Engines;
 /// </summary>
 public class ZipEngine : IArchiveEngine
 {
+    /// <summary>
+    /// 以自动检测编码的方式打开 ZIP 文件。
+    /// 先尝试 UTF-8 解码，若检测到不含 UTF-8 标记的非 ASCII 条目，
+    /// 则改用 StringCodec.Default（即当前系统的 ANSI 编码）重新打开。
+    /// 中文系统上 Default = GBK(936)，日文系统上 = Shift-JIS(932)，
+    /// 不再硬编码假设一种语言。
+    /// 使用 per-instance StringCodec，不修改全局 ZipStrings.CodePage 状态。
+    /// </summary>
+    public static ZipFile OpenZipFile(string archivePath, string? password = null)
+    {
+        var codec = StringCodec.FromCodePage(65001);
+        var zf = new ZipFile(archivePath, codec);
+        if (!string.IsNullOrEmpty(password))
+            zf.Password = password;
+
+        if (zf.Cast<ZipEntry>().Any(e => !e.IsUnicodeText))
+        {
+            CoreLog.Info("OpenZipFile: detected non-UTF-8 entries, switching to system default encoding");
+            zf.Close();
+            ((IDisposable?)zf)?.Dispose();
+            // StringCodec.Default 使用系统 ANSI 编码（中文=GBK，日文=Shift-JIS，等）
+            // 不硬编码 936，尊重当前系统区域设置
+            zf = new ZipFile(archivePath, StringCodec.Default);
+            if (!string.IsNullOrEmpty(password))
+                zf.Password = password;
+        }
+        return zf;
+    }
+
     public bool CanHandle(ArchiveFormat format) => format == ArchiveFormat.Zip;
 
     public async Task ExtractAsync(string archivePath, string destinationPath, string? password = null, IProgress<ArchiveProgress>? progress = null, CancellationToken cancellationToken = default, ArchiveOptions? options = null)
@@ -26,31 +54,7 @@ public class ZipEngine : IArchiveEngine
             ZipFile? zipFile = null;
             try
             {
-                // 先以 UTF-8 模式打开
-#pragma warning disable CS0618
-                ZipStrings.CodePage = 65001;
-#pragma warning restore CS0618
-                zipFile = new ZipFile(archivePath);
-                if (!string.IsNullOrEmpty(password))
-                {
-                    zipFile.Password = password;
-                }
-
-                // 检查是否有条目缺少 UTF-8 标记（旧版中文压缩工具产生的文件）。
-                // 若存在这样的条目，切换到 GBK 编码重新打开。
-                if (zipFile.Cast<ZipEntry>().Any(e => !e.IsUnicodeText))
-                {
-                    CoreLog.Info("ExtractAsync: detected non-UTF-8 entries, switching to GBK encoding");
-                    zipFile.Close();
-#pragma warning disable CS0618
-                    ZipStrings.CodePage = 936;
-#pragma warning restore CS0618
-                    zipFile = new ZipFile(archivePath);
-                    if (!string.IsNullOrEmpty(password))
-                    {
-                        zipFile.Password = password;
-                    }
-                }
+                zipFile = OpenZipFile(archivePath, password);
 
                 // 检查是否有加密条目但未提供密码
                 // 同时检测 ZIP 传统加密 (IsCrypted) 和 AES 加密 (AESKeySize > 0)
@@ -61,14 +65,15 @@ public class ZipEngine : IArchiveEngine
                     throw new InvalidOperationException("此压缩包已加密，请输入密码 (This archive is encrypted, password required)");
                 }
 
-                var entries = zipFile.Cast<ZipEntry>().Where(e => !e.IsDirectory).ToList();
+                var allEntries = zipFile.Cast<ZipEntry>().ToList();
+                var entries = allEntries.Where(e => !e.IsDirectory).ToList();
                 var totalBytes = entries.Sum(e => e.Size);
                 var processedBytes = 0L;
                 var processedFiles = 0;
 
                 CoreLog.Info($"ExtractAsync: {entries.Count} entries, {totalBytes} total bytes");
 
-                foreach (ZipEntry entry in zipFile)
+                foreach (ZipEntry entry in allEntries)
                 {
                     cancellationToken.ThrowIfCancellationRequested();
 
@@ -136,7 +141,7 @@ public class ZipEngine : IArchiveEngine
                         }
                     }
                     // 恢复文件原始修改时间（流已关闭，才能设置）
-                    try { File.SetLastWriteTime(resolvedPath, entryModified); } catch { }
+                    try { File.SetLastWriteTime(resolvedPath, entryModified); } catch (Exception tsEx) { CoreLog.Info($"ExtractAsync: failed to set timestamp on {resolvedPath}: {tsEx.Message}"); }
 
                     processedBytes += entrySize;
                     processedFiles++;
@@ -186,7 +191,7 @@ public class ZipEngine : IArchiveEngine
                         files.Add((file, relativePath));
 
                         // 在扫描阶段同时累计总大小
-                        try { totalBytes += new FileInfo(file).Length; } catch { }
+                        try { totalBytes += new FileInfo(file).Length; } catch (Exception sizeEx) { CoreLog.Info($"CompressAsync: failed to get file size for {file}: {sizeEx.Message}"); }
 
                         // 每 100ms 报告一次扫描进度，让用户看到正在枚举文件
                         var now = DateTime.Now;
@@ -205,7 +210,7 @@ public class ZipEngine : IArchiveEngine
                 else if (File.Exists(sourcePath))
                 {
                     files.Add((sourcePath, Path.GetFileName(sourcePath)));
-                    try { totalBytes += new FileInfo(sourcePath).Length; } catch { }
+                    try { totalBytes += new FileInfo(sourcePath).Length; } catch (Exception sizeEx) { CoreLog.Info($"CompressAsync: failed to get file size for {sourcePath}: {sizeEx.Message}"); }
                 }
             }
 
@@ -283,16 +288,8 @@ public class ZipEngine : IArchiveEngine
 
         var result = await Task.Run(() =>
         {
-            // 读取 ZIP 文件条目
-            // 支持 GBK 编码（解决中文文件名乱码问题）
-#pragma warning disable CS0618
-            ZipStrings.CodePage = 936; // GBK
-#pragma warning restore CS0618
-            using var zipFile = new ZipFile(archivePath);
-            if (!string.IsNullOrEmpty(password))
-            {
-                zipFile.Password = password;
-            }
+            // 使用 OpenZipFile 自动检测编码（UTF-8 → 系统默认编码 fallback）
+            using var zipFile = OpenZipFile(archivePath, password);
 
             var items = zipFile.Cast<ZipEntry>().Select(entry => new ArchiveItem
             {
@@ -322,14 +319,7 @@ public class ZipEngine : IArchiveEngine
         {
             try
             {
-#pragma warning disable CS0618
-                ZipStrings.CodePage = 936;
-#pragma warning restore CS0618
-                using var zipFile = new ZipFile(archivePath);
-                if (!string.IsNullOrEmpty(password))
-                {
-                    zipFile.Password = password;
-                }
+                using var zipFile = OpenZipFile(archivePath, password);
 
                 foreach (ZipEntry entry in zipFile)
                 {
@@ -384,10 +374,6 @@ public class ZipEngine : IArchiveEngine
 
         await Task.Run(() =>
         {
-#pragma warning disable CS0618
-            ZipStrings.CodePage = 936;
-#pragma warning restore CS0618
-
             // 收集需要添加的文件
             var files = new List<(string FullPath, string EntryName)>();
             foreach (var sourcePath in sourcePaths)
@@ -418,7 +404,12 @@ public class ZipEngine : IArchiveEngine
             }
 
             // 使用 SharpZipLib 的原地更新功能
-            using var zipFile = new ZipFile(archivePath);
+            // StringCodec.Default 处理所有编码情况：
+            // - 有 UTF-8 标记的条目 → UTF-8 解码
+            // - 无 UTF-8 标记的条目 → 系统 ANSI 解码（中文=GBK，日文=Shift-JIS 等）
+            // - 新增的条目 → UTF-8 写入（自动设置 UTF-8 标记）
+            // 不做硬编码编码假设，尊重系统区域设置
+            using var zipFile = new ZipFile(archivePath, StringCodec.Default);
             zipFile.BeginUpdate();
 
             var totalFiles = files.Count;
