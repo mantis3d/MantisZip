@@ -15,9 +15,8 @@ public class ZipEngineTests : IDisposable
 
     public ZipEngineTests()
     {
-        // Ensure GBK encoding support for ZIP (same as App.InitializeApp)
+        // Registration needed for StringCodec on code-page encoded ZIPs (used by ZipEngine.OpenZipFile)
         Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
-        ZipStrings.CodePage = 936;
     }
 
     public void Dispose()
