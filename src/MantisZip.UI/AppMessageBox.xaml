@@ -1,0 +1,45 @@
+<Window x:Class="MantisZip.UI.AppMessageBox"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:l="clr-namespace:MantisZip.UI.Localization"
+        Title="" Width="420" SizeToContent="Height"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="NoResize"
+        ShowInTaskbar="False"
+        Background="#F5F5F5">
+    <Grid Margin="16">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="Auto"/>
+            <ColumnDefinition Width="12"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="12"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Icon -->
+        <TextBlock x:Name="IconText" Grid.Row="0" Grid.Column="0"
+                   FontSize="32" VerticalAlignment="Top"
+                   Visibility="Collapsed"/>
+
+        <!-- Message -->
+        <TextBlock x:Name="MessageText" Grid.Row="0" Grid.Column="2"
+                   TextWrapping="Wrap" FontSize="13" Foreground="#333"
+                   VerticalAlignment="Center"/>
+
+        <!-- Buttons -->
+        <StackPanel x:Name="ButtonPanel" Grid.Row="2" Grid.ColumnSpan="3"
+                    Orientation="Horizontal" HorizontalAlignment="Center">
+            <Button x:Name="OkBtn" Content="{l:L MsgBox_Ok}" Width="80" Height="28" Click="Ok_Click"
+                    Background="White" BorderBrush="#CCC" BorderThickness="1" Margin="0,0,6,0"/>
+            <Button x:Name="CancelBtn" Content="{l:L MsgBox_Cancel}" Width="80" Height="28" Click="Cancel_Click"
+                    Background="White" BorderBrush="#CCC" BorderThickness="1" Margin="6,0,6,0" Visibility="Collapsed"/>
+            <Button x:Name="YesBtn" Content="{l:L MsgBox_Yes}" Width="80" Height="28" Click="Yes_Click"
+                    Background="White" BorderBrush="#CCC" BorderThickness="1" Margin="6,0,6,0" Visibility="Collapsed"/>
+            <Button x:Name="NoBtn" Content="{l:L MsgBox_No}" Width="80" Height="28" Click="No_Click"
+                    Background="White" BorderBrush="#CCC" BorderThickness="1" Margin="6,0,0,0" Visibility="Collapsed"/>
+        </StackPanel>
+    </Grid>
+</Window>
