@@ -1,7 +1,8 @@
 <Window x:Class="MantisZip.UI.SettingsWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="设置" Height="500" Width="580"
+             xmlns:l="clr-namespace:MantisZip.UI.Localization"
+        Title="{l:L Settings_Title}" Height="500" Width="700"
         WindowStartupLocation="CenterScreen"
         ResizeMode="NoResize"
         Background="#F5F5F5">
@@ -12,88 +13,149 @@
         </Grid.RowDefinitions>
 
         <!-- Tabs -->
-        <TabControl Grid.Row="0" x:Name="SettingsTabs">
+        <TabControl Grid.Row="0" x:Name="SettingsTabs" TabStripPlacement="Left"
+                    TextOptions.TextRenderingMode="Grayscale">
+            <TabControl.Resources>
+                <Style TargetType="TabItem">
+                    <Setter Property="MinWidth" Value="150"/>
+                    <Setter Property="MinHeight" Value="38"/>
+                    <Setter Property="Padding" Value="10,6,8,6"/>
+                    <Setter Property="Background" Value="Transparent"/>
+                    <Setter Property="Template">
+                        <Setter.Value>
+                            <ControlTemplate TargetType="TabItem">
+                                <Border x:Name="Bd" BorderThickness="0,0,0,1" BorderBrush="#E0E0E0"
+                                        Background="{TemplateBinding Background}" Padding="{TemplateBinding Padding}">
+                                    <ContentPresenter Content="{TemplateBinding Header}"
+                                                       HorizontalAlignment="Stretch"
+                                                       VerticalAlignment="Center"/>
+                                </Border>
+                                <ControlTemplate.Triggers>
+                                    <Trigger Property="IsSelected" Value="True">
+                                        <Setter TargetName="Bd" Property="Background" Value="#BBDEFB"/>
+                                        <Setter TargetName="Bd" Property="BorderThickness" Value="3,0,0,1"/>
+                                        <Setter TargetName="Bd" Property="BorderBrush" Value="#1565C0"/>
+                                    </Trigger>
+                                    <Trigger Property="IsMouseOver" Value="True">
+                                        <Setter TargetName="Bd" Property="Background" Value="#E8E8E8"/>
+                                    </Trigger>
+                                </ControlTemplate.Triggers>
+                            </ControlTemplate>
+                        </Setter.Value>
+                    </Setter>
+                </Style>
+            </TabControl.Resources>
             <!-- ═══════ 压缩 ═══════ -->
-            <TabItem Header="压缩">
+            <TabItem>
+                <TabItem.Header>
+                    <Grid HorizontalAlignment="Stretch">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock x:Name="IconCompress" Text="📦" VerticalAlignment="Center"/>
+                        <TextBlock Text="{l:L Settings_Tab_Compress}" Grid.Column="1" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="4,0,0,0"/>
+                    </Grid>
+                </TabItem.Header>
                 <ScrollViewer VerticalScrollBarVisibility="Auto">
                     <StackPanel Margin="10">
-                        <TextBlock Text="默认压缩格式" FontWeight="SemiBold" Margin="0,0,0,4"/>
+                        <TextBlock Text="{l:L Settings_Compress_DefaultFormat}" FontWeight="SemiBold" Margin="0,0,0,4"/>
                         <ComboBox x:Name="DefaultFormatCombo" Width="200" HorizontalAlignment="Left">
                             <ComboBoxItem Content="ZIP (.zip)" Tag="zip"/>
                             <ComboBoxItem Content="7z (.7z)" Tag="7z"/>
                             <ComboBoxItem Content="TAR.GZ (.tar.gz)" Tag="tar.gz"/>
                         </ComboBox>
 
-                        <TextBlock Text="默认压缩级别" FontWeight="SemiBold" Margin="0,16,0,4"/>
+                        <TextBlock Text="{l:L Settings_Compress_DefaultLevel}" FontWeight="SemiBold" Margin="0,16,0,4"/>
                         <ComboBox x:Name="DefaultLevelCombo" Width="200" HorizontalAlignment="Left">
-                            <ComboBoxItem Tag="0">0 - 仅存储</ComboBoxItem>
-                            <ComboBoxItem Tag="3">3 - 快速压缩</ComboBoxItem>
-                            <ComboBoxItem Tag="5">5 - 正常压缩</ComboBoxItem>
-                            <ComboBoxItem Tag="9">9 - 极限压缩</ComboBoxItem>
+                            <ComboBoxItem Tag="0" Content="{l:L Compress_Level_Store}"/>
+                            <ComboBoxItem Tag="3" Content="{l:L Compress_Level_Fast}"/>
+                            <ComboBoxItem Tag="5" Content="{l:L Compress_Level_Normal}"/>
+                            <ComboBoxItem Tag="9" Content="{l:L Compress_Level_Max}"/>
                         </ComboBox>
 
-                        <CheckBox x:Name="CloseAfterCompressCheck" Content="压缩完成后关闭压缩窗口" Margin="0,16,0,0"/>
-                        <CheckBox x:Name="KeepExtCheck" Content="保留源文件扩展名（abc.max → abc.max.zip）" Margin="0,8,0,0"/>
+                        <CheckBox x:Name="CloseAfterCompressCheck" Content="{l:L Settings_Compress_CloseAfterDone}" Margin="0,16,0,0"/>
+                        <CheckBox x:Name="KeepExtCheck" Content="{l:L Settings_Compress_KeepExt}" Margin="0,8,0,0"/>
                     </StackPanel>
                 </ScrollViewer>
             </TabItem>
 
             <!-- ═══════ 解压 ═══════ -->
-            <TabItem Header="解压">
+            <TabItem>
+                <TabItem.Header>
+                    <Grid HorizontalAlignment="Stretch">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock x:Name="IconExtract" Text="📂" VerticalAlignment="Center"/>
+                        <TextBlock Text="{l:L Settings_Tab_Extract}" Grid.Column="1" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="4,0,0,0"/>
+                    </Grid>
+                </TabItem.Header>
                 <ScrollViewer VerticalScrollBarVisibility="Auto">
                     <StackPanel Margin="10">
-                        <TextBlock Text="默认解压到" FontWeight="SemiBold" Margin="0,0,0,4"/>
+                        <TextBlock Text="{l:L Settings_Extract_DefaultDest}" FontWeight="SemiBold" Margin="0,0,0,4"/>
                         <ComboBox x:Name="ExtractDestCombo" Width="200" HorizontalAlignment="Left">
-                            <ComboBoxItem Content="每次询问" Tag="ask"/>
-                            <ComboBoxItem Content="压缩包所在目录" Tag="same-dir"/>
-                            <ComboBoxItem Content="桌面" Tag="desktop"/>
+                            <ComboBoxItem Content="{l:L Settings_Extract_Dest_Ask}" Tag="ask"/>
+                            <ComboBoxItem Content="{l:L Settings_Extract_Dest_SameDir}" Tag="same-dir"/>
+                            <ComboBoxItem Content="{l:L Settings_Extract_Dest_Desktop}" Tag="desktop"/>
                         </ComboBox>
 
-                        <TextBlock Text="文件已存在时" FontWeight="SemiBold" Margin="0,16,0,4"/>
+                        <TextBlock Text="{l:L Settings_Extract_ConflictAction}" FontWeight="SemiBold" Margin="0,16,0,4"/>
                         <ComboBox x:Name="ConflictCombo" Width="200" HorizontalAlignment="Left">
-                            <ComboBoxItem Content="询问我" Tag="ask"/>
-                            <ComboBoxItem Content="覆盖" Tag="overwrite"/>
-                            <ComboBoxItem Content="仅覆盖更旧的文件" Tag="overwrite-if-older"/>
-                            <ComboBoxItem Content="仅覆盖更小的文件" Tag="overwrite-if-smaller"/>
-                            <ComboBoxItem Content="自动重命名" Tag="rename"/>
-                            <ComboBoxItem Content="跳过" Tag="skip"/>
+                            <ComboBoxItem Content="{l:L Settings_Extract_Conflict_Ask}" Tag="ask"/>
+                            <ComboBoxItem Content="{l:L CompressConflict_Overwrite}" Tag="overwrite"/>
+                            <ComboBoxItem Content="{l:L Settings_Extract_Conflict_OverwriteOlder}" Tag="overwrite-if-older"/>
+                            <ComboBoxItem Content="{l:L Settings_Extract_Conflict_OverwriteSmaller}" Tag="overwrite-if-smaller"/>
+                            <ComboBoxItem Content="{l:L CompressConflict_Rename}" Tag="rename"/>
+                            <ComboBoxItem Content="{l:L Error_Skip}" Tag="skip"/>
                         </ComboBox>
 
-                        <CheckBox x:Name="OpenFolderCheck" Content="解压后打开目标文件夹" Margin="0,16,0,0"/>
-                        <CheckBox x:Name="EnableDragExtractCheck" Content="启用文件列表拖拽解压（拖出到资源管理器）" Margin="0,8,0,0"/>
+                        <CheckBox x:Name="OpenFolderCheck" Content="{l:L Settings_Extract_OpenFolderAfter}" Margin="0,16,0,0"/>
+                        <CheckBox x:Name="EnableDragExtractCheck" Content="{l:L Settings_Extract_EnableDragExtract}" Margin="0,8,0,0"/>
                     </StackPanel>
                 </ScrollViewer>
             </TabItem>
 
             <!-- ═══════ 上下文菜单 ═══════ -->
-            <TabItem Header="上下文菜单">
+            <TabItem>
+                <TabItem.Header>
+                    <Grid HorizontalAlignment="Stretch">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock x:Name="IconContextMenu" Text="☰" VerticalAlignment="Center"/>
+                        <TextBlock Text="{l:L Settings_Tab_ContextMenu}" Grid.Column="1" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="4,0,0,0"/>
+                    </Grid>
+                </TabItem.Header>
                 <ScrollViewer VerticalScrollBarVisibility="Auto">
                     <StackPanel Margin="10">
-                        <GroupBox Header="右键菜单项目" Padding="8" Margin="0,0,0,12">
+                        <GroupBox Header="{l:L Settings_Menu_GroupHeader}" Padding="8" Margin="0,0,0,12">
                             <StackPanel>
-                                <CheckBox x:Name="EnableCompressCheck" Content="启用「压缩」菜单" Margin="0,4"/>
-                                <CheckBox x:Name="EnableQuickCheck" Content="启用「压缩为（文件名）.zip」快速压缩菜单" Margin="0,4"/>
-                                <CheckBox x:Name="EnableOpenCheck" Content="启用「打开压缩包」菜单（压缩包浏览）" Margin="0,4"/>
-                                <CheckBox x:Name="EnableExtractCheck" Content="启用解压菜单（解压到此处 / 解压到压缩包名 / 解压到……）" Margin="0,4"/>
+                                <CheckBox x:Name="EnableCompressCheck" Content="{l:L Settings_Menu_EnableCompress}" Margin="0,4"/>
+                                <CheckBox x:Name="EnableQuickCheck" Content="{l:L Settings_Menu_EnableQuick}" Margin="0,4"/>
+                                <CheckBox x:Name="EnableOpenCheck" Content="{l:L Settings_Menu_EnableOpen}" Margin="0,4"/>
+                                <CheckBox x:Name="EnableExtractCheck" Content="{l:L Settings_Menu_EnableExtract}" Margin="0,4"/>
                             </StackPanel>
                         </GroupBox>
 
-                        <GroupBox Header="显示方式" Padding="8" Margin="0,0,0,12">
+                        <GroupBox Header="{l:L Settings_Menu_DisplayGroup}" Padding="8" Margin="0,0,0,12">
                             <StackPanel>
-                                <CheckBox x:Name="CascadeCheck" Content="层叠上下文菜单（所有 MantisZip 项目归入一个子菜单）" Margin="0,4"/>
-                                <CheckBox x:Name="ShowIconsCheck" Content="上下文菜单显示图标" Margin="0,4"/>
+                                <CheckBox x:Name="CascadeCheck" Content="{l:L Settings_Menu_Cascade}" Margin="0,4"/>
+                                <CheckBox x:Name="ShowIconsCheck" Content="{l:L Settings_Menu_ShowIcons}" Margin="0,4"/>
                             </StackPanel>
                         </GroupBox>
 
-                        <GroupBox Header="状态" Padding="8">
+                        <GroupBox Header="{l:L Settings_Menu_StatusGroup}" Padding="8">
                             <StackPanel>
-                                <TextBlock x:Name="ShellStatusText" Text="检测中..." Margin="0,0,0,8" Foreground="#555"/>
+                                <TextBlock x:Name="ShellStatusText" Text="{l:L Settings_Menu_Checking}" Margin="0,0,0,8" Foreground="#555"/>
                                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                                    <Button x:Name="InstallBtn" Content="安装" Width="60" Height="26"
+                                    <Button x:Name="InstallBtn" Content="{l:L Settings_Menu_Btn_Install}" Width="60" Height="26"
                                             Click="InstallBtn_Click" IsEnabled="False"/>
-                                    <Button x:Name="UninstallBtn" Content="卸载" Width="60" Height="26" Margin="6,0,0,0"
+                                    <Button x:Name="UninstallBtn" Content="{l:L Settings_Menu_Btn_Uninstall}" Width="60" Height="26" Margin="6,0,0,0"
                                             Click="UninstallBtn_Click" IsEnabled="False"/>
-                                    <Button x:Name="ApplyShellBtn" Content="应用" Width="60" Height="26" Margin="6,0,0,0"
+                                    <Button x:Name="ApplyShellBtn" Content="{l:L Settings_Menu_Btn_Apply}" Width="60" Height="26" Margin="6,0,0,0"
                                             Click="ApplyShellBtn_Click" IsEnabled="False"/>
                                 </StackPanel>
                             </StackPanel>
@@ -103,13 +165,23 @@
             </TabItem>
 
             <!-- ═══════ 预览 ═══════ -->
-            <TabItem Header="预览">
+            <TabItem>
+                <TabItem.Header>
+                    <Grid HorizontalAlignment="Stretch">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock x:Name="IconPreview" Text="👁" VerticalAlignment="Center"/>
+                        <TextBlock Text="{l:L Settings_Tab_Preview}" Grid.Column="1" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="4,0,0,0"/>
+                    </Grid>
+                </TabItem.Header>
                 <ScrollViewer VerticalScrollBarVisibility="Auto">
                     <StackPanel Margin="10">
-                        <CheckBox x:Name="EnableImagePreviewCheck" Content="启用图片预览（jpg/png/gif/bmp/webp/ico）" Margin="0,4"/>
-                        <CheckBox x:Name="EnableTextPreviewCheck" Content="启用文本预览（txt/log/code 等）" Margin="0,16,0,4"/>
+                        <CheckBox x:Name="EnableImagePreviewCheck" Content="{l:L Settings_Preview_EnableImage}" Margin="0,4"/>
+                        <CheckBox x:Name="EnableTextPreviewCheck" Content="{l:L Settings_Preview_EnableText}" Margin="0,16,0,4"/>
 
-                        <TextBlock Text="预览文件大小上限 (MB)" FontWeight="SemiBold" Margin="0,16,0,4"/>
+                        <TextBlock Text="{l:L Settings_Preview_MaxFileSize}" FontWeight="SemiBold" Margin="0,16,0,4"/>
                         <StackPanel Orientation="Horizontal">
                             <Slider x:Name="MaxPreviewSizeSlider" Width="220" Minimum="1" Maximum="100"
                                     Value="15" TickFrequency="1" IsSnapToTickEnabled="True"/>
@@ -119,31 +191,30 @@
                                      TextChanged="MaxPreviewSizeInput_TextChanged"/>
                             <TextBlock Text="MB" FontSize="12" Foreground="#555" VerticalAlignment="Center" Margin="4,0,0,0"/>
                         </StackPanel>
-                        <TextBlock Foreground="#888" FontSize="11" Margin="0,4,0,0">
-                            超过此大小的文件不会进行预览（包括图片和文本）。</TextBlock>
+                        <TextBlock Text="{l:L Settings_Preview_MaxSizeHint}" Foreground="#888" FontSize="11" Margin="0,4,0,0"/>
 
-                        <TextBlock Text="预览面板位置" FontWeight="SemiBold" Margin="0,16,0,4"/>
+                        <TextBlock Text="{l:L Settings_Preview_Position}" FontWeight="SemiBold" Margin="0,16,0,4"/>
                         <ComboBox x:Name="PreviewPositionCombo" Width="220" HorizontalAlignment="Left" Margin="0,0,0,8">
-                            <ComboBoxItem Tag="1" IsSelected="True">底部（当前默认）</ComboBoxItem>
-                            <ComboBoxItem Tag="2">目录树下方</ComboBoxItem>
-                            <ComboBoxItem Tag="3">文件列表下方</ComboBoxItem>
-                            <ComboBoxItem Tag="4">文件列表右侧</ComboBoxItem>
+                            <ComboBoxItem Tag="1" IsSelected="True" Content="{l:L Settings_Preview_Pos_Bottom}"/>
+                            <ComboBoxItem Tag="2" Content="{l:L Settings_Preview_Pos_BelowTree}"/>
+                            <ComboBoxItem Tag="3" Content="{l:L Settings_Preview_Pos_BelowList}"/>
+                            <ComboBoxItem Tag="4" Content="{l:L Settings_Preview_Pos_RightOfList}"/>
                         </ComboBox>
 
-                        <TextBlock Text="信息面板方向" FontWeight="SemiBold" Margin="0,8,0,4"/>
+                        <TextBlock Text="{l:L Settings_Preview_InfoDirection}" FontWeight="SemiBold" Margin="0,8,0,4"/>
                         <ComboBox x:Name="InfoPanelOrientationCombo" Width="180" HorizontalAlignment="Left" Margin="0,0,0,8">
-                            <ComboBoxItem Tag="Horizontal" IsSelected="True">内容右侧（左右）</ComboBoxItem>
-                            <ComboBoxItem Tag="Vertical">内容下方（上下）</ComboBoxItem>
+                            <ComboBoxItem Tag="Horizontal" IsSelected="True" Content="{l:L Settings_Preview_Dir_Horizontal}"/>
+                            <ComboBoxItem Tag="Vertical" Content="{l:L Settings_Preview_Dir_Vertical}"/>
                         </ComboBox>
 
-                        <TextBlock Text="文本预览最大大小 (MB)" FontWeight="SemiBold" Margin="0,12,0,4"/>
+                        <TextBlock Text="{l:L Settings_Preview_MaxTextSize}" FontWeight="SemiBold" Margin="0,12,0,4"/>
                         <StackPanel Orientation="Horizontal">
                             <Slider x:Name="MaxTextSizeSlider" Width="200" Minimum="1" Maximum="50"
                                     Value="5" TickFrequency="1" IsSnapToTickEnabled="True"/>
                             <TextBlock x:Name="MaxTextSizeText" Text="5 MB" Width="50" Margin="8,0,0,0" VerticalAlignment="Center"/>
                         </StackPanel>
 
-                        <TextBlock Text="文本预览字号" FontWeight="SemiBold" Margin="0,16,0,4"/>
+                        <TextBlock Text="{l:L Settings_Preview_TextFontSize}" FontWeight="SemiBold" Margin="0,16,0,4"/>
                         <StackPanel Orientation="Horizontal">
                             <Slider x:Name="TextFontSizeSlider" Width="200" Minimum="8" Maximum="36"
                                     Value="12" TickFrequency="1" IsSnapToTickEnabled="True"/>
@@ -153,24 +224,35 @@
                                 Background="#F9F9F9" CornerRadius="4">
                             <TextBlock x:Name="TextFontSizeSample" FontSize="12"
                                        FontFamily="Cascadia Code, Consolas, monospace"
-                                       Text="示例文本 — The quick brown fox jumps over the lazy dog."
+                                       Text="{l:L Settings_Preview_TextSample}"
                                        TextWrapping="Wrap"/>
                         </Border>
+
+                        <CheckBox x:Name="UseColorEmojiCheck" Content="{l:L Settings_Preview_ColorEmoji}" Margin="0,16,0,0"/>
                     </StackPanel>
                 </ScrollViewer>
             </TabItem>
 
             <!-- ═══════ 文件关联 ═══════ -->
-            <TabItem Header="文件关联">
+            <TabItem>
+                <TabItem.Header>
+                    <Grid HorizontalAlignment="Stretch">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock x:Name="IconFileAssoc" Text="🔗" VerticalAlignment="Center"/>
+                        <TextBlock Text="{l:L Settings_Tab_FileAssoc}" Grid.Column="1" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="4,0,0,0"/>
+                    </Grid>
+                </TabItem.Header>
                 <ScrollViewer VerticalScrollBarVisibility="Auto">
                     <StackPanel Margin="10">
-                        <GroupBox Header="压缩格式关联" Padding="8" Margin="0,0,0,12">
+                        <GroupBox Header="{l:L Settings_Assoc_GroupHeader}" Padding="8" Margin="0,0,0,12">
                             <StackPanel>
-                                <TextBlock TextWrapping="Wrap" Foreground="#555" FontSize="12" Margin="0,0,0,10">
-                                    安装后，双击 .zip / .7z / .rar / .tar / .gz 等文件将自动用 MantisZip 打开浏览。</TextBlock>
-                                <Button x:Name="InstallAssocBtn" Content="安装文件关联" Width="140" Height="28"
+                                <TextBlock Text="{l:L Settings_Assoc_Desc}" TextWrapping="Wrap" Foreground="#555" FontSize="12" Margin="0,0,0,10"/>
+                                <Button x:Name="InstallAssocBtn" Content="{l:L Settings_Assoc_Install}" Width="140" Height="28"
                                         HorizontalAlignment="Left" Click="InstallAssoc_Click"/>
-                                <Button x:Name="UninstallAssocBtn" Content="卸载文件关联" Width="140" Height="28"
+                                <Button x:Name="UninstallAssocBtn" Content="{l:L Settings_Assoc_Uninstall}" Width="140" Height="28"
                                         HorizontalAlignment="Left" Margin="0,8,0,0" Click="UninstallAssoc_Click"/>
                                 <TextBlock x:Name="AssocStatusText" Text="" FontSize="11" Foreground="#555" Margin="0,8,0,0"/>
                             </StackPanel>
@@ -180,58 +262,95 @@
             </TabItem>
 
             <!-- ═══════ 密码管理 ═══════ -->
-            <TabItem Header="密码管理">
+            <TabItem>
+                <TabItem.Header>
+                    <Grid HorizontalAlignment="Stretch">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock x:Name="IconPassword" Text="🔑" VerticalAlignment="Center"/>
+                        <TextBlock Text="{l:L Settings_Tab_Password}" Grid.Column="1" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="4,0,0,0"/>
+                    </Grid>
+                </TabItem.Header>
                 <ScrollViewer VerticalScrollBarVisibility="Auto">
                     <StackPanel Margin="10">
-                        <CheckBox x:Name="ShowPasswordNotifCheck" Content="解压时在进度条窗口显示匹配到的密码规则和密码文本" Margin="0,4"/>
-                        <TextBlock Foreground="#888" FontSize="11" TextWrapping="Wrap" Margin="24,0,0,12">
-                            启用后，尝试保存的密码规则时进度条上方会显示规则名称和密码，
-                            支持复制密码文本。禁用后不显示密码信息。</TextBlock>
+                        <CheckBox x:Name="ShowPasswordNotifCheck" Content="{l:L Settings_Pwd_ShowNotification}" Margin="0,4"/>
+                        <TextBlock Text="{l:L Settings_Pwd_ShowHint}" Foreground="#888" FontSize="11" TextWrapping="Wrap" Margin="24,0,0,12"/>
 
-                        <CheckBox x:Name="RevealPasswordCheck" Content="默认显示密码明文（不勾选则显示为 ******）" Margin="0,12,0,4"/>
+                        <CheckBox x:Name="RevealPasswordCheck" Content="{l:L Settings_Pwd_RevealDefault}" Margin="0,12,0,4"/>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
+            <!-- ═══════ 语言 ═══════ -->
+            <TabItem>
+                <TabItem.Header>
+                    <Grid HorizontalAlignment="Stretch">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock x:Name="IconLanguage" Text="🌐" VerticalAlignment="Center"/>
+                        <TextBlock Text="{l:L Settings_Tab_Language}" Grid.Column="1" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="4,0,0,0"/>
+                    </Grid>
+                </TabItem.Header>
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel Margin="10">
+                        <TextBlock Text="{l:L Settings_Language}" FontWeight="SemiBold" Margin="0,0,0,4"/>
+                        <ComboBox x:Name="LanguageCombo" Width="220" Height="26" HorizontalAlignment="Left"
+                                  SelectionChanged="LanguageCombo_SelectionChanged"/>
                     </StackPanel>
                 </ScrollViewer>
             </TabItem>
 
             <!-- ═══════ 高级 ═══════ -->
-            <TabItem Header="高级">
+            <TabItem>
+                <TabItem.Header>
+                    <Grid HorizontalAlignment="Stretch">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock x:Name="IconAdvanced" Text="⚙" VerticalAlignment="Center"/>
+                        <TextBlock Text="{l:L Settings_Tab_Advanced}" Grid.Column="1" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="4,0,0,0"/>
+                    </Grid>
+                </TabItem.Header>
                 <ScrollViewer VerticalScrollBarVisibility="Auto">
                     <StackPanel Margin="10">
-                        <TextBlock Text="7z 可执行文件路径" FontWeight="SemiBold" Margin="0,0,0,4"/>
+                        <TextBlock Text="{l:L Settings_Advanced_SevenZipPath}" FontWeight="SemiBold" Margin="0,0,0,4"/>
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*"/>
                                 <ColumnDefinition Width="Auto"/>
                             </Grid.ColumnDefinitions>
                             <TextBox x:Name="SevenZipPathBox" Grid.Column="0" Height="24" IsReadOnly="True"/>
-                            <Button Grid.Column="1" Content="浏览" Width="60" Height="24" Margin="6,0,0,0" Click="BrowseSevenZip_Click"/>
+                            <Button Grid.Column="1" Content="{l:L Settings_Advanced_Browse}" Width="60" Height="24" Margin="6,0,0,0" Click="BrowseSevenZip_Click"/>
                         </Grid>
 
                         <Separator Margin="0,16,0,10"/>
-                        <CheckBox x:Name="EnableDebugLogCheck" Content="启用调试日志（用于排查问题）" Margin="0,0,0,2"/>
+                        <CheckBox x:Name="EnableDebugLogCheck" Content="{l:L Settings_Advanced_EnableDebugLog}" Margin="0,0,0,2"/>
                         <TextBlock FontSize="11" Foreground="#888" Margin="24,0,0,0">
-                            <Run Text="日志文件:"/>
+                            <Run Text="{l:L Settings_Advanced_LogFile}"/>
                             <Run x:Name="LogPathText" Foreground="#555"/>
                         </TextBlock>
                         <StackPanel Orientation="Horizontal" Margin="24,4,0,0">
-                            <Button Content="打开日志文件" Width="90" Height="22" FontSize="11"
+                            <Button Content="{l:L Settings_Advanced_OpenLog}" Width="90" Height="22" FontSize="11"
                                     Click="OpenLogFolder_Click"/>
-                            <Button Content="打开启动日志" Width="100" Height="22" Margin="8,0,0,0" FontSize="11"
+                            <Button Content="{l:L Settings_Advanced_OpenStartupLog}" Width="100" Height="22" Margin="8,0,0,0" FontSize="11"
                                     Click="OpenStartupLog_Click"/>
                         </StackPanel>
 
-                        <Button Content="清理预览临时文件" Width="140" Height="26" Margin="0,16,0,0"
+                        <Button Content="{l:L Settings_Advanced_CleanPreviewTemp}" Width="140" Height="26" Margin="0,16,0,0"
                                 HorizontalAlignment="Left" Click="CleanTemp_Click"/>
 
-                        <Separator Margin="0,20,0,10"/>
-
-                        <TextBlock Text="关于 MantisZip" FontWeight="SemiBold" Margin="0,0,0,4"/>
+                        <TextBlock Text="{l:L Settings_Advanced_AboutHeader}" FontWeight="SemiBold" Margin="0,0,0,4"/>
                         <TextBlock TextWrapping="Wrap" Foreground="#555" FontSize="11">
-                            <Run>版本: </Run><Run x:Name="AboutVersionText"/>
+                            <Run Text="{l:L Settings_Advanced_AboutVersion}"/><Run x:Name="AboutVersionText"/>
                             <LineBreak/>
-                            <Run>.NET 9 WPF 桌面应用 ｜ 基于 SharpZipLib + SevenZipExtractor</Run>
+                            <Run Text="{l:L Settings_Advanced_AboutDesc}"/>
                             <LineBreak/>
-                            <Run>7-Zip 组件遵循 GNU LGPL 许可证</Run>
+                            <Run Text="{l:L Settings_Advanced_AboutLicense}"/>
                         </TextBlock>
                     </StackPanel>
                 </ScrollViewer>
@@ -240,8 +359,8 @@
 
         <!-- 底部按钮 -->
         <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,10,0,0">
-            <Button x:Name="SaveBtn" Content="保存" Width="80" Height="28" Click="SaveBtn_Click"/>
-            <Button Content="取消" Width="80" Height="28" Margin="8,0,0,0" Click="CancelBtn_Click"/>
+            <Button x:Name="SaveBtn" Content="{l:L PwdEdit_Save}" Width="80" Height="28" Click="SaveBtn_Click"/>
+            <Button Content="{l:L MsgBox_Cancel}" Width="80" Height="28" Margin="8,0,0,0" Click="CancelBtn_Click"/>
         </StackPanel>
     </Grid>
 </Window>

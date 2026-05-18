@@ -3,6 +3,7 @@ using System.IO;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
+using MantisZip.UI.Localization;
 
 namespace MantisZip.UI;
 
@@ -32,7 +33,7 @@ public partial class SettingsWindow : Window
         // 先绑定事件再加载设置，确保所有 UI 跟随加载值刷新
         LoadSettings();
 
-        // 任何上下文菜单项变更都要启用"应用"按钮
+        // 任何上下文菜单项变更都要启用L.T(L.Settings_Menu_Btn_Apply)按钮
         void OnChanged(object? s, RoutedEventArgs e) => ApplyShellBtn.IsEnabled = true;
         EnableCompressCheck.Checked += OnChanged;
         EnableCompressCheck.Unchecked += OnChanged;
@@ -85,6 +86,7 @@ public partial class SettingsWindow : Window
         MaxPreviewSizeSlider.Value = mbVal;
         MaxPreviewSizeInput.Text = mbVal.ToString();
         TextFontSizeSlider.Value = s.TextPreviewFontSize;
+        UseColorEmojiCheck.IsChecked = s.UseColorEmoji;
 
         // 密码管理
         ShowPasswordNotifCheck.IsChecked = s.ShowPasswordMatchNotification;
@@ -105,7 +107,23 @@ public partial class SettingsWindow : Window
         EnableDebugLogCheck.IsChecked = s.EnableDebugLogging;
         LogPathText.Text = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "debug.log");
         SevenZipPathBox.Text = s.SevenZipPath;
+
+        // 语言
+        LanguageCombo.Items.Clear();
+        foreach (var lang in LanguageManager.Instance.AvailableLanguages)
+        {
+            LanguageCombo.Items.Add(new ComboBoxItem
+            {
+                Content = lang.DisplayName,
+                Tag = lang.Code
+            });
+        }
+        foreach (ComboBoxItem item in LanguageCombo.Items)
+            if ((string)item.Tag == s.Language) { LanguageCombo.SelectedItem = item; break; }
+
         AboutVersionText.Text = AppConstants.Version;
+
+        App.ApplyTextRenderingMode(SettingsTabs);
     }
 
     private void SaveSettings()
@@ -134,6 +152,7 @@ public partial class SettingsWindow : Window
         s.MaxTextPreviewBytes = (long)MaxTextSizeSlider.Value * 1024 * 1024;
         s.MaxPreviewFileSize = (long)MaxPreviewSizeSlider.Value * 1024 * 1024;
         s.TextPreviewFontSize = (int)TextFontSizeSlider.Value;
+        s.UseColorEmoji = UseColorEmojiCheck.IsChecked == true;
         s.PreviewPosition = int.TryParse((PreviewPositionCombo.SelectedItem as ComboBoxItem)?.Tag?.ToString(), out var pos) ? pos : 1;
         s.InfoPanelOrientation = (InfoPanelOrientationCombo.SelectedItem as ComboBoxItem)?.Tag as string ?? "Horizontal";
 
@@ -145,6 +164,7 @@ public partial class SettingsWindow : Window
         s.SevenZipPath = SevenZipPathBox.Text;
 
         s.Save();
+        App.ApplyTextRenderingMode(SettingsTabs);
     }
 
     /// <summary>
@@ -154,8 +174,8 @@ public partial class SettingsWindow : Window
     {
         var installed = ShellIntegration.IsInstalled;
         ShellStatusText.Text = installed
-            ? "✅ Shell 右键菜单已安装"
-            : "❌ Shell 右键菜单未安装";
+            ? L.T(L.Settings_Menu_Installed)
+            : L.T(L.Settings_Menu_NotInstalled);
         InstallBtn.IsEnabled = !installed;
         UninstallBtn.IsEnabled = installed;
         // 应用按钮的状态由 OnChanged 事件单独管理
@@ -168,22 +188,22 @@ public partial class SettingsWindow : Window
             ShellIntegration.Uninstall();
             ShellIntegration.Install();
             UpdateShellStatus();
-            MessageBox.Show("Shell 右键菜单已安装", "MantisZip", MessageBoxButton.OK, MessageBoxImage.Information);
+            AppMessageBox.Show(L.T(L.Settings_Menu_InstalledMsg), L.T(L.App_MantisZipTitle), MessageBoxButton.OK, MessageBoxImage.Information);
         }
         catch (Exception ex)
         {
-            MessageBox.Show($"安装失败: {ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+            AppMessageBox.Show(L.TF(L.Settings_Menu_InstallFailed, ex.Message), L.T(L.App_ErrorTitle), MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
 
-    #region 文件关联
+    #region L.T(L.Settings_Tab_FileAssoc)
 
     private void UpdateAssocStatus()
     {
         var installed = ShellIntegration.AreAssociationsInstalled;
         AssocStatusText.Text = installed
-            ? "✅ 文件关联已安装"
-            : "❌ 文件关联未安装";
+            ? L.T(L.Settings_Assoc_Installed)
+            : L.T(L.Settings_Assoc_NotInstalled);
         InstallAssocBtn.IsEnabled = !installed;
         UninstallAssocBtn.IsEnabled = installed;
     }
@@ -195,11 +215,11 @@ public partial class SettingsWindow : Window
             ShellIntegration.UninstallAssociations();
             ShellIntegration.InstallAssociations();
             UpdateAssocStatus();
-            MessageBox.Show("文件关联已安装", "MantisZip", MessageBoxButton.OK, MessageBoxImage.Information);
+            AppMessageBox.Show(L.T(L.Settings_Assoc_InstalledMsg), L.T(L.App_MantisZipTitle), MessageBoxButton.OK, MessageBoxImage.Information);
         }
         catch (Exception ex)
         {
-            MessageBox.Show($"安装失败: {ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+            AppMessageBox.Show(L.TF(L.Settings_Menu_InstallFailed, ex.Message), L.T(L.App_ErrorTitle), MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
 
@@ -209,17 +229,17 @@ public partial class SettingsWindow : Window
         {
             ShellIntegration.UninstallAssociations();
             UpdateAssocStatus();
-            MessageBox.Show("文件关联已卸载", "MantisZip", MessageBoxButton.OK, MessageBoxImage.Information);
+            AppMessageBox.Show(L.T(L.Settings_Assoc_UninstalledMsg), L.T(L.App_MantisZipTitle), MessageBoxButton.OK, MessageBoxImage.Information);
         }
         catch (Exception ex)
         {
-            MessageBox.Show($"卸载失败: {ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+            AppMessageBox.Show(L.TF(L.Settings_Menu_UninstallFailed, ex.Message), L.T(L.App_ErrorTitle), MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
 
     #endregion
 
-    #region 预览大小输入
+    #region L.T(L.Settings_Tab_Preview)L.T(L.Main_Col_Size)输入
 
     private void MaxPreviewSizeInput_PreviewTextInput(object sender, System.Windows.Input.TextCompositionEventArgs e)
     {
@@ -249,11 +269,11 @@ public partial class SettingsWindow : Window
         {
             ShellIntegration.Uninstall();
             UpdateShellStatus();
-            MessageBox.Show("Shell 右键菜单已卸载", "MantisZip", MessageBoxButton.OK, MessageBoxImage.Information);
+            AppMessageBox.Show(L.T(L.App_ShellUninstalled), L.T(L.App_MantisZipTitle), MessageBoxButton.OK, MessageBoxImage.Information);
         }
         catch (Exception ex)
         {
-            MessageBox.Show($"卸载失败: {ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+            AppMessageBox.Show(L.TF(L.Settings_Menu_UninstallFailed, ex.Message), L.T(L.App_ErrorTitle), MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
 
@@ -266,11 +286,11 @@ public partial class SettingsWindow : Window
             ShellIntegration.Install();
             UpdateShellStatus();
             ApplyShellBtn.IsEnabled = false;
-            MessageBox.Show("上下文菜单已更新", "MantisZip", MessageBoxButton.OK, MessageBoxImage.Information);
+            AppMessageBox.Show(L.T(L.Settings_Menu_UpdatedMsg), L.T(L.App_MantisZipTitle), MessageBoxButton.OK, MessageBoxImage.Information);
         }
         catch (Exception ex)
         {
-            MessageBox.Show($"安装失败: {ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+            AppMessageBox.Show(L.TF(L.Settings_Menu_InstallFailed, ex.Message), L.T(L.App_ErrorTitle), MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
 
@@ -295,7 +315,7 @@ public partial class SettingsWindow : Window
     {
         var dialog = new Microsoft.Win32.OpenFileDialog
         {
-            Filter = "可执行文件|7z.exe|所有文件|*.*",
+            Filter = L.T(L.Settings_SevenZipFilter),
             FileName = "7z.exe"
         };
         if (dialog.ShowDialog() == true)
@@ -323,7 +343,7 @@ public partial class SettingsWindow : Window
         {
             var startupLog = Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                "MantisZip", "startup.log");
+                L.T(L.App_MantisZipTitle), "startup.log");
             var dir = Path.GetDirectoryName(startupLog);
             if (!string.IsNullOrEmpty(dir) && Directory.Exists(dir))
                 Process.Start("explorer.exe", $"/select,\"{startupLog}\"");
@@ -333,24 +353,36 @@ public partial class SettingsWindow : Window
 
     #endregion
 
+    private void LanguageCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (e.RemovedItems.Count == 0) return; // 初始填充，非用户操作
+        if (LanguageCombo.SelectedItem is ComboBoxItem item && item.Tag is string code
+            && code != AppSettings.Instance.Language)
+        {
+            LanguageManager.Instance.SwitchTo(code);
+            AppMessageBox.Show(L.T(L.Settings_Language_Restart), L.T(L.App_MantisZipTitle),
+                MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+    }
+
     private void CleanTemp_Click(object sender, RoutedEventArgs e)
     {
         try
         {
-            var tempDir = Path.Combine(Path.GetTempPath(), "MantisZip");
+            var tempDir = Path.Combine(Path.GetTempPath(), L.T(L.App_MantisZipTitle));
             if (Directory.Exists(tempDir))
             {
                 Directory.Delete(tempDir, recursive: true);
-                MessageBox.Show("预览临时文件已清理", "MantisZip", MessageBoxButton.OK, MessageBoxImage.Information);
+                AppMessageBox.Show(L.T(L.Settings_CleanPreviewDone), L.T(L.App_MantisZipTitle), MessageBoxButton.OK, MessageBoxImage.Information);
             }
             else
             {
-                MessageBox.Show("没有需要清理的临时文件", "MantisZip", MessageBoxButton.OK, MessageBoxImage.Information);
+                AppMessageBox.Show(L.T(L.Settings_CleanPreviewNone), L.T(L.App_MantisZipTitle), MessageBoxButton.OK, MessageBoxImage.Information);
             }
         }
         catch (Exception ex)
         {
-            MessageBox.Show($"清理失败: {ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+            AppMessageBox.Show(L.TF(L.Settings_CleanPreviewFailed, ex.Message), L.T(L.App_ErrorTitle), MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
 }
