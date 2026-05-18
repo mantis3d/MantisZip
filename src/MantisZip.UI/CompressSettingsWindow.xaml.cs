@@ -3,6 +3,7 @@ using MantisZip.Core.Engines;
 using Microsoft.Win32;
 using System.IO;
 using System.Windows;
+using MantisZip.UI.Localization;
 
 namespace MantisZip.UI;
 
@@ -66,8 +67,8 @@ public partial class CompressSettingsWindow : Window
     {
         var dialog = new OpenFileDialog
         {
-            Filter = "所有文件|*.*",
-            Title = "选择要压缩的文件",
+            Filter = L.T(L.Compress_FileFilter),
+            Title = L.T(L.Main_SelectFilesTitle),
             Multiselect = true
         };
 
@@ -88,7 +89,7 @@ public partial class CompressSettingsWindow : Window
     {
         var dialog = new Ookii.Dialogs.Wpf.VistaFolderBrowserDialog
         {
-            Description = "选择要压缩的目录"
+            Description = L.T(L.Compress_SelectFolderPrompt)
         };
 
         if (dialog.ShowDialog() == true)
@@ -124,8 +125,8 @@ public partial class CompressSettingsWindow : Window
 
         var dialog = new SaveFileDialog
         {
-            Filter = $"{format.ToUpper()} 压缩文件|*{ext}|所有文件|*.*",
-            Title = "保存压缩包",
+            Filter = L.TF(L.Compress_SaveFilter, format.ToUpper(), ext),
+            Title = L.T(L.Compress_Archive_Group),
             FileName = GetDefaultFileName() + ext
         };
 
@@ -192,34 +193,34 @@ public partial class CompressSettingsWindow : Window
         // 验证
         if (_sourcePaths.Count == 0)
         {
-            MessageBox.Show("请添加要压缩的文件或目录", "提示", MessageBoxButton.OK, MessageBoxImage.Warning);
+            AppMessageBox.Show(L.T(L.Compress_Validation_NoFiles), "提示", MessageBoxButton.OK, MessageBoxImage.Warning);
             return;
         }
 
         if (string.IsNullOrEmpty(OutputPathTextBox.Text))
         {
-            MessageBox.Show("请选择输出路径", "提示", MessageBoxButton.OK, MessageBoxImage.Warning);
+            AppMessageBox.Show(L.T(L.Compress_Validation_NoOutput), "提示", MessageBoxButton.OK, MessageBoxImage.Warning);
             return;
         }
 
-        // 验证密码
+        // 验证L.T(L.PwdMgr_Col_Password)
         if (EncryptCheckBox.IsChecked == true)
         {
             if (string.IsNullOrEmpty(PasswordBox.Password))
             {
-                MessageBox.Show("请输入密码", "提示", MessageBoxButton.OK, MessageBoxImage.Warning);
+                AppMessageBox.Show(L.T(L.Pwd_Validation_Required), "提示", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
             if (PasswordBox.Password != ConfirmPasswordBox.Password)
             {
-                MessageBox.Show("两次输入的密码不一致", "提示", MessageBoxButton.OK, MessageBoxImage.Warning);
+                AppMessageBox.Show(L.T(L.Compress_Validation_PwdMismatch), "提示", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
         }
 
-        App.Log("验证通过，开始压缩");
+        App.Log(L.T(L.Shell_Compress));
 
-        // 开始压缩
+        // 开始L.T(L.Shell_Compress)
         var outputPath = OutputPathTextBox.Text;
         var format = (FormatComboBox.SelectedItem as System.Windows.Controls.ComboBoxItem)?.Tag?.ToString() ?? "zip";
         var level = int.TryParse((LevelCombo.SelectedItem as System.Windows.Controls.ComboBoxItem)?.Tag?.ToString(), out var l) ? l : 5;
@@ -275,9 +276,9 @@ try
 
             await engine.CompressAsync(_sourcePaths.ToArray(), outputPath, options, progress, progressWindow.CancellationToken);
 
-            App.Log("压缩完成");
+            App.Log(L.T(L.App_CompressComplete));
 
-            progressWindow.SetComplete("压缩完成");
+            progressWindow.SetComplete(L.T(L.App_CompressComplete));
             await Task.Delay(500);
             
             // 关闭进度窗口
@@ -292,7 +293,7 @@ catch (OperationCanceledException)
         catch (Exception ex)
         {
             this.Show(); // 显示错误前先恢复窗口
-            MessageBox.Show($"压缩失败: {ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+            AppMessageBox.Show(L.TF(L.App_CompressFailed, ex.Message), L.T(L.App_ErrorTitle), MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
 

@@ -2,6 +2,7 @@ using System.Threading;
 using System.Windows;
 using System.Windows.Media;
 using MantisZip.Core.Abstractions;
+using MantisZip.UI.Localization;
 
 namespace MantisZip.UI;
 
@@ -45,10 +46,10 @@ public partial class ProgressWindow : Window
                 FilePercentText.Text = $"{p.FilePercentComplete.Value:F0}%";
             }
 
-            // 文件计数：TotalFiles > 0 时才显示，否则保持空白
+            // 文件计数：TotalFiles > 0 时才L.T(L.Pwd_ShowBtn)，L.T(L.MsgBox_No)则保持空白
             if (p.TotalFiles > 0)
             {
-                FileCountText.Text = $"文件 {p.ProcessedFiles}/{p.TotalFiles}";
+                FileCountText.Text = L.TF(L.Progress_FileCount, p.ProcessedFiles, p.TotalFiles);
                 FileCountText.Visibility = Visibility.Visible;
             }
         }
@@ -82,19 +83,19 @@ public partial class ProgressWindow : Window
             PercentText.Text = "100%";
             FileProgressBar.Value = 100;
             FilePercentText.Text = "100%";
-            FileNameText.Text = "完成";
-            CancelButton.Content = "关闭";
+            FileNameText.Text = L.T(L.Progress_Done);
+            CancelButton.Content = L.T(L.Progress_Button_Close);
         });
     }
 
     /// <summary>
-    /// 设置错误状态。
+    /// L.T(L.Settings_Title)L.T(L.App_ErrorTitle)状态。
     /// </summary>
     public void SetError(string message)
     {
         Dispatcher.Invoke(() =>
         {
-            CancelButton.Content = "关闭";
+            CancelButton.Content = L.T(L.Progress_Button_Close);
         });
     }
 
@@ -110,15 +111,15 @@ public partial class ProgressWindow : Window
         {
             // 正在运行 → 暂停
             _pauseEvent.Reset();
-            PauseButton.Content = "▶ 继续";
-            FileNameText.Text = "⏸ 已暂停 — 点击「继续」恢复";
+            PauseButton.Content = L.T(L.Progress_Button_Resume);
+            FileNameText.Text = L.T(L.Progress_Paused);
         }
         else
         {
             // 已暂停 → 恢复
             _pauseEvent.Set();
-            PauseButton.Content = "⏸ 暂停";
-            FileNameText.Text = "正在恢复…";
+            PauseButton.Content = L.T(L.Progress_Button_Pause);
+            FileNameText.Text = L.T(L.Progress_Resuming);
         }
     }
 
@@ -128,7 +129,7 @@ public partial class ProgressWindow : Window
     private bool _isRevealed;
 
     /// <summary>
-    /// 显示密码区，设置为"正在尝试"状态（密码隐藏、复制禁用）。
+    /// 显示密码区，设置为"正在尝试"L.T(L.Settings_Menu_StatusGroup)（L.T(L.PwdMgr_Col_Password)隐藏、复制禁用）。
     /// 从后台线程调用安全。
     /// </summary>
     public void ShowPasswordAttempt(string description)
@@ -138,8 +139,8 @@ public partial class ProgressWindow : Window
             PasswordSection.Visibility = Visibility.Visible;
             _password = null;
             _isRevealed = false;
-            PwdMatchText.Text = "正在尝试匹配密码规则…";
-            PwdRuleText.Text = $"规则：{description}";
+            PwdMatchText.Text = L.T(L.Progress_MatchingPassword);
+            PwdRuleText.Text = L.TF(L.Progress_PwdRule, description);
             PwdStatusText.Text = "";
             PwdRevealBtn.IsEnabled = false;
             PwdCopyBtn.IsEnabled = false;
@@ -165,12 +166,12 @@ public partial class ProgressWindow : Window
             bool revealByDefault = AppSettings.Instance.PasswordRevealByDefault;
             _isRevealed = revealByDefault;
             PwdMatchText.Text = revealByDefault
-                ? $"✅ 已匹配密码：{password}"
-                : $"✅ 已匹配密码：******";
+                ? L.TF(L.Progress_PwdMatched, password)
+                : L.T(L.Progress_PwdMatchedHidden);
             PwdRevealBtn.Content = revealByDefault ? "🙈" : "👁";
 
-            PwdRuleText.Text = $"规则：{description}";
-            PwdStatusText.Text = "✅ 密码验证通过，正在解压…";
+            PwdRuleText.Text = L.TF(L.Progress_PwdRule, description);
+            PwdStatusText.Text = L.T(L.Progress_PwdVerifying);
             PwdRevealBtn.IsEnabled = true;
             PwdCopyBtn.IsEnabled = true;
             PasswordSection.Background = new SolidColorBrush(Color.FromRgb(0xE8, 0xF5, 0xE9));
@@ -191,9 +192,9 @@ public partial class ProgressWindow : Window
     {
         _isRevealed = !_isRevealed;
         if (_isRevealed && _password != null)
-            PwdMatchText.Text = $"✅ 已匹配密码：{_password}";
+            PwdMatchText.Text = L.TF(L.Progress_PwdMatched, _password);
         else if (_password != null)
-            PwdMatchText.Text = $"✅ 已匹配密码：******";
+            PwdMatchText.Text = L.T(L.Progress_PwdMatchedHidden);
         PwdRevealBtn.Content = _isRevealed ? "🙈" : "👁";
     }
 
@@ -203,11 +204,11 @@ public partial class ProgressWindow : Window
         try
         {
             Clipboard.SetText(_password);
-            PwdStatusText.Text = "✅ 已复制到剪贴板";
+            PwdStatusText.Text = L.T(L.Progress_PwdToClipboard);
         }
         catch
         {
-            PwdStatusText.Text = "❌ 复制失败";
+            PwdStatusText.Text = L.T(L.Progress_PwdCopyFailed);
         }
     }
 

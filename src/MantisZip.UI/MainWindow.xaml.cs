@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Globalization;
 using System.IO;
 using System.Windows;
 using System.Windows.Controls;
@@ -18,6 +19,7 @@ using System.Text;
 using Markdig;
 using Ude;
 using ICSharpCode.SharpZipLib.Zip;
+using MantisZip.UI.Localization;
 
 namespace MantisZip.UI;
 
@@ -30,9 +32,11 @@ public partial class MainWindow : Window
     private ArchiveFormat _currentFormat;
     private string? _currentPassword;  // 当前压缩包的密码（打开时自动匹配）
     private bool _hasEncryptedArchive; // 当前压缩包是否有加密条目
+    private string? _archiveComment;   // 压缩包注释（仅 ZIP 格式支持）
     private List<ArchiveItem> _allItems = new();  // 存储所有文件项
+    private readonly Dictionary<string, (int Count, long Size, long CompressedSize)> _dirStats = new(); // 目录统计缓存
     private string _currentFolder = "";  // 当前目录
-    private string? _previewTempDir;        // 预览临时目录
+    private string? _previewTempDir;        // L.T(L.Settings_Tab_Preview)临时目录
     private readonly Dictionary<int, double> _lastPreviewSizes = new()
     {
         { 1, 341 }, { 2, 416 }, { 3, 479 }, { 4, 678 }
@@ -82,7 +86,7 @@ public partial class MainWindow : Window
     private string GetWindowConfigPath()
     {
         var localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
-        var folder = Path.Combine(localAppData, "MantisZip");
+        var folder = Path.Combine(localAppData, L.T(L.App_MantisZipTitle));
         return Path.Combine(folder, "window.json");
     }
 
@@ -223,6 +227,27 @@ public partial class MainWindow : Window
         };
     }
 
+    /// <summary>
+    /// 读取L.T(L.Compress_Archive_Group)注释（仅 ZIP 格式支持，通过 SharpZipLib 读取 EOCD 注释字段）。
+    /// 其他格式返回 null。
+    /// </summary>
+    private static string? ReadArchiveComment(string archivePath, ArchiveFormat format)
+    {
+        if (format != ArchiveFormat.Zip) return null;
+
+        try
+        {
+            using var zf = new ZipFile(archivePath, ICSharpCode.SharpZipLib.Zip.StringCodec.Default);
+            var comment = zf.ZipFileComment;
+            return string.IsNullOrWhiteSpace(comment) ? null : comment.Trim();
+        }
+        catch (Exception ex)
+        {
+            App.LogDebug("ReadArchiveComment: failed to read comment: {0}", ex.Message);
+            return null;
+        }
+    }
+
     internal async Task LoadArchiveAsync(string archivePath)
     {
         try
@@ -235,18 +260,19 @@ public partial class MainWindow : Window
             SelectionStatsText.Text = "";
             ArchiveStatsText.Text = "";
 
-            SetStatus("正在加载压缩包...");
+            SetStatus(L.T(L.Main_Status_Loading));
             _currentArchivePath = archivePath;
 
             var engine = ArchiveEngineFactory.GetEngineByExtension(archivePath);
             if (engine == null)
             {
-                MessageBox.Show("不支持的压缩格式", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
-                SetStatus("就绪");
+                AppMessageBox.Show(L.T(L.Main_DragFormatUnsupported), L.T(L.App_ErrorTitle), MessageBoxButton.OK, MessageBoxImage.Error);
+                SetStatus(L.T(L.Main_Status_Ready));
                 return;
             }
 
             _currentFormat = GetFormatByExtension(archivePath);
+            _archiveComment = ReadArchiveComment(archivePath, _currentFormat);
 
             var items = await engine.ListEntriesAsync(archivePath);
 
@@ -279,7 +305,8 @@ public partial class MainWindow : Window
                                     ? pwdDialog.Patterns
                                     : new List<string> { Path.GetFileName(archivePath) };
                                 var desc = pwdDialog.Description ?? "";
-                                PasswordManager.Instance.AddPassword(userPwd, desc, patterns);
+                                try { PasswordManager.Instance.AddPassword(userPwd, desc, patterns); }
+                                catch (Exception pwdEx) { App.LogDebug("LoadArchiveAsync: failed to save password: {0}", pwdEx.Message); }
                             }
                         }
                     }
@@ -301,6 +328,23 @@ public partial class MainWindow : Window
                     : SystemIconHelper.GetFileIcon(Path.GetExtension(i.Name))
             }).ToList();
 
+            // 预计算目录统计（每个目录包含的文件数、总大小、压缩后大小）
+            _dirStats.Clear();
+            foreach (var ai in _allItems)
+            {
+                if (ai.IsDirectory) continue;
+                var name = ai.Name;
+                var lastSlash = name.LastIndexOf('/');
+                if (lastSlash < 0) continue; // 根目录文件，不属于任何子目录
+                var parts = name[..lastSlash].Split('/');
+                for (int i = 0; i < parts.Length; i++)
+                {
+                    var dirPath = string.Join("/", parts, 0, i + 1);
+                    var stat = _dirStats.GetValueOrDefault(dirPath);
+                    _dirStats[dirPath] = (stat.Count + 1, stat.Size + ai.Size, stat.CompressedSize + ai.CompressedSize);
+                }
+            }
+
             // 构建目录树
             BuildFolderTree();
 
@@ -313,25 +357,26 @@ public partial class MainWindow : Window
             ArchiveNameText.Text = Path.GetFileName(archivePath);
             var totalSize = items.Sum(i => i.Size);
             var totalCompressed = items.Sum(i => i.CompressedSize);
-            ArchiveInfoText.Text = $"{items.Count} 个文件 | 原始: {FormatSize(totalSize)} | 压缩后: {FormatSize(totalCompressed)}";
-            ArchiveStatsText.Text = $"总 {items.Count} 项 | 原始 {FormatSize(totalSize)} → 压缩 {FormatSize(totalCompressed)}";
+            ArchiveInfoText.Text = L.TF(L.Main_ArchiveInfo, items.Count, FormatSize(totalSize), FormatSize(totalCompressed));
+            ArchiveStatsText.Text = L.TF(L.Main_ArchiveStats, items.Count, FormatSize(totalSize), FormatSize(totalCompressed));
 
-            SetStatus($"已加载: {Path.GetFileName(archivePath)}");
+            SetStatus(L.TF(L.Main_Status_Loaded, Path.GetFileName(archivePath)));
             UpdatePasswordStatus();
 
-            // 应用预览面板位置设置
+            // L.T(L.Settings_Menu_Btn_Apply)L.T(L.Settings_Preview_Position)L.T(L.Settings_Title)
             ApplyPreviewPosition(AppSettings.Instance.PreviewPosition);
-            // 显示压缩包信息
+            // 显示L.T(L.Compress_Archive_Group)信息
             ShowArchiveInfo();
         }
         catch (Exception ex)
         {
-            MessageBox.Show($"加载失败: {ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+            AppMessageBox.Show(L.TF(L.Main_Status_LoadFailed, ex.Message), L.T(L.App_ErrorTitle), MessageBoxButton.OK, MessageBoxImage.Error);
             DirStatsText.Text = "";
             SelectionStatsText.Text = "";
             ArchiveStatsText.Text = "";
             PasswordStatusText.Text = "";
-            SetStatus("加载失败");
+            _archiveComment = null;
+            SetStatus(L.T(L.Main_Status_LoadFailed));
         }
     }
 
@@ -367,19 +412,19 @@ public partial class MainWindow : Window
                 await engine.ExtractAsync(archivePath, destinationPath, pwd, progress, ct, opts);
 
                 progressWindow.Close();
-                SetStatus($"解压完成: {Path.GetFileName(archivePath)}");
+                SetStatus(L.TF(L.Main_Status_ExtractDone, Path.GetFileName(archivePath)));
                 if (AppSettings.Instance.OpenFolderAfterExtract) OpenInExplorer(destinationPath);
                 return;
             }
 
-            // 所有已保存密码都失败，且压缩包有加密条目 → 弹密码输入框
+            // 所有已L.T(L.PwdEdit_Save)L.T(L.PwdMgr_Col_Password)都失败，且L.T(L.Compress_Archive_Group)有加密条目 → 弹密码输入框
             if (!_hasEncryptedArchive)
             {
                 // 非加密压缩包：直接解压，不需要密码
                 var opts = App.CreateExtractOptions();
                 await engine.ExtractAsync(archivePath, destinationPath, null, progress, ct, opts);
                 progressWindow.Close();
-                SetStatus($"解压完成: {Path.GetFileName(archivePath)}");
+                SetStatus(L.TF(L.Main_Status_ExtractDone, Path.GetFileName(archivePath)));
                 if (AppSettings.Instance.OpenFolderAfterExtract) OpenInExplorer(destinationPath);
                 return;
             }
@@ -388,56 +433,56 @@ public partial class MainWindow : Window
             if (pwdResult == null)
             {
                 progressWindow.Close();
-                SetStatus("取消解压");
+                SetStatus(L.T(L.Main_Status_ExtractCancel));
                 return;
             }
 
             var (userPwd, remember, pwdDesc, pwdPatterns) = pwdResult.Value;
-            if (string.IsNullOrEmpty(userPwd)) { progressWindow.Close(); SetStatus("取消解压"); return; }
+            if (string.IsNullOrEmpty(userPwd)) { progressWindow.Close(); SetStatus(L.T(L.Main_Status_ExtractCancel)); return; }
             bool showPwdManual = _hasEncryptedArchive && AppSettings.Instance.ShowPasswordMatchNotification;
 
             if (!await App.ExtractWithPasswordAsync(archivePath, destinationPath, engine,
-                    userPwd, "手动输入", progressWindow, progress, ct, showPwdManual, remember, pwdDesc, pwdPatterns))
+                    userPwd, L.T(L.Main_ForceLoadPwd), progressWindow, progress, ct, showPwdManual, remember, pwdDesc, pwdPatterns))
             {
                 progressWindow.Close();
-                MessageBox.Show("密码错误", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
-                SetStatus("解压失败");
+                AppMessageBox.Show(L.T(L.Main_Status_WrongPwd), L.T(L.App_ErrorTitle), MessageBoxButton.OK, MessageBoxImage.Error);
+                SetStatus("L.T(L.Settings_Tab_Extract)失败");
                 return;
             }
 
             progressWindow.Close();
-            SetStatus($"解压完成: {Path.GetFileName(archivePath)}");
+            SetStatus(L.TF(L.Main_Status_ExtractDone, Path.GetFileName(archivePath)));
             if (AppSettings.Instance.OpenFolderAfterExtract) OpenInExplorer(destinationPath);
         }
         catch (OperationCanceledException)
         {
             progressWindow.Close();
-            SetStatus("已取消");
+            SetStatus(L.T(L.Main_Status_AddCancel));
         }
         catch (Exception ex)
         {
             progressWindow.Close();
             if (IsPasswordErrorLocal(ex))
             {
-                App.LogDebug("ExtractAsync: 密码错误且用户未提供密码: {0}", ex.Message);
+                App.LogDebug("ExtractAsync: L.T(L.Main_Status_WrongPwd)且用户未提供L.T(L.PwdEdit_PasswordLabel) {0}", ex.Message);
             }
             else
             {
-                MessageBox.Show($"解压失败: {ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+                AppMessageBox.Show(L.TF(L.Main_Status_ExtractFailed, ex.Message), L.T(L.App_ErrorTitle), MessageBoxButton.OK, MessageBoxImage.Error);
             }
-            SetStatus("解压失败");
+            SetStatus("L.T(L.Settings_Tab_Extract)失败");
         }
     }
 
     /// <summary>
-    /// 判断异常是否表示需要密码。与 <see cref="App.IsPasswordError"/> 保持一致。
+    /// 判断异常L.T(L.MsgBox_Yes)L.T(L.MsgBox_No)表示需要L.T(L.PwdMgr_Col_Password)。与 <see cref="App.IsPasswordError"/> 保持一致。
     /// </summary>
     private static bool IsPasswordErrorLocal(Exception ex)
     {
         var msg = ex.Message.ToLower();
-        return msg.Contains("password") || msg.Contains("密码") ||
+        return msg.Contains("password") || msg.Contains(L.T(L.PwdMgr_Col_Password)) ||
                msg.Contains("encrypted") || msg.Contains("decrypt") ||
-               msg.Contains("encryption") || ex is InvalidOperationException ||
+               msg.Contains("encryption") ||
                (ex is ZipException && (msg.Contains("password") || msg.Contains("decrypt")));
     }
 
@@ -445,7 +490,7 @@ public partial class MainWindow : Window
     {
         try
         {
-            SetStatus("正在压缩...");
+            SetStatus(L.T(L.Main_Status_Compressing));
             ShowProgress(true);
 
             var options = App.CreateCompressOptions();
@@ -461,17 +506,17 @@ public partial class MainWindow : Window
 
             await engine.CompressAsync(sourcePaths, outputPath, options, progress);
 
-            // 加载新创建的压缩包
+            // 加载新创建的L.T(L.Compress_Archive_Group)
             await LoadArchiveAsync(outputPath);
 
-            SetStatus($"压缩完成: {Path.GetFileName(outputPath)}");
+            SetStatus(L.TF(L.Main_Status_CompressDone, Path.GetFileName(outputPath)));
             ProgressBar.Value = 100;
             ProgressText.Text = "100%";
         }
         catch (Exception ex)
         {
-            MessageBox.Show($"压缩失败: {ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
-            SetStatus("压缩失败");
+            AppMessageBox.Show(L.TF(L.Main_Status_CompressFailed, ex.Message), L.T(L.App_ErrorTitle), MessageBoxButton.OK, MessageBoxImage.Error);
+            SetStatus(L.T(L.Main_Status_CompressFailed));
         }
         finally
         {
@@ -483,7 +528,7 @@ public partial class MainWindow : Window
     {
         try
         {
-            SetStatus("正在测试压缩包...");
+            SetStatus(L.T(L.Main_Status_Testing));
             ShowProgress(true);
 
             var engine = ArchiveEngineFactory.GetEngineByExtension(archivePath);
@@ -510,39 +555,40 @@ public partial class MainWindow : Window
                                 ? pwdDialog.Patterns
                                 : new List<string> { Path.GetFileName(archivePath) };
                             var desc = pwdDialog.Description ?? "";
-                            PasswordManager.Instance.AddPassword(userPwd, desc, patterns);
+                            try { PasswordManager.Instance.AddPassword(userPwd, desc, patterns); }
+                            catch (Exception pwdEx) { App.LogDebug("ReExtractWithPassword: failed to save password: {0}", pwdEx.Message); }
                         }
                     }
                     else
                     {
                         ShowProgress(false);
-                        MessageBox.Show("密码错误", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
-                        SetStatus("测试失败");
+                        AppMessageBox.Show(L.T(L.Main_Status_WrongPwd), L.T(L.App_ErrorTitle), MessageBoxButton.OK, MessageBoxImage.Error);
+                        SetStatus(L.T(L.Main_Status_TestFailed));
                         return;
                     }
                 }
                 else
                 {
                     ShowProgress(false);
-                    SetStatus("已取消");
+                    SetStatus(L.T(L.Main_Status_AddCancel));
                     return;
                 }
             }
 
             var result = await engine.TestArchiveAsync(archivePath, password);
 
-            MessageBox.Show(
-                result ? "压缩包完整 ✓" : "压缩包已损坏 ✗",
-                "测试结果",
+            AppMessageBox.Show(
+                result ? L.T(L.Main_Status_TestResultOK) : L.T(L.Main_Status_TestResultBad),
+                L.T(L.Main_Status_TestTitle),
                 MessageBoxButton.OK,
                 result ? MessageBoxImage.Information : MessageBoxImage.Warning);
 
-            SetStatus(result ? "测试通过" : "测试失败");
+            SetStatus(result ? L.T(L.Main_Status_TestPassed) : L.T(L.Main_Status_TestFailed));
         }
         catch (Exception ex)
         {
-            MessageBox.Show($"测试失败: {ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
-            SetStatus("测试失败");
+            AppMessageBox.Show(L.TF(L.Main_Status_TestFailed, ex.Message), L.T(L.App_ErrorTitle), MessageBoxButton.OK, MessageBoxImage.Error);
+            SetStatus(L.T(L.Main_Status_TestFailed));
         }
         finally
         {

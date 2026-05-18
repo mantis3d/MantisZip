@@ -1,5 +1,7 @@
 using System.IO;
+using System.Reflection;
 using Microsoft.Win32;
+using MantisZip.UI.Localization;
 
 namespace MantisZip.UI;
 
@@ -20,6 +22,7 @@ internal static class ShellIntegration
     private static readonly string[] ArchiveExtensions =
         [".zip", ".7z", ".rar", ".tar", ".tgz", ".tar.gz", ".gz", ".iso"];
 
+    // Registry key identifiers — must stay as fixed English strings (language-independent)
     private const string CascadeRoot = "MantisZip";
     private const string ProgId = "MantisZip.Archive";
 
@@ -31,15 +34,15 @@ internal static class ShellIntegration
     private const string QuickVerb = "05_MantisZipQuick";
     private const string CompressVerb = "06_MantisZipCompress";
 
-    // Display names（在 MantisZip 子菜单下，名称无需再带 MantisZip）
-    private const string OpenDisplay = "打开压缩包";
-    private const string ExtractHereDisplay = "解压到此处";
-    private const string ExtractToNamedDisplay = "解压到（压缩包名）";
-    private const string ExtractDisplay = "解压到……";
-    private const string QuickDisplay = "压缩为（文件名）.zip";
-    private const string CompressDisplay = "压缩";
+    // Display names (shown in context menu — localized)
+    private static readonly string OpenDisplay = L.T(L.Shell_Open);
+    private static readonly string ExtractHereDisplay = L.T(L.Shell_ExtractHere);
+    private static readonly string ExtractToNamedDisplay = L.T(L.Shell_ExtractToNamed);
+    private static readonly string ExtractDisplay = L.T(L.Shell_ExtractTo);
+    private static readonly string QuickDisplay = L.T(L.Shell_QuickCompress);
+    private static readonly string CompressDisplay = L.T(L.Shell_Compress);
 
-    /// <summary>检查是否已安装 Shell 扩展。</summary>
+    /// <summary>检查是否已L.T(L.Settings_Menu_Btn_Install) Shell 扩展。</summary>
     public static bool IsInstalled
     {
         get
@@ -54,7 +57,7 @@ internal static class ShellIntegration
     }
 
     /// <summary>
-    /// 安装 Shell 右键菜单。根据 AppSettings 中的开关决定层叠/独立模式及各动词启用状态。
+    /// L.T(L.Settings_Menu_Btn_Install) Shell 右键菜单。根据 AppSettings 中的开关决定层叠/独立模式及各动词启用L.T(L.Settings_Menu_StatusGroup)。
     /// </summary>
     public static void Install()
     {
@@ -62,7 +65,7 @@ internal static class ShellIntegration
         var s = AppSettings.Instance;
         var exePath = GetExePath();
 
-        // 先卸载旧注册，避免残留
+        // 先L.T(L.Settings_Menu_Btn_Uninstall)旧注册，避免残留
         Uninstall();
 
         if (s.EnableCascadingMenu)
@@ -73,7 +76,7 @@ internal static class ShellIntegration
     }
 
     /// <summary>
-    /// 卸载所有 MantisZip 右键菜单注册。
+    /// L.T(L.Settings_Menu_Btn_Uninstall)所有 L.T(L.App_MantisZipTitle) 右键菜单注册。
     /// </summary>
     public static void Uninstall()
     {
@@ -87,7 +90,7 @@ internal static class ShellIntegration
         // 层叠子命令定义
         DeleteRegistryKey($@"Software\Classes\{CascadeRoot}");
 
-        // 独立动词（含新旧 verb 名称全覆盖，升级时清理旧版注册）
+        // 独立动词（含新旧 verb L.T(L.Main_Col_Name)全L.T(L.CompressConflict_Overwrite)，升级时清理旧版注册）
         foreach (var target in new[] { "*", "Directory", @"Directory\Background" })
         {
             // 新名称
@@ -98,7 +101,7 @@ internal static class ShellIntegration
             DeleteRegistryKey($@"Software\Classes\{target}\shell\{QuickVerb}");
             DeleteRegistryKey($@"Software\Classes\{target}\shell\{CompressVerb}");
 
-            // 旧版动词名称（v0.1.3 及以前）
+            // 旧版动词L.T(L.Main_Col_Name)（v0.1.3 及以前）
             DeleteRegistryKey($@"Software\Classes\{target}\shell\MantisZipOpen");
             DeleteRegistryKey($@"Software\Classes\{target}\shell\MantisZipExtract");
             DeleteRegistryKey($@"Software\Classes\{target}\shell\MantisZipQuick");
@@ -127,7 +130,7 @@ internal static class ShellIntegration
     {
         // 顶级层叠入口：MUIVerb + ExtendedSubCommandsKey
         var entryPath = $@"Software\Classes\{target}\shell\{CascadeRoot}";
-        SetRegistryValue(entryPath, "MUIVerb", "MantisZip");
+        SetRegistryValue(entryPath, "MUIVerb", L.T(L.App_MantisZipTitle));
 
         var subCommandsPath = $@"{CascadeRoot}\{subKeySuffix}";
         SetRegistryValue(entryPath, "ExtendedSubCommandsKey", subCommandsPath);
@@ -139,7 +142,7 @@ internal static class ShellIntegration
         var shellPath = $@"Software\Classes\{subCommandsPath}\shell";
         int order = 0;
 
-        // 1. 用MantisZip打开（仅压缩包）
+        // 1. 用L.T(L.App_MantisZipTitle)L.T(L.Main_Toolbar_Open)（仅L.T(L.Compress_Archive_Group)）
         if (s.EnableOpenMenu)
         {
             order++;
@@ -152,7 +155,7 @@ internal static class ShellIntegration
             SetRegistryValue($@"{verbPath}\command", null, $@"""{exePath}"" --open ""{argVar}""");
         }
 
-        // 解压相关动词（仅压缩包；受 EnableExtractMenu 统一控制）
+        // L.T(L.Settings_Tab_Extract)相关动词（仅L.T(L.Compress_Archive_Group)；受 EnableExtractMenu 统一控制）
         if (includeExtract && s.EnableExtractMenu)
         {
             // 2. 用MantisZip解压到此处
@@ -167,7 +170,7 @@ internal static class ShellIntegration
                 SetRegistryValue($@"{verbPath}\command", null, $@"""{exePath}"" --extract-here ""{argVar}""");
             }
 
-            // 3. 用MantisZip解压到（压缩包名）
+            // 3. 用L.T(L.App_MantisZipTitle)L.T(L.Shell_ExtractToNamed)
             {
                 order++;
                 var verb = $"{order:D2}_extracttonamed";
@@ -179,7 +182,7 @@ internal static class ShellIntegration
                 SetRegistryValue($@"{verbPath}\command", null, $@"""{exePath}"" --extract-to-name ""{argVar}""");
             }
 
-            // 4. 用MantisZip解压到……
+            // 4. 用L.T(L.App_MantisZipTitle)L.T(L.Shell_ExtractTo)
             {
                 order++;
                 var verb = $"{order:D2}_extract";
@@ -192,7 +195,7 @@ internal static class ShellIntegration
             }
         }
 
-        // 5. 压缩为（文件名）.zip
+        // 5. L.T(L.Shell_QuickCompress)
         if (s.EnableQuickCompress)
         {
             order++;
@@ -204,7 +207,7 @@ internal static class ShellIntegration
             SetRegistryValue($@"{verbPath}\command", null, $@"""{exePath}"" --compress-quick ""{argVar}""");
         }
 
-        // 6. 用MantisZip压缩
+        // 6. 用L.T(L.App_MantisZipTitle)L.T(L.Shell_Compress)
         if (s.EnableCompressMenu)
         {
             order++;
@@ -231,7 +234,7 @@ internal static class ShellIntegration
             InstallVerb("*", OpenVerb, OpenDisplay, $@"""{exePath}"" --open ""%1""", s.ShowMenuIcons, exePath, BuildAppliesToFilter());
         }
 
-        // ——— 2-4. 解压动词（仅压缩包；受 EnableExtractMenu 统一控制）———
+        // ——— 2-4. L.T(L.Settings_Tab_Extract)动词（仅L.T(L.Compress_Archive_Group)；受 EnableExtractMenu 统一控制）———
         if (s.EnableExtractMenu)
         {
             InstallVerb("*", ExtractHereVerb, ExtractHereDisplay, $@"""{exePath}"" --extract-here ""%1""", s.ShowMenuIcons, exePath, BuildAppliesToFilter());
@@ -239,13 +242,13 @@ internal static class ShellIntegration
             InstallVerb("*", ExtractVerb, ExtractDisplay, $@"""{exePath}"" --extract ""%1""", s.ShowMenuIcons, exePath, BuildAppliesToFilter());
         }
 
-        // ——— 5. 压缩为（文件名）.zip ———
+        // ——— 5. L.T(L.Shell_QuickCompress) ———
         if (s.EnableQuickCompress)
         {
             InstallVerb("*", QuickVerb, QuickDisplay, $@"""{exePath}"" --compress-quick ""%1""", s.ShowMenuIcons, exePath);
         }
 
-        // ——— 6. 用MantisZip压缩 ———
+        // ——— 6. 用L.T(L.App_MantisZipTitle)L.T(L.Shell_Compress) ———
         if (s.EnableCompressMenu)
         {
             InstallVerb("*", CompressVerb, CompressDisplay, $@"""{exePath}"" --compress ""%1""", s.ShowMenuIcons, exePath);
@@ -273,9 +276,9 @@ internal static class ShellIntegration
 
     #endregion
 
-    #region 文件关联
+    #region L.T(L.Settings_Tab_FileAssoc)
 
-    /// <summary>检查文件关联是否已安装。</summary>
+    /// <summary>检查L.T(L.Settings_Tab_FileAssoc)L.T(L.MsgBox_Yes)L.T(L.MsgBox_No)已L.T(L.Settings_Menu_Btn_Install)。</summary>
     public static bool AreAssociationsInstalled
     {
         get
@@ -288,7 +291,7 @@ internal static class ShellIntegration
     }
 
     /// <summary>
-    /// 注册 ProgId 并将压缩格式扩展名与之关联。
+    /// 注册 ProgId 并将L.T(L.Shell_Compress)格式扩展名与之关联。
     /// 写入 HKCU\Software\Classes，无需管理员权限。
     /// </summary>
     public static void InstallAssociations()
@@ -298,14 +301,14 @@ internal static class ShellIntegration
 
         // 1. 注册 ProgId
         var progIdKey = $@"Software\Classes\{ProgId}";
-        SetRegistryValue(progIdKey, null, "MantisZip 压缩包");
-        SetRegistryValue($@"{progIdKey}\shell\open", null, "用 MantisZip 打开");
+        SetRegistryValue(progIdKey, null, L.T(L.Shell_ProgIdDesc));
+        SetRegistryValue($@"{progIdKey}\shell\open", null, L.T(L.Shell_OpenVerb));
         SetRegistryValue($@"{progIdKey}\shell\open\command", null, $@"""{exePath}"" --open ""%1""");
         SetRegistryValue($@"{progIdKey}\DefaultIcon", null, $@"""{exePath},0""");
 
-        // 2. 注册 Applications 条目（控制"打开方式"列表中的显示名称）
+        // 2. 注册 Applications 条目（控制"L.T(L.Main_Toolbar_Open)方式"列表中的L.T(L.Pwd_ShowBtn)L.T(L.Main_Col_Name)）
         var appKey = $@"Software\Classes\Applications\{Path.GetFileName(exePath)}";
-        SetRegistryValue(appKey, "FriendlyAppName", "MantisZip");
+        SetRegistryValue(appKey, "FriendlyAppName", L.T(L.App_MantisZipTitle));
         SetRegistryValue($@"{appKey}\shell\open\command", null, $@"""{exePath}"" --open ""%1""");
         foreach (var ext in ArchiveExtensions)
         {
@@ -316,23 +319,32 @@ internal static class ShellIntegration
         // 3. 每个扩展名写 OpenWithProgids
         foreach (var ext in ArchiveExtensions)
         {
-            if (ext == ".tar.gz") continue; // .tar.gz 由 .gz 覆盖
+            if (ext == ".tar.gz") continue; // .tar.gz 由 .gz L.T(L.CompressConflict_Overwrite)
             var extKey = $@"Software\Classes\{ext}\OpenWithProgids";
             using var key = Registry.CurrentUser.CreateSubKey(extKey);
             key?.SetValue(ProgId, Array.Empty<byte>(), RegistryValueKind.None);
+        }
+
+        // 4. 每个扩展名L.T(L.Settings_Title)独立图标
+        foreach (var ext in ArchiveExtensions)
+        {
+            if (ext == ".tar.gz") continue;
+            var iconPath = GetIconPath(ext);
+            if (iconPath != null)
+                SetRegistryValue($@"Software\Classes\{ext}\DefaultIcon", null, iconPath);
         }
 
         App.LogDebug("ShellIntegration.InstallAssociations: done");
     }
 
     /// <summary>
-    /// 卸载文件关联：删除 ProgId 和扩展名的 OpenWithProgids 条目。
+    /// L.T(L.Settings_Assoc_Uninstall)：删除 ProgId 和扩展名的 OpenWithProgids 条目。
     /// </summary>
     public static void UninstallAssociations()
     {
         App.LogDebug("ShellIntegration.UninstallAssociations: starting");
 
-        // 删除每个扩展名的 ProgId 条目
+        // 删除每个扩展名的 ProgId 条目 和 DefaultIcon
         foreach (var ext in ArchiveExtensions)
         {
             if (ext == ".tar.gz") continue;
@@ -342,6 +354,23 @@ internal static class ShellIntegration
                 key?.DeleteValue(ProgId, throwOnMissingValue: false);
             }
             catch { /* 该扩展可能没有 OpenWithProgids 键 */ }
+
+            // 清理我们设置的 DefaultIcon（仅当指向我们的图标路径时）
+            try
+            {
+                var iconPath = GetIconPath(ext);
+                if (iconPath != null)
+                {
+                    using var extKey = Registry.CurrentUser.OpenSubKey($@"Software\Classes\{ext}", writable: true);
+                    if (extKey?.GetValue(null) is string currentIcon && currentIcon.Equals(iconPath, StringComparison.OrdinalIgnoreCase))
+                    {
+                        // DeleteValue(null) deletes the (default) registry value
+                        // The null! suppresses nullable warning since the API is annotated incorrectly
+                        extKey.DeleteValue(null!);
+                    }
+                }
+            }
+            catch { }
         }
 
         // 删除 Applications 条目
@@ -381,11 +410,34 @@ internal static class ShellIntegration
 
     private static string GetExePath()
     {
-        App.LogDebug("ShellIntegration.GetExePath: ProcessPath={0}", Environment.ProcessPath ?? "(null)");
-        var path = Environment.ProcessPath;
-        if (!string.IsNullOrEmpty(path) && path.EndsWith(".dll", StringComparison.OrdinalIgnoreCase))
-            path = path.Replace(".dll", ".exe", StringComparison.OrdinalIgnoreCase);
-        return path ?? throw new InvalidOperationException("无法确定可执行文件路径");
+        return Environment.ProcessPath ?? Assembly.GetExecutingAssembly().Location;
+    }
+
+    /// <summary>
+    /// 返回扩展名对应的图标文件绝对路径。
+    /// 图标文件位于输出目录的 Resources\Icons\ 下。
+    /// 如果图标文件不存在，返回 null。
+    /// </summary>
+    private static string? GetIconPath(string extension)
+    {
+        var iconName = extension.ToLowerInvariant() switch
+        {
+            ".zip" => "zip.ico",
+            ".7z" => "sevenz.ico",
+            ".rar" => "rar.ico",
+            ".tar" => "tar.ico",
+            ".tgz" or ".tar.gz" => "tgz.ico",
+            ".gz" => "gz.ico",
+            ".iso" => "iso.ico",
+            _ => null,
+        };
+        if (iconName == null) return null;
+
+        var baseDir = Path.GetDirectoryName(GetExePath());
+        if (baseDir == null) return null;
+
+        var iconPath = Path.Combine(baseDir, "Resources", "Icons", iconName);
+        return File.Exists(iconPath) ? iconPath : null;
     }
 
     #endregion

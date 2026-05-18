@@ -1,6 +1,7 @@
 using System.Windows;
 using System.Collections.ObjectModel;
 using MantisZip.Core;
+using MantisZip.UI.Localization;
 
 namespace MantisZip.UI;
 
@@ -14,6 +15,7 @@ public partial class PasswordManagerWindow : Window
     public PasswordManagerWindow()
     {
         InitializeComponent();
+        App.ApplyTextRenderingMode(this);
         LoadPasswords(showPasswords: false);
     }
 
@@ -45,7 +47,7 @@ public partial class PasswordManagerWindow : Window
     {
         var show = !_showPasswords;
         LoadPasswords(show);
-        ShowPwdBtn.Content = show ? "👁 隐藏密码" : "👁 显示密码";
+        ShowPwdBtn.Content = show ? L.T(L.PwdMgr_HidePwd) : L.T(L.PwdMgr_ShowPwd);
     }
 
     private void Add_Click(object sender, RoutedEventArgs e)
@@ -54,7 +56,8 @@ public partial class PasswordManagerWindow : Window
         dialog.Owner = this;
         if (dialog.ShowDialog() == true)
         {
-            PasswordManager.Instance.AddPassword(dialog.ResultPassword, dialog.ResultDescription, dialog.ResultPatterns);
+            try { PasswordManager.Instance.AddPassword(dialog.ResultPassword, dialog.ResultDescription, dialog.ResultPatterns); }
+            catch (Exception ex) { AppMessageBox.Show(L.TF(L.Password_SaveFailed, ex.Message), L.T(L.App_ErrorTitle), MessageBoxButton.OK, MessageBoxImage.Error); }
             LoadPasswords(_showPasswords);
         }
     }
@@ -67,7 +70,8 @@ public partial class PasswordManagerWindow : Window
         dialog.Owner = this;
         if (dialog.ShowDialog() == true)
         {
-            PasswordManager.Instance.UpdatePassword(entry.Id, dialog.ResultPassword, dialog.ResultDescription, dialog.ResultPatterns);
+            try { PasswordManager.Instance.UpdatePassword(entry.Id, dialog.ResultPassword, dialog.ResultDescription, dialog.ResultPatterns); }
+            catch (Exception ex) { AppMessageBox.Show(L.TF(L.Password_UpdateFailed, ex.Message), L.T(L.App_ErrorTitle), MessageBoxButton.OK, MessageBoxImage.Error); }
             LoadPasswords(_showPasswords);
         }
     }
@@ -76,15 +80,16 @@ public partial class PasswordManagerWindow : Window
     {
         if (PasswordGrid.SelectedItem is not PasswordEntryView entry) return;
 
-        var result = MessageBox.Show(
-            $"确定要删除密码 \"{entry.Password}\" 吗？",
-            "确认删除",
+        var result = AppMessageBox.Show(
+            L.TF(L.Password_DeleteConfirm, entry.Password),
+            L.T(L.PwdMgr_DeleteTitle),
             MessageBoxButton.YesNo,
             MessageBoxImage.Question);
 
         if (result == MessageBoxResult.Yes)
         {
-            PasswordManager.Instance.DeletePassword(entry.Id);
+            try { PasswordManager.Instance.DeletePassword(entry.Id); }
+            catch (Exception ex) { AppMessageBox.Show(L.TF(L.Password_DeleteFailed, ex.Message), L.T(L.App_ErrorTitle), MessageBoxButton.OK, MessageBoxImage.Error); }
             LoadPasswords(_showPasswords);
         }
     }

@@ -1,7 +1,8 @@
 <Window x:Class="MantisZip.UI.CompressConflictDialog"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="目标文件已存在" Width="440" SizeToContent="Height"
+             xmlns:l="clr-namespace:MantisZip.UI.Localization"
+        Title="{l:L CompressConflict_Title}" Width="440" SizeToContent="Height"
         WindowStartupLocation="CenterScreen"
         Topmost="True"
         ResizeMode="NoResize"
@@ -12,21 +13,26 @@
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="10"/>
             <RowDefinition Height="Auto"/>
+            <RowDefinition Height="8"/>
+            <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <TextBlock Grid.Row="0" FontSize="13" Foreground="#333" TextWrapping="Wrap">
-            目标文件 <Run x:Name="FileNameText" FontFamily="Consolas" FontWeight="SemiBold"/> 已存在，请选择处理方式：
-        </TextBlock>
+        <TextBlock x:Name="HeaderText" Grid.Row="0" FontSize="13" Foreground="#333" TextWrapping="Wrap"/>
 
         <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Center">
-            <Button x:Name="OverwriteBtn" Content="覆盖" Width="85" Height="28" Click="Overwrite_Click"
+            <Button x:Name="OverwriteBtn" Content="{l:L CompressConflict_Overwrite}" Width="85" Height="28" Click="Overwrite_Click"
                     Background="White" BorderBrush="#CCC" BorderThickness="1" Margin="0,0,6,0"/>
-            <Button x:Name="AddBtn" Content="添加到压缩包" Width="110" Height="28" Click="Add_Click"
+            <Button x:Name="AddBtn" Content="{l:L CompressConflict_Add}" Width="110" Height="28" Click="Add_Click"
                     Background="White" BorderBrush="#CCC" BorderThickness="1" Margin="6,0,6,0"/>
-            <Button x:Name="RenameBtn" Content="自动重命名" Width="90" Height="28" Click="Rename_Click"
+            <Button x:Name="RenameBtn" Content="{l:L CompressConflict_Rename}" Width="90" Height="28" Click="Rename_Click"
                     Background="White" BorderBrush="#CCC" BorderThickness="1" Margin="6,0,6,0"/>
-            <Button Content="取消" Width="70" Height="28" Click="Cancel_Click"
+            <Button Content="{l:L MsgBox_Cancel}" Width="70" Height="28" Click="Cancel_Click"
                     Background="White" BorderBrush="#CCC" BorderThickness="1" Margin="6,0,0,0"/>
         </StackPanel>
+
+        <!-- Row 4: 自定义重命名输入 -->
+        <Grid Grid.Row="4" HorizontalAlignment="Stretch" Margin="14,0">
+            <TextBox x:Name="RenameTextBox" FontSize="12" Padding="3,2"/>
+        </Grid>
     </Grid>
 </Window>

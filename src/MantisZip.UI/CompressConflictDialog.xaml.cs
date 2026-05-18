@@ -1,5 +1,6 @@
 using System.IO;
 using System.Windows;
+using MantisZip.UI.Localization;
 
 namespace MantisZip.UI;
 
@@ -15,15 +16,24 @@ public partial class CompressConflictDialog : Window
 {
     public CompressConflictAction ResultAction { get; private set; } = CompressConflictAction.Cancel;
 
-    /// <param name="canAdd">是否支持"添加到压缩包"（Tar 不支持）</param>
-    public CompressConflictDialog(string filePath, bool canAdd)
+    /// <summary>用户输入的自定义文件名（未修改时返回建议名）</summary>
+    public string? CustomName => RenameTextBox.Text;
+
+    /// <param name="filePath">目标文件路径</param>
+    /// <param name="canAdd">L.T(L.MsgBox_Yes)L.T(L.MsgBox_No)支持L.T(L.CompressConflict_Add)（Tar 不支持）</param>
+    /// <param name="suggestedName">L.T(L.CompressConflict_Rename)的建议名（不含路径），用于预填输入框</param>
+    public CompressConflictDialog(string filePath, bool canAdd, string? suggestedName = null)
     {
         InitializeComponent();
-        FileNameText.Text = $"“{Path.GetFileName(filePath)}”";
+        HeaderText.Text = string.Format(L.T(L.CompressConflict_Header), $"“{Path.GetFileName(filePath)}”");
+
+        // 预填L.T(L.CompressConflict_Rename)的建议名（由调用方预计算）
+        RenameTextBox.Text = suggestedName ?? Path.GetFileName(filePath);
+
         if (!canAdd)
         {
             AddBtn.IsEnabled = false;
-            AddBtn.ToolTip = "此格式不支持添加文件";
+            AddBtn.ToolTip = L.T(L.CompressConflict_Tooltip_NoAdd);
         }
     }
 

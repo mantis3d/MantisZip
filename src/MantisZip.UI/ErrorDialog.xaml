@@ -1,7 +1,8 @@
 <Window x:Class="MantisZip.UI.ErrorDialog"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="文件读取错误" Width="420" SizeToContent="Height"
+             xmlns:l="clr-namespace:MantisZip.UI.Localization"
+        Title="{l:L Error_Title}" Width="420" SizeToContent="Height"
         WindowStartupLocation="CenterScreen"
         Topmost="True"
         ResizeMode="NoResize"
@@ -18,23 +19,21 @@
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <TextBlock Grid.Row="0" FontSize="13" FontWeight="SemiBold" Foreground="#333">
-            无法读取文件 <Run x:Name="FileNameText" FontFamily="Consolas"/>
-        </TextBlock>
+        <TextBlock x:Name="HeaderText" Grid.Row="0" FontSize="13" FontWeight="SemiBold" Foreground="#333"/>
 
         <TextBlock x:Name="ErrorMsgText" Grid.Row="2" TextWrapping="Wrap" FontSize="11" Foreground="#888"/>
 
         <StackPanel Grid.Row="4" Orientation="Horizontal" HorizontalAlignment="Center">
-            <Button Content="重试" Width="72" Height="28" Click="Retry_Click"
+            <Button Content="{l:L Error_Retry}" Width="72" Height="28" Click="Retry_Click"
                     Background="White" BorderBrush="#CCC" BorderThickness="1" Margin="0,0,6,0"/>
-            <Button Content="跳过" Width="72" Height="28" Click="Skip_Click"
+            <Button Content="{l:L Error_Skip}" Width="72" Height="28" Click="Skip_Click"
                     Background="White" BorderBrush="#CCC" BorderThickness="1" Margin="6,0,6,0"/>
-            <Button Content="中止" Width="72" Height="28" Click="Abort_Click"
+            <Button Content="{l:L Error_Abort}" Width="72" Height="28" Click="Abort_Click"
                     Background="White" BorderBrush="#CCC" BorderThickness="1" Margin="6,0,0,0"/>
         </StackPanel>
 
         <CheckBox x:Name="ApplyAllCheck" Grid.Row="6"
-                  Content="对后续所有文件使用相同操作"
+                  Content="{l:L Error_ApplyToAll}"
                   FontSize="12" Foreground="#555"
                   HorizontalAlignment="Center"/>
     </Grid>

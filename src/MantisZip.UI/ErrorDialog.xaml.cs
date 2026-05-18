@@ -1,11 +1,12 @@
 using System.IO;
 using System.Windows;
 using MantisZip.Core.Abstractions;
+using MantisZip.UI.Localization;
 
 namespace MantisZip.UI;
 
 /// <summary>
-/// 文件读取错误对话框：重试 / 跳过 / 中止，支持"应用到全部"。
+/// 文件读取错误对话框：重试 / 跳过 / 中止，支持"L.T(L.Settings_Menu_Btn_Apply)到全部"。
 /// Topmost 以确保不被其他窗口挡住。
 /// </summary>
 public partial class ErrorDialog : Window
@@ -16,7 +17,7 @@ public partial class ErrorDialog : Window
     public ErrorDialog(FileErrorInfo info)
     {
         InitializeComponent();
-        FileNameText.Text = $"“{Path.GetFileName(info.FilePath)}”";
+        HeaderText.Text = string.Format(L.T(L.Error_Header), $"“{Path.GetFileName(info.FilePath)}”");
         ErrorMsgText.Text = info.ErrorMessage;
     }
 

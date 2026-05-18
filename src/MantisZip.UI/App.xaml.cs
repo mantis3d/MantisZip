@@ -1,15 +1,17 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
 using System.IO;
 using System.IO.Pipes;
 using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Windows;
+using System.Windows.Media;
 using System.Windows.Threading;
 using ICSharpCode.SharpZipLib.Zip;
 using MantisZip.Core;
 using MantisZip.Core.Abstractions;
 using MantisZip.Core.Engines;
+using MantisZip.UI.Localization;
 
 namespace MantisZip.UI;
 
@@ -20,15 +22,15 @@ public partial class App : Application
 {
     private static readonly string LogFile = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "debug.log");
     private static readonly string StartupLog = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "MantisZip", "startup.log");
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), L.T(L.App_MantisZipTitle), "startup.log");
     private static Mutex? _instanceMutex;
 
-    private const string CompressMutexName = "MantisZip-CompressMutex";
-    private const string CompressPipeName = "MantisZip-Compress";
+    private const string CompressMutexName = "L.T(L.App_MantisZipTitle)-CompressMutex";
+    private const string CompressPipeName = "L.T(L.App_MantisZipTitle)-Compress";
 
     /// <summary>
     /// 全局初始化：所有入口（主窗口、--compress、--extract 等）都先经过这里。
-    /// 用于设置编码、全局静态变量等。
+    /// 用于L.T(L.Settings_Title)编码、全局静态变量等。
     /// </summary>
     private static void InitializeApp()
     {
@@ -59,6 +61,9 @@ public partial class App : Application
         // 全局初始化（所有入口最先运行）
         InitializeApp();
 
+        // 初始化语言管理器（需在 InitializeApp 之后，因为初始化加载 AppSettings）
+        LanguageManager.Instance.Initialize();
+
         // ===== 持久化启动日志（独立于 debug.log，不被删除）=====
         LogStartup($"START BaseDir={AppDomain.CurrentDomain.BaseDirectory} Args=[{string.Join(" ", e.Args)}]");
 
@@ -85,31 +90,31 @@ public partial class App : Application
                 {
                     case "--install-shell":
                         ShellIntegration.Install();
-                        MessageBox.Show(
-                            "Shell 右键菜单已安装。\n\n" +
-                            "• 右键压缩包 → 打开压缩包 / 解压到此处 / 解压到压缩包名 / 解压到……\n" +
-                            "• 右键任意文件/文件夹 → 压缩为（文件名）.zip / 压缩",
-                            "MantisZip", MessageBoxButton.OK, MessageBoxImage.Information);
+                        AppMessageBox.Show(
+                            "L.T(L.Settings_Menu_InstalledMsg)。\n\n" +
+                            "• 右键L.T(L.Compress_Archive_Group) → L.T(L.Shell_Open) / L.T(L.Shell_ExtractHere) / L.T(L.Settings_Tab_Extract)到L.T(L.Compress_Archive_Group)名 / L.T(L.Shell_ExtractTo)\n" +
+                            L.T(L.Shell_Compress),
+                            L.T(L.App_MantisZipTitle), MessageBoxButton.OK, MessageBoxImage.Information);
                         Shutdown();
                         return;
 
                     case "--uninstall-shell":
                         ShellIntegration.Uninstall();
-                        MessageBox.Show("Shell 右键菜单已卸载", "MantisZip",
+                        AppMessageBox.Show(L.T(L.App_ShellUninstalled), L.T(L.App_MantisZipTitle),
                             MessageBoxButton.OK, MessageBoxImage.Information);
                         Shutdown();
                         return;
 
                     case "--install-assoc":
                         ShellIntegration.InstallAssociations();
-                        MessageBox.Show("文件关联已安装。\n\n现在双击 .zip/.7z/.rar 等文件将默认用 MantisZip 打开。",
-                            "MantisZip", MessageBoxButton.OK, MessageBoxImage.Information);
+                        AppMessageBox.Show("L.T(L.Settings_Assoc_InstalledMsg)。\n\n现在双击 .zip/.7z/.rar 等文件将默认L.T(L.Shell_OpenVerb)。",
+                            L.T(L.App_MantisZipTitle), MessageBoxButton.OK, MessageBoxImage.Information);
                         Shutdown();
                         return;
 
                     case "--uninstall-assoc":
                         ShellIntegration.UninstallAssociations();
-                        MessageBox.Show("文件关联已卸载", "MantisZip",
+                        AppMessageBox.Show(L.T(L.Settings_Assoc_UninstalledMsg), L.T(L.App_MantisZipTitle),
                             MessageBoxButton.OK, MessageBoxImage.Information);
                         Shutdown();
                         return;
@@ -135,10 +140,10 @@ public partial class App : Application
                         return;
 
                     case "--test":
-                        LogStartup("--test 模式：应用启动成功");
-                        MessageBox.Show(
-                            $"应用启动成功\n\n当前目录: {AppDomain.CurrentDomain.BaseDirectory}\n启动日志: {StartupLog}",
-                            "MantisZip 测试", MessageBoxButton.OK, MessageBoxImage.Information);
+                        LogStartup("--test 模式：L.T(L.Settings_Menu_Btn_Apply)启动成功");
+                        AppMessageBox.Show(
+                            L.TF(L.App_StartupSuccess, AppDomain.CurrentDomain.BaseDirectory, StartupLog),
+                            L.T(L.App_StartupTestTitle), MessageBoxButton.OK, MessageBoxImage.Information);
                         Shutdown();
                         return;
 
@@ -151,13 +156,13 @@ public partial class App : Application
         catch (Exception ex)
         {
             Log("OnStartup 异常: {0}\n{1}", ex.Message, ex.StackTrace ?? "");
-            MessageBox.Show($"启动失败: {ex.Message}", "MantisZip 错误",
+            AppMessageBox.Show(L.TF(L.App_StartupFailed, ex.Message), L.T(L.App_StartupErrorTitle),
                 MessageBoxButton.OK, MessageBoxImage.Error);
             Shutdown();
             return;
         }
 
-        // 正常启动：手动创建主窗口（已移除 StartupUri）
+        // 正常启动：手动创建主窗口（已L.T(L.Compress_Remove) StartupUri）
         var mainWin = new MainWindow();
         mainWin.Show();
         base.OnStartup(e);
@@ -206,7 +211,7 @@ public partial class App : Application
                 catch (Exception ex)
                 {
                     LogStartup($"HandleCompress: DispatcherTimer 回调异常: {ex.Message}");
-                    MessageBox.Show($"启动压缩窗口失败: {ex.Message}", "MantisZip 错误",
+                    AppMessageBox.Show(L.TF(L.App_CompressWindowFailed, ex.Message), L.T(L.App_StartupErrorTitle),
                         MessageBoxButton.OK, MessageBoxImage.Error);
                     Current.Shutdown();
                 }
@@ -272,7 +277,7 @@ public partial class App : Application
     #endregion
 
     /// <summary>
-    /// 显示压缩窗口（--compress 专用，无主窗口）。
+    /// L.T(L.Pwd_ShowBtn)L.T(L.Shell_Compress)窗口（--compress 专用，无主窗口）。
     /// </summary>
     private static void ShowCompressWindow(List<string> paths)
     {
@@ -318,12 +323,12 @@ public partial class App : Application
     {
         if (string.IsNullOrEmpty(archivePath) || !File.Exists(archivePath))
         {
-            MessageBox.Show("要解压的文件不存在", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+            AppMessageBox.Show(L.T(L.App_FileNotFound), L.T(L.App_ErrorTitle), MessageBoxButton.OK, MessageBoxImage.Error);
             Current.Shutdown();
             return;
         }
 
-        // 解压到压缩包所在目录
+        // L.T(L.Settings_Tab_Extract)到L.T(L.Settings_Extract_Dest_SameDir)
         var dest = Path.GetDirectoryName(archivePath);
         if (string.IsNullOrEmpty(dest))
             dest = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
@@ -338,12 +343,12 @@ public partial class App : Application
     {
         if (string.IsNullOrEmpty(archivePath) || !File.Exists(archivePath))
         {
-            MessageBox.Show("要解压的文件不存在", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+            AppMessageBox.Show(L.T(L.App_FileNotFound), L.T(L.App_ErrorTitle), MessageBoxButton.OK, MessageBoxImage.Error);
             Current.Shutdown();
             return;
         }
 
-        // 解压到 压缩包所在目录\压缩包名称\ 下
+        // L.T(L.Settings_Tab_Extract)到 L.T(L.Settings_Extract_Dest_SameDir)\L.T(L.Compress_Archive_Group)L.T(L.Main_Col_Name)\ 下
         var parentDir = Path.GetDirectoryName(archivePath);
         var archiveName = Path.GetFileNameWithoutExtension(archivePath);
         if (string.IsNullOrEmpty(parentDir))
@@ -360,14 +365,14 @@ public partial class App : Application
     {
         if (string.IsNullOrEmpty(archivePath) || !File.Exists(archivePath))
         {
-            MessageBox.Show("要解压的文件不存在", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+            AppMessageBox.Show(L.T(L.App_FileNotFound), L.T(L.App_ErrorTitle), MessageBoxButton.OK, MessageBoxImage.Error);
             Current.Shutdown();
             return;
         }
 
         var settings = AppSettings.Instance;
 
-        // 确定解压目标目录
+        // L.T(L.MsgBox_Ok)L.T(L.Settings_Tab_Extract)目标目录
         var dest = ResolveExtractDestinationStatic(archivePath, settings);
         if (dest == null)
         {
@@ -476,7 +481,8 @@ public partial class App : Application
                 ? pwdPatterns
                 : new List<string> { Path.GetFileName(archivePath) };
             var saveDesc = !string.IsNullOrEmpty(pwdDesc) ? pwdDesc : "";
-            PasswordManager.Instance.AddPassword(password, saveDesc, savePatterns);
+            try { PasswordManager.Instance.AddPassword(password, saveDesc, savePatterns); }
+            catch (Exception pwdEx) { Log("HandleExtractAsync: failed to save password: {0}", pwdEx.Message); }
         }
         return true;
     }
@@ -484,15 +490,15 @@ public partial class App : Application
     #endregion
 
     /// <summary>
-    /// 公共解压逻辑：获取引擎、显示进度窗口、执行解压，完成后退出。
-    /// 支持从 PasswordManager 加载已保存密码，以及在加密时弹出密码输入框。
+    /// 公共L.T(L.Settings_Tab_Extract)逻辑：获取引擎、L.T(L.Pwd_ShowBtn)进度窗口、执行L.T(L.Settings_Tab_Extract)，L.T(L.Progress_Done)后退出。
+    /// 支持从 PasswordManager 加载已L.T(L.PwdEdit_Save)密码，以及在加密时弹出密码输入框。
     /// </summary>
     private static void RunExtractStatic(string archivePath, string dest)
     {
         var engine = ArchiveEngineFactory.GetEngineByExtension(archivePath);
         if (engine == null)
         {
-            MessageBox.Show("不支持的压缩格式", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+            AppMessageBox.Show(L.T(L.Main_DragFormatUnsupported), L.T(L.App_ErrorTitle), MessageBoxButton.OK, MessageBoxImage.Error);
             Current.Shutdown();
             return;
         }
@@ -503,7 +509,7 @@ public partial class App : Application
         var progressWindow = new ProgressWindow();
         progressWindow.InitCancellation();
         progressWindow.Show();
-        progressWindow.SetProgress(0, "正在解压...");
+        progressWindow.SetProgress(0, L.T(L.Main_Status_Extracting));
 
         var baseProgress = new Progress<ArchiveProgress>(p =>
         {
@@ -514,7 +520,7 @@ public partial class App : Application
 
         Log("--extract: {0} → {1}", archivePath, dest);
 
-        // 后台解压，完成后自动退出
+        // 后台L.T(L.Settings_Tab_Extract)，L.T(L.Progress_Done)后自动退出
         var appRef = Current; // capture for lambdas
         Task.Run(async () =>
         {
@@ -537,7 +543,7 @@ public partial class App : Application
                     await progressWindow.Dispatcher.InvokeAsync(() =>
                     {
                         appRef.ShutdownMode = ShutdownMode.OnExplicitShutdown;
-                        progressWindow.SetComplete("解压完成");
+                        progressWindow.SetComplete(L.T(L.App_ExtractComplete));
                     });
                     if (settings.OpenFolderAfterExtract) OpenInExplorerStatic(dest);
                     await Task.Delay(2500);
@@ -555,7 +561,7 @@ public partial class App : Application
                     await progressWindow.Dispatcher.InvokeAsync(() =>
                     {
                         appRef.ShutdownMode = ShutdownMode.OnExplicitShutdown;
-                        progressWindow.SetComplete("解压完成");
+                        progressWindow.SetComplete(L.T(L.App_ExtractComplete));
                     });
                     if (settings.OpenFolderAfterExtract) OpenInExplorerStatic(dest);
                     await Task.Delay(2500);
@@ -579,15 +585,15 @@ public partial class App : Application
                 }
                 LogStartup($"RunExtractStatic: user entered password (remember={remember})");
 
-                // QuickVerify + 解压（带保存密码）
+                // QuickVerify + L.T(L.Settings_Tab_Extract)（带L.T(L.PwdEdit_Save)L.T(L.PwdMgr_Col_Password)）
                 bool showPwdManual = AppSettings.Instance.ShowPasswordMatchNotification;
-                if (!await ExtractWithPasswordAsync(archivePath, dest, engine, userPwd, "手动输入",
+                if (!await ExtractWithPasswordAsync(archivePath, dest, engine, userPwd, L.T(L.Main_ForceLoadPwd),
                         progressWindow, progress, progressWindow.CancellationToken, showPwdManual, remember,
                         pwdDesc, pwdPatterns))
                 {
                     await progressWindow.Dispatcher.InvokeAsync(() =>
                     {
-                        MessageBox.Show("密码错误", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+                        AppMessageBox.Show(L.T(L.Main_Status_WrongPwd), L.T(L.App_ErrorTitle), MessageBoxButton.OK, MessageBoxImage.Error);
                         appRef.Shutdown();
                     });
                     return;
@@ -596,7 +602,7 @@ public partial class App : Application
                 await progressWindow.Dispatcher.InvokeAsync(() =>
                 {
                     appRef.ShutdownMode = ShutdownMode.OnExplicitShutdown;
-                    progressWindow.SetComplete("解压完成");
+                    progressWindow.SetComplete(L.T(L.App_ExtractComplete));
                 });
                 if (settings.OpenFolderAfterExtract) OpenInExplorerStatic(dest);
                 await Task.Delay(2500);
@@ -612,7 +618,7 @@ public partial class App : Application
                 Log("--extract 失败: {0}", ex.Message);
                 await progressWindow.Dispatcher.InvokeAsync(() =>
                 {
-                    MessageBox.Show($"解压失败: {ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+                    AppMessageBox.Show(L.TF(L.App_ExtractFailed, ex.Message), L.T(L.App_ErrorTitle), MessageBoxButton.OK, MessageBoxImage.Error);
                     appRef.Shutdown();
                 });
             }
@@ -620,7 +626,7 @@ public partial class App : Application
     }
 
     /// <summary>
-    /// 从 AppSettings 读取解压冲突策略。
+    /// 从 AppSettings 读取L.T(L.Settings_Tab_Extract)冲突策略。
     /// </summary>
     /// <summary>
     /// 创建解压选项，包含冲突处理设置和 Ask 弹窗回调。
@@ -636,11 +642,11 @@ public partial class App : Application
             ConflictAction = GetConflictActionFromSettings(),
             ConflictResolver = info =>
             {
-                // 已勾选"应用到全部" → 直接返回记忆的选择
+                // 已勾选"L.T(L.Settings_Menu_Btn_Apply)到全部" → 直接返回记忆的选择
                 if (applyToAll && chosenAction.HasValue)
                     return chosenAction.Value;
 
-                // 调度到 UI 线程显示模态对话框
+                // 调度到 UI 线程L.T(L.Pwd_ShowBtn)模态对话框
                 var dispatcher = Current?.Dispatcher;
                 if (dispatcher == null) return FileConflictAction.Overwrite;
 
@@ -648,6 +654,7 @@ public partial class App : Application
                 {
                     var dialog = new ConflictDialog(info);
                     dialog.ShowDialog();
+                    info.CustomName = dialog.CustomName;
                     return (Action: dialog.ResultAction, All: dialog.ApplyToAll);
                 });
 
@@ -700,19 +707,38 @@ public partial class App : Application
 
     /// <summary>
     /// 自动生成唯一的文件名：重复时加 (1),(2)... 后缀。
+    /// 正确处理 .tar.gz 等双扩展名。
     /// </summary>
     private static string GetUniquePath(string path)
     {
         var dir = Path.GetDirectoryName(path) ?? ".";
-        var name = Path.GetFileNameWithoutExtension(path);
-        var ext = Path.GetExtension(path);
+        string name, ext;
+
+        // 特别处理 .tar.gz 双扩展名
+        if (path.EndsWith(".tar.gz", StringComparison.OrdinalIgnoreCase))
+        {
+            // "C:\path\archive.tar.gz" → name="archive", ext=".tar.gz"
+            var withoutExt = path[..^7]; // 去掉 .tar.gz
+            name = Path.GetFileName(withoutExt);
+            ext = ".tar.gz";
+        }
+        else
+        {
+            name = Path.GetFileNameWithoutExtension(path);
+            ext = Path.GetExtension(path);
+        }
+
         for (int i = 1; i < 1000; i++)
         {
             var candidate = Path.Combine(dir, $"{name} ({i}){ext}");
             if (!File.Exists(candidate))
+            {
+                LogDebug("GetUniquePath: {0} → {1}", path, candidate);
                 return candidate;
+            }
         }
-        return path;
+        LogDebug("GetUniquePath: {0} → {0} (all names taken, fallback)", path);
+        return path; // 999 个名字全被占用了，直接L.T(L.CompressConflict_Overwrite)原文件
     }
 
     internal static FileConflictAction GetConflictActionFromSettings()
@@ -730,7 +756,7 @@ public partial class App : Application
     }
 
     /// <summary>
-    /// 快速验证密码是否正确——读第一个加密条目 1 字节，
+    /// 快速验证L.T(L.PwdMgr_Col_Password)L.T(L.MsgBox_Yes)L.T(L.MsgBox_No)正确——读第一个L.T(L.Main_Col_Encrypted)条目 1 字节，
     /// 密码不对时 SharpZipLib / SevenZipExtractor 会在读字节前抛异常。
     /// 只捕获密码相关异常，系统级错误（FileNotFoundException、UnauthorizedAccessException 等）向上传播。
     /// </summary>
@@ -765,8 +791,7 @@ public partial class App : Application
         {
             if (engine is ZipEngine)
             {
-                using var zipFile = new ZipFile(archivePath);
-                zipFile.Password = password;
+                using var zipFile = ZipEngine.OpenZipFile(archivePath, password);
                 var entry = zipFile.Cast<ZipEntry>().FirstOrDefault(e => e.IsCrypted || e.AESKeySize > 0);
                 if (entry == null) return true; // 没有加密条目（理论上不会发生）
                 using var s = zipFile.GetInputStream(entry);
@@ -796,14 +821,16 @@ public partial class App : Application
     private static bool IsPasswordError(Exception ex)
     {
         var msg = ex.Message.ToLower();
-        return msg.Contains("password") || msg.Contains("密码") ||
+        // 检查消息中是否包含密码/加密相关关键词。
+        // 移除之前的 blanket InvalidOperationException 捕获，防止误判其他场景的异常。
+        return msg.Contains("password") || msg.Contains(L.T(L.PwdMgr_Col_Password)) ||
                msg.Contains("encrypted") || msg.Contains("decrypt") ||
-               msg.Contains("encryption") || ex is InvalidOperationException ||
+               msg.Contains("encryption") ||
                (ex is ZipException && (msg.Contains("password") || msg.Contains("decrypt")));
     }
 
     /// <summary>
-    /// 处理 --open 模式：启动主窗口并加载压缩包供浏览。
+    /// 处理 --open 模式：启动主窗口并加载L.T(L.Compress_Archive_Group)供L.T(L.Settings_Advanced_Browse)。
     /// </summary>
     private static void HandleOpen(string? archivePath)
     {
@@ -841,7 +868,7 @@ public partial class App : Application
         // "ask" 或未知值 → 弹出选择对话框
         var dialog = new Ookii.Dialogs.Wpf.VistaFolderBrowserDialog
         {
-            Description = "选择解压目录"
+            Description = "选择L.T(L.Settings_Tab_Extract)目录"
         };
         return dialog.ShowDialog() == true ? dialog.SelectedPath : null;
     }
@@ -858,24 +885,30 @@ public partial class App : Application
     }
 
     /// <summary>
-    /// 处理 --compress-quick 模式：不显示设置窗口，使用 AppSettings 默认值直接压缩。
+    /// 处理 --compress-quick 模式：不L.T(L.Pwd_ShowBtn)L.T(L.Settings_Title)窗口，使用 AppSettings 默认值直接L.T(L.Shell_Compress)。
     /// </summary>
     private static void HandleCompressQuick(string[] paths)
     {
-        LogStartup($"HandleCompressQuick: paths=[{string.Join(";", paths)}]");
-        var app = Current; // Application.Current, never null after startup
-        if (app == null) return;
+        try
+        {
+            LogStartup($"HandleCompressQuick: paths=[{string.Join(";", paths)}]");
+            var app = Current;
+            if (app == null) return;
+
+            // 手动控制生命周期：防止 OnStartup 返回后 WPF 自动L.T(L.Progress_Button_Close)窗口
+            app.ShutdownMode = ShutdownMode.OnExplicitShutdown;
 
         var myPaths = paths.Where(p => File.Exists(p) || Directory.Exists(p)).ToList();
         if (myPaths.Count == 0)
         {
+            LogStartup("HandleCompressQuick: no valid paths, shutting down");
             app.Shutdown();
             return;
         }
 
         var settings = AppSettings.Instance;
 
-        // 自动确定输出路径：与第一个源文件/目录同目录
+        // 自动L.T(L.MsgBox_Ok)输出路径：与第一个L.T(L.Compress_Source_Group)/目录同目录
         var first = myPaths[0];
         string? dir;
         if (File.Exists(first))
@@ -889,77 +922,101 @@ public partial class App : Application
 
         var ext = settings.DefaultFormat == "tar.gz" ? ".tar.gz" : "." + settings.DefaultFormat;
         var outputPath = Path.Combine(dir, baseName + ext);
+        LogStartup($"HandleCompressQuick: baseName={baseName}, ext={ext}, outputPath={outputPath}");
 
-        // 目标文件已存在 → 弹冲突对话框
+        // L.T(L.CompressConflict_Title) → 弹冲突对话框
         string finalPath = outputPath;
         bool addMode = false;
         if (File.Exists(outputPath))
         {
+            LogStartup("HandleCompressQuick: output file exists, showing conflict dialog");
             var engine = ArchiveEngineFactory.GetEngineByExtension(outputPath);
             bool canAdd = engine is not null and not TarGzEngine;
             var dispatcher = app.Dispatcher;
-            if (dispatcher == null) { app.Shutdown(); return; }
+            if (dispatcher == null) { LogStartup("HandleCompressQuick: no dispatcher, abort"); app.Shutdown(); return; }
+
+            // 预计算L.T(L.CompressConflict_Rename)的建议路径，供对话框预填
+            var suggestedName = Path.GetFileName(GetUniquePath(outputPath));
 
             var conflictResult = dispatcher.Invoke(() =>
             {
-                var dlg = new CompressConflictDialog(outputPath, canAdd);
-                return dlg.ShowDialog() == true ? dlg.ResultAction : CompressConflictAction.Cancel;
+                var dlg = new CompressConflictDialog(outputPath, canAdd, suggestedName);
+                var shown = dlg.ShowDialog() == true;
+                return (Action: shown ? dlg.ResultAction : CompressConflictAction.Cancel,
+                        CustomName: dlg.CustomName);
             });
 
-            switch (conflictResult)
+            LogStartup($"HandleCompressQuick: conflictResult={conflictResult.Action}");
+
+            switch (conflictResult.Action)
             {
                 case CompressConflictAction.Cancel:
+                    LogStartup("HandleCompressQuick: user cancelled");
                     app.Shutdown();
                     return;
                 case CompressConflictAction.Rename:
-                    finalPath = GetUniquePath(outputPath);
+                    finalPath = Path.Combine(
+                        Path.GetDirectoryName(outputPath) ?? ".",
+                        conflictResult.CustomName ?? suggestedName);
+                    LogStartup($"HandleCompressQuick: renamed to {finalPath}");
                     break;
                 case CompressConflictAction.Add:
+                    LogStartup("HandleCompressQuick: adding to existing archive");
                     addMode = true;
                     break;
                 case CompressConflictAction.Overwrite:
                 default:
+                    LogStartup("HandleCompressQuick: overwriting");
                     break;
             }
         }
 
-        // 选择添加到已存在的压缩包
+        // 选择添加到已存在的L.T(L.Compress_Archive_Group)
         if (addMode)
         {
+            LogStartup("HandleCompressQuick: entering add-to-archive mode");
             var addEngine = ArchiveEngineFactory.GetEngineByExtension(finalPath);
-            if (addEngine == null) { app.Shutdown(); return; }
+            if (addEngine == null) { LogStartup("HandleCompressQuick: no engine for add, abort"); app.Shutdown(); return; }
 
             var pw = new ProgressWindow();
             pw.InitCancellation();
             pw.Show();
-            pw.SetProgress(0, "正在添加到压缩包...");
+            app.MainWindow = pw; // 显式设为 MainWindow
+            LogStartup("HandleCompressQuick: add-mode ProgressWindow shown");
+            pw.SetProgress(0, L.T(L.App_AddToArchiveProgress));
 
             var addProgress = new Progress<ArchiveProgress>(p =>
             {
                 pw.Dispatcher.BeginInvoke(() => pw.SetProgress(p));
             });
 
+            // 注意：必须在 UI 线程上捕获 CancellationToken
+            var addCt = pw.CancellationToken;
             Task.Run(async () =>
             {
                 try
                 {
+                    LogStartup($"HandleCompressQuick add: AddToArchiveAsync starting, finalPath={finalPath}");
                     await addEngine.AddToArchiveAsync(finalPath, myPaths.ToArray(),
                         new ArchiveOptions { CompressionLevel = settings.DefaultLevel },
-                        addProgress, pw.CancellationToken);
-                    await pw.Dispatcher.InvokeAsync(() => pw.SetComplete("添加完成"));
+                        addProgress, addCt);
+                    LogStartup("HandleCompressQuick add: completed");
+                    await pw.Dispatcher.InvokeAsync(() => pw.SetComplete(L.T(L.App_AddToArchiveComplete)));
                     await Task.Delay(800);
                     await pw.Dispatcher.InvokeAsync(() => app.Shutdown());
                 }
                 catch (OperationCanceledException)
                 {
+                    LogStartup("HandleCompressQuick add: cancelled");
                     await pw.Dispatcher.InvokeAsync(() => app.Shutdown());
                 }
                 catch (Exception ex)
                 {
+                    LogStartup($"HandleCompressQuick add: failed: {ex.Message}");
                     Log("--compress-quick add failed: {0}", ex.Message);
                     await pw.Dispatcher.InvokeAsync(() =>
                     {
-                        MessageBox.Show($"添加到压缩包失败: {ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+                        AppMessageBox.Show(L.TF(L.App_AddToArchiveFailed, ex.Message), L.T(L.App_ErrorTitle), MessageBoxButton.OK, MessageBoxImage.Error);
                         app.Shutdown();
                     });
                 }
@@ -968,10 +1025,13 @@ public partial class App : Application
         }
 
         // 直接压缩
+        LogStartup($"HandleCompressQuick: starting compression, finalPath={finalPath}");
         var progressWindow = new ProgressWindow();
         progressWindow.InitCancellation();
         progressWindow.Show();
-        progressWindow.SetProgress(0, "准备压缩...");
+        app.MainWindow = progressWindow; // 显式设为 MainWindow，防止 WPF 自动L.T(L.Progress_Button_Close)
+        LogStartup("HandleCompressQuick: ProgressWindow shown");
+        progressWindow.SetProgress(0, L.T(L.App_CompressPreparing));
 
         var options = App.CreateCompressOptions();
         options.CompressionLevel = settings.DefaultLevel;
@@ -985,30 +1045,43 @@ public partial class App : Application
         var compressEngine = ArchiveEngineFactory.GetEngineByExtension(finalPath) ?? new ZipEngine();
         Log("--compress-quick: {0} → {1}", string.Join(", ", myPaths), finalPath);
 
-        // 异步压缩，完成后自动退出
+        // 异步L.T(L.Shell_Compress)，L.T(L.Progress_Done)后自动退出
+        // 注意：必须在 UI 线程上捕获 CancellationToken，L.T(L.MsgBox_No)则窗口L.T(L.Progress_Button_Close)后 _cts 被释放导致异常
+        var ct = progressWindow.CancellationToken;
         Task.Run(async () =>
         {
             try
             {
-                await compressEngine.CompressAsync(myPaths.ToArray(), finalPath, options, progress, progressWindow.CancellationToken);
-                await progressWindow.Dispatcher.InvokeAsync(() => progressWindow.SetComplete("压缩完成"));
+                LogStartup($"HandleCompressQuick: CompressAsync starting: finalPath={finalPath}");
+                await compressEngine.CompressAsync(myPaths.ToArray(), finalPath, options, progress, ct);
+                LogStartup("HandleCompressQuick: CompressAsync completed");
+                await progressWindow.Dispatcher.InvokeAsync(() => progressWindow.SetComplete(L.T(L.App_CompressComplete)));
                 await Task.Delay(800);
                 await progressWindow.Dispatcher.InvokeAsync(() => app.Shutdown());
             }
             catch (OperationCanceledException)
             {
+                LogStartup("HandleCompressQuick: compression cancelled");
                 await progressWindow.Dispatcher.InvokeAsync(() => app.Shutdown());
             }
             catch (Exception ex)
             {
+                LogStartup($"HandleCompressQuick: compression failed: {ex.Message}");
                 Log("--compress-quick 失败: {0}", ex.Message);
                 await progressWindow.Dispatcher.InvokeAsync(() =>
                 {
-                    MessageBox.Show($"压缩失败: {ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+                    AppMessageBox.Show(L.TF(L.App_CompressFailed, ex.Message), L.T(L.App_ErrorTitle), MessageBoxButton.OK, MessageBoxImage.Error);
                     app.Shutdown();
                 });
             }
         });
+    }
+        catch (Exception ex)
+        {
+            LogStartup($"HandleCompressQuick: unexpected error: {ex.Message}\n{ex.StackTrace}");
+            AppMessageBox.Show(L.TF(L.App_QuickCompressFailed, ex.Message), L.T(L.App_ErrorTitle), MessageBoxButton.OK, MessageBoxImage.Error);
+            Current?.Shutdown();
+        }
     }
 
     protected override void OnExit(ExitEventArgs e)
@@ -1016,11 +1089,11 @@ public partial class App : Application
         // 清理预览临时文件
         try
         {
-            var tempDir = Path.Combine(Path.GetTempPath(), "MantisZip");
+            var tempDir = Path.Combine(Path.GetTempPath(), L.T(L.App_MantisZipTitle));
             if (Directory.Exists(tempDir))
             {
                 Directory.Delete(tempDir, recursive: true);
-                Log("已清理预览临时目录");
+                Log(L.T(L.App_CleanedPreviewTemp));
             }
         }
         catch (Exception exitEx) { LogDebug("OnExit: temp cleanup failed: {0}", exitEx.Message); }
@@ -1030,7 +1103,7 @@ public partial class App : Application
     }
 
     /// <summary>
-    /// 持久化启动日志（写入 %LOCALAPPDATA%\MantisZip\startup.log，不被删除）。
+    /// 持久化启动日志（写入 %LOCALAPPDATA%\L.T(L.App_MantisZipTitle)\startup.log，不被删除）。
     /// </summary>
     private static void LogStartup(string msg)
     {
@@ -1084,5 +1157,18 @@ public partial class App : Application
     public static void LogDebug(string fmt, params object[] args)
     {
         LogDebug(string.Format(fmt, args));
+    }
+
+    /// <summary>
+    /// 在指定元素上应用彩色 Emoji 渲染模式（Grayscale vs ClearType）。
+    /// 根据 AppSettings.UseColorEmoji 切换。
+    /// </summary>
+    public static void ApplyTextRenderingMode(DependencyObject element)
+    {
+        if (element == null) return;
+        TextOptions.SetTextRenderingMode(element,
+            AppSettings.Instance.UseColorEmoji
+                ? TextRenderingMode.Grayscale
+                : TextRenderingMode.ClearType);
     }
 }

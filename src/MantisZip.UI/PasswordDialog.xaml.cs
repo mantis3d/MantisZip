@@ -4,6 +4,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using MantisZip.Core;
+using MantisZip.UI.Localization;
 
 namespace MantisZip.UI;
 
@@ -39,7 +40,7 @@ public partial class PasswordDialog : Window
     private void LoadSavedPasswords(string fileName)
     {
         PasswordSelector.Items.Clear();
-        PasswordSelector.Items.Add(new ComboBoxItem { Content = "(输入新密码)" });
+        PasswordSelector.Items.Add(new ComboBoxItem { Content = L.T(L.Pwd_NewPasswordOption) });
 
         var matches = PasswordManager.Instance.FindMatchingPasswords(fileName);
         if (matches.Count > 0)
@@ -59,7 +60,7 @@ public partial class PasswordDialog : Window
         {
             var display = !string.IsNullOrEmpty(entry.Description)
                 ? entry.Description
-                : "（无描述）";
+                : L.T(L.Pwd_NoDescription);
             PasswordSelector.Items.Add(new ComboBoxItem
             {
                 Content = display,
@@ -131,7 +132,7 @@ public partial class PasswordDialog : Window
 
         if (string.IsNullOrWhiteSpace(password))
         {
-            MessageBox.Show("请输入密码", "提示", MessageBoxButton.OK, MessageBoxImage.Warning);
+            AppMessageBox.Show(L.T(L.Pwd_Validation_Required), "提示", MessageBoxButton.OK, MessageBoxImage.Warning);
             return;
         }
 

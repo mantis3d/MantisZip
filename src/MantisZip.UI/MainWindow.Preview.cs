@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -12,6 +13,8 @@ using MantisZip.Core.Abstractions;
 using MantisZip.Core.Utils;
 using Markdig;
 using Ude;
+using WpfAnimatedGif;
+using MantisZip.UI.Localization;
 
 namespace MantisZip.UI;
 
@@ -66,10 +69,13 @@ public partial class MainWindow
             if (item.Size > s.MaxPreviewFileSize)
             {
                 var limitMb = s.MaxPreviewFileSize / (1024.0 * 1024.0);
-                ShowUnsupportedPreview(item, $"文件过大 ({(double)item.Size / 1024 / 1024:F1} MB)，超过预览大小限制 ({limitMb:F0} MB)");
+                ShowUnsupportedPreview(item, L.TF(L.Preview_TooLarge, (double)item.Size / 1024 / 1024, limitMb));
                 return;
             }
 
+            // 先L.T(L.Pwd_ShowBtn)基本信息（文件名、L.T(L.Main_Col_Size)、L.T(L.Shell_Compress)率、日期），再异步加载内容
+            ShowPreviewPanel();
+            SetPreviewInfo(item);
             ShowPreviewLoading(item.NameDisplay ?? item.Name);
 
             if (ImageExtensions.Contains(ext))
@@ -77,11 +83,11 @@ public partial class MainWindow
                 if (!s.EnableImagePreview)
                 {
                     HidePreviewLoading();
-                    ShowUnsupportedPreview(item, "🔍 图片预览已禁用（可在设置中启用）");
+                    ShowUnsupportedPreview(item, L.T(L.Preview_ImageDisabled));
                     return;
                 }
 
-                _previewTempDir = Path.Combine(Path.GetTempPath(), "MantisZip", Guid.NewGuid().ToString());
+                _previewTempDir = Path.Combine(Path.GetTempPath(), L.T(L.App_MantisZipTitle), Guid.NewGuid().ToString());
                 Directory.CreateDirectory(_previewTempDir);
                 var tempFile = Path.Combine(_previewTempDir, Path.GetFileName(item.Name) ?? "preview" + ext);
 
@@ -95,7 +101,7 @@ public partial class MainWindow
             {
                 if (!s.EnableTextPreview)
                 {
-                    ShowUnsupportedPreview(item, "📄 文本预览已禁用（可在设置中启用）");
+                    ShowUnsupportedPreview(item, L.T(L.Preview_TextDisabled));
                     return;
                 }
 
@@ -103,11 +109,11 @@ public partial class MainWindow
                 if (item.Size > s.MaxTextPreviewBytes)
                 {
                     var limitMb = s.MaxTextPreviewBytes / (1024.0 * 1024.0);
-                    ShowUnsupportedPreview(item, $"📄 文件过大 ({(double)item.Size / 1024 / 1024:F1} MB)，超过文本预览限制 ({limitMb:F0} MB)");
+                    ShowUnsupportedPreview(item, L.TF(L.Preview_TooLargeText, (double)item.Size / 1024 / 1024, limitMb));
                     return;
                 }
 
-                _previewTempDir = Path.Combine(Path.GetTempPath(), "MantisZip", Guid.NewGuid().ToString());
+                _previewTempDir = Path.Combine(Path.GetTempPath(), L.T(L.App_MantisZipTitle), Guid.NewGuid().ToString());
                 Directory.CreateDirectory(_previewTempDir);
                 var tempFile = Path.Combine(_previewTempDir, Path.GetFileName(item.Name) ?? "preview.html");
 
@@ -124,7 +130,7 @@ public partial class MainWindow
             {
                 if (!s.EnableTextPreview)
                 {
-                    ShowUnsupportedPreview(item, "📄 文本预览已禁用（可在设置中启用）");
+                    ShowUnsupportedPreview(item, L.T(L.Preview_TextDisabled));
                     return;
                 }
 
@@ -132,11 +138,11 @@ public partial class MainWindow
                 if (item.Size > s.MaxTextPreviewBytes)
                 {
                     var limitMb = s.MaxTextPreviewBytes / (1024.0 * 1024.0);
-                    ShowUnsupportedPreview(item, $"📄 文件过大 ({(double)item.Size / 1024 / 1024:F1} MB)，超过文本预览限制 ({limitMb:F0} MB)");
+                    ShowUnsupportedPreview(item, L.TF(L.Preview_TooLargeText, (double)item.Size / 1024 / 1024, limitMb));
                     return;
                 }
 
-                _previewTempDir = Path.Combine(Path.GetTempPath(), "MantisZip", Guid.NewGuid().ToString());
+                _previewTempDir = Path.Combine(Path.GetTempPath(), L.T(L.App_MantisZipTitle), Guid.NewGuid().ToString());
                 Directory.CreateDirectory(_previewTempDir);
                 var tempFile = Path.Combine(_previewTempDir, Path.GetFileName(item.Name) ?? "preview.txt");
 
@@ -157,7 +163,7 @@ public partial class MainWindow
         }
         catch (Exception ex)
         {
-            ShowUnsupportedPreview(item, $"预览失败: {ex.Message}");
+            ShowUnsupportedPreview(item, L.TF(L.Preview_Failed, ex.Message));
         }
         finally
         {
@@ -173,7 +179,37 @@ public partial class MainWindow
     {
         try
         {
-            // 后台线程解码，不阻塞 UI
+            var ext = Path.GetExtension(filePath).ToLowerInvariant();
+
+            // GIF — 用 WpfAnimatedGif 播放动画
+            if (ext == ".gif")
+            {
+                int gifWidth = 0, gifHeight = 0;
+                await Task.Run(() =>
+                {
+                    var decoder = System.Windows.Media.Imaging.BitmapDecoder.Create(
+                        new Uri(filePath),
+                        System.Windows.Media.Imaging.BitmapCreateOptions.DelayCreation,
+                        System.Windows.Media.Imaging.BitmapCacheOption.None);
+                    gifWidth = decoder.Frames[0].PixelWidth;
+                    gifHeight = decoder.Frames[0].PixelHeight;
+                });
+
+                var gifBitmap = new System.Windows.Media.Imaging.BitmapImage(new Uri(filePath));
+                ImageBehavior.SetAnimatedSource(PreviewImage, gifBitmap);
+                PreviewImage.MaxWidth = gifWidth;
+                PreviewImage.MaxHeight = gifHeight;
+                PreviewImage.Visibility = Visibility.Visible;
+                PreviewTextBox.Visibility = Visibility.Collapsed;
+                PreviewFileIcon.Visibility = Visibility.Collapsed;
+                PreviewUnsupported.Visibility = Visibility.Collapsed;
+                PreviewHeader.Text = L.TF(L.Preview_ImageHeader, Path.GetFileName(filePath));
+                SetPreviewInfo(item, L.TF(L.Preview_Dimensions, gifWidth, gifHeight));
+                ShowPreviewPanel();
+                return;
+            }
+
+            // 普通图片 — 后台线程解码，不阻塞 UI
             var bitmap = await Task.Run(() =>
             {
                 // 先获取实际尺寸，仅对超过 1920px 的图做降采样
@@ -202,17 +238,17 @@ public partial class MainWindow
             PreviewTextBox.Visibility = Visibility.Collapsed;
             PreviewFileIcon.Visibility = Visibility.Collapsed;
             PreviewUnsupported.Visibility = Visibility.Collapsed;
-            PreviewHeader.Text = $"🔍 预览: {Path.GetFileName(filePath)}";
+            PreviewHeader.Text = L.TF(L.Preview_ImageHeader, Path.GetFileName(filePath));
 
             // 图片信息
-            SetPreviewInfo(item, $"📐 {bitmap.PixelWidth} × {bitmap.PixelHeight}");
+            SetPreviewInfo(item, L.TF(L.Preview_Dimensions, bitmap.PixelWidth, bitmap.PixelHeight));
 
             ShowPreviewPanel();
         }
         catch (Exception imgEx)
         {
             App.LogDebug("ShowImagePreviewAsync: failed: {0}", imgEx.Message);
-            ShowUnsupportedPreview(null, "无法加载此图像");
+            ShowUnsupportedPreview(null, L.T(L.Preview_ImageFailed));
         }
     }
 
@@ -257,20 +293,22 @@ public partial class MainWindow
             }
         }
 
-        // 回退：UTF-8 → GBK
+        // 回退：UTF-8 → 系统默认 ANSI 编码
         try
         {
             var utf8 = File.ReadAllText(filePath, Encoding.UTF8);
             if (!utf8.Contains('\uFFFD'))
                 return utf8;
-            App.LogDebug("DetectAndReadText: UTF8 fallback produced replacement chars, trying GBK");
+            App.LogDebug("DetectAndReadText: UTF8 fallback produced replacement chars, trying system default encoding");
         }
         catch (Exception utfEx)
         {
             App.LogDebug("DetectAndReadText: UTF8 fallback failed: {0}", utfEx.Message);
         }
 
-        return File.ReadAllText(filePath, Encoding.GetEncoding("GBK"));
+        // 使用系统默认 ANSI 编码（中文=GBK，日文=Shift-JIS，等），不做硬编码假设
+        var systemEncoding = Encoding.GetEncoding(CultureInfo.CurrentCulture.TextInfo.ANSICodePage);
+        return File.ReadAllText(filePath, systemEncoding);
     }
 
     private void ShowTextPreview(string filePath, string extension, ArchiveItem item)
@@ -286,14 +324,14 @@ public partial class MainWindow
             PreviewImage.Visibility = Visibility.Collapsed;
             PreviewFileIcon.Visibility = Visibility.Collapsed;
             PreviewUnsupported.Visibility = Visibility.Collapsed;
-            SetPreviewInfo(item, $"📄 {content.Length} 字符");
-            PreviewHeader.Text = $"📄 预览: {Path.GetFileName(filePath)} ({content.Length} 字符)";
+            SetPreviewInfo(item, L.TF(L.Preview_TextInfo, content.Length));
+            PreviewHeader.Text = L.TF(L.Preview_TextHeader, Path.GetFileName(filePath), content.Length);
             ShowPreviewPanel();
         }
         catch (Exception textEx)
         {
             App.LogDebug("ShowTextPreview: failed: {0}", textEx.Message);
-            ShowUnsupportedPreview(null, "无法读取此文件");
+            ShowUnsupportedPreview(null, L.T(L.Preview_TextFailed));
         }
     }
 
@@ -306,8 +344,8 @@ public partial class MainWindow
         PreviewTextBox.Visibility = Visibility.Collapsed;
         PreviewFileIcon.Visibility = Visibility.Collapsed;
         PreviewUnsupported.Visibility = Visibility.Collapsed;
-        SetPreviewInfo(item, "🌐 HTML 文件");
-        PreviewHeader.Text = $"🌐 预览: {Path.GetFileName(filePath)}";
+        SetPreviewInfo(item, L.T(L.Preview_HtmlInfo));
+        PreviewHeader.Text = L.TF(L.Preview_HtmlHeader, Path.GetFileName(filePath));
         ShowPreviewPanel();
     }
 
@@ -316,7 +354,14 @@ public partial class MainWindow
         try
         {
             var mdContent = File.ReadAllText(filePath);
-            var html = Markdig.Markdown.ToHtml(mdContent);
+            var pipeline = new MarkdownPipelineBuilder()
+                .UsePipeTables()
+                .UseEmphasisExtras()
+                .UseTaskLists()
+                .UseAutoIdentifiers()
+                .UseEmojiAndSmiley()
+                .Build();
+            var html = Markdig.Markdown.ToHtml(mdContent, pipeline);
             // 包裹基本样式以便阅读
             var styledHtml = $@"<!DOCTYPE html>
 <html>
@@ -341,7 +386,7 @@ public partial class MainWindow
             PreviewFileIcon.Visibility = Visibility.Collapsed;
             PreviewUnsupported.Visibility = Visibility.Collapsed;
             SetPreviewInfo(item, "📝 Markdown");
-            PreviewHeader.Text = $"📝 预览: {Path.GetFileName(filePath)}";
+            PreviewHeader.Text = L.TF(L.Preview_MarkdownHeader, Path.GetFileName(filePath));
             ShowPreviewPanel();
         }
         catch (Exception mdEx)
@@ -381,14 +426,14 @@ public partial class MainWindow
             PreviewDateText.Text = "";
             PreviewEncryptedText.Text = "";
             PreviewInfoPanel.Visibility = Visibility.Visible;
-            PreviewHeader.Text = "预览";
+            PreviewHeader.Text = L.T(L.Settings_Tab_Preview);
         }
 
         ShowPreviewPanel();
     }
 
     /// <summary>
-    /// 显示目录预览：系统文件夹图标 + 目录名
+    /// L.T(L.Pwd_ShowBtn)目录预览：系统文件夹图标 + 目录名
     /// </summary>
     private void ShowDirectoryPreview(ArchiveItem item)
     {
@@ -404,8 +449,18 @@ public partial class MainWindow
         PreviewWebBrowser.Visibility = Visibility.Collapsed;
         PreviewUnsupported.Visibility = Visibility.Collapsed;
 
+        // 目录统计
+        string formatInfo = L.T(L.Preview_DirLabel);
+        if (_dirStats.TryGetValue(item.FullPath, out var stat))
+        {
+            var sizeStr = ArchiveItem.FormatSize(stat.Size);
+            var compressedStr = ArchiveItem.FormatSize(stat.CompressedSize);
+            var ratio = stat.Size > 0 ? $"{(double)stat.CompressedSize / stat.Size * 100:F1}%" : "--";
+            formatInfo = L.TF(L.Preview_DirInfo, stat.Count, sizeStr, compressedStr, ratio);
+        }
+
         // 信息面板
-        SetPreviewInfo(item, "📁 目录");
+        SetPreviewInfo(item, formatInfo);
         PreviewFileNameText.Text = item.Name.TrimEnd('/');
 
         ShowPreviewPanel();
@@ -424,23 +479,33 @@ public partial class MainWindow
         int fileCount = _allItems.Count(i => !i.IsDirectory);
         int dirCount = _allItems.Count(i => i.IsDirectory);
 
-        PreviewHeader.Text = $"📦 {Path.GetFileName(_currentArchivePath)}";
+        PreviewHeader.Text = L.TF(L.Preview_ArchiveHeader, Path.GetFileName(_currentArchivePath));
 
-        // 内容区：压缩包图标
-        PreviewFileIcon.Source = SystemIconHelper.GetFileIcon(Path.GetExtension(_currentArchivePath));
-        PreviewFileIcon.Visibility = Visibility.Visible;
+        // 内容区：有注释则像文本文件一样L.T(L.Pwd_ShowBtn)，L.T(L.MsgBox_No)则L.T(L.Pwd_ShowBtn)系统图标
+        if (!string.IsNullOrEmpty(_archiveComment))
+        {
+            PreviewTextBox.Text = _archiveComment;
+            PreviewTextBox.FontSize = AppSettings.Instance.TextPreviewFontSize;
+            PreviewTextBox.Visibility = Visibility.Visible;
+            PreviewFileIcon.Visibility = Visibility.Collapsed;
+        }
+        else
+        {
+            PreviewFileIcon.Source = SystemIconHelper.GetFileIcon(Path.GetExtension(_currentArchivePath));
+            PreviewFileIcon.Visibility = Visibility.Visible;
+            PreviewTextBox.Visibility = Visibility.Collapsed;
+        }
         PreviewImage.Visibility = Visibility.Collapsed;
-        PreviewTextBox.Visibility = Visibility.Collapsed;
         PreviewWebBrowser.Visibility = Visibility.Collapsed;
         PreviewUnsupported.Visibility = Visibility.Collapsed;
 
         // 信息面板（压缩包概览）
         var ratio = totalSize > 0 ? $"{(double)totalCompressed / totalSize * 100:F1}%" : "--";
-        PreviewFormatInfo.Text = $"📦 {fileCount} 个文件 · {dirCount} 个目录";
+        PreviewFormatInfo.Text = L.TF(L.Preview_ArchiveOverview, fileCount, dirCount);
         PreviewFileNameText.Text = Path.GetFileName(_currentArchivePath);
-        PreviewSizeText.Text = $"原始: {FormatSize(totalSize)}";
-        PreviewCompressedText.Text = $"压缩后: {FormatSize(totalCompressed)}";
-        PreviewRatioText.Text = $"压缩率: {ratio}";
+        PreviewSizeText.Text = L.TF(L.Preview_ArchiveSize, FormatSize(totalSize));
+        PreviewCompressedText.Text = L.TF(L.Preview_ArchiveCompressed, FormatSize(totalCompressed));
+        PreviewRatioText.Text = L.TF(L.Preview_Ratio, ratio);
         PreviewDateText.Text = "";
         PreviewEncryptedText.Text = "";
         PreviewInfoPanel.Visibility = Visibility.Visible;
@@ -660,6 +725,7 @@ public partial class MainWindow
             SaveCurrentPreviewSize(AppSettings.Instance.PreviewPosition);
 
         PreviewImage.Source = null;
+        ImageBehavior.SetAnimatedSource(PreviewImage, null); // 停止 GIF 动画
         PreviewFileIcon.Source = null;
         PreviewTextBox.Text = "";
         PreviewWebBrowser.Navigate("about:blank");
@@ -680,6 +746,7 @@ public partial class MainWindow
             SaveCurrentPreviewSize(AppSettings.Instance.PreviewPosition);
 
         PreviewImage.Source = null;
+        ImageBehavior.SetAnimatedSource(PreviewImage, null); // 停止 GIF 动画
         PreviewFileIcon.Source = null;
         PreviewTextBox.Text = "";
         // 清除 WebBrowser 内容并隐藏
@@ -712,29 +779,29 @@ public partial class MainWindow
 
         PreviewFileNameText.Text = item.Name;
 
-        PreviewSizeText.Text = $"原始大小: {FormatSize(item.Size)}";
-        PreviewCompressedText.Text = $"压缩后: {FormatSize(item.CompressedSize)}";
-        PreviewRatioText.Text = $"压缩率: {ratio}";
+        PreviewSizeText.Text = L.TF(L.Preview_OriginalSize, FormatSize(item.Size));
+        PreviewCompressedText.Text = L.TF(L.Preview_PostCompressSize, FormatSize(item.CompressedSize));
+        PreviewRatioText.Text = L.TF(L.Preview_Ratio, ratio);
 
         PreviewDateText.Text = item.LastModified > DateTime.MinValue
-            ? $"修改: {item.LastModified:yyyy-MM-dd HH:mm}"
-            : "修改: ---";
-        PreviewEncryptedText.Text = item.IsEncrypted ? "🔒 已加密" : "";
+            ? L.TF(L.Preview_Modified, item.LastModified.ToString("yyyy-MM-dd HH:mm"))
+            : L.T(L.Preview_NoModified);
+        PreviewEncryptedText.Text = item.IsEncrypted ? L.T(L.Preview_Encrypted) : "";
         PreviewInfoPanel.Visibility = Visibility.Visible;
     }
 
     /// <summary>
-    /// 显示预览加载进度（覆盖在预览内容区中央）。
+    /// L.T(L.Pwd_ShowBtn)L.T(L.Settings_Tab_Preview)加载进度（L.T(L.CompressConflict_Overwrite)在L.T(L.Settings_Tab_Preview)内容区中央）。
     /// </summary>
     private void ShowPreviewLoading(string? fileName = null)
     {
-        PreviewLoadingText.Text = $"正在加载预览{(fileName != null ? ": " + fileName : "")}…";
+        PreviewLoadingText.Text = L.TF(L.Preview_Loading, fileName != null ? ": " + fileName : "");
         PreviewLoadingPanel.Visibility = Visibility.Visible;
         PreviewLoadingPercent.Text = "";
     }
 
     /// <summary>
-    /// 隐藏预览加载进度。
+    /// 隐藏L.T(L.Settings_Tab_Preview)加载进度。
     /// </summary>
     private void HidePreviewLoading()
     {
@@ -743,7 +810,7 @@ public partial class MainWindow
     }
 
     /// <summary>
-    /// 清理预览临时文件
+    /// L.T(L.Settings_Advanced_CleanPreviewTemp)
     /// </summary>
     private void ClearPreviewTemp()
     {

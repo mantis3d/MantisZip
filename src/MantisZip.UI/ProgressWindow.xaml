@@ -1,7 +1,8 @@
 <Window x:Class="MantisZip.UI.ProgressWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="操作进度" Height="Auto" Width="400" MinHeight="175"
+             xmlns:l="clr-namespace:MantisZip.UI.Localization"
+        Title="{l:L Progress_Title}" Height="Auto" Width="400" MinHeight="175"
         SizeToContent="Height"
         WindowStartupLocation="CenterScreen"
         ResizeMode="NoResize"
@@ -50,7 +51,7 @@
                             Content="👁" FontSize="10" Padding="0"
                             Background="White" BorderThickness="1"
                             BorderBrush="#CCC" Foreground="#555"
-                            Cursor="Hand" ToolTip="显示/隐藏密码"
+                            Cursor="Hand" ToolTip="{l:L PwdMgr_Col_Password}"
                             Click="PwdRevealBtn_Click"
                             IsEnabled="False"/>
 
@@ -59,7 +60,7 @@
                             Content="📋" FontSize="10" Padding="0"
                             Background="White" BorderThickness="1"
                             BorderBrush="#CCC" Foreground="#555"
-                            Cursor="Hand" ToolTip="复制密码"
+                            Cursor="Hand" ToolTip="{l:L PwdMgr_Col_Password}"
                             Click="PwdCopyBtn_Click"
                             IsEnabled="False"/>
                 </Grid>
@@ -78,7 +79,7 @@
 
         <!-- 当前操作的文件名 -->
         <TextBlock x:Name="FileNameText" Grid.Row="1"
-                   Text="正在处理..."
+                   Text="{l:L Progress_Processing}"
                    TextTrimming="CharacterEllipsis"
                    Foreground="#333"/>
 
@@ -130,10 +131,10 @@
                 <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
             <Button x:Name="PauseButton" Grid.Column="1"
-                    Content="⏸ 暂停" Width="80" Height="28" Margin="0,0,8,0"
+                    Content="{l:L Progress_Button_Pause}" Width="80" Height="28" Margin="0,0,8,0"
                     Click="PauseButton_Click"/>
             <Button x:Name="CancelButton" Grid.Column="2"
-                    Content="取消" Width="80" Height="28"
+                    Content="{l:L MsgBox_Cancel}" Width="80" Height="28"
                     Click="CancelButton_Click"/>
         </Grid>
     </Grid>

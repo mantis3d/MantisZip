@@ -5,6 +5,7 @@ using MantisZip.Core;
 using MantisZip.Core.Abstractions;
 using MantisZip.Core.Utils;
 using Microsoft.Win32;
+using MantisZip.UI.Localization;
 
 namespace MantisZip.UI;
 
@@ -21,8 +22,8 @@ public partial class MainWindow
     {
         var dialog = new OpenFileDialog
         {
-            Filter = "压缩文件|*.zip;*.7z;*.rar;*.tar;*.tar.gz;*.gz;*.iso|所有文件|*.*",
-            Title = "打开压缩包"
+            Filter = L.T(L.Main_OpenFileFilter),
+            Title = L.T(L.Shell_Open)
         };
         if (dialog.ShowDialog() == true)
             await LoadArchiveAsync(dialog.FileName);
@@ -40,13 +41,13 @@ public partial class MainWindow
     {
         var ofd = new OpenFileDialog
         {
-            Filter = "所有文件|*.*", Title = "选择要压缩的文件", Multiselect = true
+            Filter = L.T(L.Compress_FileFilter), Title = L.T(L.Main_SelectFilesTitle), Multiselect = true
         };
         if (ofd.ShowDialog() == true)
         {
             var sfd = new SaveFileDialog
             {
-                Filter = "ZIP 压缩文件|*.zip", Title = "保存为", FileName = "archive.zip"
+                Filter = L.T(L.Main_SaveZipFilter), Title = L.T(L.Main_SaveZipTitle), FileName = "archive.zip"
             };
             if (sfd.ShowDialog() == true)
                 await CompressAsync(ofd.FileNames, sfd.FileName);
@@ -63,8 +64,8 @@ public partial class MainWindow
 
     private void About_Click(object sender, RoutedEventArgs e)
     {
-        MessageBox.Show($"MantisZip - 全功能解压缩软件\n\n版本: {AppConstants.Version}\n基于 .NET 9 + WPF\n\n支持格式: ZIP, 7z, TAR, GZ, RAR (只读)\n\n7-Zip 组件遵循 GNU LGPL 许可证\nhttps://www.7-zip.org",
-            "关于 MantisZip", MessageBoxButton.OK, MessageBoxImage.Information);
+        AppMessageBox.Show(L.TF(L.Main_About_Text, AppConstants.Version),
+            L.T(L.Settings_Advanced_AboutHeader), MessageBoxButton.OK, MessageBoxImage.Information);
     }
 
     private void Settings_Click(object sender, RoutedEventArgs e)
@@ -96,17 +97,18 @@ public partial class MainWindow
                 _currentPassword = userPwd;
                 UpdatePasswordStatus();
                 UpdateEnterPasswordBtnState();
-                SetStatus("密码已匹配");
+                SetStatus(L.T(L.Main_Status_PwdMatched));
                 if (dialog.RememberPassword)
                 {
                     var patterns = dialog.Patterns.Count > 0
                         ? dialog.Patterns
                         : new List<string> { Path.GetFileName(_currentArchivePath) };
-                    PasswordManager.Instance.AddPassword(userPwd, dialog.Description ?? "", patterns);
+                    try { PasswordManager.Instance.AddPassword(userPwd, dialog.Description ?? "", patterns); }
+                    catch (Exception pwdEx) { App.LogDebug("PasswordDialog: failed to save password: {0}", pwdEx.Message); }
                 }
             }
             else
-                MessageBox.Show("密码错误", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+                AppMessageBox.Show(L.T(L.Main_Status_WrongPwd), L.T(L.App_ErrorTitle), MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
 
@@ -140,8 +142,8 @@ public partial class MainWindow
         var items = GetRightClickSelection();
         if (items.Count == 0) return;
         var text = string.Join(Environment.NewLine, items.Select(i => i.Name.TrimEnd('/')));
-        try { Clipboard.SetText(text); SetStatus($"已复制 {items.Count} 个文件名"); }
-        catch { SetStatus("复制失败"); }
+        try { Clipboard.SetText(text); SetStatus(L.TF(L.Main_Status_CopiedNames, items.Count)); }
+        catch { SetStatus(L.T(L.Main_Status_CopyFailed)); }
     }
 
     private void FileListCtx_CopyPath(object sender, RoutedEventArgs e)
@@ -149,8 +151,8 @@ public partial class MainWindow
         var items = GetRightClickSelection();
         if (items.Count == 0) return;
         var text = string.Join(Environment.NewLine, items.Select(i => i.FullPath));
-        try { Clipboard.SetText(text); SetStatus($"已复制 {items.Count} 个路径"); }
-        catch { SetStatus("复制失败"); }
+        try { Clipboard.SetText(text); SetStatus(L.TF(L.Main_Status_CopiedPaths, items.Count)); }
+        catch { SetStatus(L.T(L.Main_Status_CopyFailed)); }
     }
 
     #endregion
@@ -202,7 +204,7 @@ public partial class MainWindow
             .DistinctBy(i => i.FullPath)
             .ToList();
 
-        if (filesToExtract.Count == 0) { SetStatus("没有可提取的文件"); return; }
+        if (filesToExtract.Count == 0) { SetStatus(L.T(L.Main_Status_NoFilesToExtract)); return; }
 
         var pw = new ProgressWindow();
         pw.InitCancellation();
@@ -215,7 +217,7 @@ public partial class MainWindow
             {
                 var item = filesToExtract[i];
                 pw.CancellationToken.ThrowIfCancellationRequested();
-                pw.SetProgress((double)i / filesToExtract.Count * 100, $"正在提取: {item.Name}");
+                pw.SetProgress((double)i / filesToExtract.Count * 100, L.TF(L.Main_Status_Extracting, item.Name));
 
                 var outputPath = Path.Combine(dest, item.FullPath);
                 var dir = Path.GetDirectoryName(outputPath);
@@ -225,13 +227,13 @@ public partial class MainWindow
                     _currentArchivePath!, item.FullPath, outputPath, _currentFormat, _currentPassword, pw.CancellationToken);
             }
 
-            pw.SetComplete("提取完成");
+            pw.SetComplete(L.T(L.Main_Status_ExtractItemsDone));
             if (AppSettings.Instance.OpenFolderAfterExtract) OpenInExplorer(dest);
             await Task.Delay(800);
             pw.Close();
-            SetStatus("提取完成");
+            SetStatus(L.T(L.Main_Status_ExtractItemsDone));
         }
-        catch (OperationCanceledException) { pw.Close(); SetStatus("已取消"); }
-        catch (Exception ex) { pw.Close(); MessageBox.Show($"提取失败: {ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error); SetStatus("提取失败"); }
+        catch (OperationCanceledException) { pw.Close(); SetStatus(L.T(L.Main_Status_AddCancel)); }
+        catch (Exception ex) { pw.Close(); AppMessageBox.Show(L.TF(L.Main_Status_ExtractFailed, ex.Message), L.T(L.App_ErrorTitle), MessageBoxButton.OK, MessageBoxImage.Error); SetStatus(L.T(L.Main_Status_ExtractFailed)); }
     }
 }

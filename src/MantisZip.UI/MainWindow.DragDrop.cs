@@ -9,6 +9,7 @@ using MantisZip.Core;
 using MantisZip.Core.Abstractions;
 using MantisZip.Core.Engines;
 using MantisZip.Core.Utils;
+using MantisZip.UI.Localization;
 
 namespace MantisZip.UI;
 
@@ -30,57 +31,64 @@ public partial class MainWindow
 
     private async void Window_Drop(object sender, DragEventArgs e)
     {
-        if (!e.Data.GetDataPresent(DataFormats.FileDrop)) return;
-        if (_isOwnDrag) return;
-
-        var files = (string[])e.Data.GetData(DataFormats.FileDrop);
-        if (files.Length == 0) return;
-
-        if (_currentArchivePath != null && File.Exists(_currentArchivePath))
+        try
         {
-            if (files.Length == 1 && IsArchiveFile(files[0]))
+            if (!e.Data.GetDataPresent(DataFormats.FileDrop)) return;
+            if (_isOwnDrag) return;
+
+            var files = (string[])e.Data.GetData(DataFormats.FileDrop);
+            if (files.Length == 0) return;
+
+            if (_currentArchivePath != null && File.Exists(_currentArchivePath))
             {
-                _ = LoadArchiveAsync(files[0]);
+                if (files.Length == 1 && IsArchiveFile(files[0]))
+                {
+                    _ = LoadArchiveAsync(files[0]);
+                    return;
+                }
+
+                var result = AppMessageBox.Show(this,
+                    L.TF(L.Main_DragAddConfirm, files.Length, Path.GetFileName(_currentArchivePath)),
+                    L.T(L.CompressConflict_Add), MessageBoxButton.YesNo, MessageBoxImage.Question);
+                if (result == MessageBoxResult.Yes)
+                    await AddFilesToCurrentArchiveAsync(files);
                 return;
             }
 
-            var result = MessageBox.Show(this,
-                $"将 {files.Length} 个文件/文件夹添加到「{Path.GetFileName(_currentArchivePath)}」？",
-                "添加到压缩包", MessageBoxButton.YesNo, MessageBoxImage.Question);
-            if (result == MessageBoxResult.Yes)
-                await AddFilesToCurrentArchiveAsync(files);
-            return;
-        }
-
-        var path = files[0];
-        if (IsArchiveFile(path))
-        {
-            _ = LoadArchiveAsync(path);
-        }
-        else
-        {
-            var capturedFiles = files.ToArray();
-#pragma warning disable CS4014
-            Dispatcher.BeginInvoke(new Action(() =>
-#pragma warning restore CS4014
+            var path = files[0];
+            if (IsArchiveFile(path))
             {
-                var window = new CompressSettingsWindow();
-                foreach (var f in capturedFiles) window.AddSourcePath(f);
-                window.Owner = this;
-                window.Show();
-                window.Activate();
-            }));
+                _ = LoadArchiveAsync(path);
+            }
+            else
+            {
+                var capturedFiles = files.ToArray();
+#pragma warning disable CS4014
+                Dispatcher.BeginInvoke(new Action(() =>
+#pragma warning restore CS4014
+                {
+                    var window = new CompressSettingsWindow();
+                    foreach (var f in capturedFiles) window.AddSourcePath(f);
+                    window.Owner = this;
+                    window.Show();
+                    window.Activate();
+                }));
+            }
+        }
+        catch (Exception ex)
+        {
+            App.LogDebug("Window_Drop: unexpected error: {0}", ex.Message);
         }
     }
 
     private async Task AddFilesToCurrentArchiveAsync(string[] files)
     {
         var engine = ArchiveEngineFactory.GetEngine(_currentFormat);
-        if (engine == null) { SetStatus("不支持的压缩格式"); return; }
+        if (engine == null) { SetStatus(L.T(L.Main_DragFormatUnsupported)); return; }
 
         try
         {
-            SetStatus("正在添加文件到压缩包...");
+            SetStatus(L.T(L.Main_Status_AddingFiles));
             ShowProgress(true);
             var progress = new Progress<ArchiveProgress>(p =>
             {
@@ -96,17 +104,17 @@ public partial class MainWindow
                 progress, entryBasePath: string.IsNullOrEmpty(_currentFolder) ? null : _currentFolder);
 
             await LoadArchiveAsync(_currentArchivePath!);
-            SetStatus("文件已添加到压缩包");
+            SetStatus(L.T(L.Main_Status_AddDone));
         }
         catch (NotSupportedException ex)
         {
-            MessageBox.Show(ex.Message, "提示", MessageBoxButton.OK, MessageBoxImage.Information);
-            SetStatus("就绪");
+            AppMessageBox.Show(ex.Message, "提示", MessageBoxButton.OK, MessageBoxImage.Information);
+            SetStatus(L.T(L.Main_Status_Ready));
         }
         catch (Exception ex)
         {
-            MessageBox.Show($"添加文件失败: {ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
-            SetStatus("添加失败");
+            AppMessageBox.Show(L.TF(L.Main_Status_AddFailed, ex.Message), L.T(L.App_ErrorTitle), MessageBoxButton.OK, MessageBoxImage.Error);
+            SetStatus(L.T(L.Main_Status_AddFailed));
         }
         finally { ShowProgress(false); }
     }
@@ -123,71 +131,82 @@ public partial class MainWindow
 
     private async void FileListGrid_PreviewMouseMove(object sender, MouseEventArgs e)
     {
-        if (e.LeftButton != MouseButtonState.Pressed || _currentArchivePath == null) return;
-        if (!AppSettings.Instance.EnableDragExtract) return;
-
-        var pos = e.GetPosition(FileListGrid);
-        if (Math.Abs(pos.X - _dragStartPoint.X) < SystemParameters.MinimumHorizontalDragDistance &&
-            Math.Abs(pos.Y - _dragStartPoint.Y) < SystemParameters.MinimumHorizontalDragDistance)
-            return;
-
-        var selectedItems = FileListGrid.SelectedItems.Cast<ArchiveItem>().ToList();
-        if (selectedItems.Count == 0) return;
-
-        var hitTest = FileListGrid.InputHitTest(_dragStartPoint) as DependencyObject;
-        var row = FindVisualParent<DataGridRow>(hitTest);
-        if (row?.Item is ArchiveItem rowItem && !selectedItems.Contains(rowItem))
-        {
-            FileListGrid.SelectedItem = rowItem;
-            selectedItems = new List<ArchiveItem> { rowItem };
-        }
-
-        var filesToDrag = selectedItems.Where(i => !i.IsDirectory).ToList();
-        if (filesToDrag.Count == 0) return;
-
-        _dragTempDir = Path.Combine(Path.GetTempPath(), "MantisZip", "DragDrop", Guid.NewGuid().ToString());
-        Directory.CreateDirectory(_dragTempDir);
-
-        var pw = new ProgressWindow();
-        pw.InitCancellation();
-        pw.Owner = this;
-        pw.Show();
-        var ct = pw.CancellationToken;
-
+        ProgressWindow? pw = null;
         try
         {
-            var extractedPaths = new List<string>();
-            for (int i = 0; i < filesToDrag.Count; i++)
+            if (e.LeftButton != MouseButtonState.Pressed || _currentArchivePath == null) return;
+            if (!AppSettings.Instance.EnableDragExtract) return;
+
+            var pos = e.GetPosition(FileListGrid);
+            if (Math.Abs(pos.X - _dragStartPoint.X) < SystemParameters.MinimumHorizontalDragDistance &&
+                Math.Abs(pos.Y - _dragStartPoint.Y) < SystemParameters.MinimumHorizontalDragDistance)
+                return;
+
+            var selectedItems = FileListGrid.SelectedItems.Cast<ArchiveItem>().ToList();
+            if (selectedItems.Count == 0) return;
+
+            var hitTest = FileListGrid.InputHitTest(_dragStartPoint) as DependencyObject;
+            var row = FindVisualParent<DataGridRow>(hitTest);
+            if (row?.Item is ArchiveItem rowItem && !selectedItems.Contains(rowItem))
             {
-                if (ct.IsCancellationRequested) break;
-                var item = filesToDrag[i];
-                var outputPath = Path.Combine(_dragTempDir, item.FullPath);
-                pw.SetProgress((double)i / filesToDrag.Count * 100, $"正在提取: {item.NameDisplay ?? item.Name}");
-                await ExtractEntryForDragAsync(item, outputPath);
-                extractedPaths.Add(outputPath);
+                FileListGrid.SelectedItem = rowItem;
+                selectedItems = new List<ArchiveItem> { rowItem };
             }
 
-            if (ct.IsCancellationRequested) { SetStatus("已取消"); return; }
-            if (extractedPaths.Count == 0) { SetStatus("没有可拖拽的文件"); return; }
+            var filesToDrag = selectedItems.Where(i => !i.IsDirectory).ToList();
+            if (filesToDrag.Count == 0) return;
 
-            pw.SetProgress(100, "⏳ 正在拖拽 — 放到目标位置以复制文件");
-            _isOwnDrag = true;
-            try { DragDrop.DoDragDrop(FileListGrid, new DataObject(DataFormats.FileDrop, extractedPaths.ToArray()), DragDropEffects.Copy); }
-            finally { _isOwnDrag = false; }
-        }
-        catch (NotSupportedException ex)
-        {
-            MessageBox.Show(this, ex.Message, "提示", MessageBoxButton.OK, MessageBoxImage.Information);
+            _dragTempDir = Path.Combine(Path.GetTempPath(), L.T(L.App_MantisZipTitle), "DragDrop", Guid.NewGuid().ToString());
+            Directory.CreateDirectory(_dragTempDir);
+
+            pw = new ProgressWindow();
+            pw.InitCancellation();
+            pw.Owner = this;
+            pw.Show();
+            var ct = pw.CancellationToken;
+
+            try
+            {
+                var extractedPaths = new List<string>();
+                for (int i = 0; i < filesToDrag.Count; i++)
+                {
+                    if (ct.IsCancellationRequested) break;
+                    var item = filesToDrag[i];
+                    var outputPath = Path.Combine(_dragTempDir, item.FullPath);
+                    pw.SetProgress((double)i / filesToDrag.Count * 100, L.TF(L.Main_Status_Extracting, item.NameDisplay ?? item.Name));
+                    await ExtractEntryForDragAsync(item, outputPath);
+                    extractedPaths.Add(outputPath);
+                }
+
+                if (ct.IsCancellationRequested) { SetStatus(L.T(L.Main_Status_AddCancel)); return; }
+                if (extractedPaths.Count == 0) { SetStatus(L.T(L.Main_Status_NoDragFiles)); return; }
+
+                pw.SetProgress(100, L.T(L.Main_Status_DragWaiting));
+                _isOwnDrag = true;
+                try { DragDrop.DoDragDrop(FileListGrid, new DataObject(DataFormats.FileDrop, extractedPaths.ToArray()), DragDropEffects.Copy); }
+                finally { _isOwnDrag = false; }
+            }
+            catch (NotSupportedException ex)
+            {
+                AppMessageBox.Show(this, ex.Message, "提示", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+            catch (Exception ex)
+            {
+                AppMessageBox.Show(this, L.TF(L.Main_Status_ExtractFailed, ex.Message), L.T(L.App_ErrorTitle), MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+            finally
+            {
+                try { if (pw.IsVisible) pw.Close(); } catch { }
+                CleanupDragTempDir();
+                SetStatus(L.T(L.Main_Status_Ready));
+            }
         }
         catch (Exception ex)
         {
-            MessageBox.Show(this, $"提取文件失败: {ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
-        }
-        finally
-        {
-            try { if (pw.IsVisible) pw.Close(); } catch { }
+            App.LogDebug("FileListGrid_PreviewMouseMove: unexpected error: {0}", ex.Message);
+            try { if (pw?.IsVisible == true) pw.Close(); } catch { }
             CleanupDragTempDir();
-            SetStatus("就绪");
+            SetStatus(L.T(L.Main_Status_Ready));
         }
     }
 
@@ -214,7 +233,7 @@ public partial class MainWindow
                 return;
             }
         }
-        throw new FileNotFoundException($"在压缩包中未找到条目: {entryName}");
+        throw new FileNotFoundException(L.TF(L.Core_Drag_EntryNotFound, entryName));
     }
 
     private void CleanupDragTempDir()
@@ -242,7 +261,7 @@ public partial class MainWindow
                 ExtractTarGzSingleEntry(_currentArchivePath!, item.FullPath, outputPath);
                 break;
             default:
-                throw new NotSupportedException($"格式 {_currentFormat} 不支持拖拽提取");
+                throw new NotSupportedException(L.TF(L.Core_Drag_FormatUnsupported, _currentFormat));
         }
     }
 

@@ -7,6 +7,7 @@ using System.Windows.Input;
 using System.Windows.Media;
 using MantisZip.Core;
 using MantisZip.Core.Abstractions;
+using MantisZip.UI.Localization;
 
 namespace MantisZip.UI;
 
@@ -39,7 +40,7 @@ public partial class MainWindow
             UpdateEnterPasswordBtnState();
             return;
         }
-        PasswordStatusText.Text = _currentPassword != null ? "🔑 已匹配密码" : "🔒 需要密码";
+        PasswordStatusText.Text = _currentPassword != null ? L.T(L.Main_PwdMatchedIndicator) : L.T(L.Main_IsEncrypted);
         UpdateEnterPasswordBtnState();
     }
 
@@ -55,7 +56,7 @@ public partial class MainWindow
 
     private void BuildFolderTree()
     {
-        var root = new FolderNode { Name = "📦 根目录", FullPath = "" };
+        var root = new FolderNode { Name = L.T(L.Main_RootNode), FullPath = "" };
         var dirsAdded = new HashSet<string>();
         foreach (var item in _allItems.Where(i => i.IsDirectory))
         {
@@ -154,6 +155,22 @@ public partial class MainWindow
                 if (seen.Add(item.FullPath)) deduped.Add(item);
             }
 
+            // 为目录条目填充统计信息（文件数、总大小、压缩后大小）
+            foreach (var item in deduped)
+            {
+                if (!item.IsDirectory) continue;
+                if (_dirStats.TryGetValue(item.FullPath, out var stat))
+                {
+                    item.Size = stat.Size;
+                    item.CompressedSize = stat.CompressedSize;
+                }
+                else
+                {
+                    item.Size = 0;
+                    item.CompressedSize = 0;
+                }
+            }
+
             var sortedItems = deduped.OrderBy(i => i.SortOrder).ThenBy(i => i.Name).ToList();
             foreach (var item in sortedItems)
             {
@@ -165,9 +182,13 @@ public partial class MainWindow
             FileListGrid.Items.Refresh();
             var fileCount = sortedItems.Count(i => !i.IsDirectory);
             var dirCount = sortedItems.Count(i => i.IsDirectory);
-            DirStatsText.Text = $"{sortedItems.Count} 项 (文件 {fileCount}, 目录 {dirCount})";
+            DirStatsText.Text = L.TF(L.Main_DirStats, sortedItems.Count, fileCount, dirCount);
         }
         finally { _isProgrammaticFilter = false; }
+
+        // 过滤后无选中项 → 显示压缩包总览
+        if (FileListGrid.SelectedItems.Count == 0 && !string.IsNullOrEmpty(_currentArchivePath))
+            ShowArchiveInfo();
     }
 
     private void FileListGrid_PreviewMouseDoubleClick(object sender, MouseButtonEventArgs e)
@@ -182,18 +203,34 @@ public partial class MainWindow
 
     private async void FileListGrid_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        if (_isProgrammaticFilter) { UpdateSelectionStats(); return; }
-
-        ArchiveItem? lastClicked = e.AddedItems.Count > 0
-            ? e.AddedItems[e.AddedItems.Count - 1] as ArchiveItem
-            : e.RemovedItems.Count == 1 ? e.RemovedItems[0] as ArchiveItem : null;
-
-        if (lastClicked != null && !string.IsNullOrEmpty(_currentArchivePath))
+        try
         {
-            if (lastClicked.IsDirectory) ShowDirectoryPreview(lastClicked);
-            else await ShowPreviewAsync(lastClicked);
+            if (_isProgrammaticFilter) { UpdateSelectionStats(); return; }
+
+            // 选择为空时显示压缩包总览
+            if (FileListGrid.SelectedItems.Count == 0)
+            {
+                if (!string.IsNullOrEmpty(_currentArchivePath))
+                    ShowArchiveInfo();
+                UpdateSelectionStats();
+                return;
+            }
+
+            ArchiveItem? lastClicked = e.AddedItems.Count > 0
+                ? e.AddedItems[e.AddedItems.Count - 1] as ArchiveItem
+                : e.RemovedItems.Count == 1 ? e.RemovedItems[0] as ArchiveItem : null;
+
+            if (lastClicked != null && !string.IsNullOrEmpty(_currentArchivePath))
+            {
+                if (lastClicked.IsDirectory) ShowDirectoryPreview(lastClicked);
+                else await ShowPreviewAsync(lastClicked);
+            }
+            UpdateSelectionStats();
         }
-        UpdateSelectionStats();
+        catch (Exception ex)
+        {
+            App.LogDebug("FileListGrid_SelectionChanged: unexpected error: {0}", ex.Message);
+        }
     }
 
     private void UpdateSelectionStats()
@@ -214,7 +251,7 @@ public partial class MainWindow
             if (ai.IsDirectory) dirCount++;
             else { fileCount++; totalSize += ai.Size; }
         }
-        SelectionStatsText.Text = $"已选 {count} 项 (文件 {fileCount}, 目录 {dirCount}) | 共 {FormatSize(totalSize)}";
+        SelectionStatsText.Text = L.TF(L.Main_SelectionStats, count, fileCount, dirCount, FormatSize(totalSize));
     }
 
     private void SelectFolderInTree(string path)
@@ -285,8 +322,8 @@ public class ArchiveItem : Core.Abstractions.ArchiveItem
     public string NameForSort { get; set; } = string.Empty;
     public ImageSource? IconSource { get; set; }
 
-    public string SizeDisplay => IsDirectory ? "--" : FormatSize(Size);
-    public string CompressedSizeDisplay => IsDirectory ? "--" : FormatSize(CompressedSize);
+    public string SizeDisplay => FormatSize(Size);
+    public string CompressedSizeDisplay => FormatSize(CompressedSize);
 
     public string NameDisplay
     {

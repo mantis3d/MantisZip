@@ -1,12 +1,13 @@
 using System.IO;
 using System.Windows;
 using MantisZip.Core.Abstractions;
+using MantisZip.UI.Localization;
 
 namespace MantisZip.UI;
 
 /// <summary>
-/// 文件冲突对话框：覆盖 / 覆盖较旧 / 重命名 / 跳过，支持"应用到全部"。
-/// 显示磁盘已有文件与压缩包内文件的对比信息。
+/// 文件冲突对话框：覆盖 / 覆盖较旧 / 重命名 / 跳过，支持"L.T(L.Settings_Menu_Btn_Apply)到全部"。
+/// L.T(L.Pwd_ShowBtn)L.T(L.Conflict_DiskLabel)文件与L.T(L.Conflict_ArchiveLabel)文件的对比信息。
 /// Topmost 以确保不被进度窗口挡住。
 /// </summary>
 public partial class ConflictDialog : Window
@@ -14,17 +15,27 @@ public partial class ConflictDialog : Window
     public FileConflictAction ResultAction { get; private set; }
     public bool ApplyToAll => ApplyAllCheck.IsChecked == true;
 
+    /// <summary>用户输入的自定义文件名（未修改时返回建议名）</summary>
+    public string? CustomName => RenameTextBox.Text;
+
     public ConflictDialog(FileConflictInfo info)
     {
         InitializeComponent();
 
-        FileNameText.Text = $"“{Path.GetFileName(info.FilePath)}”";
+        HeaderText.Text = string.Format(L.T(L.Conflict_Header), $"“{Path.GetFileName(info.FilePath)}”");
+
+        // 预填L.T(L.CompressConflict_Rename)的建议名（由 Core 层预计算）
+        RenameTextBox.Text = info.SuggestedName ?? "";
+
+        // 勾选"L.T(L.Settings_Menu_Btn_Apply)到全部"时禁用L.T(L.Conflict_Btn_Rename)输入（后续文件不支持自定义名）
+        ApplyAllCheck.Checked += (_, _) => RenameTextBox.IsEnabled = false;
+        ApplyAllCheck.Unchecked += (_, _) => RenameTextBox.IsEnabled = true;
 
         // 已有文件信息
         ExistingSizeText.Text = info.ExistingSize.HasValue ? FormatSize(info.ExistingSize.Value) : "--";
         ExistingDateText.Text = info.ExistingModified?.ToString("yyyy-MM-dd HH:mm") ?? "--";
 
-        // 压缩包内条目信息
+        // L.T(L.Conflict_ArchiveLabel)条目信息
         EntrySizeText.Text = info.EntrySize.HasValue ? FormatSize(info.EntrySize.Value) : "--";
         EntryDateText.Text = info.EntryModified?.ToString("yyyy-MM-dd HH:mm") ?? "--";
 
@@ -33,11 +44,11 @@ public partial class ConflictDialog : Window
         if (info.ExistingSize.HasValue && info.EntrySize.HasValue)
         {
             if (info.EntrySize.Value > info.ExistingSize.Value)
-                parts.Add("大小: 压缩包内更大");
+                parts.Add(L.T(L.Conflict_Size_ArchiveLarger));
             else if (info.EntrySize.Value < info.ExistingSize.Value)
-                parts.Add("大小: 磁盘更大");
+                parts.Add(L.T(L.Conflict_Size_DiskLarger));
             else
-                parts.Add("大小: 相同");
+                parts.Add(L.T(L.Conflict_Size_Same));
         }
         else if (info.EntrySize.HasValue && !info.ExistingSize.HasValue)
         {
@@ -46,11 +57,11 @@ public partial class ConflictDialog : Window
         if (info.ExistingModified.HasValue && info.EntryModified.HasValue)
         {
             if (info.EntryModified.Value > info.ExistingModified.Value)
-                parts.Add("日期: 压缩包内更新");
+                parts.Add(L.T(L.Conflict_Date_ArchiveNewer));
             else if (info.EntryModified.Value < info.ExistingModified.Value)
-                parts.Add("日期: 磁盘更新");
+                parts.Add(L.T(L.Conflict_Date_DiskNewer));
             else
-                parts.Add("日期: 相同");
+                parts.Add(L.T(L.Conflict_Date_Same));
         }
         CompareResultText.Text = string.Join("  |  ", parts);
     }

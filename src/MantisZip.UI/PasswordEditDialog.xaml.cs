@@ -2,6 +2,7 @@ using System.Windows;
 using System.Collections.Generic;
 using MantisZip.Core;
 using System.Linq;
+using MantisZip.UI.Localization;
 
 namespace MantisZip.UI;
 
@@ -32,7 +33,7 @@ public partial class PasswordEditDialog : Window
         var password = PasswordBox.Text;
         if (string.IsNullOrWhiteSpace(password))
         {
-            MessageBox.Show("请输入密码", "提示", MessageBoxButton.OK, MessageBoxImage.Warning);
+            AppMessageBox.Show(L.T(L.Pwd_Validation_Required), "提示", MessageBoxButton.OK, MessageBoxImage.Warning);
             PasswordBox.Focus();
             return;
         }

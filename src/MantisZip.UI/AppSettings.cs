@@ -24,13 +24,14 @@ public class AppSettings
     public bool EnableExtractMenu { get; set; } = true;
     public bool EnableOpenMenu { get; set; } = true;     // 用 MantisZip 打开
     public bool EnableQuickCompress { get; set; } = true;
-    public bool EnableCascadingMenu { get; set; } = false;  // 层叠子菜单
+    public bool EnableCascadingMenu { get; set; } = true;   // 层叠子菜单（默认启用，避免多文件右键动词上限问题）
     public bool ShowMenuIcons { get; set; } = true;
 
     // ===== 交互 =====
     public bool EnableDragExtract { get; set; } = true;
 
     // ===== 预览 =====
+    public bool UseColorEmoji { get; set; } = true;
     public bool EnableImagePreview { get; set; } = true;
     public bool EnableTextPreview { get; set; } = true;
     public long MaxTextPreviewBytes { get; set; } = 5 * 1024 * 1024;
@@ -43,6 +44,9 @@ public class AppSettings
     // ===== 密码管理 =====
     public bool ShowPasswordMatchNotification { get; set; } = true;
     public bool PasswordRevealByDefault { get; set; } = false;
+
+    // ===== 语言 =====
+    public string Language { get; set; } = "zh";
 
     // ===== 调试 =====
     public bool EnableDebugLogging { get; set; } = false;

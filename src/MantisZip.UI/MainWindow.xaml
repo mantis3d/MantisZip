@@ -1,11 +1,12 @@
-﻿<Window x:Class="MantisZip.UI.MainWindow"
+<Window x:Class="MantisZip.UI.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:app="clr-namespace:MantisZip.UI"
+             xmlns:l="clr-namespace:MantisZip.UI.Localization"
         mc:Ignorable="d"
-        Title="MantisZip - 解压缩软件" Icon="/Resources/App.ico" Height="800" Width="1200"
+        Title="{l:L Main_WindowTitle}" Icon="/Resources/App.ico" Height="800" Width="1200"
         MinHeight="450" MinWidth="600"
         WindowStartupLocation="CenterScreen"
         AllowDrop="True"
@@ -36,74 +37,74 @@
 
         <!-- Menu Bar -->
         <Menu Grid.Row="0" Background="White">
-            <MenuItem Header="文件(_F)">
-                <MenuItem Header="打开压缩包(_O)..." Click="OpenArchive_Click" InputGestureText="Ctrl+O"/>
-                <MenuItem Header="新建压缩包(_N)..." Click="NewArchive_Click" InputGestureText="Ctrl+N"/>
+            <MenuItem Header="{l:L Main_Menu_File}">
+                <MenuItem Header="{l:L Main_Menu_OpenArchive}" Click="OpenArchive_Click" InputGestureText="Ctrl+O"/>
+                <MenuItem Header="{l:L Main_Menu_NewArchive}" Click="NewArchive_Click" InputGestureText="Ctrl+N"/>
                 <Separator/>
-                <MenuItem Header="解压缩(_E)..." Click="Extract_Click" InputGestureText="Ctrl+E"/>
-                <MenuItem Header="压缩(_C)..." Click="Compress_Click" InputGestureText="Ctrl+C"/>
+                <MenuItem Header="{l:L Main_Menu_Extract}" Click="Extract_Click" InputGestureText="Ctrl+E"/>
+                <MenuItem Header="{l:L Main_Menu_Compress}" Click="Compress_Click" InputGestureText="Ctrl+C"/>
                 <Separator/>
-                <MenuItem Header="退出(_X)" Click="Exit_Click" InputGestureText="Alt+F4"/>
+                <MenuItem Header="{l:L Main_Menu_Exit}" Click="Exit_Click" InputGestureText="Alt+F4"/>
             </MenuItem>
-            <MenuItem Header="视图(_V)">
-                <MenuItem Header="刷新(_R)" Click="Refresh_Click" InputGestureText="F5"/>
+            <MenuItem Header="{l:L Main_Menu_View}">
+                <MenuItem Header="{l:L Main_Menu_Refresh}" Click="Refresh_Click" InputGestureText="F5"/>
             </MenuItem>
-            <MenuItem Header="工具(_T)">
-                <MenuItem Header="密码管理器(_P)..." Click="PasswordManager_Click"/>
+            <MenuItem Header="{l:L Main_Menu_Tools}">
+                <MenuItem Header="{l:L Main_Menu_PasswordManager}" Click="PasswordManager_Click"/>
                 <Separator/>
-                <MenuItem Header="设置(_S)..." Click="Settings_Click"/>
+                <MenuItem Header="{l:L Main_Menu_Settings}" Click="Settings_Click"/>
             </MenuItem>
-            <MenuItem Header="帮助(_H)">
-                <MenuItem Header="关于(_A)" Click="About_Click"/>
+            <MenuItem Header="{l:L Main_Menu_Help}">
+                <MenuItem Header="{l:L Main_Menu_About}" Click="About_Click"/>
             </MenuItem>
         </Menu>
 
         <!-- Toolbar -->
         <ToolBarTray Grid.Row="1" Background="White">
             <ToolBar Band="0" BandIndex="0">
-                <Button ToolTip="新建压缩包 (Ctrl+N)" Click="NewArchive_Click" Padding="6,4">
+                <Button ToolTip="{l:L Main_Tooltip_NewArchive}" Click="NewArchive_Click" Padding="6,4">
                     <StackPanel Orientation="Vertical" HorizontalAlignment="Center">
                         <TextBlock Text="🆕" FontSize="18" HorizontalAlignment="Center"/>
-                        <TextBlock Text="新建" FontSize="10" HorizontalAlignment="Center"/>
+                        <TextBlock Text="{l:L Main_Toolbar_New}" FontSize="10" HorizontalAlignment="Center"/>
                     </StackPanel>
                 </Button>
-                <Button ToolTip="打开压缩包 (Ctrl+O)" Click="OpenArchive_Click" Padding="6,4">
+                <Button ToolTip="{l:L Main_Tooltip_OpenArchive}" Click="OpenArchive_Click" Padding="6,4">
                     <StackPanel Orientation="Vertical" HorizontalAlignment="Center">
                         <TextBlock Text="📂" FontSize="18" HorizontalAlignment="Center"/>
-                        <TextBlock Text="打开" FontSize="10" HorizontalAlignment="Center"/>
+                        <TextBlock Text="{l:L Main_Toolbar_Open}" FontSize="10" HorizontalAlignment="Center"/>
                     </StackPanel>
                 </Button>
-                <Button ToolTip="解压缩 (Ctrl+E)" Click="Extract_Click" Padding="6,4">
+                <Button ToolTip="{l:L Main_Tooltip_Extract}" Click="Extract_Click" Padding="6,4">
                     <StackPanel Orientation="Vertical" HorizontalAlignment="Center">
                         <TextBlock Text="📤" FontSize="18" HorizontalAlignment="Center"/>
-                        <TextBlock Text="解压" FontSize="10" HorizontalAlignment="Center"/>
+                        <TextBlock Text="{l:L Settings_Tab_Extract}" FontSize="10" HorizontalAlignment="Center"/>
                     </StackPanel>
                 </Button>
-                <Button ToolTip="压缩 (Ctrl+C)" Click="Compress_Click" Padding="6,4">
+                <Button ToolTip="{l:L Main_Tooltip_Compress}" Click="Compress_Click" Padding="6,4">
                     <StackPanel Orientation="Vertical" HorizontalAlignment="Center">
                         <TextBlock Text="📥" FontSize="18" HorizontalAlignment="Center"/>
-                        <TextBlock Text="压缩" FontSize="10" HorizontalAlignment="Center"/>
+                        <TextBlock Text="{l:L Shell_Compress}" FontSize="10" HorizontalAlignment="Center"/>
                     </StackPanel>
                 </Button>
                 <Separator/>
-                <Button ToolTip="测试压缩包" Click="TestArchive_Click" Padding="6,4">
+                <Button ToolTip="{l:L Main_Tooltip_Test}" Click="TestArchive_Click" Padding="6,4">
                     <StackPanel Orientation="Vertical" HorizontalAlignment="Center">
                         <TextBlock Text="✓" FontSize="18" Foreground="Green" HorizontalAlignment="Center"/>
-                        <TextBlock Text="测试" FontSize="10" HorizontalAlignment="Center"/>
+                        <TextBlock Text="{l:L Main_Toolbar_Test}" FontSize="10" HorizontalAlignment="Center"/>
                     </StackPanel>
                 </Button>
                 <Separator/>
-                <Button x:Name="EnterPasswordBtn" ToolTip="输入压缩包密码" Click="EnterPassword_Click" Padding="6,4" IsEnabled="False">
+                <Button x:Name="EnterPasswordBtn" ToolTip="{l:L Main_Tooltip_Password}" Click="EnterPassword_Click" Padding="6,4" IsEnabled="False">
                     <StackPanel Orientation="Vertical" HorizontalAlignment="Center">
                         <TextBlock Text="🔑" FontSize="18" HorizontalAlignment="Center"/>
-                        <TextBlock Text="密码" FontSize="10" HorizontalAlignment="Center"/>
+                        <TextBlock Text="{l:L PwdMgr_Col_Password}" FontSize="10" HorizontalAlignment="Center"/>
                     </StackPanel>
                 </Button>
                 <Separator/>
-                <ToggleButton x:Name="PreviewToggleBtn" ToolTip="切换预览面板" Click="PreviewToggleBtn_Click" Padding="6,4">
+                <ToggleButton x:Name="PreviewToggleBtn" ToolTip="{l:L Main_Tooltip_Preview}" Click="PreviewToggleBtn_Click" Padding="6,4">
                     <StackPanel Orientation="Vertical" HorizontalAlignment="Center">
                         <TextBlock x:Name="PreviewToggleIcon" Text="👁" FontSize="16" HorizontalAlignment="Center"/>
-                        <TextBlock Text="预览" FontSize="10" HorizontalAlignment="Center"/>
+                        <TextBlock Text="{l:L Settings_Tab_Preview}" FontSize="10" HorizontalAlignment="Center"/>
                     </StackPanel>
                 </ToggleButton>
             </ToolBar>
@@ -123,8 +124,8 @@
                             Background="#FAFAFA" BorderBrush="#AAA" BorderThickness="2" CornerRadius="8">
                         <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
                             <TextBlock Text="📁" FontSize="64" HorizontalAlignment="Center" Opacity="0.3"/>
-                            <TextBlock Text="拖放压缩包到此处，或点击" FontSize="16" Foreground="Gray" Margin="0,16,0,4"/>
-                            <Button Content="[ 打开压缩包 ]" FontSize="14" Click="OpenArchive_Click" 
+                            <TextBlock Text="{l:L Main_EmptyDropHint}" FontSize="16" Foreground="Gray" Margin="0,16,0,4"/>
+                            <Button Content="{l:L Main_OpenArchiveBtn}" FontSize="14" Click="OpenArchive_Click" 
                                     Background="Transparent" BorderThickness="0" Foreground="#2196F3" Cursor="Hand"/>
                         </StackPanel>
                     </Border>
@@ -196,13 +197,17 @@
                                 <DataGrid x:Name="FileListGrid" Grid.Column="2"
                                           AutoGenerateColumns="False"
                                           IsReadOnly="True"
-                                           SelectionMode="Extended"
+                                          SelectionMode="Extended"
                                           CanUserAddRows="False"
                                           CanUserDeleteRows="False"
                                           GridLinesVisibility="Horizontal"
                                           HeadersVisibility="Column"
                                           RowHeaderWidth="0"
                                           Background="White"
+                                          VirtualizingStackPanel.IsVirtualizing="True"
+                                          VirtualizingStackPanel.VirtualizationMode="Recycling"
+                                          EnableRowVirtualization="True"
+                                          ScrollViewer.IsDeferredScrollingEnabled="False"
                                           BorderThickness="1"
                                           BorderBrush="#DDD"
                                             SelectionChanged="FileListGrid_SelectionChanged"
@@ -211,15 +216,15 @@
                                            PreviewMouseMove="FileListGrid_PreviewMouseMove">
                                     <DataGrid.ContextMenu>
                                         <ContextMenu>
-                                            <MenuItem Header="解压到…" Click="FileListCtx_ExtractTo"/>
-                                            <MenuItem Header="解压到压缩包所在文件夹" Click="FileListCtx_ExtractHere"/>
+                                            <MenuItem Header="{l:L Main_Ctx_ExtractTo}" Click="FileListCtx_ExtractTo"/>
+                                            <MenuItem Header="{l:L Main_Ctx_ExtractHere}" Click="FileListCtx_ExtractHere"/>
                                             <Separator/>
-                                            <MenuItem Header="复制文件名" Click="FileListCtx_CopyName"/>
-                                            <MenuItem Header="复制完整路径" Click="FileListCtx_CopyPath"/>
+                                            <MenuItem Header="{l:L Main_Ctx_CopyName}" Click="FileListCtx_CopyName"/>
+                                            <MenuItem Header="{l:L Main_Ctx_CopyPath}" Click="FileListCtx_CopyPath"/>
                                         </ContextMenu>
                                     </DataGrid.ContextMenu>
                                     <DataGrid.Columns>
-                                        <DataGridTemplateColumn Header="名称" Width="*">
+                                        <DataGridTemplateColumn Header="{l:L Main_Col_Name}" Width="*">
                                             <DataGridTemplateColumn.CellTemplate>
                                                 <DataTemplate>
                                                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
@@ -229,10 +234,10 @@
                                                 </DataTemplate>
                                             </DataGridTemplateColumn.CellTemplate>
                                         </DataGridTemplateColumn>
-                                        <DataGridTextColumn Header="大小" Binding="{Binding SizeDisplay}" Width="100"/>
-                                        <DataGridTextColumn Header="压缩后" Binding="{Binding CompressedSizeDisplay}" Width="100"/>
-                                        <DataGridTextColumn Header="修改日期" Binding="{Binding DateDisplay}" Width="150"/>
-                                        <DataGridTemplateColumn Header="加密" Width="50">
+                                        <DataGridTextColumn Header="{l:L Main_Col_Size}" Binding="{Binding SizeDisplay}" Width="100"/>
+                                        <DataGridTextColumn Header="{l:L Main_Col_Compressed}" Binding="{Binding CompressedSizeDisplay}" Width="100"/>
+                                        <DataGridTextColumn Header="{l:L Main_Col_Date}" Binding="{Binding DateDisplay}" Width="150"/>
+                                        <DataGridTemplateColumn Header="{l:L Main_Col_Encrypted}" Width="50">
                                             <DataGridTemplateColumn.CellTemplate>
                                                 <DataTemplate>
                                                     <TextBlock Text="🔒" HorizontalAlignment="Center" 
@@ -315,7 +320,7 @@
                                                         HorizontalAlignment="Center"
                                                         VerticalAlignment="Center">
                                                 <TextBlock x:Name="PreviewLoadingText"
-                                                           Text="正在加载预览…"
+                                                           Text="..."
                                                            FontSize="13" Foreground="#888"
                                                            HorizontalAlignment="Center"/>
                                                 <ProgressBar Width="200" Height="8"
@@ -331,7 +336,7 @@
 
                                             <!-- Unsupported fallback -->
                                             <TextBlock x:Name="PreviewUnsupported"
-                                                       Text="🔍 无法预览此文件"
+                                                       Text="{l:L Preview_Unsupported}"
                                                        FontSize="14" Foreground="#999"
                                                        HorizontalAlignment="Center" VerticalAlignment="Center"
                                                        Visibility="Collapsed"/>
@@ -422,7 +427,7 @@
 
             <!-- Status Text (left) -->
             <StatusBarItem Grid.Column="0">
-                <TextBlock x:Name="StatusText" Text="就绪"/>
+                <TextBlock x:Name="StatusText" Text="{l:L Main_Status_Ready}"/>
             </StatusBarItem>
 
             <!-- Column 1 = spacer (*) fills center -->
