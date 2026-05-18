@@ -34,3 +34,8 @@ packages/
 Thumbs.db
 # Build artifacts
 *.zip
+
+# Agent temp files
+.sisyphus/tmp_*
+.sisyphus/run-continuation/
+replace_strings.ps1

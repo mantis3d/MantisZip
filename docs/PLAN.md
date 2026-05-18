@@ -4,8 +4,8 @@
 
 **项目状态**: 🟢 开发中 (Phase 4 收尾)  
 **创建日期**: 2026-04-23  
-**最后更新**: 2026-05-17 (v0.2.6)  
-**当前版本**: 0.2.6
+**最后更新**: 2026-05-18  
+**当前版本**: 0.2.7
 
 ---
 
@@ -32,14 +32,36 @@
 
 ## 零、依赖配置
 
-| 包名 | 版本 | 用途 |
-|------|------|------|
-| SharpZipLib | 1.4.0 | ZIP 压缩/解压 |
-| SevenZipExtractor | 1.0.19 | 7z/RAR 等解压 |
-| CommunityToolkit.Mvvm | 8.3.2 | MVVM 框架（实际未用）|
-| Ookii.Dialogs.Wpf | 5.0.1 | 文件夹选择对话框 |
-| Markdig | 1.1.3 | Markdown 渲染 |
-| Ude.NetStandard | 1.2.0 | 字符编码检测 |
+### MantisZip.Core
+
+| 包名 | 版本 | 用途 | 许可证 |
+|------|------|------|--------|
+| SharpZipLib | 1.4.2 | ZIP / TAR / GZ 压缩解压 | MIT |
+| SevenZipExtractor | 1.0.19 | 7z / RAR / ISO 解压（封装 7z.dll） | LGPL-2.1 |
+| System.Security.Cryptography.ProtectedData | 10.0.8 | DPAPI 加密存储密码 | MIT |
+
+### MantisZip.UI
+
+| 包名 | 版本 | 用途 | 许可证 |
+|------|------|------|--------|
+| CommunityToolkit.Mvvm | 8.3.2 | MVVM 辅助（仅用部分基类） | MIT |
+| Markdig | 1.1.3 | Markdown → HTML 渲染 | BSD-2-Clause |
+| Ookii.Dialogs.Wpf | 5.0.1 | 文件夹选择对话框 | BSD-3-Clause |
+| Ude.NetStandard | 1.2.0 | 字符编码检测（文本预览） | MIT |
+| WpfAnimatedGif | 2.0.2 | GIF 动画支持 | MIT |
+
+### 测试
+
+| 包名 | 版本 | 用途 | 许可证 |
+|------|------|------|--------|
+| xunit | 2.9.2 | 单元测试框架 | Apache-2.0 |
+| Microsoft.NET.Test.Sdk | 17.12.0 | 测试运行器 | MIT |
+
+### 外部工具（运行时依赖）
+
+| 工具 | 用途 | 许可证 | 备注 |
+|------|------|--------|------|
+| [7-Zip](https://www.7-zip.org/) | 7z 格式压缩（调用 7z.exe） | GNU LGPL | 解压不依赖；路径可在设置中修改 |
 
 ## 一、技术选型
 
@@ -52,31 +74,79 @@
 | 架构模式 | Code-behind | 所有逻辑在 MainWindow.xaml.cs |
 | 压缩库 | SharpZipLib (ZIP/TAR/GZ) + SevenZipExtractor (7z/RAR) | 功能成熟 |
 
-### 1.2 项目结构
+### 1.2 系统要求
+
+| 项目 | 要求 |
+|------|------|
+| 操作系统 | Windows 10 (1809+) / Windows 11 |
+| 运行时 | [.NET 9 Runtime](https://dotnet.microsoft.com/download/dotnet/9.0) |
+| 7z 压缩 | 需安装 [7-Zip](https://www.7-zip.org/)（默认路径 `C:\Program Files\7-Zip\7z.exe`，可在设置中修改） |
+| 开发工具 | Visual Studio 2022+ / dotnet CLI |
+
+### 1.3 项目结构
 
 ```
 MantisZip/
 ├── src/
-│   ├── MantisZip.Core/          # 核心业务逻辑
-│   │   ├── Abstractions/      # IArchiveEngine + Models
-│   │   ├── Engines/           # ZipEngine / SevenZipEngine / TarGzEngine
-│   │   ├── Models/
-│   │   └── Utils/             # PasswordManager, ArchiveEntryExtractor, FileConflictHelper
-│   └── MantisZip.UI/          # WPF 桌面应用
-│       ├── App.xaml / .cs     # 应用入口 + CLI 处理
-│       ├── AppConstants.cs    # 版本号常量
-│       ├── AppSettings.cs     # 用户设置（JSON 持久化）
-│       ├── MainWindow.xaml / .cs  # 主窗口 + FolderNode
-│       ├── SettingsWindow.xaml / .cs  # 设置窗口（六标签页）
-│       ├── ShellIntegration.cs    # 右键菜单 + 文件关联
-│       ├── ProgressWindow.xaml / .cs  # 双进度条 + 密码区 + 暂停
-│       └── ConflictDialog.xaml / .cs  # 文件冲突弹窗
+│   ├── MantisZip.Core/              # 核心业务逻辑
+│   │   ├── Abstractions/            # IArchiveEngine + ArchiveProgress 等模型
+│   │   │   └── ArchiveEngine.cs     # 接口 + 数据模型
+│   │   ├── Engines/                 # 各格式引擎实现
+│   │   │   ├── ZipEngine.cs         # ZIP (SharpZipLib)
+│   │   │   ├── SevenZipEngine.cs    # 7z/RAR (SevenZipExtractor)
+│   │   │   └── TarGzEngine.cs       # TAR/GZ (SharpZipLib)
+│   │   └── Utils/                   # 工具类
+│   │       ├── PasswordManager.cs   # 密码管理器
+│   │       ├── ArchiveEntryExtractor.cs  # 单项预览提取
+│   │       ├── FileConflictHelper.cs     # 解压冲突处理
+│   │       ├── CoreLog.cs                # 调试日志
+│   │       └── SplitOutputStream.cs      # 分卷压缩输出流
+│   └── MantisZip.UI/                # WPF 桌面应用（net9.0-windows）
+│       ├── MainWindow.xaml / .cs    # 主窗口（所有逻辑 code-behind）
+│       ├── MainWindow.Preview.cs    # 文件预览子系统
+│       ├── MainWindow.DragDrop.cs   # 拖拽导出
+│       ├── MainWindow.Menu.cs       # 菜单事件
+│       ├── MainWindow.UI.cs         # UI 辅助方法
+│       ├── App.xaml / .cs           # 应用入口 + CLI 处理 + --compress IPC
+│       ├── AppConstants.cs          # 版本号常量
+│       ├── AppSettings.cs           # 用户设置（JSON 持久化）
+│       ├── SettingsWindow.xaml / .cs    # 设置窗口（六标签页）
+│       ├── ProgressWindow.xaml / .cs    # 双进度条 + 密码区 + 暂停
+│       ├── CompressSettingsWindow.xaml / .cs  # 压缩配置对话框
+│       ├── ConflictDialog.xaml / .cs       # 解压冲突弹窗
+│       ├── CompressConflictDialog.xaml / .cs  # 压缩冲突弹窗
+│       ├── ErrorDialog.xaml / .cs         # 错误提示弹窗
+│       ├── AppMessageBox.xaml / .cs       # 统一消息框
+│       ├── PasswordDialog.xaml / .cs      # 密码输入框
+│       ├── PasswordEditDialog.xaml / .cs  # 密码编辑框
+│       ├── PasswordHelpDialog.xaml / .cs  # 密码帮助窗口
+│       ├── PasswordManagerWindow.xaml / .cs  # 密码管理器窗口
+│       ├── ShellIntegration.cs        # 右键菜单注册（HKCU 无管理员）
+│       ├── SystemIconHelper.cs        # SHGetFileInfo 系统图标
+│       ├── Localization/              # 本地化资源
+│       └── Resources/                 # 图标、样式等资源
+├── tests/
+│   └── MantisZip.Tests/              # xUnit 单元测试（40+ 用例）
+│       ├── Engines/                   # ZipEngine / SevenZipEngine / TarGzEngine 测试
+│       └── Fixtures/                  # 测试用压缩包生成
 ├── docs/
 │   ├── PLAN.md
 │   └── PROGRESS.md
 ├── AGENTS.md
 └── MantisZip.sln
 ```
+
+---
+
+### 设计原则
+
+| 原则 | 说明 |
+|------|------|
+| **Code-behind 模式** | 所有逻辑在 `MainWindow.xaml.cs`（及 partial class 文件），不使用 MVVM |
+| **策略模式** | `IArchiveEngine` 接口 + `ArchiveEngineFactory` 工厂按扩展名分发 |
+| **依赖方向** | `MantisZip.UI` → `MantisZip.Core`，核心层无 UI 依赖 |
+| **单例设置** | `AppSettings` 单例，JSON 持久化到 `%LOCALAPPDATA%\MantisZip` |
+| **编码处理** | per-instance `StringCodec`，不依赖全局 `ZipStrings.CodePage`，自动适配系统区域 |
 
 ---
 
@@ -91,7 +161,7 @@ MantisZip/
 | TAR | ✅ | ✅ | ❌ | |
 | GZ (tar.gz) | ✅ | ✅ | ❌ | |
 | RAR | ❌ | ✅ | ✅ | 只读 |
-| ISO | ❌ | ✅ | ❌ | 基于 SevenZipExtractor，只读 |
+| ISO | ❌ | ✅（只读浏览） | ❌ | 基于 SevenZipExtractor |
 
 ### 2.2 核心功能
 
@@ -147,6 +217,30 @@ MantisZip/
 | P1 | 文件关联（打开方式） | ✅ 完成 |
 | P2 | 快速压缩 | ✅ 完成 |
 | P3 | 桌面剪贴板监控 | ⬜ 待开发 |
+
+### 2.5 CLI 参考
+
+| 参数 | 说明 |
+|------|------|
+| *(无参数)* | 正常启动主窗口 |
+| `--open <路径>` | 启动主窗口并加载压缩包 |
+| `--compress <路径1> <路径2> ...` | 显示压缩对话框（支持多实例 IPC 合并路径） |
+| `--compress-quick <路径1> ...` | 使用默认设置直接压缩，显示进度窗口 |
+| `--extract <路径>` | 显示解压到…选择目录对话框 |
+| `--extract-here <路径>` | 解压到当前目录 |
+| `--extract-to-name <路径>` | 解压到以压缩包名命名的子目录 |
+| `--install-shell` | 安装 Shell 右键菜单 |
+| `--uninstall-shell` | 卸载 Shell 右键菜单 |
+| `--install-assoc` | 安装文件关联（.zip/.7z/.rar 等默认用 MantisZip 打开） |
+| `--uninstall-assoc` | 卸载文件关联 |
+| `--test` | 启动测试模式（检查应用配置是否正确） |
+
+**示例**:
+```powershell
+MantisZip.UI.exe --open "D:\文档.zip"
+MantisZip.UI.exe --compress-quick "D:\照片" -- "D:\备份.zip"
+MantisZip.UI.exe --extract "D:\软件包.7z"
+```
 
 ---
 
@@ -230,6 +324,7 @@ Phase 4: ██████████████████░░ 90%
 | 2026-05-13 | 子目录不显示（无显式条目 ZIP） | BuildFolderTree + FilterFiles 推导隐式目录 | ✅ v0.2.2 已修复 |
 | 2026-05-13 | CLI 密码对话框不显示 | ShutdownMode OnExplicitShutdown | ✅ v0.2.2 已修复 |
 | 2026-05-13 | 多条密码规则只试第一条 | 改为遍历所有 | ✅ v0.2.2 已修复 |
+| 2026-05-18 | 设置里「彩色 Emoji」开关无效 | WPF 原生渲染不传 `D2D1_DRAW_TEXT_OPTIONS_ENABLE_COLOR_FONT` 给 DirectWrite。需引入第三方库 Emoji.Wpf | ⬜ 待修复 |
 
 ---
 
@@ -248,7 +343,9 @@ Phase 4: ██████████████████░░ 90%
 | 文件列表右键菜单 | 右键压缩包内的文件/目录时弹出菜单：解压到…、预览、复制文件名、复制完整路径等。直接在现有 DataGrid 上挂 ContextMenu 即可，工作量低 |
 | 文本预览语法高亮 | 用 AvalonEdit 替换当前 TextBox，支持 20+ 语言语法高亮（C#/Python/XML/HTML/SQL/JS 等）。加一个 NuGet 包 + 改控件名 + 两行配置即可 |
 | 压缩方式选择 | Store/Deflate/BZip2/LZMA，需换 SharpCompress 库 |
-| 国际化 | 中文/英文界面切换 |
+| 添加到压缩包 |  |
+| 从压缩包删除 |  |
+| Emoji.Wpf 彩色 Emoji 渲染 | WPF 不支持原生彩色 Emoji，Tag 图标(📦📂☰👁🔗🔑🌐⚙)目前为黑白。引入 [Emoji.Wpf](https://github.com/samhocevar/emoji.wpf) NuGet 包，替换 TabControl 图标的 TextBlock 为 `emoji:TextBlock` |
 | 暗色主题 | 亮色/暗色切换 |
 | 文件列表筛选 | 搜索框实时过滤当前目录 + 子目录显示切换 |
 | 文件大小进度条 | 大小列背景按文件体积比例填充，一眼看出大文件 |
@@ -286,7 +383,7 @@ Phase 4: ██████████████████░░ 90%
 | 任务 | 说明 | 工作量 |
 |------|------|--------|
 | COM 右键菜单 | 动态菜单名（显示文件名）、菜单排序、自定义图标。注册 `*\shellex\ContextMenuHandlers\{GUID}` | 中 |
-| VirtualFileDataObject | COM 原生 IDataObject 替代 WPF 包装，拖拽延迟渲染不崩溃。需 P/Invoke：COMStreamWrapper、FORMATETC、STGMEDIUM | 中 |
+| **VirtualFileDataObject** | COM 原生 IDataObject 替代 WPF 包装，拖拽延迟渲染不崩溃。需 P/Invoke：COMStreamWrapper、FORMATETC、STGMEDIUM → [详细设计](.sisyphus/plans/virtual-file-data-object.md) | 中 |
 | 右键菜单目录结构预览 | 在 COM 菜单中读取压缩包 entry 列表，展示文件树（Bandizip 风格） | 高 |
 | 外部工具视频元数据 | ffprobe 提取时长/分辨率/编码，显示在信息面板。需用户安装 FFmpeg | 低 |
 | 发布 Release | GitHub Releases + 自动构建 | 低 |

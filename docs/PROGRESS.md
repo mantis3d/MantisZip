@@ -7,8 +7,8 @@
 - **技术栈**: .NET 9 + WPF + SharpZipLib + SevenZipExtractor
 
 ## 版本
-- **当前版本**: 0.2.6
-- **发布日期**: 2026-05-17 (updated)
+- **当前版本**: 0.2.7
+- **发布日期**: 2026-05-18
 
 ## 版本历史（按日期排序）
 
@@ -141,14 +141,6 @@
 10. **无密码压缩包密码区修复** - `HasEncryptedEntries` 预检，无加密不显示
 11. **版本升级** - 0.2.4
 
-### v0.2.6 (2026-05-17)
-1. **README 重写** - 「未来计划」升级为「开发计划」全景路线图，按功能域分 6 组，已完成/规划中状态标记，链接指向详细设计文档
-2. **文档冗余清理** - PROGRESS.md 移除待实现功能/技术架构/重复开发日志/已知问题章节；PLAN.md 变更日志缩短为引用 PROGRESS.md
-3. **恢复 v0.2.3 版本历史** - 填补被 v0.2.4 覆盖时误删的版本条目，修正 v0.2.2 条目归属
-4. **ISO 格式正式记录** - PLAN.md 格式支持表 + README 核心引擎表新增 ISO 解压
-5. **新增计划文档** - engine-unification-sharpcompress.md、preview-format-detection.md、file-size-progress-bar.md
-6. **文件大小进度条方案** - 纳入开发计划，纯 UI 改动
-7. **版本升级** - 0.2.6
 
 ### v0.2.5 (2026-05-13)
 1. **MainWindow 文件拆分** - 92 KB / 2400 行拆为 5 个文件，编译零警告零错误
@@ -162,4 +154,34 @@
 
 
 
+### v0.2.6 (2026-05-17)
+1. **README 重写** - 「未来计划」升级为「开发计划」全景路线图，按功能域分 6 组，已完成/规划中状态标记，链接指向详细设计文档
+2. **文档冗余清理** - PROGRESS.md 移除待实现功能/技术架构/重复开发日志/已知问题章节；PLAN.md 变更日志缩短为引用 PROGRESS.md
+3. **恢复 v0.2.3 版本历史** - 填补被 v0.2.4 覆盖时误删的版本条目，修正 v0.2.2 条目归属
+4. **ISO 格式正式记录** - PLAN.md 格式支持表 + README 核心引擎表新增 ISO 解压
+5. **新增计划文档** - engine-unification-sharpcompress.md、preview-format-detection.md、file-size-progress-bar.md
+6. **文件大小进度条方案** - 纳入开发计划，纯 UI 改动
+7. **RAR 预览修复** - ArchiveEntryExtractor 重复标签 + 路径分隔符不匹配导致"未找到条目"
+8. **GIF 动画预览** - 引入 WpfAnimatedGif 包，gif 文件用 `ImageBehavior.SetAnimatedSource` 播放
+9. **Markdown 增强** - Markdig 管道添加 PipeTables、EmphasisExtras(Strikethrough/Subscript/Superscript)、TaskLists、AutoIdentifiers、EmojiAndSmiley 扩展
+10. **统一消息弹窗 AppMessageBox** - 创建 `AppMessageBox.xaml/cs` 替换所有 `MessageBox.Show()`（37+ 调用点，9 个文件）
+11. **Zip64 修复** - SharpZipLib 1.4.0 → 1.4.2（修复 Zip64 扩展信息解析错误）
+12. **SharpCompress 迁移计划** - 新增 Phase 4（7z.exe → SevenZipSharp），4 阶段全量计划
+13. **文件类型图标** - `ShellIntegration.GetIconPath()` + 逐扩展名 `DefaultIcon`，图标文件放 `Resources\Icons\`，编译时自动复制
+14. **右键菜单层叠模式默认启用** - `EnableCascadingMenu` 默认值 `false→true`，避免 Windows 15 动词上限导致多文件右键菜单消失
+15. **预览提前显示基础信息** - `ShowPreviewAsync` 优先调用 `SetPreviewInfo(item)` + `ShowPreviewPanel()`，加载前先展示文件名/大小/压缩率
+16. **ZIP 注释预览** - 读取 `ZipFile.ZipFileComment` 并像文本文件一样显示在预览内容区，字体大小跟随 `TextPreviewFontSize` 设置
+17. **空选择显示压缩包总览** - `FileListGrid_SelectionChanged` + `FilterFiles` 末尾检测 `SelectedItems.Count == 0` 时调用 `ShowArchiveInfo()`
+18. **目录统计** - `_dirStats` 预计算缓存，文件列表大小列显示目录下所有文件之和，目录预览显示文件数/原始大小/压缩后/压缩率
+19. **版本升级** - 0.2.6
+
+### v0.2.7 (2026-05-18)
+1. **设置窗口改用竖向 Tab** - `TabStripPlacement="Left"`，左侧竖排标签页
+2. **Tab 图标** - 每个标签页加 Emoji 图标，自定义 `TabItem` ControlTemplate（38px 最小高度、选中态底色 + 3px 蓝色左边框 + 加粗指示）
+3. **Tab 布局** - 图标左对齐 + 文字居中，`MinWidth="150"` 更宽松
+4. **彩色 Emoji 渲染开关** - 添加 `AppSettings.UseColorEmoji` 和 `App.ApplyTextRenderingMode()`（WPF 原生不支持彩色 Emoji，功能待 Emoji.Wpf 库实现）
+5. **本地化补全** - CompressSettingsWindow/SettingsWindow/ConflictDialog/ErrorDialog/CompressConflictDialog/PasswordManagerWindow 等 8 个文件的硬编码中文改用 `l:L` 绑定；需代码填充的 dialog header 改用 `L.T()`/`L.TF()` 方法
+6. **L.cs 重构** - 重新生成（423 键），追加 `T()`/`TF()` 静态方法
+7. **文档记录** - `docs/PLAN.md` 记录 Emoji.Wpf 方案为 P2 待实现任务
+8. **版本升级** - 0.2.7
 
