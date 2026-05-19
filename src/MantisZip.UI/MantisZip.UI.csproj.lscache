@@ -57,12 +57,18 @@ TemporaryDependencyNodeTargetIdentifier=net9.0-windows
 [sourceFiles]
 App.xaml.cs
 AppConstants.cs
+AppMessageBox.xaml.cs
 AppSettings.cs
 AssemblyInfo.cs
 CompressConflictDialog.xaml.cs
 CompressSettingsWindow.xaml.cs
 ConflictDialog.xaml.cs
 ErrorDialog.xaml.cs
+Localization/
+ L.cs
+ LanguageManager.cs
+ LExtension.cs
+LogPrivacyHelpDialog.xaml.cs
 MainWindow.DragDrop.cs
 MainWindow.Menu.cs
 MainWindow.Preview.cs
@@ -299,9 +305,10 @@ SystemIconHelper.cs
  markdig/1.1.3/lib/net8.0/Markdig.dll
  ookii.dialogs.wpf/5.0.1/lib/net6.0-windows7.0/Ookii.Dialogs.Wpf.dll
  sevenzipextractor/1.0.19/lib/netstandard2.0/SevenZipExtractor.dll
- sharpziplib/1.4.0/lib/net6.0/ICSharpCode.SharpZipLib.dll
+ sharpziplib/1.4.2/lib/net6.0/ICSharpCode.SharpZipLib.dll
  system.security.cryptography.protecteddata/10.0.8/lib/net9.0/System.Security.Cryptography.ProtectedData.dll
  ude.netstandard/1.2.0/lib/netstandard2.0/Ude.NetStandard.dll
+ wpfanimatedgif/2.0.2/lib/netcoreapp3.0/WpfAnimatedGif.dll
 
 [analyzerReferences]
 <DOTNET>/packs/Microsoft.NETCore.App.Ref/9.0.13/analyzers/dotnet/cs/

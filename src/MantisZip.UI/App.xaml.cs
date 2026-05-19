@@ -21,9 +21,11 @@ namespace MantisZip.UI;
 /// </summary>
 public partial class App : Application
 {
-    private static readonly string LogFile = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "debug.log");
-    private static readonly string StartupLog = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), L.T(L.App_MantisZipTitle), "startup.log");
+    private static readonly string LogFile = Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+        L.T(L.App_MantisZipTitle), "debug.log");
+    // StartupLog 已合并到 LogFile（同一个文件）
+    private static string StartupLog => LogFile;
     private static Mutex? _instanceMutex;
 
     private static string CompressMutexName = "MantisZip-CompressMutex";
@@ -69,21 +71,19 @@ public partial class App : Application
         CoreLog.RedactOverride = msg =>
             LogRedactor.RedactPaths(msg, LogRedactor.ParseMode(AppSettings.Instance.LogPrivacyMode));
 
-        // ===== 持久化启动日志（独立于 debug.log，不被删除）=====
+        // ===== 统一日志 =====
+        // 所有日志（启动日志、调试日志、CoreLog 追踪日志）都写入同一个文件：
+        // %LOCALAPPDATA%\MantisZip\debug.log
+        // 该文件持久化保留，不被自动删除。
         LogStartup($"START BaseDir={AppDomain.CurrentDomain.BaseDirectory} Args=[{string.Join(" ", e.Args)}]");
 
-        // 日志（WPF 级别，每次启动清空）
+        // WPF 跟踪监听器（写入同一个文件）
         var listener = new TextWriterTraceListener(LogFile);
         listener.Name = "FileLogger";
         Trace.Listeners.Add(listener);
         Trace.AutoFlush = true;
 
-        // DEBUG 模式下不清除日志文件，保留调试信息
-        // RELEASE 模式下每次启动清空
-#if !DEBUG
-        try { File.Delete(LogFile); } catch { }
-#endif
-        LogDebug("LogDebug: debug.log will be appended in DEBUG mode");
+        LogDebug("LogDebug: debug.log will be appended");
 
         Log("启动参数: {0}", string.Join(" ", e.Args));
 
@@ -1094,7 +1094,8 @@ public partial class App : Application
     }
 
     /// <summary>
-    /// 持久化启动日志（写入 %LOCALAPPDATA%\L.T(L.App_MantisZipTitle)\startup.log，不被删除）。
+    /// 启动/操作日志（写入统一日志文件 %LOCALAPPDATA%\MantisZip\debug.log，不被自动删除）。
+    /// 已应用隐私脱敏。
     /// </summary>
     private static void LogStartup(string msg)
     {
@@ -1124,7 +1125,7 @@ public partial class App : Application
             var dir = Path.GetDirectoryName(LogFile);
             if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
                 Directory.CreateDirectory(dir);
-            File.AppendAllText(LogFile, $"[{DateTime.Now:HH:mm:ss.fff}] {redacted}\n");
+            File.AppendAllText(LogFile, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}] {redacted}\n");
             Debug.WriteLine(redacted);
         }
         catch { }
@@ -1149,7 +1150,7 @@ public partial class App : Application
             var dir = Path.GetDirectoryName(LogFile);
             if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
                 Directory.CreateDirectory(dir);
-            File.AppendAllText(LogFile, $"[DBG] [{DateTime.Now:HH:mm:ss.fff}] {redacted}\n");
+            File.AppendAllText(LogFile, $"[DBG] [{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}] {redacted}\n");
             Debug.WriteLine(redacted);
         }
         catch { }
@@ -1161,17 +1162,19 @@ public partial class App : Application
     }
 
     /// <summary>
-    /// 无条件写入 startup.log 的追踪日志（不依赖 EnableDebugLogging 设置）。
-    /// 用于调试进度条等难以复现的问题。
+    /// 无条件写入统一日志文件的追踪日志（不依赖 EnableDebugLogging 设置）。
+    /// 用于调试进度条等难以复现的问题。已应用隐私脱敏。
     /// </summary>
     public static void TraceLog(string msg)
     {
         try
         {
-            var dir = Path.GetDirectoryName(StartupLog);
+            var redacted = LogRedactor.RedactPaths(msg,
+                LogRedactor.ParseMode(AppSettings.Instance.LogPrivacyMode));
+            var dir = Path.GetDirectoryName(LogFile);
             if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
                 Directory.CreateDirectory(dir);
-            File.AppendAllText(StartupLog, $"[TRACE] [{DateTime.Now:HH:mm:ss.fff}] {msg}\n");
+            File.AppendAllText(LogFile, $"[TRACE] [{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}] {redacted}\n");
         }
         catch { }
     }

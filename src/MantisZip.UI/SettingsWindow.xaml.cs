@@ -105,7 +105,9 @@ public partial class SettingsWindow : Window
 
         // 高级
         EnableDebugLogCheck.IsChecked = s.EnableDebugLogging;
-        LogPathText.Text = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "debug.log");
+        LogPathText.Text = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            L.T(L.App_MantisZipTitle), "debug.log");
         SevenZipPathBox.Text = s.SevenZipPath;
 
         // 日志隐私脱敏
@@ -338,20 +340,6 @@ public partial class SettingsWindow : Window
             var dir = Path.GetDirectoryName(LogPathText.Text);
             if (!string.IsNullOrEmpty(dir) && Directory.Exists(dir))
                 Process.Start("explorer.exe", $"/select,\"{LogPathText.Text}\"");
-        }
-        catch { }
-    }
-
-    private void OpenStartupLog_Click(object sender, RoutedEventArgs e)
-    {
-        try
-        {
-            var startupLog = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                L.T(L.App_MantisZipTitle), "startup.log");
-            var dir = Path.GetDirectoryName(startupLog);
-            if (!string.IsNullOrEmpty(dir) && Directory.Exists(dir))
-                Process.Start("explorer.exe", $"/select,\"{startupLog}\"");
         }
         catch { }
     }

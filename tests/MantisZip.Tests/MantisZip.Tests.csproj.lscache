@@ -57,6 +57,7 @@ TemporaryDependencyNodeTargetIdentifier=net9.0
 Engines/
  SevenZipEngineTests.cs
  TarGzEngineTests.cs
+ ZipEngineDeleteTests.cs
  ZipEngineTests.cs
 Fixtures/ArchiveFixtures.cs
 obj/Debug/net9.0/
@@ -244,7 +245,7 @@ obj/Debug/net9.0/
   testhost.dll
  newtonsoft.json/13.0.1/lib/netstandard2.0/Newtonsoft.Json.dll
  sevenzipextractor/1.0.19/lib/netstandard2.0/SevenZipExtractor.dll
- sharpziplib/1.4.0/lib/net6.0/ICSharpCode.SharpZipLib.dll
+ sharpziplib/1.4.2/lib/net6.0/ICSharpCode.SharpZipLib.dll
  system.security.cryptography.protecteddata/10.0.8/lib/net9.0/System.Security.Cryptography.ProtectedData.dll
  xunit.abstractions/2.0.3/lib/netstandard2.0/xunit.abstractions.dll
  xunit.assert/2.9.2/lib/net6.0/xunit.assert.dll

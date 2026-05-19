@@ -326,8 +326,6 @@
                         <StackPanel Orientation="Horizontal" Margin="24,4,0,0">
                             <Button Content="{l:L Settings_Advanced_OpenLog}" Width="90" Height="22" FontSize="11"
                                     Click="OpenLogFolder_Click"/>
-                            <Button Content="{l:L Settings_Advanced_OpenStartupLog}" Width="100" Height="22" Margin="8,0,0,0" FontSize="11"
-                                    Click="OpenStartupLog_Click"/>
                         </StackPanel>
                         <TextBlock Text="{l:L Settings_Debug_LogPrivacyMode}" FontWeight="SemiBold" Margin="0,12,0,4"/>
                         <StackPanel Orientation="Horizontal">

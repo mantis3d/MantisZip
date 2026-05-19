@@ -7,12 +7,14 @@ namespace MantisZip.Core.Utils;
 /// <summary>
 /// DEBUG-only logger for MantisZip.Core. All methods are [Conditional("DEBUG")]
 /// so they compile to nothing in RELEASE builds.
-/// Writes to %TEMP%\MantisZip\core.log with timestamps.
+/// All output goes to %LOCALAPPDATA%\MantisZip\debug.log with timestamps.
+/// CoreLog.Trace is the only method active in RELEASE builds (for hard-to-repro bugs).
 /// </summary>
 internal static class CoreLog
 {
     private static readonly string LogPath = Path.Combine(
-        Path.GetTempPath(), "MantisZip", "core.log");
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+        "MantisZip", "debug.log");
 
     private static readonly object _lock = new();
 
@@ -74,20 +76,23 @@ internal static class CoreLog
 
     /// <summary>
     /// 无条件追踪日志（DEBUG 和 RELEASE 都写入）。
-    /// 写入 %TEMP%\MantisZip\trace.log。用于调试进度条等难以复现的问题。
+    /// 写入 %LOCALAPPDATA%\MantisZip\debug.log（与 CoreLog.Write 同文件）。
+    /// 也应用 RedactOverride 脱敏。用于调试进度条等难以复现的问题。
     /// </summary>
     internal static void Trace(string msg)
     {
-        var tracePath = Path.Combine(Path.GetTempPath(), "MantisZip", "trace.log");
+        // 应用脱敏（由 UI 层注入，null=不脱敏）
+        var finalMsg = RedactOverride?.Invoke(msg) ?? msg;
+
         try
         {
-            var dir = Path.GetDirectoryName(tracePath);
+            var dir = Path.GetDirectoryName(LogPath);
             if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
                 Directory.CreateDirectory(dir);
             lock (_lock)
             {
-                File.AppendAllText(tracePath,
-                    $"[{DateTime.Now:HH:mm:ss.fff}] {msg}\n");
+                File.AppendAllText(LogPath,
+                    $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}] {finalMsg}\n");
             }
         }
         catch { }

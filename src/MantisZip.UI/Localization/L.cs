@@ -355,7 +355,6 @@ public static class L
     public const string Settings_Advanced_EnableDebugLog           = "Settings_Advanced_EnableDebugLog";
     public const string Settings_Advanced_LogFile                  = "Settings_Advanced_LogFile";
     public const string Settings_Advanced_OpenLog                  = "Settings_Advanced_OpenLog";
-    public const string Settings_Advanced_OpenStartupLog           = "Settings_Advanced_OpenStartupLog";
     public const string Settings_Advanced_SevenZipPath             = "Settings_Advanced_SevenZipPath";
     public const string Settings_Assoc_Desc                        = "Settings_Assoc_Desc";
     public const string Settings_Assoc_GroupHeader                 = "Settings_Assoc_GroupHeader";
