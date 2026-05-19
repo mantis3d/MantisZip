@@ -20,6 +20,20 @@ public class SevenZipEngine : IArchiveEngine
     public static string SevenZipPath { get; set; } = @"C:\Program Files\7-Zip\7z.exe";
 
     /// <summary>
+    /// 安全的临时目录（仅当前用户可访问），用于 7z 密码响应文件。
+    /// 避免使用系统级共享的 %TEMP% 目录，防止密码泄露。
+    /// </summary>
+    private static string GetSecureTempDir()
+    {
+        var dir = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "MantisZip", "tmp");
+        if (!Directory.Exists(dir))
+            Directory.CreateDirectory(dir);
+        return dir;
+    }
+
+    /// <summary>
     /// 解析 7z.exe 的有效路径。按优先级尝试：
     /// 1. 配置的 SevenZipPath（用户设置）
     /// 2. Program Files 标准路径
@@ -176,7 +190,7 @@ public class SevenZipEngine : IArchiveEngine
             }
 
             CoreLog.Info($"ExtractAsync: done, {sw.ElapsedMilliseconds}ms");
-        }, cancellationToken);
+        }, cancellationToken).ConfigureAwait(false);
 
         CoreLog.Exit();
     }
@@ -222,10 +236,10 @@ public class SevenZipEngine : IArchiveEngine
             string? passwordFile = null;
             try
             {
-                // 加密：用临时响应文件传递密码，避免出现在进程命令行（Process Explorer 可见）
+                // 加密：用临时响应文件传递密码（存储在用户专属安全目录，非系统共享 %TEMP%）
                 if (options.Encrypt && !string.IsNullOrEmpty(options.Password))
                 {
-                    passwordFile = Path.Combine(Path.GetTempPath(), $"MantisZip_pwd_{Guid.NewGuid()}.tmp");
+                    passwordFile = Path.Combine(GetSecureTempDir(), $"MantisZip_pwd_{Guid.NewGuid()}.tmp");
                     await File.WriteAllTextAsync(passwordFile, $"-p{options.Password}", CancellationToken.None).ConfigureAwait(false);
                     psi.ArgumentList.Add($"@{passwordFile}");
                     psi.ArgumentList.Add("-mhe=on"); // 加密头部
@@ -283,7 +297,7 @@ public class SevenZipEngine : IArchiveEngine
                     try { File.Delete(passwordFile); } catch (Exception delEx) { CoreLog.Info($"CompressAsync: failed to delete password file: {delEx.Message}"); }
                 }
             }
-        }, cancellationToken);
+        }, cancellationToken).ConfigureAwait(false);
 
         CoreLog.Exit();
     }
@@ -321,7 +335,7 @@ public class SevenZipEngine : IArchiveEngine
 
             CoreLog.Info($"ListEntriesAsync: {items.Count} entries, {sw.ElapsedMilliseconds}ms");
             return (IReadOnlyList<ArchiveItem>)items;
-        }, cancellationToken);
+        }, cancellationToken).ConfigureAwait(false);
 
         CoreLog.Exit();
         return result;
@@ -372,7 +386,7 @@ public class SevenZipEngine : IArchiveEngine
                 CoreLog.Error($"TestArchiveAsync: failed", ex);
                 return false;
             }
-        }, cancellationToken);
+        }, cancellationToken).ConfigureAwait(false);
 
         CoreLog.Exit();
         return result;
@@ -414,7 +428,7 @@ public class SevenZipEngine : IArchiveEngine
             {
                 if (!string.IsNullOrEmpty(password))
                 {
-                    passwordFile = Path.Combine(Path.GetTempPath(), $"MantisZip_pwd_{Guid.NewGuid()}.tmp");
+                    passwordFile = Path.Combine(GetSecureTempDir(), $"MantisZip_pwd_{Guid.NewGuid()}.tmp");
                     await File.WriteAllTextAsync(passwordFile, $"-p{password}", CancellationToken.None).ConfigureAwait(false);
                     psi.ArgumentList.Add($"@{passwordFile}");
                 }
@@ -503,7 +517,7 @@ public class SevenZipEngine : IArchiveEngine
                     try { File.Delete(passwordFile); } catch (Exception delEx) { CoreLog.Info($"DeleteEntriesAsync: failed to delete password file: {delEx.Message}"); }
                 }
             }
-        }, cancellationToken);
+        }, cancellationToken).ConfigureAwait(false);
 
         CoreLog.Exit();
     }
@@ -547,10 +561,10 @@ public class SevenZipEngine : IArchiveEngine
             string? passwordFile = null;
             try
             {
-                // 加密：用临时响应文件传递密码，避免出现在进程命令行（Process Explorer 可见）
+                // 加密：用临时响应文件传递密码（存储在用户专属安全目录，非系统共享 %TEMP%）
                 if (options.Encrypt && !string.IsNullOrEmpty(options.Password))
                 {
-                    passwordFile = Path.Combine(Path.GetTempPath(), $"MantisZip_pwd_{Guid.NewGuid()}.tmp");
+                    passwordFile = Path.Combine(GetSecureTempDir(), $"MantisZip_pwd_{Guid.NewGuid()}.tmp");
                     await File.WriteAllTextAsync(passwordFile, $"-p{options.Password}", CancellationToken.None).ConfigureAwait(false);
                     psi.ArgumentList.Add($"@{passwordFile}");
                     psi.ArgumentList.Add("-mhe=on");
@@ -648,7 +662,7 @@ public class SevenZipEngine : IArchiveEngine
                     try { File.Delete(passwordFile); } catch (Exception delEx) { CoreLog.Info($"AddToArchiveAsync: failed to delete password file: {delEx.Message}"); }
                 }
             }
-        }, cancellationToken);
+        }, cancellationToken).ConfigureAwait(false);
 
         CoreLog.Exit();
     }
