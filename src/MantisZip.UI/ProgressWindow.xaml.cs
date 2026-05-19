@@ -317,7 +317,9 @@ internal class PauseAwareProgress : IProgress<ArchiveProgress>
 
     public void Report(ArchiveProgress value)
     {
-        _pauseEvent.Wait(); // 暂停时阻塞，恢复后继续
+        // 暂停时短暂等待（100ms 轮询），避免无限期阻塞线程池线程导致饥饿/死锁。
+        // 暂停后用户可取消（Cancel）来停止操作。
+        _pauseEvent.Wait(100);
         _inner.Report(value);
     }
 }
