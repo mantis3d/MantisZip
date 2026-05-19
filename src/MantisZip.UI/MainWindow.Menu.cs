@@ -351,7 +351,8 @@ public partial class MainWindow
                 pw.CancellationToken.ThrowIfCancellationRequested();
                 pw.SetProgress((double)i / filesToExtract.Count * 100, L.TF(L.Main_Status_Extracting, item.Name));
 
-                var outputPath = Path.Combine(dest, item.FullPath);
+                var safeEntryPath = FileConflictHelper.SanitizeEntryPath(item.FullPath);
+                var outputPath = FileConflictHelper.GetSafePath(dest, safeEntryPath);
                 var dir = Path.GetDirectoryName(outputPath);
                 if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir)) Directory.CreateDirectory(dir);
 

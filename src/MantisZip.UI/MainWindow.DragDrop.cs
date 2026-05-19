@@ -193,7 +193,8 @@ public partial class MainWindow
                 {
                     if (ct.IsCancellationRequested) break;
                     var item = filesToDrag[i];
-                    var outputPath = Path.Combine(_dragTempDir, item.FullPath);
+                    var safeEntryPath = FileConflictHelper.SanitizeEntryPath(item.FullPath);
+                    var outputPath = Path.Combine(_dragTempDir, safeEntryPath);
                     pw.SetProgress((double)i / filesToDrag.Count * 100, L.TF(L.Main_Status_Extracting, item.NameDisplay ?? item.Name));
                     await ExtractEntryForDragAsync(item, outputPath);
                     extractedPaths.Add(outputPath);
@@ -233,6 +234,12 @@ public partial class MainWindow
 
     private static void ExtractTarGzSingleEntry(string archivePath, string entryName, string outputPath)
     {
+        // 路径安全检查（防御纵深，调用方已净化但仍做最终验证）
+        var normalized = Path.GetFullPath(outputPath);
+        var segments = normalized.Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        if (segments.Any(s => s == ".."))
+            throw new InvalidOperationException($"输出路径包含非法路径穿越: {outputPath}");
+
         using var inputStream = File.OpenRead(archivePath);
         var isTarGz = archivePath.EndsWith(".tgz", StringComparison.OrdinalIgnoreCase)
                    || archivePath.EndsWith(".tar.gz", StringComparison.OrdinalIgnoreCase);

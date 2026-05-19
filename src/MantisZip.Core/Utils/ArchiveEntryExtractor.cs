@@ -59,6 +59,9 @@ public static class ArchiveEntryExtractor
     {
         CoreLog.Info($"ExtractZipEntry: archive={archivePath}, entry={entryName}");
 
+        // 最终路径安全检查：规范化后验证无路径穿越
+        ValidateOutputPath(outputPath);
+
         ZipFile? zipFile = null;
         try
         {
@@ -100,6 +103,9 @@ public static class ArchiveEntryExtractor
     private static void ExtractSevenZipEntry(string archivePath, string entryName, string outputPath, string? password)
     {
         CoreLog.Info($"ExtractSevenZipEntry: archive={archivePath}, entry={entryName}, password={(password != null ? "***" : "null")}");
+
+        // 最终路径安全检查：规范化后验证无路径穿越
+        ValidateOutputPath(outputPath);
         using var archiveFile = string.IsNullOrEmpty(password)
             ? new ArchiveFile(archivePath)
             : new ArchiveFile(archivePath, password);
@@ -119,5 +125,20 @@ public static class ArchiveEntryExtractor
         using var fileStream = new FileStream(outputPath, FileMode.Create, FileAccess.Write);
         entry.Extract(fileStream);
         CoreLog.Info($"ExtractSevenZipEntry: done");
+    }
+
+    /// <summary>
+    /// 最终路径安全检查：规范化后验证输出路径不包含路径穿越攻击 (Zip Slip)。
+    /// 由 ExtractZipEntry / ExtractSevenZipEntry 在写入前调用。
+    /// 注意：此检查为防御纵深；调用方（UI）应已通过 SanitizeEntryPath + GetSafePath 确保路径安全。
+    /// </summary>
+    private static void ValidateOutputPath(string outputPath)
+    {
+        var normalized = Path.GetFullPath(outputPath);
+        // 检查规范化后的路径是否仍包含 ".." 段（Path.GetFullPath 一般会解析，
+        // 但作为防御纵深仍检查之；主保护在调用方的 SanitizeEntryPath + GetSafePath）
+        var segments = normalized.Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        if (segments.Any(s => s == ".."))
+            throw new InvalidOperationException($"输出路径包含非法路径穿越: {outputPath}");
     }
 }

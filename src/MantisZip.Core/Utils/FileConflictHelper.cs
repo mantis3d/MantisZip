@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.IO;
 using MantisZip.Core.Abstractions;
 
@@ -6,7 +7,7 @@ namespace MantisZip.Core.Utils;
 /// <summary>
 /// 解压冲突处理工具
 /// </summary>
-internal static class FileConflictHelper
+public static class FileConflictHelper
 {
     /// <summary>
     /// 根据冲突策略返回实际写入路径。可能返回 null（表示跳过）。
@@ -111,14 +112,46 @@ internal static class FileConflictHelper
 
     /// <summary>
     /// 防止路径遍历攻击 (Zip Slip) — 确保解压路径在目标目录内
+    /// 使用 Path.GetRelativePath 进行可靠的包容性检查，替代不安全的 StartsWith。
     /// </summary>
     public static string GetSafePath(string destinationDir, string entryName)
     {
         var fullPath = Path.GetFullPath(Path.Combine(destinationDir, entryName));
         var destFullPath = Path.GetFullPath(destinationDir);
-        if (!fullPath.StartsWith(destFullPath, StringComparison.Ordinal))
+
+        // 使用 GetRelativePath 检查：如果相对路径以 ".." 开头或以根路径形式出现，
+        // 说明 fullPath 逃逸出了目标目录
+        var relative = Path.GetRelativePath(destFullPath, fullPath);
+        if (relative.StartsWith("..", StringComparison.Ordinal)
+            || Path.IsPathRooted(relative))
             throw new InvalidOperationException($"压缩条目包含非法路径: {entryName}");
+
         return fullPath;
+    }
+
+    /// <summary>
+    /// 净化压缩包条目路径：移除 "../"、"..\"、"." 等路径穿越组件，
+    /// 以及包含非法文件名字符的组件。用于从不可信的压缩包条目名构建安全输出路径。
+    /// 示例: "folder/../../evil.txt" → "evil.txt"
+    /// </summary>
+    public static string SanitizeEntryPath(string entryPath)
+    {
+        // 统一分隔符
+        var segments = entryPath.Replace('\\', '/').Split('/', StringSplitOptions.RemoveEmptyEntries);
+        var safe = new List<string>();
+        foreach (var seg in segments)
+        {
+            if (seg is ".." or ".")
+                continue; // 丢弃路径穿越组件
+            if (seg.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0)
+                continue; // 丢弃包含非法字符的组件
+            safe.Add(seg);
+        }
+
+        if (safe.Count == 0)
+            throw new InvalidOperationException($"条目路径净化后为空: {entryPath}");
+
+        return string.Join("/", safe);
     }
 
     private static string GetUniquePath(string path)
