@@ -164,7 +164,7 @@ public class ZipEngine : IArchiveEngine
                 zipFile?.Close();
                 ((IDisposable?)zipFile)?.Dispose();
             }
-        }, cancellationToken);
+        }, cancellationToken).ConfigureAwait(false);
 
         CoreLog.Exit();
     }
@@ -241,7 +241,7 @@ public class ZipEngine : IArchiveEngine
             }
 
             CoreLog.Info($"CompressAsync: done, {processedBytes}/{totalBytes} bytes, {sw.ElapsedMilliseconds}ms");
-        }, cancellationToken);
+        }, cancellationToken).ConfigureAwait(false);
 
         CoreLog.Exit();
     }
@@ -270,7 +270,7 @@ public class ZipEngine : IArchiveEngine
 
             CoreLog.Info($"ListEntriesAsync: {items.Count} entries, {sw.ElapsedMilliseconds}ms");
             return items;
-        }, cancellationToken);
+        }, cancellationToken).ConfigureAwait(false);
 
         CoreLog.Exit();
         return result;
@@ -304,7 +304,7 @@ public class ZipEngine : IArchiveEngine
                 CoreLog.Error($"TestArchiveAsync: failed", ex);
                 return false;
             }
-        }, cancellationToken);
+        }, cancellationToken).ConfigureAwait(false);
 
         CoreLog.Exit();
         return result;
@@ -426,7 +426,7 @@ public class ZipEngine : IArchiveEngine
             });
 
             CoreLog.Info($"AddToArchiveAsync: done, {totalNewFiles} files added ({oldEntryCount} old entries kept), {sw.ElapsedMilliseconds}ms");
-        }, cancellationToken);
+        }, cancellationToken).ConfigureAwait(false);
 
         CoreLog.Exit();
     }
@@ -499,7 +499,7 @@ public class ZipEngine : IArchiveEngine
 
             var entriesKept = totalOldEntries - entryPaths.Length;
             CoreLog.Info($"DeleteEntriesAsync: done, {entryPaths.Length} entries deleted ({entriesKept} kept), {sw.ElapsedMilliseconds}ms");
-        }, cancellationToken);
+        }, cancellationToken).ConfigureAwait(false);
 
         CoreLog.Exit();
     }

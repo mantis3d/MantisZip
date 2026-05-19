@@ -149,7 +149,7 @@ public class TarGzEngine : IArchiveEngine
             });
 
             CoreLog.Info($"ExtractAsync: done, {sw.ElapsedMilliseconds}ms");
-        }, cancellationToken);
+        }, cancellationToken).ConfigureAwait(false);
 
         CoreLog.Exit();
     }
@@ -227,7 +227,7 @@ public class TarGzEngine : IArchiveEngine
             });
 
             CoreLog.Info($"CompressAsync: done, {sw.ElapsedMilliseconds}ms");
-        }, cancellationToken);
+        }, cancellationToken).ConfigureAwait(false);
 
         CoreLog.Exit();
     }
@@ -339,7 +339,7 @@ public class TarGzEngine : IArchiveEngine
 
             CoreLog.Info($"ListEntriesAsync: {items.Count} entries, {sw.ElapsedMilliseconds}ms");
             return (IReadOnlyList<ArchiveItem>)items;
-        }, cancellationToken);
+        }, cancellationToken).ConfigureAwait(false);
 
         CoreLog.Exit();
         return result;
@@ -349,21 +349,34 @@ public class TarGzEngine : IArchiveEngine
     {
         CoreLog.Entry();
         CoreLog.Info($"DeleteEntriesAsync: {archivePath} — NotSupportedException");
-        await Task.Run(() =>
+        try
         {
-            throw new NotSupportedException("TAR/GZ 格式不支持直接删除文件，请重新创建压缩包");
-        }, cancellationToken);
+            await Task.Run(() =>
+            {
+                throw new NotSupportedException("TAR/GZ 格式不支持直接删除文件，请重新创建压缩包");
+            }, cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            CoreLog.Exit();
+        }
     }
 
     public async Task AddToArchiveAsync(string archivePath, string[] sourcePaths, ArchiveOptions options, IProgress<ArchiveProgress>? progress = null, CancellationToken cancellationToken = default, string? entryBasePath = null)
     {
         CoreLog.Entry();
         CoreLog.Info($"AddToArchiveAsync: {archivePath} — NotSupportedException");
-        await Task.Run(() =>
+        try
         {
-            throw new NotSupportedException("TAR/GZ 格式不支持直接添加文件，请重新创建压缩包");
-        }, cancellationToken);
-        // No CoreLog.Exit() — exception propagates
+            await Task.Run(() =>
+            {
+                throw new NotSupportedException("TAR/GZ 格式不支持直接添加文件，请重新创建压缩包");
+            }, cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            CoreLog.Exit();
+        }
     }
 
     public async Task<bool> TestArchiveAsync(string archivePath, string? password = null, IProgress<ArchiveProgress>? progress = null, CancellationToken cancellationToken = default)
@@ -374,7 +387,7 @@ public class TarGzEngine : IArchiveEngine
         try
         {
             // ListEntriesAsync 内部已做 Task.Run，无需再包一层
-            var items = await ListEntriesAsync(archivePath, password, cancellationToken);
+            var items = await ListEntriesAsync(archivePath, password, cancellationToken).ConfigureAwait(false);
             var ok = items.Count > 0;
             CoreLog.Info($"TestArchiveAsync: {(ok ? "passed" : "failed (no entries)")}, {items.Count} entries");
             return ok;
