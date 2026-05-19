@@ -33,7 +33,7 @@
         <StackPanel x:Name="ButtonPanel" Grid.Row="2" Grid.ColumnSpan="3"
                     Orientation="Horizontal" HorizontalAlignment="Center">
             <Button x:Name="OkBtn" Content="{l:L MsgBox_Ok}" Width="80" Height="28" Click="Ok_Click"
-                    Background="White" BorderBrush="#CCC" BorderThickness="1" Margin="0,0,6,0"/>
+                    Background="White" BorderBrush="#CCC" BorderThickness="1" Margin="0,0,6,0" Visibility="Collapsed"/>
             <Button x:Name="CancelBtn" Content="{l:L MsgBox_Cancel}" Width="80" Height="28" Click="Cancel_Click"
                     Background="White" BorderBrush="#CCC" BorderThickness="1" Margin="6,0,6,0" Visibility="Collapsed"/>
             <Button x:Name="YesBtn" Content="{l:L MsgBox_Yes}" Width="80" Height="28" Click="Yes_Click"

@@ -1,6 +1,7 @@
 using System.Threading;
 using System.Windows;
 using System.Windows.Media;
+using System.Windows.Threading;
 using MantisZip.Core.Abstractions;
 using MantisZip.UI.Localization;
 
@@ -12,6 +13,53 @@ namespace MantisZip.UI;
 /// </summary>
 public partial class ProgressWindow : Window
 {
+    /// <summary>
+    /// Creates an <see cref="IProgress{T}"/> that dispatches callbacks to the UI thread
+    /// at <see cref="DispatcherPriority.Background"/> priority.
+    /// This bypasses <see cref="System.Progress{T}"/> which always uses Normal priority (above Render),
+    /// allowing the progress bar to be visually updated between progress reports.
+    /// </summary>
+    public static IProgress<ArchiveProgress> CreateBackgroundProgress(ProgressWindow pw)
+    {
+        return new BackgroundDispatcherProgress(pw.Dispatcher, pw.SetProgress);
+    }
+
+    /// <summary>
+    /// Creates a general-purpose <see cref="IProgress{T}"/> that invokes <paramref name="callback"/>
+    /// on the given <paramref name="dispatcher"/> at Background priority.
+    /// Safe to call from any thread.
+    /// </summary>
+    public static IProgress<ArchiveProgress> CreateBackgroundProgress(Dispatcher dispatcher, Action<ArchiveProgress> callback)
+    {
+        return new BackgroundDispatcherProgress(dispatcher, callback);
+    }
+
+    /// <summary>
+    /// Custom IProgress that dispatches directly to the UI thread at Background priority.
+    /// Unlike Progress&lt;T&gt; which uses SynchronizationContext.Post (Normal priority, 8 > Render 6),
+    /// this uses Background (3 < Render 6) so the dispatcher can process Render items
+    /// between progress updates, enabling the progress bar to actually paint intermediate values.
+    /// </summary>
+    private sealed class BackgroundDispatcherProgress : IProgress<ArchiveProgress>
+    {
+        private readonly Dispatcher _dispatcher;
+        private readonly Action<ArchiveProgress> _callback;
+
+        public BackgroundDispatcherProgress(Dispatcher dispatcher, Action<ArchiveProgress> callback)
+        {
+            _dispatcher = dispatcher;
+            _callback = callback;
+        }
+
+        public void Report(ArchiveProgress value)
+        {
+            // From any thread: queue the update at Background priority.
+            // Background (3) < Render (6), so the dispatcher will process this,
+            // then process any pending Render (paint) items, then the next Background item.
+            _dispatcher.BeginInvoke((Action)(() => _callback(value)), DispatcherPriority.Background);
+        }
+    }
+
     private CancellationTokenSource? _cts;
     private readonly ManualResetEventSlim _pauseEvent = new(initialState: true);
 
@@ -31,33 +79,30 @@ public partial class ProgressWindow : Window
 
     /// <summary>
     /// 从 ArchiveProgress 更新两个进度条。
+    /// 此方法由 BackgroundDispatcherProgress 在 Background 优先级下调用，
+    /// 或直接从 UI 线程调用。无论哪种情况，我们都在 UI 线程上，直接更新控件。
     /// </summary>
     public void SetProgress(ArchiveProgress p)
     {
-        void UpdateUI()
+        App.LogDebug("[TRACE] ProgressWindow.SetProgress called: PercentComplete={0}, FilePercentComplete={1}, CurrentFile='{2}'",
+            p.PercentComplete, (object?)p.FilePercentComplete ?? "null", p.CurrentFile ?? "");
+
+        TotalProgressBar.Value = p.PercentComplete;
+        PercentText.Text = $"{p.PercentComplete:F1}%";
+        FileNameText.Text = p.CurrentFile;
+
+        if (p.FilePercentComplete.HasValue)
         {
-            TotalProgressBar.Value = p.PercentComplete;
-            PercentText.Text = $"{p.PercentComplete:F1}%";
-            FileNameText.Text = p.CurrentFile;
-
-            if (p.FilePercentComplete.HasValue)
-            {
-                FileProgressBar.Value = p.FilePercentComplete.Value;
-                FilePercentText.Text = $"{p.FilePercentComplete.Value:F0}%";
-            }
-
-            // 文件计数：TotalFiles > 0 时才L.T(L.Pwd_ShowBtn)，L.T(L.MsgBox_No)则保持空白
-            if (p.TotalFiles > 0)
-            {
-                FileCountText.Text = L.TF(L.Progress_FileCount, p.ProcessedFiles, p.TotalFiles);
-                FileCountText.Visibility = Visibility.Visible;
-            }
+            FileProgressBar.Value = p.FilePercentComplete.Value;
+            FilePercentText.Text = $"{p.FilePercentComplete.Value:F0}%";
         }
 
-        if (Dispatcher.CheckAccess())
-            UpdateUI();
-        else
-            Dispatcher.BeginInvoke((Action)UpdateUI);
+        // 文件计数：TotalFiles > 0 时才显示，否则保持空白
+        if (p.TotalFiles > 0)
+        {
+            FileCountText.Text = L.TF(L.Progress_FileCount, p.ProcessedFiles, p.TotalFiles);
+            FileCountText.Visibility = Visibility.Visible;
+        }
     }
 
     /// <summary>
@@ -77,15 +122,13 @@ public partial class ProgressWindow : Window
     /// </summary>
     public void SetComplete(string message)
     {
-        Dispatcher.Invoke(() =>
-        {
-            TotalProgressBar.Value = 100;
-            PercentText.Text = "100%";
-            FileProgressBar.Value = 100;
-            FilePercentText.Text = "100%";
-            FileNameText.Text = L.T(L.Progress_Done);
-            CancelButton.Content = L.T(L.Progress_Button_Close);
-        });
+        App.LogDebug("[TRACE] ProgressWindow.SetComplete called: message='{0}'", message);
+        TotalProgressBar.Value = 100;
+        PercentText.Text = "100%";
+        FileProgressBar.Value = 100;
+        FilePercentText.Text = "100%";
+        FileNameText.Text = L.T(L.Progress_Done);
+        CancelButton.Content = L.T(L.Progress_Button_Close);
     }
 
     /// <summary>
@@ -178,6 +221,14 @@ public partial class ProgressWindow : Window
             PasswordSection.BorderBrush = new SolidColorBrush(Color.FromRgb(0xA5, 0xD6, 0xA7));
         }
         DispatchIfNeeded(Update);
+    }
+
+    /// <summary>
+    /// 禁用取消按钮。在进入不可中断的关键操作前调用，防止用户误取消。
+    /// </summary>
+    public void DisableCancel()
+    {
+        DispatchIfNeeded(() => CancelButton.IsEnabled = false);
     }
 
     /// <summary>

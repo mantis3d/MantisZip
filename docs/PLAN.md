@@ -4,8 +4,8 @@
 
 **项目状态**: 🟢 开发中 (Phase 4 收尾)  
 **创建日期**: 2026-04-23  
-**最后更新**: 2026-05-18  
-**当前版本**: 0.2.7
+**最后更新**: 2026-05-19  
+**当前版本**: 0.2.9
 
 ---
 
@@ -207,7 +207,7 @@ MantisZip/
 | P2 | 暂停/继续 | ✅ 完成 |
 | P2 | 密码匹配进度提示 | ✅ 完成 |
 | P2 | 暗色主题 | ⬜ 待开发 |
-| P2 | 国际化 | ⬜ 待开发 |
+| P2 | 国际化（中/英） | ✅ 完成 |
 
 ### 2.4 系统集成
 
@@ -325,6 +325,7 @@ Phase 4: ██████████████████░░ 90%
 | 2026-05-13 | CLI 密码对话框不显示 | ShutdownMode OnExplicitShutdown | ✅ v0.2.2 已修复 |
 | 2026-05-13 | 多条密码规则只试第一条 | 改为遍历所有 | ✅ v0.2.2 已修复 |
 | 2026-05-18 | 设置里「彩色 Emoji」开关无效 | WPF 原生渲染不传 `D2D1_DRAW_TEXT_OPTIONS_ENABLE_COLOR_FONT` 给 DirectWrite。需引入第三方库 Emoji.Wpf | ⬜ 待修复 |
+| 2026-05-19 | SharpZipLib CommitUpdate 黑盒，添加/删除时旧条目 I/O 阶段无法上报进度 | 临时方案：按旧条目数加权进度跳变到 100%；彻底解决需迁移 SharpCompress | ✅ 临时方案已实现 |
 
 ---
 
@@ -340,11 +341,8 @@ Phase 4: ██████████████████░░ 90%
 
 | 任务 | 说明 |
 |------|------|
-| 文件列表右键菜单 | 右键压缩包内的文件/目录时弹出菜单：解压到…、预览、复制文件名、复制完整路径等。直接在现有 DataGrid 上挂 ContextMenu 即可，工作量低 |
 | 文本预览语法高亮 | 用 AvalonEdit 替换当前 TextBox，支持 20+ 语言语法高亮（C#/Python/XML/HTML/SQL/JS 等）。加一个 NuGet 包 + 改控件名 + 两行配置即可 |
 | 压缩方式选择 | Store/Deflate/BZip2/LZMA，需换 SharpCompress 库 |
-| 添加到压缩包 |  |
-| 从压缩包删除 |  |
 | Emoji.Wpf 彩色 Emoji 渲染 | WPF 不支持原生彩色 Emoji，Tag 图标(📦📂☰👁🔗🔑🌐⚙)目前为黑白。引入 [Emoji.Wpf](https://github.com/samhocevar/emoji.wpf) NuGet 包，替换 TabControl 图标的 TextBlock 为 `emoji:TextBlock` |
 | 暗色主题 | 亮色/暗色切换 |
 | 文件列表筛选 | 搜索框实时过滤当前目录 + 子目录显示切换 |
@@ -377,6 +375,8 @@ Phase 4: ██████████████████░░ 90%
 | 引擎统一 (SharpZipLib → SharpCompress) | [engine-unification-sharpcompress.md](.sisyphus/plans/engine-unification-sharpcompress.md) | 统一引擎架构，含压缩方式选择 (见上方 P2「压缩方式选择」) |
 | 预览格式识别与元数据展示 | [preview-format-detection.md](.sisyphus/plans/preview-format-detection.md) | 魔数识别 + 差异化元数据 |
 | 文件大小进度条 | [file-size-progress-bar.md](.sisyphus/plans/file-size-progress-bar.md) | 大小列背景按文件体积比例填充 |
+| MSI 安装包 (WiX) | [msi-packaging-wix.md](.sisyphus/plans/msi-packaging-wix.md) | Inno Setup EXE → WiX MSI 迁移；企业分发、静默安装 |
+| 便携版模式 | [portable-mode.md](.sisyphus/plans/portable-mode.md) | 哨兵文件触发，路径重定向到 exe 目录，免注册表 |
 
 ### 远期（P3）
 

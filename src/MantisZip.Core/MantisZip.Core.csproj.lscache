@@ -66,6 +66,8 @@ Utils/
  ArchiveEntryExtractor.cs
  CoreLog.cs
  FileConflictHelper.cs
+ FileScanner.cs
+ LogRedactor.cs
  PasswordManager.cs
  SplitOutputStream.cs
 
@@ -237,7 +239,7 @@ Utils/
  WindowsBase.dll
 <NUGET>/
  sevenzipextractor/1.0.19/lib/netstandard2.0/SevenZipExtractor.dll
- sharpziplib/1.4.0/lib/net6.0/ICSharpCode.SharpZipLib.dll
+ sharpziplib/1.4.2/lib/net6.0/ICSharpCode.SharpZipLib.dll
  system.security.cryptography.protecteddata/10.0.8/lib/net9.0/System.Security.Cryptography.ProtectedData.dll
 
 [analyzerReferences]

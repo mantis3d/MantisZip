@@ -6,6 +6,7 @@ using MantisZip.Core.Abstractions;
 using MantisZip.Core.Utils;
 using Microsoft.Win32;
 using MantisZip.UI.Localization;
+using System.Windows.Input;
 
 namespace MantisZip.UI;
 
@@ -59,7 +60,15 @@ public partial class MainWindow
     private async void Refresh_Click(object sender, RoutedEventArgs e)
     {
         if (!string.IsNullOrEmpty(_currentArchivePath))
+        {
+            var prevFolder = _currentFolder;
             await LoadArchiveAsync(_currentArchivePath);
+            if (!string.IsNullOrEmpty(prevFolder))
+            {
+                FilterFiles(prevFolder);
+                SelectFolderInTree(prevFolder);
+            }
+        }
     }
 
     private void About_Click(object sender, RoutedEventArgs e)
@@ -111,6 +120,129 @@ public partial class MainWindow
                 AppMessageBox.Show(L.T(L.Main_Status_WrongPwd), L.T(L.App_ErrorTitle), MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
+
+    #region 添加/删除操作
+
+    private async void AddFiles_Click(object sender, RoutedEventArgs e)
+    {
+        if (string.IsNullOrEmpty(_currentArchivePath)) return;
+        var engine = ArchiveEngineFactory.GetEngine(_currentFormat);
+        if (engine == null || !engine.CanAdd(_currentFormat)) return;
+
+        var filter = L.T(L.Compress_FileFilter);
+        var title = L.T(L.Main_SelectFilesTitle);
+        var ofd = new OpenFileDialog
+        {
+            Filter = filter,
+            Title = title,
+            Multiselect = true
+        };
+        if (ofd.ShowDialog() == true)
+            await AddFilesToCurrentArchiveAsync(ofd.FileNames);
+    }
+
+    private void FileListCtx_AddFiles(object sender, RoutedEventArgs e)
+    {
+        AddFiles_Click(sender, e);
+    }
+
+    private async void DeleteFiles_Click(object sender, RoutedEventArgs e)
+    {
+        await DeleteSelectedEntriesAsync();
+    }
+
+    private async void FileListCtx_DeleteFiles(object sender, RoutedEventArgs e)
+    {
+        await DeleteSelectedEntriesAsync();
+    }
+
+    /// <summary>
+    /// 键盘 Delete 键处理 — 删除选中文件
+    /// </summary>
+    private void FileListGrid_PreviewKeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.Delete && !string.IsNullOrEmpty(_currentArchivePath) && FileListGrid.IsReadOnly)
+        {
+            e.Handled = true;
+            _ = DeleteSelectedEntriesAsync();
+        }
+    }
+
+    /// <summary>
+    /// 从当前压缩包中删除选中的条目（目录自动展开为内部文件）。
+    /// </summary>
+    private async Task DeleteSelectedEntriesAsync()
+    {
+        if (string.IsNullOrEmpty(_currentArchivePath)) return;
+
+        var selectedItems = FileListGrid.SelectedItems.Cast<ArchiveItem>().ToList();
+        if (selectedItems.Count == 0) return;
+
+        // 目录展开为内部所有文件
+        var selectedDirs = selectedItems.Where(i => i.IsDirectory).Select(d => d.FullPath.TrimEnd('/') + "/").ToHashSet();
+        var filesToDelete = selectedItems
+            .Where(i => !i.IsDirectory)
+            .Concat(_allItems.Where(i => !i.IsDirectory && selectedDirs.Any(d => i.FullPath.StartsWith(d))))
+            .DistinctBy(i => i.FullPath)
+            .Select(i => i.FullPath)
+            .ToList();
+
+        if (filesToDelete.Count == 0) { SetStatus(L.T(L.Main_Status_NoFilesToExtract)); return; }
+
+        // 确认对话框
+        var confirm = AppMessageBox.Show(this,
+            L.TF(L.Main_DeleteConfirm, filesToDelete.Count),
+            L.T(L.Main_DeleteConfirmTitle),
+            MessageBoxButton.YesNo, MessageBoxImage.Warning);
+        if (confirm != MessageBoxResult.Yes) return;
+
+        var engine = ArchiveEngineFactory.GetEngineByExtension(_currentArchivePath);
+        if (engine == null) return;
+
+        var pw = new ProgressWindow();
+        pw.InitCancellation();
+        pw.Show();
+        pw.SetProgress(0, L.T(L.Main_Status_Deleting));
+
+        try
+        {
+            await engine.DeleteEntriesAsync(_currentArchivePath!, filesToDelete.ToArray(), _currentPassword,
+                ProgressWindow.CreateBackgroundProgress(pw),
+                pw.CancellationToken);
+
+            pw.SetComplete(L.T(L.Main_Status_DeleteDone));
+            await Task.Delay(800);
+            pw.Close();
+
+            var prevFolder = _currentFolder;
+            await LoadArchiveAsync(_currentArchivePath!);
+            if (!string.IsNullOrEmpty(prevFolder))
+            {
+                FilterFiles(prevFolder);
+                SelectFolderInTree(prevFolder);
+            }
+            SetStatus(L.T(L.Main_Status_DeleteDone));
+        }
+        catch (OperationCanceledException)
+        {
+            pw.Close();
+            SetStatus(L.T(L.Main_Status_AddCancel));
+        }
+        catch (NotSupportedException ex)
+        {
+            pw.Close();
+            AppMessageBox.Show(ex.Message, L.T(L.App_ErrorTitle), MessageBoxButton.OK, MessageBoxImage.Information);
+            SetStatus(L.T(L.Main_Status_Ready));
+        }
+        catch (Exception ex)
+        {
+            pw.Close();
+            AppMessageBox.Show(L.TF(L.Main_Status_DeleteFailed, ex.Message), L.T(L.App_ErrorTitle), MessageBoxButton.OK, MessageBoxImage.Error);
+            SetStatus(L.T(L.Main_Status_DeleteFailed));
+        }
+    }
+
+    #endregion
 
     #region 文件列表右键菜单
 

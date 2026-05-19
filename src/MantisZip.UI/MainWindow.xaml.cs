@@ -86,7 +86,7 @@ public partial class MainWindow : Window
     private string GetWindowConfigPath()
     {
         var localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
-        var folder = Path.Combine(localAppData, L.T(L.App_MantisZipTitle));
+        var folder = Path.Combine(localAppData, "MantisZip");
         return Path.Combine(folder, "window.json");
     }
 
@@ -362,6 +362,8 @@ public partial class MainWindow : Window
 
             SetStatus(L.TF(L.Main_Status_Loaded, Path.GetFileName(archivePath)));
             UpdatePasswordStatus();
+            UpdateAddDeleteBtnState();
+            UpdateAddDeleteBtnState();
 
             // L.T(L.Settings_Menu_Btn_Apply)L.T(L.Settings_Preview_Position)L.T(L.Settings_Title)
             ApplyPreviewPosition(AppSettings.Instance.PreviewPosition);
@@ -376,6 +378,7 @@ public partial class MainWindow : Window
             ArchiveStatsText.Text = "";
             PasswordStatusText.Text = "";
             _archiveComment = null;
+            UpdateAddDeleteBtnState();
             SetStatus(L.T(L.Main_Status_LoadFailed));
         }
     }
@@ -392,12 +395,8 @@ public partial class MainWindow : Window
             if (engine == null) return;
 
             var ct = progressWindow.CancellationToken;
-            var baseProgress = new Progress<ArchiveProgress>(p =>
-            {
-                progressWindow.Dispatcher.BeginInvoke(() =>
-                    progressWindow.SetProgress(p));
-            });
-            var progress = progressWindow.CreatePauseAwareProgress(baseProgress);
+            var progress = progressWindow.CreatePauseAwareProgress(
+                ProgressWindow.CreateBackgroundProgress(progressWindow));
 
             bool showPwd = _hasEncryptedArchive && AppSettings.Instance.ShowPasswordMatchNotification;
 
@@ -446,7 +445,7 @@ public partial class MainWindow : Window
             {
                 progressWindow.Close();
                 AppMessageBox.Show(L.T(L.Main_Status_WrongPwd), L.T(L.App_ErrorTitle), MessageBoxButton.OK, MessageBoxImage.Error);
-                SetStatus("L.T(L.Settings_Tab_Extract)失败");
+                SetStatus(L.T(L.Main_Status_WrongPwd));
                 return;
             }
 
@@ -464,13 +463,13 @@ public partial class MainWindow : Window
             progressWindow.Close();
             if (IsPasswordErrorLocal(ex))
             {
-                App.LogDebug("ExtractAsync: L.T(L.Main_Status_WrongPwd)且用户未提供L.T(L.PwdEdit_PasswordLabel) {0}", ex.Message);
+                App.LogDebug("ExtractAsync: {0} {1} {2}", L.T(L.Main_Status_WrongPwd), L.T(L.PwdEdit_PasswordLabel), ex.Message);
             }
             else
             {
                 AppMessageBox.Show(L.TF(L.Main_Status_ExtractFailed, ex.Message), L.T(L.App_ErrorTitle), MessageBoxButton.OK, MessageBoxImage.Error);
             }
-            SetStatus("L.T(L.Settings_Tab_Extract)失败");
+            SetStatus(L.TF(L.Main_Status_ExtractFailed, ""));
         }
     }
 
@@ -495,10 +494,10 @@ public partial class MainWindow : Window
 
             var options = App.CreateCompressOptions();
             options.CompressionLevel = AppSettings.Instance.DefaultLevel;
-            options.Format = ArchiveFormat.Zip;
+            options.Format = GetFormatByExtension(outputPath);
 
-            var engine = new ZipEngine();
-            var progress = new Progress<ArchiveProgress>(p =>
+            var engine = ArchiveEngineFactory.GetEngineByExtension(outputPath) ?? new ZipEngine();
+            var progress = ProgressWindow.CreateBackgroundProgress(Dispatcher, p =>
             {
                 ProgressBar.Value = p.PercentComplete;
                 ProgressText.Text = $"{p.CurrentFile} ({p.PercentComplete:F1}%)";

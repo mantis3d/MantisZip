@@ -166,41 +166,8 @@ public class TarGzEngine : IArchiveEngine
             var isTarGz = ext == ".tgz" || outputPath.EndsWith(".tar.gz");
             CoreLog.Info($"CompressAsync: format=tar.gz={isTarGz}");
 
-            // 收集所有文件（使用 EnumerateFiles 延迟枚举，边发现边报告进度）
-            var files = new List<(string FullPath, string RelativePath)>();
-            var lastScanReportTime = DateTime.Now;
-            var scanReportInterval = TimeSpan.FromMilliseconds(100);
-
-            foreach (var sourcePath in sourcePaths)
-            {
-                if (Directory.Exists(sourcePath))
-                {
-                    var baseDir = Path.GetFileName(sourcePath);
-                    foreach (var file in Directory.EnumerateFiles(sourcePath, "*", SearchOption.AllDirectories))
-                    {
-                        cancellationToken.ThrowIfCancellationRequested();
-                        var relativePath = Path.Combine(baseDir, Path.GetRelativePath(sourcePath, file));
-                        files.Add((file, relativePath));
-
-                        // 每 100ms 报告一次扫描进度，让用户看到正在枚举文件
-                        var now = DateTime.Now;
-                        if (now - lastScanReportTime >= scanReportInterval)
-                        {
-                            progress?.Report(new ArchiveProgress
-                            {
-                                CurrentFile = $"正在扫描: {relativePath} ({files.Count} 个文件)",
-                                PercentComplete = 0,
-                                FilePercentComplete = 0
-                            });
-                            lastScanReportTime = now;
-                        }
-                    }
-                }
-                else if (File.Exists(sourcePath))
-                {
-                    files.Add((sourcePath, Path.GetFileName(sourcePath)));
-                }
-            }
+            // 收集所有文件（使用 FileScanner 共享工具，边发现边报告进度）
+            var (files, _) = FileScanner.CollectFiles(sourcePaths, progress, cancellationToken);
 
             CoreLog.Info($"CompressAsync: {files.Count} files to compress");
 
@@ -214,15 +181,27 @@ public class TarGzEngine : IArchiveEngine
 
                 if (gzipOutput != null) gzipOutput.SetLevel(options.CompressionLevel);
 
+                int processedFiles = 0;
+                int totalFiles = files.Count;
                 foreach (var (fullPath, relativePath) in files)
                 {
                     cancellationToken.ThrowIfCancellationRequested();
+
+                    progress?.Report(new ArchiveProgress
+                    {
+                        CurrentFile = relativePath,
+                        PercentComplete = totalFiles > 0 ? (double)processedFiles / totalFiles * 100 : 0,
+                        FilePercentComplete = 0,
+                        TotalFiles = totalFiles,
+                        ProcessedFiles = processedFiles
+                    });
 
                     if (!TarReadFileWithRetry(fullPath, relativePath, options, tarArchive, cancellationToken))
                     {
                         if (cancellationToken.IsCancellationRequested) break;
                         continue;
                     }
+                    processedFiles++;
                 }
 
                 tarArchive.Close();
@@ -364,6 +343,16 @@ public class TarGzEngine : IArchiveEngine
 
         CoreLog.Exit();
         return result;
+    }
+
+    public async Task DeleteEntriesAsync(string archivePath, string[] entryPaths, string? password = null, IProgress<ArchiveProgress>? progress = null, CancellationToken cancellationToken = default)
+    {
+        CoreLog.Entry();
+        CoreLog.Info($"DeleteEntriesAsync: {archivePath} — NotSupportedException");
+        await Task.Run(() =>
+        {
+            throw new NotSupportedException("TAR/GZ 格式不支持直接删除文件，请重新创建压缩包");
+        }, cancellationToken);
     }
 
     public async Task AddToArchiveAsync(string archivePath, string[] sourcePaths, ArchiveOptions options, IProgress<ArchiveProgress>? progress = null, CancellationToken cancellationToken = default, string? entryBasePath = null)

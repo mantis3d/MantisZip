@@ -16,6 +16,12 @@ internal static class CoreLog
 
     private static readonly object _lock = new();
 
+    /// <summary>
+    /// 日志脱敏覆盖委托。由 UI 层在初始化时注入（因为 CoreLog 不能直接引用 AppSettings）。
+    /// 参数为原始消息字符串，返回脱敏后的消息。为 null 表示不做脱敏。
+    /// </summary>
+    internal static Func<string, string>? RedactOverride { get; set; }
+
     /// <summary>Log a message (DEBUG only).</summary>
     [Conditional("DEBUG")]
     public static void Info(string msg,
@@ -66,8 +72,37 @@ internal static class CoreLog
         Write($"[EXT] {TrimPath(file)}:{line} {member}");
     }
 
+    /// <summary>
+    /// 无条件追踪日志（DEBUG 和 RELEASE 都写入）。
+    /// 写入 %TEMP%\MantisZip\trace.log。用于调试进度条等难以复现的问题。
+    /// </summary>
+    internal static void Trace(string msg)
+    {
+        var tracePath = Path.Combine(Path.GetTempPath(), "MantisZip", "trace.log");
+        try
+        {
+            var dir = Path.GetDirectoryName(tracePath);
+            if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
+                Directory.CreateDirectory(dir);
+            lock (_lock)
+            {
+                File.AppendAllText(tracePath,
+                    $"[{DateTime.Now:HH:mm:ss.fff}] {msg}\n");
+            }
+        }
+        catch { }
+    }
+
+    internal static void Trace(string fmt, params object[] args)
+    {
+        Trace(string.Format(fmt, args));
+    }
+
     private static void Write(string msg)
     {
+        // 应用脱敏（由 UI 层注入，null=不脱敏）
+        var finalMsg = RedactOverride?.Invoke(msg) ?? msg;
+
         var dir = Path.GetDirectoryName(LogPath);
         if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
             Directory.CreateDirectory(dir);
@@ -77,12 +112,12 @@ internal static class CoreLog
             try
             {
                 File.AppendAllText(LogPath,
-                    $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}] {msg}\n");
+                    $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}] {finalMsg}\n");
             }
             catch { /* best effort */ }
         }
 
-        Debug.WriteLine($"[MantisZip.Core] {msg}");
+        Debug.WriteLine($"[MantisZip.Core] {finalMsg}");
     }
 
     private static string TrimPath(string? path)

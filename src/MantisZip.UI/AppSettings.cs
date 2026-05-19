@@ -50,6 +50,7 @@ public class AppSettings
 
     // ===== 调试 =====
     public bool EnableDebugLogging { get; set; } = false;
+    public string LogPrivacyMode { get; set; } = "full"; // "off" | "filename" | "full"
 
     // ===== 高级 =====
     public string SevenZipPath { get; set; } = @"C:\Program Files\7-Zip\7z.exe";

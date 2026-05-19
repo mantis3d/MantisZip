@@ -78,6 +78,8 @@ Window size, tree column width, and preview row height saved to `%LOCALAPPDATA%\
 - **解压**: ExtractDestination (ask/same-dir/desktop), FileConflictAction (ask/overwrite/rename/skip), OpenFolderAfterExtract
 - **上下文菜单**: EnableCompressMenu, EnableExtractMenu, EnableOpenMenu, EnableQuickCompress, EnableCascadingMenu, ShowMenuIcons
 - **预览**: EnableImagePreview, EnableTextPreview, MaxTextPreviewBytes, ShowPreviewPanel, TextPreviewFontSize
+- **调试**: EnableDebugLogging, LogPrivacyMode (off/filename/full)
+- **密码管理**: ShowPasswordMatchNotification, PasswordRevealByDefault
 - **高级**: SevenZipPath
 
 `SettingsWindow` (tabbed UI) provides GUI editing; `CompressSettingsWindow` loads defaults from `AppSettings`.
@@ -136,13 +138,9 @@ These are set **once globally** in `App.InitializeApp()` (called at the top of `
 
 `ArchiveEntryExtractor.ExtractSevenZipEntry` throws `NotSupportedException` when password is set. Encrypted 7z entries always show "无法预览此文件" (unsupported preview).
 
-### `_currentFormat` bug (critical)
+### `_currentFormat` classification (previously broken, now fixed)
 
-In `MainWindow.LoadArchiveAsync`:
-```csharp
-_currentFormat = engine.CanHandle(ArchiveFormat.Zip) ? ArchiveFormat.Zip : ArchiveFormat.SevenZip;
-```
-This always classifies non-ZIP formats as `SevenZip`. Tar/GZip/Rar archives get wrong format, causing preview extraction (`ArchiveEntryExtractor`) to fail or use wrong code paths. **Fix**: derive `_currentFormat` from the file extension instead.
+`_currentFormat` is now derived from the file extension via `GetFormatByExtension()` in `LoadArchiveAsync`, instead of the old buggy `engine.CanHandle()` check that always classified non-ZIP formats as `SevenZip`.
 
 ### TarGzEngine metadata (previously broken, now fixed)
 
@@ -161,9 +159,9 @@ The `ShowSubFoldersCheck` checkbox controls whether `FilterFiles` includes neste
 
 No CI workflows, no pre-commit hooks, no linter/analyzer config. `test_encoding/` is a one-off CLI script for debugging ZIP encoding, not a test framework.
 
-### Password manager stores plaintext
+### Password manager encryption
 
-`PasswordManager` (singleton) saves passwords as **plaintext JSON** at `%APPDATA%\MantisZip\passwords.json`. No encryption, no DPAPI.
+`PasswordManager` (singleton) saves passwords encrypted via **DPAPI** (`ProtectedData.Protect`) at `%APPDATA%\MantisZip\passwords.json`. Handles migration from old plaintext format on read (detected by `{` prefix). The `Save()` method always writes encrypted data.
 
 ### RAR support
 
@@ -205,6 +203,23 @@ Uses `ArchiveItem.FullPath` for the output temp path so files from subdirectorie
 **Root cause**: WPF OLE bridge (`IComDataObject`) has an internal bug when converting `string[]` → `CF_HDROP` for non-`DataStore` `_innerData` implementations. Confirmed by WPF source code (v8.0.1). Not fixable from app side.
 
 **Status**: Abandoned. Code removed. If a delayed-rendering solution is needed in the future, use `VirtualFileDataObject` (Microsoft.VisualStudio.OLE.Interop / Shell32 community wrappers) instead of `System.Windows.IDataObject`.
+
+### Log privacy redaction
+
+`LogRedactor` (Core/Utils) provides centralized path redaction for all log output. Uses `RegexOptions.Compiled` regex with two branches (drive-letter `C:\...` and UNC `\\server\share\...`), allowing spaces in paths (unlike earlier draft that excluded `\s`).
+
+Three modes controlled by `AppSettings.LogPrivacyMode` (defaults to `"full"`):
+- **off**: No redaction
+- **filename**: `D:\Photos\private\wedding.jpg` → `wedding.jpg`
+- **full**: Same → `[PATH_1]` (sequential IDs, same path → same ID, capped at 10000 entries)
+
+**Injection**: 
+- `CoreLog.RedactOverride` (internal `Func<string, string>?`) set by UI's `App.OnStartup` so CoreLog can redact without referencing AppSettings
+- `App.Log()`, `App.LogDebug()`, and `LogStartup()` call `LogRedactor.RedactPaths()` directly (they're in UI project and have AppSettings access)
+
+**Help dialog**: `LogPrivacyHelpDialog` opened from Settings → Debug tab's `[?]` button, matching the PasswordManager help dialog style.
+
+**Key files**: `Core/Utils/LogRedactor.cs` (new), `UI/LogPrivacyHelpDialog.xaml/.cs` (new).
 
 ### Future: COM context menu + VirtualFileDataObject
 

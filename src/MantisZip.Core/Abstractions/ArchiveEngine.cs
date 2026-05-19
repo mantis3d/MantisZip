@@ -168,42 +168,64 @@ public class ArchiveProgress
     public double? FilePercentComplete { get; set; }
 }
 
-/// <summary>
-/// 压缩引擎接口
-/// </summary>
-public interface IArchiveEngine
-{
     /// <summary>
-    /// 是否支持此格式
+    /// 压缩引擎接口
     /// </summary>
-    bool CanHandle(ArchiveFormat format);
+    public interface IArchiveEngine
+    {
+        /// <summary>
+        /// 是否支持此格式
+        /// </summary>
+        bool CanHandle(ArchiveFormat format);
 
-    /// <summary>
-    /// 解压到指定目录
-    /// </summary>
-    Task ExtractAsync(string archivePath, string destinationPath, string? password = null, IProgress<ArchiveProgress>? progress = null, CancellationToken cancellationToken = default, ArchiveOptions? options = null);
+        /// <summary>
+        /// 解压到指定目录
+        /// </summary>
+        Task ExtractAsync(string archivePath, string destinationPath, string? password = null, IProgress<ArchiveProgress>? progress = null, CancellationToken cancellationToken = default, ArchiveOptions? options = null);
 
-    /// <summary>
-    /// 压缩指定目录/文件
-    /// </summary>
-    Task CompressAsync(string[] sourcePaths, string outputPath, ArchiveOptions options, IProgress<ArchiveProgress>? progress = null, CancellationToken cancellationToken = default);
+        /// <summary>
+        /// 压缩指定目录/文件
+        /// </summary>
+        Task CompressAsync(string[] sourcePaths, string outputPath, ArchiveOptions options, IProgress<ArchiveProgress>? progress = null, CancellationToken cancellationToken = default);
 
-    /// <summary>
-    /// 列出压缩包内容
-    /// </summary>
-    Task<IReadOnlyList<ArchiveItem>> ListEntriesAsync(string archivePath, string? password = null, CancellationToken cancellationToken = default);
+        /// <summary>
+        /// 列出压缩包内容
+        /// </summary>
+        Task<IReadOnlyList<ArchiveItem>> ListEntriesAsync(string archivePath, string? password = null, CancellationToken cancellationToken = default);
 
-    /// <summary>
-    /// 测试压缩包完整性
-    /// </summary>
-    Task<bool> TestArchiveAsync(string archivePath, string? password = null, IProgress<ArchiveProgress>? progress = null, CancellationToken cancellationToken = default);
+        /// <summary>
+        /// 测试压缩包完整性
+        /// </summary>
+        Task<bool> TestArchiveAsync(string archivePath, string? password = null, IProgress<ArchiveProgress>? progress = null, CancellationToken cancellationToken = default);
 
-    /// <summary>
-    /// 向已存在的压缩包中添加文件（原地更新）
-    /// </summary>
-    /// <param name="entryBasePath">压缩包内的目标路径，例如 "subdir/" 表示添加到 subdir 目录下，null 或 "" 表示根目录。</param>
-    Task AddToArchiveAsync(string archivePath, string[] sourcePaths, ArchiveOptions options, IProgress<ArchiveProgress>? progress = null, CancellationToken cancellationToken = default, string? entryBasePath = null);
-}
+        /// <summary>
+        /// 向已存在的压缩包中添加文件（原地更新）
+        /// </summary>
+        /// <param name="entryBasePath">压缩包内的目标路径，例如 "subdir/" 表示添加到 subdir 目录下，null 或 "" 表示根目录。</param>
+        Task AddToArchiveAsync(string archivePath, string[] sourcePaths, ArchiveOptions options, IProgress<ArchiveProgress>? progress = null, CancellationToken cancellationToken = default, string? entryBasePath = null);
+
+        /// <summary>
+        /// 从压缩包中删除指定条目（原地更新）
+        /// </summary>
+        /// <param name="archivePath">压缩包路径</param>
+        /// <param name="entryPaths">要删除的条目路径列表（如 ["file.txt", "subdir/nested.txt"]）</param>
+        /// <param name="password">密码（可选）</param>
+        /// <param name="progress">进度报告</param>
+        /// <param name="cancellationToken">取消令牌</param>
+        /// <exception cref="FileNotFoundException">条目在压缩包中不存在</exception>
+        /// <exception cref="NotSupportedException">此格式不支持删除操作</exception>
+        Task DeleteEntriesAsync(string archivePath, string[] entryPaths, string? password = null, IProgress<ArchiveProgress>? progress = null, CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// 此引擎是否支持向压缩包添加文件。
+        /// </summary>
+        bool CanAdd(ArchiveFormat format) => false;
+
+        /// <summary>
+        /// 此引擎是否支持从压缩包删除文件。
+        /// </summary>
+        bool CanDelete(ArchiveFormat format) => false;
+    }
 
 /// <summary>
 /// 引擎工厂

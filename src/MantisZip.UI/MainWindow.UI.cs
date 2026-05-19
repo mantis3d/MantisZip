@@ -32,22 +32,45 @@ public partial class MainWindow
         {
             PasswordStatusText.Text = "";
             UpdateEnterPasswordBtnState();
+            UpdateAddDeleteBtnState();
             return;
         }
         if (!_hasEncryptedArchive)
         {
             PasswordStatusText.Text = "";
             UpdateEnterPasswordBtnState();
+            UpdateAddDeleteBtnState();
             return;
         }
         PasswordStatusText.Text = _currentPassword != null ? L.T(L.Main_PwdMatchedIndicator) : L.T(L.Main_IsEncrypted);
         UpdateEnterPasswordBtnState();
+        UpdateAddDeleteBtnState();
     }
 
     private void UpdateEnterPasswordBtnState()
     {
         EnterPasswordBtn.IsEnabled = !string.IsNullOrEmpty(_currentArchivePath)
             && _hasEncryptedArchive && _currentPassword == null;
+    }
+
+    /// <summary>
+    /// 根据当前加载的压缩包格式，更新添加/删除按钮的启用状态。
+    /// </summary>
+    private void UpdateAddDeleteBtnState()
+    {
+        var engine = !string.IsNullOrEmpty(_currentArchivePath)
+            ? ArchiveEngineFactory.GetEngineByExtension(_currentArchivePath)
+            : null;
+
+        if (engine == null)
+        {
+            AddFilesBtn.IsEnabled = false;
+            DeleteFilesBtn.IsEnabled = false;
+            return;
+        }
+
+        AddFilesBtn.IsEnabled = engine.CanAdd(_currentFormat);
+        DeleteFilesBtn.IsEnabled = engine.CanDelete(_currentFormat);
     }
 
     private static void OpenInExplorer(string path) => App.OpenInExplorerStatic(path);

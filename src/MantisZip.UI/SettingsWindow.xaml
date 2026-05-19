@@ -304,6 +304,45 @@
                 </ScrollViewer>
             </TabItem>
 
+            <!-- ═══════ 调试 ═══════ -->
+            <TabItem>
+                <TabItem.Header>
+                    <Grid HorizontalAlignment="Stretch">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock x:Name="IconDebug" Text="🐛" VerticalAlignment="Center"/>
+                        <TextBlock Text="{l:L Settings_Tab_Debug}" Grid.Column="1" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="4,0,0,0"/>
+                    </Grid>
+                </TabItem.Header>
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel Margin="10">
+                        <CheckBox x:Name="EnableDebugLogCheck" Content="{l:L Settings_Advanced_EnableDebugLog}" Margin="0,0,0,2"/>
+                        <TextBlock FontSize="11" Foreground="#888" Margin="24,0,0,0">
+                            <Run Text="{l:L Settings_Advanced_LogFile}"/>
+                            <Run x:Name="LogPathText" Foreground="#555"/>
+                        </TextBlock>
+                        <StackPanel Orientation="Horizontal" Margin="24,4,0,0">
+                            <Button Content="{l:L Settings_Advanced_OpenLog}" Width="90" Height="22" FontSize="11"
+                                    Click="OpenLogFolder_Click"/>
+                            <Button Content="{l:L Settings_Advanced_OpenStartupLog}" Width="100" Height="22" Margin="8,0,0,0" FontSize="11"
+                                    Click="OpenStartupLog_Click"/>
+                        </StackPanel>
+                        <TextBlock Text="{l:L Settings_Debug_LogPrivacyMode}" FontWeight="SemiBold" Margin="0,12,0,4"/>
+                        <StackPanel Orientation="Horizontal">
+                            <ComboBox x:Name="LogPrivacyModeCombo" Width="200" HorizontalAlignment="Left">
+                                <ComboBoxItem Tag="off" Content="{l:L Settings_Debug_LogPrivacyMode_Off}"/>
+                                <ComboBoxItem Tag="filename" Content="{l:L Settings_Debug_LogPrivacyMode_Filename}"/>
+                                <ComboBoxItem Tag="full" Content="{l:L Settings_Debug_LogPrivacyMode_Full}"/>
+                            </ComboBox>
+                            <Button Content="?" Width="28" Height="22" Margin="6,0,0,0" FontSize="12" FontWeight="Bold"
+                                    Click="LogPrivacyHelp_Click" ToolTip="{l:L Settings_Debug_LogPrivacyHelp_Title}"/>
+                        </StackPanel>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
             <!-- ═══════ 高级 ═══════ -->
             <TabItem>
                 <TabItem.Header>
@@ -327,19 +366,6 @@
                             <TextBox x:Name="SevenZipPathBox" Grid.Column="0" Height="24" IsReadOnly="True"/>
                             <Button Grid.Column="1" Content="{l:L Settings_Advanced_Browse}" Width="60" Height="24" Margin="6,0,0,0" Click="BrowseSevenZip_Click"/>
                         </Grid>
-
-                        <Separator Margin="0,16,0,10"/>
-                        <CheckBox x:Name="EnableDebugLogCheck" Content="{l:L Settings_Advanced_EnableDebugLog}" Margin="0,0,0,2"/>
-                        <TextBlock FontSize="11" Foreground="#888" Margin="24,0,0,0">
-                            <Run Text="{l:L Settings_Advanced_LogFile}"/>
-                            <Run x:Name="LogPathText" Foreground="#555"/>
-                        </TextBlock>
-                        <StackPanel Orientation="Horizontal" Margin="24,4,0,0">
-                            <Button Content="{l:L Settings_Advanced_OpenLog}" Width="90" Height="22" FontSize="11"
-                                    Click="OpenLogFolder_Click"/>
-                            <Button Content="{l:L Settings_Advanced_OpenStartupLog}" Width="100" Height="22" Margin="8,0,0,0" FontSize="11"
-                                    Click="OpenStartupLog_Click"/>
-                        </StackPanel>
 
                         <Button Content="{l:L Settings_Advanced_CleanPreviewTemp}" Width="140" Height="26" Margin="0,16,0,0"
                                 HorizontalAlignment="Left" Click="CleanTemp_Click"/>

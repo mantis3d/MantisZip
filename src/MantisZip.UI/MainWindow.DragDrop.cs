@@ -43,7 +43,7 @@ public partial class MainWindow
             {
                 if (files.Length == 1 && IsArchiveFile(files[0]))
                 {
-                    _ = LoadArchiveAsync(files[0]);
+                    await LoadArchiveAsync(files[0]);
                     return;
                 }
 
@@ -58,7 +58,7 @@ public partial class MainWindow
             var path = files[0];
             if (IsArchiveFile(path))
             {
-                _ = LoadArchiveAsync(path);
+                await LoadArchiveAsync(path);
             }
             else
             {
@@ -83,40 +83,61 @@ public partial class MainWindow
 
     private async Task AddFilesToCurrentArchiveAsync(string[] files)
     {
+        App.LogDebug("[TRACE] AddFilesToCurrentArchiveAsync: files count={0}, format={1}", files.Length, _currentFormat);
         var engine = ArchiveEngineFactory.GetEngine(_currentFormat);
         if (engine == null) { SetStatus(L.T(L.Main_DragFormatUnsupported)); return; }
+        App.LogDebug("[TRACE] AddFilesToCurrentArchiveAsync: engine={0}, CanAdd={1}", engine.GetType().Name, engine.CanAdd(_currentFormat));
+
+        var pw = new ProgressWindow();
+        pw.InitCancellation();
+        pw.Show();
+        pw.SetProgress(0, L.T(L.Main_Status_AddingFiles));
 
         try
         {
-            SetStatus(L.T(L.Main_Status_AddingFiles));
-            ShowProgress(true);
-            var progress = new Progress<ArchiveProgress>(p =>
-            {
-                Dispatcher.BeginInvoke(() =>
-                {
-                    ProgressBar.Value = p.PercentComplete;
-                    ProgressText.Text = p.CurrentFile;
-                });
-            });
-
+            App.LogDebug("[TRACE] AddFilesToCurrentArchiveAsync: calling engine.AddToArchiveAsync...");
             await engine.AddToArchiveAsync(_currentArchivePath!, files,
                 new ArchiveOptions { CompressionLevel = AppSettings.Instance.DefaultLevel },
-                progress, entryBasePath: string.IsNullOrEmpty(_currentFolder) ? null : _currentFolder);
+                ProgressWindow.CreateBackgroundProgress(pw),
+                cancellationToken: pw.CancellationToken,
+                entryBasePath: string.IsNullOrEmpty(_currentFolder) ? null : _currentFolder);
+            App.LogDebug("[TRACE] AddFilesToCurrentArchiveAsync: engine.AddToArchiveAsync returned");
 
+            pw.SetComplete(L.T(L.Main_Status_AddDone));
+            App.LogDebug("[TRACE] AddFilesToCurrentArchiveAsync: SetComplete called, waiting 800ms");
+            await Task.Delay(800);
+            pw.Close();
+            App.LogDebug("[TRACE] AddFilesToCurrentArchiveAsync: window closed, reloading archive");
+
+            var prevFolder = _currentFolder;
             await LoadArchiveAsync(_currentArchivePath!);
+            if (!string.IsNullOrEmpty(prevFolder))
+            {
+                FilterFiles(prevFolder);
+                SelectFolderInTree(prevFolder);
+            }
             SetStatus(L.T(L.Main_Status_AddDone));
+        }
+        catch (OperationCanceledException)
+        {
+            App.LogDebug("[TRACE] AddFilesToCurrentArchiveAsync: canceled");
+            pw.Close();
+            SetStatus(L.T(L.Main_Status_AddCancel));
         }
         catch (NotSupportedException ex)
         {
+            App.LogDebug("[TRACE] AddFilesToCurrentArchiveAsync: NotSupportedException: {0}", ex.Message);
+            pw.Close();
             AppMessageBox.Show(ex.Message, "提示", MessageBoxButton.OK, MessageBoxImage.Information);
             SetStatus(L.T(L.Main_Status_Ready));
         }
         catch (Exception ex)
         {
+            App.LogDebug("[TRACE] AddFilesToCurrentArchiveAsync: Exception: {0}", ex.Message);
+            pw.Close();
             AppMessageBox.Show(L.TF(L.Main_Status_AddFailed, ex.Message), L.T(L.App_ErrorTitle), MessageBoxButton.OK, MessageBoxImage.Error);
             SetStatus(L.T(L.Main_Status_AddFailed));
         }
-        finally { ShowProgress(false); }
     }
 
     #endregion

@@ -7,8 +7,8 @@
 - **技术栈**: .NET 9 + WPF + SharpZipLib + SevenZipExtractor
 
 ## 版本
-- **当前版本**: 0.2.7
-- **发布日期**: 2026-05-18
+- **当前版本**: 0.2.9
+- **发布日期**: 2026-05-19
 
 ## 版本历史（按日期排序）
 
@@ -184,4 +184,23 @@
 6. **L.cs 重构** - 重新生成（423 键），追加 `T()`/`TF()` 静态方法
 7. **文档记录** - `docs/PLAN.md` 记录 Emoji.Wpf 方案为 P2 待实现任务
 8. **版本升级** - 0.2.7
+
+### v0.2.8 (2026-05-19)
+1. **IPC 互斥体/管道名修正** - `App.xaml.cs` 中 `L.T()` 写在字符串字面量内导致 `--compress` 多实例 IPC 完全失效，改为固定英文标识符
+2. **L.T() 字符串嵌入修复** - `MainWindow.xaml.cs` 两处 `SetStatus` + `App.xaml.cs` 两处消息框的 `L.T()` 调用写在字符串内部的 bug
+3. **SevenZipEngine 7z.exe 自动探测** - 新增 `ResolveSevenZipPath()` 自动搜索 Program Files / Program Files (x86) / PATH，找不到才抛异常
+4. **SevenZipEngine 双重枚举消除** - `ExtractAsync` 单遍收集条目到列表，避免两遍解码 7z 头部
+5. **Window_Drop fire-and-forget 修复** - `_ = LoadArchiveAsync(...)` → `await`，异常不再被吞噬
+6. **ProgressWindow 调度一致化** - `SetComplete` 改用 `BeginInvoke` 非阻塞调度，与 `SetProgress` 保持一致
+7. **日志隐私脱敏系统** - 新增 `LogRedactor`（Core/Utils），集中式正则脱敏支持驱动器路径+UNC 路径，脱敏委托注入 `CoreLog.RedactOverride`；`App.Log/LogDebug/LogStartup` 写入前调用脱敏；默认完全脱敏模式；帮助说明窗口
+8. **版本升级** - 0.2.8
+
+### v0.2.9 (2026-05-19)
+1. **进度条渲染修复** - 创建 `BackgroundDispatcherProgress`（自定义 `IProgress<ArchiveProgress>`），以 `Background(3)` 优先级替代 `Progress<T>` 的 `Normal(8)`，使 WPF 渲染在进度更新之间发生，进度条不再卡死
+2. **加权进度（添加到压缩包 + 删除）** - `ZipEngine.AddToArchiveAsync`/`DeleteEntriesAsync` 进度按 `(i+1)/(新文件数+旧条目数)*100` 加权，反映全量工作进度
+3. **`Progress<T>` 全部替换** - UI 层 7 处 `new Progress<ArchiveProgress>(...)` 改为 `ProgressWindow.CreateBackgroundProgress()`，统一 Background 优先级调度
+4. **`SetProgress`/`SetComplete` 简化** - 移除冗余的 `Dispatcher.BeginInvoke`（自定义 IProgress 已处理调度）
+5. **`App.TraceLog` 清理** - 所有 `App.TraceLog` 改为 `App.LogDebug`，统一调试日志输出
+6. **工具栏图标/文字放大** - 图标 `18→22`，标签 `10→12`，内边距 `(6,4)→(8,6)`
+7. **版本升级** - 0.2.9
 

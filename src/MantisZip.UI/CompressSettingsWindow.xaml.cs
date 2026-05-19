@@ -249,20 +249,7 @@ try
             App.Log("options: level={0}, encrypt={1}", options.CompressionLevel, options.Encrypt);
 
             App.Log("创建 Progress 对象...");
-            var progress = new Progress<ArchiveProgress>(p =>
-            {
-                App.Log("【UI】Progress 回调 BEGIN: {0}%", p.PercentComplete);
-                try
-                {
-                    progressWindow.SetProgress(p);
-                    App.Log("【UI】SetProgress 调用成功");
-                }
-                catch (Exception ex)
-                {
-                    App.Log("【UI】SetProgress 异常: {0}", ex.Message);
-                }
-                App.Log("【UI】Progress 回调 END");
-            });
+            var progress = ProgressWindow.CreateBackgroundProgress(progressWindow);
             App.Log("Progress 对象已创建");
 
             var engine = ArchiveEngineFactory.GetEngineByExtension(outputPath);

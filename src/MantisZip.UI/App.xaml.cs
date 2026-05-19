@@ -11,6 +11,7 @@ using ICSharpCode.SharpZipLib.Zip;
 using MantisZip.Core;
 using MantisZip.Core.Abstractions;
 using MantisZip.Core.Engines;
+using MantisZip.Core.Utils;
 using MantisZip.UI.Localization;
 
 namespace MantisZip.UI;
@@ -25,8 +26,8 @@ public partial class App : Application
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), L.T(L.App_MantisZipTitle), "startup.log");
     private static Mutex? _instanceMutex;
 
-    private const string CompressMutexName = "L.T(L.App_MantisZipTitle)-CompressMutex";
-    private const string CompressPipeName = "L.T(L.App_MantisZipTitle)-Compress";
+    private static string CompressMutexName = "MantisZip-CompressMutex";
+    private static string CompressPipeName = "MantisZip-Compress";
 
     /// <summary>
     /// 全局初始化：所有入口（主窗口、--compress、--extract 等）都先经过这里。
@@ -64,6 +65,10 @@ public partial class App : Application
         // 初始化语言管理器（需在 InitializeApp 之后，因为初始化加载 AppSettings）
         LanguageManager.Instance.Initialize();
 
+        // 初始化 CoreLog 日志脱敏委托。此后所有 CoreLog 写入自动脱敏。
+        CoreLog.RedactOverride = msg =>
+            LogRedactor.RedactPaths(msg, LogRedactor.ParseMode(AppSettings.Instance.LogPrivacyMode));
+
         // ===== 持久化启动日志（独立于 debug.log，不被删除）=====
         LogStartup($"START BaseDir={AppDomain.CurrentDomain.BaseDirectory} Args=[{string.Join(" ", e.Args)}]");
 
@@ -90,10 +95,7 @@ public partial class App : Application
                 {
                     case "--install-shell":
                         ShellIntegration.Install();
-                        AppMessageBox.Show(
-                            "L.T(L.Settings_Menu_InstalledMsg)。\n\n" +
-                            "• 右键L.T(L.Compress_Archive_Group) → L.T(L.Shell_Open) / L.T(L.Shell_ExtractHere) / L.T(L.Settings_Tab_Extract)到L.T(L.Compress_Archive_Group)名 / L.T(L.Shell_ExtractTo)\n" +
-                            L.T(L.Shell_Compress),
+                        AppMessageBox.Show(L.T(L.App_ShellInstalled),
                             L.T(L.App_MantisZipTitle), MessageBoxButton.OK, MessageBoxImage.Information);
                         Shutdown();
                         return;
@@ -107,7 +109,7 @@ public partial class App : Application
 
                     case "--install-assoc":
                         ShellIntegration.InstallAssociations();
-                        AppMessageBox.Show("L.T(L.Settings_Assoc_InstalledMsg)。\n\n现在双击 .zip/.7z/.rar 等文件将默认L.T(L.Shell_OpenVerb)。",
+                        AppMessageBox.Show(L.T(L.App_AssocInstalled),
                             L.T(L.App_MantisZipTitle), MessageBoxButton.OK, MessageBoxImage.Information);
                         Shutdown();
                         return;
@@ -511,12 +513,8 @@ public partial class App : Application
         progressWindow.Show();
         progressWindow.SetProgress(0, L.T(L.Main_Status_Extracting));
 
-        var baseProgress = new Progress<ArchiveProgress>(p =>
-        {
-            progressWindow.Dispatcher.BeginInvoke(() =>
-                progressWindow.SetProgress(p));
-        });
-        var progress = progressWindow.CreatePauseAwareProgress(baseProgress);
+        var progress = progressWindow.CreatePauseAwareProgress(
+            ProgressWindow.CreateBackgroundProgress(progressWindow));
 
         Log("--extract: {0} → {1}", archivePath, dest);
 
@@ -985,10 +983,7 @@ public partial class App : Application
             LogStartup("HandleCompressQuick: add-mode ProgressWindow shown");
             pw.SetProgress(0, L.T(L.App_AddToArchiveProgress));
 
-            var addProgress = new Progress<ArchiveProgress>(p =>
-            {
-                pw.Dispatcher.BeginInvoke(() => pw.SetProgress(p));
-            });
+            var addProgress = ProgressWindow.CreateBackgroundProgress(pw);
 
             // 注意：必须在 UI 线程上捕获 CancellationToken
             var addCt = pw.CancellationToken;
@@ -1036,11 +1031,7 @@ public partial class App : Application
         var options = App.CreateCompressOptions();
         options.CompressionLevel = settings.DefaultLevel;
 
-        var progress = new Progress<ArchiveProgress>(p =>
-        {
-            progressWindow.Dispatcher.BeginInvoke(() =>
-                progressWindow.SetProgress(p));
-        });
+        var progress = ProgressWindow.CreateBackgroundProgress(progressWindow);
 
         var compressEngine = ArchiveEngineFactory.GetEngineByExtension(finalPath) ?? new ZipEngine();
         Log("--compress-quick: {0} → {1}", string.Join(", ", myPaths), finalPath);
@@ -1109,10 +1100,16 @@ public partial class App : Application
     {
         try
         {
+            // LogStartup 在 AppSettings 加载之后调用，可以安全读取配置
+            var mode = AppSettings.Instance != null
+                ? LogRedactor.ParseMode(AppSettings.Instance.LogPrivacyMode)
+                : LogPrivacyMode.Off;
+            var redacted = LogRedactor.RedactPaths(msg, mode);
+
             var dir = Path.GetDirectoryName(StartupLog);
             if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
                 Directory.CreateDirectory(dir);
-            File.AppendAllText(StartupLog, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}] {msg}\n");
+            File.AppendAllText(StartupLog, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}] {redacted}\n");
         }
         catch { }
     }
@@ -1122,11 +1119,13 @@ public partial class App : Application
         try
         {
             if (!AppSettings.Instance.EnableDebugLogging) return;
+            var redacted = LogRedactor.RedactPaths(msg,
+                LogRedactor.ParseMode(AppSettings.Instance.LogPrivacyMode));
             var dir = Path.GetDirectoryName(LogFile);
             if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
                 Directory.CreateDirectory(dir);
-            File.AppendAllText(LogFile, $"[{DateTime.Now:HH:mm:ss.fff}] {msg}\n");
-            Debug.WriteLine(msg);
+            File.AppendAllText(LogFile, $"[{DateTime.Now:HH:mm:ss.fff}] {redacted}\n");
+            Debug.WriteLine(redacted);
         }
         catch { }
     }
@@ -1145,11 +1144,13 @@ public partial class App : Application
         try
         {
             if (!AppSettings.Instance.EnableDebugLogging) return;
+            var redacted = LogRedactor.RedactPaths(msg,
+                LogRedactor.ParseMode(AppSettings.Instance.LogPrivacyMode));
             var dir = Path.GetDirectoryName(LogFile);
             if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
                 Directory.CreateDirectory(dir);
-            File.AppendAllText(LogFile, $"[DBG] [{DateTime.Now:HH:mm:ss.fff}] {msg}\n");
-            Debug.WriteLine(msg);
+            File.AppendAllText(LogFile, $"[DBG] [{DateTime.Now:HH:mm:ss.fff}] {redacted}\n");
+            Debug.WriteLine(redacted);
         }
         catch { }
     }
@@ -1157,6 +1158,27 @@ public partial class App : Application
     public static void LogDebug(string fmt, params object[] args)
     {
         LogDebug(string.Format(fmt, args));
+    }
+
+    /// <summary>
+    /// 无条件写入 startup.log 的追踪日志（不依赖 EnableDebugLogging 设置）。
+    /// 用于调试进度条等难以复现的问题。
+    /// </summary>
+    public static void TraceLog(string msg)
+    {
+        try
+        {
+            var dir = Path.GetDirectoryName(StartupLog);
+            if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
+                Directory.CreateDirectory(dir);
+            File.AppendAllText(StartupLog, $"[TRACE] [{DateTime.Now:HH:mm:ss.fff}] {msg}\n");
+        }
+        catch { }
+    }
+
+    public static void TraceLog(string fmt, params object[] args)
+    {
+        TraceLog(string.Format(fmt, args));
     }
 
     /// <summary>

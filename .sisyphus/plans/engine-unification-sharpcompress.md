@@ -1,7 +1,7 @@
 # 引擎统一计划：SharpZipLib → SharpCompress + 7z.exe → SevenZipSharp
 
 > 替换 SharpZipLib + 外置 7z.exe 进程调用，统一所有格式的压缩/解压实现
-> 状态: 📋 待定（SharpZipLib 已升级到 1.4.2，无紧急问题）
+> 状态: 📋 待定（Move up priority — SharpZipLib's BeginUpdate/CommitUpdate black box prevents progress tracking during old entry copy; SharpCompress's manual rebuild pattern natively supports full progress via per-entry reporting）
 
 ---
 
@@ -15,6 +15,7 @@
 | `ZipStrings.CodePage` 是进程级全局副作用 | `ReaderOptions.ArchiveEncoding` 按实例设置 |
 | 阻塞 I/O | 原生 async/await |
 | 不支持原地修改压缩包 | 同样不支持（方案一致） |
+| `BeginUpdate/CommitUpdate` 黑盒，旧条目 I/O 阶段无法上报进度 | 手动解压全量 → 合并 → 重压缩，可逐条目上报进度，消除跳变 |
 
 > **同时替换 7z.exe 外置进程调用** — 见 Phase 4，作为可选项
 

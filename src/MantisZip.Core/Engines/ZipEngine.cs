@@ -43,6 +43,10 @@ public class ZipEngine : IArchiveEngine
 
     public bool CanHandle(ArchiveFormat format) => format == ArchiveFormat.Zip;
 
+    public bool CanAdd(ArchiveFormat format) => format == ArchiveFormat.Zip;
+
+    public bool CanDelete(ArchiveFormat format) => format == ArchiveFormat.Zip;
+
     public async Task ExtractAsync(string archivePath, string destinationPath, string? password = null, IProgress<ArchiveProgress>? progress = null, CancellationToken cancellationToken = default, ArchiveOptions? options = null)
     {
         CoreLog.Entry();
@@ -173,46 +177,8 @@ public class ZipEngine : IArchiveEngine
 
         await Task.Run(() =>
         {
-            // 收集所有文件（使用 EnumerateFiles 延迟枚举，边发现边报告进度）
-            var files = new List<(string FullPath, string RelativePath)>();
-            long totalBytes = 0;
-            var lastScanReportTime = DateTime.Now;
-            var scanReportInterval = TimeSpan.FromMilliseconds(100);
-
-            foreach (var sourcePath in sourcePaths)
-            {
-                if (Directory.Exists(sourcePath))
-                {
-                    var dirName = Path.GetFileName(sourcePath);
-                    foreach (var file in Directory.EnumerateFiles(sourcePath, "*", SearchOption.AllDirectories))
-                    {
-                        cancellationToken.ThrowIfCancellationRequested();
-                        var relativePath = Path.Combine(dirName, Path.GetRelativePath(sourcePath, file));
-                        files.Add((file, relativePath));
-
-                        // 在扫描阶段同时累计总大小
-                        try { totalBytes += new FileInfo(file).Length; } catch (Exception sizeEx) { CoreLog.Info($"CompressAsync: failed to get file size for {file}: {sizeEx.Message}"); }
-
-                        // 每 100ms 报告一次扫描进度，让用户看到正在枚举文件
-                        var now = DateTime.Now;
-                        if (now - lastScanReportTime >= scanReportInterval)
-                        {
-                            progress?.Report(new ArchiveProgress
-                            {
-                                CurrentFile = $"正在扫描: {relativePath} ({files.Count} 个文件)",
-                                PercentComplete = 0,
-                                FilePercentComplete = 0
-                            });
-                            lastScanReportTime = now;
-                        }
-                    }
-                }
-                else if (File.Exists(sourcePath))
-                {
-                    files.Add((sourcePath, Path.GetFileName(sourcePath)));
-                    try { totalBytes += new FileInfo(sourcePath).Length; } catch (Exception sizeEx) { CoreLog.Info($"CompressAsync: failed to get file size for {sourcePath}: {sizeEx.Message}"); }
-                }
-            }
+            // 收集所有文件（使用 FileScanner 共享工具，边发现边报告进度）
+            var (files, totalBytes) = FileScanner.CollectFiles(sourcePaths, progress, cancellationToken);
 
             if (files.Count == 0)
             {
@@ -410,25 +376,129 @@ public class ZipEngine : IArchiveEngine
             // - 新增的条目 → UTF-8 写入（自动设置 UTF-8 标记）
             // 不做硬编码编码假设，尊重系统区域设置
             using var zipFile = new ZipFile(archivePath, StringCodec.Default);
+
+            // 旧条目数（CommitUpdate 时需要 I/O 复制的量）
+            var oldEntryCount = zipFile.Count;
+            var totalNewFiles = files.Count;
+            var totalWorkUnits = totalNewFiles + oldEntryCount; // 新文件压缩 + 旧条目 I/O
+
             zipFile.BeginUpdate();
 
-            var totalFiles = files.Count;
-            for (int i = 0; i < totalFiles; i++)
+            CoreLog.Trace($"[TRACE] ZipEngine.AddToArchiveAsync: totalNewFiles={totalNewFiles}, oldEntries={oldEntryCount}, totalWorkUnits={totalWorkUnits}");
+
+            // 报告 0% 确保进度窗口立即显示刷新
+            progress?.Report(new ArchiveProgress
+            {
+                CurrentFile = totalNewFiles > 0 ? Path.GetFileName(files[0].EntryName) : "",
+                PercentComplete = 0,
+                FilePercentComplete = 0
+            });
+            CoreLog.Trace("[TRACE] ZipEngine.AddToArchiveAsync: reported 0%");
+            for (int i = 0; i < totalNewFiles; i++)
             {
                 cancellationToken.ThrowIfCancellationRequested();
 
                 var (fullPath, entryName) = files[i];
                 zipFile.Add(fullPath, entryName);
 
+                // PercentComplete 按总工作量加权（新文件压缩 + 旧条目 I/O 复制）
+                var overallPct = (double)(i + 1) / totalWorkUnits * 100;
+                // FilePercentComplete 仍按新文件进度
+                var filePct = (double)(i + 1) / totalNewFiles * 100;
                 progress?.Report(new ArchiveProgress
                 {
                     CurrentFile = entryName,
-                    PercentComplete = (double)(i + 1) / totalFiles * 100
+                    PercentComplete = overallPct,
+                    FilePercentComplete = filePct
                 });
+                CoreLog.Trace($"[TRACE] ZipEngine.AddToArchiveAsync: reported overall={overallPct:F1}%, file={filePct:F0}% for '{entryName}'");
             }
 
+            cancellationToken.ThrowIfCancellationRequested();
             zipFile.CommitUpdate();
-            CoreLog.Info($"AddToArchiveAsync: done, {totalFiles} files added, {sw.ElapsedMilliseconds}ms");
+
+            // CommitUpdate 完成后上报 100%
+            progress?.Report(new ArchiveProgress
+            {
+                CurrentFile = "",
+                PercentComplete = 100,
+                FilePercentComplete = 100
+            });
+
+            CoreLog.Info($"AddToArchiveAsync: done, {totalNewFiles} files added ({oldEntryCount} old entries kept), {sw.ElapsedMilliseconds}ms");
+        }, cancellationToken);
+
+        CoreLog.Exit();
+    }
+
+    public async Task DeleteEntriesAsync(string archivePath, string[] entryPaths, string? password = null, IProgress<ArchiveProgress>? progress = null, CancellationToken cancellationToken = default)
+    {
+        CoreLog.Entry();
+        CoreLog.Info($"DeleteEntriesAsync: {archivePath}, entries=[{string.Join("; ", entryPaths)}]");
+        var sw = Stopwatch.StartNew();
+
+        await Task.Run(() =>
+        {
+            using var zipFile = OpenZipFile(archivePath, password);
+
+            // 验证所有条目是否存在
+            var entryNames = new HashSet<string>(zipFile.Cast<ZipEntry>().Select(e => e.Name));
+            foreach (var entryPath in entryPaths)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (!entryNames.Contains(entryPath))
+                {
+                    CoreLog.Error($"DeleteEntriesAsync: entry not found: {entryPath}");
+                    throw new FileNotFoundException($"压缩包中不存在条目: {entryPath}", entryPath);
+                }
+            }
+
+            if (entryPaths.Length == 0)
+            {
+                CoreLog.Info("DeleteEntriesAsync: no entries to delete");
+                return;
+            }
+
+            // 总条目数（作为总工作量：删除标记 + CommitUpdate 复制剩余条目）
+            var totalOldEntries = zipFile.Count;
+
+            // 报告 0% 确保进度窗口立即显示刷新
+            progress?.Report(new ArchiveProgress
+            {
+                CurrentFile = entryPaths[0],
+                PercentComplete = 0,
+                FilePercentComplete = 0
+            });
+
+            zipFile.BeginUpdate();
+            for (int i = 0; i < entryPaths.Length; i++)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                zipFile.Delete(entryPaths[i]);
+
+                // PercentComplete 按总条目加权（删除标记 + 剩余条目的 CommitUpdate I/O）
+                var overallPct = (double)(i + 1) / totalOldEntries * 100;
+                var filePct = (double)(i + 1) / entryPaths.Length * 100;
+                progress?.Report(new ArchiveProgress
+                {
+                    CurrentFile = entryPaths[i],
+                    PercentComplete = overallPct,
+                    FilePercentComplete = filePct
+                });
+            }
+            cancellationToken.ThrowIfCancellationRequested();
+            zipFile.CommitUpdate();
+
+            // CommitUpdate 完成后上报 100%
+            progress?.Report(new ArchiveProgress
+            {
+                CurrentFile = "",
+                PercentComplete = 100,
+                FilePercentComplete = 100
+            });
+
+            var entriesKept = totalOldEntries - entryPaths.Length;
+            CoreLog.Info($"DeleteEntriesAsync: done, {entryPaths.Length} entries deleted ({entriesKept} kept), {sw.ElapsedMilliseconds}ms");
         }, cancellationToken);
 
         CoreLog.Exit();

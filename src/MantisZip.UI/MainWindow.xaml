@@ -62,49 +62,62 @@
         <!-- Toolbar -->
         <ToolBarTray Grid.Row="1" Background="White">
             <ToolBar Band="0" BandIndex="0">
-                <Button ToolTip="{l:L Main_Tooltip_NewArchive}" Click="NewArchive_Click" Padding="6,4">
+                <Button ToolTip="{l:L Main_Tooltip_NewArchive}" Click="NewArchive_Click" Padding="8,6">
                     <StackPanel Orientation="Vertical" HorizontalAlignment="Center">
-                        <TextBlock Text="🆕" FontSize="18" HorizontalAlignment="Center"/>
-                        <TextBlock Text="{l:L Main_Toolbar_New}" FontSize="10" HorizontalAlignment="Center"/>
+                        <TextBlock Text="🆕" FontSize="22" HorizontalAlignment="Center"/>
+                        <TextBlock Text="{l:L Main_Toolbar_New}" FontSize="12" HorizontalAlignment="Center"/>
                     </StackPanel>
                 </Button>
-                <Button ToolTip="{l:L Main_Tooltip_OpenArchive}" Click="OpenArchive_Click" Padding="6,4">
+                <Button ToolTip="{l:L Main_Tooltip_OpenArchive}" Click="OpenArchive_Click" Padding="8,6">
                     <StackPanel Orientation="Vertical" HorizontalAlignment="Center">
-                        <TextBlock Text="📂" FontSize="18" HorizontalAlignment="Center"/>
-                        <TextBlock Text="{l:L Main_Toolbar_Open}" FontSize="10" HorizontalAlignment="Center"/>
+                        <TextBlock Text="📂" FontSize="22" HorizontalAlignment="Center"/>
+                        <TextBlock Text="{l:L Main_Toolbar_Open}" FontSize="12" HorizontalAlignment="Center"/>
                     </StackPanel>
                 </Button>
-                <Button ToolTip="{l:L Main_Tooltip_Extract}" Click="Extract_Click" Padding="6,4">
+                <Button ToolTip="{l:L Main_Tooltip_Extract}" Click="Extract_Click" Padding="8,6">
                     <StackPanel Orientation="Vertical" HorizontalAlignment="Center">
-                        <TextBlock Text="📤" FontSize="18" HorizontalAlignment="Center"/>
-                        <TextBlock Text="{l:L Settings_Tab_Extract}" FontSize="10" HorizontalAlignment="Center"/>
+                        <TextBlock Text="📤" FontSize="22" HorizontalAlignment="Center"/>
+                        <TextBlock Text="{l:L Settings_Tab_Extract}" FontSize="12" HorizontalAlignment="Center"/>
                     </StackPanel>
                 </Button>
-                <Button ToolTip="{l:L Main_Tooltip_Compress}" Click="Compress_Click" Padding="6,4">
+                <Button ToolTip="{l:L Main_Tooltip_Compress}" Click="Compress_Click" Padding="8,6">
                     <StackPanel Orientation="Vertical" HorizontalAlignment="Center">
-                        <TextBlock Text="📥" FontSize="18" HorizontalAlignment="Center"/>
-                        <TextBlock Text="{l:L Shell_Compress}" FontSize="10" HorizontalAlignment="Center"/>
-                    </StackPanel>
-                </Button>
-                <Separator/>
-                <Button ToolTip="{l:L Main_Tooltip_Test}" Click="TestArchive_Click" Padding="6,4">
-                    <StackPanel Orientation="Vertical" HorizontalAlignment="Center">
-                        <TextBlock Text="✓" FontSize="18" Foreground="Green" HorizontalAlignment="Center"/>
-                        <TextBlock Text="{l:L Main_Toolbar_Test}" FontSize="10" HorizontalAlignment="Center"/>
+                        <TextBlock Text="📥" FontSize="22" HorizontalAlignment="Center"/>
+                        <TextBlock Text="{l:L Shell_Compress}" FontSize="12" HorizontalAlignment="Center"/>
                     </StackPanel>
                 </Button>
                 <Separator/>
-                <Button x:Name="EnterPasswordBtn" ToolTip="{l:L Main_Tooltip_Password}" Click="EnterPassword_Click" Padding="6,4" IsEnabled="False">
+                <Button x:Name="AddFilesBtn" ToolTip="{l:L Main_Tooltip_AddFiles}" Click="AddFiles_Click" Padding="8,6" IsEnabled="False">
                     <StackPanel Orientation="Vertical" HorizontalAlignment="Center">
-                        <TextBlock Text="🔑" FontSize="18" HorizontalAlignment="Center"/>
-                        <TextBlock Text="{l:L PwdMgr_Col_Password}" FontSize="10" HorizontalAlignment="Center"/>
+                        <TextBlock Text="➕" FontSize="22" HorizontalAlignment="Center"/>
+                        <TextBlock Text="{l:L Main_Toolbar_AddFiles}" FontSize="12" HorizontalAlignment="Center"/>
+                    </StackPanel>
+                </Button>
+                <Button x:Name="DeleteFilesBtn" ToolTip="{l:L Main_Tooltip_DeleteFiles}" Click="DeleteFiles_Click" Padding="8,6" IsEnabled="False">
+                    <StackPanel Orientation="Vertical" HorizontalAlignment="Center">
+                        <TextBlock Text="✖" FontSize="22" Foreground="Red" HorizontalAlignment="Center"/>
+                        <TextBlock Text="{l:L Main_Toolbar_DeleteFiles}" FontSize="12" HorizontalAlignment="Center"/>
                     </StackPanel>
                 </Button>
                 <Separator/>
-                <ToggleButton x:Name="PreviewToggleBtn" ToolTip="{l:L Main_Tooltip_Preview}" Click="PreviewToggleBtn_Click" Padding="6,4">
+                <Button ToolTip="{l:L Main_Tooltip_Test}" Click="TestArchive_Click" Padding="8,6">
                     <StackPanel Orientation="Vertical" HorizontalAlignment="Center">
-                        <TextBlock x:Name="PreviewToggleIcon" Text="👁" FontSize="16" HorizontalAlignment="Center"/>
-                        <TextBlock Text="{l:L Settings_Tab_Preview}" FontSize="10" HorizontalAlignment="Center"/>
+                        <TextBlock Text="✓" FontSize="22" Foreground="Green" HorizontalAlignment="Center"/>
+                        <TextBlock Text="{l:L Main_Toolbar_Test}" FontSize="12" HorizontalAlignment="Center"/>
+                    </StackPanel>
+                </Button>
+                <Separator/>
+                <Button x:Name="EnterPasswordBtn" ToolTip="{l:L Main_Tooltip_Password}" Click="EnterPassword_Click" Padding="8,6" IsEnabled="False">
+                    <StackPanel Orientation="Vertical" HorizontalAlignment="Center">
+                        <TextBlock Text="🔑" FontSize="22" HorizontalAlignment="Center"/>
+                        <TextBlock Text="{l:L PwdMgr_Col_Password}" FontSize="12" HorizontalAlignment="Center"/>
+                    </StackPanel>
+                </Button>
+                <Separator/>
+                <ToggleButton x:Name="PreviewToggleBtn" ToolTip="{l:L Main_Tooltip_Preview}" Click="PreviewToggleBtn_Click" Padding="8,6">
+                    <StackPanel Orientation="Vertical" HorizontalAlignment="Center">
+                        <TextBlock x:Name="PreviewToggleIcon" Text="👁" FontSize="20" HorizontalAlignment="Center"/>
+                        <TextBlock Text="{l:L Settings_Tab_Preview}" FontSize="12" HorizontalAlignment="Center"/>
                     </StackPanel>
                 </ToggleButton>
             </ToolBar>
@@ -212,10 +225,14 @@
                                           BorderBrush="#DDD"
                                             SelectionChanged="FileListGrid_SelectionChanged"
                                            PreviewMouseDoubleClick="FileListGrid_PreviewMouseDoubleClick"
-                                           PreviewMouseLeftButtonDown="FileListGrid_PreviewMouseLeftButtonDown"
-                                           PreviewMouseMove="FileListGrid_PreviewMouseMove">
+                                            PreviewMouseLeftButtonDown="FileListGrid_PreviewMouseLeftButtonDown"
+                                            PreviewMouseMove="FileListGrid_PreviewMouseMove"
+                                            PreviewKeyDown="FileListGrid_PreviewKeyDown">
                                     <DataGrid.ContextMenu>
                                         <ContextMenu>
+                                            <MenuItem Header="{l:L Main_Ctx_AddFiles}" Click="FileListCtx_AddFiles"/>
+                                            <MenuItem Header="{l:L Main_Ctx_DeleteFiles}" Click="FileListCtx_DeleteFiles"/>
+                                            <Separator/>
                                             <MenuItem Header="{l:L Main_Ctx_ExtractTo}" Click="FileListCtx_ExtractTo"/>
                                             <MenuItem Header="{l:L Main_Ctx_ExtractHere}" Click="FileListCtx_ExtractHere"/>
                                             <Separator/>

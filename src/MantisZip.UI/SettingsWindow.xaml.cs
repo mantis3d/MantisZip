@@ -108,6 +108,10 @@ public partial class SettingsWindow : Window
         LogPathText.Text = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "debug.log");
         SevenZipPathBox.Text = s.SevenZipPath;
 
+        // 日志隐私脱敏
+        foreach (ComboBoxItem item in LogPrivacyModeCombo.Items)
+            if ((string)item.Tag == s.LogPrivacyMode) { LogPrivacyModeCombo.SelectedItem = item; break; }
+
         // 语言
         LanguageCombo.Items.Clear();
         foreach (var lang in LanguageManager.Instance.AvailableLanguages)
@@ -160,6 +164,7 @@ public partial class SettingsWindow : Window
         s.PasswordRevealByDefault = RevealPasswordCheck.IsChecked == true;
 
         s.EnableDebugLogging = EnableDebugLogCheck.IsChecked == true;
+        s.LogPrivacyMode = (LogPrivacyModeCombo.SelectedItem as ComboBoxItem)?.Tag as string ?? "off";
 
         s.SevenZipPath = SevenZipPathBox.Text;
 
@@ -363,6 +368,12 @@ public partial class SettingsWindow : Window
             AppMessageBox.Show(L.T(L.Settings_Language_Restart), L.T(L.App_MantisZipTitle),
                 MessageBoxButton.OK, MessageBoxImage.Information);
         }
+    }
+
+    private void LogPrivacyHelp_Click(object sender, RoutedEventArgs e)
+    {
+        var dialog = new LogPrivacyHelpDialog { Owner = this };
+        dialog.ShowDialog();
     }
 
     private void CleanTemp_Click(object sender, RoutedEventArgs e)
