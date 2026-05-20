@@ -37,12 +37,18 @@ public partial class SettingsWindow : Window
         void OnChanged(object? s, RoutedEventArgs e) => ApplyShellBtn.IsEnabled = true;
         EnableCompressCheck.Checked += OnChanged;
         EnableCompressCheck.Unchecked += OnChanged;
-        EnableQuickCheck.Checked += OnChanged;
-        EnableQuickCheck.Unchecked += OnChanged;
+        EnableCompressSeparateCheck.Checked += OnChanged;
+        EnableCompressSeparateCheck.Unchecked += OnChanged;
+        EnableCompressCombinedCheck.Checked += OnChanged;
+        EnableCompressCombinedCheck.Unchecked += OnChanged;
         EnableOpenCheck.Checked += OnChanged;
         EnableOpenCheck.Unchecked += OnChanged;
-        EnableExtractCheck.Checked += OnChanged;
-        EnableExtractCheck.Unchecked += OnChanged;
+        EnableExtractHereCheck.Checked += OnChanged;
+        EnableExtractHereCheck.Unchecked += OnChanged;
+        EnableExtractToNamedCheck.Checked += OnChanged;
+        EnableExtractToNamedCheck.Unchecked += OnChanged;
+        EnableExtractToCheck.Checked += OnChanged;
+        EnableExtractToCheck.Unchecked += OnChanged;
         CascadeCheck.Checked += OnChanged;
         CascadeCheck.Unchecked += OnChanged;
         ShowIconsCheck.Checked += OnChanged;
@@ -71,9 +77,13 @@ public partial class SettingsWindow : Window
 
         // 上下文菜单
         EnableCompressCheck.IsChecked = s.EnableCompressMenu;
-        EnableQuickCheck.IsChecked = s.EnableQuickCompress;
+        EnableCompressSeparateCheck.IsChecked = s.EnableCompressSeparate;
+        EnableCompressCombinedCheck.IsChecked = s.EnableCompressCombined;
         EnableOpenCheck.IsChecked = s.EnableOpenMenu;
-        EnableExtractCheck.IsChecked = s.EnableExtractMenu;
+        EnableExtractHereCheck.IsChecked = s.EnableExtractHereMenu;
+        EnableSmartCheck.IsChecked = s.EnableSmartExtractMenu;
+        EnableExtractToNamedCheck.IsChecked = s.EnableExtractToNamedMenu;
+        EnableExtractToCheck.IsChecked = s.EnableExtractToMenu;
         CascadeCheck.IsChecked = s.EnableCascadingMenu;
         ShowIconsCheck.IsChecked = s.ShowMenuIcons;
         UpdateShellStatus();
@@ -151,9 +161,13 @@ public partial class SettingsWindow : Window
         s.EnableDragExtract = EnableDragExtractCheck.IsChecked == true;
 
         s.EnableCompressMenu = EnableCompressCheck.IsChecked == true;
-        s.EnableQuickCompress = EnableQuickCheck.IsChecked == true;
+        s.EnableCompressSeparate = EnableCompressSeparateCheck.IsChecked == true;
+        s.EnableCompressCombined = EnableCompressCombinedCheck.IsChecked == true;
         s.EnableOpenMenu = EnableOpenCheck.IsChecked == true;
-        s.EnableExtractMenu = EnableExtractCheck.IsChecked == true;
+        s.EnableExtractHereMenu = EnableExtractHereCheck.IsChecked == true;
+        s.EnableSmartExtractMenu = EnableSmartCheck.IsChecked == true;
+        s.EnableExtractToNamedMenu = EnableExtractToNamedCheck.IsChecked == true;
+        s.EnableExtractToMenu = EnableExtractToCheck.IsChecked == true;
         s.EnableCascadingMenu = CascadeCheck.IsChecked == true;
         s.ShowMenuIcons = ShowIconsCheck.IsChecked == true;
 

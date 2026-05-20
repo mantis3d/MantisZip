@@ -158,10 +158,24 @@
                     <StackPanel Margin="10">
                         <GroupBox Header="{l:L Settings_Menu_GroupHeader}" Padding="8" Margin="0,0,0,12">
                             <StackPanel>
-                                <CheckBox x:Name="EnableCompressCheck" Content="{l:L Settings_Menu_EnableCompress}" Margin="0,4"/>
-                                <CheckBox x:Name="EnableQuickCheck" Content="{l:L Settings_Menu_EnableQuick}" Margin="0,4"/>
-                                <CheckBox x:Name="EnableOpenCheck" Content="{l:L Settings_Menu_EnableOpen}" Margin="0,4"/>
-                                <CheckBox x:Name="EnableExtractCheck" Content="{l:L Settings_Menu_EnableExtract}" Margin="0,4"/>
+                                <GroupBox Header="{l:L Settings_Menu_Group_Browse}" Padding="6" Margin="0,0,0,8">
+                                    <CheckBox x:Name="EnableOpenCheck" Content="{l:L Settings_Menu_EnableOpen}" Margin="4"/>
+                                </GroupBox>
+                                <GroupBox Header="{l:L Settings_Menu_Group_Compress}" Padding="6" Margin="0,0,0,8">
+                                    <StackPanel>
+                                        <CheckBox x:Name="EnableCompressCheck" Content="{l:L Settings_Menu_EnableCompress}" Margin="0,4"/>
+                                        <CheckBox x:Name="EnableCompressSeparateCheck" Content="{l:L Settings_Menu_EnableCompressSeparate}" Margin="0,4"/>
+                                        <CheckBox x:Name="EnableCompressCombinedCheck" Content="{l:L Settings_Menu_EnableCompressCombined}" Margin="0,4"/>
+                                    </StackPanel>
+                                </GroupBox>
+                                <GroupBox Header="{l:L Settings_Menu_Group_Extract}" Padding="6" Margin="0,0,0,8">
+                                    <StackPanel>
+                                        <CheckBox x:Name="EnableExtractHereCheck" Content="{l:L Settings_Menu_EnableExtractHere}" Margin="0,4"/>
+                                        <CheckBox x:Name="EnableSmartCheck" Content="{l:L Shell_SmartExtract}" Margin="0,4"/>
+                                        <CheckBox x:Name="EnableExtractToNamedCheck" Content="{l:L Settings_Menu_EnableExtractToNamed}" Margin="0,4"/>
+                                        <CheckBox x:Name="EnableExtractToCheck" Content="{l:L Settings_Menu_EnableExtractTo}" Margin="0,4"/>
+                                    </StackPanel>
+                                </GroupBox>
                             </StackPanel>
                         </GroupBox>
 
