@@ -45,7 +45,8 @@ public class AppSettings
     public bool ShowPasswordMatchNotification { get; set; } = true;
     public bool PasswordRevealByDefault { get; set; } = false;
 
-    // ===== 语言 =====
+    // ===== 外观 =====
+    public string Theme { get; set; } = "Light";    // "Light" | "Dark"
     public string Language { get; set; } = "zh";
 
     // ===== 调试 =====

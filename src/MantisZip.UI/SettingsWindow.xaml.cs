@@ -114,6 +114,10 @@ public partial class SettingsWindow : Window
         foreach (ComboBoxItem item in LogPrivacyModeCombo.Items)
             if ((string)item.Tag == s.LogPrivacyMode) { LogPrivacyModeCombo.SelectedItem = item; break; }
 
+        // 外观
+        foreach (ComboBoxItem item in ThemeCombo.Items)
+            if ((string)item.Tag == s.Theme) { ThemeCombo.SelectedItem = item; break; }
+
         // 语言
         LanguageCombo.Items.Clear();
         foreach (var lang in LanguageManager.Instance.AvailableLanguages)
@@ -158,6 +162,7 @@ public partial class SettingsWindow : Window
         s.MaxTextPreviewBytes = (long)MaxTextSizeSlider.Value * 1024 * 1024;
         s.MaxPreviewFileSize = (long)MaxPreviewSizeSlider.Value * 1024 * 1024;
         s.TextPreviewFontSize = (int)TextFontSizeSlider.Value;
+        s.Theme = (ThemeCombo.SelectedItem as ComboBoxItem)?.Tag as string ?? "Light";
         s.UseColorEmoji = UseColorEmojiCheck.IsChecked == true;
         s.PreviewPosition = int.TryParse((PreviewPositionCombo.SelectedItem as ComboBoxItem)?.Tag?.ToString(), out var pos) ? pos : 1;
         s.InfoPanelOrientation = (InfoPanelOrientationCombo.SelectedItem as ComboBoxItem)?.Tag as string ?? "Horizontal";
@@ -345,6 +350,40 @@ public partial class SettingsWindow : Window
     }
 
     #endregion
+
+    private void ThemeCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (ThemeCombo.SelectedItem is ComboBoxItem item && item.Tag is string theme
+            && theme != AppSettings.Instance.Theme)
+        {
+            var oldTheme = AppSettings.Instance.Theme;
+
+            // 临时保存，用户可以取消
+            AppSettings.Instance.Theme = theme;
+            AppSettings.Instance.Save();
+
+            var result = AppMessageBox.Show(
+                L.T(L.Settings_Appearance_ThemeRestart_Msg),
+                L.T(L.Settings_Appearance_ThemeRestart_Title),
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Question);
+            if (result == MessageBoxResult.Yes)
+            {
+                System.Diagnostics.Process.Start(Environment.ProcessPath!);
+                Application.Current.Shutdown();
+            }
+            else
+            {
+                // 用户取消 → 恢复旧主题并还原 ComboBox
+                AppSettings.Instance.Theme = oldTheme;
+                AppSettings.Instance.Save();
+                ThemeCombo.SelectionChanged -= ThemeCombo_SelectionChanged;
+                foreach (ComboBoxItem ci in ThemeCombo.Items)
+                    if ((string)ci.Tag == oldTheme) { ThemeCombo.SelectedItem = ci; break; }
+                ThemeCombo.SelectionChanged += ThemeCombo_SelectionChanged;
+            }
+        }
+    }
 
     private void LanguageCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {

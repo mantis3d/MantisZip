@@ -5,7 +5,7 @@
         Title="{l:L Settings_Title}" Height="500" Width="700"
         WindowStartupLocation="CenterScreen"
         ResizeMode="NoResize"
-        Background="#F5F5F5">
+        Background="{StaticResource Theme_WindowBg}">
     <Grid Margin="12">
         <Grid.RowDefinitions>
             <RowDefinition Height="*"/>
@@ -14,6 +14,7 @@
 
         <!-- Tabs -->
         <TabControl Grid.Row="0" x:Name="SettingsTabs" TabStripPlacement="Left"
+                    Background="{StaticResource Theme_WindowBg}"
                     TextOptions.TextRenderingMode="Grayscale">
             <TabControl.Resources>
                 <Style TargetType="TabItem">
@@ -24,7 +25,7 @@
                     <Setter Property="Template">
                         <Setter.Value>
                             <ControlTemplate TargetType="TabItem">
-                                <Border x:Name="Bd" BorderThickness="0,0,0,1" BorderBrush="#E0E0E0"
+                                <Border x:Name="Bd" BorderThickness="0,0,0,1" BorderBrush="{StaticResource Theme_BorderLight}"
                                         Background="{TemplateBinding Background}" Padding="{TemplateBinding Padding}">
                                     <ContentPresenter Content="{TemplateBinding Header}"
                                                        HorizontalAlignment="Stretch"
@@ -32,12 +33,12 @@
                                 </Border>
                                 <ControlTemplate.Triggers>
                                     <Trigger Property="IsSelected" Value="True">
-                                        <Setter TargetName="Bd" Property="Background" Value="#BBDEFB"/>
+                                        <Setter TargetName="Bd" Property="Background" Value="{StaticResource Theme_AccentLight}"/>
                                         <Setter TargetName="Bd" Property="BorderThickness" Value="3,0,0,1"/>
-                                        <Setter TargetName="Bd" Property="BorderBrush" Value="#1565C0"/>
+                                        <Setter TargetName="Bd" Property="BorderBrush" Value="{StaticResource Theme_AccentDark}"/>
                                     </Trigger>
                                     <Trigger Property="IsMouseOver" Value="True">
-                                        <Setter TargetName="Bd" Property="Background" Value="#E8E8E8"/>
+                                        <Setter TargetName="Bd" Property="Background" Value="{StaticResource Theme_ButtonHover}"/>
                                     </Trigger>
                                 </ControlTemplate.Triggers>
                             </ControlTemplate>
@@ -57,17 +58,17 @@
                         <TextBlock Text="{l:L Settings_Tab_Compress}" Grid.Column="1" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="4,0,0,0"/>
                     </Grid>
                 </TabItem.Header>
-                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" Background="{StaticResource Theme_SurfaceBg}">
                     <StackPanel Margin="10">
                         <TextBlock Text="{l:L Settings_Compress_DefaultFormat}" FontWeight="SemiBold" Margin="0,0,0,4"/>
-                        <ComboBox x:Name="DefaultFormatCombo" Width="200" HorizontalAlignment="Left">
+                        <ComboBox x:Name="DefaultFormatCombo" Width="300" HorizontalAlignment="Left" Background="{StaticResource Theme_WindowBg}" >
                             <ComboBoxItem Content="ZIP (.zip)" Tag="zip"/>
                             <ComboBoxItem Content="7z (.7z)" Tag="7z"/>
                             <ComboBoxItem Content="TAR.GZ (.tar.gz)" Tag="tar.gz"/>
                         </ComboBox>
 
                         <TextBlock Text="{l:L Settings_Compress_DefaultLevel}" FontWeight="SemiBold" Margin="0,16,0,4"/>
-                        <ComboBox x:Name="DefaultLevelCombo" Width="200" HorizontalAlignment="Left">
+                        <ComboBox x:Name="DefaultLevelCombo" Width="300" HorizontalAlignment="Left"  Background="{StaticResource Theme_WindowBg}">
                             <ComboBoxItem Tag="0" Content="{l:L Compress_Level_Store}"/>
                             <ComboBoxItem Tag="3" Content="{l:L Compress_Level_Fast}"/>
                             <ComboBoxItem Tag="5" Content="{l:L Compress_Level_Normal}"/>
@@ -92,17 +93,17 @@
                         <TextBlock Text="{l:L Settings_Tab_Extract}" Grid.Column="1" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="4,0,0,0"/>
                     </Grid>
                 </TabItem.Header>
-                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" Background="{StaticResource Theme_SurfaceBg}">
                     <StackPanel Margin="10">
                         <TextBlock Text="{l:L Settings_Extract_DefaultDest}" FontWeight="SemiBold" Margin="0,0,0,4"/>
-                        <ComboBox x:Name="ExtractDestCombo" Width="200" HorizontalAlignment="Left">
+                        <ComboBox x:Name="ExtractDestCombo" Width="300" HorizontalAlignment="Left"  Background="{StaticResource Theme_WindowBg}">
                             <ComboBoxItem Content="{l:L Settings_Extract_Dest_Ask}" Tag="ask"/>
                             <ComboBoxItem Content="{l:L Settings_Extract_Dest_SameDir}" Tag="same-dir"/>
                             <ComboBoxItem Content="{l:L Settings_Extract_Dest_Desktop}" Tag="desktop"/>
                         </ComboBox>
 
                         <TextBlock Text="{l:L Settings_Extract_ConflictAction}" FontWeight="SemiBold" Margin="0,16,0,4"/>
-                        <ComboBox x:Name="ConflictCombo" Width="200" HorizontalAlignment="Left">
+                        <ComboBox x:Name="ConflictCombo" Width="300" HorizontalAlignment="Left">
                             <ComboBoxItem Content="{l:L Settings_Extract_Conflict_Ask}" Tag="ask"/>
                             <ComboBoxItem Content="{l:L CompressConflict_Overwrite}" Tag="overwrite"/>
                             <ComboBoxItem Content="{l:L Settings_Extract_Conflict_OverwriteOlder}" Tag="overwrite-if-older"/>
@@ -113,6 +114,30 @@
 
                         <CheckBox x:Name="OpenFolderCheck" Content="{l:L Settings_Extract_OpenFolderAfter}" Margin="0,16,0,0"/>
                         <CheckBox x:Name="EnableDragExtractCheck" Content="{l:L Settings_Extract_EnableDragExtract}" Margin="0,8,0,0"/>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
+            <!-- ═══════ 外观 ═══════ -->
+            <TabItem>
+                <TabItem.Header>
+                    <Grid HorizontalAlignment="Stretch">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock x:Name="IconAppearance" Text="🎨" VerticalAlignment="Center"/>
+                        <TextBlock Text="{l:L Settings_Tab_Appearance}" Grid.Column="1" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="4,0,0,0"/>
+                    </Grid>
+                </TabItem.Header>
+                <ScrollViewer VerticalScrollBarVisibility="Auto" Background="{StaticResource Theme_SurfaceBg}">
+                    <StackPanel Margin="10">
+                        <TextBlock Text="{l:L Settings_Appearance_Theme}" FontWeight="SemiBold" Margin="0,0,0,4"/>
+                        <ComboBox x:Name="ThemeCombo" Width="300" HorizontalAlignment="Left"
+                                  SelectionChanged="ThemeCombo_SelectionChanged">
+                            <ComboBoxItem Tag="Light" Content="{l:L Settings_Appearance_Theme_Light}"/>
+                            <ComboBoxItem Tag="Dark" Content="{l:L Settings_Appearance_Theme_Dark}"/>
+                        </ComboBox>
                     </StackPanel>
                 </ScrollViewer>
             </TabItem>
@@ -129,7 +154,7 @@
                         <TextBlock Text="{l:L Settings_Tab_ContextMenu}" Grid.Column="1" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="4,0,0,0"/>
                     </Grid>
                 </TabItem.Header>
-                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" Background="{StaticResource Theme_SurfaceBg}">
                     <StackPanel Margin="10">
                         <GroupBox Header="{l:L Settings_Menu_GroupHeader}" Padding="8" Margin="0,0,0,12">
                             <StackPanel>
@@ -176,7 +201,7 @@
                         <TextBlock Text="{l:L Settings_Tab_Preview}" Grid.Column="1" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="4,0,0,0"/>
                     </Grid>
                 </TabItem.Header>
-                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" Background="{StaticResource Theme_SurfaceBg}">
                     <StackPanel Margin="10">
                         <CheckBox x:Name="EnableImagePreviewCheck" Content="{l:L Settings_Preview_EnableImage}" Margin="0,4"/>
                         <CheckBox x:Name="EnableTextPreviewCheck" Content="{l:L Settings_Preview_EnableText}" Margin="0,16,0,4"/>
@@ -189,12 +214,12 @@
                                      VerticalAlignment="Center" Text="15"
                                      PreviewTextInput="MaxPreviewSizeInput_PreviewTextInput"
                                      TextChanged="MaxPreviewSizeInput_TextChanged"/>
-                            <TextBlock Text="MB" FontSize="12" Foreground="#555" VerticalAlignment="Center" Margin="4,0,0,0"/>
+                            <TextBlock Text="MB" FontSize="12" Foreground="{StaticResource Theme_TextSecondary}" VerticalAlignment="Center" Margin="4,0,0,0"/>
                         </StackPanel>
-                        <TextBlock Text="{l:L Settings_Preview_MaxSizeHint}" Foreground="#888" FontSize="11" Margin="0,4,0,0"/>
+                        <TextBlock Text="{l:L Settings_Preview_MaxSizeHint}" Foreground="{StaticResource Theme_TextDisabled}" FontSize="11" Margin="0,4,0,0"/>
 
                         <TextBlock Text="{l:L Settings_Preview_Position}" FontWeight="SemiBold" Margin="0,16,0,4"/>
-                        <ComboBox x:Name="PreviewPositionCombo" Width="220" HorizontalAlignment="Left" Margin="0,0,0,8">
+                        <ComboBox x:Name="PreviewPositionCombo" Width="300" HorizontalAlignment="Left" Margin="0,0,0,8">
                             <ComboBoxItem Tag="1" IsSelected="True" Content="{l:L Settings_Preview_Pos_Bottom}"/>
                             <ComboBoxItem Tag="2" Content="{l:L Settings_Preview_Pos_BelowTree}"/>
                             <ComboBoxItem Tag="3" Content="{l:L Settings_Preview_Pos_BelowList}"/>
@@ -202,7 +227,7 @@
                         </ComboBox>
 
                         <TextBlock Text="{l:L Settings_Preview_InfoDirection}" FontWeight="SemiBold" Margin="0,8,0,4"/>
-                        <ComboBox x:Name="InfoPanelOrientationCombo" Width="180" HorizontalAlignment="Left" Margin="0,0,0,8">
+                        <ComboBox x:Name="InfoPanelOrientationCombo" Width="300" HorizontalAlignment="Left" Margin="0,0,0,8">
                             <ComboBoxItem Tag="Horizontal" IsSelected="True" Content="{l:L Settings_Preview_Dir_Horizontal}"/>
                             <ComboBoxItem Tag="Vertical" Content="{l:L Settings_Preview_Dir_Vertical}"/>
                         </ComboBox>
@@ -220,8 +245,8 @@
                                     Value="12" TickFrequency="1" IsSnapToTickEnabled="True"/>
                             <TextBlock x:Name="TextFontSizeText" Text="12" Width="30" Margin="8,0,0,0" VerticalAlignment="Center"/>
                         </StackPanel>
-                        <Border BorderBrush="#CCC" BorderThickness="1" Padding="8" Margin="0,8,0,0"
-                                Background="#F9F9F9" CornerRadius="4">
+                        <Border BorderBrush="{StaticResource Theme_Border}" BorderThickness="1" Padding="8" Margin="0,8,0,0"
+                                Background="{StaticResource Theme_SurfaceBg}" CornerRadius="4">
                             <TextBlock x:Name="TextFontSizeSample" FontSize="12"
                                        FontFamily="Cascadia Code, Consolas, monospace"
                                        Text="{l:L Settings_Preview_TextSample}"
@@ -245,16 +270,16 @@
                         <TextBlock Text="{l:L Settings_Tab_FileAssoc}" Grid.Column="1" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="4,0,0,0"/>
                     </Grid>
                 </TabItem.Header>
-                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" Background="{StaticResource Theme_SurfaceBg}">
                     <StackPanel Margin="10">
                         <GroupBox Header="{l:L Settings_Assoc_GroupHeader}" Padding="8" Margin="0,0,0,12">
                             <StackPanel>
-                                <TextBlock Text="{l:L Settings_Assoc_Desc}" TextWrapping="Wrap" Foreground="#555" FontSize="12" Margin="0,0,0,10"/>
+                                <TextBlock Text="{l:L Settings_Assoc_Desc}" TextWrapping="Wrap" Foreground="{StaticResource Theme_TextSecondary}" FontSize="12" Margin="0,0,0,10"/>
                                 <Button x:Name="InstallAssocBtn" Content="{l:L Settings_Assoc_Install}" Width="140" Height="28"
                                         HorizontalAlignment="Left" Click="InstallAssoc_Click"/>
                                 <Button x:Name="UninstallAssocBtn" Content="{l:L Settings_Assoc_Uninstall}" Width="140" Height="28"
                                         HorizontalAlignment="Left" Margin="0,8,0,0" Click="UninstallAssoc_Click"/>
-                                <TextBlock x:Name="AssocStatusText" Text="" FontSize="11" Foreground="#555" Margin="0,8,0,0"/>
+                                <TextBlock x:Name="AssocStatusText" Text="" FontSize="11" Foreground="{StaticResource Theme_TextSecondary}" Margin="0,8,0,0"/>
                             </StackPanel>
                         </GroupBox>
                     </StackPanel>
@@ -273,10 +298,10 @@
                         <TextBlock Text="{l:L Settings_Tab_Password}" Grid.Column="1" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="4,0,0,0"/>
                     </Grid>
                 </TabItem.Header>
-                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" Background="{StaticResource Theme_SurfaceBg}">
                     <StackPanel Margin="10">
                         <CheckBox x:Name="ShowPasswordNotifCheck" Content="{l:L Settings_Pwd_ShowNotification}" Margin="0,4"/>
-                        <TextBlock Text="{l:L Settings_Pwd_ShowHint}" Foreground="#888" FontSize="11" TextWrapping="Wrap" Margin="24,0,0,12"/>
+                        <TextBlock Text="{l:L Settings_Pwd_ShowHint}" Foreground="{StaticResource Theme_TextDisabled}" FontSize="11" TextWrapping="Wrap" Margin="24,0,0,12"/>
 
                         <CheckBox x:Name="RevealPasswordCheck" Content="{l:L Settings_Pwd_RevealDefault}" Margin="0,12,0,4"/>
                     </StackPanel>
@@ -295,10 +320,10 @@
                         <TextBlock Text="{l:L Settings_Tab_Language}" Grid.Column="1" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="4,0,0,0"/>
                     </Grid>
                 </TabItem.Header>
-                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" Background="{StaticResource Theme_SurfaceBg}">
                     <StackPanel Margin="10">
                         <TextBlock Text="{l:L Settings_Language}" FontWeight="SemiBold" Margin="0,0,0,4"/>
-                        <ComboBox x:Name="LanguageCombo" Width="220" Height="26" HorizontalAlignment="Left"
+                        <ComboBox x:Name="LanguageCombo" Width="300" Height="26" HorizontalAlignment="Left"
                                   SelectionChanged="LanguageCombo_SelectionChanged"/>
                     </StackPanel>
                 </ScrollViewer>
@@ -316,12 +341,12 @@
                         <TextBlock Text="{l:L Settings_Tab_Debug}" Grid.Column="1" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="4,0,0,0"/>
                     </Grid>
                 </TabItem.Header>
-                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" Background="{StaticResource Theme_SurfaceBg}">
                     <StackPanel Margin="10">
                         <CheckBox x:Name="EnableDebugLogCheck" Content="{l:L Settings_Advanced_EnableDebugLog}" Margin="0,0,0,2"/>
-                        <TextBlock FontSize="11" Foreground="#888" Margin="24,0,0,0">
+                        <TextBlock FontSize="11" Foreground="{StaticResource Theme_TextDisabled}" Margin="24,0,0,0">
                             <Run Text="{l:L Settings_Advanced_LogFile}"/>
-                            <Run x:Name="LogPathText" Foreground="#555"/>
+                            <Run x:Name="LogPathText" Foreground="{StaticResource Theme_TextSecondary}"/>
                         </TextBlock>
                         <StackPanel Orientation="Horizontal" Margin="24,4,0,0">
                             <Button Content="{l:L Settings_Advanced_OpenLog}" Width="90" Height="22" FontSize="11"
@@ -329,7 +354,7 @@
                         </StackPanel>
                         <TextBlock Text="{l:L Settings_Debug_LogPrivacyMode}" FontWeight="SemiBold" Margin="0,12,0,4"/>
                         <StackPanel Orientation="Horizontal">
-                            <ComboBox x:Name="LogPrivacyModeCombo" Width="200" HorizontalAlignment="Left">
+                            <ComboBox x:Name="LogPrivacyModeCombo" Width="300" HorizontalAlignment="Left">
                                 <ComboBoxItem Tag="off" Content="{l:L Settings_Debug_LogPrivacyMode_Off}"/>
                                 <ComboBoxItem Tag="filename" Content="{l:L Settings_Debug_LogPrivacyMode_Filename}"/>
                                 <ComboBoxItem Tag="full" Content="{l:L Settings_Debug_LogPrivacyMode_Full}"/>
@@ -353,7 +378,7 @@
                         <TextBlock Text="{l:L Settings_Tab_Advanced}" Grid.Column="1" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="4,0,0,0"/>
                     </Grid>
                 </TabItem.Header>
-                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" Background="{StaticResource Theme_SurfaceBg}">
                     <StackPanel Margin="10">
                         <TextBlock Text="{l:L Settings_Advanced_SevenZipPath}" FontWeight="SemiBold" Margin="0,0,0,4"/>
                         <Grid>
@@ -369,7 +394,7 @@
                                 HorizontalAlignment="Left" Click="CleanTemp_Click"/>
 
                         <TextBlock Text="{l:L Settings_Advanced_AboutHeader}" FontWeight="SemiBold" Margin="0,0,0,4"/>
-                        <TextBlock TextWrapping="Wrap" Foreground="#555" FontSize="11">
+                        <TextBlock TextWrapping="Wrap" Foreground="{StaticResource Theme_TextSecondary}" FontSize="11">
                             <Run Text="{l:L Settings_Advanced_AboutVersion}"/><Run x:Name="AboutVersionText"/>
                             <LineBreak/>
                             <Run Text="{l:L Settings_Advanced_AboutDesc}"/>
