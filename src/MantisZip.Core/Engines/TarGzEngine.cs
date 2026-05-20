@@ -33,9 +33,8 @@ public class TarGzEngine : IArchiveEngine
                 // 不预扫描文件数（避免对 .tar.gz 重复解压缩），进度基于已读取的压缩字节数
                 using var inputStream = File.OpenRead(archivePath);
                 var totalCompressedBytes = inputStream.Length;
-                Stream tarStream = isTarGz
-                    ? new GZipInputStream(inputStream)
-                    : inputStream;
+                using var gzipStream = isTarGz ? new GZipInputStream(inputStream) : null;
+                var tarStream = (Stream?)gzipStream ?? inputStream;
 
                 using var tarIn = new TarInputStream(tarStream, Encoding.UTF8);
 
@@ -291,13 +290,8 @@ public class TarGzEngine : IArchiveEngine
                 try
                 {
                     using var inputStream = File.OpenRead(archivePath);
-                    Stream tarStream = inputStream;
-
-                    if (isTarGz)
-                    {
-                        // tar.gz: 先解压 GZip 流，再读取 Tar
-                        tarStream = new GZipInputStream(inputStream);
-                    }
+                    using var gzipStream = isTarGz ? new GZipInputStream(inputStream) : null;
+                    var tarStream = (Stream?)gzipStream ?? inputStream;
 
                     using var tarIn = new TarInputStream(tarStream, Encoding.UTF8);
                     TarEntry entry;

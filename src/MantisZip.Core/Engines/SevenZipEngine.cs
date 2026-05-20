@@ -59,7 +59,7 @@ public class SevenZipEngine : IArchiveEngine
         // 检查 PATH 环境变量
         try
         {
-            var which = Process.Start(new ProcessStartInfo
+            using var which = Process.Start(new ProcessStartInfo
             {
                 FileName = "where",
                 ArgumentList = { "7z.exe" },
