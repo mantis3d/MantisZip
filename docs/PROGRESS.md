@@ -7,8 +7,8 @@
 - **技术栈**: .NET 9 + WPF + SharpZipLib + SevenZipExtractor
 
 ## 版本
-- **当前版本**: 0.2.9
-- **发布日期**: 2026-05-19
+- **当前版本**: 0.2.10
+- **发布日期**: 2026-05-20
 
 ## 版本历史（按日期排序）
 
@@ -203,4 +203,11 @@
 5. **`App.TraceLog` 清理** - 所有 `App.TraceLog` 改为 `App.LogDebug`，统一调试日志输出
 6. **工具栏图标/文字放大** - 图标 `18→22`，标签 `10→12`，内边距 `(6,4)→(8,6)`
 7. **版本升级** - 0.2.9
+
+### v0.2.10 (2026-05-20)
+1. **Quick Compress 拆分为独立/合并两项** — `--compress-separate` 依次独立压缩 + `--compress-combined` 合并压缩到父目录，各自独立 IPC 通道（Mutex/Pipe 分别命名）、Shell 菜单两项可分别开关
+2. **Shell 右键菜单 per-verb 独立开关完整化** — 新增 `EnableCompressSeparate`/`EnableCompressCombined`，替换原有的 `EnableExtractMenu` 为各解压项独立开关（解压到此处/智能解压/解压到压缩包名/解压到…）
+3. **设置窗口菜单页分组** — 浏览/压缩/解压三个子组 + GroupBox 分组分隔线，所有标签去掉「启用」前缀
+4. **文档同步更新** — README.md CLI 表补全、开发计划表补全（Smart Extract ✅、暗色主题 ✅、per-verb 开关）；AGENTS.md 补充所有 extract 模式绕过 MainWindow 的说明；PLAN.md 同步更新版本号/CLI表/进度概览/已实现设计方案
+5. **版本升级** - 0.2.10
 

@@ -4,8 +4,8 @@
 
 **项目状态**: 🟢 开发中 (Phase 4 收尾)  
 **创建日期**: 2026-04-23  
-**最后更新**: 2026-05-19  
-**当前版本**: 0.2.9
+**最后更新**: 2026-05-20  
+**当前版本**: 0.2.10
 
 ---
 
@@ -206,16 +206,17 @@ MantisZip/
 | P1 | CLI 快速压缩/解压/浏览 | ✅ 完成 |
 | P2 | 暂停/继续 | ✅ 完成 |
 | P2 | 密码匹配进度提示 | ✅ 完成 |
-| P2 | 暗色主题 | ⬜ 待开发 |
+| P2 | 暗色主题 | ✅ 完成 |
 | P2 | 国际化（中/英） | ✅ 完成 |
 
 ### 2.4 系统集成
 
 | 优先级 | 功能 | 状态 |
 |--------|------|------|
-| P1 | Shell 右键菜单 | ✅ 完成 |
+| P1 | Shell 右键菜单 — 动词模式/层叠双模式，per-verb 独立开关（打开/压缩/压缩到独立的/压缩到父目录/解压到此处/智能解压/解压到压缩包名/解压到…），菜单分组分隔线 | ✅ 完成 |
 | P1 | 文件关联（打开方式） | ✅ 完成 |
-| P2 | 快速压缩 | ✅ 完成 |
+| P2 | CLI 快速压缩/解压 — `--compress-separate`/`--compress-combined`/`--extract-smart`/`--extract-here`/`--extract-to-name` | ✅ 完成 |
+| P2 | 智能解压（Smart Extract）— 自动分析压缩包结构决定是否保留顶层文件夹 | ✅ 完成 |
 | P3 | 桌面剪贴板监控 | ⬜ 待开发 |
 
 ### 2.5 CLI 参考
@@ -226,8 +227,11 @@ MantisZip/
 | `--open <路径>` | 启动主窗口并加载压缩包 |
 | `--compress <路径1> <路径2> ...` | 显示压缩对话框（支持多实例 IPC 合并路径） |
 | `--compress-quick <路径1> ...` | 使用默认设置直接压缩，显示进度窗口 |
+| `--compress-separate <路径1> <路径2> ...` | 依次将每个选定项压缩到各自所在目录（IPC 合并） |
+| `--compress-combined <路径1> <路径2> ...` | 将所有选定项合并压缩到公共父目录（跨盘时弹窗输入名称） |
 | `--extract <路径>` | 显示解压到…选择目录对话框 |
 | `--extract-here <路径>` | 解压到当前目录 |
+| `--extract-smart <路径>` | 智能解压（自动检测是否保留顶层文件夹） |
 | `--extract-to-name <路径>` | 解压到以压缩包名命名的子目录 |
 | `--install-shell` | 安装 Shell 右键菜单 |
 | `--uninstall-shell` | 卸载 Shell 右键菜单 |
@@ -239,7 +243,10 @@ MantisZip/
 ```powershell
 MantisZip.UI.exe --open "D:\文档.zip"
 MantisZip.UI.exe --compress-quick "D:\照片" -- "D:\备份.zip"
+MantisZip.UI.exe --compress-separate "D:\照片" "D:\文档"
+MantisZip.UI.exe --compress-combined "D:\照片" "D:\文档"
 MantisZip.UI.exe --extract "D:\软件包.7z"
+MantisZip.UI.exe --extract-smart "D:\软件包.7z"
 ```
 
 ---
@@ -286,13 +293,13 @@ MantisZip.UI.exe --extract "D:\软件包.7z"
 | 3.5 | 压缩方式选择 | ⬜ 待开发 |
 
 ### Phase 4: 系统集成与发布
-**目标**: Shell 集成、发布与打包 — **90%**
+**目标**: Shell 集成、发布与打包 — **95%**
 
 | 序号 | 任务 | 状态 |
 |------|------|------|
-| 4.1 | Shell 右键菜单 | ✅ 完成 |
+| 4.1 | Shell 右键菜单（per-verb 独立开关，分组分隔线） | ✅ 完成 |
 | 4.2 | 文件关联 | ✅ 完成 |
-| 4.3 | CLI 快速压缩 | ✅ 完成 |
+| 4.3 | CLI 快速压缩/智能解压 | ✅ 完成 |
 | 4.4 | 安装包制作 | ✅ 完成 |
 | 4.5 | 发布 Release | ⬜ 待开发 |
 
@@ -304,9 +311,9 @@ MantisZip.UI.exe --extract "D:\软件包.7z"
 Phase 1: ████████████████████ 100%
 Phase 2: ████████████████████ 100%
 Phase 3: ██████████████████░░ 90%
-Phase 4: ██████████████████░░ 90%
+Phase 4: ███████████████████░ 95%
 
-总体进度: ██████████████████░ 90%
+总体进度: ███████████████████ 95%
 ```
 
 ---
@@ -344,7 +351,6 @@ Phase 4: ██████████████████░░ 90%
 | 文本预览语法高亮 | 用 AvalonEdit 替换当前 TextBox，支持 20+ 语言语法高亮（C#/Python/XML/HTML/SQL/JS 等）。加一个 NuGet 包 + 改控件名 + 两行配置即可 |
 | 压缩方式选择 | Store/Deflate/BZip2/LZMA，需换 SharpCompress 库 |
 | Emoji.Wpf 彩色 Emoji 渲染 | WPF 不支持原生彩色 Emoji，Tag 图标(📦📂☰👁🔗🔑🌐⚙)目前为黑白。引入 [Emoji.Wpf](https://github.com/samhocevar/emoji.wpf) NuGet 包，替换 TabControl 图标的 TextBlock 为 `emoji:TextBlock` |
-| 暗色主题 | 亮色/暗色切换 |
 | 文件列表筛选 | 搜索框实时过滤当前目录 + 子目录显示切换 |
 | 文件大小进度条 | 大小列背景按文件体积比例填充，一眼看出大文件 |
 
@@ -372,8 +378,6 @@ Phase 4: ██████████████████░░ 90%
 | 优先级 | 功能 | 设计文档 | 难度 | 预估工时 | 说明 |
 |--------|------|----------|:----:|:--------:|------|
 | **P1** | 引擎统一 (SharpZipLib → SharpCompress) | [engine-unification-sharpcompress.md](.sisyphus/plans/engine-unification-sharpcompress.md) | 🔴高 | 6-8h | 统一引擎架构，含压缩方式选择 (见上方 P2「压缩方式选择」)；突破 SharpZipLib CommitUpdate 黑盒进度问题 |
-| **P1** | **智能解压到此处** ⭐新增 | [smart-extract.md](.sisyphus/plans/smart-extract.md) | 🟢低 | 2-3h | 分析压缩包结构自动决定解压方式（单根目录直接解压/多根目录创建同名文件夹）；含 CLI、右键菜单、工具栏按钮 |
-| **P1** | 暗色主题 | — | 🟡中 | 3-4h | 亮色/暗色切换，所有 XAML 样式需定义两套资源字典；P2 久未实现 |
 | **P1** | 文件大小进度条 | [file-size-progress-bar.md](.sisyphus/plans/file-size-progress-bar.md) | 🟢低 | 0.5h | 大小列背景按文件体积比例填充，纯 UI 改动 |
 | **P2** | 便携版模式 | [portable-mode.md](.sisyphus/plans/portable-mode.md) | 🟢低 | 1-2h | 哨兵文件触发，路径重定向到 exe 目录，免注册表 |
 | **P2** | 预览格式识别与元数据展示 | [preview-format-detection.md](.sisyphus/plans/preview-format-detection.md) | 🔴高 | 8-12h | 魔数识别 + 差异化元数据 + 扩展预览格式（PDF/SVG/CSV/EXE 元数据等）；改动范围大 |
@@ -398,8 +402,12 @@ Phase 4: ██████████████████░░ 90%
 | 功能 | 设计文档 | 实现版本 | 说明 |
 |------|----------|:--------:|------|
 | 添加到压缩包 / 从压缩包删除 | [archive-add-delete.md](.sisyphus/plans/archive-add-delete.md) | v0.2.9 | 含 IArchiveEngine.DeleteEntriesAsync、UI 入口、确认弹窗 |
+| 暗色/亮色主题 | [dark-theme.md](.sisyphus/plans/dark-theme.md) | v0.2.9 | 主题色资源字典 + Appearance 设置页 + 实时切换 |
 | 日志隐私脱敏 | [log-privacy-redaction.md](.sisyphus/plans/log-privacy-redaction.md) | v0.2.8 | Core/Utils/LogRedactor + UI 设置面板；三种模式 |
 | 国际化 (i18n) | [i18n-localization.md](.sisyphus/plans/i18n-localization.md) | v0.2.8 | JSON 资源文件 + 静态代理类 + MarkupExtension；中英双语 |
+| 智能解压 (Smart Extract) | [smart-extract.md](.sisyphus/plans/smart-extract.md) | v0.2.10 | ArchiveStructureAnalyzer 自动分析压缩包结构，决定是否保留顶层文件夹 |
+| Quick Compress 拆分为独立/合并两项 | — | v0.2.10 | `--compress-separate` + `--compress-combined`，各自独立 IPC 通道，Shell 菜单两项可分别开关 |
+| 设置窗口菜单页分组 | — | v0.2.10 | 浏览/压缩/解压三组 + 分组分隔线，per-item 独立开关，去掉「启用」前缀 |
 
 ### 远期（P3）
 
