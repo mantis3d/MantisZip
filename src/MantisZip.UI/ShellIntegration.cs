@@ -14,8 +14,9 @@ namespace MantisZip.UI;
 ///   2. 用MantisZip解压到此处
 ///   3. 用MantisZip解压到（压缩包名）
 ///   4. 用MantisZip解压到……
-///   5. 压缩为（文件名）.zip
-///   6. 用MantisZip压缩
+///   5. 压缩到独立的（文件名）
+///   6. 压缩到（父目录名）
+///   7. 用MantisZip压缩
 /// </summary>
 internal static class ShellIntegration
 {
@@ -29,17 +30,21 @@ internal static class ShellIntegration
     // Verb names (numbered prefix for verb-mode alphabetical order)
     private const string OpenVerb = "01_MantisZipOpen";
     private const string ExtractHereVerb = "02_MantisZipExtractHere";
+    private const string ExtractSmartVerb = "02_MantisZipSmartExtract";
     private const string ExtractToNamedVerb = "03_MantisZipExtractToNamed";
     private const string ExtractVerb = "04_MantisZipExtract";
-    private const string QuickVerb = "05_MantisZipQuick";
-    private const string CompressVerb = "06_MantisZipCompress";
+    private const string CompressSeparateVerb = "05_MantisZipCompressSeparate";
+    private const string CompressCombinedVerb = "06_MantisZipCompressCombined";
+    private const string CompressVerb = "07_MantisZipCompress";
 
     // Display names (shown in context menu — localized)
     private static readonly string OpenDisplay = L.T(L.Shell_Open);
     private static readonly string ExtractHereDisplay = L.T(L.Shell_ExtractHere);
+    private static readonly string ExtractSmartDisplay = L.T(L.Shell_SmartExtract);
     private static readonly string ExtractToNamedDisplay = L.T(L.Shell_ExtractToNamed);
     private static readonly string ExtractDisplay = L.T(L.Shell_ExtractTo);
-    private static readonly string QuickDisplay = L.T(L.Shell_QuickCompress);
+    private static readonly string CompressSeparateDisplay = L.T(L.Shell_CompressSeparate);
+    private static readonly string CompressCombinedDisplay = L.T(L.Shell_CompressCombined);
     private static readonly string CompressDisplay = L.T(L.Shell_Compress);
 
     /// <summary>检查是否已L.T(L.Settings_Menu_Btn_Install) Shell 扩展。</summary>
@@ -52,7 +57,13 @@ internal static class ShellIntegration
             if (key != null) return true;
             using var key2 = Registry.CurrentUser.OpenSubKey(
                 $@"Software\Classes\*\shell\{CompressVerb}\command");
-            return key2 != null;
+            if (key2 != null) return true;
+            using var key3 = Registry.CurrentUser.OpenSubKey(
+                $@"Software\Classes\*\shell\{ExtractSmartVerb}\command");
+            if (key3 != null) return true;
+            using var key4 = Registry.CurrentUser.OpenSubKey(
+                $@"Software\Classes\*\shell\{CompressSeparateVerb}\command");
+            return key4 != null;
         }
     }
 
@@ -96,10 +107,18 @@ internal static class ShellIntegration
             // 新名称
             DeleteRegistryKey($@"Software\Classes\{target}\shell\{OpenVerb}");
             DeleteRegistryKey($@"Software\Classes\{target}\shell\{ExtractHereVerb}");
+            DeleteRegistryKey($@"Software\Classes\{target}\shell\{ExtractSmartVerb}");
             DeleteRegistryKey($@"Software\Classes\{target}\shell\{ExtractToNamedVerb}");
             DeleteRegistryKey($@"Software\Classes\{target}\shell\{ExtractVerb}");
-            DeleteRegistryKey($@"Software\Classes\{target}\shell\{QuickVerb}");
+            DeleteRegistryKey($@"Software\Classes\{target}\shell\{CompressSeparateVerb}");
+            DeleteRegistryKey($@"Software\Classes\{target}\shell\{CompressCombinedVerb}");
             DeleteRegistryKey($@"Software\Classes\{target}\shell\{CompressVerb}");
+
+            // 菜单分隔线（独立动词模式）
+            DeleteRegistryKey($@"Software\Classes\{target}\shell\00_MantisZipSepTop");
+            DeleteRegistryKey($@"Software\Classes\{target}\shell\02a_MantisZipSep");
+            DeleteRegistryKey($@"Software\Classes\{target}\shell\04a_MantisZipSep");
+            DeleteRegistryKey($@"Software\Classes\{target}\shell\99_MantisZipSepBottom");
 
             // 旧版动词L.T(L.Main_Col_Name)（v0.1.3 及以前）
             DeleteRegistryKey($@"Software\Classes\{target}\shell\MantisZipOpen");
@@ -155,14 +174,18 @@ internal static class ShellIntegration
             SetRegistryValue($@"{verbPath}\command", null, $@"""{exePath}"" --open ""{argVar}""");
         }
 
-        // L.T(L.Settings_Tab_Extract)相关动词（仅L.T(L.Compress_Archive_Group)；受 EnableExtractMenu 统一控制）
-        if (includeExtract && s.EnableExtractMenu)
+        // 解压相关动词（仅压缩包；每个独立控制）
+        if (includeExtract)
         {
+            bool firstInGroup = true;
             // 2. 用MantisZip解压到此处
+            if (s.EnableExtractHereMenu)
             {
                 order++;
                 var verb = $"{order:D2}_extracthere";
                 var verbPath = $@"{shellPath}\{verb}";
+                if (firstInGroup && order > 1) SetRegistryDword(verbPath, "CommandFlags", 8);
+                firstInGroup = false;
                 SetRegistryValue(verbPath, null, ExtractHereDisplay);
                 SetRegistryValue(verbPath, "AppliesTo", BuildAppliesToFilter());
                 if (s.ShowMenuIcons)
@@ -170,11 +193,29 @@ internal static class ShellIntegration
                 SetRegistryValue($@"{verbPath}\command", null, $@"""{exePath}"" --extract-here ""{argVar}""");
             }
 
-            // 3. 用L.T(L.App_MantisZipTitle)L.T(L.Shell_ExtractToNamed)
+            // 2.5. 智能解压到此处 (Smart Extract)
+            if (s.EnableSmartExtractMenu)
+            {
+                order++;
+                var verb = $"{order:D2}_smartextract";
+                var verbPath = $@"{shellPath}\{verb}";
+                if (firstInGroup && order > 1) SetRegistryDword(verbPath, "CommandFlags", 8);
+                firstInGroup = false;
+                SetRegistryValue(verbPath, null, ExtractSmartDisplay);
+                SetRegistryValue(verbPath, "AppliesTo", BuildAppliesToFilter());
+                if (s.ShowMenuIcons)
+                    SetRegistryValue(verbPath, "Icon", $"""{exePath},0""");
+                SetRegistryValue($@"{verbPath}\command", null, $@"""{exePath}"" --extract-smart ""{argVar}""");
+            }
+
+            // 3. 用MantisZip解压到（压缩包名）
+            if (s.EnableExtractToNamedMenu)
             {
                 order++;
                 var verb = $"{order:D2}_extracttonamed";
                 var verbPath = $@"{shellPath}\{verb}";
+                if (firstInGroup && order > 1) SetRegistryDword(verbPath, "CommandFlags", 8);
+                firstInGroup = false;
                 SetRegistryValue(verbPath, null, ExtractToNamedDisplay);
                 SetRegistryValue(verbPath, "AppliesTo", BuildAppliesToFilter());
                 if (s.ShowMenuIcons)
@@ -182,11 +223,14 @@ internal static class ShellIntegration
                 SetRegistryValue($@"{verbPath}\command", null, $@"""{exePath}"" --extract-to-name ""{argVar}""");
             }
 
-            // 4. 用L.T(L.App_MantisZipTitle)L.T(L.Shell_ExtractTo)
+            // 4. 用MantisZip解压到……
+            if (s.EnableExtractToMenu)
             {
                 order++;
                 var verb = $"{order:D2}_extract";
                 var verbPath = $@"{shellPath}\{verb}";
+                if (firstInGroup && order > 1) SetRegistryDword(verbPath, "CommandFlags", 8);
+                firstInGroup = false;
                 SetRegistryValue(verbPath, null, ExtractDisplay);
                 SetRegistryValue(verbPath, "AppliesTo", BuildAppliesToFilter());
                 if (s.ShowMenuIcons)
@@ -195,28 +239,50 @@ internal static class ShellIntegration
             }
         }
 
-        // 5. L.T(L.Shell_QuickCompress)
-        if (s.EnableQuickCompress)
+        // 压缩
         {
-            order++;
-            var verb = $"{order:D2}_quick";
-            var verbPath = $@"{shellPath}\{verb}";
-            SetRegistryValue(verbPath, null, QuickDisplay);
-            if (s.ShowMenuIcons)
-                SetRegistryValue(verbPath, "Icon", $"""{exePath},0""");
-            SetRegistryValue($@"{verbPath}\command", null, $@"""{exePath}"" --compress-quick ""{argVar}""");
-        }
+            bool firstInGroup = true;
+            // 5. 压缩到独立的（文件名）
+            if (s.EnableCompressSeparate)
+            {
+                order++;
+                var verb = $"{order:D2}_compressseparate";
+                var verbPath = $@"{shellPath}\{verb}";
+                if (firstInGroup && order > 1) SetRegistryDword(verbPath, "CommandFlags", 8);
+                firstInGroup = false;
+                SetRegistryValue(verbPath, null, CompressSeparateDisplay);
+                if (s.ShowMenuIcons)
+                    SetRegistryValue(verbPath, "Icon", $"""{exePath},0""");
+                SetRegistryValue($@"{verbPath}\command", null, $@"""{exePath}"" --compress-separate ""{argVar}""");
+            }
 
-        // 6. 用L.T(L.App_MantisZipTitle)L.T(L.Shell_Compress)
-        if (s.EnableCompressMenu)
-        {
-            order++;
-            var verb = $"{order:D2}_compress";
-            var verbPath = $@"{shellPath}\{verb}";
-            SetRegistryValue(verbPath, null, CompressDisplay);
-            if (s.ShowMenuIcons)
-                SetRegistryValue(verbPath, "Icon", $"""{exePath},0""");
-            SetRegistryValue($@"{verbPath}\command", null, $@"""{exePath}"" --compress ""{argVar}""");
+            // 6. 压缩到（父目录名）
+            if (s.EnableCompressCombined)
+            {
+                order++;
+                var verb = $"{order:D2}_compresscombined";
+                var verbPath = $@"{shellPath}\{verb}";
+                if (firstInGroup && order > 1) SetRegistryDword(verbPath, "CommandFlags", 8);
+                firstInGroup = false;
+                SetRegistryValue(verbPath, null, CompressCombinedDisplay);
+                if (s.ShowMenuIcons)
+                    SetRegistryValue(verbPath, "Icon", $"""{exePath},0""");
+                SetRegistryValue($@"{verbPath}\command", null, $@"""{exePath}"" --compress-combined ""{argVar}""");
+            }
+
+            // 7. 用MantisZip压缩
+            if (s.EnableCompressMenu)
+            {
+                order++;
+                var verb = $"{order:D2}_compress";
+                var verbPath = $@"{shellPath}\{verb}";
+                if (firstInGroup && order > 1) SetRegistryDword(verbPath, "CommandFlags", 8);
+                firstInGroup = false;
+                SetRegistryValue(verbPath, null, CompressDisplay);
+                if (s.ShowMenuIcons)
+                    SetRegistryValue(verbPath, "Icon", $"""{exePath},0""");
+                SetRegistryValue($@"{verbPath}\command", null, $@"""{exePath}"" --compress ""{argVar}""");
+            }
         }
     }
 
@@ -227,6 +293,16 @@ internal static class ShellIntegration
     private static void InstallVerbs(AppSettings s, string exePath)
     {
         // 动词按用户要求的顺序注册，使用编号前缀控制排序
+        bool dirHasSeparate = s.EnableCompressSeparate;
+        bool dirHasCombined = s.EnableCompressCombined;
+        bool dirHasCompress = s.EnableCompressMenu;
+        bool dirHasVerbs = dirHasSeparate || dirHasCombined || dirHasCompress;
+        bool bgHasVerbs = dirHasCompress;
+
+        // ——— 顶层/底层分隔符（所有目标） ———
+        InstallSeparatorVerb("*", "00_MantisZipSepTop");
+        if (dirHasVerbs) InstallSeparatorVerb("Directory", "00_MantisZipSepTop");
+        if (bgHasVerbs) InstallSeparatorVerb(@"Directory\Background", "00_MantisZipSepTop");
 
         // ——— 1. 用MantisZip打开（仅压缩包）———
         if (s.EnableOpenMenu)
@@ -234,21 +310,44 @@ internal static class ShellIntegration
             InstallVerb("*", OpenVerb, OpenDisplay, $@"""{exePath}"" --open ""%1""", s.ShowMenuIcons, exePath, BuildAppliesToFilter());
         }
 
-        // ——— 2-4. L.T(L.Settings_Tab_Extract)动词（仅L.T(L.Compress_Archive_Group)；受 EnableExtractMenu 统一控制）———
-        if (s.EnableExtractMenu)
-        {
+        // ——— 组间分隔符（* 目标：解压组前） ———
+        bool extractHasVerbs = s.EnableExtractHereMenu || s.EnableSmartExtractMenu || s.EnableExtractToNamedMenu || s.EnableExtractToMenu;
+        if (extractHasVerbs)
+            InstallSeparatorVerb("*", "02a_MantisZipSep");
+
+        // ——— 2-4. 解压动词（每个独立控制）———
+        if (s.EnableExtractHereMenu)
             InstallVerb("*", ExtractHereVerb, ExtractHereDisplay, $@"""{exePath}"" --extract-here ""%1""", s.ShowMenuIcons, exePath, BuildAppliesToFilter());
+        if (s.EnableSmartExtractMenu)
+            InstallVerb("*", ExtractSmartVerb, ExtractSmartDisplay, $@"""{exePath}"" --extract-smart ""%1""", s.ShowMenuIcons, exePath, BuildAppliesToFilter());
+        if (s.EnableExtractToNamedMenu)
             InstallVerb("*", ExtractToNamedVerb, ExtractToNamedDisplay, $@"""{exePath}"" --extract-to-name ""%1""", s.ShowMenuIcons, exePath, BuildAppliesToFilter());
+        if (s.EnableExtractToMenu)
             InstallVerb("*", ExtractVerb, ExtractDisplay, $@"""{exePath}"" --extract ""%1""", s.ShowMenuIcons, exePath, BuildAppliesToFilter());
-        }
 
-        // ——— 5. L.T(L.Shell_QuickCompress) ———
-        if (s.EnableQuickCompress)
+        // ——— 组间分隔符（压缩组前） ———
+        bool compressHasVerbs = dirHasVerbs;
+        if (compressHasVerbs)
         {
-            InstallVerb("*", QuickVerb, QuickDisplay, $@"""{exePath}"" --compress-quick ""%1""", s.ShowMenuIcons, exePath);
+            InstallSeparatorVerb("*", "04a_MantisZipSep");
+            if (dirHasVerbs) InstallSeparatorVerb("Directory", "04a_MantisZipSep");
         }
 
-        // ——— 6. 用L.T(L.App_MantisZipTitle)L.T(L.Shell_Compress) ———
+        // ——— 5. 压缩到独立的（文件名） ———
+        if (s.EnableCompressSeparate)
+        {
+            InstallVerb("*", CompressSeparateVerb, CompressSeparateDisplay, $@"""{exePath}"" --compress-separate ""%1""", s.ShowMenuIcons, exePath);
+            InstallVerb("Directory", CompressSeparateVerb, CompressSeparateDisplay, $@"""{exePath}"" --compress-separate ""%1""", s.ShowMenuIcons, exePath);
+        }
+
+        // ——— 6. 压缩到（父目录名） ———
+        if (s.EnableCompressCombined)
+        {
+            InstallVerb("*", CompressCombinedVerb, CompressCombinedDisplay, $@"""{exePath}"" --compress-combined ""%1""", s.ShowMenuIcons, exePath);
+            InstallVerb("Directory", CompressCombinedVerb, CompressCombinedDisplay, $@"""{exePath}"" --compress-combined ""%1""", s.ShowMenuIcons, exePath);
+        }
+
+        // ——— 7. 用MantisZip压缩 ———
         if (s.EnableCompressMenu)
         {
             InstallVerb("*", CompressVerb, CompressDisplay, $@"""{exePath}"" --compress ""%1""", s.ShowMenuIcons, exePath);
@@ -261,6 +360,11 @@ internal static class ShellIntegration
         // ——— Directory\Background ———
         if (s.EnableCompressMenu)
             InstallVerb(@"Directory\Background", CompressVerb, CompressDisplay, $@"""{exePath}"" --compress ""%V""", s.ShowMenuIcons, exePath);
+
+        // ——— 底层分隔符 ———
+        InstallSeparatorVerb("*", "99_MantisZipSepBottom");
+        if (dirHasVerbs) InstallSeparatorVerb("Directory", "99_MantisZipSepBottom");
+        if (bgHasVerbs) InstallSeparatorVerb(@"Directory\Background", "99_MantisZipSepBottom");
     }
 
     private static void InstallVerb(string target, string verbName, string displayName, string command, bool showIcon, string exePath, string? appliesTo = null)
@@ -272,6 +376,12 @@ internal static class ShellIntegration
         if (appliesTo != null)
             SetRegistryValue(key, "AppliesTo", appliesTo);
         SetRegistryValue($@"{key}\command", null, command);
+    }
+
+    /// <summary>安装一条菜单分隔线（独立动词模式）。</summary>
+    private static void InstallSeparatorVerb(string target, string verbName)
+    {
+        SetRegistryDword($@"Software\Classes\{target}\shell\{verbName}", "CommandFlags", 8);
     }
 
     #endregion
@@ -401,6 +511,19 @@ internal static class ShellIntegration
     {
         using var key = Registry.CurrentUser.CreateSubKey(subKey);
         key?.SetValue(valueName, value);
+    }
+
+    private static void SetRegistryDword(string subKey, string valueName, int value)
+    {
+        using var key = Registry.CurrentUser.CreateSubKey(subKey);
+        key?.SetValue(valueName, value, RegistryValueKind.DWord);
+    }
+
+    /// <summary>在指定位置添加一条菜单分隔线。</summary>
+    private static void InstallSeparator(string shellPath, int order)
+    {
+        var verb = $"{order:D2}_sep";
+        SetRegistryDword($@"{shellPath}\{verb}", "CommandFlags", 8);
     }
 
     private static void DeleteRegistryKey(string subKey)

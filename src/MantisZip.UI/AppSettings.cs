@@ -24,8 +24,14 @@ public class AppSettings
     public bool EnableExtractMenu { get; set; } = true;
     public bool EnableOpenMenu { get; set; } = true;     // 用 MantisZip 打开
     public bool EnableQuickCompress { get; set; } = true;
+    public bool EnableCompressSeparate { get; set; } = true;
+    public bool EnableCompressCombined { get; set; } = true;
     public bool EnableCascadingMenu { get; set; } = true;   // 层叠子菜单（默认启用，避免多文件右键动词上限问题）
     public bool ShowMenuIcons { get; set; } = true;
+    public bool EnableSmartExtractMenu { get; set; } = true;   // 智能解压到此处
+    public bool EnableExtractHereMenu { get; set; } = true;     // 解压到此处
+    public bool EnableExtractToNamedMenu { get; set; } = true;  // 解压到（压缩包名）
+    public bool EnableExtractToMenu { get; set; } = true;       // 解压到……
 
     // ===== 交互 =====
     public bool EnableDragExtract { get; set; } = true;

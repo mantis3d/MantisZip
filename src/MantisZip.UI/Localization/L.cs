@@ -17,9 +17,13 @@ public static class L
     public const string App_AssocInstalled                         = "App_AssocInstalled";
     public const string App_AssocUninstalled                       = "App_AssocUninstalled";
     public const string App_CleanedPreviewTemp                     = "App_CleanedPreviewTemp";
+    public const string App_CompressCombinedPromptLabel             = "App_CompressCombinedPromptLabel";
+    public const string App_CompressCombinedPromptTitle             = "App_CompressCombinedPromptTitle";
     public const string App_CompressComplete                       = "App_CompressComplete";
     public const string App_CompressFailed                         = "App_CompressFailed";
     public const string App_CompressPreparing                      = "App_CompressPreparing";
+    public const string App_CompressSeparateComplete                = "App_CompressSeparateComplete";
+    public const string App_CompressSeparateProgress                = "App_CompressSeparateProgress";
     public const string App_CompressWindowFailed                   = "App_CompressWindowFailed";
     public const string App_ErrorTitle                             = "App_ErrorTitle";
     public const string App_ExtractComplete                        = "App_ExtractComplete";
@@ -208,6 +212,7 @@ public static class L
     public const string Main_Tooltip_OpenArchive                   = "Main_Tooltip_OpenArchive";
     public const string Main_Tooltip_Password                      = "Main_Tooltip_Password";
     public const string Main_Tooltip_Preview                       = "Main_Tooltip_Preview";
+    public const string Main_Tooltip_SmartExtract                  = "Main_Tooltip_SmartExtract";
     public const string Main_Tooltip_Test                          = "Main_Tooltip_Test";
     public const string Main_DeleteConfirm                         = "Main_DeleteConfirm";
     public const string Main_DeleteTitle                           = "Main_DeleteTitle";
@@ -409,10 +414,18 @@ public static class L
     public const string Settings_Menu_Checking                     = "Settings_Menu_Checking";
     public const string Settings_Menu_DisplayGroup                 = "Settings_Menu_DisplayGroup";
     public const string Settings_Menu_EnableCompress               = "Settings_Menu_EnableCompress";
+    public const string Settings_Menu_EnableCompressCombined        = "Settings_Menu_EnableCompressCombined";
+    public const string Settings_Menu_EnableCompressSeparate        = "Settings_Menu_EnableCompressSeparate";
     public const string Settings_Menu_EnableExtract                = "Settings_Menu_EnableExtract";
+    public const string Settings_Menu_EnableExtractHere            = "Settings_Menu_EnableExtractHere";
+    public const string Settings_Menu_EnableExtractToNamed         = "Settings_Menu_EnableExtractToNamed";
+    public const string Settings_Menu_EnableExtractTo              = "Settings_Menu_EnableExtractTo";
     public const string Settings_Menu_EnableOpen                   = "Settings_Menu_EnableOpen";
     public const string Settings_Menu_EnableQuick                  = "Settings_Menu_EnableQuick";
     public const string Settings_Menu_GroupHeader                  = "Settings_Menu_GroupHeader";
+    public const string Settings_Menu_Group_Browse                 = "Settings_Menu_Group_Browse";
+    public const string Settings_Menu_Group_Compress               = "Settings_Menu_Group_Compress";
+    public const string Settings_Menu_Group_Extract                = "Settings_Menu_Group_Extract";
     public const string Settings_Menu_InstallFailed                = "Settings_Menu_InstallFailed";
     public const string Settings_Menu_Installed                    = "Settings_Menu_Installed";
     public const string Settings_Menu_InstalledMsg                 = "Settings_Menu_InstalledMsg";
@@ -458,6 +471,8 @@ public static class L
     public const string Settings_Tab_Preview                       = "Settings_Tab_Preview";
     public const string Settings_Title                             = "Settings_Title";
     public const string Shell_Compress                             = "Shell_Compress";
+    public const string Shell_CompressCombined                     = "Shell_CompressCombined";
+    public const string Shell_CompressSeparate                     = "Shell_CompressSeparate";
     public const string Shell_ExtractHere                          = "Shell_ExtractHere";
     public const string Shell_ExtractTo                            = "Shell_ExtractTo";
     public const string Shell_ExtractToNamed                       = "Shell_ExtractToNamed";
@@ -465,6 +480,7 @@ public static class L
     public const string Shell_OpenVerb                             = "Shell_OpenVerb";
     public const string Shell_ProgIdDesc                           = "Shell_ProgIdDesc";
     public const string Shell_QuickCompress                        = "Shell_QuickCompress";
+    public const string Shell_SmartExtract                         = "Shell_SmartExtract";
 
     /// <summary>Translate a key using LanguageManager.</summary>
     public static string T(string key) => LanguageManager.Instance[key];
