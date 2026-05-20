@@ -365,18 +365,41 @@ Phase 4: ██████████████████░░ 90%
 
 ### 详细设计方案
 
-以下功能已有独立方案设计文档，见 `.sisyphus/plans/`：
+以下功能已有独立方案设计文档，见 `.sisyphus/plans/`。按优先级排序，已实现的设计方案移入末尾的「已实现设计方案」小节。
 
-| 功能 | 设计文档 | 说明 |
-|------|----------|------|
-| 提取日志与解压「后悔药」 | [extract-journal-undo.md](.sisyphus/plans/extract-journal-undo.md) | 解压记录 + 一键回滚 |
-| 压缩包对比 (Archive Diff) | [archive-diff.md](.sisyphus/plans/archive-diff.md) | 压缩包文件级差异对比 |
-| 压缩预估 (Compression Estimator) | [compression-estimator.md](.sisyphus/plans/compression-estimator.md) | 压缩前估算大小/耗时 |
-| 引擎统一 (SharpZipLib → SharpCompress) | [engine-unification-sharpcompress.md](.sisyphus/plans/engine-unification-sharpcompress.md) | 统一引擎架构，含压缩方式选择 (见上方 P2「压缩方式选择」) |
-| 预览格式识别与元数据展示 | [preview-format-detection.md](.sisyphus/plans/preview-format-detection.md) | 魔数识别 + 差异化元数据 |
-| 文件大小进度条 | [file-size-progress-bar.md](.sisyphus/plans/file-size-progress-bar.md) | 大小列背景按文件体积比例填充 |
-| MSI 安装包 (WiX) | [msi-packaging-wix.md](.sisyphus/plans/msi-packaging-wix.md) | Inno Setup EXE → WiX MSI 迁移；企业分发、静默安装 |
-| 便携版模式 | [portable-mode.md](.sisyphus/plans/portable-mode.md) | 哨兵文件触发，路径重定向到 exe 目录，免注册表 |
+#### 待实现设计方案
+
+| 优先级 | 功能 | 设计文档 | 难度 | 预估工时 | 说明 |
+|--------|------|----------|:----:|:--------:|------|
+| **P1** | 引擎统一 (SharpZipLib → SharpCompress) | [engine-unification-sharpcompress.md](.sisyphus/plans/engine-unification-sharpcompress.md) | 🔴高 | 6-8h | 统一引擎架构，含压缩方式选择 (见上方 P2「压缩方式选择」)；突破 SharpZipLib CommitUpdate 黑盒进度问题 |
+| **P1** | **智能解压到此处** ⭐新增 | [smart-extract.md](.sisyphus/plans/smart-extract.md) | 🟢低 | 2-3h | 分析压缩包结构自动决定解压方式（单根目录直接解压/多根目录创建同名文件夹）；含 CLI、右键菜单、工具栏按钮 |
+| **P1** | 暗色主题 | — | 🟡中 | 3-4h | 亮色/暗色切换，所有 XAML 样式需定义两套资源字典；P2 久未实现 |
+| **P1** | 文件大小进度条 | [file-size-progress-bar.md](.sisyphus/plans/file-size-progress-bar.md) | 🟢低 | 0.5h | 大小列背景按文件体积比例填充，纯 UI 改动 |
+| **P2** | 便携版模式 | [portable-mode.md](.sisyphus/plans/portable-mode.md) | 🟢低 | 1-2h | 哨兵文件触发，路径重定向到 exe 目录，免注册表 |
+| **P2** | 预览格式识别与元数据展示 | [preview-format-detection.md](.sisyphus/plans/preview-format-detection.md) | 🔴高 | 8-12h | 魔数识别 + 差异化元数据 + 扩展预览格式（PDF/SVG/CSV/EXE 元数据等）；改动范围大 |
+| **P2** | 提取日志与解压「后悔药」 | [extract-journal-undo.md](.sisyphus/plans/extract-journal-undo.md) | 🟡中 | 3-4h | 解压记录 + 一键回滚；差异化功能亮点 |
+| **P2** | 文本预览语法高亮 (AvalonEdit) | — | 🟢低 | 1-2h | 替换当前 TextBox，支持 20+ 语言语法高亮 |
+| **P2** | 文件列表筛选/搜索 | — | 🟢低 | 1-2h | 搜索框实时过滤 + 子目录显示切换增强 |
+| **P2** | Emoji.Wpf 彩色 Emoji | — | 🟢低 | 0.5h | 替换 TabControl 图标 TextBlock 为 emoji:TextBlock |
+| **P2** | MSI 安装包 (WiX) | [msi-packaging-wix.md](.sisyphus/plans/msi-packaging-wix.md) | 🟡中 | 2-3h | Inno Setup EXE → WiX MSI 迁移；企业分发、静默安装 |
+| **P3** | 压缩包对比 (Archive Diff) | [archive-diff.md](.sisyphus/plans/archive-diff.md) | 🟡中 | 3-4h | 压缩包文件级差异对比；独特功能但非核心 |
+| **P3** | 压缩预估 (Compression Estimator) | [compression-estimator.md](.sisyphus/plans/compression-estimator.md) | 🟡中 | 4-5h | 压缩前估算大小/耗时；三级精度策略 |
+| **P3** | VirtualFileDataObject | [virtual-file-data-object.md](.sisyphus/plans/virtual-file-data-object.md) | 🔴高 | 6-8h | COM 原生 IDataObject 替代 WPF OLE 桥，拖拽延迟渲染不崩溃 |
+| **P3** | COM 右键菜单 | — | 🔴高 | 4-6h | 动态菜单名、菜单排序、自定义图标 |
+| **P3** | 右键菜单目录结构预览 | — | 🔴高 | 6-8h | COM 菜单中展示压缩包文件树（Bandizip 风格） |
+| **P3** | 外部工具视频元数据 | — | 🟢低 | 1-2h | ffprobe 提取时长/分辨率/编码 |
+| **P3** | 预览格式扩展（逐项） | 见 [preview-format-detection.md](.sisyphus/plans/preview-format-detection.md) | 🟢~🟡 | 各 0.5-2h | RTF/CSV/SVG/EXE/LNK/PDF/XLSX/TTF/SQLite/ZIP嵌套 |
+| **P3** | 发布 Release | — | 🟢低 | 1-2h | GitHub Releases + CI 自动构建 |
+
+#### 已实现设计方案
+
+以下设计方案对应的功能已在过往版本中完成，移至此处供回溯参考：
+
+| 功能 | 设计文档 | 实现版本 | 说明 |
+|------|----------|:--------:|------|
+| 添加到压缩包 / 从压缩包删除 | [archive-add-delete.md](.sisyphus/plans/archive-add-delete.md) | v0.2.9 | 含 IArchiveEngine.DeleteEntriesAsync、UI 入口、确认弹窗 |
+| 日志隐私脱敏 | [log-privacy-redaction.md](.sisyphus/plans/log-privacy-redaction.md) | v0.2.8 | Core/Utils/LogRedactor + UI 设置面板；三种模式 |
+| 国际化 (i18n) | [i18n-localization.md](.sisyphus/plans/i18n-localization.md) | v0.2.8 | JSON 资源文件 + 静态代理类 + MarkupExtension；中英双语 |
 
 ### 远期（P3）
 
