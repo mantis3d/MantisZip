@@ -5,6 +5,7 @@ using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Threading;
 using ICSharpCode.SharpZipLib.Zip;
@@ -30,6 +31,15 @@ public partial class App : Application
 
     private static string CompressMutexName = "MantisZip-CompressMutex";
     private static string CompressPipeName = "MantisZip-Compress";
+    private static readonly ManualResetEventSlim _compressPipeReady = new(false);
+
+    private static string CompressSeparateMutexName = "MantisZip-CompressSeparateMutex";
+    private static string CompressSeparatePipeName = "MantisZip-CompressSeparate";
+    private static readonly ManualResetEventSlim _compressSeparatePipeReady = new(false);
+
+    private static string CompressCombinedMutexName = "MantisZip-CompressCombinedMutex";
+    private static string CompressCombinedPipeName = "MantisZip-CompressCombined";
+    private static readonly ManualResetEventSlim _compressCombinedPipeReady = new(false);
 
     /// <summary>
     /// 全局初始化：所有入口（主窗口、--compress、--extract 等）都先经过这里。
@@ -140,8 +150,20 @@ public partial class App : Application
                         HandleExtractToNamed(e.Args.Length > 1 ? e.Args[1] : null);
                         return;
 
+                    case "--extract-smart":
+                        HandleExtractSmart(e.Args.Length > 1 ? e.Args[1] : null);
+                        return;
+
                     case "--compress-quick":
                         HandleCompressQuick(e.Args.Skip(1).ToArray());
+                        return;
+
+                    case "--compress-separate":
+                        HandleCompressSeparate(e.Args.Skip(1).ToArray());
+                        return;
+
+                    case "--compress-combined":
+                        HandleCompressCombined(e.Args.Skip(1).ToArray());
                         return;
 
                     case "--test":
@@ -199,7 +221,12 @@ public partial class App : Application
             // 第一个实例：在后台收集其他实例的路径（非阻塞）
             var allPaths = new List<string>(myPaths);
             var cts = new CancellationTokenSource();
+            _compressPipeReady.Reset();
             StartCompressPipeServer(allPaths, cts.Token);
+
+            // 等待管道服务器就绪后再启动计时器，消除竞态条件窗口期
+            if (!_compressPipeReady.Wait(3000))
+                LogStartup("HandleCompress: WARNING pipe server did not signal ready within 3s, continuing anyway");
 
             // 使用 DispatcherTimer 延迟 800ms 后显示窗口，不阻塞 UI 线程
             LogStartup("HandleCompress: 启动 DispatcherTimer 800ms");
@@ -233,32 +260,33 @@ public partial class App : Application
 
     private static void StartCompressPipeServer(List<string> allPaths, CancellationToken ct)
     {
-        ThreadPool.QueueUserWorkItem(async _ =>
+        Task.Run(async () =>
         {
-            while (!ct.IsCancellationRequested)
+            try
             {
-                try
-                {
-                    using var pipe = new NamedPipeServerStream(
-                        CompressPipeName, PipeDirection.In, -1,
-                        PipeTransmissionMode.Message, PipeOptions.Asynchronous);
+                using var pipe = new NamedPipeServerStream(
+                    CompressPipeName, PipeDirection.In, -1,
+                    PipeTransmissionMode.Message, PipeOptions.Asynchronous);
 
-                    await pipe.WaitForConnectionAsync(ct);
-                    using var reader = new StreamReader(pipe);
-                    var line = await reader.ReadLineAsync();
-                    while (line != null)
+                // Signal that the pipe server is ready to accept connections,
+                // before the first WaitForConnectionAsync call.
+                _compressPipeReady.Set();
+
+                await pipe.WaitForConnectionAsync(ct);
+                using var reader = new StreamReader(pipe);
+                var line = await reader.ReadLineAsync();
+                while (line != null)
+                {
+                    lock (allPaths)
                     {
-                        lock (allPaths)
-                        {
-                            if (!allPaths.Contains(line) && (File.Exists(line) || Directory.Exists(line)))
-                                allPaths.Add(line);
-                        }
-                        line = await reader.ReadLineAsync();
+                        if (!allPaths.Contains(line) && (File.Exists(line) || Directory.Exists(line)))
+                            allPaths.Add(line);
                     }
+                    line = await reader.ReadLineAsync();
                 }
-                catch (OperationCanceledException) { break; }
-                catch (Exception pipeEx) { LogDebug("StartCompressPipeServer: connection error: {0}", pipeEx.Message); }
             }
+            catch (OperationCanceledException) { }
+            catch (Exception pipeEx) { LogDebug("StartCompressPipeServer: connection error: {0}", pipeEx.Message); }
         });
     }
 
@@ -277,6 +305,433 @@ public partial class App : Application
         {
             Log("SendPathsToFirstInstance 失败: {0}", ex.Message);
         }
+    }
+
+    #endregion
+
+    #region --compress-separate / --compress-combined IPC
+
+    private static void StartPipeServer(List<string> allPaths, CancellationToken ct, string pipeName, ManualResetEventSlim readyEvent)
+    {
+        Task.Run(async () =>
+        {
+            try
+            {
+                using var pipe = new NamedPipeServerStream(
+                    pipeName, PipeDirection.In, -1,
+                    PipeTransmissionMode.Message, PipeOptions.Asynchronous);
+                readyEvent.Set();
+                await pipe.WaitForConnectionAsync(ct);
+                using var reader = new StreamReader(pipe);
+                var line = await reader.ReadLineAsync();
+                while (line != null)
+                {
+                    lock (allPaths)
+                    {
+                        if (!allPaths.Contains(line) && (File.Exists(line) || Directory.Exists(line)))
+                            allPaths.Add(line);
+                    }
+                    line = await reader.ReadLineAsync();
+                }
+            }
+            catch (OperationCanceledException) { }
+            catch (Exception pipeEx) { LogDebug("PipeServer ({0}): connection error: {1}", pipeName, pipeEx.Message); }
+        });
+    }
+
+    private static void SendPathsThroughPipe(List<string> paths, string pipeName)
+    {
+        try
+        {
+            using var pipe = new NamedPipeClientStream(".", pipeName, PipeDirection.Out);
+            pipe.Connect(2000);
+            using var writer = new StreamWriter(pipe);
+            foreach (var p in paths)
+                writer.WriteLine(p);
+            writer.Flush();
+        }
+        catch (Exception ex)
+        {
+            Log("SendPathsThroughPipe ({0}) 失败: {1}", pipeName, ex.Message);
+        }
+    }
+
+    private static void HandleCompressSeparate(string[] paths)
+    {
+        LogStartup($"HandleCompressSeparate: paths=[{string.Join(";", paths)}]");
+        var app = Current;
+        if (app == null) return;
+        app.ShutdownMode = ShutdownMode.OnExplicitShutdown;
+
+        var myPaths = paths.Where(p => File.Exists(p) || Directory.Exists(p)).ToList();
+        if (myPaths.Count == 0)
+        {
+            app.Shutdown();
+            return;
+        }
+
+        bool firstInstance;
+        var mutex = new Mutex(true, CompressSeparateMutexName, out firstInstance);
+
+        if (firstInstance)
+        {
+            var allPaths = new List<string>(myPaths);
+            var cts = new CancellationTokenSource();
+            _compressSeparatePipeReady.Reset();
+            StartPipeServer(allPaths, cts.Token, CompressSeparatePipeName, _compressSeparatePipeReady);
+
+            if (!_compressSeparatePipeReady.Wait(3000))
+                LogStartup("HandleCompressSeparate: WARNING pipe server did not signal ready within 3s");
+
+            var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(800) };
+            timer.Tick += (_, _) =>
+            {
+                timer.Stop();
+                cts.Cancel();
+                mutex.Dispose();
+                RunCompressSeparateBatch(allPaths);
+            };
+            timer.Start();
+        }
+        else
+        {
+            SendPathsThroughPipe(myPaths, CompressSeparatePipeName);
+            app.Shutdown();
+        }
+    }
+
+    private static void RunCompressSeparateBatch(List<string> allPaths)
+    {
+        var app = Current;
+        if (app == null) return;
+
+        var settings = AppSettings.Instance;
+
+        var progressWindow = new ProgressWindow();
+        progressWindow.InitCancellation();
+        progressWindow.Show();
+        app.MainWindow = progressWindow;
+        progressWindow.SetProgress(0, L.T(L.App_CompressPreparing));
+
+        var ct = progressWindow.CancellationToken;
+        var total = allPaths.Count;
+        int succeeded = 0, failed = 0;
+
+        Task.Run(async () =>
+        {
+            try
+            {
+                for (int i = 0; i < total; i++)
+                {
+                    ct.ThrowIfCancellationRequested();
+
+                    var item = allPaths[i];
+                    var itemName = settings.KeepOriginalExtension
+                        ? Path.GetFileName(item.TrimEnd('\\', '/'))
+                        : Path.GetFileNameWithoutExtension(item.TrimEnd('\\', '/'));
+                    string? parentDir;
+                    if (File.Exists(item))
+                        parentDir = Path.GetDirectoryName(item);
+                    else
+                        parentDir = Path.GetDirectoryName(item.TrimEnd('\\', '/'));
+                    parentDir ??= Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
+
+                    var ext = settings.DefaultFormat == "tar.gz" ? ".tar.gz" : "." + settings.DefaultFormat;
+                    var outputPath = Path.Combine(parentDir, itemName + ext);
+
+                    // 更新进度显示
+                    var progressMsg = L.TF(L.App_CompressSeparateProgress, i + 1, total);
+                    await progressWindow.Dispatcher.InvokeAsync(() =>
+                        progressWindow.SetProgress((int)((double)i / total * 100), progressMsg));
+
+                    // 冲突处理
+                    string finalPath = outputPath;
+                    bool addMode = false;
+                    if (File.Exists(outputPath))
+                    {
+                        var engine = ArchiveEngineFactory.GetEngineByExtension(outputPath);
+                        bool canAdd = engine is not null and not TarGzEngine;
+
+                        var conflictResult = await progressWindow.Dispatcher.InvokeAsync(() =>
+                        {
+                            var dlg = new CompressConflictDialog(outputPath, canAdd, Path.GetFileName(GetUniquePath(outputPath)));
+                            return dlg.ShowDialog() == true
+                                ? dlg.ResultAction
+                                : CompressConflictAction.Cancel;
+                        });
+
+                        switch (conflictResult)
+                        {
+                            case CompressConflictAction.Cancel:
+                                failed++;
+                                continue;
+                            case CompressConflictAction.Rename:
+                                finalPath = Path.Combine(parentDir,
+                                    await progressWindow.Dispatcher.InvokeAsync(() =>
+                                    {
+                                        var dlg = new CompressConflictDialog(outputPath, canAdd, Path.GetFileName(GetUniquePath(outputPath)));
+                                        dlg.ShowDialog();
+                                        return dlg.CustomName ?? Path.GetFileName(GetUniquePath(outputPath));
+                                    }));
+                                break;
+                            case CompressConflictAction.Add:
+                                addMode = true;
+                                break;
+                            case CompressConflictAction.Overwrite:
+                            default:
+                                break;
+                        }
+                    }
+
+                    try
+                    {
+                        var compressEngine = ArchiveEngineFactory.GetEngineByExtension(finalPath) ?? new ZipEngine();
+                        var options = CreateCompressOptions();
+                        options.CompressionLevel = settings.DefaultLevel;
+
+                        if (addMode)
+                        {
+                            await compressEngine.AddToArchiveAsync(finalPath, [item], options,
+                                ProgressWindow.CreateBackgroundProgress(progressWindow), ct);
+                        }
+                        else
+                        {
+                            await compressEngine.CompressAsync([item], finalPath, options,
+                                ProgressWindow.CreateBackgroundProgress(progressWindow), ct);
+                        }
+                        succeeded++;
+                    }
+                    catch (OperationCanceledException) { throw; }
+                    catch (Exception ex)
+                    {
+                        Log("--compress-separate: item failed ({0}): {1}", item, ex.Message);
+                        failed++;
+                    }
+                }
+            }
+            catch (OperationCanceledException) { }
+
+            // 完成汇总
+            await progressWindow.Dispatcher.InvokeAsync(() =>
+            {
+                if (failed > 0)
+                    progressWindow.SetComplete(L.TF(L.App_CompressSeparateComplete, succeeded, failed));
+                else
+                    progressWindow.SetComplete(L.T(L.App_CompressComplete));
+            });
+            await Task.Delay(2500);
+            await progressWindow.Dispatcher.InvokeAsync(() => app.Shutdown());
+        });
+    }
+
+    private static void HandleCompressCombined(string[] paths)
+    {
+        LogStartup($"HandleCompressCombined: paths=[{string.Join(";", paths)}]");
+        var app = Current;
+        if (app == null) return;
+        app.ShutdownMode = ShutdownMode.OnExplicitShutdown;
+
+        var myPaths = paths.Where(p => File.Exists(p) || Directory.Exists(p)).ToList();
+        if (myPaths.Count == 0)
+        {
+            app.Shutdown();
+            return;
+        }
+
+        bool firstInstance;
+        var mutex = new Mutex(true, CompressCombinedMutexName, out firstInstance);
+
+        if (firstInstance)
+        {
+            var allPaths = new List<string>(myPaths);
+            var cts = new CancellationTokenSource();
+            _compressCombinedPipeReady.Reset();
+            StartPipeServer(allPaths, cts.Token, CompressCombinedPipeName, _compressCombinedPipeReady);
+
+            if (!_compressCombinedPipeReady.Wait(3000))
+                LogStartup("HandleCompressCombined: WARNING pipe server did not signal ready within 3s");
+
+            var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(800) };
+            timer.Tick += (_, _) =>
+            {
+                timer.Stop();
+                cts.Cancel();
+                mutex.Dispose();
+                RunCompressCombined(allPaths);
+            };
+            timer.Start();
+        }
+        else
+        {
+            SendPathsThroughPipe(myPaths, CompressCombinedPipeName);
+            app.Shutdown();
+        }
+    }
+
+    private static void RunCompressCombined(List<string> allPaths)
+    {
+        var app = Current;
+        if (app == null) return;
+        var settings = AppSettings.Instance;
+
+        // 确定公共父目录
+        var commonParent = FindCommonParent(allPaths);
+        string? parentDir;
+        string archiveName;
+
+        if (commonParent != null && !IsDriveRoot(commonParent))
+        {
+            parentDir = commonParent;
+            archiveName = Path.GetFileName(commonParent.TrimEnd('\\', '/'));
+        }
+        else
+        {
+            // 无公共父目录或根目录 → 弹输入框
+            var firstParent = Path.GetDirectoryName(allPaths[0].TrimEnd('\\', '/'))
+                ?? Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
+            var defaultName = Path.GetFileNameWithoutExtension(allPaths[0].TrimEnd('\\', '/'));
+
+            var nameResult = app.Dispatcher.Invoke(() =>
+            {
+                var dlg = new ArchiveNameDialog(defaultName);
+                return dlg.ShowDialog() == true ? dlg.ArchiveName : null;
+            });
+
+            if (string.IsNullOrEmpty(nameResult))
+            {
+                app.Shutdown();
+                return;
+            }
+
+            parentDir = firstParent;
+            archiveName = nameResult;
+        }
+
+        var ext = settings.DefaultFormat == "tar.gz" ? ".tar.gz" : "." + settings.DefaultFormat;
+        var finalPath = Path.Combine(parentDir, archiveName + ext);
+
+        Log("--compress-combined: {0} paths → {1}", allPaths.Count, finalPath);
+
+        var progressWindow = new ProgressWindow();
+        progressWindow.InitCancellation();
+        progressWindow.Show();
+        app.MainWindow = progressWindow;
+        progressWindow.SetProgress(0, L.T(L.App_CompressPreparing));
+
+        var ct = progressWindow.CancellationToken;
+
+        Task.Run(async () =>
+        {
+            try
+            {
+                // 冲突处理
+                string outputPath = finalPath;
+                if (File.Exists(finalPath))
+                {
+                    var engine = ArchiveEngineFactory.GetEngineByExtension(finalPath);
+                    bool canAdd = engine is not null and not TarGzEngine;
+
+                    var conflictResult = await progressWindow.Dispatcher.InvokeAsync(() =>
+                    {
+                        var dlg = new CompressConflictDialog(finalPath, canAdd, Path.GetFileName(GetUniquePath(finalPath)));
+                        return dlg.ShowDialog() == true
+                            ? dlg.ResultAction
+                            : CompressConflictAction.Cancel;
+                    });
+
+                    switch (conflictResult)
+                    {
+                        case CompressConflictAction.Cancel:
+                            await progressWindow.Dispatcher.InvokeAsync(() => app.Shutdown());
+                            return;
+                        case CompressConflictAction.Rename:
+                            var renamed = await progressWindow.Dispatcher.InvokeAsync(() =>
+                            {
+                                var dlg = new CompressConflictDialog(finalPath, canAdd, Path.GetFileName(GetUniquePath(finalPath)));
+                                dlg.ShowDialog();
+                                return dlg.CustomName ?? Path.GetFileName(GetUniquePath(finalPath));
+                            });
+                            outputPath = Path.Combine(parentDir, renamed);
+                            break;
+                        case CompressConflictAction.Add:
+                            {
+                                var addEngine = ArchiveEngineFactory.GetEngineByExtension(outputPath);
+                                if (addEngine != null)
+                                {
+                                    var addOptions = CreateCompressOptions();
+                                    addOptions.CompressionLevel = settings.DefaultLevel;
+                                    await addEngine.AddToArchiveAsync(outputPath, allPaths.ToArray(), addOptions,
+                                        ProgressWindow.CreateBackgroundProgress(progressWindow), ct);
+                                }
+                                await progressWindow.Dispatcher.InvokeAsync(() =>
+                                {
+                                    progressWindow.SetComplete(L.T(L.App_AddToArchiveComplete));
+                                });
+                                await Task.Delay(2500);
+                                await progressWindow.Dispatcher.InvokeAsync(() => app.Shutdown());
+                                return;
+                            }
+                    }
+                }
+
+                var compressEngine = ArchiveEngineFactory.GetEngineByExtension(outputPath) ?? new ZipEngine();
+                var options = CreateCompressOptions();
+                options.CompressionLevel = settings.DefaultLevel;
+
+                await compressEngine.CompressAsync(allPaths.ToArray(), outputPath, options,
+                    ProgressWindow.CreateBackgroundProgress(progressWindow), ct);
+
+                await progressWindow.Dispatcher.InvokeAsync(() =>
+                    progressWindow.SetComplete(L.T(L.App_CompressComplete)));
+                await Task.Delay(2500);
+                await progressWindow.Dispatcher.InvokeAsync(() => app.Shutdown());
+            }
+            catch (OperationCanceledException)
+            {
+                await progressWindow.Dispatcher.InvokeAsync(() => app.Shutdown());
+            }
+            catch (Exception ex)
+            {
+                Log("--compress-combined 失败: {0}", ex.Message);
+                await progressWindow.Dispatcher.InvokeAsync(() =>
+                {
+                    AppMessageBox.Show(L.TF(L.App_CompressFailed, ex.Message), L.T(L.App_ErrorTitle), MessageBoxButton.OK, MessageBoxImage.Error);
+                    app.Shutdown();
+                });
+            }
+        });
+    }
+
+    private static string? FindCommonParent(List<string> paths)
+    {
+        if (paths.Count == 0) return null;
+        var parents = paths.Select(p =>
+        {
+            var trimmed = p.TrimEnd('\\', '/');
+            return File.Exists(trimmed)
+                ? Path.GetDirectoryName(trimmed) ?? ""
+                : Path.GetDirectoryName(trimmed) ?? "";
+        }).ToList();
+
+        if (parents.Any(string.IsNullOrEmpty)) return null;
+
+        var common = parents[0];
+        for (int i = 1; i < parents.Count; i++)
+        {
+            while (!parents[i].StartsWith(common, StringComparison.OrdinalIgnoreCase))
+            {
+                var parent = Path.GetDirectoryName(common);
+                if (parent == null) return null;
+                common = parent;
+            }
+        }
+        return common;
+    }
+
+    private static bool IsDriveRoot(string path)
+    {
+        var trimmed = path.TrimEnd('\\', '/');
+        return trimmed.Length == 2 && trimmed[1] == ':'; // e.g., "C:", "D:"
     }
 
     #endregion
@@ -364,8 +819,72 @@ public partial class App : Application
     }
 
     /// <summary>
-    /// 处理 --extract 模式：根据设置或用户选择解压，不经过主窗口。
+    /// 处理 --extract-smart 模式：分析压缩包结构后自动选择解压方式。
+    /// 若所有文件在同一根目录下 → 直接解压到压缩包所在目录；
+    /// 若文件分散在多层或在根目录 → 创建压缩包名前缀的子目录。
+    /// 条目列表可能因加密失败，此时回退到压缩包名子目录（安全默认值）。
+    /// 密码处理完全委托给 RunExtractStatic。
     /// </summary>
+    private static void HandleExtractSmart(string? archivePath)
+    {
+        if (string.IsNullOrEmpty(archivePath) || !File.Exists(archivePath))
+        {
+            AppMessageBox.Show(L.T(L.App_FileNotFound), L.T(L.App_ErrorTitle), MessageBoxButton.OK, MessageBoxImage.Error);
+            Current.Shutdown();
+            return;
+        }
+
+        var engine = ArchiveEngineFactory.GetEngineByExtension(archivePath);
+        if (engine == null)
+        {
+            AppMessageBox.Show(L.T(L.Main_DragFormatUnsupported), L.T(L.App_ErrorTitle), MessageBoxButton.OK, MessageBoxImage.Error);
+            Current.Shutdown();
+            return;
+        }
+
+        var parentDir = Path.GetDirectoryName(archivePath);
+        var archiveName = Path.GetFileNameWithoutExtension(archivePath);
+        if (string.IsNullOrEmpty(parentDir))
+            parentDir = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
+
+        // 尝试列出条目分析结构（加密压缩包可能失败 → 使用安全默认值）
+        IReadOnlyList<Core.Abstractions.ArchiveItem>? items = null;
+        try
+        {
+            items = engine.ListEntriesAsync(archivePath).GetAwaiter().GetResult();
+        }
+        catch (Exception ex) when (IsPasswordErrorStatic(ex))
+        {
+            Log("--extract-smart: ListEntriesAsync failed with crypto error, falling back to named-folder: {0}", ex.Message);
+        }
+
+        // 智能决策目标目录
+        string dest;
+        if (items == null || items.Count == 0)
+        {
+            // 无法分析或空压缩包 → 使用压缩包名子目录
+            dest = Path.Combine(parentDir, archiveName);
+        }
+        else
+        {
+            dest = ArchiveStructureAnalyzer.HasSingleRootDirectory(items)
+                ? parentDir                                       // 单一根目录 → 直接解压
+                : Path.Combine(parentDir, archiveName);            // 分散结构 → 建子目录
+        }
+
+        Log("--extract-smart: {0} items, dest={1}", items?.Count ?? 0, dest);
+        RunExtractStatic(archivePath, dest);
+    }
+
+    /// <summary>
+    /// 判断异常是否与密码相关，用于 --extract-smart 的加密回退流程。
+    /// </summary>
+    private static bool IsPasswordErrorStatic(Exception ex)
+    {
+        var msg = ex.Message.ToLower();
+        return msg.Contains("password") || msg.Contains("encrypted") ||
+               msg.Contains("decrypt") || msg.Contains("encryption");
+    }
     private static void HandleExtract(string? archivePath)
     {
         if (string.IsNullOrEmpty(archivePath) || !File.Exists(archivePath))
@@ -1311,5 +1830,73 @@ public partial class App : Application
             AppSettings.Instance.UseColorEmoji
                 ? TextRenderingMode.Grayscale
                 : TextRenderingMode.ClearType);
+    }
+
+    /// <summary>
+    /// 简单输入框对话框，用于 --compress-combined 无公共父目录时让用户输入压缩包名称。
+    /// </summary>
+    internal class ArchiveNameDialog : Window
+    {
+        public string? ArchiveName { get; private set; }
+        private readonly TextBox _textBox;
+
+        public ArchiveNameDialog(string defaultName)
+        {
+            Title = L.T(L.App_CompressCombinedPromptTitle);
+            Width = 400; Height = 160;
+            WindowStartupLocation = WindowStartupLocation.CenterScreen;
+            ResizeMode = ResizeMode.NoResize;
+            Topmost = true;
+
+            var stack = new StackPanel { Margin = new Thickness(12) };
+
+            var label = new TextBlock
+            {
+                Text = L.T(L.App_CompressCombinedPromptLabel),
+                Margin = new Thickness(0, 0, 0, 8)
+            };
+            stack.Children.Add(label);
+
+            _textBox = new TextBox
+            {
+                Text = defaultName,
+                Margin = new Thickness(0, 0, 0, 12)
+            };
+            _textBox.SelectAll();
+            _textBox.Focus();
+            stack.Children.Add(_textBox);
+
+            var btnPanel = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                HorizontalAlignment = HorizontalAlignment.Right
+            };
+
+            var okBtn = new Button
+            {
+                Content = L.T(L.MsgBox_Ok),
+                Width = 80, Height = 28,
+                Margin = new Thickness(0, 0, 8, 0),
+                IsDefault = true
+            };
+            okBtn.Click += (_, _) =>
+            {
+                ArchiveName = _textBox.Text.Trim();
+                if (!string.IsNullOrEmpty(ArchiveName))
+                    DialogResult = true;
+            };
+            btnPanel.Children.Add(okBtn);
+
+            var cancelBtn = new Button
+            {
+                Content = L.T(L.MsgBox_Cancel),
+                Width = 80, Height = 28,
+                IsCancel = true
+            };
+            btnPanel.Children.Add(cancelBtn);
+
+            stack.Children.Add(btnPanel);
+            Content = stack;
+        }
     }
 }
