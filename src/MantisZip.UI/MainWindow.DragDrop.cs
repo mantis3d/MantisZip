@@ -286,7 +286,8 @@ public partial class MainWindow
                 break;
             case ArchiveFormat.Tar:
             case ArchiveFormat.GZip:
-                ExtractTarGzSingleEntry(_currentArchivePath!, item.FullPath, outputPath);
+                await Task.Run(() =>
+                    ExtractTarGzSingleEntry(_currentArchivePath!, item.FullPath, outputPath));
                 break;
             default:
                 throw new NotSupportedException(L.TF(L.Core_Drag_FormatUnsupported, _currentFormat));

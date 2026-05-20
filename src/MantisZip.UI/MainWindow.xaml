@@ -87,6 +87,12 @@
                         <TextBlock Text="{l:L Shell_Compress}" FontSize="12" HorizontalAlignment="Center"/>
                     </StackPanel>
                 </Button>
+                <Button x:Name="SmartExtractBtn" ToolTip="{l:L Main_Tooltip_SmartExtract}" Click="SmartExtract_Click" Padding="8,6" IsEnabled="False">
+                    <StackPanel Orientation="Vertical" HorizontalAlignment="Center">
+                        <TextBlock Text="🤖" FontSize="22" HorizontalAlignment="Center"/>
+                        <TextBlock Text="{l:L Shell_SmartExtract}" FontSize="12" HorizontalAlignment="Center"/>
+                    </StackPanel>
+                </Button>
                 <Separator/>
                 <Button x:Name="AddFilesBtn" ToolTip="{l:L Main_Tooltip_AddFiles}" Click="AddFiles_Click" Padding="8,6" IsEnabled="False">
                     <StackPanel Orientation="Vertical" HorizontalAlignment="Center">

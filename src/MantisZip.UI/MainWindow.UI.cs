@@ -53,6 +53,11 @@ public partial class MainWindow
             && _hasEncryptedArchive && _currentPassword == null;
     }
 
+    private void UpdateSmartExtractBtnState()
+    {
+        SmartExtractBtn.IsEnabled = !string.IsNullOrEmpty(_currentArchivePath);
+    }
+
     /// <summary>
     /// 根据当前加载的压缩包格式，更新添加/删除按钮的启用状态。
     /// </summary>

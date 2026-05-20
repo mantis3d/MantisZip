@@ -38,6 +38,38 @@ public partial class MainWindow
             await ExtractAsync(_currentArchivePath, dest);
     }
 
+    private async void SmartExtract_Click(object sender, RoutedEventArgs e)
+    {
+        if (string.IsNullOrEmpty(_currentArchivePath)) return;
+
+        var engine = ArchiveEngineFactory.GetEngineByExtension(_currentArchivePath);
+        if (engine == null) return;
+
+        IReadOnlyList<Core.Abstractions.ArchiveItem>? items;
+        try
+        {
+            items = await engine.ListEntriesAsync(_currentArchivePath, _currentPassword);
+        }
+        catch
+        {
+            AppMessageBox.Show(L.T(L.Main_Status_ExtractFailed), L.T(L.App_ErrorTitle), MessageBoxButton.OK, MessageBoxImage.Error);
+            return;
+        }
+
+        if (items == null || items.Count == 0)
+            return;
+
+        var parentDir = Path.GetDirectoryName(_currentArchivePath)
+                        ?? Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
+        var archiveName = Path.GetFileNameWithoutExtension(_currentArchivePath);
+
+        var dest = ArchiveStructureAnalyzer.HasSingleRootDirectory(items)
+            ? parentDir
+            : Path.Combine(parentDir, archiveName);
+
+        await ExtractAsync(_currentArchivePath, dest);
+    }
+
     private async void Compress_Click(object sender, RoutedEventArgs e)
     {
         var ofd = new OpenFileDialog
