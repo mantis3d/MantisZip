@@ -448,5 +448,11 @@
   "Settings_Debug_LogPrivacyHelp_WhatNot": "不影响：压缩包内容预览、文件列表显示、密码管理器等 UI 功能。脱敏仅作用于日志文件写入。",
   "Settings_Debug_LogPrivacyHelp_Close": "关闭",
   "Main_Status_ExtractFailed": "解压失败: {0}",
-  "Settings_Preview_ColorEmoji": "启用彩色 Emoji（需要重启应用后生效）"
+  "Settings_Preview_ColorEmoji": "启用彩色 Emoji（需要重启应用后生效）",
+  "Settings_Tab_Appearance": "外观",
+  "Settings_Appearance_Theme": "主题",
+  "Settings_Appearance_Theme_Light": "亮色",
+  "Settings_Appearance_Theme_Dark": "暗色",
+  "Settings_Appearance_ThemeRestart_Title": "主题已更改",
+  "Settings_Appearance_ThemeRestart_Msg": "主题设置需要重启应用才能完全生效。\n\n是否立即重启？"
 }

@@ -441,6 +441,12 @@ public static class L
     public const string Settings_Pwd_ShowHint                      = "Settings_Pwd_ShowHint";
     public const string Settings_Pwd_ShowNotification              = "Settings_Pwd_ShowNotification";
     public const string Settings_SevenZipFilter                    = "Settings_SevenZipFilter";
+    public const string Settings_Tab_Appearance                    = "Settings_Tab_Appearance";
+    public const string Settings_Appearance_Theme                  = "Settings_Appearance_Theme";
+    public const string Settings_Appearance_Theme_Light            = "Settings_Appearance_Theme_Light";
+    public const string Settings_Appearance_Theme_Dark             = "Settings_Appearance_Theme_Dark";
+    public const string Settings_Appearance_ThemeRestart_Title      = "Settings_Appearance_ThemeRestart_Title";
+    public const string Settings_Appearance_ThemeRestart_Msg        = "Settings_Appearance_ThemeRestart_Msg";
     public const string Settings_Tab_Advanced                      = "Settings_Tab_Advanced";
     public const string Settings_Tab_Debug                         = "Settings_Tab_Debug";
     public const string Settings_Tab_Compress                      = "Settings_Tab_Compress";

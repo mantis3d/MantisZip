@@ -446,5 +446,11 @@
   "Settings_Debug_LogPrivacyHelp_WhatNot": "Does not affect: Archive content preview, file list display, password manager, or other UI features. Redaction only applies to log file output.",
   "Settings_Debug_LogPrivacyHelp_Close": "Close",
   "Main_Status_ExtractFailed": "Extraction failed: {0}",
-  "Settings_Preview_ColorEmoji": "Enable color emoji (requires restart)"
+  "Settings_Preview_ColorEmoji": "Enable color emoji (requires restart)",
+  "Settings_Tab_Appearance": "Appearance",
+  "Settings_Appearance_Theme": "Theme",
+  "Settings_Appearance_Theme_Light": "Light",
+  "Settings_Appearance_Theme_Dark": "Dark",
+  "Settings_Appearance_ThemeRestart_Title": "Theme Changed",
+  "Settings_Appearance_ThemeRestart_Msg": "Theme change requires a restart to take full effect.\n\nRestart now?"
 }
