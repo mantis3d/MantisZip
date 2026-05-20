@@ -1,0 +1,78 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!-- ═══════ 暗色主题 — 语义化颜色键 ═══════ -->
+    <!-- Design principles: 深灰背景减少眼疲劳，强调色用亮蓝保持可读性，文字对比度 ≥ 4.5:1 -->
+
+    <!-- 窗口/面板背景 -->
+    <SolidColorBrush x:Key="Theme_WindowBg" Color="#1E1E1E"/>
+    <SolidColorBrush x:Key="Theme_SurfaceBg" Color="#2D2D2D"/>
+    <SolidColorBrush x:Key="Theme_MenuBg" Color="#2D2D2D"/>
+    <SolidColorBrush x:Key="Theme_HeaderBg" Color="#252526"/>
+
+    <!-- 文字 -->
+    <SolidColorBrush x:Key="Theme_TextPrimary" Color="#D4D4D4"/>
+    <SolidColorBrush x:Key="Theme_TextSecondary" Color="#A0A0A0"/>
+    <SolidColorBrush x:Key="Theme_TextDisabled" Color="#6E6E6E"/>
+    <SolidColorBrush x:Key="Theme_TextOnAccent" Color="#FFFFFF"/>
+
+    <!-- 边框 -->
+    <SolidColorBrush x:Key="Theme_Border" Color="#3E3E3E"/>
+    <SolidColorBrush x:Key="Theme_BorderLight" Color="#333333"/>
+    <SolidColorBrush x:Key="Theme_BorderFocused" Color="#4FC3F7"/>
+
+    <!-- 强调色（暗色下用亮蓝提高可读性） -->
+    <SolidColorBrush x:Key="Theme_Accent" Color="#4FC3F7"/>
+    <SolidColorBrush x:Key="Theme_AccentLight" Color="#1A3A5C"/>
+    <SolidColorBrush x:Key="Theme_AccentDark" Color="#0288D1"/>
+
+    <!-- 选中项（失焦） -->
+    <SolidColorBrush x:Key="Theme_SelectionBg" Color="#264F78"/>
+    <SolidColorBrush x:Key="Theme_SelectionText" Color="#FFFFFF"/>
+
+    <!-- 按钮 -->
+    <SolidColorBrush x:Key="Theme_ButtonBg" Color="#3E3E3E"/>
+    <SolidColorBrush x:Key="Theme_ButtonHover" Color="#505050"/>
+    <SolidColorBrush x:Key="Theme_ButtonBorder" Color="#555555"/>
+
+    <!-- 进度条 -->
+    <SolidColorBrush x:Key="Theme_ProgressBg" Color="#3E3E3E"/>
+    <SolidColorBrush x:Key="Theme_ProgressFill" Color="#4FC3F7"/>
+
+    <!-- 状态色 -->
+    <SolidColorBrush x:Key="Theme_StatusSuccess" Color="#6FCF97"/>
+    <SolidColorBrush x:Key="Theme_StatusWarning" Color="#FFD54F"/>
+    <SolidColorBrush x:Key="Theme_StatusError" Color="#EF5350"/>
+
+    <!-- 滚动条 -->
+    <SolidColorBrush x:Key="Theme_ScrollBarBg" Color="#2D2D2D"/>
+    <SolidColorBrush x:Key="Theme_ScrollBarThumb" Color="#424242"/>
+
+    <!-- 工具提示 -->
+    <SolidColorBrush x:Key="Theme_ToolTipBg" Color="#3E3E3E"/>
+    <SolidColorBrush x:Key="Theme_ToolTipText" Color="#D4D4D4"/>
+
+    <!-- ═══════ SystemColors 覆盖（DataGrid/TreeView/Menu/ListBox 等控件内部模板使用的系统颜色） ═══════ -->
+    <SolidColorBrush x:Key="{x:Static SystemColors.ControlBrushKey}" Color="#2D2D2D"/>
+    <SolidColorBrush x:Key="{x:Static SystemColors.ControlTextBrushKey}" Color="#D4D4D4"/>
+    <SolidColorBrush x:Key="{x:Static SystemColors.WindowBrushKey}" Color="#1E1E1E"/>
+    <SolidColorBrush x:Key="{x:Static SystemColors.WindowTextBrushKey}" Color="#D4D4D4"/>
+    <SolidColorBrush x:Key="{x:Static SystemColors.MenuBrushKey}" Color="#2D2D2D"/>
+    <SolidColorBrush x:Key="{x:Static SystemColors.MenuTextBrushKey}" Color="#D4D4D4"/>
+    <SolidColorBrush x:Key="{x:Static SystemColors.MenuBarBrushKey}" Color="#2D2D2D"/>
+    <SolidColorBrush x:Key="{x:Static SystemColors.HighlightBrushKey}" Color="#4FC3F7"/>
+    <SolidColorBrush x:Key="{x:Static SystemColors.HighlightTextBrushKey}" Color="#FFFFFF"/>
+    <SolidColorBrush x:Key="{x:Static SystemColors.InactiveSelectionHighlightBrushKey}" Color="#264F78"/>
+    <SolidColorBrush x:Key="{x:Static SystemColors.InactiveSelectionHighlightTextBrushKey}" Color="#FFFFFF"/>
+    <SolidColorBrush x:Key="{x:Static SystemColors.GrayTextBrushKey}" Color="#6E6E6E"/>
+    <SolidColorBrush x:Key="{x:Static SystemColors.ActiveBorderBrushKey}" Color="#3E3E3E"/>
+    <SolidColorBrush x:Key="{x:Static SystemColors.ControlLightBrushKey}" Color="#3E3E3E"/>
+    <SolidColorBrush x:Key="{x:Static SystemColors.ControlLightLightBrushKey}" Color="#4A4A4A"/>
+    <SolidColorBrush x:Key="{x:Static SystemColors.ControlDarkBrushKey}" Color="#252525"/>
+    <SolidColorBrush x:Key="{x:Static SystemColors.ControlDarkDarkBrushKey}" Color="#1A1A1A"/>
+    <SolidColorBrush x:Key="{x:Static SystemColors.AppWorkspaceBrushKey}" Color="#1E1E1E"/>
+    <SolidColorBrush x:Key="{x:Static SystemColors.InfoBrushKey}" Color="#3E3E3E"/>
+    <SolidColorBrush x:Key="{x:Static SystemColors.InfoTextBrushKey}" Color="#D4D4D4"/>
+    <SolidColorBrush x:Key="{x:Static SystemColors.ScrollBarBrushKey}" Color="#2D2D2D"/>
+
+</ResourceDictionary>
