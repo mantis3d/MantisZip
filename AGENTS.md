@@ -76,7 +76,7 @@ Window size, tree column width, and preview row height saved to `%LOCALAPPDATA%\
 
 - **压缩**: DefaultFormat (zip/7z/tar.gz), DefaultLevel (1–9), CloseAfterCompress, KeepOriginalExtension
 - **解压**: ExtractDestination (ask/same-dir/desktop), FileConflictAction (ask/overwrite/rename/skip), OpenFolderAfterExtract
-- **上下文菜单**: EnableCompressMenu, EnableExtractMenu, EnableOpenMenu, EnableQuickCompress, EnableCascadingMenu, ShowMenuIcons
+- **上下文菜单**: EnableCompressMenu, EnableOpenMenu, EnableCascadingMenu, ShowMenuIcons, EnableSmartExtractMenu, EnableExtractHereMenu, EnableExtractToNamedMenu, EnableExtractToMenu, EnableCompressSeparate, EnableCompressCombined
 - **预览**: EnableImagePreview, EnableTextPreview, MaxTextPreviewBytes, ShowPreviewPanel, TextPreviewFontSize
 - **调试**: EnableDebugLogging, LogPrivacyMode (off/filename/full)
 - **密码管理**: ShowPasswordMatchNotification, PasswordRevealByDefault
@@ -90,12 +90,23 @@ Window size, tree column width, and preview row height saved to `%LOCALAPPDATA%\
 
 Two modes controlled by `AppSettings.EnableCascadingMenu`:
 
-- **Cascade mode** (default: off): Single "MantisZip" submenu, numbered verbs (`01_compress`, `02_quick`, `03_open`, `04_extract`) via `ExtendedSubCommandsKey`
-- **Verb mode**: Individual top-level verbs per target (`*`, `Directory`, `Directory\Background`)
+- **Cascade mode** (default: off): Single "MantisZip" submenu with separators between 浏览/压缩/解压 groups, numbered verbs via `ExtendedSubCommandsKey`
+- **Verb mode**: Individual top-level verbs per target (`*`, `Directory`, `Directory\Background`), with top/bottom separators to isolate from other apps' menus
 
-Per-verb toggles: EnableCompressMenu, EnableQuickCompress, EnableOpenMenu, EnableExtractMenu. Open and Extract verbs use `AppliesTo` filter (archive extensions only). Icons via `shell32.dll,3`.
+Menu items with individual toggles:
 
-CLI triggers: `--install-shell`, `--uninstall-shell`.
+| # | Menu Item | Toggle | CLI Trigger |
+|---|---|---|---|
+| 1 | 打开压缩包 — Open archive | EnableOpenMenu | `--open` |
+| 2 | 压缩菜单 — Compress dialog | EnableCompressMenu | `--compress` |
+| 3 | 压缩到独立的（文件名）— Per-item archives | EnableCompressSeparate | `--compress-separate` |
+| 4 | 压缩到（父目录名）— Combined archive | EnableCompressCombined | `--compress-combined` |
+| 5 | 解压到此处 — Extract here | EnableExtractHereMenu | `--extract-here` |
+| 6 | 智能解压到此处 — Smart extract | EnableSmartExtractMenu | `--extract-smart` |
+| 7 | 解压到（压缩包名）— Extract to named folder | EnableExtractToNamedMenu | `--extract-to-name` |
+| 8 | 解压到…… — Extract to… | EnableExtractToMenu | `--extract` |
+
+Open and Extract verbs use `AppliesTo` filter (archive extensions only). Icons via `shell32.dll,3` when `ShowMenuIcons` is enabled.
 
 ### CLI entry points
 
@@ -107,6 +118,11 @@ All handled in `App.OnStartup` before normal UI startup:
 | `--uninstall-shell` | Uninstall context menu, then exit |
 | `--compress <paths...>` | Show compress dialog; multi-instance IPC merges paths from multiple Windows shell invocations |
 | `--compress-quick <paths...>` | Direct compress with AppSettings defaults + ProgressWindow, then exit |
+| `--compress-separate <paths...>` | Sequential per-item compress to each item's parent directory + ProgressWindow + IPC merge |
+| `--compress-combined <paths...>` | Combined single archive from all items with common parent name + IPC merge; prompts if cross-drive |
+| `--extract-here <path>` | Direct extract to source directory with AppSettings defaults + ProgressWindow, then exit |
+| `--extract-smart <path>` | Smart extract (auto-detect top-level folder) + ProgressWindow, then exit |
+| `--extract-to-name <path>` | Extract to named folder (archive name without extension) + ProgressWindow, then exit |
 | `--extract <path>` | Direct extract with AppSettings defaults + ProgressWindow, then exit |
 | `--open <path>` | Launch MainWindow and load archive for browsing |
 | _(no args)_ | Normal MainWindow launch |
@@ -147,6 +163,14 @@ These are set **once globally** in `App.InitializeApp()` (called at the top of `
 - ~~`ListEntriesAsync` sets `LastModified = DateTime.Now` (actual timestamp lost)~~ → now uses `entry.ModTime`
 - ~~`CompressAsync` ignores `ArchiveOptions.CompressionLevel` (uses fixed gzip level 5)~~ → now uses `options.CompressionLevel`
 
+### `--compress` / `--compress-separate` / `--compress-combined` IPC multi-instance
+
+All three `--compress-*` modes use a `Mutex` + `NamedPipeServerStream` pattern. Windows launches one process per selected file; the first process acts as collector, subsequent instances send their paths via named pipe then exit. 800ms collection window. Only the first instance shows the compress dialog or ProgressWindow.
+
+- `--compress`: Mutex `MantisZipCompressMutex`, pipe `MantisZipCompressPipe`
+- `--compress-separate`: Mutex `MantisZipCompressSeparateMutex`, pipe `MantisZipCompressSeparatePipe`
+- `--compress-combined`: Mutex `MantisZipCompressCombinedMutex`, pipe `MantisZipCompressCombinedPipe`
+
 ### "Subfolder display" toggle semantics
 
 The `ShowSubFoldersCheck` checkbox controls whether `FilterFiles` includes nested items. When **checked**, subdirectory contents are also shown in the current view (a flat combined list). Implementation: `FilterFiles` is called, which filters `_allItems` — the checkbox doesn't rebuild the list, it re-filters with the same logic.
@@ -155,21 +179,18 @@ The `ShowSubFoldersCheck` checkbox controls whether `FilterFiles` includes neste
 
 `_isProgrammaticFilter` bool prevents `FilterFiles` (programmatic) from triggering `SelectionChanged` preview. The `SelectionChanged` handler infers the "last clicked item" from `e.AddedItems`/`e.RemovedItems` rather than `SelectedItem`, to support multi-select (Extended mode).
 
-### No CI, no tests, no linters
+### No CI, no full test suite, no linters
 
-No CI workflows, no pre-commit hooks, no linter/analyzer config. `test_encoding/` is a one-off CLI script for debugging ZIP encoding, not a test framework.
+No CI workflows, no pre-commit hooks, no linter/analyzer config. `test_encoding/` is a one-off CLI script for debugging ZIP encoding. `tests/` has a small test project (SmartExtractTests) but no comprehensive suite.
 
-### Password manager encryption
+### Smart Extract
 
-`PasswordManager` (singleton) saves passwords encrypted via **DPAPI** (`ProtectedData.Protect`) at `%APPDATA%\MantisZip\passwords.json`. Handles migration from old plaintext format on read (detected by `{` prefix). The `Save()` method always writes encrypted data.
+`ArchiveStructureAnalyzer` (Core/Utils) analyzes archive structure to determine whether smart extraction should extract directly to the current directory or to a subfolder:
 
-### RAR support
+- Scans the top-level entries: if they share a common root folder ≥60% of entries, extract with subfolder; otherwise extract directly
+- Used by `ArchiveEngineFactory.SmartExtractEntriesAsync` which calls the analyzer, then delegates to `ExtractAsync` with the computed target path
 
-`SevenZipEngine.CanHandle` returns `true` for `ArchiveFormat.Rar`, and `ArchiveEngineFactory.GetEngineByExtension` maps `.rar` to `SevenZipEngine`. RAR archives open and extract normally via `SevenZipExtractor` (wraps 7z.dll which supports RAR).
-
-### --compress IPC multi-instance
-
-The `--compress` handler uses a `Mutex` + `NamedPipeServerStream` pattern. Windows launches one process per selected file; the first process acts as collector, subsequent instances send their paths via named pipe then exit. 800ms collection window. Only the first instance shows the compress dialog.
+Triggered via `--extract-smart` CLI or smart extract context menu item.
 
 ## Drag-drop (drag-out to Explorer)
 
