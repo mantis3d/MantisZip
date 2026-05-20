@@ -67,6 +67,9 @@ public partial class App : Application
         // 初始化语言管理器（需在 InitializeApp 之后，因为初始化加载 AppSettings）
         LanguageManager.Instance.Initialize();
 
+        // 应用已保存的主题设置
+        ApplyTheme(AppSettings.Instance.Theme);
+
         // 初始化 CoreLog 日志脱敏委托。此后所有 CoreLog 写入自动脱敏。
         CoreLog.RedactOverride = msg =>
             LogRedactor.RedactPaths(msg, LogRedactor.ParseMode(AppSettings.Instance.LogPrivacyMode));
@@ -1183,6 +1186,119 @@ public partial class App : Application
     {
         TraceLog(string.Format(fmt, args));
     }
+
+    /// <summary>
+    /// 应用亮色/暗色主题。替换 Application 级别的主题 ResourceDictionary，
+    /// 并直接设置 SystemColors 覆盖（WPF XAML 中的 x:Static 键有时与控件模板查找不匹配）。
+    /// </summary>
+    public static void ApplyTheme(string themeName)
+    {
+        var uri = new Uri($"Themes/{themeName}.xaml", UriKind.Relative);
+        var newDict = new ResourceDictionary { Source = uri };
+
+        var existing = Current.Resources.MergedDictionaries
+            .FirstOrDefault(d => d.Source?.OriginalString?.StartsWith("Themes/") == true);
+
+        if (existing != null)
+            Current.Resources.MergedDictionaries.Remove(existing);
+
+        Current.Resources.MergedDictionaries.Add(newDict);
+
+        // SystemColors 覆盖（用 C# 保证 key 对象精准匹配）
+        bool isDark = themeName == "Dark";
+        var res = Current.Resources;
+        if (isDark)
+        {
+            res[SystemColors.ControlBrushKey]              = new SolidColorBrush(Gray(0x2D));
+            res[SystemColors.ControlTextBrushKey]          = new SolidColorBrush(Gray(0xD4));
+            res[SystemColors.WindowBrushKey]               = new SolidColorBrush(Gray(0x1E));
+            res[SystemColors.WindowTextBrushKey]           = new SolidColorBrush(Gray(0xD4));
+            res[SystemColors.MenuBrushKey]                 = new SolidColorBrush(Gray(0x2D));
+            res[SystemColors.MenuTextBrushKey]             = new SolidColorBrush(Gray(0xD4));
+            res[SystemColors.MenuBarBrushKey]              = new SolidColorBrush(Gray(0x2D));
+            res[SystemColors.HighlightBrushKey]            = new SolidColorBrush(Rgb(0x4F, 0xC3, 0xF7));
+            res[SystemColors.HighlightTextBrushKey]        = new SolidColorBrush(Rgb(0xFF, 0xFF, 0xFF));
+            res[SystemColors.InactiveSelectionHighlightBrushKey]  = new SolidColorBrush(Rgb(0x26, 0x4F, 0x78));
+            res[SystemColors.InactiveSelectionHighlightTextBrushKey] = new SolidColorBrush(Rgb(0xFF, 0xFF, 0xFF));
+            res[SystemColors.GrayTextBrushKey]             = new SolidColorBrush(Gray(0x6E));
+            res[SystemColors.ActiveBorderBrushKey]         = new SolidColorBrush(Gray(0x3E));
+            res[SystemColors.ControlLightBrushKey]         = new SolidColorBrush(Gray(0x3E));
+            res[SystemColors.ControlLightLightBrushKey]    = new SolidColorBrush(Gray(0x4A));
+            res[SystemColors.ControlDarkBrushKey]          = new SolidColorBrush(Gray(0x25));
+            res[SystemColors.ControlDarkDarkBrushKey]      = new SolidColorBrush(Gray(0x1A));
+            res[SystemColors.AppWorkspaceBrushKey]         = new SolidColorBrush(Gray(0x1E));
+            res[SystemColors.InfoBrushKey]                 = new SolidColorBrush(Gray(0x3E));
+            res[SystemColors.InfoTextBrushKey]             = new SolidColorBrush(Gray(0xD4));
+            res[SystemColors.ScrollBarBrushKey]            = new SolidColorBrush(Gray(0x2D));
+            // ColorKey 变体（有的控件模板用 Color 而非 Brush）
+            res[SystemColors.WindowColorKey]               = Rgb(0x1E, 0x1E, 0x1E);
+            res[SystemColors.ControlColorKey]              = Gray(0x2D);
+            res[SystemColors.ControlTextColorKey]          = Gray(0xD4);
+            res[SystemColors.WindowTextColorKey]           = Gray(0xD4);
+            res[SystemColors.GrayTextColorKey]             = Gray(0x6E);
+            res[SystemColors.MenuColorKey]                 = Gray(0x2D);
+            res[SystemColors.MenuTextColorKey]             = Gray(0xD4);
+            res[SystemColors.MenuBarColorKey]              = Gray(0x2D);
+            res[SystemColors.HighlightColorKey]            = Rgb(0x4F, 0xC3, 0xF7);
+            res[SystemColors.HighlightTextColorKey]        = Rgb(0xFF, 0xFF, 0xFF);
+            res[SystemColors.ActiveBorderColorKey]         = Gray(0x3E);
+            res[SystemColors.ControlLightColorKey]         = Gray(0x3E);
+            res[SystemColors.ControlLightLightColorKey]    = Gray(0x4A);
+            res[SystemColors.ControlDarkColorKey]          = Gray(0x25);
+            res[SystemColors.ControlDarkDarkColorKey]      = Gray(0x1A);
+            res[SystemColors.AppWorkspaceColorKey]         = Gray(0x1E);
+            res[SystemColors.InfoColorKey]                 = Gray(0x3E);
+            res[SystemColors.InfoTextColorKey]             = Gray(0xD4);
+            res[SystemColors.ScrollBarColorKey]            = Gray(0x2D);
+        }
+        else
+        {
+            res[SystemColors.ControlBrushKey]              = new SolidColorBrush(Rgb(0xFF, 0xFF, 0xFF));
+            res[SystemColors.ControlTextBrushKey]          = new SolidColorBrush(Gray(0x33));
+            res[SystemColors.WindowBrushKey]               = new SolidColorBrush(Rgb(0xF5, 0xF5, 0xF5));
+            res[SystemColors.WindowTextBrushKey]           = new SolidColorBrush(Gray(0x33));
+            res[SystemColors.MenuBrushKey]                 = new SolidColorBrush(Rgb(0xFF, 0xFF, 0xFF));
+            res[SystemColors.MenuTextBrushKey]             = new SolidColorBrush(Gray(0x33));
+            res[SystemColors.MenuBarBrushKey]              = new SolidColorBrush(Rgb(0xFF, 0xFF, 0xFF));
+            res[SystemColors.HighlightBrushKey]            = new SolidColorBrush(Rgb(0x21, 0x96, 0xF3));
+            res[SystemColors.HighlightTextBrushKey]        = new SolidColorBrush(Rgb(0xFF, 0xFF, 0xFF));
+            res[SystemColors.InactiveSelectionHighlightBrushKey]  = new SolidColorBrush(Rgb(0xCC, 0xE0, 0xF0));
+            res[SystemColors.InactiveSelectionHighlightTextBrushKey] = new SolidColorBrush(Rgb(0x00, 0x00, 0x00));
+            res[SystemColors.GrayTextBrushKey]             = new SolidColorBrush(Gray(0x88));
+            res[SystemColors.ActiveBorderBrushKey]         = new SolidColorBrush(Rgb(0xCC, 0xCC, 0xCC));
+            res[SystemColors.ControlLightBrushKey]         = new SolidColorBrush(Rgb(0xE0, 0xE0, 0xE0));
+            res[SystemColors.ControlLightLightBrushKey]    = new SolidColorBrush(Rgb(0xFF, 0xFF, 0xFF));
+            res[SystemColors.ControlDarkBrushKey]          = new SolidColorBrush(Rgb(0xC0, 0xC0, 0xC0));
+            res[SystemColors.ControlDarkDarkBrushKey]      = new SolidColorBrush(Gray(0x80));
+            res[SystemColors.AppWorkspaceBrushKey]         = new SolidColorBrush(Rgb(0xF5, 0xF5, 0xF5));
+            res[SystemColors.InfoBrushKey]                 = new SolidColorBrush(Rgb(0xFF, 0xFF, 0xFF));
+            res[SystemColors.InfoTextBrushKey]             = new SolidColorBrush(Gray(0x33));
+            res[SystemColors.ScrollBarBrushKey]            = new SolidColorBrush(Rgb(0xF0, 0xF0, 0xF0));
+            // ColorKey 变体（有的控件模板用 Color 而非 Brush）
+            res[SystemColors.WindowColorKey]               = Rgb(0xF5, 0xF5, 0xF5);
+            res[SystemColors.ControlColorKey]              = Rgb(0xFF, 0xFF, 0xFF);
+            res[SystemColors.ControlTextColorKey]          = Gray(0x33);
+            res[SystemColors.WindowTextColorKey]           = Gray(0x33);
+            res[SystemColors.GrayTextColorKey]             = Gray(0x88);
+            res[SystemColors.MenuColorKey]                 = Rgb(0xFF, 0xFF, 0xFF);
+            res[SystemColors.MenuTextColorKey]             = Gray(0x33);
+            res[SystemColors.MenuBarColorKey]              = Rgb(0xFF, 0xFF, 0xFF);
+            res[SystemColors.HighlightColorKey]            = Rgb(0x21, 0x96, 0xF3);
+            res[SystemColors.HighlightTextColorKey]        = Rgb(0xFF, 0xFF, 0xFF);
+            res[SystemColors.ActiveBorderColorKey]         = Rgb(0xCC, 0xCC, 0xCC);
+            res[SystemColors.ControlLightColorKey]         = Rgb(0xE0, 0xE0, 0xE0);
+            res[SystemColors.ControlLightLightColorKey]    = Rgb(0xFF, 0xFF, 0xFF);
+            res[SystemColors.ControlDarkColorKey]          = Rgb(0xC0, 0xC0, 0xC0);
+            res[SystemColors.ControlDarkDarkColorKey]      = Gray(0x80);
+            res[SystemColors.AppWorkspaceColorKey]         = Rgb(0xF5, 0xF5, 0xF5);
+            res[SystemColors.InfoColorKey]                 = Rgb(0xFF, 0xFF, 0xFF);
+            res[SystemColors.InfoTextColorKey]             = Gray(0x33);
+            res[SystemColors.ScrollBarColorKey]            = Rgb(0xF0, 0xF0, 0xF0);
+        }
+    }
+
+    private static Color Rgb(byte r, byte g, byte b) => Color.FromRgb(r, g, b);
+    private static Color Gray(byte g) => Color.FromRgb(g, g, g);
 
     /// <summary>
     /// 在指定元素上应用彩色 Emoji 渲染模式（Grayscale vs ClearType）。

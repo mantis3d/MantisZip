@@ -3,6 +3,69 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:local="clr-namespace:MantisZip.UI">
     <Application.Resources>
-         
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="Themes/Light.xaml"/>
+            </ResourceDictionary.MergedDictionaries>
+
+            <!-- ═══════ 隐式控件样式（覆盖不响应 SystemColors 覆盖的默认模板） ═══════ -->
+            <Style TargetType="Button">
+                <Setter Property="Background" Value="{DynamicResource Theme_ButtonBg}"/>
+                <Setter Property="Foreground" Value="{DynamicResource Theme_TextPrimary}"/>
+                <Setter Property="BorderBrush" Value="{DynamicResource Theme_ButtonBorder}"/>
+            </Style>
+            <Style TargetType="RepeatButton">
+                <Setter Property="Background" Value="{DynamicResource Theme_ButtonBg}"/>
+                <Setter Property="Foreground" Value="{DynamicResource Theme_TextPrimary}"/>
+                <Setter Property="BorderBrush" Value="{DynamicResource Theme_ButtonBorder}"/>
+            </Style>
+            <Style TargetType="DataGridColumnHeader">
+                <Setter Property="Background" Value="{DynamicResource Theme_HeaderBg}"/>
+                <Setter Property="Foreground" Value="{DynamicResource Theme_TextPrimary}"/>
+                <Setter Property="BorderBrush" Value="{DynamicResource Theme_Border}"/>
+            </Style>
+            <Style TargetType="ToolTip">
+                <Setter Property="Background" Value="{DynamicResource Theme_ToolTipBg}"/>
+                <Setter Property="Foreground" Value="{DynamicResource Theme_ToolTipText}"/>
+                <Setter Property="BorderBrush" Value="{DynamicResource Theme_Border}"/>
+            </Style>
+            <Style TargetType="MenuItem">
+                <Setter Property="Background" Value="{DynamicResource Theme_MenuBg}"/>
+                <Setter Property="Foreground" Value="{DynamicResource Theme_TextPrimary}"/>
+            </Style>
+            <Style TargetType="ContextMenu">
+                <Setter Property="Background" Value="{DynamicResource Theme_SurfaceBg}"/>
+                <Setter Property="Foreground" Value="{DynamicResource Theme_TextPrimary}"/>
+            </Style>
+            <Style TargetType="TextBlock">
+                <Setter Property="Foreground" Value="{DynamicResource Theme_TextPrimary}"/>
+            </Style>
+            <Style TargetType="Label">
+                <Setter Property="Foreground" Value="{DynamicResource Theme_TextPrimary}"/>
+            </Style>
+            <Style TargetType="CheckBox">
+                <Setter Property="Foreground" Value="{DynamicResource Theme_TextPrimary}"/>
+            </Style>
+            <Style TargetType="RadioButton">
+                <Setter Property="Foreground" Value="{DynamicResource Theme_TextPrimary}"/>
+            </Style>
+            <Style TargetType="GroupBox">
+                <Setter Property="Foreground" Value="{DynamicResource Theme_TextPrimary}"/>
+            </Style>
+            <!-- ComboBoxItem: 强制深色文字（ComboBox 本身白底改不了） -->
+            <Style TargetType="ComboBoxItem">
+                <Setter Property="Foreground" Value="#333333"/>
+            </Style>
+            <Style TargetType="TextBox">
+                <Setter Property="Background" Value="{DynamicResource Theme_SurfaceBg}"/>
+                <Setter Property="Foreground" Value="{DynamicResource Theme_TextPrimary}"/>
+                <Setter Property="BorderBrush" Value="{DynamicResource Theme_Border}"/>
+            </Style>
+            <Style TargetType="PasswordBox">
+                <Setter Property="Background" Value="{DynamicResource Theme_SurfaceBg}"/>
+                <Setter Property="Foreground" Value="{DynamicResource Theme_TextPrimary}"/>
+                <Setter Property="BorderBrush" Value="{DynamicResource Theme_Border}"/>
+            </Style>
+        </ResourceDictionary>
     </Application.Resources>
 </Application>
