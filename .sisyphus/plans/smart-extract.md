@@ -65,7 +65,7 @@ Add a Smart Extract feature with context menu, CLI, toolbar, and settings suppor
 
 ## Verification Strategy
 
-> **ZERO HUMAN INTERVENTION** — ALL verification is agent-executed.
+> **首要原则：自动化验证优先** — 尽可能 agent-executed；个别 WPF UI 场景需人工辅助（标注为 manual smoke test）。
 
 ### Test Decision
 - **Infrastructure exists**: YES (xUnit + test project)
@@ -110,12 +110,16 @@ Critical Path: Task 1 → Task 4 → Task 5 (Shell needs localization)
 - [ ] 1. Add localization strings
 
   **What to do**:
-  - Add key `Shell_SmartExtract` with value `"智能解压到此处"` to `Resources/strings.zh.json`
-  - Add key `Shell_SmartExtract` with value `"Smart Extract Here"` to `Resources/strings.en.json`
-  - Add constant `public const string Shell_SmartExtract = "Shell_SmartExtract";` to `Localization/L.cs` (in alpha order, after `Shell_QuickCompress`)
+   - Add key `Shell_SmartExtract` with value `"智能解压到此处"` to `Resources/strings.zh.json`
+   - Add key `Shell_SmartExtract` with value `"Smart Extract Here"` to `Resources/strings.en.json`
+   - Add key `Main_Tooltip_SmartExtract` with value `"智能解压到此处"` to `Resources/strings.zh.json` (for toolbar button tooltip)
+   - Add key `Main_Tooltip_SmartExtract` with value `"Smart Extract Here"` to `Resources/strings.en.json`
+   - Add constants to `Localization/L.cs` (in alpha order):
+     - `public const string Shell_SmartExtract = "Shell_SmartExtract";` after `Shell_QuickCompress`
+     - `public const string Main_Tooltip_SmartExtract = "Main_Tooltip_SmartExtract";` after `Main_Tooltip_Preview`
 
   **Must NOT do**:
-  - Don't regenerate L.cs from scratch — just add the one constant manually
+   - Don't regenerate L.cs from scratch — just add the two constants manually
 
   **Recommended Agent Profile**:
   - **Category**: `quick`
@@ -128,26 +132,29 @@ Critical Path: Task 1 → Task 4 → Task 5 (Shell needs localization)
   - **Blocked By**: None
 
   **References**:
-  - `src/MantisZip.UI/Resources/strings.zh.json:418` — Pattern for Shell_QuickCompress entry
-  - `src/MantisZip.UI/Resources/strings.en.json:418` — Same in English
-  - `src/MantisZip.UI/Localization/L.cs:449` — Format for adding constant
+   - `src/MantisZip.UI/Resources/strings.zh.json:418` — Pattern for Shell_QuickCompress entry
+   - `src/MantisZip.UI/Resources/strings.en.json:418` — Same in English
+   - `src/MantisZip.UI/Localization/L.cs:385-390` — Pattern for Main_Tooltip_* constants and their alpha position
 
-  **QA Scenarios**:
-  ```
-  Scenario: Localization key resolves correctly
-    Tool: Bash (grep)
-    Preconditions: Files exist with correct encoding
-    Steps:
-      1. grep 'Shell_SmartExtract' strings.zh.json → verify has Chinese text
-      2. grep 'Shell_SmartExtract' strings.en.json → verify has English text
-      3. grep 'Shell_SmartExtract' L.cs → verify constant exists
-    Expected Result: All three files contain the key
-    Evidence: .sisyphus/evidence/task-1-localization.txt
-  ```
+   **QA Scenarios**:
+   ```
+   Scenario: All localization keys resolve correctly
+     Tool: Bash (grep)
+     Preconditions: Files exist with correct encoding
+     Steps:
+       1. grep 'Shell_SmartExtract' strings.zh.json → verify has Chinese text
+       2. grep 'Shell_SmartExtract' strings.en.json → verify has English text
+       3. grep 'Shell_SmartExtract' L.cs → verify constant exists
+       4. grep 'Main_Tooltip_SmartExtract' strings.zh.json → verify has Chinese text
+       5. grep 'Main_Tooltip_SmartExtract' strings.en.json → verify has English text
+       6. grep 'Main_Tooltip_SmartExtract' L.cs → verify constant exists
+     Expected Result: All 6 items found
+     Evidence: .sisyphus/evidence/task-1-localization.txt
+   ```
 
-  **Commit**: YES
-  - Message: `i18n: add Shell_SmartExtract key`
-  - Files: `src/MantisZip.UI/Resources/strings.zh.json`, `src/MantisZip.UI/Resources/strings.en.json`, `src/MantisZip.UI/Localization/L.cs`
+   **Commit**: YES
+   - Message: `i18n: add Shell_SmartExtract + Main_Tooltip_SmartExtract keys`
+   - Files: `src/MantisZip.UI/Resources/strings.zh.json`, `src/MantisZip.UI/Resources/strings.en.json`, `src/MantisZip.UI/Localization/L.cs`
 
 ---
 
@@ -200,7 +207,7 @@ Critical Path: Task 1 → Task 4 → Task 5 (Shell needs localization)
     - If items have 0 distinct roots (empty) → return `true` (empty archive → extract here)
     - If items have 2+ distinct roots → return `false`
     - Ignore directory entries for the root check (files imply the structure)
-    - Edge case: archive with only directories → return `false`
+    - Edge case: archive with only directories → return `true` (directories at root level are a single common ancestor)
 
   **Must NOT do**:
   - Don't modify any existing engine or interface
@@ -242,6 +249,15 @@ Critical Path: Task 1 → Task 4 → Task 5 (Shell needs localization)
       2. dotnet test
     Expected Result: Test passes
     Evidence: .sisyphus/evidence/task-3-logic-2.txt
+
+  Scenario: Directories-only archive returns true
+    Tool: Bash (dotnet test)
+    Preconditions: Same
+    Steps:
+      1. Create test with items: ["dir1/sub/", "dir2/"] → HasSingleRootDirectory returns true
+      2. dotnet test
+    Expected Result: Test passes
+    Evidence: .sisyphus/evidence/task-3-logic-3.txt
   ```
 
   **Commit**: YES
@@ -257,12 +273,19 @@ Critical Path: Task 1 → Task 4 → Task 5 (Shell needs localization)
   - Add new method `HandleExtractSmart(string? archivePath)`:
     - Validate archive exists
     - Get engine via `ArchiveEngineFactory.GetEngineByExtension`
-    - List entries via `engine.ListEntriesAsync`
+    - **List entries with password-aware fallback**:
+      - Try `engine.ListEntriesAsync(archivePath, password: null, ...)` first
+      - If it throws a crypto/access exception → the archive likely requires a password before entry listing (known issue: SharpZipLib on certain encrypted ZIPs). Capture the exception, then:
+        1. Try saved passwords via `QuickVerifyPassword` to find the correct one
+        2. Re-try `ListEntriesAsync` with the found password
+        3. If no saved password works → prompt user for password before proceeding
+        4. If user cancels → exit gracefully
+    - If items list is empty after listing → show "压缩包为空" and exit (no extract needed)
     - Call `ArchiveStructureAnalyzer.HasSingleRootDirectory(items)`
     - If true → dest = parent dir (like `HandleExtractHere`)
     - If false → dest = `parentDir/archiveName/` (like `HandleExtractToNamed`)
     - Show ProgressWindow, call `engine.ExtractAsync`, exit when done
-    - Handle password: if archive has encrypted entries, try saved passwords first, prompt on failure
+    - Handle password (post-listing): if archive has encrypted entries, try saved passwords first, prompt on failure
     - Reuse existing `RunExtractStatic` pattern but with smart destination logic
 
   **Must NOT do**:
@@ -322,14 +345,15 @@ Critical Path: Task 1 → Task 4 → Task 5 (Shell needs localization)
     - Add smart extract subcommand between extracthere and extracttonamed, guarded by `s.EnableSmartExtractMenu` and `s.EnableExtractMenu`
     - Apply `AppliesTo` filter (archive extensions only)
     - Command: `--extract-smart "%1"` or `--extract-smart "%V"`
+    - ⚠ **Cascade subcommand renumbering**: Inserting a new subcommand shifts `03_extracttonamed`→`04_`, `04_extract`→`05_`, `05_quick`→`06_`, `06_compress`→`07_`. This changes registry subcommand keys on existing installs. On upgrade, old keys remain as garbage (not harmful — `Uninstall` deletes the cascade root entry before reinstall). Acceptable risk.
   - In `InstallVerbs`:
-    - Add smart extract verb registration for `*` and `Directory\Background`
+    - Add smart extract verb registration for `*` only (must receive an archive file path, not a folder — same as other extract verbs)
   - In `Uninstall`:
     - Add `DeleteRegistryKey` for `ExtractSmartVerb` + old version cleanup
-  - Add `EnableSmartExtractMenu` check to `IsInstalled` (partial match on either main key or smart verb)
+  - `IsInstalled`: Add check for `02_MantisZipSmartExtract` verb key (same pattern as existing `CompressVerb` fallback check). Smart extract is an additional verb alongside existing ones — `IsInstalled` should return `true` if any MantisZip verb key exists, not only when smart extract is present.
 
   **Must NOT do**:
-  - Don't renumber existing verbs (the `02_` prefix sorts correctly)
+  - Don't renumber existing verb constants (the `02_` prefix sorts correctly between existing `02_MantisZipExtractHere` and `03_MantisZipExtractToNamed`)
   - Don't modify verb constants for existing entries
 
   **Recommended Agent Profile**:
@@ -376,10 +400,11 @@ Critical Path: Task 1 → Task 4 → Task 5 (Shell needs localization)
 - [ ] 6. Add smart extract toolbar button to MainWindow
 
   **What to do**:
-  - In `MainWindow.xaml`, add a new button to the toolbar:
+  - In `MainWindow.xaml`, add a new button to the toolbar (use `x:Name="SmartExtractBtn"`):
     - Content: bound to `Shell_SmartExtract` localization
-    - Visibility: visible only when `_currentArchivePath != null` (reuse same pattern as other archive-dependent buttons)
-    - Position: after the existing "Extract to" button, before "Test"
+    - ToolTip: `Main_Tooltip_SmartExtract` localization (use separate tooltip key per existing convention)
+    - Archive-dependency: use `IsEnabled="False"` + code-behind enable when `_currentArchivePath != null` (reuse `AddFilesBtn`/`DeleteFilesBtn` pattern — NOT `Visibility`, to avoid layout shifts)
+    - Position: insert after the Compress button (line 89), before the first Separator (line 90) — groups with New/Open/Extract/Compress operations
   - In `MainWindow.xaml.cs`, add event handler:
     - Determine destination using same logic as `HandleExtractSmart`
     - Show progress, call engine extract
@@ -406,24 +431,35 @@ Critical Path: Task 1 → Task 4 → Task 5 (Shell needs localization)
 
   **QA Scenarios**:
   ```
-  Scenario: Toolbar button visible when archive loaded
-    Tool: Playwright
-    Preconditions: App running with archive loaded
+  Scenario: XAML compiles with correct IsEnabled pattern
+    Tool: Bash (dotnet build + grep)
+    Preconditions: XAML changes applied
     Steps:
-      1. Open MantisZip
-      2. Open any archive
-      3. Find button with text "智能解压到此处"
-    Expected Result: Button is visible and enabled
-    Evidence: .sisyphus/evidence/task-6-toolbar.png
+      1. dotnet build src/MantisZip.UI/MantisZip.UI.csproj → verify 0 errors
+      2. grep 'SmartExtractBtn' MainWindow.xaml → confirm IsEnabled="False" attribute
+         (matching AddFilesBtn/DeleteFilesBtn pattern, not Visibility)
+    Expected Result: Build clean, button uses IsEnabled pattern for archive-dependency
+    Evidence: .sisyphus/evidence/task-6-build.txt
 
-  Scenario: Toolbar button hidden when no archive
-    Tool: Playwright
-    Preconditions: App running, no archive loaded
+  Scenario: Handler references correct engine method
+    Tool: Bash (grep)
+    Preconditions: Code-behind changes applied
     Steps:
-      1. Launch MantisZip
-      2. Check for smart extract button
-    Expected Result: Button is hidden or disabled
-    Evidence: .sisyphus/evidence/task-6-toolbar-hidden.png
+      1. grep 'HasSingleRootDirectory' MainWindow.xaml.cs → verify handler calls it
+      2. grep 'ExtractAsync' MainWindow.xaml.cs → verify extract flow exists
+    Expected Result: Handler logic references ArchiveStructureAnalyzer and engine extract
+    Evidence: .sisyphus/evidence/task-6-handler.txt
+
+  Scenario: App runs with button visible (manual smoke test)
+    Tool: Bash (interactive)
+    Preconditions: App built
+    Steps:
+      1. Launch MantisZip.UI.exe
+      2. Open a .zip archive via File → Open
+      3. Visually confirm "智能解压到此处" button appears in toolbar
+      4. Click it and verify correct behavior (single-root vs multi-root)
+    Expected Result: Button appears and functions correctly
+    Evidence: .sisyphus/evidence/task-6-smoke.txt
   ```
 
   **Commit**: YES (groups with Task 4)
@@ -435,7 +471,7 @@ Critical Path: Task 1 → Task 4 → Task 5 (Shell needs localization)
 - [ ] 7. Add settings checkbox to SettingsWindow
 
   **What to do**:
-  - In `SettingsWindow.xaml`, add a CheckBox for "智能解压到此处" in the context menu section, after the existing Extract checkbox
+   - In `SettingsWindow.xaml`, add a CheckBox `x:Name="EnableSmartCheck"` for "智能解压到此处" in the context menu section, after `EnableExtractCheck` (the last checkbox in the first StackPanel of the context menu tab)
   - In `SettingsWindow.xaml.cs`:
     - Load: `EnableSmartCheck.IsChecked = s.EnableSmartExtractMenu;`
     - Save: `s.EnableSmartExtractMenu = EnableSmartCheck.IsChecked == true;`
@@ -460,16 +496,24 @@ Critical Path: Task 1 → Task 4 → Task 5 (Shell needs localization)
 
   **QA Scenarios**:
   ```
-  Scenario: Checkbox loads and saves correctly
-    Tool: Playwright
-    Preconditions: App running
+  Scenario: Build compiles and property binding is correct
+    Tool: Bash (dotnet build + grep)
+    Preconditions: XAML + code-behind changes applied
     Steps:
-      1. Open Settings → Context Menu section
-      2. Verify "智能解压到此处" checkbox exists
-      3. Toggle off, save, reopen → verify unchecked
-      4. Toggle on, save, reopen → verify checked
-    Expected Result: Checkbox state persists
-    Evidence: .sisyphus/evidence/task-7-settings.png
+      1. dotnet build src/MantisZip.UI/MantisZip.UI.csproj → verify 0 errors
+      2. grep 'EnableSmartExtractMenu' SettingsWindow.xaml.cs → verify
+         load: EnableSmartCheck.IsChecked = s.EnableSmartExtractMenu
+         save: s.EnableSmartExtractMenu = EnableSmartCheck.IsChecked == true;
+    Expected Result: Build clean, load/save logic matches AppSettings property
+    Evidence: .sisyphus/evidence/task-7-settings.txt
+
+  Scenario: AppSettings default is true
+    Tool: Bash (grep)
+    Preconditions: AppSettings.cs modified in Task 2
+    Steps:
+      1. grep 'EnableSmartExtractMenu' AppSettings.cs → confirm default = true
+    Expected Result: Property exists with default true
+    Evidence: .sisyphus/evidence/task-7-default.txt
   ```
 
   **Commit**: YES (groups with Task 2)
@@ -488,9 +532,9 @@ Critical Path: Task 1 → Task 4 → Task 5 (Shell needs localization)
     3. Empty archive → returns `true`
     4. Single file at root → returns `false`
     5. Mixed (file + folder at root) → returns `false`
-    6. Only directories → returns `true`? (design choice: true, treat as single root)
+    6. Only directories (no files) → returns `true` (directories at root share a single common ancestor)
     7. Create real zip archives with single/multi root structure, test end-to-end smart destination resolution
-    8. Archive with no entries → returns `true`
+    8. Encrypted archive: create a password-protected zip with single-root structure → verify smart extract CLI handles password prompt and extracts correctly
 
   **Must NOT do**:
   - Don't test ShellIntegration (registry) in unit tests
