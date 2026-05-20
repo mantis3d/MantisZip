@@ -127,7 +127,7 @@ All handled in `App.OnStartup` before normal UI startup:
 | `--open <path>` | Launch MainWindow and load archive for browsing |
 | _(no args)_ | Normal MainWindow launch |
 
-`--extract` bypasses MainWindow entirely (avoids `Loaded` event timing issues). `--open` uses MainWindow with archive loaded.
+`--extract`, `--extract-here`, `--extract-smart`, and `--extract-to-name` bypass MainWindow entirely (avoid `Loaded` event timing issues). `--open` uses MainWindow with archive loaded.
 
 ### System icon helper
 
