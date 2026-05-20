@@ -7,7 +7,7 @@
         Topmost="True"
         ResizeMode="NoResize"
         ShowInTaskbar="False"
-        Background="#F5F5F5">
+        Background="{StaticResource Theme_WindowBg}">
     <Grid Margin="16">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
@@ -19,22 +19,22 @@
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <TextBlock x:Name="HeaderText" Grid.Row="0" FontSize="13" FontWeight="SemiBold" Foreground="#333"/>
+        <TextBlock x:Name="HeaderText" Grid.Row="0" FontSize="13" FontWeight="SemiBold" Foreground="{StaticResource Theme_TextPrimary}"/>
 
-        <TextBlock x:Name="ErrorMsgText" Grid.Row="2" TextWrapping="Wrap" FontSize="11" Foreground="#888"/>
+        <TextBlock x:Name="ErrorMsgText" Grid.Row="2" TextWrapping="Wrap" FontSize="11" Foreground="{StaticResource Theme_TextDisabled}"/>
 
         <StackPanel Grid.Row="4" Orientation="Horizontal" HorizontalAlignment="Center">
             <Button Content="{l:L Error_Retry}" Width="72" Height="28" Click="Retry_Click"
-                    Background="White" BorderBrush="#CCC" BorderThickness="1" Margin="0,0,6,0"/>
+                    Background="{StaticResource Theme_ButtonBg}" BorderBrush="{StaticResource Theme_Border}" BorderThickness="1" Margin="0,0,6,0"/>
             <Button Content="{l:L Error_Skip}" Width="72" Height="28" Click="Skip_Click"
-                    Background="White" BorderBrush="#CCC" BorderThickness="1" Margin="6,0,6,0"/>
+                    Background="{StaticResource Theme_ButtonBg}" BorderBrush="{StaticResource Theme_Border}" BorderThickness="1" Margin="6,0,6,0"/>
             <Button Content="{l:L Error_Abort}" Width="72" Height="28" Click="Abort_Click"
-                    Background="White" BorderBrush="#CCC" BorderThickness="1" Margin="6,0,0,0"/>
+                    Background="{StaticResource Theme_ButtonBg}" BorderBrush="{StaticResource Theme_Border}" BorderThickness="1" Margin="6,0,0,0"/>
         </StackPanel>
 
         <CheckBox x:Name="ApplyAllCheck" Grid.Row="6"
                   Content="{l:L Error_ApplyToAll}"
-                  FontSize="12" Foreground="#555"
+                  FontSize="12" Foreground="{StaticResource Theme_TextSecondary}"
                   HorizontalAlignment="Center"/>
     </Grid>
 </Window>

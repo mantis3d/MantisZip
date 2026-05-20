@@ -5,7 +5,7 @@
         Title="{l:L Compress_Title}" Height="550" Width="520"
         WindowStartupLocation="CenterScreen"
         ResizeMode="NoResize"
-        Background="#F5F5F5">
+        Background="{StaticResource Theme_WindowBg}">
     <Grid Margin="15">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>

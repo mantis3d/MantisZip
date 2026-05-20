@@ -187,9 +187,9 @@ public partial class ProgressWindow : Window
             PwdStatusText.Text = "";
             PwdRevealBtn.IsEnabled = false;
             PwdCopyBtn.IsEnabled = false;
-            // 重置按钮样式
-            PasswordSection.Background = new SolidColorBrush(Color.FromRgb(0xFF, 0xF8, 0xE1)); // #FFF8E1
-            PasswordSection.BorderBrush = new SolidColorBrush(Color.FromRgb(0xFF, 0xE0, 0x82)); // #FFE082
+            // 重置按钮样式（使用主题颜色）
+            PasswordSection.Background = (SolidColorBrush)Application.Current.Resources["Theme_StatusWarning"];
+            PasswordSection.BorderBrush = (SolidColorBrush)Application.Current.Resources["Theme_StatusWarning"];
         }
         DispatchIfNeeded(Update);
     }
@@ -217,8 +217,8 @@ public partial class ProgressWindow : Window
             PwdStatusText.Text = L.T(L.Progress_PwdVerifying);
             PwdRevealBtn.IsEnabled = true;
             PwdCopyBtn.IsEnabled = true;
-            PasswordSection.Background = new SolidColorBrush(Color.FromRgb(0xE8, 0xF5, 0xE9));
-            PasswordSection.BorderBrush = new SolidColorBrush(Color.FromRgb(0xA5, 0xD6, 0xA7));
+            PasswordSection.Background = (SolidColorBrush)Application.Current.Resources["Theme_StatusSuccess"];
+            PasswordSection.BorderBrush = (SolidColorBrush)Application.Current.Resources["Theme_StatusSuccess"];
         }
         DispatchIfNeeded(Update);
     }

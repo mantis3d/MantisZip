@@ -7,7 +7,7 @@
         Topmost="True"
         ResizeMode="NoResize"
         ShowInTaskbar="False"
-        Background="#F5F5F5">
+        Background="{StaticResource Theme_WindowBg}">
     <Grid Margin="16">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
@@ -23,10 +23,10 @@
         </Grid.RowDefinitions>
 
         <!-- Row 0: Title -->
-        <TextBlock x:Name="HeaderText" Grid.Row="0" FontSize="13" FontWeight="SemiBold" Foreground="#333"/>
+        <TextBlock x:Name="HeaderText" Grid.Row="0" FontSize="13" FontWeight="SemiBold" Foreground="{StaticResource Theme_TextPrimary}"/>
 
         <!-- Row 2: Comparison panel -->
-        <Border Grid.Row="2" Background="White" BorderBrush="#DDD" BorderThickness="1" CornerRadius="4" Padding="12">
+        <Border Grid.Row="2" Background="{StaticResource Theme_SurfaceBg}" BorderBrush="{StaticResource Theme_BorderLight}" BorderThickness="1" CornerRadius="4" Padding="12">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
@@ -35,50 +35,50 @@
                 </Grid.ColumnDefinitions>
 
                 <StackPanel Grid.Column="0">
-                    <TextBlock Text="{l:L Conflict_DiskLabel}" FontWeight="SemiBold" FontSize="12" Foreground="#555" Margin="0,0,0,6"/>
-                    <TextBlock FontSize="11" Foreground="#333" LineHeight="18">
-                        <Run Text="{l:L Conflict_SizeLabel}"/><Run x:Name="ExistingSizeText" Foreground="#888"/>
+                    <TextBlock Text="{l:L Conflict_DiskLabel}" FontWeight="SemiBold" FontSize="12" Foreground="{StaticResource Theme_TextSecondary}" Margin="0,0,0,6"/>
+                    <TextBlock FontSize="11" Foreground="{StaticResource Theme_TextPrimary}" LineHeight="18">
+                        <Run Text="{l:L Conflict_SizeLabel}"/><Run x:Name="ExistingSizeText" Foreground="{StaticResource Theme_TextDisabled}"/>
                     </TextBlock>
-                    <TextBlock FontSize="11" Foreground="#333" LineHeight="18">
-                        <Run Text="{l:L Conflict_DateLabel}"/><Run x:Name="ExistingDateText" Foreground="#888"/>
+                    <TextBlock FontSize="11" Foreground="{StaticResource Theme_TextPrimary}" LineHeight="18">
+                        <Run Text="{l:L Conflict_DateLabel}"/><Run x:Name="ExistingDateText" Foreground="{StaticResource Theme_TextDisabled}"/>
                     </TextBlock>
                 </StackPanel>
 
-                <Border Grid.Column="1" Background="#FFE082" CornerRadius="10"
+                <Border Grid.Column="1" Background="{StaticResource Theme_StatusWarning}" CornerRadius="10"
                         Width="32" Height="22" Margin="12,10"
                         HorizontalAlignment="Center" VerticalAlignment="Top">
-                    <TextBlock Text="VS" FontSize="10" FontWeight="Bold" Foreground="#333"
+                    <TextBlock Text="VS" FontSize="10" FontWeight="Bold" Foreground="{StaticResource Theme_TextPrimary}"
                                HorizontalAlignment="Center" VerticalAlignment="Center"/>
                 </Border>
 
                 <StackPanel Grid.Column="2">
-                    <TextBlock Text="{l:L Conflict_ArchiveLabel}" FontWeight="SemiBold" FontSize="12" Foreground="#555" Margin="0,0,0,6"/>
-                    <TextBlock FontSize="11" Foreground="#333" LineHeight="18">
-                        <Run Text="{l:L Conflict_SizeLabel}"/><Run x:Name="EntrySizeText" Foreground="#2196F3" FontWeight="SemiBold"/>
+                    <TextBlock Text="{l:L Conflict_ArchiveLabel}" FontWeight="SemiBold" FontSize="12" Foreground="{StaticResource Theme_TextSecondary}" Margin="0,0,0,6"/>
+                    <TextBlock FontSize="11" Foreground="{StaticResource Theme_TextPrimary}" LineHeight="18">
+                        <Run Text="{l:L Conflict_SizeLabel}"/><Run x:Name="EntrySizeText" Foreground="{StaticResource Theme_Accent}" FontWeight="SemiBold"/>
                     </TextBlock>
-                    <TextBlock FontSize="11" Foreground="#333" LineHeight="18">
-                        <Run Text="{l:L Conflict_DateLabel}"/><Run x:Name="EntryDateText" Foreground="#2196F3" FontWeight="SemiBold"/>
+                    <TextBlock FontSize="11" Foreground="{StaticResource Theme_TextPrimary}" LineHeight="18">
+                        <Run Text="{l:L Conflict_DateLabel}"/><Run x:Name="EntryDateText" Foreground="{StaticResource Theme_Accent}" FontWeight="SemiBold"/>
                     </TextBlock>
                 </StackPanel>
             </Grid>
         </Border>
 
         <!-- Row 4: Comparison result -->
-        <TextBlock x:Name="CompareResultText" Grid.Row="4" FontSize="11" Foreground="#555"
+        <TextBlock x:Name="CompareResultText" Grid.Row="4" FontSize="11" Foreground="{StaticResource Theme_TextSecondary}"
                    TextWrapping="Wrap" HorizontalAlignment="Center"/>
 
         <!-- Row 6: Buttons -->
         <WrapPanel Grid.Row="6" HorizontalAlignment="Center">
             <Button Content="{l:L CompressConflict_Overwrite}" Width="75" Height="28" Click="Overwrite_Click"
-                    Background="White" BorderBrush="#CCC" BorderThickness="1" Margin="0,0,4,4"/>
+                    Background="{StaticResource Theme_ButtonBg}" BorderBrush="{StaticResource Theme_Border}" BorderThickness="1" Margin="0,0,4,4"/>
             <Button Content="{l:L Conflict_Btn_OverwriteOlder}" Width="75" Height="28" Click="OverwriteIfOlder_Click"
-                    Background="White" BorderBrush="#CCC" BorderThickness="1" Margin="4,0,4,4"/>
+                    Background="{StaticResource Theme_ButtonBg}" BorderBrush="{StaticResource Theme_Border}" BorderThickness="1" Margin="4,0,4,4"/>
             <Button Content="{l:L Conflict_Btn_OverwriteSmaller}" Width="75" Height="28" Click="OverwriteIfSmaller_Click"
-                    Background="White" BorderBrush="#CCC" BorderThickness="1" Margin="4,0,4,4"/>
+                    Background="{StaticResource Theme_ButtonBg}" BorderBrush="{StaticResource Theme_Border}" BorderThickness="1" Margin="4,0,4,4"/>
             <Button Content="{l:L Conflict_Btn_Rename}" Width="75" Height="28" Click="Rename_Click"
-                    Background="White" BorderBrush="#CCC" BorderThickness="1" Margin="4,0,4,4"/>
+                    Background="{StaticResource Theme_ButtonBg}" BorderBrush="{StaticResource Theme_Border}" BorderThickness="1" Margin="4,0,4,4"/>
             <Button Content="{l:L Error_Skip}" Width="75" Height="28" Click="Skip_Click"
-                    Background="White" BorderBrush="#CCC" BorderThickness="1" Margin="4,0,0,4"/>
+                    Background="{StaticResource Theme_ButtonBg}" BorderBrush="{StaticResource Theme_Border}" BorderThickness="1" Margin="4,0,0,4"/>
         </WrapPanel>
 
         <!-- Row 7: 自定义重命名输入（勾选"应用到全部"时禁用） -->
@@ -87,14 +87,14 @@
                 <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="*"/>
             </Grid.ColumnDefinitions>
-            <TextBlock Grid.Column="0" Text="{l:L Conflict_NewNameLabel}" VerticalAlignment="Center" FontSize="12" Foreground="#555"/>
+            <TextBlock Grid.Column="0" Text="{l:L Conflict_NewNameLabel}" VerticalAlignment="Center" FontSize="12" Foreground="{StaticResource Theme_TextSecondary}"/>
             <TextBox Grid.Column="1" x:Name="RenameTextBox" FontSize="12" Padding="3,2"/>
         </Grid>
 
         <!-- Row 9: Checkbox -->
         <CheckBox x:Name="ApplyAllCheck" Grid.Row="9"
                   Content="{l:L Error_ApplyToAll}"
-                  FontSize="12" Foreground="#555"
+                  FontSize="12" Foreground="{StaticResource Theme_TextSecondary}"
                   HorizontalAlignment="Center"/>
     </Grid>
 </Window>

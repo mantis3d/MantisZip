@@ -7,7 +7,7 @@
         Topmost="True"
         ResizeMode="NoResize"
         ShowInTaskbar="False"
-        Background="#F5F5F5">
+        Background="{StaticResource Theme_WindowBg}">
     <Grid Margin="16">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
@@ -17,17 +17,17 @@
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <TextBlock x:Name="HeaderText" Grid.Row="0" FontSize="13" Foreground="#333" TextWrapping="Wrap"/>
+        <TextBlock x:Name="HeaderText" Grid.Row="0" FontSize="13" Foreground="{StaticResource Theme_TextPrimary}" TextWrapping="Wrap"/>
 
         <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Center">
             <Button x:Name="OverwriteBtn" Content="{l:L CompressConflict_Overwrite}" Width="85" Height="28" Click="Overwrite_Click"
-                    Background="White" BorderBrush="#CCC" BorderThickness="1" Margin="0,0,6,0"/>
+                    Background="{StaticResource Theme_ButtonBg}" BorderBrush="{StaticResource Theme_Border}" BorderThickness="1" Margin="0,0,6,0"/>
             <Button x:Name="AddBtn" Content="{l:L CompressConflict_Add}" Width="110" Height="28" Click="Add_Click"
-                    Background="White" BorderBrush="#CCC" BorderThickness="1" Margin="6,0,6,0"/>
+                    Background="{StaticResource Theme_ButtonBg}" BorderBrush="{StaticResource Theme_Border}" BorderThickness="1" Margin="6,0,6,0"/>
             <Button x:Name="RenameBtn" Content="{l:L CompressConflict_Rename}" Width="90" Height="28" Click="Rename_Click"
-                    Background="White" BorderBrush="#CCC" BorderThickness="1" Margin="6,0,6,0"/>
+                    Background="{StaticResource Theme_ButtonBg}" BorderBrush="{StaticResource Theme_Border}" BorderThickness="1" Margin="6,0,6,0"/>
             <Button Content="{l:L MsgBox_Cancel}" Width="70" Height="28" Click="Cancel_Click"
-                    Background="White" BorderBrush="#CCC" BorderThickness="1" Margin="6,0,0,0"/>
+                    Background="{StaticResource Theme_ButtonBg}" BorderBrush="{StaticResource Theme_Border}" BorderThickness="1" Margin="6,0,0,0"/>
         </StackPanel>
 
         <!-- Row 4: 自定义重命名输入 -->

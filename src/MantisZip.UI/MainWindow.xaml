@@ -12,7 +12,7 @@
         AllowDrop="True"
         Drop="Window_Drop"
         DragOver="Window_DragOver"
-        Background="#F5F5F5"
+        Background="{StaticResource Theme_WindowBg}"
         Closing="Window_Closing">
 
     <Window.Resources>
@@ -21,10 +21,6 @@
             <Setter Property="IsExpanded" Value="{Binding IsExpanded}"/>
             <Setter Property="IsSelected" Value="{Binding IsSelected}"/>
         </Style>
-
-        <!-- 选中项失焦时的高亮颜色（默认浅灰几乎看不见） -->
-        <SolidColorBrush x:Key="{x:Static SystemColors.InactiveSelectionHighlightBrushKey}" Color="#CCE0F0"/>
-        <SolidColorBrush x:Key="{x:Static SystemColors.InactiveSelectionHighlightTextBrushKey}" Color="Black"/>
     </Window.Resources>
 
     <Grid>
@@ -36,7 +32,7 @@
         </Grid.RowDefinitions>
 
         <!-- Menu Bar -->
-        <Menu Grid.Row="0" Background="White">
+        <Menu Grid.Row="0" Background="{StaticResource Theme_MenuBg}" BorderThickness="0">
             <MenuItem Header="{l:L Main_Menu_File}">
                 <MenuItem Header="{l:L Main_Menu_OpenArchive}" Click="OpenArchive_Click" InputGestureText="Ctrl+O"/>
                 <MenuItem Header="{l:L Main_Menu_NewArchive}" Click="NewArchive_Click" InputGestureText="Ctrl+N"/>
@@ -60,8 +56,13 @@
         </Menu>
 
         <!-- Toolbar -->
-        <ToolBarTray Grid.Row="1" Background="White">
-            <ToolBar Band="0" BandIndex="0">
+        <ToolBarTray Grid.Row="1" Background="{StaticResource Theme_MenuBg}">
+            <ToolBar Band="0" BandIndex="0" Background="{StaticResource Theme_MenuBg}">
+                <ToolBar.Resources>
+                    <Style TargetType="ToolBar">
+                        <Setter Property="Background" Value="{StaticResource Theme_MenuBg}"/>
+                    </Style>
+                </ToolBar.Resources>
                 <Button ToolTip="{l:L Main_Tooltip_NewArchive}" Click="NewArchive_Click" Padding="8,6">
                     <StackPanel Orientation="Vertical" HorizontalAlignment="Center">
                         <TextBlock Text="🆕" FontSize="22" HorizontalAlignment="Center"/>
@@ -95,14 +96,14 @@
                 </Button>
                 <Button x:Name="DeleteFilesBtn" ToolTip="{l:L Main_Tooltip_DeleteFiles}" Click="DeleteFiles_Click" Padding="8,6" IsEnabled="False">
                     <StackPanel Orientation="Vertical" HorizontalAlignment="Center">
-                        <TextBlock Text="✖" FontSize="22" Foreground="Red" HorizontalAlignment="Center"/>
+                        <TextBlock Text="✖" FontSize="22" Foreground="{StaticResource Theme_StatusError}" HorizontalAlignment="Center"/>
                         <TextBlock Text="{l:L Main_Toolbar_DeleteFiles}" FontSize="12" HorizontalAlignment="Center"/>
                     </StackPanel>
                 </Button>
                 <Separator/>
                 <Button ToolTip="{l:L Main_Tooltip_Test}" Click="TestArchive_Click" Padding="8,6">
                     <StackPanel Orientation="Vertical" HorizontalAlignment="Center">
-                        <TextBlock Text="✓" FontSize="22" Foreground="Green" HorizontalAlignment="Center"/>
+                        <TextBlock Text="✓" FontSize="22" Foreground="{StaticResource Theme_StatusSuccess}" HorizontalAlignment="Center"/>
                         <TextBlock Text="{l:L Main_Toolbar_Test}" FontSize="12" HorizontalAlignment="Center"/>
                     </StackPanel>
                 </Button>
@@ -125,7 +126,7 @@
 
         <!-- Main Content Area -->
         <Grid Grid.Row="2" Margin="8">
-            <Border Background="White" CornerRadius="4" Padding="8">
+            <Border Background="{StaticResource Theme_SurfaceBg}" CornerRadius="4" Padding="8">
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
@@ -134,12 +135,12 @@
 
                     <!-- No Archive Loaded - Drop Hint -->
                     <Border x:Name="DropHint" Grid.Row="1" Visibility="Visible"
-                            Background="#FAFAFA" BorderBrush="#AAA" BorderThickness="2" CornerRadius="8">
+                            Background="{StaticResource Theme_WindowBg}" BorderBrush="{StaticResource Theme_Border}" BorderThickness="2" CornerRadius="8">
                         <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
                             <TextBlock Text="📁" FontSize="64" HorizontalAlignment="Center" Opacity="0.3"/>
-                            <TextBlock Text="{l:L Main_EmptyDropHint}" FontSize="16" Foreground="Gray" Margin="0,16,0,4"/>
+                            <TextBlock Text="{l:L Main_EmptyDropHint}" FontSize="16" Foreground="{StaticResource Theme_TextDisabled}" Margin="0,16,0,4"/>
                             <Button Content="{l:L Main_OpenArchiveBtn}" FontSize="14" Click="OpenArchive_Click" 
-                                    Background="Transparent" BorderThickness="0" Foreground="#2196F3" Cursor="Hand"/>
+                                    Background="Transparent" BorderThickness="0" Foreground="{StaticResource Theme_Accent}" Cursor="Hand"/>
                         </StackPanel>
                     </Border>
 
@@ -151,12 +152,12 @@
                         </Grid.RowDefinitions>
 
                         <!-- Archive Info -->
-                        <Border Grid.Row="0" Background="#E3F2FD" CornerRadius="4" Padding="12" Margin="0,0,0,8">
+                        <Border Grid.Row="0" Background="{StaticResource Theme_AccentLight}" CornerRadius="4" Padding="12" Margin="0,0,0,8">
                             <StackPanel Orientation="Horizontal">
                                 <TextBlock Text="📦" FontSize="24" VerticalAlignment="Center" Margin="0,0,12,0"/>
                                 <StackPanel>
                                     <TextBlock x:Name="ArchiveNameText" Text="" FontWeight="Bold" FontSize="14"/>
-                                    <TextBlock x:Name="ArchiveInfoText" Text="" FontSize="11" Foreground="Gray"/>
+                                    <TextBlock x:Name="ArchiveInfoText" Text="" FontSize="11" Foreground="{StaticResource Theme_TextSecondary}"/>
                                 </StackPanel>
                             </StackPanel>
                         </Border>
@@ -193,7 +194,7 @@
 
                                 <!-- Directory Tree -->
                                 <TreeView x:Name="FolderTree" Grid.Column="0" 
-                                          BorderThickness="1" BorderBrush="#DDD"
+                                          BorderThickness="1" BorderBrush="{StaticResource Theme_BorderLight}"
                                           SelectedItemChanged="FolderTree_SelectedItemChanged"
                                           ItemContainerStyle="{StaticResource TreeViewItemStyle}">
                                     <TreeView.ItemTemplate>
@@ -216,13 +217,13 @@
                                           GridLinesVisibility="Horizontal"
                                           HeadersVisibility="Column"
                                           RowHeaderWidth="0"
-                                          Background="White"
+                                          Background="{StaticResource Theme_SurfaceBg}"
                                           VirtualizingStackPanel.IsVirtualizing="True"
                                           VirtualizingStackPanel.VirtualizationMode="Recycling"
                                           EnableRowVirtualization="True"
                                           ScrollViewer.IsDeferredScrollingEnabled="False"
                                           BorderThickness="1"
-                                          BorderBrush="#DDD"
+                                          BorderBrush="{StaticResource Theme_BorderLight}"
                                             SelectionChanged="FileListGrid_SelectionChanged"
                                            PreviewMouseDoubleClick="FileListGrid_PreviewMouseDoubleClick"
                                             PreviewMouseLeftButtonDown="FileListGrid_PreviewMouseLeftButtonDown"
@@ -285,7 +286,7 @@
 
                             <!-- Preview Panel -->
                             <Border x:Name="PreviewPanel" Grid.Row="2" Grid.ColumnSpan="5"
-                                    Background="#FAFAFA" BorderBrush="#DDD" BorderThickness="1"
+                                    Background="{StaticResource Theme_WindowBg}" BorderBrush="{StaticResource Theme_BorderLight}" BorderThickness="1"
                                     CornerRadius="4" Visibility="Collapsed">
                                 <Grid Margin="8">
                                     <Grid.RowDefinitions>
@@ -295,7 +296,7 @@
 
                                     <!-- Header -->
                                     <TextBlock x:Name="PreviewHeader" Grid.Row="0"
-                                              FontWeight="SemiBold" FontSize="12" Foreground="#666"
+                                              FontWeight="SemiBold" FontSize="12" Foreground="{StaticResource Theme_TextSecondary}"
                                               VerticalAlignment="Top" HorizontalAlignment="Left"/>
 
                                     <!-- Content area + Info Panel (dual orientation) -->
@@ -338,15 +339,15 @@
                                                         VerticalAlignment="Center">
                                                 <TextBlock x:Name="PreviewLoadingText"
                                                            Text="..."
-                                                           FontSize="13" Foreground="#888"
+                                                           FontSize="13" Foreground="{StaticResource Theme_TextDisabled}"
                                                            HorizontalAlignment="Center"/>
                                                 <ProgressBar Width="200" Height="8"
                                                              IsIndeterminate="True"
                                                              Margin="0,8,0,0"
-                                                             Foreground="#2196F3"/>
+                                                             Foreground="{StaticResource Theme_Accent}"/>
                                                 <TextBlock x:Name="PreviewLoadingPercent"
                                                            Text=""
-                                                           FontSize="11" Foreground="#AAA"
+                                                           FontSize="11" Foreground="{StaticResource Theme_TextDisabled}"
                                                            HorizontalAlignment="Center"
                                                            Margin="0,4,0,0"/>
                                             </StackPanel>
@@ -354,13 +355,13 @@
                                             <!-- Unsupported fallback -->
                                             <TextBlock x:Name="PreviewUnsupported"
                                                        Text="{l:L Preview_Unsupported}"
-                                                       FontSize="14" Foreground="#999"
+                                                        FontSize="14" Foreground="{StaticResource Theme_TextDisabled}"
                                                        HorizontalAlignment="Center" VerticalAlignment="Center"
                                                        Visibility="Collapsed"/>
 
                                             <!-- Info Panel (universal) -->
                                             <Border x:Name="PreviewInfoPanel"
-                                                    Background="#F0F0F0" CornerRadius="4" 
+                                                    Background="{StaticResource Theme_HeaderBg}" CornerRadius="4" 
                                                     Padding="10" Margin="12,0,0,0"
                                                     MinWidth="160" MinHeight="60">
                                                 <Grid>
@@ -380,38 +381,38 @@
 
                                                     <!-- Row 0: Format-specific info -->
                                                     <TextBlock x:Name="PreviewFormatInfo" Grid.Row="0" Grid.ColumnSpan="3"
-                                                               FontSize="12" Foreground="#555"
+                                                               FontSize="12" Foreground="{StaticResource Theme_TextSecondary}"
                                                                TextWrapping="Wrap" Margin="0,0,0,4"/>
 
                                                     <!-- Row 1: Separator -->
                                                     <Rectangle Grid.Row="1" Grid.ColumnSpan="3"
-                                                               Height="1" Fill="#DDD" Margin="0,0,0,4"/>
+                                                               Height="1" Fill="{StaticResource Theme_BorderLight}" Margin="0,0,0,4"/>
 
                                                     <!-- Row 2: File name -->
                                                     <TextBlock x:Name="PreviewFileNameText" Grid.Row="2" Grid.ColumnSpan="3"
-                                                               FontWeight="SemiBold" Foreground="#333" FontSize="12"
+                                                               FontWeight="SemiBold" Foreground="{StaticResource Theme_TextPrimary}" FontSize="12"
                                                                TextTrimming="CharacterEllipsis" Margin="0,0,0,4"/>
 
                                                     <!-- Row 3: Separator -->
-                                                    <Rectangle Grid.Row="3" Grid.ColumnSpan="3"
-                                                               Height="1" Fill="#DDD" Margin="0,0,0,4"/>
+                                                <Rectangle Grid.Row="3" Grid.ColumnSpan="3"
+                                                           Height="1" Fill="{StaticResource Theme_BorderLight}" Margin="0,0,0,4"/>
 
-                                                    <!-- Row 4: Size / Ratio / Compressed -->
-                                                    <TextBlock x:Name="PreviewSizeText" Grid.Row="4" Grid.Column="0"
-                                                               FontSize="11" Foreground="#555"/>
-                                                    <TextBlock x:Name="PreviewCompressedText" Grid.Row="4" Grid.Column="1"
-                                                               FontSize="11" Foreground="#555"
-                                                               HorizontalAlignment="Center"/>
-                                                    <TextBlock x:Name="PreviewRatioText" Grid.Row="4" Grid.Column="2"
-                                                               FontSize="11" Foreground="#555"
-                                                               HorizontalAlignment="Right"/>
+                                                <!-- Row 4: Size / Ratio / Compressed -->
+                                                <TextBlock x:Name="PreviewSizeText" Grid.Row="4" Grid.Column="0"
+                                                           FontSize="11" Foreground="{StaticResource Theme_TextSecondary}"/>
+                                                <TextBlock x:Name="PreviewCompressedText" Grid.Row="4" Grid.Column="1"
+                                                           FontSize="11" Foreground="{StaticResource Theme_TextSecondary}"
+                                                           HorizontalAlignment="Center"/>
+                                                <TextBlock x:Name="PreviewRatioText" Grid.Row="4" Grid.Column="2"
+                                                           FontSize="11" Foreground="{StaticResource Theme_TextSecondary}"
+                                                           HorizontalAlignment="Right"/>
 
-                                                    <!-- Row 5: Date + Encrypted -->
-                                                    <TextBlock x:Name="PreviewDateText" Grid.Row="5" Grid.Column="0"
-                                                               FontSize="11" Foreground="#555"/>
-                                                    <TextBlock x:Name="PreviewEncryptedText" Grid.Row="5" Grid.Column="2"
-                                                               FontSize="11" Foreground="#555"
-                                                               HorizontalAlignment="Right"/>
+                                                <!-- Row 5: Date + Encrypted -->
+                                                <TextBlock x:Name="PreviewDateText" Grid.Row="5" Grid.Column="0"
+                                                           FontSize="11" Foreground="{StaticResource Theme_TextSecondary}"/>
+                                                <TextBlock x:Name="PreviewEncryptedText" Grid.Row="5" Grid.Column="2"
+                                                           FontSize="11" Foreground="{StaticResource Theme_TextSecondary}"
+                                                           HorizontalAlignment="Right"/>
                                                 </Grid>
                                             </Border>
                                         </Grid>
@@ -424,7 +425,7 @@
         </Grid>
 
 <!-- Status Bar -->
-        <StatusBar Grid.Row="3" Background="#E0E0E0">
+        <StatusBar Grid.Row="3" Background="{StaticResource Theme_ProgressBg}">
             <StatusBar.ItemsPanel>
                 <ItemsPanelTemplate>
                     <Grid>
@@ -451,22 +452,22 @@
 
             <!-- Dir Stats -->
             <StatusBarItem Grid.Column="2">
-                <TextBlock x:Name="DirStatsText" Margin="4,0,4,0" Foreground="#555"/>
+                <TextBlock x:Name="DirStatsText" Margin="4,0,4,0" Foreground="{StaticResource Theme_TextSecondary}"/>
             </StatusBarItem>
 
             <!-- Selection Stats -->
             <StatusBarItem Grid.Column="3">
-                <TextBlock x:Name="SelectionStatsText" Margin="4,0,4,0" Foreground="#555"/>
+                <TextBlock x:Name="SelectionStatsText" Margin="4,0,4,0" Foreground="{StaticResource Theme_TextSecondary}"/>
             </StatusBarItem>
 
             <!-- Archive Overview -->
             <StatusBarItem Grid.Column="4">
-                <TextBlock x:Name="ArchiveStatsText" Margin="4,0,4,0" Foreground="#555"/>
+                <TextBlock x:Name="ArchiveStatsText" Margin="4,0,4,0" Foreground="{StaticResource Theme_TextSecondary}"/>
             </StatusBarItem>
 
             <!-- Password Status -->
             <StatusBarItem Grid.Column="5">
-                <TextBlock x:Name="PasswordStatusText" Margin="4,0,4,0" Foreground="#555" FontSize="11"/>
+                <TextBlock x:Name="PasswordStatusText" Margin="4,0,4,0" Foreground="{StaticResource Theme_TextSecondary}" FontSize="11"/>
             </StatusBarItem>
 
             <!-- Progress -->
@@ -479,7 +480,7 @@
 
             <!-- Version (far right) -->
             <StatusBarItem Grid.Column="7">
-                <TextBlock Text="{x:Static app:AppConstants.VersionDisplay}" Foreground="#666"/>
+                <TextBlock Text="{x:Static app:AppConstants.VersionDisplay}" Foreground="{StaticResource Theme_TextSecondary}"/>
             </StatusBarItem>
         </StatusBar>
     </Grid>

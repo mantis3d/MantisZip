@@ -6,7 +6,7 @@
         WindowStartupLocation="CenterOwner"
         ResizeMode="NoResize"
         ShowInTaskbar="False"
-        Background="#F5F5F5">
+        Background="{StaticResource Theme_WindowBg}">
     <ScrollViewer VerticalScrollBarVisibility="Auto">
         <StackPanel Margin="20">
 
@@ -15,7 +15,7 @@
             <TextBlock Text="{l:L Settings_Debug_LogPrivacyHelp_Intro}" TextWrapping="Wrap" Margin="0,0,0,16" LineHeight="22"/>
 
             <!-- 三种模式说明 -->
-            <Border Background="White" CornerRadius="4" Padding="14" BorderBrush="#DDD" BorderThickness="1" Margin="0,0,0,12">
+            <Border Background="{StaticResource Theme_SurfaceBg}" CornerRadius="4" Padding="14" BorderBrush="{StaticResource Theme_BorderLight}" BorderThickness="1" Margin="0,0,0,12">
                 <StackPanel>
                     <TextBlock Text="{l:L Settings_Debug_LogPrivacyHelp_Mode_Off}" TextWrapping="Wrap" Margin="0,0,0,10" LineHeight="20"/>
                     <TextBlock Text="{l:L Settings_Debug_LogPrivacyHelp_Mode_Filename}" TextWrapping="Wrap" Margin="0,0,0,10" LineHeight="20"/>
@@ -30,7 +30,7 @@
             <!-- 关闭按钮 -->
             <Button Content="{l:L Settings_Debug_LogPrivacyHelp_Close}" Click="Close_Click" Width="100" Height="32"
                     HorizontalAlignment="Right" IsDefault="True"
-                    Background="#2196F3" Foreground="White" Margin="0,0,0,12"/>
+                    Background="{StaticResource Theme_Accent}" Foreground="{StaticResource Theme_TextOnAccent}" Margin="0,0,0,12"/>
 
         </StackPanel>
     </ScrollViewer>
