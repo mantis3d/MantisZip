@@ -54,7 +54,7 @@
                             <ColumnDefinition Width="Auto"/>
                             <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
-                        <TextBlock x:Name="IconCompress" Text="📦" VerticalAlignment="Center"/>
+                        <TextBlock x:Name="IconCompress" Text="📦" FontSize="20" VerticalAlignment="Center"/>
                         <TextBlock Text="{l:L Settings_Tab_Compress}" Grid.Column="1" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="4,0,0,0"/>
                     </Grid>
                 </TabItem.Header>
@@ -89,7 +89,7 @@
                             <ColumnDefinition Width="Auto"/>
                             <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
-                        <TextBlock x:Name="IconExtract" Text="📂" VerticalAlignment="Center"/>
+                        <TextBlock x:Name="IconExtract" Text="📂" FontSize="20" VerticalAlignment="Center"/>
                         <TextBlock Text="{l:L Settings_Tab_Extract}" Grid.Column="1" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="4,0,0,0"/>
                     </Grid>
                 </TabItem.Header>
@@ -126,7 +126,7 @@
                             <ColumnDefinition Width="Auto"/>
                             <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
-                        <TextBlock x:Name="IconAppearance" Text="🎨" VerticalAlignment="Center"/>
+                        <TextBlock x:Name="IconAppearance" Text="🎨" FontSize="20" VerticalAlignment="Center"/>
                         <TextBlock Text="{l:L Settings_Tab_Appearance}" Grid.Column="1" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="4,0,0,0"/>
                     </Grid>
                 </TabItem.Header>
@@ -150,7 +150,7 @@
                             <ColumnDefinition Width="Auto"/>
                             <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
-                        <TextBlock x:Name="IconContextMenu" Text="☰" VerticalAlignment="Center"/>
+                        <TextBlock x:Name="IconContextMenu" Text="☰" FontSize="20" VerticalAlignment="Center"/>
                         <TextBlock Text="{l:L Settings_Tab_ContextMenu}" Grid.Column="1" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="4,0,0,0"/>
                     </Grid>
                 </TabItem.Header>
@@ -211,7 +211,7 @@
                             <ColumnDefinition Width="Auto"/>
                             <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
-                        <TextBlock x:Name="IconPreview" Text="👁" VerticalAlignment="Center"/>
+                        <TextBlock x:Name="IconPreview" Text="👁" FontSize="20" VerticalAlignment="Center"/>
                         <TextBlock Text="{l:L Settings_Tab_Preview}" Grid.Column="1" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="4,0,0,0"/>
                     </Grid>
                 </TabItem.Header>
@@ -280,7 +280,7 @@
                             <ColumnDefinition Width="Auto"/>
                             <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
-                        <TextBlock x:Name="IconFileAssoc" Text="🔗" VerticalAlignment="Center"/>
+                        <TextBlock x:Name="IconFileAssoc" Text="🔗" FontSize="20" VerticalAlignment="Center"/>
                         <TextBlock Text="{l:L Settings_Tab_FileAssoc}" Grid.Column="1" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="4,0,0,0"/>
                     </Grid>
                 </TabItem.Header>
@@ -308,7 +308,7 @@
                             <ColumnDefinition Width="Auto"/>
                             <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
-                        <TextBlock x:Name="IconPassword" Text="🔑" VerticalAlignment="Center"/>
+                        <TextBlock x:Name="IconPassword" Text="🔑" FontSize="20" VerticalAlignment="Center"/>
                         <TextBlock Text="{l:L Settings_Tab_Password}" Grid.Column="1" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="4,0,0,0"/>
                     </Grid>
                 </TabItem.Header>
@@ -330,7 +330,7 @@
                             <ColumnDefinition Width="Auto"/>
                             <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
-                        <TextBlock x:Name="IconLanguage" Text="🌐" VerticalAlignment="Center"/>
+                        <TextBlock x:Name="IconLanguage" Text="🌐" FontSize="20" VerticalAlignment="Center"/>
                         <TextBlock Text="{l:L Settings_Tab_Language}" Grid.Column="1" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="4,0,0,0"/>
                     </Grid>
                 </TabItem.Header>
@@ -351,7 +351,7 @@
                             <ColumnDefinition Width="Auto"/>
                             <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
-                        <TextBlock x:Name="IconDebug" Text="🐛" VerticalAlignment="Center"/>
+                        <TextBlock x:Name="IconDebug" Text="🐛" FontSize="20" VerticalAlignment="Center"/>
                         <TextBlock Text="{l:L Settings_Tab_Debug}" Grid.Column="1" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="4,0,0,0"/>
                     </Grid>
                 </TabItem.Header>
@@ -388,7 +388,7 @@
                             <ColumnDefinition Width="Auto"/>
                             <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
-                        <TextBlock x:Name="IconAdvanced" Text="⚙" VerticalAlignment="Center"/>
+                        <TextBlock x:Name="IconAdvanced" Text="⚙" FontSize="20" VerticalAlignment="Center"/>
                         <TextBlock Text="{l:L Settings_Tab_Advanced}" Grid.Column="1" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="4,0,0,0"/>
                     </Grid>
                 </TabItem.Header>
