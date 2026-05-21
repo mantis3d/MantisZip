@@ -47,6 +47,9 @@ public class PasswordData
 [System.Runtime.Versioning.SupportedOSPlatform("windows")]
 public class PasswordManager
 {
+    /// <summary>密码库最大条目数（防暴力破解滥用）</summary>
+    public const int MaxEntries = 1000;
+
     private static readonly string AppDataPath = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
         "MantisZip");
@@ -98,7 +101,19 @@ public class PasswordManager
         }
         catch (Exception ex)
         {
-            CoreLog.Error("PasswordManager.Load: failed, resetting to empty", ex);
+            // 使用 Trace（无 [Conditional("DEBUG")]）确保 RELEASE 下也能记录
+            CoreLog.Trace("PasswordManager.Load: failed, resetting to empty: {0}", ex.Message);
+            // 备份损坏的文件，避免用户永久丢失密码数据
+            try
+            {
+                if (File.Exists(PasswordFilePath))
+                {
+                    var backupPath = PasswordFilePath + ".corrupted." + DateTime.Now.ToString("yyyyMMddHHmmss");
+                    File.Move(PasswordFilePath, backupPath);
+                    CoreLog.Trace("PasswordManager.Load: backed up corrupted file to {0}", backupPath);
+                }
+            }
+            catch { /* 备份失败不影响继续运行 */ }
             _data = new PasswordData();
         }
     }
@@ -121,6 +136,11 @@ public class PasswordManager
     }
 
     /// <summary>
+    /// 当前密码条目数
+    /// </summary>
+    public int EntryCount => _data.Passwords.Count;
+
+    /// <summary>
     /// 获取所有密码列表
     /// </summary>
     public IReadOnlyList<PasswordEntry> GetAllPasswords() => _data.Passwords.AsReadOnly();
@@ -128,18 +148,22 @@ public class PasswordManager
     /// <summary>
     /// 根据文件名查找匹配的密码
     /// </summary>
-    public List<PasswordEntry> FindMatchingPasswords(string fileName)
+    public List<PasswordEntry> FindMatchingPasswords(string fileName, int maxResults = int.MaxValue)
     {
         var name = Path.GetFileName(fileName);
         var results = new List<PasswordEntry>();
 
         foreach (var entry in _data.Passwords)
         {
+            if (results.Count >= maxResults) break;
+
             if (MatchPattern(entry.Patterns, name))
                 results.Add(entry);
         }
 
-        CoreLog.Info($"PasswordManager.FindMatchingPasswords: file={fileName} -> {results.Count} matches");
+        var clipped = results.Count >= maxResults ? " (clipped)" : "";
+        CoreLog.Info($"PasswordManager.FindMatchingPasswords: file={fileName} -> {results.Count} matches{clipped}");
+
         return results;
     }
 
@@ -217,6 +241,9 @@ public class PasswordManager
     /// </summary>
     public void AddPassword(string password, string description, List<string> patterns)
     {
+        if (_data.Passwords.Count >= MaxEntries)
+            throw new InvalidOperationException($"Password library is full (max {MaxEntries})");
+
         CoreLog.Info($"PasswordManager.AddPassword: patterns=[{string.Join("; ", patterns)}]");
         var entry = new PasswordEntry
         {
@@ -273,6 +300,26 @@ public class PasswordManager
             entry.LastUsed = DateTime.Now;
             Save();
         }
+    }
+
+    /// <summary>
+    /// 导出为明文 JSON（用于导入导出功能）
+    /// </summary>
+    public string ExportToJson()
+    {
+        return JsonSerializer.Serialize(_data, new JsonSerializerOptions { WriteIndented = true });
+    }
+
+    /// <summary>
+    /// 从明文 JSON 导入（追加模式）
+    /// </summary>
+    public void ImportFromJson(string json)
+    {
+        var imported = JsonSerializer.Deserialize<PasswordData>(json) ?? new PasswordData();
+        if (_data.Passwords.Count + imported.Passwords.Count > MaxEntries)
+            throw new InvalidOperationException($"Import would exceed password library limit ({MaxEntries})");
+        _data.Passwords.AddRange(imported.Passwords);
+        Save();
     }
 
     /// <summary>
