@@ -77,7 +77,7 @@ public partial class MainWindow
         }
         catch (Exception ex)
         {
-            App.LogDebug("Window_Drop: unexpected error: {0}", ex.Message);
+            App.TraceLog("Window_Drop: unexpected error: {0}", ex.Message);
         }
     }
 
@@ -225,7 +225,9 @@ public partial class MainWindow
         }
         catch (Exception ex)
         {
-            App.LogDebug("FileListGrid_PreviewMouseMove: unexpected error: {0}", ex.Message);
+            App.TraceLog("FileListGrid_PreviewMouseMove: unexpected error: {0}", ex.Message);
+            AppMessageBox.Show(L.TF(L.Main_Status_ExtractFailed, ex.Message),
+                L.T(L.App_ErrorTitle), MessageBoxButton.OK, MessageBoxImage.Error);
             try { if (pw?.IsVisible == true) pw.Close(); } catch { }
             CleanupDragTempDir();
             SetStatus(L.T(L.Main_Status_Ready));

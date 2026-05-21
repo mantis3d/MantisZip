@@ -189,7 +189,11 @@ public partial class SettingsWindow : Window
 
         s.SevenZipPath = SevenZipPathBox.Text;
 
-        s.Save();
+        if (!s.Save())
+        {
+            AppMessageBox.Show(L.TF(L.Settings_SaveFailed, "settings.json"),
+                L.T(L.App_ErrorTitle), MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
         App.ApplyTextRenderingMode(SettingsTabs);
     }
 
@@ -363,7 +367,10 @@ public partial class SettingsWindow : Window
             if (!string.IsNullOrEmpty(dir) && Directory.Exists(dir))
                 Process.Start("explorer.exe", $"/select,\"{LogPathText.Text}\"");
         }
-        catch { }
+        catch (Exception logEx)
+        {
+            App.TraceLog("OpenLogFolder_Click: {0}", logEx.Message);
+        }
     }
 
     #endregion

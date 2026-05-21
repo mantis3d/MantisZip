@@ -64,7 +64,7 @@ public partial class App : Application
         }
         catch (Exception initEx)
         {
-            LogDebug("InitializeApp: failed to load AppSettings: {0}", initEx.Message);
+            TraceLog("InitializeApp: failed to load AppSettings: {0}", initEx.Message);
             // 使用默认 7z 路径继续运行
         }
     }
@@ -914,15 +914,19 @@ public partial class App : Application
 
     /// <summary>
     /// 从已保存密码中匹配并快速验证。返回 (密码, 描述) 或 null。
+    /// limitReached 表示匹配到的密码超过上限（防暴力破解），已截断。
     /// </summary>
     internal static (string Password, string Description)? TryMatchPassword(
         string archivePath, IArchiveEngine engine, ProgressWindow? progressWindow,
-        bool showPwdSection)
+        bool showPwdSection, out bool limitReached)
     {
-        var savedPasswords = PasswordManager.Instance.FindMatchingPasswords(archivePath);
+        const int maxAttempts = 100;
+        var allMatches = PasswordManager.Instance.FindMatchingPasswords(archivePath);
+        limitReached = allMatches.Count > maxAttempts;
+        var candidatePasswords = limitReached ? allMatches.Take(maxAttempts).ToList() : allMatches;
         var tried = new HashSet<string>();
 
-        foreach (var entry in savedPasswords)
+        foreach (var entry in candidatePasswords)
         {
             var pwd = entry.Password;
             if (!tried.Add(pwd)) continue;
@@ -1053,7 +1057,7 @@ public partial class App : Application
                 bool showPwd = hasEncrypted && AppSettings.Instance.ShowPasswordMatchNotification;
 
                 // 先试已保存密码
-                var match = TryMatchPassword(archivePath, engine, progressWindow, showPwd);
+                var match = TryMatchPassword(archivePath, engine, progressWindow, showPwd, out var limitReached);
                 if (match != null)
                 {
                     var (pwd, desc) = match.Value;
@@ -1072,6 +1076,18 @@ public partial class App : Application
                     await Task.Delay(2500);
                     await progressWindow.Dispatcher.InvokeAsync(() => appRef.Shutdown());
                     return;
+                }
+
+                // 自动尝试达到上限 → 提示用户
+                if (limitReached)
+                {
+                    LogStartup("RunExtractStatic: auto-try limit reached, notifying user");
+                    await progressWindow.Dispatcher.InvokeAsync(() =>
+                    {
+                        AppMessageBox.Show(
+                            L.TF(L.PwdMgr_AutoTry_LimitReached, 100),
+                            L.T(L.App_MantisZipTitle), MessageBoxButton.OK, MessageBoxImage.Warning);
+                    });
                 }
 
                 // 所有已保存密码失败 → 弹密码输入框
@@ -1302,9 +1318,11 @@ public partial class App : Application
             }
             return false;
         }
-        catch
+        catch (Exception ex)
         {
-            return false;
+            // 无法检查时保守返回 true（宁可多弹密码输入框，不可静默跳过密码导致解压失败）
+            LogDebug("HasEncryptedEntries: 无法检查压缩包 '{0}'，保守假定有加密: {1}", archivePath, ex.Message);
+            return true;
         }
     }
 
@@ -1404,7 +1422,7 @@ public partial class App : Application
             if (Directory.Exists(path))
                 Process.Start("explorer.exe", path);
         }
-        catch (Exception explorerEx) { LogDebug("OpenInExplorerStatic: failed for '{0}': {1}", path, explorerEx.Message); }
+        catch (Exception explorerEx) { TraceLog("OpenInExplorerStatic: failed for '{0}': {1}", path, explorerEx.Message); }
     }
 
     /// <summary>

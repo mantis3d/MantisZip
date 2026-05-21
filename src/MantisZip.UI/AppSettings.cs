@@ -1,5 +1,6 @@
 using System.IO;
 using System.Text.Json;
+using MantisZip.Core.Utils;
 
 namespace MantisZip.UI;
 
@@ -70,7 +71,11 @@ public class AppSettings
     private static AppSettings? _instance;
     public static AppSettings Instance => _instance ??= Load();
 
-    public void Save()
+    /// <summary>
+    /// 保存设置到 settings.json。返回 true 表示成功，false 表示失败。
+    /// 调用方可根据返回值决定是否提示用户。
+    /// </summary>
+    public bool Save()
     {
         try
         {
@@ -78,8 +83,13 @@ public class AppSettings
                 Directory.CreateDirectory(SettingsDir);
             var json = JsonSerializer.Serialize(this, new JsonSerializerOptions { WriteIndented = true });
             File.WriteAllText(SettingsFile, json);
+            return true;
         }
-        catch (Exception ex) { App.LogDebug("AppSettings.Save: failed: {0}", ex.Message); }
+        catch (Exception ex)
+        {
+            App.LogDebug("AppSettings.Save: failed: {0}", ex.Message);
+            return false;
+        }
     }
 
     private static AppSettings Load()
@@ -93,7 +103,7 @@ public class AppSettings
                 if (settings != null) return settings;
             }
         }
-        catch (Exception ex) { App.LogDebug("AppSettings.Load: failed: {0}", ex.Message); }
+        catch (Exception ex) { CoreLog.Trace("AppSettings.Load: failed: {0}", ex.Message); }
         return new AppSettings();
     }
 }

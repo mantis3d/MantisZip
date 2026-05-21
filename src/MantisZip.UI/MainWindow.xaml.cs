@@ -281,7 +281,7 @@ public partial class MainWindow : Window
             _hasEncryptedArchive = items.Any(i => i.IsEncrypted);
             if (_hasEncryptedArchive)
             {
-                var match = App.TryMatchPassword(archivePath, engine, null, false);
+                var match = App.TryMatchPassword(archivePath, engine, null, false, out var limitReached);
                 if (match != null)
                 {
                     _currentPassword = match.Value.Password;
@@ -289,6 +289,11 @@ public partial class MainWindow : Window
                 }
                 else
                 {
+                    if (limitReached)
+                    {
+                        AppMessageBox.Show(L.TF(L.PwdMgr_AutoTry_LimitReached, 100),
+                            L.T(L.App_MantisZipTitle), MessageBoxButton.OK, MessageBoxImage.Warning);
+                    }
                     // 所有保存密码都失败 → 弹密码输入框让用户输入
                     App.LogDebug("LoadArchiveAsync: no saved password matched, showing dialog");
                     var pwdDialog = new PasswordDialog(Path.GetFileName(archivePath));
@@ -403,7 +408,7 @@ public partial class MainWindow : Window
             bool showPwd = _hasEncryptedArchive && AppSettings.Instance.ShowPasswordMatchNotification;
 
             // 先试已保存密码
-            var match = App.TryMatchPassword(archivePath, engine, progressWindow, showPwd);
+            var match = App.TryMatchPassword(archivePath, engine, progressWindow, showPwd, out var limitReached);
             if (match != null)
             {
                 var (pwd, desc) = match.Value;
@@ -416,6 +421,16 @@ public partial class MainWindow : Window
                 SetStatus(L.TF(L.Main_Status_ExtractDone, Path.GetFileName(archivePath)));
                 if (AppSettings.Instance.OpenFolderAfterExtract) OpenInExplorer(destinationPath);
                 return;
+            }
+
+            // 自动尝试达到上限 → 提示用户
+            if (limitReached)
+            {
+                progressWindow.Dispatcher.Invoke(() =>
+                {
+                    AppMessageBox.Show(L.TF(L.PwdMgr_AutoTry_LimitReached, 100),
+                        L.T(L.App_MantisZipTitle), MessageBoxButton.OK, MessageBoxImage.Warning);
+                });
             }
 
             // 所有已L.T(L.PwdEdit_Save)L.T(L.PwdMgr_Col_Password)都失败，且L.T(L.Compress_Archive_Group)有加密条目 → 弹密码输入框

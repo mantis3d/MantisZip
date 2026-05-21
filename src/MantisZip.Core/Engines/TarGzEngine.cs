@@ -311,7 +311,7 @@ public class TarGzEngine : IArchiveEngine
                 }
                 catch (Exception ex)
                 {
-                    CoreLog.Error($"ListEntriesAsync: parse error", ex);
+                    CoreLog.Trace($"ListEntriesAsync: parse error: {ex.Message}");
                     // 忽略解析错误，返回已解析的部分
                 }
             }
