@@ -23,22 +23,34 @@ public class ZipEngine : IArchiveEngine
     public static ZipFile OpenZipFile(string archivePath, string? password = null)
     {
         var codec = StringCodec.FromCodePage(65001);
-        var zf = new ZipFile(archivePath, codec);
+        var first = new ZipFile(archivePath, codec);
         if (!string.IsNullOrEmpty(password))
-            zf.Password = password;
+            first.Password = password;
 
-        if (zf.Cast<ZipEntry>().Any(e => !e.IsUnicodeText))
+        try
         {
-            CoreLog.Info("OpenZipFile: detected non-UTF-8 entries, switching to system default encoding");
-            zf.Close();
-            ((IDisposable?)zf)?.Dispose();
-            // StringCodec.Default 使用系统 ANSI 编码（中文=GBK，日文=Shift-JIS，等）
-            // 不硬编码 936，尊重当前系统区域设置
-            zf = new ZipFile(archivePath, StringCodec.Default);
-            if (!string.IsNullOrEmpty(password))
-                zf.Password = password;
+            if (first.Cast<ZipEntry>().Any(e => !e.IsUnicodeText))
+            {
+                CoreLog.Info("OpenZipFile: detected non-UTF-8 entries, switching to system default encoding");
+                first.Close();
+                ((IDisposable?)first)?.Dispose();
+                // StringCodec.Default 使用系统 ANSI 编码（中文=GBK，日文=Shift-JIS，等）
+                // 不硬编码 936，尊重当前系统区域设置
+                var result = new ZipFile(archivePath, StringCodec.Default);
+                if (!string.IsNullOrEmpty(password))
+                    result.Password = password;
+                return result;
+            }
+
+            return first;
         }
-        return zf;
+        catch
+        {
+            // 枚举或构造期间异常：释放已打开的 ZipFile，防止文件句柄泄漏
+            first.Close();
+            ((IDisposable?)first)?.Dispose();
+            throw;
+        }
     }
 
     public bool CanHandle(ArchiveFormat format) => format == ArchiveFormat.Zip;
