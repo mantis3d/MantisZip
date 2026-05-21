@@ -231,3 +231,13 @@
 8. **新增文件过滤计划** — `.sisyphus/plans/file-filter-feature.md`：按类型/文件名/大小/日期过滤压缩和解压，支持命名预设持久化
 9. **版本升级** - 0.2.11
 
+### v0.2.12 (2026-05-21)
+1. **密码管理器导入导出** — `PasswordManager.ExportToJson()` 导出明文 JSON，`ImportFromJson(string)` 解析追加合并；UI 导出/导入按钮 + 文件对话框 + 确认弹窗 + 条目数预检查
+2. **密码管理器防暴力破解** — `MaxEntries=1000` 上限 + `EntryCount` 属性 + `FindMatchingPasswords(maxResults)` 可选限制 + `TryMatchPassword` 只试前 100 条 + `out bool limitReached` + UI 显示 "36 / 1000" 计数器 + 满千时添加/导入拦截弹窗提示
+3. **消除 6 处静默 catch 块** — `App.InitializeApp`/`AppSettings.Load`/`OpenInExplorerStatic`/`TarGzEngine.ListEntriesAsync`/`Window_Drop`/`FileListGrid_PreviewMouseMove` 空 `catch { }` 改为 `TraceLog` 或 `AppMessageBox` 用户提示
+4. **OpenLogFolder_Click 空 catch 修复** — SettingsWindow 打开日志文件夹失败时记录日志而非静默丢弃
+5. **OpenZipFile 句柄泄漏修复** — `ZipEngine.OpenZipFile` 枚举期间异常时释放已打开的 ZipFile 避免文件句柄泄漏
+6. **AppSettings.Save 返回值修复** — 返回 `bool` 指示保存成功/失败，调用方可根据返回值决定是否提示用户
+7. **代码扫描确认** — 验证所有 async void / BeginInvoke / Process.Start / NamedPipeServerStream / Mutex 生命周期均正确
+8. **版本升级** - 0.2.12
+
