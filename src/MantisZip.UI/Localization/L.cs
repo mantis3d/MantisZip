@@ -334,6 +334,18 @@ public static class L
     public const string PwdMgr_DeleteFailed                        = "PwdMgr_DeleteFailed";
     public const string PwdMgr_DeleteTitle                         = "PwdMgr_DeleteTitle";
     public const string PwdMgr_Edit                                = "PwdMgr_Edit";
+    public const string PwdMgr_Export                              = "PwdMgr_Export";
+    public const string PwdMgr_Export_Success                      = "PwdMgr_Export_Success";
+    public const string PwdMgr_ExportFailed                        = "PwdMgr_ExportFailed";
+    public const string PwdMgr_Import                              = "PwdMgr_Import";
+    public const string PwdMgr_Import_Confirm                      = "PwdMgr_Import_Confirm";
+    public const string PwdMgr_Import_Overflow                     = "PwdMgr_Import_Overflow";
+    public const string PwdMgr_Import_Empty                        = "PwdMgr_Import_Empty";
+    public const string PwdMgr_Import_Success                      = "PwdMgr_Import_Success";
+    public const string PwdMgr_Import_Title                        = "PwdMgr_Import_Title";
+    public const string PwdMgr_ImportFailed                        = "PwdMgr_ImportFailed";
+    public const string PwdMgr_Full                                 = "PwdMgr_Full";
+    public const string PwdMgr_AutoTry_LimitReached                 = "PwdMgr_AutoTry_LimitReached";
     public const string PwdMgr_Help_Tooltip                        = "PwdMgr_Help_Tooltip";
     public const string PwdMgr_HidePwd                             = "PwdMgr_HidePwd";
     public const string PwdMgr_SaveFailed                          = "PwdMgr_SaveFailed";
@@ -460,6 +472,7 @@ public static class L
     public const string Settings_Appearance_Theme_Dark             = "Settings_Appearance_Theme_Dark";
     public const string Settings_Appearance_ThemeRestart_Title      = "Settings_Appearance_ThemeRestart_Title";
     public const string Settings_Appearance_ThemeRestart_Msg        = "Settings_Appearance_ThemeRestart_Msg";
+    public const string Settings_SaveFailed                         = "Settings_SaveFailed";
     public const string Settings_Tab_Advanced                      = "Settings_Tab_Advanced";
     public const string Settings_Tab_Debug                         = "Settings_Tab_Debug";
     public const string Settings_Tab_Compress                      = "Settings_Tab_Compress";

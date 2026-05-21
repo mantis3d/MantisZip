@@ -468,5 +468,18 @@
   "Settings_Appearance_Theme_Light": "Light",
   "Settings_Appearance_Theme_Dark": "Dark",
   "Settings_Appearance_ThemeRestart_Title": "Theme Changed",
-  "Settings_Appearance_ThemeRestart_Msg": "Theme change requires a restart to take full effect.\n\nRestart now?"
+  "Settings_Appearance_ThemeRestart_Msg": "Theme change requires a restart to take full effect.\n\nRestart now?",
+  "Settings_SaveFailed": "Failed to save settings to disk. Your changes may not persist after restart.\n\nError: {0}",
+  "PwdMgr_Export": "Export",
+  "PwdMgr_Import": "Import",
+  "PwdMgr_Export_Success": "Passwords exported to {0}",
+  "PwdMgr_Import_Success": "Successfully imported {0} passwords",
+  "PwdMgr_Import_Confirm": "Import will add {0} passwords to the existing list. Continue?",
+  "PwdMgr_Import_Overflow": "Cannot import! Space remaining: {0} entries, import needs {1}. Delete some passwords first.",
+  "PwdMgr_Import_Empty": "No password entries found in the file",
+  "PwdMgr_Import_Title": "Import Passwords",
+  "PwdMgr_ImportFailed": "Import failed: {0}",
+  "PwdMgr_ExportFailed": "Export failed: {0}",
+  "PwdMgr_Full": "Password library is full (max {0} entries)",
+  "PwdMgr_AutoTry_LimitReached": "Auto-tried the first {0} passwords, none matched. Please enter the password manually.\n\n(This is an anti-brute-force limit.)"
 }

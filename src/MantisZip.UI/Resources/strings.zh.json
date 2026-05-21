@@ -470,5 +470,18 @@
   "Settings_Appearance_Theme_Light": "亮色",
   "Settings_Appearance_Theme_Dark": "暗色",
   "Settings_Appearance_ThemeRestart_Title": "主题已更改",
-  "Settings_Appearance_ThemeRestart_Msg": "主题设置需要重启应用才能完全生效。\n\n是否立即重启？"
+  "Settings_Appearance_ThemeRestart_Msg": "主题设置需要重启应用才能完全生效。\n\n是否立即重启？",
+  "Settings_SaveFailed": "设置保存到磁盘失败，重启后可能丢失当前修改。\n\n错误: {0}",
+  "PwdMgr_Export": "导出",
+  "PwdMgr_Import": "导入",
+  "PwdMgr_Export_Success": "密码已导出到 {0}",
+  "PwdMgr_Import_Success": "成功导入 {0} 条密码",
+  "PwdMgr_Import_Confirm": "导入将添加 {0} 条密码到现有列表，是否继续？",
+  "PwdMgr_Import_Overflow": "无法导入！密码库剩余空间 {0} 条，导入需 {1} 条。请先删除部分密码再试。",
+  "PwdMgr_Import_Empty": "文件中没有找到密码条目",
+  "PwdMgr_Import_Title": "导入密码",
+  "PwdMgr_ImportFailed": "导入失败: {0}",
+  "PwdMgr_ExportFailed": "导出失败: {0}",
+  "PwdMgr_Full": "密码库已满（最多 {0} 条）",
+  "PwdMgr_AutoTry_LimitReached": "已自动尝试前 {0} 条密码均未匹配上，请手动输入密码。\n\n（这是为了防止暴力破解的自动尝试上限。）"
 }
