@@ -36,7 +36,8 @@
 
 | 包名 | 版本 | 用途 | 许可证 |
 |------|------|------|--------|
-| SharpZipLib | 1.4.2 | ZIP / TAR / GZ 压缩解压 | MIT |
+| SharpZipLib | 1.4.2 | ZIP / TAR / GZ 压缩解压（**计划替换为 SharpCompress**） | MIT |
+| SharpCompress | — | **🎯 计划新增** — 统一 ZIP/TAR/GZ/7z 引擎 API | MIT |
 | SevenZipExtractor | 1.0.19 | 7z / RAR / ISO 解压（封装 7z.dll） | LGPL-2.1 |
 | System.Security.Cryptography.ProtectedData | 10.0.8 | DPAPI 加密存储密码 | MIT |
 
@@ -72,7 +73,7 @@
 | 开发语言 | C# (.NET 9, Windows) | 现代 .NET，CLI 直接支持 |
 | UI 框架 | WPF | Windows 原生体验，高性能 |
 | 架构模式 | Code-behind | 所有逻辑在 MainWindow.xaml.cs |
-| 压缩库 | SharpZipLib (ZIP/TAR/GZ) + SevenZipExtractor (7z/RAR) | 功能成熟 |
+| 压缩库 | SharpZipLib (ZIP/TAR/GZ) + SevenZipExtractor (7z/RAR) | 功能成熟 — **计划迁移至 SharpCompress** |
 
 ### 1.2 系统要求
 
@@ -96,6 +97,10 @@ MantisZip/
 │   │   │   ├── SevenZipEngine.cs    # 7z/RAR (SevenZipExtractor)
 │   │   │   └── TarGzEngine.cs       # TAR/GZ (SharpZipLib)
 │   │   └── Utils/                   # 工具类
+│   │       ├── FileFilter/               # 文件过滤（计划新增）
+│   │       │   ├── FileFilterCriteria.cs # 过滤条件模型
+│   │       │   ├── FileFilterMatcher.cs  # 过滤匹配逻辑
+│   │       │   └── FileFilterPreset.cs   # 过滤预设模型
 │   │       ├── PasswordManager.cs   # 密码管理器
 │   │       ├── ArchiveEntryExtractor.cs  # 单项预览提取
 │   │       ├── FileConflictHelper.cs     # 解压冲突处理
@@ -132,6 +137,10 @@ MantisZip/
 ├── docs/
 │   ├── PLAN.md
 │   └── PROGRESS.md
+├── .sisyphus/
+│   └── plans/
+│       ├── engine-unification-sharpcompress.md  # SharpCompress 迁移计划
+│       └── file-filter-feature.md                # 文件过滤功能计划
 ├── AGENTS.md
 └── MantisZip.sln
 ```
@@ -218,6 +227,8 @@ MantisZip/
 | P2 | CLI 快速压缩/解压 — `--compress-separate`/`--compress-combined`/`--extract-smart`/`--extract-here`/`--extract-to-name` | ✅ 完成 |
 | P2 | 智能解压（Smart Extract）— 自动分析压缩包结构决定是否保留顶层文件夹 | ✅ 完成 |
 | P3 | 桌面剪贴板监控 | ⬜ 待开发 |
+| P2 | 引擎统一（SharpZipLib → SharpCompress） | 📋 计划 — [查看详细计划](../.sisyphus/plans/engine-unification-sharpcompress.md) |
+| P2 | 文件过滤（按类型/文件名/大小/日期过滤压缩和解压） | 📋 计划 — [查看详细计划](../.sisyphus/plans/file-filter-feature.md)，依赖 SharpCompress 迁移 |
 
 ### 2.5 CLI 参考
 
@@ -344,17 +355,7 @@ Phase 4: ███████████████████░ 95%
 
 ## 七、下一步工作
 
-### 近期（P2）
-
-| 任务 | 说明 |
-|------|------|
-| 文本预览语法高亮 | 用 AvalonEdit 替换当前 TextBox，支持 20+ 语言语法高亮（C#/Python/XML/HTML/SQL/JS 等）。加一个 NuGet 包 + 改控件名 + 两行配置即可 |
-| 压缩方式选择 | Store/Deflate/BZip2/LZMA，需换 SharpCompress 库 |
-| Emoji.Wpf 彩色 Emoji 渲染 | WPF 不支持原生彩色 Emoji，Tag 图标(📦📂☰👁🔗🔑🌐⚙)目前为黑白。引入 [Emoji.Wpf](https://github.com/samhocevar/emoji.wpf) NuGet 包，替换 TabControl 图标的 TextBlock 为 `emoji:TextBlock` |
-| 文件列表筛选 | 搜索框实时过滤当前目录 + 子目录显示切换 |
-| 文件大小进度条 | 大小列背景按文件体积比例填充，一眼看出大文件 |
-
-### 预览格式扩展（P2-P3）
+### 预览格式扩展（P1）
 
 | 格式 | 难度 | 方案 |
 |------|:----:|------|
@@ -367,7 +368,20 @@ Phase 4: ███████████████████░ 95%
 | XLSX（文本） | 🟡 中 | 本质 ZIP，读 sharedStrings.xml 拿文本 |
 | TTF / OTF | 🟡 中 | GlyphTypeface 加载字体，Canvas 绘制示例文字 |
 | SQLite | 🟡 中 | Microsoft.Data.Sqlite 读表结构和数据 |
+| Torrent 种子文件 | 🟡 中 | Bencode 解析约 100 行 |
 | ZIP 嵌套 | 🟡 中 | 提取内部压缩包到临时目录 → 再次 LoadArchiveAsync |
+
+### 近期（P2）
+
+| 任务 | 说明 |
+|------|------|
+| 文本预览语法高亮 | 用 AvalonEdit 替换当前 TextBox，支持 20+ 语言语法高亮（C#/Python/XML/HTML/SQL/JS 等）。加一个 NuGet 包 + 改控件名 + 两行配置即可 |
+| 压缩方式选择 | Store/Deflate/BZip2/LZMA，需换 SharpCompress 库 |
+| Emoji.Wpf 彩色 Emoji 渲染 | WPF 不支持原生彩色 Emoji，Tag 图标(📦📂☰👁🔗🔑🌐⚙)目前为黑白。引入 [Emoji.Wpf](https://github.com/samhocevar/emoji.wpf) NuGet 包，替换 TabControl 图标的 TextBlock 为 `emoji:TextBlock` |
+| 文件列表筛选 | 搜索框实时过滤当前目录 + 子目录显示切换 |
+| 文件大小进度条 | 大小列背景按文件体积比例填充，一眼看出大文件 |
+
+
 
 ### 详细设计方案
 
@@ -379,20 +393,21 @@ Phase 4: ███████████████████░ 95%
 |--------|------|----------|:----:|:--------:|------|
 | **P1** | 引擎统一 (SharpZipLib → SharpCompress) | [engine-unification-sharpcompress.md](.sisyphus/plans/engine-unification-sharpcompress.md) | 🔴高 | 6-8h | 统一引擎架构，含压缩方式选择 (见上方 P2「压缩方式选择」)；突破 SharpZipLib CommitUpdate 黑盒进度问题 |
 | **P1** | 文件大小进度条 | [file-size-progress-bar.md](.sisyphus/plans/file-size-progress-bar.md) | 🟢低 | 0.5h | 大小列背景按文件体积比例填充，纯 UI 改动 |
+| **P2** | 文本预览语法高亮 (AvalonEdit) | — | 🟢低 | 1-2h | 替换当前 TextBox，支持 20+ 语言语法高亮 |
 | **P2** | 便携版模式 | [portable-mode.md](.sisyphus/plans/portable-mode.md) | 🟢低 | 1-2h | 哨兵文件触发，路径重定向到 exe 目录，免注册表 |
 | **P2** | 预览格式识别与元数据展示 | [preview-format-detection.md](.sisyphus/plans/preview-format-detection.md) | 🔴高 | 8-12h | 魔数识别 + 差异化元数据 + 扩展预览格式（PDF/SVG/CSV/EXE 元数据等）；改动范围大 |
 | **P2** | 提取日志与解压「后悔药」 | [extract-journal-undo.md](.sisyphus/plans/extract-journal-undo.md) | 🟡中 | 3-4h | 解压记录 + 一键回滚；差异化功能亮点 |
-| **P2** | 文本预览语法高亮 (AvalonEdit) | — | 🟢低 | 1-2h | 替换当前 TextBox，支持 20+ 语言语法高亮 |
 | **P2** | 文件列表筛选/搜索 | — | 🟢低 | 1-2h | 搜索框实时过滤 + 子目录显示切换增强 |
 | **P2** | Emoji.Wpf 彩色 Emoji | — | 🟢低 | 0.5h | 替换 TabControl 图标 TextBlock 为 emoji:TextBlock |
 | **P2** | MSI 安装包 (WiX) | [msi-packaging-wix.md](.sisyphus/plans/msi-packaging-wix.md) | 🟡中 | 2-3h | Inno Setup EXE → WiX MSI 迁移；企业分发、静默安装 |
-| **P3** | 压缩包对比 (Archive Diff) | [archive-diff.md](.sisyphus/plans/archive-diff.md) | 🟡中 | 3-4h | 压缩包文件级差异对比；独特功能但非核心 |
 | **P3** | 压缩预估 (Compression Estimator) | [compression-estimator.md](.sisyphus/plans/compression-estimator.md) | 🟡中 | 4-5h | 压缩前估算大小/耗时；三级精度策略 |
 | **P3** | VirtualFileDataObject | [virtual-file-data-object.md](.sisyphus/plans/virtual-file-data-object.md) | 🔴高 | 6-8h | COM 原生 IDataObject 替代 WPF OLE 桥，拖拽延迟渲染不崩溃 |
 | **P3** | COM 右键菜单 | — | 🔴高 | 4-6h | 动态菜单名、菜单排序、自定义图标 |
-| **P3** | 右键菜单目录结构预览 | — | 🔴高 | 6-8h | COM 菜单中展示压缩包文件树（Bandizip 风格） |
-| **P3** | 外部工具视频元数据 | — | 🟢低 | 1-2h | ffprobe 提取时长/分辨率/编码 |
 | **P3** | 预览格式扩展（逐项） | 见 [preview-format-detection.md](.sisyphus/plans/preview-format-detection.md) | 🟢~🟡 | 各 0.5-2h | RTF/CSV/SVG/EXE/LNK/PDF/XLSX/TTF/SQLite/ZIP嵌套 |
+| **P3** | 右键菜单目录结构预览 | — | 🔴高 | 6-8h | COM 菜单中展示压缩包文件树（Bandizip 风格） |
+
+| **P3** | 外部工具视频元数据 | — | 🟢低 | 1-2h | ffprobe 提取时长/分辨率/编码 |
+| **P3** | 压缩包对比 (Archive Diff) | [archive-diff.md](.sisyphus/plans/archive-diff.md) | 🟡中 | 3-4h | 压缩包文件级差异对比；独特功能但非核心 |
 | **P3** | 发布 Release | — | 🟢低 | 1-2h | GitHub Releases + CI 自动构建 |
 
 #### 已实现设计方案

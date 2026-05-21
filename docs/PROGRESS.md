@@ -4,11 +4,20 @@
 - **项目名称**: MantisZip
 - **类型**: Windows 压缩/解压软件 (WPF)
 - **目标**: 替代 Bandizip 的开源压缩软件
-- **技术栈**: .NET 9 + WPF + SharpZipLib + SevenZipExtractor
+- **技术栈**: .NET 9 + WPF + SharpZipLib + SevenZipExtractor（**计划迁移至 SharpCompress**）
 
 ## 版本
 - **当前版本**: 0.2.10
 - **发布日期**: 2026-05-20
+
+## 规划中
+- **引擎统一计划** — SharpZipLib → SharpCompress（详见 `.sisyphus/plans/engine-unification-sharpcompress.md`）
+  - 统一 ZIP/TAR/GZ/7z API 接口
+  - 支持按条目选择性提取（为过滤功能铺路）
+- **文件过滤功能** — 按类型/文件名/大小/日期过滤压缩和解压（详见 `.sisyphus/plans/file-filter-feature.md`）
+  - 压缩时只打包匹配条件的文件
+  - 解压时只提取匹配条件的条目
+  - 支持命名预设持久化
 
 ## 版本历史（按日期排序）
 
@@ -210,4 +219,15 @@
 3. **设置窗口菜单页分组** — 浏览/压缩/解压三个子组 + GroupBox 分组分隔线，所有标签去掉「启用」前缀
 4. **文档同步更新** — README.md CLI 表补全、开发计划表补全（Smart Extract ✅、暗色主题 ✅、per-verb 开关）；AGENTS.md 补充所有 extract 模式绕过 MainWindow 的说明；PLAN.md 同步更新版本号/CLI表/进度概览/已实现设计方案
 5. **版本升级** - 0.2.10
+
+### v0.2.11 (2026-05-21)
+1. **右键菜单层叠模式项目缺失修复** — `CommandFlags=8` (ECF_SEPARATORBEFORE) 直接设置在动词上导致 `ExtendedSubCommandsKey` 子菜单中该动词不显示，改为使用独立的 separator 动词
+2. **IPC 管道服务器只接受一次连接修复** — `StartPipeServer` 创建单个 `NamedPipeServerStream` 只调一次 `WaitForConnectionAsync`，3+ 文件时只能收集 2 个路径；改为 `while (!ct.IsCancellationRequested)` 循环，每次创建新管道实例，完整收集所有进程路径
+3. **压缩冲突对话框二次弹出修复** — `RunCompressCombined` / `RunCompressSeparateBatch` 中 `Rename` 分支重复创建 `CompressConflictDialog`，用户需点击两次"自动重命名"；改为捕获首次对话框的 `CustomName` 直接使用
+4. **设置窗口 Shell 按钮预保存设置修复** — `ApplyShellBtn_Click` / `InstallBtn_Click` 未先调 `SaveSettings()`，导致右键菜单注册使用了旧设置值
+5. **Shell 注册增加 SHChangeNotify** — `Install()`/`Uninstall()` 末尾调用 `SHChangeNotify(SHCNE_ASSOCCHANGED, ...)` 强制 Explorer 刷新缓存
+6. **工具栏"智能解压"文本分离** — 新增 `Main_Toolbar_SmartExtract` 键值为"智能解压"（原有 `Shell_SmartExtract` "智能解压到此处"不变），工具栏按钮改用新键
+7. **新增引擎统一计划** — `.sisyphus/plans/engine-unification-sharpcompress.md`：SharpZipLib → SharpCompress + 新增 `ExtractEntriesAsync` 接口
+8. **新增文件过滤计划** — `.sisyphus/plans/file-filter-feature.md`：按类型/文件名/大小/日期过滤压缩和解压，支持命名预设持久化
+9. **版本升级** - 0.2.11
 

@@ -135,7 +135,51 @@ All handled in `App.OnStartup` before normal UI startup:
 
 ## Key gotchas
 
-### Chinese filename encoding (ZIP)
+## Upcoming work
+
+Two work plans tracked under `.sisyphus/plans/`:
+
+| Plan | Status | Dependency |
+|------|--------|------------|
+| [engine-unification-sharpcompress.md](.sisyphus/plans/engine-unification-sharpcompress.md) | 📋 Planned | None |
+| [file-filter-feature.md](.sisyphus/plans/file-filter-feature.md) | 📋 Planned | SharpCompress migration |
+
+### Planned: Engine unification (SharpZipLib → SharpCompress)
+
+Replace SharpZipLib with SharpCompress to get:
+- Unified `IArchive` / `IReader` API across all formats
+- Per-instance encoding (no more `ZipStrings.CodePage` global state)
+- Native async/await
+- Selective extraction via `IArchiveEntry.WriteToFile()` — enables per-entry filtering
+- New `IArchiveEngine.ExtractEntriesAsync()` method for filtered extraction
+
+See [plan](.sisyphus/plans/engine-unification-sharpcompress.md) for phased implementation (TarGzEngine → ArchiveEntryExtractor → ZipEngine → SevenZipEngine).
+
+### Planned: File filter feature
+
+Add filtering to compress/extract operations — filter by file type extension, filename pattern, size range, or date range. Supports named presets persisted in settings.
+
+See [plan](.sisyphus/plans/file-filter-feature.md).
+
+## Known issues (already fixed)
+
+### Context menu cascade mode — CommandFlags=8 hides items
+
+Setting `ECF_SEPARATORBEFORE` (`CommandFlags=8`) directly on verbs in an `ExtendedSubCommandsKey` cascade submenu causes those verbs to not appear on some Windows versions. Fixed by using explicit separator verbs instead.
+
+### IPC pipe server only accepted one connection
+
+`StartPipeServer` created one `NamedPipeServerStream` and called `WaitForConnectionAsync` once. With 3+ selected files, only 2 processes could communicate — the 3rd+ process's `Connect()` timed out. Fixed by wrapping in a `while (!ct.IsCancellationRequested)` loop creating a new pipe per client.
+
+### `CompressConflictDialog` shown twice on auto-rename
+
+When clicking "自动重命名" in the file conflict dialog, the `Rename` case re-created a new `CompressConflictDialog`. Fixed by capturing `CustomName` from the first dialog and using it directly, skipping the second popup.
+
+## Key gotchas
+
+### Chinese filename encoding (ZIP) — to be removed with SharpCompress
+
+*(This section is historic — SharpCompress migration will eliminate the global encoding hack.)*
 
 ```csharp
 Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
@@ -146,9 +190,7 @@ These are set **once globally** in `App.InitializeApp()` (called at the top of `
 
 **Rule**: If adding new code paths that bypass `App.OnStartup`, call `App.InitializeApp()` first, or replicate both lines before any `ZipFile` usage.
 
-### 7z compression requires external 7z.exe
-
-`SevenZipEngine` hardcodes path: `C:\Program Files\7-Zip\7z.exe`. If absent, 7z compression fails silently.
+### 7z compression requires external 7z.exe — to be removed with SharpCompress migration Phase 4
 
 ### 7z encrypted preview not supported
 
