@@ -1,7 +1,9 @@
+using System.IO;
 using System.Windows;
 using System.Collections.ObjectModel;
 using MantisZip.Core;
 using MantisZip.UI.Localization;
+using Microsoft.Win32;
 
 namespace MantisZip.UI;
 
@@ -38,6 +40,7 @@ public partial class PasswordManagerWindow : Window
         }
 
         PasswordGrid.ItemsSource = passwords;
+        PwdCounter.Text = $"{PasswordManager.Instance.EntryCount} / {PasswordManager.MaxEntries}";
     }
 
     /// <summary>
@@ -52,6 +55,13 @@ public partial class PasswordManagerWindow : Window
 
     private void Add_Click(object sender, RoutedEventArgs e)
     {
+        if (PasswordManager.Instance.EntryCount >= PasswordManager.MaxEntries)
+        {
+            AppMessageBox.Show(L.TF(L.PwdMgr_Full, PasswordManager.MaxEntries),
+                L.T(L.App_MantisZipTitle), MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
         var dialog = new PasswordEditDialog();
         dialog.Owner = this;
         if (dialog.ShowDialog() == true)
@@ -91,6 +101,94 @@ public partial class PasswordManagerWindow : Window
             try { PasswordManager.Instance.DeletePassword(entry.Id); }
             catch (Exception ex) { AppMessageBox.Show(L.TF(L.Password_DeleteFailed, ex.Message), L.T(L.App_ErrorTitle), MessageBoxButton.OK, MessageBoxImage.Error); }
             LoadPasswords(_showPasswords);
+        }
+    }
+
+    private void Export_Click(object sender, RoutedEventArgs e)
+    {
+        var dialog = new SaveFileDialog
+        {
+            Filter = "JSON 文件|*.json",
+            FileName = "passwords-export.json"
+        };
+        if (dialog.ShowDialog() == true)
+        {
+            try
+            {
+                var json = PasswordManager.Instance.ExportToJson();
+                File.WriteAllText(dialog.FileName, json);
+                AppMessageBox.Show(L.TF(L.PwdMgr_Export_Success, dialog.FileName),
+                    L.T(L.App_MantisZipTitle), MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+            catch (Exception ex)
+            {
+                AppMessageBox.Show(L.TF(L.PwdMgr_ExportFailed, ex.Message),
+                    L.T(L.App_ErrorTitle), MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+    }
+
+    private void Import_Click(object sender, RoutedEventArgs e)
+    {
+        var dialog = new OpenFileDialog
+        {
+            Filter = "JSON 文件|*.json"
+        };
+        if (dialog.ShowDialog() == true)
+        {
+            // 先解析确认条目数
+            string importedJson;
+            int entryCount;
+            try
+            {
+                importedJson = File.ReadAllText(dialog.FileName);
+                var data = System.Text.Json.JsonSerializer.Deserialize<PasswordData>(importedJson);
+                entryCount = data?.Passwords?.Count ?? 0;
+            }
+            catch (Exception ex)
+            {
+                AppMessageBox.Show(L.TF(L.PwdMgr_ImportFailed, ex.Message),
+                    L.T(L.App_ErrorTitle), MessageBoxButton.OK, MessageBoxImage.Error);
+                return;
+            }
+
+            if (entryCount == 0)
+            {
+                AppMessageBox.Show(L.T(L.PwdMgr_Import_Empty),
+                    L.T(L.App_MantisZipTitle), MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            // 预检查：导入后是否超过上限
+            var currentCount = PasswordManager.Instance.EntryCount;
+            if (currentCount + entryCount > PasswordManager.MaxEntries)
+            {
+                AppMessageBox.Show(L.TF(L.PwdMgr_Import_Overflow, PasswordManager.MaxEntries - currentCount, entryCount),
+                    L.T(L.App_ErrorTitle), MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            var result = AppMessageBox.Show(
+                L.TF(L.PwdMgr_Import_Confirm, entryCount),
+                L.T(L.PwdMgr_Import_Title),
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Question);
+
+            if (result == MessageBoxResult.Yes)
+            {
+                try
+                {
+                    PasswordManager.Instance.ImportFromJson(importedJson);
+                    LoadPasswords(_showPasswords);
+                    AppMessageBox.Show(L.TF(L.PwdMgr_Import_Success, entryCount),
+                        L.T(L.App_MantisZipTitle), MessageBoxButton.OK, MessageBoxImage.Information);
+                }
+                catch (Exception ex)
+                {
+                    AppMessageBox.Show(L.TF(L.PwdMgr_ImportFailed, ex.Message),
+                        L.T(L.App_ErrorTitle), MessageBoxButton.OK, MessageBoxImage.Error);
+                }
+            }
         }
     }
 
