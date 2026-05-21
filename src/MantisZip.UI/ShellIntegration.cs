@@ -1,5 +1,6 @@
 using System.IO;
 using System.Reflection;
+using System.Runtime.InteropServices;
 using Microsoft.Win32;
 using MantisZip.UI.Localization;
 
@@ -20,6 +21,11 @@ namespace MantisZip.UI;
 /// </summary>
 internal static class ShellIntegration
 {
+    [DllImport("shell32.dll", CharSet = CharSet.Auto)]
+    private static extern void SHChangeNotify(uint wEventId, uint uFlags, IntPtr dwItem1, IntPtr dwItem2);
+
+    private const uint SHCNE_ASSOCCHANGED = 0x08000000;
+    private const uint SHCNF_IDLIST = 0x0000;
     private static readonly string[] ArchiveExtensions =
         [".zip", ".7z", ".rar", ".tar", ".tgz", ".tar.gz", ".gz", ".iso"];
 
@@ -83,6 +89,9 @@ internal static class ShellIntegration
             InstallCascade(s, exePath);
         else
             InstallVerbs(s, exePath);
+        // 通知 Windows Shell 刷新上下文菜单缓存
+        SHChangeNotify(SHCNE_ASSOCCHANGED, SHCNF_IDLIST, IntPtr.Zero, IntPtr.Zero);
+
         App.LogDebug("ShellIntegration.Install: done, cascade={0}, exePath={1}", s.EnableCascadingMenu, exePath);
     }
 
@@ -132,6 +141,9 @@ internal static class ShellIntegration
         {
             DeleteRegistryKey($@"Software\Classes\{ext}\shell\MantisZipExtract");
         }
+        // 通知 Windows Shell 刷新上下文菜单缓存
+        SHChangeNotify(SHCNE_ASSOCCHANGED, SHCNF_IDLIST, IntPtr.Zero, IntPtr.Zero);
+
         App.LogDebug("ShellIntegration.Uninstall: done");
     }
 
@@ -158,6 +170,9 @@ internal static class ShellIntegration
             SetRegistryValue(entryPath, "Icon", $"""{exePath},0""");
 
         // 子命令：{CascadeRoot}\{suffix}\shell\{order_name}\command
+        // 注：分隔线使用独立的 separator verb（CommandFlags=8），
+        // 不直接设置在真实动词上，避免部分 Windows 版本上
+        // ECF_SEPARATORBEFORE 导致动词本身不显示。
         var shellPath = $@"Software\Classes\{subCommandsPath}\shell";
         int order = 0;
 
@@ -177,15 +192,19 @@ internal static class ShellIntegration
         // 解压相关动词（仅压缩包；每个独立控制）
         if (includeExtract)
         {
-            bool firstInGroup = true;
+            bool hasExtract = s.EnableExtractHereMenu || s.EnableSmartExtractMenu || s.EnableExtractToNamedMenu || s.EnableExtractToMenu;
+            if (hasExtract)
+            {
+                order++;
+                InstallSeparator(shellPath, order);
+            }
+
             // 2. 用MantisZip解压到此处
             if (s.EnableExtractHereMenu)
             {
                 order++;
                 var verb = $"{order:D2}_extracthere";
                 var verbPath = $@"{shellPath}\{verb}";
-                if (firstInGroup && order > 1) SetRegistryDword(verbPath, "CommandFlags", 8);
-                firstInGroup = false;
                 SetRegistryValue(verbPath, null, ExtractHereDisplay);
                 SetRegistryValue(verbPath, "AppliesTo", BuildAppliesToFilter());
                 if (s.ShowMenuIcons)
@@ -199,8 +218,6 @@ internal static class ShellIntegration
                 order++;
                 var verb = $"{order:D2}_smartextract";
                 var verbPath = $@"{shellPath}\{verb}";
-                if (firstInGroup && order > 1) SetRegistryDword(verbPath, "CommandFlags", 8);
-                firstInGroup = false;
                 SetRegistryValue(verbPath, null, ExtractSmartDisplay);
                 SetRegistryValue(verbPath, "AppliesTo", BuildAppliesToFilter());
                 if (s.ShowMenuIcons)
@@ -214,8 +231,6 @@ internal static class ShellIntegration
                 order++;
                 var verb = $"{order:D2}_extracttonamed";
                 var verbPath = $@"{shellPath}\{verb}";
-                if (firstInGroup && order > 1) SetRegistryDword(verbPath, "CommandFlags", 8);
-                firstInGroup = false;
                 SetRegistryValue(verbPath, null, ExtractToNamedDisplay);
                 SetRegistryValue(verbPath, "AppliesTo", BuildAppliesToFilter());
                 if (s.ShowMenuIcons)
@@ -229,8 +244,6 @@ internal static class ShellIntegration
                 order++;
                 var verb = $"{order:D2}_extract";
                 var verbPath = $@"{shellPath}\{verb}";
-                if (firstInGroup && order > 1) SetRegistryDword(verbPath, "CommandFlags", 8);
-                firstInGroup = false;
                 SetRegistryValue(verbPath, null, ExtractDisplay);
                 SetRegistryValue(verbPath, "AppliesTo", BuildAppliesToFilter());
                 if (s.ShowMenuIcons)
@@ -241,15 +254,19 @@ internal static class ShellIntegration
 
         // 压缩
         {
-            bool firstInGroup = true;
+            bool hasCompress = s.EnableCompressSeparate || s.EnableCompressCombined || s.EnableCompressMenu;
+            if (hasCompress)
+            {
+                order++;
+                InstallSeparator(shellPath, order);
+            }
+
             // 5. 压缩到独立的（文件名）
             if (s.EnableCompressSeparate)
             {
                 order++;
                 var verb = $"{order:D2}_compressseparate";
                 var verbPath = $@"{shellPath}\{verb}";
-                if (firstInGroup && order > 1) SetRegistryDword(verbPath, "CommandFlags", 8);
-                firstInGroup = false;
                 SetRegistryValue(verbPath, null, CompressSeparateDisplay);
                 if (s.ShowMenuIcons)
                     SetRegistryValue(verbPath, "Icon", $"""{exePath},0""");
@@ -262,8 +279,6 @@ internal static class ShellIntegration
                 order++;
                 var verb = $"{order:D2}_compresscombined";
                 var verbPath = $@"{shellPath}\{verb}";
-                if (firstInGroup && order > 1) SetRegistryDword(verbPath, "CommandFlags", 8);
-                firstInGroup = false;
                 SetRegistryValue(verbPath, null, CompressCombinedDisplay);
                 if (s.ShowMenuIcons)
                     SetRegistryValue(verbPath, "Icon", $"""{exePath},0""");
@@ -276,8 +291,6 @@ internal static class ShellIntegration
                 order++;
                 var verb = $"{order:D2}_compress";
                 var verbPath = $@"{shellPath}\{verb}";
-                if (firstInGroup && order > 1) SetRegistryDword(verbPath, "CommandFlags", 8);
-                firstInGroup = false;
                 SetRegistryValue(verbPath, null, CompressDisplay);
                 if (s.ShowMenuIcons)
                     SetRegistryValue(verbPath, "Icon", $"""{exePath},0""");

@@ -65,65 +65,65 @@
                 </ToolBar.Resources>
                 <Button ToolTip="{l:L Main_Tooltip_NewArchive}" Click="NewArchive_Click" Padding="8,6">
                     <StackPanel Orientation="Vertical" HorizontalAlignment="Center">
-                        <TextBlock Text="🆕" FontSize="22" HorizontalAlignment="Center"/>
+                        <TextBlock Text="🆕" FontSize="25" HorizontalAlignment="Center"/>
                         <TextBlock Text="{l:L Main_Toolbar_New}" FontSize="12" HorizontalAlignment="Center"/>
                     </StackPanel>
                 </Button>
                 <Button ToolTip="{l:L Main_Tooltip_OpenArchive}" Click="OpenArchive_Click" Padding="8,6">
                     <StackPanel Orientation="Vertical" HorizontalAlignment="Center">
-                        <TextBlock Text="📂" FontSize="22" HorizontalAlignment="Center"/>
+                        <TextBlock Text="📂" FontSize="25" HorizontalAlignment="Center"/>
                         <TextBlock Text="{l:L Main_Toolbar_Open}" FontSize="12" HorizontalAlignment="Center"/>
                     </StackPanel>
                 </Button>
                 <Button ToolTip="{l:L Main_Tooltip_Extract}" Click="Extract_Click" Padding="8,6">
                     <StackPanel Orientation="Vertical" HorizontalAlignment="Center">
-                        <TextBlock Text="📤" FontSize="22" HorizontalAlignment="Center"/>
+                        <TextBlock Text="📤" FontSize="25" HorizontalAlignment="Center"/>
                         <TextBlock Text="{l:L Settings_Tab_Extract}" FontSize="12" HorizontalAlignment="Center"/>
                     </StackPanel>
                 </Button>
                 <Button ToolTip="{l:L Main_Tooltip_Compress}" Click="Compress_Click" Padding="8,6">
                     <StackPanel Orientation="Vertical" HorizontalAlignment="Center">
-                        <TextBlock Text="📥" FontSize="22" HorizontalAlignment="Center"/>
+                        <TextBlock Text="📥" FontSize="25" HorizontalAlignment="Center"/>
                         <TextBlock Text="{l:L Shell_Compress}" FontSize="12" HorizontalAlignment="Center"/>
                     </StackPanel>
                 </Button>
                 <Button x:Name="SmartExtractBtn" ToolTip="{l:L Main_Tooltip_SmartExtract}" Click="SmartExtract_Click" Padding="8,6" IsEnabled="False">
                     <StackPanel Orientation="Vertical" HorizontalAlignment="Center">
-                        <TextBlock Text="🤖" FontSize="22" HorizontalAlignment="Center"/>
-                        <TextBlock Text="{l:L Shell_SmartExtract}" FontSize="12" HorizontalAlignment="Center"/>
+                        <TextBlock Text="🤖" FontSize="25" HorizontalAlignment="Center"/>
+                        <TextBlock Text="{l:L Main_Toolbar_SmartExtract}" FontSize="12" HorizontalAlignment="Center"/>
                     </StackPanel>
                 </Button>
                 <Separator/>
                 <Button x:Name="AddFilesBtn" ToolTip="{l:L Main_Tooltip_AddFiles}" Click="AddFiles_Click" Padding="8,6" IsEnabled="False">
                     <StackPanel Orientation="Vertical" HorizontalAlignment="Center">
-                        <TextBlock Text="➕" FontSize="22" HorizontalAlignment="Center"/>
+                        <TextBlock Text="➕" FontSize="25" HorizontalAlignment="Center"/>
                         <TextBlock Text="{l:L Main_Toolbar_AddFiles}" FontSize="12" HorizontalAlignment="Center"/>
                     </StackPanel>
                 </Button>
                 <Button x:Name="DeleteFilesBtn" ToolTip="{l:L Main_Tooltip_DeleteFiles}" Click="DeleteFiles_Click" Padding="8,6" IsEnabled="False">
                     <StackPanel Orientation="Vertical" HorizontalAlignment="Center">
-                        <TextBlock Text="✖" FontSize="22" Foreground="{StaticResource Theme_StatusError}" HorizontalAlignment="Center"/>
+                        <TextBlock Text="✖" FontSize="25" Foreground="{StaticResource Theme_StatusError}" HorizontalAlignment="Center"/>
                         <TextBlock Text="{l:L Main_Toolbar_DeleteFiles}" FontSize="12" HorizontalAlignment="Center"/>
                     </StackPanel>
                 </Button>
                 <Separator/>
                 <Button ToolTip="{l:L Main_Tooltip_Test}" Click="TestArchive_Click" Padding="8,6">
                     <StackPanel Orientation="Vertical" HorizontalAlignment="Center">
-                        <TextBlock Text="✓" FontSize="22" Foreground="{StaticResource Theme_StatusSuccess}" HorizontalAlignment="Center"/>
+                        <TextBlock Text="✓" FontSize="25" Foreground="{StaticResource Theme_StatusSuccess}" HorizontalAlignment="Center"/>
                         <TextBlock Text="{l:L Main_Toolbar_Test}" FontSize="12" HorizontalAlignment="Center"/>
                     </StackPanel>
                 </Button>
                 <Separator/>
                 <Button x:Name="EnterPasswordBtn" ToolTip="{l:L Main_Tooltip_Password}" Click="EnterPassword_Click" Padding="8,6" IsEnabled="False">
                     <StackPanel Orientation="Vertical" HorizontalAlignment="Center">
-                        <TextBlock Text="🔑" FontSize="22" HorizontalAlignment="Center"/>
+                        <TextBlock Text="🔑" FontSize="25" HorizontalAlignment="Center"/>
                         <TextBlock Text="{l:L PwdMgr_Col_Password}" FontSize="12" HorizontalAlignment="Center"/>
                     </StackPanel>
                 </Button>
                 <Separator/>
                 <ToggleButton x:Name="PreviewToggleBtn" ToolTip="{l:L Main_Tooltip_Preview}" Click="PreviewToggleBtn_Click" Padding="8,6">
                     <StackPanel Orientation="Vertical" HorizontalAlignment="Center">
-                        <TextBlock x:Name="PreviewToggleIcon" Text="👁" FontSize="20" HorizontalAlignment="Center"/>
+                        <TextBlock x:Name="PreviewToggleIcon" Text="👁" FontSize="25" HorizontalAlignment="Center"/>
                         <TextBlock Text="{l:L Settings_Tab_Preview}" FontSize="12" HorizontalAlignment="Center"/>
                     </StackPanel>
                 </ToggleButton>

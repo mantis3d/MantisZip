@@ -211,6 +211,8 @@ public partial class SettingsWindow : Window
     {
         try
         {
+            // 先持久化当前 UI 设置，再安装
+            SaveSettings();
             ShellIntegration.Uninstall();
             ShellIntegration.Install();
             UpdateShellStatus();
@@ -307,7 +309,8 @@ public partial class SettingsWindow : Window
     {
         try
         {
-            // 先卸载旧的，再按当前设置安装
+            // 先持久化 UI 当前的设置到 AppSettings.Instance，再安装
+            SaveSettings();
             ShellIntegration.Uninstall();
             ShellIntegration.Install();
             UpdateShellStatus();

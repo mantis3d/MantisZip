@@ -317,21 +317,30 @@ public partial class App : Application
         {
             try
             {
-                using var pipe = new NamedPipeServerStream(
-                    pipeName, PipeDirection.In, -1,
-                    PipeTransmissionMode.Message, PipeOptions.Asynchronous);
                 readyEvent.Set();
-                await pipe.WaitForConnectionAsync(ct);
-                using var reader = new StreamReader(pipe);
-                var line = await reader.ReadLineAsync();
-                while (line != null)
+                // 循环接受多个客户端连接。Windows 每选一个文件启动一个独立进程，
+                // 每个后续进程通过命名管道发送自己的路径。
+                while (!ct.IsCancellationRequested)
                 {
-                    lock (allPaths)
+                    using var pipe = new NamedPipeServerStream(
+                        pipeName, PipeDirection.In, -1,
+                        PipeTransmissionMode.Message, PipeOptions.Asynchronous);
+                    try
                     {
-                        if (!allPaths.Contains(line) && (File.Exists(line) || Directory.Exists(line)))
-                            allPaths.Add(line);
+                        await pipe.WaitForConnectionAsync(ct);
+                        using var reader = new StreamReader(pipe);
+                        string? line;
+                        while ((line = await reader.ReadLineAsync()) != null)
+                        {
+                            lock (allPaths)
+                            {
+                                if (!allPaths.Contains(line) && (File.Exists(line) || Directory.Exists(line)))
+                                    allPaths.Add(line);
+                            }
+                        }
                     }
-                    line = await reader.ReadLineAsync();
+                    catch (OperationCanceledException) { throw; }
+                    finally { pipe.Dispose(); }
                 }
             }
             catch (OperationCanceledException) { }
@@ -452,12 +461,15 @@ public partial class App : Application
                         var engine = ArchiveEngineFactory.GetEngineByExtension(outputPath);
                         bool canAdd = engine is not null and not TarGzEngine;
 
+                        string? initialCustomName = null;
                         var conflictResult = await progressWindow.Dispatcher.InvokeAsync(() =>
                         {
                             var dlg = new CompressConflictDialog(outputPath, canAdd, Path.GetFileName(GetUniquePath(outputPath)));
-                            return dlg.ShowDialog() == true
+                            var result = dlg.ShowDialog() == true
                                 ? dlg.ResultAction
                                 : CompressConflictAction.Cancel;
+                            initialCustomName = dlg.CustomName;
+                            return result;
                         });
 
                         switch (conflictResult)
@@ -466,13 +478,7 @@ public partial class App : Application
                                 failed++;
                                 continue;
                             case CompressConflictAction.Rename:
-                                finalPath = Path.Combine(parentDir,
-                                    await progressWindow.Dispatcher.InvokeAsync(() =>
-                                    {
-                                        var dlg = new CompressConflictDialog(outputPath, canAdd, Path.GetFileName(GetUniquePath(outputPath)));
-                                        dlg.ShowDialog();
-                                        return dlg.CustomName ?? Path.GetFileName(GetUniquePath(outputPath));
-                                    }));
+                                finalPath = Path.Combine(parentDir, initialCustomName ?? Path.GetFileName(GetUniquePath(outputPath)));
                                 break;
                             case CompressConflictAction.Add:
                                 addMode = true;
@@ -631,12 +637,15 @@ public partial class App : Application
                     var engine = ArchiveEngineFactory.GetEngineByExtension(finalPath);
                     bool canAdd = engine is not null and not TarGzEngine;
 
+                    string? initialCustomName = null;
                     var conflictResult = await progressWindow.Dispatcher.InvokeAsync(() =>
                     {
                         var dlg = new CompressConflictDialog(finalPath, canAdd, Path.GetFileName(GetUniquePath(finalPath)));
-                        return dlg.ShowDialog() == true
+                        var result = dlg.ShowDialog() == true
                             ? dlg.ResultAction
                             : CompressConflictAction.Cancel;
+                        initialCustomName = dlg.CustomName;
+                        return result;
                     });
 
                     switch (conflictResult)
@@ -645,13 +654,7 @@ public partial class App : Application
                             await progressWindow.Dispatcher.InvokeAsync(() => app.Shutdown());
                             return;
                         case CompressConflictAction.Rename:
-                            var renamed = await progressWindow.Dispatcher.InvokeAsync(() =>
-                            {
-                                var dlg = new CompressConflictDialog(finalPath, canAdd, Path.GetFileName(GetUniquePath(finalPath)));
-                                dlg.ShowDialog();
-                                return dlg.CustomName ?? Path.GetFileName(GetUniquePath(finalPath));
-                            });
-                            outputPath = Path.Combine(parentDir, renamed);
+                            outputPath = Path.Combine(parentDir, initialCustomName ?? Path.GetFileName(GetUniquePath(finalPath)));
                             break;
                         case CompressConflictAction.Add:
                             {
