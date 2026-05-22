@@ -44,6 +44,10 @@ public class AppSettings
     public long MaxTextPreviewBytes { get; set; } = 5 * 1024 * 1024;
     public long MaxPreviewFileSize { get; set; } = 15 * 1024 * 1024; // 默认 15 MB
     public int TextPreviewFontSize { get; set; } = 12;
+    public string TextPreviewFontFamily { get; set; } = "";           // 空=系统默认
+    public string TextEncodingPreference { get; set; } = "auto";      // auto / utf-8 / gbk
+    public string FontPreviewSampleText { get; set; } =
+        "The quick brown fox jumps over the lazy dog.\n0123456789\n天地玄黄 宇宙洪荒 日月盈昃 辰宿列张";
     public int PreviewPosition { get; set; } = 4; // 1=Bottom, 2=Below tree, 3=Below file list, 4=Right
     public string InfoPanelOrientation { get; set; } = "Vertical"; // Horizontal / Vertical
     public bool ShowPreviewPanel { get; set; } = true;

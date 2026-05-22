@@ -316,6 +316,24 @@
                                                 <ColumnDefinition Width="Auto"/>
                                             </Grid.ColumnDefinitions>
 
+                                            <!-- Content wrapper with toolbar + content -->
+                                            <Grid>
+                                                <Grid.RowDefinitions>
+                                                    <RowDefinition Height="Auto"/>  <!-- toolbar -->
+                                                    <RowDefinition Height="*"/>     <!-- content -->
+                                                </Grid.RowDefinitions>
+
+                                                <!-- Preview Toolbar -->
+                                                <Border x:Name="PreviewToolbarBorder" Grid.Row="0"
+                                                        Background="{StaticResource Theme_HeaderBg}" CornerRadius="4"
+                                                        Padding="6,4" Margin="0,0,0,8"
+                                                        Visibility="Collapsed">
+                                                    <StackPanel x:Name="PreviewToolbarPanel" Orientation="Horizontal"/>
+                                                </Border>
+
+                                                <!-- Content container -->
+                                                <Grid Grid.Row="1">
+
                                             <!-- Image Preview -->
                                             <Image x:Name="PreviewImage" Stretch="Uniform" Visibility="Collapsed"/>
 
@@ -365,6 +383,9 @@
                                                        HorizontalAlignment="Center" VerticalAlignment="Center"
                                                        Visibility="Collapsed"/>
 
+                                                </Grid>
+                                            </Grid>
+
                                             <!-- Info Panel (universal) -->
                                             <Border x:Name="PreviewInfoPanel"
                                                     Background="{StaticResource Theme_HeaderBg}" CornerRadius="4" 
@@ -383,9 +404,11 @@
                                                         <RowDefinition Height="Auto"/>
                                                         <RowDefinition Height="Auto"/>
                                                         <RowDefinition Height="Auto"/>
+                                                        <RowDefinition Height="Auto"/>
+                                                        <RowDefinition Height="Auto"/>
                                                     </Grid.RowDefinitions>
 
-                                                    <!-- Row 0: Format-specific info -->
+                                                    <!-- Row 0: Format-specific info (always on top) -->
                                                     <TextBlock x:Name="PreviewFormatInfo" Grid.Row="0" Grid.ColumnSpan="3"
                                                                FontSize="12" Foreground="{StaticResource Theme_TextSecondary}"
                                                                TextWrapping="Wrap" Margin="0,0,0,4"/>
@@ -394,29 +417,37 @@
                                                     <Rectangle Grid.Row="1" Grid.ColumnSpan="3"
                                                                Height="1" Fill="{StaticResource Theme_BorderLight}" Margin="0,0,0,4"/>
 
-                                                    <!-- Row 2: File name -->
-                                                    <TextBlock x:Name="PreviewFileNameText" Grid.Row="2" Grid.ColumnSpan="3"
+                                                    <!-- Row 2: Dynamic format-specific detail pairs -->
+                                                    <StackPanel x:Name="PreviewExtraInfoPanel" Grid.Row="2" Grid.ColumnSpan="3"
+                                                                 Margin="0,0,0,8" Visibility="Collapsed"/>
+
+                                                    <!-- Row 3: Separator (通用信息上方分隔线) -->
+                                                    <Rectangle x:Name="PreviewGeneralSeparator" Grid.Row="3" Grid.ColumnSpan="3"
+                                                               Height="1" Fill="{StaticResource Theme_BorderLight}" Margin="0,0,0,4"/>
+
+                                                    <!-- Row 4: File name -->
+                                                    <TextBlock x:Name="PreviewFileNameText" Grid.Row="4" Grid.ColumnSpan="3"
                                                                FontWeight="SemiBold" Foreground="{StaticResource Theme_TextPrimary}" FontSize="12"
                                                                TextTrimming="CharacterEllipsis" Margin="0,0,0,4"/>
 
-                                                    <!-- Row 3: Separator -->
-                                                <Rectangle Grid.Row="3" Grid.ColumnSpan="3"
+                                                    <!-- Row 5: Separator -->
+                                                <Rectangle Grid.Row="5" Grid.ColumnSpan="3"
                                                            Height="1" Fill="{StaticResource Theme_BorderLight}" Margin="0,0,0,4"/>
 
-                                                <!-- Row 4: Size / Ratio / Compressed -->
-                                                <TextBlock x:Name="PreviewSizeText" Grid.Row="4" Grid.Column="0"
+                                                <!-- Row 6: Size / Ratio / Compressed -->
+                                                <TextBlock x:Name="PreviewSizeText" Grid.Row="6" Grid.Column="0"
                                                            FontSize="11" Foreground="{StaticResource Theme_TextSecondary}"/>
-                                                <TextBlock x:Name="PreviewCompressedText" Grid.Row="4" Grid.Column="1"
+                                                <TextBlock x:Name="PreviewCompressedText" Grid.Row="6" Grid.Column="1"
                                                            FontSize="11" Foreground="{StaticResource Theme_TextSecondary}"
                                                            HorizontalAlignment="Center"/>
-                                                <TextBlock x:Name="PreviewRatioText" Grid.Row="4" Grid.Column="2"
+                                                <TextBlock x:Name="PreviewRatioText" Grid.Row="6" Grid.Column="2"
                                                            FontSize="11" Foreground="{StaticResource Theme_TextSecondary}"
                                                            HorizontalAlignment="Right"/>
 
-                                                <!-- Row 5: Date + Encrypted -->
-                                                <TextBlock x:Name="PreviewDateText" Grid.Row="5" Grid.Column="0"
+                                                <!-- Row 7: Date + Encrypted -->
+                                                <TextBlock x:Name="PreviewDateText" Grid.Row="7" Grid.Column="0"
                                                            FontSize="11" Foreground="{StaticResource Theme_TextSecondary}"/>
-                                                <TextBlock x:Name="PreviewEncryptedText" Grid.Row="5" Grid.Column="2"
+                                                <TextBlock x:Name="PreviewEncryptedText" Grid.Row="7" Grid.Column="2"
                                                            FontSize="11" Foreground="{StaticResource Theme_TextSecondary}"
                                                            HorizontalAlignment="Right"/>
                                                 </Grid>

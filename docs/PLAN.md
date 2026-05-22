@@ -2,10 +2,10 @@
 
 > 详细开发计划及进度跟踪文档
 
-**项目状态**: 🟢 开发中 (Phase 4 收尾)  
+**项目状态**: 🟢 开发中 (Phase 5 — 预览格式扩展)  
 **创建日期**: 2026-04-23  
-**最后更新**: 2026-05-21  
-**当前版本**: 0.2.12
+**最后更新**: 2026-05-22  
+**当前版本**: 0.3.0
 
 ---
 
@@ -50,6 +50,7 @@
 | Ookii.Dialogs.Wpf | 5.0.1 | 文件夹选择对话框 | BSD-3-Clause |
 | Ude.NetStandard | 1.2.0 | 字符编码检测（文本预览） | MIT |
 | WpfAnimatedGif | 2.0.2 | GIF 动画支持 | MIT |
+| Microsoft.Web.WebView2 | — | **🎯 计划新增** — Edge Chromium 内核，替代 WebBrowser（IE），支持 PDF 原生渲染、现代 CSS | BSD-3-Clause |
 
 ### 测试
 
@@ -366,7 +367,7 @@ Phase 4: ███████████████████░ 95%
 | SVG | 🟢 低 | WebBrowser 直接渲染 |
 | EXE / DLL | 🟢 低 | ExtractIconEx 获取专属图标 + FileVersionInfo 显示版本信息 |
 | LNK | 🟢 低 | IShellLink 读快捷方式目标路径 |
-| PDF | 🟡 中 | Windows.Data.Pdf 系统 API，第一页渲染为图片 |
+| PDF | 🟡 中 | WebView2（Edge Chromium）渲染 PDF 第一页，方案比 WinRT 更稳定 |
 | XLSX（文本） | 🟡 中 | 本质 ZIP，读 sharedStrings.xml 拿文本 |
 | TTF / OTF | 🟡 中 | GlyphTypeface 加载字体，Canvas 绘制示例文字 |
 | SQLite | 🟡 中 | Microsoft.Data.Sqlite 读表结构和数据 |
@@ -393,11 +394,11 @@ Phase 4: ███████████████████░ 95%
 
 | 优先级 | 功能 | 设计文档 | 难度 | 预估工时 | 说明 |
 |--------|------|----------|:----:|:--------:|------|
-| **P1** | 引擎统一 (SharpZipLib → SharpCompress) | [engine-unification-sharpcompress.md](.sisyphus/plans/engine-unification-sharpcompress.md) | 🔴高 | 6-8h | 统一引擎架构，含压缩方式选择 (见上方 P2「压缩方式选择」)；突破 SharpZipLib CommitUpdate 黑盒进度问题 |
+| **P1** | 引擎统一 (SharpZipLib → SharpCompress) | [engine-unification-sharpcompress.md](.sisyphus/plans/engine-unification-sharpcompress.md) | 🔴高 | 6-8h | 统一引擎架构，含压缩方式选择；突破 SharpZipLib CommitUpdate 黑盒进度问题 |
 | **P1** | 文件大小进度条 | [file-size-progress-bar.md](.sisyphus/plans/file-size-progress-bar.md) | 🟢低 | 0.5h | 大小列背景按文件体积比例填充，纯 UI 改动 |
 | **P2** | 文本预览语法高亮 (AvalonEdit) | — | 🟢低 | 1-2h | 替换当前 TextBox，支持 20+ 语言语法高亮 |
 | **P2** | 便携版模式 | [portable-mode.md](.sisyphus/plans/portable-mode.md) | 🟢低 | 1-2h | 哨兵文件触发，路径重定向到 exe 目录，免注册表 |
-| **P2** | 预览格式识别与元数据展示 | [preview-format-detection.md](.sisyphus/plans/preview-format-detection.md) | 🔴高 | 8-12h | 魔数识别 + 差异化元数据 + 扩展预览格式（PDF/SVG/CSV/EXE 元数据等）；改动范围大 |
+| **P2** | 魔数识别（内容检测替代扩展名检测） | [preview-format-detection.md](.sisyphus/plans/preview-format-detection.md) | 🔴高 | 6-8h | 剩余工作：按真实内容（非扩展名）判断格式 |
 | **P2** | 提取日志与解压「后悔药」 | [extract-journal-undo.md](.sisyphus/plans/extract-journal-undo.md) | 🟡中 | 3-4h | 解压记录 + 一键回滚；差异化功能亮点 |
 | **P2** | 文件列表筛选/搜索 | — | 🟢低 | 1-2h | 搜索框实时过滤 + 子目录显示切换增强 |
 | **P2** | Emoji.Wpf 彩色 Emoji | — | 🟢低 | 0.5h | 替换 TabControl 图标 TextBlock 为 emoji:TextBlock |
@@ -405,12 +406,11 @@ Phase 4: ███████████████████░ 95%
 | **P3** | 压缩预估 (Compression Estimator) | [compression-estimator.md](.sisyphus/plans/compression-estimator.md) | 🟡中 | 4-5h | 压缩前估算大小/耗时；三级精度策略 |
 | **P3** | VirtualFileDataObject | [virtual-file-data-object.md](.sisyphus/plans/virtual-file-data-object.md) | 🔴高 | 6-8h | COM 原生 IDataObject 替代 WPF OLE 桥，拖拽延迟渲染不崩溃 |
 | **P3** | COM 右键菜单 | — | 🔴高 | 4-6h | 动态菜单名、菜单排序、自定义图标 |
-| **P3** | 预览格式扩展（逐项） | 见 [preview-format-detection.md](.sisyphus/plans/preview-format-detection.md) | 🟢~🟡 | 各 0.5-2h | RTF/CSV/SVG/EXE/LNK/PDF/XLSX/TTF/SQLite/ZIP嵌套 |
 | **P3** | 右键菜单目录结构预览 | — | 🔴高 | 6-8h | COM 菜单中展示压缩包文件树（Bandizip 风格） |
-
-| **P3** | 外部工具视频元数据 | — | 🟢低 | 1-2h | ffprobe 提取时长/分辨率/编码 |
+| | |
 | **P3** | 压缩包对比 (Archive Diff) | [archive-diff.md](.sisyphus/plans/archive-diff.md) | 🟡中 | 3-4h | 压缩包文件级差异对比；独特功能但非核心 |
 | **P3** | 发布 Release | — | 🟢低 | 1-2h | GitHub Releases + CI 自动构建 |
+| **P3** | WebView2 替换 WebBrowser | — | 🟡中 | 1-2h | Edge Chromium 内核渲染 PDF 第一页 + HTML/Markdown 现代 CSS 支持；不主动联网 |
 
 #### 已实现设计方案
 

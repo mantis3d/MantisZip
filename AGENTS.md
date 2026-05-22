@@ -57,14 +57,27 @@ Despite using `CommunityToolkit.Mvvm`, **all logic lives in `MainWindow.xaml.cs`
 
 - Trigger: `FileListGrid_SelectionChanged` → files via `ShowPreviewAsync(item)`, directories via `ShowDirectoryPreview(item)` (system folder icon + directory info panel)
 - Extract: `ArchiveEntryExtractor.ExtractEntryAsync(...)` → temp file under `%TEMP%\MantisZip\{GUID}\`
-- Display: 
-  - `ShowImagePreviewAsync`: checks actual image dimensions first via `BitmapDecoder.Create(DelayCreation)` — only sets `DecodePixelWidth=1920` for images wider than 1920px (no upscaling); constrains `PreviewImage.MaxWidth`/`MaxHeight` to pixel dimensions to prevent `Stretch="Uniform"` from enlarging small images
-  - `ShowTextPreview` (UTF-8/GBK fallback), `ShowUnsupportedPreview`, `ShowDirectoryPreview`
-- Toolbar toggle button (`PreviewToggleBtn`) controls `_previewPanelEnabled` / `AppSettings.ShowPreviewPanel`; toggling calls `HidePreview()` (resets grid layout) or `ShowPreviewPanel()` (restores layout + re-previews selected item)
-- `ClearPreviewContent()` clears image/text/icon/webview sources without resetting grid layout (used during file-to-file switching to avoid flicker); `HidePreview()` does full cleanup including grid rows/columns reset
-- Image side panel: `PreviewInfoPanel` shows name, size, compression ratio, date — only for images
+- Display (per format):
+  - **Image**: `ShowImagePreviewAsync` — BitmapImage with DecodePixelWidth=1920 downsampling; zoom toolbar + transparency toggle
+  - **Text**: `ShowTextPreview` — UTF-8/GBK detection via Ude.NetStandard; font size toolbar
+  - **HTML**: `ShowHtmlPreview` — WebBrowser rendering
+  - **Markdown**: `ShowMarkdownPreview` — Markdig → HTML → WebBrowser
+  - **PE**: `ShowPePreview` — product name, company, version, architecture, subsystem
+  - **PDF**: `ShowPdfPreview` — version, title, author, page count, encryption status
+  - **Font**: `ShowFontPreview` — font name/style/glyph count; sample text rendering
+  - **Audio**: `ShowAudioPreview` — WAV/FLAC duration, sample rate, channels, bitrate
+  - **SQLite**: `ShowSqlitePreview` — encoding, page size, table count
+  - **ISO**: `ShowIsoPreview` — volume label, format, size
+  - **Torrent**: `ShowTorrentPreview` — file tree, InfoHash, Magnet, tracker, creator
+  - **Office**: `ShowOfficePreview` — docx/xlsx/pptx title, author, page/slide/sheet count
+  - **SVG**: `ShowSvgPreview` — WebBrowser rendering
+  - **Video**: `ShowVideoPreview` — MP4/MKV/AVI resolution, duration, codec
+- Metadata-only formats (PE, PDF, Office, audio, SQLite, ISO, torrent, video) skip the `MaxPreviewFileSize` check since they only read file headers
+- Toolbar: zoom controls for images, font size for text, ligature toggle for fonts
+- `ClearPreviewContent()` clears all sources without resetting grid layout; `HidePreview()` does full cleanup
+- Image side panel: `PreviewInfoPanel` shows name, size, compression ratio, date — now with format-specific key-value pairs below general info
 - Cleanup: `ClearPreviewTemp()` before each new preview; `App.OnExit` deletes `%TEMP%\MantisZip`
-- Respects `AppSettings.EnableImagePreview`, `EnableTextPreview`, `MaxTextPreviewBytes`, `ShowPreviewPanel`
+- `MetadataOnlyExtensions` set defines formats exempt from size limits
 
 ### Window persistence
 
@@ -135,14 +148,19 @@ All handled in `App.OnStartup` before normal UI startup:
 
 ## Key gotchas
 
+## Version 0.3.0 — Preview Format Expansion (✅ Completed)
+
+Added metadata-based preview for 12 new format types across Core parsers and UI preview methods. Also includes info panel restructuring, torrent file tree, WOFF font support, PDF metadata, and toolbar restoration.
+
 ## Upcoming work
 
-Two work plans tracked under `.sisyphus/plans/`:
+Plans tracked under `.sisyphus/plans/`:
 
 | Plan | Status | Dependency |
 |------|--------|------------|
 | [engine-unification-sharpcompress.md](.sisyphus/plans/engine-unification-sharpcompress.md) | 📋 Planned | None |
 | [file-filter-feature.md](.sisyphus/plans/file-filter-feature.md) | 📋 Planned | SharpCompress migration |
+| WebView2 for PDF/HTML rendering | 📋 Planned | None (NuGet: Microsoft.Web.WebView2) |
 
 ### Planned: Engine unification (SharpZipLib → SharpCompress)
 

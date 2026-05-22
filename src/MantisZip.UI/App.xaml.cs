@@ -24,7 +24,7 @@ public partial class App : Application
 {
     private static readonly string LogFile = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-        L.T(L.App_MantisZipTitle), "debug.log");
+        "MantisZip", "debug.log");
     // StartupLog 已合并到 LogFile（同一个文件）
     private static string StartupLog => LogFile;
     private static Mutex? _instanceMutex;

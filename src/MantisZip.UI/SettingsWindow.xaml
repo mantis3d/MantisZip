@@ -203,7 +203,7 @@
                 </ScrollViewer>
             </TabItem>
 
-            <!-- ═══════ 预览 ═══════ -->
+            <!-- ═══════ 预览（含子面板）═══════ -->
             <TabItem>
                 <TabItem.Header>
                     <Grid HorizontalAlignment="Stretch">
@@ -215,61 +215,160 @@
                         <TextBlock Text="{l:L Settings_Tab_Preview}" Grid.Column="1" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="4,0,0,0"/>
                     </Grid>
                 </TabItem.Header>
-                <ScrollViewer VerticalScrollBarVisibility="Auto" Background="{StaticResource Theme_SurfaceBg}">
-                    <StackPanel Margin="10">
-                        <CheckBox x:Name="EnableImagePreviewCheck" Content="{l:L Settings_Preview_EnableImage}" Margin="0,4"/>
-                        <CheckBox x:Name="EnableTextPreviewCheck" Content="{l:L Settings_Preview_EnableText}" Margin="0,16,0,4"/>
+                <Grid>
+                    <!-- 嵌套 TabControl 作为子面板 -->
+                    <TabControl x:Name="PreviewSubTabs" TabStripPlacement="Top"
+                                Background="{StaticResource Theme_SurfaceBg}"
+                                BorderThickness="0">
+                        <TabControl.Resources>
+                            <Style TargetType="TabItem" x:Key="PreviewSubTabStyle">
+                                <Setter Property="MinWidth" Value="60"/>
+                                <Setter Property="Padding" Value="8,4"/>
+                                <Setter Property="Background" Value="{StaticResource Theme_WindowBg}"/>
+                                <Setter Property="Template">
+                                    <Setter.Value>
+                                        <ControlTemplate TargetType="TabItem">
+                                            <Border x:Name="Bd" BorderThickness="0,0,0,2"
+                                                    BorderBrush="Transparent"
+                                                    Background="{TemplateBinding Background}"
+                                                    Padding="{TemplateBinding Padding}">
+                                                <TextBlock Text="{TemplateBinding Header}"
+                                                           HorizontalAlignment="Center"
+                                                           VerticalAlignment="Center"
+                                                           FontSize="13"/>
+                                            </Border>
+                                            <ControlTemplate.Triggers>
+                                                <Trigger Property="IsSelected" Value="True">
+                                                    <Setter TargetName="Bd" Property="BorderBrush" Value="{StaticResource Theme_AccentDark}"/>
+                                                    <Setter TargetName="Bd" Property="Background" Value="{StaticResource Theme_AccentLight}"/>
+                                                </Trigger>
+                                                <Trigger Property="IsMouseOver" Value="True">
+                                                    <Setter TargetName="Bd" Property="Background" Value="{StaticResource Theme_ButtonHover}"/>
+                                                </Trigger>
+                                            </ControlTemplate.Triggers>
+                                        </ControlTemplate>
+                                    </Setter.Value>
+                                </Setter>
+                            </Style>
+                        </TabControl.Resources>
 
-                        <TextBlock Text="{l:L Settings_Preview_MaxFileSize}" FontWeight="SemiBold" Margin="0,16,0,4"/>
-                        <StackPanel Orientation="Horizontal">
-                            <Slider x:Name="MaxPreviewSizeSlider" Width="220" Minimum="1" Maximum="100"
-                                    Value="15" TickFrequency="1" IsSnapToTickEnabled="True"/>
-                            <TextBox x:Name="MaxPreviewSizeInput" Width="50" Height="22" Margin="8,0,0,0"
-                                     VerticalAlignment="Center" Text="15"
-                                     PreviewTextInput="MaxPreviewSizeInput_PreviewTextInput"
-                                     TextChanged="MaxPreviewSizeInput_TextChanged"/>
-                            <TextBlock Text="MB" FontSize="12" Foreground="{StaticResource Theme_TextSecondary}" VerticalAlignment="Center" Margin="4,0,0,0"/>
-                        </StackPanel>
-                        <TextBlock Text="{l:L Settings_Preview_MaxSizeHint}" Foreground="{StaticResource Theme_TextDisabled}" FontSize="11" Margin="0,4,0,0"/>
+                        <!-- ── 通用 ── -->
+                        <TabItem Header="{l:L Settings_Preview_Tab_General}" Style="{StaticResource PreviewSubTabStyle}">
+                            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                <StackPanel Margin="10">
+                                    <CheckBox x:Name="ShowPreviewPanelCheck" Content="{l:L Settings_Preview_EnablePanel}" Margin="0,0,0,8"/>
 
-                        <TextBlock Text="{l:L Settings_Preview_Position}" FontWeight="SemiBold" Margin="0,16,0,4"/>
-                        <ComboBox x:Name="PreviewPositionCombo" Width="300" HorizontalAlignment="Left" Margin="0,0,0,8">
-                            <ComboBoxItem Tag="1" IsSelected="True" Content="{l:L Settings_Preview_Pos_Bottom}"/>
-                            <ComboBoxItem Tag="2" Content="{l:L Settings_Preview_Pos_BelowTree}"/>
-                            <ComboBoxItem Tag="3" Content="{l:L Settings_Preview_Pos_BelowList}"/>
-                            <ComboBoxItem Tag="4" Content="{l:L Settings_Preview_Pos_RightOfList}"/>
-                        </ComboBox>
+                                    <TextBlock Text="{l:L Settings_Preview_Position}" FontWeight="SemiBold" Margin="0,8,0,4"/>
+                                    <ComboBox x:Name="PreviewPositionCombo" Width="300" HorizontalAlignment="Left" Margin="0,0,0,8">
+                                        <ComboBoxItem Tag="1" IsSelected="True" Content="{l:L Settings_Preview_Pos_Bottom}"/>
+                                        <ComboBoxItem Tag="2" Content="{l:L Settings_Preview_Pos_BelowTree}"/>
+                                        <ComboBoxItem Tag="3" Content="{l:L Settings_Preview_Pos_BelowList}"/>
+                                        <ComboBoxItem Tag="4" Content="{l:L Settings_Preview_Pos_RightOfList}"/>
+                                    </ComboBox>
 
-                        <TextBlock Text="{l:L Settings_Preview_InfoDirection}" FontWeight="SemiBold" Margin="0,8,0,4"/>
-                        <ComboBox x:Name="InfoPanelOrientationCombo" Width="300" HorizontalAlignment="Left" Margin="0,0,0,8">
-                            <ComboBoxItem Tag="Horizontal" IsSelected="True" Content="{l:L Settings_Preview_Dir_Horizontal}"/>
-                            <ComboBoxItem Tag="Vertical" Content="{l:L Settings_Preview_Dir_Vertical}"/>
-                        </ComboBox>
+                                    <TextBlock Text="{l:L Settings_Preview_InfoDirection}" FontWeight="SemiBold" Margin="0,8,0,4"/>
+                                    <ComboBox x:Name="InfoPanelOrientationCombo" Width="300" HorizontalAlignment="Left" Margin="0,0,0,8">
+                                        <ComboBoxItem Tag="Horizontal" IsSelected="True" Content="{l:L Settings_Preview_Dir_Horizontal}"/>
+                                        <ComboBoxItem Tag="Vertical" Content="{l:L Settings_Preview_Dir_Vertical}"/>
+                                    </ComboBox>
 
-                        <TextBlock Text="{l:L Settings_Preview_MaxTextSize}" FontWeight="SemiBold" Margin="0,12,0,4"/>
-                        <StackPanel Orientation="Horizontal">
-                            <Slider x:Name="MaxTextSizeSlider" Width="200" Minimum="1" Maximum="50"
-                                    Value="5" TickFrequency="1" IsSnapToTickEnabled="True"/>
-                            <TextBlock x:Name="MaxTextSizeText" Text="5 MB" Width="50" Margin="8,0,0,0" VerticalAlignment="Center"/>
-                        </StackPanel>
+                                    <TextBlock Text="{l:L Settings_Preview_MaxFileSize}" FontWeight="SemiBold" Margin="0,12,0,4"/>
+                                    <StackPanel Orientation="Horizontal">
+                                        <Slider x:Name="MaxPreviewSizeSlider" Width="220" Minimum="1" Maximum="100"
+                                                Value="15" TickFrequency="1" IsSnapToTickEnabled="True"/>
+                                        <TextBox x:Name="MaxPreviewSizeInput" Width="50" Height="22" Margin="8,0,0,0"
+                                                 VerticalAlignment="Center" Text="15"
+                                                 PreviewTextInput="MaxPreviewSizeInput_PreviewTextInput"
+                                                 TextChanged="MaxPreviewSizeInput_TextChanged"/>
+                                        <TextBlock Text="MB" FontSize="12" Foreground="{StaticResource Theme_TextSecondary}" VerticalAlignment="Center" Margin="4,0,0,0"/>
+                                    </StackPanel>
+                                    <TextBlock Text="{l:L Settings_Preview_MaxSizeHint}" Foreground="{StaticResource Theme_TextDisabled}" FontSize="11" Margin="0,4,0,0"/>
+                                </StackPanel>
+                            </ScrollViewer>
+                        </TabItem>
 
-                        <TextBlock Text="{l:L Settings_Preview_TextFontSize}" FontWeight="SemiBold" Margin="0,16,0,4"/>
-                        <StackPanel Orientation="Horizontal">
-                            <Slider x:Name="TextFontSizeSlider" Width="200" Minimum="8" Maximum="36"
-                                    Value="12" TickFrequency="1" IsSnapToTickEnabled="True"/>
-                            <TextBlock x:Name="TextFontSizeText" Text="12" Width="30" Margin="8,0,0,0" VerticalAlignment="Center"/>
-                        </StackPanel>
-                        <Border BorderBrush="{StaticResource Theme_Border}" BorderThickness="1" Padding="8" Margin="0,8,0,0"
-                                Background="{StaticResource Theme_SurfaceBg}" CornerRadius="4">
-                            <TextBlock x:Name="TextFontSizeSample" FontSize="12"
-                                       FontFamily="Cascadia Code, Consolas, monospace"
-                                       Text="{l:L Settings_Preview_TextSample}"
-                                       TextWrapping="Wrap"/>
-                        </Border>
+                        <!-- ── 图片 ── -->
+                        <TabItem Header="{l:L Settings_Preview_Tab_Image}" Style="{StaticResource PreviewSubTabStyle}">
+                            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                <StackPanel Margin="10">
+                                    <CheckBox x:Name="EnableImagePreviewCheck" Content="{l:L Settings_Preview_EnableImage}" Margin="0,4"/>
+                                </StackPanel>
+                            </ScrollViewer>
+                        </TabItem>
 
-                        <CheckBox x:Name="UseColorEmojiCheck" Content="{l:L Settings_Preview_ColorEmoji}" Margin="0,16,0,0"/>
-                    </StackPanel>
-                </ScrollViewer>
+                        <!-- ── 文本 ── -->
+                        <TabItem Header="{l:L Settings_Preview_Tab_Text}" Style="{StaticResource PreviewSubTabStyle}">
+                            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                <StackPanel Margin="10">
+                                    <CheckBox x:Name="EnableTextPreviewCheck" Content="{l:L Settings_Preview_EnableText}" Margin="0,4,0,8"/>
+
+                                    <TextBlock Text="{l:L Settings_Preview_TextFontSize}" FontWeight="SemiBold" Margin="0,12,0,4"/>
+                                    <StackPanel Orientation="Horizontal">
+                                        <Slider x:Name="TextFontSizeSlider" Width="200" Minimum="8" Maximum="36"
+                                                Value="12" TickFrequency="1" IsSnapToTickEnabled="True"/>
+                                        <TextBlock x:Name="TextFontSizeText" Text="12" Width="30" Margin="8,0,0,0" VerticalAlignment="Center"/>
+                                    </StackPanel>
+                                    <Border BorderBrush="{StaticResource Theme_Border}" BorderThickness="1" Padding="8" Margin="0,8,0,0"
+                                            Background="{StaticResource Theme_SurfaceBg}" CornerRadius="4">
+                                        <TextBlock x:Name="TextFontSizeSample" FontSize="12"
+                                                   FontFamily="Cascadia Code, Consolas, monospace"
+                                                   Text="{l:L Settings_Preview_TextSample}"
+                                                   TextWrapping="Wrap"/>
+                                    </Border>
+
+                                    <TextBlock Text="{l:L Settings_Preview_TextFontFamily}" FontWeight="SemiBold" Margin="0,16,0,4"/>
+                                    <ComboBox x:Name="TextFontFamilyCombo" Width="300" HorizontalAlignment="Left"/>
+
+                                    <TextBlock Text="{l:L Settings_Preview_MaxTextSize}" FontWeight="SemiBold" Margin="0,16,0,4"/>
+                                    <StackPanel Orientation="Horizontal">
+                                        <Slider x:Name="MaxTextSizeSlider" Width="200" Minimum="1" Maximum="50"
+                                                Value="5" TickFrequency="1" IsSnapToTickEnabled="True"/>
+                                        <TextBlock x:Name="MaxTextSizeText" Text="5 MB" Width="50" Margin="8,0,0,0" VerticalAlignment="Center"/>
+                                    </StackPanel>
+
+                                    <CheckBox x:Name="UseColorEmojiCheck" Content="{l:L Settings_Preview_ColorEmoji}" Margin="0,16,0,0"/>
+                                </StackPanel>
+                            </ScrollViewer>
+                        </TabItem>
+
+                        <!-- ── 字体 ── -->
+                        <TabItem Header="{l:L Settings_Preview_Tab_Font}" Style="{StaticResource PreviewSubTabStyle}">
+                            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                <StackPanel Margin="10">
+                                    <TextBlock Text="{l:L Settings_Preview_FontSampleText}" FontWeight="SemiBold" Margin="0,0,0,4"/>
+                                    <TextBox x:Name="FontPreviewSampleBox" Height="100" AcceptsReturn="True" TextWrapping="Wrap"
+                                             FontSize="12" VerticalScrollBarVisibility="Auto"
+                                             HorizontalAlignment="Stretch"/>
+                                    <TextBlock Text="{l:L Settings_Preview_FontSampleHint}"
+                                               Foreground="{StaticResource Theme_TextDisabled}" FontSize="11"
+                                               TextWrapping="Wrap" Margin="0,4,0,0"/>
+                                </StackPanel>
+                            </ScrollViewer>
+                        </TabItem>
+
+                        <!-- ── 种子 ── -->
+                        <TabItem Header="{l:L Settings_Preview_Tab_Torrent}" Style="{StaticResource PreviewSubTabStyle}">
+                            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                <StackPanel Margin="10">
+                                    <TextBlock Text="{l:L Settings_Preview_Placeholder}"
+                                               Foreground="{StaticResource Theme_TextDisabled}" FontSize="12"
+                                               TextWrapping="Wrap"/>
+                                </StackPanel>
+                            </ScrollViewer>
+                        </TabItem>
+
+                        <!-- ── 可执行文件 ── -->
+                        <TabItem Header="{l:L Settings_Preview_Tab_PE}" Style="{StaticResource PreviewSubTabStyle}">
+                            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                <StackPanel Margin="10">
+                                    <TextBlock Text="{l:L Settings_Preview_Placeholder}"
+                                               Foreground="{StaticResource Theme_TextDisabled}" FontSize="12"
+                                               TextWrapping="Wrap"/>
+                                </StackPanel>
+                            </ScrollViewer>
+                        </TabItem>
+                    </TabControl>
+                </Grid>
             </TabItem>
 
             <!-- ═══════ 文件关联 ═══════ -->

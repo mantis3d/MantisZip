@@ -3,6 +3,7 @@ using System.IO;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Media;
 using MantisZip.UI.Localization;
 
 namespace MantisZip.UI;
@@ -30,7 +31,8 @@ public partial class SettingsWindow : Window
             OnTextFontSizeChanged?.Invoke(size);
         };
 
-        // 先绑定事件再加载设置，确保所有 UI 跟随加载值刷新
+        // 先填充字体列表，再加载设置并从列表中选中已保存的字体
+        PopulateFontFamilies();
         LoadSettings();
 
         // 任何上下文菜单项变更都要启用L.T(L.Settings_Menu_Btn_Apply)按钮
@@ -89,6 +91,7 @@ public partial class SettingsWindow : Window
         UpdateShellStatus();
 
         // 预览
+        ShowPreviewPanelCheck.IsChecked = s.ShowPreviewPanel;
         EnableImagePreviewCheck.IsChecked = s.EnableImagePreview;
         EnableTextPreviewCheck.IsChecked = s.EnableTextPreview;
         MaxTextSizeSlider.Value = s.MaxTextPreviewBytes / (1024 * 1024);
@@ -97,6 +100,15 @@ public partial class SettingsWindow : Window
         MaxPreviewSizeInput.Text = mbVal.ToString();
         TextFontSizeSlider.Value = s.TextPreviewFontSize;
         UseColorEmojiCheck.IsChecked = s.UseColorEmoji;
+        // 预览字体（空字符串 = 系统默认，也需选中第一项）
+        {
+            bool found = false;
+            foreach (ComboBoxItem fi in TextFontFamilyCombo.Items)
+                if ((string)fi.Tag == s.TextPreviewFontFamily) { TextFontFamilyCombo.SelectedItem = fi; found = true; break; }
+            if (!found) TextFontFamilyCombo.SelectedIndex = 0;
+        }
+        // 预览样本文本
+        FontPreviewSampleBox.Text = s.FontPreviewSampleText;
 
         // 密码管理
         ShowPasswordNotifCheck.IsChecked = s.ShowPasswordMatchNotification;
@@ -176,6 +188,10 @@ public partial class SettingsWindow : Window
         s.MaxTextPreviewBytes = (long)MaxTextSizeSlider.Value * 1024 * 1024;
         s.MaxPreviewFileSize = (long)MaxPreviewSizeSlider.Value * 1024 * 1024;
         s.TextPreviewFontSize = (int)TextFontSizeSlider.Value;
+        s.TextPreviewFontFamily = (TextFontFamilyCombo.SelectedItem as ComboBoxItem)?.Tag as string ?? "";
+        s.TextEncodingPreference = ""; // reserved
+        s.FontPreviewSampleText = FontPreviewSampleBox.Text;
+        s.ShowPreviewPanel = ShowPreviewPanelCheck.IsChecked == true;
         s.Theme = (ThemeCombo.SelectedItem as ComboBoxItem)?.Tag as string ?? "Light";
         s.UseColorEmoji = UseColorEmojiCheck.IsChecked == true;
         s.PreviewPosition = int.TryParse((PreviewPositionCombo.SelectedItem as ComboBoxItem)?.Tag?.ToString(), out var pos) ? pos : 1;
@@ -266,6 +282,32 @@ public partial class SettingsWindow : Window
         catch (Exception ex)
         {
             AppMessageBox.Show(L.TF(L.Settings_Menu_UninstallFailed, ex.Message), L.T(L.App_ErrorTitle), MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
+    #endregion
+
+    #region 字体列表
+
+    /// <summary>
+    /// 填充字体下拉列表。
+    /// </summary>
+    private void PopulateFontFamilies()
+    {
+        TextFontFamilyCombo.Items.Clear();
+        // 第一项：系统默认
+        TextFontFamilyCombo.Items.Add(new ComboBoxItem
+        {
+            Content = L.T(L.Settings_Preview_FontDefault),
+            Tag = ""
+        });
+        foreach (var family in Fonts.SystemFontFamilies.OrderBy(f => f.Source))
+        {
+            TextFontFamilyCombo.Items.Add(new ComboBoxItem
+            {
+                Content = family.Source,
+                Tag = family.Source
+            });
         }
     }
 

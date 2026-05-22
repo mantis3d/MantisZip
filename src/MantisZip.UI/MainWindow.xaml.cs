@@ -48,6 +48,7 @@ public partial class MainWindow : Window
     private string? _dragTempDir;            // 拖拽提取临时目录
     private bool _isOwnDrag;                 // 当前拖拽是否来自本窗口
     private CancellationTokenSource? _previewCts; // 预览取消令牌
+    private bool _transparentBgEnabled;
 
     public MainWindow()
     {

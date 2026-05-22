@@ -7,7 +7,9 @@ using System.Text;
 using System.Threading;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Media.Imaging;
 using MantisZip.Core;
 using MantisZip.Core.Abstractions;
 using MantisZip.Core.Utils;
@@ -49,6 +51,73 @@ public partial class MainWindow
         ".md", ".markdown"
     };
 
+    private static readonly HashSet<string> PeExtensions = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ".exe", ".dll", ".sys", ".ocx"
+    };
+
+    private static readonly HashSet<string> PdfExtensions = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ".pdf"
+    };
+
+    private static readonly HashSet<string> FontExtensions = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ".ttf", ".otf", ".woff"
+    };
+
+    private static readonly HashSet<string> TorrentExtensions = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ".torrent"
+    };
+
+    private static readonly HashSet<string> WavExtensions = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ".wav"
+    };
+
+    private static readonly HashSet<string> FlacExtensions = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ".flac"
+    };
+
+    private static readonly HashSet<string> SqliteExtensions = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ".sqlite", ".sqlite3", ".db", ".db3"
+    };
+
+    private static readonly HashSet<string> IsoExtensions = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ".iso"
+    };
+
+    private static readonly HashSet<string> OfficeExtensions = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ".docx", ".xlsx", ".pptx"
+    };
+
+    private static readonly HashSet<string> SvgExtensions = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ".svg"
+    };
+
+    private static readonly HashSet<string> VideoExtensions = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ".mp4", ".mkv", ".avi"
+    };
+
+    /// <summary>只需读取文件头的格式，不受 MaxPreviewFileSize 限制。</summary>
+    private static readonly HashSet<string> MetadataOnlyExtensions = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ".exe", ".dll", ".sys", ".ocx",
+        ".pdf", ".docx", ".xlsx", ".pptx",
+        ".wav", ".flac",
+        ".sqlite", ".sqlite3", ".db", ".db3",
+        ".iso",
+        ".torrent",
+        ".mp4", ".mkv", ".avi",
+    };
+
     private async Task ShowPreviewAsync(ArchiveItem item)
     {
         // 取消上一次正在进行的预览（避免旧预览完成后覆盖新内容）
@@ -65,8 +134,8 @@ public partial class MainWindow
             var s = AppSettings.Instance;
             var ext = Path.GetExtension(item.Name);
 
-            // 通用文件大小上限检查
-            if (item.Size > s.MaxPreviewFileSize)
+            // 文件大小上限检查（仅对需要加载完整内容的格式生效，只读头的格式不受限制）
+            if (!MetadataOnlyExtensions.Contains(ext) && item.Size > s.MaxPreviewFileSize)
             {
                 var limitMb = s.MaxPreviewFileSize / (1024.0 * 1024.0);
                 ShowUnsupportedPreview(item, L.TF(L.Preview_TooLarge, (double)item.Size / 1024 / 1024, limitMb));
@@ -152,6 +221,116 @@ public partial class MainWindow
 
                 ShowTextPreview(tempFile, ext, item);
             }
+            else if (PeExtensions.Contains(ext))
+            {
+                _previewTempDir = Path.Combine(Path.GetTempPath(), L.T(L.App_MantisZipTitle), Guid.NewGuid().ToString());
+                Directory.CreateDirectory(_previewTempDir);
+                var tempFile = Path.Combine(_previewTempDir, Path.GetFileName(item.Name) ?? "preview" + ext);
+                await Core.Utils.ArchiveEntryExtractor.ExtractEntryAsync(
+                    _currentArchivePath!, item.Name, tempFile, _currentFormat, _currentPassword, ct);
+                ct.ThrowIfCancellationRequested();
+                ShowPePreview(tempFile, item);
+            }
+            else if (PdfExtensions.Contains(ext))
+            {
+                _previewTempDir = Path.Combine(Path.GetTempPath(), L.T(L.App_MantisZipTitle), Guid.NewGuid().ToString());
+                Directory.CreateDirectory(_previewTempDir);
+                var tempFile = Path.Combine(_previewTempDir, Path.GetFileName(item.Name) ?? "preview" + ext);
+                await Core.Utils.ArchiveEntryExtractor.ExtractEntryAsync(
+                    _currentArchivePath!, item.Name, tempFile, _currentFormat, _currentPassword, ct);
+                ct.ThrowIfCancellationRequested();
+                ShowPdfPreview(tempFile, item);
+            }
+            else if (FontExtensions.Contains(ext))
+            {
+                _previewTempDir = Path.Combine(Path.GetTempPath(), L.T(L.App_MantisZipTitle), Guid.NewGuid().ToString());
+                Directory.CreateDirectory(_previewTempDir);
+                var tempFile = Path.Combine(_previewTempDir, Path.GetFileName(item.Name) ?? "preview" + ext);
+                await Core.Utils.ArchiveEntryExtractor.ExtractEntryAsync(
+                    _currentArchivePath!, item.Name, tempFile, _currentFormat, _currentPassword, ct);
+                ct.ThrowIfCancellationRequested();
+                ShowFontPreview(tempFile, item);
+            }
+            else if (WavExtensions.Contains(ext))
+            {
+                _previewTempDir = Path.Combine(Path.GetTempPath(), L.T(L.App_MantisZipTitle), Guid.NewGuid().ToString());
+                Directory.CreateDirectory(_previewTempDir);
+                var tempFile = Path.Combine(_previewTempDir, Path.GetFileName(item.Name) ?? "preview" + ext);
+                await Core.Utils.ArchiveEntryExtractor.ExtractEntryAsync(
+                    _currentArchivePath!, item.Name, tempFile, _currentFormat, _currentPassword, ct);
+                ct.ThrowIfCancellationRequested();
+                ShowAudioPreview(tempFile, item, "WAV");
+            }
+            else if (FlacExtensions.Contains(ext))
+            {
+                _previewTempDir = Path.Combine(Path.GetTempPath(), L.T(L.App_MantisZipTitle), Guid.NewGuid().ToString());
+                Directory.CreateDirectory(_previewTempDir);
+                var tempFile = Path.Combine(_previewTempDir, Path.GetFileName(item.Name) ?? "preview" + ext);
+                await Core.Utils.ArchiveEntryExtractor.ExtractEntryAsync(
+                    _currentArchivePath!, item.Name, tempFile, _currentFormat, _currentPassword, ct);
+                ct.ThrowIfCancellationRequested();
+                ShowAudioPreview(tempFile, item, "FLAC");
+            }
+            else if (SqliteExtensions.Contains(ext))
+            {
+                _previewTempDir = Path.Combine(Path.GetTempPath(), L.T(L.App_MantisZipTitle), Guid.NewGuid().ToString());
+                Directory.CreateDirectory(_previewTempDir);
+                var tempFile = Path.Combine(_previewTempDir, Path.GetFileName(item.Name) ?? "preview" + ext);
+                await Core.Utils.ArchiveEntryExtractor.ExtractEntryAsync(
+                    _currentArchivePath!, item.Name, tempFile, _currentFormat, _currentPassword, ct);
+                ct.ThrowIfCancellationRequested();
+                ShowSqlitePreview(tempFile, item);
+            }
+            else if (IsoExtensions.Contains(ext))
+            {
+                _previewTempDir = Path.Combine(Path.GetTempPath(), L.T(L.App_MantisZipTitle), Guid.NewGuid().ToString());
+                Directory.CreateDirectory(_previewTempDir);
+                var tempFile = Path.Combine(_previewTempDir, Path.GetFileName(item.Name) ?? "preview" + ext);
+                await Core.Utils.ArchiveEntryExtractor.ExtractEntryAsync(
+                    _currentArchivePath!, item.Name, tempFile, _currentFormat, _currentPassword, ct);
+                ct.ThrowIfCancellationRequested();
+                ShowIsoPreview(tempFile, item);
+            }
+            else if (TorrentExtensions.Contains(ext))
+            {
+                _previewTempDir = Path.Combine(Path.GetTempPath(), L.T(L.App_MantisZipTitle), Guid.NewGuid().ToString());
+                Directory.CreateDirectory(_previewTempDir);
+                var tempFile = Path.Combine(_previewTempDir, Path.GetFileName(item.Name) ?? "preview" + ext);
+                await Core.Utils.ArchiveEntryExtractor.ExtractEntryAsync(
+                    _currentArchivePath!, item.Name, tempFile, _currentFormat, _currentPassword, ct);
+                ct.ThrowIfCancellationRequested();
+                ShowTorrentPreview(tempFile, item);
+            }
+            else if (OfficeExtensions.Contains(ext))
+            {
+                _previewTempDir = Path.Combine(Path.GetTempPath(), L.T(L.App_MantisZipTitle), Guid.NewGuid().ToString());
+                Directory.CreateDirectory(_previewTempDir);
+                var tempFile = Path.Combine(_previewTempDir, Path.GetFileName(item.Name) ?? "preview" + ext);
+                await Core.Utils.ArchiveEntryExtractor.ExtractEntryAsync(
+                    _currentArchivePath!, item.Name, tempFile, _currentFormat, _currentPassword, ct);
+                ct.ThrowIfCancellationRequested();
+                ShowOfficePreview(tempFile, item);
+            }
+            else if (SvgExtensions.Contains(ext))
+            {
+                _previewTempDir = Path.Combine(Path.GetTempPath(), L.T(L.App_MantisZipTitle), Guid.NewGuid().ToString());
+                Directory.CreateDirectory(_previewTempDir);
+                var tempFile = Path.Combine(_previewTempDir, Path.GetFileName(item.Name) ?? "preview" + ext);
+                await Core.Utils.ArchiveEntryExtractor.ExtractEntryAsync(
+                    _currentArchivePath!, item.Name, tempFile, _currentFormat, _currentPassword, ct);
+                ct.ThrowIfCancellationRequested();
+                ShowSvgPreview(tempFile, item);
+            }
+            else if (VideoExtensions.Contains(ext))
+            {
+                _previewTempDir = Path.Combine(Path.GetTempPath(), L.T(L.App_MantisZipTitle), Guid.NewGuid().ToString());
+                Directory.CreateDirectory(_previewTempDir);
+                var tempFile = Path.Combine(_previewTempDir, Path.GetFileName(item.Name) ?? "preview" + ext);
+                await Core.Utils.ArchiveEntryExtractor.ExtractEntryAsync(
+                    _currentArchivePath!, item.Name, tempFile, _currentFormat, _currentPassword, ct);
+                ct.ThrowIfCancellationRequested();
+                ShowVideoPreview(tempFile, item);
+            }
             else
             {
                 ShowUnsupportedPreview(item);
@@ -206,6 +385,13 @@ public partial class MainWindow
                 PreviewHeader.Text = L.TF(L.Preview_ImageHeader, Path.GetFileName(filePath));
                 SetPreviewInfo(item, L.TF(L.Preview_Dimensions, gifWidth, gifHeight));
                 ShowPreviewPanel();
+
+                // 工具栏：缩放按钮
+                SetToolbar(
+                    new ToolbarButton { Text = "⊞", Tooltip = L.T(L.Preview_ZoomFit), OnClick = () => ApplyZoom(ZoomMode.FitWindow) },
+                    new ToolbarButton { Text = "1:1", Tooltip = L.T(L.Preview_Zoom100), OnClick = () => ApplyZoom(ZoomMode.Zoom100) },
+                    new ToolbarButton { Text = "↔", Tooltip = L.T(L.Preview_ZoomFitWidth), OnClick = () => ApplyZoom(ZoomMode.FitWidth) }
+                );
                 return;
             }
 
@@ -244,6 +430,21 @@ public partial class MainWindow
             SetPreviewInfo(item, L.TF(L.Preview_Dimensions, bitmap.PixelWidth, bitmap.PixelHeight));
 
             ShowPreviewPanel();
+
+            // 工具栏：缩放按钮
+            SetToolbar(
+                new ToolbarButton { Text = "⊞", Tooltip = L.T(L.Preview_ZoomFit), OnClick = () => ApplyZoom(ZoomMode.FitWindow) },
+                new ToolbarButton { Text = "1:1", Tooltip = L.T(L.Preview_Zoom100), OnClick = () => ApplyZoom(ZoomMode.Zoom100) },
+                new ToolbarButton { Text = "↔", Tooltip = L.T(L.Preview_ZoomFitWidth), OnClick = () => ApplyZoom(ZoomMode.FitWidth) }
+            );
+            // 透明背景（仅 PNG/ICO/WebP）
+            if (ext == ".png" || ext == ".ico" || ext == ".webp")
+            {
+                AddToolbarSeparator();
+                PreviewToolbarPanel.Children.Add(CreateToolbarButtonElement(
+                    new ToolbarButton { Text = "☐", Tooltip = L.T(L.Preview_ToggleTransparency), IsToggle = true, IsChecked = _transparentBgEnabled, OnClick = ToggleTransparencyBg }
+                ));
+            }
         }
         catch (Exception imgEx)
         {
@@ -327,6 +528,11 @@ public partial class MainWindow
             SetPreviewInfo(item, L.TF(L.Preview_TextInfo, content.Length));
             PreviewHeader.Text = L.TF(L.Preview_TextHeader, Path.GetFileName(filePath), content.Length);
             ShowPreviewPanel();
+
+            SetToolbar(
+                new ToolbarButton { Text = "A−", Tooltip = L.T(L.Preview_FontDecrease), OnClick = () => ChangeTextFontSize(-TextFontSizeStep) },
+                new ToolbarButton { Text = "A+", Tooltip = L.T(L.Preview_FontIncrease), OnClick = () => ChangeTextFontSize(TextFontSizeStep) }
+            );
         }
         catch (Exception textEx)
         {
@@ -826,6 +1032,422 @@ public partial class MainWindow
         {
             App.LogDebug("ClearPreviewTemp: failed: {0}", cleanupEx.Message);
         }
+    }
+
+    private void SetFormatSpecificInfo(params (string label, string value)[] items)
+    {
+        PreviewExtraInfoPanel.Children.Clear();
+        if (items.Length == 0)
+        {
+            PreviewExtraInfoPanel.Visibility = Visibility.Collapsed;
+            return;
+        }
+        var secondaryBrush = (Brush)FindResource("Theme_TextSecondary");
+        foreach (var (label, value) in items)
+        {
+            var row = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 1, 0, 1) };
+            row.Children.Add(new TextBlock { Text = label + ": ", FontSize = 11, Foreground = secondaryBrush, FontWeight = FontWeights.SemiBold });
+            row.Children.Add(new TextBlock { Text = value, FontSize = 11, Foreground = secondaryBrush, TextWrapping = TextWrapping.Wrap });
+            PreviewExtraInfoPanel.Children.Add(row);
+        }
+        PreviewExtraInfoPanel.Visibility = Visibility.Visible;
+    }
+
+    private void UpdateGeneralSeparator() { }
+
+    // ═══════════════════════════════════════════
+    //  工具栏基础设施
+    // ═══════════════════════════════════════════
+
+    public record ToolbarButton
+    {
+        public string Text { get; set; } = "";
+        public string Tooltip { get; set; } = "";
+        public bool IsToggle { get; set; }
+        public bool IsChecked { get; set; }
+        public Action? OnClick { get; set; }
+    }
+
+    private void SetToolbar(params ToolbarButton[] buttons)
+    {
+        PreviewToolbarPanel.Children.Clear();
+        if (buttons.Length == 0) { PreviewToolbarBorder.Visibility = Visibility.Collapsed; return; }
+        foreach (var btn in buttons) PreviewToolbarPanel.Children.Add(CreateToolbarButtonElement(btn));
+        PreviewToolbarBorder.Visibility = Visibility.Visible;
+    }
+
+    private Border CreateToolbarButtonElement(ToolbarButton btn)
+    {
+        var border = new Border
+        {
+            Background = Brushes.Transparent,
+            CornerRadius = new CornerRadius(3),
+            Margin = new Thickness(1, 0, 1, 0),
+            Cursor = Cursors.Hand,
+            ToolTip = btn.Tooltip,
+            Child = new TextBlock { Text = btn.Text, FontSize = 13, Padding = new Thickness(6, 3, 6, 3) },
+        };
+        if (btn.IsToggle)
+        {
+            var bgBrush = new SolidColorBrush(Color.FromArgb(30, 100, 100, 100));
+            border.MouseLeftButtonUp += (_, _) =>
+            {
+                btn.IsChecked = !btn.IsChecked;
+                border.Background = btn.IsChecked ? bgBrush : Brushes.Transparent;
+                btn.OnClick?.Invoke();
+            };
+            if (btn.IsChecked) border.Background = bgBrush;
+        }
+        else
+        {
+            border.MouseLeftButtonUp += (_, _) => btn.OnClick?.Invoke();
+        }
+        return border;
+    }
+
+    private void AddToolbarSeparator()
+    {
+        PreviewToolbarPanel.Children.Add(new Border
+        {
+            Width = 1, Height = 16, Margin = new Thickness(4, 0, 4, 0),
+            Background = new SolidColorBrush(Color.FromArgb(60, 128, 128, 128)),
+            VerticalAlignment = VerticalAlignment.Center,
+        });
+    }
+
+    // ═══════════════════════════════════════════
+    //  缩放
+    // ═══════════════════════════════════════════
+
+    private enum ZoomMode { FitWindow, Zoom100, FitWidth }
+
+    private void ApplyZoom(ZoomMode mode)
+    {
+        if (PreviewImage.Source is not BitmapSource bmp) return;
+        switch (mode)
+        {
+            case ZoomMode.FitWindow:
+                PreviewImage.Stretch = Stretch.Uniform;
+                PreviewImage.MaxWidth = double.PositiveInfinity;
+                PreviewImage.MaxHeight = double.PositiveInfinity;
+                break;
+            case ZoomMode.Zoom100:
+                PreviewImage.Stretch = Stretch.None;
+                PreviewImage.MaxWidth = bmp.PixelWidth;
+                PreviewImage.MaxHeight = bmp.PixelHeight;
+                break;
+            case ZoomMode.FitWidth:
+                PreviewImage.Stretch = Stretch.UniformToFill;
+                PreviewImage.MaxWidth = double.PositiveInfinity;
+                PreviewImage.MaxHeight = double.PositiveInfinity;
+                break;
+        }
+    }
+
+    // ═══════════════════════════════════════════
+    //  字号
+    // ═══════════════════════════════════════════
+
+    private const int TextFontSizeStep = 2;
+    private static readonly int[] TextFontSizes = { 8, 10, 12, 14, 16, 18, 20, 24, 28, 32, 36, 42, 48, 56, 64, 72 };
+
+    private void ChangeTextFontSize(int delta)
+    {
+        int current = (int)PreviewTextBox.FontSize;
+        int idx = Array.IndexOf(TextFontSizes, current);
+        if (idx < 0) { idx = Array.FindIndex(TextFontSizes, s => s >= current); if (idx < 0) idx = TextFontSizes.Length - 1; }
+        int newIdx = Math.Clamp(idx + delta, 0, TextFontSizes.Length - 1);
+        if (newIdx != idx) PreviewTextBox.FontSize = TextFontSizes[newIdx];
+    }
+
+    private void ToggleTransparencyBg()
+    {
+        _transparentBgEnabled = !_transparentBgEnabled;
+        if (VisualTreeHelper.GetParent(PreviewImage) is Panel parent)
+            parent.Background = _transparentBgEnabled ? new ImageBrush { TileMode = TileMode.Tile, Viewport = new Rect(0, 0, 16, 16), ViewportUnits = BrushMappingMode.Absolute, ImageSource = CreateCheckerPattern() } : Brushes.Transparent;
+    }
+
+    private static BitmapSource CreateCheckerPattern()
+    {
+        var pixels = new byte[16 * 16 * 4];
+        for (int y = 0; y < 16; y++)
+            for (int x = 0; x < 16; x++)
+            {
+                bool isDark = (x / 8 + y / 8) % 2 == 0;
+                int idx = (y * 16 + x) * 4;
+                byte c = isDark ? (byte)200 : (byte)230;
+                pixels[idx] = c; pixels[idx + 1] = c; pixels[idx + 2] = c; pixels[idx + 3] = 255;
+            }
+        var bmp = new WriteableBitmap(16, 16, 96, 96, PixelFormats.Bgra32, null);
+        bmp.WritePixels(new Int32Rect(0, 0, 16, 16), pixels, 16 * 4, 0);
+        return bmp;
+    }
+
+    // ── PE ──
+    private void ShowPePreview(string filePath, ArchiveItem item)
+    {
+        var info = PeParser.Parse(filePath);
+        if (info == null) { ShowUnsupportedPreview(item, L.T(L.Preview_PeParseFailed)); return; }
+        var productName = info.ProductName ?? info.AdditionalInfo ?? Path.GetFileName(filePath);
+        PreviewTextBox.Text = productName; PreviewTextBox.FontSize = 18;
+        PreviewTextBox.TextAlignment = TextAlignment.Center; PreviewTextBox.Visibility = Visibility.Visible;
+        PreviewImage.Visibility = PreviewFileIcon.Visibility = PreviewUnsupported.Visibility = PreviewWebBrowser.Visibility = Visibility.Collapsed;
+        SetPreviewInfo(item); PreviewHeader.Text = L.TF(L.Preview_PeHeader, info.Architecture ?? "", info.Subsystem ?? "");
+        ShowPreviewPanel();
+        var extra = new List<(string, string)>();
+        if (!string.IsNullOrEmpty(info.CompanyName)) extra.Add((L.T(L.Preview_PeCompany), info.CompanyName));
+        if (!string.IsNullOrEmpty(info.FileVersion)) extra.Add((L.T(L.Preview_PeVersion), info.FileVersion));
+        if (!string.IsNullOrEmpty(info.ProductVersion)) extra.Add((L.T(L.Preview_PeProductVersion), info.ProductVersion));
+        if (!string.IsNullOrEmpty(info.AdditionalInfo)) extra.Add((L.T(L.Preview_PeDescription), info.AdditionalInfo));
+        SetFormatSpecificInfo(extra.ToArray()); SetToolbar();
+    }
+
+    // ── PDF ──
+    private void ShowPdfPreview(string filePath, ArchiveItem item)
+    {
+        try
+        {
+
+
+            var info = PdfParser.Parse(filePath);
+            if (info == null) { ShowUnsupportedPreview(item, L.T(L.Preview_PdfParseFailed)); return; }
+            // 显示 PDF 图标 + 文件信息
+            PreviewFileIcon.Source = SystemIconHelper.GetFileIcon(".pdf");
+            PreviewFileIcon.Visibility = Visibility.Visible;
+            PreviewImage.Visibility = PreviewTextBox.Visibility = PreviewWebBrowser.Visibility = PreviewUnsupported.Visibility = Visibility.Collapsed;
+            SetPreviewInfo(item);
+            PreviewHeader.Text = L.TF(L.Preview_PdfHeader, info.AdditionalInfo ?? "PDF");
+            ShowPreviewPanel();
+            var extra = new List<(string, string)> { (L.T(L.Preview_PdfPages), info.PageCount?.ToString() ?? "--"), (L.T(L.Preview_PdfEncrypted), info.IsEncrypted == true ? "是" : "否") };
+            if (!string.IsNullOrEmpty(info.Title)) extra.Insert(0, (L.T(L.Preview_PdfTitle), info.Title));
+            if (!string.IsNullOrEmpty(info.Author)) extra.Add((L.T(L.Preview_PdfAuthor), info.Author));
+            SetFormatSpecificInfo(extra.ToArray()); SetToolbar();
+        }
+        catch (Exception ex) { App.LogDebug("ShowPdfPreview: failed: {0}", ex.Message); ShowUnsupportedPreview(null, L.T(L.Preview_PdfParseFailed)); }
+    }
+
+    // ── Font ──
+    private void ShowFontPreview(string filePath, ArchiveItem item)
+    {
+        try
+        {
+            var info = FontParser.Parse(filePath);
+            if (info == null) { ShowUnsupportedPreview(item, L.T(L.Preview_FontParseFailed)); return; }
+            var sampleText = AppSettings.Instance.FontPreviewSampleText;
+            if (string.IsNullOrEmpty(sampleText)) sampleText = "AaBbCc 123 示例";
+            PreviewTextBox.Text = sampleText;
+            PreviewTextBox.FontSize = 18; PreviewTextBox.TextAlignment = TextAlignment.Center;
+            PreviewTextBox.Visibility = Visibility.Visible;
+            PreviewImage.Visibility = PreviewFileIcon.Visibility = PreviewUnsupported.Visibility = PreviewWebBrowser.Visibility = Visibility.Collapsed;
+            SetPreviewInfo(item); PreviewHeader.Text = L.TF(L.Preview_FontHeader, info.AdditionalInfo ?? "Font");
+            ShowPreviewPanel();
+            SetFormatSpecificInfo(
+                (L.T(L.Preview_FontName), info.FontName ?? "--"),
+                (L.T(L.Preview_FontStyle), info.FontStyle ?? "Regular"),
+                (L.T(L.Preview_FontGlyphs), info.GlyphCount?.ToString() ?? "--"));
+            SetToolbar();
+        }
+        catch (Exception ex) { App.LogDebug("ShowFontPreview: failed: {0}", ex.Message); ShowUnsupportedPreview(null, L.T(L.Preview_FontParseFailed)); }
+    }
+
+    // ── Audio ──
+    private void ShowAudioPreview(string filePath, ArchiveItem item, string formatName)
+    {
+        try
+        {
+            FileFormatInfo? info = formatName == "WAV" ? RiffParser.Parse(filePath) : FlacParser.Parse(filePath);
+            if (info == null) { ShowUnsupportedPreview(item, L.T(L.Preview_AudioParseFailed)); return; }
+            PreviewTextBox.Text = info.DisplayName;
+            if (info.Duration.HasValue) PreviewTextBox.Text += $"\n时长: {info.Duration.Value:hh\\:mm\\:ss}";
+            if (info.SampleRate > 0) PreviewTextBox.Text += $"\n采样率: {info.SampleRate} Hz";
+            if (info.Channels > 0) PreviewTextBox.Text += $"\n声道: {info.Channels}";
+            if (info.Bitrate > 0) PreviewTextBox.Text += $"\n码率: {info.Bitrate} kbps";
+            PreviewTextBox.TextAlignment = TextAlignment.Left; PreviewTextBox.FontSize = 12;
+            PreviewTextBox.Visibility = Visibility.Visible;
+            PreviewImage.Visibility = PreviewFileIcon.Visibility = PreviewUnsupported.Visibility = PreviewWebBrowser.Visibility = Visibility.Collapsed;
+            SetPreviewInfo(item); PreviewHeader.Text = L.TF(L.Preview_AudioHeader, formatName, Path.GetFileName(filePath));
+            ShowPreviewPanel();
+            var extra = new List<(string, string)>();
+            if (info.Duration.HasValue) extra.Add((L.T(L.Preview_AudioDuration), info.Duration.Value.ToString("hh\\:mm\\:ss")));
+            if (info.SampleRate > 0) extra.Add((L.T(L.Preview_AudioSampleRate), $"{info.SampleRate} Hz"));
+            if (info.Channels > 0) extra.Add((L.T(L.Preview_AudioChannels), info.Channels.ToString()));
+            if (info.Bitrate > 0) extra.Add((L.T(L.Preview_AudioBitrate), $"{info.Bitrate} kbps"));
+            SetFormatSpecificInfo(extra.ToArray()); SetToolbar();
+        }
+        catch (Exception ex) { App.LogDebug("ShowAudioPreview: failed: {0}", ex.Message); ShowUnsupportedPreview(null, L.T(L.Preview_AudioParseFailed)); }
+    }
+
+    // ── SQLite ──
+    private void ShowSqlitePreview(string filePath, ArchiveItem item)
+    {
+        try
+        {
+            var info = SQLiteParser.Parse(filePath);
+            if (info == null) { ShowUnsupportedPreview(item, L.T(L.Preview_SqliteParseFailed)); return; }
+            PreviewTextBox.Text = info.DisplayName;
+            if (info.TableCount > 0) PreviewTextBox.Text += $"\n表数量: {info.TableCount}";
+            PreviewTextBox.TextAlignment = TextAlignment.Left; PreviewTextBox.FontSize = 12;
+            PreviewTextBox.Visibility = Visibility.Visible;
+            PreviewImage.Visibility = PreviewFileIcon.Visibility = PreviewUnsupported.Visibility = PreviewWebBrowser.Visibility = Visibility.Collapsed;
+            SetPreviewInfo(item); PreviewHeader.Text = L.TF(L.Preview_SqliteHeader, Path.GetFileName(filePath));
+            ShowPreviewPanel();
+            SetFormatSpecificInfo((L.T(L.Preview_SqliteEncoding), info.TextEncoding ?? "--"), (L.T(L.Preview_SqlitePageSize), info.AdditionalInfo?.Replace("页面大小: ", "") ?? "--"));
+            SetToolbar();
+        }
+        catch (Exception ex) { App.LogDebug("ShowSqlitePreview: failed: {0}", ex.Message); ShowUnsupportedPreview(null, L.T(L.Preview_SqliteParseFailed)); }
+    }
+
+    // ── ISO ──
+    private void ShowIsoPreview(string filePath, ArchiveItem item)
+    {
+        try
+        {
+            var info = IsoParser.Parse(filePath);
+            if (info == null) { ShowUnsupportedPreview(item, L.T(L.Preview_IsoParseFailed)); return; }
+            PreviewTextBox.Text = info.DisplayName;
+            if (info.VolumeLabel != null) PreviewTextBox.Text += $"\n卷标: {info.VolumeLabel}";
+            if (info.DiskSize > 0) PreviewTextBox.Text += $"\n大小: {ArchiveItem.FormatSize(info.DiskSize.Value)}";
+            PreviewTextBox.TextAlignment = TextAlignment.Left; PreviewTextBox.FontSize = 12;
+            PreviewTextBox.Visibility = Visibility.Visible;
+            PreviewImage.Visibility = PreviewFileIcon.Visibility = PreviewUnsupported.Visibility = PreviewWebBrowser.Visibility = Visibility.Collapsed;
+            SetPreviewInfo(item); PreviewHeader.Text = L.TF(L.Preview_IsoHeader, info.AdditionalInfo ?? "ISO 9660", Path.GetFileName(filePath));
+            ShowPreviewPanel();
+            SetFormatSpecificInfo(
+                (L.T(L.Preview_IsoVolume), info.VolumeLabel ?? "--"),
+                (L.T(L.Preview_IsoFormat), info.AdditionalInfo ?? "ISO 9660"));
+            SetToolbar();
+        }
+        catch (Exception ex) { App.LogDebug("ShowIsoPreview: failed: {0}", ex.Message); ShowUnsupportedPreview(null, L.T(L.Preview_IsoParseFailed)); }
+    }
+
+    // ── Torrent ──
+    private void ShowTorrentPreview(string filePath, ArchiveItem item)
+    {
+        try
+        {
+            var info = TorrentParser.Parse(filePath);
+            if (info == null) { ShowUnsupportedPreview(item, L.T(L.Preview_TorrentParseFailed)); return; }
+            var sb = new StringBuilder();
+            sb.Append(L.T(L.Preview_TorrentFiles)).AppendLine();
+            if (info.TorrentFileName != null) sb.AppendLine($"  {info.TorrentFileName}/");
+            if (info.TorrentTotalSize > 0) sb.AppendLine($"  总大小: {FormatSize(info.TorrentTotalSize!.Value)}");
+            if (info.PieceCount > 0) sb.AppendLine($"  分片: {info.PieceCount} × {(info.PieceSize.HasValue ? FormatSize(info.PieceSize.Value) : "?")}");
+            sb.AppendLine();
+            BuildTorrentFileTree(info, sb);
+            sb.AppendLine();
+            if (info.MagnetLink != null) { sb.AppendLine(L.T(L.Preview_TorrentMagnet)); sb.Append(info.MagnetLink); }
+            PreviewTextBox.Text = sb.ToString(); PreviewTextBox.FontSize = 12;
+            PreviewTextBox.TextAlignment = TextAlignment.Left; PreviewTextBox.Visibility = Visibility.Visible;
+            PreviewImage.Visibility = PreviewFileIcon.Visibility = PreviewUnsupported.Visibility = PreviewWebBrowser.Visibility = Visibility.Collapsed;
+            SetPreviewInfo(item); PreviewHeader.Text = L.TF(L.Preview_TorrentHeader, info.TorrentFileName ?? Path.GetFileName(filePath));
+            ShowPreviewPanel();
+            var extra = new List<(string, string)> { (L.T(L.Preview_TorrentInfoHash), info.InfoHashV1 ?? "--") };
+            if (info.TrackerUrl != null) extra.Add((L.T(L.Preview_TorrentTracker), info.TrackerUrl!));
+            if (info.TrackerCount > 1) extra.Add((L.T(L.Preview_TorrentTrackerCount), info.TrackerCount!.ToString()));
+            if (info.CreatedBy != null) extra.Add((L.T(L.Preview_TorrentCreatedBy), info.CreatedBy!));
+            if (info.IsPrivate == true) extra.Add((L.T(L.Preview_TorrentPrivate), "是"));
+            if (!string.IsNullOrEmpty(info.AdditionalInfo)) extra.Add((L.T(L.Preview_TorrentComment), info.AdditionalInfo!));
+            SetFormatSpecificInfo(extra.ToArray()); SetToolbar();
+        }
+        catch (Exception ex) { App.LogDebug("ShowTorrentPreview: failed: {0}", ex.Message); ShowUnsupportedPreview(null, L.T(L.Preview_TorrentParseFailed)); }
+    }
+
+    private static void BuildTorrentFileTree(FileFormatInfo info, StringBuilder sb)
+    {
+        if (info.TorrentFileEntries == null || info.TorrentFileEntries.Count == 0)
+        { sb.AppendLine($"  ({info.TorrentFileName ?? "?"})"); return; }
+        var root = new Dictionary<string, object>();
+        foreach (var (path, size) in info.TorrentFileEntries)
+        {
+            var parts = path.Split('/'); var current = root;
+            for (int i = 0; i < parts.Length - 1; i++)
+            {
+                if (!current.TryGetValue(parts[i], out var child)) { var sub = new Dictionary<string, object>(); current[parts[i]] = sub; child = sub; }
+                current = (Dictionary<string, object>)child!;
+            }
+            current[parts[^1]] = size;
+        }
+        RenderTree(sb, root, "");
+    }
+
+    private static void RenderTree(StringBuilder sb, Dictionary<string, object> node, string indent)
+    {
+        var items = node.ToArray();
+        for (int i = 0; i < items.Length; i++)
+        {
+            bool isLast = i == items.Length - 1;
+            string prefix = isLast ? "└── " : "├── ";
+            string childIndent = isLast ? "    " : "│   ";
+            if (items[i].Value is Dictionary<string, object> sub)
+            { sb.AppendLine($"{indent}{prefix}📁 {items[i].Key}/"); RenderTree(sb, sub, indent + childIndent); }
+            else
+            { sb.AppendLine($"{indent}{prefix}{items[i].Key}  ({ArchiveItem.FormatSize((long)items[i].Value)})"); }
+        }
+    }
+
+    // ── Office ──
+    private void ShowOfficePreview(string filePath, ArchiveItem item)
+    {
+        try
+        {
+            var info = OfficeParser.Parse(filePath);
+            if (info == null) { ShowUnsupportedPreview(item, L.T(L.Preview_OfficeParseFailed)); return; }
+            PreviewTextBox.Text = info.DisplayName;
+            if (info.Title != null) PreviewTextBox.Text += $"\n标题: {info.Title}";
+            if (info.Author != null) PreviewTextBox.Text += $"\n作者: {info.Author}";
+            if (info.PageCount > 0) PreviewTextBox.Text += $"\n{(filePath.EndsWith(".pptx") ? "幻灯片" : filePath.EndsWith(".xlsx") ? "工作表" : "页数")}: {info.PageCount}";
+            PreviewTextBox.TextAlignment = TextAlignment.Left; PreviewTextBox.FontSize = 12;
+            PreviewTextBox.Visibility = Visibility.Visible;
+            PreviewImage.Visibility = PreviewFileIcon.Visibility = PreviewUnsupported.Visibility = PreviewWebBrowser.Visibility = Visibility.Collapsed;
+            SetPreviewInfo(item); PreviewHeader.Text = info.DisplayName;
+            ShowPreviewPanel();
+            var extra = new List<(string, string)>();
+            if (info.Title != null) extra.Add((L.T(L.Preview_DocTitle), info.Title));
+            if (info.Author != null) extra.Add((L.T(L.Preview_DocAuthor), info.Author));
+            if (info.PageCount > 0) { string label = filePath.EndsWith(".pptx") ? L.T(L.Preview_DocSlides) : filePath.EndsWith(".xlsx") ? L.T(L.Preview_DocSheets) : L.T(L.Preview_DocPages); extra.Add((label, info.PageCount.ToString())); }
+            if (info.CreationDate.HasValue) extra.Add((L.T(L.Preview_DocCreated), info.CreationDate.Value.ToString("yyyy-MM-dd HH:mm")));
+            if (info.ModifiedDate.HasValue) extra.Add((L.T(L.Preview_DocModified), info.ModifiedDate.Value.ToString("yyyy-MM-dd HH:mm")));
+            SetFormatSpecificInfo(extra.ToArray()); SetToolbar();
+        }
+        catch (Exception ex) { App.LogDebug("ShowOfficePreview: failed: {0}", ex.Message); ShowUnsupportedPreview(null, L.T(L.Preview_OfficeParseFailed)); }
+    }
+
+    // ── SVG ──
+    private void ShowSvgPreview(string filePath, ArchiveItem item)
+    {
+        try
+        {
+            PreviewImage.Visibility = PreviewTextBox.Visibility = PreviewFileIcon.Visibility = PreviewUnsupported.Visibility = Visibility.Collapsed;
+            PreviewWebBrowser.Navigate(new Uri(filePath)); PreviewWebBrowser.Visibility = Visibility.Visible;
+            SetPreviewInfo(item); PreviewHeader.Text = L.TF(L.Preview_ImageHeader, Path.GetFileName(filePath));
+            ShowPreviewPanel(); SetFormatSpecificInfo(("SVG", Path.GetFileName(filePath))); SetToolbar();
+        }
+        catch (Exception ex) { App.LogDebug("ShowSvgPreview: failed: {0}", ex.Message); PreviewWebBrowser.Visibility = Visibility.Collapsed; ShowUnsupportedPreview(null, "SVG 预览失败"); }
+    }
+
+    // ── Video ──
+    private void ShowVideoPreview(string filePath, ArchiveItem item)
+    {
+        try
+        {
+            var info = VideoParser.Parse(filePath);
+            if (info == null) { ShowUnsupportedPreview(item, L.T(L.Preview_VideoParseFailed)); return; }
+            var sb = new StringBuilder(); sb.AppendLine(info.DisplayName);
+            if (info.VideoWidth > 0 && info.VideoHeight > 0) sb.AppendLine($"  分辨率: {info.VideoWidth} × {info.VideoHeight}");
+            if (info.Duration.HasValue) sb.AppendLine($"  时长: {info.Duration.Value:hh\\:mm\\:ss}");
+            if (info.Codec != null) sb.AppendLine($"  编码: {info.Codec}");
+            PreviewTextBox.Text = sb.ToString(); PreviewTextBox.TextAlignment = TextAlignment.Left; PreviewTextBox.FontSize = 12;
+            PreviewTextBox.Visibility = Visibility.Visible;
+            PreviewImage.Visibility = PreviewFileIcon.Visibility = PreviewUnsupported.Visibility = PreviewWebBrowser.Visibility = Visibility.Collapsed;
+            SetPreviewInfo(item); PreviewHeader.Text = info.DisplayName;
+            ShowPreviewPanel();
+            var extra = new List<(string, string)>();
+            if (info.VideoWidth > 0 && info.VideoHeight > 0) extra.Add((L.T(L.Preview_Dimensions), $"{info.VideoWidth} × {info.VideoHeight}"));
+            if (info.Duration.HasValue) extra.Add((L.T(L.Preview_VideoDuration), info.Duration.Value.ToString("hh\\:mm\\:ss")));
+            if (info.Codec != null) extra.Add((L.T(L.Preview_VideoCodec), info.Codec));
+            SetFormatSpecificInfo(extra.ToArray()); SetToolbar();
+        }
+        catch (Exception ex) { App.LogDebug("ShowVideoPreview: failed: {0}", ex.Message); ShowUnsupportedPreview(null, L.T(L.Preview_VideoParseFailed)); }
     }
 
     #endregion
