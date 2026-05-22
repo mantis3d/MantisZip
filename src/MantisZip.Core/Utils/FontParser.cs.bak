@@ -1,0 +1,186 @@
+using System;
+using System.IO;
+using System.Text;
+
+namespace MantisZip.Core.Utils;
+
+/// <summary>
+/// TTF/OTF 字体文件解析器。
+/// 读取 Offset Table → name table（字体名、样式）+ maxp table（字形数）。
+/// TTF/OTF 规范为 big-endian，所有多字节值需手动转换。
+/// </summary>
+public static class FontParser
+{
+    /// <summary>
+    /// 解析字体文件，返回格式信息；解析失败返回 null。
+    /// </summary>
+    public static FileFormatInfo? Parse(string filePath)
+    {
+        try
+        {
+            using var fs = new FileStream(filePath, FileMode.Open, FileAccess.Read);
+            using var reader = new BinaryReader(fs);
+
+            // ── Offset Table（big-endian）──
+            uint sfVersion = ReadBEU32(reader);
+            ushort numTables = ReadBEU16(reader);
+            reader.ReadBytes(6); // searchRange(2) + entrySelector(2) + rangeShift(2)
+
+            // ── 查找 name / maxp 表 ──
+            uint nameTableOffset = 0, nameTableLength = 0;
+            uint maxpTableOffset = 0, maxpTableLength = 0;
+            bool foundName = false, foundMaxp = false;
+
+            for (int i = 0; i < numTables; i++)
+            {
+                long entryPos = fs.Position;
+                string tag = Encoding.ASCII.GetString(reader.ReadBytes(4));
+                reader.ReadBytes(4); // checksum
+                uint offset = ReadBEU32(reader);
+                uint length = ReadBEU32(reader);
+                fs.Seek(entryPos + 16, SeekOrigin.Begin); // 16 bytes per entry
+
+                switch (tag)
+                {
+                    case "name":
+                        nameTableOffset = offset;
+                        nameTableLength = length;
+                        foundName = true;
+                        break;
+                    case "maxp":
+                        maxpTableOffset = offset;
+                        maxpTableLength = length;
+                        foundMaxp = true;
+                        break;
+                }
+            }
+
+            // ── name 表解析（big-endian）──
+            string? fontFamily = null;
+            string? fontSubfamily = null;
+            string? fullName = null;
+
+            if (foundName && nameTableOffset > 0 && nameTableLength >= 6)
+            {
+                if (nameTableOffset > fs.Length || nameTableOffset + nameTableLength > fs.Length)
+                    return null; // 表偏移无效
+
+                fs.Seek(nameTableOffset, SeekOrigin.Begin);
+                ushort format = ReadBEU16(reader);
+                ushort nameCount = ReadBEU16(reader);
+                ushort stringOffset = ReadBEU16(reader); // relative to name table start
+
+                for (int i = 0; i < nameCount; i++)
+                {
+                    ushort platformID = ReadBEU16(reader);
+                    ushort encodingID = ReadBEU16(reader);
+                    ushort languageID = ReadBEU16(reader);
+                    ushort nameID = ReadBEU16(reader);
+                    ushort length = ReadBEU16(reader);
+                    ushort offset = ReadBEU16(reader);
+
+                    if (length == 0) continue;
+
+                    long savedPos = fs.Position;
+                    try
+                    {
+                        long strPos = nameTableOffset + stringOffset + offset;
+                        if (strPos < 0 || strPos + length > fs.Length)
+                            continue; // 跳过越界条目
+
+                        fs.Seek(strPos, SeekOrigin.Begin);
+                        byte[] strBytes = reader.ReadBytes(length);
+
+                        // Windows 平台 (3) / Mac 平台 (1) → UTF-16BE / ASCII
+                        string value = platformID switch
+                        {
+                            3 => Encoding.BigEndianUnicode.GetString(strBytes),
+                            1 => Encoding.ASCII.GetString(strBytes),
+                            _ => Encoding.UTF8.GetString(strBytes),
+                        };
+
+                        // 去除末尾空字符
+                        int nullIdx = value.IndexOf('\0');
+                        if (nullIdx >= 0)
+                            value = value[..nullIdx];
+
+                        switch (nameID)
+                        {
+                            case 1 when fontFamily == null:
+                                fontFamily = value;
+                                break;
+                            case 2 when fontSubfamily == null:
+                                fontSubfamily = value;
+                                break;
+                            case 4 when fullName == null:
+                                fullName = value;
+                                break;
+                        }
+                    }
+                    finally
+                    {
+                        fs.Seek(savedPos, SeekOrigin.Begin);
+                    }
+                }
+            }
+
+            // ── maxp 表解析（big-endian）──
+            int? numGlyphs = null;
+            if (foundMaxp && maxpTableOffset > 0 && maxpTableLength >= 6)
+            {
+                if (maxpTableOffset > fs.Length || maxpTableOffset + maxpTableLength > fs.Length)
+                    return null;
+
+                fs.Seek(maxpTableOffset + 4, SeekOrigin.Begin); // skip version (uint32 BE)
+                numGlyphs = ReadBEU16(reader);
+            }
+
+            // ── 确定格式名称 ──
+            string formatName = sfVersion switch
+            {
+                0x00010000 => "TrueType",
+                0x4F54544F => "OpenType (CFF)", // OTTO
+                _ => $"Unknown ({sfVersion:X8})"
+            };
+
+            string displayName = formatName switch
+            {
+                "TrueType" => "TrueType 字体",
+                _ => "OpenType 字体"
+            };
+
+            return new FileFormatInfo
+            {
+                Format = FileFormat.Ttf,
+                DisplayName = displayName,
+                Extension = Path.GetExtension(filePath),
+                FileSize = new FileInfo(filePath).Length,
+                FontName = fontFamily ?? fullName ?? Path.GetFileNameWithoutExtension(filePath),
+                FontStyle = fontSubfamily,
+                GlyphCount = numGlyphs,
+                AdditionalInfo = formatName,
+            };
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    // ── Big-endian helpers ──
+
+    private static ushort ReadBEU16(BinaryReader r)
+    {
+        var bytes = r.ReadBytes(2);
+        if (bytes.Length < 2) throw new EndOfStreamException();
+        return (ushort)((bytes[0] << 8) | bytes[1]);
+    }
+
+    private static uint ReadBEU32(BinaryReader r)
+    {
+        var bytes = r.ReadBytes(4);
+        if (bytes.Length < 4) throw new EndOfStreamException();
+        return (uint)((bytes[0] << 24) | (bytes[1] << 16) | (bytes[2] << 8) | bytes[3]);
+    }
+}
+
