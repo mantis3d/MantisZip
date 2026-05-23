@@ -4,6 +4,7 @@ obj/
 out/
 publish_output/
 installer/
+TestPreview/
 
 # IDE
 .vs/
