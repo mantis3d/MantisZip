@@ -1225,6 +1225,9 @@ public partial class MainWindow
         switch (mode)
         {
             case ZoomMode.FitWindow:
+                // Disabled scrollbars -> ScrollViewer 约束内容到视口大小 -> Stretch.Uniform 生效
+                PreviewImageScroll.HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled;
+                PreviewImageScroll.VerticalScrollBarVisibility = ScrollBarVisibility.Disabled;
                 PreviewImage.Stretch = Stretch.Uniform;
                 PreviewImage.MaxWidth = double.PositiveInfinity;
                 PreviewImage.MaxHeight = double.PositiveInfinity;
@@ -1232,6 +1235,9 @@ public partial class MainWindow
                 PreviewImage.VerticalAlignment = VerticalAlignment.Center;
                 break;
             case ZoomMode.Zoom100:
+                // Auto scrollbars -> ScrollViewer 不约束，图像按原始尺寸，可滚动
+                PreviewImageScroll.HorizontalScrollBarVisibility = ScrollBarVisibility.Auto;
+                PreviewImageScroll.VerticalScrollBarVisibility = ScrollBarVisibility.Auto;
                 PreviewImage.Stretch = Stretch.None;
                 PreviewImage.MaxWidth = bmp.PixelWidth;
                 PreviewImage.MaxHeight = bmp.PixelHeight;
@@ -1239,11 +1245,14 @@ public partial class MainWindow
                 PreviewImage.VerticalAlignment = VerticalAlignment.Top;
                 break;
             case ZoomMode.FitWidth:
+                // 水平禁用（适应宽度），垂直自动（可上下滚动）
+                PreviewImageScroll.HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled;
+                PreviewImageScroll.VerticalScrollBarVisibility = ScrollBarVisibility.Auto;
                 PreviewImage.Stretch = Stretch.Uniform;
                 PreviewImage.MaxWidth = double.PositiveInfinity;
                 PreviewImage.MaxHeight = double.PositiveInfinity;
                 PreviewImage.HorizontalAlignment = HorizontalAlignment.Stretch;
-                PreviewImage.VerticalAlignment = VerticalAlignment.Center;
+                PreviewImage.VerticalAlignment = VerticalAlignment.Top;
                 break;
         }
     }

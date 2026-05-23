@@ -336,7 +336,7 @@
                                                 <Grid Grid.Row="1">
 
                                             <!-- Image Preview -->
-                                            <ScrollViewer x:Name="PreviewImageScroll" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto" Visibility="Collapsed">
+                                            <ScrollViewer x:Name="PreviewImageScroll" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Disabled" Visibility="Collapsed">
                                                 <Image x:Name="PreviewImage" Stretch="Uniform" Visibility="Visible" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                             </ScrollViewer>
 
