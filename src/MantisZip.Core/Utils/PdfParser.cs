@@ -126,40 +126,55 @@ public static class PdfParser
     }
 
     /// <summary>
-    /// 在文件中扫描 /Type /Pages 字典中的 /Count，获取页数。
-    /// 分块读取（最多 512KB），避免大文件全部加载。
+    /// 扫描 /Type /Pages 字典中的 /Count，获取页数。
+    /// 从文件头部和尾部两端分别扫描（各 256KB），覆盖线性化和非线性化 PDF。
+    /// 避免大文件全部加载。
     /// </summary>
     private static int? FindPageCount(FileStream fs)
     {
-        const int chunkSize = 256 * 1024;
-        long maxScan = Math.Min(512 * 1024, fs.Length);
-        byte[] buffer = new byte[chunkSize];
-        long offset = 0;
+        const int scanSize = 256 * 1024;
 
-        fs.Seek(0, SeekOrigin.Begin);
+        // 从文件头扫描 256KB
+        int? count = ScanForPageCount(fs, 0, scanSize);
+        if (count.HasValue) return count;
 
-        while (offset < maxScan)
+        // 从文件末尾往前扫描 256KB（线性化 PDF 的 Pages 树通常在末尾）
+        long tailStart = Math.Max(0, fs.Length - scanSize);
+        if (tailStart > 0)
         {
-            int toRead = (int)Math.Min(chunkSize, maxScan - offset);
-            int bytesRead = fs.Read(buffer, 0, toRead);
-            if (bytesRead == 0) break;
+            count = ScanForPageCount(fs, tailStart, scanSize);
+            if (count.HasValue) return count;
+        }
 
-            string text = System.Text.Encoding.ASCII.GetString(buffer, 0, bytesRead);
+        return null;
+    }
 
-            // 两步：先定位 /Type /Pages 所在的 << >> 字典块，再提取 /Count
-            // 这样可以应对 /Count 在 /Type /Pages 之前或之后的任意顺序
-            var dictMatch = Regex.Match(text,
-                @"<<(?:(?!>>).)*?/Type\s*/Pages(?:(?!>>).)*?>>",
-                RegexOptions.Singleline | RegexOptions.IgnoreCase);
-            if (dictMatch.Success)
-            {
-                var countMatch = Regex.Match(dictMatch.Value, @"/Count\s+(\d+)",
-                    RegexOptions.IgnoreCase);
-                if (countMatch.Success && int.TryParse(countMatch.Groups[1].Value, out int count))
-                    return count;
-            }
+    /// <summary>
+    /// 在文件指定位置读取最多 length 字节，查找 /Type /Pages 字典中的 /Count。
+    /// </summary>
+    private static int? ScanForPageCount(FileStream fs, long position, int length)
+    {
+        int actualLen = (int)Math.Min(length, fs.Length - position);
+        if (actualLen <= 0) return null;
 
-            offset += bytesRead;
+        byte[] buffer = new byte[actualLen];
+        fs.Seek(position, SeekOrigin.Begin);
+        int bytesRead = fs.Read(buffer, 0, actualLen);
+        if (bytesRead == 0) return null;
+
+        string text = System.Text.Encoding.ASCII.GetString(buffer, 0, bytesRead);
+
+        // 两步：先定位 /Type /Pages 所在的 << >> 字典块，再提取 /Count
+        // 应对 /Count 在 /Type /Pages 之前或之后的任意顺序
+        var dictMatch = Regex.Match(text,
+            @"<<(?:(?!>>).)*?/Type\s*/Pages(?:(?!>>).)*?>>",
+            RegexOptions.Singleline | RegexOptions.IgnoreCase);
+        if (dictMatch.Success)
+        {
+            var countMatch = Regex.Match(dictMatch.Value, @"/Count\s+(\d+)",
+                RegexOptions.IgnoreCase);
+            if (countMatch.Success && int.TryParse(countMatch.Groups[1].Value, out int count))
+                return count;
         }
 
         return null;
