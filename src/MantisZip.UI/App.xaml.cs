@@ -264,25 +264,30 @@ public partial class App : Application
         {
             try
             {
-                using var pipe = new NamedPipeServerStream(
-                    CompressPipeName, PipeDirection.In, -1,
-                    PipeTransmissionMode.Message, PipeOptions.Asynchronous);
-
-                // Signal that the pipe server is ready to accept connections,
-                // before the first WaitForConnectionAsync call.
                 _compressPipeReady.Set();
-
-                await pipe.WaitForConnectionAsync(ct);
-                using var reader = new StreamReader(pipe);
-                var line = await reader.ReadLineAsync();
-                while (line != null)
+                // 循环接受多个客户端连接。Windows 每选一个文件启动一个独立进程，
+                // 每个后续进程通过命名管道发送自己的路径。
+                while (!ct.IsCancellationRequested)
                 {
-                    lock (allPaths)
+                    using var pipe = new NamedPipeServerStream(
+                        CompressPipeName, PipeDirection.In, -1,
+                        PipeTransmissionMode.Message, PipeOptions.Asynchronous);
+                    try
                     {
-                        if (!allPaths.Contains(line) && (File.Exists(line) || Directory.Exists(line)))
-                            allPaths.Add(line);
+                        await pipe.WaitForConnectionAsync(ct);
+                        using var reader = new StreamReader(pipe);
+                        string? line;
+                        while ((line = await reader.ReadLineAsync()) != null)
+                        {
+                            lock (allPaths)
+                            {
+                                if (!allPaths.Contains(line) && (File.Exists(line) || Directory.Exists(line)))
+                                    allPaths.Add(line);
+                            }
+                        }
                     }
-                    line = await reader.ReadLineAsync();
+                    catch (OperationCanceledException) { throw; }
+                    finally { pipe.Dispose(); }
                 }
             }
             catch (OperationCanceledException) { }
@@ -1308,7 +1313,7 @@ public partial class App : Application
         {
             if (engine is ZipEngine)
             {
-                using var zipFile = new ZipFile(archivePath);
+                using var zipFile = ZipEngine.OpenZipFile(archivePath);
                 return zipFile.Cast<ZipEntry>().Any(e => e.IsCrypted || e.AESKeySize > 0);
             }
             if (engine is SevenZipEngine)
