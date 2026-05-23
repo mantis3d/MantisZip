@@ -128,7 +128,6 @@ public static class PdfParser
     /// <summary>
     /// 在文件中扫描 /Type /Pages 字典中的 /Count，获取页数。
     /// 分块读取（最多 512KB），避免大文件全部加载。
-    /// 正则允许中间有 &gt; 字符，适应嵌套字典的情况。
     /// </summary>
     private static int? FindPageCount(FileStream fs)
     {
@@ -147,11 +146,18 @@ public static class PdfParser
 
             string text = System.Text.Encoding.ASCII.GetString(buffer, 0, bytesRead);
 
-            var match = Regex.Match(text,
-                @"/Type\s*/Pages\b.*?/Count\s+(\d+)",
+            // 两步：先定位 /Type /Pages 所在的 << >> 字典块，再提取 /Count
+            // 这样可以应对 /Count 在 /Type /Pages 之前或之后的任意顺序
+            var dictMatch = Regex.Match(text,
+                @"<<(?:(?!>>).)*?/Type\s*/Pages(?:(?!>>).)*?>>",
                 RegexOptions.Singleline | RegexOptions.IgnoreCase);
-            if (match.Success && int.TryParse(match.Groups[1].Value, out int count))
-                return count;
+            if (dictMatch.Success)
+            {
+                var countMatch = Regex.Match(dictMatch.Value, @"/Count\s+(\d+)",
+                    RegexOptions.IgnoreCase);
+                if (countMatch.Success && int.TryParse(countMatch.Groups[1].Value, out int count))
+                    return count;
+            }
 
             offset += bytesRead;
         }
