@@ -25,6 +25,8 @@ public partial class MainWindow
 {
     #region 文件预览
 
+    private bool _webView2Crashed;
+
     private static readonly HashSet<string> ImageExtensions = new(StringComparer.OrdinalIgnoreCase)
     {
         ".jpg", ".jpeg", ".png", ".gif", ".bmp", ".ico", ".webp"
@@ -143,20 +145,34 @@ public partial class MainWindow
     /// 加新格式时请在方法开头调用此函数。
     /// </summary>
     /// <summary>
-    /// 确保 WebView2 已初始化（CoreWebView2 可用），只初始化一次。
+    /// 确保 WebView2 已初始化（CoreWebView2 可用）。浏览器进程崩溃后会重新初始化。
     /// </summary>
     private async Task EnsureWebView2InitializedAsync()
     {
-        if (PreviewWebView2.CoreWebView2 != null)
-            return;
+        // 浏览器进程崩溃后，或首次调用尚未初始化，都需要创建
+        if (!_webView2Crashed && PreviewWebView2.CoreWebView2 != null)
+            return; // 已正常初始化，无需操作
 
+        // 崩溃后或首次初始化
+        _webView2Crashed = false;
         try
         {
-            // EnsureCoreWebView2Async 是幂等的：已初始化则立即返回
             await PreviewWebView2.EnsureCoreWebView2Async();
+        }
+        catch (Exception ex)
+        {
+            App.LogDebug("WebView2 (re)initialization failed: {0}", ex.Message);
+            throw;
+        }
+
+        // CoreWebView2 刚刚创建，执行完整设置
+        try
+        {
+            // 订阅浏览器进程崩溃事件
+            PreviewWebView2.CoreWebView2!.ProcessFailed += OnWebView2ProcessFailed;
 
             // 安全配置：禁止右键菜单、禁用密码/表单自动填充
-            PreviewWebView2.CoreWebView2!.Settings.AreDefaultContextMenusEnabled = false;
+            PreviewWebView2.CoreWebView2.Settings.AreDefaultContextMenusEnabled = false;
             PreviewWebView2.CoreWebView2.Settings.IsScriptEnabled = true;
             PreviewWebView2.CoreWebView2.Settings.IsPasswordAutosaveEnabled = false;
             PreviewWebView2.CoreWebView2.Settings.IsGeneralAutofillEnabled = false;
@@ -178,6 +194,21 @@ public partial class MainWindow
             App.LogDebug("WebView2 initialization failed: {0}", ex.Message);
             throw;
         }
+    }
+
+    private void OnWebView2ProcessFailed(object? sender, CoreWebView2ProcessFailedEventArgs e)
+    {
+        _webView2Crashed = true;
+        App.LogDebug("WebView2 process failed: reason={0}, exitCode={1}", e.Reason, e.ExitCode);
+        // 仅在 WebView2 当前可见时提示用户，否则静默恢复即可
+        Dispatcher.InvokeAsync(() =>
+        {
+            if (PreviewWebView2.Visibility == Visibility.Visible)
+            {
+                PreviewWebView2.Visibility = Visibility.Collapsed;
+                ShowUnsupportedPreview(null, "预览组件异常，请重新选择文件以恢复");
+            }
+        });
     }
 
     private void HideAllPreviewControls()
