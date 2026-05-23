@@ -39,3 +39,7 @@ Thumbs.db
 .sisyphus/tmp_*
 .sisyphus/run-continuation/
 replace_strings.ps1
+
+# Development artifacts
+*.bak
+session-*.md
