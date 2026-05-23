@@ -20,6 +20,7 @@ using Markdig;
 using Ude;
 using ICSharpCode.SharpZipLib.Zip;
 using MantisZip.UI.Localization;
+using WpfAnimatedGif;
 
 namespace MantisZip.UI;
 
@@ -49,6 +50,10 @@ public partial class MainWindow : Window
     private bool _isOwnDrag;                 // 当前拖拽是否来自本窗口
     private CancellationTokenSource? _previewCts; // 预览取消令牌
     private bool _transparentBgEnabled;
+    private ImageAnimationController? _gifController;
+    private TextBox? _gifFrameInput;
+    private TextBlock? _gifFrameTotal;
+    private bool _fontLigaturesEnabled;
 
     public MainWindow()
     {
@@ -251,6 +256,7 @@ public partial class MainWindow : Window
 
     internal async Task LoadArchiveAsync(string archivePath)
     {
+        App.TraceLog("LoadArchiveAsync: entering archivePath={0}", archivePath);
         try
         {
             ClearPreviewTemp();
@@ -379,6 +385,8 @@ public partial class MainWindow : Window
         }
         catch (Exception ex)
         {
+            App.TraceLog("LoadArchiveAsync: failed: {0}", ex.ToString());
+            App.LogDebug("LoadArchiveAsync: failed: {0}", ex.ToString());
             AppMessageBox.Show(L.TF(L.Main_Status_LoadFailed, ex.Message), L.T(L.App_ErrorTitle), MessageBoxButton.OK, MessageBoxImage.Error);
             DirStatsText.Text = "";
             SelectionStatsText.Text = "";

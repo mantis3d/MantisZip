@@ -249,6 +249,8 @@
   "Preview_TooLargeText": "📄 文件过大 ({0:F1} MB)，超过文本预览限制 ({1:F0} MB)",
   "Preview_Unsupported": "🔍 无法预览此文件",
   "Preview_GifPause": "暂停/播放 GIF",
+  "Preview_GifPrevFrame": "上一帧",
+  "Preview_GifNextFrame": "下一帧",
   "Preview_ZoomFit": "适应窗口",
   "Preview_Zoom100": "原始大小 (1:1)",
   "Preview_ZoomFitWidth": "适应宽度",

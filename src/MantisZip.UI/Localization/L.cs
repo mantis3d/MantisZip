@@ -263,6 +263,8 @@ public static class L
     public const string Preview_TooLargeText                       = "Preview_TooLargeText";
     public const string Preview_Unsupported                        = "Preview_Unsupported";
     public const string Preview_GifPause                           = "Preview_GifPause";
+    public const string Preview_GifPrevFrame                       = "Preview_GifPrevFrame";
+    public const string Preview_GifNextFrame                       = "Preview_GifNextFrame";
     public const string Preview_ZoomFit                            = "Preview_ZoomFit";
     public const string Preview_Zoom100                            = "Preview_Zoom100";
     public const string Preview_ZoomFitWidth                       = "Preview_ZoomFitWidth";

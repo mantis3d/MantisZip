@@ -98,7 +98,8 @@ public partial class App : Application
 
         LogDebug("LogDebug: debug.log will be appended");
 
-        Log("启动参数: {0}", string.Join(" ", e.Args));
+        LogStartup($"启动参数: {string.Join(" ", e.Args)}");
+        TraceLog("OnStartup: after args log");
 
         try
         {
@@ -190,10 +191,14 @@ public partial class App : Application
         }
 
         // 正常启动：手动创建主窗口（已L.T(L.Compress_Remove) StartupUri）
+        TraceLog("OnStartup: creating MainWindow");
         var mainWin = new MainWindow();
+        TraceLog("OnStartup: MainWindow created, showing");
         mainWin.Show();
+        TraceLog("OnStartup: MainWindow shown");
         base.OnStartup(e);
         Log("程序启动");
+        TraceLog("OnStartup: startup complete");
     }
 
     #region --compress 多实例 IPC

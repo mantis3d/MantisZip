@@ -247,6 +247,8 @@
   "Preview_TooLargeText": "📄 File too large ({0:F1} MB), exceeds text preview limit ({1:F0} MB)",
   "Preview_Unsupported": "🔍 Preview not available",
   "Preview_GifPause": "Pause/Play GIF",
+  "Preview_GifPrevFrame": "Previous frame",
+  "Preview_GifNextFrame": "Next frame",
   "Preview_ZoomFit": "Fit window",
   "Preview_Zoom100": "Actual size (1:1)",
   "Preview_ZoomFitWidth": "Fit width",
