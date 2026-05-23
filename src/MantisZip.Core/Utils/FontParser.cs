@@ -34,8 +34,7 @@ public static class FontParser
         }
         catch (Exception ex)
         {
-            try { File.AppendAllText(Path.Combine(Path.GetTempPath(), "MantisZip", "font_parse.log"),
-                $"[{DateTime.Now:HH:mm:ss}] Parse outer ERROR: {ex.Message}\n{ex.StackTrace}\n"); } catch { }
+            CoreLog.Info($"FontParser.Parse outer failed: {ex.Message}");
             return null;
         }
     }
@@ -142,10 +141,7 @@ public static class FontParser
 
     private static FileFormatInfo? ParseWoff(string filePath)
     {
-        var logDir = Path.Combine(Path.GetTempPath(), "MantisZip");
-        try { Directory.CreateDirectory(logDir);
-            File.AppendAllText(Path.Combine(logDir, "font_parse.log"),
-                $"[{DateTime.Now:HH:mm:ss}] ParseWoff enter: {filePath}\n"); } catch { }
+        CoreLog.Info($"ParseWoff enter: {filePath}");
         using var fs = new FileStream(filePath, FileMode.Open, FileAccess.Read);
         using var reader = new BinaryReader(fs);
 
@@ -233,15 +229,15 @@ public static class FontParser
         }
         catch (Exception ex)
         {
-            try { File.AppendAllText(Path.Combine(Path.GetTempPath(), "MantisZip", "font_parse.log"),
-                $"[{DateTime.Now:HH:mm:ss}] ParseWoff inner ERROR: {ex.Message}\n{ex.StackTrace}\n"); } catch { }
-            if (outPath != null) try { File.Delete(outPath); } catch { }
+            CoreLog.Info($"ParseWoff inner failed: {ex.Message}");
+            if (outPath != null) TryDeleteTempFile(outPath);
             return null;
         }
 
         // 解析重建的 TTF
         using var outFs = new FileStream(outPath!, FileMode.Open, FileAccess.Read);
         using var outReader = new BinaryReader(outFs);
+        outReader.ReadBytes(4); // 跳过 sfVersion（ParseSfnt 假设 reader 已在 pos 4）
         var result = ParseSfnt(outPath!, outFs, outReader, sfVersion);
         if (result != null)
         {
@@ -253,7 +249,7 @@ public static class FontParser
                 result.FontName = Path.GetFileNameWithoutExtension(filePath);
         }
         else
-            try { File.Delete(outPath); } catch { }
+            TryDeleteTempFile(outPath);
         return result;
     }
 
@@ -289,6 +285,15 @@ public static class FontParser
     //  zlib deflate decompression (WOFF uses raw deflate
     //  wrapped in zlib: 2-byte header, optional tail)
     // ═══════════════════════════════════════════════════════
+
+    /// <summary>
+    /// 尝试删除临时文件，失败时记录日志但不抛出异常。
+    /// </summary>
+    private static void TryDeleteTempFile(string path)
+    {
+        try { File.Delete(path); }
+        catch (Exception ex) { CoreLog.Info($"FontParser temp file cleanup failed: {ex.Message}"); }
+    }
 
     private static byte[] DecompressDeflate(byte[] compressed, int decompressedLength)
     {

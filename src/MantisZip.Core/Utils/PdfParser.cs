@@ -126,9 +126,9 @@ public static class PdfParser
             if (author == null)
                 author = ExtractPdfString(text, "/Author");
         }
-        catch
+        catch (Exception ex)
         {
-            // 解析元数据失败不中断
+            CoreLog.Info($"PdfParser.ExtractMetadata failed: {ex.Message}");
         }
     }
 

@@ -95,7 +95,10 @@ internal static class CoreLog
                     $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}] {finalMsg}\n");
             }
         }
-        catch { }
+        catch (Exception logEx)
+        {
+            Debug.WriteLine($"CoreLog.Trace write failed: {logEx.Message}");
+        }
     }
 
     internal static void Trace(string fmt, params object[] args)
@@ -119,10 +122,12 @@ internal static class CoreLog
                 File.AppendAllText(LogPath,
                     $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}] {finalMsg}\n");
             }
-            catch { /* best effort */ }
+            catch (Exception logEx)
+            {
+                Debug.WriteLine($"CoreLog.Write failed: {logEx.Message}");
+            }
         }
 
-        Debug.WriteLine($"[MantisZip.Core] {finalMsg}");
     }
 
     private static string TrimPath(string? path)
