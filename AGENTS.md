@@ -56,24 +56,29 @@ Despite using `CommunityToolkit.Mvvm`, **all logic lives in `MainWindow.xaml.cs`
 ### Preview subsystem
 
 - Trigger: `FileListGrid_SelectionChanged` → files via `ShowPreviewAsync(item)`, directories via `ShowDirectoryPreview(item)` (system folder icon + directory info panel)
-- Extract: `ArchiveEntryExtractor.ExtractEntryAsync(...)` → temp file under `%TEMP%\MantisZip\{GUID}\`
+- **`ExtractPreviewFileAsync(item, fallbackName, ct)`** — shared helper (lines ~139) for temp extraction; creates temp dir, extracts, returns file path. Replaces 14 identical 5-line extraction blocks. Callers just `var tempFile = await ExtractPreviewFileAsync(item, "preview" + ext, ct);`
+- **`HideAllPreviewControls()`** — collapses all 5 content controls (`PreviewImage`, `PreviewTextBox`, `PreviewFileIcon`, `PreviewUnsupported`, `PreviewWebView2`). Called at the start of every `Show*Preview` method before showing the relevant control. Ensures no orphaned visibility states from previous formats.
+- **`SetToolbar(ToolbarButton[] leftButtons, ToolbarButton[] rightButtons)`** — left side is common controls (zoom, font size), right side is format-specific (transparency toggle, ligature toggle, GIF frame nav). Separator auto-inserted between left and right arrays. Callers specify both arrays explicitly.
+- **Info panel clearing** is centralized in `ShowPreviewAsync` (line ~165-167) — `PreviewExtraInfoPanel.Children.Clear()` + `.Visibility = Collapsed` before any format's display method runs. Individual format methods no longer need to clean up.
+- **`SetFormatSpecificInfo(params (string, string)[] pairs)`** — adds key-value rows to `PreviewExtraInfoPanel`; used by all metadata formats (PE/PDF/Font/Audio/SQLite/ISO/Office/Video) and Image/GIF.
 - Display (per format):
-  - **Image**: `ShowImagePreviewAsync` — BitmapImage with DecodePixelWidth=1920 downsampling; zoom toolbar + transparency toggle
+  - **Image**: `ShowImagePreviewAsync` — BitmapImage with DecodePixelWidth=1920 downsampling; zoom toolbar + transparency toggle for PNG/ICO/WebP
+  - **GIF**: Same `ShowImagePreviewAsync` path with `WpfAnimatedGif` — play/pause/frame-nav toolbar + editable frame input (TextBox + total label)
   - **Text**: `ShowTextPreview` — UTF-8/GBK detection via Ude.NetStandard; font size toolbar
-  - **HTML**: `ShowHtmlPreview` — WebBrowser rendering
-  - **Markdown**: `ShowMarkdownPreview` — Markdig → HTML → WebBrowser
+  - **HTML**: `ShowHtmlPreview` — WebView2 rendering (network requests blocked)
+  - **Markdown**: `ShowMarkdownPreview` — Markdig → HTML → WebView2 (dark theme support via `prefers-color-scheme`)
   - **PE**: `ShowPePreview` — product name, company, version, architecture, subsystem
-  - **PDF**: `ShowPdfPreview` — version, title, author, page count, encryption status
-  - **Font**: `ShowFontPreview` — font name/style/glyph count; sample text rendering
+  - **PDF**: `ShowPdfPreview` — metadata + WebView2 PDF content rendering (size-gated)
+  - **Font**: `ShowFontPreview` — font name/style/glyph count; sample text rendering; ligature toggle (re-sets TextBox.Text to force WPF redraw)
   - **Audio**: `ShowAudioPreview` — WAV/FLAC duration, sample rate, channels, bitrate
   - **SQLite**: `ShowSqlitePreview` — encoding, page size, table count
   - **ISO**: `ShowIsoPreview` — volume label, format, size
   - **Torrent**: `ShowTorrentPreview` — file tree, InfoHash, Magnet, tracker, creator
   - **Office**: `ShowOfficePreview` — docx/xlsx/pptx title, author, page/slide/sheet count
-  - **SVG**: `ShowSvgPreview` — WebBrowser rendering
+  - **SVG**: `ShowSvgPreview` — WebView2 rendering
   - **Video**: `ShowVideoPreview` — MP4/MKV/AVI resolution, duration, codec
-- Metadata-only formats (PE, PDF, Office, audio, SQLite, ISO, torrent, video) skip the `MaxPreviewFileSize` check since they only read file headers
-- Toolbar: zoom controls for images, font size for text, ligature toggle for fonts
+- Metadata-only formats (PE, Office, audio, SQLite, ISO, torrent, video) skip the `MaxPreviewFileSize` check since they only read file headers. PDF is also metadata-only (exempt from the outer size check) but conditionally renders content if `item.Size <= MaxPreviewFileSize`
+- Toolbar: `SetToolbar(left, right)` — common controls left, format-specific right, separator between. Image zoom / Text font-size / GIF play-pause-frame / Font ligature toggle / Transparency toggle.
 - `ClearPreviewContent()` clears all sources without resetting grid layout; `HidePreview()` does full cleanup
 - Image side panel: `PreviewInfoPanel` shows name, size, compression ratio, date — now with format-specific key-value pairs below general info
 - Cleanup: `ClearPreviewTemp()` before each new preview; `App.OnExit` deletes `%TEMP%\MantisZip`
@@ -160,7 +165,6 @@ Plans tracked under `.sisyphus/plans/`:
 |------|--------|------------|
 | [engine-unification-sharpcompress.md](.sisyphus/plans/engine-unification-sharpcompress.md) | 📋 Planned | None |
 | [file-filter-feature.md](.sisyphus/plans/file-filter-feature.md) | 📋 Planned | SharpCompress migration |
-| WebView2 for PDF/HTML rendering | 📋 Planned | None (NuGet: Microsoft.Web.WebView2) |
 
 ### Planned: Engine unification (SharpZipLib → SharpCompress)
 

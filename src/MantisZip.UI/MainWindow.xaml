@@ -5,6 +5,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:app="clr-namespace:MantisZip.UI"
              xmlns:l="clr-namespace:MantisZip.UI.Localization"
+             xmlns:wv2="clr-namespace:Microsoft.Web.WebView2.Wpf;assembly=Microsoft.Web.WebView2.Wpf"
         mc:Ignorable="d"
         Title="{l:L Main_WindowTitle}" Icon="/Resources/App.ico" Height="800" Width="1200"
         MinHeight="450" MinWidth="600"
@@ -353,8 +354,8 @@
                                                      ScrollViewer.VerticalScrollBarVisibility="Auto"
                                                      Visibility="Collapsed"/>
 
-                                            <!-- HTML/Markdown Preview -->
-                                            <WebBrowser x:Name="PreviewWebBrowser" Visibility="Collapsed"/>
+                                            <!-- HTML/Markdown/PDF/SVG Preview -->
+                                            <wv2:WebView2 x:Name="PreviewWebView2" Visibility="Collapsed"/>
 
                                             <!-- Loading progress -->
                                             <StackPanel x:Name="PreviewLoadingPanel"

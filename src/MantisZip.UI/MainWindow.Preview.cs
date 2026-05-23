@@ -16,6 +16,7 @@ using MantisZip.Core.Utils;
 using Markdig;
 using Ude;
 using WpfAnimatedGif;
+using Microsoft.Web.WebView2.Core;
 using MantisZip.UI.Localization;
 
 namespace MantisZip.UI;
@@ -118,6 +119,76 @@ public partial class MainWindow
         ".mp4", ".mkv", ".avi",
     };
 
+    // ═══════════════════════════════════════════
+    //  预览辅助方法 — 所有格式共用
+    // ═══════════════════════════════════════════
+
+    /// <summary>
+    /// 提取压缩包内条目到临时目录，返回临时文件路径。
+    /// 自动设置 _previewTempDir 供后续 Cleanup 使用。
+    /// </summary>
+    private async Task<string> ExtractPreviewFileAsync(ArchiveItem item, string fallbackName, CancellationToken ct)
+    {
+        _previewTempDir = Path.Combine(Path.GetTempPath(), L.T(L.App_MantisZipTitle), Guid.NewGuid().ToString());
+        Directory.CreateDirectory(_previewTempDir);
+        var tempFile = Path.Combine(_previewTempDir, Path.GetFileName(item.Name) ?? fallbackName);
+        await Core.Utils.ArchiveEntryExtractor.ExtractEntryAsync(
+            _currentArchivePath!, item.Name, tempFile, _currentFormat, _currentPassword, ct);
+        ct.ThrowIfCancellationRequested();
+        return tempFile;
+    }
+
+    /// <summary>
+    /// 隐藏所有预览内容控件，调用者再显式打开需要的控件。
+    /// 加新格式时请在方法开头调用此函数。
+    /// </summary>
+    /// <summary>
+    /// 确保 WebView2 已初始化（CoreWebView2 可用），只初始化一次。
+    /// </summary>
+    private async Task EnsureWebView2InitializedAsync()
+    {
+        if (PreviewWebView2.CoreWebView2 != null)
+            return;
+
+        try
+        {
+            // EnsureCoreWebView2Async 是幂等的：已初始化则立即返回
+            await PreviewWebView2.EnsureCoreWebView2Async();
+
+            // 安全配置：禁止右键菜单、禁用密码/表单自动填充
+            PreviewWebView2.CoreWebView2!.Settings.AreDefaultContextMenusEnabled = false;
+            PreviewWebView2.CoreWebView2.Settings.IsScriptEnabled = true;
+            PreviewWebView2.CoreWebView2.Settings.IsPasswordAutosaveEnabled = false;
+            PreviewWebView2.CoreWebView2.Settings.IsGeneralAutofillEnabled = false;
+
+            // 阻止所有外部网络请求（只允许 file:// 本地文件）
+            PreviewWebView2.CoreWebView2.AddWebResourceRequestedFilter("*", CoreWebView2WebResourceContext.All);
+            PreviewWebView2.CoreWebView2.WebResourceRequested += (s, e) =>
+            {
+                if (e.Request.Uri.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
+                    e.Request.Uri.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+                {
+                    e.Response = PreviewWebView2.CoreWebView2.Environment.CreateWebResourceResponse(
+                        null, 403, "Blocked", null);
+                }
+            };
+        }
+        catch (Exception ex)
+        {
+            App.LogDebug("WebView2 initialization failed: {0}", ex.Message);
+            throw;
+        }
+    }
+
+    private void HideAllPreviewControls()
+    {
+        PreviewImage.Visibility = Visibility.Collapsed;
+        PreviewTextBox.Visibility = Visibility.Collapsed;
+        PreviewFileIcon.Visibility = Visibility.Collapsed;
+        PreviewUnsupported.Visibility = Visibility.Collapsed;
+        PreviewWebView2.Visibility = Visibility.Collapsed;
+    }
+
     private async Task ShowPreviewAsync(ArchiveItem item)
     {
         // 取消上一次正在进行的预览（避免旧预览完成后覆盖新内容）
@@ -127,9 +198,12 @@ public partial class MainWindow
 
         try
         {
-            // 清理上次预览
-            ClearPreviewTemp();
+            // 清理上次预览：先清除内容（释放对临时文件的引用）再删除文件，防止 WPF 引用已删除的字体文件导致原生崩溃
             ClearPreviewContent();
+            ClearPreviewTemp();
+            // 统一清空格式信息面板——所有格式共用，不清就会残留旧数据
+            PreviewExtraInfoPanel.Children.Clear();
+            PreviewExtraInfoPanel.Visibility = Visibility.Collapsed;
 
             var s = AppSettings.Instance;
             var ext = Path.GetExtension(item.Name);
@@ -156,14 +230,7 @@ public partial class MainWindow
                     return;
                 }
 
-                _previewTempDir = Path.Combine(Path.GetTempPath(), L.T(L.App_MantisZipTitle), Guid.NewGuid().ToString());
-                Directory.CreateDirectory(_previewTempDir);
-                var tempFile = Path.Combine(_previewTempDir, Path.GetFileName(item.Name) ?? "preview" + ext);
-
-                await Core.Utils.ArchiveEntryExtractor.ExtractEntryAsync(
-                    _currentArchivePath!, item.Name, tempFile, _currentFormat, _currentPassword, ct);
-                ct.ThrowIfCancellationRequested();
-
+                var tempFile = await ExtractPreviewFileAsync(item, "preview" + ext, ct);
                 await ShowImagePreviewAsync(tempFile, item);
             }
             else if (HtmlExtensions.Contains(ext) || MarkdownExtensions.Contains(ext))
@@ -182,18 +249,11 @@ public partial class MainWindow
                     return;
                 }
 
-                _previewTempDir = Path.Combine(Path.GetTempPath(), L.T(L.App_MantisZipTitle), Guid.NewGuid().ToString());
-                Directory.CreateDirectory(_previewTempDir);
-                var tempFile = Path.Combine(_previewTempDir, Path.GetFileName(item.Name) ?? "preview.html");
-
-                await Core.Utils.ArchiveEntryExtractor.ExtractEntryAsync(
-                    _currentArchivePath!, item.Name, tempFile, _currentFormat, _currentPassword, ct);
-                ct.ThrowIfCancellationRequested();
-
+                var tempFile = await ExtractPreviewFileAsync(item, "preview.html", ct);
                 if (MarkdownExtensions.Contains(ext))
-                    ShowMarkdownPreview(tempFile, item);
+                    await ShowMarkdownPreview(tempFile, item);
                 else
-                    ShowHtmlPreview(tempFile, item);
+                    await ShowHtmlPreview(tempFile, item);
             }
             else if (TextExtensions.Contains(ext))
             {
@@ -211,124 +271,62 @@ public partial class MainWindow
                     return;
                 }
 
-                _previewTempDir = Path.Combine(Path.GetTempPath(), L.T(L.App_MantisZipTitle), Guid.NewGuid().ToString());
-                Directory.CreateDirectory(_previewTempDir);
-                var tempFile = Path.Combine(_previewTempDir, Path.GetFileName(item.Name) ?? "preview.txt");
-
-                await Core.Utils.ArchiveEntryExtractor.ExtractEntryAsync(
-                    _currentArchivePath!, item.Name, tempFile, _currentFormat, _currentPassword, ct);
-                ct.ThrowIfCancellationRequested();
-
+                var tempFile = await ExtractPreviewFileAsync(item, "preview.txt", ct);
                 ShowTextPreview(tempFile, ext, item);
             }
             else if (PeExtensions.Contains(ext))
             {
-                _previewTempDir = Path.Combine(Path.GetTempPath(), L.T(L.App_MantisZipTitle), Guid.NewGuid().ToString());
-                Directory.CreateDirectory(_previewTempDir);
-                var tempFile = Path.Combine(_previewTempDir, Path.GetFileName(item.Name) ?? "preview" + ext);
-                await Core.Utils.ArchiveEntryExtractor.ExtractEntryAsync(
-                    _currentArchivePath!, item.Name, tempFile, _currentFormat, _currentPassword, ct);
-                ct.ThrowIfCancellationRequested();
+                var tempFile = await ExtractPreviewFileAsync(item, "preview" + ext, ct);
                 ShowPePreview(tempFile, item);
             }
             else if (PdfExtensions.Contains(ext))
             {
-                _previewTempDir = Path.Combine(Path.GetTempPath(), L.T(L.App_MantisZipTitle), Guid.NewGuid().ToString());
-                Directory.CreateDirectory(_previewTempDir);
-                var tempFile = Path.Combine(_previewTempDir, Path.GetFileName(item.Name) ?? "preview" + ext);
-                await Core.Utils.ArchiveEntryExtractor.ExtractEntryAsync(
-                    _currentArchivePath!, item.Name, tempFile, _currentFormat, _currentPassword, ct);
-                ct.ThrowIfCancellationRequested();
-                ShowPdfPreview(tempFile, item);
+                var tempFile = await ExtractPreviewFileAsync(item, "preview" + ext, ct);
+                await ShowPdfPreview(tempFile, item);
             }
             else if (FontExtensions.Contains(ext))
             {
-                _previewTempDir = Path.Combine(Path.GetTempPath(), L.T(L.App_MantisZipTitle), Guid.NewGuid().ToString());
-                Directory.CreateDirectory(_previewTempDir);
-                var tempFile = Path.Combine(_previewTempDir, Path.GetFileName(item.Name) ?? "preview" + ext);
-                await Core.Utils.ArchiveEntryExtractor.ExtractEntryAsync(
-                    _currentArchivePath!, item.Name, tempFile, _currentFormat, _currentPassword, ct);
-                ct.ThrowIfCancellationRequested();
+                var tempFile = await ExtractPreviewFileAsync(item, "preview" + ext, ct);
                 ShowFontPreview(tempFile, item);
             }
             else if (WavExtensions.Contains(ext))
             {
-                _previewTempDir = Path.Combine(Path.GetTempPath(), L.T(L.App_MantisZipTitle), Guid.NewGuid().ToString());
-                Directory.CreateDirectory(_previewTempDir);
-                var tempFile = Path.Combine(_previewTempDir, Path.GetFileName(item.Name) ?? "preview" + ext);
-                await Core.Utils.ArchiveEntryExtractor.ExtractEntryAsync(
-                    _currentArchivePath!, item.Name, tempFile, _currentFormat, _currentPassword, ct);
-                ct.ThrowIfCancellationRequested();
+                var tempFile = await ExtractPreviewFileAsync(item, "preview" + ext, ct);
                 ShowAudioPreview(tempFile, item, "WAV");
             }
             else if (FlacExtensions.Contains(ext))
             {
-                _previewTempDir = Path.Combine(Path.GetTempPath(), L.T(L.App_MantisZipTitle), Guid.NewGuid().ToString());
-                Directory.CreateDirectory(_previewTempDir);
-                var tempFile = Path.Combine(_previewTempDir, Path.GetFileName(item.Name) ?? "preview" + ext);
-                await Core.Utils.ArchiveEntryExtractor.ExtractEntryAsync(
-                    _currentArchivePath!, item.Name, tempFile, _currentFormat, _currentPassword, ct);
-                ct.ThrowIfCancellationRequested();
+                var tempFile = await ExtractPreviewFileAsync(item, "preview" + ext, ct);
                 ShowAudioPreview(tempFile, item, "FLAC");
             }
             else if (SqliteExtensions.Contains(ext))
             {
-                _previewTempDir = Path.Combine(Path.GetTempPath(), L.T(L.App_MantisZipTitle), Guid.NewGuid().ToString());
-                Directory.CreateDirectory(_previewTempDir);
-                var tempFile = Path.Combine(_previewTempDir, Path.GetFileName(item.Name) ?? "preview" + ext);
-                await Core.Utils.ArchiveEntryExtractor.ExtractEntryAsync(
-                    _currentArchivePath!, item.Name, tempFile, _currentFormat, _currentPassword, ct);
-                ct.ThrowIfCancellationRequested();
+                var tempFile = await ExtractPreviewFileAsync(item, "preview" + ext, ct);
                 ShowSqlitePreview(tempFile, item);
             }
             else if (IsoExtensions.Contains(ext))
             {
-                _previewTempDir = Path.Combine(Path.GetTempPath(), L.T(L.App_MantisZipTitle), Guid.NewGuid().ToString());
-                Directory.CreateDirectory(_previewTempDir);
-                var tempFile = Path.Combine(_previewTempDir, Path.GetFileName(item.Name) ?? "preview" + ext);
-                await Core.Utils.ArchiveEntryExtractor.ExtractEntryAsync(
-                    _currentArchivePath!, item.Name, tempFile, _currentFormat, _currentPassword, ct);
-                ct.ThrowIfCancellationRequested();
+                var tempFile = await ExtractPreviewFileAsync(item, "preview" + ext, ct);
                 ShowIsoPreview(tempFile, item);
             }
             else if (TorrentExtensions.Contains(ext))
             {
-                _previewTempDir = Path.Combine(Path.GetTempPath(), L.T(L.App_MantisZipTitle), Guid.NewGuid().ToString());
-                Directory.CreateDirectory(_previewTempDir);
-                var tempFile = Path.Combine(_previewTempDir, Path.GetFileName(item.Name) ?? "preview" + ext);
-                await Core.Utils.ArchiveEntryExtractor.ExtractEntryAsync(
-                    _currentArchivePath!, item.Name, tempFile, _currentFormat, _currentPassword, ct);
-                ct.ThrowIfCancellationRequested();
+                var tempFile = await ExtractPreviewFileAsync(item, "preview" + ext, ct);
                 ShowTorrentPreview(tempFile, item);
             }
             else if (OfficeExtensions.Contains(ext))
             {
-                _previewTempDir = Path.Combine(Path.GetTempPath(), L.T(L.App_MantisZipTitle), Guid.NewGuid().ToString());
-                Directory.CreateDirectory(_previewTempDir);
-                var tempFile = Path.Combine(_previewTempDir, Path.GetFileName(item.Name) ?? "preview" + ext);
-                await Core.Utils.ArchiveEntryExtractor.ExtractEntryAsync(
-                    _currentArchivePath!, item.Name, tempFile, _currentFormat, _currentPassword, ct);
-                ct.ThrowIfCancellationRequested();
+                var tempFile = await ExtractPreviewFileAsync(item, "preview" + ext, ct);
                 ShowOfficePreview(tempFile, item);
             }
             else if (SvgExtensions.Contains(ext))
             {
-                _previewTempDir = Path.Combine(Path.GetTempPath(), L.T(L.App_MantisZipTitle), Guid.NewGuid().ToString());
-                Directory.CreateDirectory(_previewTempDir);
-                var tempFile = Path.Combine(_previewTempDir, Path.GetFileName(item.Name) ?? "preview" + ext);
-                await Core.Utils.ArchiveEntryExtractor.ExtractEntryAsync(
-                    _currentArchivePath!, item.Name, tempFile, _currentFormat, _currentPassword, ct);
-                ct.ThrowIfCancellationRequested();
-                ShowSvgPreview(tempFile, item);
+                var tempFile = await ExtractPreviewFileAsync(item, "preview" + ext, ct);
+                await ShowSvgPreview(tempFile, item);
             }
             else if (VideoExtensions.Contains(ext))
             {
-                _previewTempDir = Path.Combine(Path.GetTempPath(), L.T(L.App_MantisZipTitle), Guid.NewGuid().ToString());
-                Directory.CreateDirectory(_previewTempDir);
-                var tempFile = Path.Combine(_previewTempDir, Path.GetFileName(item.Name) ?? "preview" + ext);
-                await Core.Utils.ArchiveEntryExtractor.ExtractEntryAsync(
-                    _currentArchivePath!, item.Name, tempFile, _currentFormat, _currentPassword, ct);
-                ct.ThrowIfCancellationRequested();
+                var tempFile = await ExtractPreviewFileAsync(item, "preview" + ext, ct);
                 ShowVideoPreview(tempFile, item);
             }
             else
@@ -374,24 +372,66 @@ public partial class MainWindow
                     gifHeight = decoder.Frames[0].PixelHeight;
                 });
 
+                _gifController = null;
                 var gifBitmap = new System.Windows.Media.Imaging.BitmapImage(new Uri(filePath));
                 ImageBehavior.SetAnimatedSource(PreviewImage, gifBitmap);
+                // 异步加载完成后获取控制器
+                ImageBehavior.AddAnimationLoadedHandler(PreviewImage, (s, e) =>
+                {
+                    _gifController = ImageBehavior.GetAnimationController(PreviewImage);
+                    if (_gifController != null)
+                    {
+                        _gifController.CurrentFrameChanged += (_, _) => UpdateGifFrameInput();
+                        UpdateGifFrameInput();
+                    }
+                });
+                // 也立即尝试获取（可能同步可用）
+                _gifController = ImageBehavior.GetAnimationController(PreviewImage);
+                if (_gifController != null)
+                {
+                    _gifController.CurrentFrameChanged += (_, _) => UpdateGifFrameInput();
+                }
+
                 PreviewImage.MaxWidth = gifWidth;
                 PreviewImage.MaxHeight = gifHeight;
+                HideAllPreviewControls();
                 PreviewImage.Visibility = Visibility.Visible;
-                PreviewTextBox.Visibility = Visibility.Collapsed;
-                PreviewFileIcon.Visibility = Visibility.Collapsed;
-                PreviewUnsupported.Visibility = Visibility.Collapsed;
                 PreviewHeader.Text = L.TF(L.Preview_ImageHeader, Path.GetFileName(filePath));
                 SetPreviewInfo(item, L.TF(L.Preview_Dimensions, gifWidth, gifHeight));
                 ShowPreviewPanel();
 
-                // 工具栏：缩放按钮
+                // GIF 格式信息
+                try
+                {
+                    var decoder = System.Windows.Media.Imaging.BitmapDecoder.Create(
+                        new Uri(filePath),
+                        System.Windows.Media.Imaging.BitmapCreateOptions.DelayCreation,
+                        System.Windows.Media.Imaging.BitmapCacheOption.None);
+                    int frameCount = decoder.Frames.Count;
+                    SetFormatSpecificInfo(
+                        (L.T(L.Preview_ImagePixels), $"{gifWidth * gifHeight:N0}"),
+                        (L.T(L.Preview_ImageGifFrames), frameCount.ToString())
+                    );
+                }
+                catch
+                {
+                    SetFormatSpecificInfo();
+                }
+
+                // 工具栏：左侧通用缩放 + 右侧 GIF 播放控制
                 SetToolbar(
-                    new ToolbarButton { Text = "⊞", Tooltip = L.T(L.Preview_ZoomFit), OnClick = () => ApplyZoom(ZoomMode.FitWindow) },
-                    new ToolbarButton { Text = "1:1", Tooltip = L.T(L.Preview_Zoom100), OnClick = () => ApplyZoom(ZoomMode.Zoom100) },
-                    new ToolbarButton { Text = "↔", Tooltip = L.T(L.Preview_ZoomFitWidth), OnClick = () => ApplyZoom(ZoomMode.FitWidth) }
+                    new[] {
+                        new ToolbarButton { Text = "⊞", Tooltip = L.T(L.Preview_ZoomFit), OnClick = () => ApplyZoom(ZoomMode.FitWindow) },
+                        new ToolbarButton { Text = "1:1", Tooltip = L.T(L.Preview_Zoom100), OnClick = () => ApplyZoom(ZoomMode.Zoom100) },
+                        new ToolbarButton { Text = "↔", Tooltip = L.T(L.Preview_ZoomFitWidth), OnClick = () => ApplyZoom(ZoomMode.FitWidth) }
+                    },
+                    new[] {
+                        new ToolbarButton { Text = "⏮", Tooltip = L.T(L.Preview_GifPrevFrame), OnClick = GifPrevFrame },
+                        new ToolbarButton { Text = "⏯", Tooltip = L.T(L.Preview_GifPause), OnClick = ToggleGifPlayPause },
+                        new ToolbarButton { Text = "⏭", Tooltip = L.T(L.Preview_GifNextFrame), OnClick = GifNextFrame }
+                    }
                 );
+                AddGifFrameInput();
                 return;
             }
 
@@ -420,10 +460,8 @@ public partial class MainWindow
             PreviewImage.Source = bitmap;
             PreviewImage.MaxWidth = bitmap.PixelWidth;
             PreviewImage.MaxHeight = bitmap.PixelHeight;
+            HideAllPreviewControls();
             PreviewImage.Visibility = Visibility.Visible;
-            PreviewTextBox.Visibility = Visibility.Collapsed;
-            PreviewFileIcon.Visibility = Visibility.Collapsed;
-            PreviewUnsupported.Visibility = Visibility.Collapsed;
             PreviewHeader.Text = L.TF(L.Preview_ImageHeader, Path.GetFileName(filePath));
 
             // 图片信息
@@ -431,20 +469,36 @@ public partial class MainWindow
 
             ShowPreviewPanel();
 
-            // 工具栏：缩放按钮
-            SetToolbar(
-                new ToolbarButton { Text = "⊞", Tooltip = L.T(L.Preview_ZoomFit), OnClick = () => ApplyZoom(ZoomMode.FitWindow) },
-                new ToolbarButton { Text = "1:1", Tooltip = L.T(L.Preview_Zoom100), OnClick = () => ApplyZoom(ZoomMode.Zoom100) },
-                new ToolbarButton { Text = "↔", Tooltip = L.T(L.Preview_ZoomFitWidth), OnClick = () => ApplyZoom(ZoomMode.FitWidth) }
-            );
-            // 透明背景（仅 PNG/ICO/WebP）
-            if (ext == ".png" || ext == ".ico" || ext == ".webp")
+            // 图片格式信息
+            try
             {
-                AddToolbarSeparator();
-                PreviewToolbarPanel.Children.Add(CreateToolbarButtonElement(
-                    new ToolbarButton { Text = "☐", Tooltip = L.T(L.Preview_ToggleTransparency), IsToggle = true, IsChecked = _transparentBgEnabled, OnClick = ToggleTransparencyBg }
-                ));
+                long pixels = bitmap.PixelWidth * (long)bitmap.PixelHeight;
+                string bitDepth = bitmap.Format.BitsPerPixel.ToString();
+                string dpi = $"{bitmap.DpiX:F0} x {bitmap.DpiY:F0} DPI";
+                SetFormatSpecificInfo(
+                    (L.T(L.Preview_ImagePixels), $"{pixels:N0}"),
+                    (L.T(L.Preview_ImageBitDepth), bitDepth),
+                    (L.T(L.Preview_ImageDpi), dpi)
+                );
             }
+            catch
+            {
+                SetFormatSpecificInfo();
+            }
+
+            // 工具栏：左侧通用缩放，右侧透明背景切换（仅 PNG/ICO/WebP）
+            SetToolbar(
+                new[] {
+                    new ToolbarButton { Text = "⊞", Tooltip = L.T(L.Preview_ZoomFit), OnClick = () => ApplyZoom(ZoomMode.FitWindow) },
+                    new ToolbarButton { Text = "1:1", Tooltip = L.T(L.Preview_Zoom100), OnClick = () => ApplyZoom(ZoomMode.Zoom100) },
+                    new ToolbarButton { Text = "↔", Tooltip = L.T(L.Preview_ZoomFitWidth), OnClick = () => ApplyZoom(ZoomMode.FitWidth) }
+                },
+                (ext == ".png" || ext == ".ico" || ext == ".webp")
+                    ? new[] {
+                        new ToolbarButton { Text = "☐", Tooltip = L.T(L.Preview_ToggleTransparency), IsToggle = true, IsChecked = _transparentBgEnabled, OnClick = ToggleTransparencyBg }
+                      }
+                    : Array.Empty<ToolbarButton>()
+            );
         }
         catch (Exception imgEx)
         {
@@ -521,17 +575,18 @@ public partial class MainWindow
 
             PreviewTextBox.Text = content;
             PreviewTextBox.FontSize = AppSettings.Instance.TextPreviewFontSize;
+            HideAllPreviewControls();
             PreviewTextBox.Visibility = Visibility.Visible;
-            PreviewImage.Visibility = Visibility.Collapsed;
-            PreviewFileIcon.Visibility = Visibility.Collapsed;
-            PreviewUnsupported.Visibility = Visibility.Collapsed;
             SetPreviewInfo(item, L.TF(L.Preview_TextInfo, content.Length));
             PreviewHeader.Text = L.TF(L.Preview_TextHeader, Path.GetFileName(filePath), content.Length);
             ShowPreviewPanel();
 
             SetToolbar(
-                new ToolbarButton { Text = "A−", Tooltip = L.T(L.Preview_FontDecrease), OnClick = () => ChangeTextFontSize(-TextFontSizeStep) },
-                new ToolbarButton { Text = "A+", Tooltip = L.T(L.Preview_FontIncrease), OnClick = () => ChangeTextFontSize(TextFontSizeStep) }
+                new[] {
+                    new ToolbarButton { Text = "A−", Tooltip = L.T(L.Preview_FontDecrease), OnClick = () => ChangeTextFontSize(-TextFontSizeStep) },
+                    new ToolbarButton { Text = "A+", Tooltip = L.T(L.Preview_FontIncrease), OnClick = () => ChangeTextFontSize(TextFontSizeStep) }
+                },
+                Array.Empty<ToolbarButton>()
             );
         }
         catch (Exception textEx)
@@ -541,21 +596,18 @@ public partial class MainWindow
         }
     }
 
-    private void ShowHtmlPreview(string filePath, ArchiveItem item)
+    private async Task ShowHtmlPreview(string filePath, ArchiveItem item)
     {
-        // WebBrowser 需要绝对路径或 URL
-        PreviewWebBrowser.Navigate(new Uri(filePath));
-        PreviewWebBrowser.Visibility = Visibility.Visible;
-        PreviewImage.Visibility = Visibility.Collapsed;
-        PreviewTextBox.Visibility = Visibility.Collapsed;
-        PreviewFileIcon.Visibility = Visibility.Collapsed;
-        PreviewUnsupported.Visibility = Visibility.Collapsed;
+        await EnsureWebView2InitializedAsync();
+        HideAllPreviewControls();
+        PreviewWebView2.CoreWebView2.Navigate(new Uri(filePath).AbsoluteUri);
+        PreviewWebView2.Visibility = Visibility.Visible;
         SetPreviewInfo(item, L.T(L.Preview_HtmlInfo));
         PreviewHeader.Text = L.TF(L.Preview_HtmlHeader, Path.GetFileName(filePath));
         ShowPreviewPanel();
     }
 
-    private void ShowMarkdownPreview(string filePath, ArchiveItem item)
+    private async Task ShowMarkdownPreview(string filePath, ArchiveItem item)
     {
         try
         {
@@ -568,12 +620,18 @@ public partial class MainWindow
                 .UseEmojiAndSmiley()
                 .Build();
             var html = Markdig.Markdown.ToHtml(mdContent, pipeline);
-            // 包裹基本样式以便阅读
+            // 包裹基本样式以便阅读，增加暗色主题支持
             var styledHtml = $@"<!DOCTYPE html>
 <html>
 <head><meta charset='utf-8'/>
 <style>
-  body {{ font-family: system-ui, sans-serif; font-size: 14px; line-height: 1.6; padding: 16px; color: #222; }}
+  body {{ font-family: system-ui, sans-serif; font-size: 14px; line-height: 1.6; padding: 16px; color: #222; background: #fff; }}
+  @media (prefers-color-scheme: dark) {{
+    body {{ color: #e0e0e0; background: #1e1e1e; }}
+    pre {{ background: #2d2d2d; }}
+    code {{ background: #2d2d2d; }}
+    td, th {{ border-color: #444; }}
+  }}
   pre {{ background: #f4f4f4; padding: 12px; border-radius: 4px; overflow-x: auto; }}
   code {{ background: #f0f0f0; padding: 2px 4px; border-radius: 2px; font-family: Consolas, monospace; }}
   pre code {{ background: none; padding: 0; }}
@@ -585,12 +643,10 @@ public partial class MainWindow
 
             var tempHtml = Path.Combine(Path.GetDirectoryName(filePath) ?? _previewTempDir!, "markdown_preview.html");
             File.WriteAllText(tempHtml, styledHtml);
-            PreviewWebBrowser.Navigate(new Uri(tempHtml));
-            PreviewWebBrowser.Visibility = Visibility.Visible;
-            PreviewImage.Visibility = Visibility.Collapsed;
-            PreviewTextBox.Visibility = Visibility.Collapsed;
-            PreviewFileIcon.Visibility = Visibility.Collapsed;
-            PreviewUnsupported.Visibility = Visibility.Collapsed;
+            await EnsureWebView2InitializedAsync();
+            PreviewWebView2.CoreWebView2.Navigate(new Uri(tempHtml).AbsoluteUri);
+            HideAllPreviewControls();
+            PreviewWebView2.Visibility = Visibility.Visible;
             SetPreviewInfo(item, "📝 Markdown");
             PreviewHeader.Text = L.TF(L.Preview_MarkdownHeader, Path.GetFileName(filePath));
             ShowPreviewPanel();
@@ -604,10 +660,7 @@ public partial class MainWindow
 
     private void ShowUnsupportedPreview(ArchiveItem? item, string? message = null)
     {
-        PreviewUnsupported.Visibility = Visibility.Collapsed; // hide text fallback
-        PreviewImage.Visibility = Visibility.Collapsed;
-        PreviewTextBox.Visibility = Visibility.Collapsed;
-        PreviewWebBrowser.Visibility = Visibility.Collapsed;
+        HideAllPreviewControls();
         PreviewInfoPanel.Visibility = Visibility.Visible;
 
         if (item != null)
@@ -648,12 +701,9 @@ public partial class MainWindow
         PreviewHeader.Text = $"📁 {item.Name.TrimEnd('/')}";
 
         // 内容区：文件夹图标
+        HideAllPreviewControls();
         PreviewFileIcon.Source = SystemIconHelper.GetFolderIcon();
         PreviewFileIcon.Visibility = Visibility.Visible;
-        PreviewImage.Visibility = Visibility.Collapsed;
-        PreviewTextBox.Visibility = Visibility.Collapsed;
-        PreviewWebBrowser.Visibility = Visibility.Collapsed;
-        PreviewUnsupported.Visibility = Visibility.Collapsed;
 
         // 目录统计
         string formatInfo = L.T(L.Preview_DirLabel);
@@ -702,7 +752,7 @@ public partial class MainWindow
             PreviewTextBox.Visibility = Visibility.Collapsed;
         }
         PreviewImage.Visibility = Visibility.Collapsed;
-        PreviewWebBrowser.Visibility = Visibility.Collapsed;
+        PreviewWebView2.Visibility = Visibility.Collapsed;
         PreviewUnsupported.Visibility = Visibility.Collapsed;
 
         // 信息面板（压缩包概览）
@@ -932,10 +982,14 @@ public partial class MainWindow
 
         PreviewImage.Source = null;
         ImageBehavior.SetAnimatedSource(PreviewImage, null); // 停止 GIF 动画
+        _gifController?.Dispose();
+        _gifController = null;
         PreviewFileIcon.Source = null;
         PreviewTextBox.Text = "";
-        PreviewWebBrowser.Navigate("about:blank");
-        PreviewWebBrowser.Visibility = Visibility.Collapsed;
+        PreviewTextBox.ClearValue(TextBox.FontFamilyProperty); // 重置为默认字体，释放对临时字体文件的引用，防止 WPF 在文件被删除后崩溃
+        if (PreviewWebView2.CoreWebView2 != null)
+            PreviewWebView2.CoreWebView2.Navigate("about:blank");
+        PreviewWebView2.Visibility = Visibility.Collapsed;
         PreviewFormatInfo.Text = "";
         PreviewFileNameText.Text = "";
         PreviewSizeText.Text = "";
@@ -955,9 +1009,10 @@ public partial class MainWindow
         ImageBehavior.SetAnimatedSource(PreviewImage, null); // 停止 GIF 动画
         PreviewFileIcon.Source = null;
         PreviewTextBox.Text = "";
-        // 清除 WebBrowser 内容并隐藏
-        PreviewWebBrowser.Navigate("about:blank");
-        PreviewWebBrowser.Visibility = Visibility.Collapsed;
+        // 清除 WebView2 内容并隐藏
+        if (PreviewWebView2.CoreWebView2 != null)
+            PreviewWebView2.CoreWebView2.Navigate("about:blank");
+        PreviewWebView2.Visibility = Visibility.Collapsed;
         PreviewRow.Height = new GridLength(0);
         PreviewSplitterRow.Height = new GridLength(0);
         PreviewSplitter.Visibility = Visibility.Collapsed;
@@ -1068,11 +1123,15 @@ public partial class MainWindow
         public Action? OnClick { get; set; }
     }
 
-    private void SetToolbar(params ToolbarButton[] buttons)
+    private void SetToolbar(ToolbarButton[] leftButtons, ToolbarButton[] rightButtons)
     {
         PreviewToolbarPanel.Children.Clear();
-        if (buttons.Length == 0) { PreviewToolbarBorder.Visibility = Visibility.Collapsed; return; }
-        foreach (var btn in buttons) PreviewToolbarPanel.Children.Add(CreateToolbarButtonElement(btn));
+        bool hasLeft = leftButtons.Length > 0;
+        bool hasRight = rightButtons.Length > 0;
+        if (!hasLeft && !hasRight) { PreviewToolbarBorder.Visibility = Visibility.Collapsed; return; }
+        foreach (var btn in leftButtons) PreviewToolbarPanel.Children.Add(CreateToolbarButtonElement(btn));
+        if (hasLeft && hasRight) AddToolbarSeparator();
+        foreach (var btn in rightButtons) PreviewToolbarPanel.Children.Add(CreateToolbarButtonElement(btn));
         PreviewToolbarBorder.Visibility = Visibility.Visible;
     }
 
@@ -1167,6 +1226,95 @@ public partial class MainWindow
             parent.Background = _transparentBgEnabled ? new ImageBrush { TileMode = TileMode.Tile, Viewport = new Rect(0, 0, 16, 16), ViewportUnits = BrushMappingMode.Absolute, ImageSource = CreateCheckerPattern() } : Brushes.Transparent;
     }
 
+    // ── GIF 播放控制 ──
+
+    private void ToggleGifPlayPause()
+    {
+        if (_gifController == null) return;
+        if (_gifController.IsPaused)
+            _gifController.Play();
+        else
+            _gifController.Pause();
+    }
+
+    private void GifPrevFrame()
+    {
+        if (_gifController == null) return;
+        int frame = _gifController.CurrentFrame - 1;
+        if (frame < 0) frame = _gifController.FrameCount - 1;
+        _gifController.Pause();
+        _gifController.GotoFrame(frame);
+        UpdateGifFrameInput();
+    }
+
+    private void GifNextFrame()
+    {
+        if (_gifController == null) return;
+        int frame = _gifController.CurrentFrame + 1;
+        if (frame >= _gifController.FrameCount) frame = 0;
+        _gifController.Pause();
+        _gifController.GotoFrame(frame);
+        UpdateGifFrameInput();
+    }
+
+    // ── GIF 帧输入 ──
+
+    private void AddGifFrameInput()
+    {
+        AddToolbarSeparator();
+        _gifFrameInput = new TextBox
+        {
+            Width = 36,
+            Height = 20,
+            FontSize = 12,
+            TextAlignment = TextAlignment.Center,
+            VerticalContentAlignment = VerticalAlignment.Center,
+            Margin = new Thickness(2, 0, 1, 0),
+        };
+        _gifFrameInput.KeyDown += (s, e) =>
+        {
+            if (e.Key == Key.Enter && _gifController != null && int.TryParse(_gifFrameInput?.Text, out int frame))
+            {
+                frame = Math.Clamp(frame - 1, 0, _gifController.FrameCount - 1);
+                _gifController.Pause();
+                _gifController.GotoFrame(frame);
+                UpdateGifFrameInput();
+            }
+        };
+        _gifFrameTotal = new TextBlock
+        {
+            Text = "/ --",
+            FontSize = 12,
+            VerticalAlignment = VerticalAlignment.Center,
+            Margin = new Thickness(0, 0, 4, 0),
+        };
+        PreviewToolbarPanel.Children.Add(_gifFrameInput);
+        PreviewToolbarPanel.Children.Add(_gifFrameTotal);
+        UpdateGifFrameInput();
+    }
+
+    private void UpdateGifFrameInput()
+    {
+        if (_gifFrameInput == null || _gifController == null) return;
+        _gifFrameInput.Text = $"{_gifController.CurrentFrame + 1}";
+        if (_gifFrameTotal != null)
+            _gifFrameTotal.Text = $"/ {_gifController.FrameCount}";
+    }
+
+    // ── 字体连字切换 ──
+
+    private void ToggleFontLigatures()
+    {
+        _fontLigaturesEnabled = !_fontLigaturesEnabled;
+        PreviewTextBox.Typography.StandardLigatures = _fontLigaturesEnabled;
+        PreviewTextBox.Typography.ContextualLigatures = _fontLigaturesEnabled;
+        PreviewTextBox.Typography.DiscretionaryLigatures = _fontLigaturesEnabled;
+        // WPF Typography 属性变化后需要重新设置文本才能触发重绘
+        var text = PreviewTextBox.Text;
+        PreviewTextBox.Text = "";
+        PreviewTextBox.Text = text;
+    }
+
     private static BitmapSource CreateCheckerPattern()
     {
         var pixels = new byte[16 * 16 * 4];
@@ -1190,8 +1338,9 @@ public partial class MainWindow
         if (info == null) { ShowUnsupportedPreview(item, L.T(L.Preview_PeParseFailed)); return; }
         var productName = info.ProductName ?? info.AdditionalInfo ?? Path.GetFileName(filePath);
         PreviewTextBox.Text = productName; PreviewTextBox.FontSize = 18;
-        PreviewTextBox.TextAlignment = TextAlignment.Center; PreviewTextBox.Visibility = Visibility.Visible;
-        PreviewImage.Visibility = PreviewFileIcon.Visibility = PreviewUnsupported.Visibility = PreviewWebBrowser.Visibility = Visibility.Collapsed;
+        PreviewTextBox.TextAlignment = TextAlignment.Center;
+        HideAllPreviewControls();
+        PreviewTextBox.Visibility = Visibility.Visible;
         SetPreviewInfo(item); PreviewHeader.Text = L.TF(L.Preview_PeHeader, info.Architecture ?? "", info.Subsystem ?? "");
         ShowPreviewPanel();
         var extra = new List<(string, string)>();
@@ -1199,29 +1348,37 @@ public partial class MainWindow
         if (!string.IsNullOrEmpty(info.FileVersion)) extra.Add((L.T(L.Preview_PeVersion), info.FileVersion));
         if (!string.IsNullOrEmpty(info.ProductVersion)) extra.Add((L.T(L.Preview_PeProductVersion), info.ProductVersion));
         if (!string.IsNullOrEmpty(info.AdditionalInfo)) extra.Add((L.T(L.Preview_PeDescription), info.AdditionalInfo));
-        SetFormatSpecificInfo(extra.ToArray()); SetToolbar();
+        SetFormatSpecificInfo(extra.ToArray()); SetToolbar(Array.Empty<ToolbarButton>(), Array.Empty<ToolbarButton>());
     }
 
     // ── PDF ──
-    private void ShowPdfPreview(string filePath, ArchiveItem item)
+    private async Task ShowPdfPreview(string filePath, ArchiveItem item)
     {
         try
         {
-
-
             var info = PdfParser.Parse(filePath);
             if (info == null) { ShowUnsupportedPreview(item, L.T(L.Preview_PdfParseFailed)); return; }
-            // 显示 PDF 图标 + 文件信息
+            // 始终显示元数据和图标
             PreviewFileIcon.Source = SystemIconHelper.GetFileIcon(".pdf");
-            PreviewFileIcon.Visibility = Visibility.Visible;
-            PreviewImage.Visibility = PreviewTextBox.Visibility = PreviewWebBrowser.Visibility = PreviewUnsupported.Visibility = Visibility.Collapsed;
+            HideAllPreviewControls();
+            // 若文件大小在预览上限内，用 WebView2 渲染 PDF 内容
+            if (item.Size <= AppSettings.Instance.MaxPreviewFileSize)
+            {
+                await EnsureWebView2InitializedAsync();
+                PreviewWebView2.CoreWebView2.Navigate(new Uri(filePath).AbsoluteUri);
+                PreviewWebView2.Visibility = Visibility.Visible;
+            }
+            else
+            {
+                PreviewFileIcon.Visibility = Visibility.Visible;
+            }
             SetPreviewInfo(item);
             PreviewHeader.Text = L.TF(L.Preview_PdfHeader, info.AdditionalInfo ?? "PDF");
             ShowPreviewPanel();
             var extra = new List<(string, string)> { (L.T(L.Preview_PdfPages), info.PageCount?.ToString() ?? "--"), (L.T(L.Preview_PdfEncrypted), info.IsEncrypted == true ? "是" : "否") };
             if (!string.IsNullOrEmpty(info.Title)) extra.Insert(0, (L.T(L.Preview_PdfTitle), info.Title));
             if (!string.IsNullOrEmpty(info.Author)) extra.Add((L.T(L.Preview_PdfAuthor), info.Author));
-            SetFormatSpecificInfo(extra.ToArray()); SetToolbar();
+            SetFormatSpecificInfo(extra.ToArray()); SetToolbar(Array.Empty<ToolbarButton>(), Array.Empty<ToolbarButton>());
         }
         catch (Exception ex) { App.LogDebug("ShowPdfPreview: failed: {0}", ex.Message); ShowUnsupportedPreview(null, L.T(L.Preview_PdfParseFailed)); }
     }
@@ -1234,18 +1391,39 @@ public partial class MainWindow
             var info = FontParser.Parse(filePath);
             if (info == null) { ShowUnsupportedPreview(item, L.T(L.Preview_FontParseFailed)); return; }
             var sampleText = AppSettings.Instance.FontPreviewSampleText;
-            if (string.IsNullOrEmpty(sampleText)) sampleText = "AaBbCc 123 示例";
+            if (string.IsNullOrEmpty(sampleText)) sampleText = "fi ff fl ffi ffl AaBbCc 123 示例";
+            _fontLigaturesEnabled = false;
+            PreviewTextBox.Typography.StandardLigatures = false;
+            PreviewTextBox.Typography.ContextualLigatures = false;
+            PreviewTextBox.Typography.DiscretionaryLigatures = false;
+            // 将 FontFamily 设为字体文件对应的字体，使样本用实际字体渲染。
+            // 格式 "filePath#FamilyName" 是 WPF 加载字体的标准方式。
+            try
+            {
+                var fontFilePath = info.FontDecompressedPath ?? filePath;
+                var familyName = info.FontName ?? Path.GetFileNameWithoutExtension(filePath);
+                PreviewTextBox.FontFamily = new FontFamily(fontFilePath + "#" + familyName);
+            }
+            catch (Exception ex)
+            {
+                App.LogDebug("ShowFontPreview: failed to load FontFamily: {0}", ex.Message);
+            }
             PreviewTextBox.Text = sampleText;
             PreviewTextBox.FontSize = 18; PreviewTextBox.TextAlignment = TextAlignment.Center;
+            HideAllPreviewControls();
             PreviewTextBox.Visibility = Visibility.Visible;
-            PreviewImage.Visibility = PreviewFileIcon.Visibility = PreviewUnsupported.Visibility = PreviewWebBrowser.Visibility = Visibility.Collapsed;
             SetPreviewInfo(item); PreviewHeader.Text = L.TF(L.Preview_FontHeader, info.AdditionalInfo ?? "Font");
             ShowPreviewPanel();
             SetFormatSpecificInfo(
                 (L.T(L.Preview_FontName), info.FontName ?? "--"),
                 (L.T(L.Preview_FontStyle), info.FontStyle ?? "Regular"),
                 (L.T(L.Preview_FontGlyphs), info.GlyphCount?.ToString() ?? "--"));
-            SetToolbar();
+            SetToolbar(
+                Array.Empty<ToolbarButton>(),
+                new[] {
+                    new ToolbarButton { Text = "🔀", Tooltip = L.T(L.Preview_FontLigatures), IsToggle = true, IsChecked = false, OnClick = ToggleFontLigatures }
+                }
+            );
         }
         catch (Exception ex) { App.LogDebug("ShowFontPreview: failed: {0}", ex.Message); ShowUnsupportedPreview(null, L.T(L.Preview_FontParseFailed)); }
     }
@@ -1259,8 +1437,8 @@ public partial class MainWindow
             if (info == null) { ShowUnsupportedPreview(item, L.T(L.Preview_AudioParseFailed)); return; }
             PreviewTextBox.Text = info.DisplayName;
             PreviewTextBox.TextAlignment = TextAlignment.Left; PreviewTextBox.FontSize = 12;
+            HideAllPreviewControls();
             PreviewTextBox.Visibility = Visibility.Visible;
-            PreviewImage.Visibility = PreviewFileIcon.Visibility = PreviewUnsupported.Visibility = PreviewWebBrowser.Visibility = Visibility.Collapsed;
             SetPreviewInfo(item); PreviewHeader.Text = L.TF(L.Preview_AudioHeader, formatName, Path.GetFileName(filePath));
             ShowPreviewPanel();
             var extra = new List<(string, string)>();
@@ -1268,7 +1446,7 @@ public partial class MainWindow
             if (info.SampleRate > 0) extra.Add((L.T(L.Preview_AudioSampleRate), $"{info.SampleRate} Hz"));
             if (info.Channels > 0) extra.Add((L.T(L.Preview_AudioChannels), info.Channels.Value.ToString()));
             if (info.Bitrate > 0) extra.Add((L.T(L.Preview_AudioBitrate), $"{info.Bitrate} kbps"));
-            SetFormatSpecificInfo(extra.ToArray()); SetToolbar();
+            SetFormatSpecificInfo(extra.ToArray()); SetToolbar(Array.Empty<ToolbarButton>(), Array.Empty<ToolbarButton>());
         }
         catch (Exception ex) { App.LogDebug("ShowAudioPreview: failed: {0}", ex.Message); ShowUnsupportedPreview(null, L.T(L.Preview_AudioParseFailed)); }
     }
@@ -1283,12 +1461,12 @@ public partial class MainWindow
             PreviewTextBox.Text = info.DisplayName;
             if (info.TableCount > 0) PreviewTextBox.Text += $"\n表数量: {info.TableCount}";
             PreviewTextBox.TextAlignment = TextAlignment.Left; PreviewTextBox.FontSize = 12;
+            HideAllPreviewControls();
             PreviewTextBox.Visibility = Visibility.Visible;
-            PreviewImage.Visibility = PreviewFileIcon.Visibility = PreviewUnsupported.Visibility = PreviewWebBrowser.Visibility = Visibility.Collapsed;
             SetPreviewInfo(item); PreviewHeader.Text = L.TF(L.Preview_SqliteHeader, Path.GetFileName(filePath));
             ShowPreviewPanel();
             SetFormatSpecificInfo((L.T(L.Preview_SqliteEncoding), info.TextEncoding ?? "--"), (L.T(L.Preview_SqlitePageSize), info.AdditionalInfo?.Replace("页大小: ", "") ?? "--"));
-            SetToolbar();
+            SetToolbar(Array.Empty<ToolbarButton>(), Array.Empty<ToolbarButton>());
         }
         catch (Exception ex) { App.LogDebug("ShowSqlitePreview: failed: {0}", ex.Message); ShowUnsupportedPreview(null, L.T(L.Preview_SqliteParseFailed)); }
     }
@@ -1304,14 +1482,14 @@ public partial class MainWindow
             if (info.VolumeLabel != null) PreviewTextBox.Text += $"\n卷标: {info.VolumeLabel}";
             if (info.DiskSize > 0) PreviewTextBox.Text += $"\n大小: {ArchiveItem.FormatSize(info.DiskSize.Value)}";
             PreviewTextBox.TextAlignment = TextAlignment.Left; PreviewTextBox.FontSize = 12;
+            HideAllPreviewControls();
             PreviewTextBox.Visibility = Visibility.Visible;
-            PreviewImage.Visibility = PreviewFileIcon.Visibility = PreviewUnsupported.Visibility = PreviewWebBrowser.Visibility = Visibility.Collapsed;
             SetPreviewInfo(item); PreviewHeader.Text = L.TF(L.Preview_IsoHeader, info.AdditionalInfo ?? "ISO 9660", Path.GetFileName(filePath));
             ShowPreviewPanel();
             SetFormatSpecificInfo(
                 (L.T(L.Preview_IsoVolume), info.VolumeLabel ?? "--"),
                 (L.T(L.Preview_IsoFormat), info.AdditionalInfo ?? "ISO 9660"));
-            SetToolbar();
+            SetToolbar(Array.Empty<ToolbarButton>(), Array.Empty<ToolbarButton>());
         }
         catch (Exception ex) { App.LogDebug("ShowIsoPreview: failed: {0}", ex.Message); ShowUnsupportedPreview(null, L.T(L.Preview_IsoParseFailed)); }
     }
@@ -1333,8 +1511,9 @@ public partial class MainWindow
             sb.AppendLine();
             if (info.MagnetLink != null) { sb.AppendLine(L.T(L.Preview_TorrentMagnet)); sb.Append(info.MagnetLink); }
             PreviewTextBox.Text = sb.ToString(); PreviewTextBox.FontSize = 12;
-            PreviewTextBox.TextAlignment = TextAlignment.Left; PreviewTextBox.Visibility = Visibility.Visible;
-            PreviewImage.Visibility = PreviewFileIcon.Visibility = PreviewUnsupported.Visibility = PreviewWebBrowser.Visibility = Visibility.Collapsed;
+            PreviewTextBox.TextAlignment = TextAlignment.Left;
+            HideAllPreviewControls();
+            PreviewTextBox.Visibility = Visibility.Visible;
             SetPreviewInfo(item); PreviewHeader.Text = L.TF(L.Preview_TorrentHeader, info.TorrentFileName ?? Path.GetFileName(filePath));
             ShowPreviewPanel();
             var extra = new List<(string, string)> { (L.T(L.Preview_TorrentInfoHash), info.InfoHashV1 ?? "--") };
@@ -1344,7 +1523,7 @@ public partial class MainWindow
             if (info.CreatedBy != null) extra.Add((L.T(L.Preview_TorrentCreatedBy), info.CreatedBy!));
             if (info.IsPrivate == true) extra.Add((L.T(L.Preview_TorrentPrivate), "是"));
             if (!string.IsNullOrEmpty(info.AdditionalInfo)) extra.Add((L.T(L.Preview_TorrentComment), info.AdditionalInfo!));
-            SetFormatSpecificInfo(extra.ToArray()); SetToolbar();
+            SetFormatSpecificInfo(extra.ToArray()); SetToolbar(Array.Empty<ToolbarButton>(), Array.Empty<ToolbarButton>());
         }
         catch (Exception ex) { App.LogDebug("ShowTorrentPreview: failed: {0}", ex.Message); ShowUnsupportedPreview(null, L.T(L.Preview_TorrentParseFailed)); }
     }
@@ -1394,8 +1573,8 @@ public partial class MainWindow
             if (info.Author != null) PreviewTextBox.Text += $"\n作者: {info.Author}";
             if (info.PageCount > 0) PreviewTextBox.Text += $"\n{(filePath.EndsWith(".pptx") ? "幻灯片" : filePath.EndsWith(".xlsx") ? "工作表" : "页数")}: {info.PageCount}";
             PreviewTextBox.TextAlignment = TextAlignment.Left; PreviewTextBox.FontSize = 12;
+            HideAllPreviewControls();
             PreviewTextBox.Visibility = Visibility.Visible;
-            PreviewImage.Visibility = PreviewFileIcon.Visibility = PreviewUnsupported.Visibility = PreviewWebBrowser.Visibility = Visibility.Collapsed;
             SetPreviewInfo(item); PreviewHeader.Text = info.DisplayName;
             ShowPreviewPanel();
             var extra = new List<(string, string)>();
@@ -1404,22 +1583,24 @@ public partial class MainWindow
             if (info.PageCount > 0) { string label = filePath.EndsWith(".pptx") ? L.T(L.Preview_DocSlides) : filePath.EndsWith(".xlsx") ? L.T(L.Preview_DocSheets) : L.T(L.Preview_DocPages); extra.Add((label, info.PageCount.Value.ToString())); }
             if (info.CreationDate.HasValue) extra.Add((L.T(L.Preview_DocCreated), info.CreationDate.Value.ToString("yyyy-MM-dd HH:mm")));
             if (info.ModifiedDate.HasValue) extra.Add((L.T(L.Preview_DocModified), info.ModifiedDate.Value.ToString("yyyy-MM-dd HH:mm")));
-            SetFormatSpecificInfo(extra.ToArray()); SetToolbar();
+            SetFormatSpecificInfo(extra.ToArray()); SetToolbar(Array.Empty<ToolbarButton>(), Array.Empty<ToolbarButton>());
         }
         catch (Exception ex) { App.LogDebug("ShowOfficePreview: failed: {0}", ex.Message); ShowUnsupportedPreview(null, L.T(L.Preview_OfficeParseFailed)); }
     }
 
     // ── SVG ──
-    private void ShowSvgPreview(string filePath, ArchiveItem item)
+    private async Task ShowSvgPreview(string filePath, ArchiveItem item)
     {
         try
         {
-            PreviewImage.Visibility = PreviewTextBox.Visibility = PreviewFileIcon.Visibility = PreviewUnsupported.Visibility = Visibility.Collapsed;
-            PreviewWebBrowser.Navigate(new Uri(filePath)); PreviewWebBrowser.Visibility = Visibility.Visible;
+            await EnsureWebView2InitializedAsync();
+            HideAllPreviewControls();
+            PreviewWebView2.CoreWebView2.Navigate(new Uri(filePath).AbsoluteUri);
+            PreviewWebView2.Visibility = Visibility.Visible;
             SetPreviewInfo(item); PreviewHeader.Text = L.TF(L.Preview_ImageHeader, Path.GetFileName(filePath));
-            ShowPreviewPanel(); SetFormatSpecificInfo(("SVG", Path.GetFileName(filePath))); SetToolbar();
+            ShowPreviewPanel(); SetFormatSpecificInfo(("SVG", Path.GetFileName(filePath))); SetToolbar(Array.Empty<ToolbarButton>(), Array.Empty<ToolbarButton>());
         }
-        catch (Exception ex) { App.LogDebug("ShowSvgPreview: failed: {0}", ex.Message); PreviewWebBrowser.Visibility = Visibility.Collapsed; ShowUnsupportedPreview(null, "SVG 预览失败"); }
+        catch (Exception ex) { App.LogDebug("ShowSvgPreview: failed: {0}", ex.Message); ShowUnsupportedPreview(null, "SVG 预览失败"); }
     }
 
     // ── Video ──
@@ -1434,15 +1615,15 @@ public partial class MainWindow
             if (info.Duration.HasValue) sb.AppendLine($"  时长: {info.Duration.Value:hh\\:mm\\:ss}");
             if (info.Codec != null) sb.AppendLine($"  编码: {info.Codec}");
             PreviewTextBox.Text = sb.ToString(); PreviewTextBox.TextAlignment = TextAlignment.Left; PreviewTextBox.FontSize = 12;
+            HideAllPreviewControls();
             PreviewTextBox.Visibility = Visibility.Visible;
-            PreviewImage.Visibility = PreviewFileIcon.Visibility = PreviewUnsupported.Visibility = PreviewWebBrowser.Visibility = Visibility.Collapsed;
             SetPreviewInfo(item); PreviewHeader.Text = info.DisplayName;
             ShowPreviewPanel();
             var extra = new List<(string, string)>();
             if (info.VideoWidth > 0 && info.VideoHeight > 0) extra.Add((L.T(L.Preview_Dimensions), $"{info.VideoWidth} × {info.VideoHeight}"));
             if (info.Duration.HasValue) extra.Add((L.T(L.Preview_VideoDuration), info.Duration.Value.ToString("hh\\:mm\\:ss")));
             if (info.Codec != null) extra.Add((L.T(L.Preview_VideoCodec), info.Codec));
-            SetFormatSpecificInfo(extra.ToArray()); SetToolbar();
+            SetFormatSpecificInfo(extra.ToArray()); SetToolbar(Array.Empty<ToolbarButton>(), Array.Empty<ToolbarButton>());
         }
         catch (Exception ex) { App.LogDebug("ShowVideoPreview: failed: {0}", ex.Message); ShowUnsupportedPreview(null, L.T(L.Preview_VideoParseFailed)); }
     }

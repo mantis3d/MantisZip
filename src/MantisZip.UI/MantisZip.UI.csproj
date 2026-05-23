@@ -40,6 +40,7 @@
   <ItemGroup>
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
     <PackageReference Include="Markdig" Version="1.2.0" />
+    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.3967.48" />
     <PackageReference Include="Ookii.Dialogs.Wpf" Version="5.0.1" />
     <PackageReference Include="Ude.NetStandard" Version="1.2.0" />
     <PackageReference Include="WpfAnimatedGif" Version="2.0.2" />
