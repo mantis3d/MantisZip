@@ -76,6 +76,7 @@ public class FileFormatInfo
 
     // ── 数据库 ──
     public int? TableCount { get; set; }
+    public List<string>? TableNames { get; set; }
     public string? TextEncoding { get; set; }
 
     // ── 字体 ──

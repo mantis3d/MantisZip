@@ -1540,14 +1540,28 @@ public partial class MainWindow
         {
             var info = SQLiteParser.Parse(filePath);
             if (info == null) { ShowUnsupportedPreview(item, L.T(L.Preview_SqliteParseFailed)); return; }
-            PreviewTextBox.Text = info.DisplayName;
-            if (info.TableCount > 0) PreviewTextBox.Text += $"\n表数量: {info.TableCount}";
+            var sb = new StringBuilder();
+            sb.AppendLine(info.DisplayName);
+            if (info.TableCount > 0)
+            {
+                sb.AppendLine($"表数量: {info.TableCount}");
+                if (info.TableNames?.Count > 0)
+                {
+                    sb.AppendLine();
+                    foreach (var name in info.TableNames)
+                        sb.AppendLine($"  • {name}");
+                }
+            }
+            PreviewTextBox.Text = sb.ToString();
             PreviewTextBox.TextAlignment = TextAlignment.Left; PreviewTextBox.FontSize = 12;
             HideAllPreviewControls();
             PreviewTextBox.Visibility = Visibility.Visible;
             SetPreviewInfo(item); PreviewHeader.Text = L.TF(L.Preview_SqliteHeader, Path.GetFileName(filePath));
             ShowPreviewPanel();
-            SetFormatSpecificInfo((L.T(L.Preview_SqliteEncoding), info.TextEncoding ?? "--"), (L.T(L.Preview_SqlitePageSize), info.AdditionalInfo?.Replace("页大小: ", "") ?? "--"));
+            SetFormatSpecificInfo(
+                (L.T(L.Preview_SqliteEncoding), info.TextEncoding ?? "--"),
+                (L.T(L.Preview_SqlitePageSize), info.AdditionalInfo ?? "--")
+            );
             SetToolbar(Array.Empty<ToolbarButton>(), Array.Empty<ToolbarButton>());
         }
         catch (Exception ex) { App.LogDebug("ShowSqlitePreview: failed: {0}", ex.Message); ShowUnsupportedPreview(null, L.T(L.Preview_SqliteParseFailed)); }
