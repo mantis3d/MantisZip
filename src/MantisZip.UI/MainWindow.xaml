@@ -380,11 +380,22 @@
                                             </StackPanel>
 
                                             <!-- Unsupported fallback -->
-                                            <TextBlock x:Name="PreviewUnsupported"
-                                                       Text="{l:L Preview_Unsupported}"
-                                                        FontSize="14" Foreground="{StaticResource Theme_TextDisabled}"
-                                                       HorizontalAlignment="Center" VerticalAlignment="Center"
+                                            <StackPanel x:Name="PreviewUnsupportedPanel"
+                                                        Visibility="Collapsed"
+                                                        HorizontalAlignment="Center"
+                                                        VerticalAlignment="Center">
+                                                <Image x:Name="PreviewUnsupportedIcon"
+                                                       Width="48" Height="48"
+                                                       HorizontalAlignment="Center"
                                                        Visibility="Collapsed"/>
+                                                <TextBlock x:Name="PreviewUnsupportedText"
+                                                           FontSize="18"
+                                                           Foreground="{StaticResource Theme_TextDisabled}"
+                                                           TextWrapping="Wrap"
+                                                           TextAlignment="Center"
+                                                           HorizontalAlignment="Center"
+                                                           Margin="0,12,0,0"/>
+                                            </StackPanel>
 
                                                 </Grid>
                                             </Grid>

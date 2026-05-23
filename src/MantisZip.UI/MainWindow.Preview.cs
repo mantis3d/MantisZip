@@ -226,7 +226,7 @@ public partial class MainWindow
         PreviewImageScroll.Visibility = Visibility.Collapsed;
         PreviewTextBox.Visibility = Visibility.Collapsed;
         PreviewFileIcon.Visibility = Visibility.Collapsed;
-        PreviewUnsupported.Visibility = Visibility.Collapsed;
+        PreviewUnsupportedPanel.Visibility = Visibility.Collapsed;
         PreviewWebView2.Visibility = Visibility.Collapsed;
     }
 
@@ -708,26 +708,18 @@ public partial class MainWindow
             // 显示系统图标
             var ext = Path.GetExtension(item.Name);
             var icon = SystemIconHelper.GetFileIcon(ext);
-            PreviewFileIcon.Source = icon;
-            PreviewFileIcon.Visibility = Visibility.Visible;
-
-            SetPreviewInfo(item, message);
-            PreviewHeader.Text = $"📄 {item.Name}";
+            PreviewUnsupportedIcon.Source = icon;
+            PreviewUnsupportedIcon.Visibility = Visibility.Visible;
         }
         else
         {
-            PreviewFileIcon.Visibility = Visibility.Collapsed;
-            PreviewFormatInfo.Text = message ?? "";
-            PreviewFileNameText.Text = "";
-            PreviewSizeText.Text = "";
-            PreviewRatioText.Text = "";
-            PreviewCompressedText.Text = "";
-            PreviewDateText.Text = "";
-            PreviewEncryptedText.Text = "";
-            PreviewInfoPanel.Visibility = Visibility.Visible;
-            PreviewHeader.Text = L.T(L.Settings_Tab_Preview);
+            PreviewUnsupportedIcon.Visibility = Visibility.Collapsed;
         }
 
+        PreviewUnsupportedText.Text = !string.IsNullOrEmpty(message)
+            ? message
+            : L.T(L.Preview_Unsupported);
+        PreviewUnsupportedPanel.Visibility = Visibility.Visible;
         ShowPreviewPanel();
     }
 
@@ -793,7 +785,7 @@ public partial class MainWindow
         }
         PreviewImageScroll.Visibility = Visibility.Collapsed;
         PreviewWebView2.Visibility = Visibility.Collapsed;
-        PreviewUnsupported.Visibility = Visibility.Collapsed;
+        PreviewUnsupportedPanel.Visibility = Visibility.Collapsed;
 
         // 信息面板（压缩包概览）
         var ratio = totalSize > 0 ? $"{(double)totalCompressed / totalSize * 100:F1}%" : "--";
