@@ -21,17 +21,19 @@ public static class SQLiteParser
             if (Encoding.ASCII.GetString(magic) != "SQLite format 3\0")
                 return null;
 
-            ushort pageSize = reader.ReadUInt16();
+            ushort pageSizeRaw = reader.ReadUInt16();
+            int pageSize = pageSizeRaw == 1 ? 65536 : pageSizeRaw;
+
             reader.ReadByte(); // writeVersion
             reader.ReadByte(); // readVersion
             reader.ReadByte(); // reservedSpace
-            byte encByte = reader.ReadByte(); // maxEmbeddedFrac
+            reader.ReadByte(); // maxEmbeddedFrac
 
             fs.Seek(0, SeekOrigin.Begin);
             byte[] fullHeader = reader.ReadBytes(100);
 
-            // Encoding: offset 18 (after pageSize at 16)
-            byte textEncoding = fullHeader[18]; // 1=UTF-8, 2=UTF-16le, 3=UTF-16be
+            // Text encoding: offset 56 (1=UTF-8, 2=UTF-16le, 3=UTF-16be)
+            byte textEncoding = fullHeader[56];
             string encoding = textEncoding switch
             {
                 1 => "UTF-8",
@@ -45,7 +47,23 @@ public static class SQLiteParser
             for (int i = 0; i < 4; i++)
                 pageCount = (pageCount << 8) | fullHeader[28 + i];
 
-            // Try to count tables by reading first page's sqlite_master
+            // Count entries in sqlite_master from page 1 B-tree header.
+            // Page 1 layout: 100-byte db header, then B-tree page.
+            // B-tree page header: 1 byte pageType, 2 freeblock, 2 cellCount, 2 contentStart, 1 fragFreeBytes
+            int tableCount = 0;
+            try
+            {
+                fs.Seek(100, SeekOrigin.Begin);
+                byte pageType = reader.ReadByte();
+                reader.ReadBytes(2); // freeblock
+                byte[] cellCountBuf = reader.ReadBytes(2);
+                if (pageType is 0x0D or 0x05) // leaf table or interior table
+                    tableCount = (cellCountBuf[0] << 8) | cellCountBuf[1];
+            }
+            catch
+            {
+                // Non-critical; leave tableCount at 0
+            }
 
             var fi = new FileInfo(filePath);
             return new FileFormatInfo
@@ -55,10 +73,11 @@ public static class SQLiteParser
                 Extension = Path.GetExtension(filePath),
                 FileSize = fi.Length,
                 TextEncoding = encoding,
-                EntryCount = (int)pageCount, // reuse as table approximation
+                EntryCount = (int)pageCount,
+                TableCount = tableCount,
                 AdditionalInfo = $"页大小: {pageSize}",
             };
         }
-        catch { return null; }
+        catch (Exception ex) { CoreLog.Info($"SQLiteParser.Parse failed: {ex.Message}"); return null; }
     }
 }

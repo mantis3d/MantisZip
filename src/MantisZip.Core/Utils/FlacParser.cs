@@ -27,12 +27,17 @@ public static class FlacParser
 
             reader.ReadBytes(2); // minBlock
             reader.ReadBytes(2); // maxBlock
-            reader.ReadBytes(4); // minFrame
-            reader.ReadBytes(4); // maxFrame
+            reader.ReadBytes(3); // minFrame (24-bit)
+            reader.ReadBytes(3); // maxFrame (24-bit)
 
-            // 20 bits sample rate, 3 bits channels-1, 5 bits bitsPerSample-1, 36 bits totalSamples
+            // ── 接下来的 8 字节包含 20-bit 采样率 + 3-bit 声道数-1 + 5-bit 位深-1 + 36-bit 总样本数 ──
+            // 采用 big-endian 位打包，MSB 优先：
+            //   buf[0..1] 全 16 位 + buf[2] 高 4 位 = 20-bit 采样率
+            //   buf[2] bits 1-3 = 声道数-1
+            //   buf[2] bit 0 + buf[3] 高 4 位 = 5-bit 位深-1
+            //   buf[3] 低 4 位 + buf[4..7] = 36-bit 总样本数
             byte[] buf = reader.ReadBytes(8);
-            int sampleRate = ((buf[0] & 0x0F) << 12) | (buf[1] << 4) | ((buf[2] & 0xF0) >> 4);
+            int sampleRate = (buf[0] << 12) | (buf[1] << 4) | (buf[2] >> 4);
             int channels = ((buf[2] & 0x0E) >> 1) + 1;
             int bitsPerSample = (((buf[2] & 0x01) << 4) | ((buf[3] & 0xF0) >> 4)) + 1;
 
@@ -58,6 +63,6 @@ public static class FlacParser
                 Duration = duration,
             };
         }
-        catch { return null; }
+        catch (Exception ex) { CoreLog.Info($"FlacParser.Parse failed: {ex.Message}"); return null; }
     }
 }
