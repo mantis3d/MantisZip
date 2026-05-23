@@ -177,12 +177,13 @@ public partial class MainWindow
             PreviewWebView2.CoreWebView2.Settings.IsPasswordAutosaveEnabled = false;
             PreviewWebView2.CoreWebView2.Settings.IsGeneralAutofillEnabled = false;
 
-            // 隐藏 PDF 工具栏中的操作按钮（点击设置按钮会导致浏览器进程崩溃）
+            // 隐藏 PDF 工具栏中不必要的操作按钮（点击设置按钮会导致浏览器进程崩溃）
             PreviewWebView2.CoreWebView2.Settings.HiddenPdfToolbarItems =
                 CoreWebView2PdfToolbarItems.Save |
                 CoreWebView2PdfToolbarItems.Print |
                 CoreWebView2PdfToolbarItems.SaveAs |
-                CoreWebView2PdfToolbarItems.MoreSettings;
+                CoreWebView2PdfToolbarItems.MoreSettings |
+                CoreWebView2PdfToolbarItems.FullScreen;
 
             // 阻止所有外部网络请求（只允许 file:// 本地文件）
             PreviewWebView2.CoreWebView2.AddWebResourceRequestedFilter("*", CoreWebView2WebResourceContext.All);
