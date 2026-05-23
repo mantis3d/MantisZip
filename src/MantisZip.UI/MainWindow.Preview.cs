@@ -431,10 +431,9 @@ public partial class MainWindow
                     _gifController.CurrentFrameChanged += (_, _) => UpdateGifFrameInput();
                 }
 
-                PreviewImage.MaxWidth = gifWidth;
-                PreviewImage.MaxHeight = gifHeight;
                 HideAllPreviewControls();
                 PreviewImageScroll.Visibility = Visibility.Visible;
+                ApplyZoom(ZoomMode.FitWindow);
                 PreviewHeader.Text = L.TF(L.Preview_ImageHeader, Path.GetFileName(filePath));
                 SetPreviewInfo(item, L.TF(L.Preview_Dimensions, gifWidth, gifHeight));
                 ShowPreviewPanel();
@@ -497,10 +496,9 @@ public partial class MainWindow
             });
 
             PreviewImage.Source = bitmap;
-            PreviewImage.MaxWidth = bitmap.PixelWidth;
-            PreviewImage.MaxHeight = bitmap.PixelHeight;
             HideAllPreviewControls();
             PreviewImageScroll.Visibility = Visibility.Visible;
+            ApplyZoom(ZoomMode.FitWindow);
             PreviewHeader.Text = L.TF(L.Preview_ImageHeader, Path.GetFileName(filePath));
 
             // 图片信息
