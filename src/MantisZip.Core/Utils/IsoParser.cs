@@ -52,6 +52,6 @@ public static class IsoParser
                 AdditionalInfo = format,
             };
         }
-        catch { return null; }
+        catch (Exception ex) { CoreLog.Info($"IsoParser.Parse failed: {ex.Message}"); return null; }
     }
 }

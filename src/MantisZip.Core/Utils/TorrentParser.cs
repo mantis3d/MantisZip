@@ -150,7 +150,7 @@ public static class TorrentParser
                 TorrentFileEntries = fileEntries,
             };
         }
-        catch { return null; }
+        catch (Exception ex) { CoreLog.Info($"TorrentParser.Parse failed: {ex.Message}"); return null; }
     }
 
     /// <summary>

@@ -85,7 +85,7 @@ public static class OfficeParser
                 ModifiedDate = modified,
             };
         }
-        catch { return null; }
+        catch (Exception ex) { CoreLog.Info($"OfficeParser.Parse failed: {ex.Message}"); return null; }
     }
 
     /// <summary>粗略估计 docx 的页数：统计段落数 / 40（平均每页约 40 段）</summary>

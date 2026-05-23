@@ -45,7 +45,7 @@ public static class VideoParser
 
             return null;
         }
-        catch { return null; }
+        catch (Exception ex) { CoreLog.Info($"VideoParser.Parse failed: {ex.Message}"); return null; }
     }
 
     // ═══════════════════════════════════
@@ -289,7 +289,6 @@ public static class VideoParser
     private static FileFormatInfo? ParseAvi(FileStream fs, BinaryReader r)
     {
         int? width = null, height = null;
-        double? fps = null;
         string? codec = null;
 
         // Skip RIFF header (already read)

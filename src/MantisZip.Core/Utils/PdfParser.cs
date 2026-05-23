@@ -73,8 +73,9 @@ public static class PdfParser
                 AdditionalInfo = $"PDF {pdfVersion}",
             };
         }
-        catch
+        catch (Exception ex)
         {
+            CoreLog.Info($"PdfParser.Parse failed: {ex.Message}");
             return null;
         }
     }
@@ -159,7 +160,7 @@ public static class PdfParser
                 byte[] bytes = Convert.FromHexString(hex);
                 return System.Text.Encoding.ASCII.GetString(bytes).TrimEnd('\0');
             }
-            catch { }
+            catch (Exception hexEx) { CoreLog.Info($"PdfParser.DecodeHexString failed: {hexEx.Message}"); }
         }
 
         return null;

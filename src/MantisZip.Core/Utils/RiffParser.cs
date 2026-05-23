@@ -70,6 +70,6 @@ public static class RiffParser
                 Duration = duration,
             };
         }
-        catch { return null; }
+        catch (Exception ex) { CoreLog.Info($"RiffParser.Parse failed: {ex.Message}"); return null; }
     }
 }
