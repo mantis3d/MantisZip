@@ -264,8 +264,7 @@ public class FileFormatInfo
 格式只有元数据，不足以填充内容区。内容区暂时空置或显示简单统计。
 
 | 格式 | 信息面板 | 内容区 |
-|---|---|---|
-| PDF | 页数、作者、标题、加密 | ⬜ 空置 |
+|:---|---|---|
 | WAV/FLAC | 采样率、位深、声道、时长 | ⬜ 空置（或展示大号时长） |
 | MP3 | 标题、歌手、专辑、封面 | ⬜ 空置（封面照片可展示在内容区） |
 | STL | 三角面数 | ⬜ 空置 |
@@ -300,7 +299,7 @@ public class FileFormatInfo
 |---|---|---|
 | **Torrent** | 总大小、分片数、Tracker 数、InfoHash、创建时间、创建者、是否私有 | 文件列表 + Magnet 链接（可复制） |
 | **PE (EXE/DLL)** | 公司、产品名、版本号、架构(x86/x64)、子系统(GUI/CUI)、大小 | 产品名大号展示 + 图标(Phase 4) |
-| **PDF** | PDF 版本、标题、作者、页数、是否加密、大小 | 🖼 **第一页渲染图**（`Windows.Data.Pdf`）|
+| **PDF** | PDF 版本、标题、作者、页数、是否加密、大小 | 🖼 **第一页渲染图（PdfPig + SkiaSharp）** + [📄 显示完整内容] 按钮切 WebView2 |
 | **WAV** | 采样率、位深、声道数、时长、大小 | ▶ 音频播放（Phase 3 加） |
 | **FLAC** | 采样率、位深、声道数、时长、大小 | ▶ 音频播放（Phase 3 加） |
 | **MP3** | 标题、歌手、专辑、时长、比特率、采样率、大小 | 封面 + 标题 + ▶ 音频播放（Phase 3 加） |
@@ -371,17 +370,107 @@ if (SomeExtensions.Contains(ext))
 - **实现**: BinaryReader 解析 DOS header → PE header → Optional Header → VS_VERSIONINFO
 - **预估**: ~4h
 
-#### 2A.3 PDF 元数据 + 第一页预览
-- **文件**: `Core/Utils/PdfParser.cs` (新增) + `MainWindow.Preview.cs` 修改
+#### 2A.3 PDF 元数据 + 第一页预览 + 完整内容切换
+- **文件**: `Core/Utils/PdfParser.cs` + `MainWindow.Preview.cs` 修改
 - **扩展名**: `.pdf`
-- **类别**: 第三类 → 第一类（有了第一页渲染后变为内容≠信息）
+- **类别**: 第一类（内容 ≠ 信息，有图片渲染 + WebView2 切换）
 - **信息面板**: PDF 版本 (1.x)、标题、作者、页数、是否加密
-- **内容区**: 🖼 PDF 第一页渲染图（`Windows.Data.Pdf` 转图片）
-- **实现**: 
-  - 元数据: 搜 `/Info` dict 获取作者/标题；搜 `/Pages /Count` 获取页数；搜 `/Encrypt` 检测加密
-  - 第一页: `Windows.Data.Pdf.PdfDocument.LoadFromFileAsync` → `GetPage(0)` → `RenderToStreamAsync` → BitmapImage
-- **注意**: `Windows.Data.Pdf` 是 WinRT API，需引用 `%ProgramFiles(x86)%\Windows Kits\10\UnionMetadata`。项目需添加 `targetFramework="net9.0-windows10.0.17763.0"` 或在代码中用 `RuntimeInterop` 调用
-- **预估**: ~5h（含 WinRT 集成）
+- **内容区（轻量模式）**: 🖼 PDF 第一页渲染图（PdfPig + SkiaSharp）
+- **内容区（完整模式）**: WebView2 加载完整 PDF
+- **工具栏**: `[🔍 缩放] [📄 显示完整内容]` → 点击后切换 WebView2 → `[✕ 关闭完整内容]`
+
+### 实现方案
+
+#### 依赖
+- **PdfPig** (`UglyToad.PdfPig`) — 纯 .NET PDF 解析库，读取交叉引用表按需加载页面
+- **SkiaSharp** (`SkiaSharp`) — 纯 .NET 跨平台渲染库，把 PDF 页面画到 bitmap
+- 两者均为纯托管依赖，无 native 层
+
+#### 工作流
+
+```
+用户选择 .pdf 文件
+  │
+  ├── 文件 ≤ MaxPreviewFileSize
+  │     ├── 提取完整文件到 temp（供 WebView2 使用）
+  │     │     └── 工具栏显示 [📄 显示完整内容]
+  │     ├── PdfPig 读取文件头 + 第一页（按 seek，不读全文）
+  │     └── SkiaSharp 渲染第一页为 BitmapImage → PreviewImage
+  │
+  └── 文件 > MaxPreviewFileSize
+        ├── 只提取第一页所需的数据（PdfPig 只 seek 不读全文）
+        ├── SkiaSharp 渲染第一页
+        └── 不显示 [📄 显示完整内容]（因未提取完整文件）
+```
+
+#### 关键技术点
+
+1. **PdfPig 延迟加载** — `PdfDocument.Open(stream)` 默认只读交叉引用表，不加载全部对象。`document.GetPage(1)` 时只读第一页引用的对象（内容流、字体、图片）
+2. **渲染** — SkiaSharp 把 `PdfPig` 的页面操作符 (`ShowText`, `PaintPath` 等) 转换成 `SKCanvas` 绘制命令。或者直接用 `PdfPig` 的 `page.GetLetters()` + `SvgLetter` 组合成图像
+3. **完整文件提取** — 当 `item.Size ≤ MaxPreviewFileSize` 时，`ExtractPreviewFileAsync` 提取完整 PDF 到 temp。轻量模式不需要等它完成（用另一个 task 预提取）
+4. **模式切换** — [📄 显示完整内容] 按钮调用 `EnsureWebView2InitializedAsync()` → `Navigate(filePath)`。切换回轻量模式时 `HideAllPreviewControls` + 显示 PreviewImage
+
+```csharp
+private async Task ShowPdfPreview(string filePath, ArchiveItem item)
+{
+    // 1. 元数据解析（已有 PdfParser.Parse）
+    var info = PdfParser.Parse(filePath);
+    
+    // 2. 轻量模式：渲染第一页
+    using var pdfDoc = UglyToad.PdfPig.PdfDocument.Open(filePath);
+    var page = pdfDoc.GetPage(1);
+    using var bitmap = RenderPageToBitmap(page, width: 1200);
+    PreviewImage.Source = bitmap.ToBitmapImage();
+    
+    // 3. 如果 ≤ MaxPreviewFileSize，预提取完整文件供 WebView2 使用
+    if (item.Size <= MaxPreviewFileSize)
+    {
+        _pdfFullPath = await ExtractPreviewFileAsync(item, "preview.pdf", ct);
+        // 工具栏显示 [显示完整内容]
+    }
+    
+    // 4. 显示信息面板 + 工具栏
+    SetPreviewInfo(item, ...);
+    SetToolbar(...); // 缩放 + [显示完整内容]
+}
+
+// 模式切换
+private async Task ShowPdfFullContent()
+{
+    if (_pdfFullPath == null) return;
+    await EnsureWebView2InitializedAsync();
+    HideAllPreviewControls();
+    PreviewWebView2.CoreWebView2.Navigate(new Uri(_pdfFullPath).AbsoluteUri);
+    PreviewWebView2.Visibility = Visibility.Visible;
+    SetToolbar(...); // [关闭完整内容]
+}
+```
+
+#### 关于 WebView2 崩溃
+
+当前已知：
+- 点击 PDF 工具栏的 **MoreSettings**（齿轮按钮）→ 浏览器进程崩溃 → 已隐藏
+- 大 PDF 或复杂 PDF **本身可能触发**浏览器进程崩溃 → 已添加 `ProcessFailed` 事件处理 + 自动恢复
+
+轻量模式+PdfPig 方案彻底绕过了这个大 PDF 的问题：用户看到的永远是第一页预览图，只有主动点击"显示完整内容"才启动 WebView2。
+
+#### 预估
+
+| 工作项 | 预估 |
+|--------|------|
+| PdfPig + SkiaSharp 集成（NuGet + 渲染 helper） | ~2h |
+| 第一页渲染实现（RenderPageToBitmap） | ~3h |
+| 轻量/完整模式切换逻辑（ShowPdfPreview 改造） | ~2h |
+| 工具栏按钮 + 状态管理 | ~1h |
+| 大文件处理（不提取完整文件时隐藏按钮） | ~0.5h |
+| **合计** | **~8.5h** |
+
+#### 可选的简化路径
+
+如果 PdfPig + SkiaSharp 组合太重或效果不佳，备选方案：
+- **`Windows.Data.Pdf`**（WinRT API，系统内置）— 无需额外依赖，但只支持 Win10 1809+
+- **PdfiumViewer**（封装 Google PDFium）— 有 native DLL，集成复杂
+- **继续只用 WebView2** — 大 PDF 保持当前行为（仅元数据），小 PDF 用 WebView2 渲染
 
 #### 2A.4 WAV 元数据
 - **文件**: `Core/Utils/RiffParser.cs` (新增)
