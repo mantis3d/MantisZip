@@ -1222,20 +1222,20 @@ public partial class MainWindow
     private void ApplyZoom(ZoomMode mode)
     {
         if (PreviewImage.Source is not BitmapSource bmp) return;
+        // MaxWidth/MaxHeight = 自然像素尺寸，防止小图被放大
+        // ScrollViewer Disabled 时约束到视口，MaxWidth 确保不放大，两者取较窄者
         switch (mode)
         {
             case ZoomMode.FitWindow:
-                // Disabled scrollbars -> ScrollViewer 约束内容到视口大小 -> Stretch.Uniform 生效
                 PreviewImageScroll.HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled;
                 PreviewImageScroll.VerticalScrollBarVisibility = ScrollBarVisibility.Disabled;
                 PreviewImage.Stretch = Stretch.Uniform;
-                PreviewImage.MaxWidth = double.PositiveInfinity;
-                PreviewImage.MaxHeight = double.PositiveInfinity;
+                PreviewImage.MaxWidth = bmp.PixelWidth;
+                PreviewImage.MaxHeight = bmp.PixelHeight;
                 PreviewImage.HorizontalAlignment = HorizontalAlignment.Center;
                 PreviewImage.VerticalAlignment = VerticalAlignment.Center;
                 break;
             case ZoomMode.Zoom100:
-                // Auto scrollbars -> ScrollViewer 不约束，图像按原始尺寸，可滚动
                 PreviewImageScroll.HorizontalScrollBarVisibility = ScrollBarVisibility.Auto;
                 PreviewImageScroll.VerticalScrollBarVisibility = ScrollBarVisibility.Auto;
                 PreviewImage.Stretch = Stretch.None;
@@ -1245,13 +1245,12 @@ public partial class MainWindow
                 PreviewImage.VerticalAlignment = VerticalAlignment.Top;
                 break;
             case ZoomMode.FitWidth:
-                // 水平禁用（适应宽度），垂直自动（可上下滚动）
                 PreviewImageScroll.HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled;
                 PreviewImageScroll.VerticalScrollBarVisibility = ScrollBarVisibility.Auto;
                 PreviewImage.Stretch = Stretch.Uniform;
-                PreviewImage.MaxWidth = double.PositiveInfinity;
+                PreviewImage.MaxWidth = bmp.PixelWidth;
                 PreviewImage.MaxHeight = double.PositiveInfinity;
-                PreviewImage.HorizontalAlignment = HorizontalAlignment.Stretch;
+                PreviewImage.HorizontalAlignment = HorizontalAlignment.Left;
                 PreviewImage.VerticalAlignment = VerticalAlignment.Top;
                 break;
         }
