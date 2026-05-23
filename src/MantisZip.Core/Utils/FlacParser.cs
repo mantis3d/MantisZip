@@ -51,15 +51,22 @@ public static class FlacParser
                 ? TimeSpan.FromSeconds((double)totalSamples / sampleRate)
                 : null;
 
+            // 计算码率: FLAC 的码率是压缩后的，用文件大小反推
+            long fileSize = new FileInfo(filePath).Length;
+            int? bitrate = duration.HasValue && duration.Value.TotalSeconds > 0
+                ? (int)((fileSize * 8) / duration.Value.TotalSeconds / 1000)
+                : null;
+
             return new FileFormatInfo
             {
                 Format = FileFormat.Flac,
                 DisplayName = "FLAC 音频",
                 Extension = Path.GetExtension(filePath),
-                FileSize = new FileInfo(filePath).Length,
+                FileSize = fileSize,
                 SampleRate = sampleRate,
                 Channels = channels,
                 BitDepth = bitsPerSample,
+                Bitrate = bitrate,
                 Duration = duration,
             };
         }

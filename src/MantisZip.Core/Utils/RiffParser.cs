@@ -58,6 +58,11 @@ public static class RiffParser
                 duration = TimeSpan.FromSeconds(totalSamples / sampleRate.Value);
             }
 
+            // 计算码率: bitrate = sampleRate × channels × bitsPerSample / 1000 kbps
+            int? bitrate = sampleRate > 0 && channels > 0 && bitsPerSample > 0
+                ? (sampleRate.Value * channels.Value * bitsPerSample.Value) / 1000
+                : null;
+
             return new FileFormatInfo
             {
                 Format = FileFormat.Wav,
@@ -67,6 +72,7 @@ public static class RiffParser
                 SampleRate = sampleRate,
                 Channels = channels,
                 BitDepth = bitsPerSample,
+                Bitrate = bitrate,
                 Duration = duration,
             };
         }

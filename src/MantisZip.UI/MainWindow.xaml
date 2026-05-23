@@ -336,7 +336,9 @@
                                                 <Grid Grid.Row="1">
 
                                             <!-- Image Preview -->
-                                            <Image x:Name="PreviewImage" Stretch="Uniform" Visibility="Collapsed"/>
+                                            <ScrollViewer x:Name="PreviewImageScroll" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto" Visibility="Collapsed">
+                                                <Image x:Name="PreviewImage" Stretch="Uniform" Visibility="Visible" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                            </ScrollViewer>
 
                                             <!-- File Icon (for non-previewable files) -->
                                             <Image x:Name="PreviewFileIcon" Width="64" Height="64" Visibility="Collapsed"

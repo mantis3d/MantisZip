@@ -221,7 +221,7 @@ public partial class MainWindow
 
     private void HideAllPreviewControls()
     {
-        PreviewImage.Visibility = Visibility.Collapsed;
+        PreviewImageScroll.Visibility = Visibility.Collapsed;
         PreviewTextBox.Visibility = Visibility.Collapsed;
         PreviewFileIcon.Visibility = Visibility.Collapsed;
         PreviewUnsupported.Visibility = Visibility.Collapsed;
@@ -434,7 +434,7 @@ public partial class MainWindow
                 PreviewImage.MaxWidth = gifWidth;
                 PreviewImage.MaxHeight = gifHeight;
                 HideAllPreviewControls();
-                PreviewImage.Visibility = Visibility.Visible;
+                PreviewImageScroll.Visibility = Visibility.Visible;
                 PreviewHeader.Text = L.TF(L.Preview_ImageHeader, Path.GetFileName(filePath));
                 SetPreviewInfo(item, L.TF(L.Preview_Dimensions, gifWidth, gifHeight));
                 ShowPreviewPanel();
@@ -500,7 +500,7 @@ public partial class MainWindow
             PreviewImage.MaxWidth = bitmap.PixelWidth;
             PreviewImage.MaxHeight = bitmap.PixelHeight;
             HideAllPreviewControls();
-            PreviewImage.Visibility = Visibility.Visible;
+            PreviewImageScroll.Visibility = Visibility.Visible;
             PreviewHeader.Text = L.TF(L.Preview_ImageHeader, Path.GetFileName(filePath));
 
             // 图片信息
@@ -790,7 +790,7 @@ public partial class MainWindow
             PreviewFileIcon.Visibility = Visibility.Visible;
             PreviewTextBox.Visibility = Visibility.Collapsed;
         }
-        PreviewImage.Visibility = Visibility.Collapsed;
+        PreviewImageScroll.Visibility = Visibility.Collapsed;
         PreviewWebView2.Visibility = Visibility.Collapsed;
         PreviewUnsupported.Visibility = Visibility.Collapsed;
 
@@ -1023,6 +1023,7 @@ public partial class MainWindow
         ImageBehavior.SetAnimatedSource(PreviewImage, null); // 停止 GIF 动画
         _gifController?.Dispose();
         _gifController = null;
+        PreviewImageScroll.Visibility = Visibility.Collapsed;
         PreviewFileIcon.Source = null;
         PreviewTextBox.Text = "";
         PreviewTextBox.ClearValue(TextBox.FontFamilyProperty); // 重置为默认字体，释放对临时字体文件的引用，防止 WPF 在文件被删除后崩溃
@@ -1046,6 +1047,7 @@ public partial class MainWindow
 
         PreviewImage.Source = null;
         ImageBehavior.SetAnimatedSource(PreviewImage, null); // 停止 GIF 动画
+        PreviewImageScroll.Visibility = Visibility.Collapsed;
         PreviewFileIcon.Source = null;
         PreviewTextBox.Text = "";
         // 清除 WebView2 内容并隐藏
@@ -1228,16 +1230,22 @@ public partial class MainWindow
                 PreviewImage.Stretch = Stretch.Uniform;
                 PreviewImage.MaxWidth = double.PositiveInfinity;
                 PreviewImage.MaxHeight = double.PositiveInfinity;
+                PreviewImage.HorizontalAlignment = HorizontalAlignment.Center;
+                PreviewImage.VerticalAlignment = VerticalAlignment.Center;
                 break;
             case ZoomMode.Zoom100:
                 PreviewImage.Stretch = Stretch.None;
                 PreviewImage.MaxWidth = bmp.PixelWidth;
                 PreviewImage.MaxHeight = bmp.PixelHeight;
+                PreviewImage.HorizontalAlignment = HorizontalAlignment.Left;
+                PreviewImage.VerticalAlignment = VerticalAlignment.Top;
                 break;
             case ZoomMode.FitWidth:
-                PreviewImage.Stretch = Stretch.UniformToFill;
+                PreviewImage.Stretch = Stretch.Uniform;
                 PreviewImage.MaxWidth = double.PositiveInfinity;
                 PreviewImage.MaxHeight = double.PositiveInfinity;
+                PreviewImage.HorizontalAlignment = HorizontalAlignment.Stretch;
+                PreviewImage.VerticalAlignment = VerticalAlignment.Center;
                 break;
         }
     }
@@ -1261,7 +1269,8 @@ public partial class MainWindow
     private void ToggleTransparencyBg()
     {
         _transparentBgEnabled = !_transparentBgEnabled;
-        if (VisualTreeHelper.GetParent(PreviewImage) is Panel parent)
+        // PreviewImage 现在在 ScrollViewer 内，棋盘格背景设置到 ScrollViewer 所在的容器 Grid
+        if (PreviewImageScroll.Parent is Panel parent)
             parent.Background = _transparentBgEnabled ? new ImageBrush { TileMode = TileMode.Tile, Viewport = new Rect(0, 0, 16, 16), ViewportUnits = BrushMappingMode.Absolute, ImageSource = CreateCheckerPattern() } : Brushes.Transparent;
     }
 
@@ -1484,6 +1493,7 @@ public partial class MainWindow
             if (info.Duration.HasValue) extra.Add((L.T(L.Preview_AudioDuration), info.Duration.Value.ToString("hh\\:mm\\:ss")));
             if (info.SampleRate > 0) extra.Add((L.T(L.Preview_AudioSampleRate), $"{info.SampleRate} Hz"));
             if (info.Channels > 0) extra.Add((L.T(L.Preview_AudioChannels), info.Channels.Value.ToString()));
+            if (info.BitDepth > 0) extra.Add((L.T(L.Preview_AudioBitDepth), $"{info.BitDepth}-bit"));
             if (info.Bitrate > 0) extra.Add((L.T(L.Preview_AudioBitrate), $"{info.Bitrate} kbps"));
             SetFormatSpecificInfo(extra.ToArray()); SetToolbar(Array.Empty<ToolbarButton>(), Array.Empty<ToolbarButton>());
         }
@@ -1518,8 +1528,7 @@ public partial class MainWindow
             var info = IsoParser.Parse(filePath);
             if (info == null) { ShowUnsupportedPreview(item, L.T(L.Preview_IsoParseFailed)); return; }
             PreviewTextBox.Text = info.DisplayName;
-            if (info.VolumeLabel != null) PreviewTextBox.Text += $"\n卷标: {info.VolumeLabel}";
-            if (info.DiskSize > 0) PreviewTextBox.Text += $"\n大小: {ArchiveItem.FormatSize(info.DiskSize.Value)}";
+            // 详细信息放在格式信息面板中，不在内容栏重复
             PreviewTextBox.TextAlignment = TextAlignment.Left; PreviewTextBox.FontSize = 12;
             HideAllPreviewControls();
             PreviewTextBox.Visibility = Visibility.Visible;
