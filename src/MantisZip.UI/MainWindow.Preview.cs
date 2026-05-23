@@ -710,6 +710,7 @@ public partial class MainWindow
             var icon = SystemIconHelper.GetFileIcon(ext);
             PreviewUnsupportedIcon.Source = icon;
             PreviewUnsupportedIcon.Visibility = Visibility.Visible;
+            SetPreviewInfo(item);
         }
         else
         {
