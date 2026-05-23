@@ -1250,8 +1250,8 @@ public partial class MainWindow
                 PreviewImage.Stretch = Stretch.Uniform;
                 PreviewImage.MaxWidth = bmp.PixelWidth;
                 PreviewImage.MaxHeight = double.PositiveInfinity;
-                PreviewImage.HorizontalAlignment = HorizontalAlignment.Left;
-                PreviewImage.VerticalAlignment = VerticalAlignment.Top;
+                PreviewImage.HorizontalAlignment = HorizontalAlignment.Center;
+                PreviewImage.VerticalAlignment = VerticalAlignment.Center;
                 break;
         }
     }
