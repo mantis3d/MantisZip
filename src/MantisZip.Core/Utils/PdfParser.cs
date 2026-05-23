@@ -30,7 +30,7 @@ public static class PdfParser
 
             using (var fs = new FileStream(filePath, FileMode.Open, FileAccess.Read))
             {
-                // 读取前 256KB（元数据字典、Pages 树常在前部，1KB 远不够）
+                // 读取前 256KB（元数据字典、Pages 树常在前部）
                 int headLen = (int)Math.Min(256 * 1024, fs.Length);
                 byte[] headBuf = new byte[headLen];
                 fs.ReadExactly(headBuf, 0, headBuf.Length);
@@ -49,12 +49,14 @@ public static class PdfParser
                 string tailText = System.Text.Encoding.ASCII.GetString(tailBuf);
 
                 // 从尾部获取 /Info 字典引用
-                // 先尝试在尾部附近找 /Root + /Info
                 string fullText = headText + "\n" + tailText;
 
                 // 扫描 root 附近的 /Info 引用
                 ExtractMetadata(fullText, out title, out author, out subject,
-                    out creationDate, out modifiedDate, out isEncrypted, out pageCount);
+                    out creationDate, out modifiedDate, out isEncrypted);
+
+                // 页数需要扫描更多文件内容（Pages 树可能不在头尾）
+                pageCount = FindPageCount(fs);
             }
 
             return new FileFormatInfo
@@ -84,12 +86,11 @@ public static class PdfParser
         string text,
         out string? title, out string? author, out string? subject,
         out DateTime? creationDate, out DateTime? modifiedDate,
-        out bool isEncrypted, out int? pageCount)
+        out bool isEncrypted)
     {
         title = null; author = null; subject = null;
         creationDate = null; modifiedDate = null;
         isEncrypted = false;
-        pageCount = null;
 
         try
         {
@@ -97,7 +98,6 @@ public static class PdfParser
             isEncrypted = Regex.IsMatch(text, @"/Encrypt\s", RegexOptions.IgnoreCase);
 
             // 扫描 /Info 字典（通常出现在 trailer 附近）
-            // 格式: /Info << /Title (...) /Author (...) /Subject (...) >>
             var infoMatch = Regex.Match(text,
                 @"/Info\s*(<<.*?>>)",
                 RegexOptions.Singleline | RegexOptions.IgnoreCase);
@@ -113,13 +113,6 @@ public static class PdfParser
                 modifiedDate = ParsePdfDate(ExtractPdfString(infoDict, "/ModDate"));
             }
 
-            // 页数：扫描 /Type /Pages 中的 /Count
-            var pagesMatch = Regex.Match(text,
-                @"/Type\s*/Pages[^>]*?/Count\s+(\d+)",
-                RegexOptions.Singleline | RegexOptions.IgnoreCase);
-            if (pagesMatch.Success && int.TryParse(pagesMatch.Groups[1].Value, out int count))
-                pageCount = count;
-
             // 如果尾部的 /Info 没找到，尝试在整个文本中搜字典条目
             if (title == null)
                 title = ExtractPdfString(text, "/Title");
@@ -130,6 +123,40 @@ public static class PdfParser
         {
             CoreLog.Info($"PdfParser.ExtractMetadata failed: {ex.Message}");
         }
+    }
+
+    /// <summary>
+    /// 在文件中扫描 /Type /Pages 字典中的 /Count，获取页数。
+    /// 分块读取（最多 512KB），避免大文件全部加载。
+    /// 正则允许中间有 &gt; 字符，适应嵌套字典的情况。
+    /// </summary>
+    private static int? FindPageCount(FileStream fs)
+    {
+        const int chunkSize = 256 * 1024;
+        long maxScan = Math.Min(512 * 1024, fs.Length);
+        byte[] buffer = new byte[chunkSize];
+        long offset = 0;
+
+        fs.Seek(0, SeekOrigin.Begin);
+
+        while (offset < maxScan)
+        {
+            int toRead = (int)Math.Min(chunkSize, maxScan - offset);
+            int bytesRead = fs.Read(buffer, 0, toRead);
+            if (bytesRead == 0) break;
+
+            string text = System.Text.Encoding.ASCII.GetString(buffer, 0, bytesRead);
+
+            var match = Regex.Match(text,
+                @"/Type\s*/Pages\b.*?/Count\s+(\d+)",
+                RegexOptions.Singleline | RegexOptions.IgnoreCase);
+            if (match.Success && int.TryParse(match.Groups[1].Value, out int count))
+                return count;
+
+            offset += bytesRead;
+        }
+
+        return null;
     }
 
     /// <summary>
