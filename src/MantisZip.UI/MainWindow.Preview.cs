@@ -26,6 +26,8 @@ public partial class MainWindow
     #region 文件预览
 
     private bool _webView2Crashed;
+    private ZoomMode _currentZoomMode = ZoomMode.FitWindow;
+    private static readonly SolidColorBrush _toolbarCheckedBrush = new(Color.FromArgb(30, 100, 100, 100));
 
     private static readonly HashSet<string> ImageExtensions = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -470,6 +472,7 @@ public partial class MainWindow
                     }
                 );
                 AddGifFrameInput();
+                ApplyZoom(ZoomMode.FitWindow); // 初始化按钮选中态
                 return;
             }
 
@@ -498,7 +501,6 @@ public partial class MainWindow
             PreviewImage.Source = bitmap;
             HideAllPreviewControls();
             PreviewImageScroll.Visibility = Visibility.Visible;
-            ApplyZoom(ZoomMode.FitWindow);
             PreviewHeader.Text = L.TF(L.Preview_ImageHeader, Path.GetFileName(filePath));
 
             // 图片信息
@@ -536,6 +538,7 @@ public partial class MainWindow
                       }
                     : Array.Empty<ToolbarButton>()
             );
+            ApplyZoom(ZoomMode.FitWindow); // 放在 SetToolbar 之后，以便更新按钮选中态
         }
         catch (Exception imgEx)
         {
@@ -1187,20 +1190,42 @@ public partial class MainWindow
         };
         if (btn.IsToggle)
         {
-            var bgBrush = new SolidColorBrush(Color.FromArgb(30, 100, 100, 100));
             border.MouseLeftButtonUp += (_, _) =>
             {
                 btn.IsChecked = !btn.IsChecked;
-                border.Background = btn.IsChecked ? bgBrush : Brushes.Transparent;
+                border.Background = btn.IsChecked ? _toolbarCheckedBrush : Brushes.Transparent;
                 btn.OnClick?.Invoke();
             };
-            if (btn.IsChecked) border.Background = bgBrush;
+            if (btn.IsChecked) border.Background = _toolbarCheckedBrush;
         }
         else
         {
             border.MouseLeftButtonUp += (_, _) => btn.OnClick?.Invoke();
         }
         return border;
+    }
+
+    /// <summary>
+    /// 更新缩放按钮的选中状态，始终只有当前模式对应的按钮高亮。
+    /// </summary>
+    private void UpdateZoomButtonStates()
+    {
+        int idx = 0;
+        foreach (var child in PreviewToolbarPanel.Children)
+        {
+            if (child is Border border && idx < 3)
+            {
+                bool isChecked = idx switch
+                {
+                    0 => _currentZoomMode == ZoomMode.FitWindow,
+                    1 => _currentZoomMode == ZoomMode.Zoom100,
+                    2 => _currentZoomMode == ZoomMode.FitWidth,
+                    _ => false
+                };
+                border.Background = isChecked ? _toolbarCheckedBrush : Brushes.Transparent;
+                idx++;
+            }
+        }
     }
 
     private void AddToolbarSeparator()
@@ -1222,6 +1247,7 @@ public partial class MainWindow
     private void ApplyZoom(ZoomMode mode)
     {
         if (PreviewImage.Source is not BitmapSource bmp) return;
+        _currentZoomMode = mode;
         // MaxWidth/MaxHeight = 自然像素尺寸，防止小图被放大
         // ScrollViewer Disabled 时约束到视口，MaxWidth 确保不放大，两者取较窄者
         switch (mode)
@@ -1254,6 +1280,7 @@ public partial class MainWindow
                 PreviewImage.VerticalAlignment = VerticalAlignment.Center;
                 break;
         }
+        UpdateZoomButtonStates();
     }
 
     // ═══════════════════════════════════════════
