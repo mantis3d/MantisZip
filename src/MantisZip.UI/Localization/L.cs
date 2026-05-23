@@ -315,6 +315,7 @@ public static class L
     public const string Preview_TorrentTrackerCount                = "Preview_TorrentTrackerCount";
     public const string Preview_TorrentCreatedBy                   = "Preview_TorrentCreatedBy";
     public const string Preview_TorrentPrivate                     = "Preview_TorrentPrivate";
+    public const string Preview_TorrentCreationDate                = "Preview_TorrentCreationDate";
     public const string Preview_TorrentComment                     = "Preview_TorrentComment";
     public const string Preview_OfficeParseFailed                  = "Preview_OfficeParseFailed";
     public const string Preview_DocTitle                           = "Preview_DocTitle";

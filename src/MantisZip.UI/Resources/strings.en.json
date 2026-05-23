@@ -299,6 +299,7 @@
   "Preview_TorrentTrackerCount": "Trackers",
   "Preview_TorrentCreatedBy": "Created by",
   "Preview_TorrentPrivate": "Private",
+  "Preview_TorrentCreationDate": "Created",
   "Preview_TorrentComment": "Comment",
   "Preview_OfficeParseFailed": "Could not parse Office document",
   "Preview_DocTitle": "Title",

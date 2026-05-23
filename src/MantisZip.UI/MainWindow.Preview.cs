@@ -1258,10 +1258,6 @@ public partial class MainWindow
             FileFormatInfo? info = formatName == "WAV" ? RiffParser.Parse(filePath) : FlacParser.Parse(filePath);
             if (info == null) { ShowUnsupportedPreview(item, L.T(L.Preview_AudioParseFailed)); return; }
             PreviewTextBox.Text = info.DisplayName;
-            if (info.Duration.HasValue) PreviewTextBox.Text += $"\n时长: {info.Duration.Value:hh\\:mm\\:ss}";
-            if (info.SampleRate > 0) PreviewTextBox.Text += $"\n采样率: {info.SampleRate} Hz";
-            if (info.Channels > 0) PreviewTextBox.Text += $"\n声道: {info.Channels}";
-            if (info.Bitrate > 0) PreviewTextBox.Text += $"\n码率: {info.Bitrate} kbps";
             PreviewTextBox.TextAlignment = TextAlignment.Left; PreviewTextBox.FontSize = 12;
             PreviewTextBox.Visibility = Visibility.Visible;
             PreviewImage.Visibility = PreviewFileIcon.Visibility = PreviewUnsupported.Visibility = PreviewWebBrowser.Visibility = Visibility.Collapsed;
@@ -1270,7 +1266,7 @@ public partial class MainWindow
             var extra = new List<(string, string)>();
             if (info.Duration.HasValue) extra.Add((L.T(L.Preview_AudioDuration), info.Duration.Value.ToString("hh\\:mm\\:ss")));
             if (info.SampleRate > 0) extra.Add((L.T(L.Preview_AudioSampleRate), $"{info.SampleRate} Hz"));
-            if (info.Channels > 0) extra.Add((L.T(L.Preview_AudioChannels), info.Channels.ToString()));
+            if (info.Channels > 0) extra.Add((L.T(L.Preview_AudioChannels), info.Channels.Value.ToString()));
             if (info.Bitrate > 0) extra.Add((L.T(L.Preview_AudioBitrate), $"{info.Bitrate} kbps"));
             SetFormatSpecificInfo(extra.ToArray()); SetToolbar();
         }
@@ -1291,7 +1287,7 @@ public partial class MainWindow
             PreviewImage.Visibility = PreviewFileIcon.Visibility = PreviewUnsupported.Visibility = PreviewWebBrowser.Visibility = Visibility.Collapsed;
             SetPreviewInfo(item); PreviewHeader.Text = L.TF(L.Preview_SqliteHeader, Path.GetFileName(filePath));
             ShowPreviewPanel();
-            SetFormatSpecificInfo((L.T(L.Preview_SqliteEncoding), info.TextEncoding ?? "--"), (L.T(L.Preview_SqlitePageSize), info.AdditionalInfo?.Replace("页面大小: ", "") ?? "--"));
+            SetFormatSpecificInfo((L.T(L.Preview_SqliteEncoding), info.TextEncoding ?? "--"), (L.T(L.Preview_SqlitePageSize), info.AdditionalInfo?.Replace("页大小: ", "") ?? "--"));
             SetToolbar();
         }
         catch (Exception ex) { App.LogDebug("ShowSqlitePreview: failed: {0}", ex.Message); ShowUnsupportedPreview(null, L.T(L.Preview_SqliteParseFailed)); }
@@ -1342,8 +1338,9 @@ public partial class MainWindow
             SetPreviewInfo(item); PreviewHeader.Text = L.TF(L.Preview_TorrentHeader, info.TorrentFileName ?? Path.GetFileName(filePath));
             ShowPreviewPanel();
             var extra = new List<(string, string)> { (L.T(L.Preview_TorrentInfoHash), info.InfoHashV1 ?? "--") };
+            if (info.CreationDate != null) extra.Add((L.T(L.Preview_TorrentCreationDate), info.CreationDate.Value.ToString("yyyy-MM-dd HH:mm:ss")));
             if (info.TrackerUrl != null) extra.Add((L.T(L.Preview_TorrentTracker), info.TrackerUrl!));
-            if (info.TrackerCount > 1) extra.Add((L.T(L.Preview_TorrentTrackerCount), info.TrackerCount!.ToString()));
+            if (info.TrackerCount > 1) extra.Add((L.T(L.Preview_TorrentTrackerCount), info.TrackerCount.Value.ToString()));
             if (info.CreatedBy != null) extra.Add((L.T(L.Preview_TorrentCreatedBy), info.CreatedBy!));
             if (info.IsPrivate == true) extra.Add((L.T(L.Preview_TorrentPrivate), "是"));
             if (!string.IsNullOrEmpty(info.AdditionalInfo)) extra.Add((L.T(L.Preview_TorrentComment), info.AdditionalInfo!));
@@ -1379,7 +1376,7 @@ public partial class MainWindow
             string prefix = isLast ? "└── " : "├── ";
             string childIndent = isLast ? "    " : "│   ";
             if (items[i].Value is Dictionary<string, object> sub)
-            { sb.AppendLine($"{indent}{prefix}📁 {items[i].Key}/"); RenderTree(sb, sub, indent + childIndent); }
+            { sb.AppendLine($"{indent}{prefix}[DIR] {items[i].Key}/"); RenderTree(sb, sub, indent + childIndent); }
             else
             { sb.AppendLine($"{indent}{prefix}{items[i].Key}  ({ArchiveItem.FormatSize((long)items[i].Value)})"); }
         }
@@ -1404,7 +1401,7 @@ public partial class MainWindow
             var extra = new List<(string, string)>();
             if (info.Title != null) extra.Add((L.T(L.Preview_DocTitle), info.Title));
             if (info.Author != null) extra.Add((L.T(L.Preview_DocAuthor), info.Author));
-            if (info.PageCount > 0) { string label = filePath.EndsWith(".pptx") ? L.T(L.Preview_DocSlides) : filePath.EndsWith(".xlsx") ? L.T(L.Preview_DocSheets) : L.T(L.Preview_DocPages); extra.Add((label, info.PageCount.ToString())); }
+            if (info.PageCount > 0) { string label = filePath.EndsWith(".pptx") ? L.T(L.Preview_DocSlides) : filePath.EndsWith(".xlsx") ? L.T(L.Preview_DocSheets) : L.T(L.Preview_DocPages); extra.Add((label, info.PageCount.Value.ToString())); }
             if (info.CreationDate.HasValue) extra.Add((L.T(L.Preview_DocCreated), info.CreationDate.Value.ToString("yyyy-MM-dd HH:mm")));
             if (info.ModifiedDate.HasValue) extra.Add((L.T(L.Preview_DocModified), info.ModifiedDate.Value.ToString("yyyy-MM-dd HH:mm")));
             SetFormatSpecificInfo(extra.ToArray()); SetToolbar();

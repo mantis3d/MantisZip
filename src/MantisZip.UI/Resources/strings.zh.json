@@ -301,6 +301,7 @@
   "Preview_TorrentTrackerCount": "Tracker 数",
   "Preview_TorrentCreatedBy": "创建者",
   "Preview_TorrentPrivate": "私有种子",
+  "Preview_TorrentCreationDate": "创建时间",
   "Preview_TorrentComment": "备注",
   "Preview_OfficeParseFailed": "无法解析此 Office 文档",
   "Preview_DocTitle": "标题",
