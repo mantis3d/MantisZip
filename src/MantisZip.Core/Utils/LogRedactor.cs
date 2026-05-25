@@ -30,6 +30,7 @@ public static class LogRedactor
         RegexOptions.Compiled);
 
     private static readonly ConcurrentDictionary<string, int> _pathIds = new();
+    private static readonly object _pathLock = new();
     private const int MaxCachedPaths = 10000;
 
     /// <summary>
@@ -56,13 +57,23 @@ public static class LogRedactor
                     return name.Length > 0 ? name : "[DIR]";
 
                 case LogPrivacyMode.Full:
-                    var id = _pathIds.GetOrAdd(path, _ =>
+                    // 双检锁模式：先无锁检查，不存在时加锁再确认
+                    if (!_pathIds.TryGetValue(path, out var id))
                     {
-                        // 上限保护：超限时清空重建
-                        if (_pathIds.Count >= MaxCachedPaths)
-                            _pathIds.Clear();
-                        return _pathIds.Count + 1;
-                    });
+                        lock (_pathLock)
+                        {
+                            if (!_pathIds.TryGetValue(path, out id))
+                            {
+                                // 上限保护：超限时清空重建（在锁内安全执行）
+                                if (_pathIds.Count >= MaxCachedPaths)
+                                {
+                                    _pathIds.Clear();
+                                }
+                                id = _pathIds.Count + 1;
+                                _pathIds.TryAdd(path, id);
+                            }
+                        }
+                    }
                     return $"[PATH_{id}]";
 
                 default:
