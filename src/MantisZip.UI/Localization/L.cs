@@ -229,6 +229,10 @@ public static class L
     public const string Preview_ArchiveHeader                      = "Preview_ArchiveHeader";
     public const string Preview_ArchiveOverview                    = "Preview_ArchiveOverview";
     public const string Preview_ArchiveSize                        = "Preview_ArchiveSize";
+    public const string Preview_CsvFailed                          = "Preview_CsvFailed";
+    public const string Preview_CsvHeader                          = "Preview_CsvHeader";
+    public const string Preview_CsvInfo                            = "Preview_CsvInfo";
+    public const string Preview_CsvInfoTruncated                   = "Preview_CsvInfoTruncated";
     public const string Preview_Dimensions                         = "Preview_Dimensions";
     public const string Preview_DirInfo                            = "Preview_DirInfo";
     public const string Preview_DirLabel                           = "Preview_DirLabel";

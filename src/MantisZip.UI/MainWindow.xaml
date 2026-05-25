@@ -356,6 +356,26 @@
                                                      ScrollViewer.VerticalScrollBarVisibility="Auto"
                                                      Visibility="Collapsed"/>
 
+                                            <!-- CSV Grid Preview -->
+                                            <DataGrid x:Name="PreviewCsvGrid"
+                                                      AutoGenerateColumns="True"
+                                                      IsReadOnly="True"
+                                                      CanUserAddRows="False"
+                                                      CanUserDeleteRows="False"
+                                                      CanUserReorderColumns="True"
+                                                      CanUserResizeColumns="True"
+                                                      CanUserSortColumns="True"
+                                                      GridLinesVisibility="Horizontal"
+                                                      HeadersVisibility="Column"
+                                                      RowHeaderWidth="0"
+                                                      Visibility="Collapsed"
+                                                      BorderThickness="0"
+                                                      Background="Transparent"
+                                                      FontSize="12"
+                                                      MinColumnWidth="60"
+                                                      HorizontalAlignment="Stretch"
+                                                      VerticalAlignment="Stretch"/>
+
                                             <!-- HTML/Markdown/PDF/SVG Preview -->
                                             <wv2:WebView2 x:Name="PreviewWebView2" Visibility="Collapsed"/>
 

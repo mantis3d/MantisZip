@@ -5,6 +5,7 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading;
+using System.Dynamic;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -36,7 +37,7 @@ public partial class MainWindow
 
     private static readonly HashSet<string> TextExtensions = new(StringComparer.OrdinalIgnoreCase)
     {
-        ".txt", ".log", ".ini", ".cfg", ".conf", ".csv", ".xml", ".json",
+        ".txt", ".log", ".ini", ".cfg", ".conf", ".xml", ".json",
         ".cs", ".csproj", ".yaml", ".yml", ".toml",
         ".sh", ".bat", ".cmd", ".ps1", ".py", ".js", ".ts", ".tsx",
         ".css", ".scss", ".less",
@@ -104,6 +105,11 @@ public partial class MainWindow
     private static readonly HashSet<string> SvgExtensions = new(StringComparer.OrdinalIgnoreCase)
     {
         ".svg"
+    };
+
+    private static readonly HashSet<string> CsvExtensions = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ".csv"
     };
 
     private static readonly HashSet<string> VideoExtensions = new(StringComparer.OrdinalIgnoreCase)
@@ -215,7 +221,8 @@ public partial class MainWindow
         {
             if (PreviewWebView2.Visibility == Visibility.Visible)
             {
-                PreviewWebView2.Visibility = Visibility.Collapsed;
+        PreviewCsvGrid.ItemsSource = null;
+        PreviewWebView2.Visibility = Visibility.Collapsed;
                 ShowUnsupportedPreview(null, "预览组件异常，请重新选择文件以恢复");
             }
         });
@@ -226,6 +233,7 @@ public partial class MainWindow
         PreviewImageScroll.Visibility = Visibility.Collapsed;
         PreviewTextBox.Visibility = Visibility.Collapsed;
         PreviewFileIcon.Visibility = Visibility.Collapsed;
+        PreviewCsvGrid.Visibility = Visibility.Collapsed;
         PreviewUnsupportedPanel.Visibility = Visibility.Collapsed;
         PreviewWebView2.Visibility = Visibility.Collapsed;
     }
@@ -295,6 +303,11 @@ public partial class MainWindow
                     await ShowMarkdownPreview(tempFile, item);
                 else
                     await ShowHtmlPreview(tempFile, item);
+            }
+            else if (CsvExtensions.Contains(ext))
+            {
+                var tempFile = await ExtractPreviewFileAsync(item, "preview.csv", ct);
+                ShowCsvPreview(tempFile, item);
             }
             else if (TextExtensions.Contains(ext))
             {
@@ -634,6 +647,174 @@ public partial class MainWindow
             App.LogDebug("ShowTextPreview: failed: {0}", textEx.Message);
             ShowUnsupportedPreview(null, L.T(L.Preview_TextFailed));
         }
+    }
+
+    /// <summary>
+    /// 用 DataGrid 展示 CSV 文件内容。首行作为列标题，后续行作为数据行。
+    /// 行列均有限制（最多 100 行 × 100 列）以防止大表格拖垮 WPF DataGrid。
+    /// </summary>
+    private void ShowCsvPreview(string filePath, ArchiveItem item)
+    {
+        try
+        {
+            const int maxRows = 100;
+            const int maxCols = 100;
+            var lines = new List<string[]>();
+            int totalRows = 0;
+            string[] headers;
+
+            using (var reader = new StreamReader(filePath, Encoding.UTF8))
+            {
+                // 读取首行作为列标题
+                var headerLine = reader.ReadLine();
+                if (headerLine == null)
+                {
+                    ShowUnsupportedPreview(item, "CSV 文件为空");
+                    return;
+                }
+
+                headers = ParseCsvLine(headerLine);
+                // 截断到 maxCols
+                if (headers.Length > maxCols)
+                    headers = headers.Take(maxCols).ToArray();
+                // 空列名自动生成编号，保证唯一（避免 DataGrid 绑定失败）
+                headers = MakeUniqueColumnNames(headers);
+                lines.Add(headers);
+
+                // 读取数据行（限制行数）
+                string? dataLine;
+                while ((dataLine = reader.ReadLine()) != null && lines.Count <= maxRows + 1)
+                {
+                    var fields = ParseCsvLine(dataLine);
+                    if (fields.Length > maxCols)
+                        fields = fields.Take(maxCols).ToArray();
+                    lines.Add(fields);
+                    totalRows++;
+                }
+
+                // 如果截断，继续数完以显示准确总数
+                while (reader.ReadLine() != null)
+                    totalRows++;
+            }
+
+            var colCount = headers.Length;
+            int displayCount = lines.Count - 1;
+            bool rowsTruncated = totalRows > displayCount;
+
+            // 用 DataTable 填充（比 ExpandoObject 更可靠）
+            var table = new System.Data.DataTable();
+            foreach (var h in headers)
+                table.Columns.Add(h, typeof(string));
+
+            for (int i = 1; i < lines.Count; i++)
+            {
+                var row = lines[i];
+                int shownCols = Math.Min(headers.Length, row.Length);
+                var dataRow = table.NewRow();
+                for (int col = 0; col < shownCols; col++)
+                    dataRow[col] = row[col];
+                table.Rows.Add(dataRow);
+            }
+
+            PreviewCsvGrid.ItemsSource = table.DefaultView;
+
+            HideAllPreviewControls();
+            PreviewCsvGrid.Visibility = Visibility.Visible;
+
+            var info = rowsTruncated
+                ? L.TF(L.Preview_CsvInfoTruncated, displayCount, colCount, totalRows)
+                : L.TF(L.Preview_CsvInfo, displayCount, colCount);
+            SetPreviewInfo(item, info);
+            PreviewHeader.Text = L.TF(L.Preview_CsvHeader, Path.GetFileName(filePath), displayCount, colCount);
+            ShowPreviewPanel();
+        }
+        catch (Exception csvEx)
+        {
+            App.LogDebug("ShowCsvPreview: failed: {0}", csvEx.Message);
+            ShowUnsupportedPreview(null, L.T(L.Preview_CsvFailed));
+        }
+    }
+
+    /// <summary>
+    /// 确保列名合法且唯一：空值替换为"列N"，同名追加后缀。
+    /// </summary>
+    private static string[] MakeUniqueColumnNames(string[] rawHeaders)
+    {
+        var result = new string[rawHeaders.Length];
+        var used = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        for (int i = 0; i < rawHeaders.Length; i++)
+        {
+            var name = string.IsNullOrEmpty(rawHeaders[i]) ? $"列{i + 1}" : rawHeaders[i];
+            // 同名冲突 → 追加 _2, _3...
+            if (used.Contains(name))
+            {
+                int suffix = 2;
+                while (used.Contains($"{name}_{suffix}"))
+                    suffix++;
+                name = $"{name}_{suffix}";
+            }
+            used.Add(name);
+            result[i] = name;
+        }
+        return result;
+    }
+
+    /// <summary>
+    /// 解析一行 CSV，处理引号包裹的字段和转义引号。
+    /// </summary>
+    private static string[] ParseCsvLine(string line)
+    {
+        var fields = new List<string>();
+        int i = 0;
+        while (i < line.Length)
+        {
+            if (line[i] == '"')
+            {
+                // 引号包裹的字段
+                i++;
+                var sb = new StringBuilder();
+                while (i < line.Length)
+                {
+                    if (line[i] == '"')
+                    {
+                        // 转义的引号 ""
+                        if (i + 1 < line.Length && line[i + 1] == '"')
+                        {
+                            sb.Append('"');
+                            i += 2;
+                        }
+                        else
+                        {
+                            i++; // 跳过闭合引号
+                            break;
+                        }
+                    }
+                    else
+                    {
+                        sb.Append(line[i]);
+                        i++;
+                    }
+                }
+                fields.Add(sb.ToString());
+                // 跳过逗号
+                if (i < line.Length && line[i] == ',')
+                    i++;
+            }
+            else
+            {
+                // 普通字段（到逗号或行尾）
+                var sb = new StringBuilder();
+                while (i < line.Length && line[i] != ',')
+                {
+                    sb.Append(line[i]);
+                    i++;
+                }
+                fields.Add(sb.ToString());
+                if (i < line.Length && line[i] == ',')
+                    i++;
+            }
+        }
+        return fields.ToArray();
     }
 
     private async Task ShowHtmlPreview(string filePath, ArchiveItem item)
