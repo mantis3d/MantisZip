@@ -1647,6 +1647,29 @@ public partial class App : Application
     }
 
     /// <summary>
+    /// 日志文件大小上限（10 MB）。超过时自动轮转。
+    /// </summary>
+    private const long MaxLogFileSize = 10L * 1024 * 1024;
+
+    /// <summary>
+    /// 检查日志文件大小，超过上限时自动轮转（添加时间戳后缀）。
+    /// 线程安全：仅在 try-catch 内单次调用，不强制跨方法同步（日志写入不要求强一致性）。
+    /// </summary>
+    private static void RotateDebugLogIfNeeded(string logPath)
+    {
+        try
+        {
+            var fileInfo = new FileInfo(logPath);
+            if (fileInfo.Exists && fileInfo.Length > MaxLogFileSize)
+            {
+                var backupPath = logPath + "." + DateTime.Now.ToString("yyyyMMddHHmmss") + ".bak";
+                File.Move(logPath, backupPath);
+            }
+        }
+        catch { /* 轮转失败不影响继续写入 */ }
+    }
+
+    /// <summary>
     /// 启动/操作日志（写入统一日志文件 %LOCALAPPDATA%\MantisZip\debug.log，不被自动删除）。
     /// 已应用隐私脱敏。
     /// </summary>
@@ -1663,6 +1686,7 @@ public partial class App : Application
             var dir = Path.GetDirectoryName(StartupLog);
             if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
                 Directory.CreateDirectory(dir);
+            RotateDebugLogIfNeeded(StartupLog);
             File.AppendAllText(StartupLog, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}] {redacted}\n");
         }
         catch { }
@@ -1678,6 +1702,7 @@ public partial class App : Application
             var dir = Path.GetDirectoryName(LogFile);
             if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
                 Directory.CreateDirectory(dir);
+            RotateDebugLogIfNeeded(LogFile);
             File.AppendAllText(LogFile, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}] {redacted}\n");
             Debug.WriteLine(redacted);
         }
@@ -1703,6 +1728,7 @@ public partial class App : Application
             var dir = Path.GetDirectoryName(LogFile);
             if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
                 Directory.CreateDirectory(dir);
+            RotateDebugLogIfNeeded(LogFile);
             File.AppendAllText(LogFile, $"[DBG] [{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}] {redacted}\n");
             Debug.WriteLine(redacted);
         }
@@ -1727,6 +1753,7 @@ public partial class App : Application
             var dir = Path.GetDirectoryName(LogFile);
             if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
                 Directory.CreateDirectory(dir);
+            RotateDebugLogIfNeeded(LogFile);
             File.AppendAllText(LogFile, $"[TRACE] [{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}] {redacted}\n");
         }
         catch { }

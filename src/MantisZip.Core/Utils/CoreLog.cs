@@ -91,6 +91,7 @@ internal static class CoreLog
                 Directory.CreateDirectory(dir);
             lock (_lock)
             {
+                RotateIfNeeded();
                 File.AppendAllText(LogPath,
                     $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}] {finalMsg}\n");
             }
@@ -106,6 +107,25 @@ internal static class CoreLog
         Trace(string.Format(fmt, args));
     }
 
+    /// <summary>
+    /// 日志文件大小上限（10 MB）。超过时自动轮转。
+    /// </summary>
+    private const long MaxLogSize = 10L * 1024 * 1024;
+
+    private static void RotateIfNeeded()
+    {
+        try
+        {
+            var fileInfo = new FileInfo(LogPath);
+            if (fileInfo.Exists && fileInfo.Length > MaxLogSize)
+            {
+                var backupPath = LogPath + "." + DateTime.Now.ToString("yyyyMMddHHmmss") + ".bak";
+                File.Move(LogPath, backupPath);
+            }
+        }
+        catch { /* 轮转失败不影响继续写入 */ }
+    }
+
     private static void Write(string msg)
     {
         // 应用脱敏（由 UI 层注入，null=不脱敏）
@@ -119,6 +139,7 @@ internal static class CoreLog
         {
             try
             {
+                RotateIfNeeded();
                 File.AppendAllText(LogPath,
                     $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}] {finalMsg}\n");
             }
