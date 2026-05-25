@@ -199,6 +199,13 @@ public partial class MainWindow : Window
     private void Window_Closing(object sender, System.ComponentModel.CancelEventArgs e)
     {
         SaveWindowSettings();
+        // 释放预览 CancellationTokenSource
+        if (_previewCts != null)
+        {
+            _previewCts.Cancel();
+            _previewCts.Dispose();
+            _previewCts = null;
+        }
     }
 
 #endregion

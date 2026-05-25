@@ -27,6 +27,7 @@ public partial class MainWindow
     #region 文件预览
 
     private bool _webView2Crashed;
+    private bool _webView2Initialized;  // 跟踪是否已订阅事件，避免重复订阅
     private ZoomMode _currentZoomMode = ZoomMode.FitWindow;
     private static readonly SolidColorBrush _toolbarCheckedBrush = new(Color.FromArgb(30, 100, 100, 100));
 
@@ -173,10 +174,13 @@ public partial class MainWindow
             throw;
         }
 
-        // CoreWebView2 刚刚创建，执行完整设置
+        // 已经完成过一次性设置（事件订阅、安全配置），无需重复
+        if (_webView2Initialized)
+            return;
+
         try
         {
-            // 订阅浏览器进程崩溃事件
+            // 订阅浏览器进程崩溃事件（仅一次，CoreWebView2 对象在进程重启后保持不变）
             PreviewWebView2.CoreWebView2!.ProcessFailed += OnWebView2ProcessFailed;
 
             // 安全配置：禁止右键菜单、禁用密码/表单自动填充
@@ -204,6 +208,8 @@ public partial class MainWindow
                         null, 403, "Blocked", null);
                 }
             };
+
+            _webView2Initialized = true;
         }
         catch (Exception ex)
         {
@@ -240,8 +246,12 @@ public partial class MainWindow
 
     private async Task ShowPreviewAsync(ArchiveItem item)
     {
-        // 取消上一次正在进行的预览（避免旧预览完成后覆盖新内容）
-        _previewCts?.Cancel();
+        // 取消并释放上一次的 CancellationTokenSource，避免资源泄漏
+        if (_previewCts != null)
+        {
+            _previewCts.Cancel();
+            _previewCts.Dispose();
+        }
         _previewCts = new CancellationTokenSource();
         var ct = _previewCts.Token;
 
