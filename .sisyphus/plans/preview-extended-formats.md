@@ -649,22 +649,218 @@ private async Task ShowPdfFullContent()
 
 ---
 
+## Phase 5 — 元数据优先提取与两步式预览优化
+
+> **定位**: 在所有 Phase 2/3/4 格式解码器完成后实施的横切面优化。
+> **不依赖魔数检测**，但可与之协同（魔数检测做格式识别，此 Phase 做元数据提前提取）。
+
+### 动机
+
+当前所有格式的执行路径：
+```
+ExtractPreviewFileAsync (完整文件) → ShowXxxPreview (元数据 + 内容一起展示)
+```
+
+**问题**：
+- 对于大文件（如 500MB 的视频），完整的元数据仅需前 100KB，却要解压全部文件
+- 解压和元数据解析串行，用户必须等到完整提取完成才能看到任何信息
+- 纯元数据格式（PE/audio/SQLite/ISO/torrent）实际上不需要提取完整文件
+
+### 目标
+
+将 ShowPreviewAsync 拆分为两阶段：
+```
+① 提取头部 N 字节 → 解析元数据 → 显示信息面板
+②（可选）提取完整文件 → 加载内容面板
+```
+
+### 可行性分析：100KB 头部能拿到什么
+
+| 格式 | 元数据位置 | 100KB 够？ | 备注 |
+|------|-----------|:----------:|------|
+| PE (.exe/.dll) | DOS Header → PE Header | ✅ 绰绰有余 | ~64 字节即可 |
+| PDF | Info dict 在尾部 xref + trailer | ❌ 不够 | 需要头部+尾部各~100KB（双端提取）|
+| Office (docx/xlsx/pptx) | 内部 ZIP 的 `docProps/core.xml` | ⚠️ 看情况 | 取决于 docProps/ 在内部 ZIP 中的偏移 |
+| WAV | RIFF header + fmt chunk | ✅ 绰绰有余 | 前 44 字节 |
+| FLAC | STREAMINFO metadata block | ✅ 绰绰有余 | 前几 KB |
+| SQLite | Header (offset 0–100) | ✅ 绰绰有余 | 前 100 字节 |
+| ISO | Volume Descriptor (sector 16) | ✅ 足够 | ~32KB 偏移，在 100KB 内 |
+| Torrent | Bencoded dict 从文件头开始 | ✅ 足够 | 解析到 info dict 即可停 |
+| MP4 | `moov` box 可能在文件尾部 | ❌ 经常不够 | 非 fast-start 优化的文件 moov 在尾部 |
+| MKV | Segment Info 通常在文件前部 | ✅ 通常够 | EBML 头 + SeekHead + SegmentInfo |
+| AVI | RIFF header + main header | ✅ 足够 | 前几百字节 |
+| JPEG/PNG/GIF/BMP/WebP | 分辨率在文件头 | ✅ 绰绰有余 | 几 KB 内 |
+| TTF/OTF/WOFF | Table Directory 在文件头 | ✅ 足够 | ~12KB |
+| TGA | 18 字节头部 | ✅ 绰绰有余 | |
+| HDR | 分辨率在第一行 | ✅ 足够 | |
+| 文本 (txt/code) | 编码检测仅需前 4KB | ✅ 足够 | 但显示全文仍需要完整提取 |
+| HTML/Markdown/SVG | 元数据没有，需要全文渲染 | ❌ 不适用 | 不是元数据格式 |
+
+**覆盖 14/18 种格式**。PDF 和 MP4 是明显例外，需要特殊处理。
+
+### 引擎限制
+
+| 压缩格式 | 部分提取可行性 | 实现方式 |
+|----------|:------------:|---------|
+| ZIP (Deflate) | ✅ 可以 | 解压流前 N 字节后关闭 |
+| ZIP (Store) | ✅ 可以 | 直接读偏移 |
+| 7z (非固实) | ✅ 可以 | `entry.Extract(stream)` 后截断 |
+| **7z (固实)** | ❌ **无法部分提取** | 固实 block 包含多个文件，不解压完整个 block 拿不到中间条目 |
+| RAR | ✅ 可以 | 同 7z 非固实 |
+| Tar/Gz | ✅ 可以 | TarInputStream 流式读取，读够 N 字节关闭 |
+
+对于 7z 固实，需要 fallback 到：
+1. 基于扩展名判断格式（无魔数检测）
+2. 提取完整文件后再解析元数据
+
+### `ArchiveEntryExtractor` 新增方法
+
+```csharp
+/// <summary>
+/// 提取条目前 maxBytes 字节到临时文件。
+/// 用于元数据优先提取——避免为读取头部而解压整个文件。
+/// </summary>
+public static async Task<string?> ExtractEntryHeadToFileAsync(
+    string archivePath, string entryName, string outputPath,
+    int maxBytes, ArchiveFormat format, string? password = null,
+    CancellationToken ct = default);
+// 返回 null 表示不支持部分提取（如 7z 固实），调用者应 fallback
+```
+
+实现策略：
+
+- **ZIP (Deflate)**: `ZipInputStream.GetNextEntry()` → 开 `DeflateStream` → `CopyToAsync` 累计读取 maxBytes → 关闭
+- **ZIP (Store)**: 直接读取 `LocalFileHeader` 后的偏移，无需解压
+- **7z (非固实)**: `SevenZipExtractor.ExtractFile` → 写 maxBytes 到 `MemoryStream` → 写到磁盘
+- **7z (固实)**: 跳过，返回 `null`，调用者 fallback 到全文件提取
+- **Tar/Gz**: `TarInputStream` 读第一个条目，`CopyToAsync` maxBytes → 关闭
+
+```csharp
+/// <summary>
+/// 提取头部 + 尾部（用于 PDF/MP4 等元数据在尾部的格式）。
+/// </summary>
+public static async Task<(string? headFile, string? tailFile)> ExtractEntryHeadTailToFileAsync(
+    string archivePath, string entryName, string outputDir,
+    int headBytes, int tailBytes, ArchiveFormat format,
+    string? password = null, CancellationToken ct = default);
+```
+
+**注意**: 提取尾部对于 Deflate ZIP 的代价接近全量提取（必须解压完整流才能知道结尾 N 字节）。对于 Store ZIP 可以直接 seek。使用前需要根据实际压缩方法判断是否值得。
+
+### `ShowPreviewAsync` 改造流程
+
+改造后：
+
+```
+ShowPreviewAsync(item)
+  │
+  ├── ① 清理：ClearPreviewContent + ClearPreviewTemp + 清空 InfoPanel
+  │
+  ├── ② 大小检查（MetadataOnlyExtensions 免检）
+  │
+  ├── ③ 显示基础信息面板 + Loading
+  │
+  ├── ④ 提取头部 N 字节（ExtractEntryHeadToFileAsync）
+  │     ├── ZIP → 通常 100KB
+  │     ├── 7z 固实 → 跳过（fallback 到扩展名判断）
+  │     └── 失败 → fallback 到全文件提取
+  │
+  ├── ⑤ 解析元数据 → 填充 PreviewExtraInfoPanel
+  │     └── 调用格式对应的 GetXxxMetadata(headFile) 方法
+  │
+  ├── ⑥ 分类处理：
+  │     ├── 纯元数据格式 (PE/Audio/SQLite/ISO/Torrent/Video)
+  │     │     └── ✅ 完成（不加载内容面板）
+  │     │         注：Video 格式需要时长为内容显示依据，
+  │     │         100KB 头部不够时仍需全文件提取
+  │     │
+  │     ├── 需要内容渲染的格式 (Image/Text/GIF/Font/HTML/MD/SVG)
+  │     │     ├── 取消 Loading
+  │     │     ├── ExtractPreviewFileAsync (全文件，后台进行)
+  │     │     └── 加载内容控件
+  │     │
+  │     └── 需要双端提取的特例 (PDF/MP4)
+  │           ├── ExtractEntryHeadTailToFileAsync
+  │           ├── 解析元数据（补充尾部信息）
+  │           └── → 纯元数据或全量渲染
+  │
+  └── ⑦ finally: HidePreviewLoading
+```
+
+### 工作项
+
+#### 5.1 ArchiveEntryExtractor 新增部分提取方法
+- **文件**: `Core/Utils/ArchiveEntryExtractor.cs`
+- 新增 `ExtractEntryHeadToFileAsync` — ZIP/非固实 7z/Tar/Gz 支持
+- 新增 `ExtractEntryHeadTailToFileAsync` — 用于 PDF/MP4 双端提取
+- 检测 7z 固实并返回 null，由调用者 fallback
+- 为 Deflate ZIP 的 tail 提取添加性能警告注释
+- **预估**: ~3h
+
+#### 5.2 每个格式分解为 GetMetadata + ShowContent
+- 对 Phase 2/3/4 所有格式解码器，要求：
+  - 元数据解析独立为 `static GetXxxMetadata(Stream/byte[]) → Dictionary<string,string>`
+  - 内容加载保持为 `ShowXxxPreview(string filePath, item)`
+- 已有格式（Image/Text/PE/PDF/Audio/SQLite/ISO/Torrent/Video/Office）逐一拆分
+- **预估**: ~1h/格式 × 15+ 格式 = ~15h+
+
+#### 5.3 ShowPreviewAsync 两阶段编排
+- **文件**: `MainWindow.Preview.cs`
+- 修改入口流程为两阶段
+- 头部提取失败 → 静默降级到原全文件流程
+- Loading 状态管理（第一阶段：元数据解析中；第二阶段：内容加载中）
+- **预估**: ~4h
+
+#### 5.4 特殊格式处理：PDF / MP4
+- **文件**: `MainWindow.Preview.cs` + 对应 Parser
+- PDF: 头部 100KB 不够 → 双端提取 → 若 tail 搜不到 xref 则全量提取
+- MP4: head 搜 `ftyp`, tail 搜 `moov` box → 从中解析 `mvhd` 时长
+- **预估**: ~3h
+
+#### 5.5 7z 固实检测与降级
+- **文件**: `Core/Utils/ArchiveEntryExtractor.cs`
+- `SevenZipExtractor` 提供 `IsSolidArchive(stream)` 判断
+- 固实时跳过部分提取，使用扩展名分支逻辑
+- **预估**: ~2h
+
+### 总计预估
+
+| 工作项 | 预估 |
+|--------|------|
+| 5.1 ArchiveEntryExtractor 扩展 | ~3h |
+| 5.2 格式分解 × 15+ | ~15h |
+| 5.3 两阶段编排 | ~4h |
+| 5.4 PDF/MP4 特殊处理 | ~3h |
+| 5.5 7z 固实检测 | ~2h |
+| **合计** | **~27h** |
+
+### 风险与备选
+
+1. **收益取决于用例** — 大部分压缩包内文件 < 10MB，完整提取和头部提取差异不大。大视频/ISO 文件才有显著收益
+2. **7z 固实无法优化** — 固实 7z 永远需要完整提取，这是压缩算法限制，无法绕过
+3. **简化路径** — 如果 Phase 2/3/4 工作量已经很大，Phase 5 可推迟到下一迭代。纯元数据格式当前已经只提取一次，用户体验上差别不大
+4. **PDF 双端提取的代价** — Deflate ZIP 中的 PDF 提取尾部需要解压完整流，实际效果等同于全量提取。Store ZIP 可以优化
+
+---
+
 ## 实施顺序建议
 
 ```
-Phase 0  [工具栏]  → 基础框架，为后续所有格式提供交互
+Phase 0  [工具栏]           → 基础框架，为后续所有格式提供交互
   ↓
-Phase 1  [信息面板] → 信息展示容器，所有格式共用
+Phase 1  [信息面板]          → 信息展示容器，所有格式共用
   ↓
-Phase 2A [信息类格式] → Torrent, PE, PDF, WAV, FLAC, SQLite, ISO, STL, GZ/BZ2/XZ
+Phase 2A [信息类格式]       → Torrent, PE, PDF, WAV, FLAC, SQLite, ISO, STL, GZ/BZ2/XZ
   ↓
-Phase 2B [音频元数据] → MP3 ID3v2
+Phase 2B [音频元数据]       → MP3 ID3v2
   ↓
-Phase 2C [图像解码]  → TGA
+Phase 2C [图像解码]         → TGA
   ↓
-Phase 3  [中等价值]  → SVG, TTF, LNK, DBF, ICO, 字幕, Office, EPUB(封面), HDR, 🎵音频播放, 🎬视频播放
+Phase 3  [中等价值]         → SVG, TTF, LNK, DBF, ICO, 字幕, Office, EPUB(封面), HDR, 🎵音频播放, 🎬视频播放
   ↓
-Phase 4  [高难度]    → PE图标, ICL, MKV, DICOM, 证书, VHD, ...
+Phase 4  [高难度]           → PE图标, ICL, MKV, DICOM, 证书, VHD, ...
+  ↓
+Phase 5  [元数据优先提取]    → 两步式预览优化（格式基础全部完成后）
 ```
 
 每 Phase 可并行开发内部格式（各格式解码器互不依赖）。

@@ -374,3 +374,54 @@ if (FileFormatDetector.Detect(head) == FileFormat.Mp4 && tail != null)
 | MP4 tail 找不到 moov box | 降级显示 "MP4 文件" 无元数据 |
 | `EnableFormatDetection = false` | 回退到当前纯扩展名流程（Plan A 逻辑） |
 | 魔数匹配不到 | 回退扩展名；扩展名也未知 → `FileFormat.Unknown` → "无法识别格式" |
+
+---
+
+## 与两步式预览优化的关系
+
+> 参见 [`preview-extended-formats.md` → Phase 5 — 元数据优先提取与两步式预览优化](preview-extended-formats.md)
+
+### 依赖链
+
+```
+魔数检测 (Plan B)  →  ExtractHeadAsync / ExtractHeadTailAsync 基础设施
+     ↓
+格式解码器 (Phase 2/3/4)  →  每个格式的 GetXxxMetadata(byte[]) 方法
+     ↓
+两步式预览优化 (Phase 5)  →  用以上两者组合实现元数据优先显示
+```
+
+### 共享组件
+
+| 组件 | 魔数检测用途 | 两步式预览用途 |
+|------|-----------|--------------|
+| `ExtractHeadAsync` | 取前 N 字节检测文件真实格式 | 取前 N 字节提取元数据填 InfoPanel |
+| `ExtractHeadTailAsync` | 检测 MP4 的 ftyp + moov | 解析 MP4 时长/分辨率、PDF 尾部 xref |
+| `FileFormatDetector.Detect()` | 判定 FileFormat 枚举 | 辅助判定调用哪个格式解码器 |
+| 7z 固实降级策略 | 固实时跳过 head 检测 | 固实时跳过部分提取，fallback 全量 |
+
+### 关键区别
+
+魔数检测读 head 是**判定格式身份**（PE vs PDF vs ZIP），需要的数据量少（前几十字节通常就够了）。
+
+两步式预览读 head 是**提取元数据**（分辨率、编码、页数等），需要的数据量更大（通常 4KB~100KB），且每个格式有专用的元数据解析方法。
+
+两者共享 `ExtractHeadAsync` 的基础设施，但调用目的和 `maxBytes` 参数不同：
+
+```csharp
+// 魔数检测：仅需少量字节做格式识别
+byte[] head = await ExtractHeadAsync(archivePath, entry, maxBytes: 4096);
+var format = FileFormatDetector.Detect(head);
+if (format == FileFormat.Unknown) format = DetectByExtension(ext);
+
+// 两步式预览：需要更多字节做元数据解析
+string tempHeadFile = await ExtractEntryHeadToFileAsync(
+    archivePath, entry, outputPath, maxBytes: 100 * 1024);
+var metadata = GetPdfMetadata(tempHeadFile);  // 或其它格式的元数据方法
+```
+
+### 实施建议
+
+1. **魔数检测先落地** — 确保 `ExtractHeadAsync` 在所有压缩格式上工作正常
+2. **格式解码器中分离元数据方法** — 在实现各格式时（Phase 2/3/4），有意将元数据解析写成独立的 `GetXxxMetadata(byte[])`，不要和内容加载混在一起
+3. **Phase 5 统一编排** — 最后再用两阶段编排把魔数检测 + 元数据提取 + 内容加载串起来
