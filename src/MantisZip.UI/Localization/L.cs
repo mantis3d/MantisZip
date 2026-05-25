@@ -183,6 +183,7 @@ public static class L
     public const string Main_Status_LoadFailed                     = "Main_Status_LoadFailed";
     public const string Main_Status_Loaded                         = "Main_Status_Loaded";
     public const string Main_Status_Loading                        = "Main_Status_Loading";
+    public const string Main_Status_ProcessingEntries               = "Main_Status_ProcessingEntries";
     public const string Main_Status_NoDragFiles                    = "Main_Status_NoDragFiles";
     public const string Main_Status_NoFilesToExtract               = "Main_Status_NoFilesToExtract";
     public const string Main_Status_PwdMatched                     = "Main_Status_PwdMatched";

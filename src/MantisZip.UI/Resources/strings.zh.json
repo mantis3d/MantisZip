@@ -173,6 +173,7 @@
   "Main_Status_LoadFailed": "加载失败",
   "Main_Status_Loaded": "已加载: {0}",
   "Main_Status_Loading": "正在加载压缩包...",
+  "Main_Status_ProcessingEntries": "正在处理 {0} 个文件…",
   "Main_Status_NoDragFiles": "没有可拖拽的文件",
   "Main_Status_NoFilesToExtract": "没有可提取的文件",
   "Main_Status_PwdMatched": "密码已匹配",

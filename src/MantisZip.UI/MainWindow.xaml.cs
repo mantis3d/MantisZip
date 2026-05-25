@@ -53,7 +53,6 @@ public partial class MainWindow : Window
     private ImageAnimationController? _gifController;
     private TextBox? _gifFrameInput;
     private TextBlock? _gifFrameTotal;
-    private bool _fontLigaturesEnabled;
 
     public MainWindow()
     {
@@ -285,10 +284,21 @@ public partial class MainWindow : Window
                 return;
             }
 
+            // Show loading overlay before potentially slow ListEntriesAsync
+            FileListPanel.Visibility = Visibility.Visible;
+            ArchiveLoadingOverlay.Visibility = Visibility.Visible;
+            ArchiveLoadingBar.IsIndeterminate = true;
+            ArchiveLoadingText.Text = L.T(L.Main_Status_Loading);
+            ArchiveLoadingPercent.Text = "";
+            DropHint.Visibility = Visibility.Collapsed;
+
             _currentFormat = GetFormatByExtension(archivePath);
             _archiveComment = ReadArchiveComment(archivePath, _currentFormat);
 
             var items = await engine.ListEntriesAsync(archivePath);
+
+            // Update overlay to show entry count
+            ArchiveLoadingText.Text = L.TF(L.Main_Status_ProcessingEntries, items.Count);
 
             // 检测加密条目 → 自动尝试匹配已保存的密码
             _currentPassword = null;
@@ -370,8 +380,7 @@ public partial class MainWindow : Window
             // 显示根目录内容
             FilterFiles("");
 
-            FileListPanel.Visibility = Visibility.Visible;
-            DropHint.Visibility = Visibility.Collapsed;
+            ArchiveLoadingOverlay.Visibility = Visibility.Collapsed;
 
             ArchiveNameText.Text = Path.GetFileName(archivePath);
             var totalSize = items.Sum(i => i.Size);
@@ -403,6 +412,11 @@ public partial class MainWindow : Window
             UpdateAddDeleteBtnState();
             UpdateSmartExtractBtnState();
             SetStatus(L.T(L.Main_Status_LoadFailed));
+
+            // Reset UI state on error
+            ArchiveLoadingOverlay.Visibility = Visibility.Collapsed;
+            FileListPanel.Visibility = Visibility.Collapsed;
+            DropHint.Visibility = Visibility.Visible;
         }
     }
 

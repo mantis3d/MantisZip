@@ -278,6 +278,27 @@
                                             Height="4" Background="Transparent"
                                             HorizontalAlignment="Stretch" VerticalAlignment="Center"
                                             Visibility="Collapsed" Grid.ColumnSpan="5"/>
+
+                                <!-- Loading overlay while opening archive -->
+                                <Border x:Name="ArchiveLoadingOverlay" Grid.Row="0" Grid.ColumnSpan="5"
+                                        Background="{StaticResource Theme_WindowBg}"
+                                        Visibility="Collapsed">
+                                    <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
+                                        <TextBlock x:Name="ArchiveLoadingText"
+                                                   FontSize="16"
+                                                   Foreground="{StaticResource Theme_TextDisabled}"
+                                                   HorizontalAlignment="Center"/>
+                                        <ProgressBar x:Name="ArchiveLoadingBar" Width="240" Height="6"
+                                                     IsIndeterminate="True"
+                                                     Margin="0,16,0,0"
+                                                     Foreground="{StaticResource Theme_Accent}"/>
+                                        <TextBlock x:Name="ArchiveLoadingPercent"
+                                                   FontSize="11"
+                                                   Foreground="{StaticResource Theme_TextDisabled}"
+                                                   HorizontalAlignment="Center"
+                                                   Margin="0,4,0,0"/>
+                                    </StackPanel>
+                                </Border>
                             </Grid>
 
                             <!-- Vertical Splitter for Pos 4 (Right preview) -->
@@ -356,6 +377,9 @@
                                                      ScrollViewer.VerticalScrollBarVisibility="Auto"
                                                      Visibility="Collapsed"/>
 
+                                            <!-- Tabular Preview Container (CSV/SQLite/etc) -->
+                                            <Grid x:Name="PreviewTabularContainer" Visibility="Collapsed"/>
+
                                             <!-- CSV Grid Preview -->
                                             <DataGrid x:Name="PreviewCsvGrid"
                                                       AutoGenerateColumns="True"
@@ -365,7 +389,7 @@
                                                       CanUserReorderColumns="True"
                                                       CanUserResizeColumns="True"
                                                       CanUserSortColumns="True"
-                                                      GridLinesVisibility="Horizontal"
+GridLinesVisibility="All"
                                                       HeadersVisibility="Column"
                                                       RowHeaderWidth="0"
                                                       Visibility="Collapsed"

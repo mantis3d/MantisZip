@@ -173,6 +173,7 @@
   "Main_Status_LoadFailed": "Load failed",
   "Main_Status_Loaded": "Loaded: {0}",
   "Main_Status_Loading": "Loading archive...",
+  "Main_Status_ProcessingEntries": "Processing {0} entries…",
   "Main_Status_NoDragFiles": "No files to drag",
   "Main_Status_NoFilesToExtract": "No files to extract",
   "Main_Status_PwdMatched": "Password matched",
