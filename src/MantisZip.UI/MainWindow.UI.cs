@@ -123,7 +123,20 @@ public partial class MainWindow
 
     private void FolderTree_SelectedItemChanged(object sender, RoutedPropertyChangedEventArgs<object> e)
     {
-        if (FolderTree.SelectedItem is FolderNode node) FilterFiles(node.FullPath);
+        if (FolderTree.SelectedItem is FolderNode node)
+        {
+            FilterFiles(node.FullPath);
+            // 同时更新预览区为目录预览（之前只有 FilterFiles，不会触发预览更新）
+            var dirItem = new ArchiveItem
+            {
+                Name = node.FullPath + "/",
+                FullPath = node.FullPath,
+                IsDirectory = true,
+                Size = 0,
+                CompressedSize = 0,
+            };
+            ShowDirectoryPreview(dirItem);
+        }
     }
 
     private void FilterFiles(string folderPath)

@@ -91,8 +91,7 @@ public static class SQLiteParser
 
             var fi = new FileInfo(filePath);
             string pageSizeDisplay = pageSize >= 1024 ? $"{pageSize / 1024} KB" : $"{pageSize} B";
-            string additional = $"编码: {encoding} | 页大小: {pageSizeDisplay}";
-            if (pageCount > 0) additional += $" | 总页数: {pageCount}";
+            string pageInfo = pageCount > 0 ? $"页大小: {pageSizeDisplay} | 总页数: {pageCount}" : $"页大小: {pageSizeDisplay}";
 
             return new FileFormatInfo
             {
@@ -104,7 +103,7 @@ public static class SQLiteParser
                 EntryCount = (int)pageCount,
                 TableCount = tableCount,
                 TableNames = tableNames,
-                AdditionalInfo = additional,
+                AdditionalInfo = pageInfo,
             };
         }
         catch (Exception ex) { CoreLog.Info($"SQLiteParser.Parse failed: {ex.Message}"); return null; }

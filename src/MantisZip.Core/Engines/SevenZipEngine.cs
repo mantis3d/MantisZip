@@ -122,6 +122,10 @@ public class SevenZipEngine : IArchiveEngine
             }
 
             {
+                // 统计非目录条目数（用于文件计数显示）
+                int totalFiles = allEntries.Count(e => !e.IsFolder);
+                int processedFiles = 0;
+
                 // 第二遍：从已收集的列表中逐条目提取（支持密码 + 冲突处理）
                 var lastReportTime = DateTime.Now;
                 var reportInterval = TimeSpan.FromMilliseconds(100);
@@ -155,7 +159,9 @@ public class SevenZipEngine : IArchiveEngine
                     {
                         CurrentFile = entry.FileName,
                         PercentComplete = pct,
-                        FilePercentComplete = 0
+                        FilePercentComplete = 0,
+                        TotalFiles = totalFiles,
+                        ProcessedFiles = processedFiles
                     });
 
                     // 用流方式提取
@@ -168,6 +174,8 @@ public class SevenZipEngine : IArchiveEngine
                     try { File.SetLastWriteTime(resolvedPath, entryModified); }
                     catch (Exception tsEx) { CoreLog.Info($"ExtractAsync: failed to set timestamp on {resolvedPath}: {tsEx.Message}"); }
 
+                    processedFiles++;
+
                     // 文件完成时再报告一次
                     now = DateTime.Now;
                     if (now - lastReportTime >= reportInterval || i == totalEntries - 1)
@@ -176,7 +184,9 @@ public class SevenZipEngine : IArchiveEngine
                         {
                             CurrentFile = entry.FileName,
                             PercentComplete = totalEntries > 0 ? (double)(i + 1) / totalEntries * 100 : 100,
-                            FilePercentComplete = 100
+                            FilePercentComplete = 100,
+                            TotalFiles = totalFiles,
+                            ProcessedFiles = processedFiles
                         });
                         lastReportTime = now;
                     }
@@ -185,7 +195,9 @@ public class SevenZipEngine : IArchiveEngine
                 progress?.Report(new ArchiveProgress
                 {
                     CurrentFile = string.Empty,
-                    PercentComplete = 100
+                    PercentComplete = 100,
+                    TotalFiles = totalFiles,
+                    ProcessedFiles = processedFiles
                 });
             }
 

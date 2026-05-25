@@ -201,6 +201,8 @@ public class ZipEngine : IArchiveEngine
             CoreLog.Info($"CompressAsync: {files.Count} files to compress, {totalBytes} bytes total");
 
             long processedBytes = 0;
+            int totalFiles = files.Count;
+            int processedFiles = 0;
 
             try
             {
@@ -225,11 +227,28 @@ public class ZipEngine : IArchiveEngine
 
                     // 带重试/跳过/中止的文件读取
                     if (!ReadFileWithRetry(fullPath, relativePath, options, zipStream,
-                            ref processedBytes, totalBytes, cancellationToken, progress, ref lastReportTime))
+                            ref processedBytes, totalBytes, totalFiles, ref processedFiles,
+                            cancellationToken, progress, ref lastReportTime))
                     {
                         if (cancellationToken.IsCancellationRequested) break;
                         // skip 此文件，继续下一个
                         continue;
+                    }
+
+                    // 文件压缩完成后上报文件计数（确保 0 字节文件也能刷新计数）
+                    var now = DateTime.Now;
+                    if (now - lastReportTime >= reportInterval)
+                    {
+                        var pct = totalBytes > 0 ? (double)processedBytes / totalBytes * 100 : 0;
+                        progress?.Report(new ArchiveProgress
+                        {
+                            CurrentFile = "正在压缩: " + relativePath,
+                            PercentComplete = pct,
+                            FilePercentComplete = 100,
+                            TotalFiles = totalFiles,
+                            ProcessedFiles = processedFiles
+                        });
+                        lastReportTime = now;
                     }
                 }
             }
@@ -403,7 +422,9 @@ public class ZipEngine : IArchiveEngine
             {
                 CurrentFile = totalNewFiles > 0 ? Path.GetFileName(files[0].EntryName) : "",
                 PercentComplete = 0,
-                FilePercentComplete = 0
+                FilePercentComplete = 0,
+                TotalFiles = totalNewFiles,
+                ProcessedFiles = 0
             });
             CoreLog.Trace("[TRACE] ZipEngine.AddToArchiveAsync: reported 0%");
             for (int i = 0; i < totalNewFiles; i++)
@@ -421,7 +442,9 @@ public class ZipEngine : IArchiveEngine
                 {
                     CurrentFile = entryName,
                     PercentComplete = overallPct,
-                    FilePercentComplete = filePct
+                    FilePercentComplete = filePct,
+                    TotalFiles = totalNewFiles,
+                    ProcessedFiles = i + 1
                 });
                 CoreLog.Trace($"[TRACE] ZipEngine.AddToArchiveAsync: reported overall={overallPct:F1}%, file={filePct:F0}% for '{entryName}'");
             }
@@ -434,7 +457,9 @@ public class ZipEngine : IArchiveEngine
             {
                 CurrentFile = "",
                 PercentComplete = 100,
-                FilePercentComplete = 100
+                FilePercentComplete = 100,
+                TotalFiles = totalNewFiles,
+                ProcessedFiles = totalNewFiles
             });
 
             CoreLog.Info($"AddToArchiveAsync: done, {totalNewFiles} files added ({oldEntryCount} old entries kept), {sw.ElapsedMilliseconds}ms");
@@ -521,6 +546,7 @@ public class ZipEngine : IArchiveEngine
     /// </summary>
     private bool ReadFileWithRetry(string fullPath, string relativePath,
         ArchiveOptions options, ZipOutputStream zipStream, ref long processedBytes, long totalBytes,
+        int totalFiles, ref int processedFiles,
         CancellationToken ct, IProgress<ArchiveProgress>? progress, ref DateTime lastReportTime)
     {
         int retries = 3;
@@ -561,12 +587,15 @@ public class ZipEngine : IArchiveEngine
                             {
                                 CurrentFile = "正在压缩: " + relativePath,
                                 PercentComplete = pct,
-                                FilePercentComplete = filePct
+                                FilePercentComplete = filePct,
+                                TotalFiles = totalFiles,
+                                ProcessedFiles = processedFiles
                             });
                             lastReportTime = now;
                         }
                     }
                 }
+                processedFiles++;
                 return true; // success
             }
             catch (OperationCanceledException) { throw; }

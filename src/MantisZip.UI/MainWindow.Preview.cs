@@ -15,6 +15,7 @@ using MantisZip.Core;
 using MantisZip.Core.Abstractions;
 using MantisZip.Core.Utils;
 using Markdig;
+using Markdig.Extensions.Emoji;
 using Ude;
 using WpfAnimatedGif;
 using Microsoft.Web.WebView2.Core;
@@ -28,6 +29,21 @@ public partial class MainWindow
 
     private bool _webView2Crashed;
     private bool _webView2Initialized;  // 跟踪是否已订阅事件，避免重复订阅
+
+    // Markdown 预览状态（用于 emoji 切换后重新渲染）
+    private bool _markdownEmojiEnabled;
+    private string? _cachedMarkdownPath;
+    private ArchiveItem? _cachedMarkdownItem;
+    private static Dictionary<string, string>? _emojiMapping;  // 缓存 emoji 映射表
+    private int _markdownPreviewFontSize = 14;  // Markdown 预览字号基准
+
+    // 源码/渲染切换
+    private enum PreviewSourceFormat { None, Markdown, Html }
+    private PreviewSourceFormat _previewSourceFormat;
+    private bool _previewShowSource;
+    private string? _cachedHtmlPath;
+    private ArchiveItem? _cachedHtmlItem;
+
     private ZoomMode _currentZoomMode = ZoomMode.FitWindow;
     private static readonly SolidColorBrush _toolbarCheckedBrush = new(Color.FromArgb(30, 100, 100, 100));
 
@@ -115,7 +131,7 @@ public partial class MainWindow
 
     private static readonly HashSet<string> VideoExtensions = new(StringComparer.OrdinalIgnoreCase)
     {
-        ".mp4", ".mkv", ".avi"
+        ".mp4", ".mkv", ".avi", ".flv"
     };
 
     /// <summary>只需读取文件头的格式，不受 MaxPreviewFileSize 限制。</summary>
@@ -155,6 +171,8 @@ public partial class MainWindow
     /// </summary>
     /// <summary>
     /// 确保 WebView2 已初始化（CoreWebView2 可用）。浏览器进程崩溃后会重新初始化。
+    /// 通过 WebResourceRequested 事件阻止页面级别的外部网络请求。
+    /// 注意：WebView2 运行时自身的初始化联网（SmartScreen/遥测/组件更新）无法通过这些方式拦截。
     /// </summary>
     private async Task EnsureWebView2InitializedAsync()
     {
@@ -197,7 +215,7 @@ public partial class MainWindow
                 CoreWebView2PdfToolbarItems.MoreSettings |
                 CoreWebView2PdfToolbarItems.FullScreen;
 
-            // 阻止所有外部网络请求（只允许 file:// 本地文件）
+            // 阻止页面级别的外部网络请求（http/https），不影响 WebView2 运行时自身的联网行为
             PreviewWebView2.CoreWebView2.AddWebResourceRequestedFilter("*", CoreWebView2WebResourceContext.All);
             PreviewWebView2.CoreWebView2.WebResourceRequested += (s, e) =>
             {
@@ -240,6 +258,7 @@ public partial class MainWindow
         PreviewTextBox.Visibility = Visibility.Collapsed;
         PreviewFileIcon.Visibility = Visibility.Collapsed;
         PreviewCsvGrid.Visibility = Visibility.Collapsed;
+        PreviewTabularContainer.Visibility = Visibility.Collapsed;
         PreviewUnsupportedPanel.Visibility = Visibility.Collapsed;
         PreviewWebView2.Visibility = Visibility.Collapsed;
     }
@@ -366,7 +385,7 @@ public partial class MainWindow
             else if (SqliteExtensions.Contains(ext))
             {
                 var tempFile = await ExtractPreviewFileAsync(item, "preview" + ext, ct);
-                ShowSqlitePreview(tempFile, item);
+                await ShowSqlitePreview(tempFile, item);
             }
             else if (IsoExtensions.Contains(ext))
             {
@@ -497,6 +516,34 @@ public partial class MainWindow
                 AddGifFrameInput();
                 ApplyZoom(ZoomMode.FitWindow); // 初始化按钮选中态
                 return;
+            }
+
+            // ICO — 多图标展示
+            if (ext == ".ico")
+            {
+                var icoFrames = await Task.Run(() =>
+                {
+                    var decoder = System.Windows.Media.Imaging.BitmapDecoder.Create(
+                        new Uri(filePath),
+                        System.Windows.Media.Imaging.BitmapCreateOptions.DelayCreation,
+                        System.Windows.Media.Imaging.BitmapCacheOption.None);
+                    var list = new List<(System.Windows.Media.Imaging.BitmapSource frame, int w, int h)>();
+                    for (int i = 0; i < decoder.Frames.Count; i++)
+                    {
+                        var frame = decoder.Frames[i];
+                        if (frame.CanFreeze) frame.Freeze();
+                        list.Add((frame, frame.PixelWidth, frame.PixelHeight));
+                    }
+                    list.Sort((a, b) => (b.w * b.h).CompareTo(a.w * a.h)); // 大尺寸排前面
+                    return list;
+                });
+
+                if (icoFrames.Count > 1)
+                {
+                    ShowIcoGallery(icoFrames, filePath, item);
+                    return;
+                }
+                // 单帧 ICO 走到普通图片流程
             }
 
             // 普通图片 — 后台线程解码，不阻塞 UI
@@ -663,6 +710,74 @@ public partial class MainWindow
     /// 用 DataGrid 展示 CSV 文件内容。首行作为列标题，后续行作为数据行。
     /// 行列均有限制（最多 100 行 × 100 列）以防止大表格拖垮 WPF DataGrid。
     /// </summary>
+    /// <summary>
+    /// 共享方法：用 DataGrid 展示表格数据（行列上限：100 行 × 100 列）。
+    /// CSV / SQLite / Office 等格式的表格预览共用此方法。
+    /// </summary>
+    private void ShowTablePreview(System.Data.DataTable table, ArchiveItem item, string title, string? info = null)
+    {
+        PreviewCsvGrid.ItemsSource = table.DefaultView;
+        HideAllPreviewControls();
+        PreviewCsvGrid.Visibility = Visibility.Visible;
+        SetPreviewInfo(item, info);
+        PreviewHeader.Text = title;
+        ShowPreviewPanel();
+    }
+
+    /// <summary>
+    /// 共享方法：用 TabControl 展示多个表格（SQLite 多表）。
+    /// 每个标签页内嵌一个 DataGrid。
+    /// </summary>
+    private void ShowMultiTablePreview(List<TableData> tables, ArchiveItem item, string title, string? info = null)
+    {
+        PreviewTabularContainer.Children.Clear();
+
+        var tabControl = new TabControl
+        {
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+            VerticalAlignment = VerticalAlignment.Stretch,
+        };
+
+        foreach (var table in tables)
+        {
+            var dataGrid = new DataGrid
+            {
+                AutoGenerateColumns = true,
+                IsReadOnly = true,
+                CanUserAddRows = false,
+                CanUserDeleteRows = false,
+                CanUserReorderColumns = true,
+                CanUserResizeColumns = true,
+                CanUserSortColumns = true,
+                GridLinesVisibility = DataGridGridLinesVisibility.Horizontal,
+                HeadersVisibility = DataGridHeadersVisibility.Column,
+                RowHeaderWidth = 0,
+                BorderThickness = new Thickness(0),
+                Background = Brushes.Transparent,
+                FontSize = 12,
+                MinColumnWidth = 60,
+                HorizontalAlignment = HorizontalAlignment.Stretch,
+                VerticalAlignment = VerticalAlignment.Stretch,
+                ItemsSource = table.Data.DefaultView,
+            };
+
+            var tabItem = new TabItem
+            {
+                Header = table.Name,
+                Content = dataGrid,
+            };
+            tabControl.Items.Add(tabItem);
+        }
+
+        PreviewTabularContainer.Children.Add(tabControl);
+
+        HideAllPreviewControls();
+        PreviewTabularContainer.Visibility = Visibility.Visible;
+        SetPreviewInfo(item, info);
+        PreviewHeader.Text = title;
+        ShowPreviewPanel();
+    }
+
     private void ShowCsvPreview(string filePath, ArchiveItem item)
     {
         try
@@ -726,17 +841,11 @@ public partial class MainWindow
                 table.Rows.Add(dataRow);
             }
 
-            PreviewCsvGrid.ItemsSource = table.DefaultView;
-
-            HideAllPreviewControls();
-            PreviewCsvGrid.Visibility = Visibility.Visible;
-
             var info = rowsTruncated
                 ? L.TF(L.Preview_CsvInfoTruncated, displayCount, colCount, totalRows)
                 : L.TF(L.Preview_CsvInfo, displayCount, colCount);
-            SetPreviewInfo(item, info);
-            PreviewHeader.Text = L.TF(L.Preview_CsvHeader, Path.GetFileName(filePath), displayCount, colCount);
-            ShowPreviewPanel();
+            var title = L.TF(L.Preview_CsvHeader, Path.GetFileName(filePath), displayCount, colCount);
+            ShowTablePreview(table, item, title, info);
         }
         catch (Exception csvEx)
         {
@@ -829,12 +938,34 @@ public partial class MainWindow
 
     private async Task ShowHtmlPreview(string filePath, ArchiveItem item)
     {
+        _cachedHtmlPath = filePath;
+        _cachedHtmlItem = item;
+        _previewSourceFormat = PreviewSourceFormat.Html;
+
         await EnsureWebView2InitializedAsync();
         HideAllPreviewControls();
-        PreviewWebView2.CoreWebView2.Navigate(new Uri(filePath).AbsoluteUri);
-        PreviewWebView2.Visibility = Visibility.Visible;
+
+        if (_previewShowSource)
+        {
+            PreviewTextBox.Text = File.ReadAllText(filePath);
+            PreviewTextBox.FontSize = AppSettings.Instance.TextPreviewFontSize;
+            PreviewTextBox.TextAlignment = TextAlignment.Left;
+            PreviewTextBox.Visibility = Visibility.Visible;
+        }
+        else
+        {
+            PreviewWebView2.CoreWebView2.Navigate(new Uri(filePath).AbsoluteUri);
+            PreviewWebView2.Visibility = Visibility.Visible;
+        }
+
         SetPreviewInfo(item, L.T(L.Preview_HtmlInfo));
         PreviewHeader.Text = L.TF(L.Preview_HtmlHeader, Path.GetFileName(filePath));
+        SetToolbar(
+            Array.Empty<ToolbarButton>(),
+            new[] {
+                new ToolbarButton { Text = "</>", Tooltip = L.T(L.Preview_ToggleSource), IsToggle = true, IsChecked = _previewShowSource, OnClick = TogglePreviewSource },
+            }
+        );
         ShowPreviewPanel();
     }
 
@@ -842,44 +973,43 @@ public partial class MainWindow
     {
         try
         {
-            var mdContent = File.ReadAllText(filePath);
-            var pipeline = new MarkdownPipelineBuilder()
-                .UsePipeTables()
-                .UseEmphasisExtras()
-                .UseTaskLists()
-                .UseAutoIdentifiers()
-                .UseEmojiAndSmiley()
-                .Build();
-            var html = Markdig.Markdown.ToHtml(mdContent, pipeline);
-            // 包裹基本样式以便阅读，增加暗色主题支持
-            var styledHtml = $@"<!DOCTYPE html>
-<html>
-<head><meta charset='utf-8'/>
-<style>
-  body {{ font-family: system-ui, sans-serif; font-size: 14px; line-height: 1.6; padding: 16px; color: #222; background: #fff; }}
-  @media (prefers-color-scheme: dark) {{
-    body {{ color: #e0e0e0; background: #1e1e1e; }}
-    pre {{ background: #2d2d2d; }}
-    code {{ background: #2d2d2d; }}
-    td, th {{ border-color: #444; }}
-  }}
-  pre {{ background: #f4f4f4; padding: 12px; border-radius: 4px; overflow-x: auto; }}
-  code {{ background: #f0f0f0; padding: 2px 4px; border-radius: 2px; font-family: Consolas, monospace; }}
-  pre code {{ background: none; padding: 0; }}
-  img {{ max-width: 100%; }}
-  table {{ border-collapse: collapse; }}
-  td, th {{ border: 1px solid #ccc; padding: 6px 10px; }}
-</style></head>
-<body>{html}</body></html>";
+            // 缓存状态，供 emoji 切换/源码切换后重新渲染
+            _cachedMarkdownPath = filePath;
+            _cachedMarkdownItem = item;
+            _previewSourceFormat = PreviewSourceFormat.Markdown;
 
-            var tempHtml = Path.Combine(Path.GetDirectoryName(filePath) ?? _previewTempDir!, "markdown_preview.html");
-            File.WriteAllText(tempHtml, styledHtml);
-            await EnsureWebView2InitializedAsync();
-            PreviewWebView2.CoreWebView2.Navigate(new Uri(tempHtml).AbsoluteUri);
             HideAllPreviewControls();
-            PreviewWebView2.Visibility = Visibility.Visible;
+
+            if (_previewShowSource)
+            {
+                PreviewTextBox.Text = File.ReadAllText(filePath);
+                PreviewTextBox.FontSize = _markdownPreviewFontSize;
+                PreviewTextBox.TextAlignment = TextAlignment.Left;
+                PreviewTextBox.Visibility = Visibility.Visible;
+            }
+            else
+            {
+                var html = await RenderMarkdownToHtmlAsync(filePath);
+                var tempHtml = Path.Combine(Path.GetDirectoryName(filePath) ?? _previewTempDir!, "markdown_preview.html");
+                File.WriteAllText(tempHtml, html);
+                await EnsureWebView2InitializedAsync();
+                PreviewWebView2.CoreWebView2.Navigate(new Uri(tempHtml).AbsoluteUri);
+                PreviewWebView2.Visibility = Visibility.Visible;
+            }
+
             SetPreviewInfo(item, "📝 Markdown");
             PreviewHeader.Text = L.TF(L.Preview_MarkdownHeader, Path.GetFileName(filePath));
+            // 工具栏：左侧字号 ± ，右侧 源码切换 + emoji 短代码切换
+            SetToolbar(
+                new[] {
+                    new ToolbarButton { Text = "A−", Tooltip = L.T(L.Preview_FontDecrease), OnClick = () => ChangeMarkdownFontSize(-1) },
+                    new ToolbarButton { Text = "A+", Tooltip = L.T(L.Preview_FontIncrease), OnClick = () => ChangeMarkdownFontSize(1) },
+                },
+                new[] {
+                    new ToolbarButton { Text = "</>", Tooltip = L.T(L.Preview_ToggleSource), IsToggle = true, IsChecked = _previewShowSource, OnClick = TogglePreviewSource },
+                    new ToolbarButton { Text = "😊", Tooltip = "Emoji 短代码转换", IsToggle = true, IsChecked = _markdownEmojiEnabled, OnClick = ToggleMarkdownEmoji },
+                }
+            );
             ShowPreviewPanel();
         }
         catch (Exception mdEx)
@@ -887,6 +1017,170 @@ public partial class MainWindow
             App.LogDebug("ShowMarkdownPreview: failed: {0}", mdEx.Message);
             ShowUnsupportedPreview(null, "无法解析 Markdown 文件");
         }
+    }
+
+    /// <summary>
+    /// 渲染 Markdown → HTML。若 <see cref="_markdownEmojiEnabled"/> 开启，
+    /// 先替换 :emoji: 短代码为 Unicode 字符，再交由 Markdig 处理。
+    /// 注意：不可直接在 pipeline 中使用 UseEmojiAndSmiley()，
+    /// 因为它会把 :---: 表格对齐标记也误识别为 emoji 短代码，破坏所有 pipe table 渲染。
+    /// </summary>
+    private Task<string> RenderMarkdownToHtmlAsync(string filePath)
+    {
+        var mdContent = File.ReadAllText(filePath);
+        if (_markdownEmojiEnabled)
+            mdContent = ApplyEmojiShortcodes(mdContent);
+
+        var pipeline = new MarkdownPipelineBuilder()
+            .UsePipeTables()
+            .UseEmphasisExtras()
+            .UseTaskLists()
+            .UseAutoIdentifiers(Markdig.Extensions.AutoIdentifiers.AutoIdentifierOptions.GitHub)
+            .Build();
+
+        var html = Markdig.Markdown.ToHtml(mdContent, pipeline);
+
+        // 根据应用主题选择颜色，使 markdown 渲染与 WPF 主题同步
+        var isDark = AppSettings.Instance.Theme == "Dark";
+        var bodyFg = isDark ? "#e0e0e0" : "#222";
+        var bodyBg = isDark ? "#1e1e1e" : "#fff";
+        var codeBg = isDark ? "#2d2d2d" : "#f0f0f0";
+        var preBg = isDark ? "#2d2d2d" : "#f4f4f4";
+        var borderColor = isDark ? "#444" : "#ccc";
+
+        return Task.FromResult($@"<!DOCTYPE html>
+<html>
+<head><meta charset='utf-8'/>
+<style>
+  body {{ font-family: system-ui, sans-serif; font-size: {_markdownPreviewFontSize}px; line-height: 1.6; padding: 16px; color: {bodyFg}; background: {bodyBg}; }}
+  pre {{ background: {preBg}; padding: 12px; border-radius: 4px; overflow-x: auto; }}
+  code {{ background: {codeBg}; padding: 2px 4px; border-radius: 2px; font-family: Consolas, monospace; }}
+  pre code {{ background: none; padding: 0; }}
+  img {{ max-width: 100%; }}
+  table {{ border-collapse: collapse; }}
+  td, th {{ border: 1px solid {borderColor}; padding: 6px 10px; }}
+</style></head>
+<body>{html}</body></html>");
+    }
+
+    /// <summary>
+    /// 用 Markdig 内置的 emoji 短代码 → Unicode 映射表替换文本中的 :emoji: 模式。
+    /// 替换前先保护代码块内容（行内反引号、围栏代码块），避免代码内的短代码被误转换。
+    /// </summary>
+    private static string ApplyEmojiShortcodes(string markdown)
+    {
+        var mapping = GetEmojiMapping();
+        if (mapping == null || mapping.Count == 0) return markdown;
+
+        // 1. 找出所有代码块片段并替换为占位符
+        //    占位符用 %%EMOJI_PH_{n}%% ，不含 : 冒号，不会被 emoji 正则匹配到
+        var fragments = new List<string>();
+        var phRegex = new System.Text.RegularExpressions.Regex(@"```[\s\S]*?```|`[^`]*`");
+        int phIndex = 0;
+        markdown = phRegex.Replace(markdown, match =>
+        {
+            fragments.Add(match.Value);
+            return $"%%EMOJI_PH_{phIndex++}%%";
+        });
+
+        // 2. 替换 emoji 短代码
+        markdown = System.Text.RegularExpressions.Regex.Replace(markdown,
+            @":[a-zA-Z0-9_+]+(?::[a-zA-Z0-9_+]+)*:",
+            match => mapping.TryGetValue(match.Value, out var emoji) ? emoji : match.Value);
+
+        // 3. 恢复代码块
+        for (int i = 0; i < fragments.Count; i++)
+            markdown = markdown.Replace($"%%EMOJI_PH_{i}%%", fragments[i]);
+
+        return markdown;
+    }
+
+    private static Dictionary<string, string> GetEmojiMapping()
+    {
+        if (_emojiMapping == null)
+            _emojiMapping = (Dictionary<string, string>)EmojiMapping.GetDefaultEmojiShortcodeToUnicode();
+        return _emojiMapping;
+    }
+
+    private async void ToggleMarkdownEmoji()
+    {
+        _markdownEmojiEnabled = !_markdownEmojiEnabled;
+        await ReRenderMarkdownAsync();
+    }
+
+    /// <summary>
+    /// 切换源码/渲染预览模式。
+    /// 在源码模式下显示文件原始内容（PreviewTextBox），隐藏 WebView2；
+    /// 切回渲染模式时重新渲染（Markdown）或重新导航（HTML）。
+    /// </summary>
+    private async void TogglePreviewSource()
+    {
+        _previewShowSource = !_previewShowSource;
+
+        if (_previewShowSource)
+        {
+            // 切到源码：确定当前显示的是哪个文件
+            string? sourcePath = _previewSourceFormat switch
+            {
+                PreviewSourceFormat.Markdown => _cachedMarkdownPath,
+                PreviewSourceFormat.Html => _cachedHtmlPath,
+                _ => null
+            };
+
+            if (sourcePath != null && File.Exists(sourcePath))
+            {
+                PreviewWebView2.Visibility = Visibility.Collapsed;
+                PreviewTextBox.Text = File.ReadAllText(sourcePath);
+                PreviewTextBox.FontSize = AppSettings.Instance.TextPreviewFontSize;
+                PreviewTextBox.TextAlignment = TextAlignment.Left;
+                PreviewTextBox.Visibility = Visibility.Visible;
+            }
+        }
+        else
+        {
+            // 切回渲染
+            PreviewTextBox.Visibility = Visibility.Collapsed;
+
+            switch (_previewSourceFormat)
+            {
+                case PreviewSourceFormat.Markdown:
+                    await ReRenderMarkdownAsync();
+                    PreviewWebView2.Visibility = Visibility.Visible;
+                    break;
+                case PreviewSourceFormat.Html:
+                    if (PreviewWebView2.CoreWebView2 != null)
+                        PreviewWebView2.CoreWebView2.Navigate(new Uri(_cachedHtmlPath!).AbsoluteUri);
+                    PreviewWebView2.Visibility = Visibility.Visible;
+                    break;
+            }
+        }
+    }
+
+    private async Task ReRenderMarkdownAsync()
+    {
+        if (_cachedMarkdownPath == null || _cachedMarkdownItem == null)
+            return;
+
+        try
+        {
+            var html = await RenderMarkdownToHtmlAsync(_cachedMarkdownPath);
+            var tempHtml = Path.Combine(Path.GetDirectoryName(_cachedMarkdownPath) ?? _previewTempDir!, "markdown_preview.html");
+            File.WriteAllText(tempHtml, html);
+            if (PreviewWebView2.CoreWebView2 != null)
+                PreviewWebView2.CoreWebView2.Navigate(new Uri(tempHtml).AbsoluteUri);
+        }
+        catch (Exception ex)
+        {
+            App.LogDebug("ReRenderMarkdownAsync: failed: {0}", ex.Message);
+        }
+    }
+
+    private void ChangeMarkdownFontSize(int delta)
+    {
+        // 通过修改 WebView2 页面字体大小的 CSS 来实现 — 更可靠的方式是重新渲染带不同字号样式的 HTML
+        // 简单实现：重新渲染时修改 body 字号
+        _markdownPreviewFontSize = Math.Clamp(_markdownPreviewFontSize + delta, 10, 32);
+        _ = ReRenderMarkdownAsync();
     }
 
     private void ShowUnsupportedPreview(ArchiveItem? item, string? message = null)
@@ -1212,9 +1506,13 @@ public partial class MainWindow
         PreviewFileIcon.Source = null;
         PreviewTextBox.Text = "";
         PreviewTextBox.ClearValue(TextBox.FontFamilyProperty); // 重置为默认字体，释放对临时字体文件的引用，防止 WPF 在文件被删除后崩溃
+        PreviewCsvGrid.ItemsSource = null;
+        PreviewTabularContainer.Children.Clear();
         if (PreviewWebView2.CoreWebView2 != null)
             PreviewWebView2.CoreWebView2.Navigate("about:blank");
         PreviewWebView2.Visibility = Visibility.Collapsed;
+        _previewShowSource = false;
+        _previewSourceFormat = PreviewSourceFormat.None;
         PreviewFormatInfo.Text = "";
         PreviewFileNameText.Text = "";
         PreviewSizeText.Text = "";
@@ -1432,16 +1730,21 @@ public partial class MainWindow
     {
         if (PreviewImage.Source is not BitmapSource bmp) return;
         _currentZoomMode = mode;
-        // MaxWidth/MaxHeight = 自然像素尺寸，防止小图被放大
-        // ScrollViewer Disabled 时约束到视口，MaxWidth 确保不放大，两者取较窄者
+
+        // 将像素尺寸按 DPI 换算为 WPF 设备无关单位，防止 DPI ≠ 96 时图片被裁剪
+        double dpiScaleX = bmp.DpiX > 0 ? 96.0 / bmp.DpiX : 1.0;
+        double dpiScaleY = bmp.DpiY > 0 ? 96.0 / bmp.DpiY : 1.0;
+        double naturalWidth = bmp.PixelWidth * dpiScaleX;
+        double naturalHeight = bmp.PixelHeight * dpiScaleY;
+
         switch (mode)
         {
             case ZoomMode.FitWindow:
                 PreviewImageScroll.HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled;
                 PreviewImageScroll.VerticalScrollBarVisibility = ScrollBarVisibility.Disabled;
                 PreviewImage.Stretch = Stretch.Uniform;
-                PreviewImage.MaxWidth = bmp.PixelWidth;
-                PreviewImage.MaxHeight = bmp.PixelHeight;
+                PreviewImage.MaxWidth = naturalWidth;
+                PreviewImage.MaxHeight = naturalHeight;
                 PreviewImage.HorizontalAlignment = HorizontalAlignment.Center;
                 PreviewImage.VerticalAlignment = VerticalAlignment.Center;
                 break;
@@ -1449,8 +1752,8 @@ public partial class MainWindow
                 PreviewImageScroll.HorizontalScrollBarVisibility = ScrollBarVisibility.Auto;
                 PreviewImageScroll.VerticalScrollBarVisibility = ScrollBarVisibility.Auto;
                 PreviewImage.Stretch = Stretch.None;
-                PreviewImage.MaxWidth = bmp.PixelWidth;
-                PreviewImage.MaxHeight = bmp.PixelHeight;
+                PreviewImage.MaxWidth = double.PositiveInfinity;
+                PreviewImage.MaxHeight = double.PositiveInfinity;
                 PreviewImage.HorizontalAlignment = HorizontalAlignment.Left;
                 PreviewImage.VerticalAlignment = VerticalAlignment.Top;
                 break;
@@ -1458,13 +1761,95 @@ public partial class MainWindow
                 PreviewImageScroll.HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled;
                 PreviewImageScroll.VerticalScrollBarVisibility = ScrollBarVisibility.Auto;
                 PreviewImage.Stretch = Stretch.Uniform;
-                PreviewImage.MaxWidth = bmp.PixelWidth;
+                PreviewImage.MaxWidth = naturalWidth;
                 PreviewImage.MaxHeight = double.PositiveInfinity;
                 PreviewImage.HorizontalAlignment = HorizontalAlignment.Center;
                 PreviewImage.VerticalAlignment = VerticalAlignment.Center;
                 break;
         }
         UpdateZoomButtonStates();
+    }
+
+    /// <summary>
+    /// 显示 ICO 多图标画廊：将所有尺寸的图标排列在水平 WrapPanel 中。
+    /// </summary>
+    private void ShowIcoGallery(
+        System.Collections.Generic.List<(System.Windows.Media.Imaging.BitmapSource frame, int w, int h)> frames,
+        string filePath, ArchiveItem item)
+    {
+        HideAllPreviewControls();
+
+        var wrapPanel = new System.Windows.Controls.WrapPanel
+        {
+            Orientation = Orientation.Horizontal,
+            HorizontalAlignment = HorizontalAlignment.Center,
+            VerticalAlignment = VerticalAlignment.Center,
+            Margin = new System.Windows.Thickness(16)
+        };
+
+        foreach (var (frame, w, h) in frames)
+        {
+            // 每个图标一个带边框的卡片
+            var border = new System.Windows.Controls.Border
+            {
+                BorderBrush = System.Windows.SystemColors.ControlLightBrush,
+                BorderThickness = new System.Windows.Thickness(1),
+                CornerRadius = new System.Windows.CornerRadius(4),
+                Margin = new System.Windows.Thickness(8),
+                Padding = new System.Windows.Thickness(10),
+            };
+
+            var stack = new System.Windows.Controls.StackPanel
+            {
+                Orientation = Orientation.Vertical,
+                HorizontalAlignment = HorizontalAlignment.Center
+            };
+
+            var img = new System.Windows.Controls.Image
+            {
+                Source = frame,
+                Stretch = Stretch.None,
+                MaxWidth = 256,
+                MaxHeight = 256,
+                Margin = new System.Windows.Thickness(4)
+            };
+
+            var label = new System.Windows.Controls.TextBlock
+            {
+                Text = $"{w} × {h}",
+                FontSize = 11,
+                Foreground = System.Windows.SystemColors.GrayTextBrush,
+                HorizontalAlignment = HorizontalAlignment.Center,
+                Margin = new System.Windows.Thickness(0, 4, 0, 0)
+            };
+
+            stack.Children.Add(img);
+            stack.Children.Add(label);
+            border.Child = stack;
+            wrapPanel.Children.Add(border);
+        }
+
+        var scroll = new System.Windows.Controls.ScrollViewer
+        {
+            Content = wrapPanel,
+            HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
+            VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+            VerticalAlignment = VerticalAlignment.Stretch,
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+        };
+
+        PreviewTabularContainer.Children.Clear();
+        PreviewTabularContainer.Children.Add(scroll);
+        PreviewTabularContainer.Visibility = Visibility.Visible;
+
+        var first = frames[0];
+        SetPreviewInfo(item, L.TF(L.Preview_Dimensions, first.w, first.h));
+        PreviewHeader.Text = L.TF(L.Preview_ImageHeader, Path.GetFileName(filePath));
+        SetFormatSpecificInfo(
+            (L.T(L.Preview_ImagePixels), $"{first.w * first.h:N0}")
+        );
+        SetToolbar(Array.Empty<ToolbarButton>(), Array.Empty<ToolbarButton>());
+        ShowPreviewPanel();
     }
 
     // ═══════════════════════════════════════════
@@ -1566,20 +1951,6 @@ public partial class MainWindow
             _gifFrameTotal.Text = $"/ {_gifController.FrameCount}";
     }
 
-    // ── 字体连字切换 ──
-
-    private void ToggleFontLigatures()
-    {
-        _fontLigaturesEnabled = !_fontLigaturesEnabled;
-        PreviewTextBox.Typography.StandardLigatures = _fontLigaturesEnabled;
-        PreviewTextBox.Typography.ContextualLigatures = _fontLigaturesEnabled;
-        PreviewTextBox.Typography.DiscretionaryLigatures = _fontLigaturesEnabled;
-        // WPF Typography 属性变化后需要重新设置文本才能触发重绘
-        var text = PreviewTextBox.Text;
-        PreviewTextBox.Text = "";
-        PreviewTextBox.Text = text;
-    }
-
     private static BitmapSource CreateCheckerPattern()
     {
         var pixels = new byte[16 * 16 * 4];
@@ -1657,10 +2028,6 @@ public partial class MainWindow
             if (info == null) { ShowUnsupportedPreview(item, L.T(L.Preview_FontParseFailed)); return; }
             var sampleText = AppSettings.Instance.FontPreviewSampleText;
             if (string.IsNullOrEmpty(sampleText)) sampleText = "fi ff fl ffi ffl AaBbCc 123 示例";
-            _fontLigaturesEnabled = false;
-            PreviewTextBox.Typography.StandardLigatures = false;
-            PreviewTextBox.Typography.ContextualLigatures = false;
-            PreviewTextBox.Typography.DiscretionaryLigatures = false;
             // 将 FontFamily 设为字体文件对应的字体，使样本用实际字体渲染。
             // 格式 "filePath#FamilyName" 是 WPF 加载字体的标准方式。
             try
@@ -1683,12 +2050,8 @@ public partial class MainWindow
                 (L.T(L.Preview_FontName), info.FontName ?? "--"),
                 (L.T(L.Preview_FontStyle), info.FontStyle ?? "Regular"),
                 (L.T(L.Preview_FontGlyphs), info.GlyphCount?.ToString() ?? "--"));
-            SetToolbar(
-                Array.Empty<ToolbarButton>(),
-                new[] {
-                    new ToolbarButton { Text = "🔀", Tooltip = L.T(L.Preview_FontLigatures), IsToggle = true, IsChecked = false, OnClick = ToggleFontLigatures }
-                }
-            );
+            SetToolbar(Array.Empty<ToolbarButton>(), Array.Empty<ToolbarButton>());
+            // 连字开关因 WPF Typography 对外部字体不生效已移除，后续方案见 #32
         }
         catch (Exception ex) { App.LogDebug("ShowFontPreview: failed: {0}", ex.Message); ShowUnsupportedPreview(null, L.T(L.Preview_FontParseFailed)); }
     }
@@ -1708,45 +2071,68 @@ public partial class MainWindow
             ShowPreviewPanel();
             var extra = new List<(string, string)>();
             if (info.Duration.HasValue) extra.Add((L.T(L.Preview_AudioDuration), info.Duration.Value.ToString("hh\\:mm\\:ss")));
-            if (info.SampleRate > 0) extra.Add((L.T(L.Preview_AudioSampleRate), $"{info.SampleRate} Hz"));
-            if (info.Channels > 0) extra.Add((L.T(L.Preview_AudioChannels), info.Channels.Value.ToString()));
-            if (info.BitDepth > 0) extra.Add((L.T(L.Preview_AudioBitDepth), $"{info.BitDepth}-bit"));
-            if (info.Bitrate > 0) extra.Add((L.T(L.Preview_AudioBitrate), $"{info.Bitrate} kbps"));
+            if (info.SampleRate.HasValue && info.SampleRate.Value > 0) extra.Add((L.T(L.Preview_AudioSampleRate), $"{info.SampleRate} Hz"));
+            if (info.Channels.HasValue && info.Channels.Value > 0) extra.Add((L.T(L.Preview_AudioChannels), info.Channels.Value.ToString()));
+            if (info.BitDepth.HasValue) extra.Add((L.T(L.Preview_AudioBitDepth), $"{info.BitDepth}-bit"));
+            if (info.Bitrate.HasValue) extra.Add((L.T(L.Preview_AudioBitrate), $"{info.Bitrate} kbps"));
             SetFormatSpecificInfo(extra.ToArray()); SetToolbar(Array.Empty<ToolbarButton>(), Array.Empty<ToolbarButton>());
         }
         catch (Exception ex) { App.LogDebug("ShowAudioPreview: failed: {0}", ex.Message); ShowUnsupportedPreview(null, L.T(L.Preview_AudioParseFailed)); }
     }
 
     // ── SQLite ──
-    private void ShowSqlitePreview(string filePath, ArchiveItem item)
+    private async Task ShowSqlitePreview(string filePath, ArchiveItem item)
     {
         try
         {
-            var info = SQLiteParser.Parse(filePath);
-            if (info == null) { ShowUnsupportedPreview(item, L.T(L.Preview_SqliteParseFailed)); return; }
-            var sb = new StringBuilder();
-            sb.AppendLine(info.DisplayName);
-            if (info.TableCount > 0)
+            // 元数据 + 表格数据并行读取
+            var metaTask = Task.Run(() => SQLiteParser.Parse(filePath));
+            var reader = new SqliteDataReader();
+            var dataTask = reader.QueryAsync(filePath, maxRows: 100, maxCols: 100);
+
+            await Task.WhenAll(metaTask, dataTask);
+
+            var meta = await metaTask;
+            var data = await dataTask;
+
+            if (meta == null) { ShowUnsupportedPreview(item, L.T(L.Preview_SqliteParseFailed)); return; }
+
+            // 信息面板：编码、页大小、表数量
+            var extra = new List<(string, string)>
             {
-                sb.AppendLine($"表数量: {info.TableCount}");
-                if (info.TableNames?.Count > 0)
-                {
-                    sb.AppendLine();
-                    foreach (var name in info.TableNames)
-                        sb.AppendLine($"  • {name}");
-                }
-            }
-            PreviewTextBox.Text = sb.ToString();
-            PreviewTextBox.TextAlignment = TextAlignment.Left; PreviewTextBox.FontSize = 12;
-            HideAllPreviewControls();
-            PreviewTextBox.Visibility = Visibility.Visible;
-            SetPreviewInfo(item); PreviewHeader.Text = L.TF(L.Preview_SqliteHeader, Path.GetFileName(filePath));
-            ShowPreviewPanel();
-            SetFormatSpecificInfo(
-                (L.T(L.Preview_SqliteEncoding), info.TextEncoding ?? "--"),
-                (L.T(L.Preview_SqlitePageSize), info.AdditionalInfo ?? "--")
-            );
+                (L.T(L.Preview_SqliteEncoding), meta.TextEncoding ?? "--"),
+                (L.T(L.Preview_SqlitePageSize), meta.AdditionalInfo ?? "--"),
+            };
+            if (meta.TableCount > 0)
+                extra.Add(("表数量", meta.TableCount.Value.ToString()));
+            SetFormatSpecificInfo(extra.ToArray());
             SetToolbar(Array.Empty<ToolbarButton>(), Array.Empty<ToolbarButton>());
+
+            // 表格数据展示
+            var title = L.TF(L.Preview_SqliteHeader, Path.GetFileName(filePath));
+
+            if (data?.Tables.Count > 1)
+            {
+                // 多表 → TabControl
+                ShowMultiTablePreview(data.Tables, item, title);
+            }
+            else if (data?.Tables.Count == 1)
+            {
+                // 单表 → 直接 DataGrid（复用 ShowTablePreview）
+                ShowTablePreview(data.Tables[0].Data, item, title);
+            }
+            else
+            {
+                // 无数据表 → 退化为纯元数据展示（可能为空数据库）
+                HideAllPreviewControls();
+                PreviewTextBox.Text = $"{meta.DisplayName}\n表数量: {meta.TableCount}";
+                PreviewTextBox.TextAlignment = TextAlignment.Left;
+                PreviewTextBox.FontSize = 12;
+                PreviewTextBox.Visibility = Visibility.Visible;
+                SetPreviewInfo(item);
+                PreviewHeader.Text = title;
+                ShowPreviewPanel();
+            }
         }
         catch (Exception ex) { App.LogDebug("ShowSqlitePreview: failed: {0}", ex.Message); ShowUnsupportedPreview(null, L.T(L.Preview_SqliteParseFailed)); }
     }
@@ -1877,7 +2263,16 @@ public partial class MainWindow
             PreviewWebView2.CoreWebView2.Navigate(new Uri(filePath).AbsoluteUri);
             PreviewWebView2.Visibility = Visibility.Visible;
             SetPreviewInfo(item); PreviewHeader.Text = L.TF(L.Preview_ImageHeader, Path.GetFileName(filePath));
-            ShowPreviewPanel(); SetFormatSpecificInfo(("SVG", Path.GetFileName(filePath))); SetToolbar(Array.Empty<ToolbarButton>(), Array.Empty<ToolbarButton>());
+            ShowPreviewPanel(); SetFormatSpecificInfo(("SVG", Path.GetFileName(filePath)));
+            // SVG 缩放工具栏（通过 WebView2 ZoomFactor 控制）
+            SetToolbar(
+                new[] {
+                    new ToolbarButton { Text = "⊞", Tooltip = L.T(L.Preview_ZoomFit), OnClick = () => { if (PreviewWebView2.CoreWebView2 != null) PreviewWebView2.ZoomFactor = 1.0; } },
+                    new ToolbarButton { Text = "🔍−", Tooltip = "缩小", OnClick = () => { if (PreviewWebView2.CoreWebView2 != null && PreviewWebView2.ZoomFactor > 0.2) PreviewWebView2.ZoomFactor -= 0.1; } },
+                    new ToolbarButton { Text = "🔍+", Tooltip = "放大", OnClick = () => { if (PreviewWebView2.CoreWebView2 != null && PreviewWebView2.ZoomFactor < 5.0) PreviewWebView2.ZoomFactor += 0.1; } },
+                },
+                Array.Empty<ToolbarButton>()
+            );
         }
         catch (Exception ex) { App.LogDebug("ShowSvgPreview: failed: {0}", ex.Message); ShowUnsupportedPreview(null, "SVG 预览失败"); }
     }

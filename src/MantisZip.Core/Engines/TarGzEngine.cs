@@ -201,6 +201,16 @@ public class TarGzEngine : IArchiveEngine
                         continue;
                     }
                     processedFiles++;
+
+                    // 文件压缩完成后上报文件计数
+                    progress?.Report(new ArchiveProgress
+                    {
+                        CurrentFile = relativePath,
+                        PercentComplete = totalFiles > 0 ? (double)processedFiles / totalFiles * 100 : 0,
+                        FilePercentComplete = 100,
+                        TotalFiles = totalFiles,
+                        ProcessedFiles = processedFiles
+                    });
                 }
 
                 tarArchive.Close();
@@ -222,7 +232,9 @@ public class TarGzEngine : IArchiveEngine
             progress?.Report(new ArchiveProgress
             {
                 CurrentFile = string.Empty,
-                PercentComplete = 100
+                PercentComplete = 100,
+                TotalFiles = files.Count,
+                ProcessedFiles = files.Count
             });
 
             CoreLog.Info($"CompressAsync: done, {sw.ElapsedMilliseconds}ms");

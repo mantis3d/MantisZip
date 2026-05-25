@@ -21,6 +21,11 @@ public static class VideoParser
             if (fs.Length < 12) return null;
             byte[] header = r.ReadBytes(12);
 
+            // ── FLV ──
+            // Signature: 3 bytes "FLV"
+            if (header[0] == (byte)'F' && header[1] == (byte)'L' && header[2] == (byte)'V')
+                return ParseFlv(fs, r);
+
             // ── MP4 / M4V / MOV ──
             // ftyp box: 4 bytes box size, 4 bytes "ftyp", 4 bytes major brand
             if (header[4] == (byte)'f' && header[5] == (byte)'t' &&
@@ -28,6 +33,15 @@ public static class VideoParser
             {
                 string brand = Encoding.ASCII.GetString(header, 8, 4);
                 return ParseMp4(fs, r, brand);
+            }
+
+            // MOV fallback: some MOV files omit ftyp and start with moov directly
+            uint firstBoxSize = (uint)((header[0] << 24) | (header[1] << 16) | (header[2] << 8) | header[3]);
+            if (firstBoxSize >= 8 && firstBoxSize <= fs.Length &&
+                header[4] == (byte)'m' && header[5] == (byte)'o' &&
+                header[6] == (byte)'o' && header[7] == (byte)'v')
+            {
+                return ParseMp4(fs, r, "qt  ");
             }
 
             // ── MKV / WebM ──
@@ -119,13 +133,16 @@ public static class VideoParser
                                 r.ReadBytes(4); // track id
                                 r.ReadBytes(4); // reserved
                                 r.ReadBytes(ver == 1 ? 8 : 4); // duration
-                                r.ReadBytes(8); // reserved + layer
+                                r.ReadBytes(12); // reserved[2] + layer + alternate_group
                                 r.ReadBytes(4); // volume + reserved
                                 r.ReadBytes(4 * 9); // matrix
-                                width = (int)ReadBE32(r) >> 16;
-                                height = (int)ReadBE32(r) >> 16;
-                                fs.Seek(trakEnd, SeekOrigin.Begin);
-                                break;
+                                int w = (int)ReadBE32(r) >> 16;
+                                int h = (int)ReadBE32(r) >> 16;
+                                // Only set from video track (audio track tkhd has 0x0)
+                                if (w > 0 && h > 0) { width = w; height = h; }
+                                // Position is now at next sub-box after tkhd.
+                                // Continue to find mdia/hdlr for codec detection.
+                                continue;
                             }
                             else if (trType == "mdia")
                             {
@@ -146,34 +163,34 @@ public static class VideoParser
                                             codec = "video";
                                         else if (handler == "soun" && codec == null)
                                             codec = "audio";
-                                        fs.Seek(Math.Min(fs.Position + mdSize - 16, mdiaEnd), SeekOrigin.Begin);
+                                        fs.Seek(Math.Min(fs.Position + mdSize - 20, mdiaEnd), SeekOrigin.Begin);
+                                        }
+                                        else if (mdType == "minf")
+                                        {
+                                            fs.Seek(Math.Min(fs.Position + mdSize - 8, mdiaEnd), SeekOrigin.Begin);
+                                        }
+                                        else
+                                        {
+                                            fs.Seek(Math.Min(fs.Position + mdSize - 8, mdiaEnd), SeekOrigin.Begin);
+                                        }
                                     }
-                                    else if (mdType == "minf")
-                                    {
-                                        fs.Seek(Math.Min(fs.Position + mdSize - 8, mdiaEnd), SeekOrigin.Begin);
-                                    }
-                                    else
-                                    {
-                                        fs.Seek(Math.Min(fs.Position + mdSize - 12, mdiaEnd), SeekOrigin.Begin);
-                                    }
+                                    fs.Seek(mdiaEnd, SeekOrigin.Begin);
+                                    continue;
                                 }
-                                fs.Seek(mdiaEnd, SeekOrigin.Begin);
-                                continue;
-                            }
 
-                            fs.Seek(Math.Min(fs.Position + trSize - 12, trakEnd), SeekOrigin.Begin);
+                                fs.Seek(Math.Min(fs.Position + trSize - 8, trakEnd), SeekOrigin.Begin);
                         }
                         fs.Seek(trakEnd, SeekOrigin.Begin);
                         continue;
                     }
 
-                    fs.Seek(Math.Min(fs.Position + subSize - 12, moovEnd), SeekOrigin.Begin);
+                    fs.Seek(Math.Min(fs.Position + subSize - 8, moovEnd), SeekOrigin.Begin);
                 }
                 fs.Seek(moovEnd, SeekOrigin.Begin);
                 continue;
             }
 
-            fs.Seek(Math.Min(fs.Position + boxSize - 12, fs.Length), SeekOrigin.Begin);
+            fs.Seek(Math.Min(fs.Position + boxSize - 8, fs.Length), SeekOrigin.Begin);
         }
 
         return new FileFormatInfo
@@ -188,6 +205,158 @@ public static class VideoParser
             Codec = codec,
             Bitrate = bitrate,
         };
+    }
+
+    // ═══════════════════════════════════
+    //  FLV
+    // ═══════════════════════════════════
+
+    private static FileFormatInfo? ParseFlv(FileStream fs, BinaryReader r)
+    {
+        int? width = null, height = null;
+        double? durationSec = null;
+        string? codec = null;
+        int? bitrate = null;
+
+        fs.Seek(13, SeekOrigin.Begin); // skip header (9) + PreviousTagSize0 (4)
+
+        while (fs.Position < fs.Length - 15)
+        {
+            long tagStart = fs.Position;
+
+            // Tag header: 11 bytes
+            byte[] tagHdr = r.ReadBytes(11);
+            if (tagHdr.Length < 11) break;
+
+            byte tagType = (byte)(tagHdr[0] & 0x1F);
+            uint dataSize = (uint)((tagHdr[1] << 16) | (tagHdr[2] << 8) | tagHdr[3]);
+            if (dataSize == 0 || dataSize > fs.Length - fs.Position) break;
+
+            if (tagType == 18) // Script data → onMetaData
+            {
+                long dataEnd = fs.Position + dataSize;
+                byte amfType = r.ReadByte();
+                if (amfType == 0x02) // AMF0 String
+                {
+                    ushort strLen = (ushort)((r.ReadByte() << 8) | r.ReadByte());
+                    if (strLen <= dataSize - 3 && fs.Position + strLen <= dataEnd)
+                    {
+                        string strVal = Encoding.ASCII.GetString(r.ReadBytes(strLen));
+                        if (strVal == "onMetaData")
+                        {
+                            ReadAmf0Metadata(r, dataEnd,
+                                out width, out height, out durationSec, out codec, out bitrate);
+                        }
+                    }
+                }
+                fs.Seek(dataEnd, SeekOrigin.Begin);
+            }
+            else if (tagType == 9 && codec == null) // Video tag → codec ID fallback
+            {
+                byte frameInfo = r.ReadByte();
+                codec = (frameInfo & 0x0F) switch
+                {
+                    2 => "H.263",
+                    3 => "Screen Video",
+                    4 => "VP6",
+                    5 => "VP6 (Alpha)",
+                    7 => "H.264 / AVC",
+                    12 => "H.265 / HEVC",
+                    var id => $"CodecID={id}",
+                };
+            }
+
+            // Advance past data + PreviousTagSize
+            fs.Seek(tagStart + 15 + dataSize, SeekOrigin.Begin); // 11 header + data + 4 prevSize
+        }
+
+        return new FileFormatInfo
+        {
+            Format = FileFormat.Flv,
+            DisplayName = "FLV 视频",
+            Extension = ".flv",
+            FileSize = fs.Length,
+            VideoWidth = width,
+            VideoHeight = height,
+            Duration = durationSec.HasValue ? TimeSpan.FromSeconds(durationSec.Value) : null,
+            Codec = codec,
+            Bitrate = bitrate,
+        };
+    }
+
+    /// <summary>解析 AMF0 ECMA Array / Object 中的元数据键值对。</summary>
+    private static void ReadAmf0Metadata(BinaryReader r, long dataEnd,
+        out int? width, out int? height, out double? durationSec,
+        out string? codec, out int? bitrate)
+    {
+        width = height = null;
+        durationSec = null;
+        codec = null;
+        bitrate = null;
+
+        byte containerType = r.ReadByte();
+        if (containerType == 0x08) // ECMA Array (has 4-byte count prefix)
+            r.ReadBytes(4);
+        else if (containerType != 0x03) // Not an Object either
+            return;
+
+        while (r.BaseStream.Position < dataEnd - 2)
+        {
+            // Key: 2-byte length + UTF-8 string
+            ushort keyLen = (ushort)((r.ReadByte() << 8) | r.ReadByte());
+            if (keyLen == 0) { r.ReadByte(); break; } // ObjectEnd marker
+
+            if (r.BaseStream.Position + keyLen > dataEnd) break;
+            string key = Encoding.UTF8.GetString(r.ReadBytes(keyLen));
+
+            if (r.BaseStream.Position >= dataEnd) break;
+
+            byte valType = r.ReadByte();
+            switch (valType)
+            {
+                case 0x00: // Number (8-byte IEEE 754 big-endian)
+                    if (r.BaseStream.Position + 8 > dataEnd) break;
+                    byte[] numB = r.ReadBytes(8);
+                    if (BitConverter.IsLittleEndian) Array.Reverse(numB);
+                    double numVal = BitConverter.ToDouble(numB, 0);
+                    switch (key)
+                    {
+                        case "duration":        durationSec = numVal; break;
+                        case "width":            width = (int)numVal; break;
+                        case "height":           height = (int)numVal; break;
+                        case "videodatarate":    if (bitrate == null) bitrate = (int)(numVal * 1000); break;
+                        case "audiodatarate":    if (bitrate == null) bitrate = (int)(numVal * 1000); break;
+                        case "videocodecid" when codec == null:
+                            codec = numVal switch
+                            {
+                                2 => "H.263",
+                                3 => "Screen Video",
+                                4 => "VP6",
+                                7 => "H.264 / AVC",
+                                12 => "H.265 / HEVC",
+                                _ => $"CodecID={numVal}",
+                            };
+                            break;
+                    }
+                    break;
+
+                case 0x02: // String (2-byte length + UTF-8)
+                    if (r.BaseStream.Position + 2 > dataEnd) break;
+                    ushort strLen = (ushort)((r.ReadByte() << 8) | r.ReadByte());
+                    if (r.BaseStream.Position + strLen > dataEnd) break;
+                    string strVal = Encoding.UTF8.GetString(r.ReadBytes(strLen));
+                    if (key == "videocodecid" && codec == null)
+                        codec = strVal;
+                    break;
+
+                case 0x01: // Boolean (1 byte)
+                    r.ReadByte(); // skip
+                    break;
+
+                default: // Can't determine size → stop parsing
+                    return;
+            }
+        }
     }
 
     // ═══════════════════════════════════
@@ -211,59 +380,79 @@ public static class VideoParser
 
             switch (id)
             {
-                case 0x1549A966: // Segment > Info
-                    while (fs.Position < dataEnd - 4)
+                case 0x08538067: // Segment — contains Info and Tracks (VINT: 0x18538067)
+                case 0x0549A966: // Segment > Info (VINT: 0x1549A966)
+                case 0x0654AE6B: // Segment > Tracks (VINT: 0x1654AE6B)
+                {
+                    long segEnd = dataEnd;
+                    while (fs.Position < segEnd - 4)
                     {
                         if (!TryReadEbmlId(r, out uint subId)) break;
                         if (!TryReadEbmlSize(r, out ulong subSize)) break;
+                        long subDataEnd = fs.Position + (long)subSize;
+                        if (subSize > (ulong)(segEnd - fs.Position)) break;
 
-                        if (subId == 0x4489) // Segment > Info > Duration
+                        if (subId == 0x0549A966) // Info (VINT: 0x1549A966)
                         {
-                            durationSec = ReadEbmlFloat(r);
-                        }
-
-                        fs.Seek(Math.Min(fs.Position + (long)subSize, dataEnd), SeekOrigin.Begin);
-                    }
-                    break;
-
-                case 0x1654AE6B: // Segment > Tracks
-                    while (fs.Position < dataEnd - 4)
-                    {
-                        if (!TryReadEbmlId(r, out uint trId)) break;
-                        if (!TryReadEbmlSize(r, out ulong trSize)) break;
-                        long trEnd = fs.Position + (long)trSize;
-
-                        if (trId == 0xAE) // TrackEntry
-                        {
-                            while (fs.Position < trEnd - 4)
+                            long infoEnd = subDataEnd;
+                            while (fs.Position < infoEnd - 4)
                             {
-                                if (!TryReadEbmlId(r, out uint teId)) break;
-                                if (!TryReadEbmlSize(r, out ulong teSize)) break;
-                                long teEnd = fs.Position + (long)teSize;
+                                if (!TryReadEbmlId(r, out uint infoId)) break;
+                                if (!TryReadEbmlSize(r, out ulong infoSize)) break;
 
-                                if (teId == 0x86) // Track > CodecID
+                                if (infoId == 0x0489) // Duration (VINT: 0x4489)
                                 {
-                                    codec = Encoding.ASCII.GetString(r.ReadBytes((int)teSize));
+                                    durationSec = ReadEbmlFloat(r, infoSize);
                                 }
-                                else if (teId == 0xE0) // Track > Video
+
+                                fs.Seek(Math.Min(fs.Position + (long)infoSize, infoEnd), SeekOrigin.Begin);
+                            }
+                        }
+                        else                         if (subId == 0x0654AE6B) // Tracks (VINT: 0x1654AE6B)
+                        {
+                            long tracksEnd = subDataEnd;
+                            while (fs.Position < tracksEnd - 4)
+                            {
+                                if (!TryReadEbmlId(r, out uint trId)) break;
+                                if (!TryReadEbmlSize(r, out ulong trSize)) break;
+                                long trEnd = fs.Position + (long)trSize;
+
+                                if (trId == 0x2E) // TrackEntry (VINT: 0xAE)
                                 {
-                                    while (fs.Position < teEnd - 4)
+                                    while (fs.Position < trEnd - 4)
                                     {
-                                        if (!TryReadEbmlId(r, out uint vId)) break;
-                                        if (!TryReadEbmlSize(r, out ulong vSize)) break;
-                                        if (vId == 0xB0) width = (int)ReadEbmlUInt(r, vSize);
-                                        else if (vId == 0xBA) height = (int)ReadEbmlUInt(r, vSize);
-                                        else fs.Seek(Math.Min(fs.Position + (long)vSize, teEnd), SeekOrigin.Begin);
+                                        if (!TryReadEbmlId(r, out uint teId)) break;
+                                        if (!TryReadEbmlSize(r, out ulong teSize)) break;
+                                        long teEnd = fs.Position + (long)teSize;
+
+                                        if (teId == 0x06) // CodecID (VINT: 0x86)
+                                        {
+                                            codec = Encoding.ASCII.GetString(r.ReadBytes((int)teSize));
+                                        }
+                                        else if (teId == 0x60) // Video (VINT: 0xE0)
+                                        {
+                                            while (fs.Position < teEnd - 4)
+                                            {
+                                                if (!TryReadEbmlId(r, out uint vId)) break;
+                                                if (!TryReadEbmlSize(r, out ulong vSize)) break;
+                                        if (vId == 0x30) width = (int)ReadEbmlUInt(r, vSize); // PixelWidth (VINT: 0xB0)
+                                        else if (vId == 0x3A) height = (int)ReadEbmlUInt(r, vSize); // PixelHeight (VINT: 0xBA)
+                                                else fs.Seek(Math.Min(fs.Position + (long)vSize, teEnd), SeekOrigin.Begin);
+                                            }
+                                        }
+
+                                        fs.Seek(teEnd, SeekOrigin.Begin);
                                     }
                                 }
 
-                                fs.Seek(teEnd, SeekOrigin.Begin);
+                                fs.Seek(trEnd, SeekOrigin.Begin);
                             }
                         }
 
-                        fs.Seek(trEnd, SeekOrigin.Begin);
+                        fs.Seek(subDataEnd, SeekOrigin.Begin);
                     }
                     break;
+                }
             }
 
             fs.Seek(dataEnd, SeekOrigin.Begin);
@@ -292,20 +481,46 @@ public static class VideoParser
         string? codec = null;
 
         // Skip RIFF header (already read)
-        // Start scanning LIST chunks
         fs.Seek(12, SeekOrigin.Begin);
-        while (fs.Position < fs.Length - 8)
+        ParseAviChunks(r, fs, fs.Length, ref width, ref height, ref codec);
+
+        return new FileFormatInfo
+        {
+            Format = FileFormat.Avi,
+            DisplayName = "AVI 视频",
+            Extension = ".avi",
+            FileSize = fs.Length,
+            VideoWidth = width,
+            VideoHeight = height,
+            Codec = codec,
+        };
+    }
+
+    /// <summary>
+    /// Recursive AVI chunk parser. Handles LIST nesting so that
+    /// avih (inside LIST hdrl) and strh (inside LIST strl) are found.
+    /// </summary>
+    private static void ParseAviChunks(BinaryReader r, FileStream fs, long end,
+        ref int? width, ref int? height, ref string? codec)
+    {
+        while (fs.Position <= end - 8)
         {
             uint chunkId = r.ReadUInt32(); // LE
-            // FourCC
             byte[] idBytes = BitConverter.GetBytes(chunkId);
             string id = Encoding.ASCII.GetString(idBytes);
             uint chunkSize = r.ReadUInt32();
 
-            if (chunkSize > fs.Length - fs.Position) break;
+            if (chunkSize > end - fs.Position) break;
             long chunkEnd = fs.Position + chunkSize;
 
-            if (id == "avih") // Main AVI header
+            if (id == "LIST")
+            {
+                if (chunkSize < 4) break;
+                string listType = Encoding.ASCII.GetString(r.ReadBytes(4));
+                // Recurse into LIST children (they are at the same logical level)
+                ParseAviChunks(r, fs, chunkEnd, ref width, ref height, ref codec);
+            }
+            else if (id == "avih") // Main AVI header
             {
                 r.ReadBytes(8); // microSecPerFrame + maxBytesPerSec
                 r.ReadBytes(4); // paddingGranularity
@@ -327,17 +542,6 @@ public static class VideoParser
 
             fs.Seek(chunkEnd, SeekOrigin.Begin);
         }
-
-        return new FileFormatInfo
-        {
-            Format = FileFormat.Avi,
-            DisplayName = "AVI 视频",
-            Extension = ".avi",
-            FileSize = fs.Length,
-            VideoWidth = width,
-            VideoHeight = height,
-            Codec = codec,
-        };
     }
 
     // ═══════════════════════════════════
@@ -372,13 +576,16 @@ public static class VideoParser
         return true;
     }
 
-    private static double ReadEbmlFloat(BinaryReader r)
+    private static double ReadEbmlFloat(BinaryReader r, ulong size = 4)
     {
-        byte[] b = r.ReadBytes(4);
-        if (b.Length < 4) return 0;
+        int byteSize = (int)Math.Min(size, 8UL);
+        byte[] b = r.ReadBytes(byteSize);
+        if (b.Length < byteSize) return 0;
         if (BitConverter.IsLittleEndian)
             Array.Reverse(b);
-        return BitConverter.ToSingle(b, 0);
+        if (byteSize == 4)
+            return BitConverter.ToSingle(b, 0);
+        return BitConverter.ToDouble(b, 0);
     }
 
     private static ulong ReadEbmlUInt(BinaryReader r, ulong size)

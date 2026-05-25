@@ -71,12 +71,14 @@ Despite using `CommunityToolkit.Mvvm`, **all logic lives in `MainWindow.xaml.cs`
   - **PDF**: `ShowPdfPreview` — metadata + WebView2 PDF content rendering (size-gated)
   - **Font**: `ShowFontPreview` — font name/style/glyph count; sample text rendering; ligature toggle (re-sets TextBox.Text to force WPF redraw)
   - **Audio**: `ShowAudioPreview` — WAV/FLAC duration, sample rate, channels, bitrate
-  - **SQLite**: `ShowSqlitePreview` — encoding, page size, table count
+   - **SQLite**: `ShowSqlitePreview` — encoding, page size, table count + DataGrid table(s) via `SqliteDataReader` (Microsoft.Data.Sqlite); multi-table via `ShowMultiTablePreview` (TabControl)
   - **ISO**: `ShowIsoPreview` — volume label, format, size
   - **Torrent**: `ShowTorrentPreview` — file tree, InfoHash, Magnet, tracker, creator
   - **Office**: `ShowOfficePreview` — docx/xlsx/pptx title, author, page/slide/sheet count
   - **SVG**: `ShowSvgPreview` — WebView2 rendering
   - **Video**: `ShowVideoPreview` — MP4/MKV/AVI resolution, duration, codec
+- **`ShowTablePreview(DataTable, ArchiveItem, title)`** — shared method for tabular data (CSV, SQLite, future formats). Uses `PreviewCsvGrid` (DataGrid) with 100-row × 100-col limit. Params: `DataTable`, `ArchiveItem` for info panel, string title for header.
+- **`ITableDataProvider`** — optional interface in `Core/Abstractions/` for pluggable table data readers (SQLite, Office, etc.). See [modular preview providers plan](.sisyphus/plans/preview-modular-providers.md) for future extraction into separate class libraries.
 - Metadata-only formats (PE, Office, audio, SQLite, ISO, torrent, video) skip the `MaxPreviewFileSize` check since they only read file headers. PDF is also metadata-only (exempt from the outer size check) but conditionally renders content if `item.Size <= MaxPreviewFileSize`
 - Toolbar: `SetToolbar(left, right)` — common controls left, format-specific right, separator between. Image zoom / Text font-size / GIF play-pause-frame / Font ligature toggle / Transparency toggle.
 - `ClearPreviewContent()` clears all sources without resetting grid layout; `HidePreview()` does full cleanup
@@ -165,6 +167,7 @@ Plans tracked under `.sisyphus/plans/`:
 |------|--------|------------|
 | [engine-unification-sharpcompress.md](.sisyphus/plans/engine-unification-sharpcompress.md) | 📋 Planned | None |
 | [file-filter-feature.md](.sisyphus/plans/file-filter-feature.md) | 📋 Planned | SharpCompress migration |
+| [preview-modular-providers.md](.sisyphus/plans/preview-modular-providers.md) | 📋 Planned | Preview system |
 
 ### Planned: Engine unification (SharpZipLib → SharpCompress)
 

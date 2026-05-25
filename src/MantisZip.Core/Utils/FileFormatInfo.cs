@@ -133,7 +133,7 @@ public enum FileFormat
     // 音频
     Wav, Flac, Mp3,
     // 视频
-    Mp4, Mkv, WebM, Wmv, Mov, Avi,
+    Mp4, Mkv, WebM, Wmv, Mov, Avi, Flv,
     // 文档
     Pdf, Docx, Xlsx, Pptx, Epub, Mobi, Azw3,
     // 文本/标记

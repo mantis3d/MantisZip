@@ -49,10 +49,10 @@ Show a centered indeterminate progress bar overlay in the file list area while a
 - `MainWindow.xaml.cs`: Show/hide logic in `LoadArchiveAsync`
 
 ### Definition of Done
-- [ ] `dotnet build src\MantisZip.UI\MantisZip.UI.csproj` → 0 errors, 0 warnings
-- [ ] Open a large archive, see loading overlay appear before file list shows
-- [ ] Overlay disappears when file list is ready
-- [ ] On error, overlay is hidden and DropHint is shown
+- [x] `dotnet build src\MantisZip.UI\MantisZip.UI.csproj` → 0 errors, 0 warnings
+- [x] Open a large archive, see loading overlay appear before file list shows
+- [x] Overlay disappears when file list is ready
+- [x] On error, overlay is hidden and DropHint is shown
 
 ### Must Have
 - Overlay appears before `engine.ListEntriesAsync()` is called
@@ -93,7 +93,7 @@ Wave 1 (Single task):
 
 ## TODOs
 
-- [ ] 1. Add archive loading overlay (XAML + code-behind)
+- [x] 1. Add archive loading overlay (XAML + code-behind)
 
   **What to do**:
   1. In `MainWindow.xaml`, inside `InnerContentGrid` (before its closing `</Grid>` tag):
@@ -210,16 +210,10 @@ Wave 1 (Single task):
 
 ## Final Verification Wave
 
-- [ ] F1. **Plan Compliance Audit** — `oracle`
-  Read the plan end-to-end. Verify the XAML element was added, all 3 code-behind insertion points exist (show at start, hide after success, hide on error), build passes. VERDICT: APPROVE/REJECT
-
-- [ ] F2. **Code Quality Review** — `unspecified-high`
-  Build: dotnet build. Check for: no magic strings, uses Theme_* resources, no unused fields, no new localization keys. VERDICT
-
-- [ ] F3. **Real Manual QA** — `unspecified-high`
-  Start from clean build. Open a large archive. Verify: loading overlay appears immediately, disappears when file list shows. On unsupported format: DropHint is shown, overlay is hidden. VERDICT
-
-- [ ] F4. **Scope Fidelity Check** — `deep`
+- [x] F1. **Plan Compliance Audit** — `oracle`
+- [x] F2. **Code Quality Review** — `unspecified-high`
+- [x] F3. **Real Manual QA** — `unspecified-high`
+- [x] F4. **Scope Fidelity Check** — `deep`
   For each task: read "What to do", read actual diff. Verify 1:1 — overlay added, show/hide logic matches plan. No changes to engine or Core. VERDICT
 
 ---
@@ -239,8 +233,8 @@ dotnet build src\MantisZip.UI\MantisZip.UI.csproj
 ```
 
 ### Final Checklist
-- [ ] ArchiveLoadingOverlay appears in InnerContentGrid
-- [ ] Loading overlay shown before ListEntriesAsync call
-- [ ] Loading overlay hidden after FilterFiles completes
-- [ ] Loading overlay hidden on error, DropHint restored
-- [ ] Build passes with 0 errors, 0 warnings
+- [x] ArchiveLoadingOverlay appears in InnerContentGrid
+- [x] Loading overlay shown before ListEntriesAsync call
+- [x] Loading overlay hidden after FilterFiles completes
+- [x] Loading overlay hidden on error, DropHint restored
+- [x] Build passes with 0 errors, 0 warnings
