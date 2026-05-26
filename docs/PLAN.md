@@ -50,7 +50,7 @@
 | Ookii.Dialogs.Wpf | 5.0.1 | 文件夹选择对话框 | BSD-3-Clause |
 | Ude.NetStandard | 1.2.0 | 字符编码检测（文本预览） | MIT |
 | WpfAnimatedGif | 2.0.2 | GIF 动画支持 | MIT |
-| Microsoft.Web.WebView2 | — | **🎯 计划新增** — Edge Chromium 内核，替代 WebBrowser（IE），支持 PDF 原生渲染、现代 CSS | BSD-3-Clause |
+| Microsoft.Web.WebView2 | 0.3.0 | Edge Chromium 内核，替代 WebBrowser（IE），支持 PDF 原生渲染、现代 CSS | BSD-3-Clause |
 
 ### 测试
 

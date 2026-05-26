@@ -237,7 +237,7 @@
                                           GridLinesVisibility="Horizontal"
                                           HeadersVisibility="Column"
                                           RowHeaderWidth="0"
-                                          ColumnHeaderHeight="36"
+                                          ColumnHeaderHeight="28"
                                           ColumnHeaderStyle="{StaticResource DataGridColumnHeaderStyle}"
                                           Background="{StaticResource Theme_SurfaceBg}"
                                           VirtualizingStackPanel.IsVirtualizing="True"
