@@ -447,16 +447,20 @@ public partial class MainWindow
                 int gifWidth = 0, gifHeight = 0;
                 await Task.Run(() =>
                 {
-                    var decoder = System.Windows.Media.Imaging.BitmapDecoder.Create(
-                        new Uri(filePath),
-                        System.Windows.Media.Imaging.BitmapCreateOptions.DelayCreation,
-                        System.Windows.Media.Imaging.BitmapCacheOption.None);
-                    gifWidth = decoder.Frames[0].PixelWidth;
-                    gifHeight = decoder.Frames[0].PixelHeight;
+                var decoder = System.Windows.Media.Imaging.BitmapDecoder.Create(
+                    new Uri(filePath),
+                    System.Windows.Media.Imaging.BitmapCreateOptions.DelayCreation,
+                    System.Windows.Media.Imaging.BitmapCacheOption.OnLoad);
+                gifWidth = decoder.Frames[0].PixelWidth;
+                gifHeight = decoder.Frames[0].PixelHeight;
                 });
 
                 _gifController = null;
-                var gifBitmap = new System.Windows.Media.Imaging.BitmapImage(new Uri(filePath));
+                var gifBitmap = new System.Windows.Media.Imaging.BitmapImage();
+                gifBitmap.BeginInit();
+                gifBitmap.CacheOption = System.Windows.Media.Imaging.BitmapCacheOption.OnLoad;
+                gifBitmap.UriSource = new Uri(filePath);
+                gifBitmap.EndInit();
                 ImageBehavior.SetAnimatedSource(PreviewImage, gifBitmap);
                 // 异步加载完成后获取控制器
                 ImageBehavior.AddAnimationLoadedHandler(PreviewImage, (s, e) =>
@@ -488,7 +492,7 @@ public partial class MainWindow
                     var decoder = System.Windows.Media.Imaging.BitmapDecoder.Create(
                         new Uri(filePath),
                         System.Windows.Media.Imaging.BitmapCreateOptions.DelayCreation,
-                        System.Windows.Media.Imaging.BitmapCacheOption.None);
+                        System.Windows.Media.Imaging.BitmapCacheOption.OnLoad);
                     int frameCount = decoder.Frames.Count;
                     SetFormatSpecificInfo(
                         (L.T(L.Preview_ImagePixels), $"{gifWidth * gifHeight:N0}"),
@@ -526,7 +530,7 @@ public partial class MainWindow
                     var decoder = System.Windows.Media.Imaging.BitmapDecoder.Create(
                         new Uri(filePath),
                         System.Windows.Media.Imaging.BitmapCreateOptions.DelayCreation,
-                        System.Windows.Media.Imaging.BitmapCacheOption.None);
+                        System.Windows.Media.Imaging.BitmapCacheOption.OnLoad);
                     var list = new List<(System.Windows.Media.Imaging.BitmapSource frame, int w, int h)>();
                     for (int i = 0; i < decoder.Frames.Count; i++)
                     {
@@ -553,7 +557,7 @@ public partial class MainWindow
                 var decoder = System.Windows.Media.Imaging.BitmapDecoder.Create(
                     new Uri(filePath),
                     System.Windows.Media.Imaging.BitmapCreateOptions.DelayCreation,
-                    System.Windows.Media.Imaging.BitmapCacheOption.None);
+                    System.Windows.Media.Imaging.BitmapCacheOption.OnLoad);
                 int actualWidth = decoder.Frames[0].PixelWidth;
 
                 var bmp = new System.Windows.Media.Imaging.BitmapImage();
@@ -1603,8 +1607,22 @@ public partial class MainWindow
         {
             if (!string.IsNullOrEmpty(_previewTempDir) && Directory.Exists(_previewTempDir))
             {
-                Directory.Delete(_previewTempDir, recursive: true);
-                _previewTempDir = null;
+                // 重试最多 5 次，间隔 200ms，给 WPF 图片管线释放文件句柄的时间
+                for (int i = 0; i < 5; i++)
+                {
+                    try
+                    {
+                        Directory.Delete(_previewTempDir!, recursive: true);
+                        _previewTempDir = null;
+                        return;
+                    }
+                    catch (Exception) when (i < 4)
+                    {
+                        Thread.Sleep(200);
+                        GC.Collect();
+                        GC.WaitForPendingFinalizers();
+                    }
+                }
             }
         }
         catch (Exception cleanupEx)
