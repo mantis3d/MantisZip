@@ -33,6 +33,7 @@
     <!-- 按钮 -->
     <SolidColorBrush x:Key="Theme_ButtonBg" Color="#FFFFFF"/>
     <SolidColorBrush x:Key="Theme_ButtonHover" Color="#E8E8E8"/>
+    <SolidColorBrush x:Key="Theme_ButtonPressed" Color="#D0D0D0"/>
     <SolidColorBrush x:Key="Theme_ButtonBorder" Color="#CCCCCC"/>
 
     <!-- 进度条 -->

@@ -33,7 +33,7 @@
         </Grid.RowDefinitions>
 
         <!-- Menu Bar -->
-        <Menu Grid.Row="0" Background="{StaticResource Theme_MenuBg}" BorderThickness="0">
+        <Menu Grid.Row="0">
             <MenuItem Header="{l:L Main_Menu_File}">
                 <MenuItem Header="{l:L Main_Menu_OpenArchive}" Click="OpenArchive_Click" InputGestureText="Ctrl+O"/>
                 <MenuItem Header="{l:L Main_Menu_NewArchive}" Click="NewArchive_Click" InputGestureText="Ctrl+N"/>
@@ -46,6 +46,12 @@
             <MenuItem Header="{l:L Main_Menu_View}">
                 <MenuItem Header="{l:L Main_Menu_Refresh}" Click="Refresh_Click" InputGestureText="F5"/>
             </MenuItem>
+            <MenuItem Header="{l:L Main_Menu_Edit}">
+                <MenuItem x:Name="EditMenuAddFiles" Header="{l:L Main_Ctx_AddFiles}" Click="AddFiles_Click"/>
+                <MenuItem x:Name="EditMenuDeleteFiles" Header="{l:L Main_Ctx_DeleteFiles}" Click="DeleteFiles_Click"/>
+                <Separator/>
+                <MenuItem x:Name="EditMenuArchiveComment" Header="{l:L Main_Menu_ArchiveComment}" Click="EditArchiveComment_Click"/>
+            </MenuItem>
             <MenuItem Header="{l:L Main_Menu_Tools}">
                 <MenuItem Header="{l:L Main_Menu_PasswordManager}" Click="PasswordManager_Click"/>
                 <Separator/>
@@ -57,13 +63,8 @@
         </Menu>
 
         <!-- Toolbar -->
-        <ToolBarTray Grid.Row="1" Background="{StaticResource Theme_MenuBg}">
-            <ToolBar Band="0" BandIndex="0" Background="{StaticResource Theme_MenuBg}">
-                <ToolBar.Resources>
-                    <Style TargetType="ToolBar">
-                        <Setter Property="Background" Value="{StaticResource Theme_MenuBg}"/>
-                    </Style>
-                </ToolBar.Resources>
+        <Border Grid.Row="1" Background="{DynamicResource Theme_MenuBg}">
+            <ToolBar>
                 <Button ToolTip="{l:L Main_Tooltip_NewArchive}" Click="NewArchive_Click" Padding="8,6">
                     <StackPanel Orientation="Vertical" HorizontalAlignment="Center">
                         <TextBlock Text="🆕" FontSize="25" HorizontalAlignment="Center"/>
@@ -129,7 +130,7 @@
                     </StackPanel>
                 </ToggleButton>
             </ToolBar>
-        </ToolBarTray>
+        </Border>
 
         <!-- Main Content Area -->
         <Grid Grid.Row="2" Margin="8">

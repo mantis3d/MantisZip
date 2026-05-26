@@ -321,6 +321,29 @@ public partial class MainWindow
 
     #endregion
 
+    #region 压缩包注释
+
+    private void EditArchiveComment_Click(object sender, RoutedEventArgs e)
+    {
+        if (string.IsNullOrEmpty(_currentArchivePath)) return;
+
+        var dialog = new ArchiveCommentDialog(_currentArchivePath, _currentFormat, _archiveComment)
+        {
+            Owner = this
+        };
+
+        if (dialog.ShowDialog() == true)
+        {
+            // 重新读取注释并刷新预览
+            _archiveComment = ReadArchiveComment(_currentArchivePath, _currentFormat);
+            if (FileListGrid.SelectedItems.Count == 0)
+                ShowArchiveInfo();
+            SetStatus(L.T(L.Main_ArchiveComment_CommentSaved));
+        }
+    }
+
+    #endregion
+
     private void PasswordManager_Click(object sender, RoutedEventArgs e)
     {
         new PasswordManagerWindow { Owner = this }.ShowDialog();

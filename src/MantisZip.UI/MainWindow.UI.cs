@@ -71,11 +71,18 @@ public partial class MainWindow
         {
             AddFilesBtn.IsEnabled = false;
             DeleteFilesBtn.IsEnabled = false;
+            if (EditMenuAddFiles != null) EditMenuAddFiles.IsEnabled = false;
+            if (EditMenuDeleteFiles != null) EditMenuDeleteFiles.IsEnabled = false;
+            if (EditMenuArchiveComment != null) EditMenuArchiveComment.IsEnabled = false;
             return;
         }
 
         AddFilesBtn.IsEnabled = engine.CanAdd(_currentFormat);
         DeleteFilesBtn.IsEnabled = engine.CanDelete(_currentFormat);
+        if (EditMenuAddFiles != null) EditMenuAddFiles.IsEnabled = engine.CanAdd(_currentFormat);
+        if (EditMenuDeleteFiles != null) EditMenuDeleteFiles.IsEnabled = engine.CanDelete(_currentFormat);
+        // 注释仅 ZIP 格式支持
+        if (EditMenuArchiveComment != null) EditMenuArchiveComment.IsEnabled = _currentFormat == ArchiveFormat.Zip;
     }
 
     private static void OpenInExplorer(string path) => App.OpenInExplorerStatic(path);
@@ -126,16 +133,23 @@ public partial class MainWindow
         if (FolderTree.SelectedItem is FolderNode node)
         {
             FilterFiles(node.FullPath);
-            // 同时更新预览区为目录预览（之前只有 FilterFiles，不会触发预览更新）
-            var dirItem = new ArchiveItem
+            // 根目录显示压缩包总览（含注释）；子目录显示目录预览
+            if (string.IsNullOrEmpty(node.FullPath))
             {
-                Name = node.FullPath + "/",
-                FullPath = node.FullPath,
-                IsDirectory = true,
-                Size = 0,
-                CompressedSize = 0,
-            };
-            ShowDirectoryPreview(dirItem);
+                ShowArchiveInfo();
+            }
+            else
+            {
+                var dirItem = new ArchiveItem
+                {
+                    Name = node.FullPath + "/",
+                    FullPath = node.FullPath,
+                    IsDirectory = true,
+                    Size = 0,
+                    CompressedSize = 0,
+                };
+                ShowDirectoryPreview(dirItem);
+            }
         }
     }
 
