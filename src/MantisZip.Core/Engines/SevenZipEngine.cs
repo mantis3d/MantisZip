@@ -230,9 +230,11 @@ public class SevenZipEngine : IArchiveEngine
             {
                 FileName = sevenZipPath,
                 UseShellExecute = false,
-                RedirectStandardOutput = false,  // 不重定向 stdout（不使用输出内容，避免管道阻塞）
+                RedirectStandardOutput = true,
                 RedirectStandardError = true,
-                CreateNoWindow = true
+                CreateNoWindow = true,
+                StandardOutputEncoding = Encoding.UTF8,
+                StandardErrorEncoding = Encoding.UTF8
             };
 
             psi.ArgumentList.Add("a");                    // 添加
@@ -265,6 +267,14 @@ public class SevenZipEngine : IArchiveEngine
 
                 CoreLog.Info($"CompressAsync: 7z.exe output={outputPath}, mx={mx}, encrypt={options.Encrypt}");
 
+                // 报告 0% 确保进度窗口立即显示刷新
+                progress?.Report(new ArchiveProgress
+                {
+                    CurrentFile = sourcePaths.Length > 0 ? Path.GetFileName(sourcePaths[0]) : "",
+                    PercentComplete = 0,
+                    FilePercentComplete = 0
+                });
+
                 using var process = Process.Start(psi)
                     ?? throw new InvalidOperationException($"无法启动 7z.exe: {sevenZipPath}");
 
@@ -272,6 +282,43 @@ public class SevenZipEngine : IArchiveEngine
                 var errorBuilder = new StringBuilder();
                 process.ErrorDataReceived += (_, e) => { if (e.Data != null) errorBuilder.AppendLine(e.Data); };
                 process.BeginErrorReadLine();
+
+                // 异步读取 stdout 并解析进度
+                CoreLog.Trace("[TRACE] 7z CompressAsync: starting stdout progress reader");
+                var progressTask = Task.Run(() =>
+                {
+                    int lineCount = 0;
+                    try
+                    {
+                        while (!process.HasExited || !process.StandardOutput.EndOfStream)
+                        {
+                            var line = process.StandardOutput.ReadLine();
+                            if (line == null) break;
+                            lineCount++;
+
+                            // 7z.exe 进度行格式: " 73%  filename" 或 "73%"
+                            var trimmed = line.Trim();
+                            if (trimmed.Contains('%'))
+                            {
+                                var pctStr = trimmed[..(trimmed.IndexOf('%') + 1)];
+                                if (int.TryParse(pctStr.TrimEnd('%'), out var pct))
+                                {
+                                    var name = trimmed[pctStr.Length..].Trim();
+                                    progress?.Report(new ArchiveProgress
+                                    {
+                                        CurrentFile = string.IsNullOrEmpty(name) ? line : name,
+                                        PercentComplete = pct,
+                                        FilePercentComplete = pct
+                                    });
+                                    CoreLog.Trace($"[TRACE] 7z CompressAsync: parsed pct={pct}, name='{name}', raw='{line.Trim()}'");
+                                }
+                            }
+                        }
+                    }
+                    catch (ObjectDisposedException) { }
+                    catch (InvalidOperationException) { }
+                    CoreLog.Trace($"[TRACE] 7z CompressAsync: stdout reader done, {lineCount} lines");
+                }, CancellationToken.None);
 
                 // 取消时立即终止 7z 进程
                 using (cancellationToken.Register(() =>
@@ -282,7 +329,10 @@ public class SevenZipEngine : IArchiveEngine
                     await process.WaitForExitAsync(CancellationToken.None).ConfigureAwait(false);
                 }
 
-                process.WaitForExit(); // 刷新异步输出缓冲区
+                // 等待 stdout 读取任务完成（快速消费剩余输出）
+                await Task.WhenAny(progressTask, Task.Delay(2000, CancellationToken.None)).ConfigureAwait(false);
+
+                process.WaitForExit(); // 刷新异步输出缓冲区，确保 stderr 读完整
 
                 cancellationToken.ThrowIfCancellationRequested();
 

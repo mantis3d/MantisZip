@@ -390,9 +390,7 @@ public partial class MainWindow : Window
 
             SetStatus(L.TF(L.Main_Status_Loaded, Path.GetFileName(archivePath)));
             UpdatePasswordStatus();
-            UpdateAddDeleteBtnState();
             UpdateSmartExtractBtnState();
-            UpdateAddDeleteBtnState();
 
             // L.T(L.Settings_Menu_Btn_Apply)L.T(L.Settings_Preview_Position)L.T(L.Settings_Title)
             ApplyPreviewPosition(AppSettings.Instance.PreviewPosition);

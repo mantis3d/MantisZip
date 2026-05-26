@@ -1619,7 +1619,7 @@ public partial class App : Application
                 });
             }
         });
-    }
+        }
         catch (Exception ex)
         {
             LogStartup($"HandleCompressQuick: unexpected error: {ex.Message}\n{ex.StackTrace}");
