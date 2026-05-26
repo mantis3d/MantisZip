@@ -213,6 +213,9 @@ public class ZipEngine : IArchiveEngine
                 using var zipStream = new ZipOutputStream(fsOut);
                 zipStream.SetLevel(options.CompressionLevel);
 
+                if (!string.IsNullOrEmpty(options.Comment))
+                    zipStream.SetComment(options.Comment);
+
                 if (options.Encrypt && !string.IsNullOrEmpty(options.Password))
                 {
                     zipStream.Password = options.Password;
@@ -414,6 +417,9 @@ public class ZipEngine : IArchiveEngine
             var totalWorkUnits = totalNewFiles + oldEntryCount; // 新文件压缩 + 旧条目 I/O
 
             zipFile.BeginUpdate();
+
+            if (!string.IsNullOrEmpty(options.Comment))
+                zipFile.SetComment(options.Comment);
 
             CoreLog.Trace($"[TRACE] ZipEngine.AddToArchiveAsync: totalNewFiles={totalNewFiles}, oldEntries={oldEntryCount}, totalWorkUnits={totalWorkUnits}");
 

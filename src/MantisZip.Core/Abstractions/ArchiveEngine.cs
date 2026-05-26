@@ -61,10 +61,31 @@ public class ArchiveOptions
 
     /// <summary>
     /// 文件读取错误时的回调（如文件被占用无法读取）。
-    /// 参数为错误信息，返回处理方式。返回 <see cref="FileErrorAction.Retry"/> 可重试。
-    /// 可在后台线程调用，回调需自行处理 UI 线程问题。
     /// </summary>
     public Func<FileErrorInfo, FileErrorAction>? ErrorResolver { get; set; }
+
+    /// <summary>
+    /// 压缩包注释（仅 ZIP 格式支持）
+    /// </summary>
+    public string? Comment { get; set; }
+
+    /// <summary>
+    /// 多压缩包时注释的分配方式
+    /// </summary>
+    public CommentDistribution CommentDistribution { get; set; } = CommentDistribution.AllSame;
+}
+
+/// <summary>
+/// 多压缩包（独立模式）时注释的分配策略
+/// </summary>
+public enum CommentDistribution
+{
+    /// <summary>所有压缩包使用相同注释</summary>
+    AllSame,
+    /// <summary>仅第一个压缩包添加注释</summary>
+    FirstOnly,
+    /// <summary>按顺序每行对应一个压缩包</summary>
+    PerLine
 }
 
 /// <summary>
