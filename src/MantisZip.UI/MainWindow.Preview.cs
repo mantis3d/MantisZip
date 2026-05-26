@@ -2284,7 +2284,7 @@ public partial class MainWindow
         {
             var info = VideoParser.Parse(filePath);
             if (info == null) { ShowUnsupportedPreview(item, L.T(L.Preview_VideoParseFailed)); return; }
-            var sb = new StringBuilder(); sb.AppendLine(info.DisplayName);
+            var sb = new StringBuilder();
             if (info.VideoWidth > 0 && info.VideoHeight > 0) sb.AppendLine($"  分辨率: {info.VideoWidth} × {info.VideoHeight}");
             if (info.Duration.HasValue) sb.AppendLine($"  时长: {info.Duration.Value:hh\\:mm\\:ss}");
             if (info.Codec != null) sb.AppendLine($"  编码: {info.Codec}");
@@ -2294,7 +2294,7 @@ public partial class MainWindow
             SetPreviewInfo(item); PreviewHeader.Text = info.DisplayName;
             ShowPreviewPanel();
             var extra = new List<(string, string)>();
-            if (info.VideoWidth > 0 && info.VideoHeight > 0) extra.Add((L.T(L.Preview_Dimensions), $"{info.VideoWidth} × {info.VideoHeight}"));
+            if (info.VideoWidth > 0 && info.VideoHeight > 0) extra.Add((L.T(L.Preview_VideoDimensions), $"{info.VideoWidth} × {info.VideoHeight}"));
             if (info.Duration.HasValue) extra.Add((L.T(L.Preview_VideoDuration), info.Duration.Value.ToString("hh\\:mm\\:ss")));
             if (info.Codec != null) extra.Add((L.T(L.Preview_VideoCodec), info.Codec));
             SetFormatSpecificInfo(extra.ToArray()); SetToolbar(Array.Empty<ToolbarButton>(), Array.Empty<ToolbarButton>());

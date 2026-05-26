@@ -147,6 +147,7 @@ public static class VideoParser
                             else if (trType == "mdia")
                             {
                                 long mdiaEnd = fs.Position + trSize - 8;
+                                bool isVideoTrack = false;
                                 while (fs.Position < mdiaEnd - 8)
                                 {
                                     uint mdSize = ReadBE32(r);
@@ -159,24 +160,58 @@ public static class VideoParser
                                         r.ReadBytes(3); // flags
                                         r.ReadBytes(4); // pre-defined
                                         string handler = Encoding.ASCII.GetString(r.ReadBytes(4));
-                                        if (handler == "vide" && codec == null)
-                                            codec = "video";
-                                        else if (handler == "soun" && codec == null)
-                                            codec = "audio";
+                                        isVideoTrack = handler == "vide";
                                         fs.Seek(Math.Min(fs.Position + mdSize - 20, mdiaEnd), SeekOrigin.Begin);
-                                        }
-                                        else if (mdType == "minf")
+                                    }
+                                    else if (mdType == "minf" && isVideoTrack && codec == null)
+                                    {
+                                        long minfEnd = fs.Position + mdSize - 8;
+                                        while (fs.Position < minfEnd - 8)
                                         {
-                                            fs.Seek(Math.Min(fs.Position + mdSize - 8, mdiaEnd), SeekOrigin.Begin);
-                                        }
-                                        else
-                                        {
-                                            fs.Seek(Math.Min(fs.Position + mdSize - 8, mdiaEnd), SeekOrigin.Begin);
+                                            uint stSize = ReadBE32(r);
+                                            if (stSize < 8) break;
+                                            string stType = Encoding.ASCII.GetString(r.ReadBytes(4));
+                                            if (stType == "stbl")
+                                            {
+                                                long stblEnd = fs.Position + stSize - 8;
+                                                while (fs.Position < stblEnd - 8)
+                                                {
+                                                    uint sdSize = ReadBE32(r);
+                                                    if (sdSize < 8) break;
+                                                    string sdType = Encoding.ASCII.GetString(r.ReadBytes(4));
+                                                    if (sdType == "stsd" && codec == null)
+                                                    {
+                                                        r.ReadBytes(4); // version(1) + flags(3)
+                                                        uint entryCount = ReadBE32(r);
+                                                        if (entryCount > 0)
+                                                        {
+                                                            r.ReadBytes(4); // entry_size (4B)
+                                                            string fourCC = Encoding.ASCII.GetString(r.ReadBytes(4));
+                                                            codec = fourCC switch
+                                                            {
+                                                                "avc1" => "H.264",
+                                                                "hvc1" or "hev1" => "H.265",
+                                                                "mp4v" => "MPEG-4",
+                                                                "av01" => "AV1",
+                                                                "vp09" => "VP9",
+                                                                _ => fourCC.TrimEnd(' ').ToUpperInvariant(),
+                                                            };
+                                                        }
+                                                    }
+                                                    fs.Seek(Math.Min(fs.Position + sdSize - 8, stblEnd), SeekOrigin.Begin);
+                                                }
+                                            }
+                                            fs.Seek(Math.Min(fs.Position + stSize - 8, minfEnd), SeekOrigin.Begin);
                                         }
                                     }
-                                    fs.Seek(mdiaEnd, SeekOrigin.Begin);
-                                    continue;
+                                    else
+                                    {
+                                        fs.Seek(Math.Min(fs.Position + mdSize - 8, mdiaEnd), SeekOrigin.Begin);
+                                    }
                                 }
+                                fs.Seek(mdiaEnd, SeekOrigin.Begin);
+                                continue;
+                            }
 
                                 fs.Seek(Math.Min(fs.Position + trSize - 8, trakEnd), SeekOrigin.Begin);
                         }

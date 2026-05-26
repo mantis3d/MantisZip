@@ -715,7 +715,7 @@ public partial class App : Application
         });
     }
 
-    private static string? FindCommonParent(List<string> paths)
+    internal static string? FindCommonParent(List<string> paths)
     {
         if (paths.Count == 0) return null;
         var parents = paths.Select(p =>
@@ -741,7 +741,7 @@ public partial class App : Application
         return common;
     }
 
-    private static bool IsDriveRoot(string path)
+    internal static bool IsDriveRoot(string path)
     {
         var trimmed = path.TrimEnd('\\', '/');
         return trimmed.Length == 2 && trimmed[1] == ':'; // e.g., "C:", "D:"
@@ -1258,7 +1258,7 @@ public partial class App : Application
     /// 自动生成唯一的文件名：重复时加 (1),(2)... 后缀。
     /// 正确处理 .tar.gz 等双扩展名。
     /// </summary>
-    private static string GetUniquePath(string path)
+    internal static string GetUniquePath(string path)
     {
         var dir = Path.GetDirectoryName(path) ?? ".";
         string name, ext;

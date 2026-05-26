@@ -61,14 +61,14 @@
                 <ScrollViewer VerticalScrollBarVisibility="Auto" Background="{StaticResource Theme_SurfaceBg}">
                     <StackPanel Margin="10">
                         <TextBlock Text="{l:L Settings_Compress_DefaultFormat}" FontWeight="SemiBold" Margin="0,0,0,4"/>
-                        <ComboBox x:Name="DefaultFormatCombo" Width="300" HorizontalAlignment="Left" Background="{StaticResource Theme_WindowBg}" >
+                        <ComboBox x:Name="DefaultFormatCombo" Width="300" HorizontalAlignment="Left" Background="{DynamicResource Theme_WindowBg}" >
                             <ComboBoxItem Content="ZIP (.zip)" Tag="zip"/>
                             <ComboBoxItem Content="7z (.7z)" Tag="7z"/>
                             <ComboBoxItem Content="TAR.GZ (.tar.gz)" Tag="tar.gz"/>
                         </ComboBox>
 
                         <TextBlock Text="{l:L Settings_Compress_DefaultLevel}" FontWeight="SemiBold" Margin="0,16,0,4"/>
-                        <ComboBox x:Name="DefaultLevelCombo" Width="300" HorizontalAlignment="Left"  Background="{StaticResource Theme_WindowBg}">
+                        <ComboBox x:Name="DefaultLevelCombo" Width="300" HorizontalAlignment="Left"  Background="{DynamicResource Theme_WindowBg}">
                             <ComboBoxItem Tag="0" Content="{l:L Compress_Level_Store}"/>
                             <ComboBoxItem Tag="3" Content="{l:L Compress_Level_Fast}"/>
                             <ComboBoxItem Tag="5" Content="{l:L Compress_Level_Normal}"/>
@@ -96,7 +96,7 @@
                 <ScrollViewer VerticalScrollBarVisibility="Auto" Background="{StaticResource Theme_SurfaceBg}">
                     <StackPanel Margin="10">
                         <TextBlock Text="{l:L Settings_Extract_DefaultDest}" FontWeight="SemiBold" Margin="0,0,0,4"/>
-                        <ComboBox x:Name="ExtractDestCombo" Width="300" HorizontalAlignment="Left"  Background="{StaticResource Theme_WindowBg}">
+                        <ComboBox x:Name="ExtractDestCombo" Width="300" HorizontalAlignment="Left"  Background="{DynamicResource Theme_WindowBg}">
                             <ComboBoxItem Content="{l:L Settings_Extract_Dest_Ask}" Tag="ask"/>
                             <ComboBoxItem Content="{l:L Settings_Extract_Dest_SameDir}" Tag="same-dir"/>
                             <ComboBoxItem Content="{l:L Settings_Extract_Dest_Desktop}" Tag="desktop"/>
