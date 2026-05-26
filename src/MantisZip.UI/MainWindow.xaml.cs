@@ -57,6 +57,11 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+
+        // 列标题右键菜单（切换列显隐）
+        if (Resources["ColumnHeaderContextMenu"] is ContextMenu headerMenu)
+            headerMenu.Opened += ColumnHeaderContextMenu_Opened;
+
         LoadWindowSettings();
         ApplyPreviewPosition(AppSettings.Instance.PreviewPosition);
         ApplyInfoPanelOrientation(AppSettings.Instance.InfoPanelOrientation);
@@ -95,6 +100,12 @@ public partial class MainWindow : Window
         return Path.Combine(folder, "window.json");
     }
 
+    private class ColumnState
+    {
+        public double Width { get; set; }
+        public bool Visible { get; set; }
+    }
+
     private class WindowSize
     {
         public double Width { get; set; }
@@ -104,6 +115,7 @@ public partial class MainWindow : Window
         public double PreviewColumnWidth { get; set; }
         public double PreviewTreeHeight { get; set; }   // 位置2
         public double PreviewFilesHeight { get; set; }  // 位置3
+        public List<ColumnState> ColumnStates { get; set; } = new();
     }
 
     private void LoadWindowSettings()
@@ -138,6 +150,21 @@ public partial class MainWindow : Window
                     if (obj.PreviewTreeHeight > 0) _lastPreviewSizes[2] = obj.PreviewTreeHeight;
                     if (obj.PreviewFilesHeight > 0) _lastPreviewSizes[3] = obj.PreviewFilesHeight;
                     if (obj.PreviewColumnWidth > 0) _lastPreviewSizes[4] = obj.PreviewColumnWidth;
+                }
+
+                // 恢复各列的宽度和可见性（按位置索引匹配）
+                if (obj?.ColumnStates != null && obj.ColumnStates.Count > 0)
+                {
+                    for (int i = 0; i < FileListGrid.Columns.Count && i < obj.ColumnStates.Count; i++)
+                    {
+                        var state = obj.ColumnStates[i];
+                        var col = FileListGrid.Columns[i];
+                        if (state.Width > 0)
+                            col.Width = new DataGridLength(state.Width);
+                        // 跳过名称列（不允许隐藏）
+                        if (i > 0)
+                            col.Visibility = state.Visible ? Visibility.Visible : Visibility.Collapsed;
+                    }
                 }
             }
         }
@@ -176,6 +203,17 @@ public partial class MainWindow : Window
             double previewFilesHeight = _lastPreviewSizes[3];
             double previewColumnWidth = _lastPreviewSizes[4];
 
+            // 保存各列的宽度和可见性
+            var columnStates = new List<ColumnState>();
+            foreach (var col in FileListGrid.Columns)
+            {
+                columnStates.Add(new ColumnState
+                {
+                    Width = col.Width.Value,   // 当前宽度值（用户拖拽后为像素值）
+                    Visible = col.Visibility == Visibility.Visible
+                });
+            }
+
             var obj = new WindowSize
             {
                 Width = Width,
@@ -184,7 +222,8 @@ public partial class MainWindow : Window
                 PreviewRowHeight = previewHeight,
                 PreviewColumnWidth = previewColumnWidth,
                 PreviewTreeHeight = previewTreeHeight,
-                PreviewFilesHeight = previewFilesHeight
+                PreviewFilesHeight = previewFilesHeight,
+                ColumnStates = columnStates
             };
             var json = JsonSerializer.Serialize(obj, new JsonSerializerOptions { WriteIndented = true });
             File.WriteAllText(configPath, json);
