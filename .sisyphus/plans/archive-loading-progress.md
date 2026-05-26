@@ -1,5 +1,7 @@
 # Archive Loading Progress Indicator
 
+> **状态**: ✅ 已完成 | **阶段**: [✅] (1/1)
+
 ## TL;DR
 > **Quick Summary**: Add a centered overlay (indeterminate ProgressBar + "加载中…" text, then entry count "正在处理 N 个文件…") inside the file list area that shows while a large archive is being opened, before the file list populates.
 >

@@ -1,6 +1,7 @@
 # MSI 安装包 — WiX 方案
 
 > 将 MantisZip 的安装包从 Inno Setup EXE 迁移为 WiX MSI。
+> **状态**: 📋 待定 | **任务**: [⬜⬜⬜⬜] (0/4)
 > 创建日期：2026-05-18
 
 ## 动机
@@ -14,6 +15,13 @@
 | 标准 Windows 修复/卸载入口 | 部分支持 | ✅ 完整 |
 | 安装日志标准化 | 自定义日志 | ✅ `msiexec /log` |
 | 被 SCCM/Intune 管理 | ❌ | ✅ |
+
+## 任务清单
+
+- [ ] **1. WiX 环境搭建** — 安装 WiX Toolset v5，验证 `wix --version`
+- [ ] **2. `installer.wxs` 编写** — Package + Product + Feature 描述
+- [ ] **3. 构建与验证** — `wix build` 生成 MSI，验证安装/卸载
+- [ ] **4. CI/CD 集成** — 构建脚本生成 MSI 作为发布工件
 
 ## 安装
 
@@ -200,3 +208,23 @@ Bundle 产物是 `.exe`，内部嵌 MSI，但企业部署仍可用 MSI 部分。
 | 学习曲线 | 低 | 中 |
 | 社区生态 | 活跃 | 活跃（Microsoft 维护） |
 | 与 .NET 9 兼容性 | ✅ 无问题 | ✅ 无问题 |
+
+---
+
+## Definition of Done
+
+- [ ] WiX Toolset v5 安装并验证通过
+- [ ] `installer.wxs` 编写完成，生成有效 MSI
+- [ ] MSI 安装/卸载/修复功能正常
+- [ ] 静默安装 (`msiexec /quiet`) 测试通过
+- [ ] 桌面快捷方式、开始菜单、文件关联正确
+- [ ] 与现有 Inno Setup 安装不冲突（不同 UpgradeCode）
+- [ ] CI/CD 构建脚本生成 MSI 工件
+
+### Final Checklist
+
+- [ ] `wix build` 生成 MSI 无错误
+- [ ] MSI 安装后应用正常运行
+- [ ] 卸载完全清理
+- [ ] 静默安装/卸载测试通过
+- [ ] Inno Setup 安装包保留为备选方案

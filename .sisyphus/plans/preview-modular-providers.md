@@ -4,10 +4,17 @@
 
 将部分预览格式的"数据读取"实现抽取为独立的类库项目，按需分发和加载。解决预览格式增多后单个安装包体积膨胀的问题。
 
-> **状态**: 规划中（当前预览格式仍在主项目内，`ITableDataProvider` 接口已预留）
+> **状态**: 📋 待计划 | **阶段**: [⬜⬜⬜⬜] (0/4)
 > **依赖**: 预览系统稳定后 / 安装包体积接近用户不可接受时启动
 
 ---
+
+## 任务清单
+
+- [ ] **1. 接口定义** — `ITableDataProvider` 正式纳入 Core 抽象层
+- [ ] **2. 模块拆分** — SQLite / Office 等格式抽取为独立类库项目
+- [ ] **3. 模块发现与加载** — 主程序启动时自动发现可用模块
+- [ ] **4. 发布与分发** — 模块 NuGet 包 / 独立下载
 
 ## 动机
 
@@ -110,3 +117,23 @@ Source: "e_sqlite3.dll"; Dest: "{app}"; Components: preview\sqlite
 - 用户尝试预览没有对应 provider 的格式时，显示"此格式预览模块未安装"而非崩溃
 - Provider DLLs 放主程序目录，不建子目录
 - 不要在 `ITableDataProvider` 接口中引入 WPF/UI 类型，保持纯数据层
+
+---
+
+## Definition of Done
+
+- [ ] `ITableDataProvider` 接口正式纳入 Core 抽象层
+- [ ] SQLite 预览模块分离为独立类库项目
+- [ ] 主程序启动时自动发现并加载可用模块
+- [ ] 加载失败的模块静默忽略
+- [ ] 缺少对应 provider 时显示友好提示
+- [ ] `dotnet build` 通过
+
+### Final Checklist
+
+- [ ] `ITableDataProvider` 接口定义完成（纯数据层，无 UI 依赖）
+- [ ] `MantisZip.Preview.Sqlite` 独立项目可单独构建
+- [ ] 主程序启动时自动发现 Sqlite 模块
+- [ ] SQLite 预览功能与模块拆分前一致
+- [ ] 缺少模块时显示"此格式预览模块未安装"
+- [ ] 安装包可选择是否包含模块

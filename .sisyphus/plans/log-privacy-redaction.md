@@ -1,5 +1,7 @@
 # 日志隐私脱敏 — ✅ 已实现 (2026-05-19)
 
+> **状态**: ✅ 已完成（v0.2.8）| **阶段**: [✅✅✅✅✅✅✅✅] (8/8)
+
 **实现版本**: v0.2.8  
 **实现 PR**: 本次会话直接实现  
 **关键文件**: `Core/Utils/LogRedactor.cs`, `UI/LogPrivacyHelpDialog.xaml`, `UI/LogPrivacyHelpDialog.xaml.cs`
@@ -222,3 +224,26 @@ private static LogPrivacyMode ParseLogPrivacyMode(string mode) => mode switch
 | `%USERPROFILE%\Docs` | 调用点传参时已展开，日志中看到的已是展开后路径 |
 | `\Windows\System32` | 不带盘符，误匹配率 > 正确率，不处理 |
 | `file:///C:/path` | URI 格式，跨平台路径风格，暂不处理 |
+
+---
+
+## Definition of Done
+
+- [x] `LogRedactor` 静态类完成（Core 项目）
+- [x] `CoreLog.RedactOverride` 委托注入机制完成
+- [x] `AppSettings.LogPrivacyMode` 属性完成
+- [x] `App.Log()` / `App.LogDebug()` 脱敏调用完成
+- [x] SettingsWindow UI（ComboBox + 帮助按钮 + LogPrivacyHelpDialog）完成
+- [x] 本地化键完成（zh/en）
+- [x] `dotnet build` 通过
+
+### Final Checklist
+
+- [x] 脱敏模式关闭：日志路径不处理
+- [x] 仅保留文件名模式：`D:\Photos\private\wedding.jpg` → `wedding.jpg`
+- [x] 完全脱敏模式：路径替换为 `[PATH_1]`，相同路径映射到同一 ID
+- [x] UNC 路径脱敏正常
+- [x] 带空格路径脱敏正常（无路径截断泄露）
+- [x] ConcurrentDictionary 上限 10000 保护
+- [x] 设置窗口下拉选项正确加载/保存
+- [x] `[?]` 帮助说明窗口显示正常

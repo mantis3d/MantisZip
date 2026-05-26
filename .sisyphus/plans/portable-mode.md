@@ -1,6 +1,7 @@
 # 便携版模式
 
 > 为 MantisZip 增加便携模式：免安装、不写注册表、路径重定向到 exe 同目录。
+> **状态**: 📋 待定 | **任务**: [⬜⬜⬜⬜⬜] (0/5)
 > 创建日期：2026-05-18
 
 ## 动机
@@ -21,6 +22,14 @@ MantisZip.UI.exe
 ```
 
 exe 同级放一个空文本文件 `Portable.txt`（或 `.portable`），程序启动时检测到它就进入便携模式。
+
+## 任务清单
+
+- [ ] **1. `AppSettings.cs` — 路径重定向** — 哨兵文件检测 + Data 目录重定向
+- [ ] **2. `PasswordManager.cs` — 数据路径注入** — `CustomDataDir` 支持
+- [ ] **3. `App.OnStartup` — 跳过 Shell 注册** — 便携版不安装右键菜单
+- [ ] **4. `MainWindow.Preview.cs` — 预览临时目录重定向**
+- [ ] **5. `SevenZipEngine.cs` — 便携 7z 路径检测**
 
 ## 代码改动
 
@@ -134,3 +143,24 @@ Compress-Archive -Path portable_output\* -DestinationPath MantisZip-Portable.zip
 - `PublishSingleFile=true` 会在首次启动时解压到临时目录，速度略慢于安装版
 - `.NET 9` 的 SingleFile 支持原生 DLL（如 7z.dll），但不支持将外部 exe（7z.exe）嵌入单文件，需单独放在 exe 同目录
 - 如果 7z.exe 不在同目录，便携版压缩时 7z 格式会报错——需在 UI 中给出明确提示或在 7z 选择时自动降级为 ZIP
+
+---
+
+## Definition of Done
+
+- [ ] 哨兵文件 `Portable.txt` 检测完成，进入便携模式
+- [ ] 设置文件（settings.json）保存到 exe 同目录 Data/ 下
+- [ ] 密码库（passwords.json）保存到 Data/ 下
+- [ ] 便携模式下跳过 Shell 右键菜单注册
+- [ ] 预览临时文件保存到 Data/Temp/ 下
+- [ ] 7z.exe 同目录时自动检测使用
+- [ ] `dotnet build` 通过
+
+### Final Checklist
+
+- [ ] 普通模式下行为不变（不回归）
+- [ ] `Portable.txt` 存在时进入便携模式
+- [ ] 便携版设置随 exe 位置移动
+- [ ] 便携版密码库随 exe 位置移动
+- [ ] 便携版不写注册表（Shell 菜单不安装）
+- [ ] 便携版预览临时文件不写入系统 Temp

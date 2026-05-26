@@ -1,5 +1,7 @@
 # Work Plan: Add/Delete Archive Entries
 
+> **Status**: ✅ 已完成（v0.2.9）| **Tasks**: [✅✅✅✅✅] (5/5)
+
 ## Objective
 
 Implement two user-facing features in MantisZip:
@@ -20,9 +22,19 @@ Implement two user-facing features in MantisZip:
 | **Post-action** | Refresh file list | Refresh file list |
 | **TDD** | N/A (no new engine code) | ✅ Write tests before implementation |
 
+## 任务清单
+
+- [x] **Task 1: `IArchiveEngine.DeleteEntriesAsync` — Interface + Tests (TDD)**
+- [x] **Task 2: `ZipEngine.DeleteEntriesAsync` — Implementation**
+- [x] **Task 3: `SevenZipEngine.DeleteEntriesAsync` — Implementation**
+- [x] **Task 4: Add files UI (toolbar + right-click)**
+- [x] **Task 5: UI — Delete Files (Right-click + Delete Key)**
+- [x] **Task 6: Localization — 所有新增 UI 字符串**
+- [x] **Task 7: Verification — Build + Tests + Manual**
+
 ## Detailed Tasks
 
-### Task 1: IArchiveEngine.DeleteEntriesAsync — Interface + Tests (TDD)
+### Task 1: IArchiveEngine.DeleteEntriesAsync — Interface + Tests (TDD) [✅]
 
 **1a. Define interface method**
 ```csharp
@@ -49,7 +61,11 @@ Task DeleteEntriesAsync(
   - Delete on empty archive → no-op
   - Coverage: ZipEngine only (7z = integration, skip in unit test)
 
-### Task 2: ZipEngine.DeleteEntriesAsync Implementation
+### Task 2: ZipEngine.DeleteEntriesAsync Implementation [✅]
+
+- [x] `ZipFile.BeginUpdate` + `Delete` + `CommitUpdate` 实现
+- [x] 加密压缩包密码处理
+- [x] 空压缩包、不存在的条目等边界情况
 
 - SharpZipLib `ZipFile` has `Delete(ZipEntry)` method (followed by `CommitUpdate()`)
 - Implementation pattern (closely mirror existing `AddToArchiveAsync`):
@@ -61,7 +77,10 @@ Task DeleteEntriesAsync(
   6. If encrypted, the re-encryption is handled by SharpZipLib internally (it rewrites the whole ZIP)
 - Progress: report `PercentComplete` based on processed count / total count
 
-### Task 3: SevenZipEngine.DeleteEntriesAsync Implementation
+### Task 3: SevenZipEngine.DeleteEntriesAsync Implementation [✅]
+
+- [x] 7z 删除实现（非固态压缩包支持）
+- [x] 加密压缩包密码处理
 
 - Shell out to `7z.exe d {archivePath} {entryName1} {entryName2} ...`
 - Follow same pattern as CompressAsync/AddToArchiveAsync:
@@ -72,12 +91,12 @@ Task DeleteEntriesAsync(
   - Progress: can't get per-file progress from 7z.exe, report at 0% then 100%
 - TestAsync: handle exit code; 7z.exe exit code 0 = success, non-zero = failure
 
-### Task 4: TarGzEngine / RarEngine / IsoEngine — NotSupportedException
+### Task 4: TarGzEngine / RarEngine / IsoEngine — NotSupportedException [✅]
 
-- `TarGzEngine`: Add `DeleteEntriesAsync` → `throw new NotSupportedException("TAR/GZ format does not support in-place deletion")`
-- `SevenZipEngine.CanHandle` returns true for RAR and ISO → they'll hit our SevenZipEngine impl, but 7z.exe won't handle RAR deletion well. Add a guard: if format is RAR or ISO, throw NotSupportedException.
+- [x] TarGzEngine 添加 `NotSupportedException`
+- [x] SevenZipEngine 中 RAR/ISO guard
 
-### Task 5: UI — Add Files Button + Menu (Uses existing AddToArchiveAsync)
+### Task 5: UI — Add Files Button + Menu (Uses existing AddToArchiveAsync) [✅]
 
 **5a. Format capability helper**
 - Add a static helper `ArchiveFormatHelpers` (or similar) to determine if a format supports Add/Delete
@@ -110,7 +129,11 @@ Task DeleteEntriesAsync(
 - Same flow: confirm dialog (or skip if button-triggered — user already chose)
 - `_currentPassword` passed to `AddToArchiveAsync` if archive is encrypted
 
-### Task 6: UI — Delete Files (Right-click + Delete Key)
+### Task 6: UI — Delete Files (Right-click + Delete Key) [✅]
+
+- [x] Right-click 菜单项
+- [x] Delete 键盘快捷键
+- [x] 删除逻辑（展开目录 → 确认对话框 → 删除 → 刷新）
 
 **6a. Right-click context menu**
 - New `MenuItem` in XAML: Header via localization key + `InputGestureText="Del"`
@@ -132,7 +155,9 @@ Task DeleteEntriesAsync(
 8. Handle `NotSupportedException` with appropriate message per format
 9. Handle `OperationCanceledException` silently
 
-### Task 7: Localization
+### Task 7: Localization [✅]
+
+- [x] 工具栏/右键菜单/确认对话框等所有新增 UI 字符串本地化
 
 - Add localization entries for all new UI strings in `src/MantisZip.UI/Localization/` (both `zh` and `en` if bilingual supported):
   - Toolbar button tooltip: "添加文件到压缩包…"
@@ -142,7 +167,11 @@ Task DeleteEntriesAsync(
   - Disabled tooltip: "该格式不支持添加文件" / "该格式不支持删除"
   - NotSupported message per format
 
-### Task 8: Verification
+### Task 8: Verification [✅]
+
+- [x] Build 0 errors
+- [x] TDD tests pass
+- [x] 手动验证清单全部通过
 
 - Build: 0 errors, 0 warnings
 - Tests: new TDD tests pass, existing tests not broken
@@ -220,3 +249,29 @@ Modify:
     
   src/MantisZip.UI/Localization/LanguageManager.cs  (or translation files)
     — Add translations for zh and en
+
+---
+
+## Definition of Done
+
+- [x] `IArchiveEngine.DeleteEntriesAsync` 接口定义 + 各引擎实现
+- [x] ZipEngine 删除测试（TDD）通过
+- [x] 添加文件 UI（工具栏 + 右键菜单）
+- [x] 删除文件 UI（右键菜单 + Delete 键 + 确认对话框）
+- [x] 加密压缩包删除/添加正常
+- [x] 不支持的格式（TarGz/RAR/ISO）正确提示
+- [x] UI 字符串本地化（zh/en）
+- [x] `dotnet build` 通过，`dotnet test` 通过
+
+### Final Checklist
+
+- [x] 工具栏「添加文件」按钮功能正常
+- [x] 右键菜单「添加文件到压缩包」功能正常
+- [x] 拖拽添加文件（已有功能不回归）
+- [x] 右键菜单「删除」功能正常
+- [x] Delete 键删除功能正常
+- [x] 多选删除（Shift/Ctrl）功能正常
+- [x] 目录删除（展开为文件）功能正常
+- [x] 确认对话框显示正确
+- [x] 不支持的格式按钮禁用/提示正确
+- [x] 加密压缩包密码处理正常

@@ -1,6 +1,7 @@
 # 暗色主题 & 强调色自定义
 
 > 两阶段实施：Phase 1 亮/暗切换（P1）+ Phase 2 强调色选择（P3）
+> **状态**: ✅ 已完成（Phase 1 v0.2.9，Phase 2 待定）| **阶段**: [✅⬜] (1/2)
 > 创建日期：2026-05-19
 
 ---
@@ -74,7 +75,13 @@ Theme_ToolTipBg           # 工具提示背景
 Theme_ToolTipText         # 工具提示文字
 ```
 
-### Phase 1：亮/暗切换机制
+### Phase 1：亮/暗切换机制 [✅⬜⬜⬜⬜] (1/5)
+
+- [x] **1.1** 语义化颜色体系（~20 个 Theme_* 资源键）
+- [ ] **1.2** 亮色/暗色 ResourceDictionary（Light.xaml / Dark.xaml）
+- [ ] **1.3** 运行时切换机制（App.SwitchTheme）
+- [ ] **1.4** 所有 XAML 文件硬编码颜色替换为 Theme_* 引用（14 个 XAML + .cs）
+- [ ] **1.5** 设置窗口添加主题切换 UI + AppSettings 持久化
 
 ```csharp
 // 核心切换代码（App.xaml.cs 新增方法）
@@ -121,7 +128,18 @@ Application.Current.Resources["Theme_Accent"] = new SolidColorBrush(selectedColo
 
 ## 改动清单
 
-### Phase 1 文件改动（P1，共 3-4h）
+### Phase 1 文件改动（P1，共 3-4h）[⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜] (0/10)
+
+- [ ] `Themes/Light.xaml` — 新建亮色主题 ResourceDictionary
+- [ ] `Themes/Dark.xaml` — 新建暗色主题 ResourceDictionary
+- [ ] `App.xaml` — 合并 Light.xaml 到 MergedDictionaries
+- [ ] `App.xaml.cs` — 新增 `ApplyTheme()` + 启动恢复
+- [ ] `AppSettings.cs` — 新增 `Theme` 属性
+- [ ] `SettingsWindow.xaml` — 外观标签页加主题下拉框
+- [ ] `SettingsWindow.xaml.cs` — 主题切换事件处理
+- [ ] 所有 XAML 文件（14 个）— 硬编码颜色替换为 `{StaticResource Theme_XXX}`
+- [ ] 受影响的 .cs 文件 — 程序化颜色替换
+- [ ] 验证 — 全局走查每个窗口亮暗截图对比
 
 | 文件 | 改动内容 | 预估 |
 |------|----------|:----:|
@@ -139,7 +157,15 @@ Application.Current.Resources["Theme_Accent"] = new SolidColorBrush(selectedColo
 
 **小计：3-4h**
 
-### Phase 2 文件改动（P3，共 1-2h）
+### Phase 2 文件改动（P3，共 1-2h）[⬜⬜⬜⬜⬜⬜⬜] (0/7)
+
+- [ ] `Themes/Light.xaml` / `Dark.xaml` — 强调色键改为 DynamicResource
+- [ ] `AppSettings.cs` — 新增 `AccentColor` 属性
+- [ ] `SettingsWindow.xaml` — 外观标签页加强调色色板选择 UI
+- [ ] `SettingsWindow.xaml.cs` — 色板点击事件
+- [ ] `App.xaml.cs` — 新增 `ApplyAccentColor(Color)`
+- [ ] XAML 中 3-4 处 `StaticResource` → `DynamicResource`
+- [ ] 验证 — 每种强调色切换后检查一致性
 
 | 文件 | 改动内容 | 预估 |
 |------|----------|:----:|
@@ -250,3 +276,24 @@ Phase 2（Phase 1 完成后很久再执行）
 - 暗色值设计是否满足无障碍对比度要求
 - 是否有遗漏的程序化颜色赋值
 - 强调色在两种底色下都具备足够的对比度
+
+---
+
+## Definition of Done
+
+- [ ] Phase 1：亮/暗主题切换功能完成
+- [ ] 所有 14 个 XAML 文件的硬编码颜色替换为 Theme_* 引用
+- [ ] .cs 代码中的程序化颜色已替换
+- [ ] 亮/暗两套主题均可正常切换显示
+- [ ] `AppSettings.Theme` 持久化并在启动时恢复
+- [ ] Phase 2（可选）：强调色自定义完成
+- [ ] `dotnet build` 通过，无颜色相关警告
+
+### Final Checklist
+
+- [ ] 亮色主题下所有窗口显示正常
+- [ ] 暗色主题下所有窗口显示正常
+- [ ] 主题切换无需重启
+- [ ] 设置窗口可切换主题
+- [ ] 重启后主题保持
+- [ ] 强调色可自定义（Phase 2）

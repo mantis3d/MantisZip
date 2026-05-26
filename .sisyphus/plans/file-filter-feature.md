@@ -1,7 +1,8 @@
 # 文件过滤功能
 
 > 在压缩与解压时，支持按条件过滤文件：文件类型、文件名、文件大小、修改日期。
-> **前置依赖**：SharpCompress 引擎迁移完成（`.sisyphus/plans/engine-unification-sharpcompress.md`），`IArchiveEngine.ExtractEntriesAsync` 接口已就绪。
+> **状态**: 📋 待定（依赖 SharpCompress 迁移）| **阶段**: [⬜⬜⬜⬜⬜⬜⬜⬜] (0/8)
+> **前置依赖**: SharpCompress 引擎迁移完成（`.sisyphus/plans/engine-unification-sharpcompress.md`），`IArchiveEngine.ExtractEntriesAsync` 接口已就绪。
 
 ---
 
@@ -14,6 +15,17 @@
 - [ ] 各引擎 `ArchiveItem.Name` 编码一致性已验证
 
 ---
+
+## 任务清单
+
+- [ ] **1. Core: `FileFilterCriteria` 数据模型** — 扩展名/文件名/大小/日期四维条件
+- [ ] **2. Core: `FileFilterMatcher` 匹配逻辑** — 对文件/ArchiveItem 进行过滤
+- [ ] **3. UI: `FileFilterEditor` 用户控件** — 过滤条件编辑 UI
+- [ ] **4. UI: `FileFilterPreset` 预设系统** — 命名预设保存/加载
+- [ ] **5. UI: `AppSettings` 持久化** — `FilterPresets` 列表存储
+- [ ] **6. 压缩入口集成** — `CompressSettingsDialog` + 4 个 `RunCompress*` 应用过滤
+- [ ] **7. 解压入口集成** — 提取前过滤对话框 + `ExtractEntriesAsync`
+- [ ] **8. `FileFilterMatcher` 单元测试**
 
 ## Context
 
@@ -668,6 +680,17 @@ dotnet build src/MantisZip.UI/MantisZip.UI.csproj
 # Test compress filter with known directory structure
 # Test extract filter on multipart archive
 ```
+
+## Definition of Done
+
+- [ ] `FileFilterCriteria` 数据模型完成（扩展名/文件名/大小/日期四维）
+- [ ] `FileFilterMatcher` 匹配逻辑完成（对文件 + ArchiveItem 过滤）
+- [ ] `FileFilterEditor` 用户控件完成（条件编辑 + 预设管理）
+- [ ] 压缩入口集成：4 个 `RunCompress*` 均支持过滤
+- [ ] 解压入口集成：所有提取模式支持过滤
+- [ ] `FileFilterPreset` 预设可保存/加载
+- [ ] `FileFilterMatcher` 单元测试通过
+- [ ] 过滤器默认不激活（不干扰现有行为）
 
 ### Final Checklist
 - [ ] All 4 filter dimensions implemented and working

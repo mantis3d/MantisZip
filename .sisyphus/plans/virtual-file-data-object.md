@@ -1,7 +1,7 @@
 # VirtualFileDataObject — 拖拽延迟渲染替换方案
 
 > 用 COM 原生 IDataObject 替代 WPF OLE 桥，解决拖拽导出时 Explorer 崩溃问题
-> 状态: 📋 待定（P3，中等工作量）
+> **状态**: 📋 待定 | **阶段**: [⬜⬜⬜⬜⬜] (0/5)
 
 ---
 
@@ -37,6 +37,14 @@ DragDrop.DoDragDrop(FileListGrid, new DataObject(DataFormats.FileDrop, paths), D
 直接实现 `System.Runtime.InteropServices.ComTypes.IDataObject`（COM 原生接口），绕过 WPF 的 OLE 桥，从 COM 层面提供 `CF_HDROP` 格式数据，Explorer 不再崩溃。
 
 ---
+
+## 任务清单
+
+- [ ] **1. `VirtualFileDataObject` — COM IDataObject 实现** — 核心组件，实现 `System.Runtime.InteropServices.ComTypes.IDataObject`
+- [ ] **2. `COMStreamWrapper` — 流包装器** — 将 .NET Stream 暴露为 COM IStream
+- [ ] **3. 拖拽流程改造** — `MainWindow.DragDrop.cs` 集成 VFDO，替换现有急切提取
+- [ ] **4. 进度窗口适配** — 延迟渲染模式下进度报告方式调整
+- [ ] **5. 回退方案** — VFDO 不可用时回退到当前急切提取
 
 ## 架构设计
 
@@ -749,4 +757,31 @@ var vfdo = new VirtualFileDataObject(() =>
 - [WPF OLE 桥源码 (v8.0.1)](https://github.com/dotnet/wpf/tree/v8.0.1/src/Microsoft.DotNet.Wpf/src/Shared/MS/Win32) — `IComDataObject` 实现，确认 `CF_HDROP` 转换 bug
 - [DROPFILES 结构文档](https://learn.microsoft.com/en-us/windows/win32/api/shlobj_core/ns-shlobj_core-dropfiles) — MSDN
 - [IDataObject 接口](https://learn.microsoft.com/en-us/windows/win32/api/objidl/nn-objidl-idataobject) — COM 原生接口规范
+
+---
+
+## Definition of Done
+
+- [ ] `VirtualFileDataObject` 实现 COM `IDataObject` 接口，支持 `CF_HDROP`
+- [ ] `COMStreamWrapper` 将 .NET Stream 暴露为 COM IStream
+- [ ] 拖拽流程从急切提取改为延迟渲染
+- [ ] Explorer 不崩溃（验证 Win10/Win11）
+- [ ] 拖拽文件含中文名正常
+- [ ] 子目录结构保持
+- [ ] 加密压缩包文件提取正常
+- [ ] 取消拖拽时无 temp 残留
+- [ ] VFDO 不可用时有回退方案
+- [ ] `dotnet build` 通过
+
+### Final Checklist
+
+- [ ] `DoDragDrop` 时无急切提取，立即响应
+- [ ] 释放鼠标后开始提取文件
+- [ ] Explorer 不崩溃（解决 WPF OLE 桥 bug）
+- [ ] 拖拽 1 个 / 多个文件均正常
+- [ ] 中文文件名正常
+- [ ] 子目录结构保持
+- [ ] 加密压缩包密码已输入时正常
+- [ ] 拖拽取消无残留
+- [ ] Win10 1809+ / Win11 兼容
 - [GlobalAlloc / GlobalLock](https://learn.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-globalalloc) — HGLOBAL 内存管理

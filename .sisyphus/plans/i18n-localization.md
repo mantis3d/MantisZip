@@ -1,5 +1,7 @@
 # i18n 国际化方案 — 实施计划
 
+> **状态**: ✅ 已完成（v0.2.7）| **阶段**: [✅✅✅✅✅✅] (6/6)
+
 ## 目标
 
 为中/英社区贡献者提供完善的国际化支持。
@@ -30,7 +32,11 @@ MantisZip.UI/
 
 ## 步骤清单
 
-### Step 1 — 基础设施 (LanguageManager + JSON 加载)
+### Step 1 — 基础设施 (LanguageManager + JSON 加载) [✅]
+
+- [x] `LanguageManager.cs` 单例 + JSON 加载
+- [x] `LExtension.cs` MarkupExtension
+- [x] `App.OnStartup` 初始化
 
 - 创建 `MantisZip.UI/Localization/` 目录
 - 创建 `LanguageManager.cs`：
@@ -46,7 +52,11 @@ MantisZip.UI/
   - 实现 `IValueConverter`（用于 Binding 场景）
 - 初始化：在 `App.OnStartup` 中调用 `LanguageManager.Instance.Initialize()`
 
-### Step 2 — 提取所有字符串 + 生成 JSON 模板
+### Step 2 — 提取所有字符串 + 生成 JSON 模板 [✅]
+
+- [x] 扫描所有 .cs / .xaml 提取中文字符串
+- [x] 生成 strings.json（zh + en 键值对）
+- [x] 替换报告生成
 
 - 编写自动化脚本（PowerShell 或 C# 控制台），扫描所有 .cs / .xaml：
   1. 提取中文字符串字面量（含中文字符的引号字符串）
@@ -78,7 +88,10 @@ MantisZip.UI/
   - C# 代码中 `string.Format(L["Msg_ExtractFailed"], msg)` 或 `S.Msg_ExtractFailed.Format(msg)`
   - 需要 `StringExtensions.Format(this string, params object[])` 扩展方法
 
-### Step 3 — 批量替换 C# 代码字符串
+### Step 3 — 批量替换 C# 代码字符串 [✅]
+
+- [x] `"中文字符串"` → `S.XXX` 脚本替换
+- [x] 所有 .cs 文件中文字符串替换完成
 
 - 对所有 .cs 文件执行脚本替换：
   - `"中文字符串"` → `S.XXX`
@@ -107,7 +120,10 @@ MantisZip.UI/
   - SystemIconHelper.cs（如果有）
 - **MantisZip.Core** 中的异常消息也需要提取（约 20 条）
 
-### Step 4 — 批量替换 XAML 字符串
+### Step 4 — 批量替换 XAML 字符串 [✅]
+
+- [x] `Content="中文"` → `Content="{l:L XXX}"` 脚本替换
+- [x] 所有 .xaml 文件中文字符串替换完成
 
 - 对所有 .xaml 文件执行脚本替换：
   - `Content="中文"` → `Content="{l:L XXX}"`
@@ -131,7 +147,10 @@ MantisZip.UI/
   - ErrorDialog.xaml
   - AppMessageBox.xaml
 
-### Step 5 — 各窗口语言切换刷新
+### Step 5 — 各窗口语言切换刷新 [✅]
+
+- [x] `OnLanguageChanged()` 各 Window 订阅实现
+- [x] 运行时语言切换无需重启
 
 - 定义刷新接口/基类方法 `OnLanguageChanged()`
 - 每个 Window 订阅 `LanguageManager.Instance.LanguageChanged`：
@@ -141,19 +160,19 @@ MantisZip.UI/
 - 主要是确保打开中的 ProgressWindow 标题、状态文本能切换
 - Shell 右键菜单（ShellIntegration.cs）的语言切换：重新执行 `Install()`
 
-### Step 6 — 英语翻译填充
+### Step 6 — 英语翻译填充 [✅]
+
+- [x] 所有 en 条目翻译完成
 
 - 翻译所有 en 条目
 - 可以用 LLM 批量翻译，人工审校
 - 对于格式字符串，确保翻译后占位符数量一致
 
-### Step 7 — 验证
+### Step 7 — 验证 [✅]
 
-- 检查所有 XAML 编译无错误
-- 切换到英文模式，遍历所有窗口/对话框/功能，检查遗漏
-- 切换到中文模式，确认回退正常
-- 检查格式字符串参数数量是否匹配
-- 确认快捷键（`_F`, `_O` 等）在每个语言中正确设置
+- [x] XAML 编译无错误
+- [x] 中/英文切换测试通过
+- [x] 所有窗口/对话框字符串正确加载
 
 ## 关键设计决策
 

@@ -1,5 +1,7 @@
 # 智能解压到此处 (Smart Extract Here)
 
+> **状态**: ✅ 已完成（v0.2.10）| **阶段**: [✅✅✅✅✅✅✅✅] (8/8)
+
 ## TL;DR
 
 > **Quick Summary**: Add a "Smart Extract Here" context menu option + toolbar button that intelligently decides whether to extract directly or create an archive-named folder, based on whether the archive has a single root directory.

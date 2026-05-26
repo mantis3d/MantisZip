@@ -1,5 +1,7 @@
 # 拆分"快速压缩"为两个菜单项
 
+> **状态**: ✅ 已完成（v0.2.10）| **阶段**: [✅✅✅✅✅] (5/5)
+
 ## TL;DR
 
 > **Quick Summary**: 将现有的单个右键"快速压缩"菜单项拆分为两个独立项——"压缩到独立的（文件名）"（每个目录依次压缩为独立压缩包）和"压缩到（父目录名）"（所有目录打包为一个以公共父目录命名的压缩包）。两个新模式均引入 IPC 合并机制，避免多选时启动多个进程。
@@ -36,6 +38,14 @@
 - 旧的 EnableQuickCompress 保留不动但不再使用
 
 ---
+
+## 任务清单
+
+- [x] **1. Localization** — 新增 Shell_CompressSeparate / Shell_CompressCombined 等键
+- [x] **2. AppSettings** — EnableCompressSeparate / EnableCompressCombined 属性
+- [x] **3. CLI Handlers** — `--compress-separate` + `--compress-combined`（含 IPC 合并）
+- [x] **4. Shell Integration** — 动词注册 + 重编号 + 清理旧动词
+- [x] **5. UI** — SettingsWindow 复选框替换 + 主窗口适配
 
 ## Work Objectives
 
@@ -578,23 +588,25 @@ Scenario: Build compiles and property binding is correct
 
 ---
 
-## Success Criteria
+## Definition of Done
 
-### Verification Commands
-\\\ash
-dotnet build src/MantisZip.UI/MantisZip.UI.csproj
-dotnet test tests/MantisZip.Tests/MantisZip.Tests.csproj
-\\\
+- [x] `--compress-separate` CLI + IPC 合并完成
+- [x] `--compress-combined` CLI + IPC 合并完成（含跨驱动器输入框）
+- [x] Shell 菜单注册（动词重编号 + 清理旧动词）
+- [x] SettingsWindow 复选框替换（EnableCompressSeparate / EnableCompressCombined）
+- [x] 本地化字符串（zh/en）完成
+- [x] 进度窗口（Sequential progress）完成
+- [x] `dotnet build` 通过，`dotnet test` 通过
 
 ### Final Checklist
-- [ ] \Shell_CompressSeparate\ + \Shell_CompressCombined\ + progress/complete/prompt keys in zh/en/L.cs
-- [ ] \EnableCompressSeparate\ + \EnableCompressCombined\ in AppSettings, both default true
-- [ ] \--compress-separate\ works: individual archives for each path, sequential
-- [ ] \--compress-combined\ works: combined archive with common parent name
-- [ ] \--compress-combined\ cross-drive: shows name prompt dialog
-- [ ] IPC merge works for both modes (multi-item selection)
-- [ ] ProgressWindow shows sequential progress
-- [ ] Failed items skipped, final count shown
+- [x] Shell_CompressSeparate + Shell_CompressCombined + progress/complete/prompt keys in zh/en/L.cs
+- [x] EnableCompressSeparate + EnableCompressCombined in AppSettings, both default true
+- [x] `--compress-separate` works: individual archives for each path, sequential
+- [x] `--compress-combined` works: combined archive with common parent name
+- [x] `--compress-combined` cross-drive: shows name prompt dialog
+- [x] IPC merge works for both modes (multi-item selection)
+- [x] ProgressWindow shows sequential progress
+- [x] Failed items skipped, final count shown
 - [ ] Old \ 5_MantisZipQuick\ verb key no longer created
 - [ ] New verbs registered: \ 5_MantisZipCompressSeparate\, \ 6_MantisZipCompressCombined\, \ 7_MantisZipCompress\
 - [ ] SettingsWindow checkboxes replace old \EnableQuickCheck\

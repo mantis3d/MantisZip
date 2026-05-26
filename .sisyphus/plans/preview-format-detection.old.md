@@ -1,5 +1,7 @@
 # 预览格式识别与元数据展示 — ❌ 已废弃
 
+> **状态**: ❌ 已废弃（已拆分为 preview-extended-formats.md + preview-magic-detection.md）
+
 > **此计划已被拆分为两份独立计划**：
 >
 > 1. **[preview-extended-formats.md](preview-extended-formats.md)** — 扩展预览格式支持
