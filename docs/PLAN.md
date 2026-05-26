@@ -2,10 +2,10 @@
 
 > 详细开发计划及进度跟踪文档
 
-**项目状态**: 🟢 开发中 (Phase 5 — 预览格式扩展)  
+**项目状态**: 🟢 开发中 (Phase 5 — 预览格式扩展 + 压缩包注释)  
 **创建日期**: 2026-04-23  
-**最后更新**: 2026-05-22  
-**当前版本**: 0.3.0
+**最后更新**: 2026-05-26  
+**当前版本**: 0.3.1
 
 ---
 
@@ -123,6 +123,7 @@ MantisZip/
 │       ├── CompressConflictDialog.xaml / .cs  # 压缩冲突弹窗
 │       ├── ErrorDialog.xaml / .cs         # 错误提示弹窗
 │       ├── AppMessageBox.xaml / .cs       # 统一消息框
+│       ├── ArchiveCommentDialog.xaml / .cs    # 压缩包注释编辑
 │       ├── PasswordDialog.xaml / .cs      # 密码输入框
 │       ├── PasswordEditDialog.xaml / .cs  # 密码编辑框
 │       ├── PasswordHelpDialog.xaml / .cs  # 密码帮助窗口
@@ -199,6 +200,8 @@ MantisZip/
 | P2 | 文件关联 | ✅ 完成 |
 | P2 | 暂停/继续 | ✅ 完成 |
 | P2 | 快速密码验证 | ✅ 完成 |
+| P1 | 压缩包注释（编辑已有 + 压缩时指定） | ✅ 完成 |
+| P1 | 注释分配策略（AllSame/FirstOnly/PerLine） | ✅ 完成 |
 
 ### 2.3 用户交互
 
@@ -294,7 +297,7 @@ MantisZip.UI.exe --extract-smart "D:\软件包.7z"
 | 2.6 | 压缩配置面板 | ✅ 完成 |
 
 ### Phase 3: 高级功能
-**目标**: 加密、分卷等高级功能 — **90%**
+**目标**: 加密、分卷、注释等高级功能 — **95%**
 
 | 序号 | 任务 | 状态 |
 |------|------|------|
@@ -302,7 +305,8 @@ MantisZip.UI.exe --extract-smart "D:\软件包.7z"
 | 3.2 | 密码解密解压 | ✅ 完成 |
 | 3.3 | 分卷压缩 | ✅ 完成 |
 | 3.4 | 文件预览 | ✅ 完成 |
-| 3.5 | 压缩方式选择 | ⬜ 待开发 |
+| 3.5 | 压缩包注释（编辑 + 压缩注释） | ✅ 完成 |
+| 3.6 | 压缩方式选择 | ⬜ 待开发 |
 
 ### Phase 4: 系统集成与发布
 **目标**: Shell 集成、发布与打包 — **95%**
@@ -322,10 +326,10 @@ MantisZip.UI.exe --extract-smart "D:\软件包.7z"
 ```
 Phase 1: ████████████████████ 100%
 Phase 2: ████████████████████ 100%
-Phase 3: ██████████████████░░ 90%
+Phase 3: ███████████████████░ 95%
 Phase 4: ███████████████████░ 95%
 
-总体进度: ███████████████████ 95%
+总体进度: ███████████████████ 96%
 ```
 
 ---
@@ -358,21 +362,26 @@ Phase 4: ███████████████████░ 95%
 
 ## 七、下一步工作
 
-### 预览格式扩展（P1）
+### 预览格式扩展（P1）— ✅ v0.3.0 已完成
 
-| 格式 | 难度 | 方案 |
-|------|:----:|------|
-| RTF | 🟢 低 | WPF RichTextBox 原生支持 RTF 解析 |
-| CSV | 🟢 低 | 按逗号/制表符分行分列，DataGrid 展示 |
-| SVG | 🟢 低 | WebBrowser 直接渲染 |
-| EXE / DLL | 🟢 低 | ExtractIconEx 获取专属图标 + FileVersionInfo 显示版本信息 |
-| LNK | 🟢 低 | IShellLink 读快捷方式目标路径 |
-| PDF | 🟡 中 | WebView2（Edge Chromium）渲染 PDF 第一页，方案比 WinRT 更稳定 |
-| XLSX（文本） | 🟡 中 | 本质 ZIP，读 sharedStrings.xml 拿文本 |
-| TTF / OTF | 🟡 中 | GlyphTypeface 加载字体，Canvas 绘制示例文字 |
-| SQLite | 🟡 中 | Microsoft.Data.Sqlite 读表结构和数据 |
-| Torrent 种子文件 | 🟡 中 | Bencode 解析约 100 行 |
-| ZIP 嵌套 | 🟡 中 | 提取内部压缩包到临时目录 → 再次 LoadArchiveAsync |
+| 格式 | 状态 |
+|------|:----:|
+| PE 可执行文件（exe/dll） | ✅ 完成 |
+| PDF 元数据 + 内容渲染 | ✅ 完成 |
+| 字体预览（TTF/OTF/WOFF） | ✅ 完成 |
+| 音频元数据（WAV/FLAC） | ✅ 完成 |
+| SQLite 数据库预览 | ✅ 完成 |
+| ISO 映像元数据 | ✅ 完成 |
+| BT 种子（Torrent） | ✅ 完成 |
+| Office 文档（docx/xlsx/pptx） | ✅ 完成 |
+| SVG 矢量图渲染 | ✅ 完成 |
+| 视频元数据（MP4/MKV/AVI） | ✅ 完成 |
+| GIF 播放控制 + 帧导航 | ✅ 完成 |
+| 工具栏重构（公共控件左/格式控件右） | ✅ 完成 |
+| CSV | 📋 待开发 — 用 `ShowTablePreview` DataGrid 展示 |
+| RTF | 📋 待开发 — WPF RichTextBox |
+| LNK | 📋 待开发 — IShellLink |
+| ZIP 嵌套 | 📋 待开发 — extract→re-LoadArchiveAsync |
 
 ### 近期（P2）
 
@@ -383,6 +392,7 @@ Phase 4: ███████████████████░ 95%
 | Emoji.Wpf 彩色 Emoji 渲染 | WPF 不支持原生彩色 Emoji，Tag 图标(📦📂☰👁🔗🔑🌐⚙)目前为黑白。引入 [Emoji.Wpf](https://github.com/samhocevar/emoji.wpf) NuGet 包，替换 TabControl 图标的 TextBlock 为 `emoji:TextBlock` |
 | 文件列表筛选 | 搜索框实时过滤当前目录 + 子目录显示切换 |
 | 文件大小进度条 | 大小列背景按文件体积比例填充，一眼看出大文件 |
+| 压缩包内重命名/移动 | 右键「重命名」/「移动到…」、F2 快捷键、extract→delete→add 流程；支持 ZIP/7z |
 
 
 
@@ -407,10 +417,9 @@ Phase 4: ███████████████████░ 95%
 | **P3** | VirtualFileDataObject | [virtual-file-data-object.md](.sisyphus/plans/virtual-file-data-object.md) | 🔴高 | 6-8h | COM 原生 IDataObject 替代 WPF OLE 桥，拖拽延迟渲染不崩溃 |
 | **P3** | COM 右键菜单 | — | 🔴高 | 4-6h | 动态菜单名、菜单排序、自定义图标 |
 | **P3** | 右键菜单目录结构预览 | — | 🔴高 | 6-8h | COM 菜单中展示压缩包文件树（Bandizip 风格） |
-| | |
+| **P2** | 压缩包内重命名/移动条目 | [archive-rename-entry.md](.sisyphus/plans/archive-rename-entry.md) | 🟡中 | 3-4h | 右键重命名(F2)/移动到…；extract→delete→add 流程；支持 ZIP/7z |
 | **P3** | 压缩包对比 (Archive Diff) | [archive-diff.md](.sisyphus/plans/archive-diff.md) | 🟡中 | 3-4h | 压缩包文件级差异对比；独特功能但非核心 |
 | **P3** | 发布 Release | — | 🟢低 | 1-2h | GitHub Releases + CI 自动构建 |
-| **P3** | WebView2 替换 WebBrowser | — | 🟡中 | 1-2h | Edge Chromium 内核渲染 PDF 第一页 + HTML/Markdown 现代 CSS 支持；不主动联网 |
 
 #### 已实现设计方案
 
@@ -425,6 +434,8 @@ Phase 4: ███████████████████░ 95%
 | 智能解压 (Smart Extract) | [smart-extract.md](.sisyphus/plans/smart-extract.md) | v0.2.10 | ArchiveStructureAnalyzer 自动分析压缩包结构，决定是否保留顶层文件夹 |
 | Quick Compress 拆分为独立/合并两项 | — | v0.2.10 | `--compress-separate` + `--compress-combined`，各自独立 IPC 通道，Shell 菜单两项可分别开关 |
 | 设置窗口菜单页分组 | — | v0.2.10 | 浏览/压缩/解压三组 + 分组分隔线，per-item 独立开关，去掉「启用」前缀 |
+|WebView2 替换 WebBrowser | — | v0.3.1 |  Edge Chromium 内核渲染 PDF  + HTML/Markdown 现代 CSS 支持；不主动联网 |
+| 压缩包注释（编辑已有 + 压缩注释 + 注释分配策略） | — | v0.3.1 | ArchiveCommentDialog + CompressSettingsWindow TabControl Comment tab + CommentDistribution 枚举 |
 
 ### 远期（P3）
 

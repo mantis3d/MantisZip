@@ -7,8 +7,8 @@
 - **技术栈**: .NET 9 + WPF + SharpZipLib + SevenZipExtractor（**计划迁移至 SharpCompress**）
 
 ## 版本
-- **当前版本**: 0.2.10
-- **发布日期**: 2026-05-20
+- **当前版本**: 0.3.1
+- **发布日期**: 2026-05-26
 
 ## 规划中
 - **引擎统一计划** — SharpZipLib → SharpCompress（详见 `.sisyphus/plans/engine-unification-sharpcompress.md`）
@@ -240,4 +240,50 @@
 6. **AppSettings.Save 返回值修复** — 返回 `bool` 指示保存成功/失败，调用方可根据返回值决定是否提示用户
 7. **代码扫描确认** — 验证所有 async void / BeginInvoke / Process.Start / NamedPipeServerStream / Mutex 生命周期均正确
 8. **版本升级** - 0.2.12
+
+### v0.3.0 (2026-05-22) — 预览格式扩展
+1. **PE 可执行文件元数据预览** — `PeParser` (Core/Utils) 解析 exe/dll 公司、产品名、文件版本、架构、子系统、描述
+2. **PDF 元数据 + 内容渲染** — `PdfParser` 提取版本/页数/标题/作者/加密状态；WebView2 渲染 PDF 内容（size-gated）
+3. **字体预览（TTF/OTF/WOFF）** — `FontParser` 解析字族名/样式/字形数；Canvas 样本渲染 + 连字开关（Standard/Contextual/Discretionary）
+4. **音频元数据（WAV/FLAC）** — `AudioParser`/`FlacParser` 提取时长/采样率/位深/声道/码率
+5. **SQLite 数据库预览** — `SqliteParser` 读取编码/页面大小/表名列表；DataGrid 多表分页展示（TabControl）
+6. **ISO 9660 映像元数据** — `IsoParser` 提取卷标/格式/大小
+7. **BT 种子解析** — `TorrentParser` 解析 InfoHash/Magnet/文件树/Tracker/创建者；树形渲染
+8. **Office 文档元数据（docx/xlsx/pptx）** — `OfficeParser` 提取标题/作者/页数/创建时间
+9. **SVG 矢量图渲染** — WebView2 渲染
+10. **视频元数据（MP4/MKV/AVI）** — `VideoParser` 提取分辨率/时长/编码
+11. **GIF 播放控制** — 播放/暂停/逐帧导航/帧号输入跳转 + 工具栏；WpfAnimatedGif
+12. **工具栏重构** — `SetToolbar(left, right)` 公共控件左、格式专用控件右、中间自动分隔
+13. **预览信息面板增强** — `PreviewExtraInfoPanel`（格式专用 key-value）+ `SetFormatSpecificInfo()`；通用信息上方分隔线
+14. **图片透明度切换** — PNG/ICO/WebP 透明棋盘格背景切换
+15. **缩放工具栏** — 适应窗口/100%/适应宽度 + active state 高亮
+16. **不支持预览图标居中** — 大号居中图标+文字
+17. **图片降采样** — `DecodePixelWidth=1920` 防止大图内存爆炸
+18. **设置窗口预览子标签页** — 通用/图片/文本/字体/种子/可执行文件；嵌套 TabControl
+19. **预览字体选择** — 系统字体列表 + 默认选项；预览样本文本可编辑
+20. **新增 100+ 本地化键值** — 图片/GIF/PE/PDF/字体/音频/SQLite/ISO/Torrent/Office/视频预览相关
+21. **主题适配** — 工具栏 Border 使用 `Theme_HeaderBg`、信息面板 `Theme_HeaderBg` 等
+22. **版本标识** — `.csproj` 中设置 `<Version>0.3.0</Version>`
+23. **版本升级** - 0.3.0
+
+### v0.3.1 (2026-05-26) 预览修复与注释
+1. **WebView2 PDF 内容渲染** — 替换 WebBrowser 为 WebView2，支持 PDF 原生渲染 + 崩溃自动恢复；隐藏 PDF 工具栏中导致崩溃的按钮（Save/Print/SaveAs/MoreSettings/FullScreen）
+2. **PDF 页数统计修复** — 修复线性化 PDF（Pages dict 位于文件末尾）、Count 位于 Type/Pages 之前、正则范围不够三种场景导致的页数显示 `--`
+3. **图片缩放修复** — 默认 FitWindow 避免小图拉伸；修复缩放按钮失效、大图缩放后不更新、宽图 FitWidth 居中、防止小图 FitWidth 放大
+4. **SQLite 预览修复** — 编码/页面大小/表名获取修复
+5. **CSV 预览** — 用 `ShowTablePreview` DataGrid 展示，100 行 × 100 列限制
+6. **音频码率/ISO 去重** — `FlacParser` 位深修复，`IsoParser` 去除重复解析
+7. **加载大文件 overlay** — 打开大压缩包时显示 "正在加载…" 覆盖层
+8. **日志自动轮转 10MB** — `debug.log` 超过 10MB 自动重命名为 `debug.1.log` 并新建
+9. **LogRedactor 线程安全** — 双重检查锁定修复并发问题
+10. **视频解析器修复** — AVI/MKV/MOV/FLV 解析兼容性修复
+11. **CI 升级** — GitHub Actions 升级到 Node.js 24 runtimes
+12. **压缩包注释编辑** — 新增 `ArchiveCommentDialog`，主窗口编辑菜单增加「压缩包注释」，使用 SharpZipLib `BeginUpdate()` + `SetComment()` 直接修改存档注释，无需重新压缩（仅 ZIP 格式）
+13. **压缩设置窗口 TabControl** — `CompressSettingsWindow` 垂直 GroupBox 改为 TabControl，含「通用」和「注释」两个标签页
+14. **注释分配策略** — `ArchiveOptions.Comment` (string?) + `CommentDistribution` 枚举（`AllSame`/`FirstOnly`/`PerLine`），分卷压缩时按策略分配注释
+15. **注释 TAB 界面** — 文本框 + 分配策略单选按钮组（仅分离模式下可配） + ZIP 注释提示；暗色/亮色主题同步
+16. **编辑菜单状态同步** — `UpdateAddDeleteBtnState` 统一同步添加文件/删除文件/压缩包注释三项
+17. **本地化扩展** — 新增 13 个语言键值（压缩注释 + 编辑菜单）
+18. **文档同步更新** — README.md / AGENTS.md / PLAN.md / PROGRESS.md
+19. **版本升级** - 0.3.1
 

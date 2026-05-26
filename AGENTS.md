@@ -161,6 +161,11 @@ Added metadata-based preview for 12 new format types across Core parsers and UI 
 
 ## Upcoming work
 
+Already implemented in v0.2.13:
+- Archive comment editing (MainWindow edit menu)
+- CompressSettingsWindow TabControl (General + Comment tabs)
+- Comment distribution (AllSame / FirstOnly / PerLine)
+
 Plans tracked under `.sisyphus/plans/`:
 
 | Plan | Status | Dependency |
@@ -185,6 +190,41 @@ See [plan](.sisyphus/plans/engine-unification-sharpcompress.md) for phased imple
 Add filtering to compress/extract operations — filter by file type extension, filename pattern, size range, or date range. Supports named presets persisted in settings.
 
 See [plan](.sisyphus/plans/file-filter-feature.md).
+
+## v0.2.13 — Archive comment features
+
+### Archive comment editing (MainWindow)
+
+- **Trigger**: 编辑 → 压缩包注释 (EditMenuArchiveComment)
+- **Dialog**: `ArchiveCommentDialog` (new XAML + .cs) opens Modal, fetches existing comment via `ZipFile.ZipFileComment` (read-only property for display)
+- **Save**: Uses `ZipFile.BeginUpdate()` + `zipFile.SetComment(comment)` + `zipFile.CommitUpdate()` — this modifies the ZIP EOCD comment **in-place without recompression**
+- **Guard**: Only enabled when archive is ZIP format (checked via `_currentFormat == ArchiveFormat.Zip` in `UpdateAddDeleteBtnState`)
+- **Flow**: `EditArchiveComment_Click` → `OpenArchiveStream` → `ZipFile` instance → show dialog → if OK: `BeginUpdate/SetComment/CommitUpdate`
+
+### CompressSettingsWindow TabControl
+
+- **Layout**: `TabControl` with 2 tabs — "通用" (General) and "注释" (Comment)
+- **General tab**: Existing compress options (format/level/encryption/split volumes), wrapped in `ScrollViewer`
+- **Comment tab**: Multi-line TextBox + radio group for distribution strategy
+- **Theme**: TabControl/TabItem styled with `Theme_HeaderBg`, `Theme_WindowBg`, `Theme_Accent`, `Theme_ButtonHover` — matches dark/light mode system
+- **WPF content virtualization**: TabItem content is lazily created (not loaded until first selection). **All event handlers and state-update helpers must guard against null controls** in Comment tab until it's been displayed once.
+- **Output mode linkage**: Distribution radio group is always visible but only enabled when `OutputMode.Separate` is selected. Other modes ignore the distribution setting and pass the raw comment text as-is.
+
+### Comment distribution (separate output only)
+
+- **`ArchiveOptions.Comment`** (string?) — optional comment text to embed in archive
+- **`CommentDistribution`** enum in `ArchiveEngine.cs`:
+  - `AllSame`: Every archive gets the full comment text
+  - `FirstOnly`: Only the first archive gets the comment; others get empty string
+  - `PerLine`: Comment is split by newline; line N → archive N; empty lines skipped; excess archives get no comment
+- **Implementation in UI layer**: `RunSeparateCompressAsync` (CompressSettingsWindow.xaml.cs) pre-computes `perLineComments` and sets `options.Comment` per iteration based on selected distribution mode
+
+### Key gotchas
+
+- **`ZipFile.ZipFileComment` is read-only**: SharpZipLib exposes the ZIP comment as a read-only property. To write, you must call `SetComment(comment)` **after** `BeginUpdate()`.
+- **TabItem controls null until first selection**: WPF virtualizes TabItem content. Don't access `x:Name` controls inside an unselected TabItem without null guards.
+- **Comment distribution ignored outside Separate mode**: When `OutputMode` is `SingleArchive` or `QuickCompress`, the distribution radio selection has no effect — the raw comment is passed as-is.
+- **Only ZIP supports comments**: Other archive formats (7z, tar.gz) do not have a comment field. The Comment tab shows a "仅 ZIP 格式支持注释" hint.
 
 ## Known issues (already fixed)
 
