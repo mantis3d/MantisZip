@@ -92,8 +92,10 @@ internal static class CoreLog
             lock (_lock)
             {
                 RotateIfNeeded();
-                File.AppendAllText(LogPath,
-                    $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}] {finalMsg}\n");
+                using var stream = new FileStream(LogPath, FileMode.Append, FileAccess.Write, FileShare.ReadWrite);
+                using var writer = new StreamWriter(stream);
+                writer.WriteLine($"[{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}] {finalMsg}");
+                writer.Flush();
             }
         }
         catch (Exception logEx)
@@ -140,8 +142,10 @@ internal static class CoreLog
             try
             {
                 RotateIfNeeded();
-                File.AppendAllText(LogPath,
-                    $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}] {finalMsg}\n");
+                using var stream = new FileStream(LogPath, FileMode.Append, FileAccess.Write, FileShare.ReadWrite);
+                using var writer = new StreamWriter(stream);
+                writer.WriteLine($"[{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}] {finalMsg}");
+                writer.Flush();
             }
             catch (Exception logEx)
             {

@@ -90,12 +90,6 @@ public partial class App : Application
         // 该文件持久化保留，不被自动删除。
         LogStartup($"START BaseDir={AppDomain.CurrentDomain.BaseDirectory} Args=[{string.Join(" ", e.Args)}]");
 
-        // WPF 跟踪监听器（写入同一个文件）
-        var listener = new TextWriterTraceListener(LogFile);
-        listener.Name = "FileLogger";
-        Trace.Listeners.Add(listener);
-        Trace.AutoFlush = true;
-
         LogDebug("LogDebug: debug.log will be appended");
 
         LogStartup($"启动参数: {string.Join(" ", e.Args)}");
@@ -1636,8 +1630,21 @@ public partial class App : Application
             var tempDir = Path.Combine(Path.GetTempPath(), L.T(L.App_MantisZipTitle));
             if (Directory.Exists(tempDir))
             {
-                Directory.Delete(tempDir, recursive: true);
-                Log(L.T(L.App_CleanedPreviewTemp));
+                for (int i = 0; i < 5; i++)
+                {
+                    try
+                    {
+                        Directory.Delete(tempDir, recursive: true);
+                        Log(L.T(L.App_CleanedPreviewTemp));
+                        break;
+                    }
+                    catch (Exception) when (i < 4)
+                    {
+                        GC.Collect();
+                        GC.WaitForPendingFinalizers();
+                        Thread.Sleep(200);
+                    }
+                }
             }
         }
         catch (Exception exitEx) { LogDebug("OnExit: temp cleanup failed: {0}", exitEx.Message); }
@@ -1687,7 +1694,10 @@ public partial class App : Application
             if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
                 Directory.CreateDirectory(dir);
             RotateDebugLogIfNeeded(StartupLog);
-            File.AppendAllText(StartupLog, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}] {redacted}\n");
+            using var logStream = new FileStream(StartupLog, FileMode.Append, FileAccess.Write, FileShare.ReadWrite);
+            using var logWriter = new StreamWriter(logStream);
+            logWriter.WriteLine($"[{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}] {redacted}");
+            logWriter.Flush();
         }
         catch { }
     }
@@ -1703,8 +1713,10 @@ public partial class App : Application
             if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
                 Directory.CreateDirectory(dir);
             RotateDebugLogIfNeeded(LogFile);
-            File.AppendAllText(LogFile, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}] {redacted}\n");
-            Debug.WriteLine(redacted);
+            using var logStream = new FileStream(LogFile, FileMode.Append, FileAccess.Write, FileShare.ReadWrite);
+            using var logWriter = new StreamWriter(logStream);
+            logWriter.WriteLine($"[{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}] {redacted}");
+            logWriter.Flush();
         }
         catch { }
     }
@@ -1729,8 +1741,10 @@ public partial class App : Application
             if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
                 Directory.CreateDirectory(dir);
             RotateDebugLogIfNeeded(LogFile);
-            File.AppendAllText(LogFile, $"[DBG] [{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}] {redacted}\n");
-            Debug.WriteLine(redacted);
+            using var logStream = new FileStream(LogFile, FileMode.Append, FileAccess.Write, FileShare.ReadWrite);
+            using var logWriter = new StreamWriter(logStream);
+            logWriter.WriteLine($"[DBG] [{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}] {redacted}");
+            logWriter.Flush();
         }
         catch { }
     }
@@ -1754,7 +1768,10 @@ public partial class App : Application
             if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
                 Directory.CreateDirectory(dir);
             RotateDebugLogIfNeeded(LogFile);
-            File.AppendAllText(LogFile, $"[TRACE] [{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}] {redacted}\n");
+            using var logStream = new FileStream(LogFile, FileMode.Append, FileAccess.Write, FileShare.ReadWrite);
+            using var logWriter = new StreamWriter(logStream);
+            logWriter.WriteLine($"[TRACE] [{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}] {redacted}");
+            logWriter.Flush();
         }
         catch { }
     }
