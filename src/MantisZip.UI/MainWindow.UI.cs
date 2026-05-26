@@ -342,6 +342,85 @@ public partial class MainWindow
         return parent.Children.Any(c => ContainsNode(c, target));
     }
 
+    /// <summary>
+    /// DataGrid 排序事件：在列标题上显示 ▲/▼ 排序标记
+    /// </summary>
+    private void FileListGrid_Sorting(object sender, DataGridSortingEventArgs e)
+    {
+        // 清除所有列标题上的排序标记，恢复原始文字
+        foreach (var column in FileListGrid.Columns)
+        {
+            if (column.Header is string headerText)
+                column.Header = headerText.TrimEnd('▲', '▼', ' ').TrimEnd();
+        }
+
+        // 排序事件触发时 col.SortDirection 还是旧值，需要自己推算即将应用的新方向
+        var col = e.Column;
+        ListSortDirection? newDir = null;
+        if (col.SortDirection == null)
+            newDir = ListSortDirection.Ascending;
+        else if (col.SortDirection == ListSortDirection.Ascending)
+            newDir = ListSortDirection.Descending;
+        // else (Descending) → null（回到未排序）
+
+        if (col.Header is string header)
+        {
+            var clean = header.TrimEnd('▲', '▼', ' ').TrimEnd();
+            if (newDir == ListSortDirection.Ascending)
+                col.Header = clean + " ▲";
+            else if (newDir == ListSortDirection.Descending)
+                col.Header = clean + " ▼";
+        }
+    }
+
+    /// <summary>
+    /// 列标题右键菜单打开时：动态生成各列的显隐切换项
+    /// </summary>
+    private void ColumnHeaderContextMenu_Opened(object sender, RoutedEventArgs e)
+    {
+        var menu = (ContextMenu)sender;
+        menu.Items.Clear();
+
+        foreach (var column in FileListGrid.Columns)
+        {
+            // 获取原始标题文字（去掉排序标记）
+            var raw = column.Header?.ToString() ?? "";
+            raw = raw.TrimEnd('▲', '▼', ' ').TrimEnd();
+
+            // 跳过名称列（不允许隐藏）
+            if (raw == L.T(L.Main_Col_Name))   // "名称" / "Name"
+                continue;
+
+            var isVisible = column.Visibility == Visibility.Visible;
+
+            var item = new MenuItem
+            {
+                // 可见的列前加 ●，隐藏的列前加 ○，后面保持对齐
+                Header = (isVisible ? "● " : "○ ") + raw,
+                Tag = column
+            };
+
+            item.Click += ColumnVisibilityMenuItem_Click;
+            menu.Items.Add(item);
+        }
+    }
+
+    /// <summary>
+    /// 点击列显隐菜单项：切换对应列的可见性
+    /// </summary>
+    private void ColumnVisibilityMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is MenuItem item && item.Tag is DataGridColumn column)
+        {
+            var newVisible = column.Visibility != Visibility.Visible;
+            column.Visibility = newVisible ? Visibility.Visible : Visibility.Collapsed;
+
+            // 更新标题前的状态符号
+            var raw = (item.Header?.ToString() ?? "").TrimStart('●', '○', ' ');
+            item.Header = (newVisible ? "● " : "○ ") + raw;
+        }
+    }
+
     #endregion
 }
 

@@ -22,6 +22,18 @@
             <Setter Property="IsExpanded" Value="{Binding IsExpanded}"/>
             <Setter Property="IsSelected" Value="{Binding IsSelected}"/>
         </Style>
+
+        <!-- 列标题右键菜单（切换列显隐） -->
+        <ContextMenu x:Key="ColumnHeaderContextMenu"/>
+
+        <!-- DataGrid 列标题样式：适配主题 + 右键菜单 -->
+        <Style x:Key="DataGridColumnHeaderStyle" TargetType="DataGridColumnHeader">
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Padding" Value="8,0,8,0"/>
+            <Setter Property="Background" Value="{StaticResource Theme_HeaderBg}"/>
+            <Setter Property="Foreground" Value="{StaticResource Theme_TextSecondary}"/>
+            <Setter Property="ContextMenu" Value="{StaticResource ColumnHeaderContextMenu}"/>
+        </Style>
     </Window.Resources>
 
     <Grid>
@@ -225,6 +237,8 @@
                                           GridLinesVisibility="Horizontal"
                                           HeadersVisibility="Column"
                                           RowHeaderWidth="0"
+                                          ColumnHeaderHeight="36"
+                                          ColumnHeaderStyle="{StaticResource DataGridColumnHeaderStyle}"
                                           Background="{StaticResource Theme_SurfaceBg}"
                                           VirtualizingStackPanel.IsVirtualizing="True"
                                           VirtualizingStackPanel.VirtualizationMode="Recycling"
@@ -236,7 +250,8 @@
                                            PreviewMouseDoubleClick="FileListGrid_PreviewMouseDoubleClick"
                                             PreviewMouseLeftButtonDown="FileListGrid_PreviewMouseLeftButtonDown"
                                             PreviewMouseMove="FileListGrid_PreviewMouseMove"
-                                            PreviewKeyDown="FileListGrid_PreviewKeyDown">
+                                            PreviewKeyDown="FileListGrid_PreviewKeyDown"
+                                            Sorting="FileListGrid_Sorting">
                                     <DataGrid.ContextMenu>
                                         <ContextMenu>
                                             <MenuItem Header="{l:L Main_Ctx_AddFiles}" Click="FileListCtx_AddFiles"/>
@@ -260,9 +275,9 @@
                                                 </DataTemplate>
                                             </DataGridTemplateColumn.CellTemplate>
                                         </DataGridTemplateColumn>
-                                        <DataGridTextColumn Header="{l:L Main_Col_Size}" Binding="{Binding SizeDisplay}" Width="100"/>
-                                        <DataGridTextColumn Header="{l:L Main_Col_Compressed}" Binding="{Binding CompressedSizeDisplay}" Width="100"/>
-                                        <DataGridTextColumn Header="{l:L Main_Col_Date}" Binding="{Binding DateDisplay}" Width="150"/>
+                                        <DataGridTextColumn Header="{l:L Main_Col_Size}" Binding="{Binding SizeDisplay}" SortMemberPath="Size" Width="100"/>
+                                        <DataGridTextColumn Header="{l:L Main_Col_Compressed}" Binding="{Binding CompressedSizeDisplay}" SortMemberPath="CompressedSize" Width="100"/>
+                                        <DataGridTextColumn Header="{l:L Main_Col_Date}" Binding="{Binding DateDisplay}" SortMemberPath="LastModified" Width="150"/>
                                         <DataGridTemplateColumn Header="{l:L Main_Col_Encrypted}" Width="50">
                                             <DataGridTemplateColumn.CellTemplate>
                                                 <DataTemplate>
