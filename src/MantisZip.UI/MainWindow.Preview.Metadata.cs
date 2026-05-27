@@ -133,6 +133,78 @@ public partial class MainWindow
         catch (Exception ex) { App.LogDebug("ShowAudioPreview: failed: {0}", ex.Message); ShowUnsupportedPreview(null, L.T(L.Preview_AudioParseFailed)); }
     }
 
+    // ── MP3 ──
+
+    private void ShowMp3Preview(string filePath, ArchiveItem item)
+    {
+        try
+        {
+            var info = Id3v2Parser.Parse(filePath);
+            if (info == null) { ShowUnsupportedPreview(item, L.T(L.Preview_Mp3ParseFailed)); return; }
+
+            HideAllPreviewControls();
+            ShowPreviewPanel();
+
+            // 信息面板：标题、歌手、专辑、时长、比特率、采样率
+            var extra = new List<(string, string)>();
+            if (!string.IsNullOrEmpty(info.Title)) extra.Add((L.T(L.Preview_Mp3Title), info.Title));
+            if (!string.IsNullOrEmpty(info.Artist)) extra.Add((L.T(L.Preview_Mp3Artist), info.Artist));
+            if (!string.IsNullOrEmpty(info.Album)) extra.Add((L.T(L.Preview_Mp3Album), info.Album));
+            if (info.Duration.HasValue) extra.Add((L.T(L.Preview_AudioDuration), info.Duration.Value.ToString("hh\\:mm\\:ss")));
+            if (info.Bitrate.HasValue && info.Bitrate.Value > 0) extra.Add((L.T(L.Preview_AudioBitrate), $"{info.Bitrate} kbps"));
+            if (info.SampleRate.HasValue && info.SampleRate.Value > 0) extra.Add((L.T(L.Preview_AudioSampleRate), $"{info.SampleRate} Hz"));
+            SetFormatSpecificInfo(extra.ToArray());
+            SetToolbar(Array.Empty<ToolbarButton>(), Array.Empty<ToolbarButton>());
+            SetPreviewInfo(item);
+            PreviewHeader.Text = L.TF(L.Preview_Mp3Header, Path.GetFileName(filePath));
+
+            // 内容区：优先显示封面图片，无封面时显示标题/歌手
+            bool hasCoverArt = info.CoverArtData != null && info.CoverArtData.Length > 8;
+            if (hasCoverArt)
+            {
+                try
+                {
+                    var bitmap = new System.Windows.Media.Imaging.BitmapImage();
+                    bitmap.BeginInit();
+                    bitmap.CacheOption = System.Windows.Media.Imaging.BitmapCacheOption.OnLoad;
+                    bitmap.StreamSource = new MemoryStream(info.CoverArtData!);
+                    bitmap.EndInit();
+                    bitmap.Freeze();
+                    PreviewImage.Source = bitmap;
+                    PreviewImageScroll.Visibility = Visibility.Visible;
+                }
+                catch (Exception ex)
+                {
+                    App.LogDebug("ShowMp3Preview: failed to load cover art: {0}", ex.Message);
+                    hasCoverArt = false;
+                }
+            }
+
+            if (!hasCoverArt)
+            {
+                // 无封面时，内容区显示标题/歌手
+                var sb = new System.Text.StringBuilder();
+                if (!string.IsNullOrEmpty(info.Title))
+                    sb.AppendLine(info.Title);
+                if (!string.IsNullOrEmpty(info.Artist))
+                    sb.Append(info.Artist);
+                if (sb.Length > 0)
+                {
+                    PreviewTextBox.Text = sb.ToString().TrimEnd();
+                    PreviewTextBox.FontSize = 24;
+                    PreviewTextBox.TextAlignment = TextAlignment.Center;
+                    PreviewTextBox.FontFamily = null; // 默认字体
+                    PreviewTextBox.Visibility = Visibility.Visible;
+                }
+                else
+                {
+                    // 连标题都没有，内容区留空（仅显示信息面板）
+                }
+            }
+        }
+        catch (Exception ex) { App.LogDebug("ShowMp3Preview: failed: {0}", ex.Message); ShowUnsupportedPreview(null, L.T(L.Preview_Mp3ParseFailed)); }
+    }
+
     // ── SQLite ──
 
     private async Task ShowSqlitePreview(string filePath, ArchiveItem item)

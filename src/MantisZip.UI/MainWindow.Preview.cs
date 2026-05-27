@@ -104,6 +104,11 @@ public partial class MainWindow
         ".flac"
     };
 
+    private static readonly HashSet<string> Mp3Extensions = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ".mp3"
+    };
+
     private static readonly HashSet<string> SqliteExtensions = new(StringComparer.OrdinalIgnoreCase)
     {
         ".sqlite", ".sqlite3", ".db", ".db3"
@@ -139,7 +144,7 @@ public partial class MainWindow
     {
         ".exe", ".dll", ".sys", ".ocx",
         ".pdf", ".docx", ".xlsx", ".pptx",
-        ".wav", ".flac",
+        ".wav", ".flac", ".mp3",
         ".sqlite", ".sqlite3", ".db", ".db3",
         ".iso",
         ".torrent",
@@ -381,6 +386,11 @@ public partial class MainWindow
             {
                 var tempFile = await ExtractPreviewFileAsync(item, "preview" + ext, ct);
                 ShowAudioPreview(tempFile, item, "FLAC");
+            }
+            else if (Mp3Extensions.Contains(ext))
+            {
+                var tempFile = await ExtractPreviewFileAsync(item, "preview" + ext, ct);
+                ShowMp3Preview(tempFile, item);
             }
             else if (SqliteExtensions.Contains(ext))
             {
