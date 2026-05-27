@@ -46,3 +46,4 @@ replace_strings.ps1
 # Development artifacts
 *.bak
 session-*.md
+CLAUDE.md
