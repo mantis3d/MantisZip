@@ -528,6 +528,7 @@ public static class L
     public const string Settings_Extract_OpenFolderAfter           = "Settings_Extract_OpenFolderAfter";
     public const string Settings_Language                          = "Settings_Language";
     public const string Settings_Language_Restart                  = "Settings_Language_Restart";
+    public const string Settings_Language_NoTranslator             = "Settings_Language_NoTranslator";
     public const string Settings_Menu_Btn_Apply                    = "Settings_Menu_Btn_Apply";
     public const string Settings_Menu_Btn_Install                  = "Settings_Menu_Btn_Install";
     public const string Settings_Menu_Btn_Uninstall                = "Settings_Menu_Btn_Uninstall";

@@ -472,6 +472,7 @@
   "Settings_Extract_OpenFolderAfter": "Open destination folder after extraction",
   "Settings_Language": "Language",
   "Settings_Language_Restart": "Language change will take effect after restart.",
+  "Settings_Language_NoTranslator": "No translator info available",
   "Settings_Menu_Btn_Apply": "Apply",
   "Settings_Menu_Btn_Install": "Install",
   "Settings_Menu_Btn_Uninstall": "Uninstall",

@@ -474,6 +474,7 @@
   "Settings_Extract_OpenFolderAfter": "解压后打开目标文件夹",
   "Settings_Language": "界面语言",
   "Settings_Language_Restart": "语言切换将在重启后生效。",
+  "Settings_Language_NoTranslator": "暂无翻译人员信息",
   "Settings_Menu_Btn_Apply": "应用",
   "Settings_Menu_Btn_Install": "安装",
   "Settings_Menu_Btn_Uninstall": "卸载",

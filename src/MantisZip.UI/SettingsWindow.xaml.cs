@@ -35,7 +35,6 @@ public partial class SettingsWindow : Window
         {
             var size = (int)FontPreviewSizeSlider.Value;
             FontPreviewSizeText.Text = size.ToString();
-            FontPreviewSampleBox.FontSize = size;
         };
 
         // 先填充字体列表，再加载设置并从列表中选中已保存的字体
@@ -162,6 +161,7 @@ public partial class SettingsWindow : Window
         }
         foreach (ComboBoxItem item in LanguageCombo.Items)
             if ((string)item.Tag == s.Language) { LanguageCombo.SelectedItem = item; break; }
+        UpdateLanguageTranslatorText();
 
         AboutVersionText.Text = AppConstants.Version;
 
@@ -485,13 +485,30 @@ public partial class SettingsWindow : Window
     private void LanguageCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         if (e.RemovedItems.Count == 0) return; // 初始填充，非用户操作
-        if (LanguageCombo.SelectedItem is ComboBoxItem item && item.Tag is string code
-            && code != AppSettings.Instance.Language)
+        var code = (LanguageCombo.SelectedItem as ComboBoxItem)?.Tag as string;
+        if (code != null && code != AppSettings.Instance.Language)
         {
             LanguageManager.Instance.SwitchTo(code);
             AppMessageBox.Show(L.T(L.Settings_Language_Restart), L.T(L.App_MantisZipTitle),
                 MessageBoxButton.OK, MessageBoxImage.Information);
         }
+        // 无论是否切换语言（可能是相同语言换回），都更新翻译者文本
+        if (code != null)
+            UpdateLanguageTranslatorText(code);
+    }
+
+    private void UpdateLanguageTranslatorText(string? langCode = null)
+    {
+        langCode ??= (LanguageCombo.SelectedItem as ComboBoxItem)?.Tag as string;
+        if (string.IsNullOrEmpty(langCode))
+        {
+            LanguageTranslatorText.Text = "";
+            return;
+        }
+        var translator = LanguageManager.Instance.GetLanguageTranslator(langCode);
+        LanguageTranslatorText.Text = !string.IsNullOrEmpty(translator)
+            ? translator
+            : L.T(L.Settings_Language_NoTranslator);
     }
 
     private void LogPrivacyHelp_Click(object sender, RoutedEventArgs e)
