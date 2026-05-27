@@ -2,10 +2,10 @@
 
 > 详细开发计划及进度跟踪文档
 
-**项目状态**: 🟢 开发中 (Phase 5 — 预览格式扩展 + 压缩包注释)  
+**项目状态**: 🟢 开发中 (Phase 6 — 代码重构与文档更新)  
 **创建日期**: 2026-04-23  
-**最后更新**: 2026-05-26  
-**当前版本**: 0.3.1
+**最后更新**: 2026-05-27  
+**当前版本**: 0.3.3
 
 ---
 
@@ -45,12 +45,12 @@
 
 | 包名 | 版本 | 用途 | 许可证 |
 |------|------|------|--------|
-| CommunityToolkit.Mvvm | 8.3.2 | MVVM 辅助（仅用部分基类） | MIT |
-| Markdig | 1.1.3 | Markdown → HTML 渲染 | BSD-2-Clause |
+| CommunityToolkit.Mvvm | 8.4.2 | MVVM 辅助（仅用部分基类） | MIT |
+| Markdig | 1.2.0 | Markdown → HTML 渲染 | BSD-2-Clause |
 | Ookii.Dialogs.Wpf | 5.0.1 | 文件夹选择对话框 | BSD-3-Clause |
 | Ude.NetStandard | 1.2.0 | 字符编码检测（文本预览） | MIT |
 | WpfAnimatedGif | 2.0.2 | GIF 动画支持 | MIT |
-| Microsoft.Web.WebView2 | 0.3.0 | Edge Chromium 内核，替代 WebBrowser（IE），支持 PDF 原生渲染、现代 CSS | BSD-3-Clause |
+| Microsoft.Web.WebView2 | 1.0.3967.48 | Edge Chromium 内核，替代 WebBrowser（IE），支持 PDF 原生渲染、现代 CSS | BSD-3-Clause |
 
 ### 测试
 
@@ -73,7 +73,7 @@
 |------|------|------|
 | 开发语言 | C# (.NET 9, Windows) | 现代 .NET，CLI 直接支持 |
 | UI 框架 | WPF | Windows 原生体验，高性能 |
-| 架构模式 | Code-behind | 所有逻辑在 MainWindow.xaml.cs |
+| 架构模式 | Code-behind | 所有逻辑在 MainWindow.xaml.cs（及 partial class 文件）和 App 系列 partial class |
 | 压缩库 | SharpZipLib (ZIP/TAR/GZ) + SevenZipExtractor (7z/RAR) | 功能成熟 — **计划迁移至 SharpCompress** |
 
 ### 1.2 系统要求
@@ -113,7 +113,11 @@ MantisZip/
 │       ├── MainWindow.DragDrop.cs   # 拖拽导出
 │       ├── MainWindow.Menu.cs       # 菜单事件
 │       ├── MainWindow.UI.cs         # UI 辅助方法
-│       ├── App.xaml / .cs           # 应用入口 + CLI 处理 + --compress IPC
+│       ├── App.xaml / .cs           # 应用入口（~600 行，核心：OnStartup、主题、选项创建）
+│       ├── App.Cli.cs               # CLI 命令处理器（~970 行）
+│       ├── App.PipeServer.cs        # 命名管道 IPC（~130 行）
+│       ├── App.Password.cs          # 密码管理（~200 行）
+│       ├── App.Logging.cs           # 日志子系统（~140 行）
 │       ├── AppConstants.cs          # 版本号常量
 │       ├── AppSettings.cs           # 用户设置（JSON 持久化）
 │       ├── SettingsWindow.xaml / .cs    # 设置窗口（六标签页）
@@ -347,7 +351,7 @@ Phase 4: ███████████████████░ 95%
 | 2026-05-13 | 子目录不显示（无显式条目 ZIP） | BuildFolderTree + FilterFiles 推导隐式目录 | ✅ v0.2.2 已修复 |
 | 2026-05-13 | CLI 密码对话框不显示 | ShutdownMode OnExplicitShutdown | ✅ v0.2.2 已修复 |
 | 2026-05-13 | 多条密码规则只试第一条 | 改为遍历所有 | ✅ v0.2.2 已修复 |
-| 2026-05-18 | 设置里「彩色 Emoji」开关无效 | WPF 原生渲染不传 `D2D1_DRAW_TEXT_OPTIONS_ENABLE_COLOR_FONT` 给 DirectWrite。需引入第三方库 Emoji.Wpf | ⬜ 待修复 |
+| 2026-05-18 | 设置里「彩色 Emoji」开关无效 | WPF 原生渲染不传 `D2D1_DRAW_TEXT_OPTIONS_ENABLE_COLOR_FONT` 给 DirectWrite。需引入第三方库 Emoji.Wpf | ✅ 已修复 |
 | 2026-05-19 | SharpZipLib CommitUpdate 黑盒，添加/删除时旧条目 I/O 阶段无法上报进度 | 临时方案：按旧条目数加权进度跳变到 100%；彻底解决需迁移 SharpCompress | ✅ 临时方案已实现 |
 | 2026-05-21 | 多处空 `catch { }` 吞异常（日志/explorer/设置等） | 统一改为 `App.TraceLog`/`CoreLog.Trace` 记录，异常路径不再丢失信息 | ✅ v0.2.12 已修复 |
 | 2026-05-21 | `OpenZipFile` 枚举异常时 ZipFile 文件句柄泄漏 | 用 try-catch 包裹枚举逻辑，异常时释放已打开的 ZipFile | ✅ v0.2.12 已修复 |
@@ -378,7 +382,7 @@ Phase 4: ███████████████████░ 95%
 | 视频元数据（MP4/MKV/AVI） | ✅ 完成 |
 | GIF 播放控制 + 帧导航 | ✅ 完成 |
 | 工具栏重构（公共控件左/格式控件右） | ✅ 完成 |
-| CSV | 📋 待开发 — 用 `ShowTablePreview` DataGrid 展示 |
+| CSV | ✅ v0.3.1 已完成 — 用 `ShowTablePreview` DataGrid 展示（100 行 × 100 列限制） |
 | RTF | 📋 待开发 — WPF RichTextBox |
 | LNK | 📋 待开发 — IShellLink |
 | ZIP 嵌套 | 📋 待开发 — extract→re-LoadArchiveAsync |
@@ -389,7 +393,6 @@ Phase 4: ███████████████████░ 95%
 |------|------|
 | 文本预览语法高亮 | 用 AvalonEdit 替换当前 TextBox，支持 20+ 语言语法高亮（C#/Python/XML/HTML/SQL/JS 等）。加一个 NuGet 包 + 改控件名 + 两行配置即可 |
 | 压缩方式选择 | Store/Deflate/BZip2/LZMA，需换 SharpCompress 库 |
-| Emoji.Wpf 彩色 Emoji 渲染 | WPF 不支持原生彩色 Emoji，Tag 图标(📦📂☰👁🔗🔑🌐⚙)目前为黑白。引入 [Emoji.Wpf](https://github.com/samhocevar/emoji.wpf) NuGet 包，替换 TabControl 图标的 TextBlock 为 `emoji:TextBlock` |
 | 文件列表筛选 | 搜索框实时过滤当前目录 + 子目录显示切换 |
 | 文件大小进度条 | 大小列背景按文件体积比例填充，一眼看出大文件 |
 | 压缩包内重命名/移动 | 右键「重命名」/「移动到…」、F2 快捷键、extract→delete→add 流程；支持 ZIP/7z |
@@ -404,20 +407,21 @@ Phase 4: ███████████████████░ 95%
 
 | 优先级 | 功能 | 设计文档 | 难度 | 预估工时 | 说明 |
 |--------|------|----------|:----:|:--------:|------|
-| **P1** | 引擎统一 (SharpZipLib → SharpCompress) | [engine-unification-sharpcompress.md](.sisyphus/plans/engine-unification-sharpcompress.md) | 🔴高 | 6-8h | 统一引擎架构，含压缩方式选择；突破 SharpZipLib CommitUpdate 黑盒进度问题 |
-| **P1** | 文件大小进度条 | [file-size-progress-bar.md](.sisyphus/plans/file-size-progress-bar.md) | 🟢低 | 0.5h | 大小列背景按文件体积比例填充，纯 UI 改动 |
+| **P1** | 引擎统一 (SharpZipLib → SharpCompress) | [engine-unification-sharpcompress.md](/.sisyphus/plans/engine-unification-sharpcompress.md) | 🔴高 | 6-8h | 统一引擎架构，含压缩方式选择；突破 SharpZipLib CommitUpdate 黑盒进度问题 |
+| **P1** | 文件大小进度条 | [file-size-progress-bar.md](/.sisyphus/plans/file-size-progress-bar.md) | 🟢低 | 0.5h | 大小列背景按文件体积比例填充，纯 UI 改动 |
 | **P2** | 文本预览语法高亮 (AvalonEdit) | — | 🟢低 | 1-2h | 替换当前 TextBox，支持 20+ 语言语法高亮 |
 | **P2** | 便携版模式 | [portable-mode.md](.sisyphus/plans/portable-mode.md) | 🟢低 | 1-2h | 哨兵文件触发，路径重定向到 exe 目录，免注册表 |
 | **P2** | 魔数识别（内容检测替代扩展名检测） | [preview-format-detection.md](.sisyphus/plans/preview-format-detection.md) | 🔴高 | 6-8h | 剩余工作：按真实内容（非扩展名）判断格式 |
 | **P2** | 提取日志与解压「后悔药」 | [extract-journal-undo.md](.sisyphus/plans/extract-journal-undo.md) | 🟡中 | 3-4h | 解压记录 + 一键回滚；差异化功能亮点 |
 | **P2** | 文件列表筛选/搜索 | — | 🟢低 | 1-2h | 搜索框实时过滤 + 子目录显示切换增强 |
-| **P2** | Emoji.Wpf 彩色 Emoji | — | 🟢低 | 0.5h | 替换 TabControl 图标 TextBlock 为 emoji:TextBlock |
 | **P2** | MSI 安装包 (WiX) | [msi-packaging-wix.md](.sisyphus/plans/msi-packaging-wix.md) | 🟡中 | 2-3h | Inno Setup EXE → WiX MSI 迁移；企业分发、静默安装 |
 | **P3** | 压缩预估 (Compression Estimator) | [compression-estimator.md](.sisyphus/plans/compression-estimator.md) | 🟡中 | 4-5h | 压缩前估算大小/耗时；三级精度策略 |
 | **P3** | VirtualFileDataObject | [virtual-file-data-object.md](.sisyphus/plans/virtual-file-data-object.md) | 🔴高 | 6-8h | COM 原生 IDataObject 替代 WPF OLE 桥，拖拽延迟渲染不崩溃 |
 | **P3** | COM 右键菜单 | — | 🔴高 | 4-6h | 动态菜单名、菜单排序、自定义图标 |
 | **P3** | 右键菜单目录结构预览 | — | 🔴高 | 6-8h | COM 菜单中展示压缩包文件树（Bandizip 风格） |
 | **P2** | 压缩包内重命名/移动条目 | [archive-rename-entry.md](.sisyphus/plans/archive-rename-entry.md) | 🟡中 | 3-4h | 右键重命名(F2)/移动到…；extract→delete→add 流程；支持 ZIP/7z |
+| **P2** | 批量进度文件列表 | [batch-progress-list.md](.sisyphus/plans/batch-progress-list.md) | 🟡中 | 3-4h | 批量操作进度窗口增加文件列表，每项显示名称+状态；--extract-batch CLI |
+| **P2** | 资源管理器路径快速选择 | [explorer-path-switcher.md](.sisyphus/plans/explorer-path-switcher.md) | 🟢低 | 1-2h | Ctrl+G 唤出已打开的资源管理器窗口路径列表，双击填入目标位置 |
 | **P3** | 压缩包对比 (Archive Diff) | [archive-diff.md](.sisyphus/plans/archive-diff.md) | 🟡中 | 3-4h | 压缩包文件级差异对比；独特功能但非核心 |
 | **P3** | 发布 Release | — | 🟢低 | 1-2h | GitHub Releases + CI 自动构建 |
 
@@ -427,6 +431,9 @@ Phase 4: ███████████████████░ 95%
 
 | 功能 | 设计文档 | 实现版本 | 说明 |
 |------|----------|:--------:|------|
+| 预览格式扩展（12 种元数据格式） | [preview-extended-formats.md](.sisyphus/plans/preview-extended-formats.md) | v0.3.0 | PE/PDF/字体/音频/SQLite/ISO/Torrent/Office/SVG/视频 + 工具栏 + GIF 控制 + 信息面板 |
+| 快速压缩拆分为独立/合并两项 | [split-compress.md](.sisyphus/plans/split-compress.md) | v0.2.10 | --compress-separate / --compress-combined，各自独立 IPC 通道 |
+| 加载大文件 overlay | [archive-loading-progress.md](.sisyphus/plans/archive-loading-progress.md) | v0.3.1 | 打开大压缩包时居中 overlay 进度条 + 条目计数 |
 | 添加到压缩包 / 从压缩包删除 | [archive-add-delete.md](.sisyphus/plans/archive-add-delete.md) | v0.2.9 | 含 IArchiveEngine.DeleteEntriesAsync、UI 入口、确认弹窗 |
 | 暗色/亮色主题 | [dark-theme.md](.sisyphus/plans/dark-theme.md) | v0.2.9 | 主题色资源字典 + Appearance 设置页 + 实时切换 |
 | 日志隐私脱敏 | [log-privacy-redaction.md](.sisyphus/plans/log-privacy-redaction.md) | v0.2.8 | Core/Utils/LogRedactor + UI 设置面板；三种模式 |
@@ -436,6 +443,7 @@ Phase 4: ███████████████████░ 95%
 | 设置窗口菜单页分组 | — | v0.2.10 | 浏览/压缩/解压三组 + 分组分隔线，per-item 独立开关，去掉「启用」前缀 |
 |WebView2 替换 WebBrowser | — | v0.3.1 |  Edge Chromium 内核渲染 PDF  + HTML/Markdown 现代 CSS 支持；不主动联网 |
 | 压缩包注释（编辑已有 + 压缩注释 + 注释分配策略） | — | v0.3.1 | ArchiveCommentDialog + CompressSettingsWindow TabControl Comment tab + CommentDistribution 枚举 |
+| Emoji.Wpf 彩色 Emoji 渲染 | — | v0.3.2 | 引入 [Emoji.Wpf](https://github.com/samhocevar/emoji.wpf) NuGet 包，替换 SettingsWindow TabControl 和 MainWindow 工具栏/目录树图标 `<TextBlock>` 为 `<emoji:TextBlock>`，全部启用彩色渲染 |
 
 ### 远期（P3）
 

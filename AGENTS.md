@@ -13,7 +13,7 @@ dotnet build src\MantisZip.UI\MantisZip.UI.csproj
 # Run (requires Windows)
 dotnet run --project src\MantisZip.UI\MantisZip.UI.csproj
 
-# No proper test project exists — run no tests.
+# Tests are in tests/MantisZip.Tests/ (xUnit, 40+ test cases).
 # test_encoding/ is a throwaway CLI tool for debugging ZIP encoding, not a test suite.
 ```
 
@@ -161,7 +161,7 @@ Added metadata-based preview for 12 new format types across Core parsers and UI 
 
 ## Upcoming work
 
-Already implemented in v0.2.13:
+Already implemented in v0.3.1:
 - Archive comment editing (MainWindow edit menu)
 - CompressSettingsWindow TabControl (General + Comment tabs)
 - Comment distribution (AllSame / FirstOnly / PerLine)
@@ -172,7 +172,18 @@ Plans tracked under `.sisyphus/plans/`:
 |------|--------|------------|
 | [engine-unification-sharpcompress.md](.sisyphus/plans/engine-unification-sharpcompress.md) | 📋 Planned | None |
 | [file-filter-feature.md](.sisyphus/plans/file-filter-feature.md) | 📋 Planned | SharpCompress migration |
+| [file-size-progress-bar.md](.sisyphus/plans/file-size-progress-bar.md) | 📋 Planned | None |
+| [portable-mode.md](.sisyphus/plans/portable-mode.md) | 📋 Planned | None |
+| [preview-magic-detection.md](.sisyphus/plans/preview-magic-detection.md) | 📋 Planned | None |
 | [preview-modular-providers.md](.sisyphus/plans/preview-modular-providers.md) | 📋 Planned | Preview system |
+| [extract-journal-undo.md](.sisyphus/plans/extract-journal-undo.md) | 📋 Planned | None |
+| [archive-rename-entry.md](.sisyphus/plans/archive-rename-entry.md) | 📋 Planned | None |
+| [batch-progress-list.md](.sisyphus/plans/batch-progress-list.md) | 📋 Planned | None |
+| [explorer-path-switcher.md](.sisyphus/plans/explorer-path-switcher.md) | 📋 Planned | None |
+| [msi-packaging-wix.md](.sisyphus/plans/msi-packaging-wix.md) | 📋 Planned | Inno Setup installer |
+| [compression-estimator.md](.sisyphus/plans/compression-estimator.md) | 📋 Planned | None |
+| [archive-diff.md](.sisyphus/plans/archive-diff.md) | 📋 Planned | None |
+| [virtual-file-data-object.md](.sisyphus/plans/virtual-file-data-object.md) | 📋 Planned | None |
 
 ### Planned: Engine unification (SharpZipLib → SharpCompress)
 
@@ -191,7 +202,7 @@ Add filtering to compress/extract operations — filter by file type extension, 
 
 See [plan](.sisyphus/plans/file-filter-feature.md).
 
-## v0.2.13 — Archive comment features
+## v0.3.1 — Archive comment features
 
 ### Archive comment editing (MainWindow)
 
@@ -272,7 +283,7 @@ These are set **once globally** in `App.InitializeApp()` (called at the top of `
 
 ### Password manager — MaxEntries (1000) and auto-try limit (100)
 
-`PasswordManager` has a built-in `MaxEntries = 1000` cap to prevent brute-force abuse. `EntryCount` (public property) reflects current count. `AddPassword` throws `InvalidOperationException` when full. `FindMatchingPasswords(maxResults)` accepts an optional limit. `TryMatchPassword` in `App.xaml.cs` uses `maxResults: 100` and exposes `out bool limitReached` — callers show a dialog when the cap is hit.
+`PasswordManager` has a built-in `MaxEntries = 1000` cap to prevent brute-force abuse. `EntryCount` (public property) reflects current count. `AddPassword` throws `InvalidOperationException` when full. `FindMatchingPasswords(maxResults)` accepts an optional limit. `TryMatchPassword` in `App.Password.cs` uses `maxResults: 100` and exposes `out bool limitReached` — callers show a dialog when the cap is hit.
 
 ### Silent catch blocks — all converted to TraceLog
 

@@ -7,8 +7,8 @@
 - **技术栈**: .NET 9 + WPF + SharpZipLib + SevenZipExtractor（**计划迁移至 SharpCompress**）
 
 ## 版本
-- **当前版本**: 0.3.1
-- **发布日期**: 2026-05-26
+- **当前版本**: 0.3.3
+- **发布日期**: 2026-05-27
 
 ## 规划中
 - **引擎统一计划** — SharpZipLib → SharpCompress（详见 `.sisyphus/plans/engine-unification-sharpcompress.md`）
@@ -18,6 +18,7 @@
   - 压缩时只打包匹配条件的文件
   - 解压时只提取匹配条件的条目
   - 支持命名预设持久化
+- **代码重构持续** — `CompressSettingsWindow.xaml.cs` (684 行)、`SevenZipEngine.cs` (630 行)、`ShellIntegration.cs` (503 行) 仍有拆分空间
 
 ## 版本历史（按日期排序）
 
@@ -286,4 +287,27 @@
 17. **本地化扩展** — 新增 13 个语言键值（压缩注释 + 编辑菜单）
 18. **文档同步更新** — README.md / AGENTS.md / PLAN.md / PROGRESS.md
 19. **版本升级** - 0.3.1
+
+### v0.3.2 (2026-05-27) 代码拆分与文档交叉更新
+1. **App.xaml.cs 文件拆分** — 1977 行拆为 5 个 partial class 文件：App.xaml.cs (600)、App.Cli.cs (967)、App.PipeServer.cs (132)、App.Password.cs (199)、App.Logging.cs (141)
+2. **版本号更新** — 0.3.1 → 0.3.2，同步更新 AppConstants.cs + MantisZip.UI.csproj
+3. **docs/PLAN.md 交叉更新** — 项目结构补充 App 拆分文件、依赖版本修正 (CommunityToolkit.Mvvm 8.4.2、Markdig 1.2.0、WebView2 1.0.3967.48)、CSV 预览状态修复、项目状态提升至 Phase 6
+4. **docs/PROGRESS.md 更新** — 新增 v0.3.2 条目、规划中追加重构持续项
+5. **AGENTS.md 更新** — App 拆分说明、结构图补充 App.Cli/PipeServer/Password/Logging
+6. **README.md 更新** — 项目结构图补充 App 拆分文件
+7. **文档交叉对比** — 遍历 23 个 `.sisyphus/plans/` 计划文件，确认无过时版本号引用
+8. **版本升级** - 0.3.2
+
+### v0.3.3 (2026-05-27) 安装器多语言与预览设置增强
+1. **数据表格行/列限制可配置** — 设置 → 预览 → 数据表格 新增子标签页，可分别配置 CSV/SQLite 预览的最大行数和最大列数（范围 3–1000，默认 100）；`AppSettings` 新增 `MaxTablePreviewRows` / `MaxTablePreviewCols`
+2. **字体预览字号可配置** — 设置 → 预览 → 字体 新增「预览文本字号」滑块（8–36），控制主窗口字体预览的实际渲染字号；`AppSettings` 新增 `FontPreviewFontSize`
+3. **WebView2 启动时预初始化** — `MainWindow.Loaded` 事件中提前调用 `EnsureWebView2InitializedAsync()`，浏览器进程在后台提前创建，消除首次显示 HTML/Markdown/SVG/PDF 预览时的等待延迟
+4. **Inno Setup 安装包多语言支持** — 新增简体中文安装界面，安装开始时可选语言；中英文向导文字由 `[CustomMessages]` 管理
+5. **安装时配置向导页** — 新增「安装配置」自定义页面，可设置主题（浅色/深色）、安装右键菜单、关联压缩包格式
+6. **安装设置持久化** — 安装器将用户选择的 Language + Theme 写入 `%LOCALAPPDATA%\MantisZip\settings.json`，首次启动自动生效
+7. **条件系统集成** — `[Run]` 节新增 `--install-shell` / `--install-assoc` 条件执行，根据复选框状态静默安装
+8. **文档交叉对比** — 遍历 23 个 `.sisyphus/plans/` 计划文件与 `docs/`，修复遗漏和过时引用
+9. **AGENTS.md 修正** — 修正 v0.2.13 错误版本标签为 v0.3.1、补全计划列表遗漏项
+10. **PLAN.md 同步** — 补充 3 项已实现设计方案（preview-extended-formats / split-compress / archive-loading-progress）、2 项待实现计划（batch-progress-list / explorer-path-switcher）
+11. **版本升级** - 0.3.3
 
