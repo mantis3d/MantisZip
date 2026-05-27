@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
@@ -934,6 +935,36 @@ public partial class MainWindow
         PreviewToolbarBorder.Visibility = Visibility.Visible;
     }
 
+    private static readonly ConcurrentDictionary<string, BitmapSource> _emojiCache = new();
+
+    private static BitmapSource RenderEmoji(string text, double fontSize)
+    {
+        return _emojiCache.GetOrAdd($"{text}_{fontSize}", _ =>
+        {
+            var typeface = new Typeface("Segoe UI Emoji");
+            var formattedText = new FormattedText(
+                text,
+                CultureInfo.InvariantCulture,
+                FlowDirection.LeftToRight,
+                typeface,
+                fontSize,
+                Brushes.Black,
+                1.0);
+
+            var visual = new DrawingVisual();
+            using (var ctx = visual.RenderOpen())
+                ctx.DrawText(formattedText, new Point(0, 0));
+
+            var bounds = visual.ContentBounds;
+            int w = Math.Max(1, (int)Math.Ceiling(bounds.Width));
+            int h = Math.Max(1, (int)Math.Ceiling(bounds.Height));
+            var bitmap = new RenderTargetBitmap(w, h, 96, 96, PixelFormats.Pbgra32);
+            bitmap.Render(visual);
+            bitmap.Freeze();
+            return bitmap;
+        });
+    }
+
     private Border CreateToolbarButtonElement(ToolbarButton btn)
     {
         var border = new Border
@@ -943,8 +974,27 @@ public partial class MainWindow
             Margin = new Thickness(1, 0, 1, 0),
             Cursor = Cursors.Hand,
             ToolTip = btn.Tooltip,
-            Child = new TextBlock { Text = btn.Text, FontSize = 13, Padding = new Thickness(6, 3, 6, 3) },
         };
+
+        // 渲染 emoji（补充平面字符）为彩色图片
+        bool isEmoji = btn.Text.Any(c => c > 0xFFFF);
+        if (isEmoji)
+        {
+            border.Child = new Image
+            {
+                Source = RenderEmoji(btn.Text, 16),
+                Width = 22,
+                Height = 22,
+                Stretch = Stretch.Uniform,
+                Margin = new Thickness(4, 1, 4, 1),
+            };
+        }
+        else
+        {
+            border.Child = new TextBlock { Text = btn.Text, FontSize = 13, Padding = new Thickness(6, 3, 6, 3) };
+        }
+
+        if (btn.IsToggle)
         if (btn.IsToggle)
         {
             border.MouseLeftButtonUp += (_, _) =>
