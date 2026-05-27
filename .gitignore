@@ -10,6 +10,7 @@ installer/
 .vs/
 .history/
 .vscode/
+.codegraph/
 *.user
 *.suo
 

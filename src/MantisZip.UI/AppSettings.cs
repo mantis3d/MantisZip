@@ -41,11 +41,14 @@ public class AppSettings
     public bool UseColorEmoji { get; set; } = true;
     public bool EnableImagePreview { get; set; } = true;
     public bool EnableTextPreview { get; set; } = true;
+    public int MaxTablePreviewRows { get; set; } = 100;
+    public int MaxTablePreviewCols { get; set; } = 100;
     public long MaxTextPreviewBytes { get; set; } = 5 * 1024 * 1024;
     public long MaxPreviewFileSize { get; set; } = 15 * 1024 * 1024; // 默认 15 MB
     public int TextPreviewFontSize { get; set; } = 12;
     public string TextPreviewFontFamily { get; set; } = "";           // 空=系统默认
     public string TextEncodingPreference { get; set; } = "auto";      // auto / utf-8 / gbk
+    public int FontPreviewFontSize { get; set; } = 12;
     public string FontPreviewSampleText { get; set; } =
         "The quick brown fox jumps over the lazy dog.\n0123456789\n天地玄黄 宇宙洪荒 日月盈昃 辰宿列张";
     public int PreviewPosition { get; set; } = 4; // 1=Bottom, 2=Below tree, 3=Below file list, 4=Right
@@ -62,7 +65,7 @@ public class AppSettings
 
     // ===== 调试 =====
     public bool EnableDebugLogging { get; set; } = false;
-    public string LogPrivacyMode { get; set; } = "full"; // "off" | "filename" | "full"
+    public string LogPrivacyMode { get; set; } = "extension"; // "off" | "filename" | "extension" | "full"
 
     // ===== 高级 =====
     public string SevenZipPath { get; set; } = @"C:\Program Files\7-Zip\7z.exe";
