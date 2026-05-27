@@ -327,7 +327,12 @@ public static class L
     public const string Preview_AudioBitDepth                      = "Preview_AudioBitDepth";
     public const string Preview_AudioBitrate                       = "Preview_AudioBitrate";
     public const string Preview_AudioDuration                      = "Preview_AudioDuration";
-    public const string Preview_SqliteParseFailed                  = "Preview_SqliteParseFailed";
+    public const string Preview_Mp3ParseFailed                     = "Preview_Mp3ParseFailed";
+    public const string Preview_Mp3Header                          = "Preview_Mp3Header";
+    public const string Preview_Mp3Title                           = "Preview_Mp3Title";
+    public const string Preview_Mp3Artist                          = "Preview_Mp3Artist";
+    public const string Preview_Mp3Album                           = "Preview_Mp3Album";
+    public const string Preview_SqliteParseFailed                   = "Preview_SqliteParseFailed";
     public const string Preview_SqliteHeader                       = "Preview_SqliteHeader";
     public const string Preview_SqliteEncoding                     = "Preview_SqliteEncoding";
     public const string Preview_SqlitePageSize                     = "Preview_SqlitePageSize";
