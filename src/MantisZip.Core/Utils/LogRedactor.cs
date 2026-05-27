@@ -12,6 +12,8 @@ public enum LogPrivacyMode
     Off,
     /// <summary>仅保留文件名/目录名，去掉路径前缀</summary>
     FilenameOnly,
+    /// <summary>仅保留扩展名，目录替换为 [PATH_N]，文件名替换为 [FILE_N]</summary>
+    ExtensionOnly,
     /// <summary>替换为 [PATH_1] 等顺序标记</summary>
     Full
 }
@@ -30,8 +32,9 @@ public static class LogRedactor
         RegexOptions.Compiled);
 
     private static readonly ConcurrentDictionary<string, int> _pathIds = new();
+    private static readonly ConcurrentDictionary<string, int> _fileIds = new();
     private static readonly object _pathLock = new();
-    private const int MaxCachedPaths = 10000;
+    private const int MaxCachedIds = 10000;
 
     /// <summary>
     /// 对日志消息中的 Windows 路径做脱敏处理。
@@ -53,33 +56,57 @@ public static class LogRedactor
             switch (mode)
             {
                 case LogPrivacyMode.FilenameOnly:
+                {
+                    var dir = Path.GetDirectoryName(path);
                     var name = Path.GetFileName(path);
-                    return name.Length > 0 ? name : "[DIR]";
+                    var dirId = GetOrCreateId(_pathIds, dir ?? "");
+                    return $"[PATH_{dirId}]\\{name}";
+                }
+
+                case LogPrivacyMode.ExtensionOnly:
+                {
+                    var dir = Path.GetDirectoryName(path);
+                    var nameWithoutExt = Path.GetFileNameWithoutExtension(path);
+                    var ext = Path.GetExtension(path);
+                    var dirId = GetOrCreateId(_pathIds, dir ?? "");
+                    var fileId = GetOrCreateId(_fileIds, nameWithoutExt);
+                    return ext.Length > 0
+                        ? $"[PATH_{dirId}]\\[FILE_{fileId}]{ext}"
+                        : $"[PATH_{dirId}]\\[FILE_{fileId}]";
+                }
 
                 case LogPrivacyMode.Full:
-                    // 双检锁模式：先无锁检查，不存在时加锁再确认
-                    if (!_pathIds.TryGetValue(path, out var id))
-                    {
-                        lock (_pathLock)
-                        {
-                            if (!_pathIds.TryGetValue(path, out id))
-                            {
-                                // 上限保护：超限时清空重建（在锁内安全执行）
-                                if (_pathIds.Count >= MaxCachedPaths)
-                                {
-                                    _pathIds.Clear();
-                                }
-                                id = _pathIds.Count + 1;
-                                _pathIds.TryAdd(path, id);
-                            }
-                        }
-                    }
+                {
+                    var id = GetOrCreateId(_pathIds, path);
                     return $"[PATH_{id}]";
+                }
 
                 default:
                     return match.Value;
             }
         });
+    }
+
+    /// <summary>
+    /// 从指定字典获取或创建顺序 ID（双检锁模式）。
+    /// </summary>
+    private static int GetOrCreateId(ConcurrentDictionary<string, int> dict, string key)
+    {
+        if (!dict.TryGetValue(key, out var id))
+        {
+            lock (_pathLock)
+            {
+                if (!dict.TryGetValue(key, out id))
+                {
+                    // 上限保护：超限时清空重建（在锁内安全执行）
+                    if (dict.Count >= MaxCachedIds)
+                        dict.Clear();
+                    id = dict.Count + 1;
+                    dict.TryAdd(key, id);
+                }
+            }
+        }
+        return id;
     }
 
     /// <summary>
@@ -89,12 +116,17 @@ public static class LogRedactor
     public static LogPrivacyMode ParseMode(string mode) => mode switch
     {
         "filename" => LogPrivacyMode.FilenameOnly,
+        "extension" => LogPrivacyMode.ExtensionOnly,
         "full" => LogPrivacyMode.Full,
         _ => LogPrivacyMode.Off
     };
 
     /// <summary>
-    /// 清空路径 ID 映射（测试或重置时调用）
+    /// 清空路径 ID 和文件 ID 映射（测试或重置时调用）
     /// </summary>
-    public static void Reset() => _pathIds.Clear();
+    public static void Reset()
+    {
+        _pathIds.Clear();
+        _fileIds.Clear();
+    }
 }

@@ -391,7 +391,8 @@ public class SevenZipEngine : IArchiveEngine
                     CompressedSize = isDir ? 0 : (long)entry.PackedSize,
                     LastModified = entry.LastWriteTime,
                     IsDirectory = isDir,
-                    IsEncrypted = entry.IsEncrypted
+                    IsEncrypted = entry.IsEncrypted,
+                    Crc32 = isDir ? 0 : (int)entry.CRC
                 });
             }
 

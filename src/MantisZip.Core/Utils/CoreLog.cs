@@ -24,6 +24,13 @@ internal static class CoreLog
     /// </summary>
     internal static Func<string, string>? RedactOverride { get; set; }
 
+    /// <summary>
+    /// 是否允许写入日志的覆盖委托。由 UI 层在初始化时注入。
+    /// 返回 true 表示允许写入，false 表示跳过。为 null 表示始终写入。
+    /// 用于让 CoreLog 的 DEBUG 日志受 AppSettings.EnableDebugLogging 控制。
+    /// </summary>
+    internal static Func<bool>? ShouldWriteOverride { get; set; }
+
     /// <summary>Log a message (DEBUG only).</summary>
     [Conditional("DEBUG")]
     public static void Info(string msg,
@@ -130,6 +137,10 @@ internal static class CoreLog
 
     private static void Write(string msg)
     {
+        // 检查 ShouldWriteOverride：如果设置了委托且返回 false，跳过本次写入
+        if (ShouldWriteOverride != null && !ShouldWriteOverride())
+            return;
+
         // 应用脱敏（由 UI 层注入，null=不脱敏）
         var finalMsg = RedactOverride?.Invoke(msg) ?? msg;
 

@@ -299,7 +299,8 @@ public class ZipEngine : IArchiveEngine
                 CompressedSize = entry.CompressedSize,
                 LastModified = entry.DateTime,
                 IsDirectory = entry.IsDirectory,
-                IsEncrypted = entry.IsCrypted || entry.AESKeySize > 0
+                IsEncrypted = entry.IsCrypted || entry.AESKeySize > 0,
+                Crc32 = entry.HasCrc ? (int)entry.Crc : 0
             }).ToList();
 
             CoreLog.Info($"ListEntriesAsync: {items.Count} entries, {sw.ElapsedMilliseconds}ms");
