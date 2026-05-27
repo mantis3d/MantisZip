@@ -21,6 +21,9 @@ public class LanguageManager
     /// <summary>语言代码 → 本地化显示名称（来自 languages.json）</summary>
     private Dictionary<string, string> _languageDisplayNames = new();
 
+    /// <summary>语言代码 → 翻译人员介绍（来自 languages.json）</summary>
+    private Dictionary<string, string> _languageTranslators = new();
+
     private string _currentLanguage = "zh";
 
     // ── Public API ──
@@ -31,6 +34,10 @@ public class LanguageManager
     /// <summary>可用语言列表：(代码, 显示名称)</summary>
     public IReadOnlyList<(string Code, string DisplayName)> AvailableLanguages =>
         _data.Keys.Select(code => (code, _languageDisplayNames.GetValueOrDefault(code, code))).ToList();
+
+    /// <summary>获取指定语言的翻译人员介绍，无信息则返回 null。</summary>
+    public string? GetLanguageTranslator(string code) =>
+        _languageTranslators.GetValueOrDefault(code);
 
     /// <summary>
     /// 按 key 获取当前语言的翻译文本。
@@ -71,7 +78,7 @@ public class LanguageManager
     /// </summary>
     public void Initialize()
     {
-        _languageDisplayNames = LoadLanguageDisplayNames();
+        LoadLanguageMetadata();
         _data = ScanAndLoadStringFiles();
 
         // 从持久化设置恢复上一次使用的语言
@@ -97,23 +104,50 @@ public class LanguageManager
 
     // ── Internal Loaders ──
 
-    /// <summary>加载 languages.json（语言代码 → 显示名称）</summary>
-    private Dictionary<string, string> LoadLanguageDisplayNames()
+    /// <summary>
+    /// 加载 languages.json，解析显示名称和翻译人员介绍。
+    /// 兼容旧格式（"zh": "中文"）和新格式（"zh": {"name": "中文", "translator": "..."}）。
+    /// </summary>
+    private void LoadLanguageMetadata()
     {
+        _languageDisplayNames = new();
+        _languageTranslators = new();
         var path = Path.Combine(_resourcesDir, "languages.json");
         try
         {
-            if (File.Exists(path))
+            if (!File.Exists(path)) return;
+            var json = File.ReadAllText(path);
+            var doc = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(json);
+            if (doc == null) return;
+
+            foreach (var (code, element) in doc)
             {
-                var json = File.ReadAllText(path);
-                return JsonSerializer.Deserialize<Dictionary<string, string>>(json) ?? new();
+                if (element.ValueKind == JsonValueKind.String)
+                {
+                    // 旧格式: "zh": "中文"
+                    _languageDisplayNames[code] = element.GetString() ?? code;
+                }
+                else if (element.ValueKind == JsonValueKind.Object)
+                {
+                    // 新格式: "zh": {"name": "中文", "translator": "..."}
+                    if (element.TryGetProperty("name", out var nameProp))
+                        _languageDisplayNames[code] = nameProp.GetString() ?? code;
+                    else
+                        _languageDisplayNames[code] = code;
+
+                    if (element.TryGetProperty("translator", out var transProp))
+                    {
+                        var trans = transProp.GetString();
+                        if (!string.IsNullOrEmpty(trans))
+                            _languageTranslators[code] = trans;
+                    }
+                }
             }
         }
         catch (Exception ex)
         {
-            App.LogDebug("LanguageManager.LoadLanguageDisplayNames: failed: {0}", ex.Message);
+            App.LogDebug("LanguageManager.LoadLanguageMetadata: failed: {0}", ex.Message);
         }
-        return new();
     }
 
     /// <summary>扫描 Resources/strings.*.json，返回 {code → strings}</summary>

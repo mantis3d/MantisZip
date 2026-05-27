@@ -1,4 +1,10 @@
 {
-  "zh": "中文",
-  "en": "English"
+  "zh": {
+    "name": "中文",
+    "translator": "螳螂卜禅 & AI 助手 — 简体中文翻译"
+  },
+  "en": {
+    "name": "English",
+    "translator": "MantisZen & AI Assistant — English Translation"
+  }
 }
