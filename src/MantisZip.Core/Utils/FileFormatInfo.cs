@@ -36,6 +36,12 @@ public class FileFormatInfo
     public int? SampleRate { get; set; }
     public int? Channels { get; set; }
     public int? Bitrate { get; set; }
+    /// <summary>歌手 (MP3 ID3v2 TPE1)</summary>
+    public string? Artist { get; set; }
+    /// <summary>专辑 (MP3 ID3v2 TALB)</summary>
+    public string? Album { get; set; }
+    /// <summary>ID3v2 APIC 帧中的封面图片原始字节（JPEG/PNG）</summary>
+    public byte[]? CoverArtData { get; set; }
     public string? Codec { get; set; }
     public int? VideoWidth { get; set; }
     public int? VideoHeight { get; set; }
