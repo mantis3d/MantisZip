@@ -96,14 +96,14 @@ public partial class MainWindow
                 // 工具栏：左侧通用缩放 + 右侧 GIF 播放控制
                 SetToolbar(
                     new[] {
-                        new ToolbarButton { Text = "⊞", Tooltip = L.T(L.Preview_ZoomFit), OnClick = () => ApplyZoom(ZoomMode.FitWindow) },
+                        new ToolbarButton { Text = "※", Tooltip = L.T(L.Preview_ZoomFit), OnClick = () => ApplyZoom(ZoomMode.FitWindow) },
                         new ToolbarButton { Text = "1:1", Tooltip = L.T(L.Preview_Zoom100), OnClick = () => ApplyZoom(ZoomMode.Zoom100) },
                         new ToolbarButton { Text = "↔", Tooltip = L.T(L.Preview_ZoomFitWidth), OnClick = () => ApplyZoom(ZoomMode.FitWidth) }
                     },
                     new[] {
-                        new ToolbarButton { Text = "⏮", Tooltip = L.T(L.Preview_GifPrevFrame), OnClick = GifPrevFrame },
+                        new ToolbarButton { Text = "◀", Tooltip = L.T(L.Preview_GifPrevFrame), OnClick = GifPrevFrame },
                         new ToolbarButton { Text = "⏯", Tooltip = L.T(L.Preview_GifPause), OnClick = ToggleGifPlayPause },
-                        new ToolbarButton { Text = "⏭", Tooltip = L.T(L.Preview_GifNextFrame), OnClick = GifNextFrame }
+                        new ToolbarButton { Text = "▶", Tooltip = L.T(L.Preview_GifNextFrame), OnClick = GifNextFrame }
                     }
                 );
                 AddGifFrameInput();
@@ -162,6 +162,8 @@ public partial class MainWindow
             });
 
             PreviewImage.Source = bitmap;
+            _originalPreviewImage = bitmap;
+            _flattenAlphaEnabled = false;
             HideAllPreviewControls();
             PreviewImageScroll.Visibility = Visibility.Visible;
             PreviewHeader.Text = L.TF(L.Preview_ImageHeader, Path.GetFileName(filePath));
@@ -191,13 +193,14 @@ public partial class MainWindow
             // 工具栏：左侧通用缩放，右侧透明背景切换（仅 PNG/ICO/WebP）
             SetToolbar(
                 new[] {
-                    new ToolbarButton { Text = "⊞", Tooltip = L.T(L.Preview_ZoomFit), OnClick = () => ApplyZoom(ZoomMode.FitWindow) },
+                    new ToolbarButton { Text = "※", Tooltip = L.T(L.Preview_ZoomFit), OnClick = () => ApplyZoom(ZoomMode.FitWindow) },
                     new ToolbarButton { Text = "1:1", Tooltip = L.T(L.Preview_Zoom100), OnClick = () => ApplyZoom(ZoomMode.Zoom100) },
                     new ToolbarButton { Text = "↔", Tooltip = L.T(L.Preview_ZoomFitWidth), OnClick = () => ApplyZoom(ZoomMode.FitWidth) }
                 },
                 (ext == ".png" || ext == ".ico" || ext == ".webp")
                     ? new[] {
-                        new ToolbarButton { Text = "☐", Tooltip = L.T(L.Preview_ToggleTransparency), IsToggle = true, IsChecked = _transparentBgEnabled, OnClick = ToggleTransparencyBg }
+                        new ToolbarButton { Text = "🏁", Tooltip = L.T(L.Preview_ToggleTransparency), IsToggle = true, IsChecked = _transparentBgEnabled, OnClick = ToggleTransparencyBg },
+                        new ToolbarButton { Text = "🎨", Tooltip = "切换透明 (显示 RGB 原始颜色)", IsToggle = true, IsChecked = _flattenAlphaEnabled, OnClick = ToggleFlattenAlpha }
                       }
                     : Array.Empty<ToolbarButton>()
             );
@@ -221,6 +224,13 @@ public partial class MainWindow
     {
         HideAllPreviewControls();
 
+        // 缓存 ICO 画廊状态
+        _icoOriginalFrames = frames;
+        _icoImages = new List<Image>(frames.Count);
+        _icoBorders = new List<Border>(frames.Count);
+        _originalPreviewImage = null;
+        _flattenAlphaEnabled = false;
+
         var wrapPanel = new WrapPanel
         {
             Orientation = Orientation.Horizontal,
@@ -240,6 +250,7 @@ public partial class MainWindow
                 Margin = new Thickness(8),
                 Padding = new Thickness(10),
             };
+            _icoBorders.Add(border);
 
             var stack = new StackPanel
             {
@@ -255,6 +266,7 @@ public partial class MainWindow
                 MaxHeight = 256,
                 Margin = new Thickness(4)
             };
+            _icoImages.Add(img);
 
             var label = new TextBlock
             {
@@ -290,7 +302,13 @@ public partial class MainWindow
         SetFormatSpecificInfo(
             (L.T(L.Preview_ImagePixels), $"{first.w * first.h:N0}")
         );
-        SetToolbar(Array.Empty<ToolbarButton>(), Array.Empty<ToolbarButton>());
+        SetToolbar(
+            Array.Empty<ToolbarButton>(),
+            new[] {
+                new ToolbarButton { Text = "🏁", Tooltip = L.T(L.Preview_ToggleTransparency), IsToggle = true, IsChecked = _transparentBgEnabled, OnClick = ToggleTransparencyBg },
+                new ToolbarButton { Text = "🎨", Tooltip = "切换透明 (显示 RGB 原始颜色)", IsToggle = true, IsChecked = _flattenAlphaEnabled, OnClick = ToggleFlattenAlpha }
+            }
+        );
         ShowPreviewPanel();
     }
 
@@ -299,8 +317,77 @@ public partial class MainWindow
     private void ToggleTransparencyBg()
     {
         _transparentBgEnabled = !_transparentBgEnabled;
-        if (PreviewImageScroll.Parent is Panel parent)
+        if (_icoBorders is { Count: > 0 })
+        {
+            // ICO 画廊模式：切换每个卡片背景
+            if (_transparentBgEnabled)
+            {
+                var checker = CreateCheckerPattern();
+                foreach (var border in _icoBorders)
+                    border.Background = new ImageBrush { TileMode = TileMode.Tile, Viewport = new Rect(0, 0, 16, 16), ViewportUnits = BrushMappingMode.Absolute, ImageSource = checker };
+            }
+            else
+            {
+                foreach (var border in _icoBorders)
+                    border.Background = Brushes.Transparent;
+            }
+        }
+        else if (PreviewImageScroll.Parent is Panel parent)
+        {
+            // 普通图片模式：切换 ScrollViewer 背景
             parent.Background = _transparentBgEnabled ? new ImageBrush { TileMode = TileMode.Tile, Viewport = new Rect(0, 0, 16, 16), ViewportUnits = BrushMappingMode.Absolute, ImageSource = CreateCheckerPattern() } : Brushes.Transparent;
+        }
+    }
+
+    // ── Flatten Alpha Toggle ──
+
+    private void ToggleFlattenAlpha()
+    {
+        _flattenAlphaEnabled = !_flattenAlphaEnabled;
+        if (_icoImages is { Count: > 0 } && _icoOriginalFrames is { Count: > 0 })
+        {
+            // ICO 画廊模式：切换所有图标的透明通道
+            if (_flattenAlphaEnabled)
+            {
+                for (int i = 0; i < _icoImages.Count && i < _icoOriginalFrames.Count; i++)
+                    _icoImages[i].Source = FlattenAlpha(_icoOriginalFrames[i].frame);
+            }
+            else
+            {
+                for (int i = 0; i < _icoImages.Count && i < _icoOriginalFrames.Count; i++)
+                    _icoImages[i].Source = _icoOriginalFrames[i].frame;
+            }
+        }
+        else
+        {
+            // 普通图片模式
+            if (_flattenAlphaEnabled)
+            {
+                if (_originalPreviewImage != null && PreviewImage.Source is BitmapSource current)
+                    PreviewImage.Source = FlattenAlpha(current);
+            }
+            else
+            {
+                if (_originalPreviewImage != null)
+                    PreviewImage.Source = _originalPreviewImage;
+            }
+        }
+    }
+
+    private static BitmapSource FlattenAlpha(BitmapSource source)
+    {
+        var formatted = new FormatConvertedBitmap(source, PixelFormats.Bgra32, null, 0);
+        int stride = formatted.PixelWidth * 4;
+        byte[] pixels = new byte[stride * formatted.PixelHeight];
+        formatted.CopyPixels(pixels, stride, 0);
+        for (int i = 3; i < pixels.Length; i += 4)
+            pixels[i] = 255;
+        var result = BitmapSource.Create(
+            formatted.PixelWidth, formatted.PixelHeight,
+            formatted.DpiX, formatted.DpiY,
+            PixelFormats.Bgra32, null, pixels, stride);
+        result.Freeze();
+        return result;
     }
 
     // ── GIF Playback Controls ──
@@ -409,7 +496,7 @@ public partial class MainWindow
             // SVG 缩放工具栏（通过 WebView2 ZoomFactor 控制）
             SetToolbar(
                 new[] {
-                    new ToolbarButton { Text = "⊞", Tooltip = L.T(L.Preview_ZoomFit), OnClick = () => { if (PreviewWebView2.CoreWebView2 != null) PreviewWebView2.ZoomFactor = 1.0; } },
+                    new ToolbarButton { Text = "※", Tooltip = L.T(L.Preview_ZoomFit), OnClick = () => { if (PreviewWebView2.CoreWebView2 != null) PreviewWebView2.ZoomFactor = 1.0; } },
                     new ToolbarButton { Text = "🔍−", Tooltip = "缩小", OnClick = () => { if (PreviewWebView2.CoreWebView2 != null && PreviewWebView2.ZoomFactor > 0.2) PreviewWebView2.ZoomFactor -= 0.1; } },
                     new ToolbarButton { Text = "🔍+", Tooltip = "放大", OnClick = () => { if (PreviewWebView2.CoreWebView2 != null && PreviewWebView2.ZoomFactor < 5.0) PreviewWebView2.ZoomFactor += 0.1; } },
                 },

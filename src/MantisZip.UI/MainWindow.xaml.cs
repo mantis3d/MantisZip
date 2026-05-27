@@ -9,6 +9,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.ComponentModel;
 using System.Windows.Media;
+using System.Windows.Media.Imaging;
 using MantisZip.Core;
 using MantisZip.Core.Abstractions;
 using MantisZip.Core.Engines;
@@ -52,6 +53,11 @@ public partial class MainWindow : Window
     private bool _isOwnDrag;                 // 当前拖拽是否来自本窗口
     private CancellationTokenSource? _previewCts; // 预览取消令牌
     private bool _transparentBgEnabled;
+    private BitmapSource? _originalPreviewImage; // 原始图片缓存，用于恢复
+    private bool _flattenAlphaEnabled;           // 是否抛弃了透明
+    private List<(BitmapSource frame, int w, int h)>? _icoOriginalFrames; // ICO 画廊原始帧
+    private List<Image>? _icoImages;              // ICO 画廊 Image 控件引用
+    private List<Border>? _icoBorders;            // ICO 画廊 Border 控件引用
     private ImageAnimationController? _gifController;
     private TextBox? _gifFrameInput;
     private TextBlock? _gifFrameTotal;

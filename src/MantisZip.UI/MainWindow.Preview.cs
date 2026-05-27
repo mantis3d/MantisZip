@@ -778,6 +778,9 @@ public partial class MainWindow
         PreviewCompressedText.Text = "";
         PreviewDateText.Text = "";
         PreviewEncryptedText.Text = "";
+        _icoOriginalFrames = null;
+        _icoImages = null;
+        _icoBorders = null;
     }
 
     private void HidePreview()
