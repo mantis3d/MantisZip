@@ -31,6 +31,13 @@ public partial class SettingsWindow : Window
             OnTextFontSizeChanged?.Invoke(size);
         };
 
+        FontPreviewSizeSlider.ValueChanged += (_, _) =>
+        {
+            var size = (int)FontPreviewSizeSlider.Value;
+            FontPreviewSizeText.Text = size.ToString();
+            FontPreviewSampleBox.FontSize = size;
+        };
+
         // 先填充字体列表，再加载设置并从列表中选中已保存的字体
         PopulateFontFamilies();
         LoadSettings();
@@ -95,6 +102,8 @@ public partial class SettingsWindow : Window
         EnableImagePreviewCheck.IsChecked = s.EnableImagePreview;
         EnableTextPreviewCheck.IsChecked = s.EnableTextPreview;
         MaxTextSizeSlider.Value = s.MaxTextPreviewBytes / (1024 * 1024);
+        MaxTableRowsBox.Text = s.MaxTablePreviewRows.ToString();
+        MaxTableColsBox.Text = s.MaxTablePreviewCols.ToString();
         var mbVal = (int)(s.MaxPreviewFileSize / (1024 * 1024));
         MaxPreviewSizeSlider.Value = mbVal;
         MaxPreviewSizeInput.Text = mbVal.ToString();
@@ -109,6 +118,7 @@ public partial class SettingsWindow : Window
         }
         // 预览样本文本
         FontPreviewSampleBox.Text = s.FontPreviewSampleText;
+        FontPreviewSizeSlider.Value = s.FontPreviewFontSize;
 
         // 密码管理
         ShowPasswordNotifCheck.IsChecked = s.ShowPasswordMatchNotification;
@@ -186,11 +196,14 @@ public partial class SettingsWindow : Window
         s.EnableImagePreview = EnableImagePreviewCheck.IsChecked == true;
         s.EnableTextPreview = EnableTextPreviewCheck.IsChecked == true;
         s.MaxTextPreviewBytes = (long)MaxTextSizeSlider.Value * 1024 * 1024;
+        s.MaxTablePreviewRows = int.TryParse(MaxTableRowsBox.Text, out var rows) ? rows : 100;
+        s.MaxTablePreviewCols = int.TryParse(MaxTableColsBox.Text, out var cols) ? cols : 100;
         s.MaxPreviewFileSize = (long)MaxPreviewSizeSlider.Value * 1024 * 1024;
         s.TextPreviewFontSize = (int)TextFontSizeSlider.Value;
         s.TextPreviewFontFamily = (TextFontFamilyCombo.SelectedItem as ComboBoxItem)?.Tag as string ?? "";
         s.TextEncodingPreference = ""; // reserved
         s.FontPreviewSampleText = FontPreviewSampleBox.Text;
+        s.FontPreviewFontSize = (int)FontPreviewSizeSlider.Value;
         s.ShowPreviewPanel = ShowPreviewPanelCheck.IsChecked == true;
         s.Theme = (ThemeCombo.SelectedItem as ComboBoxItem)?.Tag as string ?? "Light";
         s.UseColorEmoji = UseColorEmojiCheck.IsChecked == true;
@@ -315,7 +328,7 @@ public partial class SettingsWindow : Window
 
     #region L.T(L.Settings_Tab_Preview)L.T(L.Main_Col_Size)输入
 
-    private void MaxPreviewSizeInput_PreviewTextInput(object sender, System.Windows.Input.TextCompositionEventArgs e)
+    private void IntInput_PreviewTextInput(object sender, System.Windows.Input.TextCompositionEventArgs e)
     {
         // 只允许输入数字
         foreach (var c in e.Text)
@@ -332,6 +345,24 @@ public partial class SettingsWindow : Window
             if (val > 100) { MaxPreviewSizeInput.Text = "100"; val = 100; }
             if (val != (int)MaxPreviewSizeSlider.Value)
                 MaxPreviewSizeSlider.Value = val;
+        }
+    }
+
+    private void MaxTableRows_TextChanged(object sender, System.Windows.Controls.TextChangedEventArgs e)
+    {
+        if (int.TryParse(MaxTableRowsBox.Text, out var val))
+        {
+            if (val < 3) { MaxTableRowsBox.Text = "3"; }
+            if (val > 1000) { MaxTableRowsBox.Text = "1000"; }
+        }
+    }
+
+    private void MaxTableCols_TextChanged(object sender, System.Windows.Controls.TextChangedEventArgs e)
+    {
+        if (int.TryParse(MaxTableColsBox.Text, out var val))
+        {
+            if (val < 3) { MaxTableColsBox.Text = "3"; }
+            if (val > 1000) { MaxTableColsBox.Text = "1000"; }
         }
     }
 

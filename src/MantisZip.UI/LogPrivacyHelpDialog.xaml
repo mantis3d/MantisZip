@@ -19,6 +19,7 @@
                 <StackPanel>
                     <TextBlock Text="{l:L Settings_Debug_LogPrivacyHelp_Mode_Off}" TextWrapping="Wrap" Margin="0,0,0,10" LineHeight="20"/>
                     <TextBlock Text="{l:L Settings_Debug_LogPrivacyHelp_Mode_Filename}" TextWrapping="Wrap" Margin="0,0,0,10" LineHeight="20"/>
+                    <TextBlock Text="{l:L Settings_Debug_LogPrivacyHelp_Mode_Extension}" TextWrapping="Wrap" Margin="0,0,0,10" LineHeight="20"/>
                     <TextBlock Text="{l:L Settings_Debug_LogPrivacyHelp_Mode_Full}" TextWrapping="Wrap" LineHeight="20"/>
                 </StackPanel>
             </Border>

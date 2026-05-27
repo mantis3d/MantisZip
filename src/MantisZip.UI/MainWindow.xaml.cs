@@ -44,6 +44,8 @@ public partial class MainWindow : Window
     }; // 每个位置独立记忆大小（高度:位置1/2/3, 宽度:位置4）
     private int _lastAppliedPosition = 1;    // 上次应用的布局位置，用于检测变更
     private bool _isProgrammaticFilter;      // 编程触发的 FilterFiles，应跳过 SelectionChanged 预览
+    private string? _savedSortColumnPath;    // 持久化的排序列 SortMemberPath
+    private int _savedSortDirection;         // 持久化的排序方向 (0=无, 1=升, 2=降)
     private bool _previewPanelEnabled = true; // 工具栏预览开关状态
     private Point _dragStartPoint;           // 文件列表拖拽起点
     private string? _dragTempDir;            // 拖拽提取临时目录
@@ -70,6 +72,11 @@ public partial class MainWindow : Window
         if (!_previewPanelEnabled)
             PreviewPanel.Visibility = Visibility.Collapsed;
         Activated += MainWindow_Activated;
+        Loaded += async (_, _) =>
+        {
+            try { await EnsureWebView2InitializedAsync(); }
+            catch (Exception ex) { App.LogDebug("WebView2 pre-init failed: {0}", ex.Message); }
+        };
     }
 
     private void MainWindow_Activated(object? sender, EventArgs e)
@@ -102,8 +109,11 @@ public partial class MainWindow : Window
 
     private class ColumnState
     {
+        /// <summary>列身份标识：SortMemberPath 或 Tag</summary>
+        public string? ColumnId { get; set; }
         public double Width { get; set; }
         public bool Visible { get; set; }
+        public int DisplayIndex { get; set; }
     }
 
     private class WindowSize
@@ -116,6 +126,8 @@ public partial class MainWindow : Window
         public double PreviewTreeHeight { get; set; }   // 位置2
         public double PreviewFilesHeight { get; set; }  // 位置3
         public List<ColumnState> ColumnStates { get; set; } = new();
+        public string? SortColumnPath { get; set; }
+        public int SortDirection { get; set; }  // 0=无, 1=升序, 2=降序
     }
 
     private void LoadWindowSettings()
@@ -152,20 +164,59 @@ public partial class MainWindow : Window
                     if (obj.PreviewColumnWidth > 0) _lastPreviewSizes[4] = obj.PreviewColumnWidth;
                 }
 
-                // 恢复各列的宽度和可见性（按位置索引匹配）
+                // 恢复各列的宽度、可见性和顺序
                 if (obj?.ColumnStates != null && obj.ColumnStates.Count > 0)
                 {
-                    for (int i = 0; i < FileListGrid.Columns.Count && i < obj.ColumnStates.Count; i++)
+                    // 构建身份→列的字典
+                    var columnDict = new Dictionary<string, DataGridColumn>();
+                    foreach (var col in FileListGrid.Columns)
                     {
-                        var state = obj.ColumnStates[i];
-                        var col = FileListGrid.Columns[i];
-                        if (state.Width > 0)
-                            col.Width = new DataGridLength(state.Width);
-                        // 跳过名称列（不允许隐藏）
-                        if (i > 0)
-                            col.Visibility = state.Visible ? Visibility.Visible : Visibility.Collapsed;
+                        var id = GetColumnId(col);
+                        if (id != null) columnDict[id] = col;
+                    }
+
+                    // 先按保存的 DisplayIndex 排序，避免设置时冲突
+                    var ordered = obj.ColumnStates
+                        .Where(s => s.ColumnId != null)
+                        .OrderBy(s => s.DisplayIndex)
+                        .ToList();
+
+                    // 如果所有 ColumnId 都为空（旧版 JSON），回退到位置索引匹配
+                    if (ordered.Count == 0)
+                    {
+                        for (int i = 0; i < FileListGrid.Columns.Count && i < obj.ColumnStates.Count; i++)
+                        {
+                            var col = FileListGrid.Columns[i];
+                            var state = obj.ColumnStates[i];
+                            if (state.Width > 0) col.Width = new DataGridLength(state.Width);
+                            if (i > 0) col.Visibility = state.Visible ? Visibility.Visible : Visibility.Collapsed;
+                        }
+                    }
+                    else
+                    {
+                        // 新版：按 ColumnId 匹配加载
+                        foreach (var state in ordered)
+                        {
+                            if (state.ColumnId == null || !columnDict.TryGetValue(state.ColumnId, out var col))
+                                continue;
+
+                            if (state.Width > 0)
+                                col.Width = new DataGridLength(state.Width);
+
+                            // 跳过名称列（不允许隐藏）
+                            if (state.ColumnId != "Name")
+                                col.Visibility = state.Visible ? Visibility.Visible : Visibility.Collapsed;
+
+                            col.DisplayIndex = state.DisplayIndex;
+                        }
                     }
                 }
+
+                // 记住排序列和方向，FilterFiles 设置 ItemsSource 后再应用
+                _savedSortColumnPath = obj?.SortColumnPath;
+                _savedSortDirection = obj?.SortDirection ?? 0;
+                App.LogDebug("LoadWindowSettings: sortPath={0}, sortDir={1}",
+                    _savedSortColumnPath ?? "(null)", _savedSortDirection);
             }
         }
         catch (Exception ex)
@@ -203,16 +254,33 @@ public partial class MainWindow : Window
             double previewFilesHeight = _lastPreviewSizes[3];
             double previewColumnWidth = _lastPreviewSizes[4];
 
-            // 保存各列的宽度和可见性
+            // 保存各列的宽度、可见性、顺序（按列身份匹配，而非位置索引）
             var columnStates = new List<ColumnState>();
             foreach (var col in FileListGrid.Columns)
             {
                 columnStates.Add(new ColumnState
                 {
-                    Width = col.Width.Value,   // 当前宽度值（用户拖拽后为像素值）
-                    Visible = col.Visibility == Visibility.Visible
+                    ColumnId = GetColumnId(col),
+                    Width = col.Width.Value,
+                    Visible = col.Visibility == Visibility.Visible,
+                    DisplayIndex = col.DisplayIndex
                 });
             }
+
+            // 保存当前排序列和方向
+            string? sortColumnPath = null;
+            int sortDirection = 0;
+            foreach (var col in FileListGrid.Columns)
+            {
+                if (col.SortDirection.HasValue)
+                {
+                    sortColumnPath = col.SortMemberPath;
+                    sortDirection = col.SortDirection.Value == ListSortDirection.Ascending ? 1 : 2;
+                    break;
+                }
+            }
+            App.LogDebug("SaveWindowSettings: sortPath={0}, sortDir={1}",
+                sortColumnPath ?? "(null)", sortDirection);
 
             var obj = new WindowSize
             {
@@ -223,7 +291,9 @@ public partial class MainWindow : Window
                 PreviewColumnWidth = previewColumnWidth,
                 PreviewTreeHeight = previewTreeHeight,
                 PreviewFilesHeight = previewFilesHeight,
-                ColumnStates = columnStates
+                ColumnStates = columnStates,
+                SortColumnPath = sortColumnPath,
+                SortDirection = sortDirection
             };
             var json = JsonSerializer.Serialize(obj, new JsonSerializerOptions { WriteIndented = true });
             File.WriteAllText(configPath, json);
@@ -254,6 +324,84 @@ public partial class MainWindow : Window
 // Menu event handlers moved to MainWindow.Menu.cs
 
 // Context menu moved to MainWindow.Menu.cs
+
+    #region 列排序持久化
+
+    /// <summary>
+    /// 获取列的唯一标识：优先用 SortMemberPath，模板列用 Tag
+    /// </summary>
+    private static string? GetColumnId(DataGridColumn col)
+    {
+        return col.SortMemberPath;
+    }
+
+    /// <summary>
+    /// 从 DataGrid 当前状态捕获排序列和方向到实例字段
+    /// </summary>
+    private void CaptureCurrentSort()
+    {
+        foreach (var col in FileListGrid.Columns)
+        {
+            if (col.SortDirection.HasValue)
+            {
+                _savedSortColumnPath = col.SortMemberPath;
+                _savedSortDirection = col.SortDirection.Value == ListSortDirection.Ascending ? 1 : 2;
+                App.LogDebug("CaptureCurrentSort: captured col={0}, path={1}, dir={2}",
+                    col.Header?.ToString()?.TrimEnd('▲', '▼', ' ').TrimEnd(),
+                    _savedSortColumnPath ?? "(null)",
+                    _savedSortDirection);
+                return;
+            }
+        }
+        // 当前没有排序列 → 不覆盖 _savedSortColumnPath（保留从 JSON 加载或之前捕获的值）
+    }
+
+    /// <summary>
+    /// 在设置新的 ItemsSource 后重新应用排序
+    /// </summary>
+    private void ApplySavedSort()
+    {
+        if (string.IsNullOrEmpty(_savedSortColumnPath) || _savedSortDirection <= 0)
+        {
+            App.LogDebug("ApplySavedSort: skipped (path={0}, dir={1})",
+                _savedSortColumnPath ?? "(null)", _savedSortDirection);
+            return;
+        }
+
+        var sortCol = FileListGrid.Columns.FirstOrDefault(c => c.SortMemberPath == _savedSortColumnPath);
+        if (sortCol == null)
+        {
+            App.LogDebug("ApplySavedSort: column not found for path={0}", _savedSortColumnPath);
+            return;
+        }
+
+        var direction = _savedSortDirection == 1
+            ? ListSortDirection.Ascending
+            : ListSortDirection.Descending;
+
+        App.LogDebug("ApplySavedSort: applying path={0}, dir={1}", _savedSortColumnPath, _savedSortDirection);
+
+        // 通过 CollectionView 排序（WPF 官方推荐方式）
+        var view = System.Windows.Data.CollectionViewSource.GetDefaultView(FileListGrid.ItemsSource);
+        if (view != null)
+        {
+            view.SortDescriptions.Clear();
+            view.SortDescriptions.Add(
+                new System.ComponentModel.SortDescription(sortCol.SortMemberPath, direction));
+            App.LogDebug("ApplySavedSort: view type={0}, SortDescriptions count={1}",
+                view.GetType().Name, view.SortDescriptions.Count);
+        }
+
+        sortCol.SortDirection = direction;
+
+        if (sortCol.Header is string header)
+        {
+            var clean = header.TrimEnd('▲', '▼', ' ').TrimEnd();
+            sortCol.Header = clean + (direction == ListSortDirection.Ascending ? " ▲" : " ▼");
+        }
+    }
+
+    #endregion
 
     #region 核心功能
 
@@ -391,6 +539,7 @@ public partial class MainWindow : Window
                 LastModified = i.LastModified,
                 IsDirectory = i.IsDirectory,
                 IsEncrypted = i.IsEncrypted,
+                Crc32 = i.Crc32,
                 IconSource = i.IsDirectory
                     ? SystemIconHelper.GetFolderIcon()
                     : SystemIconHelper.GetFileIcon(Path.GetExtension(i.Name))

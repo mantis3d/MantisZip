@@ -122,7 +122,7 @@ public partial class MainWindow
         var existing = nodes.FirstOrDefault(n => n.FullPath == currentPath);
         if (existing == null)
         {
-            existing = new FolderNode { Name = "📁 " + name, FullPath = currentPath };
+            existing = new FolderNode { Name = name, FullPath = currentPath };
             nodes.Add(existing);
         }
         if (index < parts.Length - 1) AddFolderNode(existing.Children, parts, index + 1, fullPath);
@@ -155,6 +155,9 @@ public partial class MainWindow
 
     private void FilterFiles(string folderPath)
     {
+        // 在替换 ItemsSource 之前捕获当前排序状态，以便重新应用
+        CaptureCurrentSort();
+
         _isProgrammaticFilter = true;
         try
         {
@@ -234,6 +237,7 @@ public partial class MainWindow
                     : item.Name.StartsWith(prefix) ? item.Name[prefix.Length..].TrimEnd('/') : item.Name;
             }
             FileListGrid.ItemsSource = sortedItems;
+            ApplySavedSort();
             FileListGrid.Items.Refresh();
             var fileCount = sortedItems.Count(i => !i.IsDirectory);
             var dirCount = sortedItems.Count(i => i.IsDirectory);
@@ -363,6 +367,16 @@ public partial class MainWindow
             newDir = ListSortDirection.Descending;
         // else (Descending) → null（回到未排序）
 
+        // 同步更新保存的排序状态（用于 FilterFiles 切目录时恢复）
+        _savedSortColumnPath = newDir.HasValue ? col.SortMemberPath : null;
+        _savedSortDirection = newDir.HasValue
+            ? (newDir.Value == ListSortDirection.Ascending ? 1 : 2)
+            : 0;
+        App.LogDebug("FileListGrid_Sorting: col={0}, sortPath={1}, dir={2}",
+            col.Header?.ToString()?.TrimEnd('▲', '▼', ' ').TrimEnd(),
+            _savedSortColumnPath ?? "(null)",
+            _savedSortDirection);
+
         if (col.Header is string header)
         {
             var clean = header.TrimEnd('▲', '▼', ' ').TrimEnd();
@@ -395,9 +409,26 @@ public partial class MainWindow
 
             var item = new MenuItem
             {
-                // 可见的列前加 ●，隐藏的列前加 ○，后面保持对齐
-                Header = (isVisible ? "● " : "○ ") + raw,
+                Header = raw,
                 Tag = column
+            };
+
+            // 各列对应的彩色 emoji 图标；可见=不透明，隐藏=半透明
+            var icon = "📋";
+            if (raw == L.T(L.Main_Col_Size)) icon = "📏";
+            else if (raw == L.T(L.Main_Col_Compressed)) icon = "📦";
+            else if (raw == L.T(L.Main_Col_Ratio)) icon = "📊";
+            else if (raw == L.T(L.Main_Col_Crc32)) icon = "🔐";
+            else if (raw == L.T(L.Main_Col_Date)) icon = "📅";
+            else if (raw == L.T(L.Main_Col_Encrypted)) icon = "🔒";
+
+            item.Icon = new Emoji.Wpf.TextBlock
+            {
+                Text = icon,
+                FontSize = 14,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(2, 0, 4, 0),
+                Opacity = isVisible ? 1.0 : 0.2
             };
 
             item.Click += ColumnVisibilityMenuItem_Click;
@@ -406,7 +437,7 @@ public partial class MainWindow
     }
 
     /// <summary>
-    /// 点击列显隐菜单项：切换对应列的可见性
+    /// 点击列显隐菜单项：切换对应列的可见性 + 图标透明度
     /// </summary>
     private void ColumnVisibilityMenuItem_Click(object sender, RoutedEventArgs e)
     {
@@ -415,9 +446,9 @@ public partial class MainWindow
             var newVisible = column.Visibility != Visibility.Visible;
             column.Visibility = newVisible ? Visibility.Visible : Visibility.Collapsed;
 
-            // 更新标题前的状态符号
-            var raw = (item.Header?.ToString() ?? "").TrimStart('●', '○', ' ');
-            item.Header = (newVisible ? "● " : "○ ") + raw;
+            // 更新图标透明度：可见=不透明，隐藏=半透明
+            if (item.Icon is Emoji.Wpf.TextBlock iconBlock)
+                iconBlock.Opacity = newVisible ? 1.0 : 0.2;
         }
     }
 
@@ -431,6 +462,7 @@ public class FolderNode : INotifyPropertyChanged
 {
     public string Name { get; set; } = string.Empty;
     public string FullPath { get; set; } = string.Empty;
+    public string Icon => string.IsNullOrEmpty(FullPath) ? "📦" : "📁";
     public List<FolderNode> Children { get; set; } = new();
 
     private bool _isExpanded;
@@ -469,6 +501,32 @@ public class ArchiveItem : Core.Abstractions.ArchiveItem
     public string DateDisplay => LastModified > DateTime.MinValue
         ? LastModified.ToString("yyyy-MM-dd HH:mm")
         : "---";
+
+    public string Crc32Display
+    {
+        get { return Crc32 != 0 ? $"{(uint)Crc32:X8}" : "---"; }
+    }
+
+    public string RatioDisplay
+    {
+        get
+        {
+            if (IsDirectory || Size == 0) return "---";
+            if (CompressedSize == 0) return "0%";
+            var ratio = (double)CompressedSize / Size;
+            return $"{ratio * 100:F1}%";
+        }
+    }
+
+    public double RatioSort
+    {
+        get
+        {
+            if (IsDirectory || Size == 0) return double.MaxValue;
+            if (CompressedSize == 0) return 0;
+            return (double)CompressedSize / Size;
+        }
+    }
 
     internal static string FormatSize(long bytes)
     {

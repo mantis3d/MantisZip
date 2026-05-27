@@ -6,6 +6,7 @@
         xmlns:app="clr-namespace:MantisZip.UI"
              xmlns:l="clr-namespace:MantisZip.UI.Localization"
              xmlns:wv2="clr-namespace:Microsoft.Web.WebView2.Wpf;assembly=Microsoft.Web.WebView2.Wpf"
+             xmlns:emoji="clr-namespace:Emoji.Wpf;assembly=Emoji.Wpf"
         mc:Ignorable="d"
         Title="{l:L Main_WindowTitle}" Icon="/Resources/App.ico" Height="800" Width="1200"
         MinHeight="450" MinWidth="600"
@@ -47,30 +48,54 @@
         <!-- Menu Bar -->
         <Menu Grid.Row="0">
             <MenuItem Header="{l:L Main_Menu_File}">
-                <MenuItem Header="{l:L Main_Menu_OpenArchive}" Click="OpenArchive_Click" InputGestureText="Ctrl+O"/>
-                <MenuItem Header="{l:L Main_Menu_NewArchive}" Click="NewArchive_Click" InputGestureText="Ctrl+N"/>
+                <MenuItem Header="{l:L Main_Menu_OpenArchive}" Click="OpenArchive_Click" InputGestureText="Ctrl+O">
+                    <MenuItem.Icon><emoji:TextBlock Text="📂" FontSize="14" Margin="2,0,4,0" VerticalAlignment="Center"/></MenuItem.Icon>
+                </MenuItem>
+                <MenuItem Header="{l:L Main_Menu_NewArchive}" Click="NewArchive_Click" InputGestureText="Ctrl+N">
+                    <MenuItem.Icon><emoji:TextBlock Text="🆕" FontSize="14" Margin="2,0,4,0" VerticalAlignment="Center"/></MenuItem.Icon>
+                </MenuItem>
                 <Separator/>
-                <MenuItem Header="{l:L Main_Menu_Extract}" Click="Extract_Click" InputGestureText="Ctrl+E"/>
-                <MenuItem Header="{l:L Main_Menu_Compress}" Click="Compress_Click" InputGestureText="Ctrl+C"/>
+                <MenuItem Header="{l:L Main_Menu_Extract}" Click="Extract_Click" InputGestureText="Ctrl+E">
+                    <MenuItem.Icon><emoji:TextBlock Text="📤" FontSize="14" Margin="2,0,4,0" VerticalAlignment="Center"/></MenuItem.Icon>
+                </MenuItem>
+                <MenuItem Header="{l:L Main_Menu_Compress}" Click="Compress_Click" InputGestureText="Ctrl+C">
+                    <MenuItem.Icon><emoji:TextBlock Text="📥" FontSize="14" Margin="2,0,4,0" VerticalAlignment="Center"/></MenuItem.Icon>
+                </MenuItem>
                 <Separator/>
-                <MenuItem Header="{l:L Main_Menu_Exit}" Click="Exit_Click" InputGestureText="Alt+F4"/>
+                <MenuItem Header="{l:L Main_Menu_Exit}" Click="Exit_Click" InputGestureText="Alt+F4">
+                    <MenuItem.Icon><emoji:TextBlock Text="🚪" FontSize="14" Margin="2,0,4,0" VerticalAlignment="Center"/></MenuItem.Icon>
+                </MenuItem>
             </MenuItem>
             <MenuItem Header="{l:L Main_Menu_View}">
-                <MenuItem Header="{l:L Main_Menu_Refresh}" Click="Refresh_Click" InputGestureText="F5"/>
+                <MenuItem Header="{l:L Main_Menu_Refresh}" Click="Refresh_Click" InputGestureText="F5">
+                    <MenuItem.Icon><emoji:TextBlock Text="🔄" FontSize="14" Margin="2,0,4,0" VerticalAlignment="Center"/></MenuItem.Icon>
+                </MenuItem>
             </MenuItem>
             <MenuItem Header="{l:L Main_Menu_Edit}">
-                <MenuItem x:Name="EditMenuAddFiles" Header="{l:L Main_Ctx_AddFiles}" Click="AddFiles_Click"/>
-                <MenuItem x:Name="EditMenuDeleteFiles" Header="{l:L Main_Ctx_DeleteFiles}" Click="DeleteFiles_Click"/>
+                <MenuItem x:Name="EditMenuAddFiles" Header="{l:L Main_Ctx_AddFiles}" Click="AddFiles_Click">
+                    <MenuItem.Icon><emoji:TextBlock Text="➕" FontSize="14" Margin="2,0,4,0" VerticalAlignment="Center"/></MenuItem.Icon>
+                </MenuItem>
+                <MenuItem x:Name="EditMenuDeleteFiles" Header="{l:L Main_Ctx_DeleteFiles}" Click="DeleteFiles_Click">
+                    <MenuItem.Icon><emoji:TextBlock Text="✖" FontSize="14" Margin="2,0,4,0" VerticalAlignment="Center"/></MenuItem.Icon>
+                </MenuItem>
                 <Separator/>
-                <MenuItem x:Name="EditMenuArchiveComment" Header="{l:L Main_Menu_ArchiveComment}" Click="EditArchiveComment_Click"/>
+                <MenuItem x:Name="EditMenuArchiveComment" Header="{l:L Main_Menu_ArchiveComment}" Click="EditArchiveComment_Click">
+                    <MenuItem.Icon><emoji:TextBlock Text="💬" FontSize="14" Margin="2,0,4,0" VerticalAlignment="Center"/></MenuItem.Icon>
+                </MenuItem>
             </MenuItem>
             <MenuItem Header="{l:L Main_Menu_Tools}">
-                <MenuItem Header="{l:L Main_Menu_PasswordManager}" Click="PasswordManager_Click"/>
+                <MenuItem Header="{l:L Main_Menu_PasswordManager}" Click="PasswordManager_Click">
+                    <MenuItem.Icon><emoji:TextBlock Text="🔑" FontSize="14" Margin="2,0,4,0" VerticalAlignment="Center"/></MenuItem.Icon>
+                </MenuItem>
                 <Separator/>
-                <MenuItem Header="{l:L Main_Menu_Settings}" Click="Settings_Click"/>
+                <MenuItem Header="{l:L Main_Menu_Settings}" Click="Settings_Click">
+                    <MenuItem.Icon><emoji:TextBlock Text="⚙" FontSize="14" Margin="2,0,4,0" VerticalAlignment="Center"/></MenuItem.Icon>
+                </MenuItem>
             </MenuItem>
             <MenuItem Header="{l:L Main_Menu_Help}">
-                <MenuItem Header="{l:L Main_Menu_About}" Click="About_Click"/>
+                <MenuItem Header="{l:L Main_Menu_About}" Click="About_Click">
+                    <MenuItem.Icon><emoji:TextBlock Text="ℹ" FontSize="14" Margin="2,0,4,0" VerticalAlignment="Center"/></MenuItem.Icon>
+                </MenuItem>
             </MenuItem>
         </Menu>
 
@@ -79,65 +104,65 @@
             <ToolBar>
                 <Button ToolTip="{l:L Main_Tooltip_NewArchive}" Click="NewArchive_Click" Padding="8,6">
                     <StackPanel Orientation="Vertical" HorizontalAlignment="Center">
-                        <TextBlock Text="🆕" FontSize="25" HorizontalAlignment="Center"/>
+                        <emoji:TextBlock Text="🆕" FontSize="25" HorizontalAlignment="Center"/>
                         <TextBlock Text="{l:L Main_Toolbar_New}" FontSize="12" HorizontalAlignment="Center"/>
                     </StackPanel>
                 </Button>
                 <Button ToolTip="{l:L Main_Tooltip_OpenArchive}" Click="OpenArchive_Click" Padding="8,6">
                     <StackPanel Orientation="Vertical" HorizontalAlignment="Center">
-                        <TextBlock Text="📂" FontSize="25" HorizontalAlignment="Center"/>
+                        <emoji:TextBlock Text="📂" FontSize="25" HorizontalAlignment="Center"/>
                         <TextBlock Text="{l:L Main_Toolbar_Open}" FontSize="12" HorizontalAlignment="Center"/>
                     </StackPanel>
                 </Button>
                 <Button ToolTip="{l:L Main_Tooltip_Extract}" Click="Extract_Click" Padding="8,6">
                     <StackPanel Orientation="Vertical" HorizontalAlignment="Center">
-                        <TextBlock Text="📤" FontSize="25" HorizontalAlignment="Center"/>
+                        <emoji:TextBlock Text="📤" FontSize="25" HorizontalAlignment="Center"/>
                         <TextBlock Text="{l:L Settings_Tab_Extract}" FontSize="12" HorizontalAlignment="Center"/>
                     </StackPanel>
                 </Button>
                 <Button ToolTip="{l:L Main_Tooltip_Compress}" Click="Compress_Click" Padding="8,6">
                     <StackPanel Orientation="Vertical" HorizontalAlignment="Center">
-                        <TextBlock Text="📥" FontSize="25" HorizontalAlignment="Center"/>
+                        <emoji:TextBlock Text="📥" FontSize="25" HorizontalAlignment="Center"/>
                         <TextBlock Text="{l:L Shell_Compress}" FontSize="12" HorizontalAlignment="Center"/>
                     </StackPanel>
                 </Button>
                 <Button x:Name="SmartExtractBtn" ToolTip="{l:L Main_Tooltip_SmartExtract}" Click="SmartExtract_Click" Padding="8,6" IsEnabled="False">
                     <StackPanel Orientation="Vertical" HorizontalAlignment="Center">
-                        <TextBlock Text="🤖" FontSize="25" HorizontalAlignment="Center"/>
+                        <emoji:TextBlock Text="🤖" FontSize="25" HorizontalAlignment="Center"/>
                         <TextBlock Text="{l:L Main_Toolbar_SmartExtract}" FontSize="12" HorizontalAlignment="Center"/>
                     </StackPanel>
                 </Button>
                 <Separator/>
                 <Button x:Name="AddFilesBtn" ToolTip="{l:L Main_Tooltip_AddFiles}" Click="AddFiles_Click" Padding="8,6" IsEnabled="False">
                     <StackPanel Orientation="Vertical" HorizontalAlignment="Center">
-                        <TextBlock Text="➕" FontSize="25" HorizontalAlignment="Center"/>
+                        <emoji:TextBlock Text="➕" FontSize="25" HorizontalAlignment="Center"/>
                         <TextBlock Text="{l:L Main_Toolbar_AddFiles}" FontSize="12" HorizontalAlignment="Center"/>
                     </StackPanel>
                 </Button>
                 <Button x:Name="DeleteFilesBtn" ToolTip="{l:L Main_Tooltip_DeleteFiles}" Click="DeleteFiles_Click" Padding="8,6" IsEnabled="False">
                     <StackPanel Orientation="Vertical" HorizontalAlignment="Center">
-                        <TextBlock Text="✖" FontSize="25" Foreground="{StaticResource Theme_StatusError}" HorizontalAlignment="Center"/>
+                        <emoji:TextBlock Text="✖" FontSize="25" Foreground="{StaticResource Theme_StatusError}" HorizontalAlignment="Center"/>
                         <TextBlock Text="{l:L Main_Toolbar_DeleteFiles}" FontSize="12" HorizontalAlignment="Center"/>
                     </StackPanel>
                 </Button>
                 <Separator/>
                 <Button ToolTip="{l:L Main_Tooltip_Test}" Click="TestArchive_Click" Padding="8,6">
                     <StackPanel Orientation="Vertical" HorizontalAlignment="Center">
-                        <TextBlock Text="✓" FontSize="25" Foreground="{StaticResource Theme_StatusSuccess}" HorizontalAlignment="Center"/>
+                        <emoji:TextBlock Text="✓" FontSize="25" Foreground="{StaticResource Theme_StatusSuccess}" HorizontalAlignment="Center"/>
                         <TextBlock Text="{l:L Main_Toolbar_Test}" FontSize="12" HorizontalAlignment="Center"/>
                     </StackPanel>
                 </Button>
                 <Separator/>
                 <Button x:Name="EnterPasswordBtn" ToolTip="{l:L Main_Tooltip_Password}" Click="EnterPassword_Click" Padding="8,6" IsEnabled="False">
                     <StackPanel Orientation="Vertical" HorizontalAlignment="Center">
-                        <TextBlock Text="🔑" FontSize="25" HorizontalAlignment="Center"/>
+                        <emoji:TextBlock Text="🔑" FontSize="25" HorizontalAlignment="Center"/>
                         <TextBlock Text="{l:L PwdMgr_Col_Password}" FontSize="12" HorizontalAlignment="Center"/>
                     </StackPanel>
                 </Button>
                 <Separator/>
                 <ToggleButton x:Name="PreviewToggleBtn" ToolTip="{l:L Main_Tooltip_Preview}" Click="PreviewToggleBtn_Click" Padding="8,6">
                     <StackPanel Orientation="Vertical" HorizontalAlignment="Center">
-                        <TextBlock x:Name="PreviewToggleIcon" Text="👁" FontSize="25" HorizontalAlignment="Center"/>
+                        <emoji:TextBlock x:Name="PreviewToggleIcon" Text="👁" FontSize="25" HorizontalAlignment="Center"/>
                         <TextBlock Text="{l:L Settings_Tab_Preview}" FontSize="12" HorizontalAlignment="Center"/>
                     </StackPanel>
                 </ToggleButton>
@@ -157,7 +182,7 @@
                     <Border x:Name="DropHint" Grid.Row="1" Visibility="Visible"
                             Background="{StaticResource Theme_WindowBg}" BorderBrush="{StaticResource Theme_Border}" BorderThickness="2" CornerRadius="8">
                         <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
-                            <TextBlock Text="📁" FontSize="64" HorizontalAlignment="Center" Opacity="0.3"/>
+                            <emoji:TextBlock Text="📁" FontSize="64" HorizontalAlignment="Center" Opacity="0.3"/>
                             <TextBlock Text="{l:L Main_EmptyDropHint}" FontSize="16" Foreground="{StaticResource Theme_TextDisabled}" Margin="0,16,0,4"/>
                             <Button Content="{l:L Main_OpenArchiveBtn}" FontSize="14" Click="OpenArchive_Click" 
                                     Background="Transparent" BorderThickness="0" Foreground="{StaticResource Theme_Accent}" Cursor="Hand"/>
@@ -174,7 +199,7 @@
                         <!-- Archive Info -->
                         <Border Grid.Row="0" Background="{StaticResource Theme_AccentLight}" CornerRadius="4" Padding="12" Margin="0,0,0,8">
                             <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="📦" FontSize="24" VerticalAlignment="Center" Margin="0,0,12,0"/>
+                                <emoji:TextBlock Text="📦" FontSize="24" VerticalAlignment="Center" Margin="0,0,12,0"/>
                                 <StackPanel>
                                     <TextBlock x:Name="ArchiveNameText" Text="" FontWeight="Bold" FontSize="14"/>
                                     <TextBlock x:Name="ArchiveInfoText" Text="" FontSize="11" Foreground="{StaticResource Theme_TextSecondary}"/>
@@ -218,9 +243,12 @@
                                           SelectedItemChanged="FolderTree_SelectedItemChanged"
                                           ItemContainerStyle="{StaticResource TreeViewItemStyle}">
                                     <TreeView.ItemTemplate>
-                                        <HierarchicalDataTemplate ItemsSource="{Binding Children}">
-                                            <TextBlock Text="{Binding Name}"/>
-                                        </HierarchicalDataTemplate>
+                                    <HierarchicalDataTemplate ItemsSource="{Binding Children}">
+                                        <StackPanel Orientation="Horizontal">
+                                            <emoji:TextBlock Text="{Binding Icon}" FontSize="14" Margin="0,0,4,0"/>
+                                            <TextBlock Text="{Binding Name}" VerticalAlignment="Center"/>
+                                        </StackPanel>
+                                    </HierarchicalDataTemplate>
                                     </TreeView.ItemTemplate>
                                 </TreeView>
 
@@ -254,18 +282,30 @@
                                             Sorting="FileListGrid_Sorting">
                                     <DataGrid.ContextMenu>
                                         <ContextMenu>
-                                            <MenuItem Header="{l:L Main_Ctx_AddFiles}" Click="FileListCtx_AddFiles"/>
-                                            <MenuItem Header="{l:L Main_Ctx_DeleteFiles}" Click="FileListCtx_DeleteFiles"/>
+                                            <MenuItem Header="{l:L Main_Ctx_AddFiles}" Click="FileListCtx_AddFiles">
+                                                <MenuItem.Icon><emoji:TextBlock Text="➕" FontSize="14" Margin="2,0,4,0" VerticalAlignment="Center"/></MenuItem.Icon>
+                                            </MenuItem>
+                                            <MenuItem Header="{l:L Main_Ctx_DeleteFiles}" Click="FileListCtx_DeleteFiles">
+                                                <MenuItem.Icon><emoji:TextBlock Text="✖" FontSize="14" Margin="2,0,4,0" VerticalAlignment="Center"/></MenuItem.Icon>
+                                            </MenuItem>
                                             <Separator/>
-                                            <MenuItem Header="{l:L Main_Ctx_ExtractTo}" Click="FileListCtx_ExtractTo"/>
-                                            <MenuItem Header="{l:L Main_Ctx_ExtractHere}" Click="FileListCtx_ExtractHere"/>
+                                            <MenuItem Header="{l:L Main_Ctx_ExtractTo}" Click="FileListCtx_ExtractTo">
+                                                <MenuItem.Icon><emoji:TextBlock Text="📤" FontSize="14" Margin="2,0,4,0" VerticalAlignment="Center"/></MenuItem.Icon>
+                                            </MenuItem>
+                                            <MenuItem Header="{l:L Main_Ctx_ExtractHere}" Click="FileListCtx_ExtractHere">
+                                                <MenuItem.Icon><emoji:TextBlock Text="📂" FontSize="14" Margin="2,0,4,0" VerticalAlignment="Center"/></MenuItem.Icon>
+                                            </MenuItem>
                                             <Separator/>
-                                            <MenuItem Header="{l:L Main_Ctx_CopyName}" Click="FileListCtx_CopyName"/>
-                                            <MenuItem Header="{l:L Main_Ctx_CopyPath}" Click="FileListCtx_CopyPath"/>
+                                            <MenuItem Header="{l:L Main_Ctx_CopyName}" Click="FileListCtx_CopyName">
+                                                <MenuItem.Icon><emoji:TextBlock Text="📋" FontSize="14" Margin="2,0,4,0" VerticalAlignment="Center"/></MenuItem.Icon>
+                                            </MenuItem>
+                                            <MenuItem Header="{l:L Main_Ctx_CopyPath}" Click="FileListCtx_CopyPath">
+                                                <MenuItem.Icon><emoji:TextBlock Text="🔗" FontSize="14" Margin="2,0,4,0" VerticalAlignment="Center"/></MenuItem.Icon>
+                                            </MenuItem>
                                         </ContextMenu>
                                     </DataGrid.ContextMenu>
                                     <DataGrid.Columns>
-                                        <DataGridTemplateColumn Header="{l:L Main_Col_Name}" Width="*">
+                                        <DataGridTemplateColumn Header="{l:L Main_Col_Name}" Width="*" SortMemberPath="Name">
                                             <DataGridTemplateColumn.CellTemplate>
                                                 <DataTemplate>
                                                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
@@ -277,11 +317,13 @@
                                         </DataGridTemplateColumn>
                                         <DataGridTextColumn Header="{l:L Main_Col_Size}" Binding="{Binding SizeDisplay}" SortMemberPath="Size" Width="100"/>
                                         <DataGridTextColumn Header="{l:L Main_Col_Compressed}" Binding="{Binding CompressedSizeDisplay}" SortMemberPath="CompressedSize" Width="100"/>
+                                        <DataGridTextColumn Header="{l:L Main_Col_Ratio}" Binding="{Binding RatioDisplay}" SortMemberPath="RatioSort" Width="80"/>
+                                        <DataGridTextColumn Header="{l:L Main_Col_Crc32}" Binding="{Binding Crc32Display}" SortMemberPath="Crc32" Width="110"/>
                                         <DataGridTextColumn Header="{l:L Main_Col_Date}" Binding="{Binding DateDisplay}" SortMemberPath="LastModified" Width="150"/>
-                                        <DataGridTemplateColumn Header="{l:L Main_Col_Encrypted}" Width="50">
+                                        <DataGridTemplateColumn Header="{l:L Main_Col_Encrypted}" Width="50" SortMemberPath="Encrypted">
                                             <DataGridTemplateColumn.CellTemplate>
                                                 <DataTemplate>
-                                                    <TextBlock Text="🔒" HorizontalAlignment="Center" 
+                                                    <emoji:TextBlock Text="🔒" HorizontalAlignment="Center" 
                                                                Visibility="{Binding IsEncrypted, Converter={StaticResource BoolToVisibilityConverter}}"/>
                                                 </DataTemplate>
                                             </DataGridTemplateColumn.CellTemplate>
