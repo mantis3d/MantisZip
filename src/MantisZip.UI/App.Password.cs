@@ -10,6 +10,7 @@ using MantisZip.Core.Utils;
 using MantisZip.UI.Localization;
 using SharpCompress.Archives;
 using SharpCompress.Readers;
+using SharpSevenZip;
 
 namespace MantisZip.UI;
 
@@ -155,8 +156,8 @@ public partial class App : Application
             }
             if (engine is SevenZipEngine)
             {
-                using var archiveFile = new global::SevenZipExtractor.ArchiveFile(archivePath);
-                return archiveFile.Entries.Any(e => !e.IsFolder && e.IsEncrypted);
+                using var extractor = new SharpSevenZipExtractor(archivePath);
+                return extractor.ArchiveFileData.Any(e => !e.IsDirectory && e.Encrypted);
             }
             return false;
         }
@@ -170,7 +171,7 @@ public partial class App : Application
 
     /// <summary>
     /// 快速验证密码是否正确——读第一个加密条目 1 字节，
-    /// 密码不对时 SharpZipLib / SevenZipExtractor 会在读字节前抛异常。
+    /// 密码不对时 SharpZipLib / SharpSevenZipExtractor 会在读字节前抛异常。
     /// 只捕获密码相关异常，系统级错误向上传播。
     /// </summary>
     internal static bool QuickVerifyPassword(string archivePath, string password, IArchiveEngine engine)
@@ -188,9 +189,9 @@ public partial class App : Application
             }
             else if (engine is SevenZipEngine)
             {
-                using var archiveFile = new global::SevenZipExtractor.ArchiveFile(archivePath, password);
-                // 7z 构造器传入密码后，访问 Entries 即可验证密码
-                _ = archiveFile.Entries.Count;
+                using var extractor = new SharpSevenZipExtractor(archivePath, password);
+                // SharpSevenZipExtractor 构造器传入密码后，访问 ArchiveFileData 即可验证密码
+                _ = extractor.ArchiveFileData.Count;
                 return true;
             }
             // TarGzEngine 不支持加密

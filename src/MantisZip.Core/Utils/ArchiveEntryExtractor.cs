@@ -2,9 +2,9 @@ using System.Diagnostics;
 using System.Linq;
 using MantisZip.Core.Abstractions;
 using MantisZip.Core.Utils;
-using SevenZipExtractor;
 using SharpCompress.Archives;
 using SharpCompress.Readers;
+using SharpSevenZip;
 
 namespace MantisZip.Core.Utils;
 
@@ -93,12 +93,12 @@ public static class ArchiveEntryExtractor
 
         // 最终路径安全检查：规范化后验证无路径穿越
         ValidateOutputPath(outputPath);
-        using var archiveFile = string.IsNullOrEmpty(password)
-            ? new ArchiveFile(archivePath)
-            : new ArchiveFile(archivePath, password);
+        using var extractor = string.IsNullOrEmpty(password)
+            ? new SharpSevenZipExtractor(archivePath)
+            : new SharpSevenZipExtractor(archivePath, password);
         // 统一路径分隔符为 /（RAR 文件可能使用 \），与 SevenZipEngine.ListEntriesAsync 保持一致
-        var entry = archiveFile.Entries.FirstOrDefault(e => e.FileName.Replace('\\', '/') == entryName);
-        if (entry == null)
+        var entry = extractor.ArchiveFileData.FirstOrDefault(e => e.FileName.Replace('\\', '/') == entryName);
+        if (entry.FileName == null)
         {
             throw new FileNotFoundException($"在压缩包中未找到条目: {entryName}");
         }
@@ -110,7 +110,7 @@ public static class ArchiveEntryExtractor
         }
 
         using var fileStream = new FileStream(outputPath, FileMode.Create, FileAccess.Write);
-        entry.Extract(fileStream);
+        extractor.ExtractFile(entry.Index, fileStream);
         CoreLog.Info($"ExtractSevenZipEntry: done");
     }
 
