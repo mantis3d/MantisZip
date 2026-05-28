@@ -356,8 +356,8 @@ public partial class CompressSettingsWindow : Window
         if (engine == null)
         {
             outputPath = Path.ChangeExtension(outputPath, ".zip");
-            engine = new ZipEngine();
         }
+        engine ??= new ZipEngine();
 
         if (File.Exists(outputPath))
         {
@@ -388,7 +388,7 @@ public partial class CompressSettingsWindow : Window
                                 addOptions.Password = PasswordBox.Password;
                                 addOptions.Comment = GetComment();
                                 var addCtx = ProgressWindow.CreateBackgroundProgress(addProgress);
-                                await engine.AddToArchiveAsync(outputPath, _sourcePaths.ToArray(), addOptions, addCtx, addProgress.CancellationToken);
+                                await engine!.AddToArchiveAsync(outputPath, _sourcePaths.ToArray(), addOptions, addCtx, addProgress.CancellationToken);
                                 addProgress.SetComplete(L.T(L.App_AddToArchiveComplete));
                                 await Task.Delay(500);
                                 addProgress.Close();
@@ -530,8 +530,8 @@ public partial class CompressSettingsWindow : Window
                     if (engine == null)
                     {
                         outputPath = Path.ChangeExtension(outputPath, ".zip");
-                        engine = new ZipEngine();
                     }
+                    engine ??= new ZipEngine();
 
                     // 冲突处理 — per item
                     if (File.Exists(outputPath))
@@ -565,7 +565,7 @@ public partial class CompressSettingsWindow : Window
                                     try
                                     {
                                         var addProgress = ProgressWindow.CreateBackgroundProgress(progressWindow);
-                                        await engine.AddToArchiveAsync(outputPath, new[] { sourcePath }, options, addProgress, ct);
+                                        await engine!.AddToArchiveAsync(outputPath, new[] { sourcePath }, options, addProgress, ct);
                                         success++;
                                     }
                                     catch (Exception addEx)
@@ -582,7 +582,7 @@ public partial class CompressSettingsWindow : Window
                     }
 
                     var progress = ProgressWindow.CreateBackgroundProgress(progressWindow);
-                    await engine.CompressAsync(new[] { sourcePath }, outputPath, options, progress, ct);
+                    await engine!.CompressAsync(new[] { sourcePath }, outputPath, options, progress, ct);
                     success++;
                 }
                 catch (OperationCanceledException)
@@ -638,8 +638,8 @@ public partial class CompressSettingsWindow : Window
         if (engine == null)
         {
             outputPath = Path.ChangeExtension(outputPath, ".zip");
-            engine = new ZipEngine();
         }
+        engine ??= new ZipEngine();
 
         if (File.Exists(outputPath))
         {
@@ -670,7 +670,7 @@ public partial class CompressSettingsWindow : Window
                                 addOptions.Password = PasswordBox.Password;
                                 addOptions.Comment = GetComment();
                                 var addCtx = ProgressWindow.CreateBackgroundProgress(addProgress);
-                                await engine.AddToArchiveAsync(outputPath, _sourcePaths.ToArray(), addOptions, addCtx, addProgress.CancellationToken);
+                                await engine!.AddToArchiveAsync(outputPath, _sourcePaths.ToArray(), addOptions, addCtx, addProgress.CancellationToken);
                                 addProgress.SetComplete(L.T(L.App_AddToArchiveComplete));
                                 await Task.Delay(500);
                                 addProgress.Close();
