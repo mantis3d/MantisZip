@@ -614,6 +614,8 @@ public partial class MainWindow : Window
 
     private async Task ExtractAsync(string archivePath, string destinationPath)
     {
+        App.LogDebug("ExtractAsync: archive='{0}', dest='{1}', password={2}",
+            archivePath, destinationPath, _currentPassword != null ? "***" : "null");
         var progressWindow = new ProgressWindow();
         progressWindow.InitCancellation();
         progressWindow.Show();
@@ -621,7 +623,11 @@ public partial class MainWindow : Window
         try
         {
             var engine = ArchiveEngineFactory.GetEngineByExtension(archivePath);
-            if (engine == null) return;
+            if (engine == null)
+            {
+                App.LogDebug("ExtractAsync: no engine found for '{0}'", archivePath);
+                return;
+            }
 
             var ct = progressWindow.CancellationToken;
             var progress = progressWindow.CreatePauseAwareProgress(
@@ -640,6 +646,7 @@ public partial class MainWindow : Window
                 await engine.ExtractAsync(archivePath, destinationPath, pwd, progress, ct, opts);
 
                 progressWindow.Close();
+                App.LogDebug("ExtractAsync: done (saved password match), dest='{0}'", destinationPath);
                 SetStatus(L.TF(L.Main_Status_ExtractDone, Path.GetFileName(archivePath)));
                 if (AppSettings.Instance.OpenFolderAfterExtract) OpenInExplorer(destinationPath);
                 return;
@@ -659,41 +666,48 @@ public partial class MainWindow : Window
             if (!_hasEncryptedArchive)
             {
                 // 非加密压缩包：直接解压，不需要密码
+                App.LogDebug("ExtractAsync: no encryption, extracting without password");
                 var opts = App.CreateExtractOptions();
                 await engine.ExtractAsync(archivePath, destinationPath, null, progress, ct, opts);
                 progressWindow.Close();
+                App.LogDebug("ExtractAsync: done (no password), dest='{0}'", destinationPath);
                 SetStatus(L.TF(L.Main_Status_ExtractDone, Path.GetFileName(archivePath)));
                 if (AppSettings.Instance.OpenFolderAfterExtract) OpenInExplorer(destinationPath);
                 return;
             }
 
+            App.LogDebug("ExtractAsync: all saved passwords failed, prompting user for password");
             var pwdResult = App.PromptForPassword(archivePath, progressWindow, this);
             if (pwdResult == null)
             {
+                App.LogDebug("ExtractAsync: user cancelled password prompt");
                 progressWindow.Close();
                 SetStatus(L.T(L.Main_Status_ExtractCancel));
                 return;
             }
 
             var (userPwd, remember, pwdDesc, pwdPatterns) = pwdResult.Value;
-            if (string.IsNullOrEmpty(userPwd)) { progressWindow.Close(); SetStatus(L.T(L.Main_Status_ExtractCancel)); return; }
+            if (string.IsNullOrEmpty(userPwd)) { App.LogDebug("ExtractAsync: empty password provided"); progressWindow.Close(); SetStatus(L.T(L.Main_Status_ExtractCancel)); return; }
             bool showPwdManual = _hasEncryptedArchive && AppSettings.Instance.ShowPasswordMatchNotification;
 
             if (!await App.ExtractWithPasswordAsync(archivePath, destinationPath, engine,
                     userPwd, L.T(L.Main_ForceLoadPwd), progressWindow, progress, ct, showPwdManual, remember, pwdDesc, pwdPatterns))
             {
                 progressWindow.Close();
+                App.LogDebug("ExtractAsync: manual password failed (wrong password)");
                 AppMessageBox.Show(L.T(L.Main_Status_WrongPwd), L.T(L.App_ErrorTitle), MessageBoxButton.OK, MessageBoxImage.Error);
                 SetStatus(L.T(L.Main_Status_WrongPwd));
                 return;
             }
 
             progressWindow.Close();
+            App.LogDebug("ExtractAsync: done (manual password), dest='{0}'", destinationPath);
             SetStatus(L.TF(L.Main_Status_ExtractDone, Path.GetFileName(archivePath)));
             if (AppSettings.Instance.OpenFolderAfterExtract) OpenInExplorer(destinationPath);
         }
         catch (OperationCanceledException)
         {
+            App.LogDebug("ExtractAsync: cancelled by user");
             progressWindow.Close();
             SetStatus(L.T(L.Main_Status_AddCancel));
         }
@@ -702,10 +716,11 @@ public partial class MainWindow : Window
             progressWindow.Close();
             if (IsPasswordErrorLocal(ex))
             {
-                App.LogDebug("ExtractAsync: {0} {1} {2}", L.T(L.Main_Status_WrongPwd), L.T(L.PwdEdit_PasswordLabel), ex.Message);
+                App.LogDebug("ExtractAsync: password error: {0}", ex.Message);
             }
             else
             {
+                App.LogDebug("ExtractAsync: failed: {0}", ex.Message);
                 AppMessageBox.Show(L.TF(L.Main_Status_ExtractFailed, ex.Message), L.T(L.App_ErrorTitle), MessageBoxButton.OK, MessageBoxImage.Error);
             }
             SetStatus(L.TF(L.Main_Status_ExtractFailed, ""));

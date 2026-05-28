@@ -159,7 +159,11 @@ public partial class MainWindow
     {
         if (string.IsNullOrEmpty(_currentArchivePath)) return;
         var engine = ArchiveEngineFactory.GetEngine(_currentFormat);
-        if (engine == null || !engine.CanAdd(_currentFormat)) return;
+        if (engine == null || !engine.CanAdd(_currentFormat))
+        {
+            App.LogDebug("AddFiles_Click: engine={0} cannot add to format={1}", engine?.GetType().Name, _currentFormat);
+            return;
+        }
 
         var filter = L.T(L.Compress_FileFilter);
         var title = L.T(L.Main_SelectFilesTitle);
@@ -170,7 +174,10 @@ public partial class MainWindow
             Multiselect = true
         };
         if (ofd.ShowDialog() == true)
+        {
+            App.LogDebug("AddFiles_Click: user selected {0} files to add to archive '{1}'", ofd.FileNames.Length, _currentArchivePath);
             await AddFilesToCurrentArchiveAsync(ofd.FileNames);
+        }
     }
 
     private void FileListCtx_AddFiles(object sender, RoutedEventArgs e)
@@ -221,15 +228,26 @@ public partial class MainWindow
 
         if (filesToDelete.Count == 0) { SetStatus(L.T(L.Main_Status_NoFilesToExtract)); return; }
 
+        App.LogDebug("DeleteSelectedEntriesAsync: {0} entries selected -> {1} files to delete from '{2}'",
+            selectedItems.Count, filesToDelete.Count, _currentArchivePath);
+
         // 确认对话框
         var confirm = AppMessageBox.Show(this,
             L.TF(L.Main_DeleteConfirm, filesToDelete.Count),
             L.T(L.Main_DeleteConfirmTitle),
             MessageBoxButton.YesNo, MessageBoxImage.Warning);
-        if (confirm != MessageBoxResult.Yes) return;
+        if (confirm != MessageBoxResult.Yes)
+        {
+            App.LogDebug("DeleteSelectedEntriesAsync: user cancelled deletion");
+            return;
+        }
 
         var engine = ArchiveEngineFactory.GetEngineByExtension(_currentArchivePath);
-        if (engine == null) return;
+        if (engine == null)
+        {
+            App.LogDebug("DeleteSelectedEntriesAsync: no engine found for '{0}'", _currentArchivePath);
+            return;
+        }
 
         var pw = new ProgressWindow();
         pw.InitCancellation();
@@ -238,6 +256,7 @@ public partial class MainWindow
 
         try
         {
+            App.LogDebug("DeleteSelectedEntriesAsync: starting deletion of {0} entries", filesToDelete.Count);
             await engine.DeleteEntriesAsync(_currentArchivePath!, filesToDelete.ToArray(), _currentPassword,
                 ProgressWindow.CreateBackgroundProgress(pw),
                 pw.CancellationToken);
@@ -246,6 +265,7 @@ public partial class MainWindow
             await Task.Delay(800);
             pw.Close();
 
+            App.LogDebug("DeleteSelectedEntriesAsync: deletion done, reloading archive");
             var prevFolder = _currentFolder;
             await LoadArchiveAsync(_currentArchivePath!);
             if (!string.IsNullOrEmpty(prevFolder))
@@ -257,17 +277,20 @@ public partial class MainWindow
         }
         catch (OperationCanceledException)
         {
+            App.LogDebug("DeleteSelectedEntriesAsync: cancelled by user");
             pw.Close();
             SetStatus(L.T(L.Main_Status_AddCancel));
         }
         catch (NotSupportedException ex)
         {
+            App.LogDebug("DeleteSelectedEntriesAsync: not supported: {0}", ex.Message);
             pw.Close();
             AppMessageBox.Show(ex.Message, L.T(L.App_ErrorTitle), MessageBoxButton.OK, MessageBoxImage.Information);
             SetStatus(L.T(L.Main_Status_Ready));
         }
         catch (Exception ex)
         {
+            App.LogDebug("DeleteSelectedEntriesAsync: failed: {0}", ex.Message);
             pw.Close();
             AppMessageBox.Show(L.TF(L.Main_Status_DeleteFailed, ex.Message), L.T(L.App_ErrorTitle), MessageBoxButton.OK, MessageBoxImage.Error);
             SetStatus(L.T(L.Main_Status_DeleteFailed));
@@ -384,6 +407,7 @@ public partial class MainWindow
     /// </summary>
     private async Task ExtractSelectedAsync(List<ArchiveItem> items, string dest)
     {
+        App.LogDebug("ExtractSelectedAsync: {0} selected items, dest='{1}', archive='{2}'", items.Count, dest, _currentArchivePath);
         var selectedDirs = items.Where(i => i.IsDirectory).Select(d => d.FullPath.TrimEnd('/') + "/").ToHashSet();
         var filesToExtract = items
             .Where(i => !i.IsDirectory)
@@ -392,6 +416,8 @@ public partial class MainWindow
             .ToList();
 
         if (filesToExtract.Count == 0) { SetStatus(L.T(L.Main_Status_NoFilesToExtract)); return; }
+
+        App.LogDebug("ExtractSelectedAsync: {0} files to extract after directory expansion", filesToExtract.Count);
 
         var pw = new ProgressWindow();
         pw.InitCancellation();
@@ -416,12 +442,13 @@ public partial class MainWindow
             }
 
             pw.SetComplete(L.T(L.Main_Status_ExtractItemsDone));
+            App.LogDebug("ExtractSelectedAsync: done, {0} files extracted to '{1}'", filesToExtract.Count, dest);
             if (AppSettings.Instance.OpenFolderAfterExtract) OpenInExplorer(dest);
             await Task.Delay(800);
             pw.Close();
             SetStatus(L.T(L.Main_Status_ExtractItemsDone));
         }
-        catch (OperationCanceledException) { pw.Close(); SetStatus(L.T(L.Main_Status_AddCancel)); }
-        catch (Exception ex) { pw.Close(); AppMessageBox.Show(L.TF(L.Main_Status_ExtractFailed, ex.Message), L.T(L.App_ErrorTitle), MessageBoxButton.OK, MessageBoxImage.Error); SetStatus(L.T(L.Main_Status_ExtractFailed)); }
+        catch (OperationCanceledException) { App.LogDebug("ExtractSelectedAsync: cancelled"); pw.Close(); SetStatus(L.T(L.Main_Status_AddCancel)); }
+        catch (Exception ex) { App.LogDebug("ExtractSelectedAsync: failed: {0}", ex.Message); pw.Close(); AppMessageBox.Show(L.TF(L.Main_Status_ExtractFailed, ex.Message), L.T(L.App_ErrorTitle), MessageBoxButton.OK, MessageBoxImage.Error); SetStatus(L.T(L.Main_Status_ExtractFailed)); }
     }
 }
