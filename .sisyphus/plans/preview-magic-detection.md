@@ -209,6 +209,88 @@ _previewHandlers[FileFormat.Torrent] = ShowTorrentPreviewAsync;
 
 ---
 
+## 方案选择：库 vs 手动魔数
+
+`FileFormatDetector.Detect()` 的核心是魔数匹配，有两条实现路径，按「库优先 → 手动回退」的优先级策略协同工作。
+
+### 方案 A：Mime-Detective 库（推荐主路径）
+
+> **适用场景**：通用格式检测的第一选择。覆盖计划中 80%+ 的格式，代码量减少 ~80%。
+
+[Mime-Detective](https://www.nuget.org/packages/Mime-Detective)（v25.8.1，1300万+ 下载量）是 .NET 生态最成熟的魔数检测库，支持 `byte[]` / `ReadOnlySpan<byte>` / `Stream` 输入。
+
+```xml
+<!-- 安装主包（含 Default 定义，MIT 许可证，约 50+ 常见签名） -->
+<PackageReference Include="Mime-Detective" Version="25.8.1" />
+
+<!-- 可选：Condensed 定义包（100+ 常见签名，含更多视频/音频格式） -->
+<!-- 注：Condensed/Exhaustive 源自 TrID 签名数据库，有许可证注意事项 -->
+<!-- <PackageReference Include="Mime-Detective.Definitions.Condensed" Version="25.8.1" /> -->
+```
+
+```csharp
+// 使用示例
+var inspector = new ContentInspectorBuilder
+{
+    Definitions = MimeDetective.Definitions.DefaultDefinitions.All()
+}.Build();
+
+var results = inspector.Inspect(headBytes);
+// results 按匹配度排序，含 MIME type、扩展名、格式名称
+// 取第一个（最高匹配度）映射到 FileFormat 枚举
+```
+
+**覆盖情况对比**：
+
+| 格式分类 | Mime-Detective Default | Condensed | 计划中需要 |
+|---------|:---:|:---:|:---:|
+| 常见图像 (PNG/JPEG/GIF/BMP/ICO/WEBP) | ✅ | ✅ | ✅ |
+| 文档 (PDF/DOCX/XLSX/PPTX/RTF) | ✅ | ✅ | ✅ |
+| 压缩包 (ZIP/7z/RAR/GZip/BZip2/XZ) | ✅ | ✅ | ✅ |
+| 音频 (MP3/FLAC/WAV/OGG) | ✅ | ✅ | ✅ |
+| 视频 (MP4/FLV) | ✅ | ✅ | ✅ |
+| 视频 (AVI/MKV/MOV) | ❌ | ✅ | ✅ |
+| 可执行文件 (EXE/DLL) | ✅ | ✅ | ✅ |
+| TTF / OTF | ❌ | ❌ | ✅ |
+| WOFF / WOFF2 | ❌ | ❌ | ✅ |
+| SQLite | ❌ | ❌ | ✅ |
+| EXR / HDR / STL / LNK | ❌ | ❌ | ✅ |
+| Torrent | ❌ | ❌ | ✅ |
+
+**仍需手动实现的部分**（Mime-Detective 返回 `Unknown` 时回退到方案 B）：
+
+1. **ZIP 子类型（EPUB/DOCX/XLSX/PPTX/ODF）** — 需部分解压 + 内容扫描
+2. **PE 子类型（EXE/DLL/SYS）** — 需解析 PE header 的 `Characteristics`
+3. **Torrent** — Bencode 字典，无统一魔数
+4. **WOFF/WOFF2/TTF/OTF** — 若 Default 包未覆盖
+5. **EXR/HDR/STL/LNK/SQLite** — 小众格式
+6. **Zstd** — Default 包可能不含
+
+**集成方式**：`FileFormatDetector.Detect()` 内部按优先级调用：
+```
+优先: Mime-Detective 检测 → 成功 → 返回 FileFormat
+回退: 方案 B 手动魔数匹配表 → 成功 → 返回 FileFormat
+兜底: DetectByExtension(ext)
+```
+
+### 方案 B：手动魔数匹配（备选/补充）
+
+> **适用场景**：Mime-Detective 未覆盖的小众格式、ZIP/PE 子类型检测、许可证敏感环境。
+
+即下文 `## 魔数匹配表` 详述的 30+ 条手动魔数 + PE/ZIP 子类型检测逻辑。零第三方依赖。
+
+**优先级规则**：方案 A 优先（库检测更全、更准），方案 A 返回 `Unknown` 时回退到方案 B 的手动表。
+
+### 相关计划引用
+
+> `CompressionEstimator`（压缩预估）的自适应压缩级别功能也依赖魔数检测判别文件类型。
+> 大文件（>64KB）的场景同样优先使用本方案的 Mime-Detective 库，
+> 检测结果映射到 `CompressionCoefficients` 分类（`image_lossy` / `media` / `archive`），
+> 从而自动降级压缩级别。
+> 详见 [`compression-estimator.md` → 自适应压缩级别](compression-estimator.md)。
+
+---
+
 ## 魔数匹配表
 
 ### 匹配优先级
