@@ -8,6 +8,7 @@ using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Threading;
 using ICSharpCode.SharpZipLib.Zip;
+using Microsoft.Win32;
 using MantisZip.Core;
 using MantisZip.Core.Abstractions;
 using MantisZip.Core.Engines;
@@ -55,6 +56,53 @@ public partial class App : Application
         {
             TraceLog("InitializeApp: failed to load AppSettings: {0}", initEx.Message);
         }
+
+        // 注册 7z.dll 解析回调 — 默认位置找不到时弹出对话框让用户手动指定
+        SevenZipEngine.SevenZipDllResolveCallback = () =>
+        {
+            var disp = Current?.Dispatcher;
+            if (disp == null || disp.CheckAccess())
+                return ShowSevenZipDllDialog();
+            return disp.Invoke(ShowSevenZipDllDialog);
+        };
+    }
+
+    /// <summary>
+    /// 弹出文件选择对话框让用户手动选择 7z.dll 路径。
+    /// 选择后保存到 AppSettings，下次启动自动使用。
+    /// </summary>
+    private static string? ShowSevenZipDllDialog()
+    {
+        var dialog = new OpenFileDialog
+        {
+            Title = "未找到 7z.dll - 请选择 7z.dll 文件",
+            Filter = "7z.dll|7z.dll|动态链接库 (*.dll)|*.dll|所有文件 (*.*)|*.*",
+            CheckFileExists = true,
+            Multiselect = false,
+            // 默认指向应用目录下的 x64/x86 子目录
+            InitialDirectory = Path.Combine(
+                AppDomain.CurrentDomain.BaseDirectory,
+                Environment.Is64BitProcess ? "x64" : "x86"),
+        };
+
+        if (dialog.ShowDialog() == true)
+        {
+            var path = dialog.FileName;
+            try
+            {
+                var settings = AppSettings.Instance;
+                settings.SevenZipPath = path;
+                settings.Save();
+                LogDebug("ShowSevenZipDllDialog: saved 7z.dll path to settings: {0}", path);
+            }
+            catch (Exception ex)
+            {
+                TraceLog("ShowSevenZipDllDialog: failed to save settings: {0}", ex.Message);
+            }
+            return path;
+        }
+
+        return null;
     }
 
     #endregion

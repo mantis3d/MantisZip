@@ -24,6 +24,12 @@ public class SevenZipEngine : IArchiveEngine
     public static string SevenZipDllPath { get; set; } = ResolveDefaultSevenZipDllPath();
 
     /// <summary>
+    /// 7z.dll 解析回调 — 由 UI 层注册。
+    /// 当默认位置找不到 7z.dll 时调用，返回用户手动指定的路径，或 null（用户取消）。
+    /// </summary>
+    public static Func<string?>? SevenZipDllResolveCallback { get; set; }
+
+    /// <summary>
     /// 向后兼容 — 设置/获取 7z.exe 路径，实际映射到 7z.dll。
     /// 尽量使用 <see cref="SevenZipDllPath"/> 替代。
     /// </summary>
@@ -57,17 +63,41 @@ public class SevenZipEngine : IArchiveEngine
         lock (_libraryLock)
         {
             if (_libraryPathInitialized) return;
+
             if (File.Exists(SevenZipDllPath))
             {
                 SharpSevenZipBase.SetLibraryPath(SevenZipDllPath);
                 CoreLog.Info($"SevenZipEngine: 7z.dll path set: {SevenZipDllPath}");
+                _libraryPathInitialized = true;
+                return;
             }
-            else
+
+            // 默认位置未找到 — 尝试回调让用户手动指定
+            CoreLog.Info($"SevenZipEngine: 7z.dll not found at {SevenZipDllPath}, invoking user resolve callback");
+            var callback = SevenZipDllResolveCallback;
+            if (callback != null)
             {
-                CoreLog.Info($"SevenZipEngine: 7z.dll not found at {SevenZipDllPath}. " +
-                             "SharpSevenZip operations may fail if the library cannot be auto-detected.");
+                try
+                {
+                    var userPath = callback();
+                    if (!string.IsNullOrEmpty(userPath) && File.Exists(userPath))
+                    {
+                        SevenZipDllPath = userPath;
+                        SharpSevenZipBase.SetLibraryPath(userPath);
+                        CoreLog.Info($"SevenZipEngine: 7z.dll path set via user callback: {userPath}");
+                        _libraryPathInitialized = true;
+                        return;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    CoreLog.Info($"SevenZipEngine: user resolve callback failed: {ex.Message}");
+                }
             }
-            _libraryPathInitialized = true;
+
+            CoreLog.Info($"SevenZipEngine: 7z.dll not found at any location. " +
+                         "SharpSevenZip operations will fail with SharpSevenZipLibraryException.");
+            _libraryPathInitialized = true; // 标记已尝试，避免每步都弹
         }
     }
 
@@ -201,6 +231,8 @@ public class SevenZipEngine : IArchiveEngine
         CoreLog.Entry();
         CoreLog.Info($"ExtractAsync: {archivePath} -> {destinationPath}, password={(password != null ? "***" : "null")}");
         var sw = Stopwatch.StartNew();
+
+        EnsureLibraryPath();
 
         await Task.Run(() =>
         {
@@ -368,6 +400,8 @@ public class SevenZipEngine : IArchiveEngine
         CoreLog.Info($"ListEntriesAsync: {archivePath}");
         var sw = Stopwatch.StartNew();
 
+        EnsureLibraryPath();
+
         var result = await Task.Run(() =>
         {
             using var extractor = string.IsNullOrEmpty(password)
@@ -419,6 +453,8 @@ public class SevenZipEngine : IArchiveEngine
     {
         CoreLog.Entry();
         CoreLog.Info($"TestArchiveAsync: {archivePath}");
+
+        EnsureLibraryPath();
 
         var result = await Task.Run(() =>
         {
@@ -479,6 +515,8 @@ public class SevenZipEngine : IArchiveEngine
         var sw = Stopwatch.StartNew();
 
         var keySet = new HashSet<string>(entryKeys.Select(k => k.Replace('\\', '/')), StringComparer.OrdinalIgnoreCase);
+
+        EnsureLibraryPath();
 
         await Task.Run(() =>
         {

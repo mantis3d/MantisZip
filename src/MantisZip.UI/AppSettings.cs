@@ -70,8 +70,8 @@ public class AppSettings
     public string LogPrivacyMode { get; set; } = "extension"; // "off" | "filename" | "extension" | "full"
 
     // ===== 高级 =====
-    /// <summary>7z.dll 路径（SharpSevenZip 使用，默认 Program Files 下的 7z.dll）</summary>
-    public string SevenZipPath { get; set; } = @"C:\Program Files\7-Zip\7z.dll";
+    /// <summary>7z.dll 路径（SharpSevenZip 使用，空字符串 = 自动探测，优先自带版本）</summary>
+    public string SevenZipPath { get; set; } = "";
 
     // ===== 持久化 =====
     private static readonly string SettingsDir = Path.Combine(
