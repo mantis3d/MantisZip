@@ -69,10 +69,11 @@ Source: "publish_output\Markdig.dll"; DestDir: "{app}"; Flags: ignoreversion
 Source: "publish_output\Microsoft.Web.WebView2.Core.dll"; DestDir: "{app}"; Flags: ignoreversion
 Source: "publish_output\Microsoft.Web.WebView2.Wpf.dll"; DestDir: "{app}"; Flags: ignoreversion
 Source: "publish_output\Ookii.Dialogs.Wpf.dll"; DestDir: "{app}"; Flags: ignoreversion
-Source: "publish_output\SevenZipExtractor.dll"; DestDir: "{app}"; Flags: ignoreversion
 Source: "publish_output\Ude.NetStandard.dll"; DestDir: "{app}"; Flags: ignoreversion
 Source: "publish_output\x64\7z.dll"; DestDir: "{app}\x64"; Flags: ignoreversion
 Source: "publish_output\x86\7z.dll"; DestDir: "{app}\x86"; Flags: ignoreversion
+; LGPL license for 7z.dll (distributed under GNU Lesser General Public License)
+Source: "lgpl.txt"; DestDir: "{app}"; Flags: ignoreversion
 ; Include all native DLLs recursively if any
 Source: "publish_output\*.dll"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs
 
