@@ -1,0 +1,1775 @@
+NuGet Gallery | SharpSevenZip 2.0.45
+https://www.nuget.org/packages/SharpSevenZip/2.0.45
+
+<!DOCTYPE html>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+NuGet Gallery
+| SharpSevenZip 2.0.45
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+﻿
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+SharpSevenZip
+
+
+2.0.45
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+.NET 6.0
+
+
+
+
+
+This package targets .NET 6.0. The package is compatible with this framework or higher.
+
+
+
+
+
+
+.NET Standard 2.0
+
+
+
+
+
+This package targets .NET Standard 2.0. The package is compatible with this framework or higher.
+
+
+
+
+
+
+.NET Framework 4.8
+
+
+
+
+
+This package targets .NET Framework 4.8. The package is compatible with this framework or higher.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+.NET CLI
+
+
+
+
+
+
+PMC
+
+
+
+
+
+
+PackageReference
+
+
+
+
+
+
+CPM
+
+
+
+
+
+
+Paket CLI
+
+
+
+
+
+
+Script & Interactive
+
+
+
+
+
+
+File-based Apps
+
+
+
+
+
+
+Cake
+
+
+
+
+
+
+
+
+
+
+
+
+<span class="install-command-row">dotnet add package SharpSevenZip --version 2.0.45</span>
+<div class="copy-button">
+<button id="dotnet-cli-0001-button" class="btn btn-brand-icon" type="button"
+data-toggle="popover" data-placement="bottom" data-content="Copied."
+aria-label="Copy the .NET CLI command" role="button">
+<span class="ms-Icon ms-Icon--Copy" aria-hidden="true"></span>
+<span>Copy</span>
+</button>
+</div>
+
+
+
+
+
+
+
+
+
+
+<span class="install-command-row">NuGet\Install-Package SharpSevenZip -Version 2.0.45</span>
+<div class="copy-button">
+<button id="package-manager-0001-button" class="btn btn-brand-icon" type="button"
+data-toggle="popover" data-placement="bottom" data-content="Copied."
+aria-label="Copy the PMC command" role="button">
+<span class="ms-Icon ms-Icon--Copy" aria-hidden="true"></span>
+<span>Copy</span>
+</button>
+</div>
+
+
+
+
+
+
+
+This command is intended to be used within the Package Manager Console in Visual Studio, as it uses the NuGet module's version of Install-Package.
+
+
+
+
+
+
+
+
+
+
+<span class="install-command-row"><PackageReference Include="SharpSevenZip" Version="2.0.45" /></span>
+<div class="copy-button">
+<button id="package-reference-0001-button" class="btn btn-brand-icon" type="button"
+data-toggle="popover" data-placement="bottom" data-content="Copied."
+aria-label="Copy the PackageReference XML node" role="button">
+<span class="ms-Icon ms-Icon--Copy" aria-hidden="true"></span>
+<span>Copy</span>
+</button>
+</div>
+
+
+
+
+
+
+
+For projects that support PackageReference, copy this XML node into the project file to reference the package.
+
+
+
+
+
+
+
+
+
+
+<span class="install-command-row"><PackageVersion Include="SharpSevenZip" Version="2.0.45" /></span>
+<div class="copy-button">
+<span class="package-manager-command-header">
+Directory.Packages.props
+</span>
+<button id="package-version-0001-button" class="btn btn-brand-icon" type="button"
+data-toggle="popover" data-placement="bottom" data-content="Copied."
+aria-label="Copy the PackageVersion XML node" role="button">
+<span class="ms-Icon ms-Icon--Copy" aria-hidden="true"></span>
+<span>Copy</span>
+</button>
+</div>
+
+
+
+
+
+
+<span class="install-command-row"><PackageReference Include="SharpSevenZip" /></span>
+<div class="copy-button">
+<span class="package-manager-command-header">
+Project file
+</span>
+<button id="package-version-0002-button" class="btn btn-brand-icon" type="button"
+data-toggle="popover" data-placement="bottom" data-content="Copied."
+aria-label="Copy the PackageVersion XML node" role="button">
+<span class="ms-Icon ms-Icon--Copy" aria-hidden="true"></span>
+<span>Copy</span>
+</button>
+</div>
+
+
+
+
+
+
+
+For projects that support Central Package Management (CPM), copy this XML node into the solution Directory.Packages.props file to version the package.
+
+
+
+
+
+
+
+
+
+
+<span class="install-command-row">paket add SharpSevenZip --version 2.0.45</span>
+<div class="copy-button">
+<button id="paket-cli-0001-button" class="btn btn-brand-icon" type="button"
+data-toggle="popover" data-placement="bottom" data-content="Copied."
+aria-label="Copy the Paket CLI command" role="button">
+<span class="ms-Icon ms-Icon--Copy" aria-hidden="true"></span>
+<span>Copy</span>
+</button>
+</div>
+
+
+
+
+
+
+
+The NuGet Team does not provide support for this client. Please contact its maintainers for support.
+
+
+
+
+
+
+
+
+
+
+<span class="install-command-row">#r "nuget: SharpSevenZip, 2.0.45"</span>
+<div class="copy-button">
+<button id="script-interactive-0001-button" class="btn btn-brand-icon" type="button"
+data-toggle="popover" data-placement="bottom" data-content="Copied."
+aria-label="Copy the Script & Interactive command" role="button">
+<span class="ms-Icon ms-Icon--Copy" aria-hidden="true"></span>
+<span>Copy</span>
+</button>
+</div>
+
+
+
+
+
+
+
+#r directive can be used in F# Interactive and Polyglot Notebooks. Copy this into the interactive tool or source code of the script to reference the package.
+
+
+
+
+
+
+
+
+
+
+<span class="install-command-row">#:package SharpSevenZip@2.0.45</span>
+<div class="copy-button">
+<button id="dotnet-run-file-0001-button" class="btn btn-brand-icon" type="button"
+data-toggle="popover" data-placement="bottom" data-content="Copied."
+aria-label="Copy the File-based Apps command" role="button">
+<span class="ms-Icon ms-Icon--Copy" aria-hidden="true"></span>
+<span>Copy</span>
+</button>
+</div>
+
+
+
+
+
+
+
+#:package directive can be used in C# file-based apps starting in .NET 10 preview 4. Copy this into a .cs file before any lines of code to reference the package.
+
+
+
+
+
+
+
+
+
+
+<span class="install-command-row">#addin nuget:?package=SharpSevenZip&version=2.0.45</span>
+<div class="copy-button">
+<span class="package-manager-command-header">
+Install as a Cake Addin
+</span>
+<button id="cake-0001-button" class="btn btn-brand-icon" type="button"
+data-toggle="popover" data-placement="bottom" data-content="Copied."
+aria-label="Copy the Cake command" role="button">
+<span class="ms-Icon ms-Icon--Copy" aria-hidden="true"></span>
+<span>Copy</span>
+</button>
+</div>
+
+
+
+
+
+
+<span class="install-command-row">#tool nuget:?package=SharpSevenZip&version=2.0.45</span>
+<div class="copy-button">
+<span class="package-manager-command-header">
+Install as a Cake Tool
+</span>
+<button id="cake-0002-button" class="btn btn-brand-icon" type="button"
+data-toggle="popover" data-placement="bottom" data-content="Copied."
+aria-label="Copy the Cake command" role="button">
+<span class="ms-Icon ms-Icon--Copy" aria-hidden="true"></span>
+<span>Copy</span>
+</button>
+</div>
+
+
+
+
+
+
+
+The NuGet Team does not provide support for this client. Please contact its maintainers for support.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+README
+
+
+
+
+
+
+
+Frameworks
+
+
+
+
+
+
+
+Dependencies
+
+
+
+
+
+
+
+
+Used By
+
+
+
+
+
+
+
+
+
+Versions
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+SharpSevenZip
+
+SharpSevenZip is a 7-zip native library wrapper. Managed 7-zip library written in C# that provides data (self-)extraction and compression (all 7-zip formats are supported). Wraps 7z.dll or any compatible one and makes use of LZMA SDK, includes self-extraction functionality.
+
+This is a fork from Squid-Box.SevenZipSharp which is a fork from tomap's fork of the original CodePlex project.
+
+SevenZipSharp is an open source wrapper for 7-zip. It exploits the native 7zip dynamic link library through its COM interface and exports classes to work with various file archives. The project appeared as an improvement of http://www.codeproject.com/KB/DLL/cs_interface_7zip.aspx.
+
+Build Status
+
+Description
+Value
+
+License
+https://github.com/JeremyAnsel/SharpSevenZip/blob/main/LICENSE
+
+Documentation
+http://jeremyansel.github.io/SharpSevenZip
+
+Source code
+https://github.com/JeremyAnsel/SharpSevenZip
+
+Nuget
+https://www.nuget.org/packages/SharpSevenZip
+
+Build
+https://ci.appveyor.com/project/JeremyAnsel/sharpsevenzip/branch/main
+
+Changes from original project
+
+As required by the GNU GPL 3.0 license, here's a rough list of what has changed since the original CodePlex project, including changes made in tomap's fork.
+
+Target .NET version changed from .NET Framework 2.0 to .NET Standard 2.0, .NET Framework 4.8, .NET 6.0 and .NET 8.0.
+
+Continous Integration added, both building and deploying.
+
+Tests re-written to NUnit 3 test cases.
+
+General code cleanup.
+
+As well as a number of improvements and bug fixes.
+
+Quick start
+
+SharpSevenZip exports three main classes - SharpSevenZipExtractor, SharpSevenZipCompressor and SharpSevenZipSfx.
+SharpSevenZipExtractor is a 7-zip unpacking front-end, it allows either to extract archives or LZMA-compressed byte arrays.
+SharpSevenZipCompressor is a 7-zip pack ingfront-end, it allows either to compress archives or byte arrays.
+SharpSevenZipSfx is a special class to create self-extracting archives. It uses the embedded sfx module by Oleg Scherbakov .
+LzmaEncodeStream/LzmaDecodeStream are special fully managed classes derived from Stream to store data compressed with LZMA and extract it.
+
+Native libraries
+
+SharpSevenZip requires a 7-zip native library to function. You can specify the path to a 7-zip dll (7z.dll, 7za.dll, etc.) in LibraryManager.cs at compile time, your app.config or via SetLibraryPath() method at runtime. <Path to SharpSevenZip.dll> + ("x86" or "x64") + "7z.dll" is the default path. For 64-bit systems, you must use the 64-bit versions of those libraries.
+7-zip ships with 7z.dll, which is used for all archive operations (usually it is "Program Files\7-Zip\7z.dll"). 7za.dll is a light version of 7z.dll, it supports only 7zip archives. You may even build your own library with formats you want from 7-zip sources. SharpSevenZip will work with them all.
+
+Main features
+
+Encryption and passwords are supported.
+
+Archive properties are supported.
+
+Multi-threading is supported.
+
+Streaming is supported.
+
+Setting the compression level and method is supported.
+
+Archive volumes are supported.
+
+Archive updates are supported.
+
+Extraction from SFX archives, as well as some other formats with embedded archives is supported.
+
+Extraction is supported from any archive format in InArchiveFormat - such as 7-zip itself, zip, rar or cab and the format is automatically guessed by the archive signature.
+You can compress streams, files or whole directories in OutArchiveFormat - 7-zip, Xz, Zip, GZip, BZip2 and Tar.
+Please note that GZip and BZip2 compresses only one file at a time.
+
+Self-extracting archives
+
+SharpSevenZipSfx supports custom sfx modules. The most powerful one is embedded in the assembly, the other lie in SharpSevenZip/sfx directory. Apart from usual sfx, you can make even small installations with the help of SfxSettings scenarios. Refer to the "configuration file parameters" for the complete command list.
+
+Advanced work with SharpSevenZipCompressor
+
+SharpSevenZipCompressor.CustomParameters is a special property to set compression switches, compatible with command line switches of 7z.exe. The complete list of those switches is in 7-zip.chm of 7-Zip installation. For example, to turn on multi-threaded compression, code
+<SharpSevenZipCompressor Instance>.CustomParameters.Add("mt", "on");
+For the complete switches list, refer to SevenZipDoc.chm in the 7-zip installation.
+
+Benchmarks
+
+Here is benchmarks to compare the performance of this library.
+The benchmarks use these libraries:
+
+.Net Framework with System.IO.Compression
+
+SharpCompress
+
+SevenZipSharp
+
+SharpSevenZip
+
+Method
+Job
+Mean
+Error
+Ratio
+Allocated
+Alloc Ratio
+
+Decompress_DotNetFramework_Empty
+Net80
+2,339.0 �s
+NA
+3.27
+51.3 KB
+0.92
+
+Decompress_DotNetFramework_Empty
+Net60
+2,189.1 �s
+NA
+3.06
+51.45 KB
+0.92
+
+Decompress_DotNetFramework_Empty
+Net48
+715.4 �s
+NA
+1.00
+56 KB
+1.00
+
+Decompress_SharpCompress_Empty
+Net60
+6,028.5 �s
+NA
+2.91
+132.3 KB
+0.87
+
+Decompress_SharpCompress_Empty
+Net80
+4,807.1 �s
+NA
+2.32
+131.76 KB
+0.87
+
+Decompress_SharpCompress_Empty
+Net48
+2,074.9 �s
+NA
+1.00
+152 KB
+1.00
+
+Decompress_SevenZipSharp_Empty
+Net60
+11,805.9 �s
+NA
+1.35
+1437.94 KB
+1.00
+
+Decompress_SevenZipSharp_Empty
+Net80
+11,043.7 �s
+NA
+1.26
+1437.23 KB
+1.00
+
+Decompress_SevenZipSharp_Empty
+Net48
+8,730.2 �s
+NA
+1.00
+1440.08 KB
+1.00
+
+Decompress_SharpSevenZip_Empty
+Net80
+5,362.0 �s
+NA
+2.46
+72.64 KB
+1.01
+
+Decompress_SharpSevenZip_Empty
+Net60
+3,992.5 �s
+NA
+1.83
+73.34 KB
+1.02
+
+Decompress_SharpSevenZip_Empty
+Net48
+2,176.1 �s
+NA
+1.00
+72 KB
+1.00
+
+Decompress_DotNetFramework_Sum1
+Net60
+8,366.1 �s
+NA
+1.72
+59.75 KB
+0.93
+
+Decompress_DotNetFramework_Sum1
+Net80
+7,726.9 �s
+NA
+1.58
+59.75 KB
+0.93
+
+Decompress_DotNetFramework_Sum1
+Net48
+4,875.2 �s
+NA
+1.00
+64 KB
+1.00
+
+Decompress_SharpCompress_Sum1
+Net60
+14,144.7 �s
+NA
+2.16
+800.57 KB
+0.97
+
+Decompress_SharpCompress_Sum1
+Net80
+7,452.1 �s
+NA
+1.14
+797.77 KB
+0.97
+
+Decompress_SharpCompress_Sum1
+Net48
+6,551.9 �s
+NA
+1.00
+824.7 KB
+1.00
+
+Decompress_SharpCompress_Sum1_Stream
+Net60
+15,248.6 �s
+NA
+1.67
+799.68 KB
+0.98
+
+Decompress_SharpCompress_Sum1_Stream
+Net80
+10,727.9 �s
+NA
+1.18
+796.99 KB
+0.98
+
+Decompress_SharpCompress_Sum1_Stream
+Net48
+9,108.2 �s
+NA
+1.00
+816.7 KB
+1.00
+
+Decompress_SevenZipSharp_Sum1
+Net60
+39,970.3 �s
+NA
+1.67
+28359.05 KB
+1.00
+
+Decompress_SevenZipSharp_Sum1
+Net80
+30,083.0 �s
+NA
+1.26
+28360.48 KB
+1.00
+
+Decompress_SevenZipSharp_Sum1
+Net48
+23,961.3 �s
+NA
+1.00
+28333.16 KB
+1.00
+
+Decompress_SharpSevenZip_Sum1
+Net80
+13,771.3 �s
+NA
+1.51
+105.06 KB
+0.94
+
+Decompress_SharpSevenZip_Sum1
+Net60
+12,465.2 �s
+NA
+1.37
+104.67 KB
+0.93
+
+Decompress_SharpSevenZip_Sum1
+Net48
+9,096.4 �s
+NA
+1.00
+112 KB
+1.00
+
+Decompress_SharpSevenZip_Sum1_Stream
+Net48
+31,351.2 �s
+NA
+1.00
+176 KB
+1.00
+
+Decompress_SharpSevenZip_Sum1_Stream
+Net80
+17,730.2 �s
+NA
+0.57
+111.59 KB
+0.63
+
+Decompress_SharpSevenZip_Sum1_Stream
+Net60
+15,435.4 �s
+NA
+0.49
+111.2 KB
+0.63
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Product
+
+Versions
+Compatible and additional computed target framework versions.
+
+
+
+
+
+
+
+
+.NET
+
+
+
+net5.0
+net5.0 was computed. 
+net5.0-windows
+net5.0-windows was computed. 
+net6.0
+net6.0 is compatible. 
+net6.0-android
+net6.0-android was computed. 
+net6.0-ios
+net6.0-ios was computed. 
+net6.0-maccatalyst
+net6.0-maccatalyst was computed. 
+net6.0-macos
+net6.0-macos was computed. 
+net6.0-tvos
+net6.0-tvos was computed. 
+net6.0-windows
+net6.0-windows was computed. 
+net7.0
+net7.0 was computed. 
+net7.0-android
+net7.0-android was computed. 
+net7.0-ios
+net7.0-ios was computed. 
+net7.0-maccatalyst
+net7.0-maccatalyst was computed. 
+net7.0-macos
+net7.0-macos was computed. 
+net7.0-tvos
+net7.0-tvos was computed. 
+net7.0-windows
+net7.0-windows was computed. 
+net8.0
+net8.0 is compatible. 
+net8.0-android
+net8.0-android was computed. 
+net8.0-browser
+net8.0-browser was computed. 
+net8.0-ios
+net8.0-ios was computed. 
+net8.0-maccatalyst
+net8.0-maccatalyst was computed. 
+net8.0-macos
+net8.0-macos was computed. 
+net8.0-tvos
+net8.0-tvos was computed. 
+net8.0-windows
+net8.0-windows was computed. 
+net9.0
+net9.0 was computed. 
+net9.0-android
+net9.0-android was computed. 
+net9.0-browser
+net9.0-browser was computed. 
+net9.0-ios
+net9.0-ios was computed. 
+net9.0-maccatalyst
+net9.0-maccatalyst was computed. 
+net9.0-macos
+net9.0-macos was computed. 
+net9.0-tvos
+net9.0-tvos was computed. 
+net9.0-windows
+net9.0-windows was computed. 
+net10.0
+net10.0 was computed. 
+net10.0-android
+net10.0-android was computed. 
+net10.0-browser
+net10.0-browser was computed. 
+net10.0-ios
+net10.0-ios was computed. 
+net10.0-maccatalyst
+net10.0-maccatalyst was computed. 
+net10.0-macos
+net10.0-macos was computed. 
+net10.0-tvos
+net10.0-tvos was computed. 
+net10.0-windows
+net10.0-windows was computed. 
+
+
+
+
+
+
+.NET Core
+
+
+
+netcoreapp2.0
+netcoreapp2.0 was computed. 
+netcoreapp2.1
+netcoreapp2.1 was computed. 
+netcoreapp2.2
+netcoreapp2.2 was computed. 
+netcoreapp3.0
+netcoreapp3.0 was computed. 
+netcoreapp3.1
+netcoreapp3.1 was computed. 
+
+
+
+
+
+
+.NET Standard
+
+
+
+netstandard2.0
+netstandard2.0 is compatible. 
+netstandard2.1
+netstandard2.1 was computed. 
+
+
+
+
+
+
+.NET Framework
+
+
+
+net461
+net461 was computed. 
+net462
+net462 was computed. 
+net463
+net463 was computed. 
+net47
+net47 was computed. 
+net471
+net471 was computed. 
+net472
+net472 was computed. 
+net48
+net48 is compatible. 
+net481
+net481 was computed. 
+
+
+
+
+
+
+MonoAndroid
+
+
+
+monoandroid
+monoandroid was computed. 
+
+
+
+
+
+
+MonoMac
+
+
+
+monomac
+monomac was computed. 
+
+
+
+
+
+
+MonoTouch
+
+
+
+monotouch
+monotouch was computed. 
+
+
+
+
+
+
+Tizen
+
+
+
+tizen40
+tizen40 was computed. 
+tizen60
+tizen60 was computed. 
+
+
+
+
+
+
+Xamarin.iOS
+
+
+
+xamarinios
+xamarinios was computed. 
+
+
+
+
+
+
+Xamarin.Mac
+
+
+
+xamarinmac
+xamarinmac was computed. 
+
+
+
+
+
+
+Xamarin.TVOS
+
+
+
+xamarintvos
+xamarintvos was computed. 
+
+
+
+
+
+
+Xamarin.WatchOS
+
+
+
+xamarinwatchos
+xamarinwatchos was computed. 
+
+
+
+
+
+
+
+
+
+
+Compatible target framework(s)
+
+
+
+
+
+Included target framework(s) (in package)
+
+
+Learn more about Target Frameworks and .NET Standard.
+
+
+
+
+
+
+
+
+
+
+.NETFramework 4.8
+
+
+
+
+System.Buffers
+(>= 4.5.1)
+
+
+
+
+System.Memory
+(>= 4.5.5)
+
+
+
+
+
+
+
+
+.NETStandard 2.0
+
+
+
+
+System.Buffers
+(>= 4.5.1)
+
+
+
+
+System.Memory
+(>= 4.5.5)
+
+
+
+
+
+
+
+
+net6.0
+
+
+
+
+No dependencies.
+
+
+
+
+
+
+
+
+net8.0
+
+
+
+
+No dependencies.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+NuGet packages
+
+
+
+
+This package is not used by any NuGet packages.
+
+
+
+
+
+GitHub repositories (3)
+
+
+
+
+Showing the top 3 popular GitHub repositories that depend on SharpSevenZip:
+
+
+
+
+
+
+Repository
+Stars
+
+
+
+
+
+
+
+
+SteamAutoCracks/Steam-auto-crack
+
+
+
+Steam Game Automatic Cracker
+
+
+
+
+3.0K
+
+
+
+
+
+
+
+pebakery/pebakery
+
+
+
+PEBakery is a script engine that specializes in customizing the Windows Preinstalled Environment (WinPE/WinRE).
+
+
+
+
+348
+
+
+
+
+
+
+
+Ameliorated-LLC/trusted-uninstaller-cli
+
+
+
+Core functionality for AME Wizard
+
+
+
+
+296
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Include prerelease
+
+
+
+
+
+
+
+Include vulnerable
+
+
+
+
+
+
+
+Include deprecated
+
+
+
+
+
+
+
+
+
+
+Version
+Downloads
+
+Last Updated
+
+
+
+
+
+
+
+
+
+
+
+2.0.45
+
+
+
+592
+
+
+4/27/2026
+
+
+
+
+
+
+
+
+
+
+2.0.42
+
+
+
+143
+
+
+4/27/2026
+
+
+
+
+
+
+
+
+
+
+2.0.36
+
+
+
+1,833
+
+
+2/12/2026
+
+
+
+
+
+
+
+
+
+
+2.0.35
+
+
+
+3,525
+
+
+11/23/2025
+
+
+
+
+
+
+
+
+
+
+2.0.33
+
+
+
+416
+
+
+11/21/2025
+
+
+
+
+
+
+
+
+
+
+2.0.32
+
+
+
+1,559
+
+
+9/26/2025
+
+
+
+
+
+
+
+
+
+
+2.0.30
+
+
+
+10,761
+
+
+9/2/2025
+
+
+
+
+
+
+
+
+
+
+2.0.29
+
+
+
+358
+
+
+8/29/2025
+
+
+
+
+
+
+
+
+
+
+2.0.27
+
+
+
+934
+
+
+7/31/2025
+
+
+
+
+
+
+
+
+
+
+2.0.26
+
+
+
+207
+
+
+7/30/2025
+
+
+
+
+
+
+
+
+
+
+2.0.25
+
+
+
+404
+
+
+7/26/2025
+
+
+
+
+
+
+
+
+
+
+2.0.24
+
+
+
+469
+
+
+7/20/2025
+
+
+
+
+
+
+
+
+
+
+2.0.23
+
+
+
+281
+
+
+7/15/2025
+
+
+
+
+
+
+
+
+
+
+2.0.22
+
+
+
+2,888
+
+
+4/4/2025
+
+
+
+
+
+
+
+
+
+
+2.0.21
+
+
+
+986
+
+
+2/26/2025
+
+
+
+
+
+
+
+
+
+
+2.0.19
+
+
+
+1,260
+
+
+1/10/2025
+
+
+
+
+
+
+
+
+
+
+2.0.14
+
+
+
+3,187
+
+
+12/12/2024
+
+
+
+
+
+
+
+
+
+
+2.0.12
+
+
+
+1,123
+
+
+9/22/2024
+
+
+
+
+
+
+
+
+
+
+2.0.11
+
+
+
+1,653
+
+
+6/16/2024
+
+
+
+
+
+
+
+
+
+
+2.0.9
+
+
+
+267
+
+
+6/1/2024
+
+
+
+
+
+
+
+
+
+
+
+
+Load more
+
+Loading failed

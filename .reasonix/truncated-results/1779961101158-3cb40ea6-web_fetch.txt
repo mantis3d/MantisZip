@@ -1,0 +1,473 @@
+https://api.github.com/repos/JeremyAnsel/SharpSevenZip/contents/SharpSevenZip/SharpSevenZip
+
+[
+  {
+    "name": "ArchiveEmulationStreamProxy.cs",
+    "path": "SharpSevenZip/SharpSevenZip/ArchiveEmulationStreamProxy.cs",
+    "sha": "65d9d722c83c46b4aa41f6e17349db8e1b00d99b",
+    "size": 2465,
+    "url": "https://api.github.com/repos/JeremyAnsel/SharpSevenZip/contents/SharpSevenZip/SharpSevenZip/ArchiveEmulationStreamProxy.cs?ref=main",
+    "html_url": "https://github.com/JeremyAnsel/SharpSevenZip/blob/main/SharpSevenZip/SharpSevenZip/ArchiveEmulationStreamProxy.cs",
+    "git_url": "https://api.github.com/repos/JeremyAnsel/SharpSevenZip/git/blobs/65d9d722c83c46b4aa41f6e17349db8e1b00d99b",
+    "download_url": "https://raw.githubusercontent.com/JeremyAnsel/SharpSevenZip/main/SharpSevenZip/SharpSevenZip/ArchiveEmulationStreamProxy.cs",
+    "type": "file",
+    "_links": {
+      "self": "https://api.github.com/repos/JeremyAnsel/SharpSevenZip/contents/SharpSevenZip/SharpSevenZip/ArchiveEmulationStreamProxy.cs?ref=main",
+      "git": "https://api.github.com/repos/JeremyAnsel/SharpSevenZip/git/blobs/65d9d722c83c46b4aa41f6e17349db8e1b00d99b",
+      "html": "https://github.com/JeremyAnsel/SharpSevenZip/blob/main/SharpSevenZip/SharpSevenZip/ArchiveEmulationStreamProxy.cs"
+    }
+  },
+  {
+    "name": "ArchiveExtractCallback.cs",
+    "path": "SharpSevenZip/SharpSevenZip/ArchiveExtractCallback.cs",
+    "sha": "b26ad52f4446d31f67673fff49aafe20b09361cf",
+    "size": 20259,
+    "url": "https://api.github.com/repos/JeremyAnsel/SharpSevenZip/contents/SharpSevenZip/SharpSevenZip/ArchiveExtractCallback.cs?ref=main",
+    "html_url": "https://github.com/JeremyAnsel/SharpSevenZip/blob/main/SharpSevenZip/SharpSevenZip/ArchiveExtractCallback.cs",
+    "git_url": "https://api.github.com/repos/JeremyAnsel/SharpSevenZip/git/blobs/b26ad52f4446d31f67673fff49aafe20b09361cf",
+    "download_url": "https://raw.githubusercontent.com/JeremyAnsel/SharpSevenZip/main/SharpSevenZip/SharpSevenZip/ArchiveExtractCallback.cs",
+    "type": "file",
+    "_links": {
+      "self": "https://api.github.com/repos/JeremyAnsel/SharpSevenZip/contents/SharpSevenZip/SharpSevenZip/ArchiveExtractCallback.cs?ref=main",
+      "git": "https://api.github.com/repos/JeremyAnsel/SharpSevenZip/git/blobs/b26ad52f4446d31f67673fff49aafe20b09361cf",
+      "html": "https://github.com/JeremyAnsel/SharpSevenZip/blob/main/SharpSevenZip/SharpSevenZip/ArchiveExtractCallback.cs"
+    }
+  },
+  {
+    "name": "ArchiveFileInfo.cs",
+    "path": "SharpSevenZip/SharpSevenZip/ArchiveFileInfo.cs",
+    "sha": "154762a6814f342769bf177a182e1a317564922b",
+    "size": 4394,
+    "url": "https://api.github.com/repos/JeremyAnsel/SharpSevenZip/contents/SharpSevenZip/SharpSevenZip/ArchiveFileInfo.cs?ref=main",
+    "html_url": "https://github.com/JeremyAnsel/SharpSevenZip/blob/main/SharpSevenZip/SharpSevenZip/ArchiveFileInfo.cs",
+    "git_url": "https://api.github.com/repos/JeremyAnsel/SharpSevenZip/git/blobs/154762a6814f342769bf177a182e1a317564922b",
+    "download_url": "https://raw.githubusercontent.com/JeremyAnsel/SharpSevenZip/main/SharpSevenZip/SharpSevenZip/ArchiveFileInfo.cs",
+    "type": "file",
+    "_links": {
+      "self": "https://api.github.com/repos/JeremyAnsel/SharpSevenZip/contents/SharpSevenZip/SharpSevenZip/ArchiveFileInfo.cs?ref=main",
+      "git": "https://api.github.com/repos/JeremyAnsel/SharpSevenZip/git/blobs/154762a6814f342769bf177a182e1a317564922b",
+      "html": "https://github.com/JeremyAnsel/SharpSevenZip/blob/main/SharpSevenZip/SharpSevenZip/ArchiveFileInfo.cs"
+    }
+  },
+  {
+    "name": "ArchiveOpenCallback.cs",
+    "path": "SharpSevenZip/SharpSevenZip/ArchiveOpenCallback.cs",
+    "sha": "5a511ecee5839bb1b8622e889fd8b675b7af8317",
+    "size": 6125,
+    "url": "https://api.github.com/repos/JeremyAnsel/SharpSevenZip/contents/SharpSevenZip/SharpSevenZip/ArchiveOpenCallback.cs?ref=main",
+    "html_url": "https://github.com/JeremyAnsel/SharpSevenZip/blob/main/SharpSevenZip/SharpSevenZip/ArchiveOpenCallback.cs",
+    "git_url": "https://api.github.com/repos/JeremyAnsel/SharpSevenZip/git/blobs/5a511ecee5839bb1b8622e889fd8b675b7af8317",
+    "download_url": "https://raw.githubusercontent.com/JeremyAnsel/SharpSevenZip/main/SharpSevenZip/SharpSevenZip/ArchiveOpenCallback.cs",
+    "type": "file",
+    "_links": {
+      "self": "https://api.github.com/repos/JeremyAnsel/SharpSevenZip/contents/SharpSevenZip/SharpSevenZip/ArchiveOpenCallback.cs?ref=main",
+      "git": "https://api.github.com/repos/JeremyAnsel/SharpSevenZip/git/blobs/5a511ecee5839bb1b8622e889fd8b675b7af8317",
+      "html": "https://github.com/JeremyAnsel/SharpSevenZip/blob/main/SharpSevenZip/SharpSevenZip/ArchiveOpenCallback.cs"
+    }
+  },
+  {
+    "name": "ArchiveProperty.cs",
+    "path": "SharpSevenZip/SharpSevenZip/ArchiveProperty.cs",
+    "sha": "a981c285bd733f8ab177d4944ac7ec77bf2a3537",
+    "size": 2982,
+    "url": "https://api.github.com/repos/JeremyAnsel/SharpSevenZip/contents/SharpSevenZip/SharpSevenZip/ArchiveProperty.cs?ref=main",
+    "html_url": "https://github.com/JeremyAnsel/SharpSevenZip/blob/main/SharpSevenZip/SharpSevenZip/ArchiveProperty.cs",
+    "git_url": "https://api.github.com/repos/JeremyAnsel/SharpSevenZip/git/blobs/a981c285bd733f8ab177d4944ac7ec77bf2a3537",
+    "download_url": "https://raw.githubusercontent.com/JeremyAnsel/SharpSevenZip/main/SharpSevenZip/SharpSevenZip/ArchiveProperty.cs",
+    "type": "file",
+    "_links": {
+      "self": "https://api.github.com/repos/JeremyAnsel/SharpSevenZip/contents/SharpSevenZip/SharpSevenZip/ArchiveProperty.cs?ref=main",
+      "git": "https://api.github.com/repos/JeremyAnsel/SharpSevenZip/git/blobs/a981c285bd733f8ab177d4944ac7ec77bf2a3537",
+      "html": "https://github.com/JeremyAnsel/SharpSevenZip/blob/main/SharpSevenZip/SharpSevenZip/ArchiveProperty.cs"
+    }
+  },
+  {
+    "name": "ArchiveUpdateCallback.cs",
+    "path": "SharpSevenZip/SharpSevenZip/ArchiveUpdateCallback.cs",
+    "sha": "d354bfe7065f859d62c69e9a7fabc19fa394317d",
+    "size": 27966,
+    "url": "https://api.github.com/repos/JeremyAnsel/SharpSevenZip/contents/SharpSevenZip/SharpSevenZip/ArchiveUpdateCallback.cs?ref=main",
+    "html_url": "https://github.com/JeremyAnsel/SharpSevenZip/blob/main/SharpSevenZip/SharpSevenZip/ArchiveUpdateCallback.cs",
+    "git_url": "https://api.github.com/repos/JeremyAnsel/SharpSevenZip/git/blobs/d354bfe7065f859d62c69e9a7fabc19fa394317d",
+    "download_url": "https://raw.githubusercontent.com/JeremyAnsel/SharpSevenZip/main/SharpSevenZip/SharpSevenZip/ArchiveUpdateCallback.cs",
+    "type": "file",
+    "_links": {
+      "self": "https://api.github.com/repos/JeremyAnsel/SharpSevenZip/contents/SharpSevenZip/SharpSevenZip/ArchiveUpdateCallback.cs?ref=main",
+      "git": "https://api.github.com/repos/JeremyAnsel/SharpSevenZip/git/blobs/d354bfe7065f859d62c69e9a7fabc19fa394317d",
+      "html": "https://github.com/JeremyAnsel/SharpSevenZip/blob/main/SharpSevenZip/SharpSevenZip/ArchiveUpdateCallback.cs"
+    }
+  },
+  {
+    "name": "AssemblyInfo.cs",
+    "path": "SharpSevenZip/SharpSevenZip/AssemblyInfo.cs",
+    "sha": "11c8777acafcd941fc39d05cacecf0635e6b179c",
+    "size": 169,
+    "url": "https://api.github.com/repos/JeremyAnsel/SharpSevenZip/contents/SharpSevenZip/SharpSevenZip/AssemblyInfo.cs?ref=main",
+    "html_url": "https://github.com/JeremyAnsel/SharpSevenZip/blob/main/SharpSevenZip/SharpSevenZip/AssemblyInfo.cs",
+    "git_url": "https://api.github.com/repos/JeremyAnsel/SharpSevenZip/git/blobs/11c8777acafcd941fc39d05cacecf0635e6b179c",
+    "download_url": "https://raw.githubusercontent.com/JeremyAnsel/SharpSevenZip/main/SharpSevenZip/SharpSevenZip/AssemblyInfo.cs",
+    "type": "file",
+    "_links": {
+      "self": "https://api.github.com/repos/JeremyAnsel/SharpSevenZip/contents/SharpSevenZip/SharpSevenZip/AssemblyInfo.cs?ref=main",
+      "git": "https://api.github.com/repos/JeremyAnsel/SharpSevenZip/git/blobs/11c8777acafcd941fc39d05cacecf0635e6b179c",
+      "html": "https://github.com/JeremyAnsel/SharpSevenZip/blob/main/SharpSevenZip/SharpSevenZip/AssemblyInfo.cs"
+    }
+  },
+  {
+    "name": "CallbackBase.cs",
+    "path": "SharpSevenZip/SharpSevenZip/CallbackBase.cs",
+    "sha": "812998308e23d3efcc33f7e45ae92bfc9034e80e",
+    "size": 2750,
+    "url": "https://api.github.com/repos/JeremyAnsel/SharpSevenZip/contents/SharpSevenZip/SharpSevenZip/CallbackBase.cs?ref=main",
+    "html_url": "https://github.com/JeremyAnsel/SharpSevenZip/blob/main/SharpSevenZip/SharpSevenZip/CallbackBase.cs",
+    "git_url": "https://api.github.com/repos/JeremyAnsel/SharpSevenZip/git/blobs/812998308e23d3efcc33f7e45ae92bfc9034e80e",
+    "download_url": "https://raw.githubusercontent.com/JeremyAnsel/SharpSevenZip/main/SharpSevenZip/SharpSevenZip/CallbackBase.cs",
+    "type": "file",
+    "_links": {
+      "self": "https://api.github.com/repos/JeremyAnsel/SharpSevenZip/contents/SharpSevenZip/SharpSevenZip/CallbackBase.cs?ref=main",
+      "git": "https://api.github.com/repos/JeremyAnsel/SharpSevenZip/git/blobs/812998308e23d3efcc33f7e45ae92bfc9034e80e",
+      "html": "https://github.com/JeremyAnsel/SharpSevenZip/blob/main/SharpSevenZip/SharpSevenZip/CallbackBase.cs"
+    }
+  },
+  {
+    "name": "Com.cs",
+    "path": "SharpSevenZip/SharpSevenZip/Com.cs",
+    "sha": "10465ab9579481072a14969aee66d5748e2ae87c",
+    "size": 33978,
+    "url": "https://api.github.com/repos/JeremyAnsel/SharpSevenZip/contents/SharpSevenZip/SharpSevenZip/Com.cs?ref=main",
+    "html_url": "https://github.com/JeremyAnsel/SharpSevenZip/blob/main/SharpSevenZip/SharpSevenZip/Com.cs",
+    "git_url": "https://api.github.com/repos/JeremyAnsel/SharpSevenZip/git/blobs/10465ab9579481072a14969aee66d5748e2ae87c",
+    "download_url": "https://raw.githubusercontent.com/JeremyAnsel/SharpSevenZip/main/SharpSevenZip/SharpSevenZip/Com.cs",
+    "type": "file",
+    "_links": {
+      "self": "https://api.github.com/repos/JeremyAnsel/SharpSevenZip/contents/SharpSevenZip/SharpSevenZip/Com.cs?ref=main",
+      "git": "https://api.github.com/repos/JeremyAnsel/SharpSevenZip/git/blobs/10465ab9579481072a14969aee66d5748e2ae87c",
+      "html": "https://github.com/JeremyAnsel/SharpSevenZip/blob/main/SharpSevenZip/SharpSevenZip/Com.cs"
+    }
+  },
+  {
+    "name": "CompressionMode.cs",
+    "path": "SharpSevenZip/SharpSevenZip/CompressionMode.cs",
+    "sha": "b7362bca0cb1206c322fc52a8ca3c3ac01c35c71",
+    "size": 310,
+    "url": "https://api.github.com/repos/JeremyAnsel/SharpSevenZip/contents/SharpSevenZip/SharpSevenZip/CompressionMode.cs?ref=main",
+    "html_url": "https://github.com/JeremyAnsel/SharpSevenZip/blob/main/SharpSevenZip/SharpSevenZip/CompressionMode.cs",
+    "git_url": "https://api.github.com/repos/JeremyAnsel/SharpSevenZip/git/blobs/b7362bca0cb1206c322fc52a8ca3c3ac01c35c71",
+    "download_url": "https://raw.githubusercontent.com/JeremyAnsel/SharpSevenZip/main/SharpSevenZip/SharpSevenZip/CompressionMode.cs",
+    "type": "file",
+    "_links": {
+      "self": "https://api.github.com/repos/JeremyAnsel/SharpSevenZip/contents/SharpSevenZip/SharpSevenZip/CompressionMode.cs?ref=main",
+      "git": "https://api.github.com/repos/JeremyAnsel/SharpSevenZip/git/blobs/b7362bca0cb1206c322fc52a8ca3c3ac01c35c71",
+      "html": "https://github.com/JeremyAnsel/SharpSevenZip/blob/main/SharpSevenZip/SharpSevenZip/CompressionMode.cs"
+    }
+  },
+  {
+    "name": "Directory.Build.targets",
+    "path": "SharpSevenZip/SharpSevenZip/Directory.Build.targets",
+    "sha": "cdf451dab49265b14de018f4b6ad101f0c7022f5",
+    "size": 270,
+    "url": "https://api.github.com/repos/JeremyAnsel/SharpSevenZip/contents/SharpSevenZip/SharpSevenZip/Directory.Build.targets?ref=main",
+    "html_url": "https://github.com/JeremyAnsel/SharpSevenZip/blob/main/SharpSevenZip/SharpSevenZip/Directory.Build.targets",
+    "git_url": "https://api.github.com/repos/JeremyAnsel/SharpSevenZip/git/blobs/cdf451dab49265b14de018f4b6ad101f0c7022f5",
+    "download_url": "https://raw.githubusercontent.com/JeremyAnsel/SharpSevenZip/main/SharpSevenZip/SharpSevenZip/Directory.Build.targets",
+    "type": "file",
+    "_links": {
+      "self": "https://api.github.com/repos/JeremyAnsel/SharpSevenZip/contents/SharpSevenZip/SharpSevenZip/Directory.Build.targets?ref=main",
+      "git": "https://api.github.com/repos/JeremyAnsel/SharpSevenZip/git/blobs/cdf451dab49265b14de018f4b6ad101f0c7022f5",
+      "html": "https://github.com/JeremyAnsel/SharpSevenZip/blob/main/SharpSevenZip/SharpSevenZip/Directory.Build.targets"
+    }
+  },
+  {
+    "name": "EventArguments",
+    "path": "SharpSevenZip/SharpSevenZip/EventArguments",
+    "sha": "ccc0d44e609594a54230131b78b6380a3a6886ed",
+    "size": 0,
+    "url": "https://api.github.com/repos/JeremyAnsel/SharpSevenZip/contents/SharpSevenZip/SharpSevenZip/EventArguments?ref=main",
+    "html_url": "https://github.com/JeremyAnsel/SharpSevenZip/tree/main/SharpSevenZip/SharpSevenZip/EventArguments",
+    "git_url": "https://api.github.com/repos/JeremyAnsel/SharpSevenZip/git/trees/ccc0d44e609594a54230131b78b6380a3a6886ed",
+    "download_url": null,
+    "type": "dir",
+    "_links": {
+      "self": "https://api.github.com/repos/JeremyAnsel/SharpSevenZip/contents/SharpSevenZip/SharpSevenZip/EventArguments?ref=main",
+      "git": "https://api.github.com/repos/JeremyAnsel/SharpSevenZip/git/trees/ccc0d44e609594a54230131b78b6380a3a6886ed",
+      "html": "https://github.com/JeremyAnsel/SharpSevenZip/tree/main/SharpSevenZip/SharpSevenZip/EventArguments"
+    }
+  },
+  {
+    "name": "EventSynchronizationStrategy.cs",
+    "path": "SharpSevenZip/SharpSevenZip/EventSynchronizationStrategy.cs",
+    "sha": "89d31dff42562971e3f9f69eaae6e55148bb81b4",
+    "size": 521,
+    "url": "https://api.github.com/repos/JeremyAnsel/SharpSevenZip/contents/SharpSevenZip/SharpSevenZip/EventSynchronizationStrategy.cs?ref=main",
+    "html_url": "https://github.com/JeremyAnsel/SharpSevenZip/blob/main/SharpSevenZip/SharpSevenZip/EventSynchronizationStrategy.cs",
+    "git_url": "https://api.github.com/repos/JeremyAnsel/SharpSevenZip/git/blobs/89d31dff42562971e3f9f69eaae6e55148bb81b4",
+    "download_url": "https://raw.githubusercontent.com/JeremyAnsel/SharpSevenZip/main/SharpSevenZip/SharpSevenZip/EventSynchronizationStrategy.cs",
+    "type": "file",
+    "_links": {
+      "self": "https://api.github.com/repos/JeremyAnsel/SharpSevenZip/contents/SharpSevenZip/SharpSevenZip/EventSynchronizationStrategy.cs?ref=main",
+      "git": "https://api.github.com/repos/JeremyAnsel/SharpSevenZip/git/blobs/89d31dff42562971e3f9f69eaae6e55148bb81b4",
+      "html": "https://github.com/JeremyAnsel/SharpSevenZip/blob/main/SharpSevenZip/SharpSevenZip/EventSynchronizationStrategy.cs"
+    }
+  },
+  {
+    "name": "Exceptions",
+    "path": "SharpSevenZip/SharpSevenZip/Exceptions",
+    "sha": "3196ffb06b97f7a8239995253a82060a397d1979",
+    "size": 0,
+    "url": "https://api.github.com/repos/JeremyAnsel/SharpSevenZip/contents/SharpSevenZip/SharpSevenZip/Exceptions?ref=main",
+    "html_url": "https://github.com/JeremyAnsel/SharpSevenZip/tree/main/SharpSevenZip/SharpSevenZip/Exceptions",
+    "git_url": "https://api.github.com/repos/JeremyAnsel/SharpSevenZip/git/trees/3196ffb06b97f7a8239995253a82060a397d1979",
+    "download_url": null,
+    "type": "dir",
+    "_links": {
+      "self": "https://api.github.com/repos/JeremyAnsel/SharpSevenZip/contents/SharpSevenZip/SharpSevenZip/Exceptions?ref=main",
+      "git": "https://api.github.com/repos/JeremyAnsel/SharpSevenZip/git/trees/3196ffb06b97f7a8239995253a82060a397d1979",
+      "html": "https://github.com/JeremyAnsel/SharpSevenZip/tree/main/SharpSevenZip/SharpSevenZip/Exceptions"
+    }
+  },
+  {
+    "name": "ExtractFileCallback.cs",
+    "path": "SharpSevenZip/SharpSevenZip/ExtractFileCallback.cs",
+    "sha": "b6b692ccd470ef89db45726f8f58669857a4e3b0",
+    "size": 284,
+    "url": "https://api.github.com/repos/JeremyAnsel/SharpSevenZip/contents/SharpSevenZip/SharpSevenZip/ExtractFileCallback.cs?ref=main",
+    "html_url": "https://github.com/JeremyAnsel/SharpSevenZip/blob/main/SharpSevenZip/SharpSevenZip/ExtractFileCallback.cs",
+    "git_url": "https://api.github.com/repos/JeremyAnsel/SharpSevenZip/git/blobs/b6b692ccd470ef89db45726f8f58669857a4e3b0",
+    "download_url": "https://raw.githubusercontent.com/JeremyAnsel/SharpSevenZip/main/SharpSevenZip/SharpSevenZip/ExtractFileCallback.cs",
+    "type": "file",
+    "_links": {
+      "self": "https://api.github.com/repos/JeremyAnsel/SharpSevenZip/contents/SharpSevenZip/SharpSevenZip/ExtractFileCallback.cs?ref=main",
+      "git": "https://api.github.com/repos/JeremyAnsel/SharpSevenZip/git/blobs/b6b692ccd470ef89db45726f8f58669857a4e3b0",
+      "html": "https://github.com/JeremyAnsel/SharpSevenZip/blob/main/SharpSevenZip/SharpSevenZip/ExtractFileCallback.cs"
+    }
+  },
+  {
+    "name": "ExtractStream.cs",
+    "path": "SharpSevenZip/SharpSevenZip/ExtractStream.cs",
+    "sha": "cd150e0ea79ceeca2be59002e41e033994d8af2b",
+    "size": 5294,
+    "url": "https://api.github.com/repos/JeremyAnsel/SharpSevenZip/contents/SharpSevenZip/SharpSevenZip/ExtractStream.cs?ref=main",
+    "html_url": "https://github.com/JeremyAnsel/SharpSevenZip/blob/main/SharpSevenZip/SharpSevenZip/ExtractStream.cs",
+    "git_url": "https://api.github.com/repos/JeremyAnsel/SharpSevenZip/git/blobs/cd150e0ea79ceeca2be59002e41e033994d8af2b",
+    "download_url": "https://raw.githubusercontent.com/JeremyAnsel/SharpSevenZip/main/SharpSevenZip/SharpSevenZip/ExtractStream.cs",
+    "type": "file",
+    "_links": {
+      "self": "https://api.github.com/repos/JeremyAnsel/SharpSevenZip/contents/SharpSevenZip/SharpSevenZip/ExtractStream.cs?ref=main",
+      "git": "https://api.github.com/repos/JeremyAnsel/SharpSevenZip/git/blobs/cd150e0ea79ceeca2be59002e41e033994d8af2b",
+      "html": "https://github.com/JeremyAnsel/SharpSevenZip/blob/main/SharpSevenZip/SharpSevenZip/ExtractStream.cs"
+    }
+  },
+  {
+    "name": "FileChecker.cs",
+    "path": "SharpSevenZip/SharpSevenZip/FileChecker.cs",
+    "sha": "c872ccbbd22101709a672a72dbce5e44aab0250f",
+    "size": 7884,
+    "url": "https://api.github.com/repos/JeremyAnsel/SharpSevenZip/contents/SharpSevenZip/SharpSevenZip/FileChecker.cs?ref=main",
+    "html_url": "https://github.com/JeremyAnsel/SharpSevenZip/blob/main/SharpSevenZip/SharpSevenZip/FileChecker.cs",
+    "git_url": "https://api.github.com/repos/JeremyAnsel/SharpSevenZip/git/blobs/c872ccbbd22101709a672a72dbce5e44aab0250f",
+    "download_url": "https://raw.githubusercontent.com/JeremyAnsel/SharpSevenZip/main/SharpSevenZip/SharpSevenZip/FileChecker.cs",
+    "type": "file",
+    "_links": {
+      "self": "https://api.github.com/repos/JeremyAnsel/SharpSevenZip/contents/SharpSevenZip/SharpSevenZip/FileChecker.cs?ref=main",
+      "git": "https://api.github.com/repos/JeremyAnsel/SharpSevenZip/git/blobs/c872ccbbd22101709a672a72dbce5e44aab0250f",
+      "html": "https://github.com/JeremyAnsel/SharpSevenZip/blob/main/SharpSevenZip/SharpSevenZip/FileChecker.cs"
+    }
+  },
+  {
+    "name": "Formats.cs",
+    "path": "SharpSevenZip/SharpSevenZip/Formats.cs",
+    "sha": "7874efea1ca8a2bfac3ac3624772c3a5ccbc01d0",
+    "size": 26214,
+    "url": "https://api.github.com/repos/JeremyAnsel/SharpSevenZip/contents/SharpSevenZip/SharpSevenZip/Formats.cs?ref=main",
+    "html_url": "https://github.com/JeremyAnsel/SharpSevenZip/blob/main/SharpSevenZip/SharpSevenZip/Formats.cs",
+    "git_url": "https://api.github.com/repos/JeremyAnsel/SharpSevenZip/git/blobs/7874efea1ca8a2bfac3ac3624772c3a5ccbc01d0",
+    "download_url": "https://raw.githubusercontent.com/JeremyAnsel/SharpSevenZip/main/SharpSevenZip/SharpSevenZip/Formats.cs",
+    "type": "file",
+    "_links": {
+      "self": "https://api.github.com/repos/JeremyAnsel/SharpSevenZip/contents/SharpSevenZip/SharpSevenZip/Formats.cs?ref=main",
+      "git": "https://api.github.com/repos/JeremyAnsel/SharpSevenZip/git/blobs/7874efea1ca8a2bfac3ac3624772c3a5ccbc01d0",
+      "html": "https://github.com/JeremyAnsel/SharpSevenZip/blob/main/SharpSevenZip/SharpSevenZip/Formats.cs"
+    }
+  },
+  {
+    "name": "ICancellable.cs",
+    "path": "SharpSevenZip/SharpSevenZip/ICancellable.cs",
+    "sha": "b909a1703b6667e6697a8366a96437dd2ef01217",
+    "size": 430,
+    "url": "https://api.github.com/repos/JeremyAnsel/SharpSevenZip/contents/SharpSevenZip/SharpSevenZip/ICancellable.cs?ref=main",
+    "html_url": "https://github.com/JeremyAnsel/SharpSevenZip/blob/main/SharpSevenZip/SharpSevenZip/ICancellable.cs",
+    "git_url": "https://api.github.com/repos/JeremyAnsel/SharpSevenZip/git/blobs/b909a1703b6667e6697a8366a96437dd2ef01217",
+    "download_url": "https://raw.githubusercontent.com/JeremyAnsel/SharpSevenZip/main/SharpSevenZip/SharpSevenZip/ICancellable.cs",
+    "type": "file",
+    "_links": {
+      "self": "https://api.github.com/repos/JeremyAnsel/SharpSevenZip/contents/SharpSevenZip/SharpSevenZip/ICancellable.cs?ref=main",
+      "git": "https://api.github.com/repos/JeremyAnsel/SharpSevenZip/git/blobs/b909a1703b6667e6697a8366a96437dd2ef01217",
+      "html": "https://github.com/JeremyAnsel/SharpSevenZip/blob/main/SharpSevenZip/SharpSevenZip/ICancellable.cs"
+    }
+  },
+  {
+    "name": "InternalCompressionMode.cs",
+    "path": "SharpSevenZip/SharpSevenZip/InternalCompressionMode.cs",
+    "sha": "07aefee050a1e9a5ffc00aba3626c8b605d09654",
+    "size": 339,
+    "url": "https://api.github.com/repos/JeremyAnsel/SharpSevenZip/contents/SharpSevenZip/SharpSevenZip/InternalCompressionMode.cs?ref=main",
+    "html_url": "https://github.com/JeremyAnsel/SharpSevenZip/blob/main/SharpSevenZip/SharpSevenZip/InternalCompressionMode.cs",
+    "git_url": "https://api.github.com/repos/JeremyAnsel/SharpSevenZip/git/blobs/07aefee050a1e9a5ffc00aba3626c8b605d09654",
+    "download_url": "https://raw.githubusercontent.com/JeremyAnsel/SharpSevenZip/main/SharpSevenZip/SharpSevenZip/InternalCompressionMode.cs",
+    "type": "file",
+    "_links": {
+      "self": "https://api.github.com/repos/JeremyAnsel/SharpSevenZip/contents/SharpSevenZip/SharpSevenZip/InternalCompressionMode.cs?ref=main",
+      "git": "https://api.github.com/repos/JeremyAnsel/SharpSevenZip/git/blobs/07aefee050a1e9a5ffc00aba3626c8b605d09654",
+      "html": "https://github.com/JeremyAnsel/SharpSevenZip/blob/main/SharpSevenZip/SharpSevenZip/InternalCompressionMode.cs"
+    }
+  },
+  {
+    "name": "LibraryFeature.cs",
+    "path": "SharpSevenZip/SharpSevenZip/LibraryFeature.cs",
+    "sha": "4dcac4c521909f69ae426717bd9e0c6d64eeec9e",
+    "size": 2904,
+    "url": "https://api.github.com/repos/JeremyAnsel/SharpSevenZip/contents/SharpSevenZip/SharpSevenZip/LibraryFeature.cs?ref=main",
+    "html_url": "https://github.com/JeremyAnsel/SharpSevenZip/blob/main/SharpSevenZip/SharpSevenZip/LibraryFeature.cs",
+    "git_url": "https://api.github.com/repos/JeremyAnsel/SharpSevenZip/git/blobs/4dcac4c521909f69ae426717bd9e0c6d64eeec9e",
+    "download_url": "https://raw.githubusercontent.com/JeremyAnsel/SharpSevenZip/main/SharpSevenZip/SharpSevenZip/LibraryFeature.cs",
+    "type": "file",
+    "_links": {
+      "self": "https://api.github.com/repos/JeremyAnsel/SharpSevenZip/contents/SharpSevenZip/SharpSevenZip/LibraryFeature.cs?ref=main",
+      "git": "https://api.github.com/repos/JeremyAnsel/SharpSevenZip/git/blobs/4dcac4c521909f69ae426717bd9e0c6d64eeec9e",
+      "html": "https://github.com/JeremyAnsel/SharpSevenZip/blob/main/SharpSevenZip/SharpSevenZip/LibraryFeature.cs"
+    }
+  },
+  {
+    "name": "Lzma",
+    "path": "SharpSevenZip/SharpSevenZip/Lzma",
+    "sha": "e2c279c40a9f84d82b9423042c6b6da92737aaf4",
+    "size": 0,
+    "url": "https://api.github.com/repos/JeremyAnsel/SharpSevenZip/contents/SharpSevenZip/SharpSevenZip/Lzma?ref=main",
+    "html_url": "https://github.com/JeremyAnsel/SharpSevenZip/tree/main/SharpSevenZip/SharpSevenZip/Lzma",
+    "git_url": "https://api.github.com/repos/JeremyAnsel/SharpSevenZip/git/trees/e2c279c40a9f84d82b9423042c6b6da92737aaf4",
+    "download_url": null,
+    "type": "dir",
+    "_links": {
+      "self": "https://api.github.com/repos/JeremyAnsel/SharpSevenZip/contents/SharpSevenZip/SharpSevenZip/Lzma?ref=main",
+      "git": "https://api.github.com/repos/JeremyAnsel/SharpSevenZip/git/trees/e2c279c40a9f84d82b9423042c6b6da92737aaf4",
+      "html": "https://github.com/JeremyAnsel/SharpSevenZip/tree/main/SharpSevenZip/SharpSevenZip/Lzma"
+    }
+  },
+  {
+    "name": "NativeMethods.cs",
+    "path": "SharpSevenZip/SharpSevenZip/NativeMethods.cs",
+    "sha": "25de67bdefe6298c0711cd39807e8d9c450075bd",
+    "size": 2423,
+    "url": "https://api.github.com/repos/JeremyAnsel/SharpSevenZip/contents/SharpSevenZip/SharpSevenZip/NativeMethods.cs?ref=main",
+    "html_url": "https://github.com/JeremyAnsel/SharpSevenZip/blob/main/SharpSevenZip/SharpSevenZip/NativeMethods.cs",
+    "git_url": "https://api.github.com/repos/JeremyAnsel/SharpSevenZip/git/blobs/25de67bdefe6298c0711cd39807e8d9c450075bd",
+    "download_url": "https://raw.githubusercontent.com/JeremyAnsel/SharpSevenZip/main/SharpSevenZip/SharpSevenZip/NativeMethods.cs",
+    "type": "file",
+    "_links": {
+      "self": "https://api.github.com/repos/JeremyAnsel/SharpSevenZip/contents/SharpSevenZip/SharpSevenZip/NativeMethods.cs?ref=main",
+      "git": "https://api.github.com/repos/JeremyAnsel/SharpSevenZip/git/blobs/25de67bdefe6298c0711cd39807e8d9c450075bd",
+      "html": "https://github.com/JeremyAnsel/SharpSevenZip/blob/main/SharpSevenZip/SharpSevenZip/NativeMethods.cs"
+    }
+  },
+  {
+    "name": "Sdk",
+    "path": "SharpSevenZip/SharpSevenZip/Sdk",
+    "sha": "dd1f27635daf3988ea75aaeb0805773248fafb1e",
+    "size": 0,
+    "url": "https://api.github.com/repos/JeremyAnsel/SharpSevenZip/contents/SharpSevenZip/SharpSevenZip/Sdk?ref=main",
+    "html_url": "https://github.com/JeremyAnsel/SharpSevenZip/tree/main/SharpSevenZip/SharpSevenZip/Sdk",
+    "git_url": "https://api.github.com/repos/JeremyAnsel/SharpSevenZip/git/trees/dd1f27635daf3988ea75aaeb0805773248fafb1e",
+    "download_url": null,
+    "type": "dir",
+    "_links": {
+      "self": "https://api.github.com/repos/JeremyAnsel/SharpSevenZip/contents/SharpSevenZip/SharpSevenZip/Sdk?ref=main",
+      "git": "https://api.github.com/repos/JeremyAnsel/SharpSevenZip/git/trees/dd1f27635daf3988ea75aaeb0805773248fafb1e",
+      "html": "https://github.com/JeremyAnsel/SharpSevenZip/tree/main/SharpSevenZip/SharpSevenZip/Sdk"
+    }
+  },
+  {
+    "name": "SharpSevenZip.csproj",
+    "path": "SharpSevenZip/SharpSevenZip/SharpSevenZip.csproj",
+    "sha": "f75a9012fa3ecdd7ae63701b232fae762ef94450",
+    "size": 3844,
+    "url": "https://api.github.com/repos/JeremyAnsel/SharpSevenZip/contents/SharpSevenZip/SharpSevenZip/SharpSevenZip.csproj?ref=main",
+    "html_url": "https://github.com/JeremyAnsel/SharpSevenZip/blob/main/SharpSevenZip/SharpSevenZip/SharpSevenZip.csproj",
+    "git_url": "https://api.github.com/repos/JeremyAnsel/SharpSevenZip/git/blobs/f75a9012fa3ecdd7ae63701b232fae762ef94450",
+    "download_url": "https://raw.githubusercontent.com/JeremyAnsel/SharpSevenZip/main/SharpSevenZip/SharpSevenZip/SharpSevenZip.csproj",
+    "type": "file",
+    "_links": {
+      "self": "https://api.github.com/repos/JeremyAnsel/SharpSevenZip/contents/SharpSevenZip/SharpSevenZip/SharpSevenZip.csproj?ref=main",
+      "git": "https://api.github.com/repos/JeremyAnsel/SharpSevenZip/git/blobs/f75a9012fa3ecdd7ae63701b232fae762ef94450",
+      "html": "https://github.com/JeremyAnsel/SharpSevenZip/blob/main/SharpSevenZip/SharpSevenZip/SharpSevenZip.csproj"
+    }
+  },
+  {
+    "name": "SharpSevenZip.targets",
+    "path": "SharpSevenZip/SharpSevenZip/SharpSevenZip.targets",
+    "sha": "dcf29d65cabd8333ec97ab16440f4c994aa596f1",
+    "size": 559,
+    "url": "https://api.github.com/repos/JeremyAnsel/SharpSevenZip/contents/SharpSevenZip/SharpSevenZip/SharpSevenZip.targets?ref=main",
+    "html_url": "https://github.com/JeremyAnsel/SharpSevenZip/blob/main/SharpSevenZip/SharpSevenZip/SharpSevenZip.targets",
+    "git_url": "https://api.github.com/repos/JeremyAnsel/SharpSevenZip/git/blobs/dcf29d65cabd8333ec97ab16440f4c994aa596f1",
+    "download_url": "https://raw.githubusercontent.com/JeremyAnsel/SharpSevenZip/main/SharpSevenZip/SharpSevenZip/SharpSevenZip.targets",
+    "type": "file",
+    "_links": {
+      "self": "https://api.github.com/repos/JeremyAnsel/SharpSevenZip/contents/SharpSevenZip/SharpSevenZip/SharpSevenZip.targets?ref=main",
+      "git": "https://api.github.com/repos/JeremyAnsel/SharpSevenZip/git/blobs/dcf29d65cabd8333ec97ab16440f4c994aa596f1",
+      "html": "https://github.com/JeremyAnsel/SharpSevenZip/blob/main/SharpSevenZip/SharpSevenZip/SharpSevenZip.targets"
+    }
+  },
+  {
+    "name": "SharpSevenZipArchiveFormat.cs",
+    "path": "SharpSevenZip/SharpSevenZip/SharpSevenZipArchiveFormat.cs",
+    "sha": "dd3e7209cc8639aa6cba79967e120344acd4c8c9",
+    "size": 2136,
+    "url": "https://api.github.com/repos/JeremyAnsel/SharpSevenZip/contents/SharpSevenZip/SharpSevenZip/SharpSevenZipArchiveFormat.cs?ref=main",
+    "html_url": "https://github.com/JeremyAnsel/SharpSevenZip/blob/main/SharpSevenZip/SharpSevenZip/SharpSevenZipArchiveFormat.cs",
+    "git_url": "https://api.github.com/repos/JeremyAnsel/SharpSevenZip/git/blobs/dd3e7209cc8639aa6cba79967e120344acd4c8c9",
+    "download_url": "https://raw.githubusercontent.com/JeremyAnsel/SharpSevenZip/main/SharpSevenZip/SharpSevenZip/SharpSevenZipArchiveFormat.cs",
+    "type": "file",
+    "_links": {
+      "self": "https://api.github.com/repos/JeremyAnsel/SharpSevenZip/contents/SharpSevenZip/SharpSevenZip/SharpSevenZipArchiveFormat.cs?ref=main",
+      "git": "https://api.github.com/repos/JeremyAnsel/SharpSevenZip/git/blobs/dd3e7209cc8639aa6cba79967e120344acd4c8c9",
+      "html": "https://github.com/JeremyAnsel/SharpSevenZip/blob/main/SharpSevenZip/SharpSevenZip/SharpSevenZipArchiveFormat.cs"
+    }
+  },
+  {
+    "name": "SharpSevenZipBase.cs",
+    "path": "SharpSevenZip/SharpSevenZip/SharpSevenZipBase.cs",
+    "sha": "834fa22ef476ee3ed74bce5bcc31e6f2953666cd",
+    "size": 9399,
+    "url": "https://api.github.com/repos/JeremyAnsel/SharpSevenZip/contents/SharpSevenZip/SharpSevenZip/SharpSevenZipBase.cs?ref=main",
+    "html_url": "https://github.com/JeremyAnsel/SharpSevenZip/blob/main/SharpSevenZip/SharpSevenZip/SharpSevenZipBase.cs",
+    "git_url": "https://api.github.com/repos/JeremyAnsel/SharpSevenZip/git/blobs/834fa22ef476ee3ed74bce5bcc31e6f2953666cd",
+    "download_url": "https://raw.githubusercontent.com/JeremyAnsel/SharpSevenZip/main/SharpSevenZip/SharpSevenZip/SharpSevenZipBase.cs",
+    "type": "file",
+    "_links": {
+      "self": "https://api.github.com/repos/JeremyAnsel/SharpSevenZip/contents/SharpSevenZip/SharpSevenZip/SharpSevenZipBase.cs?ref=main",
+      "git": "https://api.github.com/repos/JeremyAnsel/SharpSevenZip/git/blobs/834fa22ef476ee3ed74bce5bcc31e6f2953666cd",
+      "html": "https://github.com/JeremyAnsel/SharpSevenZip/blob/main/SharpSevenZip/SharpSevenZip/SharpSevenZipBase.cs"
+    }
+  },
+  {
+    "name": "SharpSevenZipCompressor.cs",
+    "path": "SharpSevenZip/SharpSevenZip/SharpSevenZipCompressor.cs",
+    "sha": "289e849a1b1e2bca928215303ece66f25446aa30",
+    "size": 66893,
+    "url": "https://api.github.com/repos/JeremyAnsel/SharpSevenZip/contents/SharpSevenZip/SharpSevenZip/SharpSevenZipCompressor.cs?ref=main",
+    "html_url": "https://github.com/JeremyAnsel/SharpSevenZip/blob/main/SharpSevenZip/SharpSevenZip/SharpSevenZipCompressor.cs",
+    "git_url": "https://api.github.com/repos/JeremyAnsel/SharpSevenZip/git/blobs/289e849a1b1e2bca928215303ece66f25446aa30",
+    "download_url": "https://raw.githubusercontent.com/JeremyAnsel/SharpSevenZip/main/SharpSevenZip/SharpSevenZip/SharpSevenZipCompressor.cs",
+    "type": "file",
+    "_links": {
+      "self": "https://api.github.com/repos/JeremyAnsel/SharpSevenZip/contents/SharpSevenZip/SharpSevenZip/SharpSevenZipCompressor.cs?ref=main",
+      "git": "https://api.github.com/repos/JeremyAnsel/SharpSevenZip/git/blobs/289e849a1b1e2bca928215303ece66f25446aa30",
+      "html": "https://github.com/JeremyAnsel/SharpSevenZip/blob/main/SharpSevenZip/SharpSevenZip/SharpSevenZipCompressor.cs"
+    }
+  },
+  {
+    "name": "SharpSevenZipCompressorAsynchronous.cs",
+    "path": "SharpSevenZip/SharpSevenZip/SharpSevenZipCompressorAsynchronous.cs",
+    "sha": 
+
+[… truncated 13924 chars …]
