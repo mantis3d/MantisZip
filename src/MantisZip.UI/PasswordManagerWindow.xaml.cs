@@ -55,8 +55,10 @@ public partial class PasswordManagerWindow : Window
 
     private void Add_Click(object sender, RoutedEventArgs e)
     {
+        App.LogDebug("PasswordManagerWindow: Add_Click, current count={0}", PasswordManager.Instance.EntryCount);
         if (PasswordManager.Instance.EntryCount >= PasswordManager.MaxEntries)
         {
+            App.LogDebug("PasswordManagerWindow: add rejected, max entries ({0}) reached", PasswordManager.MaxEntries);
             AppMessageBox.Show(L.TF(L.PwdMgr_Full, PasswordManager.MaxEntries),
                 L.T(L.App_MantisZipTitle), MessageBoxButton.OK, MessageBoxImage.Warning);
             return;
@@ -66,8 +68,12 @@ public partial class PasswordManagerWindow : Window
         dialog.Owner = this;
         if (dialog.ShowDialog() == true)
         {
-            try { PasswordManager.Instance.AddPassword(dialog.ResultPassword, dialog.ResultDescription, dialog.ResultPatterns); }
-            catch (Exception ex) { AppMessageBox.Show(L.TF(L.Password_SaveFailed, ex.Message), L.T(L.App_ErrorTitle), MessageBoxButton.OK, MessageBoxImage.Error); }
+            try
+            {
+                PasswordManager.Instance.AddPassword(dialog.ResultPassword, dialog.ResultDescription, dialog.ResultPatterns);
+                App.LogDebug("PasswordManagerWindow: password added, desc='{0}'", dialog.ResultDescription);
+            }
+            catch (Exception ex) { App.LogDebug("PasswordManagerWindow: add failed: {0}", ex.Message); AppMessageBox.Show(L.TF(L.Password_SaveFailed, ex.Message), L.T(L.App_ErrorTitle), MessageBoxButton.OK, MessageBoxImage.Error); }
             LoadPasswords(_showPasswords);
         }
     }
@@ -75,13 +81,18 @@ public partial class PasswordManagerWindow : Window
     private void Edit_Click(object sender, RoutedEventArgs e)
     {
         if (PasswordGrid.SelectedItem is not PasswordEntryView entry) return;
+        App.LogDebug("PasswordManagerWindow: Edit_Click, id={0}, desc='{1}'", entry.Id, entry.Description);
 
         var dialog = new PasswordEditDialog(entry.Id, entry.Password, entry.Description, entry.PatternDisplay);
         dialog.Owner = this;
         if (dialog.ShowDialog() == true)
         {
-            try { PasswordManager.Instance.UpdatePassword(entry.Id, dialog.ResultPassword, dialog.ResultDescription, dialog.ResultPatterns); }
-            catch (Exception ex) { AppMessageBox.Show(L.TF(L.Password_UpdateFailed, ex.Message), L.T(L.App_ErrorTitle), MessageBoxButton.OK, MessageBoxImage.Error); }
+            try
+            {
+                PasswordManager.Instance.UpdatePassword(entry.Id, dialog.ResultPassword, dialog.ResultDescription, dialog.ResultPatterns);
+                App.LogDebug("PasswordManagerWindow: password updated, id={0}, desc='{1}'", entry.Id, dialog.ResultDescription);
+            }
+            catch (Exception ex) { App.LogDebug("PasswordManagerWindow: update failed: {0}", ex.Message); AppMessageBox.Show(L.TF(L.Password_UpdateFailed, ex.Message), L.T(L.App_ErrorTitle), MessageBoxButton.OK, MessageBoxImage.Error); }
             LoadPasswords(_showPasswords);
         }
     }
@@ -89,6 +100,7 @@ public partial class PasswordManagerWindow : Window
     private void Delete_Click(object sender, RoutedEventArgs e)
     {
         if (PasswordGrid.SelectedItem is not PasswordEntryView entry) return;
+        App.LogDebug("PasswordManagerWindow: Delete_Click, id={0}, desc='{1}'", entry.Id, entry.Description);
 
         var result = AppMessageBox.Show(
             L.TF(L.Password_DeleteConfirm, entry.Password),
@@ -98,14 +110,19 @@ public partial class PasswordManagerWindow : Window
 
         if (result == MessageBoxResult.Yes)
         {
-            try { PasswordManager.Instance.DeletePassword(entry.Id); }
-            catch (Exception ex) { AppMessageBox.Show(L.TF(L.Password_DeleteFailed, ex.Message), L.T(L.App_ErrorTitle), MessageBoxButton.OK, MessageBoxImage.Error); }
+            try
+            {
+                PasswordManager.Instance.DeletePassword(entry.Id);
+                App.LogDebug("PasswordManagerWindow: password deleted, id={0}", entry.Id);
+            }
+            catch (Exception ex) { App.LogDebug("PasswordManagerWindow: delete failed: {0}", ex.Message); AppMessageBox.Show(L.TF(L.Password_DeleteFailed, ex.Message), L.T(L.App_ErrorTitle), MessageBoxButton.OK, MessageBoxImage.Error); }
             LoadPasswords(_showPasswords);
         }
     }
 
     private void Export_Click(object sender, RoutedEventArgs e)
     {
+        App.LogDebug("PasswordManagerWindow: Export_Click");
         var dialog = new SaveFileDialog
         {
             Filter = "JSON 文件|*.json",
@@ -113,15 +130,18 @@ public partial class PasswordManagerWindow : Window
         };
         if (dialog.ShowDialog() == true)
         {
+            App.LogDebug("PasswordManagerWindow: exporting to '{0}'", dialog.FileName);
             try
             {
                 var json = PasswordManager.Instance.ExportToJson();
                 File.WriteAllText(dialog.FileName, json);
+                App.LogDebug("PasswordManagerWindow: export done, {0} entries", PasswordManager.Instance.EntryCount);
                 AppMessageBox.Show(L.TF(L.PwdMgr_Export_Success, dialog.FileName),
                     L.T(L.App_MantisZipTitle), MessageBoxButton.OK, MessageBoxImage.Information);
             }
             catch (Exception ex)
             {
+                App.LogDebug("PasswordManagerWindow: export failed: {0}", ex.Message);
                 AppMessageBox.Show(L.TF(L.PwdMgr_ExportFailed, ex.Message),
                     L.T(L.App_ErrorTitle), MessageBoxButton.OK, MessageBoxImage.Error);
             }
@@ -130,12 +150,14 @@ public partial class PasswordManagerWindow : Window
 
     private void Import_Click(object sender, RoutedEventArgs e)
     {
+        App.LogDebug("PasswordManagerWindow: Import_Click");
         var dialog = new OpenFileDialog
         {
             Filter = "JSON 文件|*.json"
         };
         if (dialog.ShowDialog() == true)
         {
+            App.LogDebug("PasswordManagerWindow: importing from '{0}'", dialog.FileName);
             // 先解析确认条目数
             string importedJson;
             int entryCount;
@@ -147,6 +169,7 @@ public partial class PasswordManagerWindow : Window
             }
             catch (Exception ex)
             {
+                App.LogDebug("PasswordManagerWindow: import parse failed: {0}", ex.Message);
                 AppMessageBox.Show(L.TF(L.PwdMgr_ImportFailed, ex.Message),
                     L.T(L.App_ErrorTitle), MessageBoxButton.OK, MessageBoxImage.Error);
                 return;
@@ -154,6 +177,7 @@ public partial class PasswordManagerWindow : Window
 
             if (entryCount == 0)
             {
+                App.LogDebug("PasswordManagerWindow: import file has no entries");
                 AppMessageBox.Show(L.T(L.PwdMgr_Import_Empty),
                     L.T(L.App_MantisZipTitle), MessageBoxButton.OK, MessageBoxImage.Information);
                 return;
@@ -163,6 +187,7 @@ public partial class PasswordManagerWindow : Window
             var currentCount = PasswordManager.Instance.EntryCount;
             if (currentCount + entryCount > PasswordManager.MaxEntries)
             {
+                App.LogDebug("PasswordManagerWindow: import rejected: {0} + {1} > {2} max", currentCount, entryCount, PasswordManager.MaxEntries);
                 AppMessageBox.Show(L.TF(L.PwdMgr_Import_Overflow, PasswordManager.MaxEntries - currentCount, entryCount),
                     L.T(L.App_ErrorTitle), MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
@@ -180,11 +205,13 @@ public partial class PasswordManagerWindow : Window
                 {
                     PasswordManager.Instance.ImportFromJson(importedJson);
                     LoadPasswords(_showPasswords);
+                    App.LogDebug("PasswordManagerWindow: import done, {0} entries imported, total={1}", entryCount, PasswordManager.Instance.EntryCount);
                     AppMessageBox.Show(L.TF(L.PwdMgr_Import_Success, entryCount),
                         L.T(L.App_MantisZipTitle), MessageBoxButton.OK, MessageBoxImage.Information);
                 }
                 catch (Exception ex)
                 {
+                    App.LogDebug("PasswordManagerWindow: import failed: {0}", ex.Message);
                     AppMessageBox.Show(L.TF(L.PwdMgr_ImportFailed, ex.Message),
                         L.T(L.App_ErrorTitle), MessageBoxButton.OK, MessageBoxImage.Error);
                 }

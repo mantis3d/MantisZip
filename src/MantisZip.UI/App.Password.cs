@@ -31,6 +31,9 @@ public partial class App : Application
         var candidatePasswords = limitReached ? allMatches.Take(maxAttempts).ToList() : allMatches;
         var tried = new HashSet<string>();
 
+        LogDebug("TryMatchPassword: archive='{0}', {1} candidates found (limitReached={2})",
+            archivePath, candidatePasswords.Count, limitReached);
+
         foreach (var entry in candidatePasswords)
         {
             var pwd = entry.Password;
@@ -41,10 +44,13 @@ public partial class App : Application
 
             if (QuickVerifyPassword(archivePath, pwd, engine))
             {
+                LogDebug("TryMatchPassword: password matched: desc='{0}'", desc);
                 if (showPwdSection) progressWindow?.ShowPasswordMatched(pwd, desc);
                 return (pwd, desc);
             }
+            LogDebug("TryMatchPassword: password '{0}' failed quick verify", desc);
         }
+        LogDebug("TryMatchPassword: no saved password matched for '{0}'", archivePath);
         return null;
     }
 
@@ -102,14 +108,21 @@ public partial class App : Application
         bool showPwdSection, bool? rememberPwd = null,
         string? pwdDesc = null, List<string>? pwdPatterns = null)
     {
+        LogDebug("ExtractWithPasswordAsync: archive='{0}', dest='{1}', desc='{2}', remember={3}",
+            archivePath, destinationPath, description, rememberPwd);
         if (showPwdSection) progressWindow.ShowPasswordAttempt(description);
         if (!QuickVerifyPassword(archivePath, password, engine))
+        {
+            LogDebug("ExtractWithPasswordAsync: quick verify failed for '{0}'", description);
             return false;
+        }
 
+        LogDebug("ExtractWithPasswordAsync: quick verify passed for '{0}'", description);
         if (showPwdSection) progressWindow.ShowPasswordMatched(password, description);
 
         var opts = CreateExtractOptions();
         await engine.ExtractAsync(archivePath, destinationPath, password, progress, ct, opts);
+        LogDebug("ExtractWithPasswordAsync: extraction done");
 
         if (rememberPwd == true && !string.IsNullOrEmpty(password))
         {
@@ -117,8 +130,12 @@ public partial class App : Application
                 ? pwdPatterns
                 : new List<string> { Path.GetFileName(archivePath) };
             var saveDesc = !string.IsNullOrEmpty(pwdDesc) ? pwdDesc : "";
-            try { PasswordManager.Instance.AddPassword(password, saveDesc, savePatterns); }
-            catch (Exception pwdEx) { Log("HandleExtractAsync: failed to save password: {0}", pwdEx.Message); }
+            try
+            {
+                PasswordManager.Instance.AddPassword(password, saveDesc, savePatterns);
+                LogDebug("ExtractWithPasswordAsync: saved password (desc='{0}', patterns=[{1}])", saveDesc, string.Join("; ", savePatterns));
+            }
+            catch (Exception pwdEx) { Log("ExtractWithPasswordAsync: failed to save password: {0}", pwdEx.Message); }
         }
         return true;
     }
