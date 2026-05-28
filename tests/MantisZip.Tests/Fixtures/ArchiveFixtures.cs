@@ -2,6 +2,7 @@ using System.Text;
 using ICSharpCode.SharpZipLib.GZip;
 using ICSharpCode.SharpZipLib.Tar;
 using ICSharpCode.SharpZipLib.Zip;
+using SharpSevenZip;
 
 namespace MantisZip.Tests.Fixtures;
 
@@ -137,36 +138,53 @@ public static class ArchiveFixtures
     }
 
     /// <summary>
-    /// Create a small 7z archive using 7z.exe. Returns the file path, or null if 7z.exe not found.
+    /// Create a small 7z archive for testing. Returns the file path, or null if 7z.dll not found.
     /// </summary>
     public static string? CreateSevenZipArchive()
     {
-        var sevenZipExe = @"C:\Program Files\7-Zip\7z.exe";
-        if (!File.Exists(sevenZipExe))
+        // 查找 7z.dll
+        var dllPath = Resolve7zDll();
+        if (dllPath == null || !File.Exists(dllPath))
             return null;
 
+        SharpSevenZipBase.SetLibraryPath(dllPath);
+
+        var srcDir = Path.Combine(Path.GetTempPath(), "MantisZipTest", Guid.NewGuid().ToString());
         var path = Path.Combine(Path.GetTempPath(), "MantisZipTest", $"{Guid.NewGuid()}.7z");
         var dir = Path.GetDirectoryName(path)!;
         if (!Directory.Exists(dir)) Directory.CreateDirectory(dir);
+        Directory.CreateDirectory(srcDir);
 
-        var srcFile = Path.Combine(dir, "hello.txt");
-        File.WriteAllText(srcFile, HelloText);
-
-        var process = new System.Diagnostics.Process
+        try
         {
-            StartInfo = new System.Diagnostics.ProcessStartInfo
-            {
-                FileName = sevenZipExe,
-                Arguments = $"a -t7z \"{path}\" \"{srcFile}\" -mx=1",
-                UseShellExecute = false,
-                CreateNoWindow = true,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true
-            }
-        };
-        process.Start();
-        process.WaitForExit(15000);
+            File.WriteAllText(Path.Combine(srcDir, "hello.txt"), HelloText);
 
-        return File.Exists(path) ? path : null;
+            var compressor = new SharpSevenZipCompressor
+            {
+                ArchiveFormat = SharpSevenZip.OutArchiveFormat.SevenZip,
+                CompressionLevel = SharpSevenZip.CompressionLevel.Fast,
+                CompressionMethod = SharpSevenZip.CompressionMethod.Lzma2,
+                IncludeEmptyDirectories = true,
+                DirectoryStructure = true
+            };
+            compressor.CompressDirectory(srcDir, path);
+            return File.Exists(path) ? path : null;
+        }
+        finally
+        {
+            if (Directory.Exists(srcDir))
+                try { Directory.Delete(srcDir, recursive: true); } catch { }
+        }
+    }
+
+    private static string? Resolve7zDll()
+    {
+        var candidates = new[]
+        {
+            Path.Combine(AppDomain.CurrentDomain.BaseDirectory, Environment.Is64BitProcess ? "x64" : "x86", "7z.dll"),
+            @"C:\Program Files\7-Zip\7z.dll",
+            @"C:\Program Files (x86)\7-Zip\7z.dll"
+        };
+        return candidates.FirstOrDefault(File.Exists);
     }
 }

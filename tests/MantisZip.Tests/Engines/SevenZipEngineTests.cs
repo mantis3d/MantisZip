@@ -22,9 +22,9 @@ public class SevenZipEngineTests : IDisposable
     private string TrackFile(string path) { _tempFiles.Add(path); return path; }
     private string TrackDir(string path) { _tempDirs.Add(path); return path; }
 
-    /// <summary>Check if 7z.exe is available for tests that need archive creation.</summary>
-    private static bool Is7zExeAvailable() =>
-        File.Exists(SevenZipEngine.SevenZipPath);
+    /// <summary>Check if 7z.dll is available for SharpSevenZip compression tests.</summary>
+    private static bool Is7zDllAvailable() =>
+        File.Exists(SevenZipEngine.SevenZipDllPath);
 
     // ===== CanHandle =====
 
@@ -116,12 +116,12 @@ public class SevenZipEngineTests : IDisposable
         Assert.True(File.Exists(Path.Combine(dest, "hello.txt")));
     }
 
-    // ===== CompressAsync (requires 7z.exe) =====
+    // ===== CompressAsync =====
 
     [Fact]
     public async Task CompressAsync_CreatesValidArchive()
     {
-        if (!Is7zExeAvailable()) return;
+        if (!Is7zDllAvailable()) return;
 
         var srcDir = TrackDir(ArchiveFixtures.CreateSourceDirectory());
         var outputPath = TrackFile(Path.Combine(Path.GetTempPath(), "MantisZipTest", $"{Guid.NewGuid()}.7z"));
@@ -137,21 +137,20 @@ public class SevenZipEngineTests : IDisposable
     }
 
     [Fact]
-    public async Task CompressAsync_When7zExeMissing_Throws()
+    public void EnsureLibraryPath_InvalidPath_DoesNotThrow()
     {
-        var originalPath = SevenZipEngine.SevenZipPath;
-        SevenZipEngine.SevenZipPath = @"C:\Nonexistent\7z.exe";
+        var originalPath = SevenZipEngine.SevenZipDllPath;
+        SevenZipEngine.SevenZipDllPath = @"C:\Nonexistent\7z.dll";
         try
         {
-            var srcDir = TrackDir(ArchiveFixtures.CreateSourceDirectory());
-            var outputPath = TrackFile(Path.Combine(Path.GetTempPath(), "MantisZipTest", $"{Guid.NewGuid()}.7z"));
-
-            await Assert.ThrowsAsync<FileNotFoundException>(() =>
-                _engine.CompressAsync([srcDir], outputPath, new ArchiveOptions()));
+            // Should not throw even if path is invalid — just logs a warning and falls back.
+            var method = typeof(SevenZipEngine).GetMethod("EnsureLibraryPath",
+                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static);
+            method?.Invoke(null, null);
         }
         finally
         {
-            SevenZipEngine.SevenZipPath = originalPath;
+            SevenZipEngine.SevenZipDllPath = originalPath;
         }
     }
 
