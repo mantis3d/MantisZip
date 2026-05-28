@@ -236,6 +236,75 @@ public partial class MainWindow
                     ? item.Name.TrimEnd('/')
                     : item.Name.StartsWith(prefix) ? item.Name[prefix.Length..].TrimEnd('/') : item.Name;
             }
+
+            // ========== 进度条比例计算 ==========
+            bool showBars = AppSettings.Instance.ShowProgressBars;
+            bool separateBaseline = AppSettings.Instance.SeparateDirBaseline;
+
+            foreach (var item in sortedItems)
+            {
+                item.ProgressBarEnabled = showBars;
+                item.SeparateDirBaseline = separateBaseline;
+            }
+
+            if (showBars)
+            {
+                long maxSize = 0, maxCompressed = 0;
+                long maxDirSize = 0, maxDirCompressed = 0;
+
+                if (separateBaseline)
+                {
+                    // 分列基准：文件 vs 目录各自算 max
+                    var files = sortedItems.Where(i => !i.IsDirectory);
+                    var dirs = sortedItems.Where(i => i.IsDirectory);
+                    if (files.Any())
+                    {
+                        maxSize = files.Max(i => i.Size);
+                        maxCompressed = files.Max(i => i.CompressedSize);
+                    }
+                    if (dirs.Any())
+                    {
+                        maxDirSize = dirs.Max(i => i.Size);
+                        maxDirCompressed = dirs.Max(i => i.CompressedSize);
+                    }
+                }
+                else
+                {
+                    // 统一基准：全部条目一起算 max
+                    maxSize = sortedItems.Max(i => i.Size);
+                    maxCompressed = sortedItems.Max(i => i.CompressedSize);
+                }
+
+                foreach (var item in sortedItems)
+                {
+                    long baseSize = separateBaseline && item.IsDirectory ? maxDirSize : maxSize;
+                    if (baseSize > 0)
+                        item.SizeRatio = (double)item.Size / baseSize;
+
+                    long baseCompressed = separateBaseline && item.IsDirectory ? maxDirCompressed : maxCompressed;
+                    if (baseCompressed > 0)
+                        item.CompressedSizeRatio = (double)item.CompressedSize / baseCompressed;
+                }
+
+                // 日期：总是文件间比较（目录 LastModified 为 DateTime.MinValue）
+                var datedItems = sortedItems.Where(i => i.LastModified > DateTime.MinValue).ToList();
+                if (datedItems.Count > 1)
+                {
+                    var minDate = datedItems.Min(i => i.LastModified);
+                    var maxDate = datedItems.Max(i => i.LastModified);
+                    var span = maxDate - minDate;
+                    if (span.TotalSeconds > 0)
+                    {
+                        foreach (var item in datedItems)
+                            item.DateRatio = (item.LastModified - minDate).TotalSeconds / span.TotalSeconds;
+                    }
+                }
+                else if (datedItems.Count == 1)
+                {
+                    datedItems[0].DateRatio = 1.0;
+                }
+            }
+
             FileListGrid.ItemsSource = sortedItems;
             ApplySavedSort();
             FileListGrid.Items.Refresh();
@@ -527,6 +596,27 @@ public class ArchiveItem : Core.Abstractions.ArchiveItem
             return (double)CompressedSize / Size;
         }
     }
+
+    // ——— 进度条属性 ———
+    /// <summary>全局开关（由菜单切换）</summary>
+    public bool ProgressBarEnabled { get; set; } = true;
+    /// <summary>目录独立基准模式（由菜单切换）</summary>
+    public bool SeparateDirBaseline { get; set; } = false;
+
+    /// <summary>目录在分列基准模式下使用深色进度条</summary>
+    public bool UseDirProgressColor => IsDirectory && SeparateDirBaseline;
+
+    /// <summary>大小相对比例（0.0 ~ 1.0，FilterFiles 中计算赋值）</summary>
+    public double SizeRatio { get; set; }
+    /// <summary>压缩后大小相对比例（0.0 ~ 1.0，FilterFiles 中计算赋值）</summary>
+    public double CompressedSizeRatio { get; set; }
+    /// <summary>日期相对比例（0.0 ~ 1.0，FilterFiles 中计算赋值）</summary>
+    public double DateRatio { get; set; }
+
+    /// <summary>压缩率进度条值（绝对比例，复用 RatioSort，门控 IsDirectory/Size=0）</summary>
+    public double RatioBarValue => ProgressBarEnabled && !IsDirectory && Size > 0
+        ? Math.Min(RatioSort, 1.0)
+        : 0;
 
     internal static string FormatSize(long bytes)
     {

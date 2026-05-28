@@ -103,6 +103,32 @@ public partial class MainWindow
         }
     }
 
+    private void ToggleProgressBars_Click(object sender, RoutedEventArgs e)
+    {
+        AppSettings.Instance.ShowProgressBars = ShowProgressBarsMenu.IsChecked;
+        AppSettings.Instance.Save();
+
+        if (!string.IsNullOrEmpty(_currentFolder))
+            FilterFiles(_currentFolder);
+        else if (!string.IsNullOrEmpty(_currentArchivePath))
+            _ = LoadArchiveAsync(_currentArchivePath);
+    }
+
+    private void ToggleSepDirBaseline_Click(object sender, RoutedEventArgs e)
+    {
+        AppSettings.Instance.SeparateDirBaseline = SepDirBaselineMenu.IsChecked;
+        AppSettings.Instance.Save();
+
+        // 图标透明度随状态变化（与列标题右键菜单风格一致）
+        if (SepDirBaselineMenu.Icon is Emoji.Wpf.TextBlock icon)
+            icon.Opacity = SepDirBaselineMenu.IsChecked ? 1.0 : 0.2;
+
+        if (!string.IsNullOrEmpty(_currentFolder))
+            FilterFiles(_currentFolder);
+        else if (!string.IsNullOrEmpty(_currentArchivePath))
+            _ = LoadArchiveAsync(_currentArchivePath);
+    }
+
     private void About_Click(object sender, RoutedEventArgs e)
     {
         AppMessageBox.Show(L.TF(L.Main_About_Text, AppConstants.Version),

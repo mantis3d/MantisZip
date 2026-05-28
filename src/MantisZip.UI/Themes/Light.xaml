@@ -53,6 +53,20 @@
     <SolidColorBrush x:Key="Theme_ToolTipBg" Color="#FFFFFF"/>
     <SolidColorBrush x:Key="Theme_ToolTipText" Color="#333333"/>
 
+    <!-- ═══════ 进度条列背景色 ═══════ -->
+    <Color x:Key="ProgressBarSizeColor">#E0E7FF</Color>
+    <Color x:Key="ProgressBarCompressedSizeColor">#E8E0FF</Color>
+    <Color x:Key="ProgressBarRatioColor">#FDE68A</Color>
+    <Color x:Key="ProgressBarDateColor">#D1FAE5</Color>
+    <SolidColorBrush x:Key="ProgressBarSizeBg" Color="{StaticResource ProgressBarSizeColor}"/>
+    <SolidColorBrush x:Key="ProgressBarCompressedSizeBg" Color="{StaticResource ProgressBarCompressedSizeColor}"/>
+    <Color x:Key="ProgressBarSizeDirColor">#A3B8FF</Color>
+    <Color x:Key="ProgressBarCompressedSizeDirColor">#C4B0FF</Color>
+    <SolidColorBrush x:Key="ProgressBarSizeDirBg" Color="{StaticResource ProgressBarSizeDirColor}"/>
+    <SolidColorBrush x:Key="ProgressBarCompressedSizeDirBg" Color="{StaticResource ProgressBarCompressedSizeDirColor}"/>
+    <SolidColorBrush x:Key="ProgressBarRatioBg" Color="{StaticResource ProgressBarRatioColor}"/>
+    <SolidColorBrush x:Key="ProgressBarDateBg" Color="{StaticResource ProgressBarDateColor}"/>
+
     <!-- ═══════ SystemColors 覆盖（DataGrid/TreeView/Menu/ListBox 等控件内部模板使用的系统颜色） ═══════ -->
     <SolidColorBrush x:Key="{x:Static SystemColors.ControlBrushKey}" Color="#FFFFFF"/>
     <SolidColorBrush x:Key="{x:Static SystemColors.ControlTextBrushKey}" Color="#333333"/>

@@ -70,6 +70,13 @@ public partial class MainWindow : Window
         if (Resources["ColumnHeaderContextMenu"] is ContextMenu headerMenu)
             headerMenu.Opened += ColumnHeaderContextMenu_Opened;
 
+        // 目录独立基准菜单项：图标透明度与 IsChecked 同步（与列标题右键菜单风格一致）
+        if (SepDirBaselineMenu.Icon is Emoji.Wpf.TextBlock sepIcon)
+        {
+            SepDirBaselineMenu.IsChecked = AppSettings.Instance.SeparateDirBaseline;
+            sepIcon.Opacity = SepDirBaselineMenu.IsChecked ? 1.0 : 0.2;
+        }
+
         LoadWindowSettings();
         ApplyPreviewPosition(AppSettings.Instance.PreviewPosition);
         ApplyInfoPanelOrientation(AppSettings.Instance.InfoPanelOrientation);
