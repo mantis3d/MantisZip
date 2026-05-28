@@ -7,8 +7,8 @@
 - **技术栈**: .NET 9 + WPF + SharpZipLib + SevenZipExtractor（**计划迁移至 SharpCompress**）
 
 ## 版本
-- **当前版本**: 0.3.3
-- **发布日期**: 2026-05-27
+- **当前版本**: 0.3.4
+- **发布日期**: 2026-05-28
 
 ## 规划中
 - **引擎统一计划** — SharpZipLib → SharpCompress（详见 `.sisyphus/plans/engine-unification-sharpcompress.md`）
@@ -310,4 +310,22 @@
 9. **AGENTS.md 修正** — 修正 v0.2.13 错误版本标签为 v0.3.1、补全计划列表遗漏项
 10. **PLAN.md 同步** — 补充 3 项已实现设计方案（preview-extended-formats / split-compress / archive-loading-progress）、2 项待实现计划（batch-progress-list / explorer-path-switcher）
 11. **版本升级** - 0.3.3
+
+### v0.3.4 (2026-05-28) 调试日志系统增强
+1. **引擎分发日志** — `ArchiveEngineFactory.GetEngine`/`GetEngineByExtension` 记录引擎选择结果和扩展名映射
+2. **文件扫描日志** — `FileScanner.CollectFiles` 记录源路径数量、扫描的文件总数和总字节数
+3. **智能解压分析日志** — `ArchiveStructureAnalyzer.HasSingleRootDirectory` 记录每个文件根目录判定过程和最终结论
+4. **文件冲突解决日志** — `FileConflictHelper.ResolveByAction` 记录冲突动作和路径；`ShouldOverwriteByTime`/`ShouldOverwriteBySize` 记录文件对比结果；原有空 catch 块改为异常日志
+5. **冲突弹窗用户操作日志** — `ConflictDialog`/`CompressConflictDialog` 记录用户选择的处理动作（覆盖/跳过/重命名等）、自定义文件名和"应用到全部"状态
+6. **分卷输出日志** — `SplitOutputStream.OpenNextPart` 记录每个分卷的序号、路径和大小
+7. **ZIP 编码检测日志** — `ZipEngine.OpenZipFile` 记录 UTF-8/系统编码切换决策过程和异常
+8. **提取操作全流程日志** — `MainWindow.ExtractAsync` 记录开始/密码匹配/解压完成/取消全过程；`ExtractSelectedAsync` 记录选中条目数、展开后实际文件数和结果
+9. **删除/添加操作日志** — `MainWindow.Menu` 的 `DeleteSelectedEntriesAsync`/`AddFiles_Click` 记录选中条目数、确认/取消和完成状态
+10. **密码自动尝试过程日志** — `App.TryMatchPassword` 记录候选密码数量、每个密码的快速验证结果和匹配/失败结论；`ExtractWithPasswordAsync` 记录验证和保存结果
+11. **IPC 管道生命周期日志** — `App.PipeServer` 的 `StartPipeServer`/`StartCompressPipeServer` 记录管道启动、客户端连接接收路径数和发送端发送路径数
+12. **系统图标缓存日志** — `SystemIconHelper.GetFileIcon` 记录缓存未命中、SHGetFileInfo 加载结果和回退图标使用
+13. **设置操作日志** — `SettingsWindow` 记录设置保存（关键字段值）、Shell 菜单安装/卸载/应用、文件关联安装/卸载、主题/语言切换
+14. **密码管理器 UI 日志** — `PasswordManagerWindow` 记录添加/编辑/删除/导入/导出密码操作及结果
+15. **所有新增日志受设置开关控制** — Core 层通过 `ShouldWriteOverride` 委托联动 `AppSettings.EnableDebugLogging`，UI 层直接使用 `App.Log()`/`App.LogDebug()`，统一受设置 → 调试 → 启用调试日志控制
+16. **版本升级** - 0.3.4
 
