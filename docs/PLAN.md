@@ -392,11 +392,20 @@ Phase 4: ███████████████████░ 95%
 | 任务 | 说明 |
 |------|------|
 | 文本预览语法高亮 | 用 AvalonEdit 替换当前 TextBox，支持 20+ 语言语法高亮（C#/Python/XML/HTML/SQL/JS 等）。加一个 NuGet 包 + 改控件名 + 两行配置即可 |
-| 压缩方式选择 | Store/Deflate/BZip2/LZMA，需换 SharpCompress 库 |
-| 文件列表筛选 | 搜索框实时过滤当前目录 + 子目录显示切换 |
 | 文件大小进度条 | 大小列背景按文件体积比例填充，一眼看出大文件 |
 | 压缩包内重命名/移动 | 右键「重命名」/「移动到…」、F2 快捷键、extract→delete→add 流程；支持 ZIP/7z |
 
+### 远期（P3）
+
+| 任务 | 说明 | 工作量 |
+|------|------|--------|
+| COM 右键菜单 | 动态菜单名（显示文件名）、菜单排序、自定义图标。注册 `*\shellex\ContextMenuHandlers\{GUID}` | 中 |
+| **VirtualFileDataObject** | COM 原生 IDataObject 替代 WPF 包装，拖拽延迟渲染不崩溃。需 P/Invoke：COMStreamWrapper、FORMATETC、STGMEDIUM → [详细设计](.sisyphus/plans/virtual-file-data-object.md) | 中 |
+| 右键菜单目录结构预览 | 在 COM 菜单中读取压缩包 entry 列表，展示文件树（Bandizip 风格） | 高 |
+| 外部工具视频元数据 | ffprobe 提取时长/分辨率/编码，显示在信息面板。需用户安装 FFmpeg | 低 |
+| 发布 Release | GitHub Releases + 自动构建 | 低 |
+
+---
 
 
 ### 详细设计方案
@@ -413,7 +422,7 @@ Phase 4: ███████████████████░ 95%
 | **P2** | 便携版模式 | [portable-mode.md](.sisyphus/plans/portable-mode.md) | 🟢低 | 1-2h | 哨兵文件触发，路径重定向到 exe 目录，免注册表 |
 | **P2** | 魔数识别（内容检测替代扩展名检测） | [preview-format-detection.md](.sisyphus/plans/preview-format-detection.md) | 🔴高 | 6-8h | 剩余工作：按真实内容（非扩展名）判断格式 |
 | **P2** | 提取日志与解压「后悔药」 | [extract-journal-undo.md](.sisyphus/plans/extract-journal-undo.md) | 🟡中 | 3-4h | 解压记录 + 一键回滚；差异化功能亮点 |
-| **P2** | 文件列表筛选/搜索 | — | 🟢低 | 1-2h | 搜索框实时过滤 + 子目录显示切换增强 |
+| **P2** | 文件列表筛选/搜索 | [file-filter-feature.md](.sisyphus\plans\file-filter-feature.md) | 🟢低 | 1-2h | 搜索框实时过滤 + 子目录显示切换增强 |
 | **P2** | MSI 安装包 (WiX) | [msi-packaging-wix.md](.sisyphus/plans/msi-packaging-wix.md) | 🟡中 | 2-3h | Inno Setup EXE → WiX MSI 迁移；企业分发、静默安装 |
 | **P3** | 压缩预估 (Compression Estimator) | [compression-estimator.md](.sisyphus/plans/compression-estimator.md) | 🟡中 | 4-5h | 压缩前估算大小/耗时；三级精度策略 |
 | **P3** | VirtualFileDataObject | [virtual-file-data-object.md](.sisyphus/plans/virtual-file-data-object.md) | 🔴高 | 6-8h | COM 原生 IDataObject 替代 WPF OLE 桥，拖拽延迟渲染不崩溃 |
@@ -445,17 +454,7 @@ Phase 4: ███████████████████░ 95%
 | 压缩包注释（编辑已有 + 压缩注释 + 注释分配策略） | — | v0.3.1 | ArchiveCommentDialog + CompressSettingsWindow TabControl Comment tab + CommentDistribution 枚举 |
 | Emoji.Wpf 彩色 Emoji 渲染 | — | v0.3.2 | 引入 [Emoji.Wpf](https://github.com/samhocevar/emoji.wpf) NuGet 包，替换 SettingsWindow TabControl 和 MainWindow 工具栏/目录树图标 `<TextBlock>` 为 `<emoji:TextBlock>`，全部启用彩色渲染 |
 
-### 远期（P3）
 
-| 任务 | 说明 | 工作量 |
-|------|------|--------|
-| COM 右键菜单 | 动态菜单名（显示文件名）、菜单排序、自定义图标。注册 `*\shellex\ContextMenuHandlers\{GUID}` | 中 |
-| **VirtualFileDataObject** | COM 原生 IDataObject 替代 WPF 包装，拖拽延迟渲染不崩溃。需 P/Invoke：COMStreamWrapper、FORMATETC、STGMEDIUM → [详细设计](.sisyphus/plans/virtual-file-data-object.md) | 中 |
-| 右键菜单目录结构预览 | 在 COM 菜单中读取压缩包 entry 列表，展示文件树（Bandizip 风格） | 高 |
-| 外部工具视频元数据 | ffprobe 提取时长/分辨率/编码，显示在信息面板。需用户安装 FFmpeg | 低 |
-| 发布 Release | GitHub Releases + 自动构建 | 低 |
-
----
 
 ## 八、技术说明
 
