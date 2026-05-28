@@ -107,7 +107,7 @@ public partial class App : Application
         catch { }
     }
 
-    public static void LogDebug(string fmt, params object[] args)
+    public static void LogDebug(string fmt, params object?[] args)
     {
         LogDebug(string.Format(fmt, args));
     }
