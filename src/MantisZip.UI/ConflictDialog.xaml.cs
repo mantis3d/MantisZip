@@ -68,30 +68,36 @@ public partial class ConflictDialog : Window
 
     private void Overwrite_Click(object sender, RoutedEventArgs e)
     {
+        App.LogDebug("ConflictDialog: user chose Overwrite for '{0}', ApplyToAll={1}", HeaderText.Text, ApplyAllCheck.IsChecked);
         ResultAction = FileConflictAction.Overwrite;
         DialogResult = true;
     }
 
     private void OverwriteIfOlder_Click(object sender, RoutedEventArgs e)
     {
+        App.LogDebug("ConflictDialog: user chose OverwriteIfOlder for '{0}', ApplyToAll={1}", HeaderText.Text, ApplyAllCheck.IsChecked);
         ResultAction = FileConflictAction.OverwriteIfOlder;
         DialogResult = true;
     }
 
     private void OverwriteIfSmaller_Click(object sender, RoutedEventArgs e)
     {
+        App.LogDebug("ConflictDialog: user chose OverwriteIfSmaller for '{0}', ApplyToAll={1}", HeaderText.Text, ApplyAllCheck.IsChecked);
         ResultAction = FileConflictAction.OverwriteIfSmaller;
         DialogResult = true;
     }
 
     private void Rename_Click(object sender, RoutedEventArgs e)
     {
+        App.LogDebug("ConflictDialog: user chose Rename for '{0}', customName='{1}', ApplyToAll={2}",
+            HeaderText.Text, RenameTextBox.Text, ApplyAllCheck.IsChecked);
         ResultAction = FileConflictAction.Rename;
         DialogResult = true;
     }
 
     private void Skip_Click(object sender, RoutedEventArgs e)
     {
+        App.LogDebug("ConflictDialog: user chose Skip for '{0}', ApplyToAll={1}", HeaderText.Text, ApplyAllCheck.IsChecked);
         ResultAction = FileConflictAction.Skip;
         DialogResult = true;
     }

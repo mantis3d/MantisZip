@@ -39,24 +39,28 @@ public partial class CompressConflictDialog : Window
 
     private void Overwrite_Click(object sender, RoutedEventArgs e)
     {
+        App.LogDebug("CompressConflictDialog: user chose Overwrite for '{0}'", HeaderText.Text);
         ResultAction = CompressConflictAction.Overwrite;
         DialogResult = true;
     }
 
     private void Add_Click(object sender, RoutedEventArgs e)
     {
+        App.LogDebug("CompressConflictDialog: user chose Add for '{0}'", HeaderText.Text);
         ResultAction = CompressConflictAction.Add;
         DialogResult = true;
     }
 
     private void Rename_Click(object sender, RoutedEventArgs e)
     {
+        App.LogDebug("CompressConflictDialog: user chose Rename for '{0}', customName='{1}'", HeaderText.Text, RenameTextBox.Text);
         ResultAction = CompressConflictAction.Rename;
         DialogResult = true;
     }
 
     private void Cancel_Click(object sender, RoutedEventArgs e)
     {
+        App.LogDebug("CompressConflictDialog: user cancelled for '{0}'", HeaderText.Text);
         DialogResult = false;
     }
 }
