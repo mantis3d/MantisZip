@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Collections.Generic;
 using SharpCompress.Common;
 using SharpCompress.Compressors;
 using SharpCompress.Compressors.Deflate;
@@ -393,6 +394,31 @@ public class TarGzEngine : IArchiveEngine
         {
             CoreLog.Error($"TestArchiveAsync: failed", ex);
             return false;
+        }
+        finally
+        {
+            CoreLog.Exit();
+        }
+    }
+
+    public async Task ExtractEntriesAsync(
+        string archivePath,
+        IReadOnlyList<string> entryKeys,
+        string destinationPath,
+        string? password = null,
+        IProgress<ArchiveProgress>? progress = null,
+        CancellationToken cancellationToken = default,
+        ArchiveOptions? options = null)
+    {
+        // TAR/GZ 不支持按条目选择性解压（需要完整顺序遍历流）。
+        CoreLog.Entry();
+        CoreLog.Info($"ExtractEntriesAsync: {archivePath} — NotSupportedException");
+        try
+        {
+            await Task.Run(() =>
+            {
+                throw new NotSupportedException("TAR/GZ 格式不支持按条目选择性解压，请使用完整 ExtractAsync");
+            }, cancellationToken).ConfigureAwait(false);
         }
         finally
         {

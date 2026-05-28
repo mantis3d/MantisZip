@@ -222,6 +222,19 @@ public class ArchiveProgress
         Task<bool> TestArchiveAsync(string archivePath, string? password = null, IProgress<ArchiveProgress>? progress = null, CancellationToken cancellationToken = default);
 
         /// <summary>
+        /// 从压缩包中提取指定条目到目标目录。
+        /// 用于过滤解压场景（仅解压匹配条件的条目）。
+        /// </summary>
+        Task ExtractEntriesAsync(
+            string archivePath,
+            IReadOnlyList<string> entryKeys,
+            string destinationPath,
+            string? password = null,
+            IProgress<ArchiveProgress>? progress = null,
+            CancellationToken cancellationToken = default,
+            ArchiveOptions? options = null);
+
+        /// <summary>
         /// 向已存在的压缩包中添加文件（原地更新）
         /// </summary>
         /// <param name="entryBasePath">压缩包内的目标路径，例如 "subdir/" 表示添加到 subdir 目录下，null 或 "" 表示根目录。</param>

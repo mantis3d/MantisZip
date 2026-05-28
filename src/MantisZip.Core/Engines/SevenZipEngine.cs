@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Collections.Generic;
 using System.Text;
 using SevenZipExtractor;
 using MantisZip.Core.Abstractions;
@@ -453,6 +454,32 @@ public class SevenZipEngine : IArchiveEngine
 
         CoreLog.Exit();
         return result;
+    }
+
+    public async Task ExtractEntriesAsync(
+        string archivePath,
+        IReadOnlyList<string> entryKeys,
+        string destinationPath,
+        string? password = null,
+        IProgress<ArchiveProgress>? progress = null,
+        CancellationToken cancellationToken = default,
+        ArchiveOptions? options = null)
+    {
+        CoreLog.Entry();
+        CoreLog.Info($"ExtractEntriesAsync: {archivePath} — NotSupportedException");
+        try
+        {
+            await Task.Run(() =>
+            {
+                // 7z 需要完整解压临时目录（Entries 枚举不支持流式单条目提取），
+                // 真正的按条目解压在 Phase 4 迁移 SevenZipSharp 后实现。
+                throw new NotSupportedException("7z 格式暂不支持按条目选择性解压，请使用完整 ExtractAsync");
+            }, cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            CoreLog.Exit();
+        }
     }
 
     public async Task DeleteEntriesAsync(string archivePath, string[] entryPaths, string? password = null, IProgress<ArchiveProgress>? progress = null, CancellationToken cancellationToken = default)
