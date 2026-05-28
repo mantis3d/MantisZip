@@ -1,3 +1,5 @@
+using MantisZip.Core.Utils;
+
 namespace MantisZip.Core.Abstractions;
 
 /// <summary>
@@ -265,13 +267,15 @@ public static class ArchiveEngineFactory
 
     public static IArchiveEngine? GetEngine(ArchiveFormat format)
     {
-        return _engines.FirstOrDefault(e => e.CanHandle(format));
+        var engine = _engines.FirstOrDefault(e => e.CanHandle(format));
+        CoreLog.Info($"ArchiveEngineFactory.GetEngine: format={format} -> {engine?.GetType().Name ?? "null"}");
+        return engine;
     }
 
     public static IArchiveEngine? GetEngineByExtension(string filePath)
     {
         var ext = Path.GetExtension(filePath).ToLowerInvariant();
-        return ext switch
+        var engine = ext switch
         {
             ".zip" => GetEngine(ArchiveFormat.Zip),
             ".7z" => GetEngine(ArchiveFormat.SevenZip),
@@ -280,5 +284,7 @@ public static class ArchiveEngineFactory
             ".iso" => GetEngine(ArchiveFormat.Iso),
             _ => null
         };
+        CoreLog.Info($"ArchiveEngineFactory.GetEngineByExtension: path={filePath}, ext={ext} -> {engine?.GetType().Name ?? "null"}");
+        return engine;
     }
 }

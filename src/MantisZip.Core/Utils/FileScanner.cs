@@ -23,8 +23,11 @@ internal static class FileScanner
         var lastReportTime = DateTime.Now;
         var reportInterval = TimeSpan.FromMilliseconds(100);
 
+        CoreLog.Info($"FileScanner.CollectFiles: scanning {sourcePaths.Length} source paths");
+
         foreach (var sourcePath in sourcePaths)
         {
+            CoreLog.Info($"FileScanner.CollectFiles: scanning '{sourcePath}' ({(Directory.Exists(sourcePath) ? "dir" : File.Exists(sourcePath) ? "file" : "missing")})");
             if (Directory.Exists(sourcePath))
             {
                 var dirName = Path.GetFileName(sourcePath);
@@ -48,6 +51,7 @@ internal static class FileScanner
             }
         }
 
+        CoreLog.Info($"FileScanner.CollectFiles: done, {files.Count} files, {totalBytes} bytes");
         return (files, totalBytes);
     }
 

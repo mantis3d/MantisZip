@@ -29,9 +29,11 @@ public class ZipEngine : IArchiveEngine
 
         try
         {
-            if (first.Cast<ZipEntry>().Any(e => !e.IsUnicodeText))
+            var hasNonUtf8 = first.Cast<ZipEntry>().Any(e => !e.IsUnicodeText);
+            CoreLog.Info($"OpenZipFile: archive='{archivePath}', hasNonUtf8Entries={hasNonUtf8}");
+            if (hasNonUtf8)
             {
-                CoreLog.Info("OpenZipFile: detected non-UTF-8 entries, switching to system default encoding");
+                CoreLog.Info("OpenZipFile: switching to StringCodec.Default (system ANSI encoding)");
                 first.Close();
                 ((IDisposable?)first)?.Dispose();
                 // StringCodec.Default 使用系统 ANSI 编码（中文=GBK，日文=Shift-JIS，等）
@@ -42,11 +44,13 @@ public class ZipEngine : IArchiveEngine
                 return result;
             }
 
+            CoreLog.Info("OpenZipFile: all entries use UTF-8, keeping UTF-8 codec");
             return first;
         }
-        catch
+        catch (Exception ex)
         {
             // 枚举或构造期间异常：释放已打开的 ZipFile，防止文件句柄泄漏
+            CoreLog.Info("OpenZipFile: failed during encoding detection: {0}", ex.Message);
             first.Close();
             ((IDisposable?)first)?.Dispose();
             throw;
