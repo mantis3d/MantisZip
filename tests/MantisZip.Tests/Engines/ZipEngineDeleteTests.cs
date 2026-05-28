@@ -57,8 +57,8 @@ public class ZipEngineDeleteTests : IDisposable
 
         await _engine.DeleteEntriesAsync(archive, ["hello.txt", "subdir/nested.txt"]);
 
-        var entries = await _engine.ListEntriesAsync(archive);
-        Assert.Empty(entries);
+        // 所有条目被删除后，归档文件本身也被删除（与 SevenZipEngine 行为一致）
+        Assert.False(File.Exists(archive));
     }
 
     [Fact]

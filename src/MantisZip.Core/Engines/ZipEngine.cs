@@ -535,8 +535,8 @@ public class ZipEngine : IArchiveEngine
 
         await Task.Run(() =>
         {
-            // 收集需要添加的文件
-            var files = new List<(string FullPath, string EntryName)>();
+            // 收集需要添加的新文件
+            var newFiles = new List<(string FullPath, string EntryName)>();
             foreach (var sourcePath in sourcePaths)
             {
                 cancellationToken.ThrowIfCancellationRequested();
@@ -548,88 +548,233 @@ public class ZipEngine : IArchiveEngine
                     {
                         var relativePath = Path.Combine(dirName, Path.GetRelativePath(sourcePath, file));
                         var entryName = string.IsNullOrEmpty(entryBasePath) ? relativePath : entryBasePath + "/" + relativePath;
-                        files.Add((file, entryName));
+                        newFiles.Add((file, entryName));
                     }
                 }
                 else if (File.Exists(sourcePath))
                 {
                     var entryName = string.IsNullOrEmpty(entryBasePath) ? Path.GetFileName(sourcePath) : entryBasePath + "/" + Path.GetFileName(sourcePath);
-                    files.Add((sourcePath, entryName));
+                    newFiles.Add((sourcePath, entryName));
                 }
             }
 
-            if (files.Count == 0)
+            if (newFiles.Count == 0)
             {
                 CoreLog.Info("AddToArchiveAsync: no files to add");
                 return;
             }
 
-            // 使用 SharpZipLib 的原地更新功能
-            // StringCodec.Default 处理所有编码情况：
-            // - 有 UTF-8 标记的条目 → UTF-8 解码
-            // - 无 UTF-8 标记的条目 → 系统 ANSI 解码（中文=GBK，日文=Shift-JIS 等）
-            // - 新增的条目 → UTF-8 写入（自动设置 UTF-8 标记）
-            // 不做硬编码编码假设，尊重系统区域设置
-            using var zipFile = new ZipFile(archivePath, StringCodec.Default);
-
-            // 旧条目数（CommitUpdate 时需要 I/O 复制的量）
-            var oldEntryCount = zipFile.Count;
-            var totalNewFiles = files.Count;
-            var totalWorkUnits = totalNewFiles + oldEntryCount; // 新文件压缩 + 旧条目 I/O
-
-            zipFile.BeginUpdate();
-
-            if (!string.IsNullOrEmpty(options.Comment))
-                zipFile.SetComment(options.Comment);
-
-            CoreLog.Trace($"[TRACE] ZipEngine.AddToArchiveAsync: totalNewFiles={totalNewFiles}, oldEntries={oldEntryCount}, totalWorkUnits={totalWorkUnits}");
-
-            // 报告 0% 确保进度窗口立即显示刷新
-            progress?.Report(new ArchiveProgress
+            // 计算旧条目信息（使用 SharpZipLib ZipFile 读取，确保文件句柄及时释放）
+            int oldEntryCount = 0;
+            long oldTotalBytes = 0;
+            var oldEntriesWithTime = new List<(string Name, long Size, DateTime DateTime)>();
+            using (var zipFile = OpenZipFile(archivePath))
             {
-                CurrentFile = totalNewFiles > 0 ? Path.GetFileName(files[0].EntryName) : "",
-                PercentComplete = 0,
-                FilePercentComplete = 0,
-                TotalFiles = totalNewFiles,
-                ProcessedFiles = 0
-            });
-            CoreLog.Trace("[TRACE] ZipEngine.AddToArchiveAsync: reported 0%");
-            for (int i = 0; i < totalNewFiles; i++)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-
-                var (fullPath, entryName) = files[i];
-                zipFile.Add(fullPath, entryName);
-
-                // PercentComplete 按总工作量加权（新文件压缩 + 旧条目 I/O 复制）
-                var overallPct = (double)(i + 1) / totalWorkUnits * 100;
-                // FilePercentComplete 仍按新文件进度
-                var filePct = (double)(i + 1) / totalNewFiles * 100;
-                progress?.Report(new ArchiveProgress
+                foreach (ZipEntry entry in zipFile)
                 {
-                    CurrentFile = entryName,
-                    PercentComplete = overallPct,
-                    FilePercentComplete = filePct,
-                    TotalFiles = totalNewFiles,
-                    ProcessedFiles = i + 1
-                });
-                CoreLog.Trace($"[TRACE] ZipEngine.AddToArchiveAsync: reported overall={overallPct:F1}%, file={filePct:F0}% for '{entryName}'");
+                    if (entry.IsDirectory) continue;
+                    oldTotalBytes += entry.Size;
+                    oldEntriesWithTime.Add((entry.Name, entry.Size, entry.DateTime));
+                }
+                oldEntryCount = oldEntriesWithTime.Count;
             }
 
-            cancellationToken.ThrowIfCancellationRequested();
-            zipFile.CommitUpdate();
+            long newTotalBytes = newFiles.Sum(f => new FileInfo(f.FullPath).Length);
+            // 总工作量 = 提取旧条目字节 + 压缩全部字节
+            long workTotal = oldTotalBytes + oldTotalBytes + newTotalBytes;
+            if (workTotal == 0) workTotal = 1;
 
-            // CommitUpdate 完成后上报 100%
-            progress?.Report(new ArchiveProgress
+            // 创建临时目录
+            var tempDir = Path.Combine(Path.GetTempPath(), "MantisZip", "Rebuild", Guid.NewGuid().ToString());
+            var tempArchive = tempDir + ".new.zip";
+            try
             {
-                CurrentFile = "",
-                PercentComplete = 100,
-                FilePercentComplete = 100,
-                TotalFiles = totalNewFiles,
-                ProcessedFiles = totalNewFiles
-            });
+                Directory.CreateDirectory(tempDir);
 
-            CoreLog.Info($"AddToArchiveAsync: done, {totalNewFiles} files added ({oldEntryCount} old entries kept), {sw.ElapsedMilliseconds}ms");
+                // === Phase 1: 提取旧条目到临时目录（逐文件，字节加权进度） ===
+                long processedBytes = 0;
+                var lastReportTime = DateTime.Now;
+                var reportInterval = TimeSpan.FromMilliseconds(100);
+
+                progress?.Report(new ArchiveProgress
+                {
+                    CurrentFile = "正在提取旧条目...",
+                    PercentComplete = 0,
+                    FilePercentComplete = 0
+                });
+                CoreLog.Trace("[TRACE] ZipEngine.AddToArchiveAsync: Phase 1 — extracting old entries");
+
+                using (var zipFile = OpenZipFile(archivePath))
+                {
+                    foreach (ZipEntry entry in zipFile)
+                    {
+                        cancellationToken.ThrowIfCancellationRequested();
+                        var entryName = entry.Name;
+
+                        if (entry.IsDirectory)
+                        {
+                            var dirPath = Path.Combine(tempDir, entryName);
+                            if (!Directory.Exists(dirPath))
+                                Directory.CreateDirectory(dirPath);
+                            continue;
+                        }
+
+                        var outPath = Path.Combine(tempDir, entryName);
+                        var outDir = Path.GetDirectoryName(outPath);
+                        if (!string.IsNullOrEmpty(outDir) && !Directory.Exists(outDir))
+                            Directory.CreateDirectory(outDir);
+
+                        var entrySize = entry.Size;
+                        using (var entryStream = zipFile.GetInputStream(entry))
+                        using (var outStream = File.Create(outPath))
+                        {
+                            var buffer = new byte[81920];
+                            long entryProcessed = 0;
+                            while (true)
+                            {
+                                cancellationToken.ThrowIfCancellationRequested();
+                                var read = entryStream.Read(buffer, 0, buffer.Length);
+                                if (read <= 0) break;
+                                outStream.Write(buffer, 0, read);
+                                entryProcessed += read;
+
+                                var now = DateTime.Now;
+                                if (now - lastReportTime >= reportInterval || entryProcessed >= entrySize)
+                                {
+                                    var pct = (double)(processedBytes + entryProcessed) / workTotal * 100;
+                                    var filePct = entrySize > 0 ? (double)entryProcessed / entrySize * 100 : 100;
+                                    progress?.Report(new ArchiveProgress
+                                    {
+                                        CurrentFile = "提取: " + entryName,
+                                        PercentComplete = Math.Min(pct, 100),
+                                        FilePercentComplete = filePct
+                                    });
+                                    lastReportTime = now;
+                                }
+                            }
+                        }
+
+                        processedBytes += entrySize;
+                        try { File.SetLastWriteTime(outPath, entry.DateTime); } catch { }
+                    }
+                }
+
+                CoreLog.Trace($"[TRACE] ZipEngine.AddToArchiveAsync: Phase 1 done, extracted {processedBytes} bytes");
+
+                // === Phase 2: 复制新文件到临时目录 ===
+                foreach (var (fullPath, entryName) in newFiles)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    var outPath = Path.Combine(tempDir, entryName);
+                    var outDir = Path.GetDirectoryName(outPath);
+                    if (!string.IsNullOrEmpty(outDir) && !Directory.Exists(outDir))
+                        Directory.CreateDirectory(outDir);
+                    File.Copy(fullPath, outPath, overwrite: true);
+                }
+
+                // 扫描临时目录用于压缩
+                var compressFiles = new List<(string FullPath, string RelativePath)>();
+                long compressTotalBytes = 0;
+                foreach (var file in Directory.GetFiles(tempDir, "*", SearchOption.AllDirectories))
+                {
+                    var relPath = Path.GetRelativePath(tempDir, file);
+                    compressFiles.Add((file, relPath));
+                    compressTotalBytes += new FileInfo(file).Length;
+                }
+                if (compressTotalBytes == 0) compressTotalBytes = 1;
+                long compressProcessed = 0;
+
+                // === Phase 3: ZipOutputStream 重压缩（字节加权平滑进度） ===
+                CoreLog.Trace($"[TRACE] ZipEngine.AddToArchiveAsync: Phase 3 — recompressing {compressFiles.Count} files, {compressTotalBytes} bytes");
+                using (var fsOut = File.Create(tempArchive))
+                using (var zipStream = new ZipOutputStream(fsOut))
+                {
+                    zipStream.SetLevel(options.CompressionLevel);
+                    if (!string.IsNullOrEmpty(options.Comment))
+                        zipStream.SetComment(options.Comment);
+                    if (options.Encrypt && !string.IsNullOrEmpty(options.Password))
+                        zipStream.Password = options.Password;
+
+                    foreach (var (fullPath, relPath) in compressFiles)
+                    {
+                        cancellationToken.ThrowIfCancellationRequested();
+                        var fi = new FileInfo(fullPath);
+                        var entry = new ZipEntry(ZipEntry.CleanName(relPath))
+                        {
+                            DateTime = fi.LastWriteTime,
+                            AESKeySize = options.Encrypt ? 256 : 0
+                        };
+                        zipStream.PutNextEntry(entry);
+
+                        var buffer = new byte[81920];
+                        long totalRead = 0;
+                        var fiLen = fi.Length;
+                        using (var fsInput = File.OpenRead(fullPath))
+                        {
+                            while (totalRead < fiLen)
+                            {
+                                cancellationToken.ThrowIfCancellationRequested();
+                                var read = fsInput.Read(buffer, 0, buffer.Length);
+                                if (read <= 0) break;
+                                zipStream.Write(buffer, 0, read);
+                                totalRead += read;
+                                compressProcessed += read;
+
+                                var now = DateTime.Now;
+                                if (now - lastReportTime >= reportInterval || totalRead >= fiLen)
+                                {
+                                    // 累计进度 = 已提取的旧字节 + 正在压缩的字节量
+                                    var cumProcessed = processedBytes + compressProcessed;
+                                    var pct = (double)cumProcessed / workTotal * 100;
+                                    var filePct = fiLen > 0 ? (double)totalRead / fiLen * 100 : 100;
+                                    progress?.Report(new ArchiveProgress
+                                    {
+                                        CurrentFile = "正在压缩: " + relPath,
+                                        PercentComplete = Math.Min(pct, 100),
+                                        FilePercentComplete = filePct
+                                    });
+                                    lastReportTime = now;
+                                }
+                            }
+                        }
+
+                        // 恢复文件修改时间到 ZIP 条目
+                        // ZipEntry.DateTime 已在 PutNextEntry 前设置
+                    }
+                }
+
+                // === Phase 4: 原子替换（带重试，应对 SharpCompress 文件句柄释放延迟） ===
+                for (int retry = 0; ; retry++)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    try
+                    {
+                        File.Delete(archivePath);
+                        File.Move(tempArchive, archivePath);
+                        break;
+                    }
+                    catch (IOException) when (retry < 5)
+                    {
+                        Thread.Sleep(100);
+                    }
+                }
+
+                progress?.Report(new ArchiveProgress
+                {
+                    CurrentFile = string.Empty,
+                    PercentComplete = 100,
+                    FilePercentComplete = 100
+                });
+
+                CoreLog.Info($"AddToArchiveAsync: done, {newFiles.Count} files added ({oldEntryCount} old entries kept), {sw.ElapsedMilliseconds}ms");
+            }
+            finally
+            {
+                if (Directory.Exists(tempDir))
+                    try { Directory.Delete(tempDir, recursive: true); } catch (Exception ex) { CoreLog.Error("AddToArchiveAsync: failed to clean up temp dir", ex); }
+                if (File.Exists(tempArchive))
+                    try { File.Delete(tempArchive); } catch { }
+            }
         }, cancellationToken).ConfigureAwait(false);
 
         CoreLog.Exit();
@@ -643,66 +788,248 @@ public class ZipEngine : IArchiveEngine
 
         await Task.Run(() =>
         {
-            using var zipFile = OpenZipFile(archivePath, password);
-
-            // 验证所有条目是否存在
-            var entryNames = new HashSet<string>(zipFile.Cast<ZipEntry>().Select(e => e.Name));
-            foreach (var entryPath in entryPaths)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                if (!entryNames.Contains(entryPath))
-                {
-                    CoreLog.Error($"DeleteEntriesAsync: entry not found: {entryPath}");
-                    throw new FileNotFoundException($"压缩包中不存在条目: {entryPath}", entryPath);
-                }
-            }
-
+            var deletedSet = new HashSet<string>(entryPaths.Select(p => p.Replace('\\', '/')), StringComparer.OrdinalIgnoreCase);
             if (entryPaths.Length == 0)
             {
                 CoreLog.Info("DeleteEntriesAsync: no entries to delete");
                 return;
             }
 
-            // 总条目数（作为总工作量：删除标记 + CommitUpdate 复制剩余条目）
-            var totalOldEntries = zipFile.Count;
+            // 创建临时目录和工作文件
+            var tempDir = Path.Combine(Path.GetTempPath(), "MantisZip", "DeleteTemp", Guid.NewGuid().ToString());
+            var tempArchive = tempDir + ".new.zip";
 
-            // 报告 0% 确保进度窗口立即显示刷新
-            progress?.Report(new ArchiveProgress
+            // 使用 SharpZipLib ZipFile 完成验证 + 确定保留项 + 提取
+            long totalKeepBytes = 0;
+            int keepEntryCount = 0;
+            long workTotal = 1;
+            long processedBytes = 0;
+            var lastReportTime = DateTime.Now;
+            var reportInterval = TimeSpan.FromMilliseconds(100);
+
+            try
             {
-                CurrentFile = entryPaths[0],
-                PercentComplete = 0,
-                FilePercentComplete = 0
-            });
+                Directory.CreateDirectory(tempDir);
 
-            zipFile.BeginUpdate();
-            for (int i = 0; i < entryPaths.Length; i++)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                zipFile.Delete(entryPaths[i]);
+                // Pass 1: 验证 + 确定保留项 + 计算总字节数
+                var keepNames = new List<string>();
+                using (var zipFile = OpenZipFile(archivePath, password))
+                {
+                    var allNames = new List<string>();
+                    foreach (ZipEntry entry in zipFile)
+                    {
+                        cancellationToken.ThrowIfCancellationRequested();
+                        var name = entry.Name;
+                        allNames.Add(name);
+                    }
 
-                // PercentComplete 按总条目加权（删除标记 + 剩余条目的 CommitUpdate I/O）
-                var overallPct = (double)(i + 1) / totalOldEntries * 100;
-                var filePct = (double)(i + 1) / entryPaths.Length * 100;
+                    // 验证要删除的条目都存在
+                    var entryNameSet = new HashSet<string>(allNames);
+                    foreach (var entryPath in entryPaths)
+                    {
+                        cancellationToken.ThrowIfCancellationRequested();
+                        var normalized = entryPath.Replace('\\', '/');
+                        if (!entryNameSet.Contains(normalized))
+                        {
+                            CoreLog.Error($"DeleteEntriesAsync: entry not found: {entryPath}");
+                            throw new FileNotFoundException($"压缩包中不存在条目: {entryPath}", entryPath);
+                        }
+                    }
+
+                    foreach (var name in allNames)
+                    {
+                        cancellationToken.ThrowIfCancellationRequested();
+                        var normalized = name.Replace('\\', '/');
+                        if (!deletedSet.Contains(normalized))
+                        {
+                            keepNames.Add(name);
+                        }
+                    }
+                }
+
+                keepEntryCount = keepNames.Count;
+                if (keepEntryCount == 0)
+                {
+                    // 所有条目都被删除 — 删除原文件后返回
+                    try { File.Delete(archivePath); } catch { }
+                    CoreLog.Info("DeleteEntriesAsync: all entries deleted, removed archive");
+                    return;
+                }
+
+                // Pass 2: 提取保留条目到临时目录（带进度）
+                using (var zipFile = OpenZipFile(archivePath, password))
+                {
+                    // 先算 totalKeepBytes
+                    foreach (ZipEntry entry in zipFile)
+                    {
+                        cancellationToken.ThrowIfCancellationRequested();
+                        if (entry.IsDirectory) continue;
+                        if (keepNames.Contains(entry.Name))
+                            totalKeepBytes += entry.Size;
+                    }
+                }
+
+                workTotal = totalKeepBytes + totalKeepBytes;
+                if (workTotal == 0) workTotal = 1;
+
+                // Pass 3: 实际提取
+                using (var zipFile = OpenZipFile(archivePath, password))
+                {
+                    progress?.Report(new ArchiveProgress
+                    {
+                        CurrentFile = "正在提取保留条目...",
+                        PercentComplete = 0
+                    });
+
+                    foreach (ZipEntry entry in zipFile)
+                    {
+                        cancellationToken.ThrowIfCancellationRequested();
+                        var entryName = entry.Name;
+
+                        if (!keepNames.Contains(entryName))
+                            continue;
+
+                        if (entry.IsDirectory)
+                        {
+                            var dirPath = Path.Combine(tempDir, entryName);
+                            if (!Directory.Exists(dirPath))
+                                Directory.CreateDirectory(dirPath);
+                            continue;
+                        }
+
+                        var outPath = Path.Combine(tempDir, entryName);
+                        var outDir = Path.GetDirectoryName(outPath);
+                        if (!string.IsNullOrEmpty(outDir) && !Directory.Exists(outDir))
+                            Directory.CreateDirectory(outDir);
+
+                        var entrySize = entry.Size;
+                        using (var entryStream = zipFile.GetInputStream(entry))
+                        using (var outStream = File.Create(outPath))
+                        {
+                            var buffer = new byte[81920];
+                            long entryProcessed = 0;
+                            while (true)
+                            {
+                                cancellationToken.ThrowIfCancellationRequested();
+                                var read = entryStream.Read(buffer, 0, buffer.Length);
+                                if (read <= 0) break;
+                                outStream.Write(buffer, 0, read);
+                                entryProcessed += read;
+
+                                var now = DateTime.Now;
+                                if (now - lastReportTime >= reportInterval || entryProcessed >= entrySize)
+                                {
+                                    var pct = (double)(processedBytes + entryProcessed) / workTotal * 100;
+                                    var filePct = entrySize > 0 ? (double)entryProcessed / entrySize * 100 : 100;
+                                    progress?.Report(new ArchiveProgress
+                                    {
+                                        CurrentFile = "提取: " + entryName,
+                                        PercentComplete = Math.Min(pct, 100),
+                                        FilePercentComplete = filePct
+                                    });
+                                    lastReportTime = now;
+                                }
+                            }
+                        }
+
+                        processedBytes += entrySize;
+                        try { File.SetLastWriteTime(outPath, entry.DateTime); } catch { }
+                    }
+                }
+
+                // === Phase 2: 扫描临时目录并重压缩 ===
+                var compressFiles = new List<(string FullPath, string RelativePath)>();
+                long compressTotalBytes = 0;
+                foreach (var file in Directory.GetFiles(tempDir, "*", SearchOption.AllDirectories))
+                {
+                    var relPath = Path.GetRelativePath(tempDir, file);
+                    compressFiles.Add((file, relPath));
+                    compressTotalBytes += new FileInfo(file).Length;
+                }
+                if (compressTotalBytes == 0) compressTotalBytes = 1;
+                long compressProcessed = 0;
+
+                using (var fsOut = File.Create(tempArchive))
+                using (var zipStream = new ZipOutputStream(fsOut))
+                {
+                    // 保持默认压缩级别
+                    zipStream.SetLevel(6);
+
+                    foreach (var (fullPath, relPath) in compressFiles)
+                    {
+                        cancellationToken.ThrowIfCancellationRequested();
+                        var fi = new FileInfo(fullPath);
+                        var entry = new ZipEntry(ZipEntry.CleanName(relPath))
+                        {
+                            DateTime = fi.LastWriteTime
+                        };
+                        zipStream.PutNextEntry(entry);
+
+                        var buffer = new byte[81920];
+                        long totalRead = 0;
+                        var fiLen = fi.Length;
+                        using (var fsInput = File.OpenRead(fullPath))
+                        {
+                            while (totalRead < fiLen)
+                            {
+                                cancellationToken.ThrowIfCancellationRequested();
+                                var read = fsInput.Read(buffer, 0, buffer.Length);
+                                if (read <= 0) break;
+                                zipStream.Write(buffer, 0, read);
+                                totalRead += read;
+                                compressProcessed += read;
+
+                                var now = DateTime.Now;
+                                if (now - lastReportTime >= reportInterval || totalRead >= fiLen)
+                                {
+                                    var cumProcessed = processedBytes + compressProcessed;
+                                    var pct = (double)cumProcessed / workTotal * 100;
+                                    var filePct = fiLen > 0 ? (double)totalRead / fiLen * 100 : 100;
+                                    progress?.Report(new ArchiveProgress
+                                    {
+                                        CurrentFile = "正在压缩: " + relPath,
+                                        PercentComplete = Math.Min(pct, 100),
+                                        FilePercentComplete = filePct
+                                    });
+                                    lastReportTime = now;
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // === Phase 3: 原子替换（带重试，应对 SharpCompress 文件句柄释放延迟） ===
+                for (int retry = 0; ; retry++)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    try
+                    {
+                        File.Delete(archivePath);
+                        File.Move(tempArchive, archivePath);
+                        break;
+                    }
+                    catch (IOException) when (retry < 5)
+                    {
+                        Thread.Sleep(100);
+                    }
+                }
+
                 progress?.Report(new ArchiveProgress
                 {
-                    CurrentFile = entryPaths[i],
-                    PercentComplete = overallPct,
-                    FilePercentComplete = filePct
+                    CurrentFile = string.Empty,
+                    PercentComplete = 100,
+                    FilePercentComplete = 100
                 });
+
+                CoreLog.Info($"DeleteEntriesAsync: done, {entryPaths.Length} entries deleted ({keepEntryCount} kept), {sw.ElapsedMilliseconds}ms");
             }
-            cancellationToken.ThrowIfCancellationRequested();
-            zipFile.CommitUpdate();
-
-            // CommitUpdate 完成后上报 100%
-            progress?.Report(new ArchiveProgress
+            finally
             {
-                CurrentFile = "",
-                PercentComplete = 100,
-                FilePercentComplete = 100
-            });
-
-            var entriesKept = totalOldEntries - entryPaths.Length;
-            CoreLog.Info($"DeleteEntriesAsync: done, {entryPaths.Length} entries deleted ({entriesKept} kept), {sw.ElapsedMilliseconds}ms");
+                if (Directory.Exists(tempDir))
+                    try { Directory.Delete(tempDir, recursive: true); } catch { }
+                if (File.Exists(tempArchive))
+                    try { File.Delete(tempArchive); } catch { }
+            }
         }, cancellationToken).ConfigureAwait(false);
 
         CoreLog.Exit();
