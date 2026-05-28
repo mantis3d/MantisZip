@@ -41,20 +41,19 @@ public partial class App : Application
         // 不再全局设置 ZipStrings.CodePage。
         // ZipEngine 会按压缩包检测 UTF-8 标记，自动选择合适的编码。
 
-        // 从用户设置加载 7z.exe 路径，覆盖 SevenZipEngine 的默认值
+        // 从用户设置加载 7z.dll 路径，覆盖 SevenZipEngine 的默认值
         try
         {
             var s = AppSettings.Instance;
             if (!string.IsNullOrEmpty(s.SevenZipPath))
             {
-                SevenZipEngine.SevenZipPath = s.SevenZipPath;
-                LogDebug("InitializeApp: SevenZipPath set to {0}", s.SevenZipPath);
+                SevenZipEngine.SevenZipDllPath = s.SevenZipPath;
+                LogDebug("InitializeApp: SevenZipDllPath set to {0}", s.SevenZipPath);
             }
         }
         catch (Exception initEx)
         {
             TraceLog("InitializeApp: failed to load AppSettings: {0}", initEx.Message);
-            // 使用默认 7z 路径继续运行
         }
     }
 

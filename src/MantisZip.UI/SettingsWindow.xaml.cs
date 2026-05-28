@@ -139,8 +139,6 @@ public partial class SettingsWindow : Window
         LogPathText.Text = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
             L.T(L.App_MantisZipTitle), "debug.log");
-        SevenZipPathBox.Text = s.SevenZipPath;
-
         // 日志隐私脱敏
         foreach (ComboBoxItem item in LogPrivacyModeCombo.Items)
             if ((string)item.Tag == s.LogPrivacyMode) { LogPrivacyModeCombo.SelectedItem = item; break; }
@@ -216,8 +214,6 @@ public partial class SettingsWindow : Window
 
         s.EnableDebugLogging = EnableDebugLogCheck.IsChecked == true;
         s.LogPrivacyMode = (LogPrivacyModeCombo.SelectedItem as ComboBoxItem)?.Tag as string ?? "off";
-
-        s.SevenZipPath = SevenZipPathBox.Text;
 
         if (!s.Save())
         {
@@ -439,19 +435,6 @@ public partial class SettingsWindow : Window
     private void CancelBtn_Click(object sender, RoutedEventArgs e)
     {
         Close();
-    }
-
-    private void BrowseSevenZip_Click(object sender, RoutedEventArgs e)
-    {
-        var dialog = new Microsoft.Win32.OpenFileDialog
-        {
-            Filter = L.T(L.Settings_SevenZipFilter),
-            FileName = "7z.exe"
-        };
-        if (dialog.ShowDialog() == true)
-        {
-            SevenZipPathBox.Text = dialog.FileName;
-        }
     }
 
     #region 调试日志

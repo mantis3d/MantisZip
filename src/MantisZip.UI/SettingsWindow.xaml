@@ -525,16 +525,6 @@
                 </TabItem.Header>
                 <ScrollViewer VerticalScrollBarVisibility="Auto" Background="{StaticResource Theme_SurfaceBg}">
                     <StackPanel Margin="10">
-                        <TextBlock Text="{l:L Settings_Advanced_SevenZipPath}" FontWeight="SemiBold" Margin="0,0,0,4"/>
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="Auto"/>
-                            </Grid.ColumnDefinitions>
-                            <TextBox x:Name="SevenZipPathBox" Grid.Column="0" Height="24" IsReadOnly="True"/>
-                            <Button Grid.Column="1" Content="{l:L Settings_Advanced_Browse}" Width="60" Height="24" Margin="6,0,0,0" Click="BrowseSevenZip_Click"/>
-                        </Grid>
-
                         <Button Content="{l:L Settings_Advanced_CleanPreviewTemp}" Width="140" Height="26" Margin="0,16,0,0"
                                 HorizontalAlignment="Left" Click="CleanTemp_Click"/>
 

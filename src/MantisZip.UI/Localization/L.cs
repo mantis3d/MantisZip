@@ -115,9 +115,7 @@ public static class L
     public const string Core_Extractor_EntryNotFound               = "Core_Extractor_EntryNotFound";
     public const string Core_Extractor_FormatUnsupported           = "Core_Extractor_FormatUnsupported";
     public const string Core_Extractor_InvalidPath                 = "Core_Extractor_InvalidPath";
-    public const string Core_SevenZip_Error                        = "Core_SevenZip_Error";
-    public const string Core_SevenZip_NotFound                     = "Core_SevenZip_NotFound";
-    public const string Core_SevenZip_StartFailed                  = "Core_SevenZip_StartFailed";
+    // Core_SevenZip_* keys removed in v0.3.4 — 7z.exe replaced by SharpSevenZip
     public const string Core_TarGz_NoAdd                           = "Core_TarGz_NoAdd";
     public const string Core_Zip_Encrypted                         = "Core_Zip_Encrypted";
     public const string Error_Abort                                = "Error_Abort";
@@ -479,7 +477,6 @@ public static class L
     public const string Settings_Advanced_EnableDebugLog           = "Settings_Advanced_EnableDebugLog";
     public const string Settings_Advanced_LogFile                  = "Settings_Advanced_LogFile";
     public const string Settings_Advanced_OpenLog                  = "Settings_Advanced_OpenLog";
-    public const string Settings_Advanced_SevenZipPath             = "Settings_Advanced_SevenZipPath";
     public const string Settings_Assoc_Desc                        = "Settings_Assoc_Desc";
     public const string Settings_Assoc_GroupHeader                 = "Settings_Assoc_GroupHeader";
     public const string Settings_Assoc_Install                     = "Settings_Assoc_Install";
@@ -592,7 +589,6 @@ public static class L
     public const string Settings_Pwd_RevealDefault                 = "Settings_Pwd_RevealDefault";
     public const string Settings_Pwd_ShowHint                      = "Settings_Pwd_ShowHint";
     public const string Settings_Pwd_ShowNotification              = "Settings_Pwd_ShowNotification";
-    public const string Settings_SevenZipFilter                    = "Settings_SevenZipFilter";
     public const string Settings_Tab_Appearance                    = "Settings_Tab_Appearance";
     public const string Settings_Appearance_Theme                  = "Settings_Appearance_Theme";
     public const string Settings_Appearance_Theme_Light            = "Settings_Appearance_Theme_Light";
