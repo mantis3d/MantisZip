@@ -70,7 +70,7 @@ public static class FileConflictHelper
 
     private static string? ResolveByAction(string outputPath, FileConflictAction action, DateTime? entryModified, long? entrySize)
     {
-        return action switch
+        var resolved = action switch
         {
             FileConflictAction.Overwrite => outputPath,
             FileConflictAction.Skip => null,
@@ -79,6 +79,8 @@ public static class FileConflictHelper
             FileConflictAction.OverwriteIfSmaller => ShouldOverwriteBySize(outputPath, entrySize) ? outputPath : null,
             _ => outputPath
         };
+        CoreLog.Info($"FileConflictHelper.ResolveByAction: path='{outputPath}', action={action} -> {(resolved ?? "(skip)")}");
+        return resolved;
     }
 
     private static bool ShouldOverwriteBySize(string outputPath, long? entrySize)
@@ -88,25 +90,35 @@ public static class FileConflictHelper
         {
             var existingSize = new FileInfo(outputPath).Length;
             // "覆盖较小"：压缩包内的文件更大 → 覆盖掉磁盘上较小的文件
-            return entrySize.Value > existingSize;
+            var result = entrySize.Value > existingSize;
+            CoreLog.Info($"FileConflictHelper.OverwriteIfSmaller: entry={entrySize}, existing={existingSize} -> {(result ? "overwrite" : "skip")}");
+            return result;
         }
-        catch
+        catch (Exception ex)
         {
+            CoreLog.Info($"FileConflictHelper.OverwriteIfSmaller: failed to get file size for '{outputPath}': {ex.Message}");
             return true;
         }
     }
 
     private static bool ShouldOverwriteByTime(string outputPath, DateTime? entryModified)
     {
-        if (entryModified == null) return true; // 没有时间信息时直接覆盖
+        if (entryModified == null)
+        {
+            CoreLog.Info($"FileConflictHelper.OverwriteIfOlder: no entry modified time -> overwrite");
+            return true;
+        }
         try
         {
             var existingTime = File.GetLastWriteTime(outputPath);
-            return entryModified.Value > existingTime;
+            var result = entryModified.Value > existingTime;
+            CoreLog.Info($"FileConflictHelper.OverwriteIfOlder: entry={entryModified:yyyy-MM-dd HH:mm:ss}, existing={existingTime:yyyy-MM-dd HH:mm:ss} -> {(result ? "overwrite" : "skip")}");
+            return result;
         }
-        catch
+        catch (Exception ex)
         {
-            return true; // 读不到时间时覆盖
+            CoreLog.Info($"FileConflictHelper.OverwriteIfOlder: failed to get file time for '{outputPath}': {ex.Message}");
+            return true;
         }
     }
 

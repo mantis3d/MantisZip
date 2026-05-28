@@ -19,7 +19,10 @@ public static class ArchiveStructureAnalyzer
     {
         // 空压缩包 → true
         if (items == null || items.Count == 0)
+        {
+            CoreLog.Info($"ArchiveStructureAnalyzer: empty archive -> singleRoot=true");
             return true;
+        }
 
         string? singleRoot = null;
         bool hasFileEntries = false;
@@ -39,7 +42,10 @@ public static class ArchiveStructureAnalyzer
 
             // 文件在压缩包根目录 → 分散结构，非单一根目录
             if (root.Length == 0)
+            {
+                CoreLog.Info($"ArchiveStructureAnalyzer: file at root '{fullPath}' -> singleRoot=false (dispersed)");
                 return false;
+            }
 
             if (singleRoot == null)
             {
@@ -47,15 +53,20 @@ public static class ArchiveStructureAnalyzer
             }
             else if (!string.Equals(singleRoot, root, StringComparison.OrdinalIgnoreCase))
             {
+                CoreLog.Info($"ArchiveStructureAnalyzer: multiple roots '{singleRoot}' vs '{root}' -> singleRoot=false");
                 return false;
             }
         }
 
         // 只有目录条目（无文件）→ 视为单一根目录
         if (!hasFileEntries)
+        {
+            CoreLog.Info($"ArchiveStructureAnalyzer: no file entries -> singleRoot=true");
             return true;
+        }
 
-        // 所有文件共享一个命名目录
-        return singleRoot != null;
+        var result = singleRoot != null;
+        CoreLog.Info($"ArchiveStructureAnalyzer: root='{singleRoot}', totalItems={items.Count} -> singleRoot={result}");
+        return result;
     }
 }

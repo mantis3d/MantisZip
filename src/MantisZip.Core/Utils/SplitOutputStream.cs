@@ -40,6 +40,7 @@ internal class SplitOutputStream : Stream
             Directory.CreateDirectory(dir);
         _currentPart = File.Create(partPath);
         _currentPartLength = 0;
+        CoreLog.Info($"SplitOutputStream: created part #{_partNumber}: '{partPath}', partSize={_partSize}");
     }
 
     private string GetPartPath(int partNumber)
