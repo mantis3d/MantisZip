@@ -243,23 +243,19 @@ public partial class MainWindow
             throw new InvalidOperationException($"输出路径包含非法路径穿越: {outputPath}");
 
         using var inputStream = File.OpenRead(archivePath);
-        var isTarGz = archivePath.EndsWith(".tgz", StringComparison.OrdinalIgnoreCase)
-                   || archivePath.EndsWith(".tar.gz", StringComparison.OrdinalIgnoreCase);
-        Stream tarStream = inputStream;
-        if (isTarGz || Path.GetExtension(archivePath).Equals(".gz", StringComparison.OrdinalIgnoreCase))
-            tarStream = new ICSharpCode.SharpZipLib.GZip.GZipInputStream(inputStream);
-
-        using var tarIn = new ICSharpCode.SharpZipLib.Tar.TarInputStream(tarStream, System.Text.Encoding.UTF8);
-        ICSharpCode.SharpZipLib.Tar.TarEntry? entry;
-        while ((entry = tarIn.GetNextEntry()) != null)
+        // 传入原始压缩流，让 TarReader 自动检测 gzip 头
+        using var reader = SharpCompress.Readers.Tar.TarReader.OpenReader(inputStream, new SharpCompress.Readers.ReaderOptions { LookForHeader = true });
+        while (reader.MoveToNextEntry())
         {
+            var entry = reader.Entry;
             if (entry.IsDirectory) continue;
-            if (entry.Name == entryName)
+            if (entry.Key == entryName)
             {
                 var dir = Path.GetDirectoryName(outputPath);
                 if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir)) Directory.CreateDirectory(dir);
                 using var outStream = File.Create(outputPath);
-                tarIn.CopyEntryContents(outStream);
+                using var entryStream = reader.OpenEntryStream();
+                entryStream.CopyTo(outStream);
                 return;
             }
         }

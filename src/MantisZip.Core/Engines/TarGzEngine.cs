@@ -1,6 +1,11 @@
 using System.Diagnostics;
-using ICSharpCode.SharpZipLib.GZip;
-using ICSharpCode.SharpZipLib.Tar;
+using SharpCompress.Common;
+using SharpCompress.Compressors;
+using SharpCompress.Compressors.Deflate;
+using SharpCompress.Readers;
+using SharpCompress.Readers.Tar;
+using SharpCompress.Writers.Tar;
+using SharpCompress.Writers.GZip;
 using MantisZip.Core.Abstractions;
 using MantisZip.Core.Utils;
 using System.IO;
@@ -29,64 +34,61 @@ public class TarGzEngine : IArchiveEngine
 
             if (isTarGz || ext == ".tar")
             {
-                // TAR 或 TAR.GZ 解压 - 单遍扫描，使用压缩流位置估算总体进度
-                // 不预扫描文件数（避免对 .tar.gz 重复解压缩），进度基于已读取的压缩字节数
+                // TAR 或 TAR.GZ 解压 - 使用 SharpCompress TarReader
+                // 注意：不手动解压 GZip，直接传入原始压缩流让 TarReader 自动检测 gzip 头
                 using var inputStream = File.OpenRead(archivePath);
                 var totalCompressedBytes = inputStream.Length;
-                using var gzipStream = isTarGz ? new GZipInputStream(inputStream) : null;
-                var tarStream = (Stream?)gzipStream ?? inputStream;
 
-                using var tarIn = new TarInputStream(tarStream, Encoding.UTF8);
+                using var reader = TarReader.OpenReader(inputStream, new ReaderOptions { LookForHeader = true });
 
-                TarEntry entry;
                 int fileIndex = 0;
                 var lastReportTime = DateTime.Now;
                 var reportInterval = TimeSpan.FromMilliseconds(100);
 
-                while ((entry = tarIn.GetNextEntry()) != null)
+                while (reader.MoveToNextEntry())
                 {
                     cancellationToken.ThrowIfCancellationRequested();
 
+                    var entry = reader.Entry;
+                    var entryKey = entry.Key ?? string.Empty;
                     if (entry.IsDirectory)
                     {
-                        // 创建空目录
-                        var dirPath = FileConflictHelper.GetSafePath(destinationPath, entry.Name);
+                        var dirPath = FileConflictHelper.GetSafePath(destinationPath, entryKey);
                         if (!Directory.Exists(dirPath))
                             Directory.CreateDirectory(dirPath);
                         continue;
                     }
 
                     fileIndex++;
-                    // 总体进度基于已读取的压缩字节（对于 .tar.gz 是合理的近似，避免了双遍扫描）
                     var compressedProgress = totalCompressedBytes > 0
                         ? (double)inputStream.Position / totalCompressedBytes * 100
                         : 0;
 
-                    var outputFilePath = FileConflictHelper.GetSafePath(destinationPath, entry.Name);
+                    var outputFilePath = FileConflictHelper.GetSafePath(destinationPath, entryKey);
                     var outDir = Path.GetDirectoryName(outputFilePath);
                     if (!string.IsNullOrEmpty(outDir) && !Directory.Exists(outDir))
                         Directory.CreateDirectory(outDir);
 
+                    var entryModified = entry.LastModifiedTime ?? DateTime.MinValue;
+
                     // 逐文件报告
                     progress?.Report(new ArchiveProgress
                     {
-                        CurrentFile = entry.Name,
-                        PercentComplete = Math.Min(compressedProgress, 99.9), // 留到结束报告 100%
+                        CurrentFile = entryKey,
+                        PercentComplete = Math.Min(compressedProgress, 99.9),
                         FilePercentComplete = 0
                     });
 
                     // 冲突处理
-                    var resolved = FileConflictHelper.ResolvePath(outputFilePath, options, entry.ModTime, entry.Size);
+                    var resolved = FileConflictHelper.ResolvePath(outputFilePath, options, entryModified, entry.Size);
                     if (resolved == null)
                     {
-                        // 跳过文件但需要消费 Tar 流数据以推进到下一个条目
-                        var discardBuf = new byte[81920];
-                        while (tarIn.Read(discardBuf, 0, discardBuf.Length) > 0) { }
+                        // 跳过文件，TarReader.MoveToNextEntry 自动处理流推进
                         continue;
                     }
 
                     // 带 per-file 进度的复制
-                    var entryModified = entry.ModTime;
+                    using (var entryStream = reader.OpenEntryStream())
                     using (var outStream = File.Create(resolved))
                     {
                         var buffer = new byte[81920];
@@ -96,7 +98,7 @@ public class TarGzEngine : IArchiveEngine
                         while (true)
                         {
                             cancellationToken.ThrowIfCancellationRequested();
-                            var read = tarIn.Read(buffer, 0, buffer.Length);
+                            var read = entryStream.Read(buffer, 0, buffer.Length);
                             if (read <= 0) break;
                             outStream.Write(buffer, 0, read);
                             totalRead += read;
@@ -110,7 +112,7 @@ public class TarGzEngine : IArchiveEngine
                                     : 0;
                                 progress?.Report(new ArchiveProgress
                                 {
-                                    CurrentFile = entry.Name,
+                                    CurrentFile = entryKey,
                                     PercentComplete = Math.Min(compressedProgress, 99.9),
                                     FilePercentComplete = filePct
                                 });
@@ -118,20 +120,21 @@ public class TarGzEngine : IArchiveEngine
                             }
                         }
                     }
-                    // 恢复文件原始修改时间（流已关闭）
+                    // 恢复文件原始修改时间
                     try { File.SetLastWriteTime(resolved, entryModified); } catch (Exception tsEx) { CoreLog.Info($"ExtractAsync: failed to set timestamp on {resolved}: {tsEx.Message}"); }
                 }
             }
             else if (ext == ".gz")
             {
                 // 单纯 GZip 解压单个文件
-                using var gzip = new GZipInputStream(File.OpenRead(archivePath));
+                using var inputStream = File.OpenRead(archivePath);
+                using var gzipStream = new GZipStream(inputStream, CompressionMode.Decompress);
                 var outputPath = Path.Combine(destinationPath, Path.GetFileNameWithoutExtension(archivePath));
                 var resolved = FileConflictHelper.ResolvePath(outputPath, options);
                 if (resolved != null)
                 {
                     using var output = File.Create(resolved);
-                    gzip.CopyTo(output);
+                    gzipStream.CopyTo(output);
                 }
 
                 progress?.Report(new ArchiveProgress
@@ -165,20 +168,17 @@ public class TarGzEngine : IArchiveEngine
             var isTarGz = ext == ".tgz" || outputPath.EndsWith(".tar.gz");
             CoreLog.Info($"CompressAsync: format=tar.gz={isTarGz}");
 
-            // 收集所有文件（使用 FileScanner 共享工具，边发现边报告进度）
             var (files, _) = FileScanner.CollectFiles(sourcePaths, progress, cancellationToken);
-
             CoreLog.Info($"CompressAsync: {files.Count} files to compress");
 
             if (isTarGz || ext == ".tar")
             {
                 using var fileStream = File.Create(outputPath);
-                using var gzipOutput = isTarGz ? new GZipOutputStream(fileStream) : null;
-                using var tarArchive = gzipOutput != null
-                    ? TarArchive.CreateOutputTarArchive(gzipOutput)
-                    : TarArchive.CreateOutputTarArchive(fileStream);
-
-                if (gzipOutput != null) gzipOutput.SetLevel(options.CompressionLevel);
+                var compressionType = isTarGz ? CompressionType.GZip : CompressionType.None;
+                using SharpCompress.Writers.IWriter writer = TarWriter.OpenWriter(fileStream, new TarWriterOptions(compressionType, true)
+                {
+                    CompressionLevel = options.CompressionLevel
+                });
 
                 int processedFiles = 0;
                 int totalFiles = files.Count;
@@ -195,14 +195,13 @@ public class TarGzEngine : IArchiveEngine
                         ProcessedFiles = processedFiles
                     });
 
-                    if (!TarReadFileWithRetry(fullPath, relativePath, options, tarArchive, cancellationToken))
+                    if (!TarWriteFileWithRetry(fullPath, relativePath, options, writer, cancellationToken))
                     {
                         if (cancellationToken.IsCancellationRequested) break;
                         continue;
                     }
                     processedFiles++;
 
-                    // 文件压缩完成后上报文件计数
                     progress?.Report(new ArchiveProgress
                     {
                         CurrentFile = relativePath,
@@ -212,8 +211,6 @@ public class TarGzEngine : IArchiveEngine
                         ProcessedFiles = processedFiles
                     });
                 }
-
-                tarArchive.Close();
             }
             else if (ext == ".gz")
             {
@@ -221,11 +218,10 @@ public class TarGzEngine : IArchiveEngine
                 if (files.Count > 0)
                 {
                     using var outputStream = File.Create(outputPath);
-                    using var gzipOutput = new GZipOutputStream(outputStream);
-                    gzipOutput.SetLevel(options.CompressionLevel);
+                    using var gzipWriter = GZipWriter.OpenWriter(outputStream, new GZipWriterOptions(options.CompressionLevel));
 
                     using var input = File.OpenRead(files[0].FullPath);
-                    input.CopyTo(gzipOutput);
+                    gzipWriter.Write(Path.GetFileName(files[0].FullPath), input, null);
                 }
             }
 
@@ -246,8 +242,8 @@ public class TarGzEngine : IArchiveEngine
     /// <summary>
     /// 带重试/跳过/中止的 TAR 文件压缩。返回 false 表示跳过此文件。
     /// </summary>
-    private static bool TarReadFileWithRetry(string fullPath, string relativePath,
-        ArchiveOptions options, TarArchive tarArchive, CancellationToken ct)
+    private static bool TarWriteFileWithRetry(string fullPath, string relativePath,
+        ArchiveOptions options, SharpCompress.Writers.IWriter writer, CancellationToken ct)
     {
         int retries = 3;
         while (retries > 0)
@@ -255,9 +251,9 @@ public class TarGzEngine : IArchiveEngine
             try
             {
                 ct.ThrowIfCancellationRequested();
-                var entry = TarEntry.CreateEntryFromFile(fullPath);
-                entry.Name = relativePath;
-                tarArchive.WriteEntry(entry, false);
+                var fi = new FileInfo(fullPath);
+                using var sourceStream = File.OpenRead(fullPath);
+                writer.Write(relativePath, sourceStream, fi.LastWriteTime);
                 return true;
             }
             catch (OperationCanceledException) { throw; }
@@ -302,20 +298,18 @@ public class TarGzEngine : IArchiveEngine
                 try
                 {
                     using var inputStream = File.OpenRead(archivePath);
-                    using var gzipStream = isTarGz ? new GZipInputStream(inputStream) : null;
-                    var tarStream = (Stream?)gzipStream ?? inputStream;
-
-                    using var tarIn = new TarInputStream(tarStream, Encoding.UTF8);
-                    TarEntry entry;
-                    while ((entry = tarIn.GetNextEntry()) != null)
+                    using var reader = TarReader.OpenReader(inputStream, new ReaderOptions { LookForHeader = true });
+                    while (reader.MoveToNextEntry())
                     {
+                        var entry = reader.Entry;
+                        var entryKey = entry.Key ?? string.Empty;
                         items.Add(new ArchiveItem
                         {
-                            Name = entry.Name,
-                            FullPath = entry.IsDirectory ? entry.Name.TrimEnd('/') : entry.Name,
+                            Name = entryKey,
+                            FullPath = entry.IsDirectory ? entryKey.TrimEnd('/') : entryKey,
                             Size = entry.Size,
                             CompressedSize = entry.Size,
-                            LastModified = entry.ModTime,
+                            LastModified = entry.LastModifiedTime ?? DateTime.MinValue,
                             IsDirectory = entry.IsDirectory,
                             IsEncrypted = false
                         });
@@ -324,12 +318,10 @@ public class TarGzEngine : IArchiveEngine
                 catch (Exception ex)
                 {
                     CoreLog.Trace($"ListEntriesAsync: parse error: {ex.Message}");
-                    // 忽略解析错误，返回已解析的部分
                 }
             }
             else if (ext == ".gz")
             {
-                // GZip 单文件
                 var fi = new FileInfo(archivePath);
                 items.Add(new ArchiveItem
                 {
@@ -392,7 +384,6 @@ public class TarGzEngine : IArchiveEngine
 
         try
         {
-            // ListEntriesAsync 内部已做 Task.Run，无需再包一层
             var items = await ListEntriesAsync(archivePath, password, cancellationToken).ConfigureAwait(false);
             var ok = items.Count > 0;
             CoreLog.Info($"TestArchiveAsync: {(ok ? "passed" : "failed (no entries)")}, {items.Count} entries");
