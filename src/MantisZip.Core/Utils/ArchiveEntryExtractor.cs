@@ -1,10 +1,10 @@
 using System.Diagnostics;
 using System.Linq;
-using ICSharpCode.SharpZipLib.Zip;
 using MantisZip.Core.Abstractions;
-using MantisZip.Core.Engines;
 using MantisZip.Core.Utils;
 using SevenZipExtractor;
+using SharpCompress.Archives;
+using SharpCompress.Readers;
 
 namespace MantisZip.Core.Utils;
 
@@ -62,42 +62,29 @@ public static class ArchiveEntryExtractor
         // 最终路径安全检查：规范化后验证无路径穿越
         ValidateOutputPath(outputPath);
 
-        ZipFile? zipFile = null;
-        try
+        using var archive = ArchiveFactory.OpenArchive(archivePath,
+            new ReaderOptions { Password = password ?? string.Empty });
+
+        var entry = archive.Entries.FirstOrDefault(e => e.Key == entryName);
+        if (entry == null)
         {
-            // 使用 OpenZipFile 自动检测编码（UTF-8 → 系统默认编码 fallback），per-instance StringCodec
-            zipFile = ZipEngine.OpenZipFile(archivePath);
-
-            if (!string.IsNullOrEmpty(password))
-            {
-                zipFile.Password = password;
-            }
-
-            var entry = zipFile.GetEntry(entryName);
-            if (entry == null)
-            {
-                throw new FileNotFoundException($"在压缩包中未找到条目: {entryName}");
-            }
-
-            if (entry.IsDirectory)
-                return;
-
-            var dir = Path.GetDirectoryName(outputPath);
-            if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
-            {
-                Directory.CreateDirectory(dir);
-            }
-
-            using var inStream = zipFile.GetInputStream(entry);
-            using var outStream = new FileStream(outputPath, FileMode.Create, FileAccess.Write);
-            inStream.CopyTo(outStream);
-            CoreLog.Info($"ExtractZipEntry: done");
+            throw new FileNotFoundException($"在压缩包中未找到条目: {entryName}");
         }
-        finally
+
+        if (entry.IsDirectory)
+            return;
+
+        var dir = Path.GetDirectoryName(outputPath);
+        if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
         {
-            zipFile?.Close();
-            ((IDisposable?)zipFile)?.Dispose();
+            Directory.CreateDirectory(dir);
         }
+
+        using (var outStream = File.Open(outputPath, FileMode.Create, FileAccess.Write))
+        {
+            entry.WriteTo(outStream);
+        }
+        CoreLog.Info($"ExtractZipEntry: done");
     }
 
     private static void ExtractSevenZipEntry(string archivePath, string entryName, string outputPath, string? password)

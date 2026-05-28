@@ -3,12 +3,13 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
-using ICSharpCode.SharpZipLib.Zip;
 using MantisZip.Core;
 using MantisZip.Core.Abstractions;
 using MantisZip.Core.Engines;
 using MantisZip.Core.Utils;
 using MantisZip.UI.Localization;
+using SharpCompress.Archives;
+using SharpCompress.Readers;
 
 namespace MantisZip.UI;
 
@@ -149,8 +150,8 @@ public partial class App : Application
         {
             if (engine is ZipEngine)
             {
-                using var zipFile = ZipEngine.OpenZipFile(archivePath);
-                return zipFile.Cast<ZipEntry>().Any(e => e.IsCrypted || e.AESKeySize > 0);
+                using var archive = ArchiveFactory.OpenArchive(archivePath, new ReaderOptions());
+                return archive.Entries.Any(e => e.IsEncrypted);
             }
             if (engine is SevenZipEngine)
             {
@@ -178,10 +179,10 @@ public partial class App : Application
         {
             if (engine is ZipEngine)
             {
-                using var zipFile = ZipEngine.OpenZipFile(archivePath, password);
-                var entry = zipFile.Cast<ZipEntry>().FirstOrDefault(e => e.IsCrypted || e.AESKeySize > 0);
+                using var archive = ArchiveFactory.OpenArchive(archivePath, new ReaderOptions { Password = password });
+                var entry = archive.Entries.FirstOrDefault(e => e.IsEncrypted);
                 if (entry == null) return true; // 没有加密条目（理论上不会发生）
-                using var s = zipFile.GetInputStream(entry);
+                using var s = entry.OpenEntryStream();
                 s.ReadByte(); // 密码不对会在此抛异常
                 return true;
             }
@@ -210,7 +211,6 @@ public partial class App : Application
         var msg = ex.Message.ToLower();
         return msg.Contains("password") || msg.Contains(L.T(L.PwdMgr_Col_Password)) ||
                msg.Contains("encrypted") || msg.Contains("decrypt") ||
-               msg.Contains("encryption") ||
-               (ex is ZipException && (msg.Contains("password") || msg.Contains("decrypt")));
+               msg.Contains("encryption");
     }
 }
