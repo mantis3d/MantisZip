@@ -145,6 +145,7 @@ begin
   InstallShellCheck.Caption := CustomMessage('InstallShell');
   InstallShellCheck.Top := ShellGroupLabel.Top + ScaleY(20);
   InstallShellCheck.Left := 16;
+  InstallShellCheck.Width := WPConfigPage.SurfaceWidth - ScaleX(32);
   InstallShellCheck.Checked := True;
 
   InstallAssocCheck := TNewCheckBox.Create(WPConfigPage);
@@ -152,6 +153,7 @@ begin
   InstallAssocCheck.Caption := CustomMessage('InstallAssoc');
   InstallAssocCheck.Top := InstallShellCheck.Top + ScaleY(24);
   InstallAssocCheck.Left := 16;
+  InstallAssocCheck.Width := WPConfigPage.SurfaceWidth - ScaleX(32);
   InstallAssocCheck.Checked := True;
 end;
 
