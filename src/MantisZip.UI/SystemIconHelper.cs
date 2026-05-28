@@ -51,10 +51,16 @@ internal static class SystemIconHelper
         if (_cache.TryGetValue(key, out var cached))
             return cached;
 
+        App.LogDebug("SystemIconHelper: cache miss for '{0}', loading from shell", key);
         var icon = LoadIcon(extension);
         if (icon != null)
         {
             _cache[key] = icon;
+            App.LogDebug("SystemIconHelper: loaded icon for '{0}'", key);
+        }
+        else
+        {
+            App.LogDebug("SystemIconHelper: SHGetFileInfo returned null for '{0}', using fallback", key);
         }
         return icon ?? GetFallbackIcon();
     }

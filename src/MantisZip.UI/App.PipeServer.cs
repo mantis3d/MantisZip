@@ -28,6 +28,7 @@ public partial class App : Application
 
     private static void StartCompressPipeServer(List<string> allPaths, CancellationToken ct)
     {
+        LogDebug("StartCompressPipeServer: starting, pipeName='{0}'", CompressPipeName);
         Task.Run(async () =>
         {
             try
@@ -41,6 +42,7 @@ public partial class App : Application
                     try
                     {
                         await pipe.WaitForConnectionAsync(ct);
+                        var receivedCount = 0;
                         using var reader = new StreamReader(pipe);
                         string? line;
                         while ((line = await reader.ReadLineAsync()) != null)
@@ -48,9 +50,13 @@ public partial class App : Application
                             lock (allPaths)
                             {
                                 if (!allPaths.Contains(line) && (File.Exists(line) || Directory.Exists(line)))
+                                {
                                     allPaths.Add(line);
+                                    receivedCount++;
+                                }
                             }
                         }
+                        LogDebug("StartCompressPipeServer: received {0} new paths from client", receivedCount);
                     }
                     catch (OperationCanceledException) { throw; }
                     finally { pipe.Dispose(); }
@@ -63,6 +69,7 @@ public partial class App : Application
 
     private static void SendPathsToFirstInstance(List<string> paths)
     {
+        LogDebug("SendPathsToFirstInstance: connecting to pipe '{0}' with {1} paths", CompressPipeName, paths.Count);
         try
         {
             using var pipe = new NamedPipeClientStream(".", CompressPipeName, PipeDirection.Out);
@@ -71,6 +78,7 @@ public partial class App : Application
             foreach (var p in paths)
                 writer.WriteLine(p);
             writer.Flush();
+            LogDebug("SendPathsToFirstInstance: sent {0} paths", paths.Count);
         }
         catch (Exception ex)
         {
@@ -80,6 +88,7 @@ public partial class App : Application
 
     private static void StartPipeServer(List<string> allPaths, CancellationToken ct, string pipeName, ManualResetEventSlim readyEvent)
     {
+        LogDebug("StartPipeServer: starting, pipeName='{0}'", pipeName);
         Task.Run(async () =>
         {
             try
@@ -93,6 +102,7 @@ public partial class App : Application
                     try
                     {
                         await pipe.WaitForConnectionAsync(ct);
+                        var receivedCount = 0;
                         using var reader = new StreamReader(pipe);
                         string? line;
                         while ((line = await reader.ReadLineAsync()) != null)
@@ -100,9 +110,13 @@ public partial class App : Application
                             lock (allPaths)
                             {
                                 if (!allPaths.Contains(line) && (File.Exists(line) || Directory.Exists(line)))
+                                {
                                     allPaths.Add(line);
+                                    receivedCount++;
+                                }
                             }
                         }
+                        LogDebug("StartPipeServer ({0}): received {1} new paths from client", pipeName, receivedCount);
                     }
                     catch (OperationCanceledException) { throw; }
                     finally { pipe.Dispose(); }
@@ -115,6 +129,7 @@ public partial class App : Application
 
     private static void SendPathsThroughPipe(List<string> paths, string pipeName)
     {
+        LogDebug("SendPathsThroughPipe: connecting to pipe '{0}' with {1} paths", pipeName, paths.Count);
         try
         {
             using var pipe = new NamedPipeClientStream(".", pipeName, PipeDirection.Out);
@@ -123,6 +138,7 @@ public partial class App : Application
             foreach (var p in paths)
                 writer.WriteLine(p);
             writer.Flush();
+            LogDebug("SendPathsThroughPipe: sent {0} paths via '{1}'", paths.Count, pipeName);
         }
         catch (Exception ex)
         {

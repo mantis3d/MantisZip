@@ -172,6 +172,7 @@ public partial class SettingsWindow : Window
     {
         var s = AppSettings.Instance;
 
+        App.LogDebug("SettingsWindow.SaveSettings: saving settings");
         s.DefaultFormat = ((ComboBoxItem)DefaultFormatCombo.SelectedItem)?.Tag as string ?? "zip";
         s.DefaultLevel = int.TryParse((DefaultLevelCombo.SelectedItem as ComboBoxItem)?.Tag?.ToString(), out var l) ? l : 5;
         s.CloseAfterCompress = CloseAfterCompressCheck.IsChecked == true;
@@ -220,8 +221,14 @@ public partial class SettingsWindow : Window
 
         if (!s.Save())
         {
+            App.LogDebug("SettingsWindow: failed to save settings");
             AppMessageBox.Show(L.TF(L.Settings_SaveFailed, "settings.json"),
                 L.T(L.App_ErrorTitle), MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+        else
+        {
+            App.LogDebug("SettingsWindow: settings saved successfully (theme={0}, lang={1}, debugLog={2}, privMode={3})",
+                s.Theme, s.Language, s.EnableDebugLogging, s.LogPrivacyMode);
         }
         App.ApplyTextRenderingMode(SettingsTabs);
     }
@@ -242,6 +249,7 @@ public partial class SettingsWindow : Window
 
     private void InstallBtn_Click(object sender, RoutedEventArgs e)
     {
+        App.LogDebug("SettingsWindow: InstallBtn_Click");
         try
         {
             // 先持久化当前 UI 设置，再安装
@@ -249,10 +257,12 @@ public partial class SettingsWindow : Window
             ShellIntegration.Uninstall();
             ShellIntegration.Install();
             UpdateShellStatus();
+            App.LogDebug("SettingsWindow: shell context menu installed");
             AppMessageBox.Show(L.T(L.Settings_Menu_InstalledMsg), L.T(L.App_MantisZipTitle), MessageBoxButton.OK, MessageBoxImage.Information);
         }
         catch (Exception ex)
         {
+            App.LogDebug("SettingsWindow: shell install failed: {0}", ex.Message);
             AppMessageBox.Show(L.TF(L.Settings_Menu_InstallFailed, ex.Message), L.T(L.App_ErrorTitle), MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
@@ -271,29 +281,35 @@ public partial class SettingsWindow : Window
 
     private void InstallAssoc_Click(object sender, RoutedEventArgs e)
     {
+        App.LogDebug("SettingsWindow: InstallAssoc_Click");
         try
         {
             ShellIntegration.UninstallAssociations();
             ShellIntegration.InstallAssociations();
             UpdateAssocStatus();
+            App.LogDebug("SettingsWindow: file associations installed");
             AppMessageBox.Show(L.T(L.Settings_Assoc_InstalledMsg), L.T(L.App_MantisZipTitle), MessageBoxButton.OK, MessageBoxImage.Information);
         }
         catch (Exception ex)
         {
+            App.LogDebug("SettingsWindow: assoc install failed: {0}", ex.Message);
             AppMessageBox.Show(L.TF(L.Settings_Menu_InstallFailed, ex.Message), L.T(L.App_ErrorTitle), MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
 
     private void UninstallAssoc_Click(object sender, RoutedEventArgs e)
     {
+        App.LogDebug("SettingsWindow: UninstallAssoc_Click");
         try
         {
             ShellIntegration.UninstallAssociations();
             UpdateAssocStatus();
+            App.LogDebug("SettingsWindow: file associations uninstalled");
             AppMessageBox.Show(L.T(L.Settings_Assoc_UninstalledMsg), L.T(L.App_MantisZipTitle), MessageBoxButton.OK, MessageBoxImage.Information);
         }
         catch (Exception ex)
         {
+            App.LogDebug("SettingsWindow: assoc uninstall failed: {0}", ex.Message);
             AppMessageBox.Show(L.TF(L.Settings_Menu_UninstallFailed, ex.Message), L.T(L.App_ErrorTitle), MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
@@ -370,20 +386,24 @@ public partial class SettingsWindow : Window
 
     private void UninstallBtn_Click(object sender, RoutedEventArgs e)
     {
+        App.LogDebug("SettingsWindow: UninstallBtn_Click");
         try
         {
             ShellIntegration.Uninstall();
             UpdateShellStatus();
+            App.LogDebug("SettingsWindow: shell context menu uninstalled");
             AppMessageBox.Show(L.T(L.App_ShellUninstalled), L.T(L.App_MantisZipTitle), MessageBoxButton.OK, MessageBoxImage.Information);
         }
         catch (Exception ex)
         {
+            App.LogDebug("SettingsWindow: shell uninstall failed: {0}", ex.Message);
             AppMessageBox.Show(L.TF(L.Settings_Menu_UninstallFailed, ex.Message), L.T(L.App_ErrorTitle), MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
 
     private void ApplyShellBtn_Click(object sender, RoutedEventArgs e)
     {
+        App.LogDebug("SettingsWindow: ApplyShellBtn_Click");
         try
         {
             // 先持久化 UI 当前的设置到 AppSettings.Instance，再安装
@@ -392,20 +412,24 @@ public partial class SettingsWindow : Window
             ShellIntegration.Install();
             UpdateShellStatus();
             ApplyShellBtn.IsEnabled = false;
+            App.LogDebug("SettingsWindow: shell context menu updated and applied");
             AppMessageBox.Show(L.T(L.Settings_Menu_UpdatedMsg), L.T(L.App_MantisZipTitle), MessageBoxButton.OK, MessageBoxImage.Information);
         }
         catch (Exception ex)
         {
+            App.LogDebug("SettingsWindow: shell apply failed: {0}", ex.Message);
             AppMessageBox.Show(L.TF(L.Settings_Menu_InstallFailed, ex.Message), L.T(L.App_ErrorTitle), MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
 
     private void SaveBtn_Click(object sender, RoutedEventArgs e)
     {
+        App.LogDebug("SettingsWindow: SaveBtn_Click");
         SaveSettings();
         // 上下文菜单有改动则同步安装
         if (ApplyShellBtn.IsEnabled)
         {
+            App.LogDebug("SettingsWindow: applying shell menu changes before close");
             ShellIntegration.Uninstall();
             ShellIntegration.Install();
         }
@@ -454,6 +478,7 @@ public partial class SettingsWindow : Window
             && theme != AppSettings.Instance.Theme)
         {
             var oldTheme = AppSettings.Instance.Theme;
+            App.LogDebug("SettingsWindow: ThemeCombo changed: '{0}' -> '{1}'", oldTheme, theme);
 
             // 临时保存，用户可以取消
             AppSettings.Instance.Theme = theme;
@@ -488,6 +513,7 @@ public partial class SettingsWindow : Window
         var code = (LanguageCombo.SelectedItem as ComboBoxItem)?.Tag as string;
         if (code != null && code != AppSettings.Instance.Language)
         {
+            App.LogDebug("SettingsWindow: Language changed: '{0}' -> '{1}'", AppSettings.Instance.Language, code);
             LanguageManager.Instance.SwitchTo(code);
             AppMessageBox.Show(L.T(L.Settings_Language_Restart), L.T(L.App_MantisZipTitle),
                 MessageBoxButton.OK, MessageBoxImage.Information);
