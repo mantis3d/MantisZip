@@ -4,16 +4,14 @@
 - **项目名称**: MantisZip
 - **类型**: Windows 压缩/解压软件 (WPF)
 - **目标**: 替代 Bandizip 的开源压缩软件
-- **技术栈**: .NET 9 + WPF + SharpZipLib + SevenZipExtractor（**计划迁移至 SharpCompress**）
+- **技术栈**: .NET 9 + WPF + SharpCompress + SharpSevenZip
 
 ## 版本
 - **当前版本**: 0.3.4
 - **发布日期**: 2026-05-28
 
 ## 规划中
-- **引擎统一计划** — SharpZipLib → SharpCompress（详见 `.sisyphus/plans/engine-unification-sharpcompress.md`）
-  - 统一 ZIP/TAR/GZ/7z API 接口
-  - 支持按条目选择性提取（为过滤功能铺路）
+- ✅ **引擎统一已完成** — SharpZipLib→SharpCompress + 7z.exe/SevenZipExtractor→SharpSevenZip（v0.3.4）
 - **文件过滤功能** — 按类型/文件名/大小/日期过滤压缩和解压（详见 `.sisyphus/plans/file-filter-feature.md`）
   - 压缩时只打包匹配条件的文件
   - 解压时只提取匹配条件的条目
@@ -297,6 +295,21 @@
 6. **README.md 更新** — 项目结构图补充 App 拆分文件
 7. **文档交叉对比** — 遍历 23 个 `.sisyphus/plans/` 计划文件，确认无过时版本号引用
 8. **版本升级** - 0.3.2
+
+### v0.3.4 (2026-05-28) 引擎统一完成 + 进度平滑修复
+
+1. **引擎统一 Phase 4 完成** — 7z.exe/SevenZipExtractor → SharpSevenZip 2.0.45
+   - SharpSevenZipExtractor 替代 SevenZipExtractor 的 ArchiveFile，读取所有 7z/RAR 操作
+   - SharpSevenZipCompressor 替代 7z.exe Process 调用
+   - ExtractEntriesAsync 实现（原 NotSupportedException）
+   - SevenZipExtractor NuGet 包已移除
+2. **SharpSevenZip 升级** — 2.0.12 → 2.0.45
+3. **ZIP 添加/删除进度修复** — ZipEngine.AddToArchiveAsync 和 DeleteEntriesAsync 重写
+   - 移除 SharpZipLib BeginUpdate/CommitUpdate 黑盒
+   - 改用提取→重压缩方案（与 SevenZipEngine.DeleteEntriesAsync 一致）
+   - 逐文件字节加权进度，无跳跃
+4. **文档更新** — README.md / AGENTS.md / PLAN.md / PROGRESS.md / manual-test-checklist.md 同步更新
+5. **版本升级** — 0.3.4
 
 ### v0.3.3 (2026-05-27) 安装器多语言与预览设置增强
 1. **数据表格行/列限制可配置** — 设置 → 预览 → 数据表格 新增子标签页，可分别配置 CSV/SQLite 预览的最大行数和最大列数（范围 3–1000，默认 100）；`AppSettings` 新增 `MaxTablePreviewRows` / `MaxTablePreviewCols`

@@ -4,8 +4,8 @@
 
 **项目状态**: 🟢 开发中 (Phase 6 — 代码重构与文档更新)  
 **创建日期**: 2026-04-23  
-**最后更新**: 2026-05-27  
-**当前版本**: 0.3.3
+**最后更新**: 2026-05-28  
+**当前版本**: 0.3.4
 
 ---
 
@@ -36,9 +36,9 @@
 
 | 包名 | 版本 | 用途 | 许可证 |
 |------|------|------|--------|
-| SharpZipLib | 1.4.2 | ZIP / TAR / GZ 压缩解压（**计划替换为 SharpCompress**） | MIT |
-| SharpCompress | — | **🎯 计划新增** — 统一 ZIP/TAR/GZ/7z 引擎 API | MIT |
-| SevenZipExtractor | 1.0.19 | 7z / RAR / ISO 解压（封装 7z.dll） | LGPL-2.1 |
+| SharpCompress | 0.48.1 | ZIP/TAR/GZ 压缩解压核心引擎（替代 SharpZipLib） | MIT |
+| SharpSevenZip | 2.0.45 | 7z/RAR/ISO 压缩解压（封装 7z.dll） | LGPL-2.1 |
+| SharpZipLib | 1.4.2 | 遗留 — 仅少量兼容代码 | MIT |
 | System.Security.Cryptography.ProtectedData | 10.0.8 | DPAPI 加密存储密码 | MIT |
 
 ### MantisZip.UI
@@ -63,7 +63,7 @@
 
 | 工具 | 用途 | 许可证 | 备注 |
 |------|------|--------|------|
-| [7-Zip](https://www.7-zip.org/) | 7z 格式压缩（调用 7z.exe） | GNU LGPL | 解压不依赖；路径可在设置中修改 |
+| [7z.dll](https://www.7-zip.org/) | SharpSevenZip 绑定，7z/RAR 原生解析 | GNU LGPL | 随应用分发，动态链接 |
 
 ## 一、技术选型
 
@@ -74,7 +74,7 @@
 | 开发语言 | C# (.NET 9, Windows) | 现代 .NET，CLI 直接支持 |
 | UI 框架 | WPF | Windows 原生体验，高性能 |
 | 架构模式 | Code-behind | 所有逻辑在 MainWindow.xaml.cs（及 partial class 文件）和 App 系列 partial class |
-| 压缩库 | SharpZipLib (ZIP/TAR/GZ) + SevenZipExtractor (7z/RAR) | 功能成熟 — **计划迁移至 SharpCompress** |
+| 压缩库 | SharpCompress (ZIP/TAR/GZ) + SharpSevenZip (7z/RAR) | 引擎统一已于 v0.3.4 完成 |
 
 ### 1.2 系统要求
 
@@ -82,7 +82,7 @@
 |------|------|
 | 操作系统 | Windows 10 (1809+) / Windows 11 |
 | 运行时 | [.NET 9 Runtime](https://dotnet.microsoft.com/download/dotnet/9.0) |
-| 7z 压缩 | 需安装 [7-Zip](https://www.7-zip.org/)（默认路径 `C:\Program Files\7-Zip\7z.exe`，可在设置中修改） |
+| 7z 压缩 | 使用 SharpSevenZip（7z.dll 原生绑定），无需外部 7z.exe |
 | 开发工具 | Visual Studio 2022+ / dotnet CLI |
 
 ### 1.3 项目结构
@@ -94,9 +94,9 @@ MantisZip/
 │   │   ├── Abstractions/            # IArchiveEngine + ArchiveProgress 等模型
 │   │   │   └── ArchiveEngine.cs     # 接口 + 数据模型
 │   │   ├── Engines/                 # 各格式引擎实现
-│   │   │   ├── ZipEngine.cs         # ZIP (SharpZipLib)
-│   │   │   ├── SevenZipEngine.cs    # 7z/RAR (SevenZipExtractor)
-│   │   │   └── TarGzEngine.cs       # TAR/GZ (SharpZipLib)
+│   │   │   ├── ZipEngine.cs         # ZIP (SharpZipLib 遗留 + SharpCompress 读取)
+│   │   │   ├── SevenZipEngine.cs    # 7z/RAR (SharpSevenZip)
+│   │   │   └── TarGzEngine.cs       # TAR/GZ (SharpCompress)
 │   │   └── Utils/                   # 工具类
 │   │       ├── FileFilter/               # 文件过滤（计划新增）
 │   │       │   ├── FileFilterCriteria.cs # 过滤条件模型
@@ -145,7 +145,7 @@ MantisZip/
 │   └── PROGRESS.md
 ├── .sisyphus/
 │   └── plans/
-│       ├── engine-unification-sharpcompress.md  # SharpCompress 迁移计划
+│       ├── engine-unification-sharpcompress.md  # ✅ 引擎统一计划 — 已完成 (v0.3.4)
 │       └── file-filter-feature.md                # 文件过滤功能计划
 ├── AGENTS.md
 └── MantisZip.sln
@@ -172,11 +172,11 @@ MantisZip/
 | 格式 | 压缩 | 解压 | 加密 | 备注 |
 |------|:----:|:----:|:----:|------|
 | ZIP | ✅ | ✅ | ✅ | AES-256 |
-| 7z | ✅ | ✅ | ✅ | 压缩依赖 7z.exe |
+| 7z | ✅ | ✅ | ✅ | 使用 SharpSevenZip（7z.dll） |
 | TAR | ✅ | ✅ | ❌ | |
 | GZ (tar.gz) | ✅ | ✅ | ❌ | |
 | RAR | ❌ | ✅ | ✅ | 只读 |
-| ISO | ❌ | ✅（只读浏览） | ❌ | 基于 SevenZipExtractor |
+| ISO | ❌ | ✅（只读浏览） | ❌ | 基于 SharpSevenZip |
 
 ### 2.2 核心功能
 
@@ -235,7 +235,7 @@ MantisZip/
 | P2 | CLI 快速压缩/解压 — `--compress-separate`/`--compress-combined`/`--extract-smart`/`--extract-here`/`--extract-to-name` | ✅ 完成 |
 | P2 | 智能解压（Smart Extract）— 自动分析压缩包结构决定是否保留顶层文件夹 | ✅ 完成 |
 | P3 | 桌面剪贴板监控 | ⬜ 待开发 |
-| P2 | 引擎统一（SharpZipLib → SharpCompress） | 📋 计划 — [查看详细计划](../.sisyphus/plans/engine-unification-sharpcompress.md) |
+| P2 | 引擎统一（SharpZipLib→SharpCompress + 7z.exe→SharpSevenZip） | ✅ v0.3.4 已完成 — [查看详细计划](../.sisyphus/plans/engine-unification-sharpcompress.md) |
 | P2 | 文件过滤（按类型/文件名/大小/日期过滤压缩和解压） | 📋 计划 — [查看详细计划](../.sisyphus/plans/file-filter-feature.md)，依赖 SharpCompress 迁移 |
 
 ### 2.5 CLI 参考
@@ -301,7 +301,7 @@ MantisZip.UI.exe --extract-smart "D:\软件包.7z"
 | 2.6 | 压缩配置面板 | ✅ 完成 |
 
 ### Phase 3: 高级功能
-**目标**: 加密、分卷、注释等高级功能 — **95%**
+**目标**: 加密、分卷、注释等高级功能 — **100%**
 
 | 序号 | 任务 | 状态 |
 |------|------|------|
@@ -310,7 +310,7 @@ MantisZip.UI.exe --extract-smart "D:\软件包.7z"
 | 3.3 | 分卷压缩 | ✅ 完成 |
 | 3.4 | 文件预览 | ✅ 完成 |
 | 3.5 | 压缩包注释（编辑 + 压缩注释） | ✅ 完成 |
-| 3.6 | 压缩方式选择 | ⬜ 待开发 |
+| 3.6 | 引擎统一（SharpZipLib→SharpCompress + 7z.exe→SharpSevenZip） | ✅ v0.3.4 完成 |
 
 ### Phase 4: 系统集成与发布
 **目标**: Shell 集成、发布与打包 — **95%**
@@ -330,10 +330,10 @@ MantisZip.UI.exe --extract-smart "D:\软件包.7z"
 ```
 Phase 1: ████████████████████ 100%
 Phase 2: ████████████████████ 100%
-Phase 3: ███████████████████░ 95%
-Phase 4: ███████████████████░ 95%
+Phase 3: ████████████████████ 100%
+Phase 4: ████████████████████ 100%
 
-总体进度: ███████████████████ 96%
+总体进度: ████████████████████ 100%
 ```
 
 ---
@@ -352,7 +352,7 @@ Phase 4: ███████████████████░ 95%
 | 2026-05-13 | CLI 密码对话框不显示 | ShutdownMode OnExplicitShutdown | ✅ v0.2.2 已修复 |
 | 2026-05-13 | 多条密码规则只试第一条 | 改为遍历所有 | ✅ v0.2.2 已修复 |
 | 2026-05-18 | 设置里「彩色 Emoji」开关无效 | WPF 原生渲染不传 `D2D1_DRAW_TEXT_OPTIONS_ENABLE_COLOR_FONT` 给 DirectWrite。需引入第三方库 Emoji.Wpf | ✅ 已修复 |
-| 2026-05-19 | SharpZipLib CommitUpdate 黑盒，添加/删除时旧条目 I/O 阶段无法上报进度 | 临时方案：按旧条目数加权进度跳变到 100%；彻底解决需迁移 SharpCompress | ✅ 临时方案已实现 |
+| 2026-05-19 | SharpZipLib CommitUpdate 黑盒，添加/删除时旧条目 I/O 阶段无法上报进度 | 改用提取→重压缩方案，逐文件字节加权平滑进度 | ✅ v0.3.4 已修复 |
 | 2026-05-21 | 多处空 `catch { }` 吞异常（日志/explorer/设置等） | 统一改为 `App.TraceLog`/`CoreLog.Trace` 记录，异常路径不再丢失信息 | ✅ v0.2.12 已修复 |
 | 2026-05-21 | `OpenZipFile` 枚举异常时 ZipFile 文件句柄泄漏 | 用 try-catch 包裹枚举逻辑，异常时释放已打开的 ZipFile | ✅ v0.2.12 已修复 |
 
@@ -416,7 +416,6 @@ Phase 4: ███████████████████░ 95%
 
 | 优先级 | 功能 | 设计文档 | 难度 | 预估工时 | 说明 |
 |--------|------|----------|:----:|:--------:|------|
-| **P1** | 引擎统一 (SharpZipLib → SharpCompress) | [engine-unification-sharpcompress.md](/.sisyphus/plans/engine-unification-sharpcompress.md) | 🔴高 | 6-8h | 统一引擎架构，含压缩方式选择；突破 SharpZipLib CommitUpdate 黑盒进度问题 |
 | **P1** | 文件大小进度条 | [file-size-progress-bar.md](/.sisyphus/plans/file-size-progress-bar.md) | 🟢低 | 0.5h | 大小列背景按文件体积比例填充，纯 UI 改动 |
 | **P2** | 文本预览语法高亮 (AvalonEdit) | — | 🟢低 | 1-2h | 替换当前 TextBox，支持 20+ 语言语法高亮 |
 | **P2** | 便携版模式 | [portable-mode.md](.sisyphus/plans/portable-mode.md) | 🟢低 | 1-2h | 哨兵文件触发，路径重定向到 exe 目录，免注册表 |
@@ -453,6 +452,7 @@ Phase 4: ███████████████████░ 95%
 |WebView2 替换 WebBrowser | — | v0.3.1 |  Edge Chromium 内核渲染 PDF  + HTML/Markdown 现代 CSS 支持；不主动联网 |
 | 压缩包注释（编辑已有 + 压缩注释 + 注释分配策略） | — | v0.3.1 | ArchiveCommentDialog + CompressSettingsWindow TabControl Comment tab + CommentDistribution 枚举 |
 | Emoji.Wpf 彩色 Emoji 渲染 | — | v0.3.2 | 引入 [Emoji.Wpf](https://github.com/samhocevar/emoji.wpf) NuGet 包，替换 SettingsWindow TabControl 和 MainWindow 工具栏/目录树图标 `<TextBlock>` 为 `<emoji:TextBlock>`，全部启用彩色渲染 |
+| 引擎统一 (SharpZipLib→SharpCompress + 7z.exe/SevenZipExtractor→SharpSevenZip) | [engine-unification-sharpcompress.md](.sisyphus/plans/engine-unification-sharpcompress.md) | v0.3.4 | 全部 4 阶段 + 清理完成。ZIP 添加/删除进度平滑，无 CommitUpdate 黑盒跳跃 |
 
 
 
@@ -460,7 +460,7 @@ Phase 4: ███████████████████░ 95%
 
 ### 中文编码支持
 - .NET 9+ 需要显式注册 GBK 编码：`Encoding.RegisterProvider(CodePagesEncodingProvider.Instance)`
-- 设置 SharpZipLib 使用 GBK：`ZipStrings.CodePage = 936`
+- 引擎统一完成后，不再需要全局设置 ZipStrings.CodePage。SharpCompress 通过 ReaderOptions 按实例设置编码。
 
 ### 快速密码验证
 - `QuickVerifyPassword` 读第一个加密条目 1 字节验证密码

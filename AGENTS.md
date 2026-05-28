@@ -33,7 +33,7 @@ MantisZip.UI (WPF) ──reference──▶ MantisZip.Core (net9.0)
 
 - `IArchiveEngine` interface: `ListEntriesAsync`, `ExtractAsync`, `CompressAsync`, `TestArchiveAsync`
 - `ArchiveEngineFactory` registers engines in static constructor, dispatches by file extension
-- `SevenZipEngine.CompressAsync` shells out to `C:\Program Files\7-Zip\7z.exe` — **not** a managed library
+- `SevenZipEngine.CompressAsync` uses `SharpSevenZipCompressor` (7z.dll COM binding)
 - `ArchiveEntryExtractor` (Core/Utils) handles single-entry extraction for preview; only supports Zip and 7z
 
 ### Progress reporting
@@ -41,7 +41,7 @@ MantisZip.UI (WPF) ──reference──▶ MantisZip.Core (net9.0)
 - `ArchiveProgress` (Core/Abstractions/ArchiveEngine.cs): `PercentComplete` (overall, 0–100), `FilePercentComplete` (nullable double, 0–100 for per-file granularity), `FileName` (current file name), `Message`
 - `ZipEngine` reports per-file progress via buffered I/O copy loop with 100ms throttle; reports initial 0% and final 100% for each file
 - `SevenZipEngine.ExtractAsync` and `TarGzEngine.ExtractAsync` report progress only at completion (100%)
-- `SevenZipEngine.CompressAsync` polls `7z.exe` with `Thread.Sleep(100)`
+- `SevenZipEngine.CompressAsync` reports progress via `SharpSevenZipCompressor.Compressing` event
 - `ProgressWindow` shows two progress bars: file-level (top) and overall (bottom); `SetProgress(ArchiveProgress)` overload drives both
 
 ### ArchiveItem duality
@@ -253,20 +253,15 @@ When clicking "自动重命名" in the file conflict dialog, the `Rename` case r
 
 ## Key gotchas
 
-### Chinese filename encoding (ZIP) — to be removed with SharpCompress
-
-*(This section is historic — SharpCompress migration will eliminate the global encoding hack.)*
+### Chinese filename encoding (ZIP)
 
 ```csharp
 Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
-ZipStrings.CodePage = 936; // GBK — must be set before reading ZIP
 ```
 
-These are set **once globally** in `App.InitializeApp()` (called at the top of `OnStartup`), so every entry point gets it automatically. As safety redundancy, `ZipStrings.CodePage = 936` is also set in each `ZipEngine` method (`ListEntriesAsync`, `ExtractAsync`, `TestArchiveAsync`) before creating `ZipFile`. This is a **process-wide side-effect** — it affects all ZIP operations in the entire process.
+This is set once in `App.InitializeApp()`. ZIP encoding is handled per-instance via `StringCodec` (no global `ZipStrings.CodePage`). SharpCompress's `ZipArchive` uses `ReaderOptions.ArchiveEncoding` for per-instance encoding settings, respecting the system locale.
 
-**Rule**: If adding new code paths that bypass `App.OnStartup`, call `App.InitializeApp()` first, or replicate both lines before any `ZipFile` usage.
-
-### 7z compression requires external 7z.exe — to be removed with SharpCompress migration Phase 4
+### 7z compression uses SharpSevenZip (7z.dll) — no external 7z.exe required
 
 ### 7z encrypted preview not supported
 
