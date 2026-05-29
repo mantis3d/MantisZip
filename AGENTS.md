@@ -26,7 +26,7 @@ MantisZip.UI (WPF) ──reference──▶ MantisZip.Core (net9.0)
                                         │
                         ┌───────────────┼───────────────┐
                    ZipEngine    SevenZipEngine    TarGzEngine
-                   (SharpZipLib) (SevenZipExtractor) (SharpZipLib)
+                  (SharpCompress) (SharpSevenZip) (SharpCompress)
 ```
 
 ### Engine pattern (strategy + factory)
@@ -100,7 +100,7 @@ Window size, tree column width, and preview row height saved to `%LOCALAPPDATA%\
 - **预览**: EnableImagePreview, EnableTextPreview, MaxTextPreviewBytes, ShowPreviewPanel, TextPreviewFontSize
 - **调试**: EnableDebugLogging, LogPrivacyMode (off/filename/full)
 - **密码管理**: ShowPasswordMatchNotification, PasswordRevealByDefault
-- **高级**: SevenZipPath
+- **高级**: SevenZipPath, PreserveDirectoryRoot
 
 `SettingsWindow` (tabbed UI) provides GUI editing; `CompressSettingsWindow` loads defaults from `AppSettings`.
 
@@ -170,9 +170,9 @@ Plans tracked under `.sisyphus/plans/`:
 
 | Plan | Status | Dependency |
 |------|--------|------------|
-| [engine-unification-sharpcompress.md](.sisyphus/plans/engine-unification-sharpcompress.md) | 📋 Planned | None |
+| [engine-unification-sharpcompress.md](.sisyphus/plans/engine-unification-sharpcompress.md) | ✅ Completed (v0.3.4) | None |
 | [file-filter-feature.md](.sisyphus/plans/file-filter-feature.md) | 📋 Planned | SharpCompress migration |
-| [file-size-progress-bar.md](.sisyphus/plans/file-size-progress-bar.md) | 📋 Planned | None |
+| [file-size-progress-bar.md](.sisyphus/plans/file-size-progress-bar.md) | ✅ Completed (v0.3.4) | None |
 | [portable-mode.md](.sisyphus/plans/portable-mode.md) | 📋 Planned | None |
 | [preview-magic-detection.md](.sisyphus/plans/preview-magic-detection.md) | 📋 Planned | None |
 | [preview-modular-providers.md](.sisyphus/plans/preview-modular-providers.md) | 📋 Planned | Preview system |
@@ -184,17 +184,21 @@ Plans tracked under `.sisyphus/plans/`:
 | [compression-estimator.md](.sisyphus/plans/compression-estimator.md) | 📋 Planned | None |
 | [archive-diff.md](.sisyphus/plans/archive-diff.md) | 📋 Planned | None |
 | [virtual-file-data-object.md](.sisyphus/plans/virtual-file-data-object.md) | 📋 Planned | None |
+| [compress-preset.md](.sisyphus/plans/compress-preset.md) | 📋 Planned | COM context menu (Phase 2) |
+| [com-context-menu.md](.sisyphus/plans/com-context-menu.md) | 📋 Planned | None |
+| [png-transparency-3way.md](.sisyphus/plans/png-transparency-3way.md) | ✅ Completed | None |
 
-### Planned: Engine unification (SharpZipLib → SharpCompress)
+### ✅ Completed: Engine unification (SharpZipLib → SharpCompress + 7z.exe → SharpSevenZip)
 
-Replace SharpZipLib with SharpCompress to get:
+SharpZipLib replaced with SharpCompress, 7z.exe external process replaced with SharpSevenZip COM binding:
 - Unified `IArchive` / `IReader` API across all formats
 - Per-instance encoding (no more `ZipStrings.CodePage` global state)
 - Native async/await
 - Selective extraction via `IArchiveEntry.WriteToFile()` — enables per-entry filtering
 - New `IArchiveEngine.ExtractEntriesAsync()` method for filtered extraction
+- ZIP add/delete progress smoothing — no more `CommitUpdate` black box jumps
 
-See [plan](.sisyphus/plans/engine-unification-sharpcompress.md) for phased implementation (TarGzEngine → ArchiveEntryExtractor → ZipEngine → SevenZipEngine).
+See [plan](.sisyphus/plans/engine-unification-sharpcompress.md) for phased implementation details (TarGzEngine → ArchiveEntryExtractor → ZipEngine → SevenZipEngine → cleanup).
 
 ### Planned: File filter feature
 
@@ -385,6 +389,20 @@ Both improvements require COM component integration:
 - Effort: medium (P/Invoke for `COMStreamWrapper`, `FORMATETC`, `STGMEDIUM`)
 
 Both can be packaged as a single helper library if desired.
+
+## Version bump checklist
+
+When releasing a new version, update the version string in ALL of these locations:
+
+| # | File | Line | Content |
+|---|------|------|---------|
+| 1 | `src/MantisZip.UI/AppConstants.cs` | `public const string Version = "x.y.z"` | Single source of truth for the app display |
+| 2 | `src/MantisZip.UI/MantisZip.UI.csproj` | `<Version>x.y.z</Version>` | NuGet/assembly version |
+| 3 | `installer.iss` | `#define MyAppVersion "x.y.z"` | Inno Setup installer output filename and metadata |
+| 4 | `docs/PLAN.md` | `**当前版本**: x.y.z` | Plan document header |
+| 5 | `docs/PROGRESS.md` | `**当前版本**: x.y.z` | Changelog document header (also add a new version entry) |
+
+These 5 files must all be updated together. The `AppConstants.cs` value is the primary source — the other 4 must match it.
 
 ## Build output
 

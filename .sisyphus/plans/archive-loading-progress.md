@@ -200,8 +200,8 @@ Wave 1 (Single task):
   ```
 
   **Evidence to Capture:**
-  - [ ] Build output
-  - [ ] Code review confirming all 3 show/hide points
+  - [x] Build output
+  - [x] Code review confirming all 3 show/hide points
 
   **Commit**: YES
   - Message: `feat(ui): add loading overlay while opening large archives`

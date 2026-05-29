@@ -1,5 +1,16 @@
 # Explorer Path Switcher — 资源管理器路径快速选择
 
+> **状态**: 📋 待定 | **阶段**: [⬜⬜⬜⬜⬜⬜] (0/6)
+
+## 任务总览
+
+- [ ] **1. ExplorerWindowTracker** — COM 封装，获取资源管理器路径列表
+- [ ] **2. PathQuickSelectWindow 布局** — WPF 路径选择弹窗 UI
+- [ ] **3. PathQuickSelectWindow 交互** — 搜索过滤 + 高亮 + 双击选择
+- [ ] **4. CompressSettingsWindow 集成** — Ctrl+G 快捷键
+- [ ] **5. 提取流程集成** — App.xaml.cs + 最终验证
+- [ ] **6. 单元测试** — ExplorerWindowTracker 测试
+
 ## TL;DR
 
 > **Quick Summary**: 在压缩/解压对话框中通过 `Ctrl+G` 快捷键唤出快速路径选择器，显示所有已打开的资源管理器窗口路径，双击即可填入目标位置。

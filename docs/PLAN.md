@@ -4,7 +4,7 @@
 
 **项目状态**: 🟢 开发中 (Phase 6 — 代码重构与文档更新)  
 **创建日期**: 2026-04-23  
-**最后更新**: 2026-05-28  
+**最后更新**: 2026-05-29  
 **当前版本**: 0.3.4
 
 ---
@@ -92,32 +92,49 @@ MantisZip/
 ├── src/
 │   ├── MantisZip.Core/              # 核心业务逻辑
 │   │   ├── Abstractions/            # IArchiveEngine + ArchiveProgress 等模型
-│   │   │   └── ArchiveEngine.cs     # 接口 + 数据模型
+│   │   │   ├── ArchiveEngine.cs     # 接口 + 数据模型
+│   │   │   └── ITableDataProvider.cs    # 表格数据提供者接口（SQLite/Office）
 │   │   ├── Engines/                 # 各格式引擎实现
-│   │   │   ├── ZipEngine.cs         # ZIP (SharpZipLib 遗留 + SharpCompress 读取)
+│   │   │   ├── ZipEngine.cs         # ZIP (SharpCompress)
 │   │   │   ├── SevenZipEngine.cs    # 7z/RAR (SharpSevenZip)
 │   │   │   └── TarGzEngine.cs       # TAR/GZ (SharpCompress)
 │   │   └── Utils/                   # 工具类
-│   │       ├── FileFilter/               # 文件过滤（计划新增）
-│   │       │   ├── FileFilterCriteria.cs # 过滤条件模型
-│   │       │   ├── FileFilterMatcher.cs  # 过滤匹配逻辑
-│   │       │   └── FileFilterPreset.cs   # 过滤预设模型
-│   │       ├── PasswordManager.cs   # 密码管理器
-│   │       ├── ArchiveEntryExtractor.cs  # 单项预览提取
+│   │       ├── PasswordManager.cs   # 密码管理器（DPAPI 加密）
+│   │       ├── CoreLog.cs           # 调试日志（支持隐私脱敏）
+│   │       ├── LogRedactor.cs       # 日志路径脱敏
+│   │       ├── ArchiveEntryExtractor.cs  # 单项预览提取（ZIP/7z）
+│   │       ├── ArchiveStructureAnalyzer.cs  # 智能解压根部分析
 │   │       ├── FileConflictHelper.cs     # 解压冲突处理
-│   │       ├── CoreLog.cs                # 调试日志
-│   │       └── SplitOutputStream.cs      # 分卷压缩输出流
+│   │       ├── FileScanner.cs           # 文件遍历扫描（压缩用）
+│   │       ├── FileFormatInfo.cs        # 预览元数据模型
+│   │       ├── SplitOutputStream.cs     # 分卷压缩输出流
+│   │       ├── PeParser.cs              # PE 可执行文件解析
+│   │       ├── PdfParser.cs             # PDF 元数据解析
+│   │       ├── FontParser.cs            # 字体文件解析（TTF/OTF/WOFF）
+│   │       ├── FlacParser.cs            # FLAC 音频元数据
+│   │       ├── Id3v2Parser.cs           # ID3v2 标签解析（MP3 等）
+│   │       ├── RiffParser.cs            # RIFF 格式解析（WAV）
+│   │       ├── VideoParser.cs           # 视频元数据解析（MP4/MKV/AVI）
+│   │       ├── IsoParser.cs             # ISO 映像元数据
+│   │       ├── OfficeParser.cs          # Office 文档解析（docx/xlsx/pptx）
+│   │       ├── TorrentParser.cs         # BT 种子解析
+│   │       ├── SQLiteParser.cs          # SQLite 数据库头解析
+│   │       └── SqliteDataReader.cs      # SQLite 表数据读取
 │   └── MantisZip.UI/                # WPF 桌面应用（net9.0-windows）
 │       ├── MainWindow.xaml / .cs    # 主窗口（所有逻辑 code-behind）
-│       ├── MainWindow.Preview.cs    # 文件预览子系统
 │       ├── MainWindow.DragDrop.cs   # 拖拽导出
 │       ├── MainWindow.Menu.cs       # 菜单事件
+│       ├── MainWindow.Preview.cs    # 文件预览入口 + 分发
+│       │   ├── Preview.Image.cs     # 图片/GIF 预览
+│       │   ├── Preview.Metadata.cs  # 元数据预览（PE/PDF/字体/音视频等）
+│       │   ├── Preview.Text.cs      # 文本/CSV 预览
+│       │   └── Preview.Web.cs       # HTML/Markdown/SVG 预览
 │       ├── MainWindow.UI.cs         # UI 辅助方法
-│       ├── App.xaml / .cs           # 应用入口（~600 行，核心：OnStartup、主题、选项创建）
-│       ├── App.Cli.cs               # CLI 命令处理器（~970 行）
-│       ├── App.PipeServer.cs        # 命名管道 IPC（~130 行）
-│       ├── App.Password.cs          # 密码管理（~200 行）
-│       ├── App.Logging.cs           # 日志子系统（~140 行）
+│       ├── App.xaml / .cs           # 应用入口（核心：OnStartup、主题、选项创建）
+│       ├── App.Cli.cs               # CLI 命令处理器（--compress/--extract/--open 等）
+│       ├── App.PipeServer.cs        # 命名管道 IPC 多实例通信
+│       ├── App.Password.cs          # 密码管理（TryMatchPassword / QuickVerify 等）
+│       ├── App.Logging.cs           # 日志子系统
 │       ├── AppConstants.cs          # 版本号常量
 │       ├── AppSettings.cs           # 用户设置（JSON 持久化）
 │       ├── SettingsWindow.xaml / .cs    # 设置窗口（六标签页）
@@ -132,21 +149,27 @@ MantisZip/
 │       ├── PasswordEditDialog.xaml / .cs  # 密码编辑框
 │       ├── PasswordHelpDialog.xaml / .cs  # 密码帮助窗口
 │       ├── PasswordManagerWindow.xaml / .cs  # 密码管理器窗口
+│       ├── LogPrivacyHelpDialog.xaml / .cs   # 日志隐私脱敏帮助窗口
+│       ├── RatioToWidthConverter.cs       # 文件大小进度条绑定转换器
 │       ├── ShellIntegration.cs        # 右键菜单注册（HKCU 无管理员）
 │       ├── SystemIconHelper.cs        # SHGetFileInfo 系统图标
-│       ├── Localization/              # 本地化资源
+│       ├── Localization/              # 本地化资源（中/英 JSON）
+│       ├── Themes/                    # 亮色/暗色主题资源字典
 │       └── Resources/                 # 图标、样式等资源
 ├── tests/
-│   └── MantisZip.Tests/              # xUnit 单元测试（40+ 用例）
-│       ├── Engines/                   # ZipEngine / SevenZipEngine / TarGzEngine 测试
-│       └── Fixtures/                  # 测试用压缩包生成
+│   ├── MantisZip.Tests/              # xUnit 单元测试（40+ 用例）
+│   │   ├── Engines/                   # ZipEngine / SevenZipEngine / TarGzEngine 测试
+│   │   └── Fixtures/                  # 测试用压缩包生成
+│   └── test_encoding/                # 一次性 ZIP 编码调试工具
 ├── docs/
-│   ├── PLAN.md
-│   └── PROGRESS.md
+│   ├── PLAN.md                       # 开发计划与进度（本文件）
+│   ├── ARCHITECTURE.md               # 项目架构与技术栈
+│   ├── CLI.md                        # 命令行使用指南
+│   ├── PROGRESS.md                   # 版本历史变更日志
+│   └── manual-test-checklist.md      # 手动测试清单
 ├── .sisyphus/
-│   └── plans/
-│       ├── engine-unification-sharpcompress.md  # ✅ 引擎统一计划 — 已完成 (v0.3.4)
-│       └── file-filter-feature.md                # 文件过滤功能计划
+│   ├── notepads/                                # 功能学习笔记
+│   └── plans/                                   # 详细设计方案文档
 ├── AGENTS.md
 └── MantisZip.sln
 ```
@@ -206,6 +229,7 @@ MantisZip/
 | P2 | 快速密码验证 | ✅ 完成 |
 | P1 | 压缩包注释（编辑已有 + 压缩时指定） | ✅ 完成 |
 | P1 | 注释分配策略（AllSame/FirstOnly/PerLine） | ✅ 完成 |
+| P2 | 7z 压缩保留目录结构（PreserveDirectoryRoot） | ✅ 完成 |
 
 ### 2.3 用户交互
 
@@ -393,12 +417,13 @@ Phase 4: ████████████████████ 100%
 |------|------|
 | 文本预览语法高亮 | 用 AvalonEdit 替换当前 TextBox，支持 20+ 语言语法高亮（C#/Python/XML/HTML/SQL/JS 等）。加一个 NuGet 包 + 改控件名 + 两行配置即可 |
 | 压缩包内重命名/移动 | 右键「重命名」/「移动到…」、F2 快捷键、extract→delete→add 流程；支持 ZIP/7z |
+| RAR 压缩（外置 rar.exe/WinRAR.exe） | 通过已安装的 WinRAR 实现 RAR 格式压缩；支持固实/恢复记录/加密/分卷。依赖：rar.exe 或 WinRAR.exe |
 
 ### 远期（P3）
 
 | 任务 | 说明 | 工作量 |
 |------|------|--------|
-| COM 右键菜单 | 动态菜单名（显示文件名）、菜单排序、自定义图标。注册 `*\shellex\ContextMenuHandlers\{GUID}` | 中 |
+| COM 右键菜单 | 动态菜单名（显示文件名）、菜单排序、自定义图标。注册 `*\shellex\ContextMenuHandlers\{GUID}` → [详细设计](.sisyphus/plans/com-context-menu.md) | 中 |
 | **VirtualFileDataObject** | COM 原生 IDataObject 替代 WPF 包装，拖拽延迟渲染不崩溃。需 P/Invoke：COMStreamWrapper、FORMATETC、STGMEDIUM → [详细设计](.sisyphus/plans/virtual-file-data-object.md) | 中 |
 | 右键菜单目录结构预览 | 在 COM 菜单中读取压缩包 entry 列表，展示文件树（Bandizip 风格） | 高 |
 | 外部工具视频元数据 | ffprobe 提取时长/分辨率/编码，显示在信息面板。需用户安装 FFmpeg | 低 |
@@ -417,18 +442,21 @@ Phase 4: ████████████████████ 100%
 |--------|------|----------|:----:|:--------:|------|
 | **P2** | 文本预览语法高亮 (AvalonEdit) | — | 🟢低 | 1-2h | 替换当前 TextBox，支持 20+ 语言语法高亮 |
 | **P2** | 便携版模式 | [portable-mode.md](.sisyphus/plans/portable-mode.md) | 🟢低 | 1-2h | 哨兵文件触发，路径重定向到 exe 目录，免注册表 |
-| **P2** | 魔数识别（内容检测替代扩展名检测） | [preview-format-detection.md](.sisyphus/plans/preview-format-detection.md) | 🔴高 | 6-8h | 剩余工作：按真实内容（非扩展名）判断格式 |
+| **P2** | 魔数识别（内容检测替代扩展名检测） | [preview-magic-detection.md](.sisyphus/plans/preview-magic-detection.md) | 🔴高 | 6-8h | 剩余工作：按真实内容（非扩展名）判断格式 |
 | **P2** | 提取日志与解压「后悔药」 | [extract-journal-undo.md](.sisyphus/plans/extract-journal-undo.md) | 🟡中 | 3-4h | 解压记录 + 一键回滚；差异化功能亮点 |
-| **P2** | 文件列表筛选/搜索 | [file-filter-feature.md](.sisyphus\plans\file-filter-feature.md) | 🟢低 | 1-2h | 搜索框实时过滤 + 子目录显示切换增强 |
+| **P2** | 文件列表筛选/搜索 | [file-filter-feature.md](.sisyphus/plans/file-filter-feature.md) | 🟢低 | 1-2h | 搜索框实时过滤 + 子目录显示切换增强 |
 | **P2** | MSI 安装包 (WiX) | [msi-packaging-wix.md](.sisyphus/plans/msi-packaging-wix.md) | 🟡中 | 2-3h | Inno Setup EXE → WiX MSI 迁移；企业分发、静默安装 |
+| **P2** | RAR 压缩（外置 rar.exe/WinRAR.exe） | [rar-compression.md](.sisyphus/plans/rar-compression.md) | 🟡中 | 6-8h | 通过已安装的 WinRAR 实现 RAR 格式压缩；支持固实/恢复记录/加密/分卷 |
 | **P3** | 压缩预估 (Compression Estimator) | [compression-estimator.md](.sisyphus/plans/compression-estimator.md) | 🟡中 | 4-5h | 压缩前估算大小/耗时；三级精度策略 |
 | **P3** | VirtualFileDataObject | [virtual-file-data-object.md](.sisyphus/plans/virtual-file-data-object.md) | 🔴高 | 6-8h | COM 原生 IDataObject 替代 WPF OLE 桥，拖拽延迟渲染不崩溃 |
-| **P3** | COM 右键菜单 | — | 🔴高 | 4-6h | 动态菜单名、菜单排序、自定义图标 |
+| **P3** | COM 右键菜单 | [com-context-menu.md](.sisyphus/plans/com-context-menu.md) | 🔴高 | 4-6h | 动态菜单名、菜单排序、自定义图标；与压缩预设互不阻塞 |
 | **P3** | 右键菜单目录结构预览 | — | 🔴高 | 6-8h | COM 菜单中展示压缩包文件树（Bandizip 风格） |
 | **P2** | 压缩包内重命名/移动条目 | [archive-rename-entry.md](.sisyphus/plans/archive-rename-entry.md) | 🟡中 | 3-4h | 右键重命名(F2)/移动到…；extract→delete→add 流程；支持 ZIP/7z |
 | **P2** | 批量进度文件列表 | [batch-progress-list.md](.sisyphus/plans/batch-progress-list.md) | 🟡中 | 3-4h | 批量操作进度窗口增加文件列表，每项显示名称+状态；--extract-batch CLI |
 | **P2** | 资源管理器路径快速选择 | [explorer-path-switcher.md](.sisyphus/plans/explorer-path-switcher.md) | 🟢低 | 1-2h | Ctrl+G 唤出已打开的资源管理器窗口路径列表，双击填入目标位置 |
+| **P2** | 压缩/解压配置预设 | [compress-preset.md](.sisyphus/plans/compress-preset.md) | 🟡中 | 3-4h | 命名预设保存全部设置，支持加载/覆盖/右键菜单一键使用；Phase 1 无依赖可独立实施 |
 | **P3** | 压缩包对比 (Archive Diff) | [archive-diff.md](.sisyphus/plans/archive-diff.md) | 🟡中 | 3-4h | 压缩包文件级差异对比；独特功能但非核心 |
+| **P3** | 可插拔预览模块体系 | [preview-modular-providers.md](.sisyphus/plans/preview-modular-providers.md) | 🟡中 | 3-4h | SQLite/Office 等格式抽取为独立类库，按需分发，缩小安装包体积 |
 | **P3** | 发布 Release | — | 🟢低 | 1-2h | GitHub Releases + CI 自动构建 |
 
 #### 已实现设计方案
@@ -451,7 +479,8 @@ Phase 4: ████████████████████ 100%
 | 压缩包注释（编辑已有 + 压缩注释 + 注释分配策略） | — | v0.3.1 | ArchiveCommentDialog + CompressSettingsWindow TabControl Comment tab + CommentDistribution 枚举 |
 | Emoji.Wpf 彩色 Emoji 渲染 | — | v0.3.2 | 引入 [Emoji.Wpf](https://github.com/samhocevar/emoji.wpf) NuGet 包，替换 SettingsWindow TabControl 和 MainWindow 工具栏/目录树图标 `<TextBlock>` 为 `<emoji:TextBlock>`，全部启用彩色渲染 |
 | 引擎统一 (SharpZipLib→SharpCompress + 7z.exe/SevenZipExtractor→SharpSevenZip) | [engine-unification-sharpcompress.md](.sisyphus/plans/engine-unification-sharpcompress.md) | v0.3.4 | 全部 4 阶段 + 清理完成。ZIP 添加/删除进度平滑，无 CommitUpdate 黑盒跳跃 |
-| 文件大小进度条 | [file-size-progress-bar.md](/.sisyphus/plans/file-size-progress-bar.md) | 0.3.4 | 大小列背景按文件体积比例填充，纯 UI 改动 |
+| 文件大小进度条 | [file-size-progress-bar.md](.sisyphus/plans/file-size-progress-bar.md) | v0.3.4 | 大小列背景按文件体积比例填充，纯 UI 改动 |
+| PNG 透明信息抛弃（Flatten Alpha） | [png-transparency-3way.md](.sisyphus/plans/png-transparency-3way.md) | v0.3.4+ | 工具栏新增 `◼` 按钮切换保留/抛弃 PNG 透明通道，与棋盘格背景按钮独立工作 |
 
 
 

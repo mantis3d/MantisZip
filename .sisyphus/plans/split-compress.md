@@ -607,7 +607,7 @@ Scenario: Build compiles and property binding is correct
 - [x] IPC merge works for both modes (multi-item selection)
 - [x] ProgressWindow shows sequential progress
 - [x] Failed items skipped, final count shown
-- [ ] Old \ 5_MantisZipQuick\ verb key no longer created
-- [ ] New verbs registered: \ 5_MantisZipCompressSeparate\, \ 6_MantisZipCompressCombined\, \ 7_MantisZipCompress\
-- [ ] SettingsWindow checkboxes replace old \EnableQuickCheck\
-- [ ] No regression: \--compress\ dialog mode unchanged
+- [x] Old `5_MantisZipQuick` verb key no longer created（已在 ShellIntegration 中移除）
+- [x] New verbs registered: `5_MantisZipCompressSeparate`, `6_MantisZipCompressCombined`, `7_MantisZipCompress`
+- [x] SettingsWindow checkboxes replace old `EnableQuickCheck`（SettingsWindow 已有 Separate/Combined 两个开关）
+- [x] No regression: `--compress` dialog mode unchanged

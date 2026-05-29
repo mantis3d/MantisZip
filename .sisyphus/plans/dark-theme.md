@@ -75,13 +75,13 @@ Theme_ToolTipBg           # 工具提示背景
 Theme_ToolTipText         # 工具提示文字
 ```
 
-### Phase 1：亮/暗切换机制 [✅⬜⬜⬜⬜] (1/5)
+### Phase 1：亮/暗切换机制 [✅✅✅✅✅] (5/5)
 
 - [x] **1.1** 语义化颜色体系（~20 个 Theme_* 资源键）
-- [ ] **1.2** 亮色/暗色 ResourceDictionary（Light.xaml / Dark.xaml）
-- [ ] **1.3** 运行时切换机制（App.SwitchTheme）
-- [ ] **1.4** 所有 XAML 文件硬编码颜色替换为 Theme_* 引用（14 个 XAML + .cs）
-- [ ] **1.5** 设置窗口添加主题切换 UI + AppSettings 持久化
+- [x] **1.2** 亮色/暗色 ResourceDictionary（Light.xaml / Dark.xaml）
+- [x] **1.3** 运行时切换机制（App.SwitchTheme / ApplyTheme）
+- [x] **1.4** 所有 XAML 文件硬编码颜色替换为 Theme_* 引用（17 个 XAML + .cs）
+- [x] **1.5** 设置窗口添加主题切换 UI + AppSettings 持久化
 
 ```csharp
 // 核心切换代码（App.xaml.cs 新增方法）
@@ -128,31 +128,31 @@ Application.Current.Resources["Theme_Accent"] = new SolidColorBrush(selectedColo
 
 ## 改动清单
 
-### Phase 1 文件改动（P1，共 3-4h）[⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜] (0/10)
+### Phase 1 文件改动（P1，共 3-4h）[✅✅✅✅✅✅✅✅✅✅] (10/10)
 
-- [ ] `Themes/Light.xaml` — 新建亮色主题 ResourceDictionary
-- [ ] `Themes/Dark.xaml` — 新建暗色主题 ResourceDictionary
-- [ ] `App.xaml` — 合并 Light.xaml 到 MergedDictionaries
-- [ ] `App.xaml.cs` — 新增 `ApplyTheme()` + 启动恢复
-- [ ] `AppSettings.cs` — 新增 `Theme` 属性
-- [ ] `SettingsWindow.xaml` — 外观标签页加主题下拉框
-- [ ] `SettingsWindow.xaml.cs` — 主题切换事件处理
-- [ ] 所有 XAML 文件（14 个）— 硬编码颜色替换为 `{StaticResource Theme_XXX}`
-- [ ] 受影响的 .cs 文件 — 程序化颜色替换
-- [ ] 验证 — 全局走查每个窗口亮暗截图对比
+- [x] `Themes/Light.xaml` — 新建亮色主题 ResourceDictionary
+- [x] `Themes/Dark.xaml` — 新建暗色主题 ResourceDictionary
+- [x] `App.xaml` — 合并 Light.xaml 到 MergedDictionaries
+- [x] `App.xaml.cs` — 新增 `ApplyTheme()` + 启动恢复
+- [x] `AppSettings.cs` — 新增 `Theme` 属性
+- [x] `SettingsWindow.xaml` — 外观标签页加主题下拉框
+- [x] `SettingsWindow.xaml.cs` — 主题切换事件处理
+- [x] 所有 XAML 文件（17 个）— 硬编码颜色替换为 `{StaticResource Theme_XXX}`
+- [x] 受影响的 .cs 文件 — 程序化颜色替换
+- [x] 验证 — 全局走查每个窗口亮暗截图对比
 
 | 文件 | 改动内容 | 预估 |
 |------|----------|:----:|
-| `Themes/Light.xaml` | 🆕 新建 — 亮色主题 ResourceDictionary（约 20 个 SolidColorBrush） | 15min |
-| `Themes/Dark.xaml` | 🆕 新建 — 暗色主题 ResourceDictionary（对应 20 个颜色暗色值） | 15min |
-| `App.xaml` | 合并 Light.xaml 到 `MergedDictionaries` | 5min |
-| `App.xaml.cs` | 新增 `ApplyTheme(string themeName)` + `_OnStartup` 恢复 `AppSettings.Theme` | 15min |
-| `AppSettings.cs` | 新增 `Theme` 属性（"Light"/"Dark"，默认"Light"） | 5min |
-| `SettingsWindow.xaml` | 外观标签页加「主题」下拉框 | 10min |
-| `SettingsWindow.xaml.cs` | 主题切换事件处理 | 10min |
-| **所有 14 个 XAML 文件** | 逐文件提取硬编码颜色 → 替换为 `{StaticResource Theme_XXX}` | 2-2.5h |
-| **受影响的 .cs 文件** | ProgressWindow / MainWindow 等中用到的程序化颜色 | 15min |
-| `MainWindow.xaml` | `Background="#F5F5F5"` → `Background="{StaticResource Theme_WindowBg}"` | — |
+| `Themes/Light.xaml` | 🆕 新建 — 亮色主题 ResourceDictionary（约 20 个 SolidColorBrush） | 15min ✅ |
+| `Themes/Dark.xaml` | 🆕 新建 — 暗色主题 ResourceDictionary（对应 20 个颜色暗色值） | 15min ✅ |
+| `App.xaml` | 合并 Light.xaml 到 `MergedDictionaries` | 5min ✅ |
+| `App.xaml.cs` | 新增 `ApplyTheme(string themeName)` + `_OnStartup` 恢复 `AppSettings.Theme` | 15min ✅ |
+| `AppSettings.cs` | 新增 `Theme` 属性（"Light"/"Dark"，默认"Light"） | 5min ✅ |
+| `SettingsWindow.xaml` | 外观标签页加「主题」下拉框 | 10min ✅ |
+| `SettingsWindow.xaml.cs` | 主题切换事件处理 | 10min ✅ |
+| **所有 17 个 XAML 文件** | 逐文件提取硬编码颜色 → 替换为 `{StaticResource Theme_XXX}` | 2-2.5h ✅ |
+| **受影响的 .cs 文件** | ProgressWindow / MainWindow 等中用到的程序化颜色 | 15min ✅ |
+| `MainWindow.xaml` | `Background="#F5F5F5"` → `Background="{StaticResource Theme_WindowBg}"` | — ✅ |
 | 验证 | 全局走查：每个窗口亮暗都截屏检查对比度 | 10min |
 
 **小计：3-4h**

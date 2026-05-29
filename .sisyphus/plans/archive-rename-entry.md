@@ -1,6 +1,16 @@
 # Work Plan: Rename Entries Inside Archive
 
-> **Status**: 📋 Planned | **Estimated effort**: Medium
+> **Status**: 📋 待定 | **阶段**: [⬜⬜⬜⬜⬜⬜] (0/6)
+> **预估工时**: 🟡中 (3-4h)
+
+## 任务总览
+
+- [ ] **1. UI: 重命名对话框** — RenameEntryDialog.xaml/.cs (TextInput + 验证)
+- [ ] **2. UI: 右键菜单 + F2 快捷键** — MainWindow 上下文菜单、快捷键、多选保护
+- [ ] **3. Core: ArchiveEntryRename** — 提取→删除→添加 核心逻辑 (Core/Utils)
+- [ ] **4. UI: 移动到…** — 目录选择弹窗 + 移动处理器
+- [ ] **5. 本地化** — 中英文字符串 (~18 条)
+- [ ] **6. 验证** — 构建 + ZIP/7z 重命名 + TarGz 不支持 + 冲突提示
 
 ## Objective
 

@@ -1,5 +1,14 @@
 # 批量处理进度窗口文件列表
 
+> **状态**: 📋 待定 | **阶段**: [⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜] (0/12)
+
+## 任务总览
+
+- [ ] **Wave 1: 基础模型** — BatchItem 数据模型 + 本地化 + 单元测试 (Task 1-3)
+- [ ] **Wave 2: ProgressWindow UI** — 文件列表 XAML + 批处理模式 API + 测试 (Task 4-6)
+- [ ] **Wave 3: 批处理压缩集成** — RunCompressSeparateBatch + 测试 (Task 7-8)
+- [ ] **Wave 4: 批处理解压** — --extract-batch CLI + IPC + 右键菜单 + 测试 (Task 9-12)
+
 ## TL;DR
 
 > **Quick Summary**: 在批量操作（多压缩包压缩/解压）的进度窗口中添加文件列表，每项显示名称 + 状态（待处理/进行中/已完成/失败），实时刷新。
