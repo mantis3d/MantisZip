@@ -392,7 +392,6 @@ Phase 4: ████████████████████ 100%
 | 任务 | 说明 |
 |------|------|
 | 文本预览语法高亮 | 用 AvalonEdit 替换当前 TextBox，支持 20+ 语言语法高亮（C#/Python/XML/HTML/SQL/JS 等）。加一个 NuGet 包 + 改控件名 + 两行配置即可 |
-| 文件大小进度条 | 大小列背景按文件体积比例填充，一眼看出大文件 |
 | 压缩包内重命名/移动 | 右键「重命名」/「移动到…」、F2 快捷键、extract→delete→add 流程；支持 ZIP/7z |
 
 ### 远期（P3）
@@ -416,7 +415,6 @@ Phase 4: ████████████████████ 100%
 
 | 优先级 | 功能 | 设计文档 | 难度 | 预估工时 | 说明 |
 |--------|------|----------|:----:|:--------:|------|
-| **P1** | 文件大小进度条 | [file-size-progress-bar.md](/.sisyphus/plans/file-size-progress-bar.md) | 🟢低 | 0.5h | 大小列背景按文件体积比例填充，纯 UI 改动 |
 | **P2** | 文本预览语法高亮 (AvalonEdit) | — | 🟢低 | 1-2h | 替换当前 TextBox，支持 20+ 语言语法高亮 |
 | **P2** | 便携版模式 | [portable-mode.md](.sisyphus/plans/portable-mode.md) | 🟢低 | 1-2h | 哨兵文件触发，路径重定向到 exe 目录，免注册表 |
 | **P2** | 魔数识别（内容检测替代扩展名检测） | [preview-format-detection.md](.sisyphus/plans/preview-format-detection.md) | 🔴高 | 6-8h | 剩余工作：按真实内容（非扩展名）判断格式 |
@@ -453,6 +451,7 @@ Phase 4: ████████████████████ 100%
 | 压缩包注释（编辑已有 + 压缩注释 + 注释分配策略） | — | v0.3.1 | ArchiveCommentDialog + CompressSettingsWindow TabControl Comment tab + CommentDistribution 枚举 |
 | Emoji.Wpf 彩色 Emoji 渲染 | — | v0.3.2 | 引入 [Emoji.Wpf](https://github.com/samhocevar/emoji.wpf) NuGet 包，替换 SettingsWindow TabControl 和 MainWindow 工具栏/目录树图标 `<TextBlock>` 为 `<emoji:TextBlock>`，全部启用彩色渲染 |
 | 引擎统一 (SharpZipLib→SharpCompress + 7z.exe/SevenZipExtractor→SharpSevenZip) | [engine-unification-sharpcompress.md](.sisyphus/plans/engine-unification-sharpcompress.md) | v0.3.4 | 全部 4 阶段 + 清理完成。ZIP 添加/删除进度平滑，无 CommitUpdate 黑盒跳跃 |
+| 文件大小进度条 | [file-size-progress-bar.md](/.sisyphus/plans/file-size-progress-bar.md) | 0.3.4 | 大小列背景按文件体积比例填充，纯 UI 改动 |
 
 
 
