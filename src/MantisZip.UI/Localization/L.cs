@@ -124,6 +124,17 @@ public static class L
     public const string Error_Retry                                = "Error_Retry";
     public const string Error_Skip                                 = "Error_Skip";
     public const string Error_Title                                = "Error_Title";
+    public const string ExtractSettings_Browse                      = "ExtractSettings_Browse";
+    public const string ExtractSettings_Cancel                      = "ExtractSettings_Cancel";
+    public const string ExtractSettings_Extract                     = "ExtractSettings_Extract";
+    public const string ExtractSettings_FileCount                   = "ExtractSettings_FileCount";
+    public const string ExtractSettings_ManualPathPlaceholder        = "ExtractSettings_ManualPathPlaceholder";
+    public const string ExtractSettings_Mode_Here                   = "ExtractSettings_Mode_Here";
+    public const string ExtractSettings_Mode_Manual                 = "ExtractSettings_Mode_Manual";
+    public const string ExtractSettings_Mode_Smart                  = "ExtractSettings_Mode_Smart";
+    public const string ExtractSettings_Mode_ToName                 = "ExtractSettings_Mode_ToName";
+    public const string ExtractSettings_ModePreview                 = "ExtractSettings_ModePreview";
+    public const string ExtractSettings_Title                       = "ExtractSettings_Title";
     public const string Main_About_Text                            = "Main_About_Text";
     public const string Main_About_Title                           = "Main_About_Title";
     public const string Main_ArchiveInfo                           = "Main_ArchiveInfo";
