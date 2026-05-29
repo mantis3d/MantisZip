@@ -108,6 +108,10 @@ public partial class MainWindow
         AppSettings.Instance.ShowProgressBars = ShowProgressBarsMenu.IsChecked;
         AppSettings.Instance.Save();
 
+        // 图标透明度随状态变化（与"目录独立基准"风格一致）
+        if (ShowProgressBarsMenu.Icon is Emoji.Wpf.TextBlock icon)
+            icon.Opacity = ShowProgressBarsMenu.IsChecked ? 1.0 : 0.2;
+
         if (!string.IsNullOrEmpty(_currentFolder))
             FilterFiles(_currentFolder);
         else if (!string.IsNullOrEmpty(_currentArchivePath))
