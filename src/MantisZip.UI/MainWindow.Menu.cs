@@ -1,6 +1,7 @@
 using System.IO;
 using System.Linq;
 using System.Windows;
+using System.Windows.Controls;
 using MantisZip.Core;
 using MantisZip.Core.Abstractions;
 using MantisZip.Core.Utils;
@@ -481,4 +482,66 @@ public partial class MainWindow
         catch (OperationCanceledException) { App.LogDebug("ExtractSelectedAsync: cancelled"); pw.Close(); SetStatus(L.T(L.Main_Status_AddCancel)); }
         catch (Exception ex) { App.LogDebug("ExtractSelectedAsync: failed: {0}", ex.Message); pw.Close(); AppMessageBox.Show(L.TF(L.Main_Status_ExtractFailed, ex.Message), L.T(L.App_ErrorTitle), MessageBoxButton.OK, MessageBoxImage.Error); SetStatus(L.T(L.Main_Status_ExtractFailed)); }
     }
+
+    #region 最近打开的文件
+
+    private void RecentFilesMenu_SubmenuOpened(object sender, RoutedEventArgs e)
+    {
+        if (sender is not MenuItem menu) return;
+        menu.Items.Clear();
+
+        var entries = _recentFileManager.GetExisting();
+        if (entries.Count == 0)
+        {
+            menu.Items.Add(new MenuItem
+            {
+                Header = L.T(L.Main_Menu_RecentFiles),
+                IsEnabled = false,
+                ToolTip = null
+            });
+            return;
+        }
+
+        foreach (var entry in entries)
+        {
+            var item = new MenuItem
+            {
+                Header = entry.Path,
+                ToolTip = entry.Path,
+                Tag = entry.Path
+            };
+            item.Click += RecentFile_Click;
+            menu.Items.Add(item);
+        }
+
+        menu.Items.Add(new Separator());
+
+        var clearItem = new MenuItem
+        {
+            Header = L.T(L.Main_Menu_ClearRecentFiles)
+        };
+        clearItem.Click += ClearRecentFiles_Click;
+        menu.Items.Add(clearItem);
+    }
+
+    private async void RecentFile_Click(object? sender, RoutedEventArgs e)
+    {
+        if (sender is MenuItem item && item.Tag is string path)
+        {
+            if (!File.Exists(path))
+            {
+                AppMessageBox.Show(L.T(L.App_FileNotFound), L.T(L.App_ErrorTitle), MessageBoxButton.OK, MessageBoxImage.Warning);
+                _recentFileManager.Remove(path);
+                return;
+            }
+            await LoadArchiveAsync(path);
+        }
+    }
+
+    private void ClearRecentFiles_Click(object? sender, RoutedEventArgs e)
+    {
+        _recentFileManager.Clear();
+    }
+
+    #endregion
 }

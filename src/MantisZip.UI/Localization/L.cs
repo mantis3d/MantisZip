@@ -157,6 +157,7 @@ public static class L
     public const string Main_ArchiveComment_ZipOnly                 = "Main_ArchiveComment_ZipOnly";
     public const string Main_Menu_About                            = "Main_Menu_About";
     public const string Main_Menu_ArchiveComment                   = "Main_Menu_ArchiveComment";
+    public const string Main_Menu_ClearRecentFiles                 = "Main_Menu_ClearRecentFiles";
     public const string Main_Menu_Compress                         = "Main_Menu_Compress";
     public const string Main_Menu_Edit                             = "Main_Menu_Edit";
     public const string Main_Menu_Exit                             = "Main_Menu_Exit";
@@ -166,6 +167,7 @@ public static class L
     public const string Main_Menu_NewArchive                       = "Main_Menu_NewArchive";
     public const string Main_Menu_OpenArchive                      = "Main_Menu_OpenArchive";
     public const string Main_Menu_PasswordManager                  = "Main_Menu_PasswordManager";
+    public const string Main_Menu_RecentFiles                      = "Main_Menu_RecentFiles";
     public const string Main_Menu_Refresh                          = "Main_Menu_Refresh";
     public const string Main_Menu_Settings                         = "Main_Menu_Settings";
     public const string Main_Menu_Tools                            = "Main_Menu_Tools";
@@ -597,7 +599,8 @@ public static class L
     public const string Settings_Pwd_ShowHint                      = "Settings_Pwd_ShowHint";
     public const string Settings_Pwd_ShowNotification              = "Settings_Pwd_ShowNotification";
     public const string Settings_Tab_Appearance                    = "Settings_Tab_Appearance";
-    public const string Settings_Appearance_Theme                  = "Settings_Appearance_Theme";
+    public const string Settings_Appearance_MaxRecentFiles          = "Settings_Appearance_MaxRecentFiles";
+public const string Settings_Appearance_Theme                  = "Settings_Appearance_Theme";
     public const string Settings_Appearance_Theme_Light            = "Settings_Appearance_Theme_Light";
     public const string Settings_Appearance_Theme_Dark             = "Settings_Appearance_Theme_Dark";
     public const string Settings_Appearance_ThemeRestart_Title      = "Settings_Appearance_ThemeRestart_Title";

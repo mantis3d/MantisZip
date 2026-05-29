@@ -140,6 +140,10 @@
                             <ComboBoxItem Tag="Light" Content="{l:L Settings_Appearance_Theme_Light}"/>
                             <ComboBoxItem Tag="Dark" Content="{l:L Settings_Appearance_Theme_Dark}"/>
                         </ComboBox>
+
+                        <TextBlock Text="{l:L Settings_Appearance_MaxRecentFiles}" FontWeight="SemiBold" Margin="0,12,0,4"/>
+                        <TextBox x:Name="MaxRecentFilesBox" Width="100" HorizontalAlignment="Left"
+                                 PreviewTextInput="NumericOnly_PreviewTextInput"/>
                     </StackPanel>
                 </ScrollViewer>
             </TabItem>

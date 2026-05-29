@@ -36,6 +36,7 @@ public partial class MainWindow : Window
     private bool _hasEncryptedArchive; // 当前压缩包是否有加密条目
     private string? _archiveComment;   // 压缩包注释（仅 ZIP 格式支持）
     private List<ArchiveItem> _allItems = new();  // 存储所有文件项
+    private readonly RecentFileManager _recentFileManager = new();
     private readonly Dictionary<string, (int Count, long Size, long CompressedSize)> _dirStats = new(); // 目录统计缓存
     private string _currentFolder = "";  // 当前目录
     private string? _previewTempDir;        // L.T(L.Settings_Tab_Preview)临时目录
@@ -85,6 +86,10 @@ public partial class MainWindow : Window
         }
 
         LoadWindowSettings();
+        _recentFileManager.Load();
+        RecentFilesMenu.SubmenuOpened += RecentFilesMenu_SubmenuOpened;
+        // WPF 需要至少一个子项才渲染为子菜单（有下拉箭头），SubmenuOpened 时会清空重建
+        RecentFilesMenu.Items.Add(new MenuItem { Visibility = Visibility.Collapsed });
         ApplyPreviewPosition(AppSettings.Instance.PreviewPosition);
         ApplyInfoPanelOrientation(AppSettings.Instance.InfoPanelOrientation);
         _previewPanelEnabled = AppSettings.Instance.ShowPreviewPanel;
@@ -632,6 +637,7 @@ public partial class MainWindow : Window
             ArchiveInfoText.Text = L.TF(L.Main_ArchiveInfo, items.Count, FormatSize(totalSize), FormatSize(totalCompressed));
             ArchiveStatsText.Text = L.TF(L.Main_ArchiveStats, items.Count, FormatSize(totalSize), FormatSize(totalCompressed));
 
+            _recentFileManager.Add(archivePath);
             SetStatus(L.TF(L.Main_Status_Loaded, Path.GetFileName(archivePath)));
             UpdatePasswordStatus();
             UpdateSmartExtractBtnState();

@@ -3,6 +3,7 @@ using System.IO;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 using System.Windows.Media;
 using MantisZip.Core.Engines;
 using MantisZip.UI.Localization;
@@ -154,7 +155,8 @@ public partial class SettingsWindow : Window
 
         // 外观
         foreach (ComboBoxItem item in ThemeCombo.Items)
-            if ((string)item.Tag == s.Theme) { ThemeCombo.SelectedItem = item; break; }
+        if ((string)item.Tag == s.Theme) { ThemeCombo.SelectedItem = item; break; }
+        MaxRecentFilesBox.Text = s.MaxRecentFiles.ToString();
 
         // 语言
         LanguageCombo.Items.Clear();
@@ -215,6 +217,7 @@ public partial class SettingsWindow : Window
         s.FontPreviewFontSize = (int)FontPreviewSizeSlider.Value;
         s.ShowPreviewPanel = ShowPreviewPanelCheck.IsChecked == true;
         s.Theme = (ThemeCombo.SelectedItem as ComboBoxItem)?.Tag as string ?? "Light";
+        s.MaxRecentFiles = int.TryParse(MaxRecentFilesBox.Text, out var max) ? Math.Clamp(max, 3, 200) : 10;
         s.UseColorEmoji = UseColorEmojiCheck.IsChecked == true;
         s.PreviewPosition = int.TryParse((PreviewPositionCombo.SelectedItem as ComboBoxItem)?.Tag?.ToString(), out var pos) ? pos : 1;
         s.InfoPanelOrientation = (InfoPanelOrientationCombo.SelectedItem as ComboBoxItem)?.Tag as string ?? "Horizontal";
@@ -623,6 +626,19 @@ public partial class SettingsWindow : Window
     {
         _sevenZipPath = "";
         UpdateSevenZipStatus();
+    }
+
+    private void NumericOnly_PreviewTextInput(object sender, System.Windows.Input.TextCompositionEventArgs e)
+    {
+        // 只允许数字输入
+        foreach (var c in e.Text)
+        {
+            if (!char.IsDigit(c))
+            {
+                e.Handled = true;
+                return;
+            }
+        }
     }
 
     #endregion
