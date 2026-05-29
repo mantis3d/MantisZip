@@ -468,6 +468,13 @@ public static class L
     public const string Pwd_ShowBtn                                = "Pwd_ShowBtn";
     public const string Pwd_Title                                  = "Pwd_Title";
     public const string Pwd_Validation_Required                    = "Pwd_Validation_Required";
+    public const string Settings_Advanced_SevenZipGroupHeader      = "Settings_Advanced_SevenZipGroupHeader";
+    public const string Settings_Advanced_SevenZipStatus           = "Settings_Advanced_SevenZipStatus";
+    public const string Settings_Advanced_SevenZipPath             = "Settings_Advanced_SevenZipPath";
+    public const string Settings_Advanced_SevenZipFound            = "Settings_Advanced_SevenZipFound";
+    public const string Settings_Advanced_SevenZipNotFound         = "Settings_Advanced_SevenZipNotFound";
+    public const string Settings_Advanced_SevenZipSelectDll        = "Settings_Advanced_SevenZipSelectDll";
+    public const string Settings_Advanced_SevenZipReset            = "Settings_Advanced_SevenZipReset";
     public const string Settings_Advanced_AboutDesc                = "Settings_Advanced_AboutDesc";
     public const string Settings_Advanced_AboutHeader              = "Settings_Advanced_AboutHeader";
     public const string Settings_Advanced_AboutLicense             = "Settings_Advanced_AboutLicense";

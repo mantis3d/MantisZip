@@ -4,6 +4,7 @@ using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
+using MantisZip.Core.Engines;
 using MantisZip.UI.Localization;
 
 namespace MantisZip.UI;
@@ -12,6 +13,9 @@ public partial class SettingsWindow : Window
 {
     /// <summary>字号变更时回调主窗口，实时同步预览字号。</summary>
     public Action<int>? OnTextFontSizeChanged { get; set; }
+
+    /// <summary>7z.dll 路径（UI 中临时存储，保存时才写入 AppSettings）。</summary>
+    private string _sevenZipPath = "";
 
     public SettingsWindow()
     {
@@ -135,7 +139,11 @@ public partial class SettingsWindow : Window
         // 文件关联
         UpdateAssocStatus();
 
-        // 高级
+        // 高级 — 7z.dll
+        _sevenZipPath = s.SevenZipPath;
+        UpdateSevenZipStatus();
+
+        // 高级 — 调试日志
         EnableDebugLogCheck.IsChecked = s.EnableDebugLogging;
         LogPathText.Text = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
@@ -213,6 +221,14 @@ public partial class SettingsWindow : Window
 
         s.ShowPasswordMatchNotification = ShowPasswordNotifCheck.IsChecked == true;
         s.PasswordRevealByDefault = RevealPasswordCheck.IsChecked == true;
+
+        // 7z.dll 路径（仅在变更时才持久化并重置引擎）
+        if (_sevenZipPath != s.SevenZipPath)
+        {
+            s.SevenZipPath = _sevenZipPath;
+            // 清除引擎初始化标记，下次使用 7z 操作时重新加载新路径
+            SevenZipEngine.ResetLibraryPath();
+        }
 
         s.EnableDebugLogging = EnableDebugLogCheck.IsChecked == true;
         s.LogPrivacyMode = (LogPrivacyModeCombo.SelectedItem as ComboBoxItem)?.Tag as string ?? "off";
@@ -548,4 +564,66 @@ public partial class SettingsWindow : Window
             AppMessageBox.Show(L.TF(L.Settings_CleanPreviewFailed, ex.Message), L.T(L.App_ErrorTitle), MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
+
+    #region 7z.dll 配置
+
+    /// <summary>
+    /// 更新 7z.dll 状态显示。
+    /// 根据当前配置的路径和文件是否存在更新 UI。
+    /// </summary>
+    private void UpdateSevenZipStatus()
+    {
+        // 确定当前有效路径：用户指定优先，否则用自动探测的
+        var effectivePath = !string.IsNullOrEmpty(_sevenZipPath)
+            ? _sevenZipPath
+            : SevenZipEngine.SevenZipDllPath;
+
+        var exists = File.Exists(effectivePath);
+
+        SevenZipCurrentPathText.Text = effectivePath;
+
+        if (exists)
+        {
+            SevenZipStatusIcon.Text = "✅";
+            SevenZipStatusText.Text = L.T(L.Settings_Advanced_SevenZipFound);
+            SevenZipStatusText.Foreground = System.Windows.Media.Brushes.Green;
+        }
+        else
+        {
+            SevenZipStatusIcon.Text = "❌";
+            SevenZipStatusText.Text = L.T(L.Settings_Advanced_SevenZipNotFound);
+            SevenZipStatusText.Foreground = System.Windows.Media.Brushes.Red;
+        }
+
+        // 重置按钮仅在用户指定了路径时启用
+        SevenZipResetBtn.IsEnabled = !string.IsNullOrEmpty(_sevenZipPath);
+    }
+
+    private void SevenZipBrowseBtn_Click(object sender, RoutedEventArgs e)
+    {
+        var dialog = new Microsoft.Win32.OpenFileDialog
+        {
+            Title = L.T(L.Settings_Advanced_SevenZipSelectDll),
+            Filter = "7z.dll|7z.dll|动态链接库 (*.dll)|*.dll|所有文件 (*.*)|*.*",
+            CheckFileExists = true,
+            Multiselect = false,
+            InitialDirectory = Path.Combine(
+                AppDomain.CurrentDomain.BaseDirectory,
+                Environment.Is64BitProcess ? "x64" : "x86"),
+        };
+
+        if (dialog.ShowDialog() == true)
+        {
+            _sevenZipPath = dialog.FileName;
+            UpdateSevenZipStatus();
+        }
+    }
+
+    private void SevenZipResetBtn_Click(object sender, RoutedEventArgs e)
+    {
+        _sevenZipPath = "";
+        UpdateSevenZipStatus();
+    }
+
+    #endregion
 }

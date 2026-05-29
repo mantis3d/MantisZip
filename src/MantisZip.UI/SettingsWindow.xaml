@@ -526,10 +526,40 @@
                 </TabItem.Header>
                 <ScrollViewer VerticalScrollBarVisibility="Auto" Background="{StaticResource Theme_SurfaceBg}">
                     <StackPanel Margin="10">
-                        <Button Content="{l:L Settings_Advanced_CleanPreviewTemp}" Width="140" Height="26" Margin="0,16,0,0"
+                        <!-- 7z.dll 配置 -->
+                        <GroupBox Header="{l:L Settings_Advanced_SevenZipGroupHeader}" Padding="8" Margin="0,0,0,12">
+                            <StackPanel>
+                                <!-- 状态行 -->
+                                <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                                    <TextBlock VerticalAlignment="Center" FontWeight="SemiBold">
+                                        <Run Text="{l:L Settings_Advanced_SevenZipStatus}"/><Run Text=":"/>
+                                    </TextBlock>
+                                    <TextBlock x:Name="SevenZipStatusIcon" Margin="8,0,4,0" FontSize="14" VerticalAlignment="Center"/>
+                                    <TextBlock x:Name="SevenZipStatusText" VerticalAlignment="Center"/>
+                                </StackPanel>
+                                <!-- 路径显示（只读） -->
+                                <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                                    <TextBlock VerticalAlignment="Center" FontWeight="SemiBold">
+                                        <Run Text="{l:L Settings_Advanced_SevenZipPath}"/><Run Text=":"/>
+                                    </TextBlock>
+                                    <TextBlock x:Name="SevenZipCurrentPathText" Margin="8,0,0,0" VerticalAlignment="Center"
+                                               TextWrapping="Wrap" TextTrimming="CharacterEllipsis" MaxWidth="400"
+                                               ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}"/>
+                                </StackPanel>
+                                <!-- 操作按钮 -->
+                                <StackPanel Orientation="Horizontal">
+                                    <Button x:Name="SevenZipBrowseBtn" Content="{l:L Settings_Advanced_Browse}" Width="90" Height="26"
+                                            Click="SevenZipBrowseBtn_Click"/>
+                                    <Button x:Name="SevenZipResetBtn" Content="{l:L Settings_Advanced_SevenZipReset}" Width="100"
+                                            Height="26" Margin="8,0,0,0" Click="SevenZipResetBtn_Click"/>
+                                </StackPanel>
+                            </StackPanel>
+                        </GroupBox>
+
+                        <Button Content="{l:L Settings_Advanced_CleanPreviewTemp}" Width="140" Height="26" Margin="0,0,0,0"
                                 HorizontalAlignment="Left" Click="CleanTemp_Click"/>
 
-                        <TextBlock Text="{l:L Settings_Advanced_AboutHeader}" FontWeight="SemiBold" Margin="0,0,0,4"/>
+                        <TextBlock Text="{l:L Settings_Advanced_AboutHeader}" FontWeight="SemiBold" Margin="0,16,0,4"/>
                         <TextBlock TextWrapping="Wrap" Foreground="{StaticResource Theme_TextSecondary}" FontSize="11">
                             <Run Text="{l:L Settings_Advanced_AboutVersion}"/><Run x:Name="AboutVersionText"/>
                             <LineBreak/>
