@@ -14,6 +14,7 @@ public class AppSettings
     public int DefaultLevel { get; set; } = 5;
     public bool CloseAfterCompress { get; set; } = true;
     public bool KeepOriginalExtension { get; set; } = false;  // 保留源文件扩展名（abc.max → abc.max.zip）
+    public bool PreserveDirectoryRoot { get; set; } = true;    // 压缩文件夹时保留外层目录
 
     // ===== 解压 =====
     public string ExtractDestination { get; set; } = "ask"; // same-dir / desktop / last / ask

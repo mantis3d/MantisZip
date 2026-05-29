@@ -293,6 +293,7 @@ public partial class App : Application
 
         return new ArchiveOptions
         {
+            PreserveDirectoryRoot = AppSettings.Instance.PreserveDirectoryRoot,
             ErrorResolver = info =>
             {
                 if (applyToAll && chosenAction.HasValue)
