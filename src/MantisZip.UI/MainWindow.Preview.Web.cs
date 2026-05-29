@@ -44,7 +44,7 @@ public partial class MainWindow
         SetToolbar(
             Array.Empty<ToolbarButton>(),
             new[] {
-                new ToolbarButton { Text = "</>", Tooltip = L.T(L.Preview_ToggleSource), IsToggle = true, IsChecked = _previewShowSource, OnClick = TogglePreviewSource },
+                new ToolbarButton { Text = "</>", Tooltip = L.T(L.Preview_ToggleSource), IsToggle = true, IsChecked = _previewShowSource, OnClickAsync = TogglePreviewSource },
             }
         );
         ShowPreviewPanel();
@@ -85,12 +85,12 @@ public partial class MainWindow
             // 工具栏：左侧字号 ± ，右侧 源码切换 + emoji 短代码切换
             SetToolbar(
                 new[] {
-                    new ToolbarButton { Text = "A−", Tooltip = L.T(L.Preview_FontDecrease), OnClick = () => ChangeMarkdownFontSize(-1) },
-                    new ToolbarButton { Text = "A+", Tooltip = L.T(L.Preview_FontIncrease), OnClick = () => ChangeMarkdownFontSize(1) },
+                    new ToolbarButton { Text = "A−", Tooltip = L.T(L.Preview_FontDecrease), OnClickAsync = () => ChangeMarkdownFontSize(-1) },
+                    new ToolbarButton { Text = "A+", Tooltip = L.T(L.Preview_FontIncrease), OnClickAsync = () => ChangeMarkdownFontSize(1) },
                 },
                 new[] {
-                    new ToolbarButton { Text = "</>", Tooltip = L.T(L.Preview_ToggleSource), IsToggle = true, IsChecked = _previewShowSource, OnClick = TogglePreviewSource },
-                    new ToolbarButton { Text = "😊", Tooltip = "Emoji 短代码转换", IsToggle = true, IsChecked = _markdownEmojiEnabled, OnClick = ToggleMarkdownEmoji },
+                new ToolbarButton { Text = "</>", Tooltip = L.T(L.Preview_ToggleSource), IsToggle = true, IsChecked = _previewShowSource, OnClickAsync = TogglePreviewSource },
+                    new ToolbarButton { Text = "😊", Tooltip = "Emoji 短代码转换", IsToggle = true, IsChecked = _markdownEmojiEnabled, OnClickAsync = ToggleMarkdownEmoji },
                 }
             );
             ShowPreviewPanel();
@@ -185,7 +185,7 @@ public partial class MainWindow
         return _emojiMapping;
     }
 
-    private async void ToggleMarkdownEmoji()
+    private async Task ToggleMarkdownEmoji()
     {
         _markdownEmojiEnabled = !_markdownEmojiEnabled;
         await ReRenderMarkdownAsync();
@@ -196,7 +196,7 @@ public partial class MainWindow
     /// 在源码模式下显示文件原始内容（PreviewTextBox），隐藏 WebView2；
     /// 切回渲染模式时重新渲染（Markdown）或重新导航（HTML）。
     /// </summary>
-    private async void TogglePreviewSource()
+    private async Task TogglePreviewSource()
     {
         _previewShowSource = !_previewShowSource;
 
@@ -258,11 +258,11 @@ public partial class MainWindow
         }
     }
 
-    private void ChangeMarkdownFontSize(int delta)
+    private async Task ChangeMarkdownFontSize(int delta)
     {
         // 通过修改 WebView2 页面字体大小的 CSS 来实现 — 更可靠的方式是重新渲染带不同字号样式的 HTML
         // 简单实现：重新渲染时修改 body 字号
         _markdownPreviewFontSize = Math.Clamp(_markdownPreviewFontSize + delta, 10, 32);
-        _ = ReRenderMarkdownAsync();
+        await ReRenderMarkdownAsync();
     }
 }

@@ -921,6 +921,7 @@ public partial class MainWindow
         public bool IsToggle { get; set; }
         public bool IsChecked { get; set; }
         public Action? OnClick { get; set; }
+        public Func<Task>? OnClickAsync { get; set; }
     }
 
     private void SetToolbar(ToolbarButton[] leftButtons, ToolbarButton[] rightButtons)
@@ -995,19 +996,35 @@ public partial class MainWindow
         }
 
         if (btn.IsToggle)
-        if (btn.IsToggle)
         {
-            border.MouseLeftButtonUp += (_, _) =>
+            border.MouseLeftButtonUp += async (_, _) =>
             {
                 btn.IsChecked = !btn.IsChecked;
                 border.Background = btn.IsChecked ? _toolbarCheckedBrush : Brushes.Transparent;
-                btn.OnClick?.Invoke();
+                try
+                {
+                    if (btn.OnClickAsync != null)
+                        await btn.OnClickAsync();
+                    else
+                        btn.OnClick?.Invoke();
+                }
+                catch (Exception ex) { App.TraceLog("ToolbarButton.OnClick failed: {0}", ex.Message); }
             };
             if (btn.IsChecked) border.Background = _toolbarCheckedBrush;
         }
         else
         {
-            border.MouseLeftButtonUp += (_, _) => btn.OnClick?.Invoke();
+            border.MouseLeftButtonUp += async (_, _) =>
+            {
+                try
+                {
+                    if (btn.OnClickAsync != null)
+                        await btn.OnClickAsync();
+                    else
+                        btn.OnClick?.Invoke();
+                }
+                catch (Exception ex) { App.TraceLog("ToolbarButton.OnClick failed: {0}", ex.Message); }
+            };
         }
         return border;
     }
