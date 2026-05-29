@@ -148,6 +148,8 @@ public partial class MainWindow
                     Size = 0,
                     CompressedSize = 0,
                 };
+                if (!string.IsNullOrEmpty(_currentArchivePath))
+                    dirItem.CompressedDisplay = GetCompressedDisplayMode(_currentArchivePath, _currentFormat);
                 ShowDirectoryPreview(dirItem);
             }
         }
@@ -179,7 +181,10 @@ public partial class MainWindow
                     if (item.IsDirectory && item.FullPath == dirName)
                     { directItems.Add(item); continue; }
                     // 否则合成一个目录条目
-                    directItems.Add(new ArchiveItem { Name = dirName + "/", FullPath = dirName, Size = 0, IsDirectory = true, IconSource = SystemIconHelper.GetFolderIcon() });
+                    var syntheticDir = new ArchiveItem { Name = dirName + "/", FullPath = dirName, Size = 0, IsDirectory = true, IconSource = SystemIconHelper.GetFolderIcon() };
+                    if (!string.IsNullOrEmpty(_currentArchivePath))
+                        syntheticDir.CompressedDisplay = GetCompressedDisplayMode(_currentArchivePath, _currentFormat);
+                    directItems.Add(syntheticDir);
                 }
                 else
                 {
@@ -199,7 +204,10 @@ public partial class MainWindow
                         if (implicitDirs.Add(subDir))
                         {
                             var subDirFullPath = folderPath + "/" + subDir;
-                            directItems.Add(new ArchiveItem { Name = subDirFullPath + "/", FullPath = subDirFullPath, Size = 0, IsDirectory = true, IconSource = SystemIconHelper.GetFolderIcon() });
+                            var subDirItem = new ArchiveItem { Name = subDirFullPath + "/", FullPath = subDirFullPath, Size = 0, IsDirectory = true, IconSource = SystemIconHelper.GetFolderIcon() };
+                            if (!string.IsNullOrEmpty(_currentArchivePath))
+                                subDirItem.CompressedDisplay = GetCompressedDisplayMode(_currentArchivePath, _currentFormat);
+                            directItems.Add(subDirItem);
                         }
                     }
                 }
@@ -252,6 +260,9 @@ public partial class MainWindow
                 long maxSize = 0, maxCompressed = 0;
                 long maxDirSize = 0, maxDirCompressed = 0;
 
+                Func<ArchiveItem, long> effectiveCompressed = i =>
+                    i.CompressedDisplay == ArchiveItem.CompressedDisplayMode.NotCompressed ? i.Size : i.CompressedSize;
+
                 if (separateBaseline)
                 {
                     // 分列基准：文件 vs 目录各自算 max
@@ -260,19 +271,19 @@ public partial class MainWindow
                     if (files.Any())
                     {
                         maxSize = files.Max(i => i.Size);
-                        maxCompressed = files.Max(i => i.CompressedSize);
+                        maxCompressed = files.Max(effectiveCompressed);
                     }
                     if (dirs.Any())
                     {
                         maxDirSize = dirs.Max(i => i.Size);
-                        maxDirCompressed = dirs.Max(i => i.CompressedSize);
+                        maxDirCompressed = dirs.Max(effectiveCompressed);
                     }
                 }
                 else
                 {
                     // 统一基准：全部条目一起算 max
                     maxSize = sortedItems.Max(i => i.Size);
-                    maxCompressed = sortedItems.Max(i => i.CompressedSize);
+                    maxCompressed = sortedItems.Max(effectiveCompressed);
                 }
 
                 foreach (var item in sortedItems)
@@ -283,7 +294,7 @@ public partial class MainWindow
 
                     long baseCompressed = separateBaseline && item.IsDirectory ? maxDirCompressed : maxCompressed;
                     if (baseCompressed > 0)
-                        item.CompressedSizeRatio = (double)item.CompressedSize / baseCompressed;
+                        item.CompressedSizeRatio = (double)effectiveCompressed(item) / baseCompressed;
                 }
 
                 // 日期：总是文件间比较（目录 LastModified 为 DateTime.MinValue）
@@ -302,6 +313,15 @@ public partial class MainWindow
                 else if (datedItems.Count == 1)
                 {
                     datedItems[0].DateRatio = 1.0;
+                }
+            }
+            else
+            {
+                foreach (var item in sortedItems)
+                {
+                    item.SizeRatio = 0;
+                    item.CompressedSizeRatio = 0;
+                    item.DateRatio = 0;
                 }
             }
 
@@ -454,6 +474,29 @@ public partial class MainWindow
             else if (newDir == ListSortDirection.Descending)
                 col.Header = clean + " ▼";
         }
+
+        // 目录独立基准开启时：目录永远排在上面，文件排在下面
+        if (AppSettings.Instance.SeparateDirBaseline)
+        {
+            e.Handled = true; // 阻止默认排序，改为手动
+            // 手动更新 col.SortDirection（e.Handled=true 后 WPF 不再自动更新）
+            col.SortDirection = newDir;
+            var view = System.Windows.Data.CollectionViewSource.GetDefaultView(FileListGrid.ItemsSource);
+            if (view != null)
+            {
+                view.SortDescriptions.Clear();
+                if (newDir.HasValue)
+                {
+                    // 第一排序键：目录/文件分离（始终升序，目录在上面）
+                    view.SortDescriptions.Add(
+                        new System.ComponentModel.SortDescription("SortOrder", ListSortDirection.Ascending));
+                    // 第二排序键：用户点击的列
+                    view.SortDescriptions.Add(
+                        new System.ComponentModel.SortDescription(col.SortMemberPath, newDir.Value));
+                }
+                // newDir == null（回到未排序）→ 清空 SortDescriptions 后视图回到 FilterFiles 的默认排列
+            }
+        }
     }
 
     /// <summary>
@@ -553,12 +596,31 @@ public class FolderNode : INotifyPropertyChanged
 
 public class ArchiveItem : Core.Abstractions.ArchiveItem
 {
+    /// <summary>压缩后大小的显示模式</summary>
+    public enum CompressedDisplayMode
+    {
+        /// <summary>正常显示实际的 CompressedSize（ZIP）</summary>
+        Normal,
+        /// <summary>格式本身不压缩（ISO, TAR），用 Size 作为压缩后大小，压缩率始终 100%</summary>
+        NotCompressed,
+        /// <summary>有压缩但无法获取逐项压缩后大小（7z, RAR, TGZ/GZ），显示 ---</summary>
+        Unavailable
+    }
+
     public string DisplayName { get; set; } = string.Empty;
     public string NameForSort { get; set; } = string.Empty;
     public ImageSource? IconSource { get; set; }
 
+    public CompressedDisplayMode CompressedDisplay { get; set; } = CompressedDisplayMode.Normal;
+
     public string SizeDisplay => FormatSize(Size);
-    public string CompressedSizeDisplay => FormatSize(CompressedSize);
+
+    public string CompressedSizeDisplay => CompressedDisplay switch
+    {
+        CompressedDisplayMode.Unavailable => "---",
+        CompressedDisplayMode.NotCompressed => FormatSize(Size),
+        _ => FormatSize(CompressedSize)
+    };
 
     public string NameDisplay
     {
@@ -581,9 +643,13 @@ public class ArchiveItem : Core.Abstractions.ArchiveItem
         get
         {
             if (IsDirectory || Size == 0) return "---";
-            if (CompressedSize == 0) return "0%";
-            var ratio = (double)CompressedSize / Size;
-            return $"{ratio * 100:F1}%";
+            return CompressedDisplay switch
+            {
+                CompressedDisplayMode.Unavailable => "---",
+                CompressedDisplayMode.NotCompressed => "100%",
+                _ when CompressedSize == 0 => "---",
+                _ => $"{Math.Min((double)CompressedSize / Size, 1.0) * 100:F1}%"
+            };
         }
     }
 
@@ -592,8 +658,13 @@ public class ArchiveItem : Core.Abstractions.ArchiveItem
         get
         {
             if (IsDirectory || Size == 0) return double.MaxValue;
-            if (CompressedSize == 0) return 0;
-            return (double)CompressedSize / Size;
+            return CompressedDisplay switch
+            {
+                CompressedDisplayMode.Unavailable => double.MaxValue,
+                CompressedDisplayMode.NotCompressed => 1.0,
+                _ when CompressedSize == 0 => double.MaxValue,
+                _ => Math.Min((double)CompressedSize / Size, 1.0)
+            };
         }
     }
 
@@ -613,8 +684,9 @@ public class ArchiveItem : Core.Abstractions.ArchiveItem
     /// <summary>日期相对比例（0.0 ~ 1.0，FilterFiles 中计算赋值）</summary>
     public double DateRatio { get; set; }
 
-    /// <summary>压缩率进度条值（绝对比例，复用 RatioSort，门控 IsDirectory/Size=0）</summary>
+    /// <summary>压缩率进度条值（绝对比例，复用 RatioSort，门控 IsDirectory/Size=0/Unavailable）</summary>
     public double RatioBarValue => ProgressBarEnabled && !IsDirectory && Size > 0
+        && CompressedDisplay != CompressedDisplayMode.Unavailable
         ? Math.Min(RatioSort, 1.0)
         : 0;
 

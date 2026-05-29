@@ -487,8 +487,17 @@ public partial class MainWindow
         if (_dirStats.TryGetValue(item.FullPath, out var stat))
         {
             var sizeStr = ArchiveItem.FormatSize(stat.Size);
-            var compressedStr = ArchiveItem.FormatSize(stat.CompressedSize);
-            var ratio = stat.Size > 0 ? $"{(double)stat.CompressedSize / stat.Size * 100:F1}%" : "--";
+            var displayMode = !string.IsNullOrEmpty(_currentArchivePath)
+                ? GetCompressedDisplayMode(_currentArchivePath, _currentFormat)
+                : ArchiveItem.CompressedDisplayMode.Normal;
+            var (compressedStr, ratio) = displayMode switch
+            {
+                ArchiveItem.CompressedDisplayMode.Unavailable => ("---", "---"),
+                ArchiveItem.CompressedDisplayMode.NotCompressed => (sizeStr, "100%"),
+                _ => (
+                    ArchiveItem.FormatSize(stat.CompressedSize),
+                    stat.Size > 0 ? $"{(double)stat.CompressedSize / stat.Size * 100:F1}%" : "--")
+            };
             formatInfo = L.TF(L.Preview_DirInfo, stat.Count, sizeStr, compressedStr, ratio);
         }
 
@@ -508,9 +517,14 @@ public partial class MainWindow
             return;
 
         var totalSize = _allItems.Sum(i => i.Size);
-        var totalCompressed = _allItems.Sum(i => i.CompressedSize);
         int fileCount = _allItems.Count(i => !i.IsDirectory);
         int dirCount = _allItems.Count(i => i.IsDirectory);
+
+        // 对于无法获取逐项压缩后大小的格式，用实际文件大小作为总压缩大小
+        var anyUnavailable = _allItems.Any(i => i.CompressedDisplay == ArchiveItem.CompressedDisplayMode.Unavailable);
+        var totalCompressed = anyUnavailable
+            ? new FileInfo(_currentArchivePath).Length
+            : _allItems.Sum(i => i.CompressedSize);
 
         PreviewHeader.Text = L.TF(L.Preview_ArchiveHeader, Path.GetFileName(_currentArchivePath));
 

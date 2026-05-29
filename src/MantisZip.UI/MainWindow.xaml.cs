@@ -70,6 +70,13 @@ public partial class MainWindow : Window
         if (Resources["ColumnHeaderContextMenu"] is ContextMenu headerMenu)
             headerMenu.Opened += ColumnHeaderContextMenu_Opened;
 
+        // 进度条整体显隐：图标透明度与 IsChecked 同步
+        if (ShowProgressBarsMenu.Icon is Emoji.Wpf.TextBlock progIcon)
+        {
+            ShowProgressBarsMenu.IsChecked = AppSettings.Instance.ShowProgressBars;
+            progIcon.Opacity = ShowProgressBarsMenu.IsChecked ? 1.0 : 0.2;
+        }
+
         // 目录独立基准菜单项：图标透明度与 IsChecked 同步（与列标题右键菜单风格一致）
         if (SepDirBaselineMenu.Icon is Emoji.Wpf.TextBlock sepIcon)
         {
@@ -399,6 +406,12 @@ public partial class MainWindow : Window
         if (view != null)
         {
             view.SortDescriptions.Clear();
+            // 目录独立基准开启时：第一排序键为目录/文件分离
+            if (AppSettings.Instance.SeparateDirBaseline)
+            {
+                view.SortDescriptions.Add(
+                    new System.ComponentModel.SortDescription("SortOrder", ListSortDirection.Ascending));
+            }
             view.SortDescriptions.Add(
                 new System.ComponentModel.SortDescription(sortCol.SortMemberPath, direction));
             App.LogDebug("ApplySavedSort: view type={0}, SortDescriptions count={1}",
@@ -426,9 +439,9 @@ public partial class MainWindow : Window
 
     private static ArchiveFormat GetFormatByExtension(string path)
     {
-        var ext = Path.GetExtension(path).ToLowerInvariant();
         if (path.EndsWith(".tar.gz", StringComparison.OrdinalIgnoreCase)) return ArchiveFormat.Tar;
-        return ext switch
+
+        return Path.GetExtension(path).ToLowerInvariant() switch
         {
             ".zip" => ArchiveFormat.Zip,
             ".7z" => ArchiveFormat.SevenZip,
@@ -437,6 +450,31 @@ public partial class MainWindow : Window
             ".iso" => ArchiveFormat.Iso,
             _ => ArchiveFormat.Zip
         };
+    }
+
+    /// <summary>
+    /// 根据压缩包路径和格式返回压缩后大小的显示模式。
+    /// .tar 和 .iso 是不压缩的格式（显示实际大小，100%）。
+    /// .7z/.rar 和 .tgz/.tar.gz/.gz 是有压缩但无法获得逐项压缩后大小的格式（显示 ---）。
+    /// .zip 是正常模式（显示实际压缩后大小）。
+    /// </summary>
+    private static ArchiveItem.CompressedDisplayMode GetCompressedDisplayMode(string archivePath, ArchiveFormat format)
+    {
+        if (format == ArchiveFormat.Zip)
+            return ArchiveItem.CompressedDisplayMode.Normal;
+        if (format == ArchiveFormat.Iso)
+            return ArchiveItem.CompressedDisplayMode.NotCompressed;
+        if (format == ArchiveFormat.Tar)
+        {
+            // .tar 是未压缩的容器格式，.tgz/.tar.gz/.gz 是有压缩的
+            var ext = Path.GetExtension(archivePath).ToLowerInvariant();
+            if (ext == ".tar")
+                return ArchiveItem.CompressedDisplayMode.NotCompressed;
+            // .tgz / .gz / .tar.gz（已在上层被映射为 Tar）
+            return ArchiveItem.CompressedDisplayMode.Unavailable;
+        }
+        // 7z, RAR
+        return ArchiveItem.CompressedDisplayMode.Unavailable;
     }
 
     /// <summary>
@@ -494,6 +532,7 @@ public partial class MainWindow : Window
 
             _currentFormat = GetFormatByExtension(archivePath);
             _archiveComment = ReadArchiveComment(archivePath, _currentFormat);
+            var compressedDisplay = GetCompressedDisplayMode(archivePath, _currentFormat);
 
             var items = await engine.ListEntriesAsync(archivePath);
 
@@ -553,6 +592,7 @@ public partial class MainWindow : Window
                 IsDirectory = i.IsDirectory,
                 IsEncrypted = i.IsEncrypted,
                 Crc32 = i.Crc32,
+                CompressedDisplay = compressedDisplay,
                 IconSource = i.IsDirectory
                     ? SystemIconHelper.GetFolderIcon()
                     : SystemIconHelper.GetFileIcon(Path.GetExtension(i.Name))
@@ -585,7 +625,10 @@ public partial class MainWindow : Window
 
             ArchiveNameText.Text = Path.GetFileName(archivePath);
             var totalSize = items.Sum(i => i.Size);
-            var totalCompressed = items.Sum(i => i.CompressedSize);
+            // 对于 Unavailable 模式的格式，用实际文件大小作为总压缩大小
+            var totalCompressed = compressedDisplay == ArchiveItem.CompressedDisplayMode.Unavailable
+                ? new FileInfo(archivePath).Length
+                : items.Sum(i => i.CompressedSize);
             ArchiveInfoText.Text = L.TF(L.Main_ArchiveInfo, items.Count, FormatSize(totalSize), FormatSize(totalCompressed));
             ArchiveStatsText.Text = L.TF(L.Main_ArchiveStats, items.Count, FormatSize(totalSize), FormatSize(totalCompressed));
 
