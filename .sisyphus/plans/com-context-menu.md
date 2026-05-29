@@ -1,0 +1,540 @@
+# COM 右键菜单（Shell Context Menu）
+
+> 将当前基于注册表静态动词的右键菜单替换为 COM `IContextMenu` 实现，支持动态菜单文本、子菜单、自定义图标、预设集成。
+> **状态**: 📋 待定 | **阶段**: [⬜⬜⬜⬜⬜⬜⬜⬜⬜] (0/9)
+> **前置依赖**: SharpCompress 引擎迁移完成（`ListEntriesAsync` 用于动态显示压缩包文件名）
+
+---
+
+## Context
+
+### 现状
+
+当前 `ShellIntegration.cs`（~580 行）通过写入 `HKCU\Software\Classes` 注册表实现右键菜单：
+
+| 特性 | 当前限制 |
+|------|---------|
+| 菜单文本 | **静态** — 编译时就写死了，如"用 MantisZip 解压到此处" |
+| 文件名嵌入 | **做不到** — 无法显示"添加到 报告.zip"这种动态文本 |
+| 预设支持 | **做不到** — 预设数量动态变化，无法静态注册 |
+| 子菜单 | 层叠模式有 bug（`CommandFlags=8` 问题），`ExtendedSubCommandsKey` 不稳定 |
+| 图标 | 只能从 `shell32.dll` 取索引，无法用自定义图标 |
+| 排序 | 用编号前缀（`01_`、`02_`）勉强控制，不优雅 |
+| 卸载 | 需要遍历删除注册表键，容易残留 |
+
+### COM 菜单的优势
+
+| 特性 | COM 方案 |
+|------|---------|
+| 菜单文本 | **运行时生成** — 可读取文件名，可调用 API |
+| 子菜单 | **原生支持** — `IContextMenu` 原生支持 HMENU 子菜单 |
+| 图标 | **HICON** — 可加载任意 .ico/.png 资源 |
+| 动态条目 | 每次右键时调用 `QueryContextMenu`，天然动态 |
+| 注册 | **仅一次** — 注册 `{GUID}` 到 `shellex`，后续全由代码控制 |
+| 预设集成 | 可在菜单中枚举当前预设列表 |
+
+### 依赖关系
+
+```
+文件过滤 (file-filter-feature.md)      压缩预设 (compress-preset.md)
+        │                                       │
+        └──────────┬────────────────────────────┘
+                   ▼
+          COM 右键菜单 ← 提供动态载体供预设展示
+                   │
+                   ▼
+          压缩预设 Phase 2
+        (CLI + COM 菜单集成)
+```
+
+三个计划互不阻塞，但 COM 菜单完成后，压缩预设 Phase 2 可以接入。
+
+---
+
+## Work Objectives
+
+### Core Objective
+用 COM `IContextMenu` + `IShellExtInit` 实现取代 `ShellIntegration.cs` 的静态注册表方案，支持动态菜单文本、子菜单、自定义图标，并为压缩预设提供动态展示载体。
+
+### Concrete Deliverables
+- COM 组件：实现 `IShellExtInit`、`IContextMenu` 接口
+- 动态菜单：嵌入文件名（如"添加到 报告.zip"）
+- 子菜单支持：替代现有层叠模式，更稳定
+- 图标支持：为菜单项提供自定义图标
+- 设置集成：保留现有各菜单项的开关逻辑
+- 注册/反注册：32/64 位 COM 注册 + 清理旧注册表
+- Install/Uninstall CLI：更新 `--install-shell` / `--uninstall-shell`
+
+### Must Have
+- [ ] COM 组件注册到 `*\shellex\ContextMenuHandlers\{GUID}` 和 `Directory\shellex\ContextMenuHandlers\{GUID}`
+- [ ] 动态菜单文本（至少嵌入文件名）
+- [ ] 保留现有 8 个菜单项和它们的 toggle 开关
+- [ ] 保留层叠/独立动词两种模式
+- [ ] 菜单项可显示图标
+- [ ] `--install-shell` / `--uninstall-shell` 正常工作
+- [ ] 卸载时清除旧的静态注册表条目
+
+### Must NOT Have
+- 不做文件关联（`OpenWithProgids` 功能保留在 ShellIntegration.cs 中）
+- 不做拖拽相关的 COM 实现（那是 `VirtualFileDataObject` 计划）
+- 不改变现有的 `AppSettings` 菜单开关接口
+
+---
+
+## Verification Strategy
+
+> **ZERO HUMAN INTERVENTION** — ALL verification is agent-executed.
+
+### Test Decision
+- **Infrastructure exists**: NO
+- **Automated tests**: NO
+- **Agent-Executed QA**: ALWAYS
+
+### QA Policy
+- **COM 组件加载测试**：注册后，用 PowerShell 或测试代码验证 CLSID 可创建
+- **菜单显示测试**：用 `IExplorerPaneVisibility` 或手动验证
+- **点击执行测试**：验证 InvokeCommand 正确触发 CLI
+- **注册/反注册测试**：安装后注册表存在，卸载后注册表清理
+
+---
+
+## Execution Strategy
+
+### Parallel Execution Waves
+
+```
+Wave 1 (Research + setup):
+├── Task 1: COM context menu research + .NET pattern setup
+└── Task 2: Current ShellIntegration audit + migration mapping
+
+Wave 2 (Core COM implementation):
+├── Task 3: IShellExtInit — get file paths from shell
+├── Task 4: IContextMenu.QueryContextMenu — build dynamic menu
+├── Task 5: IContextMenu.InvokeCommand — execute actions
+└── Task 6: IContextMenu.GetCommandString — help text
+
+Wave 3 (Integration + polish):
+├── Task 7: Registration + unregistration logic
+├── Task 8: Integration with AppSettings menu toggles
+├── Task 9: Icon support for menu items
+└── Task F1-F4: Final verification
+```
+
+### Critical Path
+Task 1 → Task 3 → Task 4 → Task 5 → Task 7 → Task 8 → Task 9 → F1-F4
+
+---
+
+## TODOs
+
+- [ ] 1. COM 右键菜单方案研究 + 环境搭建
+
+  **What to do**:
+  - 研究以下内容：
+    - `IShellExtInit` 接口规范（`Initialize(LPCITEMIDLIST, IDataObject, HKEY)`）
+    - `IContextMenu` 接口规范（`QueryContextMenu`、`InvokeCommand`、`GetCommandString`）
+    - .NET 中实现 COM 接口的要求：`[ComVisible(true)]`、`[Guid]`、`[ClassInterface]`、`[ProgId]`
+    - 强命名程序集（SNK 签名）—— COM 注册必需
+    - Regasm（`regasm.exe` / `regasm /codebase`）vs 自注册（`[ComRegisterFunction]`）
+    - 32/64 位双注册（`\Software\Classes\CLSID\{GUID}` vs `\Software\Classes\Wow6432Node\CLSID\{GUID}`）
+    - InprocServer32 路径指向 .NET 运行时引导程序
+    - Windows 10/11 的 shell 扩展调试方法（`%LOCALAPPDATA%\Microsoft\Windows\Shell\` 日志）
+  - 搭建测试项目或编写原型代码验证 COM 接口可被 Explorer 加载
+  - 输出研究报告（记录关键发现和风险点）
+
+  **Must NOT do**:
+  - 不要直接修改 ShellIntegration.cs
+  - 不要在未验证的情况下注册到生产环境
+
+  **Recommended Agent Profile**:
+  - Category: `deep`（研究密集型，需要探索 .NET COM 互操作最佳实践）
+  - Skills: 建议用 `librarian` 查找 .NET COM shell extension 实现示例
+
+  **Parallelization**:
+  - Can Run In Parallel: YES
+  - Wave: Wave 1
+  - Blocked By: None
+
+  **Acceptance Criteria**:
+  - [ ] 确定 .NET 实现 COM shell extension 的最佳方案
+  - [ ] 验证原型可被 Explorer 加载
+  - [ ] 输出注册/调试/部署方案
+
+  **References**:
+  - MSDN: `IContextMenu` / `IShellExtInit` interface docs
+  - GitHub: 搜索 .NET COM shell extension 实现（C#）
+  - UI/ShellIntegration.cs — 当前实现，了解要迁移的内容
+
+  **Commit**: NO（研究性任务，无代码产出）
+
+---
+
+- [ ] 2. 当前 ShellIntegration 审计 + 迁移映射
+
+  **What to do**:
+  - 对 `ShellIntegration.cs` 进行逐功能审计：
+    - 列出所有注册表写入点
+    - 列出所有菜单项及其 toggle 设置
+    - 列出所有目标类型（`*`、`Directory`、`Directory\Background`）
+    - 列出层叠模式和独立动词模式的区别
+    - 列出 `AppliesTo` 过滤规则
+    - 列出图标设置逻辑
+    - 列出 `--install-shell` / `--uninstall-shell` 调用点
+  - 生成迁移映射表：每个注册表条目 → 对应的 COM 菜单处理方式
+  - 标记哪些逻辑保留在 `ShellIntegration.cs`（如文件关联）、哪些迁移到 COM 组件
+
+  **Must NOT do**:
+  - 不要开始写任何代码
+
+  **References**:
+  - UI/ShellIntegration.cs — 审计对象
+
+  **Parallelization**:
+  - Can Run In Parallel: YES
+  - Wave: Wave 1
+  - Blocked By: None
+
+  **Acceptance Criteria**:
+  - [ ] 完整的迁移映射表
+  - [ ] 明确文件关联 vs 右键菜单的界限
+
+  **Commit**: NO（分析性任务）
+
+---
+
+- [ ] 3. `IShellExtInit` 实现
+
+  **What to do**:
+  - 新建 `src/MantisZip.UI/ShellExt/ContextMenuHandler.cs`
+  - 实现 `IShellExtInit`：
+    ```csharp
+    [ComVisible(true)]
+    [Guid("XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX")]
+    [ClassInterface(ClassInterfaceType.None)]
+    [ProgId("MantisZip.ContextMenu")]
+    public class ContextMenuHandler : IShellExtInit, IContextMenu
+    {
+        private string[]? _selectedFiles;
+        private string? _targetFolder; // Directory\Background 模式下的目录
+
+        public void Initialize(IntPtr pidlFolder, IntPtr pDataObj, IntPtr hKeyProgId)
+        {
+            // 从 IDataObject 提取选中的文件路径
+            // 支持 *（文件）和 Directory（文件夹）两种调用上下文
+        }
+    }
+    ```
+  - 定义 COM GUID（用 `guidgen.exe` 或在线生成器生成新的 GUID）
+  - 从 `IDataObject` 提取文件路径：
+    - 获取 `FORMATETC` 为 `CF_HDROP`
+    - 解析 `STGMEDIUM` 中的文件列表
+  - 处理两种调用上下文：
+    - `*`（文件）：`_selectedFiles` 填充选中的文件路径
+    - `Directory`（文件夹）：`_selectedFiles` 填充选中的文件夹路径
+    - `Directory\Background`（背景右键）：`_targetFolder` 填充当前目录
+
+  **Must NOT do**:
+  - 不要依赖 WinForms（WPF 项目避免引入 System.Windows.Forms）
+
+  **References**:
+  - [MSDN: IShellExtInit](https://learn.microsoft.com/en-us/windows/win32/api/shobjidl_core/nn-shobjidl_core-ishellextinit)
+  - GitHub .NET shell extension 示例
+
+  **Parallelization**:
+  - NO
+  - Wave: Wave 2
+  - Blocked By: Task 1
+
+  **Acceptance Criteria**:
+  - [ ] Initialize 正确提取文件路径
+  - [ ] 支持文件、文件夹、背景三种调用上下文
+  - [ ] 异常时安全退出（不崩溃 Explorer）
+
+  **Commit**: YES
+
+---
+
+- [ ] 4. `IContextMenu.QueryContextMenu` — 构建动态菜单
+
+  **What to do**:
+  - 实现 `QueryContextMenu`：
+    - 接收 `HMENU` 句柄，用 `Win32Native.InsertMenu` / `InsertMenuItem` 添加菜单项
+    - 菜单结构（与现有 ShellIntegration 保持一致的 8 个菜单项）：
+      ```
+      ──────────── 分隔符 ────────────
+      用 MantisZip 打开
+      用 MantisZip 解压到此处
+      智能解压到此处
+      用 MantisZip 解压到（文件名）
+      用 MantisZip 解压到……
+      ──────────── 分隔符 ────────────
+      压缩到独立的（文件名）
+      压缩到（父目录名）
+      用 MantisZip 压缩
+      ──────────── 分隔符 ────────────
+      ```
+    - **动态文本**：将"（文件名）"替换为实际文件名
+      - 单文件选中：`解压到 报告` / `压缩到 报告.zip`
+      - 多文件选中：`解压到 报告 等 5 个文件` / `压缩到 文档 等 3 个文件`
+    - **层叠模式**（`EnableCascadingMenu`）：用 `InsertMenu` 的 `MF_POPUP` 创建子菜单
+    - **每个菜单项对应独立的命令 ID**，用于 `InvokeCommand` 区分
+    - 读取 `AppSettings` 判断各菜单项是否显示
+    - 菜单项顺序严格保持（用 `idCmdFirst` + offset 控制）
+    - 应用 `AppliesTo` 过滤（仅压缩包文件显示"打开/解压"菜单）
+
+  **Must NOT do**:
+  - 不要硬编码字符串（从 `L.cs` 获取，带动态参数）
+  - 不要使用 `CommandFlags=8`（旧 bug 的根源）
+
+  **References**:
+  - UI/ShellIntegration.cs:200-260 — 当前菜单项注册逻辑
+  - UI/AppSettings.cs — EnableCascadingMenu, ShowMenuIcons 等
+  - [MSDN: IContextMenu.QueryContextMenu](https://learn.microsoft.com/en-us/windows/win32/api/shobjidl_core/nf-shobjidl_core-icontextmenu-querycontextmenu)
+
+  **Parallelization**:
+  - NO
+  - Wave: Wave 2
+  - Blocked By: Task 3
+
+  **Acceptance Criteria**:
+  - [ ] 8 个菜单项全部显示
+  - [ ] 动态文本正确显示文件名
+  - [ ] 层叠模式和独立动词模式都正常工作
+  - [ ] 菜单 toggle 开关生效
+  - [ ] 分隔符位置正确
+  - [ ] AppliesTo 过滤生效
+
+  **Commit**: YES (groups with 5, 6)
+
+---
+
+- [ ] 5. `IContextMenu.InvokeCommand` — 执行菜单操作
+
+  **What to do**:
+  - 实现 `InvokeCommand`：
+    - 根据命令 ID 映射到对应的 CLI 命令
+    - 映射表：
+      | 命令 ID | 用户点击的菜单 | CLI 调用 |
+      |---------|--------------|---------|
+      | 0 | 用 MantisZip 打开 | `--open "{path}"` |
+      | 1 | 解压到此处 | `--extract-here "{path}"` |
+      | 2 | 智能解压 | `--extract-smart "{path}"` |
+      | 3 | 解压到（文件名） | `--extract-to-name "{path}"` |
+      | 4 | 解压到… | `--extract "{path}"` |
+      | 5 | 压缩到独立的 | `--compress-separate "{path1}" "{path2}"` |
+      | 6 | 压缩到（父目录名） | `--compress-combined "{path1}" "{path2}"` |
+      | 7 | 用 MantisZip 压缩 | `--compress "{path1}" "{path2}"` |
+    - 支持 `Directory\Background` 模式：
+      - 没有选中文件时，不在背景模式显示"打开/解压"菜单
+      - 背景模式只显示压缩菜单，目标路径为当前目录
+    - 使用 `Process.Start` 启动自身 exe 并传递 CLI 参数（与现有行为一致）
+    - 异常处理：任何异常不抛到 Explorer
+
+  **References**:
+  - UI/App.xaml.cs / App.Cli.cs — 现有 CLI 入口点
+  - [MSDN: IContextMenu.InvokeCommand](https://learn.microsoft.com/en-us/windows/win32/api/shobjidl_core/nf-shobjidl_core-icontextmenu-invokecommand)
+
+  **Parallelization**:
+  - NO
+  - Wave: Wave 2
+  - Blocked By: Task 4
+
+  **Acceptance Criteria**:
+  - [ ] 每个菜单项点击后触发正确的 CLI 命令
+  - [ ] 多文件选中时传递所有路径
+  - [ ] 异常不会崩溃 Explorer
+
+  **Commit**: YES (groups with 4, 6)
+
+---
+
+- [ ] 6. `IContextMenu.GetCommandString` — 帮助文本
+
+  **What to do**:
+  - 实现 `GetCommandString`：
+    - 返回每个命令的 Unicode 帮助文本（显示在状态栏）
+    - 支持 `GCS_HELPTEXT` 和 `GCS_VERB`（动词名称）
+    - 动词名称用于脚本调用：`explorer.exe` 可以通过动词名调用
+
+  **Parallelization**:
+  - NO
+  - Wave: Wave 2
+  - Blocked By: Task 4
+
+  **Acceptance Criteria**:
+  - [ ] 每个命令返回正确的帮助文本
+  - [ ] 动词名称可用
+
+  **Commit**: YES (groups with 4, 5)
+
+---
+
+- [ ] 7. 注册/反注册逻辑
+
+  **What to do**:
+  - 新建 `src/MantisZip.UI/ShellExt/ContextMenuRegistration.cs`
+  - 注册方法 `Install()`：
+    - 写入 `HKCU\Software\Classes\*\shellex\ContextMenuHandlers\MantisZip\{GUID}`
+    - 写入 `HKCU\Software\Classes\Directory\shellex\ContextMenuHandlers\MantisZip\{GUID}`
+    - 写入 `HKCU\Software\Classes\Directory\Background\shellex\ContextMenuHandlers\MantisZip\{GUID}`
+    - 写入 CLSID（`HKCU\Software\Classes\CLSID\{GUID}`）指向 InprocServer32
+    - InprocServer32 设置 `Assembly`、`Class`、`RuntimeVersion`、`CodeBase` 等 .NET 加载信息
+    - 支持 32/64 位双注册（Wow6432Node 分支）
+    - 调用 `SHChangeNotify` 刷新 Shell
+  - 反注册方法 `Uninstall()`：
+    - 删除所有 `ContextMenuHandlers` 条目
+    - 删除 CLSID 条目
+    - 调用 `SHChangeNotify` 刷新 Shell
+  - 修改 `ShellIntegration.cs`（或调用方）：
+    - `InstallShell` 方法中，如果 COM 菜单已注册，则不再做静态注册
+    - 迁移现有 `ShellIntegration.InstallMenu()` 逻辑到 COM 注册
+  - 更新 `--install-shell` / `--uninstall-shell` 为同时处理 COM 注册 + 文件关联
+
+  **Must NOT do**:
+  - 不要删除文件关联功能（OpenWithProgids 保留不动）
+
+  **References**:
+  - UI/ShellIntegration.cs:InstallMenu — 现有注册逻辑
+  - UI/ShellIntegration.cs:UninstallMenu — 现有反注册逻辑
+  - UI/App.xaml.cs — `--install-shell` / `--uninstall-shell` 处理
+
+  **Parallelization**:
+  - NO
+  - Wave: Wave 3
+  - Blocked By: Task 3（COM 组件需要先存在）
+
+  **Acceptance Criteria**:
+  - [ ] Register 后右键菜单正常出现
+  - [ ] Unregister 后右键菜单消失
+  - [ ] 32 位和 64 位都工作
+  - [ ] --install-shell 正常完成
+  - [ ] 旧的静态注册表条目被清理
+
+  **Commit**: YES
+  - Message: `feat(shell): add COM context menu registration`
+
+---
+
+- [ ] 8. AppSettings 菜单开关集成
+
+  **What to do**:
+  - 在 COM 菜单处理程序（`ContextMenuHandler.cs`）中读取 `AppSettings`：
+    - 在 `QueryContextMenu` 中判断各 toggle
+    - 注意：COM 组件在 Explorer 进程内运行，不能直接访问 WPF 的 `AppSettings`
+    - **解决方案**：将设置写入 `HKCU\Software\MantisZip\ContextMenu`，COM 组件从注册表读取
+    - 或使用 IPC（named pipe）与 MantisZip 进程通信（更复杂）
+    - 建议方案：**注册表同步**——MantisZip 保存设置时，同时写入 `HKCU\Software\MantisZip\ContextMenu`
+  - 设置项（从注册表读取）：
+    - `EnableCascadingMenu` (DWORD)
+    - `ShowMenuIcons` (DWORD)
+    - `EnableOpenMenu` ~ `EnableCompressMenu` 等 8 个 toggle (DWORD)
+  - 修改 `AppSettings.cs`：设置变更时同步到 ContextMenu 注册表键
+  - 如果设置变更后需要即时生效，调用 `SHChangeNotify` 刷新 Explorer
+
+  **Must NOT do**:
+  - 不要在 COM 组件中引用任何 WPF 或 MantisZip.UI 类型（Explorer 进程隔离）
+  - COM 组件应该是**轻量**的，只读取注册表 + 调用 CLI
+
+  **References**:
+  - UI/AppSettings.cs — 源设置
+  - UI/ShellIntegration.cs — 当前如何读取设置
+
+  **Parallelization**:
+  - NO
+  - Wave: Wave 3
+  - Blocked By: Task 4
+
+  **Acceptance Criteria**:
+  - [ ] COM 组件从注册表读取设置
+  - [ ] AppSettings 保存时同步到注册表
+  - [ ] 设置变更后 Explorer 正确反映
+
+  **Commit**: YES (groups with 7)
+
+---
+
+- [ ] 9. 菜单图标支持
+
+  **What to do**:
+  - 在 `QueryContextMenu` 中处理图标：
+    - 使用 `MENUITEMINFO.fType = MFT_OWNERDRAW` 或 `MIIM_BITMAP`
+    - 更好的方式：`MENUITEMINFO.dwItemData` + 所有者绘制
+    - 或使用 `SetMenuItemBitmaps` 设置图标
+  - 图标来源：
+    - 内置资源：MantisZip 主程序图标
+    - 分隔符不需要图标
+  - 遵守 `AppSettings.ShowMenuIcons` 设置
+  - 图标缓存：避免每次右键都重新加载（`ConcurrentDictionary` 或静态字段）
+
+  **Must NOT do**:
+  - 不要从 `shell32.dll` 取图标（当前做法，不灵活）
+
+  **References**:
+  - UI/ShellIntegration.cs — 当前图标设置（shell32.dll 索引）
+  - Win32 `MENUITEMINFO` / `SetMenuItemBitmaps` 文档
+
+  **Parallelization**:
+  - NO
+  - Wave: Wave 3
+  - Blocked By: Task 4
+
+  **Acceptance Criteria**:
+  - [ ] 菜单项显示图标
+  - [ ] ShowMenuIcons=false 时无图标
+  - [ ] 图标加载不影响菜单显示速度
+
+  **Commit**: YES
+  - Message: `feat(shell): add custom icons to COM context menu`
+
+---
+
+## Final Verification Wave
+
+- [ ] F1. **Plan Compliance Audit** — `oracle`
+  Verify all Must Have implemented. Check no static registry verbs remain (except file associations).
+
+- [ ] F2. **Code Quality Review** — `unspecified-high`
+  Build check. Check COM visibility attributes correct. Verify no WPF dependency in COM component. Check exception handling in all COM interface methods.
+
+- [ ] F3. **Real Manual QA** — `unspecified-high`
+  Full test cycle:
+  1. Register COM menu → verify menus appear on all file types
+  2. Click each menu item → verify correct CLI command executed
+  3. Test on archive (.zip) → verify open/extract menus appear
+  4. Test on non-archive (.txt) → verify only compress menus appear
+  5. Toggle each setting → verify menu changes
+  6. Cascade mode on/off → verify submenu vs flat menu
+  7. Directory right-click → verify correct menus
+  8. Directory background right-click → verify correct menus
+  9. Multi-select → verify distribute paths correctly (compress)
+  10. Unregister → verify menus disappear
+  11. Old static entries cleaned up
+
+- [ ] F4. **Scope Fidelity Check** — `deep`
+  Verify no file association change. Verify no drag-drop COM work leaked in. Verify no WPF reference in COM component.
+
+---
+
+## Commit Strategy
+
+- **3-6**: `feat(shell): implement COM IContextMenu handler`
+- **7-8**: `feat(shell): add COM context menu registration and settings sync`
+- **9**: `feat(shell): add custom icons to COM context menu`
+- (Tasks 1-2 are research/audit, no commits)
+
+---
+
+## Success Criteria
+
+### Final Checklist
+- [ ] COM 组件在 Explorer 中加载正常，不崩溃
+- [ ] 8 个菜单项全功能工作
+- [ ] 动态文本正确显示文件名
+- [ ] 层叠模式 / 独立动词模式都可正常工作
+- [ ] 菜单开关 toggle 全部生效
+- [ ] 图标显示正常
+- [ ] 多文件选中传递所有路径
+- [ ] 注册/反注册完整无残留
+- [ ] 旧静态注册表条目清理干净
+- [ ] 文件关联（OpenWithProgids）不受影响
+- [ ] `--install-shell` / `--uninstall-shell` 同时处理 COM 注册和文件关联
