@@ -356,8 +356,8 @@ public class SevenZipEngine : IArchiveEngine
 
             if (sourcePaths.Length == 1 && Directory.Exists(sourcePaths[0]))
             {
-                // 单一目录 — 使用 CompressDirectory 保留目录根
-                compr.PreserveDirectoryRoot = true;
+                // 单一目录 — 使用 CompressDirectory
+                compr.PreserveDirectoryRoot = options.PreserveDirectoryRoot;
                 compr.CompressDirectory(
                     sourcePaths[0],
                     outputPath,

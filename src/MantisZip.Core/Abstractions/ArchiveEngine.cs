@@ -75,6 +75,12 @@ public class ArchiveOptions
     /// 多压缩包时注释的分配方式
     /// </summary>
     public CommentDistribution CommentDistribution { get; set; } = CommentDistribution.AllSame;
+
+    /// <summary>
+    /// 压缩单文件夹时是否保留外层目录根（如 Folder/file.txt vs file.txt）。
+    /// 仅对 SevenZipEngine 的单目录压缩路径有效。
+    /// </summary>
+    public bool PreserveDirectoryRoot { get; set; } = true;
 }
 
 /// <summary>

@@ -126,7 +126,7 @@ public class SevenZipEngineTests : IDisposable
         var srcDir = TrackDir(ArchiveFixtures.CreateSourceDirectory());
         var outputPath = TrackFile(Path.Combine(Path.GetTempPath(), "MantisZipTest", $"{Guid.NewGuid()}.7z"));
 
-        await _engine.CompressAsync([srcDir], outputPath, new ArchiveOptions());
+        await _engine.CompressAsync([srcDir], outputPath, new ArchiveOptions { PreserveDirectoryRoot = false });
 
         Assert.True(File.Exists(outputPath));
 
