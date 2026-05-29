@@ -54,9 +54,11 @@
 ## Work Objectives
 
 ### Core Objective
+
 用 COM `IContextMenu` + `IShellExtInit` 实现取代 `ShellIntegration.cs` 的静态注册表方案，支持动态菜单文本、子菜单、自定义图标，并为压缩预设提供动态展示载体。
 
 ### Concrete Deliverables
+
 - COM 组件：实现 `IShellExtInit`、`IContextMenu` 接口
 - 动态菜单：嵌入文件名（如"添加到 报告.zip"）
 - 子菜单支持：替代现有层叠模式，更稳定
@@ -66,6 +68,7 @@
 - Install/Uninstall CLI：更新 `--install-shell` / `--uninstall-shell`
 
 ### Must Have
+
 - [ ] COM 组件注册到 `*\shellex\ContextMenuHandlers\{GUID}` 和 `Directory\shellex\ContextMenuHandlers\{GUID}`
 - [ ] 动态菜单文本（至少嵌入文件名）
 - [ ] 保留现有 8 个菜单项和它们的 toggle 开关
