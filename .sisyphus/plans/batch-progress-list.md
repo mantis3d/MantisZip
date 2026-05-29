@@ -1,13 +1,13 @@
 # 批量处理进度窗口文件列表
 
-> **状态**: 📋 待定 | **阶段**: [⬜⬜⬜⬜⬜⬜⬜⬜⬜] (0/9)
+> **状态**: 📋 待定 | **阶段**: [⬜⬜⬜⬜⬜⬜⬜■⬜] (1/9 — Task 8 ✅)
 
 ## 任务总览
 
 - [ ] **Wave 1: 基础模型** — BatchItem 数据模型 + 本地化 (Task 1-2)
 - [ ] **Wave 2: ProgressWindow UI** — 文件列表 XAML + 批处理模式 API + 测试 (Task 3-5)
 - [ ] **Wave 3: 批量压缩集成** — 共享压缩核心 + CLI/GUI 两边集成 + 测试 (Task 6)
-- [ ] **Wave 4: 批处理解压** — IPC 合并 + ExtractSettingsWindow + HandleExtract* 改造 + 测试 (Task 7-9)
+- [ ] **Wave 4: 批处理解压** — IPC 合并 + ExtractSettingsWindow (✅ 已完成) + HandleExtract* 改造 + 测试 (Task 7, 9)
 
 ## TL;DR
 
@@ -130,7 +130,7 @@ Wave 3 (Integration — depends on T3, T4):
 
 Wave 4 (Batch Extract — depends on T6):
 ├── Task 7: IPC 合并基础设施 + HandleExtractBatch 核心方法
-├── Task 8: ExtractSettingsWindow XAML + 逻辑（文件列表 + 输出路径模式）
+├── Task 8: ExtractSettingsWindow XAML + 逻辑（文件列表 + 输出路径模式）✅ 已完成（独立执行）
 ├── Task 9: 改造 HandleExtractHere/Smart/ToNamed/Extract + 测试
 
 Wave FINAL:
@@ -148,7 +148,7 @@ Task            Depends On          Blocks
 5 (tests)       1, 2                —（不阻塞实现）
 6 (compress)    3, 4                7
 7 (IPC infra)  6                   8, 9
-8 (settings Win) 7                  9
+8 (settings Win) 7                  9 ✅ 已完成
 9 (handlers)   7, 8                 F1-F4
 F1-F4           all                 —
 ```
@@ -871,7 +871,7 @@ F1-F4           all                 —
 
 ---
 
-- [ ] 8. **创建 ExtractSettingsWindow 解压设置窗口**
+- [x] 8. **创建 ExtractSettingsWindow 解压设置窗口**
 
   **设计目的**：
   - 统一替换 `--extract`（解压到……）当前的简单文件夹选择对话框
