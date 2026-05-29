@@ -75,49 +75,53 @@ public static class FileFormatDetector
 }
 ```
 
-### 2. `FileFormat` 枚举 (`Core/Utils/FileFormat.cs`)
+### 2. `FileFormat` 枚举（追加到现有 `Core/Utils/FileFormatInfo.cs`）
 
-```csharp
-public enum FileFormat
-{
-    Unknown,
+`FileFormat` 枚举**已存在**于 `Core/Utils/FileFormatInfo.cs` 末尾，使用**短名风格**。Plan B 不新建文件，只需追加当前缺失的值。
 
-    // 图像（已有 Plan A WIC 支持）
-    Png, Jpeg, Gif, Bmp, Ico, Webp, Tga, Hdr, Exr,
+现有枚举值（代码中已有的，Plan B 直接引用，不重复定义）：
 
-    // 可执行文件
-    PeExe, PeDll, PeSys, MsiInstaller,
-
-    // 文档
-    Pdf, Docx, Xlsx, Pptx, Odt, Ods, Odp, Epub, Rtf, DjVu, Xps,
-
-    // 音频
-    Mp3, Flac, Wav, OggVorbis, M4a, Wma, Ape, Opus,
-
-    // 视频
-    Mp4, Avi, Mkv, WebM, Flv, Wmv, Mov,
-
-    // 压缩包
-    Zip, SevenZip, Rar, Tar, GZip, BZip2, Xz, Zstd,
-
-    // 字体
-    TrueType, OpenType, Woff, Woff2,
-
-    // 数据库
-    Sqlite, AccessDb, Dbase, Parquet,
-
-    // 证书/安全
-    CertDer, CertPem, Pkcs12,
-
-    // 其他
-    Torrent, WindowsLnk, Iso9660,
-    Stl, Svg, Dicom, Fits, Vhd, Vmdk, Vhdx,
-    Icl, // Icon Library (PE 变体)
-    Sqlite, // 同上
-}
+```
+Unknown,
+Jpeg, Png, Gif, Bmp, WebP, Ico, Tga, Hdr, Exr, Svg,      // 图像
+Wav, Flac, Mp3,                                              // 音频
+Mp4, Mkv, WebM, Wmv, Mov, Avi, Flv,                         // 视频
+Pdf, Docx, Xlsx, Pptx, Epub, Mobi, Azw3,                     // 文档
+Text, Html, Markdown,                                         // 文本/标记
+Pe, Elf,                                                      // 可执行
+Zip, SevenZip, Rar, Tar, Gz, Bz2, Xz, Zstd, Iso,             // 压缩包
+Sqlite, Dbf,                                                  // 数据库
+Stl, Dxf, Step, Fbx,                                          // 3D
+Ttf, Otf, Woff,                                               // 字体
+Torrent, Dicom, Cer, Pfx, Lnk, Vhd, Vmdk, Icl,               // 其他
+Subtitle, OfficeOpenXml, OfficeLegacy,                        // 其他
+Iso9660, Udf,                                                 // 映像
 ```
 
-**只包含 Plan A 已支持的格式**，避免超前定义。当 Plan A 添加新格式时，同步在此添加对应枚举值。
+Plan B 需要追加的值（与现有命名风格一致，短名）：
+
+```csharp
+// 追加到现有 FileFormat 枚举末尾（文件 Core/Utils/FileFormatInfo.cs）
+
+// 音频（补充）
+Ogg,
+
+// 文档（补充）
+Odt, Ods, Odp, Rtf, DjVu, Xps,
+
+// 字体（补充）
+Woff2,
+
+// 其他
+Fits, Vhdx, Parquet,
+```
+
+**追加原则**：
+- 使用短名（`Gz` 而非 `GZip`，`Bz2` 而非 `BZip2`，`Ttf` 而非 `TrueType`），与现有代码一致
+- 不拆分子类型：PE 不分 `PeExe/PeDll/PeSys`（统一用 `Pe`，通过 `FileFormatInfo.Subsystem` 区分）
+- 证书不拆分 `CertDer/CertPem/Pkcs12`（统一用 `Cer`/`Pfx`）
+- 不超前定义 Plan A 未实现的格式（如 `MsiInstaller`、`AccessDb`、`Dbase`、`Parquet` 等待实际实现时再加）
+- 当 Plan A 添加新格式时，同步追加对应枚举值
 
 ### 3. `ExtractHeadAsync` / `ExtractHeadTailAsync` (`Core/Utils/ArchiveEntryExtractor.cs`)
 
@@ -142,16 +146,33 @@ public static Task<(byte[] head, byte[]? tail)> ExtractHeadTailAsync(
     CancellationToken ct = default);
 ```
 
-#### 各压缩格式的实现策略
+#### 实现方案：利用现有 ExtractEntryAsync 部分解压
 
-| 压缩格式 | Head 实现 | Tail 实现 |
+`ExtractHeadAsync` 基于现有的 `ExtractEntryAsync` 实现，**不改动现有完整提取逻辑**：
+
+```csharp
+public static async Task<byte[]> ExtractHeadAsync(
+    string archivePath, string entryName, int maxBytes,
+    ArchiveFormat format, string? password = null,
+    CancellationToken ct = default)
+{
+    // 方案 A（优先）：写 MemoryStream 提前截断
+    // 利用 SharpCompress 的 entry.WriteTo(stream)，maxBytes 后断开
+    // 适用于小型条目和 Store/非固态压缩
+    //
+    // 方案 B（兜底）：ExtractEntryAsync 到临时文件 → 读前 N 字节 → 删文件
+    // 适用于 Deflate 大文件和固态 7z
+}
+```
+
+| 压缩格式 | Head 实现方案 | Tail 实现 |
 |---|---|---|
-| ZIP (Deflate) | 解压前 min(headBytes, 实际大小) 字节到 MemoryStream | 需要解压完整流，截取最后 N 字节。**代价接近全量提取**，大文件谨慎使用 |
-| ZIP (Store) | 直接读取对应偏移 | 直接读取尾部偏移 |
-| 7z (非固态) | `entry.Extract(stream)` 然后截取前 N 字节 | 同上 |
-| 7z (固态) | **跳过 head 检测**，直接基于扩展名判断 | 同上，固态 7z 不做尾读取 |
-| RAR | 同 7z 非固态 | 同上 |
-| Tar/Gz | TarInputStream 读取第一个条目前 N 字节 | 不支持（流式压缩） |
+| ZIP (Deflate) | **方案 A**：`MemoryStream` + 写满 maxBytes 后 Dispose | 需要解压完整流，截取最后 N 字节。**代价接近全量提取**，大文件谨慎使用 |
+| ZIP (Store) | **方案 A**：直接读对应偏移 | 直接读取尾部偏移 |
+| 7z (非固态) | **方案 A**：`SharpSevenZipExtractor.ExtractFile(index, stream)` → 截取 | 同上 |
+| 7z (固态) | **方案 B**：固态 7z 无法随机读 → `ExtractEntryAsync` 到 temp → 读前 N 字 → 删 temp | 固态 7z 不做尾读取 |
+| RAR | **方案 A**：同 7z 非固态 | 同上 |
+| Tar/Gz | **方案 B**：`TarInputStream` 读取第一个条目前 N 字节 | 不支持（流式压缩） |
 
 #### MP4/视频格式的 head + tail 策略
 
@@ -167,10 +188,12 @@ public static Task<(byte[] head, byte[]? tail)> ExtractHeadTailAsync(
 
 ### 4. `ShowPreviewAsync` 改造 (`MainWindow.Preview.cs`)
 
-当前流程：
+当前流程（Plan A 已实现的 17 个 else-if 分支，全用扩展名判断）：
 ```
 ext → ImageExtensions.Contains → ShowImagePreviewAsync
-ext → TextExtensions.Contains → ShowTextPreview
+ext → PeExtensions.Contains → ShowPePreview
+ext → TorrentExtensions.Contains → ShowTorrentPreview
+... 共 17 个分支 ...
 ext → 其他 → ShowUnsupportedPreview (无法预览)
 ```
 
@@ -179,113 +202,113 @@ ext → 其他 → ShowUnsupportedPreview (无法预览)
 ```
 ext → 先通过 DetectByExtension 得到 FileFormat
      ↓
-  尝试 Detect(head) → 如果得到不同格式，以 Detect 为准（覆盖扩展名）
+  ExtractHeadAsync(headBytes) → Detect(head) → 如果 Detect 返回的格式与扩展名不同，
+  以 Detect 为准（覆盖扩展名）。⚠ 例外：Detect 返回 Zip 时表示子类型判定失败，
+  仍沿用 DetectByExtension 的结果（.docx 保持 Docx）
      ↓
   展示 PreviewHeader: "📄 filename.dat → JPEG 图像, 1920×1080"
      ↓
-  FileFormat → 查找 Plan A 中是否注册了解码器
-     ↓ 有解码器
+  FileFormat → 映射到 Plan A 现有的 ShowXxxPreview 方法
+     ↓ 格式有对应解码器
   调用对应解码器 → 填充 PreviewInfoPanel
   如果需要全量预览 → 继续走 ShowImagePreviewAsync / ShowTextPreview 等
-     ↓ 无解码器
-  仅展示 "JPEG 图像" / "PE32+ 可执行文件" 等信息，无全量预览
+     ↓ 格式无对应解码器
+  仅展示格式名称（如 "Ogg Vorbis 音频"），无全量预览
 ```
 
-### 5. Post-Plan-A 新增格式注册
+**映射规则**：魔数检测出的 `FileFormat` → Plan A 现有的扩展名分支：
 
-在 Plan A 中，每个格式解码器需要在统一的注册点声明自己支持的 `FileFormat` 和对应的解码逻辑。
+| 魔数检测结果 | 映射到 Plan A 分支 |
+|---|---|
+| `Jpeg`, `Png`, `Gif`, `Bmp`, `WebP`, `Ico` | `ImageExtensions.Contains(ext)` → `ShowImagePreviewAsync` |
+| `Pe` | `PeExtensions.Contains(ext)` → `ShowPePreview` |
+| `Pdf` | `PdfExtensions.Contains(ext)` → `ShowPdfPreview` |
+| `Torrent` | `TorrentExtensions.Contains(ext)` → `ShowTorrentPreview` |
+| `Docx`, `Xlsx`, `Pptx` | `OfficeExtensions.Contains(ext)` → `ShowOfficePreview` |
+| 其余无对应解码器的格式 | 展示格式名 + 基本信息，全量预览区域留空 |
+
+### 5. Plan A 现有分支的衔接
+
+Plan A 已使用 17 个 `else if (XxxExtensions.Contains(ext))` 分支实现预览。
+魔数检测改造**不改动现有分支结构**，只在分支之前插入魔数检测 + 修改 `PreviewHeader`：
 
 ```csharp
-// 方案一：ShowPreviewAsync switch 分支（简单直接，Plan A 已有模式）
-if (format == FileFormat.PeExe || format == FileFormat.PeDll)
-    ShowPePreviewAsync(tempFile, item);
+private async Task ShowPreviewAsync(ArchiveItem item)
+{
+    // ...
+    var ext = Path.GetExtension(item.Name);
 
-// 方案二（可选）：注册表模式
-_previewHandlers[FileFormat.PeExe] = ShowPePreviewAsync;
-_previewHandlers[FileFormat.Torrent] = ShowTorrentPreviewAsync;
+    // [新增] 魔数检测：覆盖扩展名判断
+    string? realFormatName = null;
+    byte[]? headBytes = null;
+    if (AppSettings.Instance.EnableFormatDetection)
+    {
+        headBytes = await ArchiveEntryExtractor.ExtractHeadAsync(
+            _currentArchivePath!, item.Name, 4096, _currentFormat, _currentPassword, ct);
+        var fileFormat = FileFormatDetector.Detect(headBytes);
+        if (fileFormat != FileFormat.Unknown)
+        {
+            realFormatName = FileFormatHelper.GetDisplayName(fileFormat);
+            // 不阻断现有分支——现有 ShowPePreview 等仍然通过 ext 进入
+            // 魔数检测只负责修改 PreviewHeader 显示
+        }
+    }
+
+    // [修改] PreviewHeader：显示真实格式名（如果有）
+    if (realFormatName != null)
+        PreviewHeader.Text = $"📄 {item.Name} → {realFormatName}";
+    else
+        PreviewHeader.Text = $"📄 {item.Name}";
+
+    // 以下是 Plan A 现有的 17 个 else-if 分支，不做改动
+    if (ImageExtensions.Contains(ext)) { ... }
+    else if (PeExtensions.Contains(ext)) { ... }
+    // ...
+}
 ```
 
-**建议使用方案一**，与 Plan A 现有模式一致，改动最小。
+这种改造方式的好处：**不改变现有预览逻辑**。魔数检测只用来改 `PreviewHeader`，
+Plan A 的每个格式解码器仍然通过扩展名触发，互不干扰。
 
 ---
 
-## 方案选择：库 vs 手动魔数
+## 方案选择：手动魔数为主，Mime-Detective 可选
 
-`FileFormatDetector.Detect()` 的核心是魔数匹配，有两条实现路径，按「库优先 → 手动回退」的优先级策略协同工作。
+`FileFormatDetector.Detect()` 的核心是魔数匹配，以「手动优先 → 库可选增强」的优先级策略工作。
 
-### 方案 A：Mime-Detective 库（推荐主路径）
+### 主路径：手动魔数匹配
 
-> **适用场景**：通用格式检测的第一选择。覆盖计划中 80%+ 的格式，代码量减少 ~80%。
+即下文 `## 魔数匹配表` 详述的 30+ 条手动魔数 + PE/ZIP 子类型检测逻辑。`Detect()` 方法约 ~300 行代码，零第三方依赖，零许可证风险。
 
-[Mime-Detective](https://www.nuget.org/packages/Mime-Detective)（v25.8.1，1300万+ 下载量）是 .NET 生态最成熟的魔数检测库，支持 `byte[]` / `ReadOnlySpan<byte>` / `Stream` 输入。
+**优势**：完全可控，覆盖计划中所需格式的 90%+。ZIP 子类型检测（DOCX/EPUB 等）和 PE 检测必须手动实现。
+
+### 可选增强：Mime-Detective 库
+
+> **作为补充**：当手动魔数返回 `Unknown` 时，如果安装了 Mime-Detective 库，用它做二次尝试。
+
+[Mime-Detective](https://www.nuget.org/packages/Mime-Detective)（v25.8.1）是 .NET 生态成熟的魔数检测库。**默认项目中不引用**，如需更广覆盖可手动添加：
 
 ```xml
-<!-- 安装主包（含 Default 定义，MIT 许可证，约 50+ 常见签名） -->
 <PackageReference Include="Mime-Detective" Version="25.8.1" />
-
-<!-- 可选：Condensed 定义包（100+ 常见签名，含更多视频/音频格式） -->
-<!-- 注：Condensed/Exhaustive 源自 TrID 签名数据库，有许可证注意事项 -->
-<!-- <PackageReference Include="Mime-Detective.Definitions.Condensed" Version="25.8.1" /> -->
+<!-- Condensed/Exhaustive 源自 TrID 签名数据库，需注意许可证 -->
 ```
 
+**Default 包的覆盖缺口**：
+Manual 表已覆盖的头像 (PNG/JPEG/GIF) 、文档 (PDF) 、压缩包 (ZIP/7z/RAR) 、音频 (MP3/FLAC/WAV) 已被手动表覆盖。Default 包缺少的 MKV/MOV/TTF/OTF/WOFF/SQLite/EXR/HDR 等，手动表也覆盖了。因此 Mime-Detective 只能作为极少数边缘情况的兜底。
+
+**集成方式**（条件编译或 try 反射）：
 ```csharp
-// 使用示例
-var inspector = new ContentInspectorBuilder
-{
-    Definitions = MimeDetective.Definitions.DefaultDefinitions.All()
-}.Build();
-
-var results = inspector.Inspect(headBytes);
-// results 按匹配度排序，含 MIME type、扩展名、格式名称
-// 取第一个（最高匹配度）映射到 FileFormat 枚举
-```
-
-**覆盖情况对比**：
-
-| 格式分类 | Mime-Detective Default | Condensed | 计划中需要 |
-|---------|:---:|:---:|:---:|
-| 常见图像 (PNG/JPEG/GIF/BMP/ICO/WEBP) | ✅ | ✅ | ✅ |
-| 文档 (PDF/DOCX/XLSX/PPTX/RTF) | ✅ | ✅ | ✅ |
-| 压缩包 (ZIP/7z/RAR/GZip/BZip2/XZ) | ✅ | ✅ | ✅ |
-| 音频 (MP3/FLAC/WAV/OGG) | ✅ | ✅ | ✅ |
-| 视频 (MP4/FLV) | ✅ | ✅ | ✅ |
-| 视频 (AVI/MKV/MOV) | ❌ | ✅ | ✅ |
-| 可执行文件 (EXE/DLL) | ✅ | ✅ | ✅ |
-| TTF / OTF | ❌ | ❌ | ✅ |
-| WOFF / WOFF2 | ❌ | ❌ | ✅ |
-| SQLite | ❌ | ❌ | ✅ |
-| EXR / HDR / STL / LNK | ❌ | ❌ | ✅ |
-| Torrent | ❌ | ❌ | ✅ |
-
-**仍需手动实现的部分**（Mime-Detective 返回 `Unknown` 时回退到方案 B）：
-
-1. **ZIP 子类型（EPUB/DOCX/XLSX/PPTX/ODF）** — 需部分解压 + 内容扫描
-2. **PE 子类型（EXE/DLL/SYS）** — 需解析 PE header 的 `Characteristics`
-3. **Torrent** — Bencode 字典，无统一魔数
-4. **WOFF/WOFF2/TTF/OTF** — 若 Default 包未覆盖
-5. **EXR/HDR/STL/LNK/SQLite** — 小众格式
-6. **Zstd** — Default 包可能不含
-
-**集成方式**：`FileFormatDetector.Detect()` 内部按优先级调用：
-```
-优先: Mime-Detective 检测 → 成功 → 返回 FileFormat
-回退: 方案 B 手动魔数匹配表 → 成功 → 返回 FileFormat
+// Detect() 内部优先级：
+优先: 手动魔数匹配表 → 成功 → 返回 FileFormat
+回退: Mime-Detective（如果 NuGet 包已安装）→ 成功 → 返回 FileFormat
 兜底: DetectByExtension(ext)
 ```
-
-### 方案 B：手动魔数匹配（备选/补充）
-
-> **适用场景**：Mime-Detective 未覆盖的小众格式、ZIP/PE 子类型检测、许可证敏感环境。
-
-即下文 `## 魔数匹配表` 详述的 30+ 条手动魔数 + PE/ZIP 子类型检测逻辑。零第三方依赖。
-
-**优先级规则**：方案 A 优先（库检测更全、更准），方案 A 返回 `Unknown` 时回退到方案 B 的手动表。
 
 ### 相关计划引用
 
 > `CompressionEstimator`（压缩预估）的自适应压缩级别功能也依赖魔数检测判别文件类型。
-> 大文件（>64KB）的场景同样优先使用本方案的 Mime-Detective 库，
-> 检测结果映射到 `CompressionCoefficients` 分类（`image_lossy` / `media` / `archive`），
+> 大文件（>64KB）的场景复用本方案的 `FileFormatDetector` 结果，
+> 映射到 `CompressionCoefficients` 分类（`image_lossy` / `media` / `archive`），
 > 从而自动降级压缩级别。
 > 详见 [`compression-estimator.md` → 自适应压缩级别](compression-estimator.md)。
 
@@ -297,65 +320,85 @@ var results = inspector.Inspect(headBytes);
 
 魔数匹配按**特异性从高到低**顺序检测，防止误匹配（如 `MZ` → PE 的检测需额外判断 PE signature）：
 
-| 优先级 | 魔数 | 长度 | FileFormat |
+| 优先级 | 魔数 | 长度 | FileFormat（枚举值） |
 |---|---|---|---|
-| 1 | `89 50 4E 47 0D 0A 1A 0A` | 8 | PNG |
-| 2 | `FF D8 FF` | 3 | JPEG |
-| 3 | `47 49 46 38 37 61` / `47 49 46 38 39 61` | 6 | GIF |
-| 4 | `42 4D` | 2 | BMP |
-| 5 | `00 00 01 00` | 4 | ICO |
-| 6 | `52 49 46 46 xx xx xx xx 57 45 42 50` | 12 | WEBP |
-| 7 | `76 2F 31 01` | 4 | EXR |
-| 8 | `23 3F 52 41 44 49 41 4E 43 45` | 10 | HDR |
-| 9 | `25 50 44 46 2D` | 5 | PDF |
-| 10 | `50 4B 03 04` → ZIP 内部分类 | 4 | ZIP 子类 |
-| 11 | `37 7A BC AF 27 1C` | 6 | 7z |
-| 12 | `52 61 72 21 1A 07 00` / `52 61 72 21 1A 07 01 00` | 7/8 | RAR / RAR5 |
-| 13 | `1F 8B` | 2 | GZip |
-| 14 | `42 5A 68` | 3 | BZip2 |
-| 15 | `FD 37 7A 58 5A 00` | 6 | XZ |
-| 16 | `28 B5 2F FD` | 4 | Zstd |
-| 17 | `49 44 33` | 3 | MP3 (ID3v2) |
-| 18 | `66 4C 61 43` | 4 | FLAC |
-| 19 | `52 49 46 46 xx xx xx xx 57 41 56 45` | 12 | WAV |
-| 20 | `4F 67 67 53` | 4 | OGG |
-| 21 | `66 74 79 70` (ftyp) | 4 | MP4/M4A |
-| 22 | `1A 45 DF A3` | 4 | MKV/WebM |
-| 23 | `46 4C 56 01` | 4 | FLV |
-| 24 | `30 26 B2 75 8E 66 CF 11` | 8 | WMA/WMV |
-| 25 | `00 01 00 00 00` | 4 | TTF |
-| 26 | `4F 54 54 4F` | 4 | OTF |
-| 27 | `77 4F 46 46` | 4 | WOFF |
-| 28 | `77 4F 46 32` | 4 | WOFF2 |
-| 29 | `4D 5A` + PE signature 验证 | 2+ | PE (EXE/DLL) |
-| 30 | `53 51 4C 69 74 65` (SQLite) | 6 | SQLite |
-| 31 | `4C 00 00 00 01 14 02 00` | 8 | LNK |
-| 32 | `D0 CF 11 E0 A1 B1 1A E1` (OLE2) | 8 | MSI/MDB(X) |
-| 33 | `73 6F 6C 69 64` (solid) | 5 | STL (ASCII) |
+| 1 | `89 50 4E 47 0D 0A 1A 0A` | 8 | `Png` |
+| 2 | `FF D8 FF` | 3 | `Jpeg` |
+| 3 | `47 49 46 38 37 61` / `47 49 46 38 39 61` | 6 | `Gif` |
+| 4 | `42 4D` | 2 | `Bmp` |
+| 5 | `00 00 01 00` | 4 | `Ico` |
+| 6 | `52 49 46 46 xx xx xx xx 57 45 42 50` | 12 | `WebP` |
+| 7 | `76 2F 31 01` | 4 | `Exr` |
+| 8 | `23 3F 52 41 44 49 41 4E 43 45` | 10 | `Hdr` |
+| 9 | `25 50 44 46 2D` | 5 | `Pdf` |
+| 10 | `50 4B 03 04` → 内联 DetectZipSubtype | 4 | `Zip` → 子类型 |
+| 11 | `37 7A BC AF 27 1C` | 6 | `SevenZip` |
+| 12 | `52 61 72 21 1A 07 00` / `52 61 72 21 1A 07 01 00` | 7/8 | `Rar` |
+| 13 | `1F 8B` | 2 | `Gz` |
+| 14 | `42 5A 68` | 3 | `Bz2` |
+| 15 | `FD 37 7A 58 5A 00` | 6 | `Xz` |
+| 16 | `28 B5 2F FD` | 4 | `Zstd` |
+| 17 | `49 44 33` | 3 | `Mp3` (ID3v2) |
+| 18 | `66 4C 61 43` | 4 | `Flac` |
+| 19 | `52 49 46 46 xx xx xx xx 57 41 56 45` | 12 | `Wav` |
+| 20 | `4F 67 67 53` | 4 | `Ogg` |
+| 21 | `66 74 79 70` (ftyp) | 4 | `Mp4` |
+| 22 | `1A 45 DF A3` | 4 | `Mkv` / `WebM` |
+| 23 | `46 4C 56 01` | 4 | `Flv` |
+| 24 | `30 26 B2 75 8E 66 CF 11` | 8 | `Wmv` |
+| 25 | `00 01 00 00 00` | 4 | `Ttf` |
+| 26 | `4F 54 54 4F` | 4 | `Otf` |
+| 27 | `77 4F 46 46` | 4 | `Woff` |
+| 28 | `77 4F 46 32` | 4 | `Woff2` |
+| 29 | `4D 5A` + PE signature 验证 | 2+ | `Pe` |
+| 30 | `53 51 4C 69 74 65` (SQLite) | 6 | Sqlite |
+| 31 | `4C 00 00 00 01 14 02 00` | 8 | Lnk |
+| 32 | `D0 CF 11 E0 A1 B1 1A E1` (OLE2) | 8 | Cer (OLE2 格式的证书/PFX) |
+| 33 | `73 6F 6C 69 64` (solid) | 5 | Stl (ASCII) |
 | 34 | `64` (Bencode 字典) | 1 | Torrent (需验证) |
 
-### ZIP 内部分类检测
+### ZIP 内部分类检测（**内联到 Detect() 内，不对外暴露 Zip 中间态**）
 
-ZIP (`PK\x03\x04`) 太通用→需进一步判断子类型：
+**关键约束**：`.docx` / `.xlsx` / `.pptx` / `.epub` 全部以 `PK\x03\x04`（ZIP 魔数）开头。
+如果 `Detect()` 返回 `Zip` 再由外界判断，"以 Detect 为准"的逻辑会把 Office/EPUB 降级成普通 ZIP，
+Plan A 已实现的文档解码器就废了。
+
+**因此 `Detect()` 内部必须完成 ZIP 子类型判定，只对外返回最终类型（`Docx` / `Epub` / `Zip`）：**
 
 ```csharp
-static FileFormat DetectZipSubtype(byte[] head)
+static FileFormat Detect(byte[] head, int length, byte[]? tail = null)
 {
-    // 在 head 中定位关键文件:
-    //   "mimetype" 含 "application/epub+zip" → Epub
-    //   "[Content_Types].xml" 含 "word/document.xml" → Docx
-    //   "[Content_Types].xml" 含 "xl/workbook.xml" → Xlsx
-    //   "[Content_Types].xml" 含 "ppt/presentation.xml" → Pptx
-    //   "meta.xml" 含 "office:document-meta" → ODF
+    // 1. 先匹配非 ZIP 的魔数（PNG/JPEG/PDF/PE 等 30+ 条）
+    //    ...
+    
+    // 2. 如果匹配到 PK\x03\x04（ZIP）→ 不立即返回 Zip，
+    //    而是调用 DetectZipSubtype() 做子类型判定
+    if (StartsWith(head, [0x50, 0x4B, 0x03, 0x04]))
+        return DetectZipSubtype(head, length);
+    
+    // 3. 其他魔数直接返回
+    //    ...
+}
+
+static FileFormat DetectZipSubtype(byte[] head, int length)
+{
+    // 扫描 head 中的 local file header:
+    //   "mimetype" 内容 = "application/epub+zip" → Epub
+    //   "[Content_Types].xml" → Docx / Xlsx / Pptx（根据 .xml 内容判断）
+    //   "META-INF/manifest.xml" → Odf / Ods / Odp
     // 以上都不是 → Zip (普通压缩包)
 }
 ```
 
-**注意**: 需要部分解压 Deflate 数据。100KB 内通常包含前几个 local file header + 部分压缩数据，对于 Store 的文件可直接读，Deflate 的需部分解压后检查。
+**实现细节**：
+- 100KB head 内通常包含前几个 local file header。对于 Store 的文件，文件名直接可读
+- 对于 Deflate 的文件，需要部分解压后检查。利用 SharpCompress 的 `ZipArchive` / `ZipFile` 只读 entry 列表，不提取完整文件
 
-### PE 格式检测
+### PE 格式检测（返回 `Pe`，不拆分子类型）
 
 ```csharp
+// 魔数检测只返回 FileFormat.Pe，不区分 EXE/DLL/SYS
+// 子类型由 Plan A 的 PeParser 通过 Subsystem 字段区分
 static bool IsPe(byte[] head)
 {
     // offset 0: "MZ"
@@ -425,12 +468,12 @@ if (FileFormatDetector.Detect(head) == FileFormat.Mp4 && tail != null)
 
 ### Step 1: FileFormat 枚举 + FileFormatDetector 核心 [⬜⬜⬜] (0/3)
 
-- [ ] `FileFormat` 枚举定义 + `FileFormatDetector.Detect()` 魔数匹配引擎
-- [ ] `DetectByExtension()` 扩展名回退
+- [ ] `FileFormat` 枚举追加（在已有 `FileFormatInfo.cs` 末尾追加缺失值）
+- [ ] `FileFormatDetector.Detect()` 魔数匹配引擎 + `DetectByExtension()` 回退
 - [ ] PE 特殊检测：MZ + PE signature 双重确认
-- **文件**: `Core/Utils/FileFormat.cs`, `Core/Utils/FileFormatDetector.cs`
-- 实现 `FileFormat` 枚举（仅 Plan A 已支持的格式）
-- 实现 `Detect(byte[], int)` — 魔数匹配引擎，覆盖上表前 20+ 种格式
+- **文件**: `Core/Utils/FileFormatInfo.cs`（追加）, `Core/Utils/FileFormatDetector.cs`（新建）
+- 在 `FileFormatInfo.cs` 末尾追加：`Ogg`, `Odt`, `Ods`, `Odp`, `Rtf`, `DjVu`, `Xps`, `Woff2`, `Fits`, `Vhdx`, `Parquet`
+- 实现 `Detect(byte[], int)` — 魔数匹配引擎，覆盖 30+ 种格式
 - 实现 `DetectByExtension(string)` — 扩展名回退
 - PE 特殊检测：MZ + PE signature 双重确认
 

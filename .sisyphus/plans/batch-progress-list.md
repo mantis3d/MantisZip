@@ -129,7 +129,7 @@ Wave 3 (Integration — depends on T3, T4):
 ├── Task 6: RunCompressSeparateBatch 集成文件列表 + 测试
 
 Wave 4 (Batch Extract — depends on T6):
-├── Task 7: IPC 合并基础设施 + RunExtract 核心方法
+├── Task 7: IPC 合并基础设施 + HandleExtractBatch 核心方法
 ├── Task 8: ExtractSettingsWindow XAML + 逻辑（文件列表 + 输出路径模式）
 ├── Task 9: 改造 HandleExtractHere/Smart/ToNamed/Extract + 测试
 
@@ -367,23 +367,22 @@ F1-F4           all                 —
 
   **QA Scenarios**:
   ```
-  Scenario: 非批处理模式列表隐藏
-    Tool: Playwright
+  Scenario: 非批处理模式列表隐藏（WpfFact）
+    Tool: Bash (dotnet test)
     Steps:
-      1. 创建 ProgressWindow 实例（非批处理模式）
+      1. 编写 [WpfFact] 测试：创建 ProgressWindow，不调用 InitBatchMode
       2. 验证 BatchListSection.Visibility == Collapsed
     Expected Result: 列表不显示
-    Evidence: .sisyphus/evidence/task-3-hidden.png
+    Evidence: .sisyphus/evidence/task-3-hidden.txt
 
-  Scenario: 批处理模式列表显示
-    Tool: Playwright
+  Scenario: 批处理模式列表显示（WpfFact）
+    Tool: Bash (dotnet test)
     Steps:
-      1. 创建 ProgressWindow 实例
-      2. 调用 InitBatchMode(["a.zip", "b.zip"])
-      3. 验证 BatchListSection.Visibility == Visible
-      4. 验证列表中有 2 项
+      1. 编写 [WpfFact] 测试：创建 ProgressWindow，调用 InitBatchMode(["a.zip", "b.zip"])
+      2. 验证 BatchListSection.Visibility == Visible
+      3. 验证 ListBox 中 2 项
     Expected Result: 列表正确显示
-    Evidence: .sisyphus/evidence/task-3-visible.png
+    Evidence: .sisyphus/evidence/task-3-visible.txt
   ```
 
   **Commit**: YES
@@ -423,9 +422,9 @@ F1-F4           all                 —
   - **Skills**: none
 
   **Parallelization**:
-  - **Can Run In Parallel**: YES (with Task 3, Wave 2)
+  - **Can Run In Parallel**: NO（串行——Task 4 引用了 Task 3 定义的 XAML 元素）
   - **Blocks**: Tasks 6
-  - **Blocked By**: Tasks 1, 2
+  - **Blocked By**: Tasks 1, 2, 3
 
   **References**:
   - `MantisZip.UI/ProgressWindow.xaml.cs:85` — `SetProgress` 模式
@@ -443,25 +442,24 @@ F1-F4           all                 —
 
   **QA Scenarios**:
   ```
-  Scenario: InitBatchMode 初始化列表
-    Tool: Playwright
+  Scenario: InitBatchMode 初始化列表（WpfFact）
+    Tool: Bash (dotnet test)
     Steps:
-      1. 创建 ProgressWindow
+      1. [WpfFact] 测试：创建 ProgressWindow
       2. InitBatchMode(["a.zip", "b.zip", "c.zip"])
-      3. 验证列表显示 3 项，所有状态为 Pending
-      4. 验证窗口 Height == 450
+      3. 验证 IsBatchMode == true, Height == 450
     Expected Result: 正确初始化
-    Evidence: .sisyphus/evidence/task-4-init.png
+    Evidence: .sisyphus/evidence/task-4-init.txt
 
-  Scenario: 更新单项状态
-    Tool: Playwright
+  Scenario: 更新单项状态（WpfFact）
+    Tool: Bash (dotnet test)
     Steps:
-      1. InitBatchMode(["a.zip", "b.zip"])
+      1. [WpfFact] 测试：InitBatchMode(["a.zip", "b.zip"])
       2. SetCurrentBatchItem(0)
       3. UpdateBatchItemStatus(0, Completed)
       4. 验证列表项状态正确
     Expected Result: 状态正确更新
-    Evidence: .sisyphus/evidence/task-4-update.png
+    Evidence: .sisyphus/evidence/task-4-update.txt
   ```
 
   **Commit**: YES (groups with 3)
@@ -474,15 +472,17 @@ F1-F4           all                 —
 
   **What to do**:
   - 在 tests 项目中添加 `ProgressWindowBatchTests.cs`
-  - 测试可纯逻辑部分：
+  - 测试范围限定在**纯逻辑层**（不实例化 WPF 控件）：
     - BatchItem 状态枚举默认值
     - HasFailures 判断逻辑
     - CompleteWithErrors 统计逻辑
     - **不测试 StatusText/StatusIcon**（这些在 UI 层通过 converter 处理）
-  - 注意：WPF UI 控件需在 STA 线程测试（使用 `[STAThread]` 或 `Apartment(ApartmentState.STA)`）
+  - ⚠️ **不要试图在 xUnit 中创建 WPF 控件实例**：xUnit 不识别 `[STAThread]`，.NET 5+ 也不支持 `ApartmentState.STA`
+  - 如需测试 WPF 控件行为（Visibility、Height 等），使用 `[WpfFact]` 属性（需 NuGet 包 `Microsoft.Toolkit.Mvvm` 或 `Microsoft.Windows.Toolkit.Test`），或编写独立的 WPF 测试项目
 
   **Must NOT do**:
   - 不测试 XAML 渲染（超出单元测试范围）
+  - ❌ 不依赖 `[STAThread]` 特性——xUnit 不识别
 
   **Recommended Agent Profile**:
   - **Category**: `quick`
@@ -594,7 +594,7 @@ F1-F4           all                 —
     Evidence: .sisyphus/evidence/task-6-cli-all-success.txt
 
   Scenario: CompressSettingsWindow 选"压缩到各自名字"
-    Tool: Playwright
+    Tool: 手动操作（截图验证）
     Steps:
       1. 创建 2 个文件
       2. 通过 --compress 打开窗口，选"压缩到各自名字"
@@ -618,67 +618,174 @@ F1-F4           all                 —
 
 ---
 
-- [ ] 7. **IPC 合并基础设施 + RunExtract 核心方法**
+- [ ] 7. **IPC 合并基础设施 + HandleExtractBatch 核心方法**
 
-   **设计原则**：
+   **设计原则（基于现有压缩 IPC 模式）**：
   - 不新增 CLI 入口，现有 `--extract-here/smart/to-name/extract` 内部增加 IPC 合并
-  - 复用现有 `StartPipeServer` / `SendPathsThroughPipe`，**管道协议不改动**
-  - 原因：第一个实例已从自己的 CLI 参数（`args[1]`）知道 mode，后续实例只需发路径
-  - 新增 Mutex+Pipe 名称：`MantisZip-ExtractMutex` / `MantisZip-ExtractPipe`
-  - `RunExtract` 作为批处理循环核心，供所有 HandleExtract* 调用
+  - **复用现有** `StartPipeServer` / `SendPathsThroughPipe`（App.PipeServer.cs），方法体不改动
+  - Shell 注册的动词仍是 `--extract-here "%1"`（单参数），Windows 为每个选中文件启动独立进程
+  - 新增一组 Mutex+Pipe 常量，用于解压 IPC 通道
+  - 管道协议改为 `{mode}|{path}`（一行），让主进程知道每项应该用什么模式
+
+  **通信协议**：
+  ```
+  客户端发送一行（无 BOM，UTF-8）：
+  {mode}|{path}
+  
+  mode 取值：
+    here   → --extract-here
+    smart  → --extract-smart
+    toname → --extract-to-name
+    extract → --extract
+  ```
+
+  **主进程决策逻辑**（收集完所有路径后）：
+  1. **检查 mode 一致性**：所有 items 的 mode 相同（理论上 100% 一致，同一次右键菜单只触发同一种动词）
+  2. **防御**：取第一个 item 的 mode 作为全体 mode
+  3. **分支**：
+     - `here` / `smart` / `toname` → 不弹设置窗口，直接进入批量解压流程
+     - `extract` → 弹 `ExtractSettingsWindow`（含文件列表 + 输出路径模式），用户确认后执行
+
+  **时序图**：
+  ```
+  Master (mutex 持有者)        Client-1          Client-2
+    │                            │                  │
+    ├─ Create Mutex(true)        │                  │
+    │  = firstInstance           │                  │
+    ├─ StartPipeServer(...)      │                  │
+    │  ── 等待连接 ──            │                  │
+    │                     Mutex(false)，是客户端      │
+    │                     pipe.Connect(2000)         │
+    │  ◄── "here|a.zip"  ─── WriteLine ──→ exit      │
+    │                                                 │
+    │                                       Mutex(false)
+    │                                       pipe.Connect(2000)
+    │  ◄── "here|b.zip"  ───────────────── WriteLine → exit
+    │                                                 │
+    ├─ DispatcherTimer 1000ms 触发                   │
+    ├─ Cancel cts（关闭管道）                        │
+    ├─ mode=here → 直接批量                          │
+    ├─ Show ProgressWindow(InitBatchMode)           │
+    ├─ 循环处理每项...                               │
+  ```
 
   **What to do**:
 
-  1. **App.PipeServer.cs — 新增 Mutex+Pipe 常量**：
+  1. **App.PipeServer.cs — 新增一组 Extract IPC 常量**：
      ```csharp
      private static string ExtractMutexName = "MantisZip-ExtractMutex";
      private static string ExtractPipeName = "MantisZip-ExtractPipe";
      private static readonly ManualResetEventSlim _extractPipeReady = new(false);
      ```
-     不需要改 `SendPathsThroughPipe` 或 `StartPipeServer` 的方法体。
+     不需要改 `StartPipeServer` 或 `SendPathsThroughPipe` 的方法体——它们已参数化。
 
-  2. **App.Cli.cs — `RunExtract` 核心方法**：
-      ```csharp
-      private async Task RunExtract(List<string> paths, ExtractOutputMode mode, string? customDest = null)
-      ```
-      流程：
-      - 创建 ProgressWindow，`InitBatchMode(paths)`
-      - `Current.ShutdownMode = ShutdownMode.OnExplicitShutdown`
-
-      **密码策略（方案 C）**：
-      - 先遍历所有压缩包，收集需要加密但无已保存密码的路径，存入 `List<string> needPwdItems`
-      - 如果 `needPwdItems` 不为空，弹出一次密码输入框（`PromptForPassword`），得到的密码用于所有需要密码的项目
-      - 循环处理每个压缩包：
-        - `SetCurrentBatchItem(i)`, `UpdateBatchItemStatus(i, InProgress)`
-        - 获取引擎：`ArchiveEngineFactory.GetEngineByExtension(path)`
-        - 按优先级确认密码：
-          1. 非加密 → 直接解压，传 `null`
-          2. `TryMatchPassword` 匹配到了 → 用匹配到的密码
-          3. 在 `needPwdItems` 中 → 用第一步输入框得到的密码
-          4. 以上都不是 → 尝试无密码解压（部分压缩包部分文件加密但可列出）
-        - `QuickVerifyPassword` 验证无误后执行解压
-        - **根据 mode 确定目标路径**：
-          - `Here`：`Path.GetDirectoryName(path)`
-          - `ToName`：`Path.Combine(Path.GetDirectoryName(path), Path.GetFileNameWithoutExtension(path))`
-          - `Smart`：调用 `ArchiveStructureAnalyzer`
-          - `Manual`：所有压缩包解压到 `customDest`
-        - 引擎执行解压
-        - 成功 → `Completed`，失败 → `Failed` + 日志，继续下一项
-      - `SetComplete(...)`，有失败保持打开，全成功自动关
-
-      **需要提取的公共方法**（`RunExtractStatic` 中的密码逻辑）：
-      - `ExtractSingleArchive(archivePath, dest, password, progress, ct)` — 在 ProgressWindow 下解压单个压缩包的循环（含完成处理、文件夹打开、自动关闭）
-      - `ResolvePasswordForArchive(archivePath, engine, batchPassword)` — 返回 `(password, isFromBatch)`，按策略 C 的优先级判断
-
-  3. **ExtractOutputMode 枚举**（放 `App.Cli.cs` 或 `MantisZip.Core/Models/`）：
+  2. **App.Cli.cs — `HandleExtractBatch` 核心方法**：
      ```csharp
+     private static void HandleExtractBatch(
+         List<(string mode, string path)> items,
+         App app)
+     ```
+     接收解析后的 `(mode, path)` 元组列表，按 mode 分支处理。
+
+     流程分支：
+
+     **A. mode = here / smart / toname（直接批量解压）**：
+     - 创建 ProgressWindow，`InitBatchMode(paths)`
+     - `app.ShutdownMode = ShutdownMode.OnExplicitShutdown`
+     - **密码策略**（同现有 `RunExtractStatic` 流程，但改为循环处理多项）：
+       1. 遍历所有压缩包，收集需要加密且无已保存密码的路径 → `needPwdItems`
+       2. 如果 `needPwdItems` 不为空，弹出一次密码输入框（`PromptForPassword`），所得密码用于所有需密项目
+       3. 循环处理每项：
+          - `SetCurrentBatchItem(i)`, `UpdateBatchItemStatus(i, InProgress)`
+          - 获取引擎：`ArchiveEngineFactory.GetEngineByExtension(path)`
+          - 按优先级确定密码：(1) 非加密 → null (2) `TryMatchPassword` 匹配 → 匹配密码 (3) 在 needPwdItems 中 → 批量密码 (4) 其余 → 无密码尝试
+          - 根据 mode 确定目标路径：
+            - `Here`：`Path.GetDirectoryName(path)`
+            - `ToName`：`Path.Combine(Path.GetDirectoryName(path), Path.GetFileNameWithoutExtension(path))`
+            - `Smart`：调用 `ArchiveStructureAnalyzer`
+          - 解压（复用现有 `RunExtractStatic` 中的加密检测/QuickVerify/ExtractAsync 逻辑）
+          - 成功 → `Completed`，失败 → `Failed` + 日志，继续下一项
+       4. `SetComplete(...)`，有失败保持打开，全成功自动关
+
+     **B. mode = extract（弹 ExtractSettingsWindow）**：
+     - 在 UI 线程弹出 `ExtractSettingsWindow`，传入 `items.Select(i => i.path)`
+     - 用户在窗口中：
+       - 看到所有压缩包的文件列表
+       - 选择输出路径模式（ToName/Here/Smart/Manual）
+       - 确认或取消
+     - 用户确认后 → 上面 A 的批量循环，mode 改用窗口选择的模式
+     - 用户取消 → `app.Shutdown()`
+
+  3. **ExtractOutputMode 枚举**（放 `MantisZip.Core/Models/ExtractOutputMode.cs`）：
+     ```csharp
+     // src/MantisZip.Core/Models/ExtractOutputMode.cs
      public enum ExtractOutputMode { Here, Smart, ToName, Manual }
      ```
+     注意这是个输出模式枚举，用于批量执行阶段。CLI 动词 `--extract` 对应的是"弹窗口让用户选 mode"，不是这个枚举里的值。
+     
+     放在 Core 项目的原因：UI 层（`ExtractSettingsWindow`）和 CLI 层（`App.Cli.cs`）都需要引用，Core 是公共依赖。
+
+  4. **App.xaml.cs — 修改 4 个解压命令的 dispatch**：
+     当前：
+     ```csharp
+     case "--extract-here":
+         HandleExtractHere(e.Args.Length > 1 ? e.Args[1] : null);
+         return;
+     ```
+     改为（复合 IPC 模式的入口）：
+     ```csharp
+     case "--extract-here":
+         HandleExtractHere(e.Args.Skip(1).Where(a => !string.IsNullOrEmpty(a)).ToArray());
+         return;
+     ```
+     同理 `--extract-smart`、`--extract-to-name`、`--extract`。
+
+  5. **App.Cli.cs — 改造 4 个 HandleExtract 入口**：
+     每个 `HandleExtract*(string[] paths)` 方法内部：
+     - 过滤有效路径：`paths.Where(File.Exists).ToList()`
+     - 0 个 → Shutdown
+     - **Mutex IPC 模式**（完全复用 `HandleCompressSeparate` 的代码结构）：
+       ```csharp
+       bool firstInstance;
+       var mutex = new Mutex(true, ExtractMutexName, out firstInstance);
+       if (firstInstance)
+       {
+           var allItems = new List<(string mode, string path)>();
+           // 把自己的路径加入，带 mode 标识
+           allItems.AddRange(myPaths.Select(p => ("here", p))); // mode 因入口而异
+           var cts = new CancellationTokenSource();
+           _extractPipeReady.Reset();
+           StartPipeServer(allItems, cts.Token, ExtractPipeName, _extractPipeReady);
+           if (!_extractPipeReady.Wait(3000)) ...
+           var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(1000) };
+           timer.Tick += (_, _) =>
+           {
+               timer.Stop(); cts.Cancel(); mutex.Dispose();
+               HandleExtractBatch(allItems, app);
+           };
+           timer.Start();
+       }
+       else
+       {
+           // 发送 mode|path 给主进程
+           SendPathsThroughPipe(myPaths.Select(p => $"here|{p}").ToList(), ExtractPipeName);
+           app.Shutdown();
+       }
+       ```
+
+  **关于 IPC 协议的变化说明**：
+  现有 `SendPathsThroughPipe` 发的是裸路径（每行一个 path），解析端直接用 `reader.ReadLine()`。现在改为发 `mode|path`，解析端需要 `Split('|')`。改动点在 `StartPipeServer` 的 reader 循环内——从 `allPaths.Add(line)` 改为 `allItems.Add((line.Split('|')[0], line.Split('|')[1]))`。
+  
+  **建议方案**：不改现有 `StartPipeServer`（给压缩用），新建一个 `StartExtractPipeServer`，解析逻辑改为读取 `mode|path`。这样压缩 IPC 不受影响。
+
+  **提取的公共方法**（从 `RunExtractStatic` 中抽离，供批处理循环调用）：
+  - `ExtractSingleArchive(archivePath, dest, password, progress, ct)` — 单个压缩包解压的完整流程
+  - `ResolvePasswordForArchive(archivePath, engine, batchPassword)` — 返回 `(password, isResolved)`，按上述优先级判断
 
   **Must NOT do**:
   - 不新增 CLI 入口
-  - 不修改现有 `--compress-*` IPC 行为
-  - 不改 HandleExtract*（Task 9 做）
+  - 不修改现有 `--compress-*` IPC 行为（`StartPipeServer` 不改动）
+  - 不改 HandleExtract* 的调用方（App.xaml.cs dispatch 只改参数传递方式）
 
   **Recommended Agent Profile**:
   - **Category**: `unspecified-high`
@@ -691,30 +798,55 @@ F1-F4           all                 —
   - **Blocked By**: Tasks 6
 
   **References**:
-  - `MantisZip.UI/App.Cli.cs:80` — `HandleCompressSeparate` IPC 模式
-  - `MantisZip.UI/App.Cli.cs:123` — `RunCompressSeparateBatch`（批量循环参考）
-  - `MantisZip.UI/App.Cli.cs:617` — `RunExtractStatic`（密码流程参考）
-  - `MantisZip.UI/App.PipeServer.cs:89` — `StartPipeServer`
-  - `MantisZip.UI/App.PipeServer.cs:130` — `SendPathsThroughPipe`
+  - `MantisZip.UI/App.Cli.cs:80` — `HandleCompressSeparate` IPC 模式（完全复用此代码结构）
+  - `MantisZip.UI/App.Cli.cs:123` — `RunCompressSeparateBatch` 批量循环参考
+  - `MantisZip.UI/App.Cli.cs:617` — `RunExtractStatic` 密码流程参考
+  - `MantisZip.UI/App.PipeServer.cs:89` — `StartPipeServer`（保留不改）
+  - `MantisZip.UI/App.PipeServer.cs:130` — `SendPathsThroughPipe`（保留不改）
+  - `MantisZip.UI/App.xaml.cs:180-193` — 4 个 extract dispatch 需要改为传数组
+  - `MantisZip.UI/ShellIntegration.cs:212` — Shell 动词注册 `--extract-here ""%1""`（单参数，不改）
 
   **Acceptance Criteria**:
-  - [ ] 新增 Mutex+Pipe 常量，Mutex 竞争逻辑正确
-  - [ ] `RunExtract` 执行批处理循环，状态正确更新
-  - [ ] 4 种模式路径解析正确
-  - [ ] 密码策略 C 正确：先自动匹配，未匹配的集中弹一次输入框
-  - [ ] 有失败项保持窗口打开
-  - [ ] 现有 `--compress-separate/combined` 的 IPC 不受影响（管道协议未改）
+  - [ ] 新增 ExtractMutexName/ExtractPipeName 常量
+  - [ ] 新增 `StartExtractPipeServer` 解析 `mode|path` 协议
+  - [ ] 4 个 HandleExtract 入口均加入 Mutex IPC 模式（结构同 HandleCompressSeparate）
+  - [ ] 第一实例正确收集所有路径 + mode，后续实例发送后退出
+  - [ ] `HandleExtractBatch` 正确处理 here/smart/toname 的直接批量分支
+  - [ ] `HandleExtractBatch` 正确处理 extract 的弹窗口分支
+  - [ ] 密码策略正确：先自动匹配 → 集中弹一次 → 逐项尝试
+  - [ ] 有失败项保持窗口打开，全成功自动关闭
+  - [ ] 现有 `--compress-separate/combined` 的 IPC 不受影响（`StartPipeServer` 未改）
+  - [ ] `dotnet build` 0 errors
 
   **QA Scenarios**:
   ```
-  Scenario: RunExtract Here 模式
+  Scenario: --extract-here 批量（3 个 .zip 在不同目录）
+    Tool: Bash (direct invoke, 模拟 IPC)
+    Steps:
+      1. 手动调用 HandleExtractHere(["a.zip", "b.zip", "c.zip"])
+         （IPC 内部走 Mutex 竞争，第一个实例触发批处理）
+      2. 验证 ProgressWindow 显示 3 项
+      3. 各解压到各自所在目录
+    Expected Result: 所有文件解压到各自目录，列表全 Completed
+    Evidence: .sisyphus/evidence/task-7-extract-here.txt
+
+  Scenario: --extract-smart 批量
     Tool: Bash (direct invoke)
     Steps:
-      1. 2 个在不同目录的 ZIP
-      2. RunExtract([a.zip, b.zip], Here)
-      3. 各解压到各自所在目录，列表全 Completed
-    Expected Result: 路径解析正确
-    Evidence: .sisyphus/evidence/task-7-extract.txt
+      1. 一个有单根目录的 ZIP + 一个无根目录的 ZIP
+      2. 分别解压到各自目录（单根→直接；分散→建子目录）
+    Expected Result: 智能判断正确
+    Evidence: .sisyphus/evidence/task-7-extract-smart.txt
+
+  Scenario: --extract 批量（弹 ExtractSettingsWindow）
+    Tool: 手动操作
+    Steps:
+      1. 选择 3 个 .zip → Shell 右键 → "用MantisZip解压到……"
+      2. 主进程收集后弹出 ExtractSettingsWindow 显示 3 项
+      3. 选择"解压到压缩包名" → 确认
+      4. 每个压缩包解压到各自同名子目录
+    Expected Result: 窗口显示文件列表，执行后各入各子目录
+    Evidence: .sisyphus/evidence/task-7-extract-window.png
 
   Scenario: 混合成功/失败
     Tool: Bash (direct invoke)
@@ -723,10 +855,18 @@ F1-F4           all                 —
       2. good→Completed, bad→Failed, 窗口保持打开
     Expected Result: 失败标记正确
     Evidence: .sisyphus/evidence/task-7-mixed.txt
+
+  Scenario: 现有压缩 IPC 不受影响
+    Tool: Bash (direct invoke)
+    Steps:
+      1. --compress-separate 2 个文件
+      2. 正常压缩，ProgressWindow 文件列表工作正常
+    Expected Result: 压缩 IPC 不受 extract IPC 新增影响
+    Evidence: .sisyphus/evidence/task-7-compress-ipc.txt
   ```
 
   **Commit**: YES
-  - Message: `feat(ui): add IPC merge infra and RunExtract method`
+  - Message: `feat(ui): add extract IPC merge infra and HandleExtractBatch method`
   - Files: `src/MantisZip.UI/App.PipeServer.cs`, `src/MantisZip.UI/App.Cli.cs`, `src/MantisZip.UI/App.xaml.cs`
 
 ---
@@ -778,7 +918,7 @@ F1-F4           all                 —
      - 若用户移除所有项则[解压]按钮禁用（允许空列表，但不允许执行）
      - 关闭时通过 `DialogResult` 判断用户是否确认
 
-  3. **本地化**（`ExtractOutputMode` 枚举在 Task 7 中定义）：
+  3. **本地化**（`ExtractOutputMode` 枚举在 Task 7 创建，位于 `MantisZip.Core/Models/ExtractOutputMode.cs`）：
      - `ExtractSettings_Title` — "解压设置"
      - `ExtractSettings_FileCount` — "已选择 {0} 个压缩包"
      - `ExtractSettings_Add` — "添加"
@@ -827,18 +967,17 @@ F1-F4           all                 —
 
   **QA Scenarios**:
   ```
-  Scenario: ExtractSettingsWindow 正常启动
-    Tool: Playwright
+  Scenario: ExtractSettingsWindow 正常启动（WpfFact）
+    Tool: Bash (dotnet test)
     Steps:
-      1. 创建 ExtractSettingsWindow(["a.zip", "b.zip", "c.zip"])
-      2. 验证显示 3 项文件列表
-      3. 验证默认选中"解压到此处"
-      4. 验证[解压]按钮可用
+      1. [WpfFact] 测试：创建 ExtractSettingsWindow(["a.zip", "b.zip", "c.zip"])
+      2. 验证 SelectedPaths 含 3 项
+      3. 验证默认 OutputMode == ToName
     Expected Result: 窗口正确初始化
-    Evidence: .sisyphus/evidence/task-8-init.png
+    Evidence: .sisyphus/evidence/task-8-init.txt
 
   Scenario: 手动输入路径
-    Tool: Playwright
+    Tool: 手动操作
     Steps:
       1. 选中"手动输入" Radio
       2. TextBox 和 Browse 按钮变为可用
@@ -847,15 +986,13 @@ F1-F4           all                 —
     Expected Result: 手动模式工作正常
     Evidence: .sisyphus/evidence/task-8-manual.png
 
-  Scenario: 移除全部文件
-    Tool: Playwright
+  Scenario: 移除全部文件（WpfFact）
+    Tool: Bash (dotnet test)
     Steps:
-      1. 窗口显示 2 项
-      2. 分别点击两个[移除]按钮
-      3. 验证列表为空，[解压]按钮禁用
-      4. 验证显示"没有待解压的文件"
+      1. [WpfFact] 测试：创建窗口含 2 项，模拟移除全部
+      2. 验证 SelectedPaths 为空
     Expected Result: 空列表时按钮禁用
-    Evidence: .sisyphus/evidence/task-8-empty.png
+    Evidence: .sisyphus/evidence/task-8-empty.txt
   ```
 
   **Commit**: YES
@@ -872,7 +1009,7 @@ F1-F4           all                 —
   - 当前四个 Handler 均接收 `string?`（单路径），需改为内部 IPC 流程
   - 提取公共 `TryIpMergeExtract` 方法避免 4 次重复 IPC 代码
   - `--extract`：单文件跳过 IPC，直接弹 `ExtractSettingsWindow`；多文件 IPC 合并后弹窗口
-  - `--extract-here / --smart / --to-name`：单文件行为不变，多文件 IPC 合并后直接调用 `RunExtract`
+  - `--extract-here / --smart / --to-name`：单文件行为不变，多文件 IPC 合并后直接调用 `HandleExtractBatch`
 
   **What to do**:
 
@@ -913,7 +1050,7 @@ F1-F4           all                 —
          }
          else // 多文件，走批处理
          {
-             RunExtract(allPaths, ExtractOutputMode.Here);
+             HandleExtractBatch(allPaths.Select(p => ("here", p)).ToList(), Current);
          }
      }
      ```
@@ -921,19 +1058,19 @@ F1-F4           all                 —
   3. **改造 `HandleExtractSmart`（`App.Cli.cs:533`）**：
      - 同上 IPC 合并
      - 单文件：走原有智能解压逻辑（含 `ListEntriesAsync` + `ArchiveStructureAnalyzer` 分析）
-     - 多文件：`RunExtract(allPaths, Smart)`
+     - 多文件：`HandleExtractBatch(items.Select(p => ("smart", p)).ToList(), Current)`
 
   4. **改造 `HandleExtractToNamed`（`App.Cli.cs:508`）**：
      - 同上 IPC 合并
      - 单文件：走原有逻辑（解压到 `{所在目录}/{压缩包名}/`）
-     - 多文件：`RunExtract(allPaths, ToName)`
+     - 多文件：`HandleExtractBatch(items.Select(p => ("toname", p)).ToList(), Current)`
 
   5. **改造 `HandleExtract`（`App.Cli.cs:592`）**：
      - 单文件（`e.Args.Length == 2`）：**跳过 IPC 合并**，直接弹 `ExtractSettingsWindow([archivePath])`
      - 多文件：走 IPC 合并，合并后弹 `ExtractSettingsWindow(allPaths)`：
        - 用户可添加/移除文件，选择输出模式
        - 最后得到 `selectedPaths` + 模式 + 自定义路径
-       - 调用 `RunExtract(selectedPaths, mode, customDest)`
+       - 调用 `HandleExtractBatch(selectedPaths.Select(p => ("extract", p)).ToList(), Current)`，在 `HandleExtractBatch` 的 B 分支中处理弹窗口逻辑
        - 用户取消 → `Current.Shutdown()`
      - 原 `ResolveExtractDestinationStatic`（弹 `VistaFolderBrowserDialog`）不再被 `--extract` 调用
 
@@ -943,10 +1080,10 @@ F1-F4           all                 —
 
   6. **单元测试**：
      - 在 `tests/MantisZip.Tests/` 添加 `BatchExtractTests.cs`
-     - 由于 `HandleExtract*` 和 `RunExtract` 在 UI 项目中，tests 只引用 Core
+     - 由于 `HandleExtract*` 和 `HandleExtractBatch` 在 UI 项目中，tests 只引用 Core
      - 测试覆盖：
        - `ArchiveEngineFactory.GetEngineByExtension()` 路径验证逻辑
-       - `RunExtract` 的 4 种模式路径解析算法（提取为 Core 可测试的方法，或通过 public static 方法暴露）
+       - `HandleExtractBatch` 的 3 种模式路径解析算法（提取为 Core 可测试的方法，或通过 public static 方法暴露）
        - IPC 合并后的 `ExtractOutputMode` 路由决策逻辑（纯逻辑测试）
 
   **Must NOT do**:
