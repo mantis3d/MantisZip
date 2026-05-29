@@ -55,6 +55,49 @@ public class SevenZipEngine : IArchiveEngine
     }
 
     /// <summary>
+    /// 7z.dll 状态信息，供设置窗口 UI 显示。
+    /// </summary>
+    public class SevenZipDllStatus
+    {
+        /// <summary>当前配置的 7z.dll 路径。</summary>
+        public string ConfiguredPath { get; init; } = "";
+        /// <summary>该路径的文件是否存在。</summary>
+        public bool Exists { get; init; }
+        /// <summary>是否已通过 EnsureLibraryPath 初始化（仅标记已尝试）。</summary>
+        public bool IsInitialized { get; init; }
+    }
+
+    /// <summary>
+    /// 获取当前 7z.dll 状态（不触发回调对话框）。
+    /// </summary>
+    public static SevenZipDllStatus GetSevenZipDllStatus()
+    {
+        return new SevenZipDllStatus
+        {
+            ConfiguredPath = SevenZipDllPath,
+            Exists = File.Exists(SevenZipDllPath),
+            IsInitialized = _libraryPathInitialized,
+        };
+    }
+
+    /// <summary>
+    /// 清除已初始化标记并重新探测默认路径，下次 EnsureLibraryPath 时重新生效。
+    /// 通常在用户修改了 7z.dll 路径后调用。
+    /// </summary>
+    /// <summary>
+    /// 清除已初始化标记并重新探测默认路径，下次 EnsureLibraryPath 时重新生效。
+    /// 通常在用户清除了手动指定的 7z.dll 路径后调用。
+    /// </summary>
+    public static void ResetLibraryPath()
+    {
+        lock (_libraryLock)
+        {
+            _libraryPathInitialized = false;
+            SevenZipDllPath = ResolveDefaultSevenZipDllPath();
+        }
+    }
+
+    /// <summary>
     /// 确保 SharpSevenZipLibraryManager 已配置 7z.dll 路径（线程安全，只执行一次）。
     /// </summary>
     internal static void EnsureLibraryPath()
