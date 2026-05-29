@@ -74,6 +74,7 @@ public partial class SettingsWindow : Window
             .FirstOrDefault(i => int.TryParse(i.Tag?.ToString(), out var l) && l == s.DefaultLevel) ?? DefaultLevelCombo.Items[2];
         CloseAfterCompressCheck.IsChecked = s.CloseAfterCompress;
         KeepExtCheck.IsChecked = s.KeepOriginalExtension;
+        PreserveRootCheck.IsChecked = s.PreserveDirectoryRoot;
 
         // 解压
         foreach (ComboBoxItem item in ExtractDestCombo.Items)
@@ -175,6 +176,7 @@ public partial class SettingsWindow : Window
         s.DefaultLevel = int.TryParse((DefaultLevelCombo.SelectedItem as ComboBoxItem)?.Tag?.ToString(), out var l) ? l : 5;
         s.CloseAfterCompress = CloseAfterCompressCheck.IsChecked == true;
         s.KeepOriginalExtension = KeepExtCheck.IsChecked == true;
+        s.PreserveDirectoryRoot = PreserveRootCheck.IsChecked == true;
 
         s.ExtractDestination = ((ComboBoxItem)ExtractDestCombo.SelectedItem)?.Tag as string ?? "ask";
         s.FileConflictAction = ((ComboBoxItem)ConflictCombo.SelectedItem)?.Tag as string ?? "ask";

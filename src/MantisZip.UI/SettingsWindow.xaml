@@ -78,6 +78,7 @@
 
                         <CheckBox x:Name="CloseAfterCompressCheck" Content="{l:L Settings_Compress_CloseAfterDone}" Margin="0,16,0,0"/>
                         <CheckBox x:Name="KeepExtCheck" Content="{l:L Settings_Compress_KeepExt}" Margin="0,8,0,0"/>
+                        <CheckBox x:Name="PreserveRootCheck" Content="压缩文件夹时保留外层目录" Margin="0,8,0,0"/>
                     </StackPanel>
                 </ScrollViewer>
             </TabItem>
