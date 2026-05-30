@@ -100,6 +100,46 @@ public partial class App : Application
     }
 
     /// <summary>
+    /// 保存密码到密码库。失败时弹出提示告知用户。
+    /// </summary>
+    /// <param name="password">要保存的密码</param>
+    /// <param name="archivePath">压缩包路径（用于生成默认匹配规则）</param>
+    /// <param name="patterns">用户指定的匹配规则，为空时使用文件名</param>
+    /// <param name="description">描述</param>
+    /// <returns>是否保存成功</returns>
+    internal static bool TrySavePassword(string password, string archivePath, List<string>? patterns, string? description)
+    {
+        if (string.IsNullOrEmpty(password))
+            return false;
+
+        var savePatterns = patterns != null && patterns.Count > 0
+            ? patterns
+            : new List<string> { Path.GetFileName(archivePath) };
+        var saveDesc = !string.IsNullOrEmpty(description) ? description : "";
+
+        try
+        {
+            PasswordManager.Instance.AddPassword(password, saveDesc, savePatterns);
+            LogDebug("TrySavePassword: saved password (desc='{0}', patterns=[{1}])", saveDesc, string.Join("; ", savePatterns));
+            return true;
+        }
+        catch (Exception pwdEx)
+        {
+            LogDebug("TrySavePassword: failed to save password: {0}", pwdEx.Message);
+            try
+            {
+                AppMessageBox.Show(
+                    L.TF(L.PwdMgr_SaveFailed, pwdEx.Message),
+                    L.T(L.App_ErrorTitle),
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+            }
+            catch { /* UI 可能不可用（CLI 模式）*/ }
+            return false;
+        }
+    }
+
+    /// <summary>
     /// QuickVerify + 全量解压 + 密码区 UI 更新。
     /// 解压成功返回 true，密码错误弹窗后返回 false。
     /// </summary>
@@ -128,16 +168,7 @@ public partial class App : Application
 
         if (rememberPwd == true && !string.IsNullOrEmpty(password))
         {
-            var savePatterns = (pwdPatterns != null && pwdPatterns.Count > 0)
-                ? pwdPatterns
-                : new List<string> { Path.GetFileName(archivePath) };
-            var saveDesc = !string.IsNullOrEmpty(pwdDesc) ? pwdDesc : "";
-            try
-            {
-                PasswordManager.Instance.AddPassword(password, saveDesc, savePatterns);
-                LogDebug("ExtractWithPasswordAsync: saved password (desc='{0}', patterns=[{1}])", saveDesc, string.Join("; ", savePatterns));
-            }
-            catch (Exception pwdEx) { Log("ExtractWithPasswordAsync: failed to save password: {0}", pwdEx.Message); }
+            TrySavePassword(password, archivePath, pwdPatterns, pwdDesc);
         }
         return true;
     }
@@ -209,8 +240,8 @@ public partial class App : Application
     /// </summary>
     private static bool IsPasswordError(Exception ex)
     {
-        var msg = ex.Message.ToLower();
-        return msg.Contains("password") || msg.Contains(L.T(L.PwdMgr_Col_Password)) ||
+        var msg = ex.Message.ToLowerInvariant();
+        return msg.Contains("password") || msg.Contains(L.T(L.PwdMgr_Col_Password).ToLowerInvariant()) ||
                msg.Contains("encrypted") || msg.Contains("decrypt") ||
                msg.Contains("encryption");
     }

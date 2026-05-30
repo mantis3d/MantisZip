@@ -112,6 +112,12 @@ public partial class App : Application
 
     protected override void OnStartup(StartupEventArgs e)
     {
+        // 先设置 CoreLog 脱敏委托（使用安全默认值 ExtensionOnly），
+        // 确保 InitializeApp 中任何 CoreLog 调用都被脱敏，
+        // 包括 AppSettings.Load() 异常处理中的 CoreLog.Trace。
+        CoreLog.RedactOverride = msg =>
+            LogRedactor.RedactPaths(msg, LogPrivacyMode.ExtensionOnly);
+
         // 全局初始化（所有入口最先运行）
         InitializeApp();
 
@@ -121,7 +127,7 @@ public partial class App : Application
         // 应用已保存的主题设置
         ApplyTheme(AppSettings.Instance.Theme);
 
-        // 初始化 CoreLog 日志脱敏委托。此后所有 CoreLog 写入自动脱敏。
+        // 用用户的实际隐私设置更新脱敏委托
         CoreLog.RedactOverride = msg =>
             LogRedactor.RedactPaths(msg, LogRedactor.ParseMode(AppSettings.Instance.LogPrivacyMode));
 

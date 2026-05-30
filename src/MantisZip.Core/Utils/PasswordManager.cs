@@ -1,3 +1,4 @@
+using System;
 using System.IO;
 using System.Security.Cryptography;
 using System.Text;
@@ -56,9 +57,9 @@ public class PasswordManager
     private static readonly string PasswordFilePath = Path.Combine(AppDataPath, "passwords.json");
 
     private PasswordData _data = new();
-    private static PasswordManager? _instance;
+    private static readonly Lazy<PasswordManager> _instance = new(() => new PasswordManager(), LazyThreadSafetyMode.ExecutionAndPublication);
 
-    public static PasswordManager Instance => _instance ??= new PasswordManager();
+    public static PasswordManager Instance => _instance.Value;
 
     private PasswordManager()
     {

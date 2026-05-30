@@ -321,7 +321,7 @@ public class ZipEngine : IArchiveEngine
                     }
                 }
 
-                try { File.SetLastWriteTime(resolvedPath, entryModified); } catch { }
+                try { File.SetLastWriteTime(resolvedPath, entryModified); } catch { CoreLog.Trace("ZipEngine.ExtractAsync: failed to set last write time for '{0}'", resolvedPath); }
 
                 processedBytes += entrySize;
                 processedFiles++;
@@ -655,7 +655,7 @@ public class ZipEngine : IArchiveEngine
                         }
 
                         processedBytes += entrySize;
-                        try { File.SetLastWriteTime(outPath, entry.DateTime); } catch { }
+                        try { File.SetLastWriteTime(outPath, entry.DateTime); } catch { CoreLog.Trace("ZipEngine: failed to set last write time for '{0}'", outPath); }
                     }
                 }
 
@@ -773,7 +773,7 @@ public class ZipEngine : IArchiveEngine
                 if (Directory.Exists(tempDir))
                     try { Directory.Delete(tempDir, recursive: true); } catch (Exception ex) { CoreLog.Error("AddToArchiveAsync: failed to clean up temp dir", ex); }
                 if (File.Exists(tempArchive))
-                    try { File.Delete(tempArchive); } catch { }
+                    try { File.Delete(tempArchive); } catch { CoreLog.Trace("ZipEngine: failed to delete temp archive '{0}'", tempArchive); }
             }
         }, cancellationToken).ConfigureAwait(false);
 
@@ -851,7 +851,7 @@ public class ZipEngine : IArchiveEngine
                 if (keepEntryCount == 0)
                 {
                     // 所有条目都被删除 — 删除原文件后返回
-                    try { File.Delete(archivePath); } catch { }
+                    try { File.Delete(archivePath); } catch { CoreLog.Trace("ZipEngine: failed to delete empty archive '{0}'", archivePath); }
                     CoreLog.Info("DeleteEntriesAsync: all entries deleted, removed archive");
                     return;
                 }
@@ -933,7 +933,7 @@ public class ZipEngine : IArchiveEngine
                         }
 
                         processedBytes += entrySize;
-                        try { File.SetLastWriteTime(outPath, entry.DateTime); } catch { }
+                        try { File.SetLastWriteTime(outPath, entry.DateTime); } catch { CoreLog.Trace("ZipEngine: failed to set last write time for '{0}'", outPath); }
                     }
                 }
 
@@ -1026,9 +1026,9 @@ public class ZipEngine : IArchiveEngine
             finally
             {
                 if (Directory.Exists(tempDir))
-                    try { Directory.Delete(tempDir, recursive: true); } catch { }
+                    try { Directory.Delete(tempDir, recursive: true); } catch { CoreLog.Trace("ZipEngine: failed to delete temp dir '{0}'", tempDir); }
                 if (File.Exists(tempArchive))
-                    try { File.Delete(tempArchive); } catch { }
+                    try { File.Delete(tempArchive); } catch { CoreLog.Trace("ZipEngine: failed to delete temp archive '{0}'", tempArchive); }
             }
         }, cancellationToken).ConfigureAwait(false);
 

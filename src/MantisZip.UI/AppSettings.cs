@@ -1,3 +1,4 @@
+using System;
 using System.IO;
 using System.Text.Json;
 using MantisZip.Core.Utils;
@@ -80,8 +81,8 @@ public class AppSettings
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "MantisZip");
     private static readonly string SettingsFile = Path.Combine(SettingsDir, "settings.json");
 
-    private static AppSettings? _instance;
-    public static AppSettings Instance => _instance ??= Load();
+    private static readonly Lazy<AppSettings> _instance = new(() => Load(), LazyThreadSafetyMode.ExecutionAndPublication);
+    public static AppSettings Instance => _instance.Value;
 
     /// <summary>
     /// 保存设置到 settings.json。返回 true 表示成功，false 表示失败。

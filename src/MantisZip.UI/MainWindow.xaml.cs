@@ -574,12 +574,7 @@ public partial class MainWindow : Window
                             _currentPassword = userPwd;
                             if (pwdDialog.RememberPassword)
                             {
-                                var patterns = pwdDialog.Patterns.Count > 0
-                                    ? pwdDialog.Patterns
-                                    : new List<string> { Path.GetFileName(archivePath) };
-                                var desc = pwdDialog.Description ?? "";
-                                try { PasswordManager.Instance.AddPassword(userPwd, desc, patterns); }
-                                catch (Exception pwdEx) { App.LogDebug("LoadArchiveAsync: failed to save password: {0}", pwdEx.Message); }
+                                App.TrySavePassword(userPwd, archivePath, pwdDialog.Patterns, pwdDialog.Description);
                             }
                         }
                     }
@@ -788,8 +783,8 @@ public partial class MainWindow : Window
     /// </summary>
     private static bool IsPasswordErrorLocal(Exception ex)
     {
-        var msg = ex.Message.ToLower();
-        return msg.Contains("password") || msg.Contains(L.T(L.PwdMgr_Col_Password)) ||
+        var msg = ex.Message.ToLowerInvariant();
+        return msg.Contains("password") || msg.Contains(L.T(L.PwdMgr_Col_Password).ToLowerInvariant()) ||
                msg.Contains("encrypted") || msg.Contains("decrypt") ||
                msg.Contains("encryption") ||
                (ex is ZipException && (msg.Contains("password") || msg.Contains("decrypt")));
@@ -860,12 +855,7 @@ public partial class MainWindow : Window
                         UpdateEnterPasswordBtnState();
                         if (pwdDialog.RememberPassword)
                         {
-                            var patterns = pwdDialog.Patterns.Count > 0
-                                ? pwdDialog.Patterns
-                                : new List<string> { Path.GetFileName(archivePath) };
-                            var desc = pwdDialog.Description ?? "";
-                            try { PasswordManager.Instance.AddPassword(userPwd, desc, patterns); }
-                            catch (Exception pwdEx) { App.LogDebug("ReExtractWithPassword: failed to save password: {0}", pwdEx.Message); }
+                            App.TrySavePassword(userPwd, archivePath, pwdDialog.Patterns, pwdDialog.Description);
                         }
                     }
                     else

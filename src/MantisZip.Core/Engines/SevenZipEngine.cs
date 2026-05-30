@@ -688,7 +688,7 @@ public class SevenZipEngine : IArchiveEngine
             if (keepEntries.Count == 0)
             {
                 // 所有条目都被删除 — 删除原文件
-                try { File.Delete(archivePath); } catch { }
+                try { File.Delete(archivePath); } catch { CoreLog.Trace("SevenZipEngine: failed to delete empty archive '{0}'", archivePath); }
                 CoreLog.Info($"DeleteEntriesAsync: all entries deleted, removed archive");
                 return;
             }
@@ -792,7 +792,7 @@ public class SevenZipEngine : IArchiveEngine
                 {
                     if (File.Exists(tempArchive))
                     {
-                        try { File.Delete(tempArchive); } catch { }
+                        try { File.Delete(tempArchive); } catch { CoreLog.Trace("SevenZipEngine: failed to delete temp archive '{0}'", tempArchive); }
                     }
                 }
             }
@@ -800,7 +800,7 @@ public class SevenZipEngine : IArchiveEngine
             {
                 if (Directory.Exists(tempDir))
                 {
-                    try { Directory.Delete(tempDir, recursive: true); } catch { }
+                    try { Directory.Delete(tempDir, recursive: true); } catch { CoreLog.Trace("SevenZipEngine: failed to delete temp dir '{0}'", tempDir); }
                 }
             }
         }, cancellationToken).ConfigureAwait(false);

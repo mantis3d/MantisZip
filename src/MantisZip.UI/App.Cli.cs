@@ -675,7 +675,7 @@ public partial class App : Application
     /// </summary>
     private static bool IsPasswordErrorStatic(Exception ex)
     {
-        var msg = ex.Message.ToLower();
+        var msg = ex.Message.ToLowerInvariant();
         return msg.Contains("password") || msg.Contains("encrypted") ||
                msg.Contains("decrypt") || msg.Contains("encryption");
     }
