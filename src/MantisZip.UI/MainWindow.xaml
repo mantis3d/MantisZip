@@ -20,6 +20,7 @@
     <Window.Resources>
         <BooleanToVisibilityConverter x:Key="BoolToVisibilityConverter"/>
         <app:RatioToWidthConverter x:Key="RatioToWidthConverter"/>
+        <app:RatioToFixedWidthConverter x:Key="RatioToFixedWidthConverter"/>
         <Style x:Key="TreeViewItemStyle" TargetType="TreeViewItem">
             <Setter Property="IsExpanded" Value="{Binding IsExpanded}"/>
             <Setter Property="IsSelected" Value="{Binding IsSelected}"/>
@@ -269,7 +270,7 @@
                                             HorizontalAlignment="Center" VerticalAlignment="Stretch"/>
 
                                 <!-- File List -->
-                                <DataGrid x:Name="FileListGrid" Grid.Column="2"
+                                        <DataGrid x:Name="FileListGrid" Grid.Column="2"
                                           AutoGenerateColumns="False"
                                           IsReadOnly="True"
                                           SelectionMode="Extended"
@@ -284,6 +285,8 @@
                                           VirtualizingStackPanel.IsVirtualizing="True"
                                           VirtualizingStackPanel.VirtualizationMode="Recycling"
                                           EnableRowVirtualization="True"
+                                          EnableColumnVirtualization="False"
+                                          CanUserReorderColumns="False"
                                           ScrollViewer.IsDeferredScrollingEnabled="False"
                                           BorderThickness="1"
                                           BorderBrush="{StaticResource Theme_BorderLight}"
@@ -318,7 +321,7 @@
                                         </ContextMenu>
                                     </DataGrid.ContextMenu>
                                     <DataGrid.Columns>
-                                        <DataGridTemplateColumn Header="{l:L Main_Col_Name}" Width="*" SortMemberPath="Name">
+                                        <DataGridTemplateColumn Header="{l:L Main_Col_Name}" Width="250" SortMemberPath="Name" DisplayIndex="0">
                                             <DataGridTemplateColumn.CellTemplate>
                                                 <DataTemplate>
                                                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
@@ -328,7 +331,7 @@
                                                 </DataTemplate>
                                             </DataGridTemplateColumn.CellTemplate>
                                         </DataGridTemplateColumn>
-                                        <DataGridTemplateColumn Header="{l:L Main_Col_Size}" Width="100" SortMemberPath="Size">
+                                        <DataGridTemplateColumn Header="{l:L Main_Col_Size}" Width="100" SortMemberPath="Size" DisplayIndex="1">
                                             <DataGridTemplateColumn.CellTemplate>
                                                 <DataTemplate>
                                                     <Grid>
@@ -344,18 +347,15 @@
                                                                 </Style>
                                                             </Rectangle.Style>
                                                             <Rectangle.Width>
-                                                                <MultiBinding Converter="{StaticResource RatioToWidthConverter}">
-                                                                    <Binding Path="SizeRatio"/>
-                                                                    <Binding Path="ActualWidth" RelativeSource="{RelativeSource AncestorType=ContentPresenter}"/>
-                                                                </MultiBinding>
-                                                            </Rectangle.Width>
-                                                        </Rectangle>
-                                                        <TextBlock Text="{Binding SizeDisplay}" VerticalAlignment="Center" Margin="4,0"/>
+                                                                 <Binding Path="SizeRatio" Converter="{StaticResource RatioToFixedWidthConverter}" ConverterParameter="100"/>
+                                                             </Rectangle.Width>
+                                                         </Rectangle>
+                                                         <TextBlock Text="{Binding SizeDisplay}" VerticalAlignment="Center" Margin="4,0"/>
                                                     </Grid>
                                                 </DataTemplate>
                                             </DataGridTemplateColumn.CellTemplate>
                                         </DataGridTemplateColumn>
-                                        <DataGridTemplateColumn Header="{l:L Main_Col_Compressed}" Width="100" SortMemberPath="CompressedSize">
+                                        <DataGridTemplateColumn Header="{l:L Main_Col_Compressed}" Width="100" SortMemberPath="CompressedSize" DisplayIndex="2">
                                             <DataGridTemplateColumn.CellTemplate>
                                                 <DataTemplate>
                                                     <Grid>
@@ -371,53 +371,44 @@
                                                                 </Style>
                                                             </Rectangle.Style>
                                                             <Rectangle.Width>
-                                                                <MultiBinding Converter="{StaticResource RatioToWidthConverter}">
-                                                                    <Binding Path="CompressedSizeRatio"/>
-                                                                    <Binding Path="ActualWidth" RelativeSource="{RelativeSource AncestorType=ContentPresenter}"/>
-                                                                </MultiBinding>
-                                                            </Rectangle.Width>
-                                                        </Rectangle>
-                                                        <TextBlock Text="{Binding CompressedSizeDisplay}" VerticalAlignment="Center" Margin="4,0"/>
+                                                                 <Binding Path="CompressedSizeRatio" Converter="{StaticResource RatioToFixedWidthConverter}" ConverterParameter="100"/>
+                                                             </Rectangle.Width>
+                                                         </Rectangle>
+                                                         <TextBlock Text="{Binding CompressedSizeDisplay}" VerticalAlignment="Center" Margin="4,0"/>
                                                     </Grid>
                                                 </DataTemplate>
                                             </DataGridTemplateColumn.CellTemplate>
                                         </DataGridTemplateColumn>
-                                        <DataGridTemplateColumn Header="{l:L Main_Col_Ratio}" Width="80" SortMemberPath="RatioSort">
+                                        <DataGridTemplateColumn Header="{l:L Main_Col_Ratio}" Width="80" SortMemberPath="RatioSort" DisplayIndex="3">
                                             <DataGridTemplateColumn.CellTemplate>
                                                 <DataTemplate>
                                                     <Grid>
                                                         <Rectangle Fill="{StaticResource ProgressBarRatioBg}" HorizontalAlignment="Left">
                                                             <Rectangle.Width>
-                                                                <MultiBinding Converter="{StaticResource RatioToWidthConverter}">
-                                                                    <Binding Path="RatioBarValue"/>
-                                                                    <Binding Path="ActualWidth" RelativeSource="{RelativeSource AncestorType=ContentPresenter}"/>
-                                                                </MultiBinding>
-                                                            </Rectangle.Width>
-                                                        </Rectangle>
-                                                        <TextBlock Text="{Binding RatioDisplay}" VerticalAlignment="Center" Margin="4,0"/>
+                                                                 <Binding Path="RatioBarValue" Converter="{StaticResource RatioToFixedWidthConverter}" ConverterParameter="80"/>
+                                                             </Rectangle.Width>
+                                                         </Rectangle>
+                                                         <TextBlock Text="{Binding RatioDisplay}" VerticalAlignment="Center" Margin="4,0"/>
                                                     </Grid>
                                                 </DataTemplate>
                                             </DataGridTemplateColumn.CellTemplate>
                                         </DataGridTemplateColumn>
-                                        <DataGridTextColumn Header="{l:L Main_Col_Crc32}" Binding="{Binding Crc32Display}" SortMemberPath="Crc32" Width="110"/>
-                                        <DataGridTemplateColumn Header="{l:L Main_Col_Date}" Width="150" SortMemberPath="LastModified">
+                                        <DataGridTextColumn Header="{l:L Main_Col_Crc32}" Binding="{Binding Crc32Display}" SortMemberPath="Crc32" Width="110" DisplayIndex="4"/>
+                                        <DataGridTemplateColumn Header="{l:L Main_Col_Date}" Width="150" SortMemberPath="LastModified" DisplayIndex="5">
                                             <DataGridTemplateColumn.CellTemplate>
                                                 <DataTemplate>
                                                     <Grid>
                                                         <Rectangle Fill="{StaticResource ProgressBarDateBg}" HorizontalAlignment="Left">
                                                             <Rectangle.Width>
-                                                                <MultiBinding Converter="{StaticResource RatioToWidthConverter}">
-                                                                    <Binding Path="DateRatio"/>
-                                                                    <Binding Path="ActualWidth" RelativeSource="{RelativeSource AncestorType=ContentPresenter}"/>
-                                                                </MultiBinding>
-                                                            </Rectangle.Width>
-                                                        </Rectangle>
-                                                        <TextBlock Text="{Binding DateDisplay}" VerticalAlignment="Center" Margin="4,0"/>
+                                                                 <Binding Path="DateRatio" Converter="{StaticResource RatioToFixedWidthConverter}" ConverterParameter="150"/>
+                                                             </Rectangle.Width>
+                                                         </Rectangle>
+                                                         <TextBlock Text="{Binding DateDisplay}" VerticalAlignment="Center" Margin="4,0"/>
                                                     </Grid>
                                                 </DataTemplate>
                                             </DataGridTemplateColumn.CellTemplate>
                                         </DataGridTemplateColumn>
-                                        <DataGridTemplateColumn Header="{l:L Main_Col_Encrypted}" Width="50" SortMemberPath="Encrypted">
+                                        <DataGridTemplateColumn Header="{l:L Main_Col_Encrypted}" Width="50" SortMemberPath="IsEncrypted" DisplayIndex="6">
                                             <DataGridTemplateColumn.CellTemplate>
                                                 <DataTemplate>
                                                     <emoji:TextBlock Text="🔒" HorizontalAlignment="Center" 
