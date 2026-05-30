@@ -2,24 +2,31 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:l="clr-namespace:MantisZip.UI.Localization"
+             xmlns:converters="clr-namespace:MantisZip.UI.Converters"
         Title="{l:L Progress_Title}" Height="Auto" Width="400" MinHeight="175"
         SizeToContent="Height"
         WindowStartupLocation="CenterScreen"
         ResizeMode="NoResize"
         ShowInTaskbar="False"
         Topmost="True">
+    <Window.Resources>
+        <converters:BatchStatusToTextConverter x:Key="BatchStatusTextConverter"/>
+        <converters:BatchStatusToIconConverter x:Key="BatchStatusIconConverter"/>
+        <converters:ProgressStatusToBackgroundConverter x:Key="ProgressStatusBackgroundConverter"/>
+    </Window.Resources>
     <Grid Margin="15">
         <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="*"/>
-            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>  <!-- 0: 文件列表 -->
+            <RowDefinition Height="Auto"/>  <!-- 1: 密码匹配区 -->
+            <RowDefinition Height="Auto"/>  <!-- 2: 当前文件名 -->
+            <RowDefinition Height="Auto"/>  <!-- 3: 文件进度条 -->
+            <RowDefinition Height="Auto"/>  <!-- 4: 总体进度条 -->
+            <RowDefinition Height="Auto"/>  <!-- 5: 文件计数 -->
+            <RowDefinition Height="Auto"/>  <!-- 6: 按钮 -->
         </Grid.RowDefinitions>
 
         <!-- ═══ 密码匹配区（默认隐藏，仅在尝试密码规则时显示）═══ -->
-        <Border x:Name="PasswordSection" Grid.Row="0"
+        <Border x:Name="PasswordSection" Grid.Row="1"
                 Background="{StaticResource Theme_StatusWarning}" BorderBrush="{StaticResource Theme_StatusWarning}" BorderThickness="1"
                 CornerRadius="4" Padding="8,6" Margin="0,0,0,8"
                 Visibility="Collapsed">
@@ -78,13 +85,13 @@
         </Border>
 
         <!-- 当前操作的文件名 -->
-        <TextBlock x:Name="FileNameText" Grid.Row="1"
+        <TextBlock x:Name="FileNameText" Grid.Row="2"
                    Text="{l:L Progress_Processing}"
                    TextTrimming="CharacterEllipsis"
                    Foreground="{StaticResource Theme_TextPrimary}"/>
 
         <!-- 当前文件进度条（上面） -->
-        <Grid Grid.Row="2" Margin="0,6,0,2">
+        <Grid Grid.Row="3" Margin="0,6,0,2">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="Auto"/>
@@ -101,7 +108,7 @@
         </Grid>
 
         <!-- 总体进度条（下面） -->
-        <Grid Grid.Row="3" Margin="0,4,0,2">
+        <Grid Grid.Row="4" Margin="0,4,0,2">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="Auto"/>
@@ -117,11 +124,69 @@
         </Grid>
 
         <!-- 文件计数 -->
-        <TextBlock x:Name="FileCountText" Grid.Row="4"
+        <TextBlock x:Name="FileCountText" Grid.Row="5"
                    Text=""
                    FontSize="11" Foreground="{StaticResource Theme_TextDisabled}"
                    Margin="0,0,0,4"
                    Visibility="Collapsed"/>
+
+        <!-- ═══ 批处理文件列表（3 列：状态图标 | 文件名+进度条背景 | 百分比）═══ -->
+        <ListView x:Name="BatchFileList" Grid.Row="0"
+                  Visibility="Collapsed"
+                  MaxHeight="160" Margin="0,0,0,8"
+                  BorderThickness="1"
+                  BorderBrush="{StaticResource Theme_Border}"
+                  Background="{StaticResource Theme_WindowBg}"
+                  ScrollViewer.VerticalScrollBarVisibility="Auto"
+                  SelectionMode="Single"
+                  HorizontalContentAlignment="Stretch">
+            <ListView.ItemContainerStyle>
+                <Style TargetType="ListViewItem">
+                    <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                    <Setter Property="Padding" Value="0"/>
+                </Style>
+            </ListView.ItemContainerStyle>
+            <ListView.ItemTemplate>
+                <DataTemplate>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="28"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="50"/>
+                        </Grid.ColumnDefinitions>
+
+                        <!-- 第 1 列: 状态图标 -->
+                        <TextBlock Grid.Column="0"
+                                   Text="{Binding Status, Converter={StaticResource BatchStatusIconConverter}}"
+                                   FontSize="14" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+
+                        <!-- 第 2 列: 文件名 + 进度条背景 -->
+                        <TextBlock Grid.Column="1"
+                                   Text="{Binding Name}"
+                                   TextTrimming="CharacterEllipsis"
+                                   VerticalAlignment="Center"
+                                   Foreground="{StaticResource Theme_TextPrimary}"
+                                   Padding="4,2">
+                            <TextBlock.Background>
+                                <MultiBinding Converter="{StaticResource ProgressStatusBackgroundConverter}">
+                                    <Binding Path="Progress"/>
+                                    <Binding Path="Status"/>
+                                </MultiBinding>
+                            </TextBlock.Background>
+                        </TextBlock>
+
+                        <!-- 第 3 列: 进度百分比 -->
+                        <TextBlock Grid.Column="2"
+                                   Text="{Binding Progress, StringFormat=\{0:F0\}%}"
+                                   HorizontalAlignment="Right"
+                                   VerticalAlignment="Center"
+                                   Foreground="{StaticResource Theme_TextSecondary}"
+                                   FontSize="11"
+                                   Padding="0,0,6,0"/>
+                    </Grid>
+                </DataTemplate>
+            </ListView.ItemTemplate>
+        </ListView>
 
         <!-- 底部按钮行 -->
         <Grid Grid.Row="6">

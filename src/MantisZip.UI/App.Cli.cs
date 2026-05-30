@@ -8,6 +8,7 @@ using ICSharpCode.SharpZipLib.Zip;
 using MantisZip.Core;
 using MantisZip.Core.Abstractions;
 using MantisZip.Core.Engines;
+using MantisZip.Core.Models;
 using MantisZip.Core.Utils;
 using MantisZip.UI.Localization;
 
@@ -132,6 +133,7 @@ public partial class App : Application
         progressWindow.Show();
         app.MainWindow = progressWindow;
         progressWindow.SetProgress(0, L.T(L.App_CompressPreparing));
+        progressWindow.InitBatchMode(allPaths);
 
         var ct = progressWindow.CancellationToken;
         var total = allPaths.Count;
@@ -160,9 +162,7 @@ public partial class App : Application
                     var outputPath = Path.Combine(parentDir, itemName + ext);
 
                     // 更新进度显示
-                    var progressMsg = L.TF(L.App_CompressSeparateProgress, i + 1, total);
-                    await progressWindow.Dispatcher.InvokeAsync(() =>
-                        progressWindow.SetProgress((int)((double)i / total * 100), progressMsg));
+                    await progressWindow.Dispatcher.InvokeAsync(() => progressWindow.SetCurrentBatchItem(i));
 
                     // 冲突处理
                     string finalPath = outputPath;
@@ -206,38 +206,62 @@ public partial class App : Application
                         var options = CreateCompressOptions();
                         options.CompressionLevel = settings.DefaultLevel;
 
+                        var batchProgress = progressWindow.CreatePauseAwareProgress(
+                            ProgressWindow.CreateBackgroundProgress(progressWindow));
+
                         if (addMode)
                         {
                             await compressEngine.AddToArchiveAsync(finalPath, [item], options,
-                                ProgressWindow.CreateBackgroundProgress(progressWindow), ct);
+                                batchProgress, ct);
                         }
                         else
                         {
                             await compressEngine.CompressAsync([item], finalPath, options,
-                                ProgressWindow.CreateBackgroundProgress(progressWindow), ct);
+                                batchProgress, ct);
                         }
                         succeeded++;
+                        await progressWindow.Dispatcher.InvokeAsync(() =>
+                            progressWindow.UpdateBatchItemStatus(i, BatchItemStatus.Completed));
                     }
                     catch (OperationCanceledException) { throw; }
                     catch (Exception ex)
                     {
                         Log("--compress-separate: item failed ({0}): {1}", item, ex.Message);
                         failed++;
+                        await progressWindow.Dispatcher.InvokeAsync(() =>
+                            progressWindow.UpdateBatchItemStatus(i, BatchItemStatus.Failed, ex.Message));
                     }
                 }
             }
             catch (OperationCanceledException) { }
 
             // 完成汇总
-            await progressWindow.Dispatcher.InvokeAsync(() =>
+            if (failed > 0)
             {
-                if (failed > 0)
-                    progressWindow.SetComplete(L.TF(L.App_CompressSeparateComplete, succeeded, failed));
-                else
-                    progressWindow.SetComplete(L.T(L.App_CompressComplete));
-            });
-            await Task.Delay(2500);
-            await progressWindow.Dispatcher.InvokeAsync(() => app.Shutdown());
+                await progressWindow.Dispatcher.InvokeAsync(() => progressWindow.CompleteWithErrors());
+                // 有失败项：窗口保持打开，用户手动关闭后退出
+                await progressWindow.Dispatcher.InvokeAsync(() =>
+                {
+                    progressWindow.CancelButton.Content = L.T(L.Progress_Button_Close);
+                });
+                // Wait for user to close
+                await Task.Run(() =>
+                {
+                    var closed = new ManualResetEventSlim(false);
+                    EventHandler handler = null!;
+                    handler = (_, _) => { closed.Set(); progressWindow.Closed -= handler; };
+                    progressWindow.Closed += handler;
+                    closed.Wait();
+                });
+                await progressWindow.Dispatcher.InvokeAsync(() => app.Shutdown());
+            }
+            else
+            {
+                await progressWindow.Dispatcher.InvokeAsync(() =>
+                    progressWindow.SetComplete(L.T(L.App_CompressComplete)));
+                await Task.Delay(2500);
+                await progressWindow.Dispatcher.InvokeAsync(() => app.Shutdown());
+            }
         });
     }
     private static void HandleCompressCombined(string[] paths)
@@ -486,99 +510,165 @@ public partial class App : Application
     /// <summary>
     /// 处理 --extract-here 模式：解压到压缩包所在目录。
     /// </summary>
-    private static void HandleExtractHere(string? archivePath)
+    private static void HandleExtractHere(string[] paths)
     {
-        if (string.IsNullOrEmpty(archivePath) || !File.Exists(archivePath))
+        LogStartup($"HandleExtractHere: paths=[{string.Join(";", paths)}]");
+        var app = Current;
+        if (app == null) return;
+        app.ShutdownMode = ShutdownMode.OnExplicitShutdown;
+
+        var myPaths = paths.Where(File.Exists).ToList();
+        if (myPaths.Count == 0) { app.Shutdown(); return; }
+
+        bool firstInstance;
+        var mutex = new Mutex(true, ExtractMutexName, out firstInstance);
+
+        if (firstInstance)
         {
-            AppMessageBox.Show(L.T(L.App_FileNotFound), L.T(L.App_ErrorTitle), MessageBoxButton.OK, MessageBoxImage.Error);
-            Current.Shutdown();
-            return;
+            var allPaths = new List<string>(myPaths);
+            var cts = new CancellationTokenSource();
+            _extractPipeReady.Reset();
+            StartPipeServer(allPaths, cts.Token, ExtractPipeName, _extractPipeReady);
+
+            if (!_extractPipeReady.Wait(3000))
+                LogStartup("HandleExtractHere: WARNING pipe server did not signal ready within 3s");
+
+            LogStartup("HandleExtractHere: 启动 DispatcherTimer 800ms");
+            var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(800) };
+            timer.Tick += (_, _) =>
+            {
+                timer.Stop();
+                cts.Cancel();
+                mutex.Dispose();
+                LogStartup("HandleExtractHere: DispatcherTimer 触发，调用 HandleExtractBatch");
+                try
+                {
+                    HandleExtractBatch(allPaths, "here");
+                    LogStartup("HandleExtractHere: HandleExtractBatch 返回");
+                }
+                catch (Exception ex)
+                {
+                    LogStartup($"HandleExtractHere: DispatcherTimer 回调异常: {ex.Message}\n{ex.StackTrace ?? ""}");
+                    try { AppMessageBox.Show(L.TF(L.App_ExtractFailed, ex.Message), L.T(L.App_StartupErrorTitle), MessageBoxButton.OK, MessageBoxImage.Error); } catch { }
+                    Current.Shutdown();
+                }
+            };
+            timer.Start();
         }
-
-        // L.T(L.Settings_Tab_Extract)到L.T(L.Settings_Extract_Dest_SameDir)
-        var dest = Path.GetDirectoryName(archivePath);
-        if (string.IsNullOrEmpty(dest))
-            dest = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
-
-        RunExtractStatic(archivePath, dest);
+        else
+        {
+            SendPathsThroughPipe(myPaths, ExtractPipeName);
+            app.Shutdown();
+        }
     }
     /// <summary>
     /// 处理 --extract-to-name 模式：解压到压缩包名命名的子目录。
     /// </summary>
-    private static void HandleExtractToNamed(string? archivePath)
+    private static void HandleExtractToNamed(string[] paths)
     {
-        if (string.IsNullOrEmpty(archivePath) || !File.Exists(archivePath))
-        {
-            AppMessageBox.Show(L.T(L.App_FileNotFound), L.T(L.App_ErrorTitle), MessageBoxButton.OK, MessageBoxImage.Error);
-            Current.Shutdown();
-            return;
-        }
+        LogStartup($"HandleExtractToNamed: paths=[{string.Join(";", paths)}]");
+        var app = Current;
+        if (app == null) return;
+        app.ShutdownMode = ShutdownMode.OnExplicitShutdown;
 
-        // L.T(L.Settings_Tab_Extract)到 L.T(L.Settings_Extract_Dest_SameDir)\L.T(L.Compress_Archive_Group)L.T(L.Main_Col_Name)\ 下
-        var parentDir = Path.GetDirectoryName(archivePath);
-        var archiveName = Path.GetFileNameWithoutExtension(archivePath);
-        if (string.IsNullOrEmpty(parentDir))
-            parentDir = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
-        var dest = Path.Combine(parentDir, archiveName);
+        var myPaths = paths.Where(File.Exists).ToList();
+        if (myPaths.Count == 0) { app.Shutdown(); return; }
 
-        RunExtractStatic(archivePath, dest);
-    }
-    /// <summary>
-    /// 处理 --extract-smart 模式：分析压缩包结构后自动选择解压方式。
-    /// 若所有文件在同一根目录下 → 直接解压到压缩包所在目录；
-    /// 若文件分散在多层或在根目录 → 创建压缩包名前缀的子目录。
-    /// 条目列表可能因加密失败，此时回退到压缩包名子目录（安全默认值）。
-    /// 密码处理完全委托给 RunExtractStatic。
-    /// </summary>
-    private static void HandleExtractSmart(string? archivePath)
-    {
-        if (string.IsNullOrEmpty(archivePath) || !File.Exists(archivePath))
-        {
-            AppMessageBox.Show(L.T(L.App_FileNotFound), L.T(L.App_ErrorTitle), MessageBoxButton.OK, MessageBoxImage.Error);
-            Current.Shutdown();
-            return;
-        }
+        bool firstInstance;
+        var mutex = new Mutex(true, ExtractMutexName, out firstInstance);
 
-        var engine = ArchiveEngineFactory.GetEngineByExtension(archivePath);
-        if (engine == null)
+        if (firstInstance)
         {
-            AppMessageBox.Show(L.T(L.Main_DragFormatUnsupported), L.T(L.App_ErrorTitle), MessageBoxButton.OK, MessageBoxImage.Error);
-            Current.Shutdown();
-            return;
-        }
+            var allPaths = new List<string>(myPaths);
+            var cts = new CancellationTokenSource();
+            _extractPipeReady.Reset();
+            StartPipeServer(allPaths, cts.Token, ExtractPipeName, _extractPipeReady);
 
-        var parentDir = Path.GetDirectoryName(archivePath);
-        var archiveName = Path.GetFileNameWithoutExtension(archivePath);
-        if (string.IsNullOrEmpty(parentDir))
-            parentDir = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
+            if (!_extractPipeReady.Wait(3000))
+                LogStartup("HandleExtractToNamed: WARNING pipe server did not signal ready within 3s");
 
-        // 尝试列出条目分析结构（加密压缩包可能失败 → 使用安全默认值）
-        IReadOnlyList<Core.Abstractions.ArchiveItem>? items = null;
-        try
-        {
-            items = engine.ListEntriesAsync(archivePath).GetAwaiter().GetResult();
-        }
-        catch (Exception ex) when (IsPasswordErrorStatic(ex))
-        {
-            Log("--extract-smart: ListEntriesAsync failed with crypto error, falling back to named-folder: {0}", ex.Message);
-        }
-
-        // 智能决策目标目录
-        string dest;
-        if (items == null || items.Count == 0)
-        {
-            // 无法分析或空压缩包 → 使用压缩包名子目录
-            dest = Path.Combine(parentDir, archiveName);
+            LogStartup("HandleExtractToNamed: 启动 DispatcherTimer 800ms");
+            var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(800) };
+            timer.Tick += (_, _) =>
+            {
+                timer.Stop();
+                cts.Cancel();
+                mutex.Dispose();
+                LogStartup("HandleExtractToNamed: DispatcherTimer 触发，调用 HandleExtractBatch");
+                try
+                {
+                    HandleExtractBatch(allPaths, "toname");
+                    LogStartup("HandleExtractToNamed: HandleExtractBatch 返回");
+                }
+                catch (Exception ex)
+                {
+                    LogStartup($"HandleExtractToNamed: DispatcherTimer 回调异常: {ex.Message}\n{ex.StackTrace ?? ""}");
+                    try { AppMessageBox.Show(L.TF(L.App_ExtractFailed, ex.Message), L.T(L.App_StartupErrorTitle), MessageBoxButton.OK, MessageBoxImage.Error); } catch { }
+                    Current.Shutdown();
+                }
+            };
+            timer.Start();
         }
         else
         {
-            dest = ArchiveStructureAnalyzer.HasSingleRootDirectory(items)
-                ? parentDir                                       // 单一根目录 → 直接解压
-                : Path.Combine(parentDir, archiveName);            // 分散结构 → 建子目录
+            SendPathsThroughPipe(myPaths, ExtractPipeName);
+            app.Shutdown();
         }
+    }
+    /// <summary>
+    /// 处理 --extract-smart 模式：分析压缩包结构后自动选择解压方式。
+    /// 支持多文件批量处理，通过 IPC 合并路径。
+    /// </summary>
+    private static void HandleExtractSmart(string[] paths)
+    {
+        LogStartup($"HandleExtractSmart: paths=[{string.Join(";", paths)}]");
+        var app = Current;
+        if (app == null) return;
+        app.ShutdownMode = ShutdownMode.OnExplicitShutdown;
 
-        Log("--extract-smart: {0} items, dest={1}", items?.Count ?? 0, dest);
-        RunExtractStatic(archivePath, dest);
+        var myPaths = paths.Where(File.Exists).ToList();
+        if (myPaths.Count == 0) { app.Shutdown(); return; }
+
+        bool firstInstance;
+        var mutex = new Mutex(true, ExtractMutexName, out firstInstance);
+
+        if (firstInstance)
+        {
+            var allPaths = new List<string>(myPaths);
+            var cts = new CancellationTokenSource();
+            _extractPipeReady.Reset();
+            StartPipeServer(allPaths, cts.Token, ExtractPipeName, _extractPipeReady);
+
+            if (!_extractPipeReady.Wait(3000))
+                LogStartup("HandleExtractSmart: WARNING pipe server did not signal ready within 3s");
+
+            LogStartup("HandleExtractSmart: 启动 DispatcherTimer 800ms");
+            var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(800) };
+            timer.Tick += (_, _) =>
+            {
+                timer.Stop();
+                cts.Cancel();
+                mutex.Dispose();
+                LogStartup("HandleExtractSmart: DispatcherTimer 触发，调用 HandleExtractBatch");
+                try
+                {
+                    HandleExtractBatch(allPaths, "smart");
+                    LogStartup("HandleExtractSmart: HandleExtractBatch 返回");
+                }
+                catch (Exception ex)
+                {
+                    LogStartup($"HandleExtractSmart: DispatcherTimer 回调异常: {ex.Message}\n{ex.StackTrace ?? ""}");
+                    try { AppMessageBox.Show(L.TF(L.App_ExtractFailed, ex.Message), L.T(L.App_StartupErrorTitle), MessageBoxButton.OK, MessageBoxImage.Error); } catch { }
+                    Current.Shutdown();
+                }
+            };
+            timer.Start();
+        }
+        else
+        {
+            SendPathsThroughPipe(myPaths, ExtractPipeName);
+            app.Shutdown();
+        }
     }
     /// <summary>
     /// 判断异常是否与密码相关，用于 --extract-smart 的加密回退流程。
@@ -589,27 +679,315 @@ public partial class App : Application
         return msg.Contains("password") || msg.Contains("encrypted") ||
                msg.Contains("decrypt") || msg.Contains("encryption");
     }
-    private static void HandleExtract(string? archivePath)
+    private static void HandleExtract(string[] paths)
     {
-        if (string.IsNullOrEmpty(archivePath) || !File.Exists(archivePath))
+        LogStartup($"HandleExtract: paths=[{string.Join(";", paths)}]");
+        var app = Current;
+        if (app == null) return;
+        app.ShutdownMode = ShutdownMode.OnExplicitShutdown;
+
+        var myPaths = paths.Where(File.Exists).ToList();
+        if (myPaths.Count == 0) { app.Shutdown(); return; }
+
+        bool firstInstance;
+        var mutex = new Mutex(true, ExtractMutexName, out firstInstance);
+
+        if (firstInstance)
         {
-            AppMessageBox.Show(L.T(L.App_FileNotFound), L.T(L.App_ErrorTitle), MessageBoxButton.OK, MessageBoxImage.Error);
-            Current.Shutdown();
+            var allPaths = new List<string>(myPaths);
+            var cts = new CancellationTokenSource();
+            _extractPipeReady.Reset();
+            StartPipeServer(allPaths, cts.Token, ExtractPipeName, _extractPipeReady);
+
+            if (!_extractPipeReady.Wait(3000))
+                LogStartup("HandleExtract: WARNING pipe server did not signal ready within 3s");
+
+            LogStartup("HandleExtract: 启动 DispatcherTimer 800ms");
+            var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(800) };
+            timer.Tick += (_, _) =>
+            {
+                timer.Stop();
+                cts.Cancel();
+                mutex.Dispose();
+                LogStartup("HandleExtract: DispatcherTimer 触发，调用 HandleExtractBatch");
+                try
+                {
+                    HandleExtractBatch(allPaths, "extract");
+                    LogStartup("HandleExtract: HandleExtractBatch 返回");
+                }
+                catch (Exception ex)
+                {
+                    LogStartup($"HandleExtract: DispatcherTimer 回调异常: {ex.Message}\n{ex.StackTrace ?? ""}");
+                    try { AppMessageBox.Show(L.TF(L.App_ExtractFailed, ex.Message), L.T(L.App_StartupErrorTitle), MessageBoxButton.OK, MessageBoxImage.Error); } catch { }
+                    Current.Shutdown();
+                }
+            };
+            timer.Start();
+        }
+        else
+        {
+            SendPathsThroughPipe(myPaths, ExtractPipeName);
+            app.Shutdown();
+        }
+    }
+    /// <summary>
+    /// 批量解压调度入口。mode="extract" 时弹出 ExtractSettingsWindow 让用户选择输出模式；
+    /// mode="here"/"smart"/"toname" 时直接按对应模式批量处理。
+    /// </summary>
+    private static void HandleExtractBatch(List<string> allPaths, string mode)
+    {
+        LogStartup($"HandleExtractBatch: mode={mode}, paths=[{string.Join(";", allPaths)}]");
+        var app = Current;
+        if (app == null) { LogStartup("HandleExtractBatch: app is null"); return; }
+
+        // mode=extract 弹出 ExtractSettingsWindow
+        if (mode == "extract")
+        {
+            ExtractOutputMode selectedMode = ExtractOutputMode.ToName;
+            string? customDest = null;
+            LogStartup("HandleExtractBatch: 准备弹出 ExtractSettingsWindow");
+            var ok = app.Dispatcher.Invoke(() =>
+            {
+                var dlg = new ExtractSettingsWindow(allPaths);
+                LogStartup("HandleExtractBatch: ExtractSettingsWindow 已创建，准备 ShowDialog");
+                var result = dlg.ShowDialog();
+                LogStartup($"HandleExtractBatch: ExtractSettingsWindow 返回 DialogResult={result}");
+                if (result != true) return false;
+                selectedMode = dlg.OutputMode;
+                customDest = dlg.CustomDestination;
+                LogStartup($"HandleExtractBatch: 用户选择 mode={selectedMode}, dest={customDest}");
+                return true;
+            });
+
+            if (!ok) { app.Shutdown(); return; }
+
+            string effectiveMode = selectedMode switch
+            {
+                ExtractOutputMode.Here => "here",
+                ExtractOutputMode.Smart => "smart",
+                ExtractOutputMode.ToName => "toname",
+                ExtractOutputMode.Manual => "manual",
+                _ => "toname"
+            };
+            if (effectiveMode == "manual")
+                HandleExtractBatchCore(allPaths, effectiveMode, app, customDest);
+            else
+                HandleExtractBatchCore(allPaths, effectiveMode, app, null);
             return;
         }
 
+        // here/smart/toname: 直接批量解压
+        HandleExtractBatchCore(allPaths, mode, app, null);
+    }
+
+    /// <summary>
+    /// 批量解压核心循环。遍历 allPaths，对每个文件按 mode 决定目标目录后调用 engine.ExtractAsync。
+    /// 支持取消。完成后自动退出。
+    /// </summary>
+    private static void HandleExtractBatchCore(List<string> allPaths, string mode, Application app, string? manualDest)
+    {
+        LogStartup($"HandleExtractBatchCore: mode={mode}, count={allPaths.Count}, manualDest={manualDest}");
         var settings = AppSettings.Instance;
 
-        // L.T(L.MsgBox_Ok)L.T(L.Settings_Tab_Extract)目标目录
-        var dest = ResolveExtractDestinationStatic(archivePath, settings);
-        if (dest == null)
-        {
-            Current.Shutdown();
-            return;
-        }
+        LogStartup("HandleExtractBatchCore: 创建 ProgressWindow");
+        var progressWindow = new ProgressWindow();
+        LogStartup("HandleExtractBatchCore: ProgressWindow 已创建，调用 InitCancellation");
+        progressWindow.InitCancellation();
+        LogStartup("HandleExtractBatchCore: 显示 ProgressWindow");
+        progressWindow.Show();
+        app.MainWindow = progressWindow;
+        progressWindow.InitBatchMode(allPaths);
+        progressWindow.SetProgress(0, L.T(L.App_ExtractingProgress));
 
-        RunExtractStatic(archivePath, dest);
+        var ct = progressWindow.CancellationToken;
+        var total = allPaths.Count;
+
+        Task.Run(async () =>
+        {
+            int succeeded = 0, failed = 0;
+            try
+            {
+                for (int i = 0; i < total; i++)
+                {
+                    ct.ThrowIfCancellationRequested();
+
+                    var archivePath = allPaths[i];
+                    await progressWindow.Dispatcher.InvokeAsync(() =>
+                        progressWindow.SetCurrentBatchItem(i));
+
+                    // 确定目标路径（所有分支均返回非 null 值）
+                    var dest = mode switch
+                    {
+                        "here" => Path.GetDirectoryName(archivePath) ?? Environment.GetFolderPath(Environment.SpecialFolder.Desktop),
+                        "toname" => Path.Combine(
+                            Path.GetDirectoryName(archivePath) ?? Environment.GetFolderPath(Environment.SpecialFolder.Desktop),
+                            Path.GetFileNameWithoutExtension(archivePath)),
+                        "manual" => manualDest ?? Environment.GetFolderPath(Environment.SpecialFolder.Desktop),
+                        "smart" => ResolveSmartDest(archivePath) ?? Environment.GetFolderPath(Environment.SpecialFolder.Desktop),
+                        _ => Path.GetDirectoryName(archivePath) ?? Environment.GetFolderPath(Environment.SpecialFolder.Desktop)
+                    };
+
+                    // 解压
+                    try
+                    {
+                        var engine = ArchiveEngineFactory.GetEngineByExtension(archivePath);
+                        if (engine == null)
+                        {
+                            failed++;
+                            await progressWindow.Dispatcher.InvokeAsync(() =>
+                                progressWindow.UpdateBatchItemStatus(i, BatchItemStatus.Failed, "Unsupported format"));
+                            continue;
+                        }
+
+                        // 密码匹配：对加密压缩包尝试已保存密码，无匹配则弹出密码输入框
+                        string? password = null;
+                        if (HasEncryptedEntries(archivePath, engine))
+                        {
+                            // 1. 尝试已保存密码
+                            var match = TryMatchPassword(archivePath, engine, progressWindow, true, out _);
+                            if (match.HasValue)
+                            {
+                                password = match.Value.Password;
+                                Log("--extract batch: password matched for '{0}'", archivePath);
+                            }
+                            else
+                            {
+                                // 2. 弹密码输入框（需在 UI 线程）
+                                var promptResult = await progressWindow.Dispatcher.InvokeAsync(() =>
+                                    PromptForPassword(archivePath, progressWindow, null));
+                                if (promptResult == null)
+                                {
+                                    failed++;
+                                    await progressWindow.Dispatcher.InvokeAsync(() =>
+                                        progressWindow.UpdateBatchItemStatus(i, BatchItemStatus.Failed,
+                                            L.T(L.App_ExtractFailed)));
+                                    continue;
+                                }
+                                password = promptResult.Value.Password;
+
+                                // 验证用户输入的密码
+                                if (!QuickVerifyPassword(archivePath, password, engine))
+                                {
+                                    failed++;
+                                    await progressWindow.Dispatcher.InvokeAsync(() =>
+                                        progressWindow.UpdateBatchItemStatus(i, BatchItemStatus.Failed,
+                                            L.T(L.App_WrongPassword)));
+                                    continue;
+                                }
+
+                                // 如果用户勾选了"记住"，保存到 PasswordManager
+                                if (promptResult.Value.Remember)
+                                {
+                                    try
+                                    {
+                                        var savePatterns = promptResult.Value.Patterns?.Count > 0
+                                            ? promptResult.Value.Patterns
+                                            : new List<string> { Path.GetFileName(archivePath) };
+                                        PasswordManager.Instance.AddPassword(password,
+                                            promptResult.Value.Description ?? "", savePatterns);
+                                        Log("--extract batch: password saved for '{0}'", archivePath);
+                                    }
+                                    catch (Exception pwdEx)
+                                    {
+                                        Log("--extract batch: save password failed: {0}", pwdEx.Message);
+                                    }
+                                }
+                            }
+                        }
+
+                        var progress = progressWindow.CreatePauseAwareProgress(
+                            ProgressWindow.CreateBackgroundProgress(progressWindow));
+
+                        if (password != null)
+                        {
+                            var opts = CreateExtractOptions();
+                            await engine.ExtractAsync(archivePath, dest, password, progress, ct, opts);
+                        }
+                        else
+                        {
+                            await engine.ExtractAsync(archivePath, dest, null, progress, ct);
+                        }
+
+                        succeeded++;
+                        await progressWindow.Dispatcher.InvokeAsync(() =>
+                            progressWindow.UpdateBatchItemStatus(i, BatchItemStatus.Completed));
+                    }
+                    catch (OperationCanceledException) { throw; }
+                    catch (Exception ex)
+                    {
+                        Log("--extract batch: item failed ({0}): {1}", archivePath, ex.Message);
+                        failed++;
+                        await progressWindow.Dispatcher.InvokeAsync(() =>
+                            progressWindow.UpdateBatchItemStatus(i, BatchItemStatus.Failed, ex.Message));
+                    }
+                }
+            }
+            catch (OperationCanceledException) { }
+
+            // 完成
+            if (failed > 0)
+            {
+                await progressWindow.Dispatcher.InvokeAsync(() =>
+                    progressWindow.CompleteWithErrors());
+                // Wait for user to close
+                await Task.Run(() =>
+                {
+                    var closed = new ManualResetEventSlim(false);
+                    EventHandler handler = null!;
+                    handler = (_, _) => { closed.Set(); progressWindow.Closed -= handler; };
+                    progressWindow.Closed += handler;
+                    closed.Wait();
+                });
+                await progressWindow.Dispatcher.InvokeAsync(() => app.Shutdown());
+            }
+            else
+            {
+                await progressWindow.Dispatcher.InvokeAsync(() =>
+                    progressWindow.SetComplete(L.T(L.App_ExtractComplete)));
+                // 全部成功：最后一个解压的目录用于打开资源管理器（仅单文件模式）
+                if (settings.OpenFolderAfterExtract && allPaths.Count == 1)
+                {
+                    var lastDest = Path.GetDirectoryName(allPaths[0])
+                        ?? Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
+                    OpenInExplorerStatic(lastDest);
+                }
+                await Task.Delay(2500);
+                await progressWindow.Dispatcher.InvokeAsync(() => app.Shutdown());
+            }
+        });
     }
+
+    /// <summary>
+    /// 智能解压路径分析：分析压缩包结构后返回目标目录。
+    /// 若所有文件在同一根目录下 → 返回压缩包所在目录；
+    /// 否则返回压缩包名子目录。
+    /// </summary>
+    private static string? ResolveSmartDest(string archivePath)
+    {
+        var parentDir = Path.GetDirectoryName(archivePath);
+        var archiveName = Path.GetFileNameWithoutExtension(archivePath);
+        if (string.IsNullOrEmpty(parentDir))
+            parentDir = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
+
+        var engine = ArchiveEngineFactory.GetEngineByExtension(archivePath);
+        if (engine == null) return Path.Combine(parentDir, archiveName);
+
+        try
+        {
+            var items = engine.ListEntriesAsync(archivePath).GetAwaiter().GetResult();
+            if (items == null || items.Count == 0)
+                return Path.Combine(parentDir, archiveName);
+
+            return ArchiveStructureAnalyzer.HasSingleRootDirectory(items)
+                ? parentDir
+                : Path.Combine(parentDir, archiveName);
+        }
+        catch
+        {
+            return Path.Combine(parentDir, archiveName);
+        }
+    }
+
     /// <summary>
     /// 公共L.T(L.Settings_Tab_Extract)逻辑：获取引擎、L.T(L.Pwd_ShowBtn)进度窗口、执行L.T(L.Settings_Tab_Extract)，L.T(L.Progress_Done)后退出。
     /// 支持从 PasswordManager 加载已L.T(L.PwdEdit_Save)密码，以及在加密时弹出密码输入框。

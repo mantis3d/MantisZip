@@ -26,6 +26,10 @@ public partial class App : Application
     private static string CompressCombinedPipeName = "MantisZip-CompressCombined";
     private static readonly ManualResetEventSlim _compressCombinedPipeReady = new(false);
 
+    private static string ExtractMutexName = "MantisZip-ExtractMutex";
+    private static string ExtractPipeName = "MantisZip-ExtractPipe";
+    private static readonly ManualResetEventSlim _extractPipeReady = new(false);
+
     private static void StartCompressPipeServer(List<string> allPaths, CancellationToken ct)
     {
         LogDebug("StartCompressPipeServer: starting, pipeName='{0}'", CompressPipeName);

@@ -1,8 +1,12 @@
+using System.Collections.ObjectModel;
+using System.IO;
+using System.Linq;
 using System.Threading;
 using System.Windows;
 using System.Windows.Media;
 using System.Windows.Threading;
 using MantisZip.Core.Abstractions;
+using MantisZip.Core.Models;
 using MantisZip.UI.Localization;
 
 namespace MantisZip.UI;
@@ -62,6 +66,11 @@ public partial class ProgressWindow : Window
 
     private CancellationTokenSource? _cts;
     private readonly ManualResetEventSlim _pauseEvent = new(initialState: true);
+    private ObservableCollection<BatchItem>? _batchItems;
+    private bool _isBatchMode;
+    private int _currentBatchIndex = -1;
+    private DateTime _lastProgressUpdate = DateTime.MinValue;
+    private static readonly TimeSpan ProgressThrottle = TimeSpan.FromMilliseconds(100);
 
     /// <summary>取消令牌</summary>
     public CancellationToken CancellationToken => _cts?.Token ?? CancellationToken.None;
@@ -71,6 +80,12 @@ public partial class ProgressWindow : Window
 
     /// <summary>当前是否暂停</summary>
     public bool IsPaused => !_pauseEvent.IsSet;
+
+    /// <summary>当前是否为批处理模式</summary>
+    public bool IsBatchMode => _isBatchMode;
+
+    /// <summary>批处理中是否有失败项</summary>
+    public bool HasFailures => _batchItems?.Any(i => i.Status == BatchItemStatus.Failed) ?? false;
 
     public ProgressWindow()
     {
@@ -102,6 +117,20 @@ public partial class ProgressWindow : Window
         {
             FileCountText.Text = L.TF(L.Progress_FileCount, p.ProcessedFiles, p.TotalFiles);
             FileCountText.Visibility = Visibility.Visible;
+        }
+
+        // 批处理模式：更新当前项的进度百分比（100ms 节流）
+        if (_isBatchMode && _currentBatchIndex >= 0 && _batchItems != null &&
+            _currentBatchIndex < _batchItems.Count)
+        {
+            var now = DateTime.UtcNow;
+            // 0% 和 100% 强制刷新，中间值每 100ms 刷新一次
+            if (p.PercentComplete >= 100 || p.PercentComplete <= 0 ||
+                (now - _lastProgressUpdate) >= ProgressThrottle)
+            {
+                _batchItems[_currentBatchIndex].Progress = p.PercentComplete;
+                _lastProgressUpdate = now;
+            }
         }
     }
 
@@ -142,8 +171,103 @@ public partial class ProgressWindow : Window
         });
     }
 
+    #region 批处理模式
+
+    /// <summary>
+    /// 初始化批处理模式。设置文件列表、标题和窗口大小。
+    /// 必须在 UI 线程调用。
+    /// </summary>
+    public void InitBatchMode(IReadOnlyList<string> paths)
+    {
+        _isBatchMode = true;
+        _currentBatchIndex = -1;
+        _lastProgressUpdate = DateTime.MinValue;
+        _batchItems = new ObservableCollection<BatchItem>(
+            paths.Select(p => new BatchItem
+            {
+                Name = Path.GetFileName(p),
+                FullPath = p,
+                Status = BatchItemStatus.Pending
+            }));
+
+        BatchFileList.ItemsSource = _batchItems;
+        BatchFileList.Visibility = Visibility.Visible;
+        Title = L.T(L.Progress_Batch_Title);
+        MinHeight = 450;
+        ResizeMode = ResizeMode.CanResizeWithGrip;
+    }
+
+    /// <summary>
+    /// 将指定索引的批处理项标记为"进行中"，并更新文件名显示。
+    /// 可从后台线程安全调用。
+    /// </summary>
+    public void SetCurrentBatchItem(int index)
+    {
+        void Update()
+        {
+            if (_batchItems == null || index < 0 || index >= _batchItems.Count) return;
+
+            // 将前一项标记为完成（如果还是 InProgress）
+            if (index > 0 && _batchItems[index - 1].Status == BatchItemStatus.InProgress)
+            {
+                _batchItems[index - 1].Status = BatchItemStatus.Completed;
+                _batchItems[index - 1].Progress = 100;
+            }
+
+            _currentBatchIndex = index;
+            _batchItems[index].Status = BatchItemStatus.InProgress;
+            _batchItems[index].Progress = 0;
+            FileNameText.Text = _batchItems[index].Name;
+        }
+        DispatchIfNeeded(Update);
+    }
+
+    /// <summary>
+    /// 更新指定批处理项的状态。
+    /// 可从后台线程安全调用。
+    /// </summary>
+    public void UpdateBatchItemStatus(int index, BatchItemStatus status, string? errorMessage = null)
+    {
+        void Update()
+        {
+            if (_batchItems == null || index < 0 || index >= _batchItems.Count) return;
+
+            _batchItems[index].Status = status;
+            if (status == BatchItemStatus.Failed)
+                _batchItems[index].ErrorMessage = errorMessage;
+        }
+        DispatchIfNeeded(Update);
+    }
+
+    /// <summary>
+    /// 批处理完成但有失败项时调用。
+    /// 显示成功/失败汇总，窗口保持打开供用户查看。
+    /// 可从后台线程安全调用。
+    /// </summary>
+    public void CompleteWithErrors()
+    {
+        void Update()
+        {
+            if (_batchItems == null) return;
+
+            int succeeded = _batchItems.Count(i => i.Status == BatchItemStatus.Completed);
+            int failed = _batchItems.Count(i => i.Status == BatchItemStatus.Failed);
+
+            SetComplete(L.TF(L.Progress_Batch_CompleteWithErrors, succeeded, failed));
+        }
+        DispatchIfNeeded(Update);
+    }
+
+    #endregion
+
     private void CancelButton_Click(object sender, RoutedEventArgs e)
     {
+        if (_isBatchMode)
+        {
+            // 批处理模式下，Cancel 按钮变为"关闭"；直接关闭窗口不 Cancel
+            Close();
+            return;
+        }
         _cts?.Cancel();
         Close();
     }

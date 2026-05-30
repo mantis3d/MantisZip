@@ -177,19 +177,19 @@ public partial class App : Application
                         return; // HandleCompress 内部会 Shutdown 或继续运行
 
                     case "--extract":
-                        HandleExtract(e.Args.Length > 1 ? e.Args[1] : null);
+                        HandleExtract(e.Args.Skip(1).Where(a => !string.IsNullOrEmpty(a)).ToArray());
                         return;
 
                     case "--extract-here":
-                        HandleExtractHere(e.Args.Length > 1 ? e.Args[1] : null);
+                        HandleExtractHere(e.Args.Skip(1).Where(a => !string.IsNullOrEmpty(a)).ToArray());
                         return;
 
                     case "--extract-to-name":
-                        HandleExtractToNamed(e.Args.Length > 1 ? e.Args[1] : null);
+                        HandleExtractToNamed(e.Args.Skip(1).Where(a => !string.IsNullOrEmpty(a)).ToArray());
                         return;
 
                     case "--extract-smart":
-                        HandleExtractSmart(e.Args.Length > 1 ? e.Args[1] : null);
+                        HandleExtractSmart(e.Args.Skip(1).Where(a => !string.IsNullOrEmpty(a)).ToArray());
                         return;
 
                     case "--compress-quick":
