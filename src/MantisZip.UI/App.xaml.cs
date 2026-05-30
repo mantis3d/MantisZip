@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
 using System.Windows;
@@ -138,6 +139,25 @@ public partial class App : Application
         LogStartup($"启动参数: {string.Join(" ", e.Args)}");
         TraceLog("OnStartup: after args log");
 
+        // ═══════ 全局异常捕获（诊断闪退用）═══════
+        this.DispatcherUnhandledException += (s, e) =>
+        {
+            TraceLog("CRASH: DispatcherUnhandledException: {0}", e.Exception.ToString());
+            e.Handled = true; // 先阻止闪退，让 app 继续运行以收集完整日志
+        };
+
+        AppDomain.CurrentDomain.UnhandledException += (s, e) =>
+        {
+            var ex = e.ExceptionObject as Exception;
+            TraceLog("CRASH: AppDomain.UnhandledException: isTerminating={0}, ex={1}", e.IsTerminating, ex?.ToString() ?? e.ExceptionObject?.ToString() ?? "");
+        };
+
+        TaskScheduler.UnobservedTaskException += (s, e) =>
+        {
+            TraceLog("CRASH: UnobservedTaskException: {0}", e.Exception?.ToString() ?? "");
+            e.SetObserved();
+        };
+
         try
         {
             if (e.Args.Length > 0)
@@ -209,6 +229,12 @@ public partial class App : Application
                         AppMessageBox.Show(
                             L.TF(L.App_StartupSuccess, AppDomain.CurrentDomain.BaseDirectory, StartupLog),
                             L.T(L.App_StartupTestTitle), MessageBoxButton.OK, MessageBoxImage.Information);
+                        Shutdown();
+                        return;
+
+                    case "--help":
+                    case "-h":
+                        ShowHelp();
                         Shutdown();
                         return;
 
@@ -644,6 +670,38 @@ public partial class App : Application
 
             stack.Children.Add(btnPanel);
             Content = stack;
+        }
+    }
+
+    #endregion
+
+    #region CLI 帮助
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern bool AttachConsole(int dwProcessId);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern bool FreeConsole();
+
+    private const int ATTACH_PARENT_PROCESS = -1;
+
+    /// <summary>
+    /// 显示 CLI 帮助信息。优先输出到父控制台（从 cmd/powershell 调用时），
+    /// 否则弹窗显示。
+    /// </summary>
+    private static void ShowHelp()
+    {
+        var helpText = L.TF(L.App_CliHelp, AppConstants.Version);
+
+        if (AttachConsole(ATTACH_PARENT_PROCESS))
+        {
+            Console.WriteLine(helpText);
+            FreeConsole();
+        }
+        else
+        {
+            AppMessageBox.Show(helpText, L.T(L.App_CliHelpTitle),
+                MessageBoxButton.OK, MessageBoxImage.Information);
         }
     }
 
