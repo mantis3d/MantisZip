@@ -12,7 +12,7 @@ MantisZip 支持丰富的命令行参数，主要用于 Shell 右键菜单集成
 | `--compress-quick <路径1> ...` | 使用默认设置直接压缩，显示进度窗口 |
 | `--compress-separate <路径1> <路径2> ...` | 依次将每个选定项压缩到各自所在目录 |
 | `--compress-combined <路径1> <路径2> ...` | 将所有选定项合并压缩到公共父目录（跨盘时弹窗输入名称） |
-| `--extract <路径>` | 显示解压到…选择目录对话框 |
+| `--extract <路径>` | 显示解压设置窗口（ExtractSettingsWindow），支持 4 种输出模式 + 冲突策略 + 打开文件夹选项 |
 | `--extract-here <路径>` | 解压到当前目录 |
 | `--extract-smart <路径>` | 智能解压（自动检测是否保留顶层文件夹） |
 | `--extract-to-name <路径>` | 解压到以压缩包名命名的子目录 |

@@ -26,6 +26,7 @@ MantisZip/
 │       ├── SystemIconHelper.cs      # SHGetFileInfo 系统图标
 │       ├── ProgressWindow.xaml/.cs  # 双进度条窗口
 │       ├── CompressSettingsWindow   # 压缩配置对话框
+│       ├── ExtractSettingsWindow    # 解压设置对话框（TabControl + GroupBox，与 Compress 风格一致）
 │       ├── ArchiveCommentDialog     # 压缩包注释编辑对话框
 │       ├── PasswordDialog           # 密码输入/管理对话框
 │       ├── FileConflictHelper.cs    # 解压冲突处理

@@ -178,7 +178,8 @@ Plans tracked under `.sisyphus/plans/`:
 | [preview-modular-providers.md](.sisyphus/plans/preview-modular-providers.md) | 📋 Planned | Preview system |
 | [extract-journal-undo.md](.sisyphus/plans/extract-journal-undo.md) | 📋 Planned | None |
 | [archive-rename-entry.md](.sisyphus/plans/archive-rename-entry.md) | 📋 Planned | None |
-| [batch-progress-list.md](.sisyphus/plans/batch-progress-list.md) | 📋 Planned | None |
+| [batch-progress-list.md](.sisyphus/plans/batch-progress-list.md) | ✅ Completed (v0.3.4) | None |
+| [extract-settings-window.md](.sisyphus/plans/extract-settings-window.md) | ✅ Completed (v0.3.5) | ExtractSettingsWindow redesign — TabControl + GroupBox + 2-column Grid, visual alignment with CompressSettingsWindow |
 | [explorer-path-switcher.md](.sisyphus/plans/explorer-path-switcher.md) | 📋 Planned | None |
 | [msi-packaging-wix.md](.sisyphus/plans/msi-packaging-wix.md) | 📋 Planned | Inno Setup installer |
 | [compression-estimator.md](.sisyphus/plans/compression-estimator.md) | 📋 Planned | None |

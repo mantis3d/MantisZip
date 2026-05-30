@@ -4,8 +4,8 @@
 
 **项目状态**: 🟢 开发中 (Phase 6 — 代码重构与文档更新)  
 **创建日期**: 2026-04-23  
-**最后更新**: 2026-05-29  
-**当前版本**: 0.3.4
+**最后更新**: 2026-05-30  
+**当前版本**: 0.3.6
 
 ---
 
@@ -140,6 +140,7 @@ MantisZip/
 │       ├── SettingsWindow.xaml / .cs    # 设置窗口（六标签页）
 │       ├── ProgressWindow.xaml / .cs    # 双进度条 + 密码区 + 暂停
 │       ├── CompressSettingsWindow.xaml / .cs  # 压缩配置对话框
+│       ├── ExtractSettingsWindow.xaml / .cs   # 解压配置对话框（与压缩窗口风格一致）
 │       ├── ConflictDialog.xaml / .cs       # 解压冲突弹窗
 │       ├── CompressConflictDialog.xaml / .cs  # 压缩冲突弹窗
 │       ├── ErrorDialog.xaml / .cs         # 错误提示弹窗
@@ -242,6 +243,7 @@ MantisZip/
 | P0 | 可取消 | ✅ 完成 |
 | P0 | 版本号显示 | ✅ 完成 |
 | P1 | 压缩配置面板 | ✅ 完成 |
+| P1 | 解压配置面板 (ExtractSettingsWindow) | ✅ v0.3.6 完成 — 与压缩窗口风格一致（TabControl + GroupBox + 2列 Grid） |
 | P1 | 设置窗口 | ✅ 完成 |
 | P1 | 右键菜单集成 | ✅ 完成 |
 | P1 | CLI 快速压缩/解压/浏览 | ✅ 完成 |
@@ -272,7 +274,7 @@ MantisZip/
 | `--compress-quick <路径1> ...` | 使用默认设置直接压缩，显示进度窗口 |
 | `--compress-separate <路径1> <路径2> ...` | 依次将每个选定项压缩到各自所在目录（IPC 合并） |
 | `--compress-combined <路径1> <路径2> ...` | 将所有选定项合并压缩到公共父目录（跨盘时弹窗输入名称） |
-| `--extract <路径>` | 显示解压到…选择目录对话框 |
+| `--extract <路径>` | 显示解压设置窗口 (ExtractSettingsWindow) |
 | `--extract-here <路径>` | 解压到当前目录 |
 | `--extract-smart <路径>` | 智能解压（自动检测是否保留顶层文件夹） |
 | `--extract-to-name <路径>` | 解压到以压缩包名命名的子目录 |
@@ -452,7 +454,6 @@ Phase 4: ████████████████████ 100%
 | **P3** | COM 右键菜单 | [com-context-menu.md](.sisyphus/plans/com-context-menu.md) | 🔴高 | 4-6h | 动态菜单名、菜单排序、自定义图标；与压缩预设互不阻塞 |
 | **P3** | 右键菜单目录结构预览 | — | 🔴高 | 6-8h | COM 菜单中展示压缩包文件树（Bandizip 风格） |
 | **P2** | 压缩包内重命名/移动条目 | [archive-rename-entry.md](.sisyphus/plans/archive-rename-entry.md) | 🟡中 | 3-4h | 右键重命名(F2)/移动到…；extract→delete→add 流程；支持 ZIP/7z |
-| **P2** | 批量进度文件列表 | [batch-progress-list.md](.sisyphus/plans/batch-progress-list.md) | 🟡中 | 3-4h | 批量操作进度窗口增加文件列表，每项显示名称+状态；--extract-batch CLI |
 | **P2** | 资源管理器路径快速选择 | [explorer-path-switcher.md](.sisyphus/plans/explorer-path-switcher.md) | 🟢低 | 1-2h | Ctrl+G 唤出已打开的资源管理器窗口路径列表，双击填入目标位置 |
 | **P2** | 压缩/解压配置预设 | [compress-preset.md](.sisyphus/plans/compress-preset.md) | 🟡中 | 3-4h | 命名预设保存全部设置，支持加载/覆盖/右键菜单一键使用；Phase 1 无依赖可独立实施 |
 | **P3** | 压缩包对比 (Archive Diff) | [archive-diff.md](.sisyphus/plans/archive-diff.md) | 🟡中 | 3-4h | 压缩包文件级差异对比；独特功能但非核心 |
@@ -481,6 +482,8 @@ Phase 4: ████████████████████ 100%
 | 引擎统一 (SharpZipLib→SharpCompress + 7z.exe/SevenZipExtractor→SharpSevenZip) | [engine-unification-sharpcompress.md](.sisyphus/plans/engine-unification-sharpcompress.md) | v0.3.4 | 全部 4 阶段 + 清理完成。ZIP 添加/删除进度平滑，无 CommitUpdate 黑盒跳跃 |
 | 文件大小进度条 | [file-size-progress-bar.md](.sisyphus/plans/file-size-progress-bar.md) | v0.3.4 | 大小列背景按文件体积比例填充，纯 UI 改动 |
 | PNG 透明信息抛弃（Flatten Alpha） | [png-transparency-3way.md](.sisyphus/plans/png-transparency-3way.md) | v0.3.4+ | 工具栏新增 `◼` 按钮切换保留/抛弃 PNG 透明通道，与棋盘格背景按钮独立工作 |
+| 批量进度文件列表 | [batch-progress-list.md](.sisyphus/plans/batch-progress-list.md) | v0.3.4 | 批量操作进度窗口增加文件列表，每项显示名称+状态；--extract-batch CLI |
+| 解压配置面板（与压缩窗口风格一致） | [extract-settings-window.md](.sisyphus/plans/extract-settings-window.md) | v0.3.6 | TabControl + GroupBox + 2列 Grid 布局；文件冲突 + 目标路径 + 打开文件夹选项 |
 
 
 
