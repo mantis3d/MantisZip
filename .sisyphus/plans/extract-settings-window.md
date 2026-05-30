@@ -1,6 +1,6 @@
 # ExtractSettingsWindow — 独立解压设置窗口
 
-> **状态**: ✅ 已完成 | **阶段**: [■■■■] (4/4)
+> **状态**: ✅ 已完成 (v0.3.5) | **阶段**: [■■■■] (4/4) + redesign
 > **来源**: 从 [batch-progress-list.md](batch-progress-list.md) Task 8 提取独立执行
 
 ---
@@ -79,6 +79,19 @@ batch-progress-list.md (原有):
 - ❌ 不碰 IPC 合并、ProgressWindow、HandleExtract* 等代码
 - ❌ 不修改现有的 4 个 CLI 入口（`--extract-here/smart/to-name/extract`）
 - ❌ 不添加关于"为空列表禁用解压按钮"之外的额外校验逻辑
+
+### ✅ v0.3.5 Redesign — Visual Alignment with CompressSettingsWindow
+
+**Changes applied 2026-05-30**:
+- **Layout**: Simple Auto-stack → **TabControl** (TabItem template matching Compress) + GroupBox × 3 + **2-column Grid** (80px label column)
+- **Window**: 530px width (matches CompressSettingsWindow)
+- **Tab 1 "基本"**: GroupBox "源文件" (fixed height 140, like Compress) + GroupBox "解压选项" (output mode radios + output path)
+- **Tab 2 "高级"**: GroupBox "行为设置" (file conflict radios + open folder checkbox)
+- **Coloring**: Removed ALL explicit Foreground/Background/BorderBrush → theme inheritance matching Compress
+- **Output path stability**: No more Visibility toggle (caused layout shift). Always visible, switches IsEnabled. Disabled mode shows computed path preview
+- **Conflict + open folder**: Written to AppSettings in ExtractButton_Click (HandleExtractBatchCore reads them)
+- **New localization keys**: 8 keys (Tab/GroupBox/label headers)
+- **Build**: 0 errors, 0 warnings
 
 ---
 

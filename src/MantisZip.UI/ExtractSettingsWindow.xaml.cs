@@ -11,6 +11,7 @@ namespace MantisZip.UI;
 /// <summary>
 /// 解压设置窗口 — 统一替换 --extract 的文件夹选择对话框。
 /// 支持单文件/多文件的输出模式选择（手动输入/解压到此处/智能解压/解压到压缩包名）。
+/// 布局风格与 CompressSettingsWindow 保持一致（TabControl + GroupBox + 2-column Grid）。
 /// </summary>
 public partial class ExtractSettingsWindow : Window
 {
@@ -28,6 +29,8 @@ public partial class ExtractSettingsWindow : Window
     // ── Internal State ──
 
     private readonly ObservableCollection<string> _files;
+    private readonly string _firstArchiveDir = "";
+    private readonly string _firstArchiveNameOnly = "";
 
     /// <summary>
     /// 创建解压设置窗口。
@@ -41,6 +44,14 @@ public partial class ExtractSettingsWindow : Window
         SelectedPaths = archivePaths.ToList();
         FileListBox.ItemsSource = _files;
 
+        // 预计算第一个压缩包的路径信息，用于非 Manual 模式下的路径预览
+        if (archivePaths.Count > 0)
+        {
+            var first = archivePaths[0];
+            _firstArchiveDir = Path.GetDirectoryName(first) ?? "";
+            _firstArchiveNameOnly = Path.GetFileNameWithoutExtension(first);
+        }
+
         UpdateFileCount();
 
         // 默认选中"解压到压缩包名"（最安全，天然隔离）
@@ -50,7 +61,33 @@ public partial class ExtractSettingsWindow : Window
         // 初始化手动路径 TextBox 占位提示
         ManualPathTextBox.Text = L.T(L.ExtractSettings_ManualPathPlaceholder);
 
+        // 从 AppSettings 加载默认值
+        LoadDefaultsFromSettings();
+
         RefreshOutputPathState();
+        UpdateExtractButton();
+    }
+
+    private void LoadDefaultsFromSettings()
+    {
+        var s = AppSettings.Instance;
+
+        // 文件冲突默认
+        switch (s.FileConflictAction)
+        {
+            case "overwrite": ConflictOverwriteRadio.IsChecked = true; break;
+            case "rename": ConflictRenameRadio.IsChecked = true; break;
+            case "skip": ConflictSkipRadio.IsChecked = true; break;
+            default: ConflictAskRadio.IsChecked = true; break;
+        }
+
+        // 打开文件夹
+        OpenFolderCheck.IsChecked = s.OpenFolderAfterExtract;
+    }
+
+    private void TabControl_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        // 保留供将来扩展
     }
 
     private void OutputMode_Changed(object sender, RoutedEventArgs e)
@@ -65,47 +102,61 @@ public partial class ExtractSettingsWindow : Window
             OutputMode = ExtractOutputMode.ToName;
 
         RefreshOutputPathState();
+        UpdateExtractButton();
+    }
+
+    private void UpdateExtractButton()
+    {
+        if (ExtractButton == null) return;
+
+        if (OutputMode == ExtractOutputMode.Manual)
+        {
+            var text = ManualPathTextBox.Text?.Trim();
+            var hasValidPath = !string.IsNullOrEmpty(text)
+                && text != L.T(L.ExtractSettings_ManualPathPlaceholder);
+            ExtractButton.IsEnabled = hasValidPath;
+        }
+        else
+        {
+            ExtractButton.IsEnabled = true;
+        }
     }
 
     /// <summary>
     /// 根据当前 OutputMode 更新路径区域的 UI 状态。
+    /// 输出路径始终可见，仅切换启用/禁用状态，避免界面跳动。
     /// </summary>
     private void RefreshOutputPathState()
     {
         if (ManualPathTextBox == null) return; // InitializeComponent 期间
 
-        switch (OutputMode)
+        if (OutputMode == ExtractOutputMode.Manual)
         {
-            case ExtractOutputMode.Manual:
-                ManualPathTextBox.IsReadOnly = false;
-                BrowseButton.Visibility = Visibility.Visible;
-                ManualPathRow.Visibility = Visibility.Visible;
-                ModePreviewText.Visibility = Visibility.Collapsed;
-                break;
+            // 手动模式：启用路径编辑
+            ManualPathTextBox.IsReadOnly = false;
+            ManualPathTextBox.IsEnabled = true;
+            BrowseButton.IsEnabled = true;
 
-            case ExtractOutputMode.Here:
-                ManualPathTextBox.IsReadOnly = true;
-                BrowseButton.Visibility = Visibility.Collapsed;
-                ManualPathRow.Visibility = Visibility.Collapsed;
-                ModePreviewText.Text = L.T(L.ExtractSettings_Mode_Here);
-                ModePreviewText.Visibility = Visibility.Visible;
-                break;
+            // 恢复之前用户输入的路径，或占位文本
+            if (!string.IsNullOrEmpty(CustomDestination))
+                ManualPathTextBox.Text = CustomDestination;
+            else
+                ManualPathTextBox.Text = L.T(L.ExtractSettings_ManualPathPlaceholder);
+        }
+        else
+        {
+            // 非手动模式：禁用路径编辑，显示计算好的路径预览
+            ManualPathTextBox.IsReadOnly = true;
+            ManualPathTextBox.IsEnabled = false;
+            BrowseButton.IsEnabled = false;
 
-            case ExtractOutputMode.Smart:
-                ManualPathTextBox.IsReadOnly = true;
-                BrowseButton.Visibility = Visibility.Collapsed;
-                ManualPathRow.Visibility = Visibility.Collapsed;
-                ModePreviewText.Text = L.T(L.ExtractSettings_Mode_Smart);
-                ModePreviewText.Visibility = Visibility.Visible;
-                break;
-
-            case ExtractOutputMode.ToName:
-                ManualPathTextBox.IsReadOnly = true;
-                BrowseButton.Visibility = Visibility.Collapsed;
-                ManualPathRow.Visibility = Visibility.Collapsed;
-                ModePreviewText.Text = L.T(L.ExtractSettings_Mode_ToName);
-                ModePreviewText.Visibility = Visibility.Visible;
-                break;
+            ManualPathTextBox.Text = OutputMode switch
+            {
+                ExtractOutputMode.Here => _firstArchiveDir,
+                ExtractOutputMode.Smart => L.T(L.ExtractSettings_Mode_Smart),
+                ExtractOutputMode.ToName => Path.Combine(_firstArchiveDir, _firstArchiveNameOnly),
+                _ => _firstArchiveDir
+            };
         }
     }
 
@@ -144,7 +195,7 @@ public partial class ExtractSettingsWindow : Window
             if (string.IsNullOrWhiteSpace(CustomDestination))
             {
                 AppMessageBox.Show(
-                    L.T(L.App_FileNotFound), // 重用"请选择有效路径"的语义，实际内容接近
+                    L.T(L.App_FileNotFound),
                     L.T(L.ExtractSettings_Title),
                     MessageBoxButton.OK,
                     MessageBoxImage.Warning);
@@ -170,6 +221,18 @@ public partial class ExtractSettingsWindow : Window
             }
         }
 
+        // 将冲突策略和打开文件夹设置写入 AppSettings（HandleExtractBatchCore 会读取）
+        var settings = AppSettings.Instance;
+        if (ConflictAskRadio.IsChecked == true)
+            settings.FileConflictAction = "ask";
+        else if (ConflictOverwriteRadio.IsChecked == true)
+            settings.FileConflictAction = "overwrite";
+        else if (ConflictRenameRadio.IsChecked == true)
+            settings.FileConflictAction = "rename";
+        else if (ConflictSkipRadio.IsChecked == true)
+            settings.FileConflictAction = "skip";
+        settings.OpenFolderAfterExtract = OpenFolderCheck.IsChecked == true;
+
         DialogResult = true;
     }
 
@@ -188,6 +251,7 @@ public partial class ExtractSettingsWindow : Window
                 CustomDestination = text;
             }
         }
+        UpdateExtractButton();
     }
 
     private void UpdateFileCount()
