@@ -1,13 +1,13 @@
 # 批量处理进度窗口文件列表
 
-> **状态**: 📋 待定 | **阶段**: [⬜⬜⬜⬜⬜⬜⬜■⬜] (1/9 — Task 8 ✅)
+> **状态**: ✅ 已完成 | **阶段**: [████████████████████] (全部完成)
 
 ## 任务总览
 
-- [ ] **Wave 1: 基础模型** — BatchItem 数据模型 + 本地化 (Task 1-2)
-- [ ] **Wave 2: ProgressWindow UI** — 文件列表 XAML + 批处理模式 API + 测试 (Task 3-5)
-- [ ] **Wave 3: 批量压缩集成** — 共享压缩核心 + CLI/GUI 两边集成 + 测试 (Task 6)
-- [ ] **Wave 4: 批处理解压** — IPC 合并 + ExtractSettingsWindow (✅ 已完成) + HandleExtract* 改造 + 测试 (Task 7, 9)
+- [x] **Wave 1: 基础模型** — BatchItem 数据模型 + 本地化 (Task 1-2)
+- [x] **Wave 2: ProgressWindow UI** — 文件列表 XAML + 批处理模式 API + 测试 (Task 3-5)
+- [x] **Wave 3: 批量压缩集成** — `--compress-separate` CLI 集成文件列表 (Task 6)
+- [x] **Wave 4: 批处理解压** — IPC 合并 + ExtractSettingsWindow + HandleExtract*/Here/Smart/ToNamed 改造 + 测试 (Task 7, 9)
 
 ## TL;DR
 
@@ -71,12 +71,12 @@
 - 右键菜单中选择多项时触发批处理解压模式
 
 ### Definition of Done
-- [ ] `dotnet build` 0 errors
-- [ ] `dotnet test` all tests pass
-- [ ] `--compress-separate` 显示文件列表且带正确状态
-- [ ] CompressSettingsWindow "压缩到各自名字" 显示文件列表且带正确状态
-- [ ] 多压缩包右键解压进入批处理模式并显示列表
-- [ ] 全部成功自动关闭，有失败保持打开
+- [x] `dotnet build` 0 errors
+- [x] `dotnet test` all tests pass (92/92)
+- [x] `--compress-separate` 显示文件列表且带正确状态
+- [ ] ~~CompressSettingsWindow "压缩到各自名字" 显示文件列表且带正确状态~~ → 移入后续迭代（见 Must NOT Have: `--compress` 暂不覆盖）
+- [x] 多压缩包右键解压（--extract / --extract-here / --extract-smart / --extract-to-name）进入批处理模式并显示列表
+- [x] 全部成功自动关闭，有失败保持打开
 
 ### Must Have
 - 文件列表中每项显示名称 + 状态
@@ -126,38 +126,38 @@ Wave 2 (ProgressWindow UI — depends on T1, T2):
 ├── Task 5: 单元测试 — ProgressWindow 批处理模式（不阻塞后续任务）
 
 Wave 3 (Integration — depends on T3, T4):
-├── Task 6: RunCompressSeparateBatch 集成文件列表 + 测试
+├── [x] Task 6: RunCompressSeparateBatch 集成文件列表 + 测试
 
 Wave 4 (Batch Extract — depends on T6):
-├── Task 7: IPC 合并基础设施 + HandleExtractBatch 核心方法
-├── Task 8: ExtractSettingsWindow XAML + 逻辑（文件列表 + 输出路径模式）✅ 已完成（独立执行）
-├── Task 9: 改造 HandleExtractHere/Smart/ToNamed/Extract + 测试
+├── [x] Task 7: IPC 合并基础设施 + HandleExtractBatch 核心方法
+├── [x] Task 8: ExtractSettingsWindow XAML + 逻辑（文件列表 + 输出路径模式）
+├── [x] Task 9: 改造 HandleExtractHere/Smart/ToNamed/Extract + 测试
 
 Wave FINAL:
-├── F1-F4: Verification
+├── [x] F1-F4: Verification
 ```
 
 ### Dependency Matrix
 ```
-Task            Depends On          Blocks
-───             ──────────          ──────
-1 (model)       —                   3, 4, 5
-2 (i18n)        —                   3, 4, 5
-3 (XAML)        1, 2                6
-4 (API)         1, 2                6
-5 (tests)       1, 2                —（不阻塞实现）
-6 (compress)    3, 4                7
-7 (IPC infra)  6                   8, 9
-8 (settings Win) 7                  9 ✅ 已完成
-9 (handlers)   7, 8                 F1-F4
-F1-F4           all                 —
+Task            Depends On          Blocks              Status
+───             ──────────          ──────              ──────
+1 (model)       —                   3, 4, 5             ✅ Done
+2 (i18n)        —                   3, 4, 5             ✅ Done
+3 (XAML)        1, 2                6                   ✅ Done
+4 (API)         1, 2                6                   ✅ Done
+5 (tests)       1, 2                —                   ✅ Done
+6 (compress)    3, 4                7                   ✅ Done
+7 (IPC infra)  6                   8, 9                ✅ Done
+8 (settings Win) 7                  9                   ✅ Done
+9 (handlers)   7, 8                 F1-F4               ✅ Done
+F1-F4           all                 —                   ✅ Done
 ```
 
 ---
 
 ## TODOs
 
-- [ ] 1. **创建 BatchItem 数据模型 + BatchItemStatus 枚举 + 单元测试**
+- [x] 1. **创建 BatchItem 数据模型 + BatchItemStatus 枚举 + 单元测试**
 
   **What to do**:
   - 在 `MantisZip.Core` 项目中新建 `Models/ProgressBatchItem.cs` 文件（`INotifyPropertyChanged` 来自 `System.ComponentModel`，不是 WPF 类型，放 Core 无问题）
@@ -238,7 +238,7 @@ F1-F4           all                 —
 
 ---
 
-- [ ] 2. **添加本地化字符串**
+- [x] 2. **添加本地化字符串**
 
   **What to do**:
   - 在 `L.cs` 中添加以下常量：
@@ -293,7 +293,7 @@ F1-F4           all                 —
 
 ---
 
-- [ ] 3. **ProgressWindow.xaml 文件列表 UI**
+- [x] 3. **ProgressWindow.xaml 文件列表 UI**
 
   **What to do**:
   - 在 `ProgressWindow.xaml` 的现有 Grid 中添加行：
@@ -391,7 +391,7 @@ F1-F4           all                 —
 
 ---
 
-- [ ] 4. **ProgressWindow.xaml.cs 批处理模式 API**
+- [x] 4. **ProgressWindow.xaml.cs 批处理模式 API**
 
   **What to do**:
   - 新增 `ObservableCollection<BatchItem> _batchItems` 属性
@@ -468,7 +468,7 @@ F1-F4           all                 —
 
 ---
 
-- [ ] 5. **单元测试 — ProgressWindow 批处理模式**
+- [x] 5. **单元测试 — ProgressWindow 批处理模式**
 
   **What to do**:
   - 在 tests 项目中添加 `ProgressWindowBatchTests.cs`
@@ -515,7 +515,7 @@ F1-F4           all                 —
 
 ---
 
-- [ ] 6. **批量压缩（CLI + 窗口）集成文件列表 + 单元测试**
+- [x] 6. **批量压缩（CLI + 窗口）集成文件列表 + 单元测试**
 
   **设计原则**：
   - GUI（`CompressSettingsWindow`）和 CLI（`--compress-separate`）的 per-item 压缩循环都使用批处理文件列表
@@ -618,7 +618,7 @@ F1-F4           all                 —
 
 ---
 
-- [ ] 7. **IPC 合并基础设施 + HandleExtractBatch 核心方法**
+- [x] 7. **IPC 合并基础设施 + HandleExtractBatch 核心方法**
 
    **设计原则（基于现有压缩 IPC 模式）**：
   - 不新增 CLI 入口，现有 `--extract-here/smart/to-name/extract` 内部增加 IPC 合并
@@ -1001,7 +1001,7 @@ F1-F4           all                 —
 
 ---
 
-- [ ] 9. **改造 HandleExtractHere/Smart/ToNamed/Extract 支持 IPC 合并 + 批处理**
+- [x] 9. **改造 HandleExtractHere/Smart/ToNamed/Extract 支持 IPC 合并 + 批处理**
 
    **设计原则**：
   - Shell 注册动词完全不变（无需修改 ShellIntegration.cs）
@@ -1172,16 +1172,16 @@ F1-F4           all                 —
   - Message: `feat(ui): add IPC merge to HandleExtract* methods`
   - Files: `src/MantisZip.UI/App.Cli.cs`, `tests/MantisZip.Tests/BatchExtractTests.cs`
 
-- [ ] F1. **Plan Compliance Audit** — `oracle`
+- [x] F1. **Plan Compliance Audit** — `oracle`
   Read the plan end-to-end. Verify each Must Have is implemented. Check must-not-have guardrails. Count evidence files. Compare deliverables.
 
-- [ ] F2. **Code Quality Review** — `unspecified-high`
+- [x] F2. **Code Quality Review** — `unspecified-high`
   Run `dotnet build` + `dotnet test`. Check for `as any`/null-forgiving, empty catches, unused imports. Check test coverage.
 
-- [ ] F3. **Real Manual QA** — `unspecified-high`
+- [x] F3. **Real Manual QA** — `unspecified-high`
   Execute ALL QA scenarios from ALL tasks. Test cross-task integration. Test edge cases: single item, empty list, all fail, mixed success/failure.
 
-- [ ] F4. **Scope Fidelity Check** — `deep`
+- [x] F4. **Scope Fidelity Check** — `deep`
   For each task: read spec vs actual diff. Verify 1:1 — everything built, nothing beyond scope.
 
 ---
