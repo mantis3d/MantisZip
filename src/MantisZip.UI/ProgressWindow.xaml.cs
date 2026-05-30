@@ -219,7 +219,7 @@ public partial class ProgressWindow : Window
             _batchItems[index].Progress = 0;
             FileNameText.Text = _batchItems[index].Name;
         }
-        DispatchIfNeeded(Update);
+        DispatchIfNeeded(Update, DispatcherPriority.Background);
     }
 
     /// <summary>
@@ -236,7 +236,7 @@ public partial class ProgressWindow : Window
             if (status == BatchItemStatus.Failed)
                 _batchItems[index].ErrorMessage = errorMessage;
         }
-        DispatchIfNeeded(Update);
+        DispatchIfNeeded(Update, DispatcherPriority.Background);
     }
 
     /// <summary>
@@ -255,7 +255,7 @@ public partial class ProgressWindow : Window
 
             SetComplete(L.TF(L.Progress_Batch_CompleteWithErrors, succeeded, failed));
         }
-        DispatchIfNeeded(Update);
+        DispatchIfNeeded(Update, DispatcherPriority.Background);
     }
 
     #endregion
@@ -390,14 +390,12 @@ public partial class ProgressWindow : Window
     #endregion
 
     /// <summary>
-    /// 若在后台线程则调度到 UI 线程执行。
+    /// 调度到 UI 线程执行。默认 Normal 优先级（兼容现有调用方）。
+    /// 批处理方法请使用 <see cref="DispatcherPriority.Background"/> 以便与进度报告交错执行。
     /// </summary>
-    private void DispatchIfNeeded(Action action)
+    private void DispatchIfNeeded(Action action, DispatcherPriority priority = DispatcherPriority.Normal)
     {
-        if (Dispatcher.CheckAccess())
-            action();
-        else
-            Dispatcher.BeginInvoke(action);
+        Dispatcher.BeginInvoke(action, priority);
     }
 
     /// <summary>
@@ -409,11 +407,12 @@ public partial class ProgressWindow : Window
     }
 
     /// <summary>
-    /// 将 IProgress 包装为暂停感知版本。提取循环中的 Report 调用会在暂停时阻塞。
+    /// 将 IProgress 包装为暂停感知版本。提取循环中的 Report 调用会在暂停时阻塞，
+    /// 直到恢复或取消。
     /// </summary>
     public IProgress<ArchiveProgress> CreatePauseAwareProgress(IProgress<ArchiveProgress> inner)
     {
-        return new PauseAwareProgress(inner, _pauseEvent);
+        return new PauseAwareProgress(inner, _pauseEvent, _cts?.Token ?? CancellationToken.None);
     }
 
     protected override void OnClosed(EventArgs e)
@@ -426,24 +425,34 @@ public partial class ProgressWindow : Window
 }
 
 /// <summary>
-/// 暂停感知的 IProgress 包装器。Report 时会先等待 PauseEvent（若已重置则阻塞）。
+/// 暂停感知的 IProgress 包装器。Report 时会先等待 PauseEvent（若已重置则阻塞直到恢复或取消）。
 /// </summary>
 internal class PauseAwareProgress : IProgress<ArchiveProgress>
 {
     private readonly IProgress<ArchiveProgress> _inner;
     private readonly ManualResetEventSlim _pauseEvent;
+    private readonly CancellationToken _cancellationToken;
 
-    public PauseAwareProgress(IProgress<ArchiveProgress> inner, ManualResetEventSlim pauseEvent)
+    public PauseAwareProgress(IProgress<ArchiveProgress> inner, ManualResetEventSlim pauseEvent, CancellationToken cancellationToken)
     {
         _inner = inner;
         _pauseEvent = pauseEvent;
+        _cancellationToken = cancellationToken;
     }
 
     public void Report(ArchiveProgress value)
     {
-        // 暂停时短暂等待（100ms 轮询），避免无限期阻塞线程池线程导致饥饿/死锁。
-        // 暂停后用户可取消（Cancel）来停止操作。
-        _pauseEvent.Wait(100);
+        try
+        {
+            // 暂停时无限期阻塞，直到用户点击恢复（_pauseEvent 被 Set）或取消。
+            // Wait(CancellationToken) 在令牌被取消时抛出 OperationCanceledException。
+            _pauseEvent.Wait(_cancellationToken);
+        }
+        catch (OperationCanceledException)
+        {
+            // 取消时不再上报进度
+            return;
+        }
         _inner.Report(value);
     }
 }

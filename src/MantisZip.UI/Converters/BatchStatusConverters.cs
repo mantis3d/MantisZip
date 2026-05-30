@@ -68,11 +68,14 @@ public class ProgressStatusToBackgroundConverter : IMultiValueConverter
         double progress = values is [double p, ..] ? p : 0d;
         var status = values is [_, BatchItemStatus s, ..] ? s : BatchItemStatus.Pending;
 
+        // 使用半透明颜色叠加在背景上，深浅主题均能正确显示。
+        // 透明度 35%，剩余部分由 ListView 底色透出。
+        const byte alpha = 0x59; // 89 ≈ 35%
         var color = status switch
         {
-            BatchItemStatus.Failed => Color.FromRgb(0xF4, 0x43, 0x36),     // red
-            BatchItemStatus.Completed => Color.FromRgb(0x4C, 0xAF, 0x50),  // green
-            _ => Color.FromRgb(0x42, 0xA5, 0xF5)                            // blue
+            BatchItemStatus.Failed => Color.FromArgb(alpha, 0xF4, 0x43, 0x36),     // red
+            BatchItemStatus.Completed => Color.FromArgb(alpha, 0x4C, 0xAF, 0x50),  // green
+            _ => Color.FromArgb(alpha, 0x42, 0xA5, 0xF5)                            // blue
         };
 
         double offset = progress / 100.0;
