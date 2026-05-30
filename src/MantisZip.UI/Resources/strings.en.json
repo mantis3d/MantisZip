@@ -635,6 +635,8 @@
   "Compress_Comment_AllSame": "Same comment for all archives",
   "Compress_Comment_FirstOnly": "Comment on the first archive only",
   "Compress_Comment_PerLine": "One line per archive (in order)",
+  "App_CliHelpTitle": "MantisZip Command Line Help",
+  "App_CliHelp": "MantisZip {0} - Archive Utility\n\nUsage: MantisZip.UI.exe [command] [arguments]\n\nCommands:\n  (no argument)         Launch main window\n  --open, -o <path>     Open archive in main window\n  --compress <paths...> Show compress dialog (multi-instance IPC merge)\n  --compress-quick <paths...>  Quick compress with default settings\n  --compress-separate <paths...>  Compress each item separately\n  --compress-combined <paths...>  Compress all items to a combined archive\n  --extract <path>      Show extract settings window\n  --extract-here <path> Extract to source directory\n  --extract-smart <path> Smart extract (auto-detect top folder)\n  --extract-to-name <path>  Extract to named subfolder\n  --install-shell       Install Shell context menu\n  --uninstall-shell     Uninstall Shell context menu\n  --install-assoc       Install file associations\n  --uninstall-assoc     Uninstall file associations\n  --test                Launch test mode\n  --help, -h            Show this help message",
   "Progress_Batch_Title": "Batch Processing",
   "Progress_Batch_Status_Pending": "Pending",
   "Progress_Batch_Status_InProgress": "In Progress",

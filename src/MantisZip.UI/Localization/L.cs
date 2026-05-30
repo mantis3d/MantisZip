@@ -16,6 +16,8 @@ public static class L
     public const string App_AddToArchiveProgress                   = "App_AddToArchiveProgress";
     public const string App_AssocInstalled                         = "App_AssocInstalled";
     public const string App_AssocUninstalled                       = "App_AssocUninstalled";
+    public const string App_CliHelp                               = "App_CliHelp";
+    public const string App_CliHelpTitle                           = "App_CliHelpTitle";
     public const string App_CleanedPreviewTemp                     = "App_CleanedPreviewTemp";
     public const string App_CompressCombinedPromptLabel             = "App_CompressCombinedPromptLabel";
     public const string App_CompressCombinedPromptTitle             = "App_CompressCombinedPromptTitle";

@@ -21,6 +21,7 @@ MantisZip 支持丰富的命令行参数，主要用于 Shell 右键菜单集成
 | `--install-assoc` | 安装文件关联（.zip/.7z/.rar 等默认用 MantisZip 打开） |
 | `--uninstall-assoc` | 卸载文件关联 |
 | `--test` | 启动测试模式（检查应用配置是否正确） |
+| `--help`, `-h` | 显示帮助信息 |
 
 ## 示例
 
@@ -46,6 +47,10 @@ MantisZip.UI.exe --extract-smart "D:\软件包.7z"
 # 安装/卸载 Shell 右键菜单
 MantisZip.UI.exe --install-shell
 MantisZip.UI.exe --uninstall-shell
+
+# 查看帮助
+MantisZip.UI.exe --help
+MantisZip.UI.exe -h
 ```
 
 ## IPC 多实例通信

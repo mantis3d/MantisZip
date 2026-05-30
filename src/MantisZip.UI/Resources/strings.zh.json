@@ -647,6 +647,8 @@
   "Compress_Comment_AllSame": "所有压缩包使用相同注释",
   "Compress_Comment_FirstOnly": "仅第一个压缩包添加注释",
   "Compress_Comment_PerLine": "按顺序每行对应一个压缩包",
+  "App_CliHelpTitle": "MantisZip 命令行帮助",
+  "App_CliHelp": "MantisZip {0} - 压缩/解压工具\n\n用法: MantisZip.UI.exe [命令] [参数]\n\n命令:\n  (无参数)              正常启动主窗口\n  --open, -o <路径>     启动主窗口并加载压缩包\n  --compress <路径...>  显示压缩对话框（支持多选 IPC 合并）\n  --compress-quick <路径...>  使用默认设置直接压缩\n  --compress-separate <路径...>  独立压缩每个选定项\n  --compress-combined <路径...>  合并压缩到公共目录\n  --extract <路径>      显示解压设置窗口\n  --extract-here <路径>  解压到当前目录\n  --extract-smart <路径>  智能解压（自动检测顶层文件夹）\n  --extract-to-name <路径>  解压到压缩包名子目录\n  --install-shell       安装 Shell 右键菜单\n  --uninstall-shell     卸载 Shell 右键菜单\n  --install-assoc       安装文件关联\n  --uninstall-assoc     卸载文件关联\n  --test                启动测试模式\n  --help, -h            显示此帮助信息",
   "Progress_Batch_Title": "批量处理",
   "Progress_Batch_Status_Pending": "待处理",
   "Progress_Batch_Status_InProgress": "进行中",
