@@ -19,7 +19,18 @@
 
   <ItemGroup>
     <ProjectReference Include="..\MantisZip.Core\MantisZip.Core.csproj" />
+    <ProjectReference Include="..\MantisZip.ShellExt\MantisZip.ShellExt.csproj" ReferenceOutputAssembly="false" PrivateAssets="all" />
   </ItemGroup>
+
+  <!-- 构建后将 comhost.dll 复制到 UI 输出目录（供 ShellIntegration.InstallCom 使用） -->
+  <Target Name="CopyShellExtComhost" AfterTargets="Build">
+    <MSBuild Projects="..\MantisZip.ShellExt\MantisZip.ShellExt.csproj" Targets="Build" Properties="Configuration=$(Configuration)" />
+    <ItemGroup>
+      <_ComhostFiles Include="..\MantisZip.ShellExt\bin\$(Configuration)\net9.0-windows\MantisZip.ShellExt.comhost.dll" />
+      <_ComhostFiles Include="..\MantisZip.ShellExt\bin\$(Configuration)\net9.0-windows\MantisZip.ShellExt.dll" />
+    </ItemGroup>
+    <Copy SourceFiles="@(_ComhostFiles)" DestinationFolder="$(OutputPath)" SkipUnchangedFiles="true" />
+  </Target>
 
   <!-- Publish 后自动从 7-Zip 安装目录复制 7z.dll 到发布目录 -->
   <Target Name="CopySevenZipDll" AfterTargets="Publish">

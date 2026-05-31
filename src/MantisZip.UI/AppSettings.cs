@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Text.Json;
+using Microsoft.Win32;
 using MantisZip.Core.Utils;
 
 namespace MantisZip.UI;
@@ -96,12 +97,44 @@ public class AppSettings
                 Directory.CreateDirectory(SettingsDir);
             var json = JsonSerializer.Serialize(this, new JsonSerializerOptions { WriteIndented = true });
             File.WriteAllText(SettingsFile, json);
+            // 同步上下文菜单设置到注册表（供 COM 组件读取）
+            SyncContextMenuToRegistry();
             return true;
         }
         catch (Exception ex)
         {
             App.LogDebug("AppSettings.Save: failed: {0}", ex.Message);
             return false;
+        }
+    }
+
+    /// <summary>
+    /// 将上下文菜单相关的设置同步到 HKCU\Software\MantisZip\ContextMenu。
+    /// COM 组件（MantisZip.ShellExt）在 Explorer 进程内从注册表读取这些设置。
+    /// </summary>
+    private void SyncContextMenuToRegistry()
+    {
+        try
+        {
+            const string keyPath = @"Software\MantisZip\ContextMenu";
+            using var key = Registry.CurrentUser.CreateSubKey(keyPath);
+            if (key == null) return;
+
+            key.SetValue("EnableCascadingMenu", EnableCascadingMenu ? 1 : 0, RegistryValueKind.DWord);
+            key.SetValue("ShowMenuIcons", ShowMenuIcons ? 1 : 0, RegistryValueKind.DWord);
+            key.SetValue("EnableOpenMenu", EnableOpenMenu ? 1 : 0, RegistryValueKind.DWord);
+            key.SetValue("EnableExtractHereMenu", EnableExtractHereMenu ? 1 : 0, RegistryValueKind.DWord);
+            key.SetValue("EnableSmartExtractMenu", EnableSmartExtractMenu ? 1 : 0, RegistryValueKind.DWord);
+            key.SetValue("EnableExtractToNamedMenu", EnableExtractToNamedMenu ? 1 : 0, RegistryValueKind.DWord);
+            key.SetValue("EnableExtractToMenu", EnableExtractToMenu ? 1 : 0, RegistryValueKind.DWord);
+            key.SetValue("EnableCompressSeparate", EnableCompressSeparate ? 1 : 0, RegistryValueKind.DWord);
+            key.SetValue("EnableCompressCombined", EnableCompressCombined ? 1 : 0, RegistryValueKind.DWord);
+            key.SetValue("EnableCompressMenu", EnableCompressMenu ? 1 : 0, RegistryValueKind.DWord);
+            key.SetValue("EnableQuickCompress", EnableQuickCompress ? 1 : 0, RegistryValueKind.DWord);
+        }
+        catch (Exception ex)
+        {
+            App.LogDebug("AppSettings.SyncContextMenuToRegistry: failed: {0}", ex.Message);
         }
     }
 

@@ -53,11 +53,17 @@ internal static class ShellIntegration
     private static readonly string CompressCombinedDisplay = L.T(L.Shell_CompressCombined);
     private static readonly string CompressDisplay = L.T(L.Shell_Compress);
 
-    /// <summary>检查是否已L.T(L.Settings_Menu_Btn_Install) Shell 扩展。</summary>
+    /// <summary>检查是否已L.T(L.Settings_Menu_Btn_Install) Shell 扩展（COM 或静态注册表）。</summary>
     public static bool IsInstalled
     {
         get
         {
+            // 检查 COM 注册（优先）
+            using var comKey = Registry.CurrentUser.OpenSubKey(
+                $@"Software\Classes\CLSID\{ComClsid}");
+            if (comKey != null) return true;
+
+            // 回退：检查静态注册表
             using var key = Registry.CurrentUser.OpenSubKey(
                 $@"Software\Classes\*\shell\{CascadeRoot}");
             if (key != null) return true;
@@ -74,7 +80,9 @@ internal static class ShellIntegration
     }
 
     /// <summary>
-    /// L.T(L.Settings_Menu_Btn_Install) Shell 右键菜单。根据 AppSettings 中的开关决定层叠/独立模式及各动词启用L.T(L.Settings_Menu_StatusGroup)。
+    /// L.T(L.Settings_Menu_Btn_Install) Shell 右键菜单。
+    /// 使用 COM IContextMenu 实现（MantisZip.ShellExt.comhost.dll），
+    /// 回退到静态注册表方案（旧版兼容）。
     /// </summary>
     public static void Install()
     {
@@ -82,16 +90,26 @@ internal static class ShellIntegration
         var s = AppSettings.Instance;
         var exePath = GetExePath();
 
-        // 先L.T(L.Settings_Menu_Btn_Uninstall)旧注册，避免残留
+        // 先清理旧注册，避免残留
         Uninstall();
 
-        if (s.EnableCascadingMenu)
-            InstallCascade(s, exePath);
+        // 尝试安装 COM 组件（MantisZip.ShellExt.comhost.dll）
+        if (InstallCom())
+        {
+            App.LogDebug("ShellIntegration.Install: COM context menu installed");
+        }
         else
-            InstallVerbs(s, exePath);
+        {
+            // 回退到静态注册表方案
+            App.LogDebug("ShellIntegration.Install: COM not available, falling back to static registry");
+            if (s.EnableCascadingMenu)
+                InstallCascade(s, exePath);
+            else
+                InstallVerbs(s, exePath);
+        }
+
         // 通知 Windows Shell 刷新上下文菜单缓存
         SHChangeNotify(SHCNE_ASSOCCHANGED, SHCNF_IDLIST, IntPtr.Zero, IntPtr.Zero);
-
         App.LogDebug("ShellIntegration.Install: done, cascade={0}, exePath={1}", s.EnableCascadingMenu, exePath);
     }
 
@@ -136,6 +154,9 @@ internal static class ShellIntegration
             DeleteRegistryKey($@"Software\Classes\{target}\shell\MantisZipCompress");
         }
 
+        // 清理 COM 组件注册
+        UninstallCom();
+
         // 旧版 per-extension 注册（v0.1.3 早期版本遗留）
         foreach (var ext in ArchiveExtensions)
         {
@@ -146,6 +167,91 @@ internal static class ShellIntegration
 
         App.LogDebug("ShellIntegration.Uninstall: done");
     }
+
+    #region COM 组件注册/反注册
+
+    // MantisZip.ShellExt 组件 CLSID（必须与 ContextMenuHandler.cs 的 [Guid] 一致）
+    private const string ComClsid = "{C90B2A1E-5E4F-4A7A-9B0F-8C1D3E5F7A9B}";
+    private const string ComProgId = "MantisZip.ContextMenu";
+    private const string ComHandlerKey = "MantisZip";
+
+    /// <summary>
+    /// 安装 COM 右键菜单（MantisZip.ShellExt.comhost.dll）。
+    /// 写入 HKCU\Software\Classes，无需管理员权限。
+    /// 返回 true 表示安装成功，false 表示 COM host DLL 不存在（触发回退）。
+    /// </summary>
+    private static bool InstallCom()
+    {
+        try
+        {
+            var baseDir = Path.GetDirectoryName(GetExePath());
+            if (baseDir == null) return false;
+
+            var comhostPath = Path.Combine(baseDir, "MantisZip.ShellExt.comhost.dll");
+            if (!File.Exists(comhostPath))
+            {
+                // Also check subdirectory (x64/x86 for architecture-specific builds)
+                comhostPath = Path.Combine(baseDir,
+                    Environment.Is64BitProcess ? "x64" : "x86",
+                    "MantisZip.ShellExt.comhost.dll");
+                if (!File.Exists(comhostPath))
+                {
+                    App.LogDebug("InstallCom: comhost.dll not found at {0}", comhostPath);
+                    return false;
+                }
+            }
+
+            App.LogDebug("InstallCom: registering from {0}", comhostPath);
+
+            // 1. CLSID 注册（HKCU — per-user）
+            var clsidKey = $@"Software\Classes\CLSID\{ComClsid}";
+            SetRegistryValue(clsidKey, null, "MantisZip Context Menu Handler");
+            SetRegistryValue($@"{clsidKey}\InprocServer32", null, comhostPath);
+            SetRegistryValue($@"{clsidKey}\InprocServer32", "ThreadingModel", "Apartment");
+            SetRegistryValue($@"{clsidKey}\ProgId", null, ComProgId);
+
+            // 2. 上下文菜单处理程序注册
+            foreach (var target in new[] { "*", "Directory", @"Directory\Background" })
+            {
+                var handlerKey = $@"Software\Classes\{target}\shellex\ContextMenuHandlers\{ComHandlerKey}";
+                SetRegistryValue(handlerKey, null, ComClsid);
+            }
+
+            App.LogDebug("InstallCom: COM registration successful");
+            return true;
+        }
+        catch (Exception ex)
+        {
+            App.LogDebug("InstallCom: failed: {0}", ex.Message);
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// 卸载 COM 右键菜单，并清理旧的静态注册表条目。
+    /// </summary>
+    private static void UninstallCom()
+    {
+        try
+        {
+            // 1. 删除上下文菜单处理程序注册
+            foreach (var target in new[] { "*", "Directory", @"Directory\Background" })
+            {
+                DeleteRegistryKey($@"Software\Classes\{target}\shellex\ContextMenuHandlers\{ComHandlerKey}");
+            }
+
+            // 2. 删除 CLSID 注册
+            DeleteRegistryKey($@"Software\Classes\CLSID\{ComClsid}");
+
+            App.LogDebug("UninstallCom: COM registration cleaned up");
+        }
+        catch (Exception ex)
+        {
+            App.LogDebug("UninstallCom: failed: {0}", ex.Message);
+        }
+    }
+
+    #endregion
 
     #region 层叠子菜单模式 (ExtendedSubCommandsKey)
 
