@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Text;
 
@@ -34,12 +35,11 @@ internal static class NativeMethods
     {
         public uint tymed;
         public IntPtr hBitmap;
-        public IntPtr unionmember;
         public IntPtr pUnkForRelease;
     }
 
-    [DllImport("ole32.dll", PreserveSig = false)]
-    public static extern int GetData(IntPtr pDataObj, ref FormatEtc pFormatEtc, out STGMEDIUM pMedium);
+    // IDataObject is a COM interface, not a DLL export
+    // — use Marshal.GetObjectForIUnknown + COM interop instead
 
     [DllImport("ole32.dll")]
     public static extern void ReleaseStgMedium(ref STGMEDIUM pMedium);
@@ -92,17 +92,20 @@ internal static class NativeMethods
     [return: MarshalAs(UnmanagedType.Bool)]
     public static extern bool DestroyMenu(IntPtr hMenu);
 
-    // ─── IContextMenu ───
-    public const uint GCS_HELPTEXT = 0x0001;
-    public const uint GCS_VERB = 0x0003;
+    // ─── IContextMenu GetCommandString flags ───
+    public const uint GCS_VERBA = 0x0000;
+    public const uint GCS_VERBW = 0x0004;
+    public const uint GCS_HELPTEXTA = 0x0001;
+    public const uint GCS_HELPTEXTW = 0x0005;
 
-    // ─── Icon loading ───
-    [DllImport("shell32.dll", CharSet = CharSet.Auto)]
-    public static extern uint ExtractIconEx(string szFileName, int nIconIndex, IntPtr[]? phiconLarge, IntPtr[]? phiconSmall, uint nIcons);
+    // ─── Debug logging (OutputDebugString) ───
+    [DllImport("kernel32.dll", CharSet = CharSet.Auto)]
+    public static extern void OutputDebugString(string lpOutputString);
 
-    [DllImport("user32.dll")]
+    // ─── GDI cleanup (for menu icon HBITMAPs) ───
+    [DllImport("gdi32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]
-    public static extern bool DestroyIcon(IntPtr hIcon);
+    public static extern bool DeleteObject(IntPtr hObject);
 
     // ─── GDI for HICON → HBITMAP conversion ───
     [DllImport("gdi32.dll")]
@@ -118,10 +121,6 @@ internal static class NativeMethods
     [DllImport("gdi32.dll")]
     public static extern IntPtr SelectObject(IntPtr hdc, IntPtr h);
 
-    [DllImport("gdi32.dll")]
-    [return: MarshalAs(UnmanagedType.Bool)]
-    public static extern bool DeleteObject(IntPtr hObject);
-
     [DllImport("user32.dll")]
     public static extern IntPtr GetDC(IntPtr hWnd);
 
@@ -133,57 +132,68 @@ internal static class NativeMethods
     public static extern bool DrawIconEx(IntPtr hdc, int xLeft, int yTop, IntPtr hIcon, int cxWidth, int cyWidth, uint istepIfAniCur, IntPtr hbrFlickerFreeDraw, uint diFlags);
 
     public const uint DI_NORMAL = 0x0003;
-    public const int MenuIconSize = 16; // standard small icon for menus
 
-    /// <summary>
-    /// Load the application icon as an HBITMAP for menu display.
-    /// Extracts the icon from MantisZip.UI.exe and converts HICON to HBITMAP.
-    /// Caller must call DeleteObject() on the returned HBITMAP to avoid leaks.
-    /// </summary>
-    public static IntPtr LoadAppIconBitmap()
+    [DllImport("user32.dll")]
+    public static extern IntPtr CreateIconFromResourceEx(byte[] pbIconBits, uint cbIconBits, [MarshalAs(UnmanagedType.Bool)] bool fIcon, uint dwVer, int cxDesired, int cyDesired, uint uFlags);
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static extern bool DestroyIcon(IntPtr hIcon);
+
+    // ─── DIB section (for alpha-transparent bitmaps) ───
+    public const uint DIB_RGB_COLORS = 0;
+
+    [DllImport("gdi32.dll")]
+    public static extern IntPtr CreateDIBSection(IntPtr hdc, ref BitmapInfo pbmi, uint iUsage, out IntPtr ppvBits, IntPtr hSection, uint dwOffset);
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct BitmapInfoHeader
     {
-        try
-        {
-            var exePath = Path.Combine(
-                Path.GetDirectoryName(typeof(ContextMenuHandler).Assembly.Location) ?? ".",
-                "MantisZip.UI.exe");
-
-            if (!File.Exists(exePath))
-                return IntPtr.Zero;
-
-            // Extract the small icon (index 0 = app icon)
-            var smallIcons = new IntPtr[1];
-            uint count = ExtractIconEx(exePath, 0, null, smallIcons, 1);
-            if (count == 0 || smallIcons[0] == IntPtr.Zero)
-                return IntPtr.Zero;
-
-            IntPtr hIcon = smallIcons[0];
-            IntPtr hbmp = ConvertIconToBitmap(hIcon);
-            DestroyIcon(hIcon);
-            return hbmp;
-        }
-        catch
-        {
-            return IntPtr.Zero;
-        }
+        public uint biSize;
+        public int biWidth;
+        public int biHeight;
+        public ushort biPlanes;
+        public ushort biBitCount;
+        public uint biCompression;
+        public uint biSizeImage;
+        public int biXPelsPerMeter;
+        public int biYPelsPerMeter;
+        public uint biClrUsed;
+        public uint biClrImportant;
     }
 
-    /// <summary>
-    /// Convert an HICON to an HBITMAP using GDI.
-    /// Caller must DeleteObject() the returned HBITMAP.
-    /// </summary>
-    private static IntPtr ConvertIconToBitmap(IntPtr hIcon)
+    [StructLayout(LayoutKind.Sequential)]
+    public struct BitmapInfo
     {
-        IntPtr hdcScreen = GetDC(IntPtr.Zero);
-        IntPtr hdcMem = CreateCompatibleDC(hdcScreen);
-        IntPtr hbmp = CreateCompatibleBitmap(hdcScreen, MenuIconSize, MenuIconSize);
-        IntPtr hOld = SelectObject(hdcMem, hbmp);
-        DrawIconEx(hdcMem, 0, 0, hIcon, MenuIconSize, MenuIconSize, 0, IntPtr.Zero, DI_NORMAL);
-        SelectObject(hdcMem, hOld);
-        DeleteDC(hdcMem);
-        ReleaseDC(IntPtr.Zero, hdcScreen);
-        return hbmp;
+        public BitmapInfoHeader bmiHeader;
+        [MarshalAs(UnmanagedType.ByValArray, SizeConst = 1)]
+        public uint[] bmiColors;
     }
+}
+
+/// <summary>IDataObject COM interface — for calling GetData from IShellExtInit::Initialize.</summary>
+[ComImport, Guid("0000010E-0000-0000-C000-000000000046")]
+[InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+internal interface IDataObjectCom
+{
+    [PreserveSig]
+    int GetData(ref NativeMethods.FormatEtc pFormatEtc, out NativeMethods.STGMEDIUM pMedium);
+    [PreserveSig]
+    int GetDataHere(ref NativeMethods.FormatEtc pFormatEtc, ref NativeMethods.STGMEDIUM pMedium);
+    [PreserveSig]
+    int QueryGetData(ref NativeMethods.FormatEtc pFormatEtc);
+    [PreserveSig]
+    int GetCanonicalFormatEtc(ref NativeMethods.FormatEtc pFormatEtcIn, out NativeMethods.FormatEtc pFormatEtcOut);
+    [PreserveSig]
+    int SetData(ref NativeMethods.FormatEtc pFormatEtc, ref NativeMethods.STGMEDIUM pMedium, [MarshalAs(UnmanagedType.Bool)] bool fRelease);
+    [PreserveSig]
+    int EnumFormatEtc(uint dwDirection, out IntPtr ppenumFormatEtc);
+    [PreserveSig]
+    int DAdvise(ref NativeMethods.FormatEtc pFormatEtc, uint advf, IntPtr pAdvSink, out uint pdwConnection);
+    [PreserveSig]
+    int DUnadvise(uint dwConnection);
+    [PreserveSig]
+    int EnumDAdvise(out IntPtr ppenumAdvise);
 }
 
 /// <summary>IntPtr extension for HIWORD/LOWORD extraction (match Win32 macros).</summary>
