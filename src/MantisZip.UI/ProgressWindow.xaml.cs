@@ -179,6 +179,7 @@ public partial class ProgressWindow : Window
     /// </summary>
     public void InitBatchMode(IReadOnlyList<string> paths)
     {
+        App.LogDebug("[BATCH] InitBatchMode: entering, paths.Count={0}", paths.Count);
         _isBatchMode = true;
         _currentBatchIndex = -1;
         _lastProgressUpdate = DateTime.MinValue;
@@ -195,6 +196,7 @@ public partial class ProgressWindow : Window
         Title = L.T(L.Progress_Batch_Title);
         MinHeight = 450;
         ResizeMode = ResizeMode.CanResizeWithGrip;
+        App.LogDebug("[BATCH] InitBatchMode: items=[{0}]", string.Join(", ", _batchItems.Select(b => $"\"{b.Name}\"")));
     }
 
     /// <summary>
@@ -205,15 +207,21 @@ public partial class ProgressWindow : Window
     {
         void Update()
         {
-            if (_batchItems == null || index < 0 || index >= _batchItems.Count) return;
+            if (_batchItems == null || index < 0 || index >= _batchItems.Count)
+            {
+                App.LogDebug("[BATCH] SetCurrentBatchItem: index={0} out of range (count={1}), skipping", index, _batchItems?.Count ?? -1);
+                return;
+            }
 
             // 将前一项标记为完成（如果还是 InProgress）
             if (index > 0 && _batchItems[index - 1].Status == BatchItemStatus.InProgress)
             {
+                App.LogDebug("[BATCH] SetCurrentBatchItem: completing previous item[{0}]=\"{1}\"", index - 1, _batchItems[index - 1].Name);
                 _batchItems[index - 1].Status = BatchItemStatus.Completed;
                 _batchItems[index - 1].Progress = 100;
             }
 
+            App.LogDebug("[BATCH] SetCurrentBatchItem: marking item[{0}]=\"{1}\" as InProgress", index, _batchItems[index].Name);
             _currentBatchIndex = index;
             _batchItems[index].Status = BatchItemStatus.InProgress;
             _batchItems[index].Progress = 0;
@@ -230,7 +238,15 @@ public partial class ProgressWindow : Window
     {
         void Update()
         {
-            if (_batchItems == null || index < 0 || index >= _batchItems.Count) return;
+            if (_batchItems == null || index < 0 || index >= _batchItems.Count)
+            {
+                App.LogDebug("[BATCH] UpdateBatchItemStatus: index={0} out of range (count={1}), status={2}, skipping", index, _batchItems?.Count ?? -1, status);
+                return;
+            }
+
+            App.LogDebug("[BATCH] UpdateBatchItemStatus: item[{0}]=\"{1}\" status: {2} -> {3}{4}",
+                index, _batchItems[index].Name, _batchItems[index].Status, status,
+                status == BatchItemStatus.Failed && errorMessage != null ? $", error=\"{errorMessage}\"" : "");
 
             _batchItems[index].Status = status;
             if (status == BatchItemStatus.Failed)
@@ -252,6 +268,7 @@ public partial class ProgressWindow : Window
 
             int succeeded = _batchItems.Count(i => i.Status == BatchItemStatus.Completed);
             int failed = _batchItems.Count(i => i.Status == BatchItemStatus.Failed);
+            App.LogDebug("[BATCH] CompleteWithErrors: succeeded={0}, failed={1}, total={2}", succeeded, failed, _batchItems.Count);
 
             SetComplete(L.TF(L.Progress_Batch_CompleteWithErrors, succeeded, failed));
         }
@@ -262,12 +279,15 @@ public partial class ProgressWindow : Window
 
     private void CancelButton_Click(object sender, RoutedEventArgs e)
     {
+        App.LogDebug("[BATCH] CancelButton_Click: _isBatchMode={0}, _cts?.IsCancellationRequested={1}", _isBatchMode, _cts?.IsCancellationRequested ?? false);
         if (_isBatchMode)
         {
             // 批处理模式下，Cancel 按钮变为"关闭"；直接关闭窗口不 Cancel
+            App.LogDebug("[BATCH] CancelButton_Click: batch mode, closing window");
             Close();
             return;
         }
+        App.LogDebug("[BATCH] CancelButton_Click: cancelling operation");
         _cts?.Cancel();
         Close();
     }
@@ -277,6 +297,7 @@ public partial class ProgressWindow : Window
         if (_pauseEvent.IsSet)
         {
             // 正在运行 → 暂停
+            App.LogDebug("[BATCH] PauseButton_Click: pausing (pauseEvent was Set)");
             _pauseEvent.Reset();
             PauseButton.Content = L.T(L.Progress_Button_Resume);
             FileNameText.Text = L.T(L.Progress_Paused);
@@ -284,6 +305,7 @@ public partial class ProgressWindow : Window
         else
         {
             // 已暂停 → 恢复
+            App.LogDebug("[BATCH] PauseButton_Click: resuming (pauseEvent was Reset)");
             _pauseEvent.Set();
             PauseButton.Content = L.T(L.Progress_Button_Pause);
             FileNameText.Text = L.T(L.Progress_Resuming);
