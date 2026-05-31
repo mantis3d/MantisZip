@@ -23,6 +23,16 @@
 
 ## 版本历史（从新到旧）
 
+### v0.3.7-refined COM 右键菜单完善（图标 + 文本 + 本地化）
+
+1. **图标系统重写** — `CreateCompatibleBitmap` → `CreateDIBSection` 32-bit DIB，修复 `MIIM_BITMAP` 透明背景变纯色问题（原因为 DDB 不含 alpha 通道）
+2. **主菜单标题图标** — "打开/解压" 和 "压缩" 弹出菜单从 `InsertMenu` + `MF_POPUP` 改为 `InsertMenuItem` + `MIIM_SUBMENU` + `MIIM_BITMAP`，菜单标题现在也显示图标
+3. **CleanupIconCache 时序修复** — 从 `QueryContextMenu` 末尾移到开头（Explorer 异步渲染菜单，末尾删除 HBITMAP 导致图标不显示）
+4. **菜单文本精简** — 去掉所有 "用 MantisZip" 前缀；"解压到此处" → "原地解压包"，"智能解压到此处" → "智能原地解压"；"用 MantisZip 压缩" → "压缩……"
+5. **多选文件动态文本** — 选择多个文件时："打开压缩包 等 N 个文件"、"原地解压N个压缩包"、"智能原地解压N个压缩包"
+6. **菜单文本本地化** — 新增 8 个 `ShellExt_*` key 到 `L.cs` + `strings.zh.json` + `strings.en.json`；`ShellIntegration.WriteMenuTextToRegistry()` 安装时将当前语言文本写入注册表；ShellExt 通过 `LoadSettingsFromRegistry()` 读取（硬编码写死回退）
+7. **文档同步** — AGENTS.md / PROGRESS.md / PLAN.md / manual-test-checklist.md
+
 ### v0.3.7 (2026-05-31) COM 右键菜单 + 注册表设置同步
 
 1. **新建 MantisZip.ShellExt 项目** — .NET 9 类库，`<EnableComHosting>true</EnableComHosting>`，comhost 模式
@@ -404,3 +414,26 @@
 12. **版本号显示** — 右下角状态栏显示
 13. **拖拽解压** — 拖拽 ZIP 文件到窗口解压
 14. **拖拽压缩** — 拖拽普通文件生成 ZIP
+
+---
+
+## 历史设计方案索引
+
+以下设计方案对应功能已在过往版本中完成，对应设计文档存于 `.sisyphus/plans/` 供回溯参考：
+
+| 功能 | 设计文档 | 实现版本 |
+|------|----------|:--------:|
+| 预览格式扩展（12 种元数据格式） | [preview-extended-formats.md](.sisyphus/plans/preview-extended-formats.md) | v0.3.0 |
+| 快速压缩拆分为独立/合并两项 | [split-compress.md](.sisyphus/plans/split-compress.md) | v0.2.10 |
+| 加载大文件 overlay | [archive-loading-progress.md](.sisyphus/plans/archive-loading-progress.md) | v0.3.1 |
+| 添加到/从压缩包删除 | [archive-add-delete.md](.sisyphus/plans/archive-add-delete.md) | v0.2.9 |
+| 暗色/亮色主题 | [dark-theme.md](.sisyphus/plans/dark-theme.md) | v0.2.9 |
+| 日志隐私脱敏 | [log-privacy-redaction.md](.sisyphus/plans/log-privacy-redaction.md) | v0.2.8 |
+| 国际化 (i18n) | [i18n-localization.md](.sisyphus/plans/i18n-localization.md) | v0.2.8 |
+| 智能解压 (Smart Extract) | [smart-extract.md](.sisyphus/plans/smart-extract.md) | v0.2.10 |
+| 引擎统一 (SharpZipLib→SharpCompress + 7z.exe→SharpSevenZip) | [engine-unification-sharpcompress.md](.sisyphus/plans/engine-unification-sharpcompress.md) | v0.3.4 |
+| 文件大小进度条 | [file-size-progress-bar.md](.sisyphus/plans/file-size-progress-bar.md) | v0.3.4 |
+| PNG 透明通道控制 | [png-transparency-3way.md](.sisyphus/plans/png-transparency-3way.md) | v0.3.4+ |
+| 批量进度文件列表 | [batch-progress-list.md](.sisyphus/plans/batch-progress-list.md) | v0.3.4 |
+| 解压配置面板 (ExtractSettingsWindow) | [extract-settings-window.md](.sisyphus/plans/extract-settings-window.md) | v0.3.6 |
+| COM 右键菜单 | [com-context-menu.md](.sisyphus/plans/com-context-menu.md) | v0.3.7 |

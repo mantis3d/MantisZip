@@ -112,6 +112,31 @@ Window size, tree column width, and preview row height saved to `%LOCALAPPDATA%\
 
 Since v0.3.7, `Install()` tries COM component registration first (`MantisZip.ShellExt.comhost.dll` via `InstallCom()`), falling back to static registry verbs if the COM host file is missing. `Uninstall()` clears both COM CLSID + shellex and all static verbs. `IsInstalled` checks the COM CLSID first.
 
+#### COM context menu (ShellExt)
+
+`ContextMenuHandler.cs` implements `IShellExtInit` + `IContextMenu` as a COM component hosted by `Explorer.exe`. Two groups:
+
+- **Extract group** (inside "打开/解压" submenu, archive files only): 打开压缩包, 原地解压包, 智能原地解压, 解压到 {name}, 解压到……
+- **Compress group** (inside "压缩" submenu): 压缩到 {name}.zip, 压缩到 {parentDir}.zip, 压缩……
+
+Multi-file selection changes text dynamically: "打开压缩包 等 {N} 个文件", "原地解压{N}个压缩包", "智能原地解压{N}个压缩包".
+
+#### Icon system
+
+Three `.ico` files (`Open.ico`, `Extract.ico`, `Compress.ico`) from `src\MantisZip.UI\Resources\MenuIcons\` are embedded as managed resources in `MantisZip.ShellExt.dll`. Loaded at runtime via `GetIconForCommand()`:
+
+1. Read .ico header → find 16×16 entry → extract raw image data
+2. `CreateIconFromResourceEx` → get HICON
+3. `ConvertIconToBitmap`: `CreateDIBSection` (32-bit DIB, top-down, alpha channel) → `DrawIconEx` → HBITMAP
+4. HBITMAPs cached per command type (`_cachedIconOpen`, `_cachedIconExtract`, `_cachedIconCompress`)
+5. `CleanupIconCache` called at the **start** of each `QueryContextMenu` (not the end, because Explorer draws asynchronously after `QueryContextMenu` returns)
+
+Uses pure Win32 API — no `System.Drawing` dependency (COM host can't use it).
+
+#### Menu text localization
+
+ShellExt reads localized menu text from registry (`HKCU\Software\MantisZip\ContextMenu\Text*`), written by `ShellIntegration.WriteMenuTextToRegistry()` during `InstallCom()`. The UI project's `L.T()` translates 8 `ShellExt_*` keys (zh + en in `strings.*.json`). Fallback to hardcoded Chinese defaults if registry values are absent.
+
 Two modes controlled by `AppSettings.EnableCascadingMenu`:
 
 - **Cascade mode** (default: off): Single "MantisZip" submenu with separators between 浏览/压缩/解压 groups, numbered verbs via `ExtendedSubCommandsKey`
@@ -130,7 +155,7 @@ Menu items with individual toggles:
 | 7 | 解压到（压缩包名）— Extract to named folder | EnableExtractToNamedMenu | `--extract-to-name` |
 | 8 | 解压到…… — Extract to… | EnableExtractToMenu | `--extract` |
 
-Open and Extract verbs use `AppliesTo` filter (archive extensions only). Icons via `shell32.dll,3` when `ShowMenuIcons` is enabled.
+Open and Extract verbs use `AppliesTo` filter (archive extensions only). Icons via `shell32.dll,3` when `ShowMenuIcons` is enabled (static cascade mode only; COM mode uses embedded .ico resources).
 
 ### CLI entry points
 
