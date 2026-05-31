@@ -1,0 +1,25 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net9.0-windows</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <UseWPF>false</UseWPF>
+    <EnableComHosting>true</EnableComHosting>
+    <EnableRegFreeCom>false</EnableRegFreeCom>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <RootNamespace>MantisZip.ShellExt</RootNamespace>
+    <AssemblyName>MantisZip.ShellExt</AssemblyName>
+  </PropertyGroup>
+
+  <!--
+    .NET COM hosting generates MantisZip.ShellExt.comhost.dll at build time.
+    Register: regsvr32 MantisZip.ShellExt.comhost.dll
+    Unregister: regsvr32 /u MantisZip.ShellExt.comhost.dll
+  -->
+
+  <ItemGroup>
+    <ProjectReference Include="..\MantisZip.Core\MantisZip.Core.csproj" />
+  </ItemGroup>
+
+</Project>
