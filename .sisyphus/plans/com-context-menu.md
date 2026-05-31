@@ -1,7 +1,7 @@
 # COM 右键菜单（Shell Context Menu）
 
 > 将当前基于注册表静态动词的右键菜单替换为 COM `IContextMenu` 实现，支持动态菜单文本、子菜单、自定义图标、预设集成。
-> **状态**: 📋 待定 | **阶段**: [⬜⬜⬜⬜⬜⬜⬜⬜⬜] (0/9)
+> **状态**: 🚧 进行中 | **阶段**: [████████░░] (8/9)
 > **前置依赖**: ✅ SharpCompress 引擎迁移完成（v0.3.4，`ListEntriesAsync` 用于动态显示压缩包文件名）
 >
 > ⚠️ **重要架构变更**: 本计划最初假设在 `MantisZip.UI` (WinExe) 项目内创建 COM 组件。但 .NET 9 的 COM 托管使用 `comhost.dll` 机制（非传统 regasm），且 WPF WinExe 不适合加载到 Explorer 进程。
@@ -135,7 +135,7 @@ Task 1 → Task 3 → Task 4 → Task 5 → Task 7 → Task 8 → Task 9 → F1-
 
 ## TODOs
 
-- [ ] 1. COM 右键菜单方案研究 + 环境搭建
+- [x] 1. COM 右键菜单方案研究 + 环境搭建
 
   **What to do**:
   - 研究以下内容：
@@ -182,7 +182,7 @@ Task 1 → Task 3 → Task 4 → Task 5 → Task 7 → Task 8 → Task 9 → F1-
 
 ---
 
-- [ ] 2. 当前 ShellIntegration 审计 + 迁移映射
+- [x] 2. 当前 ShellIntegration 审计 + 迁移映射
 
   **What to do**:
   - 对 `ShellIntegration.cs` 进行逐功能审计：
@@ -215,7 +215,7 @@ Task 1 → Task 3 → Task 4 → Task 5 → Task 7 → Task 8 → Task 9 → F1-
 
 ---
 
-- [ ] 3. `IShellExtInit` 实现
+- [x] 3. `IShellExtInit` 实现
 
   **What to do**:
   - 新建 `src/MantisZip.ShellExt/ContextMenuHandler.cs`（独立类库项目）
@@ -270,7 +270,7 @@ Task 1 → Task 3 → Task 4 → Task 5 → Task 7 → Task 8 → Task 9 → F1-
 
 ---
 
-- [ ] 4. `IContextMenu.QueryContextMenu` — 构建动态菜单
+- [x] 4. `IContextMenu.QueryContextMenu` — 构建动态菜单
 
   **What to do**:
   - 实现 `QueryContextMenu`：
@@ -324,7 +324,7 @@ Task 1 → Task 3 → Task 4 → Task 5 → Task 7 → Task 8 → Task 9 → F1-
 
 ---
 
-- [ ] 5. `IContextMenu.InvokeCommand` — 执行菜单操作
+- [x] 5. `IContextMenu.InvokeCommand` — 执行菜单操作
 
   **What to do**:
   - 实现 `InvokeCommand`：
@@ -365,7 +365,7 @@ Task 1 → Task 3 → Task 4 → Task 5 → Task 7 → Task 8 → Task 9 → F1-
 
 ---
 
-- [ ] 6. `IContextMenu.GetCommandString` — 帮助文本
+- [x] 6. `IContextMenu.GetCommandString` — 帮助文本
 
   **What to do**:
   - 实现 `GetCommandString`：
@@ -386,7 +386,7 @@ Task 1 → Task 3 → Task 4 → Task 5 → Task 7 → Task 8 → Task 9 → F1-
 
 ---
 
-- [ ] 7. 注册/反注册逻辑（.NET 9 comhost 方式）
+- [x] 7. 注册/反注册逻辑（.NET 9 comhost 方式）
 
   **背景**: .NET 5+ 弃用了 regasm。.NET 9 的 COM 注册使用 `comhost.dll` 机制：
   - 项目设置 `<EnableComHosting>true</EnableComHosting>`，构建时生成 `MantisZip.ShellExt.comhost.dll`
@@ -451,7 +451,7 @@ Task 1 → Task 3 → Task 4 → Task 5 → Task 7 → Task 8 → Task 9 → F1-
 
 ---
 
-- [ ] 8. AppSettings 菜单开关集成
+- [x] 8. AppSettings 菜单开关集成
 
   **What to do**:
   - 在 COM 菜单处理程序（`ContextMenuHandler.cs`，位于 `MantisZip.ShellExt` 项目）中读取设置：
