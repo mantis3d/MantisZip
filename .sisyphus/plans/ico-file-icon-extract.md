@@ -36,7 +36,7 @@
 | 图标选取 | 取最接近 16×16 的帧（列表图标就是 16×16）|
 | 帧格式 | 同时支持 ICO 内嵌 BMP 帧和 PNG 帧 |
 | 加载时机 | 异步加载：列表先显示占位图标，后台逐文件提取解析 |
-| 引擎接口 | 新增 `ReadEntryBytesAsync`，不修改现有 `ListEntriesAsync`/`ExtractEntryAsync` |
+| 引擎接口 | 新增 `ReadEntryBytesAsync`（IArchiveEngine 当前无此方法，需在接口和各引擎中新增实现），不修改现有 `ListEntriesAsync`/`ExtractEntryAsync` |
 
 ### ICO 容器格式简述
 
@@ -55,7 +55,7 @@
 ## 任务清单
 
 - [ ] **1. 新增 `IcoIconHelper`** — ICO 字节 → 16×16 `ImageSource`
-- [ ] **2. 引擎新增 `ReadEntryBytesAsync`** — 压缩包条目 → `byte[]`
+- [ ] **2. 接口新增 `ReadEntryBytesAsync` + 各引擎实现** — IArchiveEngine 接口新增该方法，ZipEngine/SevenZipEngine/TarGzEngine 各自实现（接口当前不存在）
 - [ ] **3. 文件列表异步图标加载** — 加载时占位 + 后台解析 `.ico`
 - [ ] **4. 本地化字符串** — 如果有需要用户感知的状态信息
 - [ ] **5. 单元测试** — `IcoIconHelper` 测试 + 集成验证
@@ -98,13 +98,13 @@ IcoIconHelper.ExtractIcon(byte[] icoData) → ImageSource?
 - `src/MantisZip.Core/Engines/SevenZipEngine.cs`
 - `src/MantisZip.Core/Engines/TarGzEngine.cs`
 
-**接口变更**:
+**接口变更（新增）**:
 
 ```csharp
-// IArchiveEngine 新增
+// IArchiveEngine 新增方法（当前接口不存在，需在 ArchiveEngine.cs 和各引擎中添加）
 public interface IArchiveEngine
 {
-    // ...现有接口...
+    // ...现有接口（13 个方法）...
     
     /// <summary>
     /// 读取压缩包中指定条目的全部字节（不解压到磁盘）

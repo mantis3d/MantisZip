@@ -2,13 +2,13 @@
 
 > 将压缩和解压的全部设置保存为命名预设，支持加载、覆盖编辑、右键菜单一键使用。
 > **状态**: 📋 待定 | **阶段**: [⬜⬜⬜⬜⬜⬜⬜⬜⬜] (0/9)
-> **部分依赖**: Phase 2 依赖 COM 右键菜单（`.sisyphus\plans\com-context-menu.md`）
+> **部分依赖**: Phase 2 依赖 COM 右键菜单（`.sisyphus\plans\com-context-menu.md`，✅ v0.3.7 已完成）
 
 ---
 
 ## 前置条件
 
-- Phase 2 需要 **COM 右键菜单** 完成（替换现有 `ShellIntegration.cs` 静态注册表方案）
+- Phase 2 的 **COM 右键菜单已在 v0.3.7 完成**（`MantisZip.ShellExt` + `comhost.dll`）。预设集成应扩展 ContextMenuHandler 的 QueryContextMenu 以动态枚举预设，而非"替换"现有 ShellIntegration（当前为 COM-first 回退静态的混合方案）
 - 文件过滤功能（`file-filter-feature.md`）完成可提供 `FileFilterCriteria` 作为可选的预设内部件
 
 ---
@@ -24,7 +24,7 @@
 | 密码 | **不保存** |
 | 菜单命名 | 使用预设名称 |
 | 菜单注册 | 保存时选择"是否显示在右键菜单" |
-| Shell 基底 | Phase 2 依赖 COM 右键菜单（动态枚举，无需静态注册） |
+| Shell 基底 | Phase 2 扩展已有 COM 右键菜单（v0.3.7 完成），ContextMenuHandler.QueryContextMenu 动态枚举预设 |
 
 ### 阶段规划
 
@@ -36,8 +36,8 @@ Phase 1（无依赖，可立即实施）
 ├── AppSettings 持久化
 └── 预设加载/覆盖逻辑
 
-Phase 2（依赖 COM 右键菜单）
-├── COM 菜单注册（标记为"显示在菜单"的预设自动出现）
+Phase 2（扩展 COM 右键菜单，v0.3.7 已完成）
+├── COM 菜单扩展（ContextMenuHandler.QueryContextMenu 动态枚举标记"显示在菜单"的预设）
 ├── CLI 入口（--compress-with-preset / --extract-with-preset）
 └── 预设管理设置页（可选，管理所有预设的菜单可见性）
 ```
@@ -102,7 +102,7 @@ Phase 2（依赖 COM 右键菜单）
 ### Must NOT Have
 - 预设内不包含密码
 - 不直接依赖文件过滤功能（Filter 字段在过滤功能完成后才可用，为 optional）
-- Phase 1 不修改 ShellIntegration.cs（等待 COM 菜单）
+- Phase 1 不修改 ShellIntegration.cs（COM 菜单已在 v0.3.7 完成，Phase 2 扩展 ContextMenuHandler.cs）
 
 ---
 

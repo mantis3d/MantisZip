@@ -187,10 +187,26 @@ Bundle 产物是 `.exe`，内部嵌 MSI，但企业部署仍可用 MSI 部分。
 
 ## 迁移步骤
 
+## COM 组件（v0.3.7 新增）
+
+MantisZip.ShellExt 包含两个关键文件需纳入 MSI：
+
+| 文件 | 说明 |
+|------|------|
+| `MantisZip.ShellExt.dll` | COM 类库（含 `ContextMenuHandler` COM 类） |
+| `MantisZip.ShellExt.comhost.dll` | .NET 9 生成的 COM host DLL（注册入口） |
+
+MSI 需：
+1. 将上述两个文件部署到 `INSTALLDIR`
+2. 安装时写入 HKCU CLSID `{C90B2A1E-5E4F-4A7A-9B0F-8C1D3E5F7A9B}` 指向 `MantisZip.ShellExt.comhost.dll`
+3. 卸载时清除该 CLSID 及 shellex 子键
+
+或者沿用现有策略：MSI 只部署文件，由应用首次启动时调用 `ShellIntegration.Install()`（会自动执行 `InstallCom()` + 回退静态注册）。
+
 | 步骤 | 内容 | 工作量 |
 |------|------|--------|
 | 1 | 准备 `app.ico` 应用图标（多尺寸） | 低（~10min） |
-| 2 | 编写 `installer.wxs`（含组件/快捷方式/注册） | 中（~2h） |
+| 2 | 编写 `installer.wxs`（含组件/快捷方式/注册 + ShellExt 组件） | 中（~2h） |
 | 3 | 测试：安装/卸载/升级/静默 | 中（~1h） |
 | 4 | 替换 `installer.iss`，移除 Inno Setup 依赖 | 低 |
 | 5 | CI 集成（GitHub Actions 自动构建 MSI） | 低（~30min） |

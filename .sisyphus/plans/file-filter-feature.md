@@ -1,18 +1,18 @@
 # 文件过滤功能
 
 > 在压缩与解压时，支持按条件过滤文件：文件类型、文件名、文件大小、修改日期。
-> **状态**: 📋 待定（依赖 SharpCompress 迁移）| **阶段**: [⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜] (0/12)
-> **前置依赖**: SharpCompress 引擎迁移完成（`.sisyphus/plans/engine-unification-sharpcompress.md`），`IArchiveEngine.ExtractEntriesAsync` 接口已就绪。
+> **状态**: 📋 待定 | **阶段**: [⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜] (0/11)
+> **前置依赖**: 无（SharpCompress 引擎迁移已于 v0.3.4 完成）
 
 ---
 
 ## 前置条件
 
-必须完成以下迁移计划中的任务：
+以下前置任务已在 v0.3.4 完成：
 
-- [ ] Phase 1-3: SharpCompress 迁移（TarGzEngine + ZipEngine + ArchiveEntryExtractor）
-- [ ] Phase 3.4: `IArchiveEngine` 新增 `ExtractEntriesAsync` 方法完成
-- [ ] 各引擎 `ArchiveItem.Name` 编码一致性已验证
+- [x] Phase 1-3: SharpCompress 迁移（TarGzEngine + ZipEngine + ArchiveEntryExtractor）
+- [x] Phase 3.4: `IArchiveEngine` 新增 `ExtractEntriesAsync` 方法完成
+- [x] 各引擎 `ArchiveItem.Name` 编码一致性已验证
 
 ---
 
@@ -126,19 +126,19 @@ Wave 1 (Core data model — all parallel):
 └── Task 4: Unit validation (manual script-based)
 
 Wave 2 (UI control — depends on Wave 1):
-├── Task 5: FileFilterEditor XAML layout
-├── Task 6: FileFilterEditor code-behind (logic + preset management)
-├── Task 7: Localization strings for all filter keys
-└── Task 8: ExtractSettingsWindow XAML (General tab + Filter tab)
+├── Task 4: FileFilterEditor XAML layout
+├── Task 5: FileFilterEditor code-behind (logic + preset management)
+├── Task 6: Localization strings for all filter keys
+└── Task 7: ExtractSettingsWindow — add Filter tab (3rd TabItem, existing XAML)
 
 Wave 3 (Compress integration — depends on Wave 1 + 2):
-├── Task 9: Embed FileFilterEditor as Tab 3 in CompressSettingsWindow
-├── Task 10: FileFilterHelper static class
-└── Task 11: Hook filter into --compress (dialog) flow (quick modes bypass filter)
+├── Task 8: Embed FileFilterEditor as Tab 3 in CompressSettingsWindow
+├── Task 9: FileFilterHelper static class
+└── Task 10: Hook filter into --compress (dialog) flow (quick modes bypass filter)
 
 Wave 4 (Extract integration — depends on Wave 1 + 2):
-├── Task 12: ExtractSettingsWindow code-behind (logic + filter integration)
-└── Task 13: Hook filter into Extract_Click + --extract flow
+├── Task 11: Extend ExtractSettingsWindow code-behind with filter support
+└── Task 12: Hook filter into Extract_Click + --extract flow
 
 Wave FINAL (Verification):
 ├── Task F1: Plan compliance audit
@@ -148,7 +148,7 @@ Wave FINAL (Verification):
 ```
 
 ### Critical Path
-Task 1 → Task 2 → Task 5 → Task 6 → Task 9 → Task 11 → Task 12 → Task 13 → F1-F4
+Task 1 → Task 2 → Task 4 → Task 5 → Task 9 → Task 7 → Task 11 → Task 12 → F1-F4
 
 ---
 
@@ -230,7 +230,7 @@ Task 1 → Task 2 → Task 5 → Task 6 → Task 9 → Task 11 → Task 12 → T
     - 扩展名：`Path.GetExtension(entry.Name)`
     - 文件名：`Path.GetFileNameWithoutExtension(entry.Name)`
     - 大小：`entry.Size`
-    - 日期：`entry.LastModified`
+    - 日期：`entry.LastModified` — 注意部分存档（如 TarGz）的 `LastModified` 可能为 `DateTime.MinValue`，此时跳过日期过滤（视为未设置日期）
   - 扩展名比较统一小写
   - 所有条件 AND 逻辑（全部满足才返回 true）
 
@@ -301,9 +301,10 @@ Task 1 → Task 2 → Task 5 → Task 6 → Task 9 → Task 11 → Task 12 → T
     - `bool IsBuiltIn` — 是否为内置预设（用户不可删除）
   - 新增 `FileFilterPreset.GetBuiltInPresets()` 静态方法返回 8 个内置预设
   - 修改 `AppSettings.cs`：
-    - 新增 `List<FileFilterPreset> FilterPresets { get; set; }`，默认空列表（不含内置预设，内置预设由 GetBuiltInPresets() 提供）
-  - `AppSettings.SaveSettings()` / `LoadSettings()` 中序列化/反序列化预设
-  - 预设数量上限 20 个（不含内置），防止 settings.json 膨胀
+    - 新增 `List<FileFilterPreset> FilterPresets { get; set; }`，默认空列表（不含内置预设，内置预设由 `GetBuiltInPresets()` 提供）
+    - `AppSettings.SaveSettings()` / `LoadSettings()` 中序列化/反序列化预设
+    - `AppSettings` 使用 `System.Text.Json` 序列化。`FileFilterCriteria` 中的 `DateTime?` 会被正确处理（默认 ISO 8601），无需自定义 `JsonConverter`
+    - 预设数量上限 20 个（不含内置），超过时 `AddPreset()` 抛出 `InvalidOperationException`，防止 settings.json 膨胀
   - 内置预设定义：
 
     | 名称 | IncludeExtensions | NamePattern | MinSize | MinDate |
@@ -387,9 +388,11 @@ Task 1 → Task 2 → Task 5 → Task 6 → Task 9 → Task 11 → Task 12 → T
     - 启用时控件可编辑，禁用时灰色
   - 使用 `Expander` 或 `GroupBox` 分组，避免视觉杂乱
   - 内置预设在下拉框中用特殊样式（如斜体或图标）区分于用户预设
+  - **主题约束**：所有颜色使用 `{StaticResource Theme_*}` 或 `{DynamicResource Theme_*}` 资源键，包括 `Theme_WindowBg`、`Theme_Accent`、`Theme_ButtonHover`、`Theme_Border`、`Theme_TextPrimary` 等，确保亮色/暗色模式均正确渲染
 
   **Must NOT do**:
   - 不要硬编码字符串，用 `{l:L ...}` 本地化，key 前缀 `FileFilter_*`
+  - 不要使用显式 Foreground/Background/BorderBrush 颜色值（统一通过主题资源继承）
 
   **Parallelization**:
   - Can Run In Parallel: NO (sequential with Task 5)
@@ -502,29 +505,25 @@ Task 1 → Task 2 → Task 5 → Task 6 → Task 9 → Task 11 → Task 12 → T
 
 ---
 
-- [ ] 7. `ExtractSettingsWindow` XAML（General Tab + Filter Tab）
+- [ ] 7. `ExtractSettingsWindow` — 添加 FileFilter Tab（第 3 个 TabItem）
 
   **What to do**:
-  - 新建 `src/MantisZip.UI/ExtractSettingsWindow.xaml` + `ExtractSettingsWindow.xaml.cs`
-  - 窗口风格与 CompressSettingsWindow 保持一致（相同尺寸、主题、按钮布局）
-  - **Tab 1：通用（General）**
-    - 目标路径选择：
-      - RadioButton 组：同目录 / 桌面 / 上一次 / 手动选择
-      - 手动选择时显示路径输入框 + 浏览按钮
-    - 文件冲突处理：
-      - ComboBox 或 RadioButton：询问 / 覆盖 / 重命名 / 跳过
-    - 解压后打开文件夹：CheckBox
-  - **Tab 2：文件过滤（Filter）**
+  - **ExtractSettingsWindow 已存在**（v0.3.4 创建，v0.3.6 重设计为 TabControl + GroupBox + 2-column Grid）。现有结构：
+    - Tab 1「基本（Basic）」: 源文件列表 + 输出方式 RadioButton 4 项 + 输出路径
+    - Tab 2「高级（Advanced）」: 文件冲突 RadioButton 4 项 + 打开文件夹 CheckBox
+  - 在现有 TabControl 中添加 **Tab 3「文件过滤（Filter）」**：
     - 内嵌 `FileFilterEditor` 控件
-    - 过滤统计标签（提取时动态更新）："共 N 个文件，过滤后将提取 M 个"
-  - 底部按钮：解压（OK）+ 取消
+    - 过滤统计标签："共 N 个文件，过滤后将提取 M 个"
+  - 窗口尺寸、按钮布局、TabItem 模板保持不变（与 CompressSettingsWindow 一致）
 
   **Must NOT do**:
+  - 不要修改 Tab 1 和 Tab 2 的任何布局或逻辑
+  - 不要修改现有的 TabControl 样式和模板
   - 不要硬编码字符串，用 `{l:L ...}` 本地化
-  - 不要复制 CompressSettingsWindow 的样式代码（用相同 StaticResource）
 
   **References**:
-  - UI/CompressSettingsWindow.xaml — 窗口样式、TabControl 样式
+  - UI/ExtractSettingsWindow.xaml — 现有窗口结构
+  - UI/CompressSettingsWindow.xaml — 参考 TabControl 样式
   - UI/FileFilterEditor.xaml (Task 4) — 内嵌控件
 
   **Parallelization**:
@@ -534,12 +533,13 @@ Task 1 → Task 2 → Task 5 → Task 6 → Task 9 → Task 11 → Task 12 → T
 
   **Acceptance Criteria**:
   - [ ] XAML compiles without errors
-  - [ ] General tab renders all options (destination, conflict, open folder)
-  - [ ] Filter tab embeds FileFilterEditor correctly
-  - [ ] Window size and style matches CompressSettingsWindow
+  - [ ] Tab 3 (Filter) embedded in existing TabControl
+  - [ ] Tab 1 and Tab 2 unchanged
+  - [ ] Filter tab embeds FileFilterEditor
+  - [ ] Filter statistics label renders correctly
 
   **Commit**: YES
-  - Message: `feat(ui): add ExtractSettingsWindow XAML`
+  - Message: `feat(ui): add file filter Tab 3 to ExtractSettingsWindow`
   - Files:
     - `src/MantisZip.UI/ExtractSettingsWindow.xaml`
     - `src/MantisZip.UI/ExtractSettingsWindow.xaml.cs`
@@ -683,34 +683,31 @@ Task 1 → Task 2 → Task 5 → Task 6 → Task 9 → Task 11 → Task 12 → T
 
 ---
 
-- [ ] 11. `ExtractSettingsWindow` 代码后端
+- [ ] 11. `ExtractSettingsWindow` — 扩展代码后端支持过滤
 
   **What to do**:
-  - 实现 `ExtractSettingsWindow` code-behind：
-    - 构造函数接收 `string archivePath` + `IReadOnlyList<ArchiveItem> entries`
-    - 属性：
-      - `string? SelectedDestination` — 用户选择的目标路径
-      - `string SelectedConflictAction` — 用户选择的冲突处理
-      - `bool OpenFolderAfterExtract` — 是否打开文件夹
-      - `FileFilterCriteria? GetFilter()` — 获取过滤条件
-      - `List<string>? GetFilteredEntryKeys()` — 获取过滤后的条目 key 列表
-    - General Tab 逻辑：
-      - 加载 AppSettings 中的默认值
-      - "手动选择"时启用路径输入框 + 浏览按钮
-    - Filter Tab 逻辑：
-      - 内嵌 FileFilterEditor
-      - 过滤统计标签实时更新：监听 FileFilterEditor.FilterChanged 事件
-      - 对 entries 应用 FileFilterMatcher 计算过滤前后的数量
-    - OK 按钮：
-      - 保存当前选择到 AppSettings
-      - 设置 DialogResult = true
-  - 窗口启动时根据 `AppSettings.ExtractFilterEnabled` 决定默认是否切换到 Filter Tab
+  - **ExtractSettingsWindow code-behind 已存在**。扩展现有类：
+    - 当前构造函数签名：`ExtractSettingsWindow(IReadOnlyList<string> archivePaths)`
+    - 扩展构造函数：新增重载 `ExtractSettingsWindow(string archivePath, IReadOnlyList<ArchiveItem> entries)` 以支持条目级别的过滤
+    - 新增字段：`_entries` / `_archivePath`（Filter Tab 需要访问条目元数据）
+    - 新增属性：
+      - `FileFilterCriteria? GetFilter()` — 从 FileFilterEditor 获取过滤条件
+      - `List<string>? GetFilteredEntryKeys()` — 对 entries 应用 FileFilterMatcher 返回匹配的 key 列表
+    - Filter Tab 逻辑（Tab 3）：
+      - 在现有 `TabControl_SelectionChanged` 中新增分支：切到 Filter Tab 时初始化过滤统计
+      - 过滤统计标签实时更新：监听 `FileFilterEditor.FilterChanged` 事件
+      - 对 `_entries` 应用 `FileFilterMatcher.IsMatch(entry, filter)` 计算过滤前后数量
+    - OK 按钮保持不变，额外保存过滤状态到 AppSettings
+  - 窗口启动时根据 `AppSettings.ExtractFilterEnabled` 决定默认切换到哪个 Tab
 
   **Must NOT do**:
-  - 不要执行实际的提取操作（只返回配置参数，由调用方执行）
+  - 不要修改现有构造函数 `ExtractSettingsWindow(IReadOnlyList<string>)` 的行为
+  - 不要修改现有的 General Tab 和 Advanced Tab 逻辑
+  - 不要执行实际的提取操作（只返回配置参数）
 
   **References**:
   - UI/ExtractSettingsWindow.xaml (Task 7)
+  - UI/ExtractSettingsWindow.xaml.cs — 现有 code-behind
   - UI/FileFilterEditor.xaml.cs (Task 5)
   - Core/FileFilter/FileFilterMatcher.cs
   - UI/AppSettings.cs
@@ -721,14 +718,15 @@ Task 1 → Task 2 → Task 5 → Task 6 → Task 9 → Task 11 → Task 12 → T
   - Blocked By: Task 7
 
   **Acceptance Criteria**:
-  - [ ] Window opens with archive entries loaded
+  - [ ] Existing constructor unchanged
+  - [ ] New constructor with entries works
   - [ ] Filter tab shows correct count: "共 N 个文件，过滤后将提取 M 个"
   - [ ] Count updates when filter criteria change
   - [ ] OK button saves settings and returns selected config
   - [ ] Cancel returns null / DialogResult = false
 
   **Commit**: YES (groups with 7)
-  - Message: `feat(ui): implement ExtractSettingsWindow logic`
+  - Message: `feat(ui): extend ExtractSettingsWindow with filter support`
   - Files: `src/MantisZip.UI/ExtractSettingsWindow.xaml.cs`
 
 ---
@@ -808,11 +806,10 @@ Task 1 → Task 2 → Task 5 → Task 6 → Task 9 → Task 11 → Task 12 → T
 - **1-3**: `feat(core): add FileFilter data model, matcher, preset, and built-in presets`
 - **4-5**: `feat(ui): add FileFilterEditor user control`
 - **6**: `feat(i18n): add file filter localization strings`
-- **7**: `feat(ui): add ExtractSettingsWindow XAML`
+- **7+11**: `feat(ui): add Filter tab to ExtractSettingsWindow`
 - **8**: `feat(ui): add filter Tab 3 to CompressSettingsWindow`
 - **9**: `feat(ui): add FileFilterHelper`
 - **10**: `feat(ui): integrate filter into compress entry points`
-- **11**: `feat(ui): implement ExtractSettingsWindow logic`
 - **12**: `feat(ui): integrate filter into MainWindow Extract_Click + --extract`
 
 ---
