@@ -22,14 +22,18 @@
     <ProjectReference Include="..\MantisZip.ShellExt\MantisZip.ShellExt.csproj" ReferenceOutputAssembly="false" PrivateAssets="all" />
   </ItemGroup>
 
-  <!-- 构建后将 comhost.dll 复制到 UI 输出目录（供 ShellIntegration.InstallCom 使用） -->
+  <!-- 构建后将 ShellExt 输出（comhost.dll + DLL + runtimeconfig.json）复制到 UI 输出目录 -->
   <Target Name="CopyShellExtComhost" AfterTargets="Build">
     <MSBuild Projects="..\MantisZip.ShellExt\MantisZip.ShellExt.csproj" Targets="Build" Properties="Configuration=$(Configuration)" />
+    <PropertyGroup>
+      <_ShellExtDir>..\MantisZip.ShellExt\bin\$(Configuration)\$(TargetFramework)</_ShellExtDir>
+    </PropertyGroup>
     <ItemGroup>
-      <_ComhostFiles Include="..\MantisZip.ShellExt\bin\$(Configuration)\net9.0-windows\MantisZip.ShellExt.comhost.dll" />
-      <_ComhostFiles Include="..\MantisZip.ShellExt\bin\$(Configuration)\net9.0-windows\MantisZip.ShellExt.dll" />
+      <_ShellExtFiles Include="$(_ShellExtDir)\MantisZip.ShellExt.comhost.dll" />
+      <_ShellExtFiles Include="$(_ShellExtDir)\MantisZip.ShellExt.dll" />
+      <_ShellExtFiles Include="$(_ShellExtDir)\MantisZip.ShellExt.runtimeconfig.json" />
     </ItemGroup>
-    <Copy SourceFiles="@(_ComhostFiles)" DestinationFolder="$(OutputPath)" SkipUnchangedFiles="true" />
+    <Copy SourceFiles="@(_ShellExtFiles)" DestinationFolder="$(OutputPath)" SkipUnchangedFiles="true" />
   </Target>
 
   <!-- Publish 后自动从 7-Zip 安装目录复制 7z.dll 到发布目录 -->
