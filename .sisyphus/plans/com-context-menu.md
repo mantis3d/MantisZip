@@ -82,10 +82,28 @@
 - [ ] `--install-shell` / `--uninstall-shell` 正常工作（仅 COM 注册，不涉及文件关联）
 - [ ] 卸载时清除旧的静态注册表条目
 
-### Must NOT Have
+### Must NOT Have (Phase 1)
 - 不做文件关联（`OpenWithProgids` 功能保留在 ShellIntegration.cs 中）
 - 不做拖拽相关的 COM 实现（那是 `VirtualFileDataObject` 计划）
 - 不改变现有的 `AppSettings` 菜单开关接口
+
+### Phase 2 Option: 砍掉静态回退 + 动词模式
+
+所有 COM 测试走通后可选的清理项：
+
+**前提**: COM 组件在所有目标环境下运行稳定，无 fallback 需求。
+
+**改动**:
+- ShellIntegration.cs: 删 `InstallCascade()` / `InstallVerbs()`、所有编号 verb 常量、分隔线 verb、
+  Uninstall 中对应清理路径、关联的 SetRegistryValue 调用 → **−~280 行**
+- `Install()` 简化：`if (!InstallCom()) return;` 不再有分支
+- `Uninstall()` 简化：只调用 `UninstallCom()` + SHChangeNotify
+- ContextMenuHandler.cs: 删 `QueryContextMenu` 中 `_cascadeMode` 条件判断的 `else` 分支 → **−~30 行**
+- AppSettings: 删 `EnableCascadingMenu` 字段及设置 UI
+- 归档 `com-migration-mapping.md`（不再需要）
+- 仅保留层叠模式，不再区分 cascade/verb
+
+**代价**: 无 comhost.dll 时完全失去右键菜单（安装包必须包含 ShellExt）
 
 ---
 
