@@ -7,20 +7,32 @@
 - **技术栈**: .NET 9 + WPF + SharpCompress + SharpSevenZip
 
 ## 版本
-- **当前版本**: 0.3.6
-- **发布日期**: 2026-05-30
+- **当前版本**: 0.3.7
+- **发布日期**: 2026-05-31
 
 ## 规划中
 - ✅ **引擎统一已完成** — SharpZipLib→SharpCompress + 7z.exe/SevenZipExtractor→SharpSevenZip（v0.3.4）
 - ✅ **批量进度文件列表已完成** — `--compress-separate` / `--extract-*` 批量操作进度窗口 + IPC 合并（v0.3.5）
 - ✅ **ExtractSettingsWindow 已完成** — 创建 + 重设计，与 CompressSettingsWindow 视觉一致（v0.3.4 创建 / v0.3.6 重设计）
+- ✅ **COM 右键菜单已完成** — .NET 9 comhost，Explorer 原生 COM 组件替代静态注册（v0.3.7）
 - **文件过滤功能** — 按类型/文件名/大小/日期过滤压缩和解压（详见 `.sisyphus/plans/file-filter-feature.md`）
   - 压缩时只打包匹配条件的文件
   - 解压时只提取匹配条件的条目
   - 支持命名预设持久化
-- **代码重构持续** — `CompressSettingsWindow.xaml.cs` (684 行)、`SevenZipEngine.cs` (630 行)、`ShellIntegration.cs` (503 行) 仍有拆分空间
+- **代码重构持续** — `CompressSettingsWindow.xaml.cs` (684 行)、`SevenZipEngine.cs` (630 行)、`ShellIntegration.cs` (482 行) 仍有拆分空间
 
 ## 版本历史（从新到旧）
+
+### v0.3.7 (2026-05-31) COM 右键菜单 + 注册表设置同步
+
+1. **新建 MantisZip.ShellExt 项目** — .NET 9 类库，`<EnableComHosting>true</EnableComHosting>`，comhost 模式
+2. **ContextMenuHandler.cs** — `IShellExtInit` + `IContextMenu` 完整实现，8 个菜单项（打开/压缩/压缩到独立的/压缩到父目录/解压到此处/智能解压/解压到压缩包名/解压到…），层叠/动词双模式，归档扩展名过滤，动态文件名，`Process.Start` 命令行调度，HICON→HBITMAP 图标缓存
+3. **NativeMethods.cs** — Win32 互操作：`CF_HDROP` 提取、`InsertMenu`/`MenuItemInfo`、GDI `DrawIconEx` 图标转换、PIDL 路径解析
+4. **COM 注册** — `ShellIntegration.InstallCom()`/`UninstallCom()` 在 `HKCU\Software\Classes` 写入 CLSID + shellex，`Install()` 优先 COM 失败回退静态，`IsInstalled` 优先检查 CLSID
+5. **设置同步** — `AppSettings.Save()` → `SyncContextMenuToRegistry()` 写 10 个 DWORD 到 `HKCU\Software\MantisZip\ContextMenu`
+6. **构建集成** — ShellExt 项目添加进 `.sln`，UI 项目引用，post-build 自动复制 `MantisZip.ShellExt.comhost.dll` 到输出目录
+7. **版本升级** — 0.3.7
+8. **文档全量同步** — PLAN.md / PROGRESS.md / AGENTS.md / ARCHITECTURE.md / manual-test-checklist.md
 
 ### v0.3.6 (2026-05-30) ExtractSettingsWindow UI 重构
 

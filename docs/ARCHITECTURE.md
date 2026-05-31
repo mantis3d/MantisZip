@@ -9,6 +9,8 @@ MantisZip/
 │   │   ├── Abstractions/            # IArchiveEngine 接口 + 数据模型
 │   │   ├── Engines/                 # ZipEngine / SevenZipEngine / TarGzEngine
 │   │   └── Utils/                   # PasswordManager / ArchiveEntryExtractor / CoreLog
+│   ├── MantisZip.ShellExt/          # COM 组件（.NET 9 comhost，Explorer 右键菜单）
+│   │   └── ContextMenuHandler.cs    # IShellExtInit + IContextMenu 实现
 │   └── MantisZip.UI/                # WPF 桌面应用（.net9.0-windows）
 │       ├── MainWindow.xaml/.cs      # 主窗口（所有逻辑 code-behind）
 │       ├── MainWindow.Preview.cs    # 文件预览子系统
@@ -35,6 +37,9 @@ MantisZip/
 │   └── MantisZip.Tests/            # xUnit 单元测试（40+ 用例）
 │       ├── Engines/                 # ZipEngine / SevenZipEngine / TarGzEngine 测试
 │       └── Fixtures/                # 测试用压缩包生成
+├── .sisyphus/
+│   ├── notepads/                   # 功能学习笔记
+│   └── plans/                      # 详细设计方案文档
 ├── docs/
 │   ├── PLAN.md                     # 开发计划与进度
 │   ├── CLI.md                      # 命令行使用指南

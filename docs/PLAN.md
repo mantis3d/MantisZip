@@ -4,8 +4,8 @@
 
 **项目状态**: 🟢 开发中 (Phase 6 — 代码重构与文档更新)  
 **创建日期**: 2026-04-23  
-**最后更新**: 2026-05-30  
-**当前版本**: 0.3.6
+**最后更新**: 2026-05-31  
+**当前版本**: 0.3.7
 
 ---
 
@@ -120,6 +120,8 @@ MantisZip/
 │   │       ├── TorrentParser.cs         # BT 种子解析
 │   │       ├── SQLiteParser.cs          # SQLite 数据库头解析
 │   │       └── SqliteDataReader.cs      # SQLite 表数据读取
+│   ├── MantisZip.ShellExt/          # COM 组件（.NET 9 comhost，Explorer 右键菜单）
+│   │   └── ContextMenuHandler.cs    # IShellExtInit + IContextMenu 实现
 │   └── MantisZip.UI/                # WPF 桌面应用（net9.0-windows）
 │       ├── MainWindow.xaml / .cs    # 主窗口（所有逻辑 code-behind）
 │       ├── MainWindow.DragDrop.cs   # 拖拽导出
@@ -257,6 +259,7 @@ MantisZip/
 | 优先级 | 功能 | 状态 |
 |--------|------|------|
 | P1 | Shell 右键菜单 — 动词模式/层叠双模式，per-verb 独立开关（打开/压缩/压缩到独立的/压缩到父目录/解压到此处/智能解压/解压到压缩包名/解压到…），菜单分组分隔线 | ✅ 完成 |
+| P1 | COM 右键菜单 — .NET 9 comhost，IShellExtInit+IContextMenu，HKCU 注册，图标支持，设置同步 | ✅ v0.3.7 完成 — [查看详细计划](../.sisyphus/plans/com-context-menu.md) |
 | P1 | 文件关联（打开方式） | ✅ 完成 |
 | P2 | CLI 快速压缩/解压 — `--compress-separate`/`--compress-combined`/`--extract-smart`/`--extract-here`/`--extract-to-name` | ✅ 完成 |
 | P2 | 智能解压（Smart Extract）— 自动分析压缩包结构决定是否保留顶层文件夹 | ✅ 完成 |

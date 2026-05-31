@@ -2,7 +2,7 @@
 
 ## Project overview
 
-WPF desktop compression/decompression app (.NET 9, Windows only). Two projects: `MantisZip.Core` (class library) + `MantisZip.UI` (WinExe).
+WPF desktop compression/decompression app (.NET 9, Windows only). Three projects: `MantisZip.Core` (class library) + `MantisZip.ShellExt` (COM component class library) + `MantisZip.UI` (WinExe).
 
 ## Quick start
 
@@ -27,6 +27,8 @@ MantisZip.UI (WPF) ──reference──▶ MantisZip.Core (net9.0)
                         ┌───────────────┼───────────────┐
                    ZipEngine    SevenZipEngine    TarGzEngine
                   (SharpCompress) (SharpSevenZip) (SharpCompress)
+
+MantisZip.ShellExt (COM) ──独立──▶ (Explorer.exe 宿主，无直接项目引用)
 ```
 
 ### Engine pattern (strategy + factory)
@@ -108,6 +110,8 @@ Window size, tree column width, and preview row height saved to `%LOCALAPPDATA%\
 
 `ShellIntegration` (static class) installs Windows Explorer context menu entries via `HKCU\Software\Classes` — no admin required.
 
+Since v0.3.7, `Install()` tries COM component registration first (`MantisZip.ShellExt.comhost.dll` via `InstallCom()`), falling back to static registry verbs if the COM host file is missing. `Uninstall()` clears both COM CLSID + shellex and all static verbs. `IsInstalled` checks the COM CLSID first.
+
 Two modes controlled by `AppSettings.EnableCascadingMenu`:
 
 - **Cascade mode** (default: off): Single "MantisZip" submenu with separators between 浏览/压缩/解压 groups, numbered verbs via `ExtendedSubCommandsKey`
@@ -186,7 +190,7 @@ Plans tracked under `.sisyphus/plans/`:
 | [archive-diff.md](.sisyphus/plans/archive-diff.md) | 📋 Planned | None |
 | [virtual-file-data-object.md](.sisyphus/plans/virtual-file-data-object.md) | 📋 Planned | None |
 | [compress-preset.md](.sisyphus/plans/compress-preset.md) | 📋 Planned | COM context menu (Phase 2) |
-| [com-context-menu.md](.sisyphus/plans/com-context-menu.md) | 📋 Planned | None |
+| [com-context-menu.md](.sisyphus/plans/com-context-menu.md) | ✅ Completed (v0.3.7) | None |
 | [png-transparency-3way.md](.sisyphus/plans/png-transparency-3way.md) | ✅ Completed | None |
 
 ### ✅ Completed: Engine unification (SharpZipLib → SharpCompress + 7z.exe → SharpSevenZip)
