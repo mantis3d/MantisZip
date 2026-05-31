@@ -656,6 +656,16 @@ public const string Settings_Appearance_Theme                  = "Settings_Appea
     public const string Shell_QuickCompress                        = "Shell_QuickCompress";
     public const string Shell_SmartExtract                         = "Shell_SmartExtract";
 
+    // ─── ShellExt COM context menu text ───
+    public const string ShellExt_Open                              = "ShellExt_Open";
+    public const string ShellExt_ExtractHereSingle                 = "ShellExt_ExtractHereSingle";
+    public const string ShellExt_ExtractHereMulti                  = "ShellExt_ExtractHereMulti";
+    public const string ShellExt_SmartExtractSingle                = "ShellExt_SmartExtractSingle";
+    public const string ShellExt_SmartExtractMulti                 = "ShellExt_SmartExtractMulti";
+    public const string ShellExt_ExtractToNamed                    = "ShellExt_ExtractToNamed";
+    public const string ShellExt_ExtractTo                         = "ShellExt_ExtractTo";
+    public const string ShellExt_Compress                          = "ShellExt_Compress";
+
     /// <summary>Translate a key using LanguageManager.</summary>
     public static string T(string key) => LanguageManager.Instance[key];
 

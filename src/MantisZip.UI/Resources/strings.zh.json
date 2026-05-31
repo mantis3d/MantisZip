@@ -593,6 +593,16 @@
   "Shell_CompressCombined": "压缩到（父目录名）",
   "Shell_CompressSeparate": "压缩到独立的（文件名）",
   "Shell_SmartExtract": "智能解压到此处",
+
+  "ShellExt_Open": "打开压缩包",
+  "ShellExt_ExtractHereSingle": "原地解压包",
+  "ShellExt_ExtractHereMulti": "原地解压{0}个压缩包",
+  "ShellExt_SmartExtractSingle": "智能原地解压",
+  "ShellExt_SmartExtractMulti": "智能原地解压{0}个压缩包",
+  "ShellExt_ExtractToNamed": "解压到",
+  "ShellExt_ExtractTo": "解压到……",
+  "ShellExt_Compress": "压缩……",
+
   "PwdMgr_Help_Tooltip": "查看匹配规则帮助",
   "Password_DeleteConfirm": "确定要删除密码 \"{0}\" 吗？",
   "Password_DeleteFailed": "删除密码失败: {0}",

@@ -581,6 +581,16 @@
   "Shell_CompressCombined": "Compress to (Parent Folder)",
   "Shell_CompressSeparate": "Compress to Separate (File Name)",
   "Shell_SmartExtract": "Smart Extract Here",
+
+  "ShellExt_Open": "Open archive",
+  "ShellExt_ExtractHereSingle": "Extract here",
+  "ShellExt_ExtractHereMulti": "Extract {0} archives",
+  "ShellExt_SmartExtractSingle": "Smart extract",
+  "ShellExt_SmartExtractMulti": "Smart extract {0} archives",
+  "ShellExt_ExtractToNamed": "Extract to",
+  "ShellExt_ExtractTo": "Extract to\u2026",
+  "ShellExt_Compress": "Compress\u2026",
+
   "PwdMgr_Help_Tooltip": "View match rule help",
   "Password_DeleteConfirm": "Delete password \"{0}\"?",
   "Password_DeleteFailed": "Failed to delete password: {0}",

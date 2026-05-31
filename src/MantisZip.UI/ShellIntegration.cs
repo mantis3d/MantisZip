@@ -9,8 +9,8 @@ namespace MantisZip.UI;
 /// <summary>
 /// Shell 右键菜单集成。
 /// 写入 HKCU\Software\Classes，无需管理员权限。
-/// 支持层叠子菜单 (cascade) 和独立动词两种模式，由 AppSettings.EnableCascadingMenu 控制。
-/// 菜单顺序（层叠模式下严格遵循）：
+/// 始终使用层叠子菜单模式（动词模式已在 v0.4.0 移除）。
+/// 菜单顺序：
 ///   1. 用MantisZip打开
 ///   2. 用MantisZip解压到此处
 ///   3. 用MantisZip解压到（压缩包名）
@@ -33,7 +33,7 @@ internal static class ShellIntegration
     private const string CascadeRoot = "MantisZip";
     private const string ProgId = "MantisZip.Archive";
 
-    // Verb names (numbered prefix for verb-mode alphabetical order)
+    // Verb names (仅用于 Uninstall 清理旧注册，动词模式已在 v0.4.0 移除)
     private const string OpenVerb = "01_MantisZipOpen";
     private const string ExtractHereVerb = "02_MantisZipExtractHere";
     private const string ExtractSmartVerb = "02_MantisZipSmartExtract";
@@ -100,17 +100,14 @@ internal static class ShellIntegration
         }
         else
         {
-            // 回退到静态注册表方案
-            App.LogDebug("ShellIntegration.Install: COM not available, falling back to static registry");
-            if (s.EnableCascadingMenu)
-                InstallCascade(s, exePath);
-            else
-                InstallVerbs(s, exePath);
+            // 回退到静态注册表方案（仅级联模式，动词模式已在 v0.4.0 移除）
+            App.LogDebug("ShellIntegration.Install: COM not available, falling back to static cascade");
+            InstallCascade(s, exePath);
         }
 
         // 通知 Windows Shell 刷新上下文菜单缓存
         SHChangeNotify(SHCNE_ASSOCCHANGED, SHCNF_IDLIST, IntPtr.Zero, IntPtr.Zero);
-        App.LogDebug("ShellIntegration.Install: done, cascade={0}, exePath={1}", s.EnableCascadingMenu, exePath);
+        App.LogDebug("ShellIntegration.Install: done, exePath={0}", exePath);
     }
 
     /// <summary>
@@ -204,11 +201,16 @@ internal static class ShellIntegration
             App.LogDebug("InstallCom: registering from {0}", comhostPath);
 
             // 1. CLSID 注册（HKCU — per-user）
+            //    .NET 6+ comhost.dll 通过 runtimeconfig.json 定位运行时和托管程序集，
+            //    不需要 InprocServer32 下额外的 Assembly/Class/CodeBase 值
             var clsidKey = $@"Software\Classes\CLSID\{ComClsid}";
             SetRegistryValue(clsidKey, null, "MantisZip Context Menu Handler");
             SetRegistryValue($@"{clsidKey}\InprocServer32", null, comhostPath);
             SetRegistryValue($@"{clsidKey}\InprocServer32", "ThreadingModel", "Apartment");
             SetRegistryValue($@"{clsidKey}\ProgId", null, ComProgId);
+            // ProgId 反向查找（由 COM CreateObject/ProgId 需要）
+            SetRegistryValue($@"Software\Classes\{ComProgId}", null, "MantisZip Context Menu Handler");
+            SetRegistryValue($@"Software\Classes\{ComProgId}\CLSID", null, ComClsid);
 
             // 2. 上下文菜单处理程序注册
             foreach (var target in new[] { "*", "Directory", @"Directory\Background" })
@@ -218,6 +220,7 @@ internal static class ShellIntegration
             }
 
             App.LogDebug("InstallCom: COM registration successful");
+            WriteMenuTextToRegistry();
             return true;
         }
         catch (Exception ex)
@@ -240,8 +243,9 @@ internal static class ShellIntegration
                 DeleteRegistryKey($@"Software\Classes\{target}\shellex\ContextMenuHandlers\{ComHandlerKey}");
             }
 
-            // 2. 删除 CLSID 注册
+            // 2. 删除 CLSID 注册及 ProgId 反向查找
             DeleteRegistryKey($@"Software\Classes\CLSID\{ComClsid}");
+            DeleteRegistryKey($@"Software\Classes\{ComProgId}");
 
             App.LogDebug("UninstallCom: COM registration cleaned up");
         }
@@ -407,104 +411,6 @@ internal static class ShellIntegration
 
     #endregion
 
-    #region 独立动词模式
-
-    private static void InstallVerbs(AppSettings s, string exePath)
-    {
-        // 动词按用户要求的顺序注册，使用编号前缀控制排序
-        bool dirHasSeparate = s.EnableCompressSeparate;
-        bool dirHasCombined = s.EnableCompressCombined;
-        bool dirHasCompress = s.EnableCompressMenu;
-        bool dirHasVerbs = dirHasSeparate || dirHasCombined || dirHasCompress;
-        bool bgHasVerbs = dirHasCompress;
-
-        // ——— 顶层/底层分隔符（所有目标） ———
-        InstallSeparatorVerb("*", "00_MantisZipSepTop");
-        if (dirHasVerbs) InstallSeparatorVerb("Directory", "00_MantisZipSepTop");
-        if (bgHasVerbs) InstallSeparatorVerb(@"Directory\Background", "00_MantisZipSepTop");
-
-        // ——— 1. 用MantisZip打开（仅压缩包）———
-        if (s.EnableOpenMenu)
-        {
-            InstallVerb("*", OpenVerb, OpenDisplay, $@"""{exePath}"" --open ""%1""", s.ShowMenuIcons, exePath, BuildAppliesToFilter());
-        }
-
-        // ——— 组间分隔符（* 目标：解压组前） ———
-        bool extractHasVerbs = s.EnableExtractHereMenu || s.EnableSmartExtractMenu || s.EnableExtractToNamedMenu || s.EnableExtractToMenu;
-        if (extractHasVerbs)
-            InstallSeparatorVerb("*", "02a_MantisZipSep");
-
-        // ——— 2-4. 解压动词（每个独立控制）———
-        if (s.EnableExtractHereMenu)
-            InstallVerb("*", ExtractHereVerb, ExtractHereDisplay, $@"""{exePath}"" --extract-here ""%1""", s.ShowMenuIcons, exePath, BuildAppliesToFilter());
-        if (s.EnableSmartExtractMenu)
-            InstallVerb("*", ExtractSmartVerb, ExtractSmartDisplay, $@"""{exePath}"" --extract-smart ""%1""", s.ShowMenuIcons, exePath, BuildAppliesToFilter());
-        if (s.EnableExtractToNamedMenu)
-            InstallVerb("*", ExtractToNamedVerb, ExtractToNamedDisplay, $@"""{exePath}"" --extract-to-name ""%1""", s.ShowMenuIcons, exePath, BuildAppliesToFilter());
-        if (s.EnableExtractToMenu)
-            InstallVerb("*", ExtractVerb, ExtractDisplay, $@"""{exePath}"" --extract ""%1""", s.ShowMenuIcons, exePath, BuildAppliesToFilter());
-
-        // ——— 组间分隔符（压缩组前） ———
-        bool compressHasVerbs = dirHasVerbs;
-        if (compressHasVerbs)
-        {
-            InstallSeparatorVerb("*", "04a_MantisZipSep");
-            if (dirHasVerbs) InstallSeparatorVerb("Directory", "04a_MantisZipSep");
-        }
-
-        // ——— 5. 压缩到独立的（文件名） ———
-        if (s.EnableCompressSeparate)
-        {
-            InstallVerb("*", CompressSeparateVerb, CompressSeparateDisplay, $@"""{exePath}"" --compress-separate ""%1""", s.ShowMenuIcons, exePath);
-            InstallVerb("Directory", CompressSeparateVerb, CompressSeparateDisplay, $@"""{exePath}"" --compress-separate ""%1""", s.ShowMenuIcons, exePath);
-        }
-
-        // ——— 6. 压缩到（父目录名） ———
-        if (s.EnableCompressCombined)
-        {
-            InstallVerb("*", CompressCombinedVerb, CompressCombinedDisplay, $@"""{exePath}"" --compress-combined ""%1""", s.ShowMenuIcons, exePath);
-            InstallVerb("Directory", CompressCombinedVerb, CompressCombinedDisplay, $@"""{exePath}"" --compress-combined ""%1""", s.ShowMenuIcons, exePath);
-        }
-
-        // ——— 7. 用MantisZip压缩 ———
-        if (s.EnableCompressMenu)
-        {
-            InstallVerb("*", CompressVerb, CompressDisplay, $@"""{exePath}"" --compress ""%1""", s.ShowMenuIcons, exePath);
-        }
-
-        // ——— Directory ———
-        if (s.EnableCompressMenu)
-            InstallVerb("Directory", CompressVerb, CompressDisplay, $@"""{exePath}"" --compress ""%1""", s.ShowMenuIcons, exePath);
-
-        // ——— Directory\Background ———
-        if (s.EnableCompressMenu)
-            InstallVerb(@"Directory\Background", CompressVerb, CompressDisplay, $@"""{exePath}"" --compress ""%V""", s.ShowMenuIcons, exePath);
-
-        // ——— 底层分隔符 ———
-        InstallSeparatorVerb("*", "99_MantisZipSepBottom");
-        if (dirHasVerbs) InstallSeparatorVerb("Directory", "99_MantisZipSepBottom");
-        if (bgHasVerbs) InstallSeparatorVerb(@"Directory\Background", "99_MantisZipSepBottom");
-    }
-
-    private static void InstallVerb(string target, string verbName, string displayName, string command, bool showIcon, string exePath, string? appliesTo = null)
-    {
-        var key = $@"Software\Classes\{target}\shell\{verbName}";
-        SetRegistryValue(key, null, displayName);
-        if (showIcon)
-            SetRegistryValue(key, "Icon", $"""{exePath},0""");
-        if (appliesTo != null)
-            SetRegistryValue(key, "AppliesTo", appliesTo);
-        SetRegistryValue($@"{key}\command", null, command);
-    }
-
-    /// <summary>安装一条菜单分隔线（独立动词模式）。</summary>
-    private static void InstallSeparatorVerb(string target, string verbName)
-    {
-        SetRegistryDword($@"Software\Classes\{target}\shell\{verbName}", "CommandFlags", 8);
-    }
-
-    #endregion
-
     #region L.T(L.Settings_Tab_FileAssoc)
 
     /// <summary>检查L.T(L.Settings_Tab_FileAssoc)L.T(L.MsgBox_Yes)L.T(L.MsgBox_No)已L.T(L.Settings_Menu_Btn_Install)。</summary>
@@ -648,6 +554,24 @@ internal static class ShellIntegration
     private static void DeleteRegistryKey(string subKey)
     {
         Registry.CurrentUser.DeleteSubKeyTree(subKey, throwOnMissingSubKey: false);
+    }
+
+    /// <summary>
+    /// Write localized ShellExt menu text to registry under HKCU\Software\MantisZip\ContextMenu.
+    /// Called during COM install so ShellExt reads the current language's strings.
+    /// </summary>
+    private static void WriteMenuTextToRegistry()
+    {
+        var regPath = @"Software\MantisZip\ContextMenu";
+        SetRegistryValue(regPath, "TextOpen", L.T(L.ShellExt_Open));
+        SetRegistryValue(regPath, "TextExtractHereSingle", L.T(L.ShellExt_ExtractHereSingle));
+        SetRegistryValue(regPath, "TextExtractHereMulti", L.T(L.ShellExt_ExtractHereMulti));
+        SetRegistryValue(regPath, "TextSmartExtractSingle", L.T(L.ShellExt_SmartExtractSingle));
+        SetRegistryValue(regPath, "TextSmartExtractMulti", L.T(L.ShellExt_SmartExtractMulti));
+        SetRegistryValue(regPath, "TextExtractToNamed", L.T(L.ShellExt_ExtractToNamed));
+        SetRegistryValue(regPath, "TextExtractTo", L.T(L.ShellExt_ExtractTo));
+        SetRegistryValue(regPath, "TextCompress", L.T(L.ShellExt_Compress));
+        App.LogDebug("WriteMenuTextToRegistry: wrote ShellExt menu text to registry");
     }
 
     private static string GetExePath()
