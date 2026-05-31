@@ -2,7 +2,10 @@
 
 > 将当前基于注册表静态动词的右键菜单替换为 COM `IContextMenu` 实现，支持动态菜单文本、子菜单、自定义图标、预设集成。
 > **状态**: 📋 待定 | **阶段**: [⬜⬜⬜⬜⬜⬜⬜⬜⬜] (0/9)
-> **前置依赖**: SharpCompress 引擎迁移完成（`ListEntriesAsync` 用于动态显示压缩包文件名）
+> **前置依赖**: ✅ SharpCompress 引擎迁移完成（v0.3.4，`ListEntriesAsync` 用于动态显示压缩包文件名）
+>
+> ⚠️ **重要架构变更**: 本计划最初假设在 `MantisZip.UI` (WinExe) 项目内创建 COM 组件。但 .NET 9 的 COM 托管使用 `comhost.dll` 机制（非传统 regasm），且 WPF WinExe 不适合加载到 Explorer 进程。
+> **修订方案**: 新建独立的类库项目 `MantisZip.ShellExt`（`net9.0-windows` 类库），不引用 WPF/MantisZip.UI 程序集，保持轻量。详情见 Task 7。
 
 ---
 
@@ -59,22 +62,24 @@
 
 ### Concrete Deliverables
 
-- COM 组件：实现 `IShellExtInit`、`IContextMenu` 接口
+- **新项目**: 创建 `MantisZip.ShellExt` 独立类库 (`net9.0-windows`)，不引用 WPF/UI 程序集
+- COM 组件：实现 `IShellExtInit`、`IContextMenu` 接口（在 ShellExt 项目中）
 - 动态菜单：嵌入文件名（如"添加到 报告.zip"）
 - 子菜单支持：替代现有层叠模式，更稳定
 - 图标支持：为菜单项提供自定义图标
-- 设置集成：保留现有各菜单项的开关逻辑
-- 注册/反注册：32/64 位 COM 注册 + 清理旧注册表
-- Install/Uninstall CLI：更新 `--install-shell` / `--uninstall-shell`
+- 设置集成：保留现有各菜单项的开关逻辑（COM 组件通过注册表读取设置）
+- 注册/反注册：32/64 位 COM host DLL 注册 + 清理旧注册表
+- Install/Uninstall CLI：更新 `--install-shell` / `--uninstall-shell`（COM 注册独立于 `--install-assoc` 文件关联）
 
 ### Must Have
 
+- [ ] `MantisZip.ShellExt` 独立类库项目（`net9.0-windows`，`<EnableComHosting>true</EnableComHosting>`）
 - [ ] COM 组件注册到 `*\shellex\ContextMenuHandlers\{GUID}` 和 `Directory\shellex\ContextMenuHandlers\{GUID}`
 - [ ] 动态菜单文本（至少嵌入文件名）
 - [ ] 保留现有 8 个菜单项和它们的 toggle 开关
 - [ ] 保留层叠/独立动词两种模式
 - [ ] 菜单项可显示图标
-- [ ] `--install-shell` / `--uninstall-shell` 正常工作
+- [ ] `--install-shell` / `--uninstall-shell` 正常工作（仅 COM 注册，不涉及文件关联）
 - [ ] 卸载时清除旧的静态注册表条目
 
 ### Must NOT Have
@@ -137,12 +142,16 @@ Task 1 → Task 3 → Task 4 → Task 5 → Task 7 → Task 8 → Task 9 → F1-
     - `IShellExtInit` 接口规范（`Initialize(LPCITEMIDLIST, IDataObject, HKEY)`）
     - `IContextMenu` 接口规范（`QueryContextMenu`、`InvokeCommand`、`GetCommandString`）
     - .NET 中实现 COM 接口的要求：`[ComVisible(true)]`、`[Guid]`、`[ClassInterface]`、`[ProgId]`
-    - 强命名程序集（SNK 签名）—— COM 注册必需
-    - Regasm（`regasm.exe` / `regasm /codebase`）vs 自注册（`[ComRegisterFunction]`）
-    - 32/64 位双注册（`\Software\Classes\CLSID\{GUID}` vs `\Software\Classes\Wow6432Node\CLSID\{GUID}`）
-    - InprocServer32 路径指向 .NET 运行时引导程序
+    - **.NET 9 COM 托管方案**（⚠️ 关键差异）：
+      - 传统 regasm 在 .NET 5+ 已弃用，改为 `<EnableComHosting>true</EnableComHosting>` 生成 `.comhost.dll`
+      - 注册方式：`regsvr32 MantisZip.ShellExt.comhost.dll`（而非 regasm）
+      - 宿主要求：独立类库项目，不能是 WinExe
+      - 架构：32/64 位需分别构建（`dotnet build -r win-x64` / `win-x86`）
+      - 引用：该程序集不能引用 WPF 程序集（Explorer 进程隔离）
+      - 独立项目必须将 Core 项目作为依赖，从注册表而非 AppSettings 读取配置
+    - SNK 强命名程序集要求（.NET COM 仍然需要）
     - Windows 10/11 的 shell 扩展调试方法（`%LOCALAPPDATA%\Microsoft\Windows\Shell\` 日志）
-  - 搭建测试项目或编写原型代码验证 COM 接口可被 Explorer 加载
+  - 搭建测试项目（`MantisZip.ShellExt` 原型）验证 COM 接口可被 Explorer 加载
   - 输出研究报告（记录关键发现和风险点）
 
   **Must NOT do**:
@@ -151,7 +160,7 @@ Task 1 → Task 3 → Task 4 → Task 5 → Task 7 → Task 8 → Task 9 → F1-
 
   **Recommended Agent Profile**:
   - Category: `deep`（研究密集型，需要探索 .NET COM 互操作最佳实践）
-  - Skills: 建议用 `librarian` 查找 .NET COM shell extension 实现示例
+  - Skills: 建议用 `librarian` 查找 .NET 5+ COM hosting + `EnableComHosting` 实现示例
 
   **Parallelization**:
   - Can Run In Parallel: YES
@@ -165,8 +174,9 @@ Task 1 → Task 3 → Task 4 → Task 5 → Task 7 → Task 8 → Task 9 → F1-
 
   **References**:
   - MSDN: `IContextMenu` / `IShellExtInit` interface docs
-  - GitHub: 搜索 .NET COM shell extension 实现（C#）
+  - GitHub .NET 5+ COM shell extension 示例（搜索 `EnableComHosting`）
   - UI/ShellIntegration.cs — 当前实现，了解要迁移的内容
+  - src/MantisZip.ShellExt/ — 新建的目标项目位置
 
   **Commit**: NO（研究性任务，无代码产出）
 
@@ -208,7 +218,7 @@ Task 1 → Task 3 → Task 4 → Task 5 → Task 7 → Task 8 → Task 9 → F1-
 - [ ] 3. `IShellExtInit` 实现
 
   **What to do**:
-  - 新建 `src/MantisZip.UI/ShellExt/ContextMenuHandler.cs`
+  - 新建 `src/MantisZip.ShellExt/ContextMenuHandler.cs`（独立类库项目）
   - 实现 `IShellExtInit`：
     ```csharp
     [ComVisible(true)]
@@ -237,11 +247,13 @@ Task 1 → Task 3 → Task 4 → Task 5 → Task 7 → Task 8 → Task 9 → F1-
     - `Directory\Background`（背景右键）：`_targetFolder` 填充当前目录
 
   **Must NOT do**:
-  - 不要依赖 WinForms（WPF 项目避免引入 System.Windows.Forms）
+  - 不要引用任何 WPF / MantisZip.UI 程序集（Explorer 进程隔离）
+  - 不要依赖 WinForms（避免引入 System.Windows.Forms）
+  - 不要引用 AppSettings（COM 组件通过注册表读取设置，见 Task 8）
 
   **References**:
   - [MSDN: IShellExtInit](https://learn.microsoft.com/en-us/windows/win32/api/shobjidl_core/nn-shobjidl_core-ishellextinit)
-  - GitHub .NET shell extension 示例
+  - GitHub .NET 5+ COM host shell extension 示例（搜索 `EnableComHosting` + `IContextMenu`）
 
   **Parallelization**:
   - NO
@@ -252,6 +264,7 @@ Task 1 → Task 3 → Task 4 → Task 5 → Task 7 → Task 8 → Task 9 → F1-
   - [ ] Initialize 正确提取文件路径
   - [ ] 支持文件、文件夹、背景三种调用上下文
   - [ ] 异常时安全退出（不崩溃 Explorer）
+  - [ ] COM 组件在 Explorer 进程内加载时不拉起 WPF 程序集
 
   **Commit**: YES
 
@@ -281,7 +294,7 @@ Task 1 → Task 3 → Task 4 → Task 5 → Task 7 → Task 8 → Task 9 → F1-
       - 多文件选中：`解压到 报告 等 5 个文件` / `压缩到 文档 等 3 个文件`
     - **层叠模式**（`EnableCascadingMenu`）：用 `InsertMenu` 的 `MF_POPUP` 创建子菜单
     - **每个菜单项对应独立的命令 ID**，用于 `InvokeCommand` 区分
-    - 读取 `AppSettings` 判断各菜单项是否显示
+    - 读取注册表中的设置（见 Task 8 的注册表同步方案）判断各菜单项是否显示
     - 菜单项顺序严格保持（用 `idCmdFirst` + offset 控制）
     - 应用 `AppliesTo` 过滤（仅压缩包文件显示"打开/解压"菜单）
 
@@ -334,7 +347,8 @@ Task 1 → Task 3 → Task 4 → Task 5 → Task 7 → Task 8 → Task 9 → F1-
     - 异常处理：任何异常不抛到 Explorer
 
   **References**:
-  - UI/App.xaml.cs / App.Cli.cs — 现有 CLI 入口点
+  - UI/App.xaml.cs — CLI 参数解析（OnStartup switch-case）
+  - UI/App.Cli.cs — CLI 命令处理器（HandleCompress, HandleExtract 等）
   - [MSDN: IContextMenu.InvokeCommand](https://learn.microsoft.com/en-us/windows/win32/api/shobjidl_core/nf-shobjidl_core-icontextmenu-invokecommand)
 
   **Parallelization**:
@@ -372,34 +386,52 @@ Task 1 → Task 3 → Task 4 → Task 5 → Task 7 → Task 8 → Task 9 → F1-
 
 ---
 
-- [ ] 7. 注册/反注册逻辑
+- [ ] 7. 注册/反注册逻辑（.NET 9 comhost 方式）
+
+  **背景**: .NET 5+ 弃用了 regasm。.NET 9 的 COM 注册使用 `comhost.dll` 机制：
+  - 项目设置 `<EnableComHosting>true</EnableComHosting>`，构建时生成 `MantisZip.ShellExt.comhost.dll`
+  - 注册用 `regsvr32 MantisZip.ShellExt.comhost.dll`（Win32 标准 COM 注册）
+  - 32/64 位分别构建：`dotnet build -r win-x64` 和 `dotnet build -r win-x86`
 
   **What to do**:
-  - 新建 `src/MantisZip.UI/ShellExt/ContextMenuRegistration.cs`
-  - 注册方法 `Install()`：
-    - 写入 `HKCU\Software\Classes\*\shellex\ContextMenuHandlers\MantisZip\{GUID}`
-    - 写入 `HKCU\Software\Classes\Directory\shellex\ContextMenuHandlers\MantisZip\{GUID}`
-    - 写入 `HKCU\Software\Classes\Directory\Background\shellex\ContextMenuHandlers\MantisZip\{GUID}`
-    - 写入 CLSID（`HKCU\Software\Classes\CLSID\{GUID}`）指向 InprocServer32
-    - InprocServer32 设置 `Assembly`、`Class`、`RuntimeVersion`、`CodeBase` 等 .NET 加载信息
-    - 支持 32/64 位双注册（Wow6432Node 分支）
-    - 调用 `SHChangeNotify` 刷新 Shell
-  - 反注册方法 `Uninstall()`：
-    - 删除所有 `ContextMenuHandlers` 条目
-    - 删除 CLSID 条目
-    - 调用 `SHChangeNotify` 刷新 Shell
-  - 修改 `ShellIntegration.cs`（或调用方）：
-    - `InstallShell` 方法中，如果 COM 菜单已注册，则不再做静态注册
-    - 迁移现有 `ShellIntegration.InstallMenu()` 逻辑到 COM 注册
-  - 更新 `--install-shell` / `--uninstall-shell` 为同时处理 COM 注册 + 文件关联
+  - 在 `MantisZip.ShellExt` 项目中确保：
+    - 项目文件设置 `<EnableComHosting>true</EnableComHosting>`
+    - 项目文件设置 `<EnableRegFreeCom>false</EnableRegFreeCom>`（不需要 regfree）
+    - COM 类使用 `[ComVisible(true)]`、`[Guid("...")]`、`[ProgId("MantisZip.ContextMenu")]`
+    - 用 SNK 签名校验强命名
+  - 在 `MantisZip.UI`（现有项目）中实现注册/反注册方法：
+    - **推荐: 在 `ShellIntegration.cs` 中新增 `InstallCom()` / `UninstallCom()` 静态方法**
+    - 注册 `InstallCom()`：
+      - 调用 `regsvr32 MantisZip.ShellExt.comhost.dll`（通过 `Process.Start` 启动）
+      - 或手动写入注册表：
+        - `HKCU\Software\Classes\CLSID\{GUID}\InprocServer32` → 指向 `MantisZip.ShellExt.comhost.dll`
+        - `HKCU\Software\Classes\CLSID\{GUID}\InprocServer32\ThreadingModel` → `"Apartment"`
+        - `*\shellex\ContextMenuHandlers\MantisZip` → `{GUID}`
+        - `Directory\shellex\ContextMenuHandlers\MantisZip` → `{GUID}`
+        - `Directory\Background\shellex\ContextMenuHandlers\MantisZip` → `{GUID}`
+      - 32/64 位：comhost 自带位数判断，只需正确分发对应架构的 DLL
+      - 调用 `SHChangeNotify` 刷新 Shell
+    - 反注册 `UninstallCom()`：
+      - `regsvr32 /u MantisZip.ShellExt.comhost.dll`
+      - 或手动删除上述注册表键
+      - 调用 `SHChangeNotify` 刷新 Shell
+    - 保留 `ShellIntegration.Install()` 方法但修改逻辑：
+      - 如果 COM 模式启用（新的 `UseComContextMenu` 开关？或自动判断），调用 `InstallCom()` 而非静态注册
+      - 否则回退到现有静态注册方式（向后兼容）
+  - 保留现有文件关联功能（不动）
+  - **`--install-shell` 负责 COM 注册**，`--install-assoc` 负责文件关联，两者保持独立（当前代码已分离）
+  - 在卸载 COM 菜单时自动清理旧的静态注册表条目（调用 `ShellIntegration.Uninstall()` 中已有的清理逻辑）
 
   **Must NOT do**:
-  - 不要删除文件关联功能（OpenWithProgids 保留不动）
+  - 不要删除文件关联功能（`OpenWithProgids` / `--install-assoc` 保留不动）
+  - 不要在 COM 组件中引用任何 WPF / MantisZip.UI 程序集
 
   **References**:
-  - UI/ShellIntegration.cs:InstallMenu — 现有注册逻辑
-  - UI/ShellIntegration.cs:UninstallMenu — 现有反注册逻辑
-  - UI/App.xaml.cs — `--install-shell` / `--uninstall-shell` 处理
+  - UI/ShellIntegration.cs — 现有注册逻辑（`Install()` / `Uninstall()`）
+  - UI/App.xaml.cs — `--install-shell` / `--uninstall-shell` CLI 参数解析（switch-case）
+  - UI/App.Cli.cs — 不涉及（注册逻辑在 ShellIntegration 中）
+  - [MSDN: .NET COM Hosting](https://learn.microsoft.com/en-us/dotnet/core/native-interop/expose-components-to-com)
+  - 示例: `dotnet new classlib` + `<EnableComHosting>true</EnableComHosting>`
 
   **Parallelization**:
   - NO
@@ -410,37 +442,42 @@ Task 1 → Task 3 → Task 4 → Task 5 → Task 7 → Task 8 → Task 9 → F1-
   - [ ] Register 后右键菜单正常出现
   - [ ] Unregister 后右键菜单消失
   - [ ] 32 位和 64 位都工作
-  - [ ] --install-shell 正常完成
-  - [ ] 旧的静态注册表条目被清理
+  - [ ] `--install-shell` 正常完成（不涉及文件关联）
+  - [ ] `--uninstall-shell` 清理旧的静态注册表条目
+  - [ ] COM host DLL 被正确注册/反注册
 
   **Commit**: YES
-  - Message: `feat(shell): add COM context menu registration`
+  - Message: `feat(shell): add COM context menu registration for .NET 9`
 
 ---
 
 - [ ] 8. AppSettings 菜单开关集成
 
   **What to do**:
-  - 在 COM 菜单处理程序（`ContextMenuHandler.cs`）中读取 `AppSettings`：
+  - 在 COM 菜单处理程序（`ContextMenuHandler.cs`，位于 `MantisZip.ShellExt` 项目）中读取设置：
     - 在 `QueryContextMenu` 中判断各 toggle
-    - 注意：COM 组件在 Explorer 进程内运行，不能直接访问 WPF 的 `AppSettings`
-    - **解决方案**：将设置写入 `HKCU\Software\MantisZip\ContextMenu`，COM 组件从注册表读取
-    - 或使用 IPC（named pipe）与 MantisZip 进程通信（更复杂）
-    - 建议方案：**注册表同步**——MantisZip 保存设置时，同时写入 `HKCU\Software\MantisZip\ContextMenu`
+    - ⚠️ **COM 组件在 Explorer 进程内运行，不能直接访问 WPF 的 `AppSettings`（JSON 文件）**
+    - **推荐方案：注册表同步**——MantisZip 保存设置时，同时写入 `HKCU\Software\MantisZip\ContextMenu`，COM 组件从注册表读取
+    - 备选：IPC（named pipe）与 MantisZip 进程通信（更复杂，不推荐）
   - 设置项（从注册表读取）：
     - `EnableCascadingMenu` (DWORD)
     - `ShowMenuIcons` (DWORD)
     - `EnableOpenMenu` ~ `EnableCompressMenu` 等 8 个 toggle (DWORD)
-  - 修改 `AppSettings.cs`：设置变更时同步到 ContextMenu 注册表键
+    - `EnableQuickCompress` (DWORD) — 注意：当前 QuickCompress 不在右键菜单内，但设置已存在
+  - 修改 `AppSettings.cs` 的 `Save()` 方法：保存 JSON 后同步写入 `HKCU\Software\MantisZip\ContextMenu` 注册表键
+    - 写入时机：每次 `Save()` 调用时，一次性写入所有相关 toggle
+    - 读取时机：COM 组件在每次 `QueryContextMenu` 时从注册表读取
   - 如果设置变更后需要即时生效，调用 `SHChangeNotify` 刷新 Explorer
 
   **Must NOT do**:
   - 不要在 COM 组件中引用任何 WPF 或 MantisZip.UI 类型（Explorer 进程隔离）
   - COM 组件应该是**轻量**的，只读取注册表 + 调用 CLI
+  - 不要用 IPC 方案（增加复杂度和 Explorer 崩溃风险）
 
   **References**:
-  - UI/AppSettings.cs — 源设置
+  - UI/AppSettings.cs — 源设置（`Save()` 方法需扩展）
   - UI/ShellIntegration.cs — 当前如何读取设置
+  - src/MantisZip.ShellExt/ContextMenuHandler.cs — COM 组件消费端
 
   **Parallelization**:
   - NO
@@ -466,7 +503,7 @@ Task 1 → Task 3 → Task 4 → Task 5 → Task 7 → Task 8 → Task 9 → F1-
   - 图标来源：
     - 内置资源：MantisZip 主程序图标
     - 分隔符不需要图标
-  - 遵守 `AppSettings.ShowMenuIcons` 设置
+  - 遵守注册表中的 `ShowMenuIcons` 设置（见 Task 8 注册表同步）
   - 图标缓存：避免每次右键都重新加载（`ConcurrentDictionary` 或静态字段）
 
   **Must NOT do**:
