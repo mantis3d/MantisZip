@@ -254,6 +254,7 @@ public static class L
     public const string Main_Status_TestResultBad                  = "Main_Status_TestResultBad";
     public const string Main_Status_TestResultOK                   = "Main_Status_TestResultOK";
     public const string Main_Status_TestTitle                      = "Main_Status_TestTitle";
+    public const string Main_Status_TestCancelled                   = "Main_Status_TestCancelled";
     public const string Main_Status_Testing                        = "Main_Status_Testing";
     public const string Main_Status_WrongPwd                       = "Main_Status_WrongPwd";
     public const string Main_Toolbar_AddFiles                      = "Main_Toolbar_AddFiles";

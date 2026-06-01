@@ -483,15 +483,72 @@ public class ZipEngine : IArchiveEngine
             {
                 using var archive = OpenArchiveWithEncodingFallback(archivePath, password);
 
-                foreach (var entry in archive.Entries)
+                // 预先收集非目录条目，确保总条目数已知
+                var entries = archive.Entries.Where(e => !e.IsDirectory).ToList();
+                int totalEntries = entries.Count;
+                int processed = 0;
+                var lastReportTime = DateTime.Now;
+                var reportInterval = TimeSpan.FromMilliseconds(500);
+
+                foreach (var entry in entries)
                 {
                     cancellationToken.ThrowIfCancellationRequested();
-                    if (entry.IsDirectory) continue;
+
+                    // 先报一次 0% 让进度条立即开始动
+                    progress?.Report(new ArchiveProgress
+                    {
+                        CurrentFile = entry.Key ?? $"entry_{processed}",
+                        PercentComplete = totalEntries > 0 ? (double)processed / totalEntries * 100 : 100,
+                        FilePercentComplete = 0,
+                    });
+
+                    var entryKey = entry.Key ?? $"entry_{processed}";
+                    var entrySize = entry.Size;
+
+                    // 读全量数据触发 SharpCompress 的 CRC32 校验（Dispose 时比对）
                     using var stream = entry.OpenEntryStream();
-                    stream.ReadByte();
+                    var buffer = new byte[81920];
+                    long totalRead = 0;
+
+                    while (true)
+                    {
+                        cancellationToken.ThrowIfCancellationRequested();
+                        int bytesRead = stream.Read(buffer, 0, buffer.Length);
+                        if (bytesRead <= 0) break;
+                        totalRead += bytesRead;
+
+                        // 大文件每 500ms 报一次进度
+                        var now = DateTime.Now;
+                        if (now - lastReportTime >= reportInterval || totalRead >= entrySize)
+                        {
+                            var filePct = entrySize > 0
+                                ? Math.Min((double)totalRead / entrySize * 100, 100)
+                                : 100;
+                            var overallPct = totalEntries > 0
+                                ? ((double)processed + (double)totalRead / Math.Max(entrySize, 1)) / totalEntries * 100
+                                : 100;
+                            progress?.Report(new ArchiveProgress
+                            {
+                                CurrentFile = entryKey,
+                                PercentComplete = Math.Min(overallPct, 100),
+                                FilePercentComplete = filePct,
+                            });
+                            lastReportTime = now;
+                        }
+                    }
+
+                    processed++;
                 }
 
-                CoreLog.Info("TestArchiveAsync: passed");
+                // 报告 100%
+                progress?.Report(new ArchiveProgress
+                {
+                    CurrentFile = string.Empty,
+                    PercentComplete = 100,
+                    FilePercentComplete = 100,
+                });
+
+                CoreLog.Info($"TestArchiveAsync: passed, {totalEntries} entries verified");
                 return true;
             }
             catch (Exception ex)

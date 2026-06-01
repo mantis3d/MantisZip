@@ -205,6 +205,7 @@
   "Main_Status_TestResultBad": "Archive is corrupt",
   "Main_Status_TestResultOK": "Archive is intact",
   "Main_Status_TestTitle": "Test Result",
+  "Main_Status_TestCancelled": "Test cancelled",
   "Main_Status_Testing": "Testing archive...",
   "Main_Status_WrongPwd": "Wrong password",
   "Main_Toolbar_AddFiles": "Add",

@@ -213,12 +213,24 @@ internal static class ShellIntegration
             SetRegistryValue($@"Software\Classes\{ComProgId}", null, "MantisZip Context Menu Handler");
             SetRegistryValue($@"Software\Classes\{ComProgId}\CLSID", null, ComClsid);
 
-            // 2. 上下文菜单处理程序注册
-            foreach (var target in new[] { "*", "Directory", @"Directory\Background" })
+            // 2. 上下文菜单处理程序注册 — per archive extension
+            //    Windows Explorer 对 * 有 16 文件限制，per-extension 注册无此限制
+            foreach (var ext in GetExtensionsForCom())
+            {
+                var handlerKey = $@"Software\Classes\{ext}\shellex\ContextMenuHandlers\{ComHandlerKey}";
+                SetRegistryValue(handlerKey, null, ComClsid);
+            }
+
+            // 3. 目录上下文菜单处理程序注册
+            foreach (var target in new[] { "Directory", @"Directory\Background" })
             {
                 var handlerKey = $@"Software\Classes\{target}\shellex\ContextMenuHandlers\{ComHandlerKey}";
                 SetRegistryValue(handlerKey, null, ComClsid);
             }
+
+            // 4. 为 *（所有文件）安装静态级联注册（仅压缩操作）
+            //    使用 %1 + IPC 处理任意数量文件，无 Explorer 16 文件限制
+            InstallCascadeForFiles();
 
             App.LogDebug("InstallCom: COM registration successful");
             WriteMenuTextToRegistry();
@@ -238,13 +250,22 @@ internal static class ShellIntegration
     {
         try
         {
-            // 1. 删除上下文菜单处理程序注册
-            foreach (var target in new[] { "*", "Directory", @"Directory\Background" })
+            // 1. 删除 per-archive-extension 上下文菜单处理程序注册
+            foreach (var ext in GetExtensionsForCom())
+            {
+                DeleteRegistryKey($@"Software\Classes\{ext}\shellex\ContextMenuHandlers\{ComHandlerKey}");
+            }
+
+            // 2. 删除目录上下文菜单处理程序注册
+            foreach (var target in new[] { "Directory", @"Directory\Background" })
             {
                 DeleteRegistryKey($@"Software\Classes\{target}\shellex\ContextMenuHandlers\{ComHandlerKey}");
             }
 
-            // 2. 删除 CLSID 注册及 ProgId 反向查找
+            // 3. 也清理旧的 * 注册（升/降级时兼容）
+            DeleteRegistryKey($@"Software\Classes\*\shellex\ContextMenuHandlers\{ComHandlerKey}");
+
+            // 4. 删除 CLSID 注册及 ProgId 反向查找
             DeleteRegistryKey($@"Software\Classes\CLSID\{ComClsid}");
             DeleteRegistryKey($@"Software\Classes\{ComProgId}");
 
@@ -254,6 +275,26 @@ internal static class ShellIntegration
         {
             App.LogDebug("UninstallCom: failed: {0}", ex.Message);
         }
+    }
+
+    /// <summary>
+    /// 返回适合注册 COM 上下文菜单处理程序的扩展名列表（不含 .tar.gz，由 .gz 覆盖）。
+    /// </summary>
+    private static IEnumerable<string> GetExtensionsForCom()
+    {
+        return ArchiveExtensions.Where(e => e != ".tar.gz");
+    }
+
+    /// <summary>
+    /// 为 *（所有文件）安装静态级联菜单，仅包含压缩操作。
+    /// 使用 %1 + IPC 处理任意数量文件，无 Explorer 16 文件限制。
+    /// 解压操作由 per-extension COM 注册的处理程序提供。
+    /// </summary>
+    private static void InstallCascadeForFiles()
+    {
+        var s = AppSettings.Instance;
+        var exePath = GetExePath();
+        InstallCascadeFor("*", "File", s, exePath, argVar: "%1", includeExtract: false);
     }
 
     #endregion
@@ -368,8 +409,12 @@ internal static class ShellIntegration
             bool hasCompress = s.EnableCompressSeparate || s.EnableCompressCombined || s.EnableCompressMenu;
             if (hasCompress)
             {
-                order++;
-                InstallSeparator(shellPath, order);
+                // 仅当存在解压组时添加分隔线，避免 * 模式下出现多余分隔线
+                if (includeExtract)
+                {
+                    order++;
+                    InstallSeparator(shellPath, order);
+                }
             }
 
             // 5. 压缩到独立的（文件名）
