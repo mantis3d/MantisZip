@@ -27,7 +27,14 @@
   <ItemGroup>
     <EmbeddedResource Include="..\MantisZip.UI\Resources\MenuIcons\Open.ico" Link="Resources\Open.ico" />
     <EmbeddedResource Include="..\MantisZip.UI\Resources\MenuIcons\Extract.ico" Link="Resources\Extract.ico" />
+    <EmbeddedResource Include="..\MantisZip.UI\Resources\MenuIcons\ExtractHere.ico" Link="Resources\ExtractHere.ico" />
+    <EmbeddedResource Include="..\MantisZip.UI\Resources\MenuIcons\ExtractSmart.ico" Link="Resources\ExtractSmart.ico" />
+    <EmbeddedResource Include="..\MantisZip.UI\Resources\MenuIcons\ExtractToNamed.ico" Link="Resources\ExtractToNamed.ico" />
+    <EmbeddedResource Include="..\MantisZip.UI\Resources\MenuIcons\ExtractTo.ico" Link="Resources\ExtractTo.ico" />
     <EmbeddedResource Include="..\MantisZip.UI\Resources\MenuIcons\Compress.ico" Link="Resources\Compress.ico" />
+    <EmbeddedResource Include="..\MantisZip.UI\Resources\MenuIcons\CompressSeparate.ico" Link="Resources\CompressSeparate.ico" />
+    <EmbeddedResource Include="..\MantisZip.UI\Resources\MenuIcons\CompressCombined.ico" Link="Resources\CompressCombined.ico" />
+    <EmbeddedResource Include="..\MantisZip.UI\Resources\MenuIcons\CompressDialog.ico" Link="Resources\CompressDialog.ico" />
   </ItemGroup>
 
 </Project>

@@ -237,7 +237,7 @@
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="60"/>
                                             <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="40"/>
                                         </Grid.ColumnDefinitions>
                                         <Grid.RowDefinitions>
                                             <RowDefinition Height="Auto"/>
@@ -270,13 +270,13 @@
                                     CornerRadius="4">
                                 <StackPanel>
                                     <CheckBox x:Name="PwdSaveCheck" Content="{l:L Compress_Pwd_SaveToLibrary}" IsChecked="True" Margin="0,0,0,6"/>
-                                     <Grid Margin="20,0,0,0">
+                                     <Grid Margin="10,0,0,0">
                                         <Grid.RowDefinitions>
                                             <RowDefinition Height="Auto"/>
                                             <RowDefinition Height="Auto"/>
                                         </Grid.RowDefinitions>
                                         <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="60"/>
+                                            <ColumnDefinition Width="70"/>
                                             <ColumnDefinition Width="*"/>
                                         </Grid.ColumnDefinitions>
                                         <TextBlock Grid.Row="0" Grid.Column="0" Text="{l:L Compress_Pwd_Description}" VerticalAlignment="Center"/>

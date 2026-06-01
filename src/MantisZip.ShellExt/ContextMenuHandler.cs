@@ -336,7 +336,7 @@ public class ContextMenuHandler : IShellExtInit, IContextMenu
                 { ShellExtLog.Info($"QueryContextMenu: extract submenu: TextExtractTo"); InsertMenuItem(hSubMenu, subId++, idCmd++, _textExtractTo, CmdIdExtractTo); _cmdIdOrder.Add(CmdIdExtractTo); }
 
                 ShellExtLog.Info("QueryContextMenu: inserting extract submenu into main menu");
-                InsertMenuItem(hMenu, indexMenu++, idCmd, "打开/解压", CmdIdExtractHere, hSubMenu: hSubMenu);
+                InsertMenuItem(hMenu, indexMenu++, idCmd, "打开/解压", -1, hSubMenu: hSubMenu, hbmpOverride: GetParentIcon(isExtract: true));
             }
             else
             {
@@ -374,7 +374,7 @@ public class ContextMenuHandler : IShellExtInit, IContextMenu
                 { ShellExtLog.Info($"QueryContextMenu: compress submenu: TextCompress"); InsertMenuItem(hSubMenu, subId++, idCmd++, _textCompress, CmdIdCompress); _cmdIdOrder.Add(CmdIdCompress); }
 
                 ShellExtLog.Info("QueryContextMenu: inserting compress submenu into main menu");
-                InsertMenuItem(hMenu, indexMenu++, idCmd, "压缩", CmdIdCompressSeparate, hSubMenu: hSubMenu);
+                InsertMenuItem(hMenu, indexMenu++, idCmd, "压缩", -1, hSubMenu: hSubMenu, hbmpOverride: GetParentIcon(isExtract: false));
             }
             else
             {
@@ -610,15 +610,22 @@ public class ContextMenuHandler : IShellExtInit, IContextMenu
 
     #region Private helpers
 
-    // Per-command icon cache: one HBITMAP per icon type, loaded on first use.
+    // Per-command icon cache: one HBITMAP per icon, loaded on first use.
     private static IntPtr _cachedIconOpen = IntPtr.Zero;
-    private static IntPtr _cachedIconExtract = IntPtr.Zero;
-    private static IntPtr _cachedIconCompress = IntPtr.Zero;
+    private static IntPtr _cachedIconExtract = IntPtr.Zero;            // parent submenu: 打开/解压
+    private static IntPtr _cachedIconCompress = IntPtr.Zero;           // parent submenu: 压缩
+    private static IntPtr _cachedIconExtractHere = IntPtr.Zero;
+    private static IntPtr _cachedIconSmartExtract = IntPtr.Zero;
+    private static IntPtr _cachedIconExtractToNamed = IntPtr.Zero;
+    private static IntPtr _cachedIconExtractTo = IntPtr.Zero;
+    private static IntPtr _cachedIconCompressSeparate = IntPtr.Zero;
+    private static IntPtr _cachedIconCompressCombined = IntPtr.Zero;
+    private static IntPtr _cachedIconCompressDialog = IntPtr.Zero;
 
-    private void InsertMenuItem(IntPtr hMenu, uint position, uint id, string text, int commandId, bool showIcon = true, IntPtr hSubMenu = default)
+    private void InsertMenuItem(IntPtr hMenu, uint position, uint id, string text, int commandId, bool showIcon = true, IntPtr hSubMenu = default, IntPtr hbmpOverride = default)
     {
         string subInfo = hSubMenu != default ? $" (submenu)" : "";
-        ShellExtLog.Info($"InsertMenuItem: text=\"{text}\", position={position}, id={id}, commandId={commandId}, showIcons={_showIcons}, showIcon={showIcon}{subInfo}");
+        ShellExtLog.Info($"InsertMenuItem: text=\"{text}\", position={position}, id={id}, commandId={commandId}, showIcons={_showIcons}, showIcon={showIcon}, hbmpOverride=0x{hbmpOverride:x16}{subInfo}");
         var mii = new MenuItemInfo
         {
             cbSize = Marshal.SizeOf<MenuItemInfo>(),
@@ -638,9 +645,9 @@ public class ContextMenuHandler : IShellExtInit, IContextMenu
         }
 
         // Add icon based on command type if enabled
-        if (showIcon && _showIcons && commandId >= 0)
+        if (showIcon && _showIcons)
         {
-            IntPtr hbmp = GetIconForCommand(commandId);
+            IntPtr hbmp = hbmpOverride != default ? hbmpOverride : (commandId >= 0 ? GetIconForCommand(commandId) : IntPtr.Zero);
             if (hbmp != IntPtr.Zero)
             {
                 mii.fMask |= NativeMethods.MIIM_BITMAP;
@@ -663,38 +670,42 @@ public class ContextMenuHandler : IShellExtInit, IContextMenu
 
     /// <summary>
     /// Return the cached HBITMAP for a given command ID, loading from embedded resource if needed.
+    /// Each command has its own icon (per-command, not shared).
     /// </summary>
     private IntPtr GetIconForCommand(int commandId)
     {
-        string resourceName;
-        ref IntPtr cache = ref _cachedIconOpen;
+        return commandId switch
+        {
+            CmdIdOpen => GetOrLoadIcon("Open.ico", ref _cachedIconOpen),
+            CmdIdExtractHere => GetOrLoadIcon("ExtractHere.ico", ref _cachedIconExtractHere),
+            CmdIdSmartExtract => GetOrLoadIcon("ExtractSmart.ico", ref _cachedIconSmartExtract),
+            CmdIdExtractToNamed => GetOrLoadIcon("ExtractToNamed.ico", ref _cachedIconExtractToNamed),
+            CmdIdExtractTo => GetOrLoadIcon("ExtractTo.ico", ref _cachedIconExtractTo),
+            CmdIdCompressSeparate => GetOrLoadIcon("CompressSeparate.ico", ref _cachedIconCompressSeparate),
+            CmdIdCompressCombined => GetOrLoadIcon("CompressCombined.ico", ref _cachedIconCompressCombined),
+            CmdIdCompress => GetOrLoadIcon("CompressDialog.ico", ref _cachedIconCompressDialog),
+            _ => IntPtr.Zero
+        };
+    }
 
-        if (commandId == CmdIdOpen)
-        {
-            resourceName = "Open.ico";
-            cache = ref _cachedIconOpen;
-        }
-        else if (commandId >= CmdIdExtractHere && commandId <= CmdIdExtractTo)
-        {
-            resourceName = "Extract.ico";
-            cache = ref _cachedIconExtract;
-        }
-        else if (commandId >= CmdIdCompressSeparate && commandId <= CmdIdCompress)
-        {
-            resourceName = "Compress.ico";
-            cache = ref _cachedIconCompress;
-        }
-        else
-            return IntPtr.Zero;
+    /// <summary>Return the cached HBITMAP for a parent submenu icon (Extract.ico / Compress.ico).</summary>
+    private IntPtr GetParentIcon(bool isExtract)
+    {
+        return isExtract
+            ? GetOrLoadIcon("Extract.ico", ref _cachedIconExtract)
+            : GetOrLoadIcon("Compress.ico", ref _cachedIconCompress);
+    }
 
+    /// <summary>Load icon from embedded resource or return cached HBITMAP.</summary>
+    private static IntPtr GetOrLoadIcon(string resourceName, ref IntPtr cache)
+    {
         if (cache != IntPtr.Zero)
             return cache;
-
         cache = LoadIconFromResource(resourceName);
         if (cache != IntPtr.Zero)
-            ShellExtLog.Info($"GetIconForCommand: loaded \"{resourceName}\" as hbmp=0x{cache:x16}");
+            ShellExtLog.Info($"LoadIcon: loaded \"{resourceName}\" as hbmp=0x{cache:x16}");
         else
-            ShellExtLog.Warn($"GetIconForCommand: failed to load \"{resourceName}\"");
+            ShellExtLog.Warn($"LoadIcon: failed to load \"{resourceName}\"");
         return cache;
     }
 
@@ -812,13 +823,20 @@ public class ContextMenuHandler : IShellExtInit, IContextMenu
         return hbmp;
     }
 
-    /// <summary>Clean up all cached icon bitmaps. Called at the end of QueryContextMenu.</summary>
+    /// <summary>Clean up all cached icon bitmaps. Called at the start of each QueryContextMenu.</summary>
     private void CleanupIconCache()
     {
         foreach (var kv in new[] {
-            new { Name = "Open",     Hbmp = _cachedIconOpen },
-            new { Name = "Extract",  Hbmp = _cachedIconExtract },
-            new { Name = "Compress", Hbmp = _cachedIconCompress }
+            new { Name = "Open",             Hbmp = _cachedIconOpen },
+            new { Name = "Extract (parent)", Hbmp = _cachedIconExtract },
+            new { Name = "Compress (parent)",Hbmp = _cachedIconCompress },
+            new { Name = "ExtractHere",      Hbmp = _cachedIconExtractHere },
+            new { Name = "SmartExtract",     Hbmp = _cachedIconSmartExtract },
+            new { Name = "ExtractToNamed",   Hbmp = _cachedIconExtractToNamed },
+            new { Name = "ExtractTo",        Hbmp = _cachedIconExtractTo },
+            new { Name = "CompressSeparate", Hbmp = _cachedIconCompressSeparate },
+            new { Name = "CompressCombined", Hbmp = _cachedIconCompressCombined },
+            new { Name = "CompressDialog",   Hbmp = _cachedIconCompressDialog },
         })
         {
             if (kv.Hbmp != IntPtr.Zero)
@@ -831,6 +849,13 @@ public class ContextMenuHandler : IShellExtInit, IContextMenu
         _cachedIconOpen = IntPtr.Zero;
         _cachedIconExtract = IntPtr.Zero;
         _cachedIconCompress = IntPtr.Zero;
+        _cachedIconExtractHere = IntPtr.Zero;
+        _cachedIconSmartExtract = IntPtr.Zero;
+        _cachedIconExtractToNamed = IntPtr.Zero;
+        _cachedIconExtractTo = IntPtr.Zero;
+        _cachedIconCompressSeparate = IntPtr.Zero;
+        _cachedIconCompressCombined = IntPtr.Zero;
+        _cachedIconCompressDialog = IntPtr.Zero;
     }
 
     /// <summary>Read settings from HKCU\Software\MantisZip\ContextMenu (set by AppSettings sync).</summary>
