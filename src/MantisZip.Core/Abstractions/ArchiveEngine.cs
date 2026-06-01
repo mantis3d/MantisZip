@@ -274,6 +274,12 @@ public class ArchiveProgress
 /// </summary>
 public static class ArchiveEngineFactory
 {
+    /// <summary>
+    /// 支持的档案文件扩展名（单一数据源）。
+    /// </summary>
+    public static readonly string[] SupportedExtensions =
+        [".zip", ".7z", ".rar", ".tar", ".tgz", ".tar.gz", ".gz", ".iso"];
+
     private static readonly List<IArchiveEngine> _engines = new();
 
     static ArchiveEngineFactory()
@@ -291,6 +297,25 @@ public static class ArchiveEngineFactory
         return engine;
     }
 
+    /// <summary>
+    /// 根据文件扩展名推断档案格式。
+    /// </summary>
+    public static ArchiveFormat GetFormatByExtension(string filePath)
+    {
+        if (filePath.EndsWith(".tar.gz", StringComparison.OrdinalIgnoreCase))
+            return ArchiveFormat.Tar;
+
+        return Path.GetExtension(filePath).ToLowerInvariant() switch
+        {
+            ".zip" => ArchiveFormat.Zip,
+            ".7z" => ArchiveFormat.SevenZip,
+            ".tar" or ".tgz" or ".gz" => ArchiveFormat.Tar,
+            ".rar" => ArchiveFormat.Rar,
+            ".iso" => ArchiveFormat.Iso,
+            _ => ArchiveFormat.Zip
+        };
+    }
+
     public static IArchiveEngine? GetEngineByExtension(string filePath)
     {
         var ext = Path.GetExtension(filePath).ToLowerInvariant();
@@ -298,12 +323,20 @@ public static class ArchiveEngineFactory
         {
             ".zip" => GetEngine(ArchiveFormat.Zip),
             ".7z" => GetEngine(ArchiveFormat.SevenZip),
-            ".tar" or ".tgz" or ".tar.gz" or ".gz" => GetEngine(ArchiveFormat.Tar),
+            ".tar" or ".tgz" or ".gz" => GetEngine(ArchiveFormat.Tar),
             ".rar" => GetEngine(ArchiveFormat.Rar),
             ".iso" => GetEngine(ArchiveFormat.Iso),
             _ => null
         };
         CoreLog.Info($"ArchiveEngineFactory.GetEngineByExtension: path={filePath}, ext={ext} -> {engine?.GetType().Name ?? "null"}");
         return engine;
+    }
+
+    /// <summary>
+    /// 根据文件扩展名获取引擎，未匹配时返回 <paramref name="fallback"/>。
+    /// </summary>
+    public static IArchiveEngine GetEngineByExtension(string filePath, IArchiveEngine fallback)
+    {
+        return GetEngineByExtension(filePath) ?? fallback;
     }
 }

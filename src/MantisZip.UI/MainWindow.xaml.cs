@@ -93,7 +93,11 @@ public partial class MainWindow : Window
         ApplyPreviewPosition(AppSettings.Instance.PreviewPosition);
         ApplyInfoPanelOrientation(AppSettings.Instance.InfoPanelOrientation);
         _previewPanelEnabled = AppSettings.Instance.ShowPreviewPanel;
-        PreviewToggleBtn.IsChecked = _previewPanelEnabled;
+        if (PreviewToggleMenu.Icon is Emoji.Wpf.TextBlock previewIcon)
+        {
+            PreviewToggleMenu.IsChecked = _previewPanelEnabled;
+            previewIcon.Opacity = _previewPanelEnabled ? 1.0 : 0.2;
+        }
         if (!_previewPanelEnabled)
             PreviewPanel.Visibility = Visibility.Collapsed;
         Activated += MainWindow_Activated;
@@ -442,20 +446,8 @@ public partial class MainWindow : Window
         return ext is ".zip" or ".7z" or ".rar" or ".tar" or ".tgz" or ".gz" or ".iso";
     }
 
-    private static ArchiveFormat GetFormatByExtension(string path)
-    {
-        if (path.EndsWith(".tar.gz", StringComparison.OrdinalIgnoreCase)) return ArchiveFormat.Tar;
-
-        return Path.GetExtension(path).ToLowerInvariant() switch
-        {
-            ".zip" => ArchiveFormat.Zip,
-            ".7z" => ArchiveFormat.SevenZip,
-            ".tar" or ".tgz" or ".gz" => ArchiveFormat.Tar,
-            ".rar" => ArchiveFormat.Rar,
-            ".iso" => ArchiveFormat.Iso,
-            _ => ArchiveFormat.Zip
-        };
-    }
+    private static ArchiveFormat GetFormatByExtension(string path) =>
+        ArchiveEngineFactory.GetFormatByExtension(path);
 
     /// <summary>
     /// 根据压缩包路径和格式返回压缩后大小的显示模式。
@@ -765,7 +757,7 @@ public partial class MainWindow : Window
         catch (Exception ex)
         {
             progressWindow.Close();
-            if (IsPasswordErrorLocal(ex))
+            if (App.IsPasswordError(ex))
             {
                 App.LogDebug("ExtractAsync: password error: {0}", ex.Message);
             }
@@ -776,18 +768,6 @@ public partial class MainWindow : Window
             }
             SetStatus(L.TF(L.Main_Status_ExtractFailed, ""));
         }
-    }
-
-    /// <summary>
-    /// 判断异常L.T(L.MsgBox_Yes)L.T(L.MsgBox_No)表示需要L.T(L.PwdMgr_Col_Password)。与 <see cref="App.IsPasswordError"/> 保持一致。
-    /// </summary>
-    private static bool IsPasswordErrorLocal(Exception ex)
-    {
-        var msg = ex.Message.ToLowerInvariant();
-        return msg.Contains("password") || msg.Contains(L.T(L.PwdMgr_Col_Password).ToLowerInvariant()) ||
-               msg.Contains("encrypted") || msg.Contains("decrypt") ||
-               msg.Contains("encryption") ||
-               (ex is ZipException && (msg.Contains("password") || msg.Contains("decrypt")));
     }
 
     private async Task CompressAsync(string[] sourcePaths, string outputPath)
@@ -801,7 +781,7 @@ public partial class MainWindow : Window
             options.CompressionLevel = AppSettings.Instance.DefaultLevel;
             options.Format = GetFormatByExtension(outputPath);
 
-            var engine = ArchiveEngineFactory.GetEngineByExtension(outputPath) ?? new ZipEngine();
+            var engine = ArchiveEngineFactory.GetEngineByExtension(outputPath, new ZipEngine());
             var progress = ProgressWindow.CreateBackgroundProgress(Dispatcher, p =>
             {
                 ProgressBar.Value = p.PercentComplete;

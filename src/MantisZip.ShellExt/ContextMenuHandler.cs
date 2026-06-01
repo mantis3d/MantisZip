@@ -231,7 +231,8 @@ public class ContextMenuHandler : IShellExtInit, IContextMenu
                 }
                 else
                 {
-                    ShellExtLog.Info($"IShellExtInit.Initialize: File mode, selected {_selectedFiles.Count} files, isArchive={_selectedFiles.Count > 0 && ArchiveExtensions.Contains(Path.GetExtension(_selectedFiles[0]))}");
+                    var ext0 = _selectedFiles.Count > 0 ? Path.GetExtension(_selectedFiles[0]) : null;
+                    ShellExtLog.Info($"IShellExtInit.Initialize: File mode, selected {_selectedFiles.Count} files, isArchive={_selectedFiles.Count > 0 && ext0 != null && ArchiveExtensions.Contains(ext0)}");
                 }
 
                 ShellExtLog.Info("IShellExtInit.Initialize returning S_OK");
@@ -271,7 +272,7 @@ public class ContextMenuHandler : IShellExtInit, IContextMenu
             _cmdIdOrder.Clear();
             uint idCmd = idCmdFirst;
             string? firstExt = _selectedFiles.Count > 0 ? Path.GetExtension(_selectedFiles[0]) : null;
-            bool isArchive = _selectedFiles.Count > 0 && ArchiveExtensions.Contains(firstExt);
+            bool isArchive = firstExt != null && ArchiveExtensions.Contains(firstExt);
             ShellExtLog.Info($"QueryContextMenu: firstExt=\"{firstExt}\", isArchive={isArchive}");
 
             // Build dynamic file name snippets

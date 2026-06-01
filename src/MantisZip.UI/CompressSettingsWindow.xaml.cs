@@ -372,7 +372,7 @@ public partial class CompressSettingsWindow : Window
                     case CompressConflictAction.Rename:
                         outputPath = Path.Combine(Path.GetDirectoryName(outputPath) ?? ".",
                             dlg.CustomName ?? Path.GetFileName(App.GetUniquePath(outputPath)));
-                        engine = ArchiveEngineFactory.GetEngineByExtension(outputPath) ?? new ZipEngine();
+                        engine = ArchiveEngineFactory.GetEngineByExtension(outputPath, new ZipEngine());
                         break;
                     case CompressConflictAction.Add:
                         {
@@ -432,7 +432,7 @@ public partial class CompressSettingsWindow : Window
             var progress = ProgressWindow.CreateBackgroundProgress(progressWindow);
 
             // re-acquire engine if outputPath changed (rename)
-            engine = ArchiveEngineFactory.GetEngineByExtension(outputPath) ?? new ZipEngine();
+            engine = ArchiveEngineFactory.GetEngineByExtension(outputPath, new ZipEngine());
 
             App.Log("引擎: {0}", engine.GetType().Name);
 
@@ -558,7 +558,7 @@ public partial class CompressSettingsWindow : Window
                             case CompressConflictAction.Rename:
                                 outputPath = Path.Combine(parentDir,
                                     conflictResult.CustomName ?? Path.GetFileName(App.GetUniquePath(outputPath)));
-                                engine = ArchiveEngineFactory.GetEngineByExtension(outputPath) ?? new ZipEngine();
+                                engine = ArchiveEngineFactory.GetEngineByExtension(outputPath, new ZipEngine());
                                 break;
                             case CompressConflictAction.Add:
                                 {
@@ -654,7 +654,7 @@ public partial class CompressSettingsWindow : Window
                     case CompressConflictAction.Rename:
                         outputPath = Path.Combine(Path.GetDirectoryName(outputPath) ?? ".",
                             dlg.CustomName ?? Path.GetFileName(App.GetUniquePath(outputPath)));
-                        engine = ArchiveEngineFactory.GetEngineByExtension(outputPath) ?? new ZipEngine();
+                        engine = ArchiveEngineFactory.GetEngineByExtension(outputPath, new ZipEngine());
                         break;
                     case CompressConflictAction.Add:
                         {
@@ -714,7 +714,7 @@ public partial class CompressSettingsWindow : Window
             var progress = ProgressWindow.CreateBackgroundProgress(progressWindow);
 
             // re-acquire engine if outputPath changed (rename)
-            engine = ArchiveEngineFactory.GetEngineByExtension(outputPath) ?? new ZipEngine();
+            engine = ArchiveEngineFactory.GetEngineByExtension(outputPath, new ZipEngine());
 
             await engine.CompressAsync(_sourcePaths.ToArray(), outputPath, options, progress, progressWindow.CancellationToken);
 

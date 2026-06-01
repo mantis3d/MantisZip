@@ -2,6 +2,7 @@ using System.IO;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using Microsoft.Win32;
+using MantisZip.Core.Abstractions;
 using MantisZip.UI.Localization;
 
 namespace MantisZip.UI;
@@ -27,7 +28,7 @@ internal static class ShellIntegration
     private const uint SHCNE_ASSOCCHANGED = 0x08000000;
     private const uint SHCNF_IDLIST = 0x0000;
     private static readonly string[] ArchiveExtensions =
-        [".zip", ".7z", ".rar", ".tar", ".tgz", ".tar.gz", ".gz", ".iso"];
+        ArchiveEngineFactory.SupportedExtensions;
 
     // Registry key identifiers — must stay as fixed English strings (language-independent)
     private const string CascadeRoot = "MantisZip";

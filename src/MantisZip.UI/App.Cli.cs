@@ -202,7 +202,7 @@ public partial class App : Application
 
                     try
                     {
-                        var compressEngine = ArchiveEngineFactory.GetEngineByExtension(finalPath) ?? new ZipEngine();
+                        var compressEngine = ArchiveEngineFactory.GetEngineByExtension(finalPath, new ZipEngine());
                         var options = CreateCompressOptions();
                         options.CompressionLevel = settings.DefaultLevel;
 
@@ -410,7 +410,7 @@ public partial class App : Application
                     }
                 }
 
-                var compressEngine = ArchiveEngineFactory.GetEngineByExtension(outputPath) ?? new ZipEngine();
+                var compressEngine = ArchiveEngineFactory.GetEngineByExtension(outputPath, new ZipEngine());
                 var options = CreateCompressOptions();
                 options.CompressionLevel = settings.DefaultLevel;
 
@@ -670,15 +670,6 @@ public partial class App : Application
             app.Shutdown();
         }
     }
-    /// <summary>
-    /// 判断异常是否与密码相关，用于 --extract-smart 的加密回退流程。
-    /// </summary>
-    private static bool IsPasswordErrorStatic(Exception ex)
-    {
-        var msg = ex.Message.ToLowerInvariant();
-        return msg.Contains("password") || msg.Contains("encrypted") ||
-               msg.Contains("decrypt") || msg.Contains("encryption");
-    }
     private static void HandleExtract(string[] paths)
     {
         LogStartup($"HandleExtract: paths=[{string.Join(";", paths)}]");
@@ -866,7 +857,7 @@ public partial class App : Application
                                 password = promptResult.Value.Password;
 
                                 // 验证用户输入的密码
-                                if (!QuickVerifyPassword(archivePath, password, engine))
+                                if (password == null || !QuickVerifyPassword(archivePath, password, engine))
                                 {
                                     failed++;
                                     await progressWindow.Dispatcher.InvokeAsync(() =>
@@ -1300,7 +1291,7 @@ public partial class App : Application
 
         var progress = ProgressWindow.CreateBackgroundProgress(progressWindow);
 
-        var compressEngine = ArchiveEngineFactory.GetEngineByExtension(finalPath) ?? new ZipEngine();
+        var compressEngine = ArchiveEngineFactory.GetEngineByExtension(finalPath, new ZipEngine());
         Log("--compress-quick: {0} → {1}", string.Join(", ", myPaths), finalPath);
 
         // 异步L.T(L.Shell_Compress)，L.T(L.Progress_Done)后自动退出

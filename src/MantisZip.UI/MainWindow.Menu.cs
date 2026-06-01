@@ -409,11 +409,15 @@ public partial class MainWindow
             _ = TestArchiveAsync(_currentArchivePath);
     }
 
-    private void PreviewToggleBtn_Click(object sender, RoutedEventArgs e)
+    private void PreviewToggleMenu_Click(object sender, RoutedEventArgs e)
     {
-        _previewPanelEnabled = PreviewToggleBtn.IsChecked == true;
+        _previewPanelEnabled = PreviewToggleMenu.IsChecked == true;
         AppSettings.Instance.ShowPreviewPanel = _previewPanelEnabled;
         AppSettings.Instance.Save();
+
+        // 图标透明度随状态变化（与进度条/目录独立基准风格一致）
+        if (PreviewToggleMenu.Icon is Emoji.Wpf.TextBlock icon)
+            icon.Opacity = _previewPanelEnabled ? 1.0 : 0.2;
 
         if (_previewPanelEnabled)
         {

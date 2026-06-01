@@ -236,13 +236,11 @@ public partial class App : Application
 
     /// <summary>
     /// 判断异常是否表示需要密码。
-    /// 与 <see cref="MainWindow.ExtractAsync"/> 中的逻辑保持一致。
     /// </summary>
-    private static bool IsPasswordError(Exception ex)
+    internal static bool IsPasswordError(Exception ex)
     {
         var msg = ex.Message.ToLowerInvariant();
-        return msg.Contains("password") || msg.Contains(L.T(L.PwdMgr_Col_Password).ToLowerInvariant()) ||
-               msg.Contains("encrypted") || msg.Contains("decrypt") ||
-               msg.Contains("encryption");
+        return msg.Contains("password") || msg.Contains("encrypted") ||
+               msg.Contains("decrypt") || msg.Contains("encryption");
     }
 }
