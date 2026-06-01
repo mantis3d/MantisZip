@@ -1,10 +1,13 @@
+using MantisZip.Core;
 using MantisZip.Core.Abstractions;
 using MantisZip.Core.Engines;
 using Microsoft.Win32;
 using System.IO;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Media;
 using MantisZip.UI.Localization;
+using System.Linq;
 
 namespace MantisZip.UI;
 
@@ -14,9 +17,15 @@ namespace MantisZip.UI;
 public partial class CompressSettingsWindow : Window
 {
     private readonly List<string> _sourcePaths = new();
+    private readonly List<Core.PasswordEntry> _allPasswordEntries = new();
+
+    private Core.PasswordEntry? _selectedLibraryEntry;
 
     private enum OutputMode { Manual, Separate, Combined }
     private OutputMode _outputMode = OutputMode.Manual;
+
+    private bool _isUsingLibrary = true; // true=密码库, false=新密码
+    private bool _isPwdRevealed;
 
     /// <summary>
     /// 是否为独立模式（由 --compress 直接启动，无主窗口）。
@@ -42,6 +51,8 @@ public partial class CompressSettingsWindow : Window
         RefreshOutputPathState();
         UpdateCompressButton();
         UpdateCommentDistributionState();
+        if (PwdAutoRules != null && PwdAutoRules.IsChecked == true)
+            RefreshAutoRules();
     }
 
     private void RefreshOutputPathState()
@@ -189,6 +200,10 @@ public partial class CompressSettingsWindow : Window
             RefreshOutputPathState();
 
         UpdateCompressButton();
+
+        // 源文件变化时重新生成自动规则（设计文档 3.3）
+        if (PwdAutoRules != null && PwdAutoRules.IsChecked == true)
+            RefreshAutoRules();
     }
 
     private void BrowseOutputButton_Click(object sender, RoutedEventArgs e)
@@ -222,7 +237,413 @@ public partial class CompressSettingsWindow : Window
 
     private void EncryptCheckBox_Changed(object sender, RoutedEventArgs e)
     {
-        PasswordGrid.IsEnabled = EncryptCheckBox.IsChecked == true;
+        var enabled = EncryptCheckBox.IsChecked == true;
+        PasswordContentGrid.IsEnabled = enabled;
+        if (!enabled)
+        {
+            _selectedLibraryEntry = null;
+            PwdSelectedStatus.Text = L.T(L.Compress_Pwd_NoEntry);
+        }
+    }
+
+    private void PasswordSource_Changed(object sender, RoutedEventArgs e)
+    {
+        _isUsingLibrary = LibraryRadio.IsChecked == true;
+        UpdatePasswordSourceUI();
+    }
+
+    /// <summary>
+    /// 同步密码来源 RadioButton 的启用/禁用和透明度状态
+    /// </summary>
+    private void UpdatePasswordSourceUI()
+    {
+        // Null guards: controls in Password tab may not be created yet during InitializeComponent
+        // 只控制内容面板的启用/透明度，RadioButton 本身始终可用
+        if (PwdLibraryContent != null)
+        {
+            PwdLibraryContent.IsEnabled = _isUsingLibrary;
+            PwdLibraryContent.Opacity = _isUsingLibrary ? 1.0 : 0.3;
+        }
+        if (NewPwdContent != null)
+        {
+            NewPwdContent.IsEnabled = !_isUsingLibrary;
+            NewPwdContent.Opacity = _isUsingLibrary ? 0.3 : 1.0;
+        }
+
+        if (_isUsingLibrary)
+        {
+            if (PwdSaveCheck != null)
+                PwdSaveCheck.Content = L.T(L.Compress_Pwd_UpdateRules);
+            if (PwdDescBox != null)
+            {
+                PwdDescBox.IsEnabled = false;
+                PwdDescBox.IsReadOnly = true;
+                if (_selectedLibraryEntry != null)
+                    PwdDescBox.Text = _selectedLibraryEntry.Description;
+            }
+            // 选择密码库条目时不覆盖规则框内容，规则始终由自动规则或用户手动维护
+            if (PwdAutoRules != null && PwdAutoRules.IsChecked == true && PwdRulesBox != null)
+                RefreshAutoRules();
+        }
+        else
+        {
+            if (PwdSaveCheck != null)
+                PwdSaveCheck.Content = L.T(L.Compress_Pwd_SaveToLibrary);
+            if (PwdDescBox != null)
+            {
+                PwdDescBox.IsEnabled = true;
+                PwdDescBox.IsReadOnly = false;
+                PwdDescBox.Text = "";
+            }
+            if (PwdAutoRules != null && PwdAutoRules.IsChecked == true)
+                RefreshAutoRules();
+        }
+    }
+
+    /// <summary>
+    /// 加载密码列表到 ListBox（按 LastUsed 降序）
+    /// </summary>
+    private void LoadPasswordLibrary()
+    {
+        _allPasswordEntries.Clear();
+        _allPasswordEntries.AddRange(PasswordManager.Instance.GetAllPasswords()
+            .OrderByDescending(e => e.LastUsed ?? DateTime.MinValue));
+        App.TraceLog("LoadPasswordLibrary: loaded {0} entries", _allPasswordEntries.Count);
+        ApplyPasswordFilter();
+    }
+
+    /// <summary>
+    /// 根据搜索词过滤密码列表
+    /// </summary>
+    private void ApplyPasswordFilter()
+    {
+        var query = PwdSearchBox.Text?.Trim() ?? "";
+        var placeholder = L.T(L.Compress_Pwd_Search);
+
+        // 搜索框用 {l:L} 占位文字作为 Text，这会在过滤时误过滤掉所有条目。
+        // 把占位文字等同为空查询，直到用户实际输入搜索词。
+        if (string.Equals(query, placeholder, StringComparison.OrdinalIgnoreCase))
+            query = "";
+
+        var filtered = _allPasswordEntries
+            .Where(e => string.IsNullOrEmpty(query)
+                || e.Description.Contains(query, StringComparison.OrdinalIgnoreCase)
+                || e.Patterns.Any(p => p.Contains(query, StringComparison.OrdinalIgnoreCase)))
+            .ToList();
+
+        // Null guard: PwdLibraryList may not be created yet during InitializeComponent
+        // (PwdSearchBox.TextChanged fires before PwdLibraryList is created in XAML order)
+        if (PwdLibraryList == null) return;
+
+        App.TraceLog("ApplyPasswordFilter: query='{0}', total={1}, filtered={2}", query, _allPasswordEntries.Count, filtered.Count);
+
+        if (filtered.Count == 0 && !string.IsNullOrEmpty(query))
+        {
+            PwdLibraryList.ItemsSource = null;
+            PwdLibraryList.Items.Add(L.T(L.Compress_Pwd_EmptySearch));
+        }
+        else
+        {
+            PwdLibraryList.ItemsSource = filtered;
+        }
+    }
+
+    /// <summary>
+    /// 搜索框获得焦点时清除占位文字
+    /// </summary>
+    private void PwdSearchBox_GotFocus(object sender, RoutedEventArgs e)
+    {
+        if (PwdSearchBox.Text == L.T(L.Compress_Pwd_Search))
+            PwdSearchBox.Text = "";
+    }
+
+    private void PwdSearchBox_TextChanged(object sender, TextChangedEventArgs e)
+    {
+        ApplyPasswordFilter();
+    }
+
+    private void PwdLibraryList_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (PwdLibraryList.SelectedItem is Core.PasswordEntry entry)
+        {
+            _selectedLibraryEntry = entry;
+            PwdSelectedStatus.Text = L.TF(L.Compress_Pwd_Selected, entry.Description);
+
+            // 同步到共享区
+            PwdDescBox.Text = entry.Description;
+            PwdDescBox.IsReadOnly = _isUsingLibrary;
+            PwdDescBox.IsEnabled = !_isUsingLibrary;
+
+            // 选中密码库条目时清空新密码输入框（设计文档 5）
+            PasswordBox.Password = "";
+            if (PwdTextBox != null) PwdTextBox.Text = "";
+            ConfirmPasswordBox.Password = "";
+            if (ConfirmPwdTextBox != null) ConfirmPwdTextBox.Text = "";
+        }
+        else
+        {
+            PwdSelectedStatus.Text = L.T(L.Compress_Pwd_NoEntry);
+        }
+    }
+
+    /// <summary>
+    /// 切换密码明文/掩码 — 在 PasswordBox 和 TextBox 之间切换
+    /// </summary>
+    private void PwdRevealBtn_Click(object sender, RoutedEventArgs e)
+    {
+        _isPwdRevealed = !_isPwdRevealed;
+
+        if (_isPwdRevealed)
+        {
+            // 切换到明文 TextBox（主密码 + 确认密码）
+            PwdTextBox.Text = PasswordBox.Password;
+            if (ConfirmPwdTextBox != null) ConfirmPwdTextBox.Text = ConfirmPasswordBox.Password;
+
+            PasswordBox.Visibility = Visibility.Collapsed;
+            PwdTextBox.Visibility = Visibility.Visible;
+            ConfirmPasswordBox.Visibility = Visibility.Collapsed;
+            if (ConfirmPwdTextBox != null) ConfirmPwdTextBox.Visibility = Visibility.Visible;
+
+            PwdTextBox.Focus();
+            PwdTextBox.SelectionStart = PwdTextBox.Text.Length;
+        }
+        else
+        {
+            // 切换回掩码 PasswordBox（主密码 + 确认密码）
+            PasswordBox.Password = PwdTextBox.Text;
+            ConfirmPasswordBox.Password = ConfirmPwdTextBox?.Text ?? "";
+
+            PwdTextBox.Visibility = Visibility.Collapsed;
+            PasswordBox.Visibility = Visibility.Visible;
+            if (ConfirmPwdTextBox != null) ConfirmPwdTextBox.Visibility = Visibility.Collapsed;
+            ConfirmPasswordBox.Visibility = Visibility.Visible;
+
+            PasswordBox.Focus();
+        }
+    }
+
+    /// <summary>
+    /// 密码框内容变化时：更新强度 + 清除密码库选中
+    /// </summary>
+    private void PasswordBox_PasswordChanged(object sender, RoutedEventArgs e)
+    {
+        OnPasswordContentChanged(PasswordBox.Password);
+    }
+
+    /// <summary>
+    /// 明文密码框内容变化时：同步处理
+    /// </summary>
+    private void PwdTextBox_TextChanged(object sender, TextChangedEventArgs e)
+    {
+        OnPasswordContentChanged(PwdTextBox.Text);
+    }
+
+    private void OnPasswordContentChanged(string? content)
+    {
+        UpdatePasswordStrength();
+
+        // 用户手动输入密码时，取消密码库的选中
+        if (!string.IsNullOrEmpty(content))
+        {
+            _selectedLibraryEntry = null;
+            PwdLibraryList.SelectedItem = null;
+            PwdSelectedStatus.Text = L.T(L.Compress_Pwd_NoEntry);
+        }
+
+        // 如果密码库有选中但用户改了密码框，自动切换到新密码模式
+        if (_isUsingLibrary && _selectedLibraryEntry == null)
+        {
+            NewPwdRadio.IsChecked = true;
+        }
+    }
+
+    /// <summary>
+    /// 更新密码强度指示
+    /// </summary>
+    private void UpdatePasswordStrength()
+    {
+        var pwd = PasswordBox.Password;
+        if (string.IsNullOrEmpty(pwd))
+        {
+            PwdStrengthText.Text = "";
+            PwdStrengthText.ClearValue(TextBlock.ForegroundProperty);
+            return;
+        }
+
+        var hasUpper = pwd.Any(char.IsUpper);
+        var hasLower = pwd.Any(char.IsLower);
+        var hasDigit = pwd.Any(char.IsDigit);
+        var hasSpecial = pwd.Any(c => !char.IsLetterOrDigit(c));
+        var variety = (hasUpper ? 1 : 0) + (hasLower ? 1 : 0) + (hasDigit ? 1 : 0) + (hasSpecial ? 1 : 0);
+
+        if (pwd.Length < 6 || (pwd.Length < 10 && variety <= 2))
+        {
+            PwdStrengthText.Text = "● " + L.T(L.Compress_Pwd_Strength_Weak);
+            PwdStrengthText.Foreground = new SolidColorBrush(Colors.Red);
+        }
+        else if (pwd.Length >= 10 && variety >= 3)
+        {
+            PwdStrengthText.Text = "● " + L.T(L.Compress_Pwd_Strength_Strong);
+            PwdStrengthText.Foreground = new SolidColorBrush(Colors.Green);
+        }
+        else
+        {
+            PwdStrengthText.Text = "● " + L.T(L.Compress_Pwd_Strength_Medium);
+            PwdStrengthText.Foreground = new SolidColorBrush(Colors.Orange);
+        }
+    }
+
+    /// <summary>
+    /// 自动规则 CheckBox 切换
+    /// </summary>
+    private void PwdAutoRules_Changed(object sender, RoutedEventArgs e)
+    {
+        // Null guard: PwdRulesBox may not be created yet during InitializeComponent
+        if (PwdRulesBox != null)
+        {
+            var auto = PwdAutoRules.IsChecked == true;
+            PwdRulesBox.IsReadOnly = auto;
+            PwdRulesBox.IsEnabled = !auto;
+        }
+        if (PwdAutoRules.IsChecked == true)
+        {
+            // 无论库模式还是新密码模式，自动规则都基于输出模式生成，不覆盖为选中条目的规则
+            RefreshAutoRules();
+        }
+    }
+
+    /// <summary>
+    /// 获取当前激活的密码
+    /// </summary>
+    private string? GetActivePassword()
+    {
+        if (EncryptCheckBox.IsChecked != true)
+            return null;
+
+        if (_isUsingLibrary)
+            return _selectedLibraryEntry?.Password;
+
+        // 明文模式下确保 PasswordBox 与 TextBox 同步（用户可能在 TextBox 中输入）
+        if (_isPwdRevealed)
+        {
+            if (PwdTextBox != null) PasswordBox.Password = PwdTextBox.Text;
+            if (ConfirmPwdTextBox != null) ConfirmPasswordBox.Password = ConfirmPwdTextBox.Text;
+        }
+
+        return PasswordBox.Password;
+    }
+
+    /// <summary>
+    /// 刷新自动规则（根据输出模式生成压缩包名 glob）
+    /// </summary>
+    private void RefreshAutoRules()
+    {
+        if (!PwdAutoRules.IsChecked == true) return;
+
+        var format = (FormatComboBox.SelectedItem as System.Windows.Controls.ComboBoxItem)?.Tag?.ToString() ?? "zip";
+        var ext = format == "tar.gz" ? ".tar.gz" : "." + format;
+
+        switch (_outputMode)
+        {
+            case OutputMode.Manual:
+                var manualPath = OutputPathTextBox.Text?.Trim();
+                if (!string.IsNullOrEmpty(manualPath))
+                {
+                    var name = Path.GetFileNameWithoutExtension(manualPath);
+                    PwdRulesBox.Text = $"{name}*{ext}";
+                }
+                break;
+
+            case OutputMode.Separate:
+                var rules = new List<string>();
+                foreach (var src in _sourcePaths)
+                {
+                    string baseName;
+                    if (File.Exists(src))
+                        baseName = Path.GetFileNameWithoutExtension(src);
+                    else if (Directory.Exists(src))
+                        baseName = Path.GetFileName(src.TrimEnd('\\', '/'));
+                    else
+                        continue;
+                    rules.Add($"{baseName}*{ext}");
+                }
+                PwdRulesBox.Text = string.Join("\r\n", rules);
+                break;
+
+            case OutputMode.Combined:
+                var commonParent = App.FindCommonParent(_sourcePaths.ToList());
+                if (commonParent != null && !App.IsDriveRoot(commonParent))
+                {
+                    var archiveName = Path.GetFileName(commonParent.TrimEnd('\\', '/'));
+                    PwdRulesBox.Text = $"{archiveName}*{ext}";
+                }
+                break;
+        }
+    }
+
+    /// <summary>
+    /// 保存密码到密码库（压缩成功后调用）
+    /// </summary>
+    private void SavePasswordAfterCompress()
+    {
+        if (PwdSaveCheck.IsChecked != true) return;
+        if (EncryptCheckBox.IsChecked != true) return;
+
+        try
+        {
+            var rules = PwdRulesBox.Text
+                ?.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)
+                .Select(r => r.Trim())
+                .Where(r => !string.IsNullOrWhiteSpace(r))
+                .ToList() ?? new List<string>();
+
+            if (rules.Count == 0)
+            {
+                // 自动生成一条规则
+                var format = (FormatComboBox.SelectedItem as System.Windows.Controls.ComboBoxItem)?.Tag?.ToString() ?? "zip";
+                var ext = format == "tar.gz" ? ".tar.gz" : "." + format;
+                rules.Add($"*{ext}");
+            }
+
+            if (_isUsingLibrary && _selectedLibraryEntry != null)
+            {
+                // 更新匹配规则：去重追加
+                var updated = false;
+                foreach (var rule in rules)
+                {
+                    if (!_selectedLibraryEntry.Patterns.Contains(rule))
+                    {
+                        _selectedLibraryEntry.Patterns.Add(rule);
+                        updated = true;
+                    }
+                }
+                if (updated)
+                {
+                    PasswordManager.Instance.UpdatePassword(
+                        _selectedLibraryEntry.Id,
+                        _selectedLibraryEntry.Password,
+                        _selectedLibraryEntry.Description,
+                        _selectedLibraryEntry.Patterns);
+                    PasswordManager.Instance.MarkUsed(_selectedLibraryEntry.Id);
+                    App.LogDebug("Password rules updated for entry: {0}", _selectedLibraryEntry.Description);
+                }
+            }
+            else if (!_isUsingLibrary)
+            {
+                // 新增密码条目
+                var password = PasswordBox.Password;
+                var desc = PwdDescBox.Text?.Trim() ?? "";
+                if (string.IsNullOrEmpty(desc))
+                    desc = $"Compressed on {DateTime.Now:yyyy-MM-dd HH:mm}";
+
+                PasswordManager.Instance.AddPassword(password, desc, rules);
+                App.LogDebug("Password saved to library: {0}", desc);
+            }
+        }
+        catch (Exception ex)
+        {
+            App.LogDebug("SavePasswordAfterCompress failed: {0}", ex.Message);
+        }
     }
 
     private void SplitSizeCombo_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
@@ -273,12 +694,53 @@ public partial class CompressSettingsWindow : Window
         CommentDistributionPanel.IsEnabled = _outputMode == OutputMode.Separate;
     }
 
+    /// <summary>
+    /// 切换到加密选项卡时统一刷新所有 UI 状态
+    /// </summary>
+    private void RefreshPasswordTabUI()
+    {
+        UpdatePasswordFormatState();
+        UpdatePasswordSourceUI();
+
+        // 重新应用自动规则状态，确保 PwdRulesBox 禁用态正确显示
+        if (PwdRulesBox != null)
+        {
+            var auto = PwdAutoRules.IsChecked == true;
+            PwdRulesBox.IsReadOnly = auto;
+            PwdRulesBox.IsEnabled = !auto;
+        }
+
+        LoadPasswordLibrary();
+    }
+
     private void TabControl_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
     {
-        if (e.Source is TabControl && CommentTab.IsSelected)
+        if (e.Source is TabControl)
         {
-            UpdateCommentFormatState();
-            UpdateCommentDistributionState();
+            if (PasswordTab.IsSelected)
+            {
+                RefreshPasswordTabUI();
+            }
+            else if (CommentTab.IsSelected)
+            {
+                UpdateCommentFormatState();
+                UpdateCommentDistributionState();
+            }
+        }
+    }
+
+    private void UpdatePasswordFormatState()
+    {
+        // Null guard: PasswordTab TabItem may not be created yet during InitializeComponent
+        // (FormatComboBox_SelectionChanged fires before TabItem (Password) is created)
+        if (PasswordTab == null) return;
+
+        var tag = (FormatComboBox.SelectedItem as System.Windows.Controls.ComboBoxItem)?.Tag?.ToString();
+        var canEncrypt = tag == "zip" || tag == "7z";
+        PasswordTab.IsEnabled = canEncrypt;
+        if (!canEncrypt && EncryptCheckBox.IsChecked == true)
+        {
+            EncryptCheckBox.IsChecked = false;
         }
     }
 
@@ -314,15 +776,26 @@ public partial class CompressSettingsWindow : Window
         // 验证密码
         if (EncryptCheckBox.IsChecked == true)
         {
-            if (string.IsNullOrEmpty(PasswordBox.Password))
+            if (_isUsingLibrary)
             {
-                AppMessageBox.Show(L.T(L.Pwd_Validation_Required), L.T(L.Compress_Title), MessageBoxButton.OK, MessageBoxImage.Warning);
-                return;
+                if (_selectedLibraryEntry == null)
+                {
+                    AppMessageBox.Show(L.T(L.Compress_Pwd_NoEntry), L.T(L.Compress_Title), MessageBoxButton.OK, MessageBoxImage.Warning);
+                    return;
+                }
             }
-            if (PasswordBox.Password != ConfirmPasswordBox.Password)
+            else
             {
-                AppMessageBox.Show(L.T(L.Compress_Validation_PwdMismatch), L.T(L.Compress_Title), MessageBoxButton.OK, MessageBoxImage.Warning);
-                return;
+                if (string.IsNullOrEmpty(PasswordBox.Password))
+                {
+                    AppMessageBox.Show(L.T(L.Pwd_Validation_Required), L.T(L.Compress_Title), MessageBoxButton.OK, MessageBoxImage.Warning);
+                    return;
+                }
+                if (PasswordBox.Password != ConfirmPasswordBox.Password)
+                {
+                    AppMessageBox.Show(L.T(L.Compress_Validation_PwdMismatch), L.T(L.Compress_Title), MessageBoxButton.OK, MessageBoxImage.Warning);
+                    return;
+                }
             }
         }
 
@@ -385,7 +858,7 @@ public partial class CompressSettingsWindow : Window
                             {
                                 var addOptions = App.CreateCompressOptions();
                                 addOptions.Encrypt = EncryptCheckBox.IsChecked == true;
-                                addOptions.Password = PasswordBox.Password;
+                                addOptions.Password = GetActivePassword();
                                 addOptions.Comment = GetComment();
                                 var addCtx = ProgressWindow.CreateBackgroundProgress(addProgress);
                                 await engine!.AddToArchiveAsync(outputPath, _sourcePaths.ToArray(), addOptions, addCtx, addProgress.CancellationToken);
@@ -422,7 +895,7 @@ public partial class CompressSettingsWindow : Window
         var options = App.CreateCompressOptions();
         options.CompressionLevel = level;
         options.Encrypt = EncryptCheckBox.IsChecked == true;
-        options.Password = PasswordBox.Password;
+        options.Password = GetActivePassword();
         options.SplitSize = GetSplitSize();
         options.Comment = GetComment();
         options.CommentDistribution = GetCommentDistribution();
@@ -442,6 +915,7 @@ public partial class CompressSettingsWindow : Window
             progressWindow.SetComplete(L.T(L.App_CompressComplete));
             await Task.Delay(500);
             progressWindow.Close();
+            SavePasswordAfterCompress();
             this.Close();
         }
         catch (OperationCanceledException)
@@ -468,7 +942,7 @@ public partial class CompressSettingsWindow : Window
         var options = App.CreateCompressOptions();
         options.CompressionLevel = level;
         options.Encrypt = EncryptCheckBox.IsChecked == true;
-        options.Password = PasswordBox.Password;
+        options.Password = GetActivePassword();
         options.SplitSize = GetSplitSize();
 
         // 注释分配 — 独立模式下每人压缩包可分配不同注释
@@ -599,6 +1073,7 @@ public partial class CompressSettingsWindow : Window
             progressWindow.SetComplete(L.TF(L.App_CompressSeparateComplete, success, fail));
             await Task.Delay(500);
             progressWindow.Close();
+            SavePasswordAfterCompress();
             this.Close();
         }
         catch (OperationCanceledException)
@@ -667,13 +1142,14 @@ public partial class CompressSettingsWindow : Window
                             {
                                 var addOptions = App.CreateCompressOptions();
                                 addOptions.Encrypt = EncryptCheckBox.IsChecked == true;
-                                addOptions.Password = PasswordBox.Password;
+                                addOptions.Password = GetActivePassword();
                                 addOptions.Comment = GetComment();
                                 var addCtx = ProgressWindow.CreateBackgroundProgress(addProgress);
                                 await engine!.AddToArchiveAsync(outputPath, _sourcePaths.ToArray(), addOptions, addCtx, addProgress.CancellationToken);
                                 addProgress.SetComplete(L.T(L.App_AddToArchiveComplete));
                                 await Task.Delay(500);
                                 addProgress.Close();
+                                SavePasswordAfterCompress();
                                 this.Close();
                             }
                             catch (OperationCanceledException) { this.Show(); addProgress.Close(); }
@@ -704,7 +1180,7 @@ public partial class CompressSettingsWindow : Window
         var options = App.CreateCompressOptions();
         options.CompressionLevel = level;
         options.Encrypt = EncryptCheckBox.IsChecked == true;
-        options.Password = PasswordBox.Password;
+        options.Password = GetActivePassword();
         options.SplitSize = GetSplitSize();
         options.Comment = GetComment();
         options.CommentDistribution = GetCommentDistribution();
@@ -722,6 +1198,7 @@ public partial class CompressSettingsWindow : Window
             progressWindow.SetComplete(L.T(L.App_CompressComplete));
             await Task.Delay(500);
             progressWindow.Close();
+            SavePasswordAfterCompress();
             this.Close();
         }
         catch (OperationCanceledException)
@@ -741,11 +1218,18 @@ public partial class CompressSettingsWindow : Window
             RefreshCombinedPath();
         UpdateCompressButton();
         UpdateCommentFormatState();
+        UpdatePasswordFormatState();
+        // Null guard: PwdAutoRules may not be created yet during InitializeComponent
+        // (FormatComboBox is in General tab, PwdAutoRules is in Password tab)
+        if (PwdAutoRules != null && PwdAutoRules.IsChecked == true)
+            RefreshAutoRules();
     }
 
     private void OutputPathTextBox_TextChanged(object sender, System.Windows.Controls.TextChangedEventArgs e)
     {
         UpdateCompressButton();
+        if (PwdAutoRules != null && PwdAutoRules.IsChecked == true)
+            RefreshAutoRules();
     }
 
     private void UpdateCompressButton()

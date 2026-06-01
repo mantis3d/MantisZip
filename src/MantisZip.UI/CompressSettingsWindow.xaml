@@ -154,28 +154,153 @@
                             </Grid>
                         </GroupBox>
 
-                        <!-- 3. 加密 -->
-                        <GroupBox Header="{l:L Compress_Encrypt_Group}" Margin="0,0,0,10">
-                            <StackPanel>
-                                <CheckBox x:Name="EncryptCheckBox" Content="{l:L Compress_Encrypt_Check}" Checked="EncryptCheckBox_Changed" Unchecked="EncryptCheckBox_Changed"/>
-                                <Grid x:Name="PasswordGrid" Margin="20,5,0,0" IsEnabled="False">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="80"/>
-                                        <ColumnDefinition Width="*"/>
-                                    </Grid.ColumnDefinitions>
-                                    <Grid.RowDefinitions>
-                                        <RowDefinition Height="Auto"/>
-                                        <RowDefinition Height="Auto"/>
-                                    </Grid.RowDefinitions>
+                        <!-- 3. 加密（已移入加密 Tab 中） -->
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
 
-                                    <TextBlock Grid.Row="0" Grid.Column="0" Text="{l:L PwdEdit_PasswordLabel}" VerticalAlignment="Center"/>
-                                    <PasswordBox x:Name="PasswordBox" Grid.Row="0" Grid.Column="1" Height="24"/>
+            <!-- ============ 加密 ============ -->
+            <TabItem x:Name="PasswordTab" Header="{l:L Compress_Tab_Password}">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" Background="{StaticResource Theme_WindowBg}">
+                    <StackPanel Margin="10">
+                        <!-- 启用加密开关 + 格式提示 -->
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                            <CheckBox x:Name="EncryptCheckBox" Content="{l:L Compress_Encrypt_Check}" 
+                                      Checked="EncryptCheckBox_Changed" Unchecked="EncryptCheckBox_Changed"
+                                      FontWeight="SemiBold" FontSize="14"/>
+                            <TextBlock x:Name="PwdFormatHint"
+                                       Text="{l:L Compress_Pwd_Zip7zOnly}"
+                                       Foreground="{StaticResource Theme_TextDisabled}"
+                                       FontSize="12"
+                                       VerticalAlignment="Center"
+                                       Margin="8,0,0,0"/>
+                        </StackPanel>
 
-                                    <TextBlock Grid.Row="1" Grid.Column="0" Text="{l:L Compress_Encrypt_Confirm}" VerticalAlignment="Center" Margin="0,5,0,0"/>
-                                    <PasswordBox x:Name="ConfirmPasswordBox" Grid.Row="1" Grid.Column="1" Height="24" Margin="0,5,0,0"/>
-                                </Grid>
-                            </StackPanel>
-                        </GroupBox>
+                        <Grid x:Name="PasswordContentGrid" IsEnabled="False">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+
+                            <!-- 从密码库选择 -->
+                            <GroupBox x:Name="PwdLibraryGroup" Grid.Row="0" Margin="0,0,0,8"
+                                      BorderBrush="{StaticResource Theme_Border}"
+                                      BorderThickness="1">
+                                <GroupBox.Header>
+                                    <RadioButton x:Name="LibraryRadio" GroupName="PasswordSource" IsChecked="True"
+                                                 Checked="PasswordSource_Changed"
+                                                 Content="{l:L Compress_Pwd_FromLibrary}"
+                                                 FontWeight="SemiBold"/>
+                                 </GroupBox.Header>
+                                <StackPanel x:Name="PwdLibraryContent">
+                                    <TextBox x:Name="PwdSearchBox" Height="24"
+                                             Text="{l:L Compress_Pwd_Search}"
+                                             GotFocus="PwdSearchBox_GotFocus"
+                                             TextChanged="PwdSearchBox_TextChanged"
+                                             Margin="0,4,0,4"/>
+                                    <ListBox x:Name="PwdLibraryList" Height="120"
+                                             SelectionChanged="PwdLibraryList_SelectionChanged"
+                                             ScrollViewer.VerticalScrollBarVisibility="Auto">
+                                        <ListBox.ItemTemplate>
+                                            <DataTemplate>
+                                                <StackPanel>
+                                                    <TextBlock Text="{Binding Description}" FontWeight="SemiBold"/>
+                                                    <TextBlock Text="{Binding PatternsDisplay}"
+                                                               Foreground="{StaticResource Theme_TextSecondary}"
+                                                               FontSize="11"/>
+                                                </StackPanel>
+                                            </DataTemplate>
+                                        </ListBox.ItemTemplate>
+                                    </ListBox>
+                                    <TextBlock x:Name="PwdSelectedStatus"
+                                               Foreground="{StaticResource Theme_TextSecondary}"
+                                               FontSize="12"
+                                               Margin="0,4,0,0"
+                                               Text="{l:L Compress_Pwd_NoEntry}"/>
+                                </StackPanel>
+                            </GroupBox>
+
+                            <!-- 输入新密码 -->
+                            <GroupBox x:Name="NewPwdGroup" Grid.Row="1" Margin="0,0,0,8"
+                                      BorderBrush="{StaticResource Theme_Border}"
+                                      BorderThickness="1">
+                                <GroupBox.Header>
+                                    <RadioButton x:Name="NewPwdRadio" GroupName="PasswordSource"
+                                                 Checked="PasswordSource_Changed"
+                                                 Content="{l:L Compress_Pwd_EnterNew}"
+                                                 FontWeight="SemiBold"/>
+                                </GroupBox.Header>
+                                <StackPanel x:Name="NewPwdContent">
+                                     <Grid Margin="0,4,0,4">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="60"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="Auto"/>
+                                        </Grid.RowDefinitions>
+                                        <TextBlock Grid.Row="0" Grid.Column="0" Text="{l:L PwdEdit_PasswordLabel}" VerticalAlignment="Center"/>
+                                        <Grid Grid.Row="0" Grid.Column="1">
+                                            <PasswordBox x:Name="PasswordBox" Height="24" PasswordChanged="PasswordBox_PasswordChanged"/>
+                                            <TextBox x:Name="PwdTextBox" Height="24" TextChanged="PwdTextBox_TextChanged" Visibility="Collapsed"/>
+                                        </Grid>
+                                        <Button x:Name="PwdRevealBtn" Grid.Row="0" Grid.Column="2" Width="28" Height="24" Margin="4,0,0,0"
+                                                Content="👁" Click="PwdRevealBtn_Click"/>
+
+                                        <TextBlock Grid.Row="1" Grid.Column="0" Text="{l:L Compress_Encrypt_Confirm}" VerticalAlignment="Center" Margin="0,5,0,0"/>
+                                        <Grid Grid.Row="1" Grid.Column="1" Margin="0,5,0,0">
+                                            <PasswordBox x:Name="ConfirmPasswordBox" Height="24"/>
+                                            <TextBox x:Name="ConfirmPwdTextBox" Height="24" Visibility="Collapsed"/>
+                                        </Grid>
+
+                                        <TextBlock x:Name="PwdStrengthText" Grid.Row="1" Grid.Column="2" VerticalAlignment="Center" Margin="4,5,0,0"/>
+                                    </Grid>
+                                </StackPanel>
+                            </GroupBox>
+
+                            <Separator Grid.Row="2" Margin="0,4,0,6"
+                                       Background="{StaticResource Theme_BorderLight}"/>
+
+                            <!-- 共享区域：保存到密码库 -->
+                            <Border Grid.Row="3" BorderBrush="{StaticResource Theme_BorderLight}" BorderThickness="1" Padding="8" Margin="0,0,0,4"
+                                    CornerRadius="4">
+                                <StackPanel>
+                                    <CheckBox x:Name="PwdSaveCheck" Content="{l:L Compress_Pwd_SaveToLibrary}" IsChecked="True" Margin="0,0,0,6"/>
+                                     <Grid Margin="20,0,0,0">
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="Auto"/>
+                                        </Grid.RowDefinitions>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="60"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Grid.Row="0" Grid.Column="0" Text="{l:L Compress_Pwd_Description}" VerticalAlignment="Center"/>
+                                        <TextBox x:Name="PwdDescBox" Grid.Row="0" Grid.Column="1" Height="24"/>
+
+                                        <StackPanel Grid.Row="1" Grid.Column="0" VerticalAlignment="Top" Margin="0,4,0,0">
+                                            <TextBlock Text="{l:L Compress_Pwd_Rules}"/>
+                                            <CheckBox x:Name="PwdAutoRules" Content="{l:L Compress_Pwd_AutoRules}" IsChecked="True"
+                                                      Margin="0,2,0,0"
+                                                      Checked="PwdAutoRules_Changed" Unchecked="PwdAutoRules_Changed"/>
+                                        </StackPanel>
+                                        <TextBox x:Name="PwdRulesBox" Grid.Row="1" Grid.Column="1" Height="60"
+                                                 AcceptsReturn="True" TextWrapping="Wrap"
+                                                 VerticalScrollBarVisibility="Auto"
+                                                 IsReadOnly="True"
+                                                 Padding="4"
+                                                 Background="{StaticResource Theme_SurfaceBg}"
+                                                 Foreground="{StaticResource Theme_TextPrimary}"
+                                                 BorderBrush="{StaticResource Theme_BorderLight}"
+                                                 BorderThickness="1"/>
+                                     </Grid>
+                                </StackPanel>
+                            </Border>
+                        </Grid>
                     </StackPanel>
                 </ScrollViewer>
             </TabItem>
