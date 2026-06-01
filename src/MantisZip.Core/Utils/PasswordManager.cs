@@ -31,6 +31,9 @@ public class PasswordEntry
 
     [JsonPropertyName("lastUsed")]
     public DateTime? LastUsed { get; set; }
+
+    [JsonIgnore]
+    public string PatternsDisplay => string.Join(", ", Patterns);
 }
 
 /// <summary>
