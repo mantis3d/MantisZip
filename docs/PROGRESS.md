@@ -33,6 +33,26 @@
 6. **菜单文本本地化** — 新增 8 个 `ShellExt_*` key 到 `L.cs` + `strings.zh.json` + `strings.en.json`；`ShellIntegration.WriteMenuTextToRegistry()` 安装时将当前语言文本写入注册表；ShellExt 通过 `LoadSettingsFromRegistry()` 读取（硬编码写死回退）
 7. **文档同步** — AGENTS.md / PROGRESS.md / PLAN.md / manual-test-checklist.md
 
+### v0.3.7-refined-2 压缩窗口密码 Tab 重设计 + 调试日志增强
+
+1. **密码选项卡布局重设计** — 对照 `docs/design-compress-password-tab.md` 修复全部差异：
+   - 密码库条目改为两行显示（描述 + 规则）
+   - 👁 按钮实现真正的 PasswordBox/TextBox 切换（主密码 + 确认密码同时切换）
+   - 两个 RadioButton 始终可用，仅内容面板切换禁用/透明度
+   - `PwdSelectedStatus` 始终显示，未选择时显示默认提示文字
+   - 密码强度改用 `●` + 颜色（红/橙/绿）替代 emoji
+   - "自动规则"移到规则文本框左侧，与"规则"标签上下排列
+   - "仅 zip 和 7z 支持加密"提示移到 EncryptCheckBox 右侧
+   - 两个 GroupBox 与共享区之间增加分隔线
+   - "保存到密码库"默认勾选
+   - 选中密码条目不再覆盖规则框内容
+   - 源文件增减触发自动规则重新计算
+   - 搜索框占位文字不再误过滤密码列表
+   - 共享区描述/规则框用 `IsEnabled` 替代 `IsReadOnly`，显示标准禁用外观
+   - 切到加密 tab 时统一调用 `RefreshPasswordTabUI()` 刷新所有 UI 状态
+2. **QuickVerifyPassword 调试日志** — catch 块新增 `TraceLog` 记录异常类型和消息，密码验证失败时可排查原因
+3. **`PasswordEntry.PatternsDisplay` 属性** — 新增 `[JsonIgnore]` 计算属性，供 XAML 两行列表绑定
+
 ### v0.3.7 (2026-05-31) COM 右键菜单 + 注册表设置同步
 
 1. **新建 MantisZip.ShellExt 项目** — .NET 9 类库，`<EnableComHosting>true</EnableComHosting>`，comhost 模式
@@ -437,3 +457,4 @@
 | 批量进度文件列表 | [batch-progress-list.md](.sisyphus/plans/batch-progress-list.md) | v0.3.4 |
 | 解压配置面板 (ExtractSettingsWindow) | [extract-settings-window.md](.sisyphus/plans/extract-settings-window.md) | v0.3.6 |
 | COM 右键菜单 | [com-context-menu.md](.sisyphus/plans/com-context-menu.md) | v0.3.7 |
+| 压缩窗口密码 Tab 重设计 | [design-compress-password-tab.md](docs/design-compress-password-tab.md) | v0.3.7-refined-2 |

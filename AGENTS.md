@@ -248,8 +248,14 @@ See [plan](.sisyphus/plans/file-filter-feature.md).
 
 ### CompressSettingsWindow TabControl
 
-- **Layout**: `TabControl` with 2 tabs — "通用" (General) and "注释" (Comment)
-- **General tab**: Existing compress options (format/level/encryption/split volumes), wrapped in `ScrollViewer`
+- **Layout**: `TabControl` with 3 tabs — "通用" (General), "加密" (Password), and "注释" (Comment)
+- **General tab**: Existing compress options (format/level/split volumes), wrapped in `ScrollViewer` (encryption moved to Password tab)
+- **Password tab**: Two-mode password selection:
+  - **Library mode**: List of saved passwords (two-line display: description + patterns per entry), search filter, selection status always visible
+  - **New password mode**: Manual entry with PasswordBox/TextBox reveal toggle (👁), confirm-password field with inline strength indicator (colored `●` circle), auto-fallback to new-password mode when user types
+  - **Shared area**: Save-to-library checkbox (default on), description field, auto-rules toggle, rules TextBox; checkbox label switches between "更新匹配规则" (library) and "保存到密码库" (new pwd)
+  - Radio buttons always enabled, only content panels disable/dim
+  - `RefreshPasswordTabUI()` called on every tab switch to sync all UI state
 - **Comment tab**: Multi-line TextBox + radio group for distribution strategy
 - **Theme**: TabControl/TabItem styled with `Theme_HeaderBg`, `Theme_WindowBg`, `Theme_Accent`, `Theme_ButtonHover` — matches dark/light mode system
 - **WPF content virtualization**: TabItem content is lazily created (not loaded until first selection). **All event handlers and state-update helpers must guard against null controls** in Comment tab until it's been displayed once.
