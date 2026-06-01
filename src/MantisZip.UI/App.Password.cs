@@ -213,23 +213,41 @@ public partial class App : Application
             {
                 using var archive = ArchiveFactory.OpenArchive(archivePath, new ReaderOptions { Password = password });
                 var entry = archive.Entries.FirstOrDefault(e => e.IsEncrypted);
-                if (entry == null) return true; // 没有加密条目（理论上不会发生）
+                TraceLog("QuickVerifyPassword(Zip): archive='{0}', foundEncrypted={1}, entryKey='{2}'",
+                    archivePath, entry != null, entry?.Key ?? "(none)");
+
+                if (entry == null)
+                {
+                    TraceLog("QuickVerifyPassword(Zip): no encrypted entries, password treated as valid");
+                    return true;
+                }
+
+                TraceLog("QuickVerifyPassword(Zip): opening stream for entry '{0}'", entry.Key ?? "(nullKey)");
                 using var s = entry.OpenEntryStream();
-                s.ReadByte(); // 密码不对会在此抛异常
+                s.ReadByte();
+                TraceLog("QuickVerifyPassword(Zip): password OK for archive='{0}'", archivePath);
                 return true;
             }
             else if (engine is SevenZipEngine)
             {
                 using var extractor = new SharpSevenZipExtractor(archivePath, password);
-                // SharpSevenZipExtractor 构造器传入密码后，访问 ArchiveFileData 即可验证密码
-                _ = extractor.ArchiveFileData.Count;
+                var afd = extractor.ArchiveFileData;
+                var total = afd.Count;
+                var encrypted = afd.Count(e => !e.IsDirectory && e.Encrypted);
+                TraceLog("QuickVerifyPassword(7z): archive='{0}', totalEntries={1}, encrypted={2}",
+                    archivePath, total, encrypted);
                 return true;
             }
+
             // TarGzEngine 不支持加密
+            TraceLog("QuickVerifyPassword: engine '{0}' has no encryption, skipping verify",
+                engine.GetType().Name);
             return true;
         }
         catch (Exception ex) when (IsPasswordError(ex))
         {
+            TraceLog("QuickVerifyPassword: FAILED for archive='{0}', password len={1}: [{2}] {3}",
+                archivePath, password?.Length ?? -1, ex.GetType().Name, ex.Message);
             return false;
         }
     }
