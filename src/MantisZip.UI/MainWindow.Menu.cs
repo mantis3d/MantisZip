@@ -108,7 +108,7 @@ public partial class MainWindow
         _dirStats.Clear();
 
         FileListGrid.ItemsSource = null;
-        FolderTree.Items.Clear();
+        FolderTree.ItemsSource = null;
         DropHint.Visibility = Visibility.Visible;
         FileListPanel.Visibility = Visibility.Collapsed;
         ArchiveLoadingOverlay.Visibility = Visibility.Collapsed;
