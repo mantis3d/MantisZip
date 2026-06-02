@@ -15,6 +15,8 @@
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="8"/>
             <RowDefinition Height="Auto"/>
+            <RowDefinition Height="8"/>
+            <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
         <TextBlock x:Name="HeaderText" Grid.Row="0" FontSize="13" Foreground="{StaticResource Theme_TextPrimary}" TextWrapping="Wrap"/>
@@ -26,7 +28,7 @@
                     Background="{StaticResource Theme_ButtonBg}" BorderBrush="{StaticResource Theme_Border}" BorderThickness="1" Margin="6,0,6,0"/>
             <Button x:Name="RenameBtn" Content="{l:L CompressConflict_Rename}" Width="90" Height="28" Click="Rename_Click"
                     Background="{StaticResource Theme_ButtonBg}" BorderBrush="{StaticResource Theme_Border}" BorderThickness="1" Margin="6,0,6,0"/>
-            <Button Content="{l:L MsgBox_Cancel}" Width="70" Height="28" Click="Cancel_Click"
+            <Button Content="{l:L Error_Skip}" Width="70" Height="28" Click="Cancel_Click"
                     Background="{StaticResource Theme_ButtonBg}" BorderBrush="{StaticResource Theme_Border}" BorderThickness="1" Margin="6,0,0,0"/>
         </StackPanel>
 
@@ -34,5 +36,11 @@
         <Grid Grid.Row="4" HorizontalAlignment="Stretch" Margin="14,0">
             <TextBox x:Name="RenameTextBox" FontSize="12" Padding="3,2"/>
         </Grid>
+
+        <!-- Row 6: 应用到全部 -->
+        <CheckBox x:Name="ApplyAllCheck" Grid.Row="6"
+                  Content="{l:L Error_ApplyToAll}"
+                  FontSize="12" Foreground="{StaticResource Theme_TextSecondary}"
+                  HorizontalAlignment="Center"/>
     </Grid>
 </Window>

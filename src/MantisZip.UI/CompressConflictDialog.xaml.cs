@@ -19,6 +19,9 @@ public partial class CompressConflictDialog : Window
     /// <summary>用户输入的自定义文件名（未修改时返回建议名）</summary>
     public string? CustomName => RenameTextBox.Text;
 
+    /// <summary>用户勾选了"应用到全部"</summary>
+    public bool ApplyToAll => ApplyAllCheck.IsChecked == true;
+
     /// <param name="filePath">目标文件路径</param>
     /// <param name="canAdd">L.T(L.MsgBox_Yes)L.T(L.MsgBox_No)支持L.T(L.CompressConflict_Add)（Tar 不支持）</param>
     /// <param name="suggestedName">L.T(L.CompressConflict_Rename)的建议名（不含路径），用于预填输入框</param>
@@ -35,6 +38,18 @@ public partial class CompressConflictDialog : Window
             AddBtn.IsEnabled = false;
             AddBtn.ToolTip = L.T(L.CompressConflict_Tooltip_NoAdd);
         }
+
+        // 勾选"应用到全部"时切换为"自动重命名"并禁用输入框
+        ApplyAllCheck.Checked += (_, _) =>
+        {
+            RenameBtn.Content = L.T(L.CompressConflict_AutoRename);
+            RenameTextBox.IsEnabled = false;
+        };
+        ApplyAllCheck.Unchecked += (_, _) =>
+        {
+            RenameBtn.Content = L.T(L.CompressConflict_Rename);
+            RenameTextBox.IsEnabled = true;
+        };
     }
 
     private void Overwrite_Click(object sender, RoutedEventArgs e)
