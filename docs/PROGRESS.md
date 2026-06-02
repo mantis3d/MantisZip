@@ -23,7 +23,7 @@
 
 ## 版本历史（从新到旧）
 
-### v0.3.7-refined COM 右键菜单完善（图标 + 文本 + 本地化）
+### v0.3.7-refined COM  (2026-06-01)  右键菜单完善（图标 + 文本 + 本地化）
 
 1. **图标系统重写** — `CreateCompatibleBitmap` → `CreateDIBSection` 32-bit DIB，修复 `MIIM_BITMAP` 透明背景变纯色问题（原因为 DDB 不含 alpha 通道）
 2. **主菜单标题图标** — "打开/解压" 和 "压缩" 弹出菜单从 `InsertMenu` + `MF_POPUP` 改为 `InsertMenuItem` + `MIIM_SUBMENU` + `MIIM_BITMAP`，菜单标题现在也显示图标

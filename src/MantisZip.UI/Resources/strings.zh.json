@@ -160,6 +160,7 @@
   "Main_Menu_Help": "帮助(_H)",
   "Main_Menu_NewArchive": "新建压缩包(_N)...",
   "Main_Menu_OpenArchive": "打开压缩包(_O)...",
+  "Main_Menu_CloseArchive": "关闭压缩包(_C)",
   "Main_Menu_PasswordManager": "密码管理器(_P)...",
   "Main_Menu_RecentFiles": "最近打开的文件",
   "Main_Menu_Refresh": "刷新(_R)",

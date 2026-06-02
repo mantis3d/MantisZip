@@ -202,6 +202,7 @@ public static class L
     public const string Main_Menu_File                             = "Main_Menu_File";
     public const string Main_Menu_Help                             = "Main_Menu_Help";
     public const string Main_Menu_NewArchive                       = "Main_Menu_NewArchive";
+    public const string Main_Menu_CloseArchive                     = "Main_Menu_CloseArchive";
     public const string Main_Menu_OpenArchive                      = "Main_Menu_OpenArchive";
     public const string Main_Menu_PasswordManager                  = "Main_Menu_PasswordManager";
     public const string Main_Menu_RecentFiles                      = "Main_Menu_RecentFiles";

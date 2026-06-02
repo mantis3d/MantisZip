@@ -106,6 +106,7 @@ public partial class MainWindow
             if (EditMenuAddFiles != null) EditMenuAddFiles.IsEnabled = false;
             if (EditMenuDeleteFiles != null) EditMenuDeleteFiles.IsEnabled = false;
             if (EditMenuArchiveComment != null) EditMenuArchiveComment.IsEnabled = false;
+            if (CloseArchiveMenu != null) CloseArchiveMenu.IsEnabled = false;
             return;
         }
 
@@ -113,6 +114,7 @@ public partial class MainWindow
         DeleteFilesBtn.IsEnabled = engine.CanDelete(_currentFormat);
         if (EditMenuAddFiles != null) EditMenuAddFiles.IsEnabled = engine.CanAdd(_currentFormat);
         if (EditMenuDeleteFiles != null) EditMenuDeleteFiles.IsEnabled = engine.CanDelete(_currentFormat);
+        if (CloseArchiveMenu != null) CloseArchiveMenu.IsEnabled = true;
         // 注释仅 ZIP 格式支持
         if (EditMenuArchiveComment != null) EditMenuArchiveComment.IsEnabled = _currentFormat == ArchiveFormat.Zip;
     }

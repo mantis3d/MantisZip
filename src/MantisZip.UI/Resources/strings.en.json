@@ -150,6 +150,7 @@
   "Main_Menu_Help": "_Help",
   "Main_Menu_NewArchive": "_New Archive...",
   "Main_Menu_OpenArchive": "_Open Archive...",
+  "Main_Menu_CloseArchive": "_Close Archive",
   "Main_Menu_PasswordManager": "_Password Manager...",
   "Main_Menu_RecentFiles": "Recent Files",
   "Main_Menu_Refresh": "_Refresh",

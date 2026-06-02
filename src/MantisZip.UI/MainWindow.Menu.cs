@@ -90,6 +90,40 @@ public partial class MainWindow
 
     private void Exit_Click(object sender, RoutedEventArgs e) => Application.Current.Shutdown();
 
+    private void CloseArchive_Click(object sender, RoutedEventArgs e)
+    {
+        if (_currentArchivePath == null) return;
+
+        HidePreview();
+        ClearPreviewTemp();
+
+        _currentArchivePath = null;
+        _currentPassword = null;
+        _currentPasswordDescription = null;
+        _currentPasswordPatterns = null;
+        _hasEncryptedArchive = false;
+        _archiveComment = null;
+        _allItems.Clear();
+        _currentFolder = "";
+        _dirStats.Clear();
+
+        FileListGrid.ItemsSource = null;
+        FolderTree.Items.Clear();
+        DropHint.Visibility = Visibility.Visible;
+        FileListPanel.Visibility = Visibility.Collapsed;
+        ArchiveLoadingOverlay.Visibility = Visibility.Collapsed;
+
+        DirStatsText.Text = "";
+        SelectionStatsText.Text = "";
+        ArchiveStatsText.Text = "";
+        PasswordStatusText.Text = "";
+        Title = "MantisZip";
+
+        UpdatePasswordStatus();
+        UpdateAddDeleteBtnState();
+        SetStatus(L.T(L.Main_Status_Ready));
+    }
+
     private async void Refresh_Click(object sender, RoutedEventArgs e)
     {
         if (!string.IsNullOrEmpty(_currentArchivePath))
