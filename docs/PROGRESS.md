@@ -7,8 +7,8 @@
 - **技术栈**: .NET 9 + WPF + SharpCompress + SharpSevenZip
 
 ## 版本
-- **当前版本**: 0.3.7
-- **发布日期**: 2026-05-31
+- **当前版本**: 0.3.7-refined-3
+- **发布日期**: 2026-06-02
 
 ## 规划中
 - ✅ **引擎统一已完成** — SharpZipLib→SharpCompress + 7z.exe/SevenZipExtractor→SharpSevenZip（v0.3.4）
@@ -52,6 +52,13 @@
    - 切到加密 tab 时统一调用 `RefreshPasswordTabUI()` 刷新所有 UI 状态
 2. **QuickVerifyPassword 调试日志** — catch 块新增 `TraceLog` 记录异常类型和消息，密码验证失败时可排查原因
 3. **`PasswordEntry.PatternsDisplay` 属性** — 新增 `[JsonIgnore]` 计算属性，供 XAML 两行列表绑定
+
+### v0.3.7-refined-3 (2026-06-02) 压缩冲突"应用到全部" + 压缩流程统一计划
+
+1. **CompressConflictDialog 新增"应用到全部"** — 压缩冲突对话框增加 CheckBox，勾选后对后续所有冲突文件自动应用相同操作；勾选时 Rename 按钮文字变为"自动重命名"，输入框禁用；未勾选时显示"重命名"（半自动编辑）；取消按钮改为"跳过"
+2. **GUI 独立压缩路径适配** — `RunSeparateCompressAsync` 新增 `applyToAll` / `chosenAction` 闭包记忆逻辑，与提取端 `CreateExtractOptions` 模式一致
+3. **CLI 独立压缩路径适配** — `RunCompressSeparateBatch` 同步添加 applyToAll 记忆逻辑，同一套 CompressConflictDialog 在两条循环路径中均支持"应用到全部"
+4. **压缩流程统一计划文档** — 创建 `.sisyphus/plans/compress-service-unify.md`，分析压缩端 3 个独立循环 vs 提取端 1 个集中入口的架构差距，提出统一 CompressService 主方案 + 冲突 UI 嵌入 ProgressWindow 备选方案
 
 ### v0.3.7 (2026-05-31) COM 右键菜单 + 注册表设置同步
 
