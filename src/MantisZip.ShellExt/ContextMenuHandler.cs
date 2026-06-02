@@ -143,11 +143,26 @@ public class ContextMenuHandler : IShellExtInit, IContextMenu
     private string _textExtractTo = TextExtractTo;
     private string _textCompress = TextCompress;
 
+    // ─── Instance tracking ───
+    private static volatile int _nextInstanceId;
+    private readonly int _instanceId = Interlocked.Increment(ref _nextInstanceId);
+
     // ─── State ───
     private List<string> _selectedFiles = new();
     private string? _targetFolder; // Directory\Background mode
     private bool _isBackgroundMode;
     private readonly List<int> _cmdIdOrder = new();
+
+    // ─── Constructor / finalizer ───
+    public ContextMenuHandler()
+    {
+        ShellExtLog.Info($"ContextMenuHandler #{_instanceId}: constructor");
+    }
+
+    ~ContextMenuHandler()
+    {
+        ShellExtLog.Info($"ContextMenuHandler #{_instanceId}: finalizer");
+    }
 
     // ─── Settings cache (read from registry) ───
     private bool _showIcons = true;
@@ -164,7 +179,7 @@ public class ContextMenuHandler : IShellExtInit, IContextMenu
 
     public int Initialize(IntPtr pidlFolder, IntPtr pDataObj, IntPtr hKeyProgId)
     {
-        ShellExtLog.Info($"IShellExtInit.Initialize entered, pidlFolder=0x{pidlFolder:x16}, hKeyProgId=0x{hKeyProgId:x16}");
+        ShellExtLog.Info($"IShellExtInit.Initialize #{_instanceId} entered, pidlFolder=0x{pidlFolder:x16}, hKeyProgId=0x{hKeyProgId:x16}");
         try
         {
             if (pDataObj == IntPtr.Zero)
@@ -235,7 +250,7 @@ public class ContextMenuHandler : IShellExtInit, IContextMenu
                     ShellExtLog.Info($"IShellExtInit.Initialize: File mode, selected {_selectedFiles.Count} files, isArchive={_selectedFiles.Count > 0 && ext0 != null && ArchiveExtensions.Contains(ext0)}");
                 }
 
-                ShellExtLog.Info("IShellExtInit.Initialize returning S_OK");
+                ShellExtLog.Info($"IShellExtInit.Initialize returning S_OK with {_selectedFiles.Count} files selected");
                 return NativeMethods.S_OK;
             }
             finally
@@ -258,7 +273,7 @@ public class ContextMenuHandler : IShellExtInit, IContextMenu
 
     public int QueryContextMenu(IntPtr hMenu, uint indexMenu, uint idCmdFirst, uint idCmdLast, uint uFlags)
     {
-        ShellExtLog.Info($"IContextMenu.QueryContextMenu entered, idCmdFirst={idCmdFirst}, idCmdLast={idCmdLast}, uFlags=0x{uFlags:x8}, _selectedFiles.Count={_selectedFiles.Count}");
+        ShellExtLog.Info($"IContextMenu.QueryContextMenu #{_instanceId} entered, idCmdFirst={idCmdFirst}, idCmdLast={idCmdLast}, uFlags=0x{uFlags:x8}, _selectedFiles.Count={_selectedFiles.Count}");
         try
         {
             // Refresh settings each time (user may have changed them)
@@ -393,7 +408,8 @@ public class ContextMenuHandler : IShellExtInit, IContextMenu
             // CleanupIconCache();
 
             int itemsAdded = (int)(idCmd - idCmdFirst);
-            ShellExtLog.Info($"QueryContextMenu: returning {itemsAdded} items added");
+            string orderSnapshot = string.Join(", ", _cmdIdOrder);
+            ShellExtLog.Info($"QueryContextMenu #{_instanceId}: returning {itemsAdded} items, _cmdIdOrder=[{orderSnapshot}]");
             // Return the number of menu items added (offset from idCmdFirst)
             return itemsAdded;
         }
@@ -410,7 +426,7 @@ public class ContextMenuHandler : IShellExtInit, IContextMenu
 
     public int InvokeCommand(IntPtr pici)
     {
-        ShellExtLog.Info($"IContextMenu.InvokeCommand entered, pici=0x{pici:x16}");
+        ShellExtLog.Info($"IContextMenu.InvokeCommand #{_instanceId} entered, pici=0x{pici:x16}");
         try
         {
             var ici = Marshal.PtrToStructure<CmInvokeCommandInfo>(pici);
@@ -498,6 +514,7 @@ public class ContextMenuHandler : IShellExtInit, IContextMenu
             }
 
             ShellExtLog.Info($"InvokeCommand: starting process: \"{exePath}\" {cmdLine}");
+            ShellExtLog.Info($"InvokeCommand: cmdLine length={cmdLine.Length}, pathCount={_selectedFiles.Count}, firstPath={(_selectedFiles.Count > 0 ? _selectedFiles[0] : "(none)")}");
             var psi = new ProcessStartInfo
             {
                 FileName = exePath,
@@ -530,7 +547,7 @@ public class ContextMenuHandler : IShellExtInit, IContextMenu
             NativeMethods.GCS_VERBA or NativeMethods.GCS_VERBW => "GCS_VERB",
             _ => $"0x{uFlags:x8}"
         };
-        ShellExtLog.Info($"IContextMenu.GetCommandString entered, offset={offset}, uFlags={flagName}, cch={cch}");
+        ShellExtLog.Info($"IContextMenu.GetCommandString #{_instanceId} entered, offset={offset}, uFlags={flagName}, cch={cch}");
         try
         {
             if (uFlags != NativeMethods.GCS_HELPTEXTA && uFlags != NativeMethods.GCS_HELPTEXTW &&

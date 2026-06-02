@@ -215,7 +215,6 @@
   "Main_Status_TestResultBad": "压缩包已损坏 ✗",
   "Main_Status_TestResultOK": "压缩包完整 ✓",
   "Main_Status_TestTitle": "测试结果",
-  "Main_Status_TestCancelled": "测试已取消",
   "Main_Status_Testing": "正在测试压缩包...",
   "Main_Status_WrongPwd": "密码错误",
   "Main_Toolbar_AddFiles": "添加",

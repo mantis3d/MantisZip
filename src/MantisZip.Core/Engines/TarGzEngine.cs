@@ -385,57 +385,10 @@ public class TarGzEngine : IArchiveEngine
 
         try
         {
-            await Task.Run(() =>
-            {
-                var ext = Path.GetExtension(archivePath).ToLowerInvariant();
-                var isTarGz = ext == ".tgz" || archivePath.EndsWith(".tar.gz", StringComparison.OrdinalIgnoreCase);
-
-                if (ext != ".tar" && !isTarGz)
-                    throw new NotSupportedException($"Unsupported extension: {ext}");
-
-                using var inputStream = File.OpenRead(archivePath);
-                var totalBytes = inputStream.Length;
-
-                using var reader = TarReader.OpenReader(inputStream, new ReaderOptions { LookForHeader = true });
-
-                int entryIndex = 0;
-                while (reader.MoveToNextEntry())
-                {
-                    cancellationToken.ThrowIfCancellationRequested();
-
-                    var entry = reader.Entry;
-                    var entryKey = entry.Key ?? $"entry_{entryIndex}";
-
-                    if (!entry.IsDirectory)
-                    {
-                        // 读取全量数据触发 GZip CRC32 校验
-                        using var entryStream = reader.OpenEntryStream();
-                        var buffer = new byte[81920];
-                        while (entryStream.Read(buffer, 0, buffer.Length) > 0) { }
-                    }
-
-                    entryIndex++;
-
-                    progress?.Report(new ArchiveProgress
-                    {
-                        CurrentFile = entryKey,
-                        PercentComplete = totalBytes > 0
-                            ? Math.Min((double)inputStream.Position / totalBytes * 100, 100)
-                            : 0,
-                    });
-                }
-
-                // 报告 100%
-                progress?.Report(new ArchiveProgress
-                {
-                    CurrentFile = string.Empty,
-                    PercentComplete = 100,
-                });
-
-                CoreLog.Info($"TestArchiveAsync: passed, {entryIndex} entries verified");
-            }, cancellationToken).ConfigureAwait(false);
-
-            return true;
+            var items = await ListEntriesAsync(archivePath, password, cancellationToken).ConfigureAwait(false);
+            var ok = items.Count > 0;
+            CoreLog.Info($"TestArchiveAsync: {(ok ? "passed" : "failed (no entries)")}, {items.Count} entries");
+            return ok;
         }
         catch (Exception ex)
         {

@@ -4,7 +4,7 @@
               xmlns:l="clr-namespace:MantisZip.UI.Localization"
              xmlns:emoji="clr-namespace:Emoji.Wpf;assembly=Emoji.Wpf"
              xmlns:converters="clr-namespace:MantisZip.UI.Converters"
-        Title="{l:L Progress_Title}" Height="Auto" Width="400" MinHeight="55"
+        Title="{l:L Progress_Title}" Height="Auto" Width="400" MinHeight="175"
         SizeToContent="Height"
         WindowStartupLocation="CenterScreen"
         ResizeMode="NoResize"
@@ -55,7 +55,7 @@
 
                     <Button x:Name="PwdRevealBtn" Grid.Column="2"
                             Width="24" Height="22" Margin="4,0,0,0"
-                            Content="👁" FontSize="12" Padding="0"
+                            Content="👁" FontSize="10" Padding="0"
                             Background="{StaticResource Theme_ButtonBg}" BorderThickness="1"
                             BorderBrush="{StaticResource Theme_Border}" Foreground="{StaticResource Theme_TextSecondary}"
                             Cursor="Hand" ToolTip="{l:L PwdMgr_Col_Password}"
@@ -64,7 +64,7 @@
 
                     <Button x:Name="PwdCopyBtn" Grid.Column="3"
                             Width="24" Height="22" Margin="4,0,0,0"
-                            Content="📋" FontSize="12" Padding="0"
+                            Content="📋" FontSize="10" Padding="0"
                             Background="{StaticResource Theme_ButtonBg}" BorderThickness="1"
                             BorderBrush="{StaticResource Theme_Border}" Foreground="{StaticResource Theme_TextSecondary}"
                             Cursor="Hand" ToolTip="{l:L PwdMgr_Col_Password}"
@@ -74,12 +74,12 @@
 
                 <!-- 第 2 行：规则描述 -->
                 <TextBlock x:Name="PwdRuleText" Grid.Row="1"
-                           Text="" FontSize="12" Foreground="{StaticResource Theme_TextDisabled}"
+                           Text="" FontSize="11" Foreground="{StaticResource Theme_TextDisabled}"
                            Margin="22,2,0,0"/>
 
                 <!-- 第 3 行：状态（验证通过 / 正在尝试） -->
                 <TextBlock x:Name="PwdStatusText" Grid.Row="2"
-                           Text="" FontSize="12" Foreground="{StaticResource Theme_TextDisabled}"
+                           Text="" FontSize="11" Foreground="{StaticResource Theme_TextDisabled}"
                            Margin="22,2,0,0"/>
             </Grid>
         </Border>
@@ -97,7 +97,7 @@
                 <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
             <ProgressBar x:Name="FileProgressBar" Grid.Column="0"
-                         Height="13"
+                         Height="10"
                          Minimum="0" Maximum="100" Value="0"
                          Foreground="{StaticResource Theme_ProgressFill}" Background="{StaticResource Theme_ProgressBg}"/>
             <TextBlock x:Name="FilePercentText" Grid.Column="1"
@@ -114,7 +114,7 @@
                 <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
             <ProgressBar x:Name="TotalProgressBar" Grid.Column="0"
-                         Height="20"
+                         Height="18"
                          Minimum="0" Maximum="100" Value="0"/>
             <TextBlock x:Name="PercentText" Grid.Column="1"
                        Text="0%"
@@ -126,14 +126,14 @@
         <!-- 文件计数 -->
         <TextBlock x:Name="FileCountText" Grid.Row="5"
                    Text=""
-                   FontSize="12" Foreground="{StaticResource Theme_TextDisabled}"
+                   FontSize="11" Foreground="{StaticResource Theme_TextDisabled}"
                    Margin="0,0,0,4"
                    Visibility="Collapsed"/>
 
         <!-- ═══ 批处理文件列表（3 列：状态图标 | 文件名+进度条背景 | 百分比）═══ -->
         <ListView x:Name="BatchFileList" Grid.Row="0"
                   Visibility="Collapsed"
-                  MaxHeight="180" Margin="0,0,0,8"
+                  MaxHeight="160" Margin="0,0,0,8"
                   BorderThickness="1"
                   BorderBrush="{StaticResource Theme_Border}"
                   Background="{StaticResource Theme_WindowBg}"
@@ -181,7 +181,7 @@
                                    HorizontalAlignment="Right"
                                    VerticalAlignment="Center"
                                    Foreground="{StaticResource Theme_TextSecondary}"
-                                   FontSize="12"
+                                   FontSize="11"
                                    Padding="0,0,6,0"/>
                     </Grid>
                 </DataTemplate>

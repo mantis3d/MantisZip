@@ -810,61 +810,51 @@ public partial class MainWindow : Window
 
     private async Task TestArchiveAsync(string archivePath)
     {
-        SetStatus(L.T(L.Main_Status_Testing));
-
-        var engine = ArchiveEngineFactory.GetEngineByExtension(archivePath);
-        if (engine == null) return;
-
-        // 如果压缩包有加密但没密码 → 先让用户输入密码
-        string? password = _currentPassword;
-        if (_hasEncryptedArchive && password == null)
+        try
         {
-            var pwdDialog = new PasswordDialog(Path.GetFileName(archivePath));
-            pwdDialog.Owner = this;
-            if (pwdDialog.ShowDialog() == true)
+            SetStatus(L.T(L.Main_Status_Testing));
+            ShowProgress(true);
+
+            var engine = ArchiveEngineFactory.GetEngineByExtension(archivePath);
+            if (engine == null) return;
+
+            // 如果压缩包有加密但没密码 → 先让用户输入密码
+            string? password = _currentPassword;
+            if (_hasEncryptedArchive && password == null)
             {
-                var userPwd = pwdDialog.ResultPassword;
-                if (!string.IsNullOrEmpty(userPwd) && App.QuickVerifyPassword(archivePath, userPwd, engine))
+                var pwdDialog = new PasswordDialog(Path.GetFileName(archivePath));
+                pwdDialog.Owner = this;
+                if (pwdDialog.ShowDialog() == true)
                 {
-                    password = userPwd;
-                    _currentPassword = userPwd;
-                    UpdatePasswordStatus();
-                    UpdateEnterPasswordBtnState();
-                    if (pwdDialog.RememberPassword)
+                    var userPwd = pwdDialog.ResultPassword;
+                    if (!string.IsNullOrEmpty(userPwd) && App.QuickVerifyPassword(archivePath, userPwd, engine))
                     {
-                        App.TrySavePassword(userPwd, archivePath, pwdDialog.Patterns, pwdDialog.Description);
+                        password = userPwd;
+                        _currentPassword = userPwd;
+                        UpdatePasswordStatus();
+                        UpdateEnterPasswordBtnState();
+                        if (pwdDialog.RememberPassword)
+                        {
+                            App.TrySavePassword(userPwd, archivePath, pwdDialog.Patterns, pwdDialog.Description);
+                        }
+                    }
+                    else
+                    {
+                        ShowProgress(false);
+                        AppMessageBox.Show(L.T(L.Main_Status_WrongPwd), L.T(L.App_ErrorTitle), MessageBoxButton.OK, MessageBoxImage.Error);
+                        SetStatus(L.T(L.Main_Status_TestFailed));
+                        return;
                     }
                 }
                 else
                 {
-                    AppMessageBox.Show(L.T(L.Main_Status_WrongPwd), L.T(L.App_ErrorTitle), MessageBoxButton.OK, MessageBoxImage.Error);
-                    SetStatus(L.T(L.Main_Status_TestFailed));
+                    ShowProgress(false);
+                    SetStatus(L.T(L.Main_Status_AddCancel));
                     return;
                 }
             }
-            else
-            {
-                SetStatus(L.T(L.Main_Status_AddCancel));
-                return;
-            }
-        }
 
-        // 弹出 ProgressWindow
-        var progressWindow = new ProgressWindow();
-        progressWindow.InitCancellation();
-        progressWindow.Show();
-
-        try
-        {
-            var progress = ProgressWindow.CreateBackgroundProgress(progressWindow);
-            var ct = progressWindow.CancellationToken;
-
-            var result = await engine.TestArchiveAsync(archivePath, password, progress, ct);
-
-            progressWindow.SetComplete(
-                result ? L.T(L.Main_Status_TestResultOK) : L.T(L.Main_Status_TestResultBad));
-            await Task.Delay(600);
-            progressWindow.Close();
+            var result = await engine.TestArchiveAsync(archivePath, password);
 
             AppMessageBox.Show(
                 result ? L.T(L.Main_Status_TestResultOK) : L.T(L.Main_Status_TestResultBad),
@@ -874,16 +864,14 @@ public partial class MainWindow : Window
 
             SetStatus(result ? L.T(L.Main_Status_TestPassed) : L.T(L.Main_Status_TestFailed));
         }
-        catch (OperationCanceledException)
-        {
-            progressWindow.Close();
-            SetStatus(L.T(L.Main_Status_TestCancelled));
-        }
         catch (Exception ex)
         {
-            progressWindow.Close();
             AppMessageBox.Show(L.TF(L.Main_Status_TestFailed, ex.Message), L.T(L.App_ErrorTitle), MessageBoxButton.OK, MessageBoxImage.Error);
             SetStatus(L.T(L.Main_Status_TestFailed));
+        }
+        finally
+        {
+            ShowProgress(false);
         }
     }
 

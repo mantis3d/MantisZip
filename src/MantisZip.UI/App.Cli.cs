@@ -80,20 +80,23 @@ public partial class App : Application
     }
     private static void HandleCompressSeparate(string[] paths)
     {
-        LogStartup($"HandleCompressSeparate: paths=[{string.Join(";", paths)}]");
+        LogStartup($"HandleCompressSeparate: entered with {paths.Length} CLI args");
         var app = Current;
         if (app == null) return;
         app.ShutdownMode = ShutdownMode.OnExplicitShutdown;
 
         var myPaths = paths.Where(p => File.Exists(p) || Directory.Exists(p)).ToList();
+        LogStartup($"HandleCompressSeparate: after filter, {myPaths.Count} valid paths out of {paths.Length}");
         if (myPaths.Count == 0)
         {
+            LogStartup("HandleCompressSeparate: no valid paths, shutting down");
             app.Shutdown();
             return;
         }
 
         bool firstInstance;
         var mutex = new Mutex(true, CompressSeparateMutexName, out firstInstance);
+        LogStartup($"HandleCompressSeparate: firstInstance={firstInstance}");
 
         if (firstInstance)
         {
@@ -111,18 +114,21 @@ public partial class App : Application
                 timer.Stop();
                 cts.Cancel();
                 mutex.Dispose();
+                LogStartup($"HandleCompressSeparate: timer fired, proceeding with {allPaths.Count} total paths");
                 RunCompressSeparateBatch(allPaths);
             };
             timer.Start();
         }
         else
         {
+            LogStartup($"HandleCompressSeparate: subsequent instance, sending {myPaths.Count} paths through pipe");
             SendPathsThroughPipe(myPaths, CompressSeparatePipeName);
             app.Shutdown();
         }
     }
     private static void RunCompressSeparateBatch(List<string> allPaths)
     {
+        LogStartup($"RunCompressSeparateBatch: starting with {allPaths.Count} paths");
         var app = Current;
         if (app == null) return;
 
@@ -266,20 +272,23 @@ public partial class App : Application
     }
     private static void HandleCompressCombined(string[] paths)
     {
-        LogStartup($"HandleCompressCombined: paths=[{string.Join(";", paths)}]");
+        LogStartup($"HandleCompressCombined: entered with {paths.Length} CLI args");
         var app = Current;
         if (app == null) return;
         app.ShutdownMode = ShutdownMode.OnExplicitShutdown;
 
         var myPaths = paths.Where(p => File.Exists(p) || Directory.Exists(p)).ToList();
+        LogStartup($"HandleCompressCombined: after filter, {myPaths.Count} valid paths out of {paths.Length}");
         if (myPaths.Count == 0)
         {
+            LogStartup("HandleCompressCombined: no valid paths, shutting down");
             app.Shutdown();
             return;
         }
 
         bool firstInstance;
         var mutex = new Mutex(true, CompressCombinedMutexName, out firstInstance);
+        LogStartup($"HandleCompressCombined: firstInstance={firstInstance}");
 
         if (firstInstance)
         {
@@ -297,18 +306,21 @@ public partial class App : Application
                 timer.Stop();
                 cts.Cancel();
                 mutex.Dispose();
+                LogStartup($"HandleCompressCombined: timer fired, proceeding with {allPaths.Count} total paths");
                 RunCompressCombined(allPaths);
             };
             timer.Start();
         }
         else
         {
+            LogStartup($"HandleCompressCombined: subsequent instance, sending {myPaths.Count} paths through pipe");
             SendPathsThroughPipe(myPaths, CompressCombinedPipeName);
             app.Shutdown();
         }
     }
     private static void RunCompressCombined(List<string> allPaths)
     {
+        LogStartup($"RunCompressCombined: starting with {allPaths.Count} paths");
         var app = Current;
         if (app == null) return;
         var settings = AppSettings.Instance;
@@ -889,8 +901,15 @@ public partial class App : Application
                         var progress = progressWindow.CreatePauseAwareProgress(
                             ProgressWindow.CreateBackgroundProgress(progressWindow));
 
-                        var opts = CreateExtractOptions();
-                        await engine.ExtractAsync(archivePath, dest, password, progress, ct, opts);
+                        if (password != null)
+                        {
+                            var opts = CreateExtractOptions();
+                            await engine.ExtractAsync(archivePath, dest, password, progress, ct, opts);
+                        }
+                        else
+                        {
+                            await engine.ExtractAsync(archivePath, dest, null, progress, ct);
+                        }
 
                         succeeded++;
                         await progressWindow.Dispatcher.InvokeAsync(() =>
