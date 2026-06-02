@@ -44,6 +44,7 @@ public static class L
     public const string App_UnsupportedFormat                      = "App_UnsupportedFormat";
     public const string App_WrongPassword                          = "App_WrongPassword";
     public const string CompressConflict_Add                       = "CompressConflict_Add";
+    public const string CompressConflict_AutoRename                = "CompressConflict_AutoRename";
     public const string CompressConflict_Cancel                    = "CompressConflict_Cancel";
     public const string CompressConflict_Header                    = "CompressConflict_Header";
     public const string CompressConflict_Overwrite                 = "CompressConflict_Overwrite";
