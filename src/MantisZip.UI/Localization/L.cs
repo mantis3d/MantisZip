@@ -273,6 +273,8 @@ public static class L
     public const string Main_Tooltip_NewArchive                    = "Main_Tooltip_NewArchive";
     public const string Main_Tooltip_OpenArchive                   = "Main_Tooltip_OpenArchive";
     public const string Main_Tooltip_Password                      = "Main_Tooltip_Password";
+    public const string Main_Tooltip_PasswordMatched                = "Main_Tooltip_PasswordMatched";
+    public const string Main_Tooltip_PasswordMissing                = "Main_Tooltip_PasswordMissing";
     public const string Main_Tooltip_Preview                       = "Main_Tooltip_Preview";
     public const string Main_Tooltip_SmartExtract                  = "Main_Tooltip_SmartExtract";
     public const string Main_Tooltip_Test                          = "Main_Tooltip_Test";
@@ -504,6 +506,10 @@ public static class L
     public const string PwdMgr_Tip                                 = "PwdMgr_Tip";
     public const string PwdMgr_Title                               = "PwdMgr_Title";
     public const string PwdMgr_UpdateFailed                        = "PwdMgr_UpdateFailed";
+    public const string PwdMatched_Description                      = "PwdMatched_Description";
+    public const string PwdMatched_Header                           = "PwdMatched_Header";
+    public const string PwdMatched_Rules                            = "PwdMatched_Rules";
+    public const string PwdMatched_Title                            = "PwdMatched_Title";
     public const string Pwd_Cancel                                 = "Pwd_Cancel";
     public const string Pwd_Description                            = "Pwd_Description";
     public const string Pwd_MatchRules                             = "Pwd_MatchRules";
