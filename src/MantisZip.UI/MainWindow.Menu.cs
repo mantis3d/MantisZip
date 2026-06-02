@@ -168,6 +168,13 @@ public partial class MainWindow
             _ = LoadArchiveAsync(_currentArchivePath);
     }
 
+    private void Donate_Click(object sender, RoutedEventArgs e)
+    {
+        var dialog = new DonationDialog();
+        dialog.Owner = this;
+        dialog.ShowDialog();
+    }
+
     private void About_Click(object sender, RoutedEventArgs e)
     {
         AppMessageBox.Show(L.TF(L.Main_About_Text, AppConstants.Version),

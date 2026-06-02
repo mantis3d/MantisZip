@@ -136,6 +136,11 @@ public static class L
     // Core_SevenZip_* keys removed in v0.3.4 — 7z.exe replaced by SharpSevenZip
     public const string Core_TarGz_NoAdd                           = "Core_TarGz_NoAdd";
     public const string Core_Zip_Encrypted                         = "Core_Zip_Encrypted";
+    public const string Donate_Header                              = "Donate_Header";
+    public const string Donate_Platforms_Hint                      = "Donate_Platforms_Hint";
+    public const string Donate_QrHint                              = "Donate_QrHint";
+    public const string Donate_QrPlaceholder                       = "Donate_QrPlaceholder";
+    public const string Donate_Title                               = "Donate_Title";
     public const string Error_Abort                                = "Error_Abort";
     public const string Error_ApplyToAll                           = "Error_ApplyToAll";
     public const string Error_Header                               = "Error_Header";
@@ -196,6 +201,7 @@ public static class L
     public const string Main_Menu_ArchiveComment                   = "Main_Menu_ArchiveComment";
     public const string Main_Menu_ClearRecentFiles                 = "Main_Menu_ClearRecentFiles";
     public const string Main_Menu_Compress                         = "Main_Menu_Compress";
+    public const string Main_Menu_Donate                           = "Main_Menu_Donate";
     public const string Main_Menu_Edit                             = "Main_Menu_Edit";
     public const string Main_Menu_Exit                             = "Main_Menu_Exit";
     public const string Main_Menu_Extract                          = "Main_Menu_Extract";
