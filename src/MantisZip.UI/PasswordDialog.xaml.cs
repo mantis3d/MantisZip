@@ -92,15 +92,19 @@ public partial class PasswordDialog : Window
         }
     }
 
-    private void ShowPasswordToggle_Changed(object? sender, RoutedEventArgs e)
+    private bool _isPasswordRevealed;
+
+    private void PwdRevealBtn_Click(object sender, RoutedEventArgs e)
     {
-        if (ShowPasswordToggle.IsChecked == true)
+        _isPasswordRevealed = !_isPasswordRevealed;
+        if (_isPasswordRevealed)
         {
             PasswordPlainBox.Text = PasswordBox.Password;
             PasswordBox.Visibility = Visibility.Collapsed;
             PasswordPlainBox.Visibility = Visibility.Visible;
             PasswordPlainBox.Focus();
             PasswordPlainBox.Select(PasswordPlainBox.Text.Length, 0);
+            PwdRevealBtn.Content = "🙈";
         }
         else
         {
@@ -108,6 +112,7 @@ public partial class PasswordDialog : Window
             PasswordPlainBox.Visibility = Visibility.Collapsed;
             PasswordBox.Visibility = Visibility.Visible;
             PasswordBox.Focus();
+            PwdRevealBtn.Content = "👁";
         }
     }
 
@@ -126,7 +131,7 @@ public partial class PasswordDialog : Window
 
     private void Ok_Click(object sender, RoutedEventArgs e)
     {
-        var password = ShowPasswordToggle.IsChecked == true
+        var password = _isPasswordRevealed
             ? PasswordPlainBox.Text
             : PasswordBox.Password;
 
