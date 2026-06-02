@@ -440,7 +440,7 @@
                             <ColumnDefinition Width="Auto"/>
                             <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
-                        <emoji:TextBlock x:Name="IconPassword" Text="🔑" FontSize="20" VerticalAlignment="Center"/>
+                        <emoji:TextBlock x:Name="IconPassword" Text="🔐" FontSize="20" VerticalAlignment="Center"/>
                         <TextBlock Text="{l:L Settings_Tab_Password}" Grid.Column="1" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="4,0,0,0"/>
                     </Grid>
                 </TabItem.Header>

@@ -156,26 +156,43 @@ public partial class MainWindow
     private void EnterPassword_Click(object sender, RoutedEventArgs e)
     {
         if (string.IsNullOrEmpty(_currentArchivePath)) return;
-        var dialog = new PasswordDialog(Path.GetFileName(_currentArchivePath));
-        dialog.Owner = this;
-        if (dialog.ShowDialog() == true)
+
+        // 已匹配 → 打开查看/复制对话框
+        if (_currentPassword != null)
         {
-            var userPwd = dialog.ResultPassword;
+            var dialog = new MatchedPasswordDialog(
+                Path.GetFileName(_currentArchivePath),
+                _currentPassword,
+                _currentPasswordDescription,
+                _currentPasswordPatterns);
+            dialog.Owner = this;
+            dialog.ShowDialog();
+            return;
+        }
+
+        // 未匹配 → 打开密码输入对话框
+        var pwdDialog = new PasswordDialog(Path.GetFileName(_currentArchivePath));
+        pwdDialog.Owner = this;
+        if (pwdDialog.ShowDialog() == true)
+        {
+            var userPwd = pwdDialog.ResultPassword;
             if (string.IsNullOrEmpty(userPwd)) return;
             var engine = ArchiveEngineFactory.GetEngineByExtension(_currentArchivePath);
             if (engine == null) return;
             if (App.QuickVerifyPassword(_currentArchivePath, userPwd, engine))
             {
                 _currentPassword = userPwd;
+                _currentPasswordDescription = pwdDialog.Description;
+                _currentPasswordPatterns = pwdDialog.Patterns?.ToList();
                 UpdatePasswordStatus();
                 UpdateEnterPasswordBtnState();
                 SetStatus(L.T(L.Main_Status_PwdMatched));
-                if (dialog.RememberPassword)
+                if (pwdDialog.RememberPassword)
                 {
-                    var patterns = dialog.Patterns.Count > 0
-                        ? dialog.Patterns
+                    var patterns = pwdDialog.Patterns.Count > 0
+                        ? pwdDialog.Patterns
                         : new List<string> { Path.GetFileName(_currentArchivePath) };
-                    try { PasswordManager.Instance.AddPassword(userPwd, dialog.Description ?? "", patterns); }
+                    try { PasswordManager.Instance.AddPassword(userPwd, pwdDialog.Description ?? "", patterns); }
                     catch (Exception pwdEx) { App.LogDebug("PasswordDialog: failed to save password: {0}", pwdEx.Message); }
                 }
             }
