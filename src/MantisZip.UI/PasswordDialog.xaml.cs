@@ -35,6 +35,16 @@ public partial class PasswordDialog : Window
         var nameOnly = Path.GetFileName(fileName);
         PatternsTextBox.Text = nameOnly;
         LoadSavedPasswords(fileName);
+
+        // 根据设置决定默认是否显示明文
+        if (AppSettings.Instance.PasswordRevealByDefault)
+        {
+            _isPasswordRevealed = true;
+            PasswordPlainBox.Text = "";
+            PasswordBox.Visibility = Visibility.Collapsed;
+            PasswordPlainBox.Visibility = Visibility.Visible;
+            PwdRevealBtn.Content = "🙈";
+        }
     }
 
     private void LoadSavedPasswords(string fileName)
@@ -93,6 +103,8 @@ public partial class PasswordDialog : Window
     }
 
     private bool _isPasswordRevealed;
+
+    public bool PasswordRevealed => _isPasswordRevealed;
 
     private void PwdRevealBtn_Click(object sender, RoutedEventArgs e)
     {
