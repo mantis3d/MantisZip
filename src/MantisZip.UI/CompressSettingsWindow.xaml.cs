@@ -959,6 +959,9 @@ public partial class CompressSettingsWindow : Window
         {
             var ct = progressWindow.CancellationToken;
 
+            bool applyToAll = false;
+            CompressConflictAction? chosenAction = null;
+
             for (int i = 0; i < _sourcePaths.Count; i++)
             {
                 if (ct.IsCancellationRequested) break;
@@ -1010,48 +1013,88 @@ public partial class CompressSettingsWindow : Window
                     // 冲突处理 — per item
                     if (File.Exists(outputPath))
                     {
-                        bool canAdd = engine is not null and not TarGzEngine;
-                        var conflictResult = await progressWindow.Dispatcher.InvokeAsync(() =>
+                        // 已勾选"应用到全部" → 直接返回记忆的选择
+                        if (applyToAll && chosenAction.HasValue)
                         {
-                            var dlg = new CompressConflictDialog(outputPath, canAdd,
-                                Path.GetFileName(App.GetUniquePath(outputPath)));
-                            return dlg.ShowDialog() == true ? dlg : null;
-                        });
-
-                        if (conflictResult == null)
-                        {
-                            fail++;
-                            continue; // 用户取消
+                            switch (chosenAction.Value)
+                            {
+                                case CompressConflictAction.Rename:
+                                    // Rename 在勾选"应用到全部"时被禁用，不应到达此处
+                                    outputPath = Path.Combine(parentDir,
+                                        Path.GetFileName(App.GetUniquePath(outputPath)));
+                                    engine = ArchiveEngineFactory.GetEngineByExtension(outputPath, new ZipEngine());
+                                    break;
+                                case CompressConflictAction.Add:
+                                    {
+                                        try
+                                        {
+                                            var addProgress = ProgressWindow.CreateBackgroundProgress(progressWindow);
+                                            await engine!.AddToArchiveAsync(outputPath, new[] { sourcePath }, options, addProgress, ct);
+                                            success++;
+                                        }
+                                        catch (Exception addEx)
+                                        {
+                                            App.Log("Separate add-to-archive failed for {0}: {1}", sourcePath, addEx.Message);
+                                            fail++;
+                                        }
+                                        continue;
+                                    }
+                                case CompressConflictAction.Overwrite:
+                                default:
+                                    break;
+                            }
                         }
-
-                        switch (conflictResult.ResultAction)
+                        else
                         {
-                            case CompressConflictAction.Cancel:
+                            bool canAdd = engine is not null and not TarGzEngine;
+                            var conflictResult = await progressWindow.Dispatcher.InvokeAsync(() =>
+                            {
+                                var dlg = new CompressConflictDialog(outputPath, canAdd,
+                                    Path.GetFileName(App.GetUniquePath(outputPath)));
+                                return dlg.ShowDialog() == true ? dlg : null;
+                            });
+
+                            if (conflictResult == null)
+                            {
                                 fail++;
-                                continue;
-                            case CompressConflictAction.Rename:
-                                outputPath = Path.Combine(parentDir,
-                                    conflictResult.CustomName ?? Path.GetFileName(App.GetUniquePath(outputPath)));
-                                engine = ArchiveEngineFactory.GetEngineByExtension(outputPath, new ZipEngine());
-                                break;
-                            case CompressConflictAction.Add:
-                                {
-                                    try
+                                continue; // 用户取消
+                            }
+
+                            if (conflictResult.ApplyToAll)
+                            {
+                                applyToAll = true;
+                                chosenAction = conflictResult.ResultAction;
+                            }
+
+                            switch (conflictResult.ResultAction)
+                            {
+                                case CompressConflictAction.Cancel:
+                                    fail++;
+                                    continue;
+                                case CompressConflictAction.Rename:
+                                    outputPath = Path.Combine(parentDir,
+                                        conflictResult.CustomName ?? Path.GetFileName(App.GetUniquePath(outputPath)));
+                                    engine = ArchiveEngineFactory.GetEngineByExtension(outputPath, new ZipEngine());
+                                    break;
+                                case CompressConflictAction.Add:
                                     {
-                                        var addProgress = ProgressWindow.CreateBackgroundProgress(progressWindow);
-                                        await engine!.AddToArchiveAsync(outputPath, new[] { sourcePath }, options, addProgress, ct);
-                                        success++;
+                                        try
+                                        {
+                                            var addProgress = ProgressWindow.CreateBackgroundProgress(progressWindow);
+                                            await engine!.AddToArchiveAsync(outputPath, new[] { sourcePath }, options, addProgress, ct);
+                                            success++;
+                                        }
+                                        catch (Exception addEx)
+                                        {
+                                            App.Log("Separate add-to-archive failed for {0}: {1}", sourcePath, addEx.Message);
+                                            fail++;
+                                        }
+                                        continue; // skip to next item
                                     }
-                                    catch (Exception addEx)
-                                    {
-                                        App.Log("Separate add-to-archive failed for {0}: {1}", sourcePath, addEx.Message);
-                                        fail++;
-                                    }
-                                    continue; // skip to next item
-                                }
-                            case CompressConflictAction.Overwrite:
-                            default:
-                                break;
+                                case CompressConflictAction.Overwrite:
+                                default:
+                                    break;
+                            }
                         }
                     }
 

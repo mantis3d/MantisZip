@@ -149,6 +149,9 @@ public partial class App : Application
         {
             try
             {
+                bool applyToAll = false;
+                CompressConflictAction? chosenAction = null;
+
                 for (int i = 0; i < total; i++)
                 {
                     ct.ThrowIfCancellationRequested();
@@ -175,34 +178,58 @@ public partial class App : Application
                     bool addMode = false;
                     if (File.Exists(outputPath))
                     {
-                        var engine = ArchiveEngineFactory.GetEngineByExtension(outputPath);
-                        bool canAdd = engine is not null and not TarGzEngine;
-
-                        string? initialCustomName = null;
-                        var conflictResult = await progressWindow.Dispatcher.InvokeAsync(() =>
+                        // 已勾选"应用到全部" → 直接返回记忆的选择
+                        if (applyToAll && chosenAction.HasValue)
                         {
-                            var dlg = new CompressConflictDialog(outputPath, canAdd, Path.GetFileName(GetUniquePath(outputPath)));
-                            var result = dlg.ShowDialog() == true
-                                ? dlg.ResultAction
-                                : CompressConflictAction.Cancel;
-                            initialCustomName = dlg.CustomName;
-                            return result;
-                        });
-
-                        switch (conflictResult)
+                            switch (chosenAction.Value)
+                            {
+                                case CompressConflictAction.Rename:
+                                    finalPath = Path.Combine(parentDir, Path.GetFileName(GetUniquePath(outputPath)));
+                                    break;
+                                case CompressConflictAction.Add:
+                                    addMode = true;
+                                    break;
+                                case CompressConflictAction.Overwrite:
+                                default:
+                                    break;
+                            }
+                        }
+                        else
                         {
-                            case CompressConflictAction.Cancel:
-                                failed++;
-                                continue;
-                            case CompressConflictAction.Rename:
-                                finalPath = Path.Combine(parentDir, initialCustomName ?? Path.GetFileName(GetUniquePath(outputPath)));
-                                break;
-                            case CompressConflictAction.Add:
-                                addMode = true;
-                                break;
-                            case CompressConflictAction.Overwrite:
-                            default:
-                                break;
+                            var engine = ArchiveEngineFactory.GetEngineByExtension(outputPath);
+                            bool canAdd = engine is not null and not TarGzEngine;
+
+                            string? initialCustomName = null;
+                            var conflictResult = await progressWindow.Dispatcher.InvokeAsync(() =>
+                            {
+                                var dlg = new CompressConflictDialog(outputPath, canAdd, Path.GetFileName(GetUniquePath(outputPath)));
+                                var shown = dlg.ShowDialog() == true;
+                                initialCustomName = dlg.CustomName;
+                                return (Action: shown ? dlg.ResultAction : CompressConflictAction.Cancel,
+                                        ApplyAll: dlg.ApplyToAll);
+                            });
+
+                            if (conflictResult.ApplyAll)
+                            {
+                                applyToAll = true;
+                                chosenAction = conflictResult.Action;
+                            }
+
+                            switch (conflictResult.Action)
+                            {
+                                case CompressConflictAction.Cancel:
+                                    failed++;
+                                    continue;
+                                case CompressConflictAction.Rename:
+                                    finalPath = Path.Combine(parentDir, initialCustomName ?? Path.GetFileName(GetUniquePath(outputPath)));
+                                    break;
+                                case CompressConflictAction.Add:
+                                    addMode = true;
+                                    break;
+                                case CompressConflictAction.Overwrite:
+                                default:
+                                    break;
+                            }
                         }
                     }
 
