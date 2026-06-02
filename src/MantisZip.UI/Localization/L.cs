@@ -188,6 +188,8 @@ public static class L
     public const string Main_DragAddTitle                          = "Main_DragAddTitle";
     public const string Main_DragFormatUnsupported                 = "Main_DragFormatUnsupported";
     public const string Main_EmptyDropHint                         = "Main_EmptyDropHint";
+    public const string Main_DropHint_OpenArchive                  = "Main_DropHint_OpenArchive";
+    public const string Main_DropHint_PasswordManager              = "Main_DropHint_PasswordManager";
     public const string Main_ForceLoadPwd                          = "Main_ForceLoadPwd";
     public const string Main_IsEncrypted                           = "Main_IsEncrypted";
     public const string Main_ArchiveComment_CommentSaved            = "Main_ArchiveComment_CommentSaved";

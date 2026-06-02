@@ -461,6 +461,16 @@ public partial class MainWindow
         new PasswordManagerWindow { Owner = this }.ShowDialog();
     }
 
+    private void DropHint_OpenArchive(object sender, MouseButtonEventArgs e)
+    {
+        OpenArchive_Click(sender, e);
+    }
+
+    private void DropHint_PasswordManager(object sender, MouseButtonEventArgs e)
+    {
+        PasswordManager_Click(sender, e);
+    }
+
     private void TestArchive_Click(object sender, RoutedEventArgs e)
     {
         if (!string.IsNullOrEmpty(_currentArchivePath))
