@@ -596,3 +596,143 @@ Task 1 → Task 3 → Task 4 → Task 5 → Task 7 → Task 8 → Task 9 → F1-
 - [ ] 旧静态注册表条目清理干净
 - [ ] 文件关联（OpenWithProgids）不受影响
 - [ ] `--install-shell` / `--uninstall-shell` 同时处理 COM 注册和文件关联
+
+---
+
+## >16 文件回退到静态 Verb 方案
+
+> **问题**: Explorer 传给 `IContextMenu` 的 `IDataObject`（`CF_HDROP`）只包含前 16 个选中文件。COM 菜单的 IPC 合并机制（`Mutex` + `NamedPipeServerStream`）虽然能补齐完整文件列表，但：
+> - 存在 800ms 等待窗口和 race condition
+> - `QueryContextMenu` 被调用时 `/ `GetCount` 只看到 16 个文件
+> - IPC 合并后的 `QueryContextMenu` 再调用时菜单已经画完了
+>
+> **方案**: COM 菜单检测 >16 个文件时主动隐身（`QueryContextMenu` 返回 `S_FALSE`），让静态动词自然接管。
+
+### 设计
+
+```
+HKCU\Software\Classes\*\shell\MantisZip\shell\extract-here\command  → 静态 verb（始终安装）
+HKCU\Software\Classes\*\shellex\ContextMenuHandlers\MantisZip\      → COM handler（始终安装）
+```
+
+两者是**独立注册的**。Explorer 构建菜单时会分别加载它们。COM handler 的 `QueryContextMenu` 返回 0 个菜单项时，静态 verb **仍然会显示**。
+
+### 文件数决定显示策略
+
+| 选中文件数 | QueryContextMenu 表现 | 用户看到什么 |
+|-----------|----------------------|-------------|
+| 0（背景模式） | 正常添加菜单项 | COM 菜单（压缩到当前目录） |
+| 1-10 | 正常添加菜单项 | COM 菜单（动态文件名、图标） |
+| 11-16 | 正常添加菜单项（精确计数） | COM 菜单（显示 "等 N 个文件"） |
+| >16 | 返回 S_FALSE（不加任何项） | **静态 verb** 菜单（无图标、固定文本） |
+
+### 改动清单
+
+#### 1. `ShellIntegration.cs` — `Install()` 改为同时安装
+
+当前 `Install()` 是"先试 COM，失败才装静态 verb"。改为**同时安装**：
+
+```csharp
+public static void Install()
+{
+    InstallCom();         // COM handler 始终注册
+    InstallStatic();      // 静态 verb 也始终注册（不再 fallback-only）
+}
+```
+
+`Uninstall()` 同步清理两种注册。
+
+#### 2. `ContextMenuHandler.cs` — `QueryContextMenu` 开头加判断
+
+```csharp
+protected override int QueryContextMenu(HMENU hmenu, uint indexMenu, uint idCmdFirst,
+    uint idCmdLast, uint uFlags)
+{
+    // >16 文件 → 隐身，让静态 verb 接管
+    int effectiveCount = GetEffectiveFileCount();
+    if (effectiveCount > 16)
+    {
+        return S_FALSE;  // 不加任何菜单项
+    }
+
+    // ≤16 文件时照常显示 COM 菜单
+    // ... 现有逻辑
+}
+```
+
+#### 3. `GetEffectiveFileCount()` 需要考虑 IPC 时序
+
+`_fullFileList` 在 `Initialize` 中被填充（来自当前实例的 `IDataObject`），之后 IPC 合并补齐。但 `QueryContextMenu` 可能在 IPC 完成之前就被调用。
+
+**方案**: 在 `Initialize` 末尾触发 IPC 合并并**同步等待**最多 500ms：
+
+```csharp
+void Initialize(IntPtr pidlFolder, IntPtr pDataObj, IntPtr hKeyProgId)
+{
+    // 1. 从 IDataObject 读取当前实例的文件列表
+    _myFiles = ExtractFilesFromDataObject(pDataObj);
+
+    // 2. 只有当前实例文件数 >16 才启动 IPC（≤16 不需要）
+    if (_myFiles.Count > 16)
+    {
+        // 3. IPC 合并：尝试获取完整文件列表
+        _fullFileList = TryMergeViaIpc(timeoutMs: 500);
+
+        // 4. 最终数量 = max(当前实例, 合并后总数)
+        _effectiveCount = Math.Max(_myFiles.Count, _fullFileList?.Count ?? 0);
+    }
+    else
+    {
+        _fullFileList = null;
+        _effectiveCount = _myFiles.Count;
+    }
+}
+```
+
+> **为什么不超过 500ms**: 如果超过 500ms 还没等齐，就按当前已有文件数决定。这保证了菜单显示不卡死。
+
+### 文件数判断在哪个阶段做更可靠
+
+两个选项：
+
+| 方案 | 在 Initialize 判断 | 在 QueryContextMenu 判断 |
+|------|-------------------|------------------------|
+| 时序 | IPC 合并已完成 | 可能 IPC 还在进行 |
+| 可靠性 | 高（等待后判断） | 低（可能看到 16 而非完整数） |
+| 对 UI 的影响 | 轻微的同步等 *** | *** 无等待 |
+| 复杂度 | 中 | 低 |
+
+**选 Initialize**：同步等 500ms 是合理代价，换来 >16 文件的正确判断。
+
+### 静态 Verb 的 IPC 合并
+
+静态 verb 对每个选中文件独立调用一次：
+
+```
+Explorer:
+  mantiszip.exe --extract-here "file1"   → 实例 1（先到，成为 Collector）
+  mantiszip.exe --extract-here "file2"   → 实例 2（通过 pipe 传 path 后退出）
+  mantiszip.exe --extract-here "..."     → 后续实例（同上）
+```
+
+现有的 `Mutex` + `NamedPipeServerStream` IPC 机制已支持这种模式（`--compress`、`--compress-separate`、`--compress-combined` 都用了）。 `--extract-here` 等命令类型也已实现 IPC 合并（`--open` 除外）。
+
+### 约束
+
+- **启动延迟**: >16 文件时，`Initialize` 多等最多 500ms。这是 IPC 合并的最小代价。
+- **COM 必须保持注册**: 即使 >16 文件场景用静态 verb，COM handler 仍须注册（因为 ≤16 文件时用它）。 `Install()` 必须始终安装两者。
+- **卸载清理**: `Uninstall()` 必须同时清理 COM CLSID 和静态 verb 的所有注册表键。
+- **Host 文件缺失**: 如果 comhost.dll 缺失，`InstallCom()` 失败，comhandler 不存在 = 永远回退到静态 verb（当前 fallback 行为）。
+
+### 后续优化的可能性
+
+- **C++/WinRT 替代方案**: 用原生 C++ 实现 `IExplorerCommand` 接口，接收 `IShellItemArray`（无 16 文件上限）。但需要添加原生 C++ 构建流程到项目中，工程量较大。
+- **缓存决策**: Monitor 文件选择模式历史，如果用户总是选 >16 文件，可临时禁用 COM handler（通过注册表标记）。
+
+---
+
+## Plan Evolution Log
+
+| 日期 | 变更 | 原因 |
+|------|------|------|
+| 2026-06-03 | 添加 >16 文件回退方案 | 解决 `IDataObject` 16 文件截断问题，无需改 IPC 流程 |
