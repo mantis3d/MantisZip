@@ -18,7 +18,10 @@ public partial class PasswordManagerWindow : Window
     {
         InitializeComponent();
         App.ApplyTextRenderingMode(this);
-        LoadPasswords(showPasswords: false);
+        var showByDefault = AppSettings.Instance.PasswordRevealByDefault;
+        LoadPasswords(showPasswords: showByDefault);
+        if (showByDefault)
+            ShowPwdBtn.Content = L.T(L.PwdMgr_HidePwd);
     }
 
     private void LoadPasswords(bool showPasswords)

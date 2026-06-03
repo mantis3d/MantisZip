@@ -33,6 +33,8 @@ public partial class MainWindow : Window
     private string? _currentArchivePath;
     private ArchiveFormat _currentFormat;
     private string? _currentPassword;  // 当前压缩包的密码（打开时自动匹配）
+    private string? _currentPasswordDescription; // 匹配的密码描述
+    private List<string>? _currentPasswordPatterns; // 匹配的密码规则
     private bool _hasEncryptedArchive; // 当前压缩包是否有加密条目
     private string? _archiveComment;   // 压缩包注释（仅 ZIP 格式支持）
     private List<ArchiveItem> _allItems = new();  // 存储所有文件项
@@ -538,6 +540,8 @@ public partial class MainWindow : Window
 
             // 检测加密条目 → 自动尝试匹配已保存的密码
             _currentPassword = null;
+            _currentPasswordDescription = null;
+            _currentPasswordPatterns = null;
             _hasEncryptedArchive = items.Any(i => i.IsEncrypted);
             if (_hasEncryptedArchive)
             {
@@ -545,6 +549,11 @@ public partial class MainWindow : Window
                 if (match != null)
                 {
                     _currentPassword = match.Value.Password;
+                    _currentPasswordDescription = match.Value.Description;
+                    // 从密码库补全 patterns
+                    var matchedEntry = PasswordManager.Instance.FindMatchingPasswords(archivePath)
+                        .FirstOrDefault(e => e.Password == match.Value.Password && e.Description == match.Value.Description);
+                    _currentPasswordPatterns = matchedEntry?.Patterns?.ToList();
                     App.LogDebug("LoadArchiveAsync: matched password desc={0}", match.Value.Description);
                 }
                 else
@@ -564,6 +573,8 @@ public partial class MainWindow : Window
                         if (!string.IsNullOrEmpty(userPwd) && App.QuickVerifyPassword(archivePath, userPwd, engine))
                         {
                             _currentPassword = userPwd;
+                            _currentPasswordDescription = pwdDialog.Description;
+                            _currentPasswordPatterns = pwdDialog.Patterns?.ToList();
                             if (pwdDialog.RememberPassword)
                             {
                                 App.TrySavePassword(userPwd, archivePath, pwdDialog.Patterns, pwdDialog.Description);

@@ -1,0 +1,86 @@
+<Window x:Class="MantisZip.UI.DonationDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:l="clr-namespace:MantisZip.UI.Localization"
+        Title="{l:L Donate_Title}" Height="Auto" Width="420"
+        SizeToContent="Height"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="NoResize"
+        ShowInTaskbar="False"
+        Background="{StaticResource Theme_WindowBg}">
+    <Grid Margin="24">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>  <!-- 0: header -->
+            <RowDefinition Height="Auto"/>  <!-- 1: QR code -->
+            <RowDefinition Height="Auto"/>  <!-- 2: platform hint -->
+            <RowDefinition Height="Auto"/>  <!-- 3: link buttons -->
+            <RowDefinition Height="Auto"/>  <!-- 4: close -->
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <TextBlock Grid.Row="0" Text="{l:L Donate_Header}" FontSize="18"
+                   FontWeight="Bold" HorizontalAlignment="Center" Margin="0,0,0,16"
+                   Foreground="{StaticResource Theme_TextPrimary}"/>
+
+        <!-- QR Code -->
+        <Border Grid.Row="1" Background="{StaticResource Theme_SurfaceBg}"
+                BorderBrush="{StaticResource Theme_BorderLight}" BorderThickness="1"
+                CornerRadius="8" Padding="20" Margin="0,0,0,16"
+                HorizontalAlignment="Center">
+            <StackPanel>
+                <Border x:Name="QrPlaceholder" Width="180" Height="180"
+                        Background="{StaticResource Theme_WindowBg}"
+                        BorderBrush="{StaticResource Theme_Border}" BorderThickness="1"
+                        CornerRadius="6">
+                    <TextBlock Text="{l:L Donate_QrPlaceholder}"
+                               Foreground="{StaticResource Theme_TextDisabled}"
+                               FontSize="13" HorizontalAlignment="Center"
+                               VerticalAlignment="Center"/>
+                </Border>
+                <!-- Replace QrPlaceholder above with this when QR image is ready:
+                <Image x:Name="QrImage" Width="180" Height="180" Source="Resources/DonateQr.png"
+                       Visibility="Collapsed" Stretch="Uniform"/> -->
+                <TextBlock Text="{l:L Donate_QrHint}" FontSize="12"
+                           Foreground="{StaticResource Theme_TextSecondary}"
+                           HorizontalAlignment="Center" Margin="0,10,0,0"/>
+            </StackPanel>
+        </Border>
+
+        <!-- Platform hint -->
+        <TextBlock Grid.Row="2" Text="{l:L Donate_Platforms_Hint}"
+                   FontSize="12" Foreground="{StaticResource Theme_TextDisabled}"
+                   HorizontalAlignment="Center" Margin="0,0,0,12"/>
+
+        <!-- Link buttons -->
+        <StackPanel Grid.Row="3" Margin="0,0,0,20">
+            <Button Content="🔗 爱发电 / Afdian" Click="OpenAfdian_Click"
+                    Height="38" Cursor="Hand"
+                    Background="{StaticResource Theme_SurfaceBg}"
+                    BorderBrush="{StaticResource Theme_Border}"
+                    BorderThickness="1"
+                    Foreground="{StaticResource Theme_TextPrimary}"
+                    FontSize="13" HorizontalContentAlignment="Center"/>
+            <Button Content="🐙 GitHub Sponsors" Click="OpenGitHub_Click"
+                    Height="38" Cursor="Hand" Margin="0,8,0,0"
+                    Background="{StaticResource Theme_SurfaceBg}"
+                    BorderBrush="{StaticResource Theme_Border}"
+                    BorderThickness="1"
+                    Foreground="{StaticResource Theme_TextPrimary}"
+                    FontSize="13" HorizontalContentAlignment="Center"/>
+            <Button Content="☕ Buy Me a Coffee" Click="OpenBuyMeACoffee_Click"
+                    Height="38" Cursor="Hand" Margin="0,8,0,0"
+                    Background="{StaticResource Theme_SurfaceBg}"
+                    BorderBrush="{StaticResource Theme_Border}"
+                    BorderThickness="1"
+                    Foreground="{StaticResource Theme_TextPrimary}"
+                    FontSize="13" HorizontalContentAlignment="Center"/>
+        </StackPanel>
+
+        <!-- Close -->
+        <Button Grid.Row="4" Content="{l:L MsgBox_Ok}" Click="Close_Click"
+                Width="80" Height="32" HorizontalAlignment="Right"
+                IsDefault="True" IsCancel="True"
+                Background="{StaticResource Theme_Accent}"
+                Foreground="{StaticResource Theme_TextOnAccent}"/>
+    </Grid>
+</Window>

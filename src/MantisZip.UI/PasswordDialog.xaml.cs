@@ -35,6 +35,16 @@ public partial class PasswordDialog : Window
         var nameOnly = Path.GetFileName(fileName);
         PatternsTextBox.Text = nameOnly;
         LoadSavedPasswords(fileName);
+
+        // 根据设置决定默认是否显示明文
+        if (AppSettings.Instance.PasswordRevealByDefault)
+        {
+            _isPasswordRevealed = true;
+            PasswordPlainBox.Text = "";
+            PasswordBox.Visibility = Visibility.Collapsed;
+            PasswordPlainBox.Visibility = Visibility.Visible;
+            PwdRevealBtn.Content = "🙈";
+        }
     }
 
     private void LoadSavedPasswords(string fileName)
@@ -92,15 +102,21 @@ public partial class PasswordDialog : Window
         }
     }
 
-    private void ShowPasswordToggle_Changed(object? sender, RoutedEventArgs e)
+    private bool _isPasswordRevealed;
+
+    public bool PasswordRevealed => _isPasswordRevealed;
+
+    private void PwdRevealBtn_Click(object sender, RoutedEventArgs e)
     {
-        if (ShowPasswordToggle.IsChecked == true)
+        _isPasswordRevealed = !_isPasswordRevealed;
+        if (_isPasswordRevealed)
         {
             PasswordPlainBox.Text = PasswordBox.Password;
             PasswordBox.Visibility = Visibility.Collapsed;
             PasswordPlainBox.Visibility = Visibility.Visible;
             PasswordPlainBox.Focus();
             PasswordPlainBox.Select(PasswordPlainBox.Text.Length, 0);
+            PwdRevealBtn.Content = "🙈";
         }
         else
         {
@@ -108,6 +124,7 @@ public partial class PasswordDialog : Window
             PasswordPlainBox.Visibility = Visibility.Collapsed;
             PasswordBox.Visibility = Visibility.Visible;
             PasswordBox.Focus();
+            PwdRevealBtn.Content = "👁";
         }
     }
 
@@ -126,7 +143,7 @@ public partial class PasswordDialog : Window
 
     private void Ok_Click(object sender, RoutedEventArgs e)
     {
-        var password = ShowPasswordToggle.IsChecked == true
+        var password = _isPasswordRevealed
             ? PasswordPlainBox.Text
             : PasswordBox.Password;
 

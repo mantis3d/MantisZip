@@ -21,9 +21,34 @@
   - 支持命名预设持久化
 - **代码重构持续** — `CompressSettingsWindow.xaml.cs` (684 行)、`SevenZipEngine.cs` (630 行)、`ShellIntegration.cs` (482 行) 仍有拆分空间
 
+### v0.3.7-refined-4 (2026-06-03) 关于窗口重设计
+
+1. **AboutWindow 新建** — 替代旧 `AppMessageBox.Show()` 为 4 标签页 WPF 对话框（关于/作者/依赖库/致谢），`ResizeMode="CanResizeWithGrip"`，`MinWidth="400"` `MinHeight="350"`，App.ico 窗口图标
+2. **关于 Tab 重设计** — 2 列 Grid（标签+内容）展示软件信息，包括：介绍（"轻量级全功能 Windows 压缩/解压软件"）、技术描述、支持格式、许可证、GitHub 仓库链接、Gitee 仓库链接；可扩展行结构
+3. **作者 Tab 重设计** — 2 列 Grid 展示 MantisZen 联系方式：邮箱（mailto 超链接）、GitHub 个人页、Gitee 个人页
+4. **依赖库 Tab** — 10 项依赖的 4 列表格（库名/版本/许可证/用途），硬编码数据，与 README 一致
+5. **致谢 Tab** — 三段式感谢文本（所有开源项目、7-Zip、OpenCode + Sisyphus Agent）
+6. **超链接统一处理** — `RequestNavigate` 事件 → `Process.Start(UseShellExecute=true)`，含异常日志
+7. **21 个 About_* 本地化键** — 中英文双语，`L.cs` 常量，`l:L` XAML 绑定
+8. **13 个冒烟测试** — `AboutWindowTests.cs` 验证 JSON 键存在性/非空/双语一致性/向后兼容（`Main_About_Text` 保留）
+9. **死键审计** — `Main_About_Text`/`Main_About_Title` 确认代码无引用（仅 L.cs + JSON 保留）
+
+### v0.3.7-refined-3 (2026-06-03) 密码工具栏 + 关闭压缩包 + 捐赠 + 空状态重设计
+
+1. **密码按钮三态重设计** — 工具栏密码按钮改为三种视觉状态：🔑 无加密、🔒 有加密未匹配、🔓 已匹配密码；点击 🔒/🔓 分别弹出密码输入/已匹配密码查看对话框
+2. **MatchedPasswordDialog 新建** — 查看已匹配密码的对话框，支持眼睛切换明文/密文 + 一键复制
+3. **Theme_StatusSuccessBg 主题色** — 亮色/暗色主题新增绿色成功背景色，用于 MatchedPasswordDialog 密码行
+4. **PasswordDialog/PasswordManagerWindow RevealByDefault 修复** — 两处对话框现在正确读取 `PasswordRevealByDefault` 设置
+5. **密码管理器图标统一** — 工具栏、菜单、设置页面全部改用 🔐 图标
+6. **密码输入对话框修复** — 原「显示密码」CheckBox 无事件处理，替换为可用的 👁 Button
+7. **关闭压缩包菜单** — 文件菜单新增 ❌ 关闭压缩包 (Ctrl+W)，重置主界面到空状态（清空文件列表、目录树、预览、密码状态、状态栏等）
+8. **文件菜单重排序** — 前三项调整为：🆕 新建 → 📂 打开 → 🕐 最近文件 → ❌ 关闭
+9. **捐赠对话框** — 帮助菜单新增 ❤️ 捐赠，弹出 DonationDialog：打赏二维码占位 + 三个平台链接（爱发电/GitHub Sponsors/Buy Me a Coffee）
+10. **空状态重设计** — 替换旧 DropHint（📁 + 文字 + 超链接）为：居中提示文字 + 两张并排操作卡片（📂 打开压缩包、🔐 密码管理器）
+
 ## 版本历史（从新到旧）
 
-### v0.3.7-refined COM 右键菜单完善（图标 + 文本 + 本地化）
+### v0.3.7-refined COM  (2026-06-01)  右键菜单完善（图标 + 文本 + 本地化）
 
 1. **图标系统重写** — `CreateCompatibleBitmap` → `CreateDIBSection` 32-bit DIB，修复 `MIIM_BITMAP` 透明背景变纯色问题（原因为 DDB 不含 alpha 通道）
 2. **主菜单标题图标** — "打开/解压" 和 "压缩" 弹出菜单从 `InsertMenu` + `MF_POPUP` 改为 `InsertMenuItem` + `MIIM_SUBMENU` + `MIIM_BITMAP`，菜单标题现在也显示图标
@@ -458,3 +483,4 @@
 | 解压配置面板 (ExtractSettingsWindow) | [extract-settings-window.md](.sisyphus/plans/extract-settings-window.md) | v0.3.6 |
 | COM 右键菜单 | [com-context-menu.md](.sisyphus/plans/com-context-menu.md) | v0.3.7 |
 | 压缩窗口密码 Tab 重设计 | [design-compress-password-tab.md](docs/design-compress-password-tab.md) | v0.3.7-refined-2 |
+| 关于窗口重设计 | [about-window-redesign.md](.sisyphus/plans/about-window-redesign.md) | v0.3.7-refined-4 |

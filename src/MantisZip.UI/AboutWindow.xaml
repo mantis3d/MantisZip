@@ -1,0 +1,357 @@
+<Window x:Class="MantisZip.UI.AboutWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:l="clr-namespace:MantisZip.UI.Localization"
+        Title="{l:L About_Title}" Icon="/Resources/App.ico"
+        MinWidth="400" MinHeight="350" Width="480" Height="460"
+        WindowStartupLocation="CenterOwner" ShowInTaskbar="False"
+        ResizeMode="CanResizeWithGrip"
+        Background="{StaticResource Theme_WindowBg}">
+    <Grid Margin="16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- ═══════ Header (icon + name + version + separator) ═══════ -->
+        <Grid Grid.Row="0" Margin="0,0,0,10">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+            <Grid Grid.Row="0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <Image Width="32" Height="32" Source="/Resources/App.ico"
+                       VerticalAlignment="Center"/>
+                <StackPanel Grid.Column="1" Margin="12,0,0,0">
+                    <TextBlock Text="MantisZip" FontSize="18" FontWeight="Bold"
+                               Foreground="{StaticResource Theme_TextPrimary}"/>
+                    <TextBlock x:Name="VersionText" FontSize="12"
+                               Foreground="{StaticResource Theme_TextSecondary}"/>
+                </StackPanel>
+            </Grid>
+            <Border Grid.Row="1" Height="1"
+                    Background="{StaticResource Theme_BorderLight}"
+                    Margin="0,10,0,0"/>
+        </Grid>
+
+        <!-- ═══════ Tabs ═══════ -->
+        <TabControl Grid.Row="1" TabStripPlacement="Top"
+                    Background="{StaticResource Theme_WindowBg}">
+
+            <!-- ─────── Tab 1: 关于 / About ─────── -->
+            <TabItem Header="{l:L About_Tab_About}">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel HorizontalAlignment="Center" Margin="24">
+                        <Image Width="64" Height="64" Source="/Resources/App.ico"
+                               Margin="0,0,0,12"/>
+                        <TextBlock Text="MantisZip" FontSize="22" FontWeight="Bold"
+                                   HorizontalAlignment="Center"
+                                   Foreground="{StaticResource Theme_TextPrimary}"/>
+                        <TextBlock FontSize="13" HorizontalAlignment="Center"
+                                   Margin="0,4,0,16"
+                                   Foreground="{StaticResource Theme_TextSecondary}"
+                                   Text="{Binding ElementName=VersionText, Path=Text}"/>
+
+                        <Grid Margin="24,0,24,0" VerticalAlignment="Top">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+
+                            <!-- 介绍 / Introduction -->
+                            <TextBlock Grid.Row="0" Grid.Column="0"
+                                Text="{l:L About_Label_Intro}"
+                                FontWeight="Bold"
+                                Foreground="{StaticResource Theme_TextSecondary}"
+                                VerticalAlignment="Center"
+                                Margin="0,0,16,8"/>
+                            <TextBlock Grid.Row="0" Grid.Column="1"
+                                Text="{l:L About_Intro}"
+                                TextWrapping="Wrap" Margin="0,0,0,8"
+                                Foreground="{StaticResource Theme_TextPrimary}"/>
+
+                            <!-- 描述 / Description -->
+                            <TextBlock Grid.Row="1" Grid.Column="0"
+                                Text="{l:L About_Label_Description}"
+                                FontWeight="Bold"
+                                Foreground="{StaticResource Theme_TextSecondary}"
+                                VerticalAlignment="Center"
+                                Margin="0,0,16,8"/>
+                            <TextBlock Grid.Row="1" Grid.Column="1"
+                                Text="{l:L About_Description}"
+                                TextWrapping="Wrap" Margin="0,0,0,8"
+                                Foreground="{StaticResource Theme_TextPrimary}"/>
+
+                            <!-- 格式 / Format -->
+                            <TextBlock Grid.Row="2" Grid.Column="0"
+                                Text="{l:L About_Label_Format}"
+                                FontWeight="Bold"
+                                Foreground="{StaticResource Theme_TextSecondary}"
+                                VerticalAlignment="Center"
+                                Margin="0,0,16,8"/>
+                            <TextBlock Grid.Row="2" Grid.Column="1"
+                                Text="{l:L About_Formats}"
+                                TextWrapping="Wrap" Margin="0,0,0,8"
+                                Foreground="{StaticResource Theme_TextPrimary}"/>
+
+                            <!-- 许可证 / License -->
+                            <TextBlock Grid.Row="3" Grid.Column="0"
+                                Text="{l:L About_Label_License}"
+                                FontWeight="Bold"
+                                Foreground="{StaticResource Theme_TextSecondary}"
+                                VerticalAlignment="Center"
+                                Margin="0,0,16,8"/>
+                            <TextBlock Grid.Row="3" Grid.Column="1"
+                                Text="{l:L About_License}"
+                                TextWrapping="Wrap" Margin="0,0,0,8"
+                                Foreground="{StaticResource Theme_TextPrimary}"/>
+
+                            <!-- GitHub -->
+                            <TextBlock Grid.Row="4" Grid.Column="0"
+                                Text="{l:L About_GitHub}"
+                                FontWeight="Bold"
+                                Foreground="{StaticResource Theme_TextSecondary}"
+                                VerticalAlignment="Center"
+                                Margin="0,0,16,8"/>
+                            <TextBlock Grid.Row="4" Grid.Column="1" Margin="0,0,0,8">
+                                <Hyperlink NavigateUri="https://github.com/mantis3d/MantisZip"
+                                           RequestNavigate="Hyperlink_RequestNavigate"
+                                           Foreground="{StaticResource Theme_Accent}">
+                                    github.com/mantis3d/MantisZip
+                                </Hyperlink>
+                            </TextBlock>
+
+                            <!-- Gitee -->
+                            <TextBlock Grid.Row="5" Grid.Column="0"
+                                Text="{l:L About_Label_Gitee}"
+                                FontWeight="Bold"
+                                Foreground="{StaticResource Theme_TextSecondary}"
+                                VerticalAlignment="Center"
+                                Margin="0,0,16,8"/>
+                            <TextBlock Grid.Row="5" Grid.Column="1" Margin="0,0,0,8">
+                                <Hyperlink NavigateUri="https://gitee.com/mantis3d/MantisZip"
+                                           RequestNavigate="Hyperlink_RequestNavigate"
+                                           Foreground="{StaticResource Theme_Accent}">
+                                    gitee.com/mantis3d/MantisZip
+                                </Hyperlink>
+                            </TextBlock>
+                        </Grid>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
+            <!-- ─────── Tab 2: 作者 / Author ─────── -->
+            <TabItem Header="{l:L About_Tab_Author}">
+                <Grid Margin="24,24,24,0" VerticalAlignment="Top">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <!-- 作者 / Author Name -->
+                    <TextBlock Grid.Row="0" Grid.Column="0"
+                        Text="{l:L About_Label_AuthorName}"
+                        FontWeight="Bold"
+                        Foreground="{StaticResource Theme_TextSecondary}"
+                        VerticalAlignment="Center"
+                        Margin="0,0,16,12"/>
+                    <TextBlock Grid.Row="0" Grid.Column="1"
+                        Text="{l:L About_Author_Name}"
+                        FontSize="16" FontWeight="Bold"
+                        Foreground="{StaticResource Theme_TextPrimary}"
+                        Margin="0,0,0,12"/>
+
+                    <!-- 邮箱 / Email -->
+                    <TextBlock Grid.Row="1" Grid.Column="0"
+                        Text="{l:L About_Label_Email}"
+                        FontWeight="Bold"
+                        Foreground="{StaticResource Theme_TextSecondary}"
+                        VerticalAlignment="Center"
+                        Margin="0,0,16,8"/>
+                    <TextBlock Grid.Row="1" Grid.Column="1" Margin="0,0,0,8">
+                        <Hyperlink NavigateUri="mailto:micheal.liu@163.com"
+                                   RequestNavigate="Hyperlink_RequestNavigate"
+                                   Foreground="{StaticResource Theme_Accent}">
+                            micheal.liu@163.com
+                        </Hyperlink>
+                    </TextBlock>
+
+                    <!-- GitHub -->
+                    <TextBlock Grid.Row="2" Grid.Column="0"
+                        Text="{l:L About_GitHub}"
+                        FontWeight="Bold"
+                        Foreground="{StaticResource Theme_TextSecondary}"
+                        VerticalAlignment="Center"
+                        Margin="0,0,16,8"/>
+                    <TextBlock Grid.Row="2" Grid.Column="1" Margin="0,0,0,8">
+                        <Hyperlink NavigateUri="https://github.com/mantis3d"
+                                   RequestNavigate="Hyperlink_RequestNavigate"
+                                   Foreground="{StaticResource Theme_Accent}">
+                            github.com/mantis3d
+                        </Hyperlink>
+                    </TextBlock>
+
+                    <!-- Gitee -->
+                    <TextBlock Grid.Row="3" Grid.Column="0"
+                        Text="{l:L About_Label_Gitee}"
+                        FontWeight="Bold"
+                        Foreground="{StaticResource Theme_TextSecondary}"
+                        VerticalAlignment="Center"
+                        Margin="0,0,16,8"/>
+                    <TextBlock Grid.Row="3" Grid.Column="1" Margin="0,0,0,8">
+                        <Hyperlink NavigateUri="https://gitee.com/mantis3d"
+                                   RequestNavigate="Hyperlink_RequestNavigate"
+                                   Foreground="{StaticResource Theme_Accent}">
+                            gitee.com/mantis3d
+                        </Hyperlink>
+                    </TextBlock>
+                </Grid>
+            </TabItem>
+
+            <!-- ─────── Tab 3: 依赖库 / Dependencies ─────── -->
+            <TabItem Header="{l:L About_Tab_Dependencies}">
+                <ScrollViewer VerticalScrollBarVisibility="Auto"
+                              Background="{StaticResource Theme_WindowBg}">
+                    <Grid Margin="16" TextElement.FontSize="13">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="2*"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="2*"/>
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>  <!-- 0: header -->
+                            <RowDefinition Height="Auto"/>  <!-- 1: separator -->
+                            <RowDefinition Height="Auto"/>  <!-- 2: CommunityToolkit.Mvvm -->
+                            <RowDefinition Height="Auto"/>  <!-- 3: Markdig -->
+                            <RowDefinition Height="Auto"/>  <!-- 4: Microsoft.Web.WebView2 -->
+                            <RowDefinition Height="Auto"/>  <!-- 5: Ookii.Dialogs.Wpf -->
+                            <RowDefinition Height="Auto"/>  <!-- 6: SharpCompress -->
+                            <RowDefinition Height="Auto"/>  <!-- 7: SharpSevenZip -->
+                            <RowDefinition Height="Auto"/>  <!-- 8: SharpZipLib -->
+                            <RowDefinition Height="Auto"/>  <!-- 9: Ude.NetStandard -->
+                            <RowDefinition Height="Auto"/>  <!-- 10: WpfAnimatedGif -->
+                            <RowDefinition Height="Auto"/>  <!-- 11: 7z.dll -->
+                        </Grid.RowDefinitions>
+
+                        <!-- Header row -->
+                        <TextBlock Grid.Row="0" Grid.Column="0"
+                                   Text="{l:L About_Library_Name}"
+                                   FontWeight="Bold" Padding="4,2"/>
+                        <TextBlock Grid.Row="0" Grid.Column="1"
+                                   Text="{l:L About_Library_Version}"
+                                   FontWeight="Bold" Padding="8,2"/>
+                        <TextBlock Grid.Row="0" Grid.Column="2"
+                                   Text="{l:L About_Library_License}"
+                                   FontWeight="Bold" Padding="8,2"/>
+                        <TextBlock Grid.Row="0" Grid.Column="3"
+                                   Text="{l:L About_Library_Purpose}"
+                                   FontWeight="Bold" Padding="4,2"/>
+
+                        <!-- Separator -->
+                        <Rectangle Grid.Row="1" Grid.ColumnSpan="4"
+                                   Height="1" Margin="0,2,0,4"
+                                   Fill="{StaticResource Theme_BorderLight}"/>
+
+                        <!-- Data rows -->
+                        <TextBlock Grid.Row="2" Grid.Column="0" Text="CommunityToolkit.Mvvm" Padding="4,3"/>
+                        <TextBlock Grid.Row="2" Grid.Column="1" Text="8.4.2" Padding="8,3"/>
+                        <TextBlock Grid.Row="2" Grid.Column="2" Text="MIT" Padding="8,3"/>
+                        <TextBlock Grid.Row="2" Grid.Column="3" Text="MVVM helpers" Padding="4,3"/>
+
+                        <TextBlock Grid.Row="3" Grid.Column="0" Text="Markdig" Padding="4,3"/>
+                        <TextBlock Grid.Row="3" Grid.Column="1" Text="1.2.0" Padding="8,3"/>
+                        <TextBlock Grid.Row="3" Grid.Column="2" Text="BSD-2-Clause" Padding="8,3"/>
+                        <TextBlock Grid.Row="3" Grid.Column="3" Text="Markdown rendering" Padding="4,3"/>
+
+                        <TextBlock Grid.Row="4" Grid.Column="0" Text="Microsoft.Web.WebView2" Padding="4,3"/>
+                        <TextBlock Grid.Row="4" Grid.Column="1" Text="1.0.3967.48" Padding="8,3"/>
+                        <TextBlock Grid.Row="4" Grid.Column="2" Text="BSD-3-Clause" Padding="8,3"/>
+                        <TextBlock Grid.Row="4" Grid.Column="3" Text="HTML/PDF preview" Padding="4,3"/>
+
+                        <TextBlock Grid.Row="5" Grid.Column="0" Text="Ookii.Dialogs.Wpf" Padding="4,3"/>
+                        <TextBlock Grid.Row="5" Grid.Column="1" Text="5.0.1" Padding="8,3"/>
+                        <TextBlock Grid.Row="5" Grid.Column="2" Text="BSD-3-Clause" Padding="8,3"/>
+                        <TextBlock Grid.Row="5" Grid.Column="3" Text="Folder picker" Padding="4,3"/>
+
+                        <TextBlock Grid.Row="6" Grid.Column="0" Text="SharpCompress" Padding="4,3"/>
+                        <TextBlock Grid.Row="6" Grid.Column="1" Text="0.48.1" Padding="8,3"/>
+                        <TextBlock Grid.Row="6" Grid.Column="2" Text="MIT" Padding="8,3"/>
+                        <TextBlock Grid.Row="6" Grid.Column="3" Text="ZIP/TAR/GZ engine" Padding="4,3"/>
+
+                        <TextBlock Grid.Row="7" Grid.Column="0" Text="SharpSevenZip" Padding="4,3"/>
+                        <TextBlock Grid.Row="7" Grid.Column="1" Text="2.0.45" Padding="8,3"/>
+                        <TextBlock Grid.Row="7" Grid.Column="2" Text="LGPL-2.1" Padding="8,3"/>
+                        <TextBlock Grid.Row="7" Grid.Column="3" Text="7z/RAR engine" Padding="4,3"/>
+
+                        <TextBlock Grid.Row="8" Grid.Column="0" Text="SharpZipLib" Padding="4,3"/>
+                        <TextBlock Grid.Row="8" Grid.Column="1" Text="1.4.2" Padding="8,3"/>
+                        <TextBlock Grid.Row="8" Grid.Column="2" Text="MIT" Padding="8,3"/>
+                        <TextBlock Grid.Row="8" Grid.Column="3" Text="Legacy (minor compat)" Padding="4,3"/>
+
+                        <TextBlock Grid.Row="9" Grid.Column="0" Text="Ude.NetStandard" Padding="4,3"/>
+                        <TextBlock Grid.Row="9" Grid.Column="1" Text="1.2.0" Padding="8,3"/>
+                        <TextBlock Grid.Row="9" Grid.Column="2" Text="MIT" Padding="8,3"/>
+                        <TextBlock Grid.Row="9" Grid.Column="3" Text="Encoding detection" Padding="4,3"/>
+
+                        <TextBlock Grid.Row="10" Grid.Column="0" Text="WpfAnimatedGif" Padding="4,3"/>
+                        <TextBlock Grid.Row="10" Grid.Column="1" Text="2.0.2" Padding="8,3"/>
+                        <TextBlock Grid.Row="10" Grid.Column="2" Text="MIT" Padding="8,3"/>
+                        <TextBlock Grid.Row="10" Grid.Column="3" Text="GIF animation" Padding="4,3"/>
+
+                        <TextBlock Grid.Row="11" Grid.Column="0" Text="7z.dll" Padding="4,3"/>
+                        <TextBlock Grid.Row="11" Grid.Column="1" Text="—" Padding="8,3"/>
+                        <TextBlock Grid.Row="11" Grid.Column="2" Text="LGPL" Padding="8,3"/>
+                        <TextBlock Grid.Row="11" Grid.Column="3" Text="7z native engine" Padding="4,3"/>
+                    </Grid>
+                </ScrollViewer>
+            </TabItem>
+
+            <!-- ─────── Tab 4: 致谢 / Acknowledgments ─────── -->
+            <TabItem Header="{l:L About_Tab_Acknowledgments}">
+                <ScrollViewer VerticalScrollBarVisibility="Auto"
+                              Background="{StaticResource Theme_WindowBg}">
+                    <StackPanel Margin="24">
+                        <TextBlock Text="{l:L About_Thanks_OSS}" TextWrapping="Wrap"
+                                   FontSize="13"
+                                   Foreground="{StaticResource Theme_TextPrimary}"/>
+                        <TextBlock Text="{l:L About_Thanks_7Zip}" TextWrapping="Wrap"
+                                   FontSize="13" Margin="0,12,0,0"
+                                   Foreground="{StaticResource Theme_TextPrimary}"/>
+                        <TextBlock Text="{l:L About_Thanks_AI}" TextWrapping="Wrap"
+                                   FontSize="13" Margin="0,12,0,0"
+                                   Foreground="{StaticResource Theme_TextSecondary}"/>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
+        </TabControl>
+
+        <!-- ═══════ Close ═══════ -->
+        <Button Grid.Row="2" Content="{l:L MsgBox_Ok}" Width="80" Height="28"
+                HorizontalAlignment="Right" Margin="0,8,0,0"
+                Click="Close_Click" IsDefault="True" IsCancel="True"
+                Background="{StaticResource Theme_ButtonBg}"
+                BorderBrush="{StaticResource Theme_Border}"
+                Foreground="{StaticResource Theme_TextPrimary}"/>
+    </Grid>
+</Window>

@@ -31,6 +31,8 @@ public partial class MainWindow
         if (string.IsNullOrEmpty(_currentArchivePath))
         {
             PasswordStatusText.Text = "";
+            _currentPasswordDescription = null;
+            _currentPasswordPatterns = null;
             UpdateEnterPasswordBtnState();
             UpdateAddDeleteBtnState();
             return;
@@ -38,6 +40,8 @@ public partial class MainWindow
         if (!_hasEncryptedArchive)
         {
             PasswordStatusText.Text = "";
+            _currentPasswordDescription = null;
+            _currentPasswordPatterns = null;
             UpdateEnterPasswordBtnState();
             UpdateAddDeleteBtnState();
             return;
@@ -49,8 +53,36 @@ public partial class MainWindow
 
     private void UpdateEnterPasswordBtnState()
     {
-        EnterPasswordBtn.IsEnabled = !string.IsNullOrEmpty(_currentArchivePath)
-            && _hasEncryptedArchive && _currentPassword == null;
+        if (string.IsNullOrEmpty(_currentArchivePath) || !_hasEncryptedArchive)
+        {
+            // 无加密
+            PwdIcon.Text = "🔑";
+            PwdIcon.ClearValue(TextBlock.ForegroundProperty);
+            PwdLabel.ClearValue(TextBlock.ForegroundProperty);
+            EnterPasswordBtn.ClearValue(Button.BackgroundProperty);
+            EnterPasswordBtn.IsEnabled = false;
+            EnterPasswordBtn.ToolTip = L.T(L.Main_Tooltip_Password);
+        }
+        else if (_currentPassword == null)
+        {
+            // 已加密，密码未匹配
+            PwdIcon.Text = "🔒";
+            PwdIcon.Foreground = (Brush)FindResource("Theme_StatusError");
+            PwdLabel.ClearValue(TextBlock.ForegroundProperty);
+            EnterPasswordBtn.ClearValue(Button.BackgroundProperty);
+            EnterPasswordBtn.IsEnabled = true;
+            EnterPasswordBtn.ToolTip = L.T(L.Main_Tooltip_PasswordMissing);
+        }
+        else
+        {
+            // 已加密，密码已匹配
+            PwdIcon.Text = "🔓";
+            PwdIcon.Foreground = (Brush)FindResource("Theme_StatusSuccess");
+            PwdLabel.ClearValue(TextBlock.ForegroundProperty);
+            EnterPasswordBtn.Background = (Brush)FindResource("Theme_StatusSuccessBg");
+            EnterPasswordBtn.IsEnabled = true;
+            EnterPasswordBtn.ToolTip = L.T(L.Main_Tooltip_PasswordMatched);
+        }
     }
 
     private void UpdateSmartExtractBtnState()
@@ -74,6 +106,7 @@ public partial class MainWindow
             if (EditMenuAddFiles != null) EditMenuAddFiles.IsEnabled = false;
             if (EditMenuDeleteFiles != null) EditMenuDeleteFiles.IsEnabled = false;
             if (EditMenuArchiveComment != null) EditMenuArchiveComment.IsEnabled = false;
+            if (CloseArchiveMenu != null) CloseArchiveMenu.IsEnabled = false;
             return;
         }
 
@@ -81,6 +114,7 @@ public partial class MainWindow
         DeleteFilesBtn.IsEnabled = engine.CanDelete(_currentFormat);
         if (EditMenuAddFiles != null) EditMenuAddFiles.IsEnabled = engine.CanAdd(_currentFormat);
         if (EditMenuDeleteFiles != null) EditMenuDeleteFiles.IsEnabled = engine.CanDelete(_currentFormat);
+        if (CloseArchiveMenu != null) CloseArchiveMenu.IsEnabled = true;
         // 注释仅 ZIP 格式支持
         if (EditMenuArchiveComment != null) EditMenuArchiveComment.IsEnabled = _currentFormat == ArchiveFormat.Zip;
     }

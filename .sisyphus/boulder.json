@@ -1,0 +1,58 @@
+{
+  "active_plan": "E:\\github\\MantisZip\\.sisyphus\\plans\\about-window-redesign.md",
+  "started_at": "2026-06-03T03:57:00.670Z",
+  "session_ids": [
+    "ses_174819743ffecZq4aDv47E24rx",
+    "ses_17452dbeeffeu6Nt5eI0pxy6Cy",
+    "ses_17452ca21ffeQR3PzL3WaSZnEB",
+    "ses_17452b7ceffeVjv4UOROvWV8hy",
+    "ses_17452a16cffehID6DcQmxypWRz"
+  ],
+  "session_origins": {
+    "ses_174819743ffecZq4aDv47E24rx": "direct",
+    "ses_17452dbeeffeu6Nt5eI0pxy6Cy": "appended",
+    "ses_17452ca21ffeQR3PzL3WaSZnEB": "appended",
+    "ses_17452b7ceffeVjv4UOROvWV8hy": "appended",
+    "ses_17452a16cffehID6DcQmxypWRz": "appended"
+  },
+  "plan_name": "about-window-redesign",
+  "agent": "atlas",
+  "task_sessions": {
+    "todo:1": {
+      "task_key": "todo:1",
+      "task_label": "1",
+      "task_title": "Add About_* localization keys",
+      "session_id": "ses_1745e4f97ffe42KFxs8lpNaBDn",
+      "agent": "Sisyphus-Junior",
+      "category": "quick",
+      "updated_at": "2026-06-03T04:01:35.165Z"
+    },
+    "todo:2": {
+      "task_key": "todo:2",
+      "task_label": "2",
+      "task_title": "Create AboutWindow.xaml and AboutWindow.xaml.cs",
+      "session_id": "ses_17459dd3cffeGEhraydRnCUGaz",
+      "agent": "Sisyphus-Junior",
+      "category": "visual-engineering",
+      "updated_at": "2026-06-03T04:05:27.700Z"
+    },
+    "todo:3": {
+      "task_key": "todo:3",
+      "task_label": "3",
+      "task_title": "Update MainWindow.Menu.cs — About_Click handler",
+      "session_id": "ses_1745602afffeNIQlg2EcPFTLdF",
+      "agent": "Sisyphus-Junior",
+      "category": "quick",
+      "updated_at": "2026-06-03T04:07:40.673Z"
+    },
+    "final-wave:f1": {
+      "task_key": "final-wave:f1",
+      "task_label": "F1",
+      "task_title": "**Plan Compliance Audit** — `oracle`",
+      "session_id": "ses_17452a16cffehID6DcQmxypWRz",
+      "agent": "Sisyphus-Junior",
+      "category": "unspecified-high",
+      "updated_at": "2026-06-03T04:13:40.023Z"
+    }
+  }
+}
