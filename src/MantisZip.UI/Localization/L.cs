@@ -250,6 +250,7 @@ public static class L
     public const string Main_OpenArchiveBtn                        = "Main_OpenArchiveBtn";
     public const string Main_OpenFileFilter                        = "Main_OpenFileFilter";
     public const string Main_OpenFileTitle                         = "Main_OpenFileTitle";
+    public const string Main_PasswordWrong                         = "Main_PasswordWrong";
     public const string Main_PwdMatchedIndicator                   = "Main_PwdMatchedIndicator";
     public const string Main_RootNode                              = "Main_RootNode";
     public const string Main_SaveZipFilter                         = "Main_SaveZipFilter";

@@ -209,6 +209,7 @@
   "Main_OpenArchiveBtn": "[ 打开压缩包 ]",
   "Main_OpenFileFilter": "压缩文件|*.zip;*.7z;*.rar;*.tar;*.tar.gz;*.gz;*.iso|所有文件|*.*",
   "Main_OpenFileTitle": "打开压缩包",
+  "Main_PasswordWrong": "密码错误，请重试",
   "Main_PwdMatchedIndicator": "🔑 已匹配密码",
   "Main_RootNode": "根目录",
   "Main_SaveZipFilter": "ZIP 压缩文件|*.zip",

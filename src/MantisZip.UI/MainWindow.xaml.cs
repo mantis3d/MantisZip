@@ -563,14 +563,20 @@ public partial class MainWindow : Window
                         AppMessageBox.Show(L.TF(L.PwdMgr_AutoTry_LimitReached, 100),
                             L.T(L.App_MantisZipTitle), MessageBoxButton.OK, MessageBoxImage.Warning);
                     }
-                    // 所有保存密码都失败 → 弹密码输入框让用户输入
+                    // 所有保存密码都失败 → 弹密码输入框让用户输入（密码错误时循环重试）
                     App.LogDebug("LoadArchiveAsync: no saved password matched, showing dialog");
-                    var pwdDialog = new PasswordDialog(Path.GetFileName(archivePath));
-                    pwdDialog.Owner = this;
-                    if (pwdDialog.ShowDialog() == true)
+                    while (true)
                     {
+                        var pwdDialog = new PasswordDialog(Path.GetFileName(archivePath));
+                        pwdDialog.Owner = this;
+                        if (pwdDialog.ShowDialog() != true)
+                            break; // 用户取消 → 以无密码状态加载（只读浏览文件名）
+
                         var userPwd = pwdDialog.ResultPassword;
-                        if (!string.IsNullOrEmpty(userPwd) && App.QuickVerifyPassword(archivePath, userPwd, engine))
+                        if (string.IsNullOrEmpty(userPwd))
+                            break;
+
+                        if (App.QuickVerifyPassword(archivePath, userPwd, engine))
                         {
                             _currentPassword = userPwd;
                             _currentPasswordDescription = pwdDialog.Description;
@@ -579,7 +585,13 @@ public partial class MainWindow : Window
                             {
                                 App.TrySavePassword(userPwd, archivePath, pwdDialog.Patterns, pwdDialog.Description);
                             }
+                            break; // 密码正确，退出循环
                         }
+
+                        // 密码错误 → 提示并重试
+                        App.LogDebug("LoadArchiveAsync: wrong password entered for '{0}'", archivePath);
+                        AppMessageBox.Show(L.T(L.Main_PasswordWrong),
+                            L.T(L.App_ErrorTitle), MessageBoxButton.OK, MessageBoxImage.Error);
                     }
                 }
             }

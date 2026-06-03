@@ -36,6 +36,9 @@ public partial class PasswordDialog : Window
         PatternsTextBox.Text = nameOnly;
         LoadSavedPasswords(fileName);
 
+        // 默认描述：日期时间 + 文件名（RememberCheckBox 默认勾选）
+        DescTextBox.Text = $"{DateTime.Now:yyyy-MM-dd HH:mm} — {Path.GetFileNameWithoutExtension(fileName)}";
+
         // 根据设置决定默认是否显示明文
         if (AppSettings.Instance.PasswordRevealByDefault)
         {
@@ -130,9 +133,9 @@ public partial class PasswordDialog : Window
 
     private void RememberCheckBox_Changed(object? sender, RoutedEventArgs e)
     {
-        if (RememberCheckBox.IsChecked == true && string.IsNullOrEmpty(DescTextBox.Text))
+        if (RememberCheckBox.IsChecked == true && DescTextBox != null && string.IsNullOrEmpty(DescTextBox.Text))
         {
-            DescTextBox.Text = Path.GetFileNameWithoutExtension(FileName);
+            DescTextBox.Text = $"{DateTime.Now:yyyy-MM-dd HH:mm} — {Path.GetFileNameWithoutExtension(FileName)}";
         }
     }
 

@@ -199,6 +199,7 @@
   "Main_OpenArchiveBtn": "[ Open Archive ]",
   "Main_OpenFileFilter": "Archives|*.zip;*.7z;*.rar;*.tar;*.tar.gz;*.gz;*.iso|All Files|*.*",
   "Main_OpenFileTitle": "Open Archive",
+  "Main_PasswordWrong": "Wrong password, please try again",
   "Main_PwdMatchedIndicator": "馃攽 Password matched",
   "Main_RootNode": "Root",
   "Main_SaveZipFilter": "ZIP Archives|*.zip",
