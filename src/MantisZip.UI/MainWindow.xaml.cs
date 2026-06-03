@@ -33,6 +33,8 @@ public partial class MainWindow : Window
     private string? _currentArchivePath;
     private ArchiveFormat _currentFormat;
     private string? _currentPassword;  // 当前压缩包的密码（打开时自动匹配）
+    private string? _currentPasswordDescription; // 匹配的密码描述
+    private List<string>? _currentPasswordPatterns; // 匹配的密码规则
     private bool _hasEncryptedArchive; // 当前压缩包是否有加密条目
     private string? _archiveComment;   // 压缩包注释（仅 ZIP 格式支持）
     private List<ArchiveItem> _allItems = new();  // 存储所有文件项
@@ -538,6 +540,8 @@ public partial class MainWindow : Window
 
             // 检测加密条目 → 自动尝试匹配已保存的密码
             _currentPassword = null;
+            _currentPasswordDescription = null;
+            _currentPasswordPatterns = null;
             _hasEncryptedArchive = items.Any(i => i.IsEncrypted);
             if (_hasEncryptedArchive)
             {
@@ -545,6 +549,11 @@ public partial class MainWindow : Window
                 if (match != null)
                 {
                     _currentPassword = match.Value.Password;
+                    _currentPasswordDescription = match.Value.Description;
+                    // 从密码库补全 patterns
+                    var matchedEntry = PasswordManager.Instance.FindMatchingPasswords(archivePath)
+                        .FirstOrDefault(e => e.Password == match.Value.Password && e.Description == match.Value.Description);
+                    _currentPasswordPatterns = matchedEntry?.Patterns?.ToList();
                     App.LogDebug("LoadArchiveAsync: matched password desc={0}", match.Value.Description);
                 }
                 else
@@ -554,21 +563,35 @@ public partial class MainWindow : Window
                         AppMessageBox.Show(L.TF(L.PwdMgr_AutoTry_LimitReached, 100),
                             L.T(L.App_MantisZipTitle), MessageBoxButton.OK, MessageBoxImage.Warning);
                     }
-                    // 所有保存密码都失败 → 弹密码输入框让用户输入
+                    // 所有保存密码都失败 → 弹密码输入框让用户输入（密码错误时循环重试）
                     App.LogDebug("LoadArchiveAsync: no saved password matched, showing dialog");
-                    var pwdDialog = new PasswordDialog(Path.GetFileName(archivePath));
-                    pwdDialog.Owner = this;
-                    if (pwdDialog.ShowDialog() == true)
+                    while (true)
                     {
+                        var pwdDialog = new PasswordDialog(Path.GetFileName(archivePath));
+                        pwdDialog.Owner = this;
+                        if (pwdDialog.ShowDialog() != true)
+                            break; // 用户取消 → 以无密码状态加载（只读浏览文件名）
+
                         var userPwd = pwdDialog.ResultPassword;
-                        if (!string.IsNullOrEmpty(userPwd) && App.QuickVerifyPassword(archivePath, userPwd, engine))
+                        if (string.IsNullOrEmpty(userPwd))
+                            break;
+
+                        if (App.QuickVerifyPassword(archivePath, userPwd, engine))
                         {
                             _currentPassword = userPwd;
+                            _currentPasswordDescription = pwdDialog.Description;
+                            _currentPasswordPatterns = pwdDialog.Patterns?.ToList();
                             if (pwdDialog.RememberPassword)
                             {
                                 App.TrySavePassword(userPwd, archivePath, pwdDialog.Patterns, pwdDialog.Description);
                             }
+                            break; // 密码正确，退出循环
                         }
+
+                        // 密码错误 → 提示并重试
+                        App.LogDebug("LoadArchiveAsync: wrong password entered for '{0}'", archivePath);
+                        AppMessageBox.Show(L.T(L.Main_PasswordWrong),
+                            L.T(L.App_ErrorTitle), MessageBoxButton.OK, MessageBoxImage.Error);
                     }
                 }
             }

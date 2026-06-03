@@ -35,6 +35,19 @@ public partial class PasswordDialog : Window
         var nameOnly = Path.GetFileName(fileName);
         PatternsTextBox.Text = nameOnly;
         LoadSavedPasswords(fileName);
+
+        // 默认描述：日期时间 + 文件名（RememberCheckBox 默认勾选）
+        DescTextBox.Text = $"{DateTime.Now:yyyy-MM-dd HH:mm} — {Path.GetFileNameWithoutExtension(fileName)}";
+
+        // 根据设置决定默认是否显示明文
+        if (AppSettings.Instance.PasswordRevealByDefault)
+        {
+            _isPasswordRevealed = true;
+            PasswordPlainBox.Text = "";
+            PasswordBox.Visibility = Visibility.Collapsed;
+            PasswordPlainBox.Visibility = Visibility.Visible;
+            PwdRevealBtn.Content = "🙈";
+        }
     }
 
     private void LoadSavedPasswords(string fileName)
@@ -92,15 +105,21 @@ public partial class PasswordDialog : Window
         }
     }
 
-    private void ShowPasswordToggle_Changed(object? sender, RoutedEventArgs e)
+    private bool _isPasswordRevealed;
+
+    public bool PasswordRevealed => _isPasswordRevealed;
+
+    private void PwdRevealBtn_Click(object sender, RoutedEventArgs e)
     {
-        if (ShowPasswordToggle.IsChecked == true)
+        _isPasswordRevealed = !_isPasswordRevealed;
+        if (_isPasswordRevealed)
         {
             PasswordPlainBox.Text = PasswordBox.Password;
             PasswordBox.Visibility = Visibility.Collapsed;
             PasswordPlainBox.Visibility = Visibility.Visible;
             PasswordPlainBox.Focus();
             PasswordPlainBox.Select(PasswordPlainBox.Text.Length, 0);
+            PwdRevealBtn.Content = "🙈";
         }
         else
         {
@@ -108,14 +127,15 @@ public partial class PasswordDialog : Window
             PasswordPlainBox.Visibility = Visibility.Collapsed;
             PasswordBox.Visibility = Visibility.Visible;
             PasswordBox.Focus();
+            PwdRevealBtn.Content = "👁";
         }
     }
 
     private void RememberCheckBox_Changed(object? sender, RoutedEventArgs e)
     {
-        if (RememberCheckBox.IsChecked == true && string.IsNullOrEmpty(DescTextBox.Text))
+        if (RememberCheckBox.IsChecked == true && DescTextBox != null && string.IsNullOrEmpty(DescTextBox.Text))
         {
-            DescTextBox.Text = Path.GetFileNameWithoutExtension(FileName);
+            DescTextBox.Text = $"{DateTime.Now:yyyy-MM-dd HH:mm} — {Path.GetFileNameWithoutExtension(FileName)}";
         }
     }
 
@@ -126,7 +146,7 @@ public partial class PasswordDialog : Window
 
     private void Ok_Click(object sender, RoutedEventArgs e)
     {
-        var password = ShowPasswordToggle.IsChecked == true
+        var password = _isPasswordRevealed
             ? PasswordPlainBox.Text
             : PasswordBox.Password;
 

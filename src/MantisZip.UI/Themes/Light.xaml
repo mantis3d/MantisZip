@@ -42,6 +42,7 @@
 
     <!-- 状态色 -->
     <SolidColorBrush x:Key="Theme_StatusSuccess" Color="#4CAF50"/>
+    <SolidColorBrush x:Key="Theme_StatusSuccessBg" Color="#4CAF50" Opacity="0.15"/>
     <SolidColorBrush x:Key="Theme_StatusWarning" Color="#FFE082"/>
     <SolidColorBrush x:Key="Theme_StatusError" Color="#F44336"/>
 
