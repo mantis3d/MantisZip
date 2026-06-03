@@ -48,57 +48,6 @@ public interface IContextMenu
 
 #endregion
 
-#region IContextMenu2 / IContextMenu3 (submenu message routing)
-
-// IMPORTANT: These interfaces are defined as FLAT (no managed inheritance from
-// IContextMenu). .NET COM CCW does NOT correctly flatten inherited interface
-// vtables — giving a derived interface its own IID but only including new methods
-// breaks COM QueryInterface. By declaring ALL methods explicitly, each interface
-// gets a proper standalone COM vtable that Explorer can call into.
-
-/// <summary>
-/// IContextMenu2 — extends IContextMenu with HandleMenuMsg for submenu message routing.
-/// GUID: 000214F4-0000-0000-C000-000000000046
-/// Without this interface, Explorer's submenu InvokeCommand routing breaks when
-/// &gt;16 files are selected (GetCommandString for offset 0 kills subsequent routing).
-/// </summary>
-[Guid("000214F4-0000-0000-C000-000000000046")]
-[InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
-public interface IContextMenu2
-{
-    [PreserveSig]
-    int QueryContextMenu(IntPtr hMenu, uint indexMenu, uint idCmdFirst, uint idCmdLast, uint uFlags);
-    [PreserveSig]
-    int InvokeCommand(IntPtr pici);
-    [PreserveSig]
-    int GetCommandString(IntPtr idCmd, uint uFlags, IntPtr reserved, [Out] StringBuilder commandString, int cch);
-    [PreserveSig]
-    int HandleMenuMsg(uint uMsg, IntPtr wParam, IntPtr lParam);
-}
-
-/// <summary>
-/// IContextMenu3 — extends IContextMenu2 with HandleMenuMsg2 (adds plResult).
-/// GUID: 000214F8-0000-0000-C000-000000000046
-/// Preferred over IContextMenu2 on Windows 2000+, returns the result of message processing.
-/// </summary>
-[Guid("000214F8-0000-0000-C000-000000000046")]
-[InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
-public interface IContextMenu3
-{
-    [PreserveSig]
-    int QueryContextMenu(IntPtr hMenu, uint indexMenu, uint idCmdFirst, uint idCmdLast, uint uFlags);
-    [PreserveSig]
-    int InvokeCommand(IntPtr pici);
-    [PreserveSig]
-    int GetCommandString(IntPtr idCmd, uint uFlags, IntPtr reserved, [Out] StringBuilder commandString, int cch);
-    [PreserveSig]
-    int HandleMenuMsg(uint uMsg, IntPtr wParam, IntPtr lParam);
-    [PreserveSig]
-    int HandleMenuMsg2(uint uMsg, IntPtr wParam, IntPtr lParam, out IntPtr plResult);
-}
-
-#endregion
-
 #region Win32 structures
 
 /// <summary>
@@ -151,7 +100,7 @@ internal struct MenuItemInfo
 [Guid("C90B2A1E-5E4F-4A7A-9B0F-8C1D3E5F7A9B")]
 [ClassInterface(ClassInterfaceType.None)]
 [ProgId("MantisZip.ContextMenu")]
-public class ContextMenuHandler : IShellExtInit, IContextMenu, IContextMenu2, IContextMenu3
+public class ContextMenuHandler : IShellExtInit, IContextMenu
 {
     // ─── Archive extensions (to match ShellIntegration.BuildAppliesToFilter) ───
     private static readonly HashSet<string> ArchiveExtensions = new(StringComparer.OrdinalIgnoreCase)
@@ -200,10 +149,9 @@ public class ContextMenuHandler : IShellExtInit, IContextMenu, IContextMenu2, IC
 
     // ─── Cross-instance file list sharing ───
     // Explorer truncates IShellExtInit.Initialize to 16 files for the first COM
-    // instance, then creates a second instance with the full list. This second
-    // instance often never receives InvokeCommand (known Explorer routing issue
-    // with CreatePopupMenu submenus). We store the full list here so the first
-    // instance (which DOES receive InvokeCommand) can use it.
+    // instance, then creates a second shadow instance with the full list.
+    // We store the full list here so the first instance (which receives
+    // InvokeCommand) can use it.
     private static List<string>? _fullFileList;
     private static readonly object _fileListLock = new();
 
@@ -275,6 +223,12 @@ public class ContextMenuHandler : IShellExtInit, IContextMenu, IContextMenu2, IC
 
             try
             {
+                // Reset the shared file list for every new selection.
+                // Explorer may create multiple instances (>16 files → shadow instance);
+                // we keep the largest as the true count, but must reset first so
+                // stale values from a previous selection don't leak across.
+                lock (_fileListLock) { _fullFileList = null; }
+
                 IntPtr hDrop = medium.hBitmap;
                 int fileCount = NativeMethods.DragQueryFile(hDrop, -1, null, 0);
                 ShellExtLog.Info($"IShellExtInit.Initialize: DragQueryFile count={fileCount}");
@@ -380,81 +334,92 @@ public class ContextMenuHandler : IShellExtInit, IContextMenu, IContextMenu2, IC
 
             // Common parent directory name for CompressCombined display
             string parentDirName = ComputeCommonParentName(_selectedFiles);
-            ShellExtLog.Info($"QueryContextMenu: fileName=\"{fileName}\", parentDirName=\"{parentDirName}\", multiFile={_selectedFiles.Count > 1}");
+
+            // Use effective file count from shared static list (may exceed this instance's truncated count)
+            int effectiveCount = _selectedFiles.Count;
+            lock (_fileListLock)
+            {
+                if (_fullFileList != null && _fullFileList.Count > effectiveCount)
+                    effectiveCount = _fullFileList.Count;
+            }
+            ShellExtLog.Info($"QueryContextMenu: fileName=\"{fileName}\", parentDirName=\"{parentDirName}\", fileCount={_selectedFiles.Count}, effectiveCount={effectiveCount}");
 
             // ─── Top separator ───
             NativeMethods.InsertMenu(hMenu, indexMenu++, NativeMethods.MF_SEPARATOR | NativeMethods.MF_BYPOSITION,
                 idCmd, null);
             ShellExtLog.Info("QueryContextMenu: added top separator");
 
-            // ─── Extract group (archive only): Open + extract items ───
+            // ─── Extract group (archive only): top-level items ───
+            bool multipleFiles = effectiveCount > 1;
             bool hasExtractOrOpen = _enableOpen || _enableExtractHere || _enableSmartExtract || _enableExtractToNamed || _enableExtractTo;
-            ShellExtLog.Info($"QueryContextMenu: hasExtractOrOpen={hasExtractOrOpen}, isArchive={isArchive}");
+            bool hasCompress = _enableCompressSeparate || _enableCompressCombined || _enableCompress;
+            ShellExtLog.Info($"QueryContextMenu: hasExtractOrOpen={hasExtractOrOpen}, isArchive={isArchive}, hasCompress={hasCompress}");
+
             if (hasExtractOrOpen && isArchive)
             {
-                ShellExtLog.Info("QueryContextMenu: building extract submenu");
-                IntPtr hSubMenu = NativeMethods.CreatePopupMenu();
-                uint subId = 0;
-
-                // Open first, then extract items
-                bool multipleFiles = _selectedFiles.Count > 1;
                 if (_enableOpen)
                 {
                     string openText = multipleFiles
-                        ? $"{_textOpen} 等 {_selectedFiles.Count} 个文件"
+                        ? $"{_textOpen} 等 {(effectiveCount > 10 ? "多" : effectiveCount.ToString())} 个文件"
                         : _textOpen;
-                    ShellExtLog.Info($"QueryContextMenu: extract submenu: TextOpen");
-                    InsertMenuItem(hSubMenu, subId++, idCmd++, openText, CmdIdOpen);
+                    ShellExtLog.Info($"QueryContextMenu: extract item: \"{openText}\"");
+                    InsertMenuItem(hMenu, indexMenu++, idCmd++, openText, CmdIdOpen, showIcon: true);
                     _cmdIdOrder.Add(CmdIdOpen);
-                    ShellExtLog.Info($"  -> Open added at subId={subId - 1}");
                 }
                 if (_enableExtractHere)
                 {
                     string hereText = multipleFiles
-                        ? string.Format(_textExtractHereMulti, _selectedFiles.Count)
+                        ? string.Format(_textExtractHereMulti, effectiveCount > 10 ? "多" : effectiveCount.ToString())
                         : _textExtractHereSingle;
-                    ShellExtLog.Info($"QueryContextMenu: extract submenu: TextExtractHere = \"{hereText}\"");
-                    InsertMenuItem(hSubMenu, subId++, idCmd++, hereText, CmdIdExtractHere);
+                    ShellExtLog.Info($"QueryContextMenu: extract item: \"{hereText}\"");
+                    InsertMenuItem(hMenu, indexMenu++, idCmd++, hereText, CmdIdExtractHere, showIcon: true);
                     _cmdIdOrder.Add(CmdIdExtractHere);
                 }
                 if (_enableSmartExtract)
                 {
                     string smartText = multipleFiles
-                        ? string.Format(_textSmartExtractMulti, _selectedFiles.Count)
+                        ? string.Format(_textSmartExtractMulti, effectiveCount > 10 ? "多" : effectiveCount.ToString())
                         : _textSmartExtractSingle;
-                    ShellExtLog.Info($"QueryContextMenu: extract submenu: TextSmartExtract = \"{smartText}\"");
-                    InsertMenuItem(hSubMenu, subId++, idCmd++, smartText, CmdIdSmartExtract);
+                    ShellExtLog.Info($"QueryContextMenu: extract item: \"{smartText}\"");
+                    InsertMenuItem(hMenu, indexMenu++, idCmd++, smartText, CmdIdSmartExtract, showIcon: true);
                     _cmdIdOrder.Add(CmdIdSmartExtract);
                 }
                 if (_enableExtractToNamed)
-                { ShellExtLog.Info($"QueryContextMenu: extract submenu: TextExtractToNamed \"{fileName}\""); InsertMenuItem(hSubMenu, subId++, idCmd++, $"{_textExtractToNamed} {fileName}", CmdIdExtractToNamed); _cmdIdOrder.Add(CmdIdExtractToNamed); }
+                {
+                    ShellExtLog.Info($"QueryContextMenu: extract item: TextExtractToNamed \"{fileName}\"");
+                    InsertMenuItem(hMenu, indexMenu++, idCmd++, $"{_textExtractToNamed} {fileName}", CmdIdExtractToNamed, showIcon: true);
+                    _cmdIdOrder.Add(CmdIdExtractToNamed);
+                }
                 if (_enableExtractTo)
-                { ShellExtLog.Info($"QueryContextMenu: extract submenu: TextExtractTo"); InsertMenuItem(hSubMenu, subId++, idCmd++, _textExtractTo, CmdIdExtractTo); _cmdIdOrder.Add(CmdIdExtractTo); }
-
-                ShellExtLog.Info("QueryContextMenu: inserting extract submenu into main menu");
-                InsertMenuItem(hMenu, indexMenu++, idCmd, "打开/解压", -1, hSubMenu: hSubMenu, hbmpOverride: GetParentIcon(isExtract: true));
+                {
+                    ShellExtLog.Info($"QueryContextMenu: extract item: \"{_textExtractTo}\"");
+                    InsertMenuItem(hMenu, indexMenu++, idCmd++, _textExtractTo, CmdIdExtractTo, showIcon: true);
+                    _cmdIdOrder.Add(CmdIdExtractTo);
+                }
             }
             else
             {
                 ShellExtLog.Info($"QueryContextMenu: skipping extract group (hasExtractOrOpen={hasExtractOrOpen}, isArchive={isArchive})");
             }
 
-            // ─── Compress group ───
-            bool hasCompress = _enableCompressSeparate || _enableCompressCombined || _enableCompress;
-            ShellExtLog.Info($"QueryContextMenu: hasCompress={hasCompress}");
+            // ─── Separator between groups (only if both shown) ───
+            if (hasExtractOrOpen && isArchive && hasCompress)
+            {
+                NativeMethods.InsertMenu(hMenu, indexMenu++, NativeMethods.MF_SEPARATOR | NativeMethods.MF_BYPOSITION,
+                    idCmd, null);
+                ShellExtLog.Info("QueryContextMenu: added mid separator");
+            }
+
+            // ─── Compress group (top-level items) ───
             if (hasCompress)
             {
-                ShellExtLog.Info("QueryContextMenu: building compress submenu");
-                IntPtr hSubMenu = NativeMethods.CreatePopupMenu();
-                uint subId = 0;
-
                 if (_enableCompressSeparate)
                 {
-                    string separateText = _selectedFiles.Count > 1
-                        ? $"压缩到{_selectedFiles.Count}个独立的压缩文件.zip"
+                    string separateText = effectiveCount > 1
+                        ? (effectiveCount > 10 ? "压缩到多个独立的压缩文件.zip" : $"压缩到{effectiveCount}个独立的压缩文件.zip")
                         : $"压缩到 {fileName}.zip";
-                    ShellExtLog.Info($"QueryContextMenu: compress submenu: \"{separateText}\"");
-                    InsertMenuItem(hSubMenu, subId++, idCmd++, separateText, CmdIdCompressSeparate);
+                    ShellExtLog.Info($"QueryContextMenu: compress item: \"{separateText}\"");
+                    InsertMenuItem(hMenu, indexMenu++, idCmd++, separateText, CmdIdCompressSeparate, showIcon: true);
                     _cmdIdOrder.Add(CmdIdCompressSeparate);
                 }
                 if (_enableCompressCombined)
@@ -462,15 +427,16 @@ public class ContextMenuHandler : IShellExtInit, IContextMenu, IContextMenu2, IC
                     string combinedText = parentDirName.Length > 0
                         ? $"压缩到 {parentDirName}.zip"
                         : "压缩到";
-                    ShellExtLog.Info($"QueryContextMenu: compress submenu: \"{combinedText}\"");
-                    InsertMenuItem(hSubMenu, subId++, idCmd++, combinedText, CmdIdCompressCombined);
+                    ShellExtLog.Info($"QueryContextMenu: compress item: \"{combinedText}\"");
+                    InsertMenuItem(hMenu, indexMenu++, idCmd++, combinedText, CmdIdCompressCombined, showIcon: true);
                     _cmdIdOrder.Add(CmdIdCompressCombined);
                 }
                 if (_enableCompress)
-                { ShellExtLog.Info($"QueryContextMenu: compress submenu: TextCompress"); InsertMenuItem(hSubMenu, subId++, idCmd++, _textCompress, CmdIdCompress); _cmdIdOrder.Add(CmdIdCompress); }
-
-                ShellExtLog.Info("QueryContextMenu: inserting compress submenu into main menu");
-                InsertMenuItem(hMenu, indexMenu++, idCmd, "压缩", -1, hSubMenu: hSubMenu, hbmpOverride: GetParentIcon(isExtract: false));
+                {
+                    ShellExtLog.Info($"QueryContextMenu: compress item: \"{_textCompress}\"");
+                    InsertMenuItem(hMenu, indexMenu++, idCmd++, _textCompress, CmdIdCompress, showIcon: true);
+                    _cmdIdOrder.Add(CmdIdCompress);
+                }
             }
             else
             {
@@ -513,32 +479,17 @@ public class ContextMenuHandler : IShellExtInit, IContextMenu, IContextMenu2, IC
             var ici = Marshal.PtrToStructure<CmInvokeCommandInfo>(pici);
             ShellExtLog.Info($"InvokeCommand: cbSize={ici.cbSize}, fMask=0x{ici.fMask:x}, lpVerb=0x{ici.lpVerb:x16}, nShow={ici.nShow}");
 
-            // Determine command ID from lpVerb (could be string or int)
-            uint hiword = ici.lpVerb.HIWORD();
-            if (hiword != 0)
-            {
-                // String verb — not expected in our implementation
-                ShellExtLog.Warn($"InvokeCommand: lpVerb HIWORD=0x{hiword:x4} != 0, got string verb, returning E_FAIL");
-                return NativeMethods.E_FAIL;
-            }
-
-            int offset = (int)ici.lpVerb.LOWORD();
-            ShellExtLog.Info($"InvokeCommand: offset={offset}, _cmdIdOrder.Count={_cmdIdOrder.Count}");
-            if (offset < 0 || offset >= _cmdIdOrder.Count)
-            {
-                ShellExtLog.Warn($"InvokeCommand: offset {offset} out of range [0, {_cmdIdOrder.Count}), returning E_FAIL");
-                return NativeMethods.E_FAIL;
-            }
-            int cmdId = _cmdIdOrder[offset];
+            // Determine command ID from lpVerb (could be string or int offset)
+            int cmdId = ResolveCommandId(ici.lpVerb);
             if (cmdId < 0)
             {
-                ShellExtLog.Warn($"InvokeCommand: cmdId={cmdId} is not a valid command (separator placeholder at offset {offset}), returning E_FAIL");
+                ShellExtLog.Warn($"InvokeCommand: unable to resolve command from lpVerb=0x{ici.lpVerb:x16}, returning E_FAIL");
                 return NativeMethods.E_FAIL;
             }
 
             string[] cmdNames = { "Open", "ExtractHere", "SmartExtract", "ExtractToNamed", "ExtractTo", "CompressSeparate", "CompressCombined", "Compress" };
             string cmdName = cmdId >= 0 && cmdId < cmdNames.Length ? cmdNames[cmdId] : $"UNKNOWN({cmdId})";
-            ShellExtLog.Info($"InvokeCommand: mapped to cmdId={cmdId} ({cmdName})");
+            ShellExtLog.Info($"InvokeCommand: resolved to cmdId={cmdId} ({cmdName})");
 
             // Build the executable path (same directory as our assembly = MantisZip install dir)
             string asmDir = Path.GetDirectoryName(typeof(ContextMenuHandler).Assembly.Location) ?? ".";
@@ -726,50 +677,16 @@ public class ContextMenuHandler : IShellExtInit, IContextMenu, IContextMenu2, IC
 
     #endregion
 
-    #region IContextMenu2 / IContextMenu3
-
-    /// <summary>
-    /// HandleMenuMsg — forwards menu window messages (WM_INITMENUPOPUP, WM_DRAWITEM,
-    /// WM_MEASUREITEM, WM_MENUSELECT) from Explorer. By implementing this interface,
-    /// Explorer properly routes InvokeCommand for submenu items.
-    ///
-    /// Without IContextMenu2/3, Explorer's submenu InvokeCommand routing breaks when
-    /// >16 files are selected. GetCommandString(offset=0) for the first submenu item
-    /// kills all subsequent InvokeCommand dispatch. Implementing these interfaces
-    /// tells Explorer to use the proper message-based routing instead.
-    /// </summary>
-    public int HandleMenuMsg(uint uMsg, IntPtr wParam, IntPtr lParam)
-    {
-        ShellExtLog.Info($"IContextMenu2.HandleMenuMsg #{_instanceId}: uMsg=0x{uMsg:x8}");
-        // We don't use owner-draw, so WM_DRAWITEM/WM_MEASUREITEM are irrelevant.
-        // WM_INITMENUPOPUP is also a no-op since our submenu items are always
-        // enabled. The mere presence of this interface is sufficient to fix the
-        // submenu routing issue.
-        return NativeMethods.S_OK;
-    }
-
-    /// <summary>
-    /// HandleMenuMsg2 — extended version of HandleMenuMsg with result pointer.
-    /// </summary>
-    public int HandleMenuMsg2(uint uMsg, IntPtr wParam, IntPtr lParam, out IntPtr plResult)
-    {
-        ShellExtLog.Info($"IContextMenu3.HandleMenuMsg2 #{_instanceId}: uMsg=0x{uMsg:x8}");
-        plResult = IntPtr.Zero;
-        return NativeMethods.S_OK;
-    }
-
-    #endregion
-
     #region Private helpers
 
     // Per-command icon cache: one HBITMAP per icon, loaded on first use.
     private static IntPtr _cachedIconOpen = IntPtr.Zero;
-    private static IntPtr _cachedIconExtract = IntPtr.Zero;            // parent submenu: 打开/解压
-    private static IntPtr _cachedIconCompress = IntPtr.Zero;           // parent submenu: 压缩
+    private static IntPtr _cachedIconExtract = IntPtr.Zero;    // parent "打开/解压" submenu
     private static IntPtr _cachedIconExtractHere = IntPtr.Zero;
     private static IntPtr _cachedIconSmartExtract = IntPtr.Zero;
     private static IntPtr _cachedIconExtractToNamed = IntPtr.Zero;
     private static IntPtr _cachedIconExtractTo = IntPtr.Zero;
+    private static IntPtr _cachedIconCompress = IntPtr.Zero;   // parent "压缩" submenu
     private static IntPtr _cachedIconCompressSeparate = IntPtr.Zero;
     private static IntPtr _cachedIconCompressCombined = IntPtr.Zero;
     private static IntPtr _cachedIconCompressDialog = IntPtr.Zero;
@@ -793,28 +710,91 @@ public class ContextMenuHandler : IShellExtInit, IContextMenu, IContextMenu2, IC
             shared = _fullFileList;
         }
 
-        if (shared != null && shared.Count > originalCount && shared.Take(originalCount).SequenceEqual(_selectedFiles, StringComparer.OrdinalIgnoreCase))
+        if (shared != null && shared.Count > originalCount)
         {
-            ShellExtLog.Info($"GetEffectiveFiles: instance #{_instanceId} resolved {shared.Count} files from shared list (original had {originalCount})");
-            return shared;
+            // Order-independent check: this instance's files must be a subset of the shared list
+            var selectedSet = new HashSet<string>(_selectedFiles, StringComparer.OrdinalIgnoreCase);
+            bool allMatch = selectedSet.IsSubsetOf(shared);
+            if (allMatch)
+            {
+                ShellExtLog.Info($"GetEffectiveFiles: instance #{_instanceId} resolved {shared.Count} files from shared list (original had {originalCount})");
+                return shared;
+            }
+            ShellExtLog.Warn($"GetEffectiveFiles: instance #{_instanceId} has {originalCount} files but shared list ({shared.Count}) does not contain all of them — keeping own list");
         }
 
         return _selectedFiles;
     }
 
+    /// <summary>
+    /// Resolve the command ID from lpVerb in InvokeCommand.
+    /// lpVerb may be an integer offset (HIWORD==0) or a string pointer (HIWORD!=0).
+    /// </summary>
+    private int ResolveCommandId(IntPtr lpVerb)
+    {
+        uint hiword = lpVerb.HIWORD();
+
+        // Integer offset (most common path)
+        if (hiword == 0)
+        {
+            int offset = (int)lpVerb.LOWORD();
+            ShellExtLog.Info($"ResolveCommandId: integer offset={offset}, _cmdIdOrder.Count={_cmdIdOrder.Count}");
+            if (offset >= 0 && offset < _cmdIdOrder.Count)
+            {
+                int cmdId = _cmdIdOrder[offset];
+                if (cmdId >= 0)
+                    return cmdId;
+                ShellExtLog.Warn($"ResolveCommandId: offset {offset} maps to separator placeholder");
+            }
+            else
+            {
+                ShellExtLog.Warn($"ResolveCommandId: offset {offset} out of range [0, {_cmdIdOrder.Count})");
+            }
+            return -1;
+        }
+
+        // String verb — Explorer passes the verb name (e.g. "compressseparate")
+        // Marshal as both ANSI and Unicode to handle both CMINVOKECOMMANDINFO variants
+        string? verbAnsi = null;
+        string? verbUni = null;
+        try { verbAnsi = Marshal.PtrToStringAnsi(lpVerb); } catch { }
+        try { verbUni = Marshal.PtrToStringUni(lpVerb); } catch { }
+
+        // CMINVOKECOMMANDINFOEX has BOTH lpVerb (ANSI, offset 16) and lpVerbW (Unicode, offset 64).
+        // Our struct stops at hIcon (offset 48) so we always read lpVerb as ANSI.
+        // Prefer ANSI — the Unicode read produces garbage from the ANSI pointer.
+        string verb = verbAnsi ?? verbUni ?? "";
+        ShellExtLog.Info($"ResolveCommandId: string verb=\"{verb}\" (ansi=\"{verbAnsi ?? "(null)"}\", uni=\"{verbUni ?? "(null)"}\")");
+
+        // Map verb string → command ID (matching GetCommandString GCS_VERB output)
+        return verb.ToLowerInvariant() switch
+        {
+            "open" => CmdIdOpen,
+            "extracthere" => CmdIdExtractHere,
+            "smartextract" => CmdIdSmartExtract,
+            "extracttonamed" => CmdIdExtractToNamed,
+            "extract" => CmdIdExtractTo,
+            "compressseparate" => CmdIdCompressSeparate,
+            "compresscombined" => CmdIdCompressCombined,
+            "compress" => CmdIdCompress,
+            _ => -1
+        };
+    }
+
     private void InsertMenuItem(IntPtr hMenu, uint position, uint id, string text, int commandId, bool showIcon = true, IntPtr hSubMenu = default, IntPtr hbmpOverride = default)
     {
-        string subInfo = hSubMenu != default ? $" (submenu)" : "";
-        ShellExtLog.Info($"InsertMenuItem: text=\"{text}\", position={position}, id={id}, commandId={commandId}, showIcons={_showIcons}, showIcon={showIcon}, hbmpOverride=0x{hbmpOverride:x16}{subInfo}");
+        string subInfo = hSubMenu != default ? " (submenu)" : "";
+        ShellExtLog.Info($"InsertMenuItem: text=\"{text}\", position={position}, id={id}, commandId={commandId}, showIcons={_showIcons}, showIcon={showIcon}{subInfo}");
+
         var mii = new MenuItemInfo
         {
             cbSize = Marshal.SizeOf<MenuItemInfo>(),
-            fMask = NativeMethods.MIIM_STRING | NativeMethods.MIIM_ID | NativeMethods.MIIM_FTYPE,
+            fMask = NativeMethods.MIIM_ID | NativeMethods.MIIM_STRING | NativeMethods.MIIM_FTYPE,
             fType = NativeMethods.MFT_STRING,
             fState = NativeMethods.MFS_ENABLED,
             wID = id,
             dwTypeData = Marshal.StringToCoTaskMemUni(text),
-            cch = (uint)text.Length
+            cch = (uint)text.Length,
         };
 
         // If this is a popup submenu item, set the submenu handle
@@ -844,7 +824,6 @@ public class ContextMenuHandler : IShellExtInit, IContextMenu, IContextMenu2, IC
         if (!result)
             ShellExtLog.Warn($"InsertMenuItem: InsertMenuItem returned false (failed) for text=\"{text}\"");
 
-        // Free the string memory we allocated
         Marshal.FreeCoTaskMem(mii.dwTypeData);
     }
 
@@ -868,7 +847,10 @@ public class ContextMenuHandler : IShellExtInit, IContextMenu, IContextMenu2, IC
         };
     }
 
-    /// <summary>Return the cached HBITMAP for a parent submenu icon (Extract.ico / Compress.ico).</summary>
+    /// <summary>
+    /// Returns a parent-level icon for the popup submenu header (打开/解压 or 压缩).
+    /// These use dedicated Extract.ico and Compress.ico files.
+    /// </summary>
     private IntPtr GetParentIcon(bool isExtract)
     {
         return isExtract
@@ -1008,12 +990,12 @@ public class ContextMenuHandler : IShellExtInit, IContextMenu, IContextMenu2, IC
     {
         foreach (var kv in new[] {
             new { Name = "Open",             Hbmp = _cachedIconOpen },
-            new { Name = "Extract (parent)", Hbmp = _cachedIconExtract },
-            new { Name = "Compress (parent)",Hbmp = _cachedIconCompress },
+            new { Name = "Extract",          Hbmp = _cachedIconExtract },
             new { Name = "ExtractHere",      Hbmp = _cachedIconExtractHere },
             new { Name = "SmartExtract",     Hbmp = _cachedIconSmartExtract },
             new { Name = "ExtractToNamed",   Hbmp = _cachedIconExtractToNamed },
             new { Name = "ExtractTo",        Hbmp = _cachedIconExtractTo },
+            new { Name = "Compress",         Hbmp = _cachedIconCompress },
             new { Name = "CompressSeparate", Hbmp = _cachedIconCompressSeparate },
             new { Name = "CompressCombined", Hbmp = _cachedIconCompressCombined },
             new { Name = "CompressDialog",   Hbmp = _cachedIconCompressDialog },
@@ -1028,11 +1010,11 @@ public class ContextMenuHandler : IShellExtInit, IContextMenu, IContextMenu2, IC
         }
         _cachedIconOpen = IntPtr.Zero;
         _cachedIconExtract = IntPtr.Zero;
-        _cachedIconCompress = IntPtr.Zero;
         _cachedIconExtractHere = IntPtr.Zero;
         _cachedIconSmartExtract = IntPtr.Zero;
         _cachedIconExtractToNamed = IntPtr.Zero;
         _cachedIconExtractTo = IntPtr.Zero;
+        _cachedIconCompress = IntPtr.Zero;
         _cachedIconCompressSeparate = IntPtr.Zero;
         _cachedIconCompressCombined = IntPtr.Zero;
         _cachedIconCompressDialog = IntPtr.Zero;
