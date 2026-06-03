@@ -37,6 +37,8 @@
   "CompressConflict_AutoRename": "自动重命名",
   "CompressConflict_Title": "目标文件已存在",
   "CompressConflict_Tooltip_NoAdd": "此格式不支持添加文件",
+  "CompressConflict_TargetLabel": "目标位置已存在的文件",
+  "CompressConflict_PathLabel": "位置: ",
   "Compress_AddFile": "添加文件",
   "Compress_AddFolder": "添加目录",
   "Compress_Archive_Group": "压缩包",

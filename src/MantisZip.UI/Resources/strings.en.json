@@ -37,6 +37,8 @@
   "CompressConflict_AutoRename": "Auto Rename",
   "CompressConflict_Title": "Target File Exists",
   "CompressConflict_Tooltip_NoAdd": "This format does not support adding files",
+  "CompressConflict_TargetLabel": "Existing file at target",
+  "CompressConflict_PathLabel": "Location: ",
   "Compress_AddFile": "Add File",
   "Compress_AddFolder": "Add Folder",
   "Compress_Archive_Group": "Archive",

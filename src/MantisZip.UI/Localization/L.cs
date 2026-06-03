@@ -51,6 +51,8 @@ public static class L
     public const string CompressConflict_Rename                    = "CompressConflict_Rename";
     public const string CompressConflict_Title                     = "CompressConflict_Title";
     public const string CompressConflict_Tooltip_NoAdd             = "CompressConflict_Tooltip_NoAdd";
+    public const string CompressConflict_TargetLabel               = "CompressConflict_TargetLabel";
+    public const string CompressConflict_PathLabel                 = "CompressConflict_PathLabel";
     public const string Compress_AddFile                           = "Compress_AddFile";
     public const string Compress_AddFolder                         = "Compress_AddFolder";
     public const string Compress_Archive_Group                     = "Compress_Archive_Group";
