@@ -4,7 +4,7 @@
               xmlns:l="clr-namespace:MantisZip.UI.Localization"
              xmlns:emoji="clr-namespace:Emoji.Wpf;assembly=Emoji.Wpf"
              xmlns:converters="clr-namespace:MantisZip.UI.Converters"
-        Title="{l:L Progress_Title}" Height="Auto" Width="400" MinHeight="175"
+        Title="{l:L Progress_Title}" Height="Auto" Width="400"
         SizeToContent="Height"
         WindowStartupLocation="CenterScreen"
         ResizeMode="NoResize"
@@ -22,7 +22,8 @@
             <RowDefinition Height="Auto"/>  <!-- 3: 文件进度条 -->
             <RowDefinition Height="Auto"/>  <!-- 4: 总体进度条 -->
             <RowDefinition Height="Auto"/>  <!-- 5: 文件计数 -->
-            <RowDefinition Height="Auto"/>  <!-- 6: 按钮 -->
+            <RowDefinition Height="*"/>      <!-- 6: 弹性填充（吸收 MinHeight 多余空间，把按钮压到底部） -->
+            <RowDefinition Height="Auto"/>  <!-- 7: 按钮 -->
         </Grid.RowDefinitions>
 
         <!-- ═══ 密码匹配区（默认隐藏，仅在尝试密码规则时显示）═══ -->
@@ -189,7 +190,7 @@
         </ListView>
 
         <!-- 底部按钮行 -->
-        <Grid Grid.Row="6">
+        <Grid Grid.Row="7">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="Auto"/>

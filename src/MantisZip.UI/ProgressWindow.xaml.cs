@@ -194,7 +194,6 @@ public partial class ProgressWindow : Window
         BatchFileList.ItemsSource = _batchItems;
         BatchFileList.Visibility = Visibility.Visible;
         Title = L.T(L.Progress_Batch_Title);
-        MinHeight = 450;
         ResizeMode = ResizeMode.CanResizeWithGrip;
         App.LogDebug("[BATCH] InitBatchMode: items=[{0}]", string.Join(", ", _batchItems.Select(b => $"\"{b.Name}\"")));
     }
