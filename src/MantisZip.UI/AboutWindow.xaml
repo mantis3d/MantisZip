@@ -56,58 +56,175 @@
                                    Margin="0,4,0,16"
                                    Foreground="{StaticResource Theme_TextSecondary}"
                                    Text="{Binding ElementName=VersionText, Path=Text}"/>
-                        <TextBlock Text="{l:L About_Description}" FontSize="13"
-                                   HorizontalAlignment="Center" TextWrapping="Wrap"
-                                   Foreground="{StaticResource Theme_TextSecondary}"/>
-                        <TextBlock Text="{l:L About_Formats}" FontSize="13"
-                                   HorizontalAlignment="Center" Margin="0,8,0,0"
-                                   Foreground="{StaticResource Theme_TextSecondary}"/>
-                        <TextBlock FontSize="13" HorizontalAlignment="Center"
-                                   Margin="0,16,0,0"
-                                   Foreground="{StaticResource Theme_TextSecondary}">
-                            <Hyperlink NavigateUri="https://github.com/mantis3d/MantisZip"
-                                       RequestNavigate="Hyperlink_RequestNavigate"
-                                       Foreground="{StaticResource Theme_Accent}">
-                                <Run Text="{l:L About_GitHub}"/>
-                            </Hyperlink>
-                            <Run Text=" · "/>
-                            <Run Text="{l:L About_License}"/>
-                        </TextBlock>
+
+                        <Grid Margin="24,0,24,0" VerticalAlignment="Top">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+
+                            <!-- 介绍 / Introduction -->
+                            <TextBlock Grid.Row="0" Grid.Column="0"
+                                Text="{l:L About_Label_Intro}"
+                                FontWeight="Bold"
+                                Foreground="{StaticResource Theme_TextSecondary}"
+                                VerticalAlignment="Center"
+                                Margin="0,0,16,8"/>
+                            <TextBlock Grid.Row="0" Grid.Column="1"
+                                Text="{l:L About_Intro}"
+                                TextWrapping="Wrap" Margin="0,0,0,8"
+                                Foreground="{StaticResource Theme_TextPrimary}"/>
+
+                            <!-- 描述 / Description -->
+                            <TextBlock Grid.Row="1" Grid.Column="0"
+                                Text="{l:L About_Label_Description}"
+                                FontWeight="Bold"
+                                Foreground="{StaticResource Theme_TextSecondary}"
+                                VerticalAlignment="Center"
+                                Margin="0,0,16,8"/>
+                            <TextBlock Grid.Row="1" Grid.Column="1"
+                                Text="{l:L About_Description}"
+                                TextWrapping="Wrap" Margin="0,0,0,8"
+                                Foreground="{StaticResource Theme_TextPrimary}"/>
+
+                            <!-- 格式 / Format -->
+                            <TextBlock Grid.Row="2" Grid.Column="0"
+                                Text="{l:L About_Label_Format}"
+                                FontWeight="Bold"
+                                Foreground="{StaticResource Theme_TextSecondary}"
+                                VerticalAlignment="Center"
+                                Margin="0,0,16,8"/>
+                            <TextBlock Grid.Row="2" Grid.Column="1"
+                                Text="{l:L About_Formats}"
+                                TextWrapping="Wrap" Margin="0,0,0,8"
+                                Foreground="{StaticResource Theme_TextPrimary}"/>
+
+                            <!-- 许可证 / License -->
+                            <TextBlock Grid.Row="3" Grid.Column="0"
+                                Text="{l:L About_Label_License}"
+                                FontWeight="Bold"
+                                Foreground="{StaticResource Theme_TextSecondary}"
+                                VerticalAlignment="Center"
+                                Margin="0,0,16,8"/>
+                            <TextBlock Grid.Row="3" Grid.Column="1"
+                                Text="{l:L About_License}"
+                                TextWrapping="Wrap" Margin="0,0,0,8"
+                                Foreground="{StaticResource Theme_TextPrimary}"/>
+
+                            <!-- GitHub -->
+                            <TextBlock Grid.Row="4" Grid.Column="0"
+                                Text="{l:L About_GitHub}"
+                                FontWeight="Bold"
+                                Foreground="{StaticResource Theme_TextSecondary}"
+                                VerticalAlignment="Center"
+                                Margin="0,0,16,8"/>
+                            <TextBlock Grid.Row="4" Grid.Column="1" Margin="0,0,0,8">
+                                <Hyperlink NavigateUri="https://github.com/mantis3d/MantisZip"
+                                           RequestNavigate="Hyperlink_RequestNavigate"
+                                           Foreground="{StaticResource Theme_Accent}">
+                                    github.com/mantis3d/MantisZip
+                                </Hyperlink>
+                            </TextBlock>
+
+                            <!-- Gitee -->
+                            <TextBlock Grid.Row="5" Grid.Column="0"
+                                Text="{l:L About_Label_Gitee}"
+                                FontWeight="Bold"
+                                Foreground="{StaticResource Theme_TextSecondary}"
+                                VerticalAlignment="Center"
+                                Margin="0,0,16,8"/>
+                            <TextBlock Grid.Row="5" Grid.Column="1" Margin="0,0,0,8">
+                                <Hyperlink NavigateUri="https://gitee.com/mantis3d/MantisZip"
+                                           RequestNavigate="Hyperlink_RequestNavigate"
+                                           Foreground="{StaticResource Theme_Accent}">
+                                    gitee.com/mantis3d/MantisZip
+                                </Hyperlink>
+                            </TextBlock>
+                        </Grid>
                     </StackPanel>
                 </ScrollViewer>
             </TabItem>
 
             <!-- ─────── Tab 2: 作者 / Author ─────── -->
             <TabItem Header="{l:L About_Tab_Author}">
-                <StackPanel Margin="24" VerticalAlignment="Top">
-                    <TextBlock Text="{l:L About_Author_Name}" FontSize="16"
-                               FontWeight="Bold"
-                               Foreground="{StaticResource Theme_TextPrimary}"/>
-                    <TextBlock Margin="0,12,0,0"
-                               Foreground="{StaticResource Theme_TextPrimary}">
+                <Grid Margin="24,24,24,0" VerticalAlignment="Top">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <!-- 作者 / Author Name -->
+                    <TextBlock Grid.Row="0" Grid.Column="0"
+                        Text="{l:L About_Label_AuthorName}"
+                        FontWeight="Bold"
+                        Foreground="{StaticResource Theme_TextSecondary}"
+                        VerticalAlignment="Center"
+                        Margin="0,0,16,12"/>
+                    <TextBlock Grid.Row="0" Grid.Column="1"
+                        Text="{l:L About_Author_Name}"
+                        FontSize="16" FontWeight="Bold"
+                        Foreground="{StaticResource Theme_TextPrimary}"
+                        Margin="0,0,0,12"/>
+
+                    <!-- 邮箱 / Email -->
+                    <TextBlock Grid.Row="1" Grid.Column="0"
+                        Text="{l:L About_Label_Email}"
+                        FontWeight="Bold"
+                        Foreground="{StaticResource Theme_TextSecondary}"
+                        VerticalAlignment="Center"
+                        Margin="0,0,16,8"/>
+                    <TextBlock Grid.Row="1" Grid.Column="1" Margin="0,0,0,8">
                         <Hyperlink NavigateUri="mailto:micheal.liu@163.com"
                                    RequestNavigate="Hyperlink_RequestNavigate"
                                    Foreground="{StaticResource Theme_Accent}">
-                            <Run Text="{l:L About_Author_Email}"/>
+                            micheal.liu@163.com
                         </Hyperlink>
                     </TextBlock>
-                    <TextBlock Margin="0,8,0,0"
-                               Foreground="{StaticResource Theme_TextPrimary}">
+
+                    <!-- GitHub -->
+                    <TextBlock Grid.Row="2" Grid.Column="0"
+                        Text="{l:L About_GitHub}"
+                        FontWeight="Bold"
+                        Foreground="{StaticResource Theme_TextSecondary}"
+                        VerticalAlignment="Center"
+                        Margin="0,0,16,8"/>
+                    <TextBlock Grid.Row="2" Grid.Column="1" Margin="0,0,0,8">
                         <Hyperlink NavigateUri="https://github.com/mantis3d"
                                    RequestNavigate="Hyperlink_RequestNavigate"
                                    Foreground="{StaticResource Theme_Accent}">
-                            <Run Text="{l:L About_Author_GitHub}"/>
+                            github.com/mantis3d
                         </Hyperlink>
                     </TextBlock>
-                    <TextBlock Margin="0,8,0,0"
-                               Foreground="{StaticResource Theme_TextPrimary}">
+
+                    <!-- Gitee -->
+                    <TextBlock Grid.Row="3" Grid.Column="0"
+                        Text="{l:L About_Label_Gitee}"
+                        FontWeight="Bold"
+                        Foreground="{StaticResource Theme_TextSecondary}"
+                        VerticalAlignment="Center"
+                        Margin="0,0,16,8"/>
+                    <TextBlock Grid.Row="3" Grid.Column="1" Margin="0,0,0,8">
                         <Hyperlink NavigateUri="https://gitee.com/mantis3d"
                                    RequestNavigate="Hyperlink_RequestNavigate"
                                    Foreground="{StaticResource Theme_Accent}">
-                            <Run Text="{l:L About_Author_Gitee}"/>
+                            gitee.com/mantis3d
                         </Hyperlink>
                     </TextBlock>
-                </StackPanel>
+                </Grid>
             </TabItem>
 
             <!-- ─────── Tab 3: 依赖库 / Dependencies ─────── -->
