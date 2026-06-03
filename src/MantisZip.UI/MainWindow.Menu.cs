@@ -177,8 +177,7 @@ public partial class MainWindow
 
     private void About_Click(object sender, RoutedEventArgs e)
     {
-        AppMessageBox.Show(L.TF(L.Main_About_Text, AppConstants.Version),
-            L.T(L.Settings_Advanced_AboutHeader), MessageBoxButton.OK, MessageBoxImage.Information);
+        new AboutWindow { Owner = this }.ShowDialog();
     }
 
     private void Settings_Click(object sender, RoutedEventArgs e)
