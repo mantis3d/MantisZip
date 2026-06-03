@@ -49,6 +49,7 @@
 | **P3** | 压缩包对比 (Archive Diff) | [archive-diff.md](.sisyphus/plans/archive-diff.md) | 🟡中 | 3-4h | 压缩包文件级差异对比 |
 | **P3** | 可插拔预览模块体系 | [preview-modular-providers.md](.sisyphus/plans/preview-modular-providers.md) | 🟡中 | 3-4h | 格式类库独立分发 |
 | **P3** | 发布 Release | — | 🟢低 | 1-2h | GitHub Releases + CI 构建 |
+| **P3** | ICO 文件自身图标显示 | [ico-file-icon-extract.md](.sisyphus/plans/ico-file-icon-extract.md) | 🟢低 | 2-3h | ico 文件列表显示自身嵌入图标 |
 | **P3** | 预览格式扩展 — RTF | — | 🟢低 | 1-2h | WPF RichTextBox |
 | **P3** | 预览格式扩展 — LNK | — | 🟡中 | 2-3h | IShellLink 解析 |
 | **P3** | 预览格式扩展 — ZIP 嵌套 | — | 🟡中 | 3-4h | extract→re-LoadArchiveAsync |

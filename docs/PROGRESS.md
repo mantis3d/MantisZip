@@ -7,7 +7,7 @@
 - **技术栈**: .NET 9 + WPF + SharpCompress + SharpSevenZip
 
 ## 版本
-- **当前版本**: 0.3.7-refined-3
+- **当前版本**: 0.3.7-refined-4
 - **发布日期**: 2026-06-03
 
 ## 规划中
@@ -247,6 +247,8 @@
 
 ### v0.2.11 (2026-05-21) 编译警告清零
 
+> ⚠️ **Git 历史存疑**：此版本在 git 历史中无对应版本提交记录，内容可能为后续回顾整理。
+
 1. **`String.Split` 移除** — 所有 `String.Split` 改为 `ReadOnlySpan` 的 `Split`，消除 CA1851 警告
 2. **Equals 比较警告** — `string.Equals(string, string)` → `string.Equals(string, string, StringComparison)`，消除 CA1309
 3. **返回 `null` 的 `await Task`** — 消除 CS4014/CA1849
@@ -275,7 +277,7 @@
 6. **工具栏图标/文字放大** — 图标 `18→22`，标签 `10→12`，内边距 `(6,4)→(8,6)`
 7. **版本升级** — 0.2.9
 
-### v0.2.8 (2026-05-19) IPC 与日志脱敏
+### v0.2.8 (2026-05-21) IPC 与日志脱敏
 
 1. **IPC 互斥体/管道名修正** — `App.xaml.cs` 中 `L.T()` 写在字符串字面量内导致 `--compress` 多实例 IPC 完全失效，改为固定英文标识符
 2. **L.T() 字符串嵌入修复** — `MainWindow.xaml.cs` 两处 `SetStatus` + `App.xaml.cs` 两处消息框的 `L.T()` 调用写在字符串内部的 bug
@@ -379,7 +381,7 @@
 1. **加密 ZIP 解压密码提示修复** — ZipEngine `ListEntriesAsync` 设置 `IsEncrypted`；`ExtractAsync` 预检 `IsCrypted` 抛出中文异常
 2. **密码管理器帮助窗口** — PasswordHelpDialog 讲解匹配规则 + 范例
 
-### v0.2.0 (2026-05-12) 开源 + 安装包
+### v0.2.0 (2026-05-13) 开源 + 安装包
 
 1. **MIT 许可证 + LICENSE 文件** — 项目切换为 MIT 开源
 2. **OpenCode 声明 + 捐赠链接** — README 添加 Sisyphus Agent 致谢和捐赠按钮
@@ -400,6 +402,8 @@
 
 ### v0.1.5 (2026-05-11) HTML/Markdown 预览 + 分卷压缩
 
+> ⚠️ **Git 历史存疑**：此版本各项功能的实际提交日期分散在 2026-05-09（Shell/拖拽）、2026-05-20（分卷压缩）和 2026-05-23（WebBrowser 预览），无对应 v0.1.5 版本提交。可能为回顾性整理版本号。
+
 1. **HTML 预览** — WebBrowser 加载 .html/.htm 文件预览
 2. **Markdown 预览** — Markdig 渲染 .md/.markdown 为带样式的 HTML
 3. **文本预览字号** — AppSettings.TextPreviewFontSize + SettingsWindow 滑块 + 实时预览
@@ -408,7 +412,7 @@
 6. **拖拽提取增强** — ProgressWindow 全程展示 + 子目录结构保留 + _isOwnDrag 防自投
 7. **分卷压缩** — CompressSettingsWindow 分卷大小 ComboBox；ZIP 引擎 SplitOutputStream；7z 引擎传 -v{size}b
 
-### v0.1.4 (2026-05-11) 拖拽增强
+### v0.1.4 (2026-05-09) 拖拽增强
 
 1. **拖出到 Explorer 拖拽提取** — 7-Zip 急切提取模型：提取后拖拽
 2. **ProgressWindow 拖拽集成** — 提取时显示进度 → 拖拽时显示"正在拖拽"提示
@@ -454,7 +458,7 @@
 5. **隐藏设置窗口** — 压缩时隐藏，完成后恢复
 6. **关于页面** — 添加 7-Zip LGPL 许可证声明
 
-### v0.1.0 (2026-04-22) 初始版本
+### v0.1.0 (2026-04-24) 初始版本
 
 1. **ZIP 解压** — 基于 SharpZipLib，支持 GBK 编码
 2. **ZIP 压缩** — 基于 SharpZipLib
@@ -493,5 +497,6 @@
 | 批量进度文件列表 | [batch-progress-list.md](.sisyphus/plans/batch-progress-list.md) | v0.3.4 |
 | 解压配置面板 (ExtractSettingsWindow) | [extract-settings-window.md](.sisyphus/plans/extract-settings-window.md) | v0.3.6 |
 | COM 右键菜单 | [com-context-menu.md](.sisyphus/plans/com-context-menu.md) | v0.3.7 |
+| COM 迁移映射表 | [com-migration-mapping.md](.sisyphus/plans/com-migration-mapping.md) | v0.3.7（辅助文档） |
 | 压缩窗口密码 Tab 重设计 | [design-compress-password-tab.md](docs/design-compress-password-tab.md) | v0.3.7-refined-2 |
 | 关于窗口重设计 | [about-window-redesign.md](.sisyphus/plans/about-window-redesign.md) | v0.3.7-refined-4 |
