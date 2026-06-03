@@ -21,6 +21,19 @@
   - 支持命名预设持久化
 - **代码重构持续** — `CompressSettingsWindow.xaml.cs` (684 行)、`SevenZipEngine.cs` (630 行)、`ShellIntegration.cs` (482 行) 仍有拆分空间
 
+### v0.3.7-refined-3 (2026-06-03) 密码工具栏 + 关闭压缩包 + 捐赠 + 空状态重设计
+
+1. **密码按钮三态重设计** — 工具栏密码按钮改为三种视觉状态：🔑 无加密、🔒 有加密未匹配、🔓 已匹配密码；点击 🔒/🔓 分别弹出密码输入/已匹配密码查看对话框
+2. **MatchedPasswordDialog 新建** — 查看已匹配密码的对话框，支持眼睛切换明文/密文 + 一键复制
+3. **Theme_StatusSuccessBg 主题色** — 亮色/暗色主题新增绿色成功背景色，用于 MatchedPasswordDialog 密码行
+4. **PasswordDialog/PasswordManagerWindow RevealByDefault 修复** — 两处对话框现在正确读取 `PasswordRevealByDefault` 设置
+5. **密码管理器图标统一** — 工具栏、菜单、设置页面全部改用 🔐 图标
+6. **密码输入对话框修复** — 原「显示密码」CheckBox 无事件处理，替换为可用的 👁 Button
+7. **关闭压缩包菜单** — 文件菜单新增 ❌ 关闭压缩包 (Ctrl+W)，重置主界面到空状态（清空文件列表、目录树、预览、密码状态、状态栏等）
+8. **文件菜单重排序** — 前三项调整为：🆕 新建 → 📂 打开 → 🕐 最近文件 → ❌ 关闭
+9. **捐赠对话框** — 帮助菜单新增 ❤️ 捐赠，弹出 DonationDialog：打赏二维码占位 + 三个平台链接（爱发电/GitHub Sponsors/Buy Me a Coffee）
+10. **空状态重设计** — 替换旧 DropHint（📁 + 文字 + 超链接）为：居中提示文字 + 两张并排操作卡片（📂 打开压缩包、🔐 密码管理器）
+
 ## 版本历史（从新到旧）
 
 ### v0.3.7-refined COM  (2026-06-01)  右键菜单完善（图标 + 文本 + 本地化）
