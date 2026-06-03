@@ -251,6 +251,8 @@ public partial class ProgressWindow : Window
             _batchItems[index].Status = status;
             if (status == BatchItemStatus.Failed)
                 _batchItems[index].ErrorMessage = errorMessage;
+            if (status == BatchItemStatus.Skipped)
+                _batchItems[index].Progress = 100;
         }
         DispatchIfNeeded(Update, DispatcherPriority.Background);
     }

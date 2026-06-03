@@ -683,6 +683,7 @@
   "Progress_Batch_Status_InProgress": "进行中",
   "Progress_Batch_Status_Completed": "已完成",
   "Progress_Batch_Status_Failed": "失败",
+  "Progress_Batch_Status_Skipped": "已跳过",
   "Progress_Batch_CompleteWithErrors": "已完成 {0} 项，失败 {1} 项",
   "Progress_Batch_AllComplete": "全部完成"
 }

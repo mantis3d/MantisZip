@@ -143,7 +143,7 @@ public partial class App : Application
 
         var ct = progressWindow.CancellationToken;
         var total = allPaths.Count;
-        int succeeded = 0, failed = 0;
+        int succeeded = 0, failed = 0, skipped = 0;
 
         Task.Run(async () =>
         {
@@ -218,7 +218,8 @@ public partial class App : Application
                             switch (conflictResult.Action)
                             {
                                 case CompressConflictAction.Cancel:
-                                    failed++;
+                                    skipped++;
+                                    progressWindow.UpdateBatchItemStatus(i, BatchItemStatus.Skipped);
                                     continue;
                                 case CompressConflictAction.Rename:
                                     finalPath = Path.Combine(parentDir, initialCustomName ?? Path.GetFileName(GetUniquePath(outputPath)));
@@ -834,7 +835,7 @@ public partial class App : Application
 
         Task.Run(async () =>
         {
-            int succeeded = 0, failed = 0;
+        int succeeded = 0, failed = 0, skipped = 0;
             try
             {
                 for (int i = 0; i < total; i++)

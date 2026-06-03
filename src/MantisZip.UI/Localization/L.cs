@@ -426,6 +426,7 @@ public static class L
     public const string Progress_Batch_CompleteWithErrors          = "Progress_Batch_CompleteWithErrors";
     public const string Progress_Batch_Status_Completed            = "Progress_Batch_Status_Completed";
     public const string Progress_Batch_Status_Failed               = "Progress_Batch_Status_Failed";
+    public const string Progress_Batch_Status_Skipped              = "Progress_Batch_Status_Skipped";
     public const string Progress_Batch_Status_InProgress           = "Progress_Batch_Status_InProgress";
     public const string Progress_Batch_Status_Pending              = "Progress_Batch_Status_Pending";
     public const string Progress_Batch_Title                       = "Progress_Batch_Title";

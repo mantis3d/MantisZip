@@ -8,7 +8,7 @@
 
 ## 版本
 - **当前版本**: 0.3.7-refined-3
-- **发布日期**: 2026-06-02
+- **发布日期**: 2026-06-03
 
 ## 规划中
 - ✅ **引擎统一已完成** — SharpZipLib→SharpCompress + 7z.exe/SevenZipExtractor→SharpSevenZip（v0.3.4）
@@ -23,17 +23,16 @@
 
 ## 版本历史（从新到旧）
 
-### v0.3.7-refined COM 右键菜单完善（图标 + 文本 + 本地化）
+### v0.3.7-refined-3 (2026-06-03) 压缩冲突增强："应用到全部" + 目标文件信息面板 + 压缩流程统一计划
 
-1. **图标系统重写** — `CreateCompatibleBitmap` → `CreateDIBSection` 32-bit DIB，修复 `MIIM_BITMAP` 透明背景变纯色问题（原因为 DDB 不含 alpha 通道）
-2. **主菜单标题图标** — "打开/解压" 和 "压缩" 弹出菜单从 `InsertMenu` + `MF_POPUP` 改为 `InsertMenuItem` + `MIIM_SUBMENU` + `MIIM_BITMAP`，菜单标题现在也显示图标
-3. **CleanupIconCache 时序修复** — 从 `QueryContextMenu` 末尾移到开头（Explorer 异步渲染菜单，末尾删除 HBITMAP 导致图标不显示）
-4. **菜单文本精简** — 去掉所有 "用 MantisZip" 前缀；"解压到此处" → "原地解压包"，"智能解压到此处" → "智能原地解压"；"用 MantisZip 压缩" → "压缩……"
-5. **多选文件动态文本** — 选择多个文件时："打开压缩包 等 N 个文件"、"原地解压N个压缩包"、"智能原地解压N个压缩包"
-6. **菜单文本本地化** — 新增 8 个 `ShellExt_*` key 到 `L.cs` + `strings.zh.json` + `strings.en.json`；`ShellIntegration.WriteMenuTextToRegistry()` 安装时将当前语言文本写入注册表；ShellExt 通过 `LoadSettingsFromRegistry()` 读取（硬编码写死回退）
-7. **文档同步** — AGENTS.md / PROGRESS.md / PLAN.md / manual-test-checklist.md
+1. **CompressConflictDialog 新增"应用到全部"** — 压缩冲突对话框增加 CheckBox，勾选后对后续所有冲突文件自动应用相同操作；勾选时 Rename 按钮文字变为"自动重命名"，输入框禁用；未勾选时显示"重命名"（半自动编辑）；取消按钮改为"跳过"
+2. **GUI 独立压缩路径适配** — `RunSeparateCompressAsync` 新增 `applyToAll` / `chosenAction` 闭包记忆逻辑，与提取端 `CreateExtractOptions` 模式一致
+3. **CLI 独立压缩路径适配** — `RunCompressSeparateBatch` 同步添加 applyToAll 记忆逻辑，同一套 CompressConflictDialog 在两条循环路径中均支持"应用到全部"
+4. **压缩流程统一计划文档** — 创建 `.sisyphus/plans/compress-service-unify.md`，分析压缩端 3 个独立循环 vs 提取端 1 个集中入口的架构差距，提出统一 CompressService 主方案 + 冲突 UI 嵌入 ProgressWindow 备选方案
+5. **CompressConflictDialog 新增目标文件信息面板** — 提取冲突对话框已有源/目标对比面板，压缩冲突对话框同样展示目标文件信息（大小、修改时间、完整路径），复用 `Conflict_SizeLabel` / `Conflict_DateLabel` 本地化键；新增 `CompressConflict_TargetLabel` / `CompressConflict_PathLabel` 键
+6. **批量进度文件列表新增「已跳过」状态** — `BatchItemStatus` 枚举新增 `Skipped`；`BatchStatusToIconConverter` / `BatchStatusToTextConverter` / `ProgressStatusToBackgroundConverter` 三个转换器同步添加 Skipped 分支（⏭️ 图标、cyan `#00BCD4` 背景、"已跳过"/"Skipped"）；`UpdateBatchItemStatus` 对 Skipped 自动设置 `Progress=100`；`RunCompressSeparateBatch` Cancel 分支由 `failed++` 改为 `skipped++` + 调用 `UpdateBatchItemStatus(Skipped)`，解决最后一个文件跳过时始终显示 Progress=0 的 bug
 
-### v0.3.7-refined-2 压缩窗口密码 Tab 重设计 + 调试日志增强
+### v0.3.7-refined-2 (2026-06-02) 压缩窗口密码 Tab 重设计 + 调试日志增强
 
 1. **密码选项卡布局重设计** — 对照 `docs/design-compress-password-tab.md` 修复全部差异：
    - 密码库条目改为两行显示（描述 + 规则）
@@ -53,12 +52,17 @@
 2. **QuickVerifyPassword 调试日志** — catch 块新增 `TraceLog` 记录异常类型和消息，密码验证失败时可排查原因
 3. **`PasswordEntry.PatternsDisplay` 属性** — 新增 `[JsonIgnore]` 计算属性，供 XAML 两行列表绑定
 
-### v0.3.7-refined-3 (2026-06-02) 压缩冲突"应用到全部" + 压缩流程统一计划
 
-1. **CompressConflictDialog 新增"应用到全部"** — 压缩冲突对话框增加 CheckBox，勾选后对后续所有冲突文件自动应用相同操作；勾选时 Rename 按钮文字变为"自动重命名"，输入框禁用；未勾选时显示"重命名"（半自动编辑）；取消按钮改为"跳过"
-2. **GUI 独立压缩路径适配** — `RunSeparateCompressAsync` 新增 `applyToAll` / `chosenAction` 闭包记忆逻辑，与提取端 `CreateExtractOptions` 模式一致
-3. **CLI 独立压缩路径适配** — `RunCompressSeparateBatch` 同步添加 applyToAll 记忆逻辑，同一套 CompressConflictDialog 在两条循环路径中均支持"应用到全部"
-4. **压缩流程统一计划文档** — 创建 `.sisyphus/plans/compress-service-unify.md`，分析压缩端 3 个独立循环 vs 提取端 1 个集中入口的架构差距，提出统一 CompressService 主方案 + 冲突 UI 嵌入 ProgressWindow 备选方案
+
+### v0.3.7-refined  (2026-06-01)  COM 右键菜单完善（图标 + 文本 + 本地化）
+
+1. **图标系统重写** — `CreateCompatibleBitmap` → `CreateDIBSection` 32-bit DIB，修复 `MIIM_BITMAP` 透明背景变纯色问题（原因为 DDB 不含 alpha 通道）
+2. **主菜单标题图标** — "打开/解压" 和 "压缩" 弹出菜单从 `InsertMenu` + `MF_POPUP` 改为 `InsertMenuItem` + `MIIM_SUBMENU` + `MIIM_BITMAP`，菜单标题现在也显示图标
+3. **CleanupIconCache 时序修复** — 从 `QueryContextMenu` 末尾移到开头（Explorer 异步渲染菜单，末尾删除 HBITMAP 导致图标不显示）
+4. **菜单文本精简** — 去掉所有 "用 MantisZip" 前缀；"解压到此处" → "原地解压包"，"智能解压到此处" → "智能原地解压"；"用 MantisZip 压缩" → "压缩……"
+5. **多选文件动态文本** — 选择多个文件时："打开压缩包 等 N 个文件"、"原地解压N个压缩包"、"智能原地解压N个压缩包"
+6. **菜单文本本地化** — 新增 8 个 `ShellExt_*` key 到 `L.cs` + `strings.zh.json` + `strings.en.json`；`ShellIntegration.WriteMenuTextToRegistry()` 安装时将当前语言文本写入注册表；ShellExt 通过 `LoadSettingsFromRegistry()` 读取（硬编码写死回退）
+7. **文档同步** — AGENTS.md / PROGRESS.md / PLAN.md / manual-test-checklist.md
 
 ### v0.3.7 (2026-05-31) COM 右键菜单 + 注册表设置同步
 

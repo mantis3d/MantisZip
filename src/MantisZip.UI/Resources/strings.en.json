@@ -655,6 +655,7 @@
   "Progress_Batch_Status_InProgress": "In Progress",
   "Progress_Batch_Status_Completed": "Completed",
   "Progress_Batch_Status_Failed": "Failed",
+  "Progress_Batch_Status_Skipped": "Skipped",
   "Progress_Batch_CompleteWithErrors": "Completed {0}, Failed {1}",
   "Progress_Batch_AllComplete": "All Complete"
 }

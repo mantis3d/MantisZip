@@ -10,6 +10,7 @@ public enum BatchItemStatus
     Pending,
     InProgress,
     Completed,
+    Skipped,
     Failed
 }
 

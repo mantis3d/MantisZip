@@ -21,6 +21,7 @@ public class BatchStatusToTextConverter : IValueConverter
                 BatchItemStatus.Pending => L.T(L.Progress_Batch_Status_Pending),
                 BatchItemStatus.InProgress => L.T(L.Progress_Batch_Status_InProgress),
                 BatchItemStatus.Completed => L.T(L.Progress_Batch_Status_Completed),
+                BatchItemStatus.Skipped => L.T(L.Progress_Batch_Status_Skipped),
                 BatchItemStatus.Failed => L.T(L.Progress_Batch_Status_Failed),
                 _ => status.ToString()
             };
@@ -46,6 +47,7 @@ public class BatchStatusToIconConverter : IValueConverter
                 BatchItemStatus.Pending => "⏳",
                 BatchItemStatus.InProgress => "🔄",
                 BatchItemStatus.Completed => "✅",
+                BatchItemStatus.Skipped => "⏭️",
                 BatchItemStatus.Failed => "❌",
                 _ => "❓"
             };
@@ -75,6 +77,7 @@ public class ProgressStatusToBackgroundConverter : IMultiValueConverter
         {
             BatchItemStatus.Failed => Color.FromArgb(alpha, 0xF4, 0x43, 0x36),     // red
             BatchItemStatus.Completed => Color.FromArgb(alpha, 0x4C, 0xAF, 0x50),  // green
+            BatchItemStatus.Skipped => Color.FromArgb(alpha, 0x00, 0xBC, 0xD4),    // cyan
             _ => Color.FromArgb(alpha, 0x42, 0xA5, 0xF5)                            // blue
         };
 
