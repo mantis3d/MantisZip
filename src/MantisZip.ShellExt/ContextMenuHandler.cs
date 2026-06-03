@@ -48,6 +48,57 @@ public interface IContextMenu
 
 #endregion
 
+#region IContextMenu2 / IContextMenu3 (submenu message routing)
+
+// IMPORTANT: These interfaces are defined as FLAT (no managed inheritance from
+// IContextMenu). .NET COM CCW does NOT correctly flatten inherited interface
+// vtables — giving a derived interface its own IID but only including new methods
+// breaks COM QueryInterface. By declaring ALL methods explicitly, each interface
+// gets a proper standalone COM vtable that Explorer can call into.
+
+/// <summary>
+/// IContextMenu2 — extends IContextMenu with HandleMenuMsg for submenu message routing.
+/// GUID: 000214F4-0000-0000-C000-000000000046
+/// Without this interface, Explorer's submenu InvokeCommand routing breaks when
+/// &gt;16 files are selected (GetCommandString for offset 0 kills subsequent routing).
+/// </summary>
+[Guid("000214F4-0000-0000-C000-000000000046")]
+[InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+public interface IContextMenu2
+{
+    [PreserveSig]
+    int QueryContextMenu(IntPtr hMenu, uint indexMenu, uint idCmdFirst, uint idCmdLast, uint uFlags);
+    [PreserveSig]
+    int InvokeCommand(IntPtr pici);
+    [PreserveSig]
+    int GetCommandString(IntPtr idCmd, uint uFlags, IntPtr reserved, [Out] StringBuilder commandString, int cch);
+    [PreserveSig]
+    int HandleMenuMsg(uint uMsg, IntPtr wParam, IntPtr lParam);
+}
+
+/// <summary>
+/// IContextMenu3 — extends IContextMenu2 with HandleMenuMsg2 (adds plResult).
+/// GUID: 000214F8-0000-0000-C000-000000000046
+/// Preferred over IContextMenu2 on Windows 2000+, returns the result of message processing.
+/// </summary>
+[Guid("000214F8-0000-0000-C000-000000000046")]
+[InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+public interface IContextMenu3
+{
+    [PreserveSig]
+    int QueryContextMenu(IntPtr hMenu, uint indexMenu, uint idCmdFirst, uint idCmdLast, uint uFlags);
+    [PreserveSig]
+    int InvokeCommand(IntPtr pici);
+    [PreserveSig]
+    int GetCommandString(IntPtr idCmd, uint uFlags, IntPtr reserved, [Out] StringBuilder commandString, int cch);
+    [PreserveSig]
+    int HandleMenuMsg(uint uMsg, IntPtr wParam, IntPtr lParam);
+    [PreserveSig]
+    int HandleMenuMsg2(uint uMsg, IntPtr wParam, IntPtr lParam, out IntPtr plResult);
+}
+
+#endregion
+
 #region Win32 structures
 
 /// <summary>
@@ -100,7 +151,7 @@ internal struct MenuItemInfo
 [Guid("C90B2A1E-5E4F-4A7A-9B0F-8C1D3E5F7A9B")]
 [ClassInterface(ClassInterfaceType.None)]
 [ProgId("MantisZip.ContextMenu")]
-public class ContextMenuHandler : IShellExtInit, IContextMenu
+public class ContextMenuHandler : IShellExtInit, IContextMenu, IContextMenu2, IContextMenu3
 {
     // ─── Archive extensions (to match ShellIntegration.BuildAppliesToFilter) ───
     private static readonly HashSet<string> ArchiveExtensions = new(StringComparer.OrdinalIgnoreCase)
@@ -146,6 +197,15 @@ public class ContextMenuHandler : IShellExtInit, IContextMenu
     // ─── Instance tracking ───
     private static volatile int _nextInstanceId;
     private readonly int _instanceId = Interlocked.Increment(ref _nextInstanceId);
+
+    // ─── Cross-instance file list sharing ───
+    // Explorer truncates IShellExtInit.Initialize to 16 files for the first COM
+    // instance, then creates a second instance with the full list. This second
+    // instance often never receives InvokeCommand (known Explorer routing issue
+    // with CreatePopupMenu submenus). We store the full list here so the first
+    // instance (which DOES receive InvokeCommand) can use it.
+    private static List<string>? _fullFileList;
+    private static readonly object _fileListLock = new();
 
     // ─── State ───
     private List<string> _selectedFiles = new();
@@ -251,6 +311,27 @@ public class ContextMenuHandler : IShellExtInit, IContextMenu
                 }
 
                 ShellExtLog.Info($"IShellExtInit.Initialize returning S_OK with {_selectedFiles.Count} files selected");
+
+                // Store the file list in the shared static field (keep largest).
+                // Explorer creates multiple instances for >16 files: the first gets
+                // truncated to 16, a later instance has the full list, and more
+                // instances may have only 1 file. We keep the largest list.
+                if (_selectedFiles.Count > 0)
+                {
+                    lock (_fileListLock)
+                    {
+                        if (_fullFileList == null || _selectedFiles.Count > _fullFileList.Count)
+                        {
+                            _fullFileList = new List<string>(_selectedFiles);
+                            ShellExtLog.Info($"IShellExtInit.Initialize: stored {_fullFileList.Count} files in static _fullFileList (was {(int?)_fullFileList?.Count ?? 0})");
+                        }
+                        else
+                        {
+                            ShellExtLog.Info($"IShellExtInit.Initialize: skipped _fullFileList update (current={_fullFileList.Count} >= new={_selectedFiles.Count})");
+                        }
+                    }
+                }
+
                 return NativeMethods.S_OK;
             }
             finally
@@ -449,6 +530,11 @@ public class ContextMenuHandler : IShellExtInit, IContextMenu
                 return NativeMethods.E_FAIL;
             }
             int cmdId = _cmdIdOrder[offset];
+            if (cmdId < 0)
+            {
+                ShellExtLog.Warn($"InvokeCommand: cmdId={cmdId} is not a valid command (separator placeholder at offset {offset}), returning E_FAIL");
+                return NativeMethods.E_FAIL;
+            }
 
             string[] cmdNames = { "Open", "ExtractHere", "SmartExtract", "ExtractToNamed", "ExtractTo", "CompressSeparate", "CompressCombined", "Compress" };
             string cmdName = cmdId >= 0 && cmdId < cmdNames.Length ? cmdNames[cmdId] : $"UNKNOWN({cmdId})";
@@ -466,10 +552,20 @@ public class ContextMenuHandler : IShellExtInit, IContextMenu
                 return NativeMethods.E_FAIL;
             }
 
+            // Resolve the effective file list — Explorer truncates the first instance's
+            // Initialize to 16 files, but a later instance may have the full list in the
+            // shared static field.
+            var files = GetEffectiveFiles(out int originalCount);
+            bool usingSharedList = files.Count > originalCount;
+            if (usingSharedList)
+            {
+                ShellExtLog.Info($"InvokeCommand: using shared full file list ({files.Count} files, original instance had {originalCount})");
+            }
+
             string cmdLine;
-            string paths = string.Join(" ", _selectedFiles.Select(p => $@"""{p}"""));
+            string paths = string.Join(" ", files.Select(p => $@"""{p}"""));
             string bgTarget = _isBackgroundMode && _targetFolder != null ? $@"""{_targetFolder}""" : "";
-            string singlePath = _selectedFiles.Count > 0 ? $@"""{_selectedFiles[0]}""" : bgTarget;
+            string singlePath = files.Count > 0 ? $@"""{files[0]}""" : bgTarget;
 
             // Use _isBackgroundMode to decide single vs multi path
             if (_isBackgroundMode && cmdId >= CmdIdCompressSeparate && cmdId <= CmdIdCompress)
@@ -480,7 +576,7 @@ public class ContextMenuHandler : IShellExtInit, IContextMenu
                 ShellExtLog.Info($"InvokeCommand: background mode, using targetFolder as path");
             }
 
-            ShellExtLog.Info($"InvokeCommand: _selectedFiles.Count={_selectedFiles.Count}, _isBackgroundMode={_isBackgroundMode}, singlePath=\"{singlePath}\", paths=\"{paths}\"");
+            ShellExtLog.Info($"InvokeCommand: usingSharedList={usingSharedList}, files.Count={files.Count}, _isBackgroundMode={_isBackgroundMode}, singlePath=\"{singlePath}\", paths.Length={paths.Length}");
 
             switch (cmdId)
             {
@@ -514,7 +610,7 @@ public class ContextMenuHandler : IShellExtInit, IContextMenu
             }
 
             ShellExtLog.Info($"InvokeCommand: starting process: \"{exePath}\" {cmdLine}");
-            ShellExtLog.Info($"InvokeCommand: cmdLine length={cmdLine.Length}, pathCount={_selectedFiles.Count}, firstPath={(_selectedFiles.Count > 0 ? _selectedFiles[0] : "(none)")}");
+            ShellExtLog.Info($"InvokeCommand: cmdLine length={cmdLine.Length}, pathCount={files.Count}, firstPath={(files.Count > 0 ? files[0] : "(none)")}");
             var psi = new ProcessStartInfo
             {
                 FileName = exePath,
@@ -563,6 +659,11 @@ public class ContextMenuHandler : IShellExtInit, IContextMenu
                 return NativeMethods.E_FAIL;
             }
             int cmdId = _cmdIdOrder[offset];
+            if (cmdId < 0)
+            {
+                ShellExtLog.Warn($"GetCommandString: cmdId={cmdId} is not a valid command (separator placeholder at offset {offset}), returning E_FAIL");
+                return NativeMethods.E_FAIL;
+            }
 
             string text;
 
@@ -625,6 +726,40 @@ public class ContextMenuHandler : IShellExtInit, IContextMenu
 
     #endregion
 
+    #region IContextMenu2 / IContextMenu3
+
+    /// <summary>
+    /// HandleMenuMsg — forwards menu window messages (WM_INITMENUPOPUP, WM_DRAWITEM,
+    /// WM_MEASUREITEM, WM_MENUSELECT) from Explorer. By implementing this interface,
+    /// Explorer properly routes InvokeCommand for submenu items.
+    ///
+    /// Without IContextMenu2/3, Explorer's submenu InvokeCommand routing breaks when
+    /// >16 files are selected. GetCommandString(offset=0) for the first submenu item
+    /// kills all subsequent InvokeCommand dispatch. Implementing these interfaces
+    /// tells Explorer to use the proper message-based routing instead.
+    /// </summary>
+    public int HandleMenuMsg(uint uMsg, IntPtr wParam, IntPtr lParam)
+    {
+        ShellExtLog.Info($"IContextMenu2.HandleMenuMsg #{_instanceId}: uMsg=0x{uMsg:x8}");
+        // We don't use owner-draw, so WM_DRAWITEM/WM_MEASUREITEM are irrelevant.
+        // WM_INITMENUPOPUP is also a no-op since our submenu items are always
+        // enabled. The mere presence of this interface is sufficient to fix the
+        // submenu routing issue.
+        return NativeMethods.S_OK;
+    }
+
+    /// <summary>
+    /// HandleMenuMsg2 — extended version of HandleMenuMsg with result pointer.
+    /// </summary>
+    public int HandleMenuMsg2(uint uMsg, IntPtr wParam, IntPtr lParam, out IntPtr plResult)
+    {
+        ShellExtLog.Info($"IContextMenu3.HandleMenuMsg2 #{_instanceId}: uMsg=0x{uMsg:x8}");
+        plResult = IntPtr.Zero;
+        return NativeMethods.S_OK;
+    }
+
+    #endregion
+
     #region Private helpers
 
     // Per-command icon cache: one HBITMAP per icon, loaded on first use.
@@ -638,6 +773,34 @@ public class ContextMenuHandler : IShellExtInit, IContextMenu
     private static IntPtr _cachedIconCompressSeparate = IntPtr.Zero;
     private static IntPtr _cachedIconCompressCombined = IntPtr.Zero;
     private static IntPtr _cachedIconCompressDialog = IntPtr.Zero;
+
+    /// <summary>
+    /// Returns the effective file list for command execution.
+    /// When Explorer creates a second COM instance with the full file list
+    /// (because Initialize was truncated to 16 files), we borrow that list
+    /// via the shared static field.
+    /// </summary>
+    private List<string> GetEffectiveFiles(out int originalCount)
+    {
+        originalCount = _selectedFiles.Count;
+        if (originalCount <= 0)
+            return _selectedFiles;
+
+        // If our list seems truncated and a fuller list is available, use it
+        List<string>? shared = null;
+        lock (_fileListLock)
+        {
+            shared = _fullFileList;
+        }
+
+        if (shared != null && shared.Count > originalCount && shared.Take(originalCount).SequenceEqual(_selectedFiles, StringComparer.OrdinalIgnoreCase))
+        {
+            ShellExtLog.Info($"GetEffectiveFiles: instance #{_instanceId} resolved {shared.Count} files from shared list (original had {originalCount})");
+            return shared;
+        }
+
+        return _selectedFiles;
+    }
 
     private void InsertMenuItem(IntPtr hMenu, uint position, uint id, string text, int commandId, bool showIcon = true, IntPtr hSubMenu = default, IntPtr hbmpOverride = default)
     {
