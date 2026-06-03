@@ -11,6 +11,8 @@
     <Grid Margin="16">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
+            <RowDefinition Height="8"/>
+            <RowDefinition Height="Auto"/>
             <RowDefinition Height="10"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="8"/>
@@ -21,7 +23,22 @@
 
         <TextBlock x:Name="HeaderText" Grid.Row="0" FontSize="13" Foreground="{StaticResource Theme_TextPrimary}" TextWrapping="Wrap"/>
 
-        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Center">
+        <!-- Row 2: 目标文件信息面板 -->
+        <Border Grid.Row="2" Background="{StaticResource Theme_SurfaceBg}" BorderBrush="{StaticResource Theme_BorderLight}" BorderThickness="1" CornerRadius="4" Padding="12">
+            <StackPanel>
+                <TextBlock Text="{l:L CompressConflict_TargetLabel}" FontWeight="SemiBold" FontSize="12" Foreground="{StaticResource Theme_TextSecondary}" Margin="0,0,0,6"/>
+                <TextBlock FontSize="11" Foreground="{StaticResource Theme_TextPrimary}" LineHeight="18">
+                    <Run Text="{l:L Conflict_SizeLabel}"/><Run x:Name="TargetSizeText" Foreground="{StaticResource Theme_TextDisabled}"/>
+                </TextBlock>
+                <TextBlock FontSize="11" Foreground="{StaticResource Theme_TextPrimary}" LineHeight="18">
+                    <Run Text="{l:L Conflict_DateLabel}"/><Run x:Name="TargetDateText" Foreground="{StaticResource Theme_TextDisabled}"/>
+                </TextBlock>
+                <TextBlock x:Name="TargetPathBlock" FontSize="11" Foreground="{StaticResource Theme_TextDisabled}" LineHeight="18" TextWrapping="Wrap" Margin="0,4,0,0"/>
+            </StackPanel>
+        </Border>
+
+        <!-- Row 4: 操作按钮 -->
+        <StackPanel Grid.Row="4" Orientation="Horizontal" HorizontalAlignment="Center">
             <Button x:Name="OverwriteBtn" Content="{l:L CompressConflict_Overwrite}" Width="85" Height="28" Click="Overwrite_Click"
                     Background="{StaticResource Theme_ButtonBg}" BorderBrush="{StaticResource Theme_Border}" BorderThickness="1" Margin="0,0,6,0"/>
             <Button x:Name="AddBtn" Content="{l:L CompressConflict_Add}" Width="110" Height="28" Click="Add_Click"
@@ -32,13 +49,13 @@
                     Background="{StaticResource Theme_ButtonBg}" BorderBrush="{StaticResource Theme_Border}" BorderThickness="1" Margin="6,0,0,0"/>
         </StackPanel>
 
-        <!-- Row 4: 自定义重命名输入 -->
-        <Grid Grid.Row="4" HorizontalAlignment="Stretch" Margin="14,0">
+        <!-- Row 6: 自定义重命名输入 -->
+        <Grid Grid.Row="6" HorizontalAlignment="Stretch" Margin="14,0">
             <TextBox x:Name="RenameTextBox" FontSize="12" Padding="3,2"/>
         </Grid>
 
-        <!-- Row 6: 应用到全部 -->
-        <CheckBox x:Name="ApplyAllCheck" Grid.Row="6"
+        <!-- Row 8: 应用到全部 -->
+        <CheckBox x:Name="ApplyAllCheck" Grid.Row="8"
                   Content="{l:L Error_ApplyToAll}"
                   FontSize="12" Foreground="{StaticResource Theme_TextSecondary}"
                   HorizontalAlignment="Center"/>

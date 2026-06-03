@@ -23,14 +23,14 @@ public partial class CompressConflictDialog : Window
     public bool ApplyToAll => ApplyAllCheck.IsChecked == true;
 
     /// <param name="filePath">目标文件路径</param>
-    /// <param name="canAdd">L.T(L.MsgBox_Yes)L.T(L.MsgBox_No)支持L.T(L.CompressConflict_Add)（Tar 不支持）</param>
-    /// <param name="suggestedName">L.T(L.CompressConflict_Rename)的建议名（不含路径），用于预填输入框</param>
+    /// <param name="canAdd">是否支持"添加到压缩包"（Tar 不支持）</param>
+    /// <param name="suggestedName">重命名的建议名（不含路径），用于预填输入框</param>
     public CompressConflictDialog(string filePath, bool canAdd, string? suggestedName = null)
     {
         InitializeComponent();
         HeaderText.Text = string.Format(L.T(L.CompressConflict_Header), $"“{Path.GetFileName(filePath)}”");
 
-        // 预填L.T(L.CompressConflict_Rename)的建议名（由调用方预计算）
+        // 预填重命名的建议名（由调用方预计算）
         RenameTextBox.Text = suggestedName ?? Path.GetFileName(filePath);
 
         if (!canAdd)
@@ -50,6 +50,46 @@ public partial class CompressConflictDialog : Window
             RenameBtn.Content = L.T(L.CompressConflict_Rename);
             RenameTextBox.IsEnabled = true;
         };
+
+        // 填充目标文件信息面板
+        PopulateTargetInfo(filePath);
+    }
+
+    private void PopulateTargetInfo(string filePath)
+    {
+        try
+        {
+            var fi = new FileInfo(filePath);
+            if (fi.Exists)
+            {
+                TargetSizeText.Text = FormatSize(fi.Length);
+                TargetDateText.Text = fi.LastWriteTime.ToString("yyyy-MM-dd HH:mm");
+            }
+            else
+            {
+                TargetSizeText.Text = "--";
+                TargetDateText.Text = "--";
+            }
+        }
+        catch
+        {
+            TargetSizeText.Text = "--";
+            TargetDateText.Text = "--";
+        }
+        TargetPathBlock.Text = L.T(L.CompressConflict_PathLabel) + filePath;
+    }
+
+    private static string FormatSize(long bytes)
+    {
+        string[] sizes = { "B", "KB", "MB", "GB", "TB" };
+        double len = bytes;
+        int order = 0;
+        while (len >= 1024 && order < sizes.Length - 1)
+        {
+            order++;
+            len /= 1024;
+        }
+        return $"{len:0.##} {sizes[order]}";
     }
 
     private void Overwrite_Click(object sender, RoutedEventArgs e)
