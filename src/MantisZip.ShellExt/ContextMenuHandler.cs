@@ -309,6 +309,10 @@ public class ContextMenuHandler : IShellExtInit, IContextMenu
     public int QueryContextMenu(IntPtr hMenu, uint indexMenu, uint idCmdFirst, uint idCmdLast, uint uFlags)
     {
         ShellExtLog.Info($"IContextMenu.QueryContextMenu #{_instanceId} entered, idCmdFirst={idCmdFirst}, idCmdLast={idCmdLast}, uFlags=0x{uFlags:x8}, _selectedFiles.Count={_selectedFiles.Count}");
+
+        // Popup submenu handle — declared outside try so catch can clean up.
+        IntPtr popupMenu = IntPtr.Zero;
+
         try
         {
             // Refresh settings each time (user may have changed them)
@@ -344,12 +348,19 @@ public class ContextMenuHandler : IShellExtInit, IContextMenu
             }
             ShellExtLog.Info($"QueryContextMenu: fileName=\"{fileName}\", parentDirName=\"{parentDirName}\", fileCount={_selectedFiles.Count}, effectiveCount={effectiveCount}");
 
-            // ─── Top separator ───
-            NativeMethods.InsertMenu(hMenu, indexMenu++, NativeMethods.MF_SEPARATOR | NativeMethods.MF_BYPOSITION,
-                idCmd, null);
+            // ─── Create a popup submenu to hold all items ───
+            // This wraps everything inside a single "MantisZip" entry in the root context menu,
+            // matching the appearance of the static verb fallback used for >12 files.
+            popupMenu = NativeMethods.CreatePopupMenu();
+            uint popupIndex = 0;
+            ShellExtLog.Info("QueryContextMenu: created popup submenu");
+
+            // ─── Top separator (inside popup) ───
+            NativeMethods.InsertMenu(popupMenu, popupIndex++, NativeMethods.MF_SEPARATOR | NativeMethods.MF_BYPOSITION,
+                (IntPtr)idCmd, null);
             ShellExtLog.Info("QueryContextMenu: added top separator");
 
-            // ─── Extract group (archive only): top-level items ───
+            // ─── Extract group (archive only): items inside popup ───
             bool multipleFiles = effectiveCount > 1;
             bool hasExtractOrOpen = _enableOpen || _enableExtractHere || _enableSmartExtract || _enableExtractToNamed || _enableExtractTo;
             bool hasCompress = _enableCompressSeparate || _enableCompressCombined || _enableCompress;
@@ -363,7 +374,7 @@ public class ContextMenuHandler : IShellExtInit, IContextMenu
                         ? $"{_textOpen} 等 {(effectiveCount > 10 ? "多" : effectiveCount.ToString())} 个文件"
                         : _textOpen;
                     ShellExtLog.Info($"QueryContextMenu: extract item: \"{openText}\"");
-                    InsertMenuItem(hMenu, indexMenu++, idCmd++, openText, CmdIdOpen, showIcon: true);
+                    InsertMenuItem(popupMenu, popupIndex++, idCmd++, openText, CmdIdOpen, showIcon: true);
                     _cmdIdOrder.Add(CmdIdOpen);
                 }
                 if (_enableExtractHere)
@@ -372,7 +383,7 @@ public class ContextMenuHandler : IShellExtInit, IContextMenu
                         ? string.Format(_textExtractHereMulti, effectiveCount > 10 ? "多" : effectiveCount.ToString())
                         : _textExtractHereSingle;
                     ShellExtLog.Info($"QueryContextMenu: extract item: \"{hereText}\"");
-                    InsertMenuItem(hMenu, indexMenu++, idCmd++, hereText, CmdIdExtractHere, showIcon: true);
+                    InsertMenuItem(popupMenu, popupIndex++, idCmd++, hereText, CmdIdExtractHere, showIcon: true);
                     _cmdIdOrder.Add(CmdIdExtractHere);
                 }
                 if (_enableSmartExtract)
@@ -381,19 +392,19 @@ public class ContextMenuHandler : IShellExtInit, IContextMenu
                         ? string.Format(_textSmartExtractMulti, effectiveCount > 10 ? "多" : effectiveCount.ToString())
                         : _textSmartExtractSingle;
                     ShellExtLog.Info($"QueryContextMenu: extract item: \"{smartText}\"");
-                    InsertMenuItem(hMenu, indexMenu++, idCmd++, smartText, CmdIdSmartExtract, showIcon: true);
+                    InsertMenuItem(popupMenu, popupIndex++, idCmd++, smartText, CmdIdSmartExtract, showIcon: true);
                     _cmdIdOrder.Add(CmdIdSmartExtract);
                 }
                 if (_enableExtractToNamed)
                 {
                     ShellExtLog.Info($"QueryContextMenu: extract item: TextExtractToNamed \"{fileName}\"");
-                    InsertMenuItem(hMenu, indexMenu++, idCmd++, $"{_textExtractToNamed} {fileName}", CmdIdExtractToNamed, showIcon: true);
+                    InsertMenuItem(popupMenu, popupIndex++, idCmd++, $"{_textExtractToNamed} {fileName}", CmdIdExtractToNamed, showIcon: true);
                     _cmdIdOrder.Add(CmdIdExtractToNamed);
                 }
                 if (_enableExtractTo)
                 {
                     ShellExtLog.Info($"QueryContextMenu: extract item: \"{_textExtractTo}\"");
-                    InsertMenuItem(hMenu, indexMenu++, idCmd++, _textExtractTo, CmdIdExtractTo, showIcon: true);
+                    InsertMenuItem(popupMenu, popupIndex++, idCmd++, _textExtractTo, CmdIdExtractTo, showIcon: true);
                     _cmdIdOrder.Add(CmdIdExtractTo);
                 }
             }
@@ -405,12 +416,12 @@ public class ContextMenuHandler : IShellExtInit, IContextMenu
             // ─── Separator between groups (only if both shown) ───
             if (hasExtractOrOpen && isArchive && hasCompress)
             {
-                NativeMethods.InsertMenu(hMenu, indexMenu++, NativeMethods.MF_SEPARATOR | NativeMethods.MF_BYPOSITION,
-                    idCmd, null);
+                NativeMethods.InsertMenu(popupMenu, popupIndex++, NativeMethods.MF_SEPARATOR | NativeMethods.MF_BYPOSITION,
+                    (IntPtr)idCmd, null);
                 ShellExtLog.Info("QueryContextMenu: added mid separator");
             }
 
-            // ─── Compress group (top-level items) ───
+            // ─── Compress group (items inside popup) ───
             if (hasCompress)
             {
                 if (_enableCompressSeparate)
@@ -419,7 +430,7 @@ public class ContextMenuHandler : IShellExtInit, IContextMenu
                         ? (effectiveCount > 10 ? "压缩到多个独立的压缩文件.zip" : $"压缩到{effectiveCount}个独立的压缩文件.zip")
                         : $"压缩到 {fileName}.zip";
                     ShellExtLog.Info($"QueryContextMenu: compress item: \"{separateText}\"");
-                    InsertMenuItem(hMenu, indexMenu++, idCmd++, separateText, CmdIdCompressSeparate, showIcon: true);
+                    InsertMenuItem(popupMenu, popupIndex++, idCmd++, separateText, CmdIdCompressSeparate, showIcon: true);
                     _cmdIdOrder.Add(CmdIdCompressSeparate);
                 }
                 if (_enableCompressCombined)
@@ -428,13 +439,13 @@ public class ContextMenuHandler : IShellExtInit, IContextMenu
                         ? $"压缩到 {parentDirName}.zip"
                         : "压缩到";
                     ShellExtLog.Info($"QueryContextMenu: compress item: \"{combinedText}\"");
-                    InsertMenuItem(hMenu, indexMenu++, idCmd++, combinedText, CmdIdCompressCombined, showIcon: true);
+                    InsertMenuItem(popupMenu, popupIndex++, idCmd++, combinedText, CmdIdCompressCombined, showIcon: true);
                     _cmdIdOrder.Add(CmdIdCompressCombined);
                 }
                 if (_enableCompress)
                 {
                     ShellExtLog.Info($"QueryContextMenu: compress item: \"{_textCompress}\"");
-                    InsertMenuItem(hMenu, indexMenu++, idCmd++, _textCompress, CmdIdCompress, showIcon: true);
+                    InsertMenuItem(popupMenu, popupIndex++, idCmd++, _textCompress, CmdIdCompress, showIcon: true);
                     _cmdIdOrder.Add(CmdIdCompress);
                 }
             }
@@ -443,10 +454,28 @@ public class ContextMenuHandler : IShellExtInit, IContextMenu
                 ShellExtLog.Info("QueryContextMenu: skipping compress group (all toggles off)");
             }
 
-            // ─── Bottom separator ───
-            NativeMethods.InsertMenu(hMenu, indexMenu++, NativeMethods.MF_SEPARATOR | NativeMethods.MF_BYPOSITION,
-                idCmd, null);
+            // ─── Bottom separator (inside popup) ───
+            NativeMethods.InsertMenu(popupMenu, popupIndex++, NativeMethods.MF_SEPARATOR | NativeMethods.MF_BYPOSITION,
+                (IntPtr)idCmd, null);
             ShellExtLog.Info("QueryContextMenu: added bottom separator");
+
+            int itemsAdded = (int)(idCmd - idCmdFirst);
+            string orderSnapshot = string.Join(", ", _cmdIdOrder);
+
+            if (itemsAdded > 0)
+            {
+                // ─── Insert the popup as a submenu in the root hMenu ───
+                NativeMethods.InsertMenu(hMenu, indexMenu, NativeMethods.MF_POPUP | NativeMethods.MF_BYPOSITION,
+                    popupMenu, "MantisZip");
+                ShellExtLog.Info($"QueryContextMenu: inserted popup submenu as \"MantisZip\" with {itemsAdded} items");
+            }
+            else
+            {
+                // No items to show — destroy the empty popup and return 0
+                NativeMethods.DestroyMenu(popupMenu);
+                popupMenu = IntPtr.Zero;
+                ShellExtLog.Info("QueryContextMenu: no items added, destroyed empty popup");
+            }
 
             // Note: icon HBITMAPs are NOT deleted here because Explorer draws the menu
             // asynchronously after QueryContextMenu returns. Deleting them would cause
@@ -454,15 +483,18 @@ public class ContextMenuHandler : IShellExtInit, IContextMenu
             // released by Explorer (next Initialize call clears them).
             // CleanupIconCache();
 
-            int itemsAdded = (int)(idCmd - idCmdFirst);
-            string orderSnapshot = string.Join(", ", _cmdIdOrder);
-            ShellExtLog.Info($"QueryContextMenu #{_instanceId}: returning {itemsAdded} items, _cmdIdOrder=[{orderSnapshot}]");
+            ShellExtLog.Info($"QueryContextMenu #{_instanceId}: returning {itemsAdded} items, popup has {popupIndex} entries, _cmdIdOrder=[{orderSnapshot}]");
             // Return the number of menu items added (offset from idCmdFirst)
             return itemsAdded;
         }
         catch (Exception ex)
         {
             ShellExtLog.Error("IContextMenu.QueryContextMenu exception", ex);
+            if (popupMenu != IntPtr.Zero)
+            {
+                NativeMethods.DestroyMenu(popupMenu);
+                ShellExtLog.Info("QueryContextMenu: destroyed popup menu on exception");
+            }
             return NativeMethods.E_FAIL;
         }
     }
