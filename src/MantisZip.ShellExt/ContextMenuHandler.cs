@@ -403,9 +403,6 @@ public class ContextMenuHandler : IShellExtInit, IContextMenu
 
             _cmdIdOrder.Clear();
             uint idCmd = idCmdFirst;
-            string? firstExt = _selectedFiles.Count > 0 ? Path.GetExtension(_selectedFiles[0]) : null;
-            bool isArchive = firstExt != null && ArchiveExtensions.Contains(firstExt);
-            ShellExtLog.Info($"QueryContextMenu: firstExt=\"{firstExt}\", isArchive={isArchive}");
 
             // Build dynamic file name snippets
             string fileName = _selectedFiles.Count > 0
@@ -438,13 +435,13 @@ public class ContextMenuHandler : IShellExtInit, IContextMenu
                 (IntPtr)idCmd, null);
             ShellExtLog.Info("QueryContextMenu: added top separator");
 
-            // ─── Extract group (archive only): items inside popup ───
+            // ─── Extract group (all files, same as compress): items inside popup ───
             bool multipleFiles = effectiveCount > 1;
             bool hasExtractOrOpen = _enableOpen || _enableExtractHere || _enableSmartExtract || _enableExtractToNamed || _enableExtractTo;
             bool hasCompress = _enableCompressSeparate || _enableCompressCombined || _enableCompress;
-            ShellExtLog.Info($"QueryContextMenu: hasExtractOrOpen={hasExtractOrOpen}, isArchive={isArchive}, hasCompress={hasCompress}");
+            ShellExtLog.Info($"QueryContextMenu: hasExtractOrOpen={hasExtractOrOpen}, hasCompress={hasCompress}");
 
-            if (hasExtractOrOpen && isArchive)
+            if (hasExtractOrOpen)
             {
                 if (_enableOpen)
                 {
@@ -488,11 +485,11 @@ public class ContextMenuHandler : IShellExtInit, IContextMenu
             }
             else
             {
-                ShellExtLog.Info($"QueryContextMenu: skipping extract group (hasExtractOrOpen={hasExtractOrOpen}, isArchive={isArchive})");
+                ShellExtLog.Info($"QueryContextMenu: skipping extract group (hasExtractOrOpen={hasExtractOrOpen})");
             }
 
             // ─── Separator between groups (only if both shown) ───
-            if (hasExtractOrOpen && isArchive && hasCompress)
+            if (hasExtractOrOpen && hasCompress)
             {
                 NativeMethods.InsertMenu(popupMenu, popupIndex++, NativeMethods.MF_SEPARATOR | NativeMethods.MF_BYPOSITION,
                     (IntPtr)idCmd, null);
