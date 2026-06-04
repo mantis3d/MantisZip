@@ -7,8 +7,8 @@
 - **技术栈**: .NET 9 + WPF + SharpCompress + SharpSevenZip
 
 ## 版本
-- **当前版本**: 0.3.7-refined-4
-- **发布日期**: 2026-06-03
+- **当前版本**: 0.3.8
+- **发布日期**: 2026-06-04
 
 ## 规划中
 - ✅ **引擎统一已完成** — SharpZipLib→SharpCompress + 7z.exe/SevenZipExtractor→SharpSevenZip（v0.3.4）
@@ -45,6 +45,10 @@
 8. **默认程序提示** — 安装成功后弹窗增加"请在系统设置中设为默认程序"提示
 9. **AppMessageBox.ShowWithAction** — 扩展 AppMessageBox 支持可选操作按钮（主色显示），安装弹窗新增「打开系统设置」按钮直接跳转 `ms-settings:defaultapps`
 10. **删除按钮加宽** — 自定义扩展名 ✕ 按钮从 20×20 扩至 36×24
+11. **Status 颜色触发修复** — 将 `x:Static` 枚举 DataTrigger 改为 bool 属性绑定，解决橙色/绿色无法显示的问题
+12. **GetExePath 修复** — 改用 `Assembly.Location` 替代 `Environment.ProcessPath`，兼容 `dotnet run` 场景，确保图标路径正确
+13. **Explorer 文件图标** — 内置格式使用 `Resources\Icons\*.ico`，自定义扩展名回退到 exe 图标
+14. **原生图标 DLL 计划** — 创建 `.sisyphus/plans/icon-dll.md`（P3），规划将 7 个 .ico 编译为资源 DLL
 
 ### v0.3.7-refined-3 (2026-06-03) 密码工具栏 + 关闭压缩包 + 捐赠 + 空状态重设计
 

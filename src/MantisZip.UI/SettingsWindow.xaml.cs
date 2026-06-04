@@ -1035,9 +1035,14 @@ internal class FormatAssocItem : INotifyPropertyChanged
             {
                 _status = value;
                 OnPropertyChanged();
+                OnPropertyChanged(nameof(IsDefaultStatus));
+                OnPropertyChanged(nameof(IsNotDefaultStatus));
             }
         }
     }
+
+    public bool IsDefaultStatus => _status == AssocStatus.IsDefault;
+    public bool IsNotDefaultStatus => _status == AssocStatus.NotDefault;
 
     public event PropertyChangedEventHandler? PropertyChanged;
 

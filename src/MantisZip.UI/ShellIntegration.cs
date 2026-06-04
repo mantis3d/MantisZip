@@ -456,7 +456,16 @@ internal static class ShellIntegration
         // 写 DefaultIcon
         var iconPath = GetIconPath(ext);
         if (iconPath != null)
+        {
             SetRegistryValue($@"Software\Classes\{ext}\DefaultIcon", null, iconPath);
+        }
+        else
+        {
+            // 自定义扩展名 — 使用软件自身图标
+            var exePath = GetExePath();
+            if (exePath != null)
+                SetRegistryValue($@"Software\Classes\{ext}\DefaultIcon", null, $@"""{exePath}"",0");
+        }
     }
 
     /// <summary>
@@ -689,7 +698,16 @@ internal static class ShellIntegration
 
     private static string GetExePath()
     {
-        return Environment.ProcessPath ?? Assembly.GetExecutingAssembly().Location;
+        // Assembly 所在目录（兼容 dotnet run 场景）
+        var assemblyPath = Assembly.GetExecutingAssembly().Location;
+        var dir = Path.GetDirectoryName(assemblyPath);
+        if (dir != null)
+        {
+            var exePath = Path.Combine(dir, "MantisZip.UI.exe");
+            if (File.Exists(exePath))
+                return exePath;
+        }
+        return assemblyPath;
     }
 
     /// <summary>

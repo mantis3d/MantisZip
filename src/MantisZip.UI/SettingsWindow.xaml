@@ -2,7 +2,6 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:l="clr-namespace:MantisZip.UI.Localization"
-        xmlns:local="clr-namespace:MantisZip.UI"
         xmlns:emoji="clr-namespace:Emoji.Wpf;assembly=Emoji.Wpf"
         Title="{l:L Settings_Title}" Height="500" Width="700"
         WindowStartupLocation="CenterScreen"
@@ -441,7 +440,7 @@
                                 <!-- 格式列表 -->
                                 <Border BorderBrush="{StaticResource Theme_Border}"
                                         BorderThickness="1" CornerRadius="4">
-                                    <ScrollViewer VerticalScrollBarVisibility="Auto" MaxHeight="260">
+                                    <ScrollViewer VerticalScrollBarVisibility="Auto" Height="180">
                                     <ItemsControl x:Name="AssocFormatList"
                                                   Grid.IsSharedSizeScope="True"
                                                   Margin="4">
@@ -452,10 +451,10 @@
                                                     <Grid.Style>
                                                         <Style TargetType="Grid">
                                                             <Style.Triggers>
-                                                                <DataTrigger Binding="{Binding Status}" Value="{x:Static local:AssocStatus.IsDefault}">
+                                                                <DataTrigger Binding="{Binding IsDefaultStatus}" Value="True">
                                                                     <Setter Property="Background" Value="#1A4CAF50"/>
                                                                 </DataTrigger>
-                                                                <DataTrigger Binding="{Binding Status}" Value="{x:Static local:AssocStatus.NotDefault}">
+                                                                <DataTrigger Binding="{Binding IsNotDefaultStatus}" Value="True">
                                                                     <Setter Property="Background" Value="#1AFF9800"/>
                                                                 </DataTrigger>
                                                             </Style.Triggers>
