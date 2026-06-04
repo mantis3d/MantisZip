@@ -9,12 +9,12 @@
 > - `MainWindow.UI.cs` — 修改 FilterFiles + 新增过滤引擎
 > - `MainWindow.xaml.cs` — 新增字段和事件处理
 > - `strings.zh.json` / `strings.en.json` — 新增本地化字符串
-> - `Core/Utils/ArchiveFilter.cs`（可选） — 可测试的过滤引擎
+> - `Core/Utils/ArchiveFilter.cs` — 可测试的过滤引擎
 > - `MantisZip.Tests` — 单元测试覆盖所有过滤逻辑
 >
 > **Estimated Effort**: Medium（2-3h）
 > **Parallel Execution**: YES — 3 waves
-> **Critical Path**: Task 1 → Task 3 → Task 5 → Task 8
+> **Critical Path**: Task 1 → Task 5 → Task 6 → Task 8
 
 ---
 
@@ -104,7 +104,7 @@
 ### QA Policy
 Every task MUST include agent-executed QA scenarios. Evidence saved to `.sisyphus/evidence/`.
 
-- **UI changes**: Use Playwright to verify controls render correctly
+- **UI changes**: Build and launch the app (`dotnet run --project src/MantisZip.UI/MantisZip.UI.csproj`), then manually verify control rendering (MantisZip 是 WPF 桌面应用，不能使用 Playwright 等 Web 工具)
 - **Logic changes**: Use Bash to run unit tests
 - **End-to-end**: Bash to build and launch the app, verify behaviors
 
@@ -119,11 +119,15 @@ Wave 1 (Foundation — can start in parallel):
 ├── Task 1: 本地化字符串 + ArchiveItem 辅助属性 [quick]
 ├── Task 2: 单元测试基础设施 [quick]
 
-Wave 2 (Core implementation — parallel):
+Wave 2a (Core — prerequisite, sequential):
 ├── Task 3: FilterFiles 增加 showSubfolders 模式 [quick]
-├── Task 4: 主工具栏 ToggleButton [quick]
-├── Task 5: 搜索框 UI (XAML + 事件) [quick]
-├── Task 6: 搜索过滤逻辑 [quick]
+│
+Wave 2b (Core — parallel after Task 3):
+├── Task 4: 主工具栏 ToggleButton [quick]       ← 依赖 Task 3，但可写 XAML+占位事件
+├── Task 5: 搜索框 UI (XAML + 事件) [quick]      ← 依赖 Task 1, Task 3
+│
+Wave 2c (Core — sequential after Task 5):
+├── Task 6: 搜索过滤逻辑 [quick]                 ← 依赖 Task 1, Task 3, Task 5
 
 Wave 3 (Integration + Tests):
 ├── Task 7: 单元测试 — FilterFiles showSubfolders [quick]
@@ -135,7 +139,7 @@ Wave 3 (Integration + Tests):
 - **1**: - → 5, 6
 - **2**: - → 7, 8
 - **3**: - → 4, 5, 6, 7
-- **4**: 3 → 5, 6
+- **4**: 3 → 5, 6（Task 4 可在 Task 3 完成前写 XAML + 占位事件，但事件处理器涉及 FilterFiles 签名变化需等待 Task 3）
 - **5**: 1, 3 → 6, 8
 - **6**: 1, 3, 5 → 8
 - **7**: 2, 3 → F1-F4
@@ -169,6 +173,8 @@ Wave 3 (Integration + Tests):
     | `Main_Filter_UnitMB` | MB | MB |
     | `Main_Filter_UnitGB` | GB | GB |
     | `Main_Filter_StatsFormat` | 显示 {0}/{1} 个文件 | Showing {0}/{1} files |
+    | `Main_Toolbar_ToggleFilter` | 筛选 | Filter |
+    | `Main_Tooltip_ToggleFilter` | 显示/隐藏筛选栏 | Show/hide filter bar |
 
   - 确认格式与其他字符串一致（注意 JSON 文件已有转义规则）
 
@@ -191,8 +197,8 @@ Wave 3 (Integration + Tests):
   - 参考现有搜索相关字符串 `Compress_Pwd_Search` 和 `Compress_Pwd_EmptySearch` 的格式
 
   **Acceptance Criteria**:
-  - [ ] `strings.zh.json` 新增 6 个键值对，格式正确（无 JSON 解析错误）
-  - [ ] `strings.en.json` 新增对应的 6 个键值对
+  - [ ] `strings.zh.json` 新增 19 个键值对，格式正确（无 JSON 解析错误）
+  - [ ] `strings.en.json` 新增对应的 19 个键值对
   - [ ] 运行 `dotnet build` 无编译错误
 
   **QA Scenarios**:
@@ -283,6 +289,7 @@ Wave 3 (Integration + Tests):
     - 跳过进度条比例计算中的目录相关逻辑
   - 更新 `DirStatsText` 在扁平模式下的显示格式：「{总数} 个文件（含子目录）」
   - 调用方检查：目录树切换、双击目录、Refresh 等场景需要传递正确的 showSubfolders 状态
+  - 集成 `UpdateSelectionStats()`：`FilterFiles` 末尾在设置 ItemsSource 后应调用 `UpdateSelectionStats()`，确保过滤后选中统计正确（当前依赖 `SelectionChanged` 事件间接更新，但筛选栏变更事件中 `_isProgrammaticFilter == false`）
 
   **Must NOT do**:
   - 不破坏现有的排序恢复逻辑（`_savedSortColumnPath` / `_savedSortDirection`）
@@ -294,8 +301,8 @@ Wave 3 (Integration + Tests):
   - **Skills**: none needed
 
   **Parallelization**:
-  - **Can Run In Parallel**: YES
-  - **Parallel Group**: Wave 2 (with Task 4, 5)
+  - **Can Run In Parallel**: NO（FilterFiles 签名变化是 Task 4/5 事件处理器的前提）
+  - **Parallel Group**: Wave 2a (sequential)
   - **Blocks**: Task 4, Task 6
   - **Blocked By**: None
 
@@ -336,9 +343,9 @@ Wave 3 (Integration + Tests):
 
 ---
 
-- [ ] 4. 主工具栏「显示所有子目录文件」ToggleButton
+- [ ] 4. 主工具栏 ToggleButton × 2（「全部子目录」+「筛选栏显隐」）
 
-  **What to do**:
+  **What to do — 按钮 A：🌲 显示所有子目录文件**：
   - 在 `MainWindow.xaml` 的 `<ToolBar>` 中添加 ToggleButton：
     - 位置：在 SmartExtractBtn 之后、Separator 之前（或其他合适位置，与现有按钮风格一致）
     - `x:Name="ShowSubfoldersBtn"`
@@ -346,12 +353,31 @@ Wave 3 (Integration + Tests):
     - 内容：🌲 emoji + 「全部子目录」文字标签（使用 `{l:L Main_Toolbar_ShowSubfolders}`）
     - ToolTip 根据状态动态切换（Main_Tooltip_ShowSubfoldersOn / Main_Tooltip_ShowSubfoldersOff）
     - `IsEnabled="False"`（默认禁用，压缩包加载后启用）
-  - 在代码-behind 添加事件处理：
-    - `ShowSubfoldersBtn_Checked` / `ShowSubfoldersBtn_Unchecked`（或统一一个 Click 事件）
-    - 事件中设置 `_showSubfolders` 并重新调用 `FilterFiles(_currentFolder)`
-    - 更新 UpdateAddDeleteBtnState 或新建 `UpdateShowSubfoldersBtnState()` 管理 IsEnabled
-  - 在 `LoadArchiveAsync` 成功后启用按钮
-  - 在 `CloseArchive` / 新压缩包加载时重置为未选中并禁用
+  - 事件处理：
+    - `ShowSubfoldersBtn_Checked` / `ShowSubfoldersBtn_Unchecked`
+    - 设置 `_showSubfolders` 并重新调用 `FilterFiles(_currentFolder)`
+    - 新建 `UpdateShowSubfoldersBtnState()` 管理 IsEnabled
+  - ⚠️ `_isProgrammaticFilter` 语义：ToggleButton 是用户操作，但 `FilterFiles` 执行时仍然设置 `_isProgrammaticFilter = true`，避免 `SelectionChanged` 触发非预期的预览。用户期待行为是：Toggle 后文件列表刷新，需要主动点击条目才触发预览。
+
+  **What to do — 按钮 B：🔍 切换筛选栏显隐**：
+  - 在 `ShowSubfoldersBtn` 旁边添加另一个 ToggleButton：
+    - `x:Name="ToggleFilterBarBtn"`
+    - 内容：🔍 emoji + 「筛选」文字标签（使用 `{l:L Main_Toolbar_ToggleFilter}`）
+    - ToolTip：显示/隐藏筛选栏
+    - `IsChecked = true`（默认展开筛选栏）
+    - `IsEnabled="False"`（默认禁用，压缩包加载后启用）
+  - 事件处理：
+    - `ToggleFilterBarBtn_Checked` → 显示筛选工具栏（`FilterBar.Visibility = Visible`）
+    - `ToggleFilterBarBtn_Unchecked` → 隐藏筛选工具栏（`FilterBar.Visibility = Collapsed`）
+    - 筛选栏隐藏时，当前已应用的过滤条件**继续保持生效**（不清除）
+  - 状态管理：
+    - 在 `LoadArchiveAsync` 成功后启用两个按钮
+    - 在 `CloseArchive` / 新压缩包加载时重置所有状态:
+      - `_showSubfolders = false`
+      - `ShowSubfoldersBtn.IsChecked = false`
+      - `ToggleFilterBarBtn.IsChecked = true`（默认展开）
+      - `_searchText = null; _dateFrom = _dateTo = null; _sizeMin = _sizeMax = null; _currentUnfilteredItems = null;`
+      - 清空所有过滤控件的值
 
   **Must NOT do**:
   - 不修改现有按钮的布局和事件
@@ -363,8 +389,8 @@ Wave 3 (Integration + Tests):
   - Reason: WPF XAML UI 修改
 
   **Parallelization**:
-  - **Can Run In Parallel**: YES
-  - **Parallel Group**: Wave 2 (with Task 3, 5)
+  - **Can Run In Parallel**: YES（写 XAML + 事件注册时用占位处理，待 Task 3 完成后补充事件处理器体）
+  - **Parallel Group**: Wave 2b (with Task 5)
   - **Blocks**: Task 6
   - **Blocked By**: Task 3
 
@@ -412,7 +438,8 @@ Wave 3 (Integration + Tests):
               <RowDefinition Height="*"/>     <!-- DataGrid 行 -->
           </Grid.RowDefinitions>
       ```
-    - Row 0：筛选工具栏容器 Border：
+    - Row 0：筛选工具栏容器 Border（`x:Name="FilterBar"`，默认 `Visibility="Visible"`）：
+      - Visibility 受工具栏 `ToggleFilterBarBtn` 的 IsChecked 控制
       - 水平布局：使用 `WrapPanel` 或 `Grid` 按比例分配
       - 包含以下 4 个过滤区域（用竖线 Separator 分隔）：
 
@@ -435,7 +462,7 @@ Wave 3 (Integration + Tests):
       - × 清除按钮 (`x:Name="ClearFiltersBtn"`)
 
     - Row 1：现有的 `<DataGrid x:Name="FileListGrid" .../>` 移入此 Grid 的 Row 1
-    - 空结果提示：在嵌套 Grid 中添加 TextBlock `x:Name="NoResultsText"`（默认 Collapsed），居中显示 `{l:L Main_Search_NoResults}`
+    - 空结果提示：在嵌套 Grid 中添加 TextBlock `x:Name="NoResultsText"`（默认 Collapsed），居中显示 `{l:L Main_Filter_NoResults}`
 
   - 事件绑定：
     - `FileSearchBox.TextChanged` → 触发文字过滤
@@ -443,9 +470,10 @@ Wave 3 (Integration + Tests):
     - `SizeMinBox.TextChanged` / `SizeMaxBox.TextChanged` → 触发大小过滤
     - `SizeMinUnit.SelectionChanged` / `SizeMaxUnit.SelectionChanged` → 单位切换后触发重过滤
     - `ClearFiltersBtn.Click` → 清空所有过滤条件（文字、日期、大小），恢复完整列表
-    - `FileSearchBox.PreviewKeyDown` → Escape 键触发清除全部
+    - `FileSearchBox.PreviewKeyDown` → Escape 键细节：当焦点在 `FileSearchBox` 中时，Escape 仅清除文字搜索框内容（不清除日期/大小）；如果在其他区域按 Escape，则作为全局清除（全部重置）。行为与 Windows 搜索惯例一致。
 
   - 所有新控件仅在加载压缩包后可见（与 FileListPanel 的 Visibility 联动）
+  - ⚠️ **嵌套布局兼容性**：此嵌套 Grid 放在 `InnerContentGrid` 的 Column 2 中。`InnerPreviewSplitter`（Grid.Row=1, ColumnSpan=5）和 `InnerPreviewRow`（Grid.Row=2, ColumnSpan=5）与该嵌套 Grid 共存在 `InnerContentGrid` 中——预览行和分隔线不受影响。不同预览位置（底部/右侧/树下方）下 filter bar 行为一致，无需特殊处理。
 
   **Must NOT do**:
   - 不修改 FileListGrid 的现有列定义
@@ -459,8 +487,8 @@ Wave 3 (Integration + Tests):
   - Reason: WPF XAML UI 布局修改，含 DatePicker/ComboBox 等控件
 
   **Parallelization**:
-  - **Can Run In Parallel**: YES
-  - **Parallel Group**: Wave 2 (with Task 3, 4)
+  - **Can Run In Parallel**: YES（写 XAML + 事件注册时用占位处理，待 Task 3 完成后补充事件处理器体）
+  - **Parallel Group**: Wave 2b (with Task 4)
   - **Blocks**: Task 6
   - **Blocked By**: Task 1, Task 3
 
@@ -522,9 +550,11 @@ Wave 3 (Integration + Tests):
     - `private string? _searchText;`
     - `private DateTime? _dateFrom;` / `private DateTime? _dateTo;`
     - `private long? _sizeMin;` / `private long? _sizeMax;`
+    - `private List<ArchiveItem>? _currentUnfilteredItems;` — `FilterFiles` 在 showSubfolders 处理和排序之后、过滤之前，把当前视图的完整列表存入此字段。`RefreshFilter()` 从它读取，避免重复 showSubfolders 的目录合成/去重逻辑
   - 单位换算辅助方法：
     - `ParseSizeWithUnit(string text, string unit) -> long?`：将"1.5" + "MB" → 1572864
     - 支持 B/KB/MB/GB 四个单位
+    - ⚠️ **异常安全**：所有输入错误（空字符串、非数字文本、负值等）均返回 `null`（跳过该过滤条件），绝不抛异常。使用 `double.TryParse(text, NumberStyles.Any, CultureInfo.InvariantCulture, out _)` 安全解析
   - 事件处理器（每个过滤控件的变化触发）：
     - `FileSearchBox.TextChanged` → 更新 `_searchText` → 调用 `RefreshFilter()`
     - `DateFromPicker.SelectedDateChanged` → 更新 `_dateFrom` → 调用 `RefreshFilter()`
@@ -533,13 +563,29 @@ Wave 3 (Integration + Tests):
     - `SizeMaxBox.TextChanged` + `SizeMaxUnit.SelectionChanged` → 更新 `_sizeMax` → 调用 `RefreshFilter()`
     - `ClearFiltersBtn.Click` → 清空所有过滤字段、清空所有控件、调用 `RefreshFilter()`
   - `RefreshFilter()` 方法：
-    - 从当前 `FileListGrid.ItemsSource` 对应的完整集合重新过滤
-    - 或从 `_allItems` + 当前目录 + showSubfolders 状态重建
-    - 更新 `FileListGrid.ItemsSource`
-    - 更新 `NoResultsText.Visibility`
-    - 更新 `DirStatsText` 显示过滤后统计：「显示 N/M 个文件」
+    - **数据来源**：统一从 `_currentUnfilteredItems` 读取（`FilterFiles` 已完成 showSubfolders 处理和排序，将结果存入此字段）
+    - **不依赖 `FileListGrid.ItemsSource` 当前值**（避免排序被破坏时数据不一致）
+    - 调用 `ApplyFilters(_currentUnfilteredItems, currentFilters)` 得到过滤列表
+    - **在设置 ItemsSource 之前**完成过滤，确保排序逻辑在最终列表上执行
   - 集成到 `FilterFiles`：
-    - `FilterFiles` 末尾调用 `RefreshFilter()` 确保搜索条件被重新应用
+    - **移除**原 `FilterFiles` 末尾的 `FileListGrid.ItemsSource = sortedItems;` + `ApplySavedSort()` + `Items.Refresh()`
+    - **改为** `FilterFiles` 构建 `sortedItems` 后：
+      1. `_currentUnfilteredItems = sortedItems;`（存下无过滤的完整列表）
+      2. 末尾调用 `RefreshFilter()`（无参数），由它从 `_currentUnfilteredItems` 读取、决定是否应用过滤和设置 ItemsSource
+    - 这样：UI 事件触发的 `RefreshFilter()` 也走同一路径（从 `_currentUnfilteredItems` 读），不再重复 showSubfolders 的目录合成/去重逻辑
+
+  - **`DirStatsText` 优先级规则**（解决三套格式冲突）：
+    ```
+    hasSubfolders = _showSubfolders && !hasActiveFilters:
+        「{total} 个文件（含子目录）」
+    hasActiveFilters:
+        L.TF(L.Main_Filter_StatsFormat, filteredCount, total)  // 显示 N/M 个文件
+    default:
+        L.TF(L.Main_DirStats, total, fileCount, dirCount)     // N 项 (文件 X, 目录 Y)
+    ```
+    优先级：过滤信息 > showSubfolders 信息 > 默认格式。过滤条件清空后自动降级。
+
+  - **`ShowArchiveInfo` 保护**：过滤后无选中项时，**不**触发 `ShowArchiveInfo()`（避免覆盖用户当前预览）。仅在首次加载且无任何过滤条件时显示归档总览。
 
   **Must NOT do**:
   - 不修改 `_allItems` 的内容（仅过滤不修改）
@@ -628,7 +674,7 @@ Wave 3 (Integration + Tests):
 
   **Commit**: YES（与 Task 5 一起）
   - Message: `feat(ui): add multi-dimensional file list filter bar (text, date range, size range)`
-  - Files: `src/MantisZip.UI/MainWindow.xaml`, `src/MantisZip.UI/MainWindow.xaml.cs`, `src/MantisZip.UI/MainWindow.UI.cs`（可选: `Core/Utils/ArchiveFilter.cs`）
+  - Files: `src/MantisZip.UI/MainWindow.xaml`, `src/MantisZip.UI/MainWindow.xaml.cs`, `src/MantisZip.UI/MainWindow.UI.cs`, `Core/Utils/ArchiveFilter.cs`
   - Pre-commit: `dotnet build`
 
 ---
@@ -681,8 +727,8 @@ Wave 3 (Integration + Tests):
     Evidence: .sisyphus/evidence/task-7-subfolder-tests.txt
   ```
 
-  **Commit**: YES（与 Task 2、3 一起提交）
-  - Message: `feat(core): add showSubfolders filtering mode with tests`
+  **Commit**: YES（与 Task 2、3、8 一起提交→Commit 2）
+  - Message: (see Commit Strategy table)
   - Files: `tests/MantisZip.Tests/FileListFilterTests.cs`, `src/MantisZip.UI/MainWindow.UI.cs`
   - Pre-commit: `dotnet test tests/MantisZip.Tests/`
 
@@ -746,9 +792,9 @@ Wave 3 (Integration + Tests):
     Evidence: .sisyphus/evidence/task-8-all-filter-tests.txt
   ```
 
-  **Commit**: YES（与 Task 5、6 一起提交）
-  - Message: `feat(ui): add multi-dimensional file list filter with tests`
-  - Files: `tests/MantisZip.Tests/FileListFilterTests.cs`, `Core/Utils/ArchiveFilter.cs`（可选）
+  **Commit**: YES（与 Task 2、3、7 一起提交→Commit 2；不随 Task 5、6 提交，避免文件冲突）
+  - Message: (see Commit Strategy table)
+  - Files: `tests/MantisZip.Tests/FileListFilterTests.cs`, `Core/Utils/ArchiveFilter.cs`
   - Pre-commit: `dotnet test tests/MantisZip.Tests/`
 
 ---
@@ -763,7 +809,7 @@ Wave 3 (Integration + Tests):
   Run `dotnet build` + `dotnet test`. Review all changed files for: empty catches, console.log in prod, commented-out code, unused imports.
   Output: `Build [PASS/FAIL] | Tests [N pass/N fail] | Files [N clean/N issues] | VERDICT`
 
-- [ ] F3. **Real Manual QA** — Playwright / Bash
+- [ ] F3. **Real Manual QA** — 手动启动应用 / Bash
   Start from clean state. Execute EVERY QA scenario from EVERY task. Test cross-task integration (toggle + search working together). Test edge cases: toggle while searching, search then toggle, rapid typing.
   Output: `Scenarios [N/N pass] | Integration [N/N] | Edge Cases [N tested] | VERDICT`
 
@@ -778,9 +824,9 @@ Wave 3 (Integration + Tests):
 | Commit | Tasks | Message |
 |--------|-------|---------|
 | 1 | 1 | `feat(l10n): add file list search/filter localization strings` |
-| 2 | 2, 3, 7 | `feat(core): add showSubfolders filtering mode with tests` |
-| 3 | 4 | `feat(ui): add "show all subfolders" ToggleButton to toolbar` |
-| 4 | 5, 6, 8 | `feat(ui): add multi-dimensional file list filter bar (text, date range, size range)` |
+| 2 | 2, 3, 7, 8 | `feat(core): add file list filtering (showSubfolders + multi-dim filter) with tests` |
+| 3 | 4 | `feat(ui): add toolbar toggle buttons (show subfolders + toggle filter bar)` |
+| 4 | 5, 6 | `feat(ui): add multi-dimensional file list filter bar (text, date range, size range)` |
 
 ---
 
@@ -793,7 +839,8 @@ dotnet test tests/MantisZip.Tests/  # Expected: All tests pass (0 failures)
 ```
 
 ### Final Checklist
-- [ ] 「显示所有子目录文件」ToggleButton 在主工具栏工作正常
+- [ ] 「显示所有子目录文件」ToggleButton（🌲）在主工具栏工作正常
+- [ ] 「切换筛选栏」ToggleButton（🔍）在主工具栏工作正常，显隐切换正确
 - [ ] 筛选工具栏显示在文件列表上方，包含文字/日期/大小三个过滤区
 - [ ] 文字搜索实时过滤，大小写不敏感
 - [ ] 日期范围 DatePicker × 2 过滤正确
