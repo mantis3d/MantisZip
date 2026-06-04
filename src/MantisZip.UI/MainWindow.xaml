@@ -461,7 +461,10 @@
                                                                 </Style>
                                                             </Rectangle.Style>
                                                             <Rectangle.Width>
-                                                                 <Binding Path="SizeRatio" Converter="{StaticResource RatioToFixedWidthConverter}" ConverterParameter="100"/>
+                                                                 <MultiBinding Converter="{StaticResource RatioToWidthConverter}">
+                                                                     <Binding Path="SizeRatio"/>
+                                                                     <Binding Path="ActualWidth" RelativeSource="{RelativeSource AncestorType=ContentPresenter}"/>
+                                                                 </MultiBinding>
                                                              </Rectangle.Width>
                                                          </Rectangle>
                                                          <TextBlock Text="{Binding SizeDisplay}" VerticalAlignment="Center" Margin="4,0"/>
@@ -485,7 +488,10 @@
                                                                 </Style>
                                                             </Rectangle.Style>
                                                             <Rectangle.Width>
-                                                                 <Binding Path="CompressedSizeRatio" Converter="{StaticResource RatioToFixedWidthConverter}" ConverterParameter="100"/>
+                                                                 <MultiBinding Converter="{StaticResource RatioToWidthConverter}">
+                                                                     <Binding Path="CompressedSizeRatio"/>
+                                                                     <Binding Path="ActualWidth" RelativeSource="{RelativeSource AncestorType=ContentPresenter}"/>
+                                                                 </MultiBinding>
                                                              </Rectangle.Width>
                                                          </Rectangle>
                                                          <TextBlock Text="{Binding CompressedSizeDisplay}" VerticalAlignment="Center" Margin="4,0"/>
@@ -499,7 +505,10 @@
                                                     <Grid>
                                                         <Rectangle Fill="{StaticResource ProgressBarRatioBg}" HorizontalAlignment="Left">
                                                             <Rectangle.Width>
-                                                                 <Binding Path="RatioBarValue" Converter="{StaticResource RatioToFixedWidthConverter}" ConverterParameter="80"/>
+                                                                 <MultiBinding Converter="{StaticResource RatioToWidthConverter}">
+                                                                     <Binding Path="RatioBarValue"/>
+                                                                     <Binding Path="ActualWidth" RelativeSource="{RelativeSource AncestorType=ContentPresenter}"/>
+                                                                 </MultiBinding>
                                                              </Rectangle.Width>
                                                          </Rectangle>
                                                          <TextBlock Text="{Binding RatioDisplay}" VerticalAlignment="Center" Margin="4,0"/>
@@ -514,7 +523,10 @@
                                                     <Grid>
                                                         <Rectangle Fill="{StaticResource ProgressBarDateBg}" HorizontalAlignment="Left">
                                                             <Rectangle.Width>
-                                                                 <Binding Path="DateRatio" Converter="{StaticResource RatioToFixedWidthConverter}" ConverterParameter="150"/>
+                                                                 <MultiBinding Converter="{StaticResource RatioToWidthConverter}">
+                                                                     <Binding Path="DateRatio"/>
+                                                                     <Binding Path="ActualWidth" RelativeSource="{RelativeSource AncestorType=ContentPresenter}"/>
+                                                                 </MultiBinding>
                                                              </Rectangle.Width>
                                                          </Rectangle>
                                                          <TextBlock Text="{Binding DateDisplay}" VerticalAlignment="Center" Margin="4,0"/>

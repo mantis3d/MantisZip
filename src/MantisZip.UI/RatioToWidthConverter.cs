@@ -12,8 +12,13 @@ public class RatioToWidthConverter : IMultiValueConverter
 {
     public object Convert(object[] values, Type targetType, object parameter, CultureInfo culture)
     {
-        if (values.Length == 2 && values[0] is double ratio && values[1] is double width)
-            return ratio * width;
+        // 安全保护：ratio 或 width 非有效值时返回 0，避免崩溃
+        if (values.Length >= 2
+            && values[0] is double ratio && double.IsFinite(ratio) && ratio > 0
+            && values[1] is double width && double.IsFinite(width) && width > 0)
+        {
+            return Math.Min(ratio * width, width);  // 不超出列宽
+        }
         return 0.0;
     }
 
