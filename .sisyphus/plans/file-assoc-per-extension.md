@@ -757,7 +757,7 @@ Wave 3 (Tests + Final):
 
 ---
 
-- [ ] 7. xUnit 测试
+- [x] 7. xUnit 测试
 
   **What to do**:
   在 `tests/MantisZip.Tests/` 中新增测试文件 `ShellIntegrationAssocTests.cs`：
