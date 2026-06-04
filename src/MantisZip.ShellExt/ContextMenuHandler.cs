@@ -154,6 +154,15 @@ public class ContextMenuHandler : IShellExtInit, IContextMenu
     // InvokeCommand) can use it.
     private static List<string>? _fullFileList;
     private static readonly object _fileListLock = new();
+    // Ensures only ONE handler instance inserts the popup per right-click session.
+    // Multiple instances (created by Explorer for >16 files) would otherwise all
+    // add their own "MantisZip" submenu with overlapping command ID ranges,
+    // preventing Explorer from routing InvokeCommand.
+    private static volatile bool _popupAddedForCurrentSession;
+    // Timestamp of the last QueryContextMenu call, used to detect new right-click
+    // sessions by time gap (shadow instances are created within seconds, new
+    // right-clicks are separated by >5 seconds of human reaction time).
+    private static long _lastQueryMenuTimestamp;
 
     // ─── State ───
     private List<string> _selectedFiles = new();
@@ -223,12 +232,6 @@ public class ContextMenuHandler : IShellExtInit, IContextMenu
 
             try
             {
-                // Reset the shared file list for every new selection.
-                // Explorer may create multiple instances (>16 files → shadow instance);
-                // we keep the largest as the true count, but must reset first so
-                // stale values from a previous selection don't leak across.
-                lock (_fileListLock) { _fullFileList = null; }
-
                 IntPtr hDrop = medium.hBitmap;
                 int fileCount = NativeMethods.DragQueryFile(hDrop, -1, null, 0);
                 ShellExtLog.Info($"IShellExtInit.Initialize: DragQueryFile count={fileCount}");
@@ -270,6 +273,57 @@ public class ContextMenuHandler : IShellExtInit, IContextMenu
                 // Explorer creates multiple instances for >16 files: the first gets
                 // truncated to 16, a later instance has the full list, and more
                 // instances may have only 1 file. We keep the largest list.
+
+                // Detect new right-click session by bidirectional subset check.
+                // Shadow instances (same selection) have files related by subset:
+                //   - First instance (16 files) stores list; shadow (25 files) has
+                //     stored ⊂ current (shadow has MORE files) — same session ✓
+                //   - Shadow 1-file instance has current ⊂ stored — same session ✓
+                // A genuinely new selection has neither direction as subset → reset.
+                lock (_fileListLock)
+                {
+                    if (_fullFileList != null && _fullFileList.Count > 0 && _selectedFiles.Count > 0)
+                    {
+                        // Check if stored files are a subset of current files
+                        // (shadow instance with MORE files than the first instance)
+                        bool storedIsSubsetOfCurrent = true;
+                        for (int i = 0; i < _fullFileList.Count; i++)
+                        {
+                            if (!_selectedFiles.Contains(_fullFileList[i], StringComparer.OrdinalIgnoreCase))
+                            {
+                                storedIsSubsetOfCurrent = false;
+                                break;
+                            }
+                        }
+
+                        // Check if current files are a subset of stored files
+                        // (shadow instance with FEWER files, e.g. the 1-file shadow)
+                        bool currentIsSubsetOfStored = true;
+                        for (int i = 0; i < _selectedFiles.Count; i++)
+                        {
+                            if (!_fullFileList.Contains(_selectedFiles[i], StringComparer.OrdinalIgnoreCase))
+                            {
+                                currentIsSubsetOfStored = false;
+                                break;
+                            }
+                        }
+
+                        // Only reset if neither is a subset → different selection
+                        if (!storedIsSubsetOfCurrent && !currentIsSubsetOfStored)
+                        {
+                            ShellExtLog.Info($"IShellExtInit.Initialize: new selection detected ({_selectedFiles.Count} files vs {_fullFileList.Count} stored, neither direction is a subset), resetting");
+                            _fullFileList = null;
+                            _popupAddedForCurrentSession = false;
+                        }
+                    }
+                    else if (_selectedFiles.Count > 0)
+                    {
+                        // No stored list yet → first instance of new session
+                        _fullFileList = null;
+                        _popupAddedForCurrentSession = false;
+                    }
+                }
+
                 if (_selectedFiles.Count > 0)
                 {
                     lock (_fileListLock)
@@ -322,6 +376,30 @@ public class ContextMenuHandler : IShellExtInit, IContextMenu
             // We do this at the start (not end) of QueryContextMenu because Explorer
             // renders the menu asynchronously — deleting before draw = invisible icons.
             CleanupIconCache();
+
+            // Reset _popupAddedForCurrentSession if enough time has passed since
+            // the last QueryContextMenu. A 2-second threshold works because:
+            //   - Shadow instances (same right-click) reuse the same flag ✓
+            //   - A new right-click is always >2s apart (even fast users) ✓
+            //   - If the threshold is exceeded, the shadow instance (which has
+            //     the full file list via _fullFileList) inserts the popup fresh
+            long now = Stopwatch.GetTimestamp();
+            if (_lastQueryMenuTimestamp != 0 &&
+                (now - _lastQueryMenuTimestamp) > Stopwatch.Frequency * 2) // 2 seconds
+            {
+                _popupAddedForCurrentSession = false;
+            }
+            _lastQueryMenuTimestamp = now;
+
+            // Only the first handler instance of a session inserts the popup.
+            // Shadow instances all skip, preventing multiple "MantisZip" submenus
+            // with overlapping command ID ranges that confuse Explorer's routing.
+            if (_popupAddedForCurrentSession)
+            {
+                ShellExtLog.Info($"QueryContextMenu #{_instanceId}: popup already added for this session, skipping menu insertion");
+                return 0;
+            }
+            _popupAddedForCurrentSession = true;
 
             _cmdIdOrder.Clear();
             uint idCmd = idCmdFirst;
