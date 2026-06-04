@@ -442,12 +442,13 @@ internal static class ShellIntegration
     }
 
     /// <summary>
-    /// 注册 ProgId 并将L.T(L.Shell_Compress)格式扩展名与之关联。
-    /// 写入 HKCU\Software\Classes，无需管理员权限。
+    /// 仅注册 ProgId 和 Applications 条目（不安装任何扩展名关联）。
+    /// 在 InstallAssoc_Click 中先调用此方法确保基础注册存在，
+    /// 然后只安装用户勾选的扩展名。
     /// </summary>
-    public static void InstallAssociations()
+    public static void EnsureProgIdRegistered()
     {
-        App.LogDebug("ShellIntegration.InstallAssociations: starting");
+        App.LogDebug("ShellIntegration.EnsureProgIdRegistered: starting");
         var exePath = GetExePath();
 
         // 1. 注册 ProgId
@@ -457,7 +458,7 @@ internal static class ShellIntegration
         SetRegistryValue($@"{progIdKey}\shell\open\command", null, $@"""{exePath}"" --open ""%1""");
         SetRegistryValue($@"{progIdKey}\DefaultIcon", null, $@"""{exePath},0""");
 
-        // 2. 注册 Applications 条目（控制"L.T(L.Main_Toolbar_Open)方式"列表中的L.T(L.Pwd_ShowBtn)L.T(L.Main_Col_Name)）
+        // 2. 注册 Applications 条目
         var appKey = $@"Software\Classes\Applications\{Path.GetFileName(exePath)}";
         SetRegistryValue(appKey, "FriendlyAppName", L.T(L.App_MantisZipTitle));
         SetRegistryValue($@"{appKey}\shell\open\command", null, $@"""{exePath}"" --open ""%1""");
@@ -467,7 +468,18 @@ internal static class ShellIntegration
             SetRegistryValue($@"{appKey}\SupportedTypes", ext, "");
         }
 
-        // 3. 每个扩展名写 OpenWithProgids + DefaultIcon
+        App.LogDebug("ShellIntegration.EnsureProgIdRegistered: done");
+    }
+
+    /// <summary>
+    /// 注册 ProgId 并将L.T(L.Shell_Compress)格式扩展名与之关联。
+    /// 写入 HKCU\Software\Classes，无需管理员权限。
+    /// </summary>
+    public static void InstallAssociations()
+    {
+        App.LogDebug("ShellIntegration.InstallAssociations: starting");
+        EnsureProgIdRegistered();
+
         foreach (var ext in ArchiveExtensions)
         {
             InstallAssociationForExtension(ext);
@@ -566,7 +578,7 @@ internal static class ShellIntegration
                 using var progIdKey = Registry.ClassesRoot.OpenSubKey(progId);
                 var displayName = progIdKey?.GetValue(null) as string;
                 if (!string.IsNullOrEmpty(displayName))
-                    return displayName;
+                    return CleanAppName(displayName);
             }
             catch { }
 
@@ -584,6 +596,22 @@ internal static class ShellIntegration
         {
             return "未设置";
         }
+    }
+
+    /// <summary>清理 ProgId 友好名称中常见的格式描述后缀。</summary>
+    private static string CleanAppName(string name)
+    {
+        if (string.IsNullOrEmpty(name)) return name;
+
+        // Strip common suffixes that make the result look like a format description
+        string[] suffixes = { " Archive", " Compressed", " File", " Document", " Image" };
+        foreach (var suffix in suffixes)
+        {
+            if (name.EndsWith(suffix, StringComparison.OrdinalIgnoreCase))
+                return name.Substring(0, name.Length - suffix.Length);
+        }
+
+        return name;
     }
 
     #endregion

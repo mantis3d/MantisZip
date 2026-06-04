@@ -568,24 +568,24 @@ public partial class SettingsWindow : Window
         App.LogDebug("SettingsWindow: InstallAssoc_Click");
         try
         {
-            // 1. 完整安装（ProgId + Applications + 全部内置扩展名）
-            ShellIntegration.InstallAssociations();
+            // 1. 注册 ProgId + Applications（基础注册，不安装扩展）
+            ShellIntegration.EnsureProgIdRegistered();
 
-            // 2. 卸载未勾选的内置扩展名
+            // 2. 只安装用户勾选的扩展名（内置 + 自定义）
             foreach (var item in AssocFormatList.Items)
             {
-                if (item is FormatAssocItem fi && !fi.IsEnabled && !fi.IsCustom)
+                if (item is FormatAssocItem fi && fi.IsEnabled)
                 {
-                    ShellIntegration.UninstallAssociationForExtension(fi.Extension);
+                    ShellIntegration.InstallAssociationForExtension(fi.Extension);
                 }
             }
 
-            // 3. 安装已勾选的自定义扩展名
+            // 3. 卸载已安装但未勾选的扩展名（清理旧关联）
             foreach (var item in AssocFormatList.Items)
             {
-                if (item is FormatAssocItem fi && fi.IsEnabled && fi.IsCustom)
+                if (item is FormatAssocItem fi && !fi.IsEnabled)
                 {
-                    ShellIntegration.InstallAssociationForExtension(fi.Extension);
+                    ShellIntegration.UninstallAssociationForExtension(fi.Extension);
                 }
             }
 
@@ -645,7 +645,7 @@ public partial class SettingsWindow : Window
     {
         try
         {
-            Process.Start("ms-settings:defaultapps");
+            Process.Start(new ProcessStartInfo("ms-settings:defaultapps") { UseShellExecute = true });
         }
         catch { }
     }
