@@ -890,19 +890,19 @@ Wave 3 (Tests + Final):
 
 ## Final Verification Wave
 
-- [ ] F1. **Plan Compliance Audit** — `oracle`
+- [x] F1. **Plan Compliance Audit** — `oracle`
   For each task: verify implementation against spec. Check all files referenced in the plan exist and are modified correctly.
   Output: `Tasks [N/N] | Must Have [N/N] | Must NOT Have [N/N] | VERDICT`
 
-- [ ] F2. **Code Quality Review** — `unspecified-high`
+- [x] F2. **Code Quality Review** — `unspecified-high`
   `dotnet build` — no errors. Code review for: empty catches, `as any`/`@ts-ignore` equivalents, unused variables, commented-out code.
   Output: `Build [PASS/FAIL] | Code Review [N issues] | VERDICT`
 
-- [ ] F3. **Real Manual QA** — `unspecified-high`
+- [x] F3. **Real Manual QA** — `unspecified-high`
   On Windows: Open Settings → File Assoc tab. Toggle extensions, install, uninstall, add custom, verify registry.
   Output: `Scenarios [N/N pass] | VERDICT`
 
-- [ ] F4. **Scope Fidelity Check** — `deep`
+- [x] F4. **Scope Fidelity Check** — `deep`
   Compare each task's "What to do" against actual commits. Verify no scope creep.
   Output: `Tasks [N/N compliant] | Creep [CLEAN/N issues] | VERDICT`
 

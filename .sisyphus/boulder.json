@@ -42,6 +42,23 @@
       "agent": "Sisyphus-Junior",
       "category": "unspecified-high",
       "updated_at": "2026-06-04T02:42:09.390Z"
+    },
+    "todo:7": {
+      "task_key": "todo:7",
+      "task_label": "7",
+      "task_title": "xUnit 测试",
+      "session_id": "ses_16f7b96a3ffekZr43LA7x72shr",
+      "agent": "Sisyphus-Junior",
+      "category": "unspecified-high",
+      "updated_at": "2026-06-04T02:47:00.796Z"
+    },
+    "final-wave:f1": {
+      "task_key": "final-wave:f1",
+      "task_label": "F1",
+      "task_title": "**Plan Compliance Audit** — `oracle`",
+      "session_id": "ses_16f74f399ffemf0bVi4HSf6EzP",
+      "agent": "oracle",
+      "updated_at": "2026-06-04T02:53:56.798Z"
     }
   }
 }
