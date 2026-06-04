@@ -1,58 +1,47 @@
 {
-  "active_plan": "E:\\github\\MantisZip\\.sisyphus\\plans\\about-window-redesign.md",
-  "started_at": "2026-06-03T03:57:00.670Z",
+  "active_plan": "E:\\github\\MantisZip\\.sisyphus\\plans\\file-assoc-per-extension.md",
+  "started_at": "2026-06-04T02:27:38.811Z",
   "session_ids": [
-    "ses_174819743ffecZq4aDv47E24rx",
-    "ses_17452dbeeffeu6Nt5eI0pxy6Cy",
-    "ses_17452ca21ffeQR3PzL3WaSZnEB",
-    "ses_17452b7ceffeVjv4UOROvWV8hy",
-    "ses_17452a16cffehID6DcQmxypWRz"
+    "ses_16fbb3462ffeJL7EiQBQaiXAGh",
+    "ses_16f8a4293ffepGRvGYClN7CH0c",
+    "ses_16f8a18eaffeSWXni8JT2Vl539",
+    "ses_16f8a0467ffeN65NCojGbBptjn"
   ],
   "session_origins": {
-    "ses_174819743ffecZq4aDv47E24rx": "direct",
-    "ses_17452dbeeffeu6Nt5eI0pxy6Cy": "appended",
-    "ses_17452ca21ffeQR3PzL3WaSZnEB": "appended",
-    "ses_17452b7ceffeVjv4UOROvWV8hy": "appended",
-    "ses_17452a16cffehID6DcQmxypWRz": "appended"
+    "ses_16fbb3462ffeJL7EiQBQaiXAGh": "direct",
+    "ses_16f8a4293ffepGRvGYClN7CH0c": "appended",
+    "ses_16f8a18eaffeSWXni8JT2Vl539": "appended",
+    "ses_16f8a0467ffeN65NCojGbBptjn": "appended"
   },
-  "plan_name": "about-window-redesign",
+  "plan_name": "file-assoc-per-extension",
   "agent": "atlas",
   "task_sessions": {
     "todo:1": {
       "task_key": "todo:1",
       "task_label": "1",
-      "task_title": "Add About_* localization keys",
-      "session_id": "ses_1745e4f97ffe42KFxs8lpNaBDn",
+      "task_title": "AppSettings — 新增属性",
+      "session_id": "ses_16f8a0467ffeN65NCojGbBptjn",
       "agent": "Sisyphus-Junior",
       "category": "quick",
-      "updated_at": "2026-06-03T04:01:35.165Z"
+      "updated_at": "2026-06-04T02:31:20.235Z"
     },
-    "todo:2": {
-      "task_key": "todo:2",
-      "task_label": "2",
-      "task_title": "Create AboutWindow.xaml and AboutWindow.xaml.cs",
-      "session_id": "ses_17459dd3cffeGEhraydRnCUGaz",
+    "todo:4": {
+      "task_key": "todo:4",
+      "task_label": "4",
+      "task_title": "SettingsWindow.xaml — 新文件关联面板 UI",
+      "session_id": "ses_16f8629deffeI2NDlkqiijkK3w",
       "agent": "Sisyphus-Junior",
       "category": "visual-engineering",
-      "updated_at": "2026-06-03T04:05:27.700Z"
+      "updated_at": "2026-06-04T02:35:17.739Z"
     },
-    "todo:3": {
-      "task_key": "todo:3",
-      "task_label": "3",
-      "task_title": "Update MainWindow.Menu.cs — About_Click handler",
-      "session_id": "ses_1745602afffeNIQlg2EcPFTLdF",
-      "agent": "Sisyphus-Junior",
-      "category": "quick",
-      "updated_at": "2026-06-03T04:07:40.673Z"
-    },
-    "final-wave:f1": {
-      "task_key": "final-wave:f1",
-      "task_label": "F1",
-      "task_title": "**Plan Compliance Audit** — `oracle`",
-      "session_id": "ses_17452a16cffehID6DcQmxypWRz",
+    "todo:5": {
+      "task_key": "todo:5",
+      "task_label": "5",
+      "task_title": "SettingsWindow.xaml.cs — 加载/保存/交互逻辑",
+      "session_id": "ses_16f8244cbffeEglsjsF4xKtciQ",
       "agent": "Sisyphus-Junior",
       "category": "unspecified-high",
-      "updated_at": "2026-06-03T04:13:40.023Z"
+      "updated_at": "2026-06-04T02:42:09.390Z"
     }
   }
 }

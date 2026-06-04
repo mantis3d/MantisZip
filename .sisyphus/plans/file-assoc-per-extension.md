@@ -142,7 +142,7 @@ Wave 3 (Tests + Final):
 
 ## TODOs
 
-- [ ] 1. AppSettings — 新增属性
+- [x] 1. AppSettings — 新增属性
 
   **What to do**:
   - 在 `AppSettings.cs` 中添加 7 个 `Assoc*` 布尔属性，默认值如下：
@@ -214,7 +214,7 @@ Wave 3 (Tests + Final):
 
 ---
 
-- [ ] 2. ShellIntegration — 逐扩展名操作 + 当前处理器检测
+- [x] 2. ShellIntegration — 逐扩展名操作 + 当前处理器检测
 
   **What to do**:
 
@@ -322,7 +322,7 @@ Wave 3 (Tests + Final):
 
 ---
 
-- [ ] 3. FormatAssocItem — 数据模型
+- [x] 3. FormatAssocItem — 数据模型
 
   **What to do**:
   在 `SettingsWindow.xaml.cs` 中（或新建单独文件）添加内部数据类：
@@ -398,7 +398,7 @@ Wave 3 (Tests + Final):
 
 ---
 
-- [ ] 4. SettingsWindow.xaml — 新文件关联面板 UI
+- [x] 4. SettingsWindow.xaml — 新文件关联面板 UI
 
   **What to do**:
   替换文件关联 Tab（当前第 407-433 行）为新的 UI：
@@ -582,7 +582,7 @@ Wave 3 (Tests + Final):
 
 ---
 
-- [ ] 5. SettingsWindow.xaml.cs — 加载/保存/交互逻辑
+- [x] 5. SettingsWindow.xaml.cs — 加载/保存/交互逻辑
 
   **What to do**:
 
@@ -683,7 +683,7 @@ Wave 3 (Tests + Final):
 
 ---
 
-- [ ] 6. 本地化字符串
+- [x] 6. 本地化字符串
 
   **What to do**:
   在 `L.cs` 及 `strings.zh.json` / `strings.en.json` 中添加新键值：

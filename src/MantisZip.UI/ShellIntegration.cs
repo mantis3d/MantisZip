@@ -415,15 +415,30 @@ internal static class ShellIntegration
     #region L.T(L.Settings_Tab_FileAssoc)
 
     /// <summary>检查L.T(L.Settings_Tab_FileAssoc)L.T(L.MsgBox_Yes)L.T(L.MsgBox_No)已L.T(L.Settings_Menu_Btn_Install)。</summary>
-    public static bool AreAssociationsInstalled
+    public static bool AreAssociationsInstalled => ArchiveExtensions.Any(AreAssociationsInstalledForExtension);
+
+    /// <summary>检查指定的扩展名是否已安装文件关联。</summary>
+    public static bool AreAssociationsInstalledForExtension(string ext)
     {
-        get
-        {
-            // OpenWithProgids 下存的是值（REG_NONE），不是子项
-            using var key = Registry.CurrentUser.OpenSubKey($@"Software\Classes\.zip\OpenWithProgids");
-            if (key == null) return false;
-            return key.GetValue(ProgId) != null;
-        }
+        using var key = Registry.CurrentUser.OpenSubKey($@"Software\Classes\{ext}\OpenWithProgids");
+        if (key == null) return false;
+        return key.GetValue(ProgId) != null;
+    }
+
+    /// <summary>为单个扩展名安装文件关联（OpenWithProgids + DefaultIcon）。</summary>
+    public static void InstallAssociationForExtension(string ext)
+    {
+        if (ext == ".tar.gz") return; // .tar.gz 文件的扩展名是 .gz，由 .gz 注册覆盖
+
+        // 写 OpenWithProgids
+        var extKey = $@"Software\Classes\{ext}\OpenWithProgids";
+        using var key = Registry.CurrentUser.CreateSubKey(extKey);
+        key?.SetValue(ProgId, Array.Empty<byte>(), RegistryValueKind.None);
+
+        // 写 DefaultIcon
+        var iconPath = GetIconPath(ext);
+        if (iconPath != null)
+            SetRegistryValue($@"Software\Classes\{ext}\DefaultIcon", null, iconPath);
     }
 
     /// <summary>
@@ -452,25 +467,44 @@ internal static class ShellIntegration
             SetRegistryValue($@"{appKey}\SupportedTypes", ext, "");
         }
 
-        // 3. 每个扩展名写 OpenWithProgids
+        // 3. 每个扩展名写 OpenWithProgids + DefaultIcon
         foreach (var ext in ArchiveExtensions)
         {
-            if (ext == ".tar.gz") continue; // .tar.gz 由 .gz L.T(L.CompressConflict_Overwrite)
-            var extKey = $@"Software\Classes\{ext}\OpenWithProgids";
-            using var key = Registry.CurrentUser.CreateSubKey(extKey);
-            key?.SetValue(ProgId, Array.Empty<byte>(), RegistryValueKind.None);
-        }
-
-        // 4. 每个扩展名L.T(L.Settings_Title)独立图标
-        foreach (var ext in ArchiveExtensions)
-        {
-            if (ext == ".tar.gz") continue;
-            var iconPath = GetIconPath(ext);
-            if (iconPath != null)
-                SetRegistryValue($@"Software\Classes\{ext}\DefaultIcon", null, iconPath);
+            InstallAssociationForExtension(ext);
         }
 
         App.LogDebug("ShellIntegration.InstallAssociations: done");
+    }
+
+    /// <summary>删除单个扩展名的文件关联（OpenWithProgids + DefaultIcon）。</summary>
+    public static void UninstallAssociationForExtension(string ext)
+    {
+        if (ext == ".tar.gz") return;
+
+        // 删除 OpenWithProgids 条目
+        try
+        {
+            using var key = Registry.CurrentUser.OpenSubKey($@"Software\Classes\{ext}\OpenWithProgids", writable: true);
+            key?.DeleteValue(ProgId, throwOnMissingValue: false);
+        }
+        catch { /* 该扩展可能没有 OpenWithProgids 键 */ }
+
+        // 删除 DefaultIcon（仅当指向我们的图标路径时）
+        try
+        {
+            var iconPath = GetIconPath(ext);
+            if (iconPath != null)
+            {
+                using var extKey = Registry.CurrentUser.OpenSubKey($@"Software\Classes\{ext}", writable: true);
+                if (extKey?.GetValue(null) is string currentIcon && currentIcon.Equals(iconPath, StringComparison.OrdinalIgnoreCase))
+                {
+                    // DeleteValue(null) deletes the (default) registry value
+                    // The null! suppresses nullable warning since the API is annotated incorrectly
+                    extKey.DeleteValue(null!);
+                }
+            }
+        }
+        catch { }
     }
 
     /// <summary>
@@ -483,30 +517,7 @@ internal static class ShellIntegration
         // 删除每个扩展名的 ProgId 条目 和 DefaultIcon
         foreach (var ext in ArchiveExtensions)
         {
-            if (ext == ".tar.gz") continue;
-            try
-            {
-                using var key = Registry.CurrentUser.OpenSubKey($@"Software\Classes\{ext}\OpenWithProgids", writable: true);
-                key?.DeleteValue(ProgId, throwOnMissingValue: false);
-            }
-            catch { /* 该扩展可能没有 OpenWithProgids 键 */ }
-
-            // 清理我们设置的 DefaultIcon（仅当指向我们的图标路径时）
-            try
-            {
-                var iconPath = GetIconPath(ext);
-                if (iconPath != null)
-                {
-                    using var extKey = Registry.CurrentUser.OpenSubKey($@"Software\Classes\{ext}", writable: true);
-                    if (extKey?.GetValue(null) is string currentIcon && currentIcon.Equals(iconPath, StringComparison.OrdinalIgnoreCase))
-                    {
-                        // DeleteValue(null) deletes the (default) registry value
-                        // The null! suppresses nullable warning since the API is annotated incorrectly
-                        extKey.DeleteValue(null!);
-                    }
-                }
-            }
-            catch { }
+            UninstallAssociationForExtension(ext);
         }
 
         // 删除 Applications 条目
@@ -518,6 +529,61 @@ internal static class ShellIntegration
         DeleteRegistryKey($@"Software\Classes\{ProgId}");
 
         App.LogDebug("ShellIntegration.UninstallAssociations: done");
+    }
+
+    /// <summary>返回已安装文件关联的扩展名数量。</summary>
+    public static int GetInstalledExtensionCount()
+    {
+        return ArchiveExtensions.Count(AreAssociationsInstalledForExtension);
+    }
+
+    /// <summary>读取指定扩展名的当前默认打开程序，返回友好显示名称。</summary>
+    public static string GetCurrentHandler(string ext)
+    {
+        try
+        {
+            var userChoice = $@"Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\{ext}\UserChoice";
+            using var key = Registry.CurrentUser.OpenSubKey(userChoice);
+            var progId = key?.GetValue("Progid") as string;
+
+            if (string.IsNullOrEmpty(progId))
+                return "未设置";
+
+            // 检查是否是我们
+            if (progId.Contains("MantisZip", StringComparison.OrdinalIgnoreCase))
+                return "MantisZip";
+
+            // Applications\xxx.exe 格式
+            if (progId.StartsWith("Applications\\", StringComparison.OrdinalIgnoreCase))
+            {
+                var exeName = progId.Substring("Applications\\".Length);
+                return Path.GetFileNameWithoutExtension(exeName);
+            }
+
+            // 尝试从 ProgId 获取友好名称
+            try
+            {
+                using var progIdKey = Registry.ClassesRoot.OpenSubKey(progId);
+                var displayName = progIdKey?.GetValue(null) as string;
+                if (!string.IsNullOrEmpty(displayName))
+                    return displayName;
+            }
+            catch { }
+
+            // 去除扩展名后缀："Bandizip.zip" → "Bandizip"
+            var knownExts = new[] { ".zip", ".7z", ".rar", ".tar", ".gz", ".tgz", ".iso" };
+            foreach (var knownExt in knownExts)
+            {
+                if (progId.EndsWith(knownExt, StringComparison.OrdinalIgnoreCase))
+                    return progId.Substring(0, progId.Length - knownExt.Length);
+            }
+
+            return progId;
+        }
+        catch
+        {
+            return "未设置";
+        }
     }
 
     #endregion

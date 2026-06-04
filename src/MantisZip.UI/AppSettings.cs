@@ -37,6 +37,16 @@ public class AppSettings
     public bool EnableExtractToNamedMenu { get; set; } = true;  // 解压到（压缩包名）
     public bool EnableExtractToMenu { get; set; } = true;       // 解压到……
 
+    // ===== 文件关联 — 逐扩展名设置 =====
+    public bool AssocZip { get; set; } = true;
+    public bool Assoc7z { get; set; } = true;
+    public bool AssocRar { get; set; } = true;
+    public bool AssocTar { get; set; } = true;
+    public bool AssocTarGz { get; set; } = true;   // controls .tgz + .tar.gz
+    public bool AssocGz { get; set; } = true;
+    public bool AssocIso { get; set; } = false;     // ISO defaults to unchecked
+    public List<string> CustomAssocExtensions { get; set; } = new();
+
     // ===== 交互 =====
     public bool EnableDragExtract { get; set; } = true;
 
