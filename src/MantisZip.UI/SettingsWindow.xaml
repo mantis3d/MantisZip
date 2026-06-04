@@ -447,7 +447,16 @@
                                         <ItemsControl.ItemTemplate>
                                             <DataTemplate>
                                                 <Grid Margin="2,5,2,5" 
-                                                      MouseLeftButtonUp="FormatRow_MouseLeftButtonUp">
+                                                       MouseLeftButtonUp="FormatRow_MouseLeftButtonUp">
+                                                    <Grid.Style>
+                                                        <Style TargetType="Grid">
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding IsCurrentlyAssociated}" Value="True">
+                                                                    <Setter Property="Background" Value="#1A4CAF50"/>
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </Grid.Style>
                                                     <Grid.ColumnDefinitions>
                                                         <ColumnDefinition Width="Auto"/>
                                                         <ColumnDefinition Width="20"/>

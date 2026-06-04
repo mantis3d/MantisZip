@@ -33,6 +33,16 @@
 8. **13 个冒烟测试** — `AboutWindowTests.cs` 验证 JSON 键存在性/非空/双语一致性/向后兼容（`Main_About_Text` 保留）
 9. **死键审计** — `Main_About_Text`/`Main_About_Title` 确认代码无引用（仅 L.cs + JSON 保留）
 
+### v0.3.8 (2026-06-04) 文件关联面板重构
+
+1. **文件关联面板重构** — 从统一开关改为按扩展名独立复选框列表，支持自定义扩展名添加/删除，行点击切换，全选/取消全选（详见 `.sisyphus/plans/file-assoc-per-extension.md`）
+2. **当前关联程序显示** — 每行显示当前关联的应用名，移除 "Archive"/"Compressed" 等后缀干扰词
+3. **系统图标** — 使用 `SystemIconHelper.GetFileIcon` 显示系统真实文件类型图标
+4. **打开默认应用按钮** — 修复 `ms-settings:defaultapps` URI 打开失败（添加 `UseShellExecute = true`）
+5. **安装 Bug 修复** — 安装按钮现在只关联勾选的格式（修复 `EnsureProgIdRegistered` 分离 + 安装逻辑重构）
+6. **关联状态持久化** — 修复每次打开窗口强制全选问题（移除 `_assocMigrationDone` 实例字段迁移代码）；安装/卸载操作同时保存勾选状态
+7. **已关联视觉区分** — 已关联的格式行显示浅绿色背景提示（`#1A4CAF50`）
+
 ### v0.3.7-refined-3 (2026-06-03) 密码工具栏 + 关闭压缩包 + 捐赠 + 空状态重设计
 
 1. **密码按钮三态重设计** — 工具栏密码按钮改为三种视觉状态：🔑 无加密、🔒 有加密未匹配、🔓 已匹配密码；点击 🔒/🔓 分别弹出密码输入/已匹配密码查看对话框

@@ -42,9 +42,6 @@ public partial class SettingsWindow : Window
         (".iso",    nameof(L.Settings_Assoc_FormatDesc_Iso),   nameof(AppSettings.AssocIso)),
     };
 
-    /// <summary>标记迁移逻辑是否已执行（防止每次 LoadSettings 重复勾选）。</summary>
-    private bool _assocMigrationDone;
-
     public SettingsWindow()
     {
         InitializeComponent();
@@ -166,25 +163,6 @@ public partial class SettingsWindow : Window
 
         // 文件关联
         PopulateAssocList();
-
-        // 迁移：旧版升级兼容 — 仅首次加载时执行，避免每次打开都覆盖用户选择
-        if (!_assocMigrationDone && ShellIntegration.AreAssociationsInstalled)
-        {
-            bool anyUnchecked = false;
-            foreach (var item in AssocFormatList.Items)
-                if (item is FormatAssocItem fi && !fi.IsCustom && !fi.IsEnabled)
-                { anyUnchecked = true; break; }
-
-            if (anyUnchecked)
-            {
-                foreach (var item in AssocFormatList.Items)
-                    if (item is FormatAssocItem fi && !fi.IsCustom)
-                        fi.IsEnabled = true;
-                UpdateAssocButtonState();
-            }
-
-            _assocMigrationDone = true;
-        }
 
         // 高级 — 7z.dll
         _sevenZipPath = s.SevenZipPath;
@@ -355,7 +333,8 @@ public partial class SettingsWindow : Window
                 SettingsProperty = fmt.SettingsProperty,
                 IsEnabled = isEnabled,
                 IsCustom = false,
-                CurrentHandler = ShellIntegration.GetCurrentHandler(fmt.Extension)
+                CurrentHandler = ShellIntegration.GetCurrentHandler(fmt.Extension),
+                IsCurrentlyAssociated = ShellIntegration.AreAssociationsInstalledForExtension(fmt.Extension)
             };
             AssocFormatList.Items.Add(item);
         }
@@ -370,7 +349,8 @@ public partial class SettingsWindow : Window
                 Icon = SystemIconHelper.GetFileIcon(ext),
                 IsEnabled = true,
                 IsCustom = true,
-                CurrentHandler = ShellIntegration.GetCurrentHandler(ext)
+                CurrentHandler = ShellIntegration.GetCurrentHandler(ext),
+                IsCurrentlyAssociated = ShellIntegration.AreAssociationsInstalledForExtension(ext)
             };
             AssocFormatList.Items.Add(item);
         }
@@ -589,14 +569,19 @@ public partial class SettingsWindow : Window
                 }
             }
 
-            // 4. 刷新所有项的当前关联程序显示
+            // 4. 刷新所有项的当前关联程序显示和关联状态
             foreach (var item in AssocFormatList.Items)
             {
                 if (item is FormatAssocItem fi)
                 {
                     fi.CurrentHandler = ShellIntegration.GetCurrentHandler(fi.Extension);
+                    fi.IsCurrentlyAssociated = ShellIntegration.AreAssociationsInstalledForExtension(fi.Extension);
                 }
             }
+
+            // 5. 保存勾选状态到 settings.json
+            SaveAssocSettings();
+            AppSettings.Instance.Save();
 
             SHChangeNotify(SHCNE_ASSOCCHANGED, SHCNF_IDLIST, IntPtr.Zero, IntPtr.Zero);
             UpdateAssocStatus();
@@ -617,14 +602,19 @@ public partial class SettingsWindow : Window
         {
             ShellIntegration.UninstallAssociations();
 
-            // 刷新所有项的当前关联程序显示
+            // 刷新所有项的当前关联程序显示和关联状态
             foreach (var item in AssocFormatList.Items)
             {
                 if (item is FormatAssocItem fi)
                 {
                     fi.CurrentHandler = ShellIntegration.GetCurrentHandler(fi.Extension);
+                    fi.IsCurrentlyAssociated = ShellIntegration.AreAssociationsInstalledForExtension(fi.Extension);
                 }
             }
+
+            // 保存勾选状态
+            SaveAssocSettings();
+            AppSettings.Instance.Save();
 
             SHChangeNotify(SHCNE_ASSOCCHANGED, SHCNF_IDLIST, IntPtr.Zero, IntPtr.Zero);
             UpdateAssocStatus();
@@ -1022,6 +1012,20 @@ internal class FormatAssocItem : INotifyPropertyChanged
             if (_currentHandler != value)
             {
                 _currentHandler = value;
+                OnPropertyChanged();
+            }
+        }
+    }
+
+    private bool _isCurrentlyAssociated;
+    public bool IsCurrentlyAssociated
+    {
+        get => _isCurrentlyAssociated;
+        set
+        {
+            if (_isCurrentlyAssociated != value)
+            {
+                _isCurrentlyAssociated = value;
                 OnPropertyChanged();
             }
         }
