@@ -33,7 +33,7 @@
         <StackPanel x:Name="ButtonPanel" Grid.Row="2" Grid.ColumnSpan="3"
                     Orientation="Horizontal" HorizontalAlignment="Center">
             <Button x:Name="ActionBtn" Width="110" Height="28" Click="ActionBtn_Click"
-                    Background="{StaticResource Theme_Accent}" Foreground="{StaticResource Theme_ButtonText}"
+                    Background="{StaticResource Theme_Accent}"
                     BorderThickness="0" Margin="0,0,6,0" Visibility="Collapsed"/>
             <Button x:Name="OkBtn" Content="{l:L MsgBox_Ok}" Width="80" Height="28" Click="Ok_Click"
                     Background="{StaticResource Theme_ButtonBg}" BorderBrush="{StaticResource Theme_Border}" BorderThickness="1" Margin="0,0,6,0" Visibility="Collapsed"/>
