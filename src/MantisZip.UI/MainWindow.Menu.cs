@@ -107,11 +107,21 @@ public partial class MainWindow
         _currentFolder = "";
         _dirStats.Clear();
 
+        // 重置筛选/过滤状态
+        _showSubfolders = false;
+        _currentUnfilteredItems = null;
+        ShowSubfoldersBtn.IsChecked = false;
+        UpdateShowSubfoldersBtnToolTip();
+        ToggleFilterBarBtn.IsChecked = true;
+        FilterBar.Visibility = Visibility.Visible;
+
         FileListGrid.ItemsSource = null;
         FolderTree.ItemsSource = null;
         DropHint.Visibility = Visibility.Visible;
         FileListPanel.Visibility = Visibility.Collapsed;
         ArchiveLoadingOverlay.Visibility = Visibility.Collapsed;
+
+        UpdateFilterBtnState();
 
         DirStatsText.Text = "";
         SelectionStatsText.Text = "";

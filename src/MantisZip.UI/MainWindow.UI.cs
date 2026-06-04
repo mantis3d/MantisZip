@@ -90,6 +90,36 @@ public partial class MainWindow
         SmartExtractBtn.IsEnabled = !string.IsNullOrEmpty(_currentArchivePath);
     }
 
+    private void UpdateFilterBtnState()
+    {
+        bool hasArchive = !string.IsNullOrEmpty(_currentArchivePath);
+        ShowSubfoldersBtn.IsEnabled = hasArchive;
+        ToggleFilterBarBtn.IsEnabled = hasArchive;
+    }
+
+    /// <summary>
+    /// 更新「显示子目录」按钮的 ToolTip 和检查状态（由外部事件调用时使用）
+    /// </summary>
+    private void UpdateShowSubfoldersBtnToolTip()
+    {
+        ShowSubfoldersBtn.ToolTip = _showSubfolders
+            ? L.T(L.Main_Tooltip_ShowSubfoldersOn)
+            : L.T(L.Main_Tooltip_ShowSubfoldersOff);
+    }
+
+    private void ShowSubfoldersBtn_Click(object sender, RoutedEventArgs e)
+    {
+        _showSubfolders = ShowSubfoldersBtn.IsChecked == true;
+        UpdateShowSubfoldersBtnToolTip();
+        FilterFiles(_currentFolder);
+    }
+
+    private void ToggleFilterBarBtn_Click(object sender, RoutedEventArgs e)
+    {
+        bool show = ToggleFilterBarBtn.IsChecked == true;
+        FilterBar.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
+    }
+
     /// <summary>
     /// 根据当前加载的压缩包格式，更新添加/删除按钮的启用状态。
     /// </summary>

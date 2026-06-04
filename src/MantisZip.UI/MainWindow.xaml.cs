@@ -653,6 +653,7 @@ public partial class MainWindow : Window
             SetStatus(L.TF(L.Main_Status_Loaded, Path.GetFileName(archivePath)));
             UpdatePasswordStatus();
             UpdateSmartExtractBtnState();
+            UpdateFilterBtnState();
 
             // L.T(L.Settings_Menu_Btn_Apply)L.T(L.Settings_Preview_Position)L.T(L.Settings_Title)
             ApplyPreviewPosition(AppSettings.Instance.PreviewPosition);
@@ -671,6 +672,7 @@ public partial class MainWindow : Window
             _archiveComment = null;
             UpdateAddDeleteBtnState();
             UpdateSmartExtractBtnState();
+            UpdateFilterBtnState();
             SetStatus(L.T(L.Main_Status_LoadFailed));
 
             // Reset UI state on error

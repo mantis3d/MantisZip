@@ -172,6 +172,19 @@
                     </StackPanel>
                 </Button>
                 <Separator/>
+                <ToggleButton x:Name="ShowSubfoldersBtn" ToolTip="{l:L Main_Tooltip_ShowSubfoldersOff}" Click="ShowSubfoldersBtn_Click" Padding="8,6" IsEnabled="False" IsChecked="False">
+                    <StackPanel Orientation="Vertical" HorizontalAlignment="Center">
+                        <emoji:TextBlock Text="🌲" FontSize="25" HorizontalAlignment="Center"/>
+                        <TextBlock Text="{l:L Main_Toolbar_ShowSubfolders}" FontSize="12" HorizontalAlignment="Center"/>
+                    </StackPanel>
+                </ToggleButton>
+                <ToggleButton x:Name="ToggleFilterBarBtn" ToolTip="{l:L Main_Tooltip_ToggleFilter}" Click="ToggleFilterBarBtn_Click" Padding="8,6" IsEnabled="False" IsChecked="True">
+                    <StackPanel Orientation="Vertical" HorizontalAlignment="Center">
+                        <emoji:TextBlock Text="🔍" FontSize="25" HorizontalAlignment="Center"/>
+                        <TextBlock Text="{l:L Main_Toolbar_ToggleFilter}" FontSize="12" HorizontalAlignment="Center"/>
+                    </StackPanel>
+                </ToggleButton>
+                <Separator/>
                 <Button ToolTip="{l:L Main_Tooltip_Test}" Click="TestArchive_Click" Padding="8,6">
                     <StackPanel Orientation="Vertical" HorizontalAlignment="Center">
                         <emoji:TextBlock Text="✓" FontSize="25" Foreground="{StaticResource Theme_StatusSuccess}" HorizontalAlignment="Center"/>
@@ -303,8 +316,75 @@
                                 <GridSplitter x:Name="TreeFileSplitter" Grid.Column="1" Width="4" Background="Transparent" 
                                             HorizontalAlignment="Center" VerticalAlignment="Stretch"/>
 
-                                <!-- File List -->
-                                        <DataGrid x:Name="FileListGrid" Grid.Column="2"
+                                <!-- File List (with filter bar) -->
+                                <Grid Grid.Column="2">
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="*"/>
+                                    </Grid.RowDefinitions>
+
+                                    <!-- Filter Bar -->
+                                    <Border x:Name="FilterBar" Grid.Row="0" Background="{StaticResource Theme_HeaderBg}" CornerRadius="2" Padding="6,4" Margin="0,0,0,4" Visibility="Visible">
+                                        <StackPanel Orientation="Horizontal">
+                                            <!-- 区域 1: 文字搜索 -->
+                                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                                <TextBlock Text="🔍" FontSize="14" Margin="2,0,4,0" VerticalAlignment="Center"/>
+                                                <TextBox x:Name="FileSearchBox" Width="160" MinWidth="80" ToolTip="{l:L Main_FilterSearch_Placeholder}"/>
+                                            </StackPanel>
+                                            <Separator Style="{StaticResource {x:Static ToolBar.SeparatorStyleKey}}" Margin="4,0"/>
+
+                                            <!-- 区域 2: 日期范围 -->
+                                            <StackPanel Orientation="Vertical" VerticalAlignment="Center" Margin="4,0">
+                                                <TextBlock Text="{l:L Main_Filter_DateLabel}" FontSize="11" Foreground="{StaticResource Theme_TextSecondary}"/>
+                                                <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
+                                                    <TextBlock Text="{l:L Main_Filter_DateFrom}" FontSize="11" VerticalAlignment="Center" Margin="0,0,2,0"/>
+                                                    <DatePicker x:Name="DateFromPicker" Width="110" Height="22" FontSize="11"/>
+                                                </StackPanel>
+                                                <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
+                                                    <TextBlock Text="{l:L Main_Filter_DateTo}" FontSize="11" VerticalAlignment="Center" Margin="0,0,2,0"/>
+                                                    <DatePicker x:Name="DateToPicker" Width="110" Height="22" FontSize="11"/>
+                                                </StackPanel>
+                                            </StackPanel>
+                                            <Separator Style="{StaticResource {x:Static ToolBar.SeparatorStyleKey}}" Margin="4,0"/>
+
+                                            <!-- 区域 3: 大小范围 -->
+                                            <StackPanel Orientation="Vertical" VerticalAlignment="Center" Margin="4,0">
+                                                <TextBlock Text="{l:L Main_Filter_SizeLabel}" FontSize="11" Foreground="{StaticResource Theme_TextSecondary}"/>
+                                                <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
+                                                    <TextBlock Text="{l:L Main_Filter_SizeMin}" FontSize="11" VerticalAlignment="Center" Margin="0,0,2,0"/>
+                                                    <TextBox x:Name="SizeMinBox" Width="60" Height="22" FontSize="11"/>
+                                                    <ComboBox x:Name="SizeMinUnit" Width="50" Height="22" FontSize="11" Margin="2,0,0,0" SelectedIndex="0">
+                                                        <ComboBoxItem Content="{l:L Main_Filter_UnitB}"/>
+                                                        <ComboBoxItem Content="{l:L Main_Filter_UnitKB}"/>
+                                                        <ComboBoxItem Content="{l:L Main_Filter_UnitMB}"/>
+                                                        <ComboBoxItem Content="{l:L Main_Filter_UnitGB}"/>
+                                                    </ComboBox>
+                                                </StackPanel>
+                                                <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
+                                                    <TextBlock Text="{l:L Main_Filter_SizeMax}" FontSize="11" VerticalAlignment="Center" Margin="0,0,2,0"/>
+                                                    <TextBox x:Name="SizeMaxBox" Width="60" Height="22" FontSize="11"/>
+                                                    <ComboBox x:Name="SizeMaxUnit" Width="50" Height="22" FontSize="11" Margin="2,0,0,0" SelectedIndex="0">
+                                                        <ComboBoxItem Content="{l:L Main_Filter_UnitB}"/>
+                                                        <ComboBoxItem Content="{l:L Main_Filter_UnitKB}"/>
+                                                        <ComboBoxItem Content="{l:L Main_Filter_UnitMB}"/>
+                                                        <ComboBoxItem Content="{l:L Main_Filter_UnitGB}"/>
+                                                    </ComboBox>
+                                                </StackPanel>
+                                            </StackPanel>
+                                            <Separator Style="{StaticResource {x:Static ToolBar.SeparatorStyleKey}}" Margin="4,0"/>
+
+                                            <!-- 区域 4: 清除全部 -->
+                                            <Button x:Name="ClearFiltersBtn" Content="✕" ToolTip="{l:L Main_Filter_ClearAll}" Width="24" Height="24" FontSize="12" Margin="4,0"/>
+                                        </StackPanel>
+                                    </Border>
+
+                                    <!-- No results overlay -->
+                                    <TextBlock x:Name="NoResultsText" Grid.Row="1" Text="{l:L Main_Filter_NoResults}" 
+                                               Foreground="{StaticResource Theme_TextDisabled}" FontSize="14"
+                                               HorizontalAlignment="Center" VerticalAlignment="Center"
+                                               Visibility="Collapsed"/>
+
+                                    <DataGrid x:Name="FileListGrid" Grid.Row="1"
                                           AutoGenerateColumns="False"
                                           IsReadOnly="True"
                                           SelectionMode="Extended"
@@ -452,6 +532,7 @@
                                         </DataGridTemplateColumn>
                                     </DataGrid.Columns>
                                 </DataGrid>
+                                </Grid>
 
                                 <!-- Inner preview row splitter (Pos 2/3) -->
                                 <GridSplitter x:Name="InnerPreviewSplitter" Grid.Row="1"
