@@ -7,6 +7,7 @@ using System.Windows.Input;
 using System.Windows.Media;
 using MantisZip.Core;
 using MantisZip.Core.Abstractions;
+using MantisZip.Core.Utils;
 using MantisZip.UI.Localization;
 
 namespace MantisZip.UI;
@@ -447,9 +448,154 @@ public partial class MainWindow
     /// </summary>
     private bool HasActiveFilters()
     {
-        // 这些字段由 Task 6 的搜索框/日期/大小事件驱动
-        // 在此阶段始终返回 false，Task 6 实现后自动生效
-        return false;
+        return !string.IsNullOrEmpty(_searchText)
+            || _dateFrom.HasValue
+            || _dateTo.HasValue
+            || _sizeMin.HasValue
+            || _sizeMax.HasValue;
+    }
+
+    /// <summary>
+    /// 从当前 unfiltered 列表重建过滤后的视图。
+    /// 由 FilterFiles 末尾调用，或者由任一过滤控件的事件处理器调用。
+    /// </summary>
+    private void RefreshFilter()
+    {
+        if (_currentUnfilteredItems == null) return;
+
+        var filters = new SearchFilters
+        {
+            Text = _searchText,
+            DateFrom = _dateFrom,
+            DateTo = _dateTo,
+            SizeMin = _sizeMin,
+            SizeMax = _sizeMax,
+        };
+
+        List<Core.Abstractions.ArchiveItem> result;
+        if (HasActiveFilters())
+        {
+            result = ArchiveFilter.ApplyFilters(_currentUnfilteredItems, filters);
+        }
+        else
+        {
+            result = new List<Core.Abstractions.ArchiveItem>(_currentUnfilteredItems);
+        }
+
+        // 设置 ItemsSource 并应用排序
+        FileListGrid.ItemsSource = result;
+        ApplySavedSort();
+        FileListGrid.Items.Refresh();
+
+        // 更新 NoResultsText 显隐
+        NoResultsText.Visibility = (result.Count == 0 && HasActiveFilters())
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+
+        // 更新状态栏
+        int totalCount = _currentUnfilteredItems.Count;
+        int fileCount = result.Count(i => !i.IsDirectory);
+        int dirCount = result.Count(i => i.IsDirectory);
+
+        if (_showSubfolders && !HasActiveFilters())
+        {
+            DirStatsText.Text = $"{totalCount} 个文件（含子目录）";
+        }
+        else if (HasActiveFilters())
+        {
+            DirStatsText.Text = L.TF(L.Main_Filter_StatsFormat, result.Count, totalCount);
+        }
+        else
+        {
+            DirStatsText.Text = L.TF(L.Main_DirStats, totalCount, fileCount, dirCount);
+        }
+
+        UpdateSelectionStats();
+    }
+
+    // ===== 过滤控件事件处理器 =====
+
+    private void FileSearchBox_TextChanged(object sender, TextChangedEventArgs e)
+    {
+        _searchText = string.IsNullOrWhiteSpace(FileSearchBox.Text) ? null : FileSearchBox.Text;
+        RefreshFilter();
+    }
+
+    private void DateFromPicker_SelectedDateChanged(object? sender, SelectionChangedEventArgs e)
+    {
+        _dateFrom = DateFromPicker.SelectedDate;
+        RefreshFilter();
+    }
+
+    private void DateToPicker_SelectedDateChanged(object? sender, SelectionChangedEventArgs e)
+    {
+        _dateTo = DateToPicker.SelectedDate;
+        RefreshFilter();
+    }
+
+    private void SizeMinBox_TextChanged(object sender, TextChangedEventArgs e)
+    {
+        _sizeMin = ArchiveFilter.ParseSizeWithUnit(SizeMinBox.Text, (SizeMinUnit.SelectedItem as ComboBoxItem)?.Content?.ToString());
+        RefreshFilter();
+    }
+
+    private void SizeMaxBox_TextChanged(object sender, TextChangedEventArgs e)
+    {
+        _sizeMax = ArchiveFilter.ParseSizeWithUnit(SizeMaxBox.Text, (SizeMaxUnit.SelectedItem as ComboBoxItem)?.Content?.ToString());
+        RefreshFilter();
+    }
+
+    private void SizeMinUnit_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (!string.IsNullOrWhiteSpace(SizeMinBox.Text))
+        {
+            _sizeMin = ArchiveFilter.ParseSizeWithUnit(SizeMinBox.Text, (SizeMinUnit.SelectedItem as ComboBoxItem)?.Content?.ToString());
+            RefreshFilter();
+        }
+    }
+
+    private void SizeMaxUnit_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (!string.IsNullOrWhiteSpace(SizeMaxBox.Text))
+        {
+            _sizeMax = ArchiveFilter.ParseSizeWithUnit(SizeMaxBox.Text, (SizeMaxUnit.SelectedItem as ComboBoxItem)?.Content?.ToString());
+            RefreshFilter();
+        }
+    }
+
+    private void ClearFiltersBtn_Click(object sender, RoutedEventArgs e)
+    {
+        // 清空所有过滤控件
+        FileSearchBox.Text = "";
+        DateFromPicker.SelectedDate = null;
+        DateToPicker.SelectedDate = null;
+        SizeMinBox.Text = "";
+        SizeMaxBox.Text = "";
+        SizeMinUnit.SelectedIndex = 0;
+        SizeMaxUnit.SelectedIndex = 0;
+
+        // 清空过滤字段
+        _searchText = null;
+        _dateFrom = null;
+        _dateTo = null;
+        _sizeMin = null;
+        _sizeMax = null;
+
+        RefreshFilter();
+    }
+
+    /// <summary>
+    /// 搜索框 Escape 键处理：仅清文字搜索框（不清除日期/大小）
+    /// </summary>
+    private void FileSearchBox_PreviewKeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.Escape)
+        {
+            FileSearchBox.Text = "";
+            _searchText = null;
+            RefreshFilter();
+            e.Handled = true;
+        }
     }
 
     private void FileListGrid_PreviewMouseDoubleClick(object sender, MouseButtonEventArgs e)
