@@ -531,6 +531,7 @@
   "Settings_Assoc_Installed": "✅ 文件关联已安装",
   "Settings_Assoc_InstalledMsg": "文件关联已安装",
   "Settings_Assoc_SetDefaultHint": "请在系统设置中设为默认程序",
+  "Settings_Assoc_OpenDefaultApps": "打开系统设置",
   "Settings_Assoc_NotInstalled": "❌ 文件关联未安装",
   "Settings_Assoc_Uninstall": "卸载文件关联",
   "Settings_Assoc_UninstallFailed": "卸载失败: {0}",

@@ -501,7 +501,7 @@
                                                     <Button Grid.Column="5"
                                                             x:Name="DeleteCustomBtn"
                                                             Content="✕"
-                                                            Width="20" Height="20" FontSize="10"
+                                                            Width="36" Height="24" FontSize="12"
                                                             VerticalAlignment="Center"
                                                             Margin="4,0,0,0"
                                                             Visibility="{Binding IsCustom, Converter={StaticResource BoolToVis}}"

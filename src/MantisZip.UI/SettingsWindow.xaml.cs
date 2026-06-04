@@ -586,7 +586,15 @@ public partial class SettingsWindow : Window
             SHChangeNotify(SHCNE_ASSOCCHANGED, SHCNF_IDLIST, IntPtr.Zero, IntPtr.Zero);
             UpdateAssocStatus();
             App.LogDebug("SettingsWindow: file associations installed for selected formats");
-            AppMessageBox.Show(L.T(L.Settings_Assoc_InstalledMsg) + "\n\n" + L.T(L.Settings_Assoc_SetDefaultHint), L.T(L.App_MantisZipTitle), MessageBoxButton.OK, MessageBoxImage.Information);
+            AppMessageBox.ShowWithAction(
+                L.T(L.Settings_Assoc_InstalledMsg) + "\n\n" + L.T(L.Settings_Assoc_SetDefaultHint),
+                L.T(L.App_MantisZipTitle),
+                L.T(L.Settings_Assoc_OpenDefaultApps),
+                () =>
+                {
+                    try { Process.Start(new ProcessStartInfo("ms-settings:defaultapps") { UseShellExecute = true }); }
+                    catch (Exception ex) { App.LogDebug("SettingsWindow: failed to open default apps: {0}", ex.Message); }
+                });
         }
         catch (Exception ex)
         {

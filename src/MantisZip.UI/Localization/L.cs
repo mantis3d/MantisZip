@@ -586,6 +586,7 @@ public static class L
     public const string Settings_Assoc_Installed                   = "Settings_Assoc_Installed";
     public const string Settings_Assoc_InstalledMsg                = "Settings_Assoc_InstalledMsg";
 public const string Settings_Assoc_SetDefaultHint              = "Settings_Assoc_SetDefaultHint";
+public const string Settings_Assoc_OpenDefaultApps              = "Settings_Assoc_OpenDefaultApps";
     public const string Settings_Assoc_NotInstalled                = "Settings_Assoc_NotInstalled";
     public const string Settings_Assoc_Uninstall                   = "Settings_Assoc_Uninstall";
     public const string Settings_Assoc_UninstallFailed             = "Settings_Assoc_UninstallFailed";
@@ -607,7 +608,6 @@ public const string Settings_Assoc_SetDefaultHint              = "Settings_Assoc
     public const string Settings_Assoc_FormatDesc_TarGz            = "Settings_Assoc_FormatDesc_TarGz";
     public const string Settings_Assoc_FormatDesc_Zip              = "Settings_Assoc_FormatDesc_Zip";
     public const string Settings_Assoc_InstallBtnText              = "Settings_Assoc_InstallBtnText";
-    public const string Settings_Assoc_OpenDefaultApps             = "Settings_Assoc_OpenDefaultApps";
     public const string Settings_Assoc_SelectAll                   = "Settings_Assoc_SelectAll";
     public const string Settings_Assoc_StatusText                  = "Settings_Assoc_StatusText";
     public const string Settings_Assoc_UserCustom                  = "Settings_Assoc_UserCustom";
