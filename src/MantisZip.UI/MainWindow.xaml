@@ -178,7 +178,7 @@
                         <TextBlock Text="{l:L Main_Toolbar_ShowSubfolders}" FontSize="12" HorizontalAlignment="Center"/>
                     </StackPanel>
                 </ToggleButton>
-                <ToggleButton x:Name="ToggleFilterBarBtn" ToolTip="{l:L Main_Tooltip_ToggleFilter}" Click="ToggleFilterBarBtn_Click" Padding="8,6" IsEnabled="False" IsChecked="True">
+                <ToggleButton x:Name="ToggleFilterBarBtn" ToolTip="{l:L Main_Tooltip_ToggleFilter}" Click="ToggleFilterBarBtn_Click" Padding="8,6" IsEnabled="False" IsChecked="False">
                     <StackPanel Orientation="Vertical" HorizontalAlignment="Center">
                         <emoji:TextBlock Text="🔍" FontSize="25" HorizontalAlignment="Center"/>
                         <TextBlock Text="{l:L Main_Toolbar_ToggleFilter}" FontSize="12" HorizontalAlignment="Center"/>
@@ -435,7 +435,7 @@
                                         </ContextMenu>
                                     </DataGrid.ContextMenu>
                                     <DataGrid.Columns>
-                                        <DataGridTemplateColumn Header="{l:L Main_Col_Name}" Width="250" SortMemberPath="Name" DisplayIndex="0">
+                                        <DataGridTemplateColumn Header="{l:L Main_Col_Name}" Width="250" MinWidth="120" MaxWidth="800" SortMemberPath="Name" DisplayIndex="0">
                                             <DataGridTemplateColumn.CellTemplate>
                                                 <DataTemplate>
                                                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
@@ -445,7 +445,7 @@
                                                 </DataTemplate>
                                             </DataGridTemplateColumn.CellTemplate>
                                         </DataGridTemplateColumn>
-                                        <DataGridTemplateColumn Header="{l:L Main_Col_Size}" Width="100" SortMemberPath="Size" DisplayIndex="1">
+                                        <DataGridTemplateColumn Header="{l:L Main_Col_Size}" Width="100" MinWidth="60" MaxWidth="400" SortMemberPath="Size" DisplayIndex="1">
                                             <DataGridTemplateColumn.CellTemplate>
                                                 <DataTemplate>
                                                     <Grid>
@@ -472,7 +472,7 @@
                                                 </DataTemplate>
                                             </DataGridTemplateColumn.CellTemplate>
                                         </DataGridTemplateColumn>
-                                        <DataGridTemplateColumn Header="{l:L Main_Col_Compressed}" Width="100" SortMemberPath="CompressedSize" DisplayIndex="2">
+                                        <DataGridTemplateColumn Header="{l:L Main_Col_Compressed}" Width="100" MinWidth="60" MaxWidth="400" SortMemberPath="CompressedSize" DisplayIndex="2">
                                             <DataGridTemplateColumn.CellTemplate>
                                                 <DataTemplate>
                                                     <Grid>
@@ -499,7 +499,7 @@
                                                 </DataTemplate>
                                             </DataGridTemplateColumn.CellTemplate>
                                         </DataGridTemplateColumn>
-                                        <DataGridTemplateColumn Header="{l:L Main_Col_Ratio}" Width="80" SortMemberPath="RatioSort" DisplayIndex="3">
+                                        <DataGridTemplateColumn Header="{l:L Main_Col_Ratio}" Width="80" MinWidth="60" MaxWidth="300" SortMemberPath="RatioSort" DisplayIndex="3">
                                             <DataGridTemplateColumn.CellTemplate>
                                                 <DataTemplate>
                                                     <Grid>
@@ -516,8 +516,8 @@
                                                 </DataTemplate>
                                             </DataGridTemplateColumn.CellTemplate>
                                         </DataGridTemplateColumn>
-                                        <DataGridTextColumn Header="{l:L Main_Col_Crc32}" Binding="{Binding Crc32Display}" SortMemberPath="Crc32" Width="110" DisplayIndex="4"/>
-                                        <DataGridTemplateColumn Header="{l:L Main_Col_Date}" Width="150" SortMemberPath="LastModified" DisplayIndex="5">
+                                        <DataGridTextColumn Header="{l:L Main_Col_Crc32}" Binding="{Binding Crc32Display}" SortMemberPath="Crc32" Width="110" MinWidth="80" MaxWidth="300" DisplayIndex="4"/>
+                                        <DataGridTemplateColumn Header="{l:L Main_Col_Date}" Width="150" MinWidth="80" MaxWidth="400" SortMemberPath="LastModified" DisplayIndex="5">
                                             <DataGridTemplateColumn.CellTemplate>
                                                 <DataTemplate>
                                                     <Grid>
@@ -534,7 +534,7 @@
                                                 </DataTemplate>
                                             </DataGridTemplateColumn.CellTemplate>
                                         </DataGridTemplateColumn>
-                                        <DataGridTemplateColumn Header="{l:L Main_Col_Encrypted}" Width="50" SortMemberPath="IsEncrypted" DisplayIndex="6">
+                                        <DataGridTemplateColumn Header="{l:L Main_Col_Encrypted}" Width="50" MinWidth="36" MaxWidth="120" SortMemberPath="IsEncrypted" DisplayIndex="6">
                                             <DataGridTemplateColumn.CellTemplate>
                                                 <DataTemplate>
                                                     <emoji:TextBlock Text="🔒" HorizontalAlignment="Center" 

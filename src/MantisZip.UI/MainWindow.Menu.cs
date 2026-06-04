@@ -112,7 +112,7 @@ public partial class MainWindow
         _currentUnfilteredItems = null;
         ShowSubfoldersBtn.IsChecked = false;
         UpdateShowSubfoldersBtnToolTip();
-        ToggleFilterBarBtn.IsChecked = true;
+        ToggleFilterBarBtn.IsChecked = false;
         FilterBar.Visibility = Visibility.Visible;
 
         FileListGrid.ItemsSource = null;

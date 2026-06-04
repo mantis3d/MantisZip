@@ -119,6 +119,24 @@ public partial class MainWindow
     {
         bool show = ToggleFilterBarBtn.IsChecked == true;
         FilterBar.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
+
+        // 关闭筛选栏时一并清除过滤条件
+        if (!show)
+        {
+            FileSearchBox.Text = "";
+            DateFromPicker.SelectedDate = null;
+            DateToPicker.SelectedDate = null;
+            SizeMinBox.Text = "";
+            SizeMaxBox.Text = "";
+            SizeMinUnit.SelectedIndex = 0;
+            SizeMaxUnit.SelectedIndex = 0;
+            _searchText = null;
+            _dateFrom = null;
+            _dateTo = null;
+            _sizeMin = null;
+            _sizeMax = null;
+            RefreshFilter();
+        }
     }
 
     /// <summary>
