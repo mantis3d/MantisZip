@@ -189,95 +189,124 @@ public partial class MainWindow
         }
     }
 
-    private void FilterFiles(string folderPath)
+    private void FilterFiles(string folderPath, bool? showSubfoldersOverride = null)
     {
         // 在替换 ItemsSource 之前捕获当前排序状态，以便重新应用
         CaptureCurrentSort();
+
+        bool show = showSubfoldersOverride ?? _showSubfolders;
 
         _isProgrammaticFilter = true;
         try
         {
             _currentFolder = folderPath;
             var directItems = new List<ArchiveItem>();
-            var implicitDirs = new HashSet<string>();
             string prefix = string.IsNullOrEmpty(folderPath) ? "" : folderPath + "/";
 
-            foreach (var item in _allItems)
+            if (show)
             {
-                if (string.IsNullOrEmpty(folderPath))
+                // ========== 扁平模式：收集所有递归子目录的文件 ==========
+                foreach (var item in _allItems)
                 {
-                    if (!item.Name.Contains("/")) { directItems.Add(item); continue; }
-                    var firstSlash = item.Name.IndexOf('/');
-                    var dirName = item.Name[..firstSlash];
-                    // 记录此目录已存在，后续同名目录不再重复添加
-                    if (!implicitDirs.Add(dirName)) continue;
-                    // 此条目本身就是该目录的显式条目 → 直接添加
-                    if (item.IsDirectory && item.FullPath == dirName)
-                    { directItems.Add(item); continue; }
-                    // 否则合成一个目录条目
-                    var syntheticDir = new ArchiveItem { Name = dirName + "/", FullPath = dirName, Size = 0, IsDirectory = true, IconSource = SystemIconHelper.GetFolderIcon() };
-                    if (!string.IsNullOrEmpty(_currentArchivePath))
-                        syntheticDir.CompressedDisplay = GetCompressedDisplayMode(_currentArchivePath, _currentFormat);
-                    directItems.Add(syntheticDir);
-                }
-                else
-                {
-                    if (!item.Name.StartsWith(prefix)) continue;
-                    if (item.FullPath == folderPath) continue;
-                    var rest = item.Name[prefix.Length..].TrimEnd('/');
-                    var restParts = rest.Split('/');
-                    if (restParts.Length == 1)
+                    if (item.IsDirectory) continue; // 不包含目录自身
+                    if (!item.FullPath.StartsWith(prefix)) continue; // 不在当前目录下则跳过
+
+                    // 根目录或子目录匹配
+                    if (string.IsNullOrEmpty(folderPath) || item.Name.StartsWith(prefix))
                     {
-                        // 显式的文件或目录
                         directItems.Add(item);
-                        if (item.IsDirectory) implicitDirs.Add(restParts[0]);
+                    }
+                }
+
+                // 设置 DisplayName 为相对路径
+                foreach (var item in directItems)
+                {
+                    item.DisplayName = string.IsNullOrEmpty(folderPath)
+                        ? item.Name
+                        : item.Name.StartsWith(prefix) ? item.Name[prefix.Length..] : item.Name;
+                }
+            }
+            else
+            {
+                // ========== 默认模式：直接条目 + 隐式目录合成（原有逻辑） ==========
+                var implicitDirs = new HashSet<string>();
+
+                foreach (var item in _allItems)
+                {
+                    if (string.IsNullOrEmpty(folderPath))
+                    {
+                        if (!item.Name.Contains("/")) { directItems.Add(item); continue; }
+                        var firstSlash = item.Name.IndexOf('/');
+                        var dirName = item.Name[..firstSlash];
+                        if (!implicitDirs.Add(dirName)) continue;
+                        if (item.IsDirectory && item.FullPath == dirName)
+                        { directItems.Add(item); continue; }
+                        var syntheticDir = new ArchiveItem { Name = dirName + "/", FullPath = dirName, Size = 0, IsDirectory = true, IconSource = SystemIconHelper.GetFolderIcon() };
+                        if (!string.IsNullOrEmpty(_currentArchivePath))
+                            syntheticDir.CompressedDisplay = GetCompressedDisplayMode(_currentArchivePath, _currentFormat);
+                        directItems.Add(syntheticDir);
                     }
                     else
                     {
-                        var subDir = restParts[0];
-                        if (implicitDirs.Add(subDir))
+                        if (!item.Name.StartsWith(prefix)) continue;
+                        if (item.FullPath == folderPath) continue;
+                        var rest = item.Name[prefix.Length..].TrimEnd('/');
+                        var restParts = rest.Split('/');
+                        if (restParts.Length == 1)
                         {
-                            var subDirFullPath = folderPath + "/" + subDir;
-                            var subDirItem = new ArchiveItem { Name = subDirFullPath + "/", FullPath = subDirFullPath, Size = 0, IsDirectory = true, IconSource = SystemIconHelper.GetFolderIcon() };
-                            if (!string.IsNullOrEmpty(_currentArchivePath))
-                                subDirItem.CompressedDisplay = GetCompressedDisplayMode(_currentArchivePath, _currentFormat);
-                            directItems.Add(subDirItem);
+                            directItems.Add(item);
+                            if (item.IsDirectory) implicitDirs.Add(restParts[0]);
+                        }
+                        else
+                        {
+                            var subDir = restParts[0];
+                            if (implicitDirs.Add(subDir))
+                            {
+                                var subDirFullPath = folderPath + "/" + subDir;
+                                var subDirItem = new ArchiveItem { Name = subDirFullPath + "/", FullPath = subDirFullPath, Size = 0, IsDirectory = true, IconSource = SystemIconHelper.GetFolderIcon() };
+                                if (!string.IsNullOrEmpty(_currentArchivePath))
+                                    subDirItem.CompressedDisplay = GetCompressedDisplayMode(_currentArchivePath, _currentFormat);
+                                directItems.Add(subDirItem);
+                            }
                         }
                     }
                 }
-            }
 
-            // 通用去重：相同 FullPath 的条目只保留第一个（防止显式+隐式重复）
-            var seen = new HashSet<string>();
-            var deduped = new List<ArchiveItem>();
-            foreach (var item in directItems)
-            {
-                if (seen.Add(item.FullPath)) deduped.Add(item);
-            }
-
-            // 为目录条目填充统计信息（文件数、总大小、压缩后大小）
-            foreach (var item in deduped)
-            {
-                if (!item.IsDirectory) continue;
-                if (_dirStats.TryGetValue(item.FullPath, out var stat))
+                // 通用去重：相同 FullPath 的条目只保留第一个
+                var seen = new HashSet<string>();
+                var deduped = new List<ArchiveItem>();
+                foreach (var item in directItems)
                 {
-                    item.Size = stat.Size;
-                    item.CompressedSize = stat.CompressedSize;
+                    if (seen.Add(item.FullPath)) deduped.Add(item);
                 }
-                else
+                directItems = deduped;
+
+                // 为目录条目填充统计信息
+                foreach (var item in directItems)
                 {
-                    item.Size = 0;
-                    item.CompressedSize = 0;
+                    if (!item.IsDirectory) continue;
+                    if (_dirStats.TryGetValue(item.FullPath, out var stat))
+                    {
+                        item.Size = stat.Size;
+                        item.CompressedSize = stat.CompressedSize;
+                    }
+                    else
+                    {
+                        item.Size = 0;
+                        item.CompressedSize = 0;
+                    }
+                }
+
+                // 设置 DisplayName
+                foreach (var item in directItems)
+                {
+                    item.DisplayName = string.IsNullOrEmpty(folderPath)
+                        ? item.Name.TrimEnd('/')
+                        : item.Name.StartsWith(prefix) ? item.Name[prefix.Length..].TrimEnd('/') : item.Name;
                 }
             }
 
-            var sortedItems = deduped.OrderBy(i => i.SortOrder).ThenBy(i => i.Name).ToList();
-            foreach (var item in sortedItems)
-            {
-                item.DisplayName = string.IsNullOrEmpty(folderPath)
-                    ? item.Name.TrimEnd('/')
-                    : item.Name.StartsWith(prefix) ? item.Name[prefix.Length..].TrimEnd('/') : item.Name;
-            }
+            var sortedItems = directItems.OrderBy(i => i.SortOrder).ThenBy(i => i.Name).ToList();
 
             // ========== 进度条比例计算 ==========
             bool showBars = AppSettings.Instance.ShowProgressBars;
@@ -289,7 +318,7 @@ public partial class MainWindow
                 item.SeparateDirBaseline = separateBaseline;
             }
 
-            if (showBars)
+            if (showBars && sortedItems.Count > 0)
             {
                 long maxSize = 0, maxCompressed = 0;
                 long maxDirSize = 0, maxDirCompressed = 0;
@@ -299,7 +328,6 @@ public partial class MainWindow
 
                 if (separateBaseline)
                 {
-                    // 分列基准：文件 vs 目录各自算 max
                     var files = sortedItems.Where(i => !i.IsDirectory);
                     var dirs = sortedItems.Where(i => i.IsDirectory);
                     if (files.Any())
@@ -315,7 +343,6 @@ public partial class MainWindow
                 }
                 else
                 {
-                    // 统一基准：全部条目一起算 max
                     maxSize = sortedItems.Max(i => i.Size);
                     maxCompressed = sortedItems.Max(effectiveCompressed);
                 }
@@ -331,7 +358,6 @@ public partial class MainWindow
                         item.CompressedSizeRatio = (double)effectiveCompressed(item) / baseCompressed;
                 }
 
-                // 日期：总是文件间比较（目录 LastModified 为 DateTime.MinValue）
                 var datedItems = sortedItems.Where(i => i.LastModified > DateTime.MinValue).ToList();
                 if (datedItems.Count > 1)
                 {
@@ -359,18 +385,41 @@ public partial class MainWindow
                 }
             }
 
+            // 存储无过滤的完整列表供 RefreshFilter 使用
+            _currentUnfilteredItems = sortedItems;
+
+            // 更新 ItemsSource 和排序
             FileListGrid.ItemsSource = sortedItems;
             ApplySavedSort();
             FileListGrid.Items.Refresh();
+
+            // 更新状态栏统计
             var fileCount = sortedItems.Count(i => !i.IsDirectory);
             var dirCount = sortedItems.Count(i => i.IsDirectory);
-            DirStatsText.Text = L.TF(L.Main_DirStats, sortedItems.Count, fileCount, dirCount);
+            if (show)
+                DirStatsText.Text = $"{sortedItems.Count} 个文件（含子目录）";
+            else
+                DirStatsText.Text = L.TF(L.Main_DirStats, sortedItems.Count, fileCount, dirCount);
+
+            // 更新选中统计
+            UpdateSelectionStats();
         }
         finally { _isProgrammaticFilter = false; }
 
-        // 过滤后无选中项 → 显示压缩包总览
-        if (FileListGrid.SelectedItems.Count == 0 && !string.IsNullOrEmpty(_currentArchivePath))
+        // 过滤后无选中项 → 显示压缩包总览（仅在非过滤触发时）
+        if (FileListGrid.SelectedItems.Count == 0 && !string.IsNullOrEmpty(_currentArchivePath)
+            && HasActiveFilters() == false)
             ShowArchiveInfo();
+    }
+
+    /// <summary>
+    /// 检查当前是否有激活的过滤条件
+    /// </summary>
+    private bool HasActiveFilters()
+    {
+        // 这些字段由 Task 6 的搜索框/日期/大小事件驱动
+        // 在此阶段始终返回 false，Task 6 实现后自动生效
+        return false;
     }
 
     private void FileListGrid_PreviewMouseDoubleClick(object sender, MouseButtonEventArgs e)

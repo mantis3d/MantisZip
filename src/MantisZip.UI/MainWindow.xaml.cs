@@ -48,6 +48,8 @@ public partial class MainWindow : Window
     }; // 每个位置独立记忆大小（高度:位置1/2/3, 宽度:位置4）
     private int _lastAppliedPosition = 1;    // 上次应用的布局位置，用于检测变更
     private bool _isProgrammaticFilter;      // 编程触发的 FilterFiles，应跳过 SelectionChanged 预览
+    private bool _showSubfolders;            // 是否展开所有子目录文件（扁平视图）
+    private List<ArchiveItem>? _currentUnfilteredItems; // FilterFiles 处理后的完整（未过滤）列表，供 RefreshFilter 读取
     private string? _savedSortColumnPath;    // 持久化的排序列 SortMemberPath
     private int _savedSortDirection;         // 持久化的排序方向 (0=无, 1=升, 2=降)
     private bool _previewPanelEnabled = true; // 工具栏预览开关状态
