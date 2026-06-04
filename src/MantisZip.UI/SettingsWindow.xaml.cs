@@ -42,6 +42,9 @@ public partial class SettingsWindow : Window
         (".iso",    nameof(L.Settings_Assoc_FormatDesc_Iso),   nameof(AppSettings.AssocIso)),
     };
 
+    /// <summary>标记迁移逻辑是否已执行（防止每次 LoadSettings 重复勾选）。</summary>
+    private bool _assocMigrationDone;
+
     public SettingsWindow()
     {
         InitializeComponent();
@@ -164,8 +167,8 @@ public partial class SettingsWindow : Window
         // 文件关联
         PopulateAssocList();
 
-        // 迁移：旧版升级兼容 — 如果已有文件关联，确保所有内置格式默认勾选
-        if (ShellIntegration.AreAssociationsInstalled)
+        // 迁移：旧版升级兼容 — 仅首次加载时执行，避免每次打开都覆盖用户选择
+        if (!_assocMigrationDone && ShellIntegration.AreAssociationsInstalled)
         {
             bool anyUnchecked = false;
             foreach (var item in AssocFormatList.Items)
@@ -179,6 +182,8 @@ public partial class SettingsWindow : Window
                         fi.IsEnabled = true;
                 UpdateAssocButtonState();
             }
+
+            _assocMigrationDone = true;
         }
 
         // 高级 — 7z.dll
