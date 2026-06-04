@@ -585,6 +585,7 @@ public static class L
     public const string Settings_Assoc_InstallFailed               = "Settings_Assoc_InstallFailed";
     public const string Settings_Assoc_Installed                   = "Settings_Assoc_Installed";
     public const string Settings_Assoc_InstalledMsg                = "Settings_Assoc_InstalledMsg";
+public const string Settings_Assoc_SetDefaultHint              = "Settings_Assoc_SetDefaultHint";
     public const string Settings_Assoc_NotInstalled                = "Settings_Assoc_NotInstalled";
     public const string Settings_Assoc_Uninstall                   = "Settings_Assoc_Uninstall";
     public const string Settings_Assoc_UninstallFailed             = "Settings_Assoc_UninstallFailed";

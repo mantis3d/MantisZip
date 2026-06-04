@@ -334,7 +334,7 @@ public partial class SettingsWindow : Window
                 IsEnabled = isEnabled,
                 IsCustom = false,
                 CurrentHandler = ShellIntegration.GetCurrentHandler(fmt.Extension),
-                IsCurrentlyAssociated = ShellIntegration.AreAssociationsInstalledForExtension(fmt.Extension)
+                Status = ShellIntegration.GetAssociationStatus(fmt.Extension)
             };
             AssocFormatList.Items.Add(item);
         }
@@ -350,7 +350,7 @@ public partial class SettingsWindow : Window
                 IsEnabled = true,
                 IsCustom = true,
                 CurrentHandler = ShellIntegration.GetCurrentHandler(ext),
-                IsCurrentlyAssociated = ShellIntegration.AreAssociationsInstalledForExtension(ext)
+                Status = ShellIntegration.GetAssociationStatus(ext)
             };
             AssocFormatList.Items.Add(item);
         }
@@ -575,7 +575,7 @@ public partial class SettingsWindow : Window
                 if (item is FormatAssocItem fi)
                 {
                     fi.CurrentHandler = ShellIntegration.GetCurrentHandler(fi.Extension);
-                    fi.IsCurrentlyAssociated = ShellIntegration.AreAssociationsInstalledForExtension(fi.Extension);
+                    fi.Status = ShellIntegration.GetAssociationStatus(fi.Extension);
                 }
             }
 
@@ -586,7 +586,7 @@ public partial class SettingsWindow : Window
             SHChangeNotify(SHCNE_ASSOCCHANGED, SHCNF_IDLIST, IntPtr.Zero, IntPtr.Zero);
             UpdateAssocStatus();
             App.LogDebug("SettingsWindow: file associations installed for selected formats");
-            AppMessageBox.Show(L.T(L.Settings_Assoc_InstalledMsg), L.T(L.App_MantisZipTitle), MessageBoxButton.OK, MessageBoxImage.Information);
+            AppMessageBox.Show(L.T(L.Settings_Assoc_InstalledMsg) + "\n\n" + L.T(L.Settings_Assoc_SetDefaultHint), L.T(L.App_MantisZipTitle), MessageBoxButton.OK, MessageBoxImage.Information);
         }
         catch (Exception ex)
         {
@@ -608,7 +608,7 @@ public partial class SettingsWindow : Window
                 if (item is FormatAssocItem fi)
                 {
                     fi.CurrentHandler = ShellIntegration.GetCurrentHandler(fi.Extension);
-                    fi.IsCurrentlyAssociated = ShellIntegration.AreAssociationsInstalledForExtension(fi.Extension);
+                    fi.Status = ShellIntegration.GetAssociationStatus(fi.Extension);
                 }
             }
 
@@ -1017,15 +1017,15 @@ internal class FormatAssocItem : INotifyPropertyChanged
         }
     }
 
-    private bool _isCurrentlyAssociated;
-    public bool IsCurrentlyAssociated
+    private AssocStatus _status;
+    public AssocStatus Status
     {
-        get => _isCurrentlyAssociated;
+        get => _status;
         set
         {
-            if (_isCurrentlyAssociated != value)
+            if (_status != value)
             {
-                _isCurrentlyAssociated = value;
+                _status = value;
                 OnPropertyChanged();
             }
         }

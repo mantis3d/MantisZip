@@ -518,6 +518,7 @@
   "Settings_Assoc_InstallFailed": "Install failed: {0}",
   "Settings_Assoc_Installed": "鉁?File associations installed",
   "Settings_Assoc_InstalledMsg": "File associations installed",
+  "Settings_Assoc_SetDefaultHint": "Set as default in system settings",
   "Settings_Assoc_NotInstalled": "鉂?File associations not installed",
   "Settings_Assoc_Uninstall": "Remove file associations",
   "Settings_Assoc_UninstallFailed": "Uninstall failed: {0}",

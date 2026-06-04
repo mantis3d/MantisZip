@@ -425,6 +425,24 @@ internal static class ShellIntegration
         return key.GetValue(ProgId) != null;
     }
 
+    /// <summary>检查指定扩展名的关联状态（无关联/关联未默认/关联且默认）。</summary>
+    public static AssocStatus GetAssociationStatus(string ext)
+    {
+        if (!AreAssociationsInstalledForExtension(ext))
+            return AssocStatus.NotAssociated;
+
+        try
+        {
+            using var key = Registry.CurrentUser.OpenSubKey($@"Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\{ext}\UserChoice");
+            var progId = key?.GetValue("Progid") as string;
+            if (!string.IsNullOrEmpty(progId) && progId.IndexOf("MantisZip", StringComparison.OrdinalIgnoreCase) >= 0)
+                return AssocStatus.IsDefault;
+        }
+        catch { }
+
+        return AssocStatus.NotDefault;
+    }
+
     /// <summary>为单个扩展名安装文件关联（OpenWithProgids + DefaultIcon）。</summary>
     public static void InstallAssociationForExtension(string ext)
     {
@@ -702,4 +720,11 @@ internal static class ShellIntegration
     }
 
     #endregion
+}
+
+public enum AssocStatus
+{
+    NotAssociated,
+    NotDefault,
+    IsDefault
 }

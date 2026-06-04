@@ -11,7 +11,7 @@ installer/
 .history/
 .vscode/
 .codegraph/
-.reasonix
+.reasonix/
 *.user
 *.suo
 

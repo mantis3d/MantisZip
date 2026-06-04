@@ -461,7 +461,7 @@ Build artifacts (bin/, obj/) are gitignored.
 每当新增或修改 `.sisyphus/plans/` 内的计划文件时，**必须同步更新** `docs/PLAN.md`：
 - 新增计划 → 在 PLAN.md 对应优先级区域（P2/P3/待实现）添加一行 `| 任务 | 说明 |` 引用新计划，保持与已存在行格式一致
 - 修改计划 → 更新 PLAN.md 中对应任务的说明、优先级或状态
-- 计划完成 → 将条目从 PLAN.md 移至归档或标记为 ✅
+- 计划完成 → 将条目从 PLAN.md 移至 PROGRESS.md 的 
 
 ### 规则 2：提交前更新 PROGRESS.md
 
