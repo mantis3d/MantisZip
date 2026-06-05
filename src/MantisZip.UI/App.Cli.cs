@@ -199,7 +199,10 @@ public partial class App : Application
                         });
                     },
                     progress,
-                    ct);
+                    ct,
+                    onItemStatus: (index, status) => progressWindow.UpdateBatchItemStatus(index, status));
+
+                progressWindow.FinalizeBatch();
 
                 if (result.Failed > 0)
                 {
@@ -380,6 +383,8 @@ public partial class App : Application
                         progressWindow.SetProgress(p);
                     }),
                     ct);
+
+                progressWindow.FinalizeBatch();
 
                 if (result.Failed > 0)
                 {
@@ -1221,6 +1226,8 @@ public partial class App : Application
                         },
                         progress,
                         ct);
+
+                    progressWindow.FinalizeBatch();
 
                     if (result.Failed > 0)
                     {

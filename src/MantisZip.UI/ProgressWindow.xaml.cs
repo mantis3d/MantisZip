@@ -276,6 +276,27 @@ public partial class ProgressWindow : Window
         DispatchIfNeeded(Update, DispatcherPriority.Background);
     }
 
+    /// <summary>
+    /// 批处理完成后调用，将所有还处于 InProgress 的项设为 Completed。
+    /// 解决最后一项从未收到完成状态的问题。
+    /// </summary>
+    public void FinalizeBatch()
+    {
+        void Update()
+        {
+            if (_batchItems == null) return;
+            for (int i = 0; i < _batchItems.Count; i++)
+            {
+                if (_batchItems[i].Status == BatchItemStatus.InProgress)
+                {
+                    _batchItems[i].Status = BatchItemStatus.Completed;
+                    _batchItems[i].Progress = 100;
+                }
+            }
+        }
+        DispatchIfNeeded(Update, DispatcherPriority.Background);
+    }
+
     #endregion
 
     private void CancelButton_Click(object sender, RoutedEventArgs e)

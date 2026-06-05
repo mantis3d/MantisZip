@@ -881,6 +881,7 @@ public partial class CompressSettingsWindow : Window
                 progress,
                 progressWindow.CancellationToken);
 
+            progressWindow.FinalizeBatch();
             progressWindow.SetComplete(L.T(L.App_CompressComplete));
             await Task.Delay(500);
             progressWindow.Close();
@@ -960,8 +961,10 @@ public partial class CompressSettingsWindow : Window
                     });
                 },
                 progress,
-                progressWindow.CancellationToken);
+                progressWindow.CancellationToken,
+                onItemStatus: (index, status) => progressWindow.UpdateBatchItemStatus(index, status));
 
+            progressWindow.FinalizeBatch();
             var summary = L.TF(L.App_CompressSeparateComplete, result.Succeeded, result.Failed);
             progressWindow.SetComplete(summary);
             await Task.Delay(500);
@@ -1058,6 +1061,7 @@ public partial class CompressSettingsWindow : Window
                 progress,
                 progressWindow.CancellationToken);
 
+            progressWindow.FinalizeBatch();
             progressWindow.SetComplete(L.T(L.App_CompressComplete));
             await Task.Delay(500);
             progressWindow.Close();

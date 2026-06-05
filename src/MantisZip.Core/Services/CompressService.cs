@@ -6,6 +6,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using MantisZip.Core.Abstractions;
 using MantisZip.Core.Engines;
+using MantisZip.Core.Models;
 using MantisZip.Core.Utils;
 
 namespace MantisZip.Core.Services;
@@ -110,7 +111,8 @@ public static class CompressService
         CompressRequest request,
         CompressConflictResolver? conflictResolver,
         IProgress<ArchiveProgress> progress,
-        CancellationToken ct)
+        CancellationToken ct,
+        Action<int, BatchItemStatus>? onItemStatus = null)
     {
         ArgumentNullException.ThrowIfNull(request);
         ArgumentNullException.ThrowIfNull(progress);
@@ -119,7 +121,7 @@ public static class CompressService
 
         return request.Mode switch
         {
-            CompressOutputMode.Separate => await CompressSeparateAsync(request, conflictResolver, progress, ct),
+            CompressOutputMode.Separate => await CompressSeparateAsync(request, conflictResolver, progress, ct, onItemStatus),
             CompressOutputMode.Manual => await CompressSingleAsync(request, conflictResolver, progress, ct),
             CompressOutputMode.Combined => await CompressSingleAsync(request, conflictResolver, progress, ct),
             _ => throw new ArgumentOutOfRangeException(nameof(request.Mode), request.Mode, null)
@@ -133,7 +135,8 @@ public static class CompressService
         CompressRequest request,
         CompressConflictResolver? conflictResolver,
         IProgress<ArchiveProgress> progress,
-        CancellationToken ct)
+        CancellationToken ct,
+        Action<int, BatchItemStatus>? onItemStatus = null)
     {
         int succeeded = 0, failed = 0, skipped = 0;
         int total = request.SourcePaths.Count;
@@ -150,6 +153,7 @@ public static class CompressService
             {
                 CoreLog.Info($"CompressService: source not found, skipping: {sourcePath}");
                 skipped++;
+                onItemStatus?.Invoke(i, BatchItemStatus.Skipped);
                 ReportOverallProgress(progress, i + 1, total, sourcePath);
                 continue;
             }
@@ -168,6 +172,7 @@ public static class CompressService
             {
                 CoreLog.Info($"CompressService: cancelled by user, skipping: {outputPath}");
                 skipped++;
+                onItemStatus?.Invoke(i, BatchItemStatus.Skipped);
                 ReportOverallProgress(progress, i + 1, total, sourcePath);
                 continue;
             }
@@ -201,12 +206,14 @@ public static class CompressService
                 }
 
                 succeeded++;
+                onItemStatus?.Invoke(i, BatchItemStatus.Completed);
                 CoreLog.Info($"CompressService: item {i + 1}/{total} succeeded");
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 CoreLog.Error($"CompressService: item {i + 1}/{total} failed", ex);
                 failed++;
+                onItemStatus?.Invoke(i, BatchItemStatus.Failed);
             }
 
             ReportOverallProgress(progress, i + 1, total, sourcePath);
