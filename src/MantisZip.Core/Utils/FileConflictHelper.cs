@@ -168,17 +168,7 @@ public static class FileConflictHelper
 
     private static string GetUniquePath(string path)
     {
-        var dir = Path.GetDirectoryName(path) ?? ".";
-        var name = Path.GetFileNameWithoutExtension(path);
-        var ext = Path.GetExtension(path);
-
-        for (int i = 1; i < 1000; i++)
-        {
-            var candidate = Path.Combine(dir, $"{name} ({i}){ext}");
-            if (!File.Exists(candidate))
-                return candidate;
-        }
-        return path;
+        return PathHelper.GetUniquePath(path);
     }
 
     /// <summary>
