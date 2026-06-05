@@ -153,8 +153,8 @@ public static class CompressService
             {
                 CoreLog.Info($"CompressService: source not found, skipping: {sourcePath}");
                 skipped++;
-                onItemStatus?.Invoke(i, BatchItemStatus.Skipped);
                 ReportOverallProgress(progress, i + 1, total, sourcePath);
+                onItemStatus?.Invoke(i, BatchItemStatus.Skipped);
                 continue;
             }
 
@@ -172,8 +172,8 @@ public static class CompressService
             {
                 CoreLog.Info($"CompressService: cancelled by user, skipping: {outputPath}");
                 skipped++;
-                onItemStatus?.Invoke(i, BatchItemStatus.Skipped);
                 ReportOverallProgress(progress, i + 1, total, sourcePath);
+                onItemStatus?.Invoke(i, BatchItemStatus.Skipped);
                 continue;
             }
 
@@ -206,6 +206,7 @@ public static class CompressService
                 }
 
                 succeeded++;
+                ReportOverallProgress(progress, i + 1, total, sourcePath);
                 onItemStatus?.Invoke(i, BatchItemStatus.Completed);
                 CoreLog.Info($"CompressService: item {i + 1}/{total} succeeded");
             }
@@ -213,10 +214,9 @@ public static class CompressService
             {
                 CoreLog.Error($"CompressService: item {i + 1}/{total} failed", ex);
                 failed++;
+                ReportOverallProgress(progress, i + 1, total, sourcePath);
                 onItemStatus?.Invoke(i, BatchItemStatus.Failed);
             }
-
-            ReportOverallProgress(progress, i + 1, total, sourcePath);
         }
 
         CoreLog.Info($"CompressService.CompressSeparateAsync: succeeded={succeeded}, failed={failed}, skipped={skipped}");
