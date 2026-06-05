@@ -869,15 +869,8 @@ public partial class App : Application
                         var progress = progressWindow.CreatePauseAwareProgress(
                             ProgressWindow.CreateBackgroundProgress(progressWindow));
 
-                        if (password != null)
-                        {
-                            var opts = CreateExtractOptions();
-                            await engine.ExtractAsync(archivePath, dest, password, progress, ct, opts);
-                        }
-                        else
-                        {
-                            await engine.ExtractAsync(archivePath, dest, null, progress, ct);
-                        }
+                        var opts = CreateExtractOptions();
+                        await engine.ExtractAsync(archivePath, dest, password, progress, ct, opts);
 
                         succeeded++;
                         await progressWindow.Dispatcher.InvokeAsync(() =>

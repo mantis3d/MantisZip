@@ -282,32 +282,49 @@ public partial class App : Application
     {
         bool applyToAll = false;
         FileConflictAction? chosenAction = null;
+        int callCount = 0;
 
         return new ArchiveOptions
         {
             ConflictAction = GetConflictActionFromSettings(),
             ConflictResolver = info =>
             {
+                callCount++;
+                LogDebug("ConflictResolver #{0}: applyToAll={1}, chosenAction={2}, path='{3}'",
+                    callCount, applyToAll, chosenAction?.ToString() ?? "null", info.FilePath);
+
                 // 已勾选"应用到全部" → 直接返回记忆的选择
                 if (applyToAll && chosenAction.HasValue)
+                {
+                    LogDebug("ConflictResolver #{0}: returning cached action={1}", callCount, chosenAction.Value);
                     return chosenAction.Value;
+                }
 
                 // 调度到 UI 线程显示模态对话框
                 var dispatcher = Current?.Dispatcher;
-                if (dispatcher == null) return FileConflictAction.Overwrite;
+                if (dispatcher == null)
+                {
+                    LogDebug("ConflictResolver #{0}: dispatcher null, returning Overwrite", callCount);
+                    return FileConflictAction.Overwrite;
+                }
 
                 var result = dispatcher.Invoke(() =>
                 {
                     var dialog = new ConflictDialog(info);
                     dialog.ShowDialog();
                     info.CustomName = dialog.CustomName;
+                    LogDebug("ConflictResolver dialog: action={0}, applyToAll={1}, customName='{2}'",
+                        dialog.ResultAction, dialog.ApplyToAll, dialog.CustomName ?? "(null)");
                     return (Action: dialog.ResultAction, All: dialog.ApplyToAll);
                 });
+
+                LogDebug("ConflictResolver #{0}: dialog returned (Action={1}, All={2})", callCount, result.Action, result.All);
 
                 if (result.All)
                 {
                     applyToAll = true;
                     chosenAction = result.Action;
+                    LogDebug("ConflictResolver #{0}: applyToAll set to true, chosenAction={1}", callCount, chosenAction.Value);
                 }
 
                 return result.Action;
