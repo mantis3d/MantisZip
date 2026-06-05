@@ -129,9 +129,9 @@ public class ContextMenuHandler : IShellExtInit, IContextMenu
     private const string TextExtractHereMulti = "原地解压{0}个压缩包";
     private const string TextSmartExtractSingle = "智能原地解压";
     private const string TextSmartExtractMulti = "智能原地解压{0}个压缩包";
-    private const string TextExtractToNamed = "解压到";
+    private const string TextExtractToNamed = "解压到目录";
     private const string TextExtractTo = "解压到……";
-    private const string TextCompress = "压缩……";
+    private const string TextCompress = "压缩到……";
 
     // Runtime text fields (populated from registry; fall back to defaults above)
     private string _textOpen = TextOpen;
@@ -358,8 +358,8 @@ public class ContextMenuHandler : IShellExtInit, IContextMenu
                 if (_enableOpen)
                 {
                     string openText = multipleFiles
-                        ? $"{_textOpen} 等 {(effectiveCount > 10 ? "多" : effectiveCount.ToString())} 个文件"
-                        : _textOpen;
+                        ? (effectiveCount > 10 ? "打开多个压缩包" : $"打开 {effectiveCount} 个压缩包")
+                        : $"{_textOpen} {fileName}";
                     ShellExtLog.Info($"QueryContextMenu: extract item: \"{openText}\"");
                     InsertMenuItem(popupMenu, popupIndex++, idCmd++, openText, CmdIdOpen, showIcon: true);
                     _cmdIdOrder.Add(CmdIdOpen);
@@ -384,8 +384,11 @@ public class ContextMenuHandler : IShellExtInit, IContextMenu
                 }
                 if (_enableExtractToNamed)
                 {
-                    ShellExtLog.Info($"QueryContextMenu: extract item: TextExtractToNamed \"{fileName}\"");
-                    InsertMenuItem(popupMenu, popupIndex++, idCmd++, $"{_textExtractToNamed} {fileName}", CmdIdExtractToNamed, showIcon: true);
+                    string namedText = multipleFiles
+                        ? (effectiveCount > 10 ? "解压到多个同名目录" : $"解压到{effectiveCount}个同名目录")
+                        : $"{_textExtractToNamed} {fileName}";
+                    ShellExtLog.Info($"QueryContextMenu: extract item: \"{namedText}\"");
+                    InsertMenuItem(popupMenu, popupIndex++, idCmd++, namedText, CmdIdExtractToNamed, showIcon: true);
                     _cmdIdOrder.Add(CmdIdExtractToNamed);
                 }
                 if (_enableExtractTo)
