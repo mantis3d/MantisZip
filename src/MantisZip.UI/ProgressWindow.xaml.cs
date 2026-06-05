@@ -220,6 +220,15 @@ public partial class ProgressWindow : Window
                 _batchItems[index - 1].Progress = 100;
             }
 
+            // 只覆盖 Pending 状态的项 — 不覆盖已被 onItemStatus 设为 Skipped/Completed/Failed 的项。
+            // 由于 Dispatcher 队列顺序不确定（日志中 UpdateBatchItemStatus 在 SetCurrentBatchItem 之前执行），
+            // 不能依赖后台线程的调用顺序。
+            if (_batchItems[index].Status != BatchItemStatus.Pending)
+            {
+                App.LogDebug("[BATCH] SetCurrentBatchItem: item[{0}]=\"{1}\" already has status {2}, not overwriting", index, _batchItems[index].Name, _batchItems[index].Status);
+                return;
+            }
+
             App.LogDebug("[BATCH] SetCurrentBatchItem: marking item[{0}]=\"{1}\" as InProgress", index, _batchItems[index].Name);
             _currentBatchIndex = index;
             _batchItems[index].Status = BatchItemStatus.InProgress;
