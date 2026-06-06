@@ -548,8 +548,8 @@ public partial class SettingsWindow : Window
         App.LogDebug("SettingsWindow: InstallAssoc_Click");
         try
         {
-            // 1. 注册 ProgId + Applications（基础注册，不安装扩展）
-            ShellIntegration.EnsureProgIdRegistered();
+            // 1. 预备工作：清理旧版单 ProgId + 注册 Applications 条目
+            ShellIntegration.PrepareAssocRegistration();
 
             // 2. 只安装用户勾选的扩展名（内置 + 自定义）
             foreach (var item in AssocFormatList.Items)

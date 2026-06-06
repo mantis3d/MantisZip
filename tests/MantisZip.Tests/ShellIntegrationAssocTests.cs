@@ -18,19 +18,9 @@ public class RegistryTestsCollection { }
 [Collection("RegistryTests")]
 public class ShellIntegrationAssocTests
 {
-    private const string ProgId = "MantisZip.Archive";
-
     private static void CleanupExtension(string ext)
     {
         ShellIntegration.UninstallAssociationForExtension(ext);
-    }
-
-    /// <summary>检查 Registry 中指定扩展名是否有 MantisZip.Archive ProgId。</summary>
-    private static bool HasProgId(string ext)
-    {
-        using var key = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(
-            $@"Software\Classes\{ext}\OpenWithProgids");
-        return key?.GetValue(ProgId) != null;
     }
 
     // ──────────────────────────────────────────────
@@ -42,7 +32,7 @@ public class ShellIntegrationAssocTests
     {
         try
         {
-            Assert.False(HasProgId(".zip"), "Precondition: .zip should not have MantisZip.ProgId before install");
+            Assert.False(ShellIntegration.AreAssociationsInstalledForExtension(".zip"), "Precondition: .zip should not have MantisZip association before install");
             ShellIntegration.InstallAssociationForExtension(".zip");
             Assert.True(ShellIntegration.AreAssociationsInstalledForExtension(".zip"));
         }
@@ -53,12 +43,12 @@ public class ShellIntegrationAssocTests
     }
 
     [Fact]
-    public void Install_SkipTarGz_DoesNotWrite()
+    public void Install_TarGz_WritesAssociation()
     {
         try
         {
             ShellIntegration.InstallAssociationForExtension(".tar.gz");
-            Assert.False(ShellIntegration.AreAssociationsInstalledForExtension(".tar.gz"));
+            Assert.True(ShellIntegration.AreAssociationsInstalledForExtension(".tar.gz"));
         }
         finally
         {
@@ -93,7 +83,7 @@ public class ShellIntegrationAssocTests
         try
         {
             ShellIntegration.InstallAssociationForExtension(".zip");
-            Assert.True(HasProgId(".zip"), "Should be installed before uninstall");
+            Assert.True(ShellIntegration.AreAssociationsInstalledForExtension(".zip"), "Should be installed before uninstall");
 
             ShellIntegration.UninstallAssociationForExtension(".zip");
             Assert.False(ShellIntegration.AreAssociationsInstalledForExtension(".zip"));
@@ -105,11 +95,19 @@ public class ShellIntegrationAssocTests
     }
 
     [Fact]
-    public void Uninstall_SkipTarGz_DoesNothing()
+    public void Uninstall_TarGz_RemovesAssociation()
     {
-        // Should not throw and should not have created entries
-        ShellIntegration.UninstallAssociationForExtension(".tar.gz");
-        Assert.False(ShellIntegration.AreAssociationsInstalledForExtension(".tar.gz"));
+        try
+        {
+            ShellIntegration.InstallAssociationForExtension(".tar.gz");
+            Assert.True(ShellIntegration.AreAssociationsInstalledForExtension(".tar.gz"));
+            ShellIntegration.UninstallAssociationForExtension(".tar.gz");
+            Assert.False(ShellIntegration.AreAssociationsInstalledForExtension(".tar.gz"));
+        }
+        finally
+        {
+            CleanupExtension(".tar.gz");
+        }
     }
 
     // ──────────────────────────────────────────────

@@ -108,7 +108,7 @@
                         </ComboBox>
 
                         <TextBlock Text="{l:L Settings_Extract_ConflictAction}" FontWeight="SemiBold" Margin="0,16,0,4"/>
-                        <ComboBox x:Name="ConflictCombo" Width="300" HorizontalAlignment="Left">
+                        <ComboBox x:Name="ConflictCombo" Width="300" HorizontalAlignment="Left" Background="{DynamicResource Theme_WindowBg}">
                             <ComboBoxItem Content="{l:L Settings_Extract_Conflict_Ask}" Tag="ask"/>
                             <ComboBoxItem Content="{l:L CompressConflict_Overwrite}" Tag="overwrite"/>
                             <ComboBoxItem Content="{l:L Settings_Extract_Conflict_OverwriteOlder}" Tag="overwrite-if-older"/>
@@ -139,6 +139,7 @@
                     <StackPanel Margin="10">
                         <TextBlock Text="{l:L Settings_Appearance_Theme}" FontWeight="SemiBold" Margin="0,0,0,4"/>
                         <ComboBox x:Name="ThemeCombo" Width="300" HorizontalAlignment="Left"
+                                  Background="{DynamicResource Theme_WindowBg}"
                                   SelectionChanged="ThemeCombo_SelectionChanged">
                             <ComboBoxItem Tag="Light" Content="{l:L Settings_Appearance_Theme_Light}"/>
                             <ComboBoxItem Tag="Dark" Content="{l:L Settings_Appearance_Theme_Dark}"/>
@@ -268,7 +269,8 @@
                                     <CheckBox x:Name="ShowPreviewPanelCheck" Content="{l:L Settings_Preview_EnablePanel}" Margin="0,0,0,8"/>
 
                                     <TextBlock Text="{l:L Settings_Preview_Position}" FontWeight="SemiBold" Margin="0,8,0,4"/>
-                                    <ComboBox x:Name="PreviewPositionCombo" Width="300" HorizontalAlignment="Left" Margin="0,0,0,8">
+                                    <ComboBox x:Name="PreviewPositionCombo" Width="300" HorizontalAlignment="Left" Margin="0,0,0,8"
+                                              Background="{DynamicResource Theme_WindowBg}">
                                         <ComboBoxItem Tag="1" IsSelected="True" Content="{l:L Settings_Preview_Pos_Bottom}"/>
                                         <ComboBoxItem Tag="2" Content="{l:L Settings_Preview_Pos_BelowTree}"/>
                                         <ComboBoxItem Tag="3" Content="{l:L Settings_Preview_Pos_BelowList}"/>
@@ -276,7 +278,8 @@
                                     </ComboBox>
 
                                     <TextBlock Text="{l:L Settings_Preview_InfoDirection}" FontWeight="SemiBold" Margin="0,8,0,4"/>
-                                    <ComboBox x:Name="InfoPanelOrientationCombo" Width="300" HorizontalAlignment="Left" Margin="0,0,0,8">
+                                    <ComboBox x:Name="InfoPanelOrientationCombo" Width="300" HorizontalAlignment="Left" Margin="0,0,0,8"
+                                              Background="{DynamicResource Theme_WindowBg}">
                                         <ComboBoxItem Tag="Horizontal" IsSelected="True" Content="{l:L Settings_Preview_Dir_Horizontal}"/>
                                         <ComboBoxItem Tag="Vertical" Content="{l:L Settings_Preview_Dir_Vertical}"/>
                                     </ComboBox>
@@ -326,7 +329,7 @@
                                     </Border>
 
                                     <TextBlock Text="{l:L Settings_Preview_TextFontFamily}" FontWeight="SemiBold" Margin="0,16,0,4"/>
-                                    <ComboBox x:Name="TextFontFamilyCombo" Width="300" HorizontalAlignment="Left"/>
+                                    <ComboBox x:Name="TextFontFamilyCombo" Width="300" HorizontalAlignment="Left" Background="{DynamicResource Theme_WindowBg}"/>
 
                                     <TextBlock Text="{l:L Settings_Preview_MaxTextSize}" FontWeight="SemiBold" Margin="0,16,0,4"/>
                                     <StackPanel Orientation="Horizontal">

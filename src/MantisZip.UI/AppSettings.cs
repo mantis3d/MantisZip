@@ -42,7 +42,7 @@ public class AppSettings
     public bool Assoc7z { get; set; } = true;
     public bool AssocRar { get; set; } = true;
     public bool AssocTar { get; set; } = true;
-    public bool AssocTarGz { get; set; } = true;   // controls .tgz + .tar.gz
+    public bool AssocTarGz { get; set; } = true;   // controls .tar.gz
     public bool AssocGz { get; set; } = true;
     public bool AssocIso { get; set; } = false;     // ISO defaults to unchecked
     public List<string> CustomAssocExtensions { get; set; } = new();
