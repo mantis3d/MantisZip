@@ -225,8 +225,7 @@ public partial class App : Application
                 {
                     await progressWindow.Dispatcher.InvokeAsync(() =>
                         progressWindow.SetComplete(L.T(L.App_CompressComplete)));
-                    await Task.Delay(2500);
-                    await progressWindow.Dispatcher.InvokeAsync(() => app.Shutdown());
+                    await progressWindow.AutoCloseOrWaitAsync(2500, () => progressWindow.Dispatcher.Invoke(() => app.Shutdown()));
                 }
             }
             catch (OperationCanceledException) { }
@@ -398,8 +397,7 @@ public partial class App : Application
                 {
                     await progressWindow.Dispatcher.InvokeAsync(() =>
                         progressWindow.SetComplete(L.T(L.App_CompressComplete)));
-                    await Task.Delay(2500);
-                    await progressWindow.Dispatcher.InvokeAsync(() => app.Shutdown());
+                    await progressWindow.AutoCloseOrWaitAsync(2500, () => progressWindow.Dispatcher.Invoke(() => app.Shutdown()));
                 }
             }
             catch (OperationCanceledException)
@@ -917,8 +915,7 @@ public partial class App : Application
                         ?? Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
                     OpenInExplorerStatic(lastDest);
                 }
-                await Task.Delay(2500);
-                await progressWindow.Dispatcher.InvokeAsync(() => app.Shutdown());
+                await progressWindow.AutoCloseOrWaitAsync(2500, () => progressWindow.Dispatcher.Invoke(() => app.Shutdown()));
             }
         });
     }
@@ -1007,8 +1004,7 @@ public partial class App : Application
                         progressWindow.SetComplete(L.T(L.App_ExtractComplete));
                     });
                     if (settings.OpenFolderAfterExtract) OpenInExplorerStatic(dest);
-                    await Task.Delay(2500);
-                    await progressWindow.Dispatcher.InvokeAsync(() => appRef.Shutdown());
+                    await progressWindow.AutoCloseOrWaitAsync(2500, () => progressWindow.Dispatcher.Invoke(() => appRef.Shutdown()));
                     return;
                 }
 
@@ -1037,8 +1033,7 @@ public partial class App : Application
                         progressWindow.SetComplete(L.T(L.App_ExtractComplete));
                     });
                     if (settings.OpenFolderAfterExtract) OpenInExplorerStatic(dest);
-                    await Task.Delay(2500);
-                    await progressWindow.Dispatcher.InvokeAsync(() => appRef.Shutdown());
+                    await progressWindow.AutoCloseOrWaitAsync(2500, () => progressWindow.Dispatcher.Invoke(() => appRef.Shutdown()));
                     return;
                 }
 
@@ -1078,8 +1073,7 @@ public partial class App : Application
                     progressWindow.SetComplete(L.T(L.App_ExtractComplete));
                 });
                 if (settings.OpenFolderAfterExtract) OpenInExplorerStatic(dest);
-                await Task.Delay(2500);
-                await progressWindow.Dispatcher.InvokeAsync(() => appRef.Shutdown());
+                await progressWindow.AutoCloseOrWaitAsync(2500, () => progressWindow.Dispatcher.Invoke(() => appRef.Shutdown()));
             }
             catch (OperationCanceledException)
             {
@@ -1238,8 +1232,7 @@ public partial class App : Application
                         LogStartup("HandleCompressQuick: completed successfully");
                         await progressWindow.Dispatcher.InvokeAsync(() =>
                             progressWindow.SetComplete(L.T(L.App_CompressComplete)));
-                        await Task.Delay(800);
-                        await progressWindow.Dispatcher.InvokeAsync(() => app.Shutdown());
+                        await progressWindow.AutoCloseOrWaitAsync(800, () => progressWindow.Dispatcher.Invoke(() => app.Shutdown()));
                     }
                 }
                 catch (OperationCanceledException)
