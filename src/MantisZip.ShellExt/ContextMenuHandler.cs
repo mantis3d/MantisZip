@@ -152,7 +152,15 @@ public class ContextMenuHandler : IShellExtInit, IContextMenu
     // instance, then creates a second shadow instance with the full list.
     // We store the full list here so the first instance (which receives
     // InvokeCommand) can use it.
+    //
+    // IMPORTANT: _fullFileList is shared across ALL COM instances in the Explorer
+    // process, INCLUDING instances from PREVIOUS right-click invocations. To
+    // prevent stale data from a previous context menu from contaminating the
+    // current one, we use a time-based batch detection: if Initialize is called
+    // more than 2 seconds after the last update, it's treated as a new batch
+    // and _fullFileList is reset.
     private static List<string>? _fullFileList;
+    private static DateTime _lastInitializeTime = DateTime.MinValue;
     private static readonly object _fileListLock = new();
 
     // ─── State ───
@@ -260,23 +268,41 @@ public class ContextMenuHandler : IShellExtInit, IContextMenu
 
                 ShellExtLog.Info($"IShellExtInit.Initialize returning S_OK with {_selectedFiles.Count} files selected");
 
-                // Store the file list in the shared static field (keep largest).
+                // Store the file list in the shared static field (keep largest within batch).
                 // Explorer creates multiple instances for >16 files: the first gets
                 // truncated to 16, a later instance has the full list, and more
                 // instances may have only 1 file. We keep the largest list.
+                //
+                // Staleness guard: _fullFileList persists across right-click invocations
+                // (same Explorer process). If Initialize is called more than 2 seconds
+                // after the last update, we treat it as a new context menu batch and
+                // reset the shared list — preventing a large old list from "shadowing"
+                // a smaller new selection.
                 if (_selectedFiles.Count > 0)
                 {
                     lock (_fileListLock)
                     {
-                        if (_fullFileList == null || _selectedFiles.Count > _fullFileList.Count)
+                        var now = DateTime.UtcNow;
+                        int? wasCount = _fullFileList?.Count;
+                        bool isNewBatch = _fullFileList == null
+                            || (now - _lastInitializeTime).TotalSeconds >= 2.0;
+
+                        if (isNewBatch)
                         {
                             _fullFileList = new List<string>(_selectedFiles);
-                            ShellExtLog.Info($"IShellExtInit.Initialize: stored {_fullFileList.Count} files in static _fullFileList (was {(int?)_fullFileList?.Count ?? 0})");
+                            ShellExtLog.Info($"IShellExtInit.Initialize: new batch, stored {_fullFileList.Count} files in static _fullFileList (was {wasCount?.ToString() ?? "null"})");
+                        }
+                        else if (_selectedFiles.Count > _fullFileList!.Count)
+                        {
+                            _fullFileList = new List<string>(_selectedFiles);
+                            ShellExtLog.Info($"IShellExtInit.Initialize: stored {_fullFileList.Count} files in static _fullFileList (was {wasCount}) [larger list]");
                         }
                         else
                         {
-                            ShellExtLog.Info($"IShellExtInit.Initialize: skipped _fullFileList update (current={_fullFileList.Count} >= new={_selectedFiles.Count})");
+                            ShellExtLog.Info($"IShellExtInit.Initialize: skipped _fullFileList update (current={_fullFileList.Count} >= new={_selectedFiles.Count}) [same batch]");
                         }
+
+                        _lastInitializeTime = now;
                     }
                 }
 
@@ -312,10 +338,13 @@ public class ContextMenuHandler : IShellExtInit, IContextMenu
             // Refresh settings each time (user may have changed them)
             LoadSettingsFromRegistry();
 
-            // Clean up icon HBITMAPs from the previous right-click.
-            // We do this at the start (not end) of QueryContextMenu because Explorer
-            // renders the menu asynchronously — deleting before draw = invisible icons.
-            CleanupIconCache();
+            // NOTE: We do NOT call CleanupIconCache() here. Icon HBITMAPs are
+            // permanently cached for the lifetime of the Explorer process.
+            // Deleting and reloading them on every right-click costs 40-120ms
+            // (reading embedded .ico → parsing → CreateIconFromResourceEx →
+            // CreateDIBSection → DrawIconEx), causing Explorer's menu to flash
+            // white while waiting for QueryContextMenu to return.
+            // ~10 KB total for all icons — freed when Explorer.exe exits.
 
             _cmdIdOrder.Clear();
             uint idCmd = idCmdFirst;
@@ -454,10 +483,27 @@ public class ContextMenuHandler : IShellExtInit, IContextMenu
 
             if (itemsAdded > 0)
             {
-                // ─── Insert the popup as a submenu in the root hMenu ───
-                NativeMethods.InsertMenu(hMenu, indexMenu, NativeMethods.MF_POPUP | NativeMethods.MF_BYPOSITION,
-                    popupMenu, "MantisZip");
-                ShellExtLog.Info($"QueryContextMenu: inserted popup submenu as \"MantisZip\" with {itemsAdded} items");
+                // ─── Insert the popup as a submenu in the root hMenu, with MantisZip icon ───
+                IntPtr hbmpMantisZip = GetOrLoadIcon("App.ico", ref _cachedIconMantisZip);
+                var miiRoot = new MenuItemInfo
+                {
+                    cbSize = Marshal.SizeOf<MenuItemInfo>(),
+                    fMask = NativeMethods.MIIM_STRING | NativeMethods.MIIM_SUBMENU | NativeMethods.MIIM_ID,
+                    fType = NativeMethods.MFT_STRING,
+                    fState = NativeMethods.MFS_ENABLED,
+                    wID = idCmd,
+                    hSubMenu = popupMenu,
+                    dwTypeData = Marshal.StringToCoTaskMemUni("MantisZip"),
+                    cch = 9,
+                };
+                if (hbmpMantisZip != IntPtr.Zero && _showIcons)
+                {
+                    miiRoot.fMask |= NativeMethods.MIIM_BITMAP;
+                    miiRoot.hbmpItem = hbmpMantisZip;
+                }
+                NativeMethods.InsertMenuItem(hMenu, indexMenu, true, ref miiRoot);
+                Marshal.FreeCoTaskMem(miiRoot.dwTypeData);
+                ShellExtLog.Info($"QueryContextMenu: inserted popup submenu as \"MantisZip\" with {itemsAdded} items, hasIcon={hbmpMantisZip != IntPtr.Zero && _showIcons}");
             }
             else
             {
@@ -467,11 +513,8 @@ public class ContextMenuHandler : IShellExtInit, IContextMenu
                 ShellExtLog.Info("QueryContextMenu: no items added, destroyed empty popup");
             }
 
-            // Note: icon HBITMAPs are NOT deleted here because Explorer draws the menu
-            // asynchronously after QueryContextMenu returns. Deleting them would cause
-            // the icons to not render. They will be cleaned up when the COM object is
-            // released by Explorer (next Initialize call clears them).
-            // CleanupIconCache();
+            // Note: icon HBITMAPs are permanently cached (no cleanup) to avoid the
+            // 40-120ms reload cost per right-click. They are freed when Explorer.exe exits.
 
             ShellExtLog.Info($"QueryContextMenu #{_instanceId}: returning {itemsAdded} items, popup has {popupIndex} entries, _cmdIdOrder=[{orderSnapshot}]");
             // Return the number of menu items added (offset from idCmdFirst)
@@ -702,6 +745,7 @@ public class ContextMenuHandler : IShellExtInit, IContextMenu
     #region Private helpers
 
     // Per-command icon cache: one HBITMAP per icon, loaded on first use.
+    private static IntPtr _cachedIconMantisZip = IntPtr.Zero;  // "MantisZip" submenu header in root menu
     private static IntPtr _cachedIconOpen = IntPtr.Zero;
     private static IntPtr _cachedIconExtract = IntPtr.Zero;    // parent "打开/解压" submenu
     private static IntPtr _cachedIconExtractHere = IntPtr.Zero;
@@ -1007,10 +1051,12 @@ public class ContextMenuHandler : IShellExtInit, IContextMenu
         return hbmp;
     }
 
-    /// <summary>Clean up all cached icon bitmaps. Called at the start of each QueryContextMenu.</summary>
+    /// <summary>Clean up all cached icon bitmaps. Not called in the hot path (kept for
+    /// potential settings-change-triggered cleanup in the future).</summary>
     private void CleanupIconCache()
     {
         foreach (var kv in new[] {
+            new { Name = "MantisZip",        Hbmp = _cachedIconMantisZip },
             new { Name = "Open",             Hbmp = _cachedIconOpen },
             new { Name = "Extract",          Hbmp = _cachedIconExtract },
             new { Name = "ExtractHere",      Hbmp = _cachedIconExtractHere },
@@ -1030,6 +1076,7 @@ public class ContextMenuHandler : IShellExtInit, IContextMenu
                 ShellExtLog.Info($"CleanupIconCache: DeleteObject returned {deleted}");
             }
         }
+        _cachedIconMantisZip = IntPtr.Zero;
         _cachedIconOpen = IntPtr.Zero;
         _cachedIconExtract = IntPtr.Zero;
         _cachedIconExtractHere = IntPtr.Zero;
