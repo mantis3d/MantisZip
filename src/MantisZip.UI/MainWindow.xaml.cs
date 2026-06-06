@@ -49,6 +49,7 @@ public partial class MainWindow : Window
     private int _lastAppliedPosition = 1;    // 上次应用的布局位置，用于检测变更
     private bool _isProgrammaticFilter;      // 编程触发的 FilterFiles，应跳过 SelectionChanged 预览
     private bool _showSubfolders;            // 是否展开所有子目录文件（扁平视图）
+    private bool _rebasedBaseline;           // 比例基准是否使用筛选后列表
     private List<ArchiveItem>? _currentUnfilteredItems; // FilterFiles 处理后的完整（未过滤）列表，供 RefreshFilter 读取
     private string? _searchText;              // 当前文字搜索词
     private DateTime? _dateFrom;              // 日期范围开始
@@ -516,6 +517,28 @@ public partial class MainWindow : Window
             DirStatsText.Text = "";
             SelectionStatsText.Text = "";
             ArchiveStatsText.Text = "";
+
+            // 重置过滤状态
+            _searchText = null;
+            _dateFrom = null;
+            _dateTo = null;
+            _sizeMin = null;
+            _sizeMax = null;
+            _showSubfolders = false;
+            ShowSubfoldersBtn.IsChecked = false;
+            UpdateShowSubfoldersBtnToolTip();
+            ToggleFilterBarBtn.IsChecked = false;
+            FilterBar.Visibility = Visibility.Collapsed;
+            _rebasedBaseline = false;
+            RebaseBaselineBtn.IsChecked = false;
+            // 清空过滤输入控件
+            FileSearchBox.Text = "";
+            DateFromPicker.SelectedDate = null;
+            DateToPicker.SelectedDate = null;
+            SizeMinBox.Text = "";
+            SizeMaxBox.Text = "";
+            SizeMinUnit.SelectedIndex = 0;
+            SizeMaxUnit.SelectedIndex = 0;
 
             SetStatus(L.T(L.Main_Status_Loading));
             _currentArchivePath = archivePath;

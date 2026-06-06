@@ -57,19 +57,19 @@
 - 单元测试覆盖所有过滤逻辑
 
 ### Definition of Done
-- [ ] ToggleButton 在主工具栏可见，仅在加载压缩包后可用
-- [ ] ToggleButton 开启后文件列表显示当前目录所有子目录的文件（扁平、无目录）
-- [ ] ToggleButton 关闭后恢复为默认行为（当前目录直接条目 + 隐式目录）
-- [ ] 筛选工具栏在文件列表上方显示，包含文字搜索/日期范围/大小范围三个过滤区
-- [ ] 文字搜索：🔍 图标 + 水印"筛选文件…"，实时过滤，大小写不敏感，匹配所有可见列
-- [ ] 日期范围：两个 DatePicker（开始/结束，竖排），过滤 LastModified 区间
-- [ ] 大小范围：两个数字输入 + 单位 ComboBox（最小/最大，竖排），过滤 Size
-- [ ] 过滤组间竖线分隔，布局清晰
-- [ ] 清除按钮（×）重置所有过滤条件
-- [ ] 组合过滤：文字+日期+大小同时生效（AND 逻辑）
-- [ ] 无匹配时显示空结果提示（DataGrid 区域文字 + 状态栏）
-- [ ] 切换目录时所有过滤条件保持，新视图自动应用
-- [ ] 所有单元测试通过
+- [x] ToggleButton 在主工具栏可见，仅在加载压缩包后可用
+- [x] ToggleButton 开启后文件列表显示当前目录所有子目录的文件（扁平、无目录）
+- [x] ToggleButton 关闭后恢复为默认行为（当前目录直接条目 + 隐式目录）
+- [x] 筛选工具栏在文件列表上方显示，包含文字搜索/日期范围/大小范围三个过滤区
+- [x] 文字搜索：🔍 图标 + 水印"筛选文件…"，实时过滤，大小写不敏感，匹配所有可见列
+- [x] 日期范围：两个 DatePicker（开始/结束，竖排），过滤 LastModified 区间
+- [x] 大小范围：两个数字输入 + 单位 ComboBox（最小/最大，竖排），过滤 Size
+- [x] 过滤组间竖线分隔，布局清晰
+- [x] 清除按钮（×）重置所有过滤条件
+- [x] 组合过滤：文字+日期+大小同时生效（AND 逻辑）
+- [x] 无匹配时显示空结果提示（DataGrid 区域文字 + 状态栏）
+- [x] 切换目录时所有过滤条件保持，新视图自动应用
+- [x] 所有单元测试通过
 
 ### Must Have
 - FilterFiles 支持 showSubfolders 参数
@@ -149,7 +149,7 @@ Wave 3 (Integration + Tests):
 
 ## TODOs
 
-- [ ] 1. 添加本地化字符串
+- [x] 1. 添加本地化字符串
 
   **What to do**:
   - 在 `strings.zh.json` 和 `strings.en.json` 中添加以下键值对：
@@ -219,7 +219,7 @@ Wave 3 (Integration + Tests):
 
 ---
 
-- [ ] 2. 单元测试基础设施 — 测试辅助方法和数据
+- [x] 2. 单元测试基础设施 — 测试辅助方法和数据
 
   **What to do**:
   - 在 `tests/MantisZip.Tests/` 下创建或扩展现有测试文件
@@ -273,7 +273,7 @@ Wave 3 (Integration + Tests):
 
 ---
 
-- [ ] 3. FilterFiles 增加 showSubfolders 模式
+- [x] 3. FilterFiles 增加 showSubfolders 模式
 
   **What to do**:
   - 在 `MainWindow.xaml.cs` 添加字段 `private bool _showSubfolders;`（默认 false）
@@ -343,7 +343,7 @@ Wave 3 (Integration + Tests):
 
 ---
 
-- [ ] 4. 主工具栏 ToggleButton × 2（「全部子目录」+「筛选栏显隐」）
+- [x] 4. 主工具栏 ToggleButton × 2（「全部子目录」+「筛选栏显隐」）
 
   **What to do — 按钮 A：🌲 显示所有子目录文件**：
   - 在 `MainWindow.xaml` 的 `<ToolBar>` 中添加 ToggleButton：
@@ -426,7 +426,7 @@ Wave 3 (Integration + Tests):
 
 ---
 
-- [ ] 5. 筛选工具栏 UI（XAML + 事件绑定）
+- [x] 5. 筛选工具栏 UI（XAML + 事件绑定）
 
   **What to do**:
   - 修改 `InnerContentGrid` 中 Column 2（FileListGrid 所在列）的布局：
@@ -523,7 +523,7 @@ Wave 3 (Integration + Tests):
 
 ---
 
-- [ ] 6. 多维度过滤引擎
+- [x] 6. 多维度过滤引擎
 
   **What to do**:
   - 设计过滤条件数据结构：
@@ -679,7 +679,7 @@ Wave 3 (Integration + Tests):
 
 ---
 
-- [ ] 7. 单元测试 — FilterFiles showSubfolders 模式
+- [x] 7. 单元测试 — FilterFiles showSubfolders 模式
 
   **What to do**:
   - 在 `FileListFilterTests.cs` 中添加测试方法，使用 `CreateTestItems()` 数据集
@@ -734,7 +734,7 @@ Wave 3 (Integration + Tests):
 
 ---
 
-- [ ] 8. 单元测试 — 多维度过滤引擎
+- [x] 8. 单元测试 — 多维度过滤引擎
 
   **What to do**:
   - 在 `FileListFilterTests.cs` 中添加测试方法，覆盖三类过滤
@@ -801,21 +801,150 @@ Wave 3 (Integration + Tests):
 
 ## Final Verification Wave
 
-- [ ] F1. **Plan Compliance Audit** — `oracle`
+- [x] F1. **Plan Compliance Audit** — `oracle`
   Read the plan end-to-end. For each "Must Have": verify implementation exists (read file, run command). For each "Must NOT Have": search codebase for forbidden patterns. Check evidence files exist in .sisyphus/evidence/. Compare deliverables against plan.
   Output: `Must Have [N/N] | Must NOT Have [N/N] | Tasks [N/N] | VERDICT: APPROVE/REJECT`
 
-- [ ] F2. **Code Quality Review** — `unspecified-high`
+- [x] F2. **Code Quality Review** — `unspecified-high`
   Run `dotnet build` + `dotnet test`. Review all changed files for: empty catches, console.log in prod, commented-out code, unused imports.
   Output: `Build [PASS/FAIL] | Tests [N pass/N fail] | Files [N clean/N issues] | VERDICT`
 
-- [ ] F3. **Real Manual QA** — 手动启动应用 / Bash
+- [x] F3. **Real Manual QA** — 手动启动应用 / Bash
   Start from clean state. Execute EVERY QA scenario from EVERY task. Test cross-task integration (toggle + search working together). Test edge cases: toggle while searching, search then toggle, rapid typing.
   Output: `Scenarios [N/N pass] | Integration [N/N] | Edge Cases [N tested] | VERDICT`
 
-- [ ] F4. **Scope Fidelity Check** — `deep`
+- [x] F4. **Scope Fidelity Check** — `deep`
   For each task: read "What to do", read actual diff. Verify 1:1 — everything in spec was built, nothing beyond spec. Check "Must NOT do" compliance.
   Output: `Tasks [N/N compliant] | Contamination [CLEAN/N issues] | Unaccounted [CLEAN/N files] | VERDICT`
+
+---
+
+## 扩展功能：筛选值吸管（Pick Filter Value）
+
+### TL;DR
+
+> **Quick Summary**: 在筛选工具栏的日期区间（各 DatePicker）和大小区间（各 Size TextBox）前面，添加吸管 🧪 按钮。点击从当前文件列表选中条目自动提取对应的值填入控件，支持多选时自动取极值（min/max）。
+>
+> **Design Change Summary**:
+> - 布局调整：日期区 `📅` + 大小区 `📏` 替代原有文字标签，位置从上方改到左侧水平排列
+> - 新控件：4 个吸管按钮（PickDateFrom/PickDateTo/PickSizeMin/PickSizeMax）
+> - 无选择或选中均为目录时，对应吸管按钮禁用 + 视觉区分
+
+### 最终布局
+
+```
+◀── 区域 1 ──▶ | ◀────────── 区域 2 ─────────▶ | ◀────────── 区域 3 ─────────▶ | ◀─ 4 ─▶
+🔍 [FileSearchBox] | 📅 [🧪] 从 [DateFromPicker] | 📏 [🧪] 最小 [SizeMinBox] [B] | ✕
+                      [🧪] 到 [DateToPicker]       [🧪] 最大 [SizeMaxBox] [B]
+```
+
+### 布局变更
+
+#### 日期区（当前 → 新）
+
+```
+当前:                         新:
+┌──────────────┐             ┌─────────────────────┐
+│ 日期:        │             │ 📅                   │
+│ 从 [DP]      │      →      │  [🧪] 从 [DP]        │
+│ 到 [DP]      │             │  [🧪] 到 [DP]        │
+└──────────────┘             └─────────────────────┘
+```
+
+- 外层从 `Vertical` → `Horizontal`（📅 在左，控件列在右）
+- 每行：`[吸管] "从"/"到" [DatePicker]`
+
+#### 大小区（当前 → 新）
+
+```
+当前:                         新:
+┌──────────────┐             ┌──────────────────────────┐
+│ 大小:        │             │ 📏                        │
+│ 最小 [B]     │      →      │  [🧪] 最小 [SizeMin] [B] │
+│ 最大 [B]     │             │  [🧪] 最大 [SizeMax] [B] │
+└──────────────┘             └──────────────────────────┘
+```
+
+### 吸管行为规则
+
+#### 取值逻辑
+
+| 吸管按钮 | 选中文件数 | 取值方式 |
+|----------|-----------|----------|
+| `PickDateFromBtn`（日期开始） | = 0 | **禁用** |
+| | = 1 | 取该文件的 `LastModified` |
+| | ≥ 2 | 取这些文件中 `LastModified` 的**最小值** |
+| `PickDateToBtn`（日期结束） | = 0 | **禁用** |
+| | = 1 | 取该文件的 `LastModified` |
+| | ≥ 2 | 取这些文件中 `LastModified` 的**最大值** |
+| `PickSizeMinBtn`（大小最小） | = 0 | **禁用** |
+| | = 1 | 取该文件的 `Size` |
+| | ≥ 2 | 取这些文件中 `Size` 的**最小值** |
+| `PickSizeMaxBtn`（大小最大） | = 0 | **禁用** |
+| | = 1 | 取该文件的 `Size` |
+| | ≥ 2 | 取这些文件中 `Size` 的**最大值** |
+
+#### 过滤规则
+
+- **目录日期排除**：计算日期极值时，跳过 `IsDirectory == true` 的条目（目录 LastModified 无意义或为 MinValue）
+- **目录大小包含**：计算大小极值时，**包含**目录条目（目录在压缩包中具有 `Size` = 子文件大小总和，是有意义的值）
+- **加密条目包含**：加密条目正常参与取值（`LastModified` 和 `Size` 对加密条目仍然可读）
+- **LastModified 无效值排除**：`LastModified == DateTime.MinValue` 的条目不参与日期极值计算
+- **纯目录选择**：如果选中条目全是目录：
+  - 日期吸管全部**禁用**（目录没有有效修改时间可吸取）
+  - 大小吸管**可用**（目录 Size 有值，可以取 min/max）
+
+#### 禁用状态
+
+| 条件 | `PickDateFromBtn` | `PickDateToBtn` | `PickSizeMinBtn` | `PickSizeMaxBtn` |
+|------|:---:|:---:|:---:|:---:|
+| 未选中任何条目 | 🚫 | 🚫 | 🚫 | 🚫 |
+| 选中全是目录 | 🚫 | 🚫 | ✅ | ✅ |
+| 选中全是 Date=MinValue | 🚫 | 🚫 | ✅ | ✅ |
+| 正常选中 | ✅ | ✅ | ✅ | ✅ |
+
+- 禁用时：`IsEnabled = false`，系统默认的灰色显示即可
+- `FileListGrid_SelectionChanged` 事件中更新所有 4 个吸管按钮的启用状态
+
+#### 取值后的效果
+
+- 点击吸管后，对应控件的值**立即填入**，触发对应的 `TextChanged` / `SelectedDateChanged` 事件，自动应用过滤
+- 如果该控件的值已经与吸管结果相同，则不触发重复过滤（避免 UI 抖动）
+- 清除按钮（✕）可一键清空过滤条件，吸管填入的值也会被清除
+
+### 本地化
+
+**新增本地化键**（可选，吸管按钮用 ToolTip 说明功能）：
+
+| Key | zh | en |
+|-----|----|----|
+| `Main_Filter_PickDateFrom` | 从选中文件取最小日期 | Pick min date from selection |
+| `Main_Filter_PickDateTo` | 从选中文件取最大日期 | Pick max date from selection |
+| `Main_Filter_PickSizeMin` | 从选中文件取最小大小 | Pick min size from selection |
+| `Main_Filter_PickSizeMax` | 从选中文件取最大大小 | Pick max size from selection |
+| `Main_Filter_NoFileSelected` | 请先选择文件 | Select files first |
+
+**移除/废弃的键**：
+
+| Key | 说明 |
+|-----|------|
+| `Main_Filter_DateLabel` | "日期:" 文字不再需要，改为 📅 emoji |
+| `Main_Filter_SizeLabel` | "大小:" 文字不再需要，改为 📏 emoji |
+
+> 注意：这两个键保留在 JSON 中不删除，避免破坏已有引用。可以标记为 `// TODO: 废弃` 注释，后续统一清理。
+
+### 实现任务
+
+- [x] T9. **布局调整 + 吸管按钮 UI** — XAML 中修改日期/大小区外层 Orientation，替换文字为 emoji，添加 4 个吸管按钮
+- [x] T10. **吸管按钮 Click 事件** — 实现取值逻辑（单文件填值 / 多文件极值 / 目录跳过 / 无效日期跳过）
+- [x] T11. **吸管按钮启用状态联动** — `FileListGrid_SelectionChanged` 中更新 4 个按钮的状态
+- [x] T12. **单元测试** — 吸管取值逻辑测试（单文件、多文件 min/max、纯目录选择、混合选择）
+
+### 依赖
+
+- 依赖现有 `FileListGrid` 的 `SelectedItems`（已有多选支持）
+- 不依赖额外 NuGet 包
+- 不修改 Core 层逻辑
 
 ---
 
@@ -839,16 +968,16 @@ dotnet test tests/MantisZip.Tests/  # Expected: All tests pass (0 failures)
 ```
 
 ### Final Checklist
-- [ ] 「显示所有子目录文件」ToggleButton（🌲）在主工具栏工作正常
-- [ ] 「切换筛选栏」ToggleButton（🔍）在主工具栏工作正常，显隐切换正确
-- [ ] 筛选工具栏显示在文件列表上方，包含文字/日期/大小三个过滤区
-- [ ] 文字搜索实时过滤，大小写不敏感
-- [ ] 日期范围 DatePicker × 2 过滤正确
-- [ ] 大小范围数字输入 + 单位 ComboBox 过滤正确
-- [ ] 三种过滤组合（AND）工作正常
-- [ ] 清除全部重置所有过滤条件
-- [ ] 显示所有子目录 + 过滤同时使用时互不冲突
-- [ ] 切换目录时所有过滤条件保持
-- [ ] 所有本地化字符串正确显示
-- [ ] 所有单元测试通过
-- [ ] 构建无错误
+- [x] 「显示所有子目录文件」ToggleButton（🌲）在主工具栏工作正常
+- [x] 「切换筛选栏」ToggleButton（🔍）在主工具栏工作正常，显隐切换正确
+- [x] 筛选工具栏显示在文件列表上方，包含文字/日期/大小三个过滤区
+- [x] 文字搜索实时过滤，大小写不敏感
+- [x] 日期范围 DatePicker × 2 过滤正确
+- [x] 大小范围数字输入 + 单位 ComboBox 过滤正确
+- [x] 三种过滤组合（AND）工作正常
+- [x] 清除全部重置所有过滤条件
+- [x] 显示所有子目录 + 过滤同时使用时互不冲突
+- [x] 切换目录时所有过滤条件保持
+- [x] 所有本地化字符串正确显示
+- [x] 所有单元测试通过
+- [x] 构建无错误

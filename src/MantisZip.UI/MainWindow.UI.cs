@@ -96,6 +96,33 @@ public partial class MainWindow
         bool hasArchive = !string.IsNullOrEmpty(_currentArchivePath);
         ShowSubfoldersBtn.IsEnabled = hasArchive;
         ToggleFilterBarBtn.IsEnabled = hasArchive;
+        UpdatePickerBtnState();
+    }
+
+    /// <summary>
+    /// 更新 4 个吸管按钮的启用状态
+    /// </summary>
+    private void UpdatePickerBtnState()
+    {
+        bool hasArchive = !string.IsNullOrEmpty(_currentArchivePath);
+        if (!hasArchive)
+        {
+            PickDateFromBtn.IsEnabled = false;
+            PickDateToBtn.IsEnabled = false;
+            PickSizeMinBtn.IsEnabled = false;
+            PickSizeMaxBtn.IsEnabled = false;
+            return;
+        }
+
+        var selected = FileListGrid.SelectedItems.OfType<ArchiveItem>().ToList();
+        int fileCount = selected.Count;
+        bool hasDateItem = selected.Any(i => !i.IsDirectory && i.LastModified > DateTime.MinValue);
+        bool hasSizeItem = selected.Count > 0;
+
+        PickDateFromBtn.IsEnabled = hasDateItem;
+        PickDateToBtn.IsEnabled = hasDateItem;
+        PickSizeMinBtn.IsEnabled = hasSizeItem;
+        PickSizeMaxBtn.IsEnabled = hasSizeItem;
     }
 
     /// <summary>
@@ -452,6 +479,10 @@ public partial class MainWindow
 
             // 更新选中统计
             UpdateSelectionStats();
+
+            // 重新应用激活的过滤条件（showSubfolders 切换 / 刷新后恢复）
+            if (HasActiveFilters())
+                RefreshFilter();
         }
         finally { _isProgrammaticFilter = false; }
 
@@ -529,6 +560,41 @@ public partial class MainWindow
         }
 
         UpdateSelectionStats();
+
+        // 比例基准切换：用筛选后列表的最大值作为进度条基准
+        if (_rebasedBaseline && HasActiveFilters() && result.Count > 0)
+        {
+            long maxSize = result.Max(i => i.Size);
+            long maxCompressed = result.Max(i => i.CompressedSize);
+            // 同时考虑 SeparateDirBaseline 时分别取文件/目录的最大值
+            bool separateBaseline = AppSettings.Instance.SeparateDirBaseline;
+            long maxFileSize = maxSize, maxDirSize = maxSize;
+            long maxFileCompressed = maxCompressed, maxDirCompressed = maxCompressed;
+            if (separateBaseline)
+            {
+                var files = result.Where(i => !i.IsDirectory).ToList();
+                var dirs = result.Where(i => i.IsDirectory).ToList();
+                if (files.Count > 0)
+                {
+                    maxFileSize = files.Max(i => i.Size);
+                    maxFileCompressed = files.Max(i => i.CompressedSize);
+                }
+                if (dirs.Count > 0)
+                {
+                    maxDirSize = dirs.Max(i => i.Size);
+                    maxDirCompressed = dirs.Max(i => i.CompressedSize);
+                }
+            }
+            foreach (var item in result)
+            {
+                var uiItem = (ArchiveItem)item;
+                long baseSize = separateBaseline && uiItem.IsDirectory ? maxDirSize : maxSize;
+                long baseCompressed = separateBaseline && uiItem.IsDirectory ? maxDirCompressed : maxCompressed;
+                uiItem.SizeRatio = baseSize > 0 ? (double)uiItem.Size / baseSize : 0;
+                uiItem.CompressedSizeRatio = baseCompressed > 0 ? (double)uiItem.CompressedSize / baseCompressed : 0;
+                uiItem.DateRatio = 0; // 日期基准在此上下文中无意义
+            }
+        }
     }
 
     // ===== 过滤控件事件处理器 =====
@@ -581,6 +647,15 @@ public partial class MainWindow
         }
     }
 
+    /// <summary>
+    /// 切换比例基准：用筛选后列表的 Max 作为基准
+    /// </summary>
+    private void RebaseBaselineBtn_Click(object sender, RoutedEventArgs e)
+    {
+        _rebasedBaseline = RebaseBaselineBtn.IsChecked == true;
+        FilterFiles(_currentFolder);
+    }
+
     private void ClearFiltersBtn_Click(object sender, RoutedEventArgs e)
     {
         // 清空所有过滤控件
@@ -599,7 +674,7 @@ public partial class MainWindow
         _sizeMin = null;
         _sizeMax = null;
 
-        RefreshFilter();
+        FilterFiles(_currentFolder);
     }
 
     /// <summary>
@@ -616,6 +691,62 @@ public partial class MainWindow
         }
     }
 
+    // ===== 吸管按钮事件处理器 =====
+
+    private void PickDateFromBtn_Click(object sender, RoutedEventArgs e)
+    {
+        var dates = FileListGrid.SelectedItems
+            .OfType<ArchiveItem>()
+            .Where(i => !i.IsDirectory && i.LastModified > DateTime.MinValue)
+            .Select(i => i.LastModified);
+
+        if (!dates.Any()) return;
+
+        var minDate = dates.Min();
+        if (DateFromPicker.SelectedDate != minDate)
+            DateFromPicker.SelectedDate = minDate;
+    }
+
+    private void PickDateToBtn_Click(object sender, RoutedEventArgs e)
+    {
+        var dates = FileListGrid.SelectedItems
+            .OfType<ArchiveItem>()
+            .Where(i => !i.IsDirectory && i.LastModified > DateTime.MinValue)
+            .Select(i => i.LastModified);
+
+        if (!dates.Any()) return;
+
+        var maxDate = dates.Max();
+        if (DateToPicker.SelectedDate != maxDate)
+            DateToPicker.SelectedDate = maxDate;
+    }
+
+    private void PickSizeMinBtn_Click(object sender, RoutedEventArgs e)
+    {
+        var sizes = FileListGrid.SelectedItems
+            .OfType<ArchiveItem>()
+            .Select(i => i.Size);
+
+        if (!sizes.Any()) return;
+
+        var minSize = sizes.Min();
+        SizeMinBox.Text = minSize.ToString();
+        SizeMinUnit.SelectedIndex = 0; // B
+    }
+
+    private void PickSizeMaxBtn_Click(object sender, RoutedEventArgs e)
+    {
+        var sizes = FileListGrid.SelectedItems
+            .OfType<ArchiveItem>()
+            .Select(i => i.Size);
+
+        if (!sizes.Any()) return;
+
+        var maxSize = sizes.Max();
+        SizeMaxBox.Text = maxSize.ToString();
+        SizeMaxUnit.SelectedIndex = 0; // B
+    }
+
     private void FileListGrid_PreviewMouseDoubleClick(object sender, MouseButtonEventArgs e)
     {
         if (FileListGrid.SelectedItem is ArchiveItem item && item.IsDirectory)
@@ -630,7 +761,7 @@ public partial class MainWindow
     {
         try
         {
-            if (_isProgrammaticFilter) { UpdateSelectionStats(); return; }
+            if (_isProgrammaticFilter) { UpdateSelectionStats(); UpdatePickerBtnState(); return; }
 
             // 选择为空时显示压缩包总览
             if (FileListGrid.SelectedItems.Count == 0)
@@ -638,6 +769,7 @@ public partial class MainWindow
                 if (!string.IsNullOrEmpty(_currentArchivePath))
                     ShowArchiveInfo();
                 UpdateSelectionStats();
+                UpdatePickerBtnState();
                 return;
             }
 
@@ -651,6 +783,7 @@ public partial class MainWindow
                 else await ShowPreviewAsync(lastClicked);
             }
             UpdateSelectionStats();
+            UpdatePickerBtnState();
         }
         catch (Exception ex)
         {

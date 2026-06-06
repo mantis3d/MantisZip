@@ -21,6 +21,15 @@
   - 支持命名预设持久化
 - **代码重构持续** — `CompressSettingsWindow.xaml.cs` (684 行)、`SevenZipEngine.cs` (630 行)、`ShellIntegration.cs` (482 行) 仍有拆分空间
 
+
+
+## 版本历史（从新到旧）
+
+### v0.3.8 (2026-06-06) 文件列表过滤修正
+- 文件列表过滤修正布局，增加吸管。
+
+
+
 ### v0.3.7-refined-4 (2026-06-03) 关于窗口重设计
 
 1. **AboutWindow 新建** — 替代旧 `AppMessageBox.Show()` 为 4 标签页 WPF 对话框（关于/作者/依赖库/致谢），`ResizeMode="CanResizeWithGrip"`，`MinWidth="400"` `MinHeight="350"`，App.ico 窗口图标
@@ -33,7 +42,7 @@
 8. **13 个冒烟测试** — `AboutWindowTests.cs` 验证 JSON 键存在性/非空/双语一致性/向后兼容（`Main_About_Text` 保留）
 9. **死键审计** — `Main_About_Text`/`Main_About_Title` 确认代码无引用（仅 L.cs + JSON 保留）
 
-### v0.3.8 (2026-06-04) 文件关联面板重构
+### v0.3.8 (2026-06-04) 文件关联面板重构 + 文件列表筛选/搜索
 
 1. **文件关联面板重构** — 从统一开关改为按扩展名独立复选框列表，支持自定义扩展名添加/删除，行点击切换，全选/取消全选（详见 `.sisyphus/plans/file-assoc-per-extension.md`）
 2. **当前关联程序显示** — 每行显示当前关联的应用名，移除 "Archive"/"Compressed" 等后缀干扰词
@@ -49,6 +58,11 @@
 12. **GetExePath 修复** — 改用 `Assembly.Location` 替代 `Environment.ProcessPath`，兼容 `dotnet run` 场景，确保图标路径正确
 13. **Explorer 文件图标** — 内置格式使用 `Resources\Icons\*.ico`，自定义扩展名回退到 exe 图标
 14. **原生图标 DLL 计划** — 创建 `.sisyphus/plans/icon-dll.md`（P3），规划将 7 个 .ico 编译为资源 DLL
+15. **文件列表筛选/搜索** — MainWindow 文件列表区域新增三维过滤系统：主工具栏「全部子目录」ToggleButton（🌲 图标）展开递归扁平视图、筛选工具栏（文字搜索 + 日期范围 DatePicker × 2 + 大小范围数字输入+单位 ComboBox）、通用过滤引擎 `ArchiveFilter.cs`（Core/Utils）支持组合 AND 过滤，15 个单元测试覆盖所有过滤逻辑（详见 `.sisyphus/plans/file-list-filter-search.md`）
+16. **全部子目录视图** — `ShowSubfoldersBtn` ToggleButton 切换文件列表为递归扁平视图，仅显示文件不含目录条目，`DisplayName` 显示相对路径
+17. **筛选工具栏显隐** — `ToggleFilterBarBtn` ToggleButton 控制筛选栏显隐，隐藏时已应用过滤条件继续保持生效
+18. **多维过滤引擎** — `SearchFilters` record + `ArchiveFilter.ApplyFilters` 静态方法，支持文字（大小写不敏感子串匹配 Name/FullPath）、日期（LastModified 区间）、大小（Size 区间 + 单位换算）三种条件的 AND 组合过滤；`ParseSizeWithUnit` 辅助方法支持 B/KB/MB/GB 单位安全转换
+19. **空结果提示** — 无匹配文件时在 DataGrid 区域居中显示"无匹配的文件"，状态栏同步更新统计格式 "显示 N/M 个文件"
 
 ### v0.3.7-refined-3 (2026-06-03) 密码工具栏 + 关闭压缩包 + 捐赠 + 空状态重设计
 
@@ -62,8 +76,6 @@
 8. **文件菜单重排序** — 前三项调整为：🆕 新建 → 📂 打开 → 🕐 最近文件 → ❌ 关闭
 9. **捐赠对话框** — 帮助菜单新增 ❤️ 捐赠，弹出 DonationDialog：打赏二维码占位 + 三个平台链接（爱发电/GitHub Sponsors/Buy Me a Coffee）
 10. **空状态重设计** — 替换旧 DropHint（📁 + 文字 + 超链接）为：居中提示文字 + 两张并排操作卡片（📂 打开压缩包、🔐 密码管理器）
-
-## 版本历史（从新到旧）
 
 ### v0.3.7-refined-3 (2026-06-03) 压缩冲突增强："应用到全部" + 目标文件信息面板 + 压缩流程统一计划
 

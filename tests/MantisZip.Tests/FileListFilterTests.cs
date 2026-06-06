@@ -294,4 +294,129 @@ public class FileListFilterTests
 
         Assert.Equal(items.Count, result.Count);
     }
+
+    // ===== 吸管取值逻辑测试 =====
+
+    [Fact]
+    public void Picker_DateFrom_ReturnsMinDate_ExcludingDirsAndMinValue()
+    {
+        var items = CreateTestItems();
+        // 模拟吸管"从选中文件取最小日期"逻辑
+        var dates = items
+            .Where(i => !i.IsDirectory && i.LastModified > DateTime.MinValue)
+            .Select(i => i.LastModified);
+
+        var minDate = dates.Min();
+        // 数据中最早的日期是 archive.zip 的 baseDate.AddDays(-5) = 2026-03-10 10:00
+        Assert.Equal(new DateTime(2026, 3, 10, 10, 0, 0), minDate);
+    }
+
+    [Fact]
+    public void Picker_DateTo_ReturnsMaxDate_ExcludingDirsAndMinValue()
+    {
+        var items = CreateTestItems();
+        // 模拟吸管"从选中文件取最大日期"逻辑
+        var dates = items
+            .Where(i => !i.IsDirectory && i.LastModified > DateTime.MinValue)
+            .Select(i => i.LastModified);
+
+        var maxDate = dates.Max();
+        // 数据中最晚的日期是 banner.svg 的 baseDate.AddDays(30) = 2026-04-15 10:00
+        Assert.Equal(new DateTime(2026, 4, 15, 10, 0, 0), maxDate);
+    }
+
+    [Fact]
+    public void Picker_Date_DirOnlySelection_ReturnsNoDates()
+    {
+        var items = CreateTestItems();
+        // 纯目录选择 — 模拟选中 empty/ 单个目录
+        var dirSelection = items.Where(i => i.IsDirectory && i.FullPath == "empty").ToList();
+
+        var dates = dirSelection
+            .Where(i => !i.IsDirectory && i.LastModified > DateTime.MinValue)
+            .Select(i => i.LastModified);
+
+        Assert.Empty(dates);
+    }
+
+    [Fact]
+    public void Picker_SizeMin_ReturnsMinSize_IncludingDirs()
+    {
+        var items = CreateTestItems();
+        // 模拟吸管"从选中文件取最小大小"逻辑（包含目录）
+        var sizes = items
+            .Select(i => i.Size);
+
+        var minSize = sizes.Min();
+        // 目录 Size=0，所以最小值是 0（来自 empty/）
+        Assert.Equal(0, minSize);
+    }
+
+    [Fact]
+    public void Picker_SizeMin_FilesOnly_ReturnsMinFileSize()
+    {
+        var items = CreateTestItems();
+        // 只选非目录文件时，最小值是 100 (readme.txt)
+        var filesOnly = items.Where(i => !i.IsDirectory).ToList();
+
+        var sizes = filesOnly.Select(i => i.Size);
+        var minSize = sizes.Min();
+
+        Assert.Equal(100, minSize);
+    }
+
+    [Fact]
+    public void Picker_SizeMax_ReturnsMaxSize_IncludingDirs()
+    {
+        var items = CreateTestItems();
+        // 模拟吸管"从选中文件取最大大小"逻辑（包含目录）
+        var sizes = items
+            .Select(i => i.Size);
+
+        var maxSize = sizes.Max();
+        // 数据中最大的是 guide.pdf (150000)
+        Assert.Equal(150000, maxSize);
+    }
+
+    [Fact]
+    public void Picker_DateFrom_SubsetSelection_ReturnsCorrectMin()
+    {
+        var items = CreateTestItems();
+        // 只选 src/ 目录下的文件
+        var srcFiles = items.Where(i => i.FullPath.StartsWith("src/") && !i.IsDirectory).ToList();
+
+        var dates = srcFiles
+            .Where(i => i.LastModified > DateTime.MinValue)
+            .Select(i => i.LastModified);
+
+        var minDate = dates.Min();
+        // src/ 下最早是 converter.cs 的 baseDate.AddDays(-1) = 2026-03-14 10:00
+        Assert.Equal(new DateTime(2026, 3, 14, 10, 0, 0), minDate);
+    }
+
+    [Fact]
+    public void Picker_SizeMax_SubsetSelection_ReturnsCorrectMax()
+    {
+        var items = CreateTestItems();
+        // 只选 images/ 目录下的文件
+        var imgFiles = items.Where(i => i.FullPath.StartsWith("images/")).ToList();
+
+        var sizes = imgFiles.Select(i => i.Size);
+        var maxSize = sizes.Max();
+        // images/ 下最大是 logo.png (45000)
+        Assert.Equal(45000, maxSize);
+
+        var minSize = sizes.Min();
+        // images/ 下最小是 banner.svg (12000)
+        Assert.Equal(12000, minSize);
+    }
+
+    [Fact]
+    public void Picker_EmptySelection_ReturnsEmpty()
+    {
+        var empty = new List<ArchiveItem>();
+        // 模拟无选中条目
+        Assert.Empty(empty.Select(i => i.LastModified));
+        Assert.Empty(empty.Select(i => i.Size));
+    }
 }
