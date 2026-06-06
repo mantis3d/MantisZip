@@ -7,7 +7,7 @@
 - **技术栈**: .NET 9 + WPF + SharpCompress + SharpSevenZip
 
 ## 版本
-- **当前版本**: 0.3.8
+- **当前版本**: 0.3.9
 - **发布日期**: 2026-06-06
 
 ## 规划中
@@ -18,7 +18,10 @@
 - 修复 ShellExt `_fullFileList` 跨右键调用批次污染 — 添加 2 秒时间窗口检测，选少文件不再错误使用上一批的旧大文件列表
 - 修复右键菜单闪烁/空白 — 永久缓存图标 HBITMAP，移除 `CleanupIconCache()` 热路径调用，消除每次右键 40-120ms 图标重载延迟
 - "MantisZip" 子菜单头加图标 — 用 App.ico + `InsertMenuItem` + `MIIM_BITMAP` 替代旧 `InsertMenu` API，根菜单显示软件图标
-
+- **压缩包计数始终显示** — `FileCountText` 不再隐藏，批处理模式显示 `压缩包 X/Y`（原仅压缩时显示，解压时隐藏）
+- **本地化语义修正** — `Progress_FileCount` 从「文件 X/Y」改为「压缩包 X/Y」/「Archive X/Y」
+- **📌 保持打开切换按钮** — 进度窗口左下角新增图钉 ToggleButton，勾选后进度走完不自动关闭窗口，用户可手动关闭
+- **倒计时期间可切换** — `AutoCloseOrWaitAsync` 每 100ms 轮询 `KeepOpenOnComplete`，倒计时中途勾选/取消勾选即时生效
 
 ### v0.3.7-refined-5 (2026-06-04) 引擎统一
 
