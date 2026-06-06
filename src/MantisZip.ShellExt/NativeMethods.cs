@@ -68,29 +68,28 @@ internal static class NativeMethods
     public const uint MIIM_SUBMENU = 0x0004;
     public const uint MFT_STRING = 0x0000;
     public const uint MFS_ENABLED = 0x0000;
+    public const uint MFS_DISABLED = 0x0002;
+    public const uint MFS_GRAYED = 0x0003;
+    public const uint MIIM_STATE = 0x0001;
     public const uint MF_SEPARATOR = 0x0800;
     public const uint MF_BYPOSITION = 0x0400;
-    public const uint MF_POPUP = 0x0010;
     public const uint MF_STRING = 0x0000;
-
-    [DllImport("user32.dll", CharSet = CharSet.Auto)]
-    public static extern IntPtr CreatePopupMenu();
+    public const uint MF_POPUP = 0x0010;
 
     [DllImport("user32.dll", CharSet = CharSet.Auto)]
     [return: MarshalAs(UnmanagedType.Bool)]
     public static extern bool InsertMenu(IntPtr hMenu, uint uPosition, uint uFlags, IntPtr uIDNewItem, string? lpNewItem);
 
-    [DllImport("user32.dll", CharSet = CharSet.Auto)]
+    [DllImport("user32.dll")]
+    public static extern IntPtr CreatePopupMenu();
+
+    [DllImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]
-    public static extern bool InsertMenu(IntPtr hMenu, uint uPosition, uint uFlags, uint uIDNewItem, string? lpNewItem);
+    public static extern bool DestroyMenu(IntPtr hMenu);
 
     [DllImport("user32.dll", CharSet = CharSet.Auto)]
     [return: MarshalAs(UnmanagedType.Bool)]
     public static extern bool InsertMenuItem(IntPtr hMenu, uint uItem, [MarshalAs(UnmanagedType.Bool)] bool fByPosition, ref MenuItemInfo lpmii);
-
-    [DllImport("user32.dll", CharSet = CharSet.Auto)]
-    [return: MarshalAs(UnmanagedType.Bool)]
-    public static extern bool DestroyMenu(IntPtr hMenu);
 
     // ─── IContextMenu GetCommandString flags ───
     public const uint GCS_VERBA = 0x0000;
@@ -114,9 +113,6 @@ internal static class NativeMethods
     [DllImport("gdi32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]
     public static extern bool DeleteDC(IntPtr hdc);
-
-    [DllImport("gdi32.dll")]
-    public static extern IntPtr CreateCompatibleBitmap(IntPtr hdc, int nWidth, int nHeight);
 
     [DllImport("gdi32.dll")]
     public static extern IntPtr SelectObject(IntPtr hdc, IntPtr h);

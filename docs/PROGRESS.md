@@ -7,10 +7,21 @@
 - **技术栈**: .NET 9 + WPF + SharpCompress + SharpSevenZip
 
 ## 版本
-- **当前版本**: 0.3.7-refined-4
-- **发布日期**: 2026-06-03
+- **当前版本**: 0.3.8
+- **发布日期**: 2026-06-06
 
 ## 规划中
+
+## 版本历史（从新到旧）
+
+### v0.3.8 (2026-06-06) 右键菜单修复（批次污染 + 闪烁 + 图标）
+- 修复 ShellExt `_fullFileList` 跨右键调用批次污染 — 添加 2 秒时间窗口检测，选少文件不再错误使用上一批的旧大文件列表
+- 修复右键菜单闪烁/空白 — 永久缓存图标 HBITMAP，移除 `CleanupIconCache()` 热路径调用，消除每次右键 40-120ms 图标重载延迟
+- "MantisZip" 子菜单头加图标 — 用 App.ico + `InsertMenuItem` + `MIIM_BITMAP` 替代旧 `InsertMenu` API，根菜单显示软件图标
+
+
+### v0.3.7-refined-5 (2026-06-04) 引擎统一
+
 - ✅ **引擎统一已完成** — SharpZipLib→SharpCompress + 7z.exe/SevenZipExtractor→SharpSevenZip（v0.3.4）
 - ✅ **批量进度文件列表已完成** — `--compress-separate` / `--extract-*` 批量操作进度窗口 + IPC 合并（v0.3.5）
 - ✅ **ExtractSettingsWindow 已完成** — 创建 + 重设计，与 CompressSettingsWindow 视觉一致（v0.3.4 创建 / v0.3.6 重设计）
@@ -46,7 +57,6 @@
 9. **捐赠对话框** — 帮助菜单新增 ❤️ 捐赠，弹出 DonationDialog：打赏二维码占位 + 三个平台链接（爱发电/GitHub Sponsors/Buy Me a Coffee）
 10. **空状态重设计** — 替换旧 DropHint（📁 + 文字 + 超链接）为：居中提示文字 + 两张并排操作卡片（📂 打开压缩包、🔐 密码管理器）
 
-## 版本历史（从新到旧）
 
 ### v0.3.7-refined-3 (2026-06-03) 压缩冲突增强："应用到全部" + 目标文件信息面板 + 压缩流程统一计划
 

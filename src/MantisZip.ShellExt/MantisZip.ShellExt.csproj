@@ -35,6 +35,8 @@
     <EmbeddedResource Include="..\MantisZip.UI\Resources\MenuIcons\CompressSeparate.ico" Link="Resources\CompressSeparate.ico" />
     <EmbeddedResource Include="..\MantisZip.UI\Resources\MenuIcons\CompressCombined.ico" Link="Resources\CompressCombined.ico" />
     <EmbeddedResource Include="..\MantisZip.UI\Resources\MenuIcons\CompressDialog.ico" Link="Resources\CompressDialog.ico" />
+    <!-- App icon for the "MantisZip" submenu header in root context menu -->
+    <EmbeddedResource Include="..\MantisZip.UI\Resources\App.ico" Link="Resources\App.ico" />
   </ItemGroup>
 
 </Project>

@@ -1,6 +1,7 @@
 using MantisZip.Core;
 using MantisZip.Core.Abstractions;
 using MantisZip.Core.Engines;
+using MantisZip.Core.Services;
 using Microsoft.Win32;
 using System.IO;
 using System.Windows;
@@ -21,8 +22,7 @@ public partial class CompressSettingsWindow : Window
 
     private Core.PasswordEntry? _selectedLibraryEntry;
 
-    private enum OutputMode { Manual, Separate, Combined }
-    private OutputMode _outputMode = OutputMode.Manual;
+    private CompressOutputMode _outputMode = CompressOutputMode.Manual;
 
     private bool _isUsingLibrary = true; // true=密码库, false=新密码
     private bool _isPwdRevealed;
@@ -42,11 +42,11 @@ public partial class CompressSettingsWindow : Window
     private void OutputMode_Changed(object sender, RoutedEventArgs e)
     {
         if (ManualRadio.IsChecked == true)
-            _outputMode = OutputMode.Manual;
+            _outputMode = CompressOutputMode.Manual;
         else if (SeparateRadio.IsChecked == true)
-            _outputMode = OutputMode.Separate;
+            _outputMode = CompressOutputMode.Separate;
         else if (CombinedRadio.IsChecked == true)
-            _outputMode = OutputMode.Combined;
+            _outputMode = CompressOutputMode.Combined;
 
         RefreshOutputPathState();
         UpdateCompressButton();
@@ -61,16 +61,16 @@ public partial class CompressSettingsWindow : Window
 
         switch (_outputMode)
         {
-            case OutputMode.Manual:
+            case CompressOutputMode.Manual:
                 OutputPathTextBox.IsReadOnly = false;
                 BrowseOutputButton.Visibility = Visibility.Visible;
                 break;
-            case OutputMode.Separate:
+            case CompressOutputMode.Separate:
                 OutputPathTextBox.IsReadOnly = true;
                 BrowseOutputButton.Visibility = Visibility.Collapsed;
                 OutputPathTextBox.Text = L.TF(L.Compress_SeparateSummary, _sourcePaths.Count);
                 break;
-            case OutputMode.Combined:
+            case CompressOutputMode.Combined:
                 OutputPathTextBox.IsReadOnly = true;
                 BrowseOutputButton.Visibility = Visibility.Collapsed;
                 RefreshCombinedPath();
@@ -101,7 +101,7 @@ public partial class CompressSettingsWindow : Window
             AppMessageBox.Show(L.T(L.Compress_CombinedUnavailable), L.T(L.Compress_Title),
                 MessageBoxButton.OK, MessageBoxImage.Warning);
             ManualRadio.IsChecked = true;
-            _outputMode = OutputMode.Manual;
+            _outputMode = CompressOutputMode.Manual;
             RefreshOutputPathState();
         }
     }
@@ -196,7 +196,7 @@ public partial class CompressSettingsWindow : Window
         SourceListBox.ItemsSource = null;
         SourceListBox.ItemsSource = _sourcePaths;
 
-        if (_outputMode != OutputMode.Manual)
+        if (_outputMode != CompressOutputMode.Manual)
             RefreshOutputPathState();
 
         UpdateCompressButton();
@@ -545,7 +545,7 @@ public partial class CompressSettingsWindow : Window
 
         switch (_outputMode)
         {
-            case OutputMode.Manual:
+            case CompressOutputMode.Manual:
                 var manualPath = OutputPathTextBox.Text?.Trim();
                 if (!string.IsNullOrEmpty(manualPath))
                 {
@@ -554,7 +554,7 @@ public partial class CompressSettingsWindow : Window
                 }
                 break;
 
-            case OutputMode.Separate:
+            case CompressOutputMode.Separate:
                 var rules = new List<string>();
                 foreach (var src in _sourcePaths)
                 {
@@ -570,7 +570,7 @@ public partial class CompressSettingsWindow : Window
                 PwdRulesBox.Text = string.Join("\r\n", rules);
                 break;
 
-            case OutputMode.Combined:
+            case CompressOutputMode.Combined:
                 var commonParent = App.FindCommonParent(_sourcePaths.ToList());
                 if (commonParent != null && !App.IsDriveRoot(commonParent))
                 {
@@ -691,7 +691,7 @@ public partial class CompressSettingsWindow : Window
     private void UpdateCommentDistributionState()
     {
         if (CommentDistributionPanel == null) return;
-        CommentDistributionPanel.IsEnabled = _outputMode == OutputMode.Separate;
+        CommentDistributionPanel.IsEnabled = _outputMode == CompressOutputMode.Separate;
     }
 
     /// <summary>
@@ -767,7 +767,7 @@ public partial class CompressSettingsWindow : Window
             return;
         }
 
-        if (_outputMode == OutputMode.Manual && string.IsNullOrEmpty(OutputPathTextBox.Text))
+        if (_outputMode == CompressOutputMode.Manual && string.IsNullOrEmpty(OutputPathTextBox.Text))
         {
             AppMessageBox.Show(L.T(L.Compress_Validation_NoOutput), L.T(L.Compress_Title), MessageBoxButton.OK, MessageBoxImage.Warning);
             return;
@@ -806,13 +806,13 @@ public partial class CompressSettingsWindow : Window
 
         switch (_outputMode)
         {
-            case OutputMode.Separate:
+            case CompressOutputMode.Separate:
                 await RunSeparateCompressAsync(format, level);
                 break;
-            case OutputMode.Combined:
+            case CompressOutputMode.Combined:
                 await RunCombinedCompressAsync(format, level);
                 break;
-            case OutputMode.Manual:
+            case CompressOutputMode.Manual:
             default:
                 await RunManualCompressAsync(format, level);
                 break;
@@ -824,94 +824,64 @@ public partial class CompressSettingsWindow : Window
         var outputPath = OutputPathTextBox.Text;
         App.Log("Manual compress — outputPath: {0}, format: {1}, level: {2}", outputPath, format, level);
 
-        // 冲突处理 — 在隐藏窗口之前进行
-        var engine = ArchiveEngineFactory.GetEngineByExtension(outputPath);
-        if (engine == null)
-        {
-            outputPath = Path.ChangeExtension(outputPath, ".zip");
-        }
-        engine ??= new ZipEngine();
-
-        if (File.Exists(outputPath))
-        {
-            bool canAdd = engine is not null and not TarGzEngine;
-            var dlg = new CompressConflictDialog(outputPath, canAdd, Path.GetFileName(App.GetUniquePath(outputPath)));
-            if (dlg.ShowDialog() == true)
-            {
-                switch (dlg.ResultAction)
-                {
-                    case CompressConflictAction.Cancel:
-                        return;
-                    case CompressConflictAction.Rename:
-                        outputPath = Path.Combine(Path.GetDirectoryName(outputPath) ?? ".",
-                            dlg.CustomName ?? Path.GetFileName(App.GetUniquePath(outputPath)));
-                        engine = ArchiveEngineFactory.GetEngineByExtension(outputPath, new ZipEngine());
-                        break;
-                    case CompressConflictAction.Add:
-                        {
-                            this.Hide();
-                            var addProgress = new ProgressWindow();
-                            addProgress.InitCancellation();
-                            addProgress.Show();
-                            await Task.Delay(100);
-                            try
-                            {
-                                var addOptions = App.CreateCompressOptions();
-                                addOptions.Encrypt = EncryptCheckBox.IsChecked == true;
-                                addOptions.Password = GetActivePassword();
-                                addOptions.Comment = GetComment();
-                                var addCtx = ProgressWindow.CreateBackgroundProgress(addProgress);
-                                await engine!.AddToArchiveAsync(outputPath, _sourcePaths.ToArray(), addOptions, addCtx, addProgress.CancellationToken);
-                                addProgress.SetComplete(L.T(L.App_AddToArchiveComplete));
-                                await Task.Delay(500);
-                                addProgress.Close();
-                                this.Close();
-                            }
-                            catch (OperationCanceledException) { this.Show(); addProgress.Close(); }
-                            catch (Exception ex)
-                            {
-                                this.Show(); addProgress.Close();
-                                AppMessageBox.Show(L.TF(L.App_CompressFailed, ex.Message), L.T(L.App_ErrorTitle), MessageBoxButton.OK, MessageBoxImage.Error);
-                            }
-                            return;
-                        }
-                    case CompressConflictAction.Overwrite:
-                    default:
-                        break;
-                }
-            }
-            else
-            {
-                return; // 用户取消对话框
-            }
-        }
-
         this.Hide();
         var progressWindow = new ProgressWindow();
         progressWindow.InitCancellation();
         progressWindow.Show();
         await Task.Delay(100);
 
-        var options = App.CreateCompressOptions();
-        options.CompressionLevel = level;
-        options.Encrypt = EncryptCheckBox.IsChecked == true;
-        options.Password = GetActivePassword();
-        options.SplitSize = GetSplitSize();
-        options.Comment = GetComment();
-        options.CommentDistribution = GetCommentDistribution();
+        var request = new CompressRequest
+        {
+            SourcePaths = new List<string>(_sourcePaths),
+            Mode = CompressOutputMode.Manual,
+            Format = format,
+            CompressionLevel = level,
+            Password = GetActivePassword(),
+            SplitSize = GetSplitSize(),
+            Comment = GetComment(),
+            CommentDistribution = GetCommentDistribution(),
+            Encrypt = EncryptCheckBox.IsChecked == true,
+            OutputPath = outputPath,
+            PreserveDirectoryRoot = AppSettings.Instance.PreserveDirectoryRoot,
+        };
+        var outputPaths = CompressService.GetOutputPaths(request);
+        progressWindow.InitBatchMode(outputPaths);
 
         try
         {
-            var progress = ProgressWindow.CreateBackgroundProgress(progressWindow);
+            bool applyToAll = false;
+            Core.Abstractions.CompressConflictAction? chosenAction = null;
 
-            // re-acquire engine if outputPath changed (rename)
-            engine = ArchiveEngineFactory.GetEngineByExtension(outputPath, new ZipEngine());
+            var rawProgress = ProgressWindow.CreateBackgroundProgress(progressWindow);
+            var progress = ProgressWindow.CreateBackgroundProgress(progressWindow.Dispatcher, p =>
+            {
+                if (p.TotalFiles > 0 && p.ProcessedFiles > 0)
+                {
+                    var itemIndex = p.ProcessedFiles - 1;
+                    if (itemIndex >= 0 && itemIndex < _sourcePaths.Count)
+                    {
+                        progressWindow.SetCurrentBatchItem(itemIndex);
+                    }
+                }
+                rawProgress.Report(p);
+            });
 
-            App.Log("引擎: {0}", engine.GetType().Name);
+            var result = await CompressService.CompressAsync(
+                request,
+                conflictResolver: info =>
+                {
+                    if (applyToAll && chosenAction.HasValue)
+                        return new CompressConflictResolution(chosenAction.Value, null);
 
-            await engine.CompressAsync(_sourcePaths.ToArray(), outputPath, options, progress, progressWindow.CancellationToken);
+                    var dlg = new CompressConflictDialog(info.OutputPath, info.CanAdd, info.SuggestedName);
+                    dlg.ShowDialog();
+                    if (dlg.ApplyToAll) { applyToAll = true; chosenAction = (Core.Abstractions.CompressConflictAction)dlg.ResultAction; }
+                    return new CompressConflictResolution((Core.Abstractions.CompressConflictAction)dlg.ResultAction, dlg.CustomName);
+                },
+                progress,
+                progressWindow.CancellationToken);
 
-            App.Log(L.T(L.App_CompressComplete));
+            progressWindow.FinalizeBatch();
             progressWindow.SetComplete(L.T(L.App_CompressComplete));
             await Task.Delay(500);
             progressWindow.Close();
@@ -939,181 +909,64 @@ public partial class CompressSettingsWindow : Window
         progressWindow.Show();
         await Task.Delay(100);
 
-        var options = App.CreateCompressOptions();
-        options.CompressionLevel = level;
-        options.Encrypt = EncryptCheckBox.IsChecked == true;
-        options.Password = GetActivePassword();
-        options.SplitSize = GetSplitSize();
-
-        // 注释分配 — 独立模式下每人压缩包可分配不同注释
-        var baseComment = GetComment();
-        var distribution = GetCommentDistribution();
-        string[]? perLineComments = distribution == CommentDistribution.PerLine && baseComment != null
-            ? baseComment.Split('\n').Select(l => l.Trim()).Where(l => l.Length > 0).ToArray()
-            : null;
-
-        var ext = format == "tar.gz" ? ".tar.gz" : "." + format;
-        int success = 0, fail = 0;
+        var request = new CompressRequest
+        {
+            SourcePaths = new List<string>(_sourcePaths),
+            Mode = CompressOutputMode.Separate,
+            Format = format,
+            CompressionLevel = level,
+            Password = GetActivePassword(),
+            SplitSize = GetSplitSize(),
+            Comment = GetComment(),
+            CommentDistribution = GetCommentDistribution(),
+            Encrypt = EncryptCheckBox.IsChecked == true,
+            KeepOriginalExtension = AppSettings.Instance.KeepOriginalExtension,
+            PreserveDirectoryRoot = AppSettings.Instance.PreserveDirectoryRoot,
+        };
+        var outputPaths = CompressService.GetOutputPaths(request);
+        progressWindow.InitBatchMode(outputPaths);
 
         try
         {
-            var ct = progressWindow.CancellationToken;
-
             bool applyToAll = false;
-            CompressConflictAction? chosenAction = null;
+            Core.Abstractions.CompressConflictAction? chosenAction = null;
 
-            for (int i = 0; i < _sourcePaths.Count; i++)
+            var rawProgress = ProgressWindow.CreateBackgroundProgress(progressWindow);
+            var progress = ProgressWindow.CreateBackgroundProgress(progressWindow.Dispatcher, p =>
             {
-                if (ct.IsCancellationRequested) break;
-
-                var sourcePath = _sourcePaths[i];
-                // 按分配策略设置每个压缩包的注释
-                options.Comment = distribution switch
+                if (p.TotalFiles > 0 && p.ProcessedFiles > 0)
                 {
-                    CommentDistribution.AllSame => baseComment,
-                    CommentDistribution.FirstOnly => i == 0 ? baseComment : null,
-                    CommentDistribution.PerLine => i < (perLineComments?.Length ?? 0) ? perLineComments![i] : null,
-                    _ => baseComment
-                };
-                progressWindow.SetProgress(new ArchiveProgress
-                {
-                    PercentComplete = (int)((double)i / _sourcePaths.Count * 100),
-                    FilePercentComplete = null,
-                    CurrentFile = Path.GetFileName(sourcePath)
-                });
-
-                try
-                {
-                    // Determine parent dir and base name
-                    string parentDir, fileNameWithoutExt;
-                    if (File.Exists(sourcePath))
+                    var itemIndex = p.ProcessedFiles - 1;
+                    if (itemIndex >= 0 && itemIndex < _sourcePaths.Count)
                     {
-                        parentDir = Path.GetDirectoryName(sourcePath) ?? ".";
-                        fileNameWithoutExt = Path.GetFileNameWithoutExtension(sourcePath);
+                        progressWindow.SetCurrentBatchItem(itemIndex);
                     }
-                    else if (Directory.Exists(sourcePath))
-                    {
-                        parentDir = Path.GetDirectoryName(sourcePath.TrimEnd('\\', '/')) ?? ".";
-                        fileNameWithoutExt = Path.GetFileName(sourcePath.TrimEnd('\\', '/'));
-                    }
-                    else
-                    {
-                        fail++;
-                        continue;
-                    }
-
-                    var outputPath = Path.Combine(parentDir, fileNameWithoutExt + ext);
-                    var engine = ArchiveEngineFactory.GetEngineByExtension(outputPath);
-                    if (engine == null)
-                    {
-                        outputPath = Path.ChangeExtension(outputPath, ".zip");
-                    }
-                    engine ??= new ZipEngine();
-
-                    // 冲突处理 — per item
-                    if (File.Exists(outputPath))
-                    {
-                        // 已勾选"应用到全部" → 直接返回记忆的选择
-                        if (applyToAll && chosenAction.HasValue)
-                        {
-                            switch (chosenAction.Value)
-                            {
-                                case CompressConflictAction.Rename:
-                                    // Rename 在勾选"应用到全部"时被禁用，不应到达此处
-                                    outputPath = Path.Combine(parentDir,
-                                        Path.GetFileName(App.GetUniquePath(outputPath)));
-                                    engine = ArchiveEngineFactory.GetEngineByExtension(outputPath, new ZipEngine());
-                                    break;
-                                case CompressConflictAction.Add:
-                                    {
-                                        try
-                                        {
-                                            var addProgress = ProgressWindow.CreateBackgroundProgress(progressWindow);
-                                            await engine!.AddToArchiveAsync(outputPath, new[] { sourcePath }, options, addProgress, ct);
-                                            success++;
-                                        }
-                                        catch (Exception addEx)
-                                        {
-                                            App.Log("Separate add-to-archive failed for {0}: {1}", sourcePath, addEx.Message);
-                                            fail++;
-                                        }
-                                        continue;
-                                    }
-                                case CompressConflictAction.Overwrite:
-                                default:
-                                    break;
-                            }
-                        }
-                        else
-                        {
-                            bool canAdd = engine is not null and not TarGzEngine;
-                            var conflictResult = await progressWindow.Dispatcher.InvokeAsync(() =>
-                            {
-                                var dlg = new CompressConflictDialog(outputPath, canAdd,
-                                    Path.GetFileName(App.GetUniquePath(outputPath)));
-                                return dlg.ShowDialog() == true ? dlg : null;
-                            });
-
-                            if (conflictResult == null)
-                            {
-                                fail++;
-                                continue; // 用户取消
-                            }
-
-                            if (conflictResult.ApplyToAll)
-                            {
-                                applyToAll = true;
-                                chosenAction = conflictResult.ResultAction;
-                            }
-
-                            switch (conflictResult.ResultAction)
-                            {
-                                case CompressConflictAction.Cancel:
-                                    fail++;
-                                    continue;
-                                case CompressConflictAction.Rename:
-                                    outputPath = Path.Combine(parentDir,
-                                        conflictResult.CustomName ?? Path.GetFileName(App.GetUniquePath(outputPath)));
-                                    engine = ArchiveEngineFactory.GetEngineByExtension(outputPath, new ZipEngine());
-                                    break;
-                                case CompressConflictAction.Add:
-                                    {
-                                        try
-                                        {
-                                            var addProgress = ProgressWindow.CreateBackgroundProgress(progressWindow);
-                                            await engine!.AddToArchiveAsync(outputPath, new[] { sourcePath }, options, addProgress, ct);
-                                            success++;
-                                        }
-                                        catch (Exception addEx)
-                                        {
-                                            App.Log("Separate add-to-archive failed for {0}: {1}", sourcePath, addEx.Message);
-                                            fail++;
-                                        }
-                                        continue; // skip to next item
-                                    }
-                                case CompressConflictAction.Overwrite:
-                                default:
-                                    break;
-                            }
-                        }
-                    }
-
-                    var progress = ProgressWindow.CreateBackgroundProgress(progressWindow);
-                    await engine!.CompressAsync(new[] { sourcePath }, outputPath, options, progress, ct);
-                    success++;
                 }
-                catch (OperationCanceledException)
-                {
-                    break;
-                }
-                catch (Exception ex)
-                {
-                    App.Log("Separate compress failed for {0}: {1}", sourcePath, ex.Message);
-                    fail++;
-                }
-            }
+                rawProgress.Report(p);
+            });
 
-            progressWindow.SetComplete(L.TF(L.App_CompressSeparateComplete, success, fail));
+            var result = await CompressService.CompressAsync(
+                request,
+                conflictResolver: info =>
+                {
+                    if (applyToAll && chosenAction.HasValue)
+                        return new CompressConflictResolution(chosenAction.Value, null);
+
+                    return progressWindow.Dispatcher.Invoke(() =>
+                    {
+                        var dlg = new CompressConflictDialog(info.OutputPath, info.CanAdd, info.SuggestedName);
+                        dlg.ShowDialog();
+                        if (dlg.ApplyToAll) { applyToAll = true; chosenAction = (Core.Abstractions.CompressConflictAction)dlg.ResultAction; }
+                        return new CompressConflictResolution((Core.Abstractions.CompressConflictAction)dlg.ResultAction, dlg.CustomName);
+                    });
+                },
+                progress,
+                progressWindow.CancellationToken,
+                onItemStatus: (index, status) => progressWindow.UpdateBatchItemStatus(index, status));
+
+            progressWindow.FinalizeBatch();
+            var summary = L.TF(L.App_CompressSeparateComplete, result.Succeeded, result.Failed);
+            progressWindow.SetComplete(summary);
             await Task.Delay(500);
             progressWindow.Close();
             SavePasswordAfterCompress();
@@ -1144,74 +997,11 @@ public partial class CompressSettingsWindow : Window
             // Cannot combine across drives
             AppMessageBox.Show(L.T(L.Compress_CombinedUnavailable), L.T(L.Compress_Title),
                 MessageBoxButton.OK, MessageBoxImage.Warning);
-            this.Show(); // restore window
+            this.Show();
             ManualRadio.IsChecked = true;
-            _outputMode = OutputMode.Manual;
+            _outputMode = CompressOutputMode.Manual;
             RefreshOutputPathState();
             return;
-        }
-
-        // 冲突处理 — 在隐藏窗口之前进行
-        var engine = ArchiveEngineFactory.GetEngineByExtension(outputPath);
-        if (engine == null)
-        {
-            outputPath = Path.ChangeExtension(outputPath, ".zip");
-        }
-        engine ??= new ZipEngine();
-
-        if (File.Exists(outputPath))
-        {
-            bool canAdd = engine is not null and not TarGzEngine;
-            var dlg = new CompressConflictDialog(outputPath, canAdd, Path.GetFileName(App.GetUniquePath(outputPath)));
-            if (dlg.ShowDialog() == true)
-            {
-                switch (dlg.ResultAction)
-                {
-                    case CompressConflictAction.Cancel:
-                        return;
-                    case CompressConflictAction.Rename:
-                        outputPath = Path.Combine(Path.GetDirectoryName(outputPath) ?? ".",
-                            dlg.CustomName ?? Path.GetFileName(App.GetUniquePath(outputPath)));
-                        engine = ArchiveEngineFactory.GetEngineByExtension(outputPath, new ZipEngine());
-                        break;
-                    case CompressConflictAction.Add:
-                        {
-                            this.Hide();
-                            var addProgress = new ProgressWindow();
-                            addProgress.InitCancellation();
-                            addProgress.Show();
-                            await Task.Delay(100);
-                            try
-                            {
-                                var addOptions = App.CreateCompressOptions();
-                                addOptions.Encrypt = EncryptCheckBox.IsChecked == true;
-                                addOptions.Password = GetActivePassword();
-                                addOptions.Comment = GetComment();
-                                var addCtx = ProgressWindow.CreateBackgroundProgress(addProgress);
-                                await engine!.AddToArchiveAsync(outputPath, _sourcePaths.ToArray(), addOptions, addCtx, addProgress.CancellationToken);
-                                addProgress.SetComplete(L.T(L.App_AddToArchiveComplete));
-                                await Task.Delay(500);
-                                addProgress.Close();
-                                SavePasswordAfterCompress();
-                                this.Close();
-                            }
-                            catch (OperationCanceledException) { this.Show(); addProgress.Close(); }
-                            catch (Exception ex)
-                            {
-                                this.Show(); addProgress.Close();
-                                AppMessageBox.Show(L.TF(L.App_CompressFailed, ex.Message), L.T(L.App_ErrorTitle), MessageBoxButton.OK, MessageBoxImage.Error);
-                            }
-                            return;
-                        }
-                    case CompressConflictAction.Overwrite:
-                    default:
-                        break;
-                }
-            }
-            else
-            {
-                return; // 用户取消对话框
-            }
         }
 
         this.Hide();
@@ -1220,24 +1010,58 @@ public partial class CompressSettingsWindow : Window
         progressWindow.Show();
         await Task.Delay(100);
 
-        var options = App.CreateCompressOptions();
-        options.CompressionLevel = level;
-        options.Encrypt = EncryptCheckBox.IsChecked == true;
-        options.Password = GetActivePassword();
-        options.SplitSize = GetSplitSize();
-        options.Comment = GetComment();
-        options.CommentDistribution = GetCommentDistribution();
+        var request = new CompressRequest
+        {
+            SourcePaths = new List<string>(_sourcePaths),
+            Mode = CompressOutputMode.Combined,
+            Format = format,
+            CompressionLevel = level,
+            Password = GetActivePassword(),
+            SplitSize = GetSplitSize(),
+            Comment = GetComment(),
+            CommentDistribution = GetCommentDistribution(),
+            Encrypt = EncryptCheckBox.IsChecked == true,
+            OutputPath = outputPath,
+            PreserveDirectoryRoot = AppSettings.Instance.PreserveDirectoryRoot,
+        };
+        var outputPaths = CompressService.GetOutputPaths(request);
+        progressWindow.InitBatchMode(outputPaths);
 
         try
         {
-            var progress = ProgressWindow.CreateBackgroundProgress(progressWindow);
+            bool applyToAll = false;
+            Core.Abstractions.CompressConflictAction? chosenAction = null;
 
-            // re-acquire engine if outputPath changed (rename)
-            engine = ArchiveEngineFactory.GetEngineByExtension(outputPath, new ZipEngine());
+            var rawProgress = ProgressWindow.CreateBackgroundProgress(progressWindow);
+            var progress = ProgressWindow.CreateBackgroundProgress(progressWindow.Dispatcher, p =>
+            {
+                if (p.TotalFiles > 0 && p.ProcessedFiles > 0)
+                {
+                    var itemIndex = p.ProcessedFiles - 1;
+                    if (itemIndex >= 0 && itemIndex < _sourcePaths.Count)
+                    {
+                        progressWindow.SetCurrentBatchItem(itemIndex);
+                    }
+                }
+                rawProgress.Report(p);
+            });
 
-            await engine.CompressAsync(_sourcePaths.ToArray(), outputPath, options, progress, progressWindow.CancellationToken);
+            var result = await CompressService.CompressAsync(
+                request,
+                conflictResolver: info =>
+                {
+                    if (applyToAll && chosenAction.HasValue)
+                        return new CompressConflictResolution(chosenAction.Value, null);
 
-            App.Log(L.T(L.App_CompressComplete));
+                    var dlg = new CompressConflictDialog(info.OutputPath, info.CanAdd, info.SuggestedName);
+                    dlg.ShowDialog();
+                    if (dlg.ApplyToAll) { applyToAll = true; chosenAction = (Core.Abstractions.CompressConflictAction)dlg.ResultAction; }
+                    return new CompressConflictResolution((Core.Abstractions.CompressConflictAction)dlg.ResultAction, dlg.CustomName);
+                },
+                progress,
+                progressWindow.CancellationToken);
+
+            progressWindow.FinalizeBatch();
             progressWindow.SetComplete(L.T(L.App_CompressComplete));
             await Task.Delay(500);
             progressWindow.Close();
@@ -1257,7 +1081,7 @@ public partial class CompressSettingsWindow : Window
 
     private void FormatComboBox_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
     {
-        if (_outputMode == OutputMode.Combined)
+        if (_outputMode == CompressOutputMode.Combined)
             RefreshCombinedPath();
         UpdateCompressButton();
         UpdateCommentFormatState();
@@ -1280,7 +1104,7 @@ public partial class CompressSettingsWindow : Window
         if (CompressButton == null) return; // InitializeComponent 期间控件尚未创建
 
         var hasSource = _sourcePaths.Count > 0;
-        if (_outputMode == OutputMode.Manual)
+        if (_outputMode == CompressOutputMode.Manual)
         {
             var hasOutput = !string.IsNullOrEmpty(OutputPathTextBox.Text);
             CompressButton.IsEnabled = hasSource && hasOutput;
