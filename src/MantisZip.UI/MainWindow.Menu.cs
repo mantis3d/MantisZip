@@ -350,8 +350,7 @@ public partial class MainWindow
                 pw.CancellationToken);
 
             pw.SetComplete(L.T(L.Main_Status_DeleteDone));
-            await Task.Delay(800);
-            pw.Close();
+            await pw.AutoCloseOrWaitAsync(800, () => pw.Close());
 
             App.LogDebug("DeleteSelectedEntriesAsync: deletion done, reloading archive");
             var prevFolder = _currentFolder;
@@ -546,8 +545,7 @@ public partial class MainWindow
             pw.SetComplete(L.T(L.Main_Status_ExtractItemsDone));
             App.LogDebug("ExtractSelectedAsync: done, {0} files extracted to '{1}'", filesToExtract.Count, dest);
             if (AppSettings.Instance.OpenFolderAfterExtract) OpenInExplorer(dest);
-            await Task.Delay(800);
-            pw.Close();
+            await pw.AutoCloseOrWaitAsync(800, () => pw.Close());
             SetStatus(L.T(L.Main_Status_ExtractItemsDone));
         }
         catch (OperationCanceledException) { App.LogDebug("ExtractSelectedAsync: cancelled"); pw.Close(); SetStatus(L.T(L.Main_Status_AddCancel)); }

@@ -883,10 +883,12 @@ public partial class CompressSettingsWindow : Window
 
             progressWindow.FinalizeBatch();
             progressWindow.SetComplete(L.T(L.App_CompressComplete));
-            await Task.Delay(500);
-            progressWindow.Close();
-            SavePasswordAfterCompress();
-            this.Close();
+            await progressWindow.AutoCloseOrWaitAsync(500, () =>
+            {
+                progressWindow.Close();
+                SavePasswordAfterCompress();
+                this.Close();
+            });
         }
         catch (OperationCanceledException)
         {
@@ -967,10 +969,12 @@ public partial class CompressSettingsWindow : Window
             progressWindow.FinalizeBatch();
             var summary = L.TF(L.App_CompressSeparateComplete, result.Succeeded, result.Failed);
             progressWindow.SetComplete(summary);
-            await Task.Delay(500);
-            progressWindow.Close();
-            SavePasswordAfterCompress();
-            this.Close();
+            await progressWindow.AutoCloseOrWaitAsync(500, () =>
+            {
+                progressWindow.Close();
+                SavePasswordAfterCompress();
+                this.Close();
+            });
         }
         catch (OperationCanceledException)
         {
@@ -1063,10 +1067,12 @@ public partial class CompressSettingsWindow : Window
 
             progressWindow.FinalizeBatch();
             progressWindow.SetComplete(L.T(L.App_CompressComplete));
-            await Task.Delay(500);
-            progressWindow.Close();
-            SavePasswordAfterCompress();
-            this.Close();
+            await progressWindow.AutoCloseOrWaitAsync(500, () =>
+            {
+                progressWindow.Close();
+                SavePasswordAfterCompress();
+                this.Close();
+            });
         }
         catch (OperationCanceledException)
         {
