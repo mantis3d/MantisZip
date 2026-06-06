@@ -342,11 +342,6 @@ public class ContextMenuHandler : IShellExtInit, IContextMenu
             uint popupIndex = 0;
             ShellExtLog.Info("QueryContextMenu: created popup submenu");
 
-            // ─── Top separator (inside popup) ───
-            NativeMethods.InsertMenu(popupMenu, popupIndex++, NativeMethods.MF_SEPARATOR | NativeMethods.MF_BYPOSITION,
-                (IntPtr)idCmd, null);
-            ShellExtLog.Info("QueryContextMenu: added top separator");
-
             // ─── Extract group (all files, same as compress): items inside popup ───
             bool multipleFiles = effectiveCount > 1;
             bool hasExtractOrOpen = _enableOpen || _enableExtractHere || _enableSmartExtract || _enableExtractToNamed || _enableExtractTo;
@@ -403,12 +398,22 @@ public class ContextMenuHandler : IShellExtInit, IContextMenu
                 ShellExtLog.Info($"QueryContextMenu: skipping extract group (hasExtractOrOpen={hasExtractOrOpen})");
             }
 
-            // ─── Separator between groups (only if both shown) ───
+            // ─── Separator between groups (used disabled text item instead of MF_SEPARATOR
+            //     because MF_SEPARATOR breaks InvokeCommand for the immediately following item) ───
             if (hasExtractOrOpen && hasCompress)
             {
-                NativeMethods.InsertMenu(popupMenu, popupIndex++, NativeMethods.MF_SEPARATOR | NativeMethods.MF_BYPOSITION,
-                    (IntPtr)idCmd, null);
-                ShellExtLog.Info("QueryContextMenu: added mid separator");
+                var sepMii = new MenuItemInfo
+                {
+                    cbSize = Marshal.SizeOf<MenuItemInfo>(),
+                    fMask = NativeMethods.MIIM_STRING | NativeMethods.MIIM_FTYPE | NativeMethods.MIIM_STATE,
+                    fType = NativeMethods.MFT_STRING,
+                    fState = NativeMethods.MFS_DISABLED | NativeMethods.MFS_GRAYED,
+                    dwTypeData = Marshal.StringToCoTaskMemUni("────────────"),
+                    cch = 12,
+                };
+                NativeMethods.InsertMenuItem(popupMenu, popupIndex++, true, ref sepMii);
+                Marshal.FreeCoTaskMem(sepMii.dwTypeData);
+                ShellExtLog.Info("QueryContextMenu: added mid separator (disabled text)");
             }
 
             // ─── Compress group (items inside popup) ───
@@ -420,9 +425,6 @@ public class ContextMenuHandler : IShellExtInit, IContextMenu
                         ? (effectiveCount > 10 ? "压缩到多个独立的压缩文件.zip" : $"压缩到{effectiveCount}个独立的压缩文件.zip")
                         : $"压缩到 {fileName}.zip";
                     ShellExtLog.Info($"QueryContextMenu: compress item: \"{separateText}\"");
-                    // 临时替代：无图标文本，放在第一项确保可用
-                    InsertMenuItem(popupMenu, popupIndex++, idCmd++, "------", CmdIdCompressSeparate, showIcon: false);
-                    _cmdIdOrder.Add(CmdIdCompressSeparate);
                     InsertMenuItem(popupMenu, popupIndex++, idCmd++, separateText, CmdIdCompressSeparate, showIcon: true);
                     _cmdIdOrder.Add(CmdIdCompressSeparate);
                 }
@@ -446,11 +448,6 @@ public class ContextMenuHandler : IShellExtInit, IContextMenu
             {
                 ShellExtLog.Info("QueryContextMenu: skipping compress group (all toggles off)");
             }
-
-            // ─── Bottom separator (inside popup) ───
-            NativeMethods.InsertMenu(popupMenu, popupIndex++, NativeMethods.MF_SEPARATOR | NativeMethods.MF_BYPOSITION,
-                (IntPtr)idCmd, null);
-            ShellExtLog.Info("QueryContextMenu: added bottom separator");
 
             int itemsAdded = (int)(idCmd - idCmdFirst);
             string orderSnapshot = string.Join(", ", _cmdIdOrder);

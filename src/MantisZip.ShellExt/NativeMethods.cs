@@ -68,6 +68,9 @@ internal static class NativeMethods
     public const uint MIIM_SUBMENU = 0x0004;
     public const uint MFT_STRING = 0x0000;
     public const uint MFS_ENABLED = 0x0000;
+    public const uint MFS_DISABLED = 0x0002;
+    public const uint MFS_GRAYED = 0x0003;
+    public const uint MIIM_STATE = 0x0001;
     public const uint MF_SEPARATOR = 0x0800;
     public const uint MF_BYPOSITION = 0x0400;
     public const uint MF_STRING = 0x0000;
