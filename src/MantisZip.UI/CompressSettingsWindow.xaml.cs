@@ -786,6 +786,14 @@ public partial class CompressSettingsWindow : Window
             }
             else
             {
+                // 如果在明文模式（👁 显示密码），先将 TextBox 内容同步到 PasswordBox，
+                // 否则 PasswordBox.Password 可能还是旧的/空的值，导致误判"密码不匹配"
+                if (_isPwdRevealed)
+                {
+                    if (PwdTextBox != null) PasswordBox.Password = PwdTextBox.Text;
+                    if (ConfirmPwdTextBox != null) ConfirmPasswordBox.Password = ConfirmPwdTextBox.Text;
+                }
+
                 if (string.IsNullOrEmpty(PasswordBox.Password))
                 {
                     AppMessageBox.Show(L.T(L.Pwd_Validation_Required), L.T(L.Compress_Title), MessageBoxButton.OK, MessageBoxImage.Warning);

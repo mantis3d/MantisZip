@@ -9,6 +9,7 @@
   "App_CompressCombinedPromptLabel": "压缩包名称：",
   "App_CompressCombinedPromptTitle": "输入压缩包名称",
   "App_CompressFailed": "压缩失败: {0}",
+  "App_CompressCollecting": "正在收集文件...",
   "App_CompressPreparing": "准备压缩...",
   "App_CompressSeparateComplete": "已压缩 {0} 个，失败 {1} 个",
   "App_CompressSeparateProgress": "正在压缩第 {0}/{1} 个目录",

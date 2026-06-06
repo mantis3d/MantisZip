@@ -9,6 +9,7 @@
   "App_CompressCombinedPromptLabel": "Archive name:",
   "App_CompressCombinedPromptTitle": "Enter archive name",
   "App_CompressFailed": "Compression failed: {0}",
+  "App_CompressCollecting": "Collecting files...",
   "App_CompressPreparing": "Preparing to compress...",
   "App_CompressSeparateComplete": "Compressed {0}, failed {1}",
   "App_CompressSeparateProgress": "Compressing {0}/{1} items",

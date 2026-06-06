@@ -3,6 +3,7 @@ using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Threading;
 using ICSharpCode.SharpZipLib.Zip;
 using MantisZip.Core;
@@ -43,6 +44,29 @@ public partial class App : Application
             // 第一个实例：在后台收集其他实例的路径（非阻塞）
             var allPaths = new List<string>(myPaths);
             var cts = new CancellationTokenSource();
+
+            // 立即显示"正在收集文件"小窗口，避免 IPC 期间用户无反馈
+            var overlay = new Window
+            {
+                Width = 320,
+                Height = 90,
+                WindowStartupLocation = WindowStartupLocation.CenterScreen,
+                WindowStyle = WindowStyle.None,
+                ResizeMode = ResizeMode.NoResize,
+                Background = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromArgb(240, 248, 248, 248)),
+                AllowsTransparency = true,
+                ShowInTaskbar = false,
+                Content = new TextBlock
+                {
+                    Text = L.T(L.App_CompressCollecting),
+                    FontSize = 16,
+                    HorizontalAlignment = HorizontalAlignment.Center,
+                    VerticalAlignment = VerticalAlignment.Center,
+                    Margin = new Thickness(16),
+                }
+            };
+            overlay.Show();
+
             _compressPipeReady.Reset();
             StartCompressPipeServer(allPaths, cts.Token);
 
@@ -57,6 +81,7 @@ public partial class App : Application
             {
                 timer.Stop();
                 cts.Cancel();
+                overlay.Hide();
                 try
                 {
                     LogStartup("HandleCompress: DispatcherTimer 触发，调用 ShowCompressWindow");
@@ -68,6 +93,10 @@ public partial class App : Application
                     AppMessageBox.Show(L.TF(L.App_CompressWindowFailed, ex.Message), L.T(L.App_StartupErrorTitle),
                         MessageBoxButton.OK, MessageBoxImage.Error);
                     Current.Shutdown();
+                }
+                finally
+                {
+                    overlay.Close();
                 }
             };
             timer.Start();
@@ -103,6 +132,16 @@ public partial class App : Application
         {
             var allPaths = new List<string>(myPaths);
             var cts = new CancellationTokenSource();
+
+            // 立即显示进度窗口，避免 IPC 收集期间用户无反馈
+            var progressWindow = new ProgressWindow();
+            progressWindow.InitCancellation();
+            progressWindow.Show();
+            app.MainWindow = progressWindow;
+            progressWindow.SetProgress(0, L.T(L.App_CompressCollecting));
+            // IPC 收集期间取消窗口 → 同步终止管道
+            progressWindow.CancellationToken.Register(() => cts.Cancel());
+
             _compressSeparatePipeReady.Reset();
             StartPipeServer(allPaths, cts.Token, CompressSeparatePipeName, _compressSeparatePipeReady);
 
@@ -116,7 +155,7 @@ public partial class App : Application
                 cts.Cancel();
                 mutex.Dispose();
                 LogStartup($"HandleCompressSeparate: timer fired, proceeding with {allPaths.Count} total paths");
-                RunCompressSeparateBatch(allPaths);
+                RunCompressSeparateBatch(allPaths, progressWindow);
             };
             timer.Start();
         }
@@ -127,7 +166,7 @@ public partial class App : Application
             app.Shutdown();
         }
     }
-    private static void RunCompressSeparateBatch(List<string> allPaths)
+    private static void RunCompressSeparateBatch(List<string> allPaths, ProgressWindow? existingWindow = null)
     {
         LogStartup($"RunCompressSeparateBatch: starting with {allPaths.Count} paths");
         var app = Current;
@@ -135,9 +174,12 @@ public partial class App : Application
 
         var settings = AppSettings.Instance;
 
-        var progressWindow = new ProgressWindow();
-        progressWindow.InitCancellation();
-        progressWindow.Show();
+        var progressWindow = existingWindow ?? new ProgressWindow();
+        if (existingWindow == null)
+        {
+            progressWindow.InitCancellation();
+            progressWindow.Show();
+        }
         app.MainWindow = progressWindow;
         progressWindow.SetProgress(0, L.T(L.App_CompressPreparing));
 
@@ -255,6 +297,15 @@ public partial class App : Application
         {
             var allPaths = new List<string>(myPaths);
             var cts = new CancellationTokenSource();
+
+            // 立即显示进度窗口，避免 IPC 收集期间用户无反馈
+            var progressWindow = new ProgressWindow();
+            progressWindow.InitCancellation();
+            progressWindow.Show();
+            app.MainWindow = progressWindow;
+            progressWindow.SetProgress(0, L.T(L.App_CompressCollecting));
+            progressWindow.CancellationToken.Register(() => cts.Cancel());
+
             _compressCombinedPipeReady.Reset();
             StartPipeServer(allPaths, cts.Token, CompressCombinedPipeName, _compressCombinedPipeReady);
 
@@ -268,7 +319,7 @@ public partial class App : Application
                 cts.Cancel();
                 mutex.Dispose();
                 LogStartup($"HandleCompressCombined: timer fired, proceeding with {allPaths.Count} total paths");
-                RunCompressCombined(allPaths);
+                RunCompressCombined(allPaths, progressWindow);
             };
             timer.Start();
         }
@@ -279,12 +330,24 @@ public partial class App : Application
             app.Shutdown();
         }
     }
-    private static void RunCompressCombined(List<string> allPaths)
+    private static void RunCompressCombined(List<string> allPaths, ProgressWindow? existingWindow = null)
     {
         LogStartup($"RunCompressCombined: starting with {allPaths.Count} paths");
         var app = Current;
         if (app == null) return;
         var settings = AppSettings.Instance;
+
+        var progressWindow = existingWindow ?? new ProgressWindow();
+        if (existingWindow == null)
+        {
+            progressWindow.InitCancellation();
+            progressWindow.Show();
+        }
+        else
+        {
+            progressWindow.SetProgress(0, L.T(L.App_CompressPreparing));
+        }
+        app.MainWindow = progressWindow;
 
         // 确定公共父目录
         var commonParent = FindCommonParent(allPaths);
@@ -324,10 +387,6 @@ public partial class App : Application
 
         Log("--compress-combined: {0} paths → {1}", allPaths.Count, finalPath);
 
-        var progressWindow = new ProgressWindow();
-        progressWindow.InitCancellation();
-        progressWindow.Show();
-        app.MainWindow = progressWindow;
         progressWindow.SetProgress(0, L.T(L.App_CompressPreparing));
 
         var request = new CompressRequest

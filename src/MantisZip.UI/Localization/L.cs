@@ -23,6 +23,7 @@ public static class L
     public const string App_CompressCombinedPromptTitle             = "App_CompressCombinedPromptTitle";
     public const string App_CompressComplete                       = "App_CompressComplete";
     public const string App_CompressFailed                         = "App_CompressFailed";
+    public const string App_CompressCollecting                     = "App_CompressCollecting";
     public const string App_CompressPreparing                      = "App_CompressPreparing";
     public const string App_CompressSeparateComplete                = "App_CompressSeparateComplete";
     public const string App_CompressSeparateProgress                = "App_CompressSeparateProgress";

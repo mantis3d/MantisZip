@@ -390,8 +390,8 @@ public partial class ProgressWindow : Window
         App.LogDebug("[BATCH] CancelButton_Click: _isBatchMode={0}, _cts?.IsCancellationRequested={1}", _isBatchMode, _cts?.IsCancellationRequested ?? false);
         if (_isBatchMode)
         {
-            // 批处理模式下，Cancel 按钮变为"关闭"；直接关闭窗口不 Cancel
-            App.LogDebug("[BATCH] CancelButton_Click: batch mode, closing window");
+            App.LogDebug("[BATCH] CancelButton_Click: batch mode, cancelling and closing");
+            _cts?.Cancel();
             Close();
             return;
         }
