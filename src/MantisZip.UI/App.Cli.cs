@@ -773,6 +773,9 @@ public partial class App : Application
         var ct = progressWindow.CancellationToken;
         var total = allPaths.Count;
 
+        // 在循环外创建 ExtractOptions，使 ConflictResolver 闭包的 applyToAll 状态可以跨 archive 保持
+        var batchOptions = CreateExtractOptions();
+
         Task.Run(async () =>
         {
         int succeeded = 0, failed = 0, skipped = 0;
@@ -869,8 +872,7 @@ public partial class App : Application
                         var progress = progressWindow.CreatePauseAwareProgress(
                             ProgressWindow.CreateBackgroundProgress(progressWindow));
 
-                        var opts = CreateExtractOptions();
-                        await engine.ExtractAsync(archivePath, dest, password, progress, ct, opts);
+                        await engine.ExtractAsync(archivePath, dest, password, progress, ct, batchOptions);
 
                         succeeded++;
                         await progressWindow.Dispatcher.InvokeAsync(() =>

@@ -12,11 +12,19 @@ namespace MantisZip.UI;
 /// </summary>
 public partial class ConflictDialog : Window
 {
-    public FileConflictAction ResultAction { get; private set; }
-    public bool ApplyToAll => ApplyAllCheck.IsChecked == true;
+    // 在按钮点击时立即捕获对话框结果，避免 ShowDialog() 返回后 WPF 控件状态发生变化
+    private FileConflictAction _capturedAction;
+    private bool _capturedApplyToAll;
+    private string? _capturedCustomName;
+    private bool _resultCaptured;
+
+    /// <summary>对话框关闭后读取此属性获取用户选择的处理方式</summary>
+    public FileConflictAction ResultAction => _resultCaptured ? _capturedAction : FileConflictAction.Overwrite;
+    /// <summary>用户是否勾选了"对后续所有文件使用相同操作"</summary>
+    public bool ApplyToAll => _resultCaptured && _capturedApplyToAll;
 
     /// <summary>用户输入的自定义文件名（未修改时返回建议名）</summary>
-    public string? CustomName => RenameTextBox.Text;
+    public string? CustomName => _resultCaptured ? _capturedCustomName : RenameTextBox.Text;
 
     public ConflictDialog(FileConflictInfo info)
     {
@@ -30,6 +38,14 @@ public partial class ConflictDialog : Window
         // 勾选"L.T(L.Settings_Menu_Btn_Apply)到全部"时禁用L.T(L.Conflict_Btn_Rename)输入（后续文件不支持自定义名）
         ApplyAllCheck.Checked += (_, _) => RenameTextBox.IsEnabled = false;
         ApplyAllCheck.Unchecked += (_, _) => RenameTextBox.IsEnabled = true;
+
+        // 窗口关闭时如果未通过按钮关闭（例如 Alt+F4），捕获当前快照
+        // 注意：只在 _resultCaptured == false 时生效，否则会覆盖按钮 Click 中的显式捕获值
+        this.Closing += (_, _) =>
+        {
+            if (!_resultCaptured)
+                CaptureResult(FileConflictAction.Overwrite, false, null);
+        };
 
         // 已有文件信息
         ExistingSizeText.Text = info.ExistingSize.HasValue ? FormatSize(info.ExistingSize.Value) : "--";
@@ -66,24 +82,36 @@ public partial class ConflictDialog : Window
         CompareResultText.Text = string.Join("  |  ", parts);
     }
 
+    /// <summary>
+    /// 立即捕获对话框当前状态的快照，供 ShowDialog() 调用方通过属性读取。
+    /// 在按钮 Click 事件中调用，确保结果不受关闭时序影响。
+    /// </summary>
+    private void CaptureResult(FileConflictAction action, bool applyToAll, string? customName)
+    {
+        _capturedAction = action;
+        _capturedApplyToAll = applyToAll;
+        _capturedCustomName = customName;
+        _resultCaptured = true;
+    }
+
     private void Overwrite_Click(object sender, RoutedEventArgs e)
     {
         App.LogDebug("ConflictDialog: user chose Overwrite for '{0}', ApplyToAll={1}", HeaderText.Text, ApplyAllCheck.IsChecked);
-        ResultAction = FileConflictAction.Overwrite;
+        CaptureResult(FileConflictAction.Overwrite, ApplyAllCheck.IsChecked == true, RenameTextBox.Text);
         DialogResult = true;
     }
 
     private void OverwriteIfOlder_Click(object sender, RoutedEventArgs e)
     {
         App.LogDebug("ConflictDialog: user chose OverwriteIfOlder for '{0}', ApplyToAll={1}", HeaderText.Text, ApplyAllCheck.IsChecked);
-        ResultAction = FileConflictAction.OverwriteIfOlder;
+        CaptureResult(FileConflictAction.OverwriteIfOlder, ApplyAllCheck.IsChecked == true, RenameTextBox.Text);
         DialogResult = true;
     }
 
     private void OverwriteIfSmaller_Click(object sender, RoutedEventArgs e)
     {
         App.LogDebug("ConflictDialog: user chose OverwriteIfSmaller for '{0}', ApplyToAll={1}", HeaderText.Text, ApplyAllCheck.IsChecked);
-        ResultAction = FileConflictAction.OverwriteIfSmaller;
+        CaptureResult(FileConflictAction.OverwriteIfSmaller, ApplyAllCheck.IsChecked == true, RenameTextBox.Text);
         DialogResult = true;
     }
 
@@ -91,14 +119,14 @@ public partial class ConflictDialog : Window
     {
         App.LogDebug("ConflictDialog: user chose Rename for '{0}', customName='{1}', ApplyToAll={2}",
             HeaderText.Text, RenameTextBox.Text, ApplyAllCheck.IsChecked);
-        ResultAction = FileConflictAction.Rename;
+        CaptureResult(FileConflictAction.Rename, ApplyAllCheck.IsChecked == true, RenameTextBox.Text);
         DialogResult = true;
     }
 
     private void Skip_Click(object sender, RoutedEventArgs e)
     {
         App.LogDebug("ConflictDialog: user chose Skip for '{0}', ApplyToAll={1}", HeaderText.Text, ApplyAllCheck.IsChecked);
-        ResultAction = FileConflictAction.Skip;
+        CaptureResult(FileConflictAction.Skip, ApplyAllCheck.IsChecked == true, RenameTextBox.Text);
         DialogResult = true;
     }
 
