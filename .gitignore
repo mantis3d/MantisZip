@@ -12,6 +12,7 @@ installer/
 .vscode/
 .codegraph/
 .reasonix/
+.opencode/
 *.user
 *.suo
 

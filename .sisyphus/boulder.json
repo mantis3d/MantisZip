@@ -1,64 +1,12 @@
 {
-  "active_plan": "E:\\github\\MantisZip\\.sisyphus\\plans\\file-assoc-per-extension.md",
-  "started_at": "2026-06-04T02:27:38.811Z",
+  "active_plan": "E:\\github\\MantisZip\\.sisyphus\\plans\\compress-service-unify.md",
+  "started_at": "2026-06-05T02:19:45.076Z",
   "session_ids": [
-    "ses_16fbb3462ffeJL7EiQBQaiXAGh",
-    "ses_16f8a4293ffepGRvGYClN7CH0c",
-    "ses_16f8a18eaffeSWXni8JT2Vl539",
-    "ses_16f8a0467ffeN65NCojGbBptjn"
+    "ses_16a6bb34fffebkafvNSxlVUMz3"
   ],
   "session_origins": {
-    "ses_16fbb3462ffeJL7EiQBQaiXAGh": "direct",
-    "ses_16f8a4293ffepGRvGYClN7CH0c": "appended",
-    "ses_16f8a18eaffeSWXni8JT2Vl539": "appended",
-    "ses_16f8a0467ffeN65NCojGbBptjn": "appended"
+    "ses_16a6bb34fffebkafvNSxlVUMz3": "direct"
   },
-  "plan_name": "file-assoc-per-extension",
-  "agent": "atlas",
-  "task_sessions": {
-    "todo:1": {
-      "task_key": "todo:1",
-      "task_label": "1",
-      "task_title": "AppSettings — 新增属性",
-      "session_id": "ses_16f8a0467ffeN65NCojGbBptjn",
-      "agent": "Sisyphus-Junior",
-      "category": "quick",
-      "updated_at": "2026-06-04T02:31:20.235Z"
-    },
-    "todo:4": {
-      "task_key": "todo:4",
-      "task_label": "4",
-      "task_title": "SettingsWindow.xaml — 新文件关联面板 UI",
-      "session_id": "ses_16f8629deffeI2NDlkqiijkK3w",
-      "agent": "Sisyphus-Junior",
-      "category": "visual-engineering",
-      "updated_at": "2026-06-04T02:35:17.739Z"
-    },
-    "todo:5": {
-      "task_key": "todo:5",
-      "task_label": "5",
-      "task_title": "SettingsWindow.xaml.cs — 加载/保存/交互逻辑",
-      "session_id": "ses_16f8244cbffeEglsjsF4xKtciQ",
-      "agent": "Sisyphus-Junior",
-      "category": "unspecified-high",
-      "updated_at": "2026-06-04T02:42:09.390Z"
-    },
-    "todo:7": {
-      "task_key": "todo:7",
-      "task_label": "7",
-      "task_title": "xUnit 测试",
-      "session_id": "ses_16f7b96a3ffekZr43LA7x72shr",
-      "agent": "Sisyphus-Junior",
-      "category": "unspecified-high",
-      "updated_at": "2026-06-04T02:47:00.796Z"
-    },
-    "final-wave:f1": {
-      "task_key": "final-wave:f1",
-      "task_label": "F1",
-      "task_title": "**Plan Compliance Audit** — `oracle`",
-      "session_id": "ses_16f74f399ffemf0bVi4HSf6EzP",
-      "agent": "oracle",
-      "updated_at": "2026-06-04T02:53:56.798Z"
-    }
-  }
+  "plan_name": "compress-service-unify",
+  "agent": "atlas"
 }

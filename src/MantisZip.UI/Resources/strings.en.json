@@ -428,7 +428,7 @@
   "Progress_Button_Pause": "鈴?Pause",
   "Progress_Button_Resume": "鈻?Resume",
   "Progress_Done": "Done",
-  "Progress_FileCount": "File {0}/{1}",
+  "Progress_FileCount": "Archive {0}/{1}",
   "Progress_MatchingPassword": "Matching password rules...",
   "Progress_Paused": "鈴?Paused 鈥?click Resume to continue",
   "Progress_Processing": "Processing...",
@@ -665,10 +665,10 @@
   "Settings_Tab_Password": "Password",
   "Settings_Tab_Preview": "Preview",
   "Settings_Title": "Settings",
-  "Shell_Compress": "Compress",
+  "Shell_Compress": "Compress to…",
   "Shell_ExtractHere": "Extract Here",
   "Shell_ExtractTo": "Extract to...",
-  "Shell_ExtractToNamed": "Extract to (archive name)",
+  "Shell_ExtractToNamed": "Extract to folder (archive name)",
   "Shell_Open": "Open Archive",
   "Shell_OpenVerb": "Open with MantisZip",
   "Shell_ProgIdDesc": "MantisZip Archive",
@@ -681,9 +681,9 @@
   "ShellExt_ExtractHereMulti": "Extract {0} archives",
   "ShellExt_SmartExtractSingle": "Smart extract",
   "ShellExt_SmartExtractMulti": "Smart extract {0} archives",
-  "ShellExt_ExtractToNamed": "Extract to",
+  "ShellExt_ExtractToNamed": "Extract to folder",
   "ShellExt_ExtractTo": "Extract to\u2026",
-  "ShellExt_Compress": "Compress\u2026",
+  "ShellExt_Compress": "Compress to\u2026",
 
   "PwdMgr_Help_Tooltip": "View match rule help",
   "Password_DeleteConfirm": "Delete password \"{0}\"?",
@@ -748,6 +748,7 @@
   "Progress_Batch_Status_Failed": "Failed",
   "Progress_Batch_Status_Skipped": "Skipped",
   "Progress_Batch_CompleteWithErrors": "Completed {0}, Failed {1}",
-  "Progress_Batch_AllComplete": "All Complete"
+  "Progress_Batch_AllComplete": "All Complete",
+  "Progress_KeepOpen": "Keep open on complete"
 }
 

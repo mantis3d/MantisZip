@@ -14,13 +14,18 @@ public enum CompressConflictAction
 
 public partial class CompressConflictDialog : Window
 {
-    public CompressConflictAction ResultAction { get; private set; } = CompressConflictAction.Cancel;
+    // 在按钮点击时立即捕获对话框结果，避免 ShowDialog() 返回后 WPF 控件状态发生变化
+    private CompressConflictAction _capturedAction;
+    private bool _capturedApplyToAll;
+    private string? _capturedCustomName;
+    private bool _resultCaptured;
 
+    /// <summary>对话框关闭后读取此属性获取用户选择的处理方式</summary>
+    public CompressConflictAction ResultAction => _resultCaptured ? _capturedAction : CompressConflictAction.Cancel;
     /// <summary>用户输入的自定义文件名（未修改时返回建议名）</summary>
-    public string? CustomName => RenameTextBox.Text;
-
-    /// <summary>用户勾选了"应用到全部"</summary>
-    public bool ApplyToAll => ApplyAllCheck.IsChecked == true;
+    public string? CustomName => _resultCaptured ? _capturedCustomName : RenameTextBox.Text;
+    /// <summary>用户是否勾选了"应用到全部"</summary>
+    public bool ApplyToAll => _resultCaptured && _capturedApplyToAll;
 
     /// <param name="filePath">目标文件路径</param>
     /// <param name="canAdd">是否支持"添加到压缩包"（Tar 不支持）</param>
@@ -92,30 +97,43 @@ public partial class CompressConflictDialog : Window
         return $"{len:0.##} {sizes[order]}";
     }
 
+    /// <summary>
+    /// 立即捕获对话框当前状态的快照，供 ShowDialog() 调用方通过属性读取。
+    /// </summary>
+    private void CaptureResult(CompressConflictAction action, string? customName)
+    {
+        _capturedAction = action;
+        _capturedApplyToAll = ApplyAllCheck.IsChecked == true;
+        _capturedCustomName = customName;
+        _resultCaptured = true;
+    }
+
     private void Overwrite_Click(object sender, RoutedEventArgs e)
     {
-        App.LogDebug("CompressConflictDialog: user chose Overwrite for '{0}'", HeaderText.Text);
-        ResultAction = CompressConflictAction.Overwrite;
+        App.LogDebug("CompressConflictDialog: user chose Overwrite for '{0}', ApplyToAll={1}", HeaderText.Text, ApplyAllCheck.IsChecked);
+        CaptureResult(CompressConflictAction.Overwrite, RenameTextBox.Text);
         DialogResult = true;
     }
 
     private void Add_Click(object sender, RoutedEventArgs e)
     {
-        App.LogDebug("CompressConflictDialog: user chose Add for '{0}'", HeaderText.Text);
-        ResultAction = CompressConflictAction.Add;
+        App.LogDebug("CompressConflictDialog: user chose Add for '{0}', ApplyToAll={1}", HeaderText.Text, ApplyAllCheck.IsChecked);
+        CaptureResult(CompressConflictAction.Add, RenameTextBox.Text);
         DialogResult = true;
     }
 
     private void Rename_Click(object sender, RoutedEventArgs e)
     {
-        App.LogDebug("CompressConflictDialog: user chose Rename for '{0}', customName='{1}'", HeaderText.Text, RenameTextBox.Text);
-        ResultAction = CompressConflictAction.Rename;
+        App.LogDebug("CompressConflictDialog: user chose Rename for '{0}', customName='{1}', ApplyToAll={2}",
+            HeaderText.Text, RenameTextBox.Text, ApplyAllCheck.IsChecked);
+        CaptureResult(CompressConflictAction.Rename, RenameTextBox.Text);
         DialogResult = true;
     }
 
     private void Cancel_Click(object sender, RoutedEventArgs e)
     {
         App.LogDebug("CompressConflictDialog: user cancelled for '{0}'", HeaderText.Text);
+        CaptureResult(CompressConflictAction.Cancel, RenameTextBox.Text);
         DialogResult = false;
     }
 }

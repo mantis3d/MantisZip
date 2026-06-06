@@ -287,20 +287,22 @@ internal static class ShellIntegration
         var shellPath = $@"Software\Classes\{subCommandsPath}\shell";
         int order = 0;
 
-        // 1. 用L.T(L.App_MantisZipTitle)L.T(L.Main_Toolbar_Open)（仅L.T(L.Compress_Archive_Group)）
+        // 1. 用MantisZip打开（所有文件均可，由应用层处理非压缩包）
         if (s.EnableOpenMenu)
         {
             order++;
             var verb = $"{order:D2}_open";
             var verbPath = $@"{shellPath}\{verb}";
             SetRegistryValue(verbPath, null, OpenDisplay);
-            SetRegistryValue(verbPath, "AppliesTo", BuildAppliesToFilter());
             if (s.ShowMenuIcons)
-                SetRegistryValue(verbPath, "Icon", $"""{exePath},0""");
+            {
+                string? icon = GetMenuIconPath(verb);
+                if (icon != null) SetRegistryValue(verbPath, "Icon", icon);
+            }
             SetRegistryValue($@"{verbPath}\command", null, $@"""{exePath}"" --open ""{argVar}""");
         }
 
-        // 解压相关动词（仅压缩包；每个独立控制）
+        // 解压相关动词（所有文件均可，跟压缩一样）
         if (includeExtract)
         {
             bool hasExtract = s.EnableExtractHereMenu || s.EnableSmartExtractMenu || s.EnableExtractToNamedMenu || s.EnableExtractToMenu;
@@ -317,9 +319,11 @@ internal static class ShellIntegration
                 var verb = $"{order:D2}_extracthere";
                 var verbPath = $@"{shellPath}\{verb}";
                 SetRegistryValue(verbPath, null, ExtractHereDisplay);
-                SetRegistryValue(verbPath, "AppliesTo", BuildAppliesToFilter());
                 if (s.ShowMenuIcons)
-                    SetRegistryValue(verbPath, "Icon", $"""{exePath},0""");
+                {
+                    string? icon = GetMenuIconPath(verb);
+                    if (icon != null) SetRegistryValue(verbPath, "Icon", icon);
+                }
                 SetRegistryValue($@"{verbPath}\command", null, $@"""{exePath}"" --extract-here ""{argVar}""");
             }
 
@@ -330,9 +334,11 @@ internal static class ShellIntegration
                 var verb = $"{order:D2}_smartextract";
                 var verbPath = $@"{shellPath}\{verb}";
                 SetRegistryValue(verbPath, null, ExtractSmartDisplay);
-                SetRegistryValue(verbPath, "AppliesTo", BuildAppliesToFilter());
                 if (s.ShowMenuIcons)
-                    SetRegistryValue(verbPath, "Icon", $"""{exePath},0""");
+                {
+                    string? icon = GetMenuIconPath(verb);
+                    if (icon != null) SetRegistryValue(verbPath, "Icon", icon);
+                }
                 SetRegistryValue($@"{verbPath}\command", null, $@"""{exePath}"" --extract-smart ""{argVar}""");
             }
 
@@ -343,9 +349,11 @@ internal static class ShellIntegration
                 var verb = $"{order:D2}_extracttonamed";
                 var verbPath = $@"{shellPath}\{verb}";
                 SetRegistryValue(verbPath, null, ExtractToNamedDisplay);
-                SetRegistryValue(verbPath, "AppliesTo", BuildAppliesToFilter());
                 if (s.ShowMenuIcons)
-                    SetRegistryValue(verbPath, "Icon", $"""{exePath},0""");
+                {
+                    string? icon = GetMenuIconPath(verb);
+                    if (icon != null) SetRegistryValue(verbPath, "Icon", icon);
+                }
                 SetRegistryValue($@"{verbPath}\command", null, $@"""{exePath}"" --extract-to-name ""{argVar}""");
             }
 
@@ -356,9 +364,11 @@ internal static class ShellIntegration
                 var verb = $"{order:D2}_extract";
                 var verbPath = $@"{shellPath}\{verb}";
                 SetRegistryValue(verbPath, null, ExtractDisplay);
-                SetRegistryValue(verbPath, "AppliesTo", BuildAppliesToFilter());
                 if (s.ShowMenuIcons)
-                    SetRegistryValue(verbPath, "Icon", $"""{exePath},0""");
+                {
+                    string? icon = GetMenuIconPath(verb);
+                    if (icon != null) SetRegistryValue(verbPath, "Icon", icon);
+                }
                 SetRegistryValue($@"{verbPath}\command", null, $@"""{exePath}"" --extract ""{argVar}""");
             }
         }
@@ -380,7 +390,10 @@ internal static class ShellIntegration
                 var verbPath = $@"{shellPath}\{verb}";
                 SetRegistryValue(verbPath, null, CompressSeparateDisplay);
                 if (s.ShowMenuIcons)
-                    SetRegistryValue(verbPath, "Icon", $"""{exePath},0""");
+                {
+                    string? icon = GetMenuIconPath(verb);
+                    if (icon != null) SetRegistryValue(verbPath, "Icon", icon);
+                }
                 SetRegistryValue($@"{verbPath}\command", null, $@"""{exePath}"" --compress-separate ""{argVar}""");
             }
 
@@ -392,7 +405,10 @@ internal static class ShellIntegration
                 var verbPath = $@"{shellPath}\{verb}";
                 SetRegistryValue(verbPath, null, CompressCombinedDisplay);
                 if (s.ShowMenuIcons)
-                    SetRegistryValue(verbPath, "Icon", $"""{exePath},0""");
+                {
+                    string? icon = GetMenuIconPath(verb);
+                    if (icon != null) SetRegistryValue(verbPath, "Icon", icon);
+                }
                 SetRegistryValue($@"{verbPath}\command", null, $@"""{exePath}"" --compress-combined ""{argVar}""");
             }
 
@@ -404,7 +420,10 @@ internal static class ShellIntegration
                 var verbPath = $@"{shellPath}\{verb}";
                 SetRegistryValue(verbPath, null, CompressDisplay);
                 if (s.ShowMenuIcons)
-                    SetRegistryValue(verbPath, "Icon", $"""{exePath},0""");
+                {
+                    string? icon = GetMenuIconPath(verb);
+                    if (icon != null) SetRegistryValue(verbPath, "Icon", icon);
+                }
                 SetRegistryValue($@"{verbPath}\command", null, $@"""{exePath}"" --compress ""{argVar}""");
             }
         }
@@ -734,6 +753,39 @@ internal static class ShellIntegration
         if (baseDir == null) return null;
 
         var iconPath = Path.Combine(baseDir, "Resources", "Icons", iconName);
+        return File.Exists(iconPath) ? iconPath : null;
+    }
+
+    /// <summary>
+    /// 返回菜单动词对应的图标文件绝对路径（与 COM 动态菜单一致）。
+    /// 动词名形如 "01_open"、"02_extracthere"，自动忽略前缀匹配。
+    /// 图标文件位于输出目录的 Resources\MenuIcons\ 下。
+    /// 如果图标文件不存在，返回 null。
+    /// </summary>
+    private static string? GetMenuIconPath(string verb)
+    {
+        // Strip order prefix ("01_open" → "open")
+        int underscoreIdx = verb.IndexOf('_');
+        string key = underscoreIdx >= 0 ? verb.Substring(underscoreIdx + 1) : verb;
+
+        var iconName = key.ToLowerInvariant() switch
+        {
+            "open" => "Open.ico",
+            "extracthere" => "ExtractHere.ico",
+            "smartextract" => "ExtractSmart.ico",
+            "extracttonamed" => "ExtractToNamed.ico",
+            "extract" => "ExtractTo.ico",
+            "compressseparate" => "CompressSeparate.ico",
+            "compresscombined" => "CompressCombined.ico",
+            "compress" => "CompressDialog.ico",
+            _ => null,
+        };
+        if (iconName == null) return null;
+
+        var baseDir = Path.GetDirectoryName(GetExePath());
+        if (baseDir == null) return null;
+
+        var iconPath = Path.Combine(baseDir, "Resources", "MenuIcons", iconName);
         return File.Exists(iconPath) ? iconPath : null;
     }
 

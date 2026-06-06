@@ -4,7 +4,7 @@
               xmlns:l="clr-namespace:MantisZip.UI.Localization"
              xmlns:emoji="clr-namespace:Emoji.Wpf;assembly=Emoji.Wpf"
              xmlns:converters="clr-namespace:MantisZip.UI.Converters"
-        Title="{l:L Progress_Title}" Height="Auto" Width="400"
+        Title="{l:L Progress_Title}" Height="Auto" Width="500"
         SizeToContent="Height"
         WindowStartupLocation="CenterScreen"
         ResizeMode="NoResize"
@@ -50,7 +50,7 @@
                     <TextBlock Grid.Column="0" Text="🔑" FontSize="14"
                                VerticalAlignment="Center" Margin="0,0,6,0"/>
                     <TextBlock x:Name="PwdMatchText" Grid.Column="1"
-                               Text="" FontSize="13" FontWeight="SemiBold"
+                               Text="" FontSize="14" FontWeight="SemiBold"
                                Foreground="{StaticResource Theme_TextPrimary}" VerticalAlignment="Center"
                                TextTrimming="CharacterEllipsis"/>
 
@@ -65,7 +65,7 @@
 
                     <Button x:Name="PwdCopyBtn" Grid.Column="3"
                             Width="24" Height="22" Margin="4,0,0,0"
-                            Content="📋" FontSize="10" Padding="0"
+                            Content="📋" FontSize="12" Padding="0"
                             Background="{StaticResource Theme_ButtonBg}" BorderThickness="1"
                             BorderBrush="{StaticResource Theme_Border}" Foreground="{StaticResource Theme_TextSecondary}"
                             Cursor="Hand" ToolTip="{l:L PwdMgr_Col_Password}"
@@ -75,12 +75,12 @@
 
                 <!-- 第 2 行：规则描述 -->
                 <TextBlock x:Name="PwdRuleText" Grid.Row="1"
-                           Text="" FontSize="11" Foreground="{StaticResource Theme_TextDisabled}"
+                           Text="" FontSize="12" Foreground="{StaticResource Theme_TextDisabled}"
                            Margin="22,2,0,0"/>
 
                 <!-- 第 3 行：状态（验证通过 / 正在尝试） -->
                 <TextBlock x:Name="PwdStatusText" Grid.Row="2"
-                           Text="" FontSize="11" Foreground="{StaticResource Theme_TextDisabled}"
+                           Text="" FontSize="12" Foreground="{StaticResource Theme_TextDisabled}"
                            Margin="22,2,0,0"/>
             </Grid>
         </Border>
@@ -98,14 +98,14 @@
                 <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
             <ProgressBar x:Name="FileProgressBar" Grid.Column="0"
-                         Height="10"
+                         Height="14"
                          Minimum="0" Maximum="100" Value="0"
                          Foreground="{StaticResource Theme_ProgressFill}" Background="{StaticResource Theme_ProgressBg}"/>
             <TextBlock x:Name="FilePercentText" Grid.Column="1"
                        Text=""
                        Width="42" Margin="6,0,0,0"
                        HorizontalAlignment="Right"
-                       Foreground="{StaticResource Theme_TextSecondary}" FontSize="11"/>
+                       Foreground="{StaticResource Theme_TextSecondary}" FontSize="12"/>
         </Grid>
 
         <!-- 总体进度条（下面） -->
@@ -115,7 +115,7 @@
                 <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
             <ProgressBar x:Name="TotalProgressBar" Grid.Column="0"
-                         Height="18"
+                         Height="22"
                          Minimum="0" Maximum="100" Value="0"/>
             <TextBlock x:Name="PercentText" Grid.Column="1"
                        Text="0%"
@@ -124,12 +124,11 @@
                         FontWeight="Bold" Foreground="{StaticResource Theme_TextPrimary}"/>
         </Grid>
 
-        <!-- 文件计数 -->
+        <!-- 文件计数（始终显示，记录处理的压缩包数量） -->
         <TextBlock x:Name="FileCountText" Grid.Row="5"
                    Text=""
-                   FontSize="11" Foreground="{StaticResource Theme_TextDisabled}"
-                   Margin="0,0,0,4"
-                   Visibility="Collapsed"/>
+                   FontSize="12" Foreground="{StaticResource Theme_TextDisabled}"
+                   Margin="0,0,0,4"/>
 
         <!-- ═══ 批处理文件列表（3 列：状态图标 | 文件名+进度条背景 | 百分比）═══ -->
         <ListView x:Name="BatchFileList" Grid.Row="0"
@@ -190,18 +189,28 @@
         </ListView>
 
         <!-- 底部按钮行 -->
-        <Grid Grid.Row="7">
+        <Grid Grid.Row="7" Margin="0,4,0,2">
             <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
-            <Button x:Name="PauseButton" Grid.Column="1"
-                    Content="{l:L Progress_Button_Pause}" Width="80" Height="28" Margin="0,0,8,0"
+            <ToggleButton x:Name="KeepOpenToggle" Grid.Column="0"
+                          Height="28" Width="34"
+                          ToolTip="{l:L Progress_KeepOpen}"
+                          VerticalAlignment="Center" Margin="0,0,4,0"
+                          Background="{StaticResource Theme_ButtonBg}"
+                          BorderBrush="{StaticResource Theme_Border}" BorderThickness="1"
+                          Checked="KeepOpenToggle_Checked" Unchecked="KeepOpenToggle_Unchecked">
+                <emoji:TextBlock Text="📌" FontSize="16" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+            </ToggleButton>
+            <Button x:Name="PauseButton" Grid.Column="2"
+                    Content="{l:L Progress_Button_Pause}" Width="80" Height="32" Margin="0,0,8,0"
                     Click="PauseButton_Click"
                     Background="{StaticResource Theme_ButtonBg}" BorderBrush="{StaticResource Theme_Border}" BorderThickness="1"/>
-            <Button x:Name="CancelButton" Grid.Column="2"
-                    Content="{l:L MsgBox_Cancel}" Width="80" Height="28"
+            <Button x:Name="CancelButton" Grid.Column="3"
+                    Content="{l:L MsgBox_Cancel}" Width="80" Height="32"
                     Click="CancelButton_Click"
                     Background="{StaticResource Theme_ButtonBg}" BorderBrush="{StaticResource Theme_Border}" BorderThickness="1"/>
         </Grid>

@@ -470,6 +470,7 @@ public static class L
     public const string Progress_Button_Pause                      = "Progress_Button_Pause";
     public const string Progress_Button_Resume                     = "Progress_Button_Resume";
     public const string Progress_Done                              = "Progress_Done";
+    public const string Progress_KeepOpen                          = "Progress_KeepOpen";
     public const string Progress_FileCount                         = "Progress_FileCount";
     public const string Progress_MatchingPassword                  = "Progress_MatchingPassword";
     public const string Progress_Paused                            = "Progress_Paused";
