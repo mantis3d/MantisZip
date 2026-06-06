@@ -405,7 +405,7 @@
   "Progress_Button_Pause": "鈴?Pause",
   "Progress_Button_Resume": "鈻?Resume",
   "Progress_Done": "Done",
-  "Progress_FileCount": "File {0}/{1}",
+  "Progress_FileCount": "Archive {0}/{1}",
   "Progress_MatchingPassword": "Matching password rules...",
   "Progress_Paused": "鈴?Paused 鈥?click Resume to continue",
   "Progress_Processing": "Processing...",
@@ -702,6 +702,7 @@
   "Progress_Batch_Status_Failed": "Failed",
   "Progress_Batch_Status_Skipped": "Skipped",
   "Progress_Batch_CompleteWithErrors": "Completed {0}, Failed {1}",
-  "Progress_Batch_AllComplete": "All Complete"
+  "Progress_Batch_AllComplete": "All Complete",
+  "Progress_KeepOpen": "Keep open on complete"
 }
 

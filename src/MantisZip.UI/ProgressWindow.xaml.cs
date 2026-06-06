@@ -81,6 +81,9 @@ public partial class ProgressWindow : Window
     /// <summary>当前是否暂停</summary>
     public bool IsPaused => !_pauseEvent.IsSet;
 
+    /// <summary>完成后不自动关闭窗口</summary>
+    public bool KeepOpenOnComplete { get; private set; }
+
     /// <summary>当前是否为批处理模式</summary>
     public bool IsBatchMode => _isBatchMode;
 
@@ -112,12 +115,20 @@ public partial class ProgressWindow : Window
             FilePercentText.Text = $"{p.FilePercentComplete.Value:F0}%";
         }
 
-        // 文件计数：TotalFiles > 0 时才显示，否则保持空白
-        if (p.TotalFiles > 0)
+        // 压缩包计数：始终显示，批处理模式显示压缩包进度，非批处理显示 1/1
+        if (_isBatchMode && _batchItems != null && _batchItems.Count > 0)
         {
-            FileCountText.Text = L.TF(L.Progress_FileCount, p.ProcessedFiles, p.TotalFiles);
-            FileCountText.Visibility = Visibility.Visible;
+            int current = _currentBatchIndex >= 0
+                ? Math.Min(_currentBatchIndex + 1, _batchItems.Count)
+                : Math.Min((int)p.PercentComplete / 100 * _batchItems.Count, _batchItems.Count);
+            if (current < 1) current = 1;
+            FileCountText.Text = L.TF(L.Progress_FileCount, current, _batchItems.Count);
         }
+        else
+        {
+            FileCountText.Text = L.TF(L.Progress_FileCount, 1, 1);
+        }
+        FileCountText.Visibility = Visibility.Visible;
 
         // 批处理模式：更新当前项的进度百分比（100ms 节流）
         if (_isBatchMode && _currentBatchIndex >= 0 && _batchItems != null &&
@@ -144,6 +155,60 @@ public partial class ProgressWindow : Window
             PercentComplete = percent,
             CurrentFile = currentFile
         });
+    }
+
+    /// <summary>
+    /// 完成后等待自动关闭或手动关闭。
+    /// 如果 <see cref="KeepOpenOnComplete"/> 在倒计时期间变为 true，则转为等待手动关闭；
+    /// 否则等待 delayMs 毫秒后执行 closeAction。
+    /// 无论哪种路径，最终都会调用 closeAction。
+    /// 可从后台线程安全调用。
+    /// </summary>
+    public async Task AutoCloseOrWaitAsync(int delayMs, Action closeAction)
+    {
+        // 如果一开始就勾选了，直接等待手动关闭
+        if (KeepOpenOnComplete)
+        {
+            await WaitForManualCloseAsync();
+        }
+        else
+        {
+            // 倒计时期间每 100ms 检查一次 KeepOpenOnComplete
+            int step = 100;
+            int elapsed = 0;
+            while (elapsed < delayMs)
+            {
+                await Task.Delay(step);
+                elapsed += step;
+                if (KeepOpenOnComplete)
+                {
+                    await WaitForManualCloseAsync();
+                    break;
+                }
+            }
+        }
+
+        // 无论用户是手动关闭还是倒计时结束，都执行关闭动作
+        closeAction();
+    }
+
+    /// <summary>
+    /// 等待用户手动关闭窗口（通过点击关闭按钮或窗口的关闭按钮）。
+    /// </summary>
+    private async Task WaitForManualCloseAsync()
+    {
+        var closed = new ManualResetEventSlim(false);
+        EventHandler handler = null!;
+        handler = (_, _) => { closed.Set(); this.Closed -= handler; };
+        this.Closed += handler;
+        try
+        {
+            await Task.Run(() => closed.Wait());
+        }
+        finally
+        {
+            this.Closed -= handler;
+        }
     }
 
     /// <summary>
@@ -307,6 +372,18 @@ public partial class ProgressWindow : Window
     }
 
     #endregion
+
+    private void KeepOpenToggle_Checked(object sender, RoutedEventArgs e)
+    {
+        KeepOpenOnComplete = true;
+        App.LogDebug("[BATCH] KeepOpenToggle: checked, will keep window open on complete");
+    }
+
+    private void KeepOpenToggle_Unchecked(object sender, RoutedEventArgs e)
+    {
+        KeepOpenOnComplete = false;
+        App.LogDebug("[BATCH] KeepOpenToggle: unchecked, will auto-close on complete");
+    }
 
     private void CancelButton_Click(object sender, RoutedEventArgs e)
     {

@@ -417,7 +417,7 @@
   "Progress_Button_Pause": "⏸ 暂停",
   "Progress_Button_Resume": "▶ 继续",
   "Progress_Done": "完成",
-  "Progress_FileCount": "文件 {0}/{1}",
+  "Progress_FileCount": "压缩包 {0}/{1}",
   "Progress_MatchingPassword": "正在尝试匹配密码规则…",
   "Progress_Paused": "⏸ 已暂停 — 点击「继续」恢复",
   "Progress_Processing": "正在处理...",
@@ -730,5 +730,6 @@
   "Progress_Batch_Status_Failed": "失败",
   "Progress_Batch_Status_Skipped": "已跳过",
   "Progress_Batch_CompleteWithErrors": "已完成 {0} 项，失败 {1} 项",
-  "Progress_Batch_AllComplete": "全部完成"
+  "Progress_Batch_AllComplete": "全部完成",
+  "Progress_KeepOpen": "完成后不关闭窗口"
 }
