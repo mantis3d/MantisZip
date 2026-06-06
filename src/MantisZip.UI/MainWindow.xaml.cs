@@ -48,6 +48,14 @@ public partial class MainWindow : Window
     }; // 每个位置独立记忆大小（高度:位置1/2/3, 宽度:位置4）
     private int _lastAppliedPosition = 1;    // 上次应用的布局位置，用于检测变更
     private bool _isProgrammaticFilter;      // 编程触发的 FilterFiles，应跳过 SelectionChanged 预览
+    private bool _showSubfolders;            // 是否展开所有子目录文件（扁平视图）
+    private bool _rebasedBaseline;           // 比例基准是否使用筛选后列表
+    private List<ArchiveItem>? _currentUnfilteredItems; // FilterFiles 处理后的完整（未过滤）列表，供 RefreshFilter 读取
+    private string? _searchText;              // 当前文字搜索词
+    private DateTime? _dateFrom;              // 日期范围开始
+    private DateTime? _dateTo;                // 日期范围结束
+    private long? _sizeMin;                   // 大小下限（字节）
+    private long? _sizeMax;                   // 大小上限（字节）
     private string? _savedSortColumnPath;    // 持久化的排序列 SortMemberPath
     private int _savedSortDirection;         // 持久化的排序方向 (0=无, 1=升, 2=降)
     private bool _previewPanelEnabled = true; // 工具栏预览开关状态
@@ -510,6 +518,28 @@ public partial class MainWindow : Window
             SelectionStatsText.Text = "";
             ArchiveStatsText.Text = "";
 
+            // 重置过滤状态
+            _searchText = null;
+            _dateFrom = null;
+            _dateTo = null;
+            _sizeMin = null;
+            _sizeMax = null;
+            _showSubfolders = false;
+            ShowSubfoldersBtn.IsChecked = false;
+            UpdateShowSubfoldersBtnToolTip();
+            ToggleFilterBarBtn.IsChecked = false;
+            FilterBar.Visibility = Visibility.Collapsed;
+            _rebasedBaseline = false;
+            RebaseBaselineBtn.IsChecked = false;
+            // 清空过滤输入控件
+            FileSearchBox.Text = "";
+            DateFromPicker.SelectedDate = null;
+            DateToPicker.SelectedDate = null;
+            SizeMinBox.Text = "";
+            SizeMaxBox.Text = "";
+            SizeMinUnit.SelectedIndex = 0;
+            SizeMaxUnit.SelectedIndex = 0;
+
             SetStatus(L.T(L.Main_Status_Loading));
             _currentArchivePath = archivePath;
 
@@ -651,6 +681,7 @@ public partial class MainWindow : Window
             SetStatus(L.TF(L.Main_Status_Loaded, Path.GetFileName(archivePath)));
             UpdatePasswordStatus();
             UpdateSmartExtractBtnState();
+            UpdateFilterBtnState();
 
             // L.T(L.Settings_Menu_Btn_Apply)L.T(L.Settings_Preview_Position)L.T(L.Settings_Title)
             ApplyPreviewPosition(AppSettings.Instance.PreviewPosition);
@@ -669,6 +700,7 @@ public partial class MainWindow : Window
             _archiveComment = null;
             UpdateAddDeleteBtnState();
             UpdateSmartExtractBtnState();
+            UpdateFilterBtnState();
             SetStatus(L.T(L.Main_Status_LoadFailed));
 
             // Reset UI state on error

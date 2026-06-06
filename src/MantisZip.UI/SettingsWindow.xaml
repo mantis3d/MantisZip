@@ -7,6 +7,9 @@
         WindowStartupLocation="CenterScreen"
         ResizeMode="NoResize"
         Background="{StaticResource Theme_WindowBg}">
+    <Window.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVis"/>
+    </Window.Resources>
     <Grid Margin="12">
         <Grid.RowDefinitions>
             <RowDefinition Height="*"/>
@@ -420,12 +423,123 @@
                     <StackPanel Margin="10">
                         <GroupBox Header="{l:L Settings_Assoc_GroupHeader}" Padding="8" Margin="0,0,0,12">
                             <StackPanel>
-                                <TextBlock Text="{l:L Settings_Assoc_Desc}" TextWrapping="Wrap" Foreground="{StaticResource Theme_TextSecondary}" FontSize="12" Margin="0,0,0,10"/>
-                                <Button x:Name="InstallAssocBtn" Content="{l:L Settings_Assoc_Install}" Width="140" Height="28"
-                                        HorizontalAlignment="Left" Click="InstallAssoc_Click"/>
-                                <Button x:Name="UninstallAssocBtn" Content="{l:L Settings_Assoc_Uninstall}" Width="140" Height="28"
-                                        HorizontalAlignment="Left" Margin="0,8,0,0" Click="UninstallAssoc_Click"/>
-                                <TextBlock x:Name="AssocStatusText" Text="" FontSize="11" Foreground="{StaticResource Theme_TextSecondary}" Margin="0,8,0,0"/>
+                                <!-- 描述文字 -->
+                                <TextBlock Text="{l:L Settings_Assoc_Desc}" TextWrapping="Wrap"
+                                           Foreground="{StaticResource Theme_TextSecondary}"
+                                           FontSize="12" Margin="0,0,0,10"/>
+
+                                <!-- 全选/取消全选 -->
+                                <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                                    <Button x:Name="SelectAllBtn" Content="{l:L Settings_Assoc_SelectAll}"
+                                            Width="80" Height="24" FontSize="12" Click="SelectAllBtn_Click"/>
+                                    <Button x:Name="DeselectAllBtn" Content="{l:L Settings_Assoc_DeselectAll}"
+                                            Width="80" Height="24" FontSize="12" Margin="6,0,0,0"
+                                            Click="DeselectAllBtn_Click"/>
+                                </StackPanel>
+
+                                <!-- 格式列表 -->
+                                <Border BorderBrush="{StaticResource Theme_Border}"
+                                        BorderThickness="1" CornerRadius="4">
+                                    <ScrollViewer VerticalScrollBarVisibility="Auto" Height="180">
+                                    <ItemsControl x:Name="AssocFormatList"
+                                                  Grid.IsSharedSizeScope="True"
+                                                  Margin="4">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <Grid Margin="2,5,2,5" 
+                                                       MouseLeftButtonUp="FormatRow_MouseLeftButtonUp">
+                                                    <Grid.Style>
+                                                        <Style TargetType="Grid">
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding IsDefaultStatus}" Value="True">
+                                                                    <Setter Property="Background" Value="#1A4CAF50"/>
+                                                                </DataTrigger>
+                                                                <DataTrigger Binding="{Binding IsNotDefaultStatus}" Value="True">
+                                                                    <Setter Property="Background" Value="#1AFF9800"/>
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </Grid.Style>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="Auto"/>
+                                                        <ColumnDefinition Width="20"/>
+                                                        <ColumnDefinition Width="Auto" SharedSizeGroup="Ext"/>
+                                                        <ColumnDefinition Width="*"/>
+                                                        <ColumnDefinition Width="Auto"/>
+                                                        <ColumnDefinition Width="Auto"/>
+                                                    </Grid.ColumnDefinitions>
+
+                                                    <CheckBox IsChecked="{Binding IsEnabled}"
+                                                              VerticalAlignment="Center"/>
+
+                                                    <Image Grid.Column="1" Source="{Binding Icon}"
+                                                           Width="16" Height="16"
+                                                           VerticalAlignment="Center"/>
+
+                                                    <TextBlock Grid.Column="2"
+                                                               Text="{Binding Extension}"
+                                                               FontWeight="SemiBold"
+                                                               VerticalAlignment="Center"
+                                                               Margin="6,0,0,0" FontSize="13"/>
+
+                                                    <TextBlock Grid.Column="3"
+                                                               Text="{Binding Description}"
+                                                               Foreground="{StaticResource Theme_TextSecondary}"
+                                                               VerticalAlignment="Center"
+                                                               Margin="8,0,0,0" FontSize="12"
+                                                               TextTrimming="CharacterEllipsis"/>
+
+                                                    <!-- 当前关联程序 -->
+                                                    <TextBlock Grid.Column="4"
+                                                               Text="{Binding CurrentHandler}"
+                                                               VerticalAlignment="Center"
+                                                               FontSize="11"
+                                                               Margin="8,0,4,0"/>
+
+                                                    <!-- 自定义扩展名的删除按钮 -->
+                                                    <Button Grid.Column="5"
+                                                            x:Name="DeleteCustomBtn"
+                                                            Content="✕"
+                                                            Width="36" Height="24" FontSize="12"
+                                                            VerticalAlignment="Center"
+                                                            Margin="4,0,0,0"
+                                                            Visibility="{Binding IsCustom, Converter={StaticResource BoolToVis}}"
+                                                            Click="DeleteCustomBtn_Click"
+                                                            ToolTip="删除此自定义格式"/>
+                                                </Grid>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </ScrollViewer>
+                                </Border>
+
+                                <!-- 添加自定义扩展名按钮 -->
+                                <Button x:Name="AddCustomBtn"
+                                        Content="{l:L Settings_Assoc_AddCustom}"
+                                        Width="160" Height="26"
+                                        HorizontalAlignment="Left" Margin="0,8,0,0"
+                                        Click="AddCustomBtn_Click"/>
+
+                                <!-- 状态 -->
+                                <TextBlock x:Name="AssocStatusText" Text="" FontSize="11"
+                                           Foreground="{StaticResource Theme_TextSecondary}"
+                                           Margin="0,8,0,0"/>
+
+                                <!-- 底部按钮行 -->
+                                <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
+                                    <Button x:Name="OpenDefaultAppsBtn"
+                                            Content="{l:L Settings_Assoc_OpenDefaultApps}"
+                                            Width="120" Height="28"
+                                            Click="OpenDefaultAppsBtn_Click"/>
+                                    <Button x:Name="InstallAssocBtn"
+                                            Content="{l:L Settings_Assoc_Install}"
+                                            Width="100" Height="28" Margin="8,0,0,0"
+                                            Click="InstallAssoc_Click"/>
+                                    <Button x:Name="UninstallAssocBtn"
+                                            Content="{l:L Settings_Assoc_Uninstall}"
+                                            Width="100" Height="28" Margin="8,0,0,0"
+                                            Click="UninstallAssoc_Click"/>
+                                </StackPanel>
                             </StackPanel>
                         </GroupBox>
                     </StackPanel>

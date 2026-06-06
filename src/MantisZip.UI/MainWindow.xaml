@@ -172,6 +172,19 @@
                     </StackPanel>
                 </Button>
                 <Separator/>
+                <ToggleButton x:Name="ShowSubfoldersBtn" ToolTip="{l:L Main_Tooltip_ShowSubfoldersOff}" Click="ShowSubfoldersBtn_Click" Padding="8,6" IsEnabled="False" IsChecked="False">
+                    <StackPanel Orientation="Vertical" HorizontalAlignment="Center">
+                        <emoji:TextBlock Text="🌲" FontSize="25" HorizontalAlignment="Center"/>
+                        <TextBlock Text="{l:L Main_Toolbar_ShowSubfolders}" FontSize="12" HorizontalAlignment="Center"/>
+                    </StackPanel>
+                </ToggleButton>
+                <ToggleButton x:Name="ToggleFilterBarBtn" ToolTip="{l:L Main_Tooltip_ToggleFilter}" Click="ToggleFilterBarBtn_Click" Padding="8,6" IsEnabled="False" IsChecked="False">
+                    <StackPanel Orientation="Vertical" HorizontalAlignment="Center">
+                        <emoji:TextBlock Text="🔍" FontSize="25" HorizontalAlignment="Center"/>
+                        <TextBlock Text="{l:L Main_Toolbar_ToggleFilter}" FontSize="12" HorizontalAlignment="Center"/>
+                    </StackPanel>
+                </ToggleButton>
+                <Separator/>
                 <Button ToolTip="{l:L Main_Tooltip_Test}" Click="TestArchive_Click" Padding="8,6">
                     <StackPanel Orientation="Vertical" HorizontalAlignment="Center">
                         <emoji:TextBlock Text="✓" FontSize="25" Foreground="{StaticResource Theme_StatusSuccess}" HorizontalAlignment="Center"/>
@@ -273,6 +286,7 @@
                             <!-- TreeView + DataGrid -->
                             <Grid x:Name="InnerContentGrid" Grid.Row="0" Grid.ColumnSpan="5">
                                 <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
                                     <RowDefinition Height="*"/>
                                     <RowDefinition x:Name="InnerPreviewSplitterRow" Height="0"/>
                                     <RowDefinition x:Name="InnerPreviewRow" Height="0"/>
@@ -285,8 +299,85 @@
                                     <ColumnDefinition x:Name="InnerPreviewColumnDef" Width="0" MinWidth="0"/>
                                 </Grid.ColumnDefinitions>
 
+                                <!-- Filter Bar (spans tree + splitter + file list) -->
+                                <Border x:Name="FilterBar" Grid.Row="0" Grid.ColumnSpan="3" Background="{StaticResource Theme_HeaderBg}" CornerRadius="2" Padding="6,4" Margin="0,0,0,4" Visibility="Collapsed">
+                                    <StackPanel Orientation="Horizontal">
+                                        <!-- 区域 1: 文字搜索 -->
+                                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                            <emoji:TextBlock Text="🔍" FontSize="14" Margin="2,0,4,0" VerticalAlignment="Center"/>
+                                            <TextBox x:Name="FileSearchBox" Width="160" MinWidth="80" ToolTip="{l:L Main_FilterSearch_Placeholder}" TextChanged="FileSearchBox_TextChanged" PreviewKeyDown="FileSearchBox_PreviewKeyDown"/>
+                                        </StackPanel>
+                                        <Separator Style="{StaticResource {x:Static ToolBar.SeparatorStyleKey}}" Margin="4,0"/>
+
+                                        <!-- 区域 2: 日期范围 -->
+                                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="4,0">
+                                            <emoji:TextBlock Text="📅" FontSize="14" Margin="0,0,4,0" VerticalAlignment="Center"/>
+                                            <StackPanel Orientation="Vertical">
+                                                <StackPanel Orientation="Horizontal" Margin="0,0,0,2">
+                                                    <Button x:Name="PickDateFromBtn" ToolTip="{l:L Main_Filter_PickDateFrom}" Width="22" Height="22" Padding="0" Margin="0,0,2,0" Click="PickDateFromBtn_Click" IsEnabled="False">
+                                                        <emoji:TextBlock Text="🧪" FontSize="12"/>
+                                                    </Button>
+                                                    <TextBlock Text="{l:L Main_Filter_DateFrom}" FontSize="11" VerticalAlignment="Center" Margin="0,0,2,0"/>
+                                                    <DatePicker x:Name="DateFromPicker" Width="110" Height="22" FontSize="11" SelectedDateChanged="DateFromPicker_SelectedDateChanged"/>
+                                                </StackPanel>
+                                                <StackPanel Orientation="Horizontal">
+                                                    <Button x:Name="PickDateToBtn" ToolTip="{l:L Main_Filter_PickDateTo}" Width="22" Height="22" Padding="0" Margin="0,0,2,0" Click="PickDateToBtn_Click" IsEnabled="False">
+                                                        <emoji:TextBlock Text="🧪" FontSize="12"/>
+                                                    </Button>
+                                                    <TextBlock Text="{l:L Main_Filter_DateTo}" FontSize="11" VerticalAlignment="Center" Margin="0,0,2,0"/>
+                                                    <DatePicker x:Name="DateToPicker" Width="110" Height="22" FontSize="11" SelectedDateChanged="DateToPicker_SelectedDateChanged"/>
+                                                </StackPanel>
+                                            </StackPanel>
+                                        </StackPanel>
+                                        <Separator Style="{StaticResource {x:Static ToolBar.SeparatorStyleKey}}" Margin="4,0"/>
+
+                                        <!-- 区域 3: 大小范围 -->
+                                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="4,0">
+                                            <emoji:TextBlock Text="📏" FontSize="14" Margin="0,0,4,0" VerticalAlignment="Center"/>
+                                            <StackPanel Orientation="Vertical">
+                                                <StackPanel Orientation="Horizontal" Margin="0,0,0,2">
+                                                    <Button x:Name="PickSizeMinBtn" ToolTip="{l:L Main_Filter_PickSizeMin}" Width="22" Height="22" Padding="0" Margin="0,0,2,0" Click="PickSizeMinBtn_Click" IsEnabled="False">
+                                                        <emoji:TextBlock Text="🧪" FontSize="12"/>
+                                                    </Button>
+                                                    <TextBlock Text="{l:L Main_Filter_SizeMin}" FontSize="11" VerticalAlignment="Center" Margin="0,0,2,0"/>
+                                                    <TextBox x:Name="SizeMinBox" Width="60" Height="22" FontSize="11" TextChanged="SizeMinBox_TextChanged"/>
+                                                    <ComboBox x:Name="SizeMinUnit" Width="50" Height="22" FontSize="11" Margin="2,0,0,0" SelectedIndex="0" SelectionChanged="SizeMinUnit_SelectionChanged">
+                                                        <ComboBoxItem Content="{l:L Main_Filter_UnitB}"/>
+                                                        <ComboBoxItem Content="{l:L Main_Filter_UnitKB}"/>
+                                                        <ComboBoxItem Content="{l:L Main_Filter_UnitMB}"/>
+                                                        <ComboBoxItem Content="{l:L Main_Filter_UnitGB}"/>
+                                                    </ComboBox>
+                                                </StackPanel>
+                                                <StackPanel Orientation="Horizontal">
+                                                    <Button x:Name="PickSizeMaxBtn" ToolTip="{l:L Main_Filter_PickSizeMax}" Width="22" Height="22" Padding="0" Margin="0,0,2,0" Click="PickSizeMaxBtn_Click" IsEnabled="False">
+                                                        <emoji:TextBlock Text="🧪" FontSize="12"/>
+                                                    </Button>
+                                                    <TextBlock Text="{l:L Main_Filter_SizeMax}" FontSize="11" VerticalAlignment="Center" Margin="0,0,2,0"/>
+                                                    <TextBox x:Name="SizeMaxBox" Width="60" Height="22" FontSize="11" TextChanged="SizeMaxBox_TextChanged"/>
+                                                    <ComboBox x:Name="SizeMaxUnit" Width="50" Height="22" FontSize="11" Margin="2,0,0,0" SelectedIndex="0" SelectionChanged="SizeMaxUnit_SelectionChanged">
+                                                        <ComboBoxItem Content="{l:L Main_Filter_UnitB}"/>
+                                                        <ComboBoxItem Content="{l:L Main_Filter_UnitKB}"/>
+                                                        <ComboBoxItem Content="{l:L Main_Filter_UnitMB}"/>
+                                                        <ComboBoxItem Content="{l:L Main_Filter_UnitGB}"/>
+                                                    </ComboBox>
+                                                </StackPanel>
+                                            </StackPanel>
+                                        </StackPanel>
+                                        <Separator Style="{StaticResource {x:Static ToolBar.SeparatorStyleKey}}" Margin="4,0"/>
+
+                                        <!-- 区域 4: 清除全部 -->
+                                        <Button x:Name="ClearFiltersBtn" Content="✕" ToolTip="{l:L Main_Filter_ClearAll}" Width="24" Height="24" FontSize="12" Margin="4,0" Click="ClearFiltersBtn_Click"/>
+                                        <Separator Style="{StaticResource {x:Static ToolBar.SeparatorStyleKey}}" Margin="4,0"/>
+
+                                        <!-- 区域 5: 比例基准切换 -->
+                                        <ToggleButton x:Name="RebaseBaselineBtn" ToolTip="筛选列表比例基准" Click="RebaseBaselineBtn_Click" IsChecked="False" Width="24" Height="24" Padding="0" Margin="4,0">
+                                            <emoji:TextBlock Text="📊" FontSize="14"/>
+                                        </ToggleButton>
+                                    </StackPanel>
+                                </Border>
+
                                 <!-- Directory Tree -->
-                                <TreeView x:Name="FolderTree" Grid.Column="0" 
+                                <TreeView x:Name="FolderTree" Grid.Row="1" Grid.Column="0" 
                                           BorderThickness="1" BorderBrush="{StaticResource Theme_BorderLight}"
                                           SelectedItemChanged="FolderTree_SelectedItemChanged"
                                           ItemContainerStyle="{StaticResource TreeViewItemStyle}">
@@ -300,11 +391,18 @@
                                     </TreeView.ItemTemplate>
                                 </TreeView>
 
-                                <GridSplitter x:Name="TreeFileSplitter" Grid.Column="1" Width="4" Background="Transparent" 
+                                <GridSplitter x:Name="TreeFileSplitter" Grid.Row="1" Grid.Column="1" Width="4" Background="Transparent" 
                                             HorizontalAlignment="Center" VerticalAlignment="Stretch"/>
 
                                 <!-- File List -->
-                                        <DataGrid x:Name="FileListGrid" Grid.Column="2"
+                                <Grid Grid.Row="1" Grid.Column="2">
+                                    <!-- No results overlay -->
+                                    <TextBlock x:Name="NoResultsText" Text="{l:L Main_Filter_NoResults}" 
+                                               Foreground="{StaticResource Theme_TextDisabled}" FontSize="14"
+                                               HorizontalAlignment="Center" VerticalAlignment="Center"
+                                               Visibility="Collapsed"/>
+
+                                    <DataGrid x:Name="FileListGrid"
                                           AutoGenerateColumns="False"
                                           IsReadOnly="True"
                                           SelectionMode="Extended"
@@ -355,7 +453,7 @@
                                         </ContextMenu>
                                     </DataGrid.ContextMenu>
                                     <DataGrid.Columns>
-                                        <DataGridTemplateColumn Header="{l:L Main_Col_Name}" Width="250" SortMemberPath="Name" DisplayIndex="0">
+                                        <DataGridTemplateColumn Header="{l:L Main_Col_Name}" Width="250" MinWidth="120" MaxWidth="800" SortMemberPath="Name" DisplayIndex="0">
                                             <DataGridTemplateColumn.CellTemplate>
                                                 <DataTemplate>
                                                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
@@ -365,7 +463,7 @@
                                                 </DataTemplate>
                                             </DataGridTemplateColumn.CellTemplate>
                                         </DataGridTemplateColumn>
-                                        <DataGridTemplateColumn Header="{l:L Main_Col_Size}" Width="100" SortMemberPath="Size" DisplayIndex="1">
+                                        <DataGridTemplateColumn Header="{l:L Main_Col_Size}" Width="100" MinWidth="60" MaxWidth="400" SortMemberPath="Size" DisplayIndex="1">
                                             <DataGridTemplateColumn.CellTemplate>
                                                 <DataTemplate>
                                                     <Grid>
@@ -381,7 +479,10 @@
                                                                 </Style>
                                                             </Rectangle.Style>
                                                             <Rectangle.Width>
-                                                                 <Binding Path="SizeRatio" Converter="{StaticResource RatioToFixedWidthConverter}" ConverterParameter="100"/>
+                                                                 <MultiBinding Converter="{StaticResource RatioToWidthConverter}">
+                                                                     <Binding Path="SizeRatio"/>
+                                                                     <Binding Path="ActualWidth" RelativeSource="{RelativeSource AncestorType=ContentPresenter}"/>
+                                                                 </MultiBinding>
                                                              </Rectangle.Width>
                                                          </Rectangle>
                                                          <TextBlock Text="{Binding SizeDisplay}" VerticalAlignment="Center" Margin="4,0"/>
@@ -389,7 +490,7 @@
                                                 </DataTemplate>
                                             </DataGridTemplateColumn.CellTemplate>
                                         </DataGridTemplateColumn>
-                                        <DataGridTemplateColumn Header="{l:L Main_Col_Compressed}" Width="100" SortMemberPath="CompressedSize" DisplayIndex="2">
+                                        <DataGridTemplateColumn Header="{l:L Main_Col_Compressed}" Width="100" MinWidth="60" MaxWidth="400" SortMemberPath="CompressedSize" DisplayIndex="2">
                                             <DataGridTemplateColumn.CellTemplate>
                                                 <DataTemplate>
                                                     <Grid>
@@ -405,7 +506,10 @@
                                                                 </Style>
                                                             </Rectangle.Style>
                                                             <Rectangle.Width>
-                                                                 <Binding Path="CompressedSizeRatio" Converter="{StaticResource RatioToFixedWidthConverter}" ConverterParameter="100"/>
+                                                                 <MultiBinding Converter="{StaticResource RatioToWidthConverter}">
+                                                                     <Binding Path="CompressedSizeRatio"/>
+                                                                     <Binding Path="ActualWidth" RelativeSource="{RelativeSource AncestorType=ContentPresenter}"/>
+                                                                 </MultiBinding>
                                                              </Rectangle.Width>
                                                          </Rectangle>
                                                          <TextBlock Text="{Binding CompressedSizeDisplay}" VerticalAlignment="Center" Margin="4,0"/>
@@ -413,13 +517,16 @@
                                                 </DataTemplate>
                                             </DataGridTemplateColumn.CellTemplate>
                                         </DataGridTemplateColumn>
-                                        <DataGridTemplateColumn Header="{l:L Main_Col_Ratio}" Width="80" SortMemberPath="RatioSort" DisplayIndex="3">
+                                        <DataGridTemplateColumn Header="{l:L Main_Col_Ratio}" Width="80" MinWidth="60" MaxWidth="300" SortMemberPath="RatioSort" DisplayIndex="3">
                                             <DataGridTemplateColumn.CellTemplate>
                                                 <DataTemplate>
                                                     <Grid>
                                                         <Rectangle Fill="{StaticResource ProgressBarRatioBg}" HorizontalAlignment="Left">
                                                             <Rectangle.Width>
-                                                                 <Binding Path="RatioBarValue" Converter="{StaticResource RatioToFixedWidthConverter}" ConverterParameter="80"/>
+                                                                 <MultiBinding Converter="{StaticResource RatioToWidthConverter}">
+                                                                     <Binding Path="RatioBarValue"/>
+                                                                     <Binding Path="ActualWidth" RelativeSource="{RelativeSource AncestorType=ContentPresenter}"/>
+                                                                 </MultiBinding>
                                                              </Rectangle.Width>
                                                          </Rectangle>
                                                          <TextBlock Text="{Binding RatioDisplay}" VerticalAlignment="Center" Margin="4,0"/>
@@ -427,14 +534,17 @@
                                                 </DataTemplate>
                                             </DataGridTemplateColumn.CellTemplate>
                                         </DataGridTemplateColumn>
-                                        <DataGridTextColumn Header="{l:L Main_Col_Crc32}" Binding="{Binding Crc32Display}" SortMemberPath="Crc32" Width="110" DisplayIndex="4"/>
-                                        <DataGridTemplateColumn Header="{l:L Main_Col_Date}" Width="150" SortMemberPath="LastModified" DisplayIndex="5">
+                                        <DataGridTextColumn Header="{l:L Main_Col_Crc32}" Binding="{Binding Crc32Display}" SortMemberPath="Crc32" Width="110" MinWidth="80" MaxWidth="300" DisplayIndex="4"/>
+                                        <DataGridTemplateColumn Header="{l:L Main_Col_Date}" Width="150" MinWidth="80" MaxWidth="400" SortMemberPath="LastModified" DisplayIndex="5">
                                             <DataGridTemplateColumn.CellTemplate>
                                                 <DataTemplate>
                                                     <Grid>
                                                         <Rectangle Fill="{StaticResource ProgressBarDateBg}" HorizontalAlignment="Left">
                                                             <Rectangle.Width>
-                                                                 <Binding Path="DateRatio" Converter="{StaticResource RatioToFixedWidthConverter}" ConverterParameter="150"/>
+                                                                 <MultiBinding Converter="{StaticResource RatioToWidthConverter}">
+                                                                     <Binding Path="DateRatio"/>
+                                                                     <Binding Path="ActualWidth" RelativeSource="{RelativeSource AncestorType=ContentPresenter}"/>
+                                                                 </MultiBinding>
                                                              </Rectangle.Width>
                                                          </Rectangle>
                                                          <TextBlock Text="{Binding DateDisplay}" VerticalAlignment="Center" Margin="4,0"/>
@@ -442,7 +552,7 @@
                                                 </DataTemplate>
                                             </DataGridTemplateColumn.CellTemplate>
                                         </DataGridTemplateColumn>
-                                        <DataGridTemplateColumn Header="{l:L Main_Col_Encrypted}" Width="50" SortMemberPath="IsEncrypted" DisplayIndex="6">
+                                        <DataGridTemplateColumn Header="{l:L Main_Col_Encrypted}" Width="50" MinWidth="36" MaxWidth="120" SortMemberPath="IsEncrypted" DisplayIndex="6">
                                             <DataGridTemplateColumn.CellTemplate>
                                                 <DataTemplate>
                                                     <emoji:TextBlock Text="🔒" HorizontalAlignment="Center" 
@@ -452,6 +562,7 @@
                                         </DataGridTemplateColumn>
                                     </DataGrid.Columns>
                                 </DataGrid>
+                                </Grid>
 
                                 <!-- Inner preview row splitter (Pos 2/3) -->
                                 <GridSplitter x:Name="InnerPreviewSplitter" Grid.Row="1"

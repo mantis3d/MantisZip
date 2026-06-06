@@ -107,11 +107,21 @@ public partial class MainWindow
         _currentFolder = "";
         _dirStats.Clear();
 
+        // 重置筛选/过滤状态
+        _showSubfolders = false;
+        _currentUnfilteredItems = null;
+        ShowSubfoldersBtn.IsChecked = false;
+        UpdateShowSubfoldersBtnToolTip();
+        ToggleFilterBarBtn.IsChecked = false;
+        FilterBar.Visibility = Visibility.Visible;
+
         FileListGrid.ItemsSource = null;
         FolderTree.ItemsSource = null;
         DropHint.Visibility = Visibility.Visible;
         FileListPanel.Visibility = Visibility.Collapsed;
         ArchiveLoadingOverlay.Visibility = Visibility.Collapsed;
+
+        UpdateFilterBtnState();
 
         DirStatsText.Text = "";
         SelectionStatsText.Text = "";
@@ -129,7 +139,32 @@ public partial class MainWindow
         if (!string.IsNullOrEmpty(_currentArchivePath))
         {
             var prevFolder = _currentFolder;
+            // 保存过滤状态以便刷新后恢复
+            bool hadActiveFilters = HasActiveFilters();
+            string? savedSearchText = _searchText;
+            DateTime? savedDateFrom = _dateFrom;
+            DateTime? savedDateTo = _dateTo;
+            long? savedSizeMin = _sizeMin;
+            long? savedSizeMax = _sizeMax;
+            bool savedShowSubfolders = _showSubfolders;
+
             await LoadArchiveAsync(_currentArchivePath);
+
+            // 恢复过滤状态
+            _searchText = savedSearchText;
+            _dateFrom = savedDateFrom;
+            _dateTo = savedDateTo;
+            _sizeMin = savedSizeMin;
+            _sizeMax = savedSizeMax;
+            _showSubfolders = savedShowSubfolders;
+            ShowSubfoldersBtn.IsChecked = savedShowSubfolders;
+            UpdateShowSubfoldersBtnToolTip();
+            if (savedSearchText != null) FileSearchBox.Text = savedSearchText;
+            if (savedDateFrom.HasValue) DateFromPicker.SelectedDate = savedDateFrom;
+            if (savedDateTo.HasValue) DateToPicker.SelectedDate = savedDateTo;
+            if (savedSizeMin.HasValue) SizeMinBox.Text = savedSizeMin.ToString();
+            if (savedSizeMax.HasValue) SizeMaxBox.Text = savedSizeMax.ToString();
+
             if (!string.IsNullOrEmpty(prevFolder))
             {
                 FilterFiles(prevFolder);

@@ -35,6 +35,15 @@
   - 支持命名预设持久化
 - **代码重构持续** — `CompressSettingsWindow.xaml.cs` (684 行)、`SevenZipEngine.cs` (630 行)、`ShellIntegration.cs` (482 行) 仍有拆分空间
 
+
+
+## 版本历史（从新到旧）
+
+### v0.3.8 (2026-06-06) 文件列表过滤修正
+- 文件列表过滤修正布局，增加吸管。
+
+
+
 ### v0.3.7-refined-4 (2026-06-03) 关于窗口重设计
 
 1. **AboutWindow 新建** — 替代旧 `AppMessageBox.Show()` 为 4 标签页 WPF 对话框（关于/作者/依赖库/致谢），`ResizeMode="CanResizeWithGrip"`，`MinWidth="400"` `MinHeight="350"`，App.ico 窗口图标
@@ -46,6 +55,28 @@
 7. **21 个 About_* 本地化键** — 中英文双语，`L.cs` 常量，`l:L` XAML 绑定
 8. **13 个冒烟测试** — `AboutWindowTests.cs` 验证 JSON 键存在性/非空/双语一致性/向后兼容（`Main_About_Text` 保留）
 9. **死键审计** — `Main_About_Text`/`Main_About_Title` 确认代码无引用（仅 L.cs + JSON 保留）
+
+### v0.3.8 (2026-06-04) 文件关联面板重构 + 文件列表筛选/搜索
+
+1. **文件关联面板重构** — 从统一开关改为按扩展名独立复选框列表，支持自定义扩展名添加/删除，行点击切换，全选/取消全选（详见 `.sisyphus/plans/file-assoc-per-extension.md`）
+2. **当前关联程序显示** — 每行显示当前关联的应用名，移除 "Archive"/"Compressed" 等后缀干扰词
+3. **系统图标** — 使用 `SystemIconHelper.GetFileIcon` 显示系统真实文件类型图标
+4. **打开默认应用按钮** — 修复 `ms-settings:defaultapps` URI 打开失败（添加 `UseShellExecute = true`）
+5. **安装 Bug 修复** — 安装按钮现在只关联勾选的格式（修复 `EnsureProgIdRegistered` 分离 + 安装逻辑重构）
+6. **关联状态持久化** — 修复每次打开窗口强制全选问题（移除 `_assocMigrationDone` 实例字段迁移代码）；安装/卸载操作同时保存勾选状态
+7. **三态关联状态视觉区分** — 无关联（无色）、已关联未默认（橙色 `#1AFF9800`）、已关联且默认（绿色 `#1A4CAF50`）
+8. **默认程序提示** — 安装成功后弹窗增加"请在系统设置中设为默认程序"提示
+9. **AppMessageBox.ShowWithAction** — 扩展 AppMessageBox 支持可选操作按钮（主色显示），安装弹窗新增「打开系统设置」按钮直接跳转 `ms-settings:defaultapps`
+10. **删除按钮加宽** — 自定义扩展名 ✕ 按钮从 20×20 扩至 36×24
+11. **Status 颜色触发修复** — 将 `x:Static` 枚举 DataTrigger 改为 bool 属性绑定，解决橙色/绿色无法显示的问题
+12. **GetExePath 修复** — 改用 `Assembly.Location` 替代 `Environment.ProcessPath`，兼容 `dotnet run` 场景，确保图标路径正确
+13. **Explorer 文件图标** — 内置格式使用 `Resources\Icons\*.ico`，自定义扩展名回退到 exe 图标
+14. **原生图标 DLL 计划** — 创建 `.sisyphus/plans/icon-dll.md`（P3），规划将 7 个 .ico 编译为资源 DLL
+15. **文件列表筛选/搜索** — MainWindow 文件列表区域新增三维过滤系统：主工具栏「全部子目录」ToggleButton（🌲 图标）展开递归扁平视图、筛选工具栏（文字搜索 + 日期范围 DatePicker × 2 + 大小范围数字输入+单位 ComboBox）、通用过滤引擎 `ArchiveFilter.cs`（Core/Utils）支持组合 AND 过滤，15 个单元测试覆盖所有过滤逻辑（详见 `.sisyphus/plans/file-list-filter-search.md`）
+16. **全部子目录视图** — `ShowSubfoldersBtn` ToggleButton 切换文件列表为递归扁平视图，仅显示文件不含目录条目，`DisplayName` 显示相对路径
+17. **筛选工具栏显隐** — `ToggleFilterBarBtn` ToggleButton 控制筛选栏显隐，隐藏时已应用过滤条件继续保持生效
+18. **多维过滤引擎** — `SearchFilters` record + `ArchiveFilter.ApplyFilters` 静态方法，支持文字（大小写不敏感子串匹配 Name/FullPath）、日期（LastModified 区间）、大小（Size 区间 + 单位换算）三种条件的 AND 组合过滤；`ParseSizeWithUnit` 辅助方法支持 B/KB/MB/GB 单位安全转换
+19. **空结果提示** — 无匹配文件时在 DataGrid 区域居中显示"无匹配的文件"，状态栏同步更新统计格式 "显示 N/M 个文件"
 
 ### v0.3.7-refined-3 (2026-06-03) 密码工具栏 + 关闭压缩包 + 捐赠 + 空状态重设计
 
@@ -504,6 +535,7 @@
 | 日志隐私脱敏 | [log-privacy-redaction.md](.sisyphus/plans/log-privacy-redaction.md) | v0.2.8 |
 | 国际化 (i18n) | [i18n-localization.md](.sisyphus/plans/i18n-localization.md) | v0.2.8 |
 | 智能解压 (Smart Extract) | [smart-extract.md](.sisyphus/plans/smart-extract.md) | v0.2.10 |
+| 文件列表筛选/搜索 | [file-list-filter-search.md](.sisyphus/plans/file-list-filter-search.md) | v0.3.8 |
 | 引擎统一 (SharpZipLib→SharpCompress + 7z.exe→SharpSevenZip) | [engine-unification-sharpcompress.md](.sisyphus/plans/engine-unification-sharpcompress.md) | v0.3.4 |
 | 文件大小进度条 | [file-size-progress-bar.md](.sisyphus/plans/file-size-progress-bar.md) | v0.3.4 |
 | PNG 透明通道控制 | [png-transparency-3way.md](.sisyphus/plans/png-transparency-3way.md) | v0.3.4+ |
