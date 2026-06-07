@@ -230,6 +230,7 @@ public static class L
     public const string Main_ArchiveComment_Prompt                  = "Main_ArchiveComment_Prompt";
     public const string Main_ArchiveComment_Save                    = "Main_ArchiveComment_Save";
     public const string Main_ArchiveComment_SaveFailed              = "Main_ArchiveComment_SaveFailed";
+    public const string Main_ArchiveComment_Saving                  = "Main_ArchiveComment_Saving";
     public const string Main_ArchiveComment_Title                   = "Main_ArchiveComment_Title";
     public const string Main_ArchiveComment_ZipOnly                 = "Main_ArchiveComment_ZipOnly";
     public const string Main_Menu_About                            = "Main_Menu_About";

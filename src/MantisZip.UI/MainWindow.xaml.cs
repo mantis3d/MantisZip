@@ -19,7 +19,6 @@ using System.Text.Json;
 using System.Text;
 using Markdig;
 using Ude;
-using ICSharpCode.SharpZipLib.Zip;
 using MantisZip.UI.Localization;
 using WpfAnimatedGif;
 
@@ -485,7 +484,7 @@ public partial class MainWindow : Window
     }
 
     /// <summary>
-    /// 读取L.T(L.Compress_Archive_Group)注释（仅 ZIP 格式支持，通过 SharpZipLib 读取 EOCD 注释字段）。
+    /// 读取压缩包注释（仅 ZIP 格式支持，通过 ZipCommentHelper 读取 EOCD 注释字段）。
     /// 其他格式返回 null。
     /// </summary>
     private static string? ReadArchiveComment(string archivePath, ArchiveFormat format)
@@ -494,8 +493,7 @@ public partial class MainWindow : Window
 
         try
         {
-            using var zf = new ZipFile(archivePath, ICSharpCode.SharpZipLib.Zip.StringCodec.Default);
-            var comment = zf.ZipFileComment;
+            var comment = ZipCommentHelper.ReadComment(archivePath);
             return string.IsNullOrWhiteSpace(comment) ? null : comment.Trim();
         }
         catch (Exception ex)

@@ -301,6 +301,7 @@
   "Main_ArchiveComment_Prompt": "Edit archive comment:",
   "Main_ArchiveComment_Save": "Save",
   "Main_ArchiveComment_SaveFailed": "Failed to save comment: {0}",
+  "Main_ArchiveComment_Saving": "Saving comment...",
   "Main_ArchiveComment_Title": "Archive Comment",
   "Main_ArchiveComment_ZipOnly": "鈸?Only ZIP archives support comments (UTF-8 encoding)",
   "Main_Menu_ArchiveComment": "_Archive Comment...",

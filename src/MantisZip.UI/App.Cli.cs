@@ -5,7 +5,6 @@ using System.Threading;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Threading;
-using ICSharpCode.SharpZipLib.Zip;
 using MantisZip.Core;
 using MantisZip.Core.Abstractions;
 using MantisZip.Core.Engines;
@@ -854,7 +853,7 @@ public partial class App : Application
                             Path.GetDirectoryName(archivePath) ?? Environment.GetFolderPath(Environment.SpecialFolder.Desktop),
                             Path.GetFileNameWithoutExtension(archivePath)),
                         "manual" => manualDest ?? Environment.GetFolderPath(Environment.SpecialFolder.Desktop),
-                        "smart" => ResolveSmartDest(archivePath) ?? Environment.GetFolderPath(Environment.SpecialFolder.Desktop),
+                        "smart" => await ResolveSmartDestAsync(archivePath) ?? Environment.GetFolderPath(Environment.SpecialFolder.Desktop),
                         _ => Path.GetDirectoryName(archivePath) ?? Environment.GetFolderPath(Environment.SpecialFolder.Desktop)
                     };
 
@@ -984,7 +983,7 @@ public partial class App : Application
     /// 若所有文件在同一根目录下 → 返回压缩包所在目录；
     /// 否则返回压缩包名子目录。
     /// </summary>
-    private static string? ResolveSmartDest(string archivePath)
+    private static async Task<string?> ResolveSmartDestAsync(string archivePath)
     {
         var parentDir = Path.GetDirectoryName(archivePath);
         var archiveName = Path.GetFileNameWithoutExtension(archivePath);
@@ -996,7 +995,7 @@ public partial class App : Application
 
         try
         {
-            var items = engine.ListEntriesAsync(archivePath).GetAwaiter().GetResult();
+            var items = await engine.ListEntriesAsync(archivePath).ConfigureAwait(false);
             if (items == null || items.Count == 0)
                 return Path.Combine(parentDir, archiveName);
 

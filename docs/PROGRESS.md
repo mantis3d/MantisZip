@@ -14,7 +14,15 @@
 
 ## 版本历史（从新到旧）
 
-### v0.3.9 (2026-06-06) 文件关联 Bug 修复 + 独立 ProgId + 设置窗口 UI 统一
+### v0.3.9 (2026-06-06 → 06-07) 文件关联 Bug 修复 + 独立 ProgId + 设置窗口 UI 统一
+
+7. **移除 SharpZipLib 注释编辑耦合**：
+   - 新建 `ZipCommentHelper`（Core/Utils）直接操作 ZIP EOCD 字节读写注释，不依赖 SharpZipLib
+   - `ArchiveCommentDialog` 保存注释时显示"正在保存注释..."文字提示（本地化键 `Main_ArchiveComment_Saving`）
+   - 清理 3 处无用 SharpZipLib import（App.xaml.cs / App.Cli.cs / MainWindow.xaml.cs）
+   - 修正 App.Password.cs 注释（SharpZipLib → SharpCompress）
+8. **版本号同步**：AppConstants.cs、.csproj、installer.iss 统一到 v0.3.9
+9. **修复 .GetAwaiter().GetResult() 同步-异步反模式**：`ResolveSmartDest` 改为 async，用 `await` 替代阻塞
 
 1. **文件关联 Bug 修复**：
    - `.tar.gz` 不再被跳过——设置勾选后真正写入注册表 `OpenWithProgids` + `DefaultIcon`
