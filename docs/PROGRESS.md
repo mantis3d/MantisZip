@@ -23,6 +23,8 @@
    - 修正 App.Password.cs 注释（SharpZipLib → SharpCompress）
 8. **版本号同步**：AppConstants.cs、.csproj、installer.iss 统一到 v0.3.9
 9. **修复 .GetAwaiter().GetResult() 同步-异步反模式**：`ResolveSmartDest` 改为 async，用 `await` 替代阻塞
+10. **App.Cli.cs 拆分**：按职责拆为 App.Compress.cs（压缩命令）、App.Extract.cs（解压命令）、App.Open.cs（打开/快速压缩），原文件保留为空白 partial 壳
+11. **CompressSettingsWindow 拆分**：密码标签页逻辑独立为 CompressSettingsWindow.Password.cs partial 文件，主文件减少 450 行
 
 1. **文件关联 Bug 修复**：
    - `.tar.gz` 不再被跳过——设置勾选后真正写入注册表 `OpenWithProgids` + `DefaultIcon`
