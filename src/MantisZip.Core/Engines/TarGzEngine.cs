@@ -385,19 +385,61 @@ public class TarGzEngine : IArchiveEngine
 
         try
         {
-            var items = await ListEntriesAsync(archivePath, password, cancellationToken).ConfigureAwait(false);
-            var ok = items.Count > 0;
-            CoreLog.Info($"TestArchiveAsync: {(ok ? "passed" : "failed (no entries)")}, {items.Count} entries");
-            return ok;
+            await Task.Run(() =>
+            {
+                var ext = Path.GetExtension(archivePath).ToLowerInvariant();
+                var isTarGz = ext == ".tgz" || archivePath.EndsWith(".tar.gz");
+
+                if (isTarGz || ext == ".tar")
+                {
+                    // TAR 或 TAR.GZ — 使用 TarReader 逐条目解压到空流验证完整性
+                    using var inputStream = File.OpenRead(archivePath);
+                    long totalCompressedBytes = inputStream.Length;
+                    using var reader = TarReader.OpenReader(inputStream, new ReaderOptions { LookForHeader = true });
+
+                    while (reader.MoveToNextEntry())
+                    {
+                        cancellationToken.ThrowIfCancellationRequested();
+                        if (reader.Entry.IsDirectory) continue;
+
+                        using var entryStream = reader.OpenEntryStream();
+                        // 完全解压条目以验证数据完整性
+                        entryStream.CopyTo(Stream.Null);
+
+                        progress?.Report(new ArchiveProgress
+                        {
+                            CurrentFile = reader.Entry.Key ?? "",
+                            PercentComplete = totalCompressedBytes > 0
+                                ? (double)inputStream.Position / totalCompressedBytes * 100
+                                : 0,
+                        });
+                    }
+                }
+                else if (ext == ".gz")
+                {
+                    // 单个 GZip 文件 — 解压到空流验证
+                    using var inputStream = File.OpenRead(archivePath);
+                    using var gzipStream = new System.IO.Compression.GZipStream(inputStream, System.IO.Compression.CompressionMode.Decompress);
+                    gzipStream.CopyTo(Stream.Null);
+
+                    progress?.Report(new ArchiveProgress
+                    {
+                        CurrentFile = Path.GetFileNameWithoutExtension(archivePath),
+                        PercentComplete = 100,
+                    });
+                }
+
+                CoreLog.Info("TestArchiveAsync: passed");
+            }, cancellationToken).ConfigureAwait(false);
+
+            CoreLog.Exit();
+            return true;
         }
         catch (Exception ex)
         {
             CoreLog.Error($"TestArchiveAsync: failed", ex);
-            return false;
-        }
-        finally
-        {
             CoreLog.Exit();
+            return false;
         }
     }
 

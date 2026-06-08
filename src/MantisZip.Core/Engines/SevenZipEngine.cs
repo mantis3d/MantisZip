@@ -507,26 +507,39 @@ public class SevenZipEngine : IArchiveEngine
                     ? new SharpSevenZipExtractor(archivePath)
                     : new SharpSevenZipExtractor(archivePath, password);
 
-                // SharpSevenZipExtractor.Check() 调用 7z.dll 的 OpenArchive + Test
+                // 1. 校验压缩包结构（7z.dll 的 Check 会验证头信息和结构完整性）
                 bool valid = extractor.Check();
 
-                // 即使 Check() 通过，也枚举条目以验证可读性
+                // 2. 逐条目解压到空流以验证每条数据的完整性（CRC 由 7z.dll 内部校验）
                 var entries = extractor.ArchiveFileData.ToList();
                 int totalEntries = entries.Count;
+                int processed = 0;
 
                 for (int i = 0; i < totalEntries; i++)
                 {
                     cancellationToken.ThrowIfCancellationRequested();
-                    if (entries[i].IsDirectory) continue;
+
+                    if (entries[i].IsDirectory)
+                    {
+                        processed++;
+                        continue;
+                    }
+
+                    // 实际解压条目到空流 — 7z.dll 在 ExtractFile 内部会校验 CRC
+                    extractor.ExtractFile(entries[i].Index, Stream.Null);
+
+                    processed++;
 
                     progress?.Report(new ArchiveProgress
                     {
                         CurrentFile = entries[i].FileName,
-                        PercentComplete = totalEntries > 0 ? (double)(i + 1) / totalEntries * 100 : 100,
+                        PercentComplete = totalEntries > 0 ? (double)processed / totalEntries * 100 : 100,
+                        TotalFiles = totalEntries,
+                        ProcessedFiles = processed,
                     });
                 }
 
-                CoreLog.Info($"TestArchiveAsync: passed, {totalEntries} entries, valid={valid}");
+                CoreLog.Info($"TestArchiveAsync: passed, {totalEntries} entries verified, valid={valid}");
                 return valid;
             }
             catch (Exception ex)

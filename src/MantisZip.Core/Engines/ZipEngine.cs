@@ -483,15 +483,31 @@ public class ZipEngine : IArchiveEngine
             {
                 using var archive = OpenArchiveWithEncodingFallback(archivePath, password);
 
-                foreach (var entry in archive.Entries)
+                var entries = archive.Entries.Where(e => !e.IsDirectory).ToList();
+                int totalFiles = entries.Count;
+                int processedFiles = 0;
+
+                foreach (var entry in entries)
                 {
                     cancellationToken.ThrowIfCancellationRequested();
-                    if (entry.IsDirectory) continue;
+
+                    // 完全解压每个条目以验证数据完整性
+                    // SharpCompress 在读取完整流时内部会检测 CRC 等错误
                     using var stream = entry.OpenEntryStream();
-                    stream.ReadByte();
+                    stream.CopyTo(Stream.Null);
+
+                    processedFiles++;
+
+                    progress?.Report(new ArchiveProgress
+                    {
+                        CurrentFile = entry.Key ?? "",
+                        PercentComplete = totalFiles > 0 ? (double)processedFiles / totalFiles * 100 : 100,
+                        TotalFiles = totalFiles,
+                        ProcessedFiles = processedFiles,
+                    });
                 }
 
-                CoreLog.Info("TestArchiveAsync: passed");
+                CoreLog.Info($"TestArchiveAsync: passed, {totalFiles} entries verified");
                 return true;
             }
             catch (Exception ex)
