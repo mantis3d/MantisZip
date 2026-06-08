@@ -29,6 +29,7 @@
    - 5 个对话框主按钮统一使用 `Theme_Accent` + `Theme_TextOnAccent` 强调色（CompressSettings、ExtractSettings、ArchiveComment、About、AppMessageBox）
        - `SettingsWindow` 语言/Label/LogPrivacyMode 两个 ComboBox 补齐缺失的 `Background="{DynamicResource Theme_WindowBg}"`
 5. **AGENTS.md 规则补充**：新增"每次 session 自动执行规则"第 3 条（新 UI 控件必须应用主题样式），并补充缺失主题资源时的处理方式；`Light.xaml` 进度条列颜色加深修复大小列对比度
+6. **QuickPathControl 设计完成**: 统一路径快捷选择组件系统（QuickPathControl UserControl + QuickPathDialog + FavoriteManagerWindow），覆盖压缩/解压/提取所有路径选择场景；旧 `explorer-path-switcher.md` 归档
 
 ### v0.3.9 (2026-06-06 → 06-07) 文件关联 Bug 修复 + 独立 ProgId + 设置窗口 UI 统一
 
