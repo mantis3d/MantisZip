@@ -19,6 +19,12 @@ public partial class MainWindow
 
     private void Window_DragOver(object sender, DragEventArgs e)
     {
+        if (_isOwnDrag)
+        {
+            e.Effects = DragDropEffects.None;
+            e.Handled = true;
+            return;
+        }
         if (e.Data.GetDataPresent(DataFormats.FileDrop))
         {
             e.Effects = DragDropEffects.Copy;
@@ -147,6 +153,25 @@ public partial class MainWindow
     {
         if (FindVisualParent<ScrollBar>(e.OriginalSource as DependencyObject) != null) return;
         _dragStartPoint = e.GetPosition(FileListGrid);
+
+        // 检测点按的条目是否已在选区内——如果是，保存当前所有选中条目；
+        // 否则清空保存，让 PreviewMouseMove 使用 DataGrid 处理后的单选集。
+        var hitTest = FileListGrid.InputHitTest(_dragStartPoint) as DependencyObject;
+        var row = FindVisualParent<DataGridRow>(hitTest);
+        if (row?.Item is ArchiveItem rowItem &&
+            FileListGrid.SelectedItems.Cast<ArchiveItem>().Contains(rowItem))
+        {
+            _dragPreservedSelection = FileListGrid.SelectedItems.Cast<ArchiveItem>().ToList();
+
+            // 多选状态 + 点按已选中条目 → 阻止 DataGrid 内部处理此点击
+            // （否则 DataGrid 在 Extended 模式下会清空多选，只保留点击的这一项）
+            if (_dragPreservedSelection.Count > 1)
+                e.Handled = true;
+        }
+        else
+        {
+            _dragPreservedSelection = null;
+        }
     }
 
     private async void FileListGrid_PreviewMouseMove(object sender, MouseEventArgs e)
@@ -162,7 +187,13 @@ public partial class MainWindow
                 Math.Abs(pos.Y - _dragStartPoint.Y) < SystemParameters.MinimumHorizontalDragDistance)
                 return;
 
-            var selectedItems = FileListGrid.SelectedItems.Cast<ArchiveItem>().ToList();
+            // 防止 async void 重入：提取阶段不处理新的 PreviewMouseMove
+            if (_isDragExtracting) return;
+
+            // 优先使用 PreviewMouseLeftButtonDown 时保存的多选集（不受 DataGrid 清空影响）
+            var selectedItems = _dragPreservedSelection
+                ?? FileListGrid.SelectedItems.Cast<ArchiveItem>().ToList();
+            _dragPreservedSelection = null; // 一次性消费
             if (selectedItems.Count == 0) return;
 
             var hitTest = FileListGrid.InputHitTest(_dragStartPoint) as DependencyObject;
@@ -173,8 +204,15 @@ public partial class MainWindow
                 selectedItems = new List<ArchiveItem> { rowItem };
             }
 
-            var filesToDrag = selectedItems.Where(i => !i.IsDirectory).ToList();
+            // 保存选中目录供路径裁剪用
+            var selectedDirs = selectedItems.Where(s => s.IsDirectory).ToList();
+
+            // 展开目录为其包含的全部文件，非目录项直接保留
+            var filesToDrag = ExpandDragItems(selectedItems);
             if (filesToDrag.Count == 0) return;
+
+            // 至此确认需要提取，置重入锁
+            _isDragExtracting = true;
 
             _dragTempDir = Path.Combine(Path.GetTempPath(), L.T(L.App_MantisZipTitle), "DragDrop", Guid.NewGuid().ToString());
             Directory.CreateDirectory(_dragTempDir);
@@ -192,8 +230,7 @@ public partial class MainWindow
                 {
                     if (ct.IsCancellationRequested) break;
                     var item = filesToDrag[i];
-                    var safeEntryPath = FileConflictHelper.SanitizeEntryPath(item.FullPath);
-                    var outputPath = Path.Combine(_dragTempDir, safeEntryPath);
+                    var outputPath = GetDragExtractPath(item, selectedDirs, _dragTempDir);
                     pw.SetProgress((double)i / filesToDrag.Count * 100, L.TF(L.Main_Status_Extracting, item.NameDisplay ?? item.Name));
                     await ExtractEntryForDragAsync(item, outputPath);
                     extractedPaths.Add(outputPath);
@@ -202,10 +239,17 @@ public partial class MainWindow
                 if (ct.IsCancellationRequested) { SetStatus(L.T(L.Main_Status_AddCancel)); return; }
                 if (extractedPaths.Count == 0) { SetStatus(L.T(L.Main_Status_NoDragFiles)); return; }
 
+                // 枚举 temp 目录下的一级条目（文件和目录），传给 CF_HDROP。
+                // Explorer 收到目录句柄后会递归复制整个目录树，从而保留子目录结构；
+                // 而传扁平文件列表会导致所有文件平铺到目标目录（结构丢失）。
+                var topLevelItems = Directory.EnumerateFileSystemEntries(_dragTempDir).ToList();
+                if (topLevelItems.Count == 0) { SetStatus(L.T(L.Main_Status_NoDragFiles)); return; }
+
                 pw.SetProgress(100, L.T(L.Main_Status_DragWaiting));
                 _isOwnDrag = true;
-                try { DragDrop.DoDragDrop(FileListGrid, new DataObject(DataFormats.FileDrop, extractedPaths.ToArray()), DragDropEffects.Copy); }
+                try { DragDrop.DoDragDrop(FileListGrid, new DataObject(DataFormats.FileDrop, topLevelItems.ToArray()), DragDropEffects.Copy); }
                 finally { _isOwnDrag = false; }
+                App.LogDebug("DragDrop: completed, topLevelItems={0}, paths=[{1}]", topLevelItems.Count, string.Join("; ", topLevelItems));
             }
             catch (NotSupportedException ex)
             {
@@ -220,6 +264,7 @@ public partial class MainWindow
                 try { if (pw.IsVisible) pw.Close(); } catch { }
                 CleanupDragTempDir();
                 SetStatus(L.T(L.Main_Status_Ready));
+                _isDragExtracting = false;
             }
         }
         catch (Exception ex)
@@ -230,35 +275,74 @@ public partial class MainWindow
             try { if (pw?.IsVisible == true) pw.Close(); } catch { }
             CleanupDragTempDir();
             SetStatus(L.T(L.Main_Status_Ready));
+            _isDragExtracting = false;
         }
     }
 
-    private static void ExtractTarGzSingleEntry(string archivePath, string entryName, string outputPath)
+    /// <summary>
+    /// 展开选集：目录项展开为其内部所有文件；非目录项直接保留。去重。
+    /// 所有路径比较前均归一化分隔符，以兼容 ZIP 中可能使用的 \ 路径。
+    /// </summary>
+    private List<ArchiveItem> ExpandDragItems(IReadOnlyList<ArchiveItem> items)
     {
-        // 路径安全检查（防御纵深，调用方已净化但仍做最终验证）
-        var normalized = Path.GetFullPath(outputPath);
-        var segments = normalized.Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-        if (segments.Any(s => s == ".."))
-            throw new InvalidOperationException($"输出路径包含非法路径穿越: {outputPath}");
-
-        using var inputStream = File.OpenRead(archivePath);
-        // 传入原始压缩流，让 TarReader 自动检测 gzip 头
-        using var reader = SharpCompress.Readers.Tar.TarReader.OpenReader(inputStream, new SharpCompress.Readers.ReaderOptions { LookForHeader = true });
-        while (reader.MoveToNextEntry())
+        var result = new List<ArchiveItem>();
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var item in items)
         {
-            var entry = reader.Entry;
-            if (entry.IsDirectory) continue;
-            if (entry.Key == entryName)
+            if (!item.IsDirectory)
             {
-                var dir = Path.GetDirectoryName(outputPath);
-                if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir)) Directory.CreateDirectory(dir);
-                using var outStream = File.Create(outputPath);
-                using var entryStream = reader.OpenEntryStream();
-                entryStream.CopyTo(outStream);
-                return;
+                if (seen.Add(item.FullPath.Replace('\\', '/')))
+                    result.Add(item);
+            }
+            else
+            {
+                var dirPath = item.FullPath.Replace('\\', '/');
+                var dirPrefix = dirPath.EndsWith("/") ? dirPath : dirPath + "/";
+                foreach (var child in _allItems)
+                {
+                    if (child.IsDirectory) continue;
+                    var childPath = child.FullPath.Replace('\\', '/');
+                    if (childPath.StartsWith(dirPrefix, StringComparison.Ordinal) &&
+                        seen.Add(childPath))
+                    {
+                        result.Add(child);
+                    }
+                }
             }
         }
-        throw new FileNotFoundException(L.TF(L.Core_Drag_EntryNotFound, entryName));
+        return result;
+    }
+
+    /// <summary>
+    /// 计算拖拽提取的目标路径：对选中目录展开的文件，去掉选中目录的父路径前缀，
+    /// 保留选中目录名作为输出根容器。非目录展开的文件保持完整归档路径。
+    /// 示例：选中 "Total Commander 10/PLUGINS/wbx" 时，
+    ///   wbx/ButtonBarChanger/file.wbx → _dragTempDir\wbx\ButtonBarChanger\file.wbx ✅
+    ///   而非 _dragTempDir\Total Commander 10\PLUGINS\wbx\ButtonBarChanger\file.wbx ❌
+    /// </summary>
+    private string GetDragExtractPath(ArchiveItem item, IReadOnlyList<ArchiveItem> selectedDirs, string tempDir)
+    {
+        var normalizedPath = item.FullPath.Replace('\\', '/');
+        var relativePath = normalizedPath;
+
+        foreach (var dir in selectedDirs)
+        {
+            var dirPath = dir.FullPath.Replace('\\', '/').TrimEnd('/');
+            var dirPrefix = dirPath + "/";
+            if (normalizedPath.StartsWith(dirPrefix, StringComparison.Ordinal))
+            {
+                // 此文件从该目录展开：去掉选中目录的父路径，保留目录名及以下子结构
+                var idx = dirPath.LastIndexOf('/');
+                if (idx >= 0)
+                    relativePath = normalizedPath.Substring(idx + 1);
+                // idx < 0 表示根级目录，无需裁剪，保留完整路径
+                break;
+            }
+        }
+
+        var safeEntryPath = FileConflictHelper.SanitizeEntryPath(relativePath);
+        // 使用 GetFullPath 归一化分隔符（\ vs /），避免 CF_HDROP 中的 mixed separators 问题
+        return Path.GetFullPath(Path.Combine(tempDir, safeEntryPath));
     }
 
     private void CleanupDragTempDir()
@@ -274,21 +358,8 @@ public partial class MainWindow
         var dir = Path.GetDirectoryName(outputPath);
         if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir)) Directory.CreateDirectory(dir);
 
-        switch (_currentFormat)
-        {
-            case ArchiveFormat.Zip:
-            case ArchiveFormat.SevenZip:
-                await ArchiveEntryExtractor.ExtractEntryAsync(
-                    _currentArchivePath!, item.FullPath, outputPath, _currentFormat, _currentPassword);
-                break;
-            case ArchiveFormat.Tar:
-            case ArchiveFormat.GZip:
-                await Task.Run(() =>
-                    ExtractTarGzSingleEntry(_currentArchivePath!, item.FullPath, outputPath));
-                break;
-            default:
-                throw new NotSupportedException(L.TF(L.Core_Drag_FormatUnsupported, _currentFormat));
-        }
+        await ArchiveEntryExtractor.ExtractEntryAsync(
+            _currentArchivePath!, item.FullPath, outputPath, _currentFormat, _currentPassword);
     }
 
     private static T? FindVisualParent<T>(DependencyObject? element) where T : DependencyObject

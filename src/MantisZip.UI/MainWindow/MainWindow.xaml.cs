@@ -61,6 +61,8 @@ public partial class MainWindow : Window
     private Point _dragStartPoint;           // 文件列表拖拽起点
     private string? _dragTempDir;            // 拖拽提取临时目录
     private bool _isOwnDrag;                 // 当前拖拽是否来自本窗口
+    private bool _isDragExtracting;          // 文件列表拖出提取中，防止重入
+    private List<ArchiveItem>? _dragPreservedSelection; // 保存点按前的多选集（DataGrid 处理后会被清空）
     private CancellationTokenSource? _previewCts; // 预览取消令牌
     private bool _transparentBgEnabled;
     private BitmapSource? _originalPreviewImage; // 原始图片缓存，用于恢复
