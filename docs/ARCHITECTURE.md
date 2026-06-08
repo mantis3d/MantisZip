@@ -51,33 +51,63 @@ MantisZip/
 │   │   ├── ShellExtLog.cs           # 日志（OutputDebugString）
 │   │   └── NativeMethods.cs         # Win32 P/Invoke
 │   └── MantisZip.UI/                # WPF 桌面应用（net9.0-windows）
-│       ├── MainWindow.xaml / .cs            # 主窗口（code-behind）
-│       ├── MainWindow.DragDrop.cs           # 拖拽导出
-│       ├── MainWindow.Menu.cs               # 菜单事件
-│       ├── MainWindow.Preview.cs            # 预览入口 + 分发
-│       │   ├── Preview.Image.cs             # 图片/GIF
-│       │   ├── Preview.Metadata.cs          # PE/PDF/字体/音视频等元数据
-│       │   ├── Preview.Text.cs              # 文本/CSV
-│       │   └── Preview.Web.cs               # HTML/Markdown/SVG
-│       ├── MainWindow.UI.cs                 # UI 辅助方法
 │       ├── App.xaml / .cs                   # 应用入口
-│       ├── App.Cli.cs / App.PipeServer.cs   # CLI + IPC
-│       ├── App.Password.cs / App.Logging.cs # 密码 + 日志
 │       ├── AppConstants.cs                  # 版本号常量
 │       ├── AppSettings.cs                   # 设置（JSON 持久化）
-│       ├── SettingsWindow.xaml / .cs        # 设置窗口
-│       ├── ProgressWindow.xaml / .cs        # 双进度条窗口
-│       ├── CompressSettingsWindow / ExtractSettingsWindow  # 压缩/解压配置对话框
-│       ├── ConflictDialog / CompressConflictDialog / ErrorDialog  # 对话框
-│       ├── ArchiveCommentDialog / PasswordDialog / PasswordEditDialog
-│       ├── PasswordHelpDialog / PasswordManagerWindow / LogPrivacyHelpDialog
-│       ├── ShellIntegration.cs              # 右键菜单注册（HKCU）
+│       ├── AppMessageBox.xaml / .cs         # 消息框
 │       ├── SystemIconHelper.cs              # SHGetFileInfo 系统图标
-│       ├── Localization/                    # 中/英 JSON 翻译资源
-│       ├── Themes/                          # 亮色/暗色主题
-│       └── Resources/                       # 图标、样式
+│       ├── RecentFileManager.cs             # 最近文件
+│       ├── Converters/                      # 值转换器
+│       │   ├── RatioToFixedWidthConverter.cs
+│       │   └── RatioToWidthConverter.cs
+│       ├── AppPartials/                     # App 分散 partial 类
+│       │   ├── App.Cli.cs                   # CLI 入口分发（最小壳）
+│       │   ├── App.Compress.cs              # --compress / --compress-quick 等压缩命令
+│       │   ├── App.Extract.cs               # --extract / --extract-here 等解压命令
+│       │   ├── App.Open.cs                  # --open 命令
+│       │   ├── App.Logging.cs               # 日志
+│       │   ├── App.Password.cs              # 密码管理辅助
+│       │   └── App.PipeServer.cs            # IPC 命名管道 + Mutex 定义
+│       ├── MainWindow/                      # 主窗口 partials
+│       │   ├── MainWindow.xaml / .cs        # 主窗口（code-behind）
+│       │   ├── MainWindow.DragDrop.cs       # 拖拽导出
+│       │   ├── MainWindow.Menu.cs           # 菜单事件
+│       │   ├── MainWindow.UI.cs             # UI 辅助方法（树/列表/工具栏）
+│       │   ├── MainWindow.Types.cs          # FolderNode / ArchiveItem / CompressedDisplayMode
+│       │   └── Preview/                     # 预览子系统
+│       │       ├── MainWindow.Preview.cs        # 预览入口 + 分发
+│       │       ├── MainWindow.Preview.Image.cs  # 图片/GIF
+│       │       ├── MainWindow.Preview.Metadata.cs  # PE/PDF/字体/音视频等元数据
+│       │       ├── MainWindow.Preview.Text.cs   # 文本/CSV
+│       │       └── MainWindow.Preview.Web.cs    # HTML/Markdown/SVG
+│       ├── Dialogs/                          # 对话框窗口
+│       │   ├── AboutWindow.xaml / .cs
+│       │   ├── ArchiveCommentDialog.xaml / .cs
+│       │   ├── CompressConflictDialog.xaml / .cs
+│       │   ├── CompressSettingsWindow.xaml / .cs
+│       │   ├── CompressSettingsWindow.Password.cs  # 密码标签页（partial）
+│       │   ├── ConflictDialog.xaml / .cs
+│       │   ├── DonationDialog.xaml / .cs
+│       │   ├── ErrorDialog.xaml / .cs
+│       │   ├── ExtractSettingsWindow.xaml / .cs
+│       │   ├── LogPrivacyHelpDialog.xaml / .cs
+│       │   ├── MatchedPasswordDialog.xaml / .cs
+│       │   ├── PasswordDialog.xaml / .cs
+│       │   ├── PasswordEditDialog.xaml / .cs
+│       │   ├── PasswordHelpDialog.xaml / .cs
+│       │   ├── PasswordManagerWindow.xaml / .cs
+│       │   ├── ProgressWindow.xaml / .cs     # 双进度条窗口
+│       │   ├── SettingsWindow.xaml / .cs
+│       │   └── SettingsWindow.Assoc.cs       # 文件关联面板（partial）
+│       ├── Shell/                            # 右键菜单 + 文件关联
+│       │   ├── ShellIntegration.cs           # 共享声明
+│       │   ├── ShellIntegration.Menu.cs      # 右键菜单注册（partial）
+│       │   └── ShellIntegration.Assoc.cs     # 文件关联注册（partial）
+│       ├── Localization/                     # 中/英 JSON 翻译资源
+│       ├── Themes/                           # 亮色/暗色主题
+│       └── Resources/                        # 图标、样式
 ├── tests/
-│   ├── MantisZip.Tests/                    # xUnit（40+ 用例）
+│   ├── MantisZip.Tests/                    # xUnit（171 用例）
 │   │   ├── Engines/                        # 引擎测试
 │   │   └── Fixtures/                       # 测试用压缩包
 │   └── test_encoding/                      # 一次性 ZIP 编码调试工具

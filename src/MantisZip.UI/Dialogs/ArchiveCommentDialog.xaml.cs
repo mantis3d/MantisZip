@@ -1,8 +1,6 @@
-using System;
 using System.Windows;
-using ICSharpCode.SharpZipLib.Zip;
-using MantisZip.Core;
 using MantisZip.Core.Abstractions;
+using MantisZip.Core.Utils;
 using MantisZip.UI.Localization;
 
 namespace MantisZip.UI;
@@ -28,7 +26,7 @@ public partial class ArchiveCommentDialog : Window
         Close();
     }
 
-    private void Save_Click(object sender, RoutedEventArgs e)
+    private async void Save_Click(object sender, RoutedEventArgs e)
     {
         if (_format != ArchiveFormat.Zip)
         {
@@ -39,12 +37,16 @@ public partial class ArchiveCommentDialog : Window
 
         var newComment = CommentTextBox.Text.Trim();
 
+        // 显示保存中状态
+        SaveBtn.IsEnabled = false;
+        CancelBtn.IsEnabled = false;
+        CommentTextBox.IsEnabled = false;
+        ButtonPanel.Visibility = Visibility.Collapsed;
+        SavingText.Visibility = Visibility.Visible;
+
         try
         {
-            using var zf = new ZipFile(_archivePath, StringCodec.Default);
-            zf.BeginUpdate();
-            zf.SetComment(newComment);
-            zf.CommitUpdate();
+            await Task.Run(() => ZipCommentHelper.WriteComment(_archivePath, newComment));
 
             DialogResult = true;
             Close();
@@ -54,6 +56,13 @@ public partial class ArchiveCommentDialog : Window
             App.LogDebug("ArchiveCommentDialog.Save: failed: {0}", ex.Message);
             AppMessageBox.Show(L.TF(L.Main_ArchiveComment_SaveFailed, ex.Message),
                 L.T(L.App_ErrorTitle), MessageBoxButton.OK, MessageBoxImage.Error);
+
+            // 恢复界面
+            SavingText.Visibility = Visibility.Collapsed;
+            ButtonPanel.Visibility = Visibility.Visible;
+            SaveBtn.IsEnabled = true;
+            CancelBtn.IsEnabled = true;
+            CommentTextBox.IsEnabled = true;
         }
     }
 }

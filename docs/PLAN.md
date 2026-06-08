@@ -4,7 +4,7 @@
 
 **项目状态**: 🟢 开发中  
 **最后更新**: 2026-06-06  
-**当前版本**: 0.3.8
+**当前版本**: 0.3.9
 
 ---
 
@@ -43,6 +43,8 @@
 | **P2** | 路径快速选择 | [explorer-path-switcher.md](.sisyphus/plans/explorer-path-switcher.md) | 🟢低 | 1-2h | Ctrl+G 唤出资源管理器路径列表 |
 | **P2** | 压缩/解压配置预设 | [compress-preset.md](.sisyphus/plans/compress-preset.md) | 🟡中 | 3-4h | 命名预设保存全部设置 |
 | **P2** | 压缩流程统一化 (CompressService) | [compress-service-unify.md](.sisyphus/plans/compress-service-unify.md) | 🟡中 | 4-6h | GUI/CLI 压缩路径统一为 CompressService |
+| **P2** | ✅ 自定义 ZIP 注释读写 | [remove-sharpziplib.md](.sisyphus/plans/remove-sharpziplib.md) | 🟢低 | 0.5h | ✅ ZipCommentHelper 替换注释编辑中的 SharpZipLib 直接调用；添加保存中文字提示 |
+| **P2** | ZipEngine 完全迁移到 SharpCompress | [zipengine-sharpcompress-migration.md](.sisyphus/plans/zipengine-sharpcompress-migration.md) | 🟡中 | 4h | CompressAsync / AddToArchiveAsync / DeleteEntriesAsync 从 SharpZipLib 迁移到 SharpCompress，彻底移除依赖 |
 | **P3** | 压缩预估 (Compression Estimator) | [compression-estimator.md](.sisyphus/plans/compression-estimator.md) | 🟡中 | 4-5h | 压缩前估算大小/耗时 |
 | **P3** | VirtualFileDataObject | [virtual-file-data-object.md](.sisyphus/plans/virtual-file-data-object.md) | 🔴高 | 6-8h | COM 原生 IDataObject 替代 WPF OLE 桥 |
 | **P3** | 压缩包对比 (Archive Diff) | [archive-diff.md](.sisyphus/plans/archive-diff.md) | 🟡中 | 3-4h | 压缩包文件级差异对比 |

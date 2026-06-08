@@ -202,7 +202,7 @@ public partial class App : Application
 
     /// <summary>
     /// 快速验证密码是否正确——读第一个加密条目 1 字节，
-    /// 密码不对时 SharpZipLib / SharpSevenZipExtractor 会在读字节前抛异常。
+    /// 密码不对时 SharpCompress / SharpSevenZipExtractor 会在读字节前抛异常。
     /// 只捕获密码相关异常，系统级错误向上传播。
     /// </summary>
     internal static bool QuickVerifyPassword(string archivePath, string password, IArchiveEngine engine)

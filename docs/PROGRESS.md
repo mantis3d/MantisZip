@@ -23,7 +23,20 @@
 2. **测试进度 UI 改进**：内联进度条改为 `ProgressWindow`，支持取消操作，取消不弹确认框（直接 `ct.IsCancellationRequested` 检测）
 3. **Dispatcher 优先级竞态修复**：`await` 续体（Normal 优先级）先于 Background 进度更新执行，导致进度 50% 就弹出结果对话框。通过 `Dispatcher.Invoke(() => { }, DispatcherPriority.Background)` 刷新解决
 
-### v0.3.9 (2026-06-06) 文件关联 Bug 修复 + 独立 ProgId + 设置窗口 UI 统一
+### v0.3.9 (2026-06-06 → 06-07) 文件关联 Bug 修复 + 独立 ProgId + 设置窗口 UI 统一
+
+7. **移除 SharpZipLib 注释编辑耦合**：
+   - 新建 `ZipCommentHelper`（Core/Utils）直接操作 ZIP EOCD 字节读写注释，不依赖 SharpZipLib
+   - `ArchiveCommentDialog` 保存注释时显示"正在保存注释..."文字提示（本地化键 `Main_ArchiveComment_Saving`）
+   - 清理 3 处无用 SharpZipLib import（App.xaml.cs / App.Cli.cs / MainWindow.xaml.cs）
+   - 修正 App.Password.cs 注释（SharpZipLib → SharpCompress）
+8. **版本号同步**：AppConstants.cs、.csproj、installer.iss 统一到 v0.3.9
+9. **修复 .GetAwaiter().GetResult() 同步-异步反模式**：`ResolveSmartDest` 改为 async，用 `await` 替代阻塞
+10. **App.Cli.cs 拆分**：按职责拆为 App.Compress.cs（压缩命令）、App.Extract.cs（解压命令）、App.Open.cs（打开/快速压缩），原文件保留为空白 partial 壳
+11. **CompressSettingsWindow 拆分**：密码标签页逻辑独立为 CompressSettingsWindow.Password.cs partial 文件，主文件减少 450 行
+12. **SettingsWindow.xaml.cs 拆分**：文件关联面板逻辑独立为 SettingsWindow.Assoc.cs partial 文件，主文件从 1051 行降至 602 行
+13. **ShellIntegration.cs 拆分**：拆为 ShellIntegration.Menu.cs（右键菜单注册）+ ShellIntegration.Assoc.cs（文件关联注册），原文件保留共享声明（99 行）
+14. **MainWindow.UI.cs 类型抽取**：FolderNode、ArchiveItem 子类、CompressedDisplayMode 枚举移到 MainWindow.Types.cs（139 行）
 
 1. **文件关联 Bug 修复**：
    - `.tar.gz` 不再被跳过——设置勾选后真正写入注册表 `OpenWithProgids` + `DefaultIcon`

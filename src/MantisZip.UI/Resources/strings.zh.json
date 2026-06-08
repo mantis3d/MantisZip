@@ -313,6 +313,7 @@
   "Main_ArchiveComment_Prompt": "编辑压缩包注释：",
   "Main_ArchiveComment_Save": "保存",
   "Main_ArchiveComment_SaveFailed": "保存注释失败: {0}",
+  "Main_ArchiveComment_Saving": "正在保存注释...",
   "Main_ArchiveComment_Title": "压缩包注释",
   "Main_ArchiveComment_ZipOnly": "ⓘ 仅 ZIP 格式支持注释（UTF-8 编码）",
   "Main_Menu_ArchiveComment": "压缩包注释(_C)...",

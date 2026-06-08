@@ -8,7 +8,6 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Threading;
-using ICSharpCode.SharpZipLib.Zip;
 using Microsoft.Win32;
 using MantisZip.Core;
 using MantisZip.Core.Abstractions;
