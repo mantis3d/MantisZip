@@ -7,12 +7,21 @@
 - **技术栈**: .NET 9 + WPF + SharpCompress + SharpSevenZip
 
 ## 版本
-- **当前版本**: 0.3.10
+- **当前版本**: 0.3.11
 - **发布日期**: 2026-06-08
 
 ## 规划中
 
 ## 版本历史（从新到旧）
+
+### v0.3.11 (2026-06-08) 文件列表拖拽提取修复（多选/目录/编码/重入）
+
+1. **异步重入竞态修复**：`PreviewMouseMove` 添加 `_isDragExtracting` 标志，防止异步提取期间并发重入导致多个 ProgressWindow
+2. **ZIP 编码兼容性修复**：`ArchiveEntryExtractor.ExtractZipEntry` 改用 `ZipEngine.OpenArchiveWithEncodingFallback`（CP437/GBK 自动探测），解决中文名 ZIP 文件在拖拽中条目查找失败的问题
+3. **Tar/GZip 提取统一**：新增 `ArchiveEntryExtractor.ExtractTarGzEntry`，`MainWindow.DragDrop` 不再单独用 `TarInputStream` 提取，所有格式统一委托给 `ArchiveEntryExtractor`
+4. **多选拖拽修复**：`PreviewMouseLeftButtonDown` 保存当前 `SelectedItems` 到 `_dragPreservedSelection`，`PreviewMouseMove` 使用保存的选择而非 DataGrid 处理后的 `SelectedItems`
+5. **目录拖拽支持**：新增 `ExpandDragItems` 方法，将选中的目录条目展开为其子文件列表；`GetDragExtractPath` 正确剥离父目录前缀保留子目录结构；`DoDragDrop` 传入 `Directory.EnumerateFileSystemEntries`（目录句柄列表而非扁平文件路径），Explorer 递归复制保留完整目录结构
+6. **自身拖拽光标修复**：`Window_DragOver` 顶部提前检查 `_isOwnDrag`，自身拖拽时显示 `None` 效果而非残留的 `Copy`
 
 ### v0.3.10 (2026-06-08) 测试按钮完整性检查 + ProgressWindow 集成
 

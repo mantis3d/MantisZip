@@ -9,13 +9,16 @@
 
 ### 当前问题：急切提取 (Eager-Extraction)
 
-目前拖拽导出使用 **7-Zip 模式的急切提取**：在 `DoDragDrop` 之前，先将所有文件完整提取到 `%TEMP%\MantisZip\DragDrop\{GUID}\`，然后调用：
+目前拖拽导出使用 **7-Zip 模式的急切提取**：在 `DoDragDrop` 之前，先将所有文件完整提取到 `%TEMP%\MantisZip\DragDrop\{GUID}\`，然后枚举 temp 目录下的一级条目（非展开的文件列表）传给 `CF_HDROP`：
 
 ```csharp
-DragDrop.DoDragDrop(FileListGrid, new DataObject(DataFormats.FileDrop, paths), DragDropEffects.Copy);
+var topLevelItems = Directory.EnumerateFileSystemEntries(_dragTempDir).ToList();
+DragDrop.DoDragDrop(FileListGrid, new DataObject(DataFormats.FileDrop, topLevelItems.ToArray()), DragDropEffects.Copy);
 ```
 
-**弊端：**
+> ⚠️ v0.3.8 之前传的是展开后的扁平文件列表（`extractedPaths.ToArray()`），导致 Explorer 不保留子目录结构。传一级目录条目后，Explorer 会递归复制整个目录树，结构得以保留。
+
+**急切提取的弊端：**
 
 | 问题 | 影响 |
 |------|------|
@@ -66,8 +69,9 @@ Explorer 边读边写，实现真正的延迟渲染
 
 **当前 (急切提取)：**
 ```
-用户按下拖拽 → 创建 TempDir → 逐一提取所有文件 → 显示进度窗口 → DoDragDrop(已就绪路径)
-    → Explorer 复制文件 → 清理 TempDir
+用户按下拖拽 → 创建 TempDir → 提取全部文件（保持子目录结构）
+    → 枚举 temp 下一级条目 → DoDragDrop(一级目录/文件路径)
+    → Explorer 递归复制目录树 → 清理 TempDir
                   ↑
         用户要等所有文件提取完才能拖
 ```
@@ -93,9 +97,11 @@ Explorer Drop 时调用：
   FORMATETC.cfFormat == CF_HDROP
     ↓
   我们构建 DROPFILES 结构：
-    DROPFILES.pFiles = offset to file list
-    DROPFILES.fWide  = true (UTF-16)
-    files列表 = "C:\Temp\MantisZip\DragDrop\...\file1.txt\0file2.txt\0\0"
+     DROPFILES.pFiles = offset to file list
+     DROPFILES.fWide  = true (UTF-16)
+     files列表 = "C:\Temp\MantisZip\DragDrop\{GUID}\wbx\0readme.txt\0\0"
+     // ↑ 传一级条目（目录+文件），而非展开的全部文件路径。
+     //   Explorer 收到目录句柄后递归复制，保留子目录结构。
     ↓
   分配 HGLOBAL (GlobalAlloc) 写入结构
     ↓
@@ -223,29 +229,30 @@ public sealed class VirtualFileDataObject : System.Runtime.InteropServices.ComTy
 ```csharp
 private string[] EnsureFilesExtracted()
 {
-    // 如果已经提取过，返回缓存路径
     if (_extractedPaths != null) return _extractedPaths;
 
     // 创建临时目录
     _dragTempDir = Path.Combine(Path.GetTempPath(), "MantisZip", "DragDrop", Guid.NewGuid().ToString());
     Directory.CreateDirectory(_dragTempDir);
 
-    // 执行实际提取（异步转同步，因为 GetData 在 COM 线程）
-    var results = new List<string>();
+    // 1. 提取所有文件到 temp（保持子目录结构）
     foreach (var item in _itemsToDrag)
     {
-        var outputPath = Path.Combine(_dragTempDir, item.FullPath);
+        var outputPath = GetDragExtractPath(item, _selectedDirs, _dragTempDir);
         // 同步提取——需要同步版本的 ExtractEntry
         ExtractEntryForDragSync(item, outputPath);
-        results.Add(outputPath);
     }
 
-    _extractedPaths = results.ToArray();
+    // 2. 枚举 temp 下一级条目（目录+文件）作为 CF_HDROP 返回
+    //    不返回展开的文件列表——否则 Explorer 不保留子目录结构
+    _extractedPaths = Directory.EnumerateFileSystemEntries(_dragTempDir).ToArray();
     return _extractedPaths;
 }
 ```
 
-**⚠️ 线程问题：** `GetData()` 由 Explorer 在 OLE 线程上同步调用。不能直接使用 `async` 提取方法。有两种处理方式：
+> ⚠️ 关键：`EnsureFilesExtracted` 返回的路径是 **temp 目录下的一级条目**（目录或文件），不是提取的所有文件路径。Explorer 收到目录句柄后会递归复制整个目录树，从而保留 `wbx\ButtonBarChanger\file.wbx` 这样的子目录结构。详见 v0.3.8 `GetDragExtractPath` 实现。
+
+**线程问题：** `GetData()` 由 Explorer 在 OLE 线程上同步调用。不能直接使用 `async` 提取方法。有两种处理方式：
 
 1. **同步提取** — 为需要提取的条目提供同步版本的 ExtractEntry。ArchiveEntryExtractor 底层用的是同步 Stream 操作，可以封装同步版本。
 2. **阻塞等待** — `Task.Run(() => ExtractAsync()).GetAwaiter().GetResult()` — 简单但可能死锁，不推荐。
@@ -277,7 +284,7 @@ DragDrop.DoDragDrop(source, dataObject, DragDropEffects.Copy);
 | 文件 | 改动 | 预估工时 |
 |------|------|---------|
 | `UI/VirtualFileDataObject.cs` | 🆕 新增 — COM IDataObject 实现，含 DROPFILES 构建、GlobalAlloc 管理 | 2h |
-| `UI/MainWindow.DragDrop.cs` | 修改 `FileListGrid_PreviewMouseMove` — 改用 VirtualFileDataObject 替代直接 DataObject；移除急切提取逻辑中的进度窗口；将提取触发移到 GetData 回调 | 1h |
+| `UI/MainWindow.DragDrop.cs` | 修改 `FileListGrid_PreviewMouseMove` — 改用 VirtualFileDataObject 替代直接 DataObject；保留 `ExpandDragItems` + `GetDragExtractPath` + 一级条目枚举逻辑，仅在 GetData 回调中执行提取而非预提取；移除急切提取的进度窗口 | 1h |
 | `UI/ProgressWindow.xaml/.cs` | 不修改或微调 — 延迟渲染模式下，ProgressWindow 在 drop 后、文件复制过程中展示；可能需要改为显示「正在将文件复制到目标…」而非提取进度 | 20min |
 | `Core/Utils/ArchiveEntryExtractor.cs` | 可选 — 添加同步版本的 ExtractEntry 方法（`ExtractEntry` 不带 Async 后缀），因为 GetData 不能 async | 30min |
 | `UI/App.cs` | 可选 — 添加拖拽提取的独立 temp 清理（当前是 DragDrop 方法结束时清理，延迟渲染模式下清理时机不同） | 15min |
@@ -478,32 +485,37 @@ internal struct DROPFILES
 ```csharp
 // 在 FileListGrid_PreviewMouseMove 中，替换：
 
-// 旧代码 — 急切提取 + DoDragDrop
-// pw.SetProgress(100, "⏳ 正在拖拽 — 放到目标位置以复制文件");
+// ———— 旧代码 (v0.3.8) ————
+// 急切提取 + 枚举一级条目 + DoDragDrop
+// var topLevelItems = Directory.EnumerateFileSystemEntries(_dragTempDir).ToList();
+// pw.SetProgress(100, L.T(L.Main_Status_DragWaiting));
 // _isOwnDrag = true;
-// DragDrop.DoDragDrop(FileListGrid, new DataObject(DataFormats.FileDrop, paths), DragDropEffects.Copy);
+// DragDrop.DoDragDrop(FileListGrid, new DataObject(DataFormats.FileDrop, topLevelItems.ToArray()), DragDropEffects.Copy);
 // _isOwnDrag = false;
 
-// 新代码 — 延迟渲染
+// ———— 新代码 — 延迟渲染 ————
 _isOwnDrag = true;
 
 // 构造 VirtualFileDataObject，传入提取回调
 // 提取只在 GetData()（即用户放下文件时）执行
 var vfdo = new VirtualFileDataObject(() =>
 {
-    // 同步提取所有文件
-    var syncExtractor = new DragDropExtractor(_currentArchivePath!, _currentFormat, _currentPassword);
-    var paths = syncExtractor.ExtractAll(filesToDrag, _dragTempDir);
-    return paths;
+    // 1. 同步提取所有文件到 temp（保持子目录结构，使用 GetDragExtractPath 计算路径）
+    var syncExtractor = new DragDropExtractor(
+        _currentArchivePath!, _currentFormat, _currentPassword);
+    syncExtractor.ExtractAll(filesToDrag, _selectedDirs, _dragTempDir);
+
+    // 2. 返回 temp 下一级条目（目录+文件），Explorer 递归复制保留结构
+    return Directory.EnumerateFileSystemEntries(_dragTempDir).ToArray();
 });
 
 DragDrop.DoDragDrop(FileListGrid, vfdo, DragDropEffects.Copy);
 // DoDragDrop 是阻塞的，执行到这里时已经完成 drop
-// VirtualFileDataObject 的析构函数会清理临时文件
 _isOwnDrag = false;
 ```
 
 **注意：**
+- `ExtractAll` 只提取到 temp，不收集路径；`EnsureFilesExtracted` 通过 `Directory.EnumerateFileSystemEntries` 枚举一级条目返回（非展开文件列表）。
 - `VirtualFileDataObject` 的清理（删除临时文件）必须在 Explorer 完成文件复制之后。当前 `IDataObject` 的实现无法感知 Explorer 何时完成复制。
 - **解决方案：** 不在 `Dispose` 中清理，而是通过 `DoDragDrop` 返回后**延迟一段时间再清理**，或者使用 `Shell32.SHFileOperation` 检测文件操作完成。
 - 更稳妥的做法：记录临时目录路径，在 `DoDragDrop` 返回后等待几秒再清理（通过 `Task.Delay` + 重试机制）。
@@ -513,6 +525,8 @@ _isOwnDrag = false;
 ```csharp
 /// <summary>
 /// 拖拽提取辅助类，提供同步提取（用于 GetData 回调）。
+/// v0.3.8 新增 GetDragExtractPath：裁剪选中目录的父路径前缀，保留选中目录名作输出根容器。
+/// ExtractAll 只负责提取到 temp，不收集路径——调用方通过 Directory.EnumerateFileSystemEntries 枚举一级条目。
 /// </summary>
 internal class DragDropExtractor
 {
@@ -527,23 +541,48 @@ internal class DragDropExtractor
         _password = password;
     }
 
-    public string[] ExtractAll(List<ArchiveItem> items, string tempDir)
+    /// <summary>
+    /// 同步提取所有文件到 tempDir，保持子目录结构。
+    /// 使用 GetDragExtractPath 计算输出路径（裁剪父路径前缀）。
+    /// 不返回路径数组——调用方枚举 tempDir 下一级条目作为 CF_HDROP 数据。
+    /// </summary>
+    public void ExtractAll(List<ArchiveItem> items, IReadOnlyList<ArchiveItem> selectedDirs, string tempDir)
     {
         Directory.CreateDirectory(tempDir);
-        var results = new List<string>();
 
         foreach (var item in items)
         {
-            var outputPath = Path.Combine(tempDir, item.FullPath);
+            // 使用与急切提取相同的路径裁剪逻辑
+            var outputPath = GetDragExtractPath(item, selectedDirs, tempDir);
             var dir = Path.GetDirectoryName(outputPath);
             if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
                 Directory.CreateDirectory(dir);
 
             ExtractSingle(item, outputPath);
-            results.Add(outputPath);
+        }
+    }
+
+    private static string GetDragExtractPath(ArchiveItem item, IReadOnlyList<ArchiveItem> selectedDirs, string tempDir)
+    {
+        // 从 MainWindow.DragDrop.cs 搬过来（v0.3.8）
+        var normalizedPath = item.FullPath.Replace('\\', '/');
+        var relativePath = normalizedPath;
+
+        foreach (var dir in selectedDirs)
+        {
+            var dirPath = dir.FullPath.Replace('\\', '/').TrimEnd('/');
+            var dirPrefix = dirPath + "/";
+            if (normalizedPath.StartsWith(dirPrefix, StringComparison.Ordinal))
+            {
+                var idx = dirPath.LastIndexOf('/');
+                if (idx >= 0)
+                    relativePath = normalizedPath.Substring(idx + 1);
+                break;
+            }
         }
 
-        return results.ToArray();
+        var safeEntryPath = FileConflictHelper.SanitizeEntryPath(relativePath);
+        return Path.GetFullPath(Path.Combine(tempDir, safeEntryPath));
     }
 
     private void ExtractSingle(ArchiveItem item, string outputPath)
@@ -708,21 +747,24 @@ if (_isOwnDrag) return; // 在 Window_Drop 中防止自我循环
 2. 如果用户取消密码输入，则不启动拖拽。
 
 ```csharp
-var itemsToDrag = selectedItems.Where(i => !i.IsDirectory).ToList();
+var itemsToDrag = ExpandDragItems(selectedItems);
+var selectedDirs = selectedItems.Where(s => s.IsDirectory).ToList();
 
 // 预检查加密文件
 var hasEncrypted = itemsToDrag.Any(i => i.IsEncrypted);
 if (hasEncrypted && !await QuickVerifyPasswordAsync())
 {
-    // 弹出密码输入（复用现有逻辑）
     if (!await PromptPasswordAsync()) return;
 }
 
-// 构造 VirtualFileDataObject
+// 构造 VirtualFileDataObject，延迟渲染
 var vfdo = new VirtualFileDataObject(() =>
 {
+    // 提取全部文件（保持子目录结构，使用 GetDragExtractPath 裁剪路径）
     var extractor = new DragDropExtractor(_currentArchivePath!, _currentFormat, _currentPassword);
-    return extractor.ExtractAll(itemsToDrag, _dragTempDir);
+    extractor.ExtractAll(itemsToDrag, selectedDirs, _dragTempDir);
+    // 返回 temp 下一级条目，Explorer 递归复制保留结构
+    return Directory.EnumerateFileSystemEntries(_dragTempDir).ToArray();
 });
 ```
 
@@ -734,7 +776,8 @@ var vfdo = new VirtualFileDataObject(() =>
 |---------|------|
 | 拖拽 1 个文本文件到桌面 | 文件正常复制，无崩溃 |
 | 拖拽 10 个文件（含中文名）到文件夹 | 全部复制成功，文件名正确 |
-| 拖拽子目录中的文件 | 保持目录结构 |
+| 拖拽子目录中的文件 | 保持目录结构（选中目录名作根容器，内部子结构完整） |
+| 拖拽选中目录（非文件）到桌面 | 保持目录名及内部子目录结构（v0.3.8 `GetDragExtractPath` + 一级条目枚举） |
 | 拖拽加密压缩包中的文件 | 提取成功（需已输入密码） |
 | 拖拽到一半按 Esc 取消 | 无 temp 残留 |
 | 拖拽后立即关闭应用 | App.OnExit 清理残留 temp |
