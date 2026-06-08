@@ -21,6 +21,7 @@
 | 任务 | 说明 | 工作量 |
 |------|------|--------|
 | **VirtualFileDataObject** | COM 原生 IDataObject 替代 WPF 包装，拖拽延迟渲染不崩溃 | 中 |
+| 拖拽提取目标检测（方案待定） | Marker 文件 / 前台窗口检测 / VFDO 三选一 | 见计划 |
 | 右键菜单目录结构预览 | 在 COM 菜单中读取压缩包 entry 列表，展示文件树（Bandizip 风格） | 高 |
 | 外部工具视频元数据 | ffprobe 提取时长/分辨率/编码 | 低 |
 | 发布 Release | GitHub Releases + 自动构建 | 低 |
@@ -53,6 +54,7 @@
 | **P3** | 发布 Release | — | 🟢低 | 1-2h | GitHub Releases + CI 构建 |
 | **P3** | ICO 文件自身图标显示 | [ico-file-icon-extract.md](.sisyphus/plans/ico-file-icon-extract.md) | 🟢低 | 2-3h | ico 文件列表显示自身嵌入图标 |
 | **P3** | 右键菜单目录结构预览 | — | 🔴高 | 6-8h | COM 菜单中展示文件树 |
+| **P3** | 拖拽提取目标检测 | [drag-drop-marker-target.md](.sisyphus/plans/drag-drop-marker-target.md) | 🟡中 | 1-3h | Marker 文件探测拖放目标目录（方案待定，需对比 VFDO 后决策） |
 | **P3** | 外部工具视频元数据 | — | 🟢低 | 2-3h | ffprobe 集成 |
 
 ---
