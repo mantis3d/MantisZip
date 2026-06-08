@@ -14,6 +14,15 @@
 
 ## 版本历史（从新到旧）
 
+### v0.3.10 (2026-06-08) 测试按钮完整性检查 + ProgressWindow 集成
+
+1. **引擎测试完整性提升**：三个引擎的 `TestArchiveAsync` 从快速检查改为完整完整性验证
+   - ZipEngine: `stream.ReadByte()`（每个条目只读 1 字节）→ `stream.CopyTo(Stream.Null)` 完整解压流
+   - TarGzEngine: `ListEntriesAsync().Count > 0`（只计数不验证）→ TarReader 逐项 `CopyTo(Stream.Null)` + `.gz` 时 GZipStream 套接
+   - SevenZipEngine: 空循环（只报告进度不测试）→ `extractor.ExtractFile(index, Stream.Null)` 逐项解压 + 保留 `extractor.Check()` 结构校验
+2. **测试进度 UI 改进**：内联进度条改为 `ProgressWindow`，支持取消操作，取消不弹确认框（直接 `ct.IsCancellationRequested` 检测）
+3. **Dispatcher 优先级竞态修复**：`await` 续体（Normal 优先级）先于 Background 进度更新执行，导致进度 50% 就弹出结果对话框。通过 `Dispatcher.Invoke(() => { }, DispatcherPriority.Background)` 刷新解决
+
 ### v0.3.9 (2026-06-06) 文件关联 Bug 修复 + 独立 ProgId + 设置窗口 UI 统一
 
 1. **文件关联 Bug 修复**：
