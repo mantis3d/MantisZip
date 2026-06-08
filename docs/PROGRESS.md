@@ -27,7 +27,8 @@
    - `MainWindow` 状态栏背景从误用的 `Theme_ProgressBg` 改为 `Theme_HeaderBg`
    - `App.xaml` 新增隐式 `TabItem` 样式，提取 CompressSettings/ExtractSettings 两窗口的重复样式，`AboutWindow` 自动获得主题化 Tab 头部
    - 5 个对话框主按钮统一使用 `Theme_Accent` + `Theme_TextOnAccent` 强调色（CompressSettings、ExtractSettings、ArchiveComment、About、AppMessageBox）
-   - `SettingsWindow` 语言/Label/LogPrivacyMode 两个 ComboBox 补齐缺失的 `Background="{DynamicResource Theme_WindowBg}"`
+       - `SettingsWindow` 语言/Label/LogPrivacyMode 两个 ComboBox 补齐缺失的 `Background="{DynamicResource Theme_WindowBg}"`
+5. **AGENTS.md 规则补充**：新增"每次 session 自动执行规则"第 3 条（新 UI 控件必须应用主题样式），并补充缺失主题资源时的处理方式；`Light.xaml` 进度条列颜色加深修复大小列对比度
 
 ### v0.3.9 (2026-06-06 → 06-07) 文件关联 Bug 修复 + 独立 ProgId + 设置窗口 UI 统一
 

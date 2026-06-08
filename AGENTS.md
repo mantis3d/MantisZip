@@ -470,3 +470,28 @@ Build artifacts (bin/, obj/) are gitignored.
 - 格式模仿已有的版本条目（日期 + 变更点列表）
 - 如果本次变更属于某个已有规划任务，在该任务后标注进度
 - 如果当前版本号已有条目，追加到该条目下；否则创建新版本条目
+
+### 规则 3：新 UI 控件必须应用主题样式
+
+新增任何 WPF UI 控件（包括复制粘贴过来的代码），**必须显式设置主题样式键**，禁止使用系统默认颜色：
+
+- 背景必须绑定 `Background="{DynamicResource Theme_WindowBg}"` 或对应语义色（`Theme_SurfaceBg`、`Theme_HeaderBg` 等）
+- 前景/文字色绑定 `Foreground="{DynamicResource Theme_TextPrimary}"` 或 `Theme_TextSecondary`
+- 边框绑定 `BorderBrush="{DynamicResource Theme_Border}"` 或 `Theme_BorderLight`
+- 按钮用 `Theme_ButtonBg` / `Theme_ButtonHover` / `Theme_ButtonPressed`
+- ComboBox、DatePicker 等控件补齐 `Background` + `Foreground` 绑定
+- 不设置 `Height` 固定值除非有充分理由（已有 `22`/`26`/`28` 统一高度可按需复用）
+- **如果新增的控件类型在主题文件中尚无对应的资源键**，必须先在 Light.xaml 和 Dark.xaml 中成对添加该控件所需的颜色/Brush 资源（遵循 `Theme_*` 命名风格），再在控件上绑定。禁止直接使用系统默认颜色。
+
+示例（错误 → 正确）：
+```xml
+<!-- ❌ 错误：使用默认系统颜色，亮/暗色切换后不可见 -->
+<TextBox x:Name="MyTextBox" Width="200"/>
+
+<!-- ✅ 正确：显式绑定主题色 -->
+<TextBox x:Name="MyTextBox" Width="200"
+         Background="{DynamicResource Theme_WindowBg}"
+         Foreground="{DynamicResource Theme_TextPrimary}"
+         BorderBrush="{DynamicResource Theme_Border}"/>
+```
+

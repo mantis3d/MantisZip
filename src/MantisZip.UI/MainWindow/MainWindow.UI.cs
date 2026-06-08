@@ -564,9 +564,15 @@ public partial class MainWindow
         // 比例基准切换：用筛选后列表的最大值作为进度条基准
         if (_rebasedBaseline && HasActiveFilters() && result.Count > 0)
         {
+            // 与 FilterFiles 初始计算保持一致：NotCompressed 格式（TAR/ISO）用 Size 作为有效压缩后大小
+            Func<Core.Abstractions.ArchiveItem, long> effectiveCompressed = i =>
+            {
+                var ui = (ArchiveItem)i;
+                return ui.CompressedDisplay == ArchiveItem.CompressedDisplayMode.NotCompressed ? ui.Size : ui.CompressedSize;
+            };
+
             long maxSize = result.Max(i => i.Size);
-            long maxCompressed = result.Max(i => i.CompressedSize);
-            // 同时考虑 SeparateDirBaseline 时分别取文件/目录的最大值
+            long maxCompressed = result.Max(effectiveCompressed);
             bool separateBaseline = AppSettings.Instance.SeparateDirBaseline;
             long maxFileSize = maxSize, maxDirSize = maxSize;
             long maxFileCompressed = maxCompressed, maxDirCompressed = maxCompressed;
@@ -577,12 +583,12 @@ public partial class MainWindow
                 if (files.Count > 0)
                 {
                     maxFileSize = files.Max(i => i.Size);
-                    maxFileCompressed = files.Max(i => i.CompressedSize);
+                    maxFileCompressed = files.Max(effectiveCompressed);
                 }
                 if (dirs.Count > 0)
                 {
                     maxDirSize = dirs.Max(i => i.Size);
-                    maxDirCompressed = dirs.Max(i => i.CompressedSize);
+                    maxDirCompressed = dirs.Max(effectiveCompressed);
                 }
             }
             foreach (var item in result)
@@ -591,8 +597,25 @@ public partial class MainWindow
                 long baseSize = separateBaseline && uiItem.IsDirectory ? maxDirSize : maxSize;
                 long baseCompressed = separateBaseline && uiItem.IsDirectory ? maxDirCompressed : maxCompressed;
                 uiItem.SizeRatio = baseSize > 0 ? (double)uiItem.Size / baseSize : 0;
-                uiItem.CompressedSizeRatio = baseCompressed > 0 ? (double)uiItem.CompressedSize / baseCompressed : 0;
-                uiItem.DateRatio = 0; // 日期基准在此上下文中无意义
+                uiItem.CompressedSizeRatio = baseCompressed > 0 ? (double)effectiveCompressed(item) / baseCompressed : 0;
+                uiItem.DateRatio = 0; // 先重置，下面重新计算
+            }
+            // 日期比例重新计算（基于过滤后的列表）
+            var datedRebase = result.OfType<ArchiveItem>().Where(i => i.LastModified > DateTime.MinValue).ToList();
+            if (datedRebase.Count > 1)
+            {
+                var minDate = datedRebase.Min(i => i.LastModified);
+                var maxDate = datedRebase.Max(i => i.LastModified);
+                var span = maxDate - minDate;
+                if (span.TotalSeconds > 0)
+                {
+                    foreach (var d in datedRebase)
+                        d.DateRatio = (d.LastModified - minDate).TotalSeconds / span.TotalSeconds;
+                }
+            }
+            else if (datedRebase.Count == 1)
+            {
+                datedRebase[0].DateRatio = 1.0;
             }
         }
     }
