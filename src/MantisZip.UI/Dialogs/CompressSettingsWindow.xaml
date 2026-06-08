@@ -18,34 +18,6 @@
                      BorderBrush="{StaticResource Theme_Border}"
                      Foreground="{StaticResource Theme_TextPrimary}">
             <TabControl.Resources>
-                <Style TargetType="TabItem">
-                    <Setter Property="MinHeight" Value="30"/>
-                    <Setter Property="Padding" Value="14,6"/>
-                    <Setter Property="Background" Value="{StaticResource Theme_HeaderBg}"/>
-                    <Setter Property="Template">
-                        <Setter.Value>
-                            <ControlTemplate TargetType="TabItem">
-                                <Border x:Name="Bd" BorderThickness="0,0,0,2"
-                                        BorderBrush="Transparent"
-                                        Background="{TemplateBinding Background}"
-                                        Padding="{TemplateBinding Padding}">
-                                    <ContentPresenter Content="{TemplateBinding Header}"
-                                                      HorizontalAlignment="Center"
-                                                      VerticalAlignment="Center"/>
-                                </Border>
-                                <ControlTemplate.Triggers>
-                                    <Trigger Property="IsSelected" Value="True">
-                                        <Setter TargetName="Bd" Property="Background" Value="{StaticResource Theme_WindowBg}"/>
-                                        <Setter TargetName="Bd" Property="BorderBrush" Value="{StaticResource Theme_Accent}"/>
-                                    </Trigger>
-                                    <Trigger Property="IsMouseOver" Value="True">
-                                        <Setter TargetName="Bd" Property="Background" Value="{StaticResource Theme_ButtonHover}"/>
-                                    </Trigger>
-                                </ControlTemplate.Triggers>
-                            </ControlTemplate>
-                        </Setter.Value>
-                    </Setter>
-                </Style>
             </TabControl.Resources>
             <!-- ============ 通用 ============ -->
             <TabItem Header="{l:L Compress_Tab_General}">
@@ -346,7 +318,8 @@
 
         <!-- 4. 按钮（始终在底部） -->
         <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,10,0,0">
-            <Button x:Name="CompressButton" Content="{l:L Shell_Compress}" Width="80" Height="28" Margin="5,0" Click="CompressButton_Click" IsEnabled="False"/>
+            <Button x:Name="CompressButton" Content="{l:L Shell_Compress}" Width="80" Height="28" Margin="5,0" Click="CompressButton_Click" IsEnabled="False"
+                    Background="{StaticResource Theme_Accent}" Foreground="{StaticResource Theme_TextOnAccent}" BorderThickness="0"/>
             <Button x:Name="CancelButton" Content="{l:L MsgBox_Cancel}" Width="80" Height="28" Click="CancelButton_Click"/>
         </StackPanel>
     </Grid>

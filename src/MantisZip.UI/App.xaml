@@ -444,6 +444,35 @@
                 <Setter Property="Foreground" Value="{DynamicResource Theme_TextPrimary}"/>
                 <Setter Property="BorderBrush" Value="{DynamicResource Theme_Border}"/>
             </Style>
+            <Style TargetType="TabItem">
+                <Setter Property="MinHeight" Value="30"/>
+                <Setter Property="Padding" Value="14,6"/>
+                <Setter Property="Background" Value="{DynamicResource Theme_HeaderBg}"/>
+                <Setter Property="Foreground" Value="{DynamicResource Theme_TextPrimary}"/>
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="TabItem">
+                            <Border x:Name="Bd" BorderThickness="0,0,0,2"
+                                    BorderBrush="Transparent"
+                                    Background="{TemplateBinding Background}"
+                                    Padding="{TemplateBinding Padding}">
+                                <ContentPresenter Content="{TemplateBinding Header}"
+                                                  HorizontalAlignment="Center"
+                                                  VerticalAlignment="Center"/>
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsSelected" Value="True">
+                                    <Setter TargetName="Bd" Property="Background" Value="{DynamicResource Theme_WindowBg}"/>
+                                    <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource Theme_Accent}"/>
+                                </Trigger>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="Bd" Property="Background" Value="{DynamicResource Theme_ButtonHover}"/>
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
         </ResourceDictionary>
     </Application.Resources>
 </Application>
