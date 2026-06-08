@@ -586,7 +586,8 @@
                 <ScrollViewer VerticalScrollBarVisibility="Auto" Background="{StaticResource Theme_SurfaceBg}">
                     <StackPanel Margin="10">
                         <TextBlock Text="{l:L Settings_Language}" FontWeight="SemiBold" Margin="0,0,0,4"/>
-                        <ComboBox x:Name="LanguageCombo" Width="300" Height="26" HorizontalAlignment="Left"
+                        <ComboBox x:Name="LanguageCombo" Width="300" HorizontalAlignment="Left"
+                                  Background="{DynamicResource Theme_WindowBg}"
                                   SelectionChanged="LanguageCombo_SelectionChanged"/>
                         <TextBlock x:Name="LanguageTranslatorText" FontSize="11"
                                    Foreground="{StaticResource Theme_TextSecondary}"
@@ -620,7 +621,8 @@
                         </StackPanel>
                         <TextBlock Text="{l:L Settings_Debug_LogPrivacyMode}" FontWeight="SemiBold" Margin="0,12,0,4"/>
                         <StackPanel Orientation="Horizontal">
-                            <ComboBox x:Name="LogPrivacyModeCombo" Width="300" HorizontalAlignment="Left">
+                            <ComboBox x:Name="LogPrivacyModeCombo" Width="300" HorizontalAlignment="Left"
+                                      Background="{DynamicResource Theme_WindowBg}">
                                 <ComboBoxItem Tag="off" Content="{l:L Settings_Debug_LogPrivacyMode_Off}"/>
                                 <ComboBoxItem Tag="filename" Content="{l:L Settings_Debug_LogPrivacyMode_Filename}"/>
                                 <ComboBoxItem Tag="extension" Content="{l:L Settings_Debug_LogPrivacyMode_Extension}"/>

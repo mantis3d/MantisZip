@@ -9,7 +9,8 @@
         WindowStartupLocation="CenterScreen"
         ResizeMode="NoResize"
         ShowInTaskbar="False"
-        Topmost="True">
+        Topmost="True"
+        Background="{StaticResource Theme_WindowBg}">
     <Window.Resources>
         <converters:BatchStatusToIconConverter x:Key="BatchStatusIconConverter"/>
         <converters:ProgressStatusToBackgroundConverter x:Key="ProgressStatusBackgroundConverter"/>
@@ -116,7 +117,8 @@
             </Grid.ColumnDefinitions>
             <ProgressBar x:Name="TotalProgressBar" Grid.Column="0"
                          Height="22"
-                         Minimum="0" Maximum="100" Value="0"/>
+                         Minimum="0" Maximum="100" Value="0"
+                         Foreground="{StaticResource Theme_ProgressFill}"/>
             <TextBlock x:Name="PercentText" Grid.Column="1"
                        Text="0%"
                        Width="42" Margin="6,0,0,0"

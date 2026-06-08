@@ -811,7 +811,7 @@ GridLinesVisibility="All"
         </Grid>
 
 <!-- Status Bar -->
-        <StatusBar Grid.Row="3" Background="{StaticResource Theme_ProgressBg}">
+        <StatusBar Grid.Row="3" Background="{StaticResource Theme_HeaderBg}">
             <StatusBar.ItemsPanel>
                 <ItemsPanelTemplate>
                     <Grid>
