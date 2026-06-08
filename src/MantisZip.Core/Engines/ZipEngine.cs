@@ -69,7 +69,7 @@ public class ZipEngine : IArchiveEngine
     /// 使用 SharpCompress 打开 ZIP 文件，自动检测编码（UTF-8 → GBK 回退）。
     /// SharpCompress 每实例设置编码，无全局副作用。
     /// </summary>
-    private static IArchive OpenArchiveWithEncodingFallback(string archivePath, string? password = null)
+    internal static IArchive OpenArchiveWithEncodingFallback(string archivePath, string? password = null)
     {
         // 先以 UTF-8 尝试打开
         var options = new ReaderOptions { Password = password ?? string.Empty };

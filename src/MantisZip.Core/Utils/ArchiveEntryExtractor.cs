@@ -1,6 +1,8 @@
 using System.Diagnostics;
+using System.IO;
 using System.Linq;
 using MantisZip.Core.Abstractions;
+using MantisZip.Core.Engines;
 using MantisZip.Core.Utils;
 using SharpCompress.Archives;
 using SharpCompress.Readers;
@@ -45,6 +47,9 @@ public static class ArchiveEntryExtractor
 
                 case ArchiveFormat.Tar:
                 case ArchiveFormat.GZip:
+                    ExtractTarGzEntry(archivePath, entryName, outputPath);
+                    break;
+
                 default:
                     CoreLog.Info($"ExtractEntryAsync: format {format} not supported for single-entry extract");
                     throw new NotSupportedException($"格式 {format} 不支持单文件预览提取");
@@ -62,8 +67,9 @@ public static class ArchiveEntryExtractor
         // 最终路径安全检查：规范化后验证无路径穿越
         ValidateOutputPath(outputPath);
 
-        using var archive = ArchiveFactory.OpenArchive(archivePath,
-            new ReaderOptions { Password = password ?? string.Empty });
+        // 使用与 ZipEngine.ListEntriesAsync 相同的编码回退逻辑，
+        // 确保 GBK/CP437 编码的遗留 ZIP 也能正确匹配条目名
+        using var archive = ZipEngine.OpenArchiveWithEncodingFallback(archivePath, password);
 
         var entry = archive.Entries.FirstOrDefault(e => e.Key == entryName);
         if (entry == null)
@@ -112,6 +118,34 @@ public static class ArchiveEntryExtractor
         using var fileStream = new FileStream(outputPath, FileMode.Create, FileAccess.Write);
         extractor.ExtractFile(entry.Index, fileStream);
         CoreLog.Info($"ExtractSevenZipEntry: done");
+    }
+
+    private static void ExtractTarGzEntry(string archivePath, string entryName, string outputPath)
+    {
+        CoreLog.Info($"ExtractTarGzEntry: archive={archivePath}, entry={entryName}");
+
+        // 最终路径安全检查
+        ValidateOutputPath(outputPath);
+
+        using var inputStream = File.OpenRead(archivePath);
+        using var reader = SharpCompress.Readers.Tar.TarReader.OpenReader(inputStream, new ReaderOptions { LookForHeader = true });
+        while (reader.MoveToNextEntry())
+        {
+            var entry = reader.Entry;
+            if (entry.IsDirectory) continue;
+            if (entry.Key == entryName)
+            {
+                var dir = Path.GetDirectoryName(outputPath);
+                if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
+                    Directory.CreateDirectory(dir);
+                using var outStream = File.Create(outputPath);
+                using var entryStream = reader.OpenEntryStream();
+                entryStream.CopyTo(outStream);
+                CoreLog.Info($"ExtractTarGzEntry: done");
+                return;
+            }
+        }
+        throw new FileNotFoundException($"在压缩包中未找到条目: {entryName}");
     }
 
     /// <summary>
