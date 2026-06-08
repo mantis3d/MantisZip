@@ -865,51 +865,71 @@ public partial class MainWindow : Window
 
     private async Task TestArchiveAsync(string archivePath)
     {
-        try
+        // 先处理密码（在 ProgressWindow 之前）
+        var engine = ArchiveEngineFactory.GetEngineByExtension(archivePath);
+        if (engine == null) return;
+
+        string? password = _currentPassword;
+        if (_hasEncryptedArchive && password == null)
         {
-            SetStatus(L.T(L.Main_Status_Testing));
-            ShowProgress(true);
-
-            var engine = ArchiveEngineFactory.GetEngineByExtension(archivePath);
-            if (engine == null) return;
-
-            // 如果压缩包有加密但没密码 → 先让用户输入密码
-            string? password = _currentPassword;
-            if (_hasEncryptedArchive && password == null)
+            var pwdDialog = new PasswordDialog(Path.GetFileName(archivePath));
+            pwdDialog.Owner = this;
+            if (pwdDialog.ShowDialog() == true)
             {
-                var pwdDialog = new PasswordDialog(Path.GetFileName(archivePath));
-                pwdDialog.Owner = this;
-                if (pwdDialog.ShowDialog() == true)
+                var userPwd = pwdDialog.ResultPassword;
+                if (!string.IsNullOrEmpty(userPwd) && App.QuickVerifyPassword(archivePath, userPwd, engine))
                 {
-                    var userPwd = pwdDialog.ResultPassword;
-                    if (!string.IsNullOrEmpty(userPwd) && App.QuickVerifyPassword(archivePath, userPwd, engine))
+                    password = userPwd;
+                    _currentPassword = userPwd;
+                    UpdatePasswordStatus();
+                    UpdateEnterPasswordBtnState();
+                    if (pwdDialog.RememberPassword)
                     {
-                        password = userPwd;
-                        _currentPassword = userPwd;
-                        UpdatePasswordStatus();
-                        UpdateEnterPasswordBtnState();
-                        if (pwdDialog.RememberPassword)
-                        {
-                            App.TrySavePassword(userPwd, archivePath, pwdDialog.Patterns, pwdDialog.Description);
-                        }
-                    }
-                    else
-                    {
-                        ShowProgress(false);
-                        AppMessageBox.Show(L.T(L.Main_Status_WrongPwd), L.T(L.App_ErrorTitle), MessageBoxButton.OK, MessageBoxImage.Error);
-                        SetStatus(L.T(L.Main_Status_TestFailed));
-                        return;
+                        App.TrySavePassword(userPwd, archivePath, pwdDialog.Patterns, pwdDialog.Description);
                     }
                 }
                 else
                 {
-                    ShowProgress(false);
-                    SetStatus(L.T(L.Main_Status_AddCancel));
+                    AppMessageBox.Show(L.T(L.Main_Status_WrongPwd), L.T(L.App_ErrorTitle), MessageBoxButton.OK, MessageBoxImage.Error);
+                    SetStatus(L.T(L.Main_Status_TestFailed));
                     return;
                 }
             }
+            else
+            {
+                SetStatus(L.T(L.Main_Status_AddCancel));
+                return;
+            }
+        }
 
-            var result = await engine.TestArchiveAsync(archivePath, password);
+        // 打开 ProgressWindow 显示逐文件测试进度
+        var progressWindow = new ProgressWindow();
+        progressWindow.InitCancellation();
+        progressWindow.Owner = this;
+        progressWindow.Show();
+
+        try
+        {
+            SetStatus(L.T(L.Main_Status_Testing));
+
+            var ct = progressWindow.CancellationToken;
+            var progress = ProgressWindow.CreateBackgroundProgress(progressWindow);
+
+            var result = await engine.TestArchiveAsync(archivePath, password, progress, ct);
+
+            // 刷新所有 Background 优先级的进度更新，确保 ProgressWindow 显示最终状态
+            // Dispatcher.Invoke 从 UI 线程推一个嵌套帧，处理完 Background 队列中所有
+            // 待处理的进度 Report 后再返回，防止结果框抢在进度更新之前弹出
+            Dispatcher.Invoke(() => { }, System.Windows.Threading.DispatcherPriority.Background);
+
+            progressWindow.Close();
+
+            // 引擎内部吞掉了 OperationCanceledException，通过 token 检测取消
+            if (ct.IsCancellationRequested)
+            {
+                SetStatus(L.T(L.Main_Status_Cancelled));
+                return;
+            }
 
             AppMessageBox.Show(
                 result ? L.T(L.Main_Status_TestResultOK) : L.T(L.Main_Status_TestResultBad),
@@ -919,14 +939,16 @@ public partial class MainWindow : Window
 
             SetStatus(result ? L.T(L.Main_Status_TestPassed) : L.T(L.Main_Status_TestFailed));
         }
+        catch (OperationCanceledException)
+        {
+            progressWindow.Close();
+            SetStatus(L.T(L.Main_Status_Cancelled));
+        }
         catch (Exception ex)
         {
+            progressWindow.Close();
             AppMessageBox.Show(L.TF(L.Main_Status_TestFailed, ex.Message), L.T(L.App_ErrorTitle), MessageBoxButton.OK, MessageBoxImage.Error);
             SetStatus(L.T(L.Main_Status_TestFailed));
-        }
-        finally
-        {
-            ShowProgress(false);
         }
     }
 
