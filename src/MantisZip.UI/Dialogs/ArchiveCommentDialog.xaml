@@ -58,7 +58,8 @@
                     Content="{l:L Main_ArchiveComment_Save}" 
                     Click="Save_Click" 
                     Width="80" Height="30"
-                    IsDefault="True"/>
+                    IsDefault="True"
+                    Background="{StaticResource Theme_Accent}" Foreground="{StaticResource Theme_TextOnAccent}" BorderThickness="0"/>
         </StackPanel>
     </Grid>
 </Window>

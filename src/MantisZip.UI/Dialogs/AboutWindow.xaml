@@ -350,8 +350,6 @@
         <Button Grid.Row="2" Content="{l:L MsgBox_Ok}" Width="80" Height="28"
                 HorizontalAlignment="Right" Margin="0,8,0,0"
                 Click="Close_Click" IsDefault="True" IsCancel="True"
-                Background="{StaticResource Theme_ButtonBg}"
-                BorderBrush="{StaticResource Theme_Border}"
-                Foreground="{StaticResource Theme_TextPrimary}"/>
+                Background="{StaticResource Theme_Accent}" Foreground="{StaticResource Theme_TextOnAccent}" BorderThickness="0"/>
     </Grid>
 </Window>
