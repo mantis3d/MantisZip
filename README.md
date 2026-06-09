@@ -1,4 +1,7 @@
+
+
 # MantisZip
+![Logo](docs\images\Logo.png)
 
 **轻量级全功能 Windows 压缩/解压软件** 
 
@@ -233,7 +236,9 @@ This project is licensed under the MIT License.
 如果 MantisZip 对你有帮助，欢迎请我喝杯咖啡 ☕  
 
 <p align="center">
-  <a href="https://www.ifdian.net/a/MantisZen"><img src="https://img.shields.io/badge/爱发电-支持我-blue?style=for-the-badge" alt="爱发电"></a>
+  <a href="https://www.ifdian.net/a/MantisZen"><img src="docs\images\afdian-MantisZen.jpg" alt="爱发电"></a>
 </p>
+
+
 
 ---
