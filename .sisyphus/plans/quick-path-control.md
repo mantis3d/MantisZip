@@ -2,7 +2,7 @@
 
 ## TL;DR
 
-> **Quick Summary**: 创建一个可复用的 QuickPathControl UserControl（TextBox + 收藏/历史/已打开窗口/浏览 四个按钮），配合 QuickPathDialog 模态弹窗和 FavoriteManagerWindow，统一替换所有路径选择场景。
+> **Quick Summary**: 创建一个可复用的 QuickPathControl UserControl（TextBox + 收藏/历史/已打开窗口/浏览 四个按钮），配合 QuickPathDialog 模态弹窗和 FavoriteManagerWindow，统一替换所有路径选择场景。收藏系统新增三个硬编码系统路径（桌面/文档/下载），用户可隐藏不可删除。
 >
 > **Deliverables**:
 > - `Core/Utils/ExplorerWindowTracker.cs` — COM 封装枚举已打开的资源管理器窗口
@@ -37,6 +37,7 @@
 - **历史记录**: 全局统一，50条，去重移至顶部，提交时记录
 - **AddFolderButton**: 也替换为 QuickPathDialog
 - **替换范围**: 一次性全部替换（CompressSettingsWindow / ExtractSettingsWindow / ResolveExtractDestinationStatic / AddFolderButton）
+- **系统路径（收藏增强）**: 桌面/文档/下载三个硬编码系统路径，用户可"隐藏"不可"删除"；FavoriteManagerWindow 中系统路径显示 🔒系统 标签 + 隐藏/显示按钮
 - **测试**: TDD for 数据管理器 + 集成测试 for COM + Agent QA
 
 **Research Findings**:
@@ -65,27 +66,33 @@
 
 ### Concrete Deliverables
 - `src/MantisZip.Core/Utils/ExplorerWindowTracker.cs` — COM 封装
-- `src/MantisZip.Core/Utils/FavoritePathManager.cs` — 收藏管理器
+- `src/MantisZip.Core/Utils/FavoritePathManager.cs` — 收藏管理器（含系统路径桌面/文档/下载）
 - `src/MantisZip.Core/Utils/PathHistoryManager.cs` — 历史管理器
-- `src/MantisZip.UI/Controls/QuickPathControl.xaml` + `.cs` — 快捷路径控件
+- `src/MantisZip.UI/Controls/QuickPathControl.xaml` + `.cs` — 快捷路径控件（下拉含系统路径🔒标识）
 - `src/MantisZip.UI/Dialogs/QuickPathDialog.xaml` + `.cs` — 模态路径选择弹窗
-- `src/MantisZip.UI/Dialogs/FavoriteManagerWindow.xaml` + `.cs` — 收藏管理窗口
+- `src/MantisZip.UI/Dialogs/FavoriteManagerWindow.xaml` + `.cs` — 收藏管理窗口（含系统路径隐藏/显示）
 - 修改 `src/MantisZip.UI/Dialogs/CompressSettingsWindow.xaml` + `.cs`
 - 修改 `src/MantisZip.UI/Dialogs/ExtractSettingsWindow.xaml` + `.cs`
 - 修改 `src/MantisZip.UI/App.xaml.cs`
 - 新增 `tests/MantisZip.Tests/FavoritePathManagerTests.cs`
+- 新增 `tests/MantisZip.Tests/FavoritePathManagerSystemPathsTests.cs`
 - 新增 `tests/MantisZip.Tests/PathHistoryManagerTests.cs`
 - 新增 `tests/MantisZip.Tests/ExplorerWindowTrackerTests.cs`
 
 ### Definition of Done
 - [ ] QuickPathControl 显示 TextBox + 4 个按钮（收藏/历史/已打开/浏览）
-- [ ] 收藏下拉菜单列出所有已保存收藏，底部有「管理收藏…」
+- [ ] 收藏下拉菜单列出系统路径 + 用户收藏（合并），底部有「管理收藏…」
+- [ ] 系统路径（桌面/文档/下载）硬编码，运行时通过 Environment.SpecialFolder 获取
+- [ ] 收藏下拉菜单中系统路径显示 🔒 图标标识
+- [ ] 隐藏的系统路径不出现于收藏下拉菜单
+- [ ] FavoriteManagerWindow 中系统路径显示"隐藏/显示"按钮，用户收藏显示"删除"按钮
+- [ ] 隐藏状态持久化到 favorites.json
 - [ ] 历史下拉菜单列出最近 50 条路径，去重，最新在前
 - [ ] 已打开下拉菜单列出当前所有资源管理器窗口路径，当前窗口高亮
 - [ ] 浏览按钮打开 SaveFileDialog（文件模式）或 VistaFolderBrowserDialog（文件夹模式）
 - [ ] 点击下拉菜单项自动填充到 TextBox
 - [ ] QuickPathDialog 模态弹窗包装 QuickPathControl + 确认/取消按钮
-- [ ] FavoriteManagerWindow 支持添加/编辑/删除/排序收藏
+- [ ] FavoriteManagerWindow 支持添加/编辑/删除/排序用户收藏 + 隐藏/显示系统路径
 - [ ] CompressSettingsWindow 输出路径使用 QuickPathControl
 - [ ] ExtractSettingsWindow 手动路径使用 QuickPathControl
 - [ ] ResolveExtractDestinationStatic 使用 QuickPathDialog
@@ -99,6 +106,10 @@
 - Late binding COM（dynamic + Type.GetTypeFromProgID），不添加 COM 引用
 - COM 错误处理：try/catch COMException/SecurityException，失败时返回空列表
 - 收藏属性：友好名称 + 路径（字符串对）
+- **系统路径（桌面/文档/下载）**: 硬编码通过 Environment.SpecialFolder 获取，不存路径本身到 JSON
+- **系统路径隐藏状态**: 持久化到 favorites.json（存 SpecialFolder 枚举名如 "Desktop"）
+- **FavoriteManagerWindow**: 系统路径显示 🔒系统 标签 + 隐藏/显示按钮；用户收藏显示删除按钮
+- **收藏下拉菜单**: 系统路径 + 用户收藏合并展示，系统路径有 🔒 标识，隐藏的系统路径不出现
 - 历史去重：相同路径移至顶部，不重复存储
 - 非手动模式：按钮禁用不隐藏
 - 新控件全部绑定主题资源键（AGENTS.md 规则 3）
@@ -115,6 +126,8 @@
 - 不做 Shell 上下文菜单集成
 - 不跟踪自动计算路径的历史记录（仅提交时记录）
 - 不修改压缩输出的 SaveFileDialog 行为（仅增加快捷按钮）
+- **系统路径不支持删除/编辑**（用户只能隐藏/显示）
+- **系统路径不存完整路径到 JSON**（仅存 SpecialFolder 枚举名用于隐藏状态跟踪）
 
 ---
 
@@ -143,13 +156,13 @@
 ```
 Wave 1 (Core — 数据层 + COM，MAX PARALLEL):
 ├── T1: ExplorerWindowTracker — COM 封装枚举资源管理器窗口
-├── T2: FavoritePathManager — favorites.json 读写管理
+├── T2: FavoritePathManager — favorites.json 读写 + 系统路径（桌面/文档/下载）
 └── T3: PathHistoryManager — 历史记录自动追踪（50条，去重，移至顶部）
 
 Wave 2 (UI 组件 — 并行构建):
-├── T4: QuickPathControl — WPF UserControl（TextBox + 4 按钮，双模式）
+├── T4: QuickPathControl — WPF UserControl（TextBox + 4 按钮，双模式，下拉含🔒系统路径）
 ├── T5: QuickPathDialog — 模态弹窗包装 QuickPathControl
-└── T6: FavoriteManagerWindow — 收藏管理窗口（增删改排序）
+└── T6: FavoriteManagerWindow — 收藏管理（含系统路径隐藏/显示）
 
 Wave 3 (集成 — 替换所有路径选择点，MAX PARALLEL):
 ├── T7: CompressSettingsWindow — 替换 OutputPathTextBox + 双模式
@@ -157,15 +170,9 @@ Wave 3 (集成 — 替换所有路径选择点，MAX PARALLEL):
 ├── T9: App.xaml.cs + AddFolderButton — 替换 VistaFolderBrowserDialog 调用
 
 Wave 4 (测试 — 全部后端验证):
-├── T10: FavoritePathManager + PathHistoryManager 单元测试
+├── T10: FavoritePathManager（含系统路径）+ PathHistoryManager 单元测试
 ├── T11: ExplorerWindowTracker 集成测试
 └── T12: 端到端 QA
-
-Wave FINAL (4 路并行评审):
-├── F1: Plan compliance audit (oracle)
-├── F2: Code quality review (unspecified-high)
-├── F3: Real manual QA (unspecified-high)
-└── F4: Scope fidelity check (deep)
 ```
 
 ### Dependency Matrix
@@ -266,41 +273,73 @@ Wave FINAL (4 路并行评审):
 
 ---
 
-- [ ] 2. FavoritePathManager — favorites.json 读写管理
+- [ ] 2. FavoritePathManager — favorites.json 读写管理 + 系统路径
 
   **What to do**:
-  - 在 `src/MantisZip.Core/Utils/FavoritePathManager.cs` 创建静态/单例类
+  - 在 `src/MantisZip.Core/Utils/FavoritePathManager.cs` 创建静态类
   - 收藏夹数据模型:
     ```csharp
     public class FavoritePathItem
     {
         public string Name { get; set; } = "";    // 友好名称
         public string Path { get; set; } = "";    // 完整路径
-        public DateTime AddedAt { get; set; }     // 添加时间（用于排序）
+        public DateTime AddedAt { get; set; }     // 添加时间
+        public bool IsSystem { get; set; }        // true=系统内置路径，不可删除/编辑
+        public string? SystemKey { get; set; }    // 系统路径标识: "Desktop"/"Documents"/"Downloads"
     }
     ```
   - favorites.json 存储路径: `%LOCALAPPDATA%\MantisZip\favorites.json`
+  - JSON 文件结构:
+    ```json
+    {
+      "hiddenSystemPaths": ["Desktop", "Downloads"],
+      "userFavorites": [
+        { "name": "项目文件", "path": "D:\\Projects", "addedAt": "2026-06-09T..." }
+      ]
+    }
+    ```
+  - **系统路径定义**（硬编码，不存路径到 JSON）:
+    ```csharp
+    private static readonly (string key, SpecialFolder folder, string defaultName)[] BuiltInSystemPaths =
+    {
+        ("Desktop",    SpecialFolder.Desktop,    "桌面"),
+        ("Documents",  SpecialFolder.MyDocuments, "文档"),
+        ("Downloads",  SpecialFolder.UserProfile, "下载"),  // 实际路径: UserProfile\Downloads
+    };
+    ```
+    - 注意: Downloads 没有直接的 SpecialFolder 枚举，使用 `Path.Combine(Environment.GetFolderPath(SpecialFolder.UserProfile), "Downloads")`
   - 接口:
     ```csharp
     public static class FavoritePathManager
     {
-        public static List<FavoritePathItem> GetAll();
+        public static List<FavoritePathItem> GetAll();        // 系统路径(未隐藏) + 用户收藏合并
+        public static List<FavoritePathItem> GetSystemPaths(); // 所有系统路径(含隐藏的)
+        public static List<FavoritePathItem> GetUserFavorites(); // 仅用户收藏
         public static void Add(string name, string path);
-        public static void Remove(string path);              // 按路径删除
+        public static void Remove(string path);                // 删除用户收藏
         public static void Update(string oldPath, string newName, string newPath);
         public static void Reorder(int oldIndex, int newIndex);
-        public static bool Exists(string path);              // 去重检查
-        public static void Save();                           // 显式持久化
-        public static void Load();                           // 从磁盘加载
+        public static bool Exists(string path);                // 去重检查
+        public static bool IsSystemPath(string path);          // 判断是否为系统路径
+        public static void SetSystemPathHidden(string key, bool hidden); // 隐藏/显示系统路径
+        public static bool IsSystemPathHidden(string key);     // 查询系统路径隐藏状态
+        public static void Save();
+        public static void Load();
     }
     ```
+  - `GetAll()` 逻辑:
+    1. 从 BuiltInSystemPaths 生成系统路径列表，调用 `Environment.GetFolderPath()` 获取真实路径
+    2. 过滤掉 `hiddenSystemPaths` 中的项
+    3. 与 `userFavorites` 合并返回（系统路径在前，用户收藏在后）
   - JSON 序列化使用 `System.Text.Json`（与 PasswordManager 一致）
-  - 文件不存在时返回空列表，不抛异常
-  - 写入时使用 `File.WriteAllText` 原子写入（先写临时文件再 rename）
+  - 文件不存在时初始化空状态（hiddenSystemPaths=[], userFavorites=[]），不抛异常
+  - 写入时使用 `File.WriteAllText`（与现有其他 Manager 一致）
 
   **Must NOT do**:
   - 不添加 NuGet 包依赖（使用 System.Text.Json，已存在）
   - 不存储密码等敏感信息
+  - 系统路径的完整路径不存 JSON（仅存 SpecialFolder 枚举名用于隐藏状态）
+  - 系统路径不允许删除/编辑——由调用者（UI 层）负责禁用按钮
 
   **Recommended Agent Profile**:
   - **Category**: `unspecified-low` — 简单的 JSON 持久化类
@@ -322,8 +361,13 @@ Wave FINAL (4 路并行评审):
   - [ ] 修改收藏 → JSON 更新
   - [ ] 重排序 → 顺序保持
   - [ ] 重复路径检测 → Add 时返回 false 或覆盖确认
-  - [ ] favorites.json 不存在 → 返回空列表，不抛异常
+  - [ ] favorites.json 不存在 → 初始化空状态，不抛异常
   - [ ] 重启后数据持续存在
+  - [ ] `GetAll()` 返回系统路径（桌面/文档/下载）+ 用户收藏合并列表
+  - [ ] `IsSystemPath(path)` 对桌面/文档/下载返回 true
+  - [ ] `SetSystemPathHidden("Desktop", true)` → `GetAll()` 不包含桌面
+  - [ ] `SetSystemPathHidden("Desktop", false)` → `GetAll()` 恢复桌面
+  - [ ] 隐藏状态持久化到 JSON，重启后保持
 
   **QA Scenarios**:
   ```
@@ -333,7 +377,7 @@ Wave FINAL (4 路并行评审):
     Steps:
       1. Add("项目", "D:\\Projects")
       2. Add("照片", "E:\\Photos")
-      3. GetAll() → 返回 2 条
+      3. GetAll() → 返回 2 条用户收藏 + 3 条系统路径 = 5 条
       4. Exists("D:\\Projects") → true
       5. Update("D:\\Projects", "新项目", "D:\\Dev\\Project")
       6. Reorder(1, 0)
@@ -341,14 +385,27 @@ Wave FINAL (4 路并行评审):
     Expected Result: 所有操作成功，JSON 文件内容正确
     Evidence: .sisyphus/evidence/task-2-favorite-crud.txt
 
+  Scenario: 系统路径隐藏/显示
+    Tool: Bash (dotnet test)
+    Preconditions: 干净的 favorites.json
+    Steps:
+      1. GetAll().Count → 3（桌面/文档/下载都可见）
+      2. SetSystemPathHidden("Desktop", true) → Save()
+      3. GetAll().Count → 2（桌面隐藏了）
+      4. 重新 Load() → GetAll().Count → 2（持久化正确）
+      5. SetSystemPathHidden("Desktop", false) → Save()
+      6. GetAll().Count → 3
+    Expected Result: 隐藏状态持久化，重启后保持
+    Evidence: .sisyphus/evidence/task-2-system-path-hide.txt
+
   Scenario: 跨重启持久化
     Tool: Bash
     Preconditions: 同上
     Steps:
-      1. Add 几条收藏
+      1. Add 几条收藏 + 隐藏桌面
       2. Save()
       3. 重新 Load()
-    Expected Result: 数据完整
+    Expected Result: 用户收藏和隐藏状态都正确持久化
     Evidence: .sisyphus/evidence/task-2-favorite-persist.txt
   ```
 
@@ -488,13 +545,15 @@ Wave FINAL (4 路并行评审):
     - 文件模式: `PathText` = 仅目录部分（如 "D:\Backups"）, `FileName` = 文件名含扩展名（如 "archive.zip"）
     - 调用者组合完整路径: `Path.Combine(PathText, FileName)`
   - **下拉菜单逻辑**:
-    - FavButton → 创建 ContextMenu，列出 FavoritePathManager.GetAll()，底部添加「管理收藏…」
+    - FavButton → 创建 ContextMenu，列出 FavoritePathManager.GetAll()（系统路径 + 用户收藏合并）
+    - 系统路径项在菜单中显示 🔒 前缀图标（或小锁图标），用户收藏不显示
+    - 菜单底部固定添加「管理收藏…」分隔线 + 菜单项
     - HistoryButton → 创建 ContextMenu，列出 PathHistoryManager.GetRecent(50)
     - ExplorerButton → 创建 ContextMenu，列出 ExplorerWindowTracker.GetOpenExplorerWindows()
     - 点击任一菜单项 → 文件夹模式设置 PathText；文件模式仅设置 PathText（目录），FileName 保持不变
     - 每个下拉菜单在打开时动态刷新数据
   - **空状态处理**:
-    - 收藏为空 → FavButton 下拉显示「暂无收藏」
+    - 收藏（系统路径+用户收藏）全部为空或全部隐藏时 → FavButton 下拉显示「暂无收藏」
     - 历史为空 → HistoryButton 下拉显示「暂无历史记录」
     - 无资源管理器窗口 → ExplorerButton 下拉显示「没有打开的文件夹」
   - **浏览按钮**:
@@ -517,6 +576,12 @@ Wave FINAL (4 路并行评审):
   - `Main_Menu_FavoriteManager` = "管理收藏…" / "Manage Favorites…"
   - `QuickPath_FolderMode` = "选择文件夹" / "Select folder"
   - `QuickPath_FileMode` = "选择保存路径" / "Select save path"
+  - `QuickPath_Desktop` = "桌面" / "Desktop"
+  - `QuickPath_Documents` = "文档" / "Documents"
+  - `QuickPath_Downloads` = "下载" / "Downloads"
+  - `QuickPath_SystemLabel` = "系统" / "System"
+  - `QuickPath_Hide` = "隐藏" / "Hide"
+  - `QuickPath_Show` = "显示" / "Show"
 
   **Must NOT do**:
   - 不使用外部图标文件（按钮用文本/emoji）
@@ -545,7 +610,9 @@ Wave FINAL (4 路并行评审):
   **Acceptance Criteria**:
   - [ ] UserControl 正确渲染：TextBox + 4 个按钮横排
   - [ ] 四个按钮有正确的 ToolTip
-  - [ ] FavButton 下拉显示收藏列表 + 底部「管理收藏…」
+  - [ ] FavButton 下拉显示系统路径（🔒） + 用户收藏 + 底部「管理收藏…」
+  - [ ] 系统路径项在菜单中带 🔒 标识
+  - [ ] 被隐藏的系统路径不在下拉菜单中出现
   - [ ] HistoryButton 下拉显示历史列表
   - [ ] ExplorerButton 下拉显示已打开窗口列表，当前窗口高亮
   - [ ] 点击下拉项 → PathTextBox 自动填充
@@ -566,20 +633,28 @@ Wave FINAL (4 路并行评审):
     Expected Result: QuickPathControl 正常显示，TextBox + [⭐][🕐][🪟][浏览] 横排
     Evidence: .sisyphus/evidence/task-4-control-appearance.png
 
-  Scenario: 收藏下拉菜单
+  Scenario: 收藏下拉含系统路径
     Tool: Bash（启动+截图）
-    Preconditions: 已添加 2 条收藏（如「项目」→ D:\Projects）
+    Preconditions: 已添加 2 条收藏（如「项目」→ D:\Projects），未隐藏系统路径
     Steps:
       1. 点击 [⭐] 按钮
-    Expected Result: 下拉菜单显示「项目」和「管理收藏…」
+    Expected Result: 下拉菜单显示 🔒桌面、🔒文档、🔒下载，然后「项目」「管理收藏…」
     Evidence: .sisyphus/evidence/task-4-fav-dropdown.png
+
+  Scenario: 隐藏的系统路径不出现
+    Tool: Bash（启动+截图）
+    Preconditions: 通过 FavoriteManagerWindow 隐藏了「桌面」
+    Steps:
+      1. 点击 [⭐] 按钮
+    Expected Result: 下拉菜单不显示桌面，只显示文档、下载和用户收藏
+    Evidence: .sisyphus/evidence/task-4-hidden-path.png
 
   Scenario: 选择路径自动填入
     Tool: Bash（启动+截图）
     Preconditions: 同上
     Steps:
-      1. 点击 [⭐] → 点击「项目」
-    Expected Result: PathTextBox 内容变为 D:\Projects
+      1. 点击 [⭐] → 点击「桌面」
+    Expected Result: PathTextBox 内容变为 C:\Users\Admin\Desktop
     Evidence: .sisyphus/evidence/task-4-path-filled.png
 
   Scenario: 浏览按钮（文件夹模式）
@@ -710,25 +785,47 @@ Wave FINAL (4 路并行评审):
 
 ---
 
-- [ ] 6. FavoriteManagerWindow — 收藏管理窗口
+- [ ] 6. FavoriteManagerWindow — 收藏管理窗口（含系统路径隐藏/显示）
 
   **What to do**:
   - 在 `src/MantisZip.UI/Dialogs/FavoriteManagerWindow.xaml` + `.cs` 创建 Window
-  - **XAML 布局**: 标题「管理收藏」+ ListView（名称、路径、添加时间）+ 底部按钮行
-  - ListView 每行：
-    - 友好名称（可编辑 TextBox inline）
-    - 完整路径（显示）
-    - 添加时间（显示）
-  - **按钮**:
-    - 「添加收藏」→ 弹出输入框（名称 + 路径），默认路径为当前 QuickPathControl 的 PathText
-    - 「编辑」→ 选中项进入编辑模式（Name 列变为 TextBox）
-    - 「删除」→ 确认后删除选中项
-    - 「上移」「下移」→ 调整排序顺序
-  - **数据绑定**: 直接绑定到 FavoritePathManager.GetAll()
-  - **增加/编辑处理**:
+  - **XAML 布局**: 标题「管理收藏」+ ListView（类型、名称、路径、操作）+ 底部按钮行
+  - ListView 每行（混排，系统路径在前，用户收藏在后）:
+    - 类型列：系统路径显示 🔒 +「系统」标签；用户收藏显示 📁 图标
+    - 友好名称
+    - 完整路径
+    - 操作列：
+      - **系统路径** → 「隐藏」/「显示」按钮（切换隐藏状态）
+      - **用户收藏** → 「删除」按钮（确认后删除）
+  - **系统路径视觉区分**:
+    - 系统路径行背景色略不同（如 `#F5F5F5` 亮色 / `#2D2D2D` 暗色，使用现成主题资源）
+    - 系统路径行名称不可编辑，用户收藏可双击编辑
+    - 🔒 图标 + `QuickPath_SystemLabel` 标签标识
+  - **底部按钮行**:
+    - 「添加收藏」→ 弹出输入框（名称 + 路径），默认路径为上一次 QuickPathControl 的 PathText
+    - 「上移」「下移」→ 调整用户收藏排序顺序（系统路径固定排在前面，不可排序）
+  - **数据源**: 通过 `FavoritePathManager.GetSystemPaths()` + `FavoritePathManager.GetUserFavorites()` 分别加载
+    ```csharp
+    // 合并显示逻辑:
+    var systemPaths = FavoritePathManager.GetSystemPaths();  // 所有系统路径（含隐藏的）
+    var userFavorites = FavoritePathManager.GetUserFavorites();
+    // UI 中系统路径在前，用户收藏在后，中间可选分隔线
+    ```
+  - **隐藏/显示处理**:
+    ```csharp
+    private void ToggleSystemPath_Click(string key)
+    {
+        var isHidden = FavoritePathManager.IsSystemPathHidden(key);
+        FavoritePathManager.SetSystemPathHidden(key, !isHidden);
+        FavoritePathManager.Save();
+        RefreshList();  // 刷新列表显示
+    }
+    ```
+  - **添加/删除/编辑处理**（仅限用户收藏）:
     - 添加时：名称和路径均不能为空，路径重复时提示
     - 编辑时：验证名称非空，路径非空
-  - **修改后自动保存**: 每次增删改排序后调用 `FavoritePathManager.Save()`
+    - 删除时：确认后删除（系统路径不可删除，此按钮不出现）
+  - **修改后自动保存**: 每次增删改排序/隐藏切换后调用 `FavoritePathManager.Save()`
   - **主题绑定**: 所有控件绑定 Theme_* 资源键
   - **多入口**:
     1. QuickPathControl ⭐ 下拉菜单 → 「管理收藏…」
@@ -752,6 +849,8 @@ Wave FINAL (4 路并行评审):
   **Must NOT do**:
   - 不添加拖拽排序（使用上下移按钮即可）
   - 不批量操作（单条增删改）
+  - 系统路径不可删除、不可编辑名称/路径
+  - 不修改系统路径的排序（固定排在用户收藏前面）
 
   **Recommended Agent Profile**:
   - **Category**: `visual-engineering` — WPF 数据管理窗口
@@ -769,33 +868,43 @@ Wave FINAL (4 路并行评审):
   - `src/MantisZip.UI/Dialogs/PasswordManagerWindow.xaml.cs` — 交互逻辑参考
 
   **Acceptance Criteria**:
-  - [ ] 窗口打开，显示所有收藏列表
-  - [ ] 添加收藏：输入名称+路径 → 保存
-  - [ ] 编辑收藏：修改名称/路径 → 保存
-  - [ ] 删除收藏：确认后删除
-  - [ ] 上移/下移：排序更新
+  - [ ] 窗口打开，显示系统路径（🔒 系统）+ 用户收藏混合列表
+  - [ ] 系统路径行：点击「隐藏」→ 路径从 GetAll() 中消失；点击「显示」→ 恢复
+  - [ ] 用户收藏：添加/编辑/删除/排序全部正常
+  - [ ] 系统路径不可编辑名称、不可删除
+  - [ ] 隐藏状态持久化，关闭重开后保持
+  - [ ] 上移/下移仅影响用户收藏顺序，系统路径固定在前
   - [ ] 重复路径提示
-  - [ ] 关闭后重新打开 → 数据完整
   - [ ] 亮/暗主题正常
 
   **QA Scenarios**:
   ```
-  Scenario: 收藏完整生命周期
+  Scenario: 收藏管理完整生命周期（含系统路径）
     Tool: Bash（启动+截图）
     Preconditions: 从 QuickPathControl 点击「管理收藏…」
     Steps:
-      1. 添加收藏（名称="项目" 路径="D:\Projects"）
-      2. 添加收藏（名称="照片" 路径="E:\Photos"）
-      3. 列表显示 2 条
-      4. 编辑「项目」→ 改为「开发项目」
-      5. 下移「照片」
-      6. 删除「开发项目」
+      1. 看到 3 条系统路径（🔒桌面、🔒文档、🔒下载）+ 分隔线 + 空用户收藏区
+      2. 隐藏桌面 → 桌面行显示「显示」按钮，行变灰
+      3. 添加用户收藏（名称="项目" 路径="D:\Projects"）
+      4. 添加用户收藏（名称="照片" 路径="E:\Photos"）
+      5. 列表显示 2 条系统路径（桌面不可见）+ 2 条用户收藏
+      6. 编辑「项目」→ 改为「开发项目」
+      7. 下移「照片」
+      8. 再次显示桌面
     Expected Result: 每一步操作后列表和数据正确同步
     Evidence: .sisyphus/evidence/task-6-favmanager-full.png
 
+  Scenario: 系统路径不可删除
+    Tool: Bash
+    Preconditions: FavoriteManagerWindow 打开
+    Steps:
+      1. 选中系统路径行
+    Expected Result: 没有「删除」按钮，只有「隐藏/显示」按钮，名称不可编辑
+    Evidence: .sisyphus/evidence/task-6-system-path-protected.png
+
   Scenario: 重复路径提示
     Tool: Bash
-    Preconditions: 已存在「D:\Projects」
+    Preconditions: 已存在用户收藏「D:\Projects」
     Steps:
       1. 再次添加同名路径
     Expected Result: 提示「该路径已存在」
@@ -1148,18 +1257,27 @@ Wave FINAL (4 路并行评审):
 
 ---
 
-- [ ] 10. 单元测试 — FavoritePathManager + PathHistoryManager
+- [ ] 10. 单元测试 — FavoritePathManager（含系统路径）+ PathHistoryManager
 
   **What to do**:
   - 在 `tests/MantisZip.Tests/FavoritePathManagerTests.cs` 创建测试
-  - 测试 FavoritePathManager:
-    - Add + GetAll 完整流程
-    - Remove 单个和全部
+  - 测试 FavoritePathManager 用户收藏:
+    - Add + GetAll 完整流程（验证返回列表包含系统路径 + 用户收藏）
+    - Remove 单个和全部（仅用户收藏）
     - Update 更新名称和路径
     - Reorder 排序
     - Exists 检测
     - Load/Save 持久化（使用临时目录）
-    - 文件不存在时返回空列表
+    - 文件不存在时初始化空状态
+  - 在 `tests/MantisZip.Tests/FavoritePathManagerSystemPathsTests.cs` 创建系统路径专项测试:
+    - `GetAll()` 默认返回 3 条系统路径（桌面/文档/下载）
+    - `IsSystemPath(桌面路径)` → true
+    - `IsSystemPath(用户自定义路径)` → false
+    - `SetSystemPathHidden("Desktop", true)` → `GetAll()` 不含桌面
+    - `SetSystemPathHidden("Desktop", false)` → `GetAll()` 恢复桌面
+    - 隐藏状态持久化到 JSON → Load 后恢复
+    - 多次隐藏/显示切换状态正确
+    - 全部三个系统路径各自独立控制隐藏
   - 在 `tests/MantisZip.Tests/PathHistoryManagerTests.cs` 创建测试
   - 测试 PathHistoryManager:
     - Record 基本添加
@@ -1193,9 +1311,10 @@ Wave FINAL (4 路并行评审):
 
   **Acceptance Criteria**:
   - [ ] `dotnet test tests/MantisZip.Tests` 全部通过
-  - [ ] FavoritePathManager 测试覆盖 CRUD + 持久化
+  - [ ] FavoritePathManager 测试覆盖 CRUD + 持久化 + 系统路径合并
+  - [ ] FavoritePathManagerSystemPathsTests 覆盖隐藏/显示 + 状态持久化
   - [ ] PathHistoryManager 测试覆盖去重 + FIFO + 排序
-  - [ ] 至少 15 个测试用例（收藏 10 + 历史 5）
+  - [ ] 至少 25 个测试用例（收藏基础 10 + 系统路径 8 + 历史 7）
 
   **QA Scenarios**:
   ```
@@ -1391,15 +1510,15 @@ Wave FINAL (4 路并行评审):
 | Task | Message |
 |------|---------|
 | 1 | `feat(core): add ExplorerWindowTracker for enumerating open Explorer windows` |
-| 2 | `feat(core): add FavoritePathManager for favorites persistence` |
+| 2 | `feat(core): add FavoritePathManager with built-in system paths (Desktop/Documents/Downloads)` |
 | 3 | `feat(core): add PathHistoryManager for recent path tracking` |
 | 4 | `feat(ui): add QuickPathControl UserControl with dual-mode path input` |
 | 5 | `feat(ui): add QuickPathDialog modal for standalone path selection` |
-| 6 | `feat(ui): add FavoriteManagerWindow for favorites management` |
+| 6 | `feat(ui): add FavoriteManagerWindow with system path hide/show support` |
 | 7 | `feat(ui): integrate QuickPathControl into CompressSettingsWindow` |
 | 8 | `feat(ui): integrate QuickPathControl into ExtractSettingsWindow` |
 | 9 | `feat(core): replace VistaFolderBrowserDialog with QuickPathDialog` |
-| 10 | `test: add FavoritePathManager and PathHistoryManager unit tests` |
+| 10 | `test: add FavoritePathManager (incl. system paths) and PathHistoryManager unit tests` |
 | 11 | `test: add ExplorerWindowTracker integration tests` |
 
 ---
@@ -1414,13 +1533,16 @@ dotnet test tests\MantisZip.Tests
 
 ### Final Checklist
 - [ ] QuickPathControl 显示 TextBox + 4 按钮，布局正确
-- [ ] 收藏下拉菜单：列出收藏 + 底部「管理收藏…」
+- [ ] 收藏下拉菜单：系统路径（🔒）+ 用户收藏合并 + 底部「管理收藏…」
+- [ ] 系统路径硬编码（桌面/文档/下载），运行时 Environment.SpecialFolder 获取
+- [ ] 隐藏的系统路径不在下拉菜单出现
 - [ ] 历史下拉菜单：最近 50 条，去重，最新在前
 - [ ] 已打开下拉菜单：资源管理器窗口列表，当前窗口高亮
 - [ ] 浏览按钮：文件模式打开 SaveFileDialog，文件夹模式打开 VistaFolderBrowserDialog
 - [ ] 点击下拉项 → 自动填充到 TextBox
 - [ ] QuickPathDialog 模态弹窗：确认返回路径，取消返回 null
-- [ ] FavoriteManagerWindow：增删改排序，持久化到磁盘
+- [ ] FavoriteManagerWindow：系统路径显示 🔒 + 隐藏/显示；用户收藏可增删改排序
+- [ ] 系统路径隐藏状态持久化到 favorites.json
 - [ ] 压缩对话框：QuickPathControl 工作正常
 - [ ] 解压对话框：QuickPathControl 工作正常
 - [ ] 所有 VistaFolderBrowserDialog 被 QuickPathDialog 替换

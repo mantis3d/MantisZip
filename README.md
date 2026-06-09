@@ -18,18 +18,7 @@
 
 MantisZip 是一款面向 Windows 的免费开源压缩/解压工具，主打**文件内预览**和**密码管理器**等便捷功能。无需解压即可直接查看压缩包内的图片、文本、Markdown、HTML 文件内容。
 
----
 
-## 💖 支持项目 | Support
-
-如果 MantisZip 对你有帮助，欢迎请我喝杯咖啡 ☕  
-
-<p align="center">
-  <a href="https://www.ifdian.net/a/MantisZen"><img src="https://img.shields.io/badge/爱发电-支持我-blue?style=for-the-badge" alt="爱发电"></a>
-  <a href="https://ko-fi.com"><img src="https://img.shields.io/badge/Ko--fi-Buy%20me%20a%20coffee-orange?style=for-the-badge" alt="Ko-fi"></a>  
-</p>
-
----
 
 ## ✨ 功能亮点
 
@@ -236,3 +225,15 @@ This project is licensed under the MIT License.
 - [WpfAnimatedGif](https://github.com/XamlAnimatedGif/WpfAnimatedGif) — WPF GIF 动画支持（MIT）
 - [Microsoft.Web.WebView2](https://developer.microsoft.com/microsoft-edge/webview2/) — WebView2 控件，用于 HTML/Markdown/SVG/PDF 内容渲染（BSD-3-Clause）
 - [7-Zip](https://www.7-zip.org/) — 7z 压缩引擎（GNU LGPL）
+
+---
+
+## 💖 支持项目 | Support
+
+如果 MantisZip 对你有帮助，欢迎请我喝杯咖啡 ☕  
+
+<p align="center">
+  <a href="https://www.ifdian.net/a/MantisZen"><img src="https://img.shields.io/badge/爱发电-支持我-blue?style=for-the-badge" alt="爱发电"></a>
+</p>
+
+---
