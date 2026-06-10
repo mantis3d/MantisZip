@@ -50,6 +50,10 @@ public class AppSettings
     // ===== 交互 =====
     public bool EnableDragExtract { get; set; } = true;
 
+    // ===== 解压 ====
+    /// <summary>解压条目时保留压缩包内的完整路径（默认关闭 = 相对当前浏览目录）</summary>
+    public bool ExtractPreserveFullPath { get; set; } = false;
+
     // ===== 预览 =====
     public bool UseColorEmoji { get; set; } = true;
     public bool EnableImagePreview { get; set; } = true;

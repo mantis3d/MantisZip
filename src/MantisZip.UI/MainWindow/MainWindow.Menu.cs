@@ -568,7 +568,17 @@ public partial class MainWindow
                 pw.CancellationToken.ThrowIfCancellationRequested();
                 pw.SetProgress((double)i / filesToExtract.Count * 100, L.TF(L.Main_Status_Extracting, item.Name));
 
-                var safeEntryPath = FileConflictHelper.SanitizeEntryPath(item.FullPath);
+                // 根据设置决定输出路径：
+                // - 关闭保留完整路径时，以当前浏览目录为基准裁剪路径前缀
+                // - item.FullPath 仍然用于 ArchiveEntryExtractor 查找条目
+                var outputEntryPath = item.FullPath;
+                if (!AppSettings.Instance.ExtractPreserveFullPath && !string.IsNullOrEmpty(_currentFolder))
+                {
+                    var cf = _currentFolder.TrimEnd('/') + "/";
+                    if (outputEntryPath.StartsWith(cf, StringComparison.OrdinalIgnoreCase))
+                        outputEntryPath = outputEntryPath.Substring(cf.Length);
+                }
+                var safeEntryPath = FileConflictHelper.SanitizeEntryPath(outputEntryPath);
                 var outputPath = FileConflictHelper.GetSafePath(dest, safeEntryPath);
                 var dir = Path.GetDirectoryName(outputPath);
                 if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir)) Directory.CreateDirectory(dir);
