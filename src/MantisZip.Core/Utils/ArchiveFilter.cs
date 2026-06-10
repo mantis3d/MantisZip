@@ -105,6 +105,9 @@ public static class ArchiveFilter
 
     private static bool MatchItem(ArchiveItem item, string pattern, FilterMatchMode mode)
     {
+        // 使用显示名称（当前目录下的相对路径），无 DisplayName 时回退到 Name
+        var searchTarget = !string.IsNullOrEmpty(item.DisplayName) ? item.DisplayName : item.Name;
+
         if (mode == FilterMatchMode.Wildcard)
         {
             var regex = _regexCache.GetOrAdd(pattern, p =>
@@ -112,12 +115,11 @@ public static class ArchiveFilter
                 string regexPattern = "^" + Regex.Escape(p).Replace("\\*", ".*").Replace("\\?", ".") + "$";
                 return new Regex(regexPattern, RegexOptions.IgnoreCase);
             });
-            return regex.IsMatch(item.Name) || regex.IsMatch(item.FullPath);
+            return regex.IsMatch(searchTarget);
         }
         else // Substring
         {
-            return item.Name.Contains(pattern, StringComparison.OrdinalIgnoreCase)
-                || item.FullPath.Contains(pattern, StringComparison.OrdinalIgnoreCase);
+            return searchTarget.Contains(pattern, StringComparison.OrdinalIgnoreCase);
         }
     }
 

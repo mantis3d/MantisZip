@@ -19,29 +19,29 @@ public class FileListFilterTests
         var baseDate = new DateTime(2026, 3, 15, 10, 0, 0);
         return new List<ArchiveItem>
         {
-            // 根目录文件
-            new() { Name = "readme.txt",       FullPath = "readme.txt",        Size = 100,    LastModified = baseDate,                     IsDirectory = false },
-            new() { Name = "notes.md",         FullPath = "notes.md",          Size = 200,    LastModified = baseDate.AddDays(1),          IsDirectory = false },
-            new() { Name = "archive.zip",      FullPath = "archive.zip",       Size = 50000,  LastModified = baseDate.AddDays(-5),         IsDirectory = false },
+            // 根目录文件 (DisplayName = FullPath，模拟 FilterFiles 根目录行为)
+            new() { Name = "readme.txt",       FullPath = "readme.txt",        DisplayName = "readme.txt",       Size = 100,    LastModified = baseDate,                     IsDirectory = false },
+            new() { Name = "notes.md",         FullPath = "notes.md",          DisplayName = "notes.md",         Size = 200,    LastModified = baseDate.AddDays(1),          IsDirectory = false },
+            new() { Name = "archive.zip",      FullPath = "archive.zip",       DisplayName = "archive.zip",      Size = 50000,  LastModified = baseDate.AddDays(-5),         IsDirectory = false },
 
-            // 子目录 src/ 的文件
-            new() { Name = "main.cs",          FullPath = "src/main.cs",               Size = 1500,   LastModified = baseDate.AddDays(2),   IsDirectory = false },
-            new() { Name = "util.cs",          FullPath = "src/util.cs",               Size = 800,    LastModified = baseDate.AddMonths(1), IsDirectory = false },
+            // 子目录 src/ 的文件 (DisplayName = FullPath，因为根目录下直接显示)
+            new() { Name = "main.cs",          FullPath = "src/main.cs",              DisplayName = "src/main.cs",             Size = 1500,   LastModified = baseDate.AddDays(2),   IsDirectory = false },
+            new() { Name = "util.cs",          FullPath = "src/util.cs",              DisplayName = "src/util.cs",             Size = 800,    LastModified = baseDate.AddMonths(1), IsDirectory = false },
 
             // 深层子目录 src/utils/ 的文件
-            new() { Name = "helper.cs",        FullPath = "src/utils/helper.cs",       Size = 3000,   LastModified = baseDate.AddDays(10),  IsDirectory = false },
-            new() { Name = "converter.cs",     FullPath = "src/utils/converter.cs",    Size = 12000,  LastModified = baseDate.AddDays(-1),  IsDirectory = false },
+            new() { Name = "helper.cs",        FullPath = "src/utils/helper.cs",      DisplayName = "src/utils/helper.cs",     Size = 3000,   LastModified = baseDate.AddDays(10),  IsDirectory = false },
+            new() { Name = "converter.cs",     FullPath = "src/utils/converter.cs",   DisplayName = "src/utils/converter.cs",  Size = 12000,  LastModified = baseDate.AddDays(-1),  IsDirectory = false },
 
             // 子目录 docs/ 的文件
-            new() { Name = "index.html",       FullPath = "docs/index.html",           Size = 2500,   LastModified = baseDate.AddDays(3),   IsDirectory = false },
-            new() { Name = "guide.pdf",        FullPath = "docs/guide.pdf",            Size = 150000, LastModified = baseDate.AddDays(20),  IsDirectory = false },
+            new() { Name = "index.html",       FullPath = "docs/index.html",          DisplayName = "docs/index.html",         Size = 2500,   LastModified = baseDate.AddDays(3),   IsDirectory = false },
+            new() { Name = "guide.pdf",        FullPath = "docs/guide.pdf",           DisplayName = "docs/guide.pdf",          Size = 150000, LastModified = baseDate.AddDays(20),  IsDirectory = false },
 
             // 子目录 images/ 的文件
-            new() { Name = "logo.png",         FullPath = "images/logo.png",           Size = 45000,  LastModified = baseDate.AddDays(7),   IsDirectory = false },
-            new() { Name = "banner.svg",       FullPath = "images/banner.svg",         Size = 12000,  LastModified = baseDate.AddDays(30),  IsDirectory = false },
+            new() { Name = "logo.png",         FullPath = "images/logo.png",          DisplayName = "images/logo.png",         Size = 45000,  LastModified = baseDate.AddDays(7),   IsDirectory = false },
+            new() { Name = "banner.svg",       FullPath = "images/banner.svg",        DisplayName = "images/banner.svg",       Size = 12000,  LastModified = baseDate.AddDays(30),  IsDirectory = false },
 
             // 空子目录（只有目录条目，无文件）
-            new() { Name = "empty/",           FullPath = "empty",                     Size = 0,      LastModified = baseDate,             IsDirectory = true },
+            new() { Name = "empty/",           FullPath = "empty",                    DisplayName = "empty",                   Size = 0,      LastModified = baseDate,             IsDirectory = true },
         };
     }
 
