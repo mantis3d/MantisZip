@@ -604,6 +604,7 @@
   "Settings_Extract_Dest_SameDir": "压缩包所在目录",
   "Settings_Extract_EnableDragExtract": "启用文件列表拖拽解压（拖出到资源管理器）",
   "Settings_Extract_OpenFolderAfter": "解压后打开目标文件夹",
+  "Settings_Extract_PreserveFullPath": "解压时保留完整路径（关闭时以当前浏览目录为基准）",
   "Settings_Language": "界面语言",
   "Settings_Language_Restart": "语言切换将在重启后生效。",
   "Settings_Language_NoTranslator": "暂无翻译人员信息",

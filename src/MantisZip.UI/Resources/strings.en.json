@@ -592,6 +592,7 @@
   "Settings_Extract_Dest_SameDir": "Same directory as archive",
   "Settings_Extract_EnableDragExtract": "Enable drag-to-extract (drag files to Explorer)",
   "Settings_Extract_OpenFolderAfter": "Open destination folder after extraction",
+  "Settings_Extract_PreserveFullPath": "Preserve full path when extracting entries (when off, path is relative to current folder)",
   "Settings_Language": "Language",
   "Settings_Language_Restart": "Language change will take effect after restart.",
   "Settings_Language_NoTranslator": "No translator info available",
