@@ -1,0 +1,57 @@
+{
+  "source": "README.md",
+  "sourceHash": "22840c499768c2038f87d25c41d316ae4cf226b5fa70af827d728306be2db401",
+  "paragraphs": [
+    {
+      "id": "intro",
+      "heading": "(title)",
+      "hash": "6fad76c45fd6e6d0242a57d28bf19a048b8b659cf7f03d1d83e131a8cafb2ee5"
+    },
+    {
+      "id": "简介",
+      "heading": "简介",
+      "hash": "cbe1177173394670b9797c3f3c81f453bcbbfde952e1600168c6ea4556bdcc61"
+    },
+    {
+      "id": "安装",
+      "heading": "安装",
+      "hash": "b93c8ab68d7bd66b80a020c1c454cefa7795bf9aa75b107e01baf9a8fafceb57"
+    },
+    {
+      "id": "使用方法",
+      "heading": "使用方法",
+      "hash": "af9380e541e468e37fe9132729280d8f2cbbf8cb0fe0da35fd98642054aac186"
+    },
+    {
+      "id": "配置",
+      "heading": "配置",
+      "hash": "4cfbfd54c6d7b5ac5209ff16e6d58b006bee196f08a413a075088c9b1495e7d5"
+    },
+    {
+      "id": "贡献指南",
+      "heading": "贡献指南",
+      "hash": "691c36768eb3a7397ef5490ee707c40c0ac7bb046300dd7c8b946c63f7e91e2d"
+    },
+    {
+      "id": "许可证",
+      "heading": "许可证",
+      "hash": "a080fd7b38fce7aa9ea2f41c820efee8d40b8e9c243847e762a3c7b485de19f0"
+    }
+  ],
+  "languages": {
+    "en": {
+      "file": "docs/README_en.md",
+      "status": "active",
+      "addedAt": "2026-06-10",
+      "paragraphs": {
+        "intro": { "hash": "6fad76c45fd6e6d0242a57d28bf19a048b8b659cf7f03d1d83e131a8cafb2ee5", "status": "published" },
+        "简介": { "hash": "cbe1177173394670b9797c3f3c81f453bcbbfde952e1600168c6ea4556bdcc61", "status": "draft" },
+        "安装": { "hash": "b93c8ab68d7bd66b80a020c1c454cefa7795bf9aa75b107e01baf9a8fafceb57", "status": "published" },
+        "使用方法": { "hash": "af9380e541e468e37fe9132729280d8f2cbbf8cb0fe0da35fd98642054aac186", "status": "published" },
+        "配置": { "hash": "4cfbfd54c6d7b5ac5209ff16e6d58b006bee196f08a413a075088c9b1495e7d5", "status": "published" },
+        "贡献指南": { "hash": "691c36768eb3a7397ef5490ee707c40c0ac7bb046300dd7c8b946c63f7e91e2d", "status": "draft" },
+        "许可证": { "hash": "a080fd7b38fce7aa9ea2f41c820efee8d40b8e9c243847e762a3c7b485de19f0", "status": "draft" }
+      }
+    }
+  }
+}

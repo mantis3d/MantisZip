@@ -1,0 +1,159 @@
+{
+  "paragraphs": [
+    {
+      "heading": "(intro)",
+      "hash": "9125196150228eb2af4cc02e19e31f2674d7a7b163ac89f3f2bdda4f96b6c5c4",
+      "id": "intro"
+    },
+    {
+      "heading": "## 📚 简介",
+      "hash": "e8b8ecf634cce8771fa139cdf140361575dc10665a25098aaf1f61ca7f20582d",
+      "id": "简介"
+    },
+    {
+      "heading": "## ✨ 功能亮点",
+      "hash": "89dd6b593311d66858b7529f0b7ef4b751d5cb6ddd60f1f8f1c4f0d354e24c56",
+      "id": "功能亮点"
+    },
+    {
+      "heading": "## 🤔 已知问题",
+      "hash": "2f8050bb97b3c503aea244bba5ee94f4f70f350937d21a6630cf16047789385e",
+      "id": "已知问题"
+    },
+    {
+      "heading": "## 🖼️ 功能截图",
+      "hash": "a95f0262984b65850849d6f482b73ebbbbf843b49e45f73b302b2666ad3f74e8",
+      "id": "功能截图"
+    },
+    {
+      "heading": "## 📦 支持的格式 | Supported Formats",
+      "hash": "54d1ce020e4731b5610be00a302d509d15fd8b6c27b72822a832656a3481ae94",
+      "id": "支持的格式-supported-formats"
+    },
+    {
+      "heading": "## 📋 系统要求",
+      "hash": "7967434516d88d1e6ec425b32911e4c6f4d76e3c6907533d401ddcdbf3cf6c32",
+      "id": "系统要求"
+    },
+    {
+      "heading": "## 🔧 构建方法",
+      "hash": "54d984a0b97a8fad2c3fab39920768a9148ff2720a15b92719a9d7e7ae8c4df7",
+      "id": "构建方法"
+    },
+    {
+      "heading": "## ⌨️ 命令行",
+      "hash": "79a8dda6c1978a5335cf907fe7046eb7fdf32d9aa3dc8579353a491897a39fba",
+      "id": "命令行"
+    },
+    {
+      "heading": "## 🏗 项目架构",
+      "hash": "7e4b0a3468cf67f6fea6064320a580680c18c83d8e66b54f2ce2070c5d3ba17d",
+      "id": "项目架构"
+    },
+    {
+      "heading": "## 📋 开发计划",
+      "hash": "6ebd157290e7e7c17640103e35a4ece9b6ac51b7afe7b213ad45a26c56e3dc1d",
+      "id": "开发计划"
+    },
+    {
+      "heading": "## 📦 第三方依赖 | Dependencies",
+      "hash": "93096504b7efc9d8c7733172b5af666232579e3f5164016242815a1f169e19c0",
+      "id": "第三方依赖-dependencies"
+    },
+    {
+      "heading": "## 🤝 贡献 | Contributing",
+      "hash": "94fa800736d03834494c0bcf4f4251b9f0354eab533749d24cde2c39c8e8334e",
+      "id": "贡献-contributing"
+    },
+    {
+      "heading": "## 📄 许可证 | License",
+      "hash": "93af4b8c82d45d3529c4dee2617628505f49e7fc2aa8af4f7690e18efe5c543f",
+      "id": "许可证-license"
+    },
+    {
+      "heading": "## 🙏 致谢 | Acknowledgments",
+      "hash": "bf532ccce3f0b86f1c4b64dda74c3795b3a5b3506a29a12b3cc40739463ad691",
+      "id": "致谢-acknowledgments"
+    },
+    {
+      "heading": "## 💖 支持项目 | Support",
+      "hash": "04fd9a34d37fd3874ba450a4f3065f7a57e7dc95e13c634e6d025e812e2d84e9",
+      "id": "支持项目-support"
+    }
+  ],
+  "languages": {
+    "en": {
+      "file": "docs/README_en.md",
+      "paragraphs": {
+        "intro": {
+          "hash": "28a75d7de46af9054bb246a87e0bb0fe3b7e358756114c4bd670865094ec1bed",
+          "status": "draft"
+        },
+        "简介": {
+          "hash": "d5296a8e51d62de1b55b9d72645224819aa7bdc66d9eec23e0d2c45295c5faa6",
+          "status": "draft"
+        },
+        "功能亮点": {
+          "hash": "b79b0c0b92cbb49c3ea70b0c3b65ea0920fb198afd7982dfc2e6b7e9de970dfb",
+          "status": "draft"
+        },
+        "已知问题": {
+          "hash": "762217594e60f1287ad2f29cba77d8bac4b4b8c14b6afe10d7577d8fbe79f591",
+          "status": "draft"
+        },
+        "功能截图": {
+          "hash": "b6f4a88a8edaa8d6b495be127c243665cf301fb55674edb86cc651f6c2833257",
+          "status": "draft"
+        },
+        "支持的格式-supported-formats": {
+          "hash": "2269664bd95a9812e5c184cc187a9b3841faa41d794fbbc4c916fbd355f6ca9d",
+          "status": "draft"
+        },
+        "系统要求": {
+          "hash": "b812fe057e90934cfbcd5ea6bd17e0d771b6ae451f952ff4d9124ad38fd9306e",
+          "status": "draft"
+        },
+        "构建方法": {
+          "hash": "ee02c3b9e07f583dfd8b5a518a0aa41c7a9f3a94ae125e281c1c815a2291a66b",
+          "status": "draft"
+        },
+        "命令行": {
+          "hash": "efc330953fda02250d02e5a1794c07624347e416752667cc82aa9818d832f2aa",
+          "status": "draft"
+        },
+        "项目架构": {
+          "hash": "5aaff745e4676c0239427f564ff2135c8a5d7fcdfeecb518a01f7974c338cd9e",
+          "status": "draft"
+        },
+        "开发计划": {
+          "hash": "3d4bbedac5f8c44c0e4baf14133590b7248c876ac5e884b530ff1fa565182284",
+          "status": "draft"
+        },
+        "第三方依赖-dependencies": {
+          "hash": "56afeee87d73ecee3c3725dcfdf21edaf1644cb2c7a450ac24b8b1624f2a7150",
+          "status": "draft"
+        },
+        "贡献-contributing": {
+          "hash": "cdfe3f0fa16e528d6eecc835b937ad6d99ec22b70591d7ae7ff1dd9965a306fd",
+          "status": "draft"
+        },
+        "许可证-license": {
+          "hash": "ca681ad1d5216c42017c49e276c8899c7a7e6f2dd1e1ca07e9a2969de41d588f",
+          "status": "draft"
+        },
+        "致谢-acknowledgments": {
+          "hash": "9ef413e0f5ca37fb824e37cf0afdd952c4b73c99e28b7fb314881e0174f59952",
+          "status": "draft"
+        },
+        "支持项目-support": {
+          "hash": "3178772a5aa22f1f29bba009e4185aba2b51ae295936c79a0246c10921d1c3b5",
+          "status": "draft"
+        }
+      },
+      "status": "active",
+      "addedAt": "2026-06-10"
+    }
+  },
+  "source": "README.md",
+  "sourceHash": "9c21827e738739e2f78c61ef301e418c25e786973ec86b4ce6c9c10457da0429"
+}

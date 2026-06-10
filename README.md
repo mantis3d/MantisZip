@@ -1,7 +1,8 @@
-
+> 🌐 Language: [中文](README.md) | [English](/docs/README_en.md)
 
 # MantisZip
-![Logo](docs\images\Logo.png)
+![Logo](docs/images/Logo.png)
+
 
 **轻量级全功能 Windows 压缩/解压软件** 
 
@@ -235,10 +236,15 @@ This project is licensed under the MIT License.
 
 如果 MantisZip 对你有帮助，欢迎请我喝杯咖啡 ☕  
 
-<p align="center">
-  <a href="https://www.ifdian.net/a/MantisZen"><img src="docs\images\afdian-MantisZen.jpg" alt="爱发电"></a>
-</p>
+### Polar
+[在 Polar 上支持](https://buy.polar.sh/polar_cl_VaCaW2l2nWkob5CyHe4dOlhL6HrQDK4ueMA9n1JyhNc)
 
+### 爱发电
+[在爱发电上支持](https://afdian.com/a/MantisZen)
+![爱发电](/docs/images/afdian-MantisZen.jpg)(https://afdian.com/a/MantisZen)
+
+### 微信打赏
+![微信打赏](/docs/images/afdian-MantisZen.jpg)
 
 
 ---
