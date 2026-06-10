@@ -7,12 +7,20 @@
 - **技术栈**: .NET 9 + WPF + SharpCompress + SharpSevenZip
 
 ## 版本
-- **当前版本**: 0.3.11
+- **当前版本**: 0.3.12
 - **发布日期**: 2026-06-08
 
 ## 规划中
 
 ## 版本历史（从新到旧）
+
+### v0.3.12 (2026-06-10) 解压路径裁剪设置（相对当前浏览目录 / 保留完整压缩包路径）
+
+1. **新增设置项**：在设置 → 解压 标签页添加"解压时保留完整路径"开关，默认关闭
+2. **解压路径裁剪**：`ExtractSelectedAsync` 在构建输出路径时，根据设置和当前浏览目录 (`_currentFolder`) 裁剪条目的 `FullPath` 前缀
+   - 关闭时（默认）：`folderA/sub/file.txt` → 当前在 `folderA/` 中解压到 `dest/sub/file.txt`
+   - 开启时：`folderA/sub/file.txt` → 解压到 `dest/folderA/sub/file.txt`（保留完整路径）
+3. 不影响 `ArchiveEntryExtractor.ExtractEntryAsync` 的条目查找（始终用原始 `FullPath`）
 
 ### v0.3.11 (2026-06-08) 文件列表拖拽提取修复（多选/目录/编码/重入）
 
