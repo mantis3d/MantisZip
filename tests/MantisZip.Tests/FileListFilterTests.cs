@@ -419,4 +419,189 @@ public class FileListFilterTests
         Assert.Empty(empty.Select(i => i.LastModified));
         Assert.Empty(empty.Select(i => i.Size));
     }
+
+    // ===== Substring 回归测试 =====
+
+    /// <summary>
+    /// 确保 MatchMode.Substring 保持原有子串匹配行为不变（回归保护）。
+    /// </summary>
+    [Fact]
+    public void Filter_Exclude_Substring_Regress()
+    {
+        var items = CreateTestItems();
+        var result = ArchiveFilter.ApplyFilters(items, new SearchFilters { Text = "helper", MatchMode = FilterMatchMode.Substring });
+        Assert.Contains(result, i => i.FullPath == "src/utils/helper.cs");
+        Assert.DoesNotContain(result, i => i.FullPath == "readme.txt");
+    }
+
+    // ===== 通配符 (Wildcard) 测试 =====
+
+    /// <summary>
+    /// 通配符 * 匹配任意字符序列 → *.cs 返回所有 .cs 文件。
+    /// </summary>
+    [Fact]
+    public void Filter_Wildcard_Star()
+    {
+        var items = CreateTestItems();
+        var result = ArchiveFilter.ApplyFilters(items, new SearchFilters { Text = "*.cs", MatchMode = FilterMatchMode.Wildcard });
+        Assert.Contains(result, i => i.FullPath == "src/main.cs");
+        Assert.Contains(result, i => i.FullPath == "src/util.cs");
+        Assert.Contains(result, i => i.FullPath == "src/utils/helper.cs");
+        Assert.Contains(result, i => i.FullPath == "src/utils/converter.cs");
+        Assert.DoesNotContain(result, i => i.FullPath == "readme.txt");
+        Assert.Equal(4, result.Count);
+    }
+
+    /// <summary>
+    /// 通配符 ? 匹配单个字符 → ?at 匹配 3 字母以 at 结尾的名称（无扩展名）。
+    /// </summary>
+    [Fact]
+    public void Filter_Wildcard_Question()
+    {
+        var items = new List<ArchiveItem>
+        {
+            new() { Name = "cat", FullPath = "cat", Size = 100, LastModified = DateTime.Now, IsDirectory = false },
+            new() { Name = "bat", FullPath = "bat", Size = 200, LastModified = DateTime.Now, IsDirectory = false },
+            new() { Name = "hat", FullPath = "hat", Size = 300, LastModified = DateTime.Now, IsDirectory = false },
+            new() { Name = "chat", FullPath = "chat", Size = 400, LastModified = DateTime.Now, IsDirectory = false },
+        };
+        var result = ArchiveFilter.ApplyFilters(items, new SearchFilters { Text = "?at", MatchMode = FilterMatchMode.Wildcard });
+        Assert.Equal(3, result.Count);
+        Assert.Contains(result, i => i.Name == "cat");
+        Assert.Contains(result, i => i.Name == "bat");
+        Assert.Contains(result, i => i.Name == "hat");
+        Assert.DoesNotContain(result, i => i.Name == "chat");
+    }
+
+    /// <summary>
+    /// 通配符前缀匹配 → src/* 返回 src/ 下所有文件，不包含根目录文件。
+    /// </summary>
+    [Fact]
+    public void Filter_Wildcard_Prefix()
+    {
+        var items = CreateTestItems();
+        var result = ArchiveFilter.ApplyFilters(items, new SearchFilters { Text = "src/*", MatchMode = FilterMatchMode.Wildcard });
+        Assert.Contains(result, i => i.FullPath == "src/main.cs");
+        Assert.Contains(result, i => i.FullPath == "src/util.cs");
+        Assert.Contains(result, i => i.FullPath == "src/utils/helper.cs");
+        Assert.Contains(result, i => i.FullPath == "src/utils/converter.cs");
+        Assert.DoesNotContain(result, i => i.FullPath == "readme.txt");
+        Assert.Equal(4, result.Count);
+    }
+
+    /// <summary>
+    /// 通配符匹配大小写不敏感 → *.CS 等同 *.cs。
+    /// </summary>
+    [Fact]
+    public void Filter_Wildcard_CaseInsensitive()
+    {
+        var items = CreateTestItems();
+        var result = ArchiveFilter.ApplyFilters(items, new SearchFilters { Text = "*.CS", MatchMode = FilterMatchMode.Wildcard });
+        Assert.Contains(result, i => i.FullPath == "src/main.cs");
+        Assert.Contains(result, i => i.FullPath == "src/util.cs");
+        Assert.Contains(result, i => i.FullPath == "src/utils/helper.cs");
+        Assert.Contains(result, i => i.FullPath == "src/utils/converter.cs");
+        Assert.Equal(4, result.Count);
+    }
+
+    /// <summary>
+    /// 通配符无匹配 → *.xyz 返回空。
+    /// </summary>
+    [Fact]
+    public void Filter_Wildcard_NoMatch()
+    {
+        var items = CreateTestItems();
+        var result = ArchiveFilter.ApplyFilters(items, new SearchFilters { Text = "*.xyz", MatchMode = FilterMatchMode.Wildcard });
+        Assert.Empty(result);
+    }
+
+    // ===== 排除 (ExcludeText) 测试 =====
+
+    /// <summary>
+    /// 文字和排除词相同 → 全部被排除。
+    /// </summary>
+    [Fact]
+    public void Filter_Exclude_Text()
+    {
+        var items = CreateTestItems();
+        var result = ArchiveFilter.ApplyFilters(items, new SearchFilters { Text = "readme", ExcludeText = "readme" });
+        Assert.Empty(result);
+    }
+
+    /// <summary>
+    /// 文字过滤 .cs 文件，排除 util.cs 本身（利用子串匹配排除完整文件名）。
+    /// </summary>
+    [Fact]
+    public void Filter_Exclude_NonExclude()
+    {
+        var items = CreateTestItems();
+        var result = ArchiveFilter.ApplyFilters(items, new SearchFilters { Text = ".cs", ExcludeText = "util.cs" });
+        Assert.Contains(result, i => i.FullPath == "src/main.cs");
+        Assert.Contains(result, i => i.FullPath == "src/utils/helper.cs");
+        Assert.Contains(result, i => i.FullPath == "src/utils/converter.cs");
+        Assert.DoesNotContain(result, i => i.FullPath == "src/util.cs");
+        Assert.Equal(3, result.Count);
+    }
+
+    /// <summary>
+    /// 空排除文字不产生过滤效果。
+    /// </summary>
+    [Fact]
+    public void Filter_Exclude_Empty()
+    {
+        var items = CreateTestItems();
+        var result = ArchiveFilter.ApplyFilters(items, new SearchFilters { Text = "readme", ExcludeText = "" });
+        Assert.Contains(result, i => i.FullPath == "readme.txt");
+        Assert.Single(result);
+    }
+
+    // ===== 通配符 + 排除组合测试 =====
+
+    /// <summary>
+    /// 通配符 *.cs 匹配所有 .cs 文件，排除 test* 开头文件。
+    /// </summary>
+    [Fact]
+    public void Filter_Wildcard_WithExclude()
+    {
+        var items = CreateTestItems();
+        items.Add(new ArchiveItem { Name = "test_runner.cs", FullPath = "test_runner.cs", Size = 500, LastModified = DateTime.Now, IsDirectory = false });
+        var result = ArchiveFilter.ApplyFilters(items, new SearchFilters { Text = "*.cs", ExcludeText = "test*", MatchMode = FilterMatchMode.Wildcard });
+        Assert.Contains(result, i => i.FullPath == "src/main.cs");
+        Assert.Contains(result, i => i.FullPath == "src/util.cs");
+        Assert.Contains(result, i => i.FullPath == "src/utils/helper.cs");
+        Assert.Contains(result, i => i.FullPath == "src/utils/converter.cs");
+        Assert.DoesNotContain(result, i => i.FullPath == "test_runner.cs");
+        Assert.Equal(4, result.Count);
+    }
+
+    /// <summary>
+    /// 子串匹配 "src" 但排除含 "utils" 路径 → src/main.cs 和 src/util.cs 保留。
+    /// </summary>
+    [Fact]
+    public void Filter_Substring_WithExclude()
+    {
+        var items = CreateTestItems();
+        var result = ArchiveFilter.ApplyFilters(items, new SearchFilters { Text = "src", ExcludeText = "utils" });
+        Assert.Contains(result, i => i.FullPath == "src/main.cs");
+        Assert.Contains(result, i => i.FullPath == "src/util.cs");
+        Assert.DoesNotContain(result, i => i.FullPath == "src/utils/helper.cs");
+        Assert.DoesNotContain(result, i => i.FullPath == "src/utils/converter.cs");
+        Assert.Equal(2, result.Count);
+    }
+
+    // ===== Regex 缓存测试 =====
+
+    /// <summary>
+    /// 重复调用相同通配符模式时缓存生效，两次结果相同。
+    /// </summary>
+    [Fact]
+    public void Filter_Wildcard_CacheReuse()
+    {
+        var items = CreateTestItems();
+        var first = ArchiveFilter.ApplyFilters(items, new SearchFilters { Text = "*.cs", MatchMode = FilterMatchMode.Wildcard });
+        var second = ArchiveFilter.ApplyFilters(items, new SearchFilters { Text = "*.cs", MatchMode = FilterMatchMode.Wildcard });
+        Assert.Equal(first.Count, second.Count);
+        Assert.Equal(first.Select(i => i.FullPath).OrderBy(x => x),
+                     second.Select(i => i.FullPath).OrderBy(x => x));
+    }
 }
