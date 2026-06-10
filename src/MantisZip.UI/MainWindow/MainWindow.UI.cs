@@ -158,6 +158,8 @@ public partial class MainWindow
             SizeMinUnit.SelectedIndex = 0;
             SizeMaxUnit.SelectedIndex = 0;
             _searchText = null;
+            _excludeText = null;
+            _matchMode = FilterMatchMode.Substring;
             _dateFrom = null;
             _dateTo = null;
             _sizeMin = null;
@@ -498,6 +500,7 @@ public partial class MainWindow
     private bool HasActiveFilters()
     {
         return !string.IsNullOrEmpty(_searchText)
+            || !string.IsNullOrEmpty(_excludeText)
             || _dateFrom.HasValue
             || _dateTo.HasValue
             || _sizeMin.HasValue
@@ -515,6 +518,8 @@ public partial class MainWindow
         var filters = new SearchFilters
         {
             Text = _searchText,
+            ExcludeText = _excludeText,
+            MatchMode = _matchMode,
             DateFrom = _dateFrom,
             DateTo = _dateTo,
             SizeMin = _sizeMin,
@@ -689,15 +694,45 @@ public partial class MainWindow
         SizeMaxBox.Text = "";
         SizeMinUnit.SelectedIndex = 0;
         SizeMaxUnit.SelectedIndex = 0;
+        ExcludeBox.Text = "";
+        MatchModeCombo.SelectedIndex = 0;
 
         // 清空过滤字段
         _searchText = null;
+        _excludeText = null;
         _dateFrom = null;
         _dateTo = null;
         _sizeMin = null;
         _sizeMax = null;
 
         FilterFiles(_currentFolder);
+    }
+
+    // ===== 排除 + 通配符事件处理器 =====
+
+    private void MatchModeCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        _matchMode = MatchModeCombo.SelectedIndex == 0
+            ? FilterMatchMode.Substring
+            : FilterMatchMode.Wildcard;
+        RefreshFilter();
+    }
+
+    private void ExcludeBox_TextChanged(object sender, TextChangedEventArgs e)
+    {
+        _excludeText = string.IsNullOrWhiteSpace(ExcludeBox.Text) ? null : ExcludeBox.Text;
+        RefreshFilter();
+    }
+
+    private void ExcludeBox_PreviewKeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.Escape)
+        {
+            ExcludeBox.Text = "";
+            _excludeText = null;
+            RefreshFilter();
+            e.Handled = true;
+        }
     }
 
     /// <summary>

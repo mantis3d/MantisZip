@@ -1,6 +1,19 @@
+using System.Collections.Concurrent;
+using System.Text.RegularExpressions;
 using MantisZip.Core.Abstractions;
 
 namespace MantisZip.Core.Utils;
+
+/// <summary>
+/// 文字匹配模式
+/// </summary>
+public enum FilterMatchMode
+{
+    /// <summary>子串匹配（默认，当前行为）</summary>
+    Substring,
+    /// <summary>通配符（* = 任意字符序列，? = 单个字符）</summary>
+    Wildcard,
+}
 
 /// <summary>
 /// 文件列表多维度过滤条件
@@ -9,6 +22,12 @@ public record SearchFilters
 {
     /// <summary>文字搜索词（大小写不敏感子串匹配）</summary>
     public string? Text { get; init; }
+
+    /// <summary>排除文字</summary>
+    public string? ExcludeText { get; init; }
+
+    /// <summary>匹配模式</summary>
+    public FilterMatchMode MatchMode { get; init; }
 
     /// <summary>日期范围开始（含）</summary>
     public DateTime? DateFrom { get; init; }
@@ -29,6 +48,8 @@ public record SearchFilters
 /// </summary>
 public static class ArchiveFilter
 {
+    private static readonly ConcurrentDictionary<string, Regex> _regexCache = new();
+
     /// <summary>
     /// 对条目列表应用组合过滤（文字 + 日期 + 大小，AND 逻辑）。
     /// 所有过滤条件均为可选——为 null/空时跳过该维度。
@@ -41,6 +62,7 @@ public static class ArchiveFilter
 
         // 无过滤条件时快速返回
         if (string.IsNullOrEmpty(filters.Text)
+            && string.IsNullOrEmpty(filters.ExcludeText)
             && filters.DateFrom == null
             && filters.DateTo == null
             && filters.SizeMin == null
@@ -51,12 +73,17 @@ public static class ArchiveFilter
 
         return items.Where(item =>
         {
-            // 文字过滤：大小写不敏感，匹配 Name 和 FullPath
+            // 文字过滤：根据匹配模式（子串/通配符）匹配
             if (!string.IsNullOrEmpty(filters.Text))
             {
-                var searchText = filters.Text;
-                if (!item.Name.Contains(searchText, StringComparison.OrdinalIgnoreCase)
-                    && !item.FullPath.Contains(searchText, StringComparison.OrdinalIgnoreCase))
+                if (!MatchItem(item, filters.Text, filters.MatchMode))
+                    return false;
+            }
+
+            // 排除过滤：使用相同匹配模式
+            if (!string.IsNullOrEmpty(filters.ExcludeText))
+            {
+                if (MatchItem(item, filters.ExcludeText, filters.MatchMode))
                     return false;
             }
 
@@ -74,6 +101,24 @@ public static class ArchiveFilter
 
             return true;
         }).ToList();
+    }
+
+    private static bool MatchItem(ArchiveItem item, string pattern, FilterMatchMode mode)
+    {
+        if (mode == FilterMatchMode.Wildcard)
+        {
+            var regex = _regexCache.GetOrAdd(pattern, p =>
+            {
+                string regexPattern = "^" + Regex.Escape(p).Replace("\\*", ".*").Replace("\\?", ".") + "$";
+                return new Regex(regexPattern, RegexOptions.IgnoreCase);
+            });
+            return regex.IsMatch(item.Name) || regex.IsMatch(item.FullPath);
+        }
+        else // Substring
+        {
+            return item.Name.Contains(pattern, StringComparison.OrdinalIgnoreCase)
+                || item.FullPath.Contains(pattern, StringComparison.OrdinalIgnoreCase);
+        }
     }
 
     /// <summary>

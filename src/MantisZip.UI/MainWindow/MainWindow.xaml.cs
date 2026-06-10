@@ -55,6 +55,8 @@ public partial class MainWindow : Window
     private DateTime? _dateTo;                // 日期范围结束
     private long? _sizeMin;                   // 大小下限（字节）
     private long? _sizeMax;                   // 大小上限（字节）
+    private string? _excludeText;              // 排除文字
+    private FilterMatchMode _matchMode;        // 匹配模式
     private string? _savedSortColumnPath;    // 持久化的排序列 SortMemberPath
     private int _savedSortDirection;         // 持久化的排序方向 (0=无, 1=升, 2=降)
     private bool _previewPanelEnabled = true; // 工具栏预览开关状态
