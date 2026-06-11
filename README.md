@@ -1,4 +1,4 @@
-> 🌐 Language: [中文](README.md) | [English](/docs/README_en.md)
+> 🌐 Language: 中文 | [English](/docs/README_en.md)
 
 # MantisZip
 <p align="center">
@@ -15,7 +15,7 @@
 </p>
 
 > 免费开源  / 基于 .NET 9 + WPF   
-> 🤖 由 [OpenCode](https://opencode.ai) 及 [OhMyOpenCode](https://ohmyopencode.com) 辅助开发
+> 🤖 由 [OpenCode](https://opencode.ai) 及 [Reasonix](https://reasonix.io) 辅助开发
 
 ---
 
@@ -29,9 +29,6 @@
   <img src="docs/images/preview-overview.gif" alt="MantisZip 极速预览总览" width="100%"/>
   <br>⏱️ 3 秒总览：在压缩包内无缝切换、指哪打哪的极速预览体验
 </p>
-
-
-
 
 ---
 
