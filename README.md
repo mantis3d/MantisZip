@@ -1,20 +1,37 @@
 > 🌐 Language: [中文](README.md) | [English](/docs/README_en.md)
 
 # MantisZip
-![Logo](docs/images/Logo.png)
+<p align="center">
+  <img src="docs/images/Logo.png" alt="MantisZip"/>
+</p>
+<p align="center">
+轻量级全功能 Windows 压缩/解压软件
+</p>
 
+<p align="center">
+  <a href="https://buy.polar.sh/polar_cl_VaCaW2l2nWkob5CyHe4dOlhL6HrQDK4ueMA9n1JyhNc"><img src="https://img.shields.io/badge/Polar-Sponsor-pink?style=flat-square" alt="Polar Sponsor"></a>
+  <a href="https://afdian.com/a/MantisZen"><img src="https://img.shields.io/badge/爱发电-赞助-blue?style=flat-square" alt="爱发电"></a>
+  <a href="https://dotnet.microsoft.com/"><img src="https://img.shields.io/badge/.NET-9.0-purple?style=flat-square" alt=".NET 9"></a>
+</p>
 
-**轻量级全功能 Windows 压缩/解压软件** 
-
-> 免费开源  
-> 基于 .NET 9 + WPF    
-> 🤖 由 [OpenCode](https://opencode.ai) 及 [OhMyOpenCode](https://ohmyopencode.com) 的 Sisyphus Agent 辅助开发
+> 免费开源  / 基于 .NET 9 + WPF   
+> 🤖 由 [OpenCode](https://opencode.ai) 及 [OhMyOpenCode](https://ohmyopencode.com) 辅助开发
 
 ---
 
 <p align="center">
-  <b>📂 打开</b> &nbsp;·&nbsp; <b>📤 解压</b> &nbsp;·&nbsp; <b>📥 压缩</b> &nbsp;·&nbsp; <b>👁 预览</b> &nbsp;·&nbsp; <b>🔑 密码管理器</b> &nbsp;·&nbsp; <b>📎 拖拽导出</b>
+  <b>📂 打开</b> &nbsp;·&nbsp; <b>📤 解压</b> &nbsp;·&nbsp; <b>📥 压缩</b> &nbsp;·&nbsp; <b>👁 预览</b> &nbsp;·&nbsp; <b>🔑 密码管理器</b> &nbsp;·&nbsp; <b></b>
 </p>
+
+---
+
+<p align="center">
+  <img src="docs/images/preview-overview.gif" alt="MantisZip 极速预览总览" width="100%"/>
+  <br>⏱️ 3 秒总览：在压缩包内无缝切换、指哪打哪的极速预览体验
+</p>
+
+
+
 
 ---
 
@@ -166,14 +183,6 @@ MantisZip.UI.exe --compress-quick "D:\照片" -- "D:\备份.zip"
 
 ---
 
-## 📋 开发计划
-
-当前项目处于快速迭代阶段（v0.3.4），已支持分卷压缩、密码管理器、文件内预览、Shell 右键菜单等功能。
-
-详细的近期功能排期与历史进度请关注 [开发计划 (PLAN.md)](docs/PLAN.md)。
-
----
-
 ## 📦 第三方依赖 | Dependencies
 
 ### MantisZip.Core
@@ -204,11 +213,6 @@ MantisZip.UI.exe --compress-quick "D:\照片" -- "D:\备份.zip"
 
 ---
 
-## 🤝 贡献 | Contributing
-
-欢迎提交 Issue 和 Pull Request。参见 [AGENTS.md](AGENTS.md) 了解项目约定和注意事项。
-
----
 
 ## 📄 许可证 | License
 
@@ -217,34 +221,76 @@ This project is licensed under the MIT License.
 
 ---
 
-## 🙏 致谢 | Acknowledgments
+## 🙏 致谢与依赖 | Acknowledgments & Dependencies
 
-- [SharpCompress](https://github.com/adamhathcock/sharpcompress) — ZIP/TAR/GZ 引擎（MIT）
-- [SharpSevenZip](https://github.com/sevenzipsharp/SevenZipSharp) — 7z/RAR 引擎（LGPL-2.1）
-- [SharpZipLib](https://github.com/icsharpcode/SharpZipLib) — 遗留 ZIP/TAR/GZ 引擎（MIT）
-- [Ude.NetStandard](https://github.com/jehugaleahsa/udetector) — Mozilla 通用字符编码检测（MIT）
-- [CommunityToolkit.Mvvm](https://github.com/CommunityToolkit/dotnet) — MVVM 工具包（MIT）
-- [Ookii.Dialogs.Wpf](https://github.com/ookii-dialogs/ookii-dialogs-wpf) — WPF 文件夹选择对话框（BSD-3-Clause）
-- [Markdig](https://github.com/xoofx/markdig) — Markdown 渲染（BSD-2-Clause）
-- [WpfAnimatedGif](https://github.com/XamlAnimatedGif/WpfAnimatedGif) — WPF GIF 动画支持（MIT）
-- [Microsoft.Web.WebView2](https://developer.microsoft.com/microsoft-edge/webview2/) — WebView2 控件，用于 HTML/Markdown/SVG/PDF 内容渲染（BSD-3-Clause）
-- [7-Zip](https://www.7-zip.org/) — 7z 压缩引擎（GNU LGPL）
+MantisZip 的诞生离不开全球开源社区的无私奉献。在此，对本项目所依赖的优秀开源库、工具及创作者致以最崇高的敬意。
+
+### 📦 核心第三方依赖库 (Runtime Dependencies)
+
+
+
+| 开源类库 / 引擎 | 主要用途 | 开源许可证 |
+| :--- | :--- | :--- |
+| **[SharpCompress](https://github.com/adamhathcock/sharpcompress)** | ZIP / TAR / GZ 核心解压与压缩引擎 | MIT |
+| **[SharpSevenZip](https://github.com/sevenzipsharp/SevenZipSharp)** | 7z / RAR 格式原生深度绑定解析 | LGPL-2.1 |
+| **[7-Zip (7z.dll)](https://www.7-zip.org/)** | 强悍的 7z 压缩底层核心（随应用分发） | GNU LGPL |
+| **[CommunityToolkit.Mvvm](https://github.com/CommunityToolkit/WindowsCommunityToolkit)** | 现代化的 WPF MVVM 架构开发工具包 | MIT |
+| **[Microsoft.Web.WebView2](https://developer.microsoft.com/en-us/microsoft-edge/webview2/)** | 用于 HTML / Markdown / SVG / PDF 的超流畅高级渲染 | BSD-3-Clause |
+| **[Markdig](https://github.com/xoofx/markdig)** | 极其快速的 Markdown 文本解析与渲染引擎 | BSD-2-Clause |
+| **[WpfAnimatedGif](https://github.com/XamlAnimatedGif/WpfAnimatedGif)** | 压缩包内 GIF 动态图片的完美嵌套播放支持 | MIT |
+| **[Ude.NetStandard](https://github.com/Ybyb/Ude.NetStandard)** | 基于 Mozilla 技术的通用文本字符编码智能检测 | MIT |
+| **[Ookii.Dialogs.Wpf](https://github.com/ookii-dialogs/ookii-dialogs.wpf)** | 为 Windows 带来现代化质感的文件夹选择对话框 | BSD-3-Clause |
+| **[SharpZipLib](https://github.com/icsharpcode/SharpZipLib)** | 传统老旧 ZIP / TAR / GZ 格式的向下兼容支持 | MIT |
+
+---
+
+### 🤖 智能化开发辅助 (AI Coding Companions)
+
+本项目在敏捷开发与重构过程中，深度借助了以下先进的 AI 编程智能体，实现了独立开发生产力的跨越式飞跃：
+
+- [OpenCode](https://opencode.ai) 负责底层核心异步架构的搭建与 .NET 9 高级特性重构。
+- [Reasonix](https://reasonix.io) 负责核心业务功能（如免解压文件预览、智能密码管理器）的高效开发、深度联调与 Bug 修复。
+- [DeepSeek](https://www.deepseek.com) 全程提供底层硬核编程大语言模型的能力支撑。
+
+*(特别感谢上述 AI 工具及其背后开发团队的卓越工作！)*
 
 ---
 
 ## 💖 支持项目 | Support
 
-如果 MantisZip 对你有帮助，欢迎请我喝杯咖啡 ☕  
+MantisZip 是一款完全免费且独立开发的开源项目。如果它提升了你的工作效率，不妨为作者注入一些继续开发的动力！☕  
 
-### Polar
-[在 Polar 上支持](https://buy.polar.sh/polar_cl_VaCaW2l2nWkob5CyHe4dOlhL6HrQDK4ueMA9n1JyhNc)
 
-### 爱发电
-[在爱发电上支持](https://afdian.com/a/MantisZen)
-![爱发电](/docs/images/afdian-MantisZen.jpg)(https://afdian.com/a/MantisZen)
 
-### 微信打赏
-![微信打赏](/docs/images/afdian-MantisZen.jpg)
+### 🌐 境外赞助
+如果您身处海外，推荐通过 Polar 赞助。支持国际信用卡、Apple Pay 等无缝支付：
+<p align="left">
+  <a href="https://buy.polar.sh/polar_cl_VaCaW2l2nWkob5CyHe4dOlhL6HrQDK4ueMA9n1JyhNc">
+    <img src="docs\images\polar_logotype_white.svg" alt="Sponsor on Polar" height="40"/>
+  </a>
+</p>
+
+---
+
+### 🇨🇳 国内赞助
+如果您在国内，支持通过 **爱发电（微信/支付宝）** 或 **微信直接打赏**。您可以直接扫描下方二维码：
+
+<table width="100%">
+  <tr>
+    <td width="50%" align="center" valign="top">
+      <b>⚡ 在爱发电上支持我</b><br><br>
+      <a href="https://afdian.com/a/MantisZen">
+        <img src="docs/images/afdian-MantisZen.jpg" alt="爱发电" width="80%"/>
+      </a>
+      <br><i>(点击或扫码前往爱发电主页)</i>
+    </td>
+    <td width="50%" align="center" valign="top">
+      <b>💚 微信直接打赏</b><br><br>
+      <img src="docs/images/wechat-pay.jpg" alt="微信打赏" width="80%"/>
+      <br><i>(欢迎请作者喝杯热咖啡)</i>
+    </td>
+  </tr>
+</table>
 
 
 ---
