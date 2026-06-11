@@ -325,6 +325,8 @@ public class SevenZipEngine : IArchiveEngine
                     continue;
                 }
 
+                var entrySize = (long)entry.Size;
+
                 progress?.Report(new ArchiveProgress
                 {
                     CurrentFile = fileName,
@@ -334,9 +336,33 @@ public class SevenZipEngine : IArchiveEngine
                     ProcessedFiles = processedFiles,
                 });
 
+                // 使用 WriteProgressStream 在 ExtractFile 写入过程中获得逐块进度
+                var lastFileReport = DateTime.Now;
                 using (var fileStream = new FileStream(resolvedPath, FileMode.Create, FileAccess.Write))
+                using (var progressStream = new WriteProgressStream(fileStream, bytesWritten =>
                 {
-                    extractor.ExtractFile(entry.Index, fileStream);
+                    // 每 100ms 更新一次进度（与 ZipEngine 一致），避免 UI 过载
+                    var now = DateTime.Now;
+                    if (now - lastFileReport < reportInterval && bytesWritten < entrySize)
+                        return;
+
+                    var filePct = entrySize > 0 ? (double)bytesWritten / entrySize * 100 : 100;
+                    var overallPct = totalFiles > 0
+                        ? (double)(processedFiles + (double)bytesWritten / entrySize) / totalFiles * 100
+                        : 0;
+
+                    progress?.Report(new ArchiveProgress
+                    {
+                        CurrentFile = fileName,
+                        PercentComplete = Math.Min(overallPct, 100),
+                        FilePercentComplete = Math.Min(filePct, 100),
+                        TotalFiles = totalFiles,
+                        ProcessedFiles = processedFiles,
+                    });
+                    lastFileReport = now;
+                }))
+                {
+                    extractor.ExtractFile(entry.Index, progressStream);
                 }
 
                 try { File.SetLastWriteTime(resolvedPath, entry.LastWriteTime); }
@@ -613,6 +639,8 @@ public class SevenZipEngine : IArchiveEngine
                 if (resolvedPath == null)
                     continue;
 
+                var entrySize = (long)entry.Size;
+
                 progress?.Report(new ArchiveProgress
                 {
                     CurrentFile = fileName,
@@ -621,9 +649,32 @@ public class SevenZipEngine : IArchiveEngine
                     ProcessedFiles = processed,
                 });
 
+                // 使用 WriteProgressStream 在 ExtractFile 写入过程中获得逐块进度
+                var lastFileReport = DateTime.Now;
                 using (var fileStream = new FileStream(resolvedPath, FileMode.Create, FileAccess.Write))
+                using (var progressStream = new WriteProgressStream(fileStream, bytesWritten =>
                 {
-                    extractor.ExtractFile(entry.Index, fileStream);
+                    var now = DateTime.Now;
+                    if (now - lastFileReport < reportInterval && bytesWritten < entrySize)
+                        return;
+
+                    var filePct = entrySize > 0 ? (double)bytesWritten / entrySize * 100 : 100;
+                    var overallPct = totalTarget > 0
+                        ? (double)(processed + (double)bytesWritten / entrySize) / totalTarget * 100
+                        : 0;
+
+                    progress?.Report(new ArchiveProgress
+                    {
+                        CurrentFile = fileName,
+                        PercentComplete = Math.Min(overallPct, 100),
+                        FilePercentComplete = Math.Min(filePct, 100),
+                        TotalFiles = totalTarget,
+                        ProcessedFiles = processed,
+                    });
+                    lastFileReport = now;
+                }))
+                {
+                    extractor.ExtractFile(entry.Index, progressStream);
                 }
 
                 try { File.SetLastWriteTime(resolvedPath, entry.LastWriteTime); }
@@ -641,6 +692,7 @@ public class SevenZipEngine : IArchiveEngine
                     {
                         CurrentFile = fileName,
                         PercentComplete = totalTarget > 0 ? (double)processed / totalTarget * 100 : 100,
+                        FilePercentComplete = 100,
                         TotalFiles = totalTarget,
                         ProcessedFiles = processed,
                     });
