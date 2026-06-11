@@ -92,6 +92,7 @@ public partial class SettingsWindow : Window
             if ((string)item.Tag == s.FileConflictAction) { ConflictCombo.SelectedItem = item; break; }
         OpenFolderCheck.IsChecked = s.OpenFolderAfterExtract;
         EnableDragExtractCheck.IsChecked = s.EnableDragExtract;
+        ExtractPreservePathCheck.IsChecked = s.ExtractPreserveFullPath;
 
         // 上下文菜单
         EnableCompressCheck.IsChecked = s.EnableCompressMenu;
@@ -196,6 +197,7 @@ public partial class SettingsWindow : Window
         s.FileConflictAction = ((ComboBoxItem)ConflictCombo.SelectedItem)?.Tag as string ?? "ask";
         s.OpenFolderAfterExtract = OpenFolderCheck.IsChecked == true;
         s.EnableDragExtract = EnableDragExtractCheck.IsChecked == true;
+        s.ExtractPreserveFullPath = ExtractPreservePathCheck.IsChecked == true;
 
         s.EnableCompressMenu = EnableCompressCheck.IsChecked == true;
         s.EnableCompressSeparate = EnableCompressSeparateCheck.IsChecked == true;

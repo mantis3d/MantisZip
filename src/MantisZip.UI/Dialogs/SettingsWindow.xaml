@@ -119,6 +119,7 @@
 
                         <CheckBox x:Name="OpenFolderCheck" Content="{l:L Settings_Extract_OpenFolderAfter}" Margin="0,16,0,0"/>
                         <CheckBox x:Name="EnableDragExtractCheck" Content="{l:L Settings_Extract_EnableDragExtract}" Margin="0,8,0,0"/>
+                        <CheckBox x:Name="ExtractPreservePathCheck" Content="{l:L Settings_Extract_PreserveFullPath}" Margin="0,8,0,0"/>
                     </StackPanel>
                 </ScrollViewer>
             </TabItem>

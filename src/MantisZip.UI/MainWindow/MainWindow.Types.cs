@@ -46,7 +46,6 @@ public class ArchiveItem : Core.Abstractions.ArchiveItem
         Unavailable
     }
 
-    public string DisplayName { get; set; } = string.Empty;
     public string NameForSort { get; set; } = string.Empty;
     public ImageSource? IconSource { get; set; }
 

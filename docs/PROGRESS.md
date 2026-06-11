@@ -7,12 +7,25 @@
 - **技术栈**: .NET 9 + WPF + SharpCompress + SharpSevenZip
 
 ## 版本
-- **当前版本**: 0.3.11
+- **当前版本**: 0.3.12
 - **发布日期**: 2026-06-08
 
 ## 规划中
 
 ## 版本历史（从新到旧）
+
+### v0.3.12 (2026-06-10) 文件列表筛选增强（排除框/通配符/显示名匹配前修复）
+1. **排除文本框 + 匹配模式选择器**：新增排除过滤（`ExcludeText`），支持子串/通配符两种匹配模式（`FilterMatchMode`），包含和排除独立生效后取交集
+2. **排除框对齐修复**：区域 1 从 `StackPanel` 改为 `Grid`（3列×2行），搜索框与排除框同列等宽，文本框统一 `Height=22`+`FontSize=11`+主题绑定
+3. **筛选匹配显示名而非 FullPath**：`MatchItem` 改用 `DisplayName`（回退到 `Name`），去掉 `FullPath` 匹配，解决根目录名为 "ma" 时 a/m 全文件匹配的 bug。核心改动：新增 `ArchiveItem.DisplayName`（Core），移除 UI 子类遮蔽，更新测试数据
+
+### v0.3.12 (2026-06-10) 解压路径裁剪设置（相对当前浏览目录 / 保留完整压缩包路径）
+
+1. **新增设置项**：在设置 → 解压 标签页添加"解压时保留完整路径"开关，默认关闭
+2. **解压路径裁剪**：`ExtractSelectedAsync` 在构建输出路径时，根据设置和当前浏览目录 (`_currentFolder`) 裁剪条目的 `FullPath` 前缀
+   - 关闭时（默认）：`folderA/sub/file.txt` → 当前在 `folderA/` 中解压到 `dest/sub/file.txt`
+   - 开启时：`folderA/sub/file.txt` → 解压到 `dest/folderA/sub/file.txt`（保留完整路径）
+3. 不影响 `ArchiveEntryExtractor.ExtractEntryAsync` 的条目查找（始终用原始 `FullPath`）
 
 ### v0.3.11 (2026-06-08) 文件列表拖拽提取修复（多选/目录/编码/重入）
 

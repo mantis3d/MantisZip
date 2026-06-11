@@ -9,6 +9,8 @@ public class ArchiveItem
 {
     public string Name { get; set; } = string.Empty;
     public string FullPath { get; set; } = string.Empty;
+    /// <summary>显示名称（相对于当前浏览目录），用于过滤和展示</summary>
+    public string DisplayName { get; set; } = string.Empty;
     public long Size { get; set; }
     public long CompressedSize { get; set; }
     public DateTime LastModified { get; set; }

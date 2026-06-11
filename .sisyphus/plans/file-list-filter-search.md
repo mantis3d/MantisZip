@@ -948,7 +948,385 @@ Wave 3 (Integration + Tests):
 
 ---
 
-## Commit Strategy
+## 扩展功能：排除文字 + 通配符匹配
+
+### TL;DR
+
+> **Quick Summary**: 在现有文字搜索框右侧添加匹配模式下拉框（子串匹配/通配符），下方添加排除文字框。匹配模式同时影响包含搜索和排除搜索。FilterBar 高度不变（区域 2/3 已是两行）。
+>
+> **Design Change Summary**:
+> - 区域 1 从单行改为垂直两行，高度自动适配（与区域 2/3 同高，FilterBar 总高不变）
+> - 新增 `MatchModeCombo`（ComboBox，搜索框右侧，宽度 100px）
+> - 新增 `ExcludeBox`（TextBox，第二行，宽度 160px，⊘ 标识）
+> - 匹配模式枚举 `FilterMatchMode` + `SearchFilters.ExcludeText` + `SearchFilters.MatchMode`
+> - 通配符（`*` = 任意序列，`?` = 单字符）转正则匹配
+
+### 最终布局
+
+```
+┌─FilterBar──(高度不变, ~54px)───────────────────────────────────────────────────┐
+│ 🔍 [FileSearchBox 160px] [子串匹配 ▼]  │ 📅 [🧪] 从 [DP]  │ 📏 [🧪] 最小 [60] [▼] │ ✕ │ 📊 │
+│ ⊘ [ExcludeBox       160px]            │    [🧪] 到 [DP]  │    [🧪] 最大 [60] [▼] │    │    │
+└─────────────────────────────────────────────────────────────────────────────────┘
+```
+
+### 实现任务
+
+- [x] E1. **排除 + 通配符 UI（XAML + 事件）**
+
+  **What to do**:
+  - 修改 `MainWindow.xaml` 中区域 1 的布局：
+    - 外层改为 `Orientation="Vertical"` 的 StackPanel
+    - **第一行**（水平）：🔍 `emoji:TextBlock` + `FileSearchBox`（不变）+ 新增 `MatchModeCombo`
+    - **第二行**（水平）：⊘ `emoji:TextBlock` + 新增 `ExcludeBox`
+    - MatchModeCombo：宽 100，高 22，FontSize 11，SelectedIndex=0（默认"子串匹配"）
+    - ExcludeBox：宽 160，高 22，ToolTip 引用 `Main_Filter_ExcludePlaceholder`
+  - 事件绑定：
+    - `MatchModeCombo.SelectionChanged` → `MatchModeCombo_SelectionChanged`
+    - `ExcludeBox.TextChanged` → `ExcludeBox_TextChanged`
+    - `ExcludeBox.PreviewKeyDown` → `ExcludeBox_PreviewKeyDown`（Escape 清空）
+  - 更新 `ClearFiltersBtn_Click`：清空 `ExcludeBox.Text`、`MatchModeCombo.SelectedIndex = 0`
+  - 更新 `ToggleFilterBarBtn_Click`：重置 `_excludeText = null`、`_matchMode = FilterMatchMode.Substring`
+  - **主题样式**：ComboBox 和 TextBox 需绑定 `Theme_WindowBg` / `Theme_TextPrimary` / `Theme_Border`（参见 AGENTS.md 规则 3）
+
+  **Must NOT do**:
+  - 不修改区域 2/3 的布局
+  - 区域 1 的垂直 StackPanel 不应设置固定高度（自动撑开）
+
+  **Recommended Agent Profile**:
+  - **Category**: `visual-engineering`
+  - **Skills**: none needed
+
+  **Parallelization**:
+  - **Can Run In Parallel**: NO（UI 改动后需立即对接逻辑改动）
+  - **Parallel Group**: Sequential (before E2)
+  - **Blocks**: E2, E4
+  - **Blocked By**: None（独立于已完成的任务 1-8）
+
+  **References**:
+  - `src/MantisZip.UI/MainWindow.xaml:303-309` — 当前区域 1 的 XAML
+  - `src/MantisZip.UI/MainWindow.xaml:343-348` — 参考 SizeMinUnit ComboBox 样式（相同高度/字号）
+  - `src/MantisZip.UI/MainWindow.UI.cs:682-701` — `ClearFiltersBtn_Click`
+  - `src/MantisZip.UI/MainWindow.UI.cs:145-167` — `ToggleFilterBarBtn_Click`
+
+  **Acceptance Criteria**:
+  - [ ] FilterBar 区域 1 变为两行布局
+  - [ ] MatchModeCombo 在 FileSearchBox 右侧，默认选中"子串匹配"
+  - [ ] ExcludeBox 在第二行，⊘ 图标标识
+  - [ ] Escape 键清空 ExcludeBox
+  - [ ] 清除按钮清空 ExcludeBox + 重置匹配模式
+  - [ ] 隐藏筛选栏时所有状态重置
+  - [ ] `dotnet build` 无编译错误（含主题色绑定）
+
+  **QA Scenarios**:
+  ```
+  Scenario: FilterBar 布局构建验证
+    Tool: Bash
+    Preconditions: XAML 已修改
+    Steps:
+      1. dotnet build src/MantisZip.UI/MantisZip.UI.csproj
+    Expected Result: Build succeeded (0 errors)
+    Evidence: .sisyphus/evidence/task-e1-ui-build.txt
+
+  Scenario: 高度验证（自动适配）
+    验证目标：区域 1 两行布局的总高度应与区域 2/3 一致
+    Tool: 视觉检查（运行应用后截图）
+    Preconditions: 打开一个压缩包，展开 FilterBar
+    Steps:
+      1. dotnet run --project src/MantisZip.UI/MantisZip.UI.csproj -- --open "test.zip"
+      2. 点击筛选按钮显示 FilterBar
+      3. 观察文字区、日期区、大小区的行高是否对齐
+    Expected Result: 三块区域的垂直高度一致（~54px），边界对齐
+    Evidence: .sisyphus/evidence/task-e1-layout.png
+  ```
+
+  **Commit**: NO（与 E2 一起）
+
+---
+
+- [x] E2. **排除 + 通配符逻辑引擎 + Code-behind**
+
+  **What to do**:
+
+  **Part A — Core 层（ArchiveFilter.cs）**：
+  - 新增枚举：
+    ```csharp
+    public enum FilterMatchMode
+    {
+        Substring,  // 子串匹配（默认，当前行为）
+        Wildcard,   // 通配符（* = 任意字符序列，? = 单个字符）
+    }
+    ```
+  - `SearchFilters` record 新增字段：
+    ```csharp
+    public string? ExcludeText { get; init; }
+    public FilterMatchMode MatchMode { get; init; }
+    ```
+  - `ApplyFilters` 文字过滤逻辑重写：
+    - 提取 `MatchItem(ArchiveItem item, string pattern, FilterMatchMode mode)` 静态方法
+    - **子串匹配**：`item.Name.Contains(text, OrdinalIgnoreCase) || item.FullPath.Contains(text, OrdinalIgnoreCase)`（现有逻辑不变）
+    - **通配符匹配**：将 pattern 转正则（`^` + `Regex.Escape`.Replace(`\*`→`.*`, `\?`→`.`) + `$`），对 `Name` 和 `FullPath` 做 `Regex.IsMatch(..., RegexOptions.IgnoreCase)`
+    - **Regex 缓存**：使用 `static ConcurrentDictionary<string, Regex>` 缓存编译后的正则，避免每项重建（key = pattern + mode）
+    - **包含逻辑**（不变，仅适配 MatchMode）：`MatchItem(item, filters.Text, filters.MatchMode)`
+    - **排除逻辑**（新增）：`!string.IsNullOrEmpty(filters.ExcludeText) && MatchItem(item, filters.ExcludeText, filters.MatchMode)` → `return false`
+    - **组合规则**：排除在包含之后执行（AND 逻辑），排除命中则不保留该条目
+
+  **Part B — UI 层（MainWindow.xaml.cs + MainWindow.UI.cs）**：
+  - 新增字段：
+    ```csharp
+    private string? _excludeText;
+    private FilterMatchMode _matchMode = FilterMatchMode.Substring;
+    ```
+  - 新增事件处理器：
+    ```csharp
+    private void ExcludeBox_TextChanged(object sender, TextChangedEventArgs e)
+    {
+        _excludeText = string.IsNullOrWhiteSpace(ExcludeBox.Text) ? null : ExcludeBox.Text;
+        RefreshFilter();
+    }
+
+    private void ExcludeBox_PreviewKeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.Escape)
+        {
+            ExcludeBox.Text = "";
+            _excludeText = null;
+            RefreshFilter();
+            e.Handled = true;
+        }
+    }
+
+    private void MatchModeCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        _matchMode = MatchModeCombo.SelectedIndex == 0
+            ? FilterMatchMode.Substring
+            : FilterMatchMode.Wildcard;
+        RefreshFilter();
+    }
+    ```
+  - 更新 `RefreshFilter()` 中 `SearchFilters` 构造：
+    ```csharp
+    var filters = new SearchFilters
+    {
+        Text = _searchText,
+        ExcludeText = _excludeText,
+        MatchMode = _matchMode,
+        DateFrom = _dateFrom,
+        // ... 其余字段不变
+    };
+    ```
+  - 更新 `HasActiveFilters()`：
+    ```csharp
+    return !string.IsNullOrEmpty(_searchText)
+        || !string.IsNullOrEmpty(_excludeText)
+        || _dateFrom.HasValue
+        || _dateTo.HasValue
+        || _sizeMin.HasValue
+        || _sizeMax.HasValue;
+    ```
+
+  **Must NOT do**:
+  - 通配符转正则时，`Regex.Escape` 要对 `\*` 和 `\?` 做安全替换（`Replace("\\*", ".*")` 注意转义）
+  - 不修改日期/大小过滤逻辑
+  - Regex 不设置 `RegexOptions.Compiled`（首次编译开销在过滤场景中不划算，且 JIT 后无法卸载）
+
+  **Recommended Agent Profile**:
+  - **Category**: `quick`
+  - **Skills**: none needed
+  - Reason: 数据层逻辑 + 事件绑定，无 UI 设计
+
+  **Parallelization**:
+  - **Can Run In Parallel**: NO（Core 层改动后需 Code-behind 联动）
+  - **Parallel Group**: Sequential (after E1)
+  - **Blocks**: E4
+  - **Blocked By**: E1
+
+  **References**:
+  - `src/MantisZip.Core/Utils/ArchiveFilter.cs:36-77` — `ApplyFilters` 现有逻辑
+  - `src/MantisZip.Core/Utils/ArchiveFilter.cs:8-24` — `SearchFilters` record
+  - `src/MantisZip.UI/MainWindow/MainWindow.UI.cs:498-504` — `HasActiveFilters()`
+  - `src/MantisZip.UI/MainWindow/MainWindow.UI.cs:511-522` — `RefreshFilter()` 构造 SearchFilters
+  - `src/MantisZip.UI/MainWindow/MainWindow.UI.cs:625-629` — `FileSearchBox_TextChanged`
+
+  **Acceptance Criteria**:
+  - [ ] `FilterMatchMode` 枚举存在，包含 `Substring` 和 `Wildcard`
+  - [ ] `SearchFilters` 新增 `ExcludeText` 和 `MatchMode` 字段
+  - [ ] 子串匹配行为与现有逻辑完全一致（回归）
+  - [ ] 通配符 `*.cs` 匹配所有 `.cs` 文件
+  - [ ] 通配符 `?at` 匹配 "cat", "bat", "hat" 等
+  - [ ] 排除文字框输入 `temp` 后，匹配 temp 的条目被排除
+  - [ ] 通配符搜索 `*.cs` 排除 `test*`：所有 .cs 文件中被排除以 test 开头的
+  - [ ] 排除文字为空时不影响包含过滤结果
+  - [ ] `dotnet build` + `dotnet test` 通过
+  - [ ] Regex 缓存正常工作（相同 pattern 不重复编译）
+
+  **QA Scenarios**:
+  ```
+  Scenario: 子串匹配回归
+    Tool: Bash
+    Preconditions: 过滤引擎已修改
+    Steps:
+      1. 调用 ApplyFilters(items, new SearchFilters { Text = "helper", MatchMode = Substring })
+    Expected Result: 结果包含 "src/utils/helper.cs"，不包含 "readme.txt"（与之前相同）
+    Evidence: .sisyphus/evidence/task-e2-substring-regression.txt
+
+  Scenario: 通配符 *.cs
+    Tool: Bash
+    Preconditions: CreateTestItems() 数据集
+    Steps:
+      1. 调用 ApplyFilters(items, new SearchFilters { Text = "*.cs", MatchMode = Wildcard })
+      2. 断言结果只包含 .cs 文件
+    Expected Result: main.cs, util.cs, helper.cs, converter.cs 被匹配
+    Evidence: .sisyphus/evidence/task-e2-wildcard-cs.txt
+
+  Scenario: 排除文字过滤
+    Tool: Bash
+    Preconditions: CreateTestItems()
+    Steps:
+      1. 调用 ApplyFilters(items, new SearchFilters { Text = "*.cs", ExcludeText = "test", MatchMode = Wildcard })
+      2. 断言结果不包含名称含 "test" 的 .cs 文件
+    Expected Result: 排除正确生效
+    Evidence: .sisyphus/evidence/task-e2-exclude.txt
+  ```
+
+  **Commit**: YES（与 E1 + E3 一起）
+  - Message: `feat(filter): add exclude text box and wildcard/match mode to file list filter`
+  - Files: `src/MantisZip.Core/Utils/ArchiveFilter.cs`, `src/MantisZip.UI/MainWindow.xaml`, `src/MantisZip.UI/MainWindow.xaml.cs`, `src/MantisZip.UI/MainWindow/MainWindow.UI.cs`, `src/MantisZip.UI/Resources/strings.zh.json`, `src/MantisZip.UI/Resources/strings.en.json`
+  - Pre-commit: `dotnet build && dotnet test tests/MantisZip.Tests/`
+
+---
+
+- [x] E3. **本地化字符串（排除 + 匹配模式）**
+
+  **What to do**:
+  - 在 `strings.zh.json` 和 `strings.en.json` 中添加：
+
+    | Key | zh | en |
+    |-----|----|----|
+    | `Main_Filter_ExcludePlaceholder` | 排除… | Exclude… |
+    | `Main_Filter_MatchModeSubstring` | 子串匹配 | Substring |
+    | `Main_Filter_MatchModeWildcard` | 通配符 | Wildcard |
+    | `Main_Filter_ExcludeLabel` | ⊘ 排除 | ⊘ Exclude |
+
+  - 格式参考现有 `Main_Filter_*` 键的 JSON 结构
+
+  **Must NOT do**:
+  - 不修改已有键值
+
+  **Recommended Agent Profile**:
+  - **Category**: `quick`
+  - **Skills**: none needed
+
+  **Parallelization**:
+  - **Can Run In Parallel**: YES（纯 JSON 改动，与 E1/E2 互不依赖）
+  - **Parallel Group**: Parallel with E1, E2
+  - **Blocks**: E2（E2 的 XAML 引用新键，必须先有键）
+  - **Blocked By**: None
+
+  **References**:
+  - `src/MantisZip.UI/Resources/strings.zh.json` — 现有中文 JSON
+  - `src/MantisZip.UI/Resources/strings.en.json` — 现有英文 JSON
+  - 参考 `Main_FilterSearch_Placeholder` 的格式
+
+  **Acceptance Criteria**:
+  - [ ] 4 个新增键值对 JSON 格式正确
+  - [ ] `dotnet build` 无错误
+
+  **QA Scenarios**:
+  ```
+  Scenario: JSON 格式验证
+    Tool: Bash
+    Preconditions: JSON 已修改
+    Steps:
+      1. dotnet build
+    Expected Result: Build succeeded
+    Evidence: .sisyphus/evidence/task-e3-json.txt
+  ```
+
+  **Commit**: YES（与 E1 + E2 一起，见 E2 提交信息）
+
+---
+
+- [x] E4. **单元测试（通配符 + 排除）**
+
+  **What to do**:
+  - 在 `FileListFilterTests.cs` 中添加测试方法：
+  - **子串回归**（确保重构不影响现有行为）：
+    - `Filter_Exclude_Substring_Regress`: 纯子串包含过滤与之前行为一致
+  - **通配符测试**：
+    - `Filter_Wildcard_Star`: `*.cs` 匹配所有 .cs 文件
+    - `Filter_Wildcard_Question`: `?at` 匹配如 "cat", "bat" 等
+    - `Filter_Wildcard_Prefix`: `src/*` 匹配 src/ 下所有文件
+    - `Filter_Wildcard_CaseInsensitive`: `*.CS` 同样匹配 .cs 文件
+    - `Filter_Wildcard_NoMatch`: `*.xyz` 返回空
+  - **排除测试**：
+    - `Filter_Exclude_Text`: 搜索 "readme" 排除 "readme" → 空
+    - `Filter_Exclude_NonExclude`: 排除文字不在结果中时不影响包含结果
+    - `Filter_Exclude_Empty`: 排除文字为空时返回正常包含结果
+  - **组合测试**：
+    - `Filter_Wildcard_WithExclude`: `*.cs` 排除 `test*` → 只保留非 test 开头的 .cs 文件
+    - `Filter_Substring_WithExclude`: "src" 排除 "utils" → src 目录下排除 utils 子目录的文件
+  - **Regex 缓存测试**：
+    - `Filter_Wildcard_CacheReuse`: 相同 pattern 两次调用返回相同结果
+
+  **Must NOT do**:
+  - 不修改已有测试用例
+  - 不依赖 UI 线程
+
+  **Recommended Agent Profile**:
+  - **Category**: `quick`
+  - **Skills**: none needed
+
+  **Parallelization**:
+  - **Can Run In Parallel**: YES
+  - **Parallel Group**: Wave 3 (with E3 if not already committed)
+  - **Blocks**: F1-F4
+  - **Blocked By**: E2
+
+  **References**:
+  - `tests/MantisZip.Tests/FileListFilterTests.cs` — 现有测试文件（~420 行）
+  - 参考现有 `Filter_Text_ByName` 等测试方法的模式
+
+  **Acceptance Criteria**:
+  - [ ] 至少 11 个新测试用例
+  - [ ] `dotnet test tests/MantisZip.Tests/` → ALL PASS（含原有 15 个 + 新增 11 个 = 26+）
+  - [ ] 所有测试不依赖 UI 线程
+
+  **QA Scenarios**:
+  ```
+  Scenario: 所有通配符和排除测试通过
+    Tool: Bash
+    Preconditions: 测试方法已添加
+    Steps:
+      1. dotnet test tests/MantisZip.Tests/
+    Expected Result: >26 passed, 0 failed
+    Evidence: .sisyphus/evidence/task-e4-all-tests.txt
+
+  Scenario: 仅通配符测试
+    Tool: Bash
+    Preconditions: 测试方法已添加
+    Steps:
+      1. dotnet test tests/MantisZip.Tests/ --filter "FullyQualifiedName~Wildcard"
+    Expected Result: All wildcard tests pass
+    Evidence: .sisyphus/evidence/task-e4-wildcard-tests.txt
+
+  Scenario: 仅排除测试
+    Tool: Bash
+    Preconditions: 测试方法已添加
+    Steps:
+      1. dotnet test tests/MantisZip.Tests/ --filter "FullyQualifiedName~Exclude"
+    Expected Result: All exclude tests pass
+    Evidence: .sisyphus/evidence/task-e4-exclude-tests.txt
+  ```
+
+  **Commit**: YES（独立提交）
+  - Message: `test: add wildcard match and exclude filter unit tests`
+  - Files: `tests/MantisZip.Tests/FileListFilterTests.cs`
+  - Pre-commit: `dotnet test tests/MantisZip.Tests/`
+
+---
+
+## H. Commit Strategy（补充）
 
 | Commit | Tasks | Message |
 |--------|-------|---------|
@@ -956,6 +1334,9 @@ Wave 3 (Integration + Tests):
 | 2 | 2, 3, 7, 8 | `feat(core): add file list filtering (showSubfolders + multi-dim filter) with tests` |
 | 3 | 4 | `feat(ui): add toolbar toggle buttons (show subfolders + toggle filter bar)` |
 | 4 | 5, 6 | `feat(ui): add multi-dimensional file list filter bar (text, date range, size range)` |
+| 5 | E3 | `feat(l10n): add exclude filter and match mode localization strings` |
+| 6 | E1, E2 | `feat(filter): add exclude text box and wildcard/match mode to file list filter` |
+| 7 | E4 | `test: add wildcard match and exclude filter unit tests` |
 
 ---
 
@@ -981,3 +1362,15 @@ dotnet test tests/MantisZip.Tests/  # Expected: All tests pass (0 failures)
 - [x] 所有本地化字符串正确显示
 - [x] 所有单元测试通过
 - [x] 构建无错误
+- [ ] 排除文字框（ExcludeBox）正确渲染在搜索框下方，⊘ 图标标识
+- [ ] 匹配模式下拉框（MatchModeCombo）在搜索框右侧，默认"子串匹配"
+- [ ] 子串匹配模式行为与原搜索行为完全一致（回归）
+- [ ] 通配符 `*` 匹配任意字符序列，`?` 匹配单个字符
+- [ ] 通配符模式下搜索 `*.cs` 正确匹配所有 .cs 文件
+- [ ] 排除文字框输入内容后匹配条目被排除
+- [ ] 排除文字为空时不影响包含过滤结果
+- [ ] 通配符搜索 + 排除同时使用（如 `*.cs` 排除 `test*`）正确工作
+- [ ] Escape 键清除排除框内容
+- [ ] 清除全部按钮（✕）重置排除框和匹配模式
+- [ ] Regex 缓存生效（相同 pattern 不重复编译）
+- [ ] FilterBar 总高度不变（区域 1 两行后自动适配）
