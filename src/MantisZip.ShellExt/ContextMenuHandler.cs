@@ -174,6 +174,39 @@ public class ContextMenuHandler : IShellExtInit, IContextMenu
     public ContextMenuHandler()
     {
         ShellExtLog.Info($"ContextMenuHandler #{_instanceId}: constructor");
+        // Preload icons eagerly so QueryContextMenu doesn't block Explorer's menu
+        // thread on first right-click.  Only the first construction across all
+        // instances actually loads (subsequent ones hit the static cache).
+        EnsureIconsPreloaded();
+    }
+
+    private static bool _iconsPreloaded;
+    private static readonly object _iconsPreloadLock = new();
+
+    private static void EnsureIconsPreloaded()
+    {
+        if (_iconsPreloaded) return;
+        lock (_iconsPreloadLock)
+        {
+            if (_iconsPreloaded) return;
+
+            // Touch every icon cache field — the first call triggers LoadIconFromResource
+            // inside _iconCacheLock; subsequent calls return the cached HBITMAP.
+            GetOrLoadIcon("App.ico",             ref _cachedIconMantisZip);
+            GetOrLoadIcon("Open.ico",            ref _cachedIconOpen);
+            GetOrLoadIcon("Extract.ico",         ref _cachedIconExtract);
+            GetOrLoadIcon("ExtractHere.ico",     ref _cachedIconExtractHere);
+            GetOrLoadIcon("ExtractSmart.ico",    ref _cachedIconSmartExtract);
+            GetOrLoadIcon("ExtractToNamed.ico",  ref _cachedIconExtractToNamed);
+            GetOrLoadIcon("ExtractTo.ico",       ref _cachedIconExtractTo);
+            GetOrLoadIcon("Compress.ico",        ref _cachedIconCompress);
+            GetOrLoadIcon("CompressSeparate.ico", ref _cachedIconCompressSeparate);
+            GetOrLoadIcon("CompressCombined.ico", ref _cachedIconCompressCombined);
+            GetOrLoadIcon("CompressDialog.ico",  ref _cachedIconCompressDialog);
+
+            _iconsPreloaded = true;
+            ShellExtLog.Info("EnsureIconsPreloaded: all icons preloaded");
+        }
     }
 
     ~ContextMenuHandler()
@@ -792,6 +825,26 @@ public class ContextMenuHandler : IShellExtInit, IContextMenu
     private static IntPtr _cachedIconCompressDialog = IntPtr.Zero;
     private static readonly object _iconCacheLock = new();
 
+    // Cached Assembly reference (avoids repeated GetExecutingAssembly + reflection in LoadIconFromResource).
+    private static readonly Assembly _shellExtAssembly = Assembly.GetExecutingAssembly();
+
+    // Hardcoded resource name map — avoids the expensive GetManifestResourceNames() array scan on every icon load.
+    // Key: short name used in code ("Open.ico"), Value: full embedded resource name.
+    private static readonly Dictionary<string, string> _iconResourceNameMap = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["App.ico"]              = "MantisZip.ShellExt.Resources.App.ico",
+        ["Open.ico"]             = "MantisZip.ShellExt.Resources.Open.ico",
+        ["Extract.ico"]          = "MantisZip.ShellExt.Resources.Extract.ico",
+        ["ExtractHere.ico"]      = "MantisZip.ShellExt.Resources.ExtractHere.ico",
+        ["ExtractSmart.ico"]     = "MantisZip.ShellExt.Resources.ExtractSmart.ico",
+        ["ExtractToNamed.ico"]   = "MantisZip.ShellExt.Resources.ExtractToNamed.ico",
+        ["ExtractTo.ico"]        = "MantisZip.ShellExt.Resources.ExtractTo.ico",
+        ["Compress.ico"]         = "MantisZip.ShellExt.Resources.Compress.ico",
+        ["CompressSeparate.ico"] = "MantisZip.ShellExt.Resources.CompressSeparate.ico",
+        ["CompressCombined.ico"] = "MantisZip.ShellExt.Resources.CompressCombined.ico",
+        ["CompressDialog.ico"]   = "MantisZip.ShellExt.Resources.CompressDialog.ico",
+    };
+
     /// <summary>
     /// Returns the effective file list for command execution.
     /// When Explorer creates a second COM instance with the full file list
@@ -991,13 +1044,20 @@ public class ContextMenuHandler : IShellExtInit, IContextMenu
     {
         try
         {
-            var assembly = Assembly.GetExecutingAssembly();
-            string? fullName = assembly.GetManifestResourceNames()
-                .FirstOrDefault(n => n.EndsWith(resourceName));
-            if (fullName == null)
-                return IntPtr.Zero;
+            // Fast path: look up full resource name from the hardcoded map (avoids reflection scan).
+            if (!_iconResourceNameMap.TryGetValue(resourceName, out string? fullName))
+            {
+                // Fallback: scan manifest resources (for icons added after this map was built).
+                fullName = _shellExtAssembly.GetManifestResourceNames()
+                    .FirstOrDefault(n => n.EndsWith(resourceName, StringComparison.OrdinalIgnoreCase));
+                if (fullName == null)
+                {
+                    ShellExtLog.Warn($"LoadIconFromResource: \"{resourceName}\" not found in embedded resources");
+                    return IntPtr.Zero;
+                }
+            }
 
-            using var stream = assembly.GetManifestResourceStream(fullName);
+            using var stream = _shellExtAssembly.GetManifestResourceStream(fullName);
             if (stream == null)
                 return IntPtr.Zero;
 
