@@ -1,10 +1,10 @@
 > 🌐 Language: 中文 | [English](/docs/README_en.md)
 
+<div align="center">
+
 # MantisZip
-<p align="center">
-  <img src="docs/images/Logo.png" alt="MantisZip"/>
-</p>
-<p align="center">
+![Logo](/docs/images/Logo.png)
+
 轻量级全功能 Windows 压缩/解压软件
 </p>
 
@@ -14,20 +14,22 @@
   <a href="https://dotnet.microsoft.com/"><img src="https://img.shields.io/badge/.NET-9.0-purple?style=flat-square" alt=".NET 9"></a>
 </p>
 
+
+
+----
+
+![MantisZip 极速预览总览](/docs/images/preview-overview.gif)
+
+ ⏱️ 3 秒总览：在压缩包内无缝切换、指哪打哪的极速预览体验
+
 > 免费开源  / 基于 .NET 9 + WPF   
 > 🤖 由 [OpenCode](https://opencode.ai) 及 [Reasonix](https://reasonix.io) 辅助开发
+</div>
 
----
+----
 
 <p align="center">
   <b>📂 打开</b> &nbsp;·&nbsp; <b>📤 解压</b> &nbsp;·&nbsp; <b>📥 压缩</b> &nbsp;·&nbsp; <b>👁 预览</b> &nbsp;·&nbsp; <b>🔑 密码管理器</b> &nbsp;·&nbsp; <b></b>
-</p>
-
----
-
-<p align="center">
-  <img src="docs/images/preview-overview.gif" alt="MantisZip 极速预览总览" width="100%"/>
-  <br>⏱️ 3 秒总览：在压缩包内无缝切换、指哪打哪的极速预览体验
 </p>
 
 ---
