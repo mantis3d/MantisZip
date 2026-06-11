@@ -1,37 +1,9 @@
 using System;
 using System.Collections.Generic;
-using System.ComponentModel;
 using System.Windows.Media;
 using MantisZip.Core.Abstractions;
 
 namespace MantisZip.UI;
-
-/// <summary>
-/// 文件夹树节点
-/// </summary>
-public class FolderNode : INotifyPropertyChanged
-{
-    public string Name { get; set; } = string.Empty;
-    public string FullPath { get; set; } = string.Empty;
-    public string Icon => string.IsNullOrEmpty(FullPath) ? "📦" : "📁";
-    public List<FolderNode> Children { get; set; } = new();
-
-    private bool _isExpanded;
-    public bool IsExpanded
-    {
-        get => _isExpanded;
-        set { if (_isExpanded != value) { _isExpanded = value; PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsExpanded))); } }
-    }
-
-    private bool _isSelected;
-    public bool IsSelected
-    {
-        get => _isSelected;
-        set { if (_isSelected != value) { _isSelected = value; PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsSelected))); } }
-    }
-
-    public event PropertyChangedEventHandler? PropertyChanged;
-}
 
 public class ArchiveItem : Core.Abstractions.ArchiveItem
 {

@@ -15,14 +15,18 @@
 
 ## 版本历史（从新到旧）
 
+### v0.3.13 (2026-06-11) 提取文件列表展示和目录树构建逻辑到 Core
+1. **ArchiveTreeBuilder**（Core/Services）：`BuildTree()` 从 `ArchiveItem` 列表构建文件夹树，`FolderNode` 类从 WPF 移到 Core
+2. **ArchiveEntryLister**（Core/Services）：`GetEntriesInFolder()` 按文件夹路径筛选条目（支持扁平/默认两种浏览模式），`ComputeDirectoryStats()` 预计算各目录的统计信息
+3. **WPF 重构**：`BuildFolderTree()` 和 `FilterFiles()` 改为调用 Core 服务，`FolderNode` 类从 `MainWindow.Types.cs` 移除
+4. **测试验证**：183 个测试全部通过
+
 ### v0.3.14-dev (2026-06-11) Avalonia 移植 —— Phase 0 完成
 1. **项目骨架**：新建 `src/MantisZip.UI.Avalonia/`（net9.0 + MVVM + Skia），目标跨平台
 2. **分支策略**：`avalonia-port` 分支独立开发，与 master 双向同步
 3. **Phase 0 功能**：项目骨架 + 文件浏览（ListBox + 列头）+ 文本预览（编码检测）+ CSV 预览（DataView）+ PE 元数据预览 — 全部验证通过
 4. **DataGrid 回退**：`Avalonia.Controls.DataGrid` v12.0.0 主题资源为空（329 字节无样式），改用 ListBox + ItemsControl 替代
 5. **NameDisplay fallback**：`ArchiveItemModel.NameDisplay` 优先使用 DisplayName，回退到 Name（ZIP 引擎未设置 DisplayName）
-
-
 
 ### v0.3.12 (2026-06-10) 文件列表筛选增强（排除框/通配符/显示名匹配前修复）
 1. **排除文本框 + 匹配模式选择器**：新增排除过滤（`ExcludeText`），支持子串/通配符两种匹配模式（`FilterMatchMode`），包含和排除独立生效后取交集
