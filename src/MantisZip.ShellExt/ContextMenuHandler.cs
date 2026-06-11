@@ -167,6 +167,7 @@ public class ContextMenuHandler : IShellExtInit, IContextMenu
     private List<string> _selectedFiles = new();
     private string? _targetFolder; // Directory\Background mode
     private bool _isBackgroundMode;
+    private bool _initializeSucceeded;
     private readonly List<int> _cmdIdOrder = new();
 
     // ─── Constructor / finalizer ───
@@ -200,7 +201,23 @@ public class ContextMenuHandler : IShellExtInit, IContextMenu
         {
             if (pDataObj == IntPtr.Zero)
             {
-                ShellExtLog.Warn("IShellExtInit.Initialize: pDataObj is null, returning E_FAIL");
+                // Background mode (e.g., right-click empty folder space):
+                // pDataObj is null but pidlFolder contains the target directory path.
+                if (pidlFolder != IntPtr.Zero)
+                {
+                    _targetFolder = NativeMethods.GetPathFromPidl(pidlFolder);
+                    _isBackgroundMode = !string.IsNullOrEmpty(_targetFolder);
+                    LoadSettingsFromRegistry();
+                    ShellExtLog.Info($"IShellExtInit.Initialize: background mode via pidlFolder, _targetFolder=\"{_targetFolder}\", _isBackgroundMode={_isBackgroundMode}");
+                    if (!_isBackgroundMode)
+                    {
+                        ShellExtLog.Warn("IShellExtInit.Initialize: GetPathFromPidl returned null/empty, returning E_FAIL");
+                        return NativeMethods.E_FAIL;
+                    }
+                    _initializeSucceeded = true;
+                    return NativeMethods.S_OK;
+                }
+                ShellExtLog.Warn("IShellExtInit.Initialize: pDataObj is null and pidlFolder is null, returning E_FAIL");
                 return NativeMethods.E_FAIL;
             }
 
@@ -266,6 +283,15 @@ public class ContextMenuHandler : IShellExtInit, IContextMenu
                     ShellExtLog.Info($"IShellExtInit.Initialize: File mode, selected {_selectedFiles.Count} files, isArchive={_selectedFiles.Count > 0 && ext0 != null && ArchiveExtensions.Contains(ext0)}");
                 }
 
+                // Guard: if we have no files (not even after GetData) and no background
+                // target, Initialize has nothing to work with — return E_FAIL.
+                if (_selectedFiles.Count == 0 && !_isBackgroundMode)
+                {
+                    ShellExtLog.Warn("IShellExtInit.Initialize: no files and not background mode, returning E_FAIL");
+                    return NativeMethods.E_FAIL;
+                }
+
+                _initializeSucceeded = true;
                 ShellExtLog.Info($"IShellExtInit.Initialize returning S_OK with {_selectedFiles.Count} files selected");
 
                 // Store the file list in the shared static field (keep largest within batch).
@@ -337,6 +363,14 @@ public class ContextMenuHandler : IShellExtInit, IContextMenu
         {
             // Refresh settings each time (user may have changed them)
             LoadSettingsFromRegistry();
+
+            // Guard: if Initialize didn't succeed, we have no usable state —
+            // return 0 (no menu items added), which tells Explorer to skip us.
+            if (!_initializeSucceeded)
+            {
+                ShellExtLog.Warn($"QueryContextMenu #{_instanceId}: Initialize did not succeed, skipping menu");
+                return 0;
+            }
 
             // NOTE: We do NOT call CleanupIconCache() here. Icon HBITMAPs are
             // permanently cached for the lifetime of the Explorer process.
@@ -756,6 +790,7 @@ public class ContextMenuHandler : IShellExtInit, IContextMenu
     private static IntPtr _cachedIconCompressSeparate = IntPtr.Zero;
     private static IntPtr _cachedIconCompressCombined = IntPtr.Zero;
     private static IntPtr _cachedIconCompressDialog = IntPtr.Zero;
+    private static readonly object _iconCacheLock = new();
 
     /// <summary>
     /// Returns the effective file list for command execution.
@@ -823,8 +858,10 @@ public class ContextMenuHandler : IShellExtInit, IContextMenu
         // Marshal as both ANSI and Unicode to handle both CMINVOKECOMMANDINFO variants
         string? verbAnsi = null;
         string? verbUni = null;
-        try { verbAnsi = Marshal.PtrToStringAnsi(lpVerb); } catch { }
-        try { verbUni = Marshal.PtrToStringUni(lpVerb); } catch { }
+        try { verbAnsi = Marshal.PtrToStringAnsi(lpVerb); }
+        catch (Exception ex) { ShellExtLog.Warn($"ResolveCommandId: PtrToStringAnsi failed: {ex.Message}"); }
+        try { verbUni = Marshal.PtrToStringUni(lpVerb); }
+        catch (Exception ex) { ShellExtLog.Warn($"ResolveCommandId: PtrToStringUni failed: {ex.Message}"); }
 
         // CMINVOKECOMMANDINFOEX has BOTH lpVerb (ANSI, offset 16) and lpVerbW (Unicode, offset 64).
         // Our struct stops at hIcon (offset 48) so we always read lpVerb as ANSI.
@@ -927,14 +964,23 @@ public class ContextMenuHandler : IShellExtInit, IContextMenu
     /// <summary>Load icon from embedded resource or return cached HBITMAP.</summary>
     private static IntPtr GetOrLoadIcon(string resourceName, ref IntPtr cache)
     {
+        // Fast path: already cached (lock-free read, works because IntPtr is atomic on all supported platforms)
         if (cache != IntPtr.Zero)
             return cache;
-        cache = LoadIconFromResource(resourceName);
-        if (cache != IntPtr.Zero)
-            ShellExtLog.Info($"LoadIcon: loaded \"{resourceName}\" as hbmp=0x{cache:x16}");
-        else
-            ShellExtLog.Warn($"LoadIcon: failed to load \"{resourceName}\"");
-        return cache;
+
+        lock (_iconCacheLock)
+        {
+            // Double-check: another thread may have loaded it while we waited
+            if (cache != IntPtr.Zero)
+                return cache;
+
+            cache = LoadIconFromResource(resourceName);
+            if (cache != IntPtr.Zero)
+                ShellExtLog.Info($"LoadIcon: loaded \"{resourceName}\" as hbmp=0x{cache:x16}");
+            else
+                ShellExtLog.Warn($"LoadIcon: failed to load \"{resourceName}\"");
+            return cache;
+        }
     }
 
     /// <summary>
@@ -1186,8 +1232,9 @@ public class ContextMenuHandler : IShellExtInit, IContextMenu
 
             return Path.GetFileName(common.TrimEnd('\\', '/'));
         }
-        catch
+        catch (Exception ex)
         {
+            ShellExtLog.Warn($"ComputeCommonParentName: exception: {ex.Message}");
             return "";
         }
     }
