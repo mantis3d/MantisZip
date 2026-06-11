@@ -428,15 +428,26 @@ public partial class App : Application
             {
                 await progressWindow.Dispatcher.InvokeAsync(() =>
                     progressWindow.CompleteWithErrors());
-                // Wait for user to close
-                await Task.Run(() =>
+
+                // 如果窗口已经被用户关闭（例如点击取消按钮时 Close() 已被调用），
+                // Closed 事件已触发，不应再等待它——否则 closed.Wait() 将永远阻塞，
+                // 导致 app.Shutdown() 不会被调用，进程留在后台。
+                bool windowOpen = await progressWindow.Dispatcher.InvokeAsync(() =>
+                    progressWindow.IsVisible);
+
+                if (windowOpen)
                 {
-                    var closed = new ManualResetEventSlim(false);
-                    EventHandler handler = null!;
-                    handler = (_, _) => { closed.Set(); progressWindow.Closed -= handler; };
-                    progressWindow.Closed += handler;
-                    closed.Wait();
-                });
+                    // 窗口仍可见 → 等待用户手动关闭
+                    await Task.Run(() =>
+                    {
+                        var closed = new ManualResetEventSlim(false);
+                        EventHandler handler = null!;
+                        handler = (_, _) => { closed.Set(); progressWindow.Closed -= handler; };
+                        progressWindow.Closed += handler;
+                        closed.Wait();
+                    });
+                }
+
                 await progressWindow.Dispatcher.InvokeAsync(() => app.Shutdown());
             }
             else

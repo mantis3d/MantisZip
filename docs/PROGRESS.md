@@ -7,8 +7,8 @@
 - **技术栈**: .NET 9 + WPF + SharpCompress + SharpSevenZip
 
 ## 版本
-- **当前版本**: 0.3.12
-- **发布日期**: 2026-06-08
+- **当前版本**: 0.3.13
+- **发布日期**: 2026-06-11
 
 ## 规划中
 
@@ -26,6 +26,12 @@
    - 关闭时（默认）：`folderA/sub/file.txt` → 当前在 `folderA/` 中解压到 `dest/sub/file.txt`
    - 开启时：`folderA/sub/file.txt` → 解压到 `dest/folderA/sub/file.txt`（保留完整路径）
 3. 不影响 `ArchiveEntryExtractor.ExtractEntryAsync` 的条目查找（始终用原始 `FullPath`）
+
+### v0.3.13 (2026-06-11) RAR 提取进度条修复 + 取消后进程残留修复
+
+1. **RAR 大文件提取进度条不更新修复**：`SevenZipEngine.ExtractAsync` / `ExtractEntriesAsync` 中 `SharpSevenZipExtractor.ExtractFile` 是同步阻塞调用，之前只在文件完全提取后报一次进度（0%→100%）。新增 `WriteProgressStream`（`Core/Utils`）包装 `FileStream`，在每次 `Write` 时通过回调按已知 `entry.Size` 计算百分比，100ms 节流上报，与 ZipEngine 的每文件进度模式一致。
+2. **取消提取后进程残留修复**：`HandleExtractBatchCore` 中 `failed > 0` 分支在 `progressWindow.Close()` 已触发过 `Closed` 事件后才订阅 `Closed += handler`，导致 `closed.Wait()` 永远阻塞、`app.Shutdown()` 永不执行。修复：通过 `Dispatcher.InvokeAsync(() => IsVisible)` 检查窗口是否已关闭，若已关闭则跳过等待直接 shutdown。
+3. **`WaitForManualCloseAsync` 同步修复**：`AutoCloseOrWaitAsync` + `KeepOpenOnComplete` 路径存在相同 bug——窗口已关闭时 `Closed` 事件早已触发，等待将永远阻塞。添加相同的 `IsVisible` 守卫检查。
 
 ### v0.3.11 (2026-06-08) 文件列表拖拽提取修复（多选/目录/编码/重入）
 

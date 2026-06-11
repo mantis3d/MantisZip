@@ -194,9 +194,16 @@ public partial class ProgressWindow : Window
 
     /// <summary>
     /// 等待用户手动关闭窗口（通过点击关闭按钮或窗口的关闭按钮）。
+    /// 如果窗口已关闭（例如用户点击了取消按钮），直接返回，避免永远阻塞。
+    /// 可从后台线程安全调用。
     /// </summary>
     private async Task WaitForManualCloseAsync()
     {
+        // 如果窗口已关闭，Closed 事件已触发，等待它将永远阻塞
+        bool isVisible = await Dispatcher.InvokeAsync(() => IsVisible);
+        if (!isVisible)
+            return;
+
         var closed = new ManualResetEventSlim(false);
         EventHandler handler = null!;
         handler = (_, _) => { closed.Set(); this.Closed -= handler; };
