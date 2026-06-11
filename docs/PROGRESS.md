@@ -14,6 +14,12 @@
 
 ## 版本历史（从新到旧）
 
+### v0.3.13 (2026-06-11) 提取文件列表展示和目录树构建逻辑到 Core
+1. **ArchiveTreeBuilder**（Core/Services）：`BuildTree()` 从 `ArchiveItem` 列表构建文件夹树，`FolderNode` 类从 WPF 移到 Core
+2. **ArchiveEntryLister**（Core/Services）：`GetEntriesInFolder()` 按文件夹路径筛选条目（支持扁平/默认两种浏览模式），`ComputeDirectoryStats()` 预计算各目录的统计信息
+3. **WPF 重构**：`BuildFolderTree()` 和 `FilterFiles()` 改为调用 Core 服务，`FolderNode` 类从 `MainWindow.Types.cs` 移除
+4. **测试验证**：183 个测试全部通过
+
 ### v0.3.12 (2026-06-10) 文件列表筛选增强（排除框/通配符/显示名匹配前修复）
 1. **排除文本框 + 匹配模式选择器**：新增排除过滤（`ExcludeText`），支持子串/通配符两种匹配模式（`FilterMatchMode`），包含和排除独立生效后取交集
 2. **排除框对齐修复**：区域 1 从 `StackPanel` 改为 `Grid`（3列×2行），搜索框与排除框同列等宽，文本框统一 `Height=22`+`FontSize=11`+主题绑定
