@@ -1,7 +1,6 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="clr-namespace:MantisZip.UI.Avalonia.ViewModels"
-        xmlns:models="clr-namespace:MantisZip.UI.Avalonia.Models"
         xmlns:conv="clr-namespace:MantisZip.UI.Avalonia.Converters"
         x:Class="MantisZip.UI.Avalonia.Views.MainWindow"
         x:DataType="vm:MainWindowViewModel"
@@ -55,10 +54,20 @@
                     Width="5" />
 
       <!-- Preview area -->
-      <Border Grid.Column="2">
-        <TextBlock Text="选择文件以预览"
-                   VerticalAlignment="Center"
-                   HorizontalAlignment="Center" />
+      <Border Grid.Column="2"
+              Padding="8">
+        <Grid>
+          <!-- Text preview -->
+          <ScrollViewer IsVisible="{Binding Preview.IsPreviewVisible}">
+            <TextBox Text="{Binding Preview.TextContent}"
+                     IsReadOnly="True"
+                     TextWrapping="Wrap"
+                     FontFamily="Consolas"
+                     FontSize="13"
+                     Background="Transparent"
+                     BorderThickness="0" />
+          </ScrollViewer>
+        </Grid>
       </Border>
     </Grid>
 

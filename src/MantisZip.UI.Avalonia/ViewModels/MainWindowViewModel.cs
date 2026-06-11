@@ -1,5 +1,6 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using MantisZip.Core.Abstractions;
 using MantisZip.UI.Avalonia.Models;
 using MantisZip.UI.Avalonia.Services;
 using System.Collections.ObjectModel;
@@ -9,11 +10,14 @@ namespace MantisZip.UI.Avalonia.ViewModels;
 public partial class MainWindowViewModel : ObservableObject
 {
     private readonly ArchiveService _archiveService = new();
+    private ArchiveFormat _currentFormat;
 
     /// <summary>
     /// 由 View 设置的对话框回调。返回选择的文件路径，取消返回 null。
     /// </summary>
     public Func<Task<string?>>? GetOpenFilePath { get; set; }
+
+    public PreviewViewModel Preview { get; } = new();
 
     [ObservableProperty]
     private string _title = "MantisZip";
@@ -34,6 +38,18 @@ public partial class MainWindowViewModel : ObservableObject
     private ArchiveItemModel? _selectedEntry;
 
     public ObservableCollection<ArchiveItemModel> Entries { get; } = [];
+
+    partial void OnSelectedEntryChanged(ArchiveItemModel? value)
+    {
+        if (value != null && CurrentArchivePath != null)
+        {
+            _ = ShowPreviewAsync(value);
+        }
+        else
+        {
+            Preview.Clear();
+        }
+    }
 
     [RelayCommand]
     private async Task OpenArchive()
@@ -69,6 +85,7 @@ public partial class MainWindowViewModel : ObservableObject
                     Entries.Add(entry);
                 }
                 CurrentArchivePath = path;
+                _currentFormat = ArchiveFormatHelper.GetFormat(path);
                 IsArchiveLoaded = true;
                 StatusMessage = $"已加载 {result.Entries.Count} 个条目";
                 Title = $"MantisZip - {Path.GetFileName(path)}";
@@ -96,6 +113,56 @@ public partial class MainWindowViewModel : ObservableObject
         }
     }
 
+    private async Task ShowPreviewAsync(ArchiveItemModel entry)
+    {
+        try
+        {
+            var ext = Path.GetExtension(entry.Name);
+            var previewType = PreviewService.ClassifyPreview(ext);
+
+            if (previewType == PreviewType.Unsupported)
+            {
+                Preview.ShowUnsupported();
+                StatusMessage = $"暂不支持预览 {ext} 文件";
+                return;
+            }
+
+            if (CurrentArchivePath == null) return;
+
+            StatusMessage = "正在提取文件...";
+
+            var tempFile = await PreviewService.ExtractToTempAsync(
+                CurrentArchivePath, entry, _currentFormat);
+
+            if (tempFile == null)
+            {
+                Preview.ShowUnsupported("提取文件失败");
+                return;
+            }
+
+            switch (previewType)
+            {
+                case PreviewType.Text:
+                    Preview.ShowText(tempFile);
+                    StatusMessage = $"文本预览: {entry.DisplayName}";
+                    break;
+                case PreviewType.Csv:
+                    // Task 5
+                    StatusMessage = "CSV 预览（待实现）";
+                    break;
+                case PreviewType.Pe:
+                    // Task 6
+                    StatusMessage = "PE 预览（待实现）";
+                    break;
+            }
+        }
+        catch (Exception ex)
+        {
+            Preview.ShowUnsupported($"预览失败: {ex.Message}");
+            StatusMessage = $"预览失败: {ex.Message}";
+        }
+    }
+
     [RelayCommand]
     private void ClearArchive()
     {
@@ -110,5 +177,6 @@ public partial class MainWindowViewModel : ObservableObject
         CurrentArchivePath = null;
         IsArchiveLoaded = false;
         SelectedEntry = null;
+        Preview.Clear();
     }
 }
