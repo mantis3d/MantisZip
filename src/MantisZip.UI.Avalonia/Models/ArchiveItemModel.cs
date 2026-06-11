@@ -11,6 +11,9 @@ public partial class ArchiveItemModel : ObservableObject
     [ObservableProperty]
     private string _displayName = string.Empty;
 
+    /// <summary>显示名称：优先用 DisplayName，回退到 Name。</summary>
+    public string NameDisplay => !string.IsNullOrEmpty(DisplayName) ? DisplayName : Name;
+
     [ObservableProperty]
     private string _fullPath = string.Empty;
 

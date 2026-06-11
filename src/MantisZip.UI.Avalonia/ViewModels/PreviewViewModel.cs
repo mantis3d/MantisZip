@@ -39,8 +39,11 @@ public partial class PreviewViewModel : ObservableObject
 
     // ── CSV ──
 
+    // DataView 实现了 IEnumerable，可绑定到 ItemsControl
+    private DataTable? _csvDataTable;
+
     [ObservableProperty]
-    private DataTable? _csvData;
+    private System.Data.DataView? _csvData;
 
     // ── PE ──
 
@@ -69,7 +72,8 @@ public partial class PreviewViewModel : ObservableObject
     public void ShowCsv(string filePath)
     {
         var table = ParseCsv(filePath);
-        CsvData = table;
+        _csvDataTable = table;
+        CsvData = table?.DefaultView;  // DataView 可绑定到 ItemsControl
         PreviewType = PreviewType.Csv;
         IsPreviewVisible = true;
     }
