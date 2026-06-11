@@ -15,6 +15,7 @@
 
 | 优先级 | 功能 | 设计文档 | 难度 | 预估工时 | 说明 |
 |--------|------|----------|:----:|:--------:|------|
+| **P0** | **WPF → Avalonia 跨平台移植（Phase 0）** | [avalonia-port-phase0.md](.sisyphus/plans/avalonia-port-phase0.md) | 🟡中 | 1-2周 | avalonia-port 分支，MVVM 架构 + SkiaSharp，Phase 0: 项目骨架 + 文件浏览 + 文本/CSV/PE 预览 |  
 | **P2** | 便携版模式 | [portable-mode.md](.sisyphus/plans/portable-mode.md) | 🟢低 | 1-2h | 哨兵文件触发，路径重定向到 exe 目录 |
 | **P2** | 魔数识别（内容检测替代扩展名检测） | [preview-magic-detection.md](.sisyphus/plans/preview-magic-detection.md) | 🔴高 | 6-8h | 按真实内容（非扩展名）判断格式 |
 | **P2** | 提取日志与解压「后悔药」 | [extract-journal-undo.md](.sisyphus/plans/extract-journal-undo.md) | 🟡中 | 3-4h | 解压记录 + 一键回滚 |

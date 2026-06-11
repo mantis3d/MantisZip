@@ -1,0 +1,50 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="clr-namespace:MantisZip.UI.Avalonia.ViewModels"
+        x:Class="MantisZip.UI.Avalonia.Views.MainWindow"
+        x:DataType="vm:MainWindowViewModel"
+        Title="{Binding Title}"
+        Width="1200"
+        Height="800"
+        MinWidth="800"
+        MinHeight="500">
+  <Grid RowDefinitions="Auto,*,Auto">
+    <!-- Menu -->
+    <Menu Grid.Row="0">
+      <MenuItem Header="文件">
+        <MenuItem Header="打开压缩包"
+                  Command="{Binding OpenArchiveCommand}" />
+        <Separator />
+        <MenuItem Header="退出" />
+      </MenuItem>
+    </Menu>
+
+    <!-- Main content: placeholder for file list + preview -->
+    <Grid Grid.Row="1"
+          ColumnDefinitions="Auto,5,*">
+      <!-- File list area — DataGrid will go here in Task 3 -->
+      <Border Grid.Column="0"
+              Width="300">
+        <TextBlock Text="文件列表"
+                   VerticalAlignment="Center"
+                   HorizontalAlignment="Center" />
+      </Border>
+
+      <GridSplitter Grid.Column="1"
+                    Width="5" />
+
+      <!-- Preview area -->
+      <Border Grid.Column="2">
+        <TextBlock Text="选择文件以预览"
+                   VerticalAlignment="Center"
+                   HorizontalAlignment="Center" />
+      </Border>
+    </Grid>
+
+    <!-- Status bar -->
+    <Border Grid.Row="2"
+            Padding="8,4">
+      <TextBlock Text="{Binding CurrentArchivePath, StringFormat='当前压缩包: {0}'}" />
+    </Border>
+  </Grid>
+</Window>

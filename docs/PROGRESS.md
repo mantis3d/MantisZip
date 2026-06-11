@@ -2,7 +2,7 @@
 
 ## 项目概述
 - **项目名称**: MantisZip
-- **类型**: Windows 压缩/解压软件 (WPF)
+- **类型**: Windows 压缩/解压软件 (WPF → Avalonia 迁移中)
 - **目标**: 替代 Bandizip 的开源压缩软件
 - **技术栈**: .NET 9 + WPF + SharpCompress + SharpSevenZip
 
@@ -11,8 +11,16 @@
 - **发布日期**: 2026-06-11
 
 ## 规划中
+- Avalonia 跨平台移植 Phase 0（`avalonia-port` 分支）
 
 ## 版本历史（从新到旧）
+
+### v0.3.14-dev (2026-06-11) Avalonia 移植 —— Phase 0 启动
+1. **项目骨架**：新建 `src/MantisZip.UI.Avalonia/`（net9.0 + MVVM + Skia），目标跨平台
+2. **分支策略**：`avalonia-port` 分支独立开发，与 master 双向同步（master → merge 修复，avalonia → cherry-pick 新解析器）
+3. 当前进度：项目脚手架完成（csproj + App + MainWindow 空壳 + build 通过）
+
+
 
 ### v0.3.12 (2026-06-10) 文件列表筛选增强（排除框/通配符/显示名匹配前修复）
 1. **排除文本框 + 匹配模式选择器**：新增排除过滤（`ExcludeText`），支持子串/通配符两种匹配模式（`FilterMatchMode`），包含和排除独立生效后取交集
