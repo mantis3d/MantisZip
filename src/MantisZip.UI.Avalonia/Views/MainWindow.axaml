@@ -1,6 +1,8 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="clr-namespace:MantisZip.UI.Avalonia.ViewModels"
+        xmlns:models="clr-namespace:MantisZip.UI.Avalonia.Models"
+        xmlns:conv="clr-namespace:MantisZip.UI.Avalonia.Converters"
         x:Class="MantisZip.UI.Avalonia.Views.MainWindow"
         x:DataType="vm:MainWindowViewModel"
         Title="{Binding Title}"
@@ -8,6 +10,10 @@
         Height="800"
         MinWidth="800"
         MinHeight="500">
+  <Window.Resources>
+    <conv:FileSizeConverter x:Key="FileSizeConverter" />
+  </Window.Resources>
+
   <Grid RowDefinitions="Auto,*,Auto">
     <!-- Menu -->
     <Menu Grid.Row="0">
@@ -19,16 +25,31 @@
       </MenuItem>
     </Menu>
 
-    <!-- Main content: placeholder for file list + preview -->
+    <!-- Main content: file list + preview -->
     <Grid Grid.Row="1"
-          ColumnDefinitions="Auto,5,*">
-      <!-- File list area — DataGrid will go here in Task 3 -->
-      <Border Grid.Column="0"
-              Width="300">
-        <TextBlock Text="文件列表"
-                   VerticalAlignment="Center"
-                   HorizontalAlignment="Center" />
-      </Border>
+          ColumnDefinitions="300,5,*">
+      <!-- File list -->
+      <DataGrid Grid.Column="0"
+                ItemsSource="{Binding Entries}"
+                SelectedItem="{Binding SelectedEntry}"
+                AutoGenerateColumns="False"
+                IsReadOnly="True"
+                AreRowDetailsFrozen="True">
+        <DataGrid.Columns>
+          <DataGridTextColumn Header="文件名"
+                              Binding="{Binding DisplayName}"
+                              Width="*" />
+          <DataGridTextColumn Header="大小"
+                              Binding="{Binding SizeDisplay}"
+                              Width="80" />
+          <DataGridTextColumn Header="压缩后"
+                              Binding="{Binding CompressedSizeDisplay}"
+                              Width="80" />
+          <DataGridTextColumn Header="修改日期"
+                              Binding="{Binding LastModifiedDisplay}"
+                              Width="120" />
+        </DataGrid.Columns>
+      </DataGrid>
 
       <GridSplitter Grid.Column="1"
                     Width="5" />
@@ -44,7 +65,7 @@
     <!-- Status bar -->
     <Border Grid.Row="2"
             Padding="8,4">
-      <TextBlock Text="{Binding CurrentArchivePath, StringFormat='当前压缩包: {0}'}" />
+      <TextBlock Text="{Binding StatusMessage}" />
     </Border>
   </Grid>
 </Window>
