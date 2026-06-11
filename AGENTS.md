@@ -303,9 +303,17 @@ This is set once in `App.InitializeApp()`. ZIP encoding is handled per-instance 
 
 ### 7z compression uses SharpSevenZip (7z.dll) — no external 7z.exe required
 
-### 7z encrypted preview not supported
+### 7z encrypted preview SUPPORTED
 
-`ArchiveEntryExtractor.ExtractSevenZipEntry` throws `NotSupportedException` when password is set. Encrypted 7z entries always show "无法预览此文件" (unsupported preview).
+**实际验证通过：** SharpSevenZip 的 `ExtractFile(index, stream)` 在传入正确密码后，对所有 7z 配置均支持单项提取预览：
+- 所有压缩方法（LZMA2 / LZMA / PPMd / BZip2 / Deflate）
+- 固实压缩（Solid）与非固实
+- AES-256 加密
+- 加密文件名（需先传入密码才能列出条目）
+
+`ArchiveEntryExtractor.ExtractSevenZipEntry` 接受 `password` 参数并传递给 `SharpSevenZipExtractor`，与 ZIP 的处理方式一致。代码中不存在 `NotSupportedException`。
+
+⚠ **注意：** "加密文件名"（`EncryptHeaders = true`）的 7z 压缩包，在输入密码前无法读取文件列表（`ArchiveFileData` 会抛出 `SharpSevenZipArchiveException`），UI 需要先弹出密码输入框再尝试列出条目。
 
 ### `_currentFormat` classification (previously broken, now fixed)
 
