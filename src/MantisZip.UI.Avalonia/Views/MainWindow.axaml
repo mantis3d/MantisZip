@@ -57,8 +57,15 @@
       <Border Grid.Column="2"
               Padding="8">
         <Grid>
+          <!-- Unsupported / empty state -->
+          <TextBlock Text="{Binding Preview.TextContent}"
+                     VerticalAlignment="Center"
+                     HorizontalAlignment="Center"
+                     TextWrapping="Wrap"
+                     IsVisible="{Binding Preview.IsUnsupportedVisible}" />
+
           <!-- Text preview -->
-          <ScrollViewer IsVisible="{Binding Preview.IsPreviewVisible}">
+          <ScrollViewer IsVisible="{Binding Preview.IsTextVisible}">
             <TextBox Text="{Binding Preview.TextContent}"
                      IsReadOnly="True"
                      TextWrapping="Wrap"
@@ -67,6 +74,39 @@
                      Background="Transparent"
                      BorderThickness="0" />
           </ScrollViewer>
+
+          <!-- CSV preview -->
+          <DataGrid IsVisible="{Binding Preview.IsCsvVisible}"
+                    ItemsSource="{Binding Preview.CsvData}"
+                    AutoGenerateColumns="True"
+                    IsReadOnly="True"
+                    AreRowDetailsFrozen="True" />
+
+          <!-- PE preview -->
+          <StackPanel IsVisible="{Binding Preview.IsPeVisible}"
+                      Spacing="8">
+            <TextBlock Text="{Binding Preview.PeTitle}"
+                       FontSize="20"
+                       FontWeight="Bold" />
+            <TextBlock Text="{Binding Preview.PeSubtitle}"
+                       FontSize="13"
+                       Foreground="#888" />
+            <Separator />
+            <ItemsControl ItemsSource="{Binding Preview.PeMetadata}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:PeMetadataItem">
+                  <Grid ColumnDefinitions="Auto,8,*"
+                        Margin="0,2">
+                    <TextBlock Text="{Binding Key}"
+                               FontWeight="Bold"
+                               Foreground="#666" />
+                    <TextBlock Grid.Column="2"
+                               Text="{Binding Value}" />
+                  </Grid>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </StackPanel>
         </Grid>
       </Border>
     </Grid>

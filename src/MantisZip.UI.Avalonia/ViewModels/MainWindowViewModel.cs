@@ -147,12 +147,12 @@ public partial class MainWindowViewModel : ObservableObject
                     StatusMessage = $"文本预览: {entry.DisplayName}";
                     break;
                 case PreviewType.Csv:
-                    // Task 5
-                    StatusMessage = "CSV 预览（待实现）";
+                    Preview.ShowCsv(tempFile);
+                    StatusMessage = $"CSV 预览: {entry.DisplayName}";
                     break;
                 case PreviewType.Pe:
-                    // Task 6
-                    StatusMessage = "PE 预览（待实现）";
+                    Preview.ShowPe(tempFile);
+                    StatusMessage = $"PE 元数据: {entry.DisplayName}";
                     break;
             }
         }
