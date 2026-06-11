@@ -1,6 +1,7 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="clr-namespace:MantisZip.UI.Avalonia.ViewModels"
+        xmlns:models="clr-namespace:MantisZip.UI.Avalonia.Models"
         xmlns:conv="clr-namespace:MantisZip.UI.Avalonia.Converters"
         x:Class="MantisZip.UI.Avalonia.Views.MainWindow"
         x:DataType="vm:MainWindowViewModel"
@@ -32,20 +33,19 @@
                 ItemsSource="{Binding Entries}"
                 SelectedItem="{Binding SelectedEntry}"
                 AutoGenerateColumns="False"
-                IsReadOnly="True"
-                AreRowDetailsFrozen="True">
+                IsReadOnly="True">
         <DataGrid.Columns>
           <DataGridTextColumn Header="文件名"
-                              Binding="{Binding DisplayName}"
+                              Binding="{Binding DisplayName, x:DataType=models:ArchiveItemModel}"
                               Width="*" />
           <DataGridTextColumn Header="大小"
-                              Binding="{Binding SizeDisplay}"
+                              Binding="{Binding SizeDisplay, x:DataType=models:ArchiveItemModel}"
                               Width="80" />
           <DataGridTextColumn Header="压缩后"
-                              Binding="{Binding CompressedSizeDisplay}"
+                              Binding="{Binding CompressedSizeDisplay, x:DataType=models:ArchiveItemModel}"
                               Width="80" />
           <DataGridTextColumn Header="修改日期"
-                              Binding="{Binding LastModifiedDisplay}"
+                              Binding="{Binding LastModifiedDisplay, x:DataType=models:ArchiveItemModel}"
                               Width="120" />
         </DataGrid.Columns>
       </DataGrid>
