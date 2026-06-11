@@ -18,7 +18,7 @@
 ### v0.3.14-dev (2026-06-11) Avalonia 移植 —— Phase 0 启动
 1. **项目骨架**：新建 `src/MantisZip.UI.Avalonia/`（net9.0 + MVVM + Skia），目标跨平台
 2. **分支策略**：`avalonia-port` 分支独立开发，与 master 双向同步（master → merge 修复，avalonia → cherry-pick 新解析器）
-3. 当前进度：项目脚手架完成（csproj + App + MainWindow 空壳 + build 通过）
+3. 当前进度：Phase 0 完成（项目骨架 + 文件浏览 + 文本/CSV/PE 预览）
 
 
 

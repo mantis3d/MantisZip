@@ -12,7 +12,16 @@
 > **依赖**: Core 项目（`src/MantisZip.Core/`）无需改动  
 > **创建日期**: 2026-06-11  
 > **更新日期**: 2026-06-11  
-> **状态**: 📋 计划 | **进度**: [　　　　　] (0/27)
+> **状态**: ✅ Phase 0 完成 | **进度**: [█████████████████] (27/27)
+
+> **完成于**: 2026-06-11  
+> **分支**: `avalonia-port`  
+> **提交**:
+> - `2ffaa7a` feat(avalonia): scaffold project skeleton with MainWindow
+> - `1cd5f7e` feat(avalonia): add ArchiveService and ArchiveItemModel with FromCore mapping
+> - `672c993` feat(avalonia): file list DataGrid with Open archive dialog
+> - `58ef9c3` feat(avalonia): text preview with encoding detection
+> - `37bf602` feat(avalonia): CSV and PE previews
 
 ---
 
