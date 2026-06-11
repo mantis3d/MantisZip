@@ -4,7 +4,7 @@
 - **项目名称**: MantisZip
 - **类型**: Windows 压缩/解压软件 (WPF → Avalonia 迁移中)
 - **目标**: 替代 Bandizip 的开源压缩软件
-- **技术栈**: .NET 9 + WPF + SharpCompress + SharpSevenZip
+- **技术栈**: .NET 9 + WPF → Avalonia 迁移中 + SharpCompress + SharpSevenZip
 
 ## 版本
 - **当前版本**: 0.3.13
@@ -15,10 +15,12 @@
 
 ## 版本历史（从新到旧）
 
-### v0.3.14-dev (2026-06-11) Avalonia 移植 —— Phase 0 启动
+### v0.3.14-dev (2026-06-11) Avalonia 移植 —— Phase 0 完成
 1. **项目骨架**：新建 `src/MantisZip.UI.Avalonia/`（net9.0 + MVVM + Skia），目标跨平台
-2. **分支策略**：`avalonia-port` 分支独立开发，与 master 双向同步（master → merge 修复，avalonia → cherry-pick 新解析器）
-3. 当前进度：Phase 0 完成（项目骨架 + 文件浏览 + 文本/CSV/PE 预览）
+2. **分支策略**：`avalonia-port` 分支独立开发，与 master 双向同步
+3. **Phase 0 功能**：项目骨架 + 文件浏览（ListBox + 列头）+ 文本预览（编码检测）+ CSV 预览（DataView）+ PE 元数据预览 — 全部验证通过
+4. **DataGrid 回退**：`Avalonia.Controls.DataGrid` v12.0.0 主题资源为空（329 字节无样式），改用 ListBox + ItemsControl 替代
+5. **NameDisplay fallback**：`ArchiveItemModel.NameDisplay` 优先使用 DisplayName，回退到 Name（ZIP 引擎未设置 DisplayName）
 
 
 
