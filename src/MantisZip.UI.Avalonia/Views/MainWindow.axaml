@@ -9,7 +9,24 @@
         Width="1200"
         Height="800"
         MinWidth="800"
-        MinHeight="500">
+        MinHeight="500"
+        Background="{DynamicResource ThemeWindowBgBrush}">
+  <Window.Styles>
+    <Style Selector="GridSplitter">
+      <Setter Property="Background" Value="{DynamicResource ThemeSplitterBgBrush}" />
+    </Style>
+    <Style Selector="Menu">
+      <Setter Property="Background" Value="{DynamicResource ThemeHeaderBgBrush}" />
+    </Style>
+    <Style Selector="ScrollViewer">
+      <Setter Property="Background" Value="{DynamicResource ThemeWindowBgBrush}" />
+    </Style>
+    <Style Selector="DataGrid">
+      <Setter Property="Background" Value="{DynamicResource ThemeListBgBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource ThemeTextPrimaryBrush}" />
+    </Style>
+  </Window.Styles>
+
   <Window.Resources>
     <conv:FileSizeConverter x:Key="FileSizeConverter" />
   </Window.Resources>
@@ -22,6 +39,10 @@
                   Command="{Binding OpenArchiveCommand}" />
         <Separator />
         <MenuItem Header="退出" />
+      </MenuItem>
+      <MenuItem Header="视图">
+        <MenuItem Header="切换暗色主题"
+                  Command="{Binding ToggleThemeCommand}" />
       </MenuItem>
     </Menu>
 
@@ -56,7 +77,8 @@
 
       <!-- Preview area -->
       <Border Grid.Column="2"
-              Padding="8">
+              Padding="8"
+              Background="{DynamicResource ThemeSurfaceBgBrush}">
         <Grid>
           <!-- Unsupported / empty state -->
           <TextBlock Text="{Binding Preview.TextContent}"
@@ -72,7 +94,8 @@
                      TextWrapping="Wrap"
                      FontFamily="Consolas"
                      FontSize="13"
-                     Background="Transparent"
+                     Background="{DynamicResource ThemeSurfaceBgBrush}"
+                     Foreground="{DynamicResource ThemeTextPrimaryBrush}"
                      BorderThickness="0" />
           </ScrollViewer>
 
@@ -92,7 +115,7 @@
                        FontWeight="Bold" />
             <TextBlock Text="{Binding Preview.PeSubtitle}"
                        FontSize="13"
-                       Foreground="#888" />
+                       Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
             <Separator />
             <ItemsControl ItemsSource="{Binding Preview.PeMetadata}">
               <ItemsControl.ItemTemplate>
@@ -101,7 +124,7 @@
                         Margin="0,2">
                     <TextBlock Text="{Binding Key}"
                                FontWeight="Bold"
-                               Foreground="#666" />
+                               Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
                     <TextBlock Grid.Column="2"
                                Text="{Binding Value}" />
                   </Grid>
@@ -115,8 +138,10 @@
 
     <!-- Status bar -->
     <Border Grid.Row="2"
-            Padding="8,4">
-      <TextBlock Text="{Binding StatusMessage}" />
+            Padding="8,4"
+            Background="{DynamicResource ThemeHeaderBgBrush}">
+      <TextBlock Text="{Binding StatusMessage}"
+                 Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
     </Border>
   </Grid>
 </Window>

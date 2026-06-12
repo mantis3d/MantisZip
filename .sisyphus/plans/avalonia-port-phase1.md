@@ -131,26 +131,26 @@ src/MantisZip.UI.Avalonia/
 
 > 简易主题切换：两套 XAML 资源字典 + 菜单项切换，无系统自动检测。
 
-- [ ] **2.1** 创建 `Themes/ThemeLight.axaml`：
+- [x] **2.1** 创建 `Themes/ThemeLight.axaml`：
   - 定义颜色资源键：`ThemeWindowBg`（#FFF5F5F5）、`ThemeTextPrimary`（#FF1A1A1A）、`ThemeTextSecondary`（#FF666666）、`ThemeBorder`（#FFE0E0E0）、`ThemeAccent`（#FF0078D4）、`ThemeSurfaceBg`（#FFFFFFFF）、`ThemeHeaderBg`（#FFF0F0F0）、`ThemeButtonBg`（#FFE0E0E0）、`ThemeButtonHover`（#FFD0D0D0）、`ThemeButtonPressed`（#FFC0C0C0）、`ThemeListBg`（#FFFFFFFF）、`ThemeListSelected`（#FFE0F0FF）、`ThemeSplitterBg`（#FFE0E0E0）
   - 包含所有 WPF 主题中的语义色对应
-- [ ] **2.2** 创建 `Themes/ThemeDark.axaml`：
+- [x] **2.2** 创建 `Themes/ThemeDark.axaml`：
   - 相同资源键，暗色值：`ThemeWindowBg`（#FF1E1E1E）、`ThemeTextPrimary`（#FFE0E0E0）、`ThemeTextSecondary`（#FF999999）、`ThemeBorder`（#FF3E3E3E）、`ThemeAccent`（#FF0078D4）、`ThemeSurfaceBg`（#FF252525）、`ThemeHeaderBg`（#FF2A2A2A）、`ThemeButtonBg`（#FF3E3E3E）、`ThemeButtonHover`（#FF4E4E4E）、`ThemeButtonPressed`（#FF5E5E5E）、`ThemeListBg`（#FF252525）、`ThemeListSelected`（#FF2A3A5A）、`ThemeSplitterBg`（#FF3E3E3E）
-- [ ] **2.3** 更新 `App.axaml`：合并 `ThemeLight.axaml` 作为默认主题
-- [ ] **2.4** `MainWindowViewModel` 添加：
+- [x] **2.3** 更新 `App.axaml`：合并 `ThemeLight.axaml` 作为默认主题
+- [x] **2.4** `MainWindowViewModel` 添加：
   - `bool IsDarkTheme` 属性
   - `ToggleThemeCommand`（切换 `IsDarkTheme`）
   - 主题切换逻辑：动态替换 `Application.Current.Resources.MergedDictionaries` 中的主题字典
-- [ ] **2.5** `MainWindow.axaml` 菜单添加："视图 → 切换暗色主题"
-- [ ] **2.6** 应用主题资源到现有控件：
+- [x] **2.5** `MainWindow.axaml` 菜单添加："视图 → 切换暗色主题"
+- [x] **2.6** 应用主题资源到现有控件：
   - `ListBox` 背景/前景/选中色
   - `GridSplitter` 背景
   - `Menu`/`MenuItem` 背景/前景
   - `ScrollViewer` 背景
   - `TextBox`（预览文本）背景/前景
   - `Border` 在预览区域
-- [ ] **2.7** 验证：切换亮/暗色，所有控件正确响应
-- [ ] **2.8** **Commit**: `feat(avalonia): add light/dark theme toggle with resource dictionaries`
+- [x] **2.7** 验证：切换亮/暗色，所有控件正确响应
+- [x] **2.8** **Commit**: `feat(avalonia): add light/dark theme toggle with resource dictionaries`
 
 ---
 

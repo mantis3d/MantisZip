@@ -1,0 +1,36 @@
+<ResourceDictionary xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <!-- Window -->
+  <Color x:Key="ThemeWindowBg">#FF1E1E1E</Color>
+  <Color x:Key="ThemeTextPrimary">#FFE0E0E0</Color>
+  <Color x:Key="ThemeTextSecondary">#FF999999</Color>
+  <Color x:Key="ThemeBorder">#FF3E3E3E</Color>
+  <Color x:Key="ThemeAccent">#FF0078D4</Color>
+  <!-- Surfaces -->
+  <Color x:Key="ThemeSurfaceBg">#FF252525</Color>
+  <Color x:Key="ThemeHeaderBg">#FF2A2A2A</Color>
+  <!-- Buttons -->
+  <Color x:Key="ThemeButtonBg">#FF3E3E3E</Color>
+  <Color x:Key="ThemeButtonHover">#FF4E4E4E</Color>
+  <Color x:Key="ThemeButtonPressed">#FF5E5E5E</Color>
+  <!-- Lists -->
+  <Color x:Key="ThemeListBg">#FF252525</Color>
+  <Color x:Key="ThemeListSelected">#FF2A3A5A</Color>
+  <!-- Splitters -->
+  <Color x:Key="ThemeSplitterBg">#FF3E3E3E</Color>
+
+  <!-- SolidColorBrush resources -->
+  <SolidColorBrush x:Key="ThemeWindowBgBrush" Color="{StaticResource ThemeWindowBg}" />
+  <SolidColorBrush x:Key="ThemeTextPrimaryBrush" Color="{StaticResource ThemeTextPrimary}" />
+  <SolidColorBrush x:Key="ThemeTextSecondaryBrush" Color="{StaticResource ThemeTextSecondary}" />
+  <SolidColorBrush x:Key="ThemeBorderBrush" Color="{StaticResource ThemeBorder}" />
+  <SolidColorBrush x:Key="ThemeAccentBrush" Color="{StaticResource ThemeAccent}" />
+  <SolidColorBrush x:Key="ThemeSurfaceBgBrush" Color="{StaticResource ThemeSurfaceBg}" />
+  <SolidColorBrush x:Key="ThemeHeaderBgBrush" Color="{StaticResource ThemeHeaderBg}" />
+  <SolidColorBrush x:Key="ThemeButtonBgBrush" Color="{StaticResource ThemeButtonBg}" />
+  <SolidColorBrush x:Key="ThemeButtonHoverBrush" Color="{StaticResource ThemeButtonHover}" />
+  <SolidColorBrush x:Key="ThemeButtonPressedBrush" Color="{StaticResource ThemeButtonPressed}" />
+  <SolidColorBrush x:Key="ThemeListBgBrush" Color="{StaticResource ThemeListBg}" />
+  <SolidColorBrush x:Key="ThemeListSelectedBrush" Color="{StaticResource ThemeListSelected}" />
+  <SolidColorBrush x:Key="ThemeSplitterBgBrush" Color="{StaticResource ThemeSplitterBg}" />
+</ResourceDictionary>

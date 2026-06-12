@@ -1,3 +1,5 @@
+using Avalonia;
+using Avalonia.Markup.Xaml.Styling;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using MantisZip.Core.Abstractions;
@@ -36,6 +38,9 @@ public partial class MainWindowViewModel : ObservableObject
 
     [ObservableProperty]
     private ArchiveItemModel? _selectedEntry;
+
+    [ObservableProperty]
+    private bool _isDarkTheme;
 
     public ObservableCollection<ArchiveItemModel> Entries { get; } = [];
 
@@ -178,5 +183,21 @@ public partial class MainWindowViewModel : ObservableObject
         IsArchiveLoaded = false;
         SelectedEntry = null;
         Preview.Clear();
+    }
+
+    [RelayCommand]
+    private void ToggleTheme()
+    {
+        IsDarkTheme = !IsDarkTheme;
+        var theme = IsDarkTheme ? "ThemeDark.axaml" : "ThemeLight.axaml";
+
+        if (Application.Current?.Resources.MergedDictionaries.Count > 0)
+        {
+            Application.Current.Resources.MergedDictionaries[0] =
+                new ResourceInclude(new Uri($"avares://MantisZip.UI.Avalonia/Themes/{theme}"))
+                {
+                    Source = new Uri($"avares://MantisZip.UI.Avalonia/Themes/{theme}")
+                };
+        }
     }
 }
