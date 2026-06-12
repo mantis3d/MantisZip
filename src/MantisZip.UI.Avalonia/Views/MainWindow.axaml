@@ -57,6 +57,15 @@
                 CanUserSortColumns="True"
                 IsReadOnly="True">
         <DataGrid.Columns>
+          <DataGridTemplateColumn Header="" Width="22">
+            <DataTemplate>
+              <Image Source="{Binding IconSource}"
+                     Width="16"
+                     Height="16"
+                     VerticalAlignment="Center"
+                     HorizontalAlignment="Center" />
+            </DataTemplate>
+          </DataGridTemplateColumn>
           <DataGridTextColumn Header="名称"
                               Binding="{Binding NameDisplay}"
                               Width="*" />

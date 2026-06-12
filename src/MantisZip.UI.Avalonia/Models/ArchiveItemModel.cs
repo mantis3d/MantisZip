@@ -1,3 +1,4 @@
+using Avalonia.Media.Imaging;
 using CommunityToolkit.Mvvm.ComponentModel;
 using MantisZip.Core.Abstractions;
 
@@ -40,6 +41,11 @@ public partial class ArchiveItemModel : ObservableObject
 
     [ObservableProperty]
     private double _compressionRatio;
+
+    [ObservableProperty]
+    private Bitmap? _iconSource;
+
+    public bool HasIcon => IconSource != null;
 
     /// <summary>
     /// 排序用：目录为 0，文件为 1（实现目录优先排序）。

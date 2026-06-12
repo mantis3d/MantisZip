@@ -6,6 +6,7 @@ namespace MantisZip.UI.Avalonia.Services;
 /// <summary>
 /// 封装 Core 的 ArchiveEngineFactory，提供压缩包浏览服务。
 /// </summary>
+[System.Runtime.Versioning.SupportedOSPlatform("windows")]
 public class ArchiveService
 {
     /// <summary>
@@ -26,6 +27,13 @@ public class ArchiveService
 
             var items = await engine.ListEntriesAsync(archivePath, password, cancellationToken);
             var models = items.Select(ArchiveItemModel.FromCore).ToList();
+
+            // Load file type icons
+            foreach (var model in models)
+            {
+                var ext = Path.GetExtension(model.Name);
+                model.IconSource = IconService.GetFileIcon(ext);
+            }
 
             return ArchiveLoadResult.Success(models);
         }

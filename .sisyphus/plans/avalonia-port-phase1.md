@@ -158,21 +158,21 @@ src/MantisZip.UI.Avalonia/
 
 > 在文件列表的文件名前显示文件类型图标。
 
-- [ ] **3.1** `Models/ArchiveItemModel.cs` 添加：
+- [x] **3.1** `Models/ArchiveItemModel.cs` 添加：
   - `Bitmap? IconSource` 属性（`[ObservableProperty]`）
   - `bool HasIcon` 计算属性
-- [ ] **3.2** 创建图标服务（可内联在 `ArchiveItemModel` 或独立 `IconService`）：
+- [x] **3.2** 创建图标服务（可内联在 `ArchiveItemModel` 或独立 `IconService`）：
   - 使用 `SystemIconHelper`（Core/Utils 已有）获取图标
   - 缓存 `ConcurrentDictionary<string, Bitmap>`
   - 注意：Avalonia `Bitmap` 与 WPF `BitmapSource` 不同，需要适配
-- [ ] **3.3** 更新 `ArchiveService.LoadArchiveAsync`：
+- [x] **3.3** 更新 `ArchiveService.LoadArchiveAsync`：
   - 映射完成后调用图标加载
   - 设置 `model.IconSource`
-- [ ] **3.4** 更新 `MainWindow.axaml` 文件列表 `DataTemplate`：
+- [x] **3.4** 更新 `MainWindow.axaml` 文件列表 `DataTemplate`：
   - 在 `NameDisplay` 前增加 `Image` 控件绑定 `IconSource`
   - 宽高 16x16
-- [ ] **3.5** 验证：打开压缩包，文件列表显示正确的文件类型图标
-- [ ] **3.6** **Commit**: `feat(avalonia): add file type icons to file list`
+- [x] **3.5** 验证：打开压缩包，文件列表显示正确的文件类型图标
+- [x] **3.6** **Commit**: `feat(avalonia): add file type icons to file list`
 
 ---
 
