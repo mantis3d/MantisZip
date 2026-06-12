@@ -1,6 +1,7 @@
 using MantisZip.Core;
 using MantisZip.Core.Abstractions;
 using MantisZip.Core.Engines;
+using MantisZip.Core.Models;
 using MantisZip.Core.Services;
 using Microsoft.Win32;
 using System.IO;
@@ -405,25 +406,14 @@ public partial class CompressSettingsWindow : Window
         };
         var outputPaths = CompressService.GetOutputPaths(request);
         progressWindow.InitBatchMode(outputPaths);
+        progressWindow.SetCurrentBatchItem(0);
 
         try
         {
             bool applyToAll = false;
             Core.Abstractions.CompressConflictAction? chosenAction = null;
 
-            var rawProgress = ProgressWindow.CreateBackgroundProgress(progressWindow);
-            var progress = ProgressWindow.CreateBackgroundProgress(progressWindow.Dispatcher, p =>
-            {
-                if (p.TotalFiles > 0 && p.ProcessedFiles > 0)
-                {
-                    var itemIndex = p.ProcessedFiles - 1;
-                    if (itemIndex >= 0 && itemIndex < _sourcePaths.Count)
-                    {
-                        progressWindow.SetCurrentBatchItem(itemIndex);
-                    }
-                }
-                rawProgress.Report(p);
-            });
+            var progress = ProgressWindow.CreateBackgroundProgress(progressWindow);
 
             var result = await CompressService.CompressAsync(
                 request,
@@ -444,7 +434,8 @@ public partial class CompressSettingsWindow : Window
             progressWindow.SetComplete(L.T(L.App_CompressComplete));
             await progressWindow.AutoCloseOrWaitAsync(500, () =>
             {
-                progressWindow.Close();
+                if (progressWindow.IsVisible)
+                    try { progressWindow.Close(); } catch { }
                 SavePasswordAfterCompress();
                 this.Close();
             });
@@ -492,19 +483,7 @@ public partial class CompressSettingsWindow : Window
             bool applyToAll = false;
             Core.Abstractions.CompressConflictAction? chosenAction = null;
 
-            var rawProgress = ProgressWindow.CreateBackgroundProgress(progressWindow);
-            var progress = ProgressWindow.CreateBackgroundProgress(progressWindow.Dispatcher, p =>
-            {
-                if (p.TotalFiles > 0 && p.ProcessedFiles > 0)
-                {
-                    var itemIndex = p.ProcessedFiles - 1;
-                    if (itemIndex >= 0 && itemIndex < _sourcePaths.Count)
-                    {
-                        progressWindow.SetCurrentBatchItem(itemIndex);
-                    }
-                }
-                rawProgress.Report(p);
-            });
+            var progress = ProgressWindow.CreateBackgroundProgress(progressWindow);
 
             var result = await CompressService.CompressAsync(
                 request,
@@ -523,14 +502,20 @@ public partial class CompressSettingsWindow : Window
                 },
                 progress,
                 progressWindow.CancellationToken,
-                onItemStatus: (index, status) => progressWindow.UpdateBatchItemStatus(index, status));
+                onItemStatus: (index, status) =>
+                {
+                    if (status == BatchItemStatus.InProgress)
+                        progressWindow.SetCurrentBatchItem(index);
+                    progressWindow.UpdateBatchItemStatus(index, status);
+                });
 
             progressWindow.FinalizeBatch();
             var summary = L.TF(L.App_CompressSeparateComplete, result.Succeeded, result.Failed);
             progressWindow.SetComplete(summary);
             await progressWindow.AutoCloseOrWaitAsync(500, () =>
             {
-                progressWindow.Close();
+                if (progressWindow.IsVisible)
+                    try { progressWindow.Close(); } catch { }
                 SavePasswordAfterCompress();
                 this.Close();
             });
@@ -589,25 +574,14 @@ public partial class CompressSettingsWindow : Window
         };
         var outputPaths = CompressService.GetOutputPaths(request);
         progressWindow.InitBatchMode(outputPaths);
+        progressWindow.SetCurrentBatchItem(0);
 
         try
         {
             bool applyToAll = false;
             Core.Abstractions.CompressConflictAction? chosenAction = null;
 
-            var rawProgress = ProgressWindow.CreateBackgroundProgress(progressWindow);
-            var progress = ProgressWindow.CreateBackgroundProgress(progressWindow.Dispatcher, p =>
-            {
-                if (p.TotalFiles > 0 && p.ProcessedFiles > 0)
-                {
-                    var itemIndex = p.ProcessedFiles - 1;
-                    if (itemIndex >= 0 && itemIndex < _sourcePaths.Count)
-                    {
-                        progressWindow.SetCurrentBatchItem(itemIndex);
-                    }
-                }
-                rawProgress.Report(p);
-            });
+            var progress = ProgressWindow.CreateBackgroundProgress(progressWindow);
 
             var result = await CompressService.CompressAsync(
                 request,
@@ -628,7 +602,8 @@ public partial class CompressSettingsWindow : Window
             progressWindow.SetComplete(L.T(L.App_CompressComplete));
             await progressWindow.AutoCloseOrWaitAsync(500, () =>
             {
-                progressWindow.Close();
+                if (progressWindow.IsVisible)
+                    try { progressWindow.Close(); } catch { }
                 SavePasswordAfterCompress();
                 this.Close();
             });

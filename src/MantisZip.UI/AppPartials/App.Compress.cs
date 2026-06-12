@@ -205,19 +205,7 @@ public partial class App : Application
 
                 var rawProgress = ProgressWindow.CreateBackgroundProgress(progressWindow);
 
-                var progress = progressWindow.CreatePauseAwareProgress(
-                    ProgressWindow.CreateBackgroundProgress(progressWindow.Dispatcher, p =>
-                    {
-                        if (p.TotalFiles > 0 && p.ProcessedFiles > 0)
-                        {
-                            var itemIndex = p.ProcessedFiles - 1;
-                            if (itemIndex >= 0 && itemIndex < allPaths.Count)
-                            {
-                                progressWindow.SetCurrentBatchItem(itemIndex);
-                            }
-                        }
-                        rawProgress.Report(p);
-                    }));
+                var progress = progressWindow.CreatePauseAwareProgress(rawProgress);
 
                 var result = await CompressService.CompressAsync(
                     request,
@@ -242,7 +230,11 @@ public partial class App : Application
                     },
                     progress,
                     ct,
-                    onItemStatus: (index, status) => progressWindow.UpdateBatchItemStatus(index, status));
+                    onItemStatus: (index, status) =>
+                    {
+                        progressWindow.SetCurrentBatchItem(index);
+                        progressWindow.UpdateBatchItemStatus(index, status);
+                    });
 
                 progressWindow.FinalizeBatch();
 
@@ -270,7 +262,10 @@ public partial class App : Application
                     await progressWindow.AutoCloseOrWaitAsync(2500, () => progressWindow.Dispatcher.Invoke(() => app.Shutdown()));
                 }
             }
-            catch (OperationCanceledException) { }
+            catch (OperationCanceledException)
+            {
+                await progressWindow.Dispatcher.InvokeAsync(() => app.Shutdown());
+            }
         });
     }
     private static void HandleCompressCombined(string[] paths)
@@ -400,6 +395,7 @@ public partial class App : Application
         };
         var outputPaths = CompressService.GetOutputPaths(request);
         progressWindow.InitBatchMode(outputPaths);
+        progressWindow.SetCurrentBatchItem(0);
 
         var ct = progressWindow.CancellationToken;
 
@@ -433,11 +429,6 @@ public partial class App : Application
                     },
                     ProgressWindow.CreateBackgroundProgress(progressWindow.Dispatcher, p =>
                     {
-                        if (p.TotalFiles > 0 && p.ProcessedFiles > 0)
-                        {
-                            var itemIndex = p.ProcessedFiles - 1;
-                            progressWindow.SetCurrentBatchItem(itemIndex);
-                        }
                         progressWindow.SetProgress(p);
                     }),
                     ct);

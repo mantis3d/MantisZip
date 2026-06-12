@@ -43,28 +43,28 @@
             <Button x:Name="OverwriteBtn" Height="Auto" Padding="6,4" MinWidth="80" Click="Overwrite_Click"
                     Background="{StaticResource Theme_ButtonBg}" BorderBrush="{StaticResource Theme_Border}" BorderThickness="1" Margin="0,0,6,0">
                 <StackPanel Orientation="Vertical" HorizontalAlignment="Center">
-                    <emoji:TextBlock Text="🔄" FontSize="16" HorizontalAlignment="Center"/>
+                    <emoji:TextBlock Text="🔄" FontSize="24" HorizontalAlignment="Center"/>
                     <TextBlock Text="{l:L CompressConflict_Overwrite}" FontSize="11" Foreground="{StaticResource Theme_TextPrimary}" HorizontalAlignment="Center" Margin="0,2,0,0"/>
                 </StackPanel>
             </Button>
             <Button x:Name="AddBtn" Height="Auto" Padding="6,4" MinWidth="100" Click="Add_Click"
                     Background="{StaticResource Theme_ButtonBg}" BorderBrush="{StaticResource Theme_Border}" BorderThickness="1" Margin="6,0,6,0">
                 <StackPanel Orientation="Vertical" HorizontalAlignment="Center">
-                    <emoji:TextBlock Text="➕" FontSize="16" HorizontalAlignment="Center"/>
+                    <emoji:TextBlock Text="➕" FontSize="24" HorizontalAlignment="Center"/>
                     <TextBlock Text="{l:L CompressConflict_Add}" FontSize="11" Foreground="{StaticResource Theme_TextPrimary}" HorizontalAlignment="Center" Margin="0,2,0,0"/>
                 </StackPanel>
             </Button>
             <Button x:Name="RenameBtn" Height="Auto" Padding="6,4" MinWidth="80" Click="Rename_Click"
                     Background="{StaticResource Theme_ButtonBg}" BorderBrush="{StaticResource Theme_Border}" BorderThickness="1" Margin="6,0,6,0">
                 <StackPanel Orientation="Vertical" HorizontalAlignment="Center">
-                    <emoji:TextBlock Text="✏️" FontSize="16" HorizontalAlignment="Center"/>
+                    <emoji:TextBlock Text="✏️" FontSize="24" HorizontalAlignment="Center"/>
                     <TextBlock Text="{l:L CompressConflict_Rename}" FontSize="11" Foreground="{StaticResource Theme_TextPrimary}" HorizontalAlignment="Center" Margin="0,2,0,0"/>
                 </StackPanel>
             </Button>
             <Button Height="Auto" Padding="6,4" MinWidth="70" Click="Cancel_Click"
                     Background="{StaticResource Theme_ButtonBg}" BorderBrush="{StaticResource Theme_Border}" BorderThickness="1" Margin="6,0,0,0">
                 <StackPanel Orientation="Vertical" HorizontalAlignment="Center">
-                    <emoji:TextBlock Text="❌" FontSize="16" HorizontalAlignment="Center"/>
+                    <emoji:TextBlock Text="⏭️" FontSize="24" HorizontalAlignment="Center"/>
                     <TextBlock Text="{l:L Error_Skip}" FontSize="11" Foreground="{StaticResource Theme_TextPrimary}" HorizontalAlignment="Center" Margin="0,2,0,0"/>
                 </StackPanel>
             </Button>

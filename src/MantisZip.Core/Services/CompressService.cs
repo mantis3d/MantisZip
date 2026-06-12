@@ -184,6 +184,9 @@ public static class CompressService
                 CoreLog.Info($"CompressService: renamed to: {outputPath}");
             }
 
+            // 通知 UI 当前批处理项开始（必须在实际压缩前调用）
+            onItemStatus?.Invoke(i, BatchItemStatus.InProgress);
+
             // 5. 注释分配
             var comment = GetCommentForIndex(request, i);
 
