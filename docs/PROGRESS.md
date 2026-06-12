@@ -8,11 +8,14 @@
 
 ## 版本
 - **当前版本**: 0.3.13
-- **发布日期**: 2026-06-11
+- **发布日期**: 2026-06-12
 
 ## 规划中
 
 ## 版本历史（从新到旧）
+
+### v0.3.13 (2026-06-12) 修复进度条bug
+1. **复进度条bug**
 
 ### v0.3.13 (2026-06-11) 提取文件列表展示和目录树构建逻辑到 Core
 1. **ArchiveTreeBuilder**（Core/Services）：`BuildTree()` 从 `ArchiveItem` 列表构建文件夹树，`FolderNode` 类从 WPF 移到 Core
@@ -38,6 +41,16 @@
 1. **RAR 大文件提取进度条不更新修复**：`SevenZipEngine.ExtractAsync` / `ExtractEntriesAsync` 中 `SharpSevenZipExtractor.ExtractFile` 是同步阻塞调用，之前只在文件完全提取后报一次进度（0%→100%）。新增 `WriteProgressStream`（`Core/Utils`）包装 `FileStream`，在每次 `Write` 时通过回调按已知 `entry.Size` 计算百分比，100ms 节流上报，与 ZipEngine 的每文件进度模式一致。
 2. **取消提取后进程残留修复**：`HandleExtractBatchCore` 中 `failed > 0` 分支在 `progressWindow.Close()` 已触发过 `Closed` 事件后才订阅 `Closed += handler`，导致 `closed.Wait()` 永远阻塞、`app.Shutdown()` 永不执行。修复：通过 `Dispatcher.InvokeAsync(() => IsVisible)` 检查窗口是否已关闭，若已关闭则跳过等待直接 shutdown。
 3. **`WaitForManualCloseAsync` 同步修复**：`AutoCloseOrWaitAsync` + `KeepOpenOnComplete` 路径存在相同 bug——窗口已关闭时 `Closed` 事件早已触发，等待将永远阻塞。添加相同的 `IsVisible` 守卫检查。
+
+### v0.3.13 (2026-06-12) 压缩批处理文件进度条修复 + 压缩完成后进程残留修复
+
+1. **压缩批处理文件进度条锯齿修复**：`ProgressWindow.SetProgress` 中总进度条改为使用公式 `已完成包数/batch总数 × 100 + 当前包进度/batch总数`，消除批处理模式下每个包 0→100% 导致的锯齿（总进度 0→100→33→0→100→66→0→100）
+2. **压缩文件列表状态乱序修复**：移除所有压缩方法中进度包装器内使用 `p.ProcessedFiles`（包内文件数）作为 batch 索引的 `SetCurrentBatchItem` 调用。改为在 `CompressSeparateAsync` 中通过 `onItemStatus?.Invoke(i, BatchItemStatus.InProgress)` 在正确的迭代边界通知 UI，在 `onItemStatus` 回调和单包模式中直接使用 `SetCurrentBatchItem(0)` 指定批处理项索引
+3. **QuickView 路径保存按钮注销后残留修复**：CefSharp 退出时崩溃
+4. **冲突对话框按钮图标尺寸统一**：CompressConflictDialog 和 ConflictDialog 的按钮图标从 FontSize 16 统一为 24
+5. **压缩完成后 exe 进程残留修复**：两处 bug 修复
+   - **Bug A**：`CompressSettingsWindow` 三个 CloseAction 中 `progressWindow.Close()` 在用户提前点击"关闭"按钮后抛出 `InvalidOperationException`，导致 `this.Close()` 被跳过、`Current.Shutdown()` 永不执行。修复：加 `if (progressWindow.IsVisible) try { progressWindow.Close(); } catch { }` 保护
+   - **Bug B**：`RunCompressSeparateBatch` 的 `catch (OperationCanceledException)` 为空块，取消后进程不退出。修复：添加 `await progressWindow.Dispatcher.InvokeAsync(() => app.Shutdown())`
 
 ### v0.3.11 (2026-06-08) 文件列表拖拽提取修复（多选/目录/编码/重入）
 
