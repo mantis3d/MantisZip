@@ -1,35 +1,43 @@
 {
-  "updated_at": "2026-06-12T07:52:43.2943442Z",
+  "updated_at": "2026-06-12T08:09:38.439Z",
   "status": "active",
   "active_work_id": "avalonia-port-phase1",
   "agent": "atlas",
   "session_origins": {
-    "ses_1452ed9eaffeR5gCWCyiHs15hh": "direct"
+    "ses_1452ed9eaffeR5gCWCyiHs15hh": "direct",
+    "ses_1451f19c3ffeHrArU0HmQVhBPy": "appended",
+    "ses_1451ed8f7ffeHF6GaS1ELI4VC3": "appended"
   },
   "active_plan": "E:\\GitHub\\MantisZip\\.sisyphus\\plans\\avalonia-port-phase1.md",
   "task_sessions": {},
   "plan_name": "avalonia-port-phase1",
   "works": {
     "avalonia-port-phase1": {
-      "updated_at": "2026-06-12T07:52:43.2943405Z",
+      "updated_at": "2026-06-12T08:09:38.439Z",
       "status": "active",
       "work_id": "avalonia-port-phase1",
       "session_origins": {
-        "ses_1452ed9eaffeR5gCWCyiHs15hh": "direct"
+        "ses_1452ed9eaffeR5gCWCyiHs15hh": "direct",
+        "ses_1451f19c3ffeHrArU0HmQVhBPy": "appended",
+        "ses_1451ed8f7ffeHF6GaS1ELI4VC3": "appended"
       },
       "active_plan": "E:\\GitHub\\MantisZip\\.sisyphus\\plans\\avalonia-port-phase1.md",
       "task_sessions": {},
       "plan_name": "avalonia-port-phase1",
       "session_ids": [
-        "ses_1452ed9eaffeR5gCWCyiHs15hh"
+        "ses_1452ed9eaffeR5gCWCyiHs15hh",
+        "ses_1451f19c3ffeHrArU0HmQVhBPy",
+        "ses_1451ed8f7ffeHF6GaS1ELI4VC3"
       ],
       "started_at": "2026-06-12T07:52:43.2942882Z",
       "agent": "atlas"
     }
   },
   "session_ids": [
-    "ses_1452ed9eaffeR5gCWCyiHs15hh"
+    "ses_1452ed9eaffeR5gCWCyiHs15hh",
+    "ses_1451f19c3ffeHrArU0HmQVhBPy",
+    "ses_1451ed8f7ffeHF6GaS1ELI4VC3"
   ],
-  "started_at": "2026-06-12T07:52:43.2835835Z",
+  "started_at": "2026-06-12T07:52:43.2942882Z",
   "schema_version": 2
 }

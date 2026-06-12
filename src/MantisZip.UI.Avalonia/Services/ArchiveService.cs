@@ -26,7 +26,8 @@ public class ArchiveService
             }
 
             var items = await engine.ListEntriesAsync(archivePath, password, cancellationToken);
-            var models = items.Select(ArchiveItemModel.FromCore).ToList();
+            var itemsList = items.ToList();
+            var models = itemsList.Select(ArchiveItemModel.FromCore).ToList();
 
             // Load file type icons
             foreach (var model in models)
@@ -35,7 +36,7 @@ public class ArchiveService
                 model.IconSource = IconService.GetFileIcon(ext);
             }
 
-            return ArchiveLoadResult.Success(models);
+            return ArchiveLoadResult.Success(models, itemsList);
         }
         catch (OperationCanceledException)
         {
@@ -67,10 +68,16 @@ public class ArchiveLoadResult
     public string? ErrorMessage { get; private init; }
     public IReadOnlyList<ArchiveItemModel>? Entries { get; private init; }
 
-    public static ArchiveLoadResult Success(List<ArchiveItemModel> entries) => new()
+    /// <summary>
+    /// 原始 ArchiveItem 列表（用于文件夹树构建等需要原始数据的场景）。
+    /// </summary>
+    public IReadOnlyList<ArchiveItem>? RawItems { get; private init; }
+
+    public static ArchiveLoadResult Success(List<ArchiveItemModel> entries, IReadOnlyList<ArchiveItem>? rawItems = null) => new()
     {
         IsSuccess = true,
-        Entries = entries
+        Entries = entries,
+        RawItems = rawItems
     };
 
     public static ArchiveLoadResult Failure(string message) => new()

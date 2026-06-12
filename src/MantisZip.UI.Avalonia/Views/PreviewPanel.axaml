@@ -1,0 +1,94 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:MantisZip.UI.Avalonia.ViewModels"
+             x:Class="MantisZip.UI.Avalonia.Views.PreviewPanel"
+             x:DataType="vm:PreviewViewModel">
+  <Grid RowDefinitions="Auto,*">
+    <!-- Toolbar -->
+    <Border Grid.Row="0"
+            Padding="4,2"
+            Background="{DynamicResource ThemeHeaderBgBrush}"
+            IsVisible="{Binding IsToolbarVisible}">
+      <StackPanel Orientation="Horizontal" Spacing="4">
+        <!-- Zoom controls (image/gif) -->
+        <StackPanel Orientation="Horizontal" Spacing="2"
+                    IsVisible="{Binding HasZoomControls}">
+          <Button Content="−" Command="{Binding ZoomOutCommand}"
+                  Width="28" Height="22" />
+          <Button Content="+" Command="{Binding ZoomInCommand}"
+                  Width="28" Height="22" />
+          <Button Content="⊡" Command="{Binding ZoomFitCommand}"
+                  Width="28" Height="22" />
+        </StackPanel>
+
+        <!-- Font size controls (text) -->
+        <StackPanel Orientation="Horizontal" Spacing="2"
+                    IsVisible="{Binding HasFontSizeControls}">
+          <Button Content="A−" Command="{Binding DecreaseFontSizeCommand}"
+                  Width="28" Height="22" />
+          <Button Content="A+" Command="{Binding IncreaseFontSizeCommand}"
+                  Width="28" Height="22" />
+        </StackPanel>
+      </StackPanel>
+    </Border>
+
+    <!-- Preview content area - will be populated by Tasks 6-11 -->
+    <ScrollViewer Grid.Row="1"
+                  Background="{DynamicResource ThemeSurfaceBgBrush}">
+      <Grid>
+        <!-- Unsupported / empty state -->
+        <TextBlock Text="{Binding TextContent}"
+                   VerticalAlignment="Center"
+                   HorizontalAlignment="Center"
+                   TextWrapping="Wrap"
+                   IsVisible="{Binding IsUnsupportedVisible}" />
+
+        <!-- Text preview -->
+        <ScrollViewer IsVisible="{Binding IsTextVisible}">
+          <TextBox Text="{Binding TextContent}"
+                   IsReadOnly="True"
+                   TextWrapping="Wrap"
+                   FontFamily="Consolas"
+                   FontSize="{Binding FontSize}"
+                   Background="{DynamicResource ThemeSurfaceBgBrush}"
+                   Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                   BorderThickness="0" />
+        </ScrollViewer>
+
+        <!-- CSV preview -->
+        <ScrollViewer IsVisible="{Binding IsCsvVisible}">
+          <DataGrid ItemsSource="{Binding CsvData}"
+                    AutoGenerateColumns="True"
+                    IsReadOnly="True"
+                    CanUserResizeColumns="True" />
+        </ScrollViewer>
+
+        <!-- PE preview -->
+        <StackPanel IsVisible="{Binding IsPeVisible}"
+                    Spacing="8">
+          <TextBlock Text="{Binding PeTitle}"
+                     FontSize="20"
+                     FontWeight="Bold" />
+          <TextBlock Text="{Binding PeSubtitle}"
+                     FontSize="13"
+                     Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+          <Separator />
+          <ItemsControl ItemsSource="{Binding PeMetadata}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="vm:PeMetadataItem">
+                <Grid ColumnDefinitions="Auto,8,*"
+                      Margin="0,2">
+                  <TextBlock Text="{Binding Key}"
+                             FontWeight="Bold"
+                             Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+                  <TextBlock Grid.Column="2"
+                             Text="{Binding Value}" />
+                </Grid>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </StackPanel>
+      </Grid>
+    </ScrollViewer>
+  </Grid>
+</UserControl>

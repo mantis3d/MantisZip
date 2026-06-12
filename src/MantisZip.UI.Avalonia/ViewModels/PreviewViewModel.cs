@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using System.Data;
 using System.Text;
 using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
 using MantisZip.Core.Utils;
 using MantisZip.UI.Avalonia.Models;
 using MantisZip.UI.Avalonia.Services;
@@ -28,6 +29,20 @@ public partial class PreviewViewModel : ObservableObject
 
     [ObservableProperty]
     private string _previewHeaderText = string.Empty;
+
+    // ── Toolbar ──
+
+    [ObservableProperty]
+    private bool _isToolbarVisible;
+
+    [ObservableProperty]
+    private double _zoomLevel = 1.0;
+
+    [ObservableProperty]
+    private int _fontSize = 13;
+
+    public bool HasZoomControls => PreviewType is PreviewType.Image or PreviewType.Gif;
+    public bool HasFontSizeControls => PreviewType == PreviewType.Text;
 
     // Computed visibility per preview type
     public bool IsTextVisible => PreviewType == PreviewType.Text;
@@ -62,6 +77,8 @@ public partial class PreviewViewModel : ObservableObject
         OnPropertyChanged(nameof(IsOfficeVisible));
         OnPropertyChanged(nameof(IsVideoVisible));
         OnPropertyChanged(nameof(IsUnsupportedVisible));
+        OnPropertyChanged(nameof(HasZoomControls));
+        OnPropertyChanged(nameof(HasFontSizeControls));
     }
 
     // ── CSV ──
@@ -82,6 +99,38 @@ public partial class PreviewViewModel : ObservableObject
 
     public ObservableCollection<PeMetadataItem> PeMetadata { get; } = [];
 
+    // ── Toolbar commands ──
+
+    [RelayCommand]
+    private void ZoomIn()
+    {
+        ZoomLevel = Math.Min(ZoomLevel + 0.25, 5.0);
+    }
+
+    [RelayCommand]
+    private void ZoomOut()
+    {
+        ZoomLevel = Math.Max(ZoomLevel - 0.25, 0.1);
+    }
+
+    [RelayCommand]
+    private void ZoomFit()
+    {
+        ZoomLevel = 1.0;
+    }
+
+    [RelayCommand]
+    private void IncreaseFontSize()
+    {
+        FontSize = Math.Min(FontSize + 2, 48);
+    }
+
+    [RelayCommand]
+    private void DecreaseFontSize()
+    {
+        FontSize = Math.Max(FontSize - 2, 8);
+    }
+
     /// <summary>
     /// 显示文本预览。
     /// </summary>
@@ -91,6 +140,7 @@ public partial class PreviewViewModel : ObservableObject
         TextContent = content;
         PreviewType = PreviewType.Text;
         IsPreviewVisible = true;
+        IsToolbarVisible = true;
     }
 
     /// <summary>
@@ -103,6 +153,7 @@ public partial class PreviewViewModel : ObservableObject
         CsvData = table?.DefaultView;  // DataView 可绑定到 ItemsControl
         PreviewType = PreviewType.Csv;
         IsPreviewVisible = true;
+        IsToolbarVisible = true;
     }
 
     /// <summary>
@@ -129,6 +180,7 @@ public partial class PreviewViewModel : ObservableObject
 
         PreviewType = PreviewType.Pe;
         IsPreviewVisible = true;
+        IsToolbarVisible = true;
     }
 
     /// <summary>
@@ -153,6 +205,9 @@ public partial class PreviewViewModel : ObservableObject
         FormatMetadata.Clear();
         PreviewHeaderText = string.Empty;
         IsPreviewVisible = false;
+        IsToolbarVisible = false;
+        ZoomLevel = 1.0;
+        FontSize = 13;
     }
 
     private void AddPeMeta(string key, string? value)

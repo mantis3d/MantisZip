@@ -180,20 +180,20 @@ src/MantisZip.UI.Avalonia/
 
 > 使用 Core 的 `ArchiveTreeBuilder` 构建文件夹树，左侧 TreeView 导航。
 
-- [ ] **4.1** `MainWindowViewModel` 添加：
+- [x] **4.1** `MainWindowViewModel` 添加：
   - `FolderNode? FolderTreeRoot` 属性（树根节点）
   - `FolderNode? SelectedFolder` 属性
   - `ObservableCollection<ArchiveItemModel> CurrentEntries`（当前目录的文件列表）
   - `string? CurrentFolder`（当前浏览目录路径）
-- [ ] **4.2** 添加命令/方法：
+- [x] **4.2** 添加命令/方法：
   - `NavigateToFolder(FolderNode node)`：设置 `CurrentFolder`，调用 `ArchiveEntryLister.GetEntriesInFolder` 过滤条目
   - `GoUpCommand`：返回上级目录
   - `BuildFolderTree(IEnumerable<ArchiveItem> allItems)`：调用 `ArchiveTreeBuilder.BuildTree`
-- [ ] **4.3** 更新 `LoadArchiveAsync`：
+- [x] **4.3** 更新 `LoadArchiveAsync`：
   - 调用 `BuildFolderTree` 构建树
   - 展开根节点
   - 导航到根目录（显示根目录下的条目）
-- [ ] **4.4** `MainWindow.axaml` 布局改为 3 列：
+- [x] **4.4** `MainWindow.axaml` 布局改为 3 列：
   ```xml
   <Grid ColumnDefinitions="Auto,5,2.5*,5,3*">
   ```
@@ -201,16 +201,16 @@ src/MantisZip.UI.Avalonia/
   - Column 2: 文件列表（`ListBox` 绑定 `CurrentEntries`）
   - Column 4: 预览区域
   - GridSplitter at Column 1 and 3
-- [ ] **4.5** `TreeView.ItemTemplate`：
+- [x] **4.5** `TreeView.ItemTemplate`：
   - 显示文件夹图标 + `Name`
   - `IsExpanded` 双向绑定
   - 选中节点 → `NavigateToFolder`
-- [ ] **4.6** 更新 `SelectedEntry` 预览触发逻辑：
+- [x] **4.6** 更新 `SelectedEntry` 预览触发逻辑：
   - 预览时仍使用 `Entries`（全量）提取文件
   - 或使用 `CurrentEntries` 中的引用
-- [ ] **4.7** 同步：`SelectedFolder` 变化时重新过滤 `CurrentEntries`
-- [ ] **4.8** 验证：打开含子目录的压缩包，树导航正常，文件列表随目录切换更新
-- [ ] **4.9** **Commit**: `feat(avalonia): add TreeView folder navigation with 3-pane layout`
+- [x] **4.7** 同步：`SelectedFolder` 变化时重新过滤 `CurrentEntries`
+- [x] **4.8** 验证：打开含子目录的压缩包，树导航正常，文件列表随目录切换更新
+- [x] **4.9** **Commit**: `feat(avalonia): add TreeView folder navigation with 3-pane layout`
 
 ---
 
@@ -218,24 +218,24 @@ src/MantisZip.UI.Avalonia/
 
 > 在各格式预览上方添加共享工具栏（缩放/字号/格式特定按钮）。
 
-- [ ] **5.1** `PreviewViewModel` 添加：
+- [x] **5.1** `PreviewViewModel` 添加：
   - `bool IsToolbarVisible`
   - `double ZoomLevel`（图片缩放，默认 1.0）
   - `int FontSize`（文本字号，默认 13）
   - `bool HasZoomControls`（`PreviewType == Image || PreviewType == Gif`）
   - `bool HasFontSizeControls`（`PreviewType == Text`）
-- [ ] **5.2** 添加命令：
+- [x] **5.2** 添加命令：
   - `ZoomInCommand` / `ZoomOutCommand` / `ZoomFitCommand`
   - `IncreaseFontSizeCommand` / `DecreaseFontSizeCommand`
-- [ ] **5.3** `PreviewPanel.axaml` 添加工具栏：
+- [x] **5.3** `PreviewPanel.axaml` 添加工具栏：
   - 水平 `StackPanel`：
     - 左侧：通用按钮（放大/缩小/适应，字号+/-）
     - `Separator`
     - 右侧：格式特定按钮（占位，后续 task 填充）
   - 工具栏背景使用主题色
-- [ ] **5.4** 连接图片缩放：`Image` 控件的 `RenderTransform` 绑定 `ZoomLevel`
-- [ ] **5.5** 连接字号：预览 `TextBox` 的 `FontSize` 绑定
-- [ ] **5.6** **Commit**: `feat(avalonia): add shared preview toolbar with zoom and font size controls`
+- [x] **5.4** 连接图片缩放：`Image` 控件的 `RenderTransform` 绑定 `ZoomLevel`（实现在 Task 6）
+- [x] **5.5** 连接字号：预览 `TextBox` 的 `FontSize` 绑定
+- [x] **5.6** **Commit**: `feat(avalonia): add shared preview toolbar with zoom and font size controls`
 
 ---
 

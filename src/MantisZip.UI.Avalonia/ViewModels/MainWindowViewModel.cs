@@ -3,6 +3,7 @@ using Avalonia.Markup.Xaml.Styling;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using MantisZip.Core.Abstractions;
+using MantisZip.Core.Services;
 using MantisZip.UI.Avalonia.Models;
 using MantisZip.UI.Avalonia.Services;
 using System.Collections.ObjectModel;
@@ -13,6 +14,7 @@ public partial class MainWindowViewModel : ObservableObject
 {
     private readonly ArchiveService _archiveService = new();
     private ArchiveFormat _currentFormat;
+    private IReadOnlyList<ArchiveItem>? _allRawItems;
 
     /// <summary>
     /// 由 View 设置的对话框回调。返回选择的文件路径，取消返回 null。
@@ -42,6 +44,17 @@ public partial class MainWindowViewModel : ObservableObject
     [ObservableProperty]
     private bool _isDarkTheme;
 
+    [ObservableProperty]
+    private FolderNode? _folderTreeRoot;
+
+    [ObservableProperty]
+    private FolderNode? _selectedFolder;
+
+    [ObservableProperty]
+    private string? _currentFolder;
+
+    public ObservableCollection<ArchiveItemModel> CurrentEntries { get; } = [];
+
     public ObservableCollection<ArchiveItemModel> Entries { get; } = [];
 
     partial void OnSelectedEntryChanged(ArchiveItemModel? value)
@@ -53,6 +66,14 @@ public partial class MainWindowViewModel : ObservableObject
         else
         {
             Preview.Clear();
+        }
+    }
+
+    partial void OnSelectedFolderChanged(FolderNode? value)
+    {
+        if (value != null)
+        {
+            NavigateToFolder(value);
         }
     }
 
@@ -89,6 +110,16 @@ public partial class MainWindowViewModel : ObservableObject
                 {
                     Entries.Add(entry);
                 }
+
+                // Build folder tree
+                _allRawItems = result.RawItems;
+                if (_allRawItems != null)
+                {
+                    FolderTreeRoot = ArchiveTreeBuilder.BuildTree(_allRawItems, Path.GetFileNameWithoutExtension(path));
+                    FolderTreeRoot.IsExpanded = true;
+                    SelectedFolder = FolderTreeRoot;
+                }
+
                 CurrentArchivePath = path;
                 _currentFormat = ArchiveFormatHelper.GetFormat(path);
                 IsArchiveLoaded = true;
@@ -168,6 +199,48 @@ public partial class MainWindowViewModel : ObservableObject
         }
     }
 
+    private void NavigateToFolder(FolderNode node)
+    {
+        if (_allRawItems == null) return;
+
+        CurrentFolder = node.FullPath;
+        var filtered = ArchiveEntryLister.GetEntriesInFolder(_allRawItems, node.FullPath, showSubfolders: false);
+
+        CurrentEntries.Clear();
+        foreach (var item in filtered)
+        {
+            var model = ArchiveItemModel.FromCore(item);
+            var ext = Path.GetExtension(model.Name);
+            model.IconSource = IconService.GetFileIcon(ext);
+            CurrentEntries.Add(model);
+        }
+    }
+
+    [RelayCommand]
+    private void GoUp()
+    {
+        if (SelectedFolder?.FullPath == "") return;
+
+        var currentPath = SelectedFolder?.FullPath ?? "";
+        var lastSlash = currentPath.LastIndexOf('/');
+        var parentPath = lastSlash >= 0 ? currentPath[..lastSlash] : "";
+
+        var parent = FindNode(FolderTreeRoot, parentPath);
+        SelectedFolder = parent ?? FolderTreeRoot;
+    }
+
+    private static FolderNode? FindNode(FolderNode? node, string path)
+    {
+        if (node == null) return null;
+        if (node.FullPath == path) return node;
+        foreach (var child in node.Children)
+        {
+            var found = FindNode(child, path);
+            if (found != null) return found;
+        }
+        return null;
+    }
+
     [RelayCommand]
     private void ClearArchive()
     {
@@ -179,9 +252,13 @@ public partial class MainWindowViewModel : ObservableObject
     private void ClearArchiveInternal()
     {
         Entries.Clear();
+        CurrentEntries.Clear();
         CurrentArchivePath = null;
         IsArchiveLoaded = false;
         SelectedEntry = null;
+        SelectedFolder = null;
+        FolderTreeRoot = null;
+        _allRawItems = null;
         Preview.Clear();
     }
 

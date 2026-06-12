@@ -2,7 +2,8 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="clr-namespace:MantisZip.UI.Avalonia.ViewModels"
         xmlns:models="clr-namespace:MantisZip.UI.Avalonia.Models"
-        xmlns:conv="clr-namespace:MantisZip.UI.Avalonia.Converters"
+         xmlns:conv="clr-namespace:MantisZip.UI.Avalonia.Converters"
+         xmlns:views="clr-namespace:MantisZip.UI.Avalonia.Views"
         x:Class="MantisZip.UI.Avalonia.Views.MainWindow"
         x:DataType="vm:MainWindowViewModel"
         Title="{Binding Title}"
@@ -46,12 +47,42 @@
       </MenuItem>
     </Menu>
 
-    <!-- Main content: file list + preview -->
+    <!-- Main content: TreeView | file list | preview -->
     <Grid Grid.Row="1"
-          ColumnDefinitions="2.5*,5,3*">
+          ColumnDefinitions="Auto,5,2.5*,5,3*">
+      <!-- Folder tree -->
+      <Border Grid.Column="0"
+              Width="220"
+              Background="{DynamicResource ThemeSurfaceBgBrush}">
+        <Grid RowDefinitions="Auto,*">
+          <TextBlock Text="浏览"
+                     Margin="8,6"
+                     FontWeight="SemiBold"
+                     Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+          <TreeView Grid.Row="1"
+                    ItemsSource="{Binding FolderTreeRoot.Children}"
+                    SelectedItem="{Binding SelectedFolder}"
+                    BorderThickness="0"
+                    Background="Transparent">
+            <TreeView.ItemTemplate>
+              <TreeDataTemplate ItemsSource="{Binding Children}">
+                <StackPanel Orientation="Horizontal" Spacing="4"
+                            Margin="4,2">
+                  <TextBlock Text="{Binding Name}"
+                             Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+                </StackPanel>
+              </TreeDataTemplate>
+            </TreeView.ItemTemplate>
+          </TreeView>
+        </Grid>
+      </Border>
+
+      <GridSplitter Grid.Column="1"
+                    Width="5" />
+
       <!-- File list as DataGrid -->
-      <DataGrid Grid.Column="0"
-                ItemsSource="{Binding Entries}"
+      <DataGrid Grid.Column="2"
+                ItemsSource="{Binding CurrentEntries}"
                 SelectedItem="{Binding SelectedEntry}"
                 AutoGenerateColumns="False"
                 CanUserSortColumns="True"
@@ -60,8 +91,7 @@
           <DataGridTemplateColumn Header="" Width="22">
             <DataTemplate>
               <Image Source="{Binding IconSource}"
-                     Width="16"
-                     Height="16"
+                     Width="16" Height="16"
                      VerticalAlignment="Center"
                      HorizontalAlignment="Center" />
             </DataTemplate>
@@ -81,68 +111,12 @@
         </DataGrid.Columns>
       </DataGrid>
 
-      <GridSplitter Grid.Column="1"
+      <GridSplitter Grid.Column="3"
                     Width="5" />
 
       <!-- Preview area -->
-      <Border Grid.Column="2"
-              Padding="8"
-              Background="{DynamicResource ThemeSurfaceBgBrush}">
-        <Grid>
-          <!-- Unsupported / empty state -->
-          <TextBlock Text="{Binding Preview.TextContent}"
-                     VerticalAlignment="Center"
-                     HorizontalAlignment="Center"
-                     TextWrapping="Wrap"
-                     IsVisible="{Binding Preview.IsUnsupportedVisible}" />
-
-          <!-- Text preview -->
-          <ScrollViewer IsVisible="{Binding Preview.IsTextVisible}">
-            <TextBox Text="{Binding Preview.TextContent}"
-                     IsReadOnly="True"
-                     TextWrapping="Wrap"
-                     FontFamily="Consolas"
-                     FontSize="13"
-                     Background="{DynamicResource ThemeSurfaceBgBrush}"
-                     Foreground="{DynamicResource ThemeTextPrimaryBrush}"
-                     BorderThickness="0" />
-          </ScrollViewer>
-
-          <!-- CSV preview -->
-          <ScrollViewer IsVisible="{Binding Preview.IsCsvVisible}">
-            <DataGrid ItemsSource="{Binding Preview.CsvData}"
-                      AutoGenerateColumns="True"
-                      IsReadOnly="True"
-                      CanUserResizeColumns="True" />
-          </ScrollViewer>
-
-          <!-- PE preview -->
-          <StackPanel IsVisible="{Binding Preview.IsPeVisible}"
-                      Spacing="8">
-            <TextBlock Text="{Binding Preview.PeTitle}"
-                       FontSize="20"
-                       FontWeight="Bold" />
-            <TextBlock Text="{Binding Preview.PeSubtitle}"
-                       FontSize="13"
-                       Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
-            <Separator />
-            <ItemsControl ItemsSource="{Binding Preview.PeMetadata}">
-              <ItemsControl.ItemTemplate>
-                <DataTemplate x:DataType="vm:PeMetadataItem">
-                  <Grid ColumnDefinitions="Auto,8,*"
-                        Margin="0,2">
-                    <TextBlock Text="{Binding Key}"
-                               FontWeight="Bold"
-                               Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
-                    <TextBlock Grid.Column="2"
-                               Text="{Binding Value}" />
-                  </Grid>
-                </DataTemplate>
-              </ItemsControl.ItemTemplate>
-            </ItemsControl>
-          </StackPanel>
-        </Grid>
-      </Border>
+      <views:PreviewPanel Grid.Column="4"
+                          DataContext="{Binding Preview}" />
     </Grid>
 
     <!-- Status bar -->
