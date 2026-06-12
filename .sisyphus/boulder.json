@@ -1,89 +1,35 @@
 {
-  "active_plan": "E:\\GitHub\\MantisZip\\.sisyphus\\plans\\file-list-filter-search.md",
-  "started_at": "2026-06-10T05:37:48.134Z",
-  "session_ids": [
-    "ses_1501a14e8ffe9f7ANfsmA4m3xr",
-    "ses_14ff52ee9ffeD4x6KiXzlYS7Ej",
-    "ses_14ff50af6ffeAGmSYgUAEbmUIt",
-    "ses_14fe4c109ffeV6W28NGQ6amAGW",
-    "ses_14fe4b8fbffeLEX9Cc6l5zjDVl",
-    "ses_14fe4abf3ffe8twLdSZ3i4J88n",
-    "ses_14fe4a05fffe6PAAZZk8OOCgsy"
-  ],
-  "session_origins": {
-    "ses_1501a14e8ffe9f7ANfsmA4m3xr": "direct",
-    "ses_14ff52ee9ffeD4x6KiXzlYS7Ej": "appended",
-    "ses_14ff50af6ffeAGmSYgUAEbmUIt": "appended",
-    "ses_14fe4c109ffeV6W28NGQ6amAGW": "appended",
-    "ses_14fe4b8fbffeLEX9Cc6l5zjDVl": "appended",
-    "ses_14fe4abf3ffe8twLdSZ3i4J88n": "appended",
-    "ses_14fe4a05fffe6PAAZZk8OOCgsy": "appended"
-  },
-  "plan_name": "file-list-filter-search",
+  "updated_at": "2026-06-12T07:52:43.2943442Z",
+  "status": "active",
+  "active_work_id": "avalonia-port-phase1",
   "agent": "atlas",
-  "task_sessions": {
-    "todo:1": {
-      "task_key": "todo:1",
-      "task_label": "1",
-      "task_title": "ApplyFilters in ArchiveFilter.cs still uses old substring-only logic — needs MatchItem method + wildcard + exclude",
-      "session_id": "ses_14ff50af6ffeAGmSYgUAEbmUIt",
-      "agent": "Atlas - Plan Executor",
-      "updated_at": "2026-06-10T05:50:33.347Z",
-      "started_at": "2026-06-10T05:50:33.346Z",
-      "status": "completed",
-      "ended_at": "2026-06-10T05:50:33.347Z",
-      "elapsed_ms": 1
-    }
+  "session_origins": {
+    "ses_1452ed9eaffeR5gCWCyiHs15hh": "direct"
   },
-  "active_work_id": "file-list-filter-search",
-  "schema_version": 2,
+  "active_plan": "E:\\GitHub\\MantisZip\\.sisyphus\\plans\\avalonia-port-phase1.md",
+  "task_sessions": {},
+  "plan_name": "avalonia-port-phase1",
   "works": {
-    "file-list-filter-search": {
-      "work_id": "file-list-filter-search",
-      "active_plan": "E:\\GitHub\\MantisZip\\.sisyphus\\plans\\file-list-filter-search.md",
-      "plan_name": "file-list-filter-search",
-      "started_at": "2026-06-10T05:37:48.134Z",
-      "session_ids": [
-        "ses_1501a14e8ffe9f7ANfsmA4m3xr",
-        "ses_14ff52ee9ffeD4x6KiXzlYS7Ej",
-        "ses_14ff50af6ffeAGmSYgUAEbmUIt",
-        "ses_14fe4c109ffeV6W28NGQ6amAGW",
-        "ses_14fe4b8fbffeLEX9Cc6l5zjDVl",
-        "ses_14fe4abf3ffe8twLdSZ3i4J88n",
-        "ses_14fe4a05fffe6PAAZZk8OOCgsy"
-      ],
+    "avalonia-port-phase1": {
+      "updated_at": "2026-06-12T07:52:43.2943405Z",
+      "status": "active",
+      "work_id": "avalonia-port-phase1",
       "session_origins": {
-        "ses_1501a14e8ffe9f7ANfsmA4m3xr": "direct",
-        "ses_14ff52ee9ffeD4x6KiXzlYS7Ej": "appended",
-        "ses_14ff50af6ffeAGmSYgUAEbmUIt": "appended",
-        "ses_14fe4c109ffeV6W28NGQ6amAGW": "appended",
-        "ses_14fe4b8fbffeLEX9Cc6l5zjDVl": "appended",
-        "ses_14fe4abf3ffe8twLdSZ3i4J88n": "appended",
-        "ses_14fe4a05fffe6PAAZZk8OOCgsy": "appended"
+        "ses_1452ed9eaffeR5gCWCyiHs15hh": "direct"
       },
-      "agent": "atlas",
-      "task_sessions": {
-        "todo:1": {
-          "task_key": "todo:1",
-          "task_label": "1",
-          "task_title": "ApplyFilters in ArchiveFilter.cs still uses old substring-only logic — needs MatchItem method + wildcard + exclude",
-          "session_id": "ses_14ff50af6ffeAGmSYgUAEbmUIt",
-          "agent": "Atlas - Plan Executor",
-          "updated_at": "2026-06-10T05:50:33.347Z",
-          "started_at": "2026-06-10T05:50:33.346Z",
-          "status": "completed",
-          "ended_at": "2026-06-10T05:50:33.347Z",
-          "elapsed_ms": 1
-        }
-      },
-      "updated_at": "2026-06-10T05:57:24.670Z",
-      "ended_at": "2026-06-10T05:41:43.947Z",
-      "elapsed_ms": 235813,
-      "status": "completed"
+      "active_plan": "E:\\GitHub\\MantisZip\\.sisyphus\\plans\\avalonia-port-phase1.md",
+      "task_sessions": {},
+      "plan_name": "avalonia-port-phase1",
+      "session_ids": [
+        "ses_1452ed9eaffeR5gCWCyiHs15hh"
+      ],
+      "started_at": "2026-06-12T07:52:43.2942882Z",
+      "agent": "atlas"
     }
   },
-  "updated_at": "2026-06-10T05:57:24.670Z",
-  "status": "completed",
-  "ended_at": "2026-06-10T05:41:43.947Z",
-  "elapsed_ms": 235813
+  "session_ids": [
+    "ses_1452ed9eaffeR5gCWCyiHs15hh"
+  ],
+  "started_at": "2026-06-12T07:52:43.2835835Z",
+  "schema_version": 2
 }

@@ -66,32 +66,32 @@ src/MantisZip.UI.Avalonia/
 
 > DataGrid v12.0.0 本身完好，问题仅在 **Avalonia 12 需要显式引入 DataGrid 主题样式**。修复后，文件列表 ListBox 和 CSV ItemsControl 都替换为 DataGrid。
 
-- [ ] **0.1** `App.axaml` 添加 DataGrid 样式引用：
+- [x] **0.1** `App.axaml` 添加 DataGrid 样式引用：
   ```xml
   <Application.Styles>
       <FluentTheme />
       <StyleInclude Source="avares://Avalonia.Controls.DataGrid/Themes/Fluent.xaml"/>
   </Application.Styles>
   ```
-- [ ] **0.2** `MainWindow.axaml`：文件列表 ListBox → DataGrid
+- [x] **0.2** `MainWindow.axaml`：文件列表 ListBox → DataGrid
   - `DataGrid ItemsSource="{Binding Entries}" SelectedItem="{Binding SelectedEntry}"`
   - 列定义：`DataGridTextColumn` 绑定 `NameDisplay` / `SizeDisplay` / `CompressedSizeDisplay` / `LastModifiedDisplay`
   - 列宽：`NameDisplay` 用 `*`，其余用固定宽或 `Auto`
   - 去掉列头手动定义 Grid 行（DataGrid 自带列头）
   - 启用排序（`CanUserSortColumns="True"`）
-- [ ] **0.3** CSV 预览：`ItemsControl` → `DataGrid`
+- [x] **0.3** CSV 预览：`ItemsControl` → `DataGrid`
   - 替换 `ScrollViewer > ItemsControl` 为 `ScrollViewer > DataGrid`
   - `DataGrid ItemsSource="{Binding Preview.CsvData}" AutoGenerateColumns="True"`
   - 设置 `IsReadOnly="True" CanUserResizeColumns="True"`
-- [ ] **0.4** 清理：
+- [x] **0.4** 清理：
   - 移除 `Controls/CsvDataGrid.axaml` + `CsvDataGrid.cs`（不再需要）
   - 移除 `BoolToVisibilityConverter.cs`（如不再被其他地方引用）
   - 检查 `using Avalonia.Controls.DataGrid` 是否正确
-- [ ] **0.5** 验证：
+- [x] **0.5** 验证：
   - `dotnet build src\MantisZip.UI.Avalonia` 编译通过
   - DataGrid 正常显示文件列表，列头可点击排序
   - CSV 预览以表格形式展示，列自动生成
-- [ ] **0.6** **Commit**: `feat(avalonia): add DataGrid style include, replace ListBox/ItemsControl with DataGrid`
+- [x] **0.6** **Commit**: `feat(avalonia): add DataGrid style include, replace ListBox/ItemsControl with DataGrid`
 
 ---
 

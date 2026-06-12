@@ -28,39 +28,28 @@
     <!-- Main content: file list + preview -->
     <Grid Grid.Row="1"
           ColumnDefinitions="2.5*,5,3*">
-      <!-- File list header + items -->
-      <Grid Grid.Column="0"
-            RowDefinitions="Auto,*">
-        <!-- Column header -->
-        <Grid ColumnDefinitions="*,80,70,100"
-              Margin="4,4,4,0">
-          <TextBlock Text="名称" FontWeight="SemiBold" />
-          <TextBlock Grid.Column="1" Text="大小" FontWeight="SemiBold" />
-          <TextBlock Grid.Column="2" Text="压缩后" FontWeight="SemiBold" />
-          <TextBlock Grid.Column="3" Text="修改日期" FontWeight="SemiBold" />
-        </Grid>
-
-        <!-- File items -->
-        <ListBox Grid.Row="1"
-                 ItemsSource="{Binding Entries}"
-                 SelectedItem="{Binding SelectedEntry}">
-          <ListBox.ItemTemplate>
-            <DataTemplate x:DataType="models:ArchiveItemModel">
-              <Grid ColumnDefinitions="*,80,70,100"
-                    Margin="2,0">
-                <TextBlock Text="{Binding NameDisplay}"
-                           TextTrimming="CharacterEllipsis" />
-                <TextBlock Grid.Column="1"
-                           Text="{Binding SizeDisplay}" />
-                <TextBlock Grid.Column="2"
-                           Text="{Binding CompressedSizeDisplay}" />
-                <TextBlock Grid.Column="3"
-                           Text="{Binding LastModifiedDisplay}" />
-              </Grid>
-            </DataTemplate>
-          </ListBox.ItemTemplate>
-        </ListBox>
-      </Grid>
+      <!-- File list as DataGrid -->
+      <DataGrid Grid.Column="0"
+                ItemsSource="{Binding Entries}"
+                SelectedItem="{Binding SelectedEntry}"
+                AutoGenerateColumns="False"
+                CanUserSortColumns="True"
+                IsReadOnly="True">
+        <DataGrid.Columns>
+          <DataGridTextColumn Header="名称"
+                              Binding="{Binding NameDisplay}"
+                              Width="*" />
+          <DataGridTextColumn Header="大小"
+                              Binding="{Binding SizeDisplay}"
+                              Width="80" />
+          <DataGridTextColumn Header="压缩后"
+                              Binding="{Binding CompressedSizeDisplay}"
+                              Width="70" />
+          <DataGridTextColumn Header="修改日期"
+                              Binding="{Binding LastModifiedDisplay}"
+                              Width="100" />
+        </DataGrid.Columns>
+      </DataGrid>
 
       <GridSplitter Grid.Column="1"
                     Width="5" />
@@ -89,33 +78,10 @@
 
           <!-- CSV preview -->
           <ScrollViewer IsVisible="{Binding Preview.IsCsvVisible}">
-            <ItemsControl ItemsSource="{Binding Preview.CsvData}">
-              <ItemsControl.ItemTemplate>
-                <DataTemplate>
-                  <Grid Margin="0,1">
-                    <ItemsControl ItemsSource="{Binding Row.ItemArray}"
-                                  x:CompileBindings="False">
-                      <ItemsControl.ItemsPanel>
-                        <ItemsPanelTemplate>
-                          <StackPanel Orientation="Horizontal" />
-                        </ItemsPanelTemplate>
-                      </ItemsControl.ItemsPanel>
-                      <ItemsControl.ItemTemplate>
-                        <DataTemplate>
-                          <Border BorderBrush="Gray"
-                                  BorderThickness="0,0,1,0"
-                                  Padding="6,2">
-                            <TextBlock Text="{Binding}"
-                                       FontFamily="Consolas"
-                                       FontSize="12" />
-                          </Border>
-                        </DataTemplate>
-                      </ItemsControl.ItemTemplate>
-                    </ItemsControl>
-                  </Grid>
-                </DataTemplate>
-              </ItemsControl.ItemTemplate>
-            </ItemsControl>
+            <DataGrid ItemsSource="{Binding Preview.CsvData}"
+                      AutoGenerateColumns="True"
+                      IsReadOnly="True"
+                      CanUserResizeColumns="True" />
           </ScrollViewer>
 
           <!-- PE preview -->
