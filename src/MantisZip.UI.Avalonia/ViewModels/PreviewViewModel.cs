@@ -1,7 +1,7 @@
 using System.Collections.ObjectModel;
 using System.Data;
 using System.Text;
-using Avalonia.Media.Imaging;
+using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using MantisZip.Core.Utils;
@@ -32,39 +32,14 @@ public partial class PreviewViewModel : ObservableObject
     [ObservableProperty]
     private string _previewHeaderText = string.Empty;
 
-    // ── Image ──
+    // FontFamily 手动实现，不使用 [ObservableProperty]（源生成器对 Avalonia.Media 命名空间有已知问题）
+    private global::Avalonia.Media.FontFamily _fontFamily = global::Avalonia.Media.FontFamily.Default;
 
-    [ObservableProperty]
-    private Bitmap? _previewImage;
-
-    [ObservableProperty]
-    private int _imageWidth;
-
-    [ObservableProperty]
-    private int _imageHeight;
-
-    [ObservableProperty]
-    private bool _isTransparencySupported;
-
-    // ── SQLite ──
-
-    private string? _lastPreviewFilePath;
-
-    [ObservableProperty]
-    private DataView? _sqliteTableData;
-
-    [ObservableProperty]
-    private ObservableCollection<string> _sqliteTableNames = [];
-
-    [ObservableProperty]
-    private int _selectedTableIndex;
-
-    private DataTable? _currentSqliteTable;
-
-    // ── Torrent ──
-
-    [ObservableProperty]
-    private ObservableCollection<TorrentFileItem> _torrentFileItems = [];
+    public global::Avalonia.Media.FontFamily FontFamily
+    {
+        get => _fontFamily;
+        set => SetProperty(ref _fontFamily, value);
+    }
 
     // ── Toolbar ──
 
@@ -115,6 +90,9 @@ public partial class PreviewViewModel : ObservableObject
         OnPropertyChanged(nameof(IsUnsupportedVisible));
         OnPropertyChanged(nameof(HasZoomControls));
         OnPropertyChanged(nameof(HasFontSizeControls));
+        OnPropertyChanged(nameof(HasGifControls));
+
+
     }
 
     // ── CSV ──
@@ -135,6 +113,62 @@ public partial class PreviewViewModel : ObservableObject
 
     public ObservableCollection<PeMetadataItem> PeMetadata { get; } = [];
 
+    // ── Image ──
+
+    [ObservableProperty]
+    private global::Avalonia.Media.Imaging.Bitmap? _previewImage;
+
+    [ObservableProperty]
+    private int _imageWidth;
+
+    [ObservableProperty]
+    private int _imageHeight;
+
+    [ObservableProperty]
+    private bool _isTransparencySupported;
+
+    // ── Torrent ──
+
+    [ObservableProperty]
+    private ObservableCollection<TorrentFileItem> _torrentFileItems = [];
+
+    // ── SQLite ──
+
+    [ObservableProperty]
+    private System.Data.DataView? _sqliteTableData;
+
+    [ObservableProperty]
+    private ObservableCollection<string> _sqliteTableNames = [];
+
+    [ObservableProperty]
+    private int _selectedTableIndex;
+
+    private string? _lastPreviewFilePath;
+    private System.Data.DataTable? _currentSqliteTable;
+
+    // ── GIF animation ──
+
+    [ObservableProperty]
+    private bool _isPlaying = true;
+
+    [ObservableProperty]
+    private int _currentFrame;
+
+    [ObservableProperty]
+    private int _totalFrames;
+
+    public bool HasGifControls => PreviewType == PreviewType.Gif;
+
+    private List<GifFrame>? _gifFrames;
+    private int _gifCurrentFrameIndex;
+    private DispatcherTimer? _gifTimer;
+
+    private struct GifFrame
+    {
+        public global::Avalonia.Media.Imaging.Bitmap Bitmap;
+        public int DelayMs;
+    }
+
     // ── Toolbar commands ──
 
     [RelayCommand]
@@ -152,7 +186,17 @@ public partial class PreviewViewModel : ObservableObject
     [RelayCommand]
     private void ZoomFit()
     {
-        ZoomLevel = 1.0;
+        if (ImageWidth > 0 && ImageHeight > 0)
+        {
+            var fitX = 600.0 / ImageWidth;
+            var fitY = 500.0 / ImageHeight;
+            ZoomLevel = Math.Min(fitX, fitY);
+            if (ZoomLevel > 1.0) ZoomLevel = 1.0;
+        }
+        else
+        {
+            ZoomLevel = 1.0;
+        }
     }
 
     [RelayCommand]
@@ -165,6 +209,47 @@ public partial class PreviewViewModel : ObservableObject
     private void DecreaseFontSize()
     {
         FontSize = Math.Max(FontSize - 2, 8);
+    }
+
+    // ── GIF controls ──
+
+    [RelayCommand]
+    private void PlayPauseGif()
+    {
+        IsPlaying = !IsPlaying;
+        if (IsPlaying)
+            StartGifAnimation();
+        else
+            StopGifTimer();
+    }
+
+    [RelayCommand]
+    private void PreviousGifFrame()
+    {
+        if (_gifFrames == null || _gifFrames.Count == 0) return;
+        StopGifTimer();
+        _gifCurrentFrameIndex = (_gifCurrentFrameIndex - 1 + _gifFrames.Count) % _gifFrames.Count;
+        CurrentFrame = _gifCurrentFrameIndex;
+        PreviewImage = _gifFrames[_gifCurrentFrameIndex].Bitmap;
+    }
+
+    [RelayCommand]
+    private void NextGifFrame()
+    {
+        if (_gifFrames == null || _gifFrames.Count == 0) return;
+        StopGifTimer();
+        _gifCurrentFrameIndex = (_gifCurrentFrameIndex + 1) % _gifFrames.Count;
+        CurrentFrame = _gifCurrentFrameIndex;
+        PreviewImage = _gifFrames[_gifCurrentFrameIndex].Bitmap;
+    }
+
+    partial void OnCurrentFrameChanged(int value)
+    {
+        if (_gifFrames == null || value < 0 || value >= _gifFrames.Count) return;
+        if (!_isAnimating)
+            StopGifTimer();
+        _gifCurrentFrameIndex = value;
+        PreviewImage = _gifFrames[value].Bitmap;
     }
 
     /// <summary>
@@ -227,7 +312,7 @@ public partial class PreviewViewModel : ObservableObject
     public void ShowImage(string filePath)
     {
         using var fs = File.OpenRead(filePath);
-        var bitmap = Bitmap.DecodeToWidth(fs, 1920);
+        var bitmap = new global::Avalonia.Media.Imaging.Bitmap(fs);
         PreviewImage = bitmap;
         ImageWidth = bitmap.PixelSize.Width;
         ImageHeight = bitmap.PixelSize.Height;
@@ -237,6 +322,12 @@ public partial class PreviewViewModel : ObservableObject
         IsPreviewVisible = true;
         IsToolbarVisible = true;
         PreviewHeaderText = "图片预览";
+        // 初始缩放：适应预览区域（预估 600×500）
+        var fitX = 600.0 / ImageWidth;
+        var fitY = 500.0 / ImageHeight;
+        ZoomLevel = Math.Min(fitX, fitY);
+        if (ZoomLevel > 1.0) ZoomLevel = 1.0;
+
         FormatMetadata =
         [
             new FormatMetadataItem("尺寸", $"{ImageWidth} × {ImageHeight}"),
@@ -251,20 +342,131 @@ public partial class PreviewViewModel : ObservableObject
     /// </summary>
     public void ShowGif(string filePath)
     {
-        using var fs = File.OpenRead(filePath);
-        var bitmap = Bitmap.DecodeToWidth(fs, 1920);
-        PreviewImage = bitmap;
-        ImageWidth = bitmap.PixelSize.Width;
-        ImageHeight = bitmap.PixelSize.Height;
-        PreviewType = PreviewType.Gif;
-        IsPreviewVisible = true;
-        IsToolbarVisible = true;
-        PreviewHeaderText = "GIF 预览";
-        FormatMetadata =
-        [
-            new FormatMetadataItem("尺寸", $"{ImageWidth} × {ImageHeight}"),
-            new FormatMetadataItem("文件大小", FormatFileSize(new FileInfo(filePath).Length)),
-        ];
+        StopGifTimer();
+        _gifFrames = null;
+
+        try
+        {
+            using var img = System.Drawing.Image.FromFile(filePath);
+            int frameCount = img.GetFrameCount(System.Drawing.Imaging.FrameDimension.Time);
+            if (frameCount <= 0)
+            {
+                ShowUnsupported("无法解码 GIF");
+                return;
+            }
+
+            TotalFrames = frameCount;
+            IsPlaying = true;
+            CurrentFrame = 0;
+            _gifCurrentFrameIndex = 0;
+
+            // 读取帧延迟（PropertyTagFrameDelay = 0x5100）
+            var delayBytes = img.GetPropertyItem(0x5100)?.Value;
+            var delays = new int[frameCount];
+            if (delayBytes != null)
+            {
+                for (int i = 0; i < frameCount; i++)
+                    delays[i] = Math.Max(50, (delayBytes[i * 4] + delayBytes[i * 4 + 1] * 256) * 10);
+            }
+            else
+            {
+                for (int i = 0; i < frameCount; i++)
+                    delays[i] = 100;
+            }
+
+            // 解码所有帧
+            var frames = new List<GifFrame>(frameCount);
+            for (int i = 0; i < frameCount; i++)
+            {
+                img.SelectActiveFrame(System.Drawing.Imaging.FrameDimension.Time, i);
+                using var ms = new MemoryStream();
+                img.Save(ms, System.Drawing.Imaging.ImageFormat.Png);
+                ms.Position = 0;
+                frames.Add(new GifFrame
+                {
+                    Bitmap = new global::Avalonia.Media.Imaging.Bitmap(ms),
+                    DelayMs = delays[i]
+                });
+            }
+
+            _gifFrames = frames;
+
+            if (frames.Count > 0)
+            {
+                PreviewImage = frames[0].Bitmap;
+                ImageWidth = frames[0].Bitmap.PixelSize.Width;
+                ImageHeight = frames[0].Bitmap.PixelSize.Height;
+            }
+
+            // 启动动画
+            if (frames.Count > 1)
+                StartGifAnimation();
+
+            // 初始缩放：适应预览区域
+            var fitX = 600.0 / ImageWidth;
+            var fitY = 500.0 / ImageHeight;
+            ZoomLevel = Math.Min(fitX, fitY);
+            if (ZoomLevel > 1.0) ZoomLevel = 1.0;
+
+            PreviewType = PreviewType.Gif;
+            IsPreviewVisible = true;
+            IsToolbarVisible = true;
+            PreviewHeaderText = "GIF 预览";
+            FormatMetadata =
+            [
+                new FormatMetadataItem("尺寸", $"{ImageWidth} × {ImageHeight}"),
+                new FormatMetadataItem("文件大小", FormatFileSize(new FileInfo(filePath).Length)),
+                new FormatMetadataItem("帧数", TotalFrames.ToString()),
+            ];
+        }
+        catch (Exception ex)
+        {
+            ShowUnsupported($"GIF 加载失败: {ex.Message}");
+        }
+    }
+
+    private void StartGifAnimation()
+    {
+        if (_gifFrames == null || _gifFrames.Count <= 1) return;
+
+        StopGifTimer();
+        _gifTimer = new DispatcherTimer(DispatcherPriority.Normal, Dispatcher.UIThread);
+        _gifTimer.Interval = TimeSpan.FromMilliseconds(_gifFrames[_gifCurrentFrameIndex].DelayMs);
+        _gifTimer.Tick += OnGifTimerTick;
+        _gifTimer.Start();
+    }
+
+    internal void StopGifTimer()
+    {
+        if (_gifTimer != null)
+        {
+            _gifTimer.Stop();
+            _gifTimer.Tick -= OnGifTimerTick;
+            _gifTimer = null;
+        }
+    }
+
+    private bool _isAnimating;
+
+    private void OnGifTimerTick(object? sender, EventArgs e)
+    {
+        try
+        {
+            if (_gifFrames == null || _gifFrames.Count == 0) return;
+
+            _isAnimating = true;
+            _gifCurrentFrameIndex = (_gifCurrentFrameIndex + 1) % _gifFrames.Count;
+            CurrentFrame = _gifCurrentFrameIndex;
+            PreviewImage = _gifFrames[_gifCurrentFrameIndex].Bitmap;
+
+            if (_gifTimer != null && _gifCurrentFrameIndex < _gifFrames.Count)
+                _gifTimer.Interval = TimeSpan.FromMilliseconds(_gifFrames[_gifCurrentFrameIndex].DelayMs);
+            _isAnimating = false;
+        }
+        catch
+        {
+            _isAnimating = false;
+        }
     }
 
     // ── SVG ──
@@ -274,13 +476,54 @@ public partial class PreviewViewModel : ObservableObject
     /// </summary>
     public void ShowSvg(string filePath)
     {
-        using var fs = File.OpenRead(filePath);
-        var bitmap = Bitmap.DecodeToWidth(fs, 1920);
-        PreviewImage = bitmap;
-        PreviewType = PreviewType.Svg;
-        IsPreviewVisible = true;
-        IsToolbarVisible = true;
-        PreviewHeaderText = "SVG 预览";
+        try
+        {
+            var svg = new Svg.Skia.SKSvg();
+            svg.Load(filePath);
+
+            if (svg.Picture == null)
+            {
+                ShowUnsupported("无法解析 SVG 文件");
+                return;
+            }
+
+            var rect = svg.Picture.CullRect;
+            var svgW = Math.Max(1, (float)rect.Width);
+            var svgH = Math.Max(1, (float)rect.Height);
+
+            // 最小预览尺寸 512px（小图标自动放大），最大 2048px 防撑爆
+            const float minSize = 512f;
+            const float maxSize = 2048f;
+            var scale = 1f;
+            if (svgW < minSize && svgH < minSize)
+                scale = Math.Min(minSize / svgW, minSize / svgH);
+            if (svgW * scale > maxSize || svgH * scale > maxSize)
+                scale = Math.Min(maxSize / (svgW * scale), maxSize / (svgH * scale)) * scale;
+
+            var w = (int)(svgW * scale);
+            var h = (int)(svgH * scale);
+
+            using var surface = SkiaSharp.SKSurface.Create(new SkiaSharp.SKImageInfo(w, h));
+            var canvas = surface.Canvas;
+            canvas.Clear(SkiaSharp.SKColors.Transparent);
+            canvas.Scale((float)w / rect.Width, (float)h / rect.Height);
+            canvas.DrawPicture(svg.Picture);
+            canvas.Flush();
+
+            using var img = surface.Snapshot();
+            using var data = img.Encode(SkiaSharp.SKEncodedImageFormat.Png, 100);
+            var ms = new MemoryStream(data.ToArray());
+            PreviewImage = new global::Avalonia.Media.Imaging.Bitmap(ms);
+
+            PreviewType = PreviewType.Svg;
+            IsPreviewVisible = true;
+            IsToolbarVisible = true;
+            PreviewHeaderText = "SVG 预览";
+        }
+        catch (Exception ex)
+        {
+            ShowUnsupported($"SVG 渲染失败: {ex.Message}");
+        }
     }
 
     // ── Font ──
@@ -304,6 +547,17 @@ public partial class PreviewViewModel : ObservableObject
         FormatMetadata.Add(new("字体名称", info.FontName ?? "未知"));
         FormatMetadata.Add(new("样式", info.FontStyle ?? "常规"));
         FormatMetadata.Add(new("字形数", info.GlyphCount?.ToString() ?? "未知"));
+
+        // 从字体文件加载 FontFamily，使示例文本用该字体渲染
+        var fontFilePath = info.FontDecompressedPath ?? filePath;
+        try
+        {
+            FontFamily = new global::Avalonia.Media.FontFamily(fontFilePath);
+        }
+        catch
+        {
+            FontFamily = global::Avalonia.Media.FontFamily.Default;
+        }
         TextContent = "The quick brown fox jumps over the lazy dog\n0123456789\nABCDEFGHIJKLMNOPQRSTUVWXYZ\nabcdefghijklmnopqrstuvwxyz\n天地玄黄 宇宙洪荒 日月盈昃 辰宿列张";
     }
 
@@ -593,6 +847,9 @@ public partial class PreviewViewModel : ObservableObject
         SqliteTableNames.Clear();
         SelectedTableIndex = 0;
         _lastPreviewFilePath = null;
+        StopGifTimer();
+        _gifFrames = null;
+        FontFamily = global::Avalonia.Media.FontFamily.Default;
         IsPreviewVisible = false;
         IsToolbarVisible = false;
         ZoomLevel = 1.0;

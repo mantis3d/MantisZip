@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-06-12T08:42:57.3411688Z",
+  "updated_at": "2026-06-12T08:43:14.448Z",
   "status": "completed",
   "active_work_id": "avalonia-port-phase1",
   "agent": "atlas",
@@ -13,7 +13,7 @@
   "plan_name": "avalonia-port-phase1",
   "works": {
     "avalonia-port-phase1": {
-      "updated_at": "2026-06-12T08:42:57.3354490Z",
+      "updated_at": "2026-06-12T08:43:14.448Z",
       "status": "completed",
       "work_id": "avalonia-port-phase1",
       "session_origins": {
@@ -30,7 +30,9 @@
         "ses_1451ed8f7ffeHF6GaS1ELI4VC3"
       ],
       "started_at": "2026-06-12T07:52:43.2942882Z",
-      "agent": "atlas"
+      "agent": "atlas",
+      "ended_at": "2026-06-12T08:43:14.448Z",
+      "elapsed_ms": 3031154
     }
   },
   "session_ids": [
@@ -39,5 +41,7 @@
     "ses_1451ed8f7ffeHF6GaS1ELI4VC3"
   ],
   "started_at": "2026-06-12T07:52:43.2942882Z",
-  "schema_version": 2
+  "schema_version": 2,
+  "ended_at": "2026-06-12T08:43:14.448Z",
+  "elapsed_ms": 3031154
 }

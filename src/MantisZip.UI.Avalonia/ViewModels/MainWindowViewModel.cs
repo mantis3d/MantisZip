@@ -151,6 +151,9 @@ public partial class MainWindowViewModel : ObservableObject
 
     private async Task ShowPreviewAsync(ArchiveItemModel entry)
     {
+        // 切换文件前停止上一个 GIF 动画
+        Preview.StopGifTimer();
+
         try
         {
             var ext = Path.GetExtension(entry.Name);

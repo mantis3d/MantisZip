@@ -15,20 +15,39 @@
         <StackPanel Orientation="Horizontal" Spacing="2"
                     IsVisible="{Binding HasZoomControls}">
           <Button Content="−" Command="{Binding ZoomOutCommand}"
-                  Width="28" Height="22" />
+                  Width="32" Height="28" FontSize="16" Padding="0" />
           <Button Content="+" Command="{Binding ZoomInCommand}"
-                  Width="28" Height="22" />
-          <Button Content="⊡" Command="{Binding ZoomFitCommand}"
-                  Width="28" Height="22" />
+                  Width="32" Height="28" FontSize="16" Padding="0" />
+          <Button Content="⟲" Command="{Binding ZoomFitCommand}"
+                  Width="32" Height="28" FontSize="14" Padding="0" />
         </StackPanel>
 
         <!-- Font size controls (text) -->
         <StackPanel Orientation="Horizontal" Spacing="2"
                     IsVisible="{Binding HasFontSizeControls}">
           <Button Content="A−" Command="{Binding DecreaseFontSizeCommand}"
-                  Width="28" Height="22" />
+                  Width="36" Height="28" FontSize="13" Padding="0" />
           <Button Content="A+" Command="{Binding IncreaseFontSizeCommand}"
-                  Width="28" Height="22" />
+                  Width="36" Height="28" FontSize="13" Padding="0" />
+        </StackPanel>
+
+        <!-- GIF controls -->
+        <StackPanel Orientation="Horizontal" Spacing="2"
+                    IsVisible="{Binding HasGifControls}">
+          <Button Content="⏮" Command="{Binding PreviousGifFrameCommand}"
+                  Width="32" Height="28" FontSize="16" Padding="0" />
+          <Button Content="⏯" Command="{Binding PlayPauseGifCommand}"
+                  Width="32" Height="28" FontSize="16" Padding="0" />
+          <Button Content="⏭" Command="{Binding NextGifFrameCommand}"
+                  Width="32" Height="28" FontSize="16" Padding="0" />
+          <TextBox Text="{Binding CurrentFrame}"
+                   Width="36" Height="26"
+                   FontSize="14"
+                   VerticalContentAlignment="Center"
+                   HorizontalContentAlignment="Center" />
+          <TextBlock Text="{Binding TotalFrames, StringFormat=/ {0}}"
+                     FontSize="14"
+                     VerticalAlignment="Center" />
         </StackPanel>
       </StackPanel>
     </Border>
@@ -95,7 +114,7 @@
                       HorizontalScrollBarVisibility="Auto"
                       VerticalScrollBarVisibility="Auto">
           <Image Source="{Binding PreviewImage}"
-                 RenderTransformOrigin="50%,50%">
+                 RenderTransformOrigin="0,0">
             <Image.RenderTransform>
               <ScaleTransform ScaleX="{Binding ZoomLevel}"
                               ScaleY="{Binding ZoomLevel}" />
@@ -108,7 +127,7 @@
                       HorizontalScrollBarVisibility="Auto"
                       VerticalScrollBarVisibility="Auto">
           <Image Source="{Binding PreviewImage}"
-                 RenderTransformOrigin="50%,50%">
+                 RenderTransformOrigin="0,0">
             <Image.RenderTransform>
               <ScaleTransform ScaleX="{Binding ZoomLevel}"
                               ScaleY="{Binding ZoomLevel}" />
@@ -140,7 +159,7 @@
             </ItemsControl>
             <Separator />
             <TextBlock Text="{Binding TextContent}"
-                       FontFamily="Consolas"
+                       FontFamily="{Binding FontFamily}"
                        FontSize="16"
                        TextWrapping="Wrap" />
           </StackPanel>
