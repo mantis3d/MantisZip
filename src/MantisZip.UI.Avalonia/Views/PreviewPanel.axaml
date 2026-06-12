@@ -1,6 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="clr-namespace:MantisZip.UI.Avalonia.ViewModels"
+             xmlns:models="clr-namespace:MantisZip.UI.Avalonia.Models"
              x:Class="MantisZip.UI.Avalonia.Views.PreviewPanel"
              x:DataType="vm:PreviewViewModel">
   <Grid RowDefinitions="Auto,*">
@@ -83,6 +84,190 @@
                              Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
                   <TextBlock Grid.Column="2"
                              Text="{Binding Value}" />
+                </Grid>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </StackPanel>
+
+        <!-- Image preview -->
+        <ScrollViewer IsVisible="{Binding IsImageVisible}"
+                      HorizontalScrollBarVisibility="Auto"
+                      VerticalScrollBarVisibility="Auto">
+          <Image Source="{Binding PreviewImage}"
+                 RenderTransformOrigin="50%,50%">
+            <Image.RenderTransform>
+              <ScaleTransform ScaleX="{Binding ZoomLevel}"
+                              ScaleY="{Binding ZoomLevel}" />
+            </Image.RenderTransform>
+          </Image>
+        </ScrollViewer>
+
+        <!-- GIF preview (same image control) -->
+        <ScrollViewer IsVisible="{Binding IsGifVisible}"
+                      HorizontalScrollBarVisibility="Auto"
+                      VerticalScrollBarVisibility="Auto">
+          <Image Source="{Binding PreviewImage}"
+                 RenderTransformOrigin="50%,50%">
+            <Image.RenderTransform>
+              <ScaleTransform ScaleX="{Binding ZoomLevel}"
+                              ScaleY="{Binding ZoomLevel}" />
+            </Image.RenderTransform>
+          </Image>
+        </ScrollViewer>
+
+        <!-- SVG preview -->
+        <ScrollViewer IsVisible="{Binding IsSvgVisible}">
+          <Image Source="{Binding PreviewImage}" />
+        </ScrollViewer>
+
+        <!-- Font preview -->
+        <ScrollViewer IsVisible="{Binding IsFontVisible}">
+          <StackPanel Spacing="12">
+            <TextBlock Text="{Binding PreviewHeaderText}"
+                       FontSize="20"
+                       FontWeight="Bold" />
+            <ItemsControl ItemsSource="{Binding FormatMetadata}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="models:FormatMetadataItem">
+                  <Grid ColumnDefinitions="Auto,8,*" Margin="0,2">
+                    <TextBlock Text="{Binding Key}" FontWeight="Bold"
+                               Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+                    <TextBlock Grid.Column="2" Text="{Binding Value}" />
+                  </Grid>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+            <Separator />
+            <TextBlock Text="{Binding TextContent}"
+                       FontFamily="Consolas"
+                       FontSize="16"
+                       TextWrapping="Wrap" />
+          </StackPanel>
+        </ScrollViewer>
+
+        <!-- Audio preview (metadata only) -->
+        <StackPanel IsVisible="{Binding IsAudioVisible}"
+                    Spacing="8">
+          <TextBlock Text="{Binding PreviewHeaderText}"
+                     FontSize="20"
+                     FontWeight="Bold" />
+          <ItemsControl ItemsSource="{Binding FormatMetadata}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="models:FormatMetadataItem">
+                <Grid ColumnDefinitions="Auto,8,*" Margin="0,2">
+                  <TextBlock Text="{Binding Key}" FontWeight="Bold"
+                             Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+                  <TextBlock Grid.Column="2" Text="{Binding Value}" />
+                </Grid>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </StackPanel>
+
+        <!-- SQLite preview -->
+        <Grid IsVisible="{Binding IsSqliteVisible}"
+              RowDefinitions="Auto,*">
+          <TabControl Grid.Row="0"
+                      ItemsSource="{Binding SqliteTableNames}"
+                      SelectedIndex="{Binding SelectedTableIndex}">
+            <TabControl.ItemTemplate>
+              <DataTemplate>
+                <TextBlock Text="{Binding}" />
+              </DataTemplate>
+            </TabControl.ItemTemplate>
+          </TabControl>
+          <DataGrid Grid.Row="1"
+                    ItemsSource="{Binding SqliteTableData}"
+                    AutoGenerateColumns="True"
+                    IsReadOnly="True"
+                    CanUserResizeColumns="True" />
+        </Grid>
+
+        <!-- ISO preview (metadata only) -->
+        <StackPanel IsVisible="{Binding IsIsoVisible}"
+                    Spacing="8">
+          <TextBlock Text="{Binding PreviewHeaderText}"
+                     FontSize="20"
+                     FontWeight="Bold" />
+          <ItemsControl ItemsSource="{Binding FormatMetadata}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="models:FormatMetadataItem">
+                <Grid ColumnDefinitions="Auto,8,*" Margin="0,2">
+                  <TextBlock Text="{Binding Key}" FontWeight="Bold"
+                             Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+                  <TextBlock Grid.Column="2" Text="{Binding Value}" />
+                </Grid>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </StackPanel>
+
+        <!-- Torrent preview -->
+        <ScrollViewer IsVisible="{Binding IsTorrentVisible}">
+          <StackPanel Spacing="8">
+            <TextBlock Text="{Binding PreviewHeaderText}"
+                       FontSize="20"
+                       FontWeight="Bold" />
+            <ItemsControl ItemsSource="{Binding FormatMetadata}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="models:FormatMetadataItem">
+                  <Grid ColumnDefinitions="Auto,8,*" Margin="0,2">
+                    <TextBlock Text="{Binding Key}" FontWeight="Bold"
+                               Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+                    <TextBlock Grid.Column="2" Text="{Binding Value}" />
+                  </Grid>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+            <Separator />
+            <TextBlock Text="文件列表" FontWeight="SemiBold" />
+            <ItemsControl ItemsSource="{Binding TorrentFileItems}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:TorrentFileItem">
+                  <Grid ColumnDefinitions="*,80" Margin="0,1">
+                    <TextBlock Text="{Binding Path}" />
+                    <TextBlock Grid.Column="1" Text="{Binding SizeDisplay}"
+                               Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+                  </Grid>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </StackPanel>
+        </ScrollViewer>
+
+        <!-- Office preview (metadata only) -->
+        <StackPanel IsVisible="{Binding IsOfficeVisible}"
+                    Spacing="8">
+          <TextBlock Text="{Binding PreviewHeaderText}"
+                     FontSize="20"
+                     FontWeight="Bold" />
+          <ItemsControl ItemsSource="{Binding FormatMetadata}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="models:FormatMetadataItem">
+                <Grid ColumnDefinitions="Auto,8,*" Margin="0,2">
+                  <TextBlock Text="{Binding Key}" FontWeight="Bold"
+                             Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+                  <TextBlock Grid.Column="2" Text="{Binding Value}" />
+                </Grid>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </StackPanel>
+
+        <!-- Video preview (metadata only) -->
+        <StackPanel IsVisible="{Binding IsVideoVisible}"
+                    Spacing="8">
+          <TextBlock Text="{Binding PreviewHeaderText}"
+                     FontSize="20"
+                     FontWeight="Bold" />
+          <ItemsControl ItemsSource="{Binding FormatMetadata}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="models:FormatMetadataItem">
+                <Grid ColumnDefinitions="Auto,8,*" Margin="0,2">
+                  <TextBlock Text="{Binding Key}" FontWeight="Bold"
+                             Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+                  <TextBlock Grid.Column="2" Text="{Binding Value}" />
                 </Grid>
               </DataTemplate>
             </ItemsControl.ItemTemplate>

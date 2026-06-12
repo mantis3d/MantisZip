@@ -1,11 +1,13 @@
 using System.Collections.ObjectModel;
 using System.Data;
 using System.Text;
+using Avalonia.Media.Imaging;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using MantisZip.Core.Utils;
 using MantisZip.UI.Avalonia.Models;
 using MantisZip.UI.Avalonia.Services;
+using Microsoft.Data.Sqlite;
 using Ude;
 
 namespace MantisZip.UI.Avalonia.ViewModels;
@@ -29,6 +31,40 @@ public partial class PreviewViewModel : ObservableObject
 
     [ObservableProperty]
     private string _previewHeaderText = string.Empty;
+
+    // ── Image ──
+
+    [ObservableProperty]
+    private Bitmap? _previewImage;
+
+    [ObservableProperty]
+    private int _imageWidth;
+
+    [ObservableProperty]
+    private int _imageHeight;
+
+    [ObservableProperty]
+    private bool _isTransparencySupported;
+
+    // ── SQLite ──
+
+    private string? _lastPreviewFilePath;
+
+    [ObservableProperty]
+    private DataView? _sqliteTableData;
+
+    [ObservableProperty]
+    private ObservableCollection<string> _sqliteTableNames = [];
+
+    [ObservableProperty]
+    private int _selectedTableIndex;
+
+    private DataTable? _currentSqliteTable;
+
+    // ── Torrent ──
+
+    [ObservableProperty]
+    private ObservableCollection<TorrentFileItem> _torrentFileItems = [];
 
     // ── Toolbar ──
 
@@ -183,6 +219,350 @@ public partial class PreviewViewModel : ObservableObject
         IsToolbarVisible = true;
     }
 
+    // ── Image ──
+
+    /// <summary>
+    /// 显示图片预览。
+    /// </summary>
+    public void ShowImage(string filePath)
+    {
+        using var fs = File.OpenRead(filePath);
+        var bitmap = Bitmap.DecodeToWidth(fs, 1920);
+        PreviewImage = bitmap;
+        ImageWidth = bitmap.PixelSize.Width;
+        ImageHeight = bitmap.PixelSize.Height;
+        var ext = Path.GetExtension(filePath).ToLowerInvariant();
+        IsTransparencySupported = ext is ".png" or ".ico" or ".webp";
+        PreviewType = PreviewType.Image;
+        IsPreviewVisible = true;
+        IsToolbarVisible = true;
+        PreviewHeaderText = "图片预览";
+        FormatMetadata =
+        [
+            new FormatMetadataItem("尺寸", $"{ImageWidth} × {ImageHeight}"),
+            new FormatMetadataItem("文件大小", FormatFileSize(new FileInfo(filePath).Length)),
+        ];
+    }
+
+    // ── GIF ──
+
+    /// <summary>
+    /// 显示 GIF 预览。
+    /// </summary>
+    public void ShowGif(string filePath)
+    {
+        using var fs = File.OpenRead(filePath);
+        var bitmap = Bitmap.DecodeToWidth(fs, 1920);
+        PreviewImage = bitmap;
+        ImageWidth = bitmap.PixelSize.Width;
+        ImageHeight = bitmap.PixelSize.Height;
+        PreviewType = PreviewType.Gif;
+        IsPreviewVisible = true;
+        IsToolbarVisible = true;
+        PreviewHeaderText = "GIF 预览";
+        FormatMetadata =
+        [
+            new FormatMetadataItem("尺寸", $"{ImageWidth} × {ImageHeight}"),
+            new FormatMetadataItem("文件大小", FormatFileSize(new FileInfo(filePath).Length)),
+        ];
+    }
+
+    // ── SVG ──
+
+    /// <summary>
+    /// 显示 SVG 预览（通过 Bitmap 栅格化渲染）。
+    /// </summary>
+    public void ShowSvg(string filePath)
+    {
+        using var fs = File.OpenRead(filePath);
+        var bitmap = Bitmap.DecodeToWidth(fs, 1920);
+        PreviewImage = bitmap;
+        PreviewType = PreviewType.Svg;
+        IsPreviewVisible = true;
+        IsToolbarVisible = true;
+        PreviewHeaderText = "SVG 预览";
+    }
+
+    // ── Font ──
+
+    /// <summary>
+    /// 显示字体元数据与示例文本。
+    /// </summary>
+    public void ShowFont(string filePath)
+    {
+        var info = FontParser.Parse(filePath);
+        if (info == null)
+        {
+            ShowUnsupported("无法解析字体文件");
+            return;
+        }
+        PreviewType = PreviewType.Font;
+        IsPreviewVisible = true;
+        IsToolbarVisible = true;
+        PreviewHeaderText = "字体预览";
+        FormatMetadata.Clear();
+        FormatMetadata.Add(new("字体名称", info.FontName ?? "未知"));
+        FormatMetadata.Add(new("样式", info.FontStyle ?? "常规"));
+        FormatMetadata.Add(new("字形数", info.GlyphCount?.ToString() ?? "未知"));
+        TextContent = "The quick brown fox jumps over the lazy dog\n0123456789\nABCDEFGHIJKLMNOPQRSTUVWXYZ\nabcdefghijklmnopqrstuvwxyz\n天地玄黄 宇宙洪荒 日月盈昃 辰宿列张";
+    }
+
+    // ── Audio ──
+
+    /// <summary>
+    /// 显示音频元数据信息。
+    /// </summary>
+    public void ShowAudio(string filePath)
+    {
+        var ext = Path.GetExtension(filePath).ToLowerInvariant();
+        FileFormatInfo? info = ext switch
+        {
+            ".flac" => FlacParser.Parse(filePath),
+            ".wav" => RiffParser.Parse(filePath),
+            ".mp3" => Id3v2Parser.Parse(filePath),
+            _ => null
+        };
+        if (info == null)
+        {
+            ShowUnsupported("无法解析音频文件");
+            return;
+        }
+        PreviewType = PreviewType.Audio;
+        IsPreviewVisible = true;
+        IsToolbarVisible = true;
+        PreviewHeaderText = "音频信息";
+        FormatMetadata.Clear();
+        if (info.Duration.HasValue)
+            FormatMetadata.Add(new("时长", info.Duration.Value.ToString(@"mm\:ss")));
+        if (info.SampleRate.HasValue)
+            FormatMetadata.Add(new("采样率", $"{info.SampleRate} Hz"));
+        if (info.Channels.HasValue)
+            FormatMetadata.Add(new("声道", info.Channels.Value.ToString()));
+        if (info.Bitrate.HasValue)
+            FormatMetadata.Add(new("比特率", $"{info.Bitrate} kbps"));
+        if (info.Artist != null)
+            FormatMetadata.Add(new("艺术家", info.Artist));
+        if (info.Album != null)
+            FormatMetadata.Add(new("专辑", info.Album));
+    }
+
+    // ── SQLite ──
+
+    private void LoadSqliteTable(string filePath, string tableName)
+    {
+        using var conn = new SqliteConnection($"Data Source={filePath}");
+        conn.Open();
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = $"SELECT * FROM \"{tableName.Replace("\"", "\"\"")}\" LIMIT 100";
+        using var reader = cmd.ExecuteReader();
+
+        var table = new DataTable();
+        for (int i = 0; i < reader.FieldCount && i < 100; i++)
+            table.Columns.Add(reader.GetName(i));
+
+        while (reader.Read())
+        {
+            var row = table.NewRow();
+            for (int i = 0; i < reader.FieldCount && i < 100; i++)
+                row[i] = reader.IsDBNull(i) ? DBNull.Value : reader.GetValue(i);
+            table.Rows.Add(row);
+        }
+        _currentSqliteTable = table;
+        SqliteTableData = table.DefaultView;
+    }
+
+    partial void OnSelectedTableIndexChanged(int value)
+    {
+        if (value >= 0 && value < SqliteTableNames.Count && !string.IsNullOrEmpty(_lastPreviewFilePath))
+        {
+            LoadSqliteTable(_lastPreviewFilePath, SqliteTableNames[value]);
+        }
+    }
+
+    /// <summary>
+    /// 显示 SQLite 数据库预览。
+    /// </summary>
+    public void ShowSqlitePreview(string filePath)
+    {
+        try
+        {
+            _lastPreviewFilePath = filePath;
+
+            using var conn = new SqliteConnection($"Data Source={filePath}");
+            conn.Open();
+
+            // 获取所有表名
+            var tables = new List<string>();
+            using (var cmd = conn.CreateCommand())
+            {
+                cmd.CommandText = "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name";
+                using var reader = cmd.ExecuteReader();
+                while (reader.Read())
+                    tables.Add(reader.GetString(0));
+            }
+
+            SqliteTableNames = new ObservableCollection<string>(tables);
+
+            // 加载第一个表
+            if (tables.Count > 0)
+            {
+                SelectedTableIndex = 0;
+                LoadSqliteTable(filePath, tables[0]);
+            }
+
+            PreviewType = PreviewType.Sqlite;
+            IsPreviewVisible = true;
+            IsToolbarVisible = true;
+            PreviewHeaderText = "SQLite 数据库";
+            FormatMetadata.Clear();
+            FormatMetadata.Add(new("表数量", tables.Count.ToString()));
+        }
+        catch (Exception ex)
+        {
+            ShowUnsupported($"无法读取 SQLite 数据库: {ex.Message}");
+        }
+    }
+
+    // ── ISO ──
+
+    /// <summary>
+    /// 显示光盘镜像元数据。
+    /// </summary>
+    public void ShowIso(string filePath)
+    {
+        var info = IsoParser.Parse(filePath);
+        if (info == null)
+        {
+            ShowUnsupported("无法解析光盘镜像");
+            return;
+        }
+        PreviewType = PreviewType.Iso;
+        IsPreviewVisible = true;
+        IsToolbarVisible = true;
+        PreviewHeaderText = "光盘镜像";
+        FormatMetadata.Clear();
+        FormatMetadata.Add(new("卷标", info.VolumeLabel ?? "未知"));
+        FormatMetadata.Add(new("格式", info.DisplayName ?? "ISO 9660"));
+        if (info.DiskSize.HasValue)
+            FormatMetadata.Add(new("大小", FormatFileSize(info.DiskSize.Value)));
+    }
+
+    // ── Torrent ──
+
+    /// <summary>
+    /// 显示 BT 种子元数据与文件列表。
+    /// </summary>
+    public void ShowTorrent(string filePath)
+    {
+        var info = TorrentParser.Parse(filePath);
+        if (info == null)
+        {
+            ShowUnsupported("无法解析种子文件");
+            return;
+        }
+        PreviewType = PreviewType.Torrent;
+        IsPreviewVisible = true;
+        IsToolbarVisible = true;
+        PreviewHeaderText = "BT 种子";
+        FormatMetadata.Clear();
+        if (info.InfoHashV1 != null)
+            FormatMetadata.Add(new("InfoHash", info.InfoHashV1));
+        if (info.MagnetLink != null)
+            FormatMetadata.Add(new("Magnet 链接", info.MagnetLink));
+        if (info.TrackerUrl != null)
+            FormatMetadata.Add(new("Tracker", info.TrackerUrl));
+        if (info.CreatedBy != null)
+            FormatMetadata.Add(new("创建者", info.CreatedBy));
+        if (info.FileCount.HasValue)
+            FormatMetadata.Add(new("文件数", info.FileCount.Value.ToString()));
+        if (info.TorrentTotalSize.HasValue)
+            FormatMetadata.Add(new("总大小", FormatFileSize(info.TorrentTotalSize.Value)));
+
+        // 种子内文件列表
+        if (info.TorrentFileEntries != null)
+        {
+            TorrentFileItems = new ObservableCollection<TorrentFileItem>(
+                info.TorrentFileEntries.Select(f => new TorrentFileItem(f.Path, f.Size)));
+        }
+    }
+
+    // ── Office ──
+
+    /// <summary>
+    /// 显示 Office 文档元数据。
+    /// </summary>
+    public void ShowOffice(string filePath)
+    {
+        var info = OfficeParser.Parse(filePath);
+        if (info == null)
+        {
+            ShowUnsupported("无法解析 Office 文档");
+            return;
+        }
+        PreviewType = PreviewType.Office;
+        IsPreviewVisible = true;
+        IsToolbarVisible = true;
+        var ext = Path.GetExtension(filePath).ToLowerInvariant();
+        PreviewHeaderText = ext switch
+        {
+            ".docx" => "Word 文档信息",
+            ".xlsx" => "Excel 工作簿信息",
+            ".pptx" => "PowerPoint 演示文稿信息",
+            _ => "Office 文档信息"
+        };
+        FormatMetadata.Clear();
+        if (info.Title != null) FormatMetadata.Add(new("标题", info.Title));
+        if (info.Author != null) FormatMetadata.Add(new("作者", info.Author));
+        if (info.Subject != null) FormatMetadata.Add(new("主题", info.Subject));
+        if (info.PageCount.HasValue) FormatMetadata.Add(new("页数", info.PageCount.Value.ToString()));
+        if (info.CreationDate.HasValue) FormatMetadata.Add(new("创建日期", info.CreationDate.Value.ToString("yyyy-MM-dd HH:mm")));
+    }
+
+    // ── Video ──
+
+    /// <summary>
+    /// 显示视频元数据。
+    /// </summary>
+    public void ShowVideo(string filePath)
+    {
+        var info = VideoParser.Parse(filePath);
+        if (info == null)
+        {
+            ShowUnsupported("无法解析视频文件");
+            return;
+        }
+        PreviewType = PreviewType.Video;
+        IsPreviewVisible = true;
+        IsToolbarVisible = true;
+        PreviewHeaderText = "视频信息";
+        FormatMetadata.Clear();
+        if (info.VideoWidth.HasValue && info.VideoHeight.HasValue)
+            FormatMetadata.Add(new("分辨率", $"{info.VideoWidth} × {info.VideoHeight}"));
+        if (info.Duration.HasValue)
+            FormatMetadata.Add(new("时长", info.Duration.Value.ToString(@"hh\:mm\:ss")));
+        if (info.Codec != null)
+            FormatMetadata.Add(new("编码", info.Codec));
+        if (info.Bitrate.HasValue)
+            FormatMetadata.Add(new("比特率", $"{info.Bitrate} kbps"));
+    }
+
+    /// <summary>
+    /// 格式化文件大小为人类可读字符串。
+    /// </summary>
+    private static string FormatFileSize(long bytes)
+    {
+        if (bytes == 0) return "0 B";
+        var units = new[] { "B", "KB", "MB", "GB", "TB" };
+        var unitIndex = 0;
+        var size = (double)bytes;
+        while (size >= 1024 && unitIndex < units.Length - 1)
+        {
+            size /= 1024;
+            unitIndex++;
+        }
+        return unitIndex == 0 ? $"{bytes} {units[unitIndex]}" : $"{size:F2} {units[unitIndex]}";
+    }
+
     /// <summary>
     /// 显示暂不支持预览提示。
     /// </summary>
@@ -204,6 +584,15 @@ public partial class PreviewViewModel : ObservableObject
         CsvData = null;
         FormatMetadata.Clear();
         PreviewHeaderText = string.Empty;
+        PreviewImage = null;
+        ImageWidth = 0;
+        ImageHeight = 0;
+        IsTransparencySupported = false;
+        TorrentFileItems.Clear();
+        SqliteTableData = null;
+        SqliteTableNames.Clear();
+        SelectedTableIndex = 0;
+        _lastPreviewFilePath = null;
         IsPreviewVisible = false;
         IsToolbarVisible = false;
         ZoomLevel = 1.0;
@@ -336,4 +725,26 @@ public class PeMetadataItem
 {
     public string Key { get; set; } = string.Empty;
     public string Value { get; set; } = string.Empty;
+}
+
+/// <summary>
+/// Torrent 文件列表条目。
+/// </summary>
+public record TorrentFileItem(string Path, long Size)
+{
+    public string SizeDisplay => FormatSize(Size);
+
+    private static string FormatSize(long bytes)
+    {
+        if (bytes == 0) return "0 B";
+        var units = new[] { "B", "KB", "MB", "GB", "TB" };
+        var unitIndex = 0;
+        var size = (double)bytes;
+        while (size >= 1024 && unitIndex < units.Length - 1)
+        {
+            size /= 1024;
+            unitIndex++;
+        }
+        return unitIndex == 0 ? $"{bytes} {units[unitIndex]}" : $"{size:F2} {units[unitIndex]}";
+    }
 }

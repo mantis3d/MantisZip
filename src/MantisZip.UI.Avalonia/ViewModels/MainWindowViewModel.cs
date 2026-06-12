@@ -190,6 +190,51 @@ public partial class MainWindowViewModel : ObservableObject
                     Preview.ShowPe(tempFile);
                     StatusMessage = $"PE 元数据: {entry.DisplayName}";
                     break;
+                case PreviewType.Image:
+                    Preview.ShowImage(tempFile);
+                    StatusMessage = $"图片预览: {entry.DisplayName}";
+                    break;
+                case PreviewType.Gif:
+                    Preview.ShowGif(tempFile);
+                    StatusMessage = $"GIF 预览: {entry.DisplayName}";
+                    break;
+                case PreviewType.Svg:
+                    Preview.ShowSvg(tempFile);
+                    StatusMessage = $"SVG 预览: {entry.DisplayName}";
+                    break;
+                case PreviewType.Font:
+                    Preview.ShowFont(tempFile);
+                    StatusMessage = $"字体预览: {entry.DisplayName}";
+                    break;
+                case PreviewType.Audio:
+                    Preview.ShowAudio(tempFile);
+                    StatusMessage = $"音频信息: {entry.DisplayName}";
+                    break;
+                case PreviewType.Sqlite:
+                    Preview.ShowSqlitePreview(tempFile);
+                    StatusMessage = $"SQLite 数据库: {entry.DisplayName}";
+                    break;
+                case PreviewType.Iso:
+                    Preview.ShowIso(tempFile);
+                    StatusMessage = $"ISO 镜像: {entry.DisplayName}";
+                    break;
+                case PreviewType.Torrent:
+                    Preview.ShowTorrent(tempFile);
+                    StatusMessage = $"种子信息: {entry.DisplayName}";
+                    break;
+                case PreviewType.Office:
+                    Preview.ShowOffice(tempFile);
+                    StatusMessage = $"Office 文档: {entry.DisplayName}";
+                    break;
+                case PreviewType.Video:
+                    Preview.ShowVideo(tempFile);
+                    StatusMessage = $"视频信息: {entry.DisplayName}";
+                    break;
+                case PreviewType.Html:
+                case PreviewType.Markdown:
+                    Preview.ShowUnsupported($"暂不支持预览 {(previewType == PreviewType.Html ? "HTML" : "Markdown")} 文件");
+                    StatusMessage = $"暂不支持预览 {ext} 文件";
+                    break;
             }
         }
         catch (Exception ex)

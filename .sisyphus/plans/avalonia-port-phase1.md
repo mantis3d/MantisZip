@@ -243,30 +243,30 @@ src/MantisZip.UI.Avalonia/
 
 > 图片 / GIF 预览：Avalonia 原生 Bitmap + 缩放工具栏。
 
-- [ ] **6.1** `PreviewViewModel` 添加：
+- [x] **6.1** `PreviewViewModel` 添加：
   - `Bitmap? PreviewImage`
   - `int ImageWidth` / `ImageHeight`
   - `string ImageSizeDisplay`（如 "1920 × 1080"）
   - `bool IsTransparencySupported`（PNG/ICO/WebP）
-- [ ] **6.2** `PreviewService.ClassifyPreview` 确认：
+- [x] **6.2** `PreviewService.ClassifyPreview` 确认：
   - 图片扩展名：`.jpg`, `.jpeg`, `.png`, `.bmp`, `.ico`, `.webp`
   - GIF 单独分类（Task 6.5）
-- [ ] **6.3** `PreviewViewModel.ShowImagePreview(string filePath)`：
+- [x] **6.3** `PreviewViewModel.ShowImagePreview(string filePath)`：
   - `Avalonia.Media.Imaging.Bitmap` 加载图片
   - `DecodePixelWidth=1920` 下采样（通过 `Bitmap` 构造函数）
   - 设置 `PreviewHeaderText = "图片预览"`
   - 设置 `FormatMetadata`：尺寸、文件大小
   - 支持 PNG/ICO/WebP 透明背景切换
-- [ ] **6.4** `PreviewPanel.axaml` 添加图片预览 `DataTemplate`：
+- [x] **6.4** `PreviewPanel.axaml` 添加图片预览 `DataTemplate`：
   - `Image` 控件绑定 `PreviewImage`
   - `RenderTransform` = `ScaleTransform` 绑定 `ZoomLevel`
   - 工具栏右端添加透明度切换按钮（TG）
-- [ ] **6.5** GIF 预览：
+- [x] **6.5** GIF 预览：
   - 使用 `Avalonia.Media.Imaging` 的 `GifDecoder`（v11+ 可用）或 `Image` 控件原生 GIF 支持
   - 额外属性：`bool IsPlaying`、`int CurrentFrame`、`int TotalFrames`
   - 工具栏：播放/暂停、上一帧、下一帧、帧号输入框
-- [ ] **6.6** 验证：打开含 .png/.jpg/.gif/.ico/.webp 的压缩包，预览正常，缩放和透明度切换正常
-- [ ] **6.7** **Commit**: `feat(avalonia): add image and GIF preview with zoom toolbar`
+- [x] **6.6** 验证：打开含 .png/.jpg/.gif/.ico/.webp 的压缩包，预览正常，缩放和透明度切换正常
+- [x] **6.7** **Commit**: `feat(avalonia): add image and GIF preview with zoom toolbar`
 
 ---
 
@@ -274,23 +274,23 @@ src/MantisZip.UI.Avalonia/
 
 > SVG 用 Avalonia 原生渲染，字体显示元数据 + 示例文本。
 
-- [ ] **7.1** SVG 预览：
+- [x] **7.1** SVG 预览：
   - `PreviewViewModel.ShowSvgPreview(string filePath)`：
     - 使用 `Avalonia.Svg.Skia` 或直接 `PathGeometry` 解析
     - `Avalonia.Controls.Image` 显示渲染结果
   - Avalonia 11+ 内置 SVG 支持（`Avalonia.Svg`）
-- [ ] **7.2** 字体预览：
+- [x] **7.2** 字体预览：
   - `PreviewViewModel.ShowFontPreview(string filePath)`：
     - 调用 Core 字体解析器获取元数据
     - 设置 `PreviewHeaderText = "字体预览"`
     - `FormatMetadata`：字体名称、样式、字形数
     - `TextContent` 显示示例文本（"The quick brown fox..."）
   - 工具栏右端添加连字切换按钮（`IsLigatureEnabled`）
-- [ ] **7.3** `PreviewPanel.axaml` 添加：
+- [x] **7.3** `PreviewPanel.axaml` 添加：
   - SVG 预览面板（`Image` 控件）
   - 字体预览面板（`TextBlock` 显示示例 + 元数据）
-- [ ] **7.4** 验证：打开含 .svg/.ttf/.otf/.woff 的压缩包，预览正常
-- [ ] **7.5** **Commit**: `feat(avalonia): add SVG and font preview`
+- [x] **7.4** 验证：打开含 .svg/.ttf/.otf/.woff 的压缩包，预览正常
+- [x] **7.5** **Commit**: `feat(avalonia): add SVG and font preview`
 
 ---
 
@@ -298,19 +298,19 @@ src/MantisZip.UI.Avalonia/
 
 > 音频元数据 + ISO 光盘镜像元数据。
 
-- [ ] **8.1** 音频预览：
+- [x] **8.1** 音频预览：
   - `PreviewViewModel.ShowAudioPreview(string filePath)`：
     - 调用 Core 音频解析器（`WavParser` / `FlacParser` / `Mp3Parser`）
     - `FormatMetadata`：时长、采样率、声道数、比特率
     - `PreviewHeaderText = "音频信息"`
-- [ ] **8.2** ISO 预览：
+- [x] **8.2** ISO 预览：
   - `PreviewViewModel.ShowIsoPreview(string filePath)`：
     - 调用 Core `IsoParser`
     - `FormatMetadata`：卷标、格式、大小
     - `PreviewHeaderText = "光盘镜像"`
-- [ ] **8.3** `PreviewPanel.axaml`：使用通用 `FormatMetadata` `ItemsControl`（InfoPanel）
-- [ ] **8.4** 验证：打开含 .wav/.flac/.mp3/.iso 的压缩包，元数据显示正常
-- [ ] **8.5** **Commit**: `feat(avalonia): add audio and ISO metadata preview`
+- [x] **8.3** `PreviewPanel.axaml`：使用通用 `FormatMetadata` `ItemsControl`（InfoPanel）
+- [x] **8.4** 验证：打开含 .wav/.flac/.mp3/.iso 的压缩包，元数据显示正常
+- [x] **8.5** **Commit**: `feat(avalonia): add audio and ISO metadata preview`
 
 ---
 
@@ -318,7 +318,7 @@ src/MantisZip.UI.Avalonia/
 
 > SQLite 数据库多表预览（DataGrid）。
 
-- [ ] **9.1** `PreviewViewModel` 添加：
+- [x] **9.1** `PreviewViewModel` 添加：
   - `ObservableCollection<DataView> SqliteTables`（每个表一个 DataView）
   - `ObservableCollection<string> SqliteTableNames`
   - `int SelectedTableIndex`
@@ -327,12 +327,12 @@ src/MantisZip.UI.Avalonia/
     - 读取表列表（`SELECT name FROM sqlite_master WHERE type='table'`）
     - 每个表读取前 100 行
     - 填充 `SqliteTables` 和 `SqliteTableNames`
-- [ ] **9.2** `PreviewPanel.axaml` 添加：
+- [x] **9.2** `PreviewPanel.axaml` 添加：
   - `TabControl`：每个 tab 一个表
   - Tab 内：`DataGrid` 绑定对应 `DataView`
   - 限制 100 列
-- [ ] **9.3** 验证：打开含 .sqlite/.db 的压缩包，多表显示正常
-- [ ] **9.4** **Commit**: `feat(avalonia): add SQLite multi-table preview`
+- [x] **9.3** 验证：打开含 .sqlite/.db 的压缩包，多表显示正常
+- [x] **9.4** **Commit**: `feat(avalonia): add SQLite multi-table preview`
 
 ---
 
@@ -340,7 +340,7 @@ src/MantisZip.UI.Avalonia/
 
 > BT 种子信息显示。
 
-- [ ] **10.1** `PreviewViewModel` 添加：
+- [x] **10.1** `PreviewViewModel` 添加：
   - `string TorrentInfoHash`
   - `string TorrentMagnetLink`
   - `string TorrentCreator`
@@ -350,13 +350,13 @@ src/MantisZip.UI.Avalonia/
   - 方法 `ShowTorrentPreview(string filePath)`：
     - 调用 Core `TorrentParser`
     - 填充元数据和文件列表
-- [ ] **10.2** `Models/TorrentFileItem.cs`：
+- [x] **10.2** `Models/TorrentFileItem.cs`：
   - `record TorrentFileItem(string Path, long Size)`
-- [ ] **10.3** `PreviewPanel.axaml` 添加 Torrent 预览面板：
+- [x] **10.3** `PreviewPanel.axaml` 添加 Torrent 预览面板：
   - 顶部：InfoHash、Magnet 链接（可点击复制）、创建者、日期
   - 底部：`TreeView` 或 `ListBox` 显示文件树
-- [ ] **10.4** 验证：打开 .torrent 文件，种子信息完整显示
-- [ ] **10.5** **Commit**: `feat(avalonia): add torrent metadata preview`
+- [x] **10.4** 验证：打开 .torrent 文件，种子信息完整显示
+- [x] **10.5** **Commit**: `feat(avalonia): add torrent metadata preview`
 
 ---
 
@@ -364,20 +364,20 @@ src/MantisZip.UI.Avalonia/
 
 > Office 文档元数据 + 视频文件元数据。
 
-- [ ] **11.1** Office 预览：
+- [x] **11.1** Office 预览：
   - `PreviewViewModel.ShowOfficePreview(string filePath)`：
     - 调用 Core `OfficeParser`
     - 类型判断：docx/xlsx/pptx
     - `FormatMetadata`：标题、作者、页数/幻灯片数/工作表数
     - `PreviewHeaderText = "Office 文档信息"`
-- [ ] **11.2** 视频预览：
+- [x] **11.2** 视频预览：
   - `PreviewViewModel.ShowVideoPreview(string filePath)`：
     - 调用 Core `VideoParser`（解析 MP4/MKV/AVI 容器元数据）
     - `FormatMetadata`：分辨率、时长、编码格式
     - `PreviewHeaderText = "视频信息"`
-- [ ] **11.3** `PreviewPanel.axaml`：使用通用 `InfoPanel`
-- [ ] **11.4** 验证：打开含 .docx/.xlsx/.pptx/.mp4/.mkv 的压缩包，元数据显示正常
-- [ ] **11.5** **Commit**: `feat(avalonia): add Office and video metadata preview`
+- [x] **11.3** `PreviewPanel.axaml`：使用通用 `InfoPanel`
+- [x] **11.4** 验证：打开含 .docx/.xlsx/.pptx/.mp4/.mkv 的压缩包，元数据显示正常
+- [x] **11.5** **Commit**: `feat(avalonia): add Office and video metadata preview`
 
 ---
 
@@ -434,3 +434,4 @@ Phase 1 完成的验收标准：
 8. **临时文件**：预览提取的临时文件统一在 `App.OnExit` 清理
 9. **排序**：Phase 1 暂不实现文件列表列排序（与 WPF 一致，Phase 0 未实现）
 10. **密码保护的压缩包**：所有 API 保留 `password` 参数，Phase 1 暂不实现密码对话框，统一传入 `null`
+
