@@ -70,24 +70,24 @@ ZIP 注释存储在文件末尾的 **EOCD（End of Central Directory）** 记录
 移除 SharpZipLib 依赖，同时保持 ZIP 注释原地编辑功能不变。
 
 ### Concrete Deliverables
-1. `MantisZip.Core/Utils/ZipCommentHelper.cs` — 静态工具类，提供 `ReadCommentAsync` / `WriteCommentAsync`
-2. `ArchiveCommentDialog.xaml` — 添加 "正在保存注释..." TextBlock（默认 Collapsed）
-3. `ArchiveCommentDialog.xaml.cs` — 改为 async，保存时显示保存文字 + 禁用按钮，完成后关闭；替换 `ZipFile.SetComment` 为 `ZipCommentHelper.WriteCommentAsync`
-4. `MainWindow.xaml.cs` `ReadArchiveComment()` — 替换 `ZipFile.ZipFileComment` 为 `ZipCommentHelper.ReadComment`
-5. 删除 `App.xaml.cs` / `App.Cli.cs` 中的 `using ICSharpCode.SharpZipLib.Zip`
-6. 从 `MantisZip.Core.csproj` 移除 `<PackageReference Include="SharpZipLib" />`
-7. 新增本地化键 `Main_ArchiveComment_Saving`
-8. 构建验证 + `lsp_diagnostics` 清洁
+1. ✅ `MantisZip.Core/Utils/ZipCommentHelper.cs` — 静态工具类，提供 `ReadCommentAsync` / `WriteCommentAsync`
+2. ✅ `ArchiveCommentDialog.xaml` — 添加 "正在保存注释..." TextBlock（默认 Collapsed）
+3. ✅ `ArchiveCommentDialog.xaml.cs` — 改为 async，保存时显示保存文字 + 禁用按钮，完成后关闭；替换 `ZipFile.SetComment` 为 `ZipCommentHelper.WriteCommentAsync`
+4. ✅ `MainWindow.xaml.cs` `ReadArchiveComment()` — 替换 `ZipFile.ZipFileComment` 为 `ZipCommentHelper.ReadComment`
+5. ✅ 删除 `App.xaml.cs` / `App.Cli.cs` 中的 `using ICSharpCode.SharpZipLib.Zip`
+6. ❌ **阻塞** 从 `MantisZip.Core.csproj` 移除 `<PackageReference Include="SharpZipLib" />` — `ZipEngine.cs` 仍需 SharpZipLib 用于加密 ZIP 写入回退
+7. ✅ 新增本地化键 `Main_ArchiveComment_Saving`
+8. ✅ 构建验证 + `lsp_diagnostics` 清洁
 
 ### Definition of Done
-- [ ] `ZipCommentHelper` 实现完成，含 XML 文档注释
-- [ ] 注释读取功能正常（打开已有注释的 ZIP 能显示）
-- [ ] 注释写入功能正常（修改注释后保存，重新打开能看到新注释）
-- [ ] 无注释的 ZIP 文件也能正常处理（返回 null/空）
-- [ ] 大文件 ZIP 时操作正常
-- [ ] 所有 import 清理干净，无编译警告
-- [ ] `SharpZipLib` 从 `.csproj` 移除后构建通过
-- [ ] 全部 171 个测试通过
+- [x] `ZipCommentHelper` 实现完成（`src/MantisZip.Core/Utils/ZipCommentHelper.cs`），含 XML 文档注释
+- [x] 注释读取功能正常（打开已有注释的 ZIP 能显示）
+- [x] 注释写入功能正常（修改注释后保存，重新打开能看到新注释）
+- [x] 无注释的 ZIP 文件也能正常处理（返回 null/空）
+- [x] 大文件 ZIP 时操作正常
+- [x] 所有 import 清理干净（`App.xaml.cs` 已无 SharpZipLib 引用；`App.Cli.cs` 已合并/删除）
+- [ ] `SharpZipLib` 从 `.csproj` 移除后构建通过 — ⏸️ **阻塞：`ZipEngine.cs` 仍依赖 SharpZipLib (加密 ZIP 回退)**，详见 scope-correction 更新
+- [x] 全部 171 个测试通过（经 `zipengine-sharpcompress-migration` 后为 183/183）
 
 ### Must Have
 - 原地修改，不重新压缩
@@ -206,14 +206,36 @@ ZipCommentHelper.WriteComment(_archivePath, newComment);
 
 ---
 
-## Scope Correction (post-implementation)
+## Scope Correction (post-implementation) — 已更新
 
-**发现**：`ZipEngine.cs`（Core/Engines）全文件 1128 行大量使用 SharpZipLib（`ZipFile`, `ZipOutputStream`, `ZipEntry` 等）。
-SharpZipLib → SharpCompress 的引擎迁移在 AGENTS.md 中被标记为已完成，但 ZipEngine 仍有深度依赖。
+**初始发现**：`ZipEngine.cs` 大量使用 SharpZipLib（`ZipFile`, `ZipOutputStream`, `ZipEntry` 等），导致无法完全移除依赖。
+
+**后续进展**：`zipengine-sharpcompress-migration.md` 计划已完成 ZipEngine 三方法的 SharpCompress 迁移：
+- ✅ `CompressAsync` → `ZipWriter`（未加密）；`ZipOutputStream` 保留为加密回退
+- ✅ `AddToArchiveAsync` → `IArchive`+`IArchiveEntry`+`ZipWriter`（未加密）；`ZipOutputStream` 保留为加密回退
+- ✅ `DeleteEntriesAsync` → `IArchive`+`IArchiveEntry`+`ZipWriter`（该方法无加密）
+- ✅ `OpenZipFile` 静态方法已删除（68 行死代码）
+- ❌ `ZipOutputStream` 约 20 行生产代码留在 CompressAsync/AddToArchiveAsync 的加密分支中
+- ❌ `ReadFileWithRetryZipOutputStream` helper 保留（约 90 行），供加密分支使用
 
 因此：
 - ✅ `ZipCommentHelper` + ArchiveCommentDialog 改进：**已完成**
-- ❌ 完全移除 SharpZipLib 依赖：**阻塞**，需要另行迁移 ZipEngine（更大的工程）
+- ✅ ZipEngine 核心方法（Compress/Add/Delete）SharpZipLib → SharpCompress 迁移：**已完成**
+- ❌ 完全移除 SharpZipLib 依赖：**阻塞**（SharpCompress ZipWriter 不支持加密 API → 见 `zipengine-sharpcompress-migration.md` post-migration analysis）
+
+### 当前 SharpZipLib 残留范围（精确到行）
+
+**生产代码**（`src/MantisZip.Core/Engines/ZipEngine.cs`）：
+- `using ICSharpCode.SharpZipLib.Zip` (行 5)
+- `ZipOutputStream` 在 CompressAsync + AddToArchiveAsync 加密分支中（约 20 行）
+- `ReadFileWithRetryZipOutputStream` helper 方法（约 90 行）
+
+**测试固件**（`tests/MantisZip.Tests/`）：
+- `Fixtures/ArchiveFixtures.cs` — `ZipOutputStream` 创建加密 ZIP
+- `Engines/SmartExtractTests.cs` — `ZipOutputStream`+`ZipEntry` 创建测试 ZIP
+- `Engines/ZipEngineTests.cs` — `using ICSharpCode.SharpZipLib.Zip`
+- `Engines/CompressServiceTests.cs` — `ZipOutputStream` 创建测试 ZIP
+- `Engines/ZipEngineDeleteTests.cs` — `ZipOutputStream` 创建测试 ZIP
 
 ---
 

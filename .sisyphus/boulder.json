@@ -1,89 +1,39 @@
 {
-  "active_plan": "E:\\GitHub\\MantisZip\\.sisyphus\\plans\\file-list-filter-search.md",
-  "started_at": "2026-06-10T05:37:48.134Z",
+  "active_plan": "E:\\GitHub\\MantisZip\\.sisyphus\\plans\\zipengine-sharpcompress-migration.md",
+  "started_at": "2026-06-12T05:52:00.000Z",
   "session_ids": [
-    "ses_1501a14e8ffe9f7ANfsmA4m3xr",
-    "ses_14ff52ee9ffeD4x6KiXzlYS7Ej",
-    "ses_14ff50af6ffeAGmSYgUAEbmUIt",
-    "ses_14fe4c109ffeV6W28NGQ6amAGW",
-    "ses_14fe4b8fbffeLEX9Cc6l5zjDVl",
-    "ses_14fe4abf3ffe8twLdSZ3i4J88n",
-    "ses_14fe4a05fffe6PAAZZk8OOCgsy"
+    "ses_1459d2906ffePTQhej9fR85mDZ"
   ],
   "session_origins": {
-    "ses_1501a14e8ffe9f7ANfsmA4m3xr": "direct",
-    "ses_14ff52ee9ffeD4x6KiXzlYS7Ej": "appended",
-    "ses_14ff50af6ffeAGmSYgUAEbmUIt": "appended",
-    "ses_14fe4c109ffeV6W28NGQ6amAGW": "appended",
-    "ses_14fe4b8fbffeLEX9Cc6l5zjDVl": "appended",
-    "ses_14fe4abf3ffe8twLdSZ3i4J88n": "appended",
-    "ses_14fe4a05fffe6PAAZZk8OOCgsy": "appended"
+    "ses_1459d2906ffePTQhej9fR85mDZ": "direct"
   },
-  "plan_name": "file-list-filter-search",
+  "plan_name": "zipengine-sharpcompress-migration",
   "agent": "atlas",
-  "task_sessions": {
-    "todo:1": {
-      "task_key": "todo:1",
-      "task_label": "1",
-      "task_title": "ApplyFilters in ArchiveFilter.cs still uses old substring-only logic — needs MatchItem method + wildcard + exclude",
-      "session_id": "ses_14ff50af6ffeAGmSYgUAEbmUIt",
-      "agent": "Atlas - Plan Executor",
-      "updated_at": "2026-06-10T05:50:33.347Z",
-      "started_at": "2026-06-10T05:50:33.346Z",
-      "status": "completed",
-      "ended_at": "2026-06-10T05:50:33.347Z",
-      "elapsed_ms": 1
-    }
-  },
-  "active_work_id": "file-list-filter-search",
+  "task_sessions": {},
+  "active_work_id": "zipengine-sharpcompress-migration",
   "schema_version": 2,
   "works": {
-    "file-list-filter-search": {
-      "work_id": "file-list-filter-search",
-      "active_plan": "E:\\GitHub\\MantisZip\\.sisyphus\\plans\\file-list-filter-search.md",
-      "plan_name": "file-list-filter-search",
-      "started_at": "2026-06-10T05:37:48.134Z",
+    "zipengine-sharpcompress-migration": {
+      "work_id": "zipengine-sharpcompress-migration",
+      "active_plan": "E:\\GitHub\\MantisZip\\.sisyphus\\plans\\zipengine-sharpcompress-migration.md",
+      "plan_name": "zipengine-sharpcompress-migration",
+      "started_at": "2026-06-12T05:52:00.000Z",
       "session_ids": [
-        "ses_1501a14e8ffe9f7ANfsmA4m3xr",
-        "ses_14ff52ee9ffeD4x6KiXzlYS7Ej",
-        "ses_14ff50af6ffeAGmSYgUAEbmUIt",
-        "ses_14fe4c109ffeV6W28NGQ6amAGW",
-        "ses_14fe4b8fbffeLEX9Cc6l5zjDVl",
-        "ses_14fe4abf3ffe8twLdSZ3i4J88n",
-        "ses_14fe4a05fffe6PAAZZk8OOCgsy"
+        "ses_1459d2906ffePTQhej9fR85mDZ"
       ],
       "session_origins": {
-        "ses_1501a14e8ffe9f7ANfsmA4m3xr": "direct",
-        "ses_14ff52ee9ffeD4x6KiXzlYS7Ej": "appended",
-        "ses_14ff50af6ffeAGmSYgUAEbmUIt": "appended",
-        "ses_14fe4c109ffeV6W28NGQ6amAGW": "appended",
-        "ses_14fe4b8fbffeLEX9Cc6l5zjDVl": "appended",
-        "ses_14fe4abf3ffe8twLdSZ3i4J88n": "appended",
-        "ses_14fe4a05fffe6PAAZZk8OOCgsy": "appended"
+        "ses_1459d2906ffePTQhej9fR85mDZ": "direct"
       },
       "agent": "atlas",
-      "task_sessions": {
-        "todo:1": {
-          "task_key": "todo:1",
-          "task_label": "1",
-          "task_title": "ApplyFilters in ArchiveFilter.cs still uses old substring-only logic — needs MatchItem method + wildcard + exclude",
-          "session_id": "ses_14ff50af6ffeAGmSYgUAEbmUIt",
-          "agent": "Atlas - Plan Executor",
-          "updated_at": "2026-06-10T05:50:33.347Z",
-          "started_at": "2026-06-10T05:50:33.346Z",
-          "status": "completed",
-          "ended_at": "2026-06-10T05:50:33.347Z",
-          "elapsed_ms": 1
-        }
-      },
-      "updated_at": "2026-06-10T05:57:24.670Z",
-      "ended_at": "2026-06-10T05:41:43.947Z",
-      "elapsed_ms": 235813,
-      "status": "completed"
+      "task_sessions": {},
+      "status": "completed",
+      "ended_at": "2026-06-12T06:15:33.227Z",
+      "elapsed_ms": 1413227,
+      "updated_at": "2026-06-12T06:15:33.228Z"
     }
   },
-  "updated_at": "2026-06-10T05:57:24.670Z",
   "status": "completed",
-  "ended_at": "2026-06-10T05:41:43.947Z",
-  "elapsed_ms": 235813
+  "ended_at": "2026-06-12T06:15:33.227Z",
+  "elapsed_ms": 1413227,
+  "updated_at": "2026-06-12T06:15:33.228Z"
 }

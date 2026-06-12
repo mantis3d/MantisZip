@@ -18,7 +18,22 @@
 
 ## 版本历史（从新到旧）
 
-### v0.3.13 (2026-06-12) 压缩批处理文件进度条修复 + 压缩完成后进程残留修复
+### v0.3.13 (2026-06-12) ZipEngine SharpZipLib → SharpCompress 迁移 + 压缩批处理文件进度条修复 + 压缩完成后进程残留修复
+
+0. **关联计划同步 + .NET 11 追踪**：
+   - `engine-unification-sharpcompress.md`：Phase 5 状态更新为"部分完成"，新增 .NET 11 `System.IO.Compression.ZipArchive` AES-256 支持作为 SharpZipLib 移除的最佳候选项
+   - `remove-sharpziplib.md`：Scope Correction 重写，精确标注残留范围
+   - `zipengine-sharpcompress-migration.md`：Post-Migration Analysis 新增 .NET 11 追踪节
+   - .NET 11 目标 2026 年 11 月发布，届时可彻底移除 SharpZipLib
+
+0. **ZipEngine SharpZipLib → SharpCompress 迁移**（参见 [迁移计划](.sisyphus/plans/zipengine-sharpcompress-migration.md)）：
+   - `CompressAsync`：`ZipOutputStream` → `ZipWriter`（未加密路径）；加密路径保留 SharpZipLib 回退（因 SharpCompress ZipWriter 不支持加密）
+   - `AddToArchiveAsync`：全部 SharpZipLib API → SharpCompress `IArchive` + `ZipWriter`
+   - `DeleteEntriesAsync`：同上，2-pass 结构全部迁移
+   - 删除 `OpenZipFile` 静态方法（dead code，68 行）
+   - `OpenArchiveWithEncodingFallback`：改为使用 `FileStream(FileShare.Delete)` 解决原子替换时文件锁问题
+   - 类注释更新为"基于 SharpCompress，加密回退使用 SharpZipLib"
+   - 183 测试全部通过
 
 1. **压缩批处理文件进度条锯齿修复**：`ProgressWindow.SetProgress` 中总进度条改为使用公式 `已完成包数/batch总数 × 100 + 当前包进度/batch总数`，消除批处理模式下每个包 0→100% 导致的锯齿（总进度 0→100→33→0→100→66→0→100）
 2. **压缩文件列表状态乱序修复**：移除所有压缩方法中进度包装器内使用 `p.ProcessedFiles`（包内文件数）作为 batch 索引的 `SetCurrentBatchItem` 调用。改为在 `CompressSeparateAsync` 中通过 `onItemStatus?.Invoke(i, BatchItemStatus.InProgress)` 在正确的迭代边界通知 UI，在 `onItemStatus` 回调和单包模式中直接使用 `SetCurrentBatchItem(0)` 指定批处理项索引
