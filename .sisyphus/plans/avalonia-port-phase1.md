@@ -13,7 +13,7 @@
 > **依赖**: `ArchiveTreeBuilder` / `ArchiveEntryLister`（Core/Services，已在 main 分支合并到 avalonia-port）  
 > **创建日期**: 2026-06-11  
 > **更新日期**: 2026-06-11  
-> **状态**: 📋 计划中 | **进度**: [                    ] (0/—)
+> **状态**: ✅ 已完成 | **进度**: [████████████████████] (99/99)
 
 ---
 
@@ -385,13 +385,13 @@ src/MantisZip.UI.Avalonia/
 
 > 确保分支干净，与 main 保持同步。
 
-- [ ] **12.1** 确认 `src/MantisZip.UI/`（WPF 项目）未被触碰
-- [ ] **12.2** 确认所有新文件有正确的命名空间和文件头
-- [ ] **12.3** `git merge main` 将 main 最新改动合并到 avalonia-port
-- [ ] **12.4** 解决可能的冲突
-- [ ] **12.5** 验证：`dotnet build src\MantisZip.UI.Avalonia` 编译通过
-- [ ] **12.6** 验证：`dotnet test tests\MantisZip.Tests` 所有测试通过
-- [ ] **12.7** 更新本计划状态为 ✅
+- [x] **12.1** 确认 `src/MantisZip.UI/`（WPF 项目）未被触碰
+- [x] **12.2** 确认所有新文件有正确的命名空间和文件头
+- [x] **12.3** `git merge main` 将 main 最新改动合并到 avalonia-port
+- [x] **12.4** 解决可能的冲突
+- [x] **12.5** 验证：`dotnet build src\MantisZip.UI.Avalonia` 编译通过
+- [x] **12.6** 验证：`dotnet test tests\MantisZip.Tests` 所有测试通过
+- [x] **12.7** 更新本计划状态为 ✅
 
 ---
 
@@ -399,25 +399,25 @@ src/MantisZip.UI.Avalonia/
 
 Phase 1 完成的验收标准：
 
-- [ ] `dotnet build src\MantisZip.UI.Avalonia` 编译通过
-- [ ] `dotnet run --project src\MantisZip.UI.Avalonia` 窗口启动
-- [ ] 打开含子目录的压缩包，TreeView 显示目录结构
-- [ ] 目录导航：点击文件夹 → 文件列表更新
-- [ ] 图片预览（.png/.jpg/.ico/.webp）正常显示，缩放可用
-- [ ] GIF 预览（.gif）动画播放/暂停/帧导航正常
-- [ ] SVG 预览（.svg）正常渲染
-- [ ] 字体预览（.ttf/.otf/.woff）显示元数据 + 示例文本
-- [ ] 音频元数据（.wav/.flac/.mp3）显示正确
-- [ ] SQLite 预览（.sqlite/.db）多表 DataGrid 正常
-- [ ] ISO 元数据（.iso）显示卷标/格式
-- [ ] Torrent 预览（.torrent）显示 InfoHash/Magnet/文件树
-- [ ] Office 元数据（.docx/.xlsx/.pptx）显示正确
-- [ ] 视频元数据（.mp4/.mkv）显示分辨率/时长
-- [ ] 亮/暗主题切换正常
-- [ ] 文件列表显示文件类型图标
-- [ ] 预览工具栏（缩放/字号）功能正常
-- [ ] WPF 项目 `src/MantisZip.UI/` 未被修改
-- [ ] `git merge main` 无冲突，所有测试通过
+- [x] `dotnet build src\MantisZip.UI.Avalonia` 编译通过
+- [x] `dotnet run --project src\MantisZip.UI.Avalonia` 窗口启动
+- [x] 打开含子目录的压缩包，TreeView 显示目录结构
+- [x] 目录导航：点击文件夹 → 文件列表更新
+- [x] 图片预览（.png/.jpg/.ico/.webp）正常显示，缩放可用
+- [x] GIF 预览（.gif）动画播放/暂停/帧导航正常
+- [x] SVG 预览（.svg）正常渲染
+- [x] 字体预览（.ttf/.otf/.woff）显示元数据 + 示例文本
+- [x] 音频元数据（.wav/.flac/.mp3）显示正确
+- [x] SQLite 预览（.sqlite/.db）多表 DataGrid 正常
+- [x] ISO 元数据（.iso）显示卷标/格式
+- [x] Torrent 预览（.torrent）显示 InfoHash/Magnet/文件树
+- [x] Office 元数据（.docx/.xlsx/.pptx）显示正确
+- [x] 视频元数据（.mp4/.mkv）显示分辨率/时长
+- [x] 亮/暗主题切换正常
+- [x] 文件列表显示文件类型图标
+- [x] 预览工具栏（缩放/字号）功能正常
+- [x] WPF 项目 `src/MantisZip.UI/` 未被修改
+- [x] `git merge main` 无冲突，所有测试通过
 
 ---
 
@@ -434,4 +434,6 @@ Phase 1 完成的验收标准：
 8. **临时文件**：预览提取的临时文件统一在 `App.OnExit` 清理
 9. **排序**：Phase 1 暂不实现文件列表列排序（与 WPF 一致，Phase 0 未实现）
 10. **密码保护的压缩包**：所有 API 保留 `password` 参数，Phase 1 暂不实现密码对话框，统一传入 `null`
+
+
 
