@@ -273,7 +273,7 @@
   "Main_Tooltip_Test": "Test Archive",
   "Main_Tooltip_SmartExtract": "Smart Extract Here",
   "Main_FilterSearch_Placeholder": "Filter files…",
-  "Main_Toolbar_ShowSubfolders": "All subfolders",
+  "Main_Toolbar_ShowSubfolders": "flatten folders",
   "Main_Tooltip_ShowSubfoldersOn": "Show all subfolder files (On)",
   "Main_Tooltip_ShowSubfoldersOff": "Current directory only (Off)",
   "Main_Filter_NoResults": "No matching files",
