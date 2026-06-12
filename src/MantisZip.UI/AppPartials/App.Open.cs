@@ -96,23 +96,13 @@ public partial class App : Application
         };
         var outputPaths = CompressService.GetOutputPaths(request);
         progressWindow.InitBatchMode(outputPaths);
+        progressWindow.SetCurrentBatchItem(0);
 
         bool applyToAll = false;
         Core.Abstractions.CompressConflictAction? chosenAction = null;
 
         var rawProgress = ProgressWindow.CreateBackgroundProgress(progressWindow);
-        var progress = ProgressWindow.CreateBackgroundProgress(progressWindow.Dispatcher, p =>
-        {
-            if (p.TotalFiles > 0 && p.ProcessedFiles > 0)
-            {
-                var itemIndex = p.ProcessedFiles - 1;
-                if (itemIndex >= 0 && itemIndex < myPaths.Count)
-                {
-                    progressWindow.SetCurrentBatchItem(itemIndex);
-                }
-            }
-            rawProgress.Report(p);
-        });
+        var progress = rawProgress;
         var ct = progressWindow.CancellationToken;
 
             Task.Run(async () =>

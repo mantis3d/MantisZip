@@ -105,9 +105,24 @@ public partial class ProgressWindow : Window
         App.LogDebug("[TRACE] ProgressWindow.SetProgress called: PercentComplete={0}, FilePercentComplete={1}, CurrentFile='{2}'",
             p.PercentComplete, (object?)p.FilePercentComplete ?? "null", p.CurrentFile ?? "");
 
-        TotalProgressBar.Value = p.PercentComplete;
-        PercentText.Text = $"{p.PercentComplete:F1}%";
         FileNameText.Text = p.CurrentFile;
+
+        // 批处理模式总进度 = 已完成包的权重 + 当前包的进度权重，消除锯齿
+        if (_isBatchMode && _batchItems != null && _batchItems.Count > 1)
+        {
+            double completedWeight = _currentBatchIndex > 0
+                ? (double)_currentBatchIndex / _batchItems.Count * 100
+                : 0;
+            double currentWeight = p.PercentComplete / _batchItems.Count;
+            double overallPct = completedWeight + currentWeight;
+            TotalProgressBar.Value = overallPct;
+            PercentText.Text = $"{overallPct:F1}%";
+        }
+        else
+        {
+            TotalProgressBar.Value = p.PercentComplete;
+            PercentText.Text = $"{p.PercentComplete:F1}%";
+        }
 
         if (p.FilePercentComplete.HasValue)
         {
@@ -130,12 +145,11 @@ public partial class ProgressWindow : Window
         }
         FileCountText.Visibility = Visibility.Visible;
 
-        // 批处理模式：更新当前项的进度百分比（100ms 节流）
+        // 批处理模式：更新当前项的进度百分比（使用引擎报告的包内进度，0-100，100ms 节流）
         if (_isBatchMode && _currentBatchIndex >= 0 && _batchItems != null &&
             _currentBatchIndex < _batchItems.Count)
         {
             var now = DateTime.UtcNow;
-            // 0% 和 100% 强制刷新，中间值每 100ms 刷新一次
             if (p.PercentComplete >= 100 || p.PercentComplete <= 0 ||
                 (now - _lastProgressUpdate) >= ProgressThrottle)
             {

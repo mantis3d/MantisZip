@@ -174,7 +174,7 @@
                 <Separator/>
                 <ToggleButton x:Name="ShowSubfoldersBtn" ToolTip="{l:L Main_Tooltip_ShowSubfoldersOff}" Click="ShowSubfoldersBtn_Click" Padding="8,6" IsEnabled="False" IsChecked="False">
                     <StackPanel Orientation="Vertical" HorizontalAlignment="Center">
-                        <emoji:TextBlock Text="🌲" FontSize="25" HorizontalAlignment="Center"/>
+                        <emoji:TextBlock Text="📖" FontSize="25" HorizontalAlignment="Center"/>
                         <TextBlock Text="{l:L Main_Toolbar_ShowSubfolders}" FontSize="12" HorizontalAlignment="Center"/>
                     </StackPanel>
                 </ToggleButton>
