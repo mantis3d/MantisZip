@@ -23,17 +23,44 @@ public partial class PreviewViewModel : ObservableObject
     [ObservableProperty]
     private bool _isPreviewVisible;
 
+    [ObservableProperty]
+    private ObservableCollection<FormatMetadataItem> _formatMetadata = [];
+
+    [ObservableProperty]
+    private string _previewHeaderText = string.Empty;
+
     // Computed visibility per preview type
     public bool IsTextVisible => PreviewType == PreviewType.Text;
     public bool IsCsvVisible => PreviewType == PreviewType.Csv;
     public bool IsPeVisible => PreviewType == PreviewType.Pe;
     public bool IsUnsupportedVisible => PreviewType == PreviewType.Unsupported || PreviewType == PreviewType.None;
 
+    public bool IsImageVisible => PreviewType == PreviewType.Image;
+    public bool IsGifVisible => PreviewType == PreviewType.Gif;
+    public bool IsSvgVisible => PreviewType == PreviewType.Svg;
+    public bool IsFontVisible => PreviewType == PreviewType.Font;
+    public bool IsAudioVisible => PreviewType == PreviewType.Audio;
+    public bool IsSqliteVisible => PreviewType == PreviewType.Sqlite;
+    public bool IsIsoVisible => PreviewType == PreviewType.Iso;
+    public bool IsTorrentVisible => PreviewType == PreviewType.Torrent;
+    public bool IsOfficeVisible => PreviewType == PreviewType.Office;
+    public bool IsVideoVisible => PreviewType == PreviewType.Video;
+
     partial void OnPreviewTypeChanged(PreviewType value)
     {
         OnPropertyChanged(nameof(IsTextVisible));
         OnPropertyChanged(nameof(IsCsvVisible));
         OnPropertyChanged(nameof(IsPeVisible));
+        OnPropertyChanged(nameof(IsImageVisible));
+        OnPropertyChanged(nameof(IsGifVisible));
+        OnPropertyChanged(nameof(IsSvgVisible));
+        OnPropertyChanged(nameof(IsFontVisible));
+        OnPropertyChanged(nameof(IsAudioVisible));
+        OnPropertyChanged(nameof(IsSqliteVisible));
+        OnPropertyChanged(nameof(IsIsoVisible));
+        OnPropertyChanged(nameof(IsTorrentVisible));
+        OnPropertyChanged(nameof(IsOfficeVisible));
+        OnPropertyChanged(nameof(IsVideoVisible));
         OnPropertyChanged(nameof(IsUnsupportedVisible));
     }
 
@@ -123,6 +150,8 @@ public partial class PreviewViewModel : ObservableObject
         PeSubtitle = string.Empty;
         PeMetadata.Clear();
         CsvData = null;
+        FormatMetadata.Clear();
+        PreviewHeaderText = string.Empty;
         IsPreviewVisible = false;
     }
 

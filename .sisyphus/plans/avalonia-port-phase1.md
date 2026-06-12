@@ -99,7 +99,7 @@ src/MantisZip.UI.Avalonia/
 
 > 扩展 `PreviewType` 枚举覆盖所有格式，添加通用元数据模型和 `InfoPanel` 控件。
 
-- [ ] **1.1** 扩展 `PreviewType` 枚举（PreviewService.cs）：
+- [x] **1.1** 扩展 `PreviewType` 枚举（PreviewService.cs）：
   ```csharp
   public enum PreviewType
   {
@@ -108,22 +108,22 @@ src/MantisZip.UI.Avalonia/
       Office, Video, Unsupported
   }
   ```
-- [ ] **1.2** 创建 `Models/FormatMetadataItem.cs`：
+- [x] **1.2** 创建 `Models/FormatMetadataItem.cs`：
   - `record FormatMetadataItem(string Key, string Value)` — 通用键值对
-- [ ] **1.3** 创建 `Controls/InfoPanel.axaml` + `.cs`：
+- [x] **1.3** 创建 `Controls/InfoPanel.axaml` + `.cs`：
   - `ItemsControl` 绑定 `ObservableCollection<FormatMetadataItem>`
   - 两列布局：Key（次色灰）+ Value（正常色），`Separator` 分隔
   - 不依赖任何特定格式
-- [ ] **1.4** `PreviewViewModel` 扩展：
+- [x] **1.4** `PreviewViewModel` 扩展：
   - 新增 `ObservableCollection<FormatMetadataItem> FormatMetadata`
   - 新增 `string PreviewHeaderText`（格式标题，如 "字体预览"）
   - 新增所有 `Is*Visible` 计算属性（`IsImageVisible` 等）
   - 更新 `OnPreviewTypeChanged` 通知所有 `Is*Visible`
-- [ ] **1.5** `PreviewService.ClassifyPreview` 扩展：
+- [x] **1.5** `PreviewService.ClassifyPreview` 扩展：
   - 添加所有格式的扩展名集合（参照 WPF 版 `MainWindow.Preview.cs`）
   - 返回对应的 `PreviewType`
-- [ ] **1.6** 添加 `Core` nuget 包引用（如需）：`Microsoft.Data.Sqlite` 已在 csproj
-- [ ] **1.7** **Commit**: `feat(avalonia): expand PreviewType enum, add InfoPanel and FormatMetadataItem`
+- [x] **1.6** 添加 `Core` nuget 包引用（如需）：`Microsoft.Data.Sqlite` 已在 csproj
+- [x] **1.7** **Commit**: `feat(avalonia): expand PreviewType enum, add InfoPanel and FormatMetadataItem`
 
 ---
 

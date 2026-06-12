@@ -14,6 +14,15 @@ public enum PreviewType
     Csv,
     Pe,
     Image,
+    Gif,
+    Svg,
+    Font,
+    Audio,
+    Sqlite,
+    Iso,
+    Torrent,
+    Office,
+    Video,
     Html,
     Markdown,
     Unsupported
@@ -39,6 +48,48 @@ public class PreviewService
     private static readonly HashSet<string> CsvExtensions = new(StringComparer.OrdinalIgnoreCase) { ".csv" };
     private static readonly HashSet<string> PeExtensions = new(StringComparer.OrdinalIgnoreCase) { ".exe", ".dll", ".sys", ".ocx" };
 
+    private static readonly HashSet<string> ImageExtensions = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ".jpg", ".jpeg", ".png", ".bmp", ".ico", ".webp"
+    };
+
+    private static readonly HashSet<string> GifExtensions = new(StringComparer.OrdinalIgnoreCase) { ".gif" };
+    private static readonly HashSet<string> SvgExtensions = new(StringComparer.OrdinalIgnoreCase) { ".svg" };
+    private static readonly HashSet<string> FontExtensions = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ".ttf", ".otf", ".woff", ".woff2", ".eot"
+    };
+
+    private static readonly HashSet<string> AudioExtensions = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ".wav", ".flac", ".mp3", ".ogg", ".aac", ".wma", ".m4a"
+    };
+
+    private static readonly HashSet<string> SqliteExtensions = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ".sqlite", ".sqlite3", ".db", ".db3"
+    };
+
+    private static readonly HashSet<string> IsoExtensions = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ".iso"
+    };
+
+    private static readonly HashSet<string> TorrentExtensions = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ".torrent"
+    };
+
+    private static readonly HashSet<string> OfficeExtensions = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ".docx", ".xlsx", ".pptx"
+    };
+
+    private static readonly HashSet<string> VideoExtensions = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ".mp4", ".mkv", ".avi", ".mov", ".wmv", ".flv", ".webm"
+    };
+
     private const long MaxPreviewFileSize = 50 * 1024 * 1024; // 50 MB
     private const long MaxTextPreviewBytes = 1 * 1024 * 1024;  // 1 MB
 
@@ -50,6 +101,16 @@ public class PreviewService
         if (TextExtensions.Contains(ext)) return PreviewType.Text;
         if (CsvExtensions.Contains(ext)) return PreviewType.Csv;
         if (PeExtensions.Contains(ext)) return PreviewType.Pe;
+        if (ImageExtensions.Contains(ext)) return PreviewType.Image;
+        if (GifExtensions.Contains(ext)) return PreviewType.Gif;
+        if (SvgExtensions.Contains(ext)) return PreviewType.Svg;
+        if (FontExtensions.Contains(ext)) return PreviewType.Font;
+        if (AudioExtensions.Contains(ext)) return PreviewType.Audio;
+        if (SqliteExtensions.Contains(ext)) return PreviewType.Sqlite;
+        if (IsoExtensions.Contains(ext)) return PreviewType.Iso;
+        if (TorrentExtensions.Contains(ext)) return PreviewType.Torrent;
+        if (OfficeExtensions.Contains(ext)) return PreviewType.Office;
+        if (VideoExtensions.Contains(ext)) return PreviewType.Video;
         return PreviewType.Unsupported;
     }
 
