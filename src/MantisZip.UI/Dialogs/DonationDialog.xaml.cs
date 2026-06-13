@@ -16,17 +16,12 @@ public partial class DonationDialog : Window
 
     private void OpenAfdian_Click(object sender, RoutedEventArgs e)
     {
-        OpenUrl("https://afdian.com/a/mantiszip");
+        OpenUrl("https://afdian.com/a/MantisZen");
     }
 
-    private void OpenGitHub_Click(object sender, RoutedEventArgs e)
+    private void Polar_Click(object sender, RoutedEventArgs e)
     {
-        OpenUrl("https://github.com/sponsors/mantiszip");
-    }
-
-    private void OpenBuyMeACoffee_Click(object sender, RoutedEventArgs e)
-    {
-        OpenUrl("https://buymeacoffee.com/mantiszip");
+        OpenUrl("https://buy.polar.sh/polar_cl_VaCaW2l2nWkob5CyHe4dOlhL6HrQDK4ueMA9n1JyhNc");
     }
 
     private static void OpenUrl(string url)

@@ -93,7 +93,7 @@ public partial class MainWindow
                 App.LogDebug("ShowFontPreview: failed to load FontFamily: {0}", ex.Message);
             }
             PreviewTextBox.Text = sampleText;
-            PreviewTextBox.FontSize = AppSettings.Instance.FontPreviewFontSize; PreviewTextBox.TextAlignment = TextAlignment.Center;
+            PreviewTextBox.FontSize = AppSettings.Instance.FontPreviewFontSize; PreviewTextBox.TextAlignment = TextAlignment.Left;
             HideAllPreviewControls();
             PreviewTextBox.Visibility = Visibility.Visible;
             SetPreviewInfo(item); PreviewHeader.Text = L.TF(L.Preview_FontHeader, info.AdditionalInfo ?? "Font");
