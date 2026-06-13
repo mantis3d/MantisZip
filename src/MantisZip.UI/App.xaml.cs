@@ -184,7 +184,11 @@ public partial class App : Application
                         return;
 
                     case "--install-assoc":
-                        ShellIntegration.InstallAssociations();
+                        if (e.Args.Length > 1 && !string.IsNullOrWhiteSpace(e.Args[1]))
+                            ShellIntegration.InstallAssociations(
+                                e.Args[1].Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
+                        else
+                            ShellIntegration.InstallAssociations();
                         AppMessageBox.Show(L.T(L.App_AssocInstalled),
                             L.T(L.App_MantisZipTitle), MessageBoxButton.OK, MessageBoxImage.Information);
                         Shutdown();
@@ -260,7 +264,19 @@ public partial class App : Application
 
         // 正常启动：手动创建主窗口（已移除 StartupUri）
         TraceLog("OnStartup: creating MainWindow");
-        var mainWin = new MainWindow();
+        MainWindow mainWin;
+        try
+        {
+            mainWin = new MainWindow();
+        }
+        catch (Exception ex)
+        {
+            Log("创建主窗口失败: {0}\n{1}", ex.Message, ex.StackTrace ?? "");
+            AppMessageBox.Show(L.TF(L.App_StartupFailed, ex.Message), L.T(L.App_StartupErrorTitle),
+                MessageBoxButton.OK, MessageBoxImage.Error);
+            Shutdown();
+            return;
+        }
         TraceLog("OnStartup: MainWindow created, showing");
         mainWin.Show();
         TraceLog("OnStartup: MainWindow shown");

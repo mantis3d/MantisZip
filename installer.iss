@@ -29,7 +29,7 @@ ChangesEnvironment=yes
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
-Name: "简体中文"; MessagesFile: "compiler:Languages\ChineseSimplified.isl"
+Name: "chinese"; MessagesFile: "compiler:Languages\ChineseSimplified.isl"
 
 [CustomMessages]
 ; English
@@ -40,7 +40,7 @@ english.ThemeLight=Light theme
 english.ThemeDark=Dark theme
 english.ShellGroup=System Integration
 english.InstallShell=Add to Windows context menu
-english.InstallAssoc=Associate archive file types (.zip, .7z, .rar, etc.)
+english.AssocGroup=File type associations
 
 ; Chinese (Simplified)
 chinese.ConfigPageTitle=安装配置
@@ -50,47 +50,38 @@ chinese.ThemeLight=浅色主题
 chinese.ThemeDark=深色主题
 chinese.ShellGroup=系统集成
 chinese.InstallShell=添加到 Windows 右键菜单
-chinese.InstallAssoc=关联压缩包文件格式（.zip, .7z, .rar 等）
+chinese.AssocGroup=文件关联
 
 [Tasks]
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"
 
 [Files]
-; === MantisZip Core ===
+; === All DLLs (wildcard — automatically includes new dependencies) ===
+Source: "publish_output\*.dll"; DestDir: "{app}"; Flags: ignoreversion
+
+; === Executables ===
 Source: "publish_output\MantisZip.UI.exe"; DestDir: "{app}"; Flags: ignoreversion
-Source: "publish_output\MantisZip.UI.dll"; DestDir: "{app}"; Flags: ignoreversion
-Source: "publish_output\MantisZip.UI.deps.json"; DestDir: "{app}"; Flags: ignoreversion
-Source: "publish_output\MantisZip.UI.runtimeconfig.json"; DestDir: "{app}"; Flags: ignoreversion
-Source: "publish_output\MantisZip.Core.dll"; DestDir: "{app}"; Flags: ignoreversion
+
+; === Debug symbols ===
 Source: "publish_output\MantisZip.Core.pdb"; DestDir: "{app}"; Flags: ignoreversion
 Source: "publish_output\MantisZip.UI.pdb"; DestDir: "{app}"; Flags: ignoreversion
 
-; === ShellExt COM context menu handler ===
-Source: "publish_output\MantisZip.ShellExt.dll"; DestDir: "{app}"; Flags: ignoreversion
-Source: "publish_output\MantisZip.ShellExt.comhost.dll"; DestDir: "{app}"; Flags: ignoreversion
+; === Runtime config (required for .NET assembly resolution) ===
+Source: "publish_output\MantisZip.UI.deps.json"; DestDir: "{app}"; Flags: ignoreversion
+Source: "publish_output\MantisZip.UI.runtimeconfig.json"; DestDir: "{app}"; Flags: ignoreversion
 Source: "publish_output\MantisZip.ShellExt.runtimeconfig.json"; DestDir: "{app}"; Flags: ignoreversion
-
-; === Third-party dependencies ===
-Source: "publish_output\CommunityToolkit.Mvvm.dll"; DestDir: "{app}"; Flags: ignoreversion
-Source: "publish_output\ICSharpCode.SharpZipLib.dll"; DestDir: "{app}"; Flags: ignoreversion
-Source: "publish_output\SharpCompress.dll"; DestDir: "{app}"; Flags: ignoreversion
-Source: "publish_output\SharpSevenZip.dll"; DestDir: "{app}"; Flags: ignoreversion
-Source: "publish_output\Markdig.dll"; DestDir: "{app}"; Flags: ignoreversion
-Source: "publish_output\Microsoft.Data.Sqlite.dll"; DestDir: "{app}"; Flags: ignoreversion
-Source: "publish_output\Microsoft.Web.WebView2.Core.dll"; DestDir: "{app}"; Flags: ignoreversion
-Source: "publish_output\Microsoft.Web.WebView2.Wpf.dll"; DestDir: "{app}"; Flags: ignoreversion
-Source: "publish_output\Ookii.Dialogs.Wpf.dll"; DestDir: "{app}"; Flags: ignoreversion
-Source: "publish_output\Ude.NetStandard.dll"; DestDir: "{app}"; Flags: ignoreversion
-Source: "publish_output\Emoji.Wpf.dll"; DestDir: "{app}"; Flags: ignoreversion
-Source: "publish_output\WpfAnimatedGif.dll"; DestDir: "{app}"; Flags: ignoreversion
 
 ; === 7z.dll (SharpSevenZip): architecture-specific subdirectories ===
 Source: "publish_output\x64\7z.dll"; DestDir: "{app}\x64"; Flags: ignoreversion
 Source: "publish_output\x86\7z.dll"; DestDir: "{app}\x86"; Flags: ignoreversion
 
-; === Resources (file type icons and context menu icons) ===
+; === Resources (app icon, file type icons, context menu icons, localization) ===
+Source: "publish_output\Resources\App.ico"; DestDir: "{app}\Resources"; Flags: ignoreversion
 Source: "publish_output\Resources\Icons\*.ico"; DestDir: "{app}\Resources\Icons"; Flags: ignoreversion
 Source: "publish_output\Resources\MenuIcons\*.ico"; DestDir: "{app}\Resources\MenuIcons"; Flags: ignoreversion
+Source: "publish_output\Resources\strings.en.json"; DestDir: "{app}\Resources"; Flags: ignoreversion
+Source: "publish_output\Resources\strings.zh.json"; DestDir: "{app}\Resources"; Flags: ignoreversion
+Source: "publish_output\Resources\languages.json"; DestDir: "{app}\Resources"; Flags: ignoreversion
 
 ; === License (7z.dll is distributed under GNU Lesser General Public License) ===
 Source: "lgpl.txt"; DestDir: "{app}"; Flags: ignoreversion
@@ -101,12 +92,12 @@ Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; WorkingDi
 
 [Run]
 Filename: "{app}\{#MyAppExeName}"; Parameters: "--install-shell"; Flags: nowait skipifsilent; WorkingDir: "{app}"; Check: IsShellInstallChecked
-Filename: "{app}\{#MyAppExeName}"; Parameters: "--install-assoc"; Flags: nowait skipifsilent; WorkingDir: "{app}"; Check: IsAssocInstallChecked
+Filename: "{app}\{#MyAppExeName}"; Parameters: "--install-assoc {code:GetAssocParams}"; Flags: nowait skipifsilent; WorkingDir: "{app}"; Check: IsAnyAssocChecked
 Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#StringChange(MyAppName, '&', '&&')}}"; Flags: nowait postinstall skipifsilent; WorkingDir: "{app}"
 
 [UninstallRun]
-Filename: "{app}\{#MyAppExeName}"; Parameters: "--uninstall-shell"; Flags: nowait skipifsilent runhidden; WorkingDir: "{app}"
-Filename: "{app}\{#MyAppExeName}"; Parameters: "--uninstall-assoc"; Flags: nowait skipifsilent runhidden; WorkingDir: "{app}"
+Filename: "{app}\{#MyAppExeName}"; Parameters: "--uninstall-shell"; Flags: runhidden; WorkingDir: "{app}"
+Filename: "{app}\{#MyAppExeName}"; Parameters: "--uninstall-assoc"; Flags: runhidden; WorkingDir: "{app}"
 
 [Code]
 const
@@ -119,13 +110,23 @@ var
   ThemeLightRadio: TNewRadioButton;
   ThemeDarkRadio: TNewRadioButton;
   InstallShellCheck: TNewCheckBox;
-  InstallAssocCheck: TNewCheckBox;
+  // Per-format association checkboxes
+  AssocCheckZip: TNewCheckBox;
+  AssocCheck7z: TNewCheckBox;
+  AssocCheckRar: TNewCheckBox;
+  AssocCheckTar: TNewCheckBox;
+  AssocCheckTarGz: TNewCheckBox;
+  AssocCheckGz: TNewCheckBox;
+  AssocCheckIso: TNewCheckBox;
 
 // Create the custom configuration wizard page (theme + system integration)
 procedure CreateConfigPage;
 var
   ThemeGroupLabel: TNewStaticText;
   ShellGroupLabel: TNewStaticText;
+  AssocGroupLabel: TNewStaticText;
+  RowTop: Integer;
+  RowTop2: Integer;
 begin
   WPConfigPage := CreateCustomPage(wpLicense,
     CustomMessage('ConfigPageTitle'),
@@ -168,13 +169,74 @@ begin
   InstallShellCheck.Width := WPConfigPage.SurfaceWidth - ScaleX(32);
   InstallShellCheck.Checked := True;
 
-  InstallAssocCheck := TNewCheckBox.Create(WPConfigPage);
-  InstallAssocCheck.Parent := WPConfigPage.Surface;
-  InstallAssocCheck.Caption := CustomMessage('InstallAssoc');
-  InstallAssocCheck.Top := InstallShellCheck.Top + ScaleY(24);
-  InstallAssocCheck.Left := 16;
-  InstallAssocCheck.Width := WPConfigPage.SurfaceWidth - ScaleX(32);
-  InstallAssocCheck.Checked := True;
+  // --- File type associations (per-format checkboxes) ---
+  AssocGroupLabel := TNewStaticText.Create(WPConfigPage);
+  AssocGroupLabel.Parent := WPConfigPage.Surface;
+  AssocGroupLabel.Caption := CustomMessage('AssocGroup');
+  AssocGroupLabel.Font.Style := [fsBold];
+  AssocGroupLabel.Top := InstallShellCheck.Top + ScaleY(28);
+  AssocGroupLabel.Left := 0;
+
+  RowTop := AssocGroupLabel.Top + ScaleY(20);
+
+  AssocCheckZip := TNewCheckBox.Create(WPConfigPage);
+  AssocCheckZip.Parent := WPConfigPage.Surface;
+  AssocCheckZip.Caption := '.zip';
+  AssocCheckZip.Top := RowTop;
+  AssocCheckZip.Left := 16;
+  AssocCheckZip.Width := ScaleX(64);
+  AssocCheckZip.Checked := True;
+
+  AssocCheck7z := TNewCheckBox.Create(WPConfigPage);
+  AssocCheck7z.Parent := WPConfigPage.Surface;
+  AssocCheck7z.Caption := '.7z';
+  AssocCheck7z.Top := RowTop;
+  AssocCheck7z.Left := ScaleX(96);
+  AssocCheck7z.Width := ScaleX(64);
+  AssocCheck7z.Checked := True;
+
+  AssocCheckRar := TNewCheckBox.Create(WPConfigPage);
+  AssocCheckRar.Parent := WPConfigPage.Surface;
+  AssocCheckRar.Caption := '.rar';
+  AssocCheckRar.Top := RowTop;
+  AssocCheckRar.Left := ScaleX(176);
+  AssocCheckRar.Width := ScaleX(64);
+  AssocCheckRar.Checked := True;
+
+  AssocCheckTar := TNewCheckBox.Create(WPConfigPage);
+  AssocCheckTar.Parent := WPConfigPage.Surface;
+  AssocCheckTar.Caption := '.tar';
+  AssocCheckTar.Top := RowTop;
+  AssocCheckTar.Left := ScaleX(256);
+  AssocCheckTar.Width := ScaleX(64);
+  AssocCheckTar.Checked := True;
+
+  // Row 2
+  RowTop2 := RowTop + ScaleY(24);
+
+  AssocCheckTarGz := TNewCheckBox.Create(WPConfigPage);
+  AssocCheckTarGz.Parent := WPConfigPage.Surface;
+  AssocCheckTarGz.Caption := '.tar.gz';
+  AssocCheckTarGz.Top := RowTop2;
+  AssocCheckTarGz.Left := 16;
+  AssocCheckTarGz.Width := ScaleX(80);
+  AssocCheckTarGz.Checked := True;
+
+  AssocCheckGz := TNewCheckBox.Create(WPConfigPage);
+  AssocCheckGz.Parent := WPConfigPage.Surface;
+  AssocCheckGz.Caption := '.gz';
+  AssocCheckGz.Top := RowTop2;
+  AssocCheckGz.Left := ScaleX(112);
+  AssocCheckGz.Width := ScaleX(64);
+  AssocCheckGz.Checked := True;
+
+  AssocCheckIso := TNewCheckBox.Create(WPConfigPage);
+  AssocCheckIso.Parent := WPConfigPage.Surface;
+  AssocCheckIso.Caption := '.iso';
+  AssocCheckIso.Top := RowTop2;
+  AssocCheckIso.Left := ScaleX(192);
+  AssocCheckIso.Width := ScaleX(64);
+  AssocCheckIso.Checked := True;
 end;
 
 // Map Inno Setup language code to MantisZip app language code
@@ -206,9 +268,32 @@ begin
   Result := InstallShellCheck.Checked;
 end;
 
-function IsAssocInstallChecked: Boolean;
+// Returns true if at least one format checkbox is checked
+function IsAnyAssocChecked: Boolean;
 begin
-  Result := InstallAssocCheck.Checked;
+  Result := AssocCheckZip.Checked or AssocCheck7z.Checked or AssocCheckRar.Checked
+         or AssocCheckTar.Checked or AssocCheckTarGz.Checked or AssocCheckGz.Checked
+         or AssocCheckIso.Checked;
+end;
+
+// Builds comma-separated list of checked extensions for the --install-assoc parameter
+function GetAssocParams(Param: string): string;
+var
+  parts: TStringList;
+begin
+  parts := TStringList.Create;
+  try
+    if AssocCheckZip.Checked then parts.Add('.zip');
+    if AssocCheck7z.Checked then parts.Add('.7z');
+    if AssocCheckRar.Checked then parts.Add('.rar');
+    if AssocCheckTar.Checked then parts.Add('.tar');
+    if AssocCheckTarGz.Checked then parts.Add('.tar.gz');
+    if AssocCheckGz.Checked then parts.Add('.gz');
+    if AssocCheckIso.Checked then parts.Add('.iso');
+    Result := parts.CommaText;
+  finally
+    parts.Free;
+  end;
 end;
 
 procedure InitializeWizard;
@@ -237,8 +322,9 @@ var
   SettingsDir: string;
   SettingsFile: string;
 begin
-  if CurStep = ssInstall then
+  if CurStep = ssPostInstall then
   begin
+    // 在复制文件完成后安装 WebView2 Runtime（避免阻塞文件安装进度条）
     if not IsWebView2Installed then
     begin
       BootstrapperPath := ExpandConstant('{tmp}\MicrosoftEdgeWebview2Setup.exe');
@@ -261,10 +347,7 @@ begin
     end
     else
       Log('WebView2 Runtime is already installed.');
-  end;
 
-  if CurStep = ssPostInstall then
-  begin
     SettingsDir := ExpandConstant('{localappdata}\MantisZip');
     SettingsFile := SettingsDir + '\settings.json';
 
