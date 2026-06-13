@@ -223,6 +223,7 @@ public partial class MainWindow
             if (PreviewTextBox.Visibility == Visibility.Visible)
                 PreviewTextBox.FontSize = size;
         };
+        window.Owner = this;
         window.ShowDialog();
         if (PreviewTextBox.Visibility == Visibility.Visible)
             PreviewTextBox.FontSize = AppSettings.Instance.TextPreviewFontSize;

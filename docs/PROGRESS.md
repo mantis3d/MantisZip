@@ -18,6 +18,21 @@
 
 ## 版本历史（从新到旧）
 
+ ### v0.3.13 (2026-06-13) 安装脚本修正 + 对话框 Owner 修复
+
+0. **installer.iss 修正**：
+   - 移除 `publish_output\*.dll` 通配符（避免重复+遗漏）
+   - 添加 ShellExt COM 文件：`MantisZip.ShellExt.dll`、`.comhost.dll`、`.runtimeconfig.json`
+   - 添加 6 个缺失 NuGet DLL（SharpCompress、SharpSevenZip、Microsoft.Data.Sqlite、Emoji.Wpf、WpfAnimatedGif）
+   - 添加 `Resources\Icons\*.ico` 和 `Resources\MenuIcons\*.ico`
+   - 启用 `[UninstallRun]`：卸载时调用 `--uninstall-shell` 和 `--uninstall-assoc`
+
+1. **对话框 Owner 修正**（6 个文件）：修复弹窗被主窗口挡住的问题
+   - `AppMessageBox.xaml.cs`：`Show()`/`ShowWithAction()` 添加 `GetActiveWindow()` 自动检测 Owner，修复 85+ 个调用点
+   - `MainWindow.Menu.cs`：`SettingsWindow` 设 Owner
+   - `App.Compress.cs` / `App.Extract.cs` / `App.Open.cs`：CLI 模式下的冲突/命名对话框设 Owner
+   - `CompressSettingsWindow.xaml.cs`：3 个冲突对话框设 Owner
+
 ### v0.3.13 (2026-06-12) ZipEngine SharpZipLib → SharpCompress 迁移 + 压缩批处理文件进度条修复 + 压缩完成后进程残留修复
 
 0. **关联计划同步 + .NET 11 追踪**：

@@ -29,7 +29,7 @@ ChangesEnvironment=yes
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
-Name: "chinese"; MessagesFile: "compiler:Languages\ChineseSimplified.isl"
+Name: "简体中文"; MessagesFile: "compiler:Languages\ChineseSimplified.isl"
 
 [CustomMessages]
 ; English
@@ -56,6 +56,7 @@ chinese.InstallAssoc=关联压缩包文件格式（.zip, .7z, .rar 等）
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"
 
 [Files]
+; === MantisZip Core ===
 Source: "publish_output\MantisZip.UI.exe"; DestDir: "{app}"; Flags: ignoreversion
 Source: "publish_output\MantisZip.UI.dll"; DestDir: "{app}"; Flags: ignoreversion
 Source: "publish_output\MantisZip.UI.deps.json"; DestDir: "{app}"; Flags: ignoreversion
@@ -63,19 +64,36 @@ Source: "publish_output\MantisZip.UI.runtimeconfig.json"; DestDir: "{app}"; Flag
 Source: "publish_output\MantisZip.Core.dll"; DestDir: "{app}"; Flags: ignoreversion
 Source: "publish_output\MantisZip.Core.pdb"; DestDir: "{app}"; Flags: ignoreversion
 Source: "publish_output\MantisZip.UI.pdb"; DestDir: "{app}"; Flags: ignoreversion
+
+; === ShellExt COM context menu handler ===
+Source: "publish_output\MantisZip.ShellExt.dll"; DestDir: "{app}"; Flags: ignoreversion
+Source: "publish_output\MantisZip.ShellExt.comhost.dll"; DestDir: "{app}"; Flags: ignoreversion
+Source: "publish_output\MantisZip.ShellExt.runtimeconfig.json"; DestDir: "{app}"; Flags: ignoreversion
+
+; === Third-party dependencies ===
 Source: "publish_output\CommunityToolkit.Mvvm.dll"; DestDir: "{app}"; Flags: ignoreversion
 Source: "publish_output\ICSharpCode.SharpZipLib.dll"; DestDir: "{app}"; Flags: ignoreversion
+Source: "publish_output\SharpCompress.dll"; DestDir: "{app}"; Flags: ignoreversion
+Source: "publish_output\SharpSevenZip.dll"; DestDir: "{app}"; Flags: ignoreversion
 Source: "publish_output\Markdig.dll"; DestDir: "{app}"; Flags: ignoreversion
+Source: "publish_output\Microsoft.Data.Sqlite.dll"; DestDir: "{app}"; Flags: ignoreversion
 Source: "publish_output\Microsoft.Web.WebView2.Core.dll"; DestDir: "{app}"; Flags: ignoreversion
 Source: "publish_output\Microsoft.Web.WebView2.Wpf.dll"; DestDir: "{app}"; Flags: ignoreversion
 Source: "publish_output\Ookii.Dialogs.Wpf.dll"; DestDir: "{app}"; Flags: ignoreversion
 Source: "publish_output\Ude.NetStandard.dll"; DestDir: "{app}"; Flags: ignoreversion
+Source: "publish_output\Emoji.Wpf.dll"; DestDir: "{app}"; Flags: ignoreversion
+Source: "publish_output\WpfAnimatedGif.dll"; DestDir: "{app}"; Flags: ignoreversion
+
+; === 7z.dll (SharpSevenZip): architecture-specific subdirectories ===
 Source: "publish_output\x64\7z.dll"; DestDir: "{app}\x64"; Flags: ignoreversion
 Source: "publish_output\x86\7z.dll"; DestDir: "{app}\x86"; Flags: ignoreversion
-; LGPL license for 7z.dll (distributed under GNU Lesser General Public License)
+
+; === Resources (file type icons and context menu icons) ===
+Source: "publish_output\Resources\Icons\*.ico"; DestDir: "{app}\Resources\Icons"; Flags: ignoreversion
+Source: "publish_output\Resources\MenuIcons\*.ico"; DestDir: "{app}\Resources\MenuIcons"; Flags: ignoreversion
+
+; === License (7z.dll is distributed under GNU Lesser General Public License) ===
 Source: "lgpl.txt"; DestDir: "{app}"; Flags: ignoreversion
-; Include all native DLLs recursively if any
-Source: "publish_output\*.dll"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs
 
 [Icons]
 Name: "{autoprograms}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; WorkingDir: "{app}"
@@ -87,7 +105,8 @@ Filename: "{app}\{#MyAppExeName}"; Parameters: "--install-assoc"; Flags: nowait 
 Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#StringChange(MyAppName, '&', '&&')}}"; Flags: nowait postinstall skipifsilent; WorkingDir: "{app}"
 
 [UninstallRun]
-; Note: shell integration cleanup is manual via Settings window
+Filename: "{app}\{#MyAppExeName}"; Parameters: "--uninstall-shell"; Flags: nowait skipifsilent runhidden; WorkingDir: "{app}"
+Filename: "{app}\{#MyAppExeName}"; Parameters: "--uninstall-assoc"; Flags: nowait skipifsilent runhidden; WorkingDir: "{app}"
 
 [Code]
 const

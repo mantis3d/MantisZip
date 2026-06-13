@@ -71,6 +71,7 @@ public partial class AppMessageBox : Window
         MessageBoxButton button = MessageBoxButton.OK, MessageBoxImage icon = MessageBoxImage.None)
     {
         var dialog = new AppMessageBox(message, title, button, icon);
+        dialog.Owner = GetActiveWindow();
         dialog.ShowDialog();
         return dialog._result;
     }
@@ -92,7 +93,18 @@ public partial class AppMessageBox : Window
     {
         var dialog = new AppMessageBox(message, title, MessageBoxButton.OK, icon,
             actionButtonText, action);
+        dialog.Owner = GetActiveWindow();
         dialog.ShowDialog();
+    }
+
+    /// <summary>
+    /// 获取当前活跃窗口，用于没有显式 Owner 的对话框自动指定 Owner，
+    /// 避免弹窗出现在主窗口后面。
+    /// </summary>
+    private static Window? GetActiveWindow()
+    {
+        try { return Application.Current?.Windows.OfType<Window>().FirstOrDefault(w => w.IsActive); }
+        catch { return null; }
     }
 
     private void Ok_Click(object sender, RoutedEventArgs e)

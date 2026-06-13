@@ -423,6 +423,7 @@ public partial class CompressSettingsWindow : Window
                         return new CompressConflictResolution(chosenAction.Value, null);
 
                     var dlg = new CompressConflictDialog(info.OutputPath, info.CanAdd, info.SuggestedName);
+                    dlg.Owner = progressWindow;
                     dlg.ShowDialog();
                     if (dlg.ApplyToAll) { applyToAll = true; chosenAction = (Core.Abstractions.CompressConflictAction)dlg.ResultAction; }
                     return new CompressConflictResolution((Core.Abstractions.CompressConflictAction)dlg.ResultAction, dlg.CustomName);
@@ -495,6 +496,7 @@ public partial class CompressSettingsWindow : Window
                     return progressWindow.Dispatcher.Invoke(() =>
                     {
                         var dlg = new CompressConflictDialog(info.OutputPath, info.CanAdd, info.SuggestedName);
+                        dlg.Owner = progressWindow;
                         dlg.ShowDialog();
                         if (dlg.ApplyToAll) { applyToAll = true; chosenAction = (Core.Abstractions.CompressConflictAction)dlg.ResultAction; }
                         return new CompressConflictResolution((Core.Abstractions.CompressConflictAction)dlg.ResultAction, dlg.CustomName);
@@ -591,6 +593,7 @@ public partial class CompressSettingsWindow : Window
                         return new CompressConflictResolution(chosenAction.Value, null);
 
                     var dlg = new CompressConflictDialog(info.OutputPath, info.CanAdd, info.SuggestedName);
+                    dlg.Owner = progressWindow;
                     dlg.ShowDialog();
                     if (dlg.ApplyToAll) { applyToAll = true; chosenAction = (Core.Abstractions.CompressConflictAction)dlg.ResultAction; }
                     return new CompressConflictResolution((Core.Abstractions.CompressConflictAction)dlg.ResultAction, dlg.CustomName);
