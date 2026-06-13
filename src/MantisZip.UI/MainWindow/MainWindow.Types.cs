@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Windows.Media;
 using MantisZip.Core.Abstractions;
+using MantisZip.Core.Utils;
 
 namespace MantisZip.UI;
 
@@ -100,12 +101,5 @@ public class ArchiveItem : Core.Abstractions.ArchiveItem
         ? Math.Min(RatioSort, 1.0)
         : 0;
 
-    internal static string FormatSize(long bytes)
-    {
-        string[] sizes = { "B", "KB", "MB", "GB", "TB" };
-        double len = bytes;
-        int order = 0;
-        while (len >= 1024 && order < sizes.Length - 1) { order++; len /= 1024; }
-        return $"{len:0.##} {sizes[order]}";
-    }
+    internal static string FormatSize(long bytes) => FormatUtil.FormatSize(bytes);
 }

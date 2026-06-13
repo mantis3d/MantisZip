@@ -275,15 +275,7 @@ public partial class MainWindow
     /// 根据字体文件扩展名推断预览加载失败的原因，用于在信息面板显示。
     /// </summary>
     private static string GetFontLoadFailureReason(string fontFilePath)
-    {
-        string ext = Path.GetExtension(fontFilePath)?.ToLowerInvariant() ?? "";
-        return ext switch
-        {
-            ".otf" => "CFF 轮廓格式（OpenType）",
-            ".woff" or ".woff2" => "Web 字体格式",
-            _ => "WPF 字体系统限制",
-        };
-    }
+        => FormatUtil.GetFontLoadFailureReason(fontFilePath);
 
     // ── Audio ──
 
@@ -479,7 +471,7 @@ public partial class MainWindow
             if (info.TorrentTotalSize > 0) sb.AppendLine($"  总大小: {FormatSize(info.TorrentTotalSize!.Value)}");
             if (info.PieceCount > 0) sb.AppendLine($"  分片: {info.PieceCount} × {(info.PieceSize.HasValue ? FormatSize(info.PieceSize.Value) : "?")}");
             sb.AppendLine();
-            BuildTorrentFileTree(info, sb);
+            sb.Append(FormatUtil.BuildTorrentFileTree(info));
             sb.AppendLine();
             if (info.MagnetLink != null) { sb.AppendLine(L.T(L.Preview_TorrentMagnet)); sb.Append(info.MagnetLink); }
             PreviewTextBox.Text = sb.ToString(); PreviewTextBox.FontSize = 12;
@@ -500,38 +492,6 @@ public partial class MainWindow
         catch (Exception ex) { App.LogDebug("ShowTorrentPreview: failed: {0}", ex.Message); ShowUnsupportedPreview(null, L.T(L.Preview_TorrentParseFailed)); }
     }
 
-    private static void BuildTorrentFileTree(FileFormatInfo info, StringBuilder sb)
-    {
-        if (info.TorrentFileEntries == null || info.TorrentFileEntries.Count == 0)
-        { sb.AppendLine($"  ({info.TorrentFileName ?? "?"})"); return; }
-        var root = new Dictionary<string, object>();
-        foreach (var (path, size) in info.TorrentFileEntries)
-        {
-            var parts = path.Split('/'); var current = root;
-            for (int i = 0; i < parts.Length - 1; i++)
-            {
-                if (!current.TryGetValue(parts[i], out var child)) { var sub = new Dictionary<string, object>(); current[parts[i]] = sub; child = sub; }
-                current = (Dictionary<string, object>)child!;
-            }
-            current[parts[^1]] = size;
-        }
-        RenderTree(sb, root, "");
-    }
-
-    private static void RenderTree(StringBuilder sb, Dictionary<string, object> node, string indent)
-    {
-        var items = node.ToArray();
-        for (int i = 0; i < items.Length; i++)
-        {
-            bool isLast = i == items.Length - 1;
-            string prefix = isLast ? "└── " : "├── ";
-            string childIndent = isLast ? "    " : "│   ";
-            if (items[i].Value is Dictionary<string, object> sub)
-            { sb.AppendLine($"{indent}{prefix}[DIR] {items[i].Key}/"); RenderTree(sb, sub, indent + childIndent); }
-            else
-            { sb.AppendLine($"{indent}{prefix}{items[i].Key}  ({ArchiveItem.FormatSize((long)items[i].Value)})"); }
-        }
-    }
 
     // ── Office ──
 

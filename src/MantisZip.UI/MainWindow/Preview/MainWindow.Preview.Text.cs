@@ -41,58 +41,7 @@ public partial class MainWindow
     /// 置信度不足时退化为 UTF-8 → GBK 回退。
     /// </summary>
     private static string DetectAndReadText(string filePath)
-    {
-        // 读取文件头供编码检测（不需要全文）
-        byte[] header;
-        using (var fs = new FileStream(filePath, FileMode.Open, FileAccess.Read))
-        {
-            int len = (int)Math.Min(fs.Length, 4096);
-            header = new byte[len];
-            fs.ReadExactly(header, 0, len);
-        }
-
-        var detector = new CharsetDetector();
-        detector.Feed(header, 0, header.Length);
-        detector.DataEnd();
-
-        string detected = detector.Charset;
-        double confidence = detector.Confidence;
-
-        App.LogDebug("DetectAndReadText: detected={0}, confidence={1:P1}", detected, confidence);
-
-        // 置信度 >= 50% 且编码名有效 → 用检测到的编码读取
-        if (confidence >= 0.5 && !string.IsNullOrEmpty(detected))
-        {
-            try
-            {
-                // Ude 返回的编码名与 .NET 兼容（如 "GB-18030"、"Shift_JIS"）
-                var enc = Encoding.GetEncoding(detected);
-                return File.ReadAllText(filePath, enc);
-            }
-            catch (Exception ex)
-            {
-                App.LogDebug("DetectAndReadText: detected encoding {0} failed: {1}", detected, ex.Message);
-                // 降级到回退逻辑
-            }
-        }
-
-        // 回退：UTF-8 → 系统默认 ANSI 编码
-        try
-        {
-            var utf8 = File.ReadAllText(filePath, Encoding.UTF8);
-            if (!utf8.Contains('\uFFFD'))
-                return utf8;
-            App.LogDebug("DetectAndReadText: UTF8 fallback produced replacement chars, trying system default encoding");
-        }
-        catch (Exception utfEx)
-        {
-            App.LogDebug("DetectAndReadText: UTF8 fallback failed: {0}", utfEx.Message);
-        }
-
-        // 使用系统默认 ANSI 编码（中文=GBK，日文=Shift-JIS，等），不做硬编码假设
-        var systemEncoding = Encoding.GetEncoding(CultureInfo.CurrentCulture.TextInfo.ANSICodePage);
-        return File.ReadAllText(filePath, systemEncoding);
-    }
+        => TextEncodingDetector.DetectAndReadText(filePath);
 
     // ── Text Preview ──
 
@@ -218,19 +167,19 @@ public partial class MainWindow
                     return;
                 }
 
-                headers = ParseCsvLine(headerLine);
+                headers = CsvParser.ParseCsvLine(headerLine);
                 // 截断到 maxCols
                 if (headers.Length > maxCols)
                     headers = headers.Take(maxCols).ToArray();
                 // 空列名自动生成编号，保证唯一（避免 DataGrid 绑定失败）
-                headers = MakeUniqueColumnNames(headers);
+                headers = CsvParser.MakeUniqueColumnNames(headers);
                 lines.Add(headers);
 
                 // 读取数据行（限制行数）
                 string? dataLine;
                 while ((dataLine = reader.ReadLine()) != null && lines.Count <= maxRows + 1)
                 {
-                    var fields = ParseCsvLine(dataLine);
+                    var fields = CsvParser.ParseCsvLine(dataLine);
                     if (fields.Length > maxCols)
                         fields = fields.Take(maxCols).ToArray();
                     lines.Add(fields);
@@ -277,82 +226,4 @@ public partial class MainWindow
     /// <summary>
     /// 确保列名合法且唯一：空值替换为"列N"，同名追加后缀。
     /// </summary>
-    private static string[] MakeUniqueColumnNames(string[] rawHeaders)
-    {
-        var result = new string[rawHeaders.Length];
-        var used = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        for (int i = 0; i < rawHeaders.Length; i++)
-        {
-            var name = string.IsNullOrEmpty(rawHeaders[i]) ? $"列{i + 1}" : rawHeaders[i];
-            // 同名冲突 → 追加 _2, _3...
-            if (used.Contains(name))
-            {
-                int suffix = 2;
-                while (used.Contains($"{name}_{suffix}"))
-                    suffix++;
-                name = $"{name}_{suffix}";
-            }
-            used.Add(name);
-            result[i] = name;
-        }
-        return result;
-    }
-
-    /// <summary>
-    /// 解析一行 CSV，处理引号包裹的字段和转义引号。
-    /// </summary>
-    private static string[] ParseCsvLine(string line)
-    {
-        var fields = new List<string>();
-        int i = 0;
-        while (i < line.Length)
-        {
-            if (line[i] == '"')
-            {
-                // 引号包裹的字段
-                i++;
-                var sb = new StringBuilder();
-                while (i < line.Length)
-                {
-                    if (line[i] == '"')
-                    {
-                        // 转义的引号 ""
-                        if (i + 1 < line.Length && line[i + 1] == '"')
-                        {
-                            sb.Append('"');
-                            i += 2;
-                        }
-                        else
-                        {
-                            i++; // 跳过闭合引号
-                            break;
-                        }
-                    }
-                    else
-                    {
-                        sb.Append(line[i]);
-                        i++;
-                    }
-                }
-                fields.Add(sb.ToString());
-                // 跳过逗号
-                if (i < line.Length && line[i] == ',')
-                    i++;
-            }
-            else
-            {
-                // 普通字段（到逗号或行尾）
-                var sb = new StringBuilder();
-                while (i < line.Length && line[i] != ',')
-                {
-                    sb.Append(line[i]);
-                    i++;
-                }
-                fields.Add(sb.ToString());
-                if (i < line.Length && line[i] == ',')
-                    i++;
-            }
-        }
-        return fields.ToArray();
-    }
 }
