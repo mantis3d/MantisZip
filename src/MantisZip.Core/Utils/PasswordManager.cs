@@ -5,6 +5,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
+using MantisZip.Core.Abstractions;
 using MantisZip.Core.Utils;
 
 namespace MantisZip.Core;
@@ -46,13 +47,15 @@ public class PasswordData
 }
 
 /// <summary>
-/// 密码管理器（DPAPI 加密存储，仅 Windows）
+/// 密码管理器（AES-GCM 加密存储，跨平台）
 /// </summary>
-[System.Runtime.Versioning.SupportedOSPlatform("windows")]
 public class PasswordManager
 {
     /// <summary>密码库最大条目数（防暴力破解滥用）</summary>
     public const int MaxEntries = 1000;
+
+    /// <summary>AES-GCM 格式文件前缀</summary>
+    internal const string FormatPrefix = "MZPAES|";
 
     private static readonly string AppDataPath = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
@@ -64,13 +67,23 @@ public class PasswordManager
 
     public static PasswordManager Instance => _instance.Value;
 
+    /// <summary>
+    /// 数据保护器。默认使用 AES-GCM，可在应用程序启动时更换为平台特定实现。
+    /// 必须在首次访问 <see cref="Instance"/> 之前设置。
+    /// </summary>
+    public static IDataProtector Protector { get; set; } = new AesGcmDataProtector();
+
     private PasswordManager()
     {
         Load();
     }
 
     /// <summary>
-    /// 加载密码数据
+    /// 加载密码数据。
+    /// 支持三种格式自动检测：
+    ///   1. 明文 JSON（v0.x 早期版本）
+    ///   2. DPAPI 加密（v0.3.x 版本）— 自动迁移到 AES-GCM
+    ///   3. AES-GCM 加密（当前版本）
     /// </summary>
     public void Load()
     {
@@ -80,21 +93,28 @@ public class PasswordManager
             if (File.Exists(PasswordFilePath))
             {
                 var raw = File.ReadAllText(PasswordFilePath);
+                var trimmed = raw.TrimStart();
 
-                // 旧格式 (未加密的 JSON) — 以 '{' 开头
-                if (raw.TrimStart().StartsWith("{") || raw.TrimStart().StartsWith("["))
+                // Format 1: 明文 JSON（v0.x 早期版本）
+                if (trimmed.StartsWith("{") || trimmed.StartsWith("["))
                 {
                     _data = JsonSerializer.Deserialize<PasswordData>(raw) ?? new PasswordData();
                     CoreLog.Info($"PasswordManager.Load: loaded {_data.Passwords.Count} entries (plaintext, will migrate on save)");
                 }
-                else
+                // Format 2: AES-GCM 加密（当前版本）
+                else if (trimmed.StartsWith(FormatPrefix))
                 {
-                    // 新格式：Base64 → DPAPI 解密 → JSON
-                    var ciphertext = Convert.FromBase64String(raw);
-                    var decrypted = ProtectedData.Unprotect(ciphertext, null, DataProtectionScope.CurrentUser);
+                    var base64 = trimmed.Substring(FormatPrefix.Length);
+                    var ciphertext = Convert.FromBase64String(base64);
+                    var decrypted = Protector.Unprotect(ciphertext);
                     var json = Encoding.UTF8.GetString(decrypted);
                     _data = JsonSerializer.Deserialize<PasswordData>(json) ?? new PasswordData();
-                    CoreLog.Info($"PasswordManager.Load: loaded {_data.Passwords.Count} entries (encrypted)");
+                    CoreLog.Info($"PasswordManager.Load: loaded {_data.Passwords.Count} entries (AES-GCM encrypted)");
+                }
+                // Format 3: 旧 DPAPI 加密格式（v0.3.x）— 自动迁移到 AES-GCM
+                else
+                {
+                    MigrateFromDpapi(raw);
                 }
             }
             else
@@ -123,7 +143,50 @@ public class PasswordManager
     }
 
     /// <summary>
-    /// 保存密码数据（DPAPI 加密）。
+    /// 从旧 DPAPI 加密格式迁移到 AES-GCM。
+    /// 解密成功后立即用 <see cref="Protector"/> 重写文件。
+    /// </summary>
+#pragma warning disable CA1416 // ProtectedData 仅 Windows 支持，此处由 try-catch PlatformNotSupportedException 兜底
+    private void MigrateFromDpapi(string raw)
+    {
+        try
+        {
+            var ciphertext = Convert.FromBase64String(raw);
+            var decrypted = ProtectedData.Unprotect(ciphertext, null, DataProtectionScope.CurrentUser);
+            var json = Encoding.UTF8.GetString(decrypted);
+            _data = JsonSerializer.Deserialize<PasswordData>(json) ?? new PasswordData();
+            CoreLog.Info($"PasswordManager.Load: loaded {_data.Passwords.Count} entries (DPAPI encrypted), migrating to AES-GCM");
+
+            // 备份旧 DPAPI 文件
+            var backupPath = PasswordFilePath + ".dpapi-backup";
+            if (!File.Exists(backupPath))
+            {
+                File.Copy(PasswordFilePath, backupPath);
+                CoreLog.Info("PasswordManager.Load: backed up DPAPI file to {0}", backupPath);
+            }
+
+            // 立即用 AES-GCM 格式保存
+            Save();
+
+            CoreLog.Info("PasswordManager.Load: migration complete (DPAPI → AES-GCM)");
+        }
+        catch (PlatformNotSupportedException)
+        {
+            // 非 Windows 平台无法解密 DPAPI 数据，抛出让外层 catch 处理
+            CoreLog.Trace("PasswordManager.MigrateFromDpapi: DPAPI not available on this platform, cannot migrate");
+            throw;
+        }
+        catch (Exception ex)
+        {
+            // 解密失败（不是 DPAPI 格式或密钥不匹配）
+            CoreLog.Trace("PasswordManager.MigrateFromDpapi: DPAPI decryption failed: {0}", ex.Message);
+            throw;
+        }
+    }
+#pragma warning restore CA1416
+
+    /// <summary>
+    /// 保存密码数据（AES-GCM 加密）。
     /// 保存失败时抛出异常，由调用方（UI 层）处理并通知用户。
     /// </summary>
     public void Save()
@@ -133,10 +196,10 @@ public class PasswordManager
 
         var json = JsonSerializer.Serialize(_data, new JsonSerializerOptions { WriteIndented = true });
         var plaintext = Encoding.UTF8.GetBytes(json);
-        var encrypted = ProtectedData.Protect(plaintext, null, DataProtectionScope.CurrentUser);
-        var base64 = Convert.ToBase64String(encrypted);
-        File.WriteAllText(PasswordFilePath, base64);
-        CoreLog.Info($"PasswordManager.Save: saved {_data.Passwords.Count} entries (encrypted)");
+        var encrypted = Protector.Protect(plaintext);
+        var encoded = FormatPrefix + Convert.ToBase64String(encrypted);
+        File.WriteAllText(PasswordFilePath, encoded);
+        CoreLog.Info($"PasswordManager.Save: saved {_data.Passwords.Count} entries (AES-GCM encrypted)");
     }
 
     /// <summary>

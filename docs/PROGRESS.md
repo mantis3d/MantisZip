@@ -18,7 +18,7 @@
 
 ## 版本历史（从新到旧）
 
- ### v0.3.13 (2026-06-13) 安装脚本修正 + 对话框 Owner 修复 + Emoji.Wpf 依赖缺失修复
+ ### v0.3.13 (2026-06-13) DPAPI → AES-GCM 替换 + 安装脚本修正 + 对话框 Owner 修复 + Emoji.Wpf 依赖缺失修复
 
 0. **installer.iss 通配符化 + Emoji.Wpf 依赖修复**：
    - **[Files]** 改为 `*.dll` 通配符，取代逐一手写 DLL 清单，杜绝未来遗漏
@@ -41,6 +41,15 @@
 4. **预置用户设置机制**：
    - 创建 `installer\prebuilt\settings.json` 和 `window.json`，安装器在首次安装时复制到 `%LOCALAPPDATA%\MantisZip\`
    - 用户替换这两个文件即可在安装后自动加载自己的配置
+
+5. **DPAPI → AES-GCM 替换**（跨平台移植 Phase 4 子任务）：
+   - 新建 `IDataProtector` 接口（`Core/Abstractions/`），抽象数据保护操作
+   - 新建 `AesGcmDataProtector`（`Core/Utils/`），基于 .NET `AesGcm`（AES-256-GCM）实现跨平台加密，密钥以文件形式存储于 `%APPDATA%/MantisZip/.masterkey`
+   - `PasswordManager` 移除 `[SupportedOSPlatform("windows")]` 特性，改为通过 `IDataProtector` 接口调用加密，默认使用 `AesGcmDataProtector`
+   - `Load()` 支持三种格式自动检测：明文 JSON → AES-GCM `MZPAES|` 格式 → 旧 DPAPI 格式（自动迁移）
+   - 旧 DPAPI 文件首次加载时自动解密并重写为 AES-GCM 格式，原文件备份为 `passwords.json.dpapi-backup`
+   - 所有 7 个 UI 消费端无需修改（`PasswordManager.Instance.*` API 签名不变）
+   - 参见 [跨平台移植计划](.sisyphus/plans/cross-platform-port.md)
 
 ### v0.3.13 (2026-06-12) ZipEngine SharpZipLib → SharpCompress 迁移 + 压缩批处理文件进度条修复 + 压缩完成后进程残留修复
 
