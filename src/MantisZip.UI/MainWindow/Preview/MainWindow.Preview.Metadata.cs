@@ -6,6 +6,8 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Media;
+using System.Windows.Media.Imaging;
+using System.Runtime.InteropServices;
 using Microsoft.Web.WebView2.Core;
 using MantisZip.Core;
 using MantisZip.Core.Abstractions;
@@ -80,22 +82,79 @@ public partial class MainWindow
             if (info == null) { ShowUnsupportedPreview(item, L.T(L.Preview_FontParseFailed)); return; }
             var sampleText = AppSettings.Instance.FontPreviewSampleText;
             if (string.IsNullOrEmpty(sampleText)) sampleText = "fi ff fl ffi ffl AaBbCc 123 示例";
-            // 将 FontFamily 设为字体文件对应的字体，使样本用实际字体渲染。
-            // 格式 "filePath#FamilyName" 是 WPF 加载字体的标准方式。
+
+            var fontFilePath = info.FontDecompressedPath ?? filePath;
+            var familyName = info.FontName ?? Path.GetFileNameWithoutExtension(filePath);
+
+            App.LogDebug("ShowFontPreview: fontFilePath={0}, familyName={1}", fontFilePath, familyName);
+
+            // 三层回退策略：
+            //   1. "path#FamilyName" — TrueType TTF 支持，无需额外依赖
+            //   2. FontFamily(directory, name) — WPF 通过 DirectWrite 扫描目录加载，支持 CFF-OTF
+            //   3. GlyphTypeface → GlyphRun → RenderTargetBitmap — 绝对兼容的纯渲染回退
+            bool fontLoaded = false;
+            bool glyphRendered = false;
+
+            // ─── 尝试 1：path#FamilyName ───
             try
             {
-                var fontFilePath = info.FontDecompressedPath ?? filePath;
-                var familyName = info.FontName ?? Path.GetFileNameWithoutExtension(filePath);
+                var ff = new FontFamily(fontFilePath + "#" + familyName);
+                var testTypeface = new Typeface(ff, FontStyles.Normal, FontWeights.Normal, FontStretches.Normal);
+                fontLoaded = testTypeface.FontFamily.FamilyNames.Values
+                    .Any(v => v.ToString().IndexOf(familyName, StringComparison.OrdinalIgnoreCase) >= 0);
+                App.LogDebug("ShowFontPreview: tier 1 (# syntax) result={0}", fontLoaded);
+            }
+            catch (Exception ex1) { App.LogDebug("ShowFontPreview: tier 1 exception: {0}", ex1.Message); }
+
+            if (fontLoaded)
+            {
                 PreviewTextBox.FontFamily = new FontFamily(fontFilePath + "#" + familyName);
             }
-            catch (Exception ex)
+            else
             {
-                App.LogDebug("ShowFontPreview: failed to load FontFamily: {0}", ex.Message);
+                // ─── 尝试 2：基于目录的 DirectWrite 加载 ───
+                try
+                {
+                    var fontDir = Path.GetDirectoryName(fontFilePath);
+                    if (fontDir != null)
+                    {
+                        var baseUri = new Uri(fontDir + "\\", UriKind.Absolute);
+                        var ff2 = new FontFamily(baseUri, familyName);
+                        var testTypeface2 = new Typeface(ff2, FontStyles.Normal, FontWeights.Normal, FontStretches.Normal);
+                        if (testTypeface2.FontFamily.FamilyNames.Values
+                            .Any(v => v.ToString().IndexOf(familyName, StringComparison.OrdinalIgnoreCase) >= 0))
+                        {
+                            PreviewTextBox.FontFamily = ff2;
+                            fontLoaded = true;
+                        }
+                        App.LogDebug("ShowFontPreview: tier 2 (dir scan) result={0}", fontLoaded);
+                    }
+                }
+                catch (Exception ex2) { App.LogDebug("ShowFontPreview: tier 2 exception: {0}", ex2.Message); }
+
+                // ─── 尝试 3：GlyphTypeface 渲染位图（绝对兼容） ───
+                if (!fontLoaded)
+                {
+                    glyphRendered = ShowFontPreviewGlyphRender(fontFilePath, familyName, sampleText);
+                    App.LogDebug("ShowFontPreview: tier 3 (GlyphRun) result={0}", glyphRendered);
+                }
             }
+
             PreviewTextBox.Text = sampleText;
             PreviewTextBox.FontSize = AppSettings.Instance.FontPreviewFontSize; PreviewTextBox.TextAlignment = TextAlignment.Left;
             HideAllPreviewControls();
-            PreviewTextBox.Visibility = Visibility.Visible;
+            if (glyphRendered)
+            {
+                PreviewImageScroll.Visibility = Visibility.Visible;
+            }
+            else
+            {
+                PreviewTextBox.Visibility = Visibility.Visible;
+                // 所有加载方式均失败，在信息面板显示原因
+                PreviewFormatInfo.Text = L.TF(L.Preview_FontLoadFailed, GetFontLoadFailureReason(fontFilePath));
+                PreviewFormatInfo.Foreground = new SolidColorBrush(
+                    System.Windows.Media.Color.FromArgb(255, 200, 120, 0)); // 橙色警告
+            }
             SetPreviewInfo(item); PreviewHeader.Text = L.TF(L.Preview_FontHeader, info.AdditionalInfo ?? "Font");
             ShowPreviewPanel();
             SetFormatSpecificInfo(
@@ -106,6 +165,124 @@ public partial class MainWindow
             // 连字开关因 WPF Typography 对外部字体不生效已移除，后续方案见 #32
         }
         catch (Exception ex) { App.LogDebug("ShowFontPreview: failed: {0}", ex.Message); ShowUnsupportedPreview(null, L.T(L.Preview_FontParseFailed)); }
+    }
+
+    /// <summary>
+    /// 最终回退：通过 GlyphTypeface + GlyphRun 直接渲染字体样本到位图，
+    /// 绕过 WPF FontFamily 对 CFF 轮廓 OpenType 字体的限制。
+    /// </summary>
+    private bool ShowFontPreviewGlyphRender(string fontFilePath, string familyName, string sampleText)
+    {
+        try
+        {
+            var glyphTypeface = new GlyphTypeface(new Uri(fontFilePath));
+            App.LogDebug("GlyphRender: loaded glyphTypeface, glyphCount={0}",
+                glyphTypeface.GlyphCount);
+            double fontSize = AppSettings.Instance.FontPreviewFontSize;
+            double totalWidth = 0;
+
+            var glyphIndices = new ushort[sampleText.Length];
+            var advanceWidths = new double[sampleText.Length];
+            for (int i = 0; i < sampleText.Length; i++)
+            {
+                ushort glyphIndex = glyphTypeface.CharacterToGlyphMap.TryGetValue(sampleText[i], out ushort idx)
+                    ? (ushort)idx : (ushort)0;
+                glyphIndices[i] = glyphIndex;
+                // AdvanceWidths 单位为 em，乘以 fontSize 即得 DIP
+                advanceWidths[i] = glyphTypeface.AdvanceWidths[glyphIndex] * fontSize;
+                totalWidth += advanceWidths[i];
+            }
+
+            App.LogDebug("GlyphRender: glyphIndices.Length={0}, totalWidth={1:F1}", glyphIndices.Length, totalWidth);
+
+            // GlyphRun 在 .NET 9 中内部 COM 对象未初始化导致构造失败，
+            // 改用 GDI+ PrivateFontCollection 加载 CFF-OTF，绘制到 Bitmap 后转为 WPF ImageSource。
+            try
+            {
+                float fsize = (float)fontSize;
+                using var fontColl = new System.Drawing.Text.PrivateFontCollection();
+                fontColl.AddFontFile(fontFilePath);
+                if (fontColl.Families.Length == 0)
+                {
+                    App.LogDebug("GlyphRender: GDI+ PrivateFontCollection returned 0 families");
+                    return false;
+                }
+                using var font = new System.Drawing.Font(fontColl.Families[0], fsize,
+                    System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Pixel);
+
+                // 测量文本尺寸
+                using var tmpBmp = new System.Drawing.Bitmap(1, 1);
+                using var tmpG = System.Drawing.Graphics.FromImage(tmpBmp);
+                var textSize = tmpG.MeasureString(sampleText, font);
+
+                int bmpW = Math.Max((int)textSize.Width + 20, 200);
+                int bmpH = Math.Max((int)textSize.Height + 20, 50);
+
+                using var bmp = new System.Drawing.Bitmap(bmpW, bmpH,
+                    System.Drawing.Imaging.PixelFormat.Format32bppArgb);
+                using var g = System.Drawing.Graphics.FromImage(bmp);
+                g.Clear(System.Drawing.Color.Transparent);
+                g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAlias;
+
+                // 使用主题文字色（Theme_TextPrimary），在 GDI+ 中绘制
+                System.Drawing.Color textColor = System.Drawing.Color.White;
+                if (TryFindResource("Theme_TextPrimary") is System.Windows.Media.SolidColorBrush wpfFg)
+                {
+                    textColor = System.Drawing.Color.FromArgb(
+                        wpfFg.Color.A, wpfFg.Color.R, wpfFg.Color.G, wpfFg.Color.B);
+                }
+                using var brush = new System.Drawing.SolidBrush(textColor);
+                g.DrawString(sampleText, font, brush, 10, 10);
+
+                // GDI+ Bitmap → WPF BitmapSource
+                IntPtr hbitmap = bmp.GetHbitmap();
+                try
+                {
+                    var src = System.Windows.Interop.Imaging.CreateBitmapSourceFromHBitmap(
+                        hbitmap, IntPtr.Zero,
+                        new Int32Rect(0, 0, bmp.Width, bmp.Height),
+                        System.Windows.Media.Imaging.BitmapSizeOptions.FromEmptyOptions());
+                    PreviewImage.Source = src;
+                    PreviewImage.Stretch = System.Windows.Media.Stretch.None;
+                    PreviewImage.HorizontalAlignment = System.Windows.HorizontalAlignment.Left;
+                    PreviewImage.VerticalAlignment = System.Windows.VerticalAlignment.Top;
+                }
+                finally
+                {
+                    DeleteObject(hbitmap);
+                }
+
+                App.LogDebug("GlyphRender: GDI+ render OK, bmp={0}x{1}", bmpW, bmpH);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                App.LogDebug("GlyphRender: GDI+ render failed: {0} — {1}", ex.GetType().Name, ex.Message);
+                return false;
+            }
+        }
+        catch (Exception ex)
+        {
+            App.LogDebug("ShowFontPreviewGlyphRender failed: {0} — {1}", ex.GetType().Name, ex.Message);
+            return false;
+        }
+    }
+
+    [DllImport("gdi32.dll", SetLastError = true)]
+    private static extern bool DeleteObject(IntPtr hObject);
+
+    /// <summary>
+    /// 根据字体文件扩展名推断预览加载失败的原因，用于在信息面板显示。
+    /// </summary>
+    private static string GetFontLoadFailureReason(string fontFilePath)
+    {
+        string ext = Path.GetExtension(fontFilePath)?.ToLowerInvariant() ?? "";
+        return ext switch
+        {
+            ".otf" => "CFF 轮廓格式（OpenType）",
+            ".woff" or ".woff2" => "Web 字体格式",
+            _ => "WPF 字体系统限制",
+        };
     }
 
     // ── Audio ──

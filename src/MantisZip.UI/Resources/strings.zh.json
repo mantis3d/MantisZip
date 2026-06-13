@@ -380,6 +380,7 @@
   "Preview_PdfTitle": "标题",
   "Preview_PdfAuthor": "作者",
   "Preview_FontParseFailed": "无法解析此字体文件",
+  "Preview_FontLoadFailed": "字体预览受限：{0}",
   "Preview_FontHeader": "{0}",
   "Preview_FontName": "字体名称",
   "Preview_FontStyle": "样式",

@@ -41,6 +41,7 @@ public partial class MainWindow : Window
     private readonly Dictionary<string, (int Count, long Size, long CompressedSize)> _dirStats = new(); // 目录统计缓存
     private string _currentFolder = "";  // 当前目录
     private string? _previewTempDir;        // L.T(L.Settings_Tab_Preview)临时目录
+
     private readonly Dictionary<int, double> _lastPreviewSizes = new()
     {
         { 1, 341 }, { 2, 416 }, { 3, 479 }, { 4, 678 }

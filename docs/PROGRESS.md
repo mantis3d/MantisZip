@@ -42,6 +42,12 @@
    - 创建 `installer\prebuilt\settings.json` 和 `window.json`，安装器在首次安装时复制到 `%LOCALAPPDATA%\MantisZip\`
    - 用户替换这两个文件即可在安装后自动加载自己的配置
 
+6. **字体预览修复**：
+   - `FontParser.ParseSfnt` 修复：name table 解析优先 pid=3（Windows Unicode）而非 pid=1（Mac），解决 CJK 字体名错误问题
+   - 新增 CFF-OTF 字体回退机制：三层策略（`#` 语法 → 目录扫描 DirectWrite → GDI+ PrivateFontCollection），绕过 WPF 对 CFF 轮廓字体的加载限制
+   - 失败时信息面板显示橙色警告及原因（CFF 轮廓 / Web 字体 / WPF 限制）
+   - `ClearPreviewContent` 重置 `Image.Stretch`，避免字体渲染干扰图片预览
+
 5. **DPAPI → AES-GCM 替换**（跨平台移植 Phase 4 子任务）：
    - 新建 `IDataProtector` 接口（`Core/Abstractions/`），抽象数据保护操作
    - 新建 `AesGcmDataProtector`（`Core/Utils/`），基于 .NET `AesGcm`（AES-256-GCM）实现跨平台加密，密钥以文件形式存储于 `%APPDATA%/MantisZip/.masterkey`

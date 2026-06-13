@@ -378,6 +378,7 @@
   "Preview_PdfTitle": "Title",
   "Preview_PdfAuthor": "Author",
   "Preview_FontParseFailed": "Could not parse font file",
+  "Preview_FontLoadFailed": "Font preview limited: {0}",
   "Preview_FontHeader": "{0}",
   "Preview_FontName": "Font name",
   "Preview_FontStyle": "Style",

@@ -416,6 +416,7 @@ public static class L
     public const string Preview_PdfTitle                           = "Preview_PdfTitle";
     public const string Preview_PdfAuthor                          = "Preview_PdfAuthor";
     public const string Preview_FontParseFailed                    = "Preview_FontParseFailed";
+    public const string Preview_FontLoadFailed                     = "Preview_FontLoadFailed";
     public const string Preview_FontHeader                         = "Preview_FontHeader";
     public const string Preview_FontName                           = "Preview_FontName";
     public const string Preview_FontStyle                          = "Preview_FontStyle";
