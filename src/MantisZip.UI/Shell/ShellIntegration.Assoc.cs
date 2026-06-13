@@ -126,7 +126,8 @@ internal static partial class ShellIntegration
     /// 各格式扩展名逐个关联独立 ProgId。
     /// 写入 HKCU\Software\Classes，无需管理员权限。
     /// </summary>
-    public static void InstallAssociations()
+    /// <param name="extensions">要安装的扩展名列表。null 表示安装所有内置扩展名。</param>
+    public static void InstallAssociations(IEnumerable<string>? extensions = null)
     {
         App.LogDebug("ShellIntegration.InstallAssociations: starting");
 
@@ -137,7 +138,8 @@ internal static partial class ShellIntegration
         EnsureApplicationsRegistered();
 
         // 逐个安装独立 ProgId + 文件关联
-        foreach (var ext in ArchiveExtensions)
+        var targets = extensions ?? (IEnumerable<string>)ArchiveExtensions;
+        foreach (var ext in targets)
         {
             InstallAssociationForExtension(ext);
         }
