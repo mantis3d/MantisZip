@@ -18,9 +18,15 @@
 
 ## 版本历史（从新到旧）
 
- ### v0.3.13 (2026-06-13) DPAPI → AES-GCM 替换 + 安装脚本修正 + 对话框 Owner 修复 + Emoji.Wpf 依赖缺失修复
+ ### v0.3.13 (2026-06-13) DPAPI → AES-GCM 替换 + 安装脚本修正 + 对话框 Owner 修复 + Emoji.Wpf 依赖缺失修复 + ZIP 中文编码假阳性修复
 
-0. **installer.iss 通配符化 + Emoji.Wpf 依赖修复**：
+0. **ZIP 中文文件名乱码修复**（写端 + 读端双向）：
+   - **写端**：三个 `ZipWriterOptions` 构造位置全部添加 `ArchiveEncoding = new ArchiveEncoding { Default = Encoding.UTF8 }`，确保写入时使用 UTF-8 编码并设置 bit 11
+   - **读端：bit 11 检测**：新增 `ZipHasUtf8Flag()` 按 ZIP 规范读取中央目录原始位标志，bit 11 已设置时跳过 GBK 回退
+   - **读端：CJK 启发式检测**：新增 `LooksLikeValidCjk()`，无 bit 11 但解码结果在 CJK 范围内的也保留 UTF-8，防止第三方工具写的 UTF-8 ZIP 被误判为 GBK
+   - 影响：所有 ZIP 读写路径（CompressAsync / AddToArchiveAsync / DeleteEntriesAsync / ListEntriesAsync / ExtractAsync）
+
+1. **installer.iss 通配符化 + Emoji.Wpf 依赖修复**：
    - **[Files]** 改为 `*.dll` 通配符，取代逐一手写 DLL 清单，杜绝未来遗漏
    - 新增打包：`Typography.GlyphLayout.dll`、`Typography.OpenFont.dll`、`Stfu.dll`（Emoji.Wpf 依赖，缺失导致启动闪退 `TypeInitializationException`）
    - 新增打包：`SQLitePCLRaw.*.dll`（3 个）、`WinRT.Runtime.dll`、`Microsoft.Windows.SDK.NET.dll`、`Microsoft.Web.WebView2.WinForms.dll`、`System.Security.Cryptography.ProtectedData.dll`
