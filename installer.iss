@@ -87,6 +87,11 @@ Source: "publish_output\Resources\languages.json"; DestDir: "{app}\Resources"; F
 ; === License (7z.dll is distributed under GNU Lesser General Public License) ===
 Source: "lgpl.txt"; DestDir: "{app}"; Flags: ignoreversion
 
+; === Prebuilt user settings (copied to %LOCALAPPDATA% on fresh install) ===
+; Replace files in installer\prebuilt\ with your own settings from %LOCALAPPDATA%\MantisZip\
+Source: "installer\prebuilt\settings.json"; DestDir: "{app}\prebuilt"; Flags: ignoreversion
+Source: "installer\prebuilt\window.json"; DestDir: "{app}\prebuilt"; Flags: ignoreversion
+
 [Icons]
 Name: "{autoprograms}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; WorkingDir: "{app}"
 Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; WorkingDir: "{app}"; Tasks: desktopicon
@@ -329,6 +334,7 @@ var
   Json: string;
   SettingsDir: string;
   SettingsFile: string;
+  WindowFile: string;
 begin
   if CurStep = ssPostInstall then
   begin
@@ -358,20 +364,38 @@ begin
 
     SettingsDir := ExpandConstant('{localappdata}\MantisZip');
     SettingsFile := SettingsDir + '\settings.json';
+    WindowFile := SettingsDir + '\window.json';
 
     // Only write on fresh install — don't overwrite existing user settings on upgrade
     if not FileExists(SettingsFile) then
     begin
-      Log('Writing installer settings to: ' + SettingsFile);
+      Log('Writing prebuilt settings to: ' + SettingsDir);
       if not DirExists(SettingsDir) then
         CreateDir(SettingsDir);
 
-      Json := '{' +
-        '"Language": "' + GetAppLanguageCode + '",' +
-        '"Theme": "' + GetSelectedTheme + '"' +
-        '}';
-      SaveStringToFile(SettingsFile, Json, False);
-      Log('Installer settings written successfully.');
+      // Copy prebuilt settings.json (including Language + Theme from wizard)
+      // Users can replace installer\prebuilt\ with their own files before building the installer
+      if CopyFile(ExpandConstant('{app}\prebuilt\settings.json'), SettingsFile, False) then
+        Log('Prebuilt settings.json copied.')
+      else
+      begin
+        Log('Failed to copy prebuilt settings.json, writing minimal config...');
+        // Fallback: write minimal settings (Language + Theme from wizard)
+        Json := '{' +
+          '"Language": "' + GetAppLanguageCode + '",' +
+          '"Theme": "' + GetSelectedTheme + '"' +
+          '}';
+        SaveStringToFile(SettingsFile, Json, False);
+      end;
+
+      // Copy prebuilt window.json if it exists
+      if FileExists(ExpandConstant('{app}\prebuilt\window.json')) then
+      begin
+        if CopyFile(ExpandConstant('{app}\prebuilt\window.json'), WindowFile, False) then
+          Log('Prebuilt window.json copied.')
+        else
+          Log('Failed to copy prebuilt window.json.');
+      end;
     end
     else
       Log('Settings file already exists, preserving existing user settings.');

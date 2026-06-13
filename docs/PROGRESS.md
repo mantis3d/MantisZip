@@ -38,6 +38,10 @@
    - 添加 `SetupIconFile`，安装包使用 `App.ico` 图标
    - `IsWebView2Installed` 改用 `RegQueryStringValue` 检查 `pv` 版本值，并补充 `HKLM32`（WOW6432Node）检测，防止每次重复下载 WebView2
 
+4. **预置用户设置机制**：
+   - 创建 `installer\prebuilt\settings.json` 和 `window.json`，安装器在首次安装时复制到 `%LOCALAPPDATA%\MantisZip\`
+   - 用户替换这两个文件即可在安装后自动加载自己的配置
+
 ### v0.3.13 (2026-06-12) ZipEngine SharpZipLib → SharpCompress 迁移 + 压缩批处理文件进度条修复 + 压缩完成后进程残留修复
 
 0. **关联计划同步 + .NET 11 追踪**：
