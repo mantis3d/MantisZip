@@ -799,6 +799,10 @@ public partial class MainWindow
         _icoOriginalFrames = null;
         _icoImages = null;
         _icoBorders = null;
+
+        // 清理棋盘格背景视觉（不重置 _transparentBgEnabled 标志位）
+        if (PreviewImageScroll.Parent is Panel bgPanel)
+            bgPanel.Background = Brushes.Transparent;
     }
 
     private void HidePreview()
