@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -10,7 +9,6 @@ using System.Windows.Media;
 using MantisZip.Core;
 using MantisZip.Core.Abstractions;
 using MantisZip.Core.Utils;
-using Ude;
 using MantisZip.UI.Localization;
 
 namespace MantisZip.UI;
