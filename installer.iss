@@ -26,6 +26,7 @@ WizardStyle=modern
 PrivilegesRequired=admin
 ArchitecturesInstallIn64BitMode=x64compatible
 ChangesEnvironment=yes
+SetupIconFile=src\MantisZip.UI\Resources\App.ico
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
@@ -301,11 +302,18 @@ begin
   CreateConfigPage;
 end;
 
-// Check if WebView2 Runtime is already installed
+// Check if WebView2 Runtime is already installed.
+// Checks multiple registry locations and confirms a version value exists (not just a key).
 function IsWebView2Installed: Boolean;
+var
+  version: string;
 begin
-  Result := RegKeyExists(HKLM, WebView2RegKey) or
-            RegKeyExists(HKCU, WebView2RegKey);
+  // 64-bit view (HKLM) or HKCU
+  Result := RegQueryStringValue(HKLM, WebView2RegKey, 'pv', version) or
+            RegQueryStringValue(HKCU, WebView2RegKey, 'pv', version);
+  // 32-bit (WOW6432Node) view — WebView2 installer often registers here on 64-bit Windows
+  if not Result then
+    Result := RegQueryStringValue(HKLM32, WebView2RegKey, 'pv', version);
 end;
 
 // Download file via URLMon (built-in Windows API, no extra DLLs needed)

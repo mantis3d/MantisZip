@@ -34,6 +34,10 @@
 
 2. **App.xaml.cs**：`new MainWindow()` 包裹进 try-catch，防止 XAML 初始化闪退，改为显示错误对话框
 
+3. **installer.iss 修复**：
+   - 添加 `SetupIconFile`，安装包使用 `App.ico` 图标
+   - `IsWebView2Installed` 改用 `RegQueryStringValue` 检查 `pv` 版本值，并补充 `HKLM32`（WOW6432Node）检测，防止每次重复下载 WebView2
+
 ### v0.3.13 (2026-06-12) ZipEngine SharpZipLib → SharpCompress 迁移 + 压缩批处理文件进度条修复 + 压缩完成后进程残留修复
 
 0. **关联计划同步 + .NET 11 追踪**：
