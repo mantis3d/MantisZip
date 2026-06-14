@@ -33,9 +33,6 @@ public partial class PreviewViewModel : ObservableObject
     private string _previewHeaderText = string.Empty;
 
     [ObservableProperty]
-    private bool _isHtmlVisible;
-
-    [ObservableProperty]
     private string _htmlContent = string.Empty;
 
     // FontFamily 手动实现，不使用 [ObservableProperty]（源生成器对 Avalonia.Media 命名空间有已知问题）
@@ -77,6 +74,7 @@ public partial class PreviewViewModel : ObservableObject
     public bool IsTorrentVisible => PreviewType == PreviewType.Torrent;
     public bool IsOfficeVisible => PreviewType == PreviewType.Office;
     public bool IsVideoVisible => PreviewType == PreviewType.Video;
+    public bool IsHtmlVisible => PreviewType is PreviewType.Html or PreviewType.Markdown;
 
     partial void OnPreviewTypeChanged(PreviewType value)
     {
@@ -916,7 +914,6 @@ td, th {{ border: 1px solid #ccc; padding: 6px; }}
         ImageWidth = 0;
         ImageHeight = 0;
         HtmlContent = string.Empty;
-        IsHtmlVisible = false;
         IsTransparencySupported = false;
         TorrentFileItems.Clear();
         SqliteTableData = null;
