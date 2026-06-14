@@ -26,6 +26,17 @@ public partial class MainWindow : Window
         DataContext = vm;
     }
 
+    public async void LoadArchiveOnStartup(string path)
+    {
+        // Wait for window to be ready
+        await Task.Delay(100); // Small delay to let the window initialize
+        var vm = DataContext as MainWindowViewModel;
+        if (vm != null)
+        {
+            await vm.LoadArchiveAsync(path);
+        }
+    }
+
     private async Task<string?> OpenFileDialogAsync()
     {
         var result = await StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
