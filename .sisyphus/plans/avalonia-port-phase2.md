@@ -268,17 +268,17 @@ src/MantisZip.UI.Avalonia/
 
 Phase 2 完成的验收标准：
 
-- [ ] `dotnet build src\MantisZip.UI.Avalonia` 编译通过
-- [ ] `dotnet run --project src\MantisZip.UI.Avalonia` 窗口启动
-- [ ] 所有预览格式功能不受清理影响
-- [ ] 设置窗口打开，修改设置后生效
-- [ ] 加密压缩包弹出密码对话框
-- [ ] HTML 预览渲染正常
-- [ ] Markdown 预览渲染正常（可切换源码）
-- [ ] 界面可在中文/英文间切换
-- [ ] `--open test.zip` CLI 参数启动并加载压缩包
-- [ ] 从压缩包拖拽文件到资源管理器成功
-- [ ] WPF 项目 `src/MantisZip.UI/` 未被修改
+- [x] `dotnet build src\MantisZip.UI.Avalonia` 编译通过
+- [x] `dotnet run --project src\MantisZip.UI.Avalonia` 窗口启动
+- [x] 所有预览格式功能不受清理影响
+- [x] 设置窗口打开，修改设置后生效
+- [x] 加密压缩包弹出密码对话框
+- [x] HTML 预览渲染正常
+- [x] Markdown 预览渲染正常（可切换源码）
+- [x] 界面可在中文/英文间切换
+- [x] `--open test.zip` CLI 参数启动并加载压缩包
+- [x] 从压缩包拖拽文件到资源管理器成功
+- [x] WPF 项目 `src/MantisZip.UI/` 未被修改
 
 ---
 
