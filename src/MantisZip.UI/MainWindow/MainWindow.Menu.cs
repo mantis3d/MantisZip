@@ -182,10 +182,8 @@ public partial class MainWindow
         if (ShowProgressBarsMenu.Icon is Emoji.Wpf.TextBlock icon)
             icon.Opacity = ShowProgressBarsMenu.IsChecked ? 1.0 : 0.2;
 
-        if (!string.IsNullOrEmpty(_currentFolder))
+        if (!string.IsNullOrEmpty(_currentArchivePath))
             FilterFiles(_currentFolder);
-        else if (!string.IsNullOrEmpty(_currentArchivePath))
-            _ = LoadArchiveAsync(_currentArchivePath);
     }
 
     private void ToggleSepDirBaseline_Click(object sender, RoutedEventArgs e)
@@ -197,10 +195,8 @@ public partial class MainWindow
         if (SepDirBaselineMenu.Icon is Emoji.Wpf.TextBlock icon)
             icon.Opacity = SepDirBaselineMenu.IsChecked ? 1.0 : 0.2;
 
-        if (!string.IsNullOrEmpty(_currentFolder))
+        if (!string.IsNullOrEmpty(_currentArchivePath))
             FilterFiles(_currentFolder);
-        else if (!string.IsNullOrEmpty(_currentArchivePath))
-            _ = LoadArchiveAsync(_currentArchivePath);
     }
 
     private void Donate_Click(object sender, RoutedEventArgs e)
