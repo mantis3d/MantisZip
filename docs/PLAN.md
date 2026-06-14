@@ -3,7 +3,7 @@
 > 未来待开发功能规划。已实现功能请见 [docs/PROGRESS.md](docs/PROGRESS.md)，技术架构请见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)。
 
 **项目状态**: 🟢 开发中  
-**最后更新**: 2026-06-11  
+**最后更新**: 2026-06-14  
 **当前版本**: 0.3.13
 
 ---
@@ -17,7 +17,7 @@
 |--------|------|----------|:----:|:--------:|------|
 | **P0** | **WPF → Avalonia 跨平台移植（Phase 0 ✅）** | [avalonia-port-phase0.md](.sisyphus/plans/avalonia-port-phase0.md) | 🟡中 | 1-2周 | avalonia-port 分支，MVVM 架构 + SkiaSharp。Phase 0 完成: 项目骨架 + 文件浏览 + 文本/CSV/PE 预览 |  
 | **P0** | **Avalonia Phase 1 ✅: 预览格式扩展 + 文件夹树 + 主题** | [avalonia-port-phase1.md](.sisyphus/plans/avalonia-port-phase1.md) | 🟡中 | 1-2周 | Phase 1 完成: 图片/GIF/SVG/字体/音频/SQLite/ISO/Torrent/Office/视频预览 + TreeView 导航 + 亮/暗主题 + 系统图标 |  
-| **P0** | **Avalonia Phase 2: 设置/密码/HTML预览/多语言 + 代码清理** | [avalonia-port-phase2.md](.sisyphus/plans/avalonia-port-phase2.md) | 🟡中 | 1-2周 | Phase 2: 设置窗口、密码对话框、HTML/Markdown 预览、i18n 多语言、CLI 参数、拖拽导出、Core 重复清理 |  
+| **P0** | **Avalonia Phase 2 ✅: 设置/密码/HTML预览/多语言 + 代码清理** | [avalonia-port-phase2.md](.sisyphus/plans/avalonia-port-phase2.md) | 🟡中 | 1-2周 | Phase 2 完成: 设置窗口、密码对话框、HTML/Markdown 预览、i18n 多语言、CLI 参数、拖拽导出、Core 重复清理 |  
 | **P2** | 便携版模式 | [portable-mode.md](.sisyphus/plans/portable-mode.md) | 🟢低 | 1-2h | 哨兵文件触发，路径重定向到 exe 目录 |
 | **P2** | 魔数识别（内容检测替代扩展名检测） | [preview-magic-detection.md](.sisyphus/plans/preview-magic-detection.md) | 🔴高 | 6-8h | 按真实内容（非扩展名）判断格式 |
 | **P2** | 提取日志与解压「后悔药」 | [extract-journal-undo.md](.sisyphus/plans/extract-journal-undo.md) | 🟡中 | 3-4h | 解压记录 + 一键回滚 |

@@ -98,27 +98,27 @@ src/MantisZip.UI.Avalonia/
 
 > 基于 Core 的 `AppSettings` 模型，创建设置窗口 UI。
 
-- [ ] **1.1** 创建 `ViewModels/SettingsWindowViewModel.cs`：
+- [x] **1.1** 创建 `ViewModels/SettingsWindowViewModel.cs`：
   - 属性映射到 `AppSettings` 的各个节：
     - 压缩：`DefaultFormat`、`DefaultLevel`
     - 预览：`EnableImagePreview`、`EnableTextPreview`、`MaxTextPreviewBytes`、`TextPreviewFontSize`
     - 调试：`EnableDebugLogging`
   - `LoadCommand` / `SaveCommand`
   - `SettingsWindowViewModel` 继承 `ObservableObject`
-- [ ] **1.2** 创建 `Views/SettingsWindow.axaml` + `.cs`：
+- [x] **1.2** 创建 `Views/SettingsWindow.axaml` + `.cs`：
   - TabControl 布局（与 WPF 版对应）：
     - Tab1 "预览"：预览启用开关、文本预览字号、最大预览字节
     - Tab2 "压缩"：默认格式（下拉框）、压缩级别（滑块 1-9）
     - Tab3 "调试"：调试日志开关
   - 所有控件绑定主题色（`DynamicResource`）
-- [ ] **1.3** `MainWindowViewModel` 添加：
+- [x] **1.3** `MainWindowViewModel` 添加：
   - `OpenSettingsCommand`：打开设置窗口（模态对话框）
   - 菜单项 "设置" → `OpenSettingsCommand`
-- [ ] **1.4** 设置持久化：
+- [x] **1.4** 设置持久化：
   - 保存到 `%LOCALAPPDATA%\MantisZip\settings.json`（与 WPF 共享路径）
   - 读取现有 `AppSettings` 实例
-- [ ] **1.5** 验证：打开设置窗口，修改设置，重启后生效
-- [ ] **1.6** **Commit**: `feat(avalonia): add settings window`
+- [x] **1.5** 验证：打开设置窗口，修改设置，重启后生效
+- [x] **1.6** **Commit**: `feat(avalonia): add settings window`
 
 ---
 
@@ -126,24 +126,24 @@ src/MantisZip.UI.Avalonia/
 
 > 打开加密压缩包时弹出密码输入窗口。
 
-- [ ] **2.1** `ArchiveService.LoadArchiveAsync` 修改：
+- [x] **2.1** `ArchiveService.LoadArchiveAsync` 修改：
   - 添加 `password` 参数传递
   - 首次尝试 `password: null`，如返回 `PasswordRequired` 则触发密码弹窗
-- [ ] **2.2** 创建 `Views/PasswordDialog.axaml` + `.cs`：
+- [x] **2.2** 创建 `Views/PasswordDialog.axaml` + `.cs`：
   - `PasswordBox` 输入密码
   - `CheckBox` "记住会话中"（不保存到 PasswordManager，仅内存缓存）
   - "确定" / "取消" 按钮
   - 主题色绑定
-- [ ] **2.3** `MainWindowViewModel` 添加：
+- [x] **2.3** `MainWindowViewModel` 添加：
   - `ShowPasswordDialog()` 方法
   - 缓存密码字典 `Dictionary<string, string> _sessionPasswords`（路径→密码）
-- [ ] **2.4** `LoadArchiveAsync` 流程：
+- [x] **2.4** `LoadArchiveAsync` 流程：
   1. 检查 `_sessionPasswords` 是否有缓存密码
   2. 尝试解密
   3. 如果 `PasswordRequired` → 弹密码窗
   4. 用户输入密码后重试
   5. 如果取消 → 显示"需要密码"消息
-- [ ] **2.5** **Commit**: `feat(avalonia): add password dialog for encrypted archives`
+- [x] **2.5** **Commit**: `feat(avalonia): add password dialog for encrypted archives`
 
 ---
 
@@ -151,14 +151,14 @@ src/MantisZip.UI.Avalonia/
 
 > HTML 和 Markdown 渲染预览。
 
-- [ ] **3.1** 调研 Avalonia WebView 方案：
+- [x] **3.1** 调研 Avalonia WebView 方案：
   - `Avalonia.WebView`（跨平台 Chromium）
   - 或 `Avalonia.WebView2`（Windows-only，与 WPF 一致）
   - 选择跨平台方案
-- [ ] **3.2** `PreviewService.ClassifyPreview` 添加：
+- [x] **3.2** `PreviewService.ClassifyPreview` 添加：
   - `HtmlExtensions`：`.html`, `.htm`
   - `MarkdownExtensions`：`.md`, `.markdown`
-- [ ] **3.3** HTML 预览：
+- [x] **3.3** HTML 预览：
   - `PreviewViewModel.ShowHtmlPreview(string filePath)`：
     - 读取 HTML 文件内容
     - 设置 `TextContent`（源码）
@@ -166,14 +166,14 @@ src/MantisZip.UI.Avalonia/
   - `PreviewPanel.axaml` 添加 HTML 的 DataTemplate：
     - WebView 控件渲染内容
     - 可选：`ToggleSourceCommand` 切换源码/渲染视图
-- [ ] **3.4** Markdown 预览：
+- [x] **3.4** Markdown 预览：
   - `PreviewViewModel.ShowMarkdownPreview(string filePath)`：
     - 用 `Markdig` 将 Markdown 转为 HTML
     - 注入暗色主题 CSS（根据当前主题）
     - 将 HTML 传给 WebView 渲染
   - 与 HTML 预览共享 WebView DataTemplate
-- [ ] **3.5** 验证：打开含 .html/.htm/.md 的压缩包，渲染正常
-- [ ] **3.6** **Commit**: `feat(avalonia): add HTML and Markdown preview with WebView`
+- [x] **3.5** 验证：打开含 .html/.htm/.md 的压缩包，渲染正常
+- [x] **3.6** **Commit**: `feat(avalonia): add HTML and Markdown preview with WebView`
 
 ---
 
@@ -181,29 +181,29 @@ src/MantisZip.UI.Avalonia/
 
 > 中文/英文界面切换。
 
-- [ ] **4.1** 创建 `Localization/` 目录 + 资源文件：
+- [x] **4.1** 创建 `Localization/` 目录 + 资源文件：
   - `strings.zh-CN.json` — 中文（默认，完整翻译）
   - `strings.en.json` — 英文
   - 格式：`{ "key": "value" }` 键值对
   - 键名按模块前缀：`Menu_OpenArchive`、`Preview_Text`、`Status_Loaded` 等
-- [ ] **4.2** 创建本地化管理器：
+- [x] **4.2** 创建本地化管理器：
   - `LocalizationManager` 静态类
   - `CurrentCulture` 属性（切换时触发事件）
   - `T(string key)` 方法（以 WPF 的 `L.T()` 为参考）
   - 从 JSON 文件加载资源
   - 线程安全
-- [ ] **4.3** `MainWindowViewModel` 添加：
+- [x] **4.3** `MainWindowViewModel` 添加：
   - `string CurrentLanguage` 属性
   - `SwitchLanguageCommand`（zh-CN / en 切换）
   - 菜单项 "语言 → 中文 / English"
-- [ ] **4.4** 所有 ViewModel/View 中的硬编码字符串改为 `LocalizationManager.T()` 调用：
+- [x] **4.4** 所有 ViewModel/View 中的硬编码字符串改为 `LocalizationManager.T()` 调用：
   - 菜单标题（"打开压缩包"、"退出"、"视图"等）
   - 状态栏消息（"已加载 N 个条目"、"正在加载..."等）
   - 预览面板（"未支持"、"图片预览"等）
   - 设置窗口标签
   - 密码对话框提示
-- [ ] **4.5** 验证：切换语言，界面文字即时更新
-- [ ] **4.6** **Commit**: `feat(avalonia): add i18n support with Chinese and English`
+- [x] **4.5** 验证：切换语言，界面文字即时更新
+- [x] **4.6** **Commit**: `feat(avalonia): add i18n support with Chinese and English`
 
 ---
 
@@ -211,7 +211,7 @@ src/MantisZip.UI.Avalonia/
 
 > 支持命令行参数 `--open`、`--extract`、`--compress` 等。
 
-- [ ] **5.1** `App.axaml.cs` 的 `OnFrameworkInitializationCompleted` 中解析参数：
+- [x] **5.1** `App.axaml.cs` 的 `OnFrameworkInitializationCompleted` 中解析参数：
   ```csharp
   var args = Environment.GetCommandLineArgs().Skip(1).ToArray();
   ```
@@ -219,12 +219,12 @@ src/MantisZip.UI.Avalonia/
   - `--extract <path>`：直接解压到同目录（无需 UI）
   - `--extract-here <path>`：解压到当前目录
   - `--extract-to-name <path>`：解压到以文件名命名的目录
-- [ ] **5.2** 创建 CLI 处理流程：
+- [x] **5.2** 创建 CLI 处理流程：
   - 无参数 → 正常启动 MainWindow
   - 有参数 → 处理完后退出（或显示窗口）
   - 使用 Core 的 `ArchiveEngineFactory` + `IArchiveEngine.ExtractAsync`
-- [ ] **5.3** 验证：`dotnet run -- --open test.zip` 启动并加载压缩包
-- [ ] **5.4** **Commit**: `feat(avalonia): add CLI argument handling`
+- [x] **5.3** 验证：`dotnet run -- --open test.zip` 启动并加载压缩包
+- [x] **5.4** **Commit**: `feat(avalonia): add CLI argument handling`
 
 ---
 
@@ -232,22 +232,22 @@ src/MantisZip.UI.Avalonia/
 
 > 从文件列表拖拽文件到资源管理器。
 
-- [ ] **6.1** `MainWindow.axaml.cs` 添加拖拽事件：
+- [x] **6.1** `MainWindow.axaml.cs` 添加拖拽事件：
   - `ListBox/DragDrop`（或 DataGrid 拖拽）
   - `PreviewMouseMove` 检测拖动开始
-- [ ] **6.2** 提取临时文件：
+- [x] **6.2** 提取临时文件：
   - `ArchiveEntryExtractor.ExtractEntryAsync`（Core 已有）
   - 提取到 `%TEMP%\MantisZip\DragDrop\{GUID}\`
   - 子目录保留（使用 `FullPath` 的相对路径）
-- [ ] **6.3** 创建 `DataObject`：
+- [x] **6.3** 创建 `DataObject`：
   - `DragDrop.SetDataObject` → `DataObject(DataFormats.FileDrop, paths[])`
-- [ ] **6.4** 清理：
+- [x] **6.4** 清理：
   - 拖拽完成后删除临时目录
   - 或进程退出时统一清理
-- [ ] **6.5** 自己的窗口防护：
+- [x] **6.5** 自己的窗口防护：
   - `_isOwnDrag` 标记防止 `Window_Drop` 响应自己的拖拽
-- [ ] **6.6** 验证：从压缩包拖文件到桌面，文件复制成功
-- [ ] **6.7** **Commit**: `feat(avalonia): add drag-drop support for extracting files`
+- [x] **6.6** 验证：从压缩包拖文件到桌面，文件复制成功
+- [x] **6.7** **Commit**: `feat(avalonia): add drag-drop support for extracting files`
 
 ---
 
@@ -255,12 +255,12 @@ src/MantisZip.UI.Avalonia/
 
 > 确保分支干净，与 main 保持同步。
 
-- [ ] **7.1** 确认 `src/MantisZip.UI/`（WPF 项目）未被触碰
-- [ ] **7.2** 确认所有新文件有正确的命名空间、主题绑定
-- [ ] **7.3** `git merge main` 将 main 最新改动合并到 avalonia-port
-- [ ] **7.4** 解决可能的冲突
-- [ ] **7.5** 验证：`dotnet build src\MantisZip.UI.Avalonia` 编译通过
-- [ ] **7.6** 更新本计划状态为 ✅
+- [x] **7.1** 确认 `src/MantisZip.UI/`（WPF 项目）未被触碰
+- [x] **7.2** 确认所有新文件有正确的命名空间、主题绑定
+- [x] **7.3** `git merge main` 将 main 最新改动合并到 avalonia-port
+- [x] **7.4** 解决可能的冲突
+- [x] **7.5** 验证：`dotnet build src\MantisZip.UI.Avalonia` 编译通过
+- [x] **7.6** 更新本计划状态为 ✅
 
 ---
 
