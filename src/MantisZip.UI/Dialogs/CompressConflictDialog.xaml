@@ -58,7 +58,7 @@
                     Background="{StaticResource Theme_ButtonBg}" BorderBrush="{StaticResource Theme_Border}" BorderThickness="1" Margin="6,0,6,0">
                 <StackPanel Orientation="Vertical" HorizontalAlignment="Center">
                     <emoji:TextBlock Text="✏️" FontSize="24" HorizontalAlignment="Center"/>
-                    <TextBlock Text="{l:L CompressConflict_Rename}" FontSize="11" Foreground="{StaticResource Theme_TextPrimary}" HorizontalAlignment="Center" Margin="0,2,0,0"/>
+                    <TextBlock x:Name="RenameBtnLabel" Text="{l:L CompressConflict_Rename}" FontSize="11" Foreground="{StaticResource Theme_TextPrimary}" HorizontalAlignment="Center" Margin="0,2,0,0"/>
                 </StackPanel>
             </Button>
             <Button Height="Auto" Padding="6,4" MinWidth="70" Click="Cancel_Click"
