@@ -35,19 +35,24 @@
   <Grid RowDefinitions="Auto,*,Auto">
     <!-- Menu -->
     <Menu Grid.Row="0">
-      <MenuItem Header="文件">
-        <MenuItem Header="打开压缩包"
+      <MenuItem Header="{Binding LocalizedStrings[Menu_File]}">
+        <MenuItem Header="{Binding LocalizedStrings[Menu_OpenArchive]}"
                   Command="{Binding OpenArchiveCommand}" />
         <Separator />
-        <Separator />
-        <MenuItem Header="设置"
+        <MenuItem Header="{Binding LocalizedStrings[Menu_Settings]}"
                   Command="{Binding OpenSettingsCommand}" />
         <Separator />
-        <MenuItem Header="退出" />
+        <MenuItem Header="{Binding LocalizedStrings[Menu_Exit]}" />
       </MenuItem>
-      <MenuItem Header="视图">
-        <MenuItem Header="切换暗色主题"
+      <MenuItem Header="{Binding LocalizedStrings[Menu_View]}">
+        <MenuItem Header="{Binding LocalizedStrings[Menu_ToggleTheme]}"
                   Command="{Binding ToggleThemeCommand}" />
+      </MenuItem>
+      <MenuItem Header="{Binding LocalizedStrings[Menu_Language]}">
+        <MenuItem Header="{Binding LocalizedStrings[Menu_LangChinese]}"
+                  Command="{Binding SwitchLanguageCommand}" />
+        <MenuItem Header="{Binding LocalizedStrings[Menu_LangEnglish]}"
+                  Command="{Binding SwitchLanguageCommand}" />
       </MenuItem>
     </Menu>
 
@@ -59,7 +64,7 @@
               Width="220"
               Background="{DynamicResource ThemeSurfaceBgBrush}">
         <Grid RowDefinitions="Auto,*">
-          <TextBlock Text="浏览"
+          <TextBlock Text="{Binding LocalizedStrings[Tree_Browse]}"
                      Margin="8,6"
                      FontWeight="SemiBold"
                      Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
@@ -100,16 +105,16 @@
                      HorizontalAlignment="Center" />
             </DataTemplate>
           </DataGridTemplateColumn>
-          <DataGridTextColumn Header="名称"
+          <DataGridTextColumn Header="{Binding LocalizedStrings[DataGrid_Name]}"
                               Binding="{Binding NameDisplay}"
                               Width="*" />
-          <DataGridTextColumn Header="大小"
+          <DataGridTextColumn Header="{Binding LocalizedStrings[DataGrid_Size]}"
                               Binding="{Binding SizeDisplay}"
                               Width="80" />
-          <DataGridTextColumn Header="压缩后"
+          <DataGridTextColumn Header="{Binding LocalizedStrings[DataGrid_Compressed]}"
                               Binding="{Binding CompressedSizeDisplay}"
                               Width="70" />
-          <DataGridTextColumn Header="修改日期"
+          <DataGridTextColumn Header="{Binding LocalizedStrings[DataGrid_Modified]}"
                               Binding="{Binding LastModifiedDisplay}"
                               Width="100" />
         </DataGrid.Columns>

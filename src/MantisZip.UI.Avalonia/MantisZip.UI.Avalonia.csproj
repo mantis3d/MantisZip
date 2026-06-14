@@ -32,4 +32,10 @@
     <ProjectReference Include="..\MantisZip.Core\MantisZip.Core.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Update="Localization\*.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
 </Project>

@@ -36,6 +36,49 @@ public partial class MainWindowViewModel : ObservableObject
     /// </summary>
     private readonly Dictionary<string, string> _sessionPasswords = new(StringComparer.OrdinalIgnoreCase);
 
+    // ── i18n ──
+
+    [ObservableProperty]
+    private string _currentLanguage = LocalizationManager.CurrentLanguageCode;
+
+    [ObservableProperty]
+    private Dictionary<string, string> _localizedStrings = new();
+
+    [RelayCommand]
+    private void SwitchLanguage()
+    {
+        LocalizationManager.CurrentLanguage = LocalizationManager.CurrentLanguage == AppLanguage.Chinese
+            ? AppLanguage.English
+            : AppLanguage.Chinese;
+        CurrentLanguage = LocalizationManager.CurrentLanguageCode;
+        UpdateLocalizedStrings();
+    }
+
+    private void UpdateLocalizedStrings()
+    {
+        Title = LocalizationManager.T("App_Title");
+        if (CurrentArchivePath != null)
+        {
+            Title = $"{LocalizationManager.T("App_Title")} - {Path.GetFileName(CurrentArchivePath)}";
+        }
+
+        var newDict = new Dictionary<string, string>();
+        var keys = new[]
+        {
+            "Menu_File", "Menu_OpenArchive", "Menu_Settings", "Menu_Exit",
+            "Menu_View", "Menu_ToggleTheme", "Menu_Language", "Menu_LangChinese", "Menu_LangEnglish",
+            "Tree_Browse",
+            "DataGrid_Name", "DataGrid_Size", "DataGrid_Compressed", "DataGrid_Modified",
+            "App_Title"
+        };
+        foreach (var key in keys)
+        {
+            newDict[key] = LocalizationManager.T(key);
+        }
+        LocalizedStrings = newDict;
+        OnPropertyChanged(nameof(LocalizedStrings));
+    }
+
     public PreviewViewModel Preview { get; } = new();
 
     [ObservableProperty]
@@ -72,6 +115,17 @@ public partial class MainWindowViewModel : ObservableObject
 
     public ObservableCollection<ArchiveItemModel> Entries { get; } = [];
 
+    public MainWindowViewModel()
+    {
+        LocalizationManager.CultureChanged += OnCultureChanged;
+        UpdateLocalizedStrings();
+    }
+
+    private void OnCultureChanged(object? sender, EventArgs e)
+    {
+        UpdateLocalizedStrings();
+    }
+
     partial void OnSelectedEntryChanged(ArchiveItemModel? value)
     {
         if (value != null && CurrentArchivePath != null)
@@ -107,12 +161,12 @@ public partial class MainWindowViewModel : ObservableObject
     {
         if (!ArchiveFormatHelper.IsArchiveFile(path))
         {
-            StatusMessage = $"不支持的文件格式: {Path.GetExtension(path)}";
+            StatusMessage = LocalizationManager.T("Status_UnsupportedFormat", Path.GetExtension(path));
             return;
         }
 
         IsLoading = true;
-        StatusMessage = "正在加载压缩包...";
+        StatusMessage = LocalizationManager.T("Status_Loading");
         ClearArchiveInternal();
 
         try
@@ -132,7 +186,7 @@ public partial class MainWindowViewModel : ObservableObject
                     password = await ShowPasswordDialog(path);
                     if (password == null)
                     {
-                        StatusMessage = "已取消 - 需要密码";
+                        StatusMessage = LocalizationManager.T("Status_PasswordCancelled");
                         IsLoading = false;
                         return;
                     }
@@ -142,7 +196,7 @@ public partial class MainWindowViewModel : ObservableObject
 
                     if (result.IsPasswordRequired)
                     {
-                        StatusMessage = "密码错误";
+                        StatusMessage = LocalizationManager.T("Status_WrongPassword");
                         IsLoading = false;
                         return;
                     }
@@ -152,7 +206,7 @@ public partial class MainWindowViewModel : ObservableObject
                 }
                 else
                 {
-                    StatusMessage = "此压缩包已加密，请输入密码";
+                    StatusMessage = LocalizationManager.T("Status_PasswordRequired");
                 }
             }
 
@@ -175,21 +229,21 @@ public partial class MainWindowViewModel : ObservableObject
                 CurrentArchivePath = path;
                 _currentFormat = ArchiveFormatHelper.GetFormat(path);
                 IsArchiveLoaded = true;
-                StatusMessage = $"已加载 {result.Entries.Count} 个条目";
-                Title = $"MantisZip - {Path.GetFileName(path)}";
+                StatusMessage = LocalizationManager.T("Status_Loaded", result.Entries.Count);
+                Title = $"{LocalizationManager.T("App_Title")} - {Path.GetFileName(path)}";
             }
             else if (result.IsCancelled)
             {
-                StatusMessage = "已取消";
+                StatusMessage = LocalizationManager.T("Status_Cancelled");
             }
             else if (!result.IsPasswordRequired) // Don't override password-related messages
             {
-                StatusMessage = result.ErrorMessage ?? "无法打开压缩包";
+                StatusMessage = result.ErrorMessage ?? LocalizationManager.T("Status_OpenArchiveFailed");
             }
         }
         catch (Exception ex)
         {
-            StatusMessage = $"加载失败: {ex.Message}";
+            StatusMessage = LocalizationManager.T("Status_LoadFailed", ex.Message);
         }
         finally
         {
@@ -210,20 +264,20 @@ public partial class MainWindowViewModel : ObservableObject
             if (previewType == PreviewType.Unsupported)
             {
                 Preview.ShowUnsupported();
-                StatusMessage = $"暂不支持预览 {ext} 文件";
+                StatusMessage = LocalizationManager.T("Status_Unsupported", ext);
                 return;
             }
 
             if (CurrentArchivePath == null) return;
 
-            StatusMessage = "正在提取文件...";
+            StatusMessage = LocalizationManager.T("Status_Extracting");
 
             var tempFile = await PreviewService.ExtractToTempAsync(
                 CurrentArchivePath, entry, _currentFormat);
 
             if (tempFile == null)
             {
-                Preview.ShowUnsupported("提取文件失败");
+                Preview.ShowUnsupported(LocalizationManager.T("Status_ExtractFailed"));
                 return;
             }
 
@@ -231,70 +285,70 @@ public partial class MainWindowViewModel : ObservableObject
             {
                 case PreviewType.Text:
                     Preview.ShowText(tempFile);
-                    StatusMessage = $"文本预览: {entry.DisplayName}";
+                    StatusMessage = LocalizationManager.T("Preview_Text", entry.DisplayName);
                     break;
                 case PreviewType.Csv:
                     Preview.ShowCsv(tempFile);
-                    StatusMessage = $"CSV 预览: {entry.DisplayName}";
+                    StatusMessage = LocalizationManager.T("Preview_Csv", entry.DisplayName);
                     break;
                 case PreviewType.Pe:
                     Preview.ShowPe(tempFile);
-                    StatusMessage = $"PE 元数据: {entry.DisplayName}";
+                    StatusMessage = LocalizationManager.T("Preview_Pe", entry.DisplayName);
                     break;
                 case PreviewType.Image:
                     Preview.ShowImage(tempFile);
-                    StatusMessage = $"图片预览: {entry.DisplayName}";
+                    StatusMessage = LocalizationManager.T("Preview_Image", entry.DisplayName);
                     break;
                 case PreviewType.Gif:
                     Preview.ShowGif(tempFile);
-                    StatusMessage = $"GIF 预览: {entry.DisplayName}";
+                    StatusMessage = LocalizationManager.T("Preview_Gif", entry.DisplayName);
                     break;
                 case PreviewType.Svg:
                     Preview.ShowSvg(tempFile);
-                    StatusMessage = $"SVG 预览: {entry.DisplayName}";
+                    StatusMessage = LocalizationManager.T("Preview_Svg", entry.DisplayName);
                     break;
                 case PreviewType.Font:
                     Preview.ShowFont(tempFile);
-                    StatusMessage = $"字体预览: {entry.DisplayName}";
+                    StatusMessage = LocalizationManager.T("Preview_Font", entry.DisplayName);
                     break;
                 case PreviewType.Audio:
                     Preview.ShowAudio(tempFile);
-                    StatusMessage = $"音频信息: {entry.DisplayName}";
+                    StatusMessage = LocalizationManager.T("Preview_Audio", entry.DisplayName);
                     break;
                 case PreviewType.Sqlite:
                     Preview.ShowSqlitePreview(tempFile);
-                    StatusMessage = $"SQLite 数据库: {entry.DisplayName}";
+                    StatusMessage = LocalizationManager.T("Preview_Sqlite", entry.DisplayName);
                     break;
                 case PreviewType.Iso:
                     Preview.ShowIso(tempFile);
-                    StatusMessage = $"ISO 镜像: {entry.DisplayName}";
+                    StatusMessage = LocalizationManager.T("Preview_Iso", entry.DisplayName);
                     break;
                 case PreviewType.Torrent:
                     Preview.ShowTorrent(tempFile);
-                    StatusMessage = $"种子信息: {entry.DisplayName}";
+                    StatusMessage = LocalizationManager.T("Preview_Torrent", entry.DisplayName);
                     break;
                 case PreviewType.Office:
                     Preview.ShowOffice(tempFile);
-                    StatusMessage = $"Office 文档: {entry.DisplayName}";
+                    StatusMessage = LocalizationManager.T("Preview_Office", entry.DisplayName);
                     break;
                 case PreviewType.Video:
                     Preview.ShowVideo(tempFile);
-                    StatusMessage = $"视频信息: {entry.DisplayName}";
+                    StatusMessage = LocalizationManager.T("Preview_Video", entry.DisplayName);
                     break;
                 case PreviewType.Html:
                     Preview.ShowHtmlPreview(tempFile);
-                    StatusMessage = $"HTML 预览: {entry.DisplayName}";
+                    StatusMessage = LocalizationManager.T("Preview_Html", entry.DisplayName);
                     break;
                 case PreviewType.Markdown:
                     Preview.ShowMarkdownPreview(tempFile);
-                    StatusMessage = $"Markdown 预览: {entry.DisplayName}";
+                    StatusMessage = LocalizationManager.T("Preview_Markdown", entry.DisplayName);
                     break;
             }
         }
         catch (Exception ex)
         {
-            Preview.ShowUnsupported($"预览失败: {ex.Message}");
-            StatusMessage = $"预览失败: {ex.Message}";
+            Preview.ShowUnsupported(LocalizationManager.T("Status_PreviewFailed", ex.Message));
+            StatusMessage = LocalizationManager.T("Status_PreviewFailed", ex.Message);
         }
     }
 

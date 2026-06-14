@@ -3,7 +3,7 @@
         xmlns:vm="clr-namespace:MantisZip.UI.Avalonia.ViewModels"
         x:Class="MantisZip.UI.Avalonia.Views.SettingsWindow"
         x:DataType="vm:SettingsWindowViewModel"
-        Title="设置"
+        Title="{Binding WindowTitle}"
         Width="520"
         Height="440"
         MinWidth="400"
@@ -56,19 +56,19 @@
     <TabControl Grid.Row="0"
                 Background="{DynamicResource ThemeSurfaceBgBrush}"
                 BorderBrush="{DynamicResource ThemeBorderBrush}">
-      <TabItem Header="预览">
+      <TabItem Header="{Binding TabPreviewHeader}">
         <ScrollViewer Background="{DynamicResource ThemeWindowBgBrush}">
           <StackPanel Spacing="10"
                       Margin="12">
-            <CheckBox Content="启用图片预览"
+            <CheckBox Content="{Binding EnableImagePreviewText}"
                       IsChecked="{Binding EnableImagePreview}" />
-            <CheckBox Content="启用文本预览"
+            <CheckBox Content="{Binding EnableTextPreviewText}"
                       IsChecked="{Binding EnableTextPreview}" />
 
             <Separator Background="{DynamicResource ThemeBorderBrush}" />
 
             <StackPanel Spacing="4">
-              <TextBlock Text="文本预览字号"
+              <TextBlock Text="{Binding TextPreviewFontSizeText}"
                          FontSize="13" />
               <Grid ColumnDefinitions="*,Auto">
                 <Slider Grid.Column="0"
@@ -88,7 +88,7 @@
             </StackPanel>
 
             <StackPanel Spacing="4">
-              <TextBlock Text="最大预览字节"
+              <TextBlock Text="{Binding MaxPreviewBytesText}"
                          FontSize="13" />
               <TextBox Text="{Binding MaxTextPreviewBytes}"
                        Width="200"
@@ -98,12 +98,12 @@
         </ScrollViewer>
       </TabItem>
 
-      <TabItem Header="压缩">
+      <TabItem Header="{Binding TabCompressHeader}">
         <ScrollViewer Background="{DynamicResource ThemeWindowBgBrush}">
           <StackPanel Spacing="10"
                       Margin="12">
             <StackPanel Spacing="4">
-              <TextBlock Text="默认格式"
+              <TextBlock Text="{Binding DefaultFormatText}"
                          FontSize="13" />
               <ComboBox SelectedValue="{Binding DefaultFormat}"
                         Width="160"
@@ -117,7 +117,7 @@
             <Separator Background="{DynamicResource ThemeBorderBrush}" />
 
             <StackPanel Spacing="4">
-              <TextBlock Text="压缩级别"
+              <TextBlock Text="{Binding CompressionLevelText}"
                          FontSize="13" />
               <Grid ColumnDefinitions="*,Auto">
                 <Slider Grid.Column="0"
@@ -139,11 +139,11 @@
         </ScrollViewer>
       </TabItem>
 
-      <TabItem Header="调试">
+      <TabItem Header="{Binding TabDebugHeader}">
         <ScrollViewer Background="{DynamicResource ThemeWindowBgBrush}">
           <StackPanel Spacing="10"
                       Margin="12">
-            <CheckBox Content="启用调试日志"
+            <CheckBox Content="{Binding EnableDebugLogText}"
                       IsChecked="{Binding EnableDebugLogging}" />
           </StackPanel>
         </ScrollViewer>
@@ -156,7 +156,7 @@
                 HorizontalAlignment="Right"
                 Spacing="8"
                 Margin="0,12,0,0">
-      <Button Content="保存"
+      <Button Content="{Binding SaveText}"
               Padding="16,6"
               Click="OnSaveClick"
               Background="{DynamicResource ThemeButtonBgBrush}"
@@ -171,7 +171,7 @@
           </Style>
         </Button.Styles>
       </Button>
-      <Button Content="取消"
+      <Button Content="{Binding CancelText}"
               Padding="16,6"
               Click="OnCancelClick"
               Background="{DynamicResource ThemeButtonBgBrush}"
