@@ -21,6 +21,11 @@ public partial class MainWindowViewModel : ObservableObject
     /// </summary>
     public Func<Task<string?>>? GetOpenFilePath { get; set; }
 
+    /// <summary>
+    /// 由 View 设置的对话框回调，用于打开设置窗口。
+    /// </summary>
+    public Func<Task>? ShowSettingsWindow { get; set; }
+
     public PreviewViewModel Preview { get; } = new();
 
     [ObservableProperty]
@@ -308,6 +313,13 @@ public partial class MainWindowViewModel : ObservableObject
         FolderTreeRoot = null;
         _allRawItems = null;
         Preview.Clear();
+    }
+
+    [RelayCommand]
+    private async Task OpenSettings()
+    {
+        if (ShowSettingsWindow != null)
+            await ShowSettingsWindow();
     }
 
     [RelayCommand]

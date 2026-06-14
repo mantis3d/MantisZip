@@ -1,0 +1,191 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="clr-namespace:MantisZip.UI.Avalonia.ViewModels"
+        x:Class="MantisZip.UI.Avalonia.Views.SettingsWindow"
+        x:DataType="vm:SettingsWindowViewModel"
+        Title="设置"
+        Width="520"
+        Height="440"
+        MinWidth="400"
+        MinHeight="300"
+        Background="{DynamicResource ThemeWindowBgBrush}">
+  <Window.Styles>
+    <Style Selector="TabItem">
+      <Setter Property="Background" Value="{DynamicResource ThemeTabHeaderBgBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource ThemeTextPrimaryBrush}" />
+    </Style>
+    <Style Selector="TabItem:selected /template/ ContentPresenter">
+      <Setter Property="Background" Value="{DynamicResource ThemeSurfaceBgBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource ThemeAccentBrush}" />
+    </Style>
+    <Style Selector="TabControl /template/ Border#PART_SelectedContentBorder">
+      <Setter Property="Background" Value="{DynamicResource ThemeSurfaceBgBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource ThemeBorderBrush}" />
+    </Style>
+    <Style Selector="CheckBox">
+      <Setter Property="Foreground" Value="{DynamicResource ThemeTextPrimaryBrush}" />
+    </Style>
+    <Style Selector="Label">
+      <Setter Property="Foreground" Value="{DynamicResource ThemeTextPrimaryBrush}" />
+    </Style>
+    <Style Selector="TextBlock">
+      <Setter Property="Foreground" Value="{DynamicResource ThemeTextPrimaryBrush}" />
+    </Style>
+    <Style Selector="TextBox">
+      <Setter Property="Background" Value="{DynamicResource ThemeSurfaceBgBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource ThemeTextPrimaryBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource ThemeBorderBrush}" />
+    </Style>
+    <Style Selector="ComboBox">
+      <Setter Property="Background" Value="{DynamicResource ThemeComboBoxBgBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource ThemeTextPrimaryBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource ThemeComboBoxBorderBrush}" />
+    </Style>
+    <Style Selector="ComboBoxItem">
+      <Setter Property="Background" Value="{DynamicResource ThemeComboBoxBgBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource ThemeTextPrimaryBrush}" />
+    </Style>
+    <Style Selector="ComboBoxItem:selected">
+      <Setter Property="Background" Value="{DynamicResource ThemeListSelectedBrush}" />
+    </Style>
+  </Window.Styles>
+
+  <Grid RowDefinitions="*,Auto"
+        Margin="12">
+    <!-- TabControl -->
+    <TabControl Grid.Row="0"
+                Background="{DynamicResource ThemeSurfaceBgBrush}"
+                BorderBrush="{DynamicResource ThemeBorderBrush}">
+      <TabItem Header="预览">
+        <ScrollViewer Background="{DynamicResource ThemeWindowBgBrush}">
+          <StackPanel Spacing="10"
+                      Margin="12">
+            <CheckBox Content="启用图片预览"
+                      IsChecked="{Binding EnableImagePreview}" />
+            <CheckBox Content="启用文本预览"
+                      IsChecked="{Binding EnableTextPreview}" />
+
+            <Separator Background="{DynamicResource ThemeBorderBrush}" />
+
+            <StackPanel Spacing="4">
+              <TextBlock Text="文本预览字号"
+                         FontSize="13" />
+              <Grid ColumnDefinitions="*,Auto">
+                <Slider Grid.Column="0"
+                        Minimum="8"
+                        Maximum="48"
+                        Value="{Binding TextPreviewFontSize}"
+                        TickFrequency="1"
+                        IsSnapToTickEnabled="True"
+                        Margin="0,0,8,0" />
+                <Border Grid.Column="1"
+                        Padding="8,2">
+                  <TextBlock Text="{Binding TextPreviewFontSize}"
+                             VerticalAlignment="Center"
+                             FontWeight="SemiBold" />
+                </Border>
+              </Grid>
+            </StackPanel>
+
+            <StackPanel Spacing="4">
+              <TextBlock Text="最大预览字节"
+                         FontSize="13" />
+              <TextBox Text="{Binding MaxTextPreviewBytes}"
+                       Width="200"
+                       HorizontalAlignment="Left" />
+            </StackPanel>
+          </StackPanel>
+        </ScrollViewer>
+      </TabItem>
+
+      <TabItem Header="压缩">
+        <ScrollViewer Background="{DynamicResource ThemeWindowBgBrush}">
+          <StackPanel Spacing="10"
+                      Margin="12">
+            <StackPanel Spacing="4">
+              <TextBlock Text="默认格式"
+                         FontSize="13" />
+              <ComboBox SelectedValue="{Binding DefaultFormat}"
+                        Width="160"
+                        HorizontalAlignment="Left">
+                <ComboBoxItem Content="zip" />
+                <ComboBoxItem Content="7z" />
+                <ComboBoxItem Content="tar.gz" />
+              </ComboBox>
+            </StackPanel>
+
+            <Separator Background="{DynamicResource ThemeBorderBrush}" />
+
+            <StackPanel Spacing="4">
+              <TextBlock Text="压缩级别"
+                         FontSize="13" />
+              <Grid ColumnDefinitions="*,Auto">
+                <Slider Grid.Column="0"
+                        Minimum="1"
+                        Maximum="9"
+                        Value="{Binding DefaultLevel}"
+                        TickFrequency="1"
+                        IsSnapToTickEnabled="True"
+                        Margin="0,0,8,0" />
+                <Border Grid.Column="1"
+                        Padding="8,2">
+                  <TextBlock Text="{Binding DefaultLevel}"
+                             VerticalAlignment="Center"
+                             FontWeight="SemiBold" />
+                </Border>
+              </Grid>
+            </StackPanel>
+          </StackPanel>
+        </ScrollViewer>
+      </TabItem>
+
+      <TabItem Header="调试">
+        <ScrollViewer Background="{DynamicResource ThemeWindowBgBrush}">
+          <StackPanel Spacing="10"
+                      Margin="12">
+            <CheckBox Content="启用调试日志"
+                      IsChecked="{Binding EnableDebugLogging}" />
+          </StackPanel>
+        </ScrollViewer>
+      </TabItem>
+    </TabControl>
+
+    <!-- Bottom buttons -->
+    <StackPanel Grid.Row="1"
+                Orientation="Horizontal"
+                HorizontalAlignment="Right"
+                Spacing="8"
+                Margin="0,12,0,0">
+      <Button Content="保存"
+              Padding="16,6"
+              Click="OnSaveClick"
+              Background="{DynamicResource ThemeButtonBgBrush}"
+              Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+              BorderBrush="{DynamicResource ThemeBorderBrush}">
+        <Button.Styles>
+          <Style Selector="Button:pressed">
+            <Setter Property="Background" Value="{DynamicResource ThemeButtonPressedBrush}" />
+          </Style>
+          <Style Selector="Button:pointerover">
+            <Setter Property="Background" Value="{DynamicResource ThemeButtonHoverBrush}" />
+          </Style>
+        </Button.Styles>
+      </Button>
+      <Button Content="取消"
+              Padding="16,6"
+              Click="OnCancelClick"
+              Background="{DynamicResource ThemeButtonBgBrush}"
+              Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+              BorderBrush="{DynamicResource ThemeBorderBrush}">
+        <Button.Styles>
+          <Style Selector="Button:pressed">
+            <Setter Property="Background" Value="{DynamicResource ThemeButtonPressedBrush}" />
+          </Style>
+          <Style Selector="Button:pointerover">
+            <Setter Property="Background" Value="{DynamicResource ThemeButtonHoverBrush}" />
+          </Style>
+        </Button.Styles>
+      </Button>
+    </StackPanel>
+  </Grid>
+</Window>

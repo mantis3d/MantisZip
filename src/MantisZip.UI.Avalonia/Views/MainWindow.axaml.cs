@@ -12,6 +12,11 @@ public partial class MainWindow : Window
 
         var vm = new MainWindowViewModel();
         vm.GetOpenFilePath = OpenFileDialogAsync;
+        vm.ShowSettingsWindow = async () =>
+        {
+            var dialog = new SettingsWindow();
+            await dialog.ShowDialog(this);
+        };
         DataContext = vm;
     }
 

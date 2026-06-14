@@ -39,6 +39,10 @@
         <MenuItem Header="打开压缩包"
                   Command="{Binding OpenArchiveCommand}" />
         <Separator />
+        <Separator />
+        <MenuItem Header="设置"
+                  Command="{Binding OpenSettingsCommand}" />
+        <Separator />
         <MenuItem Header="退出" />
       </MenuItem>
       <MenuItem Header="视图">

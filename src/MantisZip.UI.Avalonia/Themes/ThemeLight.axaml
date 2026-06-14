@@ -18,6 +18,12 @@
   <Color x:Key="ThemeListSelected">#FFE0F0FF</Color>
   <!-- Splitters -->
   <Color x:Key="ThemeSplitterBg">#FFE0E0E0</Color>
+  <!-- TabControl -->
+  <Color x:Key="ThemeTabHeaderBg">#FFF0F0F0</Color>
+  <Color x:Key="ThemeTabHeaderFg">#FF1A1A1A</Color>
+  <!-- ComboBox -->
+  <Color x:Key="ThemeComboBoxBg">#FFFFFFFF</Color>
+  <Color x:Key="ThemeComboBoxBorder">#FFE0E0E0</Color>
 
   <!-- SolidColorBrush resources for binding -->
   <SolidColorBrush x:Key="ThemeWindowBgBrush" Color="{StaticResource ThemeWindowBg}" />
@@ -33,4 +39,8 @@
   <SolidColorBrush x:Key="ThemeListBgBrush" Color="{StaticResource ThemeListBg}" />
   <SolidColorBrush x:Key="ThemeListSelectedBrush" Color="{StaticResource ThemeListSelected}" />
   <SolidColorBrush x:Key="ThemeSplitterBgBrush" Color="{StaticResource ThemeSplitterBg}" />
+  <SolidColorBrush x:Key="ThemeTabHeaderBgBrush" Color="{StaticResource ThemeTabHeaderBg}" />
+  <SolidColorBrush x:Key="ThemeTabHeaderFgBrush" Color="{StaticResource ThemeTabHeaderFg}" />
+  <SolidColorBrush x:Key="ThemeComboBoxBgBrush" Color="{StaticResource ThemeComboBoxBg}" />
+  <SolidColorBrush x:Key="ThemeComboBoxBorderBrush" Color="{StaticResource ThemeComboBoxBorder}" />
 </ResourceDictionary>
