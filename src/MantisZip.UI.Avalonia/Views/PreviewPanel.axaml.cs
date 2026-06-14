@@ -1,3 +1,4 @@
+using System.Text;
 using Avalonia.Controls;
 using MantisZip.UI.Avalonia.ViewModels;
 
@@ -29,7 +30,9 @@ public partial class PreviewPanel : UserControl
     {
         if (vm.IsHtmlVisible && !string.IsNullOrEmpty(vm.HtmlContent))
         {
-            HtmlWebView.NavigateToString(vm.HtmlContent);
+            // data URI: embed HTML inline so no temp files needed
+            var base64 = Convert.ToBase64String(Encoding.UTF8.GetBytes(vm.HtmlContent));
+            HtmlWebView.Source = new Uri($"data:text/html;base64,{base64}");
         }
     }
 }

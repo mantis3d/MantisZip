@@ -2,7 +2,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="clr-namespace:MantisZip.UI.Avalonia.ViewModels"
              xmlns:models="clr-namespace:MantisZip.UI.Avalonia.Models"
-             xmlns:wv2="clr-namespace:Avalonia.Controls;assembly=Avalonia.WebView2"
+             xmlns:wv2="clr-namespace:Avalonia.Controls;assembly=Avalonia.Controls.WebView"
              x:Class="MantisZip.UI.Avalonia.Views.PreviewPanel"
              x:DataType="vm:PreviewViewModel">
   <Grid RowDefinitions="Auto,*">
@@ -297,7 +297,7 @@
         <!-- HTML/Markdown preview (WebView2) -->
         <ScrollViewer IsVisible="{Binding IsHtmlVisible}"
                       Background="{DynamicResource ThemeSurfaceBgBrush}">
-          <wv2:WebView2 x:Name="HtmlWebView" />
+          <wv2:NativeWebView x:Name="HtmlWebView" />
         </ScrollViewer>
       </Grid>
     </ScrollViewer>
