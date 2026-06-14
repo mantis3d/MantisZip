@@ -1,5 +1,6 @@
 using System.IO;
 using System.Windows;
+using MantisZip.Core.Utils;
 using MantisZip.UI.Localization;
 
 namespace MantisZip.UI;
@@ -67,7 +68,7 @@ public partial class CompressConflictDialog : Window
             var fi = new FileInfo(filePath);
             if (fi.Exists)
             {
-                TargetSizeText.Text = FormatSize(fi.Length);
+                TargetSizeText.Text = FormatUtil.FormatSize(fi.Length);
                 TargetDateText.Text = fi.LastWriteTime.ToString("yyyy-MM-dd HH:mm");
             }
             else
@@ -82,19 +83,6 @@ public partial class CompressConflictDialog : Window
             TargetDateText.Text = "--";
         }
         TargetPathBlock.Text = L.T(L.CompressConflict_PathLabel) + filePath;
-    }
-
-    private static string FormatSize(long bytes)
-    {
-        string[] sizes = { "B", "KB", "MB", "GB", "TB" };
-        double len = bytes;
-        int order = 0;
-        while (len >= 1024 && order < sizes.Length - 1)
-        {
-            order++;
-            len /= 1024;
-        }
-        return $"{len:0.##} {sizes[order]}";
     }
 
     /// <summary>

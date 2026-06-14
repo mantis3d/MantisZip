@@ -166,6 +166,20 @@ public partial class MainWindow
             _flattenAlphaEnabled = false;
             HideAllPreviewControls();
             PreviewImageScroll.Visibility = Visibility.Visible;
+
+            // 透明棋盘格背景：仅 PNG/ICO/WebP 支持透明的格式保持状态，其他格式只清理视觉不重置标志位
+            bool showTransparencyBtn = ext == ".png" || ext == ".ico" || ext == ".webp";
+            if (showTransparencyBtn && PreviewImageScroll.Parent is Panel transPanel)
+            {
+                transPanel.Background = _transparentBgEnabled
+                    ? new ImageBrush { TileMode = TileMode.Tile, Viewport = new Rect(0, 0, 16, 16), ViewportUnits = BrushMappingMode.Absolute, ImageSource = CreateCheckerPattern() }
+                    : Brushes.Transparent;
+            }
+            else if (!showTransparencyBtn && PreviewImageScroll.Parent is Panel nonTransPanel)
+            {
+                nonTransPanel.Background = Brushes.Transparent;
+            }
+
             PreviewHeader.Text = L.TF(L.Preview_ImageHeader, Path.GetFileName(filePath));
 
             // 图片信息
@@ -197,7 +211,7 @@ public partial class MainWindow
                     new ToolbarButton { Text = "1:1", Tooltip = L.T(L.Preview_Zoom100), OnClick = () => ApplyZoom(ZoomMode.Zoom100) },
                     new ToolbarButton { Text = "↔", Tooltip = L.T(L.Preview_ZoomFitWidth), OnClick = () => ApplyZoom(ZoomMode.FitWidth) }
                 },
-                (ext == ".png" || ext == ".ico" || ext == ".webp")
+                showTransparencyBtn
                     ? new[] {
                         new ToolbarButton { Text = "🏁", Tooltip = L.T(L.Preview_ToggleTransparency), IsToggle = true, IsChecked = _transparentBgEnabled, OnClick = ToggleTransparencyBg },
                         new ToolbarButton { Text = "🎨", Tooltip = "切换透明 (显示 RGB 原始颜色)", IsToggle = true, IsChecked = _flattenAlphaEnabled, OnClick = ToggleFlattenAlpha }
@@ -251,6 +265,10 @@ public partial class MainWindow
                 Padding = new Thickness(10),
             };
             _icoBorders.Add(border);
+
+            // 根据 _transparentBgEnabled 初始状态设置棋盘格
+            if (_transparentBgEnabled)
+                border.Background = new ImageBrush { TileMode = TileMode.Tile, Viewport = new Rect(0, 0, 16, 16), ViewportUnits = BrushMappingMode.Absolute, ImageSource = CreateCheckerPattern() };
 
             var stack = new StackPanel
             {

@@ -217,6 +217,7 @@ public partial class App : Application
                                 return new CompressConflictResolution(chosenAction.Value, null);
 
                             var dlg = new CompressConflictDialog(info.OutputPath, info.CanAdd, info.SuggestedName);
+                            dlg.Owner = progressWindow;
                             var shown = dlg.ShowDialog() == true;
                             if (dlg.ApplyToAll)
                             {
@@ -364,6 +365,7 @@ public partial class App : Application
             var nameResult = app.Dispatcher.Invoke(() =>
             {
                 var dlg = new ArchiveNameDialog(defaultName);
+                dlg.Owner = progressWindow;
                 return dlg.ShowDialog() == true ? dlg.ArchiveName : null;
             });
 
@@ -416,6 +418,7 @@ public partial class App : Application
                                 return new CompressConflictResolution(chosenAction.Value, null);
 
                             var dlg = new CompressConflictDialog(info.OutputPath, info.CanAdd, info.SuggestedName);
+                            dlg.Owner = progressWindow;
                             var shown = dlg.ShowDialog() == true;
                             if (dlg.ApplyToAll)
                             {

@@ -772,6 +772,9 @@ public partial class MainWindow
             SaveCurrentPreviewSize(AppSettings.Instance.PreviewPosition);
 
         PreviewImage.Source = null;
+        PreviewImage.ClearValue(Image.StretchProperty); // 还原默认拉伸，避免字体 GlyphRun 渲染时设置的 Stretch=None 影响后续图片预览
+        PreviewImage.ClearValue(FrameworkElement.HorizontalAlignmentProperty);
+        PreviewImage.ClearValue(FrameworkElement.VerticalAlignmentProperty);
         ImageBehavior.SetAnimatedSource(PreviewImage, null); // 停止 GIF 动画
         _gifController?.Dispose();
         _gifController = null;
@@ -796,6 +799,10 @@ public partial class MainWindow
         _icoOriginalFrames = null;
         _icoImages = null;
         _icoBorders = null;
+
+        // 清理棋盘格背景视觉（不重置 _transparentBgEnabled 标志位）
+        if (PreviewImageScroll.Parent is Panel bgPanel)
+            bgPanel.Background = Brushes.Transparent;
     }
 
     private void HidePreview()

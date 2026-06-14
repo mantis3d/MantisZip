@@ -23,6 +23,9 @@ public class ZipEngine : IArchiveEngine
     /// <summary>
     /// 使用 SharpCompress 打开 ZIP 文件，自动检测编码（UTF-8 → GBK 回退）。
     /// SharpCompress 每实例设置编码，无全局副作用。
+    /// 
+    /// 回退逻辑：只有 ZIP 条目未设置 UTF-8 标志（bit 11）且内容含高位字符时，
+    /// 才尝试 GBK 回退。如果 bit 11 已设置，说明条目名是 UTF-8 编码，不进行回退。
     /// </summary>
     internal static IArchive OpenArchiveWithEncodingFallback(string archivePath, string? password = null)
     {
@@ -63,12 +66,28 @@ public class ZipEngine : IArchiveEngine
 
             if (hasHighAscii)
             {
-                CoreLog.Info("OpenArchiveWithEncodingFallback: detected high-ASCII entry names, retrying with GBK");
+                // 检查 ZIP 中央目录中是否有条目设置了 UTF-8 标志（bit 11）。
+                // 如果有，说明条目名本就是 UTF-8 编码，不应回退到 GBK。
+                if (ZipHasUtf8Flag(archivePath))
+                {
+                    CoreLog.Info("OpenArchiveWithEncodingFallback: ZIP has UTF-8 flag (bit 11), keeping UTF-8 codec");
+                    return archive;
+                }
+
+                // 即使没有 bit 11，如果解码后的文件名看起来像合法的 CJK 文本（而非
+                // GBK→UTF-8 误解码的拉丁字符），也保留 UTF-8 解码结果。
+                if (LooksLikeValidCjk(archive))
+                {
+                    CoreLog.Info("OpenArchiveWithEncodingFallback: decoded names appear as valid CJK, keeping UTF-8 codec");
+                    return archive;
+                }
+
+                CoreLog.Info("OpenArchiveWithEncodingFallback: detected high-ASCII entry names without UTF-8 flag, retrying with GBK");
                 archive.Dispose();
                 return OpenWithGbk();
             }
 
-            CoreLog.Info("OpenArchiveWithEncodingFallback: entries appear UTF-8, keeping UTF-8 codec");
+            CoreLog.Info("OpenArchiveWithEncodingFallback: entries appear ASCII, keeping default codec");
             return archive;
         }
         catch
@@ -76,6 +95,114 @@ public class ZipEngine : IArchiveEngine
             archive.Dispose();
             return OpenWithGbk();
         }
+    }
+
+    /// <summary>
+    /// 读取 ZIP 文件的中央目录，检查是否有任何条目设置了 UTF-8 文件名标志（通用位标志 bit 11 = 0x0800）。
+    /// </summary>
+    private static bool ZipHasUtf8Flag(string archivePath)
+    {
+        try
+        {
+            using var fs = File.OpenRead(archivePath);
+            if (fs.Length < 22) return false;
+
+            // 在文件末尾搜索 EOCD（End of Central Directory）签名 0x06054b50
+            long eocdPos = -1;
+            // EOCD 最小固定长度 22，最大长度 65557（含注释）
+            long searchStart = Math.Max(0, fs.Length - 65557);
+            byte[] sig = [0x50, 0x4b, 0x05, 0x06]; // little-endian 0x06054b50
+
+            fs.Seek(searchStart, SeekOrigin.Begin);
+            byte[] buf = new byte[fs.Length - searchStart];
+            int read = fs.Read(buf, 0, buf.Length);
+
+            for (int i = read - 22; i >= 0; i--)
+            {
+                if (buf[i] == sig[0] && buf[i + 1] == sig[1] &&
+                    buf[i + 2] == sig[2] && buf[i + 3] == sig[3])
+                {
+                    eocdPos = searchStart + i;
+                    break;
+                }
+            }
+
+            if (eocdPos < 0) return false;
+
+            // 解析 EOCD：偏移 16 处为中央目录偏移量（4 bytes）
+            uint centralDirOffset = BitConverter.ToUInt32(buf, (int)(eocdPos - searchStart + 16));
+            uint centralDirSize = BitConverter.ToUInt32(buf, (int)(eocdPos - searchStart + 12));
+
+            // 遍历中央目录条目
+            fs.Seek(centralDirOffset, SeekOrigin.Begin);
+            var reader = new BinaryReader(fs, Encoding.UTF8);
+            long endPos = centralDirOffset + centralDirSize;
+
+            while (fs.Position < endPos)
+            {
+                uint sig2 = reader.ReadUInt32();
+                if (sig2 != 0x02014b50) break;
+
+                // 跳过版本信息（4 bytes）
+                reader.ReadBytes(4);
+                // 通用位标志（2 bytes），偏移 8
+                ushort flags = reader.ReadUInt16();
+
+                if ((flags & 0x0800) != 0)
+                    return true;
+
+                // 跳过剩余的固定头部到达可变长度字段
+                // 已读：签名(4) + 版本(2+2) + 标志(2) = 10
+                // 再跳：压缩方法(2) + 时间(2) + 日期(2) + CRC(4) + 压缩大小(4) + 未压缩大小(4) = 18
+                reader.ReadBytes(18);
+                ushort nameLen = reader.ReadUInt16();  // 偏移 28
+                ushort extraLen = reader.ReadUInt16(); // 偏移 30
+                ushort commentLen = reader.ReadUInt16(); // 偏移 32
+                reader.ReadBytes(12); // 磁盘号(2) + 内部属性(2) + 外部属性(4) + 本地偏移(4) = 12
+
+                // 跳过可变长度字段
+                reader.ReadBytes(nameLen + extraLen + commentLen);
+            }
+
+            return false;
+        }
+        catch
+        {
+            // 出错时回退到旧行为（回退 GBK）
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// 检查已用 UTF-8 解码的条目名是否看起来像合法的 CJK 文本。
+    /// GBK→UTF-8 误解码会产生拉丁字符（如 é ① À 等），而合法 CJK 在 U+4E00+ 范围。
+    /// </summary>
+    private static bool LooksLikeValidCjk(IArchive archive)
+    {
+        int totalHigh = 0;
+        int cjkCount = 0;
+
+        foreach (var entry in archive.Entries)
+        {
+            if (string.IsNullOrEmpty(entry.Key)) continue;
+            foreach (char c in entry.Key)
+            {
+                if (c <= 127) continue;
+                totalHigh++;
+                // CJK 及相关字符范围
+                if ((c >= 0x4E00 && c <= 0x9FFF) ||      // CJK Unified Ideographs
+                    (c >= 0x3400 && c <= 0x4DBF) ||      // CJK Extension A
+                    (c >= 0x2B740 && c <= 0x2B81F) ||    // CJK Extension C
+                    (c >= 0xF900 && c <= 0xFAFF) ||      // CJK Compatibility Ideographs
+                    (c >= 0x3000 && c <= 0x303F) ||      // CJK Symbols and Punctuation
+                    (c >= 0xFF00 && c <= 0xFFEF))        // Halfwidth and Fullwidth Forms
+                {
+                    cjkCount++;
+                }
+            }
+        }
+
+        return totalHigh > 0 && cjkCount >= totalHigh * 0.5;
     }
 
     public bool CanHandle(ArchiveFormat format) => format == ArchiveFormat.Zip;
@@ -379,6 +506,7 @@ public class ZipEngine : IArchiveEngine
                     {
                         CompressionLevel = options.CompressionLevel,
                         ArchiveComment = options.Comment ?? "",
+                        ArchiveEncoding = new ArchiveEncoding { Default = Encoding.UTF8 },
                     };
                     using var zipWriter = new ZipWriter(fsOut, writerOptions);
 
@@ -760,6 +888,7 @@ public class ZipEngine : IArchiveEngine
                         {
                             CompressionLevel = options.CompressionLevel,
                             ArchiveComment = options.Comment ?? "",
+                            ArchiveEncoding = new ArchiveEncoding { Default = Encoding.UTF8 },
                         };
                         using var zipWriter = new ZipWriter(fsOut, writerOptions);
 
@@ -1021,6 +1150,7 @@ public class ZipEngine : IArchiveEngine
                     var writerOptions = new ZipWriterOptions(CompressionType.Deflate)
                     {
                         CompressionLevel = 6,
+                        ArchiveEncoding = new ArchiveEncoding { Default = Encoding.UTF8 },
                     };
                     using var zipWriter = new ZipWriter(fsOut, writerOptions);
 

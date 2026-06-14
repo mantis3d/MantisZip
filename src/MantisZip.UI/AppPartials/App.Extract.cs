@@ -253,6 +253,7 @@ public partial class App : Application
             var ok = app.Dispatcher.Invoke(() =>
             {
                 var dlg = new ExtractSettingsWindow(allPaths);
+                dlg.Owner = Application.Current?.Windows.OfType<Window>().FirstOrDefault(w => w.IsActive);
                 LogStartup("HandleExtractBatch: ExtractSettingsWindow 已创建，准备 ShowDialog");
                 var result = dlg.ShowDialog();
                 LogStartup($"HandleExtractBatch: ExtractSettingsWindow 返回 DialogResult={result}");

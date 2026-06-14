@@ -15,6 +15,82 @@
 
 ## 版本历史（从新到旧）
 
+ ### v0.3.13 (2026-06-13) DPAPI → AES-GCM 替换 + 安装脚本修正 + 对话框 Owner 修复 + Emoji.Wpf 依赖缺失修复 + ZIP 中文编码假阳性修复
+
+0. **ZIP 中文文件名乱码修复**（写端 + 读端双向）：
+   - **写端**：三个 `ZipWriterOptions` 构造位置全部添加 `ArchiveEncoding = new ArchiveEncoding { Default = Encoding.UTF8 }`，确保写入时使用 UTF-8 编码并设置 bit 11
+   - **读端：bit 11 检测**：新增 `ZipHasUtf8Flag()` 按 ZIP 规范读取中央目录原始位标志，bit 11 已设置时跳过 GBK 回退
+   - **读端：CJK 启发式检测**：新增 `LooksLikeValidCjk()`，无 bit 11 但解码结果在 CJK 范围内的也保留 UTF-8，防止第三方工具写的 UTF-8 ZIP 被误判为 GBK
+   - 影响：所有 ZIP 读写路径（CompressAsync / AddToArchiveAsync / DeleteEntriesAsync / ListEntriesAsync / ExtractAsync）
+
+1. **installer.iss 通配符化 + Emoji.Wpf 依赖修复**：
+   - **[Files]** 改为 `*.dll` 通配符，取代逐一手写 DLL 清单，杜绝未来遗漏
+   - 新增打包：`Typography.GlyphLayout.dll`、`Typography.OpenFont.dll`、`Stfu.dll`（Emoji.Wpf 依赖，缺失导致启动闪退 `TypeInitializationException`）
+   - 新增打包：`SQLitePCLRaw.*.dll`（3 个）、`WinRT.Runtime.dll`、`Microsoft.Windows.SDK.NET.dll`、`Microsoft.Web.WebView2.WinForms.dll`、`System.Security.Cryptography.ProtectedData.dll`
+   - 添加 `ShellExt.runtimeconfig.json`
+
+1. **对话框 Owner 修正**（6 个文件）：修复弹窗被主窗口挡住的问题
+   - `AppMessageBox.xaml.cs`：`Show()`/`ShowWithAction()` 添加 `GetActiveWindow()` 自动检测 Owner，修复 85+ 个调用点
+   - `MainWindow.Menu.cs`：`SettingsWindow` 设 Owner
+   - `App.Compress.cs` / `App.Extract.cs` / `App.Open.cs`：CLI 模式下的冲突/命名对话框设 Owner
+   - `CompressSettingsWindow.xaml.cs`：3 个冲突对话框设 Owner
+
+2. **App.xaml.cs**：`new MainWindow()` 包裹进 try-catch，防止 XAML 初始化闪退，改为显示错误对话框
+
+3. **installer.iss 修复**：
+   - 添加 `SetupIconFile`，安装包使用 `App.ico` 图标
+   - `IsWebView2Installed` 改用 `RegQueryStringValue` 检查 `pv` 版本值，并补充 `HKLM32`（WOW6432Node）检测，防止每次重复下载 WebView2
+
+4. **预置用户设置机制**：
+   - 创建 `installer\prebuilt\settings.json` 和 `window.json`，安装器在首次安装时复制到 `%LOCALAPPDATA%\MantisZip\`
+   - 用户替换这两个文件即可在安装后自动加载自己的配置
+
+6. **字体预览修复**：
+   - `FontParser.ParseSfnt` 修复：name table 解析优先 pid=3（Windows Unicode）而非 pid=1（Mac），解决 CJK 字体名错误问题
+   - 新增 CFF-OTF 字体回退机制：三层策略（`#` 语法 → 目录扫描 DirectWrite → GDI+ PrivateFontCollection），绕过 WPF 对 CFF 轮廓字体的加载限制
+   - 失败时信息面板显示橙色警告及原因（CFF 轮廓 / Web 字体 / WPF 限制）
+   - `ClearPreviewContent` 重置 `Image.Stretch`，避免字体渲染干扰图片预览
+
+5. **DPAPI → AES-GCM 替换**（跨平台移植 Phase 4 子任务）：
+   - 新建 `IDataProtector` 接口（`Core/Abstractions/`），抽象数据保护操作
+   - 新建 `AesGcmDataProtector`（`Core/Utils/`），基于 .NET `AesGcm`（AES-256-GCM）实现跨平台加密，密钥以文件形式存储于 `%APPDATA%/MantisZip/.masterkey`
+   - `PasswordManager` 移除 `[SupportedOSPlatform("windows")]` 特性，改为通过 `IDataProtector` 接口调用加密，默认使用 `AesGcmDataProtector`
+   - `Load()` 支持三种格式自动检测：明文 JSON → AES-GCM `MZPAES|` 格式 → 旧 DPAPI 格式（自动迁移）
+   - 旧 DPAPI 文件首次加载时自动解密并重写为 AES-GCM 格式，原文件备份为 `passwords.json.dpapi-backup`
+   - 所有 7 个 UI 消费端无需修改（`PasswordManager.Instance.*` API 签名不变）
+   - 参见 [跨平台移植计划](.sisyphus/plans/cross-platform-port.md)
+
+### v0.3.13 (2026-06-12) ZipEngine SharpZipLib → SharpCompress 迁移 + 压缩批处理文件进度条修复 + 压缩完成后进程残留修复
+
+0. **关联计划同步 + .NET 11 追踪**：
+   - `engine-unification-sharpcompress.md`：Phase 5 状态更新为"部分完成"，新增 .NET 11 `System.IO.Compression.ZipArchive` AES-256 支持作为 SharpZipLib 移除的最佳候选项
+   - `remove-sharpziplib.md`：Scope Correction 重写，精确标注残留范围
+   - `zipengine-sharpcompress-migration.md`：Post-Migration Analysis 新增 .NET 11 追踪节
+   - .NET 11 目标 2026 年 11 月发布，届时可彻底移除 SharpZipLib
+
+0. **ZipEngine SharpZipLib → SharpCompress 迁移**（参见 [迁移计划](.sisyphus/plans/zipengine-sharpcompress-migration.md)）：
+   - `CompressAsync`：`ZipOutputStream` → `ZipWriter`（未加密路径）；加密路径保留 SharpZipLib 回退（因 SharpCompress ZipWriter 不支持加密）
+   - `AddToArchiveAsync`：全部 SharpZipLib API → SharpCompress `IArchive` + `ZipWriter`
+   - `DeleteEntriesAsync`：同上，2-pass 结构全部迁移
+   - 删除 `OpenZipFile` 静态方法（dead code，68 行）
+   - `OpenArchiveWithEncodingFallback`：改为使用 `FileStream(FileShare.Delete)` 解决原子替换时文件锁问题
+   - 类注释更新为"基于 SharpCompress，加密回退使用 SharpZipLib"
+   - 183 测试全部通过
+
+1. **压缩批处理文件进度条锯齿修复**：`ProgressWindow.SetProgress` 中总进度条改为使用公式 `已完成包数/batch总数 × 100 + 当前包进度/batch总数`，消除批处理模式下每个包 0→100% 导致的锯齿（总进度 0→100→33→0→100→66→0→100）
+2. **压缩文件列表状态乱序修复**：移除所有压缩方法中进度包装器内使用 `p.ProcessedFiles`（包内文件数）作为 batch 索引的 `SetCurrentBatchItem` 调用。改为在 `CompressSeparateAsync` 中通过 `onItemStatus?.Invoke(i, BatchItemStatus.InProgress)` 在正确的迭代边界通知 UI，在 `onItemStatus` 回调和单包模式中直接使用 `SetCurrentBatchItem(0)` 指定批处理项索引
+3. **QuickView 路径保存按钮注销后残留修复**：CefSharp 退出时崩溃
+4. **冲突对话框按钮图标尺寸统一**：CompressConflictDialog 和 ConflictDialog 的按钮图标从 FontSize 16 统一为 24
+5. **压缩完成后 exe 进程残留修复**：两处 bug 修复
+   - **Bug A**：`CompressSettingsWindow` 三个 CloseAction 中 `progressWindow.Close()` 在用户提前点击"关闭"按钮后抛出 `InvalidOperationException`，导致 `this.Close()` 被跳过、`Current.Shutdown()` 永不执行。修复：加 `if (progressWindow.IsVisible) try { progressWindow.Close(); } catch { }` 保护
+   - **Bug B**：`RunCompressSeparateBatch` 的 `catch (OperationCanceledException)` 为空块，取消后进程不退出。修复：添加 `await progressWindow.Dispatcher.InvokeAsync(() => app.Shutdown())`
+
+### v0.3.13 (2026-06-11) RAR 提取进度条修复 + 取消后进程残留修复
+
+1. **RAR 大文件提取进度条不更新修复**：`SevenZipEngine.ExtractAsync` / `ExtractEntriesAsync` 中 `SharpSevenZipExtractor.ExtractFile` 是同步阻塞调用，之前只在文件完全提取后报一次进度（0%→100%）。新增 `WriteProgressStream`（`Core/Utils`）包装 `FileStream`，在每次 `Write` 时通过回调按已知 `entry.Size` 计算百分比，100ms 节流上报，与 ZipEngine 的每文件进度模式一致。
+2. **取消提取后进程残留修复**：`HandleExtractBatchCore` 中 `failed > 0` 分支在 `progressWindow.Close()` 已触发过 `Closed` 事件后才订阅 `Closed += handler`，导致 `closed.Wait()` 永远阻塞、`app.Shutdown()` 永不执行。修复：通过 `Dispatcher.InvokeAsync(() => IsVisible)` 检查窗口是否已关闭，若已关闭则跳过等待直接 shutdown。
+3. **`WaitForManualCloseAsync` 同步修复**：`AutoCloseOrWaitAsync` + `KeepOpenOnComplete` 路径存在相同 bug——窗口已关闭时 `Closed` 事件早已触发，等待将永远阻塞。添加相同的 `IsVisible` 守卫检查。
+
 ### v0.3.13 (2026-06-11) 提取文件列表展示和目录树构建逻辑到 Core
 1. **ArchiveTreeBuilder**（Core/Services）：`BuildTree()` 从 `ArchiveItem` 列表构建文件夹树，`FolderNode` 类从 WPF 移到 Core
 2. **ArchiveEntryLister**（Core/Services）：`GetEntriesInFolder()` 按文件夹路径筛选条目（支持扁平/默认两种浏览模式），`ComputeDirectoryStats()` 预计算各目录的统计信息

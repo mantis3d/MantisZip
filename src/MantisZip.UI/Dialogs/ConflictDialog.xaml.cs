@@ -1,6 +1,7 @@
 using System.IO;
 using System.Windows;
 using MantisZip.Core.Abstractions;
+using MantisZip.Core.Utils;
 using MantisZip.UI.Localization;
 
 namespace MantisZip.UI;
@@ -48,11 +49,11 @@ public partial class ConflictDialog : Window
         };
 
         // 已有文件信息
-        ExistingSizeText.Text = info.ExistingSize.HasValue ? FormatSize(info.ExistingSize.Value) : "--";
+        ExistingSizeText.Text = info.ExistingSize.HasValue ? FormatUtil.FormatSize(info.ExistingSize.Value) : "--";
         ExistingDateText.Text = info.ExistingModified?.ToString("yyyy-MM-dd HH:mm") ?? "--";
 
         // L.T(L.Conflict_ArchiveLabel)条目信息
-        EntrySizeText.Text = info.EntrySize.HasValue ? FormatSize(info.EntrySize.Value) : "--";
+        EntrySizeText.Text = info.EntrySize.HasValue ? FormatUtil.FormatSize(info.EntrySize.Value) : "--";
         EntryDateText.Text = info.EntryModified?.ToString("yyyy-MM-dd HH:mm") ?? "--";
 
         // 对比结果
@@ -130,16 +131,5 @@ public partial class ConflictDialog : Window
         DialogResult = true;
     }
 
-    private static string FormatSize(long bytes)
-    {
-        string[] sizes = { "B", "KB", "MB", "GB", "TB" };
-        double len = bytes;
-        int order = 0;
-        while (len >= 1024 && order < sizes.Length - 1)
-        {
-            order++;
-            len /= 1024;
-        }
-        return $"{len:0.##} {sizes[order]}";
-    }
+
 }

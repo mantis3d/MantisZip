@@ -66,6 +66,8 @@ public static class FontParser
         }
 
         string? family = null, subfamily = null, fullName = null;
+        ushort familyPid = 0, subfamilyPid = 0, fullNamePid = 0;
+        string? prefFamily = null; // name ID 16 (preferred family) fallback
 
         if (foundName && nameOff > 0 && nameLen >= 6
             && nameOff < fs.Length && nameOff + nameLen <= fs.Length)
@@ -101,12 +103,28 @@ public static class FontParser
                     int nul = val.IndexOf('\0');
                     if (nul >= 0) val = val[..nul];
 
-                    if (nid == 1 && family == null) family = val;
-                    else if (nid == 2 && subfamily == null) subfamily = val;
-                    else if (nid == 4 && fullName == null) fullName = val;
+                    // Priority: pid=3 (Windows Unicode) > pid=1 (Mac) > other
+                    if (nid == 1 && ShouldReplaceNameEntry(familyPid, pid))
+                    { family = val; familyPid = pid; }
+                    else if (nid == 2 && ShouldReplaceNameEntry(subfamilyPid, pid))
+                    { subfamily = val; subfamilyPid = pid; }
+                    else if (nid == 4 && ShouldReplaceNameEntry(fullNamePid, pid))
+                    { fullName = val; fullNamePid = pid; }
+                    // Collect Preferred Family (name ID 16) as fallback
+                    else if (nid == 16 && ShouldReplaceNameEntry(familyPid, pid))
+                    { prefFamily = val; }
                 }
                 finally { fs.Seek(saved, SeekOrigin.Begin); }
             }
+
+            // If no pid=3 family name found, use preferred family (nid 16) as fallback
+            if (family == null || (familyPid != 3 && prefFamily != null))
+                family = prefFamily;
+        }
+
+        static bool ShouldReplaceNameEntry(ushort currentPid, ushort newPid)
+        {
+            return currentPid == 0 || (currentPid == 1 && newPid == 3);
         }
 
         int? glyphs = null;

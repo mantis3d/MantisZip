@@ -3,7 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:l="clr-namespace:MantisZip.UI.Localization"
         Title="{l:L About_Title}" Icon="/Resources/App.ico"
-        MinWidth="400" MinHeight="350" Width="480" Height="460"
+        MinWidth="500" MinHeight="350" Width="680" Height="500"
         WindowStartupLocation="CenterOwner" ShowInTaskbar="False"
         ResizeMode="CanResizeWithGrip"
         Background="{StaticResource Theme_WindowBg}">

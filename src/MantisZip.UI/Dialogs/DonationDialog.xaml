@@ -60,14 +60,7 @@
                     BorderThickness="1"
                     Foreground="{StaticResource Theme_TextPrimary}"
                     FontSize="13" HorizontalContentAlignment="Center"/>
-            <Button Content="🐙 GitHub Sponsors" Click="OpenGitHub_Click"
-                    Height="38" Cursor="Hand" Margin="0,8,0,0"
-                    Background="{StaticResource Theme_SurfaceBg}"
-                    BorderBrush="{StaticResource Theme_Border}"
-                    BorderThickness="1"
-                    Foreground="{StaticResource Theme_TextPrimary}"
-                    FontSize="13" HorizontalContentAlignment="Center"/>
-            <Button Content="☕ Buy Me a Coffee" Click="OpenBuyMeACoffee_Click"
+            <Button Content="☕ Polar" Click="Polar_Click"
                     Height="38" Cursor="Hand" Margin="0,8,0,0"
                     Background="{StaticResource Theme_SurfaceBg}"
                     BorderBrush="{StaticResource Theme_Border}"
