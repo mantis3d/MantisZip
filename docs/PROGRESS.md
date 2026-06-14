@@ -63,6 +63,14 @@
    - 所有 7 个 UI 消费端无需修改（`PasswordManager.Instance.*` API 签名不变）
    - 参见 [跨平台移植计划](.sisyphus/plans/cross-platform-port.md)
 
+5. **ToggleSepDirBaseline / ToggleProgressBars 根目录状态重置修复**：
+   - `ToggleSepDirBaseline_Click` 和 `ToggleProgressBars_Click` 在根目录时不再调用 `LoadArchiveAsync`（会重置展平/筛选状态），改为统一走 `FilterFiles(_currentFolder)`
+   - 影响：主菜单"目录独立基准"、进度条显隐切换不再丢失"展平目录"和"筛选"状态
+
+6. **CompressConflictDialog 重命名按钮图标丢失修复**：
+   - 勾选"对后续文件使用相同操作"时，`RenameBtn.Content` 被替换为纯字符串（丢掉 ✏️ emoji）
+   - 修复：XAML 中给按钮内 TextBlock 命名 `RenameBtnLabel`，代码改设 `.Text` 而非 `.Content`
+
 ### v0.3.13 (2026-06-12) ZipEngine SharpZipLib → SharpCompress 迁移 + 压缩批处理文件进度条修复 + 压缩完成后进程残留修复
 
 0. **关联计划同步 + .NET 11 追踪**：
