@@ -12,6 +12,9 @@
   <a href="https://buy.polar.sh/polar_cl_VaCaW2l2nWkob5CyHe4dOlhL6HrQDK4ueMA9n1JyhNc"><img src="https://img.shields.io/badge/Polar-Sponsor-pink?style=flat-square" alt="Polar Sponsor"></a>
   <a href="https://afdian.com/a/MantisZen"><img src="https://img.shields.io/badge/爱发电-赞助-blue?style=flat-square" alt="爱发电"></a>
   <a href="https://dotnet.microsoft.com/"><img src="https://img.shields.io/badge/.NET-9.0-purple?style=flat-square" alt=".NET 9"></a>
+
+  [![QQ Group](https://img.shields.io/badge/QQ%E7%BE%A4-778347352-blue?style=flat-square&logo=tencent-qq&logoColor=white)](https://qm.qq.com/cgi-bin/qm/qr?k=778347352)
+
 </p>
 
 
@@ -294,3 +297,14 @@ MantisZip 是一款完全免费且独立开发的开源项目。如果它提升�
 
 
 ---
+
+---
+
+### 💬 交流与反馈 (Community)
+
+如果你在体验《MantisZip》的过程中遇到了 Bug、有新的功能想法，或者单纯想和同行切磋 WPF/.NET 独立开发技术，欢迎加入我们的开发者社区：
+
+* **QQ 交流群**：`778347352`（👉 [点击一键加入群聊](https://qm.qq.com/cgi-bin/qm/qr?k=778347352)）
+* **GitHub Issues**：[提交 Bug 或 Feature Request](../../issues)
+
+> 💡 **小提示**：进群请备注 “GitHub / MantisZip”，咱们群里不定期掉落内测版安装包和技术杂谈。
