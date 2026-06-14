@@ -68,29 +68,29 @@ src/MantisZip.UI.Avalonia/
 
 > 删除 Avalonia 中与 Core 重复的逻辑，改为调用 Core 方法。
 
-- [ ] **0.1** `PreviewViewModel.DetectAndReadText()` → 改用 `TextEncodingDetector.DetectAndReadText(filePath)`
+- [x] **0.1** `PreviewViewModel.DetectAndReadText()` → 改用 `TextEncodingDetector.DetectAndReadText(filePath)`
   - 删除 Avalonia 版私有方法（~42 行）
   - Core 版回退用 ANSICodePage（比硬编码 GBK 更通用）
   - 注意捕获异常 + 兼容现有调用签名
-- [ ] **0.2** `PreviewViewModel.ParseCsv()` + `SplitCsvLine()` → 改用 `CsvParser`
+- [x] **0.2** `PreviewViewModel.ParseCsv()` + `SplitCsvLine()` → 改用 `CsvParser`
   - 删除两个私有方法（~55 行）
   - 用 `CsvParser.ParseCsvLine()` 代替 `SplitCsvLine()`
   - 用 `CsvParser.MakeUniqueColumnNames()` 处理列名冲突
   - `DataTable` 构建逻辑保留在 VM 层（UI 绑定需要）
-- [ ] **0.3** `ArchiveItemModel.FormatSize()` + `TorrentFileItem.FormatSize()` → 改用 `FormatUtil.FormatSize()`
+- [x] **0.3** `ArchiveItemModel.FormatSize()` + `TorrentFileItem.FormatSize()` → 改用 `FormatUtil.FormatSize()`
   - 删除两个私有方法（~24 行）
   - `ArchiveItemModel.FromCore()` 中调用 `FormatUtil.FormatSize(item.Size)`
   - `TorrentFileItem.SizeDisplay` 调用 `FormatUtil.FormatSize(Size)`
   - 如有格式差异（`F2` vs `0.##`），统一 Core 版行为
-- [ ] **0.4** `FileSizeConverter` 内部改为委托 `FormatUtil.FormatSize`
+- [x] **0.4** `FileSizeConverter` 内部改为委托 `FormatUtil.FormatSize`
   - IValueConverter 保留（UI 绑定需要），内部逻辑一行委托
-- [ ] **0.5** `ArchiveFormatHelper.IsArchiveFile()` → 改为委托 `ArchiveEngineFactory`
+- [x] **0.5** `ArchiveFormatHelper.IsArchiveFile()` → 改为委托 `ArchiveEngineFactory`
   ```csharp
   public static bool IsArchiveFile(string path) =>
       ArchiveEngineFactory.GetEngineByExtension(path) != null;
   ```
-- [ ] **0.6** 验证：`dotnet build` 编译通过，所有预览功能正常
-- [ ] **0.7** **Commit**: `refactor(avalonia): remove duplicate code from Core, use Core services directly`
+- [x] **0.6** 验证：`dotnet build` 编译通过，所有预览功能正常
+- [x] **0.7** **Commit**: `refactor(avalonia): remove duplicate code from Core, use Core services directly`
 
 ---
 

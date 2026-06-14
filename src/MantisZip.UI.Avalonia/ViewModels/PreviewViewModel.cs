@@ -8,7 +8,6 @@ using MantisZip.Core.Utils;
 using MantisZip.UI.Avalonia.Models;
 using MantisZip.UI.Avalonia.Services;
 using Microsoft.Data.Sqlite;
-using Ude;
 
 namespace MantisZip.UI.Avalonia.ViewModels;
 
@@ -257,7 +256,7 @@ public partial class PreviewViewModel : ObservableObject
     /// </summary>
     public void ShowText(string filePath)
     {
-        var content = DetectAndReadText(filePath);
+        var content = TextEncodingDetector.DetectAndReadText(filePath);
         TextContent = content;
         PreviewType = PreviewType.Text;
         IsPreviewVisible = true;
@@ -269,9 +268,28 @@ public partial class PreviewViewModel : ObservableObject
     /// </summary>
     public void ShowCsv(string filePath)
     {
-        var table = ParseCsv(filePath);
+        var table = new DataTable();
+        var lines = File.ReadLines(filePath).Take(101).ToList();
+
+        if (lines.Count > 0)
+        {
+            var rawHeaders = CsvParser.ParseCsvLine(lines[0]);
+            var headers = CsvParser.MakeUniqueColumnNames(rawHeaders.Take(100).ToArray());
+            foreach (var h in headers)
+                table.Columns.Add(h);
+
+            foreach (var line in lines.Skip(1).Take(100))
+            {
+                var values = CsvParser.ParseCsvLine(line);
+                var row = table.NewRow();
+                for (int i = 0; i < Math.Min(values.Length, table.Columns.Count); i++)
+                    row[i] = values[i].Trim();
+                table.Rows.Add(row);
+            }
+        }
+
         _csvDataTable = table;
-        CsvData = table?.DefaultView;  // DataView 可绑定到 ItemsControl
+        CsvData = table.DefaultView;  // DataView 可绑定到 ItemsControl
         PreviewType = PreviewType.Csv;
         IsPreviewVisible = true;
         IsToolbarVisible = true;
@@ -864,115 +882,8 @@ public partial class PreviewViewModel : ObservableObject
         }
     }
 
-    /// <summary>
-    /// 简单 CSV 解析：首行表头，逗号分隔，限制 100 行 × 100 列。
-    /// </summary>
-    private static DataTable ParseCsv(string filePath)
-    {
-        var table = new DataTable();
-        var lines = File.ReadLines(filePath).Take(101).ToList();
 
-        if (lines.Count == 0) return table;
 
-        // 首行作为列名
-        var headers = SplitCsvLine(lines[0]);
-        foreach (var h in headers.Take(100))
-        {
-            table.Columns.Add(string.IsNullOrWhiteSpace(h) ? $"列{table.Columns.Count + 1}" : h.Trim());
-        }
-
-        // 数据行
-        foreach (var line in lines.Skip(1).Take(100))
-        {
-            var values = SplitCsvLine(line);
-            var row = table.NewRow();
-            for (int i = 0; i < Math.Min(values.Count, table.Columns.Count); i++)
-            {
-                row[i] = values[i].Trim();
-            }
-            table.Rows.Add(row);
-        }
-
-        return table;
-    }
-
-    /// <summary>
-    /// 简单 CSV 行解析（支持引号包裹的字段）。
-    /// </summary>
-    private static List<string> SplitCsvLine(string line)
-    {
-        var fields = new List<string>();
-        var current = new StringBuilder();
-        bool inQuotes = false;
-
-        foreach (char c in line)
-        {
-            if (c == '"')
-            {
-                inQuotes = !inQuotes;
-            }
-            else if (c == ',' && !inQuotes)
-            {
-                fields.Add(current.ToString());
-                current.Clear();
-            }
-            else
-            {
-                current.Append(c);
-            }
-        }
-
-        fields.Add(current.ToString());
-        return fields;
-    }
-
-    /// <summary>
-    /// 使用 Ude.NetStandard 检测文本编码并读取内容。
-    /// </summary>
-    private static string DetectAndReadText(string filePath)
-    {
-        byte[] header;
-        using (var fs = new FileStream(filePath, FileMode.Open, FileAccess.Read))
-        {
-            var len = (int)Math.Min(fs.Length, 4096);
-            header = new byte[len];
-            fs.ReadExactly(header, 0, len);
-        }
-
-        var detector = new CharsetDetector();
-        detector.Feed(header, 0, header.Length);
-        detector.DataEnd();
-
-        var detected = detector.Charset;
-        var confidence = detector.Confidence;
-
-        if (confidence >= 0.5 && !string.IsNullOrEmpty(detected))
-        {
-            try
-            {
-                var enc = Encoding.GetEncoding(detected);
-                return File.ReadAllText(filePath, enc);
-            }
-            catch { }
-        }
-
-        try
-        {
-            var utf8 = File.ReadAllText(filePath, Encoding.UTF8);
-            if (!utf8.Contains('\uFFFD'))
-                return utf8;
-        }
-        catch { }
-
-        try
-        {
-            return File.ReadAllText(filePath, Encoding.GetEncoding("gbk"));
-        }
-        catch
-        {
-            return File.ReadAllText(filePath, Encoding.UTF8);
-        }
-    }
 }
 
 /// <summary>
@@ -989,19 +900,5 @@ public class PeMetadataItem
 /// </summary>
 public record TorrentFileItem(string Path, long Size)
 {
-    public string SizeDisplay => FormatSize(Size);
-
-    private static string FormatSize(long bytes)
-    {
-        if (bytes == 0) return "0 B";
-        var units = new[] { "B", "KB", "MB", "GB", "TB" };
-        var unitIndex = 0;
-        var size = (double)bytes;
-        while (size >= 1024 && unitIndex < units.Length - 1)
-        {
-            size /= 1024;
-            unitIndex++;
-        }
-        return unitIndex == 0 ? $"{bytes} {units[unitIndex]}" : $"{size:F2} {units[unitIndex]}";
-    }
+    public string SizeDisplay => FormatUtil.FormatSize(Size);
 }

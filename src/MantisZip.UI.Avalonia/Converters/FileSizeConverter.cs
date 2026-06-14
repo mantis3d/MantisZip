@@ -1,5 +1,6 @@
 using System.Globalization;
 using Avalonia.Data.Converters;
+using MantisZip.Core.Utils;
 
 namespace MantisZip.UI.Avalonia.Converters;
 
@@ -12,21 +13,7 @@ public class FileSizeConverter : IValueConverter
         if (value is not long bytes)
             return null;
 
-        if (bytes == 0)
-            return "0 B";
-
-        var unitIndex = 0;
-        var size = (double)bytes;
-
-        while (size >= 1024 && unitIndex < SizeUnits.Length - 1)
-        {
-            size /= 1024;
-            unitIndex++;
-        }
-
-        return unitIndex == 0
-            ? $"{bytes} {SizeUnits[unitIndex]}"
-            : $"{size:F2} {SizeUnits[unitIndex]}";
+        return FormatUtil.FormatSize(bytes);
     }
 
     public object? ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)

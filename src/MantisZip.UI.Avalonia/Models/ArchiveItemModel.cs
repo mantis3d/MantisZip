@@ -1,6 +1,7 @@
 using Avalonia.Media.Imaging;
 using CommunityToolkit.Mvvm.ComponentModel;
 using MantisZip.Core.Abstractions;
+using MantisZip.Core.Utils;
 
 namespace MantisZip.UI.Avalonia.Models;
 
@@ -72,19 +73,5 @@ public partial class ArchiveItemModel : ObservableObject
         };
     }
 
-    private static string FormatSize(long bytes)
-    {
-        if (bytes == 0) return "0 B";
-        var units = new[] { "B", "KB", "MB", "GB", "TB" };
-        var unitIndex = 0;
-        var size = (double)bytes;
-        while (size >= 1024 && unitIndex < units.Length - 1)
-        {
-            size /= 1024;
-            unitIndex++;
-        }
-        return unitIndex == 0
-            ? $"{bytes} {units[unitIndex]}"
-            : $"{size:F2} {units[unitIndex]}";
-    }
+    private static string FormatSize(long bytes) => FormatUtil.FormatSize(bytes);
 }
