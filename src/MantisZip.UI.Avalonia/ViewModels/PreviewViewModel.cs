@@ -7,6 +7,7 @@ using CommunityToolkit.Mvvm.Input;
 using MantisZip.Core.Utils;
 using MantisZip.UI.Avalonia.Models;
 using MantisZip.UI.Avalonia.Services;
+using Markdig;
 using Microsoft.Data.Sqlite;
 
 namespace MantisZip.UI.Avalonia.ViewModels;
@@ -30,6 +31,12 @@ public partial class PreviewViewModel : ObservableObject
 
     [ObservableProperty]
     private string _previewHeaderText = string.Empty;
+
+    [ObservableProperty]
+    private bool _isHtmlVisible;
+
+    [ObservableProperty]
+    private string _htmlContent = string.Empty;
 
     // FontFamily 手动实现，不使用 [ObservableProperty]（源生成器对 Avalonia.Media 命名空间有已知问题）
     private global::Avalonia.Media.FontFamily _fontFamily = global::Avalonia.Media.FontFamily.Default;
@@ -90,7 +97,7 @@ public partial class PreviewViewModel : ObservableObject
         OnPropertyChanged(nameof(HasZoomControls));
         OnPropertyChanged(nameof(HasFontSizeControls));
         OnPropertyChanged(nameof(HasGifControls));
-
+        OnPropertyChanged(nameof(IsHtmlVisible));
 
     }
 
@@ -836,6 +843,55 @@ public partial class PreviewViewModel : ObservableObject
     }
 
     /// <summary>
+    /// 显示 HTML 预览（WebView2）。
+    /// </summary>
+    public void ShowHtmlPreview(string filePath)
+    {
+        HtmlContent = File.ReadAllText(filePath);
+        PreviewType = PreviewType.Html;
+        IsPreviewVisible = true;
+        IsToolbarVisible = false;
+    }
+
+    /// <summary>
+    /// 显示 Markdown 预览（Markdig → HTML → WebView2）。
+    /// </summary>
+    public void ShowMarkdownPreview(string filePath)
+    {
+        var markdown = File.ReadAllText(filePath);
+        var pipeline = new MarkdownPipelineBuilder().UseAdvancedExtensions().Build();
+        var bodyHtml = Markdown.ToHtml(markdown, pipeline);
+
+        HtmlContent = $@"<!DOCTYPE html>
+<html><head><meta charset='utf-8'/>
+<style>
+* {{ font-family: sans-serif; margin: 0; padding: 0; box-sizing: border-box; }}
+body {{ padding: 16px; line-height: 1.6; }}
+/* Light theme defaults */
+body {{ background: #ffffff; color: #1a1a1a; }}
+a {{ color: #1a73e8; }}
+code, pre {{ background: #f5f5f5; padding: 2px 4px; border-radius: 3px; }}
+pre {{ padding: 12px; overflow-x: auto; }}
+blockquote {{ border-left: 4px solid #ddd; margin: 0.5em 0; padding-left: 12px; }}
+h1, h2, h3, h4 {{ margin: 0.8em 0 0.4em; }}
+p, li {{ margin: 0.5em 0; }}
+img {{ max-width: 100%; }}
+table {{ border-collapse: collapse; }}
+td, th {{ border: 1px solid #ccc; padding: 6px; }}
+/* Dark theme via prefers-color-scheme */
+@media (prefers-color-scheme: dark) {{
+  body {{ background: #1e1e1e; color: #e0e0e0; }}
+  a {{ color: #8ab4f8; }}
+  code, pre {{ background: #2d2d2d; }}
+  blockquote {{ border-left-color: #555; }}
+}}
+</style></head><body>{bodyHtml}</body></html>";
+        PreviewType = PreviewType.Markdown;
+        IsPreviewVisible = true;
+        IsToolbarVisible = false;
+    }
+
+    /// <summary>
     /// 显示暂不支持预览提示。
     /// </summary>
     public void ShowUnsupported(string? message = null)
@@ -859,6 +915,8 @@ public partial class PreviewViewModel : ObservableObject
         PreviewImage = null;
         ImageWidth = 0;
         ImageHeight = 0;
+        HtmlContent = string.Empty;
+        IsHtmlVisible = false;
         IsTransparencySupported = false;
         TorrentFileItems.Clear();
         SqliteTableData = null;

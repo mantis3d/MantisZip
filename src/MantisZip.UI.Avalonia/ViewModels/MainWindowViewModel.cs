@@ -282,9 +282,12 @@ public partial class MainWindowViewModel : ObservableObject
                     StatusMessage = $"视频信息: {entry.DisplayName}";
                     break;
                 case PreviewType.Html:
+                    Preview.ShowHtmlPreview(tempFile);
+                    StatusMessage = $"HTML 预览: {entry.DisplayName}";
+                    break;
                 case PreviewType.Markdown:
-                    Preview.ShowUnsupported($"暂不支持预览 {(previewType == PreviewType.Html ? "HTML" : "Markdown")} 文件");
-                    StatusMessage = $"暂不支持预览 {ext} 文件";
+                    Preview.ShowMarkdownPreview(tempFile);
+                    StatusMessage = $"Markdown 预览: {entry.DisplayName}";
                     break;
             }
         }

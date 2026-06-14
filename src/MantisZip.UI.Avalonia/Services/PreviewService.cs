@@ -90,6 +90,16 @@ public class PreviewService
         ".mp4", ".mkv", ".avi", ".mov", ".wmv", ".flv", ".webm"
     };
 
+    private static readonly HashSet<string> HtmlExtensions = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ".html", ".htm"
+    };
+
+    private static readonly HashSet<string> MarkdownExtensions = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ".md", ".markdown", ".mdown"
+    };
+
     private const long MaxPreviewFileSize = 50 * 1024 * 1024; // 50 MB
     private const long MaxTextPreviewBytes = 1 * 1024 * 1024;  // 1 MB
 
@@ -111,6 +121,8 @@ public class PreviewService
         if (TorrentExtensions.Contains(ext)) return PreviewType.Torrent;
         if (OfficeExtensions.Contains(ext)) return PreviewType.Office;
         if (VideoExtensions.Contains(ext)) return PreviewType.Video;
+        if (HtmlExtensions.Contains(ext)) return PreviewType.Html;
+        if (MarkdownExtensions.Contains(ext)) return PreviewType.Markdown;
         return PreviewType.Unsupported;
     }
 
