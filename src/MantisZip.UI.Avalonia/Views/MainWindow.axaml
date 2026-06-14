@@ -90,7 +90,8 @@
                     Width="5" />
 
       <!-- File list as DataGrid -->
-      <DataGrid Grid.Column="2"
+      <DataGrid x:Name="FileListGrid"
+                Grid.Column="2"
                 ItemsSource="{Binding CurrentEntries}"
                 SelectedItem="{Binding SelectedEntry}"
                 AutoGenerateColumns="False"

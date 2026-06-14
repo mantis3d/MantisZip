@@ -1,11 +1,21 @@
+using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Input;
 using Avalonia.Platform.Storage;
+using MantisZip.Core.Abstractions;
+using MantisZip.Core.Utils;
+using MantisZip.UI.Avalonia.Models;
 using MantisZip.UI.Avalonia.ViewModels;
 
 namespace MantisZip.UI.Avalonia.Views;
 
 public partial class MainWindow : Window
 {
+    private bool _isOwnDrag;
+    private string? _dragDropTempDir;
+    private PointerPressedEventArgs? _dragStartEvent;
+    private Point _dragStartPoint;
+
     public MainWindow()
     {
         InitializeComponent();
@@ -24,6 +34,105 @@ public partial class MainWindow : Window
             return result ? dialog.Password : null;
         };
         DataContext = vm;
+
+        // Setup drag-drop from file list
+        var fileGrid = this.FindControl<DataGrid>("FileListGrid");
+        if (fileGrid != null)
+        {
+            fileGrid.PointerPressed += (s, e) =>
+            {
+                _dragStartPoint = e.GetPosition(fileGrid);
+                _dragStartEvent = e;
+            };
+
+            fileGrid.PointerMoved += async (s, e) =>
+            {
+                if (_dragStartEvent == null) return;
+
+                var pos = e.GetPosition(fileGrid);
+                var delta = pos - _dragStartPoint;
+                if (Math.Abs(delta.X) < 10 && Math.Abs(delta.Y) < 10)
+                    return;
+
+                var triggerEvent = _dragStartEvent;
+                _dragStartEvent = null; // Prevent re-entry
+
+                var vm2 = DataContext as MainWindowViewModel;
+                if (vm2?.SelectedEntry == null) return;
+                var archivePath = vm2.CurrentArchivePath;
+                if (string.IsNullOrEmpty(archivePath)) return;
+
+                var entry = vm2.SelectedEntry;
+                var format = ArchiveFormatHelper.GetFormat(archivePath);
+
+                // Create temp directory for extracted file
+                _dragDropTempDir = Path.Combine(Path.GetTempPath(), "MantisZip", "DragDrop", Guid.NewGuid().ToString());
+                Directory.CreateDirectory(_dragDropTempDir);
+
+                try
+                {
+                    vm2.StatusMessage = "正在提取文件...";
+
+                    var targetPath = Path.Combine(_dragDropTempDir, entry.Name);
+                    var dir = Path.GetDirectoryName(targetPath);
+                    if (dir != null && !Directory.Exists(dir))
+                        Directory.CreateDirectory(dir);
+
+                    await ArchiveEntryExtractor.ExtractEntryAsync(
+                        archivePath,
+                        entry.FullPath,
+                        targetPath,
+                        format);
+
+                    // Create data transfer with the extracted file
+                    var storageFile = await StorageProvider.TryGetFileFromPathAsync(new Uri(targetPath));
+                    if (storageFile != null)
+                    {
+                        var dataTransfer = new DataTransfer();
+                        dataTransfer.Add(DataTransferItem.CreateFile(storageFile));
+
+                        _isOwnDrag = true;
+                        vm2.StatusMessage = "正在拖拽 — 放到目标位置以复制文件";
+
+                        await DragDrop.DoDragDropAsync(triggerEvent, dataTransfer, DragDropEffects.Copy);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Drag-drop failed: {ex.Message}");
+                }
+                finally
+                {
+                    _isOwnDrag = false;
+                    CleanupDragDropTemp();
+                    if (DataContext is MainWindowViewModel vm3)
+                        vm3.StatusMessage = "";
+                }
+            };
+        }
+
+        // Prevent reacting to our own drag-drop
+        this.AddHandler(DragDrop.DropEvent, (s, e) =>
+        {
+            if (_isOwnDrag)
+                e.Handled = true;
+        });
+    }
+
+    private void CleanupDragDropTemp()
+    {
+        if (_dragDropTempDir != null && Directory.Exists(_dragDropTempDir))
+        {
+            try
+            {
+                Directory.Delete(_dragDropTempDir, recursive: true);
+            }
+            catch
+            {
+                // Best effort cleanup
+            }
+            _dragDropTempDir = null;
+        }
     }
 
     public async void LoadArchiveOnStartup(string path)
