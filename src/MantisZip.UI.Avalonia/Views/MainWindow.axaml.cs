@@ -17,6 +17,12 @@ public partial class MainWindow : Window
             var dialog = new SettingsWindow();
             await dialog.ShowDialog(this);
         };
+        vm.ShowPasswordDialog = async (archivePath) =>
+        {
+            var dialog = new PasswordDialog(Path.GetFileName(archivePath));
+            var result = await dialog.ShowDialog<bool>(this);
+            return result ? dialog.Password : null;
+        };
         DataContext = vm;
     }
 

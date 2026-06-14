@@ -26,6 +26,16 @@ public partial class MainWindowViewModel : ObservableObject
     /// </summary>
     public Func<Task>? ShowSettingsWindow { get; set; }
 
+    /// <summary>
+    /// 由 View 设置的密码对话框回调。参数为压缩包路径，返回密码或取消时返回 null。
+    /// </summary>
+    public Func<string, Task<string?>>? ShowPasswordDialog { get; set; }
+
+    /// <summary>
+    /// 会话密码缓存：压缩包路径 → 密码（仅内存，不持久化）。
+    /// </summary>
+    private readonly Dictionary<string, string> _sessionPasswords = new(StringComparer.OrdinalIgnoreCase);
+
     public PreviewViewModel Preview { get; } = new();
 
     [ObservableProperty]
@@ -107,7 +117,44 @@ public partial class MainWindowViewModel : ObservableObject
 
         try
         {
-            var result = await _archiveService.LoadArchiveAsync(path);
+            // Check session password cache first
+            string? password = null;
+            if (_sessionPasswords.TryGetValue(path, out var cachedPwd))
+                password = cachedPwd;
+
+            var result = await _archiveService.LoadArchiveAsync(path, password);
+
+            if (result.IsPasswordRequired)
+            {
+                // Prompt for password
+                if (ShowPasswordDialog != null)
+                {
+                    password = await ShowPasswordDialog(path);
+                    if (password == null)
+                    {
+                        StatusMessage = "已取消 - 需要密码";
+                        IsLoading = false;
+                        return;
+                    }
+
+                    // Retry with password
+                    result = await _archiveService.LoadArchiveAsync(path, password);
+
+                    if (result.IsPasswordRequired)
+                    {
+                        StatusMessage = "密码错误";
+                        IsLoading = false;
+                        return;
+                    }
+
+                    // Cache password on success
+                    _sessionPasswords[path] = password;
+                }
+                else
+                {
+                    StatusMessage = "此压缩包已加密，请输入密码";
+                }
+            }
 
             if (result.IsSuccess && result.Entries != null)
             {
@@ -131,15 +178,11 @@ public partial class MainWindowViewModel : ObservableObject
                 StatusMessage = $"已加载 {result.Entries.Count} 个条目";
                 Title = $"MantisZip - {Path.GetFileName(path)}";
             }
-            else if (result.IsPasswordRequired)
-            {
-                StatusMessage = "此压缩包已加密，请输入密码（Phase 0 暂不支持密码）";
-            }
             else if (result.IsCancelled)
             {
                 StatusMessage = "已取消";
             }
-            else
+            else if (!result.IsPasswordRequired) // Don't override password-related messages
             {
                 StatusMessage = result.ErrorMessage ?? "无法打开压缩包";
             }
