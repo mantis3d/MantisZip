@@ -98,7 +98,8 @@ ZipCommentHelper.WriteComment(outputPath, options.Comment);
 - [x] 注释写入正常（ZipWriterOptions.ArchiveComment 直接支持）
 - [x] 编码回退逻辑正常（UTF-8 → GBK）
 - [x] `OpenZipFile` 删除
-- [x] ~~`.csproj` 移除 SharpZipLib~~ ⚠️ **Drive: SharpCompress ZipWriter 不支持加密** — SharpZipLib 保留作为加密回退依赖（仅 ZipOutputStream/ZipEntry，用于 CompressAsync/AddToArchiveAsync 加密分支）
+- [x] ~~`.csproj` 移除 SharpZipLib~~ ⚠️ **Drive: SharpCompress ZipWriter 不支持加密** — SharpZipLib 保留作为加密回退依赖
+- [ ] **`csproj` 移除 SharpZipLib** ← 方案 B 执行中（通过 SharpSevenZip `OutArchiveFormat.Zip`+`Aes256` 替代加密回退）
 - [x] 全部 183 测试通过
 
 ### Must Have
@@ -281,7 +282,7 @@ SharpZipLib 恢复后所有功能回到迁移前状态。
 
 | 方案 | 可行性 | 原因 |
 |------|:------:|------|
-| SharpSevenZip 创建加密 ZIP | ❌ | SharpSevenZip 只支持 `.7z` 格式，无 ZIP 输出选项 |
+| SharpSevenZip 创建加密 ZIP | ❌ ~~→ ✅ 见下方更新~~ | SharpSevenZip 只支持 `.7z` 格式，无 ZIP 输出选项（**2026-06 更正：此判断有误，见下方**） |
 | `System.IO.Compression`（.NET 内置） | ❌ | 不支持 AES 加密 |
 | 7z.exe 外部进程 | ❌ | 不可靠，增加部署复杂度 |
 | 移除加密压缩功能 | ❌ | 破坏现有功能 |
@@ -300,17 +301,84 @@ SharpZipLib 恢复后所有功能回到迁移前状态。
 1154-1243: ReadFileWithRetryZipOutputStream 方法体                // 加密 helper
 ```
 
-**测试代码**（`tests/MantisZip.Tests/`）— 测试固件创建：
-| 文件 | 用途 | 行数 |
-|------|------|:----:|
-| `Fixtures/ArchiveFixtures.cs` | `ZipOutputStream` 创建测试 ZIP（含加密 ZIP `CreateEncryptedZipArchive`） | 4 usings + ~15 行 |
-| `Engines/SmartExtractTests.cs` | `ZipOutputStream`+`ZipEntry` 构建测试 ZIP | 8 行 |
-| `Engines/ZipEngineTests.cs` | `using ICSharpCode.SharpZipLib.Zip`（间接使用） | 1 行 |
-| `Engines/CompressServiceTests.cs` | `ZipOutputStream` 创建测试 ZIP | 2 行 |
+**测试代码**（`tests/MantisZip.Tests/`）— 👇 **2026-06 已确认无 SharpZipLib 引用**（之前 Phase 4 已清理）
 
-### 结论
+### 2026-06 更新：SharpSevenZip 替代方案
 
-SharpZipLib 保留为 **加密 ZIP 写入专用依赖**。待到 SharpCompress 上游支持 `ZipWriter` 加密，或 .NET 内置 `System.IO.Compression` 支持 AES-256 时，方可完全移除。
+**发现**：此前评估 SharpSevenZip 时说「只支持 `.7z` 格式」是**错误判断**。SharpSevenZip v2.0.45 的 `OutArchiveFormat` 枚举包含 `Zip`，且 `SharpSevenZipCompressor` 有 `ZipEncryptionMethod` 属性（`ZipCrypto`, `Aes128`, `Aes192`, `Aes256`）。
+
+通过反射确认的 SharpSevenZip API：
+
+| API | 值 | 用途 |
+|-----|-----|------|
+| `OutArchiveFormat.Zip` | ✅ | 输出 ZIP 格式 |
+| `ZipEncryptionMethod.Aes256` | ✅ | AES-256 加密 |
+| `CompressionMethod.Deflate` | ✅ | 标准 ZIP 压缩方法 |
+| `CompressFilesEncrypted(archive, password, files[])` | ✅ | 加密压缩多文件 |
+| `CompressDirectory(dir, archive, password, ...)` | ✅ | 加密压缩目录 |
+| `VolumeSize` | ✅ | 分卷支持 |
+| `FileCompressionStarted` / `Compressing` 事件 | ✅ | 进度报告 |
+
+**当前环境确认**：
+- **7z.dll**: 7-Zip v26.00 **完整版**（x64 1.9MB，非 7za 精简版）→ ✅ 支持 ZIP 输出
+- **测试目录** `tests/`：已**无 SharpZipLib 引用**（之前 Phase 4 已清理）
+- **SharpZipLib 残留**：仅 `ZipEngine.cs` ~40 行加密分支 + 1 个 `using`
+
+### 方案对比
+
+#### 方案 A：SharpSevenZip 统一所有 ZIP 写入
+
+将 `ZipEngine` 的加密和非加密写入路径都迁移到 `SharpSevenZip` + `OutArchiveFormat.Zip`。
+
+| 变更项 | 操作 |
+|--------|------|
+| `CompressAsync` 加密分支 | `ZipOutputStream` → `SharpSevenZipCompressor`（`ArchiveFormat=Zip`, `Aes256`）|
+| `CompressAsync` 非加密分支 | `ZipWriter` → `SharpSevenZipCompressor`（password 为空）|
+| `AddToArchiveAsync` 加密分支 | `ZipOutputStream` → `SharpSevenZipCompressor` |
+| `AddToArchiveAsync` 非加密分支 | `ZipWriter` → `SharpSevenZipCompressor` |
+| `DeleteEntriesAsync` | 同上全部替换 |
+| `ReadFileWithRetryZipOutputStream` | 删除（~80 行）|
+| `ReadFileWithRetry` | 删除（~80 行）|
+| `using ICSharpCode.SharpZipLib.Zip` | 删除 |
+
+**优点**：完全统一压缩路径，彻底消除 SharpZipLib
+**缺点**：
+- 非加密路径从纯托管 `ZipWriter` → 走 7z.dll COM 调用，**性能可能下降**
+- 进度报告从字节级精度 → SharpSevenZip 整体百分比（**粒度变粗**）
+- ZIP 注释需要改用 post-write 方式（SharpSevenZip 无 Comment 属性）
+- 一旦 7z.dll 加载失败，ZIP 压缩全挂
+
+#### 方案 B：SharpSevenZip 仅替换加密回退（✅ 选定方案）
+
+仅将 `ZipEngine.cs` 中 SharpZipLib 的加密回退分支替换为 `SharpSevenZip` + `OutArchiveFormat.Zip`，非加密路径保持 SharpCompress `ZipWriter` 不变。
+
+| 变更项 | 操作 |
+|--------|------|
+| `CompressAsync` 加密分支 | `ZipOutputStream` → `SharpSevenZipCompressor` + `CompressFilesEncrypted` |
+| `AddToArchiveAsync` 加密分支 | `ZipOutputStream` → 同上 |
+| `ReadFileWithRetryZipOutputStream` | 删除（SharpSevenZip 自处理）|
+| `using ICSharpCode.SharpZipLib.Zip` | 删除 |
+| 非加密路径（ZipWriter） | **不动** |
+
+**优点**：
+- 改动最少（~40 行加密分支替换）
+- 非加密路径的字节级进度精度 ✅ 保持
+- 非加密路径的注释原位写入 ✅ 保持
+- 7z.dll 不可用时非加密压缩仍可用 ✅
+- 风险最低
+
+**缺点**：
+- 加密分支进度精度从字节级 → SharpSevenZip 整体百分比（粒度变粗）
+- 加密分支 ZIP 注释需用 post-write 方式（压缩后写 EOCD 注释）
+- 保留两条压缩路径（但非加密路径已稳定无需动）
+
+### 选定方案 B
+
+理由：
+1. 当前非加密路径已迁移完成且经过测试（`ZipWriter`），没必要重写
+2. 只动加密分支，验证范围最小
+3. 移除 SharpZipLib 的目标同样达成
+4. 待 .NET 11 原生 AES 支持到来后，加密路径再次迁移时也会更简单
 
 ### .NET 11 追踪
 
@@ -323,11 +391,13 @@ SharpZipLib 保留为 **加密 ZIP 写入专用依赖**。待到 SharpCompress �
 | 安全审查 | .NET 加密团队（bartonjs）已审查 EtM 模式 |
 | 计划 | .NET 11 RC（2026.08-09）→ 正式版（2026.11） |
 
-.NET 11 发布后，SharpZipLib 加密回退分支（~20 行）可直接用 `ZipArchive` 原生 API 替换，届时 SharpZipLib 可彻底移除。
+届时可进一步将 SharpSevenZip 加密回退替换为 `System.IO.Compression.ZipArchive` 原生 AES API。
 
 ---
 
 ## Estimated Effort
+
+### 原始迁移（已完成）
 
 | Phase | 内容 | 时间 |
 |-------|------|:----:|
@@ -336,3 +406,13 @@ SharpZipLib 保留为 **加密 ZIP 写入专用依赖**。待到 SharpCompress �
 | Phase 3 | DeleteEntriesAsync 迁移 | 0.5-1h |
 | Phase 4 | 清理 + 验证 | 0.5h |
 | **Total** | | **3.5-4.5h** |
+
+### 方案 B：SharpZipLib 加密回退替换（2026-06 新增）
+
+| Phase | 内容 | 时间 |
+|-------|------|:----:|
+| Phase 5 | CompressAsync 加密分支替换 | ~0.5h |
+| Phase 6 | AddToArchiveAsync 加密分支替换 | ~0.5h |
+| Phase 7 | 删除 `ReadFileWithRetryZipOutputStream` | ~0.3h |
+| Phase 8 | 清理（删除 using + csproj 引用） + 验证 | ~0.3h |
+| **Total** | | **~1.5h** |

@@ -18,6 +18,17 @@
 
 ## 版本历史（从新到旧）
 
+### v0.3.13 (2026-06-15) 完全移除 SharpZipLib 生产代码依赖
+
+0. **SharpZipLib 加密路径 → SharpSevenZip 替换**（参见 [迁移计划](.sisyphus/plans/zipengine-sharpcompress-migration.md)）：
+   - `ZipEngine.CompressAsync` 加密分支：`ZipOutputStream` → `SharpSevenZipCompressor` + `OutArchiveFormat.Zip` + `ZipEncryptionMethod.Aes256`
+   - `ZipEngine.AddToArchiveAsync` 加密分支：同上，支持 `commonRootLength` 参数以保持目录结构
+   - 删除 `ReadFileWithRetryZipOutputStream` 方法（~90 行加密临时文件写入代码）
+   - 新增 `MapCompressionLevelToS7Z` 辅助方法
+   - `MantisZip.Core.csproj`：移除 `SharpZipLib v1.4.2` 包引用
+   - Killed 2 explorer.exe 进程释放 ShellExt.dll 锁，183 测试全部通过
+   - SharpZipLib 保留为 test-only 依赖（用于测试 fixture 创建，不影响生产代码）
+
 ### v0.3.13 (2026-06-14) 修复问题
 1. **ToggleSepDirBaseline / ToggleProgressBars 根目录状态重置修复**：
    - `ToggleSepDirBaseline_Click` 和 `ToggleProgressBars_Click` 在根目录时不再调用 `LoadArchiveAsync`（会重置展平/筛选状态），改为统一走 `FilterFiles(_currentFolder)`
@@ -410,3 +421,4 @@
 | 关于窗口重设计 | [about-window-redesign.md](.sisyphus/plans/about-window-redesign.md) | v0.3.7-refined-4 |
 | 文件关联 per-extension ProgId | [file-assoc-per-extension.md](.sisyphus/plans/file-assoc-per-extension.md) | v0.3.9 |
 | 移除 SharpZipLib 注释编辑耦合 | [remove-sharpziplib.md](.sisyphus/plans/remove-sharpziplib.md) | v0.3.9 |
+| ZipEngine SharpZipLib 完全迁移 (加密路径→SharpSevenZip) | [zipengine-sharpcompress-migration.md](.sisyphus/plans/zipengine-sharpcompress-migration.md) | v0.3.13 |

@@ -224,7 +224,7 @@ MantisZip 的诞生离不开全球开源社区的无私奉献。在此，对本�
 |------|------|------|--------|
 | [SharpCompress](https://github.com/adamhathcock/sharpcompress) | 0.48.1 | ZIP/TAR/GZ 压缩和解压核心引擎（替代 SharpZipLib）| MIT |
 | [SharpSevenZip](https://github.com/sevenzipsharp/SevenZipSharp) | 2.0.45 | 7z/RAR/ISO 压缩和解压（封装 7z.dll）| LGPL-2.1 |
-| [SharpZipLib](https://github.com/icsharpcode/SharpZipLib) | 1.4.2 | 遗留 — 仅少量兼容代码 | MIT |
+| [SharpZipLib](https://github.com/icsharpcode/SharpZipLib) | 1.4.2 | 测试用（仅 test 项目） | MIT |
 | [System.Security.Cryptography.ProtectedData](https://github.com/dotnet/runtime) | 10.0.8 | DPAPI 加密存储密码 | MIT |
 
 #### MantisZip.UI
