@@ -442,11 +442,12 @@ When releasing a new version, update the version string in ALL of these location
 |---|------|------|---------|
 | 1 | `src/MantisZip.UI/AppConstants.cs` | `public const string Version = "x.y.z"` | Single source of truth for the app display |
 | 2 | `src/MantisZip.UI/MantisZip.UI.csproj` | `<Version>x.y.z</Version>` | NuGet/assembly version |
-| 3 | `installer.iss` | `#define MyAppVersion "x.y.z"` | Inno Setup installer output filename and metadata |
-| 4 | `docs/PLAN.md` | `**当前版本**: x.y.z` | Plan document header |
-| 5 | `docs/PROGRESS.md` | `**当前版本**: x.y.z` | Changelog document header (also add a new version entry) |
+| 3 | `docs/PLAN.md` | `**当前版本**: x.y.z` | Plan document header |
+| 4 | `docs/PROGRESS.md` | `**当前版本**: x.y.z` | Changelog document header (also add a new version entry) |
 
-These 5 files must all be updated together. The `AppConstants.cs` value is the primary source — the other 4 must match it.
+These 4 files must all be updated together. The `AppConstants.cs` value is the primary source — the other 3 must match it.
+
+**Note:** `installer.iss` no longer requires manual version bumps. The release workflow (`release.yml`) passes the version from the git tag via `/dMyAppVersion=${{ env.VERSION }}` to ISCC at compile time. The `#define MyAppVersion` in `installer.iss` is wrapped in `#ifndef` and serves only as a fallback default for local builds — update it occasionally but it is no longer a release-blocking item.
 
 ## Build output
 
@@ -473,6 +474,7 @@ Build artifacts (bin/, obj/) are gitignored.
 
 ### 规则 2：版本号变更
 - 只有在用户明确说明变更版本号时才会变更，不要未经用户允许擅自变更版本号。如果你觉得应该变更版本号，需要向用户询问。
+- 当变更版本号时，需遵循 Version bump checklist 的部分全部更新。
 
 ### 规则 3：提交前更新 PROGRESS.md
 

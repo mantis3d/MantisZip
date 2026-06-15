@@ -7,7 +7,7 @@
 - **技术栈**: .NET 9 + WPF + SharpCompress + SharpSevenZip
 
 ## 版本
-- **当前版本**: 0.3.13
+- **当前版本**: 0.4.0
 - **发布日期**: 2026-06-12
 
 ## 规划中
@@ -29,6 +29,12 @@
    - MSBuild `$(PublishDir)` 结尾反斜杠与 `&quot;` 包装组合导致 Windows 命令行解析将 `\"` 当作转义引号，`$PublishDir` 末尾混入多余 `"` 字符
    - `scripts/copy-7z-dll.ps1`：新增 `$PublishDir.TrimEnd('"', '\')` 防御性清理
    - `MantisZip.UI.csproj`：使用 MSBuild 属性函数 `$(PublishDir.TrimEnd('\\'))` 从源头消除结尾反斜杠
+
+3. **Release workflow 修复 — ISCC 找不到 MyAppVersion**：
+   - `installer.iss`：`#define MyAppVersion` 改为 `#ifndef` 条件定义，支持 ISCC `/d` 命令行参数覆盖
+   - `.github/workflows/release.yml`：移除脆弱的正则替换版本号步骤，改为 `& $iscc "/dMyAppVersion=$env:VERSION" installer.iss` 直接传参，添加 `$LASTEXITCODE` 检查
+   - `AGENTS.md`：Version bump checklist 移除 `installer.iss`（不再需要手动同步版本号）
+   - 版本号统一同步到 **0.4.0**（`AppConstants.cs`、`MantisZip.UI.csproj`、`docs/PLAN.md`）
 
 ### v0.3.13 (2026-06-15) 完全移除 SharpZipLib 生产代码依赖
 

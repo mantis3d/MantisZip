@@ -2,7 +2,9 @@
 ; Requires Inno Setup 6
 
 #define MyAppName "MantisZip"
-#define MyAppVersion "0.3.13"
+#ifndef MyAppVersion
+#define MyAppVersion "0.4.0"
+#endif
 #define MyAppPublisher "MantisZip Contributors"
 #define MyAppURL "https://github.com/yourusername/MantisZip"
 #define MyAppExeName "MantisZip.UI.exe"

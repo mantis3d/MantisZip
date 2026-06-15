@@ -62,14 +62,6 @@ jobs:
           echo "VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
           echo "Building installer for version: $version"
 
-      - name: Update installer.iss version
-        shell: pwsh
-        run: |
-          $iss = Get-Content installer.iss -Raw
-          $iss = $iss -replace '(#define MyAppVersion ")[^"]*(")', "`$1$env:VERSION`$2"
-          Set-Content installer.iss -Value $iss -NoNewline
-          Write-Host "installer.iss version updated to: $env:VERSION"
-
       - name: Build installer
         shell: pwsh
         run: |
@@ -88,7 +80,9 @@ jobs:
           }
           if (-not $iscc) { throw "ISCC.exe not found after installing Inno Setup" }
           Write-Host "Using ISCC: $iscc"
-          & $iscc installer.iss
+          Write-Host "Version: $env:VERSION"
+          & $iscc "/dMyAppVersion=$env:VERSION" installer.iss
+          if ($LASTEXITCODE -ne 0) { throw "ISCC compilation failed (exit code: $LASTEXITCODE)" }
           Write-Host "Installer built successfully"
 
       - name: List installer artifacts
