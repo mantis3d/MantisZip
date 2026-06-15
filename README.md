@@ -117,14 +117,14 @@ MantisZip 是一款面向 Windows 的免费开源压缩/解压工具，主打**�
 ### ⚡ 更多解压冲突选项
 
 除了其他软件的「覆盖」「跳过」和「自动重命名」之外，还增加了「覆盖旧文件」和「覆盖小文件」，「自动重命名」也可无缝切换至手动重命名。
-![解压文件冲突](docs\images\ConflictCompress.png)
-![压缩文件冲突](docs\images\ConflictExtract.png)
+![解压文件冲突](docs/images/ConflictCompress.png)
+![压缩文件冲突](docs/images/ConflictExtract.png)
 
 ### 🐞 调试日志
 
 开启后记录详细操作日志到 `debug.log`，帮助排查问题。提供**隐私脱敏**选项，避免泄露用户隐私。
 
-![压缩文件冲突](docs\images\SettingDebug.png)
+![调试日志设置](docs/images/SettingDebug.png)
 
 ---
 
@@ -280,8 +280,8 @@ MantisZip 是一款完全免费且独立开发的开源项目。如果它提升�
 如果您身处海外，推荐通过 Polar 赞助。支持国际信用卡、Apple Pay 等无缝支付：
 <p align="left">
   <a href="https://buy.polar.sh/polar_cl_VaCaW2l2nWkob5CyHe4dOlhL6HrQDK4ueMA9n1JyhNc">
-    <img src="docs\images\polar_logotype_black.svg" alt="Sponsor on Polar" height="40"/>
-    <img src="docs\images\polar_logotype_white.svg" alt="Sponsor on Polar" height="40"/>
+    <img src="docs/images/polar_logotype_black.svg" alt="Sponsor on Polar" height="40"/>
+    <img src="docs/images/polar_logotype_white.svg" alt="Sponsor on Polar" height="40"/>
   </a>
 </p>
 

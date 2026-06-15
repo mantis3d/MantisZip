@@ -46,6 +46,10 @@
    - `LogRedactor.cs`：_pathRegex 新增第三条分支 `[^\\""<>|:]+(?:\\[^\\""<>|]+)+\\?` 匹配相对路径（如压缩包内条目路径 `字体\FiraCode-Medium.ttf`），不再依赖盘符前缀
    - `AGENTS.md`：修正 LogPrivacyMode 默认值文档从 `"full"` → `"extension"`，补充 `extension` 模式描述，更新 regex 分支计数
 
+6. **README.md 路径修复 — 反斜杠 → 正斜杠**：
+   - 将 4 处 `docs\images\` 反斜杠路径替换为 `docs/images/` 正斜杠（GitHub 要求 URL 路径使用正斜杠）
+   - 修正 `SettingDebug.png` 的 alt 文本从「压缩文件冲突」改为「调试日志设置」
+
 ### v0.3.13 (2026-06-15) 完全移除 SharpZipLib 生产代码依赖
 
 0. **SharpZipLib 加密路径 → SharpSevenZip 替换**（参见 [迁移计划](.sisyphus/plans/zipengine-sharpcompress-migration.md)）：
