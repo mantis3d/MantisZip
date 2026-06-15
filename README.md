@@ -299,7 +299,6 @@ MantisZip 是一款完全免费且独立开发的开源项目。如果它提升�
       <b>⚡ 在爱发电上支持我</b><br>      
         <img src="docs/images/afdian-MantisZen.jpg" alt="爱发电" width="80%"/>
       <br><i>(点击或扫码前往爱发电主页)</i>
-      <br>(新店开张，主页审核中，若无法打开可先加 QQ 群调教作者)<br>
       </a>
     </td>
     <td width="50%" align="center" valign="top">

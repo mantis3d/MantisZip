@@ -30,32 +30,36 @@
    - 从 [kira-96/Inno-Setup-Chinese-Simplified-Translation](https://github.com/kira-96/Inno-Setup-Chinese-Simplified-Translation) 获取语言文件，存入 `setup\Languages\ChineseSimplified.isl`
    - `installer.iss` 改为引用本地相对路径（与翻译项目 CI 方案推荐一致）
 
-3. **CI 修复 — en.json 缺少 About_Author_Bilibili 键**：
+3. **CI 修复 — ISCC 编译找不到 MantisZip.ShellExt.runtimeconfig.json**：
+   - `MantisZip.ShellExt` 是 COM 类库（无 `<OutputType>`，默认为 `Library`），类库不生成 `runtimeconfig.json`
+   - `installer.iss` 第 75 行移除 `MantisZip.ShellExt.runtimeconfig.json` 引用
+
+4. **CI 修复 — en.json 缺少 About_Author_Bilibili 键**：
    - `strings.en.json` 缺少 `About_Author_Bilibili` 键导致 `BothLanguages_HaveSameAboutKeySet` 测试失败
    - 添加英文翻译值 `"Bilibili: space.bilibili.com/44202554"`
 
-2. **CI 修复 — copy-7z-dll.ps1 路径引号截断**：
+5. **CI 修复 — copy-7z-dll.ps1 路径引号截断**：
    - MSBuild `$(PublishDir)` 结尾反斜杠与 `&quot;` 包装组合导致 Windows 命令行解析将 `\"` 当作转义引号，`$PublishDir` 末尾混入多余 `"` 字符
    - `scripts/copy-7z-dll.ps1`：新增 `$PublishDir.TrimEnd('"', '\')` 防御性清理
    - `MantisZip.UI.csproj`：使用 MSBuild 属性函数 `$(PublishDir.TrimEnd('\\'))` 从源头消除结尾反斜杠
 
-3. **Release workflow 修复 — ISCC 找不到 MyAppVersion**：
+6. **Release workflow 修复 — ISCC 找不到 MyAppVersion**：
    - `installer.iss`：`#define MyAppVersion` 改为 `#ifndef` 条件定义，支持 ISCC `/d` 命令行参数覆盖
    - `.github/workflows/release.yml`：移除脆弱的正则替换版本号步骤，改为 `& $iscc "/dMyAppVersion=$env:VERSION" installer.iss` 直接传参，添加 `$LASTEXITCODE` 检查
    - `AGENTS.md`：Version bump checklist 移除 `installer.iss`（不再需要手动同步版本号）
    - 版本号统一同步到 **0.4.0**（`AppConstants.cs`、`MantisZip.UI.csproj`、`docs/PLAN.md`）
 
-4. **全局调试日志增强 — CoreLog.Trace 注入 + DiagnosticsEnabled 开关**：
+7. **全局调试日志增强 — CoreLog.Trace 注入 + DiagnosticsEnabled 开关**：
    - `CoreLog.cs`：`ShouldWriteOverride` 委托 → `DiagnosticsEnabled` 静态 bool，所有 Info/Error/Entry/Exit/Trace/Write 方法统一受控；`[Conditional("DEBUG")]` 的 Info/Error 仅在 DEBUG 编译，Trace 全编译
    - **43 个 catch 块**注入 `CoreLog.Trace` 以捕获静默异常路径：ZipEngine（AddToArchiveAsync、DeleteEntriesAsync、OpenZipFile）、TarGzEngine（ListEntriesAsync、CompressAsync、ExtractAsync）、PasswordManager（AddPassword、DeletePassword、FindMatchingPasswords、DeleteRule）、App.Password（TryMatchPassword）、PeParser/PdfParser/SQLiteParser（Close）、MainWindow.*（ShellExecPreview、SetFormatSpecificInfo、ShowVideoPreview、ExtractWithProgressAsync、DragDrop）、App.Open/Extract（PipeServer/冲突处理/批处理完成）、CompressSettingsWindow/ExtractSettingsWindow（压缩/解压过程中各阶段）、ProgressWindow（批处理初始化）、ShellIntegration.Assoc（SetupAssoc/Install）
    - `App.OnStartup`：设置 `CoreLog.DiagnosticsEnabled = AppSettings.Instance.EnableDebugLogging`
    - `SettingsWindow`：调试开关变更时弹出 `AppMessageBox` 提示重启生效，新增 `Settings_Debug_Restart` 中英文本地化字符串
 
-5. **LogRedactor 隐私脱敏修复 — 相对路径 regex 分支**：
+8. **LogRedactor 隐私脱敏修复 — 相对路径 regex 分支**：
    - `LogRedactor.cs`：_pathRegex 新增第三条分支 `[^\\""<>|:]+(?:\\[^\\""<>|]+)+\\?` 匹配相对路径（如压缩包内条目路径 `字体\FiraCode-Medium.ttf`），不再依赖盘符前缀
    - `AGENTS.md`：修正 LogPrivacyMode 默认值文档从 `"full"` → `"extension"`，补充 `extension` 模式描述，更新 regex 分支计数
 
-6. **README.md 路径修复 — 反斜杠 → 正斜杠**：
+9. **README.md 路径修复 — 反斜杠 → 正斜杠**：
    - 将 4 处 `docs\images\` 反斜杠路径替换为 `docs/images/` 正斜杠（GitHub 要求 URL 路径使用正斜杠）
    - 修正 `SettingDebug.png` 的 alt 文本从「压缩文件冲突」改为「调试日志设置」
 

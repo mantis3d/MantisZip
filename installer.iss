@@ -72,7 +72,6 @@ Source: "publish_output\MantisZip.UI.pdb"; DestDir: "{app}"; Flags: ignoreversio
 ; === Runtime config (required for .NET assembly resolution) ===
 Source: "publish_output\MantisZip.UI.deps.json"; DestDir: "{app}"; Flags: ignoreversion
 Source: "publish_output\MantisZip.UI.runtimeconfig.json"; DestDir: "{app}"; Flags: ignoreversion
-Source: "publish_output\MantisZip.ShellExt.runtimeconfig.json"; DestDir: "{app}"; Flags: ignoreversion
 
 ; === 7z.dll (SharpSevenZip): architecture-specific subdirectories ===
 Source: "publish_output\x64\7z.dll"; DestDir: "{app}\x64"; Flags: ignoreversion
