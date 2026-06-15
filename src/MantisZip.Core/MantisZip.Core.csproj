@@ -16,7 +16,6 @@
     <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.8" />
     <PackageReference Include="SharpCompress" Version="0.48.1" />
     <PackageReference Include="SharpSevenZip" Version="2.0.45" />
-    <PackageReference Include="SharpZipLib" Version="1.4.2" />
     <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="10.0.8" />
     <PackageReference Include="Ude.NetStandard" Version="1.2.0" />
   </ItemGroup>
