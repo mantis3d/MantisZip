@@ -7,4 +7,5 @@
 
 软件第一个版本：
 - 软件功能基本完整，测试基本完成。
-- ![MantisZip 极速预览总览](/docs/images/preview-overview.gif)
+- ![MantisZip 极速预览总览](images/preview-overview.gif)
+- ![压缩密码设置](images/PasswordManager.png)
