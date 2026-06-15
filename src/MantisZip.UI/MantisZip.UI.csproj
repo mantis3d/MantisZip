@@ -38,7 +38,7 @@
 
   <!-- Publish 后自动从 7-Zip 安装目录复制 7z.dll 到发布目录 -->
   <Target Name="CopySevenZipDll" AfterTargets="Publish">
-    <Exec Command="powershell -ExecutionPolicy Bypass -File &quot;$(MSBuildProjectDirectory)\..\..\scripts\copy-7z-dll.ps1&quot; -PublishDir &quot;$(PublishDir)&quot;"
+    <Exec Command="powershell -ExecutionPolicy Bypass -File &quot;$(MSBuildProjectDirectory)\..\..\scripts\copy-7z-dll.ps1&quot; -PublishDir &quot;$(PublishDir.TrimEnd('\\'))&quot;"
           Condition="'$(PublishDir)' != '' And Exists('$(MSBuildProjectDirectory)\..\..\scripts\copy-7z-dll.ps1')"
           IgnoreExitCode="true" />
   </Target>

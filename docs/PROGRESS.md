@@ -21,6 +21,15 @@
 ### v0.4.0 (2026-06-15) 第一个上线版本
  - 功能基本完成，测试基本完成。第一个上线版本。
 
+1. **CI 修复 — en.json 缺少 About_Author_Bilibili 键**：
+   - `strings.en.json` 缺少 `About_Author_Bilibili` 键导致 `BothLanguages_HaveSameAboutKeySet` 测试失败
+   - 添加英文翻译值 `"Bilibili: space.bilibili.com/44202554"`
+
+2. **CI 修复 — copy-7z-dll.ps1 路径引号截断**：
+   - MSBuild `$(PublishDir)` 结尾反斜杠与 `&quot;` 包装组合导致 Windows 命令行解析将 `\"` 当作转义引号，`$PublishDir` 末尾混入多余 `"` 字符
+   - `scripts/copy-7z-dll.ps1`：新增 `$PublishDir.TrimEnd('"', '\')` 防御性清理
+   - `MantisZip.UI.csproj`：使用 MSBuild 属性函数 `$(PublishDir.TrimEnd('\\'))` 从源头消除结尾反斜杠
+
 ### v0.3.13 (2026-06-15) 完全移除 SharpZipLib 生产代码依赖
 
 0. **SharpZipLib 加密路径 → SharpSevenZip 替换**（参见 [迁移计划](.sisyphus/plans/zipengine-sharpcompress-migration.md)）：
