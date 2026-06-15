@@ -149,7 +149,9 @@ public class TarGzEngineTests : IDisposable
     [Fact]
     public async Task TestArchiveAsync_InvalidArchive_ReturnsFalse()
     {
-        var badPath = TrackFile(Path.Combine(Path.GetTempPath(), "MantisZipTest", $"{Guid.NewGuid()}.tar.gz"));
+        var badDir = Path.Combine(Path.GetTempPath(), "MantisZipTest");
+        Directory.CreateDirectory(badDir);
+        var badPath = TrackFile(Path.Combine(badDir, $"{Guid.NewGuid()}.tar.gz"));
         // Write data with GZip magic header but corrupt payload to ensure TestArchive fails
         var badGzip = new byte[] { 0x1F, 0x8B, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x04, 0x00 };
         await File.WriteAllBytesAsync(badPath, badGzip);
