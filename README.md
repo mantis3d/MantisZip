@@ -72,11 +72,11 @@ MantisZip 是一款面向 Windows 的免费开源压缩/解压工具，主打**�
 
 <details>
 <summary><b>📊 点击展开：查看硬核数据类预览（SQLite 数据库、CSV、BT 种子、ISO）</b></summary>
-<p align="center">
+<!--p align="center">
   <br>
   <img src="docs/images/preview-data.gif" alt="硬核数据预览" width="80%"/>
   <br><i>（无需提取大文件，毫秒级抓取 SQLite 表结构、种子文件树与 PE 元数据）</i>
-</p>
+</p-->
 
 | 预览类型 | 展示信息 |
 |----------|----------|
@@ -93,6 +93,8 @@ MantisZip 是一款面向 Windows 的免费开源压缩/解压工具，主打**�
 
 ### 🔑 智能密码管理器
 
+![压缩密码设置](/docs/images/PasswordManager.png)
+
 保存常用密码，可以根据规则自动尝试匹配密码。
 
 如果一个文件输入过正确密码，可以选择保存记录，下次打开与解压则无需再次输入密码。密码以 DPAPI 加密存储。
@@ -103,8 +105,24 @@ MantisZip 是一款面向 Windows 的免费开源压缩/解压工具，主打**�
 <summary><b>📊 点击展开：密码与规则设置与匹配</b></summary>
 <p align="center">
   <br>
-  <img src="docs/images/preview-data.gif" alt="硬核数据预览" width="80%"/>
-  <br><i>当压缩包正确设置密码与匹配规则，再次打开则无痕自动匹配，并且不影响预览功能。</i>
+  
+  压缩时可以选择从密码库加载密码，或者手动输入新密码
+
+  ![压缩密码设置](/docs/images/CompressPassword.png)
+
+  如果打开一个有密码的文件会提示输入密码并保存规则
+
+  ![压缩密码打开](/docs/images/ZipOpenPassword.png)
+
+  当压缩包正确设置密码与匹配规则，再次打开则无痕自动匹配，并且不影响预览功能。
+
+  ![压缩密码匹配](/docs/images/ZipFitPassword.png)
+
+  当压缩包没有正确设置密码与匹配规则，则会显示加锁图标，并且不能预览。
+
+  ![压缩密码不匹配](/docs/images/ZipNotFitPassword.png)
+
+  <br><i></i>
 </p>
 
 </details>
@@ -121,9 +139,9 @@ MantisZip 是一款面向 Windows 的免费开源压缩/解压工具，主打**�
 
 ## 🤔 已知问题
 - 本软件亮点是功能和易用性，所以性能上稍逊于主流压缩软件。将来会逐渐优化。
-- **拖拽导出**功能使用 7‑Zip 的 eager-extraction 模式（先全部解压到临时目录再发起拖拽），大文件较多时会有延迟。该功能默认关闭，可在设置里打开。WPF OLE 桥的 bug 导致延迟渲染方案不可行，未来考虑用 COM `VirtualFileDataObject` 重写。
-- 预览 Markdown、HTML、SVG、PDF 使用 WebView2 控件，已拦截所有外部网络请求（仅允许 `file://` 本地访问）。初次运行时 WebView2 需初始化（若系统无 Runtime 则会自动引导安装）。
-- 有些格式的压缩包**不支持**单项预览提取，预览时会有提示
+- **拖拽导出**功能使用 7‑Zip 的 eager-extraction 模式（先全部解压到临时目录再发起拖拽），大文件较多时会有延迟。该功能默认关闭，可在设置里打开。WPF OLE 桥的 bug 导致延迟渲染方案不可行，~~未来考虑用 COM `VirtualFileDataObject` 重写。~~ 未来会把 WPF 界面替换为 Avalonia，就能解决这个问题。
+- ~~预览 Markdown、HTML、SVG、PDF 使用 WebView2 控件，已拦截所有外部网络请求（仅允许 `file://` 本地访问）。初次运行时 WebView2 需初始化（若系统无 Runtime 则会自动引导安装）。~~ 把 WPF 界面替换为 Avalonia 之后这个问题也没了。
+- 有些格式的压缩包**不支持**单项预览，预览时会有提示
 - RAR 格式不支持压缩（只读解压）。
 - 目前只支持 Windows 平台，跨平台支持已在计划中。
 
@@ -271,6 +289,7 @@ MantisZip 是一款完全免费且独立开发的开源项目。如果它提升�
 如果您身处海外，推荐通过 Polar 赞助。支持国际信用卡、Apple Pay 等无缝支付：
 <p align="left">
   <a href="https://buy.polar.sh/polar_cl_VaCaW2l2nWkob5CyHe4dOlhL6HrQDK4ueMA9n1JyhNc">
+    <img src="docs\images\polar_logotype_black.svg" alt="Sponsor on Polar" height="40"/>
     <img src="docs\images\polar_logotype_white.svg" alt="Sponsor on Polar" height="40"/>
   </a>
 </p>
@@ -283,15 +302,17 @@ MantisZip 是一款完全免费且独立开发的开源项目。如果它提升�
 <table width="100%">
   <tr>
     <td width="50%" align="center" valign="top">
-      <b>⚡ 在爱发电上支持我</b><br>(新店开张，主页审核中，若无法打开可先加 QQ 群调教作者)<br><br>
+      <b>⚡ 在爱发电上支持我</b><br>
       <a href="https://afdian.com/a/MantisZen">
         <img src="docs/images/afdian-MantisZen.jpg" alt="爱发电" width="80%"/>
       </a>
       <br><i>(点击或扫码前往爱发电主页)</i>
+      <br>(新店开张，主页审核中，若无法打开可先加 QQ 群调教作者)<br>
+
     </td>
     <td width="50%" align="center" valign="top">
       <b>💚 微信直接打赏</b><br><br>
-      <img src="docs/images/wechat-pay.jpg" alt="微信打赏" width="80%"/>
+      <img src="docs/images/wechat-Sponsor.png" alt="微信打赏" width="80%"/>
       <br><i>(欢迎请作者喝杯热咖啡)</i>
     </td>
   </tr>
