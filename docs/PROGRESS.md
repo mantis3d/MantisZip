@@ -18,6 +18,9 @@
 
 ## 版本历史（从新到旧）
 
+### v0.4.0 (2026-06-15) 第一个上线版本
+ - 功能基本完成，测试基本完成。第一个上线版本。
+
 ### v0.3.13 (2026-06-15) 完全移除 SharpZipLib 生产代码依赖
 
 0. **SharpZipLib 加密路径 → SharpSevenZip 替换**（参见 [迁移计划](.sisyphus/plans/zipengine-sharpcompress-migration.md)）：
@@ -31,7 +34,8 @@
 
 1. **Release 自动化**（参见 [计划](.sisyphus/plans/release-automation.md)）：
    - 新建 `.github/workflows/release.yml`：打 `v*` tag 时自动 `dotnet publish` → ISCC 编译安装包 → `gh release create` 发布
-   - 版本号从 git tag 派生，消除三处手动同步
+   - 版本号从 git tag 派生，CI 自动写入代码文件，消除三处手动同步
+   - Release notes 由 `docs/RELEASE_NOTES.md` 提供，发布前编辑该文件顶部最新版本说明即可
    - CI 流程保持不变
 
 ### v0.3.13 (2026-06-14) 修复问题
