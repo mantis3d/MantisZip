@@ -45,24 +45,37 @@
 
             <!-- ─────── Tab 1: 关于 / About ─────── -->
             <TabItem Header="{l:L About_Tab_About}">
-                <ScrollViewer VerticalScrollBarVisibility="Auto">
-                    <StackPanel HorizontalAlignment="Center" Margin="24">
-                        <Image Width="64" Height="64" Source="/Resources/App.ico"
-                               Margin="0,0,0,12"/>
-                        <TextBlock Text="MantisZip" FontSize="22" FontWeight="Bold"
-                                   HorizontalAlignment="Center"
-                                   Foreground="{StaticResource Theme_TextPrimary}"/>
-                        <TextBlock FontSize="13" HorizontalAlignment="Center"
-                                   Margin="0,4,0,16"
-                                   Foreground="{StaticResource Theme_TextSecondary}"
-                                   Text="{Binding ElementName=VersionText, Path=Text}"/>
+                <ScrollViewer VerticalScrollBarVisibility="Auto"
+                              Background="{StaticResource Theme_WindowBg}">
+                    <Grid Margin="24">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
 
-                        <Grid Margin="24,0,24,0" VerticalAlignment="Top">
+                        <!-- Left: Icon + Name + Version -->
+                        <StackPanel Grid.Column="0" VerticalAlignment="Center"
+                                    HorizontalAlignment="Center"
+                                    MinWidth="120" Margin="0,0,40,0">
+                            <Image Width="64" Height="64" Source="/Resources/App.ico"
+                                   Margin="0,0,0,12"/>
+                            <TextBlock Text="MantisZip" FontSize="22" FontWeight="Bold"
+                                       HorizontalAlignment="Center"
+                                       Foreground="{StaticResource Theme_TextPrimary}"/>
+                            <TextBlock FontSize="13" HorizontalAlignment="Center"
+                                       Margin="0,4,0,0"
+                                       Foreground="{StaticResource Theme_TextSecondary}"
+                                       Text="{Binding ElementName=VersionText, Path=Text}"/>
+                        </StackPanel>
+
+                        <!-- Right: Info Grid -->
+                        <Grid Grid.Column="1" VerticalAlignment="Center">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="Auto"/>
                                 <ColumnDefinition Width="*"/>
                             </Grid.ColumnDefinitions>
                             <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
                                 <RowDefinition Height="Auto"/>
                                 <RowDefinition Height="Auto"/>
                                 <RowDefinition Height="Auto"/>
@@ -148,8 +161,22 @@
                                     gitee.com/mantis3d/MantisZip
                                 </Hyperlink>
                             </TextBlock>
+                            <!-- QQ group -->
+                            <TextBlock Grid.Row="6" Grid.Column="0"
+                                Text="{l:L About_Label_QQ}"
+                                FontWeight="Bold"
+                                Foreground="{StaticResource Theme_TextSecondary}"
+                                VerticalAlignment="Center"
+                                Margin="0,0,16,8"/>
+                            <TextBlock Grid.Row="6" Grid.Column="1" Margin="0,0,0,8">
+                                <Hyperlink NavigateUri="https://qm.qq.com/cgi-bin/qm/qr?k=778347352"
+                                           RequestNavigate="Hyperlink_RequestNavigate"
+                                           Foreground="{StaticResource Theme_Accent}">
+                                    778347352
+                                </Hyperlink>
+                            </TextBlock>
                         </Grid>
-                    </StackPanel>
+                    </Grid>
                 </ScrollViewer>
             </TabItem>
 
@@ -161,6 +188,8 @@
                         <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
                     <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
@@ -222,6 +251,20 @@
                                    RequestNavigate="Hyperlink_RequestNavigate"
                                    Foreground="{StaticResource Theme_Accent}">
                             gitee.com/mantis3d
+                        </Hyperlink>
+                    </TextBlock>
+                    <!-- Bilibili -->
+                    <TextBlock Grid.Row="4" Grid.Column="0"
+                        Text="{l:L About_Label_Bilibili}"
+                        FontWeight="Bold"
+                        Foreground="{StaticResource Theme_TextSecondary}"
+                        VerticalAlignment="Center"
+                        Margin="0,0,16,8"/>
+                    <TextBlock Grid.Row="4" Grid.Column="1" Margin="0,0,0,8">
+                        <Hyperlink NavigateUri="https://space.bilibili.com/44202554"
+                                   RequestNavigate="Hyperlink_RequestNavigate"
+                                   Foreground="{StaticResource Theme_Accent}">
+                            space.bilibili.com/44202554
                         </Hyperlink>
                     </TextBlock>
                 </Grid>
@@ -306,7 +349,7 @@
                         <TextBlock Grid.Row="8" Grid.Column="0" Text="SharpZipLib" Padding="4,3"/>
                         <TextBlock Grid.Row="8" Grid.Column="1" Text="1.4.2" Padding="8,3"/>
                         <TextBlock Grid.Row="8" Grid.Column="2" Text="MIT" Padding="8,3"/>
-                        <TextBlock Grid.Row="8" Grid.Column="3" Text="Legacy (minor compat)" Padding="4,3"/>
+                        <TextBlock Grid.Row="8" Grid.Column="3" Text="Test-only (fixture creation)" Padding="4,3"/>
 
                         <TextBlock Grid.Row="9" Grid.Column="0" Text="Ude.NetStandard" Padding="4,3"/>
                         <TextBlock Grid.Row="9" Grid.Column="1" Text="1.2.0" Padding="8,3"/>
