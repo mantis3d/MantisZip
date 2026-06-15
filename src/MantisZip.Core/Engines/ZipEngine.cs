@@ -53,8 +53,9 @@ public class ZipEngine : IArchiveEngine
         {
             archive = ArchiveFactory.OpenArchive(fs, options);
         }
-        catch
+        catch (Exception ex)
         {
+            CoreLog.Trace("OpenArchiveWithEncodingFallback: failed to open archive: {0}", ex.Message);
             fs.Dispose();
             throw;
         }
@@ -90,8 +91,9 @@ public class ZipEngine : IArchiveEngine
             CoreLog.Info("OpenArchiveWithEncodingFallback: entries appear ASCII, keeping default codec");
             return archive;
         }
-        catch
+        catch (Exception ex)
         {
+            CoreLog.Trace("OpenArchiveWithEncodingFallback: encoding detection failed, falling back to GBK: {0}", ex.Message);
             archive.Dispose();
             return OpenWithGbk();
         }
@@ -166,8 +168,9 @@ public class ZipEngine : IArchiveEngine
 
             return false;
         }
-        catch
+        catch (Exception ex)
         {
+            CoreLog.Trace("ZipHasUtf8Flag: failed to read central directory: {0}", ex.Message);
             // 出错时回退到旧行为（回退 GBK）
             return false;
         }

@@ -84,8 +84,9 @@ public static class SQLiteParser
                     }
                 }
             }
-            catch
+            catch (Exception ex)
             {
+                CoreLog.Trace("SQLiteParser: failed to open database: {0}", ex.Message);
                 // Non-critical
             }
 
@@ -162,8 +163,9 @@ public static class SQLiteParser
 
             return null;
         }
-        catch
+        catch (Exception ex)
         {
+            CoreLog.Trace("SQLiteParser: failed to read table: {0}", ex.Message);
             return null;
         }
     }

@@ -239,6 +239,7 @@ public partial class SettingsWindow : Window
             SevenZipEngine.ResetLibraryPath();
         }
 
+        var debugLogChanged = s.EnableDebugLogging != (EnableDebugLogCheck.IsChecked == true);
         s.EnableDebugLogging = EnableDebugLogCheck.IsChecked == true;
         s.LogPrivacyMode = (LogPrivacyModeCombo.SelectedItem as ComboBoxItem)?.Tag as string ?? "off";
 
@@ -254,6 +255,12 @@ public partial class SettingsWindow : Window
         {
             App.LogDebug("SettingsWindow: settings saved successfully (theme={0}, lang={1}, debugLog={2}, privMode={3})",
                 s.Theme, s.Language, s.EnableDebugLogging, s.LogPrivacyMode);
+
+            if (debugLogChanged)
+            {
+                AppMessageBox.Show(L.T(L.Settings_Debug_Restart), L.T(L.App_MantisZipTitle),
+                    MessageBoxButton.OK, MessageBoxImage.Information);
+            }
         }
         App.ApplyTextRenderingMode(SettingsTabs);
     }

@@ -36,6 +36,16 @@
    - `AGENTS.md`：Version bump checklist 移除 `installer.iss`（不再需要手动同步版本号）
    - 版本号统一同步到 **0.4.0**（`AppConstants.cs`、`MantisZip.UI.csproj`、`docs/PLAN.md`）
 
+4. **全局调试日志增强 — CoreLog.Trace 注入 + DiagnosticsEnabled 开关**：
+   - `CoreLog.cs`：`ShouldWriteOverride` 委托 → `DiagnosticsEnabled` 静态 bool，所有 Info/Error/Entry/Exit/Trace/Write 方法统一受控；`[Conditional("DEBUG")]` 的 Info/Error 仅在 DEBUG 编译，Trace 全编译
+   - **43 个 catch 块**注入 `CoreLog.Trace` 以捕获静默异常路径：ZipEngine（AddToArchiveAsync、DeleteEntriesAsync、OpenZipFile）、TarGzEngine（ListEntriesAsync、CompressAsync、ExtractAsync）、PasswordManager（AddPassword、DeletePassword、FindMatchingPasswords、DeleteRule）、App.Password（TryMatchPassword）、PeParser/PdfParser/SQLiteParser（Close）、MainWindow.*（ShellExecPreview、SetFormatSpecificInfo、ShowVideoPreview、ExtractWithProgressAsync、DragDrop）、App.Open/Extract（PipeServer/冲突处理/批处理完成）、CompressSettingsWindow/ExtractSettingsWindow（压缩/解压过程中各阶段）、ProgressWindow（批处理初始化）、ShellIntegration.Assoc（SetupAssoc/Install）
+   - `App.OnStartup`：设置 `CoreLog.DiagnosticsEnabled = AppSettings.Instance.EnableDebugLogging`
+   - `SettingsWindow`：调试开关变更时弹出 `AppMessageBox` 提示重启生效，新增 `Settings_Debug_Restart` 中英文本地化字符串
+
+5. **LogRedactor 隐私脱敏修复 — 相对路径 regex 分支**：
+   - `LogRedactor.cs`：_pathRegex 新增第三条分支 `[^\\""<>|:]+(?:\\[^\\""<>|]+)+\\?` 匹配相对路径（如压缩包内条目路径 `字体\FiraCode-Medium.ttf`），不再依赖盘符前缀
+   - `AGENTS.md`：修正 LogPrivacyMode 默认值文档从 `"full"` → `"extension"`，补充 `extension` 模式描述，更新 regex 分支计数
+
 ### v0.3.13 (2026-06-15) 完全移除 SharpZipLib 生产代码依赖
 
 0. **SharpZipLib 加密路径 → SharpSevenZip 替换**（参见 [迁移计划](.sisyphus/plans/zipengine-sharpcompress-migration.md)）：

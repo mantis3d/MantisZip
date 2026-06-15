@@ -51,8 +51,9 @@ public partial class MainWindow
         {
             items = await engine.ListEntriesAsync(_currentArchivePath, _currentPassword);
         }
-        catch
+        catch (Exception ex)
         {
+            CoreLog.Trace("MenuItem_Click: failed: {0}", ex.Message);
             AppMessageBox.Show(L.T(L.Main_Status_ExtractFailed), L.T(L.App_ErrorTitle), MessageBoxButton.OK, MessageBoxImage.Error);
             return;
         }
@@ -449,7 +450,7 @@ public partial class MainWindow
         if (items.Count == 0) return;
         var text = string.Join(Environment.NewLine, items.Select(i => i.Name.TrimEnd('/')));
         try { Clipboard.SetText(text); SetStatus(L.TF(L.Main_Status_CopiedNames, items.Count)); }
-        catch { SetStatus(L.T(L.Main_Status_CopyFailed)); }
+        catch (Exception ex) { CoreLog.Trace("CopyToClipboard: failed: {0}", ex.Message); SetStatus(L.T(L.Main_Status_CopyFailed)); }
     }
 
     private void FileListCtx_CopyPath(object sender, RoutedEventArgs e)
@@ -458,7 +459,7 @@ public partial class MainWindow
         if (items.Count == 0) return;
         var text = string.Join(Environment.NewLine, items.Select(i => i.FullPath));
         try { Clipboard.SetText(text); SetStatus(L.TF(L.Main_Status_CopiedPaths, items.Count)); }
-        catch { SetStatus(L.T(L.Main_Status_CopyFailed)); }
+        catch (Exception ex) { CoreLog.Trace("CopyToClipboard: failed: {0}", ex.Message); SetStatus(L.T(L.Main_Status_CopyFailed)); }
     }
 
     #endregion

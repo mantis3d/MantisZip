@@ -718,6 +718,7 @@
   "Settings_Debug_LogPrivacyHelp_What": "影响范围：统一日志文件 (%LOCALAPPDATA%\\MantisZip\\debug.log) 中的所有路径。核心引擎日志、调试日志和启动日志均已合并到该文件。",
   "Settings_Debug_LogPrivacyHelp_WhatNot": "不影响：压缩包内容预览、文件列表显示、密码管理器等 UI 功能。脱敏仅作用于日志文件写入。",
   "Settings_Debug_LogPrivacyHelp_Close": "关闭",
+  "Settings_Debug_Restart": "调试日志设置将在重启后生效。",
   "Main_Status_ExtractFailed": "解压失败: {0}",
   "Settings_Preview_ColorEmoji": "启用彩色 Emoji（需要重启应用后生效）",
   "Settings_Tab_Appearance": "外观",

@@ -1,4 +1,4 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
@@ -130,8 +130,8 @@ public partial class App : Application
         CoreLog.RedactOverride = msg =>
             LogRedactor.RedactPaths(msg, LogRedactor.ParseMode(AppSettings.Instance.LogPrivacyMode));
 
-        // CoreLog 的 DEBUG 日志受“启用调试日志”设置控制
-        CoreLog.ShouldWriteOverride = () => AppSettings.Instance.EnableDebugLogging;
+        // CoreLog 日志受“启用调试日志”设置控制
+        CoreLog.DiagnosticsEnabled = AppSettings.Instance.EnableDebugLogging;
 
         // ===== 统一日志 =====
         // 所有日志（启动日志、调试日志、CoreLog 追踪日志）都写入同一个文件：

@@ -33,7 +33,7 @@ internal static partial class ShellIntegration
             if (!string.IsNullOrEmpty(progId) && progId.IndexOf("MantisZip", StringComparison.OrdinalIgnoreCase) >= 0)
                 return AssocStatus.IsDefault;
         }
-        catch { }
+        catch (Exception ex) { App.LogDebug("ShellIntegration.GetAssociationStatus: failed: {0}", ex.Message); }
 
         return AssocStatus.NotDefault;
     }
@@ -158,7 +158,7 @@ internal static partial class ShellIntegration
             using var key = Registry.CurrentUser.OpenSubKey($@"Software\Classes\{ext}\OpenWithProgids", writable: true);
             key?.DeleteValue(progId, throwOnMissingValue: false);
         }
-        catch { /* 该扩展可能没有 OpenWithProgids 键 */ }
+        catch (Exception ex) { App.LogDebug("ShellIntegration.UninstallAssociationForExtension: failed to delete OpenWithProgids: {0}", ex.Message); }
 
         // 删除 DefaultIcon（仅当指向我们的图标路径时）
         try
@@ -178,7 +178,7 @@ internal static partial class ShellIntegration
                 }
             }
         }
-        catch { }
+        catch (Exception ex) { App.LogDebug("ShellIntegration.UninstallAssociationForExtension: failed to delete DefaultIcon: {0}", ex.Message); }
 
         // 删除独立 ProgId 键（仅当该 ProgId 不被其他扩展引用时）
         DeleteRegistryKey($@"Software\Classes\{progId}");
@@ -253,7 +253,7 @@ internal static partial class ShellIntegration
                 if (!string.IsNullOrEmpty(displayName))
                     return CleanAppName(displayName);
             }
-            catch { }
+            catch (Exception ex) { App.LogDebug("ShellIntegration.GetCurrentHandler: failed to read ProgId friendly name: {0}", ex.Message); }
 
             // 去除扩展名后缀："Bandizip.zip" → "Bandizip"
             var knownExts = new[] { ".zip", ".7z", ".rar", ".tar", ".gz", ".tgz", ".iso" };
@@ -265,8 +265,9 @@ internal static partial class ShellIntegration
 
             return progId;
         }
-        catch
+        catch (Exception ex)
         {
+            App.LogDebug("ShellIntegration.GetCurrentHandler: failed to read handler: {0}", ex.Message);
             return "未设置";
         }
     }

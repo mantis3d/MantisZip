@@ -117,10 +117,14 @@ MantisZip 是一款面向 Windows 的免费开源压缩/解压工具，主打**�
 ### ⚡ 更多解压冲突选项
 
 除了其他软件的「覆盖」「跳过」和「自动重命名」之外，还增加了「覆盖旧文件」和「覆盖小文件」，「自动重命名」也可无缝切换至手动重命名。
+![解压文件冲突](docs\images\ConflictCompress.png)
+![压缩文件冲突](docs\images\ConflictExtract.png)
 
 ### 🐞 调试日志
-开启后记录详细操作日志到 `debug.log`，帮助排查问题。
 
+开启后记录详细操作日志到 `debug.log`，帮助排查问题。提供**隐私脱敏**选项，避免泄露用户隐私。
+
+![压缩文件冲突](docs\images\SettingDebug.png)
 
 ---
 
@@ -289,13 +293,12 @@ MantisZip 是一款完全免费且独立开发的开源项目。如果它提升�
 <table width="100%">
   <tr>
     <td width="50%" align="center" valign="top">
-      <b>⚡ 在爱发电上支持我</b><br>
-      <b>⚡ 在爱发电上支持我</b><br>
       <a href="https://afdian.com/a/MantisZen">
+      <b>⚡ 在爱发电上支持我</b><br>      
         <img src="docs/images/afdian-MantisZen.jpg" alt="爱发电" width="80%"/>
-      </a>
       <br><i>(点击或扫码前往爱发电主页)</i>
       <br>(新店开张，主页审核中，若无法打开可先加 QQ 群调教作者)<br>
+      </a>
     </td>
     <td width="50%" align="center" valign="top">
       <b>💚 微信直接打赏</b><br><br>

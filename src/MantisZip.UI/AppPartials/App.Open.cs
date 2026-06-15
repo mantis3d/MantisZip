@@ -162,6 +162,7 @@ public partial class App : Application
                 }
                 catch (Exception ex)
                 {
+                    CoreLog.Trace("HandleOpen: failed: {0}", ex.Message);
                     LogStartup($"HandleCompressQuick: failed: {ex.Message}");
                     Log("--compress-quick 失败: {0}", ex.Message);
                     await progressWindow.Dispatcher.InvokeAsync(() =>
@@ -174,6 +175,7 @@ public partial class App : Application
         }
         catch (Exception ex)
         {
+            CoreLog.Trace("HandleOpen: parse failed: {0}", ex.Message);
             LogStartup($"HandleCompressQuick: unexpected error: {ex.Message}\n{ex.StackTrace}");
             AppMessageBox.Show(L.TF(L.App_QuickCompressFailed, ex.Message), L.T(L.App_ErrorTitle), MessageBoxButton.OK, MessageBoxImage.Error);
             Current?.Shutdown();

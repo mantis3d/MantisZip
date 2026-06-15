@@ -5,10 +5,11 @@ using System.Runtime.CompilerServices;
 namespace MantisZip.Core.Utils;
 
 /// <summary>
-/// DEBUG-only logger for MantisZip.Core. All methods are [Conditional("DEBUG")]
-/// so they compile to nothing in RELEASE builds.
-/// All output goes to %LOCALAPPDATA%\MantisZip\debug.log with timestamps.
-/// CoreLog.Trace is the only method active in RELEASE builds (for hard-to-repro bugs).
+/// Logger for MantisZip.Core.
+/// Info/Error/Entry/Exit are [Conditional("DEBUG")] — compiled away in RELEASE builds.
+/// Trace is active in all builds.
+/// All methods are gated by DiagnosticsEnabled (set from AppSettings.EnableDebugLogging at startup).
+/// Output goes to %LOCALAPPDATA%\MantisZip\debug.log with timestamps.
 /// </summary>
 internal static class CoreLog
 {
@@ -25,11 +26,11 @@ internal static class CoreLog
     internal static Func<string, string>? RedactOverride { get; set; }
 
     /// <summary>
-    /// 是否允许写入日志的覆盖委托。由 UI 层在初始化时注入。
-    /// 返回 true 表示允许写入，false 表示跳过。为 null 表示始终写入。
-    /// 用于让 CoreLog 的 DEBUG 日志受 AppSettings.EnableDebugLogging 控制。
+    /// 全局诊断开关。由 UI 层在启动时从 AppSettings.EnableDebugLogging 设置。
+    /// true=允许写入日志，false=所有日志静默。重启后生效。
+    /// 控制 CoreLog 的所有 Info/Error/Entry/Exit/Trace 方法。
     /// </summary>
-    internal static Func<bool>? ShouldWriteOverride { get; set; }
+    internal static bool DiagnosticsEnabled { get; set; } = true;
 
     /// <summary>Log a message (DEBUG only).</summary>
     [Conditional("DEBUG")]
@@ -82,12 +83,14 @@ internal static class CoreLog
     }
 
     /// <summary>
-    /// 无条件追踪日志（DEBUG 和 RELEASE 都写入）。
+    /// 追踪日志（DEBUG 和 RELEASE 都写入）。
     /// 写入 %LOCALAPPDATA%\MantisZip\debug.log（与 CoreLog.Write 同文件）。
-    /// 也应用 RedactOverride 脱敏。用于调试进度条等难以复现的问题。
+    /// 也应用 RedactOverride 脱敏，受 DiagnosticsEnabled 开关控制。
     /// </summary>
     internal static void Trace(string msg)
     {
+        if (!DiagnosticsEnabled) return;
+
         // 应用脱敏（由 UI 层注入，null=不脱敏）
         var finalMsg = RedactOverride?.Invoke(msg) ?? msg;
 
@@ -137,8 +140,7 @@ internal static class CoreLog
 
     private static void Write(string msg)
     {
-        // 检查 ShouldWriteOverride：如果设置了委托且返回 false，跳过本次写入
-        if (ShouldWriteOverride != null && !ShouldWriteOverride())
+        if (!DiagnosticsEnabled)
             return;
 
         // 应用脱敏（由 UI 层注入，null=不脱敏）

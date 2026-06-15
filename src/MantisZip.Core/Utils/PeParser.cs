@@ -159,8 +159,9 @@ public static class PeParser
                 AdditionalInfo = fileDescription,
             };
         }
-        catch
+        catch (Exception ex)
         {
+            CoreLog.Trace("PeParser: failed to read PE metadata: {0}", ex.Message);
             return null;
         }
     }
@@ -400,8 +401,9 @@ public static class PeParser
                 reader.BaseStream.Seek(childStart + childLength, SeekOrigin.Begin);
             }
         }
-        catch
+        catch (Exception ex)
         {
+            CoreLog.Trace("PeParser: failed to parse rich header: {0}", ex.Message);
             // 解析版本信息中的部分失败不中断
         }
     }

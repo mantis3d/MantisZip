@@ -814,6 +814,7 @@ public partial class MainWindow : Window
         }
         catch (Exception ex)
         {
+            CoreLog.Trace("ExtractAsync: failed: {0}", ex.Message);
             progressWindow.Close();
             if (App.IsPasswordError(ex))
             {
@@ -857,6 +858,7 @@ public partial class MainWindow : Window
         }
         catch (Exception ex)
         {
+            CoreLog.Trace("CompressAsync: failed: {0}", ex.Message);
             AppMessageBox.Show(L.TF(L.Main_Status_CompressFailed, ex.Message), L.T(L.App_ErrorTitle), MessageBoxButton.OK, MessageBoxImage.Error);
             SetStatus(L.T(L.Main_Status_CompressFailed));
         }
@@ -949,6 +951,7 @@ public partial class MainWindow : Window
         }
         catch (Exception ex)
         {
+            CoreLog.Trace("TestArchiveAsync: unexpected error: {0}", ex.Message);
             progressWindow.Close();
             AppMessageBox.Show(L.TF(L.Main_Status_TestFailed, ex.Message), L.T(L.App_ErrorTitle), MessageBoxButton.OK, MessageBoxImage.Error);
             SetStatus(L.T(L.Main_Status_TestFailed));

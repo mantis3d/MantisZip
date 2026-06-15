@@ -400,11 +400,12 @@ Uses `ArchiveItem.FullPath` for the output temp path so files from subdirectorie
 
 ### Log privacy redaction
 
-`LogRedactor` (Core/Utils) provides centralized path redaction for all log output. Uses `RegexOptions.Compiled` regex with two branches (drive-letter `C:\...` and UNC `\\server\share\...`), allowing spaces in paths (unlike earlier draft that excluded `\s`).
+`LogRedactor` (Core/Utils) provides centralized path redaction for all log output. Uses `RegexOptions.Compiled` regex with three branches (drive-letter `C:\...`, UNC `\\server\share\...`, and relative `folder\sub\file.ext`), allowing spaces in paths (unlike earlier draft that excluded `\s`).
 
-Three modes controlled by `AppSettings.LogPrivacyMode` (defaults to `"full"`):
+Four modes controlled by `AppSettings.LogPrivacyMode` (defaults to `"extension"`):
 - **off**: No redaction
 - **filename**: `D:\Photos\private\wedding.jpg` → `wedding.jpg`
+- **extension**: `D:\Photos\private\wedding.jpg` → `[PATH_1]\[FILE_1].jpg` (preserves extension only)
 - **full**: Same → `[PATH_1]` (sequential IDs, same path → same ID, capped at 10000 entries)
 
 **Injection**: 

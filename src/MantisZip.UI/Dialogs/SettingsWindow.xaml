@@ -153,67 +153,6 @@
                 </ScrollViewer>
             </TabItem>
 
-            <!-- ═══════ 上下文菜单 ═══════ -->
-            <TabItem>
-                <TabItem.Header>
-                    <Grid HorizontalAlignment="Stretch">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto"/>
-                            <ColumnDefinition Width="*"/>
-                        </Grid.ColumnDefinitions>
-                        <emoji:TextBlock x:Name="IconContextMenu" Text="🖱️" FontSize="20" VerticalAlignment="Center"/>
-                        <TextBlock Text="{l:L Settings_Tab_ContextMenu}" Grid.Column="1" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="4,0,0,0"/>
-                    </Grid>
-                </TabItem.Header>
-                <ScrollViewer VerticalScrollBarVisibility="Auto" Background="{StaticResource Theme_SurfaceBg}">
-                    <StackPanel Margin="10">
-                        <GroupBox Header="{l:L Settings_Menu_GroupHeader}" Padding="8" Margin="0,0,0,12">
-                            <StackPanel>
-                                <GroupBox Header="{l:L Settings_Menu_Group_Browse}" Padding="6" Margin="0,0,0,8">
-                                    <CheckBox x:Name="EnableOpenCheck" Content="{l:L Settings_Menu_EnableOpen}" Margin="4"/>
-                                </GroupBox>
-                                <GroupBox Header="{l:L Settings_Menu_Group_Compress}" Padding="6" Margin="0,0,0,8">
-                                    <StackPanel>
-                                        <CheckBox x:Name="EnableCompressCheck" Content="{l:L Settings_Menu_EnableCompress}" Margin="0,4"/>
-                                        <CheckBox x:Name="EnableCompressSeparateCheck" Content="{l:L Settings_Menu_EnableCompressSeparate}" Margin="0,4"/>
-                                        <CheckBox x:Name="EnableCompressCombinedCheck" Content="{l:L Settings_Menu_EnableCompressCombined}" Margin="0,4"/>
-                                    </StackPanel>
-                                </GroupBox>
-                                <GroupBox Header="{l:L Settings_Menu_Group_Extract}" Padding="6" Margin="0,0,0,8">
-                                    <StackPanel>
-                                        <CheckBox x:Name="EnableExtractHereCheck" Content="{l:L Settings_Menu_EnableExtractHere}" Margin="0,4"/>
-                                        <CheckBox x:Name="EnableSmartCheck" Content="{l:L Shell_SmartExtract}" Margin="0,4"/>
-                                        <CheckBox x:Name="EnableExtractToNamedCheck" Content="{l:L Settings_Menu_EnableExtractToNamed}" Margin="0,4"/>
-                                        <CheckBox x:Name="EnableExtractToCheck" Content="{l:L Settings_Menu_EnableExtractTo}" Margin="0,4"/>
-                                    </StackPanel>
-                                </GroupBox>
-                            </StackPanel>
-                        </GroupBox>
-
-                        <GroupBox Header="{l:L Settings_Menu_DisplayGroup}" Padding="8" Margin="0,0,0,12">
-                            <StackPanel>
-                                <CheckBox x:Name="CascadeCheck" Content="{l:L Settings_Menu_Cascade}" Margin="0,4"/>
-                                <CheckBox x:Name="ShowIconsCheck" Content="{l:L Settings_Menu_ShowIcons}" Margin="0,4"/>
-                            </StackPanel>
-                        </GroupBox>
-
-                        <GroupBox Header="{l:L Settings_Menu_StatusGroup}" Padding="8">
-                            <StackPanel>
-                                <TextBlock x:Name="ShellStatusText" Text="{l:L Settings_Menu_Checking}" Margin="0,0,0,8" Foreground="#555"/>
-                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                                    <Button x:Name="InstallBtn" Content="{l:L Settings_Menu_Btn_Install}" Width="60" Height="26"
-                                            Click="InstallBtn_Click" IsEnabled="False"/>
-                                    <Button x:Name="UninstallBtn" Content="{l:L Settings_Menu_Btn_Uninstall}" Width="60" Height="26" Margin="6,0,0,0"
-                                            Click="UninstallBtn_Click" IsEnabled="False"/>
-                                    <Button x:Name="ApplyShellBtn" Content="{l:L Settings_Menu_Btn_Apply}" Width="60" Height="26" Margin="6,0,0,0"
-                                            Click="ApplyShellBtn_Click" IsEnabled="False"/>
-                                </StackPanel>
-                            </StackPanel>
-                        </GroupBox>
-                    </StackPanel>
-                </ScrollViewer>
-            </TabItem>
-
             <!-- ═══════ 预览（含子面板）═══════ -->
             <TabItem>
                 <TabItem.Header>
@@ -411,6 +350,114 @@
                 </Grid>
             </TabItem>
 
+            <!-- ═══════ 密码管理 ═══════ -->
+            <TabItem>
+                <TabItem.Header>
+                    <Grid HorizontalAlignment="Stretch">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <emoji:TextBlock x:Name="IconPassword" Text="🔐" FontSize="20" VerticalAlignment="Center"/>
+                        <TextBlock Text="{l:L Settings_Tab_Password}" Grid.Column="1" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="4,0,0,0"/>
+                    </Grid>
+                </TabItem.Header>
+                <ScrollViewer VerticalScrollBarVisibility="Auto" Background="{StaticResource Theme_SurfaceBg}">
+                    <StackPanel Margin="10">
+                        <CheckBox x:Name="ShowPasswordNotifCheck" Content="{l:L Settings_Pwd_ShowNotification}" Margin="0,4"/>
+                        <TextBlock Text="{l:L Settings_Pwd_ShowHint}" Foreground="{StaticResource Theme_TextDisabled}" FontSize="11" TextWrapping="Wrap" Margin="24,0,0,12"/>
+
+                        <CheckBox x:Name="RevealPasswordCheck" Content="{l:L Settings_Pwd_RevealDefault}" Margin="0,12,0,4"/>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
+            <!-- ═══════ 语言 ═══════ -->
+            <TabItem>
+                <TabItem.Header>
+                    <Grid HorizontalAlignment="Stretch">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <emoji:TextBlock x:Name="IconLanguage" Text="🌐" FontSize="20" VerticalAlignment="Center"/>
+                        <TextBlock Text="{l:L Settings_Tab_Language}" Grid.Column="1" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="4,0,0,0"/>
+                    </Grid>
+                </TabItem.Header>
+                <ScrollViewer VerticalScrollBarVisibility="Auto" Background="{StaticResource Theme_SurfaceBg}">
+                    <StackPanel Margin="10">
+                        <TextBlock Text="{l:L Settings_Language}" FontWeight="SemiBold" Margin="0,0,0,4"/>
+                        <ComboBox x:Name="LanguageCombo" Width="300" HorizontalAlignment="Left"
+                                Background="{DynamicResource Theme_WindowBg}"
+                                SelectionChanged="LanguageCombo_SelectionChanged"/>
+                        <TextBlock x:Name="LanguageTranslatorText" FontSize="11"
+                                Foreground="{StaticResource Theme_TextSecondary}"
+                                TextWrapping="Wrap" Margin="0,8,0,0"/>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
+            <!-- ═══════ 上下文菜单 ═══════ -->
+            <TabItem>
+                <TabItem.Header>
+                    <Grid HorizontalAlignment="Stretch">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <emoji:TextBlock x:Name="IconContextMenu" Text="🖱️" FontSize="20" VerticalAlignment="Center"/>
+                        <TextBlock Text="{l:L Settings_Tab_ContextMenu}" Grid.Column="1" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="4,0,0,0"/>
+                    </Grid>
+                </TabItem.Header>
+                <ScrollViewer VerticalScrollBarVisibility="Auto" Background="{StaticResource Theme_SurfaceBg}">
+                    <StackPanel Margin="10">
+                        <GroupBox Header="{l:L Settings_Menu_GroupHeader}" Padding="8" Margin="0,0,0,12">
+                            <StackPanel>
+                                <GroupBox Header="{l:L Settings_Menu_Group_Browse}" Padding="6" Margin="0,0,0,8">
+                                    <CheckBox x:Name="EnableOpenCheck" Content="{l:L Settings_Menu_EnableOpen}" Margin="4"/>
+                                </GroupBox>
+                                <GroupBox Header="{l:L Settings_Menu_Group_Compress}" Padding="6" Margin="0,0,0,8">
+                                    <StackPanel>
+                                        <CheckBox x:Name="EnableCompressCheck" Content="{l:L Settings_Menu_EnableCompress}" Margin="0,4"/>
+                                        <CheckBox x:Name="EnableCompressSeparateCheck" Content="{l:L Settings_Menu_EnableCompressSeparate}" Margin="0,4"/>
+                                        <CheckBox x:Name="EnableCompressCombinedCheck" Content="{l:L Settings_Menu_EnableCompressCombined}" Margin="0,4"/>
+                                    </StackPanel>
+                                </GroupBox>
+                                <GroupBox Header="{l:L Settings_Menu_Group_Extract}" Padding="6" Margin="0,0,0,8">
+                                    <StackPanel>
+                                        <CheckBox x:Name="EnableExtractHereCheck" Content="{l:L Settings_Menu_EnableExtractHere}" Margin="0,4"/>
+                                        <CheckBox x:Name="EnableSmartCheck" Content="{l:L Shell_SmartExtract}" Margin="0,4"/>
+                                        <CheckBox x:Name="EnableExtractToNamedCheck" Content="{l:L Settings_Menu_EnableExtractToNamed}" Margin="0,4"/>
+                                        <CheckBox x:Name="EnableExtractToCheck" Content="{l:L Settings_Menu_EnableExtractTo}" Margin="0,4"/>
+                                    </StackPanel>
+                                </GroupBox>
+                            </StackPanel>
+                        </GroupBox>
+
+                        <GroupBox Header="{l:L Settings_Menu_DisplayGroup}" Padding="8" Margin="0,0,0,12">
+                            <StackPanel>
+                                <CheckBox x:Name="CascadeCheck" Content="{l:L Settings_Menu_Cascade}" Margin="0,4"/>
+                                <CheckBox x:Name="ShowIconsCheck" Content="{l:L Settings_Menu_ShowIcons}" Margin="0,4"/>
+                            </StackPanel>
+                        </GroupBox>
+
+                        <GroupBox Header="{l:L Settings_Menu_StatusGroup}" Padding="8">
+                            <StackPanel>
+                                <TextBlock x:Name="ShellStatusText" Text="{l:L Settings_Menu_Checking}" Margin="0,0,0,8" Foreground="#555"/>
+                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                    <Button x:Name="InstallBtn" Content="{l:L Settings_Menu_Btn_Install}" Width="60" Height="26"
+                                            Click="InstallBtn_Click" IsEnabled="False"/>
+                                    <Button x:Name="UninstallBtn" Content="{l:L Settings_Menu_Btn_Uninstall}" Width="60" Height="26" Margin="6,0,0,0"
+                                            Click="UninstallBtn_Click" IsEnabled="False"/>
+                                    <Button x:Name="ApplyShellBtn" Content="{l:L Settings_Menu_Btn_Apply}" Width="60" Height="26" Margin="6,0,0,0"
+                                            Click="ApplyShellBtn_Click" IsEnabled="False"/>
+                                </StackPanel>
+                            </StackPanel>
+                        </GroupBox>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
             <!-- ═══════ 文件关联 ═══════ -->
             <TabItem>
                 <TabItem.Header>
@@ -546,53 +593,6 @@
                                 </StackPanel>
                             </StackPanel>
                         </GroupBox>
-                    </StackPanel>
-                </ScrollViewer>
-            </TabItem>
-
-            <!-- ═══════ 密码管理 ═══════ -->
-            <TabItem>
-                <TabItem.Header>
-                    <Grid HorizontalAlignment="Stretch">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto"/>
-                            <ColumnDefinition Width="*"/>
-                        </Grid.ColumnDefinitions>
-                        <emoji:TextBlock x:Name="IconPassword" Text="🔐" FontSize="20" VerticalAlignment="Center"/>
-                        <TextBlock Text="{l:L Settings_Tab_Password}" Grid.Column="1" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="4,0,0,0"/>
-                    </Grid>
-                </TabItem.Header>
-                <ScrollViewer VerticalScrollBarVisibility="Auto" Background="{StaticResource Theme_SurfaceBg}">
-                    <StackPanel Margin="10">
-                        <CheckBox x:Name="ShowPasswordNotifCheck" Content="{l:L Settings_Pwd_ShowNotification}" Margin="0,4"/>
-                        <TextBlock Text="{l:L Settings_Pwd_ShowHint}" Foreground="{StaticResource Theme_TextDisabled}" FontSize="11" TextWrapping="Wrap" Margin="24,0,0,12"/>
-
-                        <CheckBox x:Name="RevealPasswordCheck" Content="{l:L Settings_Pwd_RevealDefault}" Margin="0,12,0,4"/>
-                    </StackPanel>
-                </ScrollViewer>
-            </TabItem>
-
-            <!-- ═══════ 语言 ═══════ -->
-            <TabItem>
-                <TabItem.Header>
-                    <Grid HorizontalAlignment="Stretch">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto"/>
-                            <ColumnDefinition Width="*"/>
-                        </Grid.ColumnDefinitions>
-                        <emoji:TextBlock x:Name="IconLanguage" Text="🌐" FontSize="20" VerticalAlignment="Center"/>
-                        <TextBlock Text="{l:L Settings_Tab_Language}" Grid.Column="1" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="4,0,0,0"/>
-                    </Grid>
-                </TabItem.Header>
-                <ScrollViewer VerticalScrollBarVisibility="Auto" Background="{StaticResource Theme_SurfaceBg}">
-                    <StackPanel Margin="10">
-                        <TextBlock Text="{l:L Settings_Language}" FontWeight="SemiBold" Margin="0,0,0,4"/>
-                        <ComboBox x:Name="LanguageCombo" Width="300" HorizontalAlignment="Left"
-                                  Background="{DynamicResource Theme_WindowBg}"
-                                  SelectionChanged="LanguageCombo_SelectionChanged"/>
-                        <TextBlock x:Name="LanguageTranslatorText" FontSize="11"
-                                   Foreground="{StaticResource Theme_TextSecondary}"
-                                   TextWrapping="Wrap" Margin="0,8,0,0"/>
                     </StackPanel>
                 </ScrollViewer>
             </TabItem>
