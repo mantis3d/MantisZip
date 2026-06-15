@@ -21,7 +21,16 @@
 ### v0.4.0 (2026-06-15) 第一个上线版本
  - 功能基本完成，测试基本完成。第一个上线版本。
 
-1. **CI 修复 — en.json 缺少 About_Author_Bilibili 键**：
+1. **CI 修复 — TarGzEngineTests.TestArchiveAsync_InvalidArchive_ReturnsFalse DirectoryNotFoundException**：
+   - 测试在写入 corrupt .tar.gz 前未创建 `MantisZipTest\` 目录，CI 裸机上目录不存在导致 `DirectoryNotFoundException`
+   - 添加 `Directory.CreateDirectory` 确保目录存在，与 ArchiveFixtures 中所有 fixture 方法的做法一致
+
+2. **CI 修复 — ISCC 编译找不到 ChineseSimplified.isl**：
+   - Inno Setup 6.7.1 Chocolatey 包未包含 `ChineseSimplified.isl`，`compiler:Languages\` 路径查找失败
+   - 从 [kira-96/Inno-Setup-Chinese-Simplified-Translation](https://github.com/kira-96/Inno-Setup-Chinese-Simplified-Translation) 获取语言文件，存入 `setup\Languages\ChineseSimplified.isl`
+   - `installer.iss` 改为引用本地相对路径（与翻译项目 CI 方案推荐一致）
+
+3. **CI 修复 — en.json 缺少 About_Author_Bilibili 键**：
    - `strings.en.json` 缺少 `About_Author_Bilibili` 键导致 `BothLanguages_HaveSameAboutKeySet` 测试失败
    - 添加英文翻译值 `"Bilibili: space.bilibili.com/44202554"`
 

@@ -32,7 +32,7 @@ SetupIconFile=src\MantisZip.UI\Resources\App.ico
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
-Name: "chinese"; MessagesFile: "compiler:Languages\ChineseSimplified.isl"
+Name: "chinese"; MessagesFile: "setup\Languages\ChineseSimplified.isl"
 
 [CustomMessages]
 ; English
