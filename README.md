@@ -73,9 +73,11 @@ MantisZip 是一款面向 Windows 的免费开源压缩/解压工具，主打**�
 <details>
 <summary><b>📊 点击展开：查看硬核数据类预览（SQLite 数据库、CSV、BT 种子、ISO）</b></summary>
 <!--p align="center">
+<!--p align="center">
   <br>
   <img src="docs/images/preview-data.gif" alt="硬核数据预览" width="80%"/>
   <br><i>（无需提取大文件，毫秒级抓取 SQLite 表结构、种子文件树与 PE 元数据）</i>
+</p-->
 </p-->
 
 | 预览类型 | 展示信息 |
@@ -105,6 +107,24 @@ MantisZip 是一款面向 Windows 的免费开源压缩/解压工具，主打**�
 <summary><b>📊 点击展开：密码与规则设置与匹配</b></summary>
 <p align="center">
   <br>
+  
+  压缩时可以选择从密码库加载密码，或者手动输入新密码
+
+  ![压缩密码设置](/docs/images/CompressPassword.png)
+
+  如果打开一个有密码的文件会提示输入密码并保存规则
+
+  ![压缩密码打开](/docs/images/ZipOpenPassword.png)
+
+  当压缩包正确设置密码与匹配规则，再次打开则无痕自动匹配，并且不影响预览功能。
+
+  ![压缩密码匹配](/docs/images/ZipFitPassword.png)
+
+  当压缩包没有正确设置密码与匹配规则，则会显示加锁图标，并且不能预览。
+
+  ![压缩密码不匹配](/docs/images/ZipNotFitPassword.png)
+
+  <br><i></i>
   
   压缩时可以选择从密码库加载密码，或者手动输入新密码
 
@@ -302,6 +322,7 @@ MantisZip 是一款完全免费且独立开发的开源项目。如果它提升�
 <table width="100%">
   <tr>
     <td width="50%" align="center" valign="top">
+      <b>⚡ 在爱发电上支持我</b><br>
       <b>⚡ 在爱发电上支持我</b><br>
       <a href="https://afdian.com/a/MantisZen">
         <img src="docs/images/afdian-MantisZen.jpg" alt="爱发电" width="80%"/>
