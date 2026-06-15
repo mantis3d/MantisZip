@@ -5,4 +5,6 @@
 
 ## v0.4.0
 
-- （在此填写更新内容）
+软件第一个版本：
+- 软件功能基本完整
+- ![MantisZip 极速预览总览](/docs/images/preview-overview.gif)
