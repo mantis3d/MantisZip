@@ -1,0 +1,130 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'  # 匹配 v0.4.0, v0.4.1, v1.0.0 等
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Setup .NET 9
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 9.0.x
+
+      - name: Install 7-Zip (for 7z.dll bundling)
+        run: choco install 7zip --no-progress -y
+
+      - name: Restore dependencies
+        run: dotnet restore
+
+      - name: Build
+        run: dotnet build --no-restore --configuration Release
+
+      - name: Test (excluding SevenZipEngine — requires native 7z.dll)
+        run: >
+          dotnet test --no-restore --configuration Release
+          --filter "FullyQualifiedName!~SevenZipEngine"
+          --logger "console;verbosity=normal"
+
+      - name: Publish (framework-dependent)
+        run: >
+          dotnet publish src\MantisZip.UI\MantisZip.UI.csproj
+          --no-restore --configuration Release
+          --output publish_output
+          -p:DebugType=portable
+          -p:DebugSymbols=true
+
+      - name: Verify publish output
+        shell: pwsh
+        run: |
+          Write-Host "=== publish_output structure ==="
+          Get-ChildItem -Path publish_output -Recurse | ForEach-Object {
+            Write-Host $_.FullName.Replace((Get-Location).Path + "\publish_output\", "")
+          }
+
+      - name: Install Inno Setup
+        run: choco install innosetup --no-progress -y
+
+      - name: Extract version from tag
+        shell: pwsh
+        run: |
+          $tag = "${{ github.ref_name }}"
+          $version = $tag -replace '^v', ''
+          echo "VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          echo "Building installer for version: $version"
+
+      - name: Update installer.iss version
+        shell: pwsh
+        run: |
+          $iss = Get-Content installer.iss -Raw
+          $iss = $iss -replace '(#define MyAppVersion ")[^"]*(")', "`$1$env:VERSION`$2"
+          Set-Content installer.iss -Value $iss -NoNewline
+          Write-Host "installer.iss version updated to: $env:VERSION"
+
+      - name: Build installer
+        shell: pwsh
+        run: |
+          $iscc = (Get-Command "iscc.exe" -ErrorAction SilentlyContinue).Source
+          if (-not $iscc) {
+            # 检查 Inno Setup 6 默认安装路径
+            $paths = @(
+              "C:\Program Files (x86)\Inno Setup 6\ISCC.exe",
+              "C:\Program Files\Inno Setup 6\ISCC.exe",
+              "C:\Program Files (x86)\Inno Setup 5\ISCC.exe",
+              "C:\Program Files\Inno Setup 5\ISCC.exe"
+            )
+            foreach ($p in $paths) {
+              if (Test-Path $p) { $iscc = $p; break }
+            }
+          }
+          if (-not $iscc) { throw "ISCC.exe not found after installing Inno Setup" }
+          Write-Host "Using ISCC: $iscc"
+          & $iscc installer.iss
+          Write-Host "Installer built successfully"
+
+      - name: List installer artifacts
+        shell: pwsh
+        run: Get-ChildItem -Path installer -Filter "*.exe" | Select-Object Name, Length
+
+      - name: Read release notes
+        shell: pwsh
+        run: |
+          $notesFile = "docs/RELEASE_NOTES.md"
+          if (Test-Path $notesFile) {
+            $content = Get-Content $notesFile -Raw
+            # 找到最新版本条目（第一个 ## v 标题之后的内容，直到下一个 ## 标题）
+            if ($content -match '## v[\d.]+.*?\n(.*?)(?=\n## |\Z)') {
+              $notes = $matches[1].Trim()
+            } else {
+              $notes = $content
+            }
+            # GitHub Release notes 最大支持 125000 字符，截断保护
+            if ($notes.Length -gt 120000) { $notes = $notes.Substring(0, 120000) + "`n`n…（截断）" }
+            Set-Content -Path release_notes.txt -Value $notes -NoNewline
+            Write-Host "Release notes extracted ($($notes.Length) chars)"
+          } else {
+            Set-Content -Path release_notes.txt -Value "请参见 PROGRESS.md 了解更新内容。" -NoNewline
+            Write-Host "RELEASE_NOTES.md not found, using fallback"
+          }
+
+      - name: Create Release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $installer = Get-ChildItem -Path installer -Filter "*.exe" | Select-Object -First 1
+          if (-not $installer) { throw "No installer executable found" }
+          $notes = Get-Content release_notes.txt -Raw
+          gh release create "${{ github.ref_name }}" `
+            --title "MantisZip ${{ env.VERSION }}" `
+            --notes "$notes" `
+            "$($installer.FullName)"
