@@ -29,6 +29,11 @@
    - Killed 2 explorer.exe 进程释放 ShellExt.dll 锁，183 测试全部通过
    - SharpZipLib 保留为 test-only 依赖（用于测试 fixture 创建，不影响生产代码）
 
+1. **Release 自动化**（参见 [计划](.sisyphus/plans/release-automation.md)）：
+   - 新建 `.github/workflows/release.yml`：打 `v*` tag 时自动 `dotnet publish` → ISCC 编译安装包 → `gh release create` 发布
+   - 版本号从 git tag 派生，消除三处手动同步
+   - CI 流程保持不变
+
 ### v0.3.13 (2026-06-14) 修复问题
 1. **ToggleSepDirBaseline / ToggleProgressBars 根目录状态重置修复**：
    - `ToggleSepDirBaseline_Click` 和 `ToggleProgressBars_Click` 在根目录时不再调用 `LoadArchiveAsync`（会重置展平/筛选状态），改为统一走 `FilterFiles(_currentFolder)`

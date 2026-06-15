@@ -13,11 +13,14 @@
   <a href="https://afdian.com/a/MantisZen"><img src="https://img.shields.io/badge/爱发电-赞助-blue?style=flat-square" alt="爱发电"></a>
   <a href="https://dotnet.microsoft.com/"><img src="https://img.shields.io/badge/.NET-9.0-purple?style=flat-square" alt=".NET 9"></a>
 
-  [![QQ Group](https://img.shields.io/badge/QQ%E7%BE%A4-778347352-blue?style=flat-square&logo=tencent-qq&logoColor=white)](https://qm.qq.com/cgi-bin/qm/qr?k=778347352)
+
+
+  [![QQ Group](https://img.shields.io/badge/QQ%E7%BE%A4-778347352-blue?style=flat-square&logo=tencent-qq&logoColor=white)](https://qm.qq.com/cgi-bin/qm/qr?k=778347352) 
+  [![discord](https://img.shields.io/badge/discord-Join-blue?style=flat-square&logo=discord&logoColor=white)](https://discord.gg/PpuyhceJpZ)
+
+
 
 </p>
-
-
 
 ----
 
@@ -281,7 +284,7 @@ MantisZip 是一款完全免费且独立开发的开源项目。如果它提升�
 <table width="100%">
   <tr>
     <td width="50%" align="center" valign="top">
-      <b>⚡ 在爱发电上支持我</b><br><br>
+      <b>⚡ 在爱发电上支持我</b><br>(新店开张，主页审核中，若无法打开可先加 QQ 群调教作者)<br><br>
       <a href="https://afdian.com/a/MantisZen">
         <img src="docs/images/afdian-MantisZen.jpg" alt="爱发电" width="80%"/>
       </a>
