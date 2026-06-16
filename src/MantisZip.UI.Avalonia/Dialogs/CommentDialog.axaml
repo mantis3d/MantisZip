@@ -1,0 +1,34 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="MantisZip.UI.Avalonia.Dialogs.CommentDialog"
+        Title="Archive Comment"
+        Width="450"
+        SizeToContent="Height"
+        WindowStartupLocation="CenterOwner"
+        Background="{DynamicResource ThemeWindowBgBrush}">
+  <Grid RowDefinitions="*,Auto"
+        Margin="16">
+    <TextBox Grid.Row="0"
+             x:Name="CommentTextBox"
+             AcceptsReturn="True"
+             TextWrapping="Wrap"
+             MinHeight="150"
+             MaxHeight="300"
+             Margin="0,0,0,12"
+             PlaceholderText="Enter archive comment..." />
+
+    <StackPanel Grid.Row="1"
+                Orientation="Horizontal"
+                HorizontalAlignment="Right"
+                Spacing="8">
+      <Button Content="Save"
+              Width="80"
+              Height="28"
+              Click="OnSaveClick" />
+      <Button Content="Cancel"
+              Width="80"
+              Height="28"
+              Click="OnCancelClick" />
+    </StackPanel>
+  </Grid>
+</Window>

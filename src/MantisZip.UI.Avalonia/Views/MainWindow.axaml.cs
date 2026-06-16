@@ -1,6 +1,7 @@
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
+using Avalonia.Input.Platform;
 using Avalonia.Interactivity;
 using Avalonia.Platform.Storage;
 using MantisZip.Core.Abstractions;
@@ -107,6 +108,37 @@ public partial class MainWindow : Window
             }
         };
 
+        vm.CopyToClipboard = async (text) =>
+        {
+            try
+            {
+                var topLevel = TopLevel.GetTopLevel(this);
+                if (topLevel?.Clipboard != null)
+                    await topLevel.Clipboard.SetValueAsync(DataFormat.Text, text);
+            }
+            catch
+            {
+                // Clipboard not available in this environment
+            }
+        };
+
+        vm.ShowCommentDialog = async (existingComment) =>
+        {
+            var dialog = new CommentDialog(existingComment);
+            var result = await dialog.ShowDialog<bool>(this);
+            return result ? dialog.Comment : null;
+        };
+
+        vm.GetOpenFilePaths = async () =>
+        {
+            var result = await StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+            {
+                Title = "Select files to add",
+                AllowMultiple = true
+            });
+            return result.Count > 0 ? result.Select(f => f.TryGetLocalPath()).Where(p => p != null).Cast<string>().ToList() : null;
+        };
+
         // Setup drag-drop from file list
         var fileGrid = this.FindControl<DataGrid>("FileListGrid");
         if (fileGrid != null)
@@ -191,6 +223,38 @@ public partial class MainWindow : Window
         });
     }
 
+    private void OnWindowDragOver(object? sender, DragEventArgs e)
+    {
+        // Accept drop if files are being dragged (check for File format)
+        if (e.DataTransfer != null && e.DataTransfer.Formats.Contains(DataFormat.File))
+            e.DragEffects = DragDropEffects.Copy;
+        else
+            e.DragEffects = DragDropEffects.None;
+    }
+
+    private async void OnWindowDrop(object? sender, DragEventArgs e)
+    {
+        if (e.DataTransfer == null) return;
+
+        foreach (var item in e.DataTransfer.Items)
+        {
+            var raw = item.TryGetRaw(DataFormat.File);
+            if (raw is IStorageFile storageFile)
+            {
+                var path = storageFile.TryGetLocalPath();
+                if (string.IsNullOrEmpty(path)) continue;
+
+                if (ArchiveFormatHelper.IsArchiveFile(path))
+                {
+                    var vm = DataContext as MainWindowViewModel;
+                    if (vm != null)
+                        await vm.LoadArchiveAsync(path);
+                    return; // Only open the first matching archive
+                }
+            }
+        }
+    }
+
     private void CleanupDragDropTemp()
     {
         if (_dragDropTempDir != null && Directory.Exists(_dragDropTempDir))
@@ -240,12 +304,4 @@ public partial class MainWindow : Window
         return result.Count >= 1 ? result[0].Path.LocalPath : null;
     }
 
-    private void OnDataGridContextMenuExtract(object? sender, RoutedEventArgs e)
-    {
-        var vm = DataContext as MainWindowViewModel;
-        if (vm?.ExtractArchiveCommand.CanExecute(null) == true)
-        {
-            vm.ExtractArchiveCommand.Execute(null);
-        }
-    }
 }

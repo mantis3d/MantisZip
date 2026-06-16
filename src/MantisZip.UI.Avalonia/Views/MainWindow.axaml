@@ -11,17 +11,21 @@
         Height="800"
         MinWidth="800"
         MinHeight="500"
-        Background="{DynamicResource ThemeWindowBgBrush}">
+        Background="{DynamicResource ThemeWindowBgBrush}"
+        DragDrop.AllowDrop="True"
+        DragDrop.Drop="OnWindowDrop"
+        DragDrop.DragOver="OnWindowDragOver">
 
   <Window.Resources>
     <conv:FileSizeConverter x:Key="FileSizeConverter" />
+    <conv:BoolInvertConverter x:Key="BoolInvertConverter" />
   </Window.Resources>
 
   <Grid RowDefinitions="Auto,Auto,Auto,*,Auto">
     <!-- Menu (Row 0) -->
     <Menu Grid.Row="0">
       <MenuItem Header="{Binding LocalizedStrings[Menu_File]}">
-        <MenuItem Command="{Binding OpenArchiveCommand}">
+        <MenuItem Command="{Binding OpenArchiveCommand}" InputGesture="Ctrl+O">
           <MenuItem.Header>
             <StackPanel Orientation="Horizontal" Spacing="4">
               <TextBlock Text="📂" FontSize="14" />
@@ -29,7 +33,7 @@
             </StackPanel>
           </MenuItem.Header>
         </MenuItem>
-        <MenuItem Command="{Binding CloseArchiveCommand}"
+        <MenuItem Command="{Binding CloseArchiveCommand}" InputGesture="Ctrl+W"
                   IsEnabled="{Binding IsArchiveLoaded}">
           <MenuItem.Header>
             <StackPanel Orientation="Horizontal" Spacing="4">
@@ -38,7 +42,24 @@
             </StackPanel>
           </MenuItem.Header>
         </MenuItem>
-        <MenuItem Command="{Binding RefreshArchiveCommand}"
+        <MenuItem Header="Recent Files"
+                  ItemsSource="{Binding RecentFiles}"
+                  IsEnabled="{Binding RecentFiles.Count}">
+          <MenuItem.ItemTemplate>
+            <DataTemplate>
+              <MenuItem Command="{Binding $parent[Menu].DataContext.OpenRecentFileCommand}"
+                        CommandParameter="{Binding .}">
+                <MenuItem.Header>
+                  <StackPanel Orientation="Horizontal" Spacing="4">
+                    <TextBlock Text="🕐" FontSize="14" />
+                    <TextBlock Text="{Binding .}" />
+                  </StackPanel>
+                </MenuItem.Header>
+              </MenuItem>
+            </DataTemplate>
+          </MenuItem.ItemTemplate>
+        </MenuItem>
+        <MenuItem Command="{Binding RefreshArchiveCommand}" InputGesture="F5"
                   IsEnabled="{Binding IsArchiveLoaded}">
           <MenuItem.Header>
             <StackPanel Orientation="Horizontal" Spacing="4">
@@ -57,10 +78,17 @@
           </MenuItem.Header>
         </MenuItem>
         <Separator />
-        <MenuItem Header="{Binding LocalizedStrings[Menu_Exit]}" />
+        <MenuItem Command="{Binding ExitCommand}">
+          <MenuItem.Header>
+            <StackPanel Orientation="Horizontal" Spacing="4">
+              <TextBlock Text="🚪" FontSize="14" />
+              <TextBlock Text="{Binding LocalizedStrings[Menu_Exit]}" />
+            </StackPanel>
+          </MenuItem.Header>
+        </MenuItem>
       </MenuItem>
       <MenuItem Header="{Binding LocalizedStrings[Menu_Edit]}">
-        <MenuItem Command="{Binding ExtractArchiveCommand}"
+        <MenuItem Command="{Binding ExtractArchiveCommand}" InputGesture="Ctrl+E"
                   IsEnabled="{Binding IsArchiveLoaded}">
           <MenuItem.Header>
             <StackPanel Orientation="Horizontal" Spacing="4">
@@ -87,8 +115,56 @@
             </StackPanel>
           </MenuItem.Header>
         </MenuItem>
+        <MenuItem Command="{Binding SmartExtractCommand}"
+                  IsEnabled="{Binding IsArchiveLoaded}">
+          <MenuItem.Header>
+            <StackPanel Orientation="Horizontal" Spacing="4">
+              <TextBlock Text="🤖" FontSize="14" />
+              <TextBlock Text="Smart Extract" />
+            </StackPanel>
+          </MenuItem.Header>
+        </MenuItem>
         <Separator />
-        <MenuItem Command="{Binding NewArchiveCommand}">
+        <MenuItem Command="{Binding AddFilesCommand}"
+                  IsEnabled="{Binding IsArchiveLoaded}">
+          <MenuItem.Header>
+            <StackPanel Orientation="Horizontal" Spacing="4">
+              <TextBlock Text="➕" FontSize="14" />
+              <TextBlock Text="Add Files" />
+            </StackPanel>
+          </MenuItem.Header>
+        </MenuItem>
+        <MenuItem Command="{Binding DeleteFilesCommand}"
+                  IsEnabled="{Binding IsArchiveLoaded}">
+          <MenuItem.Header>
+            <StackPanel Orientation="Horizontal" Spacing="4">
+              <TextBlock Text="✖" FontSize="14" />
+              <TextBlock Text="Delete" />
+            </StackPanel>
+          </MenuItem.Header>
+        </MenuItem>
+        <Separator />
+        <MenuItem Command="{Binding TestArchiveCommand}"
+                  IsEnabled="{Binding IsArchiveLoaded}">
+          <MenuItem.Header>
+            <StackPanel Orientation="Horizontal" Spacing="4">
+              <TextBlock Text="✅" FontSize="14" />
+              <TextBlock Text="Test Archive" />
+            </StackPanel>
+          </MenuItem.Header>
+        </MenuItem>
+        <Separator />
+        <MenuItem Command="{Binding EditCommentCommand}"
+                  IsEnabled="{Binding IsArchiveLoaded}">
+          <MenuItem.Header>
+            <StackPanel Orientation="Horizontal" Spacing="4">
+              <TextBlock Text="💬" FontSize="14" />
+              <TextBlock Text="Comment" />
+            </StackPanel>
+          </MenuItem.Header>
+        </MenuItem>
+        <Separator />
+        <MenuItem Command="{Binding NewArchiveCommand}" InputGesture="Ctrl+N">
           <MenuItem.Header>
             <StackPanel Orientation="Horizontal" Spacing="4">
               <TextBlock Text="🆕" FontSize="14" />
@@ -96,7 +172,7 @@
             </StackPanel>
           </MenuItem.Header>
         </MenuItem>
-        <MenuItem Command="{Binding CompressSelectedCommand}">
+        <MenuItem Command="{Binding CompressSelectedCommand}" InputGesture="Ctrl+C">
           <MenuItem.Header>
             <StackPanel Orientation="Horizontal" Spacing="4">
               <TextBlock Text="📥" FontSize="14" />
@@ -144,7 +220,8 @@
         <Button Command="{Binding NewArchiveCommand}"
                 Height="42"
                 Padding="8,2"
-                FontSize="11">
+                FontSize="11"
+                ToolTip.Tip="New archive (Ctrl+N)">
           <StackPanel>
             <TextBlock Text="🆕" FontSize="18" HorizontalAlignment="Center" />
             <TextBlock Text="{Binding LocalizedStrings[Toolbar_New]}"
@@ -154,7 +231,8 @@
         <Button Command="{Binding OpenArchiveCommand}"
                 Height="42"
                 Padding="8,2"
-                FontSize="11">
+                FontSize="11"
+                ToolTip.Tip="Open archive (Ctrl+O)">
           <StackPanel>
             <TextBlock Text="📂" FontSize="18" HorizontalAlignment="Center" />
             <TextBlock Text="{Binding LocalizedStrings[Toolbar_Open]}"
@@ -165,7 +243,8 @@
                 IsEnabled="{Binding IsArchiveLoaded}"
                 Height="42"
                 Padding="8,2"
-                FontSize="11">
+                FontSize="11"
+                ToolTip.Tip="Extract archive (Ctrl+E)">
           <StackPanel>
             <TextBlock Text="📤" FontSize="18" HorizontalAlignment="Center" />
             <TextBlock Text="{Binding LocalizedStrings[Toolbar_Extract]}"
@@ -175,11 +254,23 @@
         <Button Command="{Binding CompressSelectedCommand}"
                 Height="42"
                 Padding="8,2"
-                FontSize="11">
+                FontSize="11"
+                ToolTip.Tip="Compress files (Ctrl+C)">
           <StackPanel>
             <TextBlock Text="📥" FontSize="18" HorizontalAlignment="Center" />
             <TextBlock Text="{Binding LocalizedStrings[Toolbar_Compress]}"
                        FontSize="11" HorizontalAlignment="Center" />
+          </StackPanel>
+        </Button>
+        <Button Command="{Binding SmartExtractCommand}"
+                IsEnabled="{Binding IsArchiveLoaded}"
+                Height="42"
+                Padding="8,2"
+                FontSize="11"
+                ToolTip.Tip="Smart extract">
+          <StackPanel>
+            <TextBlock Text="🤖" FontSize="18" HorizontalAlignment="Center" />
+            <TextBlock Text="Smart" FontSize="11" HorizontalAlignment="Center" />
           </StackPanel>
         </Button>
         <Border Width="1"
@@ -191,7 +282,8 @@
                       IsChecked="{Binding IsFilterBarVisible}"
                       Height="42"
                       Padding="8,2"
-                      FontSize="11">
+                      FontSize="11"
+                      ToolTip.Tip="Toggle filter bar">
           <StackPanel>
             <TextBlock Text="🔍" FontSize="18" HorizontalAlignment="Center" />
             <TextBlock Text="{Binding LocalizedStrings[Toolbar_Filter]}"
@@ -202,13 +294,68 @@
                       IsChecked="{Binding IsPreviewVisible}"
                       Height="42"
                       Padding="8,2"
-                      FontSize="11">
+                      FontSize="11"
+                      ToolTip.Tip="Toggle preview panel">
           <StackPanel>
             <TextBlock Text="👁" FontSize="18" HorizontalAlignment="Center" />
             <TextBlock Text="{Binding LocalizedStrings[Toolbar_Preview]}"
                        FontSize="11" HorizontalAlignment="Center" />
           </StackPanel>
         </ToggleButton>
+        <Border Width="1"
+                Height="24"
+                VerticalAlignment="Center"
+                Background="{DynamicResource ThemeBorderBrush}"
+                Margin="4,0" />
+        <Button Command="{Binding AddFilesCommand}"
+                IsEnabled="{Binding IsArchiveLoaded}"
+                Height="42"
+                Padding="8,2"
+                FontSize="11"
+                ToolTip.Tip="Add files to archive">
+          <StackPanel>
+            <TextBlock Text="➕" FontSize="18" HorizontalAlignment="Center" />
+            <TextBlock Text="Add" FontSize="11" HorizontalAlignment="Center" />
+          </StackPanel>
+        </Button>
+        <Button Command="{Binding DeleteFilesCommand}"
+                IsEnabled="{Binding IsArchiveLoaded}"
+                Height="42"
+                Padding="8,2"
+                FontSize="11"
+                ToolTip.Tip="Delete selected files">
+          <StackPanel>
+            <TextBlock Text="✖" FontSize="18" HorizontalAlignment="Center" />
+            <TextBlock Text="Del" FontSize="11" HorizontalAlignment="Center" />
+          </StackPanel>
+        </Button>
+        <ToggleButton IsChecked="{Binding ShowSubfolders}"
+                      Height="42"
+                      Padding="8,2"
+                      FontSize="11"
+                      ToolTip.Tip="Show subfolder contents">
+          <StackPanel>
+            <TextBlock Text="📂" FontSize="18" HorizontalAlignment="Center" />
+            <TextBlock Text="{Binding LocalizedStrings[Filter_ShowSubfolders]}"
+                       FontSize="11" HorizontalAlignment="Center" />
+          </StackPanel>
+        </ToggleButton>
+        <Border Width="1"
+                Height="24"
+                VerticalAlignment="Center"
+                Background="{DynamicResource ThemeBorderBrush}"
+                Margin="4,0" />
+        <Button Command="{Binding TestArchiveCommand}"
+                IsEnabled="{Binding IsArchiveLoaded}"
+                Height="42"
+                Padding="8,2"
+                FontSize="11"
+                ToolTip.Tip="Test archive integrity">
+          <StackPanel>
+            <TextBlock Text="✅" FontSize="18" HorizontalAlignment="Center" />
+            <TextBlock Text="Test" FontSize="11" HorizontalAlignment="Center" />
+          </StackPanel>
+        </Button>
       </StackPanel>
     </Border>
 
@@ -279,8 +426,25 @@
     </Border>
 
     <!-- Main content: TreeView | file list | preview (Row 3) -->
-    <Grid Grid.Row="3"
-          ColumnDefinitions="Auto,5,2.5*,5,3*">
+    <Grid Grid.Row="3">
+      <!-- Drop hint overlay (shown when no archive loaded) -->
+      <Border IsVisible="{Binding IsArchiveLoaded, Converter={StaticResource BoolInvertConverter}}"
+              Background="{DynamicResource ThemeWindowBgBrush}">
+        <StackPanel VerticalAlignment="Center"
+                    HorizontalAlignment="Center"
+                    Spacing="8">
+          <TextBlock Text="📂" FontSize="64" HorizontalAlignment="Center" />
+          <TextBlock Text="{Binding LocalizedStrings[Main_DropHint]}"
+                     FontSize="16"
+                     Foreground="{DynamicResource ThemeTextSecondaryBrush}"
+                     TextWrapping="Wrap"
+                     HorizontalAlignment="Center" />
+        </StackPanel>
+      </Border>
+
+      <!-- Archive content (hidden when no archive loaded) -->
+      <Grid IsVisible="{Binding IsArchiveLoaded}"
+            ColumnDefinitions="Auto,5,2.5*,5,3*">
       <!-- Folder tree -->
       <Border Grid.Column="0"
               Width="220"
@@ -321,8 +485,20 @@
                 IsReadOnly="True">
         <DataGrid.ContextMenu>
           <ContextMenu>
-            <MenuItem Header="Extract"
-                      Click="OnDataGridContextMenuExtract" />
+            <MenuItem Header="{Binding LocalizedStrings[Ctx_Extract]}"
+                      Command="{Binding ExtractArchiveCommand}" />
+            <MenuItem Header="{Binding LocalizedStrings[Ctx_SmartExtract]}"
+                      Command="{Binding SmartExtractCommand}" />
+            <MenuItem Header="{Binding LocalizedStrings[Ctx_ExtractTo]}"
+                      Command="{Binding ExtractToCommand}" />
+            <Separator />
+            <MenuItem Header="{Binding LocalizedStrings[Ctx_CopyName]}"
+                      Command="{Binding CopyFileNameCommand}" />
+            <MenuItem Header="{Binding LocalizedStrings[Ctx_Test]}"
+                      Command="{Binding TestEntryCommand}" />
+            <Separator />
+            <MenuItem Header="{Binding LocalizedStrings[Ctx_Delete]}"
+                      Command="{Binding DeleteFilesCommand}" />
           </ContextMenu>
         </DataGrid.ContextMenu>
         <DataGrid.Columns>
@@ -334,22 +510,54 @@
                      HorizontalAlignment="Center" />
             </DataTemplate>
           </DataGridTemplateColumn>
-          <DataGridTextColumn Header="{Binding LocalizedStrings[DataGrid_Name]}"
-                              Binding="{Binding NameDisplay}"
-                              SortMemberPath="Name"
-                              Width="*" />
-          <DataGridTextColumn Header="{Binding LocalizedStrings[DataGrid_Size]}"
-                              Binding="{Binding SizeDisplay}"
-                              SortMemberPath="Size"
-                              Width="80" />
-          <DataGridTextColumn Header="{Binding LocalizedStrings[DataGrid_Compressed]}"
-                              Binding="{Binding CompressedSizeDisplay}"
-                              SortMemberPath="CompressedSize"
-                              Width="70" />
-          <DataGridTextColumn Header="{Binding LocalizedStrings[DataGrid_Modified]}"
-                              Binding="{Binding LastModifiedDisplay}"
-                              SortMemberPath="LastModified"
-                              Width="100" />
+          <DataGridTextColumn SortMemberPath="Name"
+                              Width="*">
+            <DataGridTextColumn.Header>
+              <StackPanel Orientation="Horizontal" Spacing="3">
+                <TextBlock Text="📋" FontSize="13" />
+                <TextBlock Text="{Binding LocalizedStrings[DataGrid_Name]}" />
+              </StackPanel>
+            </DataGridTextColumn.Header>
+            <DataGridTextColumn.Binding>
+              <Binding Path="NameDisplay" />
+            </DataGridTextColumn.Binding>
+          </DataGridTextColumn>
+          <DataGridTextColumn SortMemberPath="Size"
+                              Width="80">
+            <DataGridTextColumn.Header>
+              <StackPanel Orientation="Horizontal" Spacing="3">
+                <TextBlock Text="📏" FontSize="13" />
+                <TextBlock Text="{Binding LocalizedStrings[DataGrid_Size]}" />
+              </StackPanel>
+            </DataGridTextColumn.Header>
+            <DataGridTextColumn.Binding>
+              <Binding Path="SizeDisplay" />
+            </DataGridTextColumn.Binding>
+          </DataGridTextColumn>
+          <DataGridTextColumn SortMemberPath="CompressedSize"
+                              Width="70">
+            <DataGridTextColumn.Header>
+              <StackPanel Orientation="Horizontal" Spacing="3">
+                <TextBlock Text="📦" FontSize="13" />
+                <TextBlock Text="{Binding LocalizedStrings[DataGrid_Compressed]}" />
+              </StackPanel>
+            </DataGridTextColumn.Header>
+            <DataGridTextColumn.Binding>
+              <Binding Path="CompressedSizeDisplay" />
+            </DataGridTextColumn.Binding>
+          </DataGridTextColumn>
+          <DataGridTextColumn SortMemberPath="LastModified"
+                              Width="100">
+            <DataGridTextColumn.Header>
+              <StackPanel Orientation="Horizontal" Spacing="3">
+                <TextBlock Text="📅" FontSize="13" />
+                <TextBlock Text="{Binding LocalizedStrings[DataGrid_Modified]}" />
+              </StackPanel>
+            </DataGridTextColumn.Header>
+            <DataGridTextColumn.Binding>
+              <Binding Path="LastModifiedDisplay" />
+            </DataGridTextColumn.Binding>
+          </DataGridTextColumn>
         </DataGrid.Columns>
       </DataGrid>
 
@@ -359,6 +567,7 @@
       <!-- Preview area -->
       <views:PreviewPanel Grid.Column="4"
                           DataContext="{Binding Preview}" />
+    </Grid>
     </Grid>
 
     <!-- Status bar (Row 4) -->

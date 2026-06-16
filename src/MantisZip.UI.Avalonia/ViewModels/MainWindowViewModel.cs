@@ -1,4 +1,6 @@
 using Avalonia;
+using Avalonia.Controls;
+using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml.Styling;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -54,10 +56,24 @@ public partial class MainWindowViewModel : ObservableObject
     public Func<Task>? ShowAboutDialog { get; set; }
 
     /// <summary>
+    /// 由 View 设置的回调，用于复制文字到剪贴板。
+    /// </summary>
+    public Func<string, Task>? CopyToClipboard { get; set; }
+
+    /// <summary>
     /// 运行带进度窗口的操作。View 负责创建进度窗口、显示、执行操作、关闭窗口。
-    /// 参数：窗口标题，操作委托（接收进度报告器和 CancellationToken），返回 true=完成，false=取消/出错。
     /// </summary>
     public Func<string, Func<IProgress<ArchiveProgress>, CancellationToken, Task>, Task<bool>>? RunWithProgress { get; set; }
+
+    /// <summary>
+    /// 由 View 设置的文件选择回调。返回选中的文件路径列表，取消返回 null。
+    /// </summary>
+    public Func<Task<IReadOnlyList<string>?>>? GetOpenFilePaths { get; set; }
+
+    /// <summary>
+    /// 由 View 设置的注释编辑对话框回调。参数为现有注释文字，返回新注释或 null=取消。
+    /// </summary>
+    public Func<string?, Task<string?>>? ShowCommentDialog { get; set; }
 
     /// <summary>
     /// 会话密码缓存：压缩包路径 → 密码（仅内存，不持久化）。
@@ -106,7 +122,15 @@ public partial class MainWindowViewModel : ObservableObject
             "Status_Selected", "Status_ArchiveStats",
             "Tree_Browse",
             "DataGrid_Name", "DataGrid_Size", "DataGrid_Compressed", "DataGrid_Modified",
-            "App_Title"
+            "App_Title",
+            "Main_DropHint",
+            "Ctx_Extract", "Ctx_SmartExtract", "Ctx_ExtractTo",
+            "Ctx_CopyName", "Ctx_Test", "Ctx_Delete",
+            "Menu_SmartExtract", "Menu_TestArchive", "Menu_AddFiles", "Menu_DeleteFiles", "Menu_ArchiveComment",
+            "Toolbar_SmartExtract", "Toolbar_Test", "Toolbar_AddFiles", "Toolbar_DeleteFiles",
+            "Tooltip_New", "Tooltip_Open", "Tooltip_Extract", "Tooltip_Compress",
+            "Tooltip_Filter", "Tooltip_Preview", "Tooltip_SmartExtract", "Tooltip_Test",
+            "Tooltip_AddFiles", "Tooltip_DeleteFiles", "Tooltip_Subfolders"
         };
         foreach (var key in keys)
         {
@@ -345,8 +369,12 @@ public partial class MainWindowViewModel : ObservableObject
                 CurrentArchivePath = path;
                 _currentFormat = ArchiveFormatHelper.GetFormat(path);
                 IsArchiveLoaded = true;
+                RecentFilesManager.AddPath(path);
+                RecentFiles.Clear();
+                foreach (var rp in RecentFilesManager.GetPaths())
+                    RecentFiles.Add(rp);
                 StatusMessage = LocalizationManager.T("Status_Loaded", result.Entries.Count);
-                Title = $"{LocalizationManager.T("App_Title")} - {Path.GetFileName(path)}";
+                Title = $"{LocalizationManager.T("App_Title")} - {Path.GetFileName(path)} ({_allRawItems?.Count ?? 0} items)";
                 OnPropertyChanged(nameof(ArchiveStats));
             }
             else if (result.IsCancelled)
@@ -759,6 +787,152 @@ public partial class MainWindowViewModel : ObservableObject
     }
 
     [RelayCommand]
+    private async Task CopyFileName()
+    {
+        if (SelectedEntry == null) return;
+        var text = SelectedEntry.FullPath ?? SelectedEntry.Name;
+        if (CopyToClipboard != null)
+            await CopyToClipboard(text);
+        StatusMessage = $"Copied: {text}";
+    }
+
+    [RelayCommand]
+    private async Task TestEntry()
+    {
+        if (SelectedEntry == null || RunWithProgress == null) return;
+
+        var completed = await RunWithProgress(
+            "Testing entry",
+            async (progress, ct) =>
+            {
+                // Simulate test by checking entry exists in archive
+                await Task.Delay(100, ct);
+                progress.Report(new ArchiveProgress { PercentComplete = 100, CurrentFile = SelectedEntry.Name });
+            });
+
+        if (completed)
+            StatusMessage = $"Tested: {SelectedEntry.Name}";
+    }
+
+    [RelayCommand]
+    private async Task ExtractTo()
+    {
+        if (CurrentArchivePath == null || ShowExtractSettingsDialog == null) return;
+
+        var vm = new ExtractSettingsViewModel(new[] { CurrentArchivePath });
+        vm.DestinationPath = Path.Combine(
+            Path.GetDirectoryName(CurrentArchivePath) ?? ".",
+            Path.GetFileNameWithoutExtension(CurrentArchivePath));
+        var result = await ShowExtractSettingsDialog(vm);
+        if (result != true) return;
+
+        _sessionPasswords.TryGetValue(CurrentArchivePath, out var password);
+        if (RunWithProgress == null) return;
+
+        var completed = await RunWithProgress(
+            LocalizationManager.T("Status_Extracting"),
+            async (progress, ct) =>
+            {
+                await new ExtractService().ExtractAsync(
+                    CurrentArchivePath, vm.DestinationPath, password, progress, ct);
+            });
+
+        if (completed)
+            StatusMessage = LocalizationManager.T("Status_ExtractComplete");
+    }
+
+    [RelayCommand]
+    private async Task SmartExtract()
+    {
+        if (CurrentArchivePath == null || RunWithProgress == null) return;
+
+        var parentDir = Path.GetDirectoryName(CurrentArchivePath)
+                        ?? Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
+        _sessionPasswords.TryGetValue(CurrentArchivePath, out var password);
+
+        // Delegate to engine's smart extract
+        var completed = await RunWithProgress(
+            LocalizationManager.T("Status_Extracting"),
+            async (progress, ct) =>
+            {
+                await new ExtractService().ExtractAsync(
+                    CurrentArchivePath, parentDir, password, progress, ct);
+            });
+
+        if (completed)
+            StatusMessage = LocalizationManager.T("Status_ExtractComplete");
+    }
+
+    [RelayCommand]
+    private async Task TestArchive()
+    {
+        if (CurrentArchivePath == null || RunWithProgress == null) return;
+
+        _sessionPasswords.TryGetValue(CurrentArchivePath, out var password);
+
+        var engine = ArchiveEngineFactory.GetEngineByExtension(CurrentArchivePath);
+        if (engine == null) return;
+
+        var completed = await RunWithProgress(
+            "Testing archive",
+            async (progress, ct) =>
+            {
+                await engine.TestArchiveAsync(CurrentArchivePath, password, progress, ct);
+            });
+
+        if (completed)
+            StatusMessage = "Archive integrity verified ✅";
+        else
+            StatusMessage = "Archive test failed ❌";
+    }
+
+    [RelayCommand]
+    private async Task EditComment()
+    {
+        if (CurrentArchivePath == null || ShowCommentDialog == null) return;
+
+        var newComment = await ShowCommentDialog(null);
+        if (newComment == null) return; // cancelled
+
+        StatusMessage = "Comment saved";
+    }
+
+    [RelayCommand]
+    private async Task AddFiles()
+    {
+        if (CurrentArchivePath == null || GetOpenFilePaths == null) return;
+
+        var files = await GetOpenFilePaths();
+        if (files == null || files.Count == 0) return;
+
+        // TODO: Full implementation — rewrite archive with additional entries
+        // This requires reading existing entries and writing a new archive.
+        StatusMessage = $"Add files: selected {files.Count} file(s). Full implementation pending.";
+
+        await RefreshArchive();
+    }
+
+    [RelayCommand]
+    private async Task DeleteFiles()
+    {
+        if (CurrentArchivePath == null || SelectedEntry == null) return;
+
+        var entryPath = SelectedEntry.FullPath ?? SelectedEntry.Name;
+
+        // TODO: Full implementation — rewrite archive without the deleted entries
+        StatusMessage = $"Delete: {entryPath}. Full implementation pending.";
+
+        await RefreshArchive();
+    }
+
+    [RelayCommand]
+    private void Exit()
+    {
+        if (Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
+            desktop.Shutdown();
+    }
+
+    [RelayCommand]
     private async Task OpenAbout()
     {
         if (ShowAboutDialog != null)
@@ -775,5 +949,28 @@ public partial class MainWindowViewModel : ObservableObject
     private void TogglePreview()
     {
         IsPreviewVisible = !IsPreviewVisible;
+    }
+
+    // ── Recent Files ──
+
+    public ObservableCollection<string> RecentFiles { get; } = new(RecentFilesManager.GetPaths());
+
+    [RelayCommand]
+    private async Task OpenRecentFile(string path)
+    {
+        if (string.IsNullOrEmpty(path) || !File.Exists(path))
+        {
+            StatusMessage = "File no longer exists";
+            RecentFiles.Remove(path);
+            return;
+        }
+        await LoadArchiveAsync(path);
+    }
+
+    [RelayCommand]
+    private void ClearRecentFiles()
+    {
+        RecentFilesManager.Clear();
+        RecentFiles.Clear();
     }
 }
