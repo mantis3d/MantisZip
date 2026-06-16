@@ -744,6 +744,7 @@ public const string Settings_Appearance_Theme                  = "Settings_Appea
     public const string Settings_Appearance_ThemeRestart_Title      = "Settings_Appearance_ThemeRestart_Title";
     public const string Settings_Appearance_ThemeRestart_Msg        = "Settings_Appearance_ThemeRestart_Msg";
     public const string Settings_SaveFailed                         = "Settings_SaveFailed";
+    public const string Settings_Debug_Restart                       = "Settings_Debug_Restart";
     public const string Settings_Tab_Advanced                      = "Settings_Tab_Advanced";
     public const string Settings_Tab_Debug                         = "Settings_Tab_Debug";
     public const string Settings_Tab_Compress                      = "Settings_Tab_Compress";

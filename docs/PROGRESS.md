@@ -7,13 +7,89 @@
 - **技术栈**: .NET 9 + WPF → Avalonia 迁移中 + SharpCompress + SharpSevenZip
 
 ## 版本
-- **当前版本**: 0.3.13
-- **发布日期**: 2026-06-11
+- **当前版本**: 0.4.0
+- **发布日期**: 2026-06-12
 
 ## 规划中
 - Avalonia 跨平台移植 Phase 0（`avalonia-port` 分支）
 
 ## 版本历史（从新到旧）
+
+### v0.4.0 (2026-06-15) 第一个上线版本
+ - 功能基本完成，测试基本完成。第一个上线版本。
+
+7. **RELEASE_NOTES.md 移至根目录**：
+   - `docs/RELEASE_NOTES.md` → `RELEASE_NOTES.md`，方便根目录直接访问
+   - 更新 CI release workflow 中的读取路径
+   - 图片相对路径同步修正为 `docs/images/...`
+
+1. **CI 修复 — TarGzEngineTests.TestArchiveAsync_InvalidArchive_ReturnsFalse DirectoryNotFoundException**：
+   - 测试在写入 corrupt .tar.gz 前未创建 `MantisZipTest\` 目录，CI 裸机上目录不存在导致 `DirectoryNotFoundException`
+   - 添加 `Directory.CreateDirectory` 确保目录存在，与 ArchiveFixtures 中所有 fixture 方法的做法一致
+
+2. **CI 修复 — ISCC 编译找不到 ChineseSimplified.isl**：
+   - Inno Setup 6.7.1 Chocolatey 包未包含 `ChineseSimplified.isl`，`compiler:Languages\` 路径查找失败
+   - 从 [kira-96/Inno-Setup-Chinese-Simplified-Translation](https://github.com/kira-96/Inno-Setup-Chinese-Simplified-Translation) 获取语言文件，存入 `setup\Languages\ChineseSimplified.isl`
+   - `installer.iss` 改为引用本地相对路径（与翻译项目 CI 方案推荐一致）
+
+3. **CI 修复 — ISCC 编译找不到 MantisZip.ShellExt.runtimeconfig.json**：
+   - `MantisZip.ShellExt` 是 COM 类库（无 `<OutputType>`，默认为 `Library`），类库不生成 `runtimeconfig.json`
+   - `installer.iss` 第 75 行移除 `MantisZip.ShellExt.runtimeconfig.json` 引用
+
+4. **CI 修复 — en.json 缺少 About_Author_Bilibili 键**：
+   - `strings.en.json` 缺少 `About_Author_Bilibili` 键导致 `BothLanguages_HaveSameAboutKeySet` 测试失败
+   - 添加英文翻译值 `"Bilibili: space.bilibili.com/44202554"`
+
+5. **CI 修复 — copy-7z-dll.ps1 路径引号截断**：
+   - MSBuild `$(PublishDir)` 结尾反斜杠与 `&quot;` 包装组合导致 Windows 命令行解析将 `\"` 当作转义引号，`$PublishDir` 末尾混入多余 `"` 字符
+   - `scripts/copy-7z-dll.ps1`：新增 `$PublishDir.TrimEnd('"', '\')` 防御性清理
+   - `MantisZip.UI.csproj`：使用 MSBuild 属性函数 `$(PublishDir.TrimEnd('\\'))` 从源头消除结尾反斜杠
+
+6. **Release workflow 修复 — ISCC 找不到 MyAppVersion**：
+   - `installer.iss`：`#define MyAppVersion` 改为 `#ifndef` 条件定义，支持 ISCC `/d` 命令行参数覆盖
+   - `.github/workflows/release.yml`：移除脆弱的正则替换版本号步骤，改为 `& $iscc "/dMyAppVersion=$env:VERSION" installer.iss` 直接传参，添加 `$LASTEXITCODE` 检查
+   - `AGENTS.md`：Version bump checklist 移除 `installer.iss`（不再需要手动同步版本号）
+   - 版本号统一同步到 **0.4.0**（`AppConstants.cs`、`MantisZip.UI.csproj`、`docs/PLAN.md`）
+
+7. **全局调试日志增强 — CoreLog.Trace 注入 + DiagnosticsEnabled 开关**：
+   - `CoreLog.cs`：`ShouldWriteOverride` 委托 → `DiagnosticsEnabled` 静态 bool，所有 Info/Error/Entry/Exit/Trace/Write 方法统一受控；`[Conditional("DEBUG")]` 的 Info/Error 仅在 DEBUG 编译，Trace 全编译
+   - **43 个 catch 块**注入 `CoreLog.Trace` 以捕获静默异常路径：ZipEngine（AddToArchiveAsync、DeleteEntriesAsync、OpenZipFile）、TarGzEngine（ListEntriesAsync、CompressAsync、ExtractAsync）、PasswordManager（AddPassword、DeletePassword、FindMatchingPasswords、DeleteRule）、App.Password（TryMatchPassword）、PeParser/PdfParser/SQLiteParser（Close）、MainWindow.*（ShellExecPreview、SetFormatSpecificInfo、ShowVideoPreview、ExtractWithProgressAsync、DragDrop）、App.Open/Extract（PipeServer/冲突处理/批处理完成）、CompressSettingsWindow/ExtractSettingsWindow（压缩/解压过程中各阶段）、ProgressWindow（批处理初始化）、ShellIntegration.Assoc（SetupAssoc/Install）
+   - `App.OnStartup`：设置 `CoreLog.DiagnosticsEnabled = AppSettings.Instance.EnableDebugLogging`
+   - `SettingsWindow`：调试开关变更时弹出 `AppMessageBox` 提示重启生效，新增 `Settings_Debug_Restart` 中英文本地化字符串
+
+8. **LogRedactor 隐私脱敏修复 — 相对路径 regex 分支**：
+   - `LogRedactor.cs`：_pathRegex 新增第三条分支 `[^\\""<>|:]+(?:\\[^\\""<>|]+)+\\?` 匹配相对路径（如压缩包内条目路径 `字体\FiraCode-Medium.ttf`），不再依赖盘符前缀
+   - `AGENTS.md`：修正 LogPrivacyMode 默认值文档从 `"full"` → `"extension"`，补充 `extension` 模式描述，更新 regex 分支计数
+
+9. **README.md 路径修复 — 反斜杠 → 正斜杠**：
+   - 将 4 处 `docs\images\` 反斜杠路径替换为 `docs/images/` 正斜杠（GitHub 要求 URL 路径使用正斜杠）
+   - 修正 `SettingDebug.png` 的 alt 文本从「压缩文件冲突」改为「调试日志设置」
+
+### v0.3.13 (2026-06-15) 完全移除 SharpZipLib 生产代码依赖
+
+0. **SharpZipLib 加密路径 → SharpSevenZip 替换**（参见 [迁移计划](.sisyphus/plans/zipengine-sharpcompress-migration.md)）：
+   - `ZipEngine.CompressAsync` 加密分支：`ZipOutputStream` → `SharpSevenZipCompressor` + `OutArchiveFormat.Zip` + `ZipEncryptionMethod.Aes256`
+   - `ZipEngine.AddToArchiveAsync` 加密分支：同上，支持 `commonRootLength` 参数以保持目录结构
+   - 删除 `ReadFileWithRetryZipOutputStream` 方法（~90 行加密临时文件写入代码）
+   - 新增 `MapCompressionLevelToS7Z` 辅助方法
+   - `MantisZip.Core.csproj`：移除 `SharpZipLib v1.4.2` 包引用
+   - Killed 2 explorer.exe 进程释放 ShellExt.dll 锁，183 测试全部通过
+   - SharpZipLib 保留为 test-only 依赖（用于测试 fixture 创建，不影响生产代码）
+
+1. **Release 自动化**（参见 [计划](.sisyphus/plans/release-automation.md)）：
+   - 新建 `.github/workflows/release.yml`：打 `v*` tag 时自动 `dotnet publish` → ISCC 编译安装包 → `gh release create` 发布
+   - 版本号从 git tag 派生，CI 自动写入代码文件，消除三处手动同步
+   - Release notes 由 `docs/RELEASE_NOTES.md` 提供，发布前编辑该文件顶部最新版本说明即可
+   - CI 流程保持不变
+
+### v0.3.13 (2026-06-14) 修复问题
+1. **ToggleSepDirBaseline / ToggleProgressBars 根目录状态重置修复**：
+   - `ToggleSepDirBaseline_Click` 和 `ToggleProgressBars_Click` 在根目录时不再调用 `LoadArchiveAsync`（会重置展平/筛选状态），改为统一走 `FilterFiles(_currentFolder)`
+   - 影响：主菜单"目录独立基准"、进度条显隐切换不再丢失"展平目录"和"筛选"状态
+
+2. **CompressConflictDialog 重命名按钮图标丢失修复**：
+   - 勾选"对后续文件使用相同操作"时，`RenameBtn.Content` 被替换为纯字符串（丢掉 ✏️ emoji）
+   - 修复：XAML 中给按钮内 TextBlock 命名 `RenameBtnLabel`，代码改设 `.Text` 而非 `.Content`
 
  ### v0.3.13 (2026-06-13) DPAPI → AES-GCM 替换 + 安装脚本修正 + 对话框 Owner 修复 + Emoji.Wpf 依赖缺失修复 + ZIP 中文编码假阳性修复
 
@@ -59,6 +135,8 @@
    - 旧 DPAPI 文件首次加载时自动解密并重写为 AES-GCM 格式，原文件备份为 `passwords.json.dpapi-backup`
    - 所有 7 个 UI 消费端无需修改（`PasswordManager.Instance.*` API 签名不变）
    - 参见 [跨平台移植计划](.sisyphus/plans/cross-platform-port.md)
+
+
 
 ### v0.3.13 (2026-06-12) ZipEngine SharpZipLib → SharpCompress 迁移 + 压缩批处理文件进度条修复 + 压缩完成后进程残留修复
 
@@ -404,3 +482,4 @@
 | 关于窗口重设计 | [about-window-redesign.md](.sisyphus/plans/about-window-redesign.md) | v0.3.7-refined-4 |
 | 文件关联 per-extension ProgId | [file-assoc-per-extension.md](.sisyphus/plans/file-assoc-per-extension.md) | v0.3.9 |
 | 移除 SharpZipLib 注释编辑耦合 | [remove-sharpziplib.md](.sisyphus/plans/remove-sharpziplib.md) | v0.3.9 |
+| ZipEngine SharpZipLib 完全迁移 (加密路径→SharpSevenZip) | [zipengine-sharpcompress-migration.md](.sisyphus/plans/zipengine-sharpcompress-migration.md) | v0.3.13 |

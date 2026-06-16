@@ -134,7 +134,10 @@ public partial class App : Application
                     MessageBoxButton.OK,
                     MessageBoxImage.Warning);
             }
-            catch { /* UI 可能不可用（CLI 模式）*/ }
+            catch (Exception uiEx)
+            {
+                CoreLog.Trace("HandlePassword: UI not available: {0}", uiEx.Message);
+            }
             return false;
         }
     }
@@ -195,6 +198,7 @@ public partial class App : Application
         catch (Exception ex)
         {
             // 无法检查时保守返回 true（宁可多弹密码输入框，不可静默跳过密码导致解压失败）
+            CoreLog.Trace("HasEncryptedEntries: check failed for '{0}': {1}", archivePath, ex.Message);
             LogDebug("HasEncryptedEntries: 无法检查压缩包 '{0}'，保守假定有加密: {1}", archivePath, ex.Message);
             return true;
         }

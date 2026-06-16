@@ -48,12 +48,12 @@ public partial class CompressConflictDialog : Window
         // 勾选"应用到全部"时切换为"自动重命名"并禁用输入框
         ApplyAllCheck.Checked += (_, _) =>
         {
-            RenameBtn.Content = L.T(L.CompressConflict_AutoRename);
+            RenameBtnLabel.Text = L.T(L.CompressConflict_AutoRename);
             RenameTextBox.IsEnabled = false;
         };
         ApplyAllCheck.Unchecked += (_, _) =>
         {
-            RenameBtn.Content = L.T(L.CompressConflict_Rename);
+            RenameBtnLabel.Text = L.T(L.CompressConflict_Rename);
             RenameTextBox.IsEnabled = true;
         };
 

@@ -7,6 +7,7 @@ using System.Windows.Media;
 using System.Windows.Threading;
 using MantisZip.Core.Abstractions;
 using MantisZip.Core.Models;
+using MantisZip.Core.Utils;
 using MantisZip.UI.Localization;
 
 namespace MantisZip.UI;
@@ -532,8 +533,9 @@ public partial class ProgressWindow : Window
             Clipboard.SetText(_password);
             PwdStatusText.Text = L.T(L.Progress_PwdToClipboard);
         }
-        catch
+        catch (Exception ex)
         {
+            CoreLog.Trace("ProgressWindow: operation failed: {0}", ex.Message);
             PwdStatusText.Text = L.T(L.Progress_PwdCopyFailed);
         }
     }

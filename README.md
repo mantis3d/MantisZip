@@ -3,22 +3,24 @@
 <div align="center">
 
 # MantisZip
-![Logo](/docs/images/Logo.png)
+![Logo](docs/images/Logo.png)
 
 轻量级全功能 Windows 压缩/解压软件
 </p>
 
 <p align="center">
   <a href="https://buy.polar.sh/polar_cl_VaCaW2l2nWkob5CyHe4dOlhL6HrQDK4ueMA9n1JyhNc"><img src="https://img.shields.io/badge/Polar-Sponsor-pink?style=flat-square" alt="Polar Sponsor"></a>
-  <a href="https://afdian.com/a/MantisZen"><img src="https://img.shields.io/badge/爱发电-赞助-blue?style=flat-square" alt="爱发电"></a>
+  <a href="https://afdian.com/a/MantisZen"><img src="https://img.shields.io/badge/%E7%88%B1%E5%8F%91%E7%94%B5-%E8%B5%92%E5%8A%A9-blue?style=flat-square" alt="爱发电"></a>
   <a href="https://dotnet.microsoft.com/"><img src="https://img.shields.io/badge/.NET-9.0-purple?style=flat-square" alt=".NET 9"></a>
+
+  [![QQ Group](https://img.shields.io/badge/QQ%E7%BE%A4-778347352-blue?style=flat-square&logo=tencent-qq&logoColor=white)](https://qm.qq.com/cgi-bin/qm/qr?k=778347352) 
+  [![discord](https://img.shields.io/badge/discord-Join-blue?style=flat-square&logo=discord&logoColor=white)](https://discord.gg/PpuyhceJpZ)
+
 </p>
-
-
 
 ----
 
-![MantisZip 极速预览总览](/docs/images/preview-overview.gif)
+![MantisZip 极速预览总览](docs/images/preview-overview.gif)
 
  ⏱️ 3 秒总览：在压缩包内无缝切换、指哪打哪的极速预览体验
 
@@ -29,7 +31,7 @@
 ----
 
 <p align="center">
-  <b>👁 预览</b> &nbsp;·&nbsp; <b>🔑 密码管理器</b> &nbsp;·&nbsp; <b></b>
+  <b>👁 预览</b> &nbsp;·&nbsp; <b>🔑 密码管理器</b> &nbsp;·&nbsp; <b>⚙️ 高级解压选项</b>
 </p>
 
 ---
@@ -56,7 +58,7 @@ MantisZip 是一款面向 Windows 的免费开源压缩/解压工具，主打**�
     </td>
     <td width="50%" valign="top">
       <b>📄 文档与排版类预览</b><br>
-      无缝切换纯文本、Markdown 实时渲染、HTML 本地沙盒及 PDF 视窗。
+      无缝切换纯文本、Markdown 实时渲染、HTML 及 PDF，以及字体字形预览。
       <img src="docs/images/preview-docs.gif" alt="文档预览" width="100%"/>
     </td>
   </tr>
@@ -66,11 +68,6 @@ MantisZip 是一款面向 Windows 的免费开源压缩/解压工具，主打**�
 
 <details>
 <summary><b>📊 点击展开：查看硬核数据类预览（SQLite 数据库、CSV、BT 种子、ISO）</b></summary>
-<p align="center">
-  <br>
-  <img src="docs/images/preview-data.gif" alt="硬核数据预览" width="80%"/>
-  <br><i>（无需提取大文件，毫秒级抓取 SQLite 表结构、种子文件树与 PE 元数据）</i>
-</p>
 
 | 预览类型 | 展示信息 |
 |----------|----------|
@@ -86,7 +83,9 @@ MantisZip 是一款面向 Windows 的免费开源压缩/解压工具，主打**�
 
 
 ### 🔑 智能密码管理器
-[这里粘贴密码管理器介绍和截图]
+
+![压缩密码设置](docs/images/PasswordManager.png)
+
 保存常用密码，可以根据规则自动尝试匹配密码。
 
 如果一个文件输入过正确密码，可以选择保存记录，下次打开与解压则无需再次输入密码。密码以 DPAPI 加密存储。
@@ -97,28 +96,45 @@ MantisZip 是一款面向 Windows 的免费开源压缩/解压工具，主打**�
 <summary><b>📊 点击展开：密码与规则设置与匹配</b></summary>
 <p align="center">
   <br>
-  <img src="docs/images/preview-data.gif" alt="硬核数据预览" width="80%"/>
-  <br><i>当压缩包正确设置密码与匹配规则，再次打开则无痕自动匹配，并且不影响预览功能。</i>
-</p>
+  压缩时可以选择从密码库加载密码，或者手动输入新密码
 
+  ![压缩密码设置](docs/images/CompressPassword.png)
+
+  如果打开一个有密码的文件会提示输入密码并保存规则
+
+  ![压缩密码打开](docs/images/ZipOpenPassword.png)
+
+  当压缩包正确设置密码与匹配规则，再次打开则无痕自动匹配，并且不影响预览功能。
+
+  ![压缩密码匹配](docs/images/ZipFitPassword.png)
+
+  当压缩包没有正确设置密码与匹配规则，则会显示加锁图标，并且不能预览。
+
+  ![压缩密码不匹配](docs/images/ZipNotFitPassword.png)
+</p>
 </details>
 
 ### ⚡ 更多解压冲突选项
-[这里粘贴冲突选项和日志部分]
 
 除了其他软件的「覆盖」「跳过」和「自动重命名」之外，还增加了「覆盖旧文件」和「覆盖小文件」，「自动重命名」也可无缝切换至手动重命名。
 
-### 调试日志
-开启后记录详细操作日志到 `debug.log`，帮助排查问题。
+![解压文件冲突](docs/images/ConflictCompress.png)
 
+![压缩文件冲突](docs/images/ConflictExtract.png)
+
+### 🐞 调试日志
+
+开启后记录详细操作日志到 `debug.log`，帮助排查问题。提供**隐私脱敏**选项，避免泄露用户隐私。
+
+![调试日志设置](docs/images/SettingDebug.png)
 
 ---
 
 ## 🤔 已知问题
 - 本软件亮点是功能和易用性，所以性能上稍逊于主流压缩软件。将来会逐渐优化。
-- **拖拽导出**功能使用 7‑Zip 的 eager-extraction 模式（先全部解压到临时目录再发起拖拽），大文件较多时会有延迟。该功能默认关闭，可在设置里打开。WPF OLE 桥的 bug 导致延迟渲染方案不可行，未来考虑用 COM `VirtualFileDataObject` 重写。
-- 预览 Markdown、HTML、SVG、PDF 使用 WebView2 控件，已拦截所有外部网络请求（仅允许 `file://` 本地访问）。初次运行时 WebView2 需初始化（若系统无 Runtime 则会自动引导安装）。
-- 有些格式的压缩包**不支持**单项预览提取，预览时会有提示
+- **拖拽导出**功能使用 7‑Zip 的 eager-extraction 模式（先全部解压到临时目录再发起拖拽），大文件较多时会有延迟。该功能默认关闭，可在设置里打开。未来会将 WPF 界面替换为 Avalonia 以原生解决该平台的延迟渲染限制。
+- 预览 Markdown、HTML、SVG、PDF 目前使用 WebView2 控件，已拦截所有外部网络请求（仅允许 `file://` 本地访问）。未来迁移至 Avalonia 后架构将进一步轻量化。
+- 有些格式的压缩包**不支持**单项预览，预览时会有提示。
 - RAR 格式不支持压缩（只读解压）。
 - 目前只支持 Windows 平台，跨平台支持已在计划中。
 
@@ -142,7 +158,7 @@ MantisZip 是一款面向 Windows 的免费开源压缩/解压工具，主打**�
 
 - **操作系统**: Windows 10 (1809+) / Windows 11 （跨平台支持已在计划中）
 - **运行时**: [.NET 9 Runtime](https://dotnet.microsoft.com/download/dotnet/9.0)
-- **WebView2 Runtime**: HTML/Markdown/SVG/PDF 预览依赖 [WebView2 Runtime](https://developer.microsoft.com/microsoft-edge/webview2/)（Win11 预装，Win10 自动安装或通过 Evergreen Bootstrapper 分发）
+- **WebView2 Runtime**: HTML/Markdown/SVG/PDF 预览依赖 [WebView2 Runtime](https://developer.microsoft.com/microsoft-edge/webview2/)
 
 ---
 
@@ -150,7 +166,7 @@ MantisZip 是一款面向 Windows 的免费开源压缩/解压工具，主打**�
 
 ```powershell
 # 克隆仓库
-git clone https://github.com/yourusername/MantisZip.git
+git clone [https://github.com/mantis3d/MantisZip.git](https://github.com/mantis3d/MantisZip.git)
 cd MantisZip
 
 # 构建
@@ -221,7 +237,7 @@ MantisZip 的诞生离不开全球开源社区的无私奉献。在此，对本�
 |------|------|------|--------|
 | [SharpCompress](https://github.com/adamhathcock/sharpcompress) | 0.48.1 | ZIP/TAR/GZ 压缩和解压核心引擎（替代 SharpZipLib）| MIT |
 | [SharpSevenZip](https://github.com/sevenzipsharp/SevenZipSharp) | 2.0.45 | 7z/RAR/ISO 压缩和解压（封装 7z.dll）| LGPL-2.1 |
-| [SharpZipLib](https://github.com/icsharpcode/SharpZipLib) | 1.4.2 | 遗留 — 仅少量兼容代码 | MIT |
+| [SharpZipLib](https://github.com/icsharpcode/SharpZipLib) | 1.4.2 | 测试用（仅 test 项目） | MIT |
 | [System.Security.Cryptography.ProtectedData](https://github.com/dotnet/runtime) | 10.0.8 | DPAPI 加密存储密码 | MIT |
 
 #### MantisZip.UI
@@ -266,7 +282,8 @@ MantisZip 是一款完全免费且独立开发的开源项目。如果它提升�
 如果您身处海外，推荐通过 Polar 赞助。支持国际信用卡、Apple Pay 等无缝支付：
 <p align="left">
   <a href="https://buy.polar.sh/polar_cl_VaCaW2l2nWkob5CyHe4dOlhL6HrQDK4ueMA9n1JyhNc">
-    <img src="docs\images\polar_logotype_white.svg" alt="Sponsor on Polar" height="40"/>
+    <img src="docs/images/polar_logotype_black.svg" alt="Sponsor on Polar" height="40"/>
+    <img src="docs/images/polar_logotype_white.svg" alt="Sponsor on Polar" height="40"/>
   </a>
 </p>
 
@@ -278,15 +295,15 @@ MantisZip 是一款完全免费且独立开发的开源项目。如果它提升�
 <table width="100%">
   <tr>
     <td width="50%" align="center" valign="top">
-      <b>⚡ 在爱发电上支持我</b><br><br>
       <a href="https://afdian.com/a/MantisZen">
+      <b>⚡ 在爱发电上支持我</b><br>      
         <img src="docs/images/afdian-MantisZen.jpg" alt="爱发电" width="80%"/>
-      </a>
       <br><i>(点击或扫码前往爱发电主页)</i>
+      </a>
     </td>
     <td width="50%" align="center" valign="top">
       <b>💚 微信直接打赏</b><br><br>
-      <img src="docs/images/wechat-pay.jpg" alt="微信打赏" width="80%"/>
+      <img src="docs/images/wechat-Sponsor.png" alt="微信打赏" width="80%"/>
       <br><i>(欢迎请作者喝杯热咖啡)</i>
     </td>
   </tr>
@@ -294,3 +311,14 @@ MantisZip 是一款完全免费且独立开发的开源项目。如果它提升�
 
 
 ---
+
+
+### 💬 交流与反馈 (Community)
+
+如果你在体验《MantisZip》的过程中遇到了 Bug、有新的功能想法，或者单纯想和同行切磋 WPF/.NET 独立开发技术，欢迎加入我们的开发者社区：
+
+* **QQ 交流群**：`778347352`（👉 [点击一键加入群聊](https://qm.qq.com/cgi-bin/qm/qr?k=778347352)）
+* **GitHub Issues**：[提交 Bug 或 Feature Request](../../issues)
+* **Discord 交流群**: （👉 [点击一键加入群聊](https://discord.gg/PpuyhceJpZ)）
+
+> 💡 **小提示**：进群请备注 “GitHub / MantisZip”。

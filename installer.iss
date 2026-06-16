@@ -2,7 +2,9 @@
 ; Requires Inno Setup 6
 
 #define MyAppName "MantisZip"
-#define MyAppVersion "0.3.13"
+#ifndef MyAppVersion
+#define MyAppVersion "0.4.0"
+#endif
 #define MyAppPublisher "MantisZip Contributors"
 #define MyAppURL "https://github.com/yourusername/MantisZip"
 #define MyAppExeName "MantisZip.UI.exe"
@@ -30,7 +32,7 @@ SetupIconFile=src\MantisZip.UI\Resources\App.ico
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
-Name: "chinese"; MessagesFile: "compiler:Languages\ChineseSimplified.isl"
+Name: "chinese"; MessagesFile: "setup\Languages\ChineseSimplified.isl"
 
 [CustomMessages]
 ; English
@@ -70,7 +72,6 @@ Source: "publish_output\MantisZip.UI.pdb"; DestDir: "{app}"; Flags: ignoreversio
 ; === Runtime config (required for .NET assembly resolution) ===
 Source: "publish_output\MantisZip.UI.deps.json"; DestDir: "{app}"; Flags: ignoreversion
 Source: "publish_output\MantisZip.UI.runtimeconfig.json"; DestDir: "{app}"; Flags: ignoreversion
-Source: "publish_output\MantisZip.ShellExt.runtimeconfig.json"; DestDir: "{app}"; Flags: ignoreversion
 
 ; === 7z.dll (SharpSevenZip): architecture-specific subdirectories ===
 Source: "publish_output\x64\7z.dll"; DestDir: "{app}\x64"; Flags: ignoreversion

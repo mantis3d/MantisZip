@@ -137,7 +137,10 @@ public class PasswordManager
                     CoreLog.Trace("PasswordManager.Load: backed up corrupted file to {0}", backupPath);
                 }
             }
-            catch { /* 备份失败不影响继续运行 */ }
+            catch (Exception backupEx)
+            {
+                CoreLog.Trace("PasswordManager.Load: backup failed: {0}", backupEx.Message);
+            }
             _data = new PasswordData();
         }
     }

@@ -27,8 +27,9 @@ public static class LogRedactor
     // 编译一次，避免每次 log 调用重复编译
     // 分支1: 驱动器路径 (支持空格，末尾以空白/引号/行尾自然截断)
     // 分支2: UNC 路径  \\server\share\path
+    // 分支3: 相对路径  folder\sub\file.ext（如压缩包内条目路径）
     private static readonly Regex _pathRegex = new(
-        @"[A-Za-z]:(?:\\[^\\""<>|]+)+\\?|\\\\[^\\""<>|]+(?:\\[^\\""<>|]+)+\\?",
+        @"[A-Za-z]:(?:\\[^\\""<>|]+)+\\?|\\\\[^\\""<>|]+(?:\\[^\\""<>|]+)+\\?|[^\\""<>|:]+(?:\\[^\\""<>|]+)+\\?",
         RegexOptions.Compiled);
 
     private static readonly ConcurrentDictionary<string, int> _pathIds = new();

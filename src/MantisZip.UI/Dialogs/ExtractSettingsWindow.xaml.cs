@@ -1,4 +1,5 @@
 using MantisZip.Core.Models;
+using MantisZip.Core.Utils;
 using MantisZip.UI.Localization;
 using Ookii.Dialogs.Wpf;
 using System.Collections.ObjectModel;
@@ -209,8 +210,9 @@ public partial class ExtractSettingsWindow : Window
                 {
                     Directory.CreateDirectory(CustomDestination);
                 }
-                catch
+                catch (Exception ex)
                 {
+                    CoreLog.Trace("ExtractSettingsWindow: failed: {0}", ex.Message);
                     AppMessageBox.Show(
                         L.T(L.App_ExtractFailed),
                         L.T(L.ExtractSettings_Title),

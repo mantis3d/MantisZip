@@ -260,6 +260,7 @@ public class TarGzEngine : IArchiveEngine
             catch (OperationCanceledException) { throw; }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {
+                CoreLog.Trace("ExtractAsync: IO error on '{0}': {1}", relativePath, ex.Message);
                 retries--;
                 if (options?.ErrorResolver == null)
                 {

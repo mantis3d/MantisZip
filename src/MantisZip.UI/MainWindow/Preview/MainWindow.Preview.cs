@@ -434,6 +434,7 @@ public partial class MainWindow
         }
         catch (Exception ex)
         {
+            CoreLog.Trace("ShowPreviewAsync: failed: {0}", ex.Message);
             ShowUnsupportedPreview(item, L.TF(L.Preview_Failed, ex.Message));
         }
         finally
@@ -897,6 +898,7 @@ public partial class MainWindow
                     }
                     catch (Exception) when (i < 4)
                     {
+                        CoreLog.Trace("ExtractPreviewFileAsync: attempt {0} failed", i + 1);
                         Thread.Sleep(200);
                         GC.Collect();
                         GC.WaitForPendingFinalizers();

@@ -251,7 +251,7 @@ public static class PdfParser
             int.TryParse(match.Groups[6].Value, out int s))
         {
             try { return new DateTime(y, mo, d, h, mi, s); }
-            catch { }
+            catch (Exception ex) { CoreLog.Trace("PdfParser: failed to parse PDF metadata: {0}", ex.Message); }
         }
 
         return null;

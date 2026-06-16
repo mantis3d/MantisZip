@@ -88,8 +88,9 @@ public partial class MainWindow
                         (L.T(L.Preview_ImageGifFrames), frameCount.ToString())
                     );
                 }
-                catch
+                catch (Exception ex)
                 {
+                    CoreLog.Trace("ShowImagePreviewAsync: failed: {0}", ex.Message);
                     SetFormatSpecificInfo();
                 }
 
@@ -199,8 +200,9 @@ public partial class MainWindow
                     (L.T(L.Preview_ImageDpi), dpi)
                 );
             }
-            catch
+            catch (Exception ex)
             {
+                CoreLog.Trace("ShowImagePreviewAsync: metadata failed: {0}", ex.Message);
                 SetFormatSpecificInfo();
             }
 

@@ -3,7 +3,7 @@
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
     <TargetFramework>net9.0-windows10.0.17763.0</TargetFramework>
-    <Version>0.3.13</Version>
+    <Version>0.4.0</Version>
     <SupportedOSPlatformVersion>10.0.17763.0</SupportedOSPlatformVersion>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
@@ -38,13 +38,14 @@
 
   <!-- Publish 后自动从 7-Zip 安装目录复制 7z.dll 到发布目录 -->
   <Target Name="CopySevenZipDll" AfterTargets="Publish">
-    <Exec Command="powershell -ExecutionPolicy Bypass -File &quot;$(MSBuildProjectDirectory)\..\..\scripts\copy-7z-dll.ps1&quot; -PublishDir &quot;$(PublishDir)&quot;"
+    <Exec Command="powershell -ExecutionPolicy Bypass -File &quot;$(MSBuildProjectDirectory)\..\..\scripts\copy-7z-dll.ps1&quot; -PublishDir &quot;$(PublishDir.TrimEnd('\\'))&quot;"
           Condition="'$(PublishDir)' != '' And Exists('$(MSBuildProjectDirectory)\..\..\scripts\copy-7z-dll.ps1')"
           IgnoreExitCode="true" />
   </Target>
 
   <ItemGroup>
     <Resource Include="Resources\App.ico" />
+    <Resource Include="Resources\DonateQr.png" />
   </ItemGroup>
 
   <ItemGroup>
@@ -54,7 +55,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Content Include="Resources\**">
+    <Content Include="Resources\**" Exclude="Resources\DonateQr.png">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
   </ItemGroup>

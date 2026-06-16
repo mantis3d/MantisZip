@@ -17,6 +17,11 @@ param(
     [string]$PublishDir
 )
 
+# Guard: MSBuild $(PublishDir) may end with a trailing backslash, and when
+# wrapped in &quot;…&quot; in the .csproj Exec command the \" sequence at the
+# end is eaten by Windows command-line parsing, leaving a stray " in the value.
+$PublishDir = $PublishDir.TrimEnd('"', '\')
+
 $hostUi = $Host.UI
 
 $candidates = @(

@@ -253,10 +253,12 @@ public partial class MainWindow
             }
             catch (NotSupportedException ex)
             {
+                CoreLog.Trace("FileListGrid_PreviewMouseMove: drag not supported: {0}", ex.Message);
                 AppMessageBox.Show(this, ex.Message, "提示", MessageBoxButton.OK, MessageBoxImage.Information);
             }
             catch (Exception ex)
             {
+                CoreLog.Trace("FileListGrid_PreviewMouseMove: drag failed: {0}", ex.Message);
                 AppMessageBox.Show(this, L.TF(L.Main_Status_ExtractFailed, ex.Message), L.T(L.App_ErrorTitle), MessageBoxButton.OK, MessageBoxImage.Error);
             }
             finally

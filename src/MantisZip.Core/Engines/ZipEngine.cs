@@ -2,7 +2,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text;
-using ICSharpCode.SharpZipLib.Zip;
+using SharpSevenZip;
 using MantisZip.Core.Abstractions;
 using MantisZip.Core.Utils;
 using SharpCompress.Archives;
@@ -16,7 +16,7 @@ using SharpCompress.Writers.Zip;
 namespace MantisZip.Core.Engines;
 
 /// <summary>
-/// ZIP 压缩引擎（基于 SharpCompress，加密回退使用 SharpZipLib）
+/// ZIP 压缩引擎（基于 SharpCompress，加密使用 SharpSevenZip + OutArchiveFormat.Zip）
 /// </summary>
 public class ZipEngine : IArchiveEngine
 {
@@ -53,8 +53,9 @@ public class ZipEngine : IArchiveEngine
         {
             archive = ArchiveFactory.OpenArchive(fs, options);
         }
-        catch
+        catch (Exception ex)
         {
+            CoreLog.Trace("OpenArchiveWithEncodingFallback: failed to open archive: {0}", ex.Message);
             fs.Dispose();
             throw;
         }
@@ -90,8 +91,9 @@ public class ZipEngine : IArchiveEngine
             CoreLog.Info("OpenArchiveWithEncodingFallback: entries appear ASCII, keeping default codec");
             return archive;
         }
-        catch
+        catch (Exception ex)
         {
+            CoreLog.Trace("OpenArchiveWithEncodingFallback: encoding detection failed, falling back to GBK: {0}", ex.Message);
             archive.Dispose();
             return OpenWithGbk();
         }
@@ -166,8 +168,9 @@ public class ZipEngine : IArchiveEngine
 
             return false;
         }
-        catch
+        catch (Exception ex)
         {
+            CoreLog.Trace("ZipHasUtf8Flag: failed to read central directory: {0}", ex.Message);
             // 出错时回退到旧行为（回退 GBK）
             return false;
         }
@@ -465,39 +468,62 @@ public class ZipEngine : IArchiveEngine
 
                 if (isEncrypted)
                 {
-                    // ZipWriter 不支持加密；回退至 SharpZipLib
-                    using var zipStream = new ZipOutputStream(fsOut);
-                    zipStream.SetLevel(options.CompressionLevel);
-                    if (!string.IsNullOrEmpty(options.Comment))
-                        zipStream.SetComment(options.Comment);
-                    zipStream.Password = options.Password;
+                    // SharpSevenZip 支持 ZIP + AES-256 加密（SharpCompress ZipWriter 不支持加密）
+                    fsOut.Dispose();
 
-                    foreach (var (fullPath, relativePath) in files)
+                    SevenZipEngine.EnsureLibraryPath();
+
+                    var s7zCompressor = new SharpSevenZipCompressor
                     {
-                        cancellationToken.ThrowIfCancellationRequested();
+                        ArchiveFormat = OutArchiveFormat.Zip,
+                        ZipEncryptionMethod = ZipEncryptionMethod.Aes256,
+                        CompressionMethod = CompressionMethod.Deflate,
+                        CompressionLevel = MapCompressionLevelToS7Z(options.CompressionLevel),
+                        IncludeEmptyDirectories = true,
+                        DirectoryStructure = true,
+                    };
 
-                        if (!ReadFileWithRetryZipOutputStream(fullPath, relativePath, options, zipStream,
-                                ref processedBytes, totalBytes, totalFiles, ref processedFiles,
-                                cancellationToken, progress, ref lastReportTime))
-                        {
-                            if (cancellationToken.IsCancellationRequested) break;
-                            continue;
-                        }
+                    if (options.SplitSize > 0)
+                        s7zCompressor.VolumeSize = options.SplitSize;
 
-                        var now = DateTime.Now;
-                        if (now - lastReportTime >= reportInterval)
+                    if (!string.IsNullOrEmpty(options.Comment))
+                    {
+                        // SharpSevenZip 无 Comment 属性，注释在压缩后通过 EOCD 写入
+                    }
+
+                    var s7zAccumPct = 0.0;
+                    var s7zCurrentFile = "";
+                    s7zCompressor.FileCompressionStarted += (_, e) =>
+                    {
+                        s7zCurrentFile = e.FileName ?? "";
+                    };
+                    s7zCompressor.Compressing += (_, e) =>
+                    {
+                        s7zAccumPct = Math.Min(100, s7zAccumPct + e.PercentDelta);
+                        progress?.Report(new ArchiveProgress
                         {
-                            var pct = totalBytes > 0 ? (double)processedBytes / totalBytes * 100 : 0;
-                            progress?.Report(new ArchiveProgress
-                            {
-                                CurrentFile = "正在压缩: " + relativePath,
-                                PercentComplete = pct,
-                                FilePercentComplete = 100,
-                                TotalFiles = totalFiles,
-                                ProcessedFiles = processedFiles
-                            });
-                            lastReportTime = now;
-                        }
+                            CurrentFile = "正在压缩: " + s7zCurrentFile,
+                            PercentComplete = s7zAccumPct,
+                            FilePercentComplete = s7zAccumPct,
+                            TotalFiles = totalFiles,
+                            ProcessedFiles = processedFiles,
+                        });
+                    };
+
+                    var sourceFilePaths = files.Select(f => f.FullPath).Distinct().ToArray();
+                    if (sourceFilePaths.Length > 0)
+                    {
+                        s7zCompressor.CompressFilesEncrypted(outputPath, options.Password ?? "", sourceFilePaths);
+                    }
+
+                    processedBytes = totalBytes;
+                    processedFiles = totalFiles;
+
+                    // ZIP 注释：SharpSevenZip 不支持压缩时写入，压缩后通过 EOCD 后写
+                    if (!string.IsNullOrEmpty(options.Comment))
+                    {
+                        try { ZipCommentHelper.WriteComment(outputPath, options.Comment); }
+                        catch (Exception commentEx) { CoreLog.Error("CompressAsync: failed to write ZIP comment", commentEx); }
                     }
                 }
                 else
@@ -669,6 +695,20 @@ public class ZipEngine : IArchiveEngine
         }
     }
 
+    /// <summary>
+    /// 将 0–9 压缩级别映射到 SharpSevenZip.CompressionLevel 枚举。
+    /// </summary>
+    private static SharpSevenZip.CompressionLevel MapCompressionLevelToS7Z(int level) => level switch
+    {
+        0 => SharpSevenZip.CompressionLevel.None,
+        1 or 2 => SharpSevenZip.CompressionLevel.Fast,
+        3 or 4 => SharpSevenZip.CompressionLevel.Low,
+        5 or 6 => SharpSevenZip.CompressionLevel.Normal,
+        7 or 8 => SharpSevenZip.CompressionLevel.High,
+        9 => SharpSevenZip.CompressionLevel.Ultra,
+        _ => SharpSevenZip.CompressionLevel.Normal,
+    };
+
     public async Task AddToArchiveAsync(string archivePath, string[] sourcePaths, ArchiveOptions options, IProgress<ArchiveProgress>? progress = null, CancellationToken cancellationToken = default, string? entryBasePath = null)
     {
         CoreLog.Entry();
@@ -832,54 +872,60 @@ public class ZipEngine : IArchiveEngine
 
                     if (isEncrypted)
                     {
-                        // ZipWriter 不支持加密；回退至 SharpZipLib
-                        using var zipStream = new ZipOutputStream(fsOut);
-                        zipStream.SetLevel(options.CompressionLevel);
-                        if (!string.IsNullOrEmpty(options.Comment))
-                            zipStream.SetComment(options.Comment);
-                        zipStream.Password = options.Password;
+                        // SharpSevenZip 支持 ZIP + AES-256 加密
+                        fsOut.Dispose();
 
-                        foreach (var (fullPath, relPath) in compressFiles)
+                        SevenZipEngine.EnsureLibraryPath();
+
+                        var s7zCompressor = new SharpSevenZipCompressor
                         {
-                            cancellationToken.ThrowIfCancellationRequested();
-                            var fi = new FileInfo(fullPath);
-                            var entry = new ZipEntry(ZipEntry.CleanName(relPath))
-                            {
-                                DateTime = fi.LastWriteTime,
-                                AESKeySize = 256
-                            };
-                            zipStream.PutNextEntry(entry);
+                            ArchiveFormat = OutArchiveFormat.Zip,
+                            ZipEncryptionMethod = ZipEncryptionMethod.Aes256,
+                            CompressionMethod = CompressionMethod.Deflate,
+                            CompressionLevel = MapCompressionLevelToS7Z(options.CompressionLevel),
+                            IncludeEmptyDirectories = true,
+                            DirectoryStructure = true,
+                        };
 
-                            var buffer = new byte[81920];
-                            long totalRead = 0;
-                            var fiLen = fi.Length;
-                            using (var fsInput = File.OpenRead(fullPath))
-                            {
-                                while (totalRead < fiLen)
-                                {
-                                    cancellationToken.ThrowIfCancellationRequested();
-                                    var read = fsInput.Read(buffer, 0, buffer.Length);
-                                    if (read <= 0) break;
-                                    zipStream.Write(buffer, 0, read);
-                                    totalRead += read;
-                                    compressProcessed += read;
+                        // 所有文件在同⼀临时目录下，计算 commonRoot 以保留相对路径结构
+                        var commonRoot = tempDir.Length;
+                        if (!tempDir.EndsWith(Path.DirectorySeparatorChar.ToString()))
+                            commonRoot++; // 包含分隔符
 
-                                    var now = DateTime.Now;
-                                    if (now - lastReportTime >= reportInterval || totalRead >= fiLen)
-                                    {
-                                        var cumProcessed = processedBytes + compressProcessed;
-                                        var pct = (double)cumProcessed / workTotal * 100;
-                                        var filePct = fiLen > 0 ? (double)totalRead / fiLen * 100 : 100;
-                                        progress?.Report(new ArchiveProgress
-                                        {
-                                            CurrentFile = "正在压缩: " + relPath,
-                                            PercentComplete = Math.Min(pct, 100),
-                                            FilePercentComplete = filePct
-                                        });
-                                        lastReportTime = now;
-                                    }
-                                }
-                            }
+                        var s7zAccumPct = 0.0;
+                        var s7zCurrentFile = "";
+                        s7zCompressor.FileCompressionStarted += (_, e) =>
+                        {
+                            s7zCurrentFile = e.FileName ?? "";
+                        };
+                        s7zCompressor.Compressing += (_, e) =>
+                        {
+                            s7zAccumPct = Math.Min(100, s7zAccumPct + e.PercentDelta);
+                            var cumProcessed = processedBytes + (long)(compressTotalBytes * s7zAccumPct / 100);
+                            var pct = (double)cumProcessed / workTotal * 100;
+                            progress?.Report(new ArchiveProgress
+                            {
+                                CurrentFile = "正在压缩: " + s7zCurrentFile,
+                                PercentComplete = Math.Min(pct, 100),
+                                FilePercentComplete = s7zAccumPct,
+                            });
+                        };
+
+                        var allFilePaths = compressFiles.Select(f => f.FullPath).ToArray();
+                        if (allFilePaths.Length > 0)
+                        {
+                            s7zCompressor.CompressFilesEncrypted(
+                                tempArchive, commonRoot,
+                                options.Password ?? "", allFilePaths);
+                        }
+
+                        processedBytes += compressTotalBytes;
+
+                        // ZIP 注释：SharpSevenZip 不支持压缩时写入，压缩后通过 EOCD 后写
+                        if (!string.IsNullOrEmpty(options.Comment))
+                        {
+                            try { ZipCommentHelper.WriteComment(tempArchive, options.Comment); }
+                            catch (Exception commentEx) { CoreLog.Error("AddToArchiveAsync: failed to write ZIP comment", commentEx); }
                         }
                     }
                     else
@@ -1236,97 +1282,7 @@ public class ZipEngine : IArchiveEngine
         CoreLog.Exit();
     }
 
-    /// <summary>
-    /// 带重试/跳过/中止的文件压缩读取（SharpZipLib 路径，仅加密回退使用）。
-    /// 返回 false 表示跳过此文件。
-    /// </summary>
-    private bool ReadFileWithRetryZipOutputStream(string fullPath, string relativePath,
-        ArchiveOptions options, ZipOutputStream zipStream, ref long processedBytes, long totalBytes,
-        int totalFiles, ref int processedFiles,
-        CancellationToken ct, IProgress<ArchiveProgress>? progress, ref DateTime lastReportTime)
-    {
-        int retries = 3;
-        while (retries > 0)
-        {
-            try
-            {
-                var fi = new FileInfo(fullPath);
-                var entry = new ZipEntry(ZipEntry.CleanName(relativePath))
-                {
-                    DateTime = fi.LastWriteTime,
-                    AESKeySize = 256
-                };
-
-                zipStream.PutNextEntry(entry);
-
-                var buffer = new byte[81920];
-                long totalRead = 0;
-                var fiLen = fi.Length;
-
-                using (var fsInput = File.OpenRead(fullPath))
-                {
-                    while (totalRead < fiLen)
-                    {
-                        ct.ThrowIfCancellationRequested();
-                        var read = fsInput.Read(buffer, 0, buffer.Length);
-                        if (read <= 0) break;
-                        zipStream.Write(buffer, 0, read);
-                        totalRead += read;
-                        processedBytes += read;
-
-                        var now = DateTime.Now;
-                        if (now - lastReportTime >= TimeSpan.FromMilliseconds(100) || totalRead >= fiLen)
-                        {
-                            var pct = totalBytes > 0 ? (double)processedBytes / totalBytes * 100 : 0;
-                            var filePct = fiLen > 0 ? (double)totalRead / fiLen * 100 : 100;
-                            progress?.Report(new ArchiveProgress
-                            {
-                                CurrentFile = "正在压缩: " + relativePath,
-                                PercentComplete = pct,
-                                FilePercentComplete = filePct,
-                                TotalFiles = totalFiles,
-                                ProcessedFiles = processedFiles
-                            });
-                            lastReportTime = now;
-                        }
-                    }
-                }
-                processedFiles++;
-                return true; // success
-            }
-            catch (OperationCanceledException) { throw; }
-            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-            {
-                retries--;
-                if (options?.ErrorResolver == null)
-                {
-                    // 没有回调 → 直接重试
-                    if (retries <= 0) throw;
-                    continue;
-                }
-
-                var action = options.ErrorResolver(new FileErrorInfo
-                {
-                    FilePath = fullPath,
-                    ErrorMessage = ex.Message,
-                    RetriesRemaining = retries
-                });
-
-                if (action == FileErrorAction.Retry)
-                {
-                    // 已减 retries，直接继续循环
-                    continue;
-                }
-                if (action == FileErrorAction.Skip)
-                {
-                    return false; // 跳过此文件
-                }
-                // Abort
-                throw;
-            }
-        }
-        return false;
-    }
+    // ReadFileWithRetryZipOutputStream 已删除（SharpZipLib 加密回退已被 SharpSevenZip 替代）
 
     /// <summary>
     /// 带重试/跳过/中止的文件压缩读取（SharpCompress ZipWriter 路径）。

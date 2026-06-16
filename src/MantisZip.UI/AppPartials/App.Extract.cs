@@ -61,6 +61,7 @@ public partial class App : Application
                 }
                 catch (Exception ex)
                 {
+                    CoreLog.Trace("HandleExtractHere: failed: {0}", ex.Message);
                     LogStartup($"HandleExtractHere: DispatcherTimer 回调异常: {ex.Message}\n{ex.StackTrace ?? ""}");
                     try { AppMessageBox.Show(L.TF(L.App_ExtractFailed, ex.Message), L.T(L.App_StartupErrorTitle), MessageBoxButton.OK, MessageBoxImage.Error); } catch { }
                     Current.Shutdown();
@@ -115,6 +116,7 @@ public partial class App : Application
                 }
                 catch (Exception ex)
                 {
+                    CoreLog.Trace("HandleExtractToNamed: failed: {0}", ex.Message);
                     LogStartup($"HandleExtractToNamed: DispatcherTimer 回调异常: {ex.Message}\n{ex.StackTrace ?? ""}");
                     try { AppMessageBox.Show(L.TF(L.App_ExtractFailed, ex.Message), L.T(L.App_StartupErrorTitle), MessageBoxButton.OK, MessageBoxImage.Error); } catch { }
                     Current.Shutdown();
@@ -170,6 +172,7 @@ public partial class App : Application
                 }
                 catch (Exception ex)
                 {
+                    CoreLog.Trace("HandleExtractSmart: failed: {0}", ex.Message);
                     LogStartup($"HandleExtractSmart: DispatcherTimer 回调异常: {ex.Message}\n{ex.StackTrace ?? ""}");
                     try { AppMessageBox.Show(L.TF(L.App_ExtractFailed, ex.Message), L.T(L.App_StartupErrorTitle), MessageBoxButton.OK, MessageBoxImage.Error); } catch { }
                     Current.Shutdown();
@@ -221,6 +224,7 @@ public partial class App : Application
                 }
                 catch (Exception ex)
                 {
+                    CoreLog.Trace("HandleExtract: failed: {0}", ex.Message);
                     LogStartup($"HandleExtract: DispatcherTimer 回调异常: {ex.Message}\n{ex.StackTrace ?? ""}");
                     try { AppMessageBox.Show(L.TF(L.App_ExtractFailed, ex.Message), L.T(L.App_StartupErrorTitle), MessageBoxButton.OK, MessageBoxImage.Error); } catch { }
                     Current.Shutdown();
@@ -492,8 +496,9 @@ public partial class App : Application
                 ? parentDir
                 : Path.Combine(parentDir, archiveName);
         }
-        catch
+        catch (Exception ex)
         {
+            CoreLog.Trace("GetSmartExtractDestination: failed: {0}", ex.Message);
             return Path.Combine(parentDir, archiveName);
         }
     }
@@ -628,6 +633,7 @@ public partial class App : Application
             }
             catch (Exception ex)
             {
+                CoreLog.Trace("RunExtractStatic: failed: {0}", ex.Message);
                 LogStartup($"RunExtractStatic: exception: {ex.Message}");
                 Log("--extract 失败: {0}", ex.Message);
                 await progressWindow.Dispatcher.InvokeAsync(() =>

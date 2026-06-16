@@ -3,6 +3,7 @@ using MantisZip.Core.Abstractions;
 using MantisZip.Core.Engines;
 using MantisZip.Core.Models;
 using MantisZip.Core.Services;
+using MantisZip.Core.Utils;
 using Microsoft.Win32;
 using System.IO;
 using System.Windows;
@@ -447,6 +448,7 @@ public partial class CompressSettingsWindow : Window
         }
         catch (Exception ex)
         {
+            CoreLog.Trace("RunCompressAsync: failed: {0}", ex.Message);
             this.Show();
             AppMessageBox.Show(L.TF(L.App_CompressFailed, ex.Message), L.T(L.App_ErrorTitle), MessageBoxButton.OK, MessageBoxImage.Error);
         }
@@ -617,6 +619,7 @@ public partial class CompressSettingsWindow : Window
         }
         catch (Exception ex)
         {
+            CoreLog.Trace("RunCompressAsync (combined): failed: {0}", ex.Message);
             this.Show();
             AppMessageBox.Show(L.TF(L.App_CompressFailed, ex.Message), L.T(L.App_ErrorTitle), MessageBoxButton.OK, MessageBoxImage.Error);
         }

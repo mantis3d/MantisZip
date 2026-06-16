@@ -28,28 +28,28 @@
                 CornerRadius="8" Padding="20" Margin="0,0,0,16"
                 HorizontalAlignment="Center">
             <StackPanel>
-                <Border x:Name="QrPlaceholder" Width="180" Height="180"
+                <!--Border x:Name="QrPlaceholder" Width="180" Height="180"
                         Background="{StaticResource Theme_WindowBg}"
                         BorderBrush="{StaticResource Theme_Border}" BorderThickness="1"
                         CornerRadius="6">
-                    <TextBlock Text="{l:L Donate_QrPlaceholder}"
-                               Foreground="{StaticResource Theme_TextDisabled}"
-                               FontSize="13" HorizontalAlignment="Center"
-                               VerticalAlignment="Center"/>
-                </Border>
-                <!-- Replace QrPlaceholder above with this when QR image is ready:
-                <Image x:Name="QrImage" Width="180" Height="180" Source="Resources/DonateQr.png"
-                       Visibility="Collapsed" Stretch="Uniform"/> -->
+                        </Border-->
+
+                <Image x:Name="QrImage" Width="300" Height="300" Source="/Resources/DonateQr.png"
+                        Visibility="Visible" Stretch="Uniform"/>
+                <!--TextBlock Text="{l:L Donate_QrPlaceholder}"
+                            Foreground="{StaticResource Theme_TextPrimary}"
+                            FontSize="13" HorizontalAlignment="Center"
+                            Margin="0,8,0,0"/-->
                 <TextBlock Text="{l:L Donate_QrHint}" FontSize="12"
-                           Foreground="{StaticResource Theme_TextSecondary}"
-                           HorizontalAlignment="Center" Margin="0,10,0,0"/>
+                            Foreground="{StaticResource Theme_TextSecondary}"
+                            HorizontalAlignment="Center" Margin="0,10,0,0"/>
             </StackPanel>
         </Border>
 
         <!-- Platform hint -->
         <TextBlock Grid.Row="2" Text="{l:L Donate_Platforms_Hint}"
-                   FontSize="12" Foreground="{StaticResource Theme_TextDisabled}"
-                   HorizontalAlignment="Center" Margin="0,0,0,12"/>
+                    FontSize="12" Foreground="{StaticResource Theme_TextDisabled}"
+                    HorizontalAlignment="Center" Margin="0,0,0,12"/>
 
         <!-- Link buttons -->
         <StackPanel Grid.Row="3" Margin="0,0,0,20">
