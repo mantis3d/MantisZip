@@ -100,6 +100,9 @@ public partial class MainWindowViewModel : ObservableObject
             "Menu_NewArchive", "Menu_Compress", "Menu_PasswordManager", "Menu_About",
             "Toolbar_New", "Toolbar_Open", "Toolbar_Extract", "Toolbar_Compress",
             "Toolbar_Filter", "Toolbar_Preview",
+            "Menu_Toolbar", "Menu_FilterBar",
+            "Filter_Search", "Filter_DateFrom", "Filter_DateTo",
+            "Filter_SizeMin", "Filter_SizeMax", "Filter_ShowSubfolders",
             "Status_Selected", "Status_ArchiveStats",
             "Tree_Browse",
             "DataGrid_Name", "DataGrid_Size", "DataGrid_Compressed", "DataGrid_Modified",
@@ -185,6 +188,9 @@ public partial class MainWindowViewModel : ObservableObject
 
     [ObservableProperty]
     private bool _isFilterBarVisible;
+
+    [ObservableProperty]
+    private bool _isPreviewVisible;
 
     [ObservableProperty]
     private bool _isStatusBarVisible = true;
@@ -763,5 +769,11 @@ public partial class MainWindowViewModel : ObservableObject
     private void ToggleFilterBar()
     {
         IsFilterBarVisible = !IsFilterBarVisible;
+    }
+
+    [RelayCommand]
+    private void TogglePreview()
+    {
+        IsPreviewVisible = !IsPreviewVisible;
     }
 }

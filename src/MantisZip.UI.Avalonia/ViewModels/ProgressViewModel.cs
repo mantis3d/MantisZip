@@ -1,9 +1,11 @@
 using System;
+using System.Collections.Generic;
 using System.Threading;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using MantisZip.Core.Abstractions;
+using MantisZip.UI.Avalonia.Services;
 
 namespace MantisZip.UI.Avalonia.ViewModels;
 
@@ -14,6 +16,21 @@ namespace MantisZip.UI.Avalonia.ViewModels;
 public partial class ProgressViewModel : ObservableObject
 {
     private CancellationTokenSource? _cts;
+
+    /// <summary>
+    /// Localized strings bound by the ProgressWindow UI.
+    /// </summary>
+    public Dictionary<string, string> LocalizedStrings { get; }
+
+    public ProgressViewModel()
+    {
+        LocalizedStrings = new Dictionary<string, string>
+        {
+            ["Progress_Cancel"] = LocalizationManager.T("Progress_Cancel"),
+            ["Progress_Complete"] = LocalizationManager.T("Progress_Complete"),
+            ["Progress_Cancelling"] = LocalizationManager.T("Progress_Cancelling"),
+        };
+    }
 
     [ObservableProperty]
     private string _windowTitle = string.Empty;

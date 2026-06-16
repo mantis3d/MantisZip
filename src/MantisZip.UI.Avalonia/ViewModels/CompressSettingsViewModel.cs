@@ -1,6 +1,7 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using MantisZip.Core.Abstractions;
+using MantisZip.UI.Avalonia.Services;
 
 namespace MantisZip.UI.Avalonia.ViewModels;
 
@@ -12,6 +13,9 @@ public partial class CompressSettingsViewModel : ObservableObject
 {
     /// <summary>源文件/目录路径列表（输入，显示用）。</summary>
     public IReadOnlyList<string> SelectedPaths { get; }
+
+    /// <summary>本地化字符串字典，XAML 通过 {Binding LocalizedStrings[Key]} 访问。</summary>
+    public Dictionary<string, string> LocalizedStrings { get; } = new();
 
     /// <summary>源文件摘要文字，用于界面显示。</summary>
     public string SelectedPathsSummary => SelectedPaths.Count > 0
@@ -49,7 +53,7 @@ public partial class CompressSettingsViewModel : ObservableObject
     private CommentDistribution _commentDistribution = CommentDistribution.AllSame;
 
     [ObservableProperty]
-    private string _windowTitle = "Compress Settings";
+    private string _windowTitle = LocalizationManager.T("Compress_Title");
 
     // -- Comment radio button backing (sync via partial methods)
 
@@ -96,6 +100,33 @@ public partial class CompressSettingsViewModel : ObservableObject
     public CompressSettingsViewModel(IReadOnlyList<string> sourcePaths)
     {
         SelectedPaths = sourcePaths;
+
+        // Populate localized strings
+        LocalizedStrings["Compress_TabGeneral"] = LocalizationManager.T("Compress_TabGeneral");
+        LocalizedStrings["Compress_TabPassword"] = LocalizationManager.T("Compress_TabPassword");
+        LocalizedStrings["Compress_TabComment"] = LocalizationManager.T("Compress_TabComment");
+        LocalizedStrings["Compress_Format"] = LocalizationManager.T("Compress_Format");
+        LocalizedStrings["Compress_Level"] = LocalizationManager.T("Compress_Level");
+        LocalizedStrings["Compress_OutputPath"] = LocalizationManager.T("Compress_OutputPath");
+        LocalizedStrings["Compress_OutputPlaceholder"] = LocalizationManager.T("Compress_OutputPlaceholder");
+        LocalizedStrings["Compress_SourceFiles"] = LocalizationManager.T("Compress_SourceFiles");
+        LocalizedStrings["Compress_Browse"] = LocalizationManager.T("Compress_Browse");
+        LocalizedStrings["Compress_Password"] = LocalizationManager.T("Compress_Password");
+        LocalizedStrings["Compress_PasswordPlaceholder"] = LocalizationManager.T("Compress_PasswordPlaceholder");
+        LocalizedStrings["Compress_ConfirmPassword"] = LocalizationManager.T("Compress_ConfirmPassword");
+        LocalizedStrings["Compress_ConfirmPlaceholder"] = LocalizationManager.T("Compress_ConfirmPlaceholder");
+        LocalizedStrings["Compress_ShowPassword"] = LocalizationManager.T("Compress_ShowPassword");
+        LocalizedStrings["Compress_EncryptArchive"] = LocalizationManager.T("Compress_EncryptArchive");
+        LocalizedStrings["Compress_Strength"] = LocalizationManager.T("Compress_Strength");
+        LocalizedStrings["Compress_Comment"] = LocalizationManager.T("Compress_Comment");
+        LocalizedStrings["Compress_CommentPlaceholder"] = LocalizationManager.T("Compress_CommentPlaceholder");
+        LocalizedStrings["Compress_CommentHint"] = LocalizationManager.T("Compress_CommentHint");
+        LocalizedStrings["Compress_Distribution"] = LocalizationManager.T("Compress_Distribution");
+        LocalizedStrings["Compress_Distribute_AllSame"] = LocalizationManager.T("Compress_Distribute_AllSame");
+        LocalizedStrings["Compress_Distribute_FirstOnly"] = LocalizationManager.T("Compress_Distribute_FirstOnly");
+        LocalizedStrings["Compress_Distribute_PerLine"] = LocalizationManager.T("Compress_Distribute_PerLine");
+        LocalizedStrings["Compress_Start"] = LocalizationManager.T("Compress_Start");
+        LocalizedStrings["Compress_Cancel"] = LocalizationManager.T("Compress_Cancel");
     }
 
     partial void OnPasswordChanged(string? value)
