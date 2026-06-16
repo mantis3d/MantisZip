@@ -4,6 +4,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using MantisZip.Core.Abstractions;
 using MantisZip.Core.Services;
+using MantisZip.Core.Utils;
 using MantisZip.UI.Avalonia.Models;
 using MantisZip.UI.Avalonia.Services;
 using System.Collections.ObjectModel;
@@ -15,6 +16,7 @@ public partial class MainWindowViewModel : ObservableObject
     private readonly ArchiveService _archiveService = new();
     private ArchiveFormat _currentFormat;
     private IReadOnlyList<ArchiveItem>? _allRawItems;
+    private bool _isProgrammaticFilter;
 
     /// <summary>
     /// 由 View 设置的对话框回调。返回选择的文件路径，取消返回 null。
@@ -30,6 +32,32 @@ public partial class MainWindowViewModel : ObservableObject
     /// 由 View 设置的密码对话框回调。参数为压缩包路径，返回密码或取消时返回 null。
     /// </summary>
     public Func<string, Task<string?>>? ShowPasswordDialog { get; set; }
+
+    /// <summary>
+    /// 解压设置对话框回调。传入 ExtractSettingsViewModel，返回 true=确认，false=取消。
+    /// </summary>
+    public Func<ExtractSettingsViewModel, Task<bool?>>? ShowExtractSettingsDialog { get; set; }
+
+    /// <summary>
+    /// 压缩设置对话框回调。传入 CompressSettingsViewModel，返回 true=确认，false=取消。
+    /// </summary>
+    public Func<CompressSettingsViewModel, Task<bool?>>? ShowCompressSettingsDialog { get; set; }
+
+    /// <summary>
+    /// 密码管理器窗口回调。
+    /// </summary>
+    public Func<Task>? ShowPasswordManager { get; set; }
+
+    /// <summary>
+    /// 关于对话框回调。
+    /// </summary>
+    public Func<Task>? ShowAboutDialog { get; set; }
+
+    /// <summary>
+    /// 运行带进度窗口的操作。View 负责创建进度窗口、显示、执行操作、关闭窗口。
+    /// 参数：窗口标题，操作委托（接收进度报告器和 CancellationToken），返回 true=完成，false=取消/出错。
+    /// </summary>
+    public Func<string, Func<IProgress<ArchiveProgress>, CancellationToken, Task>, Task<bool>>? RunWithProgress { get; set; }
 
     /// <summary>
     /// 会话密码缓存：压缩包路径 → 密码（仅内存，不持久化）。
@@ -65,8 +93,14 @@ public partial class MainWindowViewModel : ObservableObject
         var newDict = new Dictionary<string, string>();
         var keys = new[]
         {
-            "Menu_File", "Menu_OpenArchive", "Menu_Settings", "Menu_Exit",
-            "Menu_View", "Menu_ToggleTheme", "Menu_Language", "Menu_LangChinese", "Menu_LangEnglish",
+            "Menu_File", "Menu_OpenArchive", "Menu_CloseArchive", "Menu_Refresh", "Menu_Settings", "Menu_Exit",
+            "Menu_Edit", "Menu_View", "Menu_ToggleTheme", "Menu_Language", "Menu_LangChinese", "Menu_LangEnglish",
+            "Menu_Help",
+            "Menu_ExtractArchive", "Menu_ExtractHere", "Menu_ExtractToName",
+            "Menu_NewArchive", "Menu_Compress", "Menu_PasswordManager", "Menu_About",
+            "Toolbar_New", "Toolbar_Open", "Toolbar_Extract", "Toolbar_Compress",
+            "Toolbar_Filter", "Toolbar_Preview",
+            "Status_Selected", "Status_ArchiveStats",
             "Tree_Browse",
             "DataGrid_Name", "DataGrid_Size", "DataGrid_Compressed", "DataGrid_Modified",
             "App_Title"
@@ -115,6 +149,67 @@ public partial class MainWindowViewModel : ObservableObject
 
     public ObservableCollection<ArchiveItemModel> Entries { get; } = [];
 
+    // ── Filter / Toolbar / Status properties ──
+
+    /// <summary>选择统计："已选: N 个, X MB"。</summary>
+    public string SelectionStats
+    {
+        get
+        {
+            if (SelectedEntry == null) return string.Empty;
+            var size = FormatUtil.FormatSize(SelectedEntry.Size);
+            return $"{LocalizationManager.T("Status_Selected")}: 1 | {SelectedEntry.NameDisplay}, {size}";
+        }
+    }
+
+    /// <summary>压缩包统计："ZIP | 原始: X MB → 压缩: Y MB (ratio%)"。</summary>
+    public string ArchiveStats
+    {
+        get
+        {
+            if (_allRawItems == null || _allRawItems.Count == 0)
+                return string.Empty;
+
+            var files = _allRawItems.Where(i => !i.IsDirectory).ToList();
+            if (files.Count == 0) return string.Empty;
+
+            var totalSize = files.Sum(i => i.Size);
+            var totalCompressed = files.Sum(i => i.CompressedSize);
+            var ratio = totalSize > 0
+                ? $"({((double)totalCompressed / totalSize * 100):F1}%)"
+                : "";
+
+            return $"{_currentFormat} | {FormatUtil.FormatSize(totalSize)} → {FormatUtil.FormatSize(totalCompressed)} {ratio}";
+        }
+    }
+
+    [ObservableProperty]
+    private bool _isFilterBarVisible;
+
+    [ObservableProperty]
+    private bool _isStatusBarVisible = true;
+
+    [ObservableProperty]
+    private string? _filterText;
+
+    [ObservableProperty]
+    private DateTime? _filterDateFrom;
+
+    [ObservableProperty]
+    private DateTime? _filterDateTo;
+
+    [ObservableProperty]
+    private long? _filterSizeMin;
+
+    [ObservableProperty]
+    private long? _filterSizeMax;
+
+    [ObservableProperty]
+    private string _filterSizeUnit = "KB";
+
+    [ObservableProperty]
+    private bool _showSubfolders;
+
     public MainWindowViewModel()
     {
         LocalizationManager.CultureChanged += OnCultureChanged;
@@ -128,6 +223,8 @@ public partial class MainWindowViewModel : ObservableObject
 
     partial void OnSelectedEntryChanged(ArchiveItemModel? value)
     {
+        OnPropertyChanged(nameof(SelectionStats));
+
         if (value != null && CurrentArchivePath != null)
         {
             _ = ShowPreviewAsync(value);
@@ -144,6 +241,19 @@ public partial class MainWindowViewModel : ObservableObject
         {
             NavigateToFolder(value);
         }
+    }
+
+    partial void OnFilterTextChanged(string? value) => ApplyFilter();
+    partial void OnFilterDateFromChanged(DateTime? value) => ApplyFilter();
+    partial void OnFilterDateToChanged(DateTime? value) => ApplyFilter();
+    partial void OnFilterSizeMinChanged(long? value) => ApplyFilter();
+    partial void OnFilterSizeMaxChanged(long? value) => ApplyFilter();
+    partial void OnShowSubfoldersChanged(bool value) => ApplyFilter();
+
+    private void ApplyFilter()
+    {
+        if (_allRawItems == null || _isProgrammaticFilter) return;
+        PopulateEntries();
     }
 
     [RelayCommand]
@@ -231,6 +341,7 @@ public partial class MainWindowViewModel : ObservableObject
                 IsArchiveLoaded = true;
                 StatusMessage = LocalizationManager.T("Status_Loaded", result.Entries.Count);
                 Title = $"{LocalizationManager.T("App_Title")} - {Path.GetFileName(path)}";
+                OnPropertyChanged(nameof(ArchiveStats));
             }
             else if (result.IsCancelled)
             {
@@ -355,18 +466,80 @@ public partial class MainWindowViewModel : ObservableObject
     private void NavigateToFolder(FolderNode node)
     {
         if (_allRawItems == null) return;
-
         CurrentFolder = node.FullPath;
-        var filtered = ArchiveEntryLister.GetEntriesInFolder(_allRawItems, node.FullPath, showSubfolders: false);
+        PopulateEntries();
+    }
 
-        CurrentEntries.Clear();
-        foreach (var item in filtered)
+    /// <summary>
+    /// 应用过滤条件并刷新当前目录的条目显示。
+    /// </summary>
+    private void FilterFiles() => PopulateEntries();
+
+    /// <summary>
+    /// 根据当前过滤条件 + 当前文件夹刷新 CurrentEntries。
+    /// </summary>
+    private void PopulateEntries()
+    {
+        if (_allRawItems == null) return;
+
+        _isProgrammaticFilter = true;
+        try
         {
-            var model = ArchiveItemModel.FromCore(item);
-            var ext = Path.GetExtension(model.Name);
-            model.IconSource = IconService.GetFileIcon(ext);
-            CurrentEntries.Add(model);
+            var filteredSource = GetFilteredSource();
+            var entries = ArchiveEntryLister.GetEntriesInFolder(
+                filteredSource, CurrentFolder ?? "", ShowSubfolders);
+
+            CurrentEntries.Clear();
+            foreach (var item in entries)
+            {
+                var model = ArchiveItemModel.FromCore(item);
+                var ext = Path.GetExtension(model.Name);
+                model.IconSource = IconService.GetFileIcon(ext);
+                CurrentEntries.Add(model);
+            }
         }
+        finally
+        {
+            _isProgrammaticFilter = false;
+        }
+    }
+
+    /// <summary>
+    /// 对 _allRawItems 应用文本/日期/大小过滤器，返回过滤后的列表。
+    /// </summary>
+    private IReadOnlyList<ArchiveItem> GetFilteredSource()
+    {
+        if (_allRawItems == null) return Array.Empty<ArchiveItem>();
+
+        IEnumerable<ArchiveItem> filtered = _allRawItems;
+
+        // Text filter
+        if (!string.IsNullOrWhiteSpace(FilterText))
+        {
+            var text = FilterText.ToLowerInvariant();
+            filtered = filtered.Where(i => i.Name.Contains(text, StringComparison.OrdinalIgnoreCase));
+        }
+
+        // Date range filter
+        if (FilterDateFrom.HasValue)
+            filtered = filtered.Where(i => i.LastModified >= FilterDateFrom.Value);
+        if (FilterDateTo.HasValue)
+            filtered = filtered.Where(i => i.LastModified <= FilterDateTo.Value);
+
+        // Size range filter
+        var multiplier = FilterSizeUnit?.ToUpperInvariant() switch
+        {
+            "KB" => 1024L,
+            "MB" => 1024L * 1024,
+            "GB" => 1024L * 1024 * 1024,
+            _ => 1L
+        };
+        if (FilterSizeMin.HasValue)
+            filtered = filtered.Where(i => i.Size >= FilterSizeMin.Value * multiplier);
+        if (FilterSizeMax.HasValue)
+            filtered = filtered.Where(i => i.Size <= FilterSizeMax.Value * multiplier);
+
+        return filtered.ToList();
     }
 
     [RelayCommand]
@@ -436,5 +609,159 @@ public partial class MainWindowViewModel : ObservableObject
                     Source = new Uri($"avares://MantisZip.UI.Avalonia/Themes/{theme}")
                 };
         }
+    }
+
+    // ── Phase 3: Archive commands ──
+
+    [RelayCommand]
+    private void CloseArchive()
+    {
+        ClearArchiveInternal();
+        StatusMessage = null;
+        Title = LocalizationManager.T("App_Title");
+    }
+
+    [RelayCommand]
+    private async Task RefreshArchive()
+    {
+        if (CurrentArchivePath == null) return;
+
+        var savedFolder = CurrentFolder;
+        var savedEntryName = SelectedEntry?.FullPath;
+
+        await LoadArchiveAsync(CurrentArchivePath);
+
+        // Restore navigation
+        if (savedEntryName != null && FolderTreeRoot != null)
+        {
+            var savedNode = FindNode(FolderTreeRoot, savedEntryName);
+            if (savedNode != null)
+            {
+                SelectedFolder = savedNode;
+                return;
+            }
+        }
+
+        if (savedFolder != null && FolderTreeRoot != null)
+        {
+            SelectedFolder = FindNode(FolderTreeRoot, savedFolder) ?? FolderTreeRoot;
+        }
+    }
+
+    [RelayCommand]
+    private async Task ExtractArchive()
+    {
+        if (CurrentArchivePath == null || ShowExtractSettingsDialog == null) return;
+
+        var vm = new ExtractSettingsViewModel(new[] { CurrentArchivePath });
+        var result = await ShowExtractSettingsDialog(vm);
+        if (result != true) return;
+
+        var dest = vm.DestinationPath;
+        var openFolder = vm.OpenFolderAfterExtract;
+
+        if (RunWithProgress == null) return;
+
+        _sessionPasswords.TryGetValue(CurrentArchivePath, out var password);
+
+        var completed = await RunWithProgress(
+            LocalizationManager.T("Status_Extracting"),
+            async (progress, ct) =>
+            {
+                await new ExtractService().ExtractAsync(
+                    CurrentArchivePath, dest, password, progress, ct);
+            });
+
+        if (completed)
+        {
+            StatusMessage = LocalizationManager.T("Status_ExtractComplete");
+        }
+    }
+
+    [RelayCommand]
+    private async Task ExtractArchiveHere()
+    {
+        if (CurrentArchivePath == null || RunWithProgress == null) return;
+
+        var dest = Path.GetDirectoryName(CurrentArchivePath)
+                   ?? Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
+
+        _sessionPasswords.TryGetValue(CurrentArchivePath, out var password);
+
+        var completed = await RunWithProgress(
+            LocalizationManager.T("Status_Extracting"),
+            async (progress, ct) =>
+            {
+                await new ExtractService().ExtractAsync(
+                    CurrentArchivePath, dest, password, progress, ct);
+            });
+
+        if (completed)
+        {
+            StatusMessage = LocalizationManager.T("Status_ExtractComplete");
+        }
+    }
+
+    [RelayCommand]
+    private async Task ExtractArchiveToName()
+    {
+        if (CurrentArchivePath == null || RunWithProgress == null) return;
+
+        var parentDir = Path.GetDirectoryName(CurrentArchivePath)
+                        ?? Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
+        var folderName = Path.GetFileNameWithoutExtension(CurrentArchivePath);
+        var dest = Path.Combine(parentDir, folderName);
+
+        _sessionPasswords.TryGetValue(CurrentArchivePath, out var password);
+
+        var completed = await RunWithProgress(
+            LocalizationManager.T("Status_Extracting"),
+            async (progress, ct) =>
+            {
+                await new ExtractService().ExtractAsync(
+                    CurrentArchivePath, dest, password, progress, ct);
+            });
+
+        if (completed)
+        {
+            StatusMessage = LocalizationManager.T("Status_ExtractComplete");
+        }
+    }
+
+    [RelayCommand]
+    private async Task NewArchive()
+    {
+        if (ShowCompressSettingsDialog == null) return;
+        var vm = new CompressSettingsViewModel(Array.Empty<string>());
+        await ShowCompressSettingsDialog(vm);
+    }
+
+    [RelayCommand]
+    private async Task CompressSelected()
+    {
+        if (ShowCompressSettingsDialog == null) return;
+        // Opens compress dialog with empty list — user picks files from filesystem in dialog
+        var vm = new CompressSettingsViewModel(Array.Empty<string>());
+        await ShowCompressSettingsDialog(vm);
+    }
+
+    [RelayCommand]
+    private async Task OpenPasswordManager()
+    {
+        if (ShowPasswordManager != null)
+            await ShowPasswordManager();
+    }
+
+    [RelayCommand]
+    private async Task OpenAbout()
+    {
+        if (ShowAboutDialog != null)
+            await ShowAboutDialog();
+    }
+
+    [RelayCommand]
+    private void ToggleFilterBar()
+    {
+        IsFilterBarVisible = !IsFilterBarVisible;
     }
 }

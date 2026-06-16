@@ -1,0 +1,91 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="MantisZip.UI.Avalonia.Dialogs.ProgressWindow"
+        x:CompileBindings="False"
+        Title="{Binding WindowTitle}"
+        Width="450" Height="180"
+        WindowStartupLocation="CenterOwner"
+        Background="{DynamicResource ThemeWindowBgBrush}">
+  <Window.Styles>
+    <Style Selector="TextBlock">
+      <Setter Property="Foreground" Value="{DynamicResource ThemeTextPrimaryBrush}" />
+    </Style>
+    <Style Selector="ProgressBar">
+      <Setter Property="Foreground" Value="{DynamicResource ThemeAccentBrush}" />
+    </Style>
+    <Style Selector="Button">
+      <Setter Property="Background" Value="{DynamicResource ThemeButtonBgBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource ThemeTextPrimaryBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource ThemeBorderBrush}" />
+    </Style>
+    <Style Selector="Button:pressed">
+      <Setter Property="Background" Value="{DynamicResource ThemeButtonPressedBrush}" />
+    </Style>
+    <Style Selector="Button:pointerover">
+      <Setter Property="Background" Value="{DynamicResource ThemeButtonHoverBrush}" />
+    </Style>
+  </Window.Styles>
+
+  <Grid RowDefinitions="*,Auto,Auto,Auto,Auto"
+        Margin="16"
+        RowSpacing="6">
+    <!-- Row 0: Status message -->
+    <TextBlock x:Name="StatusText"
+               Text="{Binding StatusMessage}"
+               TextTrimming="CharacterEllipsis"
+               VerticalAlignment="Center" />
+
+    <!-- Row 1: Per-file progress bar (file-level granularity) -->
+    <Grid Grid.Row="1">
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="*" />
+        <ColumnDefinition Width="Auto" />
+      </Grid.ColumnDefinitions>
+      <ProgressBar Grid.Column="0"
+                   Value="{Binding FilePercentComplete}"
+                   Minimum="0" Maximum="100"
+                   Height="12" />
+      <TextBlock Grid.Column="1"
+                 Text="{Binding FilePercentComplete, StringFormat=\{0\}%}"
+                 Width="38"
+                 Margin="6,0,0,0"
+                 HorizontalAlignment="Right"
+                 Foreground="{DynamicResource ThemeTextSecondaryBrush}"
+                 FontSize="11" />
+    </Grid>
+
+    <!-- Row 2: Overall progress bar -->
+    <Grid Grid.Row="2">
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="*" />
+        <ColumnDefinition Width="Auto" />
+      </Grid.ColumnDefinitions>
+      <ProgressBar Grid.Column="0"
+                   Value="{Binding PercentComplete}"
+                   Minimum="0" Maximum="100"
+                   IsIndeterminate="{Binding IsIndeterminate}"
+                   Height="18" />
+      <TextBlock Grid.Column="1"
+                 Text="{Binding PercentComplete, StringFormat=\{0\}%}"
+                 Width="38"
+                 Margin="6,0,0,0"
+                 HorizontalAlignment="Right"
+                 FontWeight="Bold"
+                 Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+    </Grid>
+
+    <!-- Row 3: Current file name -->
+    <TextBlock Grid.Row="3"
+               Text="{Binding FileName}"
+               TextTrimming="CharacterEllipsis"
+               Foreground="{DynamicResource ThemeTextSecondaryBrush}"
+               FontSize="12" />
+
+    <!-- Row 4: Cancel button -->
+    <Button Grid.Row="4"
+            Content="Cancel"
+            Command="{Binding CancelCommand}"
+            HorizontalAlignment="Right"
+            Padding="16,6" />
+  </Grid>
+</Window>

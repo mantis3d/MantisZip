@@ -2,8 +2,8 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="clr-namespace:MantisZip.UI.Avalonia.ViewModels"
         xmlns:models="clr-namespace:MantisZip.UI.Avalonia.Models"
-         xmlns:conv="clr-namespace:MantisZip.UI.Avalonia.Converters"
-         xmlns:views="clr-namespace:MantisZip.UI.Avalonia.Views"
+        xmlns:conv="clr-namespace:MantisZip.UI.Avalonia.Converters"
+        xmlns:views="clr-namespace:MantisZip.UI.Avalonia.Views"
         x:Class="MantisZip.UI.Avalonia.Views.MainWindow"
         x:DataType="vm:MainWindowViewModel"
         Title="{Binding Title}"
@@ -26,27 +26,109 @@
       <Setter Property="Background" Value="{DynamicResource ThemeListBgBrush}" />
       <Setter Property="Foreground" Value="{DynamicResource ThemeTextPrimaryBrush}" />
     </Style>
+    <!-- Toolbar button styles -->
+    <Style Selector="Button">
+      <Setter Property="Background" Value="{DynamicResource ThemeButtonBgBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource ThemeTextPrimaryBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource ThemeBorderBrush}" />
+    </Style>
+    <Style Selector="Button:pointerover">
+      <Setter Property="Background" Value="{DynamicResource ThemeButtonHoverBrush}" />
+    </Style>
+    <Style Selector="Button:pressed">
+      <Setter Property="Background" Value="{DynamicResource ThemeButtonPressedBrush}" />
+    </Style>
+    <!-- ToggleButton styles -->
+    <Style Selector="ToggleButton">
+      <Setter Property="Background" Value="{DynamicResource ThemeButtonBgBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource ThemeTextPrimaryBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource ThemeBorderBrush}" />
+    </Style>
+    <Style Selector="ToggleButton:pointerover">
+      <Setter Property="Background" Value="{DynamicResource ThemeButtonHoverBrush}" />
+    </Style>
+    <Style Selector="ToggleButton:pressed">
+      <Setter Property="Background" Value="{DynamicResource ThemeButtonPressedBrush}" />
+    </Style>
+    <Style Selector="ToggleButton:checked">
+      <Setter Property="Background" Value="{DynamicResource ThemeAccentBrush}" />
+    </Style>
+    <!-- Filter bar control styles -->
+    <Style Selector="TextBox">
+      <Setter Property="Background" Value="{DynamicResource ThemeSurfaceBgBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource ThemeTextPrimaryBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource ThemeBorderBrush}" />
+    </Style>
+    <Style Selector="ComboBox">
+      <Setter Property="Background" Value="{DynamicResource ThemeComboBoxBgBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource ThemeTextPrimaryBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource ThemeComboBoxBorderBrush}" />
+    </Style>
+    <Style Selector="ComboBoxItem">
+      <Setter Property="Background" Value="{DynamicResource ThemeComboBoxBgBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource ThemeTextPrimaryBrush}" />
+    </Style>
+    <Style Selector="ComboBoxItem:selected">
+      <Setter Property="Background" Value="{DynamicResource ThemeListSelectedBrush}" />
+    </Style>
+    <Style Selector="CheckBox">
+      <Setter Property="Foreground" Value="{DynamicResource ThemeTextPrimaryBrush}" />
+    </Style>
+    <Style Selector="DatePicker">
+      <Setter Property="Background" Value="{DynamicResource ThemeSurfaceBgBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource ThemeTextPrimaryBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource ThemeBorderBrush}" />
+    </Style>
   </Window.Styles>
 
   <Window.Resources>
     <conv:FileSizeConverter x:Key="FileSizeConverter" />
   </Window.Resources>
 
-  <Grid RowDefinitions="Auto,*,Auto">
-    <!-- Menu -->
+  <Grid RowDefinitions="Auto,Auto,Auto,*,Auto">
+    <!-- Menu (Row 0) -->
     <Menu Grid.Row="0">
       <MenuItem Header="{Binding LocalizedStrings[Menu_File]}">
         <MenuItem Header="{Binding LocalizedStrings[Menu_OpenArchive]}"
                   Command="{Binding OpenArchiveCommand}" />
+        <MenuItem Header="{Binding LocalizedStrings[Menu_CloseArchive]}"
+                  Command="{Binding CloseArchiveCommand}"
+                  IsEnabled="{Binding IsArchiveLoaded}" />
+        <MenuItem Header="{Binding LocalizedStrings[Menu_Refresh]}"
+                  Command="{Binding RefreshArchiveCommand}"
+                  IsEnabled="{Binding IsArchiveLoaded}" />
         <Separator />
         <MenuItem Header="{Binding LocalizedStrings[Menu_Settings]}"
                   Command="{Binding OpenSettingsCommand}" />
         <Separator />
         <MenuItem Header="{Binding LocalizedStrings[Menu_Exit]}" />
       </MenuItem>
+      <MenuItem Header="{Binding LocalizedStrings[Menu_Edit]}">
+        <MenuItem Header="{Binding LocalizedStrings[Menu_ExtractArchive]}"
+                  Command="{Binding ExtractArchiveCommand}"
+                  IsEnabled="{Binding IsArchiveLoaded}" />
+        <MenuItem Header="{Binding LocalizedStrings[Menu_ExtractHere]}"
+                  Command="{Binding ExtractArchiveHereCommand}"
+                  IsEnabled="{Binding IsArchiveLoaded}" />
+        <MenuItem Header="{Binding LocalizedStrings[Menu_ExtractToName]}"
+                  Command="{Binding ExtractArchiveToNameCommand}"
+                  IsEnabled="{Binding IsArchiveLoaded}" />
+        <Separator />
+        <MenuItem Header="{Binding LocalizedStrings[Menu_NewArchive]}"
+                  Command="{Binding NewArchiveCommand}" />
+        <MenuItem Header="{Binding LocalizedStrings[Menu_Compress]}"
+                  Command="{Binding CompressSelectedCommand}" />
+        <Separator />
+        <MenuItem Header="{Binding LocalizedStrings[Menu_PasswordManager]}"
+                  Command="{Binding OpenPasswordManagerCommand}" />
+      </MenuItem>
       <MenuItem Header="{Binding LocalizedStrings[Menu_View]}">
         <MenuItem Header="{Binding LocalizedStrings[Menu_ToggleTheme]}"
                   Command="{Binding ToggleThemeCommand}" />
+      </MenuItem>
+      <MenuItem Header="{Binding LocalizedStrings[Menu_Help]}">
+        <MenuItem Header="{Binding LocalizedStrings[Menu_About]}"
+                  Command="{Binding OpenAboutCommand}" />
       </MenuItem>
       <MenuItem Header="{Binding LocalizedStrings[Menu_Language]}">
         <MenuItem Header="{Binding LocalizedStrings[Menu_LangChinese]}"
@@ -56,8 +138,118 @@
       </MenuItem>
     </Menu>
 
-    <!-- Main content: TreeView | file list | preview -->
-    <Grid Grid.Row="1"
+    <!-- Toolbar (Row 1) -->
+    <Border Grid.Row="1"
+            Padding="4"
+            Background="{DynamicResource ThemeHeaderBgBrush}">
+      <StackPanel Orientation="Horizontal" Spacing="4">
+        <Button Content="{Binding LocalizedStrings[Toolbar_New]}"
+                Command="{Binding NewArchiveCommand}"
+                Height="28"
+                Padding="8,0"
+                FontSize="13" />
+        <Button Content="{Binding LocalizedStrings[Toolbar_Open]}"
+                Command="{Binding OpenArchiveCommand}"
+                Height="28"
+                Padding="8,0"
+                FontSize="13" />
+        <Button Content="{Binding LocalizedStrings[Toolbar_Extract]}"
+                Command="{Binding ExtractArchiveCommand}"
+                IsEnabled="{Binding IsArchiveLoaded}"
+                Height="28"
+                Padding="8,0"
+                FontSize="13" />
+        <Button Content="{Binding LocalizedStrings[Toolbar_Compress]}"
+                Command="{Binding CompressSelectedCommand}"
+                Height="28"
+                Padding="8,0"
+                FontSize="13" />
+        <Border Width="1"
+                Height="20"
+                VerticalAlignment="Center"
+                Background="{DynamicResource ThemeBorderBrush}"
+                Margin="4,0" />
+        <ToggleButton Content="{Binding LocalizedStrings[Toolbar_Filter]}"
+                      Command="{Binding ToggleFilterBarCommand}"
+                      IsChecked="{Binding IsFilterBarVisible}"
+                      Height="28"
+                      Padding="8,0"
+                      FontSize="13" />
+        <ToggleButton Content="{Binding LocalizedStrings[Toolbar_Preview]}"
+                      Height="28"
+                      Padding="8,0"
+                      FontSize="13" />
+      </StackPanel>
+    </Border>
+
+    <!-- Filter bar (Row 2, collapsible) -->
+    <Border Grid.Row="2"
+            IsVisible="{Binding IsFilterBarVisible}"
+            Padding="8,4"
+            Background="{DynamicResource ThemeSurfaceBgBrush}"
+            BorderBrush="{DynamicResource ThemeBorderBrush}"
+            BorderThickness="0,0,0,1">
+      <StackPanel Orientation="Horizontal"
+                    VerticalAlignment="Center">
+        <TextBlock Text="{Binding LocalizedStrings[Filter_SearchLabel]}"
+                   VerticalAlignment="Center"
+                   Foreground="{DynamicResource ThemeTextSecondaryBrush}"
+                   Margin="0,0,4,0" />
+        <TextBox Text="{Binding FilterText}"
+                 Width="160"
+                 Height="26"
+                 Margin="0,0,12,0" />
+
+        <TextBlock Text="{Binding LocalizedStrings[Filter_DateFrom]}"
+                   VerticalAlignment="Center"
+                   Foreground="{DynamicResource ThemeTextSecondaryBrush}"
+                   Margin="0,0,4,0" />
+        <DatePicker Width="130"
+                    Height="26"
+                    SelectedDate="{Binding FilterDateFrom}"
+                    Margin="0,0,12,0" />
+        <TextBlock Text="{Binding LocalizedStrings[Filter_DateTo]}"
+                   VerticalAlignment="Center"
+                   Foreground="{DynamicResource ThemeTextSecondaryBrush}"
+                   Margin="0,0,4,0" />
+        <DatePicker Width="130"
+                    Height="26"
+                    SelectedDate="{Binding FilterDateTo}"
+                    Margin="0,0,12,0" />
+
+        <TextBlock Text="{Binding LocalizedStrings[Filter_SizeMin]}"
+                   VerticalAlignment="Center"
+                   Foreground="{DynamicResource ThemeTextSecondaryBrush}"
+                   Margin="0,0,4,0" />
+        <TextBox Width="80"
+                 Height="26"
+                 Text="{Binding FilterSizeMin}"
+                 Margin="0,0,12,0" />
+        <ComboBox Width="60"
+                  Height="26"
+                  SelectedItem="{Binding FilterSizeUnit}"
+                  Margin="0,0,12,0">
+          <ComboBoxItem Content="KB" />
+          <ComboBoxItem Content="MB" />
+          <ComboBoxItem Content="GB" />
+        </ComboBox>
+        <TextBlock Text="{Binding LocalizedStrings[Filter_SizeMax]}"
+                   VerticalAlignment="Center"
+                   Foreground="{DynamicResource ThemeTextSecondaryBrush}"
+                   Margin="0,0,4,0" />
+        <TextBox Width="80"
+                 Height="26"
+                 Text="{Binding FilterSizeMax}"
+                 Margin="0,0,12,0" />
+
+        <CheckBox IsChecked="{Binding ShowSubfolders}"
+                  Content="{Binding LocalizedStrings[Filter_ShowSubfolders]}"
+                  VerticalAlignment="Center" />
+      </StackPanel>
+    </Border>
+
+    <!-- Main content: TreeView | file list | preview (Row 3) -->
+    <Grid Grid.Row="3"
           ColumnDefinitions="Auto,5,2.5*,5,3*">
       <!-- Folder tree -->
       <Border Grid.Column="0"
@@ -97,6 +289,12 @@
                 AutoGenerateColumns="False"
                 CanUserSortColumns="True"
                 IsReadOnly="True">
+        <DataGrid.ContextMenu>
+          <ContextMenu>
+            <MenuItem Header="Extract"
+                      Click="OnDataGridContextMenuExtract" />
+          </ContextMenu>
+        </DataGrid.ContextMenu>
         <DataGrid.Columns>
           <DataGridTemplateColumn Header="" Width="22">
             <DataTemplate>
@@ -108,15 +306,19 @@
           </DataGridTemplateColumn>
           <DataGridTextColumn Header="{Binding LocalizedStrings[DataGrid_Name]}"
                               Binding="{Binding NameDisplay}"
+                              SortMemberPath="Name"
                               Width="*" />
           <DataGridTextColumn Header="{Binding LocalizedStrings[DataGrid_Size]}"
                               Binding="{Binding SizeDisplay}"
+                              SortMemberPath="Size"
                               Width="80" />
           <DataGridTextColumn Header="{Binding LocalizedStrings[DataGrid_Compressed]}"
                               Binding="{Binding CompressedSizeDisplay}"
+                              SortMemberPath="CompressedSize"
                               Width="70" />
           <DataGridTextColumn Header="{Binding LocalizedStrings[DataGrid_Modified]}"
                               Binding="{Binding LastModifiedDisplay}"
+                              SortMemberPath="LastModified"
                               Width="100" />
         </DataGrid.Columns>
       </DataGrid>
@@ -129,12 +331,26 @@
                           DataContext="{Binding Preview}" />
     </Grid>
 
-    <!-- Status bar -->
-    <Border Grid.Row="2"
+    <!-- Status bar (Row 4) -->
+    <Border Grid.Row="4"
             Padding="8,4"
             Background="{DynamicResource ThemeHeaderBgBrush}">
-      <TextBlock Text="{Binding StatusMessage}"
-                 Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+      <Grid ColumnDefinitions="Auto,*,Auto">
+        <TextBlock Grid.Column="0"
+                   Text="{Binding SelectionStats}"
+                   Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                   FontSize="12" />
+        <TextBlock Grid.Column="1"
+                   Text="{Binding ArchiveStats}"
+                   Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                   FontSize="12"
+                   HorizontalAlignment="Center" />
+        <TextBlock Grid.Column="2"
+                   Text="{Binding StatusMessage}"
+                   Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                   FontSize="12"
+                   HorizontalAlignment="Right" />
+      </Grid>
     </Border>
   </Grid>
 </Window>

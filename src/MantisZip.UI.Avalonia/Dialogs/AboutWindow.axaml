@@ -1,0 +1,89 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="MantisZip.UI.Avalonia.Dialogs.AboutWindow"
+        x:CompileBindings="False"
+        Title="About MantisZip"
+        Width="400"
+        Height="300"
+        WindowStartupLocation="CenterOwner"
+        Background="{DynamicResource ThemeWindowBgBrush}">
+  <Window.Styles>
+    <Style Selector="TextBlock">
+      <Setter Property="Foreground" Value="{DynamicResource ThemeTextPrimaryBrush}" />
+    </Style>
+  </Window.Styles>
+
+  <Grid Margin="24">
+    <StackPanel VerticalAlignment="Center"
+                HorizontalAlignment="Center"
+                Spacing="12">
+      <!-- App icon placeholder -->
+      <Border Width="64"
+              Height="64"
+              CornerRadius="14"
+              Background="{DynamicResource ThemeAccentBrush}"
+              HorizontalAlignment="Center">
+        <TextBlock Text="MZ"
+                   FontSize="24"
+                   FontWeight="Bold"
+                   Foreground="White"
+                   HorizontalAlignment="Center"
+                   VerticalAlignment="Center" />
+      </Border>
+
+      <!-- App name -->
+      <TextBlock Text="MantisZip"
+                 FontSize="24"
+                 FontWeight="Bold"
+                 HorizontalAlignment="Center" />
+
+      <!-- Version -->
+      <TextBlock Text="{Binding VersionText}"
+                 FontSize="14"
+                 Foreground="{DynamicResource ThemeTextSecondaryBrush}"
+                 HorizontalAlignment="Center" />
+
+      <!-- Tech stack -->
+      <TextBlock Text=".NET 9 + Avalonia + SharpCompress"
+                 FontSize="12"
+                 Foreground="{DynamicResource ThemeTextSecondaryBrush}"
+                 TextWrapping="Wrap"
+                 TextAlignment="Center"
+                 HorizontalAlignment="Center" />
+
+      <!-- License link -->
+      <Button Content="MIT License on GitHub"
+              HorizontalAlignment="Center"
+              Background="Transparent"
+              Foreground="{DynamicResource ThemeAccentBrush}"
+              BorderThickness="0"
+              Cursor="Hand"
+              Click="OnLicenseClick">
+        <Button.Styles>
+          <Style Selector="Button:pointerover">
+            <Setter Property="Foreground" Value="{DynamicResource ThemeTextPrimaryBrush}" />
+          </Style>
+        </Button.Styles>
+      </Button>
+
+      <!-- Close button -->
+      <Button Content="Close"
+              HorizontalAlignment="Center"
+              Width="100"
+              Padding="8,6"
+              Click="OnCloseClick"
+              Background="{DynamicResource ThemeButtonBgBrush}"
+              Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+              BorderBrush="{DynamicResource ThemeBorderBrush}">
+        <Button.Styles>
+          <Style Selector="Button:pressed">
+            <Setter Property="Background" Value="{DynamicResource ThemeButtonPressedBrush}" />
+          </Style>
+          <Style Selector="Button:pointerover">
+            <Setter Property="Background" Value="{DynamicResource ThemeButtonHoverBrush}" />
+          </Style>
+        </Button.Styles>
+      </Button>
+    </StackPanel>
+  </Grid>
+</Window>

@@ -1,0 +1,268 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="MantisZip.UI.Avalonia.Dialogs.CompressSettingsWindow"
+        x:CompileBindings="False"
+        Title="{Binding WindowTitle}"
+        Width="550"
+        SizeToContent="Height"
+        WindowStartupLocation="CenterOwner"
+        Background="{DynamicResource ThemeWindowBgBrush}">
+  <Window.Styles>
+    <Style Selector="TextBlock">
+      <Setter Property="Foreground" Value="{DynamicResource ThemeTextPrimaryBrush}" />
+    </Style>
+    <Style Selector="TextBox">
+      <Setter Property="Background" Value="{DynamicResource ThemeSurfaceBgBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource ThemeTextPrimaryBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource ThemeBorderBrush}" />
+    </Style>
+    <Style Selector="ComboBox">
+      <Setter Property="Background" Value="{DynamicResource ThemeComboBoxBgBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource ThemeTextPrimaryBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource ThemeComboBoxBorderBrush}" />
+    </Style>
+    <Style Selector="ComboBoxItem">
+      <Setter Property="Background" Value="{DynamicResource ThemeComboBoxBgBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource ThemeTextPrimaryBrush}" />
+    </Style>
+    <Style Selector="ComboBoxItem:selected">
+      <Setter Property="Background" Value="{DynamicResource ThemeListSelectedBrush}" />
+    </Style>
+    <Style Selector="CheckBox">
+      <Setter Property="Foreground" Value="{DynamicResource ThemeTextPrimaryBrush}" />
+    </Style>
+    <Style Selector="RadioButton">
+      <Setter Property="Foreground" Value="{DynamicResource ThemeTextPrimaryBrush}" />
+    </Style>
+    <Style Selector="TabControl">
+      <Setter Property="Background" Value="{DynamicResource ThemeSurfaceBgBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource ThemeBorderBrush}" />
+    </Style>
+    <Style Selector="TabItem">
+      <Setter Property="Background" Value="{DynamicResource ThemeTabHeaderBgBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource ThemeTabHeaderFgBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource ThemeBorderBrush}" />
+    </Style>
+    <Style Selector="TabItem:selected">
+      <Setter Property="Background" Value="{DynamicResource ThemeHeaderBgBrush}" />
+    </Style>
+    <Style Selector="TabItem:pointerover">
+      <Setter Property="Background" Value="{DynamicResource ThemeButtonHoverBrush}" />
+    </Style>
+  </Window.Styles>
+
+  <Grid RowDefinitions="*,Auto"
+        Margin="16">
+    <!-- === Tabbed content === -->
+    <TabControl Grid.Row="0">
+      <!-- Tab 1: General -->
+      <TabItem Header="General">
+        <StackPanel Spacing="12"
+                     Margin="8">
+          <!-- Format -->
+          <TextBlock Text="Format"
+                      FontWeight="SemiBold"
+                      FontSize="14" />
+          <ComboBox SelectedItem="{Binding DefaultFormat}">
+            <ComboBoxItem Content="zip" />
+            <ComboBoxItem Content="tar.gz" />
+          </ComboBox>
+
+          <!-- Compression level -->
+          <TextBlock Text="Compression Level"
+                      FontWeight="SemiBold"
+                      FontSize="14" />
+          <Grid ColumnDefinitions="*,Auto">
+            <Slider Grid.Column="0"
+                    Minimum="1"
+                    Maximum="9"
+                    TickFrequency="1"
+                    IsSnapToTickEnabled="True"
+                    Value="{Binding CompressionLevel}" />
+            <TextBlock Grid.Column="1"
+                        Text="{Binding CompressionLevel}"
+                        Margin="12,0,0,0"
+                        VerticalAlignment="Center"
+                        FontWeight="Bold" />
+          </Grid>
+
+          <!-- Output path -->
+          <TextBlock Text="Output Path"
+                      FontWeight="SemiBold"
+                      FontSize="14" />
+          <Grid ColumnDefinitions="*,Auto">
+            <TextBox Grid.Column="0"
+                      PlaceholderText="Select output file path"
+                      Text="{Binding OutputPath}" />
+            <Button Grid.Column="1"
+                    Content="Browse"
+                    Width="80"
+                    Height="28"
+                    Margin="8,0,0,0"
+                    Command="{Binding BrowseOutputPathCommand}"
+                    Background="{DynamicResource ThemeButtonBgBrush}"
+                    Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                    BorderBrush="{DynamicResource ThemeBorderBrush}">
+              <Button.Styles>
+                <Style Selector="Button:pressed">
+                  <Setter Property="Background" Value="{DynamicResource ThemeButtonPressedBrush}" />
+                </Style>
+                <Style Selector="Button:pointerover">
+                  <Setter Property="Background" Value="{DynamicResource ThemeButtonHoverBrush}" />
+                </Style>
+              </Button.Styles>
+            </Button>
+          </Grid>
+
+          <!-- Source files summary -->
+          <TextBlock Text="Source Files"
+                      FontWeight="SemiBold"
+                      FontSize="14" />
+          <TextBlock Text="{Binding SelectedPathsSummary}"
+                      FontSize="12"
+                      Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+        </StackPanel>
+      </TabItem>
+
+      <!-- Tab 2: Password -->
+      <TabItem Header="Password">
+        <StackPanel Spacing="12"
+                     Margin="8">
+          <!-- Password -->
+          <TextBlock Text="Password"
+                      FontWeight="SemiBold"
+                      FontSize="14" />
+          <Grid ColumnDefinitions="*,Auto">
+            <TextBox Grid.Column="0"
+                      x:Name="PasswordTextBox"
+                      PlaceholderText="Enter password"
+                      Text="{Binding Password}"
+                      PasswordChar="●" />
+            <Button Grid.Column="1"
+                    x:Name="RevealButton"
+                    Content="Show"
+                    Width="60"
+                    Height="28"
+                    Margin="8,0,0,0"
+                    Click="TogglePasswordReveal"
+                    Background="{DynamicResource ThemeButtonBgBrush}"
+                    Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                    BorderBrush="{DynamicResource ThemeBorderBrush}">
+              <Button.Styles>
+                <Style Selector="Button:pressed">
+                  <Setter Property="Background" Value="{DynamicResource ThemeButtonPressedBrush}" />
+                </Style>
+                <Style Selector="Button:pointerover">
+                  <Setter Property="Background" Value="{DynamicResource ThemeButtonHoverBrush}" />
+                </Style>
+              </Button.Styles>
+            </Button>
+          </Grid>
+
+          <!-- Confirm password -->
+          <TextBlock Text="Confirm Password"
+                      FontWeight="SemiBold"
+                      FontSize="14" />
+          <TextBox PlaceholderText="Confirm password"
+                    Text="{Binding ConfirmPassword}"
+                    PasswordChar="●" />
+
+          <!-- Password strength -->
+          <TextBlock FontSize="12"
+                      Foreground="{DynamicResource ThemeTextSecondaryBrush}">
+            <Run Text="Strength: " />
+            <Run Text="{Binding PasswordStrength}" FontWeight="Bold" />
+          </TextBlock>
+
+          <!-- Password match indicator -->
+          <TextBlock x:Name="PasswordMatchIndicator"
+                      FontSize="12"
+                      IsVisible="False" />
+
+          <!-- Encrypt checkbox -->
+          <CheckBox IsChecked="{Binding Encrypt}">
+            <TextBlock Text="Encrypt archive"
+                        TextWrapping="Wrap" />
+          </CheckBox>
+        </StackPanel>
+      </TabItem>
+
+      <!-- Tab 3: Comment -->
+      <TabItem Header="Comment">
+        <StackPanel Spacing="12"
+                     Margin="8">
+          <!-- Hint -->
+          <TextBlock Text="Note: Only ZIP format supports comments."
+                      FontSize="12"
+                      FontStyle="Italic"
+                      Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+
+          <!-- Comment text -->
+          <TextBox PlaceholderText="Enter archive comment"
+                    Text="{Binding Comment}"
+                    AcceptsReturn="True"
+                    MinHeight="80"
+                    TextWrapping="Wrap" />
+
+          <!-- Separator -->
+          <Separator Background="{DynamicResource ThemeBorderBrush}" />
+
+          <!-- Distribution -->
+          <TextBlock Text="Comment Distribution"
+                      FontWeight="SemiBold"
+                      FontSize="14" />
+          <RadioButton GroupName="CommentDist"
+                        IsChecked="{Binding CommentAllSame}">
+            <TextBlock Text="Same comment for all archives" TextWrapping="Wrap" />
+          </RadioButton>
+          <RadioButton GroupName="CommentDist"
+                        IsChecked="{Binding CommentFirstOnly}">
+            <TextBlock Text="First archive only" TextWrapping="Wrap" />
+          </RadioButton>
+          <RadioButton GroupName="CommentDist"
+                        IsChecked="{Binding CommentPerLine}">
+            <TextBlock Text="One line per archive (Per-Line)" TextWrapping="Wrap" />
+          </RadioButton>
+        </StackPanel>
+      </TabItem>
+    </TabControl>
+
+    <!-- === Bottom buttons === -->
+    <StackPanel Grid.Row="1"
+                Orientation="Horizontal"
+                HorizontalAlignment="Right"
+                Spacing="8"
+                Margin="0,16,0,0">
+      <Button Content="Compress"
+              Padding="20,7"
+              Command="{Binding StartCompressCommand}"
+              Background="{DynamicResource ThemeAccentBrush}"
+              Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+              BorderThickness="0">
+        <Button.Styles>
+          <Style Selector="Button:pressed">
+            <Setter Property="Opacity" Value="0.8" />
+          </Style>
+          <Style Selector="Button:pointerover">
+            <Setter Property="Opacity" Value="0.9" />
+          </Style>
+        </Button.Styles>
+      </Button>
+      <Button Content="Cancel"
+              Padding="20,7"
+              Command="{Binding CancelCommand}"
+              Background="{DynamicResource ThemeButtonBgBrush}"
+              Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+              BorderBrush="{DynamicResource ThemeBorderBrush}">
+        <Button.Styles>
+          <Style Selector="Button:pressed">
+            <Setter Property="Background" Value="{DynamicResource ThemeButtonPressedBrush}" />
+          </Style>
+          <Style Selector="Button:pointerover">
+            <Setter Property="Background" Value="{DynamicResource ThemeButtonHoverBrush}" />
+          </Style>
+        </Button.Styles>
+      </Button>
+    </StackPanel>
+  </Grid>
+</Window>

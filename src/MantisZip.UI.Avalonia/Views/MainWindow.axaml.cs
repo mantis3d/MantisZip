@@ -1,9 +1,11 @@
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
+using Avalonia.Interactivity;
 using Avalonia.Platform.Storage;
 using MantisZip.Core.Abstractions;
 using MantisZip.Core.Utils;
+using MantisZip.UI.Avalonia.Dialogs;
 using MantisZip.UI.Avalonia.Models;
 using MantisZip.UI.Avalonia.ViewModels;
 
@@ -34,6 +36,76 @@ public partial class MainWindow : Window
             return result ? dialog.Password : null;
         };
         DataContext = vm;
+
+        // ── Phase 3: Wire up ViewModel dialog callbacks ──
+
+        vm.ShowExtractSettingsDialog = async (evm) =>
+        {
+            var dialog = new ExtractSettingsWindow(evm.ArchivePaths);
+            var result = await dialog.ShowDialog<bool>(this);
+            if (result)
+            {
+                evm.DestinationPath = dialog.ViewModel.DestinationPath;
+                evm.ConflictAction = dialog.ViewModel.ConflictAction;
+                evm.OpenFolderAfterExtract = dialog.ViewModel.OpenFolderAfterExtract;
+            }
+            return result;
+        };
+
+        vm.ShowCompressSettingsDialog = async (cvm) =>
+        {
+            var dialog = new CompressSettingsWindow(cvm.SelectedPaths);
+            var result = await dialog.ShowDialog<bool>(this);
+            if (result)
+            {
+                cvm.DefaultFormat = dialog.ViewModel.DefaultFormat;
+                cvm.CompressionLevel = dialog.ViewModel.CompressionLevel;
+                cvm.OutputPath = dialog.ViewModel.OutputPath;
+                cvm.Password = dialog.ViewModel.Password;
+                cvm.Encrypt = dialog.ViewModel.Encrypt;
+                cvm.Comment = dialog.ViewModel.Comment;
+                cvm.CommentDistribution = dialog.ViewModel.CommentDistribution;
+            }
+            return result;
+        };
+
+        vm.ShowPasswordManager = async () =>
+        {
+            var dialog = new PasswordManagerWindow();
+            await dialog.ShowDialog(this);
+        };
+
+        vm.ShowAboutDialog = async () =>
+        {
+            var dialog = new AboutWindow();
+            await dialog.ShowDialog(this);
+        };
+
+        vm.RunWithProgress = async (title, operation) =>
+        {
+            var pw = new ProgressWindow(title);
+            pw.InitCancellation();
+
+            try
+            {
+                pw.Show();
+                var progress = ProgressViewModel.CreateBackgroundProgress(pw, p => pw.SetProgress(p));
+                await operation(progress, pw.CancellationToken);
+                return true;
+            }
+            catch (OperationCanceledException)
+            {
+                return false;
+            }
+            catch (Exception)
+            {
+                return false;
+            }
+            finally
+            {
+                pw.Close();
+            }
+        };
 
         // Setup drag-drop from file list
         var fileGrid = this.FindControl<DataGrid>("FileListGrid");
@@ -166,5 +238,14 @@ public partial class MainWindow : Window
         });
 
         return result.Count >= 1 ? result[0].Path.LocalPath : null;
+    }
+
+    private void OnDataGridContextMenuExtract(object? sender, RoutedEventArgs e)
+    {
+        var vm = DataContext as MainWindowViewModel;
+        if (vm?.ExtractArchiveCommand.CanExecute(null) == true)
+        {
+            vm.ExtractArchiveCommand.Execute(null);
+        }
     }
 }
