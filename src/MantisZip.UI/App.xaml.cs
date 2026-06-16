@@ -178,8 +178,8 @@ public partial class App : Application
 
                     case "--uninstall-shell":
                         ShellIntegration.Uninstall();
-                        AppMessageBox.Show(L.T(L.App_ShellUninstalled), L.T(L.App_MantisZipTitle),
-                            MessageBoxButton.OK, MessageBoxImage.Information);
+                        // 由安装程序/卸载程序（Inno Setup）调用时使用 runhidden 标志，
+                        // 无 UI 界面，直接退出即可。
                         Shutdown();
                         return;
 
@@ -196,8 +196,7 @@ public partial class App : Application
 
                     case "--uninstall-assoc":
                         ShellIntegration.UninstallAssociations();
-                        AppMessageBox.Show(L.T(L.Settings_Assoc_UninstalledMsg), L.T(L.App_MantisZipTitle),
-                            MessageBoxButton.OK, MessageBoxImage.Information);
+                        // 同上——卸载程序 runhidden 调用，无 UI。
                         Shutdown();
                         return;
 
