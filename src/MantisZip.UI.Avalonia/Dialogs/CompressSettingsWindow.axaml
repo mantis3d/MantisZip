@@ -56,11 +56,11 @@
     <!-- === Tabbed content === -->
     <TabControl Grid.Row="0">
       <!-- Tab 1: General -->
-      <TabItem Header="General">
+      <TabItem Header="{Binding LocalizedStrings[Compress_TabGeneral]}">
         <StackPanel Spacing="12"
                      Margin="8">
           <!-- Format -->
-          <TextBlock Text="Format"
+          <TextBlock Text="{Binding LocalizedStrings[Compress_Format]}"
                       FontWeight="SemiBold"
                       FontSize="14" />
           <ComboBox SelectedItem="{Binding DefaultFormat}">
@@ -69,7 +69,7 @@
           </ComboBox>
 
           <!-- Compression level -->
-          <TextBlock Text="Compression Level"
+          <TextBlock Text="{Binding LocalizedStrings[Compress_Level]}"
                       FontWeight="SemiBold"
                       FontSize="14" />
           <Grid ColumnDefinitions="*,Auto">
@@ -87,15 +87,15 @@
           </Grid>
 
           <!-- Output path -->
-          <TextBlock Text="Output Path"
+          <TextBlock Text="{Binding LocalizedStrings[Compress_OutputPath]}"
                       FontWeight="SemiBold"
                       FontSize="14" />
           <Grid ColumnDefinitions="*,Auto">
             <TextBox Grid.Column="0"
-                      PlaceholderText="Select output file path"
+                      PlaceholderText="{Binding LocalizedStrings[Compress_OutputPlaceholder]}"
                       Text="{Binding OutputPath}" />
             <Button Grid.Column="1"
-                    Content="Browse"
+                    Content="{Binding LocalizedStrings[Compress_Browse]}"
                     Width="80"
                     Height="28"
                     Margin="8,0,0,0"
@@ -115,7 +115,7 @@
           </Grid>
 
           <!-- Source files summary -->
-          <TextBlock Text="Source Files"
+          <TextBlock Text="{Binding LocalizedStrings[Compress_SourceFiles]}"
                       FontWeight="SemiBold"
                       FontSize="14" />
           <TextBlock Text="{Binding SelectedPathsSummary}"
@@ -125,22 +125,22 @@
       </TabItem>
 
       <!-- Tab 2: Password -->
-      <TabItem Header="Password">
+      <TabItem Header="{Binding LocalizedStrings[Compress_TabPassword]}">
         <StackPanel Spacing="12"
                      Margin="8">
           <!-- Password -->
-          <TextBlock Text="Password"
+          <TextBlock Text="{Binding LocalizedStrings[Compress_Password]}"
                       FontWeight="SemiBold"
                       FontSize="14" />
           <Grid ColumnDefinitions="*,Auto">
             <TextBox Grid.Column="0"
                       x:Name="PasswordTextBox"
-                      PlaceholderText="Enter password"
+                      PlaceholderText="{Binding LocalizedStrings[Compress_PasswordPlaceholder]}"
                       Text="{Binding Password}"
                       PasswordChar="●" />
             <Button Grid.Column="1"
                     x:Name="RevealButton"
-                    Content="Show"
+                    Content="{Binding LocalizedStrings[Compress_ShowPassword]}"
                     Width="60"
                     Height="28"
                     Margin="8,0,0,0"
@@ -160,17 +160,17 @@
           </Grid>
 
           <!-- Confirm password -->
-          <TextBlock Text="Confirm Password"
+          <TextBlock Text="{Binding LocalizedStrings[Compress_ConfirmPassword]}"
                       FontWeight="SemiBold"
                       FontSize="14" />
-          <TextBox PlaceholderText="Confirm password"
+          <TextBox PlaceholderText="{Binding LocalizedStrings[Compress_ConfirmPlaceholder]}"
                     Text="{Binding ConfirmPassword}"
                     PasswordChar="●" />
 
           <!-- Password strength -->
           <TextBlock FontSize="12"
                       Foreground="{DynamicResource ThemeTextSecondaryBrush}">
-            <Run Text="Strength: " />
+            <Run Text="{Binding LocalizedStrings[Compress_Strength]}" />
             <Run Text="{Binding PasswordStrength}" FontWeight="Bold" />
           </TextBlock>
 
@@ -181,24 +181,24 @@
 
           <!-- Encrypt checkbox -->
           <CheckBox IsChecked="{Binding Encrypt}">
-            <TextBlock Text="Encrypt archive"
+            <TextBlock Text="{Binding LocalizedStrings[Compress_EncryptArchive]}"
                         TextWrapping="Wrap" />
           </CheckBox>
         </StackPanel>
       </TabItem>
 
       <!-- Tab 3: Comment -->
-      <TabItem Header="Comment">
+      <TabItem Header="{Binding LocalizedStrings[Compress_TabComment]}">
         <StackPanel Spacing="12"
                      Margin="8">
           <!-- Hint -->
-          <TextBlock Text="Note: Only ZIP format supports comments."
+          <TextBlock Text="{Binding LocalizedStrings[Compress_CommentHint]}"
                       FontSize="12"
                       FontStyle="Italic"
                       Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
 
           <!-- Comment text -->
-          <TextBox PlaceholderText="Enter archive comment"
+          <TextBox PlaceholderText="{Binding LocalizedStrings[Compress_CommentPlaceholder]}"
                     Text="{Binding Comment}"
                     AcceptsReturn="True"
                     MinHeight="80"
@@ -208,20 +208,20 @@
           <Separator Background="{DynamicResource ThemeBorderBrush}" />
 
           <!-- Distribution -->
-          <TextBlock Text="Comment Distribution"
+          <TextBlock Text="{Binding LocalizedStrings[Compress_Distribution]}"
                       FontWeight="SemiBold"
                       FontSize="14" />
           <RadioButton GroupName="CommentDist"
                         IsChecked="{Binding CommentAllSame}">
-            <TextBlock Text="Same comment for all archives" TextWrapping="Wrap" />
+            <TextBlock Text="{Binding LocalizedStrings[Compress_Distribute_AllSame]}" TextWrapping="Wrap" />
           </RadioButton>
           <RadioButton GroupName="CommentDist"
                         IsChecked="{Binding CommentFirstOnly}">
-            <TextBlock Text="First archive only" TextWrapping="Wrap" />
+            <TextBlock Text="{Binding LocalizedStrings[Compress_Distribute_FirstOnly]}" TextWrapping="Wrap" />
           </RadioButton>
           <RadioButton GroupName="CommentDist"
                         IsChecked="{Binding CommentPerLine}">
-            <TextBlock Text="One line per archive (Per-Line)" TextWrapping="Wrap" />
+            <TextBlock Text="{Binding LocalizedStrings[Compress_Distribute_PerLine]}" TextWrapping="Wrap" />
           </RadioButton>
         </StackPanel>
       </TabItem>
@@ -233,7 +233,7 @@
                 HorizontalAlignment="Right"
                 Spacing="8"
                 Margin="0,16,0,0">
-      <Button Content="Compress"
+      <Button Content="{Binding LocalizedStrings[Compress_Start]}"
               Padding="20,7"
               Command="{Binding StartCompressCommand}"
               Background="{DynamicResource ThemeAccentBrush}"
@@ -248,7 +248,7 @@
           </Style>
         </Button.Styles>
       </Button>
-      <Button Content="Cancel"
+      <Button Content="{Binding LocalizedStrings[Compress_Cancel]}"
               Padding="20,7"
               Command="{Binding CancelCommand}"
               Background="{DynamicResource ThemeButtonBgBrush}"

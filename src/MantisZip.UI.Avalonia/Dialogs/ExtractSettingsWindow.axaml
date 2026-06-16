@@ -2,7 +2,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         x:Class="MantisZip.UI.Avalonia.Dialogs.ExtractSettingsWindow"
         x:CompileBindings="False"
-        Title="Extract Settings"
+        Title="{Binding LocalizedStrings[Extract_Title]}"
         Width="520"
         MinWidth="400"
         SizeToContent="Height"
@@ -45,7 +45,7 @@
     <StackPanel Grid.Row="0"
                 Spacing="14">
       <!-- Source files -->
-      <TextBlock Text="Source Archives"
+      <TextBlock Text="{Binding LocalizedStrings[Extract_SourceArchives]}"
                  FontWeight="SemiBold"
                  FontSize="14" />
       <ListBox x:Name="FileListBox"
@@ -63,15 +63,15 @@
       <Separator Background="{DynamicResource ThemeBorderBrush}" />
 
       <!-- Destination path -->
-      <TextBlock Text="Destination"
+      <TextBlock Text="{Binding LocalizedStrings[Extract_Destination]}"
                  FontWeight="SemiBold"
                  FontSize="14" />
       <Grid ColumnDefinitions="*,Auto">
         <TextBox Grid.Column="0"
-                 PlaceholderText="Select destination folder"
+                 PlaceholderText="{Binding LocalizedStrings[Extract_DestinationPlaceholder]}"
                  Text="{Binding DestinationPath}" />
         <Button Grid.Column="1"
-                Content="Browse"
+                Content="{Binding LocalizedStrings[Extract_Browse]}"
                 Width="80"
                 Height="28"
                 Margin="8,0,0,0"
@@ -96,22 +96,22 @@
       <Grid ColumnDefinitions="Auto,*"
             RowDefinitions="Auto,Auto">
         <TextBlock Grid.Row="0" Grid.Column="0"
-                   Text="When file exists:"
+                   Text="{Binding LocalizedStrings[Extract_WhenFileExists]}"
                    VerticalAlignment="Center"
                    Margin="0,0,12,0" />
         <ComboBox Grid.Row="0" Grid.Column="1"
                   SelectedItem="{Binding ConflictAction}"
                   HorizontalAlignment="Stretch">
-          <ComboBoxItem Content="Ask" />
-          <ComboBoxItem Content="Overwrite" />
-          <ComboBoxItem Content="Rename" />
-          <ComboBoxItem Content="Skip" />
+          <ComboBoxItem Content="{Binding LocalizedStrings[Extract_Conflict_Ask]}" />
+          <ComboBoxItem Content="{Binding LocalizedStrings[Extract_Conflict_Overwrite]}" />
+          <ComboBoxItem Content="{Binding LocalizedStrings[Extract_Conflict_Rename]}" />
+          <ComboBoxItem Content="{Binding LocalizedStrings[Extract_Conflict_Skip]}" />
         </ComboBox>
 
         <CheckBox Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2"
                   Margin="0,10,0,0"
                   IsChecked="{Binding OpenFolderAfterExtract}">
-          <TextBlock Text="Open folder after extract"
+          <TextBlock Text="{Binding LocalizedStrings[Extract_OpenFolder]}"
                      TextWrapping="Wrap" />
         </CheckBox>
       </Grid>
@@ -123,7 +123,7 @@
                 HorizontalAlignment="Right"
                 Spacing="8"
                 Margin="0,16,0,0">
-      <Button Content="Extract"
+      <Button Content="{Binding LocalizedStrings[Extract_Start]}"
               Padding="20,7"
               Command="{Binding ExtractCommand}"
               Background="{DynamicResource ThemeAccentBrush}"
@@ -138,7 +138,7 @@
           </Style>
         </Button.Styles>
       </Button>
-      <Button Content="Cancel"
+      <Button Content="{Binding LocalizedStrings[Extract_Cancel]}"
               Padding="20,7"
               Command="{Binding CancelCommand}"
               Background="{DynamicResource ThemeButtonBgBrush}"

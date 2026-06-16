@@ -83,7 +83,7 @@
 
     <!-- Row 4: Cancel button -->
     <Button Grid.Row="4"
-            Content="Cancel"
+            Content="{Binding LocalizedStrings[Progress_Cancel]}"
             Command="{Binding CancelCommand}"
             HorizontalAlignment="Right"
             Padding="16,6" />
