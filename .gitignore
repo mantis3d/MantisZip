@@ -2,7 +2,7 @@
 bin/
 obj/
 out/
-publish_output/
+publish_output*/
 installer/
 
 
