@@ -35,11 +35,10 @@
 | 9 | 压缩包密码输入（工具栏） | 工具栏密码按钮 | **P1** | 当前走对话框，但工具栏快捷按钮更方便 |
 | 10 | 右键菜单增强 | DataGrid ContextMenu | **P1** | 当前只有 Extract，缺 CopyName/Test/Delete/ExtractTo |
 | 11 | 工具栏 Tooltip | 每个按钮有 ToolTip | **P2** | 当前按钮无 tooltip |
-| 12 | 列排序箭头 ▲/▼ | 点击列头时显示 | **P2** | DataGrid 列头排序方向指示 |
-| 13 | 列标题 emoji 图标 | 如 📏大小、📦压缩后 | **P3** | 纯视觉改进 |
-| 14 | 空状态拖拽引导 | 未加载压缩包时显示 📂 拖拽提示 | **P1** | 当前空窗口无引导，用户不知道可以拖拽 |
-| 15 | 标题栏显示条目统计 | "MantisZip - archive.zip (42 项)" | **P2** | 当前标题只有文件名 |
-| 16 | 键盘快捷键 | Ctrl+O/W/E/C、F5 等 | **P2** | 当前无快捷键 |
+| 12 | 列标题 emoji 图标 | 如 📏大小、📦压缩后 | **P3** | 纯视觉改进 |
+| 13 | 空状态拖拽引导 | 未加载压缩包时显示 📂 拖拽提示 | **P1** | 当前空窗口无引导，用户不知道可以拖拽 |
+| 14 | 标题栏显示条目统计 | "MantisZip - archive.zip (42 项)" | **P2** | 当前标题只有文件名 |
+| 15 | 键盘快捷键 | Ctrl+O/W/E/C、F5 等 | **P2** | 当前无快捷键 |
 
 ---
 
@@ -232,53 +231,41 @@ Localization/strings.*.json        ← 添加 i18n 键
 
 ---
 
-### Task 12：列排序箭头（P2）
-
-> 当前 DataGrid 列头点击排序但没有方向指示。WPF 显示 ▲/▼。
-
-- [ ] **12.1** `MainWindowViewModel` 跟踪当前排序列和方向（`SortColumn`、`SortDirection`）
-- [ ] **12.2** 在列头绑定中动态显示 ▲/▼：
-  - 绑定 `SortMemberPath="Name"` 的列头 → 根据当前排序列追加 " ▲" 或 " ▼"
-- [ ] **12.3** 或直接启用 Avalonia DataGrid 内置的 `DataGridColumnHeader` 排序箭头样式（检查 `AreSortIndicatorsEnabled`）
-
----
-
-### Task 13：列标题 emoji 图标（P3）
 
 > WPF 列头显示 emoji：📋名称、📏大小、📦压缩后、📊压缩率、📅日期。
 
-- [ ] **13.1** `MainWindow.axaml` DataGrid 列头 Header 改为 StackPanel（emoji + 文字）：
+- [ ] **12.1** `MainWindow.axaml` DataGrid 列头 Header 改为 StackPanel（emoji + 文字）：
   - 名称列：`📋` + "名称"
   - 大小列：`📏` + "大小"
   - 压缩后列：`📦` + "压缩后"
   - 修改日期列：`📅` + "修改日期"
-- [ ] **13.2** emoji 文字从 `LocalizedStrings` 读取，不影响排序
+- [ ] **12.2** emoji 文字从 `LocalizedStrings` 读取，不影响排序
 
 ---
 
-### Task 14：空状态拖拽引导（P1）
+### Task 12：空状态拖拽引导（P1）
 
 > 未加载压缩包时，窗口中央显示一个大图标 + 提示文字："拖拽压缩包到此以打开"。
 
-- [ ] **14.1** `MainWindow.axaml` 添加空状态层（在主 Grid 的顶层）：
+- [ ] **13.1** `MainWindow.axaml` 添加空状态层（在主 Grid 的顶层）：
   - 仅 `IsArchiveLoaded == false` 时显示
   - 居中显示 📂 emoji（FontSize 64）+ 提示文字
   - 背景透明，带虚线边框（`Border` + `BorderBrush` + `BorderThickness="2"`）
-- [ ] **14.2** 空状态区域也支持拖拽（`AllowDrop` + 绑定拖入事件）
-- [ ] **14.3** 验证：启动应用 → 看到拖拽引导 → 拖入 .zip → 自动打开 → 引导消失
+- [ ] **13.2** 空状态区域也支持拖拽（`AllowDrop` + 绑定拖入事件）
+- [ ] **13.3** 验证：启动应用 → 看到拖拽引导 → 拖入 .zip → 自动打开 → 引导消失
 
 ---
 
-### Task 15：标题栏显示条目统计（P2）
+### Task 13：标题栏显示条目统计（P2）
 
-- [ ] **15.1** `MainWindowViewModel` 中 `Title` 属性在加载压缩包后显示：
+- [ ] **14.1** `MainWindowViewModel` 中 `Title` 属性在加载压缩包后显示：
   - `"MantisZip - archive.zip (42 项)"`
   - 从 `_allRawItems.Count` 获取条目数
-- [ ] **15.2** 当前已实现基本文件名标题，只需追加条目计数
+- [ ] **14.2** 当前已实现基本文件名标题，只需追加条目计数
 
 ---
 
-### Task 16：键盘快捷键（P2）
+### Task 14：键盘快捷键（P2）
 
 > WPF 版支持：Ctrl+N/O/W/E/C、F5 刷新、Delete 删除。
 
@@ -339,7 +326,6 @@ Localization/strings.*.json        ← 添加 i18n 键
 - [ ] 工具栏密码按钮 — 点击弹出密码输入，状态图标变化
 - [ ] 右键菜单 — Extract/CopyName/Test/Delete 全部可用
 - [ ] 工具栏 Tooltip — 鼠标悬停显示提示文字
-- [ ] 列排序箭头 — 点击列头时 ▲/▼ 可见
 - [ ] 列标题 emoji — 📋📏📦📅 显示在列头
 - [ ] 空状态引导 — 未加载时显示拖拽提示
 - [ ] 标题栏条目统计 — "MantisZip - archive.zip (42 项)"
