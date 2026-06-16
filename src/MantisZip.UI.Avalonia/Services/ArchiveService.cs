@@ -6,7 +6,6 @@ namespace MantisZip.UI.Avalonia.Services;
 /// <summary>
 /// 封装 Core 的 ArchiveEngineFactory，提供压缩包浏览服务。
 /// </summary>
-[System.Runtime.Versioning.SupportedOSPlatform("windows")]
 public class ArchiveService
 {
     /// <summary>

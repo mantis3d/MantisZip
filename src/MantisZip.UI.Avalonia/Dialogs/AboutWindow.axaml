@@ -7,11 +7,6 @@
         Height="300"
         WindowStartupLocation="CenterOwner"
         Background="{DynamicResource ThemeWindowBgBrush}">
-  <Window.Styles>
-    <Style Selector="TextBlock">
-      <Setter Property="Foreground" Value="{DynamicResource ThemeTextPrimaryBrush}" />
-    </Style>
-  </Window.Styles>
 
   <Grid Margin="24">
     <StackPanel VerticalAlignment="Center"
@@ -59,11 +54,6 @@
               BorderThickness="0"
               Cursor="Hand"
               Click="OnLicenseClick">
-        <Button.Styles>
-          <Style Selector="Button:pointerover">
-            <Setter Property="Foreground" Value="{DynamicResource ThemeTextPrimaryBrush}" />
-          </Style>
-        </Button.Styles>
       </Button>
 
       <!-- Close button -->
@@ -75,14 +65,6 @@
               Background="{DynamicResource ThemeButtonBgBrush}"
               Foreground="{DynamicResource ThemeTextPrimaryBrush}"
               BorderBrush="{DynamicResource ThemeBorderBrush}">
-        <Button.Styles>
-          <Style Selector="Button:pressed">
-            <Setter Property="Background" Value="{DynamicResource ThemeButtonPressedBrush}" />
-          </Style>
-          <Style Selector="Button:pointerover">
-            <Setter Property="Background" Value="{DynamicResource ThemeButtonHoverBrush}" />
-          </Style>
-        </Button.Styles>
       </Button>
     </StackPanel>
   </Grid>

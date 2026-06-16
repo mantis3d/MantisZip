@@ -9,46 +9,6 @@
         MinWidth="400"
         MinHeight="300"
         Background="{DynamicResource ThemeWindowBgBrush}">
-  <Window.Styles>
-    <Style Selector="TabItem">
-      <Setter Property="Background" Value="{DynamicResource ThemeTabHeaderBgBrush}" />
-      <Setter Property="Foreground" Value="{DynamicResource ThemeTextPrimaryBrush}" />
-    </Style>
-    <Style Selector="TabItem:selected /template/ ContentPresenter">
-      <Setter Property="Background" Value="{DynamicResource ThemeSurfaceBgBrush}" />
-      <Setter Property="Foreground" Value="{DynamicResource ThemeAccentBrush}" />
-    </Style>
-    <Style Selector="TabControl /template/ Border#PART_SelectedContentBorder">
-      <Setter Property="Background" Value="{DynamicResource ThemeSurfaceBgBrush}" />
-      <Setter Property="BorderBrush" Value="{DynamicResource ThemeBorderBrush}" />
-    </Style>
-    <Style Selector="CheckBox">
-      <Setter Property="Foreground" Value="{DynamicResource ThemeTextPrimaryBrush}" />
-    </Style>
-    <Style Selector="Label">
-      <Setter Property="Foreground" Value="{DynamicResource ThemeTextPrimaryBrush}" />
-    </Style>
-    <Style Selector="TextBlock">
-      <Setter Property="Foreground" Value="{DynamicResource ThemeTextPrimaryBrush}" />
-    </Style>
-    <Style Selector="TextBox">
-      <Setter Property="Background" Value="{DynamicResource ThemeSurfaceBgBrush}" />
-      <Setter Property="Foreground" Value="{DynamicResource ThemeTextPrimaryBrush}" />
-      <Setter Property="BorderBrush" Value="{DynamicResource ThemeBorderBrush}" />
-    </Style>
-    <Style Selector="ComboBox">
-      <Setter Property="Background" Value="{DynamicResource ThemeComboBoxBgBrush}" />
-      <Setter Property="Foreground" Value="{DynamicResource ThemeTextPrimaryBrush}" />
-      <Setter Property="BorderBrush" Value="{DynamicResource ThemeComboBoxBorderBrush}" />
-    </Style>
-    <Style Selector="ComboBoxItem">
-      <Setter Property="Background" Value="{DynamicResource ThemeComboBoxBgBrush}" />
-      <Setter Property="Foreground" Value="{DynamicResource ThemeTextPrimaryBrush}" />
-    </Style>
-    <Style Selector="ComboBoxItem:selected">
-      <Setter Property="Background" Value="{DynamicResource ThemeListSelectedBrush}" />
-    </Style>
-  </Window.Styles>
 
   <Grid RowDefinitions="*,Auto"
         Margin="12">
@@ -162,14 +122,6 @@
               Background="{DynamicResource ThemeButtonBgBrush}"
               Foreground="{DynamicResource ThemeTextPrimaryBrush}"
               BorderBrush="{DynamicResource ThemeBorderBrush}">
-        <Button.Styles>
-          <Style Selector="Button:pressed">
-            <Setter Property="Background" Value="{DynamicResource ThemeButtonPressedBrush}" />
-          </Style>
-          <Style Selector="Button:pointerover">
-            <Setter Property="Background" Value="{DynamicResource ThemeButtonHoverBrush}" />
-          </Style>
-        </Button.Styles>
       </Button>
       <Button Content="{Binding CancelText}"
               Padding="16,6"
@@ -177,14 +129,6 @@
               Background="{DynamicResource ThemeButtonBgBrush}"
               Foreground="{DynamicResource ThemeTextPrimaryBrush}"
               BorderBrush="{DynamicResource ThemeBorderBrush}">
-        <Button.Styles>
-          <Style Selector="Button:pressed">
-            <Setter Property="Background" Value="{DynamicResource ThemeButtonPressedBrush}" />
-          </Style>
-          <Style Selector="Button:pointerover">
-            <Setter Property="Background" Value="{DynamicResource ThemeButtonHoverBrush}" />
-          </Style>
-        </Button.Styles>
       </Button>
     </StackPanel>
   </Grid>

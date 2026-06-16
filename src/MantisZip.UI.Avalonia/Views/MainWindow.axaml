@@ -12,74 +12,6 @@
         MinWidth="800"
         MinHeight="500"
         Background="{DynamicResource ThemeWindowBgBrush}">
-  <Window.Styles>
-    <Style Selector="GridSplitter">
-      <Setter Property="Background" Value="{DynamicResource ThemeSplitterBgBrush}" />
-    </Style>
-    <Style Selector="Menu">
-      <Setter Property="Background" Value="{DynamicResource ThemeHeaderBgBrush}" />
-    </Style>
-    <Style Selector="ScrollViewer">
-      <Setter Property="Background" Value="{DynamicResource ThemeWindowBgBrush}" />
-    </Style>
-    <Style Selector="DataGrid">
-      <Setter Property="Background" Value="{DynamicResource ThemeListBgBrush}" />
-      <Setter Property="Foreground" Value="{DynamicResource ThemeTextPrimaryBrush}" />
-    </Style>
-    <!-- Toolbar button styles -->
-    <Style Selector="Button">
-      <Setter Property="Background" Value="{DynamicResource ThemeButtonBgBrush}" />
-      <Setter Property="Foreground" Value="{DynamicResource ThemeTextPrimaryBrush}" />
-      <Setter Property="BorderBrush" Value="{DynamicResource ThemeBorderBrush}" />
-    </Style>
-    <Style Selector="Button:pointerover">
-      <Setter Property="Background" Value="{DynamicResource ThemeButtonHoverBrush}" />
-    </Style>
-    <Style Selector="Button:pressed">
-      <Setter Property="Background" Value="{DynamicResource ThemeButtonPressedBrush}" />
-    </Style>
-    <!-- ToggleButton styles -->
-    <Style Selector="ToggleButton">
-      <Setter Property="Background" Value="{DynamicResource ThemeButtonBgBrush}" />
-      <Setter Property="Foreground" Value="{DynamicResource ThemeTextPrimaryBrush}" />
-      <Setter Property="BorderBrush" Value="{DynamicResource ThemeBorderBrush}" />
-    </Style>
-    <Style Selector="ToggleButton:pointerover">
-      <Setter Property="Background" Value="{DynamicResource ThemeButtonHoverBrush}" />
-    </Style>
-    <Style Selector="ToggleButton:pressed">
-      <Setter Property="Background" Value="{DynamicResource ThemeButtonPressedBrush}" />
-    </Style>
-    <Style Selector="ToggleButton:checked">
-      <Setter Property="Background" Value="{DynamicResource ThemeAccentBrush}" />
-    </Style>
-    <!-- Filter bar control styles -->
-    <Style Selector="TextBox">
-      <Setter Property="Background" Value="{DynamicResource ThemeSurfaceBgBrush}" />
-      <Setter Property="Foreground" Value="{DynamicResource ThemeTextPrimaryBrush}" />
-      <Setter Property="BorderBrush" Value="{DynamicResource ThemeBorderBrush}" />
-    </Style>
-    <Style Selector="ComboBox">
-      <Setter Property="Background" Value="{DynamicResource ThemeComboBoxBgBrush}" />
-      <Setter Property="Foreground" Value="{DynamicResource ThemeTextPrimaryBrush}" />
-      <Setter Property="BorderBrush" Value="{DynamicResource ThemeComboBoxBorderBrush}" />
-    </Style>
-    <Style Selector="ComboBoxItem">
-      <Setter Property="Background" Value="{DynamicResource ThemeComboBoxBgBrush}" />
-      <Setter Property="Foreground" Value="{DynamicResource ThemeTextPrimaryBrush}" />
-    </Style>
-    <Style Selector="ComboBoxItem:selected">
-      <Setter Property="Background" Value="{DynamicResource ThemeListSelectedBrush}" />
-    </Style>
-    <Style Selector="CheckBox">
-      <Setter Property="Foreground" Value="{DynamicResource ThemeTextPrimaryBrush}" />
-    </Style>
-    <Style Selector="DatePicker">
-      <Setter Property="Background" Value="{DynamicResource ThemeSurfaceBgBrush}" />
-      <Setter Property="Foreground" Value="{DynamicResource ThemeTextPrimaryBrush}" />
-      <Setter Property="BorderBrush" Value="{DynamicResource ThemeBorderBrush}" />
-    </Style>
-  </Window.Styles>
 
   <Window.Resources>
     <conv:FileSizeConverter x:Key="FileSizeConverter" />
@@ -89,46 +21,112 @@
     <!-- Menu (Row 0) -->
     <Menu Grid.Row="0">
       <MenuItem Header="{Binding LocalizedStrings[Menu_File]}">
-        <MenuItem Header="{Binding LocalizedStrings[Menu_OpenArchive]}"
-                  Command="{Binding OpenArchiveCommand}" />
-        <MenuItem Header="{Binding LocalizedStrings[Menu_CloseArchive]}"
-                  Command="{Binding CloseArchiveCommand}"
-                  IsEnabled="{Binding IsArchiveLoaded}" />
-        <MenuItem Header="{Binding LocalizedStrings[Menu_Refresh]}"
-                  Command="{Binding RefreshArchiveCommand}"
-                  IsEnabled="{Binding IsArchiveLoaded}" />
+        <MenuItem Command="{Binding OpenArchiveCommand}">
+          <MenuItem.Header>
+            <StackPanel Orientation="Horizontal" Spacing="4">
+              <TextBlock Text="📂" FontSize="14" />
+              <TextBlock Text="{Binding LocalizedStrings[Menu_OpenArchive]}" />
+            </StackPanel>
+          </MenuItem.Header>
+        </MenuItem>
+        <MenuItem Command="{Binding CloseArchiveCommand}"
+                  IsEnabled="{Binding IsArchiveLoaded}">
+          <MenuItem.Header>
+            <StackPanel Orientation="Horizontal" Spacing="4">
+              <TextBlock Text="🚪" FontSize="14" />
+              <TextBlock Text="{Binding LocalizedStrings[Menu_CloseArchive]}" />
+            </StackPanel>
+          </MenuItem.Header>
+        </MenuItem>
+        <MenuItem Command="{Binding RefreshArchiveCommand}"
+                  IsEnabled="{Binding IsArchiveLoaded}">
+          <MenuItem.Header>
+            <StackPanel Orientation="Horizontal" Spacing="4">
+              <TextBlock Text="🔄" FontSize="14" />
+              <TextBlock Text="{Binding LocalizedStrings[Menu_Refresh]}" />
+            </StackPanel>
+          </MenuItem.Header>
+        </MenuItem>
         <Separator />
-        <MenuItem Header="{Binding LocalizedStrings[Menu_Settings]}"
-                  Command="{Binding OpenSettingsCommand}" />
+        <MenuItem Command="{Binding OpenSettingsCommand}">
+          <MenuItem.Header>
+            <StackPanel Orientation="Horizontal" Spacing="4">
+              <TextBlock Text="⚙" FontSize="14" />
+              <TextBlock Text="{Binding LocalizedStrings[Menu_Settings]}" />
+            </StackPanel>
+          </MenuItem.Header>
+        </MenuItem>
         <Separator />
         <MenuItem Header="{Binding LocalizedStrings[Menu_Exit]}" />
       </MenuItem>
       <MenuItem Header="{Binding LocalizedStrings[Menu_Edit]}">
-        <MenuItem Header="{Binding LocalizedStrings[Menu_ExtractArchive]}"
-                  Command="{Binding ExtractArchiveCommand}"
-                  IsEnabled="{Binding IsArchiveLoaded}" />
-        <MenuItem Header="{Binding LocalizedStrings[Menu_ExtractHere]}"
-                  Command="{Binding ExtractArchiveHereCommand}"
-                  IsEnabled="{Binding IsArchiveLoaded}" />
-        <MenuItem Header="{Binding LocalizedStrings[Menu_ExtractToName]}"
-                  Command="{Binding ExtractArchiveToNameCommand}"
-                  IsEnabled="{Binding IsArchiveLoaded}" />
+        <MenuItem Command="{Binding ExtractArchiveCommand}"
+                  IsEnabled="{Binding IsArchiveLoaded}">
+          <MenuItem.Header>
+            <StackPanel Orientation="Horizontal" Spacing="4">
+              <TextBlock Text="📤" FontSize="14" />
+              <TextBlock Text="{Binding LocalizedStrings[Menu_ExtractArchive]}" />
+            </StackPanel>
+          </MenuItem.Header>
+        </MenuItem>
+        <MenuItem Command="{Binding ExtractArchiveHereCommand}"
+                  IsEnabled="{Binding IsArchiveLoaded}">
+          <MenuItem.Header>
+            <StackPanel Orientation="Horizontal" Spacing="4">
+              <TextBlock Text="📍" FontSize="14" />
+              <TextBlock Text="{Binding LocalizedStrings[Menu_ExtractHere]}" />
+            </StackPanel>
+          </MenuItem.Header>
+        </MenuItem>
+        <MenuItem Command="{Binding ExtractArchiveToNameCommand}"
+                  IsEnabled="{Binding IsArchiveLoaded}">
+          <MenuItem.Header>
+            <StackPanel Orientation="Horizontal" Spacing="4">
+              <TextBlock Text="📁" FontSize="14" />
+              <TextBlock Text="{Binding LocalizedStrings[Menu_ExtractToName]}" />
+            </StackPanel>
+          </MenuItem.Header>
+        </MenuItem>
         <Separator />
-        <MenuItem Header="{Binding LocalizedStrings[Menu_NewArchive]}"
-                  Command="{Binding NewArchiveCommand}" />
-        <MenuItem Header="{Binding LocalizedStrings[Menu_Compress]}"
-                  Command="{Binding CompressSelectedCommand}" />
+        <MenuItem Command="{Binding NewArchiveCommand}">
+          <MenuItem.Header>
+            <StackPanel Orientation="Horizontal" Spacing="4">
+              <TextBlock Text="🆕" FontSize="14" />
+              <TextBlock Text="{Binding LocalizedStrings[Menu_NewArchive]}" />
+            </StackPanel>
+          </MenuItem.Header>
+        </MenuItem>
+        <MenuItem Command="{Binding CompressSelectedCommand}">
+          <MenuItem.Header>
+            <StackPanel Orientation="Horizontal" Spacing="4">
+              <TextBlock Text="📥" FontSize="14" />
+              <TextBlock Text="{Binding LocalizedStrings[Menu_Compress]}" />
+            </StackPanel>
+          </MenuItem.Header>
+        </MenuItem>
         <Separator />
         <MenuItem Header="{Binding LocalizedStrings[Menu_PasswordManager]}"
                   Command="{Binding OpenPasswordManagerCommand}" />
       </MenuItem>
       <MenuItem Header="{Binding LocalizedStrings[Menu_View]}">
-        <MenuItem Header="{Binding LocalizedStrings[Menu_ToggleTheme]}"
-                  Command="{Binding ToggleThemeCommand}" />
+        <MenuItem Command="{Binding ToggleThemeCommand}">
+          <MenuItem.Header>
+            <StackPanel Orientation="Horizontal" Spacing="4">
+              <TextBlock Text="🌓" FontSize="14" />
+              <TextBlock Text="{Binding LocalizedStrings[Menu_ToggleTheme]}" />
+            </StackPanel>
+          </MenuItem.Header>
+        </MenuItem>
       </MenuItem>
       <MenuItem Header="{Binding LocalizedStrings[Menu_Help]}">
-        <MenuItem Header="{Binding LocalizedStrings[Menu_About]}"
-                  Command="{Binding OpenAboutCommand}" />
+        <MenuItem Command="{Binding OpenAboutCommand}">
+          <MenuItem.Header>
+            <StackPanel Orientation="Horizontal" Spacing="4">
+              <TextBlock Text="ℹ" FontSize="14" />
+              <TextBlock Text="{Binding LocalizedStrings[Menu_About]}" />
+            </StackPanel>
+          </MenuItem.Header>
+        </MenuItem>
       </MenuItem>
       <MenuItem Header="{Binding LocalizedStrings[Menu_Language]}">
         <MenuItem Header="{Binding LocalizedStrings[Menu_LangChinese]}"
@@ -140,47 +138,77 @@
 
     <!-- Toolbar (Row 1) -->
     <Border Grid.Row="1"
-            Padding="4"
+            Padding="6,4"
             Background="{DynamicResource ThemeHeaderBgBrush}">
       <StackPanel Orientation="Horizontal" Spacing="4">
-        <Button Content="{Binding LocalizedStrings[Toolbar_New]}"
-                Command="{Binding NewArchiveCommand}"
-                Height="28"
-                Padding="8,0"
-                FontSize="13" />
-        <Button Content="{Binding LocalizedStrings[Toolbar_Open]}"
-                Command="{Binding OpenArchiveCommand}"
-                Height="28"
-                Padding="8,0"
-                FontSize="13" />
-        <Button Content="{Binding LocalizedStrings[Toolbar_Extract]}"
-                Command="{Binding ExtractArchiveCommand}"
+        <Button Command="{Binding NewArchiveCommand}"
+                Height="42"
+                Padding="8,2"
+                FontSize="11">
+          <StackPanel>
+            <TextBlock Text="🆕" FontSize="18" HorizontalAlignment="Center" />
+            <TextBlock Text="{Binding LocalizedStrings[Toolbar_New]}"
+                       FontSize="11" HorizontalAlignment="Center" />
+          </StackPanel>
+        </Button>
+        <Button Command="{Binding OpenArchiveCommand}"
+                Height="42"
+                Padding="8,2"
+                FontSize="11">
+          <StackPanel>
+            <TextBlock Text="📂" FontSize="18" HorizontalAlignment="Center" />
+            <TextBlock Text="{Binding LocalizedStrings[Toolbar_Open]}"
+                       FontSize="11" HorizontalAlignment="Center" />
+          </StackPanel>
+        </Button>
+        <Button Command="{Binding ExtractArchiveCommand}"
                 IsEnabled="{Binding IsArchiveLoaded}"
-                Height="28"
-                Padding="8,0"
-                FontSize="13" />
-        <Button Content="{Binding LocalizedStrings[Toolbar_Compress]}"
-                Command="{Binding CompressSelectedCommand}"
-                Height="28"
-                Padding="8,0"
-                FontSize="13" />
+                Height="42"
+                Padding="8,2"
+                FontSize="11">
+          <StackPanel>
+            <TextBlock Text="📤" FontSize="18" HorizontalAlignment="Center" />
+            <TextBlock Text="{Binding LocalizedStrings[Toolbar_Extract]}"
+                       FontSize="11" HorizontalAlignment="Center" />
+          </StackPanel>
+        </Button>
+        <Button Command="{Binding CompressSelectedCommand}"
+                Height="42"
+                Padding="8,2"
+                FontSize="11">
+          <StackPanel>
+            <TextBlock Text="📥" FontSize="18" HorizontalAlignment="Center" />
+            <TextBlock Text="{Binding LocalizedStrings[Toolbar_Compress]}"
+                       FontSize="11" HorizontalAlignment="Center" />
+          </StackPanel>
+        </Button>
         <Border Width="1"
-                Height="20"
+                Height="24"
                 VerticalAlignment="Center"
                 Background="{DynamicResource ThemeBorderBrush}"
                 Margin="4,0" />
-        <ToggleButton Content="{Binding LocalizedStrings[Toolbar_Filter]}"
-                      Command="{Binding ToggleFilterBarCommand}"
+        <ToggleButton Command="{Binding ToggleFilterBarCommand}"
                       IsChecked="{Binding IsFilterBarVisible}"
-                      Height="28"
-                      Padding="8,0"
-                      FontSize="13" />
-        <ToggleButton Content="{Binding LocalizedStrings[Toolbar_Preview]}"
-                      Command="{Binding TogglePreviewCommand}"
+                      Height="42"
+                      Padding="8,2"
+                      FontSize="11">
+          <StackPanel>
+            <TextBlock Text="🔍" FontSize="18" HorizontalAlignment="Center" />
+            <TextBlock Text="{Binding LocalizedStrings[Toolbar_Filter]}"
+                       FontSize="11" HorizontalAlignment="Center" />
+          </StackPanel>
+        </ToggleButton>
+        <ToggleButton Command="{Binding TogglePreviewCommand}"
                       IsChecked="{Binding IsPreviewVisible}"
-                      Height="28"
-                      Padding="8,0"
-                      FontSize="13" />
+                      Height="42"
+                      Padding="8,2"
+                      FontSize="11">
+          <StackPanel>
+            <TextBlock Text="👁" FontSize="18" HorizontalAlignment="Center" />
+            <TextBlock Text="{Binding LocalizedStrings[Toolbar_Preview]}"
+                       FontSize="11" HorizontalAlignment="Center" />
+          </StackPanel>
+        </ToggleButton>
       </StackPanel>
     </Border>
 

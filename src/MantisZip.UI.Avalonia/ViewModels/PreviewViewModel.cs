@@ -163,15 +163,10 @@ public partial class PreviewViewModel : ObservableObject
 
     public bool HasGifControls => PreviewType == PreviewType.Gif;
 
-    private List<GifFrame>? _gifFrames;
+    private List<GifFrameData>? _gifFrames;
     private int _gifCurrentFrameIndex;
     private DispatcherTimer? _gifTimer;
 
-    private struct GifFrame
-    {
-        public global::Avalonia.Media.Imaging.Bitmap Bitmap;
-        public int DelayMs;
-    }
 
     // ── Toolbar commands ──
 
@@ -370,47 +365,17 @@ public partial class PreviewViewModel : ObservableObject
 
         try
         {
-            using var img = System.Drawing.Image.FromFile(filePath);
-            int frameCount = img.GetFrameCount(System.Drawing.Imaging.FrameDimension.Time);
-            if (frameCount <= 0)
+            var frames = GifDecoder.DecodeFrames(filePath);
+            if (frames == null || frames.Count == 0)
             {
                 ShowUnsupported("无法解码 GIF");
                 return;
             }
 
-            TotalFrames = frameCount;
+            TotalFrames = frames.Count;
             IsPlaying = true;
             CurrentFrame = 0;
             _gifCurrentFrameIndex = 0;
-
-            // 读取帧延迟（PropertyTagFrameDelay = 0x5100）
-            var delayBytes = img.GetPropertyItem(0x5100)?.Value;
-            var delays = new int[frameCount];
-            if (delayBytes != null)
-            {
-                for (int i = 0; i < frameCount; i++)
-                    delays[i] = Math.Max(50, (delayBytes[i * 4] + delayBytes[i * 4 + 1] * 256) * 10);
-            }
-            else
-            {
-                for (int i = 0; i < frameCount; i++)
-                    delays[i] = 100;
-            }
-
-            // 解码所有帧
-            var frames = new List<GifFrame>(frameCount);
-            for (int i = 0; i < frameCount; i++)
-            {
-                img.SelectActiveFrame(System.Drawing.Imaging.FrameDimension.Time, i);
-                using var ms = new MemoryStream();
-                img.Save(ms, System.Drawing.Imaging.ImageFormat.Png);
-                ms.Position = 0;
-                frames.Add(new GifFrame
-                {
-                    Bitmap = new global::Avalonia.Media.Imaging.Bitmap(ms),
-                    DelayMs = delays[i]
-                });
-            }
 
             _gifFrames = frames;
 

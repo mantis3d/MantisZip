@@ -11,5 +11,155 @@
   <Application.Styles>
     <FluentTheme />
     <StyleInclude Source="avares://Avalonia.Controls.DataGrid/Themes/Fluent.xaml"/>
+
+    <!-- ════════════════════════════════════════════ -->
+    <!-- GLOBAL CONTROL STYLES (applied app-wide)    -->
+    <!-- ════════════════════════════════════════════ -->
+
+    <!-- TextBlock -->
+    <Style Selector="TextBlock">
+      <Setter Property="Foreground" Value="{DynamicResource ThemeTextPrimaryBrush}" />
+    </Style>
+
+    <!-- TextBox -->
+    <Style Selector="TextBox">
+      <Setter Property="Background" Value="{DynamicResource ThemeSurfaceBgBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource ThemeTextPrimaryBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource ThemeBorderBrush}" />
+      <Setter Property="CornerRadius" Value="4" />
+    </Style>
+
+    <!-- Button -->
+    <Style Selector="Button">
+      <Setter Property="Background" Value="{DynamicResource ThemeButtonBgBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource ThemeTextPrimaryBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource ThemeBorderBrush}" />
+      <Setter Property="CornerRadius" Value="4" />
+      <Setter Property="Padding" Value="8,4" />
+      <Setter Property="MinHeight" Value="26" />
+    </Style>
+    <Style Selector="Button:pointerover">
+      <Setter Property="Background" Value="{DynamicResource ThemeButtonHoverBrush}" />
+    </Style>
+    <Style Selector="Button:pressed">
+      <Setter Property="Background" Value="{DynamicResource ThemeButtonPressedBrush}" />
+    </Style>
+
+    <!-- ToggleButton -->
+    <Style Selector="ToggleButton">
+      <Setter Property="Background" Value="{DynamicResource ThemeButtonBgBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource ThemeTextPrimaryBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource ThemeBorderBrush}" />
+      <Setter Property="CornerRadius" Value="4" />
+      <Setter Property="Padding" Value="8,4" />
+      <Setter Property="MinHeight" Value="26" />
+    </Style>
+    <Style Selector="ToggleButton:pointerover">
+      <Setter Property="Background" Value="{DynamicResource ThemeButtonHoverBrush}" />
+    </Style>
+    <Style Selector="ToggleButton:pressed">
+      <Setter Property="Background" Value="{DynamicResource ThemeButtonPressedBrush}" />
+    </Style>
+    <Style Selector="ToggleButton:checked">
+      <Setter Property="Background" Value="{DynamicResource ThemeAccentBrush}" />
+    </Style>
+
+    <!-- ComboBox -->
+    <Style Selector="ComboBox">
+      <Setter Property="Background" Value="{DynamicResource ThemeComboBoxBgBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource ThemeTextPrimaryBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource ThemeComboBoxBorderBrush}" />
+      <Setter Property="CornerRadius" Value="4" />
+    </Style>
+    <Style Selector="ComboBoxItem">
+      <Setter Property="Background" Value="{DynamicResource ThemeComboBoxBgBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource ThemeTextPrimaryBrush}" />
+    </Style>
+    <Style Selector="ComboBoxItem:selected">
+      <Setter Property="Background" Value="{DynamicResource ThemeListSelectedBrush}" />
+    </Style>
+
+    <!-- CheckBox -->
+    <Style Selector="CheckBox">
+      <Setter Property="Foreground" Value="{DynamicResource ThemeTextPrimaryBrush}" />
+    </Style>
+
+    <!-- RadioButton -->
+    <Style Selector="RadioButton">
+      <Setter Property="Foreground" Value="{DynamicResource ThemeTextPrimaryBrush}" />
+    </Style>
+
+    <!-- TabControl & TabItem -->
+    <Style Selector="TabControl">
+      <Setter Property="Background" Value="{DynamicResource ThemeSurfaceBgBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource ThemeBorderBrush}" />
+    </Style>
+    <Style Selector="TabItem">
+      <Setter Property="Background" Value="{DynamicResource ThemeTabHeaderBgBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource ThemeTabHeaderFgBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource ThemeBorderBrush}" />
+    </Style>
+    <Style Selector="TabItem:selected">
+      <Setter Property="Background" Value="{DynamicResource ThemeHeaderBgBrush}" />
+    </Style>
+    <Style Selector="TabItem:pointerover">
+      <Setter Property="Background" Value="{DynamicResource ThemeButtonHoverBrush}" />
+    </Style>
+
+    <!-- DataGrid -->
+    <Style Selector="DataGrid">
+      <Setter Property="Background" Value="{DynamicResource ThemeListBgBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource ThemeTextPrimaryBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource ThemeBorderBrush}" />
+    </Style>
+    <Style Selector="DataGridColumnHeader">
+      <Setter Property="Background" Value="{DynamicResource ThemeHeaderBgBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource ThemeTextPrimaryBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource ThemeBorderBrush}" />
+    </Style>
+    <Style Selector="DataGridRow">
+      <Setter Property="Background" Value="{DynamicResource ThemeListBgBrush}" />
+    </Style>
+    <Style Selector="DataGridRow:selected /template/ DataGridCell">
+      <Setter Property="Background" Value="{DynamicResource ThemeListSelectedBrush}" />
+    </Style>
+
+    <!-- DatePicker -->
+    <Style Selector="DatePicker">
+      <Setter Property="Background" Value="{DynamicResource ThemeSurfaceBgBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource ThemeTextPrimaryBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource ThemeBorderBrush}" />
+    </Style>
+
+    <!-- ProgressBar -->
+    <Style Selector="ProgressBar">
+      <Setter Property="Foreground" Value="{DynamicResource ThemeAccentBrush}" />
+      <Setter Property="Background" Value="{DynamicResource ThemeBorderBrush}" />
+    </Style>
+
+    <!-- ScrollViewer -->
+    <Style Selector="ScrollViewer">
+      <Setter Property="Background" Value="{DynamicResource ThemeWindowBgBrush}" />
+    </Style>
+
+    <!-- Menu -->
+    <Style Selector="Menu">
+      <Setter Property="Background" Value="{DynamicResource ThemeHeaderBgBrush}" />
+    </Style>
+
+    <!-- GridSplitter -->
+    <Style Selector="GridSplitter">
+      <Setter Property="Background" Value="{DynamicResource ThemeSplitterBgBrush}" />
+    </Style>
+
+    <!-- ListBox -->
+    <Style Selector="ListBox">
+      <Setter Property="Background" Value="{DynamicResource ThemeSurfaceBgBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource ThemeTextPrimaryBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource ThemeBorderBrush}" />
+    </Style>
+    <Style Selector="ListBoxItem">
+      <Setter Property="Foreground" Value="{DynamicResource ThemeTextPrimaryBrush}" />
+    </Style>
   </Application.Styles>
 </Application>

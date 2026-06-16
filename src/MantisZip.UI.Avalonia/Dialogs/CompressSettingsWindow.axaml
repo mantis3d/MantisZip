@@ -7,49 +7,6 @@
         SizeToContent="Height"
         WindowStartupLocation="CenterOwner"
         Background="{DynamicResource ThemeWindowBgBrush}">
-  <Window.Styles>
-    <Style Selector="TextBlock">
-      <Setter Property="Foreground" Value="{DynamicResource ThemeTextPrimaryBrush}" />
-    </Style>
-    <Style Selector="TextBox">
-      <Setter Property="Background" Value="{DynamicResource ThemeSurfaceBgBrush}" />
-      <Setter Property="Foreground" Value="{DynamicResource ThemeTextPrimaryBrush}" />
-      <Setter Property="BorderBrush" Value="{DynamicResource ThemeBorderBrush}" />
-    </Style>
-    <Style Selector="ComboBox">
-      <Setter Property="Background" Value="{DynamicResource ThemeComboBoxBgBrush}" />
-      <Setter Property="Foreground" Value="{DynamicResource ThemeTextPrimaryBrush}" />
-      <Setter Property="BorderBrush" Value="{DynamicResource ThemeComboBoxBorderBrush}" />
-    </Style>
-    <Style Selector="ComboBoxItem">
-      <Setter Property="Background" Value="{DynamicResource ThemeComboBoxBgBrush}" />
-      <Setter Property="Foreground" Value="{DynamicResource ThemeTextPrimaryBrush}" />
-    </Style>
-    <Style Selector="ComboBoxItem:selected">
-      <Setter Property="Background" Value="{DynamicResource ThemeListSelectedBrush}" />
-    </Style>
-    <Style Selector="CheckBox">
-      <Setter Property="Foreground" Value="{DynamicResource ThemeTextPrimaryBrush}" />
-    </Style>
-    <Style Selector="RadioButton">
-      <Setter Property="Foreground" Value="{DynamicResource ThemeTextPrimaryBrush}" />
-    </Style>
-    <Style Selector="TabControl">
-      <Setter Property="Background" Value="{DynamicResource ThemeSurfaceBgBrush}" />
-      <Setter Property="BorderBrush" Value="{DynamicResource ThemeBorderBrush}" />
-    </Style>
-    <Style Selector="TabItem">
-      <Setter Property="Background" Value="{DynamicResource ThemeTabHeaderBgBrush}" />
-      <Setter Property="Foreground" Value="{DynamicResource ThemeTabHeaderFgBrush}" />
-      <Setter Property="BorderBrush" Value="{DynamicResource ThemeBorderBrush}" />
-    </Style>
-    <Style Selector="TabItem:selected">
-      <Setter Property="Background" Value="{DynamicResource ThemeHeaderBgBrush}" />
-    </Style>
-    <Style Selector="TabItem:pointerover">
-      <Setter Property="Background" Value="{DynamicResource ThemeButtonHoverBrush}" />
-    </Style>
-  </Window.Styles>
 
   <Grid RowDefinitions="*,Auto"
         Margin="16">
@@ -103,14 +60,6 @@
                     Background="{DynamicResource ThemeButtonBgBrush}"
                     Foreground="{DynamicResource ThemeTextPrimaryBrush}"
                     BorderBrush="{DynamicResource ThemeBorderBrush}">
-              <Button.Styles>
-                <Style Selector="Button:pressed">
-                  <Setter Property="Background" Value="{DynamicResource ThemeButtonPressedBrush}" />
-                </Style>
-                <Style Selector="Button:pointerover">
-                  <Setter Property="Background" Value="{DynamicResource ThemeButtonHoverBrush}" />
-                </Style>
-              </Button.Styles>
             </Button>
           </Grid>
 
@@ -148,14 +97,6 @@
                     Background="{DynamicResource ThemeButtonBgBrush}"
                     Foreground="{DynamicResource ThemeTextPrimaryBrush}"
                     BorderBrush="{DynamicResource ThemeBorderBrush}">
-              <Button.Styles>
-                <Style Selector="Button:pressed">
-                  <Setter Property="Background" Value="{DynamicResource ThemeButtonPressedBrush}" />
-                </Style>
-                <Style Selector="Button:pointerover">
-                  <Setter Property="Background" Value="{DynamicResource ThemeButtonHoverBrush}" />
-                </Style>
-              </Button.Styles>
             </Button>
           </Grid>
 
@@ -239,14 +180,6 @@
               Background="{DynamicResource ThemeAccentBrush}"
               Foreground="{DynamicResource ThemeTextPrimaryBrush}"
               BorderThickness="0">
-        <Button.Styles>
-          <Style Selector="Button:pressed">
-            <Setter Property="Opacity" Value="0.8" />
-          </Style>
-          <Style Selector="Button:pointerover">
-            <Setter Property="Opacity" Value="0.9" />
-          </Style>
-        </Button.Styles>
       </Button>
       <Button Content="{Binding LocalizedStrings[Compress_Cancel]}"
               Padding="20,7"
@@ -254,14 +187,6 @@
               Background="{DynamicResource ThemeButtonBgBrush}"
               Foreground="{DynamicResource ThemeTextPrimaryBrush}"
               BorderBrush="{DynamicResource ThemeBorderBrush}">
-        <Button.Styles>
-          <Style Selector="Button:pressed">
-            <Setter Property="Background" Value="{DynamicResource ThemeButtonPressedBrush}" />
-          </Style>
-          <Style Selector="Button:pointerover">
-            <Setter Property="Background" Value="{DynamicResource ThemeButtonHoverBrush}" />
-          </Style>
-        </Button.Styles>
       </Button>
     </StackPanel>
   </Grid>
