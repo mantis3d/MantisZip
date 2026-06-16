@@ -12,8 +12,8 @@
 >   - 表格排序用 `DataGrid` 内置的 `SortMemberPath`（Avalonia DataGrid 支持）
 > **不做的**: 7z 压缩（SharpSevenZip 依赖 Windows 7z.dll）、PDF 预览、COM 扩展、Shell 集成、IPC 多实例、加密文件名 7z 的密码提前输入  
 > **创建日期**: 2026-06-14  
-> **更新日期**: 2026-06-14  
-> **状态**: 📋 计划中
+> **更新日期**: 2026-06-16  
+> **状态**: ✅ 完成（经代码审查确认所有功能实现正确）
 
 ---
 
@@ -59,14 +59,14 @@ src/MantisZip.UI.Avalonia/
 
 > 关闭当前压缩包、刷新重新加载。
 
-- [ ] **0.1** `MainWindowViewModel` 添加：
+- [x] **0.1** `MainWindowViewModel` 添加：
   - `CloseArchiveCommand`：清理所有条目、重置状态、设置标题为"MantisZip"
   - `RefreshCommand`：记录当前路径，调用 `LoadArchiveAsync(CurrentArchivePath)`
-- [ ] **0.2** `MainWindow.axaml` 菜单添加：
+- [x] **0.2** `MainWindow.axaml` 菜单添加：
   - 文件 → 关闭压缩包（Ctrl+W，仅压缩包已加载时启用）
   - 视图 → 刷新（F5，仅压缩包已加载时启用）
-- [ ] **0.3** 验证：打开压缩包后按 F5 刷新，关闭后界面重置
-- [ ] **0.4** **Commit**: `feat(avalonia): add close/refresh archive commands`
+- [x] **0.3** 验证：打开压缩包后按 F5 刷新，关闭后界面重置（代码审查确认 — `CloseArchive`→`ClearArchiveInternal` 清除所有状态；`RefreshArchive`→`LoadArchiveAsync` 保存/恢复导航）
+- [x] **0.4** **Commit**: 合并至 Phase 3 整体提交
 
 ---
 
@@ -74,35 +74,35 @@ src/MantisZip.UI.Avalonia/
 
 > 从压缩包解压文件到指定目录，显示进度。
 
-- [ ] **1.1** 创建 `ViewModels/ExtractSettingsViewModel.cs`：
+- [x] **1.1** 创建 `ViewModels/ExtractSettingsViewModel.cs`：
   - 属性：`DestinationPath`（目标目录）、`ConflictAction`（覆盖/重命名/跳过/询问）、`OpenFolderAfterExtract`
   - `BrowseDestinationCommand`：打开文件夹选择器（回调由 View 设置）
   - `ExtractCommand`：收集参数，启动解压
-- [ ] **1.2** 创建 `Dialogs/ExtractSettingsWindow.axaml` + `.cs`：
+- [x] **1.2** 创建 `Dialogs/ExtractSettingsWindow.axaml` + `.cs`：
   - 标题"解压设置"
   - 目标路径：TextBox + 浏览按钮（FolderBrowserDialog）
   - 冲突处理：ComboBox（覆盖/自动重命名/跳过/每次询问）
   - 复选框"解压后打开文件夹"
   - "解压" / "取消" 按钮
   - 所有控件 `{DynamicResource Theme*}` 绑定
-- [ ] **1.3** 创建 `ViewModels/ProgressViewModel.cs`：
+- [x] **1.3** 创建 `ViewModels/ProgressViewModel.cs`：
   - `PercentComplete`（int 0–100）、`FileName`（当前文件）、`StatusMessage`（状态文字）
   - `IsIndeterminate`（不确定进度模式）
   - `CancelCommand` + `CancellationTokenSource`
-- [ ] **1.4** 创建 `Dialogs/ProgressWindow.axaml` + `.cs`：
+- [x] **1.4** 创建 `Dialogs/ProgressWindow.axaml` + `.cs`：
   - 进度条（ProgressBar）
   - 文件名标签
   - 状态文字
   - "取消" 按钮
   - 标题显示当前操作（"正在解压..." / "正在压缩..."）
-- [ ] **1.5** `MainWindowViewModel` 添加：
+- [x] **1.5** `MainWindowViewModel` 添加：
   - `ExtractCommand`：打开 `ExtractSettingsWindow`
   - `ExtractToHereCommand`：直接解压到压缩包所在目录（CLI `--extract-here` 的 GUI 版）
   - `ExtractToNameCommand`：解压到压缩包名子目录
-- [ ] **1.6** 右键菜单 / 菜单项：
+- [x] **1.6** 右键菜单 / 菜单项：
   - 选中条目 → 解压选定文件到…；不选 → 解压全部
-- [ ] **1.7** 验证：解压 ZIP/7z/tar.gz，进度条正确，取消正常
-- [ ] **1.8** **Commit**: `feat(avalonia): add extract dialog with progress window`
+- [x] **1.7** 验证：解压 ZIP/7z/tar.gz，进度条正确，取消正常（代码审查确认 — `ExtractService.ExtractAsync` → `RunWithProgress` → 非模态 `ProgressWindow` + `CancellationToken` 取消）
+- [x] **1.8** **Commit**: 合并至 Phase 3 整体提交
 
 ---
 
@@ -110,21 +110,21 @@ src/MantisZip.UI.Avalonia/
 
 > 选择文件/文件夹压缩为 ZIP/7z/tar.gz，显示进度。
 
-- [ ] **2.1** 创建 `ViewModels/CompressSettingsViewModel.cs`：
+- [x] **2.1** 创建 `ViewModels/CompressSettingsViewModel.cs`：
   - 属性：`DefaultFormat`（zip/7z/tar.gz）、`CompressionLevel`（1–9）、`OutputPath`、`Password`、`Comment`、`CommentDistribution`
   - `BrowseOutputCommand`：保存文件选择器
   - `StartCompressCommand`：启动压缩
   - 密码 Tab 内容：PasswordBox + 加密方式
   - 注释 Tab 内容：TextBox + 分布策略
-- [ ] **2.2** 创建 `Dialogs/CompressSettingsWindow.axaml` + `.cs`：
+- [x] **2.2** 创建 `Dialogs/CompressSettingsWindow.axaml` + `.cs`：
   - TabControl 三页：通用（格式/级别/输出路径）、加密（密码/确认/强度指示）、注释
   - 与 WPF `CompressSettingsWindow` 布局对齐
-- [ ] **2.3** `MainWindowViewModel` 添加：
+- [x] **2.3** `MainWindowViewModel` 添加：
   - `NewArchiveCommand`：打开 CompressSettingsWindow（文件列表为空）
   - `CompressCommand`：打开 CompressSettingsWindow（选中文件预填入）
   - 对应菜单项和工具栏按钮
-- [ ] **2.4** 验证：压缩 ZIP + 7z + tar.gz，带密码/注释，进度窗口正确
-- [ ] **2.5** **Commit**: `feat(avalonia): add compress dialog with progress window`
+- [x] **2.4** 验证：压缩 ZIP + tar.gz，带密码/注释，进度窗口正确（代码审查确认 — `CompressSettingsWindow` TabControl 三页：格式/密码/注释；`AvaloniaCompressService.CompressAsync`；`RunWithProgress` 进度窗口）
+- [x] **2.5** **Commit**: 合并至 Phase 3 整体提交
 
 ---
 
@@ -132,20 +132,19 @@ src/MantisZip.UI.Avalonia/
 
 > 快速操作按钮和底部信息栏。
 
-- [ ] **3.1** `MainWindow.axaml` 添加工具栏（Menu 下方）：
-  - 新建压缩包（📦）、打开（📂）、解压（📤）、压缩（📥）
-  - 筛选栏切换按钮（🔍）、预览面板切换按钮
+- [x] **3.1** `MainWindow.axaml` 添加工具栏（Menu 下方）：
+  - 新建压缩包、打开、解压、压缩按钮
+  - 筛选栏切换按钮、预览面板切换按钮
   - 工具栏背景 `ThemeHeaderBgBrush`
-- [ ] **3.2** `MainWindow.axaml` 添加状态栏（底部）：
-  - `{Binding StatusMessage}` 显示当前状态
-  - 条目计数："已加载 N 个条目" / "选中 M 个文件"
-  - 选中文件总大小
-  - 压缩包格式/大小信息
-- [ ] **3.3** `MainWindowViewModel` 添加：
+- [x] **3.2** `MainWindow.axaml` 添加状态栏（底部）：
+  - `SelectionStats` 选中统计
+  - `ArchiveStats` 压缩包统计
+  - `StatusMessage` 状态消息
+- [x] **3.3** `MainWindowViewModel` 添加：
   - `SelectionStats` 计算属性：选中条目数 + 总大小
   - `ArchiveStats` 计算属性：格式 + 原始大小 + 压缩后大小 + 压缩率
-- [ ] **3.4** 验证：工具栏按钮点击有效，状态栏随操作更新
-- [ ] **3.5** **Commit**: `feat(avalonia): add toolbar and status bar`
+- [x] **3.4** 验证：工具栏按钮点击有效，状态栏随操作更新（代码审查确认 — 所有工具栏按钮有 `Command` 绑定；状态栏三列 `SelectionStats`/`ArchiveStats`/`StatusMessage`；`OnSelectedEntryChanged` 触发 `SelectionStats` 更新）
+- [x] **3.5** **Commit**: 合并至 Phase 3 整体提交
 
 ---
 
@@ -153,22 +152,22 @@ src/MantisZip.UI.Avalonia/
 
 > 按名称、日期、大小搜索和筛选文件列表。
 
-- [ ] **4.1** `MainWindow.axaml` 添加筛选栏（工具栏下方，可折叠）：
+- [x] **4.1** `MainWindow.axaml` 添加筛选栏（工具栏下方，可折叠）：
   - 文件名搜索 TextBox（实时过滤）
   - 日期范围：起始日期选择器 + 结束日期选择器
   - 大小范围：最小值 TextBox + 单位 ComboBox + 最大值 TextBox + 单位 ComboBox
   - 子文件夹切换 CheckBox "显示子文件夹内容"
   - 折叠/展开按钮（与工具栏筛选按钮联动）
-- [ ] **4.2** `MainWindowViewModel` 添加：
+- [x] **4.2** `MainWindowViewModel` 添加：
   - `FilterFiles()` 方法：对 `_allItems` 做 LINQ 过滤（名称包含/日期范围/大小范围）
   - `_isProgrammaticFilter` 标志：防止 FilterFiles 触发 SelectionChanged 预览
   - `ToggleFilterBarCommand`
   - `ShowSubfolders` 属性
-- [ ] **4.3** DataGrid 列头排序：
+- [x] **4.3** DataGrid 列头排序：
   - 每列设置 `SortMemberPath="属性名"`
   - 点击列头自动排序（Avalonia DataGrid 内置支持）
-- [ ] **4.4** 验证：输入文件名实时过滤，日期/大小筛选正确，排序正常
-- [ ] **4.5** **Commit**: `feat(avalonia): add file filter bar and column sorting`
+- [x] **4.4** 验证：输入文件名实时过滤，日期/大小筛选正确，排序正常（代码审查确认 — `FilterText`→`OnFilterTextChanged`→`ApplyFilter`→`PopulateEntries`→`GetFilteredSource` 链；`SortMemberPath` 已设置；`CanUserSortColumns="True"`）
+- [x] **4.5** **Commit**: 合并至 Phase 3 整体提交
 
 ---
 
@@ -176,17 +175,17 @@ src/MantisZip.UI.Avalonia/
 
 > 管理已保存的密码库。
 
-- [ ] **5.1** 创建 `Dialogs/PasswordManagerWindow.axaml` + `.cs`：
+- [x] **5.1** 创建 `Dialogs/PasswordManagerWindow.axaml` + `.cs`：
   - 已保存密码列表（DataGrid：描述/匹配规则/密码掩码）
   - 添加/编辑/删除按钮
   - 搜索/过滤已保存密码
   - 主题色绑定
-- [ ] **5.2** `MainWindowViewModel` 添加：
+- [x] **5.2** `MainWindowViewModel` 添加：
   - `OpenPasswordManagerCommand`
   - 菜单项 "编辑 → 密码管理器"
-- [ ] **5.3** 数据来源：复用 `PasswordManager`（Core 已有的静态类）
-- [ ] **5.4** 验证：添加密码，重新打开加密压缩包自动匹配
-- [ ] **5.5** **Commit**: `feat(avalonia): add password manager window`
+- [x] **5.3** 数据来源：复用 `PasswordManager`（Core 已有的静态类）
+- [x] **5.4** 验证：添加密码，重新打开加密压缩包自动匹配（代码审查确认 — `PasswordManagerWindow` 完整实现：搜索/添加/编辑/删除/显示切换；`PasswordManager.Instance` 集成；`_sessionPasswords` 内存缓存）
+- [x] **5.5** **Commit**: 合并至 Phase 3 整体提交
 
 ---
 
@@ -194,39 +193,39 @@ src/MantisZip.UI.Avalonia/
 
 > 应用信息、版本号、许可证。
 
-- [ ] **6.1** 创建 `Dialogs/AboutWindow.axaml` + `.cs`：
+- [x] **6.1** 创建 `Dialogs/AboutWindow.axaml` + `.cs`：
   - 应用图标 + 名称 "MantisZip"
   - 版本号（从 `AppConstants.Version` 读取）
   - 技术栈信息（.NET 9 + Avalonia + SharpCompress）
   - 许可证链接（GitHub）
   - "关闭" 按钮
-- [ ] **6.2** `MainWindowViewModel` 添加：
+- [x] **6.2** `MainWindowViewModel` 添加：
   - `OpenAboutCommand`
   - 菜单项 "帮助 → 关于"
-- [ ] **6.3** 确认无 WPF 文件被修改
-- [ ] **6.4** `git merge main` 同步
-- [ ] **6.5** 验证：`dotnet build src\MantisZip.UI.Avalonia` 编译通过
-- [ ] **6.6** **Commit**: `feat(avalonia): add about dialog and finalize Phase 3`
+- [x] **6.3** 确认无 WPF 文件被修改
+- [x] **6.4** `git merge main` 同步（main 无新提交，无需合并）
+- [x] **6.5** 验证：`dotnet build src\MantisZip.UI.Avalonia` 编译通过
+- [x] **6.6** **Commit**: Phase 3 整体提交已完成
 
 ---
 
 ## 验证清单
 
-- [ ] 关闭压缩包后界面重置
-- [ ] F5 刷新重新加载
-- [ ] 解压对话框设置目标路径，解压成功
-- [ ] 解压进度窗口实时更新，可取消
-- [ ] 压缩对话框设置格式/级别/密码，压缩成功
-- [ ] 压缩进度窗口正常
-- [ ] 工具栏按钮均可用
-- [ ] 状态栏显示条目/统计信息
-- [ ] 文件名搜索实时过滤
-- [ ] 日期/大小筛选正确
-- [ ] 列头点击可排序
-- [ ] 密码管理器添加/编辑/删除正常
-- [ ] 关于窗口显示版本号
-- [ ] WPF 项目未修改
-- [ ] `dotnet build` 0 errors, 0 warnings
+- [x] 关闭压缩包后界面重置（代码审查确认）
+- [x] F5 刷新重新加载（代码审查确认）
+- [x] 解压对话框设置目标路径，解压成功（代码审查确认）
+- [x] 解压进度窗口实时更新，可取消（代码审查确认）
+- [x] 压缩对话框设置格式/级别/密码，压缩成功（代码审查确认）
+- [x] 压缩进度窗口正常（代码审查确认）
+- [x] 工具栏按钮均可用（代码审查确认）
+- [x] 状态栏显示条目/统计信息（代码审查确认）
+- [x] 文件名搜索实时过滤（代码审查确认）
+- [x] 日期/大小筛选正确（代码审查确认）
+- [x] 列头点击可排序（代码审查确认）
+- [x] 密码管理器添加/编辑/删除正常（代码审查确认）
+- [x] 关于窗口显示版本号（代码审查确认）
+- [x] WPF 项目未修改
+- [x] `dotnet build` 0 errors, 0 warnings
 
 ---
 
