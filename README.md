@@ -122,6 +122,22 @@ MantisZip 是一款面向 Windows 的免费开源压缩/解压工具，主打**�
 
 ![压缩文件冲突](docs/images/ConflictExtract.png)
 
+### 文件列表增强
+<details>
+<summary><b>📊 展平目录与过滤工具</b></summary>
+<p align="center">
+  <br>
+
+![未展平目录](docs\images\FlieListNotFlat.png)
+
+![展平目录](docs\images\FlieListFlat.png)
+
+
+</p>
+</details>
+
+
+
 ### 🐞 调试日志
 
 开启后记录详细操作日志到 `debug.log`，帮助排查问题。提供**隐私脱敏**选项，避免泄露用户隐私。
