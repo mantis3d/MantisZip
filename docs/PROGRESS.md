@@ -21,6 +21,11 @@
 ### v0.4.0 (2026-06-15) 第一个上线版本
  - 功能基本完成，测试基本完成。第一个上线版本。
 
+7. **RELEASE_NOTES.md 移至根目录**：
+   - `docs/RELEASE_NOTES.md` → `RELEASE_NOTES.md`，方便根目录直接访问
+   - 更新 CI release workflow 中的读取路径
+   - 图片相对路径同步修正为 `docs/images/...`
+
 1. **CI 修复 — TarGzEngineTests.TestArchiveAsync_InvalidArchive_ReturnsFalse DirectoryNotFoundException**：
    - 测试在写入 corrupt .tar.gz 前未创建 `MantisZipTest\` 目录，CI 裸机上目录不存在导致 `DirectoryNotFoundException`
    - 添加 `Directory.CreateDirectory` 确保目录存在，与 ArchiveFixtures 中所有 fixture 方法的做法一致
