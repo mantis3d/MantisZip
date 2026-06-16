@@ -8,7 +8,7 @@ namespace MantisZip.UI.Avalonia.Dialogs;
 
 public partial class AboutWindow : Window
 {
-    public string VersionText => "v0.4.0";
+    public string VersionText => AppConstants.VersionDisplay;
 
     public Dictionary<string, string> LocalizedStrings { get; }
 

@@ -3,7 +3,7 @@
 > 未来待开发功能规划。已实现功能请见 [docs/PROGRESS.md](docs/PROGRESS.md)，技术架构请见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)。
 
 **项目状态**: 🟢 开发中  
-**最后更新**: 2026-06-15  
+**最后更新**: 2026-06-16  
 **当前版本**: 0.4.0
 
 ---
@@ -18,7 +18,8 @@
 | **P0** | **WPF → Avalonia 跨平台移植（Phase 0 ✅）** | [avalonia-port-phase0.md](.sisyphus/plans/avalonia-port-phase0.md) | 🟡中 | 1-2周 | avalonia-port 分支，MVVM 架构 + SkiaSharp。Phase 0 完成: 项目骨架 + 文件浏览 + 文本/CSV/PE 预览 |  
 | **P0** | **Avalonia Phase 1 ✅: 预览格式扩展 + 文件夹树 + 主题** | [avalonia-port-phase1.md](.sisyphus/plans/avalonia-port-phase1.md) | 🟡中 | 1-2周 | Phase 1 完成: 图片/GIF/SVG/字体/音频/SQLite/ISO/Torrent/Office/视频预览 + TreeView 导航 + 亮/暗主题 + 系统图标 |  
 | **P0** | **Avalonia Phase 2 ✅: 设置/密码/HTML预览/多语言 + 代码清理** | [avalonia-port-phase2.md](.sisyphus/plans/avalonia-port-phase2.md) | 🟡中 | 1-2周 | Phase 2 完成: 设置窗口、密码对话框、HTML/Markdown 预览、i18n 多语言、CLI 参数、拖拽导出、Core 重复清理 |  
-| **P0** | **Avalonia Phase 3 📋: 压缩/解压工作流 + 工具栏/筛选** | [avalonia-port-phase3.md](.sisyphus/plans/avalonia-port-phase3.md) | 🟡中 | 2-3周 | Phase 3: 压缩对话框、解压对话框、进度窗口、工具栏、状态栏、文件筛选排序、密码管理器、关于窗口。**全部跨平台，不做 Windows-only 依赖** |  
+| **P0** | **Avalonia Phase 3 ✅: 压缩/解压工作流 + 工具栏/筛选** | [avalonia-port-phase3.md](.sisyphus/plans/avalonia-port-phase3.md) | 🟡中 | 2-3周 | Phase 3 已完成: 压缩对话框、解压对话框、进度窗口、工具栏、状态栏、文件筛选排序、密码管理器、关于窗口。**全部跨平台，不做 Windows-only 依赖** |  
+| **P0** | **Avalonia Phase 4: 去残留依赖 + 测试** | [avalonia-port-phase4.md](.sisyphus/plans/avalonia-port-phase4.md) | 🟡中 | 1-2周 | 清除 Avalonia UI 层 Windows-only 依赖（IconService/SHGetFileInfo、System.Drawing/GIF 解码）→ 内置图标集 + SkiaSharp；补充 Avalonia 测试。**仅改 MantisZip.UI.Avalonia/，不改 Core** |  
 | **P2** | 便携版模式 | [portable-mode.md](.sisyphus/plans/portable-mode.md) | 🟢低 | 1-2h | 哨兵文件触发，路径重定向到 exe 目录 |
 | **P2** | 魔数识别（内容检测替代扩展名检测） | [preview-magic-detection.md](.sisyphus/plans/preview-magic-detection.md) | 🔴高 | 6-8h | 按真实内容（非扩展名）判断格式 |
 | **P2** | 提取日志与解压「后悔药」 | [extract-journal-undo.md](.sisyphus/plans/extract-journal-undo.md) | 🟡中 | 3-4h | 解压记录 + 一键回滚 |

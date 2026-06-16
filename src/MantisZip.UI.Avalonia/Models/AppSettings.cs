@@ -12,6 +12,11 @@ public class AppSettings
     public string DefaultFormat { get; set; } = "zip";
     public int DefaultLevel { get; set; } = 5;
 
+    // ===== 解压 =====
+    public string ExtractDestination { get; set; } = "ask"; // same-dir / desktop / last / ask
+    public string FileConflictAction { get; set; } = "ask"; // overwrite / rename / skip / ask
+    public bool OpenFolderAfterExtract { get; set; } = false;
+
     // ===== 预览 =====
     public bool EnableImagePreview { get; set; } = true;
     public bool EnableTextPreview { get; set; } = true;
