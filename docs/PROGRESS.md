@@ -65,6 +65,14 @@
    - 将 4 处 `docs\images\` 反斜杠路径替换为 `docs/images/` 正斜杠（GitHub 要求 URL 路径使用正斜杠）
    - 修正 `SettingDebug.png` 的 alt 文本从「压缩文件冲突」改为「调试日志设置」
 
+10. **Avalonia 对话框本地化 + 工具栏修复**：
+    - 压缩/解压/进度/关于对话框所有硬编码英文 → `LocalizedStrings` 字典绑定，支持中/英语言切换
+    - 所有对话框 ViewModel 新增 `LocalizedStrings` 属性，在构造时通过 `LocalizationManager.T()` 填充
+    - 补充 strings.en.json / strings.zh-CN.json 缺少的 11 个翻译键
+    - 工具栏 Preview 按钮补全 `TogglePreviewCommand` 和 `IsChecked` 绑定（之前是死按钮）
+    - 筛选栏 Filter_* 键加载到 `UpdateLocalizedStrings()` 中，筛选标签不再显示空文本
+    - 修复 XAML 筛选栏 `Filter_SearchLabel` → `Filter_Search` 键名不匹配
+
 ### v0.3.13 (2026-06-15) 完全移除 SharpZipLib 生产代码依赖
 
 0. **SharpZipLib 加密路径 → SharpSevenZip 替换**（参见 [迁移计划](.sisyphus/plans/zipengine-sharpcompress-migration.md)）：
