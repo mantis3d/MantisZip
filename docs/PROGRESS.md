@@ -8,7 +8,7 @@
 
 ## 版本
 - **当前版本**: 0.4.0
-- **发布日期**: 2026-06-12
+- **发布日期**: 2026-06-16
 
 ## 规划中
 
@@ -18,8 +18,21 @@
 
 ## 版本历史（从新到旧）
 
+### v0.4.0 (2026-06-17) 第一个上线版本的修复
+
+1. **安装包命名调整**：
+   - 自包含安装包 → `MantisZip-{version}-Setup.exe`（简洁默认名）
+   - 框架依赖安装包 → `MantisZip-{version}-Setup-NoDotNet.exe`（明确标注需 .NET runtime）
+   - RELEASE_NOTES.md 文件说明和推荐语同步更新
+
+2. **修复 release.yml 正则读取 Release Notes 失败**：
+   - 根因：`(.*?)` 未启用 `Singleline` 标志，`.` 不匹配换行符，正则永远匹配不到下一个 `## v` 标题
+   - 修复：添加 `(?s)` 使 `.` 跨行匹配
+
+
 ### v0.4.0 (2026-06-15) 第一个上线版本
   - 功能基本完成，测试基本完成。第一个上线版本。
+
 
 8. **修复 Win11 右键菜单不显示**：
    - 根因：Windows 11 忽略 HKCU 下的 COM Shell Extension 注册（`shellex\ContextMenuHandlers`），即使注册成功 Explorer 也不会加载 COM 组件

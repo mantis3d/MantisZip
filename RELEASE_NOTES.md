@@ -3,9 +3,9 @@
 ## v0.4.0
 
 ### 文件说明
-MantisZip-0.4.0-Setup.exe 是需要安装 dotnet runtime 才能运行的。 MantisZip-0.4.0-Setup-SelfContained.exe 是自包含 dotnet runtime 的。
+MantisZip-0.4.0-Setup.exe 是自包含 dotnet runtime 的。 MantisZip-0.4.0-Setup-NoDotNet.exe 是需要安装 dotnet runtime 才能运行的。
 
-**如果你不明白上面那句话是什么意思，请下载 MantisZip-0.4.0-Setup-SelfContained.exe。**
+**如果你不明白上面那句话是什么意思，请下载 MantisZip-0.4.0-Setup.exe。**
 
 ### 软件第一个版本：
 - 软件功能基本完整，测试基本完成。
