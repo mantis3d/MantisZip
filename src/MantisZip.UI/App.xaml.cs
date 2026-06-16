@@ -171,8 +171,8 @@ public partial class App : Application
                 {
                     case "--install-shell":
                         ShellIntegration.Install();
-                        AppMessageBox.Show(L.T(L.App_ShellInstalled),
-                            L.T(L.App_MantisZipTitle), MessageBoxButton.OK, MessageBoxImage.Information);
+                        // 安装程序（Inno Setup）以 nowait 调用此命令，
+                        // 无需弹确认框，安装程序已向用户报告状态。
                         Shutdown();
                         return;
 
@@ -189,8 +189,7 @@ public partial class App : Application
                                 e.Args[1].Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
                         else
                             ShellIntegration.InstallAssociations();
-                        AppMessageBox.Show(L.T(L.App_AssocInstalled),
-                            L.T(L.App_MantisZipTitle), MessageBoxButton.OK, MessageBoxImage.Information);
+                        // 安装程序以 nowait 调用，无需弹确认框。
                         Shutdown();
                         return;
 
