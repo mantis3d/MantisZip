@@ -141,14 +141,53 @@ public partial class MainWindow
             }
 
             // 普通图片 — 后台线程解码，不阻塞 UI
-            var bitmap = await Task.Run(() =>
+            var bitmap = await Task.Run<System.Windows.Media.Imaging.BitmapSource>(() =>
             {
-                // 先获取实际尺寸，仅对超过 1920px 的图做降采样
-                var decoder = System.Windows.Media.Imaging.BitmapDecoder.Create(
+                // PNG/ICO/WebP 需要保留 Alpha 通道：使用 BitmapDecoder + PreservePixelFormat
+                // 避免 BitmapImage 的 DecodePixelWidth 或默认转换丢失透明通道
+                bool needAlpha = ext == ".png" || ext == ".ico" || ext == ".webp";
+                if (needAlpha)
+                {
+                    var decoder = System.Windows.Media.Imaging.BitmapDecoder.Create(
+                        new Uri(filePath),
+                        System.Windows.Media.Imaging.BitmapCreateOptions.PreservePixelFormat,
+                        System.Windows.Media.Imaging.BitmapCacheOption.OnLoad);
+                    var frame = decoder.Frames[0];
+
+                    // PreservePixelFormat 返回的帧可能是 PixelFormats.Default（Alpha 数据存在但格式非标准），
+                    // WPF Image 无法正确渲染这种格式的透明通道，所以统一转成 Bgra32。
+                    // 对大图降采样（TransformedBitmap 输出即 Bgra32，同时保留 Alpha）
+                    if (frame.PixelWidth > 1920)
+                    {
+                        if (frame.CanFreeze)
+                            frame.Freeze();
+                        double scale = 1920.0 / frame.PixelWidth;
+                        var scaled = new System.Windows.Media.Imaging.TransformedBitmap(
+                            frame, new System.Windows.Media.ScaleTransform(scale, scale));
+                        scaled.Freeze();
+                        return scaled;
+                    }
+
+                    // 非降采样路径：将 Default 或其他非标准格式转为 Bgra32，确保 Alpha 能被 WPF 正确渲染
+                    if (frame.Format != PixelFormats.Bgra32 && frame.Format != PixelFormats.Pbgra32)
+                    {
+                        var converted = new System.Windows.Media.Imaging.FormatConvertedBitmap(
+                            frame, PixelFormats.Bgra32, null, 0);
+                        converted.Freeze();
+                        return converted;
+                    }
+
+                    if (frame.CanFreeze)
+                        frame.Freeze();
+                    return frame;
+                }
+
+                // 无 Alpha 格式（jpg/bmp/gif）：沿用 BitmapImage 的高效解码路径
+                var decoder2 = System.Windows.Media.Imaging.BitmapDecoder.Create(
                     new Uri(filePath),
                     System.Windows.Media.Imaging.BitmapCreateOptions.DelayCreation,
                     System.Windows.Media.Imaging.BitmapCacheOption.OnLoad);
-                int actualWidth = decoder.Frames[0].PixelWidth;
+                int actualWidth = decoder2.Frames[0].PixelWidth;
 
                 var bmp = new System.Windows.Media.Imaging.BitmapImage();
                 bmp.BeginInit();

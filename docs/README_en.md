@@ -1,33 +1,72 @@
-> 🌐 Language: [中文](../README.md) | [English](README_en.md)
+> 🌐 Language: 中文 | [English](/docs/README_en.md)
 
+<div align="center">
 
 # MantisZip
-![Logo](/docs/images/Logo.png)
+![Logo](images/Logo.png)
 
-**Lightweight all-in-one Windows compression/decompression tool**
-
-> Free & Open Source  
-> Built on .NET 9 + WPF    
-> 🤖 AI-assisted development by [OpenCode](https://opencode.ai) and [OhMyOpenCode](https://ohmyopencode.com)'s Sisyphus Agent
-
----
+Lightweight full-featured Windows compression/decompression tool
+</p>
 
 <p align="center">
-  <b>📂 Open</b> &nbsp;·&nbsp; <b>📤 Extract</b> &nbsp;·&nbsp; <b>📥 Compress</b> &nbsp;·&nbsp; <b>👁 Preview</b> &nbsp;·&nbsp; <b>🔑 Password Manager</b> &nbsp;·&nbsp; <b>📎 Drag & Drop Export</b>
+  <a href="https://buy.polar.sh/polar_cl_VaCaW2l2nWkob5CyHe4dOlhL6HrQDK4ueMA9n1JyhNc"><img src="https://img.shields.io/badge/Polar-Sponsor-pink?style=flat-square" alt="Polar Sponsor"></a>
+  <a href="https://afdian.com/a/MantisZen"><img src="https://img.shields.io/badge/Afdian-Sponsor-blue?style=flat-square" alt="爱发电"></a>
+  <a href="https://dotnet.microsoft.com/"><img src="https://img.shields.io/badge/.NET-9.0-purple?style=flat-square" alt=".NET 9"></a>
+
+  [![QQ Group](https://img.shields.io/badge/QQ%20Group-778347352-blue?style=flat-square&logo=tencent-qq&logoColor=white)](https://qm.qq.com/cgi-bin/qm/qr?k=778347352) 
+  [![discord](https://img.shields.io/badge/discord-Join-blue?style=flat-square&logo=discord&logoColor=white)](https://discord.gg/PpuyhceJpZ)
+
+</p>
+
+----
+
+![MantisZip Quick Preview Overview](images/preview-overview.gif)
+
+ ⏱️ 3-second overview: seamless switching and instant preview inside archives
+
+> Free & Open Source / Built on .NET 9 + WPF   
+> 🤖 AI-assisted development by [OpenCode](https://opencode.ai) and [Reasonix](https://reasonix.io)
+</div>
+
+----
+
+<p align="center">
+  <b>👁 Preview</b> &nbsp;·&nbsp; <b>🔑 Password Manager</b> &nbsp;·&nbsp; <b>⚙️ Advanced Extraction Options</b>
 </p>
 
 ---
 
 ## 📚 Introduction
 
-MantisZip is a free, open-source compression/decompression tool for Windows, featuring **in-archive preview** and **password manager** for enhanced convenience. You can directly view images, text, Markdown, and HTML files inside archives without extracting them first.
+MantisZip is a free, open-source compression/decompression tool for Windows, featuring **in-archive preview** and **password manager** for enhanced convenience. You can directly view images, text, Markdown, HTML, and more inside archives without extracting them first.
 
-## ✨ Features
+## ✨ Feature Highlights
 
-### In-Archive Preview
+### 👁️ In-Archive Preview
+
 Preview **images**, **text**, **HTML/Markdown**, **SVG**, **fonts**, and more directly inside archives.
 
-Some formats support **metadata display** (no full file loading required):
+#### 🔍 Deep Dive: Advanced Preview Spotlights
+
+<table width="100%">
+  <tr>
+    <td width="50%" valign="top">
+      <b>🖼️ Media & Image Preview</b><br>
+      Supports PNG transparency channel display, and embedded GIF animation playback inside archives.
+      <img src="images/preview-media.gif" alt="Image and media preview" width="100%"/>
+    </td>
+    <td width="50%" valign="top">
+      <b>📄 Document & Typography Preview</b><br>
+      Seamlessly switch between plain text, real-time Markdown rendering, HTML, PDF, and font glyph preview.
+      <img src="images/preview-docs.gif" alt="Document preview" width="100%"/>
+    </td>
+  </tr>
+</table>
+
+#### Some formats support **metadata display** (no full file loading required):
+
+<details>
+<summary><b>📊 Click to expand: In-depth data previews (SQLite databases, CSV, BitTorrent, ISO)</b></summary>
 
 | Preview Type | Information Displayed |
 |----------|----------|
@@ -39,59 +78,65 @@ Some formats support **metadata display** (no full file loading required):
 | Database (SQLite) | Encoding, page size, table count |
 | Disc image (ISO) | Volume label, format, size |
 | BitTorrent | InfoHash, file tree, Magnet link, Tracker, creator |
+</details>
 
-Future enhancement: detect file content by magic bytes rather than extension.
 
-### Password Manager
+### 🔑 Smart Password Manager
+
+![Compress password settings](images/PasswordManager.png)
+
 Save frequently used passwords and auto-match them by rules.
 
-If a correct password is entered for a file, you can choose to save it — no need to re-enter next time you open or extract. Passwords are encrypted with DPAPI.
+If a correct password is entered for a file, you can choose to save it — no need to re-enter next time you open or extract it. Passwords are encrypted with DPAPI.
 
-Supports import/export (plain JSON) for backup and migration. Max 1000 entries; auto-try limited to first 100 entries to prevent brute-force abuse.
+Supports import/export (plain JSON) for backup and migration. Max 1000 entries; auto-try limited to the first 100 entries to prevent brute-force abuse.
 
-### Extraction Conflict Options
-Beyond the usual "Overwrite", "Skip", and "Auto-rename", adds "Overwrite older files" and "Overwrite smaller files". "Auto-rename" can also seamlessly switch to manual rename.
+<details>
+<summary><b>📊 Click to expand: Password & rule setup and matching</b></summary>
+<p align="center">
+  <br>
+  During compression, you can load a password from the library or manually enter a new one.
 
-### Debug Logging
-When enabled, detailed operation logs are written to `debug.log` for troubleshooting.
+  ![Compress password settings](images/CompressPassword.png)
+
+  Opening a password-protected file prompts for password entry and rule saving.
+
+  ![Zip password prompt](images/ZipOpenPassword.png)
+
+  Once the password and matching rules are correctly set, subsequent opens match automatically without notice, and preview functions work seamlessly.
+
+  ![Password matched](images/ZipFitPassword.png)
+
+  If the password or matching rules are not correctly configured, a lock icon is shown and preview is disabled.
+
+  ![Password not matched](images/ZipNotFitPassword.png)
+</p>
+</details>
+
+### ⚡ More Extraction Conflict Options
+
+Beyond the usual "Overwrite", "Skip", and "Auto-rename", adds **"Overwrite older files"** and **"Overwrite smaller files"**. "Auto-rename" can also seamlessly switch to manual rename.
+
+![Extraction file conflict](images/ConflictCompress.png)
+
+![Compression file conflict](images/ConflictExtract.png)
+
+### 🐞 Debug Logging
+
+When enabled, detailed operation logs are written to `debug.log` for troubleshooting. Provides **privacy redaction** options to avoid leaking user privacy.
+
+![Debug log settings](images/SettingDebug.png)
 
 ---
 
 ## 🤔 Known Issues
 - This software prioritizes features and usability, so performance may lag behind mainstream compression tools. Optimization will come in future releases.
-- **Drag-and-drop export** uses 7-Zip's eager-extraction model (extracts all files to temp before initiating drag), causing delays with many large files. This feature is off by default and can be enabled in settings. A WPF OLE bridge bug prevents deferred rendering — may be rewritten with COM `VirtualFileDataObject` in the future.
-- Markdown, HTML, SVG, and PDF preview use the WebView2 control, with all external network requests blocked (only `file://` local access allowed). WebView2 initializes on first run (auto-installs if the runtime is missing).
-- Encrypted 7z/RAR archives do **not** support single-entry preview extraction (`ArchiveEntryExtractor` throws `NotSupportedException`).
+- **Drag-and-drop export** uses 7-Zip's eager-extraction model (extracts all files to temp before initiating drag), causing delays with many large files. This feature is off by default and can be enabled in settings. Future migration from WPF to Avalonia will natively resolve this platform's deferred rendering limitation.
+- Markdown, HTML, SVG, and PDF preview currently use the WebView2 control, with all external network requests blocked (only `file://` local access allowed). The architecture will be further streamlined after migrating to Avalonia.
+- Some archive formats do **not** support single-entry preview — a prompt will be shown in such cases.
 - RAR format does not support compression (read-only extraction).
+- Currently only supports Windows; cross-platform support is planned.
 
----
-
-## 🖼️ Screenshots
-
-> Coming soon
-
-### In-Archive Preview
-
-Images
-
-Text
-
-HTML
-
-Markdown
-
-Adjustable preview pane position
-
-### Password Manager
-Save frequently used password matching rules.
-
-Auto-attempt password matching during extraction.
-
-Password input
-
-### Extraction Conflict
-
-### Debug Logging
 
 ---
 
@@ -104,36 +149,36 @@ Password input
 | TAR | ✅ | ✅ | ❌ |
 | GZ / TGZ | ✅ | ✅ | ❌ |
 | RAR | ❌ | ✅ | ✅ |
-| ISO | ❌ | ✅ (read-only) | ❌ |
+| ISO | ❌ | ✅ (read-only browsing) | ❌ |
 
 ---
 
 ## 📋 System Requirements
 
-- **OS**: Windows 10 (1809+) / Windows 11
+- **OS**: Windows 10 (1809+) / Windows 11 (cross-platform support is planned)
 - **Runtime**: [.NET 9 Runtime](https://dotnet.microsoft.com/download/dotnet/9.0)
-- **WebView2 Runtime**: HTML/Markdown/SVG/PDF preview requires [WebView2 Runtime](https://developer.microsoft.com/microsoft-edge/webview2/) (preinstalled on Win11; auto-installed on Win10 or distributed via Evergreen Bootstrapper)
+- **WebView2 Runtime**: HTML/Markdown/SVG/PDF preview requires [WebView2 Runtime](https://developer.microsoft.com/microsoft-edge/webview2/)
 
 ---
 
 ## 🔧 Build
 
 ```powershell
-# 克隆仓库
-git clone https://github.com/yourusername/MantisZip.git
+# Clone the repository
+git clone https://github.com/mantis3d/MantisZip.git
 cd MantisZip
 
-# 构建
+# Build
 dotnet build src\MantisZip.UI\MantisZip.UI.csproj
 
-# 运行
+# Run
 dotnet run --project src\MantisZip.UI\MantisZip.UI.csproj
 
-# 运行测试
+# Run tests
 dotnet test tests\MantisZip.Tests\MantisZip.Tests.csproj
 ```
 
-**Output**: `src/MantisZip.UI/bin/Debug/net9.0-windows/MantisZip.UI.exe`
+**Output path**: `src/MantisZip.UI/bin/Debug/net9.0-windows/MantisZip.UI.exe`
 
 ---
 
@@ -142,43 +187,55 @@ dotnet test tests\MantisZip.Tests\MantisZip.Tests.csproj
 MantisZip supports powerful command-line invocation (e.g., for context menu integration).
 
 ```powershell
-# 打开压缩包浏览
-MantisZip.UI.exe --open "D:\文档.zip"
+# Open an archive for browsing
+MantisZip.UI.exe --open "D:\Documents.zip"
 
-# 快速压缩（默认设置直接压缩）
-MantisZip.UI.exe --compress-quick "D:\照片" -- "D:\备份.zip"
+# Quick compress (default settings)
+MantisZip.UI.exe --compress-quick "D:\Photos" -- "D:\backup.zip"
 ```
 
-See the [CLI Guide](docs/CLI.md) for the full parameter list.
+See the [CLI Guide](CLI.md) for the full parameter list.
 
 ---
 
 ## 🏗 Architecture
 
-See the [Architecture Document](docs/ARCHITECTURE.md) for details on module structure and technology stack.
+See the [Architecture Document](ARCHITECTURE.md) for details on module structure and technology stack design.
 
 ---
 
-## 📋 Roadmap
+## 📦 Third-Party Dependencies
 
-Currently in rapid iteration (v0.3.4). Supports multi-volume compression, password manager, in-archive preview, Shell context menu, and more.
+### External Tools (Runtime Dependencies)
 
-For detailed near-term feature planning and history, see [Development Plan](docs/PLAN.md).
+| Tool | Purpose | License | Notes |
+|------|--------|--------|------|
+| [7z.dll](https://www.7-zip.org/) | Native 7z/RAR parsing (SharpSevenZip binding) | GNU LGPL | Distributed with app, dynamically linked |
 
 ---
 
-## 📦 Dependencies
+## 📄 License
 
-### MantisZip.Core
+This project is licensed under the **MIT License** — see the [LICENSE](../LICENSE) file for details.
+
+---
+
+## 🙏 Acknowledgments
+
+MantisZip would not exist without the generous contributions of the global open-source community. We extend our deepest gratitude to the excellent open-source libraries, tools, and their creators on which this project depends.
+
+### 📦 Core Third-Party Libraries
+
+#### MantisZip.Core
 
 | Package | Version | Purpose | License |
 |------|------|------|--------|
-| [SharpCompress](https://github.com/adamhathcock/sharpcompress) | 0.48.1 | Core ZIP/TAR/GZ engine (replaces SharpZipLib) | MIT |
-| [SharpSevenZip](https://github.com/sevenzipsharp/SevenZipSharp) | 2.0.45 | 7z/RAR/ISO engine (wraps 7z.dll) | LGPL-2.1 |
-| [SharpZipLib](https://github.com/icsharpcode/SharpZipLib) | 1.4.2 | Legacy — minimal compatibility code | MIT |
+| [SharpCompress](https://github.com/adamhathcock/sharpcompress) | 0.48.1 | Core ZIP/TAR/GZ compression and decompression engine (replaces SharpZipLib) | MIT |
+| [SharpSevenZip](https://github.com/sevenzipsharp/SevenZipSharp) | 2.0.45 | 7z/RAR/ISO compression and decompression (wraps 7z.dll) | LGPL-2.1 |
+| [SharpZipLib](https://github.com/icsharpcode/SharpZipLib) | 1.4.2 | Testing only (test project) | MIT |
 | [System.Security.Cryptography.ProtectedData](https://github.com/dotnet/runtime) | 10.0.8 | DPAPI-encrypted password storage | MIT |
 
-### MantisZip.UI
+#### MantisZip.UI
 
 | Package | Version | Purpose | License |
 |------|------|------|--------|
@@ -189,7 +246,7 @@ For detailed near-term feature planning and history, see [Development Plan](docs
 | [WpfAnimatedGif](https://github.com/XamlAnimatedGif/WpfAnimatedGif) | 2.0.2 | GIF animation support | MIT |
 | [Microsoft.Web.WebView2](https://developer.microsoft.com/microsoft-edge/webview2/) | 1.0.3967.48 | HTML/Markdown/SVG/PDF preview (replaces WPF WebBrowser) | BSD-3-Clause |
 
-### External Tools (Runtime Dependencies)
+#### External Tools (Runtime Dependencies)
 
 | Tool | Purpose | License | Notes |
 |------|--------|--------|------|
@@ -197,42 +254,63 @@ For detailed near-term feature planning and history, see [Development Plan](docs
 
 ---
 
-## 🤝 Contributing
+### 🤖 Intelligent Development Assistance
 
-Issues and Pull Requests are welcome. See [AGENTS.md](AGENTS.md) for project conventions and notes.
+During agile development and refactoring, this project deeply leveraged the following advanced AI coding agents, achieving a leap in independent development productivity:
 
----
+- [OpenCode](https://opencode.ai) — Responsible for the foundational core async architecture and .NET 9 advanced feature refactoring.
+- [Reasonix](https://reasonix.io) — Responsible for efficient development, deep debugging, and bug fixing of core business features (e.g., in-archive preview, smart password manager).
+- [DeepSeek](https://www.deepseek.com) — Provided underlying hardcore programming large language model support throughout the project.
 
-## 📄 License
-
-This project is licensed under the **MIT License** — see the [LICENSE](LICENSE) file for details.
-
----
-
-## 🙏 Acknowledgments
-
-- [SharpCompress](https://github.com/adamhathcock/sharpcompress) — ZIP/TAR/GZ engine (MIT)
-- [SharpSevenZip](https://github.com/sevenzipsharp/SevenZipSharp) — 7z/RAR engine (LGPL-2.1)
-- [SharpZipLib](https://github.com/icsharpcode/SharpZipLib) — Legacy ZIP/TAR/GZ engine (MIT)
-- [Ude.NetStandard](https://github.com/jehugaleahsa/udetector) — Mozilla universal charset detection (MIT)
-- [CommunityToolkit.Mvvm](https://github.com/CommunityToolkit/dotnet) — MVVM toolkit (MIT)
-- [Ookii.Dialogs.Wpf](https://github.com/ookii-dialogs/ookii-dialogs-wpf) — WPF folder picker dialog (BSD-3-Clause)
-- [Markdig](https://github.com/xoofx/markdig) — Markdown rendering (BSD-2-Clause)
-- [WpfAnimatedGif](https://github.com/XamlAnimatedGif/WpfAnimatedGif) — WPF GIF animation support (MIT)
-- [Microsoft.Web.WebView2](https://developer.microsoft.com/microsoft-edge/webview2/) — WebView2 control for HTML/Markdown/SVG/PDF rendering (BSD-3-Clause)
-- [7-Zip](https://www.7-zip.org/) — 7z compression engine (GNU LGPL)
+*(Special thanks to the above AI tools and the outstanding teams behind them!)*
 
 ---
 
-## 💖 Support
+## 💖 Support the Project
 
-If MantisZip helps you, feel free to buy me a coffee ☕
+MantisZip is a completely free, independently developed open-source project. If it has boosted your productivity, consider fueling the developer with some continued motivation! ☕
 
-### Afdian
-[Support on Afdian](https://afdian.com/a/MantisZen)
-![Afdian QR Code](docs/images/afdian-MantisZen.jpg)(https://afdian.com/a/MantisZen)
-
-### WeChat Donation
-![WeChat QR Code](docs/images/afdian-MantisZen.jpg)
+### 🌐 International Sponsors
+If you are outside of China, we recommend sponsoring via Polar. Supports international credit cards, Apple Pay, and more for seamless payment:
+<p align="left">
+  <a href="https://buy.polar.sh/polar_cl_VaCaW2l2nWkob5CyHe4dOlhL6HrQDK4ueMA9n1JyhNc">
+    <img src="images/polar_logotype_black.svg" alt="Sponsor on Polar" height="40"/>
+    <img src="images/polar_logotype_white.svg" alt="Sponsor on Polar" height="40"/>
+  </a>
+</p>
 
 ---
+
+### 🇨🇳 Domestic Sponsors (China)
+If you are in China, you can support via **Afdian (WeChat/Alipay)** or **WeChat direct donation**. Scan the QR codes below:
+
+<table width="100%">
+  <tr>
+    <td width="50%" align="center" valign="top">
+      <a href="https://afdian.com/a/MantisZen">
+      <b>⚡ Support me on Afdian</b><br>      
+        <img src="images/afdian-MantisZen.jpg" alt="Afdian" width="80%"/>
+      <br><i>(Click or scan to visit the Afdian page)</i>
+      </a>
+    </td>
+    <td width="50%" align="center" valign="top">
+      <b>💚 WeChat Direct Donation</b><br><br>
+      <img src="images/wechat-Sponsor.png" alt="WeChat donation" width="80%"/>
+      <br><i>(Buy the developer a cup of coffee ☕)</i>
+    </td>
+  </tr>
+</table>
+
+
+---
+
+
+### 💬 Community & Feedback
+
+If you encounter a bug, have a feature idea, or just want to chat about WPF/.NET independent development, feel free to join our developer community:
+
+* **QQ Group**: `778347352` (👉 [Click to join](https://qm.qq.com/cgi-bin/qm/qr?k=778347352))
+* **GitHub Issues**: [Submit a Bug or Feature Request](../../issues)
+* **Discord**: (👉 [Click to join](https://discord.gg/PpuyhceJpZ))
+
+> 💡 **Tip**: Please mention "GitHub / MantisZip" when joining the group.

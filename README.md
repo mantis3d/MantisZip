@@ -10,7 +10,7 @@
 
 <p align="center">
   <a href="https://buy.polar.sh/polar_cl_VaCaW2l2nWkob5CyHe4dOlhL6HrQDK4ueMA9n1JyhNc"><img src="https://img.shields.io/badge/Polar-Sponsor-pink?style=flat-square" alt="Polar Sponsor"></a>
-  <a href="https://afdian.com/a/MantisZen"><img src="https://img.shields.io/badge/%E7%88%B1%E5%8F%91%E7%94%B5-%E8%B5%92%E5%8A%A9-blue?style=flat-square" alt="爱发电"></a>
+  <a href="https://afdian.com/a/MantisZen"><img src="https://img.shields.io/badge/爱发电-赞助-blue?style=flat-square" alt="爱发电"></a>
   <a href="https://dotnet.microsoft.com/"><img src="https://img.shields.io/badge/.NET-9.0-purple?style=flat-square" alt=".NET 9"></a>
 
   [![QQ Group](https://img.shields.io/badge/QQ%E7%BE%A4-778347352-blue?style=flat-square&logo=tencent-qq&logoColor=white)](https://qm.qq.com/cgi-bin/qm/qr?k=778347352) 
@@ -81,6 +81,7 @@ MantisZip 是一款面向 Windows 的免费开源压缩/解压工具，主打**�
 | BT 种子 | InfoHash、文件树、Magnet 链接、Tracker、创建者 |
 </details>
 
+----
 
 ### 🔑 智能密码管理器
 
@@ -114,6 +115,8 @@ MantisZip 是一款面向 Windows 的免费开源压缩/解压工具，主打**�
 </p>
 </details>
 
+----
+
 ### ⚡ 更多解压冲突选项
 
 除了其他软件的「覆盖」「跳过」和「自动重命名」之外，还增加了「覆盖旧文件」和「覆盖小文件」，「自动重命名」也可无缝切换至手动重命名。
@@ -121,6 +124,44 @@ MantisZip 是一款面向 Windows 的免费开源压缩/解压工具，主打**�
 ![解压文件冲突](docs/images/ConflictCompress.png)
 
 ![压缩文件冲突](docs/images/ConflictExtract.png)
+
+----
+
+### 文件列表增强
+
+文件列表增加尺寸比例条，展平目录与过滤工具。工具虽小，却能提升效率。
+
+<details>
+<summary><b>📊 点击展开：展平目录与过滤工具</b></summary>
+<p align="center">
+  <br>
+
+尺寸比例条，可以直观展示当前目录下的文件和日期的比例，让你一目了然。
+
+![未展平目录](docs/images/FlieListNotFlat.png)
+
+----
+
+展平目录可以显示当前目录以及其下所有子目录的文件。
+
+![展平目录](docs/images/FlieListFlat.png)
+
+----
+
+列排序可以按照列数据对列表进行排序。
+
+![列排序](docs/images/FlieListSizeSort.png)
+
+----
+
+文件列表过滤可以按照规则只显示需要的文件。
+
+![文件列表过滤](docs/images/FlieListSizeFilter.png)
+
+</p>
+</details>
+
+----
 
 ### 🐞 调试日志
 
@@ -205,22 +246,20 @@ MantisZip.UI.exe --compress-quick "D:\照片" -- "D:\备份.zip"
 
 ---
 
-## 📦 第三方依赖 | Dependencies
-
-
-### 外部工具（运行时依赖）
-
-| 工具 | 用途 | 许可证 | 备注 |
-|------|------|--------|------|
-| [7z.dll](https://www.7-zip.org/) | 7z/RAR 原生解析（SharpSevenZip 绑定） | GNU LGPL | 随应用分发，动态链接 |
-
----
-
-
 ## 📄 许可证 | License
 
 本项目使用 **MIT 许可证** — 详见 [LICENSE](LICENSE) 文件。  
 This project is licensed under the MIT License.
+
+---
+
+## 📦 下载与安装 | Download
+
+| 节点 | 下载渠道 | 提取码| 适用人群 |
+| :--- | :--- | :--- | :--- |
+| **夸克网盘** | [👉 点击前往下载](https://pan.quark.cn/s/ae193b2aa11b) | **`mTZH`** | **国内推荐**！移动端/PC端不限速，支持一键转存与极速同步。 |
+| **百度网盘** | [👉 点击前往下载](https://pan.baidu.com/s/1CJXNu1M1ARkH2hf48mfb-g?pwd=yevn) | **`yevn`** | 国内常规备用通道，方便习惯使用百度云盘生态的用户下载。 |
+| **官方 QQ 群** | [👉 点击加入交流群 (778347352)](https://qm.qq.com/cgi-bin/qm/qr?k=778347352) | *无需验证* | **核心推荐**！进群文件一键极速下载，获取最新测试版、调教作者与Bug反馈。 |
 
 ---
 
@@ -296,13 +335,13 @@ MantisZip 是一款完全免费且独立开发的开源项目。如果它提升�
   <tr>
     <td width="50%" align="center" valign="top">
       <a href="https://afdian.com/a/MantisZen">
-      <b>⚡ 在爱发电上支持我</b><br>      
+      <b>⚡ 在爱发电上支持我 ⚡</b><br>      
         <img src="docs/images/afdian-MantisZen.jpg" alt="爱发电" width="80%"/>
       <br><i>(点击或扫码前往爱发电主页)</i>
       </a>
     </td>
     <td width="50%" align="center" valign="top">
-      <b>💚 微信直接打赏</b><br><br>
+      <b>💚 微信直接打赏 💚</b><br><br>
       <img src="docs/images/wechat-Sponsor.png" alt="微信打赏" width="80%"/>
       <br><i>(欢迎请作者喝杯热咖啡)</i>
     </td>
@@ -318,7 +357,7 @@ MantisZip 是一款完全免费且独立开发的开源项目。如果它提升�
 如果你在体验《MantisZip》的过程中遇到了 Bug、有新的功能想法，或者单纯想和同行切磋 WPF/.NET 独立开发技术，欢迎加入我们的开发者社区：
 
 * **QQ 交流群**：`778347352`（👉 [点击一键加入群聊](https://qm.qq.com/cgi-bin/qm/qr?k=778347352)）
-* **GitHub Issues**：[提交 Bug 或 Feature Request](../../issues)
+* **代码库提交**：[提交 Bug 或 Feature Request](../../issues)
 * **Discord 交流群**: （👉 [点击一键加入群聊](https://discord.gg/PpuyhceJpZ)）
 
 > 💡 **小提示**：进群请备注 “GitHub / MantisZip”。

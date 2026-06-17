@@ -90,6 +90,8 @@ public class AppSettings
     // ===== 高级 =====
     /// <summary>7z.dll 路径（SharpSevenZip 使用，空字符串 = 自动探测，优先自带版本）</summary>
     public string SevenZipPath { get; set; } = "";
+    /// <summary>启动时自动清理 %TEMP%\MantisZip\ 临时文件</summary>
+    public bool CleanTempOnStartup { get; set; } = true;
 
     // ===== 持久化 =====
     private static readonly string SettingsDir = Path.Combine(

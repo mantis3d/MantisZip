@@ -36,6 +36,10 @@ internal static partial class ShellIntegration
     /// 安装 Shell 右键菜单。
     /// 使用 COM IContextMenu 实现（MantisZip.ShellExt.comhost.dll），
     /// 回退到静态注册表方案（旧版兼容）。
+    ///
+    /// Windows 11 已知问题：HKCU 下的 COM Shell Extension 注册会被 Explorer 忽略，
+    /// 因此当检测到 Windows 11 时直接使用静态级联方案（InstallCascade）。
+    /// 参考: https://learn.microsoft.com/en-us/answers/questions/1685103
     /// </summary>
     public static void Install()
     {
@@ -46,16 +50,29 @@ internal static partial class ShellIntegration
         // 先清理旧注册，避免残留
         Uninstall();
 
-        // 尝试安装 COM 组件（MantisZip.ShellExt.comhost.dll）
-        if (InstallCom())
+        // Windows 11 (build >= 22000) 忽略 HKCU COM Shell Extension 注册。
+        // 直接使用静态级联方案，确保右键菜单正常显示。
+        if (Environment.OSVersion.Version.Build >= 22000)
         {
-            App.LogDebug("ShellIntegration.Install: COM context menu installed");
+            App.LogDebug("ShellIntegration.Install: Windows 11 detected (build {0}), " +
+                "HKCU COM shell extensions are ignored by Explorer. " +
+                "Falling back to static cascade registration.",
+                Environment.OSVersion.Version.Build);
+            InstallCascade(s, exePath);
         }
         else
         {
-            // 回退到静态注册表方案（仅级联模式，动词模式已在 v0.4.0 移除）
-            App.LogDebug("ShellIntegration.Install: COM not available, falling back to static cascade");
-            InstallCascade(s, exePath);
+            // 尝试安装 COM 组件（MantisZip.ShellExt.comhost.dll）
+            if (InstallCom())
+            {
+                App.LogDebug("ShellIntegration.Install: COM context menu installed");
+            }
+            else
+            {
+                // 回退到静态注册表方案（仅级联模式，动词模式已在 v0.4.0 移除）
+                App.LogDebug("ShellIntegration.Install: COM not available, falling back to static cascade");
+                InstallCascade(s, exePath);
+            }
         }
 
         // 通知 Windows Shell 刷新上下文菜单缓存

@@ -139,6 +139,24 @@ public partial class App : Application
         // 该文件持久化保留，不被自动删除。
         LogStartup($"START BaseDir={AppDomain.CurrentDomain.BaseDirectory} Args=[{string.Join(" ", e.Args)}]");
 
+        // 启动时清理上次残留的临时文件（死机/崩溃后留下的预览、拖拽、引擎重建等临时文件）
+        if (AppSettings.Instance.CleanTempOnStartup)
+        {
+            try
+            {
+                var tempDir = Path.Combine(Path.GetTempPath(), L.T(L.App_MantisZipTitle));
+                if (Directory.Exists(tempDir))
+                {
+                    Directory.Delete(tempDir, recursive: true);
+                    LogDebug("OnStartup: cleaned temp dir: {0}", tempDir);
+                }
+            }
+            catch (Exception startupCleanEx)
+            {
+                LogDebug("OnStartup: temp cleanup failed (will retry on exit): {0}", startupCleanEx.Message);
+            }
+        }
+
         LogDebug("LogDebug: debug.log will be appended");
 
         LogStartup($"启动参数: {string.Join(" ", e.Args)}");
@@ -171,15 +189,15 @@ public partial class App : Application
                 {
                     case "--install-shell":
                         ShellIntegration.Install();
-                        AppMessageBox.Show(L.T(L.App_ShellInstalled),
-                            L.T(L.App_MantisZipTitle), MessageBoxButton.OK, MessageBoxImage.Information);
+                        // 安装程序（Inno Setup）以 nowait 调用此命令，
+                        // 无需弹确认框，安装程序已向用户报告状态。
                         Shutdown();
                         return;
 
                     case "--uninstall-shell":
                         ShellIntegration.Uninstall();
-                        AppMessageBox.Show(L.T(L.App_ShellUninstalled), L.T(L.App_MantisZipTitle),
-                            MessageBoxButton.OK, MessageBoxImage.Information);
+                        // 由安装程序/卸载程序（Inno Setup）调用时使用 runhidden 标志，
+                        // 无 UI 界面，直接退出即可。
                         Shutdown();
                         return;
 
@@ -189,15 +207,13 @@ public partial class App : Application
                                 e.Args[1].Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
                         else
                             ShellIntegration.InstallAssociations();
-                        AppMessageBox.Show(L.T(L.App_AssocInstalled),
-                            L.T(L.App_MantisZipTitle), MessageBoxButton.OK, MessageBoxImage.Information);
+                        // 安装程序以 nowait 调用，无需弹确认框。
                         Shutdown();
                         return;
 
                     case "--uninstall-assoc":
                         ShellIntegration.UninstallAssociations();
-                        AppMessageBox.Show(L.T(L.Settings_Assoc_UninstalledMsg), L.T(L.App_MantisZipTitle),
-                            MessageBoxButton.OK, MessageBoxImage.Information);
+                        // 同上——卸载程序 runhidden 调用，无 UI。
                         Shutdown();
                         return;
 

@@ -599,6 +599,9 @@ public static class L
     public const string Settings_Advanced_AboutVersion             = "Settings_Advanced_AboutVersion";
     public const string Settings_Advanced_Browse                   = "Settings_Advanced_Browse";
     public const string Settings_Advanced_CleanPreviewTemp         = "Settings_Advanced_CleanPreviewTemp";
+    public const string Settings_Advanced_CleanAllTemp              = "Settings_Advanced_CleanAllTemp";
+    public const string Settings_Advanced_TempGroupHeader           = "Settings_Advanced_TempGroupHeader";
+    public const string Settings_Advanced_CleanTempOnStartup        = "Settings_Advanced_CleanTempOnStartup";
     public const string Settings_Advanced_EnableDebugLog           = "Settings_Advanced_EnableDebugLog";
     public const string Settings_Advanced_LogFile                  = "Settings_Advanced_LogFile";
     public const string Settings_Advanced_OpenLog                  = "Settings_Advanced_OpenLog";

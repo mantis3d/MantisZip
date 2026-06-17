@@ -16,7 +16,18 @@
 ## 版本历史（从新到旧）
 
 ### v0.4.0 (2026-06-15) 第一个上线版本
- - 功能基本完成，测试基本完成。第一个上线版本。
+  - 功能基本完成，测试基本完成。第一个上线版本。
+
+10. **设置窗口新增「临时文件管理」GroupBox + 启动时自动清理**：
+    - 高级 Tab 中原有的「清理预览临时文件」按钮与新增的「清理所有临时文件」按钮归入 GroupBox「临时文件管理」
+    - 新增 `AppSettings.CleanTempOnStartup` 设置（默认启用），启动时自动清理 `%TEMP%\MantisZip\` 中的孤儿临时文件（死机/崩溃后的残留）
+    - 两个按钮共用 `CleanMantisZipTempFiles()` 方法，删除 `%TEMP%\MantisZip\` 下的所有文件（预览、拖拽导出、引擎重建/删除、字体解析等全部临时文件）
+
+8. **修复 Win11 右键菜单不显示**：
+   - 根因：Windows 11 忽略 HKCU 下的 COM Shell Extension 注册（`shellex\ContextMenuHandlers`），即使注册成功 Explorer 也不会加载 COM 组件
+   - `ShellIntegration.Install()` 检测到 Win11（build ≥ 22000）时跳过 COM 注册，直接使用静态级联方案（`InstallCascade`）
+   - Win10 行为不变（先试 COM，失败则回退静态）
+   - 参考：[Microsoft Q&A: Context menu shell extensions on Win11](https://learn.microsoft.com/en-us/answers/questions/1685103)
 
 7. **RELEASE_NOTES.md 移至根目录**：
    - `docs/RELEASE_NOTES.md` → `RELEASE_NOTES.md`，方便根目录直接访问
@@ -491,3 +502,4 @@
 | 文件关联 per-extension ProgId | [file-assoc-per-extension.md](.sisyphus/plans/file-assoc-per-extension.md) | v0.3.9 |
 | 移除 SharpZipLib 注释编辑耦合 | [remove-sharpziplib.md](.sisyphus/plans/remove-sharpziplib.md) | v0.3.9 |
 | ZipEngine SharpZipLib 完全迁移 (加密路径→SharpSevenZip) | [zipengine-sharpcompress-migration.md](.sisyphus/plans/zipengine-sharpcompress-migration.md) | v0.3.13 |
+| 压缩流程统一化 (CompressService) | [compress-service-unify.md](.sisyphus/plans/compress-service-unify.md) | v0.4.0 |

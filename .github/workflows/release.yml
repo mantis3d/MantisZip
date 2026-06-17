@@ -43,6 +43,15 @@ jobs:
           -p:DebugType=portable
           -p:DebugSymbols=true
 
+      - name: Publish (self-contained, x64)
+        run: >
+          dotnet publish src\MantisZip.UI\MantisZip.UI.csproj
+          --no-restore --configuration Release
+          --runtime win-x64 --self-contained
+          --output publish_output_selfcontained
+          -p:DebugType=portable
+          -p:DebugSymbols=true
+
       - name: Verify publish output
         shell: pwsh
         run: |
@@ -85,6 +94,28 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "ISCC compilation failed (exit code: $LASTEXITCODE)" }
           Write-Host "Installer built successfully"
 
+      - name: Build self-contained installer
+        shell: pwsh
+        run: |
+          $iscc = (Get-Command "iscc.exe" -ErrorAction SilentlyContinue).Source
+          if (-not $iscc) {
+            $paths = @(
+              "C:\Program Files (x86)\Inno Setup 6\ISCC.exe",
+              "C:\Program Files\Inno Setup 6\ISCC.exe",
+              "C:\Program Files (x86)\Inno Setup 5\ISCC.exe",
+              "C:\Program Files\Inno Setup 5\ISCC.exe"
+            )
+            foreach ($p in $paths) {
+              if (Test-Path $p) { $iscc = $p; break }
+            }
+          }
+          if (-not $iscc) { throw "ISCC.exe not found after installing Inno Setup" }
+          Write-Host "Using ISCC: $iscc"
+          Write-Host "Version: $env:VERSION"
+          & $iscc "/dMyAppVersion=$env:VERSION" installer-selfcontained.iss
+          if ($LASTEXITCODE -ne 0) { throw "ISCC compilation failed (exit code: $LASTEXITCODE)" }
+          Write-Host "Self-contained installer built successfully"
+
       - name: List installer artifacts
         shell: pwsh
         run: Get-ChildItem -Path installer -Filter "*.exe" | Select-Object Name, Length
@@ -115,10 +146,10 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          $installer = Get-ChildItem -Path installer -Filter "*.exe" | Select-Object -First 1
-          if (-not $installer) { throw "No installer executable found" }
+          $installers = Get-ChildItem -Path installer -Filter "*.exe" | ForEach-Object FullName
+          if (-not $installers) { throw "No installer executable found" }
           $notes = Get-Content release_notes.txt -Raw
           gh release create "${{ github.ref_name }}" `
             --title "MantisZip ${{ env.VERSION }}" `
             --notes "$notes" `
-            "$($installer.FullName)"
+            $installers
