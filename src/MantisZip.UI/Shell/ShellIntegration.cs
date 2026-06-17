@@ -10,7 +10,12 @@ namespace MantisZip.UI;
 /// <summary>
 /// Shell 右键菜单集成。
 /// 写入 HKCU\Software\Classes，无需管理员权限。
-/// 始终使用层叠子菜单模式（动词模式已在 v0.4.0 移除）。
+/// 使用层叠子菜单模式（ExtendedSubCommandsKey），兼容所有 Windows 版本。
+/// 不依赖 COM 运行时，避免 COM host DLL 加载失败导致菜单不显示的问题。
+///
+/// COM 组件（MantisZip.ShellExt.comhost.dll）实验性代码保留，
+/// 可通过手动注册 CLSID 启用，但不作为默认安装方案。
+///
 /// 菜单顺序：
 ///   1. 用MantisZip打开
 ///   2. 用MantisZip解压到此处

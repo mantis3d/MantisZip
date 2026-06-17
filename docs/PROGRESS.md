@@ -21,6 +21,11 @@
 ### v0.4.0 (2026-06-15) 第一个上线版本
   - 功能基本完成，测试基本完成。第一个上线版本。
 
+11. **修复 CLI 参数识别 + 右键菜单 Win10 不显示**：
+    - CLI 参数归一化：`install-assoc`、`install-shell` 等不带 `--` 前缀的命令现在也能正确识别（自动添加 `--`）；无法识别的参数记录日志警告
+    - 右键菜单安装改为全平台统一的静态级联方案（`InstallCascade`），移除 COM 默认安装路径，避免部分 Win10 设备上 `MantisZip.ShellExt.comhost.dll` 加载失败导致菜单不显示的问题
+    - `InstallCom()` 代码保留但不再默认调用；`ShellIntegration.Install()` 统一走级联注册
+
 10. **设置窗口新增「临时文件管理」GroupBox + 启动时自动清理**：
     - 高级 Tab 中原有的「清理预览临时文件」按钮与新增的「清理所有临时文件」按钮归入 GroupBox「临时文件管理」
     - 新增 `AppSettings.CleanTempOnStartup` 设置（默认启用），启动时自动清理 `%TEMP%\MantisZip\` 中的孤儿临时文件（死机/崩溃后的残留）
