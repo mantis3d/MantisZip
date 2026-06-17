@@ -680,8 +680,14 @@
                             </StackPanel>
                         </GroupBox>
 
-                        <Button Content="{l:L Settings_Advanced_CleanPreviewTemp}" Width="140" Height="26" Margin="0,0,0,0"
-                                HorizontalAlignment="Left" Click="CleanTemp_Click"/>
+                        <GroupBox Header="{l:L Settings_Advanced_TempGroupHeader}" Padding="8" Margin="0,0,0,12">
+                            <StackPanel>
+                                <Button Content="{l:L Settings_Advanced_CleanPreviewTemp}" Width="160" Height="26"
+                                        HorizontalAlignment="Left" Click="CleanTemp_Click"/>
+                                <Button Content="{l:L Settings_Advanced_CleanAllTemp}" Width="160" Height="26" Margin="0,6,0,0"
+                                        HorizontalAlignment="Left" Click="CleanAllTemp_Click"/>
+                            </StackPanel>
+                        </GroupBox>
 
                         <TextBlock Text="{l:L Settings_Advanced_AboutHeader}" FontWeight="SemiBold" Margin="0,16,0,4"/>
                         <TextBlock TextWrapping="Wrap" Foreground="{StaticResource Theme_TextSecondary}" FontSize="11">

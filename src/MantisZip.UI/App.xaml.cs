@@ -139,6 +139,24 @@ public partial class App : Application
         // 该文件持久化保留，不被自动删除。
         LogStartup($"START BaseDir={AppDomain.CurrentDomain.BaseDirectory} Args=[{string.Join(" ", e.Args)}]");
 
+        // 启动时清理上次残留的临时文件（死机/崩溃后留下的预览、拖拽、引擎重建等临时文件）
+        if (AppSettings.Instance.CleanTempOnStartup)
+        {
+            try
+            {
+                var tempDir = Path.Combine(Path.GetTempPath(), L.T(L.App_MantisZipTitle));
+                if (Directory.Exists(tempDir))
+                {
+                    Directory.Delete(tempDir, recursive: true);
+                    LogDebug("OnStartup: cleaned temp dir: {0}", tempDir);
+                }
+            }
+            catch (Exception startupCleanEx)
+            {
+                LogDebug("OnStartup: temp cleanup failed (will retry on exit): {0}", startupCleanEx.Message);
+            }
+        }
+
         LogDebug("LogDebug: debug.log will be appended");
 
         LogStartup($"启动参数: {string.Join(" ", e.Args)}");

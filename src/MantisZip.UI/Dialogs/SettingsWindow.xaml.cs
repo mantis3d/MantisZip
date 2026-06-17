@@ -515,6 +515,20 @@ public partial class SettingsWindow : Window
 
     private void CleanTemp_Click(object sender, RoutedEventArgs e)
     {
+        CleanMantisZipTempFiles();
+    }
+
+    private void CleanAllTemp_Click(object sender, RoutedEventArgs e)
+    {
+        CleanMantisZipTempFiles();
+    }
+
+    /// <summary>
+    /// 删除 %TEMP%\MantisZip\ 目录下所有临时文件。
+    /// 包含预览、拖拽导出、引擎重建/删除、字体解析等产生的全部临时文件。
+    /// </summary>
+    private void CleanMantisZipTempFiles()
+    {
         try
         {
             var tempDir = Path.Combine(Path.GetTempPath(), L.T(L.App_MantisZipTitle));
