@@ -10,7 +10,7 @@
 
 <p align="center">
   <a href="https://buy.polar.sh/polar_cl_VaCaW2l2nWkob5CyHe4dOlhL6HrQDK4ueMA9n1JyhNc"><img src="https://img.shields.io/badge/Polar-Sponsor-pink?style=flat-square" alt="Polar Sponsor"></a>
-  <a href="https://afdian.com/a/MantisZen"><img src="https://img.shields.io/badge/%E7%88%B1%E5%8F%91%E7%94%B5-%E8%B5%92%E5%8A%A9-blue?style=flat-square" alt="爱发电"></a>
+  <a href="https://afdian.com/a/MantisZen"><img src="https://img.shields.io/badge/爱发电-赞助-blue?style=flat-square" alt="爱发电"></a>
   <a href="https://dotnet.microsoft.com/"><img src="https://img.shields.io/badge/.NET-9.0-purple?style=flat-square" alt=".NET 9"></a>
 
   [![QQ Group](https://img.shields.io/badge/QQ%E7%BE%A4-778347352-blue?style=flat-square&logo=tencent-qq&logoColor=white)](https://qm.qq.com/cgi-bin/qm/qr?k=778347352) 
@@ -335,13 +335,13 @@ MantisZip 是一款完全免费且独立开发的开源项目。如果它提升�
   <tr>
     <td width="50%" align="center" valign="top">
       <a href="https://afdian.com/a/MantisZen">
-      <b>⚡ 在爱发电上支持我</b><br>      
+      <b>⚡ 在爱发电上支持我 ⚡</b><br>      
         <img src="docs/images/afdian-MantisZen.jpg" alt="爱发电" width="80%"/>
       <br><i>(点击或扫码前往爱发电主页)</i>
       </a>
     </td>
     <td width="50%" align="center" valign="top">
-      <b>💚 微信直接打赏</b><br><br>
+      <b>💚 微信直接打赏 💚</b><br><br>
       <img src="docs/images/wechat-Sponsor.png" alt="微信打赏" width="80%"/>
       <br><i>(欢迎请作者喝杯热咖啡)</i>
     </td>
