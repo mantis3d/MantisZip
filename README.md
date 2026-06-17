@@ -124,17 +124,26 @@ MantisZip 是一款面向 Windows 的免费开源压缩/解压工具，主打**�
 
 ### 文件列表增强
 
+文件列表增加尺寸比例条，展平目录与过滤工具。工具虽小，却能提升效率。
+
 <details>
 <summary><b>📊 点击展开：展平目录与过滤工具</b></summary>
 <p align="center">
   <br>
 
+尺寸比例条，可以直观展示当前目录下的文件和日期的比例，让你一目了然。
 
 ![未展平目录](docs\images\FlieListNotFlat.png)
 
+展平目录可以显示当前目录以及其下所有子目录的文件。
+
 ![展平目录](docs\images\FlieListFlat.png)
 
+列排序可以按照列数据对列表进行排序。
+
 ![列排序](docs/images/FlieListSizeSort.png)
+
+文件列表过滤可以按照规则只显示需要的文件。
 
 ![文件列表过滤](docs/images/FlieListSizeFilter.png)
 
