@@ -138,13 +138,13 @@ MantisZip 是一款面向 Windows 的免费开源压缩/解压工具，主打**�
 
 尺寸比例条，可以直观展示当前目录下的文件和日期的比例，让你一目了然。
 
-![未展平目录](docs\images\FlieListNotFlat.png)
+![未展平目录](docs/images/FlieListNotFlat.png)
 
 ----
 
 展平目录可以显示当前目录以及其下所有子目录的文件。
 
-![展平目录](docs\images\FlieListFlat.png)
+![展平目录](docs/images/FlieListFlat.png)
 
 ----
 
