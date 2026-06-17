@@ -81,6 +81,7 @@ MantisZip 是一款面向 Windows 的免费开源压缩/解压工具，主打**�
 | BT 种子 | InfoHash、文件树、Magnet 链接、Tracker、创建者 |
 </details>
 
+----
 
 ### 🔑 智能密码管理器
 
@@ -114,6 +115,8 @@ MantisZip 是一款面向 Windows 的免费开源压缩/解压工具，主打**�
 </p>
 </details>
 
+----
+
 ### ⚡ 更多解压冲突选项
 
 除了其他软件的「覆盖」「跳过」和「自动重命名」之外，还增加了「覆盖旧文件」和「覆盖小文件」，「自动重命名」也可无缝切换至手动重命名。
@@ -122,26 +125,43 @@ MantisZip 是一款面向 Windows 的免费开源压缩/解压工具，主打**�
 
 ![压缩文件冲突](docs/images/ConflictExtract.png)
 
+----
+
 ### 文件列表增强
+
+文件列表增加尺寸比例条，展平目录与过滤工具。工具虽小，却能提升效率。
 
 <details>
 <summary><b>📊 点击展开：展平目录与过滤工具</b></summary>
 <p align="center">
   <br>
 
+尺寸比例条，可以直观展示当前目录下的文件和日期的比例，让你一目了然。
 
 ![未展平目录](docs\images\FlieListNotFlat.png)
 
+----
+
+展平目录可以显示当前目录以及其下所有子目录的文件。
+
 ![展平目录](docs\images\FlieListFlat.png)
 
+----
+
+列排序可以按照列数据对列表进行排序。
+
 ![列排序](docs/images/FlieListSizeSort.png)
+
+----
+
+文件列表过滤可以按照规则只显示需要的文件。
 
 ![文件列表过滤](docs/images/FlieListSizeFilter.png)
 
 </p>
 </details>
 
-
+----
 
 ### 🐞 调试日志
 
@@ -235,11 +255,11 @@ This project is licensed under the MIT License.
 
 ## 📦 下载与安装 | Download
 
-| 节点 (Location) | 下载渠道 (Channel) | 提取码/凭证 (Credentials) | 适用人群 (Target) |
+| 节点 | 下载渠道 | 提取码| 适用人群 |
 | :--- | :--- | :--- | :--- |
-| **夸克网盘** | [👉 点击前往夸克极速下载](https://pan.quark.cn/s/ae193b2aa11b) | **`mTZH`** | **国内推荐**！移动端/PC端不限速，支持一键转存与极速同步。 |
-| **百度网盘** | [👉 点击前往百度网盘下载](https://pan.baidu.com/s/1CJXNu1M1ARkH2hf48mfb-g?pwd=yevn) | **`yevn`** | 国内常规备用通道，方便习惯使用百度云盘生态的用户下载。 |
-| **官方 QQ 群** | [👉 点击一键加入交流群 (778347352)](https://qm.qq.com/cgi-bin/qm/qr?k=778347352) | *无需验证* | **核心推荐**！进群文件一键极速下载，获取最新测试版、调教作者与Bug反馈。 |
+| **夸克网盘** | [👉 点击前往下载](https://pan.quark.cn/s/ae193b2aa11b) | **`mTZH`** | **国内推荐**！移动端/PC端不限速，支持一键转存与极速同步。 |
+| **百度网盘** | [👉 点击前往下载](https://pan.baidu.com/s/1CJXNu1M1ARkH2hf48mfb-g?pwd=yevn) | **`yevn`** | 国内常规备用通道，方便习惯使用百度云盘生态的用户下载。 |
+| **官方 QQ 群** | [👉 点击加入交流群 (778347352)](https://qm.qq.com/cgi-bin/qm/qr?k=778347352) | *无需验证* | **核心推荐**！进群文件一键极速下载，获取最新测试版、调教作者与Bug反馈。 |
 
 ---
 
