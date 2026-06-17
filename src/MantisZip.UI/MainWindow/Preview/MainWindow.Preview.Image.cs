@@ -154,14 +154,27 @@ public partial class MainWindow
                         System.Windows.Media.Imaging.BitmapCacheOption.OnLoad);
                     var frame = decoder.Frames[0];
 
-                    // 对大图降采样（TransformedBitmap 保留像素格式，不会丢掉 Alpha）
+                    // PreservePixelFormat 返回的帧可能是 PixelFormats.Default（Alpha 数据存在但格式非标准），
+                    // WPF Image 无法正确渲染这种格式的透明通道，所以统一转成 Bgra32。
+                    // 对大图降采样（TransformedBitmap 输出即 Bgra32，同时保留 Alpha）
                     if (frame.PixelWidth > 1920)
                     {
+                        if (frame.CanFreeze)
+                            frame.Freeze();
                         double scale = 1920.0 / frame.PixelWidth;
                         var scaled = new System.Windows.Media.Imaging.TransformedBitmap(
                             frame, new System.Windows.Media.ScaleTransform(scale, scale));
                         scaled.Freeze();
                         return scaled;
+                    }
+
+                    // 非降采样路径：将 Default 或其他非标准格式转为 Bgra32，确保 Alpha 能被 WPF 正确渲染
+                    if (frame.Format != PixelFormats.Bgra32 && frame.Format != PixelFormats.Pbgra32)
+                    {
+                        var converted = new System.Windows.Media.Imaging.FormatConvertedBitmap(
+                            frame, PixelFormats.Bgra32, null, 0);
+                        converted.Freeze();
+                        return converted;
                     }
 
                     if (frame.CanFreeze)
