@@ -11,7 +11,7 @@ public class CompressSettingsViewModelTests
     public void Constructor_WithEmptyPaths_ShowsNoFilesSelected()
     {
         var vm = new CompressSettingsViewModel(Array.Empty<string>());
-        Assert.Equal("No files selected", vm.SelectedPathsSummary);
+        Assert.Equal("未选择文件", vm.SelectedPathsSummary);
     }
 
     [Fact]
@@ -19,7 +19,7 @@ public class CompressSettingsViewModelTests
     {
         var paths = new[] { "file1.txt", "file2.zip" };
         var vm = new CompressSettingsViewModel(paths);
-        Assert.Contains("2 item", vm.SelectedPathsSummary);
+        Assert.Contains("2 项", vm.SelectedPathsSummary);
         Assert.Equal(2, vm.SelectedPaths.Count);
     }
 
@@ -39,13 +39,13 @@ public class CompressSettingsViewModelTests
     {
         var vm = new CompressSettingsViewModel(Array.Empty<string>());
         vm.Password = "";
-        Assert.Equal("None", vm.PasswordStrength);
+        Assert.Equal("无", vm.PasswordStrength);
     }
 
     [Theory]
-    [InlineData("ab", "Weak")]
-    [InlineData("abcd1234", "Medium")]
-    [InlineData("Str0ng!Pass#2024", "Strong")]
+    [InlineData("ab", "弱")]
+    [InlineData("abcd1234", "中")]
+    [InlineData("Str0ng!Pass#2024", "强")]
     public void PasswordStrength_VariousInputs_ReturnsExpected(string password, string expected)
     {
         var vm = new CompressSettingsViewModel(Array.Empty<string>());

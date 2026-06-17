@@ -41,9 +41,11 @@
     </Style>
     <Style Selector="Button:pointerover">
       <Setter Property="Background" Value="{DynamicResource ThemeButtonHoverBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource ThemeTextPrimaryBrush}" />
     </Style>
     <Style Selector="Button:pressed">
       <Setter Property="Background" Value="{DynamicResource ThemeButtonPressedBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource ThemeTextPrimaryBrush}" />
     </Style>
 
     <!-- ToggleButton -->
@@ -57,12 +59,38 @@
     </Style>
     <Style Selector="ToggleButton:pointerover">
       <Setter Property="Background" Value="{DynamicResource ThemeButtonHoverBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource ThemeTextPrimaryBrush}" />
     </Style>
     <Style Selector="ToggleButton:pressed">
       <Setter Property="Background" Value="{DynamicResource ThemeButtonPressedBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource ThemeTextPrimaryBrush}" />
     </Style>
     <Style Selector="ToggleButton:checked">
       <Setter Property="Background" Value="{DynamicResource ThemeAccentBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource ThemeTextPrimaryBrush}" />
+    </Style>
+
+    <!-- ════════════════════════════════════════════ -->
+    <!-- TOOLBAR BUTTON STYLES                       -->
+    <!-- ════════════════════════════════════════════ -->
+
+    <Style Selector="Button.ToolbarButton, ToggleButton.ToolbarButton">
+      <Setter Property="Height" Value="54" />
+      <Setter Property="Padding" Value="8,2" />
+    </Style>
+
+    <Style Selector="Button.ToolbarButton > StackPanel, ToggleButton.ToolbarButton > StackPanel">
+      <Setter Property="Spacing" Value="2" />
+    </Style>
+
+    <Style Selector="TextBlock.ToolbarButtonIcon">
+      <Setter Property="FontSize" Value="20" />
+      <Setter Property="HorizontalAlignment" Value="Center" />
+    </Style>
+
+    <Style Selector="TextBlock.ToolbarButtonLabel">
+      <Setter Property="FontSize" Value="13" />
+      <Setter Property="HorizontalAlignment" Value="Center" />
     </Style>
 
     <!-- ComboBox -->
@@ -143,9 +171,17 @@
       <Setter Property="Background" Value="{DynamicResource ThemeWindowBgBrush}" />
     </Style>
 
-    <!-- Menu -->
+    <!-- Menu / MenuItem -->
     <Style Selector="Menu">
       <Setter Property="Background" Value="{DynamicResource ThemeHeaderBgBrush}" />
+    </Style>
+    <Style Selector="MenuItem">
+      <Setter Property="Foreground" Value="{DynamicResource ThemeTextPrimaryBrush}" />
+      <Setter Property="Background" Value="Transparent" />
+    </Style>
+    <Style Selector="MenuItem:pointerover">
+      <Setter Property="Background" Value="{DynamicResource ThemeButtonHoverBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource ThemeTextPrimaryBrush}" />
     </Style>
 
     <!-- GridSplitter -->

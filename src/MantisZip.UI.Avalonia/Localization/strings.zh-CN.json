@@ -47,6 +47,43 @@
   "Preview_Markdown": "Markdown 预览: {0}",
   "Preview_Unsupported": "暂不支持预览此文件格式",
 
+  "Menu_ExtractArchive": "解压压缩包",
+  "Menu_ExtractHere": "解压到此处",
+  "Menu_ExtractToName": "解压到命名文件夹",
+  "Menu_NewArchive": "新建压缩包",
+  "Menu_Compress": "压缩文件",
+
+  "Toolbar_Filter": "筛选",
+  "Toolbar_Preview": "预览",
+
+  "Status_Selected": "已选",
+  "Status_ExtractComplete": "解压完成",
+  "Status_Copied": "已复制",
+  "Status_EntryTested": "已验证",
+  "Status_CommentSaveFailed": "保存注释失败",
+  "Status_FileNotFound": "文件不存在",
+  "Status_TestingEntry": "正在测试条目",
+  "Status_TestingArchive": "正在测试压缩包",
+  "Status_SmartExtracting": "正在智能解压",
+  "Status_AddingFiles": "正在添加文件到压缩包",
+  "Status_DeletingFiles": "正在从压缩包删除文件",
+
+  "Status_Entries": "个条目",
+
+  "Main_RecentFiles": "最近文件",
+
+  "Comment_Title": "压缩包注释",
+  "Comment_Placeholder": "输入压缩包注释...",
+  "Comment_Save": "保存",
+  "Comment_Cancel": "取消",
+
+  "Compress_NItemsSelected": "已选 {0} 项",
+  "Compress_NoFilesSelected": "未选择文件",
+  "Compress_Strength_None": "无",
+  "Compress_Strength_Weak": "弱",
+  "Compress_Strength_Medium": "中",
+  "Compress_Strength_Strong": "强",
+
   "Settings_Title": "设置",
   "Settings_TabPreview": "预览",
   "Settings_TabCompress": "压缩",
@@ -215,5 +252,19 @@
   "Tooltip_Test": "测试压缩包完整性",
   "Tooltip_AddFiles": "向压缩包添加文件",
   "Tooltip_DeleteFiles": "删除选中文件",
-  "Tooltip_Subfolders": "显示子文件夹内容"
+  "Tooltip_Subfolders": "显示子文件夹内容",
+  "Toolbar_Password": "密码",
+  "Tooltip_Password": "打开密码管理器",
+
+  "Status_AddComplete": "文件添加成功",
+  "Status_DeleteComplete": "文件已删除",
+  "Status_TestOK": "压缩包完整性验证通过 ✅",
+  "Status_TestFailed": "压缩包测试失败 ❌",
+  "Status_CommentSaved": "压缩包注释已保存",
+  "Status_SmartExtractSingleRoot": "智能解压完成（已剥离根文件夹）",
+  "Status_SmartExtractNamed": "智能解压完成（已解压到命名文件夹）",
+  "Status_CommentNotSupported": "仅 ZIP 格式支持注释",
+  "Status_ConfirmDelete": "确定要删除此项吗？",
+  "Main_NoRecentFiles": "无最近文件",
+  "Main_ClearRecentFiles": "清除最近文件"
 }

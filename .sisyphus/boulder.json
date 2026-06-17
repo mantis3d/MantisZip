@@ -1,47 +1,52 @@
 {
-  "updated_at": "2026-06-12T08:43:14.448Z",
-  "status": "completed",
-  "active_work_id": "avalonia-port-phase1",
-  "agent": "atlas",
-  "session_origins": {
-    "ses_1452ed9eaffeR5gCWCyiHs15hh": "direct",
-    "ses_1451f19c3ffeHrArU0HmQVhBPy": "appended",
-    "ses_1451ed8f7ffeHF6GaS1ELI4VC3": "appended"
-  },
-  "active_plan": "E:\\GitHub\\MantisZip\\.sisyphus\\plans\\avalonia-port-phase1.md",
-  "task_sessions": {},
-  "plan_name": "avalonia-port-phase1",
-  "works": {
-    "avalonia-port-phase1": {
-      "updated_at": "2026-06-12T08:43:14.448Z",
-      "status": "completed",
-      "work_id": "avalonia-port-phase1",
-      "session_origins": {
-        "ses_1452ed9eaffeR5gCWCyiHs15hh": "direct",
-        "ses_1451f19c3ffeHrArU0HmQVhBPy": "appended",
-        "ses_1451ed8f7ffeHF6GaS1ELI4VC3": "appended"
-      },
-      "active_plan": "E:\\GitHub\\MantisZip\\.sisyphus\\plans\\avalonia-port-phase1.md",
-      "task_sessions": {},
-      "plan_name": "avalonia-port-phase1",
-      "session_ids": [
-        "ses_1452ed9eaffeR5gCWCyiHs15hh",
-        "ses_1451f19c3ffeHrArU0HmQVhBPy",
-        "ses_1451ed8f7ffeHF6GaS1ELI4VC3"
-      ],
-      "started_at": "2026-06-12T07:52:43.2942882Z",
-      "agent": "atlas",
-      "ended_at": "2026-06-12T08:43:14.448Z",
-      "elapsed_ms": 3031154
-    }
-  },
-  "session_ids": [
-    "ses_1452ed9eaffeR5gCWCyiHs15hh",
-    "ses_1451f19c3ffeHrArU0HmQVhBPy",
-    "ses_1451ed8f7ffeHF6GaS1ELI4VC3"
-  ],
-  "started_at": "2026-06-12T07:52:43.2942882Z",
+  "active_plan": "E:\\GitHub\\MantisZip\\.sisyphus\\plans\\avalonia-port-phase5.md",
+  "started_at": "2026-06-17T06:03:36.133Z",
+  "ended_at": "2026-06-17T06:15:00.000Z",
+  "session_ids": ["ses_12bd270d6ffeAwmBlemnoU5Lff"],
+  "plan_name": "avalonia-port-phase5",
   "schema_version": 2,
-  "ended_at": "2026-06-12T08:43:14.448Z",
-  "elapsed_ms": 3031154
+  "status": "completed",
+  "works": {
+    "avalonia-port-phase5": {
+      "status": "completed",
+      "work_id": "avalonia-port-phase5",
+      "plan_name": "avalonia-port-phase5",
+      "session_ids": ["ses_12bd270d6ffeAwmBlemnoU5Lff"],
+      "started_at": "2026-06-17T06:03:36.133Z",
+      "elapsed_ms": 690000
+    }
+  }
+}
+  },
+  "active_work_id": "avalonia-port-phase5-legacy",
+  "updated_at": "2026-06-17T06:14:01.548Z",
+  "works": {
+    "avalonia-port-phase5-legacy": {
+      "work_id": "avalonia-port-phase5-legacy",
+      "active_plan": "E:\\GitHub\\MantisZip\\.sisyphus\\plans\\avalonia-port-phase5.md",
+      "plan_name": "avalonia-port-phase5",
+      "status": "active",
+      "started_at": "2026-06-17T06:03:36.133Z",
+      "updated_at": "2026-06-17T06:14:01.548Z",
+      "session_ids": [
+        "ses_12bd270d6ffeAwmBlemnoU5Lff"
+      ],
+      "session_origins": {
+        "ses_12bd270d6ffeAwmBlemnoU5Lff": "direct"
+      },
+      "task_sessions": {
+        "todo:1": {
+          "task_key": "todo:1",
+          "task_label": "1",
+          "task_title": "**\"Clear Recent Files\"** menu item inside the Recent Files submenu",
+          "session_id": "ses_12bc9cb79ffec3wgIQ7gONX96p",
+          "agent": "Sisyphus-Junior",
+          "category": "visual-engineering",
+          "updated_at": "2026-06-17T06:14:01.548Z",
+          "started_at": "2026-06-17T06:14:01.548Z",
+          "status": "running"
+        }
+      }
+    }
+  }
 }

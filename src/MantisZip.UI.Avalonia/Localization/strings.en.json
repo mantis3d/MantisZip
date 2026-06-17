@@ -47,6 +47,43 @@
   "Preview_Markdown": "Markdown preview: {0}",
   "Preview_Unsupported": "Preview not supported for this file type",
 
+  "Menu_ExtractArchive": "Extract Archive",
+  "Menu_ExtractHere": "Extract Here",
+  "Menu_ExtractToName": "Extract to Named Folder",
+  "Menu_NewArchive": "New Archive",
+  "Menu_Compress": "Compress Files",
+
+  "Toolbar_Filter": "Filter",
+  "Toolbar_Preview": "Preview",
+
+  "Status_Selected": "Selected",
+  "Status_ExtractComplete": "Extraction complete",
+  "Status_Copied": "Copied",
+  "Status_EntryTested": "Tested",
+  "Status_CommentSaveFailed": "Failed to save comment",
+  "Status_FileNotFound": "File no longer exists",
+  "Status_TestingEntry": "Testing entry",
+  "Status_TestingArchive": "Testing archive",
+  "Status_SmartExtracting": "Smart extracting",
+  "Status_AddingFiles": "Adding files to archive",
+  "Status_DeletingFiles": "Deleting files from archive",
+
+  "Status_Entries": "items",
+
+  "Main_RecentFiles": "Recent Files",
+
+  "Comment_Title": "Archive Comment",
+  "Comment_Placeholder": "Enter archive comment...",
+  "Comment_Save": "Save",
+  "Comment_Cancel": "Cancel",
+
+  "Compress_NItemsSelected": "{0} item(s) selected",
+  "Compress_NoFilesSelected": "No files selected",
+  "Compress_Strength_None": "None",
+  "Compress_Strength_Weak": "Weak",
+  "Compress_Strength_Medium": "Medium",
+  "Compress_Strength_Strong": "Strong",
+
   "Settings_Title": "Settings",
   "Settings_TabPreview": "Preview",
   "Settings_TabCompress": "Compress",
@@ -215,5 +252,19 @@
   "Tooltip_Test": "Test archive integrity",
   "Tooltip_AddFiles": "Add files to archive",
   "Tooltip_DeleteFiles": "Delete selected files",
-  "Tooltip_Subfolders": "Show subfolder contents"
+  "Tooltip_Subfolders": "Show subfolder contents",
+  "Toolbar_Password": "Password",
+  "Tooltip_Password": "Open password manager",
+
+  "Status_AddComplete": "Files added successfully",
+  "Status_DeleteComplete": "File deleted",
+  "Status_TestOK": "Archive integrity verified ✅",
+  "Status_TestFailed": "Archive test failed ❌",
+  "Status_CommentSaved": "Archive comment saved",
+  "Status_SmartExtractSingleRoot": "Smart extract complete (stripped root folder)",
+  "Status_SmartExtractNamed": "Smart extract complete (extracted to named folder)",
+  "Status_CommentNotSupported": "Comments are only supported for ZIP archives",
+  "Status_ConfirmDelete": "Are you sure you want to delete this item?",
+  "Main_NoRecentFiles": "No recent files",
+  "Main_ClearRecentFiles": "Clear Recent Files"
 }

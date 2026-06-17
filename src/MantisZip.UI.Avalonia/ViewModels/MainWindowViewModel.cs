@@ -130,7 +130,16 @@ public partial class MainWindowViewModel : ObservableObject
             "Toolbar_SmartExtract", "Toolbar_Test", "Toolbar_AddFiles", "Toolbar_DeleteFiles",
             "Tooltip_New", "Tooltip_Open", "Tooltip_Extract", "Tooltip_Compress",
             "Tooltip_Filter", "Tooltip_Preview", "Tooltip_SmartExtract", "Tooltip_Test",
-            "Tooltip_AddFiles", "Tooltip_DeleteFiles", "Tooltip_Subfolders"
+            "Tooltip_AddFiles", "Tooltip_DeleteFiles", "Tooltip_Subfolders",
+            "Status_AddComplete", "Status_DeleteComplete", "Status_TestOK", "Status_TestFailed",
+            "Status_CommentSaved", "Status_SmartExtractSingleRoot", "Status_SmartExtractNamed",
+            "Status_CommentNotSupported", "Status_ConfirmDelete",
+            "Status_ExtractComplete",
+            "Status_Copied", "Status_EntryTested", "Status_CommentSaveFailed", "Status_FileNotFound",
+            "Status_TestingEntry", "Status_TestingArchive", "Status_SmartExtracting",
+            "Status_AddingFiles", "Status_DeletingFiles", "Status_Entries",
+            "Main_NoRecentFiles", "Main_ClearRecentFiles", "Main_RecentFiles",
+            "Toolbar_Password", "Tooltip_Password"
         };
         foreach (var key in keys)
         {
@@ -374,7 +383,7 @@ public partial class MainWindowViewModel : ObservableObject
                 foreach (var rp in RecentFilesManager.GetPaths())
                     RecentFiles.Add(rp);
                 StatusMessage = LocalizationManager.T("Status_Loaded", result.Entries.Count);
-                Title = $"{LocalizationManager.T("App_Title")} - {Path.GetFileName(path)} ({_allRawItems?.Count ?? 0} items)";
+                Title = $"{LocalizationManager.T("App_Title")} - {Path.GetFileName(path)} ({_allRawItems?.Count ?? 0} {LocalizationManager.T("Status_Entries")})";
                 OnPropertyChanged(nameof(ArchiveStats));
             }
             else if (result.IsCancelled)
@@ -606,7 +615,7 @@ public partial class MainWindowViewModel : ObservableObject
     {
         ClearArchiveInternal();
         StatusMessage = null;
-        Title = "MantisZip";
+        Title = LocalizationManager.T("App_Title");
     }
 
     private void ClearArchiveInternal()
@@ -793,7 +802,7 @@ public partial class MainWindowViewModel : ObservableObject
         var text = SelectedEntry.FullPath ?? SelectedEntry.Name;
         if (CopyToClipboard != null)
             await CopyToClipboard(text);
-        StatusMessage = $"Copied: {text}";
+        StatusMessage = $"{LocalizationManager.T("Status_Copied")}: {text}";
     }
 
     [RelayCommand]
@@ -802,7 +811,7 @@ public partial class MainWindowViewModel : ObservableObject
         if (SelectedEntry == null || RunWithProgress == null) return;
 
         var completed = await RunWithProgress(
-            "Testing entry",
+            LocalizationManager.T("Status_TestingEntry"),
             async (progress, ct) =>
             {
                 // Simulate test by checking entry exists in archive
@@ -811,7 +820,7 @@ public partial class MainWindowViewModel : ObservableObject
             });
 
         if (completed)
-            StatusMessage = $"Tested: {SelectedEntry.Name}";
+            StatusMessage = $"{LocalizationManager.T("Status_EntryTested")}: {SelectedEntry.Name}";
     }
 
     [RelayCommand]
@@ -848,19 +857,29 @@ public partial class MainWindowViewModel : ObservableObject
 
         var parentDir = Path.GetDirectoryName(CurrentArchivePath)
                         ?? Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
+
+        bool hasSingleRoot = _allRawItems != null && ArchiveStructureAnalyzer.HasSingleRootDirectory(_allRawItems);
+
+        var dest = hasSingleRoot
+            ? parentDir
+            : Path.Combine(parentDir, Path.GetFileNameWithoutExtension(CurrentArchivePath));
+
         _sessionPasswords.TryGetValue(CurrentArchivePath, out var password);
 
-        // Delegate to engine's smart extract
         var completed = await RunWithProgress(
-            LocalizationManager.T("Status_Extracting"),
+            LocalizationManager.T("Status_SmartExtracting"),
             async (progress, ct) =>
             {
                 await new ExtractService().ExtractAsync(
-                    CurrentArchivePath, parentDir, password, progress, ct);
+                    CurrentArchivePath, dest, password, progress, ct);
             });
 
         if (completed)
-            StatusMessage = LocalizationManager.T("Status_ExtractComplete");
+        {
+            StatusMessage = hasSingleRoot
+                ? LocalizationManager.T("Status_SmartExtractSingleRoot")
+                : LocalizationManager.T("Status_SmartExtractNamed");
+        }
     }
 
     [RelayCommand]
@@ -874,16 +893,16 @@ public partial class MainWindowViewModel : ObservableObject
         if (engine == null) return;
 
         var completed = await RunWithProgress(
-            "Testing archive",
+            LocalizationManager.T("Status_TestingArchive"),
             async (progress, ct) =>
             {
                 await engine.TestArchiveAsync(CurrentArchivePath, password, progress, ct);
             });
 
         if (completed)
-            StatusMessage = "Archive integrity verified ✅";
+            StatusMessage = LocalizationManager.T("Status_TestOK");
         else
-            StatusMessage = "Archive test failed ❌";
+            StatusMessage = LocalizationManager.T("Status_TestFailed");
     }
 
     [RelayCommand]
@@ -891,38 +910,90 @@ public partial class MainWindowViewModel : ObservableObject
     {
         if (CurrentArchivePath == null || ShowCommentDialog == null) return;
 
-        var newComment = await ShowCommentDialog(null);
+        // Only ZIP format supports comments
+        if (_currentFormat != ArchiveFormat.Zip)
+        {
+            StatusMessage = LocalizationManager.T("Status_CommentNotSupported");
+            return;
+        }
+
+        // Read existing comment using ZipCommentHelper (EOCD binary read, no recompression)
+        string? existingComment = null;
+        try
+        {
+            existingComment = ZipCommentHelper.ReadComment(CurrentArchivePath);
+        }
+        catch
+        {
+            // If we can't read, start with empty
+        }
+
+        var newComment = await ShowCommentDialog(existingComment);
         if (newComment == null) return; // cancelled
 
-        StatusMessage = "Comment saved";
+        try
+        {
+            ZipCommentHelper.WriteComment(CurrentArchivePath, newComment);
+            StatusMessage = LocalizationManager.T("Status_CommentSaved");
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"{LocalizationManager.T("Status_CommentSaveFailed")}: {ex.Message}";
+        }
     }
 
     [RelayCommand]
     private async Task AddFiles()
     {
-        if (CurrentArchivePath == null || GetOpenFilePaths == null) return;
+        if (CurrentArchivePath == null || GetOpenFilePaths == null || RunWithProgress == null) return;
 
         var files = await GetOpenFilePaths();
         if (files == null || files.Count == 0) return;
 
-        // TODO: Full implementation — rewrite archive with additional entries
-        // This requires reading existing entries and writing a new archive.
-        StatusMessage = $"Add files: selected {files.Count} file(s). Full implementation pending.";
+        var engine = ArchiveEngineFactory.GetEngineByExtension(CurrentArchivePath);
+        if (engine == null) return;
 
-        await RefreshArchive();
+        _sessionPasswords.TryGetValue(CurrentArchivePath, out var password);
+
+        var completed = await RunWithProgress(
+            LocalizationManager.T("Status_AddingFiles"),
+            async (progress, ct) =>
+            {
+                var options = new ArchiveOptions { Password = password };
+                await engine.AddToArchiveAsync(CurrentArchivePath, files.ToArray(), options, progress, ct);
+            });
+
+        if (completed)
+        {
+            StatusMessage = LocalizationManager.T("Status_AddComplete");
+            await RefreshArchive();
+        }
     }
 
     [RelayCommand]
     private async Task DeleteFiles()
     {
-        if (CurrentArchivePath == null || SelectedEntry == null) return;
+        if (CurrentArchivePath == null || SelectedEntry == null || RunWithProgress == null) return;
 
         var entryPath = SelectedEntry.FullPath ?? SelectedEntry.Name;
 
-        // TODO: Full implementation — rewrite archive without the deleted entries
-        StatusMessage = $"Delete: {entryPath}. Full implementation pending.";
+        var engine = ArchiveEngineFactory.GetEngineByExtension(CurrentArchivePath);
+        if (engine == null) return;
 
-        await RefreshArchive();
+        _sessionPasswords.TryGetValue(CurrentArchivePath, out var password);
+
+        var completed = await RunWithProgress(
+            LocalizationManager.T("Status_DeletingFiles"),
+            async (progress, ct) =>
+            {
+                await engine.DeleteEntriesAsync(CurrentArchivePath, new[] { entryPath }, password, progress, ct);
+            });
+
+        if (completed)
+        {
+            StatusMessage = LocalizationManager.T("Status_DeleteComplete");
+            await RefreshArchive();
+        }
     }
 
     [RelayCommand]
@@ -960,7 +1031,7 @@ public partial class MainWindowViewModel : ObservableObject
     {
         if (string.IsNullOrEmpty(path) || !File.Exists(path))
         {
-            StatusMessage = "File no longer exists";
+            StatusMessage = LocalizationManager.T("Status_FileNotFound");
             RecentFiles.Remove(path);
             return;
         }

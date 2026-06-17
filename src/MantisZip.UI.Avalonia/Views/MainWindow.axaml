@@ -42,7 +42,7 @@
             </StackPanel>
           </MenuItem.Header>
         </MenuItem>
-        <MenuItem Header="Recent Files"
+        <MenuItem Header="{Binding LocalizedStrings[Main_RecentFiles]}"
                   ItemsSource="{Binding RecentFiles}"
                   IsEnabled="{Binding RecentFiles.Count}">
           <MenuItem.ItemTemplate>
@@ -58,6 +58,15 @@
               </MenuItem>
             </DataTemplate>
           </MenuItem.ItemTemplate>
+        </MenuItem>
+        <Separator />
+        <MenuItem Command="{Binding ClearRecentFilesCommand}">
+          <MenuItem.Header>
+            <StackPanel Orientation="Horizontal" Spacing="4">
+              <TextBlock Text="🗑" FontSize="14" />
+              <TextBlock Text="{Binding LocalizedStrings[Main_ClearRecentFiles]}" />
+            </StackPanel>
+          </MenuItem.Header>
         </MenuItem>
         <MenuItem Command="{Binding RefreshArchiveCommand}" InputGesture="F5"
                   IsEnabled="{Binding IsArchiveLoaded}">
@@ -120,7 +129,7 @@
           <MenuItem.Header>
             <StackPanel Orientation="Horizontal" Spacing="4">
               <TextBlock Text="🤖" FontSize="14" />
-              <TextBlock Text="Smart Extract" />
+              <TextBlock Text="{Binding LocalizedStrings[Menu_SmartExtract]}" />
             </StackPanel>
           </MenuItem.Header>
         </MenuItem>
@@ -130,7 +139,7 @@
           <MenuItem.Header>
             <StackPanel Orientation="Horizontal" Spacing="4">
               <TextBlock Text="➕" FontSize="14" />
-              <TextBlock Text="Add Files" />
+              <TextBlock Text="{Binding LocalizedStrings[Menu_AddFiles]}" />
             </StackPanel>
           </MenuItem.Header>
         </MenuItem>
@@ -139,7 +148,7 @@
           <MenuItem.Header>
             <StackPanel Orientation="Horizontal" Spacing="4">
               <TextBlock Text="✖" FontSize="14" />
-              <TextBlock Text="Delete" />
+              <TextBlock Text="{Binding LocalizedStrings[Menu_DeleteFiles]}" />
             </StackPanel>
           </MenuItem.Header>
         </MenuItem>
@@ -149,7 +158,7 @@
           <MenuItem.Header>
             <StackPanel Orientation="Horizontal" Spacing="4">
               <TextBlock Text="✅" FontSize="14" />
-              <TextBlock Text="Test Archive" />
+              <TextBlock Text="{Binding LocalizedStrings[Menu_TestArchive]}" />
             </StackPanel>
           </MenuItem.Header>
         </MenuItem>
@@ -159,7 +168,7 @@
           <MenuItem.Header>
             <StackPanel Orientation="Horizontal" Spacing="4">
               <TextBlock Text="💬" FontSize="14" />
-              <TextBlock Text="Comment" />
+              <TextBlock Text="{Binding LocalizedStrings[Menu_ArchiveComment]}" />
             </StackPanel>
           </MenuItem.Header>
         </MenuItem>
@@ -217,60 +226,51 @@
             Padding="6,4"
             Background="{DynamicResource ThemeHeaderBgBrush}">
       <StackPanel Orientation="Horizontal" Spacing="4">
-        <Button Command="{Binding NewArchiveCommand}"
-                Height="42"
-                Padding="8,2"
-                FontSize="11"
-                ToolTip.Tip="New archive (Ctrl+N)">
-          <StackPanel>
-            <TextBlock Text="🆕" FontSize="18" HorizontalAlignment="Center" />
+        <Button Classes="ToolbarButton"
+                Command="{Binding NewArchiveCommand}"
+                ToolTip.Tip="{Binding LocalizedStrings[Tooltip_New]}">
+          <StackPanel >
+            <TextBlock Text="🆕" Classes="ToolbarButtonIcon" />
             <TextBlock Text="{Binding LocalizedStrings[Toolbar_New]}"
-                       FontSize="11" HorizontalAlignment="Center" />
+                       Classes="ToolbarButtonLabel" />
           </StackPanel>
         </Button>
-        <Button Command="{Binding OpenArchiveCommand}"
-                Height="42"
-                Padding="8,2"
-                FontSize="11"
-                ToolTip.Tip="Open archive (Ctrl+O)">
-          <StackPanel>
-            <TextBlock Text="📂" FontSize="18" HorizontalAlignment="Center" />
+        <Button Classes="ToolbarButton"
+                Command="{Binding OpenArchiveCommand}"
+                ToolTip.Tip="{Binding LocalizedStrings[Tooltip_Open]}">
+          <StackPanel >
+            <TextBlock Text="📂" Classes="ToolbarButtonIcon" />
             <TextBlock Text="{Binding LocalizedStrings[Toolbar_Open]}"
-                       FontSize="11" HorizontalAlignment="Center" />
+                       Classes="ToolbarButtonLabel" />
           </StackPanel>
         </Button>
-        <Button Command="{Binding ExtractArchiveCommand}"
+        <Button Classes="ToolbarButton"
+                Command="{Binding ExtractArchiveCommand}"
                 IsEnabled="{Binding IsArchiveLoaded}"
-                Height="42"
-                Padding="8,2"
-                FontSize="11"
-                ToolTip.Tip="Extract archive (Ctrl+E)">
-          <StackPanel>
-            <TextBlock Text="📤" FontSize="18" HorizontalAlignment="Center" />
+                ToolTip.Tip="{Binding LocalizedStrings[Tooltip_Extract]}">
+          <StackPanel >
+            <TextBlock Text="📤" Classes="ToolbarButtonIcon" />
             <TextBlock Text="{Binding LocalizedStrings[Toolbar_Extract]}"
-                       FontSize="11" HorizontalAlignment="Center" />
+                       Classes="ToolbarButtonLabel" />
           </StackPanel>
         </Button>
-        <Button Command="{Binding CompressSelectedCommand}"
-                Height="42"
-                Padding="8,2"
-                FontSize="11"
-                ToolTip.Tip="Compress files (Ctrl+C)">
-          <StackPanel>
-            <TextBlock Text="📥" FontSize="18" HorizontalAlignment="Center" />
+        <Button Classes="ToolbarButton"
+                Command="{Binding CompressSelectedCommand}"
+                ToolTip.Tip="{Binding LocalizedStrings[Tooltip_Compress]}">
+          <StackPanel >
+            <TextBlock Text="📥" Classes="ToolbarButtonIcon" />
             <TextBlock Text="{Binding LocalizedStrings[Toolbar_Compress]}"
-                       FontSize="11" HorizontalAlignment="Center" />
+                       Classes="ToolbarButtonLabel" />
           </StackPanel>
         </Button>
-        <Button Command="{Binding SmartExtractCommand}"
+        <Button Classes="ToolbarButton"
+                Command="{Binding SmartExtractCommand}"
                 IsEnabled="{Binding IsArchiveLoaded}"
-                Height="42"
-                Padding="8,2"
-                FontSize="11"
-                ToolTip.Tip="Smart extract">
-          <StackPanel>
-            <TextBlock Text="🤖" FontSize="18" HorizontalAlignment="Center" />
-            <TextBlock Text="Smart" FontSize="11" HorizontalAlignment="Center" />
+                ToolTip.Tip="{Binding LocalizedStrings[Tooltip_SmartExtract]}">
+          <StackPanel >
+            <TextBlock Text="🤖" Classes="ToolbarButtonIcon" />
+            <TextBlock Text="{Binding LocalizedStrings[Toolbar_SmartExtract]}"
+                       Classes="ToolbarButtonLabel" />
           </StackPanel>
         </Button>
         <Border Width="1"
@@ -278,28 +278,24 @@
                 VerticalAlignment="Center"
                 Background="{DynamicResource ThemeBorderBrush}"
                 Margin="4,0" />
-        <ToggleButton Command="{Binding ToggleFilterBarCommand}"
+        <ToggleButton Classes="ToolbarButton"
+                      Command="{Binding ToggleFilterBarCommand}"
                       IsChecked="{Binding IsFilterBarVisible}"
-                      Height="42"
-                      Padding="8,2"
-                      FontSize="11"
-                      ToolTip.Tip="Toggle filter bar">
-          <StackPanel>
-            <TextBlock Text="🔍" FontSize="18" HorizontalAlignment="Center" />
+                      ToolTip.Tip="{Binding LocalizedStrings[Tooltip_Filter]}">
+          <StackPanel >
+            <TextBlock Text="🔍" Classes="ToolbarButtonIcon" />
             <TextBlock Text="{Binding LocalizedStrings[Toolbar_Filter]}"
-                       FontSize="11" HorizontalAlignment="Center" />
+                       Classes="ToolbarButtonLabel" />
           </StackPanel>
         </ToggleButton>
-        <ToggleButton Command="{Binding TogglePreviewCommand}"
+        <ToggleButton Classes="ToolbarButton"
+                      Command="{Binding TogglePreviewCommand}"
                       IsChecked="{Binding IsPreviewVisible}"
-                      Height="42"
-                      Padding="8,2"
-                      FontSize="11"
-                      ToolTip.Tip="Toggle preview panel">
-          <StackPanel>
-            <TextBlock Text="👁" FontSize="18" HorizontalAlignment="Center" />
+                      ToolTip.Tip="{Binding LocalizedStrings[Tooltip_Preview]}">
+          <StackPanel >
+            <TextBlock Text="👁" Classes="ToolbarButtonIcon" />
             <TextBlock Text="{Binding LocalizedStrings[Toolbar_Preview]}"
-                       FontSize="11" HorizontalAlignment="Center" />
+                       Classes="ToolbarButtonLabel" />
           </StackPanel>
         </ToggleButton>
         <Border Width="1"
@@ -307,37 +303,33 @@
                 VerticalAlignment="Center"
                 Background="{DynamicResource ThemeBorderBrush}"
                 Margin="4,0" />
-        <Button Command="{Binding AddFilesCommand}"
+        <Button Classes="ToolbarButton"
+                Command="{Binding AddFilesCommand}"
                 IsEnabled="{Binding IsArchiveLoaded}"
-                Height="42"
-                Padding="8,2"
-                FontSize="11"
-                ToolTip.Tip="Add files to archive">
-          <StackPanel>
-            <TextBlock Text="➕" FontSize="18" HorizontalAlignment="Center" />
-            <TextBlock Text="Add" FontSize="11" HorizontalAlignment="Center" />
+                ToolTip.Tip="{Binding LocalizedStrings[Tooltip_AddFiles]}">
+          <StackPanel >
+            <TextBlock Text="➕" Classes="ToolbarButtonIcon" />
+            <TextBlock Text="{Binding LocalizedStrings[Toolbar_AddFiles]}"
+                       Classes="ToolbarButtonLabel" />
           </StackPanel>
         </Button>
-        <Button Command="{Binding DeleteFilesCommand}"
+        <Button Classes="ToolbarButton"
+                Command="{Binding DeleteFilesCommand}"
                 IsEnabled="{Binding IsArchiveLoaded}"
-                Height="42"
-                Padding="8,2"
-                FontSize="11"
-                ToolTip.Tip="Delete selected files">
-          <StackPanel>
-            <TextBlock Text="✖" FontSize="18" HorizontalAlignment="Center" />
-            <TextBlock Text="Del" FontSize="11" HorizontalAlignment="Center" />
+                ToolTip.Tip="{Binding LocalizedStrings[Tooltip_DeleteFiles]}">
+          <StackPanel >
+            <TextBlock Text="✖" Classes="ToolbarButtonIcon" />
+            <TextBlock Text="{Binding LocalizedStrings[Toolbar_DeleteFiles]}"
+                       Classes="ToolbarButtonLabel" />
           </StackPanel>
         </Button>
-        <ToggleButton IsChecked="{Binding ShowSubfolders}"
-                      Height="42"
-                      Padding="8,2"
-                      FontSize="11"
-                      ToolTip.Tip="Show subfolder contents">
-          <StackPanel>
-            <TextBlock Text="📂" FontSize="18" HorizontalAlignment="Center" />
+        <ToggleButton Classes="ToolbarButton"
+                      IsChecked="{Binding ShowSubfolders}"
+                      ToolTip.Tip="{Binding LocalizedStrings[Tooltip_Subfolders]}">
+          <StackPanel >
+            <TextBlock Text="📂" Classes="ToolbarButtonIcon" />
             <TextBlock Text="{Binding LocalizedStrings[Filter_ShowSubfolders]}"
-                       FontSize="11" HorizontalAlignment="Center" />
+                       Classes="ToolbarButtonLabel" />
           </StackPanel>
         </ToggleButton>
         <Border Width="1"
@@ -345,15 +337,28 @@
                 VerticalAlignment="Center"
                 Background="{DynamicResource ThemeBorderBrush}"
                 Margin="4,0" />
-        <Button Command="{Binding TestArchiveCommand}"
+        <Button Classes="ToolbarButton"
+                Command="{Binding TestArchiveCommand}"
                 IsEnabled="{Binding IsArchiveLoaded}"
-                Height="42"
-                Padding="8,2"
-                FontSize="11"
-                ToolTip.Tip="Test archive integrity">
-          <StackPanel>
-            <TextBlock Text="✅" FontSize="18" HorizontalAlignment="Center" />
-            <TextBlock Text="Test" FontSize="11" HorizontalAlignment="Center" />
+                ToolTip.Tip="{Binding LocalizedStrings[Tooltip_Test]}">
+          <StackPanel >
+            <TextBlock Text="✅" Classes="ToolbarButtonIcon" />
+            <TextBlock Text="{Binding LocalizedStrings[Toolbar_Test]}"
+                       Classes="ToolbarButtonLabel" />
+          </StackPanel>
+        </Button>
+        <Border Width="1"
+                Height="24"
+                VerticalAlignment="Center"
+                Background="{DynamicResource ThemeBorderBrush}"
+                Margin="4,0" />
+        <Button Classes="ToolbarButton"
+                Command="{Binding OpenPasswordManagerCommand}"
+                ToolTip.Tip="{Binding LocalizedStrings[Tooltip_Password]}">
+          <StackPanel >
+            <TextBlock Text="🔑" Classes="ToolbarButtonIcon" />
+            <TextBlock Text="{Binding LocalizedStrings[Toolbar_Password]}"
+                       Classes="ToolbarButtonLabel" />
           </StackPanel>
         </Button>
       </StackPanel>

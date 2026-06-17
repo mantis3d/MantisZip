@@ -19,8 +19,8 @@ public partial class CompressSettingsViewModel : ObservableObject
 
     /// <summary>源文件摘要文字，用于界面显示。</summary>
     public string SelectedPathsSummary => SelectedPaths.Count > 0
-        ? $"{SelectedPaths.Count} item(s) selected"
-        : "No files selected";
+        ? LocalizationManager.T("Compress_NItemsSelected", SelectedPaths.Count)
+        : LocalizationManager.T("Compress_NoFilesSelected");
 
     /// <summary>由 View 设置的文件保存选择回调。返回选择的路径，取消返回 null。</summary>
     public Func<Task<string?>>? BrowseOutput { get; set; }
@@ -75,10 +75,10 @@ public partial class CompressSettingsViewModel : ObservableObject
         get
         {
             if (string.IsNullOrEmpty(Password))
-                return "None";
+                return LocalizationManager.T("Compress_Strength_None");
 
             if (Password.Length < 4)
-                return "Weak";
+                return LocalizationManager.T("Compress_Strength_Weak");
 
             bool hasUpper = Password.Any(char.IsUpper);
             bool hasLower = Password.Any(char.IsLower);
@@ -88,12 +88,12 @@ public partial class CompressSettingsViewModel : ObservableObject
             int types = (hasUpper ? 1 : 0) + (hasLower ? 1 : 0) + (hasDigit ? 1 : 0) + (hasSpecial ? 1 : 0);
 
             if (Password.Length >= 12 && types >= 3)
-                return "Strong";
+                return LocalizationManager.T("Compress_Strength_Strong");
 
             if (Password.Length >= 8 && types >= 2)
-                return "Medium";
+                return LocalizationManager.T("Compress_Strength_Medium");
 
-            return "Weak";
+            return LocalizationManager.T("Compress_Strength_Weak");
         }
     }
 
