@@ -26,6 +26,13 @@
     - 右键菜单安装改为全平台统一的静态级联方案（`InstallCascade`），移除 COM 默认安装路径，避免部分 Win10 设备上 `MantisZip.ShellExt.comhost.dll` 加载失败导致菜单不显示的问题
     - `InstallCom()` 代码保留但不再默认调用；`ShellIntegration.Install()` 统一走级联注册
 
+12. **设置窗口新增"动态菜单"选项**：
+    - 上下文菜单 Tab 中新增"动态菜单"复选框（`EnableDynamicMenu`，默认开启）
+    - 开启时安装 COM 组件（`InstallCom`），关闭时安装静态级联菜单（`InstallCascade`）
+    - 移除已死代码的"层叠上下文菜单"复选框（`EnableCascadingMenu`，早就是 cascade-only）
+    - 切换选项时弹出提示，告知需重新安装才能生效
+    - `com-context-menu.md` 计划补充 Explorer DLL 锁定问题
+
 10. **设置窗口新增「临时文件管理」GroupBox + 启动时自动清理**：
     - 高级 Tab 中原有的「清理预览临时文件」按钮与新增的「清理所有临时文件」按钮归入 GroupBox「临时文件管理」
     - 新增 `AppSettings.CleanTempOnStartup` 设置（默认启用），启动时自动清理 `%TEMP%\MantisZip\` 中的孤儿临时文件（死机/崩溃后的残留）

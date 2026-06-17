@@ -436,7 +436,7 @@
 
                         <GroupBox Header="{l:L Settings_Menu_DisplayGroup}" Padding="8" Margin="0,0,0,12">
                             <StackPanel>
-                                <CheckBox x:Name="CascadeCheck" Content="{l:L Settings_Menu_Cascade}" Margin="0,4"/>
+                                <CheckBox x:Name="DynamicMenuCheck" Content="{l:L Settings_Menu_EnableDynamic}" Margin="0,4"/>
                                 <CheckBox x:Name="ShowIconsCheck" Content="{l:L Settings_Menu_ShowIcons}" Margin="0,4"/>
                             </StackPanel>
                         </GroupBox>

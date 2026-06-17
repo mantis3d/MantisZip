@@ -66,8 +66,10 @@ public partial class SettingsWindow : Window
         EnableExtractToNamedCheck.Unchecked += OnChanged;
         EnableExtractToCheck.Checked += OnChanged;
         EnableExtractToCheck.Unchecked += OnChanged;
-        CascadeCheck.Checked += OnChanged;
-        CascadeCheck.Unchecked += OnChanged;
+        DynamicMenuCheck.Checked += OnChanged;
+        DynamicMenuCheck.Unchecked += OnChanged;
+        DynamicMenuCheck.Checked += (_, _) => ShowDynamicMenuPrompt();
+        DynamicMenuCheck.Unchecked += (_, _) => ShowDynamicMenuPrompt();
         ShowIconsCheck.Checked += OnChanged;
         ShowIconsCheck.Unchecked += OnChanged;
     }
@@ -103,7 +105,7 @@ public partial class SettingsWindow : Window
         EnableSmartCheck.IsChecked = s.EnableSmartExtractMenu;
         EnableExtractToNamedCheck.IsChecked = s.EnableExtractToNamedMenu;
         EnableExtractToCheck.IsChecked = s.EnableExtractToMenu;
-        CascadeCheck.IsChecked = s.EnableCascadingMenu;
+        DynamicMenuCheck.IsChecked = s.EnableDynamicMenu;
         ShowIconsCheck.IsChecked = s.ShowMenuIcons;
         UpdateShellStatus();
 
@@ -207,7 +209,7 @@ public partial class SettingsWindow : Window
         s.EnableSmartExtractMenu = EnableSmartCheck.IsChecked == true;
         s.EnableExtractToNamedMenu = EnableExtractToNamedCheck.IsChecked == true;
         s.EnableExtractToMenu = EnableExtractToCheck.IsChecked == true;
-        s.EnableCascadingMenu = CascadeCheck.IsChecked == true;
+        s.EnableDynamicMenu = DynamicMenuCheck.IsChecked == true;
         s.ShowMenuIcons = ShowIconsCheck.IsChecked == true;
 
         s.EnableImagePreview = EnableImagePreviewCheck.IsChecked == true;
@@ -263,6 +265,15 @@ public partial class SettingsWindow : Window
             }
         }
         App.ApplyTextRenderingMode(SettingsTabs);
+    }
+
+    /// <summary>
+    /// 切换动态/静态菜单时的提示。
+    /// </summary>
+    private static void ShowDynamicMenuPrompt()
+    {
+        AppMessageBox.Show(L.T(L.Settings_Menu_DynamicMenuPrompt), L.T(L.App_MantisZipTitle),
+            MessageBoxButton.OK, MessageBoxImage.Information);
     }
 
     /// <summary>

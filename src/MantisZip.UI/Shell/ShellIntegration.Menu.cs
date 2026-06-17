@@ -34,14 +34,8 @@ internal static partial class ShellIntegration
 
     /// <summary>
     /// 安装 Shell 右键菜单。
-    /// 使用静态级联方案（ExtendedSubCommandsKey），兼容所有 Windows 版本。
-    ///
-    /// COM IContextMenu 实现（MantisZip.ShellExt.comhost.dll）在部分 Windows 10
-    /// 版本上可能因运行时配置或文件缺失而无法被 Explorer 加载，导致右键菜单不显示。
-    /// 静态级联方案不依赖 COM 运行时，在所有 Windows 版本上均可靠工作。
-    ///
-    /// COM 组件可通过 --install-shell-com 命令行单独安装（实验性功能）。
-    /// 参考: https://learn.microsoft.com/en-us/answers/questions/1685103
+    /// 根据 AppSettings.EnableDynamicMenu 决定使用 COM 动态菜单
+    /// 还是静态级联方案（ExtendedSubCommandsKey）。
     /// </summary>
     public static void Install()
     {
@@ -52,8 +46,21 @@ internal static partial class ShellIntegration
         // 先清理旧注册，避免残留
         Uninstall();
 
-        // 使用静态级联方案（可靠兼容所有 Windows 版本）
-        InstallCascade(s, exePath);
+        if (s.EnableDynamicMenu)
+        {
+            // 安装 COM 动态菜单，若 COM host DLL 不存在则回退到静态方案
+            if (!InstallCom())
+            {
+                App.LogDebug("ShellIntegration.Install: COM not available, falling back to static cascade");
+                InstallCascade(s, exePath);
+            }
+        }
+        else
+        {
+            // 安装静态级联方案（可靠兼容所有 Windows 版本）
+            App.LogDebug("ShellIntegration.Install: using static cascade registration");
+            InstallCascade(s, exePath);
+        }
 
         // 通知 Windows Shell 刷新上下文菜单缓存
         SHChangeNotify(SHCNE_ASSOCCHANGED, SHCNF_IDLIST, IntPtr.Zero, IntPtr.Zero);
