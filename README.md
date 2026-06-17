@@ -123,15 +123,20 @@ MantisZip 是一款面向 Windows 的免费开源压缩/解压工具，主打**�
 ![压缩文件冲突](docs/images/ConflictExtract.png)
 
 ### 文件列表增强
+
 <details>
-<summary><b>📊 展平目录与过滤工具</b></summary>
+<summary><b>📊 点击展开：展平目录与过滤工具</b></summary>
 <p align="center">
   <br>
+
 
 ![未展平目录](docs\images\FlieListNotFlat.png)
 
 ![展平目录](docs\images\FlieListFlat.png)
 
+![列排序](docs/images/FlieListSizeSort.png)
+
+![文件列表过滤](docs/images/FlieListSizeFilter.png)
 
 </p>
 </details>
@@ -221,22 +226,20 @@ MantisZip.UI.exe --compress-quick "D:\照片" -- "D:\备份.zip"
 
 ---
 
-## 📦 第三方依赖 | Dependencies
-
-
-### 外部工具（运行时依赖）
-
-| 工具 | 用途 | 许可证 | 备注 |
-|------|------|--------|------|
-| [7z.dll](https://www.7-zip.org/) | 7z/RAR 原生解析（SharpSevenZip 绑定） | GNU LGPL | 随应用分发，动态链接 |
-
----
-
-
 ## 📄 许可证 | License
 
 本项目使用 **MIT 许可证** — 详见 [LICENSE](LICENSE) 文件。  
 This project is licensed under the MIT License.
+
+---
+
+## 📦 下载与安装 | Download
+
+| 节点 (Location) | 下载渠道 (Channel) | 提取码/凭证 (Credentials) | 适用人群 (Target) |
+| :--- | :--- | :--- | :--- |
+| **夸克网盘** | [👉 点击前往夸克极速下载](https://pan.quark.cn/s/ae193b2aa11b) | **`mTZH`** | **国内推荐**！移动端/PC端不限速，支持一键转存与极速同步。 |
+| **百度网盘** | [👉 点击前往百度网盘下载](https://pan.baidu.com/s/1CJXNu1M1ARkH2hf48mfb-g?pwd=yevn) | **`yevn`** | 国内常规备用通道，方便习惯使用百度云盘生态的用户下载。 |
+| **官方 QQ 群** | [👉 点击一键加入交流群 (778347352)](https://qm.qq.com/cgi-bin/qm/qr?k=778347352) | *无需验证* | **核心推荐**！进群文件一键极速下载，获取最新测试版、调教作者与Bug反馈。 |
 
 ---
 
@@ -334,7 +337,7 @@ MantisZip 是一款完全免费且独立开发的开源项目。如果它提升�
 如果你在体验《MantisZip》的过程中遇到了 Bug、有新的功能想法，或者单纯想和同行切磋 WPF/.NET 独立开发技术，欢迎加入我们的开发者社区：
 
 * **QQ 交流群**：`778347352`（👉 [点击一键加入群聊](https://qm.qq.com/cgi-bin/qm/qr?k=778347352)）
-* **GitHub Issues**：[提交 Bug 或 Feature Request](../../issues)
+* **代码库提交**：[提交 Bug 或 Feature Request](../../issues)
 * **Discord 交流群**: （👉 [点击一键加入群聊](https://discord.gg/PpuyhceJpZ)）
 
 > 💡 **小提示**：进群请备注 “GitHub / MantisZip”。
