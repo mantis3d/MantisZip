@@ -10,7 +10,7 @@ Lightweight full-featured Windows compression/decompression tool
 
 <p align="center">
   <a href="https://buy.polar.sh/polar_cl_VaCaW2l2nWkob5CyHe4dOlhL6HrQDK4ueMA9n1JyhNc"><img src="https://img.shields.io/badge/Polar-Sponsor-pink?style=flat-square" alt="Polar Sponsor"></a>
-  <a href="https://afdian.com/a/MantisZen"><img src="https://img.shields.io/badge/Afdian-Sponsor-blue?style=flat-square" alt="爱发电"></a>
+  <a href="https://afdian.com/a/MantisZen"><img src="https://img.shields.io/badge/%E7%88%B1%E5%8F%91%E7%94%B5-%E8%B5%9E%E5%8A%A9-blue?style=flat-square" alt="爱发电"></a>
   <a href="https://dotnet.microsoft.com/"><img src="https://img.shields.io/badge/.NET-9.0-purple?style=flat-square" alt=".NET 9"></a>
 
   [![QQ Group](https://img.shields.io/badge/QQ%20Group-778347352-blue?style=flat-square&logo=tencent-qq&logoColor=white)](https://qm.qq.com/cgi-bin/qm/qr?k=778347352) 
@@ -80,6 +80,7 @@ Preview **images**, **text**, **HTML/Markdown**, **SVG**, **fonts**, and more di
 | BitTorrent | InfoHash, file tree, Magnet link, Tracker, creator |
 </details>
 
+----
 
 ### 🔑 Smart Password Manager
 
@@ -113,6 +114,8 @@ Supports import/export (plain JSON) for backup and migration. Max 1000 entries; 
 </p>
 </details>
 
+----
+
 ### ⚡ More Extraction Conflict Options
 
 Beyond the usual "Overwrite", "Skip", and "Auto-rename", adds **"Overwrite older files"** and **"Overwrite smaller files"**. "Auto-rename" can also seamlessly switch to manual rename.
@@ -121,9 +124,43 @@ Beyond the usual "Overwrite", "Skip", and "Auto-rename", adds **"Overwrite older
 
 ![Compression file conflict](images/ConflictExtract.png)
 
-### 🐞 Debug Logging
+----
 
-When enabled, detailed operation logs are written to `debug.log` for troubleshooting. Provides **privacy redaction** options to avoid leaking user privacy.
+### File List Enhancements
+
+The file list now includes a size ratio bar, directory flattening, and filtering tools. Small tools that make a big difference in efficiency.
+
+<details>
+<summary><b>📊 Click to expand: Directory flattening and filtering tools</b></summary>
+<p align="center">
+  <br>
+
+  The size ratio bar provides a visual overview of file sizes and dates in the current directory at a glance.
+
+  ![Unflattened directory](images/FlieListNotFlat.png)
+
+  ----
+
+  Flattening the directory shows files from the current directory and all its subdirectories.
+
+  ![Flattened directory](images/FlieListFlat.png)
+
+  ----
+
+  Column sorting lets you sort the list by any column's data.
+
+  ![Column sorting](images/FlieListSizeSort.png)
+
+  ----
+
+  File list filtering lets you display only the files you need based on rules.
+
+  ![File list filtering](images/FlieListSizeFilter.png)
+
+</p>
+</details>
+
+----
 
 ![Debug log settings](images/SettingDebug.png)
 
@@ -204,19 +241,19 @@ See the [Architecture Document](ARCHITECTURE.md) for details on module structure
 
 ---
 
-## 📦 Third-Party Dependencies
-
-### External Tools (Runtime Dependencies)
-
-| Tool | Purpose | License | Notes |
-|------|--------|--------|------|
-| [7z.dll](https://www.7-zip.org/) | Native 7z/RAR parsing (SharpSevenZip binding) | GNU LGPL | Distributed with app, dynamically linked |
-
----
-
 ## 📄 License
 
 This project is licensed under the **MIT License** — see the [LICENSE](../LICENSE) file for details.
+
+---
+
+## 📦 Download & Installation
+
+| Channel | Link | Access Code | Audience |
+| :--- | :--- | :--- | :--- |
+| **Quark Cloud Drive** | [👉 Download](https://pan.quark.cn/s/ae193b2aa11b) | **`mTZH`** | **Recommended for China**! No speed limits on mobile/PC, supports one-click save and fast sync. |
+| **Baidu Cloud Drive** | [👉 Download](https://pan.baidu.com/s/1CJXNu1M1ARkH2hf48mfb-g?pwd=yevn) | **`yevn`** | Alternative domestic channel for users accustomed to the Baidu ecosystem. |
+| **Official QQ Group** | [👉 Join Group (778347352)](https://qm.qq.com/cgi-bin/qm/qr?k=778347352) | *No verification* | **Highly recommended**! One-click download of latest builds, early access betas, direct feedback to the developer. |
 
 ---
 
@@ -288,13 +325,13 @@ If you are in China, you can support via **Afdian (WeChat/Alipay)** or **WeChat 
   <tr>
     <td width="50%" align="center" valign="top">
       <a href="https://afdian.com/a/MantisZen">
-      <b>⚡ Support me on Afdian</b><br>      
+      <b>⚡ Support me on Afdian ⚡</b><br>      
         <img src="images/afdian-MantisZen.jpg" alt="Afdian" width="80%"/>
       <br><i>(Click or scan to visit the Afdian page)</i>
       </a>
     </td>
     <td width="50%" align="center" valign="top">
-      <b>💚 WeChat Direct Donation</b><br><br>
+      <b>💚 WeChat Direct Donation 💚</b><br><br>
       <img src="images/wechat-Sponsor.png" alt="WeChat donation" width="80%"/>
       <br><i>(Buy the developer a cup of coffee ☕)</i>
     </td>
@@ -310,7 +347,7 @@ If you are in China, you can support via **Afdian (WeChat/Alipay)** or **WeChat 
 If you encounter a bug, have a feature idea, or just want to chat about WPF/.NET independent development, feel free to join our developer community:
 
 * **QQ Group**: `778347352` (👉 [Click to join](https://qm.qq.com/cgi-bin/qm/qr?k=778347352))
-* **GitHub Issues**: [Submit a Bug or Feature Request](../../issues)
+* **Code Repository**: [Submit a Bug or Feature Request](../../issues)
 * **Discord**: (👉 [Click to join](https://discord.gg/PpuyhceJpZ))
 
 > 💡 **Tip**: Please mention "GitHub / MantisZip" when joining the group.
