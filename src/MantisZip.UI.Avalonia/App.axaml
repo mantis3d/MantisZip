@@ -27,7 +27,18 @@
       <Setter Property="Background" Value="{DynamicResource ThemeSurfaceBgBrush}" />
       <Setter Property="Foreground" Value="{DynamicResource ThemeTextPrimaryBrush}" />
       <Setter Property="BorderBrush" Value="{DynamicResource ThemeBorderBrush}" />
-      <Setter Property="CornerRadius" Value="4" />
+      <Setter Property="CornerRadius" Value="6" />
+      <Setter Property="Padding" Value="8,8" />
+      <Setter Property="Transitions">
+        <Setter.Value>
+          <Transitions>
+            <BrushTransition Property="BorderBrush" Duration="0:0:0.15" />
+          </Transitions>
+        </Setter.Value>
+      </Setter>
+    </Style>
+    <Style Selector="TextBox:focus-within">
+      <Setter Property="BorderBrush" Value="{DynamicResource ThemeAccentBrush}" />
     </Style>
 
     <!-- Button -->
@@ -35,9 +46,17 @@
       <Setter Property="Background" Value="{DynamicResource ThemeButtonBgBrush}" />
       <Setter Property="Foreground" Value="{DynamicResource ThemeTextPrimaryBrush}" />
       <Setter Property="BorderBrush" Value="{DynamicResource ThemeBorderBrush}" />
-      <Setter Property="CornerRadius" Value="4" />
+      <Setter Property="CornerRadius" Value="6" />
       <Setter Property="Padding" Value="8,4" />
       <Setter Property="MinHeight" Value="26" />
+      <Setter Property="Transitions">
+        <Setter.Value>
+          <Transitions>
+            <BrushTransition Property="Background" Duration="0:0:0.15" />
+            <BrushTransition Property="Foreground" Duration="0:0:0.15" />
+          </Transitions>
+        </Setter.Value>
+      </Setter>
     </Style>
     <Style Selector="Button:pointerover">
       <Setter Property="Background" Value="{DynamicResource ThemeButtonHoverBrush}" />
@@ -53,9 +72,17 @@
       <Setter Property="Background" Value="{DynamicResource ThemeButtonBgBrush}" />
       <Setter Property="Foreground" Value="{DynamicResource ThemeTextPrimaryBrush}" />
       <Setter Property="BorderBrush" Value="{DynamicResource ThemeBorderBrush}" />
-      <Setter Property="CornerRadius" Value="4" />
+      <Setter Property="CornerRadius" Value="6" />
       <Setter Property="Padding" Value="8,4" />
       <Setter Property="MinHeight" Value="26" />
+      <Setter Property="Transitions">
+        <Setter.Value>
+          <Transitions>
+            <BrushTransition Property="Background" Duration="0:0:0.15" />
+            <BrushTransition Property="Foreground" Duration="0:0:0.15" />
+          </Transitions>
+        </Setter.Value>
+      </Setter>
     </Style>
     <Style Selector="ToggleButton:pointerover">
       <Setter Property="Background" Value="{DynamicResource ThemeButtonHoverBrush}" />
@@ -98,7 +125,17 @@
       <Setter Property="Background" Value="{DynamicResource ThemeComboBoxBgBrush}" />
       <Setter Property="Foreground" Value="{DynamicResource ThemeTextPrimaryBrush}" />
       <Setter Property="BorderBrush" Value="{DynamicResource ThemeComboBoxBorderBrush}" />
-      <Setter Property="CornerRadius" Value="4" />
+      <Setter Property="CornerRadius" Value="6" />
+      <Setter Property="Transitions">
+        <Setter.Value>
+          <Transitions>
+            <BrushTransition Property="BorderBrush" Duration="0:0:0.15" />
+          </Transitions>
+        </Setter.Value>
+      </Setter>
+    </Style>
+    <Style Selector="ComboBox:focus-within">
+      <Setter Property="BorderBrush" Value="{DynamicResource ThemeAccentBrush}" />
     </Style>
     <Style Selector="ComboBoxItem">
       <Setter Property="Background" Value="{DynamicResource ThemeComboBoxBgBrush}" />
@@ -123,13 +160,9 @@
       <Setter Property="Background" Value="{DynamicResource ThemeSurfaceBgBrush}" />
       <Setter Property="BorderBrush" Value="{DynamicResource ThemeBorderBrush}" />
     </Style>
-    <Style Selector="TabItem">
-      <Setter Property="Background" Value="{DynamicResource ThemeTabHeaderBgBrush}" />
-      <Setter Property="Foreground" Value="{DynamicResource ThemeTabHeaderFgBrush}" />
-      <Setter Property="BorderBrush" Value="{DynamicResource ThemeBorderBrush}" />
-    </Style>
     <Style Selector="TabItem:selected">
-      <Setter Property="Background" Value="{DynamicResource ThemeHeaderBgBrush}" />
+      <Setter Property="Background" Value="{DynamicResource ThemeAccentBrush}" />
+      <Setter Property="Foreground" Value="White" />
     </Style>
     <Style Selector="TabItem:pointerover">
       <Setter Property="Background" Value="{DynamicResource ThemeButtonHoverBrush}" />
@@ -142,8 +175,8 @@
       <Setter Property="BorderBrush" Value="{DynamicResource ThemeBorderBrush}" />
     </Style>
     <Style Selector="DataGridColumnHeader">
-      <Setter Property="Background" Value="{DynamicResource ThemeHeaderBgBrush}" />
-      <Setter Property="Foreground" Value="{DynamicResource ThemeTextPrimaryBrush}" />
+      <Setter Property="Background" Value="{DynamicResource ThemeAccentBrush}" />
+      <Setter Property="Foreground" Value="White" />
       <Setter Property="BorderBrush" Value="{DynamicResource ThemeBorderBrush}" />
     </Style>
     <Style Selector="DataGridRow">
@@ -151,6 +184,9 @@
     </Style>
     <Style Selector="DataGridRow:selected /template/ DataGridCell">
       <Setter Property="Background" Value="{DynamicResource ThemeListSelectedBrush}" />
+    </Style>
+    <Style Selector="DataGridRow:pointerover /template/ DataGridCell">
+      <Setter Property="Background" Value="{DynamicResource ThemeButtonHoverBrush}" />
     </Style>
 
     <!-- DatePicker -->
@@ -164,11 +200,15 @@
     <Style Selector="ProgressBar">
       <Setter Property="Foreground" Value="{DynamicResource ThemeAccentBrush}" />
       <Setter Property="Background" Value="{DynamicResource ThemeBorderBrush}" />
+      <Setter Property="CornerRadius" Value="4" />
     </Style>
 
     <!-- ScrollViewer -->
     <Style Selector="ScrollViewer">
       <Setter Property="Background" Value="{DynamicResource ThemeWindowBgBrush}" />
+    </Style>
+    <Style Selector="ScrollBar Thumb">
+      <Setter Property="CornerRadius" Value="4" />
     </Style>
 
     <!-- Menu / MenuItem -->
