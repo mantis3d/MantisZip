@@ -67,6 +67,6 @@
             Content="{Binding LocalizedStrings[Progress_Cancel]}"
             Command="{Binding CancelCommand}"
             HorizontalAlignment="Right"
-            Padding="16,6" />
+            Padding="16" />
   </Grid>
 </Window>

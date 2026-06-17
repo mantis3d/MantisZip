@@ -11,7 +11,7 @@
         Background="{DynamicResource ThemeWindowBgBrush}">
 
   <Grid RowDefinitions="*,Auto"
-        Margin="12">
+        Margin="16">
     <!-- TabControl -->
     <TabControl Grid.Row="0"
                 Background="{DynamicResource ThemeSurfaceBgBrush}"

@@ -6,7 +6,8 @@
         Width="400"
         Height="300"
         WindowStartupLocation="CenterOwner"
-        Background="{DynamicResource ThemeWindowBgBrush}">
+        Background="{DynamicResource ThemeWindowBgBrush}"
+        Padding="16">
 
   <Grid Margin="24">
     <StackPanel VerticalAlignment="Center"

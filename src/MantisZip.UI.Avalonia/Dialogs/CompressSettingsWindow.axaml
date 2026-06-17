@@ -175,14 +175,14 @@
                 Spacing="8"
                 Margin="0,16,0,0">
       <Button Content="{Binding LocalizedStrings[Compress_Start]}"
-              Padding="20,7"
+              Padding="16"
               Command="{Binding StartCompressCommand}"
               Background="{DynamicResource ThemeAccentBrush}"
               Foreground="{DynamicResource ThemeTextPrimaryBrush}"
               BorderThickness="0">
       </Button>
       <Button Content="{Binding LocalizedStrings[Compress_Cancel]}"
-              Padding="20,7"
+              Padding="16"
               Command="{Binding CancelCommand}"
               Background="{DynamicResource ThemeButtonBgBrush}"
               Foreground="{DynamicResource ThemeTextPrimaryBrush}"

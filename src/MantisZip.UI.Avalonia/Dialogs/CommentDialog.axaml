@@ -6,7 +6,8 @@
         Width="450"
         SizeToContent="Height"
         WindowStartupLocation="CenterOwner"
-        Background="{DynamicResource ThemeWindowBgBrush}">
+        Background="{DynamicResource ThemeWindowBgBrush}"
+        Padding="16">
   <Grid RowDefinitions="*,Auto"
         Margin="16">
     <TextBox Grid.Row="0"
