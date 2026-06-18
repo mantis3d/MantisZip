@@ -679,8 +679,9 @@ public static class L
     public const string Settings_Menu_Btn_Apply                    = "Settings_Menu_Btn_Apply";
     public const string Settings_Menu_Btn_Install                  = "Settings_Menu_Btn_Install";
     public const string Settings_Menu_Btn_Uninstall                = "Settings_Menu_Btn_Uninstall";
-    public const string Settings_Menu_Cascade                      = "Settings_Menu_Cascade";
     public const string Settings_Menu_Checking                     = "Settings_Menu_Checking";
+    public const string Settings_Menu_DynamicMenuPrompt             = "Settings_Menu_DynamicMenuPrompt";
+    public const string Settings_Menu_EnableDynamic                = "Settings_Menu_EnableDynamic";
     public const string Settings_Menu_DisplayGroup                 = "Settings_Menu_DisplayGroup";
     public const string Settings_Menu_EnableCompress               = "Settings_Menu_EnableCompress";
     public const string Settings_Menu_EnableCompressCombined        = "Settings_Menu_EnableCompressCombined";

@@ -404,10 +404,14 @@ public partial class MainWindow : Window
     /// </summary>
     private void ApplySavedSort()
     {
+        var view = System.Windows.Data.CollectionViewSource.GetDefaultView(FileListGrid.ItemsSource);
+        if (view is not System.Windows.Data.ListCollectionView listView) return;
+
         if (string.IsNullOrEmpty(_savedSortColumnPath) || _savedSortDirection <= 0)
         {
-            App.LogDebug("ApplySavedSort: skipped (path={0}, dir={1})",
-                _savedSortColumnPath ?? "(null)", _savedSortDirection);
+            // 没有列排序时，至少设置导航行优先 + 目录/文件分离
+            listView.CustomSort = new NavigationEntryFirstComparer(
+                null, 0, AppSettings.Instance.SeparateDirBaseline);
             return;
         }
 
@@ -415,6 +419,8 @@ public partial class MainWindow : Window
         if (sortCol == null)
         {
             App.LogDebug("ApplySavedSort: column not found for path={0}", _savedSortColumnPath);
+            listView.CustomSort = new NavigationEntryFirstComparer(
+                null, 0, AppSettings.Instance.SeparateDirBaseline);
             return;
         }
 
@@ -424,22 +430,9 @@ public partial class MainWindow : Window
 
         App.LogDebug("ApplySavedSort: applying path={0}, dir={1}", _savedSortColumnPath, _savedSortDirection);
 
-        // 通过 CollectionView 排序（WPF 官方推荐方式）
-        var view = System.Windows.Data.CollectionViewSource.GetDefaultView(FileListGrid.ItemsSource);
-        if (view != null)
-        {
-            view.SortDescriptions.Clear();
-            // 目录独立基准开启时：第一排序键为目录/文件分离
-            if (AppSettings.Instance.SeparateDirBaseline)
-            {
-                view.SortDescriptions.Add(
-                    new System.ComponentModel.SortDescription("SortOrder", ListSortDirection.Ascending));
-            }
-            view.SortDescriptions.Add(
-                new System.ComponentModel.SortDescription(sortCol.SortMemberPath, direction));
-            App.LogDebug("ApplySavedSort: view type={0}, SortDescriptions count={1}",
-                view.GetType().Name, view.SortDescriptions.Count);
-        }
+        // 设置 CustomSort（导航行优先 + 目录/文件分离 + 列排序）
+        listView.CustomSort = new NavigationEntryFirstComparer(
+            sortCol.SortMemberPath, _savedSortDirection, AppSettings.Instance.SeparateDirBaseline);
 
         sortCol.SortDirection = direction;
 
@@ -448,6 +441,96 @@ public partial class MainWindow : Window
             var clean = header.TrimEnd('▲', '▼', ' ').TrimEnd();
             sortCol.Header = clean + (direction == ListSortDirection.Ascending ? " ▲" : " ▼");
         }
+    }
+
+    /// <summary>
+    /// "返回上级目录"导航行优先的自定义比较器。
+    /// 排序规则：
+    /// 1. IsNavigationEntry == true 的项永远排在最前
+    /// 2. 启用 SeparateDirBaseline 时：目录（SortOrder=0）排在文件（SortOrder=1）前面
+    /// 3. 按列排序属性比较
+    /// 4. 保底：按名称排序
+    /// </summary>
+    private class NavigationEntryFirstComparer : System.Collections.IComparer
+    {
+        private readonly string? _sortColumnPath;
+        private readonly int _sortDirection; // 0=none, 1=asc, 2=desc
+        private readonly bool _separateDirBaseline;
+
+        public NavigationEntryFirstComparer(string? sortColumnPath, int sortDirection, bool separateDirBaseline)
+        {
+            _sortColumnPath = sortColumnPath;
+            _sortDirection = sortDirection;
+            _separateDirBaseline = separateDirBaseline;
+        }
+
+        public int Compare(object? a, object? b)
+        {
+            var x = a as ArchiveItem;
+            var y = b as ArchiveItem;
+            if (ReferenceEquals(x, y)) return 0;
+            if (x == null) return -1;
+            if (y == null) return 1;
+
+            // 1. 导航行永远在最前
+            if (x.IsNavigationEntry && !y.IsNavigationEntry) return -1;
+            if (!x.IsNavigationEntry && y.IsNavigationEntry) return 1;
+            if (x.IsNavigationEntry && y.IsNavigationEntry) return 0;
+
+            // 2. 目录/文件分离（SeparateDirBaseline）
+            if (_separateDirBaseline)
+            {
+                int cmp = x.SortOrder.CompareTo(y.SortOrder);
+                if (cmp != 0) return cmp;
+            }
+
+            // 3. 列排序
+            if (!string.IsNullOrEmpty(_sortColumnPath) && _sortDirection > 0)
+            {
+                var prop = typeof(ArchiveItem).GetProperty(_sortColumnPath);
+                if (prop != null)
+                {
+                    var valX = prop.GetValue(x);
+                    var valY = prop.GetValue(y);
+                    int cmp = CompareValues(valX, valY);
+                    if (cmp != 0)
+                        return _sortDirection == 1 ? cmp : -cmp;
+                }
+            }
+
+            // 4. 保底：按名称排序
+            return string.Compare(x.Name, y.Name, StringComparison.Ordinal);
+        }
+
+        private static int CompareValues(object? a, object? b)
+        {
+            if (a == null && b == null) return 0;
+            if (a == null) return -1;
+            if (b == null) return 1;
+
+            if (a is string sa && b is string sb)
+                return string.Compare(sa, sb, StringComparison.Ordinal);
+            if (a is long la && b is long lb)
+                return la.CompareTo(lb);
+            if (a is double da && b is double db)
+                return da.CompareTo(db);
+            if (a is DateTime dta && b is DateTime dtb)
+                return dta.CompareTo(dtb);
+            if (a is int ia && b is int ib)
+                return ia.CompareTo(ib);
+            if (a is bool ba && b is bool bb)
+                return ba.CompareTo(bb);
+
+            return string.Compare(a.ToString(), b.ToString(), StringComparison.Ordinal);
+        }
+    }
+
+    /// <summary>获取当前文件夹的上级目录路径，根目录返回空字符串</summary>
+    private static string GetParentFolderPath(string folderPath)
+    {
+        if (string.IsNullOrEmpty(folderPath)) return "";
+        var lastSlash = folderPath.LastIndexOf('/');
+        return lastSlash >= 0 ? folderPath[..lastSlash] : "";
     }
 
     #endregion

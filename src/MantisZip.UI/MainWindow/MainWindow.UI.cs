@@ -294,6 +294,20 @@ public partial class MainWindow
                 }
             }
 
+            // 在子目录顶部插入"返回上级目录"导航行
+            if (!string.IsNullOrEmpty(_currentFolder))
+            {
+                directItems.Insert(0, new ArchiveItem
+                {
+                    Name = "..",
+                    FullPath = GetParentFolderPath(_currentFolder),
+                    IsDirectory = true,
+                    IsNavigationEntry = true,
+                    DisplayName = "..",
+                    IconSource = SystemIconHelper.GetFolderIcon(),
+                });
+            }
+
             var sortedItems = directItems.OrderBy(i => i.SortOrder).ThenBy(i => i.Name).ToList();
 
             // ========== 进度条比例计算 ==========
@@ -444,6 +458,20 @@ public partial class MainWindow
         else
         {
             result = new List<Core.Abstractions.ArchiveItem>(_currentUnfilteredItems);
+        }
+
+        // 在过滤结果顶部插入"返回上级目录"导航行（不受过滤条件影响）
+        if (!string.IsNullOrEmpty(_currentFolder))
+        {
+            result.Insert(0, new ArchiveItem
+            {
+                Name = "..",
+                FullPath = GetParentFolderPath(_currentFolder),
+                IsDirectory = true,
+                IsNavigationEntry = true,
+                DisplayName = "..",
+                IconSource = SystemIconHelper.GetFolderIcon(),
+            });
         }
 
         // 设置 ItemsSource 并应用排序
@@ -745,7 +773,7 @@ public partial class MainWindow
                 ? e.AddedItems[e.AddedItems.Count - 1] as ArchiveItem
                 : e.RemovedItems.Count == 1 ? e.RemovedItems[0] as ArchiveItem : null;
 
-            if (lastClicked != null && !string.IsNullOrEmpty(_currentArchivePath))
+            if (lastClicked != null && !lastClicked.IsNavigationEntry && !string.IsNullOrEmpty(_currentArchivePath))
             {
                 if (lastClicked.IsDirectory) ShowDirectoryPreview(lastClicked);
                 else await ShowPreviewAsync(lastClicked);
@@ -766,6 +794,7 @@ public partial class MainWindow
         if (count == 0) { SelectionStatsText.Text = ""; return; }
         if (count == 1 && FileListGrid.SelectedItems[0] is ArchiveItem single)
         {
+            if (single.IsNavigationEntry) { SelectionStatsText.Text = ""; return; }
             SelectionStatsText.Text = single.IsDirectory
                 ? $"📁 {single.Name.TrimEnd('/')}"
                 : $"📄 {single.Name} ({FormatSize(single.Size)})";
@@ -774,6 +803,7 @@ public partial class MainWindow
         int fileCount = 0, dirCount = 0; long totalSize = 0;
         foreach (ArchiveItem ai in FileListGrid.SelectedItems)
         {
+            if (ai.IsNavigationEntry) continue;
             if (ai.IsDirectory) dirCount++;
             else { fileCount++; totalSize += ai.Size; }
         }
@@ -853,27 +883,14 @@ public partial class MainWindow
                 col.Header = clean + " ▼";
         }
 
-        // 目录独立基准开启时：目录永远排在上面，文件排在下面
-        if (AppSettings.Instance.SeparateDirBaseline)
+        // 阻止默认排序（SortDescriptions），改用 CustomSort（导航行优先 + 目录/文件分离 + 列排序）
+        e.Handled = true;
+        col.SortDirection = newDir;
+        var view = System.Windows.Data.CollectionViewSource.GetDefaultView(FileListGrid.ItemsSource);
+        if (view is System.Windows.Data.ListCollectionView listView)
         {
-            e.Handled = true; // 阻止默认排序，改为手动
-            // 手动更新 col.SortDirection（e.Handled=true 后 WPF 不再自动更新）
-            col.SortDirection = newDir;
-            var view = System.Windows.Data.CollectionViewSource.GetDefaultView(FileListGrid.ItemsSource);
-            if (view != null)
-            {
-                view.SortDescriptions.Clear();
-                if (newDir.HasValue)
-                {
-                    // 第一排序键：目录/文件分离（始终升序，目录在上面）
-                    view.SortDescriptions.Add(
-                        new System.ComponentModel.SortDescription("SortOrder", ListSortDirection.Ascending));
-                    // 第二排序键：用户点击的列
-                    view.SortDescriptions.Add(
-                        new System.ComponentModel.SortDescription(col.SortMemberPath, newDir.Value));
-                }
-                // newDir == null（回到未排序）→ 清空 SortDescriptions 后视图回到 FilterFiles 的默认排列
-            }
+            listView.CustomSort = new NavigationEntryFirstComparer(
+                _savedSortColumnPath, _savedSortDirection, AppSettings.Instance.SeparateDirBaseline);
         }
     }
 

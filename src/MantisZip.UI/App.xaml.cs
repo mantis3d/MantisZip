@@ -185,7 +185,12 @@ public partial class App : Application
         {
             if (e.Args.Length > 0)
             {
-                switch (e.Args[0])
+                // 参数归一化：允许不带 -- 前缀的常见命令（如 "install-assoc" 等同于 "--install-assoc"）
+                var cmd = e.Args[0];
+                if (!cmd.StartsWith("-"))
+                    cmd = "--" + cmd;
+
+                switch (cmd)
                 {
                     case "--install-shell":
                         ShellIntegration.Install();
@@ -266,6 +271,10 @@ public partial class App : Application
                     case "--open":
                         HandleOpen(e.Args.Length > 1 ? e.Args[1] : null);
                         return;
+
+                    default:
+                        LogStartup($"警告: 无法识别的命令行参数 '{e.Args[0]}'。使用 --help 查看可用命令。");
+                        break;
                 }
             }
         }

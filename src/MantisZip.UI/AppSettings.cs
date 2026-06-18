@@ -30,7 +30,7 @@ public class AppSettings
     public bool EnableQuickCompress { get; set; } = true;
     public bool EnableCompressSeparate { get; set; } = true;
     public bool EnableCompressCombined { get; set; } = true;
-    public bool EnableCascadingMenu { get; set; } = true;   // 层叠子菜单（默认启用，避免多文件右键动词上限问题）
+    public bool EnableDynamicMenu { get; set; } = true;     // 动态 COM 菜单（默认启用）
     public bool ShowMenuIcons { get; set; } = true;
     public bool EnableSmartExtractMenu { get; set; } = true;   // 智能解压到此处
     public bool EnableExtractHereMenu { get; set; } = true;     // 解压到此处
@@ -136,7 +136,7 @@ public class AppSettings
             using var key = Registry.CurrentUser.CreateSubKey(keyPath);
             if (key == null) return;
 
-            key.SetValue("EnableCascadingMenu", EnableCascadingMenu ? 1 : 0, RegistryValueKind.DWord);
+            key.SetValue("EnableDynamicMenu", EnableDynamicMenu ? 1 : 0, RegistryValueKind.DWord);
             key.SetValue("ShowMenuIcons", ShowMenuIcons ? 1 : 0, RegistryValueKind.DWord);
             key.SetValue("EnableOpenMenu", EnableOpenMenu ? 1 : 0, RegistryValueKind.DWord);
             key.SetValue("EnableExtractHereMenu", EnableExtractHereMenu ? 1 : 0, RegistryValueKind.DWord);

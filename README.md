@@ -163,9 +163,7 @@ MantisZip 是一款面向 Windows 的免费开源压缩/解压工具，主打**�
 
 ----
 
-### 🐞 调试日志
-
-开启后记录详细操作日志到 `debug.log`，帮助排查问题。提供**隐私脱敏**选项，避免泄露用户隐私。
+c
 
 ![调试日志设置](docs/images/SettingDebug.png)
 
@@ -246,14 +244,14 @@ MantisZip.UI.exe --compress-quick "D:\照片" -- "D:\备份.zip"
 
 ---
 
-## 📄 许可证 | License
+## 📄 许可证
 
 本项目使用 **MIT 许可证** — 详见 [LICENSE](LICENSE) 文件。  
 This project is licensed under the MIT License.
 
 ---
 
-## 📦 下载与安装 | Download
+## 📦 下载与安装
 
 | 节点 | 下载渠道 | 提取码| 适用人群 |
 | :--- | :--- | :--- | :--- |

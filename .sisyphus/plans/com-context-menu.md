@@ -728,6 +728,10 @@ Explorer:
 
 - **C++/WinRT 替代方案**: 用原生 C++ 实现 `IExplorerCommand` 接口，接收 `IShellItemArray`（无 16 文件上限）。但需要添加原生 C++ 构建流程到项目中，工程量较大。
 - **缓存决策**: Monitor 文件选择模式历史，如果用户总是选 >16 文件，可临时禁用 COM handler（通过注册表标记）。
+- **Explorer DLL 锁定问题**: COM 菜单安装后，Explorer 进程会加载 `MantisZip.ShellExt.comhost.dll` 并持有文件锁，导致后续覆盖安装或卸载时可能遇到"文件被占用"错误。已在设置窗口添加"动态菜单"选项（`EnableDynamicMenu`），切换菜单类型时需重新安装。未来可考虑：
+  - `UninstallCom()` 卸载后主动触发 `SHChangeNotify` + 延迟重试，给 Explorer 释放句柄的时间
+  - 安装程序使用重启管理器（Restart Manager）自动处理锁定
+  - 在设置 UI 卸载时提示用户先重启资源管理器或注销
 
 ---
 

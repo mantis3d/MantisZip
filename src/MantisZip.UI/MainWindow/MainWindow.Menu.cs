@@ -317,11 +317,40 @@ public partial class MainWindow
     }
 
     /// <summary>
-    /// 键盘 Delete 键处理 — 删除选中文件
+    /// 键盘快捷键处理：
+    /// — Enter：目录上回车则进入该目录，文件上回车无反应（多选以最后选择项为准）
+    /// — Backspace：返回上级目录
+    /// — Delete：删除选中文件
     /// </summary>
     private void FileListGrid_PreviewKeyDown(object sender, KeyEventArgs e)
     {
-        if (e.Key == Key.Delete && !string.IsNullOrEmpty(_currentArchivePath) && FileListGrid.IsReadOnly)
+        if (string.IsNullOrEmpty(_currentArchivePath)) return;
+
+        if (e.Key == Key.Enter)
+        {
+            if (FileListGrid.SelectedItem is ArchiveItem item && item.IsDirectory)
+            {
+                FilterFiles(item.FullPath);
+                SelectFolderInTree(item.FullPath);
+            }
+            e.Handled = true;
+            return;
+        }
+
+        if (e.Key == Key.Back)
+        {
+            if (!string.IsNullOrEmpty(_currentFolder))
+            {
+                var lastSlash = _currentFolder.LastIndexOf('/');
+                var parent = lastSlash >= 0 ? _currentFolder[..lastSlash] : "";
+                FilterFiles(parent);
+                SelectFolderInTree(parent);
+            }
+            e.Handled = true;
+            return;
+        }
+
+        if (e.Key == Key.Delete && FileListGrid.IsReadOnly)
         {
             e.Handled = true;
             _ = DeleteSelectedEntriesAsync();
@@ -335,7 +364,8 @@ public partial class MainWindow
     {
         if (string.IsNullOrEmpty(_currentArchivePath)) return;
 
-        var selectedItems = FileListGrid.SelectedItems.Cast<ArchiveItem>().ToList();
+        var selectedItems = FileListGrid.SelectedItems.Cast<ArchiveItem>()
+            .Where(i => !i.IsNavigationEntry).ToList();
         if (selectedItems.Count == 0) return;
 
         // 目录展开为内部所有文件
@@ -423,7 +453,8 @@ public partial class MainWindow
 
     private List<ArchiveItem> GetRightClickSelection()
     {
-        return FileListGrid.SelectedItems.Cast<ArchiveItem>().ToList();
+        return FileListGrid.SelectedItems.Cast<ArchiveItem>()
+            .Where(i => !i.IsNavigationEntry).ToList();
     }
 
     private async void FileListCtx_ExtractTo(object sender, RoutedEventArgs e)
