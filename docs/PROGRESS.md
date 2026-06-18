@@ -26,6 +26,10 @@
 ### v0.4.0 (2026-06-15) 第一个上线版本
   - 功能基本完成，测试基本完成。第一个上线版本。
 
+14. **Bugfix: 最近文件菜单项灰色不可点击 (Avalonia)**：
+    - 根因：在 DataTemplate 中使用 `$parent[Menu]` 或 `$parent[Window]` 绑定 `OpenRecentFileCommand`，但 Avalonia 弹出菜单的视觉树独立，无法通过 `$parent` 找到祖先
+    - 改用 `MenuItem.Click` 事件 + 代码后置直接调用 ViewModel 的 `OpenRecentFileCommand` 绕过绑定限制
+
 13. **文件列表新增「返回上级目录」导航行 (`..`)**：
     - 子目录顶部固定显示 `..` 行，点击/回车进入上级目录
     - 排序机制从 `SortDescriptions` 迁移到 `CustomSort`，`..` 永远在最顶

@@ -304,4 +304,14 @@ public partial class MainWindow : Window
         return result.Count >= 1 ? result[0].Path.LocalPath : null;
     }
 
+    private async void RecentFileMenuItem_Click(object? sender, RoutedEventArgs e)
+    {
+        if (sender is MenuItem mi && mi.DataContext is string filePath)
+        {
+            if (DataContext is MainWindowViewModel vm && vm.OpenRecentFileCommand.CanExecute(filePath))
+            {
+                vm.OpenRecentFileCommand.Execute(filePath);
+            }
+        }
+    }
 }

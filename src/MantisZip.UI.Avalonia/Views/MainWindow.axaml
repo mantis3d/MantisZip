@@ -5,6 +5,7 @@
         xmlns:conv="clr-namespace:MantisZip.UI.Avalonia.Converters"
         xmlns:views="clr-namespace:MantisZip.UI.Avalonia.Views"
         x:Class="MantisZip.UI.Avalonia.Views.MainWindow"
+        x:Name="ThisWindow"
         x:DataType="vm:MainWindowViewModel"
         Title="{Binding Title}"
         Width="1200"
@@ -47,7 +48,7 @@
                   IsEnabled="{Binding RecentFiles.Count}">
           <MenuItem.ItemTemplate>
             <DataTemplate>
-              <MenuItem Command="{Binding $parent[Menu].DataContext.OpenRecentFileCommand}"
+              <MenuItem Click="RecentFileMenuItem_Click"
                         CommandParameter="{Binding .}">
                 <MenuItem.Header>
                   <StackPanel Orientation="Horizontal" Spacing="4">
