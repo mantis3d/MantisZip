@@ -127,7 +127,7 @@ jobs:
           if (Test-Path $notesFile) {
             $content = Get-Content $notesFile -Raw
             # 找到最新版本条目（第一个 ## v 标题之后的内容，直到下一个 ## 标题）
-            if ($content -match '## v[\d.]+.*?\n(.*?)(?=\n## |\Z)') {
+            if ($content -match '(?s)## v[\d.]+.*?\n(.*?)(?=\n## |\Z)') {
               $notes = $matches[1].Trim()
             } else {
               $notes = $content

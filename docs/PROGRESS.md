@@ -7,8 +7,8 @@
 - **技术栈**: .NET 9 + WPF + SharpCompress + SharpSevenZip
 
 ## 版本
-- **当前版本**: 0.4.0
-- **发布日期**: 2026-06-12
+- **当前版本**: 0.4.1
+- **发布日期**: 2026-06-18
 
 ## 规划中
 
@@ -17,6 +17,18 @@
 | [跨平台移植可行性研究](.sisyphus/plans/cross-platform-port.md) | 砍 ShellExt，WPF→Avalonia，SharpSevenZip→SharpCompress/p7zip，DPAPI→AES-GCM |
 
 ## 版本历史（从新到旧）
+
+### v0.4.1 (2026-06-18) 发布流程修复 + 文档双语化
+
+1. **CI release notes regex 修复**：
+   - GitHub workflow 提取 RELEASE_NOTES.md 内容时 regex 缺少 `(?s)` 单行模式标志，导致 `.` 不匹配换行符，捕获组 `(.*?)` 无法跨行截取，回退到读取全文
+   - 修复后正确提取首个 `## v` 标题到下一个 `##` 之间的文本
+
+2. **RELEASE_NOTES.md 双语化**：
+   - 所有版本条目的中文说明下方增加英文对照翻译
+   - 标题统一添加 `/ English` 双语标注
+3. 修复动态菜单bug
+4. 文件列表增加“返回父目录”项目。
 
 ### v0.4.0 (2026-06-15) 第一个上线版本
   - 功能基本完成，测试基本完成。第一个上线版本。

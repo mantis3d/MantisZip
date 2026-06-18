@@ -6,7 +6,7 @@
 #define MyAppVersion "0.4.0"
 #endif
 #define MyAppPublisher "MantisZip Contributors"
-#define MyAppURL "https://github.com/yourusername/MantisZip"
+#define MyAppURL "https://github.com/mantis3d/MantisZip"
 #define MyAppExeName "MantisZip.UI.exe"
 
 [Setup]
@@ -21,7 +21,7 @@ DefaultDirName={autopf}\{#MyAppName}
 DisableProgramGroupPage=yes
 LicenseFile=LICENSE
 OutputDir=installer
-OutputBaseFilename=MantisZip-{#MyAppVersion}-Setup
+OutputBaseFilename=MantisZip-{#MyAppVersion}-Setup-NoDotNet
 Compression=lzma
 SolidCompression=yes
 WizardStyle=modern
