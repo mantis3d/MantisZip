@@ -20,7 +20,12 @@
 
 ### v0.4.1 (2026-06-18) 发布流程修复 + 文档双语化
 
-1. **修复 COM 右键菜单闪烁**：
+1. **修复 COM 右键菜单闪烁（背景模式）**：
+   - 初版修复只覆盖了文件模式（`*`），忽略了背景模式（`Directory\Background`）
+   - 背景模式的 `Initialize` 中 `_selectedFiles.Count == 0`，跳过了 `_menuBuiltForBatch` 的 lock 块，导致所有实例都独立构建菜单
+   - 新增 `else if (_isBackgroundMode)` 分支，独立管理背景模式的 batch 追踪和去重
+
+2. **修复 COM 右键菜单闪烁（文件模式）**：
    - 根因：Explorer 在一次右键中创建 3 个 COM 实例（不同 hKeyProgId），每个都完整执行 `QueryContextMenu`，3 次向同一个 HMENU 插入菜单项 → 闪烁
    - 修复：新增 `_menuBuiltForBatch` static 标记，同一批中只有第一个实例构建菜单，后续实例立即返回 0
    - `Initialize` 检测到新批次时重置标记；`QueryContextMenu` 开头用 `_fileListLock` 保护检查

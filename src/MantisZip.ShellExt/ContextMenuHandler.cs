@@ -373,6 +373,29 @@ public class ContextMenuHandler : IShellExtInit, IContextMenu
                         _lastInitializeTime = now;
                     }
                 }
+                else if (_isBackgroundMode)
+                {
+                    // Background mode (Directory\Background): no files selected,
+                    // but we still need batch tracking for QueryContextMenu dedup.
+                    // _fullFileList is not used for background commands.
+                    lock (_fileListLock)
+                    {
+                        var now = DateTime.UtcNow;
+                        bool isNewBatch = _lastInitializeTime == DateTime.MinValue
+                            || (now - _lastInitializeTime).TotalSeconds >= 2.0;
+
+                        if (isNewBatch)
+                        {
+                            _menuBuiltForBatch = false;
+                            ShellExtLog.Info($"IShellExtInit.Initialize: new batch (bg mode), reset _menuBuiltForBatch");
+                        }
+                        else
+                        {
+                            ShellExtLog.Info($"IShellExtInit.Initialize: same batch (bg mode), skipping dedup reset");
+                        }
+                        _lastInitializeTime = now;
+                    }
+                }
 
                 return NativeMethods.S_OK;
             }
