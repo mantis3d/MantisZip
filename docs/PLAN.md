@@ -17,7 +17,6 @@
 |--------|------|----------|:----:|:--------:|------|
 | **P0** | ZIP 压缩流直拷优化 | [zip-copy-mode-optimization.md](.sisyphus/plans/zip-copy-mode-optimization.md) | 🟡中 | 2-3天 | 添加/删除文件时直拷已有条目的压缩数据，避免全量解压再压缩 |
 | **P0** | 便携版模式 | [portable-mode.md](.sisyphus/plans/portable-mode.md) | 🟢低 | 1-2h | 哨兵文件触发，路径重定向到 exe 目录 |
-| **P0** | 文件列表返回上级目录 | [parent-directory-entry.md](.sisyphus/plans/parent-directory-entry.md) | 🟢低 | 1-2h | DataGrid 顶部固定 `..` 行，不受排序过滤影响 |
 | **P0** | CLI/右键菜单权限不足时提权 | [uac-elevation-permission.md](.sisyphus/plans/uac-elevation-permission.md) | 🟡中 | 3-4h | 检测目标目录可写性，不可写时弹 UAC 提权 |
 | **P1** | 统一路径快捷选择 (QuickPathControl) | [quick-path-control.md](.sisyphus/plans/quick-path-control.md) | 🟡中 | 4-6h | 收藏/历史/资源管理器窗口三合一控件；系统路径（桌面/文档/下载）可隐藏不可删除 |
 | **P1** | Win11 一级右键菜单 | [win11-first-level-menu.md](.sisyphus/plans/win11-first-level-menu.md) | 🔴高 | 1-2周 | IExplorerCommand 实现，HKLM 提权注册，双接口共存 |
@@ -73,7 +72,7 @@
 
 ### 🟡 需调整 — Core 可复用，UI 需移植（22 个）
 
-`about-window-redesign.md`、`archive-add-delete.md`、`archive-diff.md`、`archive-loading-progress.md`、`archive-rename-entry.md`、`batch-progress-list.md`、`compress-preset.md`（Phase1）、`compress-service-unify.md`、`compression-estimator.md`、`custom-columns.md`、`design-compress-password-tab.md`、`engine-unification-sharpcompress.md`、`extract-journal-undo.md`、`file-filter-feature.md`、`file-list-filter-search.md`、`file-size-progress-bar.md`、`ico-file-icon-extract.md`、`office-content-preview.md`、`png-transparency-3way.md`、`preview-extended-formats.md`、`smart-extract.md`、`split-compress.md`
+`about-window-redesign.md`、`archive-add-delete.md`、`archive-diff.md`、`archive-loading-progress.md`、`archive-rename-entry.md`、`batch-progress-list.md`、`compress-preset.md`、`parent-directory-entry.md`（Phase1）、`compress-service-unify.md`、`compression-estimator.md`、`custom-columns.md`、`design-compress-password-tab.md`、`engine-unification-sharpcompress.md`、`extract-journal-undo.md`、`file-filter-feature.md`、`file-list-filter-search.md`、`file-size-progress-bar.md`、`ico-file-icon-extract.md`、`office-content-preview.md`、`png-transparency-3way.md`、`preview-extended-formats.md`、`smart-extract.md`、`split-compress.md`
 
 ### 🔴 冲突 — 需完全重写或废弃（14 个）
 
