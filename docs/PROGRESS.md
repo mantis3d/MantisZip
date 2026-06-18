@@ -11,7 +11,14 @@
 - **发布日期**: 2026-06-12
 
 ## 规划中
-- Avalonia 跨平台移植 Phase 0（`avalonia-port` 分支）
+- Avalonia 跨平台移植后续 Phase
+
+### avalonia-port 分支 (WIP)
+  - **Bugfix: SQLite 预览文件锁定** — SqliteConnection 加 `Pooling=False`，防止连接池在 Dispose 后仍持文件句柄导致重新预览失败
+  - **Bugfix: 按钮悬停黑白色** — FluentTheme ControlTheme 用黑白资源覆盖按钮 ContentPresenter 的 `:pointerover`/`:pressed` 背景，已添加 14 个 Fluent 资源覆盖至 ThemeLight/ThemeDark
+  - **Phase 6: 样式统一与视觉打磨** — 全局控件 CornerRadius 6px + Transitions (0.15s) + TextBox/ComboBox 焦点高亮 + Dialog Padding 统一 16
+  - **Phase 5: 工具栏按钮样式重构** — Button/ToggleButton 统一样式类，消除重复属性实例，按钮高度 42→54
+  - **Phase 4: App.axaml 统一控件样式** — 移除 WPF 风格样式，适配 Avalonia 原生样式系统 (2026-06-15)
 
 ## 版本历史（从新到旧）
 

@@ -43,4 +43,24 @@
   <SolidColorBrush x:Key="ThemeTabHeaderFgBrush" Color="{StaticResource ThemeTabHeaderFg}" />
   <SolidColorBrush x:Key="ThemeComboBoxBgBrush" Color="{StaticResource ThemeComboBoxBg}" />
   <SolidColorBrush x:Key="ThemeComboBoxBorderBrush" Color="{StaticResource ThemeComboBoxBorder}" />
+
+  <!-- ════════════════════════════════════════════ -->
+  <!-- Fluent Theme Overrides — Button            -->
+  <!-- ════════════════════════════════════════════ -->
+  <SolidColorBrush x:Key="ButtonBackgroundPointerOver" Color="{StaticResource ThemeButtonHover}" />
+  <SolidColorBrush x:Key="ButtonBackgroundPressed" Color="{StaticResource ThemeButtonPressed}" />
+  <SolidColorBrush x:Key="ButtonForegroundPointerOver" Color="{StaticResource ThemeTextPrimary}" />
+  <SolidColorBrush x:Key="ButtonForegroundPressed" Color="{StaticResource ThemeTextPrimary}" />
+  <SolidColorBrush x:Key="ButtonBorderBrushPointerOver" Color="{StaticResource ThemeBorder}" />
+  <SolidColorBrush x:Key="ButtonBorderBrushPressed" Color="{StaticResource ThemeBorder}" />
+
+  <!-- ToggleButton -->
+  <SolidColorBrush x:Key="ToggleButtonBackgroundPointerOver" Color="{StaticResource ThemeButtonHover}" />
+  <SolidColorBrush x:Key="ToggleButtonBackgroundPressed" Color="{StaticResource ThemeButtonPressed}" />
+  <SolidColorBrush x:Key="ToggleButtonForegroundPointerOver" Color="{StaticResource ThemeTextPrimary}" />
+  <SolidColorBrush x:Key="ToggleButtonForegroundPressed" Color="{StaticResource ThemeTextPrimary}" />
+  <SolidColorBrush x:Key="ToggleButtonBorderBrushPointerOver" Color="{StaticResource ThemeBorder}" />
+  <SolidColorBrush x:Key="ToggleButtonBorderBrushPressed" Color="{StaticResource ThemeBorder}" />
+  <SolidColorBrush x:Key="ToggleButtonBackgroundCheckedPointerOver" Color="{StaticResource ThemeAccent}" />
+  <SolidColorBrush x:Key="ToggleButtonBackgroundCheckedPressed" Color="{StaticResource ThemeButtonPressed}" />
 </ResourceDictionary>

@@ -592,7 +592,7 @@ public partial class PreviewViewModel : ObservableObject
 
     private void LoadSqliteTable(string filePath, string tableName)
     {
-        using var conn = new SqliteConnection($"Data Source={filePath}");
+        using var conn = new SqliteConnection($"Data Source={filePath};Pooling=False");
         conn.Open();
         using var cmd = conn.CreateCommand();
         cmd.CommandText = $"SELECT * FROM \"{tableName.Replace("\"", "\"\"")}\" LIMIT 100";
@@ -630,7 +630,7 @@ public partial class PreviewViewModel : ObservableObject
         {
             _lastPreviewFilePath = filePath;
 
-            using var conn = new SqliteConnection($"Data Source={filePath}");
+            using var conn = new SqliteConnection($"Data Source={filePath};Pooling=False");
             conn.Open();
 
             // 获取所有表名
