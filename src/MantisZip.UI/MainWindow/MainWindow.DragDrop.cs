@@ -158,6 +158,12 @@ public partial class MainWindow
         // 否则清空保存，让 PreviewMouseMove 使用 DataGrid 处理后的单选集。
         var hitTest = FileListGrid.InputHitTest(_dragStartPoint) as DependencyObject;
         var row = FindVisualParent<DataGridRow>(hitTest);
+        // 导航行不可拖拽
+        if (row?.Item is ArchiveItem navItem && navItem.IsNavigationEntry)
+        {
+            _dragPreservedSelection = null;
+            return;
+        }
         if (row?.Item is ArchiveItem rowItem &&
             FileListGrid.SelectedItems.Cast<ArchiveItem>().Contains(rowItem))
         {
@@ -191,8 +197,9 @@ public partial class MainWindow
             if (_isDragExtracting) return;
 
             // 优先使用 PreviewMouseLeftButtonDown 时保存的多选集（不受 DataGrid 清空影响）
-            var selectedItems = _dragPreservedSelection
-                ?? FileListGrid.SelectedItems.Cast<ArchiveItem>().ToList();
+            var selectedItems = (_dragPreservedSelection
+                ?? FileListGrid.SelectedItems.Cast<ArchiveItem>().ToList())
+                .Where(i => !i.IsNavigationEntry).ToList();
             _dragPreservedSelection = null; // 一次性消费
             if (selectedItems.Count == 0) return;
 
