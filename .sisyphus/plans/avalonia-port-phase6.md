@@ -94,8 +94,8 @@ Light 和 Dark 都已经有 `ThemeButtonHoverBrush` 了。所以实际上**没�
 </Style>
 ```
 
-- [ ] **2a.1**: 修改 `<Style Selector="Button">`：`CornerRadius` 4→6，添加 `Transitions`
-- [ ] **2a.2**: 构建验证
+- [x] **2a.1**: 修改 `<Style Selector="Button">`：`CornerRadius` 4→6，添加 `Transitions`
+- [x] **2a.2**: 构建验证
 
 ### 2b: ToggleButton — CornerRadius + Transitions
 
@@ -118,8 +118,8 @@ Light 和 Dark 都已经有 `ThemeButtonHoverBrush` 了。所以实际上**没�
 </Style>
 ```
 
-- [ ] **2b.1**: 修改 `<Style Selector="ToggleButton">`：CornerRadius 4→6，添加 Transitions
-- [ ] **2b.2**: 构建验证
+- [x] **2b.1**: 修改 `<Style Selector="ToggleButton">`：CornerRadius 4→6，添加 Transitions
+- [x] **2b.2**: 构建验证
 
 ### 2c: TextBox — CornerRadius + Padding + Transitions + focus
 
@@ -143,9 +143,9 @@ Light 和 Dark 都已经有 `ThemeButtonHoverBrush` 了。所以实际上**没�
 </Style>
 ```
 
-- [ ] **2c.1**: 修改 TextBox Style：CornerRadius 4→6，Padding 改为 8,8，添加 Transitions
-- [ ] **2c.2**: 添加 `TextBox:focus-within` 焦点边框变色
-- [ ] **2c.3**: 构建验证
+- [x] **2c.1**: 修改 TextBox Style：CornerRadius 4→6，Padding 改为 8,8，添加 Transitions
+- [x] **2c.2**: 添加 `TextBox:focus-within` 焦点边框变色
+- [x] **2c.3**: 构建验证
 
 ### 2d: ComboBox — CornerRadius + Transitions + focus
 
@@ -169,9 +169,9 @@ Light 和 Dark 都已经有 `ThemeButtonHoverBrush` 了。所以实际上**没�
 </Style>
 ```
 
-- [ ] **2d.1**: 修改 ComboBox Style：CornerRadius 4→6，Padding 改为 8,6，添加 Transitions
-- [ ] **2d.2**: 添加 `ComboBox:focus-within` 焦点边框变色
-- [ ] **2d.3**: 构建验证
+- [x] **2d.1**: 修改 ComboBox Style：CornerRadius 4→6，Padding 8,6，添加 Transitions ✅（Padding 在后续修复中补上）
+- [x] **2d.2**: 添加 `ComboBox:focus-within` 焦点边框变色
+- [x] **2d.3**: 构建验证
 
 ### 2e: TabItem — CornerRadius + selected 颜色
 
@@ -191,8 +191,8 @@ Light 和 Dark 都已经有 `ThemeButtonHoverBrush` 了。所以实际上**没�
 
 > **Avalonia 兼容性**: TabItem 可能不支持 `CornerRadius`。如果构建或运行报错，移除该 Setter，只改 :selected 样式。
 
-- [ ] **2e.1**: TabItem :selected 改为主题色背景 + 白色文字
-- [ ] **2e.2**: 构建验证，确认 TabItem 支持 CornerRadius 与否
+- [x] **2e.1**: TabItem :selected 改为主题色背景 + 白色文字
+- [x] **2e.2**: 构建验证，确认 TabItem 不支持 CornerRadius（保持 0）
 
 ### 2f: DataGrid — ColumnHeader 颜色 + Row 悬停
 
@@ -211,9 +211,9 @@ Light 和 Dark 都已经有 `ThemeButtonHoverBrush` 了。所以实际上**没�
 </Style>
 ```
 
-- [ ] **2f.1**: DataGridColumnHeader 背景改为 `ThemeAccentBrush` + 白色文字
-- [ ] **2f.2**: 添加 `DataGridRow:pointerover` 样式
-- [ ] **2f.3**: 构建验证
+- [x] **2f.1**: DataGridColumnHeader 背景改为 `ThemeAccentBrush` + 白色文字
+- [x] **2f.2**: 添加 `DataGridRow:pointerover` 样式
+- [x] **2f.3**: 构建验证
 
 ### 2g: ProgressBar — CornerRadius
 
@@ -225,8 +225,8 @@ Light 和 Dark 都已经有 `ThemeButtonHoverBrush` 了。所以实际上**没�
 </Style>
 ```
 
-- [ ] **2g.1**: 添加 ProgressBar CornerRadius="4"
-- [ ] **2g.2**: 构建验证
+- [x] **2g.1**: 添加 ProgressBar CornerRadius="4"
+- [x] **2g.2**: 构建验证
 
 ### 2h: ScrollBar Thumb — CornerRadius
 
@@ -236,13 +236,13 @@ Light 和 Dark 都已经有 `ThemeButtonHoverBrush` 了。所以实际上**没�
 </Style>
 ```
 
-- [ ] **2h.1**: 添加 ScrollBar Thumb CornerRadius
-- [ ] **2h.2**: 构建验证
+- [x] **2h.1**: 添加 ScrollBar Thumb CornerRadius
+- [x] **2h.2**: 构建验证
 
 ### 2i: 完整构建验证
 
-- [ ] **2i.1**: `dotnet build src\MantisZip.UI.Avalonia\MantisZip.UI.Avalonia.csproj` 0 错误 0 警告
-- [ ] **2i.2**: `dotnet test tests/MantisZip.UI.Avalonia.Tests/` 全部通过
+- [x] **2i.1**: `dotnet build src\MantisZip.UI.Avalonia\MantisZip.UI.Avalonia.csproj` 0 错误 0 警告
+- [x] **2i.2**: `dotnet test tests/MantisZip.UI.Avalonia.Tests/` 全部通过（35 passed, 2 skipped, 0 failed）
 
 ---
 
@@ -264,22 +264,22 @@ Light 和 Dark 都已经有 `ThemeButtonHoverBrush` 了。所以实际上**没�
 
 有些对话框内的 `Padding` 是作用于面板或容器（如 StackPanel、Border），不是窗口级别的。只修改**窗口顶级容器**的 Padding。内部容器的 Padding 保留不动，以保证内部控件布局不受影响。
 
-- [ ] **3.1**: `AboutWindow.axaml` 窗口 Padding 改为 16
-- [ ] **3.2**: `CompressSettingsWindow.axaml` 窗口 Padding 改为 16
-- [ ] **3.3**: `ExtractSettingsWindow.axaml` 窗口 Padding 改为 16
-- [ ] **3.4**: `PasswordManagerWindow.axaml` 窗口 Padding 改为 16
-- [ ] **3.5**: `ProgressWindow.axaml` 窗口 Padding 改为 16
-- [ ] **3.6**: `SettingsWindow.axaml` TabControl 外层 Padding 改为 16
-- [ ] **3.7**: `PasswordDialog.axaml` StackPanel Padding 改为 16
-- [ ] **3.8**: `CommentDialog.axaml` 如果存在 Padding，改为 16
-- [ ] **3.9**: 构建验证
+- [x] **3.1**: `AboutWindow.axaml` 窗口 Padding 改为 16
+- [x] **3.2**: `CompressSettingsWindow.axaml` Grid Margin 改为 16
+- [x] **3.3**: `ExtractSettingsWindow.axaml` Grid Margin 改为 16
+- [x] **3.4**: `PasswordManagerWindow.axaml` 窗口 Padding 改为 16
+- [x] **3.5**: `ProgressWindow.axaml` Grid Margin 改为 16
+- [x] **3.6**: `SettingsWindow.axaml` TabControl 外层 Grid Margin 改为 16
+- [x] **3.7**: `PasswordDialog.axaml` StackPanel Margin 改为 16
+- [x] **3.8**: `CommentDialog.axaml` 窗口 Padding 改为 16
+- [x] **3.9**: 构建验证
 
 ---
 
 ## Task 4: 最终验证
 
-- [ ] **4.1**: `dotnet build src\MantisZip.UI.Avalonia\MantisZip.UI.Avalonia.csproj` — 0 errors, 0 warnings
-- [ ] **4.2**: `dotnet test tests/MantisZip.UI.Avalonia.Tests/` — 全部通过
+- [x] **4.1**: `dotnet build src\MantisZip.UI.Avalonia\MantisZip.UI.Avalonia.csproj` — 0 errors, 0 warnings ✅
+- [x] **4.2**: `dotnet test tests/MantisZip.UI.Avalonia.Tests/` — 全部通过（35 passed, 2 skipped, 0 failed）✅
 - [ ] **4.3**: 手动验收：按钮悬停有过渡动画（不再是瞬间变色）
 - [ ] **4.4**: 手动验收：输入框获得焦点时边框变为主题色
 - [ ] **4.5**: 手动验收：DataGrid 列头颜色改变

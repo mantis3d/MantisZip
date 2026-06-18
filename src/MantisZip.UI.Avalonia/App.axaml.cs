@@ -1,6 +1,9 @@
 using Avalonia;
+using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
+using Avalonia.Platform;
+using Avalonia.Threading;
 using MantisZip.Core.Abstractions;
 using MantisZip.UI.Avalonia.Views;
 
@@ -8,6 +11,9 @@ namespace MantisZip.UI.Avalonia;
 
 public partial class App : Application
 {
+    private const string LightThemeUri = "avares://MantisZip.UI.Avalonia/Themes/ThemeLight.axaml";
+    private const string DarkThemeUri = "avares://MantisZip.UI.Avalonia/Themes/ThemeDark.axaml";
+
     public override void Initialize()
     {
         AvaloniaXamlLoader.Load(this);
@@ -15,6 +21,14 @@ public partial class App : Application
 
     public override void OnFrameworkInitializationCompleted()
     {
+        // ── Apply system theme ──
+        ApplySystemTheme();
+        if (PlatformSettings is IPlatformSettings ps)
+        {
+            ps.ColorValuesChanged += (_, _) =>
+                global::Avalonia.Threading.Dispatcher.UIThread.Post(() => ApplySystemTheme());
+        }
+
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
             var args = Environment.GetCommandLineArgs().Skip(1).ToArray();
@@ -79,6 +93,30 @@ public partial class App : Application
         }
 
         base.OnFrameworkInitializationCompleted();
+    }
+
+    private void ApplySystemTheme()
+    {
+        if (PlatformSettings is not IPlatformSettings ps) return;
+        try
+        {
+            var isDark = ps.GetColorValues().ThemeVariant == PlatformThemeVariant.Dark;
+
+            // ── Swap resource dictionary ──
+            var uri = new Uri(isDark ? DarkThemeUri : LightThemeUri);
+            Resources.MergedDictionaries.Clear();
+            if (AvaloniaXamlLoader.Load(uri) is IResourceProvider themeProvider)
+                Resources.MergedDictionaries.Add(themeProvider);
+
+            // ── Set theme variant for FluentTheme ──
+            RequestedThemeVariant = isDark
+                ? global::Avalonia.Styling.ThemeVariant.Dark
+                : global::Avalonia.Styling.ThemeVariant.Light;
+        }
+        catch
+        {
+            // Fallback: keep current theme
+        }
     }
 
     private static void ExtractArchive(string archivePath, string targetDir)

@@ -4,6 +4,7 @@
   <Application.Resources>
     <ResourceDictionary>
       <ResourceDictionary.MergedDictionaries>
+        <!-- 默认 light 主题，运行时由 App.axaml.cs 根据系统设置切换为 Dark -->
         <ResourceInclude Source="avares://MantisZip.UI.Avalonia/Themes/ThemeLight.axaml" />
       </ResourceDictionary.MergedDictionaries>
     </ResourceDictionary>
@@ -126,6 +127,7 @@
       <Setter Property="Foreground" Value="{DynamicResource ThemeTextPrimaryBrush}" />
       <Setter Property="BorderBrush" Value="{DynamicResource ThemeComboBoxBorderBrush}" />
       <Setter Property="CornerRadius" Value="6" />
+      <Setter Property="Padding" Value="8,6" />
       <Setter Property="Transitions">
         <Setter.Value>
           <Transitions>
