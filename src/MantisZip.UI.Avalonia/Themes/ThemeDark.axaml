@@ -69,4 +69,12 @@
   <!-- ════════════════════════════════════════════ -->
   <SolidColorBrush x:Key="MenuFlyoutPresenterBackground" Color="{StaticResource ThemeHeaderBg}" />
   <SolidColorBrush x:Key="MenuFlyoutPresenterBorderBrush" Color="{StaticResource ThemeBorder}" />
+
+  <!-- ════════════════════════════════════════════ -->
+  <!-- Fluent Theme Overrides — Control Foregrounds -->
+  <!-- ════════════════════════════════════════════ -->
+  <SolidColorBrush x:Key="MenuFlyoutItemForeground" Color="{StaticResource ThemeTextPrimary}" />
+  <SolidColorBrush x:Key="MenuFlyoutItemForegroundPointerOver" Color="{StaticResource ThemeTextPrimary}" />
+  <SolidColorBrush x:Key="MenuFlyoutItemForegroundDisabled" Color="{StaticResource ThemeTextSecondary}" />
+  <SolidColorBrush x:Key="ButtonForegroundDisabled" Color="{StaticResource ThemeTextSecondary}" />
 </ResourceDictionary>
