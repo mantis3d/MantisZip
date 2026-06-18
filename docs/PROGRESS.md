@@ -14,7 +14,7 @@
 - Avalonia 跨平台移植后续 Phase
 
 ### avalonia-port 分支 (WIP)
-  - **Bugfix: 暗色菜单弹出面板白色背景 + 控制前景色修复** — 添加 `MenuFlyoutPresenterBackground` 修复菜单弹出面板背景；添加 `MenuFlyoutItemForeground`/`MenuFlyoutItemForegroundPointerOver`/`MenuFlyoutItemForegroundDisabled`/`ButtonForegroundDisabled` Fluent 资源覆盖，修复暗色模式下菜单文字、悬停文字、禁用按钮/菜单文字黑色问题
+  - **Bugfix: 暗色菜单弹出面板白色背景 + 控制前景色修复** — 添加 `MenuFlyoutPresenterBackground` 修复菜单弹出面板背景；覆盖 `MenuFlyoutItemForeground`/`MenuFlyoutItemForegroundPointerOver`/`MenuFlyoutItemForegroundDisabled`/`ButtonForegroundDisabled`/`TabItemHeaderForegroundUnselected`/`TabItemHeaderForegroundSelected`/`ComboBoxForeground`/`ComboBoxItemForeground`/`ComboBoxItemForegroundPointerOver`/`ComboBoxItemForegroundSelected`/`CheckBoxForegroundUnchecked`/`CheckBoxForegroundChecked` 等 Fluent 资源键及 App.axaml TabItem 样式、SettingsWindow Foreground
   - **Bugfix: SQLite 预览文件锁定** — SqliteConnection 加 `Pooling=False`，防止连接池在 Dispose 后仍持文件句柄导致重新预览失败
   - **Bugfix: 按钮悬停黑白色** — FluentTheme ControlTheme 用黑白资源覆盖按钮 ContentPresenter 的 `:pointerover`/`:pressed` 背景，已添加 14 个 Fluent 资源覆盖至 ThemeLight/ThemeDark
   - **Phase 6: 样式统一与视觉打磨** — 全局控件 CornerRadius 6px + Transitions (0.15s) + TextBox/ComboBox 焦点高亮 + Dialog Padding 统一 16

@@ -8,7 +8,8 @@
         Height="440"
         MinWidth="400"
         MinHeight="300"
-        Background="{DynamicResource ThemeWindowBgBrush}">
+         Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+         Background="{DynamicResource ThemeWindowBgBrush}">
 
   <Grid RowDefinitions="*,Auto"
         Margin="16">

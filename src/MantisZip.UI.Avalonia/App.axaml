@@ -162,12 +162,18 @@
       <Setter Property="Background" Value="{DynamicResource ThemeSurfaceBgBrush}" />
       <Setter Property="BorderBrush" Value="{DynamicResource ThemeBorderBrush}" />
     </Style>
+    <Style Selector="TabItem">
+      <Setter Property="Foreground" Value="{DynamicResource ThemeTextPrimaryBrush}" />
+    </Style>
     <Style Selector="TabItem:selected">
       <Setter Property="Background" Value="{DynamicResource ThemeAccentBrush}" />
-      <Setter Property="Foreground" Value="White" />
+      <Setter Property="Foreground" Value="{DynamicResource ThemeTextPrimaryBrush}" />
     </Style>
-    <Style Selector="TabItem:pointerover">
-      <Setter Property="Background" Value="{DynamicResource ThemeButtonHoverBrush}" />
+    <Style Selector="TabItem:pointerover /template/ Border#PART_LayoutRoot">
+      <Setter Property="TextElement.Foreground" Value="{DynamicResource ThemeTextPrimaryBrush}" />
+    </Style>
+    <Style Selector="TabItem:selected:pointerover /template/ Border#PART_LayoutRoot">
+      <Setter Property="TextElement.Foreground" Value="{DynamicResource ThemeTextPrimaryBrush}" />
     </Style>
 
     <!-- DataGrid -->
