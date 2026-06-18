@@ -159,8 +159,16 @@ public class ContextMenuHandler : IShellExtInit, IContextMenu
     // current one, we use a time-based batch detection: if Initialize is called
     // more than 2 seconds after the last update, it's treated as a new batch
     // and _fullFileList is reset.
+    //
+    // IMPORTANT: Explorer often creates MULTIPLE COM instances for a single
+    // right-click event (different hKeyProgId, same files). _menuBuiltForBatch
+    // ensures only the first instance to reach QueryContextMenu actually builds
+    // the menu; subsequent instances return 0 immediately. This prevents the
+    // "menu flash" caused by 2-3 instances each inserting 8 menu items + icons
+    // into the shared root HMENU.
     private static List<string>? _fullFileList;
     private static DateTime _lastInitializeTime = DateTime.MinValue;
+    private static bool _menuBuiltForBatch; // protected by _fileListLock
     private static readonly object _fileListLock = new();
 
     // ─── State ───
@@ -349,6 +357,7 @@ public class ContextMenuHandler : IShellExtInit, IContextMenu
                         if (isNewBatch)
                         {
                             _fullFileList = new List<string>(_selectedFiles);
+                            _menuBuiltForBatch = false; // reset for new batch
                             ShellExtLog.Info($"IShellExtInit.Initialize: new batch, stored {_fullFileList.Count} files in static _fullFileList (was {wasCount?.ToString() ?? "null"})");
                         }
                         else if (_selectedFiles.Count > _fullFileList!.Count)
@@ -412,6 +421,21 @@ public class ContextMenuHandler : IShellExtInit, IContextMenu
             // CreateDIBSection → DrawIconEx), causing Explorer's menu to flash
             // white while waiting for QueryContextMenu to return.
             // ~10 KB total for all icons — freed when Explorer.exe exits.
+
+            // ─── Batch-level dedup ───
+            // Explorer often creates multiple COM instances for a single right-click.
+            // Only the first instance to reach this point builds the menu; subsequent
+            // instances return 0 immediately to prevent menu flashing.
+            lock (_fileListLock)
+            {
+                if (_menuBuiltForBatch)
+                {
+                    ShellExtLog.Info($"QueryContextMenu #{_instanceId}: menu already built for this batch, returning 0 (dedup)");
+                    return 0;
+                }
+                _menuBuiltForBatch = true;
+            }
+            ShellExtLog.Info($"QueryContextMenu #{_instanceId}: building menu for this batch (first instance)");
 
             _cmdIdOrder.Clear();
             uint idCmd = idCmdFirst;

@@ -20,7 +20,12 @@
 
 ### v0.4.1 (2026-06-18) 发布流程修复 + 文档双语化
 
-1. **CI release notes regex 修复**：
+1. **修复 COM 右键菜单闪烁**：
+   - 根因：Explorer 在一次右键中创建 3 个 COM 实例（不同 hKeyProgId），每个都完整执行 `QueryContextMenu`，3 次向同一个 HMENU 插入菜单项 → 闪烁
+   - 修复：新增 `_menuBuiltForBatch` static 标记，同一批中只有第一个实例构建菜单，后续实例立即返回 0
+   - `Initialize` 检测到新批次时重置标记；`QueryContextMenu` 开头用 `_fileListLock` 保护检查
+
+2. **CI release notes regex 修复**：
    - GitHub workflow 提取 RELEASE_NOTES.md 内容时 regex 缺少 `(?s)` 单行模式标志，导致 `.` 不匹配换行符，捕获组 `(.*?)` 无法跨行截取，回退到读取全文
    - 修复后正确提取首个 `## v` 标题到下一个 `##` 之间的文本
 
