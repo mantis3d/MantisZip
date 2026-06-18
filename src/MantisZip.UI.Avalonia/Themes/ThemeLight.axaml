@@ -63,4 +63,10 @@
   <SolidColorBrush x:Key="ToggleButtonBorderBrushPressed" Color="{StaticResource ThemeBorder}" />
   <SolidColorBrush x:Key="ToggleButtonBackgroundCheckedPointerOver" Color="{StaticResource ThemeAccent}" />
   <SolidColorBrush x:Key="ToggleButtonBackgroundCheckedPressed" Color="{StaticResource ThemeButtonPressed}" />
+
+  <!-- ════════════════════════════════════════════ -->
+  <!-- Fluent Theme Overrides — MenuFlyoutPresenter -->
+  <!-- ════════════════════════════════════════════ -->
+  <SolidColorBrush x:Key="MenuFlyoutPresenterBackground" Color="{StaticResource ThemeHeaderBg}" />
+  <SolidColorBrush x:Key="MenuFlyoutPresenterBorderBrush" Color="{StaticResource ThemeBorder}" />
 </ResourceDictionary>
