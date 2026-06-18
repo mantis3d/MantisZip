@@ -19,14 +19,17 @@ public class ArchiveItem : Core.Abstractions.ArchiveItem
         Unavailable
     }
 
+    /// <summary>是否为"返回上级目录"导航行</summary>
+    public bool IsNavigationEntry { get; set; }
+
     public string NameForSort { get; set; } = string.Empty;
     public ImageSource? IconSource { get; set; }
 
     public CompressedDisplayMode CompressedDisplay { get; set; } = CompressedDisplayMode.Normal;
 
-    public string SizeDisplay => FormatSize(Size);
+    public string SizeDisplay => IsNavigationEntry ? "" : FormatSize(Size);
 
-    public string CompressedSizeDisplay => CompressedDisplay switch
+    public string CompressedSizeDisplay => IsNavigationEntry ? "" : CompressedDisplay switch
     {
         CompressedDisplayMode.Unavailable => "---",
         CompressedDisplayMode.NotCompressed => FormatSize(Size),
@@ -40,19 +43,21 @@ public class ArchiveItem : Core.Abstractions.ArchiveItem
 
     public int SortOrder => IsDirectory ? 0 : 1;
 
-    public string DateDisplay => LastModified > DateTime.MinValue
+    public string DateDisplay => IsNavigationEntry ? "" :
+        LastModified > DateTime.MinValue
         ? LastModified.ToString("yyyy-MM-dd HH:mm")
         : "---";
 
     public string Crc32Display
     {
-        get { return Crc32 != 0 ? $"{(uint)Crc32:X8}" : "---"; }
+        get { return IsNavigationEntry ? "" : Crc32 != 0 ? $"{(uint)Crc32:X8}" : "---"; }
     }
 
     public string RatioDisplay
     {
         get
         {
+            if (IsNavigationEntry) return "";
             if (IsDirectory || Size == 0) return "---";
             return CompressedDisplay switch
             {
