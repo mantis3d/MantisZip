@@ -21,6 +21,7 @@
 | **P1** | 统一路径快捷选择 (QuickPathControl) | [quick-path-control.md](.sisyphus/plans/quick-path-control.md) | 🟡中 | 4-6h | 收藏/历史/资源管理器窗口三合一控件；系统路径（桌面/文档/下载）可隐藏不可删除 |
 | **P1** | Win11 一级右键菜单 | [win11-first-level-menu.md](.sisyphus/plans/win11-first-level-menu.md) | 🔴高 | 1-2周 | IExplorerCommand 实现，HKLM 提权注册，双接口共存 |
 | **P1** | 压缩解压文件筛选 | [file-filter-feature.md](.sisyphus/plans/file-filter-feature.md) | 🟢低 | 1-2h | 压缩解压文件筛选 |
+| **P1** | 自包含体积优化（Avalonia 迁移后） | [selfcontained-size-optimization.md](.sisyphus/plans/selfcontained-size-optimization.md) | 🟡中 | 4-6h | 三步渐进：InvariantGlobalization → 保守修剪 → 激进修剪，目标降至 20–25 MB |
 | **P2** | 魔数识别（内容检测替代扩展名检测） | [preview-magic-detection.md](.sisyphus/plans/preview-magic-detection.md) | 🔴高 | 6-8h | 按真实内容（非扩展名）判断格式 |
 | **P2** | 压缩预估 (Compression Estimator) | [compression-estimator.md](.sisyphus/plans/compression-estimator.md) | 🟡中 | 4-5h | 压缩前估算大小/耗时 |
 | **P2** | MSI 安装包 (WiX) | [msi-packaging-wix.md](.sisyphus/plans/msi-packaging-wix.md) | 🟡中 | 2-3h | Inno Setup → WiX MSI 迁移 |
