@@ -1,0 +1,194 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="MantisZip.UI.Avalonia.Dialogs.ConflictDialog"
+        x:CompileBindings="False"
+        Title="{Binding WinTitle}"
+        Width="500"
+        WindowStartupLocation="CenterOwner"
+        SizeToContent="Height"
+        CanResize="False"
+        Background="{DynamicResource ThemeWindowBgBrush}"
+        Padding="16">
+
+  <Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto"
+        Margin="8">
+
+    <!-- Row 0: Header -->
+    <TextBlock Grid.Row="0"
+               x:Name="HeaderText"
+               FontSize="13"
+               FontWeight="SemiBold"
+               TextWrapping="Wrap" />
+
+    <!-- Row 1: Comparison panel (disk vs archive) -->
+    <Border Grid.Row="1"
+            Margin="0,8,0,0"
+            Padding="12"
+            Background="{DynamicResource ThemeSurfaceBgBrush}"
+            BorderBrush="{DynamicResource ThemeBorderBrush}"
+            BorderThickness="1"
+            CornerRadius="4">
+      <Grid ColumnDefinitions="*,Auto,*">
+        <!-- Left: Disk file info -->
+        <StackPanel Grid.Column="0">
+          <TextBlock Text="{Binding DiskLabel}"
+                     FontWeight="SemiBold"
+                     FontSize="12"
+                     Foreground="{DynamicResource ThemeTextSecondaryBrush}"
+                     Margin="0,0,0,6" />
+          <TextBlock FontSize="11"
+                     Foreground="{DynamicResource ThemeTextPrimaryBrush}">
+            <Run Text="{Binding SizeLabel}" />
+            <Run x:Name="ExistingSizeText"
+                 Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+          </TextBlock>
+          <TextBlock FontSize="11"
+                     Foreground="{DynamicResource ThemeTextPrimaryBrush}">
+            <Run Text="{Binding DateLabel}" />
+            <Run x:Name="ExistingDateText"
+                 Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+          </TextBlock>
+        </StackPanel>
+
+        <!-- Center: VS badge -->
+        <Border Grid.Column="1"
+                Width="32"
+                Height="22"
+                CornerRadius="10"
+                Background="{DynamicResource ThemeAccentBrush}"
+                Margin="12,10"
+                HorizontalAlignment="Center"
+                VerticalAlignment="Top">
+          <TextBlock Text="VS"
+                     FontSize="10"
+                     FontWeight="Bold"
+                     Foreground="White"
+                     HorizontalAlignment="Center"
+                     VerticalAlignment="Center" />
+        </Border>
+
+        <!-- Right: Archive entry info -->
+        <StackPanel Grid.Column="2">
+          <TextBlock Text="{Binding ArchiveLabel}"
+                     FontWeight="SemiBold"
+                     FontSize="12"
+                     Foreground="{DynamicResource ThemeTextSecondaryBrush}"
+                     Margin="0,0,0,6" />
+          <TextBlock FontSize="11"
+                     Foreground="{DynamicResource ThemeTextPrimaryBrush}">
+            <Run Text="{Binding SizeLabel}" />
+            <Run x:Name="EntrySizeText"
+                 Foreground="{DynamicResource ThemeAccentBrush}"
+                 FontWeight="SemiBold" />
+          </TextBlock>
+          <TextBlock FontSize="11"
+                     Foreground="{DynamicResource ThemeTextPrimaryBrush}">
+            <Run Text="{Binding DateLabel}" />
+            <Run x:Name="EntryDateText"
+                 Foreground="{DynamicResource ThemeAccentBrush}"
+                 FontWeight="SemiBold" />
+          </TextBlock>
+        </StackPanel>
+      </Grid>
+    </Border>
+
+    <!-- Row 2: Comparison result -->
+    <TextBlock Grid.Row="2"
+               x:Name="CompareResultText"
+               FontSize="11"
+               Foreground="{DynamicResource ThemeTextSecondaryBrush}"
+               TextWrapping="Wrap"
+               HorizontalAlignment="Center"
+               Margin="0,4,0,0" />
+
+    <!-- Row 3: Buttons -->
+    <WrapPanel Grid.Row="3"
+               HorizontalAlignment="Center"
+               Margin="0,10,0,0">
+      <Button MinWidth="70"
+              Padding="6,4"
+              Margin="0,0,4,4"
+              Click="Overwrite_Click">
+        <StackPanel Orientation="Vertical"
+                    HorizontalAlignment="Center">
+          <TextBlock Text="🔄"
+                     FontSize="24"
+                     HorizontalAlignment="Center" />
+          <TextBlock Text="{Binding OverwriteText}"
+                     FontSize="11"
+                     HorizontalAlignment="Center"
+                     Margin="0,2,0,0" />
+        </StackPanel>
+      </Button>
+      <Button MinWidth="70"
+              Padding="6,4"
+              Margin="4,0,4,4"
+              Click="Rename_Click">
+        <StackPanel Orientation="Vertical"
+                    HorizontalAlignment="Center">
+          <TextBlock Text="✏️"
+                     FontSize="24"
+                     HorizontalAlignment="Center" />
+          <TextBlock Text="{Binding RenameText}"
+                     FontSize="11"
+                     HorizontalAlignment="Center"
+                     Margin="0,2,0,0" />
+        </StackPanel>
+      </Button>
+      <Button MinWidth="70"
+              Padding="6,4"
+              Margin="4,0,4,4"
+              Click="Skip_Click">
+        <StackPanel Orientation="Vertical"
+                    HorizontalAlignment="Center">
+          <TextBlock Text="⏭️"
+                     FontSize="24"
+                     HorizontalAlignment="Center" />
+          <TextBlock Text="{Binding SkipText}"
+                     FontSize="11"
+                     HorizontalAlignment="Center"
+                     Margin="0,2,0,0" />
+        </StackPanel>
+      </Button>
+      <Button MinWidth="70"
+              Padding="6,4"
+              Margin="4,0,0,4"
+              Click="Cancel_Click">
+        <StackPanel Orientation="Vertical"
+                    HorizontalAlignment="Center">
+          <TextBlock Text="❌"
+                     FontSize="24"
+                     HorizontalAlignment="Center" />
+          <TextBlock Text="{Binding CancelText}"
+                     FontSize="11"
+                     HorizontalAlignment="Center"
+                     Margin="0,2,0,0" />
+        </StackPanel>
+      </Button>
+    </WrapPanel>
+
+    <!-- Row 4: Custom rename input -->
+    <Grid Grid.Row="4"
+          ColumnDefinitions="Auto,*"
+          Margin="30,4,30,0">
+      <TextBlock Grid.Column="0"
+                 Text="{Binding NewNameLabel}"
+                 VerticalAlignment="Center"
+                 FontSize="12"
+                 Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+      <TextBox Grid.Column="1"
+               x:Name="RenameTextBox"
+               FontSize="12"
+               Padding="3,2"
+               PlaceholderText="{Binding RenameHint}" />
+    </Grid>
+
+    <!-- Row 5: Apply to all -->
+    <CheckBox Grid.Row="6"
+              x:Name="ApplyAllCheck"
+              Content="{Binding ApplyAllText}"
+              FontSize="12"
+              Foreground="{DynamicResource ThemeTextSecondaryBrush}"
+              HorizontalAlignment="Center" />
+  </Grid>
+</Window>

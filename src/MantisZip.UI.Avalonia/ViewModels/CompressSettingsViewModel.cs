@@ -1,5 +1,7 @@
+using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using MantisZip.Core;
 using MantisZip.Core.Abstractions;
 using MantisZip.UI.Avalonia.Services;
 
@@ -51,6 +53,58 @@ public partial class CompressSettingsViewModel : ObservableObject
 
     [ObservableProperty]
     private CommentDistribution _commentDistribution = CommentDistribution.AllSame;
+
+    // -- Password mode (library vs new password)
+
+    [ObservableProperty]
+    private bool _isPasswordLibraryMode = true;
+
+    [ObservableProperty]
+    private string _passwordSearchText = "";
+
+    [ObservableProperty]
+    private Core.PasswordEntry? _selectedPasswordEntry;
+
+    [ObservableProperty]
+    private bool _saveToLibrary = true;
+
+    [ObservableProperty]
+    private string _passwordDescription = "";
+
+    [ObservableProperty]
+    private bool _autoGenerateRules = true;
+
+    [ObservableProperty]
+    private string _rulesText = "";
+
+    [ObservableProperty]
+    private bool _isPasswordRevealed;
+
+    /// <summary>Filtered list of password library entries.</summary>
+    public ObservableCollection<Core.PasswordEntry> FilteredPasswordEntries { get; } = new();
+
+    /// <summary>Password strength as numeric value 0-4 for visual indicator.</summary>
+    public int PasswordStrengthValue
+    {
+        get
+        {
+            if (string.IsNullOrEmpty(Password))
+                return -1;
+            return GetPasswordStrength(Password);
+        }
+    }
+
+    /// <summary>Visual password strength indicator (●●●●).</summary>
+    public string PasswordStrengthIndicator
+    {
+        get
+        {
+            if (string.IsNullOrEmpty(Password))
+                return "○○○○";
+            int strength = GetPasswordStrength(Password);
+            return new string('●', Math.Max(1, strength)).PadRight(4, '○');
+        }
+    }
 
     [ObservableProperty]
     private string _windowTitle = LocalizationManager.T("Compress_Title");
@@ -125,19 +179,71 @@ public partial class CompressSettingsViewModel : ObservableObject
         LocalizedStrings["Compress_Distribute_AllSame"] = LocalizationManager.T("Compress_Distribute_AllSame");
         LocalizedStrings["Compress_Distribute_FirstOnly"] = LocalizationManager.T("Compress_Distribute_FirstOnly");
         LocalizedStrings["Compress_Distribute_PerLine"] = LocalizationManager.T("Compress_Distribute_PerLine");
+        LocalizedStrings["Compress_Pwd_Library"] = LocalizationManager.T("Compress_Pwd_Library");
+        LocalizedStrings["Compress_Pwd_NewPassword"] = LocalizationManager.T("Compress_Pwd_NewPassword");
+        LocalizedStrings["Compress_Pwd_Search"] = LocalizationManager.T("Compress_Pwd_Search");
+        LocalizedStrings["Compress_Pwd_NoEntry"] = LocalizationManager.T("Compress_Pwd_NoEntry");
+        LocalizedStrings["Compress_Pwd_Selected"] = LocalizationManager.T("Compress_Pwd_Selected");
+        LocalizedStrings["Compress_Pwd_EnterPwd"] = LocalizationManager.T("Compress_Pwd_EnterPwd");
+        LocalizedStrings["Compress_Pwd_ConfirmPwd"] = LocalizationManager.T("Compress_Pwd_ConfirmPwd");
+        LocalizedStrings["Compress_Pwd_Match"] = LocalizationManager.T("Compress_Pwd_Match");
+        LocalizedStrings["Compress_Pwd_NoMatch"] = LocalizationManager.T("Compress_Pwd_NoMatch");
+        LocalizedStrings["Compress_Pwd_SaveToLibrary"] = LocalizationManager.T("Compress_Pwd_SaveToLibrary");
+        LocalizedStrings["Compress_Pwd_UpdateRules"] = LocalizationManager.T("Compress_Pwd_UpdateRules");
+        LocalizedStrings["Compress_Pwd_Description"] = LocalizationManager.T("Compress_Pwd_Description");
+        LocalizedStrings["Compress_Pwd_DescWatermark"] = LocalizationManager.T("Compress_Pwd_DescWatermark");
+        LocalizedStrings["Compress_Pwd_AutoRules"] = LocalizationManager.T("Compress_Pwd_AutoRules");
+        LocalizedStrings["Compress_Pwd_Rules"] = LocalizationManager.T("Compress_Pwd_Rules");
+        LocalizedStrings["Compress_Pwd_RulesWatermark"] = LocalizationManager.T("Compress_Pwd_RulesWatermark");
         LocalizedStrings["Compress_Start"] = LocalizationManager.T("Compress_Start");
         LocalizedStrings["Compress_Cancel"] = LocalizationManager.T("Compress_Cancel");
+
+        // Load password library
+        LoadPasswordLibrary();
     }
 
     partial void OnPasswordChanged(string? value)
     {
         OnPropertyChanged(nameof(PasswordStrength));
+        OnPropertyChanged(nameof(PasswordStrengthValue));
+        OnPropertyChanged(nameof(PasswordStrengthIndicator));
         OnPropertyChanged(nameof(PasswordsMatch));
     }
 
     partial void OnConfirmPasswordChanged(string? value)
     {
         OnPropertyChanged(nameof(PasswordsMatch));
+    }
+
+    partial void OnIsPasswordLibraryModeChanged(bool value)
+    {
+        if (!value)
+        {
+            // Switching to new password mode — clear selected entry
+            SelectedPasswordEntry = null;
+        }
+        else
+        {
+            // Switching to library mode — refresh list
+            ApplyPasswordFilter();
+        }
+        OnPropertyChanged(nameof(IsPasswordLibraryMode));
+    }
+
+    partial void OnSelectedPasswordEntryChanged(Core.PasswordEntry? value)
+    {
+        if (value != null)
+        {
+            Password = value.Password;
+            PasswordDescription = value.Description;
+            RulesText = value.PatternsDisplay;
+            ConfirmPassword = value.Password; // auto-match in library mode
+        }
+    }
+
+    partial void OnPasswordSearchTextChanged(string value)
+    {
+        ApplyPasswordFilter();
     }
 
     partial void OnCommentAllSameChanged(bool value)
@@ -168,6 +274,95 @@ public partial class CompressSettingsViewModel : ObservableObject
             CommentFirstOnly = false;
             CommentDistribution = CommentDistribution.PerLine;
         }
+    }
+
+    /// <summary>
+    /// Load all password entries from PasswordManager into the filtered list.
+    /// </summary>
+    public void LoadPasswordLibrary()
+    {
+        FilteredPasswordEntries.Clear();
+        var entries = PasswordManager.Instance.GetAllPasswords()
+            .OrderByDescending(e => e.LastUsed ?? DateTime.MinValue)
+            .ToList();
+        foreach (var entry in entries)
+        {
+            FilteredPasswordEntries.Add(entry);
+        }
+    }
+
+    /// <summary>
+    /// Apply search text filter to the password library.
+    /// </summary>
+    public void ApplyPasswordFilter()
+    {
+        var allEntries = PasswordManager.Instance.GetAllPasswords()
+            .OrderByDescending(e => e.LastUsed ?? DateTime.MinValue);
+
+        FilteredPasswordEntries.Clear();
+        foreach (var entry in allEntries)
+        {
+            if (string.IsNullOrEmpty(PasswordSearchText) ||
+                entry.Description.Contains(PasswordSearchText, StringComparison.OrdinalIgnoreCase) ||
+                entry.PatternsDisplay.Contains(PasswordSearchText, StringComparison.OrdinalIgnoreCase))
+            {
+                FilteredPasswordEntries.Add(entry);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Refresh auto-rules from source file paths.
+    /// </summary>
+    public void RefreshAutoRules()
+    {
+        // Generate rules from file extensions of selected paths
+        var extensions = SelectedPaths
+            .Select(p => Path.GetExtension(p))
+            .Where(e => !string.IsNullOrEmpty(e))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        if (extensions.Count > 0)
+        {
+            RulesText = string.Join(", ", extensions.Select(e => $"*{e}"));
+        }
+        else
+        {
+            RulesText = string.Join(", ", SelectedPaths.Select(p => Path.GetFileName(p)));
+        }
+    }
+
+    /// <summary>
+    /// Get password strength as numeric value 0-4.
+    /// </summary>
+    public static int GetPasswordStrength(string? pwd)
+    {
+        if (string.IsNullOrEmpty(pwd)) return -1;
+        int score = 0;
+        if (pwd.Length >= 8) score++;
+        if (pwd.Any(char.IsUpper) && pwd.Any(char.IsLower)) score++;
+        if (pwd.Any(char.IsDigit)) score++;
+        if (pwd.Any(c => !char.IsLetterOrDigit(c))) score++;
+        return Math.Min(score, 4);
+    }
+
+    [RelayCommand]
+    private void TogglePasswordMode()
+    {
+        IsPasswordLibraryMode = !IsPasswordLibraryMode;
+    }
+
+    [RelayCommand]
+    private void TogglePasswordReveal()
+    {
+        IsPasswordRevealed = !IsPasswordRevealed;
+    }
+
+    [RelayCommand]
+    private void ClearPasswordSearch()
+    {
+        PasswordSearchText = "";
     }
 
     [RelayCommand]

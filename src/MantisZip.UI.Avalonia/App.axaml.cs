@@ -5,7 +5,18 @@ using Avalonia.Markup.Xaml;
 using Avalonia.Platform;
 using Avalonia.Threading;
 using MantisZip.Core.Abstractions;
+using MantisZip.Core.Engines;
+using MantisZip.Core.Services;
+using MantisZip.Core.Utils;
+using MantisZip.UI.Avalonia.Dialogs;
+using MantisZip.UI.Avalonia.Models;
+using MantisZip.UI.Avalonia.Services;
+using MantisZip.UI.Avalonia.ViewModels;
 using MantisZip.UI.Avalonia.Views;
+using System.Diagnostics;
+using System.IO.Pipes;
+using System.Runtime.InteropServices;
+using System.Threading;
 
 namespace MantisZip.UI.Avalonia;
 
@@ -13,6 +24,14 @@ public partial class App : Application
 {
     private const string LightThemeUri = "avares://MantisZip.UI.Avalonia/Themes/ThemeLight.axaml";
     private const string DarkThemeUri = "avares://MantisZip.UI.Avalonia/Themes/ThemeDark.axaml";
+
+    // ── IPC Mutex/Pipe names ──
+    private const string CompressMutexName = "MantisZipCompressMutex";
+    private const string CompressPipeName = "MantisZipCompressPipe";
+    private const string CompressSeparateMutexName = "MantisZipCompressSeparateMutex";
+    private const string CompressSeparatePipeName = "MantisZipCompressSeparatePipe";
+    private const string CompressCombinedMutexName = "MantisZipCompressCombinedMutex";
+    private const string CompressCombinedPipeName = "MantisZipCompressCombinedPipe";
 
     public override void Initialize()
     {
@@ -41,7 +60,8 @@ public partial class App : Application
             else
             {
                 var command = args[0].ToLowerInvariant();
-                var path = args.Length > 1 ? args[1] : null;
+                var cmdPaths = args.Length > 1 ? args.Skip(1).ToArray() : Array.Empty<string>();
+                var path = cmdPaths.Length > 0 ? cmdPaths[0] : null;
 
                 switch (command)
                 {
@@ -84,6 +104,40 @@ public partial class App : Application
                         desktop.Shutdown();
                         break;
 
+                    case "--extract-smart":
+                        // Smart extract: analyze archive structure and choose extraction mode
+                        if (!string.IsNullOrEmpty(path) && File.Exists(path))
+                            ExtractSmart(path);
+                        desktop.Shutdown();
+                        break;
+
+                    case "--compress":
+                        // IPC multi-instance compress with settings dialog
+                        HandleCompress(cmdPaths.ToList(), desktop);
+                        break;
+
+                    case "--compress-quick":
+                        // Direct compress with AppSettings defaults + ProgressWindow
+                        HandleCompressQuick(cmdPaths.ToList(), desktop);
+                        break;
+
+                    case "--compress-separate":
+                        // IPC multi-instance per-item sequential compress
+                        HandleCompressSeparate(cmdPaths.ToList(), desktop);
+                        break;
+
+                    case "--compress-combined":
+                        // IPC multi-instance single combined archive
+                        HandleCompressCombined(cmdPaths.ToList(), desktop);
+                        break;
+
+                    case "--install-shell":
+                    case "--uninstall-shell":
+                    case "--install-assoc":
+                    case "--uninstall-assoc":
+                        HandleShellCommand(command, desktop);
+                        break;
+
                     default:
                         // Unknown args: just show UI
                         desktop.MainWindow = new MainWindow();
@@ -94,6 +148,10 @@ public partial class App : Application
 
         base.OnFrameworkInitializationCompleted();
     }
+
+    // ════════════════════════════════════════════════════════════════
+    //  Theme
+    // ════════════════════════════════════════════════════════════════
 
     private void ApplySystemTheme()
     {
@@ -119,6 +177,10 @@ public partial class App : Application
         }
     }
 
+    // ════════════════════════════════════════════════════════════════
+    //  Extract helpers
+    // ════════════════════════════════════════════════════════════════
+
     private static void ExtractArchive(string archivePath, string targetDir)
     {
         try
@@ -137,5 +199,583 @@ public partial class App : Application
         {
             Console.Error.WriteLine($"Extraction failed: {ex.Message}");
         }
+    }
+
+    private static void ExtractSmart(string archivePath)
+    {
+        try
+        {
+            var engine = ArchiveEngineFactory.GetEngineByExtension(archivePath);
+            if (engine == null)
+            {
+                Console.Error.WriteLine($"Unsupported archive format: {archivePath}");
+                return;
+            }
+
+            // List entries to analyze structure
+            var items = engine.ListEntriesAsync(archivePath).GetAwaiter().GetResult();
+            var hasSingleRoot = ArchiveStructureAnalyzer.HasSingleRootDirectory(items);
+
+            string targetDir;
+            if (hasSingleRoot)
+            {
+                // Single root folder: extract to current directory
+                targetDir = Directory.GetCurrentDirectory();
+                Console.WriteLine("SmartExtract: single root detected, extracting to current directory");
+            }
+            else
+            {
+                // Dispersed files: extract to named subfolder
+                var dirName = Path.GetFileNameWithoutExtension(archivePath);
+                if (archivePath.EndsWith(".tar.gz", StringComparison.OrdinalIgnoreCase))
+                    dirName = Path.GetFileNameWithoutExtension(Path.GetFileNameWithoutExtension(archivePath));
+                targetDir = Path.Combine(Path.GetDirectoryName(archivePath) ?? ".", dirName);
+                Directory.CreateDirectory(targetDir);
+                Console.WriteLine($"SmartExtract: dispersed structure, extracting to {targetDir}");
+            }
+
+            engine.ExtractAsync(archivePath, targetDir).GetAwaiter().GetResult();
+            Console.WriteLine($"Extracted: {archivePath} -> {targetDir}");
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Smart extraction failed: {ex.Message}");
+        }
+    }
+
+    // ════════════════════════════════════════════════════════════════
+    //  Shell commands (--install-shell, --uninstall-shell, etc.)
+    // ════════════════════════════════════════════════════════════════
+
+    private static void HandleShellCommand(string command, IClassicDesktopStyleApplicationLifetime desktop)
+    {
+        if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+        {
+            Console.Error.WriteLine("当前平台不支持");
+            desktop.Shutdown();
+            return;
+        }
+
+        try
+        {
+            // Shell integration is in the WPF MantisZip.UI assembly.
+            // On Windows, try to locate and run the WPF exe with the same argument.
+            // If the WPF exe is not found, show a helpful message.
+            var wpfExe = FindWpfExe();
+            if (wpfExe != null)
+            {
+                var psi = new ProcessStartInfo(wpfExe, command) { UseShellExecute = false };
+                using var proc = Process.Start(psi);
+                proc?.WaitForExit();
+            }
+            else
+            {
+                var cmdName = command switch
+                {
+                    "--install-shell" => "Install shell extension",
+                    "--uninstall-shell" => "Uninstall shell extension",
+                    "--install-assoc" => "Install file associations",
+                    "--uninstall-assoc" => "Uninstall file associations",
+                    _ => command
+                };
+                Console.Error.WriteLine($"Shell integration is not available in the Avalonia version. Please use the WPF version (MantisZip.UI.exe) to run: {cmdName}");
+                Console.Error.WriteLine($"Command: {command}");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Failed to execute {command}: {ex.Message}");
+        }
+
+        desktop.Shutdown();
+    }
+
+    /// <summary>
+    /// Attempt to locate the WPF MantisZip.UI.exe next to the Avalonia binary.
+    /// This is a best-effort lookup for shell integration commands.
+    /// </summary>
+    private static string? FindWpfExe()
+    {
+        try
+        {
+            // Look for MantisZip.UI.exe in common relative locations
+            var baseDir = AppContext.BaseDirectory;
+
+            // Same directory (side-by-side deployment)
+            var sameDir = Path.Combine(baseDir, "MantisZip.UI.exe");
+            if (File.Exists(sameDir)) return sameDir;
+
+            // Up one level (e.g., both in sibling directories under a common output root)
+            var parentDir = Path.GetDirectoryName(baseDir.TrimEnd('\\', '/'));
+            if (parentDir != null)
+            {
+                var siblingDir = Path.Combine(parentDir, "MantisZip.UI", "net9.0-windows", "MantisZip.UI.exe");
+                if (File.Exists(siblingDir)) return siblingDir;
+            }
+
+            // Check for dotnet run / published layout
+            // Relative from the solution root: src/MantisZip.UI/bin/.../MantisZip.UI.exe
+            var slnDir = FindSolutionDirectory(baseDir);
+            if (slnDir != null)
+            {
+                var buildDir = Path.Combine(slnDir, "src", "MantisZip.UI", "bin");
+                if (Directory.Exists(buildDir))
+                {
+                    var configDirs = Directory.GetDirectories(buildDir, "*", SearchOption.TopDirectoryOnly);
+                    foreach (var cfg in configDirs)
+                    {
+                        var tfDir = Path.Combine(cfg, "net9.0-windows");
+                        if (Directory.Exists(tfDir))
+                        {
+                            var exe = Path.Combine(tfDir, "MantisZip.UI.exe");
+                            if (File.Exists(exe)) return exe;
+                        }
+                    }
+                }
+            }
+        }
+        catch
+        {
+            // Best-effort
+        }
+
+        return null;
+    }
+
+    private static string? FindSolutionDirectory(string startDir)
+    {
+        var dir = startDir;
+        while (dir != null)
+        {
+            if (File.Exists(Path.Combine(dir, "MantisZip.sln")))
+                return dir;
+            dir = Path.GetDirectoryName(dir);
+        }
+        return null;
+    }
+
+    // ════════════════════════════════════════════════════════════════
+    //  IPC helpers (NamedPipe multi-instance)
+    // ════════════════════════════════════════════════════════════════
+
+    private static void StartPipeServer(List<string> allPaths, CancellationToken ct, string pipeName, ManualResetEventSlim readyEvent)
+    {
+        Task.Run(async () =>
+        {
+            try
+            {
+                readyEvent.Set();
+                while (!ct.IsCancellationRequested)
+                {
+                    using var pipe = new NamedPipeServerStream(
+                        pipeName, PipeDirection.In, -1,
+                        PipeTransmissionMode.Message, PipeOptions.Asynchronous);
+                    try
+                    {
+                        await pipe.WaitForConnectionAsync(ct);
+                        var receivedCount = 0;
+                        using var reader = new StreamReader(pipe);
+                        string? line;
+                        while ((line = await reader.ReadLineAsync()) != null)
+                        {
+                            lock (allPaths)
+                            {
+                                if (!allPaths.Contains(line) && (File.Exists(line) || Directory.Exists(line)))
+                                {
+                                    allPaths.Add(line);
+                                    receivedCount++;
+                                }
+                            }
+                        }
+                        Debug.WriteLine($"PipeServer ({pipeName}): received {receivedCount} new paths from client");
+                    }
+                    catch (OperationCanceledException) { throw; }
+                    finally { pipe.Dispose(); }
+                }
+            }
+            catch (OperationCanceledException) { }
+            catch (Exception pipeEx) { Debug.WriteLine($"PipeServer ({pipeName}): error: {pipeEx.Message}"); }
+        });
+    }
+
+    private static void SendPathsThroughPipe(List<string> paths, string pipeName)
+    {
+        try
+        {
+            using var pipe = new NamedPipeClientStream(".", pipeName, PipeDirection.Out);
+            pipe.Connect(2000);
+            using var writer = new StreamWriter(pipe);
+            foreach (var p in paths)
+                writer.WriteLine(p);
+            writer.Flush();
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"SendPathsThroughPipe ({pipeName}) failed: {ex.Message}");
+        }
+    }
+
+    // ════════════════════════════════════════════════════════════════
+    //  --compress : IPC + CompressSettingsWindow
+    // ════════════════════════════════════════════════════════════════
+
+    private static void HandleCompress(List<string> paths, IClassicDesktopStyleApplicationLifetime desktop)
+    {
+        var myPaths = paths.Where(p => File.Exists(p) || Directory.Exists(p)).ToList();
+        if (myPaths.Count == 0) { desktop.Shutdown(); return; }
+
+        if (OperatingSystem.IsWindows())
+        {
+            bool firstInstance;
+            var mutex = new Mutex(true, CompressMutexName, out firstInstance);
+
+            if (firstInstance)
+            {
+                var allPaths = new List<string>(myPaths);
+                var cts = new CancellationTokenSource();
+                var pipeReady = new ManualResetEventSlim(false);
+                StartPipeServer(allPaths, cts.Token, CompressPipeName, pipeReady);
+                pipeReady.Wait(3000);
+
+                _ = Task.Delay(800).ContinueWith(_ =>
+                {
+                    cts.Cancel();
+                    mutex.Dispose();
+                    Dispatcher.UIThread.Post(async () =>
+                    {
+                        try { await ShowCompressDialogAndRun(allPaths, desktop); }
+                        finally { desktop.Shutdown(); }
+                    });
+                });
+            }
+            else
+            {
+                SendPathsThroughPipe(myPaths, CompressPipeName);
+                desktop.Shutdown();
+            }
+        }
+        else
+        {
+            // Non-Windows: show dialog directly (no IPC)
+            Dispatcher.UIThread.Post(async () =>
+            {
+                try { await ShowCompressDialogAndRun(myPaths, desktop); }
+                finally { desktop.Shutdown(); }
+            });
+        }
+    }
+
+    private static async Task ShowCompressDialogAndRun(List<string> paths, IClassicDesktopStyleApplicationLifetime desktop)
+    {
+        var dlg = new CompressSettingsWindow(paths);
+
+        // Intercept CloseAction: on "Compress", run the compression
+        dlg.ViewModel.CloseAction = async (result) =>
+        {
+            dlg.Close();
+            if (result)
+            {
+                var vm = dlg.ViewModel;
+                var request = new CompressRequest
+                {
+                    SourcePaths = paths.ToList(),
+                    Mode = CompressOutputMode.Manual,
+                    Format = vm.DefaultFormat,
+                    CompressionLevel = vm.CompressionLevel,
+                    Password = vm.Password,
+                    Encrypt = vm.Encrypt,
+                    Comment = vm.Comment,
+                    CommentDistribution = vm.CommentDistribution,
+                    OutputPath = vm.OutputPath,
+                    PreserveDirectoryRoot = true,
+                };
+
+                await CompressWithProgress(request, "压缩", desktop);
+            }
+            await Task.CompletedTask;
+        };
+
+        dlg.Show();
+        desktop.MainWindow = dlg;
+    }
+
+    // ════════════════════════════════════════════════════════════════
+    //  --compress-quick : defaults + ProgressWindow, then exit
+    // ════════════════════════════════════════════════════════════════
+
+    private static void HandleCompressQuick(List<string> paths, IClassicDesktopStyleApplicationLifetime desktop)
+    {
+        var myPaths = paths.Where(p => File.Exists(p) || Directory.Exists(p)).ToList();
+        if (myPaths.Count == 0) { desktop.Shutdown(); return; }
+
+        var settings = AppSettings.Load();
+
+        // Auto-determine output path from first source
+        var first = myPaths[0];
+        var dir = File.Exists(first)
+            ? Path.GetDirectoryName(first)
+            : Path.GetDirectoryName(first.TrimEnd('\\', '/'));
+        dir ??= Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
+        var baseName = Path.GetFileNameWithoutExtension(first.TrimEnd('\\', '/'));
+        var ext = settings.DefaultFormat == "tar.gz" ? ".tar.gz" : "." + settings.DefaultFormat;
+        var outputPath = Path.Combine(dir, baseName + ext);
+
+        var request = new CompressRequest
+        {
+            SourcePaths = myPaths,
+            Mode = CompressOutputMode.Manual,
+            Format = settings.DefaultFormat,
+            CompressionLevel = settings.DefaultLevel,
+            OutputPath = outputPath,
+            PreserveDirectoryRoot = true,
+        };
+
+        _ = CompressWithProgress(request, "快速压缩", desktop);
+    }
+
+    // ════════════════════════════════════════════════════════════════
+    //  --compress-separate : IPC + per-item batch compress
+    // ════════════════════════════════════════════════════════════════
+
+    private static void HandleCompressSeparate(List<string> paths, IClassicDesktopStyleApplicationLifetime desktop)
+    {
+        var myPaths = paths.Where(p => File.Exists(p) || Directory.Exists(p)).ToList();
+        if (myPaths.Count == 0) { desktop.Shutdown(); return; }
+
+        if (OperatingSystem.IsWindows())
+        {
+            bool firstInstance;
+            var mutex = new Mutex(true, CompressSeparateMutexName, out firstInstance);
+
+            if (firstInstance)
+            {
+                var allPaths = new List<string>(myPaths);
+                var cts = new CancellationTokenSource();
+                var pipeReady = new ManualResetEventSlim(false);
+                StartPipeServer(allPaths, cts.Token, CompressSeparatePipeName, pipeReady);
+                pipeReady.Wait(3000);
+
+                _ = Task.Delay(800).ContinueWith(_ =>
+                {
+                    cts.Cancel();
+                    mutex.Dispose();
+                    Dispatcher.UIThread.Post(async () =>
+                    {
+                        try { await RunCompressSeparate(allPaths, desktop); }
+                        finally { desktop.Shutdown(); }
+                    });
+                });
+            }
+            else
+            {
+                SendPathsThroughPipe(myPaths, CompressSeparatePipeName);
+                desktop.Shutdown();
+            }
+        }
+        else
+        {
+            Dispatcher.UIThread.Post(async () =>
+            {
+                try { await RunCompressSeparate(myPaths, desktop); }
+                finally { desktop.Shutdown(); }
+            });
+        }
+    }
+
+    private static async Task RunCompressSeparate(List<string> paths, IClassicDesktopStyleApplicationLifetime desktop)
+    {
+        var settings = AppSettings.Load();
+
+        var request = new CompressRequest
+        {
+            SourcePaths = paths,
+            Mode = CompressOutputMode.Separate,
+            Format = settings.DefaultFormat,
+            CompressionLevel = settings.DefaultLevel,
+            KeepOriginalExtension = false,
+            PreserveDirectoryRoot = true,
+        };
+
+        await CompressWithProgress(request, "批量压缩", desktop);
+    }
+
+    // ════════════════════════════════════════════════════════════════
+    //  --compress-combined : IPC + single combined archive
+    // ════════════════════════════════════════════════════════════════
+
+    private static void HandleCompressCombined(List<string> paths, IClassicDesktopStyleApplicationLifetime desktop)
+    {
+        var myPaths = paths.Where(p => File.Exists(p) || Directory.Exists(p)).ToList();
+        if (myPaths.Count == 0) { desktop.Shutdown(); return; }
+
+        if (OperatingSystem.IsWindows())
+        {
+            bool firstInstance;
+            var mutex = new Mutex(true, CompressCombinedMutexName, out firstInstance);
+
+            if (firstInstance)
+            {
+                var allPaths = new List<string>(myPaths);
+                var cts = new CancellationTokenSource();
+                var pipeReady = new ManualResetEventSlim(false);
+                StartPipeServer(allPaths, cts.Token, CompressCombinedPipeName, pipeReady);
+                pipeReady.Wait(3000);
+
+                _ = Task.Delay(800).ContinueWith(_ =>
+                {
+                    cts.Cancel();
+                    mutex.Dispose();
+                    Dispatcher.UIThread.Post(async () =>
+                    {
+                        try { await RunCompressCombined(allPaths, desktop); }
+                        finally { desktop.Shutdown(); }
+                    });
+                });
+            }
+            else
+            {
+                SendPathsThroughPipe(myPaths, CompressCombinedPipeName);
+                desktop.Shutdown();
+            }
+        }
+        else
+        {
+            Dispatcher.UIThread.Post(async () =>
+            {
+                try { await RunCompressCombined(myPaths, desktop); }
+                finally { desktop.Shutdown(); }
+            });
+        }
+    }
+
+    private static async Task RunCompressCombined(List<string> paths, IClassicDesktopStyleApplicationLifetime desktop)
+    {
+        var settings = AppSettings.Load();
+
+        // Determine common parent for archive name
+        var commonParent = FindCommonParent(paths);
+        string parentDir;
+        string archiveName;
+
+        if (commonParent != null && !IsDriveRoot(commonParent))
+        {
+            parentDir = commonParent;
+            archiveName = Path.GetFileName(commonParent.TrimEnd('\\', '/'));
+        }
+        else
+        {
+            // No common parent: use first file's directory
+            var first = paths[0];
+            parentDir = Path.GetDirectoryName(first.TrimEnd('\\', '/'))
+                ?? Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
+            archiveName = Path.GetFileNameWithoutExtension(first.TrimEnd('\\', '/'));
+        }
+
+        var ext = settings.DefaultFormat == "tar.gz" ? ".tar.gz" : "." + settings.DefaultFormat;
+        var outputPath = Path.Combine(parentDir, archiveName + ext);
+
+        var request = new CompressRequest
+        {
+            SourcePaths = paths,
+            Mode = CompressOutputMode.Combined,
+            Format = settings.DefaultFormat,
+            CompressionLevel = settings.DefaultLevel,
+            OutputPath = outputPath,
+            PreserveDirectoryRoot = true,
+        };
+
+        await CompressWithProgress(request, "合并压缩", desktop);
+    }
+
+    // ════════════════════════════════════════════════════════════════
+    //  Shared: compress with ProgressWindow
+    // ════════════════════════════════════════════════════════════════
+
+    private static async Task CompressWithProgress(CompressRequest request, string title, IClassicDesktopStyleApplicationLifetime desktop)
+    {
+        var progressWindow = new ProgressWindow(title);
+        progressWindow.InitCancellation();
+        progressWindow.Show();
+        desktop.MainWindow = progressWindow;
+
+        var doneEvent = new ManualResetEventSlim(false);
+        Exception? captureException = null;
+
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                var rawProgress = ProgressViewModel.CreateBackgroundProgress(
+                    progressWindow, p => progressWindow.SetProgress(p));
+
+                var avCompress = new AvaloniaCompressService();
+                var result = await avCompress.CompressAsync(request, rawProgress, progressWindow.CancellationToken);
+
+                await Dispatcher.UIThread.InvokeAsync(() =>
+                {
+                    progressWindow.SetStatus(result.Failed > 0 ? "失败" : "完成");
+                    progressWindow.SetProgress(new ArchiveProgress { PercentComplete = 100 });
+                });
+
+                // Small delay so user can see completion
+                await Task.Delay(1500);
+            }
+            catch (OperationCanceledException) { }
+            catch (Exception ex)
+            {
+                captureException = ex;
+                Console.Error.WriteLine($"Compression failed: {ex.Message}");
+            }
+            finally
+            {
+                doneEvent.Set();
+            }
+        });
+
+        // Wait for completion (non-blocking via the ongoing main loop)
+        await Task.Run(() => doneEvent.Wait());
+
+        progressWindow.Close();
+
+        if (captureException != null)
+            Console.Error.WriteLine($"Compression error: {captureException.Message}");
+
+        desktop.Shutdown();
+    }
+
+    // ════════════════════════════════════════════════════════════════
+    //  Path utilities
+    // ════════════════════════════════════════════════════════════════
+
+    internal static string? FindCommonParent(List<string> paths)
+    {
+        if (paths.Count == 0) return null;
+        var parents = paths.Select(p =>
+        {
+            var trimmed = p.TrimEnd('\\', '/');
+            return File.Exists(trimmed)
+                ? Path.GetDirectoryName(trimmed) ?? ""
+                : Path.GetDirectoryName(trimmed) ?? "";
+        }).ToList();
+
+        if (parents.Any(string.IsNullOrEmpty)) return null;
+
+        var common = parents[0];
+        for (int i = 1; i < parents.Count; i++)
+        {
+            while (!parents[i].StartsWith(common, StringComparison.OrdinalIgnoreCase))
+            {
+                var parent = Path.GetDirectoryName(common);
+                if (parent == null) return null;
+                common = parent;
+            }
+        }
+        return common;
+    }
+
+    internal static bool IsDriveRoot(string path)
+    {
+        var trimmed = path.TrimEnd('\\', '/');
+        return trimmed.Length == 2 && trimmed[1] == ':';
     }
 }

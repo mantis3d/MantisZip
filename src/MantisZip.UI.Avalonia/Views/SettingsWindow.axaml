@@ -104,8 +104,209 @@
         <ScrollViewer Background="{DynamicResource ThemeWindowBgBrush}">
           <StackPanel Spacing="10"
                       Margin="12">
-            <CheckBox Content="{Binding EnableDebugLogText}"
+            <CheckBox Content="{Binding DebugText}"
                       IsChecked="{Binding EnableDebugLogging}" />
+          </StackPanel>
+        </ScrollViewer>
+      </TabItem>
+
+      <!-- ═══════ 解压 ═══════ -->
+      <TabItem Header="{Binding TabExtractHeader}">
+        <ScrollViewer Background="{DynamicResource ThemeWindowBgBrush}">
+          <StackPanel Spacing="10"
+                      Margin="12">
+            <StackPanel Spacing="4">
+              <TextBlock Text="{Binding ExtractDefaultDestText}"
+                         FontSize="13" />
+              <ComboBox SelectedValue="{Binding ExtractDestination}"
+                        Width="240"
+                        HorizontalAlignment="Left">
+                <ComboBoxItem Content="每次询问" Tag="ask" />
+                <ComboBoxItem Content="压缩包所在目录" Tag="same-dir" />
+                <ComboBoxItem Content="桌面" Tag="desktop" />
+              </ComboBox>
+            </StackPanel>
+
+            <Separator Background="{DynamicResource ThemeBorderBrush}" />
+
+            <StackPanel Spacing="4">
+              <TextBlock Text="{Binding ExtractConflictActionText}"
+                         FontSize="13" />
+              <ComboBox SelectedValue="{Binding FileConflictAction}"
+                        Width="240"
+                        HorizontalAlignment="Left">
+                <ComboBoxItem Content="每次询问" Tag="ask" />
+                <ComboBoxItem Content="覆盖" Tag="overwrite" />
+                <ComboBoxItem Content="覆盖旧版本" Tag="overwrite-if-older" />
+                <ComboBoxItem Content="覆盖小文件" Tag="overwrite-if-smaller" />
+                <ComboBoxItem Content="自动重命名" Tag="rename" />
+                <ComboBoxItem Content="跳过" Tag="skip" />
+              </ComboBox>
+            </StackPanel>
+
+            <Separator Background="{DynamicResource ThemeBorderBrush}" />
+
+            <CheckBox Content="{Binding ExtractOpenFolderAfterText}"
+                      IsChecked="{Binding OpenFolderAfterExtract}" />
+            <CheckBox Content="{Binding ExtractEnableDragText}"
+                      IsChecked="{Binding EnableDragExtract}" />
+            <CheckBox Content="{Binding ExtractPreserveFullPathText}"
+                      IsChecked="{Binding ExtractPreserveFullPath}" />
+          </StackPanel>
+        </ScrollViewer>
+      </TabItem>
+
+      <!-- ═══════ 上下文菜单 ═══════ -->
+      <TabItem Header="{Binding TabContextMenuHeader}">
+        <ScrollViewer Background="{DynamicResource ThemeWindowBgBrush}">
+          <StackPanel Spacing="10"
+                      Margin="12">
+            <Border BorderBrush="{DynamicResource ThemeBorderBrush}"
+                    BorderThickness="1"
+                    Padding="8"
+                    CornerRadius="4"
+                    Background="{DynamicResource ThemeSurfaceBgBrush}">
+              <StackPanel Spacing="6">
+                <TextBlock Text="{Binding ContextMenuGroupHeader}"
+                           FontWeight="SemiBold"
+                           FontSize="13"
+                           Margin="0,0,0,4" />
+
+                <TextBlock Text="{Binding ContextMenuGroupBrowse}"
+                           FontWeight="SemiBold"
+                           FontSize="12" />
+                <CheckBox Content="{Binding ContextMenuEnableOpen}"
+                          IsChecked="{Binding EnableOpenMenu}"
+                          Margin="8,0,0,0" />
+
+                <TextBlock Text="{Binding ContextMenuGroupCompress}"
+                           FontWeight="SemiBold"
+                           FontSize="12"
+                           Margin="0,4,0,0" />
+                <CheckBox Content="{Binding ContextMenuEnableCompress}"
+                          IsChecked="{Binding EnableCompressMenu}"
+                          Margin="8,0,0,0" />
+                <CheckBox Content="{Binding ContextMenuEnableCompressSeparate}"
+                          IsChecked="{Binding EnableCompressSeparate}"
+                          Margin="8,0,0,0" />
+                <CheckBox Content="{Binding ContextMenuEnableCompressCombined}"
+                          IsChecked="{Binding EnableCompressCombined}"
+                          Margin="8,0,0,0" />
+
+                <TextBlock Text="{Binding ContextMenuGroupExtract}"
+                           FontWeight="SemiBold"
+                           FontSize="12"
+                           Margin="0,4,0,0" />
+                <CheckBox Content="{Binding ContextMenuEnableExtractHere}"
+                          IsChecked="{Binding EnableExtractHereMenu}"
+                          Margin="8,0,0,0" />
+                <CheckBox Content="{Binding ContextMenuEnableSmartExtract}"
+                          IsChecked="{Binding EnableSmartExtractMenu}"
+                          Margin="8,0,0,0" />
+                <CheckBox Content="{Binding ContextMenuEnableExtractToNamed}"
+                          IsChecked="{Binding EnableExtractToNamedMenu}"
+                          Margin="8,0,0,0" />
+                <CheckBox Content="{Binding ContextMenuEnableExtractTo}"
+                          IsChecked="{Binding EnableExtractToMenu}"
+                          Margin="8,0,0,0" />
+              </StackPanel>
+            </Border>
+
+            <Border BorderBrush="{DynamicResource ThemeBorderBrush}"
+                    BorderThickness="1"
+                    Padding="8"
+                    CornerRadius="4"
+                    Background="{DynamicResource ThemeSurfaceBgBrush}">
+              <StackPanel Spacing="6">
+                <TextBlock Text="{Binding ContextMenuGroupDisplay}"
+                           FontWeight="SemiBold"
+                           FontSize="13"
+                           Margin="0,0,0,4" />
+                <CheckBox Content="{Binding ContextMenuEnableDynamicMenu}"
+                          IsChecked="{Binding EnableDynamicMenu}" />
+                <CheckBox Content="{Binding ContextMenuShowMenuIcons}"
+                          IsChecked="{Binding ShowMenuIcons}" />
+              </StackPanel>
+            </Border>
+
+            <StackPanel Orientation="Horizontal"
+                        HorizontalAlignment="Right"
+                        Spacing="8">
+              <Button Content="{Binding ContextMenuInstall}"
+                      Command="{Binding InstallShellCommand}"
+                      Padding="12,4"
+                      Background="{DynamicResource ThemeButtonBgBrush}"
+                      Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                      BorderBrush="{DynamicResource ThemeBorderBrush}" />
+              <Button Content="{Binding ContextMenuUninstall}"
+                      Command="{Binding UninstallShellCommand}"
+                      Padding="12,4"
+                      Background="{DynamicResource ThemeButtonBgBrush}"
+                      Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                      BorderBrush="{DynamicResource ThemeBorderBrush}" />
+            </StackPanel>
+          </StackPanel>
+        </ScrollViewer>
+      </TabItem>
+
+      <!-- ═══════ 高级 ═══════ -->
+      <TabItem Header="{Binding TabAdvancedHeader}">
+        <ScrollViewer Background="{DynamicResource ThemeWindowBgBrush}">
+          <StackPanel Spacing="10"
+                      Margin="12">
+            <StackPanel Spacing="4">
+              <TextBlock Text="{Binding AdvancedSevenZipPathText}"
+                         FontSize="13" />
+              <Grid ColumnDefinitions="*,Auto">
+                <TextBox Grid.Column="0"
+                         Text="{Binding SevenZipPath}"
+                         Watermark="C:\Program Files\7-Zip\7z.dll"
+                         Margin="0,0,8,0" />
+                <Button Grid.Column="1"
+                        Content="{Binding AdvancedBrowseText}"
+                        Command="{Binding BrowseSevenZipCommand}"
+                        Padding="12,4"
+                        Background="{DynamicResource ThemeButtonBgBrush}"
+                        Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                        BorderBrush="{DynamicResource ThemeBorderBrush}" />
+              </Grid>
+            </StackPanel>
+
+            <Separator Background="{DynamicResource ThemeBorderBrush}" />
+
+            <CheckBox Content="{Binding AdvancedPreserveRootText}"
+                      IsChecked="{Binding PreserveDirectoryRoot}" />
+
+            <Separator Background="{DynamicResource ThemeBorderBrush}" />
+
+            <Border BorderBrush="{DynamicResource ThemeBorderBrush}"
+                    BorderThickness="1"
+                    Padding="8"
+                    CornerRadius="4"
+                    Background="{DynamicResource ThemeSurfaceBgBrush}">
+              <StackPanel Spacing="8">
+                <TextBlock Text="{Binding AdvancedTempGroupText}"
+                           FontWeight="SemiBold"
+                           FontSize="13"
+                           Margin="0,0,0,4" />
+                <Button Content="{Binding AdvancedCleanPreviewTempText}"
+                        Command="{Binding CleanPreviewTempCommand}"
+                        Padding="12,4"
+                        HorizontalAlignment="Left"
+                        Background="{DynamicResource ThemeButtonBgBrush}"
+                        Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                        BorderBrush="{DynamicResource ThemeBorderBrush}" />
+                <Button Content="{Binding AdvancedCleanAllTempText}"
+                        Command="{Binding CleanAllTempCommand}"
+                        Padding="12,4"
+                        HorizontalAlignment="Left"
+                        Background="{DynamicResource ThemeButtonBgBrush}"
+                        Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                        BorderBrush="{DynamicResource ThemeBorderBrush}" />
+                <CheckBox Content="{Binding AdvancedCleanOnStartupText}"
+                          IsChecked="{Binding CleanTempOnStartup}" />
+              </StackPanel>
+            </Border>
           </StackPanel>
         </ScrollViewer>
       </TabItem>

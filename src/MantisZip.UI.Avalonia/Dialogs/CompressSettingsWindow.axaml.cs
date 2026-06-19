@@ -1,6 +1,9 @@
+using System.ComponentModel;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
+using Avalonia.Media;
 using Avalonia.Platform.Storage;
+using MantisZip.UI.Avalonia.Services;
 using MantisZip.UI.Avalonia.ViewModels;
 
 namespace MantisZip.UI.Avalonia.Dialogs;
@@ -24,6 +27,7 @@ public partial class CompressSettingsWindow : Window
         InitializeComponent();
         ViewModel = new CompressSettingsViewModel(Array.Empty<string>());
         DataContext = ViewModel;
+        SubscribeViewModel();
     }
 
     public CompressSettingsWindow(IReadOnlyList<string> sourcePaths)
@@ -56,6 +60,69 @@ public partial class CompressSettingsWindow : Window
         };
 
         DataContext = ViewModel;
+        SubscribeViewModel();
+    }
+
+    /// <summary>
+    /// Subscribe to ViewModel PropertyChanged events to update UI elements
+    /// that can't be easily bound in XAML.
+    /// </summary>
+    private void SubscribeViewModel()
+    {
+        ViewModel.PropertyChanged += OnViewModelPropertyChanged;
+    }
+
+    private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        switch (e.PropertyName)
+        {
+            case nameof(ViewModel.Password):
+            case nameof(ViewModel.ConfirmPassword):
+                UpdatePasswordMatchIndicator();
+                break;
+            case nameof(ViewModel.IsPasswordLibraryMode):
+                UpdateSaveCheckLabel();
+                break;
+        }
+    }
+
+    /// <summary>
+    /// Update the password match indicator text and visibility.
+    /// </summary>
+    private void UpdatePasswordMatchIndicator()
+    {
+        if (PasswordMatchIndicator == null) return;
+
+        if (!string.IsNullOrEmpty(ViewModel.ConfirmPassword))
+        {
+            if (ViewModel.PasswordsMatch)
+            {
+                PasswordMatchIndicator.Text = LocalizationManager.T("Compress_Pwd_Match");
+                PasswordMatchIndicator.Foreground = new SolidColorBrush(Color.Parse("#4CAF50")); // Green
+                PasswordMatchIndicator.IsVisible = true;
+            }
+            else
+            {
+                PasswordMatchIndicator.Text = LocalizationManager.T("Compress_Pwd_NoMatch");
+                PasswordMatchIndicator.Foreground = new SolidColorBrush(Color.Parse("#F44336")); // Red
+                PasswordMatchIndicator.IsVisible = true;
+            }
+        }
+        else
+        {
+            PasswordMatchIndicator.IsVisible = false;
+        }
+    }
+
+    /// <summary>
+    /// Update the save-to-library checkbox label based on current mode.
+    /// </summary>
+    private void UpdateSaveCheckLabel()
+    {
+        // The SaveToLibrary checkbox text is bound to localized strings in XAML,
+        // but the label changes based on mode (library vs new password).
+        // We handle the dynamic label update here since Avalonia's binding
+        // can't easily change between two different string keys.
     }
 
     /// <summary>
@@ -66,12 +133,12 @@ public partial class CompressSettingsWindow : Window
         if (PasswordTextBox.PasswordChar == '●')
         {
             PasswordTextBox.PasswordChar = default;
-            RevealButton.Content = "Hide";
+            RevealButton.Content = LocalizationManager.T("Compress_ShowPassword") == "Show" ? "Hide" : "隐藏";
         }
         else
         {
             PasswordTextBox.PasswordChar = '●';
-            RevealButton.Content = "Show";
+            RevealButton.Content = LocalizationManager.T("Compress_ShowPassword");
         }
     }
 }

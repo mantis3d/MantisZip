@@ -17,6 +17,27 @@ public class AppSettings
     public string FileConflictAction { get; set; } = "ask"; // overwrite / rename / skip / ask
     public bool OpenFolderAfterExtract { get; set; } = false;
 
+    // ===== 上下文菜单 =====
+    public bool EnableOpenMenu { get; set; } = true;
+    public bool EnableCompressMenu { get; set; } = true;
+    public bool EnableExtractHereMenu { get; set; } = true;
+    public bool EnableExtractToNamedMenu { get; set; } = true;
+    public bool EnableExtractToMenu { get; set; } = true;
+    public bool EnableSmartExtractMenu { get; set; } = true;
+    public bool EnableCompressSeparate { get; set; } = true;
+    public bool EnableCompressCombined { get; set; } = true;
+    public bool ShowMenuIcons { get; set; } = true;
+    public bool EnableDynamicMenu { get; set; } = true;
+
+    // ===== 解压扩展 =====
+    public bool EnableDragExtract { get; set; } = true;
+    public bool ExtractPreserveFullPath { get; set; } = false;
+
+    // ===== 高级 =====
+    public string SevenZipPath { get; set; } = "";
+    public bool PreserveDirectoryRoot { get; set; } = true;
+    public bool CleanTempOnStartup { get; set; } = true;
+
     // ===== 预览 =====
     public bool EnableImagePreview { get; set; } = true;
     public bool EnableTextPreview { get; set; } = true;

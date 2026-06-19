@@ -14,6 +14,7 @@
 - Avalonia 跨平台移植后续 Phase
 
 ### avalonia-port 分支 (WIP)
+  - **Phase 7: 功能补齐 — CLI/IPC/设置标签页/对话框/i18n** — CLI 9 命令 + IPC 多实例; 设置窗口 Extract/ContextMenu/Advanced 三标签页; 10 个新对话框 (CompressConflictDialog/ConflictDialog/ErrorDialog/PasswordEditDialog/PasswordHelpDialog/LogPrivacyHelpDialog/MatchedPasswordDialog/DonationDialog); CompressSettingsWindow Password 标签增强（库模式/新密码模式/强度指示/自动规则）; i18n 中英文全键 (2026-06-19)
   - **Bugfix: 暗色菜单弹出面板白色背景 + 控制前景色修复** — 添加 `MenuFlyoutPresenterBackground` 修复菜单弹出面板背景；覆盖 `MenuFlyoutItemForeground`/`MenuFlyoutItemForegroundPointerOver`/`MenuFlyoutItemForegroundDisabled`/`ButtonForegroundDisabled`/`TabItemHeaderForegroundUnselected`/`TabItemHeaderForegroundSelected`/`ComboBoxForeground`/`ComboBoxItemForeground`/`ComboBoxItemForegroundPointerOver`/`ComboBoxItemForegroundSelected`/`CheckBoxForegroundUnchecked`/`CheckBoxForegroundChecked` 等 Fluent 资源键及 App.axaml TabItem 样式、SettingsWindow Foreground
   - **Bugfix: SQLite 预览文件锁定** — SqliteConnection 加 `Pooling=False`，防止连接池在 Dispose 后仍持文件句柄导致重新预览失败
   - **Bugfix: 按钮悬停黑白色** — FluentTheme ControlTheme 用黑白资源覆盖按钮 ContentPresenter 的 `:pointerover`/`:pressed` 背景，已添加 14 个 Fluent 资源覆盖至 ThemeLight/ThemeDark
@@ -115,6 +116,40 @@
     - 工具栏 Preview 按钮补全 `TogglePreviewCommand` 和 `IsChecked` 绑定（之前是死按钮）
     - 筛选栏 Filter_* 键加载到 `UpdateLocalizedStrings()` 中，筛选标签不再显示空文本
     - 修复 XAML 筛选栏 `Filter_SearchLabel` → `Filter_Search` 键名不匹配
+
+11. **Avalonia Phase 7: CLI 命令补齐 + IPC 多实例**：
+    - `App.axaml.cs` 新增 9 个 CLI 命令：`--compress`、`--compress-quick`、`--compress-separate`、`--compress-combined`、`--extract-smart`、`--install-shell`、`--uninstall-shell`、`--install-assoc`、`--uninstall-assoc`
+    - IPC 多实例：compress/compress-separate/compress-combined 使用 Mutex + NamedPipeServerStream 模式（与 WPF 一致）
+    - Shell 集成命令委托给 WPF exe 执行
+
+12. **Avalonia Phase 7: 设置窗口 Extract/ContextMenu/Advanced 三标签页**：
+    - Extract 标签：解压目标目录、文件冲突策略（Ask/Overwrite/OverwriteOlder/OverwriteSmaller/Rename/Skip）、打开文件夹、拖拽解压、保留完整路径
+    - ContextMenu 标签：8 个菜单项独立开关 + 显示图标/动态菜单 + 安装/卸载按钮（非 Windows 提示不可用）
+    - Advanced 标签：7z.dll 路径选择、保留目录根、临时文件管理（清理预览/清理全部/启动时自动清理）
+
+13. **Avalonia Phase 7: 10 个新对话框**：
+    - CompressConflictDialog：压缩文件冲突（覆盖/重命名/跳过/取消 + 应用到全部）
+    - ConflictDialog：解压冲突（磁盘 vs 压缩包文件对比，修改时间/大小）
+    - ErrorDialog：通用错误（重试/跳过/中止 + 应用到全部）
+    - PasswordEditDialog：密码编辑（密码/描述/匹配规则，支持 Glob/Regex 模式）
+    - PasswordHelpDialog：密码管理器帮助（Glob 通配符/正则表达式/自动规则说明）
+    - LogPrivacyHelpDialog：日志隐私模式帮助（off/filename/extension/full 四种模式对比）
+    - MatchedPasswordDialog：密码自动匹配结果（显示/复制/确认使用）
+    - DonationDialog：捐赠页面
+    - 全部对话框绑定主题色（`ThemeWindowBgBrush`/`ThemeTextPrimaryBrush`/`ThemeBorderBrush` 等）
+
+14. **Avalonia Phase 7: CompressSettingsWindow Password 标签增强**：
+    - 标签使用 TabControl 双模式：库模式（搜索/选择已存密码）和新建模式（密码强度指示/确认匹配）
+    - 库模式：搜索过滤、选择状态显示、匹配规则预览
+    - 新建模式：PasswordBox/TextBox 切换、强度指示彩色圆圈、确认密码匹配
+    - 共享区域：保存到库复选框、描述字段、自动规则开关及编辑
+    - 使用 MVVM 方式（WPF 对应部分是代码后置 partial class）
+
+15. **Avalonia Phase 7: i18n 补齐**：
+    - strings.zh-CN.json + strings.en.json 同步添加全部新对话框/设置标签页的翻译键
+    - 覆盖：Extract 标签（10+ 键）、ContextMenu 标签（8+ 键）、Advanced 标签（5+ 键）、全部对话框标题/按钮/标签
+    - 构建验证：`dotnet build src\MantisZip.UI.Avalonia\` — 0 errors, 0 warnings
+    - 测试：35 passed, 2 skipped, 0 failed
 
 ### v0.3.13 (2026-06-15) 完全移除 SharpZipLib 生产代码依赖
 

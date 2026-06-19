@@ -1,0 +1,66 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="MantisZip.UI.Avalonia.Dialogs.LogPrivacyHelpDialog"
+        x:CompileBindings="False"
+        Title="{Binding WinTitle}"
+        Width="520"
+        Height="460"
+        WindowStartupLocation="CenterOwner"
+        Background="{DynamicResource ThemeWindowBgBrush}"
+        Padding="16">
+  <ScrollViewer VerticalScrollBarVisibility="Auto">
+    <StackPanel Margin="20" Spacing="16">
+
+      <!-- 标题 -->
+      <TextBlock Text="{Binding WinTitle}"
+                 FontSize="18"
+                 FontWeight="Bold" />
+
+      <!-- 简介 -->
+      <TextBlock Text="{Binding IntroText}"
+                 TextWrapping="Wrap"
+                 LineHeight="22" />
+
+      <!-- 四种模式说明 -->
+      <Border Background="{DynamicResource ThemeSurfaceBgBrush}"
+              CornerRadius="4"
+              Padding="14"
+              BorderBrush="{DynamicResource ThemeBorderBrush}"
+              BorderThickness="1">
+        <StackPanel Spacing="10">
+          <TextBlock Text="{Binding ModeOffText}"
+                     TextWrapping="Wrap"
+                     LineHeight="20" />
+          <TextBlock Text="{Binding ModeFilenameText}"
+                     TextWrapping="Wrap"
+                     LineHeight="20" />
+          <TextBlock Text="{Binding ModeExtensionText}"
+                     TextWrapping="Wrap"
+                     LineHeight="20" />
+          <TextBlock Text="{Binding ModeFullText}"
+                     TextWrapping="Wrap"
+                     LineHeight="20" />
+        </StackPanel>
+      </Border>
+
+      <!-- 影响范围 -->
+      <TextBlock Text="{Binding WhatText}"
+                 TextWrapping="Wrap"
+                 LineHeight="22" />
+      <TextBlock Text="{Binding WhatNotText}"
+                 TextWrapping="Wrap"
+                 LineHeight="22" />
+
+      <!-- 关闭按钮 -->
+      <Button Content="{Binding CloseText}"
+              HorizontalAlignment="Right"
+              Width="100"
+              Height="28"
+              IsDefault="True"
+              Click="OnCloseClick"
+              Background="{DynamicResource ThemeAccentBrush}"
+              Foreground="White"
+              Margin="0,0,0,12" />
+    </StackPanel>
+  </ScrollViewer>
+</Window>

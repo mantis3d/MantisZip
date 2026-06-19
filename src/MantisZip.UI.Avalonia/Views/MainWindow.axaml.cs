@@ -114,7 +114,13 @@ public partial class MainWindow : Window
             {
                 var topLevel = TopLevel.GetTopLevel(this);
                 if (topLevel?.Clipboard != null)
-                    await topLevel.Clipboard.SetValueAsync(DataFormat.Text, text);
+                {
+                    var transfer = new global::Avalonia.Input.DataTransfer();
+                    var item = new global::Avalonia.Input.DataTransferItem();
+                    item.SetText(text);
+                    transfer.Add(item);
+                    await topLevel.Clipboard.SetDataAsync(transfer);
+                }
             }
             catch
             {
