@@ -260,7 +260,7 @@
               <Grid ColumnDefinitions="*,Auto">
                 <TextBox Grid.Column="0"
                          Text="{Binding SevenZipPath}"
-                         Watermark="C:\Program Files\7-Zip\7z.dll"
+                         PlaceholderText="C:\Program Files\7-Zip\7z.dll"
                          Margin="0,0,8,0" />
                 <Button Grid.Column="1"
                         Content="{Binding AdvancedBrowseText}"
