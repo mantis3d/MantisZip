@@ -3,7 +3,7 @@
 > 未来待开发功能规划。已实现功能请见 [docs/PROGRESS.md](docs/PROGRESS.md)，技术架构请见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)。
 
 **项目状态**: 🟢 开发中  
-**最后更新**: 2026-06-18  
+**最后更新**: 2026-06-19  
 **当前版本**: 0.4.1
 
 ---
@@ -38,7 +38,7 @@
 | **P3** | Office 文档内容预览增强 | [office-content-preview.md](.sisyphus/plans/office-content-preview.md) | 🟡中 | 6-8h | docx/xlsx/pptx 从仅元数据扩展到富文本/表格/幻灯片文本渲染 |
 | **P3** | ICO 文件自身图标显示 | [ico-file-icon-extract.md](.sisyphus/plans/ico-file-icon-extract.md) | 🟢低 | 2-3h | ico 文件列表显示自身嵌入图标 |
 | **P3** | 右键菜单目录结构预览 | — | 🔴高 | 6-8h | COM 菜单中展示文件树 |
-| **P4** | 拖拽提取目标检测 | [drag-drop-marker-target.md](.sisyphus/plans/drag-drop-marker-target.md) | 🟡中 | 1-3h | Marker 文件探测拖放目标目录（方案待定，需对比 VFDO 后决策） |
+| **P1** | Avalonia 拖拽直接解压 | [drag-drop-direct-extract.md](.sisyphus/plans/drag-drop-direct-extract.md) | 🟡中 | 4-6h | Drop 后 WindowFromPoint+ShellWindows 检测目标路径直接解压，跳过 OLE CF_HDROP |
 | **P4** | 外部工具视频元数据 | — | 🟢低 | 2-3h | ffprobe 集成 |
 | **🔍调研** | 跨平台移植可行性 | [cross-platform-port.md](.sisyphus/plans/cross-platform-port.md) | 🟡中大 | 2-3月 | 砍 ShellExt，WPF→Avalonia，WebView2→WebKit，SharpSevenZip→SharpCompress/p7zip，DPAPI→AES-GCM |
 
@@ -51,6 +51,7 @@
 |--------|------|----------|:----:|:--------:|------|------|
 | **P3** | VirtualFileDataObject | [virtual-file-data-object.md](.sisyphus/plans/virtual-file-data-object.md) | 🔴高 | 6-8h | COM 原生 IDataObject 替代 WPF OLE 桥 | 跨平台移植（Avalonia）后不再依赖 WPF OLE 桥，无 OLE CF_HDROP bug，VFDO 无存在必要 |
 | **P2** | 文本预览语法高亮 | [text-preview-syntax-highlighting.md](.sisyphus/plans/text-preview-syntax-highlighting.md) | 🟡中 | 5-7h | AvalonEdit 替换 TextBox，支持 20+ 语言语法高亮 | AvalonEdit 是 WPF-only 控件，跨平台移植（Avalonia）后需使用 AvaloniaEdit 完全重写 |
+| **P4** | 拖拽提取目标检测 | [drag-drop-marker-target.md](.sisyphus/plans/drag-drop-marker-target.md) | 🟡中 | 1-3h | Marker 文件探测拖放目标目录 | 被 [drag-drop-direct-extract.md](.sisyphus/plans/drag-drop-direct-extract.md) 取代——WindowFromPoint+ShellWindows 更直接可靠 |
 
 ---
 
@@ -76,7 +77,7 @@
 
 ### 🔴 冲突 — 需完全重写或废弃（14 个）
 
-`com-context-menu.md`、`com-migration-mapping.md`、`dark-theme.md`、`drag-drop-marker-target.md`、`embedded-thumbnail-preview.md`、`extract-settings-window.md`、`file-assoc-per-extension.md`、`icon-dll.md`、`msi-packaging-wix.md`、`quick-path-control.md`、`quickpath-unified.md`、`rar-compression.md`、`text-preview-syntax-highlighting.md`、`virtual-file-data-object.md`
+`com-context-menu.md`、`com-migration-mapping.md`、`dark-theme.md`、`embedded-thumbnail-preview.md`、`extract-settings-window.md`、`file-assoc-per-extension.md`、`icon-dll.md`、`msi-packaging-wix.md`、`quick-path-control.md`、`quickpath-unified.md`、`rar-compression.md`、`text-preview-syntax-highlighting.md`、`virtual-file-data-object.md`
 
 ### 关键发现
 
