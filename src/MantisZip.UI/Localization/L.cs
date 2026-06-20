@@ -180,6 +180,12 @@ public static class L
     public const string Error_Retry                                = "Error_Retry";
     public const string Error_Skip                                 = "Error_Skip";
     public const string Error_Title                                = "Error_Title";
+    public const string ElevationDialog_Cancel                       = "ElevationDialog_Cancel";
+    public const string ElevationDialog_Elevate                      = "ElevationDialog_Elevate";
+    public const string ElevationDialog_Hint                         = "ElevationDialog_Hint";
+    public const string ElevationDialog_Message                      = "ElevationDialog_Message";
+    public const string ElevationDialog_MultiMessage                 = "ElevationDialog_MultiMessage";
+    public const string ElevationDialog_Title                        = "ElevationDialog_Title";
     public const string ExtractSettings_Browse                      = "ExtractSettings_Browse";
     public const string ExtractSettings_Cancel                      = "ExtractSettings_Cancel";
     public const string ExtractSettings_Extract                     = "ExtractSettings_Extract";

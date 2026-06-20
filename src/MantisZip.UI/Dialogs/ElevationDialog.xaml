@@ -1,0 +1,63 @@
+<Window x:Class="MantisZip.UI.ElevationDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:l="clr-namespace:MantisZip.UI.Localization"
+        Title="{l:L ElevationDialog_Title}" Width="480" SizeToContent="Height"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="NoResize"
+        ShowInTaskbar="False"
+        Topmost="True"
+        Background="{StaticResource Theme_WindowBg}">
+    <Grid Margin="20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="12"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="16"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- 消息 -->
+        <TextBlock Grid.Row="0" x:Name="MessageText"
+                   FontSize="13" FontWeight="SemiBold"
+                   Foreground="{StaticResource Theme_TextPrimary}"
+                   TextWrapping="Wrap"/>
+
+        <!-- 不可写入目录列表（仅多目录时显示） -->
+        <ItemsControl Grid.Row="2" x:Name="DirectoryList"
+                      Foreground="{StaticResource Theme_TextSecondary}"
+                      FontSize="12" Visibility="Collapsed">
+            <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                    <TextBlock Text="{Binding}" Margin="12,2,0,2"
+                               TextWrapping="Wrap"
+                               FontFamily="Consolas, Courier New, monospace"/>
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
+
+        <!-- 提示 + 按钮 -->
+        <StackPanel Grid.Row="4">
+            <TextBlock Text="{l:L ElevationDialog_Hint}"
+                       Foreground="{StaticResource Theme_TextDisabled}"
+                       FontSize="11" TextWrapping="Wrap" Margin="0,0,0,16"/>
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                <Button x:Name="ElevateBtn"
+                        Content="{l:L ElevationDialog_Elevate}"
+                        Width="140" Height="32"
+                        Click="Elevate_Click"
+                        IsDefault="True"
+                        Background="{StaticResource Theme_Accent}"
+                        Foreground="{StaticResource Theme_TextOnAccent}"
+                        Margin="0,0,8,0"/>
+                <Button Content="{l:L ElevationDialog_Cancel}"
+                        Width="80" Height="32"
+                        Click="Cancel_Click"
+                        IsCancel="True"
+                        Background="{StaticResource Theme_ButtonBg}"
+                        BorderBrush="{StaticResource Theme_Border}"
+                        BorderThickness="1"/>
+            </StackPanel>
+        </StackPanel>
+    </Grid>
+</Window>

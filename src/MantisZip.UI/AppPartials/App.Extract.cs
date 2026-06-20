@@ -308,6 +308,56 @@ public partial class App : Application
         progressWindow.InitBatchMode(allPaths);
         progressWindow.SetProgress(0, L.T(L.App_ExtractingProgress));
 
+        // ===== 权限检测：检查所有目标目录的可写性 =====
+        var directoriesToCheck = new List<string>();
+        foreach (var archivePath in allPaths)
+        {
+            var dir = mode switch
+            {
+                "here" => Path.GetDirectoryName(archivePath),
+                "toname" => Path.Combine(
+                    Path.GetDirectoryName(archivePath) ?? "",
+                    Path.GetFileNameWithoutExtension(archivePath) ?? ""),
+                "manual" => manualDest,
+                "smart" => Path.GetDirectoryName(archivePath),
+                _ => Path.GetDirectoryName(archivePath)
+            };
+            if (!string.IsNullOrEmpty(dir) && !directoriesToCheck.Contains(dir))
+                directoriesToCheck.Add(dir);
+        }
+
+        var unwritable = directoriesToCheck.Where(d => !IsDirectoryWritable(d!)).Select(d => d!).ToList();
+        if (unwritable.Count > 0)
+        {
+            if (IsElevated())
+            {
+                ShowElevationFailedDialog(unwritable);
+                app.Shutdown();
+                return;
+            }
+
+            if (!AppSettings.Instance.AllowElevation)
+            {
+                ShowElevationInfoDialog(unwritable);
+                app.Shutdown();
+                return;
+            }
+
+            var result = ShowElevationDialog(unwritable);
+            if (result == true)
+            {
+                RelaunchAsAdmin(Environment.GetCommandLineArgs().Skip(1).ToArray());
+                app.Shutdown();
+                return;
+            }
+            else
+            {
+                app.Shutdown();
+                return;
+            }
+        }
+        // ===== 权限检测结束 =====
+
         var ct = progressWindow.CancellationToken;
         var total = allPaths.Count;
 
