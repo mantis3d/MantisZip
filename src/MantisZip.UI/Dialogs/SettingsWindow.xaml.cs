@@ -160,6 +160,9 @@ public partial class SettingsWindow : Window
         foreach (ComboBoxItem item in LogPrivacyModeCombo.Items)
             if ((string)item.Tag == s.LogPrivacyMode) { LogPrivacyModeCombo.SelectedItem = item; break; }
 
+        // 高级 — 权限提升
+        AllowElevationCheck.IsChecked = s.AllowElevation;
+
         // 外观
         foreach (ComboBoxItem item in ThemeCombo.Items)
         if ((string)item.Tag == s.Theme) { ThemeCombo.SelectedItem = item; break; }
@@ -244,6 +247,7 @@ public partial class SettingsWindow : Window
         var debugLogChanged = s.EnableDebugLogging != (EnableDebugLogCheck.IsChecked == true);
         s.EnableDebugLogging = EnableDebugLogCheck.IsChecked == true;
         s.LogPrivacyMode = (LogPrivacyModeCombo.SelectedItem as ComboBoxItem)?.Tag as string ?? "off";
+        s.AllowElevation = AllowElevationCheck.IsChecked == true;
 
         SaveAssocSettings();
 

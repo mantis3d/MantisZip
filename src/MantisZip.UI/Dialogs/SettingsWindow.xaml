@@ -689,6 +689,17 @@
                             </StackPanel>
                         </GroupBox>
 
+                        <!-- 权限提升 -->
+                        <GroupBox Header="{l:L Settings_Advanced_ElevationGroupHeader}" Padding="8" Margin="0,0,0,12">
+                            <StackPanel>
+                                <CheckBox x:Name="AllowElevationCheck" 
+                                          Content="{l:L Settings_Advanced_AllowElevation}" Margin="0,4"/>
+                                <TextBlock Text="{l:L Settings_Advanced_AllowElevationHint}"
+                                           Foreground="{StaticResource Theme_TextSecondary}" 
+                                           FontSize="11" TextWrapping="Wrap" Margin="24,0,0,0"/>
+                            </StackPanel>
+                        </GroupBox>
+
                         <TextBlock Text="{l:L Settings_Advanced_AboutHeader}" FontWeight="SemiBold" Margin="0,16,0,4"/>
                         <TextBlock TextWrapping="Wrap" Foreground="{StaticResource Theme_TextSecondary}" FontSize="11">
                             <Run Text="{l:L Settings_Advanced_AboutVersion}"/><Run x:Name="AboutVersionText"/>

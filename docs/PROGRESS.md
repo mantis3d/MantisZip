@@ -55,6 +55,15 @@
    - 标题统一添加 `/ English` 双语标注
 3. 修复动态菜单bug
 4. 文件列表增加“返回父目录”项目。
+5. **UAC 提权机制 — 双模式权限不足处理**：
+   - `AppSettings.AllowElevation` 属性（默认 false），设置在设置 → 高级 → 权限提升
+   - 新建 `App.Elevation.cs` 含 6 个辅助方法：`IsDirectoryWritable`, `IsElevated`, `RelaunchAsAdmin`, `ShowElevationInfoDialog`, `ShowElevationDialog`, `ShowElevationFailedDialog`
+   - 三个新对话框：`ElevationInfoDialog`（仅提示不可写目录+确定）、`ElevationDialog`（提权/取消）、`ElevationFailedDialog`（提权后仍不可写错误）
+   - 注入 3 个 CLI 入口点：`HandleExtractBatchCore`、`RunCompressSeparateBatch`、`HandleCompressQuick`
+   - 默认行为仅弹提示（不提权）；仅当 `AllowElevation=true` 才弹出 UAC 提权窗口
+   - 设置窗口高级标签新增“权限提升” GroupBox
+   - 中/英文各 17 个本地化键
+   - 设计文档：`.sisyphus/plans/uac-elevation-permission.md`
 
 ### v0.4.0 (2026-06-15) 第一个上线版本
   - 功能基本完成，测试基本完成。第一个上线版本。
