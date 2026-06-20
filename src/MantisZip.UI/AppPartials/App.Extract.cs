@@ -467,6 +467,52 @@ public partial class App : Application
                             progressWindow.UpdateBatchItemStatus(i, BatchItemStatus.Completed));
                     }
                     catch (OperationCanceledException) { throw; }
+                    catch (UnauthorizedAccessException uax)
+                    {
+                        // 权限不足 → 根据设置弹出提权/提示对话框
+                        var qi1 = uax.Message.IndexOf('\'');
+                        var qi2 = qi1 >= 0 ? uax.Message.LastIndexOf('\'') : -1;
+                        var failedPath = (qi1 >= 0 && qi2 > qi1)
+                            ? uax.Message.Substring(qi1 + 1, qi2 - qi1 - 1)
+                            : null;
+                        var failedDir = failedPath != null
+                            ? Path.GetDirectoryName(failedPath) ?? dest
+                            : dest;
+
+                        Log("--extract batch: permission denied ({0})", uax.Message);
+
+                        await progressWindow.Dispatcher.InvokeAsync(() =>
+                        {
+                            var unwritable = new List<string> { failedDir };
+
+                            if (IsElevated())
+                            {
+                                ShowElevationFailedDialog(unwritable);
+                                app.Shutdown();
+                            }
+                            else if (!AppSettings.Instance.AllowElevation)
+                            {
+                                ShowElevationInfoDialog(unwritable);
+                                app.Shutdown();
+                            }
+                            else
+                            {
+                                var elevationResult = ShowElevationDialog(unwritable);
+                                if (elevationResult == true)
+                                {
+                                    RelaunchAsAdmin(Environment.GetCommandLineArgs().Skip(1).ToArray());
+                                    app.Shutdown();
+                                }
+                                else
+                                {
+                                    app.Shutdown();
+                                }
+                            }
+                        });
+
+                        // Shutdown 已调用，退出 Task.Run 避免后续 CompleteWithErrors 冲突
+                        return;
+                    }
                     catch (Exception ex)
                     {
                         Log("--extract batch: item failed ({0}): {1}", archivePath, ex.Message);
