@@ -15,6 +15,8 @@ MantisZip-0.4.2-Setup-NoDotNet.exe requires the .NET runtime to be installed. Ma
 
 - 修复上下文动态菜单有时会闪烁的问题。
 - 修复安装时选择语言和外观无效的问题。
+- 完成计划 [zip 复制模式](.sisyphus/plans/zipengine-sharpcompress-migration.md)，添加删除文件不再是“解压缩→重新压缩”，而改成了“复制模式”。速度极大提升。
+- 完成计划 [权限提升](.sisyphus/plans/uac-elevation-permission.md)，当压缩解压到无权限的目录时，会有正确的处理。
 
 
 ## v0.4.1

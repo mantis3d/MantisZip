@@ -18,13 +18,21 @@
 
 ## 版本历史（从新到旧）
 
-### v0.4.2 (2026-06-20) 安装程序主题/语言选择修复
+### v0.4.2 (2026-06-20) 安装程序主题/语言选择修复 / ZIP copy-mode 进度与取消
 
 1. **修复安装时主题选择不生效的 Bug**：
    - `installer\prebuilt\settings.json` 缺少 `Theme` 和 `Language` 字段，导致 `CopyFile` 主路径下用户向导选择被丢弃
    - 在该文件中添加 `__LANG__` 和 `__THEME__` 占位符
    - 新增 `PatchSettingsThemeAndLanguage` 过程，`CopyFile` 成功后读取 JSON、替换占位符为用户实际选择的语言和主题
    - `installer.iss` + `installer-selfcontained.iss` 同步修改
+2. **ZIP 添加/删除进度与取消优化**：
+   - `CompressNewEntry`：从 3 遍（全读→CRC32→Deflate）改为单遍流式（80KB 块流式 CRC32 + Deflate），降低内存占用并支持逐块取消
+   - `CopyStreamRangeAsync`：新增每 80KB 块粒度进度报告（FilePercentComplete 0→100 + 整体 PercentComplete 平滑插值），100ms 节流
+   - 收尾阶段分步报告：写入中央目录 92% → 写入目录尾 94% → 刷入磁盘 97% → 原子替换 100%
+   - Phase 1/2 条目权重从 100 降至 90，保留 10% 给收尾阶段
+   - `WriteCentralDirectory` 移除逐条进度（毫秒级操作无意义）
+   - `ComputeCrc32` 移除（被增量 CRC32 替代）
+   - 所有 211 个测试通过
 
 ### v0.4.1 (2026-06-18) 发布流程修复 + 文档双语化
 

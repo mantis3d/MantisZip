@@ -413,7 +413,7 @@ public partial class MainWindow
                 pw.CancellationToken);
 
             pw.SetComplete(L.T(L.Main_Status_DeleteDone));
-            await pw.AutoCloseOrWaitAsync(800, () => pw.Close());
+            await pw.AutoCloseOrWaitAsync(0, () => pw.Close());
 
             App.LogDebug("DeleteSelectedEntriesAsync: deletion done, reloading archive");
             var prevFolder = _currentFolder;

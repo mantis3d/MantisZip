@@ -370,13 +370,7 @@ internal static partial class ZipBinaryRewriter
                 double basePct = totalEntries > 0
                     ? (double)processedEntries / totalEntries * 100
                     : 0;
-
-                progress?.Report(new ArchiveProgress
-                {
-                    CurrentFile = "复制: " + entry.FileName,
-                    PercentComplete = basePct,
-                    FilePercentComplete = 0
-                });
+                double entryWeight = 90.0 / totalEntries;
 
                 // ── Read and optionally rewrite LFH ──────────────────
                 LfhInfo lfhInfo = ReadAndMaybeRewriteLfh(
@@ -387,9 +381,11 @@ internal static partial class ZipBinaryRewriter
                 // Write LFH header to output
                 output.Write(lfhHeader, 0, lfhHeader.Length);
 
-                // Stream-copy compressed data
+                // Stream-copy compressed data with per-chunk progress
                 await CopyStreamRangeAsync(
-                    source, output, entry.CompressedSize, cancellationToken);
+                    source, output, entry.CompressedSize,
+                    entry.FileName, basePct, entryWeight,
+                    progress, cancellationToken);
 
                 bytesCopied += lfhHeader.Length + entry.CompressedSize;
 
@@ -400,13 +396,6 @@ internal static partial class ZipBinaryRewriter
                     : entry;
                 entriesToWrite.Add((entryForCd, entryOffset, false, lfhHeader));
                 processedEntries++;
-
-                progress?.Report(new ArchiveProgress
-                {
-                    CurrentFile = "复制: " + entry.FileName,
-                    PercentComplete = (double)processedEntries / totalEntries * 100,
-                    FilePercentComplete = 100
-                });
 
                 CoreLog.Trace("ZipBinaryRewriter: copied entry '{0}' ({1} bytes)",
                     entry.FileName, entry.CompressedSize);
@@ -424,19 +413,14 @@ internal static partial class ZipBinaryRewriter
                     double basePct = totalEntries > 0
                         ? (double)processedEntries / totalEntries * 100
                         : 0;
-
-                    progress?.Report(new ArchiveProgress
-                    {
-                        CurrentFile = "压缩: " + newEntry.EntryName,
-                        PercentComplete = basePct,
-                        FilePercentComplete = 0
-                    });
+                    double entryWeight = 90.0 / totalEntries;
 
                     long entryOffset = output.Position;
 
-                    // Compress and write the new entry's LFH + data
+                    // Compress and write the new entry's LFH + data (streaming with progress)
                     var (lfhBytes, compressedSize, crc32) =
-                        CompressNewEntry(output, newEntry, encoding);
+                        CompressNewEntry(output, newEntry, encoding,
+                            basePct, entryWeight, progress, cancellationToken);
 
                     bytesAdded += lfhBytes.Length + compressedSize;
 
@@ -463,13 +447,6 @@ internal static partial class ZipBinaryRewriter
                     entriesToWrite.Add((syntheticEntry, entryOffset, true, lfhBytes));
                     processedEntries++;
 
-                    progress?.Report(new ArchiveProgress
-                    {
-                        CurrentFile = "压缩: " + newEntry.EntryName,
-                        PercentComplete = (double)processedEntries / totalEntries * 100,
-                        FilePercentComplete = 100
-                    });
-
                     CoreLog.Trace("ZipBinaryRewriter: added new entry '{0}' ({1} bytes compressed)",
                         newEntry.EntryName, compressedSize);
                 }
@@ -478,14 +455,35 @@ internal static partial class ZipBinaryRewriter
             // ══════════════════════════════════════════════════════════
             // Phase 3: Write central directory
             // ══════════════════════════════════════════════════════════
+            progress?.Report(new ArchiveProgress
+            {
+                CurrentFile = "正在写入中央目录...",
+                PercentComplete = 92,
+                FilePercentComplete = 100
+            });
+
             long centralDirStart = output.Position;
             WriteCentralDirectory(output, entriesToWrite, encoding, progress);
+
+            progress?.Report(new ArchiveProgress
+            {
+                CurrentFile = "正在写入目录结束标记...",
+                PercentComplete = 94,
+                FilePercentComplete = 100
+            });
 
             // ══════════════════════════════════════════════════════════
             // Phase 4: Write EOCD
             // ══════════════════════════════════════════════════════════
             string effectiveComment = comment ?? existingComment ?? string.Empty;
             WriteEocd(output, centralDirStart, entriesToWrite.Count, effectiveComment);
+
+            progress?.Report(new ArchiveProgress
+            {
+                CurrentFile = "正在保存到磁盘...",
+                PercentComplete = 97,
+                FilePercentComplete = 100
+            });
 
             // ── Finalize (close then atomically replace) ─────────────
             output.Dispose();
@@ -494,6 +492,13 @@ internal static partial class ZipBinaryRewriter
             if (File.Exists(destPath))
                 File.Delete(destPath);
             File.Move(tempDestPath, destPath);
+
+            progress?.Report(new ArchiveProgress
+            {
+                CurrentFile = string.Empty,
+                PercentComplete = 100,
+                FilePercentComplete = 100
+            });
 
             int copyCount = entriesToWrite.Count(e => !e.IsNew);
             int addCount = entriesToWrite.Count - copyCount;
@@ -629,32 +634,55 @@ internal static partial class ZipBinaryRewriter
     /// The caller is responsible for tracking the output offset before calling this method.
     /// </returns>
     private static (byte[] lfhBytes, long compressedSize, uint crc32) CompressNewEntry(
-        Stream output, in NewEntry entry, Encoding encoding)
+        Stream output, in NewEntry entry, Encoding encoding,
+        double basePercent, double entryWeight,
+        IProgress<ArchiveProgress>? progress,
+        CancellationToken cancellationToken)
     {
-        // ── Read source data ──────────────────────────────────────────
-        byte[] data = new byte[entry.Size];
-        int totalRead = 0;
-        while (totalRead < entry.Size)
-        {
-            int read = entry.Data.Read(data, totalRead, (int)(entry.Size - totalRead));
-            if (read <= 0) break;
-            totalRead += read;
-        }
+        var lastReportTime = DateTime.Now;
+        var reportInterval = TimeSpan.FromMilliseconds(100);
 
-        // ── CRC32 ────────────────────────────────────────────────────
-        uint crc32 = ComputeCrc32(data);
+        // ── Stream source data through CRC32 + Deflate in one pass ──
+        using var ms = new MemoryStream();
+        uint crc = 0xFFFFFFFF;
 
-        // ── Deflate compress ──────────────────────────────────────────
-        byte[] compressed;
-        using (var ms = new MemoryStream())
+        using (var deflate = new DeflateStream(ms, CompressionLevel.Optimal, leaveOpen: true))
         {
-            using (var deflate = new DeflateStream(ms, CompressionLevel.Optimal, leaveOpen: true))
+            byte[] buffer = new byte[81920];
+            long totalRead = 0;
+
+            while (totalRead < entry.Size)
             {
-                deflate.Write(data, 0, data.Length);
-            }
-            compressed = ms.ToArray();
-        }
+                cancellationToken.ThrowIfCancellationRequested();
 
+                int toRead = (int)Math.Min(buffer.Length, entry.Size - totalRead);
+                int read = entry.Data.Read(buffer, 0, toRead);
+                if (read <= 0) break;
+
+                // Update CRC32 incrementally
+                for (int i = 0; i < read; i++)
+                    crc = Crc32LookupTable[(int)((crc ^ buffer[i]) & 0xFF)] ^ (crc >> 8);
+
+                deflate.Write(buffer, 0, read);
+                totalRead += read;
+
+                var now = DateTime.Now;
+                if (now - lastReportTime >= reportInterval || totalRead >= entry.Size)
+                {
+                    var filePct = entry.Size > 0 ? (double)totalRead / entry.Size * 100 : 100;
+                    progress?.Report(new ArchiveProgress
+                    {
+                        CurrentFile = "压缩: " + entry.EntryName,
+                        PercentComplete = Math.Min(90.0, basePercent + totalRead * entryWeight / Math.Max(entry.Size, 1)),
+                        FilePercentComplete = filePct
+                    });
+                    lastReportTime = now;
+                }
+            }
+        } // DeflateStream flushed here; ms contains the compressed data
+
+        uint crc32 = crc ^ 0xFFFFFFFF;
+        byte[] compressed = ms.ToArray();
         int compressedSize = compressed.Length;
 
         // ── Build LFH ─────────────────────────────────────────────────
@@ -733,13 +761,6 @@ internal static partial class ZipBinaryRewriter
         for (int i = 0; i < total; i++)
         {
             var (entry, newOffset, isNew, _) = entriesToWrite[i];
-
-            progress?.Report(new ArchiveProgress
-            {
-                CurrentFile = "正在写入中央目录: " + entry.FileName,
-                PercentComplete = 90 + (int)((double)i / total * 10),
-                FilePercentComplete = 100
-            });
 
             // Encode filename using the detected encoding
             byte[] fileNameBytes = encoding.GetBytes(entry.FileName);
@@ -823,22 +844,6 @@ internal static partial class ZipBinaryRewriter
 
     // ────────────────────── CRC32 ───────────────────────
 
-    /// <summary>
-    /// Compute CRC-32 (PKZip variant) for a byte array.
-    /// Uses the standard polynomial 0xEDB88320 with a pre-computed lookup table.
-    /// </summary>
-    private static uint ComputeCrc32(byte[] data)
-    {
-        // Pre-computed CRC-32 lookup table
-        ReadOnlySpan<uint> table = Crc32LookupTable;
-        uint crc = 0xFFFFFFFF;
-        for (int i = 0; i < data.Length; i++)
-        {
-            crc = table[(int)((crc ^ data[i]) & 0xFF)] ^ (crc >> 8);
-        }
-        return crc ^ 0xFFFFFFFF;
-    }
-
     private static readonly uint[] Crc32LookupTable = BuildCrc32Table();
 
     private static uint[] BuildCrc32Table()
@@ -869,10 +874,18 @@ internal static partial class ZipBinaryRewriter
         Stream source,
         Stream dest,
         long count,
+        string entryName,
+        double basePercent,
+        double entryWeight,
+        IProgress<ArchiveProgress>? progress,
         CancellationToken cancellationToken)
     {
         byte[] buffer = new byte[81920];
         long remaining = count;
+        long totalRead = 0;
+        var lastReportTime = DateTime.Now;
+        var reportInterval = TimeSpan.FromMilliseconds(100);
+
         while (remaining > 0)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -885,6 +898,20 @@ internal static partial class ZipBinaryRewriter
             await dest.WriteAsync(buffer.AsMemory(0, read), cancellationToken)
                 .ConfigureAwait(false);
             remaining -= read;
+            totalRead += read;
+
+            var now = DateTime.Now;
+            if (now - lastReportTime >= reportInterval || remaining == 0)
+            {
+                var filePct = count > 0 ? (double)totalRead / count * 100 : 100;
+                progress?.Report(new ArchiveProgress
+                {
+                    CurrentFile = "复制: " + entryName,
+                    PercentComplete = Math.Min(90.0, basePercent + totalRead * entryWeight / Math.Max(count, 1)),
+                    FilePercentComplete = filePct
+                });
+                lastReportTime = now;
+            }
         }
     }
 
