@@ -14,7 +14,9 @@ namespace MantisZip.UI;
 public partial class App : Application
 {
     /// <summary>
-    /// 检测指定目录是否可写入。尝试创建测试文件并用 DeleteOnClose 自动清理。
+    /// 检测指定目录是否可写入。包含两级探测：
+    /// 1. 根目录写入测试文件（DeleteOnClose 自动清理）
+    /// 2. 在根目录下创建子目录并写入测试文件（捕获子目录级别的权限问题）
     /// </summary>
     private static bool IsDirectoryWritable(string dirPath)
     {
@@ -23,8 +25,19 @@ public partial class App : Application
             if (!Directory.Exists(dirPath))
                 Directory.CreateDirectory(dirPath);
 
+            // 第一级：根目录写入测试
             var testFile = Path.Combine(dirPath, Path.GetRandomFileName());
             using (var fs = File.Create(testFile, 1, FileOptions.DeleteOnClose)) { }
+
+            // 第二级：子目录创建 + 写入测试
+            var testDir = Path.Combine(dirPath, Path.GetRandomFileName());
+            Directory.CreateDirectory(testDir);
+            var testFileInSub = Path.Combine(testDir, Path.GetRandomFileName());
+            using (var fs = File.Create(testFileInSub, 1, FileOptions.DeleteOnClose)) { }
+
+            // 清理测试子目录（文件已因 DeleteOnClose 自动删除）
+            try { Directory.Delete(testDir); } catch { }
+
             return true;
         }
         catch (UnauthorizedAccessException) { return false; }

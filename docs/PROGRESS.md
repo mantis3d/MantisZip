@@ -64,6 +64,7 @@
    - 设置窗口高级标签新增“权限提升” GroupBox
    - 中/英文各 17 个本地化键
    - 设计文档：`.sisyphus/plans/uac-elevation-permission.md`
+   - `IsDirectoryWritable` 增强：新增子目录创建 + 写入二级探测，捕获子目录级别的权限不足（Access to the path）
 
 ### v0.4.0 (2026-06-15) 第一个上线版本
   - 功能基本完成，测试基本完成。第一个上线版本。
