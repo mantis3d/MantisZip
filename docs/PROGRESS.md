@@ -65,6 +65,7 @@
    - 中/英文各 17 个本地化键
    - 设计文档：`.sisyphus/plans/uac-elevation-permission.md`
    - 解压侧新增 `catch(UnauthorizedAccessException)` 响应式拦截：解压中遇到 Access to the path 时触发提权/提示流程，不做事前预检
+   - 修复拦截后无响应问题：`Dispatcher.InvokeAsync` 改为同步 `Dispatcher.Invoke`，避免 catch 块内 async 状态机挂起
 
 ### v0.4.0 (2026-06-15) 第一个上线版本
   - 功能基本完成，测试基本完成。第一个上线版本。

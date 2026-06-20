@@ -481,7 +481,8 @@ public partial class App : Application
 
                         Log("--extract batch: permission denied ({0})", uax.Message);
 
-                        await progressWindow.Dispatcher.InvokeAsync(() =>
+                        // 使用同步 Invoke 而非 await InvokeAsync，避免 catch 块内的 async 状态机挂起
+                        progressWindow.Dispatcher.Invoke(() =>
                         {
                             var unwritable = new List<string> { failedDir };
 
