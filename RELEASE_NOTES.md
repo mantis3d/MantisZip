@@ -1,4 +1,22 @@
 
+## v0.4.2
+
+### 文件说明 / File Description
+
+MantisZip-0.4.2-Setup-NoDotNet.exe 是需要安装 dotnet runtime 才能运行的。MantisZip-0.4.2-Setup.exe 是自包含 dotnet runtime 的。
+
+MantisZip-0.4.2-Setup-NoDotNet.exe requires the .NET runtime to be installed. MantisZip-0.4.2-Setup.exe is self-contained with the .NET runtime.
+
+**如果你不明白上面那句话是什么意思，请下载 MantisZip-0.4.2-Setup.exe。**
+
+**If you don't understand what the above means, please download MantisZip-0.4.2-Setup.exe.**
+
+### 更新内容 / Changelog
+
+- 修复上下文动态菜单有时会闪烁的问题。
+- 修复安装时选择语言和外观无效的问题。
+
+
 ## v0.4.1
 
 ### 文件说明 / File Description

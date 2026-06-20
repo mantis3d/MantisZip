@@ -7,8 +7,8 @@
 - **技术栈**: .NET 9 + WPF + SharpCompress + SharpSevenZip
 
 ## 版本
-- **当前版本**: 0.4.1
-- **发布日期**: 2026-06-18
+- **当前版本**: 0.4.2
+- **发布日期**: 2026-06-20
 
 ## 规划中
 
@@ -17,6 +17,14 @@
 | [跨平台移植可行性研究](.sisyphus/plans/cross-platform-port.md) | 砍 ShellExt，WPF→Avalonia，SharpSevenZip→SharpCompress/p7zip，DPAPI→AES-GCM |
 
 ## 版本历史（从新到旧）
+
+### v0.4.2 (2026-06-20) 安装程序主题/语言选择修复
+
+1. **修复安装时主题选择不生效的 Bug**：
+   - `installer\prebuilt\settings.json` 缺少 `Theme` 和 `Language` 字段，导致 `CopyFile` 主路径下用户向导选择被丢弃
+   - 在该文件中添加 `__LANG__` 和 `__THEME__` 占位符
+   - 新增 `PatchSettingsThemeAndLanguage` 过程，`CopyFile` 成功后读取 JSON、替换占位符为用户实际选择的语言和主题
+   - `installer.iss` + `installer-selfcontained.iss` 同步修改
 
 ### v0.4.1 (2026-06-18) 发布流程修复 + 文档双语化
 
