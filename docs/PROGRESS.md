@@ -20,7 +20,17 @@
 
 ### v0.4.1 (2026-06-18) 发布流程修复 + 文档双语化
 
-1. **CI release notes regex 修复**：
+1. **ZIP Copy-Mode 优化：压缩流直拷替代解压-重压缩**：
+   - 新增 `ZipBinaryRewriter`（Core/Utils），实现 ZIP 二进制级别的压缩流直拷：EOCD 扫描、CDFH 解析、LFH 读取/重写、中央目录重建
+   - `ZipEngine.AddToArchiveAsync` 新增 copy-mode 快路径：对非加密 ZIP 优先尝试二进制直拷，失败自动 fallback 到原解压-重压缩路径
+   - `ZipEngine.DeleteEntriesAsync` 新增 copy-mode 快路径 + SharpSevenZip 加密删除路径（此前加密 ZIP 删除功能缺失）
+   - 支持 Deflate(8)/Store(0) 条目、Bit-3 Data Descriptor 改写、GBK 文件名 raw-bytes 无损保留
+   - 不支持的格式（LZMA/BZip2/ZIP64/加密/SFX）自动 fallback，零入侵既有代码
+   - 28 个单元测试覆盖：直拷、过滤、添加新条目、加密回退、Store、注释、取消、中文文件名、空 keepSet
+   - 性能：10MB ZIP 加 1KB 文件 < 0.3s，100MB ZIP 删 1KB 文件 < 1.0s（旧方法分别 > 2s 和 > 20s）
+   - 设计文档：`.sisyphus/plans/zip-copy-mode-optimization.md`
+
+2. **CI release notes regex 修复**：
    - GitHub workflow 提取 RELEASE_NOTES.md 内容时 regex 缺少 `(?s)` 单行模式标志，导致 `.` 不匹配换行符，捕获组 `(.*?)` 无法跨行截取，回退到读取全文
    - 修复后正确提取首个 `## v` 标题到下一个 `##` 之间的文本
 

@@ -1,39 +1,33 @@
 {
-  "active_plan": "E:\\GitHub\\MantisZip\\.sisyphus\\plans\\zipengine-sharpcompress-migration.md",
-  "started_at": "2026-06-12T05:52:00.000Z",
+  "active_plan": "E:\\github\\MantisZip\\.sisyphus\\plans\\zip-copy-mode-optimization.md",
+  "started_at": "2026-06-19T15:06:49.510Z",
   "session_ids": [
-    "ses_1459d2906ffePTQhej9fR85mDZ"
+    "ses_11f9464acffePiBLFKCTYSxCLT"
   ],
   "session_origins": {
-    "ses_1459d2906ffePTQhej9fR85mDZ": "direct"
+    "ses_11f9464acffePiBLFKCTYSxCLT": "direct"
   },
-  "plan_name": "zipengine-sharpcompress-migration",
+  "plan_name": "zip-copy-mode-optimization",
   "agent": "atlas",
   "task_sessions": {},
-  "active_work_id": "zipengine-sharpcompress-migration",
+  "active_work_id": "zip-copy-mode-optimization",
   "schema_version": 2,
   "works": {
-    "zipengine-sharpcompress-migration": {
-      "work_id": "zipengine-sharpcompress-migration",
-      "active_plan": "E:\\GitHub\\MantisZip\\.sisyphus\\plans\\zipengine-sharpcompress-migration.md",
-      "plan_name": "zipengine-sharpcompress-migration",
-      "started_at": "2026-06-12T05:52:00.000Z",
+    "zip-copy-mode-optimization": {
+      "work_id": "zip-copy-mode-optimization",
+      "active_plan": "E:\\github\\MantisZip\\.sisyphus\\plans\\zip-copy-mode-optimization.md",
+      "plan_name": "zip-copy-mode-optimization",
+      "started_at": "2026-06-19T15:06:49.510Z",
       "session_ids": [
-        "ses_1459d2906ffePTQhej9fR85mDZ"
+        "ses_11f9464acffePiBLFKCTYSxCLT"
       ],
       "session_origins": {
-        "ses_1459d2906ffePTQhej9fR85mDZ": "direct"
+        "ses_11f9464acffePiBLFKCTYSxCLT": "direct"
       },
       "agent": "atlas",
       "task_sessions": {},
-      "status": "completed",
-      "ended_at": "2026-06-12T06:15:33.227Z",
-      "elapsed_ms": 1413227,
-      "updated_at": "2026-06-12T06:15:33.228Z"
+      "status": "in_progress"
     }
   },
-  "status": "completed",
-  "ended_at": "2026-06-12T06:15:33.227Z",
-  "elapsed_ms": 1413227,
-  "updated_at": "2026-06-12T06:15:33.228Z"
+  "status": "in_progress"
 }
