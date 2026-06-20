@@ -367,6 +367,7 @@ public partial class App : Application
         Task.Run(async () =>
         {
         int succeeded = 0, failed = 0, skipped = 0;
+            bool permissionDialogShown = false;
             try
             {
                 for (int i = 0; i < total; i++)
@@ -469,7 +470,18 @@ public partial class App : Application
                     catch (OperationCanceledException) { throw; }
                     catch (UnauthorizedAccessException uax)
                     {
-                        // 权限不足 → 根据设置弹出提权/提示对话框
+                        // 后续权限不足：静默跳过（只弹窗提醒一次）
+                        if (permissionDialogShown)
+                        {
+                            Log("--extract batch: permission denied (silent skip): {0}", uax.Message);
+                            failed++;
+                            progressWindow.Dispatcher.Invoke(() =>
+                                progressWindow.UpdateBatchItemStatus(i, BatchItemStatus.Failed, "权限不足：拒绝访问"));
+                            continue;
+                        }
+                        permissionDialogShown = true;
+
+                        // 首次权限不足 → 弹出对话框
                         var qi1 = uax.Message.IndexOf('\'');
                         var qi2 = qi1 >= 0 ? uax.Message.LastIndexOf('\'') : -1;
                         var failedPath = (qi1 >= 0 && qi2 > qi1)
@@ -481,6 +493,8 @@ public partial class App : Application
 
                         Log("--extract batch: permission denied ({0})", uax.Message);
 
+                        bool shutdownRequested = false;
+
                         // 使用同步 Invoke 而非 await InvokeAsync，避免 catch 块内的 async 状态机挂起
                         progressWindow.Dispatcher.Invoke(() =>
                         {
@@ -489,12 +503,12 @@ public partial class App : Application
                             if (IsElevated())
                             {
                                 ShowElevationFailedDialog(unwritable);
-                                app.Shutdown();
+                                // 已提权仍失败：不退出进程，后续其他目录可能可写
                             }
                             else if (!AppSettings.Instance.AllowElevation)
                             {
                                 ShowElevationInfoDialog(unwritable);
-                                app.Shutdown();
+                                // 默认仅提示：不退出进程，后续静默跳过
                             }
                             else
                             {
@@ -503,16 +517,19 @@ public partial class App : Application
                                 {
                                     RelaunchAsAdmin(Environment.GetCommandLineArgs().Skip(1).ToArray());
                                     app.Shutdown();
+                                    shutdownRequested = true;
                                 }
-                                else
-                                {
-                                    app.Shutdown();
-                                }
+                                // 取消提权：不退出进程，后续静默跳过
                             }
                         });
 
-                        // Shutdown 已调用，退出 Task.Run 避免后续 CompleteWithErrors 冲突
-                        return;
+                        if (shutdownRequested)
+                            return;
+
+                        failed++;
+                        await progressWindow.Dispatcher.InvokeAsync(() =>
+                            progressWindow.UpdateBatchItemStatus(i, BatchItemStatus.Failed, "权限不足：拒绝访问"));
+                        continue;
                     }
                     catch (Exception ex)
                     {

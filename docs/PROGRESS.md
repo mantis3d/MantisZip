@@ -64,8 +64,9 @@
    - 设置窗口高级标签新增“权限提升” GroupBox
    - 中/英文各 17 个本地化键
    - 设计文档：`.sisyphus/plans/uac-elevation-permission.md`
-   - 解压侧新增 `catch(UnauthorizedAccessException)` 响应式拦截：解压中遇到 Access to the path 时触发提权/提示流程，不做事前预检
-   - 修复拦截后无响应问题：`Dispatcher.InvokeAsync` 改为同步 `Dispatcher.Invoke`，避免 catch 块内 async 状态机挂起
+    - 解压侧新增 `catch(UnauthorizedAccessException)` 响应式拦截：解压中遇到 Access to the path 时触发提权/提示流程，不做事前预检
+    - 修复拦截后无响应问题：`Dispatcher.InvokeAsync` 改为同步 `Dispatcher.Invoke`，避免 catch 块内 async 状态机挂起
+    - **提权弹窗行为优化**：首次权限不足弹窗一次，后续静默跳过（标记 Failed），不退出进程。已提权仍失败也继续处理（后续目录可能可写）
 
 ### v0.4.0 (2026-06-15) 第一个上线版本
   - 功能基本完成，测试基本完成。第一个上线版本。
