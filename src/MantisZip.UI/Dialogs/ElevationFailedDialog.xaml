@@ -39,7 +39,7 @@
                     <TextBlock Margin="12,2,0,2" TextWrapping="Wrap"
                                FontFamily="Consolas, Courier New, monospace">
                         <Run Text="• "/>
-                        <Run Text="{Binding}"/>
+                        <Run Text="{Binding Mode=OneWay}"/>
                     </TextBlock>
                 </DataTemplate>
             </ItemsControl.ItemTemplate>
