@@ -280,7 +280,6 @@
                 Background="{DynamicResource ThemeBorderBrush}"
                 Margin="4,0" />
         <ToggleButton Classes="ToolbarButton"
-                      Command="{Binding ToggleFilterBarCommand}"
                       IsChecked="{Binding IsFilterBarVisible}"
                       ToolTip.Tip="{Binding LocalizedStrings[Tooltip_Filter]}">
           <StackPanel >
@@ -290,7 +289,6 @@
           </StackPanel>
         </ToggleButton>
         <ToggleButton Classes="ToolbarButton"
-                      Command="{Binding TogglePreviewCommand}"
                       IsChecked="{Binding IsPreviewVisible}"
                       ToolTip.Tip="{Binding LocalizedStrings[Tooltip_Preview]}">
           <StackPanel >

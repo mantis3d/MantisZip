@@ -2,7 +2,7 @@
 
 ## 目标
 
-将 Avalonia 版设置窗口增强到与 WPF 版功能平级：新增 4 个标签页、增强 3 个已有标签页、实现语言动态切换基础设施、调整布局风格。
+将 Avalonia 版设置窗口增强到与 WPF 版功能平级：修复语言切换 Bug、新增 4 个标签页（语言/外观/密码管理/文件关联）、增强 3 个已有标签页（压缩/预览/调试）、实现 SettingsWindow 动态语言刷新、调整布局风格（左侧标签 + emoji 图标）。
 
 ## 前置条件
 
@@ -11,22 +11,43 @@
 
 ## 任务分解
 
-### Task 1：LanguageManager 基础设施（前置依赖）
+### Task 1a：修复主菜单语言切换 Bug
+
+**问题**：MainWindow.axaml 中"中文"和"English"两个 MenuItem 共用同一个 `SwitchLanguageCommand`，该命令仅 toggle（中⇄英），点击"English"时如果已是英文会错误地切回中文。
 
 **文件**：
-- 新建 `src/MantisZip.UI.Avalonia/Services/LanguageManager.cs`
-- 修改 `strings.zh-CN.json`、`strings.en.json`（新增语言相关键）
-- 现有 `LocalizationManager` 在 `Services/LocalizationManager.cs`
+- 修改 `Views/MainWindow.axaml` — 两个 MenuItem 加 `CommandParameter`
+- 修改 `ViewModels/MainWindowViewModel.cs` — `SwitchLanguage` 接受参数
 
 **实现要点**：
-- 实现 `AvailableLanguages`（`(Code, DisplayName)[]`）列表
-- `CurrentLanguage` 属性，切换时重新加载 `strings.*.json` 并触发 UI 刷新
-- 所有 ViewModel 的 `LocalizationManager.T()` 调用改为支持动态切换
-- 参考 WPF `LanguageManager`（`src/MantisZip.UI/AppPartials/App.Language.cs` 或类似文件）
+- `CommandParameter="zh-CN"` / `CommandParameter="en"`
+- `SwitchLanguage(string? lang)` 根据参数设置 `LocalizationManager.CurrentLanguage`
+- 保留 toggle 行为作为 fallback（参数为 null 时）
 
-**验收标准**：
-- ComboBox 切换语言后，当前打开的窗口 UI 文本即时刷新
-- 语言选择持久化到 `AppSettings.Language`
+### Task 1b：SettingsWindow 动态语言刷新
+
+**文件**：
+- 修改 `ViewModels/SettingsWindowViewModel.cs`
+
+**实现要点**：
+- 构造函数订阅 `LocalizationManager.CultureChanged` 事件
+- 事件触发时对所有本地化计算属性（`=> LocalizationManager.T(...)`) 调用 `OnPropertyChanged(nameof(...))`
+- 确保 SettingsWindow 打开时切换语言，UI 即时刷新
+
+### Task 1c：新增「语言」标签页（依赖 Task 1b）
+
+**文件**：
+- 修改 `Views/SettingsWindow.axaml` — 新增 TabItem
+- 修改 `ViewModels/SettingsWindowViewModel.cs` — 新增属性 + 命令
+- 修改 `Services/LocalizationManager.cs` — 新增 `AvailableLanguages`
+- 修改 `Models/AppSettings.cs` — 添加 `Language` 属性持久化
+
+**实现要点**：
+- 语言 ComboBox 绑定 `AvailableLanguages`（zh-CN / en）
+- SelectionChanged → 设置 `LocalizationManager.CurrentLanguage` + 保存到 `AppSettings.Language`
+- 译者信息 TextBlock（`LanguageTranslatorText`）
+- i18n 键：`Settings_Tab_Language`、`Settings_Language`
+- 数据绑定：`{Binding LocalizedStrings[Settings_Language]}` 模式（与 MainWindow 一致）
 
 ### Task 2：新增「外观」标签页
 
@@ -52,20 +73,7 @@
 - `PasswordRevealByDefault` CheckBox（首次打开密码输入框时是否自动显示密码）
 - i18n 键：`Settings_Tab_Password`、`Settings_Pwd_ShowNotification`、`Settings_Pwd_ShowHint`、`Settings_Pwd_RevealDefault`
 
-### Task 4：新增「语言」标签页
-
-**文件**：
-- 修改 `Views/SettingsWindow.axaml`
-- 修改 `ViewModels/SettingsWindowViewModel.cs`
-- 依赖 Task 1（LanguageManager）
-
-**实现要点**：
-- 语言 ComboBox 绑定 `LanguageManager.AvailableLanguages`
-- SelectionChanged → 切换语言 → 刷新当前窗口 UI
-- 译者信息 TextBlock（`LanguageTranslatorText`）
-- i18n 键：`Settings_Tab_Language`、`Settings_Language`
-
-### Task 5：新增「文件关联」标签页
+### Task 4：新增「文件关联」标签页
 
 **文件**：
 - 修改 `Views/SettingsWindow.axaml`
@@ -82,7 +90,7 @@
 - 调用 `ShellIntegration.Assoc`（通过 CLI 委托给 WPF exe）
 - i18n 键：`Settings_Tab_FileAssoc`、`Settings_Assoc_*`
 
-### Task 6：增强「压缩」标签页
+### Task 5：增强「压缩」标签页
 
 **文件**：
 - 修改 `Views/SettingsWindow.axaml`（Compress TabItem 内）
@@ -96,7 +104,7 @@
   - `PreserveDirectoryRoot` — 压缩文件夹时保留外层目录
 - i18n 键：`Settings_Compress_CloseAfterDone`、`Settings_Compress_KeepExt`、`Settings_Compress_PreserveRoot`
 
-### Task 7：增强「预览」标签页（最复杂）
+### Task 6：增强「预览」标签页（最复杂）
 
 **文件**：
 - 修改 `Views/SettingsWindow.axaml`（Preview TabItem → 子 TabControl）
@@ -111,7 +119,7 @@
 - 子标签页 4 — **布局**：预览位置 Combo（底部/树下/文件列表下/右侧）、信息面板方向 Combo（水平/垂直）、显示预览面板 CheckBox、最大预览文件大小 Slider（MB）
 - i18n 键：参考 WPF `Settings_Preview_Tab_Text`、`Settings_Preview_Tab_Font`、`Settings_Preview_Tab_Table`、`Settings_Preview_Tab_Position` 等
 
-### Task 8：增强「调试」标签页
+### Task 7：增强「调试」标签页
 
 **文件**：
 - 修改 `Views/SettingsWindow.axaml`（Debug TabItem 内）
@@ -125,7 +133,7 @@
 - 日志文件路径显示（只读 TextBlock）
 - i18n 键：`Settings_Debug_LogPrivacyMode`、`Settings_Debug_LogPath`、`Settings_Debug_LogPrivacyHelp`、`Settings_Debug_Restart`
 
-### Task 9：布局调整
+### Task 8：布局调整
 
 **文件**：
 - 修改 `Views/SettingsWindow.axaml` — TabControl 属性 + TabItem Header
@@ -146,7 +154,7 @@
 - 调整 TabItem.MinWidth/MinHeight 适配左侧布局
 - 注意：Theme 资源需保证左侧 TabStrip 在暗色模式下可见
 
-### Task 10：ViewModel 设置持久化
+### Task 9：ViewModel 设置持久化
 
 **文件**：
 - 修改 `ViewModels/SettingsWindowViewModel.cs` — `SaveSettings()` / `LoadSettings()`
@@ -163,22 +171,23 @@
 | 文件 | 变更内容 |
 |------|----------|
 | `Views/SettingsWindow.axaml` | 全部 10 个标签页 + 左侧布局 + emoji 图标 |
-| `ViewModels/SettingsWindowViewModel.cs` | 所有新属性 + Save/Load + 命令 |
-| `Models/AppSettings.cs` | 添加所有缺失的 WPF 属性字段 |
+| `ViewModels/SettingsWindowViewModel.cs` | 所有新属性 + 本地化刷新 + Save/Load + 命令 |
+| `ViewModels/MainWindowViewModel.cs` | SwitchLanguage 接受 CommandParameter |
+| `Views/MainWindow.axaml` | 语言菜单项加 CommandParameter |
+| `Models/AppSettings.cs` | 添加所有缺失的 WPF 属性字段（约 25 个） |
+| `Services/LocalizationManager.cs` | 新增 AvailableLanguages 属性 |
 | `Localization/strings.zh-CN.json` | 新增 50+ 翻译键 |
 | `Localization/strings.en.json` | 新增 50+ 翻译键 |
 
 ### 新建文件
 | 文件 | 说明 |
 |------|------|
-| `Services/LanguageManager.cs` | 动态语言切换基础设施 |
 | `ViewModels/FormatAssocItem.cs` | 文件关联条目 ViewModel（可选） |
 
 ### 不修改文件
 | 文件 | 原因 |
 |------|------|
 | `App.axaml` / `App.axaml.cs` | CLI 和 IPC 在 Phase 7 已完成 |
-| `MainWindow.axaml` / `MainWindow.axaml.cs` | 设置窗口独立，不涉及主窗口 |
 | `Dialogs/*.axaml` | Phase 7 已全部完成 |
 | ShellExt 相关 | WPF 独占功能，委托执行 |
 
@@ -192,14 +201,15 @@
 
 | Task | 内容 | 预估文件 | 难度 |
 |------|------|:--------:|:----:|
-| 1 | LanguageManager 基础设施 | 2-3 | 🟡中 |
+| 1a | 修复主菜单语言切换 Bug | 2 | 🟢低 |
+| 1b | SettingsWindow 动态语言刷新 | 1 | 🟢低 |
+| 1c | 新增语言标签页 | 3-4 | 🟢低 |
 | 2 | 外观标签 | 2 | 🟢低 |
 | 3 | 密码管理标签 | 2 | 🟢低 |
-| 4 | 语言标签（依赖 Task 1） | 2 | 🟢低 |
-| 5 | 文件关联标签 | 3-4 | 🟡中 |
-| 6 | 压缩标签增强 | 2 | 🟢低 |
-| 7 | 预览标签增强（最复杂） | 3 | 🔴高 |
-| 8 | 调试标签增强 | 2 | 🟢低 |
-| 9 | 布局调整 | 1 | 🟢低 |
-| 10 | ViewModel 设置持久化 | 2 | 🟡中 |
-| **合计** | | **~20** | |
+| 4 | 文件关联标签 | 3-4 | 🟡中 |
+| 5 | 压缩标签增强 | 2 | 🟢低 |
+| 6 | 预览标签增强（最复杂） | 3 | 🔴高 |
+| 7 | 调试标签增强 | 2 | 🟢低 |
+| 8 | 布局调整 | 1 | 🟢低 |
+| 9 | ViewModel 设置持久化 | 2 | 🟡中 |
+| **合计** | | **~23** | |
