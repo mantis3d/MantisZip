@@ -14,6 +14,8 @@
 - Avalonia 跨平台移植后续 Phase
 
 ### avalonia-port 分支 (WIP)
+  - **Phase 9: 文件列表交互补齐** — DataGrid 添加双击目录进入、Enter/Backspace/Delete 键盘导航、列排序（`..` 置顶 + 目录优先 + 箭头标记），与 WPF 文件列表交互行为保持一致 (2026-06-21)
+  - **Phase 8: 设置窗口 TabControl 重构 + i18n 补全 + ComboBox 修复** — SettingsWindow 重构为完整 TabControl（压缩/解压/上下文菜单/高级/预览），Preview 分 4 子标签页（文本/字体/表格/布局）；新增 70+ i18n 中英文键；AppSettings 扩展 shadow 配置属性；LocalizationManager `T()` 添加 null-safe fallback；修复 Avalonia 12 不支持 `SelectedValuePath` 导致的 ComboBox 选择不生效，改用 `ItemsSource` + `SelectedItem` + `Option(Display,Value)` 模式 (2026-06-21)
   - **Phase 7: 功能补齐 — CLI/IPC/设置标签页/对话框/i18n** — CLI 9 命令 + IPC 多实例; 设置窗口 Extract/ContextMenu/Advanced 三标签页; 10 个新对话框 (CompressConflictDialog/ConflictDialog/ErrorDialog/PasswordEditDialog/PasswordHelpDialog/LogPrivacyHelpDialog/MatchedPasswordDialog/DonationDialog); CompressSettingsWindow Password 标签增强（库模式/新密码模式/强度指示/自动规则）; i18n 中英文全键 (2026-06-19)
   - **Bugfix: 暗色菜单弹出面板白色背景 + 控制前景色修复** — 添加 `MenuFlyoutPresenterBackground` 修复菜单弹出面板背景；覆盖 `MenuFlyoutItemForeground`/`MenuFlyoutItemForegroundPointerOver`/`MenuFlyoutItemForegroundDisabled`/`ButtonForegroundDisabled`/`TabItemHeaderForegroundUnselected`/`TabItemHeaderForegroundSelected`/`ComboBoxForeground`/`ComboBoxItemForeground`/`ComboBoxItemForegroundPointerOver`/`ComboBoxItemForegroundSelected`/`CheckBoxForegroundUnchecked`/`CheckBoxForegroundChecked` 等 Fluent 资源键及 App.axaml TabItem 样式、SettingsWindow Foreground
   - **Bugfix: SQLite 预览文件锁定** — SqliteConnection 加 `Pooling=False`，防止连接池在 Dispose 后仍持文件句柄导致重新预览失败
@@ -26,6 +28,20 @@
 
 ### v0.4.0 (2026-06-15) 第一个上线版本
   - 功能基本完成，测试基本完成。第一个上线版本。
+
+15. **设置窗口 TabControl 重构 + 完整标签页体系**：
+  - SettingsWindow 由单页改为完整 TabControl：压缩/解压/上下文菜单/高级/预览
+  - Preview 标签页内嵌子 TabControl：文本/字体/表格/布局
+  - 新增 70+ i18n 中英文键覆盖所有标签页/子标签页的标题和提示
+  - AppSettings 扩展 Preview/Orientation/Emoji 等 shadow 配置属性
+  - LocalizationManager `T(key)` 添加 null-safe fallback（key 不存在时返回默认值）
+
+16. **Bugfix: Avalonia 12 ComboBox SelectedValuePath 不支持 + 选择不生效**：
+  - 根因：Avalonia 12 删除了 `SelectedValuePath` 依赖属性，移除后 `SelectedValue` 拿 string 与 `ComboBoxItem` 对象引用比较，永远不匹配
+  - 移除全部 9 处 `SelectedValuePath="Tag"`（AVLN2000 编译错误）
+  - 8 个 ComboBox 由内联 `ComboBoxItem` + `SelectedValue` 改为 `ItemsSource="{Binding XxxOptions}"` + `SelectedItem="{Binding SelectedXxxOption}"` + `ItemTemplate`
+  - 新增 `Option(string Display, string Value)` record，`Save()` 从 `SelectedXxxOption?.Value` 读取
+  - `OnCultureChanged()` 重建 Options 集合以响应语言切换
 
 14. **Bugfix: 最近文件菜单项灰色不可点击 (Avalonia)**：
     - 根因：在 DataTemplate 中使用 `$parent[Menu]` 或 `$parent[Window]` 绑定 `OpenRecentFileCommand`，但 Avalonia 弹出菜单的视觉树独立，无法通过 `$parent` 找到祖先
