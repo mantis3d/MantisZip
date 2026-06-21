@@ -21,17 +21,19 @@ public class TarGzEngine : IArchiveEngine
 {
     public bool CanHandle(ArchiveFormat format) => format == ArchiveFormat.Tar || format == ArchiveFormat.GZip;
 
-    public async Task ExtractAsync(string archivePath, string destinationPath, string? password = null, IProgress<ArchiveProgress>? progress = null, CancellationToken cancellationToken = default, ArchiveOptions? options = null)
+    public async Task<ExtractResult> ExtractAsync(string archivePath, string destinationPath, string? password = null, IProgress<ArchiveProgress>? progress = null, CancellationToken cancellationToken = default, ArchiveOptions? options = null)
     {
         CoreLog.Entry();
         CoreLog.Info($"ExtractAsync: {archivePath} -> {destinationPath}");
         var sw = Stopwatch.StartNew();
 
-        await Task.Run(() =>
+        var result = await Task.Run(() =>
         {
             var ext = Path.GetExtension(archivePath).ToLowerInvariant();
             var isTarGz = ext == ".tgz" || archivePath.EndsWith(".tar.gz");
             CoreLog.Info($"ExtractAsync: format=tar.gz={isTarGz}, ext={ext}");
+
+            int successCount = 0, failedEntries = 0;
 
             if (isTarGz || ext == ".tar")
             {
@@ -88,41 +90,50 @@ public class TarGzEngine : IArchiveEngine
                         continue;
                     }
 
-                    // 带 per-file 进度的复制
-                    using (var entryStream = reader.OpenEntryStream())
-                    using (var outStream = File.Create(resolved))
+                    try
                     {
-                        var buffer = new byte[81920];
-                        long totalRead = 0;
-                        long entrySize = entry.Size;
-
-                        while (true)
+                        // 带 per-file 进度的复制
+                        using (var entryStream = reader.OpenEntryStream())
+                        using (var outStream = File.Create(resolved))
                         {
-                            cancellationToken.ThrowIfCancellationRequested();
-                            var read = entryStream.Read(buffer, 0, buffer.Length);
-                            if (read <= 0) break;
-                            outStream.Write(buffer, 0, read);
-                            totalRead += read;
+                            var buffer = new byte[81920];
+                            long totalRead = 0;
+                            long entrySize = entry.Size;
 
-                            var now = DateTime.Now;
-                            if (now - lastReportTime >= reportInterval || totalRead >= entrySize)
+                            while (true)
                             {
-                                var filePct = entrySize > 0 ? (double)totalRead / entrySize * 100 : 100;
-                                compressedProgress = totalCompressedBytes > 0
-                                    ? (double)inputStream.Position / totalCompressedBytes * 100
-                                    : 0;
-                                progress?.Report(new ArchiveProgress
+                                cancellationToken.ThrowIfCancellationRequested();
+                                var read = entryStream.Read(buffer, 0, buffer.Length);
+                                if (read <= 0) break;
+                                outStream.Write(buffer, 0, read);
+                                totalRead += read;
+
+                                var now = DateTime.Now;
+                                if (now - lastReportTime >= reportInterval || totalRead >= entrySize)
                                 {
-                                    CurrentFile = entryKey,
-                                    PercentComplete = Math.Min(compressedProgress, 99.9),
-                                    FilePercentComplete = filePct
-                                });
-                                lastReportTime = now;
+                                    var filePct = entrySize > 0 ? (double)totalRead / entrySize * 100 : 100;
+                                    compressedProgress = totalCompressedBytes > 0
+                                        ? (double)inputStream.Position / totalCompressedBytes * 100
+                                        : 0;
+                                    progress?.Report(new ArchiveProgress
+                                    {
+                                        CurrentFile = entryKey,
+                                        PercentComplete = Math.Min(compressedProgress, 99.9),
+                                        FilePercentComplete = filePct
+                                    });
+                                    lastReportTime = now;
+                                }
                             }
                         }
+                        // 恢复文件原始修改时间
+                        try { File.SetLastWriteTime(resolved, entryModified); } catch (Exception tsEx) { CoreLog.Info($"ExtractAsync: failed to set timestamp on {resolved}: {tsEx.Message}"); }
+                        successCount++;
                     }
-                    // 恢复文件原始修改时间
-                    try { File.SetLastWriteTime(resolved, entryModified); } catch (Exception tsEx) { CoreLog.Info($"ExtractAsync: failed to set timestamp on {resolved}: {tsEx.Message}"); }
+                    catch (UnauthorizedAccessException uax)
+                    {
+                        CoreLog.Info($"ExtractAsync: permission denied for '{entryKey}': {uax.Message}");
+                        failedEntries++;
+                    }
                 }
             }
             else if (ext == ".gz")
@@ -134,8 +145,17 @@ public class TarGzEngine : IArchiveEngine
                 var resolved = FileConflictHelper.ResolvePath(outputPath, options);
                 if (resolved != null)
                 {
-                    using var output = File.Create(resolved);
-                    gzipStream.CopyTo(output);
+                    try
+                    {
+                        using var output = File.Create(resolved);
+                        gzipStream.CopyTo(output);
+                        successCount = 1;
+                    }
+                    catch (UnauthorizedAccessException uax)
+                    {
+                        CoreLog.Info($"ExtractAsync: permission denied for '{outputPath}': {uax.Message}");
+                        failedEntries = 1;
+                    }
                 }
 
                 progress?.Report(new ArchiveProgress
@@ -151,10 +171,12 @@ public class TarGzEngine : IArchiveEngine
                 PercentComplete = 100
             });
 
-            CoreLog.Info($"ExtractAsync: done, {sw.ElapsedMilliseconds}ms");
+            CoreLog.Info($"ExtractAsync: done, {sw.ElapsedMilliseconds}ms, failedEntries={failedEntries}");
+            return new ExtractResult { SucceededEntries = successCount, FailedEntries = failedEntries };
         }, cancellationToken).ConfigureAwait(false);
 
         CoreLog.Exit();
+        return result;
     }
 
     public async Task CompressAsync(string[] sourcePaths, string outputPath, ArchiveOptions options, IProgress<ArchiveProgress>? progress = null, CancellationToken cancellationToken = default)

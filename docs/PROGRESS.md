@@ -18,6 +18,21 @@
 
 ## 版本历史（从新到旧）
 
+### v0.4.3 (2026-06-21) 压缩包内逐条目权限跳过 + UAC 弹窗行为修复
+
+1. **压缩包内逐条目权限跳过**：
+   - 新增 `ExtractResult` 类（`SucceededEntries`/`FailedEntries`）
+   - `IArchiveEngine.ExtractAsync` 返回类型从 `Task` 改为 `Task<ExtractResult>`
+   - ZipEngine/SevenZipEngine/TarGzEngine 逐条目循环包 `try-catch(UnauthorizedAccessException)`，跳过失败条目继续处理其余
+   - GZip 单文件解压同样包 try-catch
+   - 调用方（App.Extract.cs）根据 `ExtractResult` 判断全失败/部分成功
+2. **UAC 提权弹窗修复**：
+   - 删除 `HandleExtractBatchCore` 预检（事前扫描所有目标目录），完全由 catch 响应式拦截
+   - 首次权限不足弹窗一次，后续静默跳过（标记 Failed），不退出进程
+   - 已提权仍失败不退出（其他目录可能可写）
+   - 仅用户点击「以管理员身份运行」时才重启旧进程
+3. **设计文档**：`.sisyphus/plans/uac-elevation-permission.md` 更新
+
 ### v0.4.2 (2026-06-20) 安装程序主题/语言选择修复 / ZIP copy-mode 进度与取消
 
 1. **修复安装时主题选择不生效的 Bug**：
