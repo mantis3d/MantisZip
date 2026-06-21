@@ -454,17 +454,23 @@ public partial class App : Application
 
                             if (IsElevated())
                             {
+                                Log("--extract batch: IsElevated=true, showing ElevationFailedDialog");
                                 ShowElevationFailedDialog(unwritable);
+                                Log("--extract batch: ElevationFailedDialog closed");
                                 // 已提权仍失败：不退出进程，后续其他目录可能可写
                             }
                             else if (!AppSettings.Instance.AllowElevation)
                             {
+                                Log("--extract batch: AllowElevation=false, showing ElevationInfoDialog");
                                 ShowElevationInfoDialog(unwritable);
+                                Log("--extract batch: ElevationInfoDialog closed");
                                 // 默认仅提示：不退出进程，后续静默跳过
                             }
                             else
                             {
+                                Log("--extract batch: AllowElevation=true, showing ElevationDialog");
                                 var elevationResult = ShowElevationDialog(unwritable);
+                                Log("--extract batch: ElevationDialog closed, result={0}", elevationResult?.ToString() ?? "null");
                                 if (elevationResult == true)
                                 {
                                     RelaunchAsAdmin(Environment.GetCommandLineArgs().Skip(1).ToArray());
@@ -475,6 +481,7 @@ public partial class App : Application
                             }
                         });
 
+                        Log("--extract batch: Dispatcher.Invoke returned, shutdownRequested={0}", shutdownRequested);
                         if (shutdownRequested)
                             return;
 
