@@ -7,7 +7,7 @@
 - **技术栈**: .NET 9 + WPF + SharpCompress + SharpSevenZip
 
 ## 版本
-- **当前版本**: 0.4.2
+- **当前版本**: 0.4.3
 - **发布日期**: 2026-06-20
 
 ## 规划中
@@ -17,6 +17,22 @@
 | [跨平台移植可行性研究](.sisyphus/plans/cross-platform-port.md) | 砍 ShellExt，WPF→Avalonia，SharpSevenZip→SharpCompress/p7zip，DPAPI→AES-GCM |
 
 ## 版本历史（从新到旧）
+
+### v0.4.3 (2026-06-21) 压缩包内逐条目权限跳过 + UAC 弹窗行为修复
+
+1. **压缩包内逐条目权限跳过**：
+   - 新增 `ExtractResult` 类（`SucceededEntries`/`FailedEntries`）
+   - `IArchiveEngine.ExtractAsync` 返回类型从 `Task` 改为 `Task<ExtractResult>`
+   - ZipEngine/SevenZipEngine/TarGzEngine 逐条目循环包 `try-catch(UnauthorizedAccessException)`，跳过失败条目继续处理其余
+   - GZip 单文件解压同样包 try-catch
+   - 调用方（App.Extract.cs）根据 `ExtractResult` 判断全失败/部分成功
+2. **UAC 提权弹窗修复**：
+   - 删除 `HandleExtractBatchCore` 预检（事前扫描所有目标目录），完全由 catch 响应式拦截
+   - 首次权限不足弹窗一次，后续静默跳过（标记 Failed），不退出进程
+   - 已提权仍失败不退出（其他目录可能可写）
+   - 仅用户点击「以管理员身份运行」时才重启旧进程
+3. **设计文档**：`.sisyphus/plans/uac-elevation-permission.md` 更新
+4. **进度窗口错误摘要**：ProgressWindow 新增 `ErrorSummaryBox`（可复制 TextBox），解压权限错误时在进度条和按钮之间显示错误摘要文本
 
 ### v0.4.2 (2026-06-20) 安装程序主题/语言选择修复 / ZIP copy-mode 进度与取消
 
@@ -55,6 +71,18 @@
    - 标题统一添加 `/ English` 双语标注
 3. 修复动态菜单bug
 4. 文件列表增加“返回父目录”项目。
+5. **UAC 提权机制 — 双模式权限不足处理**：
+   - `AppSettings.AllowElevation` 属性（默认 false），设置在设置 → 高级 → 权限提升
+   - 新建 `App.Elevation.cs` 含 6 个辅助方法：`IsDirectoryWritable`, `IsElevated`, `RelaunchAsAdmin`, `ShowElevationInfoDialog`, `ShowElevationDialog`, `ShowElevationFailedDialog`
+   - 三个新对话框：`ElevationInfoDialog`（仅提示不可写目录+确定）、`ElevationDialog`（提权/取消）、`ElevationFailedDialog`（提权后仍不可写错误）
+   - 注入 3 个 CLI 入口点：`HandleExtractBatchCore`、`RunCompressSeparateBatch`、`HandleCompressQuick`
+   - 默认行为仅弹提示（不提权）；仅当 `AllowElevation=true` 才弹出 UAC 提权窗口
+   - 设置窗口高级标签新增“权限提升” GroupBox
+   - 中/英文各 17 个本地化键
+   - 设计文档：`.sisyphus/plans/uac-elevation-permission.md`
+    - 解压侧新增 `catch(UnauthorizedAccessException)` 响应式拦截：解压中遇到 Access to the path 时触发提权/提示流程，不做事前预检
+    - 修复拦截后无响应问题：`Dispatcher.InvokeAsync` 改为同步 `Dispatcher.Invoke`，避免 catch 块内 async 状态机挂起
+    - **提权弹窗行为优化**：首次权限不足弹窗一次，后续静默跳过（标记 Failed），不退出进程。已提权仍失败也继续处理（后续目录可能可写）
 
 ### v0.4.0 (2026-06-15) 第一个上线版本
   - 功能基本完成，测试基本完成。第一个上线版本。

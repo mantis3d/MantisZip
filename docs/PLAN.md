@@ -17,7 +17,7 @@
 |--------|------|----------|:----:|:--------:|------|
 | **P0** | ZIP 压缩流直拷优化 | [zip-copy-mode-optimization.md](.sisyphus/plans/zip-copy-mode-optimization.md) | 🟡中 | 2-3天 | 添加/删除文件时直拷已有条目的压缩数据，避免全量解压再压缩 |
 | **P0** | 便携版模式 | [portable-mode.md](.sisyphus/plans/portable-mode.md) | 🟢低 | 1-2h | 哨兵文件触发，路径重定向到 exe 目录 |
-| **P0** | CLI/右键菜单权限不足时提权 | [uac-elevation-permission.md](.sisyphus/plans/uac-elevation-permission.md) | 🟡中 | 3-4h | 检测目标目录可写性，不可写时弹 UAC 提权 |
+| **P0** | CLI/右键菜单权限不足时提权 | [uac-elevation-permission.md](.sisyphus/plans/uac-elevation-permission.md) | 🟡中 | 4-5h | 检测目标目录可写性；默认仅提示不可写目录，设置中开启"允许提升权限"后才弹 UAC 提权 |
 | **P1** | 统一路径快捷选择 (QuickPathControl) | [quick-path-control.md](.sisyphus/plans/quick-path-control.md) | 🟡中 | 4-6h | 收藏/历史/资源管理器窗口三合一控件；系统路径（桌面/文档/下载）可隐藏不可删除 |
 | **P1** | Win11 一级右键菜单 | [win11-first-level-menu.md](.sisyphus/plans/win11-first-level-menu.md) | 🔴高 | 1-2周 | IExplorerCommand 实现，HKLM 提权注册，双接口共存 |
 | **P1** | 压缩解压文件筛选 | [file-filter-feature.md](.sisyphus/plans/file-filter-feature.md) | 🟢低 | 1-2h | 压缩解压文件筛选 |

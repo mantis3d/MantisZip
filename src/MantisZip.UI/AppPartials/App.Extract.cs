@@ -308,6 +308,8 @@ public partial class App : Application
         progressWindow.InitBatchMode(allPaths);
         progressWindow.SetProgress(0, L.T(L.App_ExtractingProgress));
 
+        // 权限检测不做事前扫描，由 catch(UnauthorizedAccessException) 响应式处理
+
         var ct = progressWindow.CancellationToken;
         var total = allPaths.Count;
 
@@ -317,6 +319,7 @@ public partial class App : Application
         Task.Run(async () =>
         {
         int succeeded = 0, failed = 0, skipped = 0;
+            bool permissionDialogShown = false;
             try
             {
                 for (int i = 0; i < total; i++)
@@ -410,13 +413,142 @@ public partial class App : Application
                         var progress = progressWindow.CreatePauseAwareProgress(
                             ProgressWindow.CreateBackgroundProgress(progressWindow));
 
-                        await engine.ExtractAsync(archivePath, dest, password, progress, ct, batchOptions);
+                        var extractResult = await engine.ExtractAsync(archivePath, dest, password, progress, ct, batchOptions);
 
-                        succeeded++;
-                        await progressWindow.Dispatcher.InvokeAsync(() =>
-                            progressWindow.UpdateBatchItemStatus(i, BatchItemStatus.Completed));
+                        // 逐条目权限不足 → 首次弹窗，后续静默
+                        if (extractResult.HasFailures)
+                        {
+                            progressWindow.SetErrorSummary(
+                                $"{extractResult.FailedEntries} 个文件因权限不足未能写入到 {dest}");
+
+                            if (!permissionDialogShown)
+                            {
+                                permissionDialogShown = true;
+                                bool shutdownRequested = false;
+
+                                progressWindow.Dispatcher.Invoke(() =>
+                                {
+                                    var unwritable = new List<string> { dest };
+
+                                    if (IsElevated())
+                                    {
+                                        Log("--extract batch: IsElevated=true, showing ElevationFailedDialog (per-entry)");
+                                        ShowElevationFailedDialog(unwritable);
+                                    }
+                                    else if (!AppSettings.Instance.AllowElevation)
+                                    {
+                                        Log("--extract batch: AllowElevation=false, showing ElevationInfoDialog (per-entry)");
+                                        ShowElevationInfoDialog(unwritable);
+                                    }
+                                    else
+                                    {
+                                        Log("--extract batch: AllowElevation=true, showing ElevationDialog (per-entry)");
+                                        var elevationResult = ShowElevationDialog(unwritable);
+                                        if (elevationResult == true)
+                                        {
+                                            RelaunchAsAdmin(Environment.GetCommandLineArgs().Skip(1).ToArray());
+                                            app.Shutdown();
+                                            shutdownRequested = true;
+                                        }
+                                    }
+                                });
+
+                                if (shutdownRequested)
+                                    return;
+                            }
+                            else
+                            {
+                                Log("--extract batch: permission denied (silent skip, {0} entries)", extractResult.FailedEntries);
+                            }
+                        }
+
+                        if (extractResult.HasFailures && extractResult.SucceededEntries == 0)
+                        {
+                            // 所有条目都失败（权限不足）→ 整个压缩包标记失败
+                            failed++;
+                            Log("--extract batch: all {0} entries failed (permission denied)", extractResult.FailedEntries);
+                            await progressWindow.Dispatcher.InvokeAsync(() =>
+                                progressWindow.UpdateBatchItemStatus(i, BatchItemStatus.Failed,
+                                    $"全部 {extractResult.FailedEntries} 项失败（权限不足）"));
+                        }
+                        else
+                        {
+                            if (extractResult.HasFailures)
+                            {
+                                Log("--extract batch: partial success, {0} entries succeeded, {1} failed (permission)",
+                                    extractResult.SucceededEntries, extractResult.FailedEntries);
+                            }
+                            succeeded++;
+                            await progressWindow.Dispatcher.InvokeAsync(() =>
+                                progressWindow.UpdateBatchItemStatus(i, BatchItemStatus.Completed));
+                        }
                     }
                     catch (OperationCanceledException) { throw; }
+                    catch (UnauthorizedAccessException uax)
+                    {
+                        // 此 catch 现在只处理目录创建级别的权限错误（ExtractAsync 内逐条目的已内部处理）
+                        // 后续权限不足：静默跳过（只弹窗提醒一次）
+                        progressWindow.SetErrorSummary($"目标目录 {dest} 无法写入，权限不足");
+
+                        if (permissionDialogShown)
+                        {
+                            Log("--extract batch: permission denied (silent skip): {0}", uax.Message);
+                            failed++;
+                            progressWindow.Dispatcher.Invoke(() =>
+                                progressWindow.UpdateBatchItemStatus(i, BatchItemStatus.Failed, "权限不足：拒绝访问"));
+                            continue;
+                        }
+                        permissionDialogShown = true;
+
+                        // 首次权限不足 → 弹出对话框
+                        var qi1 = uax.Message.IndexOf('\'');
+                        var qi2 = qi1 >= 0 ? uax.Message.LastIndexOf('\'') : -1;
+                        var failedPath = (qi1 >= 0 && qi2 > qi1)
+                            ? uax.Message.Substring(qi1 + 1, qi2 - qi1 - 1)
+                            : null;
+                        var failedDir = failedPath != null
+                            ? Path.GetDirectoryName(failedPath) ?? dest
+                            : dest;
+
+                        Log("--extract batch: permission denied ({0})", uax.Message);
+
+                        bool shutdownRequested = false;
+
+                        // 使用同步 Invoke 而非 await InvokeAsync，避免 catch 块内的 async 状态机挂起
+                        progressWindow.Dispatcher.Invoke(() =>
+                        {
+                            var unwritable = new List<string> { failedDir };
+
+                            if (IsElevated())
+                            {
+                                ShowElevationFailedDialog(unwritable);
+                                // 已提权仍失败：不退出进程，后续其他目录可能可写
+                            }
+                            else if (!AppSettings.Instance.AllowElevation)
+                            {
+                                ShowElevationInfoDialog(unwritable);
+                                // 默认仅提示：不退出进程，后续静默跳过
+                            }
+                            else
+                            {
+                                var elevationResult = ShowElevationDialog(unwritable);
+                                if (elevationResult == true)
+                                {
+                                    RelaunchAsAdmin(Environment.GetCommandLineArgs().Skip(1).ToArray());
+                                    app.Shutdown();
+                                    shutdownRequested = true;
+                                }
+                                // 取消提权：不退出进程，后续静默跳过
+                            }
+                        });
+                        if (shutdownRequested)
+                            return;
+
+                        failed++;
+                        await progressWindow.Dispatcher.InvokeAsync(() =>
+                            progressWindow.UpdateBatchItemStatus(i, BatchItemStatus.Failed, "权限不足：拒绝访问"));
+                        continue;
+                    }
                     catch (Exception ex)
                     {
                         Log("--extract batch: item failed ({0}): {1}", archivePath, ex.Message);

@@ -14,9 +14,17 @@ MantisZip-0.4.2-Setup-NoDotNet.exe requires the .NET runtime to be installed. Ma
 ### 更新内容 / Changelog
 
 - 修复上下文动态菜单有时会闪烁的问题。
-- 修复安装时选择语言和外观无效的问题。
-- 完成计划 [zip 复制模式](.sisyphus/plans/zipengine-sharpcompress-migration.md)，添加删除文件不再是“解压缩→重新压缩”，而改成了“复制模式”。速度极大提升。
-- 完成计划 [权限提升](.sisyphus/plans/uac-elevation-permission.md)，当压缩解压到无权限的目录时，会有正确的处理。
+- Fixed issue where dynamic context menus sometimes flickered.
+- 修复安装时选择语言和外观无效的问题（感谢 Peiming_The_Blank）。
+- Fixed issue where language and appearance selection during installation was ineffective (thanks to Peiming_The_Blank).
+- 完成计划 [zip 复制模式](.sisyphus/plans/zipengine-sharpcompress-migration.md)，添加删除文件不再是"解压缩→重新压缩"，而改成了"复制模式"。速度极大提升。
+- Completed plan: [ZIP copy mode](.sisyphus/plans/zipengine-sharpcompress-migration.md). Adding/deleting files now uses "copy mode" instead of "decompress → recompress". Significantly faster.
+- 完成计划 [权限提升](.sisyphus/plans/uac-elevation-permission.md)，当压缩解压到无权限的目录时，会有正确的处理（感谢 xieyilin.main）。
+- Completed plan: [UAC elevation](.sisyphus/plans/uac-elevation-permission.md). Proper handling when compressing/extracting to directories without permission (thanks to xieyilin.main).
+- ![无权限](docs/images/version/v0.4.2/NoPermission.png)
+- ![设置提升](docs/images/version/v0.4.2/SettingPermission.png)
+- ![提升权限](docs/images/version/v0.4.2/ElevationPermission.png)
+
 
 
 ## v0.4.1

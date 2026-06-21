@@ -1,33 +1,13 @@
 {
-  "active_plan": "E:\\github\\MantisZip\\.sisyphus\\plans\\zip-copy-mode-optimization.md",
-  "started_at": "2026-06-19T15:06:49.510Z",
-  "session_ids": [
-    "ses_11f9464acffePiBLFKCTYSxCLT"
-  ],
-  "session_origins": {
-    "ses_11f9464acffePiBLFKCTYSxCLT": "direct"
-  },
-  "plan_name": "zip-copy-mode-optimization",
+  "active_plan": null,
+  "started_at": "2026-06-20T02:55:47.863Z",
+  "session_ids": [],
+  "session_origins": {},
+  "plan_name": null,
   "agent": "atlas",
   "task_sessions": {},
-  "active_work_id": "zip-copy-mode-optimization",
+  "active_work_id": null,
   "schema_version": 2,
-  "works": {
-    "zip-copy-mode-optimization": {
-      "work_id": "zip-copy-mode-optimization",
-      "active_plan": "E:\\github\\MantisZip\\.sisyphus\\plans\\zip-copy-mode-optimization.md",
-      "plan_name": "zip-copy-mode-optimization",
-      "started_at": "2026-06-19T15:06:49.510Z",
-      "session_ids": [
-        "ses_11f9464acffePiBLFKCTYSxCLT"
-      ],
-      "session_origins": {
-        "ses_11f9464acffePiBLFKCTYSxCLT": "direct"
-      },
-      "agent": "atlas",
-      "task_sessions": {},
-      "status": "in_progress"
-    }
-  },
-  "status": "in_progress"
+  "works": {},
+  "status": "idle"
 }

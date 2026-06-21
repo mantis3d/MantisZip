@@ -23,8 +23,9 @@
             <RowDefinition Height="Auto"/>  <!-- 3: 文件进度条 -->
             <RowDefinition Height="Auto"/>  <!-- 4: 总体进度条 -->
             <RowDefinition Height="Auto"/>  <!-- 5: 文件计数 -->
-            <RowDefinition Height="*"/>      <!-- 6: 弹性填充（吸收 MinHeight 多余空间，把按钮压到底部） -->
-            <RowDefinition Height="Auto"/>  <!-- 7: 按钮 -->
+            <RowDefinition Height="Auto"/>  <!-- 6: 错误摘要（可复制文本，默认隐藏） -->
+            <RowDefinition Height="*"/>      <!-- 7: 弹性填充（吸收 MinHeight 多余空间，把按钮压到底部） -->
+            <RowDefinition Height="Auto"/>  <!-- 8: 按钮 -->
         </Grid.RowDefinitions>
 
         <!-- ═══ 密码匹配区（默认隐藏，仅在尝试密码规则时显示）═══ -->
@@ -132,6 +133,21 @@
                    FontSize="12" Foreground="{StaticResource Theme_TextDisabled}"
                    Margin="0,0,0,4"/>
 
+        <!-- 错误摘要（仅失败时可见，可选中复制） -->
+        <TextBox x:Name="ErrorSummaryBox" Grid.Row="6"
+                 Text=""
+                 IsReadOnly="True"
+                 Visibility="Collapsed"
+                 TextWrapping="Wrap"
+                 FontSize="12"
+                 Foreground="{StaticResource Theme_StatusError}"
+                 Background="Transparent"
+                 BorderThickness="0"
+                 Padding="0,0,0,6"
+                 IsTabStop="False"
+                 Focusable="False"
+                 Cursor="Arrow"/>
+
         <!-- ═══ 批处理文件列表（3 列：状态图标 | 文件名+进度条背景 | 百分比）═══ -->
         <ListView x:Name="BatchFileList" Grid.Row="0"
                   Visibility="Collapsed"
@@ -191,7 +207,7 @@
         </ListView>
 
         <!-- 底部按钮行 -->
-        <Grid Grid.Row="7" Margin="0,4,0,2">
+        <Grid Grid.Row="8" Margin="0,4,0,2">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="*"/>

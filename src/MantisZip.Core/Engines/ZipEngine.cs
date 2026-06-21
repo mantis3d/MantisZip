@@ -214,13 +214,13 @@ public class ZipEngine : IArchiveEngine
 
     public bool CanDelete(ArchiveFormat format) => format == ArchiveFormat.Zip;
 
-    public async Task ExtractAsync(string archivePath, string destinationPath, string? password = null, IProgress<ArchiveProgress>? progress = null, CancellationToken cancellationToken = default, ArchiveOptions? options = null)
+    public async Task<ExtractResult> ExtractAsync(string archivePath, string destinationPath, string? password = null, IProgress<ArchiveProgress>? progress = null, CancellationToken cancellationToken = default, ArchiveOptions? options = null)
     {
         CoreLog.Entry();
         CoreLog.Info($"ExtractAsync: {archivePath} -> {destinationPath}, password={(password != null ? "***" : "null")}");
         var sw = Stopwatch.StartNew();
 
-        await Task.Run(() =>
+        var result = await Task.Run(() =>
         {
             using var archive = OpenArchiveWithEncodingFallback(archivePath, password);
 
@@ -237,6 +237,7 @@ public class ZipEngine : IArchiveEngine
             var totalBytes = entries.Sum(e => e.Size);
             var processedBytes = 0L;
             var processedFiles = 0;
+            int failedEntries = 0;
 
             CoreLog.Info($"ExtractAsync: {entries.Count} entries, {totalBytes} total bytes");
 
@@ -270,47 +271,56 @@ public class ZipEngine : IArchiveEngine
                 }
 
                 var entrySize = entry.Size;
-                using (var entryStream = entry.OpenEntryStream())
-                using (var outputStream = File.Create(resolvedPath))
+
+                try
                 {
-                    var buffer = new byte[81920];
-                    var entryProcessed = 0L;
-                    var lastReportTime = DateTime.Now;
-                    var reportInterval = TimeSpan.FromMilliseconds(100);
-
-                    while (true)
+                    using (var entryStream = entry.OpenEntryStream())
+                    using (var outputStream = File.Create(resolvedPath))
                     {
-                        cancellationToken.ThrowIfCancellationRequested();
-                        var read = entryStream.Read(buffer, 0, buffer.Length);
-                        if (read <= 0) break;
+                        var buffer = new byte[81920];
+                        var entryProcessed = 0L;
+                        var lastReportTime = DateTime.Now;
+                        var reportInterval = TimeSpan.FromMilliseconds(100);
 
-                        outputStream.Write(buffer, 0, read);
-                        entryProcessed += read;
-
-                        var now = DateTime.Now;
-                        if (now - lastReportTime >= reportInterval || entryProcessed >= entrySize)
+                        while (true)
                         {
-                            var filePct = entrySize > 0 ? (double)entryProcessed / entrySize * 100 : 100;
-                            var overallPct = totalBytes > 0 ? (double)(processedBytes + entryProcessed) / totalBytes * 100 : 0;
-                            progress?.Report(new ArchiveProgress
+                            cancellationToken.ThrowIfCancellationRequested();
+                            var read = entryStream.Read(buffer, 0, buffer.Length);
+                            if (read <= 0) break;
+
+                            outputStream.Write(buffer, 0, read);
+                            entryProcessed += read;
+
+                            var now = DateTime.Now;
+                            if (now - lastReportTime >= reportInterval || entryProcessed >= entrySize)
                             {
-                                CurrentFile = entryKey,
-                                TotalFiles = entries.Count,
-                                ProcessedFiles = processedFiles,
-                                TotalBytes = totalBytes,
-                                ProcessedBytes = processedBytes + entryProcessed,
-                                PercentComplete = overallPct,
-                                FilePercentComplete = filePct
-                            });
-                            lastReportTime = now;
+                                var filePct = entrySize > 0 ? (double)entryProcessed / entrySize * 100 : 100;
+                                var overallPct = totalBytes > 0 ? (double)(processedBytes + entryProcessed) / totalBytes * 100 : 0;
+                                progress?.Report(new ArchiveProgress
+                                {
+                                    CurrentFile = entryKey,
+                                    TotalFiles = entries.Count,
+                                    ProcessedFiles = processedFiles,
+                                    TotalBytes = totalBytes,
+                                    ProcessedBytes = processedBytes + entryProcessed,
+                                    PercentComplete = overallPct,
+                                    FilePercentComplete = filePct
+                                });
+                                lastReportTime = now;
+                            }
                         }
                     }
-                }
-                // 恢复文件原始修改时间
-                try { File.SetLastWriteTime(resolvedPath, entryModified); } catch (Exception tsEx) { CoreLog.Info($"ExtractAsync: failed to set timestamp on {resolvedPath}: {tsEx.Message}"); }
+                    // 恢复文件原始修改时间
+                    try { File.SetLastWriteTime(resolvedPath, entryModified); } catch (Exception tsEx) { CoreLog.Info($"ExtractAsync: failed to set timestamp on {resolvedPath}: {tsEx.Message}"); }
 
-                processedBytes += entrySize;
-                processedFiles++;
+                    processedBytes += entrySize;
+                    processedFiles++;
+                }
+                catch (UnauthorizedAccessException uax)
+                {
+                    CoreLog.Info($"ExtractAsync: permission denied for '{entryKey}': {uax.Message}");
+                    failedEntries++;
+                }
             }
 
             progress?.Report(new ArchiveProgress
@@ -319,10 +329,12 @@ public class ZipEngine : IArchiveEngine
                 PercentComplete = 100
             });
 
-            CoreLog.Info($"ExtractAsync: done, {processedFiles} files, {processedBytes} bytes, {sw.ElapsedMilliseconds}ms");
+            CoreLog.Info($"ExtractAsync: done, {processedFiles} files, {processedBytes} bytes, {sw.ElapsedMilliseconds}ms, failedEntries={failedEntries}");
+            return new ExtractResult { SucceededEntries = processedFiles, FailedEntries = failedEntries };
         }, cancellationToken).ConfigureAwait(false);
 
         CoreLog.Exit();
+        return result;
     }
 
     public async Task ExtractEntriesAsync(

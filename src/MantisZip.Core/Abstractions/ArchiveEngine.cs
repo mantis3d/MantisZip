@@ -199,6 +199,19 @@ public class ArchiveProgress
     public double? FilePercentComplete { get; set; }
 }
 
+/// <summary>
+/// 解压操作的结果统计。
+/// </summary>
+public class ExtractResult
+{
+    /// <summary>成功提取的条目数。</summary>
+    public int SucceededEntries { get; init; }
+    /// <summary>因权限不足等原因跳过的条目数。</summary>
+    public int FailedEntries { get; init; }
+    /// <summary>是否有条目失败。</summary>
+    public bool HasFailures => FailedEntries > 0;
+}
+
     /// <summary>
     /// 压缩引擎接口
     /// </summary>
@@ -212,7 +225,7 @@ public class ArchiveProgress
         /// <summary>
         /// 解压到指定目录
         /// </summary>
-        Task ExtractAsync(string archivePath, string destinationPath, string? password = null, IProgress<ArchiveProgress>? progress = null, CancellationToken cancellationToken = default, ArchiveOptions? options = null);
+        Task<ExtractResult> ExtractAsync(string archivePath, string destinationPath, string? password = null, IProgress<ArchiveProgress>? progress = null, CancellationToken cancellationToken = default, ArchiveOptions? options = null);
 
         /// <summary>
         /// 压缩指定目录/文件
