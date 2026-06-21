@@ -431,5 +431,73 @@
   "Settings_Debug_LogPrivacyHelp_Mode_Full": "▫ Full: All path and filename info is redacted (e.g. [PATH_1])",
   "Settings_Debug_LogPrivacyHelp_What": "Affected: Local file paths, directory paths, UNC paths appearing in log output.",
   "Settings_Debug_LogPrivacyHelp_WhatNot": "Not affected: Log content outside file paths, error message text (without path portions), UI display.",
-  "Settings_Debug_LogPrivacyHelp_Close": "Close"
+  "Settings_Debug_LogPrivacyHelp_Close": "Close",
+
+  "Settings_Tab_Language": "Language",
+  "Settings_Language": "Language",
+  "Settings_Language_Chinese": "Chinese",
+  "Settings_Language_English": "English",
+  "Settings_Language_Translator": "Translator: {0}",
+
+  "Settings_Tab_Appearance": "Appearance",
+  "Settings_Appearance_Theme": "Theme",
+  "Settings_Appearance_Theme_Light": "Light",
+  "Settings_Appearance_Theme_Dark": "Dark",
+  "Settings_Appearance_MaxRecentFiles": "Max Recent Files",
+
+  "Settings_Tab_Password": "Password",
+  "Settings_Pwd_ShowNotification": "Show password match notification",
+  "Settings_Pwd_RevealDefault": "Reveal password by default",
+
+  "Settings_Tab_FileAssoc": "File Association",
+  "Settings_Assoc_Desc": "Select which archive file types to associate with MantisZip.",
+  "Settings_Assoc_SelectAll": "Select All",
+  "Settings_Assoc_DeselectAll": "Deselect All",
+  "Settings_Assoc_CustomList": "Custom Extensions",
+  "Settings_Assoc_Add": "Add",
+  "Settings_Assoc_Remove": "Remove",
+  "Settings_Assoc_PlatformUnsupported": "File association not supported on this platform",
+
+  "Settings_Compress_CloseAfterDone": "Close dialog after compress",
+  "Settings_Compress_KeepExt": "Keep original extension",
+  "Settings_Compress_PreserveRoot": "Preserve directory root",
+
+  "Settings_Preview_Tab_Text": "Text",
+  "Settings_Preview_Tab_Font": "Font",
+  "Settings_Preview_Tab_Table": "Table",
+  "Settings_Preview_Tab_Position": "Layout",
+
+  "Settings_Preview_Text_ImagePreview": "Enable image preview",
+  "Settings_Preview_Text_TextPreview": "Enable text preview",
+  "Settings_Preview_Text_FontFamily": "Font family",
+  "Settings_Preview_Text_FontSize": "Font size",
+  "Settings_Preview_Text_ColorEmoji": "Color emoji",
+  "Settings_Preview_Text_MaxSize": "Max text size",
+  "Settings_Preview_Text_UnitMB": "MB",
+
+  "Settings_Preview_Font_Sample": "Sample text",
+  "Settings_Preview_Font_PreviewSize": "Preview font size",
+
+  "Settings_Preview_Table_MaxRows": "Max rows",
+  "Settings_Preview_Table_MaxCols": "Max columns",
+
+  "Settings_Preview_Position": "Preview position",
+  "Settings_Preview_Position_Bottom": "Bottom",
+  "Settings_Preview_Position_BelowTree": "Below tree",
+  "Settings_Preview_Position_BelowList": "Below file list",
+  "Settings_Preview_Position_Right": "Right",
+  "Settings_Preview_InfoPanelOrientation": "Info panel orientation",
+  "Settings_Preview_InfoPanel_Horizontal": "Horizontal",
+  "Settings_Preview_InfoPanel_Vertical": "Vertical",
+  "Settings_Preview_ShowPanel": "Show preview panel",
+  "Settings_Preview_MaxFileSize": "Max preview file size",
+
+  "Settings_Debug_LogPrivacyMode": "Log privacy mode",
+  "Settings_Debug_LogPrivacyMode_Off": "Off",
+  "Settings_Debug_LogPrivacyMode_Filename": "Filename",
+  "Settings_Debug_LogPrivacyMode_Extension": "Extension",
+  "Settings_Debug_LogPrivacyMode_Full": "Full path",
+  "Settings_Debug_LogPath": "Log file path",
+  "Settings_Debug_LogPrivacyHelp": "Privacy mode help",
+  "Settings_Debug_Restart": "Changes will take effect after restart"
 }

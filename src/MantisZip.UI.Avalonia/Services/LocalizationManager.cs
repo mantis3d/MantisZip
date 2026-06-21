@@ -76,4 +76,17 @@ public static class LocalizationManager
         try { return string.Format(format, args); }
         catch { return format; }
     }
+
+    public class LanguageInfo
+    {
+        public string Code { get; set; } = string.Empty;
+        public string DisplayName { get; set; } = string.Empty;
+        public string TranslatorText { get; set; } = string.Empty;
+    }
+
+    public static List<LanguageInfo> AvailableLanguages { get; } = new()
+    {
+        new() { Code = "zh-CN", DisplayName = "中文", TranslatorText = "MantisZip 团队" },
+        new() { Code = "en", DisplayName = "English", TranslatorText = "Community Contributors" },
+    };
 }

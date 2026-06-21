@@ -36,6 +36,10 @@ public partial class App : Application
     public override void Initialize()
     {
         AvaloniaXamlLoader.Load(this);
+        // When precompiled XAML is available, AvaloniaXamlLoader uses it.
+        // If not available (e.g. after clean build), InitializeComponent() from
+        // the source generator handles runtime loading.
+        // InitializeComponent();
     }
 
     public override void OnFrameworkInitializationCompleted()

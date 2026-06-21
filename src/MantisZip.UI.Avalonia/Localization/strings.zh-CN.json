@@ -431,5 +431,73 @@
   "Settings_Debug_LogPrivacyHelp_Mode_Full": "▫ 完全：路径和文件名的所有信息均脱敏（如 [PATH_1]）",
   "Settings_Debug_LogPrivacyHelp_What": "受影响：所有日志输出中出现的本地文件路径、目录路径、UNC 路径。",
   "Settings_Debug_LogPrivacyHelp_WhatNot": "不受影响：文件名/路径之外的其他日志内容、错误消息文本（不包含路径的部分）、UI 界面显示。",
-  "Settings_Debug_LogPrivacyHelp_Close": "关闭"
+  "Settings_Debug_LogPrivacyHelp_Close": "关闭",
+
+  "Settings_Tab_Language": "语言",
+  "Settings_Language": "语言",
+  "Settings_Language_Chinese": "中文",
+  "Settings_Language_English": "English",
+  "Settings_Language_Translator": "翻译贡献者: {0}",
+
+  "Settings_Tab_Appearance": "外观",
+  "Settings_Appearance_Theme": "主题",
+  "Settings_Appearance_Theme_Light": "浅色",
+  "Settings_Appearance_Theme_Dark": "深色",
+  "Settings_Appearance_MaxRecentFiles": "最大最近文件数",
+
+  "Settings_Tab_Password": "密码管理",
+  "Settings_Pwd_ShowNotification": "显示密码匹配通知",
+  "Settings_Pwd_RevealDefault": "默认显示密码",
+
+  "Settings_Tab_FileAssoc": "文件关联",
+  "Settings_Assoc_Desc": "选择希望与 MantisZip 关联的压缩包文件类型。",
+  "Settings_Assoc_SelectAll": "全选",
+  "Settings_Assoc_DeselectAll": "取消全选",
+  "Settings_Assoc_CustomList": "自定义扩展名",
+  "Settings_Assoc_Add": "添加",
+  "Settings_Assoc_Remove": "删除",
+  "Settings_Assoc_PlatformUnsupported": "当前平台不支持文件关联",
+
+  "Settings_Compress_CloseAfterDone": "压缩完成后关闭对话框",
+  "Settings_Compress_KeepExt": "保留原文件扩展名",
+  "Settings_Compress_PreserveRoot": "压缩文件夹时保留外层目录",
+
+  "Settings_Preview_Tab_Text": "文本",
+  "Settings_Preview_Tab_Font": "字体",
+  "Settings_Preview_Tab_Table": "表格",
+  "Settings_Preview_Tab_Position": "布局",
+
+  "Settings_Preview_Text_ImagePreview": "启用图像预览",
+  "Settings_Preview_Text_TextPreview": "启用文本预览",
+  "Settings_Preview_Text_FontFamily": "字体",
+  "Settings_Preview_Text_FontSize": "字号",
+  "Settings_Preview_Text_ColorEmoji": "彩色 Emoji",
+  "Settings_Preview_Text_MaxSize": "最大文本大小",
+  "Settings_Preview_Text_UnitMB": "MB",
+
+  "Settings_Preview_Font_Sample": "样本文本",
+  "Settings_Preview_Font_PreviewSize": "预览字号",
+
+  "Settings_Preview_Table_MaxRows": "最大行数",
+  "Settings_Preview_Table_MaxCols": "最大列数",
+
+  "Settings_Preview_Position": "预览位置",
+  "Settings_Preview_Position_Bottom": "底部",
+  "Settings_Preview_Position_BelowTree": "树下",
+  "Settings_Preview_Position_BelowList": "文件列表下",
+  "Settings_Preview_Position_Right": "右侧",
+  "Settings_Preview_InfoPanelOrientation": "信息面板方向",
+  "Settings_Preview_InfoPanel_Horizontal": "水平",
+  "Settings_Preview_InfoPanel_Vertical": "垂直",
+  "Settings_Preview_ShowPanel": "显示预览面板",
+  "Settings_Preview_MaxFileSize": "最大预览文件大小",
+
+  "Settings_Debug_LogPrivacyMode": "日志隐私模式",
+  "Settings_Debug_LogPrivacyMode_Off": "关闭",
+  "Settings_Debug_LogPrivacyMode_Filename": "文件名",
+  "Settings_Debug_LogPrivacyMode_Extension": "扩展名",
+  "Settings_Debug_LogPrivacyMode_Full": "完整路径",
+  "Settings_Debug_LogPath": "日志文件路径",
+  "Settings_Debug_LogPrivacyHelp": "隐私模式帮助",
+  "Settings_Debug_Restart": "变更将在重启后生效"
 }

@@ -11,6 +11,8 @@ public class AppSettings
     // ===== 压缩 =====
     public string DefaultFormat { get; set; } = "zip";
     public int DefaultLevel { get; set; } = 5;
+    public bool CloseAfterCompress { get; set; } = true;
+    public bool KeepOriginalExtension { get; set; } = false;
 
     // ===== 解压 =====
     public string ExtractDestination { get; set; } = "ask"; // same-dir / desktop / last / ask
@@ -43,9 +45,40 @@ public class AppSettings
     public bool EnableTextPreview { get; set; } = true;
     public long MaxTextPreviewBytes { get; set; } = 1 * 1024 * 1024; // 1 MB
     public int TextPreviewFontSize { get; set; } = 13;
+    public int MaxTablePreviewRows { get; set; } = 100;
+    public int MaxTablePreviewCols { get; set; } = 100;
+    public long MaxPreviewFileSize { get; set; } = 15 * 1024 * 1024;
+    public string TextPreviewFontFamily { get; set; } = "";
+    public string TextEncodingPreference { get; set; } = "auto";
+    public int FontPreviewFontSize { get; set; } = 12;
+    public string FontPreviewSampleText { get; set; } = "The quick brown fox jumps over the lazy dog.\n0123456789\n天地玄黄 宇宙洪荒 日月盈昃 辰宿列张";
+    public int PreviewPosition { get; set; } = 4;
+    public string InfoPanelOrientation { get; set; } = "Vertical";
+    public bool ShowPreviewPanel { get; set; } = true;
+    public bool UseColorEmoji { get; set; } = true;
+
+    // ===== 密码管理 =====
+    public bool ShowPasswordMatchNotification { get; set; } = true;
+    public bool PasswordRevealByDefault { get; set; } = false;
+
+    // ===== 外观 =====
+    public string Theme { get; set; } = "Light";
+    public int MaxRecentFiles { get; set; } = 10;
+    public string Language { get; set; } = "zh";
+
+    // ===== 文件关联 =====
+    public bool AssocZip { get; set; } = true;
+    public bool Assoc7z { get; set; } = true;
+    public bool AssocRar { get; set; } = true;
+    public bool AssocTar { get; set; } = true;
+    public bool AssocTarGz { get; set; } = true;
+    public bool AssocGz { get; set; } = true;
+    public bool AssocIso { get; set; } = false;
+    public List<string> CustomAssocExtensions { get; set; } = new();
 
     // ===== 调试 =====
     public bool EnableDebugLogging { get; set; } = false;
+    public string LogPrivacyMode { get; set; } = "extension";
 
     // ===== 持久化 =====
     private static readonly string SettingsDir =

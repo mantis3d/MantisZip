@@ -216,9 +216,9 @@
       </MenuItem>
       <MenuItem Header="{Binding LocalizedStrings[Menu_Language]}">
         <MenuItem Header="{Binding LocalizedStrings[Menu_LangChinese]}"
-                  Command="{Binding SwitchLanguageCommand}" />
+                  Command="{Binding SwitchLanguageCommand}" CommandParameter="zh-CN" />
         <MenuItem Header="{Binding LocalizedStrings[Menu_LangEnglish]}"
-                  Command="{Binding SwitchLanguageCommand}" />
+                  Command="{Binding SwitchLanguageCommand}" CommandParameter="en" />
       </MenuItem>
     </Menu>
 

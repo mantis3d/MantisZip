@@ -89,11 +89,16 @@ public partial class MainWindowViewModel : ObservableObject
     private Dictionary<string, string> _localizedStrings = new();
 
     [RelayCommand]
-    private void SwitchLanguage()
+    private void SwitchLanguage(string? lang)
     {
-        LocalizationManager.CurrentLanguage = LocalizationManager.CurrentLanguage == AppLanguage.Chinese
-            ? AppLanguage.English
-            : AppLanguage.Chinese;
+        LocalizationManager.CurrentLanguage = lang switch
+        {
+            "zh-CN" => AppLanguage.Chinese,
+            "en" => AppLanguage.English,
+            _ => LocalizationManager.CurrentLanguage == AppLanguage.Chinese
+                ? AppLanguage.English
+                : AppLanguage.Chinese
+        };
         CurrentLanguage = LocalizationManager.CurrentLanguageCode;
         UpdateLocalizedStrings();
     }
