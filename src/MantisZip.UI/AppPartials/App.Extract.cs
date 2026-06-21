@@ -418,6 +418,9 @@ public partial class App : Application
                         // 逐条目权限不足 → 首次弹窗，后续静默
                         if (extractResult.HasFailures)
                         {
+                            progressWindow.SetErrorSummary(
+                                $"{extractResult.FailedEntries} 个文件因权限不足未能写入到 {dest}");
+
                             if (!permissionDialogShown)
                             {
                                 permissionDialogShown = true;
@@ -485,6 +488,8 @@ public partial class App : Application
                     {
                         // 此 catch 现在只处理目录创建级别的权限错误（ExtractAsync 内逐条目的已内部处理）
                         // 后续权限不足：静默跳过（只弹窗提醒一次）
+                        progressWindow.SetErrorSummary($"目标目录 {dest} 无法写入，权限不足");
+
                         if (permissionDialogShown)
                         {
                             Log("--extract batch: permission denied (silent skip): {0}", uax.Message);

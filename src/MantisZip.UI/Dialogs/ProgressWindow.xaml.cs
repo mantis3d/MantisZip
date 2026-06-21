@@ -248,13 +248,15 @@ public partial class ProgressWindow : Window
     }
 
     /// <summary>
-    /// L.T(L.Settings_Title)L.T(L.App_ErrorTitle)状态。
+    /// 设置错误摘要文本（可复制）。
+    /// 显示在进度条和按钮之间，批量告知用户有几个文件出错。
     /// </summary>
-    public void SetError(string message)
+    public void SetErrorSummary(string message)
     {
-        Dispatcher.Invoke(() =>
+        DispatchIfNeeded(() =>
         {
-            CancelButton.Content = L.T(L.Progress_Button_Close);
+            ErrorSummaryBox.Text = message;
+            ErrorSummaryBox.Visibility = Visibility.Visible;
         });
     }
 

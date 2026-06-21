@@ -7,7 +7,7 @@
 - **技术栈**: .NET 9 + WPF + SharpCompress + SharpSevenZip
 
 ## 版本
-- **当前版本**: 0.4.2
+- **当前版本**: 0.4.3
 - **发布日期**: 2026-06-20
 
 ## 规划中
@@ -32,6 +32,7 @@
    - 已提权仍失败不退出（其他目录可能可写）
    - 仅用户点击「以管理员身份运行」时才重启旧进程
 3. **设计文档**：`.sisyphus/plans/uac-elevation-permission.md` 更新
+4. **进度窗口错误摘要**：ProgressWindow 新增 `ErrorSummaryBox`（可复制 TextBox），解压权限错误时在进度条和按钮之间显示错误摘要文本
 
 ### v0.4.2 (2026-06-20) 安装程序主题/语言选择修复 / ZIP copy-mode 进度与取消
 
