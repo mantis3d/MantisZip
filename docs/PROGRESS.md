@@ -36,6 +36,13 @@
   - AppSettings 扩展 Preview/Orientation/Emoji 等 shadow 配置属性
   - LocalizationManager `T(key)` 添加 null-safe fallback（key 不存在时返回默认值）
 
+17. **Phase 9: 文件列表交互补齐**：
+  - DataGrid 添加双击目录进入（导航到目录路径 + 选中目录树节点）
+  - 键盘导航：Enter 进入目录、Backspace 返回上级、Delete 删除选中条目
+  - 列排序自定义：`..` 导航行始终最前 → 目录优先于文件 → 组内按排序列
+  - `▲`/`▼` 箭头标记列头，切换目录不清除排序状态
+  - ViewModel 新增 `NavigateToFolderPath(string)` 方法
+
 16. **Bugfix: Avalonia 12 ComboBox SelectedValuePath 不支持 + 选择不生效**：
   - 根因：Avalonia 12 删除了 `SelectedValuePath` 依赖属性，移除后 `SelectedValue` 拿 string 与 `ComboBoxItem` 对象引用比较，永远不匹配
   - 移除全部 9 处 `SelectedValuePath="Tag"`（AVLN2000 编译错误）

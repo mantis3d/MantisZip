@@ -519,6 +519,28 @@ public partial class MainWindowViewModel : ObservableObject
     }
 
     /// <summary>
+    /// 从文件列表双击目录时按路径导航（无需 FolderNode）。
+    /// </summary>
+    public void NavigateToFolderPath(string path)
+    {
+        if (_allRawItems == null) return;
+        _isProgrammaticFilter = true;
+        try
+        {
+            CurrentFolder = path;
+            PopulateEntries();
+            // 同步选中目录树中的对应节点
+            var node = FindNode(FolderTreeRoot, path);
+            if (node != null)
+                SelectedFolder = node;
+        }
+        finally
+        {
+            _isProgrammaticFilter = false;
+        }
+    }
+
+    /// <summary>
     /// 应用过滤条件并刷新当前目录的条目显示。
     /// </summary>
     private void FilterFiles() => PopulateEntries();

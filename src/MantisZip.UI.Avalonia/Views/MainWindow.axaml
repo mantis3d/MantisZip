@@ -486,7 +486,10 @@
                 SelectedItem="{Binding SelectedEntry}"
                 AutoGenerateColumns="False"
                 CanUserSortColumns="True"
-                IsReadOnly="True">
+                IsReadOnly="True"
+                DoubleTapped="FileListGrid_DoubleTapped"
+                KeyDown="FileListGrid_KeyDown"
+                Sorting="FileListGrid_Sorting">
         <DataGrid.ContextMenu>
           <ContextMenu>
             <MenuItem Header="{Binding LocalizedStrings[Ctx_Extract]}"

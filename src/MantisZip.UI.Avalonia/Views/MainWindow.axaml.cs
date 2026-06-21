@@ -18,6 +18,8 @@ public partial class MainWindow : Window
     private string? _dragDropTempDir;
     private PointerPressedEventArgs? _dragStartEvent;
     private Point _dragStartPoint;
+    private string? _lastSortMemberPath;
+    private bool _lastSortDescending;
 
     public MainWindow()
     {
@@ -227,6 +229,119 @@ public partial class MainWindow : Window
             if (_isOwnDrag)
                 e.Handled = true;
         });
+    }
+
+    private void FileListGrid_DoubleTapped(object? sender, TappedEventArgs e)
+    {
+        if (sender is not DataGrid grid) return;
+        if (grid.SelectedItem is ArchiveItemModel item && item.IsDirectory)
+        {
+            if (DataContext is MainWindowViewModel vm)
+                vm.NavigateToFolderPath(item.FullPath);
+        }
+    }
+
+    private void FileListGrid_KeyDown(object? sender, global::Avalonia.Input.KeyEventArgs e)
+    {
+        if (sender is not DataGrid grid) return;
+        if (grid.SelectedItem is not ArchiveItemModel item) return;
+        if (DataContext is not MainWindowViewModel vm) return;
+
+        switch (e.Key)
+        {
+            case global::Avalonia.Input.Key.Enter:
+                if (item.IsDirectory)
+                {
+                    vm.NavigateToFolderPath(item.FullPath);
+                    e.Handled = true;
+                }
+                break;
+
+            case global::Avalonia.Input.Key.Back:
+                vm.GoUpCommand.Execute(null);
+                e.Handled = true;
+                break;
+
+            case global::Avalonia.Input.Key.Delete:
+                vm.DeleteFilesCommand.Execute(null);
+                e.Handled = true;
+                break;
+        }
+    }
+
+    private void FileListGrid_Sorting(object? sender, DataGridColumnEventArgs e)
+    {
+        if (sender is not DataGrid grid) return;
+
+        // 清除所有列标题上的排序标记，恢复原始文字
+        foreach (var column in grid.Columns)
+        {
+            if (column.Header is string headerText)
+                column.Header = headerText.TrimEnd('▲', '▼', ' ').TrimEnd();
+        }
+
+        var col = e.Column;
+        var sortMemberPath = col.SortMemberPath;
+
+        // 推算新方向：切换同一列时翻转，新列默认为升序
+        if (_lastSortMemberPath != sortMemberPath)
+        {
+            _lastSortDescending = false;
+        }
+        else
+        {
+            _lastSortDescending = !_lastSortDescending;
+        }
+        _lastSortMemberPath = sortMemberPath;
+
+        // 阻止默认排序（改用自定义手动排序）
+        e.Handled = true;
+
+        // 更新列头箭头
+        if (col.Header is string header)
+        {
+            var clean = header.TrimEnd('▲', '▼', ' ').TrimEnd();
+            col.Header = _lastSortDescending ? clean + " ▼" : clean + " ▲";
+        }
+
+        // 手动排序：.. 导航行 → 目录 → 文件，组内排序
+        if (DataContext is MainWindowViewModel vm)
+        {
+            var entries = vm.CurrentEntries.ToList();
+
+            List<ArchiveItemModel> sorted;
+            if (_lastSortDescending)
+            {
+                sorted = entries
+                    .OrderBy(e => e.Name == ".." ? 0 : e.IsDirectory ? 1 : 2)
+                    .ThenByDescending(e => GetSortValue(e, sortMemberPath))
+                    .ToList();
+            }
+            else
+            {
+                sorted = entries
+                    .OrderBy(e => e.Name == ".." ? 0 : e.IsDirectory ? 1 : 2)
+                    .ThenBy(e => GetSortValue(e, sortMemberPath))
+                    .ToList();
+            }
+
+            vm.CurrentEntries.Clear();
+            foreach (var item in sorted)
+                vm.CurrentEntries.Add(item);
+        }
+    }
+
+    private static IComparable GetSortValue(ArchiveItemModel item, string memberPath)
+    {
+        return memberPath switch
+        {
+            "Name" or "NameDisplay" => item.NameDisplay,
+            "Size" => item.Size,
+            "CompressedSize" => item.CompressedSize,
+            "LastModified" => item.LastModified,
+            "CompressionRatio" => item.CompressionRatio,
+            _ => item.NameDisplay
+        };
     }
 
     private void OnWindowDragOver(object? sender, DragEventArgs e)
