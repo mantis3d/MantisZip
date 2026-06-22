@@ -148,7 +148,7 @@ public static class CompressionCoefficients
 ## 任务清单
 
 - [ ] **1. Core: `CompressionEstimator` 类** — 三级预估算法（快速/标准/精确）
-- [ ] **2. Core: `CompressionHistoryStore` 类** — 学习型预估数据库（两级 key 策略 + JSON 持久化）
+- [ ] **2. Core: `CompressionHistoryStore` 类** — 学习型预估数据库（三级 key 策略：格式+文件大小分桶 + JSON 持久化）
 - [ ] **3. Core: `CompressionCoefficients` 经验系数表** — 扩展名 → 类型 → 压缩率
 - [ ] **4. UI: `CompressSettingsWindow` 预估面板** — XAML 布局 + 数据绑定
 - [ ] **5. UI: 预估交互逻辑** — 自动检测 + 刷新按钮 + 防抖 + 学习型记录 hook
@@ -161,7 +161,7 @@ public static class CompressionCoefficients
 | 文件 | 改动 | 预估工时 |
 |------|------|---------|
 | `Core/Utils/CompressionEstimator.cs` | 🆕 新增 — 三级预估算法 | 3h |
-| `Core/Utils/CompressionHistoryStore.cs` | 🆕 新增 — 学习型预估数据库（两级 key 策略） | 1.5h |
+| `Core/Utils/CompressionHistoryStore.cs` | 🆕 新增 — 学习型预估数据库（三级 key 策略：格式+大小分桶 + JSON 持久化） | 2h |
 | `UI/CompressSettingsWindow.xaml` | 添加预估面板 UI | 30min |
 | `UI/CompressSettingsWindow.xaml.cs` | 集成预估逻辑 + 刷新按钮 | 1h |
 | `UI/MainWindow.xaml.cs` | 压缩前显示预估（可选步骤） | 15min |
@@ -323,6 +323,64 @@ CompressionHistoryStore.Record(
 | 7z 采样需调 7z.exe，无法纯内存 | 🟡 | 7z 的采样回退到经验公式；或只对 ZIP/Tar 做实际采样 |
 | 超大文件源（TB 级），扫描耗时 | 🟢 | 限制扫描文件数（默认 10000）；超大文件跳过采样 |
 | 预估耗时本身太长 | 🟢 | 默认仅快速模式；标准模式需用户手动触发 |
+
+### 精度增强：文件大小分桶
+
+**问题**：同魔数格式内部，压缩比可能因文件特征差异而不同。例如小尺寸 JPEG（缩略图，64KB）与高质量大尺寸 JPEG（数 MB）的压缩特性不同，混合在一个桶里取平均可能两头不靠。
+
+**方案**：在现有 key 后追加一维大小分段，形成三位 key：
+
+```
+Jpeg_Zip_5_S    < 100KB      → 缩略图/图标类
+Jpeg_Zip_5_M    100KB–1MB    → 普通网络图片
+Jpeg_Zip_5_L    1MB–10MB     → 高分辨率照片
+Jpeg_Zip_5_XL   > 10MB       → 超高质/RAW 导出
+```
+
+**分段策略**（对数分段，覆盖从 KB 到 GB 的广泛范围）：
+
+| 分段 | 阈值 | 适用场景 | 典型文件 |
+|------|------|---------|---------|
+| S (Small) | < 100KB | 缩略图、图标、小文本 | `.ico`、小 `.jpg`、短 `.txt` |
+| M (Medium) | 100KB – 1MB | 普通文档、中等图片 | `.pdf`、`.docx`、网页截图 |
+| L (Large) | 1MB – 10MB | 高分辨率图片、短音频 | `.mp3`、大 `.jpg`、`.png` |
+| XL (Extra Large) | 10MB – 100MB | 长音频、短视频、安装包 | `.exe`、`.wav`、`.mp4` 片段 |
+| XXL (Double Extra) | 100MB – 1GB | 高清视频、数据库 | `.mkv`、`.iso`、`.7z` |
+| XXXL (Triple Extra) | > 1GB | 大型数据集 | 虚拟机镜像、超大压缩包 |
+
+**key 格式**：
+
+```
+有魔数: {FileFormat}_{ArchiveFormat}_{Level}_{Bucket}   如 "Wav_Zip_5_XL"
+无魔数: {Extension}_{ArchiveFormat}_{Level}_{Bucket}    如 ".wav_Zip_5_XL"
+```
+
+**桶内逻辑与魔数 Unknown 相同**：
+
+```
+有魔数 → 桶内取平均值
+魔数 Unknown + 有扩展名 → 桶内取平均值
+魔数 Unknown + 无扩展名 → 不记录
+```
+
+**Record 签名变化**：
+
+```csharp
+CompressionHistoryStore.Record(
+    fileFormat: ...,
+    extension: ...,
+    archiveFormat: ...,
+    level: ...,
+    originalSize: fileSize,           ← 已有，用此值计算桶
+    compressedSize: compressedSize);
+```
+
+**冷启动影响**：每个桶独立积累 3 次才启用。相比无分桶方案，一个格式需要 3×N 桶次才能覆盖所有大小范围，冷启动更慢。对策：
+
+- **全局平均作为回退**：大小桶积累不足时（< 3 次），回退到同格式无分桶的全局平均值（已有设计），两者都低于 3 次再走采样
+- **合并相邻桶**：S 桶 + M 桶累计 ≥ 3 但各自 < 3 时，合并 SM 区间临时取平均
+
+**数据清理**：同现有设计，每 key 保留最近 20 条。
 
 ---
 
