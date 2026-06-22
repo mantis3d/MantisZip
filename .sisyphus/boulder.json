@@ -1,13 +1,21 @@
 {
-  "active_plan": null,
-  "started_at": "2026-06-20T02:55:47.863Z",
-  "session_ids": [],
+  "active_plan": "E:\\GitHub\\MantisZip\\.sisyphus\\plans\\quickpath-unified.md",
+  "started_at": "2026-06-22T06:53:17.040Z",
+  "session_ids": ["ses_111e528acffeEIHO5WDRXTtVec"],
   "session_origins": {},
-  "plan_name": null,
+  "plan_name": "quickpath-unified",
   "agent": "atlas",
   "task_sessions": {},
-  "active_work_id": null,
+  "active_work_id": "quickpath-unified",
   "schema_version": 2,
-  "works": {},
-  "status": "idle"
+  "works": {
+    "quickpath-unified": {
+      "plan_name": "quickpath-unified",
+      "plan_path": "E:\\GitHub\\MantisZip\\.sisyphus\\plans\\quickpath-unified.md",
+      "status": "active",
+      "started_at": "2026-06-22T06:53:17.040Z",
+      "session_ids": ["ses_111e528acffeEIHO5WDRXTtVec"]
+    }
+  },
+  "status": "active"
 }

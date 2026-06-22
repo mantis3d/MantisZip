@@ -80,12 +80,21 @@ public partial class MainWindow
         };
         if (ofd.ShowDialog() == true)
         {
-            var sfd = new SaveFileDialog
+            var qpd = new QuickPathDialog
             {
-                Filter = L.T(L.Main_SaveZipFilter), Title = L.T(L.Main_SaveZipTitle), FileName = "archive.zip"
+                Owner = this,
+                Title = "选择压缩文件保存位置",
+                IsFolderMode = false,
+                IsFileOpenMode = false,
+                FileTypeFilter = L.T(L.Main_SaveZipFilter),
+                DefaultFileName = "archive.zip"
             };
-            if (sfd.ShowDialog() == true)
-                await CompressAsync(ofd.FileNames, sfd.FileName);
+            if (qpd.ShowDialog() == true && !string.IsNullOrEmpty(qpd.SelectedPath))
+            {
+                var fullPath = Path.Combine(qpd.SelectedPath, qpd.SelectedFileName ?? "archive.zip");
+                PathHistoryManager.Record(qpd.SelectedPath);
+                await CompressAsync(ofd.FileNames, fullPath);
+            }
         }
     }
 
@@ -521,6 +530,11 @@ public partial class MainWindow
     private void PasswordManager_Click(object sender, RoutedEventArgs e)
     {
         new PasswordManagerWindow { Owner = this }.ShowDialog();
+    }
+
+    private void BookmarkManager_Click(object sender, RoutedEventArgs e)
+    {
+        new FavoriteManagerWindow { Owner = this }.ShowDialog();
     }
 
     private void DropHint_OpenArchive(object sender, MouseButtonEventArgs e)

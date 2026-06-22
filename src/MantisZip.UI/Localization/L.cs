@@ -241,6 +241,7 @@ public static class L
     public const string Main_ArchiveComment_ZipOnly                 = "Main_ArchiveComment_ZipOnly";
     public const string Main_Menu_About                            = "Main_Menu_About";
     public const string Main_Menu_ArchiveComment                   = "Main_Menu_ArchiveComment";
+    public const string Main_Menu_BookmarkManager                   = "Main_Menu_BookmarkManager";
     public const string Main_Menu_ClearRecentFiles                 = "Main_Menu_ClearRecentFiles";
     public const string Main_Menu_Compress                         = "Main_Menu_Compress";
     public const string Main_Menu_Donate                           = "Main_Menu_Donate";

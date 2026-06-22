@@ -1,4 +1,4 @@
-﻿using MantisZip.Core;
+using MantisZip.Core;
 using MantisZip.Core.Abstractions;
 using MantisZip.Core.Services;
 using System.IO;
@@ -332,11 +332,10 @@ public partial class CompressSettingsWindow : Window
         switch (_outputMode)
         {
             case CompressOutputMode.Manual:
-                var manualPath = OutputPathTextBox.Text?.Trim();
-                if (!string.IsNullOrEmpty(manualPath))
+                var manualName = FileNameTextBox.Text?.Trim();
+                if (!string.IsNullOrEmpty(manualName))
                 {
-                    var name = Path.GetFileNameWithoutExtension(manualPath);
-                    PwdRulesBox.Text = $"{name}*{ext}";
+                    PwdRulesBox.Text = $"{manualName}*{ext}";
                 }
                 break;
 

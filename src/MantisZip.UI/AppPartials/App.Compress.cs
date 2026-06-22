@@ -566,7 +566,9 @@ public partial class App : Application
                 ? Path.GetFileName(first.TrimEnd('\\', '/'))
                 : Path.GetFileNameWithoutExtension(first.TrimEnd('\\', '/'));
             var ext = s.DefaultFormat == "tar.gz" ? ".tar.gz" : "." + s.DefaultFormat;
-            win.OutputPathTextBox.Text = Path.Combine(dir, name + ext);
+            win.OutputPathControl.PathText = dir;
+            win.FileNameTextBox.Text = name;
+            win.FileExtensionLabel.Text = ext;
         }
 
         win.Closed += (_, _) =>

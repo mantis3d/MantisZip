@@ -3,6 +3,7 @@ using System.Windows;
 using System.Collections.ObjectModel;
 using MantisZip.Core;
 using MantisZip.UI.Localization;
+using MantisZip.Core.Utils;
 using Microsoft.Win32;
 
 namespace MantisZip.UI;
@@ -126,20 +127,26 @@ public partial class PasswordManagerWindow : Window
     private void Export_Click(object sender, RoutedEventArgs e)
     {
         App.LogDebug("PasswordManagerWindow: Export_Click");
-        var dialog = new SaveFileDialog
+        var dialog = new QuickPathDialog
         {
-            Filter = "JSON 文件|*.json",
-            FileName = "passwords-export.json"
+            Owner = this,
+            Title = "导出密码到文件",
+            IsFolderMode = false,
+            IsFileOpenMode = false,
+            FileTypeFilter = "JSON 文件|*.json",
+            DefaultFileName = "passwords-export.json"
         };
-        if (dialog.ShowDialog() == true)
+        if (dialog.ShowDialog() == true && !string.IsNullOrEmpty(dialog.SelectedPath))
         {
-            App.LogDebug("PasswordManagerWindow: exporting to '{0}'", dialog.FileName);
+            var fullPath = Path.Combine(dialog.SelectedPath, dialog.SelectedFileName ?? "passwords-export.json");
+            App.LogDebug("PasswordManagerWindow: exporting to '{0}'", fullPath);
             try
             {
                 var json = PasswordManager.Instance.ExportToJson();
-                File.WriteAllText(dialog.FileName, json);
+                File.WriteAllText(fullPath, json);
+                PathHistoryManager.Record(dialog.SelectedPath);
                 App.LogDebug("PasswordManagerWindow: export done, {0} entries", PasswordManager.Instance.EntryCount);
-                AppMessageBox.Show(L.TF(L.PwdMgr_Export_Success, dialog.FileName),
+                AppMessageBox.Show(L.TF(L.PwdMgr_Export_Success, fullPath),
                     L.T(L.App_MantisZipTitle), MessageBoxButton.OK, MessageBoxImage.Information);
             }
             catch (Exception ex)

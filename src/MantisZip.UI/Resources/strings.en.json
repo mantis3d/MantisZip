@@ -1,4 +1,4 @@
-﻿{
+{
   "App_AddToArchiveComplete": "Added successfully",
   "App_AddToArchiveFailed": "Failed to add to archive: {0}",
   "App_AddToArchiveProgress": "Adding to archive...",
@@ -215,6 +215,7 @@
   "Main_Menu_Refresh": "_Refresh",
   "Main_Menu_ProgressBars": "Proportion _Fill Bars",
   "Main_Menu_SepDirBaseline": "_Separate Dir Baseline",
+  "Main_Menu_BookmarkManager": "_Bookmark Manager...",
   "Main_Menu_Settings": "_Settings...",
   "Main_Menu_Tools": "_Tools",
   "Main_Menu_View": "_View",

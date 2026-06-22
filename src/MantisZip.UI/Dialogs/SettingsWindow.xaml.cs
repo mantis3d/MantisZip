@@ -11,6 +11,7 @@ using MantisZip.Core.Engines;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using MantisZip.UI.Localization;
+using MantisZip.UI.Controls;
 
 namespace MantisZip.UI;
 

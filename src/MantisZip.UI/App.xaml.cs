@@ -1,5 +1,6 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -73,21 +74,17 @@ public partial class App : Application
     /// </summary>
     private static string? ShowSevenZipDllDialog()
     {
-        var dialog = new OpenFileDialog
+        var dialog = new QuickPathDialog
         {
             Title = "未找到 7z.dll - 请选择 7z.dll 文件",
-            Filter = "7z.dll|7z.dll|动态链接库 (*.dll)|*.dll|所有文件 (*.*)|*.*",
-            CheckFileExists = true,
-            Multiselect = false,
-            // 默认指向应用目录下的 x64/x86 子目录
-            InitialDirectory = Path.Combine(
-                AppDomain.CurrentDomain.BaseDirectory,
-                Environment.Is64BitProcess ? "x64" : "x86"),
+            IsFileOpenMode = true,
+            FileOpenFilter = "7z.dll|7z.dll|动态链接库 (*.dll)|*.dll|所有文件 (*.*)|*.*",
+            Owner = Current?.Windows.Cast<Window>().FirstOrDefault(w => w.IsActive)
         };
 
-        if (dialog.ShowDialog() == true)
+        if (dialog.ShowDialog() == true && !string.IsNullOrEmpty(dialog.SelectedPath))
         {
-            var path = dialog.FileName;
+            var path = dialog.SelectedPath;
             try
             {
                 var settings = AppSettings.Instance;
