@@ -242,6 +242,9 @@
   "Progress_Cancelling": "Cancelling...",
 
   "Filter_Search": "Search file name...",
+  "Filter_Exclude": "Exclude files...",
+  "Filter_MatchModeSubstring": "Substring",
+  "Filter_MatchModeWildcard": "Wildcard",
   "Filter_DateFrom": "From",
   "Filter_DateTo": "To",
   "Filter_SizeMin": "Min",

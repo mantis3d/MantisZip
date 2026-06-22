@@ -122,8 +122,9 @@ public partial class MainWindowViewModel : ObservableObject
             "Toolbar_New", "Toolbar_Open", "Toolbar_Extract", "Toolbar_Compress",
             "Toolbar_Filter", "Toolbar_Preview",
             "Menu_Toolbar", "Menu_FilterBar",
-            "Filter_Search", "Filter_DateFrom", "Filter_DateTo",
+            "Filter_Search", "Filter_Exclude", "Filter_DateFrom", "Filter_DateTo",
             "Filter_SizeMin", "Filter_SizeMax", "Filter_ShowSubfolders",
+            "Filter_MatchModeSubstring", "Filter_MatchModeWildcard",
             "Status_Selected", "Status_ArchiveStats",
             "Tree_Browse",
             "DataGrid_Name", "DataGrid_Size", "DataGrid_Compressed", "DataGrid_Modified",
@@ -152,6 +153,13 @@ public partial class MainWindowViewModel : ObservableObject
         }
         LocalizedStrings = newDict;
         OnPropertyChanged(nameof(LocalizedStrings));
+
+        // Refresh match mode options display text
+        MatchModeOptions.Clear();
+        MatchModeOptions.Add(new FilterMatchModeInfo { Value = FilterMatchMode.Substring, Display = LocalizationManager.T("Filter_MatchModeSubstring") });
+        MatchModeOptions.Add(new FilterMatchModeInfo { Value = FilterMatchMode.Wildcard, Display = LocalizationManager.T("Filter_MatchModeWildcard") });
+        // Restore selection after refresh
+        SelectedMatchModeOption = MatchModeOptions.FirstOrDefault(o => o.Value == FilterMatchMode);
     }
 
     public PreviewViewModel Preview { get; } = new();
@@ -173,6 +181,11 @@ public partial class MainWindowViewModel : ObservableObject
 
     [ObservableProperty]
     private ArchiveItemModel? _selectedEntry;
+
+    /// <summary>
+    /// 当前选中的条目列表（由 View 的 SelectionChanged 同步）。
+    /// </summary>
+    public List<ArchiveItemModel> SelectedEntries { get; } = new();
 
     [ObservableProperty]
     private bool _isDarkTheme;
@@ -237,6 +250,15 @@ public partial class MainWindowViewModel : ObservableObject
     private string? _filterText;
 
     [ObservableProperty]
+    private string? _filterExcludeText;
+
+    [ObservableProperty]
+    private FilterMatchMode _filterMatchMode = FilterMatchMode.Substring;
+
+    [ObservableProperty]
+    private FilterMatchModeInfo? _selectedMatchModeOption;
+
+    [ObservableProperty]
     private DateTime? _filterDateFrom;
 
     [ObservableProperty]
@@ -251,8 +273,18 @@ public partial class MainWindowViewModel : ObservableObject
     [ObservableProperty]
     private string _filterSizeUnit = "KB";
 
+    /// <summary>
+    /// 大小单位选项列表（直接绑定到 ComboBox）。
+    /// </summary>
+    public ObservableCollection<string> SizeUnitOptions { get; } = new() { "B", "KB", "MB", "GB" };
+
     [ObservableProperty]
     private bool _showSubfolders;
+
+    /// <summary>
+    /// 匹配模式选项列表（子串匹配 / 通配符）。显示文本通过 UpdateLocalizedStrings() 刷新。
+    /// </summary>
+    public ObservableCollection<FilterMatchModeInfo> MatchModeOptions { get; } = new();
 
     public MainWindowViewModel()
     {
@@ -288,6 +320,16 @@ public partial class MainWindowViewModel : ObservableObject
     }
 
     partial void OnFilterTextChanged(string? value) => ApplyFilter();
+    partial void OnFilterExcludeTextChanged(string? value) => ApplyFilter();
+    partial void OnFilterMatchModeChanged(FilterMatchMode value) => ApplyFilter();
+
+    partial void OnSelectedMatchModeOptionChanged(FilterMatchModeInfo? value)
+    {
+        if (value != null && value.Value != FilterMatchMode)
+        {
+            FilterMatchMode = value.Value;
+        }
+    }
     partial void OnFilterDateFromChanged(DateTime? value) => ApplyFilter();
     partial void OnFilterDateToChanged(DateTime? value) => ApplyFilter();
     partial void OnFilterSizeMinChanged(long? value) => ApplyFilter();
@@ -583,34 +625,25 @@ public partial class MainWindowViewModel : ObservableObject
 
         IEnumerable<ArchiveItem> filtered = _allRawItems;
 
-        // Text filter
-        if (!string.IsNullOrWhiteSpace(FilterText))
+        return ArchiveFilter.ApplyFilters(filtered.ToList(), new SearchFilters
         {
-            var text = FilterText.ToLowerInvariant();
-            filtered = filtered.Where(i => i.Name.Contains(text, StringComparison.OrdinalIgnoreCase));
-        }
-
-        // Date range filter
-        if (FilterDateFrom.HasValue)
-            filtered = filtered.Where(i => i.LastModified >= FilterDateFrom.Value);
-        if (FilterDateTo.HasValue)
-            filtered = filtered.Where(i => i.LastModified <= FilterDateTo.Value);
-
-        // Size range filter
-        var multiplier = FilterSizeUnit?.ToUpperInvariant() switch
-        {
-            "KB" => 1024L,
-            "MB" => 1024L * 1024,
-            "GB" => 1024L * 1024 * 1024,
-            _ => 1L
-        };
-        if (FilterSizeMin.HasValue)
-            filtered = filtered.Where(i => i.Size >= FilterSizeMin.Value * multiplier);
-        if (FilterSizeMax.HasValue)
-            filtered = filtered.Where(i => i.Size <= FilterSizeMax.Value * multiplier);
-
-        return filtered.ToList();
+            Text = string.IsNullOrWhiteSpace(FilterText) ? null : FilterText,
+            ExcludeText = string.IsNullOrWhiteSpace(FilterExcludeText) ? null : FilterExcludeText,
+            MatchMode = FilterMatchMode,
+            DateFrom = FilterDateFrom,
+            DateTo = FilterDateTo,
+            SizeMin = FilterSizeMin.HasValue ? FilterSizeMin.Value * GetSizeMultiplier() : null,
+            SizeMax = FilterSizeMax.HasValue ? FilterSizeMax.Value * GetSizeMultiplier() : null,
+        });
     }
+
+    private long GetSizeMultiplier() => FilterSizeUnit?.ToUpperInvariant() switch
+    {
+        "KB" => 1024L,
+        "MB" => 1024L * 1024,
+        "GB" => 1024L * 1024 * 1024,
+        _ => 1L
+    };
 
     [RelayCommand]
     private void GoUp()
@@ -1071,4 +1104,13 @@ public partial class MainWindowViewModel : ObservableObject
         RecentFilesManager.Clear();
         RecentFiles.Clear();
     }
+}
+
+/// <summary>
+/// 匹配模式 ComboBox 选项包装，用于显示本地化文本并保留 FilterMatchMode 值。
+/// </summary>
+public class FilterMatchModeInfo
+{
+    public FilterMatchMode Value { get; init; }
+    public string Display { get; set; } = "";
 }

@@ -376,6 +376,17 @@ public partial class MainWindow : Window
         }
     }
 
+    private void FileListGrid_SelectionChanged(object? sender, SelectionChangedEventArgs e)
+    {
+        if (DataContext is not MainWindowViewModel vm) return;
+        vm.SelectedEntries.Clear();
+        foreach (var item in FileListGrid.SelectedItems)
+        {
+            if (item is ArchiveItemModel model)
+                vm.SelectedEntries.Add(model);
+        }
+    }
+
     private void CleanupDragDropTemp()
     {
         if (_dragDropTempDir != null && Directory.Exists(_dragDropTempDir))
@@ -423,6 +434,112 @@ public partial class MainWindow : Window
         });
 
         return result.Count >= 1 ? result[0].Path.LocalPath : null;
+    }
+
+    // ── Filter picker buttons (🧪 pick from selected items) ──
+
+    private void PickDateFrom_Click(object? sender, RoutedEventArgs e)
+    {
+        var vm = DataContext as MainWindowViewModel;
+        if (vm == null) return;
+        try
+        {
+            if (vm.SelectedEntries.Count == 0)
+            {
+                WritePickerTrace("PickDateFrom: SelectedEntries is empty");
+                return;
+            }
+            var dates = vm.SelectedEntries
+                .Where(i => !i.IsDirectory && i.LastModified > DateTime.MinValue)
+                .Select(i => i.LastModified)
+                .ToList();
+            if (dates.Count == 0)
+            {
+                WritePickerTrace("PickDateFrom: no valid dates, entries=" + vm.SelectedEntries.Count);
+                return;
+            }
+            var minDate = dates.Min();
+            WritePickerTrace($"PickDateFrom: minDate={minDate:O}, picker.IsNull={FilterDateFromPicker == null}, vm.IsNull={vm == null}");
+            vm.FilterDateFrom = minDate;
+            if (FilterDateFromPicker != null)
+                FilterDateFromPicker.SelectedDate = minDate;
+        }
+        catch (Exception ex)
+        {
+            WritePickerTrace($"PickDateFrom ERROR: {ex}");
+        }
+    }
+
+    private void PickDateTo_Click(object? sender, RoutedEventArgs e)
+    {
+        var vm = DataContext as MainWindowViewModel;
+        if (vm == null) return;
+        try
+        {
+            if (vm.SelectedEntries.Count == 0)
+            {
+                WritePickerTrace("PickDateTo: SelectedEntries is empty");
+                return;
+            }
+            var dates = vm.SelectedEntries
+                .Where(i => !i.IsDirectory && i.LastModified > DateTime.MinValue)
+                .Select(i => i.LastModified)
+                .ToList();
+            if (dates.Count == 0)
+            {
+                WritePickerTrace("PickDateTo: no valid dates");
+                return;
+            }
+            var maxDate = dates.Max();
+            vm.FilterDateTo = maxDate;
+            if (FilterDateToPicker != null)
+                FilterDateToPicker.SelectedDate = maxDate;
+        }
+        catch (Exception ex)
+        {
+            WritePickerTrace($"PickDateTo ERROR: {ex}");
+        }
+    }
+
+    private static void WritePickerTrace(string msg)
+    {
+        var logPath = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "MantisZip", "debug.log");
+        try
+        {
+            var dir = Path.GetDirectoryName(logPath);
+            if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
+                Directory.CreateDirectory(dir);
+            File.AppendAllText(logPath, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}] [PN] {msg}\n");
+        }
+        catch { }
+    }
+
+    private void PickSizeMin_Click(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is not MainWindowViewModel vm) return;
+        if (vm.SelectedEntries.Count == 0) return;
+        var sizes = vm.SelectedEntries
+            .Where(i => !i.IsDirectory)
+            .Select(i => i.Size)
+            .ToList();
+        if (sizes.Count == 0) return;
+        vm.FilterSizeMin = sizes.Min();
+        vm.FilterSizeUnit = "B";
+    }
+
+    private void PickSizeMax_Click(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is not MainWindowViewModel vm) return;
+        if (vm.SelectedEntries.Count == 0) return;
+        var sizes = vm.SelectedEntries
+            .Where(i => !i.IsDirectory)
+            .Select(i => i.Size)
+            .ToList();
+        if (sizes.Count == 0) return;
+        vm.FilterSizeMax = sizes.Max();
+        vm.FilterSizeUnit = "B";
     }
 
     private async void RecentFileMenuItem_Click(object? sender, RoutedEventArgs e)

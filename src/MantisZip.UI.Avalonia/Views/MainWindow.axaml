@@ -5,8 +5,8 @@
         xmlns:conv="clr-namespace:MantisZip.UI.Avalonia.Converters"
         xmlns:views="clr-namespace:MantisZip.UI.Avalonia.Views"
         x:Class="MantisZip.UI.Avalonia.Views.MainWindow"
-        x:Name="ThisWindow"
-        x:DataType="vm:MainWindowViewModel"
+         x:Name="ThisWindow"
+         x:DataType="vm:MainWindowViewModel"
         Title="{Binding Title}"
         Width="1200"
         Height="800"
@@ -20,6 +20,8 @@
   <Window.Resources>
     <conv:FileSizeConverter x:Key="FileSizeConverter" />
     <conv:BoolInvertConverter x:Key="BoolInvertConverter" />
+    <conv:DateTimeToOffsetConverter x:Key="DateTimeToOffsetConverter" />
+    <conv:NullableLongConverter x:Key="NullableLongConverter" />
   </Window.Resources>
 
   <Grid RowDefinitions="Auto,Auto,Auto,*,Auto">
@@ -363,7 +365,7 @@
       </StackPanel>
     </Border>
 
-    <!-- Filter bar (Row 2, collapsible) -->
+    <!-- Filter bar (Row 2, collapsible) — WPF consistent layout -->
     <Border Grid.Row="2"
             IsVisible="{Binding IsFilterBarVisible}"
             Padding="8,4"
@@ -371,61 +373,138 @@
             BorderBrush="{DynamicResource ThemeBorderBrush}"
             BorderThickness="0,0,0,1">
       <StackPanel Orientation="Horizontal"
-                    VerticalAlignment="Center">
-        <TextBlock Text="{Binding LocalizedStrings[Filter_Search]}"
-                   VerticalAlignment="Center"
-                   Foreground="{DynamicResource ThemeTextSecondaryBrush}"
-                   Margin="0,0,4,0" />
-        <TextBox Text="{Binding FilterText}"
-                 Width="160"
-                 Height="26"
-                 Margin="0,0,12,0" />
+                  VerticalAlignment="Center">
+        <!-- Section 1: 文字搜索 + 匹配模式 + 排除 -->
+        <Grid VerticalAlignment="Center" Margin="0,0,4,0">
+          <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+          </Grid.RowDefinitions>
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="Auto" />
+            <ColumnDefinition Width="160" />
+            <ColumnDefinition Width="100" />
+          </Grid.ColumnDefinitions>
+          <!-- Row 0: 🔍 + search box + match mode -->
+          <TextBlock Grid.Row="0" Grid.Column="0" Text="🔍" FontSize="13" Margin="2,0,4,2" VerticalAlignment="Center" />
+          <TextBox Grid.Row="0" Grid.Column="1" Height="22" FontSize="11"
+                   Text="{Binding FilterText}" Margin="0,0,0,2"
+                   Background="{DynamicResource ThemeWindowBgBrush}"
+                   Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                   BorderBrush="{DynamicResource ThemeBorderBrush}" />
+          <ComboBox Grid.Row="0" Grid.Column="2" Height="22" FontSize="11" Margin="2,0,0,2"
+                    ItemsSource="{Binding MatchModeOptions}"
+                    SelectedItem="{Binding SelectedMatchModeOption}"
+                    Background="{DynamicResource ThemeWindowBgBrush}"
+                    Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                    BorderBrush="{DynamicResource ThemeBorderBrush}">
+            <ComboBox.ItemTemplate>
+              <DataTemplate>
+                <TextBlock Text="{Binding Display}" FontSize="11"
+                           Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+              </DataTemplate>
+            </ComboBox.ItemTemplate>
+          </ComboBox>
+          <!-- Row 1: ⊘ + exclude box -->
+          <TextBlock Grid.Row="1" Grid.Column="0" Text="⊘" FontSize="13" Margin="2,0,4,0" VerticalAlignment="Center" />
+          <TextBox Grid.Row="1" Grid.Column="1" Height="22" FontSize="11"
+                   Text="{Binding FilterExcludeText}"
+                   ToolTip.Tip="{Binding LocalizedStrings[Filter_Exclude]}"
+                   PlaceholderText="{Binding LocalizedStrings[Filter_Exclude]}"
+                   Background="{DynamicResource ThemeWindowBgBrush}"
+                   Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                   BorderBrush="{DynamicResource ThemeBorderBrush}" />
+        </Grid>
+        <Border Width="1" Height="24" VerticalAlignment="Center"
+                Background="{DynamicResource ThemeBorderBrush}" Margin="4,0" />
 
-        <TextBlock Text="{Binding LocalizedStrings[Filter_DateFrom]}"
-                   VerticalAlignment="Center"
-                   Foreground="{DynamicResource ThemeTextSecondaryBrush}"
-                   Margin="0,0,4,0" />
-        <DatePicker Width="130"
-                    Height="26"
-                    SelectedDate="{Binding FilterDateFrom}"
-                    Margin="0,0,12,0" />
-        <TextBlock Text="{Binding LocalizedStrings[Filter_DateTo]}"
-                   VerticalAlignment="Center"
-                   Foreground="{DynamicResource ThemeTextSecondaryBrush}"
-                   Margin="0,0,4,0" />
-        <DatePicker Width="130"
-                    Height="26"
-                    SelectedDate="{Binding FilterDateTo}"
-                    Margin="0,0,12,0" />
+        <!-- Section 2: 日期范围 + 🧪 picker buttons -->
+        <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="4,0">
+          <TextBlock Text="📅" FontSize="14" Margin="0,0,4,0" VerticalAlignment="Center" />
+          <StackPanel Orientation="Vertical" VerticalAlignment="Center">
+            <StackPanel Orientation="Horizontal" Margin="0,0,0,2">
+              <Button Width="20" Height="20" Padding="0" Margin="0,0,2,0" Click="PickDateFrom_Click"
+                      Background="{DynamicResource ThemeButtonBgBrush}"
+                      Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                      BorderBrush="{DynamicResource ThemeBorderBrush}">
+                <TextBlock Text="🧪" FontSize="11" />
+              </Button>
+              <TextBlock Text="{Binding LocalizedStrings[Filter_DateFrom]}"
+                         FontSize="11" VerticalAlignment="Center" Margin="0,0,2,0"
+                         Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+              <DatePicker x:Name="FilterDateFromPicker" Width="105" Height="22"
+                          SelectedDate="{Binding FilterDateFrom, Converter={StaticResource DateTimeToOffsetConverter}}"
+                          Background="{DynamicResource ThemeWindowBgBrush}"
+                          Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                          BorderBrush="{DynamicResource ThemeBorderBrush}" />
+            </StackPanel>
+            <StackPanel Orientation="Horizontal">
+              <Button Width="20" Height="20" Padding="0" Margin="0,0,2,0" Click="PickDateTo_Click"
+                      Background="{DynamicResource ThemeButtonBgBrush}"
+                      Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                      BorderBrush="{DynamicResource ThemeBorderBrush}">
+                <TextBlock Text="🧪" FontSize="11" />
+              </Button>
+              <TextBlock Text="{Binding LocalizedStrings[Filter_DateTo]}"
+                         FontSize="11" VerticalAlignment="Center" Margin="0,0,2,0"
+                         Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+              <DatePicker x:Name="FilterDateToPicker" Width="105" Height="22"
+                          SelectedDate="{Binding FilterDateTo, Converter={StaticResource DateTimeToOffsetConverter}}"
+                          Background="{DynamicResource ThemeWindowBgBrush}"
+                          Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                          BorderBrush="{DynamicResource ThemeBorderBrush}" />
+            </StackPanel>
+          </StackPanel>
+        </StackPanel>
+        <Border Width="1" Height="24" VerticalAlignment="Center"
+                Background="{DynamicResource ThemeBorderBrush}" Margin="4,0" />
 
-        <TextBlock Text="{Binding LocalizedStrings[Filter_SizeMin]}"
-                   VerticalAlignment="Center"
-                   Foreground="{DynamicResource ThemeTextSecondaryBrush}"
-                   Margin="0,0,4,0" />
-        <TextBox Width="80"
-                 Height="26"
-                 Text="{Binding FilterSizeMin}"
-                 Margin="0,0,12,0" />
-        <ComboBox Width="60"
-                  Height="26"
-                  SelectedItem="{Binding FilterSizeUnit}"
-                  Margin="0,0,12,0">
-          <ComboBoxItem Content="KB" />
-          <ComboBoxItem Content="MB" />
-          <ComboBoxItem Content="GB" />
-        </ComboBox>
-        <TextBlock Text="{Binding LocalizedStrings[Filter_SizeMax]}"
-                   VerticalAlignment="Center"
-                   Foreground="{DynamicResource ThemeTextSecondaryBrush}"
-                   Margin="0,0,4,0" />
-        <TextBox Width="80"
-                 Height="26"
-                 Text="{Binding FilterSizeMax}"
-                 Margin="0,0,12,0" />
-
-        <CheckBox IsChecked="{Binding ShowSubfolders}"
-                  Content="{Binding LocalizedStrings[Filter_ShowSubfolders]}"
-                  VerticalAlignment="Center" />
+        <!-- Section 3: 大小范围 + 🧪 picker buttons -->
+        <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="4,0">
+          <TextBlock Text="📏" FontSize="14" Margin="0,0,4,0" VerticalAlignment="Center" />
+          <StackPanel Orientation="Vertical" VerticalAlignment="Center">
+            <StackPanel Orientation="Horizontal" Margin="0,0,0,2">
+              <Button Width="20" Height="20" Padding="0" Margin="0,0,2,0" Click="PickSizeMin_Click"
+                      Background="{DynamicResource ThemeButtonBgBrush}"
+                      Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                      BorderBrush="{DynamicResource ThemeBorderBrush}">
+                <TextBlock Text="🧪" FontSize="11" />
+              </Button>
+              <TextBlock Text="{Binding LocalizedStrings[Filter_SizeMin]}"
+                         FontSize="11" VerticalAlignment="Center" Margin="0,0,2,0"
+                         Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+              <TextBox Width="60" Height="22"
+                       Text="{Binding FilterSizeMin, Converter={StaticResource NullableLongConverter}}"
+                       Background="{DynamicResource ThemeWindowBgBrush}"
+                       Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                       BorderBrush="{DynamicResource ThemeBorderBrush}"
+                       Padding="2,0" BorderThickness="1" />
+              <ComboBox Width="50" Height="22" Margin="2,0,0,0"
+                         ItemsSource="{Binding SizeUnitOptions}"
+                         SelectedItem="{Binding FilterSizeUnit}"
+                         Background="{DynamicResource ThemeWindowBgBrush}"
+                         Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                         BorderBrush="{DynamicResource ThemeBorderBrush}" />
+            </StackPanel>
+            <StackPanel Orientation="Horizontal">
+              <Button Width="20" Height="20" Padding="0" Margin="0,0,2,0" Click="PickSizeMax_Click"
+                      Background="{DynamicResource ThemeButtonBgBrush}"
+                      Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                      BorderBrush="{DynamicResource ThemeBorderBrush}">
+                <TextBlock Text="🧪" FontSize="11" />
+              </Button>
+              <TextBlock Text="{Binding LocalizedStrings[Filter_SizeMax]}"
+                         FontSize="11" VerticalAlignment="Center" Margin="0,0,2,0"
+                         Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+              <TextBox Width="60" Height="22"
+                       Text="{Binding FilterSizeMax, Converter={StaticResource NullableLongConverter}}"
+                       Background="{DynamicResource ThemeWindowBgBrush}"
+                       Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                       BorderBrush="{DynamicResource ThemeBorderBrush}"
+                       Padding="2,0" BorderThickness="1" />
+            </StackPanel>
+          </StackPanel>
+        </StackPanel>
       </StackPanel>
     </Border>
 
@@ -487,6 +566,7 @@
                 AutoGenerateColumns="False"
                 CanUserSortColumns="True"
                 IsReadOnly="True"
+                SelectionChanged="FileListGrid_SelectionChanged"
                 DoubleTapped="FileListGrid_DoubleTapped"
                 KeyDown="FileListGrid_KeyDown"
                 Sorting="FileListGrid_Sorting">

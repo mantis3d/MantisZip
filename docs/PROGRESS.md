@@ -15,6 +15,7 @@
 
 ### avalonia-port 分支 (WIP)
   - **Phase 9: 文件列表交互补齐** — DataGrid 添加双击目录进入、Enter/Backspace/Delete 键盘导航、列排序（`..` 置顶 + 目录优先 + 箭头标记），与 WPF 文件列表交互行为保持一致 (2026-06-21)
+  - **Bugfix: 筛选工具栏尺寸输入框白边 + 空值红框** — 添加 `NullableLongConverter` 处理空字符串→null 绑定；尺寸 TextBox 加 `Padding="2,0"` `BorderThickness="1"` 消除白边遮挡数字 (2026-06-22)
   - **Phase 8: 设置窗口 TabControl 重构 + i18n 补全 + ComboBox 修复** — SettingsWindow 重构为完整 TabControl（压缩/解压/上下文菜单/高级/预览），Preview 分 4 子标签页（文本/字体/表格/布局）；新增 70+ i18n 中英文键；AppSettings 扩展 shadow 配置属性；LocalizationManager `T()` 添加 null-safe fallback；修复 Avalonia 12 不支持 `SelectedValuePath` 导致的 ComboBox 选择不生效，改用 `ItemsSource` + `SelectedItem` + `Option(Display,Value)` 模式 (2026-06-21)
   - **Phase 7: 功能补齐 — CLI/IPC/设置标签页/对话框/i18n** — CLI 9 命令 + IPC 多实例; 设置窗口 Extract/ContextMenu/Advanced 三标签页; 10 个新对话框 (CompressConflictDialog/ConflictDialog/ErrorDialog/PasswordEditDialog/PasswordHelpDialog/LogPrivacyHelpDialog/MatchedPasswordDialog/DonationDialog); CompressSettingsWindow Password 标签增强（库模式/新密码模式/强度指示/自动规则）; i18n 中英文全键 (2026-06-19)
   - **Bugfix: 暗色菜单弹出面板白色背景 + 控制前景色修复** — 添加 `MenuFlyoutPresenterBackground` 修复菜单弹出面板背景；覆盖 `MenuFlyoutItemForeground`/`MenuFlyoutItemForegroundPointerOver`/`MenuFlyoutItemForegroundDisabled`/`ButtonForegroundDisabled`/`TabItemHeaderForegroundUnselected`/`TabItemHeaderForegroundSelected`/`ComboBoxForeground`/`ComboBoxItemForeground`/`ComboBoxItemForegroundPointerOver`/`ComboBoxItemForegroundSelected`/`CheckBoxForegroundUnchecked`/`CheckBoxForegroundChecked` 等 Fluent 资源键及 App.axaml TabItem 样式、SettingsWindow Foreground
@@ -42,6 +43,11 @@
   - 列排序自定义：`..` 导航行始终最前 → 目录优先于文件 → 组内按排序列
   - `▲`/`▼` 箭头标记列头，切换目录不清除排序状态
   - ViewModel 新增 `NavigateToFolderPath(string)` 方法
+
+18. **Bugfix: 筛选工具栏尺寸输入框白边 + 空值红框**：
+  - +`NullableLongConverter`：`long?` ↔ `string` 转换，空字符串→null，消除清空时 InvalidCastException 红框
+  - 尺寸 TextBox 添加 `Padding="2,0"` `BorderThickness="1"`，消除默认粗边框+内边距导致的数字遮挡
+  - 同个 Converter 文件 `Converters/DateTimeConverter.cs` 新增，注册到 Window.Resources
 
 16. **Bugfix: Avalonia 12 ComboBox SelectedValuePath 不支持 + 选择不生效**：
   - 根因：Avalonia 12 删除了 `SelectedValuePath` 依赖属性，移除后 `SelectedValue` 拿 string 与 `ComboBoxItem` 对象引用比较，永远不匹配

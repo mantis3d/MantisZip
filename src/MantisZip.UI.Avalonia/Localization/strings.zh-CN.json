@@ -242,6 +242,9 @@
   "Progress_Cancelling": "正在取消...",
 
   "Filter_Search": "搜索文件名...",
+  "Filter_Exclude": "排除文件...",
+  "Filter_MatchModeSubstring": "子串匹配",
+  "Filter_MatchModeWildcard": "通配符",
   "Filter_DateFrom": "起始日期",
   "Filter_DateTo": "结束日期",
   "Filter_SizeMin": "最小",
