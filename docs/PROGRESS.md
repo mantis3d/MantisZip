@@ -29,6 +29,12 @@
    - 标题统一添加 `/ English` 双语标注
 3. 修复动态菜单bug
 4. 文件列表增加“返回父目录”项目。
+5. **计划文档整理**：
+   - `drag-drop-direct-extract.md` 更新：纳入纯 Win32 覆盖层方案、UIA 降级、颜色状态机、呼吸动画等设计细节
+   - `parent-directory-entry.md` 补充到 PROGRESS.md 历史设计方案索引
+   - `quick-path-control.md` 归档（被 `quickpath-unified.md` 取代）
+   - 跨平台影响分析重建：从 43（含已完成/已废弃）精简为 26 个待实现计划
+   - PLAN.md 新增 `self-contained-installer.md`（P1）待实现条目
 
 ### v0.4.0 (2026-06-15) 第一个上线版本
   - 功能基本完成，测试基本完成。第一个上线版本。
@@ -523,3 +529,4 @@
 | ZipEngine SharpZipLib 完全迁移 (加密路径→SharpSevenZip) | [zipengine-sharpcompress-migration.md](.sisyphus/plans/zipengine-sharpcompress-migration.md) | v0.3.13 |
 | 压缩流程统一化 (CompressService) | [compress-service-unify.md](.sisyphus/plans/compress-service-unify.md) | v0.4.0 |
 | 发布 Release | [release-automation.md](.sisyphus/plans/release-automation.md) | v0.4.0 |
+| 返回上级目录 (.. 导航行) | [parent-directory-entry.md](.sisyphus/plans/parent-directory-entry.md) | v0.4.0 |
