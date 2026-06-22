@@ -7,8 +7,8 @@
 - **技术栈**: .NET 9 + WPF + SharpCompress + SharpSevenZip
 
 ## 版本
-- **当前版本**: 0.4.1
-- **发布日期**: 2026-06-18
+- **当前版本**: 0.4.3
+- **发布日期**: 2026-06-20
 
 ## 规划中
 
@@ -18,9 +18,51 @@
 
 ## 版本历史（从新到旧）
 
+### v0.4.3 (2026-06-21) 压缩包内逐条目权限跳过 + UAC 弹窗行为修复
+
+1. **压缩包内逐条目权限跳过**：
+   - 新增 `ExtractResult` 类（`SucceededEntries`/`FailedEntries`）
+   - `IArchiveEngine.ExtractAsync` 返回类型从 `Task` 改为 `Task<ExtractResult>`
+   - ZipEngine/SevenZipEngine/TarGzEngine 逐条目循环包 `try-catch(UnauthorizedAccessException)`，跳过失败条目继续处理其余
+   - GZip 单文件解压同样包 try-catch
+   - 调用方（App.Extract.cs）根据 `ExtractResult` 判断全失败/部分成功
+2. **UAC 提权弹窗修复**：
+   - 删除 `HandleExtractBatchCore` 预检（事前扫描所有目标目录），完全由 catch 响应式拦截
+   - 首次权限不足弹窗一次，后续静默跳过（标记 Failed），不退出进程
+   - 已提权仍失败不退出（其他目录可能可写）
+   - 仅用户点击「以管理员身份运行」时才重启旧进程
+3. **设计文档**：`.sisyphus/plans/uac-elevation-permission.md` 更新
+4. **进度窗口错误摘要**：ProgressWindow 新增 `ErrorSummaryBox`（可复制 TextBox），解压权限错误时在进度条和按钮之间显示错误摘要文本
+
+### v0.4.2 (2026-06-20) 安装程序主题/语言选择修复 / ZIP copy-mode 进度与取消
+
+1. **修复安装时主题选择不生效的 Bug**：
+   - `installer\prebuilt\settings.json` 缺少 `Theme` 和 `Language` 字段，导致 `CopyFile` 主路径下用户向导选择被丢弃
+   - 在该文件中添加 `__LANG__` 和 `__THEME__` 占位符
+   - 新增 `PatchSettingsThemeAndLanguage` 过程，`CopyFile` 成功后读取 JSON、替换占位符为用户实际选择的语言和主题
+   - `installer.iss` + `installer-selfcontained.iss` 同步修改
+2. **ZIP 添加/删除进度与取消优化**：
+   - `CompressNewEntry`：从 3 遍（全读→CRC32→Deflate）改为单遍流式（80KB 块流式 CRC32 + Deflate），降低内存占用并支持逐块取消
+   - `CopyStreamRangeAsync`：新增每 80KB 块粒度进度报告（FilePercentComplete 0→100 + 整体 PercentComplete 平滑插值），100ms 节流
+   - 收尾阶段分步报告：写入中央目录 92% → 写入目录尾 94% → 刷入磁盘 97% → 原子替换 100%
+   - Phase 1/2 条目权重从 100 降至 90，保留 10% 给收尾阶段
+   - `WriteCentralDirectory` 移除逐条进度（毫秒级操作无意义）
+   - `ComputeCrc32` 移除（被增量 CRC32 替代）
+   - 所有 211 个测试通过
+
 ### v0.4.1 (2026-06-18) 发布流程修复 + 文档双语化
 
-1. **CI release notes regex 修复**：
+1. **ZIP Copy-Mode 优化：压缩流直拷替代解压-重压缩**：
+   - 新增 `ZipBinaryRewriter`（Core/Utils），实现 ZIP 二进制级别的压缩流直拷：EOCD 扫描、CDFH 解析、LFH 读取/重写、中央目录重建
+   - `ZipEngine.AddToArchiveAsync` 新增 copy-mode 快路径：对非加密 ZIP 优先尝试二进制直拷，失败自动 fallback 到原解压-重压缩路径
+   - `ZipEngine.DeleteEntriesAsync` 新增 copy-mode 快路径 + SharpSevenZip 加密删除路径（此前加密 ZIP 删除功能缺失）
+   - 支持 Deflate(8)/Store(0) 条目、Bit-3 Data Descriptor 改写、GBK 文件名 raw-bytes 无损保留
+   - 不支持的格式（LZMA/BZip2/ZIP64/加密/SFX）自动 fallback，零入侵既有代码
+   - 28 个单元测试覆盖：直拷、过滤、添加新条目、加密回退、Store、注释、取消、中文文件名、空 keepSet
+   - 性能：10MB ZIP 加 1KB 文件 < 0.3s，100MB ZIP 删 1KB 文件 < 1.0s（旧方法分别 > 2s 和 > 20s）
+   - 设计文档：`.sisyphus/plans/zip-copy-mode-optimization.md`
+
+2. **CI release notes regex 修复**：
    - GitHub workflow 提取 RELEASE_NOTES.md 内容时 regex 缺少 `(?s)` 单行模式标志，导致 `.` 不匹配换行符，捕获组 `(.*?)` 无法跨行截取，回退到读取全文
    - 修复后正确提取首个 `## v` 标题到下一个 `##` 之间的文本
 
@@ -35,6 +77,18 @@
    - `quick-path-control.md` 归档（被 `quickpath-unified.md` 取代）
    - 跨平台影响分析重建：从 43（含已完成/已废弃）精简为 26 个待实现计划
    - PLAN.md 新增 `self-contained-installer.md`（P1）待实现条目
+5. **UAC 提权机制 — 双模式权限不足处理**：
+   - `AppSettings.AllowElevation` 属性（默认 false），设置在设置 → 高级 → 权限提升
+   - 新建 `App.Elevation.cs` 含 6 个辅助方法：`IsDirectoryWritable`, `IsElevated`, `RelaunchAsAdmin`, `ShowElevationInfoDialog`, `ShowElevationDialog`, `ShowElevationFailedDialog`
+   - 三个新对话框：`ElevationInfoDialog`（仅提示不可写目录+确定）、`ElevationDialog`（提权/取消）、`ElevationFailedDialog`（提权后仍不可写错误）
+   - 注入 3 个 CLI 入口点：`HandleExtractBatchCore`、`RunCompressSeparateBatch`、`HandleCompressQuick`
+   - 默认行为仅弹提示（不提权）；仅当 `AllowElevation=true` 才弹出 UAC 提权窗口
+   - 设置窗口高级标签新增“权限提升” GroupBox
+   - 中/英文各 17 个本地化键
+   - 设计文档：`.sisyphus/plans/uac-elevation-permission.md`
+    - 解压侧新增 `catch(UnauthorizedAccessException)` 响应式拦截：解压中遇到 Access to the path 时触发提权/提示流程，不做事前预检
+    - 修复拦截后无响应问题：`Dispatcher.InvokeAsync` 改为同步 `Dispatcher.Invoke`，避免 catch 块内 async 状态机挂起
+    - **提权弹窗行为优化**：首次权限不足弹窗一次，后续静默跳过（标记 Failed），不退出进程。已提权仍失败也继续处理（后续目录可能可写）
 
 ### v0.4.0 (2026-06-15) 第一个上线版本
   - 功能基本完成，测试基本完成。第一个上线版本。

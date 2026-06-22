@@ -307,6 +307,25 @@ begin
   end;
 end;
 
+// Replace placeholder tokens in the copied settings.json with actual wizard selections.
+procedure PatchSettingsThemeAndLanguage(const FileName: String);
+var
+  Content: AnsiString;
+  ContentStr: String;
+begin
+  if LoadStringFromFile(FileName, Content) then
+  begin
+    ContentStr := Content;
+    StringChange(ContentStr, '__LANG__', GetAppLanguageCode);
+    StringChange(ContentStr, '__THEME__', GetSelectedTheme);
+    Content := ContentStr;
+    SaveStringToFile(FileName, Content, False);
+    Log('Settings patched with wizard theme/language selection.');
+  end
+  else
+    Log('Failed to load settings.json for theme/language patching.');
+end;
+
 procedure InitializeWizard;
 begin
   CreateConfigPage;
@@ -381,7 +400,11 @@ begin
       // Copy prebuilt settings.json (including Language + Theme from wizard)
       // Users can replace installer\prebuilt\ with their own files before building the installer
       if CopyFile(ExpandConstant('{app}\prebuilt\settings.json'), SettingsFile, False) then
+      begin
         Log('Prebuilt settings.json copied.')
+        // Override placeholder tokens with actual wizard selections
+        PatchSettingsThemeAndLanguage(SettingsFile);
+      end
       else
       begin
         Log('Failed to copy prebuilt settings.json, writing minimal config...');

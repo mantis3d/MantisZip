@@ -105,7 +105,40 @@ public partial class App : Application
         var progress = rawProgress;
         var ct = progressWindow.CancellationToken;
 
-            Task.Run(async () =>
+        // ===== 权限检测：检查输出目录的可写性 =====
+        var outputDir = Path.GetDirectoryName(outputPath);
+        if (!string.IsNullOrEmpty(outputDir) && !IsDirectoryWritable(outputDir))
+        {
+            if (IsElevated())
+            {
+                ShowElevationFailedDialog(new[] { outputDir });
+                app.Shutdown();
+                return;
+            }
+
+            if (!AppSettings.Instance.AllowElevation)
+            {
+                ShowElevationInfoDialog(new[] { outputDir });
+                app.Shutdown();
+                return;
+            }
+
+            var result = ShowElevationDialog(new[] { outputDir });
+            if (result == true)
+            {
+                RelaunchAsAdmin(Environment.GetCommandLineArgs().Skip(1).ToArray());
+                app.Shutdown();
+                return;
+            }
+            else
+            {
+                app.Shutdown();
+                return;
+            }
+        }
+        // ===== 权限检测结束 =====
+
+        Task.Run(async () =>
             {
                 try
                 {

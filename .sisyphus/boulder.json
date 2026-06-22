@@ -1,39 +1,13 @@
 {
-  "active_plan": "E:\\GitHub\\MantisZip\\.sisyphus\\plans\\zipengine-sharpcompress-migration.md",
-  "started_at": "2026-06-12T05:52:00.000Z",
-  "session_ids": [
-    "ses_1459d2906ffePTQhej9fR85mDZ"
-  ],
-  "session_origins": {
-    "ses_1459d2906ffePTQhej9fR85mDZ": "direct"
-  },
-  "plan_name": "zipengine-sharpcompress-migration",
+  "active_plan": null,
+  "started_at": "2026-06-20T02:55:47.863Z",
+  "session_ids": [],
+  "session_origins": {},
+  "plan_name": null,
   "agent": "atlas",
   "task_sessions": {},
-  "active_work_id": "zipengine-sharpcompress-migration",
+  "active_work_id": null,
   "schema_version": 2,
-  "works": {
-    "zipengine-sharpcompress-migration": {
-      "work_id": "zipengine-sharpcompress-migration",
-      "active_plan": "E:\\GitHub\\MantisZip\\.sisyphus\\plans\\zipengine-sharpcompress-migration.md",
-      "plan_name": "zipengine-sharpcompress-migration",
-      "started_at": "2026-06-12T05:52:00.000Z",
-      "session_ids": [
-        "ses_1459d2906ffePTQhej9fR85mDZ"
-      ],
-      "session_origins": {
-        "ses_1459d2906ffePTQhej9fR85mDZ": "direct"
-      },
-      "agent": "atlas",
-      "task_sessions": {},
-      "status": "completed",
-      "ended_at": "2026-06-12T06:15:33.227Z",
-      "elapsed_ms": 1413227,
-      "updated_at": "2026-06-12T06:15:33.228Z"
-    }
-  },
-  "status": "completed",
-  "ended_at": "2026-06-12T06:15:33.227Z",
-  "elapsed_ms": 1413227,
-  "updated_at": "2026-06-12T06:15:33.228Z"
+  "works": {},
+  "status": "idle"
 }

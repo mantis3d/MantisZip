@@ -92,6 +92,8 @@ public class AppSettings
     public string SevenZipPath { get; set; } = "";
     /// <summary>启动时自动清理 %TEMP%\MantisZip\ 临时文件</summary>
     public bool CleanTempOnStartup { get; set; } = true;
+    /// <summary>CLI 模式下遇到权限不足时，是否弹提权窗口（默认 false = 仅提示不可写目录）</summary>
+    public bool AllowElevation { get; set; } = false;
 
     // ===== 持久化 =====
     private static readonly string SettingsDir = Path.Combine(
