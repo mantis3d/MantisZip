@@ -33,6 +33,7 @@
    - 仅用户点击「以管理员身份运行」时才重启旧进程
 3. **设计文档**：`.sisyphus/plans/uac-elevation-permission.md` 更新
 4. **进度窗口错误摘要**：ProgressWindow 新增 `ErrorSummaryBox`（可复制 TextBox），解压权限错误时在进度条和按钮之间显示错误摘要文本
+5. **计划状态同步**：将 `zip-copy-mode-optimization.md`（v0.4.2）和 `uac-elevation-permission.md`（v0.4.2）从 PLAN.md 待实现移至 PROGRESS.md 历史设计方案索引，同步更新跨平台分析计数
 
 ### v0.4.2 (2026-06-20) 安装程序主题/语言选择修复 / ZIP copy-mode 进度与取消
 
@@ -584,3 +585,5 @@
 | 压缩流程统一化 (CompressService) | [compress-service-unify.md](.sisyphus/plans/compress-service-unify.md) | v0.4.0 |
 | 发布 Release | [release-automation.md](.sisyphus/plans/release-automation.md) | v0.4.0 |
 | 返回上级目录 (.. 导航行) | [parent-directory-entry.md](.sisyphus/plans/parent-directory-entry.md) | v0.4.0 |
+| ZIP 压缩流直拷优化 (ZipBinaryRewriter) | [zip-copy-mode-optimization.md](.sisyphus/plans/zip-copy-mode-optimization.md) | v0.4.2 |
+| UAC 提权 + 权限不足处理 | [uac-elevation-permission.md](.sisyphus/plans/uac-elevation-permission.md) | v0.4.2 |

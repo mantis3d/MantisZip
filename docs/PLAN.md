@@ -3,7 +3,7 @@
 > 未来待开发功能规划。已实现功能请见 [docs/PROGRESS.md](docs/PROGRESS.md)，技术架构请见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)。
 
 **项目状态**: 🟢 开发中  
-**最后更新**: 2026-06-20  
+**最后更新**: 2026-06-22  
 **当前版本**: 0.4.2
 
 ---
@@ -15,9 +15,7 @@
 
 | 优先级 | 功能 | 设计文档 | 难度 | 预估工时 | 说明 |
 |--------|------|----------|:----:|:--------:|------|
-| **P0** | ZIP 压缩流直拷优化 | [zip-copy-mode-optimization.md](.sisyphus/plans/zip-copy-mode-optimization.md) | 🟡中 | 2-3天 | 添加/删除文件时直拷已有条目的压缩数据，避免全量解压再压缩 |
 | **P0** | 便携版模式 | [portable-mode.md](.sisyphus/plans/portable-mode.md) | 🟢低 | 1-2h | 哨兵文件触发，路径重定向到 exe 目录 |
-| **P0** | CLI/右键菜单权限不足时提权 | [uac-elevation-permission.md](.sisyphus/plans/uac-elevation-permission.md) | 🟡中 | 4-5h | 检测目标目录可写性；默认仅提示不可写目录，设置中开启"允许提升权限"后才弹 UAC 提权 |
 | **P1** | 统一路径快捷选择 (QuickPathControl) | [quickpath-unified.md](.sisyphus/plans/quickpath-unified.md) | 🟡中 | 4-6h | 收藏/历史/资源管理器窗口三合一控件 + QuickPathDialog + FavoriteManagerWindow；替换全部 13 个路径选择对话框 |
 | **P1** | Win11 一级右键菜单 | [win11-first-level-menu.md](.sisyphus/plans/win11-first-level-menu.md) | 🔴高 | 1-2周 | IExplorerCommand 实现，HKLM 提权注册，双接口共存 |
 | **P1** | 压缩解压文件筛选 | [file-filter-feature.md](.sisyphus/plans/file-filter-feature.md) | 🟢低 | 1-2h | 压缩解压文件筛选 |
@@ -58,7 +56,7 @@
 
 ## 跨平台移植影响分析
 
-> 对 `docs/PLAN.md` 待实现全部 26 个计划进行的 WPF→Avalonia 兼容性评估（不含调研计划本身）。（2026-06-22）
+> 对 `docs/PLAN.md` 待实现全部 24 个计划进行的 WPF→Avalonia 兼容性评估（不含调研计划本身）。（2026-06-22）
 >
 > **注意**: 已完成方案（见 `docs/PROGRESS.md` 历史设计方案索引）不再列入本分析。已废弃方案仅作参考。
 
@@ -67,20 +65,20 @@
 | 影响等级 | 数量 | 含义 |
 |---------|:----:|------|
 | 🟢 无影响 | 5 | Core 层纯 C# 逻辑，开箱即用 |
-| 🟡 需调整 | 11 | Core 逻辑可复用，UI 层（XAML/控件）需移植到 Avalonia |
-| 🔴 冲突 | 10 | 依赖 COM/注册表/Shell API/WPF 独占控件，需完全重写或平台替代方案 |
+| 🟡 需调整 | 10 | Core 逻辑可复用，UI 层（XAML/控件）需移植到 Avalonia |
+| 🔴 冲突 | 9 | 依赖 COM/注册表/Shell API/WPF 独占控件，需完全重写或平台替代方案 |
 
 ### 🟢 无影响（5 个）
 
 `portable-mode.md`、`preview-magic-detection.md`、`preview-modular-providers.md`、`self-contained-installer.md`、`selfcontained-size-optimization.md`
 
-### 🟡 需调整 — Core 可复用，UI 需移植（11 个）
+### 🟡 需调整 — Core 可复用，UI 需移植（10 个）
 
-`archive-diff.md`、`archive-rename-entry.md`、`compress-preset.md`、`compression-estimator.md`、`custom-columns.md`、`extract-journal-undo.md`、`file-filter-feature.md`、`ico-file-icon-extract.md`、`office-content-preview.md`、`zip-copy-mode-optimization.md`、`外部工具视频元数据（无计划文件）`
+`archive-diff.md`、`archive-rename-entry.md`、`compress-preset.md`、`compression-estimator.md`、`custom-columns.md`、`extract-journal-undo.md`、`file-filter-feature.md`、`ico-file-icon-extract.md`、`office-content-preview.md`、`外部工具视频元数据（无计划文件）`
 
-### 🔴 冲突 — 需完全重写或废弃（10 个）
+### 🔴 冲突 — 需完全重写或废弃（9 个）
 
-`drag-drop-direct-extract.md`（Win32 Shell API）、`embedded-thumbnail-preview.md`（Shell 缩略图 API）、`frozen-column.md`（DataGrid 冻结列）、`icon-dll.md`（原生资源 DLL）、`msi-packaging-wix.md`（Windows Installer）、`quickpath-unified.md`（WPF UserControl 体系）、`rar-compression.md`（Windows 外置 rar.exe）、`uac-elevation-permission.md`（UAC 提权）、`win11-first-level-menu.md`（COM IExplorerCommand）、`右键菜单目录结构预览（无计划文件）`
+`drag-drop-direct-extract.md`（Win32 Shell API）、`embedded-thumbnail-preview.md`（Shell 缩略图 API）、`frozen-column.md`（DataGrid 冻结列）、`icon-dll.md`（原生资源 DLL）、`msi-packaging-wix.md`（Windows Installer）、`quickpath-unified.md`（WPF UserControl 体系）、`rar-compression.md`（Windows 外置 rar.exe）、`win11-first-level-menu.md`（COM IExplorerCommand）、`右键菜单目录结构预览（无计划文件）`
 
 ### 关键发现
 
