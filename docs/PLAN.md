@@ -3,8 +3,8 @@
 > 未来待开发功能规划。已实现功能请见 [docs/PROGRESS.md](docs/PROGRESS.md)，技术架构请见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)。
 
 **项目状态**: 🟢 开发中  
-**最后更新**: 2026-06-21  
-**当前版本**: 0.4.0
+**最后更新**: 2026-06-20  
+**当前版本**: 0.4.2
 
 ---
 
@@ -17,10 +17,11 @@
 |--------|------|----------|:----:|:--------:|------|
 | **P0** | ZIP 压缩流直拷优化 | [zip-copy-mode-optimization.md](.sisyphus/plans/zip-copy-mode-optimization.md) | 🟡中 | 2-3天 | 添加/删除文件时直拷已有条目的压缩数据，避免全量解压再压缩 |
 | **P0** | 便携版模式 | [portable-mode.md](.sisyphus/plans/portable-mode.md) | 🟢低 | 1-2h | 哨兵文件触发，路径重定向到 exe 目录 |
-| **P0** | CLI/右键菜单权限不足时提权 | [uac-elevation-permission.md](.sisyphus/plans/uac-elevation-permission.md) | 🟡中 | 3-4h | 检测目标目录可写性，不可写时弹 UAC 提权 |
+| **P0** | CLI/右键菜单权限不足时提权 | [uac-elevation-permission.md](.sisyphus/plans/uac-elevation-permission.md) | 🟡中 | 4-5h | 检测目标目录可写性；默认仅提示不可写目录，设置中开启"允许提升权限"后才弹 UAC 提权 |
 | **P1** | 统一路径快捷选择 (QuickPathControl) | [quick-path-control.md](.sisyphus/plans/quick-path-control.md) | 🟡中 | 4-6h | 收藏/历史/资源管理器窗口三合一控件；系统路径（桌面/文档/下载）可隐藏不可删除 |
 | **P1** | Win11 一级右键菜单 | [win11-first-level-menu.md](.sisyphus/plans/win11-first-level-menu.md) | 🔴高 | 1-2周 | IExplorerCommand 实现，HKLM 提权注册，双接口共存 |
 | **P1** | 压缩解压文件筛选 | [file-filter-feature.md](.sisyphus/plans/file-filter-feature.md) | 🟢低 | 1-2h | 压缩解压文件筛选 |
+| **P1** | 自包含体积优化（Avalonia 迁移后） | [selfcontained-size-optimization.md](.sisyphus/plans/selfcontained-size-optimization.md) | 🟡中 | 4-6h | 三步渐进：InvariantGlobalization → 保守修剪 → 激进修剪，目标降至 20–25 MB |
 | **P2** | 魔数识别（内容检测替代扩展名检测） | [preview-magic-detection.md](.sisyphus/plans/preview-magic-detection.md) | 🔴高 | 6-8h | 按真实内容（非扩展名）判断格式 |
 | **P2** | 压缩预估 (Compression Estimator) | [compression-estimator.md](.sisyphus/plans/compression-estimator.md) | 🟡中 | 4-5h | 压缩前估算大小/耗时 |
 | **P2** | MSI 安装包 (WiX) | [msi-packaging-wix.md](.sisyphus/plans/msi-packaging-wix.md) | 🟡中 | 2-3h | Inno Setup → WiX MSI 迁移 |
@@ -32,13 +33,12 @@
 | **P3** | 压缩包对比 (Archive Diff) | [archive-diff.md](.sisyphus/plans/archive-diff.md) | 🟡中 | 3-4h | 压缩包文件级差异对比 |
 | **P3** | 原生图标 DLL | [icon-dll.md](.sisyphus/plans/icon-dll.md) | 🟡中 | 2-3h | 将 7 个 .ico 编译进原生资源 DLL，消除路径依赖 |
 | **P3** | 可插拔预览模块体系 | [preview-modular-providers.md](.sisyphus/plans/preview-modular-providers.md) | 🟡中 | 3-4h | 格式类库独立分发 |
-| **P3** | 发布 Release | [release-automation.md](.sisyphus/plans/release-automation.md) | 🟢低 | 1-2h | GitHub Actions CI/CD 自动构建安装包 + 打 tag 即发布 |
 | **P3** | 文件列表自定义列 | [custom-columns.md](.sisyphus/plans/custom-columns.md) | 🟡中 | 4-6h | 可自定义显示文件元数据列（文档标题、图片尺寸等） |
 | **P3** | 冻结列（水平滚动时列固定） | [frozen-column.md](.sisyphus/plans/frozen-column.md) | 🟢低 | 1-2h | 右键列标题冻结/取消冻结，分隔线，设置持久化 |
 | **P3** | Office 文档内容预览增强 | [office-content-preview.md](.sisyphus/plans/office-content-preview.md) | 🟡中 | 6-8h | docx/xlsx/pptx 从仅元数据扩展到富文本/表格/幻灯片文本渲染 |
 | **P3** | ICO 文件自身图标显示 | [ico-file-icon-extract.md](.sisyphus/plans/ico-file-icon-extract.md) | 🟢低 | 2-3h | ico 文件列表显示自身嵌入图标 |
 | **P3** | 右键菜单目录结构预览 | — | 🔴高 | 6-8h | COM 菜单中展示文件树 |
-| **P4** | 拖拽提取目标检测 | [drag-drop-marker-target.md](.sisyphus/plans/drag-drop-marker-target.md) | 🟡中 | 1-3h | Marker 文件探测拖放目标目录（方案待定，需对比 VFDO 后决策） |
+| **P1** | Avalonia 拖拽直接解压 | [drag-drop-direct-extract.md](.sisyphus/plans/drag-drop-direct-extract.md) | 🟡中 | 4-6h | Drop 后 WindowFromPoint+ShellWindows 检测目标路径直接解压，跳过 OLE CF_HDROP |
 | **P4** | 外部工具视频元数据 | — | 🟢低 | 2-3h | ffprobe 集成 |
 | **🔍调研** | 跨平台移植可行性 | [cross-platform-port.md](.sisyphus/plans/cross-platform-port.md) | 🟡中大 | 2-3月 | 砍 ShellExt，WPF→Avalonia，WebView2→WebKit，SharpSevenZip→SharpCompress/p7zip，DPAPI→AES-GCM |
 
@@ -51,6 +51,7 @@
 |--------|------|----------|:----:|:--------:|------|------|
 | **P3** | VirtualFileDataObject | [virtual-file-data-object.md](.sisyphus/plans/virtual-file-data-object.md) | 🔴高 | 6-8h | COM 原生 IDataObject 替代 WPF OLE 桥 | 跨平台移植（Avalonia）后不再依赖 WPF OLE 桥，无 OLE CF_HDROP bug，VFDO 无存在必要 |
 | **P2** | 文本预览语法高亮 | [text-preview-syntax-highlighting.md](.sisyphus/plans/text-preview-syntax-highlighting.md) | 🟡中 | 5-7h | AvalonEdit 替换 TextBox，支持 20+ 语言语法高亮 | AvalonEdit 是 WPF-only 控件，跨平台移植（Avalonia）后需使用 AvaloniaEdit 完全重写 |
+| **P4** | 拖拽提取目标检测 | [drag-drop-marker-target.md](.sisyphus/plans/drag-drop-marker-target.md) | 🟡中 | 1-3h | Marker 文件探测拖放目标目录 | 被 [drag-drop-direct-extract.md](.sisyphus/plans/drag-drop-direct-extract.md) 取代——WindowFromPoint+ShellWindows 更直接可靠 |
 
 ---
 
@@ -76,7 +77,7 @@
 
 ### 🔴 冲突 — 需完全重写或废弃（14 个）
 
-`com-context-menu.md`、`com-migration-mapping.md`、`dark-theme.md`、`drag-drop-marker-target.md`、`embedded-thumbnail-preview.md`、`extract-settings-window.md`、`file-assoc-per-extension.md`、`icon-dll.md`、`msi-packaging-wix.md`、`quick-path-control.md`、`quickpath-unified.md`、`rar-compression.md`、`text-preview-syntax-highlighting.md`、`virtual-file-data-object.md`
+`com-context-menu.md`、`com-migration-mapping.md`、`dark-theme.md`、`embedded-thumbnail-preview.md`、`extract-settings-window.md`、`file-assoc-per-extension.md`、`icon-dll.md`、`msi-packaging-wix.md`、`quick-path-control.md`、`quickpath-unified.md`、`rar-compression.md`、`text-preview-syntax-highlighting.md`、`virtual-file-data-object.md`
 
 ### 关键发现
 

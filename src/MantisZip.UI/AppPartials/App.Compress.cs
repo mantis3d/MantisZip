@@ -194,6 +194,45 @@ public partial class App : Application
         var outputPaths = CompressService.GetOutputPaths(request);
         progressWindow.InitBatchMode(outputPaths);
 
+        // ===== 权限检测：检查所有输出目录的可写性 =====
+        var outputDirs = outputPaths
+            .Select(p => Path.GetDirectoryName(p))
+            .Where(d => !string.IsNullOrEmpty(d))
+            .Distinct()
+            .ToList();
+
+        var unwritable = outputDirs.Where(d => !IsDirectoryWritable(d!)).Select(d => d!).ToList();
+        if (unwritable.Count > 0)
+        {
+            if (IsElevated())
+            {
+                ShowElevationFailedDialog(unwritable);
+                app.Shutdown();
+                return;
+            }
+
+            if (!AppSettings.Instance.AllowElevation)
+            {
+                ShowElevationInfoDialog(unwritable);
+                app.Shutdown();
+                return;
+            }
+
+            var result = ShowElevationDialog(unwritable);
+            if (result == true)
+            {
+                RelaunchAsAdmin(Environment.GetCommandLineArgs().Skip(1).ToArray());
+                app.Shutdown();
+                return;
+            }
+            else
+            {
+                app.Shutdown();
+                return;
+            }
+        }
+        // ===== 权限检测结束 =====
+
         var ct = progressWindow.CancellationToken;
 
         Task.Run(async () =>

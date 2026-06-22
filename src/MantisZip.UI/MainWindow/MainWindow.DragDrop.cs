@@ -111,7 +111,7 @@ public partial class MainWindow
 
             pw.SetComplete(L.T(L.Main_Status_AddDone));
             App.LogDebug("[TRACE] AddFilesToCurrentArchiveAsync: SetComplete called, waiting for auto-close");
-            await pw.AutoCloseOrWaitAsync(800, () => pw.Close());
+            await pw.AutoCloseOrWaitAsync(0, () => pw.Close());
             App.LogDebug("[TRACE] AddFilesToCurrentArchiveAsync: window closed, reloading archive");
 
             var prevFolder = _currentFolder;

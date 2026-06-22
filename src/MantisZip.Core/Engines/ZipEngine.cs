@@ -214,13 +214,13 @@ public class ZipEngine : IArchiveEngine
 
     public bool CanDelete(ArchiveFormat format) => format == ArchiveFormat.Zip;
 
-    public async Task ExtractAsync(string archivePath, string destinationPath, string? password = null, IProgress<ArchiveProgress>? progress = null, CancellationToken cancellationToken = default, ArchiveOptions? options = null)
+    public async Task<ExtractResult> ExtractAsync(string archivePath, string destinationPath, string? password = null, IProgress<ArchiveProgress>? progress = null, CancellationToken cancellationToken = default, ArchiveOptions? options = null)
     {
         CoreLog.Entry();
         CoreLog.Info($"ExtractAsync: {archivePath} -> {destinationPath}, password={(password != null ? "***" : "null")}");
         var sw = Stopwatch.StartNew();
 
-        await Task.Run(() =>
+        var result = await Task.Run(() =>
         {
             using var archive = OpenArchiveWithEncodingFallback(archivePath, password);
 
@@ -237,6 +237,7 @@ public class ZipEngine : IArchiveEngine
             var totalBytes = entries.Sum(e => e.Size);
             var processedBytes = 0L;
             var processedFiles = 0;
+            int failedEntries = 0;
 
             CoreLog.Info($"ExtractAsync: {entries.Count} entries, {totalBytes} total bytes");
 
@@ -270,47 +271,56 @@ public class ZipEngine : IArchiveEngine
                 }
 
                 var entrySize = entry.Size;
-                using (var entryStream = entry.OpenEntryStream())
-                using (var outputStream = File.Create(resolvedPath))
+
+                try
                 {
-                    var buffer = new byte[81920];
-                    var entryProcessed = 0L;
-                    var lastReportTime = DateTime.Now;
-                    var reportInterval = TimeSpan.FromMilliseconds(100);
-
-                    while (true)
+                    using (var entryStream = entry.OpenEntryStream())
+                    using (var outputStream = File.Create(resolvedPath))
                     {
-                        cancellationToken.ThrowIfCancellationRequested();
-                        var read = entryStream.Read(buffer, 0, buffer.Length);
-                        if (read <= 0) break;
+                        var buffer = new byte[81920];
+                        var entryProcessed = 0L;
+                        var lastReportTime = DateTime.Now;
+                        var reportInterval = TimeSpan.FromMilliseconds(100);
 
-                        outputStream.Write(buffer, 0, read);
-                        entryProcessed += read;
-
-                        var now = DateTime.Now;
-                        if (now - lastReportTime >= reportInterval || entryProcessed >= entrySize)
+                        while (true)
                         {
-                            var filePct = entrySize > 0 ? (double)entryProcessed / entrySize * 100 : 100;
-                            var overallPct = totalBytes > 0 ? (double)(processedBytes + entryProcessed) / totalBytes * 100 : 0;
-                            progress?.Report(new ArchiveProgress
+                            cancellationToken.ThrowIfCancellationRequested();
+                            var read = entryStream.Read(buffer, 0, buffer.Length);
+                            if (read <= 0) break;
+
+                            outputStream.Write(buffer, 0, read);
+                            entryProcessed += read;
+
+                            var now = DateTime.Now;
+                            if (now - lastReportTime >= reportInterval || entryProcessed >= entrySize)
                             {
-                                CurrentFile = entryKey,
-                                TotalFiles = entries.Count,
-                                ProcessedFiles = processedFiles,
-                                TotalBytes = totalBytes,
-                                ProcessedBytes = processedBytes + entryProcessed,
-                                PercentComplete = overallPct,
-                                FilePercentComplete = filePct
-                            });
-                            lastReportTime = now;
+                                var filePct = entrySize > 0 ? (double)entryProcessed / entrySize * 100 : 100;
+                                var overallPct = totalBytes > 0 ? (double)(processedBytes + entryProcessed) / totalBytes * 100 : 0;
+                                progress?.Report(new ArchiveProgress
+                                {
+                                    CurrentFile = entryKey,
+                                    TotalFiles = entries.Count,
+                                    ProcessedFiles = processedFiles,
+                                    TotalBytes = totalBytes,
+                                    ProcessedBytes = processedBytes + entryProcessed,
+                                    PercentComplete = overallPct,
+                                    FilePercentComplete = filePct
+                                });
+                                lastReportTime = now;
+                            }
                         }
                     }
-                }
-                // 恢复文件原始修改时间
-                try { File.SetLastWriteTime(resolvedPath, entryModified); } catch (Exception tsEx) { CoreLog.Info($"ExtractAsync: failed to set timestamp on {resolvedPath}: {tsEx.Message}"); }
+                    // 恢复文件原始修改时间
+                    try { File.SetLastWriteTime(resolvedPath, entryModified); } catch (Exception tsEx) { CoreLog.Info($"ExtractAsync: failed to set timestamp on {resolvedPath}: {tsEx.Message}"); }
 
-                processedBytes += entrySize;
-                processedFiles++;
+                    processedBytes += entrySize;
+                    processedFiles++;
+                }
+                catch (UnauthorizedAccessException uax)
+                {
+                    CoreLog.Info($"ExtractAsync: permission denied for '{entryKey}': {uax.Message}");
+                    failedEntries++;
+                }
             }
 
             progress?.Report(new ArchiveProgress
@@ -319,10 +329,12 @@ public class ZipEngine : IArchiveEngine
                 PercentComplete = 100
             });
 
-            CoreLog.Info($"ExtractAsync: done, {processedFiles} files, {processedBytes} bytes, {sw.ElapsedMilliseconds}ms");
+            CoreLog.Info($"ExtractAsync: done, {processedFiles} files, {processedBytes} bytes, {sw.ElapsedMilliseconds}ms, failedEntries={failedEntries}");
+            return new ExtractResult { SucceededEntries = processedFiles, FailedEntries = failedEntries };
         }, cancellationToken).ConfigureAwait(false);
 
         CoreLog.Exit();
+        return result;
     }
 
     public async Task ExtractEntriesAsync(
@@ -764,6 +776,87 @@ public class ZipEngine : IArchiveEngine
             long workTotal = oldTotalBytes + oldTotalBytes + newTotalBytes;
             if (workTotal == 0) workTotal = 1;
 
+            // ── Optimized copy-mode path (binary rewrite, no decompress-recompress) ──
+            if (!(options.Encrypt && !string.IsNullOrEmpty(options.Password)))
+            {
+                string? tempArchiveFast = null;
+                try
+                {
+                    CoreLog.Info("AddToArchiveAsync: attempting copy-mode fast path");
+                    tempArchiveFast = Path.GetTempFileName() + ".zip";
+
+                    // Detect encoding: check UTF-8 flag to choose between UTF-8 and GBK
+                    var encoding = ZipHasUtf8Flag(archivePath) ? Encoding.UTF8 : Encoding.GetEncoding("gbk");
+
+                    // Build NewEntry list from source paths with auto-cleanup
+                    var newEntries = new List<NewEntry>();
+                    var streamsToDispose = new List<Stream>();
+                    try
+                    {
+                        foreach (var (fullPath, entryName) in newFiles)
+                        {
+                            var fileStream = File.OpenRead(fullPath);
+                            streamsToDispose.Add(fileStream);
+                            var fi = new FileInfo(fullPath);
+                            newEntries.Add(new NewEntry(
+                                EntryName: entryName.Replace('\\', '/'),
+                                Data: fileStream,
+                                LastModified: fi.LastWriteTime,
+                                Size: fi.Length));
+                        }
+
+                        var result = ZipBinaryRewriter.RewriteAsync(
+                            sourcePath: archivePath,
+                            destPath: tempArchiveFast,
+                            keepEntryNames: null,  // keep all existing entries
+                            addEntries: newEntries,
+                            encoding: encoding,
+                            comment: options.Comment,  // null = preserve original comment
+                            progress: progress,
+                            cancellationToken: cancellationToken).GetAwaiter().GetResult();
+
+                        // Atomic replace (same retry pattern as legacy path)
+                        for (int retry = 0; ; retry++)
+                        {
+                            cancellationToken.ThrowIfCancellationRequested();
+                            try
+                            {
+                                File.Delete(archivePath);
+                                File.Move(tempArchiveFast, archivePath);
+                                break;
+                            }
+                            catch (IOException) when (retry < 5)
+                            {
+                                Thread.Sleep(100);
+                            }
+                        }
+
+                        progress?.Report(new ArchiveProgress
+                        {
+                            CurrentFile = string.Empty,
+                            PercentComplete = 100,
+                            FilePercentComplete = 100
+                        });
+
+                        CoreLog.Info($"AddToArchiveAsync: copy-mode fast path done, {result.EntriesCopied} entries copied, {result.EntriesAdded} entries added");
+                        return;
+                    }
+                    finally
+                    {
+                        foreach (var s in streamsToDispose)
+                            s.Dispose();
+                    }
+                }
+                catch (ZipCopyModeException)
+                {
+                    CoreLog.Info("AddToArchiveAsync: copy-mode not available, falling back to legacy path");
+                    if (tempArchiveFast != null)
+                    {
+                        try { if (File.Exists(tempArchiveFast)) File.Delete(tempArchiveFast); } catch { }
+                    }
+                }
+            }
+
             // 创建临时目录
             var tempDir = Path.Combine(Path.GetTempPath(), "MantisZip", "Rebuild", Guid.NewGuid().ToString());
             var tempArchive = tempDir + ".new.zip";
@@ -1036,6 +1129,85 @@ public class ZipEngine : IArchiveEngine
                 return;
             }
 
+            // ── Optimized copy-mode path (binary rewrite, no decompress-recompress) ──
+            {
+                string? tempArchiveFast = null;
+                try
+                {
+                    CoreLog.Info("DeleteEntriesAsync: attempting copy-mode fast path");
+                    tempArchiveFast = Path.GetTempFileName() + ".zip";
+
+                    // Detect encoding
+                    var encoding = ZipHasUtf8Flag(archivePath) ? Encoding.UTF8 : Encoding.GetEncoding("gbk");
+
+                    // Build keep set: all entries NOT in entryPaths
+                    var deletedNormalized = new HashSet<string>(entryPaths.Select(p => p.Replace('\\', '/')), StringComparer.OrdinalIgnoreCase);
+                    var keepSet = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+                    using (var archive = OpenArchiveWithEncodingFallback(archivePath, password))
+                    {
+                        foreach (var entry in archive.Entries)
+                        {
+                            var name = entry.Key ?? string.Empty;
+                            if (!deletedNormalized.Contains(name.Replace('\\', '/')))
+                                keepSet.Add(name);
+                        }
+                    }
+
+                    if (keepSet.Count == 0)
+                    {
+                        // All entries to be deleted — just delete the archive
+                        try { File.Delete(archivePath); } catch { }
+                        CoreLog.Info("DeleteEntriesAsync: all entries deleted via copy-mode, removed archive");
+                        return;
+                    }
+
+                    var result = ZipBinaryRewriter.RewriteAsync(
+                        sourcePath: archivePath,
+                        destPath: tempArchiveFast,
+                        keepEntryNames: keepSet,
+                        addEntries: null,
+                        encoding: encoding,
+                        comment: null,  // preserve original comment
+                        progress: progress,
+                        cancellationToken: cancellationToken).GetAwaiter().GetResult();
+
+                    // Atomic replace
+                    for (int retry = 0; ; retry++)
+                    {
+                        cancellationToken.ThrowIfCancellationRequested();
+                        try
+                        {
+                            File.Delete(archivePath);
+                            File.Move(tempArchiveFast, archivePath);
+                            break;
+                        }
+                        catch (IOException) when (retry < 5)
+                        {
+                            Thread.Sleep(100);
+                        }
+                    }
+
+                    progress?.Report(new ArchiveProgress
+                    {
+                        CurrentFile = string.Empty,
+                        PercentComplete = 100,
+                        FilePercentComplete = 100
+                    });
+
+                    CoreLog.Info($"DeleteEntriesAsync: copy-mode fast path done, {result.EntriesCopied} entries kept");
+                    return;
+                }
+                catch (ZipCopyModeException)
+                {
+                    CoreLog.Info("DeleteEntriesAsync: copy-mode not available, falling back to legacy path");
+                    if (tempArchiveFast != null)
+                    {
+                        try { if (File.Exists(tempArchiveFast)) File.Delete(tempArchiveFast); } catch { }
+                    }
+                }
+            }
+
             // 创建临时目录和工作文件
             var tempDir = Path.Combine(Path.GetTempPath(), "MantisZip", "DeleteTemp", Guid.NewGuid().ToString());
             var tempArchive = tempDir + ".new.zip";
@@ -1095,6 +1267,13 @@ public class ZipEngine : IArchiveEngine
                     try { File.Delete(archivePath); } catch { CoreLog.Trace("ZipEngine: failed to delete empty archive '{0}'", archivePath); }
                     CoreLog.Info("DeleteEntriesAsync: all entries deleted, removed archive");
                     return;
+                }
+
+                // ── Check if source archive is encrypted ──
+                bool sourceIsEncrypted = false;
+                using (var checkArchive = OpenArchiveWithEncodingFallback(archivePath, password))
+                {
+                    sourceIsEncrypted = checkArchive.Entries.Any(e => e.IsEncrypted);
                 }
 
                 // Pass 2: 提取保留条目到临时目录（带进度）
@@ -1179,7 +1358,7 @@ public class ZipEngine : IArchiveEngine
                     }
                 }
 
-                // === Phase 2: 扫描临时目录并重压缩 ===
+                // === Phase 2: 重压缩保留条目 ===
                 var compressFiles = new List<(string FullPath, string RelativePath)>();
                 long compressTotalBytes = 0;
                 foreach (var file in Directory.GetFiles(tempDir, "*", SearchOption.AllDirectories))
@@ -1191,54 +1370,111 @@ public class ZipEngine : IArchiveEngine
                 if (compressTotalBytes == 0) compressTotalBytes = 1;
                 long compressProcessed = 0;
 
-                using (var fsOut = File.Create(tempArchive))
-                {
-                    var writerOptions = new ZipWriterOptions(CompressionType.Deflate)
-                    {
-                        CompressionLevel = 6,
-                        ArchiveEncoding = new ArchiveEncoding { Default = Encoding.UTF8 },
-                    };
-                    using var zipWriter = new ZipWriter(fsOut, writerOptions);
+                CoreLog.Trace($"[TRACE] ZipEngine.DeleteEntriesAsync: Phase 2 — recompressing {compressFiles.Count} files, {compressTotalBytes} bytes");
 
-                    foreach (var (fullPath, relPath) in compressFiles)
+                if (sourceIsEncrypted && !string.IsNullOrEmpty(password))
+                {
+                    // SharpSevenZip 加密路径
+                    using (var fsOut = File.Create(tempArchive))
                     {
-                        cancellationToken.ThrowIfCancellationRequested();
-                        var fi = new FileInfo(fullPath);
-                        var entryPath = relPath.Replace('\\', '/');
-                        var entryOptions = new ZipWriterEntryOptions
+                        fsOut.Dispose();
+
+                        SevenZipEngine.EnsureLibraryPath();
+
+                        var s7zCompressor = new SharpSevenZipCompressor
                         {
-                            ModificationDateTime = fi.LastWriteTime,
+                            ArchiveFormat = OutArchiveFormat.Zip,
+                            ZipEncryptionMethod = ZipEncryptionMethod.Aes256,
+                            CompressionMethod = CompressionMethod.Deflate,
+                            CompressionLevel = SharpSevenZip.CompressionLevel.Normal,
+                            IncludeEmptyDirectories = true,
+                            DirectoryStructure = true,
                         };
 
-                        using (var entryStream = zipWriter.WriteToStream(entryPath, entryOptions))
-                        using (var fsInput = File.OpenRead(fullPath))
+                        var s7zAccumPct = 0.0;
+                        var s7zCurrentFile = "";
+                        s7zCompressor.FileCompressionStarted += (_, e) =>
                         {
-                            var buffer = new byte[81920];
-                            long totalRead = 0;
-                            var fiLen = fi.Length;
-
-                            while (totalRead < fiLen)
+                            s7zCurrentFile = e.FileName ?? "";
+                        };
+                        s7zCompressor.Compressing += (_, e) =>
+                        {
+                            s7zAccumPct = Math.Min(100, s7zAccumPct + e.PercentDelta);
+                            var cumProcessed = processedBytes + (long)(compressTotalBytes * s7zAccumPct / 100);
+                            var pct = (double)cumProcessed / workTotal * 100;
+                            progress?.Report(new ArchiveProgress
                             {
-                                cancellationToken.ThrowIfCancellationRequested();
-                                var read = fsInput.Read(buffer, 0, buffer.Length);
-                                if (read <= 0) break;
-                                entryStream.Write(buffer, 0, read);
-                                totalRead += read;
-                                compressProcessed += read;
+                                CurrentFile = "正在压缩: " + s7zCurrentFile,
+                                PercentComplete = Math.Min(pct, 100),
+                                FilePercentComplete = s7zAccumPct,
+                            });
+                        };
 
-                                var now = DateTime.Now;
-                                if (now - lastReportTime >= reportInterval || totalRead >= fiLen)
+                        var commonRoot = tempDir.Length;
+                        if (!tempDir.EndsWith(Path.DirectorySeparatorChar.ToString()))
+                            commonRoot++;
+
+                        var allFilePaths = compressFiles.Select(f => f.FullPath).ToArray();
+                        if (allFilePaths.Length > 0)
+                        {
+                            s7zCompressor.CompressFilesEncrypted(
+                                tempArchive, commonRoot,
+                                password ?? "", allFilePaths);
+                        }
+                    }
+                }
+                else
+                {
+                    // 非加密路径：SharpCompress ZipWriter（原实现）
+                    using (var fsOut = File.Create(tempArchive))
+                    {
+                        var writerOptions = new ZipWriterOptions(CompressionType.Deflate)
+                        {
+                            CompressionLevel = 6,
+                            ArchiveEncoding = new ArchiveEncoding { Default = Encoding.UTF8 },
+                        };
+                        using var zipWriter = new ZipWriter(fsOut, writerOptions);
+
+                        foreach (var (fullPath, relPath) in compressFiles)
+                        {
+                            cancellationToken.ThrowIfCancellationRequested();
+                            var fi = new FileInfo(fullPath);
+                            var entryPath = relPath.Replace('\\', '/');
+                            var entryOptions = new ZipWriterEntryOptions
+                            {
+                                ModificationDateTime = fi.LastWriteTime,
+                            };
+
+                            using (var entryStream = zipWriter.WriteToStream(entryPath, entryOptions))
+                            using (var fsInput = File.OpenRead(fullPath))
+                            {
+                                var buffer = new byte[81920];
+                                long totalRead = 0;
+                                var fiLen = fi.Length;
+
+                                while (totalRead < fiLen)
                                 {
-                                    var cumProcessed = processedBytes + compressProcessed;
-                                    var pct = (double)cumProcessed / workTotal * 100;
-                                    var filePct = fiLen > 0 ? (double)totalRead / fiLen * 100 : 100;
-                                    progress?.Report(new ArchiveProgress
+                                    cancellationToken.ThrowIfCancellationRequested();
+                                    var read = fsInput.Read(buffer, 0, buffer.Length);
+                                    if (read <= 0) break;
+                                    entryStream.Write(buffer, 0, read);
+                                    totalRead += read;
+                                    compressProcessed += read;
+
+                                    var now = DateTime.Now;
+                                    if (now - lastReportTime >= reportInterval || totalRead >= fiLen)
                                     {
-                                        CurrentFile = "正在压缩: " + relPath,
-                                        PercentComplete = Math.Min(pct, 100),
-                                        FilePercentComplete = filePct
-                                    });
-                                    lastReportTime = now;
+                                        var cumProcessed = processedBytes + compressProcessed;
+                                        var pct = (double)cumProcessed / workTotal * 100;
+                                        var filePct = fiLen > 0 ? (double)totalRead / fiLen * 100 : 100;
+                                        progress?.Report(new ArchiveProgress
+                                        {
+                                            CurrentFile = "正在压缩: " + relPath,
+                                            PercentComplete = Math.Min(pct, 100),
+                                            FilePercentComplete = filePct
+                                        });
+                                        lastReportTime = now;
+                                    }
                                 }
                             }
                         }

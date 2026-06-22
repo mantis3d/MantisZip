@@ -264,7 +264,7 @@ public class SevenZipEngine : IArchiveEngine
 
     #region ExtractAsync（SharpSevenZipExtractor）
 
-    public async Task ExtractAsync(
+    public async Task<ExtractResult> ExtractAsync(
         string archivePath, string destinationPath,
         string? password = null,
         IProgress<ArchiveProgress>? progress = null,
@@ -277,7 +277,7 @@ public class SevenZipEngine : IArchiveEngine
 
         EnsureLibraryPath();
 
-        await Task.Run(() =>
+        var result = await Task.Run(() =>
         {
             using var extractor = string.IsNullOrEmpty(password)
                 ? new SharpSevenZipExtractor(archivePath)
@@ -295,6 +295,7 @@ public class SevenZipEngine : IArchiveEngine
             var allEntries = extractor.ArchiveFileData.ToList();
             int totalFiles = allEntries.Count(e => !e.IsDirectory);
             int processedFiles = 0;
+            int failedEntries = 0;
             var lastReportTime = DateTime.Now;
             var reportInterval = TimeSpan.FromMilliseconds(100);
 
@@ -336,55 +337,63 @@ public class SevenZipEngine : IArchiveEngine
                     ProcessedFiles = processedFiles,
                 });
 
-                // 使用 WriteProgressStream 在 ExtractFile 写入过程中获得逐块进度
-                var lastFileReport = DateTime.Now;
-                using (var fileStream = new FileStream(resolvedPath, FileMode.Create, FileAccess.Write))
-                using (var progressStream = new WriteProgressStream(fileStream, bytesWritten =>
+                try
                 {
-                    // 每 100ms 更新一次进度（与 ZipEngine 一致），避免 UI 过载
+                    // 使用 WriteProgressStream 在 ExtractFile 写入过程中获得逐块进度
+                    var lastFileReport = DateTime.Now;
+                    using (var fileStream = new FileStream(resolvedPath, FileMode.Create, FileAccess.Write))
+                    using (var progressStream = new WriteProgressStream(fileStream, bytesWritten =>
+                    {
+                        // 每 100ms 更新一次进度（与 ZipEngine 一致），避免 UI 过载
+                        var now = DateTime.Now;
+                        if (now - lastFileReport < reportInterval && bytesWritten < entrySize)
+                            return;
+
+                        var filePct = entrySize > 0 ? (double)bytesWritten / entrySize * 100 : 100;
+                        var overallPct = totalFiles > 0
+                            ? (double)(processedFiles + (double)bytesWritten / entrySize) / totalFiles * 100
+                            : 0;
+
+                        progress?.Report(new ArchiveProgress
+                        {
+                            CurrentFile = fileName,
+                            PercentComplete = Math.Min(overallPct, 100),
+                            FilePercentComplete = Math.Min(filePct, 100),
+                            TotalFiles = totalFiles,
+                            ProcessedFiles = processedFiles,
+                        });
+                        lastFileReport = now;
+                    }))
+                    {
+                        extractor.ExtractFile(entry.Index, progressStream);
+                    }
+
+                    try { File.SetLastWriteTime(resolvedPath, entry.LastWriteTime); }
+                    catch (Exception tsEx)
+                    {
+                        CoreLog.Info($"ExtractAsync: failed to set timestamp on {resolvedPath}: {tsEx.Message}");
+                    }
+
+                    processedFiles++;
+
                     var now = DateTime.Now;
-                    if (now - lastFileReport < reportInterval && bytesWritten < entrySize)
-                        return;
-
-                    var filePct = entrySize > 0 ? (double)bytesWritten / entrySize * 100 : 100;
-                    var overallPct = totalFiles > 0
-                        ? (double)(processedFiles + (double)bytesWritten / entrySize) / totalFiles * 100
-                        : 0;
-
-                    progress?.Report(new ArchiveProgress
+                    if (now - lastReportTime >= reportInterval || processedFiles == totalFiles)
                     {
-                        CurrentFile = fileName,
-                        PercentComplete = Math.Min(overallPct, 100),
-                        FilePercentComplete = Math.Min(filePct, 100),
-                        TotalFiles = totalFiles,
-                        ProcessedFiles = processedFiles,
-                    });
-                    lastFileReport = now;
-                }))
-                {
-                    extractor.ExtractFile(entry.Index, progressStream);
+                        progress?.Report(new ArchiveProgress
+                        {
+                            CurrentFile = fileName,
+                            PercentComplete = totalFiles > 0 ? (double)processedFiles / totalFiles * 100 : 100,
+                            FilePercentComplete = 100,
+                            TotalFiles = totalFiles,
+                            ProcessedFiles = processedFiles,
+                        });
+                        lastReportTime = now;
+                    }
                 }
-
-                try { File.SetLastWriteTime(resolvedPath, entry.LastWriteTime); }
-                catch (Exception tsEx)
+                catch (UnauthorizedAccessException uax)
                 {
-                    CoreLog.Info($"ExtractAsync: failed to set timestamp on {resolvedPath}: {tsEx.Message}");
-                }
-
-                processedFiles++;
-
-                var now = DateTime.Now;
-                if (now - lastReportTime >= reportInterval || processedFiles == totalFiles)
-                {
-                    progress?.Report(new ArchiveProgress
-                    {
-                        CurrentFile = fileName,
-                        PercentComplete = totalFiles > 0 ? (double)processedFiles / totalFiles * 100 : 100,
-                        FilePercentComplete = 100,
-                        TotalFiles = totalFiles,
-                        ProcessedFiles = processedFiles,
-                    });
-                    lastReportTime = now;
+                    CoreLog.Info($"ExtractAsync: permission denied for '{fileName}': {uax.Message}");
+                    failedEntries++;
                 }
             }
 
@@ -396,10 +405,12 @@ public class SevenZipEngine : IArchiveEngine
                 ProcessedFiles = processedFiles,
             });
 
-            CoreLog.Info($"ExtractAsync: done, {sw.ElapsedMilliseconds}ms");
+            CoreLog.Info($"ExtractAsync: done, {sw.ElapsedMilliseconds}ms, failedEntries={failedEntries}");
+            return new ExtractResult { SucceededEntries = processedFiles, FailedEntries = failedEntries };
         }, cancellationToken).ConfigureAwait(false);
 
         CoreLog.Exit();
+        return result;
     }
 
     #endregion
