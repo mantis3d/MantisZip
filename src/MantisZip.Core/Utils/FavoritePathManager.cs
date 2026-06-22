@@ -89,9 +89,11 @@ public static class FavoritePathManager
         if (string.IsNullOrWhiteSpace(path)) return;
         lock (_lock)
         {
-            if (IsSystemPathInternal(path, out _)) throw new InvalidOperationException("System paths cannot be removed.");
-            _userFavorites.RemoveAll(f => string.Equals(f.Path, path, StringComparison.OrdinalIgnoreCase));
-            Save();
+            // 用户收藏可能包含与系统路径相同的路径名（如手动添加的 Downloads 路径）
+            // 直接匹配 _userFavorites 删除，不通过 IsSystemPathInternal 抛异常拦截
+            var removed = _userFavorites.RemoveAll(f => string.Equals(f.Path, path, StringComparison.OrdinalIgnoreCase));
+            if (removed > 0)
+                Save();
         }
     }
 

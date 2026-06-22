@@ -18,9 +18,7 @@
 
 ## 版本历史（从新到旧）
 
-### v0.4.3 (2026-06-21) 压缩包内逐条目权限跳过 + UAC 弹窗行为修复
-
-### v0.4.3+ (2026-06-22) QuickPathControl 统一路径选择 + 资源管理器窗口检测 + 书签管理器菜单
+### v0.4.3 (2026-06-22) QuickPathControl 统一路径选择 + 资源管理器窗口检测 + 书签管理器 + 权限跳过
 
 1. **QuickPathControl 统一路径选择（压缩/解压窗口）**：
    - CompressSettingsWindow：原有 OutputPathTextBox + BrowseOutputButton → QuickPathControl（文件保存模式），新增独立 FileNameTextBox 输入文件名
@@ -34,9 +32,7 @@
    - 新增 Main_Menu_BookmarkManager 本地化键（中/英）
 4. **布局修复**：
    - CompressSettingsWindow 内 Grid 从 5 行扩展至 7 行，消除 FormatOptionsPanel 与 VolumeSize 重叠
-   - 所有 234 个测试通过
-
-1. **压缩包内逐条目权限跳过**：
+5. **压缩包内逐条目权限跳过**：
    - 新增 `ExtractResult` 类（`SucceededEntries`/`FailedEntries`）
    - `IArchiveEngine.ExtractAsync` 返回类型从 `Task` 改为 `Task<ExtractResult>`
    - ZipEngine/SevenZipEngine/TarGzEngine 逐条目循环包 `try-catch(UnauthorizedAccessException)`，跳过失败条目继续处理其余

@@ -21,10 +21,11 @@ public partial class FavoriteManagerWindow : Window
     {
         var allItems = new List<FavoriteItemViewModel>();
 
-        // System paths
+        // System paths (skip hidden ones)
         foreach (var sp in FavoritePathManager.GetSystemPaths())
         {
-            var hidden = FavoritePathManager.IsSystemPathHidden(sp.SystemKey ?? "");
+            if (FavoritePathManager.IsSystemPathHidden(sp.SystemKey ?? ""))
+                continue;
             allItems.Add(new FavoriteItemViewModel
             {
                 Name = sp.Name,
@@ -32,7 +33,7 @@ public partial class FavoriteManagerWindow : Window
                 TypeLabel = "系统",
                 IsSystem = true,
                 SystemKey = sp.SystemKey ?? "",
-                IsHidden = hidden
+                IsHidden = false
             });
         }
 
