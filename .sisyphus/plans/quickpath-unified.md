@@ -2,27 +2,32 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use subagent-driven-development (recommended) or executing-plans to implement plan task-by-task.
 
-**Goal:** 统一 MantisZip 所有路径选择场景，用 QuickPathControl（⭐收藏/🕐历史/🪟资源管理器/📁浏览）替换全部 13 个路径选择对话框，并在 CompressSettingsWindow 中添加 DynamicFormatOptionsPanel（格式特有设置选项随格式动态切换）。
+**Goal:** 统一 MantisZip 所有路径选择场景，用带 ⭐收藏/🕐历史/🪟资源管理器快捷入口的自定义文件选择器替换系统对话框。WPF 阶段的 QuickPathControl + 数据层已实现基础能力；**最终形态在 Avalonia 版本中实现**——构建一个跨平台的 CustomFilePickerDialog，包含文件浏览区域 + ⭐🕐🪟 快捷入口 + 可扩展底部控件插槽。
 
-**Architecture:** QuickPathControl WPF UserControl（三种模式：文件夹/文件保存/文件打开）+ 数据管理器层（FavoritePathManager/PathHistoryManager/ExplorerWindowTracker）+ 嵌入所有现有对话框。DynamicFormatOptionsPanel 通过 ContentControl 固定槽位切换格式选项。
+**Architecture (WPF 已有):** QuickPathControl WPF UserControl（三种模式）+ 数据管理器层（FavoritePathManager/PathHistoryManager/ExplorerWindowTracker）+ 嵌入现有对话框。DynamicFormatOptionsPanel 提供格式选项控件。
+**Architecture (Avalonia 目标):** CustomFilePickerDialog（文件列表 + ⭐🕐🪟 工具栏 + 额外控件插槽）+ Core 数据层复用 + 通过 StorageProvider 跨平台枚举目录。
 
-**Tech Stack:** .NET 9 WPF, SharpSevenZip (7z.dll), SharpCompress, System.Text.Json, Ookii.Dialogs.Wpf
+**Tech Stack:** 
+- **WPF (现有):** .NET 9 WPF, SharpSevenZip, SharpCompress, Ookii.Dialogs.Wpf
+- **Avalonia (目标):** Avalonia UI, StorageProvider, Core 数据层（跨平台通用）
 
 ---
 
 ## TL;DR
 
-> **Quick Summary**: 整合原有的 QuickPathControl 计划和新的自定义保存对话框设计，统一所有路径选择交互。
+> **Quick Summary**: 整合原有的 QuickPathControl 计划和新的自定义保存对话框设计，统一所有路径选择交互。WPF 阶段完成数据层 + QuickPathControl 组件 + CompressSettingsWindow 嵌入；**系统对话框替换部分推迟到 Avalonia 阶段**，以 CustomFilePickerDialog（文件列表 + ⭐🕐🪟 快捷入口 + 底部控件插槽）统一替换所有 OpenFileDialog / SaveFileDialog / FolderBrowserDialog。 计划和新的自定义保存对话框设计，统一所有路径选择交互。
 >
-> **Deliverables**:
+> **Deliverables (WPF ✅ 已完成)**:
 > - Core 数据层：ExplorerWindowTracker, FavoritePathManager, PathHistoryManager
-> - UI 组件：QuickPathControl（增强三种模式）, QuickPathDialog, FavoriteManagerWindow, DynamicFormatOptionsPanel
-> - 集成：CompressSettingsWindow（QuickPathControl + 格式动态选项）, UnifiedExtractDialog, SettingsWindow, PasswordManagerWindow, ArchiveSaveAsDialog
-> - AGENTS.md 修正（7z 加密预览已验证支持）
+> - UI 组件：QuickPathControl（三种模式）, QuickPathDialog, FavoriteManagerWindow, DynamicFormatOptionsPanel
+> - 集成：CompressSettingsWindow（QuickPathControl + 格式动态选项）
 >
-> **Estimated Effort**: Large
-> **Parallel Execution**: YES — 6 waves
-> **Critical Path**: T1 → T4 → T7/T8 → ... → Final Verification
+> **Deliverables (Avalonia 🚧 目标)**:
+> - CustomFilePickerDialog（跨平台自定义文件选择器，含文件列表 + ⭐🕐🪟 工具栏 + 底部控件插槽）
+> - 替换全部 ~8 处系统对话框调用
+>
+> **Estimated Effort**: Medium (Avalonia 阶段)
+> **Parallel Execution**: YES — Core 数据层可复用，UI 独立构建
 
 ---
 
@@ -794,6 +799,120 @@ Wave FINAL (验证):
 | 15 | `test: add unit tests for FavoritePathManager and PathHistoryManager` | `tests/...` |
 | 16 | `test: add integration tests for ExplorerWindowTracker` | `tests/...` |
 | 17 | `fix(docs): correct 7z encrypted preview claim in AGENTS.md` | `AGENTS.md` |
+
+---
+
+## Avalonia 迁移策略 — 自定义路径选择器
+
+> 在 WPF 上大动干戈替换系统对话框是走弯路，因为 WPF 即将被 Avalonia 替换。
+
+### 背景
+
+WPF 版本的路径选择已实现 QuickPathControl（⭐🕐🪟📁 四个按钮 + 下拉菜单），但这里的"📁 浏览"按钮仍然会弹系统文件对话框（OpenFileDialog / SaveFileDialog / VistaFolderBrowserDialog）。这是目前交互链路上的断裂点。
+
+原本考虑在 WPF 上通过 `IFileDialogCustomize` COM 接口给系统对话框底部加额外控件，但随着 Avalonia 迁移启动，这条路不再值得走：
+
+| 能力 | WPF (CustomPlaces + COM) | Avalonia (StorageProvider) |
+|------|-------------------------|---------------------------|
+| 加左侧快捷方式 | ✅ CustomPlaces | ❌ 不支持 |
+| 底部加自定义控件 | ✅ IFileDialogCustomize | ❌ 不支持 |
+| 文件浏览区域 | 系统原生 | ❌ 必须自己实现 |
+| 跨平台 | ❌ Windows only | ✅ Win/Mac/Linux |
+
+### 最终目标：Avalonia `CustomFilePickerDialog`
+
+一个自定义的、跨平台的文件选择器窗口，直接替换所有 `OpenFileDialog` / `SaveFileDialog` / `VistaFolderBrowserDialog` 调用。
+
+```
+┌─── 选择文件/文件夹 ──────────────────────────────┐
+│ [⭐ 收藏] [🕐 最近] [🪟 资源管理器] 地址: [______ ▾] │  ← ⭐🕐🪟 在窗口顶部
+├──────────────────────────────────────────────────┤
+│ 📁 文件/文件夹列表（Avalonia 控件实现）                │
+│   ..                  ↑ 上一级                     │  ← 跨平台文件浏览
+│   📂 Projects/         📄 document.zip             │
+│   📂 Photos/           📄 readme.md               │
+│   📂 Downloads/                                    │
+│                                                    │
+├──────────────────────────────────────────────────┤
+│ 文件名: [________________]                          │
+│ 文件类型: [所有支持的格式    ▾]                    │
+├──────────────────────────────────────────────────┤
+│ ↓ 额外控件区域（ContentControl 插槽，按场景嵌入）    │  ← 格式选项、加密、解压选项
+│   [格式: ▾] [☐ 加密] [密码: ______]               │
+│                                                    │
+│              [确定]              [取消]              │
+└────────────────────────────────────────────────────┘
+```
+
+### 架构设计
+
+```
+┌─ Core 层（已有，跨平台通用） ──────────────────────┐
+│  FavoritePathManager     — favorites.json 读写       │
+│  PathHistoryManager      — 历史 50 条去重            │
+│  ExplorerWindowTracker   — COM 枚举资源管理器        │
+│                          （Windows 专用，try/catch 降级）│
+└─────────────────────────────────────────────────────┘
+                          ↓ 提供数据
+┌─ Avalonia UI ──────────────────────────────────────┐
+│  CustomFilePickerDialog.axaml / .axaml.cs           │
+│  ├── ⭐ 收藏下拉按钮 → FavoritePathManager           │
+│  ├── 🕐 历史下拉按钮 → PathHistoryManager            │
+│  ├── 🪟 窗口下拉按钮 → ExplorerWindowTracker         │
+│  ├── 📁 文件列表区域 → Avalonia ListBox + StorageProvider │
+│  ├── 地址栏 TextBox → 手动输入/导航                  │
+│  └── ⬇ 额外控件 ContentControl → 按场景注入           │
+│                                                     │
+│  Mode: OpenFile | SaveFile | PickFolder              │
+│  Result: SelectedPath (string) + Custom data         │
+└─────────────────────────────────────────────────────┘
+```
+
+### 三种模式
+
+| 模式 | 行为 | 文件列表显示 | 额外控件插槽 |
+|------|------|-----------|------------|
+| `OpenFile` | 选择已存在文件（单文件） | 显示文件 + 文件夹 | 可选（如无则隐藏） |
+| `SaveFile` | 选择目录 + 输入文件名 | 显示文件 + 文件夹 | 格式选项 + 加密等 |
+| `PickFolder` | 选择目录（不选文件） | 仅显示文件夹 | 解压选项等 |
+
+### 替换清单（Avalonia 版本）
+
+| 场景 | 当前方式 | Avalonia 替换 |
+|------|---------|-------------|
+| SettingsWindow → 选 7z.dll | `OpenFileDialog` | `CustomFilePickerDialog.OpenFile()` |
+| MainWindow → 打开压缩包 | `OpenFileDialog` | `CustomFilePickerDialog.OpenFile()` |
+| 右键 → 解压到…… | `VistaFolderBrowserDialog` | `CustomFilePickerDialog.PickFolder()` + 解压选项插槽 |
+| 压缩 → 保存到 | `SaveFileDialog` | `CustomFilePickerDialog.SaveFile()` + 格式选项插槽 |
+| 密码 → 导入 | `OpenFileDialog` | `CustomFilePickerDialog.OpenFile()` |
+| 密码 → 导出 | `SaveFileDialog` | `CustomFilePickerDialog.SaveFile()` |
+| 启动 → 选 7z.dll | `OpenFileDialog` | `CustomFilePickerDialog.OpenFile()` |
+| 压缩窗口 → 添加文件 | `OpenFileDialog` | `CustomFilePickerDialog.OpenFile(multiselect)` |
+
+### 与现有 WPF 组件的关系
+
+| WPF 组件 | Avalonia 策略 |
+|----------|-------------|
+| QuickPathControl | 保留作为**内嵌式路径选择**（嵌入在窗口里的路径输入行，不是弹窗），在 Avalonia 中重写 UserControl |
+| QuickPathDialog | 被 CustomFilePickerDialog 取代（不再弹两层） |
+| DynamicFormatOptionsPanel | 保留，作为额外控件嵌入 CustomFilePickerDialog 底部 |
+| UnifiedExtractDialog | 被 CustomFilePickerDialog.PickFolder() + 解压选项插槽 取代 |
+| ArchiveSaveAsDialog | 被 CustomFilePickerDialog.SaveFile() + 格式选项插槽 取代 |
+| ExplorerWindowTracker | 保留 Core 层（Windows 上用 COM），其他平台返回空列表 |
+| FavoritePathManager | 保留，跨平台通用 |
+| PathHistoryManager | 保留，跨平台通用 |
+
+### 暂缓的 WPF 工作
+
+以下任务**不在 WPF 上继续推进**，留给 Avalonia 版本：
+
+- ~~T9: UnifiedExtractDialog 菜单接入~~ → CustomFilePickerDialog 取代
+- ~~T10: SettingsWindow 7z.dll QuickPathControl~~ → CustomFilePickerDialog 取代
+- ~~T11: PasswordManagerWindow 导出 QuickPathControl~~ → CustomFilePickerDialog 取代
+- ~~T12: App.xaml.cs 启动 QuickPathDialog~~ → CustomFilePickerDialog 取代
+- ~~T13: MainWindow 压缩路径 QuickPathControl~~ → CustomFilePickerDialog 取代
+- ~~T14: ArchiveSaveAsDialog 菜单接入~~ → CustomFilePickerDialog 取代
+- ~~F3: 真实 QA~~ → 推迟到 Avalonia
 
 ---
 
