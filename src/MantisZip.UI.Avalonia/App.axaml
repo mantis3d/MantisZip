@@ -114,6 +114,7 @@
     <Style Selector="TextBlock.ToolbarButtonIcon">
       <Setter Property="FontSize" Value="20" />
       <Setter Property="HorizontalAlignment" Value="Center" />
+      <Setter Property="Foreground" Value="{DynamicResource ThemeTextPrimaryBrush}" />
     </Style>
 
     <Style Selector="TextBlock.ToolbarButtonLabel">
