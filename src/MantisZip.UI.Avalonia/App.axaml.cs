@@ -163,6 +163,7 @@ public partial class App : Application
         try
         {
             var isDark = ps.GetColorValues().ThemeVariant == PlatformThemeVariant.Dark;
+            DebugLog($"[Theme] ApplySystemTheme dark={isDark}");
 
             // ── Swap resource dictionary ──
             var uri = new Uri(isDark ? DarkThemeUri : LightThemeUri);
@@ -175,10 +176,25 @@ public partial class App : Application
                 ? global::Avalonia.Styling.ThemeVariant.Dark
                 : global::Avalonia.Styling.ThemeVariant.Light;
         }
-        catch
+        catch (Exception ex)
         {
-            // Fallback: keep current theme
+            DebugLog($"[Theme] ApplySystemTheme ERROR: {ex.Message}");
         }
+    }
+
+    internal static void DebugLog(string msg)
+    {
+        try
+        {
+            var logPath = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                "MantisZip", "debug.log");
+            var dir = Path.GetDirectoryName(logPath);
+            if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
+                Directory.CreateDirectory(dir);
+            File.AppendAllText(logPath, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}] {msg}\n");
+        }
+        catch { }
     }
 
     // ════════════════════════════════════════════════════════════════

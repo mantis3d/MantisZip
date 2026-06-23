@@ -300,6 +300,7 @@ public partial class MainWindowViewModel : ObservableObject
     partial void OnSelectedEntryChanged(ArchiveItemModel? value)
     {
         OnPropertyChanged(nameof(SelectionStats));
+        App.DebugLog($"[PRV] OnSelectedEntryChanged: {(value?.Name ?? "null")}, archive={CurrentArchivePath != null}");
 
         if (value != null && CurrentArchivePath != null)
         {
@@ -454,6 +455,8 @@ public partial class MainWindowViewModel : ObservableObject
 
     private async Task ShowPreviewAsync(ArchiveItemModel entry)
     {
+        App.DebugLog($"[PRV] ShowPreviewAsync start: {entry.Name}, fmt={_currentFormat}");
+
         // 切换文件前停止上一个 GIF 动画
         Preview.StopGifTimer();
 
@@ -461,6 +464,7 @@ public partial class MainWindowViewModel : ObservableObject
         {
             var ext = Path.GetExtension(entry.Name);
             var previewType = PreviewService.ClassifyPreview(ext);
+            App.DebugLog($"[PRV] Classified as {previewType}");
 
             if (previewType == PreviewType.Unsupported)
             {
@@ -469,12 +473,17 @@ public partial class MainWindowViewModel : ObservableObject
                 return;
             }
 
-            if (CurrentArchivePath == null) return;
+            if (CurrentArchivePath == null)
+            {
+                App.DebugLog("[PRV] CurrentArchivePath is null, aborting");
+                return;
+            }
 
             StatusMessage = LocalizationManager.T("Status_Extracting");
 
             var tempFile = await PreviewService.ExtractToTempAsync(
                 CurrentArchivePath, entry, _currentFormat);
+            App.DebugLog($"[PRV] Extracted to: {tempFile}");
 
             if (tempFile == null)
             {
@@ -497,8 +506,10 @@ public partial class MainWindowViewModel : ObservableObject
                     StatusMessage = LocalizationManager.T("Preview_Pe", entry.DisplayName);
                     break;
                 case PreviewType.Image:
+                    App.DebugLog("[PRV] Calling ShowImage");
                     Preview.ShowImage(tempFile);
                     StatusMessage = LocalizationManager.T("Preview_Image", entry.DisplayName);
+                    App.DebugLog("[PRV] ShowImage returned");
                     break;
                 case PreviewType.Gif:
                     Preview.ShowGif(tempFile);
@@ -548,9 +559,11 @@ public partial class MainWindowViewModel : ObservableObject
         }
         catch (Exception ex)
         {
+            App.DebugLog($"[PRV] ShowPreviewAsync EXCEPTION: {ex.GetType().Name}: {ex.Message}");
             Preview.ShowUnsupported(LocalizationManager.T("Status_PreviewFailed", ex.Message));
             StatusMessage = LocalizationManager.T("Status_PreviewFailed", ex.Message);
         }
+        App.DebugLog("[PRV] ShowPreviewAsync end");
     }
 
     private void NavigateToFolder(FolderNode node)

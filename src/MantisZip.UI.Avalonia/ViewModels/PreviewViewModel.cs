@@ -329,8 +329,13 @@ public partial class PreviewViewModel : ObservableObject
     /// </summary>
     public void ShowImage(string filePath)
     {
+        App.DebugLog($"[IMG] ShowImage: {filePath}");
+        App.DebugLog($"[IMG] Before: PreviewType={PreviewType}, PreviewImage={(PreviewImage != null ? $"w{ImageWidth}xh{ImageHeight}" : "null")}");
+
         using var fs = File.OpenRead(filePath);
         var bitmap = new global::Avalonia.Media.Imaging.Bitmap(fs);
+        App.DebugLog($"[IMG] Bitmap loaded: {bitmap.PixelSize.Width}x{bitmap.PixelSize.Height}, dpi={bitmap.Dpi.X}x{bitmap.Dpi.Y}");
+
         PreviewImage = bitmap;
         ImageWidth = bitmap.PixelSize.Width;
         ImageHeight = bitmap.PixelSize.Height;
@@ -351,6 +356,7 @@ public partial class PreviewViewModel : ObservableObject
             new FormatMetadataItem("尺寸", $"{ImageWidth} × {ImageHeight}"),
             new FormatMetadataItem("文件大小", FormatFileSize(new FileInfo(filePath).Length)),
         ];
+        App.DebugLog($"[IMG] ShowImage done: PreviewType={PreviewType}, Zoom={ZoomLevel}, IsToolbarVisible={IsToolbarVisible}");
     }
 
     // ── GIF ──
