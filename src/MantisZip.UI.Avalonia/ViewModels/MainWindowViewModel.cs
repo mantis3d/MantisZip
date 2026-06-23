@@ -510,6 +510,19 @@ public partial class MainWindowViewModel : ObservableObject
                     Preview.ShowImage(tempFile);
                     StatusMessage = LocalizationManager.T("Preview_Image", entry.DisplayName);
                     App.DebugLog("[PRV] ShowImage returned");
+                    // HACK: 图片加载后强制刷新主题，清除可能的样式状态残留
+                    global::Avalonia.Threading.Dispatcher.UIThread.Post(async () =>
+                    {
+                        // 获取当前主题变体
+                        var app = global::Avalonia.Application.Current;
+                        if (app == null) return;
+                        var current = app.RequestedThemeVariant;
+                        // 先置 null 再恢复，强制全视觉树重算 DynamicResource
+                        app.RequestedThemeVariant = null;
+                        await Task.Delay(30);
+                        app.RequestedThemeVariant = current;
+                        App.DebugLog("[PRV] Theme variant toggled null->current after image preview");
+                    }, global::Avalonia.Threading.DispatcherPriority.Background);
                     break;
                 case PreviewType.Gif:
                     Preview.ShowGif(tempFile);

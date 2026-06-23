@@ -330,18 +330,20 @@ public partial class PreviewViewModel : ObservableObject
     public void ShowImage(string filePath)
     {
         App.DebugLog($"[IMG] ShowImage: {filePath}");
-        App.DebugLog($"[IMG] Before: PreviewType={PreviewType}, PreviewImage={(PreviewImage != null ? $"w{ImageWidth}xh{ImageHeight}" : "null")}");
+        App.DebugLog($"[IMG] Before: PreviewType={PreviewType}, PreviewImage={(PreviewImage != null ? $"w{ImageWidth}xh{ImageWidth}" : "null")}");
 
+        // 用 DecodeToWidth 替代 Bitmap(Stream)，使用不同的解码路径
         using var fs = File.OpenRead(filePath);
-        var bitmap = new global::Avalonia.Media.Imaging.Bitmap(fs);
+        var bitmap = global::Avalonia.Media.Imaging.Bitmap.DecodeToWidth(fs, 1920);
         App.DebugLog($"[IMG] Bitmap loaded: {bitmap.PixelSize.Width}x{bitmap.PixelSize.Height}, dpi={bitmap.Dpi.X}x{bitmap.Dpi.Y}");
 
+        // 先设置 PreviewType 让 Image 控件进入可见状态，再设置 Source
+        PreviewType = PreviewType.Image;
         PreviewImage = bitmap;
         ImageWidth = bitmap.PixelSize.Width;
         ImageHeight = bitmap.PixelSize.Height;
         var ext = Path.GetExtension(filePath).ToLowerInvariant();
         IsTransparencySupported = ext is ".png" or ".ico" or ".webp";
-        PreviewType = PreviewType.Image;
         IsPreviewVisible = true;
         IsToolbarVisible = true;
         PreviewHeaderText = "图片预览";
