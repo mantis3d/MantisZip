@@ -484,7 +484,8 @@
                          SelectedItem="{Binding FilterSizeUnit}"
                          Background="{DynamicResource ThemeWindowBgBrush}"
                          Foreground="{DynamicResource ThemeTextPrimaryBrush}"
-                         BorderBrush="{DynamicResource ThemeBorderBrush}" />
+                         BorderBrush="{DynamicResource ThemeBorderBrush}"
+                         Padding="2,0" BorderThickness="1" />
             </StackPanel>
             <StackPanel Orientation="Horizontal">
               <Button Width="20" Height="20" Padding="0" Margin="0,0,2,0" Click="PickSizeMax_Click"
