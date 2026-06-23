@@ -55,7 +55,7 @@
                 Foreground="{DynamicResource Theme_TextPrimary}"
                 BorderBrush="{DynamicResource Theme_ButtonBorder}"
                 BorderThickness="1">
-            <emoji:TextBlock Text="🪟" FontSize="14" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+            <emoji:TextBlock Text="⚡" FontSize="14" HorizontalAlignment="Center" VerticalAlignment="Center"/>
         </Button>
 
         <!-- 📁 Browse -->
