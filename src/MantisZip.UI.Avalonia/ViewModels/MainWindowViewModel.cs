@@ -510,6 +510,13 @@ public partial class MainWindowViewModel : ObservableObject
                     Preview.ShowImage(tempFile);
                     StatusMessage = LocalizationManager.T("Preview_Image", entry.DisplayName);
                     App.DebugLog("[PRV] ShowImage returned");
+                    // HACK: 图片加载后强制刷新窗口，清空 Skia 管线状态残留
+                    global::Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+                    {
+                        if (global::Avalonia.Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop && desktop.MainWindow != null)
+                            desktop.MainWindow.InvalidateVisual();
+                        App.DebugLog("[PRV] Forced InvalidateVisual after image preview");
+                    }, global::Avalonia.Threading.DispatcherPriority.Render);
                     break;
                 case PreviewType.Gif:
                     Preview.ShowGif(tempFile);
