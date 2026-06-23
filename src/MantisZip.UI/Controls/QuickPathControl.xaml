@@ -24,6 +24,7 @@
         <!-- ⭐ Favorites -->
         <Button Grid.Column="1" Width="22" Height="22" Margin="2,0,0,0"
                 Content="⭐" FontSize="12" Padding="0"
+                FontFamily="Segoe UI Emoji"
                 Click="FavoritesButton_Click"
                 ToolTip="收藏"
                 Background="{DynamicResource Theme_ButtonBg}"
@@ -34,6 +35,7 @@
         <!-- 🕐 History -->
         <Button Grid.Column="2" Width="22" Height="22" Margin="2,0,0,0"
                 Content="🕐" FontSize="12" Padding="0"
+                FontFamily="Segoe UI Emoji"
                 Click="HistoryButton_Click"
                 ToolTip="历史"
                 Background="{DynamicResource Theme_ButtonBg}"
@@ -44,6 +46,7 @@
         <!-- 🪟 Explorer windows -->
         <Button Grid.Column="3" Width="22" Height="22" Margin="2,0,0,0"
                 Content="🪟" FontSize="12" Padding="0"
+                FontFamily="Segoe UI Emoji"
                 Click="ExplorerButton_Click"
                 ToolTip="资源管理器"
                 Background="{DynamicResource Theme_ButtonBg}"
@@ -53,11 +56,17 @@
 
         <!-- 📁 Browse -->
         <Button x:Name="BrowseButton" Grid.Column="4" Height="22" Margin="4,0,0,0"
-                Content="{l:L Settings_Advanced_Browse}" FontSize="11" Padding="4,0"
+                FontFamily="Segoe UI Emoji" FontSize="11" Padding="4,0"
                 Click="BrowseButton_Click"
+                ToolTip="{l:L Settings_Advanced_Browse}"
                 Background="{DynamicResource Theme_ButtonBg}"
                 Foreground="{DynamicResource Theme_TextPrimary}"
                 BorderBrush="{DynamicResource Theme_ButtonBorder}"
-                BorderThickness="1"/>
+                BorderThickness="1">
+            <StackPanel Orientation="Horizontal">
+                <TextBlock Text="📁" FontFamily="Segoe UI Emoji" FontSize="12" Margin="0,0,3,0"/>
+                <TextBlock Text="{l:L Settings_Advanced_Browse}" FontFamily="{StaticResource {x:Static SystemFonts.MessageFontFamilyKey}}" FontSize="11"/>
+            </StackPanel>
+        </Button>
     </Grid>
 </UserControl>

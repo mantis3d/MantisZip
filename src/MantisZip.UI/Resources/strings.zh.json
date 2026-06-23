@@ -91,6 +91,7 @@
   "Compress_Level_Normal": "5 - 正常压缩",
   "Compress_Level_Store": "0 - 仅存储",
   "Compress_OutputPath": "输出路径:",
+  "Compress_FileName": "文件名:",
   "Compress_Remove": "移除",
   "Compress_SaveFilter": "{0} 压缩文件|*{1}|所有文件|*.*",
   "Compress_SelectFolderPrompt": "选择要压缩的目录",
