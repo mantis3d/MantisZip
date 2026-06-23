@@ -83,6 +83,51 @@
                         <CheckBox x:Name="CloseAfterCompressCheck" Content="{l:L Settings_Compress_CloseAfterDone}" Margin="0,16,0,0"/>
                         <CheckBox x:Name="KeepExtCheck" Content="{l:L Settings_Compress_KeepExt}" Margin="0,8,0,0"/>
                         <CheckBox x:Name="PreserveRootCheck" Content="压缩文件夹时保留外层目录" Margin="0,8,0,0"/>
+
+                        <Border BorderBrush="{DynamicResource Theme_BorderLight}" BorderThickness="1" CornerRadius="4" Padding="8" Margin="0,12,0,0"
+                                Background="{DynamicResource Theme_SurfaceBg}">
+                            <StackPanel>
+                                <TextBlock Text="默认格式选项" FontWeight="SemiBold" Margin="0,0,0,8"
+                                           Foreground="{DynamicResource Theme_TextPrimary}"/>
+
+                                <Grid Margin="0,0,0,6">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="110"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Text="{l:L Settings_Compress_ZipEncoding}" VerticalAlignment="Center"
+                                               Foreground="{DynamicResource Theme_TextPrimary}"/>
+                                    <ComboBox x:Name="ZipEncodingCombo" Grid.Column="1" Width="200" HorizontalAlignment="Left"
+                                              Background="{DynamicResource Theme_WindowBg}"
+                                              Foreground="{DynamicResource Theme_TextPrimary}">
+                                        <ComboBoxItem Content="UTF-8" Tag="utf-8"/>
+                                        <ComboBoxItem Content="GBK" Tag="gbk"/>
+                                        <ComboBoxItem Content="保留原始" Tag="default"/>
+                                    </ComboBox>
+                                </Grid>
+
+                                <Grid Margin="0,0,0,6">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="110"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Text="{l:L Settings_Compress_SevenZipMethod}" VerticalAlignment="Center"
+                                               Foreground="{DynamicResource Theme_TextPrimary}"/>
+                                    <ComboBox x:Name="SevenZipMethodCombo" Grid.Column="1" Width="200" HorizontalAlignment="Left"
+                                              Background="{DynamicResource Theme_WindowBg}"
+                                              Foreground="{DynamicResource Theme_TextPrimary}">
+                                        <ComboBoxItem Content="LZMA2" Tag="LZMA2"/>
+                                        <ComboBoxItem Content="LZMA" Tag="LZMA"/>
+                                        <ComboBoxItem Content="PPMd" Tag="PPMd"/>
+                                        <ComboBoxItem Content="BZip2" Tag="BZip2"/>
+                                        <ComboBoxItem Content="Deflate" Tag="Deflate"/>
+                                    </ComboBox>
+                                </Grid>
+
+                                <CheckBox x:Name="SevenZipSolidCheck" Content="{l:L Settings_Compress_SevenZipSolid}"
+                                          Foreground="{DynamicResource Theme_TextPrimary}"/>
+                            </StackPanel>
+                        </Border>
                     </StackPanel>
                 </ScrollViewer>
             </TabItem>

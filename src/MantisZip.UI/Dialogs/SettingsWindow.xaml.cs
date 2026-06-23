@@ -88,6 +88,13 @@ public partial class SettingsWindow : Window
         KeepExtCheck.IsChecked = s.KeepOriginalExtension;
         PreserveRootCheck.IsChecked = s.PreserveDirectoryRoot;
 
+        // 默认格式选项
+        foreach (ComboBoxItem item in ZipEncodingCombo.Items)
+            if ((string)item.Tag == s.ZipEncoding) { ZipEncodingCombo.SelectedItem = item; break; }
+        foreach (ComboBoxItem item in SevenZipMethodCombo.Items)
+            if ((string)item.Tag == s.SevenZipCompressionMethod) { SevenZipMethodCombo.SelectedItem = item; break; }
+        SevenZipSolidCheck.IsChecked = s.SevenZipSolid;
+
         // 解压
         foreach (ComboBoxItem item in ExtractDestCombo.Items)
             if ((string)item.Tag == s.ExtractDestination) { ExtractDestCombo.SelectedItem = item; break; }
@@ -198,6 +205,9 @@ public partial class SettingsWindow : Window
         s.CloseAfterCompress = CloseAfterCompressCheck.IsChecked == true;
         s.KeepOriginalExtension = KeepExtCheck.IsChecked == true;
         s.PreserveDirectoryRoot = PreserveRootCheck.IsChecked == true;
+        s.ZipEncoding = (ZipEncodingCombo.SelectedItem as ComboBoxItem)?.Tag as string ?? "utf-8";
+        s.SevenZipCompressionMethod = (SevenZipMethodCombo.SelectedItem as ComboBoxItem)?.Tag as string ?? "LZMA2";
+        s.SevenZipSolid = SevenZipSolidCheck.IsChecked == true;
 
         s.ExtractDestination = ((ComboBoxItem)ExtractDestCombo.SelectedItem)?.Tag as string ?? "ask";
         s.FileConflictAction = ((ComboBoxItem)ConflictCombo.SelectedItem)?.Tag as string ?? "ask";
