@@ -17,6 +17,9 @@ public class AppSettings
     public bool CloseAfterCompress { get; set; } = true;
     public bool KeepOriginalExtension { get; set; } = false;  // 保留源文件扩展名（abc.max → abc.max.zip）
     public bool PreserveDirectoryRoot { get; set; } = true;    // 压缩文件夹时保留外层目录
+    public string ZipEncoding { get; set; } = "utf-8";         // ZIP 文件名编码：utf-8 / gbk / default
+    public string SevenZipCompressionMethod { get; set; } = "LZMA2"; // 7z 压缩方法：LZMA / LZMA2 / PPMd / BZip2 / Deflate
+    public bool SevenZipSolid { get; set; } = true;            // 7z 固实压缩
 
     // ===== 解压 =====
     public string ExtractDestination { get; set; } = "ask"; // same-dir / desktop / last / ask
