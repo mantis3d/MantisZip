@@ -18,8 +18,11 @@
 
 ## 版本历史（从新到旧）
 
-### v0.4.3 (2026-06-22) QuickPathControl 统一路径选择 + 资源管理器窗口检测 + 书签管理器 + 权限跳过
+### v0.4.3 (2026-06-22) QuickPathControl 统一路径选择 + 资源管理器窗口检测 + 书签管理器 + 权限跳过 + QuickPathPreDialog
 
+1. **QuickPathPreDialog 集成**：
+   - `QuickPathPreDialog`（轻量路径选择前置窗）创建完成，支持两种模式：选目录模式直接返回路径，选文件模式先选目录再弹系统对话框定位
+   - 替换 6 处系统对话框调用：SettingsWindow 7z.dll 浏览、App.xaml.cs `ShowSevenZipDllDialog` / `ResolveExtractDestinationStatic`、MainWindow `OpenArchive_Click` / `AddFiles_Click`、PasswordManagerWindow `Import_Click` / `Export_Click`
 1. **QuickPathControl 统一路径选择（压缩/解压窗口）**：
    - CompressSettingsWindow：原有 OutputPathTextBox + BrowseOutputButton → QuickPathControl（文件保存模式），新增独立 FileNameTextBox 输入文件名
    - ExtractSettingsWindow：原有 ManualPathTextBox + BrowseButton → QuickPathControl（文件夹选择模式）

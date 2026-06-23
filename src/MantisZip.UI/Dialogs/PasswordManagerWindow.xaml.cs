@@ -4,7 +4,6 @@ using System.Collections.ObjectModel;
 using MantisZip.Core;
 using MantisZip.UI.Localization;
 using MantisZip.Core.Utils;
-using Microsoft.Win32;
 
 namespace MantisZip.UI;
 
@@ -127,24 +126,25 @@ public partial class PasswordManagerWindow : Window
     private void Export_Click(object sender, RoutedEventArgs e)
     {
         App.LogDebug("PasswordManagerWindow: Export_Click");
-        var dialog = new QuickPathDialog
+        var dlg = new QuickPathPreDialog
         {
             Owner = this,
-            Title = "导出密码到文件",
-            IsFolderMode = false,
+            IsPickFolderMode = false,
             IsFileOpenMode = false,
             FileTypeFilter = "JSON 文件|*.json",
             DefaultFileName = "passwords-export.json"
         };
-        if (dialog.ShowDialog() == true && !string.IsNullOrEmpty(dialog.SelectedPath))
+        if (dlg.ShowDialog() == true && dlg.SelectedPath != null)
         {
-            var fullPath = Path.Combine(dialog.SelectedPath, dialog.SelectedFileName ?? "passwords-export.json");
+            var fullPath = dlg.SelectedPath;
             App.LogDebug("PasswordManagerWindow: exporting to '{0}'", fullPath);
             try
             {
                 var json = PasswordManager.Instance.ExportToJson();
                 File.WriteAllText(fullPath, json);
-                PathHistoryManager.Record(dialog.SelectedPath);
+                var dir = Path.GetDirectoryName(fullPath);
+                if (dir != null)
+                    PathHistoryManager.Record(dir);
                 App.LogDebug("PasswordManagerWindow: export done, {0} entries", PasswordManager.Instance.EntryCount);
                 AppMessageBox.Show(L.TF(L.PwdMgr_Export_Success, fullPath),
                     L.T(L.App_MantisZipTitle), MessageBoxButton.OK, MessageBoxImage.Information);
@@ -161,19 +161,22 @@ public partial class PasswordManagerWindow : Window
     private void Import_Click(object sender, RoutedEventArgs e)
     {
         App.LogDebug("PasswordManagerWindow: Import_Click");
-        var dialog = new OpenFileDialog
+        var dlg = new QuickPathPreDialog
         {
-            Filter = "JSON 文件|*.json"
+            Owner = this,
+            IsPickFolderMode = false,
+            IsFileOpenMode = true,
+            FileOpenFilter = "JSON 文件|*.json"
         };
-        if (dialog.ShowDialog() == true)
+        if (dlg.ShowDialog() == true && dlg.SelectedPath != null)
         {
-            App.LogDebug("PasswordManagerWindow: importing from '{0}'", dialog.FileName);
+            App.LogDebug("PasswordManagerWindow: importing from '{0}'", dlg.SelectedPath);
             // 先解析确认条目数
             string importedJson;
             int entryCount;
             try
             {
-                importedJson = File.ReadAllText(dialog.FileName);
+                importedJson = File.ReadAllText(dlg.SelectedPath);
                 var data = System.Text.Json.JsonSerializer.Deserialize<PasswordData>(importedJson);
                 entryCount = data?.Passwords?.Count ?? 0;
             }
