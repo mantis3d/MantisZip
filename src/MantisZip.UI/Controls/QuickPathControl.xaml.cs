@@ -170,6 +170,11 @@ public partial class QuickPathControl : UserControl
         };
         popup.Items.Add(manageItem);
 
+        // Position below button, left-aligned
+        popup.PlacementTarget = sender as Button;
+        popup.Placement = PlacementMode.Bottom;
+        popup.VerticalOffset = 2;
+
         popup.IsOpen = true;
     }
 
@@ -199,6 +204,11 @@ public partial class QuickPathControl : UserControl
                 popup.Items.Add(mi);
             }
         }
+
+        // Position below button, left-aligned
+        popup.PlacementTarget = sender as Button;
+        popup.Placement = PlacementMode.Bottom;
+        popup.VerticalOffset = 2;
 
         popup.IsOpen = true;
     }
@@ -241,6 +251,11 @@ public partial class QuickPathControl : UserControl
                 popup.Items.Add(mi);
             }
         }
+
+        // Position below button, left-aligned
+        popup.PlacementTarget = sender as Button;
+        popup.Placement = PlacementMode.Bottom;
+        popup.VerticalOffset = 2;
 
         popup.IsOpen = true;
     }
