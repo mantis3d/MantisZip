@@ -479,7 +479,7 @@
                        Foreground="{DynamicResource ThemeTextPrimaryBrush}"
                        BorderBrush="{DynamicResource ThemeBorderBrush}"
                        Padding="2,0" BorderThickness="1" />
-              <ComboBox Width="50" Height="22" Margin="2,0,0,0"
+              <ComboBox Width="65" Height="22" Margin="2,0,0,0"
                          ItemsSource="{Binding SizeUnitOptions}"
                          SelectedItem="{Binding FilterSizeUnit}"
                          Background="{DynamicResource ThemeWindowBgBrush}"
