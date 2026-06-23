@@ -232,7 +232,24 @@ public class SevenZipEngine : IArchiveEngine
     {
         compr.ArchiveFormat = OutArchiveFormat.SevenZip;
         compr.CompressionLevel = MapCompressionLevel(options.CompressionLevel);
-        compr.CompressionMethod = CompressionMethod.Lzma2;
+
+        // 压缩方法（来自 DynamicFormatOptionsPanel SevenZipCompressionMethod）
+        compr.CompressionMethod = options.SevenZipCompressionMethod?.ToLowerInvariant() switch
+        {
+            "lzma" => CompressionMethod.Lzma,
+            "lzma2" => CompressionMethod.Lzma2,
+            "ppmd" => CompressionMethod.Ppmd,
+            "bzip2" => CompressionMethod.BZip2,
+            "deflate" => CompressionMethod.Deflate,
+            _ => CompressionMethod.Lzma2, // 默认
+        };
+
+        // 固实压缩（SharpSevenZip 无原生属性，通过 CustomParameters 传递）
+        if (!options.SevenZipSolid)
+        {
+            compr.CustomParameters["s"] = "off";
+        }
+
         compr.IncludeEmptyDirectories = true;
         compr.DirectoryStructure = true;
 

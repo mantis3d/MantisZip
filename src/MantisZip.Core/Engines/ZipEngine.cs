@@ -540,11 +540,17 @@ public class ZipEngine : IArchiveEngine
                 }
                 else
                 {
+                    var encoding = (options.FileNameEncoding?.ToLowerInvariant()) switch
+                    {
+                        "gbk" => Encoding.GetEncoding("GBK"),
+                        "default" => Encoding.Default,
+                        _ => Encoding.UTF8,
+                    };
                     var writerOptions = new ZipWriterOptions(CompressionType.Deflate)
                     {
                         CompressionLevel = options.CompressionLevel,
                         ArchiveComment = options.Comment ?? "",
-                        ArchiveEncoding = new ArchiveEncoding { Default = Encoding.UTF8 },
+                        ArchiveEncoding = new ArchiveEncoding { Default = encoding },
                     };
                     using var zipWriter = new ZipWriter(fsOut, writerOptions);
 
@@ -1023,11 +1029,17 @@ public class ZipEngine : IArchiveEngine
                     }
                     else
                     {
+                        var zipEncoding = (options.FileNameEncoding?.ToLowerInvariant()) switch
+                        {
+                            "gbk" => Encoding.GetEncoding("GBK"),
+                            "default" => Encoding.Default,
+                            _ => Encoding.UTF8,
+                        };
                         var writerOptions = new ZipWriterOptions(CompressionType.Deflate)
                         {
                             CompressionLevel = options.CompressionLevel,
                             ArchiveComment = options.Comment ?? "",
-                            ArchiveEncoding = new ArchiveEncoding { Default = Encoding.UTF8 },
+                            ArchiveEncoding = new ArchiveEncoding { Default = zipEncoding },
                         };
                         using var zipWriter = new ZipWriter(fsOut, writerOptions);
 
