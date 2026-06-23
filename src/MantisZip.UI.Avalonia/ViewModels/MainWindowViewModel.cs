@@ -1,5 +1,8 @@
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Media;
+using Avalonia.Platform;
+using Avalonia.Styling;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml.Styling;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -10,6 +13,7 @@ using MantisZip.Core.Utils;
 using MantisZip.UI.Avalonia.Models;
 using MantisZip.UI.Avalonia.Services;
 using System.Collections.ObjectModel;
+using System.Text;
 
 namespace MantisZip.UI.Avalonia.ViewModels;
 
@@ -507,21 +511,16 @@ public partial class MainWindowViewModel : ObservableObject
                     break;
                 case PreviewType.Image:
                     App.DebugLog("[PRV] Calling ShowImage");
+                    DumpThemeState("BEFORE-IMG");
                     Preview.ShowImage(tempFile);
                     StatusMessage = LocalizationManager.T("Preview_Image", entry.DisplayName);
                     App.DebugLog("[PRV] ShowImage returned");
-                    // HACK: 图片加载后强制刷新主题，清除可能的样式状态残留
+                    DumpThemeState("AFTER-IMG");
+                    // 延迟诊断：等渲染稳定后再检查一次
                     global::Avalonia.Threading.Dispatcher.UIThread.Post(async () =>
                     {
-                        // 获取当前主题变体
-                        var app = global::Avalonia.Application.Current;
-                        if (app == null) return;
-                        var current = app.RequestedThemeVariant;
-                        // 先置 null 再恢复，强制全视觉树重算 DynamicResource
-                        app.RequestedThemeVariant = null;
-                        await Task.Delay(30);
-                        app.RequestedThemeVariant = current;
-                        App.DebugLog("[PRV] Theme variant toggled null->current after image preview");
+                        await Task.Delay(1000);
+                        DumpThemeState("1S-AFTER-IMG");
                     }, global::Avalonia.Threading.DispatcherPriority.Background);
                     break;
                 case PreviewType.Gif:
@@ -1111,6 +1110,93 @@ public partial class MainWindowViewModel : ObservableObject
     // ── Recent Files ──
 
     public ObservableCollection<string> RecentFiles { get; } = new(RecentFilesManager.GetPaths());
+
+    // ════════════════════════════════════════════════════════════════
+    //  Diagnostics
+    // ════════════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// 主题状态快照，输出到 debug.log，用于诊断图片预览后按钮渲染异常。
+    /// </summary>
+    private static void DumpThemeState(string tag)
+    {
+        try
+        {
+            var app = global::Avalonia.Application.Current;
+            if (app == null) return;
+
+            var sb = new StringBuilder();
+            sb.AppendLine($"[DIAG-{tag}] Theme state dump:");
+
+            // 1) Theme variant
+            var variant = app.RequestedThemeVariant;
+            sb.AppendLine($"  RequestedThemeVariant = {variant?.Key ?? "null"}");
+
+            // 2) Merged dictionaries
+            sb.AppendLine($"  MergedDictionaries.Count = {app.Resources.MergedDictionaries.Count}");
+            for (int i = 0; i < app.Resources.MergedDictionaries.Count; i++)
+            {
+                var md = app.Resources.MergedDictionaries[i];
+                sb.AppendLine($"    [{i}] {md.GetType().Name} {md.GetHashCode()} src={GetSourceUri(md)}");
+            }
+
+            // 3) Key brushes
+            DumpBrush(app, variant, "ThemeTextPrimaryBrush", sb);
+            DumpBrush(app, variant, "ThemeButtonHoverBrush", sb);
+            DumpBrush(app, variant, "ThemeButtonBgBrush", sb);
+            DumpBrush(app, variant, "ThemeButtonPressedBrush", sb);
+            DumpBrush(app, variant, "ThemeAccentBrush", sb);
+            DumpBrush(app, variant, "ThemeWindowBgBrush", sb);
+
+            // 4) Platform theme
+            if (app.PlatformSettings is IPlatformSettings ps)
+            {
+                try
+                {
+                    var cv = ps.GetColorValues();
+                    sb.AppendLine($"  PlatformThemeVariant = {cv.ThemeVariant}");
+                }
+                catch { sb.AppendLine($"  GetColorValues() threw"); }
+            }
+
+            sb.AppendLine($"[DIAG-{tag}] end");
+            App.DebugLog(sb.ToString());
+        }
+        catch (Exception ex)
+        {
+            App.DebugLog($"[DIAG-{tag}] ERROR: {ex.Message}");
+        }
+    }
+
+    private static string GetSourceUri(object? rp)
+    {
+        if (rp is null) return "null";
+        var t = rp.GetType();
+        var srcProp = t.GetProperty("Source");
+        if (srcProp != null && srcProp.GetValue(rp) is Uri uri)
+            return uri.ToString();
+        return t.Name;
+    }
+
+    private static void DumpBrush(Application app, ThemeVariant? variant, string key, StringBuilder sb)
+    {
+        if (app.Resources.TryGetResource(key, variant, out var value))
+        {
+            if (value is SolidColorBrush scb)
+            {
+                var c = scb.Color;
+                sb.AppendLine($"  {key} = SolidColorBrush(R={c.R},G={c.G},B={c.B},A={c.A}) hash={scb.GetHashCode()}");
+            }
+            else
+            {
+                sb.AppendLine($"  {key} = {value?.GetType().Name} hash={value?.GetHashCode()}");
+            }
+        }
+        else
+        {
+            sb.AppendLine($"  {key} = NOT FOUND (variant={variant?.Key})");
+        }
+    }
 
     [RelayCommand]
     private async Task OpenRecentFile(string path)
