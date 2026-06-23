@@ -46,6 +46,16 @@
 3. **设计文档**：`.sisyphus/plans/uac-elevation-permission.md` 更新
 4. **进度窗口错误摘要**：ProgressWindow 新增 `ErrorSummaryBox`（可复制 TextBox），解压权限错误时在进度条和按钮之间显示错误摘要文本
 5. **计划状态同步**：将 `zip-copy-mode-optimization.md`（v0.4.2）和 `uac-elevation-permission.md`（v0.4.2）从 PLAN.md 待实现移至 PROGRESS.md 历史设计方案索引，同步更新跨平台分析计数
+6. **DynamicFormatOptionsPanel 后端接线**：ZIP 编码/7z 压缩方法/7z 固实选项从 UI 接入到压缩引擎：
+   - `ArchiveOptions`/`CompressRequest` 新增 `FileNameEncoding`、`SevenZipCompressionMethod`、`SevenZipSolid` 属性
+   - `ZipEngine`：根据 `FileNameEncoding` 选择 ZIP 文件名编码（utf-8/gbk/default）
+   - `SevenZipEngine.ConfigureCompressor`：根据选项选择压缩方法（LZMA/LZMA2/PPMd/BZip2/Deflate），非固实时设 `CustomParameters["s"]="off"`
+   - 修复 `FormatComboBox_SelectionChanged` 未同步 `FormatOptionsPanel.SelectedFormat` 导致面板不随格式切换的 bug
+7. **默认格式选项设置**：设置窗口 → 压缩标签页新增「默认格式选项」区域：
+   - AppSettings 新增 `ZipEncoding`、`SevenZipCompressionMethod`、`SevenZipSolid` 属性
+   - SettingsWindow 读写持久化
+   - `DynamicFormatOptionsPanel.LoadDefaults()` 打开压缩窗口时自动加载设置值
+   - 快捷压缩路径（`--compress-quick`/`--compress-separate`/`--compress-combined`）读取 AppSettings 默认值
 
 ### v0.4.2 (2026-06-20) 安装程序主题/语言选择修复 / ZIP copy-mode 进度与取消
 

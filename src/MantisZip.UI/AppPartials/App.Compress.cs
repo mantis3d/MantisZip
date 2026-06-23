@@ -190,6 +190,9 @@ public partial class App : Application
             CompressionLevel = settings.DefaultLevel,
             KeepOriginalExtension = settings.KeepOriginalExtension,
             PreserveDirectoryRoot = settings.PreserveDirectoryRoot,
+            FileNameEncoding = settings.ZipEncoding,
+            SevenZipCompressionMethod = settings.SevenZipCompressionMethod,
+            SevenZipSolid = settings.SevenZipSolid,
         };
         var outputPaths = CompressService.GetOutputPaths(request);
         progressWindow.InitBatchMode(outputPaths);
@@ -433,6 +436,9 @@ public partial class App : Application
             CompressionLevel = settings.DefaultLevel,
             OutputPath = finalPath,
             PreserveDirectoryRoot = settings.PreserveDirectoryRoot,
+            FileNameEncoding = settings.ZipEncoding,
+            SevenZipCompressionMethod = settings.SevenZipCompressionMethod,
+            SevenZipSolid = settings.SevenZipSolid,
         };
         var outputPaths = CompressService.GetOutputPaths(request);
         progressWindow.InitBatchMode(outputPaths);
