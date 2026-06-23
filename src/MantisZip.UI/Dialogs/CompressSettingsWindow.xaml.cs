@@ -138,6 +138,8 @@ public partial class CompressSettingsWindow : Window
     {
         var s = AppSettings.Instance;
 
+        FormatOptionsPanel.LoadDefaults();
+
         // 默认格式
         foreach (System.Windows.Controls.ComboBoxItem item in FormatComboBox.Items)
         {
@@ -417,6 +419,9 @@ public partial class CompressSettingsWindow : Window
             Encrypt = EncryptCheckBox.IsChecked == true,
             OutputPath = outputPath,
             PreserveDirectoryRoot = AppSettings.Instance.PreserveDirectoryRoot,
+            FileNameEncoding = FormatOptionsPanel.FileNameEncoding,
+            SevenZipCompressionMethod = FormatOptionsPanel.SevenZipCompressionMethod,
+            SevenZipSolid = FormatOptionsPanel.SevenZipSolid,
         };
         var outputPaths = CompressService.GetOutputPaths(request);
         progressWindow.InitBatchMode(outputPaths);
@@ -490,6 +495,9 @@ public partial class CompressSettingsWindow : Window
             Encrypt = EncryptCheckBox.IsChecked == true,
             KeepOriginalExtension = AppSettings.Instance.KeepOriginalExtension,
             PreserveDirectoryRoot = AppSettings.Instance.PreserveDirectoryRoot,
+            FileNameEncoding = FormatOptionsPanel.FileNameEncoding,
+            SevenZipCompressionMethod = FormatOptionsPanel.SevenZipCompressionMethod,
+            SevenZipSolid = FormatOptionsPanel.SevenZipSolid,
         };
         var outputPaths = CompressService.GetOutputPaths(request);
         progressWindow.InitBatchMode(outputPaths);
@@ -588,6 +596,9 @@ public partial class CompressSettingsWindow : Window
             Encrypt = EncryptCheckBox.IsChecked == true,
             OutputPath = outputPath,
             PreserveDirectoryRoot = AppSettings.Instance.PreserveDirectoryRoot,
+            FileNameEncoding = FormatOptionsPanel.FileNameEncoding,
+            SevenZipCompressionMethod = FormatOptionsPanel.SevenZipCompressionMethod,
+            SevenZipSolid = FormatOptionsPanel.SevenZipSolid,
         };
         var outputPaths = CompressService.GetOutputPaths(request);
         progressWindow.InitBatchMode(outputPaths);
@@ -649,6 +660,12 @@ public partial class CompressSettingsWindow : Window
         // (FormatComboBox is in General tab, PwdAutoRules is in Password tab)
         if (PwdAutoRules != null && PwdAutoRules.IsChecked == true)
             RefreshAutoRules();
+
+        // 同步 DynamicFormatOptionsPanel 的格式（加 null 守卫，因为初始化时
+        // FormatOptionsPanel 可能还未被 XAML 创建）
+        if (FormatOptionsPanel != null
+            && FormatComboBox.SelectedItem is ComboBoxItem item && item.Tag is string tag)
+            FormatOptionsPanel.SelectedFormat = tag;
     }
 
     private void FileNameTextBox_TextChanged(object sender, System.Windows.Controls.TextChangedEventArgs e)

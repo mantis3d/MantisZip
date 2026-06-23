@@ -70,6 +70,31 @@ public partial class DynamicFormatOptionsPanel : UserControl
         }
     }
 
+    /// <summary>
+    /// 从 AppSettings 加载默认值，预填到各控件中。
+    /// </summary>
+    public void LoadDefaults()
+    {
+        var s = AppSettings.Instance;
+
+        // ZIP 编码
+        for (int i = 0; i < EncodingCombo.Items.Count; i++)
+        {
+            if (EncodingCombo.Items[i] is ComboBoxItem item && (string)item.Tag == s.ZipEncoding)
+            { EncodingCombo.SelectedIndex = i; break; }
+        }
+
+        // 7z 压缩方法
+        for (int i = 0; i < MethodCombo.Items.Count; i++)
+        {
+            if (MethodCombo.Items[i] is ComboBoxItem item && (string)item.Tag == s.SevenZipCompressionMethod)
+            { MethodCombo.SelectedIndex = i; break; }
+        }
+
+        // 7z 固实
+        SolidCheck.IsChecked = s.SevenZipSolid;
+    }
+
     private void UpdatePanel()
     {
         // Hide all panels first

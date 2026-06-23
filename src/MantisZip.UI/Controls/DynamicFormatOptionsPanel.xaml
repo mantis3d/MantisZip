@@ -18,10 +18,10 @@
                     </Grid.ColumnDefinitions>
                     <TextBlock Grid.Column="0" Text="文件名编码:" VerticalAlignment="Center"
                                Foreground="{DynamicResource Theme_TextPrimary}"/>
-                    <ComboBox x:Name="EncodingCombo" Grid.Column="1" Height="24"
-                              Background="{DynamicResource Theme_SurfaceBg}"
-                              Foreground="{DynamicResource Theme_TextPrimary}"
-                              BorderBrush="{DynamicResource Theme_Border}">
+                    <ComboBox x:Name="EncodingCombo" Grid.Column="1" Height="24" SelectedIndex="0"
+                               Background="{DynamicResource Theme_SurfaceBg}"
+                               Foreground="{DynamicResource Theme_TextPrimary}"
+                               BorderBrush="{DynamicResource Theme_Border}">
                         <ComboBoxItem Content="UTF-8" Tag="utf-8"/>
                         <ComboBoxItem Content="GBK" Tag="gbk"/>
                         <ComboBoxItem Content="保留原始" Tag="default"/>
