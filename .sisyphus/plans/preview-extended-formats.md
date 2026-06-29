@@ -1,6 +1,7 @@
 # 扩展预览格式支持 (Extended Preview Format Support)
 
 > **状态**: ✅ 已完成（v0.3.0，Phase 0-3）| **阶段**: [✅✅✅✅⬜⬜] (4/6)
+> **⚠️ 2026-06-29 修正**: 本计划编写时假设全部格式在主项目中直接实现。Avalonia 迁移后，**含重大原生依赖的功能改为插件化**（见 [preview-avalonia-opportunities.md](.sisyphus/plans/preview-avalonia-opportunities.md) 第 8 节）。以下章节已据此更新：Phase 2D、Phase 3.10/3.11、Phase 4。
 
 ## TL;DR
 
@@ -8,6 +9,7 @@
 
 > **依赖**: 无（独立于魔数检测计划）
 > **并行执行**: 各 Phase 内部可并行（工具按钮 + 各格式解码器独立文件）
+> **插件化前提**: 所有带原生 DLL 依赖的功能（Magick.NET、LibVLC）实现为独立插件，通过 `plugins/` 目录加载。纯 C# 元数据解析器继续内置在主项目中。
 
 ---
 
@@ -16,10 +18,13 @@
 - [x] **Phase 0: 预览工具栏** — ToolBar 容器 + 通用/格式特定按钮
 - [x] **Phase 1: 信息面板增强** — 动态信息展示容器
 - [x] **Phase 2: 快速出货格式** — Torrent/PE/PDF/WAV/FLAC/SQLite/ISO 等 9+ 格式
-  - Phase 2C TGA + Phase 2D Magick.NET 统一方案 → 见下方章节
-- [x] **Phase 3: 中等价值格式** — SVG/字体/LNK/DBF/ICO/字幕/Office/EPUB/HDR/音视频播放
+  - Phase 2C TGA + Phase 2D Magick.NET 统一方案 → 已纳入插件化计划
+- [x] **Phase 3: 中等价值格式** — SVG/字体/LNK/DBF/ICO/字幕/Office/EPUB/HDR/~~音视频播放~~
   - Office 内容预览增强 → [office-content-preview.md](office-content-preview.md)（独立子计划）
+  - 音视频播放（原 3.10/3.11）→ 已移至插件化方案（LibVLC）
+  - HDR 图像 → Magick.NET 插件
 - [ ] **Phase 4: 高难度格式** — PE图标/ICL/MKV/DICOM/证书/VHD 等
+  - EXR/TIFF → 已由 Magick.NET 插件覆盖
 - [ ] **Phase 5: 元数据优先提取与两步式预览优化** — 横切面优化
 
 ## Phase 0 — 预览工具栏 [✅]
@@ -565,108 +570,85 @@ private async Task ShowPdfFullContent()
 
 ## Phase 2D — 统一图像解码方案（Magick.NET）
 
-> **建议**: 用 Magick.NET 一个库替代 TGA/HDR/EXR/TIFF 等多个自研解码器。
-> 已在 Phase 4 中作为 EXR 方案提及，建议**提前至 Phase 2**统一实施。
+> **⚠️ 2026-06-29 修正**: 原方案假设直接引用 NuGet 包 + 内联代码分支。Avalonia 迁移 + 插件化后，Magick.NET 改为**独立插件**，通过 `plugins/` 目录加载。见 [preview-avalonia-opportunities.md 第 8 节](.sisyphus/plans/preview-avalonia-opportunities.md#8-重大依赖的体积分析与分离方案)。
 
 ### 动机
 
-当前计划中对小众图像格式的解码方案分散且重复：
+当前计划中对小众图像格式的解码方案分散且重复。Magick.NET 一个库覆盖全部目标格式，但 ~28MB 原生 DLL 不适合直接捆绑进主程序。
 
-| 格式 | 原方案 | 预估工时 |
-|:----:|:------:|:--------:|
-| TGA | DIY C# decoder（~200 行） | ~6h |
-| HDR | DIY tone-mapping | ~8h |
-| EXR | 待定（"需引入 Magick.NET 依赖"） | 待定 |
-| TIFF | ❌ 未计划（WPF 原生支持有限） | — |
-| **合计** | | **~14h+** |
+### 方案变更
 
-用 Magick.NET 统一后，全部格式只需 **~3h** 集成 + 测试。
+| 维度 | 原方案（过时） | 新方案 |
+|:----:|:-------------:|:-------|
+| 集成方式 | 直接 NuGet 引用 + `ShowImagePreviewAsync` 内联分支 | 独立项目 `MantisZip.Preview.Magick`，实现 `IPreviewProvider` 接口 |
+| 加载 | 编译时绑定 | 运行时 `AssemblyLoadContext` 扫描 `plugins/` 目录加载 |
+| 原生 DLL | 随主程序分发 | 放在 `plugins/MantisZip.Preview.Magick/native/x64/` 下 |
+| 缺失处理 | crash | 静默降级，预览区显示"需要安装高级图片支持插件" |
+| 分发 | 包含在安装包内 | 单独 zip 发布（~8MB 压缩），用户按需下载解压 |
 
-### 库信息
-
-| 项目 | 内容 |
-|------|------|
-| **NuGet** | `Magick.NET-Q16-HDRI-AnyCPU` |
-| **License** | Apache 2.0 ✅（与 MIT 完全兼容）|
-| **格式** | TGA✅ TIFF✅ HDR✅ EXR✅ + 200+ 其他格式 |
-| **.NET** | net8.0+，Windows x64 ✅ |
-| **依赖** | 随 NuGet 分发 native ImageMagick DLL（~20MB） |
-
-### 使用方式
+### `MagickExtensions` 列表（保留，移至插件内部）
 
 ```csharp
-using ImageMagick;
-
-// 一行代码：加载任何小众图像格式 → WPF BitmapSource
-using var image = new MagickImage(tempFilePath);
-
-// 直接设置到 PreviewImage（已有控件）
-PreviewImage.Source = image.ToBitmapSource();
-```
-
-### 集成到 ShowImagePreviewAsync
-
-在 `ShowImagePreviewAsync` 中加一个 Magick.NET 后备分支：
-
-```csharp
-// 在 WPF BitmapImage 无法处理的格式后面
-else if (MagickExtensions.Contains(ext))
-{
-    using var image = new MagickImage(tempFilePath);
-    PreviewImage.Source = image.ToBitmapSource();
-    // 信息面板根据 image 属性填充
-    SetPreviewInfo(item);
-    SetFormatSpecificInfo(
-        ("分辨率", $"{image.Width} × {image.Height}"),
-        ("色深", $"{image.Depth}-bit"),
-        ("格式", image.Format.ToString())
-    );
-}
-```
-
-`MagickExtensions` 列表：
-```csharp
+// 此列表从主程序移至 MantisZip.Preview.Magick 插件项目内
 private static readonly HashSet<string> MagickExtensions = new(StringComparer.OrdinalIgnoreCase)
 {
     ".tga", ".targa",    // TGA
     ".hdr", ".radiance", // HDR
     ".exr",              // OpenEXR
-    ".tif", ".tiff",     // TIFF（补充 WPF 不支持的压缩变体）
+    ".tif", ".tiff",     // TIFF
+    ".psd", ".psb",      // Photoshop
     ".dng",              // 数码相机 RAW
     ".xcf",              // GIMP
-    ".psd",              // Photoshop
     ".cr2", ".nef", ".arw", // 相机 RAW（可选）
 };
+```
+
+### 插件接口适配
+
+```csharp
+public class MagickPreviewProvider : IPreviewProvider
+{
+    public string PluginName => "Magick.NET 高级图片支持";
+    public IEnumerable<string> SupportedExtensions => MagickExtensions;
+    public bool IsAvailable => true; // 原生 DLL 存在性已在 PluginLoadContext 层保证
+
+    public async Task<PreviewResult?> TryPreviewAsync(Stream data, string extension, CancellationToken ct)
+    {
+        using var image = new MagickImage(data);
+        return new PreviewResult
+        {
+            Image = image.ToBitmap(),  // Avalonia Bitmap
+            Metadata = new Dictionary<string, string>
+            {
+                ["分辨率"] = $"{image.Width} × {image.Height}",
+                ["色深"] = $"{image.Depth}-bit",
+                ["格式"] = image.Format.ToString(),
+            }
+        };
+    }
+}
 ```
 
 ### 预估工作量
 
 | 工作项 | 预估 |
 |:------|:----:|
-| 添加 Magick.NET NuGet 依赖 | ~0.5h |
-| ShowImagePreviewAsync 添加 MagickExtensions 分支 | ~1h |
-| 信息面板填充 + 工具栏适配 | ~0.5h |
-| TGA/HDR/EXR/TIFF 四种格式的测试验证 | ~1h |
-| **合计** | **~3h** |
+| 插件项目 `MantisZip.Preview.Magick` 搭建 + NuGet 引用 | ~1h |
+| `IPreviewProvider` 实现（解码 + 元数据） | ~1.5h |
+| 主程序侧插件发现 + 分发路由 | ~2h |
+| 缺失插件时的提示 UI | ~1h |
+| 测试验证（TGA/HDR/EXR/TIFF/PSD） | ~1.5h |
+| **合计** | **~7h** |
 
-### 对比：自研 vs Magick.NET
+### 对比
 
-| 维度 | 自研解码器方案 | Magick.NET 方案 |
-|:----:|:-------------:|:---------------:|
-| 开发时间 | ~14h+（TGA + HDR + EXR）| ~3h |
-| 格式覆盖 | 3 种 | TGA/HDR/EXR/TIFF + 额外 200+ |
-| 维护负担 | 自研 bug 需自己修 | ImageMagick 社区维护 |
-| License | MIT（自研代码） | Apache 2.0 |
-| 包体积 | 零新增（纯 C#） | +~20MB native DLL |
-| 边缘情况 | 需自己处理所有变体 | ImageMagick 已处理 |
-
-### 替换说明
-
-实施 Phase 2D 后，以下原有条目更新：
-- **Phase 2C.1 TGA**：从"DIY ~6h"改为"Magick.NET ~1h"
-- **Phase 3.9 HDR**：从"DIY ~8h"改为"Magick.NET 统一方案"
-- **Phase 4.10 EXR**：从"待定"改为"已纳入 Phase 2D"
-- **新增 TIFF**：纳入 MagickExtensions
+| 维度 | 自研解码器方案 | 原 Magick.NET 方案（直接捆绑） | 插件化 Magick.NET 方案 |
+|:----:|:-------------:|:---------------------------:|:---------------------:|
+| 开发时间 | ~14h+ | ~3h | ~7h |
+| 格式覆盖 | 3 种 | 200+ | 200+ |
+| 安装包体积影响 | 零 | +~28MB ❌ | **零**（默认安装不包含） |
+| 用户体验 | 即时可用 | 即时可用 | 需下载插件（多一步） |
+| 维护负担 | 自研 bug 自己修 | 社区维护 | 社区维护 |
 
 ---
 
@@ -686,72 +668,35 @@ private static readonly HashSet<string> MagickExtensions = new(StringComparer.Or
 | 3.10 | **🎵 音频播放** | 播放器 | WAV/FLAC 同 Phase 2A；MP3 同 Phase 2B | ▶ `MediaElement` + 播放/暂停/进度条/音量 | `MainWindow.Preview.cs` | ~6h |
 | 3.11 | **🎬 视频播放** | 播放器 | 分辨率、时长、编解码器 | ▶ `MediaElement` + 播放/暂停/进度条 | `MainWindow.Preview.cs` | ~4h |
 
-### 3.10 音频播放 详细设计
+### 3.10/3.11 音视频播放（已移至插件化方案）
 
-**影响格式**: MP3, WAV, FLAC（Phase 2A/2B 已有元数据解析）
+> **⚠️ 2026-06-29 修正**: WPF 有原生 `MediaElement`，Avalonia 无此控件。音视频播放改为**独立插件** `MantisZip.Preview.MediaPlayer`（基于 LibVLCSharp），通过 `plugins/` 按需加载。详细设计见 [preview-avalonia-opportunities.md 第 4 节](.sisyphus/plans/preview-avalonia-opportunities.md#4-音视频播放替代方案)。
 
-**内容区变更**:
+**影响格式**: MP3, WAV, FLAC, MP4, WMV
 
-```
-初始状态:                        点击播放后:
-┌─────────────────┐              ┌─────────────────┐
-│  封面(若有)      │              │  ▶❚❚ 暂停      │
-│  标题 歌手       │   ▶ 点击   → │  01:23 / 03:42  │
-│  [▶ 播放]       │              │  ██████░░░░░░   │
-│                 │              │  🔊 ───○──      │
-└─────────────────┘              └─────────────────┘
-```
+**元数据仍内置**: 音视频的**元数据解析**（时长、采样率、分辨率、编码等）是纯 C# 代码，保持内置在主程序中，不依赖插件。即使没有安装 MediaPlayer 插件，信息面板也能正常显示文件信息。
 
-**技术实现**:
-- `MediaElement` 丢到内容区，`Source = new Uri(tempFile)`
-- **切换文件时**: 切到新的音频/视频前，先 Stop() + 清 Source + 卸载 MediaElement
-- **压缩包内大文件**: 首次点击播放时才开始提取到 temp。可显示 "正在提取…" 提示
-- **进度条**: `MediaElement` 本身不提供 UI，需自己实现 Slider + Timer（`Position` 轮询）
-- **音量**: `MediaElement.Volume` 0-1
-
-**工具栏联动**:
-- 播放中显示 ▶/❚❚ 按钮（已有工具栏，格式特定按钮）
-- 不需要额外依赖
-
-### 3.11 视频播放 详细设计
-
-**影响格式**: MP4 (.mp4, .m4v), WMV (.wmv)
-
-> MKV/WebM/FLV 等 `MediaElement` 不支持的格式 → 信息面板正常显示元数据，内容区显示 "此格式暂不支持播放"
-
-**内容区变更**:
+**内容区变更**（有插件时）:
 
 ```
-初始状态:                        点击播放后:
-┌─────────────────┐              ┌─────────────────┐
-│                 │              │                 │
-│  ▶ 点击播放     │              │  ▶❚❚          │
-│                 │   ▶ 点击   → │  视频画面       │
-│  MP4 视频       │              │                 │
-│  12.3 MB        │              │  01:23 / 10:30  │
-│                 │              │  ██████░░░░░░   │
-└─────────────────┘              └─────────────────┘
+┌─────────────────┐
+│  ▶❚❚ 暂停      │
+│  01:23 / 03:42  │
+│  ██████░░░░░░   │
+│  🔊 ───○──      │
+└─────────────────┘
 ```
 
-**大文件处理**:
-- 视频文件可能很大（几百 MB 到 GB）。点击播放后先显示 "正在提取…（xx MB / yy MB）"，用 `ExtractEntryAsync` 的 Progress 回调更新
-- 提取完成后 `MediaElement.Source = new Uri(tempFile)`
-- **注意**: 大文件提取可能耗时较长，确保用户能看到进度反馈
-
-**支持的视频格式**:
-| 格式 | 扩展名 | 原生播放 | 备注 |
-|---|---|---|---|
-| MP4 (H.264) | `.mp4`, `.m4v` | ✅ Win10 内置 | HEVC 扩展可能需额外安装，H.264 通吃 |
-| WMV | `.wmv`, `.asf` | ✅ WMP 原生 | 零问题 |
-| AVI | `.avi` | ⚠️ 跟编码器 | 不保证，随缘 |
-| MKV | `.mkv` | ❌ | 不支持的格式提示 |
-| WebM | `.webm` | ❌ | 不支持的格式提示 |
-
-**清理**: 切换文件时 `MediaElement.Close()` + 删除 temp 文件（同现有清理逻辑）
+**无插件时的兜底**:
+- 信息面板正常展示元数据（纯 C# 解析，始终可用）
+- 内容区显示："🔔 播放音视频需要下载解码引擎（约 10MB）[📥 下载]"
+- 点击下载 → 后台下载 → 解压到 `plugins/MantisZip.Preview.MediaPlayer/` → 刷新即可播放
 
 ---
 
-## Phase 4 — 高难度格式 [⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜] (0/10)
+## Phase 4 — 高难度格式 [⬜⬜⬜⬜⬜⬜⬜⬜] (0/8)
+
+> **⚠️ 2026-06-29 修正**: EXR 和 TIFF 已由 Magick.NET 插件覆盖，从 Phase 4 移除。其余格式保持为纯 C# 解析器（无原生依赖），继续内置在主项目中。
 
 - [ ] 4.1 PE 图标提取
 - [ ] 4.2 ICL 图标库
@@ -762,7 +707,6 @@ private static readonly HashSet<string> MagickExtensions = new(StringComparer.Or
 - [ ] 4.7 VHD/VMDK
 - [ ] 4.8 MOBI/AZW3
 - [ ] 4.9 DXF/STEP/FBX
-- [ ] 4.10 EXR 图像
 
 | # | 格式 | 说明 | 预估 |
 |---|------|------|------|
@@ -775,7 +719,6 @@ private static readonly HashSet<string> MagickExtensions = new(StringComparer.Or
 | 4.7 | VHD/VMDK | 头部解析磁盘容量 | ~4h |
 | 4.8 | MOBI/AZW3 | Palm DB 格式解析 | ~8h |
 | 4.9 | DXF/STEP/FBX | 实体数/面数 | ~15h |
-| 4.10 | EXR 图像 | ✅ **已纳入 [Phase 2D](#phase-2d--统一图像解码方案magicknet)**，由 Magick.NET 统一处理 | ~1h |
 
 ---
 
@@ -979,26 +922,21 @@ ShowPreviewAsync(item)
 
 ---
 
-## 实施顺序建议
+## 实施顺序建议（Avalonia + 插件化修正）
 
 ```
-Phase 0  [工具栏]           → 基础框架，为后续所有格式提供交互
-  ↓
-Phase 1  [信息面板]          → 信息展示容器，所有格式共用
-  ↓
-Phase 2A [信息类格式]       → Torrent, PE, PDF, WAV, FLAC, SQLite, ISO, STL, GZ/BZ2/XZ
-  ↓
-Phase 2B [音频元数据]       → MP3 ID3v2
-  ↓
-Phase 2C [图像解码]         → TGA
-  ↓
-Phase 2D [统一解码]         → Magick.NET 统一处理 TGA/HDR/EXR/TIFF（可选替代 Phase 2C + 3.9 + 4.10）
-  ↓
-Phase 3  [中等价值]         → SVG, TTF, LNK, DBF, ICO, 字幕, Office, EPUB(封面), ~~HDR~~（已纳入 Phase 2D）, 🎵音频播放, 🎬视频播放
-  ↓
-Phase 4  [高难度]           → PE图标, ICL, MKV, DICOM, 证书, VHD, ...
-  ↓
-Phase 5  [元数据优先提取]    → 两步式预览优化（格式基础全部完成后）
+WPF 已实现:
+  Phase 0 [工具栏]           → ✅ 已完成
+  Phase 1 [信息面板]          → ✅ 已完成
+  Phase 2A [信息类格式]       → ✅ Torrent/PE/PDF/WAV/FLAC/SQLite/ISO/STL/GZ
+  Phase 2B [音频元数据]       → ✅ MP3 ID3v2
+  Phase 3  [中等价值]         → ✅ SVG/字体/LNK/DBF/ICO/字幕/Office/EPUB/HDR 元数据
+
+Avalonia 迁移后:
+  ├── Phase 2D [Magick.NET 插件]  → TGA/HDR/EXR/TIFF/PSD（独立项目，选装）
+  ├── Phase M  [MediaPlayer 插件] → 音视频播放（独立项目，按需下载）
+  ├── Phase 4  [高难度格式]       → PE图标/ICL/MKV/DICOM/证书/VHD...（纯 C#，内置）
+  └── Phase 5  [元数据优先提取]    → 两步式预览优化（Core 层先行，UI 适配）
 ```
 
 每 Phase 可并行开发内部格式（各格式解码器互不依赖）。
@@ -1010,11 +948,11 @@ Phase 5  [元数据优先提取]    → 两步式预览优化（格式基础全�
 - [x] Phase 0：预览工具栏完成（通用按钮 + GIF/PNG 格式特定按钮）
 - [x] Phase 1：信息面板增强（动态 ItemsControl 展示所有格式信息）
 - [x] Phase 2：快速出货格式完成（Torrent/PE/PDF/WAV/FLAC/SQLite/ISO/STL/GZ/MP3/TGA）
-  - Phase 2D 统一解码方案（Magick.NET）→ **建议中**，见 [Phase 2D](#phase-2d--统一图像解码方案magicknet)
-- [x] Phase 3：中等价值格式完成（SVG/字体/LNK/DBF/ICO/字幕/Office/EPUB/音视频播放）
-  - HDR 已移至 Phase 2D Magick.NET 统一方案
-- [ ] Phase 4：高难度格式（待定，9 项子任务，EXR 已纳入 Phase 2D）→ [详细设计](.sisyphus/plans/preview-extended-formats.md#L646)
-- [ ] Phase 5：元数据优先提取与两步式优化（待定，5 项子任务均未开始）
+- [x] Phase 3：中等价值格式完成（SVG/字体/LNK/DBF/ICO/字幕/Office/EPUB/HDR 元数据）
+- [ ] Phase 2D 插件化：Magick.NET 统一解码 → 见 [preview-avalonia-opportunities.md](.sisyphus/plans/preview-avalonia-opportunities.md#8-重大依赖的体积分析与分离方案)
+- [ ] Phase 3.10/3.11 插件化：LibVLC 音视频播放 → 见 [preview-avalonia-opportunities.md 第 4 节](.sisyphus/plans/preview-avalonia-opportunities.md#4-音视频播放替代方案)
+- [ ] Phase 4：高难度格式（8 项子任务，EXR/TIFF 已由 Magick.NET 插件覆盖）
+- [ ] Phase 5：元数据优先提取与两步式优化（5 项子任务均未开始）
 - [x] `dotnet build` 通过
 
 ### Final Checklist
@@ -1036,4 +974,5 @@ Phase 5  [元数据优先提取]    → 两步式预览优化（格式基础全�
 - [x] 字体预览展示名称/样式/字形数 + 样本渲染
 - [x] SVG/Markdown/HTML WebView2 渲染正常
 - [x] 视频元数据展示分辨率/时长/编码
-- [ ] **Phase 2D (建议中)**: Magick.NET 统一解码 TGA/HDR/EXR/TIFF → 预计 ~3h
+- [ ] **Magick.NET 插件**: `MantisZip.Preview.Magick` 独立项目，覆盖 TGA/HDR/EXR/TIFF/PSD 等
+- [ ] **MediaPlayer 插件**: `MantisZip.Preview.MediaPlayer` 独立项目，LibVLC 音视频播放
