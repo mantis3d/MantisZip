@@ -1,13 +1,14 @@
 # 魔数检测文件真实格式 (Magic Byte Content Detection)
 
-> **状态**: 📋 待定 | **阶段**: [⬜⬜⬜⬜⬜⬜] (0/6)
+> **状态**: 📋 待定 | **Phase 1 (Core)**: [⬜⬜⬜⬜] (0/4) | **Phase 2 (UI)**: [⬜⬜⬜] (0/3) | **总进度**: (0/7)
 
-## TL;DR
+**⚠️ 两阶段拆分**：
 
-在 Plan A（扩展名识别→预览）完成后，新增基于魔数/文件内容的格式检测引擎，替代当前的扩展名判断，使无名文件、扩展名错误或被改名的文件也能被正确识别和预览。
+- **Phase 1 — Core（可立即执行）**：`FileFormatDetector`、`ExtractHeadAsync`、ZIP 子类型、MP4 tail 等全部在 `MantisZip.Core` 项目中完成，与 UI 框架无关。**Avalonia 移植完成前可先行落地。**
+- **Phase 2 — UI（需 Avalonia 就绪）**：在 Avalonia 版的预览流程中插入魔数检测 + 修改 PreviewHeader。改动量小，仅在现有预览分支前加几十行。
 
-> **依赖**: Plan A 已完成（各格式解码器已就绪）
-> **核心价值**: 扩展名不可靠时仍能识别格式，并在 PreviewHeader 中显示真实格式名
+> **依赖**：Plan A 已完成（各格式解码器已就绪）
+> **核心价值**：扩展名不可靠时仍能识别格式，并在 PreviewHeader 中显示真实格式名
 
 ---
 
@@ -457,16 +458,28 @@ if (FileFormatDetector.Detect(head) == FileFormat.Mp4 && tail != null)
 
 ## 任务总览
 
-- [ ] **Step 1: FileFormat 枚举 + FileFormatDetector 核心**
-- [ ] **Step 2: ExtractHeadAsync + ExtractHeadTailAsync**
-- [ ] **Step 3: ShowPreviewAsync 改造**
-- [ ] **Step 4: ZIP 子类型检测**
-- [ ] **Step 5: MP4 tail 检测**
-- [ ] **Step 6: 设置开关**
+### Phase 1 — Core（可立即执行，与 UI 框架无关）
+
+- [ ] **P1-S1: FileFormat 枚举 + FileFormatDetector 核心** — `FileFormatInfo.cs` 追加 + `FileFormatDetector.Detect()` 魔数匹配引擎
+- [ ] **P1-S2: ExtractHeadAsync + ExtractHeadTailAsync** — 压缩包条目头部/尾部提取基础设施
+- [ ] **P1-S3: ZIP 子类型检测** — `DetectZipSubtype` 区分 EPUB/DOCX/XLSX/PPTX/ODF
+- [ ] **P1-S4: MP4 tail 检测** — moov box 解析：时长 + 分辨率
+
+### Phase 2 — UI（需等 Avalonia 移植完成）
+
+- [ ] **P2-S1: ShowPreviewAsync 改造** — 在 Avalonia 版预览流程中插入魔数检测
+- [ ] **P2-S2: PreviewHeader 展示真实格式**
+- [ ] **P2-S3: 设置开关** — `AppSettings.EnableFormatDetection`
 
 ## 工作项
 
-### Step 1: FileFormat 枚举 + FileFormatDetector 核心 [⬜⬜⬜] (0/3)
+---
+
+### Phase 1 — Core（可立即执行，与 UI 框架无关）
+
+均在 `MantisZip.Core` 项目内完成，改动不涉及任何 WPF/Avalonia 控件。测试全部在 Core 项目跑。
+
+#### P1-S1: FileFormat 枚举 + FileFormatDetector 核心 [⬜⬜⬜] (0/3)
 
 - [ ] `FileFormat` 枚举追加（在已有 `FileFormatInfo.cs` 末尾追加缺失值）
 - [ ] `FileFormatDetector.Detect()` 魔数匹配引擎 + `DetectByExtension()` 回退
@@ -477,37 +490,47 @@ if (FileFormatDetector.Detect(head) == FileFormat.Mp4 && tail != null)
 - 实现 `DetectByExtension(string)` — 扩展名回退
 - PE 特殊检测：MZ + PE signature 双重确认
 
-### Step 2: ExtractHeadAsync + ExtractHeadTailAsync [⬜⬜⬜⬜] (0/4)
+#### P1-S2: ExtractHeadAsync + ExtractHeadTailAsync [⬜⬜⬜⬜] (0/4)
 
 - [ ] `ExtractHeadAsync` — ZIP (Deflate/Store), 7z, RAR 支持
 - [ ] `ExtractHeadTailAsync` — 可选尾读取
 - [ ] 7z 固态压缩降级策略
-- [ ] headSize 通过 `AppSettings.PreviewHeadSize` 可配置
+- [ ] headSize 通过 `AppSettings.PreviewHeadSize` 可配置（Avalonia 版再追加对应设置 UI）
+- **文件**: `Core/Utils/ArchiveEntryExtractor.cs`
 
-**文件**: `Core/Utils/ArchiveEntryExtractor.cs`
-
-### Step 3: ShowPreviewAsync 改造 [⬜⬜⬜] (0/3)
-
-- [ ] 在现有 `ext` 判定之前插入魔数检测
-- [ ] 修改 PreviewHeader 展示真实格式
-- [ ] `FileFormat` → 映射到 Plan A 各解码器
-
-**文件**: `MainWindow.Preview.cs`
-
-### Step 4: ZIP 子类型检测 [⬜⬜] (0/2)
+#### P1-S3: ZIP 子类型检测 [⬜⬜] (0/2)
 
 - [ ] `DetectZipSubtype(byte[])` — EPUB/DOCX/XLSX/PPTX/ODF 区分
 - [ ] 部分 Deflate 解压 + 文件内容匹配
+- **文件**: `Core/Utils/FileFormatDetector.cs`
 
-### Step 5: MP4 tail 检测 [⬜⬜] (0/2)
+#### P1-S4: MP4 tail 检测 [⬜⬜] (0/2)
 
 - [ ] `ExtractHeadTailAsync` 的 MP4 调用策略
 - [ ] moov box 解析：时长 (mvhd) + 分辨率 (tkhd)
+- **文件**: `Core/Utils/ArchiveEntryExtractor.cs`
 
-### Step 6: 设置开关 [⬜⬜] (0/2)
+---
+
+### Phase 2 — UI（需 Avalonia 移植完成后再实施）
+
+均在 Avalonia 版 UI 项目中完成，改动量小。
+
+#### P2-S1: ShowPreviewAsync 改造 [⬜⬜⬜] (0/3)
+
+- [ ] 在现有 ext 判定之前插入魔数检测（调用 Phase 1 的 `FileFormatDetector.Detect()`）
+- [ ] 修改 PreviewHeader 展示真实格式
+- [ ] `FileFormat` → 映射到现有预览解码器
+- **文件**: Avalonia 版 `MainWindow.Preview.cs`
+
+#### P2-S2: PreviewHeader 展示真实格式 [⬜] (0/1)
+
+- [ ] 标题栏显示 `📄 filename → JPEG 图像` 格式
+
+#### P2-S3: 设置开关 [⬜⬜] (0/2)
 
 - [ ] `AppSettings` 新增 `EnableFormatDetection` (默认 true)
-- [ ] 关闭时回退到当前纯扩展名流程
+- [ ] 关闭时回退到纯扩展名流程
 
 ---
 
@@ -577,14 +600,22 @@ var metadata = GetPdfMetadata(tempHeadFile);  // 或其它格式的元数据方�
 
 ## Definition of Done
 
+### Phase 1 — Core ✅
+
 - [ ] `FileFormatDetector` 魔数匹配引擎完成（覆盖 20+ 格式）
 - [ ] `ExtractHeadAsync` / `ExtractHeadTailAsync` 实现
-- [ ] `ShowPreviewAsync` 集成魔数检测
 - [ ] ZIP 子类型检测（EPUB/DOCX/XLSX/PPTX/ODF）
 - [ ] MP4 tail 检测（moov box 解析）
-- [ ] `AppSettings.EnableFormatDetection` 开关
 - [ ] 7z 固态压缩降级处理
-- [ ] `dotnet build` 通过
+- [ ] `dotnet build` 通过（Core 项目 + 测试项目）
+- [ ] Core 层单元测试通过
+
+### Phase 2 — UI 🚧 Avalonia 就绪后
+
+- [ ] ShowPreviewAsync 集成魔数检测
+- [ ] PreviewHeader 显示真实格式名
+- [ ] `AppSettings.EnableFormatDetection` 开关 + 设置 UI
+- [ ] Avalonia 版 `dotnet build` + 冒烟测试通过
 
 ### Final Checklist
 
