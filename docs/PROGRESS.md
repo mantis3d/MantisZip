@@ -18,6 +18,22 @@
 
 ## 版本历史（从新到旧）
 
+### v0.4.3+ (2026-06-29) 预览系统计划更新（Avalonia 方向 + 快速预览模式）
+
+1. **新计划：Avalonia 预览机会分析** — `preview-avalonia-opportunities.md`
+   - 分析 WPF→Avalonia 迁移对预览系统各格式的影响
+   - 评估 PSD/AI/HDR 等新格式的预览方案
+   - 提出 HDR 全景 360° 查看器方案（WebView2 + Three.js / Skia 自渲染两路线）
+   - 音视频播放替代方案（LibVLCSharp）
+   - **三级依赖隔离体系**：将 Magick.NET/LibVLC 等重大依赖拆分为可选插件，通过 `plugins/` 目录 + `AssemblyLoadContext` 加载，控制安装包体积
+2. **新计划：快速预览与渐进式加载** — `preview-quick-modes.md`
+   - 三种预览模式：⚡快速 / ▶渐进 / 📄完整
+   - 28 个格式逐行分析每种模式下的行为
+   - 后台 `ProgressiveLoadManager` 管理渐进加载与取消
+   - 后续扩展：文件列表缩略图模式
+3. **修正计划**：`preview-extended-formats.md` 更新——Phase 2D（Magick.NET）改为插件化方案，Phase 3.10/3.11（音视频）改为 LibVLC 插件，Phase 4 EXR/TIFF 由 Magick.NET 覆盖移除
+4. **PLAN.md**：新增两条调研条目 + 快速预览 P2 条目
+
 ### v0.4.3 (2026-06-21) 压缩包内逐条目权限跳过 + UAC 弹窗行为修复
 
 1. **压缩包内逐条目权限跳过**：
