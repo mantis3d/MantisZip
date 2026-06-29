@@ -1,21 +1,58 @@
 {
-  "active_plan": "E:\\GitHub\\MantisZip\\.sisyphus\\plans\\quickpath-unified.md",
-  "started_at": "2026-06-22T06:53:17.040Z",
-  "session_ids": ["ses_111e528acffeEIHO5WDRXTtVec"],
-  "session_origins": {},
-  "plan_name": "quickpath-unified",
-  "agent": "atlas",
-  "task_sessions": {},
-  "active_work_id": "quickpath-unified",
-  "schema_version": 2,
-  "works": {
-    "quickpath-unified": {
-      "plan_name": "quickpath-unified",
-      "plan_path": "E:\\GitHub\\MantisZip\\.sisyphus\\plans\\quickpath-unified.md",
-      "status": "active",
-      "started_at": "2026-06-22T06:53:17.040Z",
-      "session_ids": ["ses_111e528acffeEIHO5WDRXTtVec"]
-    }
+  "active_plan": "E:\\github\\MantisZip\\.sisyphus\\plans\\contributors-panel.md",
+  "started_at": "2026-06-29T06:46:02.725Z",
+  "session_ids": [
+    "ses_0edf489a6ffeGestPKzk0RWA6N"
+  ],
+  "session_origins": {
+    "ses_0edf489a6ffeGestPKzk0RWA6N": "direct"
   },
-  "status": "active"
+  "plan_name": "contributors-panel",
+  "agent": "atlas",
+  "task_sessions": {
+    "todo:1": {
+      "task_key": "todo:1",
+      "task_label": "1",
+      "task_title": "Create CSV data files",
+      "session_id": "ses_0edde72efffeciYsjgwgN1mPox",
+      "agent": "Sisyphus-Junior",
+      "category": "quick",
+      "updated_at": "2026-06-29T06:48:03.218Z"
+    },
+    "todo:3": {
+      "task_key": "todo:3",
+      "task_label": "3",
+      "task_title": "Update AboutWindow.xaml — two contributor sections",
+      "session_id": "ses_0edda34e7ffe2KFeFsYt3kL49N",
+      "agent": "Sisyphus-Junior",
+      "category": "quick",
+      "updated_at": "2026-06-29T06:53:24.442Z"
+    },
+    "todo:4": {
+      "task_key": "todo:4",
+      "task_label": "4",
+      "task_title": "Update AboutWindow.xaml.cs — shared CSV loader for both categories",
+      "session_id": "ses_0edd811ccffeibISOD68IVJFsJ",
+      "agent": "Sisyphus-Junior",
+      "category": "quick",
+      "updated_at": "2026-06-29T06:56:56.426Z"
+    },
+    "todo:5": {
+      "task_key": "todo:5",
+      "task_label": "5",
+      "task_title": "Update tests and installer",
+      "session_id": "ses_0edd4f5e8ffersiQYuuagdovp5",
+      "agent": "Sisyphus-Junior",
+      "category": "quick",
+      "updated_at": "2026-06-29T06:57:52.255Z"
+    },
+    "final-wave:f1": {
+      "task_key": "final-wave:f1",
+      "task_label": "F1",
+      "task_title": "**Plan Compliance Audit** — `oracle`",
+      "session_id": "ses_0edb7cd4effeRcts5zN3pNl7lE",
+      "agent": "oracle",
+      "updated_at": "2026-06-29T07:30:32.358Z"
+    }
+  }
 }

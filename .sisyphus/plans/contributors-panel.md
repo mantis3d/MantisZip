@@ -62,10 +62,10 @@
 - `installer.iss` — 安装程序包含两个 CSV
 
 ### Definition of Done
-- [ ] 两个 CSV 文件存在且格式正确
-- [ ] 打开 AboutWindow → 致谢 Tab → 先显示技术贡献者名单，再显示资金支持者名单，每行约4个名字
-- [ ] `dotnet build src\MantisZip.UI\MantisZip.UI.csproj` 无错误
-- [ ] `dotnet test tests\MantisZip.Tests\` 全部通过
+- [x] 两个 CSV 文件存在且格式正确
+- [x] 打开 AboutWindow → 致谢 Tab → 先显示技术贡献者名单，再显示资金支持者名单，每行约4个名字
+- [x] `dotnet build src\MantisZip.UI\MantisZip.UI.csproj` 无错误
+- [x] `dotnet test tests\MantisZip.Tests\` 全部通过
 
 ### Must Have
 - 两个独立 WrapPanel 区域，分别排序，分别处理空状态
@@ -116,7 +116,7 @@ Task 1: Create contributors.csv
 
 ## TODOs
 
-- [ ] 1. Create CSV data files
+- [x] 1. Create CSV data files
 
   **What to do**:
   Create two CSV files in `src/MantisZip.UI/` with UTF-8 with BOM encoding.
@@ -190,7 +190,7 @@ Task 1: Create contributors.csv
 
 ---
 
-- [ ] 2. Add localization keys (3 new keys)
+- [x] 2. Add localization keys (3 new keys)
 
   **What to do**:
   Add 3 new keys to the localization system.
@@ -267,7 +267,7 @@ Task 1: Create contributors.csv
 
 ---
 
-- [ ] 3. Update AboutWindow.xaml — two contributor sections
+- [x] 3. Update AboutWindow.xaml — two contributor sections
 
   **What to do**:
   In `AboutWindow.xaml`, locate the Acknowledgments TabItem (lines 373-388). After the `About_Thanks_AI` TextBlock (line 383-385), expand the StackPanel to include **two sections** (Technical + Financial), each following the same pattern.
@@ -398,7 +398,7 @@ Task 1: Create contributors.csv
 
 ---
 
-- [ ] 4. Update AboutWindow.xaml.cs — shared CSV loader for both categories
+- [x] 4. Update AboutWindow.xaml.cs — shared CSV loader for both categories
 
   **What to do**:
   Add a `Contributor` model class and a shared loader method that supports both CSV files.
@@ -538,7 +538,7 @@ Task 1: Create contributors.csv
 
 ---
 
-- [ ] 5. Update tests and installer
+- [x] 5. Update tests and installer
 
   **What to do**:
 
@@ -607,7 +607,7 @@ Task 1: Create contributors.csv
 
 ---
 
-- [ ] 6. Build and test verification
+- [x] 6. Build and test verification
 
   **What to do**:
   1. Run `dotnet build src\MantisZip.UI\MantisZip.UI.csproj` — verify 0 errors
@@ -658,7 +658,7 @@ Task 1: Create contributors.csv
 
 > 4 review agents run in PARALLEL. ALL must APPROVE.
 
-- [ ] F1. **Plan Compliance Audit** — `oracle`
+- [x] F1. **Plan Compliance Audit** — `oracle`
   - Both CSV files exist with correct encoding
   - CopyToOutputDirectory set for both in .csproj
   - All 3 localization keys in zh.json, en.json, L.cs
@@ -666,18 +666,18 @@ Task 1: Create contributors.csv
   - installer.iss has both CSV entries
   - **Must NOT have**: UI editor, score display, click handlers
 
-- [ ] F2. **Code Quality Review** — `unspecified-high`
+- [x] F2. **Code Quality Review** — `unspecified-high`
   - `dotnet build` → PASS, `dotnet test` → PASS
   - No empty catches, no unused imports
 
-- [ ] F3. **Real Manual QA** — `unspecified-high`
+- [x] F3. **Real Manual QA** — `unspecified-high`
   - Both files populated → both lists display correctly (Technical first, Financial second)
   - Delete technical CSV → technical shows empty, financial still shows
   - Delete both → both show "暂无贡献者"
   - 1 entry, 5 entries, 9 entries → WrapPanel wrapping behavior
   - Sorting: highest score first, alphabetical tiebreaker
 
-- [ ] F4. **Scope Fidelity Check** — `deep`
+- [x] F4. **Scope Fidelity Check** — `deep`
   - Each task's output matches its spec
   - No scope creep
 
@@ -703,11 +703,11 @@ dotnet test tests\MantisZip.Tests\MantisZip.Tests.csproj
 ```
 
 ### Final Checklist
-- [ ] Two CSV files exist with proper configuration (technical + financial)
-- [ ] 3 localization keys in all 3 files (zh.json, en.json, L.cs)
-- [ ] XAML with two WrapPanel sections (Technical + Financial)
-- [ ] Code-behind with shared CSV loader
-- [ ] Tests updated (ExpectedAboutKeys 24 entries, count >= 24)
-- [ ] Installer includes both CSV files
-- [ ] Build succeeds
-- [ ] All tests pass
+- [x] Two CSV files exist with proper configuration (technical + financial)
+- [x] 3 localization keys in all 3 files (zh.json, en.json, L.cs)
+- [x] XAML with two WrapPanel sections (Technical + Financial)
+- [x] Code-behind with shared CSV loader
+- [x] Tests updated (ExpectedAboutKeys 24 entries, count >= 24)
+- [x] Installer includes both CSV files
+- [x] Build succeeds
+- [x] All tests pass
