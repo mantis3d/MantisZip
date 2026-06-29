@@ -58,7 +58,8 @@
    - AppSettings 新增 `ZipEncoding`、`SevenZipCompressionMethod`、`SevenZipSolid` 属性
    - SettingsWindow 读写持久化
    - `DynamicFormatOptionsPanel.LoadDefaults()` 打开压缩窗口时自动加载设置值
-   - 快捷压缩路径（`--compress-quick`/`--compress-separate`/`--compress-combined`）读取 AppSettings 默认值
+    - 快捷压缩路径（`--compress-quick`/`--compress-separate`/`--compress-combined`）读取 AppSettings 默认值
+8. **RELEASE_NOTES.md 双语化**：将 v0.4.3 更新内容翻译为中英双语，格式与 v0.4.2/v0.4.1 保持一致
 
 ### v0.4.2 (2026-06-20) 安装程序主题/语言选择修复 / ZIP copy-mode 进度与取消
 
