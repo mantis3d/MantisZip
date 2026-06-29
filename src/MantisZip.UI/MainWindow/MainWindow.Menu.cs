@@ -22,13 +22,15 @@ public partial class MainWindow
 
     private async void OpenArchive_Click(object sender, RoutedEventArgs e)
     {
-        var dialog = new OpenFileDialog
+        var dlg = new QuickPathPreDialog
         {
-            Filter = L.T(L.Main_OpenFileFilter),
-            Title = L.T(L.Shell_Open)
+            Owner = this,
+            IsPickFolderMode = false,
+            IsFileOpenMode = true,
+            FileOpenFilter = L.T(L.Main_OpenFileFilter)
         };
-        if (dialog.ShowDialog() == true)
-            await LoadArchiveAsync(dialog.FileName);
+        if (dlg.ShowDialog() == true && dlg.SelectedPath != null)
+            await LoadArchiveAsync(dlg.SelectedPath);
     }
 
     private async void Extract_Click(object sender, RoutedEventArgs e)
@@ -297,11 +299,22 @@ public partial class MainWindow
 
         var filter = L.T(L.Compress_FileFilter);
         var title = L.T(L.Main_SelectFilesTitle);
+
+        // 先用 QuickPathPreDialog 选目录，再弹系统对话框定位到那里（支持多选）
+        var preDlg = new QuickPathPreDialog
+        {
+            Owner = this,
+            IsPickFolderMode = true // 选目录模式，不弹系统对话框
+        };
+        if (preDlg.ShowDialog() != true || string.IsNullOrEmpty(preDlg.SelectedPath))
+            return;
+
         var ofd = new OpenFileDialog
         {
             Filter = filter,
             Title = title,
-            Multiselect = true
+            Multiselect = true,
+            InitialDirectory = preDlg.SelectedPath
         };
         if (ofd.ShowDialog() == true)
         {

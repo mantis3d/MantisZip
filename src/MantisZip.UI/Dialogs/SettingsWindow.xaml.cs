@@ -610,20 +610,20 @@ public partial class SettingsWindow : Window
 
     private void SevenZipBrowseBtn_Click(object sender, RoutedEventArgs e)
     {
-        var dialog = new Microsoft.Win32.OpenFileDialog
+        var dlg = new QuickPathPreDialog
         {
-            Title = L.T(L.Settings_Advanced_SevenZipSelectDll),
-            Filter = "7z.dll|7z.dll|动态链接库 (*.dll)|*.dll|所有文件 (*.*)|*.*",
-            CheckFileExists = true,
-            Multiselect = false,
-            InitialDirectory = Path.Combine(
+            Owner = this,
+            IsPickFolderMode = false,
+            IsFileOpenMode = true,
+            FileOpenFilter = "7z.dll|7z.dll|动态链接库 (*.dll)|*.dll|所有文件 (*.*)|*.*",
+            InitialPath = Path.Combine(
                 AppDomain.CurrentDomain.BaseDirectory,
                 Environment.Is64BitProcess ? "x64" : "x86"),
         };
 
-        if (dialog.ShowDialog() == true)
+        if (dlg.ShowDialog() == true && dlg.SelectedPath != null)
         {
-            _sevenZipPath = dialog.FileName;
+            _sevenZipPath = dlg.SelectedPath;
             UpdateSevenZipStatus();
         }
     }

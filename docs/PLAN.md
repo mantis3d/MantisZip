@@ -16,7 +16,7 @@
 | 优先级 | 功能 | 设计文档 | 难度 | 预估工时 | 说明 |
 |--------|------|----------|:----:|:--------:|------|
 | **P0** | 便携版模式 | [portable-mode.md](.sisyphus/plans/portable-mode.md) | 🟢低 | 1-2h | 哨兵文件触发，路径重定向到 exe 目录 |
-| **P1** | 统一路径快捷选择 (QuickPathControl) | [quickpath-unified.md](.sisyphus/plans/quickpath-unified.md) | 🟡中 | 4-6h | 收藏/历史/资源管理器窗口三合一控件 + QuickPathDialog + FavoriteManagerWindow；替换全部 13 个路径选择对话框 |
+| **P1** | 统一路径快捷选择 (QuickPathControl → Avalonia) | [quickpath-unified.md](.sisyphus/plans/quickpath-unified.md) | 🟡中 | 4-6h | WPF 已完成数据层 + QuickPathControl 组件 + CompressSettingsWindow 嵌入；WPF 新增 QuickPathPreDialog 前置窗（系统对话框前先选路径）；Avalonia 阶段以 CustomFilePickerDialog + QuickPathBuddy 统一替换 |
 | **P1** | Win11 一级右键菜单 | [win11-first-level-menu.md](.sisyphus/plans/win11-first-level-menu.md) | 🔴高 | 1-2周 | IExplorerCommand 实现，HKLM 提权注册，双接口共存 |
 | **P1** | 压缩解压文件筛选 | [file-filter-feature.md](.sisyphus/plans/file-filter-feature.md) | 🟢低 | 1-2h | 压缩解压文件筛选 |
 | **P1** | 自包含体积优化（Avalonia 迁移后） | [selfcontained-size-optimization.md](.sisyphus/plans/selfcontained-size-optimization.md) | 🟡中 | 4-6h | 三步渐进：InvariantGlobalization → 保守修剪 → 激进修剪，目标降至 20–25 MB |

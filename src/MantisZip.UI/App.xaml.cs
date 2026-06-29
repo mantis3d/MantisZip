@@ -74,17 +74,17 @@ public partial class App : Application
     /// </summary>
     private static string? ShowSevenZipDllDialog()
     {
-        var dialog = new QuickPathDialog
+        var dlg = new QuickPathPreDialog
         {
-            Title = "未找到 7z.dll - 请选择 7z.dll 文件",
+            Owner = Current?.Windows.Cast<Window>().FirstOrDefault(w => w.IsActive),
+            IsPickFolderMode = false,
             IsFileOpenMode = true,
-            FileOpenFilter = "7z.dll|7z.dll|动态链接库 (*.dll)|*.dll|所有文件 (*.*)|*.*",
-            Owner = Current?.Windows.Cast<Window>().FirstOrDefault(w => w.IsActive)
+            FileOpenFilter = "7z.dll|7z.dll|动态链接库 (*.dll)|*.dll|所有文件 (*.*)|*.*"
         };
 
-        if (dialog.ShowDialog() == true && !string.IsNullOrEmpty(dialog.SelectedPath))
+        if (dlg.ShowDialog() == true && dlg.SelectedPath != null)
         {
-            var path = dialog.SelectedPath;
+            var path = dlg.SelectedPath;
             try
             {
                 var settings = AppSettings.Instance;
@@ -455,12 +455,13 @@ public partial class App : Application
             return Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
         }
 
-        // "ask" 或未知值 → 弹出选择对话框
-        var dialog = new Ookii.Dialogs.Wpf.VistaFolderBrowserDialog
+        // "ask" 或未知值 → 弹出 QuickPathPreDialog 选目录
+        var dlg = new QuickPathPreDialog
         {
-            Description = "选择解压目录"
+            IsPickFolderMode = true
         };
-        return dialog.ShowDialog() == true ? dialog.SelectedPath : null;
+        // 静态上下文中无法设置 Owner，ShowDialog 时传入当前活动窗口
+        return dlg.ShowDialog() == true ? dlg.SelectedPath : null;
     }
 
     [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
