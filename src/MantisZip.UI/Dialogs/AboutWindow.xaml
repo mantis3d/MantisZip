@@ -384,6 +384,37 @@
                                    FontSize="13" Margin="0,12,0,0"
                                    Foreground="{DynamicResource Theme_TextSecondary}"/>
 
+                        <!-- ─── 资金支持者 / Financial Supporters ─── -->
+                        <Border Height="1" Margin="0,16,0,8"
+                                Background="{DynamicResource Theme_BorderLight}"/>
+                        <TextBlock Text="{l:L About_Contributors_Financial}"
+                                   FontSize="14" FontWeight="Bold" Margin="0,0,0,8"
+                                   Foreground="{DynamicResource Theme_TextPrimary}"/>
+                        <ItemsControl x:Name="ContributorsFinancialList"
+                                      Background="Transparent" BorderThickness="0">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <WrapPanel Orientation="Horizontal"
+                                               ItemWidth="140" ItemHeight="26"/>
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <TextBlock Text="{Binding Name}"
+                                                Foreground="{DynamicResource Theme_TextPrimary}"
+                                                FontSize="13"
+                                                VerticalAlignment="Center"
+                                                Margin="4,2"/>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                        <TextBlock x:Name="ContributorsFinancialEmpty"
+                                    Text="{l:L About_Contributors_None}"
+                                    Foreground="{DynamicResource Theme_TextSecondary}"
+                                    FontSize="13"
+                                    Visibility="Collapsed"
+                                    Margin="0,4,0,0"/>
+                        
                         <!-- ─── 技术贡献者 / Technical Contributors ─── -->
                         <Border Height="1" Margin="0,16,0,8"
                                 Background="{DynamicResource Theme_BorderLight}"/>
@@ -415,36 +446,6 @@
                                    Visibility="Collapsed"
                                    Margin="0,4,0,0"/>
 
-                        <!-- ─── 资金支持者 / Financial Supporters ─── -->
-                        <Border Height="1" Margin="0,16,0,8"
-                                Background="{DynamicResource Theme_BorderLight}"/>
-                        <TextBlock Text="{l:L About_Contributors_Financial}"
-                                   FontSize="14" FontWeight="Bold" Margin="0,0,0,8"
-                                   Foreground="{DynamicResource Theme_TextPrimary}"/>
-                        <ItemsControl x:Name="ContributorsFinancialList"
-                                      Background="Transparent" BorderThickness="0">
-                            <ItemsControl.ItemsPanel>
-                                <ItemsPanelTemplate>
-                                    <WrapPanel Orientation="Horizontal"
-                                               ItemWidth="140" ItemHeight="26"/>
-                                </ItemsPanelTemplate>
-                            </ItemsControl.ItemsPanel>
-                            <ItemsControl.ItemTemplate>
-                                <DataTemplate>
-                                    <TextBlock Text="{Binding Name}"
-                                               Foreground="{DynamicResource Theme_TextPrimary}"
-                                               FontSize="13"
-                                               VerticalAlignment="Center"
-                                               Margin="4,2"/>
-                                </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
-                        <TextBlock x:Name="ContributorsFinancialEmpty"
-                                   Text="{l:L About_Contributors_None}"
-                                   Foreground="{DynamicResource Theme_TextSecondary}"
-                                   FontSize="13"
-                                   Visibility="Collapsed"
-                                   Margin="0,4,0,0"/>
                     </StackPanel>
                 </ScrollViewer>
             </TabItem>
