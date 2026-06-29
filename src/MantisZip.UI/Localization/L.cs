@@ -65,6 +65,9 @@ public static class L
     public const string About_Thanks_OSS                                = "About_Thanks_OSS";
     public const string About_Thanks_AI                                 = "About_Thanks_AI";
     public const string About_Thanks_7Zip                              = "About_Thanks_7Zip";
+    public const string About_Contributors_Technical                     = "About_Contributors_Technical";
+    public const string About_Contributors_Financial                     = "About_Contributors_Financial";
+    public const string About_Contributors_None                         = "About_Contributors_None";
     public const string About_Intro                                    = "About_Intro";
     public const string About_Label_AuthorName                         = "About_Label_AuthorName";
     public const string About_Label_Description                        = "About_Label_Description";
