@@ -560,7 +560,7 @@
   "Settings_Advanced_AboutDesc": ".NET 9 WPF Desktop App | SharpCompress + SharpSevenZip",
   "Settings_Advanced_AboutHeader": "About MantisZip",
   "Settings_Advanced_AboutLicense": "7-Zip components licensed under GNU LGPL",
-  "Settings_Advanced_AboutVersion": "Version: {0}",
+  "Settings_Advanced_AboutVersion": "Version: ",
   "Settings_Advanced_AllowElevation": "Allow elevation (show UAC prompt in CLI mode)",
   "Settings_Advanced_AllowElevationHint": "Disabled by default. When enabled, if the target directory is not writable in CLI mode, MantisZip will prompt for administrator privileges.",
   "Settings_Advanced_ElevationGroupHeader": "Elevation",

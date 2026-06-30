@@ -726,6 +726,19 @@
                             </StackPanel>
                         </GroupBox>
 
+                        <!-- 默认路径优先级 -->
+                        <GroupBox Header="{l:L Settings_DefaultPath_GroupHeader}" Padding="8" Margin="0,0,0,12">
+                            <StackPanel>
+                                <RadioButton x:Name="DefaultPathContext"   GroupName="DefaultPathPriority" Content="{l:L Settings_DefaultPath_Context}"   Margin="0,2"/>
+                                <RadioButton x:Name="DefaultPathExplorer"  GroupName="DefaultPathPriority" Content="{l:L Settings_DefaultPath_Explorer}"  Margin="0,2"/>
+                                <RadioButton x:Name="DefaultPathRecent"    GroupName="DefaultPathPriority" Content="{l:L Settings_DefaultPath_Recent}"    Margin="0,2"/>
+                                <RadioButton x:Name="DefaultPathDesktop"   GroupName="DefaultPathPriority" Content="{l:L Settings_DefaultPath_Desktop}"   Margin="0,2"/>
+                                <TextBlock Text="{l:L Settings_DefaultPath_Hint}"
+                                           Foreground="{StaticResource Theme_TextSecondary}"
+                                           FontSize="11" TextWrapping="Wrap" Margin="0,6,0,0"/>
+                            </StackPanel>
+                        </GroupBox>
+
                         <GroupBox Header="{l:L Settings_Advanced_TempGroupHeader}" Padding="8" Margin="0,0,0,12">
                             <StackPanel>
                                 <Button Content="{l:L Settings_Advanced_CleanPreviewTemp}" Width="160" Height="26"

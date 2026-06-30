@@ -171,6 +171,17 @@ public partial class SettingsWindow : Window
         // 高级 — 权限提升
         AllowElevationCheck.IsChecked = s.AllowElevation;
 
+        // 高级 — 默认路径优先级
+        var priorityBtn = s.DefaultPathPriority switch
+        {
+            "context"  => DefaultPathContext,
+            "explorer" => DefaultPathExplorer,
+            "recent"   => DefaultPathRecent,
+            "desktop"  => DefaultPathDesktop,
+            _          => DefaultPathContext
+        };
+        priorityBtn.IsChecked = true;
+
         // 外观
         foreach (ComboBoxItem item in ThemeCombo.Items)
         if ((string)item.Tag == s.Theme) { ThemeCombo.SelectedItem = item; break; }
@@ -259,6 +270,12 @@ public partial class SettingsWindow : Window
         s.EnableDebugLogging = EnableDebugLogCheck.IsChecked == true;
         s.LogPrivacyMode = (LogPrivacyModeCombo.SelectedItem as ComboBoxItem)?.Tag as string ?? "off";
         s.AllowElevation = AllowElevationCheck.IsChecked == true;
+
+        // 高级 — 默认路径优先级
+        if (DefaultPathContext.IsChecked   == true) s.DefaultPathPriority = "context";
+        else if (DefaultPathExplorer.IsChecked == true) s.DefaultPathPriority = "explorer";
+        else if (DefaultPathRecent.IsChecked   == true) s.DefaultPathPriority = "recent";
+        else if (DefaultPathDesktop.IsChecked  == true) s.DefaultPathPriority = "desktop";
 
         SaveAssocSettings();
 
@@ -616,9 +633,9 @@ public partial class SettingsWindow : Window
             IsPickFolderMode = false,
             IsFileOpenMode = true,
             FileOpenFilter = "7z.dll|7z.dll|动态链接库 (*.dll)|*.dll|所有文件 (*.*)|*.*",
-            InitialPath = Path.Combine(
+            InitialPath = App.ResolveDefaultPath(Path.Combine(
                 AppDomain.CurrentDomain.BaseDirectory,
-                Environment.Is64BitProcess ? "x64" : "x86"),
+                Environment.Is64BitProcess ? "x64" : "x86")) ?? ""
         };
 
         if (dlg.ShowDialog() == true && dlg.SelectedPath != null)

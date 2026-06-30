@@ -562,7 +562,7 @@
   "Settings_Advanced_AboutDesc": ".NET 9 WPF 桌面应用 ｜ 基于 SharpCompress + SharpSevenZip",
   "Settings_Advanced_AboutHeader": "关于 MantisZip",
   "Settings_Advanced_AboutLicense": "7-Zip 组件遵循 GNU LGPL 许可证",
-  "Settings_Advanced_AboutVersion": "版本: {0}",
+  "Settings_Advanced_AboutVersion": "版本: ",
   "Settings_Advanced_AllowElevation": "允许提升权限（CLI 模式下弹出 UAC 提权窗口）",
   "Settings_Advanced_AllowElevationHint": "默认关闭。开启后，CLI 模式下遇目标目录无写入权限时，会弹出 UAC 提权窗口以管理员身份重试。",
   "Settings_Advanced_ElevationGroupHeader": "权限提升",
