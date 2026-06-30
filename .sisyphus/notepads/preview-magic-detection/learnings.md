@@ -69,3 +69,27 @@
 - Avalonia `MantisZip.UI.Avalonia/` still has zero source files
 - Phase 2 was successfully implemented in WPF as WPF is the active UI framework
 - If Avalonia port happens, the same ~50 lines of integration code must be replicated in the Avalonia `MainWindow.Preview.cs`
+
+## Bugfix: Plain text files not detected by magic detection
+
+### Root cause
+`FileFormatDetector.Detect()` returns `FileFormat.Unknown` for plain text files because text has no magic byte signature. The `ShowPreviewAsync` code also didn't call `DetectByExtension()` as fallback. So text files with wrong/no extension showed no format name.
+
+### Fix (two parts)
+
+**Part A — `FileFormatDetector.Detect()` text heuristics**:
+Added `LooksLikeText()` heuristic as the final check before returning `Unknown`:
+- Scans up to 512 bytes
+- Rejects if null byte ratio > 1% (binary indicator)
+- Counts printable ASCII (0x20-0x7E), whitespace (TAB/LF/CR/FF), and UTF-8 multi-byte sequences
+- For files with mostly UTF-8 sequences (e.g., Chinese text): allows up to 30% non-printable
+- For ASCII text: allows up to 20% non-printable
+- Rejects files < 8 bytes
+
+**Part B — `ShowPreviewAsync` extension fallback**:
+When `Detect()` returns `Unknown`, now calls `FileFormatDetector.DetectByExtension(ext)` as fallback.
+This way, a `.txt` file (even without magic bytes) shows "文本" in the header.
+
+### Files modified
+- `src/MantisZip.Core/Utils/FileFormatDetector.cs` — +~50 lines: `LooksLikeText()` + text heuristics check
+- `src/MantisZip.UI/MainWindow/Preview/MainWindow.Preview.cs` — +5 lines: `DetectByExtension` fallback

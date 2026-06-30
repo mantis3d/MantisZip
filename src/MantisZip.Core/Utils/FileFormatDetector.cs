@@ -334,6 +334,13 @@ public static class FileFormatDetector
             return FileFormat.Avi;
         }
 
+        // 36. Text heuristics: if no magic matched but content looks like text, return Text
+        if (LooksLikeText(head, Math.Min(length, 512)))
+        {
+            CoreLog.Info("Detect: text heuristics matched");
+            return FileFormat.Text;
+        }
+
         return FileFormat.Unknown;
     }
 
@@ -567,5 +574,78 @@ public static class FileFormatDetector
         // Check "PE\0\0" signature
         return head[peOffset] == 'P' && head[peOffset + 1] == 'E' &&
                head[peOffset + 2] == 0 && head[peOffset + 3] == 0;
+    }
+
+    /// <summary>
+    /// 启发式判断字节数组是否看起来像文本内容（无魔数时的兜底策略）。
+    /// 检查以下特征：
+    ///   - null 字节比例 &lt; 1%（纯文本几乎不含 null）
+    ///   - 可打印 ASCII + 空白字符比例 &gt; 80%
+    ///   - 至少 8 字节才参与判断（避免空文件或极短内容的误判）
+    /// </summary>
+    private static bool LooksLikeText(byte[] data, int length)
+    {
+        if (length < 8)
+            return false;
+
+        int totalNonPrintable = 0;
+        int nullCount = 0;
+        int utf8SeqCount = 0;
+
+        for (int i = 0; i < length; i++)
+        {
+            byte b = data[i];
+
+            // 统计 null 字节
+            if (b == 0)
+            {
+                nullCount++;
+                totalNonPrintable++;
+                continue;
+            }
+
+            // 可打印 ASCII (0x20–0x7E)
+            if (b >= 0x20 && b <= 0x7E)
+                continue;
+
+            // 常见空白/控制符：TAB(9), LF(10), CR(13), FF(12)
+            if (b == 9 || b == 10 || b == 12 || b == 13)
+                continue;
+
+            // UTF-8 多字节序列起始字节 (0xC0–0xFD)
+            if (b >= 0xC0)
+            {
+                utf8SeqCount++;
+                // 跳过后续 continuation bytes (0x80–0xBF) 以免重复计数
+                while (i + 1 < length && data[i + 1] >= 0x80 && data[i + 1] <= 0xBF)
+                    i++;
+                continue;
+            }
+
+            // UTF-8 continuation byte (0x80–0xBF) 需要前导字节才合法
+            if (b >= 0x80 && b <= 0xBF)
+            {
+                // 孤立 continuation byte → 非文本
+                totalNonPrintable++;
+                continue;
+            }
+
+            // 其他控制字符 (0x01–0x08, 0x0B, 0x0E–0x1F)
+            totalNonPrintable++;
+        }
+
+        // null 字节比例 > 1% → 二进制
+        if (nullCount * 100 > length)
+            return false;
+
+        // 如果大部分是 UTF-8 多字节序列，最后判定更宽松
+        if (utf8SeqCount * 2 > length)
+        {
+            // 大量 UTF-8 序列（如中文），放宽非打印字符比例
+            return totalNonPrintable * 10 <= length * 3; // ≤30% non-printable
+        }
+
+        // 常规文本：非打印字符比例 ≤ 20%
+        return totalNonPrintable * 5 <= length;
     }
 }
