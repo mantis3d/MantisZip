@@ -159,4 +159,12 @@ public enum FileFormat
     Subtitle, OfficeOpenXml, OfficeLegacy,
     // 映像
     VhdLegacy, Iso9660, Udf,
+    // 音频（补充）
+    Ogg,
+    // 文档（补充）
+    Odt, Ods, Odp, Rtf, DjVu, Xps,
+    // 字体（补充）
+    Woff2,
+    // 其他
+    Fits, Vhdx, Parquet,
 }
