@@ -605,6 +605,12 @@ public static class L
     public const string Settings_Advanced_SevenZipNotFound         = "Settings_Advanced_SevenZipNotFound";
     public const string Settings_Advanced_SevenZipSelectDll        = "Settings_Advanced_SevenZipSelectDll";
     public const string Settings_Advanced_SevenZipReset            = "Settings_Advanced_SevenZipReset";
+    public const string Settings_DefaultPath_GroupHeader           = "Settings_DefaultPath_GroupHeader";
+    public const string Settings_DefaultPath_Context               = "Settings_DefaultPath_Context";
+    public const string Settings_DefaultPath_Explorer              = "Settings_DefaultPath_Explorer";
+    public const string Settings_DefaultPath_Recent                = "Settings_DefaultPath_Recent";
+    public const string Settings_DefaultPath_Desktop               = "Settings_DefaultPath_Desktop";
+    public const string Settings_DefaultPath_Hint                  = "Settings_DefaultPath_Hint";
     public const string Settings_Advanced_AboutDesc                = "Settings_Advanced_AboutDesc";
     public const string Settings_Advanced_AboutHeader              = "Settings_Advanced_AboutHeader";
     public const string Settings_Advanced_AboutLicense             = "Settings_Advanced_AboutLicense";

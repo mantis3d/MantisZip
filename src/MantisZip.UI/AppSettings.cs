@@ -98,6 +98,16 @@ public class AppSettings
     /// <summary>CLI 模式下遇到权限不足时，是否弹提权窗口（默认 false = 仅提示不可写目录）</summary>
     public bool AllowElevation { get; set; } = false;
 
+    // ===== 默认路径优先级 =====
+    /// <summary>
+    /// QuickPathPreDialog 默认路径优先级策略。
+    /// "context"   = 场景相关 > 资源管理器 > 最近使用 > 桌面
+    /// "explorer"  = 资源管理器 > 场景相关 > 最近使用 > 桌面
+    /// "recent"    = 最近使用 > 场景相关 > 资源管理器 > 桌面
+    /// "desktop"   = 直接桌面
+    /// </summary>
+    public string DefaultPathPriority { get; set; } = "context";
+
     // ===== 持久化 =====
     private static readonly string SettingsDir = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "MantisZip");
