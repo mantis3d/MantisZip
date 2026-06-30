@@ -27,7 +27,8 @@ public partial class MainWindow
             Owner = this,
             IsPickFolderMode = false,
             IsFileOpenMode = true,
-            FileOpenFilter = L.T(L.Main_OpenFileFilter)
+            FileOpenFilter = L.T(L.Main_OpenFileFilter),
+            InitialPath = App.ResolveDefaultPath(null) ?? ""
         };
         if (dlg.ShowDialog() == true && dlg.SelectedPath != null)
             await LoadArchiveAsync(dlg.SelectedPath);
@@ -310,10 +311,13 @@ public partial class MainWindow
         var title = L.T(L.Main_SelectFilesTitle);
 
         // 先用 QuickPathPreDialog 选目录，再弹系统对话框定位到那里（支持多选）
+        var archiveDir = !string.IsNullOrEmpty(_currentArchivePath)
+            ? Path.GetDirectoryName(_currentArchivePath) : null;
         var preDlg = new QuickPathPreDialog
         {
             Owner = this,
-            IsPickFolderMode = true // 选目录模式，不弹系统对话框
+            IsPickFolderMode = true, // 选目录模式，不弹系统对话框
+            InitialPath = App.ResolveDefaultPath(archiveDir) ?? ""
         };
         if (preDlg.ShowDialog() != true || string.IsNullOrEmpty(preDlg.SelectedPath))
             return;

@@ -79,7 +79,8 @@ public partial class App : Application
             Owner = Current?.Windows.Cast<Window>().FirstOrDefault(w => w.IsActive),
             IsPickFolderMode = false,
             IsFileOpenMode = true,
-            FileOpenFilter = "7z.dll|7z.dll|动态链接库 (*.dll)|*.dll|所有文件 (*.*)|*.*"
+            FileOpenFilter = "7z.dll|7z.dll|动态链接库 (*.dll)|*.dll|所有文件 (*.*)|*.*",
+            InitialPath = ResolveDefaultPath(AppDomain.CurrentDomain.BaseDirectory) ?? ""
         };
 
         if (dlg.ShowDialog() == true && dlg.SelectedPath != null)
@@ -456,12 +457,40 @@ public partial class App : Application
         }
 
         // "ask" 或未知值 → 弹出 QuickPathPreDialog 选目录
+        var archiveDir = !string.IsNullOrEmpty(archivePath)
+            ? Path.GetDirectoryName(archivePath) : null;
         var dlg = new QuickPathPreDialog
         {
-            IsPickFolderMode = true
+            IsPickFolderMode = true,
+            InitialPath = ResolveDefaultPath(archiveDir) ?? ""
         };
         // 静态上下文中无法设置 Owner，ShowDialog 时传入当前活动窗口
         return dlg.ShowDialog() == true ? dlg.SelectedPath : null;
+    }
+
+    /// <summary>
+    /// 根据用户设置的优先级策略，返回 QuickPathPreDialog 的默认路径。
+    /// </summary>
+    /// <param name="contextPath">场景相关路径（如压缩包所在目录），无则传 null。</param>
+    internal static string? ResolveDefaultPath(string? contextPath)
+    {
+        var priority = AppSettings.Instance.DefaultPathPriority;
+
+        string? context  = contextPath;
+        string? explorer = ExplorerWindowTracker.GetActiveExplorerPath();
+        string? recent   = PathHistoryManager.GetRecent(1).FirstOrDefault()?.Path;
+        string? desktop  = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
+
+        var chain = priority switch
+        {
+            "context"  => new[] { context, explorer, recent, desktop },
+            "explorer" => new[] { explorer, context, recent, desktop },
+            "recent"   => new[] { recent, context, explorer, desktop },
+            "desktop"  => new[] { desktop },
+            _          => new[] { context, explorer, recent, desktop }
+        };
+
+        return chain.FirstOrDefault(p => !string.IsNullOrEmpty(p));
     }
 
     [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]

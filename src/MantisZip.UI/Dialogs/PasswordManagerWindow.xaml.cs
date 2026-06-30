@@ -132,7 +132,8 @@ public partial class PasswordManagerWindow : Window
             IsPickFolderMode = false,
             IsFileOpenMode = false,
             FileTypeFilter = "JSON 文件|*.json",
-            DefaultFileName = "passwords-export.json"
+            DefaultFileName = "passwords-export.json",
+            InitialPath = App.ResolveDefaultPath(null) ?? ""
         };
         if (dlg.ShowDialog() == true && dlg.SelectedPath != null)
         {
@@ -166,7 +167,8 @@ public partial class PasswordManagerWindow : Window
             Owner = this,
             IsPickFolderMode = false,
             IsFileOpenMode = true,
-            FileOpenFilter = "JSON 文件|*.json"
+            FileOpenFilter = "JSON 文件|*.json",
+            InitialPath = App.ResolveDefaultPath(null) ?? ""
         };
         if (dlg.ShowDialog() == true && dlg.SelectedPath != null)
         {
