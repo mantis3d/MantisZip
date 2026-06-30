@@ -502,5 +502,23 @@
   "Settings_Debug_LogPrivacyMode_Full": "Full path",
   "Settings_Debug_LogPath": "Log file path",
   "Settings_Debug_LogPrivacyHelp": "Privacy mode help",
-  "Settings_Debug_Restart": "Changes will take effect after restart"
+  "Settings_Debug_Restart": "Changes will take effect after restart",
+
+  "Menu_Test": "Test",
+  "Test_AboutWindow": "About Window",
+  "Test_SettingsWindow": "Settings Window",
+  "Test_PasswordManager": "Password Manager",
+  "Test_DonationDialog": "Donation Dialog",
+  "Test_LogPrivacyHelp": "Log Privacy Help",
+  "Test_PasswordHelp": "Password Help",
+  "Test_CommentDialog": "Comment Editor",
+  "Test_PasswordEditDialog": "Password Edit",
+  "Test_PasswordDialog": "Password Input",
+  "Test_ProgressWindow": "Progress Window",
+  "Test_ErrorDialog": "Error Info",
+  "Test_CompressSettings": "Compress Settings",
+  "Test_ExtractSettings": "Extract Settings",
+  "Test_CompressConflict": "Compress Conflict",
+  "Test_ConflictDialog": "File Conflict",
+  "Test_MatchedPassword": "Matched Password"
 }

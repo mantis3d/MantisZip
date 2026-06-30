@@ -145,7 +145,14 @@ public partial class MainWindowViewModel : ObservableObject
             "Status_TestingEntry", "Status_TestingArchive", "Status_SmartExtracting",
             "Status_AddingFiles", "Status_DeletingFiles", "Status_Entries",
             "Main_NoRecentFiles", "Main_ClearRecentFiles", "Main_RecentFiles",
-            "Toolbar_Password", "Tooltip_Password"
+            "Toolbar_Password", "Tooltip_Password",
+            "Menu_Test",
+            "Test_AboutWindow", "Test_SettingsWindow", "Test_PasswordManager",
+            "Test_DonationDialog", "Test_LogPrivacyHelp", "Test_PasswordHelp",
+            "Test_CommentDialog", "Test_PasswordEditDialog", "Test_PasswordDialog",
+            "Test_ProgressWindow", "Test_ErrorDialog",
+            "Test_CompressSettings", "Test_ExtractSettings",
+            "Test_CompressConflict", "Test_ConflictDialog", "Test_MatchedPassword"
         };
         foreach (var key in keys)
         {

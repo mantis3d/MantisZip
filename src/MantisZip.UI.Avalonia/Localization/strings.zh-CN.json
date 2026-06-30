@@ -502,5 +502,23 @@
   "Settings_Debug_LogPrivacyMode_Full": "完整路径",
   "Settings_Debug_LogPath": "日志文件路径",
   "Settings_Debug_LogPrivacyHelp": "隐私模式帮助",
-  "Settings_Debug_Restart": "变更将在重启后生效"
+  "Settings_Debug_Restart": "变更将在重启后生效",
+
+  "Menu_Test": "测试",
+  "Test_AboutWindow": "关于窗口",
+  "Test_SettingsWindow": "设置窗口",
+  "Test_PasswordManager": "密码管理器",
+  "Test_DonationDialog": "捐赠窗口",
+  "Test_LogPrivacyHelp": "日志隐私帮助",
+  "Test_PasswordHelp": "密码帮助",
+  "Test_CommentDialog": "注释编辑",
+  "Test_PasswordEditDialog": "密码编辑",
+  "Test_PasswordDialog": "密码输入",
+  "Test_ProgressWindow": "进度窗口",
+  "Test_ErrorDialog": "错误信息",
+  "Test_CompressSettings": "压缩设置",
+  "Test_ExtractSettings": "解压设置",
+  "Test_CompressConflict": "压缩冲突",
+  "Test_ConflictDialog": "文件冲突",
+  "Test_MatchedPassword": "匹配密码"
 }
