@@ -314,6 +314,7 @@ public static class L
     public const string Main_Toolbar_Compress                      = "Main_Toolbar_Compress";
     public const string Main_Toolbar_DeleteFiles                   = "Main_Toolbar_DeleteFiles";
     public const string Main_Toolbar_Extract                       = "Main_Toolbar_Extract";
+    public const string Main_Toolbar_ExtractSelected               = "Main_Toolbar_ExtractSelected";
     public const string Main_Toolbar_New                           = "Main_Toolbar_New";
     public const string Main_Toolbar_Open                          = "Main_Toolbar_Open";
     public const string Main_Toolbar_Password                      = "Main_Toolbar_Password";
@@ -324,6 +325,7 @@ public static class L
     public const string Main_Tooltip_Compress                      = "Main_Tooltip_Compress";
     public const string Main_Tooltip_DeleteFiles                   = "Main_Tooltip_DeleteFiles";
     public const string Main_Tooltip_Extract                       = "Main_Tooltip_Extract";
+    public const string Main_Tooltip_ExtractSelected               = "Main_Tooltip_ExtractSelected";
     public const string Main_Tooltip_NewArchive                    = "Main_Tooltip_NewArchive";
     public const string Main_Tooltip_OpenArchive                   = "Main_Tooltip_OpenArchive";
     public const string Main_Tooltip_Password                      = "Main_Tooltip_Password";
