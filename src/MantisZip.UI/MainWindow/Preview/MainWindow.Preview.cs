@@ -305,6 +305,38 @@ public partial class MainWindow
             SetPreviewInfo(item);
             ShowPreviewLoading(item.NameDisplay ?? item.Name);
 
+            // 魔数检测：通过文件头部字节识别真实格式（即使扩展名缺失或错误）
+            string? realFormatName = null;
+            if (s.EnableFormatDetection && _currentArchivePath != null)
+            {
+                try
+                {
+                    var head = await ArchiveEntryExtractor.ExtractHeadAsync(
+                        _currentArchivePath!, item.Name,
+                        AppSettings.Instance.PreviewHeadSize,
+                        _currentFormat, _currentPassword, ct);
+                    if (head != null && head.Length > 0)
+                    {
+                        var detectedFormat = FileFormatDetector.Detect(head, head.Length);
+                        if (detectedFormat != FileFormat.Unknown)
+                        {
+                            realFormatName = FileFormatHelper.GetDisplayName(detectedFormat);
+                        }
+                    }
+                }
+                catch (OperationCanceledException) { throw; }
+                catch (Exception ex)
+                {
+                    App.LogDebug("ShowPreviewAsync: magic detection failed: {0}", ex.Message);
+                }
+            }
+
+            // 如果魔数检测到真实格式，在标题中显示（已有格式分支会覆盖为更具体的标题，无对应分支时魔数检测结果保留）
+            if (realFormatName != null)
+                PreviewHeader.Text = $"📄 {item.Name} → {realFormatName}";
+            else
+                PreviewHeader.Text = $"📄 {item.Name}";
+
             if (ImageExtensions.Contains(ext))
             {
                 if (!s.EnableImagePreview)
