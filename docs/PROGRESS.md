@@ -14,6 +14,7 @@
 - Avalonia 跨平台移植后续 Phase
 
 ### avalonia-port 分支 (WIP)
+  - **SettingsWindow Tab 紧凑样式 + DonationDialog 修复** — SettingsWindow Tab 标题改用全局 `TabItem.compactTab` class selector（FontSize=18, MinHeight=36），emoji FontSize=16；子 tab 统一应用 compactTab 样式；窗口 720×560；DonationDialog 修复 `avares://DonateQr.png` 找不到崩溃（csproj 加 `<AvaloniaResource>`），两按钮 Width=340 与二维码宽度对齐 (2026-06-30)
   - **Phase 10 计划 + 测试菜单** — 创建 `avalonia-phase10-feature-parity.md` 规划 WPF 功能补齐（文件列表进度条/预览信息面板/状态栏增强）；主菜单新增 🧪 测试菜单，内含 16 个可独立打开的对话框/窗口（含默认测试数据），i18n 中英文键，构建零错误 (2026-06-30)
   - **Phase 9: 文件列表交互补齐** — DataGrid 添加双击目录进入、Enter/Backspace/Delete 键盘导航、列排序（`..` 置顶 + 目录优先 + 箭头标记），与 WPF 文件列表交互行为保持一致 (2026-06-21)
   - **Bugfix: 筛选工具栏尺寸输入框白边 + 空值红框** — 添加 `NullableLongConverter` 处理空字符串→null 绑定；尺寸 TextBox 加 `Padding="2,0"` `BorderThickness="1"` 消除白边遮挡数字 (2026-06-22)

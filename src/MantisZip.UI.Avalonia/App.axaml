@@ -247,5 +247,12 @@
     <Style Selector="ListBoxItem">
       <Setter Property="Foreground" Value="{DynamicResource ThemeTextPrimaryBrush}" />
     </Style>
+
+    <!-- TabItem.compactTab — compact tab headers for settings windows -->
+    <Style Selector="TabItem.compactTab">
+      <Setter Property="MinHeight" Value="36" />
+      <Setter Property="Padding" Value="8,6,8,6" />
+      <Setter Property="FontSize" Value="18" />
+    </Style>
   </Application.Styles>
 </Application>

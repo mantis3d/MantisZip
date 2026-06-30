@@ -3,7 +3,7 @@
         x:Class="MantisZip.UI.Avalonia.Dialogs.DonationDialog"
         x:CompileBindings="False"
         Title="{Binding WinTitle}"
-        Width="420"
+        Width="520"
         SizeToContent="Height"
         WindowStartupLocation="CenterOwner"
         Background="{DynamicResource ThemeWindowBgBrush}"
@@ -30,12 +30,12 @@
             Margin="0,0,0,16"
             HorizontalAlignment="Center">
       <StackPanel Spacing="10">
-        <Image Width="300"
-               Height="300"
+        <Image Width="400"
+               Height="400"
                Source="avares://MantisZip.UI.Avalonia/Resources/DonateQr.png"
                Stretch="Uniform" />
         <TextBlock Text="{Binding QrHintText}"
-                   FontSize="12"
+                   FontSize="14"
                    Foreground="{DynamicResource ThemeTextSecondaryBrush}"
                    HorizontalAlignment="Center" />
       </StackPanel>
@@ -44,7 +44,7 @@
     <!-- Row 2: Platform hint -->
     <TextBlock Grid.Row="2"
                Text="{Binding PlatformsHintText}"
-               FontSize="12"
+               FontSize="14"
                Foreground="{DynamicResource ThemeTextSecondaryBrush}"
                HorizontalAlignment="Center"
                Margin="0,0,0,12" />
@@ -52,23 +52,26 @@
     <!-- Row 3: Platform link buttons -->
     <StackPanel Grid.Row="3"
                 Spacing="8"
-                Margin="0,0,0,20">
+                Margin="0,0,0,20"
+                HorizontalAlignment="Center">
       <Button Content="🔗 爱发电 / Afdian"
-              Height="38"
+              Height="48"
+              Width="440"
               Background="{DynamicResource ThemeSurfaceBgBrush}"
               BorderBrush="{DynamicResource ThemeBorderBrush}"
               BorderThickness="1"
               Foreground="{DynamicResource ThemeTextPrimaryBrush}"
-              FontSize="13"
+              FontSize="18"
               HorizontalContentAlignment="Center"
               Click="OpenAfdian_Click" />
       <Button Content="☕ Polar"
-              Height="38"
+              Height="48"
+              Width="440"
               Background="{DynamicResource ThemeSurfaceBgBrush}"
               BorderBrush="{DynamicResource ThemeBorderBrush}"
               BorderThickness="1"
               Foreground="{DynamicResource ThemeTextPrimaryBrush}"
-              FontSize="13"
+              FontSize="18"
               HorizontalContentAlignment="Center"
               Click="Polar_Click" />
     </StackPanel>

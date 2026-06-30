@@ -4,445 +4,536 @@
         x:Class="MantisZip.UI.Avalonia.Views.SettingsWindow"
         x:DataType="vm:SettingsWindowViewModel"
         Title="{Binding WindowTitle}"
-        Width="680"
-        Height="500"
-        MinWidth="600"
-        MinHeight="400"
-         Foreground="{DynamicResource ThemeTextPrimaryBrush}"
-         Background="{DynamicResource ThemeWindowBgBrush}">
+        Width="720"
+        Height="540"
+        WindowStartupLocation="CenterScreen"
+        CanResize="False"
+        Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+        Background="{DynamicResource ThemeWindowBgBrush}">
 
   <Grid RowDefinitions="*,Auto"
         Margin="16">
-    <!-- TabControl -->
+    <!-- Tabs -->
     <TabControl Grid.Row="0" TabStripPlacement="Left"
                 Background="{DynamicResource ThemeSurfaceBgBrush}"
                 BorderBrush="{DynamicResource ThemeBorderBrush}">
-      <TabItem>
+
+
+      <!-- ═══════ 1. 压缩 ═══════ -->
+      <TabItem Classes="compactTab">
         <TabItem.Header>
-          <StackPanel Orientation="Horizontal" Spacing="4">
-            <TextBlock Text="👁" FontSize="14" />
-            <TextBlock Text="{Binding TabPreviewHeader}" VerticalAlignment="Center" />
-          </StackPanel>
+          <Grid ColumnDefinitions="Auto,*">
+            <TextBlock Text="📦" FontSize="18" VerticalAlignment="Center" />
+            <TextBlock Text="{Binding TabCompressHeader}" Grid.Column="1" Margin="4,0,0,0"
+                       VerticalAlignment="Center" />
+          </Grid>
         </TabItem.Header>
         <ScrollViewer Background="{DynamicResource ThemeWindowBgBrush}">
-          <TabControl Background="{DynamicResource ThemeSurfaceBgBrush}"
-                      BorderBrush="{DynamicResource ThemeBorderBrush}">
-
-            <!-- Text sub-tab -->
-            <TabItem Header="{Binding PreviewTabTextHeader}">
-              <StackPanel Spacing="10" Margin="12">
-                <CheckBox Content="{Binding EnableImagePreviewText}"
-                          IsChecked="{Binding EnableImagePreview}" />
-                <CheckBox Content="{Binding EnableTextPreviewText}"
-                          IsChecked="{Binding EnableTextPreview}" />
-
-                <Separator Background="{DynamicResource ThemeBorderBrush}" />
-
-                <StackPanel Spacing="4">
-                  <TextBlock Text="{Binding PreviewTextFontFamilyText}" FontSize="13" />
-                  <ComboBox Width="240"
-                              HorizontalAlignment="Left"
-                              Background="{DynamicResource ThemeWindowBgBrush}"
-                              Foreground="{DynamicResource ThemeTextPrimaryBrush}">
-                    <ComboBoxItem Content="系统默认" Tag="" />
-                  </ComboBox>
-                </StackPanel>
-
-                <StackPanel Spacing="4">
-                  <TextBlock Text="{Binding TextPreviewFontSizeText}" FontSize="13" />
-                  <Grid ColumnDefinitions="*,Auto">
-                    <Slider Grid.Column="0" Minimum="8" Maximum="48"
-                            Value="{Binding TextPreviewFontSize}"
-                            TickFrequency="1" IsSnapToTickEnabled="True"
-                            Margin="0,0,8,0" />
-                    <Border Grid.Column="1" Padding="8,2">
-                      <TextBlock Text="{Binding TextPreviewFontSize}"
-                                 VerticalAlignment="Center" FontWeight="SemiBold" />
-                    </Border>
-                  </Grid>
-                </StackPanel>
-
-                <CheckBox Content="{Binding PreviewTextColorEmojiText}"
-                          IsChecked="{Binding UseColorEmoji}" />
-
-                <Separator Background="{DynamicResource ThemeBorderBrush}" />
-
-                <StackPanel Spacing="4">
-                  <TextBlock Text="{Binding PreviewTextMaxSizeText}" FontSize="13" />
-                  <Grid ColumnDefinitions="*,Auto">
-                    <Slider Grid.Column="0" Minimum="1" Maximum="100"
-                            Value="{Binding MaxTextPreviewMB}"
-                            TickFrequency="1" IsSnapToTickEnabled="True"
-                            Margin="0,0,8,0" />
-                    <Border Grid.Column="1" Padding="8,2">
-                      <TextBlock Text="{Binding MaxTextPreviewMBText}"
-                                 VerticalAlignment="Center" FontWeight="SemiBold" />
-                    </Border>
-                  </Grid>
-                </StackPanel>
-              </StackPanel>
-            </TabItem>
-
-            <!-- Font sub-tab -->
-            <TabItem Header="{Binding PreviewTabFontHeader}">
-              <StackPanel Spacing="10" Margin="12">
-                <StackPanel Spacing="4">
-                  <TextBlock Text="{Binding PreviewFontSampleText}" FontSize="13" />
-                  <TextBox Text="{Binding FontPreviewSampleText}"
-                           AcceptsReturn="True"
-                           Height="80"
-                           TextWrapping="Wrap"
-                           Background="{DynamicResource ThemeWindowBgBrush}"
-                           Foreground="{DynamicResource ThemeTextPrimaryBrush}"
-                           BorderBrush="{DynamicResource ThemeBorderBrush}" />
-                </StackPanel>
-
-                <Separator Background="{DynamicResource ThemeBorderBrush}" />
-
-                <StackPanel Spacing="4">
-                  <TextBlock Text="{Binding PreviewFontPreviewSizeText}" FontSize="13" />
-                  <Grid ColumnDefinitions="*,Auto">
-                    <Slider Grid.Column="0" Minimum="8" Maximum="72"
-                            Value="{Binding FontPreviewFontSize}"
-                            TickFrequency="1" IsSnapToTickEnabled="True"
-                            Margin="0,0,8,0" />
-                    <Border Grid.Column="1" Padding="8,2">
-                      <TextBlock Text="{Binding FontPreviewFontSize}"
-                                 VerticalAlignment="Center" FontWeight="SemiBold" />
-                    </Border>
-                  </Grid>
-                </StackPanel>
-              </StackPanel>
-            </TabItem>
-
-            <!-- Table sub-tab -->
-            <TabItem Header="{Binding PreviewTabTableHeader}">
-              <StackPanel Spacing="10" Margin="12">
-                <StackPanel Spacing="4">
-                  <TextBlock Text="{Binding PreviewTableMaxRowsText}" FontSize="13" />
-                  <TextBox Text="{Binding MaxTablePreviewRows}"
-                           Width="120"
-                           HorizontalAlignment="Left"
-                           Background="{DynamicResource ThemeWindowBgBrush}"
-                           Foreground="{DynamicResource ThemeTextPrimaryBrush}"
-                           BorderBrush="{DynamicResource ThemeBorderBrush}" />
-                </StackPanel>
-
-                <Separator Background="{DynamicResource ThemeBorderBrush}" />
-
-                <StackPanel Spacing="4">
-                  <TextBlock Text="{Binding PreviewTableMaxColsText}" FontSize="13" />
-                  <TextBox Text="{Binding MaxTablePreviewCols}"
-                           Width="120"
-                           HorizontalAlignment="Left"
-                           Background="{DynamicResource ThemeWindowBgBrush}"
-                           Foreground="{DynamicResource ThemeTextPrimaryBrush}"
-                           BorderBrush="{DynamicResource ThemeBorderBrush}" />
-                </StackPanel>
-              </StackPanel>
-            </TabItem>
-
-            <!-- Layout sub-tab -->
-            <TabItem Header="{Binding PreviewTabPositionHeader}">
-              <StackPanel Spacing="10" Margin="12">
-                <StackPanel Spacing="4">
-                  <TextBlock Text="{Binding PreviewPositionText}" FontSize="13" />
-                  <ComboBox ItemsSource="{Binding PreviewPositionOptions}"
-                            SelectedItem="{Binding SelectedPreviewPositionOption}"
-                            Width="200"
-                            HorizontalAlignment="Left">
-                    <ComboBox.ItemTemplate>
-                      <DataTemplate>
-                        <TextBlock Text="{Binding Display}" />
-                      </DataTemplate>
-                    </ComboBox.ItemTemplate>
-                  </ComboBox>
-                </StackPanel>
-
-                <Separator Background="{DynamicResource ThemeBorderBrush}" />
-
-                <StackPanel Spacing="4">
-                  <TextBlock Text="{Binding PreviewInfoOrientationText}" FontSize="13" />
-                  <ComboBox ItemsSource="{Binding InfoPanelOrientationOptions}"
-                            SelectedItem="{Binding SelectedInfoPanelOrientationOption}"
-                            Width="160"
-                            HorizontalAlignment="Left">
-                    <ComboBox.ItemTemplate>
-                      <DataTemplate>
-                        <TextBlock Text="{Binding Display}" />
-                      </DataTemplate>
-                    </ComboBox.ItemTemplate>
-                  </ComboBox>
-                </StackPanel>
-
-                <Separator Background="{DynamicResource ThemeBorderBrush}" />
-
-                <CheckBox Content="{Binding PreviewShowPanelText}"
-                          IsChecked="{Binding ShowPreviewPanel}" />
-
-                <Separator Background="{DynamicResource ThemeBorderBrush}" />
-
-                <StackPanel Spacing="4">
-                  <TextBlock Text="{Binding PreviewMaxFileSizeText}" FontSize="13" />
-                  <Grid ColumnDefinitions="*,Auto">
-                    <Slider Grid.Column="0" Minimum="1" Maximum="200"
-                            Value="{Binding MaxPreviewFileSizeMB}"
-                            TickFrequency="1" IsSnapToTickEnabled="True"
-                            Margin="0,0,8,0" />
-                    <Border Grid.Column="1" Padding="8,2">
-                      <TextBlock Text="{Binding MaxPreviewFileSizeMBText}"
-                                 VerticalAlignment="Center" FontWeight="SemiBold" />
-                    </Border>
-                  </Grid>
-                </StackPanel>
-              </StackPanel>
-            </TabItem>
-
-          </TabControl>
-        </ScrollViewer>
-      </TabItem>
-
-      <TabItem>
-        <TabItem.Header>
-          <StackPanel Orientation="Horizontal" Spacing="4">
-            <TextBlock Text="🔧" FontSize="14" />
-            <TextBlock Text="{Binding TabCompressHeader}" VerticalAlignment="Center" />
-          </StackPanel>
-        </TabItem.Header>
-        <ScrollViewer Background="{DynamicResource ThemeWindowBgBrush}">
-          <StackPanel Spacing="10"
-                      Margin="12">
-            <StackPanel Spacing="4">
-              <TextBlock Text="{Binding DefaultFormatText}"
-                         FontSize="13" />
-              <ComboBox ItemsSource="{Binding DefaultFormatOptions}"
-                         SelectedItem="{Binding SelectedDefaultFormatOption}"
-                         Width="160"
-                         HorizontalAlignment="Left">
-                <ComboBox.ItemTemplate>
-                  <DataTemplate>
-                    <TextBlock Text="{Binding Display}" />
-                  </DataTemplate>
-                </ComboBox.ItemTemplate>
-              </ComboBox>
-            </StackPanel>
-
-            <Separator Background="{DynamicResource ThemeBorderBrush}" />
-
-            <StackPanel Spacing="4">
-              <TextBlock Text="{Binding CompressionLevelText}"
-                         FontSize="13" />
-              <Grid ColumnDefinitions="*,Auto">
-                <Slider Grid.Column="0"
-                        Minimum="1"
-                        Maximum="9"
-                        Value="{Binding DefaultLevel}"
-                        TickFrequency="1"
-                        IsSnapToTickEnabled="True"
-                        Margin="0,0,8,0" />
-                <Border Grid.Column="1"
-                        Padding="8,2">
-                  <TextBlock Text="{Binding DefaultLevel}"
-                             VerticalAlignment="Center"
-                             FontWeight="SemiBold" />
-                </Border>
-              </Grid>
-            </StackPanel>
-
-            <Separator Background="{DynamicResource ThemeBorderBrush}" />
-
-            <CheckBox Content="{Binding CloseAfterCompressText}"
-                      IsChecked="{Binding CloseAfterCompress}" />
-            <CheckBox Content="{Binding KeepOriginalExtensionText}"
-                      IsChecked="{Binding KeepOriginalExtension}" />
-            <CheckBox Content="{Binding PreserveDirectoryRootText}"
-                      IsChecked="{Binding PreserveDirectoryRoot}" />
-          </StackPanel>
-        </ScrollViewer>
-      </TabItem>
-
-      <TabItem>
-        <TabItem.Header>
-          <StackPanel Orientation="Horizontal" Spacing="4">
-            <TextBlock Text="🐛" FontSize="14" />
-            <TextBlock Text="{Binding TabDebugHeader}" VerticalAlignment="Center" />
-          </StackPanel>
-        </TabItem.Header>
-        <ScrollViewer Background="{DynamicResource ThemeWindowBgBrush}">
-          <StackPanel Spacing="10"
-                      Margin="12">
-            <CheckBox Content="{Binding DebugText}"
-                      IsChecked="{Binding EnableDebugLogging}" />
-
-            <Separator Background="{DynamicResource ThemeBorderBrush}" />
-
-            <StackPanel Spacing="4">
-              <TextBlock Text="{Binding LogPrivacyModeText}"
-                         FontSize="13" />
-              <Grid ColumnDefinitions="*,Auto">
-                <ComboBox Grid.Column="0"
-                          ItemsSource="{Binding LogPrivacyModeOptions}"
-                          SelectedItem="{Binding SelectedLogPrivacyModeOption}"
-                          Width="240"
-                          HorizontalAlignment="Left">
+          <StackPanel Spacing="12" Margin="12">
+            <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
+                    CornerRadius="4" Padding="12" Background="{DynamicResource ThemeSurfaceBgBrush}">
+              <StackPanel Spacing="8">
+                <TextBlock Text="{Binding DefaultFormatText}" FontWeight="SemiBold" />
+                <ComboBox ItemsSource="{Binding DefaultFormatOptions}"
+                          SelectedItem="{Binding SelectedDefaultFormatOption}"
+                          Width="240" HorizontalAlignment="Left">
                   <ComboBox.ItemTemplate>
                     <DataTemplate>
                       <TextBlock Text="{Binding Display}" />
                     </DataTemplate>
                   </ComboBox.ItemTemplate>
                 </ComboBox>
-                <Button Grid.Column="1"
-                        Content="{Binding LogPrivacyHelpText}"
-                        Command="{Binding OpenLogPrivacyHelpCommand}"
-                        Padding="8,4"
-                        Margin="8,0,0,0"
-                        Background="{DynamicResource ThemeButtonBgBrush}"
-                        Foreground="{DynamicResource ThemeTextPrimaryBrush}"
-                        BorderBrush="{DynamicResource ThemeBorderBrush}" />
-              </Grid>
-            </StackPanel>
-
-            <Separator Background="{DynamicResource ThemeBorderBrush}" />
-
-            <StackPanel Spacing="4">
-              <TextBlock Text="{Binding LogPathText}"
-                         FontSize="13" />
-              <TextBlock Text="{Binding LogFilePath}"
-                         FontSize="12"
-                         Foreground="{DynamicResource ThemeTextSecondaryBrush}"
-                         TextWrapping="Wrap" />
-            </StackPanel>
-          </StackPanel>
-        </ScrollViewer>
-      </TabItem>
-
-      <!-- ═══════ 解压 ═══════ -->
-      <TabItem>
-        <TabItem.Header>
-          <StackPanel Orientation="Horizontal" Spacing="4">
-            <TextBlock Text="📂" FontSize="14" />
-            <TextBlock Text="{Binding TabExtractHeader}" VerticalAlignment="Center" />
-          </StackPanel>
-        </TabItem.Header>
-        <ScrollViewer Background="{DynamicResource ThemeWindowBgBrush}">
-          <StackPanel Spacing="10"
-                      Margin="12">
-            <StackPanel Spacing="4">
-              <TextBlock Text="{Binding ExtractDefaultDestText}"
-                         FontSize="13" />
-              <ComboBox ItemsSource="{Binding ExtractDestinationOptions}"
-                         SelectedItem="{Binding SelectedExtractDestinationOption}"
-                         Width="240"
-                         HorizontalAlignment="Left">
-                <ComboBox.ItemTemplate>
-                  <DataTemplate>
-                    <TextBlock Text="{Binding Display}" />
-                  </DataTemplate>
-                </ComboBox.ItemTemplate>
-              </ComboBox>
-            </StackPanel>
-
-            <Separator Background="{DynamicResource ThemeBorderBrush}" />
-
-            <StackPanel Spacing="4">
-              <TextBlock Text="{Binding ExtractConflictActionText}"
-                         FontSize="13" />
-              <ComboBox ItemsSource="{Binding FileConflictActionOptions}"
-                         SelectedItem="{Binding SelectedFileConflictActionOption}"
-                         Width="240"
-                         HorizontalAlignment="Left">
-                <ComboBox.ItemTemplate>
-                  <DataTemplate>
-                    <TextBlock Text="{Binding Display}" />
-                  </DataTemplate>
-                </ComboBox.ItemTemplate>
-              </ComboBox>
-            </StackPanel>
-
-            <Separator Background="{DynamicResource ThemeBorderBrush}" />
-
-            <CheckBox Content="{Binding ExtractOpenFolderAfterText}"
-                      IsChecked="{Binding OpenFolderAfterExtract}" />
-            <CheckBox Content="{Binding ExtractEnableDragText}"
-                      IsChecked="{Binding EnableDragExtract}" />
-            <CheckBox Content="{Binding ExtractPreserveFullPathText}"
-                      IsChecked="{Binding ExtractPreserveFullPath}" />
-          </StackPanel>
-        </ScrollViewer>
-      </TabItem>
-
-      <!-- ═══════ 上下文菜单 ═══════ -->
-      <TabItem>
-        <TabItem.Header>
-          <StackPanel Orientation="Horizontal" Spacing="4">
-            <TextBlock Text="🖱️" FontSize="14" />
-            <TextBlock Text="{Binding TabContextMenuHeader}" VerticalAlignment="Center" />
-          </StackPanel>
-        </TabItem.Header>
-        <ScrollViewer Background="{DynamicResource ThemeWindowBgBrush}">
-          <StackPanel Spacing="10"
-                      Margin="12">
-            <Border BorderBrush="{DynamicResource ThemeBorderBrush}"
-                    BorderThickness="1"
-                    Padding="8"
-                    CornerRadius="4"
-                    Background="{DynamicResource ThemeSurfaceBgBrush}">
-              <StackPanel Spacing="6">
-                <TextBlock Text="{Binding ContextMenuGroupHeader}"
-                           FontWeight="SemiBold"
-                           FontSize="13"
-                           Margin="0,0,0,4" />
-
-                <TextBlock Text="{Binding ContextMenuGroupBrowse}"
-                           FontWeight="SemiBold"
-                           FontSize="12" />
-                <CheckBox Content="{Binding ContextMenuEnableOpen}"
-                          IsChecked="{Binding EnableOpenMenu}"
-                          Margin="8,0,0,0" />
-
-                <TextBlock Text="{Binding ContextMenuGroupCompress}"
-                           FontWeight="SemiBold"
-                           FontSize="12"
-                           Margin="0,4,0,0" />
-                <CheckBox Content="{Binding ContextMenuEnableCompress}"
-                          IsChecked="{Binding EnableCompressMenu}"
-                          Margin="8,0,0,0" />
-                <CheckBox Content="{Binding ContextMenuEnableCompressSeparate}"
-                          IsChecked="{Binding EnableCompressSeparate}"
-                          Margin="8,0,0,0" />
-                <CheckBox Content="{Binding ContextMenuEnableCompressCombined}"
-                          IsChecked="{Binding EnableCompressCombined}"
-                          Margin="8,0,0,0" />
-
-                <TextBlock Text="{Binding ContextMenuGroupExtract}"
-                           FontWeight="SemiBold"
-                           FontSize="12"
-                           Margin="0,4,0,0" />
-                <CheckBox Content="{Binding ContextMenuEnableExtractHere}"
-                          IsChecked="{Binding EnableExtractHereMenu}"
-                          Margin="8,0,0,0" />
-                <CheckBox Content="{Binding ContextMenuEnableSmartExtract}"
-                          IsChecked="{Binding EnableSmartExtractMenu}"
-                          Margin="8,0,0,0" />
-                <CheckBox Content="{Binding ContextMenuEnableExtractToNamed}"
-                          IsChecked="{Binding EnableExtractToNamedMenu}"
-                          Margin="8,0,0,0" />
-                <CheckBox Content="{Binding ContextMenuEnableExtractTo}"
-                          IsChecked="{Binding EnableExtractToMenu}"
-                          Margin="8,0,0,0" />
               </StackPanel>
             </Border>
 
-            <Border BorderBrush="{DynamicResource ThemeBorderBrush}"
-                    BorderThickness="1"
-                    Padding="8"
-                    CornerRadius="4"
-                    Background="{DynamicResource ThemeSurfaceBgBrush}">
-              <StackPanel Spacing="6">
+            <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
+                    CornerRadius="4" Padding="12" Background="{DynamicResource ThemeSurfaceBgBrush}">
+              <StackPanel Spacing="8">
+                <TextBlock Text="{Binding CompressionLevelText}" FontWeight="SemiBold" />
+                <Grid ColumnDefinitions="*,Auto">
+                  <Slider Grid.Column="0" Minimum="1" Maximum="9"
+                          Value="{Binding DefaultLevel}"
+                          TickFrequency="1" IsSnapToTickEnabled="True"
+                          Margin="0,0,8,0" />
+                  <Border Grid.Column="1" Padding="8,2">
+                    <TextBlock Text="{Binding DefaultLevel}"
+                               VerticalAlignment="Center" FontWeight="SemiBold" />
+                  </Border>
+                </Grid>
+              </StackPanel>
+            </Border>
+
+            <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
+                    CornerRadius="4" Padding="12" Background="{DynamicResource ThemeSurfaceBgBrush}">
+              <StackPanel Spacing="8">
+                <TextBlock Text="选项" FontWeight="SemiBold" />
+                <CheckBox Content="{Binding CloseAfterCompressText}"
+                          IsChecked="{Binding CloseAfterCompress}" />
+                <CheckBox Content="{Binding KeepOriginalExtensionText}"
+                          IsChecked="{Binding KeepOriginalExtension}" />
+                <CheckBox Content="{Binding PreserveDirectoryRootText}"
+                          IsChecked="{Binding PreserveDirectoryRoot}" />
+              </StackPanel>
+            </Border>
+          </StackPanel>
+        </ScrollViewer>
+      </TabItem>
+
+      <!-- ═══════ 2. 解压 ═══════ -->
+      <TabItem Classes="compactTab">
+        <TabItem.Header>
+          <Grid ColumnDefinitions="Auto,*">
+            <TextBlock Text="📂" FontSize="18" VerticalAlignment="Center" />
+            <TextBlock Text="{Binding TabExtractHeader}" Grid.Column="1" Margin="4,0,0,0"
+                       VerticalAlignment="Center" />
+          </Grid>
+        </TabItem.Header>
+        <ScrollViewer Background="{DynamicResource ThemeWindowBgBrush}">
+          <StackPanel Spacing="12" Margin="12">
+            <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
+                    CornerRadius="4" Padding="12" Background="{DynamicResource ThemeSurfaceBgBrush}">
+              <StackPanel Spacing="8">
+                <TextBlock Text="{Binding ExtractDefaultDestText}" FontWeight="SemiBold" />
+                <ComboBox ItemsSource="{Binding ExtractDestinationOptions}"
+                          SelectedItem="{Binding SelectedExtractDestinationOption}"
+                          Width="240" HorizontalAlignment="Left">
+                  <ComboBox.ItemTemplate>
+                    <DataTemplate>
+                      <TextBlock Text="{Binding Display}" />
+                    </DataTemplate>
+                  </ComboBox.ItemTemplate>
+                </ComboBox>
+              </StackPanel>
+            </Border>
+
+            <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
+                    CornerRadius="4" Padding="12" Background="{DynamicResource ThemeSurfaceBgBrush}">
+              <StackPanel Spacing="8">
+                <TextBlock Text="{Binding ExtractConflictActionText}" FontWeight="SemiBold" />
+                <ComboBox ItemsSource="{Binding FileConflictActionOptions}"
+                          SelectedItem="{Binding SelectedFileConflictActionOption}"
+                          Width="240" HorizontalAlignment="Left">
+                  <ComboBox.ItemTemplate>
+                    <DataTemplate>
+                      <TextBlock Text="{Binding Display}" />
+                    </DataTemplate>
+                  </ComboBox.ItemTemplate>
+                </ComboBox>
+              </StackPanel>
+            </Border>
+
+            <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
+                    CornerRadius="4" Padding="12" Background="{DynamicResource ThemeSurfaceBgBrush}">
+              <StackPanel Spacing="8">
+                <TextBlock Text="选项" FontWeight="SemiBold" />
+                <CheckBox Content="{Binding ExtractOpenFolderAfterText}"
+                          IsChecked="{Binding OpenFolderAfterExtract}" />
+                <CheckBox Content="{Binding ExtractEnableDragText}"
+                          IsChecked="{Binding EnableDragExtract}" />
+                <CheckBox Content="{Binding ExtractPreserveFullPathText}"
+                          IsChecked="{Binding ExtractPreserveFullPath}" />
+              </StackPanel>
+            </Border>
+          </StackPanel>
+        </ScrollViewer>
+      </TabItem>
+
+      <!-- ═══════ 3. 外观 ═══════ -->
+      <TabItem Classes="compactTab">
+        <TabItem.Header>
+          <Grid ColumnDefinitions="Auto,*">
+            <TextBlock Text="🎨" FontSize="18" VerticalAlignment="Center" />
+            <TextBlock Text="{Binding TabAppearanceHeader}" Grid.Column="1" Margin="4,0,0,0"
+                       VerticalAlignment="Center" />
+          </Grid>
+        </TabItem.Header>
+        <ScrollViewer Background="{DynamicResource ThemeWindowBgBrush}">
+          <StackPanel Spacing="12" Margin="12">
+            <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
+                    CornerRadius="4" Padding="12" Background="{DynamicResource ThemeSurfaceBgBrush}">
+              <StackPanel Spacing="8">
+                <TextBlock Text="{Binding AppearanceThemeText}" FontWeight="SemiBold" />
+                <ComboBox ItemsSource="{Binding ThemeOptions}"
+                          SelectedItem="{Binding SelectedThemeOption}"
+                          Width="200" HorizontalAlignment="Left">
+                  <ComboBox.ItemTemplate>
+                    <DataTemplate>
+                      <TextBlock Text="{Binding Display}" />
+                    </DataTemplate>
+                  </ComboBox.ItemTemplate>
+                </ComboBox>
+              </StackPanel>
+            </Border>
+
+            <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
+                    CornerRadius="4" Padding="12" Background="{DynamicResource ThemeSurfaceBgBrush}">
+              <StackPanel Spacing="8">
+                <TextBlock Text="{Binding AppearanceMaxRecentFilesText}" FontWeight="SemiBold" />
+                <TextBox Text="{Binding MaxRecentFiles}"
+                         Width="120" HorizontalAlignment="Left"
+                         Background="{DynamicResource ThemeWindowBgBrush}"
+                         Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                         BorderBrush="{DynamicResource ThemeBorderBrush}" />
+              </StackPanel>
+            </Border>
+          </StackPanel>
+        </ScrollViewer>
+      </TabItem>
+
+      <!-- ═══════ 4. 预览 ═══════ -->
+      <TabItem Classes="compactTab">
+        <TabItem.Header>
+          <Grid ColumnDefinitions="Auto,*">
+            <TextBlock Text="👁" FontSize="18" VerticalAlignment="Center" />
+            <TextBlock Text="{Binding TabPreviewHeader}" Grid.Column="1" Margin="4,0,0,0"
+                       VerticalAlignment="Center" />
+          </Grid>
+        </TabItem.Header>
+        <Grid>
+          <TabControl TabStripPlacement="Top"
+                      Background="{DynamicResource ThemeSurfaceBgBrush}"
+                      BorderBrush="{DynamicResource ThemeBorderBrush}">
+            <!-- 通用 General -->
+            <TabItem Header="通用" Classes="compactTab">
+              <ScrollViewer Background="{DynamicResource ThemeWindowBgBrush}">
+                <StackPanel Spacing="12" Margin="12">
+                  <CheckBox Content="{Binding PreviewShowPanelText}"
+                            IsChecked="{Binding ShowPreviewPanel}" />
+
+                  <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
+                          CornerRadius="4" Padding="12" Background="{DynamicResource ThemeSurfaceBgBrush}">
+                    <StackPanel Spacing="8">
+                      <TextBlock Text="{Binding PreviewPositionText}" FontWeight="SemiBold" />
+                      <ComboBox ItemsSource="{Binding PreviewPositionOptions}"
+                                SelectedItem="{Binding SelectedPreviewPositionOption}"
+                                Width="240" HorizontalAlignment="Left">
+                        <ComboBox.ItemTemplate>
+                          <DataTemplate>
+                            <TextBlock Text="{Binding Display}" />
+                          </DataTemplate>
+                        </ComboBox.ItemTemplate>
+                      </ComboBox>
+                    </StackPanel>
+                  </Border>
+
+                  <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
+                          CornerRadius="4" Padding="12" Background="{DynamicResource ThemeSurfaceBgBrush}">
+                    <StackPanel Spacing="8">
+                      <TextBlock Text="{Binding PreviewInfoOrientationText}" FontWeight="SemiBold" />
+                      <ComboBox ItemsSource="{Binding InfoPanelOrientationOptions}"
+                                SelectedItem="{Binding SelectedInfoPanelOrientationOption}"
+                                Width="200" HorizontalAlignment="Left">
+                        <ComboBox.ItemTemplate>
+                          <DataTemplate>
+                            <TextBlock Text="{Binding Display}" />
+                          </DataTemplate>
+                        </ComboBox.ItemTemplate>
+                      </ComboBox>
+                    </StackPanel>
+                  </Border>
+
+                  <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
+                          CornerRadius="4" Padding="12" Background="{DynamicResource ThemeSurfaceBgBrush}">
+                    <StackPanel Spacing="8">
+                      <TextBlock Text="{Binding PreviewMaxFileSizeText}" FontWeight="SemiBold" />
+                      <Grid ColumnDefinitions="*,Auto">
+                        <Slider Grid.Column="0" Minimum="1" Maximum="200"
+                                Value="{Binding MaxPreviewFileSizeMB}"
+                                TickFrequency="1" IsSnapToTickEnabled="True"
+                                Margin="0,0,8,0" />
+                        <Border Grid.Column="1" Padding="8,2">
+                          <TextBlock Text="{Binding MaxPreviewFileSizeMBText}"
+                                     VerticalAlignment="Center" FontWeight="SemiBold" />
+                        </Border>
+                      </Grid>
+                    </StackPanel>
+                  </Border>
+                </StackPanel>
+              </ScrollViewer>
+            </TabItem>
+
+            <!-- 图片 Image -->
+            <TabItem Header="图片" Classes="compactTab">
+              <ScrollViewer Background="{DynamicResource ThemeWindowBgBrush}">
+                <StackPanel Spacing="12" Margin="12">
+                  <CheckBox Content="{Binding EnableImagePreviewText}"
+                            IsChecked="{Binding EnableImagePreview}" />
+                </StackPanel>
+              </ScrollViewer>
+            </TabItem>
+
+            <!-- 文本 Text -->
+            <TabItem Header="{Binding PreviewTabTextHeader}" Classes="compactTab">
+              <ScrollViewer Background="{DynamicResource ThemeWindowBgBrush}">
+                <StackPanel Spacing="12" Margin="12">
+                  <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
+                          CornerRadius="4" Padding="12" Background="{DynamicResource ThemeSurfaceBgBrush}">
+                    <StackPanel Spacing="8">
+                      <TextBlock Text="{Binding TextPreviewFontSizeText}" FontWeight="SemiBold" />
+                      <Grid ColumnDefinitions="*,Auto">
+                        <Slider Grid.Column="0" Minimum="8" Maximum="48"
+                                Value="{Binding TextPreviewFontSize}"
+                                TickFrequency="1" IsSnapToTickEnabled="True"
+                                Margin="0,0,8,0" />
+                        <Border Grid.Column="1" Padding="8,2">
+                          <TextBlock Text="{Binding TextPreviewFontSize}"
+                                     VerticalAlignment="Center" FontWeight="SemiBold" />
+                        </Border>
+                      </Grid>
+                    </StackPanel>
+                  </Border>
+
+                  <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
+                          CornerRadius="4" Padding="12" Background="{DynamicResource ThemeSurfaceBgBrush}">
+                    <StackPanel Spacing="8">
+                      <TextBlock Text="{Binding PreviewTextFontFamilyText}" FontWeight="SemiBold" />
+                      <ComboBox Width="240" HorizontalAlignment="Left"
+                                Background="{DynamicResource ThemeWindowBgBrush}"
+                                Foreground="{DynamicResource ThemeTextPrimaryBrush}">
+                        <ComboBoxItem Content="系统默认" Tag="" />
+                      </ComboBox>
+                    </StackPanel>
+                  </Border>
+
+                  <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
+                          CornerRadius="4" Padding="12" Background="{DynamicResource ThemeSurfaceBgBrush}">
+                    <StackPanel Spacing="8">
+                      <TextBlock Text="{Binding PreviewTextMaxSizeText}" FontWeight="SemiBold" />
+                      <Grid ColumnDefinitions="*,Auto">
+                        <Slider Grid.Column="0" Minimum="1" Maximum="100"
+                                Value="{Binding MaxTextPreviewMB}"
+                                TickFrequency="1" IsSnapToTickEnabled="True"
+                                Margin="0,0,8,0" />
+                        <Border Grid.Column="1" Padding="8,2">
+                          <TextBlock Text="{Binding MaxTextPreviewMBText}"
+                                     VerticalAlignment="Center" FontWeight="SemiBold" />
+                        </Border>
+                      </Grid>
+                    </StackPanel>
+                  </Border>
+
+                  <CheckBox Content="{Binding EnableTextPreviewText}"
+                            IsChecked="{Binding EnableTextPreview}" />
+                  <CheckBox Content="{Binding PreviewTextColorEmojiText}"
+                            IsChecked="{Binding UseColorEmoji}" />
+                </StackPanel>
+              </ScrollViewer>
+            </TabItem>
+
+            <!-- 字体 Font -->
+            <TabItem Header="{Binding PreviewTabFontHeader}" Classes="compactTab">
+              <ScrollViewer Background="{DynamicResource ThemeWindowBgBrush}">
+                <StackPanel Spacing="12" Margin="12">
+                  <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
+                          CornerRadius="4" Padding="12" Background="{DynamicResource ThemeSurfaceBgBrush}">
+                    <StackPanel Spacing="8">
+                      <TextBlock Text="{Binding PreviewFontSampleText}" FontWeight="SemiBold" />
+                      <TextBox Text="{Binding FontPreviewSampleText}"
+                               AcceptsReturn="True"
+                               Height="120"
+                               TextWrapping="Wrap"
+                               Background="{DynamicResource ThemeWindowBgBrush}"
+                               Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                               BorderBrush="{DynamicResource ThemeBorderBrush}" />
+                    </StackPanel>
+                  </Border>
+
+                  <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
+                          CornerRadius="4" Padding="12" Background="{DynamicResource ThemeSurfaceBgBrush}">
+                    <StackPanel Spacing="8">
+                      <TextBlock Text="{Binding PreviewFontPreviewSizeText}" FontWeight="SemiBold" />
+                      <Grid ColumnDefinitions="*,Auto">
+                        <Slider Grid.Column="0" Minimum="8" Maximum="72"
+                                Value="{Binding FontPreviewFontSize}"
+                                TickFrequency="1" IsSnapToTickEnabled="True"
+                                Margin="0,0,8,0" />
+                        <Border Grid.Column="1" Padding="8,2">
+                          <TextBlock Text="{Binding FontPreviewFontSize}"
+                                     VerticalAlignment="Center" FontWeight="SemiBold" />
+                        </Border>
+                      </Grid>
+                    </StackPanel>
+                  </Border>
+                </StackPanel>
+              </ScrollViewer>
+            </TabItem>
+
+            <!-- 种子 Torrent -->
+            <TabItem Header="种子" Classes="compactTab">
+              <ScrollViewer Background="{DynamicResource ThemeWindowBgBrush}">
+                <StackPanel Spacing="12" Margin="12">
+                  <TextBlock Text="Torrent 预览设置将在后续版本中添加。"
+                             Foreground="{DynamicResource ThemeTextSecondaryBrush}"
+                             FontSize="12" TextWrapping="Wrap" />
+                </StackPanel>
+              </ScrollViewer>
+            </TabItem>
+
+            <!-- 可执行文件 PE -->
+            <TabItem Header="可执行文件" Classes="compactTab">
+              <ScrollViewer Background="{DynamicResource ThemeWindowBgBrush}">
+                <StackPanel Spacing="12" Margin="12">
+                  <TextBlock Text="PE 文件预览设置将在后续版本中添加。"
+                             Foreground="{DynamicResource ThemeTextSecondaryBrush}"
+                             FontSize="12" TextWrapping="Wrap" />
+                </StackPanel>
+              </ScrollViewer>
+            </TabItem>
+
+            <!-- 数据表格 Datatable -->
+            <TabItem Header="{Binding PreviewTabTableHeader}" Classes="compactTab">
+              <ScrollViewer Background="{DynamicResource ThemeWindowBgBrush}">
+                <StackPanel Spacing="12" Margin="12">
+                  <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
+                          CornerRadius="4" Padding="12" Background="{DynamicResource ThemeSurfaceBgBrush}">
+                    <StackPanel Spacing="8">
+                      <TextBlock Text="{Binding PreviewTableMaxRowsText}" FontWeight="SemiBold" />
+                      <TextBox Text="{Binding MaxTablePreviewRows}"
+                               Width="120" HorizontalAlignment="Left"
+                               Background="{DynamicResource ThemeWindowBgBrush}"
+                               Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                               BorderBrush="{DynamicResource ThemeBorderBrush}" />
+                    </StackPanel>
+                  </Border>
+
+                  <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
+                          CornerRadius="4" Padding="12" Background="{DynamicResource ThemeSurfaceBgBrush}">
+                    <StackPanel Spacing="8">
+                      <TextBlock Text="{Binding PreviewTableMaxColsText}" FontWeight="SemiBold" />
+                      <TextBox Text="{Binding MaxTablePreviewCols}"
+                               Width="120" HorizontalAlignment="Left"
+                               Background="{DynamicResource ThemeWindowBgBrush}"
+                               Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                               BorderBrush="{DynamicResource ThemeBorderBrush}" />
+                    </StackPanel>
+                  </Border>
+                </StackPanel>
+              </ScrollViewer>
+            </TabItem>
+          </TabControl>
+        </Grid>
+      </TabItem>
+
+      <!-- ═══════ 5. 密码管理 ═══════ -->
+      <TabItem Classes="compactTab">
+        <TabItem.Header>
+          <Grid ColumnDefinitions="Auto,*">
+            <TextBlock Text="🔐" FontSize="18" VerticalAlignment="Center" />
+            <TextBlock Text="{Binding TabPasswordHeader}" Grid.Column="1" Margin="4,0,0,0"
+                       VerticalAlignment="Center" />
+          </Grid>
+        </TabItem.Header>
+        <ScrollViewer Background="{DynamicResource ThemeWindowBgBrush}">
+          <StackPanel Spacing="12" Margin="12">
+            <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
+                    CornerRadius="4" Padding="12" Background="{DynamicResource ThemeSurfaceBgBrush}">
+              <StackPanel Spacing="8">
+                <TextBlock Text="密码选项" FontWeight="SemiBold" />
+                <CheckBox Content="{Binding PwdShowNotificationText}"
+                          IsChecked="{Binding ShowPasswordMatchNotification}" />
+                <CheckBox Content="{Binding PwdRevealDefaultText}"
+                          IsChecked="{Binding PasswordRevealByDefault}" />
+              </StackPanel>
+            </Border>
+          </StackPanel>
+        </ScrollViewer>
+      </TabItem>
+
+      <!-- ═══════ 6. 语言 ═══════ -->
+      <TabItem Classes="compactTab">
+        <TabItem.Header>
+          <Grid ColumnDefinitions="Auto,*">
+            <TextBlock Text="🌐" FontSize="18" VerticalAlignment="Center" />
+            <TextBlock Text="{Binding TabLanguageHeader}" Grid.Column="1" Margin="4,0,0,0"
+                       VerticalAlignment="Center" />
+          </Grid>
+        </TabItem.Header>
+        <ScrollViewer Background="{DynamicResource ThemeWindowBgBrush}">
+          <StackPanel Spacing="12" Margin="12">
+            <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
+                    CornerRadius="4" Padding="12" Background="{DynamicResource ThemeSurfaceBgBrush}">
+              <StackPanel Spacing="8">
+                <TextBlock Text="{Binding LanguageText}" FontWeight="SemiBold" />
+                <ComboBox ItemsSource="{Binding SelectedLanguageOptions}"
+                          SelectedItem="{Binding SelectedSelectedLanguageOption}"
+                          Width="200" HorizontalAlignment="Left">
+                  <ComboBox.ItemTemplate>
+                    <DataTemplate>
+                      <TextBlock Text="{Binding Display}" />
+                    </DataTemplate>
+                  </ComboBox.ItemTemplate>
+                </ComboBox>
+              </StackPanel>
+            </Border>
+            <TextBlock Text="{Binding LanguageTranslatorText}"
+                       FontSize="12"
+                       Foreground="{DynamicResource ThemeTextSecondaryBrush}"
+                       TextWrapping="Wrap" />
+          </StackPanel>
+        </ScrollViewer>
+      </TabItem>
+
+      <!-- ═══════ 7. 上下文菜单 ═══════ -->
+      <TabItem Classes="compactTab">
+        <TabItem.Header>
+          <Grid ColumnDefinitions="Auto,*">
+            <TextBlock Text="📋" FontSize="18" VerticalAlignment="Center" />
+            <TextBlock Text="{Binding TabContextMenuHeader}" Grid.Column="1" Margin="4,0,0,0"
+                       VerticalAlignment="Center" />
+          </Grid>
+        </TabItem.Header>
+        <ScrollViewer Background="{DynamicResource ThemeWindowBgBrush}">
+          <StackPanel Spacing="12" Margin="12">
+            <!-- 菜单项目组 -->
+            <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
+                    CornerRadius="4" Padding="12" Background="{DynamicResource ThemeSurfaceBgBrush}">
+              <StackPanel Spacing="8">
+                <TextBlock Text="{Binding ContextMenuGroupHeader}"
+                           FontWeight="SemiBold" FontSize="13" Margin="0,0,0,4" />
+
+                <TextBlock Text="{Binding ContextMenuGroupBrowse}"
+                           FontWeight="SemiBold" FontSize="12" />
+                <CheckBox Content="{Binding ContextMenuEnableOpen}"
+                          IsChecked="{Binding EnableOpenMenu}"
+                          Margin="12,0,0,0" />
+
+                <TextBlock Text="{Binding ContextMenuGroupCompress}"
+                           FontWeight="SemiBold" FontSize="12"
+                           Margin="0,6,0,0" />
+                <CheckBox Content="{Binding ContextMenuEnableCompress}"
+                          IsChecked="{Binding EnableCompressMenu}"
+                          Margin="12,0,0,0" />
+                <CheckBox Content="{Binding ContextMenuEnableCompressSeparate}"
+                          IsChecked="{Binding EnableCompressSeparate}"
+                          Margin="12,0,0,0" />
+                <CheckBox Content="{Binding ContextMenuEnableCompressCombined}"
+                          IsChecked="{Binding EnableCompressCombined}"
+                          Margin="12,0,0,0" />
+
+                <TextBlock Text="{Binding ContextMenuGroupExtract}"
+                           FontWeight="SemiBold" FontSize="12"
+                           Margin="0,6,0,0" />
+                <CheckBox Content="{Binding ContextMenuEnableExtractHere}"
+                          IsChecked="{Binding EnableExtractHereMenu}"
+                          Margin="12,0,0,0" />
+                <CheckBox Content="{Binding ContextMenuEnableSmartExtract}"
+                          IsChecked="{Binding EnableSmartExtractMenu}"
+                          Margin="12,0,0,0" />
+                <CheckBox Content="{Binding ContextMenuEnableExtractToNamed}"
+                          IsChecked="{Binding EnableExtractToNamedMenu}"
+                          Margin="12,0,0,0" />
+                <CheckBox Content="{Binding ContextMenuEnableExtractTo}"
+                          IsChecked="{Binding EnableExtractToMenu}"
+                          Margin="12,0,0,0" />
+              </StackPanel>
+            </Border>
+
+            <!-- 显示组 -->
+            <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
+                    CornerRadius="4" Padding="12" Background="{DynamicResource ThemeSurfaceBgBrush}">
+              <StackPanel Spacing="8">
                 <TextBlock Text="{Binding ContextMenuGroupDisplay}"
-                           FontWeight="SemiBold"
-                           FontSize="13"
-                           Margin="0,0,0,4" />
+                           FontWeight="SemiBold" FontSize="13" Margin="0,0,0,4" />
                 <CheckBox Content="{Binding ContextMenuEnableDynamicMenu}"
                           IsChecked="{Binding EnableDynamicMenu}" />
                 <CheckBox Content="{Binding ContextMenuShowMenuIcons}"
@@ -450,6 +541,7 @@
               </StackPanel>
             </Border>
 
+            <!-- 安装/卸载 -->
             <StackPanel Orientation="Horizontal"
                         HorizontalAlignment="Right"
                         Spacing="8">
@@ -470,52 +562,162 @@
         </ScrollViewer>
       </TabItem>
 
-      <!-- ═══════ 高级 ═══════ -->
-      <TabItem>
+      <!-- ═══════ 8. 文件关联 ═══════ -->
+      <TabItem Classes="compactTab">
         <TabItem.Header>
-          <StackPanel Orientation="Horizontal" Spacing="4">
-            <TextBlock Text="⚙️" FontSize="14" />
-            <TextBlock Text="{Binding TabAdvancedHeader}" VerticalAlignment="Center" />
-          </StackPanel>
+          <Grid ColumnDefinitions="Auto,*">
+            <TextBlock Text="🔗" FontSize="18" VerticalAlignment="Center" />
+            <TextBlock Text="{Binding TabFileAssocHeader}" Grid.Column="1" Margin="4,0,0,0"
+                       VerticalAlignment="Center" />
+          </Grid>
         </TabItem.Header>
         <ScrollViewer Background="{DynamicResource ThemeWindowBgBrush}">
-          <StackPanel Spacing="10"
-                      Margin="12">
-            <StackPanel Spacing="4">
-              <TextBlock Text="{Binding AdvancedSevenZipPathText}"
-                         FontSize="13" />
-              <Grid ColumnDefinitions="*,Auto">
-                <TextBox Grid.Column="0"
-                         Text="{Binding SevenZipPath}"
-                         PlaceholderText="C:\Program Files\7-Zip\7z.dll"
-                         Margin="0,0,8,0" />
-                <Button Grid.Column="1"
-                        Content="{Binding AdvancedBrowseText}"
-                        Command="{Binding BrowseSevenZipCommand}"
-                        Padding="12,4"
-                        Background="{DynamicResource ThemeButtonBgBrush}"
-                        Foreground="{DynamicResource ThemeTextPrimaryBrush}"
-                        BorderBrush="{DynamicResource ThemeBorderBrush}" />
-              </Grid>
-            </StackPanel>
+          <StackPanel Spacing="12" Margin="12">
+            <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
+                    CornerRadius="4" Padding="12" Background="{DynamicResource ThemeSurfaceBgBrush}">
+              <StackPanel Spacing="8">
+                <TextBlock Text="文件类型关联" FontWeight="SemiBold" />
+                <TextBlock Text="{Binding FileAssocDescText}"
+                           FontSize="12"
+                           Foreground="{DynamicResource ThemeTextSecondaryBrush}"
+                           TextWrapping="Wrap" />
 
-            <Separator Background="{DynamicResource ThemeBorderBrush}" />
+                <Grid ColumnDefinitions="Auto,*"
+                      RowDefinitions="Auto,Auto,Auto,Auto"
+                      HorizontalAlignment="Left"
+                      Margin="0,8,0,0">
+                  <CheckBox Grid.Row="0" Grid.Column="0" Content=".zip" IsChecked="{Binding AssocZip}" Margin="0,0,16,4" />
+                  <CheckBox Grid.Row="0" Grid.Column="1" Content=".7z" IsChecked="{Binding Assoc7z}" Margin="0,0,0,4" />
+                  <CheckBox Grid.Row="1" Grid.Column="0" Content=".rar" IsChecked="{Binding AssocRar}" Margin="0,0,16,4" />
+                  <CheckBox Grid.Row="1" Grid.Column="1" Content=".tar" IsChecked="{Binding AssocTar}" Margin="0,0,0,4" />
+                  <CheckBox Grid.Row="2" Grid.Column="0" Content=".tar.gz" IsChecked="{Binding AssocTarGz}" Margin="0,0,16,4" />
+                  <CheckBox Grid.Row="2" Grid.Column="1" Content=".gz" IsChecked="{Binding AssocGz}" Margin="0,0,0,4" />
+                  <CheckBox Grid.Row="3" Grid.Column="0" Content=".iso" IsChecked="{Binding AssocIso}" Margin="0,0,16,4" />
+                </Grid>
 
-            <CheckBox Content="{Binding AdvancedPreserveRootText}"
-                      IsChecked="{Binding PreserveDirectoryRoot}" />
+                <StackPanel Orientation="Horizontal"
+                            Spacing="8"
+                            Margin="0,8,0,0">
+                  <Button Content="{Binding FileAssocSelectAllText}"
+                          Command="{Binding SelectAllAssocCommand}"
+                          Padding="12,4"
+                          Background="{DynamicResource ThemeButtonBgBrush}"
+                          Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                          BorderBrush="{DynamicResource ThemeBorderBrush}" />
+                  <Button Content="{Binding FileAssocDeselectAllText}"
+                          Command="{Binding DeselectAllAssocCommand}"
+                          Padding="12,4"
+                          Background="{DynamicResource ThemeButtonBgBrush}"
+                          Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                          BorderBrush="{DynamicResource ThemeBorderBrush}" />
+                </StackPanel>
+              </StackPanel>
+            </Border>
+          </StackPanel>
+        </ScrollViewer>
+      </TabItem>
 
-            <Separator Background="{DynamicResource ThemeBorderBrush}" />
+    
+      <!-- ═══════ 9. 调试 ═══════ -->
+      <TabItem Classes="compactTab">
+        <TabItem.Header>
+          <Grid ColumnDefinitions="Auto,*">
+            <TextBlock Text="🐛" FontSize="18" VerticalAlignment="Center" />
+            <TextBlock Text="{Binding TabDebugHeader}" Grid.Column="1" Margin="4,0,0,0"
+                       VerticalAlignment="Center" />
+          </Grid>
+        </TabItem.Header>
+        <ScrollViewer Background="{DynamicResource ThemeWindowBgBrush}">
+          <StackPanel Spacing="12" Margin="12">
+            <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
+                    CornerRadius="4" Padding="12" Background="{DynamicResource ThemeSurfaceBgBrush}">
+              <StackPanel Spacing="8">
+                <TextBlock Text="调试选项" FontWeight="SemiBold" />
+                <CheckBox Content="{Binding DebugText}"
+                          IsChecked="{Binding EnableDebugLogging}" />
+              </StackPanel>
+            </Border>
 
-            <Border BorderBrush="{DynamicResource ThemeBorderBrush}"
-                    BorderThickness="1"
-                    Padding="8"
-                    CornerRadius="4"
-                    Background="{DynamicResource ThemeSurfaceBgBrush}">
+            <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
+                    CornerRadius="4" Padding="12" Background="{DynamicResource ThemeSurfaceBgBrush}">
+              <StackPanel Spacing="8">
+                <TextBlock Text="{Binding LogPrivacyModeText}" FontWeight="SemiBold" />
+                <Grid ColumnDefinitions="*,Auto">
+                  <ComboBox Grid.Column="0"
+                            ItemsSource="{Binding LogPrivacyModeOptions}"
+                            SelectedItem="{Binding SelectedLogPrivacyModeOption}"
+                            Width="240"
+                            HorizontalAlignment="Left">
+                    <ComboBox.ItemTemplate>
+                      <DataTemplate>
+                        <TextBlock Text="{Binding Display}" />
+                      </DataTemplate>
+                    </ComboBox.ItemTemplate>
+                  </ComboBox>
+                  <Button Grid.Column="1"
+                          Content="{Binding LogPrivacyHelpText}"
+                          Command="{Binding OpenLogPrivacyHelpCommand}"
+                          Padding="8,4"
+                          Margin="8,0,0,0"
+                          Background="{DynamicResource ThemeButtonBgBrush}"
+                          Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                          BorderBrush="{DynamicResource ThemeBorderBrush}" />
+                </Grid>
+              </StackPanel>
+            </Border>
+
+            <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
+                    CornerRadius="4" Padding="12" Background="{DynamicResource ThemeSurfaceBgBrush}">
+              <StackPanel Spacing="8">
+                <TextBlock Text="{Binding LogPathText}" FontWeight="SemiBold" />
+                <TextBlock Text="{Binding LogFilePath}"
+                           FontSize="12"
+                           Foreground="{DynamicResource ThemeTextSecondaryBrush}"
+                           TextWrapping="Wrap" />
+              </StackPanel>
+            </Border>
+          </StackPanel>
+        </ScrollViewer>
+      </TabItem>
+      <!-- ═══════ 10. 高级 ═══════ -->
+      <TabItem Classes="compactTab">
+        <TabItem.Header>
+          <Grid ColumnDefinitions="Auto,*">
+            <TextBlock Text="🛠" FontSize="18" VerticalAlignment="Center" />
+            <TextBlock Text="{Binding TabAdvancedHeader}" Grid.Column="1" Margin="4,0,0,0"
+                       VerticalAlignment="Center" />
+          </Grid>
+        </TabItem.Header>
+        <ScrollViewer Background="{DynamicResource ThemeWindowBgBrush}">
+          <StackPanel Spacing="12" Margin="12">
+            <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
+                    CornerRadius="4" Padding="12" Background="{DynamicResource ThemeSurfaceBgBrush}">
+              <StackPanel Spacing="8">
+                <TextBlock Text="{Binding AdvancedSevenZipPathText}" FontWeight="SemiBold" />
+                <Grid ColumnDefinitions="*,Auto">
+                  <TextBox Grid.Column="0"
+                           Text="{Binding SevenZipPath}"
+                           PlaceholderText="C:\Program Files\7-Zip\7z.dll"
+                           Margin="0,0,8,0"
+                           Background="{DynamicResource ThemeWindowBgBrush}"
+                           Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                           BorderBrush="{DynamicResource ThemeBorderBrush}" />
+                  <Button Grid.Column="1"
+                          Content="{Binding AdvancedBrowseText}"
+                          Command="{Binding BrowseSevenZipCommand}"
+                          Padding="12,4"
+                          Background="{DynamicResource ThemeButtonBgBrush}"
+                          Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                          BorderBrush="{DynamicResource ThemeBorderBrush}" />
+                </Grid>
+              </StackPanel>
+            </Border>
+
+            <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
+                    CornerRadius="4" Padding="12" Background="{DynamicResource ThemeSurfaceBgBrush}">
               <StackPanel Spacing="8">
                 <TextBlock Text="{Binding AdvancedTempGroupText}"
-                           FontWeight="SemiBold"
-                           FontSize="13"
-                           Margin="0,0,0,4" />
+                           FontWeight="SemiBold" />
                 <Button Content="{Binding AdvancedCleanPreviewTempText}"
                         Command="{Binding CleanPreviewTempCommand}"
                         Padding="12,4"
@@ -538,142 +740,6 @@
         </ScrollViewer>
       </TabItem>
 
-      <!-- ═══════ 外观 ═══════ -->
-      <TabItem>
-        <TabItem.Header>
-          <StackPanel Orientation="Horizontal" Spacing="4">
-            <TextBlock Text="🎨" FontSize="14" />
-            <TextBlock Text="{Binding TabAppearanceHeader}" VerticalAlignment="Center" />
-          </StackPanel>
-        </TabItem.Header>
-        <ScrollViewer Background="{DynamicResource ThemeWindowBgBrush}">
-          <StackPanel Spacing="10"
-                      Margin="12">
-            <StackPanel Spacing="4">
-              <TextBlock Text="{Binding AppearanceThemeText}"
-                         FontSize="13" />
-              <ComboBox ItemsSource="{Binding ThemeOptions}"
-                         SelectedItem="{Binding SelectedThemeOption}"
-                         Width="160"
-                         HorizontalAlignment="Left">
-                <ComboBox.ItemTemplate>
-                  <DataTemplate>
-                    <TextBlock Text="{Binding Display}" />
-                  </DataTemplate>
-                </ComboBox.ItemTemplate>
-              </ComboBox>
-            </StackPanel>
-
-            <Separator Background="{DynamicResource ThemeBorderBrush}" />
-
-            <StackPanel Spacing="4">
-              <TextBlock Text="{Binding AppearanceMaxRecentFilesText}"
-                         FontSize="13" />
-              <TextBox Text="{Binding MaxRecentFiles}"
-                       Width="120"
-                       HorizontalAlignment="Left" />
-            </StackPanel>
-          </StackPanel>
-        </ScrollViewer>
-      </TabItem>
-
-      <!-- ═══════ 密码管理 ═══════ -->
-      <TabItem>
-        <TabItem.Header>
-          <StackPanel Orientation="Horizontal" Spacing="4">
-            <TextBlock Text="🔐" FontSize="14" />
-            <TextBlock Text="{Binding TabPasswordHeader}" VerticalAlignment="Center" />
-          </StackPanel>
-        </TabItem.Header>
-        <ScrollViewer Background="{DynamicResource ThemeWindowBgBrush}">
-          <StackPanel Spacing="10"
-                      Margin="12">
-            <CheckBox Content="{Binding PwdShowNotificationText}"
-                      IsChecked="{Binding ShowPasswordMatchNotification}" />
-            <CheckBox Content="{Binding PwdRevealDefaultText}"
-                      IsChecked="{Binding PasswordRevealByDefault}" />
-          </StackPanel>
-        </ScrollViewer>
-      </TabItem>
-
-      <!-- ═══════ 语言 ═══════ -->
-      <TabItem>
-        <TabItem.Header>
-          <StackPanel Orientation="Horizontal" Spacing="4">
-            <TextBlock Text="🌐" FontSize="14" />
-            <TextBlock Text="{Binding TabLanguageHeader}" VerticalAlignment="Center" />
-          </StackPanel>
-        </TabItem.Header>
-        <ScrollViewer Background="{DynamicResource ThemeWindowBgBrush}">
-          <StackPanel Spacing="10"
-                      Margin="12">
-            <StackPanel Spacing="4">
-              <TextBlock Text="{Binding LanguageText}"
-                         FontSize="13" />
-              <ComboBox ItemsSource="{Binding SelectedLanguageOptions}"
-                         SelectedItem="{Binding SelectedSelectedLanguageOption}"
-                         Width="200"
-                         HorizontalAlignment="Left">
-                <ComboBox.ItemTemplate>
-                  <DataTemplate>
-                    <TextBlock Text="{Binding Display}" />
-                  </DataTemplate>
-                </ComboBox.ItemTemplate>
-              </ComboBox>
-            </StackPanel>
-            <TextBlock Text="{Binding LanguageTranslatorText}"
-                       FontSize="12"
-                       Foreground="{DynamicResource ThemeTextSecondaryBrush}"
-                       TextWrapping="Wrap" />
-          </StackPanel>
-        </ScrollViewer>
-      </TabItem>
-
-      <!-- ═══════ 文件关联 ═══════ -->
-      <TabItem>
-        <TabItem.Header>
-          <StackPanel Orientation="Horizontal" Spacing="4">
-            <TextBlock Text="🔗" FontSize="14" />
-            <TextBlock Text="{Binding TabFileAssocHeader}" VerticalAlignment="Center" />
-          </StackPanel>
-        </TabItem.Header>
-        <ScrollViewer Background="{DynamicResource ThemeWindowBgBrush}">
-          <StackPanel Spacing="10"
-                      Margin="12">
-            <TextBlock Text="{Binding FileAssocDescText}"
-                       FontSize="13"
-                       TextWrapping="Wrap" />
-
-            <Grid ColumnDefinitions="Auto,*"
-                  RowDefinitions="Auto,Auto,Auto,Auto"
-                  HorizontalAlignment="Left">
-              <CheckBox Grid.Row="0" Grid.Column="0" Content=".zip" IsChecked="{Binding AssocZip}" Margin="0,0,16,4" />
-              <CheckBox Grid.Row="0" Grid.Column="1" Content=".7z" IsChecked="{Binding Assoc7z}" Margin="0,0,0,4" />
-              <CheckBox Grid.Row="1" Grid.Column="0" Content=".rar" IsChecked="{Binding AssocRar}" Margin="0,0,16,4" />
-              <CheckBox Grid.Row="1" Grid.Column="1" Content=".tar" IsChecked="{Binding AssocTar}" Margin="0,0,0,4" />
-              <CheckBox Grid.Row="2" Grid.Column="0" Content=".tar.gz" IsChecked="{Binding AssocTarGz}" Margin="0,0,16,4" />
-              <CheckBox Grid.Row="2" Grid.Column="1" Content=".gz" IsChecked="{Binding AssocGz}" Margin="0,0,0,4" />
-              <CheckBox Grid.Row="3" Grid.Column="0" Content=".iso" IsChecked="{Binding AssocIso}" Margin="0,0,16,4" />
-            </Grid>
-
-            <StackPanel Orientation="Horizontal"
-                        Spacing="8">
-              <Button Content="{Binding FileAssocSelectAllText}"
-                      Command="{Binding SelectAllAssocCommand}"
-                      Padding="12,4"
-                      Background="{DynamicResource ThemeButtonBgBrush}"
-                      Foreground="{DynamicResource ThemeTextPrimaryBrush}"
-                      BorderBrush="{DynamicResource ThemeBorderBrush}" />
-              <Button Content="{Binding FileAssocDeselectAllText}"
-                      Command="{Binding DeselectAllAssocCommand}"
-                      Padding="12,4"
-                      Background="{DynamicResource ThemeButtonBgBrush}"
-                      Foreground="{DynamicResource ThemeTextPrimaryBrush}"
-                      BorderBrush="{DynamicResource ThemeBorderBrush}" />
-            </StackPanel>
-          </StackPanel>
-        </ScrollViewer>
-      </TabItem>
     </TabControl>
 
     <!-- Bottom buttons -->
@@ -687,15 +753,13 @@
               Click="OnSaveClick"
               Background="{DynamicResource ThemeButtonBgBrush}"
               Foreground="{DynamicResource ThemeTextPrimaryBrush}"
-              BorderBrush="{DynamicResource ThemeBorderBrush}">
-      </Button>
+              BorderBrush="{DynamicResource ThemeBorderBrush}" />
       <Button Content="{Binding CancelText}"
               Padding="16,6"
               Click="OnCancelClick"
               Background="{DynamicResource ThemeButtonBgBrush}"
               Foreground="{DynamicResource ThemeTextPrimaryBrush}"
-              BorderBrush="{DynamicResource ThemeBorderBrush}">
-      </Button>
+              BorderBrush="{DynamicResource ThemeBorderBrush}" />
     </StackPanel>
   </Grid>
 </Window>
