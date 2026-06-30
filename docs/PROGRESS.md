@@ -14,6 +14,7 @@
 - Avalonia 跨平台移植后续 Phase
 
 ### avalonia-port 分支 (WIP)
+  - **Phase 10 计划 + 测试菜单** — 创建 `avalonia-phase10-feature-parity.md` 规划 WPF 功能补齐（文件列表进度条/预览信息面板/状态栏增强）；主菜单新增 🧪 测试菜单，内含 16 个可独立打开的对话框/窗口（含默认测试数据），i18n 中英文键，构建零错误 (2026-06-30)
   - **Phase 9: 文件列表交互补齐** — DataGrid 添加双击目录进入、Enter/Backspace/Delete 键盘导航、列排序（`..` 置顶 + 目录优先 + 箭头标记），与 WPF 文件列表交互行为保持一致 (2026-06-21)
   - **Bugfix: 筛选工具栏尺寸输入框白边 + 空值红框** — 添加 `NullableLongConverter` 处理空字符串→null 绑定；尺寸 TextBox 加 `Padding="2,0"` `BorderThickness="1"` 消除白边遮挡数字 (2026-06-22)
   - **Phase 8: 设置窗口 TabControl 重构 + i18n 补全 + ComboBox 修复** — SettingsWindow 重构为完整 TabControl（压缩/解压/上下文菜单/高级/预览），Preview 分 4 子标签页（文本/字体/表格/布局）；新增 70+ i18n 中英文键；AppSettings 扩展 shadow 配置属性；LocalizationManager `T()` 添加 null-safe fallback；修复 Avalonia 12 不支持 `SelectedValuePath` 导致的 ComboBox 选择不生效，改用 `ItemsSource` + `SelectedItem` + `Option(Display,Value)` 模式 (2026-06-21)

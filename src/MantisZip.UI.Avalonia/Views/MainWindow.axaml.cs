@@ -9,6 +9,7 @@ using MantisZip.Core.Utils;
 using MantisZip.UI.Avalonia.Dialogs;
 using MantisZip.UI.Avalonia.Models;
 using MantisZip.UI.Avalonia.ViewModels;
+using MantisZip.Core;
 
 namespace MantisZip.UI.Avalonia.Views;
 
@@ -550,6 +551,38 @@ public partial class MainWindow : Window
             {
                 vm.OpenRecentFileCommand.Execute(filePath);
             }
+        }
+    }
+
+    private async void TestWindow_Click(object? sender, RoutedEventArgs e)
+    {
+        if (sender is not MenuItem mi || mi.Tag is not string tag)
+            return;
+
+        Window? window = tag switch
+        {
+            "AboutWindow" => new AboutWindow(),
+            "SettingsWindow" => new Views.SettingsWindow(),
+            "PasswordManagerWindow" => new PasswordManagerWindow(),
+            "DonationDialog" => new DonationDialog(),
+            "LogPrivacyHelpDialog" => new LogPrivacyHelpDialog(),
+            "PasswordHelpDialog" => new PasswordHelpDialog(),
+            "CommentDialog" => new CommentDialog(),
+            "PasswordEditDialog" => new PasswordEditDialog(),
+            "PasswordDialog" => new PasswordDialog("test.7z"),
+            "ProgressWindow" => new ProgressWindow("测试进度窗口"),
+            "ErrorDialog" => new ErrorDialog(new FileErrorInfo { FilePath = @"C:\test\test.zip", ErrorMessage = "这是一个测试错误信息\n可用于测试错误对话框的显示效果。" }),
+            "CompressSettingsWindow" => new CompressSettingsWindow(),
+            "ExtractSettingsWindow" => new ExtractSettingsWindow(),
+            "CompressConflictDialog" => new CompressConflictDialog(@"C:\test\file.txt", "file.txt"),
+            "ConflictDialog" => new ConflictDialog(new FileConflictInfo { FilePath = @"C:\existing\file.txt" }),
+            "MatchedPasswordDialog" => new MatchedPasswordDialog(new PasswordEntry { Description = "测试密码", Patterns = { "*.zip" }, Password = "test123" }, "test.zip"),
+            _ => null
+        };
+
+        if (window != null)
+        {
+            await window.ShowDialog(this);
         }
     }
 }

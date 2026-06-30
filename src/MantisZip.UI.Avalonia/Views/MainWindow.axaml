@@ -216,6 +216,146 @@
           </MenuItem.Header>
         </MenuItem>
       </MenuItem>
+      <MenuItem>
+        <MenuItem.Header>
+          <StackPanel Orientation="Horizontal" Spacing="4">
+            <TextBlock Text="🧪" FontSize="14" />
+            <TextBlock Text="{Binding LocalizedStrings[Menu_Test]}" />
+          </StackPanel>
+        </MenuItem.Header>
+        <MenuItem Click="TestWindow_Click" Tag="AboutWindow">
+          <MenuItem.Header>
+            <StackPanel Orientation="Horizontal" Spacing="4">
+              <TextBlock Text="ℹ" FontSize="14" />
+              <TextBlock Text="{Binding LocalizedStrings[Test_AboutWindow]}" />
+            </StackPanel>
+          </MenuItem.Header>
+        </MenuItem>
+        <MenuItem Click="TestWindow_Click" Tag="SettingsWindow">
+          <MenuItem.Header>
+            <StackPanel Orientation="Horizontal" Spacing="4">
+              <TextBlock Text="⚙" FontSize="14" />
+              <TextBlock Text="{Binding LocalizedStrings[Test_SettingsWindow]}" />
+            </StackPanel>
+          </MenuItem.Header>
+        </MenuItem>
+        <MenuItem Click="TestWindow_Click" Tag="PasswordManagerWindow">
+          <MenuItem.Header>
+            <StackPanel Orientation="Horizontal" Spacing="4">
+              <TextBlock Text="🔑" FontSize="14" />
+              <TextBlock Text="{Binding LocalizedStrings[Test_PasswordManager]}" />
+            </StackPanel>
+          </MenuItem.Header>
+        </MenuItem>
+        <MenuItem Click="TestWindow_Click" Tag="DonationDialog">
+          <MenuItem.Header>
+            <StackPanel Orientation="Horizontal" Spacing="4">
+              <TextBlock Text="❤" FontSize="14" />
+              <TextBlock Text="{Binding LocalizedStrings[Test_DonationDialog]}" />
+            </StackPanel>
+          </MenuItem.Header>
+        </MenuItem>
+        <Separator />
+        <MenuItem Click="TestWindow_Click" Tag="LogPrivacyHelpDialog">
+          <MenuItem.Header>
+            <StackPanel Orientation="Horizontal" Spacing="4">
+              <TextBlock Text="🔒" FontSize="14" />
+              <TextBlock Text="{Binding LocalizedStrings[Test_LogPrivacyHelp]}" />
+            </StackPanel>
+          </MenuItem.Header>
+        </MenuItem>
+        <MenuItem Click="TestWindow_Click" Tag="PasswordHelpDialog">
+          <MenuItem.Header>
+            <StackPanel Orientation="Horizontal" Spacing="4">
+              <TextBlock Text="❓" FontSize="14" />
+              <TextBlock Text="{Binding LocalizedStrings[Test_PasswordHelp]}" />
+            </StackPanel>
+          </MenuItem.Header>
+        </MenuItem>
+        <Separator />
+        <MenuItem Click="TestWindow_Click" Tag="CommentDialog">
+          <MenuItem.Header>
+            <StackPanel Orientation="Horizontal" Spacing="4">
+              <TextBlock Text="💬" FontSize="14" />
+              <TextBlock Text="{Binding LocalizedStrings[Test_CommentDialog]}" />
+            </StackPanel>
+          </MenuItem.Header>
+        </MenuItem>
+        <MenuItem Click="TestWindow_Click" Tag="PasswordEditDialog">
+          <MenuItem.Header>
+            <StackPanel Orientation="Horizontal" Spacing="4">
+              <TextBlock Text="✏" FontSize="14" />
+              <TextBlock Text="{Binding LocalizedStrings[Test_PasswordEditDialog]}" />
+            </StackPanel>
+          </MenuItem.Header>
+        </MenuItem>
+        <MenuItem Click="TestWindow_Click" Tag="PasswordDialog">
+          <MenuItem.Header>
+            <StackPanel Orientation="Horizontal" Spacing="4">
+              <TextBlock Text="🔐" FontSize="14" />
+              <TextBlock Text="{Binding LocalizedStrings[Test_PasswordDialog]}" />
+            </StackPanel>
+          </MenuItem.Header>
+        </MenuItem>
+        <Separator />
+        <MenuItem Click="TestWindow_Click" Tag="ProgressWindow">
+          <MenuItem.Header>
+            <StackPanel Orientation="Horizontal" Spacing="4">
+              <TextBlock Text="⏳" FontSize="14" />
+              <TextBlock Text="{Binding LocalizedStrings[Test_ProgressWindow]}" />
+            </StackPanel>
+          </MenuItem.Header>
+        </MenuItem>
+        <MenuItem Click="TestWindow_Click" Tag="ErrorDialog">
+          <MenuItem.Header>
+            <StackPanel Orientation="Horizontal" Spacing="4">
+              <TextBlock Text="⚠" FontSize="14" />
+              <TextBlock Text="{Binding LocalizedStrings[Test_ErrorDialog]}" />
+            </StackPanel>
+          </MenuItem.Header>
+        </MenuItem>
+        <Separator />
+        <MenuItem Click="TestWindow_Click" Tag="CompressSettingsWindow">
+          <MenuItem.Header>
+            <StackPanel Orientation="Horizontal" Spacing="4">
+              <TextBlock Text="🗜" FontSize="14" />
+              <TextBlock Text="{Binding LocalizedStrings[Test_CompressSettings]}" />
+            </StackPanel>
+          </MenuItem.Header>
+        </MenuItem>
+        <MenuItem Click="TestWindow_Click" Tag="ExtractSettingsWindow">
+          <MenuItem.Header>
+            <StackPanel Orientation="Horizontal" Spacing="4">
+              <TextBlock Text="📦" FontSize="14" />
+              <TextBlock Text="{Binding LocalizedStrings[Test_ExtractSettings]}" />
+            </StackPanel>
+          </MenuItem.Header>
+        </MenuItem>
+        <MenuItem Click="TestWindow_Click" Tag="CompressConflictDialog">
+          <MenuItem.Header>
+            <StackPanel Orientation="Horizontal" Spacing="4">
+              <TextBlock Text="🔄" FontSize="14" />
+              <TextBlock Text="{Binding LocalizedStrings[Test_CompressConflict]}" />
+            </StackPanel>
+          </MenuItem.Header>
+        </MenuItem>
+        <MenuItem Click="TestWindow_Click" Tag="ConflictDialog">
+          <MenuItem.Header>
+            <StackPanel Orientation="Horizontal" Spacing="4">
+              <TextBlock Text="⚡" FontSize="14" />
+              <TextBlock Text="{Binding LocalizedStrings[Test_ConflictDialog]}" />
+            </StackPanel>
+          </MenuItem.Header>
+        </MenuItem>
+        <MenuItem Click="TestWindow_Click" Tag="MatchedPasswordDialog">
+          <MenuItem.Header>
+            <StackPanel Orientation="Horizontal" Spacing="4">
+              <TextBlock Text="🔓" FontSize="14" />
+              <TextBlock Text="{Binding LocalizedStrings[Test_MatchedPassword]}" />
+            </StackPanel>
+          </MenuItem.Header>
+        </MenuItem>
+      </MenuItem>
       <MenuItem Header="{Binding LocalizedStrings[Menu_Language]}">
         <MenuItem Header="{Binding LocalizedStrings[Menu_LangChinese]}"
                   Command="{Binding SwitchLanguageCommand}" CommandParameter="zh-CN" />
