@@ -161,7 +161,7 @@ public class FavoriteItemViewModel
     public string? SystemKey { get; set; }
     public bool IsHidden { get; set; }
 
-    public string DisplayName => IsSystem ? $"🔒 {Name}" : Name;
+    public string DisplayName => IsSystem ? $"{FavoritePathManager.GetSystemIcon(SystemKey)} {Name}" : Name;
 }
 
 /// <summary>

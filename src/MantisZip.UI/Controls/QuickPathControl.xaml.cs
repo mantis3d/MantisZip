@@ -145,7 +145,7 @@ public partial class QuickPathControl : UserControl
         {
             foreach (var item in items)
             {
-                var display = item.IsSystem ? $"🔒 {item.Name}" : item.Name;
+                var display = item.IsSystem ? $"{FavoritePathManager.GetSystemIcon(item.SystemKey)} {item.Name}" : item.Name;
                 var mi = new MenuItem
                 {
                     Header = $"{display}  ({item.Path})",

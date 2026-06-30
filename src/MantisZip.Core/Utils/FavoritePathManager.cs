@@ -76,10 +76,11 @@ public static class FavoritePathManager
     public static void Add(string name, string path)
     {
         if (string.IsNullOrWhiteSpace(name) || string.IsNullOrWhiteSpace(path)) return;
+        var trimmedPath = NormalizePath(path.Trim());
         lock (_lock)
         {
-            if (_userFavorites.Any(f => string.Equals(f.Path, path, StringComparison.OrdinalIgnoreCase))) return;
-            _userFavorites.Add(new FavoritePathItem(name.Trim(), path.Trim(), DateTime.Now, false, null));
+            if (_userFavorites.Any(f => string.Equals(f.Path, trimmedPath, StringComparison.OrdinalIgnoreCase))) return;
+            _userFavorites.Add(new FavoritePathItem(name.Trim(), trimmedPath, DateTime.Now, false, null));
             Save();
         }
     }
@@ -87,11 +88,12 @@ public static class FavoritePathManager
     public static void Remove(string path)
     {
         if (string.IsNullOrWhiteSpace(path)) return;
+        var trimmedPath = NormalizePath(path.Trim());
         lock (_lock)
         {
             // 用户收藏可能包含与系统路径相同的路径名（如手动添加的 Downloads 路径）
             // 直接匹配 _userFavorites 删除，不通过 IsSystemPathInternal 抛异常拦截
-            var removed = _userFavorites.RemoveAll(f => string.Equals(f.Path, path, StringComparison.OrdinalIgnoreCase));
+            var removed = _userFavorites.RemoveAll(f => string.Equals(f.Path, trimmedPath, StringComparison.OrdinalIgnoreCase));
             if (removed > 0)
                 Save();
         }
@@ -178,11 +180,44 @@ public static class FavoritePathManager
 
     private static bool IsSystemPathInternal(string path, out string? key)
     {
-        foreach (var def in SystemPathDefs) { if (string.Equals(def.Path, path, StringComparison.OrdinalIgnoreCase)) { key = def.Key; return true; } }
-        key = null; return false;
+        var normalized = NormalizePath(path);
+        foreach (var def in SystemPathDefs)
+        {
+            if (string.Equals(def.Path, normalized, StringComparison.OrdinalIgnoreCase))
+            {
+                key = def.Key;
+                return true;
+            }
+        }
+        key = null;
+        return false;
+    }
+
+    /// <summary>
+    /// 去除尾部目录分隔符（保留根路径如 "C:\" 的原状）。
+    /// </summary>
+    private static string NormalizePath(string path)
+    {
+        if (string.IsNullOrEmpty(path)) return path;
+        // 对于根路径（如 "C:\"）保留尾部分隔符不截断
+        while (path.Length > 3 &&
+               (path[^1] == Path.DirectorySeparatorChar || path[^1] == Path.AltDirectorySeparatorChar))
+            path = path[..^1];
+        return path;
     }
 
     private static string GetSystemDisplayName(string key) => key switch { "Desktop" => "桌面", "Documents" => "文档", "Downloads" => "下载", _ => key };
+
+    /// <summary>
+    /// 获取系统路径对应的图标 emoji。
+    /// </summary>
+    public static string GetSystemIcon(string? key) => key switch
+    {
+        "Desktop"   => "🖥️",
+        "Documents" => "📄",
+        "Downloads" => "📥",
+        _           => "📁",
+    };
 
     private record SystemPathDef(string Key, string Path);
 }

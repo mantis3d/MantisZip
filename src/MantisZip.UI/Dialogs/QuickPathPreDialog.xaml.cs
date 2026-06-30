@@ -153,7 +153,7 @@ public partial class QuickPathPreDialog : Window
 
     private void UpdateUIForMode()
     {
-        PathControl.IsFolderMode = IsPickFolderMode;
+        PathControl.IsFolderMode = true;
         PathControl.IsFileOpenMode = false;
 
         if (IsPickFolderMode)

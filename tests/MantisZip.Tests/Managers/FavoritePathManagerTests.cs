@@ -32,13 +32,51 @@ public class FavoritePathManagerTests
     }
 
     [Fact]
-    public void Add_DuplicatePath_SilentlyIgnored()
+    public void Add_SystemPath_CreatesUserFavorite()
     {
-        // Add is no-op for system paths (they already exist via system defs)
+        // User may manually add a favorite with the same path as a system path.
+        // This is allowed — the user entry coexists with the system path entry.
         var desktop = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
-        FavoritePathManager.Add("Desktop_cpy", desktop);
-        // Should not have created a duplicate - Exists returns true (system path)
-        Assert.True(FavoritePathManager.Exists(desktop));
+        var name = "Desktop_cpy_" + Guid.NewGuid().ToString("N");
+        try
+        {
+            FavoritePathManager.Add(name, desktop);
+
+            // System path entry still exists
+            Assert.True(FavoritePathManager.IsSystemPath(desktop));
+            // And we also have a user entry with the same path
+            var userFavs = FavoritePathManager.GetUserFavorites();
+            Assert.Contains(userFavs, f => f.Path == desktop && f.Name == name && !f.IsSystem);
+        }
+        finally
+        {
+            FavoritePathManager.Remove(desktop);
+        }
+    }
+
+    [Fact]
+    public void Add_TrailingSlash_Normalized()
+    {
+        var uniquePath = @"D:\__MantisZipTest_" + Guid.NewGuid().ToString("N");
+        try
+        {
+            FavoritePathManager.Add("SlashTest", uniquePath + @"\");
+            Assert.True(FavoritePathManager.Exists(uniquePath));
+            var all = FavoritePathManager.GetAll();
+            // Path stored without trailing separator
+            Assert.Contains(all, i => i.Path == uniquePath);
+        }
+        finally
+        {
+            FavoritePathManager.Remove(uniquePath);
+        }
+    }
+
+    [Fact]
+    public void IsSystemPath_TrailingSlash_Normalized()
+    {
+        var desktop = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
+        Assert.True(FavoritePathManager.IsSystemPath(desktop + @"\"));
     }
 
     [Fact]
@@ -134,9 +172,12 @@ public class FavoritePathManagerTests
     }
 
     [Fact]
-    public void Remove_SystemPath_Throws()
+    public void Remove_SystemPath_DoesNotThrow()
     {
         var desktop = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
-        Assert.Throws<InvalidOperationException>(() => FavoritePathManager.Remove(desktop));
+        // System paths are not stored in _userFavorites, so Remove should silently do nothing.
+        FavoritePathManager.Remove(desktop);
+        // No exception expected — the call is a no-op.
+        Assert.True(FavoritePathManager.IsSystemPath(desktop));
     }
 }
