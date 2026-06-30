@@ -48,6 +48,12 @@ public partial class MainWindow
     private ZoomMode _currentZoomMode = ZoomMode.FitWindow;
     private static readonly SolidColorBrush _toolbarCheckedBrush = new(Color.FromArgb(30, 100, 100, 100));
 
+    // 魔数路由状态
+    private ArchiveItem? _currentPreviewItem;
+    private FileFormat? _previewFormatOverride; // null=用 detectedFormat, non-null=用此值覆盖
+    private FileFormat _previewExtFormat; // 扩展名对应的格式（供切换按钮回调使用）
+    private ToolbarButton[]? _toolbarConflictButtons; // 冲突时的切换按钮，SetToolbar 自动拾取
+
     private static readonly HashSet<string> ImageExtensions = new(StringComparer.OrdinalIgnoreCase)
     {
         ".jpg", ".jpeg", ".png", ".gif", ".bmp", ".ico", ".webp"
@@ -271,6 +277,10 @@ public partial class MainWindow
 
     private async Task ShowPreviewAsync(ArchiveItem item)
     {
+        _currentPreviewItem = item;
+        // 新文件选择时重置格式覆盖状态（避免切换文件后仍沿用之前的切换选择）
+        _previewFormatOverride = null;
+        _toolbarConflictButtons = null;
         // 取消并释放上一次的 CancellationTokenSource，避免资源泄漏
         if (_previewCts != null)
         {
@@ -307,6 +317,7 @@ public partial class MainWindow
 
             // 魔数检测：通过文件头部字节识别真实格式（即使扩展名缺失或错误）
             string? realFormatName = null;
+            FileFormat detectedFormat = FileFormat.Unknown;
             if (s.EnableFormatDetection && _currentArchivePath != null)
             {
                 try
@@ -317,10 +328,19 @@ public partial class MainWindow
                         _currentFormat, _currentPassword, ct);
                     if (head != null && head.Length > 0)
                     {
-                        var detectedFormat = FileFormatDetector.Detect(head, head.Length);
+                        detectedFormat = FileFormatDetector.Detect(head, head.Length);
                         if (detectedFormat != FileFormat.Unknown)
                         {
                             realFormatName = FileFormatHelper.GetDisplayName(detectedFormat);
+                        }
+                        else
+                        {
+                            // 魔数未匹配时，用扩展名回退猜测（对无魔数的纯文本格式有效）
+                            var extFallback = FileFormatDetector.DetectByExtension(ext);
+                            if (extFallback != FileFormat.Unknown)
+                            {
+                                realFormatName = FileFormatHelper.GetDisplayName(extFallback);
+                            }
                         }
                     }
                 }
@@ -331,11 +351,64 @@ public partial class MainWindow
                 }
             }
 
-            // 如果魔数检测到真实格式，在标题中显示（已有格式分支会覆盖为更具体的标题，无对应分支时魔数检测结果保留）
+            // 各格式方法控制自己的标题，魔数结果放到信息栏
+            PreviewHeader.Text = $"📄 {item.Name}";
+
+            // 魔数结果写到信息栏（格式方法若调用 SetFormatSpecificInfo 会覆盖此行，是预期行为）
+            _previewExtFormat = FileFormat.Unknown;
             if (realFormatName != null)
-                PreviewHeader.Text = $"📄 {item.Name} → {realFormatName}";
-            else
-                PreviewHeader.Text = $"📄 {item.Name}";
+            {
+                _previewExtFormat = FileFormatDetector.DetectByExtension(ext);
+                var secondaryBrush = (Brush)FindResource("Theme_TextSecondary");
+                var row = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 1, 0, 1) };
+                row.Children.Add(new TextBlock { Text = "格式: ", FontSize = 11, Foreground = secondaryBrush, FontWeight = FontWeights.SemiBold });
+                var valueBlock = new TextBlock { Text = realFormatName, FontSize = 11, Foreground = secondaryBrush, TextWrapping = TextWrapping.Wrap };
+                bool hasConflict = _previewExtFormat != FileFormat.Unknown && _previewExtFormat != detectedFormat;
+                if (hasConflict)
+                {
+                    valueBlock.Foreground = (Brush)FindResource("Theme_Accent");
+                    valueBlock.Text = $"⚠️ {realFormatName}（扩展名: {ext}）";
+                }
+                row.Children.Add(valueBlock);
+                PreviewExtraInfoPanel.Children.Add(row);
+                PreviewExtraInfoPanel.Visibility = Visibility.Visible;
+            }
+
+            // 冲突切换按钮：在格式方法 SetToolbar 前设置，方法内部会自动拾取
+            if (detectedFormat != FileFormat.Unknown
+                && _previewExtFormat != FileFormat.Unknown
+                && _previewExtFormat != detectedFormat)
+            {
+                bool usingMagic = _previewFormatOverride == null;
+                var targetFormat = usingMagic ? _previewExtFormat : detectedFormat;
+                var targetName = FileFormatHelper.GetDisplayName(targetFormat);
+                var currentName = usingMagic ? realFormatName : FileFormatHelper.GetDisplayName(_previewExtFormat);
+
+                _toolbarConflictButtons = new[]
+                {
+                    new ToolbarButton
+                    {
+                        Text = usingMagic ? $"按扩展名({ext})" : $"按魔数",
+                        Tooltip = $"当前: {currentName}，点击切换为 {targetName}",
+                        IsToggle = true,
+                        IsChecked = !usingMagic,
+                        OnClick = () =>
+                        {
+                            _previewFormatOverride = usingMagic ? _previewExtFormat : null;
+                            // 重新预览（异步触发）
+                            _ = ShowPreviewAsync(_currentPreviewItem!);
+                        }
+                    }
+                };
+            }
+
+            // 魔数优先路由（扩展名回退仅在魔数 Unknown 时生效）
+            if (detectedFormat != FileFormat.Unknown)
+            {
+                var effectiveFormat = _previewFormatOverride ?? detectedFormat;
+                if (await TryMagicPreview(effectiveFormat, item, ext, ct, _previewExtFormat))
+                    return;
+            }
 
             if (ImageExtensions.Contains(ext))
             {
@@ -457,6 +530,7 @@ public partial class MainWindow
             }
             else
             {
+                // 扩展名未匹配任何已知格式，且魔数也未识别或不可预览
                 ShowUnsupportedPreview(item);
             }
         }
@@ -472,6 +546,86 @@ public partial class MainWindow
         finally
         {
             HidePreviewLoading();
+        }
+    }
+
+    /// <summary>
+    /// 魔数优先路由：根据 detectedFormat 选择预览方法。
+    /// 返回 true 表示已处理预览，false 表示该格式无对应预览方法（调用方应走扩展名回退）。
+    /// </summary>
+    private async Task<bool> TryMagicPreview(
+        FileFormat format, ArchiveItem item, string ext, CancellationToken ct, FileFormat extFormat)
+    {
+        var s = AppSettings.Instance;
+
+        switch (format)
+        {
+            // ── 位图图像 ──
+            case FileFormat.Png or FileFormat.Jpeg or FileFormat.Gif
+                 or FileFormat.Bmp or FileFormat.WebP or FileFormat.Ico
+                 or FileFormat.Tga or FileFormat.Hdr or FileFormat.Exr:
+                if (!s.EnableImagePreview)
+                {
+                    HidePreviewLoading();
+                    ShowUnsupportedPreview(item, L.T(L.Preview_ImageDisabled));
+                    return true;
+                }
+                var imgFile = await ExtractPreviewFileAsync(item, "preview.bin", ct);
+                await ShowImagePreviewAsync(imgFile, item);
+                return true;
+
+            // ── SVG ──
+            case FileFormat.Svg:
+                if (!s.EnableImagePreview)
+                {
+                    HidePreviewLoading();
+                    ShowUnsupportedPreview(item, L.T(L.Preview_ImageDisabled));
+                    return true;
+                }
+                var svgFile = await ExtractPreviewFileAsync(item, "preview.svg", ct);
+                await ShowSvgPreview(svgFile, item);
+                return true;
+
+            // ── 纯文本 ──
+            case FileFormat.Text:
+                if (!s.EnableTextPreview)
+                {
+                    ShowUnsupportedPreview(item, L.T(L.Preview_TextDisabled));
+                    return true;
+                }
+                if (item.Size > s.MaxTextPreviewBytes)
+                {
+                    var limitMb = s.MaxTextPreviewBytes / (1024.0 * 1024.0);
+                    ShowUnsupportedPreview(item, L.TF(L.Preview_TooLargeText, (double)item.Size / 1024 / 1024, limitMb));
+                    return true;
+                }
+                var txtFile = await ExtractPreviewFileAsync(item, "preview.txt", ct);
+                ShowTextPreview(txtFile, ext, item);
+                return true;
+
+            // ── HTML/Markdown ──
+            case FileFormat.Html or FileFormat.Markdown:
+                if (!s.EnableTextPreview)
+                {
+                    ShowUnsupportedPreview(item, L.T(L.Preview_TextDisabled));
+                    return true;
+                }
+                if (item.Size > s.MaxTextPreviewBytes)
+                {
+                    var limitMb = s.MaxTextPreviewBytes / (1024.0 * 1024.0);
+                    ShowUnsupportedPreview(item, L.TF(L.Preview_TooLargeText, (double)item.Size / 1024 / 1024, limitMb));
+                    return true;
+                }
+                var webFile = await ExtractPreviewFileAsync(item, "preview.html", ct);
+                if (format == FileFormat.Markdown)
+                    await ShowMarkdownPreview(webFile, item);
+                else
+                    await ShowHtmlPreview(webFile, item);
+                return true;
+
+            // ── 其他检测到的格式无专用预览方法 → 返回 false 走扩展名回退 ──
+            default:
+                return false;
         }
     }
 
@@ -983,11 +1137,20 @@ public partial class MainWindow
     {
         PreviewToolbarPanel.Children.Clear();
         bool hasLeft = leftButtons.Length > 0;
+        bool hasMiddle = _toolbarConflictButtons is { Length: > 0 };
         bool hasRight = rightButtons.Length > 0;
-        if (!hasLeft && !hasRight) { PreviewToolbarBorder.Visibility = Visibility.Collapsed; return; }
+        if (!hasLeft && !hasMiddle && !hasRight) { PreviewToolbarBorder.Visibility = Visibility.Collapsed; return; }
         foreach (var btn in leftButtons) PreviewToolbarPanel.Children.Add(CreateToolbarButtonElement(btn));
-        if (hasLeft && hasRight) AddToolbarSeparator();
-        foreach (var btn in rightButtons) PreviewToolbarPanel.Children.Add(CreateToolbarButtonElement(btn));
+        if (hasMiddle)
+        {
+            if (hasLeft) AddToolbarSeparator();
+            foreach (var btn in _toolbarConflictButtons!) PreviewToolbarPanel.Children.Add(CreateToolbarButtonElement(btn));
+        }
+        if (hasRight)
+        {
+            if (hasLeft || hasMiddle) AddToolbarSeparator();
+            foreach (var btn in rightButtons) PreviewToolbarPanel.Children.Add(CreateToolbarButtonElement(btn));
+        }
         PreviewToolbarBorder.Visibility = Visibility.Visible;
     }
 
