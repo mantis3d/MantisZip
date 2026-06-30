@@ -1,0 +1,68 @@
+<UserControl x:Class="MantisZip.UI.Controls.DynamicFormatOptionsPanel"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:l="clr-namespace:MantisZip.UI.Localization"
+             Background="{DynamicResource Theme_WindowBg}">
+    <Border BorderBrush="{DynamicResource Theme_BorderLight}" BorderThickness="1" Padding="8"
+            CornerRadius="4" MinHeight="100"
+            Background="{DynamicResource Theme_SurfaceBg}">
+        <Grid>
+            <!-- ZIP panel -->
+            <StackPanel x:Name="ZipPanel" Visibility="Visible">
+                <TextBlock Text="ZIP 选项" FontWeight="SemiBold" Margin="0,0,0,6"
+                           Foreground="{DynamicResource Theme_TextPrimary}"/>
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="80"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Grid.Column="0" Text="文件名编码:" VerticalAlignment="Center"
+                               Foreground="{DynamicResource Theme_TextPrimary}"/>
+                    <ComboBox x:Name="EncodingCombo" Grid.Column="1" Height="24" SelectedIndex="0"
+                               Background="{DynamicResource Theme_SurfaceBg}"
+                               Foreground="{DynamicResource Theme_TextPrimary}"
+                               BorderBrush="{DynamicResource Theme_Border}">
+                        <ComboBoxItem Content="UTF-8" Tag="utf-8"/>
+                        <ComboBoxItem Content="GBK" Tag="gbk"/>
+                        <ComboBoxItem Content="保留原始" Tag="default"/>
+                    </ComboBox>
+                </Grid>
+            </StackPanel>
+
+            <!-- 7z panel -->
+            <StackPanel x:Name="SevenZPanel" Visibility="Collapsed">
+                <TextBlock Text="7z 选项" FontWeight="SemiBold" Margin="0,0,0,6"
+                           Foreground="{DynamicResource Theme_TextPrimary}"/>
+                <Grid Margin="0,0,0,6">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="80"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Grid.Column="0" Text="压缩方法:" VerticalAlignment="Center"
+                               Foreground="{DynamicResource Theme_TextPrimary}"/>
+                    <ComboBox x:Name="MethodCombo" Grid.Column="1" Height="24" SelectedIndex="1"
+                              Background="{DynamicResource Theme_SurfaceBg}"
+                              Foreground="{DynamicResource Theme_TextPrimary}"
+                              BorderBrush="{DynamicResource Theme_Border}">
+                        <ComboBoxItem Content="LZMA" Tag="LZMA"/>
+                        <ComboBoxItem Content="LZMA2" Tag="LZMA2"/>
+                        <ComboBoxItem Content="PPMd" Tag="PPMd"/>
+                        <ComboBoxItem Content="BZip2" Tag="BZip2"/>
+                        <ComboBoxItem Content="Deflate" Tag="Deflate"/>
+                    </ComboBox>
+                </Grid>
+                <CheckBox x:Name="SolidCheck" Content="固实压缩" IsChecked="True"
+                          Foreground="{DynamicResource Theme_TextPrimary}"/>
+            </StackPanel>
+
+            <!-- TAR.GZ placeholder panel -->
+            <StackPanel x:Name="TarGzPanel" Visibility="Collapsed">
+                <TextBlock Text="TAR.GZ 无额外格式选项"
+                           Foreground="{DynamicResource Theme_TextDisabled}"
+                           FontStyle="Italic"
+                           VerticalAlignment="Center"
+                           HorizontalAlignment="Center"/>
+            </StackPanel>
+        </Grid>
+    </Border>
+</UserControl>

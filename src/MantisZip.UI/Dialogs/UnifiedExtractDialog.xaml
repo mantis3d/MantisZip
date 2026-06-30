@@ -1,0 +1,70 @@
+<Window x:Class="MantisZip.UI.UnifiedExtractDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:controls="clr-namespace:MantisZip.UI.Controls"
+        xmlns:l="clr-namespace:MantisZip.UI.Localization"
+        Title="{l:L Shell_Extract}" Height="300" Width="500"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="NoResize"
+        ShowInTaskbar="False"
+        Background="{DynamicResource Theme_WindowBg}">
+    <Grid Margin="12">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <TextBlock Grid.Row="0" Text="解压到" FontSize="14" FontWeight="SemiBold" Margin="0,0,0,8"
+                   Foreground="{DynamicResource Theme_TextPrimary}"/>
+
+        <!-- QuickPathControl (folder mode) -->
+        <controls:QuickPathControl x:Name="PathControl" Grid.Row="1" IsFolderMode="True"
+                                   Margin="0,0,0,10"/>
+
+        <!-- Extract options -->
+        <GroupBox Grid.Row="2" Header="解压选项" Padding="8"
+                  BorderBrush="{DynamicResource Theme_BorderLight}" BorderThickness="1"
+                  Background="{DynamicResource Theme_SurfaceBg}">
+            <StackPanel>
+                <Grid Margin="0,0,0,6">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="100"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Grid.Column="0" Text="文件冲突:" VerticalAlignment="Center"
+                               Foreground="{DynamicResource Theme_TextPrimary}"/>
+                    <ComboBox x:Name="ConflictCombo" Grid.Column="1" Height="24" SelectedIndex="0"
+                              Background="{DynamicResource Theme_SurfaceBg}"
+                              Foreground="{DynamicResource Theme_TextPrimary}"
+                              BorderBrush="{DynamicResource Theme_Border}">
+                        <ComboBoxItem Content="覆盖"/>
+                        <ComboBoxItem Content="跳过"/>
+                        <ComboBoxItem Content="自动重命名"/>
+                        <ComboBoxItem Content="覆盖旧文件"/>
+                        <ComboBoxItem Content="覆盖小文件"/>
+                    </ComboBox>
+                </Grid>
+                <CheckBox x:Name="PreserveRootCheck" Content="保留目录结构" IsChecked="True"
+                          Foreground="{DynamicResource Theme_TextPrimary}"/>
+            </StackPanel>
+        </GroupBox>
+
+        <!-- Buttons -->
+        <StackPanel Grid.Row="4" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,10,0,0">
+            <Button Content="{l:L MsgBox_Ok}" Width="80" Height="28" Margin="0,0,8,0" IsDefault="True"
+                    Click="Ok_Click"
+                    Background="{DynamicResource Theme_Accent}"
+                    Foreground="{DynamicResource Theme_TextOnAccent}"
+                    BorderThickness="0"/>
+            <Button Content="{l:L MsgBox_Cancel}" Width="80" Height="28" IsCancel="True"
+                    Click="Cancel_Click"
+                    Background="{DynamicResource Theme_ButtonBg}"
+                    Foreground="{DynamicResource Theme_TextPrimary}"
+                    BorderBrush="{DynamicResource Theme_ButtonBorder}"/>
+        </StackPanel>
+    </Grid>
+</Window>

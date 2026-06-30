@@ -8,7 +8,7 @@
 
 ## 版本
 - **当前版本**: 0.4.3
-- **发布日期**: 2026-06-20
+- **发布日期**: 2026-06-29
 
 ## 规划中
 
@@ -18,9 +18,49 @@
 
 ## 版本历史（从新到旧）
 
-### v0.4.3 (2026-06-21) 压缩包内逐条目权限跳过 + UAC 弹窗行为修复
+### v0.4.3+ (2026-06-30) 工具栏新增「解压选择文件」按钮
 
-1. **压缩包内逐条目权限跳过**：
+1. **工具栏新增「解压选择文件」按钮** — 位于「解压」与「压缩」之间，行为与右键菜单「解压到…」一致：选中文件后弹窗选择目标目录再解压。图标 📑。按钮在加载压缩包后启用。
+2. **右键菜单图标统一** — 「解压到…」图标从 📤 改为 📑，与工具栏按钮保持一致。
+
+### v0.4.3+ (2026-06-30) 默认路径优先级设置
+
+1. **AppSettings** — 新增 `DefaultPathPriority` 属性，支持 4 种策略：场景相关 / 资源管理器 / 最近使用 / 桌面
+2. **ResolveDefaultPath() 静态方法** — 按优先级链自动选取最佳默认路径，链中非空即停
+3. **设置 UI** — 🧰 高级标签页新增「默认路径优先级」GroupBox，4 个 RadioButton
+4. **7 个 QuickPathPreDialog 调用点** — 全部接入 `ResolveDefaultPath`，弹窗不再是空路径开局
+
+### v0.4.3+ (2026-06-29) 预览系统计划更新（Avalonia 方向 + 快速预览模式）
+
+1. **新计划：Avalonia 预览机会分析** — `preview-avalonia-opportunities.md`
+   - 分析 WPF→Avalonia 迁移对预览系统各格式的影响
+   - 评估 PSD/AI/HDR 等新格式的预览方案
+   - 提出 HDR 全景 360° 查看器方案（WebView2 + Three.js / Skia 自渲染两路线）
+   - 音视频播放替代方案（LibVLCSharp）
+   - **三级依赖隔离体系**：将 Magick.NET/LibVLC 等重大依赖拆分为可选插件，通过 `plugins/` 目录 + `AssemblyLoadContext` 加载，控制安装包体积
+2. **新计划：快速预览与渐进式加载** — `preview-quick-modes.md`
+   - 三种预览模式：⚡快速 / ▶渐进 / 📄完整
+   - 28 个格式逐行分析每种模式下的行为
+   - 后台 `ProgressiveLoadManager` 管理渐进加载与取消
+   - 后续扩展：文件列表缩略图模式
+3. **修正计划**：`preview-extended-formats.md` 更新——Phase 2D（Magick.NET）改为插件化方案，Phase 3.10/3.11（音视频）改为 LibVLC 插件，Phase 4 EXR/TIFF 由 Magick.NET 覆盖移除
+4. **PLAN.md**：新增两条调研条目 + 快速预览 P2 条目
+
+### v0.4.3 (2026-06-22) QuickPathControl 统一路径选择 + 资源管理器窗口检测 + 书签管理器 + 权限跳过
+
+1. **QuickPathControl 统一路径选择（压缩/解压窗口）**：
+   - CompressSettingsWindow：原有 OutputPathTextBox + BrowseOutputButton → QuickPathControl（文件保存模式），新增独立 FileNameTextBox 输入文件名
+   - ExtractSettingsWindow：原有 ManualPathTextBox + BrowseButton → QuickPathControl（文件夹选择模式）
+   - QuickPathControl 支持收藏夹 ⭐、历史记录 🕐、资源管理器窗口 🪟、浏览 📁
+2. **资源管理器窗口检测修复**：
+   - ExplorerWindowTracker 重写：COM IShellWindows（CLSID 直接创建）为主 + Win32 EnumWindows（CabinetWClass）兜底
+   - 解决 Shell.Application.Windows() 在某些系统返回空列表的问题
+3. **书签管理器菜单**：
+   - 主菜单 工具 > 新增「书签管理器(_B)...」打开 FavoriteManagerWindow
+   - 新增 Main_Menu_BookmarkManager 本地化键（中/英）
+4. **布局修复**：
+   - CompressSettingsWindow 内 Grid 从 5 行扩展至 7 行，消除 FormatOptionsPanel 与 VolumeSize 重叠
+5. **压缩包内逐条目权限跳过**：
    - 新增 `ExtractResult` 类（`SucceededEntries`/`FailedEntries`）
    - `IArchiveEngine.ExtractAsync` 返回类型从 `Task` 改为 `Task<ExtractResult>`
    - ZipEngine/SevenZipEngine/TarGzEngine 逐条目循环包 `try-catch(UnauthorizedAccessException)`，跳过失败条目继续处理其余
@@ -33,6 +73,18 @@
    - 仅用户点击「以管理员身份运行」时才重启旧进程
 3. **设计文档**：`.sisyphus/plans/uac-elevation-permission.md` 更新
 4. **进度窗口错误摘要**：ProgressWindow 新增 `ErrorSummaryBox`（可复制 TextBox），解压权限错误时在进度条和按钮之间显示错误摘要文本
+5. **计划状态同步**：将 `zip-copy-mode-optimization.md`（v0.4.2）和 `uac-elevation-permission.md`（v0.4.2）从 PLAN.md 待实现移至 PROGRESS.md 历史设计方案索引，同步更新跨平台分析计数
+6. **DynamicFormatOptionsPanel 后端接线**：ZIP 编码/7z 压缩方法/7z 固实选项从 UI 接入到压缩引擎：
+   - `ArchiveOptions`/`CompressRequest` 新增 `FileNameEncoding`、`SevenZipCompressionMethod`、`SevenZipSolid` 属性
+   - `ZipEngine`：根据 `FileNameEncoding` 选择 ZIP 文件名编码（utf-8/gbk/default）
+   - `SevenZipEngine.ConfigureCompressor`：根据选项选择压缩方法（LZMA/LZMA2/PPMd/BZip2/Deflate），非固实时设 `CustomParameters["s"]="off"`
+   - 修复 `FormatComboBox_SelectionChanged` 未同步 `FormatOptionsPanel.SelectedFormat` 导致面板不随格式切换的 bug
+7. **默认格式选项设置**：设置窗口 → 压缩标签页新增「默认格式选项」区域：
+   - AppSettings 新增 `ZipEncoding`、`SevenZipCompressionMethod`、`SevenZipSolid` 属性
+   - SettingsWindow 读写持久化
+   - `DynamicFormatOptionsPanel.LoadDefaults()` 打开压缩窗口时自动加载设置值
+    - 快捷压缩路径（`--compress-quick`/`--compress-separate`/`--compress-combined`）读取 AppSettings 默认值
+8. **RELEASE_NOTES.md 双语化**：将 v0.4.3 更新内容翻译为中英双语，格式与 v0.4.2/v0.4.1 保持一致
 
 ### v0.4.2 (2026-06-20) 安装程序主题/语言选择修复 / ZIP copy-mode 进度与取消
 
@@ -71,6 +123,12 @@
    - 标题统一添加 `/ English` 双语标注
 3. 修复动态菜单bug
 4. 文件列表增加“返回父目录”项目。
+5. **计划文档整理**：
+   - `drag-drop-direct-extract.md` 更新：纳入纯 Win32 覆盖层方案、UIA 降级、颜色状态机、呼吸动画等设计细节
+   - `parent-directory-entry.md` 补充到 PROGRESS.md 历史设计方案索引
+   - `quick-path-control.md` 归档（被 `quickpath-unified.md` 取代）
+   - 跨平台影响分析重建：从 43（含已完成/已废弃）精简为 26 个待实现计划
+   - PLAN.md 新增 `self-contained-installer.md`（P1）待实现条目
 5. **UAC 提权机制 — 双模式权限不足处理**：
    - `AppSettings.AllowElevation` 属性（默认 false），设置在设置 → 高级 → 权限提升
    - 新建 `App.Elevation.cs` 含 6 个辅助方法：`IsDirectoryWritable`, `IsElevated`, `RelaunchAsAdmin`, `ShowElevationInfoDialog`, `ShowElevationDialog`, `ShowElevationFailedDialog`
@@ -577,3 +635,7 @@
 | ZipEngine SharpZipLib 完全迁移 (加密路径→SharpSevenZip) | [zipengine-sharpcompress-migration.md](.sisyphus/plans/zipengine-sharpcompress-migration.md) | v0.3.13 |
 | 压缩流程统一化 (CompressService) | [compress-service-unify.md](.sisyphus/plans/compress-service-unify.md) | v0.4.0 |
 | 发布 Release | [release-automation.md](.sisyphus/plans/release-automation.md) | v0.4.0 |
+| 返回上级目录 (.. 导航行) | [parent-directory-entry.md](.sisyphus/plans/parent-directory-entry.md) | v0.4.0 |
+| ZIP 压缩流直拷优化 (ZipBinaryRewriter) | [zip-copy-mode-optimization.md](.sisyphus/plans/zip-copy-mode-optimization.md) | v0.4.2 |
+| UAC 提权 + 权限不足处理 | [uac-elevation-permission.md](.sisyphus/plans/uac-elevation-permission.md) | v0.4.2 |
+| 自包含安装包发布 | [self-contained-installer.md](.sisyphus/plans/self-contained-installer.md) | v0.4.2 |

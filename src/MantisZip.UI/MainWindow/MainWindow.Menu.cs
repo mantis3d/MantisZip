@@ -22,13 +22,16 @@ public partial class MainWindow
 
     private async void OpenArchive_Click(object sender, RoutedEventArgs e)
     {
-        var dialog = new OpenFileDialog
+        var dlg = new QuickPathPreDialog
         {
-            Filter = L.T(L.Main_OpenFileFilter),
-            Title = L.T(L.Shell_Open)
+            Owner = this,
+            IsPickFolderMode = false,
+            IsFileOpenMode = true,
+            FileOpenFilter = L.T(L.Main_OpenFileFilter),
+            InitialPath = App.ResolveDefaultPath(null) ?? ""
         };
-        if (dialog.ShowDialog() == true)
-            await LoadArchiveAsync(dialog.FileName);
+        if (dlg.ShowDialog() == true && dlg.SelectedPath != null)
+            await LoadArchiveAsync(dlg.SelectedPath);
     }
 
     private async void Extract_Click(object sender, RoutedEventArgs e)
@@ -37,6 +40,15 @@ public partial class MainWindow
         var dest = ResolveExtractDestination(_currentArchivePath);
         if (dest != null)
             await ExtractAsync(_currentArchivePath, dest);
+    }
+
+    private async void ExtractSelected_Click(object sender, RoutedEventArgs e)
+    {
+        var items = GetRightClickSelection();
+        if (items.Count == 0 || string.IsNullOrEmpty(_currentArchivePath)) return;
+        var dest = ResolveExtractDestination(_currentArchivePath);
+        if (dest != null)
+            await ExtractSelectedAsync(items, dest);
     }
 
     private async void SmartExtract_Click(object sender, RoutedEventArgs e)
@@ -80,12 +92,21 @@ public partial class MainWindow
         };
         if (ofd.ShowDialog() == true)
         {
-            var sfd = new SaveFileDialog
+            var qpd = new QuickPathDialog
             {
-                Filter = L.T(L.Main_SaveZipFilter), Title = L.T(L.Main_SaveZipTitle), FileName = "archive.zip"
+                Owner = this,
+                Title = "选择压缩文件保存位置",
+                IsFolderMode = false,
+                IsFileOpenMode = false,
+                FileTypeFilter = L.T(L.Main_SaveZipFilter),
+                DefaultFileName = "archive.zip"
             };
-            if (sfd.ShowDialog() == true)
-                await CompressAsync(ofd.FileNames, sfd.FileName);
+            if (qpd.ShowDialog() == true && !string.IsNullOrEmpty(qpd.SelectedPath))
+            {
+                var fullPath = Path.Combine(qpd.SelectedPath, qpd.SelectedFileName ?? "archive.zip");
+                PathHistoryManager.Record(qpd.SelectedPath);
+                await CompressAsync(ofd.FileNames, fullPath);
+            }
         }
     }
 
@@ -288,11 +309,25 @@ public partial class MainWindow
 
         var filter = L.T(L.Compress_FileFilter);
         var title = L.T(L.Main_SelectFilesTitle);
+
+        // 先用 QuickPathPreDialog 选目录，再弹系统对话框定位到那里（支持多选）
+        var archiveDir = !string.IsNullOrEmpty(_currentArchivePath)
+            ? Path.GetDirectoryName(_currentArchivePath) : null;
+        var preDlg = new QuickPathPreDialog
+        {
+            Owner = this,
+            IsPickFolderMode = true, // 选目录模式，不弹系统对话框
+            InitialPath = App.ResolveDefaultPath(archiveDir) ?? ""
+        };
+        if (preDlg.ShowDialog() != true || string.IsNullOrEmpty(preDlg.SelectedPath))
+            return;
+
         var ofd = new OpenFileDialog
         {
             Filter = filter,
             Title = title,
-            Multiselect = true
+            Multiselect = true,
+            InitialDirectory = preDlg.SelectedPath
         };
         if (ofd.ShowDialog() == true)
         {
@@ -521,6 +556,11 @@ public partial class MainWindow
     private void PasswordManager_Click(object sender, RoutedEventArgs e)
     {
         new PasswordManagerWindow { Owner = this }.ShowDialog();
+    }
+
+    private void BookmarkManager_Click(object sender, RoutedEventArgs e)
+    {
+        new FavoriteManagerWindow { Owner = this }.ShowDialog();
     }
 
     private void DropHint_OpenArchive(object sender, MouseButtonEventArgs e)

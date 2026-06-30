@@ -1,7 +1,6 @@
 using MantisZip.Core.Models;
 using MantisZip.Core.Utils;
 using MantisZip.UI.Localization;
-using Ookii.Dialogs.Wpf;
 using System.Collections.ObjectModel;
 using System.IO;
 using System.Windows;
@@ -59,9 +58,6 @@ public partial class ExtractSettingsWindow : Window
         ToNameRadio.IsChecked = true;
         OutputMode = ExtractOutputMode.ToName;
 
-        // 初始化手动路径 TextBox 占位提示
-        ManualPathTextBox.Text = L.T(L.ExtractSettings_ManualPathPlaceholder);
-
         // 从 AppSettings 加载默认值
         LoadDefaultsFromSettings();
 
@@ -112,10 +108,8 @@ public partial class ExtractSettingsWindow : Window
 
         if (OutputMode == ExtractOutputMode.Manual)
         {
-            var text = ManualPathTextBox.Text?.Trim();
-            var hasValidPath = !string.IsNullOrEmpty(text)
-                && text != L.T(L.ExtractSettings_ManualPathPlaceholder);
-            ExtractButton.IsEnabled = hasValidPath;
+            var text = OutputPathControl.PathText?.Trim();
+            ExtractButton.IsEnabled = !string.IsNullOrEmpty(text);
         }
         else
         {
@@ -129,52 +123,29 @@ public partial class ExtractSettingsWindow : Window
     /// </summary>
     private void RefreshOutputPathState()
     {
-        if (ManualPathTextBox == null) return; // InitializeComponent 期间
+        if (OutputPathControl == null) return; // InitializeComponent 期间
 
         if (OutputMode == ExtractOutputMode.Manual)
         {
             // 手动模式：启用路径编辑
-            ManualPathTextBox.IsReadOnly = false;
-            ManualPathTextBox.IsEnabled = true;
-            BrowseButton.IsEnabled = true;
+            OutputPathControl.IsReadOnly = false;
 
-            // 恢复之前用户输入的路径，或占位文本
+            // 恢复之前用户输入的路径
             if (!string.IsNullOrEmpty(CustomDestination))
-                ManualPathTextBox.Text = CustomDestination;
-            else
-                ManualPathTextBox.Text = L.T(L.ExtractSettings_ManualPathPlaceholder);
+                OutputPathControl.PathText = CustomDestination;
         }
         else
         {
             // 非手动模式：禁用路径编辑，显示计算好的路径预览
-            ManualPathTextBox.IsReadOnly = true;
-            ManualPathTextBox.IsEnabled = false;
-            BrowseButton.IsEnabled = false;
+            OutputPathControl.IsReadOnly = true;
 
-            ManualPathTextBox.Text = OutputMode switch
+            OutputPathControl.PathText = OutputMode switch
             {
                 ExtractOutputMode.Here => _firstArchiveDir,
                 ExtractOutputMode.Smart => L.T(L.ExtractSettings_Mode_Smart),
                 ExtractOutputMode.ToName => Path.Combine(_firstArchiveDir, _firstArchiveNameOnly),
                 _ => _firstArchiveDir
             };
-        }
-    }
-
-    private void BrowseButton_Click(object sender, RoutedEventArgs e)
-    {
-        var dialog = new VistaFolderBrowserDialog
-        {
-            Description = L.T(L.ExtractSettings_Title),
-            SelectedPath = !string.IsNullOrEmpty(CustomDestination)
-                ? CustomDestination
-                : Environment.GetFolderPath(Environment.SpecialFolder.Desktop)
-        };
-
-        if (dialog.ShowDialog() == true)
-        {
-            CustomDestination = dialog.SelectedPath;
-            ManualPathTextBox.Text = CustomDestination;
         }
     }
 
@@ -185,9 +156,9 @@ public partial class ExtractSettingsWindow : Window
         {
             if (string.IsNullOrWhiteSpace(CustomDestination))
             {
-                // 用户在 TextBox 直接输入了内容但 CustomDestination 未同步
-                var text = ManualPathTextBox.Text?.Trim();
-                if (!string.IsNullOrEmpty(text) && text != L.T(L.ExtractSettings_ManualPathPlaceholder))
+                // 同步 OutputPathControl 输入的路径
+                var text = OutputPathControl.PathText?.Trim();
+                if (!string.IsNullOrEmpty(text))
                 {
                     CustomDestination = text;
                 }
@@ -243,18 +214,6 @@ public partial class ExtractSettingsWindow : Window
         DialogResult = false;
     }
 
-    private void ManualPathTextBox_TextChanged(object sender, TextChangedEventArgs e)
-    {
-        if (OutputMode == ExtractOutputMode.Manual)
-        {
-            var text = ManualPathTextBox.Text?.Trim();
-            if (!string.IsNullOrEmpty(text) && text != L.T(L.ExtractSettings_ManualPathPlaceholder))
-            {
-                CustomDestination = text;
-            }
-        }
-        UpdateExtractButton();
-    }
 
     private void UpdateFileCount()
     {

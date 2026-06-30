@@ -182,6 +182,7 @@ public partial class MainWindow
         {
             AddFilesBtn.IsEnabled = false;
             DeleteFilesBtn.IsEnabled = false;
+            ExtractSelectedBtn.IsEnabled = false;
             if (EditMenuAddFiles != null) EditMenuAddFiles.IsEnabled = false;
             if (EditMenuDeleteFiles != null) EditMenuDeleteFiles.IsEnabled = false;
             if (EditMenuArchiveComment != null) EditMenuArchiveComment.IsEnabled = false;
@@ -191,6 +192,7 @@ public partial class MainWindow
 
         AddFilesBtn.IsEnabled = engine.CanAdd(_currentFormat);
         DeleteFilesBtn.IsEnabled = engine.CanDelete(_currentFormat);
+        ExtractSelectedBtn.IsEnabled = true;
         if (EditMenuAddFiles != null) EditMenuAddFiles.IsEnabled = engine.CanAdd(_currentFormat);
         if (EditMenuDeleteFiles != null) EditMenuDeleteFiles.IsEnabled = engine.CanDelete(_currentFormat);
         if (CloseArchiveMenu != null) CloseArchiveMenu.IsEnabled = true;

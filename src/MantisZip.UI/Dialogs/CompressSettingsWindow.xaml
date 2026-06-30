@@ -2,7 +2,8 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:l="clr-namespace:MantisZip.UI.Localization"
-        Title="{l:L Compress_Title}" Height="640" Width="530"
+         xmlns:controls="clr-namespace:MantisZip.UI.Controls"
+        Title="{l:L Compress_Title}" Height="660" Width="530"
         WindowStartupLocation="CenterScreen"
         ResizeMode="NoResize"
         Background="{DynamicResource Theme_WindowBg}">
@@ -56,6 +57,8 @@
                                     <RowDefinition Height="Auto"/>
                                     <RowDefinition Height="Auto"/>
                                     <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
                                 </Grid.RowDefinitions>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="80"/>
@@ -79,34 +82,50 @@
                                     </StackPanel>
                                 </Grid>
 
-                                <!-- Row 1: Output path -->
+                                <!-- Row 1: QuickPathControl (output directory) -->
                                 <TextBlock Grid.Row="1" Grid.Column="0" Text="{l:L Compress_OutputPath}" VerticalAlignment="Center"/>
-                                <Grid Grid.Row="1" Grid.Column="1">
+                                <controls:QuickPathControl x:Name="OutputPathControl" Grid.Row="1" Grid.Column="1"
+                                                          IsFolderMode="False"
+                                                          IsFileOpenMode="False"
+                                                          FileTypeFilter="ZIP 文件|*.zip|7z 文件|*.7z|TAR.GZ 文件|*.tar.gz|所有文件|*.*"
+                                                          DefaultFileName="archive.zip"
+                                                          VerticalAlignment="Center"/>
+
+                                <!-- Row 2: FileName -->
+                                <TextBlock Grid.Row="2" Grid.Column="0" Text="{l:L Compress_FileName}" VerticalAlignment="Center" Margin="0,8,0,0"/>
+                                <Grid Grid.Row="2" Grid.Column="1" Margin="0,8,0,0">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="*"/>
                                         <ColumnDefinition Width="Auto"/>
                                     </Grid.ColumnDefinitions>
-                                    <TextBox x:Name="OutputPathTextBox" Grid.Column="0" Height="24" TextChanged="OutputPathTextBox_TextChanged"/>
-                                    <Button x:Name="BrowseOutputButton" Content="{l:L Settings_Advanced_Browse}" Width="60" Height="24" Grid.Column="1" Click="BrowseOutputButton_Click"/>
+                                    <TextBox x:Name="FileNameTextBox" Grid.Column="0" Height="24" TextChanged="FileNameTextBox_TextChanged"/>
+                                    <TextBlock x:Name="FileExtensionLabel" Grid.Column="1"
+                                              Text=".zip"
+                                              VerticalAlignment="Center"
+                                              Margin="6,0,0,0"
+                                              Foreground="{DynamicResource Theme_TextSecondary}"/>
                                 </Grid>
 
-                                <TextBlock Grid.Row="2" Grid.Column="0" Text="{l:L Compress_Format}" VerticalAlignment="Center" Margin="0,10,0,0"/>
-                                <ComboBox x:Name="FormatComboBox" Grid.Row="2" Grid.Column="1" Height="24" Margin="0,10,0,0" SelectedIndex="0" SelectionChanged="FormatComboBox_SelectionChanged">
+                                <TextBlock Grid.Row="3" Grid.Column="0" Text="{l:L Compress_Format}" VerticalAlignment="Center" Margin="0,10,0,0"/>
+                                <ComboBox x:Name="FormatComboBox" Grid.Row="3" Grid.Column="1" Height="24" Margin="0,10,0,0" SelectedIndex="0" SelectionChanged="FormatComboBox_SelectionChanged">
                                     <ComboBoxItem Content="ZIP (.zip)" Tag="zip"/>
                                     <ComboBoxItem Content="7z (.7z)" Tag="7z"/>
                                     <ComboBoxItem Content="TAR.GZ (.tar.gz)" Tag="tar.gz"/>
                                 </ComboBox>
 
-                                <TextBlock Grid.Row="3" Grid.Column="0" Text="{l:L Compress_Level}" VerticalAlignment="Center" Margin="0,10,0,0"/>
-                                <ComboBox x:Name="LevelCombo" Grid.Row="3" Grid.Column="1" Height="24" Margin="0,10,0,0" SelectedIndex="2">
+                                <!-- DynamicFormatOptionsPanel -->
+                                <controls:DynamicFormatOptionsPanel x:Name="FormatOptionsPanel" Grid.Row="4" Grid.ColumnSpan="2" Margin="0,8,0,0"/>
+
+                                <TextBlock Grid.Row="5" Grid.Column="0" Text="{l:L Compress_Level}" VerticalAlignment="Center" Margin="0,10,0,0"/>
+                                <ComboBox x:Name="LevelCombo" Grid.Row="5" Grid.Column="1" Height="24" Margin="0,10,0,0" SelectedIndex="2">
                                     <ComboBoxItem Tag="0" Content="{l:L Compress_Level_Store}"/>
                                     <ComboBoxItem Tag="3" Content="{l:L Compress_Level_Fast}"/>
                                     <ComboBoxItem Tag="5" Content="{l:L Compress_Level_Normal}"/>
                                     <ComboBoxItem Tag="9" Content="{l:L Compress_Level_Max}"/>
                                 </ComboBox>
 
-                                <TextBlock Grid.Row="4" Grid.Column="0" Text="{l:L Compress_VolumeSize}" VerticalAlignment="Center" Margin="0,10,0,0"/>
-                                <StackPanel Grid.Row="4" Grid.Column="1" Orientation="Horizontal" Margin="0,10,0,0">
+                                <TextBlock Grid.Row="6" Grid.Column="0" Text="{l:L Compress_VolumeSize}" VerticalAlignment="Center" Margin="0,10,0,0"/>
+                                <StackPanel Grid.Row="6" Grid.Column="1" Orientation="Horizontal" Margin="0,10,0,0">
                                     <ComboBox x:Name="SplitSizeCombo" Width="130" Height="24" SelectedIndex="0"
                                               SelectionChanged="SplitSizeCombo_SelectionChanged">
                                         <ComboBoxItem Tag="0" Content="{l:L Compress_Volume_None}"/>

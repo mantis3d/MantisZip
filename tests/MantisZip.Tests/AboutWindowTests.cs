@@ -52,7 +52,10 @@ public class AboutWindowTests
         "About_Library_Purpose",
         "About_Thanks_OSS",
         "About_Thanks_AI",
-        "About_Thanks_7Zip"
+        "About_Thanks_7Zip",
+        "About_Contributors_Technical",
+        "About_Contributors_Financial",
+        "About_Contributors_None"
     ];
 
     private static Dictionary<string, string> LoadJson(string path)
@@ -149,7 +152,7 @@ public class AboutWindowTests
     {
         var zh = LoadJson(ZhJsonPath);
         int count = zh.Keys.Count(k => k.StartsWith("About_"));
-        Assert.True(count >= 21, $"About_* 键的数量 ({count}) 小于 21");
+        Assert.True(count >= 24, $"About_* 键的数量 ({count}) 小于 24");
     }
 
     // ──────────────────────────────────────────────

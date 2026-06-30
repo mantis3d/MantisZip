@@ -93,6 +93,9 @@ public partial class App : Application
             KeepOriginalExtension = settings.KeepOriginalExtension,
             OutputPath = outputPath,
             PreserveDirectoryRoot = settings.PreserveDirectoryRoot,
+            FileNameEncoding = settings.ZipEncoding,
+            SevenZipCompressionMethod = settings.SevenZipCompressionMethod,
+            SevenZipSolid = settings.SevenZipSolid,
         };
         var outputPaths = CompressService.GetOutputPaths(request);
         progressWindow.InitBatchMode(outputPaths);

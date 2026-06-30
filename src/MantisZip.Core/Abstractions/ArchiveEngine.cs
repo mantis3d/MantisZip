@@ -83,6 +83,21 @@ public class ArchiveOptions
     /// 仅对 SevenZipEngine 的单目录压缩路径有效。
     /// </summary>
     public bool PreserveDirectoryRoot { get; set; } = true;
+
+    /// <summary>
+    /// ZIP 文件名编码："utf-8" / "gbk" / "default"。null 表示使用引擎默认（UTF-8）。
+    /// </summary>
+    public string? FileNameEncoding { get; set; }
+
+    /// <summary>
+    /// 7z 压缩方法："LZMA" / "LZMA2" / "PPMd" / "BZip2" / "Deflate"。null 表示引擎默认（LZMA2）。
+    /// </summary>
+    public string? SevenZipCompressionMethod { get; set; }
+
+    /// <summary>
+    /// 7z 固实压缩标志。默认 true。
+    /// </summary>
+    public bool SevenZipSolid { get; set; } = true;
 }
 
 /// <summary>

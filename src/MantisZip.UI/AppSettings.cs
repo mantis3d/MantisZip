@@ -17,6 +17,9 @@ public class AppSettings
     public bool CloseAfterCompress { get; set; } = true;
     public bool KeepOriginalExtension { get; set; } = false;  // 保留源文件扩展名（abc.max → abc.max.zip）
     public bool PreserveDirectoryRoot { get; set; } = true;    // 压缩文件夹时保留外层目录
+    public string ZipEncoding { get; set; } = "utf-8";         // ZIP 文件名编码：utf-8 / gbk / default
+    public string SevenZipCompressionMethod { get; set; } = "LZMA2"; // 7z 压缩方法：LZMA / LZMA2 / PPMd / BZip2 / Deflate
+    public bool SevenZipSolid { get; set; } = true;            // 7z 固实压缩
 
     // ===== 解压 =====
     public string ExtractDestination { get; set; } = "ask"; // same-dir / desktop / last / ask
@@ -94,6 +97,16 @@ public class AppSettings
     public bool CleanTempOnStartup { get; set; } = true;
     /// <summary>CLI 模式下遇到权限不足时，是否弹提权窗口（默认 false = 仅提示不可写目录）</summary>
     public bool AllowElevation { get; set; } = false;
+
+    // ===== 默认路径优先级 =====
+    /// <summary>
+    /// QuickPathPreDialog 默认路径优先级策略。
+    /// "context"   = 场景相关 > 资源管理器 > 最近使用 > 桌面
+    /// "explorer"  = 资源管理器 > 场景相关 > 最近使用 > 桌面
+    /// "recent"    = 最近使用 > 场景相关 > 资源管理器 > 桌面
+    /// "desktop"   = 直接桌面
+    /// </summary>
+    public string DefaultPathPriority { get; set; } = "context";
 
     // ===== 持久化 =====
     private static readonly string SettingsDir = Path.Combine(

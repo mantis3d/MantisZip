@@ -52,6 +52,15 @@ public class CompressRequest
 
     /// <summary>压缩单文件夹时是否保留外层目录根，仅 SevenZipEngine 有效</summary>
     public bool PreserveDirectoryRoot { get; init; } = true;
+
+    /// <summary>ZIP 文件名编码："utf-8" / "gbk" / "default"，null 表示引擎默认</summary>
+    public string? FileNameEncoding { get; init; }
+
+    /// <summary>7z 压缩方法："LZMA" / "LZMA2" / "PPMd" / "BZip2" / "Deflate"，null 表示引擎默认</summary>
+    public string? SevenZipCompressionMethod { get; init; }
+
+    /// <summary>7z 固实压缩标志</summary>
+    public bool SevenZipSolid { get; init; } = true;
 }
 
 /// <summary>
@@ -382,6 +391,9 @@ public static class CompressService
             Comment = resolvedComment,
             CommentDistribution = CommentDistribution.AllSame, // 已由 Service 解析完成
             PreserveDirectoryRoot = request.PreserveDirectoryRoot,
+            FileNameEncoding = request.FileNameEncoding,
+            SevenZipCompressionMethod = request.SevenZipCompressionMethod,
+            SevenZipSolid = request.SevenZipSolid,
         };
     }
 

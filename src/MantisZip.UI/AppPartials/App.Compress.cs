@@ -190,6 +190,9 @@ public partial class App : Application
             CompressionLevel = settings.DefaultLevel,
             KeepOriginalExtension = settings.KeepOriginalExtension,
             PreserveDirectoryRoot = settings.PreserveDirectoryRoot,
+            FileNameEncoding = settings.ZipEncoding,
+            SevenZipCompressionMethod = settings.SevenZipCompressionMethod,
+            SevenZipSolid = settings.SevenZipSolid,
         };
         var outputPaths = CompressService.GetOutputPaths(request);
         progressWindow.InitBatchMode(outputPaths);
@@ -433,6 +436,9 @@ public partial class App : Application
             CompressionLevel = settings.DefaultLevel,
             OutputPath = finalPath,
             PreserveDirectoryRoot = settings.PreserveDirectoryRoot,
+            FileNameEncoding = settings.ZipEncoding,
+            SevenZipCompressionMethod = settings.SevenZipCompressionMethod,
+            SevenZipSolid = settings.SevenZipSolid,
         };
         var outputPaths = CompressService.GetOutputPaths(request);
         progressWindow.InitBatchMode(outputPaths);
@@ -566,7 +572,9 @@ public partial class App : Application
                 ? Path.GetFileName(first.TrimEnd('\\', '/'))
                 : Path.GetFileNameWithoutExtension(first.TrimEnd('\\', '/'));
             var ext = s.DefaultFormat == "tar.gz" ? ".tar.gz" : "." + s.DefaultFormat;
-            win.OutputPathTextBox.Text = Path.Combine(dir, name + ext);
+            win.OutputPathControl.PathText = dir;
+            win.FileNameTextBox.Text = name;
+            win.FileExtensionLabel.Text = ext;
         }
 
         win.Closed += (_, _) =>
