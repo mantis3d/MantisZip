@@ -41,6 +41,15 @@ public partial class MainWindow
             await ExtractAsync(_currentArchivePath, dest);
     }
 
+    private async void ExtractSelected_Click(object sender, RoutedEventArgs e)
+    {
+        var items = GetRightClickSelection();
+        if (items.Count == 0 || string.IsNullOrEmpty(_currentArchivePath)) return;
+        var dest = ResolveExtractDestination(_currentArchivePath);
+        if (dest != null)
+            await ExtractSelectedAsync(items, dest);
+    }
+
     private async void SmartExtract_Click(object sender, RoutedEventArgs e)
     {
         if (string.IsNullOrEmpty(_currentArchivePath)) return;
