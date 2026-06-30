@@ -18,6 +18,19 @@
 
 ## 版本历史（从新到旧）
 
+### v0.4.3+ (2026-06-30) 魔数检测预览系统 Phase 1+2 完成
+
+1. **新功能：魔数检测文件真实格式** — `preview-magic-detection.md`（全部 44 项任务完成）
+   - **Phase 1 — Core**：`FileFormatDetector`（35+ 魔数签名 + ZIP 子类型 + PE 双重验证）
+   - `ExtractHeadAsync`/`ExtractHeadTailAsync`：压缩包条目头部/尾部字节提取，支持 ZIP Deflate/Store、7z 固态降级、RAR
+   - MP4 moov box 解析：mvhd 时长 + tkhd 分辨率
+   - `FileFormatHelper`：90+ 格式中文显示名
+   - `PreviewHeadSize` 设置（默认 4096）
+   - **Phase 2 — UI（WPF）**：在 `ShowPreviewAsync` 中插入魔数检测，`PreviewHeader` 显示真实格式名（如 `📄 file.dat → JPEG 图像`）
+   - `AppSettings.EnableFormatDetection` 开关（默认 true）
+2. 新建文件：`FileFormatDetector.cs`（571 行）、`FileFormatHelper.cs`（95 行）
+3. 修改文件：`FileFormatInfo.cs`（追加 11 枚举值）、`ArchiveEntryExtractor.cs`（+224 行）、`AppSettings.cs`、`MainWindow.Preview.cs`
+
 ### v0.4.3+ (2026-06-29) 预览系统计划更新（Avalonia 方向 + 快速预览模式）
 
 1. **新计划：Avalonia 预览机会分析** — `preview-avalonia-opportunities.md`
