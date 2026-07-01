@@ -1,6 +1,6 @@
 # 魔数检测文件真实格式 (Magic Byte Content Detection)
 
-> **状态**: ✅ Phase 1 完成 / ✅ Phase 2 完成 / 📋 Phase P1(TextSubtype) 待实现 | **Phase 1 (Core)**: [✅✅✅✅] (4/4) | **Phase 2 (UI)**: [✅✅✅] (3/3) implemented in WPF | **Phase P1 (TextSubtype)**: [⬜] (0/1) | **总进度**: (7/8)
+> **状态**: ✅ Phase 1 完成 / ✅ Phase 2 完成 / ✅ Phase P1(TextSubtype) 完成 | **Phase 1 (Core)**: [✅✅✅✅✅] (5/5) | **Phase 2 (UI)**: [✅✅✅] (3/3) implemented in WPF | **Phase P1 (TextSubtype)**: [✅] (1/1) | **总进度**: (9/9)
 
 **⚠️ 两阶段拆分**：
 
@@ -548,9 +548,9 @@ if (FileFormatDetector.Detect(head) == FileFormat.Mp4 && tail != null)
 - [x] moov box 解析：时长 (mvhd) + 分辨率 (tkhd)
 - **文件**: `Core/Utils/ArchiveEntryExtractor.cs`
 
-#### P1-S5: 文本子类型检测 [⬜] (0/1)
+#### P1-S5: 文本子类型检测 [✅] (1/1)
 
-- [ ] `DetectTextSubtype(string)` — HTML/XML/JSON/Markdown/CSV/INI 内容启发式区分
+- [x] `DetectTextSubtype(string)` — HTML/XML/JSON/Markdown/CSV/INI 内容启发式区分
 - **文件**: `Core/Utils/FileFormatDetector.cs`
 - 在魔数未命中 + `LooksLikeText()` 时调用，替代直接返回 `Text`
 - `TryMagicPreview` 新增 `Html`/`Markdown`/`Csv`/`Json`/`Xml`/`Ini` case，路由到现有预览方法
@@ -663,11 +663,11 @@ var metadata = GetPdfMetadata(tempHeadFile);  // 或其它格式的元数据方�
 - [x] WPF 版 `dotnet build` 通过（0 errors）+ 测试通过（233/234，1 个预存失败无关）
 - [x] 📌 Avalonia 移植时需在 `MainWindow.Preview.cs` 做等同集成（未来任务标记）
 
-### Phase P1 — Text Subtype Detection 📋 待实现
+### Phase P1 — Text Subtype Detection ✅ 完成
 
-- [ ] `FileFormatDetector.DetectTextSubtype()` — 文本子类型启发式判别（HTML/XML/JSON/Markdown/CSV/INI）
-- [ ] `TryMagicPreview` 新增对应 case，路由到现有预览方法
-- [ ] 扩展名回退场景下也能享受子类型路由
+- [x] `FileFormatDetector.DetectTextSubtype()` — 文本子类型启发式判别（HTML/XML/JSON/Markdown/CSV/INI）
+- [x] `TryMagicPreview` 新增对应 case，路由到现有预览方法
+- [x] 扩展名回退场景下也能享受子类型路由
 
 ### Final Checklist
 
@@ -679,5 +679,5 @@ var metadata = GetPdfMetadata(tempHeadFile);  // 或其它格式的元数据方�
 - [x] MP4 正确解析时长/分辨率（ExtractHeadTailAsync moov box 解析已实现）
 - [x] `EnableFormatDetection = false` 时完全回退到扩展名流程
 - [x] 取消/切换文件时无异常（OperationCanceledException 正确处理）
-- [ ] 文本子类型检测识别 HTML/XML/JSON/Markdown/CSV/INI
-- [ ] HTML/Markdown 子类型路由到 WebView2 渲染预览，CSV 路由到表格预览
+- [x] 文本子类型检测识别 HTML/XML/JSON/Markdown/CSV/INI
+- [x] HTML/Markdown 子类型路由到 WebView2 渲染预览，CSV 路由到表格预览

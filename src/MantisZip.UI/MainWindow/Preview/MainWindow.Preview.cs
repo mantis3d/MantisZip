@@ -628,6 +628,40 @@ public partial class MainWindow
                     await ShowHtmlPreview(webFile, item);
                 return true;
 
+            // ── CSV ──
+            case FileFormat.Csv:
+                if (!s.EnableTextPreview)
+                {
+                    ShowUnsupportedPreview(item, L.T(L.Preview_TextDisabled));
+                    return true;
+                }
+                if (item.Size > s.MaxTextPreviewBytes)
+                {
+                    var limitMb = s.MaxTextPreviewBytes / (1024.0 * 1024.0);
+                    ShowUnsupportedPreview(item, L.TF(L.Preview_TooLargeText, (double)item.Size / 1024 / 1024, limitMb));
+                    return true;
+                }
+                var csvFile = await ExtractPreviewFileAsync(item, "preview.csv", ct);
+                ShowCsvPreview(csvFile, item);
+                return true;
+
+            // ── JSON/XML/INI → 文本预览 ──
+            case FileFormat.Json or FileFormat.Xml or FileFormat.Ini:
+                if (!s.EnableTextPreview)
+                {
+                    ShowUnsupportedPreview(item, L.T(L.Preview_TextDisabled));
+                    return true;
+                }
+                if (item.Size > s.MaxTextPreviewBytes)
+                {
+                    var limitMb = s.MaxTextPreviewBytes / (1024.0 * 1024.0);
+                    ShowUnsupportedPreview(item, L.TF(L.Preview_TooLargeText, (double)item.Size / 1024 / 1024, limitMb));
+                    return true;
+                }
+                var jsonXmlIniFile = await ExtractPreviewFileAsync(item, "preview" + ext, ct);
+                ShowTextPreview(jsonXmlIniFile, ext, item);
+                return true;
+
             // ── 其他检测到的格式无专用预览方法 → 返回 false 走扩展名回退 ──
             default:
                 return false;
@@ -657,6 +691,10 @@ public partial class MainWindow
             FileFormat.Text => ".txt",
             FileFormat.Html => ".html",
             FileFormat.Markdown => ".md",
+            FileFormat.Csv => ".csv",
+            FileFormat.Json => ".json",
+            FileFormat.Xml => ".xml",
+            FileFormat.Ini => ".ini",
             // 档案格式（扩展名链回退）
             FileFormat.Torrent => ".torrent",
             FileFormat.Sqlite => ".sqlite",

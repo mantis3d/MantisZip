@@ -4,7 +4,10 @@
   "completed_at": "2026-06-30T03:00:00.000Z",
   "status": "completed",
   "session_ids": [
-    "ses_0e99dfcbaffeoMXGRjml4gj76W"
+    "ses_0e99dfcbaffeoMXGRjml4gj76W",
+    "ses_0e33e811fffeCH4Ff5x5SArXu3",
+    "ses_0e337f753ffe9eJaqljWTJUyqC",
+    "ses_0e3369c8cffee90CQQAHPJF5ck"
   ],
   "plan_name": "preview-magic-detection",
   "agent": "atlas",
@@ -25,11 +28,41 @@
     "tests": "233/234 pass (1 pre-existing unrelated failure)"
   },
   "session_origins": {
-    "ses_0e99dfcbaffeoMXGRjml4gj76W": "direct"
+    "ses_0e99dfcbaffeoMXGRjml4gj76W": "direct",
+    "ses_0e33e811fffeCH4Ff5x5SArXu3": "appended",
+    "ses_0e337f753ffe9eJaqljWTJUyqC": "appended",
+    "ses_0e3369c8cffee90CQQAHPJF5ck": "appended"
   },
   "task_sessions": {},
   "active_work_id": "preview-magic-detection-legacy",
   "ended_at": "2026-06-30T03:02:53.017Z",
   "elapsed_ms": 1613017,
-  "updated_at": "2026-06-30T03:02:53.017Z"
+  "updated_at": "2026-07-01T08:26:28.302Z",
+  "schema_version": 2,
+  "works": {
+    "preview-magic-detection-legacy": {
+      "work_id": "preview-magic-detection-legacy",
+      "active_plan": "E:\\GitHub\\MantisZip\\.sisyphus\\plans\\preview-magic-detection.md",
+      "plan_name": "preview-magic-detection",
+      "status": "completed",
+      "started_at": "2026-06-30T02:36:00.000Z",
+      "ended_at": "2026-06-30T03:02:53.017Z",
+      "elapsed_ms": 1613017,
+      "updated_at": "2026-07-01T08:26:28.302Z",
+      "session_ids": [
+        "ses_0e99dfcbaffeoMXGRjml4gj76W",
+        "ses_0e33e811fffeCH4Ff5x5SArXu3",
+        "ses_0e337f753ffe9eJaqljWTJUyqC",
+        "ses_0e3369c8cffee90CQQAHPJF5ck"
+      ],
+      "session_origins": {
+        "ses_0e99dfcbaffeoMXGRjml4gj76W": "direct",
+        "ses_0e33e811fffeCH4Ff5x5SArXu3": "appended",
+        "ses_0e337f753ffe9eJaqljWTJUyqC": "appended",
+        "ses_0e3369c8cffee90CQQAHPJF5ck": "appended"
+      },
+      "agent": "atlas",
+      "task_sessions": {}
+    }
+  }
 }
