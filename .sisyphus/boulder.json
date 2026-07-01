@@ -1,58 +1,35 @@
 {
-  "active_plan": "E:\\github\\MantisZip\\.sisyphus\\plans\\contributors-panel.md",
-  "started_at": "2026-06-29T06:46:02.725Z",
+  "active_plan": "E:\\GitHub\\MantisZip\\.sisyphus\\plans\\preview-magic-detection.md",
+  "started_at": "2026-06-30T02:36:00.000Z",
+  "completed_at": "2026-06-30T03:00:00.000Z",
+  "status": "completed",
   "session_ids": [
-    "ses_0edf489a6ffeGestPKzk0RWA6N"
+    "ses_0e99dfcbaffeoMXGRjml4gj76W"
   ],
-  "session_origins": {
-    "ses_0edf489a6ffeGestPKzk0RWA6N": "direct"
-  },
-  "plan_name": "contributors-panel",
+  "plan_name": "preview-magic-detection",
   "agent": "atlas",
-  "task_sessions": {
-    "todo:1": {
-      "task_key": "todo:1",
-      "task_label": "1",
-      "task_title": "Create CSV data files",
-      "session_id": "ses_0edde72efffeciYsjgwgN1mPox",
-      "agent": "Sisyphus-Junior",
-      "category": "quick",
-      "updated_at": "2026-06-29T06:48:03.218Z"
-    },
-    "todo:3": {
-      "task_key": "todo:3",
-      "task_label": "3",
-      "task_title": "Update AboutWindow.xaml — two contributor sections",
-      "session_id": "ses_0edda34e7ffe2KFeFsYt3kL49N",
-      "agent": "Sisyphus-Junior",
-      "category": "quick",
-      "updated_at": "2026-06-29T06:53:24.442Z"
-    },
-    "todo:4": {
-      "task_key": "todo:4",
-      "task_label": "4",
-      "task_title": "Update AboutWindow.xaml.cs — shared CSV loader for both categories",
-      "session_id": "ses_0edd811ccffeibISOD68IVJFsJ",
-      "agent": "Sisyphus-Junior",
-      "category": "quick",
-      "updated_at": "2026-06-29T06:56:56.426Z"
-    },
-    "todo:5": {
-      "task_key": "todo:5",
-      "task_label": "5",
-      "task_title": "Update tests and installer",
-      "session_id": "ses_0edd4f5e8ffersiQYuuagdovp5",
-      "agent": "Sisyphus-Junior",
-      "category": "quick",
-      "updated_at": "2026-06-29T06:57:52.255Z"
-    },
-    "final-wave:f1": {
-      "task_key": "final-wave:f1",
-      "task_label": "F1",
-      "task_title": "**Plan Compliance Audit** — `oracle`",
-      "session_id": "ses_0edb7cd4effeRcts5zN3pNl7lE",
-      "agent": "oracle",
-      "updated_at": "2026-06-29T07:30:32.358Z"
-    }
-  }
+  "summary": {
+    "phase1_core": "completed",
+    "phase2_ui": "completed",
+    "files_created": [
+      "src/MantisZip.Core/Utils/FileFormatDetector.cs",
+      "src/MantisZip.Core/Utils/FileFormatHelper.cs"
+    ],
+    "files_modified": [
+      "src/MantisZip.Core/Utils/FileFormatInfo.cs",
+      "src/MantisZip.Core/Utils/ArchiveEntryExtractor.cs",
+      "src/MantisZip.UI/AppSettings.cs",
+      "src/MantisZip.UI/MainWindow/Preview/MainWindow.Preview.cs"
+    ],
+    "build": "0 errors, 0 new warnings",
+    "tests": "233/234 pass (1 pre-existing unrelated failure)"
+  },
+  "session_origins": {
+    "ses_0e99dfcbaffeoMXGRjml4gj76W": "direct"
+  },
+  "task_sessions": {},
+  "active_work_id": "preview-magic-detection-legacy",
+  "ended_at": "2026-06-30T03:02:53.017Z",
+  "elapsed_ms": 1613017,
+  "updated_at": "2026-06-30T03:02:53.017Z"
 }

@@ -7,7 +7,7 @@
 - **技术栈**: .NET 9 + WPF + SharpCompress + SharpSevenZip
 
 ## 版本
-- **当前版本**: 0.4.3
+- **当前版本**: 0.4.4
 - **发布日期**: 2026-06-29
 
 ## 规划中
@@ -17,6 +17,22 @@
 | [跨平台移植可行性研究](.sisyphus/plans/cross-platform-port.md) | 砍 ShellExt，WPF→Avalonia，SharpSevenZip→SharpCompress/p7zip，DPAPI→AES-GCM |
 
 ## 版本历史（从新到旧）
+
+### v0.4.4 (2026-06-30) 魔数检测预览系统 Phase 1+2+3 完成
+
+1. **新功能：魔数检测文件真实格式** — `preview-magic-detection.md`（全部 44 项任务完成）
+   - **Phase 1 — Core**：`FileFormatDetector`（35+ 魔数签名 + ZIP 子类型 + PE 双重验证）
+   - `LooksLikeText()` 启发式检测：纯文本文件（无魔数签名）的兜底识别，基于 null 字节比例 + 可打印字符 + UTF-8 序列分析
+   - `ExtractHeadAsync`/`ExtractHeadTailAsync`：压缩包条目头部/尾部字节提取，支持 ZIP Deflate/Store、7z 固态降级、RAR
+   - MP4 moov box 解析：mvhd 时长 + tkhd 分辨率
+   - `FileFormatHelper`：90+ 格式中文显示名
+   - `PreviewHeadSize` 设置（默认 4096）
+   - **Phase 2 — UI（WPF）**：魔数优先路由重构（`TryMagicPreview`），将魔数检测结果写入 `PreviewExtraInfoPanel`（冲突时红色提示），扩展名回退仅作为魔数 Unknown 时的兜底
+   - **冲突检测 + 切换按钮**：魔数检测结果与扩展名不一致时，在预览工具栏两组按钮之间插入"按扩展名/按魔数"切换按钮，点击后重新预览
+   - `AppSettings.EnableFormatDetection` 开关（默认 true）
+   - **Phase 3 — ArchiveEngineFactory 魔数兜底**：`GetEngineByExtension` 在扩展名未匹配时，读取文件头部字节调用 `FileFormatDetector.Detect()` 识别真实档案格式，支持 .epub/.docx/.xlsx/.pptx 等 ZIP 子类型自动路由到 ZipEngine
+2. 新建文件：`FileFormatDetector.cs`（650+ 行）、`FileFormatHelper.cs`（95 行）
+3. 修改文件：`FileFormatInfo.cs`（追加 11 枚举值）、`ArchiveEntryExtractor.cs`（+224 行）、`AppSettings.cs`、`ArchiveEngine.cs`（+60 行魔数兜底 + 映射）、`MainWindow.Preview.cs`（+180 行魔数路由 + 冲突切换）、`MainWindow.Preview.Text.cs`（文本左对齐修复）
 
 ### v0.4.3+ (2026-06-30) 工具栏新增「解压选择文件」按钮
 

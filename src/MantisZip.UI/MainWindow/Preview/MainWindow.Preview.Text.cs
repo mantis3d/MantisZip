@@ -52,6 +52,7 @@ public partial class MainWindow
 
             PreviewTextBox.Text = content;
             PreviewTextBox.FontSize = AppSettings.Instance.TextPreviewFontSize;
+            PreviewTextBox.TextAlignment = TextAlignment.Left;
             HideAllPreviewControls();
             PreviewTextBox.Visibility = Visibility.Visible;
             SetPreviewInfo(item, L.TF(L.Preview_TextInfo, content.Length));
