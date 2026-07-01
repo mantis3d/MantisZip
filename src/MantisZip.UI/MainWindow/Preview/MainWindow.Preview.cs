@@ -408,6 +408,12 @@ public partial class MainWindow
                 var effectiveFormat = _previewFormatOverride ?? detectedFormat;
                 if (await TryMagicPreview(effectiveFormat, item, ext, ct, _previewExtFormat))
                     return;
+
+                // 魔数识别但 TryMagicPreview 无对应路由 → 将扩展名映射为魔数格式的标准扩展名，
+                // 以便走扩展名链调用对应的预览方法（如 Torrent→.torrent→ShowTorrentPreview）
+                var magicExt = MapFileFormatToExtension(effectiveFormat);
+                if (magicExt != null)
+                    ext = magicExt;
             }
 
             if (ImageExtensions.Contains(ext))
@@ -530,7 +536,7 @@ public partial class MainWindow
             }
             else
             {
-                // 扩展名未匹配任何已知格式，且魔数也未识别或不可预览
+                // 扩展名（含魔数映射回退）未匹配任何已知格式
                 ShowUnsupportedPreview(item);
             }
         }
@@ -627,6 +633,47 @@ public partial class MainWindow
             default:
                 return false;
         }
+    }
+
+    /// <summary>
+    /// 将魔数检测的 FileFormat 映射到标准扩展名，用于魔数识别后走扩展名链路由。
+    /// 返回 null 表示该格式无标准扩展名或无需走扩展名路由。
+    /// </summary>
+    private static string? MapFileFormatToExtension(FileFormat format)
+    {
+        return format switch
+        {
+            FileFormat.Torrent => ".torrent",
+            FileFormat.Sqlite => ".sqlite",
+            FileFormat.Pe => ".exe",
+            FileFormat.Pdf => ".pdf",
+            FileFormat.Ttf => ".ttf",
+            FileFormat.Otf => ".otf",
+            FileFormat.Woff => ".woff",
+            FileFormat.Wav => ".wav",
+            FileFormat.Flac => ".flac",
+            FileFormat.Mp3 => ".mp3",
+            FileFormat.Ogg => ".ogg",
+            FileFormat.Iso => ".iso",
+            FileFormat.Docx => ".docx",
+            FileFormat.Xlsx => ".xlsx",
+            FileFormat.Pptx => ".pptx",
+            FileFormat.Epub => ".epub",
+            FileFormat.Woff2 => ".woff2",
+            FileFormat.Mp4 => ".mp4",
+            FileFormat.Mkv => ".mkv",
+            FileFormat.WebM => ".webm",
+            FileFormat.Wmv => ".wmv",
+            FileFormat.Mov => ".mov",
+            FileFormat.Avi => ".avi",
+            FileFormat.Flv => ".flv",
+            FileFormat.Dicom => ".dcm",
+            FileFormat.Cer => ".cer",
+            FileFormat.Lnk => ".lnk",
+            FileFormat.Pfx => ".pfx",
+            FileFormat.Subtitle => ".srt",
+            _ => null
+        };
     }
 
     private void ShowUnsupportedPreview(ArchiveItem? item, string? message = null)
