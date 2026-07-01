@@ -33,6 +33,7 @@
    - **Phase 3 — ArchiveEngineFactory 魔数兜底**：`GetEngineByExtension` 在扩展名未匹配时，读取文件头部字节调用 `FileFormatDetector.Detect()` 识别真实档案格式，支持 .epub/.docx/.xlsx/.pptx 等 ZIP 子类型自动路由到 ZipEngine
 2. 新建文件：`FileFormatDetector.cs`（650+ 行）、`FileFormatHelper.cs`（95 行）
 3. 修改文件：`FileFormatInfo.cs`（追加 11 枚举值）、`ArchiveEntryExtractor.cs`（+224 行）、`AppSettings.cs`、`ArchiveEngine.cs`（+60 行魔数兜底 + 映射）、`MainWindow.Preview.cs`（+180 行魔数路由 + 冲突切换）、`MainWindow.Preview.Text.cs`（文本左对齐修复）
+4. **文本子类型检测已关闭**：`DetectTextSubtype()` 启发式精度不足暂禁用，代码保留，`Detect()` 中改回返回 `FileFormat.Text`
 
 ### v0.4.3+ (2026-06-30) 工具栏新增「解压选择文件」按钮
 

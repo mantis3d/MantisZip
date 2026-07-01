@@ -335,10 +335,11 @@ public static class FileFormatDetector
         }
 
         // 36. Text heuristics: if no magic matched but content looks like text, return Text
+        // NOTE: DetectTextSubtype() is implemented but disabled — heuristic quality needs improvement.
         if (LooksLikeText(head, Math.Min(length, 512)))
         {
-            CoreLog.Info("Detect: text heuristics matched, running subtype detection");
-            return DetectTextSubtype(head, length);
+            CoreLog.Info("Detect: text heuristics matched");
+            return FileFormat.Text;
         }
 
         return FileFormat.Unknown;
