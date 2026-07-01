@@ -575,7 +575,7 @@ public partial class MainWindow
                     ShowUnsupportedPreview(item, L.T(L.Preview_ImageDisabled));
                     return true;
                 }
-                var imgFile = await ExtractPreviewFileAsync(item, "preview.bin", ct);
+                var imgFile = await ExtractPreviewFileAsync(item, "preview" + ext, ct);
                 await ShowImagePreviewAsync(imgFile, item);
                 return true;
 
@@ -642,6 +642,22 @@ public partial class MainWindow
     {
         return format switch
         {
+            // 图像
+            FileFormat.Png => ".png",
+            FileFormat.Jpeg => ".jpg",
+            FileFormat.Gif => ".gif",
+            FileFormat.Bmp => ".bmp",
+            FileFormat.WebP => ".webp",
+            FileFormat.Ico => ".ico",
+            FileFormat.Tga => ".tga",
+            FileFormat.Hdr => ".hdr",
+            FileFormat.Exr => ".exr",
+            FileFormat.Svg => ".svg",
+            // 文本/标记
+            FileFormat.Text => ".txt",
+            FileFormat.Html => ".html",
+            FileFormat.Markdown => ".md",
+            // 档案格式（扩展名链回退）
             FileFormat.Torrent => ".torrent",
             FileFormat.Sqlite => ".sqlite",
             FileFormat.Pe => ".exe",
