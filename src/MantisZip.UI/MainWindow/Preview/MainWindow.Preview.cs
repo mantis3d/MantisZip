@@ -278,8 +278,8 @@ public partial class MainWindow
     private async Task ShowPreviewAsync(ArchiveItem item)
     {
         _currentPreviewItem = item;
-        // 新文件选择时重置格式覆盖状态（避免切换文件后仍沿用之前的切换选择）
-        _previewFormatOverride = null;
+        // 格式覆盖由调用方（SelectionChanged/菜单）在文件切换时重置。
+        // 冲突切换按钮的 OnClick 调用 ShowPreviewAsync 时保留覆盖状态。
         _toolbarConflictButtons = null;
         // 取消并释放上一次的 CancellationTokenSource，避免资源泄漏
         if (_previewCts != null)
