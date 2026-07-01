@@ -354,7 +354,7 @@ public partial class MainWindow
             // 各格式方法控制自己的标题，魔数结果放到信息栏
             PreviewHeader.Text = $"📄 {item.Name}";
 
-            // 魔数结果写到信息栏（格式方法若调用 SetFormatSpecificInfo 会覆盖此行，是预期行为）
+            // 魔数结果写到信息栏（SetFormatSpecificInfo 不再 Clear，此行会保留在信息栏顶部）
             _previewExtFormat = FileFormat.Unknown;
             if (realFormatName != null)
             {
@@ -1160,9 +1160,11 @@ public partial class MainWindow
         }
     }
 
+    /// <summary>
+    /// 设置格式专有信息。不清除已有行（魔数"格式:"行由 ShowPreviewAsync 在顶部清除后添加）。
+    /// </summary>
     private void SetFormatSpecificInfo(params (string label, string value)[] items)
     {
-        PreviewExtraInfoPanel.Children.Clear();
         if (items.Length == 0)
         {
             PreviewExtraInfoPanel.Visibility = Visibility.Collapsed;
