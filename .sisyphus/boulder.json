@@ -1,40 +1,35 @@
 {
-  "active_plan": "E:\\github\\MantisZip\\.sisyphus\\plans\\installer-dotnet-autodownload.md",
-  "started_at": "2026-07-01T07:42:37.079Z",
+  "active_plan": "E:\\GitHub\\MantisZip\\.sisyphus\\plans\\preview-magic-detection.md",
+  "started_at": "2026-06-30T02:36:00.000Z",
+  "completed_at": "2026-06-30T03:00:00.000Z",
+  "status": "completed",
   "session_ids": [
-    "ses_0e36d8593ffemR226K4QhfLSyz",
-    "ses_0e359eae5ffeyGuhmUNNbfP5xV",
-    "ses_0e359e4d6ffeROMCgmWcnzADLt",
-    "ses_0e359d7a6ffeqR72aaBX0B93R5",
-    "ses_0e359cdd0ffe9J7RwyAatD68RH"
+    "ses_0e99dfcbaffeoMXGRjml4gj76W"
   ],
-  "session_origins": {
-    "ses_0e36d8593ffemR226K4QhfLSyz": "direct",
-    "ses_0e359eae5ffeyGuhmUNNbfP5xV": "appended",
-    "ses_0e359e4d6ffeROMCgmWcnzADLt": "appended",
-    "ses_0e359d7a6ffeqR72aaBX0B93R5": "appended",
-    "ses_0e359cdd0ffe9J7RwyAatD68RH": "appended"
-  },
-  "plan_name": "installer-dotnet-autodownload",
+  "plan_name": "preview-magic-detection",
   "agent": "atlas",
-  "task_sessions": {
-    "todo:1": {
-      "task_key": "todo:1",
-      "task_label": "1",
-      "task_title": "修改 `installer.iss` — 添加 .NET 9 Desktop Runtime 自动下载安装",
-      "session_id": "ses_0e35ddc6effeH4yf1IOaR82KYF",
-      "agent": "Sisyphus-Junior",
-      "category": "quick",
-      "updated_at": "2026-07-01T07:45:28.733Z"
-    },
-    "final-wave:f1": {
-      "task_key": "final-wave:f1",
-      "task_label": "F1",
-      "task_title": "**Plan Compliance Audit** — `oracle`",
-      "session_id": "ses_0e359d7a6ffeqR72aaBX0B93R5",
-      "agent": "oracle",
-      "updated_at": "2026-07-01T07:48:58.592Z"
-    }
+  "summary": {
+    "phase1_core": "completed",
+    "phase2_ui": "completed",
+    "files_created": [
+      "src/MantisZip.Core/Utils/FileFormatDetector.cs",
+      "src/MantisZip.Core/Utils/FileFormatHelper.cs"
+    ],
+    "files_modified": [
+      "src/MantisZip.Core/Utils/FileFormatInfo.cs",
+      "src/MantisZip.Core/Utils/ArchiveEntryExtractor.cs",
+      "src/MantisZip.UI/AppSettings.cs",
+      "src/MantisZip.UI/MainWindow/Preview/MainWindow.Preview.cs"
+    ],
+    "build": "0 errors, 0 new warnings",
+    "tests": "233/234 pass (1 pre-existing unrelated failure)"
   },
-  "completed": true
+  "session_origins": {
+    "ses_0e99dfcbaffeoMXGRjml4gj76W": "direct"
+  },
+  "task_sessions": {},
+  "active_work_id": "preview-magic-detection-legacy",
+  "ended_at": "2026-06-30T03:02:53.017Z",
+  "elapsed_ms": 1613017,
+  "updated_at": "2026-06-30T03:02:53.017Z"
 }
