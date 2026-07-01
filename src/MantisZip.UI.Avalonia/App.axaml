@@ -177,6 +177,11 @@
       <Setter Property="TextElement.Foreground" Value="{DynamicResource ThemeTextPrimaryBrush}" />
     </Style>
 
+    <!-- TabItem.compactTab - reduced padding for dialog TabControls -->
+    <Style Selector="TabItem.compactTab">
+      <Setter Property="Padding" Value="8,4" />
+    </Style>
+
     <!-- DataGrid -->
     <Style Selector="DataGrid">
       <Setter Property="Background" Value="{DynamicResource ThemeListBgBrush}" />

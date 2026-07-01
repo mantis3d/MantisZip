@@ -52,6 +52,27 @@ public partial class CompressSettingsWindow : Window
             return file?.Path?.LocalPath;
         };
 
+        // 设置文件/文件夹选择回调
+        ViewModel.PickFiles = async () =>
+        {
+            var files = await StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+            {
+                Title = "Select files to compress",
+                AllowMultiple = true
+            });
+            return files?.Select(f => f.Path?.LocalPath).Where(p => p != null).ToList()!;
+        };
+
+        ViewModel.PickFolder = async () =>
+        {
+            var folders = await StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions
+            {
+                Title = "Select folder to compress",
+                AllowMultiple = false
+            });
+            return folders.Count >= 1 ? folders[0].Path?.LocalPath : null;
+        };
+
         // 设置关闭回调
         ViewModel.CloseAction = async (result) =>
         {

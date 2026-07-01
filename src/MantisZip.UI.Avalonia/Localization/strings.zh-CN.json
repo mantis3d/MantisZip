@@ -79,6 +79,10 @@
 
   "Compress_NItemsSelected": "已选 {0} 项",
   "Compress_NoFilesSelected": "未选择文件",
+  "Compress_AddFile": "添加文件",
+  "Compress_AddFolder": "添加文件夹",
+  "Compress_Remove": "移除",
+  "Compress_Archive_Group": "压缩选项",
   "Compress_Strength_None": "无",
   "Compress_Strength_Weak": "弱",
   "Compress_Strength_Medium": "中",

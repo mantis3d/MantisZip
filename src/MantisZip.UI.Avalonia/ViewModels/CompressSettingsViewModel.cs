@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.Collections.Specialized;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using MantisZip.Core;
@@ -13,8 +14,8 @@ namespace MantisZip.UI.Avalonia.ViewModels;
 /// </summary>
 public partial class CompressSettingsViewModel : ObservableObject
 {
-    /// <summary>源文件/目录路径列表（输入，显示用）。</summary>
-    public IReadOnlyList<string> SelectedPaths { get; }
+    /// <summary>源文件/目录路径列表（可修改，显示用）。</summary>
+    public ObservableCollection<string> SelectedPaths { get; } = new();
 
     /// <summary>本地化字符串字典，XAML 通过 {Binding LocalizedStrings[Key]} 访问。</summary>
     public Dictionary<string, string> LocalizedStrings { get; } = new();
@@ -26,6 +27,12 @@ public partial class CompressSettingsViewModel : ObservableObject
 
     /// <summary>由 View 设置的文件保存选择回调。返回选择的路径，取消返回 null。</summary>
     public Func<Task<string?>>? BrowseOutput { get; set; }
+
+    /// <summary>由 View 设置的文件选择回调。返回选择的文件路径列表，取消返回 null。</summary>
+    public Func<Task<IReadOnlyList<string>?>>? PickFiles { get; set; }
+
+    /// <summary>由 View 设置的文件夹选择回调。返回选择的路径，取消返回 null。</summary>
+    public Func<Task<string?>>? PickFolder { get; set; }
 
     /// <summary>由 View 设置的关闭回调。参数 true=确认压缩，false=取消。</summary>
     public Func<bool, Task>? CloseAction { get; set; }
@@ -153,7 +160,13 @@ public partial class CompressSettingsViewModel : ObservableObject
 
     public CompressSettingsViewModel(IReadOnlyList<string> sourcePaths)
     {
-        SelectedPaths = sourcePaths;
+        foreach (var p in sourcePaths)
+            SelectedPaths.Add(p);
+        SelectedPaths.CollectionChanged += (_, _) =>
+        {
+            OnPropertyChanged(nameof(SelectedPathsSummary));
+            UpdateAutoRules();
+        };
 
         // Populate localized strings
         LocalizedStrings["Compress_TabGeneral"] = LocalizationManager.T("Compress_TabGeneral");
@@ -164,6 +177,10 @@ public partial class CompressSettingsViewModel : ObservableObject
         LocalizedStrings["Compress_OutputPath"] = LocalizationManager.T("Compress_OutputPath");
         LocalizedStrings["Compress_OutputPlaceholder"] = LocalizationManager.T("Compress_OutputPlaceholder");
         LocalizedStrings["Compress_SourceFiles"] = LocalizationManager.T("Compress_SourceFiles");
+        LocalizedStrings["Compress_Archive_Group"] = LocalizationManager.T("Compress_Archive_Group");
+        LocalizedStrings["Compress_AddFile"] = LocalizationManager.T("Compress_AddFile");
+        LocalizedStrings["Compress_AddFolder"] = LocalizationManager.T("Compress_AddFolder");
+        LocalizedStrings["Compress_Remove"] = LocalizationManager.T("Compress_Remove");
         LocalizedStrings["Compress_Browse"] = LocalizationManager.T("Compress_Browse");
         LocalizedStrings["Compress_Password"] = LocalizationManager.T("Compress_Password");
         LocalizedStrings["Compress_PasswordPlaceholder"] = LocalizationManager.T("Compress_PasswordPlaceholder");
@@ -394,5 +411,57 @@ public partial class CompressSettingsViewModel : ObservableObject
     {
         if (CloseAction != null)
             await CloseAction(false);
+    }
+
+    // ── Source file management ──
+
+    [RelayCommand]
+    private async Task AddFiles()
+    {
+        if (PickFiles == null) return;
+        var files = await PickFiles();
+        if (files != null)
+        {
+            foreach (var f in files)
+            {
+                if (!SelectedPaths.Contains(f))
+                    SelectedPaths.Add(f);
+            }
+        }
+    }
+
+    [RelayCommand]
+    private async Task AddFolder()
+    {
+        if (PickFolder == null) return;
+        var folder = await PickFolder();
+        if (!string.IsNullOrEmpty(folder) && !SelectedPaths.Contains(folder))
+        {
+            SelectedPaths.Add(folder);
+        }
+    }
+
+    [RelayCommand]
+    private void RemoveSelected(object? selectedItem)
+    {
+        if (selectedItem is string path)
+        {
+            SelectedPaths.Remove(path);
+        }
+    }
+
+    private void UpdateAutoRules()
+    {
+        // Re-generate auto-rules from current file list
+        var extensions = SelectedPaths
+            .Select(p => Path.GetExtension(p))
+            .Where(e => !string.IsNullOrEmpty(e))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Select(e => $"*{e}")
+            .ToList();
+        if (extensions.Count > 0 && AutoGenerateRules)
+        {
+            RulesText = string.Join(", ", extensions);
+        }
     }
 }

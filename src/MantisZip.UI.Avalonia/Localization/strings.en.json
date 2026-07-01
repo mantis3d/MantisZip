@@ -79,6 +79,10 @@
 
   "Compress_NItemsSelected": "{0} item(s) selected",
   "Compress_NoFilesSelected": "No files selected",
+  "Compress_AddFile": "Add File",
+  "Compress_AddFolder": "Add Folder",
+  "Compress_Remove": "Remove",
+  "Compress_Archive_Group": "Compression Options",
   "Compress_Strength_None": "None",
   "Compress_Strength_Weak": "Weak",
   "Compress_Strength_Medium": "Medium",
