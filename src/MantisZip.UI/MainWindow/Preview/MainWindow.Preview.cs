@@ -170,7 +170,7 @@ public partial class MainWindow
     {
         _previewTempDir = Path.Combine(Path.GetTempPath(), L.T(L.App_MantisZipTitle), Guid.NewGuid().ToString());
         Directory.CreateDirectory(_previewTempDir);
-        var tempFile = Path.Combine(_previewTempDir, Path.GetFileName(item.Name) ?? fallbackName);
+        var tempFile = Path.Combine(_previewTempDir, fallbackName);
         await Core.Utils.ArchiveEntryExtractor.ExtractEntryAsync(
             _currentArchivePath!, item.Name, tempFile, _currentFormat, _currentPassword, ct);
         ct.ThrowIfCancellationRequested();
