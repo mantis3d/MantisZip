@@ -1,0 +1,1 @@
+URL: https://aka.ms/dotnet/9.0/windowsdesktop-runtime-win-x64.exe -> 301 -> https://builds.dotnet.microsoft.com/dotnet/WindowsDesktop/9.0.17/windowsdesktop-runtime-9.0.17-win-x64.exe. VALID.

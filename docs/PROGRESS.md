@@ -18,6 +18,12 @@
 
 ## 版本历史（从新到旧）
 
+### v0.4.3+ (2026-07-01) NoDotNet 安装包增强——.NET 9 自动下载
+
+1. **installer.iss 新增 .NET 9 Desktop Runtime 自动检测 + 下载安装** — 安装时自动检测注册表 `HKLM\SOFTWARE\dotnet\Setup\InstalledVersions\x64\sharedfx\Microsoft.WindowsDesktop.App`，缺失时从 `aka.ms/dotnet/9.0/windowsdesktop-runtime-win-x64.exe` 下载并静默安装 `/quiet /install /norestart`。完全复用已有 WebView2 模式（`URLDownloadToFile` + `Exec`）。失败不阻塞安装（仅记日志）。
+2. **安装包文件名重命名** — `installer.iss` 输出：`NoDotNet` → `WebSetup`（因现支持自动下载 .NET）；`installer-selfcontained.iss` 输出：`Setup` → `Offline`（自包含离线包）。感谢用户建议。
+3. **贡献者鸣谢页面更新** — `AboutWindow.xaml` 新增财务贡献者显示区。由上一轮计划（contributors-panel）完成。
+
 ### v0.4.3+ (2026-06-30) 工具栏新增「解压选择文件」按钮
 
 1. **工具栏新增「解压选择文件」按钮** — 位于「解压」与「压缩」之间，行为与右键菜单「解压到…」一致：选中文件后弹窗选择目标目录再解压。图标 📑。按钮在加载压缩包后启用。
