@@ -406,14 +406,13 @@ public partial class MainWindow
             if (detectedFormat != FileFormat.Unknown)
             {
                 var effectiveFormat = _previewFormatOverride ?? detectedFormat;
-                if (await TryMagicPreview(effectiveFormat, item, ext, ct, _previewExtFormat))
-                    return;
-
-                // 魔数识别但 TryMagicPreview 无对应路由 → 将扩展名映射为魔数格式的标准扩展名，
-                // 以便走扩展名链调用对应的预览方法（如 Torrent→.torrent→ShowTorrentPreview）
+                // 将扩展名映射为魔数格式的标准扩展名，使格式方法（工具栏、缩放、切换等）能正确识别
                 var magicExt = MapFileFormatToExtension(effectiveFormat);
                 if (magicExt != null)
                     ext = magicExt;
+                if (await TryMagicPreview(effectiveFormat, item, ext, ct, _previewExtFormat))
+                    return;
+                // TryMagicPreview 无对应路由 → 继续走扩展名链（此时 ext 已是魔数映射后的值）
             }
 
             if (ImageExtensions.Contains(ext))
