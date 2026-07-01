@@ -143,7 +143,7 @@ public enum FileFormat
     // 文档
     Pdf, Docx, Xlsx, Pptx, Epub, Mobi, Azw3,
     // 文本/标记
-    Text, Html, Markdown,
+    Text, Html, Markdown, Csv, Json, Xml, Ini,
     // 可执行
     Pe, Elf,
     // 压缩包
