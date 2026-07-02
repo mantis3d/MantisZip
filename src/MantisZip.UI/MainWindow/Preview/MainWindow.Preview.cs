@@ -351,6 +351,19 @@ public partial class MainWindow
                 }
             }
 
+            // Text 兜底时检查扩展名：如果扩展名指向已知的非纯文本格式，用扩展名结果
+            if (detectedFormat == FileFormat.Text)
+            {
+                var origExt = Path.GetExtension(item.Name);
+                var extFormat = FileFormatDetector.DetectByExtension(origExt);
+                if (extFormat != FileFormat.Unknown && extFormat != FileFormat.Text)
+                {
+                    detectedFormat = extFormat;
+                    realFormatName = FileFormatHelper.GetDisplayName(extFormat);
+                    App.LogDebug("TextSubtype fallback: using extension {0} -> {1}", origExt, detectedFormat);
+                }
+            }
+
             // 各格式方法控制自己的标题，魔数结果放到信息栏
             PreviewHeader.Text = $"📄 {item.Name}";
 
