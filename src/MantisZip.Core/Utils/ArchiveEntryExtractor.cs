@@ -72,7 +72,7 @@ public static class ArchiveEntryExtractor
         // 确保 GBK/CP437 编码的遗留 ZIP 也能正确匹配条目名
         using var archive = ZipEngine.OpenArchiveWithEncodingFallback(archivePath, password);
 
-        var entry = archive.Entries.FirstOrDefault(e => e.Key == entryName);
+        var entry = archive.Entries.FindEntry(entryName);
         if (entry == null)
         {
             throw new FileNotFoundException($"在压缩包中未找到条目: {entryName}");
@@ -104,7 +104,7 @@ public static class ArchiveEntryExtractor
             ? new SharpSevenZipExtractor(archivePath)
             : new SharpSevenZipExtractor(archivePath, password);
         // 统一路径分隔符为 /（RAR 文件可能使用 \），与 SevenZipEngine.ListEntriesAsync 保持一致
-        var entry = extractor.ArchiveFileData.FirstOrDefault(e => e.FileName.Replace('\\', '/') == entryName);
+        var entry = extractor.ArchiveFileData.FirstOrDefault(e => ArchivePath.Normalize(e.FileName) == entryName);
         if (entry.FileName == null)
         {
             throw new FileNotFoundException($"在压缩包中未找到条目: {entryName}");
@@ -237,7 +237,7 @@ public static class ArchiveEntryExtractor
         string archivePath, string entryName, int maxBytes, string? password)
     {
         using var archive = ZipEngine.OpenArchiveWithEncodingFallback(archivePath, password);
-        var entry = archive.Entries.FirstOrDefault(e => e.Key == entryName);
+        var entry = archive.Entries.FindEntry(entryName);
         if (entry == null)
             throw new FileNotFoundException($"在压缩包中未找到条目: {entryName}");
         if (entry.IsDirectory)
@@ -258,7 +258,7 @@ public static class ArchiveEntryExtractor
         SharpSevenZipExtractor extractor, string entryName, int maxBytes)
     {
         var entry = extractor.ArchiveFileData.FirstOrDefault(e =>
-            e.FileName.Replace('\\', '/') == entryName);
+            ArchivePath.Normalize(e.FileName) == entryName);
         if (entry.FileName == null)
             throw new FileNotFoundException($"在压缩包中未找到条目: {entryName}");
         if (entry.IsDirectory)
@@ -330,7 +330,7 @@ public static class ArchiveEntryExtractor
             case ArchiveFormat.Zip:
             {
                 using var archive = ZipEngine.OpenArchiveWithEncodingFallback(archivePath, password);
-                var entry = archive.Entries.FirstOrDefault(e => e.Key == entryName);
+                var entry = archive.Entries.FindEntry(entryName);
                 if (entry == null || entry.IsDirectory)
                     return null;
 
@@ -355,7 +355,7 @@ public static class ArchiveEntryExtractor
                     return null;
 
                 var entry = extractor.ArchiveFileData.FirstOrDefault(e =>
-                    e.FileName.Replace('\\', '/') == entryName);
+                    ArchivePath.Normalize(e.FileName) == entryName);
                 if (entry.FileName == null || entry.IsDirectory)
                     return null;
 
