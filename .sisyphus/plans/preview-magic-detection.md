@@ -1,6 +1,6 @@
 # 魔数检测文件真实格式 (Magic Byte Content Detection)
 
-> **状态**: ✅ Phase 1 完成 / ✅ Phase 2 Complete | **Phase 1 (Core)**: [✅✅✅✅] (4/4) | **Phase 2 (UI)**: [✅✅✅] (3/3) implemented in WPF | **总进度**: (7/7)
+> **状态**: ✅ Phase 1 完成 / ✅ Phase 2 完成 / ✅ Phase P1(TextSubtype) 完成 | **Phase 1 (Core)**: [✅✅✅✅✅] (5/5) | **Phase 2 (UI)**: [✅✅✅] (3/3) implemented in WPF | **Phase P1 (TextSubtype)**: [✅] (1/1) | **总进度**: (9/9)
 
 **⚠️ 两阶段拆分**：
 
@@ -415,6 +415,44 @@ static bool IsPe(byte[] head)
 
 ---
 
+### 文本格式子类型检测（无魔数格式的内容启发式判断）
+
+文本文件没有魔数，`LooksLikeText` 返回 `true` 后，需要对内容做进一步启发式判断区分子类型。
+
+#### 检测优先级（按特异性从高到低）
+
+| 优先级 | 检测特征 | FileFormat |
+|--------|----------|------------|
+| 1 | 首行 `<?xml ` 或 `<` + 闭合尖括号模式的高占比 | `Xml` |
+| 2 | 首非空字符为 `{` 或 `[`，末尾对应 `}` / `]` 且可通过简单平衡检查 | `Json` |
+| 3 | `<!DOCTYPE html>`、`<html`、`<head`、`<body` 等标记（大小写不敏感） | `Html` |
+| 4 | `# `、`## `、`### ` 等标题行数 > 1，或 `[]()` 链接、` ``` ` 代码块 | `Markdown` |
+| 5 | 多行（>3行）每行分隔符数量一致（逗号/制表符/分号），行数 > 3 | `Csv` |
+| 6 | `[` + `]` 节头行存在，且 `key=value` 占比高 | `Ini` |
+| 7 | 以上都不匹配 | `Text` |
+
+#### 实现
+
+在 `FileFormatDetector.cs` 新增：
+
+```csharp
+/// <summary>
+/// 对已判定为文本的内容做子类型检测（无魔数格式）。
+/// 返回 Text 表示无法进一步区分。
+/// </summary>
+public static FileFormat DetectTextSubtype(string content, int length);
+```
+
+字符串参数从 `Detect()` 的 `byte[] head` 转换而来（UTF-8/GBK 检测复用 `Ude.NetStandard` 路径）。
+
+#### 影响
+
+- `Detect()` 在魔数未命中且 `LooksLikeText()` 返回 `true` 时 → 不直接返回 `Text`，而是调用 `DetectTextSubtype()`
+- `TryMagicPreview` 的新增分支：`Html` → `ShowHtmlPreview`，`Markdown` → `ShowMarkdownPreview`，`Csv` → `ShowCsvPreview`，其余 → `ShowTextPreview`
+- 现有 `Text` case 保持不变（纯文本降级）
+
+---
+
 ## 磁数检测 + 尾读取（针对 MP4）
 
 ### 问题
@@ -509,6 +547,13 @@ if (FileFormatDetector.Detect(head) == FileFormat.Mp4 && tail != null)
 - [x] `ExtractHeadTailAsync` 的 MP4 调用策略
 - [x] moov box 解析：时长 (mvhd) + 分辨率 (tkhd)
 - **文件**: `Core/Utils/ArchiveEntryExtractor.cs`
+
+#### P1-S5: 文本子类型检测 [✅] (1/1)
+
+- [x] `DetectTextSubtype(string)` — HTML/XML/JSON/Markdown/CSV/INI 内容启发式区分
+- **文件**: `Core/Utils/FileFormatDetector.cs`
+- 在魔数未命中 + `LooksLikeText()` 时调用，替代直接返回 `Text`
+- `TryMagicPreview` 新增 `Html`/`Markdown`/`Csv`/`Json`/`Xml`/`Ini` case，路由到现有预览方法
 
 ---
 
@@ -618,6 +663,12 @@ var metadata = GetPdfMetadata(tempHeadFile);  // 或其它格式的元数据方�
 - [x] WPF 版 `dotnet build` 通过（0 errors）+ 测试通过（233/234，1 个预存失败无关）
 - [x] 📌 Avalonia 移植时需在 `MainWindow.Preview.cs` 做等同集成（未来任务标记）
 
+### Phase P1 — Text Subtype Detection ✅ 完成
+
+- [x] `FileFormatDetector.DetectTextSubtype()` — 文本子类型启发式判别（HTML/XML/JSON/Markdown/CSV/INI）
+- [x] `TryMagicPreview` 新增对应 case，路由到现有预览方法
+- [x] 扩展名回退场景下也能享受子类型路由
+
 ### Final Checklist
 
 - [x] 无扩展名的文件可识别真实格式（魔数检测走通后显示格式名）
@@ -628,3 +679,5 @@ var metadata = GetPdfMetadata(tempHeadFile);  // 或其它格式的元数据方�
 - [x] MP4 正确解析时长/分辨率（ExtractHeadTailAsync moov box 解析已实现）
 - [x] `EnableFormatDetection = false` 时完全回退到扩展名流程
 - [x] 取消/切换文件时无异常（OperationCanceledException 正确处理）
+- [x] 文本子类型检测识别 HTML/XML/JSON/Markdown/CSV/INI
+- [x] HTML/Markdown 子类型路由到 WebView2 渲染预览，CSV 路由到表格预览
