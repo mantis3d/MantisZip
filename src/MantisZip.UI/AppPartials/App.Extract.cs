@@ -551,10 +551,15 @@ public partial class App : Application
                     }
                     catch (Exception ex)
                     {
-                        Log("--extract batch: item failed ({0}): {1}", archivePath, ex.Message);
+                        // SharpSevenZip EncryptHeaders=false 的加密压缩包，错误密码抛出 "data error"
+                        var itemEngine = ArchiveEngineFactory.GetEngineByExtension(archivePath);
+                        bool isPwdError = itemEngine != null &&
+                            IsPasswordOrCorruptedDataError(ex, HasEncryptedEntries(archivePath, itemEngine));
+                        var failMsg = isPwdError ? L.T(L.App_WrongPassword) : ex.Message;
+                        Log("--extract batch: item failed ({0}): {1}", archivePath, failMsg);
                         failed++;
                         await progressWindow.Dispatcher.InvokeAsync(() =>
-                            progressWindow.UpdateBatchItemStatus(i, BatchItemStatus.Failed, ex.Message));
+                            progressWindow.UpdateBatchItemStatus(i, BatchItemStatus.Failed, failMsg));
                     }
                 }
             }
@@ -666,9 +671,9 @@ public partial class App : Application
         var appRef = Current; // capture for lambdas
         Task.Run(async () =>
         {
+            bool hasEncrypted = HasEncryptedEntries(archivePath, engine);
             try
             {
-                bool hasEncrypted = HasEncryptedEntries(archivePath, engine);
                 bool showPwd = hasEncrypted && AppSettings.Instance.ShowPasswordMatchNotification;
 
                 // 先试已保存密码
@@ -768,9 +773,14 @@ public partial class App : Application
                 CoreLog.Trace("RunExtractStatic: failed: {0}", ex.Message);
                 LogStartup($"RunExtractStatic: exception: {ex.Message}");
                 Log("--extract 失败: {0}", ex.Message);
+
+                bool isPwdError = IsPasswordOrCorruptedDataError(ex, hasEncrypted);
                 await progressWindow.Dispatcher.InvokeAsync(() =>
                 {
-                    AppMessageBox.Show(L.TF(L.App_ExtractFailed, ex.Message), L.T(L.App_ErrorTitle), MessageBoxButton.OK, MessageBoxImage.Error);
+                    if (isPwdError)
+                        AppMessageBox.Show(L.T(L.Main_Status_WrongPwd), L.T(L.App_ErrorTitle), MessageBoxButton.OK, MessageBoxImage.Error);
+                    else
+                        AppMessageBox.Show(L.TF(L.App_ExtractFailed, ex.Message), L.T(L.App_ErrorTitle), MessageBoxButton.OK, MessageBoxImage.Error);
                     appRef.Shutdown();
                 });
             }

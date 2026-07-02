@@ -36,7 +36,7 @@ public static class ArchiveStructureAnalyzer
             hasFileEntries = true;
 
             // 处理 FullPath，统一为正斜杠
-            var fullPath = item.FullPath?.Replace('\\', '/') ?? string.Empty;
+            var fullPath = ArchivePath.Normalize(item.FullPath);
             var firstSlash = fullPath.IndexOf('/');
             var root = firstSlash >= 0 ? fullPath[..firstSlash] : string.Empty;
 

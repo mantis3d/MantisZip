@@ -330,7 +330,7 @@ public class SevenZipEngine : IArchiveEngine
                     continue;
                 }
 
-                string fileName = entry.FileName.Replace('\\', '/');
+                string fileName = ArchivePath.Normalize(entry.FileName);
                 var outputPath = FileConflictHelper.GetSafePath(destinationPath, fileName);
                 var outDir = Path.GetDirectoryName(outputPath);
                 if (!string.IsNullOrEmpty(outDir) && !Directory.Exists(outDir))
@@ -513,7 +513,7 @@ public class SevenZipEngine : IArchiveEngine
                 })
                 .Select(entry =>
                 {
-                    string fileName = entry.FileName.Replace('\\', '/');
+                    string fileName = ArchivePath.Normalize(entry.FileName);
                     bool isDir = entry.IsDirectory;
 
                     return new ArchiveItem
@@ -624,7 +624,7 @@ public class SevenZipEngine : IArchiveEngine
         CoreLog.Info($"ExtractEntriesAsync: {archivePath}, {entryKeys.Count} entries -> {destinationPath}");
         var sw = Stopwatch.StartNew();
 
-        var keySet = new HashSet<string>(entryKeys.Select(k => k.Replace('\\', '/')), StringComparer.OrdinalIgnoreCase);
+        var keySet = new HashSet<string>(entryKeys.Select(k => ArchivePath.Normalize(k)), StringComparer.OrdinalIgnoreCase);
 
         EnsureLibraryPath();
 
@@ -635,7 +635,7 @@ public class SevenZipEngine : IArchiveEngine
                 : new SharpSevenZipExtractor(archivePath, password);
 
             var allEntries = extractor.ArchiveFileData.ToList();
-            int totalTarget = allEntries.Count(e => !e.IsDirectory && keySet.Contains(e.FileName.Replace('\\', '/')));
+            int totalTarget = allEntries.Count(e => !e.IsDirectory && keySet.Contains(ArchivePath.Normalize(e.FileName)));
             int processed = 0;
             var lastReportTime = DateTime.Now;
             var reportInterval = TimeSpan.FromMilliseconds(100);
@@ -644,7 +644,7 @@ public class SevenZipEngine : IArchiveEngine
             {
                 cancellationToken.ThrowIfCancellationRequested();
 
-                string fileName = entry.FileName.Replace('\\', '/');
+                string fileName = ArchivePath.Normalize(entry.FileName);
 
                 // 只提取请求的条目
                 if (!keySet.Contains(fileName))
@@ -767,10 +767,10 @@ public class SevenZipEngine : IArchiveEngine
                        ? new SharpSevenZipExtractor(archivePath)
                        : new SharpSevenZipExtractor(archivePath, password))
             {
-                var deletedSet = new HashSet<string>(entryPaths.Select(p => p.Replace('\\', '/')));
+                var deletedSet = new HashSet<string>(entryPaths.Select(p => ArchivePath.Normalize(p)));
                 foreach (var entry in extractor.ArchiveFileData)
                 {
-                    var normalized = entry.FileName.Replace('\\', '/');
+                    var normalized = ArchivePath.Normalize(entry.FileName);
                     if (!deletedSet.Contains(normalized))
                     {
                         keepEntries.Add((normalized, entry.IsDirectory));
@@ -798,7 +798,7 @@ public class SevenZipEngine : IArchiveEngine
                 {
                     // 建立 fileName → ArchiveFileInfo 索引
                     var entryMap = extractor.ArchiveFileData
-                        .ToDictionary(e => e.FileName.Replace('\\', '/'), e => e, StringComparer.OrdinalIgnoreCase);
+                        .ToDictionary(e => ArchivePath.Normalize(e.FileName), e => e, StringComparer.OrdinalIgnoreCase);
 
                     int total = keepEntries.Count;
                     int processed = 0;

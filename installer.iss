@@ -21,7 +21,7 @@ DefaultDirName={autopf}\{#MyAppName}
 DisableProgramGroupPage=yes
 LicenseFile=LICENSE
 OutputDir=installer
-OutputBaseFilename=MantisZip-{#MyAppVersion}-Setup-NoDotNet
+OutputBaseFilename=MantisZip-{#MyAppVersion}-Setup-WebSetup
 Compression=lzma
 SolidCompression=yes
 WizardStyle=modern
@@ -114,6 +114,8 @@ Filename: "{app}\{#MyAppExeName}"; Parameters: "--uninstall-assoc"; Flags: runhi
 const
   WebView2RegKey = 'SOFTWARE\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}';
   EvergreenBootstrapperUrl = 'https://go.microsoft.com/fwlink/p/?LinkId=2124703';
+  DotNet9RegKey = 'SOFTWARE\dotnet\Setup\InstalledVersions\x64\sharedfx\Microsoft.WindowsDesktop.App';
+  DotNet9RuntimeUrl = 'https://aka.ms/dotnet/9.0/windowsdesktop-runtime-win-x64.exe';
 
 var
   // Custom wizard page controls
@@ -345,6 +347,41 @@ begin
     Result := RegQueryStringValue(HKLM32, WebView2RegKey, 'pv', version);
 end;
 
+// Check if .NET 9 Desktop Runtime is already installed.
+// Checks for any subkey starting with "9." under the WindowsDesktop.App registry path.
+function IsDotNet9Installed: Boolean;
+var
+  subkeys: TArrayOfString;
+  i: Integer;
+begin
+  Result := False;
+  // 64-bit view (HKLM)
+  if RegGetSubkeyNames(HKLM, DotNet9RegKey, subkeys) then
+  begin
+    for i := 0 to GetArrayLength(subkeys) - 1 do
+    begin
+      if Copy(subkeys[i], 1, 2) = '9.' then
+      begin
+        Result := True;
+        Exit;
+      end;
+    end;
+  end;
+  // 32-bit (WOW6432Node) view
+  if not Result then
+    if RegGetSubkeyNames(HKLM32, DotNet9RegKey, subkeys) then
+    begin
+      for i := 0 to GetArrayLength(subkeys) - 1 do
+      begin
+        if Copy(subkeys[i], 1, 2) = '9.' then
+        begin
+          Result := True;
+          Exit;
+        end;
+      end;
+    end;
+end;
+
 // Download file via URLMon (built-in Windows API, no extra DLLs needed)
 function URLDownloadToFile(pCaller: Cardinal; szURL: string; szFileName: string; dwReserved: Cardinal; lpfnCB: Cardinal): Integer;
   external 'URLDownloadToFileW@urlmon.dll stdcall';
@@ -362,7 +399,31 @@ var
 begin
   if CurStep = ssPostInstall then
   begin
-    // 在复制文件完成后安装 WebView2 Runtime（避免阻塞文件安装进度条）
+    // 1. First: .NET 9 Desktop Runtime (more critical — app won't start without it)
+    if not IsDotNet9Installed then
+    begin
+      BootstrapperPath := ExpandConstant('{tmp}\dotnet-runtime-9.0-win-x64.exe');
+      Log('.NET 9 Desktop Runtime not found. Downloading...');
+      if URLDownloadToFile(0, DotNet9RuntimeUrl, BootstrapperPath, 0, 0) = 0 then
+      begin
+        Log('Downloaded .NET 9 bootstrapper. Installing silently...');
+        if Exec(BootstrapperPath, '/quiet /install /norestart', '', SW_SHOW, ewWaitUntilTerminated, ResultCode) then
+        begin
+          if ResultCode = 0 then
+            Log('.NET 9 Desktop Runtime installed successfully.')
+          else
+            Log('.NET 9 Desktop Runtime installer exited with code: ' + IntToStr(ResultCode));
+        end
+        else
+          Log('Failed to launch .NET 9 bootstrapper.');
+      end
+      else
+        Log('Failed to download .NET 9 bootstrapper. User may need to install manually.');
+    end
+    else
+      Log('.NET 9 Desktop Runtime is already installed.');
+
+    // 2. Then: WebView2 Runtime（避免阻塞文件安装进度条）
     if not IsWebView2Installed then
     begin
       BootstrapperPath := ExpandConstant('{tmp}\MicrosoftEdgeWebview2Setup.exe');

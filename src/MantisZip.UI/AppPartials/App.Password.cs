@@ -20,6 +20,40 @@ namespace MantisZip.UI;
 public partial class App : Application
 {
     /// <summary>
+    /// 判断 QuickVerifyPassword 的结果是否可信，用于自动匹配已保存密码。
+    /// 对 EncryptHeaders=false 的 7z/RAR，QuickVerifyPassword 对所有密码都返回 true
+    /// （ArchiveFileData 不需要密码即可读取），因此不可信，应跳过自动匹配。
+    /// </summary>
+    internal static bool CanTrustQuickVerify(string archivePath, IArchiveEngine engine)
+    {
+        // 只有 SharpSevenZip 引擎存在此问题
+        if (engine is SevenZipEngine)
+        {
+            try
+            {
+                using var extractor = new SharpSevenZipExtractor(archivePath);
+                var afd = extractor.ArchiveFileData;
+                // ArchiveFileData 成功 → EncryptHeaders=false
+                // 如果有加密条目则无法验证密码 → 不可信
+                bool hasEncrypted = afd.Any(e => !e.IsDirectory && e.Encrypted);
+                if (hasEncrypted)
+                {
+                    LogDebug("CanTrustQuickVerify: 7z/RAR EncryptHeaders=false with encrypted entries, cannot trust QuickVerify");
+                    return false;
+                }
+                // 无加密条目 → 不需要密码
+                return true;
+            }
+            catch
+            {
+                // ArchiveFileData 抛出异常 → EncryptHeaders=true → 密码验证可靠
+                return true;
+            }
+        }
+        return true;
+    }
+
+    /// <summary>
     /// 从已保存密码中匹配并快速验证。返回 (密码, 描述) 或 null。
     /// limitReached 表示匹配到的密码超过上限（防暴力破解），已截断。
     /// </summary>
@@ -27,6 +61,15 @@ public partial class App : Application
         string archivePath, IArchiveEngine engine, ProgressWindow? progressWindow,
         bool showPwdSection, out bool limitReached)
     {
+        // 对不可信引擎跳过已保存密码自动匹配（如 EncryptHeaders=false 的 7z/RAR），
+        // 避免 QuickVerifyPassword 误判导致错误密码被标记为"匹配"。
+        if (!CanTrustQuickVerify(archivePath, engine))
+        {
+            LogDebug("TryMatchPassword: QuickVerify not trusted for this archive, skipping saved password matching");
+            limitReached = false;
+            return null;
+        }
+
         const int maxAttempts = 100;
         var allMatches = PasswordManager.Instance.FindMatchingPasswords(archivePath);
         limitReached = allMatches.Count > maxAttempts;
@@ -205,8 +248,10 @@ public partial class App : Application
     }
 
     /// <summary>
-    /// 快速验证密码是否正确——读第一个加密条目 1 字节，
-    /// 密码不对时 SharpCompress / SharpSevenZipExtractor 会在读字节前抛异常。
+    /// 快速验证密码是否正确——读第一个加密条目 1 字节（ZIP），
+    /// 或检查能否用密码打开压缩包（7z）。
+    /// 对于 EncryptHeaders=false 的 7z 压缩包，仅检查 ArchiveFileData 是否可读，
+    /// 密码的真正验证将延迟到实际解压/预览时进行。
     /// 只捕获密码相关异常，系统级错误向上传播。
     /// </summary>
     internal static bool QuickVerifyPassword(string archivePath, string password, IArchiveEngine engine)
@@ -240,6 +285,16 @@ public partial class App : Application
                 var encrypted = afd.Count(e => !e.IsDirectory && e.Encrypted);
                 TraceLog("QuickVerifyPassword(7z): archive='{0}', totalEntries={1}, encrypted={2}",
                     archivePath, total, encrypted);
+
+                // SharpSevenZip 在未加密文件头（EncryptHeaders=false）时，用错误密码也能
+                // 打开并读取 ArchiveFileData，因此仅读取文件列表不足以验证密码正确性。
+                // 但如果 EncryptHeaders=true，ArchiveFileData 读取本身就会因密码错误抛异常，
+                // 被外层 catch(IsPasswordError) 捕获返回 false。
+                // 对于 EncryptHeaders=false，密码验证将延迟到实际解压/预览时进行。
+                // 届时 ExtractFile 会以 "File is corrupted. Data error has occured." 表示密码错误，
+                // UI 应将其视为密码错误并重新提示输入。
+
+                TraceLog("QuickVerifyPassword(7z): password accepted (archive opened OK) for archive='{0}'", archivePath);
                 return true;
             }
 
@@ -264,5 +319,20 @@ public partial class App : Application
         var msg = ex.Message.ToLowerInvariant();
         return msg.Contains("password") || msg.Contains("encrypted") ||
                msg.Contains("decrypt") || msg.Contains("encryption");
+    }
+
+    /// <summary>
+    /// 判断异常是否属于密码相关的错误（含 SharpSevenZip "data error"）。
+    /// SharpSevenZip 对 EncryptHeaders=false 的加密压缩包，传入错误密码时抛出
+    /// "File is corrupted. Data error has occured." 而非显式密码错误。
+    /// 当已知压缩包有加密条目时，需要将此异常视为密码错误。
+    /// </summary>
+    internal static bool IsPasswordOrCorruptedDataError(Exception ex, bool hasEncrypted)
+    {
+        if (IsPasswordError(ex)) return true;
+        if (!hasEncrypted) return false;
+        var msg = ex.Message;
+        return msg.Contains("data error", StringComparison.OrdinalIgnoreCase) ||
+               msg.Contains("corrupted", StringComparison.OrdinalIgnoreCase);
     }
 }

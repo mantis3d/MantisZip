@@ -149,7 +149,7 @@ public static class FileConflictHelper
     public static string SanitizeEntryPath(string entryPath)
     {
         // 统一分隔符
-        var segments = entryPath.Replace('\\', '/').Split('/', StringSplitOptions.RemoveEmptyEntries);
+        var segments = ArchivePath.Normalize(entryPath).Split('/', StringSplitOptions.RemoveEmptyEntries);
         var safe = new List<string>();
         foreach (var seg in segments)
         {

@@ -26,19 +26,21 @@
 在 `CompressSettingsWindow` 底部添加预估面板：
 
 ```
-┌─────────────────────────────────────────┐
-│  压缩预估值                              │
-│  ┌─────────────────────────────────┐    │
-│  │ 格式      级别   预计大小   耗时   │    │
-│  │ ─────────────────────────────── │    │
-│  │ ZIP       5      12.3 MB   ~2s  │    │
-│  │ ZIP       9      11.1 MB   ~4s  │    │
-│  │ 7z        5       8.7 MB   ~8s  │    │
-│  │ 7z        9       7.2 MB  ~15s  │    │
-│  │ Tar.gz    5      13.8 MB   ~3s  │    │
-│  └─────────────────────────────────┘    │
-│  [刷新预估]                              │
-└─────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────┐
+│  压缩预估值                                              │
+│  ┌─────────────────────────────────────────────────┐    │
+│  │ 格式   级别   预计大小             预计耗时       │    │
+│  │              标准      自适应      标准  自适应   │    │
+│  │ ─────────────────────────────────────────────── │    │
+│  │ ZIP     5    12.3 MB  10.1 MB*   ~2s   ~1s     │    │
+│  │ ZIP     9    11.1 MB  10.0 MB*   ~4s   ~1s     │    │
+│  │ 7z      5     8.7 MB   7.9 MB*   ~8s   ~3s     │    │
+│  │ 7z      9     7.2 MB   6.8 MB*  ~15s   ~4s     │    │
+│  │ Tar.gz  5    13.8 MB  11.2 MB*   ~3s   ~1s     │    │
+│  └─────────────────────────────────────────────────┘    │
+│  * 自适应压缩: image_lossy/media/archive 自动降级 Store  │
+│  [刷新预估]                                              │
+└─────────────────────────────────────────────────────────┘
 ```
 
 ### 预估策略
@@ -153,19 +155,35 @@ public static class CompressionCoefficients
 - [ ] **4. UI: `CompressSettingsWindow` 预估面板** — XAML 布局 + 数据绑定
 - [ ] **5. UI: 预估交互逻辑** — 自动检测 + 刷新按钮 + 防抖 + 学习型记录 hook
 - [ ] **6. Test: 单元测试** — `CompressionEstimatorTests` + `CompressionHistoryStoreTests`
+- [ ] **7. Core: `RuntimeEstimator` 类** — 加权融合实时 ETA 算法，支持先验速度初始化
+- [ ] **8. Core: `BatchRuntimeEstimator` 类** — 批处理模式下两个层级的 ETA 计算（当前包实时 + 待处理包预估值）
+- [ ] **9. UI: `ProgressWindow` 时间信息行** — XAML 布局 + 时间格式化 + 防抖
+- [ ] **10. UI: ETA 集成逻辑** — `App.Compress.cs` / `CompressService` 传递预估数据到 ProgressWindow，批处理模式支持
+- [ ] **11. Test: `RuntimeEstimatorTests`** — 速度推算 + 加权融合 + 批处理汇总
+- [ ] **12. Core: 格式目录 FormatCatalog** — `FormatDefinition` 模型 + 内置格式注册 + 自定义格式管理 + 查询匹配
+- [ ] **13. Core+UI: 自适应规则系统** — `AdaptiveOverrideRule` + `AdaptiveLevel` 枚举 + SettingsWindow 规则编辑器 + 预设规则
+- [ ] **14. Core: 规则匹配集成** — 引擎压缩 + 预估器自适应列均按「用户规则 → 格式目录 → 内置分类」优先级查表
 
 ## 改动范围
 
-涉及 **6 个文件**：
+涉及 **13 个文件**：
 
 | 文件 | 改动 | 预估工时 |
 |------|------|---------|
 | `Core/Utils/CompressionEstimator.cs` | 🆕 新增 — 三级预估算法 | 3h |
-| `Core/Utils/CompressionHistoryStore.cs` | 🆕 新增 — 学习型预估数据库（三级 key 策略：格式+大小分桶 + JSON 持久化） | 2h |
+| `Core/Utils/CompressionHistoryStore.cs` | 🆕 新增 — 学习型预估数据库 | 2h |
+| `Core/Utils/RuntimeEstimator.cs` | 🆕 新增 — 加权融合实时 ETA + 批处理汇总 | 2h |
+| `Core/Models/FormatDefinition.cs` | 🆕 新增 — `FormatDefinition` 模型 | 15min |
+| `Core/Models/AdaptiveOverrideRule.cs` | 🆕 新增 — `AdaptiveOverrideRule` + `AdaptiveLevel` 枚举 | 30min |
+| `Core/Services/FormatCatalog.cs` | 🆕 新增 — 格式目录注册/查询/匹配 | 1h |
+| `UI/AppSettings.cs` | 新增 `CustomFormats` + `AdaptiveOverrides` 属性 + 预设默认规则初始化 | 30min |
+| `UI/SettingsWindow.xaml` + `.cs` | 格式目录列表 + 自定义格式编辑器 + 规则列表 + 规则编辑器 | 3h |
 | `UI/CompressSettingsWindow.xaml` | 添加预估面板 UI | 30min |
 | `UI/CompressSettingsWindow.xaml.cs` | 集成预估逻辑 + 刷新按钮 | 1h |
-| `UI/MainWindow.xaml.cs` | 压缩前显示预估（可选步骤） | 15min |
-| 测试项目 | `CompressionEstimatorTests` + `CompressionHistoryStoreTests` | 1h |
+| `UI/ProgressWindow.xaml` | 添加时间信息行 UI | 30min |
+| `UI/ProgressWindow.xaml.cs` | 集成 RuntimeEstimator、时间格式化、防抖 | 1.5h |
+| `UI/AppPartials/App.Compress.cs` 或 `Core/Services/CompressService.cs` | 传递预估值到 ProgressWindow | 30min |
+| 测试项目 | 全部 3 个测试文件 | 2h |
 
 **运行时依赖变更：** 无（JSON 文件写入，不需要外部数据库）
 
@@ -211,6 +229,11 @@ public class EstimateRow
     public string SizeDisplay { get; set; }  // "12.3 MB"
     public string DurationDisplay { get; set; } // "~2s"
     public bool IsRecommended { get; set; }  // 标记推荐组合
+
+    // 🆕 自适应压缩预估列
+    public string AdaptiveSizeDisplay { get; set; }     // "10.1 MB" — 启用自适应后的预估大小
+    public string AdaptiveDurationDisplay { get; set; } // "~1s" — 启用自适应后的预估耗时
+    public bool AdaptiveAvailable { get; set; }          // 当前设置是否已启用自适应模式
 }
 ```
 
@@ -240,7 +263,64 @@ double ratio = (double)compressedSampleTotal / sampleTotal;
 long estimatedSize = (long)(totalSize * ratio);
 ```
 
-`CompressSample` 使用 `MemoryStream` + 对应的引擎流（`ZipOutputStream` / 模拟），只压缩到内存，不写磁盘。
+`CompressSample` 使用 `MemoryStream` + 对应引擎的写入器，只压缩到内存，不写磁盘。各格式实现：
+
+- **ZIP**：`SharpCompress.Writers.Zip.ZipWriter` + `MemoryStream`
+- **7z**：`SharpSevenZipCompressor` + `MemoryStream`（SharpSevenZip 通过 COM 绑定 7z.dll，支持纯内存压缩）
+- **Tar/Gz**：`SharpCompress.Writers.Tar.TarWriter` + 可选 `GZipStream` 包装 `MemoryStream`
+
+### 自适应感知预估 (Adaptive-Aware Estimation)
+
+当用户在设置中启用了自适应压缩时（设置 → 压缩 → 自适应压缩级别），预估值需要反映自适应压缩的实际效果——部分文件会被自动降级为 Store（级别 0）。
+
+**核心逻辑**：
+
+```
+EstimateAllAsync → 对每行（格式×级别）计算两组值:
+  标准值:  所有文件按选定级别压缩 → size_standard, duration_standard
+  自适应值: 按分类逐文件决定级别 → size_adaptive, duration_adaptive
+
+自适应值计算:
+  foreach (var path in sourcePaths)
+  {
+      var category = ClassifyByExtension(path);  // text/code/image_lossy/...
+      
+      // 自适应降级判定
+      int effectiveLevel = (category is "image_lossy" or "media" or "archive")
+          ? 0   // Store — 不压缩
+          : selectedLevel;
+      
+      size_adaptive += GetCoefficient(format, category, effectiveLevel) × fileSize;
+      duration_adaptive += GetDuration(format, category, effectiveLevel, fileSize);
+      
+      size_standard += GetCoefficient(format, category, selectedLevel) × fileSize;
+      duration_standard += GetDuration(format, category, selectedLevel, fileSize);
+  }
+```
+
+**系数扩展**：`CompressionCoefficients._rates` 需要支持按级别查表。对自适应降级的 Store(0) 级别，有以下系数：
+
+| 分类 | ZIP 系数 | 7z 系数 | Tar 系数 |
+|------|---------|---------|---------|
+| `image_lossy` Store(0) | 1.00 | 1.00 | 1.00 |
+| `media` Store(0) | 1.00 | 1.00 | 1.00 |
+| `archive` Store(0) | 1.00 | 1.00 | 1.00 |
+
+这些类型本身已经是压缩格式，Store 不压缩 ≈ 保持原大小。对其他分类（`text`/`code`/`image_lossless`/`binary`），自适应不会降级，所以系数与选定级别一致。
+
+**耗时预估**：自适应降级为 Store 后，耗时大幅降低（只做流拷贝，不做压缩计算）。经验耗时系数：
+
+| 操作 | 速度基准 |
+|------|---------|
+| 标准压缩（级别 5） | ~50 MB/s (ZIP), ~10 MB/s (7z) |
+| Store（级别 0） | ~500 MB/s (磁盘 I/O 限速) |
+
+当 `image_lossy`/`media`/`archive` 文件占比较高时，自适应耗时显著低于标准耗时。
+
+**UI 联动**：
+- `EstimateRow.AdaptiveAvailable` 根据 `AppSettings` 当前的自适应压缩级别设置决定
+- 如果自适应设置为「禁用」，则 `AdaptiveAvailable = false`，表格中自适应列隐藏或置灰
+- 如果自适应设置为「仅已知格式」或「智能检测」，自适应列正常显示
 
 ### 显示时机
 
@@ -320,7 +400,7 @@ CompressionHistoryStore.Record(
 | 风险 | 等级 | 对策 |
 |------|------|------|
 | 采样低估误差（前 1MB 可压但后面不可压） | 🟡 | 备注说明「预估值仅供参考」；加粗误差范围 |
-| 7z 采样需调 7z.exe，无法纯内存 | 🟡 | 7z 的采样回退到经验公式；或只对 ZIP/Tar 做实际采样 |
+| ~~7z 采样需调 7z.exe，无法纯内存~~ | ✅ 已解决 | SharpSevenZip（COM 绑定 7z.dll）支持 `MemoryStream` 输出，7z 纯内存采样可行 |
 | 超大文件源（TB 级），扫描耗时 | 🟢 | 限制扫描文件数（默认 10000）；超大文件跳过采样 |
 | 预估耗时本身太长 | 🟢 | 默认仅快速模式；标准模式需用户手动触发 |
 
@@ -381,6 +461,152 @@ CompressionHistoryStore.Record(
 - **合并相邻桶**：S 桶 + M 桶累计 ≥ 3 但各自 < 3 时，合并 SM 区间临时取平均
 
 **数据清理**：同现有设计，每 key 保留最近 20 条。
+
+---
+
+## 运行时预估 (Runtime ETA)
+
+> 压缩过程中，在进度条区域实时显示预计剩余时间和总时间。
+> **依赖**: `CompressionEstimator` 的预估值做初始速度加权
+
+### 用户界面
+
+在 `ProgressWindow` 的进度条下方、按钮上方，新增一条时间信息行：
+
+```
+┌─────────────────────────────────────┐
+│  正在压缩: 照片.zip                   │
+│  ████████████████░░░░░  72%          │  ← 文件进度条
+│  ████████████████████░  85%          │  ← 总体进度条
+│  ⏱ 已用 1:23 · 剩余 0:32 · 共 1:55  │  ← 🆕 时间信息行
+│  📦 2 / 3 个压缩包                    │  ← 文件计数
+└─────────────────────────────────────┘
+```
+
+批处理模式下显示两行：
+
+```
+│  📦 当前包: 已用 1:23 · 剩余 0:32 · 共 1:55          │
+│  📋 全部:   已用 1:23 · 预估剩余 4:15 · 共 5:38      │
+```
+
+### 核心算法：加权融合
+
+```csharp
+public class RuntimeEstimator
+{
+    private readonly DateTime _startTime = DateTime.UtcNow;
+    private readonly long _totalBytes;
+    private readonly double _initialSpeed;  // 来自 CompressionEstimator 的先验速度
+
+    private long _lastProcessedBytes;
+    private DateTime _lastUpdateTime;
+    private double _blendedSpeed;
+
+    // 加权融合:
+    //   前 5 秒: blendedSpeed = initialSpeed × (1-w) + realSpeed × w
+    //   5 秒后:  blendedSpeed ≈ realSpeed (w → 1)
+    public TimeSpan? GetEstimatedRemaining(long processedBytes)
+    {
+        var elapsed = DateTime.UtcNow - _startTime;
+        double realSpeed = elapsed.TotalSeconds > 0
+            ? processedBytes / elapsed.TotalSeconds
+            : 0;
+
+        // weight 从 0 线性增长到 1，5 秒 stabilization
+        double weight = Math.Min(1.0, elapsed.TotalSeconds / 5.0);
+        _blendedSpeed = realSpeed * weight + _initialSpeed * (1 - weight);
+
+        if (_blendedSpeed <= 0) return null;
+
+        long remaining = _totalBytes - processedBytes;
+        return TimeSpan.FromSeconds(remaining / _blendedSpeed);
+    }
+
+    public TimeSpan Elapsed => DateTime.UtcNow - _startTime;
+    public TimeSpan EstimatedTotal => Elapsed + (GetEstimatedRemaining(...) ?? TimeSpan.Zero);
+}
+```
+
+**`_initialSpeed` 来源**：
+- `CompressionEstimator.StandardEstimateAsync` 返回的 `EstimatedDuration` 推算出预期速度
+- 若未运行预估值（用户未点刷新），使用 `QuickEstimate` 的经验系数 × 文件大小估算
+
+### 先验速度的获取与传输
+
+```csharp
+// CompressService 启动时传递预估数据
+var estimate = await CompressionEstimator.EstimateAllAsync(sourcePaths);
+var initialSpeed = estimate.AverageTotalBytes / estimate.AverageDuration.TotalSeconds;
+
+// 通过新类传递到 ProgressWindow
+var runtimeEstimator = new RuntimeEstimator(totalBytes: estimate.TotalSize, initialSpeed);
+```
+
+`RuntimeEstimator` 实例由 `CompressService`（或 `App.Compress.cs`/`App.Extract.cs`）创建，传递给 `ProgressWindow`。
+
+### ArchiveProgress 扩展
+
+`ArchiveProgress` 增加一个可选字段，用于引擎报告更精确的进度预估值（如 7z 引擎知道整个压缩包的总输入大小）：
+
+```csharp
+public class ArchiveProgress
+{
+    // ... 现有字段 ...
+
+    /// <summary>压缩引擎预估的剩余时间（可选），由 RuntimeEstimator 在 UI 层计算后填入显示。</summary>
+    // 注：此字段不由引擎设置，由 ProgressWindow 的 RuntimeEstimator 在 UI 层计算
+}
+```
+
+实际上 `RuntimeEstimator` 在 UI 层运行即可，无需引擎参与。`ArchiveProgress` 已有 `TotalBytes`/`ProcessedBytes`，`RuntimeEstimator` 只需这两个值 + `_startTime` + `_initialSpeed`。
+
+### 批处理模式时间预估
+
+批处理模式下，需要维护两个层级的 `RuntimeEstimator`：
+
+```
+BatchRuntimeEstimator
+├── _currentArchiveEstimator: RuntimeEstimator  // 当前包的实时 ETA
+├── _pendingArchives: List<ArchivePreEstimate>  // 待处理包的预估值
+└── GetRemaining():
+      currentArchiveRemaining = _currentArchiveEstimator.GetEstimatedRemaining(...)
+      pendingArchivesTotal = _pendingArchives.Sum(p => p.estimatedDuration)
+      totalRemaining = currentArchiveRemaining + pendingArchivesTotal
+```
+
+**`ArchivePreEstimate` 数据模型**：
+
+```csharp
+public class ArchivePreEstimate
+{
+    public string ArchiveName { get; set; }
+    public long TotalBytes { get; set; }
+    public TimeSpan EstimatedDuration { get; set; }  // 来自 CompressionEstimator
+}
+```
+
+**显示**：
+- 当前包剩余时间：用 `_currentArchiveEstimator` 的实时速度推算
+- 全部剩余时间 = 当前包剩余 + 待处理包的预估时间之和
+
+### 显示防抖
+
+- ETA 文本更新频率：每 **1 秒**刷新一次（不需要和进度条一样快）
+- 前 3 秒显示 `"估算中..."` 避免初始闪烁
+- 剩余时间 < 5 秒时显示 `"即将完成"` 而非 `"剩余 0:03"`
+- 暂停时显示 `"已暂停"`，恢复后继续
+
+### 时间格式化
+
+```csharp
+public static string FormatTimeSpan(TimeSpan ts)
+{
+    if (ts.TotalHours >= 1)
+        return $"{(int)ts.TotalHours}:{ts.Minutes:D2}:{ts.Seconds:D2}";  // 1:23:45
+    return $"{ts.Minutes}:{ts.Seconds:D2}";  // 23:45
+}
+```
 
 ---
 
@@ -447,20 +673,25 @@ JPG/PNG/MP4/ZIP/7z 等已压缩格式，使用高压缩级别几乎不减小体�
 **`FileFormat` → `CompressionCoefficients` 映射表**（主路径使用）：
 
 ```
-FileFormat 枚举值                             CompressionCoefficients 分类
-────────────────────────                    ────────────────────────
-Jpeg, WebP                                  → image_lossy (压不动, 压缩率 ~0.99)
-Png, Gif, Bmp, Ico, Tga, Hdr, Exr, Svg     → image_lossless (可压, 压缩率 ~0.85)
-Mp4, Mkv, WebM, Wmv, Mov, Avi, Flv         → media (压不动, 压缩率 ~1.00)
-Wav, Flac, Mp3, Ogg                         → media (已压缩, 压缩率 ~0.99)
-Zip, SevenZip, Rar, Tar, Gz, Bz2, Xz, Zstd → archive (已压缩, 压缩率 ~1.00)
-Pdf, Docx, Xlsx, Pptx, Epub                 → binary (可压, 压缩率 ~0.60)
-Pe, Elf, Cer, Pfx                           → binary (可压, 压缩率 ~0.60)
-Ttf, Otf, Woff, Woff2                       → binary (可压, 压缩率 ~0.60)
-Sqlite, Dbf, Iso                            → binary (可压, 压缩率 ~0.60)
-Torrent, Stl, Lnk, Vhd, Vmdk                → binary (可压, 压缩率 ~0.60)
-Text, Html, Markdown                        → text (高压缩比, 压缩率 ~0.15)
-Subtitle                                    → text (高压缩比, 压缩率 ~0.15)
+FileFormat 枚举值                                               CompressionCoefficients 分类
+────────────────────────                                      ────────────────────────
+Jpeg, WebP, DjVu                                              → image_lossy (压不动, 压缩率 ~0.99)
+Png, Gif, Bmp, Ico, Tga, Hdr, Exr, Svg                       → image_lossless (可压, 压缩率 ~0.85)
+Mp4, Mkv, WebM, Wmv, Mov, Avi, Flv                           → media (压不动, 压缩率 ~1.00)
+Wav, Flac, Mp3, Ogg                                           → media (已压缩, 压缩率 ~0.99)
+Zip, SevenZip, Rar, Tar, Gz, Bz2, Xz, Zstd                   → archive (已压缩, 压缩率 ~1.00)
+Pdf, Docx, Xlsx, Pptx, Epub, Mobi, Azw3                       → binary (可压, 压缩率 ~0.60)
+Odt, Ods, Odp                                                 → binary (ZIP-based OOXML 等价, 压缩率 ~0.60)
+Xps                                                           → binary (ZIP-based, 压缩率 ~0.60)
+OfficeOpenXml, OfficeLegacy                                   → binary (压缩率 ~0.60)
+Pe, Elf, Cer, Pfx                                             → binary (可压, 压缩率 ~0.60)
+Ttf, Otf, Woff, Woff2                                         → binary (可压, 压缩率 ~0.60)
+Sqlite, Dbf, Iso, Vhd, Vhdx, Vmdk, VhdLegacy, Iso9660, Udf   → binary (可压, 压缩率 ~0.60)
+Torrent, Stl, Lnk, Icl, Dicom                                 → binary (可压, 压缩率 ~0.60)
+Dxf, Step, Fbx                                                → binary (3D 格式, 可压, 压缩率 ~0.60)
+Fits, Parquet                                                 → binary (科学数据, 可压, 压缩率 ~0.60)
+Text, Html, Markdown, Rtf                                     → text (高压缩比, 压缩率 ~0.15)
+Subtitle                                                      → text (高压缩比, 压缩率 ~0.15)
 ```
 
 如果安装了 Mime-Detective 作为可选增强，其 MIME type 映射保持不变（同 `preview-magic-detection.md`）：
@@ -487,6 +718,243 @@ application/zip,...     → archive
 
 `禁用` 时行为与现在一致；`仅已知格式` 时零额外开销。
 
+### 用户自定义格式级别覆盖规则
+
+在自适应压缩基础上，用户可以创建**多条件规则**，用一条规则覆盖一组格式。
+
+核心设计分为**两层**：**格式目录**（纯数据定义） + **规则**（引用格式，设定行为）。
+
+#### 第一层：格式目录（FormatCatalog）
+
+格式目录是系统中所有已知/自定义格式的定义中心。**没有启用开关**——格式定义只是事实描述（X = 这些扩展名 + 这些魔数），不存在启用/禁用的概念。
+
+**内置格式**预加载自 `FileFormat` 枚举，不可修改删除：
+
+```
+格式 ID  显示名           扩展名                             魔数(内置)
+──────────────────────────────────────────────────────────────────
+Jpeg     JPEG 图片        .jpg .jpeg                         由 FileFormatDetector 处理
+Png      PNG 图片         .png                                由 FileFormatDetector 处理
+WebP     WebP 图片        .webp                               由 FileFormatDetector 处理
+Mp4      MP4 视频         .mp4                                由 FileFormatDetector 处理
+Mp3      MP3 音频         .mp3                                由 FileFormatDetector 处理
+Zip      ZIP 压缩包       .zip                                由 FileFormatDetector 处理
+...      ...
+```
+
+**自定义格式**用户新增，用于工作中的专有/小众格式，可设置扩展名 + 魔数 hex：
+
+```
+格式 ID  显示名           扩展名       魔数(hex)
+──────────────────────────────────────────────
+MaxFile  Max3D 场景文件   .max         1A2B3C4D...
+```
+
+```csharp
+public class FormatDefinition
+{
+    public string Id { get; set; } = "";                 // "Jpeg"
+    public string DisplayName { get; set; } = "";         // "JPEG 图片"
+    public List<string> Extensions { get; set; } = new();   // [".jpg", ".jpeg"]
+    public string? MagicHex { get; set; }                 // "FFD8FFE0" — 仅自定义格式需要
+    public bool IsBuiltIn { get; set; } = true;            // 内置不可删改
+}
+```
+
+**魔数获取方式**：UI 提供「从文件读取」按钮，用户选择一个同格式文件，程序读前 16 字节自动填入 hex。
+
+#### 第二层：规则（AdaptiveOverrideRule）
+
+规则引用格式目录中的 `Id`，不直接写扩展名。
+
+```csharp
+public class AdaptiveOverrideRule
+{
+    public string Name { get; set; } = "";                    // "图片类"
+    public List<string> FormatIds { get; set; } = new();      // ["Jpeg", "Png", "WebP"]
+    public AdaptiveLevel Level { get; set; } = AdaptiveLevel.Store;
+    public bool Enabled { get; set; } = true;
+}
+
+public enum AdaptiveLevel
+{
+    Store,          // 0
+    Fast,           // 3
+    Normal,         // 5
+    Max,            // 9
+    Global,         // 跟随全局级别
+    GlobalPlusOne,  // 全局+1（不超过9）
+    GlobalMinusOne, // 全局-1（不低于0）
+    Custom,         // 用户自定义 1-9
+}
+
+public class AppSettings
+{
+    // ... 现有字段 ...
+    public List<FormatDefinition> CustomFormats { get; set; } = new();  // 用户自建格式
+    public List<AdaptiveOverrideRule> AdaptiveOverrides { get; set; } = new();
+}
+```
+
+#### 级别解析
+
+```csharp
+int ResolveAdaptiveLevel(AdaptiveOverrideRule rule, int globalLevel) =>
+    rule.Level switch
+    {
+        AdaptiveLevel.Store          => 0,
+        AdaptiveLevel.Fast           => 3,
+        AdaptiveLevel.Normal         => 5,
+        AdaptiveLevel.Max            => 9,
+        AdaptiveLevel.Global         => globalLevel,
+        AdaptiveLevel.GlobalPlusOne  => Math.Min(9, globalLevel + 1),
+        AdaptiveLevel.GlobalMinusOne => Math.Max(0, globalLevel - 1),
+        AdaptiveLevel.Custom         => rule.CustomLevel ?? globalLevel,
+        _                            => globalLevel,
+    };
+```
+
+#### 匹配优先级
+
+```
+对每个文件 path:
+  ext = Path.GetExtension(path).ToLowerInvariant()
+  if 文件 > 64KB: 读前 16 字节 → head[]
+
+  1. 用户自定义规则（按列表顺序，第一条命中即生效）
+     foreach rule in AdaptiveOverrides:
+       if !rule.Enabled: continue
+
+       foreach fid in rule.FormatIds:
+         def = FormatCatalog.Get(fid)    // 合并内置 + 自定义
+         if def == null: continue
+
+         // 扩展名匹配（所有格式通用）
+         if ext in def.Extensions:
+           effectiveLevel = ResolveAdaptiveLevel(rule, globalLevel)
+           goto apply
+
+         // 自定义魔数匹配（仅自定义格式、>64KB 且 MagicHex 非空）
+         if def.MagicHex != null && head != null &&
+            head.Length >= def.MagicHex.Length/2 &&
+            head.Take(def.MagicHex.Length/2).SequenceEqual(HexToBytes(def.MagicHex)):
+           effectiveLevel = ResolveAdaptiveLevel(rule, globalLevel)
+           goto apply
+
+       // 内置格式命中一条即可（不需要逐个格式试魔数）
+       // 扩展名已匹配到内置格式的 def，直接生效
+
+  2. 未命中 → 走内置自适应分类
+     category = ClassifyByExtension(path)
+     if category in ("image_lossy", "media", "archive"):
+       effectiveLevel = 0   // Store
+     else:
+       effectiveLevel = globalLevel
+
+  apply: 用 effectiveLevel 处理此文件
+```
+
+**关键设计**：
+- 用户规则 **先于** 内置规则检查，优先级更高
+- 规则列表按**顺序**匹配（可拖拽排序），首条命中即生效
+- 内置格式匹配走扩展名（魔数由 `FileFormatDetector` 在内置分类阶段处理）
+- 自定义格式匹配走扩展名 + hex 魔数双重验证
+- 空规则列表时行为与无此功能完全一致，零兼容成本
+
+#### UI 设计
+
+SettingsWindow → 压缩标签页，自适应压缩级别选择器下方，分两个区域：
+
+**格式目录面板**：
+
+```
+┌─ 格式目录 ─────────────────────────────────────┐
+│  内置格式（不可删除）                              │
+│  JPEG (.jpg .jpeg)                               │
+│  PNG (.png)                                      │
+│  WebP (.webp)                                    │
+│  ...                                             │
+│                                                   │
+│  自定义格式                                         │
+│  Max3D 场景文件  .max  [1A2B3C4D...]     [✕]    │
+│  [+ 添加自定义格式]                                 │
+└──────────────────────────────────────────────────┘
+```
+
+点击 [+ 添加自定义格式] 弹出编辑器：
+
+```
+┌─ 自定义格式 ──────────────────────────────┐
+│  名称:      Max3D 场景文件                  │
+│  扩展名:    .max                            │
+│  魔数(hex): [1A2B3C4D ...         ]         │
+│             [📂 从文件读取]                  │
+│                                            │
+│  [✔ 保存]    [取消]                        │
+└────────────────────────────────────────────┘
+```
+
+**规则面板**：
+
+```
+┌─ 自适应规则 ───────────────────────────────┐
+│  ☑ 图片类     [JPEG PNG WebP Gif] → 存储   │
+│  ☑ 视频类     [MP4 MKV Avi]      → 存储   │
+│  ☐ 文档类     [PDF Docx Epub]    → 全局-1  │
+│  ☐ .max文件   [Max3D]            → 存储   │
+│  ──────────────────────────────────────── │
+│  [+ 添加规则]    [恢复默认]                │
+└────────────────────────────────────────────┘
+```
+
+规则编辑器选择格式时，直接弹出一个可选列表（内置+自定义合并展示），勾选即可。
+
+#### 预设默认规则（首次安装时填充，用户可删改）
+
+```csharp
+new AdaptiveOverrideRule
+{
+    Name = "图片类",
+    FormatIds = new() { "Jpeg", "Png", "WebP", "Bmp", "Gif", "Ico", "Tga", "Hdr", "Exr", "Svg" },
+    Level = AdaptiveLevel.Store,
+    Enabled = true,
+},
+new AdaptiveOverrideRule
+{
+    Name = "视频类",
+    FormatIds = new() { "Mp4", "Mkv", "WebM", "Wmv", "Mov", "Avi", "Flv" },
+    Level = AdaptiveLevel.Store,
+    Enabled = true,
+},
+new AdaptiveOverrideRule
+{
+    Name = "音频类",
+    FormatIds = new() { "Mp3", "Flac", "Wav", "Ogg" },
+    Level = AdaptiveLevel.Store,
+    Enabled = true,
+},
+new AdaptiveOverrideRule
+{
+    Name = "压缩包类",
+    FormatIds = new() { "Zip", "SevenZip", "Rar", "Tar", "Gz", "Bz2", "Xz", "Zstd", "Iso" },
+    Level = AdaptiveLevel.Store,
+    Enabled = true,
+},
+```
+
+#### 对预估器和引擎的影响
+
+| 组件 | 改动 |
+|------|------|
+| `FormatCatalog`（新增） | 管理内置+自定义格式定义，提供按 ID/扩展名/魔数查询 |
+| `Core/Models/FormatDefinition.cs` | 🆕 格式定义数据模型 |
+| `Core/Models/AdaptiveOverrideRule.cs` | 🆕 规则模型（`FormatIds` 引用格式 ID） |
+| `CompressionEstimator.EstimateAllAsync` | 计算自适应列时，先从规则表查级别 |
+| `ZipEngine` / `TarGzEngine` | 压缩时按文件查规则表决定最终级别 |
+| `SevenZipEngine` | 同上；按级别分组打包 |
+| `AppSettings` | 新增 `CustomFormats` + `AdaptiveOverrides` 属性 |
+| `SettingsWindow.xaml` + `.cs` | 格式目录列表 + 自定义格式编辑器 + 规则列表 + 规则编辑器 |
+
 ### 引擎改动
 
 - `ArchiveOptions` 增加 `AdaptiveCompressionLevel`（三态枚举）
@@ -503,6 +971,7 @@ application/zip,...     → archive
 
 ## Definition of Done
 
+### 压缩前预估
 - [ ] `CompressionEstimator` 三级预估算法完成
 - [ ] `CompressionCoefficients` 经验系数表覆盖所有常见文件类型
 - [ ] `CompressSettingsWindow` 预估面板 UI 完成
@@ -510,10 +979,26 @@ application/zip,...     → archive
 - [ ] 预估值不阻塞 UI（async 后台）
 - [ ] `dotnet build` 通过，`dotnet test` 通过
 
+### 运行时 ETA
+- [ ] `RuntimeEstimator` 加权融合算法完成（先验速度 + 实时速度）
+- [ ] `BatchRuntimeEstimator` 批处理双层 ETA 完成
+- [ ] `ProgressWindow` 时间信息行 UI 完成（单包 / 批处理）
+- [ ] ETA 防抖：前 3 秒「估算中」、暂停时「已暂停」、即将完成提示
+- [ ] 预估值从 CompressionEstimator → RuntimeEstimator 的传递链路打通
+
 ### Final Checklist
 
+#### 压缩前预估
 - [ ] 快速预估（经验系数）在窗口打开时自动显示
 - [ ] 标准预估（采样压缩）用户手动触发正常
 - [ ] 格式/级别变更时自动重新预估（500ms 防抖）
 - [ ] 预估面板不阻塞 UI 操作
+- [ ] 自适应感知：表格自适应列根据 AppSettings 联动显示/隐藏
+- [ ] 自适应感知：启用自适应后，image_lossy/media/archive 文件的系数正确使用 Store 级别
+- [ ] 自适应感知：耗时列也反映自适应降级后的速度提升
 - [ ] 自适应压缩级别（后续扩展）接口已预留
+
+#### 运行时 ETA
+- [ ] 压缩/解压进度窗口显示 ETA（已用时间、剩余时间、总时间）
+- [ ] 批处理模式下同时显示当前包和全部的总时间
+- [ ] 暂停时 ETA 正确暂停，恢复后续算
