@@ -3,11 +3,11 @@
              xmlns:vm="clr-namespace:MantisZip.UI.Avalonia.ViewModels"
              xmlns:models="clr-namespace:MantisZip.UI.Avalonia.Models"
              xmlns:wv2="clr-namespace:Avalonia.Controls;assembly=Avalonia.Controls.WebView"
-             x:Class="MantisZip.UI.Avalonia.Views.PreviewPanel"
-             x:DataType="vm:PreviewViewModel">
-   <Grid x:Name="PreviewRootGrid"
-         RowDefinitions="Auto,*,Auto"
-         ColumnDefinitions="*,Auto">
+              x:Class="MantisZip.UI.Avalonia.Views.PreviewPanel"
+              x:DataType="vm:PreviewViewModel">
+    <Grid x:Name="PreviewRootGrid"
+          RowDefinitions="Auto,*,Auto"
+          ColumnDefinitions="*,Auto">
     <!-- Toolbar -->
     <Border Grid.Row="0" Grid.Column="0"
             Padding="4,2"
@@ -314,32 +314,7 @@
             IsVisible="{Binding IsInfoPanelVisible}">
       <ScrollViewer Padding="10">
         <StackPanel Spacing="8">
-          <!-- File name -->
-          <TextBlock Text="{Binding FileName}" FontWeight="Bold"
-                     Foreground="{DynamicResource ThemeTextPrimaryBrush}"
-                     TextWrapping="Wrap" />
-          <Separator />
-          <!-- File info rows -->
-          <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto">
-            <TextBlock Grid.Row="0" Grid.Column="0" Text="大小:" FontWeight="SemiBold"
-                       Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
-            <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding FileSize}"
-                       Foreground="{DynamicResource ThemeTextPrimaryBrush}" Margin="8,0,0,0" />
-            <TextBlock Grid.Row="1" Grid.Column="0" Text="压缩后:" FontWeight="SemiBold"
-                       Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
-            <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding CompressedSize}"
-                       Foreground="{DynamicResource ThemeTextPrimaryBrush}" Margin="8,0,0,0" />
-            <TextBlock Grid.Row="2" Grid.Column="0" Text="压缩率:" FontWeight="SemiBold"
-                       Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
-            <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding CompressionRatio}"
-                       Foreground="{DynamicResource ThemeTextPrimaryBrush}" Margin="8,0,0,0" />
-            <TextBlock Grid.Row="3" Grid.Column="0" Text="修改日期:" FontWeight="SemiBold"
-                       Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
-            <TextBlock Grid.Row="3" Grid.Column="1" Text="{Binding ModifiedDate}"
-                       Foreground="{DynamicResource ThemeTextPrimaryBrush}" Margin="8,0,0,0" />
-          </Grid>
-          <Separator />
-          <!-- Format metadata -->
+          <!-- Format metadata (top section) -->
           <TextBlock Text="详细信息" FontWeight="SemiBold"
                      Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
           <ItemsControl ItemsSource="{Binding FormatMetadata}">
@@ -354,6 +329,42 @@
               </DataTemplate>
             </ItemsControl.ItemTemplate>
           </ItemsControl>
+          <Separator />
+          <!-- File name -->
+          <TextBlock Text="{Binding FileName}" FontWeight="Bold"
+                     Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                     TextWrapping="Wrap" />
+          <Separator />
+          <!-- Size / Compressed / Ratio (one row, 3 columns) -->
+          <Grid ColumnDefinitions="*,*,*">
+            <StackPanel>
+              <TextBlock Text="大小:" FontWeight="SemiBold"
+                         Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+              <TextBlock Text="{Binding FileSize}"
+                         Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+            </StackPanel>
+            <StackPanel Grid.Column="1">
+              <TextBlock Text="压缩后:" FontWeight="SemiBold"
+                         Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+              <TextBlock Text="{Binding CompressedSize}"
+                         Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+            </StackPanel>
+            <StackPanel Grid.Column="2">
+              <TextBlock Text="压缩率:" FontWeight="SemiBold"
+                         Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+              <TextBlock Text="{Binding CompressionRatio}"
+                         Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+            </StackPanel>
+          </Grid>
+          <!-- Date -->
+          <Grid ColumnDefinitions="Auto,*">
+            <TextBlock Text="修改日期:" FontWeight="SemiBold"
+                       Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+            <TextBlock Grid.Column="1" Text="{Binding ModifiedDate}"
+                       Foreground="{DynamicResource ThemeTextPrimaryBrush}" Margin="8,0,0,0" />
+          </Grid>
+          <!-- Bottom spacer -->
+          <Rectangle Height="6" Fill="Transparent" />
         </StackPanel>
       </ScrollViewer>
     </Border>

@@ -182,7 +182,7 @@ public partial class PreviewViewModel : ObservableObject
     private bool _isInfoPanelVisible;
 
     [ObservableProperty]
-    private string _infoPanelOrientation = "Horizontal";
+    private string _infoPanelOrientation = "Vertical";
 
     public bool IsHorizontalInfoPanel => InfoPanelOrientation != "Vertical";
     public bool IsVerticalInfoPanel => InfoPanelOrientation == "Vertical";
