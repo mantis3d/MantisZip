@@ -116,7 +116,7 @@ public partial class CompressSettingsWindow : Window
         var commonParent = App.FindCommonParent(_sourcePaths.ToList());
         if (commonParent != null && !App.IsDriveRoot(commonParent))
         {
-            var archiveName = Path.GetFileName(commonParent.TrimEnd('\\', '/'));
+            var archiveName = ArchivePath.GetFileName(commonParent);
             var format = (FormatComboBox.SelectedItem as System.Windows.Controls.ComboBoxItem)?.Tag?.ToString() ?? "zip";
             var ext = GetFormatExtension();
             OutputPathControl.PathText = commonParent;
@@ -561,7 +561,7 @@ public partial class CompressSettingsWindow : Window
 
         if (commonParent != null && !App.IsDriveRoot(commonParent))
         {
-            var archiveName = Path.GetFileName(commonParent.TrimEnd('\\', '/'));
+            var archiveName = ArchivePath.GetFileName(commonParent);
             var ext = format == "tar.gz" ? ".tar.gz" : "." + format;
             outputPath = Path.Combine(commonParent, archiveName + ext);
         }

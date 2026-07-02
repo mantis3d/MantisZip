@@ -1,6 +1,7 @@
 using MantisZip.Core;
 using MantisZip.Core.Abstractions;
 using MantisZip.Core.Services;
+using MantisZip.Core.Utils;
 using System.IO;
 using System.Windows;
 using System.Windows.Controls;
@@ -347,7 +348,7 @@ public partial class CompressSettingsWindow : Window
                     if (File.Exists(src))
                         baseName = Path.GetFileNameWithoutExtension(src);
                     else if (Directory.Exists(src))
-                        baseName = Path.GetFileName(src.TrimEnd('\\', '/'));
+                        baseName = ArchivePath.GetFileName(src);
                     else
                         continue;
                     rules.Add($"{baseName}*{ext}");
@@ -359,7 +360,7 @@ public partial class CompressSettingsWindow : Window
                 var commonParent = App.FindCommonParent(_sourcePaths.ToList());
                 if (commonParent != null && !App.IsDriveRoot(commonParent))
                 {
-                    var archiveName = Path.GetFileName(commonParent.TrimEnd('\\', '/'));
+                    var archiveName = ArchivePath.GetFileName(commonParent);
                     PwdRulesBox.Text = $"{archiveName}*{ext}";
                 }
                 break;
