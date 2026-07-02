@@ -7,6 +7,7 @@ using MantisZip.Core.Utils;
 using SharpCompress.Archives;
 using SharpCompress.Readers;
 using SharpSevenZip;
+using SharpSevenZip.Exceptions;
 
 namespace MantisZip.Core.Utils;
 
