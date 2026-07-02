@@ -5,6 +5,9 @@
   "Menu_Exit": "退出",
   "Menu_View": "视图",
   "Menu_ToggleTheme": "切换暗色主题",
+  "Menu_ProgressBars": "进度条",
+  "Menu_SepDirBaseline": "目录独立基准",
+  "Menu_InfoPanelOrientation": "信息面板位置",
   "Menu_Language": "语言",
   "Menu_LangChinese": "中文",
   "Menu_LangEnglish": "English",
@@ -14,6 +17,7 @@
   "DataGrid_Name": "名称",
   "DataGrid_Size": "大小",
   "DataGrid_Compressed": "压缩后",
+  "DataGrid_Ratio": "压缩率",
   "DataGrid_Modified": "修改日期",
 
   "Status_Loading": "正在加载压缩包...",

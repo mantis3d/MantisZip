@@ -88,4 +88,19 @@
   <!-- CheckBox -->
   <SolidColorBrush x:Key="CheckBoxForegroundUnchecked" Color="{StaticResource ThemeTextPrimary}" />
   <SolidColorBrush x:Key="CheckBoxForegroundChecked" Color="{StaticResource ThemeTextPrimary}" />
+
+  <!-- Progress bar colors -->
+  <Color x:Key="ProgressBarSizeColor">#FFE0E7FF</Color>
+  <Color x:Key="ProgressBarSizeDirColor">#FFA3B8FF</Color>
+  <Color x:Key="ProgressBarCompressedSizeColor">#FFE8E0FF</Color>
+  <Color x:Key="ProgressBarCompressedSizeDirColor">#FFC4B0FF</Color>
+  <Color x:Key="ProgressBarRatioColor">#FFFDE68A</Color>
+  <Color x:Key="ProgressBarDateColor">#FFD1FAE5</Color>
+
+  <SolidColorBrush x:Key="ProgressBarSizeBrush" Color="{StaticResource ProgressBarSizeColor}" />
+  <SolidColorBrush x:Key="ProgressBarSizeDirBrush" Color="{StaticResource ProgressBarSizeDirColor}" />
+  <SolidColorBrush x:Key="ProgressBarCompressedSizeBrush" Color="{StaticResource ProgressBarCompressedSizeColor}" />
+  <SolidColorBrush x:Key="ProgressBarCompressedSizeDirBrush" Color="{StaticResource ProgressBarCompressedSizeDirColor}" />
+  <SolidColorBrush x:Key="ProgressBarRatioBrush" Color="{StaticResource ProgressBarRatioColor}" />
+  <SolidColorBrush x:Key="ProgressBarDateBrush" Color="{StaticResource ProgressBarDateColor}" />
 </ResourceDictionary>

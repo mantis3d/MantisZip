@@ -5,9 +5,11 @@
              xmlns:wv2="clr-namespace:Avalonia.Controls;assembly=Avalonia.Controls.WebView"
              x:Class="MantisZip.UI.Avalonia.Views.PreviewPanel"
              x:DataType="vm:PreviewViewModel">
-  <Grid RowDefinitions="Auto,*">
+   <Grid x:Name="PreviewRootGrid"
+         RowDefinitions="Auto,*,Auto"
+         ColumnDefinitions="*,Auto">
     <!-- Toolbar -->
-    <Border Grid.Row="0"
+    <Border Grid.Row="0" Grid.Column="0"
             Padding="4,2"
             Background="{DynamicResource ThemeHeaderBgBrush}"
             IsVisible="{Binding IsToolbarVisible}">
@@ -54,7 +56,7 @@
     </Border>
 
     <!-- Preview content area - will be populated by Tasks 6-11 -->
-    <ScrollViewer Grid.Row="1"
+    <ScrollViewer Grid.Row="1" Grid.Column="0"
                   Background="{DynamicResource ThemeSurfaceBgBrush}">
       <Grid>
         <!-- Unsupported / empty state -->
@@ -301,5 +303,59 @@
         </ScrollViewer>
       </Grid>
     </ScrollViewer>
+
+    <!-- Preview Info Panel (placed dynamically by ApplyInfoPanelOrientation) -->
+    <Border x:Name="PreviewInfoBorder"
+            Grid.Row="0" Grid.Column="1" Grid.RowSpan="2"
+            Width="220"
+            Background="{DynamicResource ThemeHeaderBgBrush}"
+            BorderBrush="{DynamicResource ThemeBorderBrush}"
+            BorderThickness="1,0,0,0"
+            IsVisible="{Binding IsInfoPanelVisible}">
+      <ScrollViewer Padding="10">
+        <StackPanel Spacing="8">
+          <!-- File name -->
+          <TextBlock Text="{Binding FileName}" FontWeight="Bold"
+                     Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                     TextWrapping="Wrap" />
+          <Separator />
+          <!-- File info rows -->
+          <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto">
+            <TextBlock Grid.Row="0" Grid.Column="0" Text="大小:" FontWeight="SemiBold"
+                       Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+            <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding FileSize}"
+                       Foreground="{DynamicResource ThemeTextPrimaryBrush}" Margin="8,0,0,0" />
+            <TextBlock Grid.Row="1" Grid.Column="0" Text="压缩后:" FontWeight="SemiBold"
+                       Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+            <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding CompressedSize}"
+                       Foreground="{DynamicResource ThemeTextPrimaryBrush}" Margin="8,0,0,0" />
+            <TextBlock Grid.Row="2" Grid.Column="0" Text="压缩率:" FontWeight="SemiBold"
+                       Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+            <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding CompressionRatio}"
+                       Foreground="{DynamicResource ThemeTextPrimaryBrush}" Margin="8,0,0,0" />
+            <TextBlock Grid.Row="3" Grid.Column="0" Text="修改日期:" FontWeight="SemiBold"
+                       Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+            <TextBlock Grid.Row="3" Grid.Column="1" Text="{Binding ModifiedDate}"
+                       Foreground="{DynamicResource ThemeTextPrimaryBrush}" Margin="8,0,0,0" />
+          </Grid>
+          <Separator />
+          <!-- Format metadata -->
+          <TextBlock Text="详细信息" FontWeight="SemiBold"
+                     Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+          <ItemsControl ItemsSource="{Binding FormatMetadata}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="models:FormatMetadataItem">
+                <Grid ColumnDefinitions="Auto,8,*" Margin="0,2">
+                  <TextBlock Text="{Binding Key}" FontWeight="Bold"
+                             Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+                  <TextBlock Grid.Column="2" Text="{Binding Value}"
+                             Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+                </Grid>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </StackPanel>
+      </ScrollViewer>
+    </Border>
   </Grid>
 </UserControl>

@@ -46,6 +46,30 @@ public partial class ArchiveItemModel : ObservableObject
     [ObservableProperty]
     private Bitmap? _iconSource;
 
+    [ObservableProperty]
+    private double _sizeRatio;
+
+    [ObservableProperty]
+    private double _compressedSizeRatio;
+
+    [ObservableProperty]
+    private double _dateRatio;
+
+    [ObservableProperty]
+    private double _ratioBarValue;
+
+    [ObservableProperty]
+    private bool _progressBarEnabled = true;
+
+    [ObservableProperty]
+    private bool _useDirProgressColor;
+
+    // Brush key properties for progress bar color switching
+    public string SizeBarBrushKey => UseDirProgressColor ? "ProgressBarSizeDirBrush" : "ProgressBarSizeBrush";
+    public string CompressedSizeBarBrushKey => UseDirProgressColor ? "ProgressBarCompressedSizeDirBrush" : "ProgressBarCompressedSizeBrush";
+    public string RatioBarBrushKey => "ProgressBarRatioBrush";
+    public string DateBarBrushKey => UseDirProgressColor ? "ProgressBarDateDirBrush" : "ProgressBarDateBrush";
+
     public bool HasIcon => IconSource != null;
 
     /// <summary>

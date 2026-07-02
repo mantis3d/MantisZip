@@ -14,6 +14,7 @@
 - Avalonia 跨平台移植后续 Phase
 
 ### avalonia-port 分支 (WIP)
+  - **Phase 10: WPF 功能补齐（进度条/信息面板/状态栏）** — 状态栏增强（DirStats 目录文件计数/FilterStats 过滤统计/EncodingInfo 编码信息→6 列布局）；预览信息面板（文件元数据侧栏 + 横向/纵向位置切换 AppSettings.InfoPanelOrientation）；文件列表进度条 DataGridTemplateColumn（Size/CompressedSize/Modified 背景 Rectangle 色条 + CompressionRatio 列），RatioToWidthConverter/BrushResourceConverter，8 色主题资源（亮/暗），视图菜单开关（进度条/目录独立基准），i18n 中英文键 (2026-07-01)
   - **ExtractSettingsWindow + CompressSettingsWindow GroupBox 重构** — ExtractSettingsWindow: Separator → 3 Border GroupBox（源文件/目标目录/文件冲突），窗口 530 CanResize=False；CompressSettingsWindow: 3 TabItem 加 compactTab，General tab 顺序 WPF 一致（源文件列表带 AddFile/AddFolder/Remove 按钮 + 压缩选项合并组），Password/Comment tab 同样 Border GroupBox 分组；ViewModel SelectedPaths 改为 ObservableCollection 支持增删；新增 i18n 键 (2026-06-30)
   - **SettingsWindow Tab 紧凑样式 + DonationDialog 修复** — SettingsWindow Tab 标题改用全局 `TabItem.compactTab` class selector（FontSize=18, MinHeight=36），emoji FontSize=16；子 tab 统一应用 compactTab 样式；窗口 720×560；DonationDialog 修复 `avares://DonateQr.png` 找不到崩溃（csproj 加 `<AvaloniaResource>`），两按钮 Width=340 与二维码宽度对齐 (2026-06-30)
   - **Phase 10 计划 + 测试菜单** — 创建 `avalonia-phase10-feature-parity.md` 规划 WPF 功能补齐（文件列表进度条/预览信息面板/状态栏增强）；主菜单新增 🧪 测试菜单，内含 16 个可独立打开的对话框/窗口（含默认测试数据），i18n 中英文键，构建零错误 (2026-06-30)

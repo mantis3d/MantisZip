@@ -161,6 +161,53 @@ public partial class PreviewViewModel : ObservableObject
     [ObservableProperty]
     private int _totalFrames;
 
+    // ── Preview Info Panel ──
+
+    [ObservableProperty]
+    private string _fileName = string.Empty;
+
+    [ObservableProperty]
+    private string _fileSize = string.Empty;
+
+    [ObservableProperty]
+    private string _compressedSize = string.Empty;
+
+    [ObservableProperty]
+    private string _compressionRatio = string.Empty;
+
+    [ObservableProperty]
+    private string _modifiedDate = string.Empty;
+
+    [ObservableProperty]
+    private bool _isInfoPanelVisible;
+
+    [ObservableProperty]
+    private string _infoPanelOrientation = "Horizontal";
+
+    public bool IsHorizontalInfoPanel => InfoPanelOrientation != "Vertical";
+    public bool IsVerticalInfoPanel => InfoPanelOrientation == "Vertical";
+
+    partial void OnInfoPanelOrientationChanged(string value)
+    {
+        OnPropertyChanged(nameof(IsHorizontalInfoPanel));
+        OnPropertyChanged(nameof(IsVerticalInfoPanel));
+    }
+
+    public void ToggleInfoPanelOrientation()
+    {
+        InfoPanelOrientation = InfoPanelOrientation == "Vertical" ? "Horizontal" : "Vertical";
+    }
+
+    public void SetFileInfo(string name, string size, string compressed, string ratio, string modified)
+    {
+        FileName = name;
+        FileSize = size;
+        CompressedSize = compressed;
+        CompressionRatio = ratio;
+        ModifiedDate = modified;
+        IsInfoPanelVisible = true;
+    }
+
     public bool HasGifControls => PreviewType == PreviewType.Gif;
 
     private List<GifFrameData>? _gifFrames;
@@ -900,6 +947,14 @@ td, th {{ border: 1px solid #ccc; padding: 6px; }}
         IsToolbarVisible = false;
         ZoomLevel = 1.0;
         FontSize = 13;
+
+        // Reset info panel
+        FileName = string.Empty;
+        FileSize = string.Empty;
+        CompressedSize = string.Empty;
+        CompressionRatio = string.Empty;
+        ModifiedDate = string.Empty;
+        IsInfoPanelVisible = false;
     }
 
     private void AddPeMeta(string key, string? value)

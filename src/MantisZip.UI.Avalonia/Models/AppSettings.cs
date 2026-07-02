@@ -65,6 +65,8 @@ public class AppSettings
     public string Theme { get; set; } = "Light";
     public int MaxRecentFiles { get; set; } = 10;
     public string Language { get; set; } = "zh";
+    public bool ShowProgressBars { get; set; } = true;
+    public bool SeparateDirBaseline { get; set; } = false;
 
     // ===== 文件关联 =====
     public bool AssocZip { get; set; } = true;

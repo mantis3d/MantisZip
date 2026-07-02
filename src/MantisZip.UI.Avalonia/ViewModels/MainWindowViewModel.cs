@@ -79,6 +79,7 @@ public partial class MainWindowViewModel : ObservableObject
     /// 会话密码缓存：压缩包路径 → 密码（仅内存，不持久化）。
     /// </summary>
     private readonly Dictionary<string, string> _sessionPasswords = new(StringComparer.OrdinalIgnoreCase);
+    private readonly AppSettings _appSettings = AppSettings.Load();
 
     // ── i18n ──
 
@@ -122,12 +123,13 @@ public partial class MainWindowViewModel : ObservableObject
             "Toolbar_New", "Toolbar_Open", "Toolbar_Extract", "Toolbar_Compress",
             "Toolbar_Filter", "Toolbar_Preview",
             "Menu_Toolbar", "Menu_FilterBar",
+            "Menu_ProgressBars", "Menu_SepDirBaseline", "Menu_InfoPanelOrientation",
             "Filter_Search", "Filter_Exclude", "Filter_DateFrom", "Filter_DateTo",
             "Filter_SizeMin", "Filter_SizeMax", "Filter_ShowSubfolders",
             "Filter_MatchModeSubstring", "Filter_MatchModeWildcard",
             "Status_Selected", "Status_ArchiveStats",
             "Tree_Browse",
-            "DataGrid_Name", "DataGrid_Size", "DataGrid_Compressed", "DataGrid_Modified",
+            "DataGrid_Name", "DataGrid_Size", "DataGrid_Compressed", "DataGrid_Modified", "DataGrid_Ratio",
             "App_Title",
             "Main_DropHint",
             "Ctx_Extract", "Ctx_SmartExtract", "Ctx_ExtractTo",
@@ -185,6 +187,18 @@ public partial class MainWindowViewModel : ObservableObject
 
     [ObservableProperty]
     private string? _statusMessage;
+
+    /// <summary>目录/文件统计："3 dirs, 15 files"。</summary>
+    [ObservableProperty]
+    private string _dirStats = string.Empty;
+
+    /// <summary>过滤统计："12/20"（显示数/总数），无过滤时为空。</summary>
+    [ObservableProperty]
+    private string _filterStats = string.Empty;
+
+    /// <summary>编码信息："UTF-8" 或压缩包编码。</summary>
+    [ObservableProperty]
+    private string _encodingInfo = string.Empty;
 
     [ObservableProperty]
     private ArchiveItemModel? _selectedEntry;
@@ -254,6 +268,12 @@ public partial class MainWindowViewModel : ObservableObject
     private bool _isStatusBarVisible = true;
 
     [ObservableProperty]
+    private bool _showProgressBars = true;
+
+    [ObservableProperty]
+    private bool _separateDirBaseline;
+
+    [ObservableProperty]
     private string? _filterText;
 
     [ObservableProperty]
@@ -297,6 +317,10 @@ public partial class MainWindowViewModel : ObservableObject
     {
         LocalizationManager.CultureChanged += OnCultureChanged;
         UpdateLocalizedStrings();
+
+        // Load settings
+        ShowProgressBars = _appSettings.ShowProgressBars;
+        SeparateDirBaseline = _appSettings.SeparateDirBaseline;
     }
 
     private void OnCultureChanged(object? sender, EventArgs e)
@@ -440,6 +464,11 @@ public partial class MainWindowViewModel : ObservableObject
                 StatusMessage = LocalizationManager.T("Status_Loaded", result.Entries.Count);
                 Title = $"{LocalizationManager.T("App_Title")} - {Path.GetFileName(path)} ({_allRawItems?.Count ?? 0} {LocalizationManager.T("Status_Entries")})";
                 OnPropertyChanged(nameof(ArchiveStats));
+                EncodingInfo = _currentFormat switch
+                {
+                    ArchiveFormat.Zip => "UTF-8", // Common default; actual detection TBD
+                    _ => string.Empty
+                };
             }
             else if (result.IsCancelled)
             {
@@ -563,6 +592,17 @@ public partial class MainWindowViewModel : ObservableObject
                     StatusMessage = LocalizationManager.T("Preview_Markdown", entry.DisplayName);
                     break;
             }
+
+            // Populate preview info panel (only for supported, not for unsupported)
+            if (Preview.PreviewType != PreviewType.Unsupported && Preview.PreviewType != PreviewType.None)
+            {
+                Preview.SetFileInfo(
+                    entry.NameDisplay,
+                    entry.SizeDisplay,
+                    entry.CompressedSizeDisplay,
+                    entry.Size > 0 ? $"{entry.CompressionRatio:F1}%" : "N/A",
+                    entry.LastModifiedDisplay);
+            }
         }
         catch (Exception ex)
         {
@@ -627,12 +667,68 @@ public partial class MainWindowViewModel : ObservableObject
                 var model = ArchiveItemModel.FromCore(item);
                 var ext = Path.GetExtension(model.Name);
                 model.IconSource = IconService.GetFileIcon(ext);
+                model.ProgressBarEnabled = ShowProgressBars;
                 CurrentEntries.Add(model);
+            }
+
+            // Populate DirStats
+            var dirCount = CurrentEntries.Count(e => e.IsDirectory);
+            var fileCount = CurrentEntries.Count - dirCount;
+            DirStats = $"{dirCount} dirs, {fileCount} files";
+
+            // Populate FilterStats — only show when filters are active
+            if (!string.IsNullOrWhiteSpace(FilterText) || !string.IsNullOrWhiteSpace(FilterExcludeText) ||
+                FilterDateFrom.HasValue || FilterDateTo.HasValue ||
+                FilterSizeMin.HasValue || FilterSizeMax.HasValue)
+            {
+                var totalItems = _allRawItems?.Count ?? 0;
+                FilterStats = $"{CurrentEntries.Count}/{totalItems}";
+            }
+            else
+            {
+                FilterStats = string.Empty;
+            }
+
+            // Compute progress bar ratios
+            if (ShowProgressBars)
+            {
+                ComputeProgressBarRatios();
             }
         }
         finally
         {
             _isProgrammaticFilter = false;
+        }
+    }
+
+    /// <summary>
+    /// 计算所有条目的进度条比例值（相对大小、压缩比、日期分布等）。
+    /// </summary>
+    private void ComputeProgressBarRatios()
+    {
+        if (CurrentEntries.Count == 0) return;
+
+        var sizeItems = SeparateDirBaseline
+            ? CurrentEntries.ToList()
+            : CurrentEntries.Where(e => !e.IsDirectory).ToList();
+
+        if (sizeItems.Count == 0) return;
+
+        var maxSize = sizeItems.Max(e => (long)e.Size);
+        var maxCompressed = sizeItems.Max(e => (long)e.CompressedSize);
+
+        var fileItems = CurrentEntries.Where(e => !e.IsDirectory && e.LastModified > DateTime.MinValue).ToList();
+        var minDate = fileItems.Count > 0 ? fileItems.Min(e => e.LastModified) : DateTime.Now;
+        var maxDate = fileItems.Count > 0 ? fileItems.Max(e => e.LastModified) : DateTime.Now;
+        var dateRange = (maxDate - minDate).TotalSeconds;
+
+        foreach (var item in CurrentEntries)
+        {
+            item.SizeRatio = maxSize > 0 ? (double)item.Size / maxSize : 0;
+            item.CompressedSizeRatio = maxCompressed > 0 ? (double)item.CompressedSize / maxCompressed : 0;
+            item.DateRatio = dateRange > 0 ? (item.LastModified - minDate).TotalSeconds / dateRange : 0;
+            item.RatioBarValue = item.Size > 0 ? Math.Min((double)item.CompressedSize / item.Size, 1.0) : 0;
+            item.UseDirProgressColor = item.IsDirectory && SeparateDirBaseline;
         }
     }
 
@@ -708,6 +804,9 @@ public partial class MainWindowViewModel : ObservableObject
         SelectedFolder = null;
         FolderTreeRoot = null;
         _allRawItems = null;
+        DirStats = string.Empty;
+        FilterStats = string.Empty;
+        EncodingInfo = string.Empty;
         Preview.Clear();
     }
 
@@ -1100,6 +1199,34 @@ public partial class MainWindowViewModel : ObservableObject
     private void TogglePreview()
     {
         IsPreviewVisible = !IsPreviewVisible;
+    }
+
+    [RelayCommand]
+    private void ToggleProgressBars()
+    {
+        ShowProgressBars = !ShowProgressBars;
+        _appSettings.ShowProgressBars = ShowProgressBars;
+        _ = _appSettings.Save();
+        // Update ProgressBarEnabled on all current items
+        foreach (var item in CurrentEntries)
+        {
+            item.ProgressBarEnabled = ShowProgressBars;
+        }
+    }
+
+    [RelayCommand]
+    private void ToggleSepDirBaseline()
+    {
+        SeparateDirBaseline = !SeparateDirBaseline;
+        _appSettings.SeparateDirBaseline = SeparateDirBaseline;
+        _ = _appSettings.Save();
+        PopulateEntries();
+    }
+
+    [RelayCommand]
+    private void ToggleInfoPanelOrientation()
+    {
+        Preview.ToggleInfoPanelOrientation();
     }
 
     // ── Recent Files ──

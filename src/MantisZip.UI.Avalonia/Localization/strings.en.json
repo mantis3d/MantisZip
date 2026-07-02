@@ -5,6 +5,9 @@
   "Menu_Exit": "Exit",
   "Menu_View": "View",
   "Menu_ToggleTheme": "Toggle Dark Theme",
+  "Menu_ProgressBars": "Progress Bars",
+  "Menu_SepDirBaseline": "Separate Dir Baseline",
+  "Menu_InfoPanelOrientation": "Info Panel Position",
   "Menu_Language": "Language",
   "Menu_LangChinese": "中文",
   "Menu_LangEnglish": "English",
@@ -14,6 +17,7 @@
   "DataGrid_Name": "Name",
   "DataGrid_Size": "Size",
   "DataGrid_Compressed": "Compressed",
+  "DataGrid_Ratio": "Ratio",
   "DataGrid_Modified": "Modified",
 
   "Status_Loading": "Loading archive...",

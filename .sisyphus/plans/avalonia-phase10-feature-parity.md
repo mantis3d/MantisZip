@@ -1,10 +1,16 @@
 # Avalonia Phase 10: WPF Feature Parity (Progress Bars, Info Panel, Status Bar)
 
-> **Status**: 📋 Planned | **Target**: v0.4.0
+> **Status**: ✅ Completed | **Target**: v0.4.0
 
 ## Overview
 
 Port three WPF features that were not implemented during the initial Avalonia port (Phase 0-9): file list progress bars, separated preview info panel, and enriched status bar.
+
+## TODOs
+
+- [x] Status Bar Enrichment
+- [x] Preview Info Panel
+- [x] File List Progress Bars
 
 ## 1. File List Progress Bars
 
