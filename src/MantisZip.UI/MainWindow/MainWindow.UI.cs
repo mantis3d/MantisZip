@@ -778,7 +778,12 @@ public partial class MainWindow
             if (lastClicked != null && !lastClicked.IsNavigationEntry && !string.IsNullOrEmpty(_currentArchivePath))
             {
                 if (lastClicked.IsDirectory) ShowDirectoryPreview(lastClicked);
-                else await ShowPreviewAsync(lastClicked);
+                else
+                {
+                    // 切换文件时重置格式覆盖状态
+                    _previewFormatOverride = null;
+                    await ShowPreviewAsync(lastClicked);
+                }
             }
             UpdateSelectionStats();
             UpdatePickerBtnState();

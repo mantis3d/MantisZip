@@ -163,7 +163,7 @@ public static class ArchiveEntryExtractor
         if (segments.Any(s => s == ".."))
             throw new InvalidOperationException($"输出路径包含非法路径穿越: {outputPath}");
     }
-    
+
     /// <summary>
     /// 提取压缩包内条目的前 maxBytes 字节到内存。
     /// </summary>

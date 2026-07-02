@@ -595,7 +595,12 @@ public partial class MainWindow
             if (FileListGrid.SelectedItem is ArchiveItem selected && !string.IsNullOrEmpty(_currentArchivePath))
             {
                 if (selected.IsDirectory) ShowDirectoryPreview(selected);
-                else _ = ShowPreviewAsync(selected);
+                else
+                {
+                    // 切换文件/重新加载时重置格式覆盖状态
+                    _previewFormatOverride = null;
+                    _ = ShowPreviewAsync(selected);
+                }
             }
         }
         else
