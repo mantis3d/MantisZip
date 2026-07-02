@@ -1,14 +1,30 @@
+## v0.4.4
+
+### 文件说明 / File Description
+
+MantisZip-0.4.4-Setup-NoDotNet.exe 是需要安装 dotnet runtime 才能运行的。MantisZip-0.4.4-Setup.exe 是自包含 dotnet runtime 的。
+
+MantisZip-0.4.4-Setup-NoDotNet.exe requires the .NET runtime to be installed. MantisZip-0.4.4-Setup.exe is self-contained with the .NET runtime.
+
+**如果你不明白上面那句话是什么意思，请下载 MantisZip-0.4.4-Setup.exe。**
+
+**If you don't understand what the above means, please download MantisZip-0.4.4-Setup.exe.**
+
+### 更新内容 / Changelog
+
+- 完成 [快速路径选择](.sisyphus/plans/quickpath-unified.md) 计划。
+
 ## v0.4.3
 
 ### 文件说明 / File Description
 
-MantisZip-0.4.2-Setup-NoDotNet.exe 是需要安装 dotnet runtime 才能运行的。MantisZip-0.4.2-Setup.exe 是自包含 dotnet runtime 的。
+MantisZip-0.4.3-Setup-NoDotNet.exe 是需要安装 dotnet runtime 才能运行的。MantisZip-0.4.3-Setup.exe 是自包含 dotnet runtime 的。
 
-MantisZip-0.4.2-Setup-NoDotNet.exe requires the .NET runtime to be installed. MantisZip-0.4.2-Setup.exe is self-contained with the .NET runtime.
+MantisZip-0.4.3-Setup-NoDotNet.exe requires the .NET runtime to be installed. MantisZip-0.4.3-Setup.exe is self-contained with the .NET runtime.
 
-**如果你不明白上面那句话是什么意思，请下载 MantisZip-0.4.2-Setup.exe。**
+**如果你不明白上面那句话是什么意思，请下载 MantisZip-0.4.3-Setup.exe。**
 
-**If you don't understand what the above means, please download MantisZip-0.4.2-Setup.exe.**
+**If you don't understand what the above means, please download MantisZip-0.4.3-Setup.exe.**
 
 ### 更新内容 / Changelog
 

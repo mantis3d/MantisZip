@@ -34,6 +34,17 @@
 2. 新建文件：`FileFormatDetector.cs`（650+ 行）、`FileFormatHelper.cs`（95 行）
 3. 修改文件：`FileFormatInfo.cs`（追加 11 枚举值）、`ArchiveEntryExtractor.cs`（+224 行）、`AppSettings.cs`、`ArchiveEngine.cs`（+60 行魔数兜底 + 映射）、`MainWindow.Preview.cs`（+180 行魔数路由 + 冲突切换）、`MainWindow.Preview.Text.cs`（文本左对齐修复）
 
+### v0.4.4+ (2026-07-02) EncryptHeaders=false 7z 密码验证修复
+
+1. **修复 EncryptHeaders=false 7z 密码验证** — SharpSevenZip 在 EncryptHeaders=false 时，`ArchiveFileData` 无需密码即可读取，导致 `QuickVerifyPassword` 对所有密码都返回 true：
+   - **`CanTrustQuickVerify()`（新建）**：检测 EncryptHeaders=false 7z/RAR，跳过不可信的已保存密码自动匹配
+   - **`TryMatchPassword`**：不可信时返回 null，避免错误密码被标记为"匹配"
+   - **`LoadArchiveAsync`**：SevenZipEngine EncryptHeaders=false 分支跳过 TryMatchPassword 但仍弹出密码输入对话框（用户取消→🔒，用户输入→🔓）
+   - **`ExtractAsync`**：优先使用 `_currentPassword`（工具栏已输入时不再重复弹窗）
+   - **`IsPasswordOrCorruptedDataError()`（新建）**：将 SharpSevenZip 的 "data error" 识别为密码错误（EncryptHeaders=false 时错误密码抛出此异常）
+   - **`RunExtractStatic`/`HandleExtractBatchCore`**：同样适配 "data error" → 密码错误
+2. **修改文件（3 个）**：`App.Password.cs`（+74 行）、`MainWindow.xaml.cs`（+188 行）、`App.Extract.cs`（+18 行）
+
 ### v0.4.4+ (2026-07-02) 压缩包路径处理一站式重构——ArchivePath 统一入口
 
 1. **新建 `ArchivePath` 类** — `ArchivePathExtensions.cs` → `ArchivePath`，压缩包路径处理的一站式入口
