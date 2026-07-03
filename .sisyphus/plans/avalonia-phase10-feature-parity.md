@@ -86,6 +86,67 @@ Add a dedicated side panel next to preview content showing general file info (na
 
 The panel uses `ThemeHeaderBgBrush` background, `CornerRadius="4"`, `Padding="10"`.
 
+### 4. Missing Format Metadata Fields (WPF → Avalonia 补齐)
+
+**Status**: 📋 Planned | **Priority**: P2 (post-Phase 10 cleanup)
+
+Each format method in `PreviewViewModel.cs` populates `FormatMetadata` with format-specific key-value pairs.
+The following fields exist in WPF but are missing/不同的 in the current Avalonia implementation.
+
+| # | Format | WPF Field | WPF Key | Avalonia Status | Parser Field |
+|---|--------|-----------|---------|-----------------|-------------|
+| 1 | **Image** (non-GIF) | `像素数` | `Preview_ImagePixels` | ❌ 缺；Avalonia 目前用"文件大小" | `bitmap.PixelWidth * bitmap.PixelHeight` |
+| 2 | **Image** (non-GIF) | `色深` | `Preview_ImageBitDepth` | ❌ 缺 | `bitmap.Format.BitsPerPixel` |
+| 3 | **Image** (non-GIF) | `DPI` | `Preview_ImageDpi` | ❌ 缺 | `bitmap.DpiX / bitmap.DpiY` |
+| 4 | **Image** (non-GIF) | WPF 用 BitmapDecoder 获取的信息 | — | ⚠️ Avalonia 用 `Bitmap.DecodeToWidth`，PixelSize 属性不同 | — |
+| 5 | **Audio** | `位深` (BitDepth) | `Preview_AudioBitDepth` | ❌ 缺 | `FileFormatInfo.BitDepth` |
+| 6 | **Audio** (MP3) | `标题` / `歌手` / `专辑` | `Preview_Mp3Title/Artist/Album` | ✅ 已通过 `info.Artist`/`info.Album` 覆盖 | `Id3v2Parser` → FileFormatInfo |
+| 7 | **SQLite** | `编码` | `Preview_SqliteEncoding` | ❌ 缺；Avalonia 只查了表数量 | `meta.TextEncoding` |
+| 8 | **SQLite** | `页大小` | `Preview_SqlitePageSize` | ❌ 缺 | `meta.AdditionalInfo` (含 page size) |
+| 9 | **SQLite** | 表数量 | — | ✅ Avalonia 有「表数量」 | `meta.TableCount` |
+| 10 | **Office** | `修改日期` | `Preview_DocModified` | ❌ 缺；Avalonia 只有创建日期 | `info.ModifiedDate` |
+| 11 | **Torrent** | `创建日期` | `Preview_TorrentCreationDate` | ❌ 缺；Avalonia 无此字段 | `info.CreationDate` |
+| 12 | **Torrent** | `Tracker 数量` | `Preview_TorrentTrackerCount` | ❌ 缺 | `info.TrackerCount` |
+| 13 | **Torrent** | `是否私有` | `Preview_TorrentPrivate` | ❌ 缺 | `info.IsPrivate` |
+| 14 | **Torrent** | `备注` (Comment) | `Preview_TorrentComment` | ❌ 缺 | `info.AdditionalInfo` |
+
+### 5. Avalonia 优势字段（WPF 较难获取，Avalonia 更简单）
+
+这些字段在 WPF 中需要走 `BitmapDecoder.Create` 才能获取（额外创建解码器），而在 Avalonia 中 `Bitmap` 直接暴露，一行属性访问即可。
+
+| # | 字段 | Avalonia 获取方式 | WPF 获取方式 | 说明 |
+|---|------|-----------------|-------------|------|
+| 1 | Image **DPI** | `bitmap.Dpi.X / bitmap.Dpi.Y` | `BitmapDecoder.Create(...).Frames[0].DpiX/DpiY` | ✅ 已存在于 DebugLog，只需加到 FormatMetadata |
+| 2 | Image **像素格式** | `bitmap.Format` → `"32-bit BGRA"` 等 | `Frames[0].Format.BitsPerPixel`（PixelFormat 复杂类） | ✅ `PixelFormat` 枚举直接可映射 |
+| 3 | Image **物理尺寸 (DIP)** | `bitmap.Size`（Width × Height in DIPs） | 需手动 `PixelWidth / DpiX * 96` | 显示 DPI 感知尺寸与像素尺寸的差异 |
+
+### 6. Parser 已暴露但两个版本都未展示的字段
+
+| # | 字段 | Parser 来源 | 说明 |
+|---|------|-----------|------|
+| 1 | PE **架构/子系统** | `PeInfo.Architecture` / `.Subsystem` | WPF 只在 header 显示，不在 FormatMetadata |
+| 2 | Torrent **分片大小** | `TorrentInfo.PieceSize` | 可直接 `FormatSize(info.PieceSize)` |
+| 3 | Torrent **分片数** | `TorrentInfo.PieceCount` | 整数值，直接显示 |
+
+### 综合优先级建议
+
+| 优先级 | 项数 | 标签 | 难度 |
+|--------|------|------|------|
+| P0 | 2 | Image DPI + 像素格式 | ⭐ — 一行代码，Avalonia 直出 |
+| P0 | 5 | Audio BitDepth / Office ModifiedDate / Torrent 创建日期+Tracker数+私有+备注 | ⭐ — 一行 Add |
+| P1 | 2 | SQLite 编码+页大小 | ⭐⭐ — 需加 PRAGMA 查询 |
+| P1 | 3 | PE 架构/子系统 / Torrent 分片大小+分片数 | ⭐ — 一行 Add |
+| P2 | 3 | Image 色深/DPI(WPF方式)/物理尺寸 | ⭐⭐ — Avalonia Bitmap 的 Format 枚举需映射 |
+
+#### 备注
+
+- **Image** (WPF 方式): WPF 用 `System.Windows.Media.Imaging.BitmapDecoder.Create` 获取 BitsPerPixel/DpiX；Avalonia 用 `Bitmap.DecodeToWidth` 解码，DPI/Format 是直接属性，反而更简单 (#5.1-5.3)。
+- **Image Avalonia 优势**: Avalonia 的 `Bitmap` 直接暴露 `Dpi` (Vector) 和 `Format` (PixelFormat 枚举)，无需像 WPF 那样走 BitmapDecoder 间接获取。
+- **Audio**: `FileFormatInfo.BitDepth` 在 Avalonia 的 FlacParser/RiffParser 中应该已经解析了，只需在 `ShowAudio` 中加 `FormatMetadata.Add` 即可。
+- **SQLite**: WPF 从 `SqliteMeta` 获取 TextEncoding/AdditionalInfo；Avalonia 的 `ShowSqlitePreview` 直接连 SQLite 但没读取编码/页大小等元信息，需添加 `PRAGMA page_size` 和 `PRAGMA encoding` 查询。
+- **Torrent**: `info.CreationDate`/`info.TrackerCount`/`info.IsPrivate`/`info.AdditionalInfo` 在 Avalonia 的 `TorrentParser.Parse` 输出中应存在，只需在 `ShowTorrent` 中添加。
+- **Office**: `info.ModifiedDate` 在 `OfficeParser.Parse` 输出中应存在，只需在 `ShowOffice` 中添加。
+
 ## 3. Status Bar Enrichment
 
 ### Goal
