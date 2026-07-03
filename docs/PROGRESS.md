@@ -69,8 +69,19 @@
    - `ContextMenuHandler.cs` 保留 2 处（ShellExt 不引用 Core）
 3. **修改文件（11 个）**：`ArchivePathExtensions.cs`（新建）、`ZipEngine.cs`、`SevenZipEngine.cs`、`ArchiveEntryExtractor.cs`、`ArchiveStructureAnalyzer.cs`、`FileConflictHelper.cs`、`MainWindow.DragDrop.cs`、`App.Compress.cs`、`App.Open.cs`、`CompressSettingsWindow.xaml.cs`、`CompressSettingsWindow.Password.cs`
 
+### v0.4.4+ (2026-07-03) 双击文件默认程序打开 + 上级目录预览刷新修复
 
-### v0.4.4+ (2026-07-02) 压缩包路径处理一站式重构——ArchivePath 统一入口
+1. **新功能：双击文件调用系统默认程序打开** — 在 `FileListGrid_PreviewMouseDoubleClick` 中添加文件双击处理分支：
+   - `AppSettings.DoubleClickOpenThreshold` 设置阈值（MB 为单位，默认 10MB，0=禁用），在设置窗口解压缩 Tab 末尾配置
+   - 超过阈值时弹出确认对话框："文件超过 X MB，确定要解压并打开吗？"
+   - 文件 >= 1MB 时显示 ProgressWindow 显示提取进度，< 1MB 则静默提取
+   - 提取到 `%TEMP%\MantisZip\OpenWith\{GUID}\` 后通过 `Process.Start(UseShellExecute=true)` 调用系统默认程序打开
+   - Tar/GZip/ISO 不支持单文件提取，弹出"该格式不支持双击打开"
+   - 加密未输入密码时提示"请先输入密码"
+   - 状态栏更新为"已用默认程序打开 {文件名}"
+   - Temp 文件随 App.OnExit 自动清理
+2. **修复 Bug：上级目录（..）选中时预览面板不刷新** — 移除 `FileListGrid_SelectionChanged` 中的 `!lastClicked.IsNavigationEntry` 守卫条件
+3. **修改文件（7 个）**：`AppSettings.cs`（+2 行）、`SettingsWindow.xaml`（+17 行）、`SettingsWindow.xaml.cs`（+11 行）、`L.cs`（+6 行）、`MainWindow.UI.cs`（+112 行）、`strings.zh.json`（+6 行）、`strings.en.json`（+6 行）
 
 1. **新建 `ArchivePath` 类** — `ArchivePathExtensions.cs` → `ArchivePath`，压缩包路径处理的一站式入口
    - `Normalize()`：`\` → `/` 统一分隔符，null 安全

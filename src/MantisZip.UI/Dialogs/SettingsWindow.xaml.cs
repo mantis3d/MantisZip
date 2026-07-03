@@ -103,6 +103,7 @@ public partial class SettingsWindow : Window
         OpenFolderCheck.IsChecked = s.OpenFolderAfterExtract;
         EnableDragExtractCheck.IsChecked = s.EnableDragExtract;
         ExtractPreservePathCheck.IsChecked = s.ExtractPreserveFullPath;
+        DoubleClickThresholdBox.Text = (s.DoubleClickOpenThreshold / (1024 * 1024)).ToString();
 
         // 上下文菜单
         EnableCompressCheck.IsChecked = s.EnableCompressMenu;
@@ -225,6 +226,8 @@ public partial class SettingsWindow : Window
         s.OpenFolderAfterExtract = OpenFolderCheck.IsChecked == true;
         s.EnableDragExtract = EnableDragExtractCheck.IsChecked == true;
         s.ExtractPreserveFullPath = ExtractPreservePathCheck.IsChecked == true;
+        s.DoubleClickOpenThreshold = long.TryParse(DoubleClickThresholdBox.Text, out var threshold)
+            ? threshold * 1024 * 1024 : 10 * 1024 * 1024;
 
         s.EnableCompressMenu = EnableCompressCheck.IsChecked == true;
         s.EnableCompressSeparate = EnableCompressSeparateCheck.IsChecked == true;
@@ -376,6 +379,14 @@ public partial class SettingsWindow : Window
         foreach (var c in e.Text)
         {
             if (!char.IsDigit(c)) { e.Handled = true; return; }
+        }
+    }
+
+    private void DoubleClickThresholdBox_TextChanged(object sender, System.Windows.Controls.TextChangedEventArgs e)
+    {
+        if (int.TryParse(DoubleClickThresholdBox.Text, out var val))
+        {
+            if (val < 0) { DoubleClickThresholdBox.Text = "0"; }
         }
     }
 

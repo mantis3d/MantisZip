@@ -28,6 +28,7 @@ public static class L
     public const string App_CompressSeparateComplete                = "App_CompressSeparateComplete";
     public const string App_CompressSeparateProgress                = "App_CompressSeparateProgress";
     public const string App_CompressWindowFailed                   = "App_CompressWindowFailed";
+    public const string App_ConfirmTitle                           = "App_ConfirmTitle";
     public const string App_ErrorTitle                             = "App_ErrorTitle";
     public const string App_ExtractComplete                        = "App_ExtractComplete";
     public const string App_ExtractFailed                          = "App_ExtractFailed";
@@ -226,6 +227,9 @@ public static class L
     public const string Main_Ctx_ExtractHere                       = "Main_Ctx_ExtractHere";
     public const string Main_Ctx_ExtractTo                         = "Main_Ctx_ExtractTo";
     public const string Main_DirStats                              = "Main_DirStats";
+    public const string Main_DoubleClickFormatNotSupported         = "Main_DoubleClickFormatNotSupported";
+    public const string Main_DoubleClickOpenConfirm                = "Main_DoubleClickOpenConfirm";
+    public const string Main_DoubleClickPasswordNeeded             = "Main_DoubleClickPasswordNeeded";
     public const string Main_DragAddConfirm                        = "Main_DragAddConfirm";
     public const string Main_DragAddTitle                          = "Main_DragAddTitle";
     public const string Main_DragFormatUnsupported                 = "Main_DragFormatUnsupported";
@@ -288,6 +292,7 @@ public static class L
     public const string Main_Status_CopiedNames                    = "Main_Status_CopiedNames";
     public const string Main_Status_CopiedPaths                    = "Main_Status_CopiedPaths";
     public const string Main_Status_CopyFailed                     = "Main_Status_CopyFailed";
+    public const string Main_Status_DoubleClickOpened              = "Main_Status_DoubleClickOpened";
     public const string Main_Status_DragWaiting                    = "Main_Status_DragWaiting";
     public const string Main_Status_ExtractCancel                  = "Main_Status_ExtractCancel";
     public const string Main_Status_ExtractCancelled               = "Main_Status_ExtractCancelled";
@@ -689,6 +694,7 @@ public static class L
     public const string Settings_Extract_Dest_Ask                  = "Settings_Extract_Dest_Ask";
     public const string Settings_Extract_Dest_Desktop              = "Settings_Extract_Dest_Desktop";
     public const string Settings_Extract_Dest_SameDir              = "Settings_Extract_Dest_SameDir";
+    public const string Settings_Extract_DoubleClickOpenThreshold  = "Settings_Extract_DoubleClickOpenThreshold";
     public const string Settings_Extract_EnableDragExtract         = "Settings_Extract_EnableDragExtract";
     public const string Settings_Extract_OpenFolderAfter           = "Settings_Extract_OpenFolderAfter";
     public const string Settings_Language                          = "Settings_Language";

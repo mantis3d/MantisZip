@@ -334,12 +334,11 @@ public static class FileFormatDetector
             return FileFormat.Avi;
         }
 
-        // 36. Text heuristics: if no magic matched but content looks like text, return Text
-        // NOTE: DetectTextSubtype() is implemented but disabled — heuristic quality needs improvement.
+        // 36. Text heuristics: if no magic matched but content looks like text, check subtype
         if (LooksLikeText(head, Math.Min(length, 512)))
         {
-            CoreLog.Info("Detect: text heuristics matched");
-            return FileFormat.Text;
+            CoreLog.Info("Detect: text heuristics matched, checking subtype");
+            return DetectTextSubtype(head, length);
         }
 
         return FileFormat.Unknown;
@@ -655,7 +654,8 @@ public static class FileFormatDetector
     }
 
     /// <summary>
-    /// 文本子类型检测：在 LooksLikeText 通过后，进一步区分 CSV/JSON/XML/INI/HTML/Markdown。
+    /// 文本子类型检测：在 LooksLikeText 通过后，进一步区分 SVG/HTML/XML。
+    /// 仅启用高精度检测项。JSON/Markdown/CSV/INI 因误报率过高暂不启用。
     /// </summary>
     private static FileFormat DetectTextSubtype(byte[] head, int length)
     {
@@ -684,7 +684,21 @@ public static class FileFormatDetector
         if (trimmed.Length == 0)
             return FileFormat.Text;
 
-        // ── 1. XML ──
+        // ── 1. SVG（最高优先级，特征极强）──
+        if (ContainsSvgTag(trimmed))
+        {
+            CoreLog.Info("DetectTextSubtype: SVG detected");
+            return FileFormat.Svg;
+        }
+
+        // ── 2. HTML（明确的文档结构标记）──
+        if (StartsWithAny(trimmed, new[] { "<!DOCTYPE html", "<html", "<head", "<body", "<div" }, StringComparison.OrdinalIgnoreCase))
+        {
+            CoreLog.Info("DetectTextSubtype: HTML detected");
+            return FileFormat.Html;
+        }
+
+        // ── 3. XML（<?xml 前缀，可靠性高）──
         if (trimmed.StartsWith("<?xml", StringComparison.OrdinalIgnoreCase) ||
             (trimmed[0] == '<' && !trimmed.StartsWith("</") && AngleBracketDensity(content) > 0.3))
         {
@@ -692,45 +706,7 @@ public static class FileFormatDetector
             return FileFormat.Xml;
         }
 
-        // ── 2. JSON ──
-        if (trimmed[0] == '{' || trimmed[0] == '[')
-        {
-            if (HasBalancedBrackets(trimmed))
-            {
-                CoreLog.Info("DetectTextSubtype: JSON detected");
-                return FileFormat.Json;
-            }
-        }
-
-        // ── 3. HTML ──
-        if (StartsWithAny(trimmed, new[] { "<!DOCTYPE html", "<html", "<head", "<body", "<div" }, StringComparison.OrdinalIgnoreCase))
-        {
-            CoreLog.Info("DetectTextSubtype: HTML detected");
-            return FileFormat.Html;
-        }
-
-        // ── 4. Markdown ──
-        if (ContainsAny(trimmed, "# ", "## ", "---", "[](", "```", "> "))
-        {
-            CoreLog.Info("DetectTextSubtype: Markdown detected");
-            return FileFormat.Markdown;
-        }
-
-        // ── 5. CSV ──
-        if (LooksLikeCsv(content))
-        {
-            CoreLog.Info("DetectTextSubtype: CSV detected");
-            return FileFormat.Csv;
-        }
-
-        // ── 6. INI ──
-        if (LooksLikeIni(content))
-        {
-            CoreLog.Info("DetectTextSubtype: INI detected");
-            return FileFormat.Ini;
-        }
-
-        // ── 7. 兜底 ──
+        // ── 兜底 ──
         return FileFormat.Text;
     }
 
@@ -747,24 +723,32 @@ public static class FileFormatDetector
     }
 
     /// <summary>
-    /// 检查 JSON 的大括号/方括号是否基本平衡。
+    /// 检查内容中是否包含 SVG 标签特征：&lt;svg 或 xmlns="http://www.w3.org/2000/svg"。
     /// </summary>
-    private static bool HasBalancedBrackets(string s)
+    private static bool ContainsSvgTag(string s)
     {
-        int braces = 0, brackets = 0;
-        bool inString = false;
-        for (int i = 0; i < s.Length; i++)
+        // 在首 1024 字符内搜索 <svg 标签
+        int searchLen = Math.Min(s.Length, 1024);
+        for (int i = 0; i < searchLen - 4; i++)
         {
-            char c = s[i];
-            if (c == '"' && (i == 0 || s[i - 1] != '\\'))
-                inString = !inString;
-            if (inString) continue;
-            if (c == '{') braces++;
-            else if (c == '}') { braces--; if (braces < 0) return false; }
-            else if (c == '[') brackets++;
-            else if (c == ']') { brackets--; if (brackets < 0) return false; }
+            if (s[i] == '<'
+                && (s[i + 1] == 's' || s[i + 1] == 'S')
+                && (s[i + 2] == 'v' || s[i + 2] == 'V')
+                && (s[i + 3] == 'g' || s[i + 3] == 'G')
+                && (i + 4 >= s.Length || s[i + 4] == ' ' || s[i + 4] == '>' || s[i + 4] == '/' || s[i + 4] == '\t' || s[i + 4] == '\n' || s[i + 4] == '\r'))
+            {
+                return true;
+            }
         }
-        return braces == 0 && brackets == 0;
+
+        // 兜底：检查 xmlns SVG 命名空间
+        if (s.Contains("xmlns=\"http://www.w3.org/2000/svg\"", StringComparison.OrdinalIgnoreCase) ||
+            s.Contains("xmlns='http://www.w3.org/2000/svg'", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        return false;
     }
 
     /// <summary>
@@ -775,117 +759,5 @@ public static class FileFormatDetector
         foreach (var candidate in candidates)
             if (s.StartsWith(candidate, comparison)) return true;
         return false;
-    }
-
-    /// <summary>
-    /// 检查字符串是否包含目标数组中任意一项。
-    /// </summary>
-    private static bool ContainsAny(string s, params string[] candidates)
-    {
-        foreach (var candidate in candidates)
-            if (s.Contains(candidate)) return true;
-        return false;
-    }
-
-    /// <summary>
-    /// CSV 启发式检测：3 行以上且分隔符（逗号/制表符/分号）数量一致。
-    /// </summary>
-    private static bool LooksLikeCsv(string s)
-    {
-        // 按行拆分
-        var lines = SplitLines(s);
-        if (lines.Count < 3)
-            return false;
-
-        char[] delimiters = { ',', '\t', ';' };
-        foreach (char delim in delimiters)
-        {
-            int? expectedCount = null;
-            bool consistent = true;
-            int nonEmptyCount = 0;
-
-            foreach (string line in lines)
-            {
-                string trimmed = line.Trim();
-                if (trimmed.Length == 0) continue;
-                nonEmptyCount++;
-                int count = 0;
-                foreach (char c in trimmed)
-                    if (c == delim) count++;
-                if (expectedCount == null)
-                    expectedCount = count;
-                else if (count != expectedCount.Value)
-                {
-                    consistent = false;
-                    break;
-                }
-            }
-
-            if (consistent && expectedCount > 0 && nonEmptyCount >= 3)
-                return true;
-        }
-
-        return false;
-    }
-
-    /// <summary>
-    /// INI 启发式检测：存在 [section] 行且 key=value 比例 > 30%。
-    /// </summary>
-    private static bool LooksLikeIni(string s)
-    {
-        var lines = SplitLines(s);
-        if (lines.Count < 2)
-            return false;
-
-        int sectionCount = 0;
-        int kvpCount = 0;
-
-        foreach (string line in lines)
-        {
-            string trimmed = line.Trim();
-            if (trimmed.Length == 0 || trimmed[0] == ';' || trimmed[0] == '#')
-                continue;
-
-            if (trimmed[0] == '[' && trimmed[trimmed.Length - 1] == ']' && trimmed.Length > 2)
-                sectionCount++;
-            else if (trimmed.Contains('=') && trimmed[0] != '=' && trimmed[trimmed.Length - 1] != '=')
-                kvpCount++;
-        }
-
-        if (sectionCount == 0)
-            return false;
-
-        int total = sectionCount + kvpCount;
-        return total > 0 && (double)kvpCount / total > 0.3;
-    }
-
-    /// <summary>
-    /// 按换行符拆分字符串，返回非空行列表。
-    /// </summary>
-    private static List<string> SplitLines(string s)
-    {
-        var lines = new List<string>();
-        int start = 0;
-        for (int i = 0; i < s.Length; i++)
-        {
-            if (s[i] == '\n' || s[i] == '\r')
-            {
-                if (i > start)
-                {
-                    string line = s.Substring(start, i - start);
-                    if (line.Length > 0) lines.Add(line);
-                }
-                start = i + 1;
-                // skip \r\n or \n\r
-                if (i + 1 < s.Length && (s[i + 1] == '\n' || s[i + 1] == '\r') && s[i + 1] != s[i])
-                    start = i + 2;
-            }
-        }
-        if (start < s.Length)
-        {
-            string last = s.Substring(start);
-            if (last.Length > 0) lines.Add(last);
-        }
-        return lines;
     }
 }
