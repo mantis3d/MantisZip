@@ -3,7 +3,7 @@
 
 #define MyAppName "MantisZip"
 #ifndef MyAppVersion
-#define MyAppVersion "0.4.0"
+#define MyAppVersion "0.4.4"
 #endif
 #define MyAppPublisher "MantisZip Contributors"
 #define MyAppURL "https://github.com/mantis3d/MantisZip"
@@ -45,6 +45,10 @@ english.ShellGroup=System Integration
 english.InstallShell=Add to Windows context menu
 english.AssocGroup=File type associations
 
+; Download page (shown before installation begins)
+english.DownloadPageCaption=Download required components
+english.DownloadPageDescription=MantisZip requires .NET 9 Runtime and WebView2 Runtime to run. They will be downloaded automatically.
+
 ; Chinese (Simplified)
 chinese.ConfigPageTitle=安装配置
 chinese.ConfigDesc=选择偏好的外观和系统集成设置
@@ -54,6 +58,8 @@ chinese.ThemeDark=深色主题
 chinese.ShellGroup=系统集成
 chinese.InstallShell=添加到 Windows 右键菜单
 chinese.AssocGroup=文件关联
+chinese.DownloadPageCaption=正在下载必要组件
+chinese.DownloadPageDescription=MantisZip 需要 .NET 9 运行时和 WebView2 运行时才能运行。正在自动下载中。
 
 [Tasks]
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"
@@ -131,6 +137,8 @@ var
   AssocCheckTarGz: TNewCheckBox;
   AssocCheckGz: TNewCheckBox;
   AssocCheckIso: TNewCheckBox;
+  // Download progress page
+  DownloadPage: TDownloadWizardPage;
 
 // Create the custom configuration wizard page (theme + system integration)
 procedure CreateConfigPage;
@@ -330,6 +338,10 @@ end;
 
 procedure InitializeWizard;
 begin
+  DownloadPage := CreateDownloadPage(
+    CustomMessage('DownloadPageCaption'),
+    CustomMessage('DownloadPageDescription'),
+    '');
   CreateConfigPage;
 end;
 
@@ -382,11 +394,24 @@ begin
     end;
 end;
 
-// Download file via URLMon (built-in Windows API, no extra DLLs needed)
-function URLDownloadToFile(pCaller: Cardinal; szURL: string; szFileName: string; dwReserved: Cardinal; lpfnCB: Cardinal): Integer;
-  external 'URLDownloadToFileW@urlmon.dll stdcall';
+// Intercept the "Ready to Install" page — download prerequisites before installation begins.
+// The download happens AFTER the user clicks Install but BEFORE file copying.
+function NextButtonClick(CurPageID: Integer): Boolean;
+begin
+  Result := True;
+  if CurPageID = wpReady then
+  begin
+    DownloadPage.Clear;
+    if not IsDotNet9Installed then
+      DownloadPage.Add(DotNet9RuntimeUrl, 'dotnet-runtime-9.0-win-x64.exe', '');
+    if not IsWebView2Installed then
+      DownloadPage.Add(EvergreenBootstrapperUrl, 'MicrosoftEdgeWebview2Setup.exe', '');
 
-// Install WebView2 Runtime before app starts
+    DownloadPage.Download;
+  end;
+end;
+
+// Install runtimes (already downloaded via DownloadPage)
 // Write installer settings to AppData after install completes
 procedure CurStepChanged(CurStep: TSetupStep);
 var
@@ -400,13 +425,13 @@ begin
   if CurStep = ssPostInstall then
   begin
     // 1. First: .NET 9 Desktop Runtime (more critical — app won't start without it)
+    // File was already downloaded via DownloadPage before installation began.
     if not IsDotNet9Installed then
     begin
       BootstrapperPath := ExpandConstant('{tmp}\dotnet-runtime-9.0-win-x64.exe');
-      Log('.NET 9 Desktop Runtime not found. Downloading...');
-      if URLDownloadToFile(0, DotNet9RuntimeUrl, BootstrapperPath, 0, 0) = 0 then
+      if FileExists(BootstrapperPath) then
       begin
-        Log('Downloaded .NET 9 bootstrapper. Installing silently...');
+        Log('Installing .NET 9 Desktop Runtime...');
         if Exec(BootstrapperPath, '/quiet /install /norestart', '', SW_SHOW, ewWaitUntilTerminated, ResultCode) then
         begin
           if ResultCode = 0 then
@@ -418,19 +443,18 @@ begin
           Log('Failed to launch .NET 9 bootstrapper.');
       end
       else
-        Log('Failed to download .NET 9 bootstrapper. User may need to install manually.');
+        Log('.NET 9 bootstrapper not found. Download may have failed; user may need to install manually.');
     end
     else
       Log('.NET 9 Desktop Runtime is already installed.');
 
-    // 2. Then: WebView2 Runtime（避免阻塞文件安装进度条）
+    // 2. Then: WebView2 Runtime
     if not IsWebView2Installed then
     begin
       BootstrapperPath := ExpandConstant('{tmp}\MicrosoftEdgeWebview2Setup.exe');
-      Log('WebView2 Runtime not found. Downloading Evergreen Bootstrapper...');
-      if URLDownloadToFile(0, EvergreenBootstrapperUrl, BootstrapperPath, 0, 0) = 0 then
+      if FileExists(BootstrapperPath) then
       begin
-        Log('Downloaded bootstrapper. Installing silently...');
+        Log('Installing WebView2 Runtime...');
         if Exec(BootstrapperPath, '/silent /install', '', SW_SHOW, ewWaitUntilTerminated, ResultCode) then
         begin
           if ResultCode = 0 then
@@ -442,7 +466,7 @@ begin
           Log('Failed to launch WebView2 bootstrapper.');
       end
       else
-        Log('Failed to download WebView2 bootstrapper. User may need to install manually.');
+        Log('WebView2 bootstrapper not found. Download may have failed; user may need to install manually.');
     end
     else
       Log('WebView2 Runtime is already installed.');

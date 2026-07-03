@@ -48,6 +48,11 @@
 6. **修复**：密码输入框"取消"后再次弹出陷入循环（加 `userCancelled` 标志区分取消和密码错误）。
 7. **修改文件**: `App.Password.cs`（+294/-162 行）、`MainWindow.xaml.cs`（+111/-285 行）、`App.Extract.cs`（+32/-139 行）
 8. **新增文件**: `.sisyphus/plans/password-flow-unification.md`
+9. **installer-selfcontained.iss 完全离线安装包** — 移除 WebView2 在线下载逻辑，改为本地捆绑 Evergreen Standalone Installer
+   - 新增 `WebView2-LICENSE.txt` 微软再分发许可声明
+   - 新增 `installer\download-redist.ps1` 预下载脚本
+   - 新增 `installer\redist\MicrosoftEdgeWebView2RuntimeInstallerX64.exe`（从微软官方下载）
+   - 删除 `URLDownloadToFile` 函数和 `EvergreenBootstrapperUrl` 常量
 
 ### v0.4.4+ (2026-07-02) 压缩包路径处理一站式重构——ArchivePath 统一入口
 
