@@ -665,80 +665,31 @@ public partial class MainWindow : Window
                 // 7z 加密压缩包：需要密码才能列出条目
                 passwordHandledInCatch = true;
                 _hasEncryptedArchive = true;
-                _currentPassword = null;
-                _currentPasswordDescription = null;
-                _currentPasswordPatterns = null;
-
                 App.LogDebug("LoadArchiveAsync: encrypted 7z archive, entering password flow");
 
-                // 先尝试已保存密码
-                var match = App.TryMatchPassword(archivePath, engine, null, false, out var limitReached);
-                if (match != null)
+                var pwdResult = await App.ResolvePasswordAsync(archivePath, engine,
+                    existingItems: null, progressWindow: null, owner: this, CancellationToken.None);
+                if (pwdResult != null)
                 {
-                    _currentPassword = match.Value.Password;
-                    _currentPasswordDescription = match.Value.Description;
-                    var matchedEntry = PasswordManager.Instance.FindMatchingPasswords(archivePath)
-                        .FirstOrDefault(e => e.Password == match.Value.Password && e.Description == match.Value.Description);
-                    _currentPasswordPatterns = matchedEntry?.Patterns?.ToList();
-                    App.LogDebug("LoadArchiveAsync: matched password desc={0}", match.Value.Description);
+                    _currentPassword = pwdResult.Password;
+                    _currentPasswordDescription = pwdResult.Description;
+                    _currentPasswordPatterns = pwdResult.Patterns;
 
                     items = await engine.ListEntriesAsync(archivePath, _currentPassword);
                 }
                 else
                 {
-                    if (limitReached)
-                    {
-                        AppMessageBox.Show(L.TF(L.PwdMgr_AutoTry_LimitReached, 100),
-                            L.T(L.App_MantisZipTitle), MessageBoxButton.OK, MessageBoxImage.Warning);
-                    }
-
-                    // 所有已保存密码都失败 → 弹密码输入框
-                    App.LogDebug("LoadArchiveAsync: no saved password matched, showing dialog");
-                    while (true)
-                    {
-                        var pwdDialog = new PasswordDialog(Path.GetFileName(archivePath));
-                        pwdDialog.Owner = this;
-                        if (pwdDialog.ShowDialog() != true)
-                        {
-                            // 用户取消 → 无法加载加密 7z 压缩包（无密码无法列出条目）
-                            App.LogDebug("LoadArchiveAsync: user cancelled password dialog for encrypted 7z");
-                            throw new InvalidOperationException(
-                                "此压缩包已加密，需要密码才能打开 (This archive is encrypted, password required)");
-                        }
-
-                        var userPwd = pwdDialog.ResultPassword;
-                        if (string.IsNullOrEmpty(userPwd))
-                            throw new InvalidOperationException(
-                                "此压缩包已加密，需要密码才能打开 (This archive is encrypted, password required)");
-
-                        if (App.QuickVerifyPassword(archivePath, userPwd, engine))
-                        {
-                            _currentPassword = userPwd;
-                            _currentPasswordDescription = pwdDialog.Description;
-                            _currentPasswordPatterns = pwdDialog.Patterns?.ToList();
-                            if (pwdDialog.RememberPassword)
-                            {
-                                App.TrySavePassword(userPwd, archivePath, pwdDialog.Patterns, pwdDialog.Description);
-                            }
-
-                            items = await engine.ListEntriesAsync(archivePath, _currentPassword);
-                            break; // 密码正确，退出循环
-                        }
-
-                        // 密码错误 → 提示并重试
-                        App.LogDebug("LoadArchiveAsync: wrong password entered for '{0}'", archivePath);
-                        AppMessageBox.Show(L.T(L.Main_PasswordWrong),
-                            L.T(L.App_ErrorTitle), MessageBoxButton.OK, MessageBoxImage.Error);
-                    }
+                    // 用户取消 → 无法加载加密 7z 压缩包（无密码无法列出条目）
+                    App.LogDebug("LoadArchiveAsync: user cancelled password dialog for encrypted 7z");
+                    throw new InvalidOperationException(
+                        "此压缩包已加密，需要密码才能打开 (This archive is encrypted, password required)");
                 }
             }
 
             // Update overlay to show entry count
             ArchiveLoadingText.Text = L.TF(L.Main_Status_ProcessingEntries, items.Count);
 
-            // 检测加密条目 → 自动尝试匹配已保存的密码
-            // （仅对非 7z/RAR 加密压缩包执行；7z/RAR 加密已在上面 catch 中先获取密码后才列出条目；
-            //   或 EncryptHeaders=false 的 7z/RAR 可以无密码列出条目但无法验证密码正确性）
+            // 检测加密条目 → 自动尝试匹配已保存的密码（支持所有格式，含 EncryptHeaders=false 7z/RAR）
             if (!passwordHandledInCatch)
             {
                 _currentPassword = null;
@@ -747,86 +698,13 @@ public partial class MainWindow : Window
                 _hasEncryptedArchive = items.Any(i => i.IsEncrypted);
                 if (_hasEncryptedArchive)
                 {
-                    // SharpSevenZip 在 EncryptHeaders=false 时，用错误密码也能打开并读取 ArchiveFileData，
-                    // QuickVerifyPassword 无法验证密码正确性。因此跳过自动匹配已保存密码（TryMatchPassword），
-                    if (engine is SevenZipEngine)
+                    var pwdResult = await App.ResolvePasswordAsync(archivePath, engine,
+                        existingItems: items, progressWindow: null, owner: this, CancellationToken.None);
+                    if (pwdResult != null)
                     {
-                        App.LogDebug("LoadArchiveAsync: 7z/RAR EncryptHeaders=false, showing password dialog (no verify)");
-                        // 但保留密码输入弹窗，让用户有机会手动输入密码（不循环：因为无法用 QuickVerify 验证）
-                        var pwdDialog = new PasswordDialog(Path.GetFileName(archivePath));
-                        pwdDialog.Owner = this;
-                        if (pwdDialog.ShowDialog() == true)
-                        {
-                            var userPwd = pwdDialog.ResultPassword;
-                            if (!string.IsNullOrEmpty(userPwd))
-                            {
-                                _currentPassword = userPwd;
-                                _currentPasswordDescription = pwdDialog.Description;
-                                _currentPasswordPatterns = pwdDialog.Patterns?.ToList();
-                                // QuickVerify 不可信，但接受用户输入的密码，提取时由 SharpSevenZip 验证
-                                if (pwdDialog.RememberPassword)
-                                    App.TrySavePassword(userPwd, archivePath, pwdDialog.Patterns, pwdDialog.Description);
-                                App.LogDebug("LoadArchiveAsync: password accepted (unverified): desc='{0}'", pwdDialog.Description);
-                                UpdatePasswordStatus();
-                                UpdateEnterPasswordBtnState();
-                                SetStatus(L.T(L.Main_Status_PwdMatched));
-                            }
-                        }
-                        // 用户取消 → 以无密码状态加载（🔒 锁定图标），后续通过工具栏输入密码
-                        App.LogDebug("LoadArchiveAsync: EncryptHeaders=false 7z password flow done (pwd={0})",
-                            _currentPassword != null ? "***" : "null");
-                    }
-                    else
-                    {
-                        var match = App.TryMatchPassword(archivePath, engine, null, false, out var limitReached);
-                        if (match != null)
-                        {
-                            _currentPassword = match.Value.Password;
-                            _currentPasswordDescription = match.Value.Description;
-                            // 从密码库补全 patterns
-                            var matchedEntry = PasswordManager.Instance.FindMatchingPasswords(archivePath)
-                                .FirstOrDefault(e => e.Password == match.Value.Password && e.Description == match.Value.Description);
-                            _currentPasswordPatterns = matchedEntry?.Patterns?.ToList();
-                            App.LogDebug("LoadArchiveAsync: matched password desc={0}", match.Value.Description);
-                        }
-                        else
-                        {
-                            if (limitReached)
-                            {
-                                AppMessageBox.Show(L.TF(L.PwdMgr_AutoTry_LimitReached, 100),
-                                    L.T(L.App_MantisZipTitle), MessageBoxButton.OK, MessageBoxImage.Warning);
-                            }
-                            // 所有保存密码都失败 → 弹密码输入框让用户输入（密码错误时循环重试）
-                            App.LogDebug("LoadArchiveAsync: no saved password matched, showing dialog");
-                            while (true)
-                            {
-                                var pwdDialog = new PasswordDialog(Path.GetFileName(archivePath));
-                                pwdDialog.Owner = this;
-                                if (pwdDialog.ShowDialog() != true)
-                                    break; // 用户取消 → 以无密码状态加载（只读浏览文件名）
-
-                                var userPwd = pwdDialog.ResultPassword;
-                                if (string.IsNullOrEmpty(userPwd))
-                                    break;
-
-                                if (App.QuickVerifyPassword(archivePath, userPwd, engine))
-                                {
-                                    _currentPassword = userPwd;
-                                    _currentPasswordDescription = pwdDialog.Description;
-                                    _currentPasswordPatterns = pwdDialog.Patterns?.ToList();
-                                    if (pwdDialog.RememberPassword)
-                                    {
-                                        App.TrySavePassword(userPwd, archivePath, pwdDialog.Patterns, pwdDialog.Description);
-                                    }
-                                    break; // 密码正确，退出循环
-                                }
-
-                                // 密码错误 → 提示并重试
-                                App.LogDebug("LoadArchiveAsync: wrong password entered for '{0}'", archivePath);
-                                AppMessageBox.Show(L.T(L.Main_PasswordWrong),
-                                    L.T(L.App_ErrorTitle), MessageBoxButton.OK, MessageBoxImage.Error);
-                            }
-                        }
+                        _currentPassword = pwdResult.Password;
+                        _currentPasswordDescription = pwdResult.Description;
+                        _currentPasswordPatterns = pwdResult.Patterns;
                     }
                 }
             }
@@ -944,8 +822,8 @@ public partial class MainWindow : Window
                 App.LogDebug("ExtractAsync: using _currentPassword from toolbar");
                 try
                 {
-                    var opts = App.CreateExtractOptions();
-                    await engine.ExtractAsync(archivePath, destinationPath, _currentPassword, progress, ct, opts);
+                    var currentPwdOpts = App.CreateExtractOptions();
+                    await engine.ExtractAsync(archivePath, destinationPath, _currentPassword, progress, ct, currentPwdOpts);
                     progressWindow.Close();
                     App.LogDebug("ExtractAsync: done (_currentPassword), dest='{0}'", destinationPath);
                     SetStatus(L.TF(L.Main_Status_ExtractDone, Path.GetFileName(archivePath)));
@@ -967,73 +845,30 @@ public partial class MainWindow : Window
                 }
             }
 
-            // 先试已保存密码
-            var match = App.TryMatchPassword(archivePath, engine, progressWindow, showPwd, out var limitReached);
-            if (match != null)
-            {
-                var (pwd, desc) = match.Value;
-                if (showPwd) progressWindow.ShowPasswordMatched(pwd, desc);
+            // 统一密码解析（TryMatchPassword + 对话框循环）
+            var pwdResult = await App.ResolvePasswordAsync(archivePath, engine,
+                existingItems: null, progressWindow, this, ct);
+            var password = pwdResult?.Password;
 
-                var opts = App.CreateExtractOptions();
-                await engine.ExtractAsync(archivePath, destinationPath, pwd, progress, ct, opts);
-
-                progressWindow.Close();
-                App.LogDebug("ExtractAsync: done (saved password match), dest='{0}'", destinationPath);
-                SetStatus(L.TF(L.Main_Status_ExtractDone, Path.GetFileName(archivePath)));
-                if (AppSettings.Instance.OpenFolderAfterExtract) OpenInExplorer(destinationPath);
-                return;
-            }
-
-            // 自动尝试达到上限 → 提示用户
-            if (limitReached)
-            {
-                progressWindow.Dispatcher.Invoke(() =>
-                {
-                    AppMessageBox.Show(L.TF(L.PwdMgr_AutoTry_LimitReached, 100),
-                        L.T(L.App_MantisZipTitle), MessageBoxButton.OK, MessageBoxImage.Warning);
-                });
-            }
-
-            // 所有已L.T(L.PwdEdit_Save)L.T(L.PwdMgr_Col_Password)都失败，且L.T(L.Compress_Archive_Group)有加密条目 → 弹密码输入框
-            if (!_hasEncryptedArchive)
+            if (!_hasEncryptedArchive && password == null)
             {
                 // 非加密压缩包：直接解压，不需要密码
                 App.LogDebug("ExtractAsync: no encryption, extracting without password");
-                var opts = App.CreateExtractOptions();
-                await engine.ExtractAsync(archivePath, destinationPath, null, progress, ct, opts);
-                progressWindow.Close();
-                App.LogDebug("ExtractAsync: done (no password), dest='{0}'", destinationPath);
-                SetStatus(L.TF(L.Main_Status_ExtractDone, Path.GetFileName(archivePath)));
-                if (AppSettings.Instance.OpenFolderAfterExtract) OpenInExplorer(destinationPath);
-                return;
             }
-
-            App.LogDebug("ExtractAsync: all saved passwords failed, prompting user for password");
-            var pwdResult = App.PromptForPassword(archivePath, progressWindow, this);
-            if (pwdResult == null)
+            else if (password == null)
             {
+                // 用户取消
                 App.LogDebug("ExtractAsync: user cancelled password prompt");
                 progressWindow.Close();
                 SetStatus(L.T(L.Main_Status_ExtractCancel));
                 return;
             }
 
-            var (userPwd, remember, pwdDesc, pwdPatterns) = pwdResult.Value;
-            if (string.IsNullOrEmpty(userPwd)) { App.LogDebug("ExtractAsync: empty password provided"); progressWindow.Close(); SetStatus(L.T(L.Main_Status_ExtractCancel)); return; }
-            bool showPwdManual = _hasEncryptedArchive && AppSettings.Instance.ShowPasswordMatchNotification;
-
-            if (!await App.ExtractWithPasswordAsync(archivePath, destinationPath, engine,
-                    userPwd, L.T(L.Main_ForceLoadPwd), progressWindow, progress, ct, showPwdManual, remember, pwdDesc, pwdPatterns))
-            {
-                progressWindow.Close();
-                App.LogDebug("ExtractAsync: manual password failed (wrong password)");
-                AppMessageBox.Show(L.T(L.Main_Status_WrongPwd), L.T(L.App_ErrorTitle), MessageBoxButton.OK, MessageBoxImage.Error);
-                SetStatus(L.T(L.Main_Status_WrongPwd));
-                return;
-            }
+            var opts = App.CreateExtractOptions();
+            await engine.ExtractAsync(archivePath, destinationPath, password, progress, ct, opts);
 
             progressWindow.Close();
-            App.LogDebug("ExtractAsync: done (manual password), dest='{0}'", destinationPath);
+            App.LogDebug("ExtractAsync: done, dest='{0}'", destinationPath);
             SetStatus(L.TF(L.Main_Status_ExtractDone, Path.GetFileName(archivePath)));
             if (AppSettings.Instance.OpenFolderAfterExtract) OpenInExplorer(destinationPath);
         }

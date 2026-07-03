@@ -354,60 +354,22 @@ public partial class App : Application
                             continue;
                         }
 
-                        // 密码匹配：对加密压缩包尝试已保存密码，无匹配则弹出密码输入框
+                        // 统一密码解析（TryMatchPassword + 对话框循环）
                         string? password = null;
                         if (HasEncryptedEntries(archivePath, engine))
                         {
-                            // 1. 尝试已保存密码
-                            var match = TryMatchPassword(archivePath, engine, progressWindow, true, out _);
-                            if (match.HasValue)
+                            var pwdResult = await ResolvePasswordAsync(archivePath, engine,
+                                existingItems: null, progressWindow, null, ct);
+                            if (pwdResult == null)
                             {
-                                password = match.Value.Password;
-                                Log("--extract batch: password matched for '{0}'", archivePath);
+                                failed++;
+                                await progressWindow.Dispatcher.InvokeAsync(() =>
+                                    progressWindow.UpdateBatchItemStatus(i, BatchItemStatus.Failed,
+                                        L.T(L.App_ExtractFailed)));
+                                continue;
                             }
-                            else
-                            {
-                                // 2. 弹密码输入框（需在 UI 线程）
-                                var promptResult = await progressWindow.Dispatcher.InvokeAsync(() =>
-                                    PromptForPassword(archivePath, progressWindow, null));
-                                if (promptResult == null)
-                                {
-                                    failed++;
-                                    await progressWindow.Dispatcher.InvokeAsync(() =>
-                                        progressWindow.UpdateBatchItemStatus(i, BatchItemStatus.Failed,
-                                            L.T(L.App_ExtractFailed)));
-                                    continue;
-                                }
-                                password = promptResult.Value.Password;
-
-                                // 验证用户输入的密码
-                                if (password == null || !QuickVerifyPassword(archivePath, password, engine))
-                                {
-                                    failed++;
-                                    await progressWindow.Dispatcher.InvokeAsync(() =>
-                                        progressWindow.UpdateBatchItemStatus(i, BatchItemStatus.Failed,
-                                            L.T(L.App_WrongPassword)));
-                                    continue;
-                                }
-
-                                // 如果用户勾选了"记住"，保存到 PasswordManager
-                                if (promptResult.Value.Remember)
-                                {
-                                    try
-                                    {
-                                        var savePatterns = promptResult.Value.Patterns?.Count > 0
-                                            ? promptResult.Value.Patterns
-                                            : new List<string> { Path.GetFileName(archivePath) };
-                                        PasswordManager.Instance.AddPassword(password,
-                                            promptResult.Value.Description ?? "", savePatterns);
-                                        Log("--extract batch: password saved for '{0}'", archivePath);
-                                    }
-                                    catch (Exception pwdEx)
-                                    {
-                                        Log("--extract batch: save password failed: {0}", pwdEx.Message);
-                                    }
-                                }
-                            }
+                            password = pwdResult.Password;
+                            Log("--extract batch: password resolved for '{0}'", archivePath);
                         }
 
                         var progress = progressWindow.CreatePauseAwareProgress(
@@ -674,87 +636,26 @@ public partial class App : Application
             bool hasEncrypted = HasEncryptedEntries(archivePath, engine);
             try
             {
-                bool showPwd = hasEncrypted && AppSettings.Instance.ShowPasswordMatchNotification;
+                // 统一密码解析（TryMatchPassword + 对话框循环）
+                var pwdResult = await ResolvePasswordAsync(archivePath, engine,
+                    existingItems: null, progressWindow, null, progressWindow.CancellationToken);
+                var password = pwdResult?.Password;
 
-                // 先试已保存密码
-                var match = TryMatchPassword(archivePath, engine, progressWindow, showPwd, out var limitReached);
-                if (match != null)
+                if (!hasEncrypted && password == null)
                 {
-                    var (pwd, desc) = match.Value;
-                    LogStartup($"RunExtractStatic: matched saved password desc={desc}");
-
-                    if (showPwd) progressWindow.ShowPasswordMatched(pwd, desc);
-                    var opts = CreateExtractOptions();
-                    await engine.ExtractAsync(archivePath, dest, pwd, progress, progressWindow.CancellationToken, opts);
-
-                    await progressWindow.Dispatcher.InvokeAsync(() =>
-                    {
-                        appRef.ShutdownMode = ShutdownMode.OnExplicitShutdown;
-                        progressWindow.SetComplete(L.T(L.App_ExtractComplete));
-                    });
-                    if (settings.OpenFolderAfterExtract) OpenInExplorerStatic(dest);
-                    await progressWindow.AutoCloseOrWaitAsync(2500, () => progressWindow.Dispatcher.Invoke(() => appRef.Shutdown()));
-                    return;
+                    // 非加密压缩包：直接解压
+                    LogStartup("RunExtractStatic: not encrypted, extracting without password");
                 }
-
-                // 自动尝试达到上限 → 提示用户
-                if (limitReached)
+                else if (password == null)
                 {
-                    LogStartup("RunExtractStatic: auto-try limit reached, notifying user");
-                    await progressWindow.Dispatcher.InvokeAsync(() =>
-                    {
-                        AppMessageBox.Show(
-                            L.TF(L.PwdMgr_AutoTry_LimitReached, 100),
-                            L.T(L.App_MantisZipTitle), MessageBoxButton.OK, MessageBoxImage.Warning);
-                    });
-                }
-
-                // 所有已保存密码失败 → 弹密码输入框
-                if (!hasEncrypted)
-                {
-                    // 非加密压缩包：直接解压，不需要密码
-                    LogStartup("RunExtractStatic: no saved passwords and not encrypted, extracting without password");
-                    var opts = CreateExtractOptions();
-                    await engine.ExtractAsync(archivePath, dest, null, progress, progressWindow.CancellationToken, opts);
-                    await progressWindow.Dispatcher.InvokeAsync(() =>
-                    {
-                        appRef.ShutdownMode = ShutdownMode.OnExplicitShutdown;
-                        progressWindow.SetComplete(L.T(L.App_ExtractComplete));
-                    });
-                    if (settings.OpenFolderAfterExtract) OpenInExplorerStatic(dest);
-                    await progressWindow.AutoCloseOrWaitAsync(2500, () => progressWindow.Dispatcher.Invoke(() => appRef.Shutdown()));
-                    return;
-                }
-
-                LogStartup("RunExtractStatic: all saved passwords failed, showing PasswordDialog");
-                var pwdResult = PromptForPassword(archivePath, progressWindow, null);
-                if (pwdResult == null)
-                {
+                    // 用户取消
+                    LogStartup("RunExtractStatic: user cancelled password dialog");
                     await progressWindow.Dispatcher.InvokeAsync(() => appRef.Shutdown());
                     return;
                 }
 
-                var (userPwd, remember, pwdDesc, pwdPatterns) = pwdResult.Value;
-                if (string.IsNullOrEmpty(userPwd))
-                {
-                    await progressWindow.Dispatcher.InvokeAsync(() => appRef.Shutdown());
-                    return;
-                }
-                LogStartup($"RunExtractStatic: user entered password (remember={remember})");
-
-                // QuickVerify + 解压（带保存密码）
-                bool showPwdManual = AppSettings.Instance.ShowPasswordMatchNotification;
-                if (!await ExtractWithPasswordAsync(archivePath, dest, engine, userPwd, L.T(L.Main_ForceLoadPwd),
-                        progressWindow, progress, progressWindow.CancellationToken, showPwdManual, remember,
-                        pwdDesc, pwdPatterns))
-                {
-                    await progressWindow.Dispatcher.InvokeAsync(() =>
-                    {
-                        AppMessageBox.Show(L.T(L.Main_Status_WrongPwd), L.T(L.App_ErrorTitle), MessageBoxButton.OK, MessageBoxImage.Error);
-                        appRef.Shutdown();
-                    });
-                    return;
-                }
+                var opts = CreateExtractOptions();
+                await engine.ExtractAsync(archivePath, dest, password, progress, progressWindow.CancellationToken, opts);
 
                 await progressWindow.Dispatcher.InvokeAsync(() =>
                 {

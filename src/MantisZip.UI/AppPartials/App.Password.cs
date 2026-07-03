@@ -20,40 +20,6 @@ namespace MantisZip.UI;
 public partial class App : Application
 {
     /// <summary>
-    /// 判断 QuickVerifyPassword 的结果是否可信，用于自动匹配已保存密码。
-    /// 对 EncryptHeaders=false 的 7z/RAR，QuickVerifyPassword 对所有密码都返回 true
-    /// （ArchiveFileData 不需要密码即可读取），因此不可信，应跳过自动匹配。
-    /// </summary>
-    internal static bool CanTrustQuickVerify(string archivePath, IArchiveEngine engine)
-    {
-        // 只有 SharpSevenZip 引擎存在此问题
-        if (engine is SevenZipEngine)
-        {
-            try
-            {
-                using var extractor = new SharpSevenZipExtractor(archivePath);
-                var afd = extractor.ArchiveFileData;
-                // ArchiveFileData 成功 → EncryptHeaders=false
-                // 如果有加密条目则无法验证密码 → 不可信
-                bool hasEncrypted = afd.Any(e => !e.IsDirectory && e.Encrypted);
-                if (hasEncrypted)
-                {
-                    LogDebug("CanTrustQuickVerify: 7z/RAR EncryptHeaders=false with encrypted entries, cannot trust QuickVerify");
-                    return false;
-                }
-                // 无加密条目 → 不需要密码
-                return true;
-            }
-            catch
-            {
-                // ArchiveFileData 抛出异常 → EncryptHeaders=true → 密码验证可靠
-                return true;
-            }
-        }
-        return true;
-    }
-
-    /// <summary>
     /// 从已保存密码中匹配并快速验证。返回 (密码, 描述) 或 null。
     /// limitReached 表示匹配到的密码超过上限（防暴力破解），已截断。
     /// </summary>
@@ -61,15 +27,6 @@ public partial class App : Application
         string archivePath, IArchiveEngine engine, ProgressWindow? progressWindow,
         bool showPwdSection, out bool limitReached)
     {
-        // 对不可信引擎跳过已保存密码自动匹配（如 EncryptHeaders=false 的 7z/RAR），
-        // 避免 QuickVerifyPassword 误判导致错误密码被标记为"匹配"。
-        if (!CanTrustQuickVerify(archivePath, engine))
-        {
-            LogDebug("TryMatchPassword: QuickVerify not trusted for this archive, skipping saved password matching");
-            limitReached = false;
-            return null;
-        }
-
         const int maxAttempts = 100;
         var allMatches = PasswordManager.Instance.FindMatchingPasswords(archivePath);
         limitReached = allMatches.Count > maxAttempts;
@@ -186,37 +143,155 @@ public partial class App : Application
     }
 
     /// <summary>
-    /// QuickVerify + 全量解压 + 密码区 UI 更新。
-    /// 解压成功返回 true，密码错误弹窗后返回 false。
+    /// 统一密码解析的结果。
     /// </summary>
-    internal static async Task<bool> ExtractWithPasswordAsync(
-        string archivePath, string destinationPath, IArchiveEngine engine,
-        string password, string description, ProgressWindow progressWindow,
-        IProgress<ArchiveProgress> progress, CancellationToken ct,
-        bool showPwdSection, bool? rememberPwd = null,
-        string? pwdDesc = null, List<string>? pwdPatterns = null)
+    internal sealed class PasswordResult
     {
-        LogDebug("ExtractWithPasswordAsync: archive='{0}', dest='{1}', desc='{2}', remember={3}",
-            archivePath, destinationPath, description, rememberPwd);
-        if (showPwdSection) progressWindow.ShowPasswordAttempt(description);
-        if (!QuickVerifyPassword(archivePath, password, engine))
+        public string Password { get; set; } = "";
+        public string? Description { get; set; }
+        public List<string>? Patterns { get; set; }
+        /// <summary>密码是否来自已保存的密码库（而非用户手动输入）。</summary>
+        public bool IsFromSaved { get; set; }
+    }
+
+    /// <summary>
+    /// 统一密码解析入口。处理所有格式的密码获取逻辑：
+    /// 1. 检查是否需要密码
+    /// 2. 尝试已保存密码（TryMatchPassword）
+    /// 3. 弹出密码输入框让用户输入（循环验证直到通过或取消）
+    /// 4. 返回 PasswordResult 或 null（用户取消/无需密码）
+    ///
+    /// progressWindow 用于执行 UI 线程调度（对话框）；
+    /// 如果 progressWindow 为 null，调用方必须在 UI 线程上，且需提供 owner。
+    /// </summary>
+    internal static async Task<PasswordResult?> ResolvePasswordAsync(
+        string archivePath,
+        IArchiveEngine engine,
+        IReadOnlyList<MantisZip.Core.Abstractions.ArchiveItem>? existingItems,
+        ProgressWindow? progressWindow,
+        Window? owner,
+        CancellationToken ct)
+    {
+        // Step 1: 检查是否需要密码
+        bool hasEncrypted;
+        if (existingItems != null)
         {
-            LogDebug("ExtractWithPasswordAsync: quick verify failed for '{0}'", description);
-            return false;
+            hasEncrypted = existingItems.Any(i => i.IsEncrypted);
+        }
+        else
+        {
+            // existingItems==null → 无密码无法列出（EncryptHeaders=true 7z）
+            hasEncrypted = true;
         }
 
-        LogDebug("ExtractWithPasswordAsync: quick verify passed for '{0}'", description);
-        if (showPwdSection) progressWindow.ShowPasswordMatched(password, description);
-
-        var opts = CreateExtractOptions();
-        await engine.ExtractAsync(archivePath, destinationPath, password, progress, ct, opts);
-        LogDebug("ExtractWithPasswordAsync: extraction done");
-
-        if (rememberPwd == true && !string.IsNullOrEmpty(password))
+        if (!hasEncrypted)
         {
-            TrySavePassword(password, archivePath, pwdPatterns, pwdDesc);
+            LogDebug("ResolvePasswordAsync: no encrypted entries, skipping");
+            return null;
         }
-        return true;
+
+        LogDebug("ResolvePasswordAsync: archive='{0}', engine={1}", archivePath, engine.GetType().Name);
+
+        bool showPwd = AppSettings.Instance.ShowPasswordMatchNotification;
+
+        // Step 2: 尝试已保存密码
+        var match = TryMatchPassword(archivePath, engine, progressWindow, showPwd, out var limitReached);
+        if (match != null)
+        {
+            LogDebug("ResolvePasswordAsync: saved password matched: desc='{0}'", match.Value.Description);
+            var matchedEntry = PasswordManager.Instance.FindMatchingPasswords(archivePath)
+                .FirstOrDefault(e => e.Password == match.Value.Password && e.Description == match.Value.Description);
+            return new PasswordResult
+            {
+                Password = match.Value.Password,
+                Description = match.Value.Description,
+                Patterns = matchedEntry?.Patterns?.ToList(),
+                IsFromSaved = true
+            };
+        }
+
+        if (limitReached && progressWindow != null)
+        {
+            await progressWindow.Dispatcher.InvokeAsync(() =>
+                AppMessageBox.Show(L.TF(L.PwdMgr_AutoTry_LimitReached, 100),
+                    L.T(L.App_MantisZipTitle), MessageBoxButton.OK, MessageBoxImage.Warning));
+        }
+
+        // Step 3: 密码对话框循环
+        LogDebug("ResolvePasswordAsync: no saved password matched, prompting user");
+        while (true)
+        {
+            ct.ThrowIfCancellationRequested();
+
+            PasswordResult? dialogResult;
+            if (progressWindow != null)
+            {
+                // 通过 progressWindow.Dispatcher 调度到 UI 线程
+                var prompt = PromptForPassword(archivePath, progressWindow, owner);
+                if (prompt == null) return null;
+                var (userPwd, remember, pwdDesc, pwdPatterns) = prompt.Value;
+                if (string.IsNullOrEmpty(userPwd)) return null;
+
+                if (QuickVerifyPassword(archivePath, userPwd, engine))
+                {
+                    if (remember) TrySavePassword(userPwd, archivePath, pwdPatterns, pwdDesc);
+                    return new PasswordResult
+                    {
+                        Password = userPwd,
+                        Description = pwdDesc,
+                        Patterns = pwdPatterns?.ToList(),
+                        IsFromSaved = false
+                    };
+                }
+
+                // 密码错误
+                await progressWindow.Dispatcher.InvokeAsync(() =>
+                    AppMessageBox.Show(L.T(L.Main_PasswordWrong), L.T(L.App_ErrorTitle),
+                        MessageBoxButton.OK, MessageBoxImage.Error));
+            }
+            else
+            {
+                // 无 progressWindow：调用方必须在 UI 线程上
+                if (owner == null)
+                {
+                    LogDebug("ResolvePasswordAsync: no owner and no progressWindow, cannot show dialog");
+                    return null;
+                }
+
+                bool userCancelled = false;
+                dialogResult = await owner.Dispatcher.InvokeAsync(() =>
+                {
+                    var dlg = new PasswordDialog(Path.GetFileName(archivePath));
+                    dlg.Owner = owner;
+                    if (dlg.ShowDialog() != true) { userCancelled = true; return null; }
+
+                    var userPwd = dlg.ResultPassword;
+                    if (string.IsNullOrEmpty(userPwd)) { userCancelled = true; return null; }
+
+                    if (QuickVerifyPassword(archivePath, userPwd, engine))
+                    {
+                        if (dlg.RememberPassword)
+                            TrySavePassword(userPwd, archivePath, dlg.Patterns, dlg.Description);
+                        return new PasswordResult
+                        {
+                            Password = userPwd,
+                            Description = dlg.Description,
+                            Patterns = dlg.Patterns?.ToList(),
+                            IsFromSaved = false
+                        };
+                    }
+
+                    // 密码错误 → 由外层 while 循环重试
+                    AppMessageBox.Show(L.T(L.Main_PasswordWrong), L.T(L.App_ErrorTitle),
+                        MessageBoxButton.OK, MessageBoxImage.Error);
+                    return null;
+                });
+
+                if (userCancelled) return null;           // 用户取消 → 退出整个流程
+                if (dialogResult != null) return dialogResult; // 密码正确 → 返回
+                // null + !userCancelled → 密码错误 → 继续循环
+            }
+        }
     }
 
     /// <summary>
@@ -249,9 +324,9 @@ public partial class App : Application
 
     /// <summary>
     /// 快速验证密码是否正确——读第一个加密条目 1 字节（ZIP），
-    /// 或检查能否用密码打开压缩包（7z）。
-    /// 对于 EncryptHeaders=false 的 7z 压缩包，仅检查 ArchiveFileData 是否可读，
-    /// 密码的真正验证将延迟到实际解压/预览时进行。
+    /// 或提取最小加密条目的前 ~8KB（7z/RAR）。
+    /// 对 EncryptHeaders=false 的 7z/RAR，ArchiveFileData 无密码即可读取，
+    /// 因此需要真正提取一个加密条目来验证密码。
     /// 只捕获密码相关异常，系统级错误向上传播。
     /// </summary>
     internal static bool QuickVerifyPassword(string archivePath, string password, IArchiveEngine engine)
@@ -282,20 +357,35 @@ public partial class App : Application
                 using var extractor = new SharpSevenZipExtractor(archivePath, password);
                 var afd = extractor.ArchiveFileData;
                 var total = afd.Count;
-                var encrypted = afd.Count(e => !e.IsDirectory && e.Encrypted);
+                var encrypted = afd.Where(e => !e.IsDirectory && e.Encrypted).ToList();
                 TraceLog("QuickVerifyPassword(7z): archive='{0}', totalEntries={1}, encrypted={2}",
-                    archivePath, total, encrypted);
+                    archivePath, total, encrypted.Count);
 
-                // SharpSevenZip 在未加密文件头（EncryptHeaders=false）时，用错误密码也能
-                // 打开并读取 ArchiveFileData，因此仅读取文件列表不足以验证密码正确性。
-                // 但如果 EncryptHeaders=true，ArchiveFileData 读取本身就会因密码错误抛异常，
-                // 被外层 catch(IsPasswordError) 捕获返回 false。
-                // 对于 EncryptHeaders=false，密码验证将延迟到实际解压/预览时进行。
-                // 届时 ExtractFile 会以 "File is corrupted. Data error has occured." 表示密码错误，
-                // UI 应将其视为密码错误并重新提示输入。
+                if (encrypted.Count == 0)
+                {
+                    // 无加密条目 → 无需密码验证
+                    TraceLog("QuickVerifyPassword(7z): no encrypted entries, password treated as valid");
+                    return true;
+                }
 
-                TraceLog("QuickVerifyPassword(7z): password accepted (archive opened OK) for archive='{0}'", archivePath);
-                return true;
+                // EncryptHeaders=true 时，ArchiveFileData 会在密码错误时抛出异常被外层捕获；
+                // 能到达此处说明密码对 EncryptHeaders=true 已验证通过。
+                // EncryptHeaders=false 时 ArchiveFileData 无密码也能读取，需要实际提取来验证。
+                // 选最小加密条目以减少提取开销。
+                var smallest = encrypted.OrderBy(e => e.Size).First();
+                try
+                {
+                    using var verifyStream = new BoundedWriteStream(maxBytes: 8192);
+                    extractor.ExtractFile(smallest.Index, verifyStream);
+                    TraceLog("QuickVerifyPassword(7z): password OK for archive='{0}'", archivePath);
+                    return true;
+                }
+                catch (Exception ex) when (IsPasswordOrCorruptedDataError(ex, true))
+                {
+                    TraceLog("QuickVerifyPassword(7z): FAILED - password wrong or data corrupted: [{0}] {1}",
+                        ex.GetType().Name, ex.Message);
+                    return false;
+                }
             }
 
             // TarGzEngine 不支持加密
@@ -308,6 +398,36 @@ public partial class App : Application
             TraceLog("QuickVerifyPassword: FAILED for archive='{0}', password len={1}: [{2}] {3}",
                 archivePath, password?.Length ?? -1, ex.GetType().Name, ex.Message);
             return false;
+        }
+    }
+
+    /// <summary>
+    /// 限制写入量的 Stream，用于密码验证时只提取一小部分数据即可确认密码正确。
+    /// 写入超过 maxBytes 后静默丢弃，不抛异常（避免干扰 SharpSevenZip 内部状态机）。
+    /// </summary>
+    private sealed class BoundedWriteStream : Stream
+    {
+        private long _written;
+        private readonly long _maxBytes;
+
+        public BoundedWriteStream(long maxBytes) { _maxBytes = maxBytes; }
+
+        public override bool CanRead => false;
+        public override bool CanSeek => false;
+        public override bool CanWrite => true;
+        public override long Length => _written;
+        public override long Position { get => _written; set => throw new NotSupportedException(); }
+
+        public override void Flush() { }
+        public override int Read(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+        public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+        public override void SetLength(long value) => throw new NotSupportedException();
+
+        public override void Write(byte[] buffer, int offset, int count)
+        {
+            if (_written >= _maxBytes) return;
+            var toWrite = Math.Min(count, _maxBytes - _written);
+            _written += toWrite;
         }
     }
 

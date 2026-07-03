@@ -34,16 +34,20 @@
 2. 新建文件：`FileFormatDetector.cs`（650+ 行）、`FileFormatHelper.cs`（95 行）
 3. 修改文件：`FileFormatInfo.cs`（追加 11 枚举值）、`ArchiveEntryExtractor.cs`（+224 行）、`AppSettings.cs`、`ArchiveEngine.cs`（+60 行魔数兜底 + 映射）、`MainWindow.Preview.cs`（+180 行魔数路由 + 冲突切换）、`MainWindow.Preview.Text.cs`（文本左对齐修复）
 
-### v0.4.4+ (2026-07-02) EncryptHeaders=false 7z 密码验证修复
+### v0.4.5 (2026-07-03) 密码流程统一 + QuickVerify 7z 扩展
 
-1. **修复 EncryptHeaders=false 7z 密码验证** — SharpSevenZip 在 EncryptHeaders=false 时，`ArchiveFileData` 无需密码即可读取，导致 `QuickVerifyPassword` 对所有密码都返回 true：
-   - **`CanTrustQuickVerify()`（新建）**：检测 EncryptHeaders=false 7z/RAR，跳过不可信的已保存密码自动匹配
-   - **`TryMatchPassword`**：不可信时返回 null，避免错误密码被标记为"匹配"
-   - **`LoadArchiveAsync`**：SevenZipEngine EncryptHeaders=false 分支跳过 TryMatchPassword 但仍弹出密码输入对话框（用户取消→🔒，用户输入→🔓）
-   - **`ExtractAsync`**：优先使用 `_currentPassword`（工具栏已输入时不再重复弹窗）
-   - **`IsPasswordOrCorruptedDataError()`（新建）**：将 SharpSevenZip 的 "data error" 识别为密码错误（EncryptHeaders=false 时错误密码抛出此异常）
-   - **`RunExtractStatic`/`HandleExtractBatchCore`**：同样适配 "data error" → 密码错误
-2. **修改文件（3 个）**：`App.Password.cs`（+74 行）、`MainWindow.xaml.cs`（+188 行）、`App.Extract.cs`（+18 行）
+1. **QuickVerifyPassword 扩展支持 7z EncryptHeaders=false** — 新增 `BoundedWriteStream`（写入 ~8KB 后静默丢弃），提取最小加密条目验证密码。所有格式的 QuickVerify 现在都可靠。
+2. **删除 `CanTrustQuickVerify`** — QuickVerify 对所有格式可靠，不再需要此区分。
+3. **`ResolvePasswordAsync` 统一密码入口** — 新增 `PasswordResult` 类 + 统一方法，涵盖：检查加密 → TryMatchPassword → 对话框循环。所有调用方通过同一入口获取密码。
+4. **调用方大幅简化**：
+   - `LoadArchiveAsync`：~100 行分支逻辑 → 2 个 ResolvePasswordAsync 调用
+   - `ExtractAsync`：~50 行 TryMatchPassword+ExtractWithPasswordAsync → ResolvePasswordAsync
+   - `RunExtractStatic`：~60 行 → ResolvePasswordAsync
+   - `HandleExtractBatchCore`：~40 行 → ResolvePasswordAsync
+5. **删除 `ExtractWithPasswordAsync`** — 不再使用。
+6. **修复**：密码输入框"取消"后再次弹出陷入循环（加 `userCancelled` 标志区分取消和密码错误）。
+7. **修改文件**: `App.Password.cs`（+294/-162 行）、`MainWindow.xaml.cs`（+111/-285 行）、`App.Extract.cs`（+32/-139 行）
+8. **新增文件**: `.sisyphus/plans/password-flow-unification.md`
 
 ### v0.4.4+ (2026-07-02) 压缩包路径处理一站式重构——ArchivePath 统一入口
 
