@@ -3,7 +3,8 @@ bin/
 obj/
 out/
 publish_output*/
-installer/
+installer/*
+!installer/download-redist.ps1
 
 
 # IDE
