@@ -53,6 +53,68 @@ public partial class DynamicFormatOptionsPanel : UserControl
         }
     }
 
+    /// <summary>7z solid block size. null if not 7z mode.</summary>
+    public string? SevenZipSolidBlockSize
+    {
+        get
+        {
+            if (SelectedFormat != "7z") return null;
+            if (SolidBlockSizeCombo.SelectedItem is ComboBoxItem item)
+                return item.Tag as string;
+            return "";
+        }
+    }
+
+    /// <summary>7z dictionary size (bytes). null if not 7z mode.</summary>
+    public int? SevenZipDictionarySize
+    {
+        get
+        {
+            if (SelectedFormat != "7z") return null;
+            if (DictSizeCombo.SelectedItem is ComboBoxItem item
+                && int.TryParse(item.Tag?.ToString(), out var val) && val > 0)
+                return val;
+            return null;
+        }
+    }
+
+    /// <summary>7z num fast bytes / word size. null if not 7z mode.</summary>
+    public int? SevenZipNumFastBytes
+    {
+        get
+        {
+            if (SelectedFormat != "7z") return null;
+            if (WordSizeCombo.SelectedItem is ComboBoxItem item
+                && int.TryParse(item.Tag?.ToString(), out var val) && val > 0)
+                return val;
+            return null;
+        }
+    }
+
+    /// <summary>7z match finder. null if not 7z mode.</summary>
+    public string? SevenZipMatchFinder
+    {
+        get
+        {
+            if (SelectedFormat != "7z") return null;
+            if (MatchFinderCombo.SelectedItem is ComboBoxItem item)
+                return item.Tag as string;
+            return null;
+        }
+    }
+
+    /// <summary>ZIP compression method. null if not zip mode.</summary>
+    public string? ZipCompressionMethod
+    {
+        get
+        {
+            if (SelectedFormat != "zip") return null;
+            if (ZipMethodCombo.SelectedItem is ComboBoxItem item)
+                return item.Tag as string;
+            return "deflate";
+        }
+    }
+
     // ── Constructor ───────────────────────────────────────────────────────────
 
     public DynamicFormatOptionsPanel()
@@ -70,6 +132,12 @@ public partial class DynamicFormatOptionsPanel : UserControl
         }
     }
 
+    private void SolidCheck_Changed(object sender, RoutedEventArgs e)
+    {
+        // 固实不勾选时，固实块大小禁用
+        SolidBlockSizeCombo.IsEnabled = SolidCheck.IsChecked == true;
+    }
+
     /// <summary>
     /// 从 AppSettings 加载默认值，预填到各控件中。
     /// </summary>
@@ -84,6 +152,13 @@ public partial class DynamicFormatOptionsPanel : UserControl
             { EncodingCombo.SelectedIndex = i; break; }
         }
 
+        // ZIP 压缩方法
+        for (int i = 0; i < ZipMethodCombo.Items.Count; i++)
+        {
+            if (ZipMethodCombo.Items[i] is ComboBoxItem item && (string)item.Tag == s.ZipCompressionMethod)
+            { ZipMethodCombo.SelectedIndex = i; break; }
+        }
+
         // 7z 压缩方法
         for (int i = 0; i < MethodCombo.Items.Count; i++)
         {
@@ -93,6 +168,39 @@ public partial class DynamicFormatOptionsPanel : UserControl
 
         // 7z 固实
         SolidCheck.IsChecked = s.SevenZipSolid;
+        SolidBlockSizeCombo.IsEnabled = s.SevenZipSolid;
+
+        // 7z 固实块大小
+        for (int i = 0; i < SolidBlockSizeCombo.Items.Count; i++)
+        {
+            if (SolidBlockSizeCombo.Items[i] is ComboBoxItem item && (string)item.Tag == s.SevenZipSolidBlockSize)
+            { SolidBlockSizeCombo.SelectedIndex = i; break; }
+        }
+
+        // 7z 字典大小
+        for (int i = 0; i < DictSizeCombo.Items.Count; i++)
+        {
+            if (DictSizeCombo.Items[i] is ComboBoxItem item
+                && int.TryParse(item.Tag?.ToString(), out var val) && val > 0
+                && val == s.SevenZipDictionarySize)
+            { DictSizeCombo.SelectedIndex = i; break; }
+        }
+
+        // 7z Word Size
+        for (int i = 0; i < WordSizeCombo.Items.Count; i++)
+        {
+            if (WordSizeCombo.Items[i] is ComboBoxItem item
+                && int.TryParse(item.Tag?.ToString(), out var val) && val > 0
+                && val == s.SevenZipNumFastBytes)
+            { WordSizeCombo.SelectedIndex = i; break; }
+        }
+
+        // 7z 匹配器
+        for (int i = 0; i < MatchFinderCombo.Items.Count; i++)
+        {
+            if (MatchFinderCombo.Items[i] is ComboBoxItem item && (string)item.Tag == s.SevenZipMatchFinder)
+            { MatchFinderCombo.SelectedIndex = i; break; }
+        }
     }
 
     private void UpdatePanel()
@@ -110,6 +218,7 @@ public partial class DynamicFormatOptionsPanel : UserControl
                 break;
             case "7z":
                 SevenZPanel.Visibility = Visibility.Visible;
+                SolidBlockSizeCombo.IsEnabled = SolidCheck.IsChecked == true;
                 break;
             case "tar.gz":
             case "tgz":

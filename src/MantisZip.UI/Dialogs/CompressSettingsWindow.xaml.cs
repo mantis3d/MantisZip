@@ -296,6 +296,22 @@ public partial class CompressSettingsWindow : Window
         CommentDistributionPanel.IsEnabled = _outputMode == CompressOutputMode.Separate;
     }
 
+    /// <summary>读取密码 Tab 的 ZIP 加密方式选择。</summary>
+    private string GetZipEncryptionMethod()
+    {
+        if (EncryptMethodCombo?.SelectedItem is ComboBoxItem item)
+            return item.Tag?.ToString() ?? "aes256";
+        return "aes256";
+    }
+
+    /// <summary>读取密码 Tab 的 7z 加密文件头选项。</summary>
+    private bool GetSevenZipEncryptHeaders()
+    {
+        if (EncryptHeadersCheck?.IsChecked == true)
+            return true;
+        return false;
+    }
+
     private void TabControl_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
     {
         if (e.Source is TabControl)
@@ -422,6 +438,13 @@ public partial class CompressSettingsWindow : Window
             FileNameEncoding = FormatOptionsPanel.FileNameEncoding,
             SevenZipCompressionMethod = FormatOptionsPanel.SevenZipCompressionMethod,
             SevenZipSolid = FormatOptionsPanel.SevenZipSolid,
+            SevenZipSolidBlockSize = FormatOptionsPanel.SevenZipSolidBlockSize,
+            SevenZipDictionarySize = FormatOptionsPanel.SevenZipDictionarySize,
+            SevenZipNumFastBytes = FormatOptionsPanel.SevenZipNumFastBytes,
+            SevenZipMatchFinder = FormatOptionsPanel.SevenZipMatchFinder,
+            ZipCompressionMethod = FormatOptionsPanel.ZipCompressionMethod,
+            ZipEncryptionMethod = GetZipEncryptionMethod(),
+            SevenZipEncryptHeaders = GetSevenZipEncryptHeaders(),
         };
         var outputPaths = CompressService.GetOutputPaths(request);
         progressWindow.InitBatchMode(outputPaths);
@@ -498,6 +521,13 @@ public partial class CompressSettingsWindow : Window
             FileNameEncoding = FormatOptionsPanel.FileNameEncoding,
             SevenZipCompressionMethod = FormatOptionsPanel.SevenZipCompressionMethod,
             SevenZipSolid = FormatOptionsPanel.SevenZipSolid,
+            SevenZipSolidBlockSize = FormatOptionsPanel.SevenZipSolidBlockSize,
+            SevenZipDictionarySize = FormatOptionsPanel.SevenZipDictionarySize,
+            SevenZipNumFastBytes = FormatOptionsPanel.SevenZipNumFastBytes,
+            SevenZipMatchFinder = FormatOptionsPanel.SevenZipMatchFinder,
+            ZipCompressionMethod = FormatOptionsPanel.ZipCompressionMethod,
+            ZipEncryptionMethod = GetZipEncryptionMethod(),
+            SevenZipEncryptHeaders = GetSevenZipEncryptHeaders(),
         };
         var outputPaths = CompressService.GetOutputPaths(request);
         progressWindow.InitBatchMode(outputPaths);
@@ -599,6 +629,13 @@ public partial class CompressSettingsWindow : Window
             FileNameEncoding = FormatOptionsPanel.FileNameEncoding,
             SevenZipCompressionMethod = FormatOptionsPanel.SevenZipCompressionMethod,
             SevenZipSolid = FormatOptionsPanel.SevenZipSolid,
+            SevenZipSolidBlockSize = FormatOptionsPanel.SevenZipSolidBlockSize,
+            SevenZipDictionarySize = FormatOptionsPanel.SevenZipDictionarySize,
+            SevenZipNumFastBytes = FormatOptionsPanel.SevenZipNumFastBytes,
+            SevenZipMatchFinder = FormatOptionsPanel.SevenZipMatchFinder,
+            ZipCompressionMethod = FormatOptionsPanel.ZipCompressionMethod,
+            ZipEncryptionMethod = GetZipEncryptionMethod(),
+            SevenZipEncryptHeaders = GetSevenZipEncryptHeaders(),
         };
         var outputPaths = CompressService.GetOutputPaths(request);
         progressWindow.InitBatchMode(outputPaths);

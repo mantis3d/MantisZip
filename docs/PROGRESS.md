@@ -49,21 +49,18 @@
 7. **修改文件**: `App.Password.cs`（+294/-162 行）、`MainWindow.xaml.cs`（+111/-285 行）、`App.Extract.cs`（+32/-139 行）
 8. **新增文件**: `.sisyphus/plans/password-flow-unification.md`
 
-### v0.4.4+ (2026-07-02) 压缩包路径处理一站式重构——ArchivePath 统一入口
+### v0.4.5+ (2026-07-03) 压缩选项增强——7z 字典/块/匹配器 + ZIP 方法 + 加密方式
 
-1. **新建 `ArchivePath` 类** — `ArchivePathExtensions.cs` → `ArchivePath`，压缩包路径处理的一站式入口
-   - `Normalize()`：`\` → `/` 统一分隔符，null 安全
-   - `TrimEndSeparator()`：去除尾部斜杠（保留根路径 `C:\`）
-   - `GetFileName()` / `GetDirectoryName()` / `GetFileNameWithoutExtension()`：自动处理尾部斜杠，无需调用方手动 TrimEnd
-   - `GetFileNameWithoutExtension()` 特殊处理 `.tar.gz` 双扩展名，与 `ArchiveEngine.GetFormatByExtension` 保持一致
-   - `FindEntry()`：按归一化路径在条目集合中查找
-2. **消除 4 种遗留路径处理模式**：
-   - 去除 29 处内联 `.Replace('\\', '/')` → `ArchivePath.Normalize()`
-   - 去除 16 处 `.TrimEnd('\\', '/')` → `ArchivePath.GetFileName`/`GetDirectoryName`/`GetFileNameWithoutExtension`/`TrimEndSeparator`
-   - 消除 `NormalizePathSeparators()` 扩展方法
-   - `ContextMenuHandler.cs` 保留 2 处（ShellExt 不引用 Core）
-3. **修改文件（11 个）**：`ArchivePathExtensions.cs`（新建）、`ZipEngine.cs`、`SevenZipEngine.cs`、`ArchiveEntryExtractor.cs`、`ArchiveStructureAnalyzer.cs`、`FileConflictHelper.cs`、`MainWindow.DragDrop.cs`、`App.Compress.cs`、`App.Open.cs`、`CompressSettingsWindow.xaml.cs`、`CompressSettingsWindow.Password.cs`
-
+1. **压缩选项增强计划** — `.sisyphus/plans/compression-options-enhancement.md`
+2. **AppSettings 新增 7 个默认属性**：`SevenZipSolidBlockSize`、`SevenZipDictionarySize`、`SevenZipNumFastBytes`、`SevenZipMatchFinder`、`ZipCompressionMethod`、`ZipEncryptionMethod`、`SevenZipEncryptHeaders`
+3. **ArchiveOptions 新增对应属性** — `ArchiveEngine.cs` 添加 7 个属性 + 默认值 + XML 文档
+4. **CompressRequest + BuildOptions** — `CompressService.cs` 添加 7 个 init 属性 + `BuildOptions` 传递
+5. **DynamicFormatOptionsPanel** — 7z 面板新增 4 个 ComboBox（固实块大小、字典大小、Word Size、匹配器）+ 固实联动禁用；ZIP 面板新增"压缩方法"ComboBox（Deflate/Deflate64/BZip2/LZMA/PPMd/Store）
+6. **SettingsWindow** — 压缩 Tab 新增 6 个 ComboBox + 1 个 CheckBox 设置默认值；已在 `LoadSettings`/`SaveSettings` 中添加对应逻辑
+7. **CompressSettingsWindow** — 加密 Tab 新增"加密方式"GroupBox（ZIP 加密方式 ComboBox + 7z 加密文件头 CheckBox）
+8. **SevenZipEngine** — `ConfigureCompressor` 应用新参数（CustomParameters `s`、LzmaDictionarySize、LzmaNumFastBytes、LzmaMatchFinder、EncryptHeaders）
+9. **ZipEngine** — 加密路径使用 SharpSevenZip `CompressionMethod` + `ZipEncryptionMethod`；非加密路径使用 SharpCompress `CompressionType`；支持 Deflate64/BZip2/LZMA/PPMd/Store
+10. **修改文件（12 个）**：`AppSettings.cs`、`ArchiveEngine.cs`、`CompressService.cs`、`DynamicFormatOptionsPanel.xaml`、`DynamicFormatOptionsPanel.xaml.cs`、`SettingsWindow.xaml`、`SettingsWindow.xaml.cs`、`CompressSettingsWindow.xaml`、`CompressSettingsWindow.xaml.cs`、`SevenZipEngine.cs`、`ZipEngine.cs`、`PROGRESS.md`
 
 ### v0.4.4+ (2026-07-02) 压缩包路径处理一站式重构——ArchivePath 统一入口
 
@@ -79,6 +76,7 @@
    - 消除 `NormalizePathSeparators()` 扩展方法
    - `ContextMenuHandler.cs` 保留 2 处（ShellExt 不引用 Core）
 3. **修改文件（11 个）**：`ArchivePathExtensions.cs`（新建）、`ZipEngine.cs`、`SevenZipEngine.cs`、`ArchiveEntryExtractor.cs`、`ArchiveStructureAnalyzer.cs`、`FileConflictHelper.cs`、`MainWindow.DragDrop.cs`、`App.Compress.cs`、`App.Open.cs`、`CompressSettingsWindow.xaml.cs`、`CompressSettingsWindow.Password.cs`
+
 
 ### v0.4.3+ (2026-07-01) NoDotNet 安装包增强——.NET 9 自动下载
 

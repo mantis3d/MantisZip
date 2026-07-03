@@ -173,6 +173,8 @@
                                 <RowDefinition Height="Auto"/>
                                 <RowDefinition Height="Auto"/>
                                 <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
                             </Grid.RowDefinitions>
 
                             <!-- 从密码库选择 -->
@@ -291,6 +293,34 @@
                                      </Grid>
                                 </StackPanel>
                             </Border>
+
+                            <!-- 加密方式（仅加密启用时可见） -->
+                            <GroupBox Grid.Row="4" Header="加密方式" Margin="0,0,0,4"
+                                      BorderBrush="{StaticResource Theme_Border}"
+                                      BorderThickness="1">
+                                <StackPanel>
+                                    <Grid Margin="0,4,0,4">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="80"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Grid.Column="0" Text="ZIP 加密:" VerticalAlignment="Center"
+                                                   Foreground="{StaticResource Theme_TextPrimary}"/>
+                                        <ComboBox x:Name="EncryptMethodCombo" Grid.Column="1" Height="24" SelectedIndex="0"
+                                                  Background="{StaticResource Theme_SurfaceBg}"
+                                                  Foreground="{StaticResource Theme_TextPrimary}"
+                                                  BorderBrush="{StaticResource Theme_Border}">
+                                            <ComboBoxItem Content="AES-256" Tag="aes256"/>
+                                            <ComboBoxItem Content="AES-192" Tag="aes192"/>
+                                            <ComboBoxItem Content="AES-128" Tag="aes128"/>
+                                            <ComboBoxItem Content="ZipCrypto" Tag="zipcrypto"/>
+                                        </ComboBox>
+                                    </Grid>
+                                    <CheckBox x:Name="EncryptHeadersCheck" Content="7z 加密文件头 (EncryptHeaders)"
+                                              Foreground="{StaticResource Theme_TextPrimary}"
+                                              Margin="0,2,0,0"/>
+                                </StackPanel>
+                            </GroupBox>
                         </Grid>
                     </StackPanel>
                 </ScrollViewer>

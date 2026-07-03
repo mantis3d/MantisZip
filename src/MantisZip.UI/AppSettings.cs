@@ -20,6 +20,13 @@ public class AppSettings
     public string ZipEncoding { get; set; } = "utf-8";         // ZIP 文件名编码：utf-8 / gbk / default
     public string SevenZipCompressionMethod { get; set; } = "LZMA2"; // 7z 压缩方法：LZMA / LZMA2 / PPMd / BZip2 / Deflate
     public bool SevenZipSolid { get; set; } = true;            // 7z 固实压缩
+    public string SevenZipSolidBlockSize { get; set; } = "";   // 7z 固实块大小：""=默认 / "64m" / "256m" / "512m" / "1g"
+    public int SevenZipDictionarySize { get; set; } = 0;       // 7z 字典大小（字节）：0=默认 / 2^24 / 2^25 / 2^27 / 2^28
+    public int SevenZipNumFastBytes { get; set; } = 0;         // 7z Word Size：0=默认 / 32 / 64 / 128 / 255
+    public string SevenZipMatchFinder { get; set; } = "";      // 7z 匹配器：""=默认 / "bt2" / "bt3" / "bt4"
+    public string ZipCompressionMethod { get; set; } = "deflate"; // ZIP 压缩方法：deflate / deflate64 / bzip2 / lzma / ppmd / store
+    public string ZipEncryptionMethod { get; set; } = "aes256";   // ZIP 加密方式：aes256 / aes192 / aes128 / zipcrypto
+    public bool SevenZipEncryptHeaders { get; set; } = true;      // 7z 加密文件名
 
     // ===== 解压 =====
     public string ExtractDestination { get; set; } = "ask"; // same-dir / desktop / last / ask

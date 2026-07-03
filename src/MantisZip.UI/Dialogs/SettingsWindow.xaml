@@ -126,6 +126,117 @@
 
                                 <CheckBox x:Name="SevenZipSolidCheck" Content="{l:L Settings_Compress_SevenZipSolid}"
                                           Foreground="{DynamicResource Theme_TextPrimary}"/>
+
+                                <Grid Margin="0,6,0,0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="110"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Text="7z 固实块大小:" VerticalAlignment="Center"
+                                               Foreground="{DynamicResource Theme_TextPrimary}"/>
+                                    <ComboBox x:Name="SevenZipBlockSizeCombo" Grid.Column="1" Width="200" HorizontalAlignment="Left"
+                                              Background="{DynamicResource Theme_WindowBg}"
+                                              Foreground="{DynamicResource Theme_TextPrimary}">
+                                        <ComboBoxItem Content="默认" Tag=""/>
+                                        <ComboBoxItem Content="64MB" Tag="64m"/>
+                                        <ComboBoxItem Content="256MB" Tag="256m"/>
+                                        <ComboBoxItem Content="512MB" Tag="512m"/>
+                                        <ComboBoxItem Content="1GB" Tag="1g"/>
+                                    </ComboBox>
+                                </Grid>
+
+                                <Grid Margin="0,6,0,0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="110"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Text="7z 字典大小:" VerticalAlignment="Center"
+                                               Foreground="{DynamicResource Theme_TextPrimary}"/>
+                                    <ComboBox x:Name="SevenZipDictCombo" Grid.Column="1" Width="200" HorizontalAlignment="Left"
+                                              Background="{DynamicResource Theme_WindowBg}"
+                                              Foreground="{DynamicResource Theme_TextPrimary}">
+                                        <ComboBoxItem Content="默认" Tag="0"/>
+                                        <ComboBoxItem Content="16MB" Tag="16777216"/>
+                                        <ComboBoxItem Content="32MB" Tag="33554432"/>
+                                        <ComboBoxItem Content="64MB" Tag="67108864"/>
+                                        <ComboBoxItem Content="128MB" Tag="134217728"/>
+                                        <ComboBoxItem Content="256MB" Tag="268435456"/>
+                                    </ComboBox>
+                                </Grid>
+
+                                <Grid Margin="0,6,0,0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="110"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Text="7z Word Size:" VerticalAlignment="Center"
+                                               Foreground="{DynamicResource Theme_TextPrimary}"/>
+                                    <ComboBox x:Name="SevenZipWordSizeCombo" Grid.Column="1" Width="200" HorizontalAlignment="Left"
+                                              Background="{DynamicResource Theme_WindowBg}"
+                                              Foreground="{DynamicResource Theme_TextPrimary}">
+                                        <ComboBoxItem Content="默认" Tag="0"/>
+                                        <ComboBoxItem Content="32" Tag="32"/>
+                                        <ComboBoxItem Content="64" Tag="64"/>
+                                        <ComboBoxItem Content="128" Tag="128"/>
+                                        <ComboBoxItem Content="255" Tag="255"/>
+                                    </ComboBox>
+                                </Grid>
+
+                                <Grid Margin="0,6,0,0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="110"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Text="7z 匹配器:" VerticalAlignment="Center"
+                                               Foreground="{DynamicResource Theme_TextPrimary}"/>
+                                    <ComboBox x:Name="SevenZipMatchFinderCombo" Grid.Column="1" Width="200" HorizontalAlignment="Left"
+                                              Background="{DynamicResource Theme_WindowBg}"
+                                              Foreground="{DynamicResource Theme_TextPrimary}">
+                                        <ComboBoxItem Content="默认" Tag=""/>
+                                        <ComboBoxItem Content="BT2" Tag="bt2"/>
+                                        <ComboBoxItem Content="BT3" Tag="bt3"/>
+                                        <ComboBoxItem Content="BT4" Tag="bt4"/>
+                                    </ComboBox>
+                                </Grid>
+
+                                <Grid Margin="0,6,0,0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="110"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Text="ZIP 压缩方法:" VerticalAlignment="Center"
+                                               Foreground="{DynamicResource Theme_TextPrimary}"/>
+                                    <ComboBox x:Name="ZipMethodCombo" Grid.Column="1" Width="200" HorizontalAlignment="Left"
+                                              Background="{DynamicResource Theme_WindowBg}"
+                                              Foreground="{DynamicResource Theme_TextPrimary}">
+                                        <ComboBoxItem Content="Deflate" Tag="deflate"/>
+                                        <ComboBoxItem Content="Deflate64" Tag="deflate64"/>
+                                        <ComboBoxItem Content="BZip2" Tag="bzip2"/>
+                                        <ComboBoxItem Content="LZMA" Tag="lzma"/>
+                                        <ComboBoxItem Content="PPMd" Tag="ppmd"/>
+                                        <ComboBoxItem Content="Store" Tag="store"/>
+                                    </ComboBox>
+                                </Grid>
+
+                                <Grid Margin="0,6,0,0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="110"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Text="ZIP 加密方式:" VerticalAlignment="Center"
+                                               Foreground="{DynamicResource Theme_TextPrimary}"/>
+                                    <ComboBox x:Name="ZipEncryptionCombo" Grid.Column="1" Width="200" HorizontalAlignment="Left"
+                                              Background="{DynamicResource Theme_WindowBg}"
+                                              Foreground="{DynamicResource Theme_TextPrimary}">
+                                        <ComboBoxItem Content="AES-256" Tag="aes256"/>
+                                        <ComboBoxItem Content="AES-192" Tag="aes192"/>
+                                        <ComboBoxItem Content="AES-128" Tag="aes128"/>
+                                        <ComboBoxItem Content="ZipCrypto" Tag="zipcrypto"/>
+                                    </ComboBox>
+                                </Grid>
+
+                                <CheckBox x:Name="SevenZipEncryptHeadersCheck" Content="7z 加密文件名（EncryptHeaders）"
+                                          Foreground="{DynamicResource Theme_TextPrimary}" Margin="0,6,0,0"/>
                             </StackPanel>
                         </Border>
                     </StackPanel>
