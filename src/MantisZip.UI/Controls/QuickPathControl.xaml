@@ -1,0 +1,76 @@
+<UserControl x:Class="MantisZip.UI.Controls.QuickPathControl"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:l="clr-namespace:MantisZip.UI.Localization"
+             xmlns:emoji="clr-namespace:Emoji.Wpf;assembly=Emoji.Wpf"
+             Background="{DynamicResource Theme_WindowBg}">
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="26"/>
+            <ColumnDefinition Width="26"/>
+            <ColumnDefinition Width="26"/>
+            <ColumnDefinition Width="60"/>
+        </Grid.ColumnDefinitions>
+
+        <TextBox x:Name="PathTextBox" Grid.Column="0" Height="24"
+                 Text="{Binding PathText, RelativeSource={RelativeSource AncestorType=UserControl}, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                 TextChanged="PathTextBox_TextChanged"
+                 IsReadOnly="{Binding IsReadOnly, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                 Background="{DynamicResource Theme_SurfaceBg}"
+                 Foreground="{DynamicResource Theme_TextPrimary}"
+                 BorderBrush="{DynamicResource Theme_Border}"
+                 Padding="6,2"/>
+
+        <!-- ⭐ Favorites -->
+        <Button Grid.Column="1" Width="22" Height="22" Margin="2,0,0,0"
+                Padding="0"
+                Click="FavoritesButton_Click"
+                ToolTip="收藏"
+                Background="{DynamicResource Theme_ButtonBg}"
+                Foreground="{DynamicResource Theme_TextPrimary}"
+                BorderBrush="{DynamicResource Theme_ButtonBorder}"
+                BorderThickness="1">
+            <emoji:TextBlock Text="⭐" FontSize="14" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+        </Button>
+
+        <!-- 🕐 History -->
+        <Button Grid.Column="2" Width="22" Height="22" Margin="2,0,0,0"
+                Padding="0"
+                Click="HistoryButton_Click"
+                ToolTip="历史"
+                Background="{DynamicResource Theme_ButtonBg}"
+                Foreground="{DynamicResource Theme_TextPrimary}"
+                BorderBrush="{DynamicResource Theme_ButtonBorder}"
+                BorderThickness="1">
+            <emoji:TextBlock Text="🕐" FontSize="14" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+        </Button>
+
+        <!-- 🪟 Explorer windows -->
+        <Button Grid.Column="3" Width="22" Height="22" Margin="2,0,0,0"
+                Padding="0"
+                Click="ExplorerButton_Click"
+                ToolTip="资源管理器"
+                Background="{DynamicResource Theme_ButtonBg}"
+                Foreground="{DynamicResource Theme_TextPrimary}"
+                BorderBrush="{DynamicResource Theme_ButtonBorder}"
+                BorderThickness="1">
+            <emoji:TextBlock Text="⚡" FontSize="14" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+        </Button>
+
+        <!-- 📁 Browse -->
+        <Button x:Name="BrowseButton" Grid.Column="4" Height="22" Margin="4,0,0,0"
+                Padding="4,0"
+                Click="BrowseButton_Click"
+                ToolTip="{l:L Settings_Advanced_Browse}"
+                Background="{DynamicResource Theme_ButtonBg}"
+                Foreground="{DynamicResource Theme_TextPrimary}"
+                BorderBrush="{DynamicResource Theme_ButtonBorder}"
+                BorderThickness="1">
+            <StackPanel Orientation="Horizontal">
+                <emoji:TextBlock Text="📁" FontSize="12" Margin="0,0,3,0" VerticalAlignment="Center"/>
+                <TextBlock Text="{l:L Settings_Advanced_Browse}" FontSize="11" VerticalAlignment="Center"/>
+            </StackPanel>
+        </Button>
+    </Grid>
+</UserControl>

@@ -2,10 +2,13 @@
 ; This installer bundles the .NET 9 runtime — no separate runtime install needed.
 ; Derived from installer.iss for framework-dependent builds.
 ; Requires Inno Setup 6
+;
+; Before compiling, run installer\download-redist.ps1 to download the
+; WebView2 Runtime Standalone Installer (required for offline installation).
 
 #define MyAppName "MantisZip"
 #ifndef MyAppVersion
-#define MyAppVersion "0.4.0"
+#define MyAppVersion "0.4.4"
 #endif
 #define MyAppPublisher "MantisZip Contributors"
 #define MyAppURL "https://github.com/mantis3d/MantisZip"
@@ -25,7 +28,7 @@ DefaultDirName={autopf}\{#MyAppName}
 DisableProgramGroupPage=yes
 LicenseFile=LICENSE
 OutputDir=installer
-OutputBaseFilename=MantisZip-{#MyAppVersion}-Setup
+OutputBaseFilename=MantisZip-{#MyAppVersion}-Setup-Offline
 Compression=lzma
 SolidCompression=yes
 WizardStyle=modern
@@ -73,10 +76,6 @@ Source: "publish_output_selfcontained\MantisZip.UI.exe"; DestDir: "{app}"; Flags
 Source: "publish_output_selfcontained\MantisZip.Core.pdb"; DestDir: "{app}"; Flags: ignoreversion
 Source: "publish_output_selfcontained\MantisZip.UI.pdb"; DestDir: "{app}"; Flags: ignoreversion
 
-; === Runtime config (required for .NET assembly resolution) ===
-Source: "publish_output_selfcontained\MantisZip.UI.deps.json"; DestDir: "{app}"; Flags: ignoreversion
-Source: "publish_output_selfcontained\MantisZip.UI.runtimeconfig.json"; DestDir: "{app}"; Flags: ignoreversion
-
 ; === 7z.dll (SharpSevenZip): architecture-specific subdirectories ===
 Source: "publish_output_selfcontained\x64\7z.dll"; DestDir: "{app}\x64"; Flags: ignoreversion
 Source: "publish_output_selfcontained\x86\7z.dll"; DestDir: "{app}\x86"; Flags: ignoreversion
@@ -89,8 +88,19 @@ Source: "publish_output_selfcontained\Resources\strings.en.json"; DestDir: "{app
 Source: "publish_output_selfcontained\Resources\strings.zh.json"; DestDir: "{app}\Resources"; Flags: ignoreversion
 Source: "publish_output_selfcontained\Resources\languages.json"; DestDir: "{app}\Resources"; Flags: ignoreversion
 
-; === License (7z.dll is distributed under GNU Lesser General Public License) ===
+; === Contributor CSV files (compiled into AboutWindow) ===
+Source: "publish_output_selfcontained\contributors-technical.csv"; DestDir: "{app}"; Flags: ignoreversion
+Source: "publish_output_selfcontained\contributors-financial.csv"; DestDir: "{app}"; Flags: ignoreversion
+
+; === License files ===
+; 7z.dll (SharpSevenZip) is distributed under GNU Lesser General Public License
 Source: "lgpl.txt"; DestDir: "{app}"; Flags: ignoreversion
+; Microsoft Edge WebView2 Runtime — redistributed under Microsoft Software License Terms
+Source: "WebView2-LICENSE.txt"; DestDir: "{app}"; Flags: ignoreversion
+
+; === WebView2 Runtime Standalone Installer (offline installation for systems without WebView2) ===
+; Pre-download from https://go.microsoft.com/fwlink/p/?LinkId=2124701 (x64)
+Source: "installer\redist\MicrosoftEdgeWebView2RuntimeInstallerX64.exe"; DestDir: "{tmp}"; Flags: deleteafterinstall
 
 ; === Prebuilt user settings (copied to %LOCALAPPDATA% on fresh install) ===
 ; Replace files in installer\prebuilt\ with your own settings from %LOCALAPPDATA%\MantisZip\
@@ -113,7 +123,6 @@ Filename: "{app}\{#MyAppExeName}"; Parameters: "--uninstall-assoc"; Flags: runhi
 [Code]
 const
   WebView2RegKey = 'SOFTWARE\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}';
-  EvergreenBootstrapperUrl = 'https://go.microsoft.com/fwlink/p/?LinkId=2124703';
 
 var
   // Custom wizard page controls
@@ -345,11 +354,7 @@ begin
     Result := RegQueryStringValue(HKLM32, WebView2RegKey, 'pv', version);
 end;
 
-// Download file via URLMon (built-in Windows API, no extra DLLs needed)
-function URLDownloadToFile(pCaller: Cardinal; szURL: string; szFileName: string; dwReserved: Cardinal; lpfnCB: Cardinal): Integer;
-  external 'URLDownloadToFileW@urlmon.dll stdcall';
-
-// Install WebView2 Runtime before app starts
+// Install WebView2 Runtime from bundled package before app starts
 // Write installer settings to AppData after install completes
 procedure CurStepChanged(CurStep: TSetupStep);
 var
@@ -362,26 +367,21 @@ var
 begin
   if CurStep = ssPostInstall then
   begin
-    // 在复制文件完成后安装 WebView2 Runtime（避免阻塞文件安装进度条）
+    // 从本地捆绑包安装 WebView2 Runtime（完全离线安装）
+    // 文件已通过 [Files] 段提取到 {tmp}
     if not IsWebView2Installed then
     begin
-      BootstrapperPath := ExpandConstant('{tmp}\MicrosoftEdgeWebview2Setup.exe');
-      Log('WebView2 Runtime not found. Downloading Evergreen Bootstrapper...');
-      if URLDownloadToFile(0, EvergreenBootstrapperUrl, BootstrapperPath, 0, 0) = 0 then
+      BootstrapperPath := ExpandConstant('{tmp}\MicrosoftEdgeWebView2RuntimeInstallerX64.exe');
+      Log('WebView2 Runtime not found. Installing from bundled package...');
+      if Exec(BootstrapperPath, '/silent /install', '', SW_SHOW, ewWaitUntilTerminated, ResultCode) then
       begin
-        Log('Downloaded bootstrapper. Installing silently...');
-        if Exec(BootstrapperPath, '/silent /install', '', SW_SHOW, ewWaitUntilTerminated, ResultCode) then
-        begin
-          if ResultCode = 0 then
-            Log('WebView2 Runtime installed successfully.')
-          else
-            Log('WebView2 Runtime installer exited with code: ' + IntToStr(ResultCode));
-        end
+        if ResultCode = 0 then
+          Log('WebView2 Runtime installed successfully.')
         else
-          Log('Failed to launch WebView2 bootstrapper.');
+          Log('WebView2 Runtime installer exited with code: ' + IntToStr(ResultCode));
       end
       else
-        Log('Failed to download WebView2 bootstrapper. User may need to install manually.');
+        Log('Failed to launch WebView2 installer. The system may not be supported (x64 required).');
     end
     else
       Log('WebView2 Runtime is already installed.');

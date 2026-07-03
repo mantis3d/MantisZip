@@ -143,7 +143,7 @@ public enum FileFormat
     // 文档
     Pdf, Docx, Xlsx, Pptx, Epub, Mobi, Azw3,
     // 文本/标记
-    Text, Html, Markdown,
+    Text, Html, Markdown, Csv, Json, Xml, Ini,
     // 可执行
     Pe, Elf,
     // 压缩包
@@ -159,4 +159,12 @@ public enum FileFormat
     Subtitle, OfficeOpenXml, OfficeLegacy,
     // 映像
     VhdLegacy, Iso9660, Udf,
+    // 音频（补充）
+    Ogg,
+    // 文档（补充）
+    Odt, Ods, Odp, Rtf, DjVu, Xps,
+    // 字体（补充）
+    Woff2,
+    // 其他
+    Fits, Vhdx, Parquet,
 }

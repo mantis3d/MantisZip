@@ -17,11 +17,16 @@ public class AppSettings
     public bool CloseAfterCompress { get; set; } = true;
     public bool KeepOriginalExtension { get; set; } = false;  // 保留源文件扩展名（abc.max → abc.max.zip）
     public bool PreserveDirectoryRoot { get; set; } = true;    // 压缩文件夹时保留外层目录
+    public string ZipEncoding { get; set; } = "utf-8";         // ZIP 文件名编码：utf-8 / gbk / default
+    public string SevenZipCompressionMethod { get; set; } = "LZMA2"; // 7z 压缩方法：LZMA / LZMA2 / PPMd / BZip2 / Deflate
+    public bool SevenZipSolid { get; set; } = true;            // 7z 固实压缩
 
     // ===== 解压 =====
     public string ExtractDestination { get; set; } = "ask"; // same-dir / desktop / last / ask
     public string FileConflictAction { get; set; } = "ask"; // overwrite / rename / skip / ask
     public bool OpenFolderAfterExtract { get; set; } = false;
+    /// <summary>双击文件打开阈值（字节），超过此大小弹出确认框。0 = 禁用双击打开。</summary>
+    public long DoubleClickOpenThreshold { get; set; } = 10 * 1024 * 1024; // 默认 10 MB
 
     // ===== 上下文菜单 / 文件关联 =====
     public bool EnableCompressMenu { get; set; } = true;
@@ -71,6 +76,10 @@ public class AppSettings
     public int PreviewPosition { get; set; } = 4; // 1=Bottom, 2=Below tree, 3=Below file list, 4=Right
     public string InfoPanelOrientation { get; set; } = "Vertical"; // Horizontal / Vertical
     public bool ShowPreviewPanel { get; set; } = true;
+    /// <summary>格式检测头部字节数（默认 4KB），用于魔数检测读取的文件头部大小</summary>
+    public int PreviewHeadSize { get; set; } = 4096;
+    /// <summary>启用魔数检测文件真实格式（默认开启）。当扩展名缺失或错误时，通过文件头 magic byte 识别真实格式。关闭时回退到纯扩展名判断。</summary>
+    public bool EnableFormatDetection { get; set; } = true;
 
     // ===== 密码管理 =====
     public bool ShowPasswordMatchNotification { get; set; } = true;
@@ -94,6 +103,16 @@ public class AppSettings
     public bool CleanTempOnStartup { get; set; } = true;
     /// <summary>CLI 模式下遇到权限不足时，是否弹提权窗口（默认 false = 仅提示不可写目录）</summary>
     public bool AllowElevation { get; set; } = false;
+
+    // ===== 默认路径优先级 =====
+    /// <summary>
+    /// QuickPathPreDialog 默认路径优先级策略。
+    /// "context"   = 场景相关 > 资源管理器 > 最近使用 > 桌面
+    /// "explorer"  = 资源管理器 > 场景相关 > 最近使用 > 桌面
+    /// "recent"    = 最近使用 > 场景相关 > 资源管理器 > 桌面
+    /// "desktop"   = 直接桌面
+    /// </summary>
+    public string DefaultPathPriority { get; set; } = "context";
 
     // ===== 持久化 =====
     private static readonly string SettingsDir = Path.Combine(

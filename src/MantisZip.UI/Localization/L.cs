@@ -28,6 +28,7 @@ public static class L
     public const string App_CompressSeparateComplete                = "App_CompressSeparateComplete";
     public const string App_CompressSeparateProgress                = "App_CompressSeparateProgress";
     public const string App_CompressWindowFailed                   = "App_CompressWindowFailed";
+    public const string App_ConfirmTitle                           = "App_ConfirmTitle";
     public const string App_ErrorTitle                             = "App_ErrorTitle";
     public const string App_ExtractComplete                        = "App_ExtractComplete";
     public const string App_ExtractFailed                          = "App_ExtractFailed";
@@ -65,6 +66,9 @@ public static class L
     public const string About_Thanks_OSS                                = "About_Thanks_OSS";
     public const string About_Thanks_AI                                 = "About_Thanks_AI";
     public const string About_Thanks_7Zip                              = "About_Thanks_7Zip";
+    public const string About_Contributors_Technical                     = "About_Contributors_Technical";
+    public const string About_Contributors_Financial                     = "About_Contributors_Financial";
+    public const string About_Contributors_None                         = "About_Contributors_None";
     public const string About_Intro                                    = "About_Intro";
     public const string About_Label_AuthorName                         = "About_Label_AuthorName";
     public const string About_Label_Description                        = "About_Label_Description";
@@ -223,6 +227,9 @@ public static class L
     public const string Main_Ctx_ExtractHere                       = "Main_Ctx_ExtractHere";
     public const string Main_Ctx_ExtractTo                         = "Main_Ctx_ExtractTo";
     public const string Main_DirStats                              = "Main_DirStats";
+    public const string Main_DoubleClickFormatNotSupported         = "Main_DoubleClickFormatNotSupported";
+    public const string Main_DoubleClickOpenConfirm                = "Main_DoubleClickOpenConfirm";
+    public const string Main_DoubleClickPasswordNeeded             = "Main_DoubleClickPasswordNeeded";
     public const string Main_DragAddConfirm                        = "Main_DragAddConfirm";
     public const string Main_DragAddTitle                          = "Main_DragAddTitle";
     public const string Main_DragFormatUnsupported                 = "Main_DragFormatUnsupported";
@@ -241,6 +248,7 @@ public static class L
     public const string Main_ArchiveComment_ZipOnly                 = "Main_ArchiveComment_ZipOnly";
     public const string Main_Menu_About                            = "Main_Menu_About";
     public const string Main_Menu_ArchiveComment                   = "Main_Menu_ArchiveComment";
+    public const string Main_Menu_BookmarkManager                   = "Main_Menu_BookmarkManager";
     public const string Main_Menu_ClearRecentFiles                 = "Main_Menu_ClearRecentFiles";
     public const string Main_Menu_Compress                         = "Main_Menu_Compress";
     public const string Main_Menu_Donate                           = "Main_Menu_Donate";
@@ -284,6 +292,7 @@ public static class L
     public const string Main_Status_CopiedNames                    = "Main_Status_CopiedNames";
     public const string Main_Status_CopiedPaths                    = "Main_Status_CopiedPaths";
     public const string Main_Status_CopyFailed                     = "Main_Status_CopyFailed";
+    public const string Main_Status_DoubleClickOpened              = "Main_Status_DoubleClickOpened";
     public const string Main_Status_DragWaiting                    = "Main_Status_DragWaiting";
     public const string Main_Status_ExtractCancel                  = "Main_Status_ExtractCancel";
     public const string Main_Status_ExtractCancelled               = "Main_Status_ExtractCancelled";
@@ -310,6 +319,7 @@ public static class L
     public const string Main_Toolbar_Compress                      = "Main_Toolbar_Compress";
     public const string Main_Toolbar_DeleteFiles                   = "Main_Toolbar_DeleteFiles";
     public const string Main_Toolbar_Extract                       = "Main_Toolbar_Extract";
+    public const string Main_Toolbar_ExtractSelected               = "Main_Toolbar_ExtractSelected";
     public const string Main_Toolbar_New                           = "Main_Toolbar_New";
     public const string Main_Toolbar_Open                          = "Main_Toolbar_Open";
     public const string Main_Toolbar_Password                      = "Main_Toolbar_Password";
@@ -320,6 +330,7 @@ public static class L
     public const string Main_Tooltip_Compress                      = "Main_Tooltip_Compress";
     public const string Main_Tooltip_DeleteFiles                   = "Main_Tooltip_DeleteFiles";
     public const string Main_Tooltip_Extract                       = "Main_Tooltip_Extract";
+    public const string Main_Tooltip_ExtractSelected               = "Main_Tooltip_ExtractSelected";
     public const string Main_Tooltip_NewArchive                    = "Main_Tooltip_NewArchive";
     public const string Main_Tooltip_OpenArchive                   = "Main_Tooltip_OpenArchive";
     public const string Main_Tooltip_Password                      = "Main_Tooltip_Password";
@@ -599,6 +610,12 @@ public static class L
     public const string Settings_Advanced_SevenZipNotFound         = "Settings_Advanced_SevenZipNotFound";
     public const string Settings_Advanced_SevenZipSelectDll        = "Settings_Advanced_SevenZipSelectDll";
     public const string Settings_Advanced_SevenZipReset            = "Settings_Advanced_SevenZipReset";
+    public const string Settings_DefaultPath_GroupHeader           = "Settings_DefaultPath_GroupHeader";
+    public const string Settings_DefaultPath_Context               = "Settings_DefaultPath_Context";
+    public const string Settings_DefaultPath_Explorer              = "Settings_DefaultPath_Explorer";
+    public const string Settings_DefaultPath_Recent                = "Settings_DefaultPath_Recent";
+    public const string Settings_DefaultPath_Desktop               = "Settings_DefaultPath_Desktop";
+    public const string Settings_DefaultPath_Hint                  = "Settings_DefaultPath_Hint";
     public const string Settings_Advanced_AboutDesc                = "Settings_Advanced_AboutDesc";
     public const string Settings_Advanced_AboutHeader              = "Settings_Advanced_AboutHeader";
     public const string Settings_Advanced_AboutLicense             = "Settings_Advanced_AboutLicense";
@@ -677,6 +694,7 @@ public static class L
     public const string Settings_Extract_Dest_Ask                  = "Settings_Extract_Dest_Ask";
     public const string Settings_Extract_Dest_Desktop              = "Settings_Extract_Dest_Desktop";
     public const string Settings_Extract_Dest_SameDir              = "Settings_Extract_Dest_SameDir";
+    public const string Settings_Extract_DoubleClickOpenThreshold  = "Settings_Extract_DoubleClickOpenThreshold";
     public const string Settings_Extract_EnableDragExtract         = "Settings_Extract_EnableDragExtract";
     public const string Settings_Extract_OpenFolderAfter           = "Settings_Extract_OpenFolderAfter";
     public const string Settings_Language                          = "Settings_Language";

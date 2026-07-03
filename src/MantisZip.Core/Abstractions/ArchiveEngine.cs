@@ -83,6 +83,21 @@ public class ArchiveOptions
     /// 仅对 SevenZipEngine 的单目录压缩路径有效。
     /// </summary>
     public bool PreserveDirectoryRoot { get; set; } = true;
+
+    /// <summary>
+    /// ZIP 文件名编码："utf-8" / "gbk" / "default"。null 表示使用引擎默认（UTF-8）。
+    /// </summary>
+    public string? FileNameEncoding { get; set; }
+
+    /// <summary>
+    /// 7z 压缩方法："LZMA" / "LZMA2" / "PPMd" / "BZip2" / "Deflate"。null 表示引擎默认（LZMA2）。
+    /// </summary>
+    public string? SevenZipCompressionMethod { get; set; }
+
+    /// <summary>
+    /// 7z 固实压缩标志。默认 true。
+    /// </summary>
+    public bool SevenZipSolid { get; set; } = true;
 }
 
 /// <summary>
@@ -343,8 +358,68 @@ public static class ArchiveEngineFactory
             ".iso" => GetEngine(ArchiveFormat.Iso),
             _ => null
         };
-        CoreLog.Info($"ArchiveEngineFactory.GetEngineByExtension: path={filePath}, ext={ext} -> {engine?.GetType().Name ?? "null"}");
-        return engine;
+
+        if (engine != null)
+        {
+            CoreLog.Info($"ArchiveEngineFactory.GetEngineByExtension: path={filePath}, ext={ext} -> {engine.GetType().Name}");
+            return engine;
+        }
+
+        // 扩展名未匹配 → 尝试魔数检测兜底（如 .epub / .dmg / 无扩展名文件等）
+        var magicEngine = GetEngineByMagic(filePath);
+        if (magicEngine != null)
+        {
+            CoreLog.Info($"ArchiveEngineFactory.GetEngineByMagic: path={filePath} -> {magicEngine.GetType().Name}");
+            return magicEngine;
+        }
+
+        CoreLog.Info($"ArchiveEngineFactory.GetEngineByExtension: path={filePath}, ext={ext} -> null");
+        return null;
+    }
+
+    /// <summary>
+    /// 通过文件头部魔数检测档案格式，返回对应的引擎。
+    /// 用于扩展名无法识别时的兜底（如 .epub、无扩展名文件等）。
+    /// </summary>
+    private static IArchiveEngine? GetEngineByMagic(string filePath)
+    {
+        try
+        {
+            using var fs = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read);
+            int headSize = (int)Math.Min(fs.Length, 4096);
+            if (headSize < 4) return null; // 至少需要 4 字节来识别常见魔数
+            byte[] head = new byte[headSize];
+            int read = fs.Read(head, 0, headSize);
+            if (read == 0) return null;
+
+            var format = FileFormatDetector.Detect(head, read);
+            var archiveFormat = MapFileFormatToArchiveFormat(format);
+            return archiveFormat != null ? GetEngine(archiveFormat.Value) : null;
+        }
+        catch (Exception ex)
+        {
+            CoreLog.Trace($"ArchiveEngineFactory.GetEngineByMagic: failed to read {filePath}: {ex.Message}");
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// 将魔数检测的 FileFormat 映射到 ArchiveFormat。
+    /// 返回 null 表示该格式无对应引擎（非档案格式）。
+    /// </summary>
+    private static ArchiveFormat? MapFileFormatToArchiveFormat(FileFormat format)
+    {
+        return format switch
+        {
+            FileFormat.Zip or FileFormat.Docx or FileFormat.Xlsx
+                or FileFormat.Pptx or FileFormat.Epub => ArchiveFormat.Zip,
+            FileFormat.SevenZip => ArchiveFormat.SevenZip,
+            FileFormat.Rar => ArchiveFormat.Rar,
+            FileFormat.Tar => ArchiveFormat.Tar,
+            FileFormat.Gz => ArchiveFormat.GZip,
+            FileFormat.Iso => ArchiveFormat.Iso,
+            _ => null
+        };
     }
 
     /// <summary>

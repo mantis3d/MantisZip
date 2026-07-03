@@ -10,6 +10,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using MantisZip.UI.Localization;
+using MantisZip.UI.Controls;
 using System.Linq;
 
 namespace MantisZip.UI;
@@ -33,6 +34,27 @@ public partial class CompressSettingsWindow : Window
     {
         InitializeComponent();
         LoadDefaultsFromSettings();
+
+        // Sync QuickPathControl.FileName to FileNameTextBox when browse selects a file
+        var fileNameDepDesc = System.ComponentModel.DependencyPropertyDescriptor.FromProperty(
+            QuickPathControl.FileNameProperty, typeof(QuickPathControl));
+        fileNameDepDesc.AddValueChanged(OutputPathControl, (_, _) =>
+        {
+            if (!string.IsNullOrEmpty(OutputPathControl.FileName))
+            {
+                var ext = GetFormatExtension();
+                var name = OutputPathControl.FileName;
+                if (name.EndsWith(ext, StringComparison.OrdinalIgnoreCase))
+                    name = name.Substring(0, name.Length - ext.Length);
+                FileNameTextBox.Text = name;
+            }
+        });
+    }
+
+    private string GetFormatExtension()
+    {
+        var tag = (FormatComboBox.SelectedItem as System.Windows.Controls.ComboBoxItem)?.Tag?.ToString() ?? "zip";
+        return tag == "tar.gz" ? ".tar.gz" : "." + tag;
     }
 
     private void OutputMode_Changed(object sender, RoutedEventArgs e)
@@ -53,47 +75,57 @@ public partial class CompressSettingsWindow : Window
 
     private void RefreshOutputPathState()
     {
-        if (OutputPathTextBox == null) return; // InitializeComponent 期间控件尚未创建
+        if (OutputPathControl == null) return; // InitializeComponent 期间控件尚未创建
 
         switch (_outputMode)
         {
             case CompressOutputMode.Manual:
-                OutputPathTextBox.IsReadOnly = false;
-                BrowseOutputButton.Visibility = Visibility.Visible;
+                OutputPathControl.IsReadOnly = false;
+                FileNameTextBox.IsReadOnly = false;
+                FileNameTextBox.Visibility = Visibility.Visible;
+                FileExtensionLabel.Visibility = Visibility.Visible;
                 break;
             case CompressOutputMode.Separate:
-                OutputPathTextBox.IsReadOnly = true;
-                BrowseOutputButton.Visibility = Visibility.Collapsed;
-                OutputPathTextBox.Text = L.TF(L.Compress_SeparateSummary, _sourcePaths.Count);
+                OutputPathControl.IsReadOnly = true;
+                OutputPathControl.PathText = L.TF(L.Compress_SeparateSummary, _sourcePaths.Count);
+                FileNameTextBox.Text = "";
+                FileNameTextBox.IsReadOnly = true;
+                FileNameTextBox.Visibility = Visibility.Collapsed;
+                FileExtensionLabel.Visibility = Visibility.Collapsed;
                 break;
             case CompressOutputMode.Combined:
-                OutputPathTextBox.IsReadOnly = true;
-                BrowseOutputButton.Visibility = Visibility.Collapsed;
+                OutputPathControl.IsReadOnly = true;
+                FileNameTextBox.IsReadOnly = true;
+                FileNameTextBox.Visibility = Visibility.Visible;
+                FileExtensionLabel.Visibility = Visibility.Visible;
                 RefreshCombinedPath();
                 break;
         }
     }
 
-    private void RefreshCombinedPath()
+        private void RefreshCombinedPath()
     {
-        if (OutputPathTextBox == null) return;
+        if (OutputPathControl == null) return;
         if (_sourcePaths.Count == 0)
         {
-            OutputPathTextBox.Text = "";
+            OutputPathControl.PathText = "";
+            FileNameTextBox.Text = "";
             return;
         }
 
         var commonParent = App.FindCommonParent(_sourcePaths.ToList());
         if (commonParent != null && !App.IsDriveRoot(commonParent))
         {
-            var archiveName = Path.GetFileName(commonParent.TrimEnd('\\', '/'));
+            var archiveName = ArchivePath.GetFileName(commonParent);
             var format = (FormatComboBox.SelectedItem as System.Windows.Controls.ComboBoxItem)?.Tag?.ToString() ?? "zip";
-            var ext = format == "tar.gz" ? ".tar.gz" : "." + format;
-            OutputPathTextBox.Text = Path.Combine(commonParent, archiveName + ext);
+            var ext = GetFormatExtension();
+            OutputPathControl.PathText = commonParent;
+            FileNameTextBox.Text = archiveName;
+            FileExtensionLabel.Text = ext;
         }
         else
         {
-            // Cross-drive — revert to manual
+            // Cross-drive \u2014 revert to manual
             AppMessageBox.Show(L.T(L.Compress_CombinedUnavailable), L.T(L.Compress_Title),
                 MessageBoxButton.OK, MessageBoxImage.Warning);
             ManualRadio.IsChecked = true;
@@ -105,6 +137,8 @@ public partial class CompressSettingsWindow : Window
     private void LoadDefaultsFromSettings()
     {
         var s = AppSettings.Instance;
+
+        FormatOptionsPanel.LoadDefaults();
 
         // 默认格式
         foreach (System.Windows.Controls.ComboBoxItem item in FormatComboBox.Items)
@@ -200,25 +234,6 @@ public partial class CompressSettingsWindow : Window
         // 源文件变化时重新生成自动规则（设计文档 3.3）
         if (PwdAutoRules != null && PwdAutoRules.IsChecked == true)
             RefreshAutoRules();
-    }
-
-    private void BrowseOutputButton_Click(object sender, RoutedEventArgs e)
-    {
-        var format = (FormatComboBox.SelectedItem as System.Windows.Controls.ComboBoxItem)?.Tag?.ToString() ?? "zip";
-        var ext = format == "tar.gz" ? ".tar.gz" : "." + format;
-
-        var dialog = new SaveFileDialog
-        {
-            Filter = L.TF(L.Compress_SaveFilter, format.ToUpper(), ext),
-            Title = L.T(L.Compress_Archive_Group),
-            FileName = GetDefaultFileName() + ext
-        };
-
-        if (dialog.ShowDialog() == true)
-        {
-            OutputPathTextBox.Text = dialog.FileName;
-            UpdateCompressButton();
-        }
     }
 
     private string GetDefaultFileName()
@@ -320,7 +335,7 @@ public partial class CompressSettingsWindow : Window
             return;
         }
 
-        if (_outputMode == CompressOutputMode.Manual && string.IsNullOrEmpty(OutputPathTextBox.Text))
+        if (_outputMode == CompressOutputMode.Manual && string.IsNullOrEmpty(OutputPathControl.PathText))
         {
             AppMessageBox.Show(L.T(L.Compress_Validation_NoOutput), L.T(L.Compress_Title), MessageBoxButton.OK, MessageBoxImage.Warning);
             return;
@@ -382,7 +397,7 @@ public partial class CompressSettingsWindow : Window
 
     private async Task RunManualCompressAsync(string format, int level)
     {
-        var outputPath = OutputPathTextBox.Text;
+        var outputPath = Path.Combine(OutputPathControl.PathText, FileNameTextBox.Text + GetFormatExtension());
         App.Log("Manual compress — outputPath: {0}, format: {1}, level: {2}", outputPath, format, level);
 
         this.Hide();
@@ -404,6 +419,9 @@ public partial class CompressSettingsWindow : Window
             Encrypt = EncryptCheckBox.IsChecked == true,
             OutputPath = outputPath,
             PreserveDirectoryRoot = AppSettings.Instance.PreserveDirectoryRoot,
+            FileNameEncoding = FormatOptionsPanel.FileNameEncoding,
+            SevenZipCompressionMethod = FormatOptionsPanel.SevenZipCompressionMethod,
+            SevenZipSolid = FormatOptionsPanel.SevenZipSolid,
         };
         var outputPaths = CompressService.GetOutputPaths(request);
         progressWindow.InitBatchMode(outputPaths);
@@ -477,6 +495,9 @@ public partial class CompressSettingsWindow : Window
             Encrypt = EncryptCheckBox.IsChecked == true,
             KeepOriginalExtension = AppSettings.Instance.KeepOriginalExtension,
             PreserveDirectoryRoot = AppSettings.Instance.PreserveDirectoryRoot,
+            FileNameEncoding = FormatOptionsPanel.FileNameEncoding,
+            SevenZipCompressionMethod = FormatOptionsPanel.SevenZipCompressionMethod,
+            SevenZipSolid = FormatOptionsPanel.SevenZipSolid,
         };
         var outputPaths = CompressService.GetOutputPaths(request);
         progressWindow.InitBatchMode(outputPaths);
@@ -540,7 +561,7 @@ public partial class CompressSettingsWindow : Window
 
         if (commonParent != null && !App.IsDriveRoot(commonParent))
         {
-            var archiveName = Path.GetFileName(commonParent.TrimEnd('\\', '/'));
+            var archiveName = ArchivePath.GetFileName(commonParent);
             var ext = format == "tar.gz" ? ".tar.gz" : "." + format;
             outputPath = Path.Combine(commonParent, archiveName + ext);
         }
@@ -575,6 +596,9 @@ public partial class CompressSettingsWindow : Window
             Encrypt = EncryptCheckBox.IsChecked == true,
             OutputPath = outputPath,
             PreserveDirectoryRoot = AppSettings.Instance.PreserveDirectoryRoot,
+            FileNameEncoding = FormatOptionsPanel.FileNameEncoding,
+            SevenZipCompressionMethod = FormatOptionsPanel.SevenZipCompressionMethod,
+            SevenZipSolid = FormatOptionsPanel.SevenZipSolid,
         };
         var outputPaths = CompressService.GetOutputPaths(request);
         progressWindow.InitBatchMode(outputPaths);
@@ -636,14 +660,21 @@ public partial class CompressSettingsWindow : Window
         // (FormatComboBox is in General tab, PwdAutoRules is in Password tab)
         if (PwdAutoRules != null && PwdAutoRules.IsChecked == true)
             RefreshAutoRules();
+
+        // 同步 DynamicFormatOptionsPanel 的格式（加 null 守卫，因为初始化时
+        // FormatOptionsPanel 可能还未被 XAML 创建）
+        if (FormatOptionsPanel != null
+            && FormatComboBox.SelectedItem is ComboBoxItem item && item.Tag is string tag)
+            FormatOptionsPanel.SelectedFormat = tag;
     }
 
-    private void OutputPathTextBox_TextChanged(object sender, System.Windows.Controls.TextChangedEventArgs e)
+    private void FileNameTextBox_TextChanged(object sender, System.Windows.Controls.TextChangedEventArgs e)
     {
         UpdateCompressButton();
         if (PwdAutoRules != null && PwdAutoRules.IsChecked == true)
             RefreshAutoRules();
     }
+
 
     private void UpdateCompressButton()
     {
@@ -652,8 +683,9 @@ public partial class CompressSettingsWindow : Window
         var hasSource = _sourcePaths.Count > 0;
         if (_outputMode == CompressOutputMode.Manual)
         {
-            var hasOutput = !string.IsNullOrEmpty(OutputPathTextBox.Text);
-            CompressButton.IsEnabled = hasSource && hasOutput;
+            var hasDir = !string.IsNullOrEmpty(OutputPathControl?.PathText);
+            var hasName = !string.IsNullOrEmpty(FileNameTextBox?.Text);
+            CompressButton.IsEnabled = hasSource && hasDir && hasName;
         }
         else
         {

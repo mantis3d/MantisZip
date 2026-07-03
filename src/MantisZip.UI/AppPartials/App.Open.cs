@@ -68,11 +68,11 @@ public partial class App : Application
             if (File.Exists(first))
                 dir = Path.GetDirectoryName(first);
             else
-                dir = Path.GetDirectoryName(first.TrimEnd('\\', '/'));
+                dir = ArchivePath.GetDirectoryName(first);
             dir ??= Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
             var baseName = settings.KeepOriginalExtension
-                ? Path.GetFileName(first.TrimEnd('\\', '/'))
-                : Path.GetFileNameWithoutExtension(first.TrimEnd('\\', '/'));
+                ? ArchivePath.GetFileName(first)
+                : ArchivePath.GetFileNameWithoutExtension(first);
 
             var ext = settings.DefaultFormat == "tar.gz" ? ".tar.gz" : "." + settings.DefaultFormat;
             var outputPath = Path.Combine(dir, baseName + ext);
@@ -93,6 +93,9 @@ public partial class App : Application
             KeepOriginalExtension = settings.KeepOriginalExtension,
             OutputPath = outputPath,
             PreserveDirectoryRoot = settings.PreserveDirectoryRoot,
+            FileNameEncoding = settings.ZipEncoding,
+            SevenZipCompressionMethod = settings.SevenZipCompressionMethod,
+            SevenZipSolid = settings.SevenZipSolid,
         };
         var outputPaths = CompressService.GetOutputPaths(request);
         progressWindow.InitBatchMode(outputPaths);

@@ -540,11 +540,17 @@ public class ZipEngine : IArchiveEngine
                 }
                 else
                 {
+                    var encoding = (options.FileNameEncoding?.ToLowerInvariant()) switch
+                    {
+                        "gbk" => Encoding.GetEncoding("GBK"),
+                        "default" => Encoding.Default,
+                        _ => Encoding.UTF8,
+                    };
                     var writerOptions = new ZipWriterOptions(CompressionType.Deflate)
                     {
                         CompressionLevel = options.CompressionLevel,
                         ArchiveComment = options.Comment ?? "",
-                        ArchiveEncoding = new ArchiveEncoding { Default = Encoding.UTF8 },
+                        ArchiveEncoding = new ArchiveEncoding { Default = encoding },
                     };
                     using var zipWriter = new ZipWriter(fsOut, writerOptions);
 
@@ -614,7 +620,7 @@ public class ZipEngine : IArchiveEngine
 
             var items = archive.Entries.Select(entry =>
             {
-                var entryKey = entry.Key ?? string.Empty;
+                var entryKey = ArchivePath.Normalize(entry.Key);
                 return new ArchiveItem
                 {
                     Name = entryKey,
@@ -737,7 +743,7 @@ public class ZipEngine : IArchiveEngine
 
                 if (Directory.Exists(sourcePath))
                 {
-                    var dirName = Path.GetFileName(sourcePath.TrimEnd('\\', '/'));
+                    var dirName = ArchivePath.GetFileName(sourcePath);
                     foreach (var file in Directory.GetFiles(sourcePath, "*", SearchOption.AllDirectories))
                     {
                         var relativePath = Path.Combine(dirName, Path.GetRelativePath(sourcePath, file));
@@ -799,7 +805,7 @@ public class ZipEngine : IArchiveEngine
                             streamsToDispose.Add(fileStream);
                             var fi = new FileInfo(fullPath);
                             newEntries.Add(new NewEntry(
-                                EntryName: entryName.Replace('\\', '/'),
+                                EntryName: ArchivePath.Normalize(entryName),
                                 Data: fileStream,
                                 LastModified: fi.LastWriteTime,
                                 Size: fi.Length));
@@ -1023,11 +1029,17 @@ public class ZipEngine : IArchiveEngine
                     }
                     else
                     {
+                        var zipEncoding = (options.FileNameEncoding?.ToLowerInvariant()) switch
+                        {
+                            "gbk" => Encoding.GetEncoding("GBK"),
+                            "default" => Encoding.Default,
+                            _ => Encoding.UTF8,
+                        };
                         var writerOptions = new ZipWriterOptions(CompressionType.Deflate)
                         {
                             CompressionLevel = options.CompressionLevel,
                             ArchiveComment = options.Comment ?? "",
-                            ArchiveEncoding = new ArchiveEncoding { Default = Encoding.UTF8 },
+                            ArchiveEncoding = new ArchiveEncoding { Default = zipEncoding },
                         };
                         using var zipWriter = new ZipWriter(fsOut, writerOptions);
 
@@ -1035,7 +1047,7 @@ public class ZipEngine : IArchiveEngine
                         {
                             cancellationToken.ThrowIfCancellationRequested();
                             var fi = new FileInfo(fullPath);
-                            var entryPath = relPath.Replace('\\', '/');
+                            var entryPath = ArchivePath.Normalize(relPath);
                             var entryOptions = new ZipWriterEntryOptions
                             {
                                 ModificationDateTime = fi.LastWriteTime,
@@ -1122,7 +1134,7 @@ public class ZipEngine : IArchiveEngine
 
         await Task.Run(() =>
         {
-            var deletedSet = new HashSet<string>(entryPaths.Select(p => p.Replace('\\', '/')), StringComparer.OrdinalIgnoreCase);
+            var deletedSet = new HashSet<string>(entryPaths.Select(p => ArchivePath.Normalize(p)), StringComparer.OrdinalIgnoreCase);
             if (entryPaths.Length == 0)
             {
                 CoreLog.Info("DeleteEntriesAsync: no entries to delete");
@@ -1141,7 +1153,7 @@ public class ZipEngine : IArchiveEngine
                     var encoding = ZipHasUtf8Flag(archivePath) ? Encoding.UTF8 : Encoding.GetEncoding("gbk");
 
                     // Build keep set: all entries NOT in entryPaths
-                    var deletedNormalized = new HashSet<string>(entryPaths.Select(p => p.Replace('\\', '/')), StringComparer.OrdinalIgnoreCase);
+                    var deletedNormalized = new HashSet<string>(entryPaths.Select(p => ArchivePath.Normalize(p)), StringComparer.OrdinalIgnoreCase);
                     var keepSet = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
                     using (var archive = OpenArchiveWithEncodingFallback(archivePath, password))
@@ -1149,7 +1161,7 @@ public class ZipEngine : IArchiveEngine
                         foreach (var entry in archive.Entries)
                         {
                             var name = entry.Key ?? string.Empty;
-                            if (!deletedNormalized.Contains(name.Replace('\\', '/')))
+                            if (!deletedNormalized.Contains(ArchivePath.Normalize(name)))
                                 keepSet.Add(name);
                         }
                     }
@@ -1241,7 +1253,7 @@ public class ZipEngine : IArchiveEngine
                     foreach (var entryPath in entryPaths)
                     {
                         cancellationToken.ThrowIfCancellationRequested();
-                        var normalized = entryPath.Replace('\\', '/');
+                        var normalized = ArchivePath.Normalize(entryPath);
                         if (!entryNameSet.Contains(normalized))
                         {
                             CoreLog.Error($"DeleteEntriesAsync: entry not found: {entryPath}");
@@ -1252,7 +1264,7 @@ public class ZipEngine : IArchiveEngine
                     foreach (var name in allNames)
                     {
                         cancellationToken.ThrowIfCancellationRequested();
-                        var normalized = name.Replace('\\', '/');
+                        var normalized = ArchivePath.Normalize(name);
                         if (!deletedSet.Contains(normalized))
                         {
                             keepNames.Add(name);
@@ -1439,7 +1451,7 @@ public class ZipEngine : IArchiveEngine
                         {
                             cancellationToken.ThrowIfCancellationRequested();
                             var fi = new FileInfo(fullPath);
-                            var entryPath = relPath.Replace('\\', '/');
+                            var entryPath = ArchivePath.Normalize(relPath);
                             var entryOptions = new ZipWriterEntryOptions
                             {
                                 ModificationDateTime = fi.LastWriteTime,
@@ -1541,7 +1553,7 @@ public class ZipEngine : IArchiveEngine
                     ModificationDateTime = fi.LastWriteTime,
                 };
 
-                var entryPath = relativePath.Replace('\\', '/');
+                var entryPath = ArchivePath.Normalize(relativePath);
                 using (var entryStream = zipWriter.WriteToStream(entryPath, entryOptions))
                 using (var fsInput = File.OpenRead(fullPath))
                 {

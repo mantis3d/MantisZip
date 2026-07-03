@@ -1,0 +1,73 @@
+<Window x:Class="MantisZip.UI.FavoriteManagerWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:l="clr-namespace:MantisZip.UI.Localization"
+        Title="管理收藏" Height="450" Width="500"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="NoResize"
+        ShowInTaskbar="False"
+        Background="{DynamicResource Theme_WindowBg}">
+    <Grid Margin="12">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <TextBlock Grid.Row="0" Text="收藏夹管理" FontSize="16" FontWeight="SemiBold" Margin="0,0,0,8"
+                   Foreground="{DynamicResource Theme_TextPrimary}"/>
+
+        <!-- ListView -->
+        <ListView x:Name="FavoritesListView" Grid.Row="1"
+                  Background="{DynamicResource Theme_SurfaceBg}"
+                  BorderBrush="{DynamicResource Theme_Border}"
+                  Foreground="{DynamicResource Theme_TextPrimary}"
+                  SelectionChanged="FavoritesListView_SelectionChanged">
+            <ListView.View>
+                <GridView>
+                    <GridViewColumn Header="名称" Width="120" DisplayMemberBinding="{Binding DisplayName}"/>
+                    <GridViewColumn Header="路径" Width="200" DisplayMemberBinding="{Binding Path}"/>
+                    <GridViewColumn Header="类型" Width="80" DisplayMemberBinding="{Binding TypeLabel}"/>
+                </GridView>
+            </ListView.View>
+        </ListView>
+
+        <!-- Buttons -->
+        <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,8,0,0" HorizontalAlignment="Left">
+            <Button x:Name="AddButton" Content="添加收藏" Width="90" Height="26" Margin="0,0,6,0"
+                    Click="AddButton_Click"
+                    Background="{DynamicResource Theme_ButtonBg}"
+                    Foreground="{DynamicResource Theme_TextPrimary}"
+                    BorderBrush="{DynamicResource Theme_ButtonBorder}"/>
+            <Button x:Name="EditButton" Content="编辑" Width="60" Height="26" Margin="0,0,6,0" IsEnabled="False"
+                    Click="EditButton_Click"
+                    Background="{DynamicResource Theme_ButtonBg}"
+                    Foreground="{DynamicResource Theme_TextPrimary}"
+                    BorderBrush="{DynamicResource Theme_ButtonBorder}"/>
+            <Button x:Name="DeleteButton" Content="删除" Width="60" Height="26" Margin="0,0,6,0" IsEnabled="False"
+                    Click="DeleteButton_Click"
+                    Background="{DynamicResource Theme_ButtonBg}"
+                    Foreground="{DynamicResource Theme_TextPrimary}"
+                    BorderBrush="{DynamicResource Theme_ButtonBorder}"/>
+            <Button x:Name="MoveUpButton" Content="上移" Width="60" Height="26" Margin="0,0,6,0" IsEnabled="False"
+                    Click="MoveUpButton_Click"
+                    Background="{DynamicResource Theme_ButtonBg}"
+                    Foreground="{DynamicResource Theme_TextPrimary}"
+                    BorderBrush="{DynamicResource Theme_ButtonBorder}"/>
+            <Button x:Name="MoveDownButton" Content="下移" Width="60" Height="26" IsEnabled="False"
+                    Click="MoveDownButton_Click"
+                    Background="{DynamicResource Theme_ButtonBg}"
+                    Foreground="{DynamicResource Theme_TextPrimary}"
+                    BorderBrush="{DynamicResource Theme_ButtonBorder}"/>
+        </StackPanel>
+
+        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,0,0">
+            <Button Content="{l:L MsgBox_Ok}" Width="80" Height="28" IsDefault="True"
+                    Click="Ok_Click"
+                    Background="{DynamicResource Theme_Accent}"
+                    Foreground="{DynamicResource Theme_TextOnAccent}"
+                    BorderThickness="0"/>
+        </StackPanel>
+    </Grid>
+</Window>

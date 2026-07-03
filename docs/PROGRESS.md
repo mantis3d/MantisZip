@@ -7,8 +7,8 @@
 - **技术栈**: .NET 9 + WPF → Avalonia 迁移中 + SharpCompress + SharpSevenZip
 
 ## 版本
-- **当前版本**: 0.4.3
-- **发布日期**: 2026-06-20
+- **当前版本**: 0.4.4
+- **发布日期**: 2026-06-29
 
 ## 规划中
 - Avalonia 跨平台移植后续 Phase
@@ -32,9 +32,134 @@
 
 ## 版本历史（从新到旧）
 
-### v0.4.3 (2026-06-21) 压缩包内逐条目权限跳过 + UAC 弹窗行为修复
+### v0.4.4 (2026-06-30) 魔数检测预览系统 Phase 1+2+3 完成
 
-1. **压缩包内逐条目权限跳过**：
+1. **新功能：魔数检测文件真实格式** — `preview-magic-detection.md`（全部 44 项任务完成）
+   - **Phase 1 — Core**：`FileFormatDetector`（35+ 魔数签名 + ZIP 子类型 + PE 双重验证）
+   - `LooksLikeText()` 启发式检测：纯文本文件（无魔数签名）的兜底识别，基于 null 字节比例 + 可打印字符 + UTF-8 序列分析
+   - `ExtractHeadAsync`/`ExtractHeadTailAsync`：压缩包条目头部/尾部字节提取，支持 ZIP Deflate/Store、7z 固态降级、RAR
+   - MP4 moov box 解析：mvhd 时长 + tkhd 分辨率
+   - `FileFormatHelper`：90+ 格式中文显示名
+   - `PreviewHeadSize` 设置（默认 4096）
+   - **Phase 2 — UI（WPF）**：魔数优先路由重构（`TryMagicPreview`），将魔数检测结果写入 `PreviewExtraInfoPanel`（冲突时红色提示），扩展名回退仅作为魔数 Unknown 时的兜底
+   - **冲突检测 + 切换按钮**：魔数检测结果与扩展名不一致时，在预览工具栏两组按钮之间插入"按扩展名/按魔数"切换按钮，点击后重新预览
+   - `AppSettings.EnableFormatDetection` 开关（默认 true）
+   - **Phase 3 — ArchiveEngineFactory 魔数兜底**：`GetEngineByExtension` 在扩展名未匹配时，读取文件头部字节调用 `FileFormatDetector.Detect()` 识别真实档案格式，支持 .epub/.docx/.xlsx/.pptx 等 ZIP 子类型自动路由到 ZipEngine
+2. 新建文件：`FileFormatDetector.cs`（650+ 行）、`FileFormatHelper.cs`（95 行）
+3. 修改文件：`FileFormatInfo.cs`（追加 11 枚举值）、`ArchiveEntryExtractor.cs`（+224 行）、`AppSettings.cs`、`ArchiveEngine.cs`（+60 行魔数兜底 + 映射）、`MainWindow.Preview.cs`（+180 行魔数路由 + 冲突切换）、`MainWindow.Preview.Text.cs`（文本左对齐修复）
+
+### v0.4.5 (2026-07-03) 密码流程统一 + QuickVerify 7z 扩展
+
+1. **QuickVerifyPassword 扩展支持 7z EncryptHeaders=false** — 新增 `BoundedWriteStream`（写入 ~8KB 后静默丢弃），提取最小加密条目验证密码。所有格式的 QuickVerify 现在都可靠。
+2. **删除 `CanTrustQuickVerify`** — QuickVerify 对所有格式可靠，不再需要此区分。
+3. **`ResolvePasswordAsync` 统一密码入口** — 新增 `PasswordResult` 类 + 统一方法，涵盖：检查加密 → TryMatchPassword → 对话框循环。所有调用方通过同一入口获取密码。
+4. **调用方大幅简化**：
+   - `LoadArchiveAsync`：~100 行分支逻辑 → 2 个 ResolvePasswordAsync 调用
+   - `ExtractAsync`：~50 行 TryMatchPassword+ExtractWithPasswordAsync → ResolvePasswordAsync
+   - `RunExtractStatic`：~60 行 → ResolvePasswordAsync
+   - `HandleExtractBatchCore`：~40 行 → ResolvePasswordAsync
+5. **删除 `ExtractWithPasswordAsync`** — 不再使用。
+6. **修复**：密码输入框"取消"后再次弹出陷入循环（加 `userCancelled` 标志区分取消和密码错误）。
+7. **修改文件**: `App.Password.cs`（+294/-162 行）、`MainWindow.xaml.cs`（+111/-285 行）、`App.Extract.cs`（+32/-139 行）
+8. **新增文件**: `.sisyphus/plans/password-flow-unification.md`
+9. **installer-selfcontained.iss 完全离线安装包** — 移除 WebView2 在线下载逻辑，改为本地捆绑 Evergreen Standalone Installer
+   - 新增 `WebView2-LICENSE.txt` 微软再分发许可声明
+   - 新增 `installer\download-redist.ps1` 预下载脚本
+   - 新增 `installer\redist\MicrosoftEdgeWebView2RuntimeInstallerX64.exe`（从微软官方下载）
+   - 删除 `URLDownloadToFile` 函数和 `EvergreenBootstrapperUrl` 常量
+
+### v0.4.4+ (2026-07-02) 压缩包路径处理一站式重构——ArchivePath 统一入口
+
+1. **新建 `ArchivePath` 类** — `ArchivePathExtensions.cs` → `ArchivePath`，压缩包路径处理的一站式入口
+   - `Normalize()`：`\` → `/` 统一分隔符，null 安全
+   - `TrimEndSeparator()`：去除尾部斜杠（保留根路径 `C:\`）
+   - `GetFileName()` / `GetDirectoryName()` / `GetFileNameWithoutExtension()`：自动处理尾部斜杠，无需调用方手动 TrimEnd
+   - `GetFileNameWithoutExtension()` 特殊处理 `.tar.gz` 双扩展名，与 `ArchiveEngine.GetFormatByExtension` 保持一致
+   - `FindEntry()`：按归一化路径在条目集合中查找
+2. **消除 4 种遗留路径处理模式**：
+   - 去除 29 处内联 `.Replace('\\', '/')` → `ArchivePath.Normalize()`
+   - 去除 16 处 `.TrimEnd('\\', '/')` → `ArchivePath.GetFileName`/`GetDirectoryName`/`GetFileNameWithoutExtension`/`TrimEndSeparator`
+   - 消除 `NormalizePathSeparators()` 扩展方法
+   - `ContextMenuHandler.cs` 保留 2 处（ShellExt 不引用 Core）
+3. **修改文件（11 个）**：`ArchivePathExtensions.cs`（新建）、`ZipEngine.cs`、`SevenZipEngine.cs`、`ArchiveEntryExtractor.cs`、`ArchiveStructureAnalyzer.cs`、`FileConflictHelper.cs`、`MainWindow.DragDrop.cs`、`App.Compress.cs`、`App.Open.cs`、`CompressSettingsWindow.xaml.cs`、`CompressSettingsWindow.Password.cs`
+
+### v0.4.4+ (2026-07-03) 双击文件默认程序打开 + 上级目录预览刷新修复
+
+1. **新功能：双击文件调用系统默认程序打开** — 在 `FileListGrid_PreviewMouseDoubleClick` 中添加文件双击处理分支：
+   - `AppSettings.DoubleClickOpenThreshold` 设置阈值（MB 为单位，默认 10MB，0=禁用），在设置窗口解压缩 Tab 末尾配置
+   - 超过阈值时弹出确认对话框："文件超过 X MB，确定要解压并打开吗？"
+   - 文件 >= 1MB 时显示 ProgressWindow 显示提取进度，< 1MB 则静默提取
+   - 提取到 `%TEMP%\MantisZip\OpenWith\{GUID}\` 后通过 `Process.Start(UseShellExecute=true)` 调用系统默认程序打开
+   - Tar/GZip/ISO 不支持单文件提取，弹出"该格式不支持双击打开"
+   - 加密未输入密码时提示"请先输入密码"
+   - 状态栏更新为"已用默认程序打开 {文件名}"
+   - Temp 文件随 App.OnExit 自动清理
+2. **修复 Bug：上级目录（..）选中时预览面板不刷新** — 移除 `FileListGrid_SelectionChanged` 中的 `!lastClicked.IsNavigationEntry` 守卫条件
+3. **修改文件（7 个）**：`AppSettings.cs`（+2 行）、`SettingsWindow.xaml`（+17 行）、`SettingsWindow.xaml.cs`（+11 行）、`L.cs`（+6 行）、`MainWindow.UI.cs`（+112 行）、`strings.zh.json`（+6 行）、`strings.en.json`（+6 行）
+
+1. **新建 `ArchivePath` 类** — `ArchivePathExtensions.cs` → `ArchivePath`，压缩包路径处理的一站式入口
+   - `Normalize()`：`\` → `/` 统一分隔符，null 安全
+   - `TrimEndSeparator()`：去除尾部斜杠（保留根路径 `C:\`）
+   - `GetFileName()` / `GetDirectoryName()` / `GetFileNameWithoutExtension()`：自动处理尾部斜杠，无需调用方手动 TrimEnd
+   - `GetFileNameWithoutExtension()` 特殊处理 `.tar.gz` 双扩展名，与 `ArchiveEngine.GetFormatByExtension` 保持一致
+   - `FindEntry()`：按归一化路径在条目集合中查找
+2. **消除 4 种遗留路径处理模式**：
+   - 去除 29 处内联 `.Replace('\\', '/')` → `ArchivePath.Normalize()`
+   - 去除 16 处 `.TrimEnd('\\', '/')` → `ArchivePath.GetFileName`/`GetDirectoryName`/`GetFileNameWithoutExtension`/`TrimEndSeparator`
+   - 消除 `NormalizePathSeparators()` 扩展方法
+   - `ContextMenuHandler.cs` 保留 2 处（ShellExt 不引用 Core）
+3. **修改文件（11 个）**：`ArchivePathExtensions.cs`（新建）、`ZipEngine.cs`、`SevenZipEngine.cs`、`ArchiveEntryExtractor.cs`、`ArchiveStructureAnalyzer.cs`、`FileConflictHelper.cs`、`MainWindow.DragDrop.cs`、`App.Compress.cs`、`App.Open.cs`、`CompressSettingsWindow.xaml.cs`、`CompressSettingsWindow.Password.cs`
+
+### v0.4.3+ (2026-07-01) NoDotNet 安装包增强——.NET 9 自动下载
+
+1. **installer.iss 新增 .NET 9 Desktop Runtime 自动检测 + 下载安装** — 安装时自动检测注册表 `HKLM\SOFTWARE\dotnet\Setup\InstalledVersions\x64\sharedfx\Microsoft.WindowsDesktop.App`，缺失时从 `aka.ms/dotnet/9.0/windowsdesktop-runtime-win-x64.exe` 下载并静默安装 `/quiet /install /norestart`。完全复用已有 WebView2 模式（`URLDownloadToFile` + `Exec`）。失败不阻塞安装（仅记日志）。
+2. **安装包文件名重命名** — `installer.iss` 输出：`NoDotNet` → `WebSetup`（因现支持自动下载 .NET）；`installer-selfcontained.iss` 输出：`Setup` → `Offline`（自包含离线包）。感谢用户建议。
+3. **贡献者鸣谢页面更新** — `AboutWindow.xaml` 新增财务贡献者显示区。由上一轮计划（contributors-panel）完成。
+4. **文本子类型检测已关闭**：`DetectTextSubtype()` 启发式精度不足暂禁用，代码保留，`Detect()` 中改回返回 `FileFormat.Text`
+
+### v0.4.3+ (2026-06-30) 工具栏新增「解压选择文件」按钮
+
+1. **工具栏新增「解压选择文件」按钮** — 位于「解压」与「压缩」之间，行为与右键菜单「解压到…」一致：选中文件后弹窗选择目标目录再解压。图标 📑。按钮在加载压缩包后启用。
+2. **右键菜单图标统一** — 「解压到…」图标从 📤 改为 📑，与工具栏按钮保持一致。
+
+### v0.4.3+ (2026-06-30) 默认路径优先级设置
+
+1. **AppSettings** — 新增 `DefaultPathPriority` 属性，支持 4 种策略：场景相关 / 资源管理器 / 最近使用 / 桌面
+2. **ResolveDefaultPath() 静态方法** — 按优先级链自动选取最佳默认路径，链中非空即停
+3. **设置 UI** — 🧰 高级标签页新增「默认路径优先级」GroupBox，4 个 RadioButton
+4. **7 个 QuickPathPreDialog 调用点** — 全部接入 `ResolveDefaultPath`，弹窗不再是空路径开局
+
+### v0.4.3+ (2026-06-29) 预览系统计划更新（Avalonia 方向 + 快速预览模式）
+
+1. **新计划：Avalonia 预览机会分析** — `preview-avalonia-opportunities.md`
+   - 分析 WPF→Avalonia 迁移对预览系统各格式的影响
+   - 评估 PSD/AI/HDR 等新格式的预览方案
+   - 提出 HDR 全景 360° 查看器方案（WebView2 + Three.js / Skia 自渲染两路线）
+   - 音视频播放替代方案（LibVLCSharp）
+   - **三级依赖隔离体系**：将 Magick.NET/LibVLC 等重大依赖拆分为可选插件，通过 `plugins/` 目录 + `AssemblyLoadContext` 加载，控制安装包体积
+2. **新计划：快速预览与渐进式加载** — `preview-quick-modes.md`
+   - 三种预览模式：⚡快速 / ▶渐进 / 📄完整
+   - 28 个格式逐行分析每种模式下的行为
+   - 后台 `ProgressiveLoadManager` 管理渐进加载与取消
+   - 后续扩展：文件列表缩略图模式
+3. **修正计划**：`preview-extended-formats.md` 更新——Phase 2D（Magick.NET）改为插件化方案，Phase 3.10/3.11（音视频）改为 LibVLC 插件，Phase 4 EXR/TIFF 由 Magick.NET 覆盖移除
+4. **PLAN.md**：新增两条调研条目 + 快速预览 P2 条目
+
+### v0.4.3 (2026-06-22) QuickPathControl 统一路径选择 + 资源管理器窗口检测 + 书签管理器 + 权限跳过
+
+1. **QuickPathControl 统一路径选择（压缩/解压窗口）**：
+   - CompressSettingsWindow：原有 OutputPathTextBox + BrowseOutputButton → QuickPathControl（文件保存模式），新增独立 FileNameTextBox 输入文件名
+   - ExtractSettingsWindow：原有 ManualPathTextBox + BrowseButton → QuickPathControl（文件夹选择模式）
+   - QuickPathControl 支持收藏夹 ⭐、历史记录 🕐、资源管理器窗口 🪟、浏览 📁
+2. **资源管理器窗口检测修复**：
+   - ExplorerWindowTracker 重写：COM IShellWindows（CLSID 直接创建）为主 + Win32 EnumWindows（CabinetWClass）兜底
+   - 解决 Shell.Application.Windows() 在某些系统返回空列表的问题
+3. **书签管理器菜单**：
+   - 主菜单 工具 > 新增「书签管理器(_B)...」打开 FavoriteManagerWindow
+   - 新增 Main_Menu_BookmarkManager 本地化键（中/英）
+4. **布局修复**：
+   - CompressSettingsWindow 内 Grid 从 5 行扩展至 7 行，消除 FormatOptionsPanel 与 VolumeSize 重叠
+5. **压缩包内逐条目权限跳过**：
    - 新增 `ExtractResult` 类（`SucceededEntries`/`FailedEntries`）
    - `IArchiveEngine.ExtractAsync` 返回类型从 `Task` 改为 `Task<ExtractResult>`
    - ZipEngine/SevenZipEngine/TarGzEngine 逐条目循环包 `try-catch(UnauthorizedAccessException)`，跳过失败条目继续处理其余
@@ -47,6 +172,18 @@
    - 仅用户点击「以管理员身份运行」时才重启旧进程
 3. **设计文档**：`.sisyphus/plans/uac-elevation-permission.md` 更新
 4. **进度窗口错误摘要**：ProgressWindow 新增 `ErrorSummaryBox`（可复制 TextBox），解压权限错误时在进度条和按钮之间显示错误摘要文本
+5. **计划状态同步**：将 `zip-copy-mode-optimization.md`（v0.4.2）和 `uac-elevation-permission.md`（v0.4.2）从 PLAN.md 待实现移至 PROGRESS.md 历史设计方案索引，同步更新跨平台分析计数
+6. **DynamicFormatOptionsPanel 后端接线**：ZIP 编码/7z 压缩方法/7z 固实选项从 UI 接入到压缩引擎：
+   - `ArchiveOptions`/`CompressRequest` 新增 `FileNameEncoding`、`SevenZipCompressionMethod`、`SevenZipSolid` 属性
+   - `ZipEngine`：根据 `FileNameEncoding` 选择 ZIP 文件名编码（utf-8/gbk/default）
+   - `SevenZipEngine.ConfigureCompressor`：根据选项选择压缩方法（LZMA/LZMA2/PPMd/BZip2/Deflate），非固实时设 `CustomParameters["s"]="off"`
+   - 修复 `FormatComboBox_SelectionChanged` 未同步 `FormatOptionsPanel.SelectedFormat` 导致面板不随格式切换的 bug
+7. **默认格式选项设置**：设置窗口 → 压缩标签页新增「默认格式选项」区域：
+   - AppSettings 新增 `ZipEncoding`、`SevenZipCompressionMethod`、`SevenZipSolid` 属性
+   - SettingsWindow 读写持久化
+   - `DynamicFormatOptionsPanel.LoadDefaults()` 打开压缩窗口时自动加载设置值
+    - 快捷压缩路径（`--compress-quick`/`--compress-separate`/`--compress-combined`）读取 AppSettings 默认值
+8. **RELEASE_NOTES.md 双语化**：将 v0.4.3 更新内容翻译为中英双语，格式与 v0.4.2/v0.4.1 保持一致
 
 ### v0.4.2 (2026-06-20) 安装程序主题/语言选择修复 / ZIP copy-mode 进度与取消
 
@@ -85,6 +222,12 @@
    - 标题统一添加 `/ English` 双语标注
 3. 修复动态菜单bug
 4. 文件列表增加“返回父目录”项目。
+5. **计划文档整理**：
+   - `drag-drop-direct-extract.md` 更新：纳入纯 Win32 覆盖层方案、UIA 降级、颜色状态机、呼吸动画等设计细节
+   - `parent-directory-entry.md` 补充到 PROGRESS.md 历史设计方案索引
+   - `quick-path-control.md` 归档（被 `quickpath-unified.md` 取代）
+   - 跨平台影响分析重建：从 43（含已完成/已废弃）精简为 26 个待实现计划
+   - PLAN.md 新增 `self-contained-installer.md`（P1）待实现条目
 5. **UAC 提权机制 — 双模式权限不足处理**：
    - `AppSettings.AllowElevation` 属性（默认 false），设置在设置 → 高级 → 权限提升
    - 新建 `App.Elevation.cs` 含 6 个辅助方法：`IsDirectoryWritable`, `IsElevated`, `RelaunchAsAdmin`, `ShowElevationInfoDialog`, `ShowElevationDialog`, `ShowElevationFailedDialog`
@@ -671,3 +814,7 @@
 | ZipEngine SharpZipLib 完全迁移 (加密路径→SharpSevenZip) | [zipengine-sharpcompress-migration.md](.sisyphus/plans/zipengine-sharpcompress-migration.md) | v0.3.13 |
 | 压缩流程统一化 (CompressService) | [compress-service-unify.md](.sisyphus/plans/compress-service-unify.md) | v0.4.0 |
 | 发布 Release | [release-automation.md](.sisyphus/plans/release-automation.md) | v0.4.0 |
+| 返回上级目录 (.. 导航行) | [parent-directory-entry.md](.sisyphus/plans/parent-directory-entry.md) | v0.4.0 |
+| ZIP 压缩流直拷优化 (ZipBinaryRewriter) | [zip-copy-mode-optimization.md](.sisyphus/plans/zip-copy-mode-optimization.md) | v0.4.2 |
+| UAC 提权 + 权限不足处理 | [uac-elevation-permission.md](.sisyphus/plans/uac-elevation-permission.md) | v0.4.2 |
+| 自包含安装包发布 | [self-contained-installer.md](.sisyphus/plans/self-contained-installer.md) | v0.4.2 |

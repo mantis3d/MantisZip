@@ -11,6 +11,7 @@ using MantisZip.Core.Engines;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using MantisZip.UI.Localization;
+using MantisZip.UI.Controls;
 
 namespace MantisZip.UI;
 
@@ -87,6 +88,13 @@ public partial class SettingsWindow : Window
         KeepExtCheck.IsChecked = s.KeepOriginalExtension;
         PreserveRootCheck.IsChecked = s.PreserveDirectoryRoot;
 
+        // 默认格式选项
+        foreach (ComboBoxItem item in ZipEncodingCombo.Items)
+            if ((string)item.Tag == s.ZipEncoding) { ZipEncodingCombo.SelectedItem = item; break; }
+        foreach (ComboBoxItem item in SevenZipMethodCombo.Items)
+            if ((string)item.Tag == s.SevenZipCompressionMethod) { SevenZipMethodCombo.SelectedItem = item; break; }
+        SevenZipSolidCheck.IsChecked = s.SevenZipSolid;
+
         // 解压
         foreach (ComboBoxItem item in ExtractDestCombo.Items)
             if ((string)item.Tag == s.ExtractDestination) { ExtractDestCombo.SelectedItem = item; break; }
@@ -95,6 +103,7 @@ public partial class SettingsWindow : Window
         OpenFolderCheck.IsChecked = s.OpenFolderAfterExtract;
         EnableDragExtractCheck.IsChecked = s.EnableDragExtract;
         ExtractPreservePathCheck.IsChecked = s.ExtractPreserveFullPath;
+        DoubleClickThresholdBox.Text = (s.DoubleClickOpenThreshold / (1024 * 1024)).ToString();
 
         // 上下文菜单
         EnableCompressCheck.IsChecked = s.EnableCompressMenu;
@@ -163,6 +172,17 @@ public partial class SettingsWindow : Window
         // 高级 — 权限提升
         AllowElevationCheck.IsChecked = s.AllowElevation;
 
+        // 高级 — 默认路径优先级
+        var priorityBtn = s.DefaultPathPriority switch
+        {
+            "context"  => DefaultPathContext,
+            "explorer" => DefaultPathExplorer,
+            "recent"   => DefaultPathRecent,
+            "desktop"  => DefaultPathDesktop,
+            _          => DefaultPathContext
+        };
+        priorityBtn.IsChecked = true;
+
         // 外观
         foreach (ComboBoxItem item in ThemeCombo.Items)
         if ((string)item.Tag == s.Theme) { ThemeCombo.SelectedItem = item; break; }
@@ -197,12 +217,17 @@ public partial class SettingsWindow : Window
         s.CloseAfterCompress = CloseAfterCompressCheck.IsChecked == true;
         s.KeepOriginalExtension = KeepExtCheck.IsChecked == true;
         s.PreserveDirectoryRoot = PreserveRootCheck.IsChecked == true;
+        s.ZipEncoding = (ZipEncodingCombo.SelectedItem as ComboBoxItem)?.Tag as string ?? "utf-8";
+        s.SevenZipCompressionMethod = (SevenZipMethodCombo.SelectedItem as ComboBoxItem)?.Tag as string ?? "LZMA2";
+        s.SevenZipSolid = SevenZipSolidCheck.IsChecked == true;
 
         s.ExtractDestination = ((ComboBoxItem)ExtractDestCombo.SelectedItem)?.Tag as string ?? "ask";
         s.FileConflictAction = ((ComboBoxItem)ConflictCombo.SelectedItem)?.Tag as string ?? "ask";
         s.OpenFolderAfterExtract = OpenFolderCheck.IsChecked == true;
         s.EnableDragExtract = EnableDragExtractCheck.IsChecked == true;
         s.ExtractPreserveFullPath = ExtractPreservePathCheck.IsChecked == true;
+        s.DoubleClickOpenThreshold = long.TryParse(DoubleClickThresholdBox.Text, out var threshold)
+            ? threshold * 1024 * 1024 : 10 * 1024 * 1024;
 
         s.EnableCompressMenu = EnableCompressCheck.IsChecked == true;
         s.EnableCompressSeparate = EnableCompressSeparateCheck.IsChecked == true;
@@ -248,6 +273,12 @@ public partial class SettingsWindow : Window
         s.EnableDebugLogging = EnableDebugLogCheck.IsChecked == true;
         s.LogPrivacyMode = (LogPrivacyModeCombo.SelectedItem as ComboBoxItem)?.Tag as string ?? "off";
         s.AllowElevation = AllowElevationCheck.IsChecked == true;
+
+        // 高级 — 默认路径优先级
+        if (DefaultPathContext.IsChecked   == true) s.DefaultPathPriority = "context";
+        else if (DefaultPathExplorer.IsChecked == true) s.DefaultPathPriority = "explorer";
+        else if (DefaultPathRecent.IsChecked   == true) s.DefaultPathPriority = "recent";
+        else if (DefaultPathDesktop.IsChecked  == true) s.DefaultPathPriority = "desktop";
 
         SaveAssocSettings();
 
@@ -348,6 +379,14 @@ public partial class SettingsWindow : Window
         foreach (var c in e.Text)
         {
             if (!char.IsDigit(c)) { e.Handled = true; return; }
+        }
+    }
+
+    private void DoubleClickThresholdBox_TextChanged(object sender, System.Windows.Controls.TextChangedEventArgs e)
+    {
+        if (int.TryParse(DoubleClickThresholdBox.Text, out var val))
+        {
+            if (val < 0) { DoubleClickThresholdBox.Text = "0"; }
         }
     }
 
@@ -599,20 +638,20 @@ public partial class SettingsWindow : Window
 
     private void SevenZipBrowseBtn_Click(object sender, RoutedEventArgs e)
     {
-        var dialog = new Microsoft.Win32.OpenFileDialog
+        var dlg = new QuickPathPreDialog
         {
-            Title = L.T(L.Settings_Advanced_SevenZipSelectDll),
-            Filter = "7z.dll|7z.dll|动态链接库 (*.dll)|*.dll|所有文件 (*.*)|*.*",
-            CheckFileExists = true,
-            Multiselect = false,
-            InitialDirectory = Path.Combine(
+            Owner = this,
+            IsPickFolderMode = false,
+            IsFileOpenMode = true,
+            FileOpenFilter = "7z.dll|7z.dll|动态链接库 (*.dll)|*.dll|所有文件 (*.*)|*.*",
+            InitialPath = App.ResolveDefaultPath(Path.Combine(
                 AppDomain.CurrentDomain.BaseDirectory,
-                Environment.Is64BitProcess ? "x64" : "x86"),
+                Environment.Is64BitProcess ? "x64" : "x86")) ?? ""
         };
 
-        if (dialog.ShowDialog() == true)
+        if (dlg.ShowDialog() == true && dlg.SelectedPath != null)
         {
-            _sevenZipPath = dialog.FileName;
+            _sevenZipPath = dlg.SelectedPath;
             UpdateSevenZipStatus();
         }
     }

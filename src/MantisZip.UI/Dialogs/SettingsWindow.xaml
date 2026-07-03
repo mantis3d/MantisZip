@@ -2,6 +2,7 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:l="clr-namespace:MantisZip.UI.Localization"
+         xmlns:controls="clr-namespace:MantisZip.UI.Controls"
         xmlns:emoji="clr-namespace:Emoji.Wpf;assembly=Emoji.Wpf"
         Title="{l:L Settings_Title}" Height="500" Width="700"
         WindowStartupLocation="CenterScreen"
@@ -82,6 +83,51 @@
                         <CheckBox x:Name="CloseAfterCompressCheck" Content="{l:L Settings_Compress_CloseAfterDone}" Margin="0,16,0,0"/>
                         <CheckBox x:Name="KeepExtCheck" Content="{l:L Settings_Compress_KeepExt}" Margin="0,8,0,0"/>
                         <CheckBox x:Name="PreserveRootCheck" Content="压缩文件夹时保留外层目录" Margin="0,8,0,0"/>
+
+                        <Border BorderBrush="{DynamicResource Theme_BorderLight}" BorderThickness="1" CornerRadius="4" Padding="8" Margin="0,12,0,0"
+                                Background="{DynamicResource Theme_SurfaceBg}">
+                            <StackPanel>
+                                <TextBlock Text="默认格式选项" FontWeight="SemiBold" Margin="0,0,0,8"
+                                           Foreground="{DynamicResource Theme_TextPrimary}"/>
+
+                                <Grid Margin="0,0,0,6">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="110"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Text="{l:L Settings_Compress_ZipEncoding}" VerticalAlignment="Center"
+                                               Foreground="{DynamicResource Theme_TextPrimary}"/>
+                                    <ComboBox x:Name="ZipEncodingCombo" Grid.Column="1" Width="200" HorizontalAlignment="Left"
+                                              Background="{DynamicResource Theme_WindowBg}"
+                                              Foreground="{DynamicResource Theme_TextPrimary}">
+                                        <ComboBoxItem Content="UTF-8" Tag="utf-8"/>
+                                        <ComboBoxItem Content="GBK" Tag="gbk"/>
+                                        <ComboBoxItem Content="保留原始" Tag="default"/>
+                                    </ComboBox>
+                                </Grid>
+
+                                <Grid Margin="0,0,0,6">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="110"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Text="{l:L Settings_Compress_SevenZipMethod}" VerticalAlignment="Center"
+                                               Foreground="{DynamicResource Theme_TextPrimary}"/>
+                                    <ComboBox x:Name="SevenZipMethodCombo" Grid.Column="1" Width="200" HorizontalAlignment="Left"
+                                              Background="{DynamicResource Theme_WindowBg}"
+                                              Foreground="{DynamicResource Theme_TextPrimary}">
+                                        <ComboBoxItem Content="LZMA2" Tag="LZMA2"/>
+                                        <ComboBoxItem Content="LZMA" Tag="LZMA"/>
+                                        <ComboBoxItem Content="PPMd" Tag="PPMd"/>
+                                        <ComboBoxItem Content="BZip2" Tag="BZip2"/>
+                                        <ComboBoxItem Content="Deflate" Tag="Deflate"/>
+                                    </ComboBox>
+                                </Grid>
+
+                                <CheckBox x:Name="SevenZipSolidCheck" Content="{l:L Settings_Compress_SevenZipSolid}"
+                                          Foreground="{DynamicResource Theme_TextPrimary}"/>
+                            </StackPanel>
+                        </Border>
                     </StackPanel>
                 </ScrollViewer>
             </TabItem>
@@ -120,6 +166,23 @@
                         <CheckBox x:Name="OpenFolderCheck" Content="{l:L Settings_Extract_OpenFolderAfter}" Margin="0,16,0,0"/>
                         <CheckBox x:Name="EnableDragExtractCheck" Content="{l:L Settings_Extract_EnableDragExtract}" Margin="0,8,0,0"/>
                         <CheckBox x:Name="ExtractPreservePathCheck" Content="{l:L Settings_Extract_PreserveFullPath}" Margin="0,8,0,0"/>
+
+                        <Border BorderBrush="{DynamicResource Theme_BorderLight}" BorderThickness="1" CornerRadius="4" Padding="8" Margin="0,12,0,0"
+                                Background="{DynamicResource Theme_SurfaceBg}">
+                            <StackPanel>
+                                <TextBlock Text="{l:L Settings_Extract_DoubleClickOpenThreshold}" FontWeight="SemiBold" Margin="0,0,0,8"
+                                           Foreground="{DynamicResource Theme_TextPrimary}"/>
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBox x:Name="DoubleClickThresholdBox" Width="80" Height="22" VerticalAlignment="Center"
+                                             Background="{DynamicResource Theme_WindowBg}"
+                                             Foreground="{DynamicResource Theme_TextPrimary}"
+                                             BorderBrush="{DynamicResource Theme_Border}"
+                                             PreviewTextInput="IntInput_PreviewTextInput"
+                                             TextChanged="DoubleClickThresholdBox_TextChanged"/>
+                                    <TextBlock Text="MB" FontSize="12" Foreground="{DynamicResource Theme_TextSecondary}" VerticalAlignment="Center" Margin="6,0,0,0"/>
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
                     </StackPanel>
                 </ScrollViewer>
             </TabItem>
@@ -677,6 +740,19 @@
                                     <Button x:Name="SevenZipResetBtn" Content="{l:L Settings_Advanced_SevenZipReset}" Width="100"
                                             Height="26" Margin="8,0,0,0" Click="SevenZipResetBtn_Click"/>
                                 </StackPanel>
+                            </StackPanel>
+                        </GroupBox>
+
+                        <!-- 默认路径优先级 -->
+                        <GroupBox Header="{l:L Settings_DefaultPath_GroupHeader}" Padding="8" Margin="0,0,0,12">
+                            <StackPanel>
+                                <RadioButton x:Name="DefaultPathContext"   GroupName="DefaultPathPriority" Content="{l:L Settings_DefaultPath_Context}"   Margin="0,2"/>
+                                <RadioButton x:Name="DefaultPathExplorer"  GroupName="DefaultPathPriority" Content="{l:L Settings_DefaultPath_Explorer}"  Margin="0,2"/>
+                                <RadioButton x:Name="DefaultPathRecent"    GroupName="DefaultPathPriority" Content="{l:L Settings_DefaultPath_Recent}"    Margin="0,2"/>
+                                <RadioButton x:Name="DefaultPathDesktop"   GroupName="DefaultPathPriority" Content="{l:L Settings_DefaultPath_Desktop}"   Margin="0,2"/>
+                                <TextBlock Text="{l:L Settings_DefaultPath_Hint}"
+                                           Foreground="{StaticResource Theme_TextSecondary}"
+                                           FontSize="11" TextWrapping="Wrap" Margin="0,6,0,0"/>
                             </StackPanel>
                         </GroupBox>
 

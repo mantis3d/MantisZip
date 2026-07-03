@@ -1,3 +1,47 @@
+## v0.4.4
+
+### 文件说明 / File Description
+
+MantisZip-0.4.4-Setup-WebSetup.exe 是需要联网才能安装的。MantisZip-0.4.4-Setup-Offline.exe 是离线安装包。
+
+
+### 更新内容 / Changelog
+
+- 完成 [快速路径选择](.sisyphus/plans/quickpath-unified.md) 计划。
+- 
+
+## v0.4.3
+
+### 文件说明 / File Description
+
+MantisZip-0.4.3-Setup-NoDotNet.exe 是需要安装 dotnet runtime 才能运行的。MantisZip-0.4.3-Setup.exe 是自包含 dotnet runtime 的。
+
+MantisZip-0.4.3-Setup-NoDotNet.exe requires the .NET runtime to be installed. MantisZip-0.4.3-Setup.exe is self-contained with the .NET runtime.
+
+**如果你不明白上面那句话是什么意思，请下载 MantisZip-0.4.3-Setup.exe。**
+
+**If you don't understand what the above means, please download MantisZip-0.4.3-Setup.exe.**
+
+### 更新内容 / Changelog
+
+- 完成 [快速路径选择](.sisyphus/plans/quickpath-unified.md) 计划。
+- Completed [Quick Path Selection](.sisyphus/plans/quickpath-unified.md) plan.
+- 快速路径选择，在"浏览"按钮旁边加上三个用于切换路径的按钮。（灵感来自软件 Listary）
+- Quick Path Selection: added three buttons next to the "Browse" button for switching paths. (Inspired by Listary)
+- ![快速路径选择](docs/images/version/v0.4.3/QuickPath.png)
+- 可以把常用路径加入书签，在"书签"按钮弹出菜单里面选择并切换。
+- Frequently used paths can be bookmarked and selected via the "Bookmark" button popup menu for quick switching.
+- ![快速路径书签](docs/images/version/v0.4.3/QuickPathBookmark.png)
+- 可以在书签管理器里面管理书签。
+- Bookmarks can be managed in the Bookmark Manager.
+- ![书签管理器](docs/images/version/v0.4.3/BookmarkManager.png)
+- "历史"按钮，弹出菜单里面会显示最近的用到的目录并切换。
+- The "History" button shows recently used directories in a popup menu for quick switching.
+- ![快速路径历史](docs/images/version/v0.4.3/QuickPathHistory.png)
+- "切换"按钮，弹出菜单里面会显示此时打开的资源管理器目录并切换。
+- The "Switch" button shows currently open Explorer directories in a popup menu for quick switching.
+- ![快速路径切换](docs/images/version/v0.4.3/QuickPathQuickSwitch.png)
+
 
 ## v0.4.2
 

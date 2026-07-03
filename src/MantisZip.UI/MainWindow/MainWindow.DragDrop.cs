@@ -300,17 +300,17 @@ public partial class MainWindow
         {
             if (!item.IsDirectory)
             {
-                if (seen.Add(item.FullPath.Replace('\\', '/')))
+                if (seen.Add(ArchivePath.Normalize(item.FullPath)))
                     result.Add(item);
             }
             else
             {
-                var dirPath = item.FullPath.Replace('\\', '/');
+                var dirPath = ArchivePath.Normalize(item.FullPath);
                 var dirPrefix = dirPath.EndsWith("/") ? dirPath : dirPath + "/";
                 foreach (var child in _allItems)
                 {
                     if (child.IsDirectory) continue;
-                    var childPath = child.FullPath.Replace('\\', '/');
+                    var childPath = ArchivePath.Normalize(child.FullPath);
                     if (childPath.StartsWith(dirPrefix, StringComparison.Ordinal) &&
                         seen.Add(childPath))
                     {
@@ -331,12 +331,12 @@ public partial class MainWindow
     /// </summary>
     private string GetDragExtractPath(ArchiveItem item, IReadOnlyList<ArchiveItem> selectedDirs, string tempDir)
     {
-        var normalizedPath = item.FullPath.Replace('\\', '/');
+        var normalizedPath = ArchivePath.Normalize(item.FullPath);
         var relativePath = normalizedPath;
 
         foreach (var dir in selectedDirs)
         {
-            var dirPath = dir.FullPath.Replace('\\', '/').TrimEnd('/');
+            var dirPath = ArchivePath.TrimEndSeparator(ArchivePath.Normalize(dir.FullPath));
             var dirPrefix = dirPath + "/";
             if (normalizedPath.StartsWith(dirPrefix, StringComparison.Ordinal))
             {

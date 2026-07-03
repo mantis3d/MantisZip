@@ -190,6 +190,9 @@ public partial class App : Application
             CompressionLevel = settings.DefaultLevel,
             KeepOriginalExtension = settings.KeepOriginalExtension,
             PreserveDirectoryRoot = settings.PreserveDirectoryRoot,
+            FileNameEncoding = settings.ZipEncoding,
+            SevenZipCompressionMethod = settings.SevenZipCompressionMethod,
+            SevenZipSolid = settings.SevenZipSolid,
         };
         var outputPaths = CompressService.GetOutputPaths(request);
         progressWindow.InitBatchMode(outputPaths);
@@ -392,14 +395,14 @@ public partial class App : Application
         if (commonParent != null && !IsDriveRoot(commonParent))
         {
             parentDir = commonParent;
-            archiveName = Path.GetFileName(commonParent.TrimEnd('\\', '/'));
+            archiveName = ArchivePath.GetFileName(commonParent);
         }
         else
         {
             // 无公共父目录或根目录 → 弹输入框
-            var firstParent = Path.GetDirectoryName(allPaths[0].TrimEnd('\\', '/'))
+            var firstParent = ArchivePath.GetDirectoryName(allPaths[0])
                 ?? Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
-            var defaultName = Path.GetFileNameWithoutExtension(allPaths[0].TrimEnd('\\', '/'));
+            var defaultName = ArchivePath.GetFileNameWithoutExtension(allPaths[0]);
 
             var nameResult = app.Dispatcher.Invoke(() =>
             {
@@ -433,6 +436,9 @@ public partial class App : Application
             CompressionLevel = settings.DefaultLevel,
             OutputPath = finalPath,
             PreserveDirectoryRoot = settings.PreserveDirectoryRoot,
+            FileNameEncoding = settings.ZipEncoding,
+            SevenZipCompressionMethod = settings.SevenZipCompressionMethod,
+            SevenZipSolid = settings.SevenZipSolid,
         };
         var outputPaths = CompressService.GetOutputPaths(request);
         progressWindow.InitBatchMode(outputPaths);
@@ -512,7 +518,7 @@ public partial class App : Application
         if (paths.Count == 0) return null;
         var parents = paths.Select(p =>
         {
-            var trimmed = p.TrimEnd('\\', '/');
+            var trimmed = ArchivePath.TrimEndSeparator(p);
             return File.Exists(trimmed)
                 ? Path.GetDirectoryName(trimmed) ?? ""
                 : Path.GetDirectoryName(trimmed) ?? "";
@@ -535,7 +541,7 @@ public partial class App : Application
 
     internal static bool IsDriveRoot(string path)
     {
-        var trimmed = path.TrimEnd('\\', '/');
+        var trimmed = ArchivePath.TrimEndSeparator(path);
         return trimmed.Length == 2 && trimmed[1] == ':'; // e.g., "C:", "D:"
     }
     /// <summary>
@@ -559,14 +565,16 @@ public partial class App : Application
             if (File.Exists(first))
                 dir = Path.GetDirectoryName(first);
             else if (Directory.Exists(first))
-                dir = Path.GetDirectoryName(first.TrimEnd('\\', '/'));
+                dir = ArchivePath.GetDirectoryName(first);
             dir ??= Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
             var s = AppSettings.Instance;
             var name = s.KeepOriginalExtension
-                ? Path.GetFileName(first.TrimEnd('\\', '/'))
-                : Path.GetFileNameWithoutExtension(first.TrimEnd('\\', '/'));
+                ? ArchivePath.GetFileName(first)
+                : ArchivePath.GetFileNameWithoutExtension(first);
             var ext = s.DefaultFormat == "tar.gz" ? ".tar.gz" : "." + s.DefaultFormat;
-            win.OutputPathTextBox.Text = Path.Combine(dir, name + ext);
+            win.OutputPathControl.PathText = dir;
+            win.FileNameTextBox.Text = name;
+            win.FileExtensionLabel.Text = ext;
         }
 
         win.Closed += (_, _) =>

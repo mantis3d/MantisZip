@@ -1,0 +1,63 @@
+<Window x:Class="MantisZip.UI.AddFavoriteDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="添加收藏" Height="200" Width="440"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="NoResize"
+        ShowInTaskbar="False"
+        Background="{DynamicResource Theme_WindowBg}">
+    <Grid Margin="12">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <Grid Grid.Row="0" Margin="0,0,0,8">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="60"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+            <TextBlock Grid.Column="0" Text="名称:" VerticalAlignment="Center"
+                       Foreground="{DynamicResource Theme_TextPrimary}"/>
+            <TextBox x:Name="NameTextBox" Grid.Column="1" Height="24"
+                     Background="{DynamicResource Theme_SurfaceBg}"
+                     Foreground="{DynamicResource Theme_TextPrimary}"
+                     BorderBrush="{DynamicResource Theme_Border}"/>
+        </Grid>
+
+        <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="60"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <TextBlock Grid.Column="0" Text="路径:" VerticalAlignment="Center"
+                       Foreground="{DynamicResource Theme_TextPrimary}"/>
+            <TextBox x:Name="PathTextBox" Grid.Column="1" Height="24"
+                     Background="{DynamicResource Theme_SurfaceBg}"
+                     Foreground="{DynamicResource Theme_TextPrimary}"
+                     BorderBrush="{DynamicResource Theme_Border}"/>
+            <Button Grid.Column="2" Content="浏览…" Width="60" Height="24" Margin="4,0,0,0"
+                    Click="BrowsePath_Click"
+                    Background="{DynamicResource Theme_ButtonBg}"
+                    Foreground="{DynamicResource Theme_TextPrimary}"
+                    BorderBrush="{DynamicResource Theme_ButtonBorder}"/>
+        </Grid>
+
+        <StackPanel Grid.Row="4" Orientation="Horizontal" HorizontalAlignment="Right">
+            <Button Content="确定" Width="80" Height="28" Margin="0,0,8,0" IsDefault="True"
+                    Click="Ok_Click"
+                    Background="{DynamicResource Theme_Accent}"
+                    Foreground="{DynamicResource Theme_TextOnAccent}"
+                    BorderThickness="0"/>
+            <Button Content="取消" Width="80" Height="28" IsCancel="True"
+                    Click="Cancel_Click"
+                    Background="{DynamicResource Theme_ButtonBg}"
+                    Foreground="{DynamicResource Theme_TextPrimary}"
+                    BorderBrush="{DynamicResource Theme_ButtonBorder}"/>
+        </StackPanel>
+    </Grid>
+</Window>

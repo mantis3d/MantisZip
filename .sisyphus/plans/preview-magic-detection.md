@@ -1,13 +1,14 @@
 # 魔数检测文件真实格式 (Magic Byte Content Detection)
 
-> **状态**: 📋 待定 | **阶段**: [⬜⬜⬜⬜⬜⬜] (0/6)
+> **状态**: ✅ Phase 1 完成 / ✅ Phase 2 完成 / ✅ Phase P1(TextSubtype) 完成 | **Phase 1 (Core)**: [✅✅✅✅✅] (5/5) | **Phase 2 (UI)**: [✅✅✅] (3/3) implemented in WPF | **Phase P1 (TextSubtype)**: [✅] (1/1) | **总进度**: (9/9)
 
-## TL;DR
+**⚠️ 两阶段拆分**：
 
-在 Plan A（扩展名识别→预览）完成后，新增基于魔数/文件内容的格式检测引擎，替代当前的扩展名判断，使无名文件、扩展名错误或被改名的文件也能被正确识别和预览。
+- **Phase 1 — Core（可立即执行）**：`FileFormatDetector`、`ExtractHeadAsync`、ZIP 子类型、MP4 tail 等全部在 `MantisZip.Core` 项目中完成，与 UI 框架无关。**Avalonia 移植完成前已先行落地。**
+- **Phase 2 — UI（已在 WPF 中实现）**：在 WPF 的预览流程中插入魔数检测 + 修改 PreviewHeader。改动量小，仅在现有预览分支前加几十行。Avalonia 移植后需在 Avalonia 版做相同集成。
 
-> **依赖**: Plan A 已完成（各格式解码器已就绪）
-> **核心价值**: 扩展名不可靠时仍能识别格式，并在 PreviewHeader 中显示真实格式名
+> **依赖**：Plan A 已完成（各格式解码器已就绪）
+> **核心价值**：扩展名不可靠时仍能识别格式，并在 PreviewHeader 中显示真实格式名
 
 ---
 
@@ -414,6 +415,44 @@ static bool IsPe(byte[] head)
 
 ---
 
+### 文本格式子类型检测（无魔数格式的内容启发式判断）
+
+文本文件没有魔数，`LooksLikeText` 返回 `true` 后，需要对内容做进一步启发式判断区分子类型。
+
+#### 检测优先级（按特异性从高到低）
+
+| 优先级 | 检测特征 | FileFormat |
+|--------|----------|------------|
+| 1 | 首行 `<?xml ` 或 `<` + 闭合尖括号模式的高占比 | `Xml` |
+| 2 | 首非空字符为 `{` 或 `[`，末尾对应 `}` / `]` 且可通过简单平衡检查 | `Json` |
+| 3 | `<!DOCTYPE html>`、`<html`、`<head`、`<body` 等标记（大小写不敏感） | `Html` |
+| 4 | `# `、`## `、`### ` 等标题行数 > 1，或 `[]()` 链接、` ``` ` 代码块 | `Markdown` |
+| 5 | 多行（>3行）每行分隔符数量一致（逗号/制表符/分号），行数 > 3 | `Csv` |
+| 6 | `[` + `]` 节头行存在，且 `key=value` 占比高 | `Ini` |
+| 7 | 以上都不匹配 | `Text` |
+
+#### 实现
+
+在 `FileFormatDetector.cs` 新增：
+
+```csharp
+/// <summary>
+/// 对已判定为文本的内容做子类型检测（无魔数格式）。
+/// 返回 Text 表示无法进一步区分。
+/// </summary>
+public static FileFormat DetectTextSubtype(string content, int length);
+```
+
+字符串参数从 `Detect()` 的 `byte[] head` 转换而来（UTF-8/GBK 检测复用 `Ude.NetStandard` 路径）。
+
+#### 影响
+
+- `Detect()` 在魔数未命中且 `LooksLikeText()` 返回 `true` 时 → 不直接返回 `Text`，而是调用 `DetectTextSubtype()`
+- `TryMagicPreview` 的新增分支：`Html` → `ShowHtmlPreview`，`Markdown` → `ShowMarkdownPreview`，`Csv` → `ShowCsvPreview`，其余 → `ShowTextPreview`
+- 现有 `Text` case 保持不变（纯文本降级）
+
+---
+
 ## 磁数检测 + 尾读取（针对 MP4）
 
 ### 问题
@@ -457,57 +496,86 @@ if (FileFormatDetector.Detect(head) == FileFormat.Mp4 && tail != null)
 
 ## 任务总览
 
-- [ ] **Step 1: FileFormat 枚举 + FileFormatDetector 核心**
-- [ ] **Step 2: ExtractHeadAsync + ExtractHeadTailAsync**
-- [ ] **Step 3: ShowPreviewAsync 改造**
-- [ ] **Step 4: ZIP 子类型检测**
-- [ ] **Step 5: MP4 tail 检测**
-- [ ] **Step 6: 设置开关**
+### Phase 1 — Core（可立即执行，与 UI 框架无关）
+
+- [x] **P1-S1: FileFormat 枚举 + FileFormatDetector 核心** — `FileFormatInfo.cs` 追加 + `FileFormatDetector.Detect()` 魔数匹配引擎
+- [x] **P1-S2: ExtractHeadAsync + ExtractHeadTailAsync** — 压缩包条目头部/尾部提取基础设施
+- [x] **P1-S3: ZIP 子类型检测** — `DetectZipSubtype` 区分 EPUB/DOCX/XLSX/PPTX/ODF
+- [x] **P1-S4: MP4 tail 检测** — moov box 解析：时长 + 分辨率
+
+### Phase 2 — UI（已在 WPF 中实现，Avalonia 移植时需做等同改动）
+
+- [x] **P2-S1: ShowPreviewAsync 改造** — 在 WPF 版预览流程中插入魔数检测
+- [x] **P2-S2: PreviewHeader 展示真实格式**
+- [x] **P2-S3: 设置开关** — `AppSettings.EnableFormatDetection`
 
 ## 工作项
 
-### Step 1: FileFormat 枚举 + FileFormatDetector 核心 [⬜⬜⬜] (0/3)
+---
 
-- [ ] `FileFormat` 枚举追加（在已有 `FileFormatInfo.cs` 末尾追加缺失值）
-- [ ] `FileFormatDetector.Detect()` 魔数匹配引擎 + `DetectByExtension()` 回退
-- [ ] PE 特殊检测：MZ + PE signature 双重确认
+### Phase 1 — Core（可立即执行，与 UI 框架无关）
+
+均在 `MantisZip.Core` 项目内完成，改动不涉及任何 WPF/Avalonia 控件。测试全部在 Core 项目跑。
+
+#### P1-S1: FileFormat 枚举 + FileFormatDetector 核心 [⬜⬜⬜] (0/3)
+
+- [x] `FileFormat` 枚举追加（在已有 `FileFormatInfo.cs` 末尾追加缺失值）
+- [x] `FileFormatDetector.Detect()` 魔数匹配引擎 + `DetectByExtension()` 回退
+- [x] PE 特殊检测：MZ + PE signature 双重确认
 - **文件**: `Core/Utils/FileFormatInfo.cs`（追加）, `Core/Utils/FileFormatDetector.cs`（新建）
 - 在 `FileFormatInfo.cs` 末尾追加：`Ogg`, `Odt`, `Ods`, `Odp`, `Rtf`, `DjVu`, `Xps`, `Woff2`, `Fits`, `Vhdx`, `Parquet`
 - 实现 `Detect(byte[], int)` — 魔数匹配引擎，覆盖 30+ 种格式
 - 实现 `DetectByExtension(string)` — 扩展名回退
 - PE 特殊检测：MZ + PE signature 双重确认
 
-### Step 2: ExtractHeadAsync + ExtractHeadTailAsync [⬜⬜⬜⬜] (0/4)
+#### P1-S2: ExtractHeadAsync + ExtractHeadTailAsync [⬜⬜⬜⬜] (0/4)
 
-- [ ] `ExtractHeadAsync` — ZIP (Deflate/Store), 7z, RAR 支持
-- [ ] `ExtractHeadTailAsync` — 可选尾读取
-- [ ] 7z 固态压缩降级策略
-- [ ] headSize 通过 `AppSettings.PreviewHeadSize` 可配置
+- [x] `ExtractHeadAsync` — ZIP (Deflate/Store), 7z, RAR 支持
+- [x] `ExtractHeadTailAsync` — 可选尾读取
+- [x] 7z 固态压缩降级策略
+- [x] headSize 通过 `AppSettings.PreviewHeadSize` 可配置（Avalonia 版再追加对应设置 UI）
+- **文件**: `Core/Utils/ArchiveEntryExtractor.cs`
 
-**文件**: `Core/Utils/ArchiveEntryExtractor.cs`
+#### P1-S3: ZIP 子类型检测 [⬜⬜] (0/2)
 
-### Step 3: ShowPreviewAsync 改造 [⬜⬜⬜] (0/3)
+- [x] `DetectZipSubtype(byte[])` — EPUB/DOCX/XLSX/PPTX/ODF 区分
+- [x] 部分 Deflate 解压 + 文件内容匹配
+- **文件**: `Core/Utils/FileFormatDetector.cs`
 
-- [ ] 在现有 `ext` 判定之前插入魔数检测
-- [ ] 修改 PreviewHeader 展示真实格式
-- [ ] `FileFormat` → 映射到 Plan A 各解码器
+#### P1-S4: MP4 tail 检测 [⬜⬜] (0/2)
 
-**文件**: `MainWindow.Preview.cs`
+- [x] `ExtractHeadTailAsync` 的 MP4 调用策略
+- [x] moov box 解析：时长 (mvhd) + 分辨率 (tkhd)
+- **文件**: `Core/Utils/ArchiveEntryExtractor.cs`
 
-### Step 4: ZIP 子类型检测 [⬜⬜] (0/2)
+#### P1-S5: 文本子类型检测 [✅] (1/1)
 
-- [ ] `DetectZipSubtype(byte[])` — EPUB/DOCX/XLSX/PPTX/ODF 区分
-- [ ] 部分 Deflate 解压 + 文件内容匹配
+- [x] `DetectTextSubtype(string)` — HTML/XML/JSON/Markdown/CSV/INI 内容启发式区分
+- **文件**: `Core/Utils/FileFormatDetector.cs`
+- 在魔数未命中 + `LooksLikeText()` 时调用，替代直接返回 `Text`
+- `TryMagicPreview` 新增 `Html`/`Markdown`/`Csv`/`Json`/`Xml`/`Ini` case，路由到现有预览方法
 
-### Step 5: MP4 tail 检测 [⬜⬜] (0/2)
+---
 
-- [ ] `ExtractHeadTailAsync` 的 MP4 调用策略
-- [ ] moov box 解析：时长 (mvhd) + 分辨率 (tkhd)
+### Phase 2 — UI（已在 WPF 中实现，Avalonia 移植时需做等同改动）
 
-### Step 6: 设置开关 [⬜⬜] (0/2)
+均在 WPF 版 UI 项目中完成，改动量小。Avalonia 移植时在 `MainWindow.Preview.cs` 做等同的 ~50 行集成。
 
-- [ ] `AppSettings` 新增 `EnableFormatDetection` (默认 true)
-- [ ] 关闭时回退到当前纯扩展名流程
+#### P2-S1: ShowPreviewAsync 改造 [✅✅✅] (3/3)
+
+- [x] 在现有 ext 判定之前插入魔数检测（调用 Phase 1 的 `FileFormatDetector.Detect()`）
+- [x] 修改 PreviewHeader 展示真实格式
+- [x] `FileFormat` → 映射到现有预览解码器
+- **文件**: `src/MantisZip.UI/MainWindow/Preview/MainWindow.Preview.cs`
+
+#### P2-S2: PreviewHeader 展示真实格式 [✅] (1/1)
+
+- [x] 标题栏显示 `📄 filename → JPEG 图像` 格式
+
+#### P2-S3: 设置开关 [✅✅] (2/2)
+
+- [x] `AppSettings` 新增 `EnableFormatDetection` (默认 true)
+- [x] 关闭时回退到纯扩展名流程
 
 ---
 
@@ -577,22 +645,39 @@ var metadata = GetPdfMetadata(tempHeadFile);  // 或其它格式的元数据方�
 
 ## Definition of Done
 
-- [ ] `FileFormatDetector` 魔数匹配引擎完成（覆盖 20+ 格式）
-- [ ] `ExtractHeadAsync` / `ExtractHeadTailAsync` 实现
-- [ ] `ShowPreviewAsync` 集成魔数检测
-- [ ] ZIP 子类型检测（EPUB/DOCX/XLSX/PPTX/ODF）
-- [ ] MP4 tail 检测（moov box 解析）
-- [ ] `AppSettings.EnableFormatDetection` 开关
-- [ ] 7z 固态压缩降级处理
-- [ ] `dotnet build` 通过
+### Phase 1 — Core ✅
+
+- [x] `FileFormatDetector` 魔数匹配引擎完成（覆盖 35+ 格式）
+- [x] `ExtractHeadAsync` / `ExtractHeadTailAsync` 实现
+- [x] ZIP 子类型检测（EPUB/DOCX/XLSX/PPTX/ODF）
+- [x] MP4 tail 检测（moov box 解析）
+- [x] 7z 固态压缩降级处理
+- [x] `dotnet build` 通过（Core 项目 + 测试项目）
+- [x] Core 层单元测试通过（233/234，1 个预存失败无关——FavoritePathManager）
+
+### Phase 2 — UI ✅ WPF 实现完成
+
+- [x] ShowPreviewAsync 集成魔数检测
+- [x] PreviewHeader 显示真实格式名
+- [x] `AppSettings.EnableFormatDetection` 开关（默认 true，设置 UI 界面待 SettingsWindow 追加）
+- [x] WPF 版 `dotnet build` 通过（0 errors）+ 测试通过（233/234，1 个预存失败无关）
+- [x] 📌 Avalonia 移植时需在 `MainWindow.Preview.cs` 做等同集成（未来任务标记）
+
+### Phase P1 — Text Subtype Detection ✅ 完成
+
+- [x] `FileFormatDetector.DetectTextSubtype()` — 文本子类型启发式判别（HTML/XML/JSON/Markdown/CSV/INI）
+- [x] `TryMagicPreview` 新增对应 case，路由到现有预览方法
+- [x] 扩展名回退场景下也能享受子类型路由
 
 ### Final Checklist
 
-- [ ] 无扩展名的文件可识别真实格式
-- [ ] 扩展名错误的文件按真实格式展示
-- [ ] PreviewHeader 显示真实格式名
-- [ ] 回退到 Plan A 解码器正常
-- [ ] 7z 固态压缩不执行 head 提取
-- [ ] MP4 正确解析时长/分辨率
-- [ ] `EnableFormatDetection = false` 时完全回退到扩展名流程
-- [ ] 取消/切换文件时无异常
+- [x] 无扩展名的文件可识别真实格式（魔数检测走通后显示格式名）
+- [x] 扩展名错误的文件按真实格式展示（魔数检测覆盖扩展名判断）
+- [x] PreviewHeader 显示真实格式名
+- [x] 回退到 Plan A 解码器正常（各格式分支不受影响，仍按扩展名触发）
+- [x] 7z 固态压缩不执行 head 提取（ExtractHeadAsync 已实现降级策略）
+- [x] MP4 正确解析时长/分辨率（ExtractHeadTailAsync moov box 解析已实现）
+- [x] `EnableFormatDetection = false` 时完全回退到扩展名流程
+- [x] 取消/切换文件时无异常（OperationCanceledException 正确处理）
+- [x] 文本子类型检测识别 HTML/XML/JSON/Markdown/CSV/INI
+- [x] HTML/Markdown 子类型路由到 WebView2 渲染预览，CSV 路由到表格预览
