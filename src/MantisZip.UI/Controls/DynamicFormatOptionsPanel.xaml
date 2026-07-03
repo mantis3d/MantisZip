@@ -84,11 +84,16 @@
                               Background="{DynamicResource Theme_SurfaceBg}"
                               Foreground="{DynamicResource Theme_TextPrimary}"
                               BorderBrush="{DynamicResource Theme_Border}">
-                        <ComboBoxItem Content="默认" Tag=""/>
+                        <ComboBoxItem Content="默认(全固实)" Tag=""/>
+                        <ComboBoxItem Content="16MB" Tag="16m"/>
+                        <ComboBoxItem Content="32MB" Tag="32m"/>
                         <ComboBoxItem Content="64MB" Tag="64m"/>
+                        <ComboBoxItem Content="128MB" Tag="128m"/>
                         <ComboBoxItem Content="256MB" Tag="256m"/>
                         <ComboBoxItem Content="512MB" Tag="512m"/>
                         <ComboBoxItem Content="1GB" Tag="1g"/>
+                        <ComboBoxItem Content="2GB" Tag="2g"/>
+                        <ComboBoxItem Content="4GB" Tag="4g"/>
                     </ComboBox>
                 </Grid>
 
@@ -116,12 +121,13 @@
                         <ColumnDefinition Width="80"/>
                         <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
-                    <TextBlock Grid.Column="0" Text="Word Size:" VerticalAlignment="Center"
+                    <TextBlock Grid.Column="0" Text="单词大小:" VerticalAlignment="Center"
                                Foreground="{DynamicResource Theme_TextPrimary}"/>
-                    <ComboBox x:Name="WordSizeCombo" Grid.Column="1" Height="24" SelectedIndex="4"
+                    <ComboBox x:Name="WordSizeCombo" Grid.Column="1" Height="24" SelectedIndex="0"
                               Background="{DynamicResource Theme_SurfaceBg}"
                               Foreground="{DynamicResource Theme_TextPrimary}"
                               BorderBrush="{DynamicResource Theme_Border}">
+                        <ComboBoxItem Content="默认(273)" Tag="0"/>
                         <ComboBoxItem Content="32" Tag="32"/>
                         <ComboBoxItem Content="64" Tag="64"/>
                         <ComboBoxItem Content="128" Tag="128"/>
@@ -136,10 +142,11 @@
                     </Grid.ColumnDefinitions>
                     <TextBlock Grid.Column="0" Text="匹配器:" VerticalAlignment="Center"
                                Foreground="{DynamicResource Theme_TextPrimary}"/>
-                    <ComboBox x:Name="MatchFinderCombo" Grid.Column="1" Height="24" SelectedIndex="3"
+                    <ComboBox x:Name="MatchFinderCombo" Grid.Column="1" Height="24" SelectedIndex="0"
                               Background="{DynamicResource Theme_SurfaceBg}"
                               Foreground="{DynamicResource Theme_TextPrimary}"
                               BorderBrush="{DynamicResource Theme_Border}">
+                        <ComboBoxItem Content="默认(BT4)" Tag=""/>
                         <ComboBoxItem Content="BT2" Tag="bt2"/>
                         <ComboBoxItem Content="BT3" Tag="bt3"/>
                         <ComboBoxItem Content="BT4" Tag="bt4"/>

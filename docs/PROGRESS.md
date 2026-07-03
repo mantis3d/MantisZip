@@ -61,6 +61,7 @@
 8. **SevenZipEngine** — `ConfigureCompressor` 应用新参数（CustomParameters `s`、LzmaDictionarySize、LzmaNumFastBytes、LzmaMatchFinder、EncryptHeaders）
 9. **ZipEngine** — 加密路径使用 SharpSevenZip `CompressionMethod` + `ZipEncryptionMethod`；非加密路径使用 SharpCompress `CompressionType`；支持 Deflate64/BZip2/LZMA/PPMd/Store
 10. **修改文件（12 个）**：`AppSettings.cs`、`ArchiveEngine.cs`、`CompressService.cs`、`DynamicFormatOptionsPanel.xaml`、`DynamicFormatOptionsPanel.xaml.cs`、`SettingsWindow.xaml`、`SettingsWindow.xaml.cs`、`CompressSettingsWindow.xaml`、`CompressSettingsWindow.xaml.cs`、`SevenZipEngine.cs`、`ZipEngine.cs`、`PROGRESS.md`
+11. **后续修复**：Word Size 中文标签、匹配器/字典/固实块"默认"改为带数值显示（默认(273)/默认(BT4)/默认(16MB)/默认(全固实)）、固实块选项扩展到 10 个（16MB~4GB）、`SolidCheck_Changed` null 保护
 
 ### v0.4.4+ (2026-07-02) 压缩包路径处理一站式重构——ArchivePath 统一入口
 

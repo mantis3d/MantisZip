@@ -137,11 +137,16 @@
                                     <ComboBox x:Name="SevenZipBlockSizeCombo" Grid.Column="1" Width="200" HorizontalAlignment="Left"
                                               Background="{DynamicResource Theme_WindowBg}"
                                               Foreground="{DynamicResource Theme_TextPrimary}">
-                                        <ComboBoxItem Content="默认" Tag=""/>
+                                        <ComboBoxItem Content="默认(全固实)" Tag=""/>
+                                        <ComboBoxItem Content="16MB" Tag="16m"/>
+                                        <ComboBoxItem Content="32MB" Tag="32m"/>
                                         <ComboBoxItem Content="64MB" Tag="64m"/>
+                                        <ComboBoxItem Content="128MB" Tag="128m"/>
                                         <ComboBoxItem Content="256MB" Tag="256m"/>
                                         <ComboBoxItem Content="512MB" Tag="512m"/>
                                         <ComboBoxItem Content="1GB" Tag="1g"/>
+                                        <ComboBoxItem Content="2GB" Tag="2g"/>
+                                        <ComboBoxItem Content="4GB" Tag="4g"/>
                                     </ComboBox>
                                 </Grid>
 
@@ -155,7 +160,7 @@
                                     <ComboBox x:Name="SevenZipDictCombo" Grid.Column="1" Width="200" HorizontalAlignment="Left"
                                               Background="{DynamicResource Theme_WindowBg}"
                                               Foreground="{DynamicResource Theme_TextPrimary}">
-                                        <ComboBoxItem Content="默认" Tag="0"/>
+                                        <ComboBoxItem Content="默认(16MB)" Tag="0"/>
                                         <ComboBoxItem Content="16MB" Tag="16777216"/>
                                         <ComboBoxItem Content="32MB" Tag="33554432"/>
                                         <ComboBoxItem Content="64MB" Tag="67108864"/>
@@ -169,12 +174,12 @@
                                         <ColumnDefinition Width="110"/>
                                         <ColumnDefinition Width="*"/>
                                     </Grid.ColumnDefinitions>
-                                    <TextBlock Grid.Column="0" Text="7z Word Size:" VerticalAlignment="Center"
+                                    <TextBlock Grid.Column="0" Text="7z 单词大小:" VerticalAlignment="Center"
                                                Foreground="{DynamicResource Theme_TextPrimary}"/>
                                     <ComboBox x:Name="SevenZipWordSizeCombo" Grid.Column="1" Width="200" HorizontalAlignment="Left"
                                               Background="{DynamicResource Theme_WindowBg}"
                                               Foreground="{DynamicResource Theme_TextPrimary}">
-                                        <ComboBoxItem Content="默认" Tag="0"/>
+                                        <ComboBoxItem Content="默认(273)" Tag="0"/>
                                         <ComboBoxItem Content="32" Tag="32"/>
                                         <ComboBoxItem Content="64" Tag="64"/>
                                         <ComboBoxItem Content="128" Tag="128"/>
@@ -192,7 +197,7 @@
                                     <ComboBox x:Name="SevenZipMatchFinderCombo" Grid.Column="1" Width="200" HorizontalAlignment="Left"
                                               Background="{DynamicResource Theme_WindowBg}"
                                               Foreground="{DynamicResource Theme_TextPrimary}">
-                                        <ComboBoxItem Content="默认" Tag=""/>
+                                        <ComboBoxItem Content="默认(BT4)" Tag=""/>
                                         <ComboBoxItem Content="BT2" Tag="bt2"/>
                                         <ComboBoxItem Content="BT3" Tag="bt3"/>
                                         <ComboBoxItem Content="BT4" Tag="bt4"/>

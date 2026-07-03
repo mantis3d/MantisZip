@@ -135,7 +135,10 @@ public partial class DynamicFormatOptionsPanel : UserControl
     private void SolidCheck_Changed(object sender, RoutedEventArgs e)
     {
         // 固实不勾选时，固实块大小禁用
-        SolidBlockSizeCombo.IsEnabled = SolidCheck.IsChecked == true;
+        // SolidCheck 在 XAML 中有 IsChecked=True，会在 InitializeComponent 期间触发此事件，
+        // 此时 SolidBlockSizeCombo 可能尚未创建（XAML 元素顺序靠后），需要 null 保护
+        if (SolidBlockSizeCombo != null)
+            SolidBlockSizeCombo.IsEnabled = SolidCheck.IsChecked == true;
     }
 
     /// <summary>
