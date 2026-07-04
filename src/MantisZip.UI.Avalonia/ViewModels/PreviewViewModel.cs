@@ -400,11 +400,14 @@ public partial class PreviewViewModel : ObservableObject
         ZoomLevel = Math.Min(fitX, fitY);
         if (ZoomLevel > 1.0) ZoomLevel = 1.0;
 
-        FormatMetadata =
-        [
-            new FormatMetadataItem("尺寸", $"{ImageWidth} × {ImageHeight}"),
-            new FormatMetadataItem("文件大小", FormatFileSize(new FileInfo(filePath).Length)),
-        ];
+        var metaItems = new List<FormatMetadataItem>
+        {
+            new("尺寸", $"{ImageWidth} × {ImageHeight}"),
+            new("文件大小", FormatFileSize(new FileInfo(filePath).Length)),
+        };
+        // DPI — Avalonia Bitmap 直接暴露，比 WPF 的 BitmapDecoder 方式简单
+        metaItems.Add(new("DPI", $"{bitmap.Dpi.X:F0} × {bitmap.Dpi.Y:F0}"));
+        FormatMetadata = [.. metaItems];
         App.DebugLog($"[IMG] ShowImage done: PreviewType={PreviewType}, Zoom={ZoomLevel}, IsToolbarVisible={IsToolbarVisible}");
     }
 
@@ -637,6 +640,8 @@ public partial class PreviewViewModel : ObservableObject
             FormatMetadata.Add(new("声道", info.Channels.Value.ToString()));
         if (info.Bitrate.HasValue)
             FormatMetadata.Add(new("比特率", $"{info.Bitrate} kbps"));
+        if (info.BitDepth.HasValue)
+            FormatMetadata.Add(new("位深", $"{info.BitDepth}-bit"));
         if (info.Artist != null)
             FormatMetadata.Add(new("艺术家", info.Artist));
         if (info.Album != null)
@@ -768,8 +773,16 @@ public partial class PreviewViewModel : ObservableObject
             FormatMetadata.Add(new("Magnet 链接", info.MagnetLink));
         if (info.TrackerUrl != null)
             FormatMetadata.Add(new("Tracker", info.TrackerUrl));
+        if (info.CreationDate != null)
+            FormatMetadata.Add(new("创建日期", info.CreationDate.Value.ToString("yyyy-MM-dd HH:mm:ss")));
+        if (info.TrackerCount.HasValue && info.TrackerCount.Value > 1)
+            FormatMetadata.Add(new("Tracker 数量", info.TrackerCount.Value.ToString()));
+        if (info.IsPrivate == true)
+            FormatMetadata.Add(new("是否私有", "是"));
         if (info.CreatedBy != null)
             FormatMetadata.Add(new("创建者", info.CreatedBy));
+        if (!string.IsNullOrEmpty(info.AdditionalInfo))
+            FormatMetadata.Add(new("备注", info.AdditionalInfo));
         if (info.FileCount.HasValue)
             FormatMetadata.Add(new("文件数", info.FileCount.Value.ToString()));
         if (info.TorrentTotalSize.HasValue)
@@ -813,6 +826,7 @@ public partial class PreviewViewModel : ObservableObject
         if (info.Subject != null) FormatMetadata.Add(new("主题", info.Subject));
         if (info.PageCount.HasValue) FormatMetadata.Add(new("页数", info.PageCount.Value.ToString()));
         if (info.CreationDate.HasValue) FormatMetadata.Add(new("创建日期", info.CreationDate.Value.ToString("yyyy-MM-dd HH:mm")));
+        if (info.ModifiedDate.HasValue) FormatMetadata.Add(new("修改日期", info.ModifiedDate.Value.ToString("yyyy-MM-dd HH:mm")));
     }
 
     // ── Video ──
