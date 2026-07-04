@@ -96,7 +96,13 @@ public partial class PreviewViewModel : ObservableObject
         OnPropertyChanged(nameof(HasFontSizeControls));
         OnPropertyChanged(nameof(HasGifControls));
         OnPropertyChanged(nameof(IsHtmlVisible));
+        OnPropertyChanged(nameof(IsFontTextFallbackVisible));
 
+    }
+
+    partial void OnPreviewImageChanged(global::Avalonia.Media.Imaging.Bitmap? value)
+    {
+        OnPropertyChanged(nameof(IsFontTextFallbackVisible));
     }
 
     // ── CSV ──
@@ -594,18 +600,112 @@ public partial class PreviewViewModel : ObservableObject
         FormatMetadata.Add(new("样式", info.FontStyle ?? "常规"));
         FormatMetadata.Add(new("字形数", info.GlyphCount?.ToString() ?? "未知"));
 
-        // 从字体文件加载 FontFamily，使示例文本用该字体渲染
         var fontFilePath = info.FontDecompressedPath ?? filePath;
+
+        // 从设置读取样本文字和字号
+        var settings = AppSettings.Load();
+        var sampleText = settings.FontPreviewSampleText;
+        if (string.IsNullOrEmpty(sampleText))
+            sampleText = "The quick brown fox jumps over the lazy dog\n0123456789\nABCDEFGHIJKLMNOPQRSTUVWXYZ\nabcdefghijklmnopqrstuvwxyz\n天地玄黄 宇宙洪荒 日月盈昃 辰宿列张";
+
+        FontSize = settings.FontPreviewFontSize;
+
+        // 使用 SkiaSharp 直接渲染字体样本到位图，
+        // 绕过 Avalonia 12 FontFamily 对文件路径字体的兼容性问题
+        FontFamily = global::Avalonia.Media.FontFamily.Default;
+        PreviewImage = null;
         try
         {
-            FontFamily = new global::Avalonia.Media.FontFamily(fontFilePath);
+            // 使用 FromStream 而非 FromFile：SkiaSharp.FromFile 会内存映射文件，
+            // 导致后续预览其他字体时无法删除/覆盖该临时文件（IOException：用户映射区域）
+            var fontData = File.ReadAllBytes(fontFilePath);
+            var memStream = new MemoryStream(fontData);
+            using var typeface = SkiaSharp.SKTypeface.FromStream(memStream);
+            if (typeface != null)
+            {
+                // ── 检测字体是否支持 CJK 字符 ──
+                var testChars = "中天国汉字";
+                var testGlyphs = typeface.GetGlyphs(testChars.AsSpan());
+                bool supportsCjk = testGlyphs.Any(g => g != 0);
+
+                if (!supportsCjk)
+                {
+                    // 不支持 CJK 时从样本中移除中文行
+                    var allLines = sampleText.Split('\n');
+                    var nonCjkLines = allLines
+                        .Where(l => !l.Any(c => c >= 0x4E00 && c <= 0x9FFF))
+                        .ToList();
+                    if (nonCjkLines.Count == 0)
+                        nonCjkLines.Add("(The preview sample text contains Chinese characters\nwhich are not supported by this font.)");
+                    sampleText = string.Join("\n", nonCjkLines);
+                }
+
+                var isDark = settings.Theme == "Dark";
+                var textColor = isDark ? SkiaSharp.SKColors.White : SkiaSharp.SKColors.Black;
+
+                using var font = new SkiaSharp.SKFont(typeface, FontSize);
+                using var paint = new SkiaSharp.SKPaint
+                {
+                    Color = textColor,
+                    IsAntialias = true,
+                };
+
+                // 逐行测量
+                var lines = sampleText.Split('\n');
+                float maxWidth = 0;
+                float totalHeight = 0;
+                var lineSpacings = new float[lines.Length];
+                for (int i = 0; i < lines.Length; i++)
+                {
+                    var w = font.MeasureText(lines[i]);
+                    if (w > maxWidth) maxWidth = w;
+                    lineSpacings[i] = font.Spacing;
+                    totalHeight += font.Spacing;
+                }
+
+                int bmpW = Math.Max((int)Math.Ceiling(maxWidth) + 40, 200);
+                int bmpH = Math.Max((int)Math.Ceiling(totalHeight) + 40, 50);
+
+                using var bitmap = new SkiaSharp.SKBitmap(bmpW, bmpH);
+                using var canvas = new SkiaSharp.SKCanvas(bitmap);
+                canvas.Clear(SkiaSharp.SKColors.Transparent);
+
+                float y = 20 + font.Spacing;
+                for (int i = 0; i < lines.Length; i++)
+                {
+                    canvas.DrawText(lines[i], 20, y, SkiaSharp.SKTextAlign.Left, font, paint);
+                    y += lineSpacings[i];
+                }
+
+                // SKBitmap → Avalonia Bitmap
+                using var image = SkiaSharp.SKImage.FromBitmap(bitmap);
+                using var data = image.Encode(SkiaSharp.SKEncodedImageFormat.Png, 100);
+                using var outMs = new MemoryStream();
+                data.SaveTo(outMs);
+                outMs.Position = 0;
+                PreviewImage = new global::Avalonia.Media.Imaging.Bitmap(outMs);
+            }
         }
-        catch
+        catch (Exception ex)
         {
-            FontFamily = global::Avalonia.Media.FontFamily.Default;
+            App.DebugLog($"[FONT] SkiaSharp render failed: {ex.Message}");
         }
-        TextContent = "The quick brown fox jumps over the lazy dog\n0123456789\nABCDEFGHIJKLMNOPQRSTUVWXYZ\nabcdefghijklmnopqrstuvwxyz\n天地玄黄 宇宙洪荒 日月盈昃 辰宿列张";
+
+        if (PreviewImage == null)
+        {
+            // SkiaSharp 渲染失败时的回退：用文本形式显示
+            TextContent = sampleText;
+        }
+        else
+        {
+            TextContent = string.Empty;
+        }
     }
+
+    /// <summary>
+    /// 字体预览的 SkiaSharp 渲染失败时是否显示回退文本。
+    /// </summary>
+    public bool IsFontTextFallbackVisible => PreviewType == PreviewType.Font && PreviewImage == null;
 
     // ── Audio ──
 

@@ -161,10 +161,16 @@
               </ItemsControl.ItemTemplate>
             </ItemsControl>
             <Separator />
+            <!-- SkiaSharp 渲染的字体样本位图（非空时显示） -->
+            <Image Source="{Binding PreviewImage}"
+                   Stretch="None"
+                   HorizontalAlignment="Left" />
+            <!-- SkiaSharp 渲染失败时的回退文本 -->
             <TextBlock Text="{Binding TextContent}"
                        FontFamily="{Binding FontFamily}"
-                       FontSize="16"
-                       TextWrapping="Wrap" />
+                       FontSize="{Binding FontSize}"
+                       TextWrapping="Wrap"
+                       IsVisible="{Binding IsFontTextFallbackVisible}" />
           </StackPanel>
         </ScrollViewer>
 
