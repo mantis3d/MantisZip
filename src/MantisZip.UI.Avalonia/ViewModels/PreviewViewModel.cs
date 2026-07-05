@@ -5,6 +5,7 @@ using System.Text;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using HarfBuzzSharp;
 using MantisZip.Core.Utils;
 using MantisZip.UI.Avalonia.Models;
 using MantisZip.UI.Avalonia.Services;
@@ -101,6 +102,7 @@ public partial class PreviewViewModel : ObservableObject
         OnPropertyChanged(nameof(HasZoomControls));
         OnPropertyChanged(nameof(HasFontSizeControls));
         OnPropertyChanged(nameof(HasGifControls));
+        OnPropertyChanged(nameof(HasLigatureControls));
         OnPropertyChanged(nameof(IsHtmlVisible));
         OnPropertyChanged(nameof(IsFontTextFallbackVisible));
 
@@ -222,6 +224,15 @@ public partial class PreviewViewModel : ObservableObject
 
     public bool HasGifControls => PreviewType == PreviewType.Gif;
 
+    // ── Ligature toggle ──
+
+    public bool HasLigatureControls => PreviewType == PreviewType.Font;
+
+    [ObservableProperty]
+    private bool _isLigatureEnabled = true;
+
+    public bool CanLigatureToggle => _fontSupportsLigature;
+
     private List<GifFrameData>? _gifFrames;
     private int _gifCurrentFrameIndex;
     private DispatcherTimer? _gifTimer;
@@ -299,6 +310,20 @@ public partial class PreviewViewModel : ObservableObject
         _gifCurrentFrameIndex = (_gifCurrentFrameIndex + 1) % _gifFrames.Count;
         CurrentFrame = _gifCurrentFrameIndex;
         PreviewImage = _gifFrames[_gifCurrentFrameIndex].Bitmap;
+    }
+
+    // ── Ligature toggle ──
+
+    [RelayCommand]
+    private void ToggleLigature()
+    {
+        IsLigatureEnabled = !IsLigatureEnabled;
+        // 持久化到设置
+        var settings = AppSettings.Load();
+        settings.FontPreviewEnableLigature = IsLigatureEnabled;
+        settings.Save();
+        // 重新渲染
+        ReRenderFontPreview();
     }
 
     partial void OnCurrentFrameChanged(int value)
@@ -590,6 +615,7 @@ public partial class PreviewViewModel : ObservableObject
     private string _fontPreviewSampleText = string.Empty;
     private byte[]? _fontPreviewCachedData;
     private bool _fontPreviewIsDark;
+    private bool _fontSupportsLigature;
 
     /// <summary>
     /// 显示字体元数据与示例文本。
@@ -625,6 +651,11 @@ public partial class PreviewViewModel : ObservableObject
 
         FontSize = settings.FontPreviewFontSize;
         _fontPreviewIsDark = settings.Theme == "Dark";
+        IsLigatureEnabled = settings.FontPreviewEnableLigature;
+
+        // 检测连字支持
+        _fontSupportsLigature = CheckFontSupportsLigature(_fontPreviewCachedData, FontSize);
+        OnPropertyChanged(nameof(CanLigatureToggle));
 
         // Avalonia 12 FontFamily(fileUri#name) 对所有格式的字体都会崩溃（Skia 原生 bug），
         // 统一走 SkiaSharp FromStream + 自动换行位图渲染。
@@ -640,6 +671,79 @@ public partial class PreviewViewModel : ObservableObject
     {
         if (_fontPreviewCachedData == null) return;
         RenderFontPreview(_fontPreviewCachedData, _fontPreviewSampleText, _fontPreviewIsDark);
+    }
+
+    /// <summary>
+    /// 检测字体是否支持连字（liga feature）。
+    /// 用 HarfBuzz 对同一文本分别以 liga=1 和 liga=0 做 shaping，
+    /// 如果得到的 glyph 序列不同，说明字体实现了 liga 替代规则。
+    /// </summary>
+    private static bool CheckFontSupportsLigature(byte[] fontData, float fontSize)
+    {
+        try
+        {
+            var handle = System.Runtime.InteropServices.GCHandle.Alloc(fontData, System.Runtime.InteropServices.GCHandleType.Pinned);
+            try
+            {
+                using var blob = new HarfBuzzSharp.Blob(handle.AddrOfPinnedObject(), fontData.Length, HarfBuzzSharp.MemoryMode.Duplicate);
+                using var face = new HarfBuzzSharp.Face(blob, 0);
+                using var hbFont = new global::HarfBuzzSharp.Font(face);
+
+                const string testText = "fi ff fl ffi ffl --> != =>";
+
+                // 用全部 4 个影响连字的 feature 来对比：
+                //   calt (Contextual Alternates) — Fira Code 等编程字体用
+                //   liga (Standard Ligatures)     — fi/fl/ff 等传统合字
+                //   dlig (Discretionary Ligatures) — 可选连字
+                //   clig (Contextual Ligatures)    — 上下文连字
+                var ligFeatures = new[]
+                {
+                    new HarfBuzzSharp.Feature(HarfBuzzSharp.Tag.Parse("calt"), 1),
+                    new HarfBuzzSharp.Feature(HarfBuzzSharp.Tag.Parse("liga"), 1),
+                    new HarfBuzzSharp.Feature(HarfBuzzSharp.Tag.Parse("dlig"), 1),
+                    new HarfBuzzSharp.Feature(HarfBuzzSharp.Tag.Parse("clig"), 1),
+                };
+                var noLigFeatures = new[]
+                {
+                    new HarfBuzzSharp.Feature(HarfBuzzSharp.Tag.Parse("calt"), 0),
+                    new HarfBuzzSharp.Feature(HarfBuzzSharp.Tag.Parse("liga"), 0),
+                    new HarfBuzzSharp.Feature(HarfBuzzSharp.Tag.Parse("dlig"), 0),
+                    new HarfBuzzSharp.Feature(HarfBuzzSharp.Tag.Parse("clig"), 0),
+                };
+
+                var bufferOn = new HarfBuzzSharp.Buffer();
+                bufferOn.AddUtf8(testText);
+                bufferOn.GuessSegmentProperties();
+                hbFont.Shape(bufferOn, ligFeatures);
+
+                var bufferOff = new HarfBuzzSharp.Buffer();
+                bufferOff.AddUtf8(testText);
+                bufferOff.GuessSegmentProperties();
+                hbFont.Shape(bufferOff, noLigFeatures);
+
+                var onInfos = bufferOn.GlyphInfos;
+                var offInfos = bufferOff.GlyphInfos;
+
+                if (onInfos.Length != offInfos.Length)
+                    return true;
+
+                for (int i = 0; i < onInfos.Length; i++)
+                {
+                    if (onInfos[i].Codepoint != offInfos[i].Codepoint)
+                        return true;
+                }
+
+                return false;
+            }
+            finally
+            {
+                handle.Free();
+            }
+        }
+        catch
+        {
+            return false;
+        }
     }
 
     private void RenderFontPreview(byte[] fontData, string sampleText, bool isDark)
@@ -743,10 +847,79 @@ public partial class PreviewViewModel : ObservableObject
                 canvas.Clear(SkiaSharp.SKColors.Transparent);
 
                 float y = padding + font.Spacing;
-                foreach (var (line, _) in wrappedLines)
+
+                // ── 连字渲染：如果字体支持连字且用户启用了，用 HarfBuzz shaping ──
+                bool useLigature = IsLigatureEnabled && _fontSupportsLigature;
+
+                if (useLigature)
                 {
-                    canvas.DrawText(line, padding, y, SkiaSharp.SKTextAlign.Left, font, paint);
-                    y += font.Spacing;
+                    // 创建 HarfBuzz font — 用 GCHandle pinned 的 font data 构造 Blob
+                    var hbHandle = System.Runtime.InteropServices.GCHandle.Alloc(fontData, System.Runtime.InteropServices.GCHandleType.Pinned);
+                    try
+                    {
+                        using var hbBlob = new HarfBuzzSharp.Blob(hbHandle.AddrOfPinnedObject(), fontData.Length, HarfBuzzSharp.MemoryMode.Duplicate);
+                        using var hbFace = new HarfBuzzSharp.Face(hbBlob, 0);
+                        float upem = hbFace.UnitsPerEm;
+                        using var hbFont = new global::HarfBuzzSharp.Font(hbFace);
+                        hbFont.SetScale((int)upem, (int)upem);
+
+                        foreach (var (line, _) in wrappedLines)
+                        {
+                            using var buffer = new HarfBuzzSharp.Buffer();
+                            buffer.AddUtf8(line);
+                            buffer.GuessSegmentProperties();
+                            // 开启全部 4 个连字相关 feature：calt(Fira Code)/liga/dlig/clig
+                            var enableLigFeatures = new[]
+                            {
+                                new HarfBuzzSharp.Feature(HarfBuzzSharp.Tag.Parse("calt"), 1),
+                                new HarfBuzzSharp.Feature(HarfBuzzSharp.Tag.Parse("liga"), 1),
+                                new HarfBuzzSharp.Feature(HarfBuzzSharp.Tag.Parse("dlig"), 1),
+                                new HarfBuzzSharp.Feature(HarfBuzzSharp.Tag.Parse("clig"), 1),
+                            };
+                            hbFont.Shape(buffer, enableLigFeatures);
+
+                            var infos = buffer.GlyphInfos;
+                            var positions = buffer.GlyphPositions;
+
+                            int glyphCount = infos.Length;
+                            var skPositions = new SkiaSharp.SKPoint[glyphCount];
+                            float cx = 0;
+                            float scale = FontSize / upem;
+                            float baseline = y;
+                            for (int i = 0; i < glyphCount; i++)
+                            {
+                                skPositions[i] = new SkiaSharp.SKPoint(
+                                    cx + positions[i].XOffset * scale,
+                                    baseline + positions[i].YOffset * scale);
+                                cx += positions[i].XAdvance * scale;
+                            }
+
+                            // 使用 SKTextBlob 绘制 shaped glyphs
+                            var builder = new SkiaSharp.SKTextBlobBuilder();
+                            var run = builder.AllocatePositionedRun(font, glyphCount);
+                            for (int i = 0; i < glyphCount; i++)
+                            {
+                                run.Glyphs[i] = (ushort)infos[i].Codepoint;
+                                run.Positions[i] = skPositions[i];
+                            }
+                            using var blob = builder.Build();
+                            canvas.DrawText(blob, padding, 0, paint);
+                            y += font.Spacing;
+                        }
+                    }
+                    finally
+                    {
+                        hbHandle.Free();
+                    }
+                }
+                else
+                {
+                    // ── 无连字：走 DrawText ──
+                    foreach (var (line, _) in wrappedLines)
+                    {
+                        canvas.DrawText(line, padding, y, SkiaSharp.SKTextAlign.Left, font, paint);
+                        y += font.Spacing;
+                    }
                 }
 
                 // ── 直接内存拷贝：SKBitmap → WriteableBitmap（跳过 PNG 编解码） ──

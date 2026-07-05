@@ -15,6 +15,9 @@
 
 ### avalonia-port 分支 (WIP)
   - **WPF 字体预览重构** — 替换 GDI+ 位图渲染为 WPF 原生 GlyphTypeface + DrawGlyphRun → RenderTargetBitmap（DirectWrite 管道）；新增 CFF-OTF 检测跳过 unsafe FontFamily 避免原生崩溃；新增 CJK 字形检测自动过滤不支持的样本文字；Avalonia 端新增 SkiaSharp 字体位图渲染 + CJK 过滤 + 回退 TextBlock (2026-07-04)
+  - **Avalonia 字体预览性能优化** — 合并折行和测量为一遍（`List<(string, float)>`，消除重复 `MeasureText`）；缓存字体 bytes + 主题色到内存供 `ReRenderFontPreview` 复用，避免每次重新读文件 + `AppSettings.Load()` 的 JSON I/O；SKBitmap → WriteableBitmap 直接 `Marshal.Copy` 像素内存，跳过 PNG 编解码往返（`SKImage.Encode` → `new Bitmap(stream)`）(2026-07-05)
+  - **Avalonia 字体预览自动换行 + 窗口缩放响应** — `FontPreviewWrapWidth` 属性驱动 SkiaSharp 折行宽度；`x:Name="FontPreviewScrollViewer"` 绑定 `ScrollViewer.Bounds.Width`；`SizeChanged` 200ms 防抖 + `ReRenderFontPreview()` 窗口缩放后自动刷新位图 (2026-07-05)
+  - **修复 PreviewPanel DataContextChanged 事件订阅泄漏** — 解构匿名 lambda 为命名方法，DataContext 变更时先 `-=` 旧 VM 的 `PropertyChanged` 再 `+=` 新 VM；`SizeChanged` 提取为独立命名方法只订阅一次 (2026-07-05)
   - **Phase 10: WPF 功能补齐（进度条/信息面板/状态栏）** — 状态栏增强（DirStats 目录文件计数/FilterStats 过滤统计/EncodingInfo 编码信息→6 列布局）；预览信息面板（文件元数据侧栏 + 横向/纵向位置切换 AppSettings.InfoPanelOrientation）；文件列表进度条 DataGridTemplateColumn（Size/CompressedSize/Modified 背景 Rectangle 色条 + CompressionRatio 列），RatioToWidthConverter/BrushResourceConverter，8 色主题资源（亮/暗），视图菜单开关（进度条/目录独立基准），i18n 中英文键 (2026-07-01)
   - **信息面板修复** — 默认方向改为 Vertical（下方）；"详细信息"移到上方、"基本信息"移到底部；大小/压缩后/压缩率一行三列；底部加间距避免被状态栏遮挡 (2026-07-02)
   - **P0 元数据字段补齐** — ShowImage 新增 DPI；ShowAudio 新增 BitDepth；ShowOffice 新增 ModifiedDate；ShowTorrent 新增 CreationDate/TrackerCount/IsPrivate/AdditionalInfo (2026-07-02)

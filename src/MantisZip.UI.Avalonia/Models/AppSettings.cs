@@ -52,6 +52,7 @@ public class AppSettings
     public string TextEncodingPreference { get; set; } = "auto";
     public int FontPreviewFontSize { get; set; } = 12;
     public string FontPreviewSampleText { get; set; } = "The quick brown fox jumps over the lazy dog.\n0123456789\n天地玄黄 宇宙洪荒 日月盈昃 辰宿列张";
+    public bool FontPreviewEnableLigature { get; set; } = true;
     public int PreviewPosition { get; set; } = 4;
     public string InfoPanelOrientation { get; set; } = "Vertical";
     public bool ShowPreviewPanel { get; set; } = true;

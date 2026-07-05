@@ -48,9 +48,18 @@
                    FontSize="14"
                    VerticalContentAlignment="Center"
                    HorizontalContentAlignment="Center" />
-          <TextBlock Text="{Binding TotalFrames, StringFormat=/ {0}}"
-                     FontSize="14"
-                     VerticalAlignment="Center" />
+           <TextBlock Text="{Binding TotalFrames, StringFormat=/ {0}}"
+                      FontSize="14"
+                      VerticalAlignment="Center" />
+         </StackPanel>
+
+        <!-- Ligature toggle (font preview) -->
+        <StackPanel Orientation="Horizontal" Spacing="2"
+                    IsVisible="{Binding HasLigatureControls}">
+          <Button Content="连字"
+                  Command="{Binding ToggleLigatureCommand}"
+                  Width="48" Height="28" FontSize="12" Padding="0"
+                  IsEnabled="{Binding CanLigatureToggle}" />
         </StackPanel>
       </StackPanel>
     </Border>
