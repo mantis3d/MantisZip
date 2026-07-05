@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using System.Data;
+using System.Runtime.InteropServices;
 using System.Text;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -43,6 +44,11 @@ public partial class PreviewViewModel : ObservableObject
         get => _fontFamily;
         set => SetProperty(ref _fontFamily, value);
     }
+
+    /// <summary>
+    /// 字体预览的自动换行宽度。由 PreviewPanel 代码后置根据 ScrollViewer 实际宽度设置。
+    /// </summary>
+    public double FontPreviewWrapWidth { get; set; } = 700;
 
     // ── Toolbar ──
 
@@ -580,6 +586,11 @@ public partial class PreviewViewModel : ObservableObject
 
     // ── Font ──
 
+    private string? _fontPreviewFontPath;
+    private string _fontPreviewSampleText = string.Empty;
+    private byte[]? _fontPreviewCachedData;
+    private bool _fontPreviewIsDark;
+
     /// <summary>
     /// 显示字体元数据与示例文本。
     /// </summary>
@@ -601,6 +612,10 @@ public partial class PreviewViewModel : ObservableObject
         FormatMetadata.Add(new("字形数", info.GlyphCount?.ToString() ?? "未知"));
 
         var fontFilePath = info.FontDecompressedPath ?? filePath;
+        _fontPreviewFontPath = fontFilePath;
+
+        // 读取并缓存字体数据，供 ReRenderFontPreview 复用（避免重复文件 I/O）
+        _fontPreviewCachedData = File.ReadAllBytes(fontFilePath);
 
         // 从设置读取样本文字和字号
         var settings = AppSettings.Load();
@@ -609,17 +624,31 @@ public partial class PreviewViewModel : ObservableObject
             sampleText = "The quick brown fox jumps over the lazy dog\n0123456789\nABCDEFGHIJKLMNOPQRSTUVWXYZ\nabcdefghijklmnopqrstuvwxyz\n天地玄黄 宇宙洪荒 日月盈昃 辰宿列张";
 
         FontSize = settings.FontPreviewFontSize;
+        _fontPreviewIsDark = settings.Theme == "Dark";
 
-        // 使用 SkiaSharp 直接渲染字体样本到位图，
-        // 绕过 Avalonia 12 FontFamily 对文件路径字体的兼容性问题
+        // Avalonia 12 FontFamily(fileUri#name) 对所有格式的字体都会崩溃（Skia 原生 bug），
+        // 统一走 SkiaSharp FromStream + 自动换行位图渲染。
         FontFamily = global::Avalonia.Media.FontFamily.Default;
+        RenderFontPreview(_fontPreviewCachedData, sampleText, _fontPreviewIsDark);
+    }
+
+    /// <summary>
+    /// 重新渲染字体预览（用于窗口缩放后更新折行宽度）。
+    /// 使用 ShowFont 时缓存的字体数据和主题色，避免重复文件 I/O。
+    /// </summary>
+    public void ReRenderFontPreview()
+    {
+        if (_fontPreviewCachedData == null) return;
+        RenderFontPreview(_fontPreviewCachedData, _fontPreviewSampleText, _fontPreviewIsDark);
+    }
+
+    private void RenderFontPreview(byte[] fontData, string sampleText, bool isDark)
+    {
         PreviewImage = null;
+        _fontPreviewSampleText = sampleText;
         try
         {
-            // 使用 FromStream 而非 FromFile：SkiaSharp.FromFile 会内存映射文件，
-            // 导致后续预览其他字体时无法删除/覆盖该临时文件（IOException：用户映射区域）
-            var fontData = File.ReadAllBytes(fontFilePath);
-            var memStream = new MemoryStream(fontData);
+            using var memStream = new MemoryStream(fontData);
             using var typeface = SkiaSharp.SKTypeface.FromStream(memStream);
             if (typeface != null)
             {
@@ -640,7 +669,6 @@ public partial class PreviewViewModel : ObservableObject
                     sampleText = string.Join("\n", nonCjkLines);
                 }
 
-                var isDark = settings.Theme == "Dark";
                 var textColor = isDark ? SkiaSharp.SKColors.White : SkiaSharp.SKColors.Black;
 
                 using var font = new SkiaSharp.SKFont(typeface, FontSize);
@@ -650,40 +678,93 @@ public partial class PreviewViewModel : ObservableObject
                     IsAntialias = true,
                 };
 
-                // 逐行测量
-                var lines = sampleText.Split('\n');
-                float maxWidth = 0;
+                // ── 自动换行渲染（一次性完成折行和测量，避免重复 MeasureText） ──
+                float wrapWidth = Math.Max((float)FontPreviewWrapWidth - 40f, 100f);
+                float padding = 20f;
+                var logicalLines = sampleText.Split('\n');
+
+                // (Text, Width) — 折行时同时缓存每行宽度，消除二次测量
+                var wrappedLines = new List<(string Text, float Width)>();
                 float totalHeight = 0;
-                var lineSpacings = new float[lines.Length];
-                for (int i = 0; i < lines.Length; i++)
+                float maxLineWidth = 0;
+
+                foreach (var logicalLine in logicalLines)
                 {
-                    var w = font.MeasureText(lines[i]);
-                    if (w > maxWidth) maxWidth = w;
-                    lineSpacings[i] = font.Spacing;
-                    totalHeight += font.Spacing;
+                    var lineWidth = font.MeasureText(logicalLine);
+                    if (lineWidth <= wrapWidth)
+                    {
+                        wrappedLines.Add((logicalLine, lineWidth));
+                        if (lineWidth > maxLineWidth) maxLineWidth = lineWidth;
+                        totalHeight += font.Spacing;
+                    }
+                    else
+                    {
+                        // 在单词边界折行，逐词测量
+                        var words = logicalLine.Split(' ');
+                        var currentLine = new StringBuilder();
+                        float currentWidth = 0;
+                        foreach (var word in words)
+                        {
+                            var wordWidth = font.MeasureText(word);
+                            float spaceWidth = currentLine.Length > 0 ? font.MeasureText(" ") : 0;
+                            if (currentWidth + spaceWidth + wordWidth > wrapWidth && currentLine.Length > 0)
+                            {
+                                wrappedLines.Add((currentLine.ToString(), currentWidth));
+                                if (currentWidth > maxLineWidth) maxLineWidth = currentWidth;
+                                totalHeight += font.Spacing;
+                                currentLine = new StringBuilder(word);
+                                currentWidth = wordWidth;
+                            }
+                            else
+                            {
+                                if (currentLine.Length > 0)
+                                {
+                                    currentLine.Append(' ');
+                                    currentWidth += spaceWidth;
+                                }
+                                currentLine.Append(word);
+                                currentWidth += wordWidth;
+                            }
+                        }
+                        if (currentLine.Length > 0)
+                        {
+                            wrappedLines.Add((currentLine.ToString(), currentWidth));
+                            if (currentWidth > maxLineWidth) maxLineWidth = currentWidth;
+                            totalHeight += font.Spacing;
+                        }
+                    }
                 }
 
-                int bmpW = Math.Max((int)Math.Ceiling(maxWidth) + 40, 200);
-                int bmpH = Math.Max((int)Math.Ceiling(totalHeight) + 40, 50);
+                int bmpW = Math.Max((int)Math.Ceiling(Math.Min(maxLineWidth, wrapWidth) + padding * 2), 200);
+                int bmpH = Math.Max((int)Math.Ceiling(totalHeight + padding * 2), 50);
 
-                using var bitmap = new SkiaSharp.SKBitmap(bmpW, bmpH);
+                using var bitmap = new SkiaSharp.SKBitmap(bmpW, bmpH, SkiaSharp.SKColorType.Bgra8888, SkiaSharp.SKAlphaType.Premul);
                 using var canvas = new SkiaSharp.SKCanvas(bitmap);
                 canvas.Clear(SkiaSharp.SKColors.Transparent);
 
-                float y = 20 + font.Spacing;
-                for (int i = 0; i < lines.Length; i++)
+                float y = padding + font.Spacing;
+                foreach (var (line, _) in wrappedLines)
                 {
-                    canvas.DrawText(lines[i], 20, y, SkiaSharp.SKTextAlign.Left, font, paint);
-                    y += lineSpacings[i];
+                    canvas.DrawText(line, padding, y, SkiaSharp.SKTextAlign.Left, font, paint);
+                    y += font.Spacing;
                 }
 
-                // SKBitmap → Avalonia Bitmap
-                using var image = SkiaSharp.SKImage.FromBitmap(bitmap);
-                using var data = image.Encode(SkiaSharp.SKEncodedImageFormat.Png, 100);
-                using var outMs = new MemoryStream();
-                data.SaveTo(outMs);
-                outMs.Position = 0;
-                PreviewImage = new global::Avalonia.Media.Imaging.Bitmap(outMs);
+                // ── 直接内存拷贝：SKBitmap → WriteableBitmap（跳过 PNG 编解码） ──
+                int stride = bmpW * 4; // BGRA8888, 4 bytes/pixel
+                int totalBytes = stride * bmpH;
+                var pixelData = new byte[totalBytes];
+                Marshal.Copy(bitmap.GetPixels(), pixelData, 0, totalBytes);
+
+                var writeableBmp = new global::Avalonia.Media.Imaging.WriteableBitmap(
+                    new global::Avalonia.PixelSize(bmpW, bmpH),
+                    new global::Avalonia.Vector(96, 96),
+                    global::Avalonia.Platform.PixelFormat.Bgra8888,
+                    global::Avalonia.Platform.AlphaFormat.Premul);
+
+                using var locked = writeableBmp.Lock();
+                Marshal.Copy(pixelData, 0, locked.Address, totalBytes);
+
+                PreviewImage = writeableBmp;
             }
         }
         catch (Exception ex)
@@ -693,7 +774,6 @@ public partial class PreviewViewModel : ObservableObject
 
         if (PreviewImage == null)
         {
-            // SkiaSharp 渲染失败时的回退：用文本形式显示
             TextContent = sampleText;
         }
         else
