@@ -144,7 +144,7 @@
         </ScrollViewer>
 
         <!-- Font preview -->
-        <ScrollViewer IsVisible="{Binding IsFontVisible}">
+        <ScrollViewer x:Name="FontPreviewScrollViewer" IsVisible="{Binding IsFontVisible}">
           <StackPanel Spacing="12">
             <TextBlock Text="{Binding PreviewHeaderText}"
                        FontSize="20"

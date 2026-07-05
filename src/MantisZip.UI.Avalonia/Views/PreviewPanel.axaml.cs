@@ -1,4 +1,8 @@
+using System;
+using System.ComponentModel;
 using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Layout;
@@ -8,29 +12,73 @@ namespace MantisZip.UI.Avalonia.Views;
 
 public partial class PreviewPanel : UserControl
 {
+    private PreviewViewModel? _vm;
+    private CancellationTokenSource? _resizeDebounceCts;
+
     public PreviewPanel()
     {
         InitializeComponent();
 
-        this.DataContextChanged += (_, _) =>
+        this.DataContextChanged += OnDataContextChanged;
+        // FontPreviewScrollViewer 在 InitializeComponent 后可用，只订阅一次
+        if (FontPreviewScrollViewer != null)
+            FontPreviewScrollViewer.SizeChanged += OnFontPreviewScrollerSizeChanged;
+    }
+
+    private void OnDataContextChanged(object? sender, EventArgs e)
+    {
+        // 清理旧 VM 的订阅，防止重复订阅和内存泄漏
+        if (_vm != null)
+            _vm.PropertyChanged -= OnVmPropertyChanged;
+
+        if (this.DataContext is PreviewViewModel vm)
         {
-            if (this.DataContext is PreviewViewModel vm)
+            _vm = vm;
+            vm.PropertyChanged += OnVmPropertyChanged;
+            ApplyInfoPanelOrientation(vm.InfoPanelOrientation);
+        }
+    }
+
+    private void OnVmPropertyChanged(object? sender, PropertyChangedEventArgs args)
+    {
+        var vm = _vm;
+        if (vm == null) return;
+        if (args.PropertyName == nameof(PreviewViewModel.IsHtmlVisible) ||
+            args.PropertyName == nameof(PreviewViewModel.HtmlContent))
+        {
+            UpdateWebViewContent(vm);
+        }
+        if (args.PropertyName == nameof(PreviewViewModel.InfoPanelOrientation))
+        {
+            ApplyInfoPanelOrientation(vm.InfoPanelOrientation);
+        }
+    }
+
+    private void OnFontPreviewScrollerSizeChanged(object? sender, SizeChangedEventArgs e)
+    {
+        if (_vm == null || FontPreviewScrollViewer == null) return;
+        var w = FontPreviewScrollViewer.Bounds.Width;
+        if (w <= 0) return;
+        // 防抖：用户连续拖拽时不重复触发 SkiaSharp 重新渲染，
+        // 松开鼠标后 200ms 才更新宽度并重新渲染字体预览
+        _resizeDebounceCts?.Cancel();
+        _resizeDebounceCts = new CancellationTokenSource();
+        var ct = _resizeDebounceCts.Token;
+        var uiCtx = SynchronizationContext.Current;
+        _ = Task.Run(async () =>
+        {
+            await Task.Delay(200, ct);
+            if (!ct.IsCancellationRequested)
             {
-                vm.PropertyChanged += (_, args) =>
+                uiCtx?.Post(_ =>
                 {
-                    if (args.PropertyName == nameof(PreviewViewModel.IsHtmlVisible) ||
-                        args.PropertyName == nameof(PreviewViewModel.HtmlContent))
-                    {
-                        UpdateWebViewContent(vm);
-                    }
-                    if (args.PropertyName == nameof(PreviewViewModel.InfoPanelOrientation))
-                    {
-                        ApplyInfoPanelOrientation(vm.InfoPanelOrientation);
-                    }
-                };
-                ApplyInfoPanelOrientation(vm.InfoPanelOrientation);
+                    var vm = _vm;
+                    if (vm == null) return;
+                    vm.FontPreviewWrapWidth = w;
+                    vm.ReRenderFontPreview();
+                }, null);
             }
-        };
+        }, ct);
     }
 
     public void ApplyInfoPanelOrientation(string orientation)
@@ -57,7 +105,7 @@ public partial class PreviewPanel : UserControl
             // Info panel to the right of content (default)
             Grid.SetRow(PreviewInfoBorder, 0);
             Grid.SetColumn(PreviewInfoBorder, 1);
-            Grid.SetRowSpan(PreviewInfoBorder, 2);
+            Grid.SetRowSpan(PreviewInfoBorder, 1);
             PreviewRootGrid.RowDefinitions[2].Height = new GridLength(0);
             PreviewRootGrid.ColumnDefinitions[1].Width = new GridLength(220, GridUnitType.Pixel);
             PreviewInfoBorder.Width = 220;
