@@ -22,6 +22,7 @@
     <conv:BoolInvertConverter x:Key="BoolInvertConverter" />
     <conv:DateTimeToOffsetConverter x:Key="DateTimeToOffsetConverter" />
     <conv:NullableLongConverter x:Key="NullableLongConverter" />
+    <conv:RatioToWidthConverter x:Key="RatioToWidthConverter" />
   </Window.Resources>
 
   <Grid RowDefinitions="Auto,Auto,Auto,*,Auto">
@@ -202,6 +203,38 @@
             <StackPanel Orientation="Horizontal" Spacing="4">
               <TextBlock Text="🌓" FontSize="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
               <TextBlock Text="{Binding LocalizedStrings[Menu_ToggleTheme]}" />
+            </StackPanel>
+          </MenuItem.Header>
+        </MenuItem>
+        <Separator />
+        <MenuItem Command="{Binding ToggleProgressBarsCommand}"
+                  IsEnabled="{Binding IsArchiveLoaded}">
+          <MenuItem.Header>
+            <StackPanel Orientation="Horizontal" Spacing="4">
+              <CheckBox IsChecked="{Binding ShowProgressBars}"
+                        IsHitTestVisible="False"
+                        VerticalAlignment="Center" />
+              <TextBlock Text="{Binding LocalizedStrings[Menu_ProgressBars]}" />
+            </StackPanel>
+          </MenuItem.Header>
+        </MenuItem>
+        <MenuItem Command="{Binding ToggleSepDirBaselineCommand}"
+                  IsEnabled="{Binding IsArchiveLoaded}">
+          <MenuItem.Header>
+            <StackPanel Orientation="Horizontal" Spacing="4">
+              <CheckBox IsChecked="{Binding SeparateDirBaseline}"
+                        IsHitTestVisible="False"
+                        VerticalAlignment="Center" />
+              <TextBlock Text="{Binding LocalizedStrings[Menu_SepDirBaseline]}" />
+            </StackPanel>
+          </MenuItem.Header>
+        </MenuItem>
+        <Separator />
+        <MenuItem Command="{Binding ToggleInfoPanelOrientationCommand}">
+          <MenuItem.Header>
+            <StackPanel Orientation="Horizontal" Spacing="4">
+              <TextBlock Text="📐" FontSize="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+              <TextBlock Text="{Binding LocalizedStrings[Menu_InfoPanelOrientation]}" />
             </StackPanel>
           </MenuItem.Header>
         </MenuItem>
@@ -750,42 +783,118 @@
               <Binding Path="NameDisplay" />
             </DataGridTextColumn.Binding>
           </DataGridTextColumn>
-          <DataGridTextColumn SortMemberPath="Size"
-                              Width="80">
-            <DataGridTextColumn.Header>
+          <DataGridTemplateColumn SortMemberPath="Size"
+                                  Width="80">
+            <DataGridTemplateColumn.Header>
               <StackPanel Orientation="Horizontal" Spacing="3">
                 <TextBlock Text="📏" FontSize="13" />
                 <TextBlock Text="{Binding LocalizedStrings[DataGrid_Size]}" />
               </StackPanel>
-            </DataGridTextColumn.Header>
-            <DataGridTextColumn.Binding>
-              <Binding Path="SizeDisplay" />
-            </DataGridTextColumn.Binding>
-          </DataGridTextColumn>
-          <DataGridTextColumn SortMemberPath="CompressedSize"
-                              Width="70">
-            <DataGridTextColumn.Header>
+            </DataGridTemplateColumn.Header>
+            <DataGridTemplateColumn.CellTemplate>
+              <DataTemplate>
+                <Grid>
+                  <Rectangle Fill="{DynamicResource ProgressBarSizeBrush}"
+                             HorizontalAlignment="Left">
+                    <Rectangle.Width>
+                      <MultiBinding Converter="{StaticResource RatioToWidthConverter}">
+                        <Binding Path="SizeRatio" />
+                        <Binding Path="Bounds.Width"
+                                 RelativeSource="{RelativeSource AncestorType=ContentPresenter}" />
+                      </MultiBinding>
+                    </Rectangle.Width>
+                  </Rectangle>
+                  <TextBlock Text="{Binding SizeDisplay}"
+                             VerticalAlignment="Center"
+                             Margin="4,0" />
+                </Grid>
+              </DataTemplate>
+            </DataGridTemplateColumn.CellTemplate>
+          </DataGridTemplateColumn>
+          <DataGridTemplateColumn SortMemberPath="CompressedSize"
+                                  Width="70">
+            <DataGridTemplateColumn.Header>
               <StackPanel Orientation="Horizontal" Spacing="3">
                 <TextBlock Text="📦" FontSize="13" />
                 <TextBlock Text="{Binding LocalizedStrings[DataGrid_Compressed]}" />
               </StackPanel>
-            </DataGridTextColumn.Header>
-            <DataGridTextColumn.Binding>
-              <Binding Path="CompressedSizeDisplay" />
-            </DataGridTextColumn.Binding>
-          </DataGridTextColumn>
-          <DataGridTextColumn SortMemberPath="LastModified"
-                              Width="100">
-            <DataGridTextColumn.Header>
+            </DataGridTemplateColumn.Header>
+            <DataGridTemplateColumn.CellTemplate>
+              <DataTemplate>
+                <Grid>
+                  <Rectangle Fill="{DynamicResource ProgressBarCompressedSizeBrush}"
+                             HorizontalAlignment="Left">
+                    <Rectangle.Width>
+                      <MultiBinding Converter="{StaticResource RatioToWidthConverter}">
+                        <Binding Path="CompressedSizeRatio" />
+                        <Binding Path="Bounds.Width"
+                                 RelativeSource="{RelativeSource AncestorType=ContentPresenter}" />
+                      </MultiBinding>
+                    </Rectangle.Width>
+                  </Rectangle>
+                  <TextBlock Text="{Binding CompressedSizeDisplay}"
+                             VerticalAlignment="Center"
+                             Margin="4,0" />
+                </Grid>
+              </DataTemplate>
+            </DataGridTemplateColumn.CellTemplate>
+          </DataGridTemplateColumn>
+          <DataGridTemplateColumn SortMemberPath="RatioSort"
+                                  Width="70">
+            <DataGridTemplateColumn.Header>
+              <StackPanel Orientation="Horizontal" Spacing="3">
+                <TextBlock Text="📊" FontSize="13" />
+                <TextBlock Text="{Binding LocalizedStrings[DataGrid_Ratio]}" />
+              </StackPanel>
+            </DataGridTemplateColumn.Header>
+            <DataGridTemplateColumn.CellTemplate>
+              <DataTemplate>
+                <Grid>
+                  <Rectangle Fill="{DynamicResource ProgressBarRatioBrush}"
+                             HorizontalAlignment="Left">
+                    <Rectangle.Width>
+                      <MultiBinding Converter="{StaticResource RatioToWidthConverter}">
+                        <Binding Path="RatioBarValue" />
+                        <Binding Path="Bounds.Width"
+                                 RelativeSource="{RelativeSource AncestorType=ContentPresenter}" />
+                      </MultiBinding>
+                    </Rectangle.Width>
+                  </Rectangle>
+                  <TextBlock Text="{Binding RatioDisplay}"
+                             VerticalAlignment="Center"
+                             Margin="4,0" />
+                </Grid>
+              </DataTemplate>
+            </DataGridTemplateColumn.CellTemplate>
+          </DataGridTemplateColumn>
+          <DataGridTemplateColumn SortMemberPath="LastModified"
+                                  Width="100">
+            <DataGridTemplateColumn.Header>
               <StackPanel Orientation="Horizontal" Spacing="3">
                 <TextBlock Text="📅" FontSize="13" />
                 <TextBlock Text="{Binding LocalizedStrings[DataGrid_Modified]}" />
               </StackPanel>
-            </DataGridTextColumn.Header>
-            <DataGridTextColumn.Binding>
-              <Binding Path="LastModifiedDisplay" />
-            </DataGridTextColumn.Binding>
-          </DataGridTextColumn>
+            </DataGridTemplateColumn.Header>
+            <DataGridTemplateColumn.CellTemplate>
+              <DataTemplate>
+                <Grid>
+                  <Rectangle Fill="{DynamicResource ProgressBarDateBrush}"
+                             HorizontalAlignment="Left">
+                    <Rectangle.Width>
+                      <MultiBinding Converter="{StaticResource RatioToWidthConverter}">
+                        <Binding Path="DateRatio" />
+                        <Binding Path="Bounds.Width"
+                                 RelativeSource="{RelativeSource AncestorType=ContentPresenter}" />
+                      </MultiBinding>
+                    </Rectangle.Width>
+                  </Rectangle>
+                  <TextBlock Text="{Binding LastModifiedDisplay}"
+                             VerticalAlignment="Center"
+                             Margin="4,0" />
+                </Grid>
+              </DataTemplate>
+            </DataGridTemplateColumn.CellTemplate>
+          </DataGridTemplateColumn>
         </DataGrid.Columns>
       </DataGrid>
 

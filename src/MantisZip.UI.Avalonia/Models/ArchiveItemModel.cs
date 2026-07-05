@@ -77,6 +77,33 @@ public partial class ArchiveItemModel : ObservableObject
     /// </summary>
     public int SortOrder => IsDirectory ? 0 : 1;
 
+    /// <summary>
+    /// 压缩率显示文本（如 "75.0%"）。目录或 Size=0 返回空。
+    /// </summary>
+    public string RatioDisplay
+    {
+        get
+        {
+            if (IsDirectory || Size == 0) return "";
+            if (CompressedSize == 0) return "0.0%";
+            if (CompressedSize >= Size) return "100.0%";
+            return $"{CompressionRatio:F1}%";
+        }
+    }
+
+    /// <summary>
+    /// 压缩率排序值（0–1）。目录返回 -1 以便排在最后。
+    /// </summary>
+    public double RatioSort
+    {
+        get
+        {
+            if (IsDirectory || Size <= 0) return -1;
+            if (CompressedSize <= 0) return 0;
+            return Math.Min((double)CompressedSize / Size, 1.0);
+        }
+    }
+
     public static ArchiveItemModel FromCore(ArchiveItem item)
     {
         return new ArchiveItemModel
