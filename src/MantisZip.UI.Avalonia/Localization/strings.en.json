@@ -455,6 +455,7 @@
   "Settings_Appearance_Theme_Light": "Light",
   "Settings_Appearance_Theme_Dark": "Dark",
   "Settings_Appearance_MaxRecentFiles": "Max Recent Files",
+  "Settings_Appearance_AppFontFamily": "App Font Family",
 
   "Settings_Tab_Password": "Password",
   "Settings_Pwd_ShowNotification": "Show password match notification",
@@ -485,6 +486,7 @@
   "Settings_Preview_Text_ColorEmoji": "Color emoji",
   "Settings_Preview_Text_MaxSize": "Max text size",
   "Settings_Preview_Text_UnitMB": "MB",
+  "Settings_Preview_FontDefault": "System Default",
 
   "Settings_Preview_Font_Sample": "Sample text",
   "Settings_Preview_Font_PreviewSize": "Preview font size",

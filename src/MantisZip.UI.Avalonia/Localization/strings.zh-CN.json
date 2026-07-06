@@ -455,6 +455,7 @@
   "Settings_Appearance_Theme_Light": "浅色",
   "Settings_Appearance_Theme_Dark": "深色",
   "Settings_Appearance_MaxRecentFiles": "最大最近文件数",
+  "Settings_Appearance_AppFontFamily": "全局界面字体",
 
   "Settings_Tab_Password": "密码管理",
   "Settings_Pwd_ShowNotification": "显示密码匹配通知",
@@ -485,6 +486,7 @@
   "Settings_Preview_Text_ColorEmoji": "彩色 Emoji",
   "Settings_Preview_Text_MaxSize": "最大文本大小",
   "Settings_Preview_Text_UnitMB": "MB",
+  "Settings_Preview_FontDefault": "系统默认",
 
   "Settings_Preview_Font_Sample": "样本文本",
   "Settings_Preview_Font_PreviewSize": "预览字号",
