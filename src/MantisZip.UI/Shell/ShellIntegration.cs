@@ -78,6 +78,33 @@ internal static partial class ShellIntegration
     private const string ComProgId = "MantisZip.ContextMenu";
     private const string ComHandlerKey = "MantisZip";
 
+    // 注册表路径 — COM 组件及 UI 设置共享
+    private const string ContextMenuRegPath = @"Software\MantisZip\ContextMenu";
+
+    // DynamicMenuStatus 取值（存储在 ContextMenuRegPath 下）
+    public const string DynamicMenuStatus_Active = "active";
+    public const string DynamicMenuStatus_Fallback = "fallback";
+    public const string DynamicMenuStatus_Disabled = "disabled";
+
+    /// <summary>
+    /// 返回动态菜单状态（active / fallback / disabled / not_installed）。
+    /// 从注册表读取，由 Install() 在安装时写入。
+    /// </summary>
+    public static string GetDynamicMenuStatus()
+    {
+        try
+        {
+            using var key = Registry.CurrentUser.OpenSubKey(ContextMenuRegPath);
+            if (key == null) return "not_installed";
+            var val = key.GetValue("DynamicMenuStatus") as string;
+            return val ?? "unknown";
+        }
+        catch
+        {
+            return "unknown";
+        }
+    }
+
     #region Registry helpers
 
     private static void SetRegistryValue(string subKey, string? valueName, string value)

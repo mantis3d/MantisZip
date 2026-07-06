@@ -76,6 +76,13 @@ Source: "publish_output_selfcontained\MantisZip.UI.exe"; DestDir: "{app}"; Flags
 Source: "publish_output_selfcontained\MantisZip.Core.pdb"; DestDir: "{app}"; Flags: ignoreversion
 Source: "publish_output_selfcontained\MantisZip.UI.pdb"; DestDir: "{app}"; Flags: ignoreversion
 
+; === Runtime config (required for .NET assembly resolution) ===
+Source: "publish_output_selfcontained\MantisZip.UI.deps.json"; DestDir: "{app}"; Flags: ignoreversion
+Source: "publish_output_selfcontained\MantisZip.UI.runtimeconfig.json"; DestDir: "{app}"; Flags: ignoreversion
+
+; === ShellExt COM host (dynamic context menu) ===
+Source: "publish_output_selfcontained\MantisZip.ShellExt.runtimeconfig.json"; DestDir: "{app}"; Flags: ignoreversion
+
 ; === 7z.dll (SharpSevenZip): architecture-specific subdirectories ===
 Source: "publish_output_selfcontained\x64\7z.dll"; DestDir: "{app}\x64"; Flags: ignoreversion
 Source: "publish_output_selfcontained\x86\7z.dll"; DestDir: "{app}\x86"; Flags: ignoreversion

@@ -1,4 +1,5 @@
 using System.IO;
+using System.Runtime.InteropServices;
 using Microsoft.Win32;
 using MantisZip.UI.Localization;
 
@@ -48,17 +49,32 @@ internal static partial class ShellIntegration
 
         if (s.EnableDynamicMenu)
         {
-            // 安装 COM 动态菜单，若 COM host DLL 不存在则回退到静态方案
+            // 安装 COM 动态菜单
             if (!InstallCom())
             {
                 App.LogDebug("ShellIntegration.Install: COM not available, falling back to static cascade");
+                SetDynamicMenuStatus(DynamicMenuStatus_Disabled);
                 InstallCascade(s, exePath);
+            }
+            else if (!TestComActivation())
+            {
+                // COM 注册成功但实际激活失败 → 回退到静态菜单
+                App.LogDebug("ShellIntegration.Install: COM registration succeeded but activation failed, falling back to static cascade");
+                SetDynamicMenuStatus(DynamicMenuStatus_Fallback);
+                UninstallCom();
+                InstallCascade(s, exePath);
+            }
+            else
+            {
+                App.LogDebug("ShellIntegration.Install: COM registration and activation successful");
+                SetDynamicMenuStatus(DynamicMenuStatus_Active);
             }
         }
         else
         {
             // 安装静态级联方案（可靠兼容所有 Windows 版本）
             App.LogDebug("ShellIntegration.Install: using static cascade registration");
+            SetDynamicMenuStatus(DynamicMenuStatus_Disabled);
             InstallCascade(s, exePath);
         }
 
@@ -110,6 +126,9 @@ internal static partial class ShellIntegration
 
         // 清理 COM 组件注册
         UninstallCom();
+
+        // 清理上下文菜单设置（防止 stale 状态残留）
+        DeleteRegistryKey(ContextMenuRegPath);
 
         // 旧版 per-extension 注册（v0.1.3 早期版本遗留）
         foreach (var ext in ArchiveExtensions)
@@ -392,9 +411,58 @@ internal static partial class ShellIntegration
     /// Write localized ShellExt menu text to registry under HKCU\Software\MantisZip\ContextMenu.
     /// Called during COM install so ShellExt reads the current language's strings.
     /// </summary>
+    private static void SetDynamicMenuStatus(string status)
+    {
+        try
+        {
+            using var key = Registry.CurrentUser.CreateSubKey(ContextMenuRegPath);
+            key?.SetValue("DynamicMenuStatus", status, RegistryValueKind.String);
+        }
+        catch (Exception ex)
+        {
+            App.LogDebug("SetDynamicMenuStatus: failed to write status '{0}': {1}", status, ex.Message);
+        }
+    }
+
+    /// <summary>
+    /// 通过 CoCreateInstance 实际验证 COM 组件能否激活。
+    /// 如果 comhost.dll 无法加载或 .NET 运行时不可用，返回 false。
+    /// </summary>
+    private static bool TestComActivation()
+    {
+        try
+        {
+            var clsid = new Guid(ComClsid);
+            var iidUnknown = new Guid("00000000-0000-0000-C000-000000000046");
+            int hr = CoCreateInstance(ref clsid, IntPtr.Zero, 1 /*CLSCTX_INPROC_SERVER*/,
+                ref iidUnknown, out var ptr);
+            if (hr == 0 && ptr != IntPtr.Zero)
+            {
+                Marshal.Release(ptr);
+                App.LogDebug("TestComActivation: CoCreateInstance succeeded");
+                return true;
+            }
+            App.LogDebug("TestComActivation: CoCreateInstance failed with hr=0x{0:x8}", hr);
+            return false;
+        }
+        catch (Exception ex)
+        {
+            App.LogDebug("TestComActivation: exception: {0}", ex.Message);
+            return false;
+        }
+    }
+
+    [DllImport("ole32.dll")]
+    private static extern int CoCreateInstance(
+        [In] ref Guid rclsid,
+        IntPtr pUnkOuter,
+        uint dwClsContext,
+        [In] ref Guid riid,
+        out IntPtr ppv);
+
     private static void WriteMenuTextToRegistry()
     {
-        var regPath = @"Software\MantisZip\ContextMenu";
+        var regPath = ContextMenuRegPath;
         SetRegistryValue(regPath, "TextOpen", L.T(L.ShellExt_Open));
         SetRegistryValue(regPath, "TextExtractHereSingle", L.T(L.ShellExt_ExtractHereSingle));
         SetRegistryValue(regPath, "TextExtractHereMulti", L.T(L.ShellExt_ExtractHereMulti));

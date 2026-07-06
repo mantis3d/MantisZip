@@ -674,6 +674,8 @@
   "Settings_Menu_InstalledMsg": "Shell 右键菜单已安装",
   "Settings_Menu_NotInstalled": "❌ Shell 右键菜单未安装",
   "Settings_Menu_ShowIcons": "上下文菜单显示图标",
+  "Settings_Menu_StatusDynamicActive": "✅ 动态菜单已启用",
+  "Settings_Menu_StatusDynamicFallback": "⚠️ 动态菜单加载失败，已回退到静态菜单",
   "Settings_Menu_StatusGroup": "状态",
   "Settings_Menu_UninstallFailed": "卸载失败: {0}",
   "Settings_Menu_UpdatedMsg": "上下文菜单已更新",

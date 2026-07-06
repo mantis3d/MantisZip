@@ -317,9 +317,21 @@ public partial class SettingsWindow : Window
     private void UpdateShellStatus()
     {
         var installed = ShellIntegration.IsInstalled;
-        ShellStatusText.Text = installed
-            ? L.T(L.Settings_Menu_Installed)
-            : L.T(L.Settings_Menu_NotInstalled);
+        if (installed)
+        {
+            var dynStatus = ShellIntegration.GetDynamicMenuStatus();
+            ShellStatusText.Text = dynStatus switch
+            {
+                "active"     => L.T(L.Settings_Menu_StatusDynamicActive),
+                "fallback"   => L.T(L.Settings_Menu_StatusDynamicFallback),
+                "disabled"   => L.T(L.Settings_Menu_Installed),
+                _            => L.T(L.Settings_Menu_Installed)
+            };
+        }
+        else
+        {
+            ShellStatusText.Text = L.T(L.Settings_Menu_NotInstalled);
+        }
         InstallBtn.IsEnabled = !installed;
         UninstallBtn.IsEnabled = installed;
         // 应用按钮的状态由 OnChanged 事件单独管理

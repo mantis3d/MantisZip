@@ -79,6 +79,9 @@ Source: "publish_output\MantisZip.UI.pdb"; DestDir: "{app}"; Flags: ignoreversio
 Source: "publish_output\MantisZip.UI.deps.json"; DestDir: "{app}"; Flags: ignoreversion
 Source: "publish_output\MantisZip.UI.runtimeconfig.json"; DestDir: "{app}"; Flags: ignoreversion
 
+; === ShellExt COM host (dynamic context menu) — runtimeconfig.json required for COM activation ===
+Source: "publish_output\MantisZip.ShellExt.runtimeconfig.json"; DestDir: "{app}"; Flags: ignoreversion
+
 ; === 7z.dll (SharpSevenZip): architecture-specific subdirectories ===
 Source: "publish_output\x64\7z.dll"; DestDir: "{app}\x64"; Flags: ignoreversion
 Source: "publish_output\x86\7z.dll"; DestDir: "{app}\x86"; Flags: ignoreversion
@@ -108,8 +111,6 @@ Name: "{autoprograms}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; WorkingD
 Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; WorkingDir: "{app}"; Tasks: desktopicon
 
 [Run]
-Filename: "{app}\{#MyAppExeName}"; Parameters: "--install-shell"; Flags: nowait skipifsilent; WorkingDir: "{app}"; Check: IsShellInstallChecked
-Filename: "{app}\{#MyAppExeName}"; Parameters: "--install-assoc {code:GetAssocParams}"; Flags: nowait skipifsilent; WorkingDir: "{app}"; Check: IsAnyAssocChecked
 Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#StringChange(MyAppName, '&', '&&')}}"; Flags: nowait postinstall skipifsilent; WorkingDir: "{app}"
 
 [UninstallRun]
@@ -435,6 +436,7 @@ var
   SettingsDir: string;
   SettingsFile: string;
   WindowFile: string;
+  i: Integer;
 begin
   if CurStep = ssPostInstall then
   begin
@@ -451,11 +453,19 @@ begin
           if ResultCode = 0 then
           begin
             Log('.NET 9 Desktop Runtime installed successfully.');
-            // Give the .NET runtime a moment to fully register with the system.
-            // Without this delay, the [Run] section launching MantisZip right
-            // after Setup finishes may trigger a Windows "download .NET" prompt
-            // because the runtime isn't recognized as installed yet.
-            Sleep(3000);
+            // Wait for .NET registry registration to complete before running
+            // shell/assoc registration (which also launch MantisZip.exe).
+            // The installer process exits before the registry is fully synced.
+            i := 0;
+            while (i < 60) and (not IsDotNet9Installed) do
+            begin
+              Sleep(500);
+              i := i + 1;
+            end;
+            if IsDotNet9Installed then
+              Log('.NET registration confirmed after ~' + IntToStr(i * 500) + 'ms')
+            else
+              Log('.NET registration not detected after ~30s, proceeding anyway');
           end
           else
             Log('.NET 9 Desktop Runtime installer exited with code: ' + IntToStr(ResultCode));
@@ -491,6 +501,29 @@ begin
     end
     else
       Log('WebView2 Runtime is already installed.');
+
+    // 3. Register shell extensions and file associations.
+    // These run MantisZip.exe, which requires .NET 9, so they must happen
+    // AFTER the .NET registration wait above.
+    if InstallShellCheck.Checked then
+    begin
+      Log('Registering context menu...');
+      if Exec(ExpandConstant('{app}\MantisZip.UI.exe'), '--install-shell', '',
+        SW_SHOW, ewNoWait, ResultCode) then
+        Log('Context menu registration initiated.')
+      else
+        Log('Failed to launch --install-shell.');
+    end;
+    if IsAnyAssocChecked then
+    begin
+      Log('Registering file associations...');
+      if Exec(ExpandConstant('{app}\MantisZip.UI.exe'),
+        '--install-assoc ' + GetAssocParams(''),
+        '', SW_SHOW, ewNoWait, ResultCode) then
+        Log('File association registration initiated.')
+      else
+        Log('Failed to launch --install-assoc.');
+    end;
 
     SettingsDir := ExpandConstant('{localappdata}\MantisZip');
     SettingsFile := SettingsDir + '\settings.json';

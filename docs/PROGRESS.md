@@ -53,6 +53,12 @@
    - 新增 `installer\download-redist.ps1` 预下载脚本
    - 新增 `installer\redist\MicrosoftEdgeWebView2RuntimeInstallerX64.exe`（从微软官方下载）
    - 删除 `URLDownloadToFile` 函数和 `EvergreenBootstrapperUrl` 常量
+10. **installer.iss 下载进度可视化 + WebSetup 修复**：
+    - 用 `TDownloadWizardPage` 替代 `URLDownloadToFile` 静默下载，用户可见 .NET/WebView2 下载进度条
+    - 修复 `Type Mismatch` 运行时错误：补全 `Show/try-except/finally/Hide` 生命周期和 `nil` 回调参数
+    - 修复 32 位安装程序在 64 位系统上检测不到已安装运行时：`HKLM` → `HKLM64`（避免 WOW6432Node 重定向）
+    - 修复 .NET 安装后立即启动 MantisZip 触发 Windows 下载提示：安装成功后在 `CurStepChanged` 追加 3 秒 `Sleep` 等待注册完成
+11. **installer-selfcontained.iss 同步更新**：移除 `deps.json`/`runtimeconfig.json` 引用（自包含发布不生成）
 
 ### v0.4.4+ (2026-07-02) 压缩包路径处理一站式重构——ArchivePath 统一入口
 
