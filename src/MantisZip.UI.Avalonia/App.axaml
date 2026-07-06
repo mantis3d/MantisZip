@@ -17,6 +17,11 @@
     <!-- GLOBAL CONTROL STYLES (applied app-wide)    -->
     <!-- ════════════════════════════════════════════ -->
 
+    <!-- Window — 字体由 App.axaml.cs 根据设置动态设置为 {DynamicResource AppGlobalFont} -->
+    <Style Selector="Window">
+      <Setter Property="FontFamily" Value="{DynamicResource AppGlobalFont}" />
+    </Style>
+
     <!-- TextBlock — 不设 Foreground（继承父控件），避免覆盖 emoji 彩色渲染 -->
     <Style Selector="TextBlock">
       <!-- Foreground left unset — inherits from parent; setting it here would

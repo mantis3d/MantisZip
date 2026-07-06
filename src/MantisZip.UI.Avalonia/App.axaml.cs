@@ -2,6 +2,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
+using Avalonia.Media;
 using Avalonia.Platform;
 using Avalonia.Threading;
 using MantisZip.Core.Abstractions;
@@ -51,6 +52,9 @@ public partial class App : Application
             ps.ColorValuesChanged += (_, _) =>
                 global::Avalonia.Threading.Dispatcher.UIThread.Post(() => ApplySystemTheme());
         }
+
+        // ── Apply global font from settings ──
+        ApplyAppFontFamily();
 
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
@@ -180,6 +184,56 @@ public partial class App : Application
         {
             DebugLog($"[Theme] ApplySystemTheme ERROR: {ex.Message}");
         }
+    }
+
+    /// <summary>
+    /// 从 AppSettings 读取全局界面字体设置，更新 AppGlobalFont 资源及所有已打开窗口。
+    /// </summary>
+    private void ApplyAppFontFamily()
+    {
+        try
+        {
+            var settings = AppSettings.Load();
+            var fontName = settings.AppFontFamily;
+
+            if (string.IsNullOrEmpty(fontName))
+            {
+                // 默认字体：重建资源确保 DynamicResource 重求值，清除窗口本地值让 Style 接管
+                Resources.Remove("AppGlobalFont");
+                Resources.Add("AppGlobalFont", FontFamily.Default);
+                if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
+                {
+                    foreach (var w in desktop.Windows)
+                        w.ClearValue(TextBlock.FontFamilyProperty);
+                }
+            }
+            else
+            {
+                // 指定字体：更新资源 + 设置窗口本地值，确保立即可见
+                var font = new FontFamily(fontName);
+                Resources["AppGlobalFont"] = font;
+                if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
+                {
+                    foreach (var w in desktop.Windows)
+                        w.FontFamily = font;
+                }
+            }
+
+            DebugLog($"[Font] Applied global font: {(string.IsNullOrEmpty(fontName) ? "default" : fontName)}");
+        }
+        catch (Exception ex)
+        {
+            DebugLog($"[Font] Failed to apply global font: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// 供 SettingsWindow 保存设置后立即刷新全局字体（无需重启）。
+    /// </summary>
+    internal static void RefreshAppFontFamily()
+    {
+        if (Current is App app)
+            app.ApplyAppFontFamily();
     }
 
     internal static void DebugLog(string msg)
