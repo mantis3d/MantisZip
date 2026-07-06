@@ -80,7 +80,7 @@
           <TextBox Text="{Binding TextContent}"
                    IsReadOnly="True"
                    TextWrapping="Wrap"
-                   FontFamily="Consolas"
+                   FontFamily="{Binding TextPreviewFontFamily}"
                    FontSize="{Binding FontSize}"
                    Background="{DynamicResource ThemeSurfaceBgBrush}"
                    Foreground="{DynamicResource ThemeTextPrimaryBrush}"
@@ -176,7 +176,7 @@
                    HorizontalAlignment="Left" />
             <!-- SkiaSharp 渲染失败时的回退文本 -->
             <TextBlock Text="{Binding TextContent}"
-                       FontFamily="{Binding FontFamily}"
+                   FontFamily="{Binding TextPreviewFontFamily}"
                        FontSize="{Binding FontSize}"
                        TextWrapping="Wrap"
                        IsVisible="{Binding IsFontTextFallbackVisible}" />

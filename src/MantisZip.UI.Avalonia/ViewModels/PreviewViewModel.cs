@@ -47,6 +47,18 @@ public partial class PreviewViewModel : ObservableObject
     }
 
     /// <summary>
+    /// 文本预览的字体，独立于 FontFamily（后者是框架继承属性，会被传播到子控件）。
+    /// 只绑到文本预览 TextBox，不影响界面其他部分。
+    /// </summary>
+    private global::Avalonia.Media.FontFamily _textPreviewFontFamily = global::Avalonia.Media.FontFamily.Default;
+
+    public global::Avalonia.Media.FontFamily TextPreviewFontFamily
+    {
+        get => _textPreviewFontFamily;
+        set => SetProperty(ref _textPreviewFontFamily, value);
+    }
+
+    /// <summary>
     /// 字体预览的自动换行宽度。由 PreviewPanel 代码后置根据 ScrollViewer 实际宽度设置。
     /// </summary>
     public double FontPreviewWrapWidth { get; set; } = 700;
@@ -272,12 +284,18 @@ public partial class PreviewViewModel : ObservableObject
     private void IncreaseFontSize()
     {
         FontSize = Math.Min(FontSize + 2, 48);
+        var settings = AppSettings.Load();
+        settings.TextPreviewFontSize = FontSize;
+        settings.Save();
     }
 
     [RelayCommand]
     private void DecreaseFontSize()
     {
         FontSize = Math.Max(FontSize - 2, 8);
+        var settings = AppSettings.Load();
+        settings.TextPreviewFontSize = FontSize;
+        settings.Save();
     }
 
     // ── GIF controls ──
@@ -345,6 +363,20 @@ public partial class PreviewViewModel : ObservableObject
         PreviewType = PreviewType.Text;
         IsPreviewVisible = true;
         IsToolbarVisible = true;
+        // 从设置加载文本预览字号和字体
+        var settings = AppSettings.Load();
+        FontSize = settings.TextPreviewFontSize;
+        var fontFamilyName = settings.TextPreviewFontFamily;
+        try
+        {
+            TextPreviewFontFamily = !string.IsNullOrEmpty(fontFamilyName)
+                ? new global::Avalonia.Media.FontFamily(fontFamilyName)
+                : global::Avalonia.Media.FontFamily.Default;
+        }
+        catch
+        {
+            TextPreviewFontFamily = global::Avalonia.Media.FontFamily.Default;
+        }
     }
 
     /// <summary>
