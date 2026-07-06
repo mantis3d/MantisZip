@@ -140,6 +140,9 @@ public partial class SettingsWindowViewModel : ObservableObject
     [ObservableProperty]
     private int _maxRecentFiles = 10;
 
+    [ObservableProperty]
+    private string _appFontFamily = "";
+
     // ── Password ──
     [ObservableProperty]
     private bool _showPasswordMatchNotification;
@@ -193,6 +196,12 @@ public partial class SettingsWindowViewModel : ObservableObject
 
     public System.Collections.ObjectModel.ObservableCollection<Option> FileConflictActionOptions { get; } = new();
     [ObservableProperty] private Option? _selectedFileConflictActionOption;
+
+    public System.Collections.ObjectModel.ObservableCollection<Option> TextFontFamilyOptions { get; } = new();
+    [ObservableProperty] private Option? _selectedTextFontFamilyOption;
+
+    public System.Collections.ObjectModel.ObservableCollection<Option> AppFontFamilyOptions { get; } = new();
+    [ObservableProperty] private Option? _selectedAppFontFamilyOption;
 
     // ── Localized strings ──
 
@@ -339,6 +348,7 @@ public partial class SettingsWindowViewModel : ObservableObject
     public string AppearanceThemeLightText => LocalizationManager.T("Settings_Appearance_Theme_Light");
     public string AppearanceThemeDarkText => LocalizationManager.T("Settings_Appearance_Theme_Dark");
     public string AppearanceMaxRecentFilesText => LocalizationManager.T("Settings_Appearance_MaxRecentFiles");
+    public string AppearanceAppFontFamilyText => LocalizationManager.T("Settings_Appearance_AppFontFamily");
 
     // ── Password strings ──
     public string PwdShowNotificationText => LocalizationManager.T("Settings_Pwd_ShowNotification");
@@ -414,6 +424,7 @@ public partial class SettingsWindowViewModel : ObservableObject
         // Appearance
         _theme = _settings.Theme;
         _maxRecentFiles = _settings.MaxRecentFiles;
+        _appFontFamily = _settings.AppFontFamily;
 
         // Password
         _showPasswordMatchNotification = _settings.ShowPasswordMatchNotification;
@@ -477,6 +488,38 @@ public partial class SettingsWindowViewModel : ObservableObject
         FileConflictActionOptions.Add(new Option(ConflictOverwriteSmallerText, "overwrite-if-smaller"));
         FileConflictActionOptions.Add(new Option(ConflictRenameText, "rename"));
         FileConflictActionOptions.Add(new Option(ConflictSkipText, "skip"));
+
+        // 字体列表（文本预览 + 全局界面共用同一份系统字体枚举）
+        PopulateFontOptions();
+    }
+
+    /// <summary>
+    /// 用 SkiaSharp 枚举系统字体，填充文本预览和全局界面的字体系列 ComboBox。
+    /// </summary>
+    private void PopulateFontOptions()
+    {
+        var defaultName = LocalizationManager.T("Settings_Preview_FontDefault");
+
+        TextFontFamilyOptions.Clear();
+        TextFontFamilyOptions.Add(new Option(defaultName, ""));
+        AppFontFamilyOptions.Clear();
+        AppFontFamilyOptions.Add(new Option(defaultName, ""));
+
+        try
+        {
+            var fontNames = SkiaSharp.SKFontManager.Default.FontFamilies
+                .OrderBy(n => n)
+                .ToList();
+            foreach (var name in fontNames)
+            {
+                TextFontFamilyOptions.Add(new Option(name, name));
+                AppFontFamilyOptions.Add(new Option(name, name));
+            }
+        }
+        catch
+        {
+            // 获取字体列表失败时，至少保留"系统默认"项
+        }
     }
 
     private void SetSelectedOptions()
@@ -489,6 +532,12 @@ public partial class SettingsWindowViewModel : ObservableObject
         SelectedLogPrivacyModeOption = LogPrivacyModeOptions.FirstOrDefault(o => o.Value == LogPrivacyMode);
         SelectedExtractDestinationOption = ExtractDestinationOptions.FirstOrDefault(o => o.Value == ExtractDestination);
         SelectedFileConflictActionOption = FileConflictActionOptions.FirstOrDefault(o => o.Value == FileConflictAction);
+
+        SelectedTextFontFamilyOption = TextFontFamilyOptions.FirstOrDefault(o => o.Value == TextPreviewFontFamily)
+                                       ?? TextFontFamilyOptions.FirstOrDefault();
+
+        SelectedAppFontFamilyOption = AppFontFamilyOptions.FirstOrDefault(o => o.Value == AppFontFamily)
+                                      ?? AppFontFamilyOptions.FirstOrDefault();
     }
 
     private void OnCultureChanged(object? sender, EventArgs e)
@@ -625,7 +674,7 @@ public partial class SettingsWindowViewModel : ObservableObject
         _settings.EnableTextPreview = EnableTextPreview;
         _settings.MaxTextPreviewBytes = MaxTextPreviewBytes;
         _settings.TextPreviewFontSize = TextPreviewFontSize;
-        _settings.TextPreviewFontFamily = TextPreviewFontFamily;
+        _settings.TextPreviewFontFamily = SelectedTextFontFamilyOption?.Value ?? TextPreviewFontFamily;
         _settings.FontPreviewFontSize = FontPreviewFontSize;
         _settings.FontPreviewSampleText = FontPreviewSampleText;
         _settings.MaxTablePreviewRows = MaxTablePreviewRows;
@@ -670,6 +719,7 @@ public partial class SettingsWindowViewModel : ObservableObject
         // Appearance
         _settings.Theme = SelectedThemeOption?.Value ?? Theme;
         _settings.MaxRecentFiles = MaxRecentFiles;
+        _settings.AppFontFamily = SelectedAppFontFamilyOption?.Value ?? AppFontFamily;
 
         // Password
         _settings.ShowPasswordMatchNotification = ShowPasswordMatchNotification;
