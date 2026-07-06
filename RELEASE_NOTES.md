@@ -4,11 +4,20 @@
 
 MantisZip-0.4.4-Setup-WebSetup.exe 是需要联网才能安装的。MantisZip-0.4.4-Setup-Offline.exe 是离线安装包。
 
+MantisZip-0.4.4-Setup-WebSetup.exe requires internet during installation. MantisZip-0.4.4-Setup-Offline.exe is a fully offline installer.
+
+**如果你不明白上面那句话是什么意思，请下载 MantisZip-0.4.4-Setup-Offline.exe。**
+**If you don't understand what the above means, please download MantisZip-0.4.4-Setup-Offline.exe.**
 
 ### 更新内容 / Changelog
 
-- 完成 [快速路径选择](.sisyphus/plans/quickpath-unified.md) 计划。
+- 完成 [以内容识别格式](.sisyphus/plans/preview-magic-detection.md) 计划 — 魔数检测预览系统
 - 
+- 完成压缩包路径处理一站式重构，并修复加密压缩解压的多处bug.
+- 双击文件用系统默认程序打开
+- 安装包增强，安装包文件名重命名：`NoDotNet` → `WebSetup`，`Setup` → `Offline`，清晰区分联网/离线
+
+
 
 ## v0.4.3
 

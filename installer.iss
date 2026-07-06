@@ -140,6 +140,9 @@ var
   // Download progress page
   DownloadPage: TDownloadWizardPage;
 
+// Import Sleep from kernel32 for post-install delay (let .NET registration settle)
+procedure Sleep(Milliseconds: DWord); external 'Sleep@kernel32.dll stdcall';
+
 // Create the custom configuration wizard page (theme + system integration)
 procedure CreateConfigPage;
 var
@@ -341,7 +344,7 @@ begin
   DownloadPage := CreateDownloadPage(
     CustomMessage('DownloadPageCaption'),
     CustomMessage('DownloadPageDescription'),
-    '');
+    nil);
   CreateConfigPage;
 end;
 
@@ -351,12 +354,10 @@ function IsWebView2Installed: Boolean;
 var
   version: string;
 begin
-  // 64-bit view (HKLM) or HKCU
-  Result := RegQueryStringValue(HKLM, WebView2RegKey, 'pv', version) or
+  // NOTE: This installer is 32-bit. On 64-bit Windows, HKLM is
+  // redirected to WOW6432Node — use HKLM64 for the native 64-bit view.
+  Result := RegQueryStringValue(HKLM64, WebView2RegKey, 'pv', version) or
             RegQueryStringValue(HKCU, WebView2RegKey, 'pv', version);
-  // 32-bit (WOW6432Node) view — WebView2 installer often registers here on 64-bit Windows
-  if not Result then
-    Result := RegQueryStringValue(HKLM32, WebView2RegKey, 'pv', version);
 end;
 
 // Check if .NET 9 Desktop Runtime is already installed.
@@ -367,8 +368,10 @@ var
   i: Integer;
 begin
   Result := False;
-  // 64-bit view (HKLM)
-  if RegGetSubkeyNames(HKLM, DotNet9RegKey, subkeys) then
+  // NOTE: This installer is 32-bit. On 64-bit Windows, HKLM is
+  // redirected to WOW6432Node — use HKLM64 for the native 64-bit view.
+  // .NET 9 Desktop Runtime registers in the native 64-bit registry only.
+  if RegGetSubkeyNames(HKLM64, DotNet9RegKey, subkeys) then
   begin
     for i := 0 to GetArrayLength(subkeys) - 1 do
     begin
@@ -379,36 +382,47 @@ begin
       end;
     end;
   end;
-  // 32-bit (WOW6432Node) view
-  if not Result then
-    if RegGetSubkeyNames(HKLM32, DotNet9RegKey, subkeys) then
-    begin
-      for i := 0 to GetArrayLength(subkeys) - 1 do
-      begin
-        if Copy(subkeys[i], 1, 2) = '9.' then
-        begin
-          Result := True;
-          Exit;
-        end;
-      end;
-    end;
 end;
 
 // Intercept the "Ready to Install" page — download prerequisites before installation begins.
 // The download happens AFTER the user clicks Install but BEFORE file copying.
 function NextButtonClick(CurPageID: Integer): Boolean;
+var
+  NeedDownload: Boolean;
 begin
-  Result := True;
   if CurPageID = wpReady then
   begin
+    NeedDownload := False;
     DownloadPage.Clear;
     if not IsDotNet9Installed then
+    begin
       DownloadPage.Add(DotNet9RuntimeUrl, 'dotnet-runtime-9.0-win-x64.exe', '');
+      NeedDownload := True;
+    end;
     if not IsWebView2Installed then
+    begin
       DownloadPage.Add(EvergreenBootstrapperUrl, 'MicrosoftEdgeWebview2Setup.exe', '');
+      NeedDownload := True;
+    end;
 
-    DownloadPage.Download;
-  end;
+    // Only show the download page if there are items to download.
+    if NeedDownload then
+    begin
+      DownloadPage.Show;
+      try
+        try
+          DownloadPage.Download;
+          Result := True;
+        except
+          Result := False;
+        end;
+      finally
+        DownloadPage.Hide;
+      end;
+    end else
+      Result := True;
+  end else
+    Result := True;
 end;
 
 // Install runtimes (already downloaded via DownloadPage)
@@ -435,7 +449,14 @@ begin
         if Exec(BootstrapperPath, '/quiet /install /norestart', '', SW_SHOW, ewWaitUntilTerminated, ResultCode) then
         begin
           if ResultCode = 0 then
-            Log('.NET 9 Desktop Runtime installed successfully.')
+          begin
+            Log('.NET 9 Desktop Runtime installed successfully.');
+            // Give the .NET runtime a moment to fully register with the system.
+            // Without this delay, the [Run] section launching MantisZip right
+            // after Setup finishes may trigger a Windows "download .NET" prompt
+            // because the runtime isn't recognized as installed yet.
+            Sleep(3000);
+          end
           else
             Log('.NET 9 Desktop Runtime installer exited with code: ' + IntToStr(ResultCode));
         end
