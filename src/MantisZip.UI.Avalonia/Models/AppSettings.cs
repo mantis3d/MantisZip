@@ -65,6 +65,7 @@ public class AppSettings
     // ===== 外观 =====
     public string Theme { get; set; } = "Light";
     public int MaxRecentFiles { get; set; } = 10;
+    public string AppFontFamily { get; set; } = "";
     public string Language { get; set; } = "zh";
     public bool ShowProgressBars { get; set; } = true;
     public bool SeparateDirBaseline { get; set; } = false;
