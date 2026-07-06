@@ -7,8 +7,8 @@
 - **技术栈**: .NET 9 + WPF + SharpCompress + SharpSevenZip
 
 ## 版本
-- **当前版本**: 0.4.4
-- **发布日期**: 2026-06-29
+- **当前版本**: 0.4.5
+- **发布日期**: 2026-07-06
 
 ## 规划中
 
@@ -17,6 +17,20 @@
 | [跨平台移植可行性研究](.sisyphus/plans/cross-platform-port.md) | 砍 ShellExt，WPF→Avalonia，SharpSevenZip→SharpCompress/p7zip，DPAPI→AES-GCM |
 
 ## 版本历史（从新到旧）
+
+### v0.4.5 (2026-07-06) 压缩选项增强（7z/ZIP 参数扩展）完成
+
+1. **新功能：7z/ZIP 压缩选项扩展** — `compression-options-enhancement.md`
+   - **7z 参数**：固实块大小、字典大小(Dictionary Size)、单词大小(Word Size)、匹配器(Match Finder)、加密文件名(Encrypt Headers)
+   - **ZIP 参数**：压缩方法(Deflate/Deflate64/BZip2/LZMA/PPMd/Store)、加密方式(AES-256/192/128/ZipCrypto)
+   - **AppSettings**：7 个新属性作为默认值，可在 SettingsWindow → 压缩 Tab 配置
+   - **DynamicFormatOptionsPanel**：7z 面板（固实块/字典/单词/匹配器组合框 + 固实联动）+ ZIP 面板（压缩方法组合框）
+   - **加密 Tab 整合**：ZIP 加密方式 + 7z 加密文件名置于 CompressSettingsWindow 加密 Tab
+   - **引擎实现**：SevenZipEngine.ConfigureCompressor 应用所有参数；ZipEngine 同时支持 SharpCompress（非加密）和 SharpSevenZip（加密）路径
+   - **i18n**：24 个新本地化键（中/英），全部 XAML 绑定 `{l:L ...}`
+   - **文本优化**：ComboBox 默认值显示 7z.dll 内部默认值（273/BT4/16MB/全固实）
+   - **Bug 修复**：`SolidCheck_Changed` 空引用保护（XAML 初始化时序）
+   - **前置优化**：固实块大小选项扩展至 10 档（16MB~4GB）
 
 ### v0.4.4 (2026-06-30) 魔数检测预览系统 Phase 1+2+3 完成
 
