@@ -176,6 +176,22 @@
                          BorderBrush="{DynamicResource ThemeBorderBrush}" />
               </StackPanel>
             </Border>
+
+            <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
+                    CornerRadius="4" Padding="12" Background="{DynamicResource ThemeSurfaceBgBrush}">
+              <StackPanel Spacing="8">
+                <TextBlock Text="{Binding AppearanceAppFontFamilyText}" FontWeight="SemiBold" />
+                <ComboBox ItemsSource="{Binding AppFontFamilyOptions}"
+                          SelectedItem="{Binding SelectedAppFontFamilyOption}"
+                          Width="240" HorizontalAlignment="Left">
+                  <ComboBox.ItemTemplate>
+                    <DataTemplate>
+                      <TextBlock Text="{Binding Display}" />
+                    </DataTemplate>
+                  </ComboBox.ItemTemplate>
+                </ComboBox>
+              </StackPanel>
+            </Border>
           </StackPanel>
         </ScrollViewer>
       </TabItem>
@@ -288,9 +304,17 @@
                     <StackPanel Spacing="8">
                       <TextBlock Text="{Binding PreviewTextFontFamilyText}" FontWeight="SemiBold" />
                       <ComboBox Width="240" HorizontalAlignment="Left"
+                                ItemsSource="{Binding TextFontFamilyOptions}"
+                                SelectedItem="{Binding SelectedTextFontFamilyOption}"
                                 Background="{DynamicResource ThemeWindowBgBrush}"
                                 Foreground="{DynamicResource ThemeTextPrimaryBrush}">
-                        <ComboBoxItem Content="系统默认" Tag="" />
+                        <ComboBox.ItemTemplate>
+                          <DataTemplate>
+                            <TextBlock Text="{Binding Display}"
+                                       Background="{DynamicResource ThemeWindowBgBrush}"
+                                       Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+                          </DataTemplate>
+                        </ComboBox.ItemTemplate>
                       </ComboBox>
                     </StackPanel>
                   </Border>

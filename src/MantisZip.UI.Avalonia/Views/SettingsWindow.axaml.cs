@@ -1,3 +1,4 @@
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
 using MantisZip.UI.Avalonia.ViewModels;
@@ -16,6 +17,10 @@ public partial class SettingsWindow : Window
     {
         if (DataContext is SettingsWindowViewModel vm)
             vm.SaveCommand.Execute(null);
+
+        // 刷新全局字体、主题等需要立即生效的设置
+        App.RefreshAppFontFamily();
+
         Close();
     }
 
