@@ -14,6 +14,7 @@
 - Avalonia 跨平台移植后续 Phase
 
 ### avalonia-port 分支 (WIP)
+  - **全局界面字体设置 + 文本预览字体隔离** — 设置窗口外观 Tab 新增"全局界面字体" ComboBox（枚举系统字体）；`AppSettings.AppFontFamily` 持久化；`App.axaml` 添加 Window 级 `FontFamily="{DynamicResource AppGlobalFont}"` 样式；`ApplyAppFontFamily()` 在启动和保存设置后刷新资源 + 迭代已打开窗口应用（特定字体设本地值，默认字体清本地值避免 hover 回退）；文本预览 TextBox 改为绑定 `TextPreviewFontFamily` 而非继承的 `FontFamily`，避免被全局字体覆盖；文本预览字号调节（A+/A−）即时持久化到 `AppSettings.TextPreviewFontSize`；新增中英文键 `Settings_Preview_FontDefault` / `Settings_Appearance_AppFontFamily` (2026-07-06)
   - **WPF 字体预览重构** — 替换 GDI+ 位图渲染为 WPF 原生 GlyphTypeface + DrawGlyphRun → RenderTargetBitmap（DirectWrite 管道）；新增 CFF-OTF 检测跳过 unsafe FontFamily 避免原生崩溃；新增 CJK 字形检测自动过滤不支持的样本文字；Avalonia 端新增 SkiaSharp 字体位图渲染 + CJK 过滤 + 回退 TextBlock (2026-07-04)
   - **Avalonia 字体预览性能优化** — 合并折行和测量为一遍（`List<(string, float)>`，消除重复 `MeasureText`）；缓存字体 bytes + 主题色到内存供 `ReRenderFontPreview` 复用，避免每次重新读文件 + `AppSettings.Load()` 的 JSON I/O；SKBitmap → WriteableBitmap 直接 `Marshal.Copy` 像素内存，跳过 PNG 编解码往返（`SKImage.Encode` → `new Bitmap(stream)`）(2026-07-05)
   - **Avalonia 字体预览自动换行 + 窗口缩放响应** — `FontPreviewWrapWidth` 属性驱动 SkiaSharp 折行宽度；`x:Name="FontPreviewScrollViewer"` 绑定 `ScrollViewer.Bounds.Width`；`SizeChanged` 200ms 防抖 + `ReRenderFontPreview()` 窗口缩放后自动刷新位图 (2026-07-05)
