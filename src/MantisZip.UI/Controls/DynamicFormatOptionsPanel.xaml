@@ -9,14 +9,14 @@
         <Grid>
             <!-- ZIP panel -->
             <StackPanel x:Name="ZipPanel" Visibility="Visible">
-                <TextBlock Text="ZIP 选项" FontWeight="SemiBold" Margin="0,0,0,6"
+                <TextBlock Text="{l:L CompressOpt_ZipPanel}" FontWeight="SemiBold" Margin="0,0,0,6"
                            Foreground="{DynamicResource Theme_TextPrimary}"/>
                 <Grid Margin="0,0,0,6">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="80"/>
                         <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
-                    <TextBlock Grid.Column="0" Text="文件名编码:" VerticalAlignment="Center"
+                    <TextBlock Grid.Column="0" Text="{l:L CompressOpt_FileNameEncoding}" VerticalAlignment="Center"
                                Foreground="{DynamicResource Theme_TextPrimary}"/>
                     <ComboBox x:Name="EncodingCombo" Grid.Column="1" Height="24" SelectedIndex="0"
                                Background="{DynamicResource Theme_SurfaceBg}"
@@ -24,7 +24,7 @@
                                BorderBrush="{DynamicResource Theme_Border}">
                         <ComboBoxItem Content="UTF-8" Tag="utf-8"/>
                         <ComboBoxItem Content="GBK" Tag="gbk"/>
-                        <ComboBoxItem Content="保留原始" Tag="default"/>
+                        <ComboBoxItem Content="{l:L CompressOpt_KeepOriginal}" Tag="default"/>
                     </ComboBox>
                 </Grid>
                 <Grid>
@@ -32,7 +32,7 @@
                         <ColumnDefinition Width="80"/>
                         <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
-                    <TextBlock Grid.Column="0" Text="压缩方法:" VerticalAlignment="Center"
+                    <TextBlock Grid.Column="0" Text="{l:L CompressOpt_CompressionMethod}" VerticalAlignment="Center"
                                Foreground="{DynamicResource Theme_TextPrimary}"/>
                     <ComboBox x:Name="ZipMethodCombo" Grid.Column="1" Height="24" SelectedIndex="0"
                               Background="{DynamicResource Theme_SurfaceBg}"
@@ -50,14 +50,14 @@
 
             <!-- 7z panel -->
             <StackPanel x:Name="SevenZPanel" Visibility="Collapsed">
-                <TextBlock Text="7z 选项" FontWeight="SemiBold" Margin="0,0,0,6"
+                <TextBlock Text="{l:L CompressOpt_SevenZipPanel}" FontWeight="SemiBold" Margin="0,0,0,6"
                            Foreground="{DynamicResource Theme_TextPrimary}"/>
                 <Grid Margin="0,0,0,6">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="80"/>
                         <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
-                    <TextBlock Grid.Column="0" Text="压缩方法:" VerticalAlignment="Center"
+                    <TextBlock Grid.Column="0" Text="{l:L CompressOpt_CompressionMethod}" VerticalAlignment="Center"
                                Foreground="{DynamicResource Theme_TextPrimary}"/>
                     <ComboBox x:Name="MethodCombo" Grid.Column="1" Height="24" SelectedIndex="1"
                               Background="{DynamicResource Theme_SurfaceBg}"
@@ -70,7 +70,7 @@
                         <ComboBoxItem Content="Deflate" Tag="Deflate"/>
                     </ComboBox>
                 </Grid>
-                <CheckBox x:Name="SolidCheck" Content="固实压缩" IsChecked="True"
+                <CheckBox x:Name="SolidCheck" Content="{l:L CompressOpt_Solid}" IsChecked="True"
                           Foreground="{DynamicResource Theme_TextPrimary}" Checked="SolidCheck_Changed" Unchecked="SolidCheck_Changed"/>
 
                 <Grid Margin="0,6,0,0">
@@ -78,13 +78,13 @@
                         <ColumnDefinition Width="80"/>
                         <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
-                    <TextBlock Grid.Column="0" Text="固实块大小:" VerticalAlignment="Center"
+                    <TextBlock Grid.Column="0" Text="{l:L CompressOpt_SolidBlockSize}" VerticalAlignment="Center"
                                Foreground="{DynamicResource Theme_TextPrimary}"/>
                     <ComboBox x:Name="SolidBlockSizeCombo" Grid.Column="1" Height="24"
                               Background="{DynamicResource Theme_SurfaceBg}"
                               Foreground="{DynamicResource Theme_TextPrimary}"
                               BorderBrush="{DynamicResource Theme_Border}">
-                        <ComboBoxItem Content="默认(全固实)" Tag=""/>
+                        <ComboBoxItem Content="{l:L CompressOpt_SolidBlockSize_Default}" Tag=""/>
                         <ComboBoxItem Content="16MB" Tag="16m"/>
                         <ComboBoxItem Content="32MB" Tag="32m"/>
                         <ComboBoxItem Content="64MB" Tag="64m"/>
@@ -102,12 +102,13 @@
                         <ColumnDefinition Width="80"/>
                         <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
-                    <TextBlock Grid.Column="0" Text="字典大小:" VerticalAlignment="Center"
+                    <TextBlock Grid.Column="0" Text="{l:L CompressOpt_DictionarySize}" VerticalAlignment="Center"
                                Foreground="{DynamicResource Theme_TextPrimary}"/>
-                    <ComboBox x:Name="DictSizeCombo" Grid.Column="1" Height="24" SelectedIndex="3"
+                    <ComboBox x:Name="DictSizeCombo" Grid.Column="1" Height="24" SelectedIndex="0"
                               Background="{DynamicResource Theme_SurfaceBg}"
                               Foreground="{DynamicResource Theme_TextPrimary}"
                               BorderBrush="{DynamicResource Theme_Border}">
+                        <ComboBoxItem Content="{l:L CompressOpt_DictSize_Default}" Tag="0"/>
                         <ComboBoxItem Content="16MB" Tag="16777216"/>
                         <ComboBoxItem Content="32MB" Tag="33554432"/>
                         <ComboBoxItem Content="64MB" Tag="67108864"/>
@@ -121,13 +122,13 @@
                         <ColumnDefinition Width="80"/>
                         <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
-                    <TextBlock Grid.Column="0" Text="单词大小:" VerticalAlignment="Center"
+                    <TextBlock Grid.Column="0" Text="{l:L CompressOpt_WordSize}" VerticalAlignment="Center"
                                Foreground="{DynamicResource Theme_TextPrimary}"/>
                     <ComboBox x:Name="WordSizeCombo" Grid.Column="1" Height="24" SelectedIndex="0"
                               Background="{DynamicResource Theme_SurfaceBg}"
                               Foreground="{DynamicResource Theme_TextPrimary}"
                               BorderBrush="{DynamicResource Theme_Border}">
-                        <ComboBoxItem Content="默认(273)" Tag="0"/>
+                        <ComboBoxItem Content="{l:L CompressOpt_WordSize_Default}" Tag="0"/>
                         <ComboBoxItem Content="32" Tag="32"/>
                         <ComboBoxItem Content="64" Tag="64"/>
                         <ComboBoxItem Content="128" Tag="128"/>
@@ -140,13 +141,13 @@
                         <ColumnDefinition Width="80"/>
                         <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
-                    <TextBlock Grid.Column="0" Text="匹配器:" VerticalAlignment="Center"
+                    <TextBlock Grid.Column="0" Text="{l:L CompressOpt_MatchFinder}" VerticalAlignment="Center"
                                Foreground="{DynamicResource Theme_TextPrimary}"/>
                     <ComboBox x:Name="MatchFinderCombo" Grid.Column="1" Height="24" SelectedIndex="0"
                               Background="{DynamicResource Theme_SurfaceBg}"
                               Foreground="{DynamicResource Theme_TextPrimary}"
                               BorderBrush="{DynamicResource Theme_Border}">
-                        <ComboBoxItem Content="默认(BT4)" Tag=""/>
+                        <ComboBoxItem Content="{l:L CompressOpt_MatchFinder_Default}" Tag=""/>
                         <ComboBoxItem Content="BT2" Tag="bt2"/>
                         <ComboBoxItem Content="BT3" Tag="bt3"/>
                         <ComboBoxItem Content="BT4" Tag="bt4"/>
@@ -156,7 +157,7 @@
 
             <!-- TAR.GZ placeholder panel -->
             <StackPanel x:Name="TarGzPanel" Visibility="Collapsed">
-                <TextBlock Text="TAR.GZ 无额外格式选项"
+                <TextBlock Text="{l:L CompressOpt_TarGzNoExtra}"
                            Foreground="{DynamicResource Theme_TextDisabled}"
                            FontStyle="Italic"
                            VerticalAlignment="Center"

@@ -799,6 +799,32 @@
   "Progress_Batch_Status_Skipped": "Skipped",
   "Progress_Batch_CompleteWithErrors": "Completed {0}, Failed {1}",
   "Progress_Batch_AllComplete": "All Complete",
-  "Progress_KeepOpen": "Keep open on complete"
+  "Progress_KeepOpen": "Keep open on complete",
+
+  "CompressOpt_ZipPanel": "ZIP Options",
+  "CompressOpt_FileNameEncoding": "Filename Encoding:",
+  "CompressOpt_KeepOriginal": "Keep Original",
+  "CompressOpt_CompressionMethod": "Compression Method:",
+  "CompressOpt_SevenZipPanel": "7z Options",
+  "CompressOpt_Solid": "Solid Compression",
+  "CompressOpt_SolidBlockSize": "Solid Block Size:",
+  "CompressOpt_SolidBlockSize_Default": "Default (Full Solid)",
+  "CompressOpt_DictionarySize": "Dictionary Size:",
+  "CompressOpt_DictSize_Default": "Default (16MB)",
+  "CompressOpt_WordSize": "Word Size:",
+  "CompressOpt_WordSize_Default": "Default (273)",
+  "CompressOpt_MatchFinder": "Match Finder:",
+  "CompressOpt_MatchFinder_Default": "Default (BT4)",
+  "CompressOpt_TarGzNoExtra": "TAR.GZ has no additional options",
+
+  "Settings_CompressOpt_SevenZipGroup": "7z Default Options",
+  "Settings_CompressOpt_ZipGroup": "ZIP Default Options",
+  "Settings_CompressOpt_CompressionMethod": "Compression Method:",
+  "Settings_CompressOpt_SolidBlockSize": "Solid Block Size:",
+  "Settings_CompressOpt_DictionarySize": "Dictionary Size:",
+  "Settings_CompressOpt_WordSize": "Word Size:",
+  "Settings_CompressOpt_MatchFinder": "Match Finder:",
+  "Settings_CompressOpt_EncryptionMethod": "Encryption Method:",
+  "Settings_CompressOpt_EncryptHeaders": "Encrypt Headers"
 }
 

@@ -817,5 +817,31 @@
   "Progress_Batch_Status_Skipped": "已跳过",
   "Progress_Batch_CompleteWithErrors": "已完成 {0} 项，失败 {1} 项",
   "Progress_Batch_AllComplete": "全部完成",
-  "Progress_KeepOpen": "完成后不关闭窗口"
+  "Progress_KeepOpen": "完成后不关闭窗口",
+
+  "CompressOpt_ZipPanel": "ZIP 选项",
+  "CompressOpt_FileNameEncoding": "文件名编码:",
+  "CompressOpt_KeepOriginal": "保留原始",
+  "CompressOpt_CompressionMethod": "压缩方法:",
+  "CompressOpt_SevenZipPanel": "7z 选项",
+  "CompressOpt_Solid": "固实压缩",
+  "CompressOpt_SolidBlockSize": "固实块大小:",
+  "CompressOpt_SolidBlockSize_Default": "默认(全固实)",
+  "CompressOpt_DictionarySize": "字典大小:",
+  "CompressOpt_DictSize_Default": "默认(16MB)",
+  "CompressOpt_WordSize": "单词大小:",
+  "CompressOpt_WordSize_Default": "默认(273)",
+  "CompressOpt_MatchFinder": "匹配器:",
+  "CompressOpt_MatchFinder_Default": "默认(BT4)",
+  "CompressOpt_TarGzNoExtra": "TAR.GZ 无额外格式选项",
+
+  "Settings_CompressOpt_SevenZipGroup": "7z 默认选项",
+  "Settings_CompressOpt_ZipGroup": "ZIP 默认选项",
+  "Settings_CompressOpt_CompressionMethod": "压缩方法:",
+  "Settings_CompressOpt_SolidBlockSize": "固实块大小:",
+  "Settings_CompressOpt_DictionarySize": "字典大小:",
+  "Settings_CompressOpt_WordSize": "单词大小:",
+  "Settings_CompressOpt_MatchFinder": "匹配器:",
+  "Settings_CompressOpt_EncryptionMethod": "加密方式:",
+  "Settings_CompressOpt_EncryptHeaders": "加密文件名（EncryptHeaders）"
 }

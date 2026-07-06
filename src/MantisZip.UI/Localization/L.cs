@@ -799,6 +799,34 @@ public const string Settings_Appearance_Theme                  = "Settings_Appea
     public const string ShellExt_ExtractTo                         = "ShellExt_ExtractTo";
     public const string ShellExt_Compress                          = "ShellExt_Compress";
 
+    // ─── Compress option panel ───
+    public const string CompressOpt_ZipPanel                          = "CompressOpt_ZipPanel";
+    public const string CompressOpt_FileNameEncoding                  = "CompressOpt_FileNameEncoding";
+    public const string CompressOpt_KeepOriginal                      = "CompressOpt_KeepOriginal";
+    public const string CompressOpt_CompressionMethod                 = "CompressOpt_CompressionMethod";
+    public const string CompressOpt_SevenZipPanel                     = "CompressOpt_SevenZipPanel";
+    public const string CompressOpt_Solid                             = "CompressOpt_Solid";
+    public const string CompressOpt_SolidBlockSize                    = "CompressOpt_SolidBlockSize";
+    public const string CompressOpt_SolidBlockSize_Default            = "CompressOpt_SolidBlockSize_Default";
+    public const string CompressOpt_DictionarySize                    = "CompressOpt_DictionarySize";
+    public const string CompressOpt_DictSize_Default                  = "CompressOpt_DictSize_Default";
+    public const string CompressOpt_WordSize                          = "CompressOpt_WordSize";
+    public const string CompressOpt_WordSize_Default                  = "CompressOpt_WordSize_Default";
+    public const string CompressOpt_MatchFinder                       = "CompressOpt_MatchFinder";
+    public const string CompressOpt_MatchFinder_Default               = "CompressOpt_MatchFinder_Default";
+    public const string CompressOpt_TarGzNoExtra                      = "CompressOpt_TarGzNoExtra";
+
+    // ─── Settings window — compression options ───
+    public const string Settings_CompressOpt_SevenZipGroup            = "Settings_CompressOpt_SevenZipGroup";
+    public const string Settings_CompressOpt_ZipGroup                 = "Settings_CompressOpt_ZipGroup";
+    public const string Settings_CompressOpt_CompressionMethod        = "Settings_CompressOpt_CompressionMethod";
+    public const string Settings_CompressOpt_SolidBlockSize           = "Settings_CompressOpt_SolidBlockSize";
+    public const string Settings_CompressOpt_DictionarySize           = "Settings_CompressOpt_DictionarySize";
+    public const string Settings_CompressOpt_WordSize                 = "Settings_CompressOpt_WordSize";
+    public const string Settings_CompressOpt_MatchFinder              = "Settings_CompressOpt_MatchFinder";
+    public const string Settings_CompressOpt_EncryptionMethod         = "Settings_CompressOpt_EncryptionMethod";
+    public const string Settings_CompressOpt_EncryptHeaders           = "Settings_CompressOpt_EncryptHeaders";
+
     /// <summary>Translate a key using LanguageManager.</summary>
     public static string T(string key) => LanguageManager.Instance[key];
 
