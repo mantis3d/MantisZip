@@ -726,6 +726,7 @@ public static class L
     public const string Settings_Menu_NotInstalled                 = "Settings_Menu_NotInstalled";
     public const string Settings_Menu_ShowIcons                    = "Settings_Menu_ShowIcons";
     public const string Settings_Menu_StatusDynamicActive          = "Settings_Menu_StatusDynamicActive";
+    public const string Settings_Menu_StatusDynamicPending         = "Settings_Menu_StatusDynamicPending";
     public const string Settings_Menu_StatusDynamicFallback        = "Settings_Menu_StatusDynamicFallback";
     public const string Settings_Menu_StatusGroup                  = "Settings_Menu_StatusGroup";
     public const string Settings_Menu_UninstallFailed              = "Settings_Menu_UninstallFailed";

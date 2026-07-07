@@ -195,6 +195,16 @@ public partial class App : Application
             TraceLog("OnStartup: first-run handling failed: {0}", firstRunEx.Message);
         }
 
+        // 检查 COM 动态菜单状态（如果 pending，检测 Explorer 是否已加载 comhost.dll）
+        try
+        {
+            ShellIntegration.CheckComStatus();
+        }
+        catch (Exception comCheckEx)
+        {
+            TraceLog("OnStartup: CheckComStatus failed: {0}", comCheckEx.Message);
+        }
+
         // ═══════ 全局异常捕获（诊断闪退用）═══════
         this.DispatcherUnhandledException += (s, e) =>
         {

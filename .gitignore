@@ -32,6 +32,7 @@ debug.log
 # Test
 TestResults/
 TestPreview/
+publish_test/
 
 # Packages
 packages/

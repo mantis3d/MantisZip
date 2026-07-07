@@ -50,26 +50,18 @@ internal static partial class ShellIntegration
 
         if (s.EnableDynamicMenu)
         {
-            // 安装 COM 动态菜单
+            // 安装 COM 动态菜单 + 同时安装静态级联菜单作为兜底
             if (!InstallCom())
             {
-                App.LogDebug("ShellIntegration.Install: COM not available, falling back to static cascade");
+                App.LogDebug("ShellIntegration.Install: COM not available, installing cascade only");
                 SetDynamicMenuStatus(DynamicMenuStatus_Disabled);
-                InstallCascade(s, exePath);
-            }
-            else if (!TestComActivation())
-            {
-                // COM 注册成功但实际激活失败 → 回退到静态菜单
-                App.LogDebug("ShellIntegration.Install: COM registration succeeded but activation failed (in-process), falling back to static cascade");
-                SetDynamicMenuStatus(DynamicMenuStatus_Fallback);
-                UninstallCom();
-                InstallCascade(s, exePath);
             }
             else
             {
-                App.LogDebug("ShellIntegration.Install: COM registration and activation successful");
-                SetDynamicMenuStatus(DynamicMenuStatus_Active);
+                App.LogDebug("ShellIntegration.Install: COM registered, status=pending (waiting for Explorer to load the component)");
+                SetDynamicMenuStatus(DynamicMenuStatus_Pending);
             }
+            InstallCascade(s, exePath);
         }
         else
         {
@@ -94,19 +86,30 @@ internal static partial class ShellIntegration
     public static void Uninstall()
     {
         App.LogDebug("ShellIntegration.Uninstall: starting");
+        UninstallStaticMenus();
+        UninstallCom();
+        DeleteRegistryKey(ContextMenuRegPath);
+        SHChangeNotify(SHCNE_ASSOCCHANGED, SHCNF_IDLIST, IntPtr.Zero, IntPtr.Zero);
+        App.LogDebug("ShellIntegration.Uninstall: done");
+    }
+
+    /// <summary>
+    /// 卸载所有静态菜单注册（层叠入口 + 独立动词），保留 COM 注册。
+    /// 当 COM 动态菜单激活时调用，避免两个菜单同时出现。
+    /// </summary>
+    private static void UninstallStaticMenus()
+    {
         // 层叠入口
         foreach (var target in new[] { "*", "Directory", @"Directory\Background" })
         {
             DeleteRegistryKey($@"Software\Classes\{target}\shell\{CascadeRoot}");
         }
-
         // 层叠子命令定义
         DeleteRegistryKey($@"Software\Classes\{CascadeRoot}");
 
         // 独立动词（含新旧动词名称全量，升级时清理旧版注册）
         foreach (var target in new[] { "*", "Directory", @"Directory\Background" })
         {
-            // 新名称
             DeleteRegistryKey($@"Software\Classes\{target}\shell\{OpenVerb}");
             DeleteRegistryKey($@"Software\Classes\{target}\shell\{ExtractHereVerb}");
             DeleteRegistryKey($@"Software\Classes\{target}\shell\{ExtractSmartVerb}");
@@ -115,35 +118,20 @@ internal static partial class ShellIntegration
             DeleteRegistryKey($@"Software\Classes\{target}\shell\{CompressSeparateVerb}");
             DeleteRegistryKey($@"Software\Classes\{target}\shell\{CompressCombinedVerb}");
             DeleteRegistryKey($@"Software\Classes\{target}\shell\{CompressVerb}");
-
-            // 菜单分隔线（独立动词模式）
             DeleteRegistryKey($@"Software\Classes\{target}\shell\00_MantisZipSepTop");
             DeleteRegistryKey($@"Software\Classes\{target}\shell\02a_MantisZipSep");
             DeleteRegistryKey($@"Software\Classes\{target}\shell\04a_MantisZipSep");
             DeleteRegistryKey($@"Software\Classes\{target}\shell\99_MantisZipSepBottom");
-
-            // 旧版动词名称（v0.1.3 及以前）
             DeleteRegistryKey($@"Software\Classes\{target}\shell\MantisZipOpen");
             DeleteRegistryKey($@"Software\Classes\{target}\shell\MantisZipExtract");
             DeleteRegistryKey($@"Software\Classes\{target}\shell\MantisZipQuick");
             DeleteRegistryKey($@"Software\Classes\{target}\shell\MantisZipCompress");
         }
-
-        // 清理 COM 组件注册
-        UninstallCom();
-
-        // 清理上下文菜单设置（防止 stale 状态残留）
-        DeleteRegistryKey(ContextMenuRegPath);
-
         // 旧版 per-extension 注册（v0.1.3 早期版本遗留）
         foreach (var ext in ArchiveExtensions)
         {
             DeleteRegistryKey($@"Software\Classes\{ext}\shell\MantisZipExtract");
         }
-        // 通知 Windows Shell 刷新上下文菜单缓存
-        SHChangeNotify(SHCNE_ASSOCCHANGED, SHCNF_IDLIST, IntPtr.Zero, IntPtr.Zero);
-
-        App.LogDebug("ShellIntegration.Uninstall: done");
     }
 
     #region COM 组件注册/反注册
@@ -491,30 +479,58 @@ internal static partial class ShellIntegration
     }
 
     /// <summary>
-    /// 通过 CoCreateInstance 实际验证 COM 组件能否激活。
-    /// 如果 comhost.dll 无法加载或 .NET 运行时不可用，返回 false。
+    /// 在应用启动时检查 Explorer 是否已经成功加载了 COM 组件。
+    /// 遍历所有 Explorer 进程的模块列表，查找 MantisZip.ShellExt.comhost.dll。
     /// </summary>
-    private static bool TestComActivation()
+    public static void CheckComStatus()
     {
+        var status = GetDynamicMenuStatus();
+        if (status != DynamicMenuStatus_Pending) return;
+
+        App.LogDebug("CheckComStatus: status=pending, scanning Explorer processes...");
+        bool found = false;
+        int explorerCount = 0;
         try
         {
-            var clsid = new Guid(ComClsid);
-            var iidUnknown = new Guid("00000000-0000-0000-C000-000000000046");
-            int hr = CoCreateInstance(ref clsid, IntPtr.Zero, 1 /*CLSCTX_INPROC_SERVER*/,
-                ref iidUnknown, out var ptr);
-            if (hr == 0 && ptr != IntPtr.Zero)
+            foreach (var proc in Process.GetProcessesByName("explorer"))
             {
-                Marshal.Release(ptr);
-                App.LogDebug("TestComActivation: CoCreateInstance succeeded");
-                return true;
+                explorerCount++;
+                try
+                {
+                    foreach (ProcessModule module in proc.Modules)
+                    {
+                        if (module.FileName.IndexOf("MantisZip.ShellExt.comhost.dll",
+                                StringComparison.OrdinalIgnoreCase) >= 0)
+                        {
+                            App.LogDebug("CheckComStatus: found comhost.dll loaded in Explorer PID={0}, promoting to active", proc.Id);
+                            found = true;
+                            break;
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    // Explorer 进程可能已退出，或某些模块无法访问
+                    App.LogDebug("CheckComStatus: failed to enumerate modules for PID={0}: {1}", proc.Id, ex.Message);
+                }
+                if (found) break;
             }
-            App.LogDebug("TestComActivation: CoCreateInstance failed with hr=0x{0:x8}", hr);
-            return false;
         }
         catch (Exception ex)
         {
-            App.LogDebug("TestComActivation: exception: {0}", ex.Message);
-            return false;
+            App.LogDebug("CheckComStatus: failed to enumerate Explorer processes: {0}", ex.Message);
+        }
+
+        if (found)
+        {
+            SetDynamicMenuStatus(DynamicMenuStatus_Active);
+            App.LogDebug("CheckComStatus: status changed to active, removing static cascade menus");
+            UninstallStaticMenus();
+            SHChangeNotify(SHCNE_ASSOCCHANGED, SHCNF_IDLIST, IntPtr.Zero, IntPtr.Zero);
+        }
+        else
+        {
+            App.LogDebug("CheckComStatus: comhost.dll not found in {0} Explorer process(es), staying pending", explorerCount);
         }
     }
 

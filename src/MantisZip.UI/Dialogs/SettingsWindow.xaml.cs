@@ -323,6 +323,7 @@ public partial class SettingsWindow : Window
             ShellStatusText.Text = dynStatus switch
             {
                 "active"     => L.T(L.Settings_Menu_StatusDynamicActive),
+                "pending"    => L.T(L.Settings_Menu_StatusDynamicPending),
                 "fallback"   => L.T(L.Settings_Menu_StatusDynamicFallback),
                 "disabled"   => L.T(L.Settings_Menu_Installed),
                 _            => L.T(L.Settings_Menu_Installed)

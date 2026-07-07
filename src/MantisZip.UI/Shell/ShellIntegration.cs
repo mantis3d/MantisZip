@@ -85,6 +85,7 @@ internal static partial class ShellIntegration
     public const string DynamicMenuStatus_Active = "active";
     public const string DynamicMenuStatus_Fallback = "fallback";
     public const string DynamicMenuStatus_Disabled = "disabled";
+    public const string DynamicMenuStatus_Pending = "pending";
 
     /// <summary>
     /// 返回动态菜单状态（active / fallback / disabled / not_installed）。
