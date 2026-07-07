@@ -1,5 +1,7 @@
 # About Window Redesign
 
+> **状态**: ✅ 已完成（v0.3.7-refined-4）| **阶段**: [████████████████████] (全部完成)
+
 ## TL;DR
 
 > **Quick Summary**: Replace the current primitive MessageBox-based "About" dialog with a proper WPF AboutWindow featuring 4 tabs (关于/作者/依赖库/致谢), following qBittorrent EE's dialog design.

@@ -15,7 +15,6 @@
 
 | 优先级 | 功能 | 设计文档 | 难度 | 预估工时 | 说明 |
 |--------|------|----------|:----:|:--------:|------|
-| **P0** | 压缩选项增强（7z/ZIP 参数扩展） | [compression-options-enhancement.md](.sisyphus/plans/compression-options-enhancement.md) | 🟢低 | 2-3h | 7z：固实块大小/字典/Word Size/匹配器/加密文件名；ZIP：压缩方法/加密方式 |
 | **P0** | 便携版模式 | [portable-mode.md](.sisyphus/plans/portable-mode.md) | 🟢低 | 1-2h | 哨兵文件触发，路径重定向到 exe 目录 |
 | **P1** | 统一路径快捷选择 (QuickPathControl → Avalonia) | [quickpath-unified.md](.sisyphus/plans/quickpath-unified.md) | 🟡中 | 4-6h | WPF 已完成数据层 + QuickPathControl 组件 + CompressSettingsWindow 嵌入；WPF 新增 QuickPathPreDialog 前置窗（系统对话框前先选路径）；Avalonia 阶段以 CustomFilePickerDialog + QuickPathBuddy 统一替换 |
 | **P1** | Win11 一级右键菜单 | [win11-first-level-menu.md](.sisyphus/plans/win11-first-level-menu.md) | 🔴高 | 1-2周 | IExplorerCommand 实现，HKLM 提权注册，双接口共存 |

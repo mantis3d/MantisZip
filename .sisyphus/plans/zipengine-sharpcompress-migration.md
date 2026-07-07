@@ -1,5 +1,7 @@
 # ZipEngine SharpZipLib → SharpCompress 迁移
 
+> **状态**: ✅ 已完成（v0.3.13）| **阶段**: [████████████████████] (全部完成)
+
 ## TL;DR
 
 > **Quick Summary**: 将 `ZipEngine.cs` 中剩余的 3 个方法从 SharpZipLib API 迁移到 SharpCompress，最大化减少 SharpZipLib 依赖。

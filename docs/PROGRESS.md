@@ -721,3 +721,7 @@
 | ZIP 压缩流直拷优化 (ZipBinaryRewriter) | [zip-copy-mode-optimization.md](.sisyphus/plans/zip-copy-mode-optimization.md) | v0.4.2 |
 | UAC 提权 + 权限不足处理 | [uac-elevation-permission.md](.sisyphus/plans/uac-elevation-permission.md) | v0.4.2 |
 | 自包含安装包发布 | [self-contained-installer.md](.sisyphus/plans/self-contained-installer.md) | v0.4.2 |
+| 压缩选项增强（7z/ZIP 参数扩展） | [compression-options-enhancement.md](.sisyphus/plans/compression-options-enhancement.md) | v0.4.5 |
+| 密码流程统一 (ResolvePasswordAsync) | [password-flow-unification.md](.sisyphus/plans/password-flow-unification.md) | v0.4.5+ |
+| 安装包 .NET 9 自动下载 | [installer-dotnet-autodownload.md](.sisyphus/plans/installer-dotnet-autodownload.md) | v0.4.3+ |
+| 贡献者鸣谢面板 | [contributors-panel.md](.sisyphus/plans/contributors-panel.md) | v0.4.3+ |
