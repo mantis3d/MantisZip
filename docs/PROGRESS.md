@@ -34,6 +34,38 @@
 2. 新建文件：`FileFormatDetector.cs`（650+ 行）、`FileFormatHelper.cs`（95 行）
 3. 修改文件：`FileFormatInfo.cs`（追加 11 枚举值）、`ArchiveEntryExtractor.cs`（+224 行）、`AppSettings.cs`、`ArchiveEngine.cs`（+60 行魔数兜底 + 映射）、`MainWindow.Preview.cs`（+180 行魔数路由 + 冲突切换）、`MainWindow.Preview.Text.cs`（文本左对齐修复）
 
+### v0.4.6 (2026-07-07) COM 动态菜单 + 进程名日志 + 安装包优化
+
+1. **COM 动态菜单组件** — `MantisZip.ShellExt` 实现 `IShellExtInit` + `IContextMenu` 作为 COM 组件
+   - 动态菜单文本（根据文件名生成「解压到 {name}」「压缩到 {name}.zip」）
+   - 纯 Win32 图标加载（无 `System.Drawing` 依赖）
+   - 多选文件数量显示（「打开压缩包 等 {N} 个文件」）
+   - 本地化菜单文本（通过注册表 + AppSettings 的 `L.T()`）
+   - 子母菜单模式（cascade/verb 两种注册方式）
+   - 单个菜单项开关（8 个独立 toggle）
+2. **COM 注册与安装流程** — `InstallCom()` + `TestComActivation()` + 回退逻辑
+   - 注册 COM CLSID + `shellex\ContextMenuHandlers`
+   - 安装时 CoCreateInstance 验证 COM 组件可激活
+   - 激活失败自动回退静态级联菜单
+   - 注册后 DIAG 日志（CLSID、InprocServer32、runtimeconfig.json、目录 DLL 清单）
+3. **动态菜单状态跟踪** — `DynamicMenuStatus`（Active/Fallback/Disabled）
+   - 安装时写入逗号分隔的注册表值
+   - `IsInstalled` 优先检查 COM CLSID
+   - 安装摘要日志记录状态
+4. **ShellExt 进程名日志** — `ContextMenuHandler` 构造函数记录宿主进程名（Explorer.exe 或其它）
+5. **安装包优化**：
+   - `installer.iss`：补充 `MantisZip.ShellExt.dll` 等 16 个必需 DLL 和 x64/x86 目录
+   - `installer-selfcontained.iss`：COM 组件 + WebView2 绿色版增强
+   - 安装程序路径从 `{autopf}\{#MyAppName}` 改为 `{autopf}\MantisZip`（兼容旧版）
+   - `.s\enable-com` 安装后自动执行标记
+6. **移除废弃代码**：删除已不再需要的 `TestComInExplorerContext()` 方法及相关分支
+7. **修改文件**:
+   - `src/MantisZip.ShellExt/ContextMenuHandler.cs` (+8 行进程名日志)
+   - `src/MantisZip.UI/Shell/ShellIntegration.Menu.cs` (+/- 整体重构：新增 InstallCom/TestComActivation/InstallCascade、动态菜单状态、DIAG 日志)
+   - `src/MantisZip.UI/Shell/ShellIntegration.cs` (IsInstalled COM 优先、status 读写)
+   - `src/MantisZip.UI/App.xaml.cs` (日志开关、首次安装写注册表)
+   - `installer.iss`, `installer-selfcontained.iss` (COM 组件部署)
+
 ### v0.4.5 (2026-07-03) 密码流程统一 + QuickVerify 7z 扩展
 
 1. **QuickVerifyPassword 扩展支持 7z EncryptHeaders=false** — 新增 `BoundedWriteStream`（写入 ~8KB 后静默丢弃），提取最小加密条目验证密码。所有格式的 QuickVerify 现在都可靠。

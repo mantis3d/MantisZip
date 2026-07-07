@@ -173,7 +173,13 @@ public class ContextMenuHandler : IShellExtInit, IContextMenu
     // ─── Constructor / finalizer ───
     public ContextMenuHandler()
     {
-        ShellExtLog.Info($"ContextMenuHandler #{_instanceId}: constructor");
+        // Log hosting process info for diagnostics — this is critical to determine
+        // whether Explorer (process name "explorer") or the MantisZip UI process is
+        // loading the COM component. If only the MantisZip UI PID appears here but
+        // never Explorer's, the shellex registration may not be picked up by Explorer.
+        string procName = "unknown";
+        try { procName = System.Diagnostics.Process.GetCurrentProcess().ProcessName; } catch { }
+        ShellExtLog.Info($"ContextMenuHandler #{_instanceId}: constructor, process=\"{procName}\"");
         // Preload icons eagerly so QueryContextMenu doesn't block Explorer's menu
         // thread on first right-click.  Only the first construction across all
         // instances actually loads (subsequent ones hit the static cache).

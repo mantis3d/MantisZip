@@ -351,14 +351,28 @@ end;
 
 // Check if WebView2 Runtime is already installed.
 // Checks multiple registry locations and confirms a version value exists (not just a key).
+// Also validates the WebView2Loader.dll file exists on disk to guard against
+// stale registry entries from aborted/corrupted installations.
 function IsWebView2Installed: Boolean;
 var
   version: string;
+  loaderPath: string;
 begin
   // NOTE: This installer is 32-bit. On 64-bit Windows, HKLM is
   // redirected to WOW6432Node — use HKLM64 for the native 64-bit view.
   Result := RegQueryStringValue(HKLM64, WebView2RegKey, 'pv', version) or
             RegQueryStringValue(HKCU, WebView2RegKey, 'pv', version);
+  if Result then
+  begin
+    // Double-check: registry key is present, but are the actual runtime files intact?
+    // WebView2 Runtime (x64) installs to {commonpf64}\Microsoft Edge WebView2 Runtime\
+    loaderPath := ExpandConstant('{commonpf64}') + '\Microsoft Edge WebView2 Runtime\WebView2Loader.dll';
+    if not FileExists(loaderPath) then
+    begin
+      Log('WebView2 registry key found but WebView2Loader.dll is missing at: ' + loaderPath + ' — treating as not installed');
+      Result := False;
+    end;
+  end;
 end;
 
 // Check if .NET 9 Desktop Runtime is already installed.
@@ -502,27 +516,22 @@ begin
     else
       Log('WebView2 Runtime is already installed.');
 
-    // 3. Register shell extensions and file associations.
-    // These run MantisZip.exe, which requires .NET 9, so they must happen
-    // AFTER the .NET registration wait above.
+    // 3. Shell integration deferred to first user launch (non-elevated context).
+    //    SHChangeNotify from an elevated (installer) process does NOT propagate
+    //    to the non-elevated Explorer.exe, so dynamic COM context menus appear
+    //    missing until reinstalled from MantisZip's Settings window.
+    //    Instead: write a FirstRun marker. MantisZip's App.OnStartup detects it
+    //    on the first normal (non-elevated) launch and calls ShellIntegration.Install()
+    //    — which includes SHChangeNotify from the correct integrity level.
     if InstallShellCheck.Checked then
     begin
-      Log('Registering context menu...');
-      if Exec(ExpandConstant('{app}\MantisZip.UI.exe'), '--install-shell', '',
-        SW_SHOW, ewNoWait, ResultCode) then
-        Log('Context menu registration initiated.')
-      else
-        Log('Failed to launch --install-shell.');
+      RegWriteStringValue(HKCU, 'Software\MantisZip', 'FirstRunShell', '1');
+      Log('FirstRunShell marker written (shell integration will install on first user launch)');
     end;
     if IsAnyAssocChecked then
     begin
-      Log('Registering file associations...');
-      if Exec(ExpandConstant('{app}\MantisZip.UI.exe'),
-        '--install-assoc ' + GetAssocParams(''),
-        '', SW_SHOW, ewNoWait, ResultCode) then
-        Log('File association registration initiated.')
-      else
-        Log('Failed to launch --install-assoc.');
+      RegWriteStringValue(HKCU, 'Software\MantisZip', 'FirstRunAssoc', '1');
+      Log('FirstRunAssoc marker written (file associations will register on first user launch)');
     end;
 
     SettingsDir := ExpandConstant('{localappdata}\MantisZip');

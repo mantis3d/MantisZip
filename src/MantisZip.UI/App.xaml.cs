@@ -160,6 +160,41 @@ public partial class App : Application
         LogStartup($"启动参数: {string.Join(" ", e.Args)}");
         TraceLog("OnStartup: after args log");
 
+        // ===== 首次运行：Shell 集成安装（延迟到用户进程，非提权）=====
+        // 安装程序以管理员权限运行时，SHChangeNotify 无法传播到非提权的
+        // Explorer.exe，导致动态右键菜单不显示。安装程序改为写入 FirstRun
+        // 标记，由首次用户级启动时在这里安装 Shell 集成，
+        // 确保 SHChangeNotify 来自正确的完整性级别。
+        try
+        {
+            using var firstRunKey = Registry.CurrentUser.OpenSubKey(
+                @"Software\MantisZip", writable: true);
+            if (firstRunKey != null)
+            {
+                var firstRunShell = firstRunKey.GetValue("FirstRunShell") as string;
+                if (firstRunShell == "1")
+                {
+                    TraceLog("OnStartup: FirstRunShell marker found, installing shell integration...");
+                    ShellIntegration.Install();
+                    firstRunKey.DeleteValue("FirstRunShell");
+                    TraceLog("OnStartup: first-run shell integration installed");
+                }
+
+                var firstRunAssoc = firstRunKey.GetValue("FirstRunAssoc") as string;
+                if (firstRunAssoc == "1")
+                {
+                    TraceLog("OnStartup: FirstRunAssoc marker found, registering file associations...");
+                    ShellIntegration.InstallAssociations();
+                    firstRunKey.DeleteValue("FirstRunAssoc");
+                    TraceLog("OnStartup: first-run file associations registered");
+                }
+            }
+        }
+        catch (Exception firstRunEx)
+        {
+            TraceLog("OnStartup: first-run handling failed: {0}", firstRunEx.Message);
+        }
+
         // ═══════ 全局异常捕获（诊断闪退用）═══════
         this.DispatcherUnhandledException += (s, e) =>
         {

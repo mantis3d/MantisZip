@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.IO;
 using System.Runtime.InteropServices;
 using Microsoft.Win32;
@@ -59,7 +60,7 @@ internal static partial class ShellIntegration
             else if (!TestComActivation())
             {
                 // COM 注册成功但实际激活失败 → 回退到静态菜单
-                App.LogDebug("ShellIntegration.Install: COM registration succeeded but activation failed, falling back to static cascade");
+                App.LogDebug("ShellIntegration.Install: COM registration succeeded but activation failed (in-process), falling back to static cascade");
                 SetDynamicMenuStatus(DynamicMenuStatus_Fallback);
                 UninstallCom();
                 InstallCascade(s, exePath);
@@ -80,7 +81,11 @@ internal static partial class ShellIntegration
 
         // 通知 Windows Shell 刷新上下文菜单缓存
         SHChangeNotify(SHCNE_ASSOCCHANGED, SHCNF_IDLIST, IntPtr.Zero, IntPtr.Zero);
-        App.LogDebug("ShellIntegration.Install: done, exePath={0}", exePath);
+
+        // ── Install summary ──
+        var dynStatus = GetDynamicMenuStatus();
+        App.LogDebug("ShellIntegration.Install: done — dynStatus={0}, installed={1}, exePath={2}",
+            dynStatus, IsInstalled, exePath);
     }
 
     /// <summary>
@@ -191,6 +196,67 @@ internal static partial class ShellIntegration
             }
 
             App.LogDebug("InstallCom: COM registration successful");
+
+            // ── Diagnostics: log all registry keys and verify file paths ──
+            App.LogDebug("InstallCom: DIAG — CLSID=\"{0}\"", ComClsid);
+            App.LogDebug("InstallCom: DIAG — InprocServer32=\"{0}\"", comhostPath);
+            App.LogDebug("InstallCom: DIAG — InprocServer32 exists={0}", File.Exists(comhostPath));
+
+            // Verify runtimeconfig.json next to comhost.dll (required for .NET COM hosting)
+            var comhostDir = Path.GetDirectoryName(comhostPath);
+            var runtimeConfig = comhostDir != null
+                ? Path.Combine(comhostDir, "MantisZip.ShellExt.runtimeconfig.json")
+                : null;
+            if (runtimeConfig != null)
+                App.LogDebug("InstallCom: DIAG — runtimeconfig.json exists={0}", File.Exists(runtimeConfig));
+
+            // Log all shellex handler keys
+            foreach (var target in new[] { "*", "Directory", @"Directory\Background" })
+            {
+                var handlerKey = $@"Software\Classes\{target}\shellex\ContextMenuHandlers\{ComHandlerKey}";
+                string? actualValue = null;
+                try
+                {
+                    using var key = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(
+                        $@"Software\Classes\{target}\shellex\ContextMenuHandlers\{ComHandlerKey}");
+                    actualValue = key?.GetValue(null) as string;
+                }
+                catch { }
+                App.LogDebug("InstallCom: DIAG — HKCU\\{0} = \"{1}\"", handlerKey, actualValue ?? "(null)");
+            }
+
+            // Log program directory listing for dependency verification
+            var baseDirForLog = Path.GetDirectoryName(GetExePath());
+            if (baseDirForLog != null)
+            {
+                try
+                {
+                    var allDlls = Directory.GetFiles(baseDirForLog, "*.dll");
+                    App.LogDebug("InstallCom: DIAG — App directory has {0} DLL(s)", allDlls.Length);
+                    // Log key DLLs
+                    var keyDlls = new[] {
+                        "MantisZip.ShellExt.dll", "MantisZip.ShellExt.comhost.dll",
+                        "MantisZip.Core.dll", "SharpCompress.dll", "SharpSevenZip.dll"
+                    };
+                    foreach (var dll in keyDlls)
+                    {
+                        var dllPath = Path.Combine(baseDirForLog, dll);
+                        App.LogDebug("InstallCom: DIAG — {0} exists={1} size={2}",
+                            dll, File.Exists(dllPath),
+                            File.Exists(dllPath) ? new FileInfo(dllPath).Length : 0);
+                    }
+                    // Check 7z.dll in x64 subdirectory
+                    var sevenZ64 = Path.Combine(baseDirForLog, "x64", "7z.dll");
+                    var sevenZ86 = Path.Combine(baseDirForLog, "x86", "7z.dll");
+                    App.LogDebug("InstallCom: DIAG — x64\\7z.dll exists={0}", File.Exists(sevenZ64));
+                    App.LogDebug("InstallCom: DIAG — x86\\7z.dll exists={0}", File.Exists(sevenZ86));
+                }
+                catch (Exception ex)
+                {
+                    App.LogDebug("InstallCom: DIAG — directory listing error: {0}", ex.Message);
+                }
+            }
+
             WriteMenuTextToRegistry();
             return true;
         }
