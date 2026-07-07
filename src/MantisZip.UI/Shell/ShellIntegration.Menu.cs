@@ -50,18 +50,19 @@ internal static partial class ShellIntegration
 
         if (s.EnableDynamicMenu)
         {
-            // 安装 COM 动态菜单 + 同时安装静态级联菜单作为兜底
             if (!InstallCom())
             {
                 App.LogDebug("ShellIntegration.Install: COM not available, installing cascade only");
                 SetDynamicMenuStatus(DynamicMenuStatus_Disabled);
+                InstallCascade(s, exePath);
             }
             else
             {
-                App.LogDebug("ShellIntegration.Install: COM registered, status=pending (waiting for Explorer to load the component)");
+                // 仅注册 COM，不安装级联菜单（避免两个菜单同时出现）。
+                // 级联菜单会在 CheckComStatus() 发现 COM 尚未被 Explorer 加载时自动安装。
+                App.LogDebug("ShellIntegration.Install: COM registered, status=pending (cascade will be installed if COM not loaded in Explorer)");
                 SetDynamicMenuStatus(DynamicMenuStatus_Pending);
             }
-            InstallCascade(s, exePath);
         }
         else
         {
@@ -530,7 +531,11 @@ internal static partial class ShellIntegration
         }
         else
         {
-            App.LogDebug("CheckComStatus: comhost.dll not found in {0} Explorer process(es), staying pending", explorerCount);
+            // COM 尚未被 Explorer 加载 → 安装级联菜单作为兜底，确保右键菜单可用
+            App.LogDebug("CheckComStatus: comhost.dll not found in {0} Explorer process(es), installing cascade as fallback", explorerCount);
+            var s = AppSettings.Instance;
+            InstallCascade(s, GetExePath());
+            SHChangeNotify(SHCNE_ASSOCCHANGED, SHCNF_IDLIST, IntPtr.Zero, IntPtr.Zero);
         }
     }
 

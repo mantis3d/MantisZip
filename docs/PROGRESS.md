@@ -34,7 +34,7 @@
 2. 新建文件：`FileFormatDetector.cs`（650+ 行）、`FileFormatHelper.cs`（95 行）
 3. 修改文件：`FileFormatInfo.cs`（追加 11 枚举值）、`ArchiveEntryExtractor.cs`（+224 行）、`AppSettings.cs`、`ArchiveEngine.cs`（+60 行魔数兜底 + 映射）、`MainWindow.Preview.cs`（+180 行魔数路由 + 冲突切换）、`MainWindow.Preview.Text.cs`（文本左对齐修复）
 
-### v0.4.6 (2026-07-07) COM 动态菜单 + pending 状态 + 共存设计
+### v0.4.6 (2026-07-07) COM 动态菜单 + pending 状态 + 延迟级联安装
 
 1. **COM 动态菜单组件** — `MantisZip.ShellExt` 实现 `IShellExtInit` + `IContextMenu` 作为 COM 组件
    - 动态菜单文本（根据文件名生成「解压到 {name}」「压缩到 {name}.zip」）
@@ -43,27 +43,26 @@
    - 本地化菜单文本（通过注册表 + AppSettings 的 `L.T()`）
    - 子母菜单模式（cascade/verb 两种注册方式）
    - 单个菜单项开关（8 个独立 toggle）
-2. **COM 共存安装流程** — Install 时同时注册 COM + 静态级联菜单
-   - COM 注册成功 → 状态 `pending`（等待 Explorer 加载 COM）
-   - COM 注册失败 → 状态 `disabled`（仅静态级联菜单）
-   - 始终安装静态级联菜单作为兜底
-   - 注册后 DIAG 日志（CLSID、InprocServer32、runtimeconfig.json、目录 DLL 清单）
+2. **COM + 延迟级联安装流程** — Install 仅注册 COM，级联菜单在检测到 COM 未加载时自动安装
+   - COM 注册成功 → 状态 `pending`（仅 COM shellex，无 cascade）
+   - COM DLL 不存在 → 状态 `disabled`（安装 cascade 兜底）
+   - 启动时 `CheckComStatus()` 扫 Explorer 模块 → 未加载 comhost.dll 则安装 cascade
+   - Settings 安装按钮和首次运行流程均立即调用 CheckComStatus，确保菜单立即可用
+   - 避免安装时同时注册两个菜单导致右键出现重复菜单
 3. **动态菜单状态跟踪** — `DynamicMenuStatus`（Active/Pending/Fallback/Disabled）
-   - `CheckComStatus()` — 启动时扫描 Explorer 进程模块列表，查找 comhost.dll
-   - 找到 → 状态升级 `active`，并自动清理静态级联菜单注册（`UninstallStaticMenus()`）
-   - 未找到 → 保持 `pending`
-4. **UI 状态提示** — Settings 窗口显示状态文字：pending→"等待 Explorer 加载"、active→"动态菜单已启用"
-5. **ShellExt 进程名日志** — `ContextMenuHandler` 构造函数记录宿主进程名（Explorer.exe 或其它）
-6. **移除废弃代码**：`TestComInExplorerContext()`、`TestComActivation()`、三级回退分支
-7. **修改文件**:
+   - `CheckComStatus()` 找到 comhost.dll → 升级 `active` + `UninstallStaticMenus()` 清理级联
+   - 未找到 → 安装 cascade 兜底，状态保持 `pending`
+   - 状态文字：pending→"动态菜单加载失败，暂时回退到静态菜单"、active→"动态菜单已启用"
+4. **ShellExt 进程名日志** — `ContextMenuHandler` 构造函数记录宿主进程名（Explorer.exe 或其它）
+5. **移除废弃代码**：`TestComInExplorerContext()`、`TestComActivation()`、三级回退分支
+6. **修改文件**:
    - `src/MantisZip.ShellExt/ContextMenuHandler.cs` (+8 行进程名日志)
-   - `src/MantisZip.UI/Shell/ShellIntegration.Menu.cs` (+/-：Install 共存设计、CheckComStatus、UninstallStaticMenus、删除 TestComActivation/TestComInExplorerContext)
+   - `src/MantisZip.UI/Shell/ShellIntegration.Menu.cs` (+/-：Install 延迟级联、CheckComStatus、UninstallStaticMenus、删除 TestComActivation/TestComInExplorerContext)
    - `src/MantisZip.UI/Shell/ShellIntegration.cs` (新增 DynamicMenuStatus_Pending)
    - `src/MantisZip.UI/App.xaml.cs` (启动时调用 CheckComStatus)
-   - `src/MantisZip.UI/Dialogs/SettingsWindow.xaml.cs` (UpdateShellStatus 增加 pending 分支)
+   - `src/MantisZip.UI/Dialogs/SettingsWindow.xaml.cs` (UpdateShellStatus pending 分支 + InstallBtn 调用 CheckComStatus)
    - `src/MantisZip.UI/Localization/L.cs` (新增 Settings_Menu_StatusDynamicPending)
-   - `src/MantisZip.UI/Resources/strings.zh.json` / `strings.en.json` (新增 pending 状态文本)
-   - `installer.iss`, `installer-selfcontained.iss` (COM 组件部署)
+   - `src/MantisZip.UI/Resources/strings.zh.json` / `strings.en.json` (pending 状态文本)
 
 ### v0.4.5 (2026-07-03) 密码流程统一 + QuickVerify 7z 扩展
 

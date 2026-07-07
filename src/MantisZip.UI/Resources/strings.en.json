@@ -673,7 +673,7 @@
   "Settings_Menu_NotInstalled": "鉂?Shell context menu not installed",
 "Settings_Menu_ShowIcons": "Show icons in context menu",
 "Settings_Menu_StatusDynamicActive": "✅ Dynamic menu active",
-"Settings_Menu_StatusDynamicPending": "⏳ Dynamic menu registered, waiting for Explorer to load",
+"Settings_Menu_StatusDynamicPending": "⚠️ Dynamic menu failed, temporarily using static fallback",
 "Settings_Menu_StatusDynamicFallback": "⚠️ Dynamic menu failed, using static fallback",
 "Settings_Menu_StatusGroup": "Status",
   "Settings_Menu_UninstallFailed": "Uninstall failed: {0}",

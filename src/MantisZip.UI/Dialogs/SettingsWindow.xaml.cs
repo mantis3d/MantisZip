@@ -347,6 +347,9 @@ public partial class SettingsWindow : Window
             SaveSettings();
             ShellIntegration.Uninstall();
             ShellIntegration.Install();
+            // 安装后立即检查 COM 状态：如果 COM 尚未被 Explorer 加载，
+            // CheckComStatus 会自动安装级联菜单作为兜底。
+            ShellIntegration.CheckComStatus();
             UpdateShellStatus();
             App.LogDebug("SettingsWindow: shell context menu installed");
             AppMessageBox.Show(L.T(L.Settings_Menu_InstalledMsg), L.T(L.App_MantisZipTitle), MessageBoxButton.OK, MessageBoxImage.Information);
