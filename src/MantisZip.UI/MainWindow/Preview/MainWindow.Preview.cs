@@ -351,6 +351,33 @@ public partial class MainWindow
                 }
             }
 
+            // Text 兜底时检查扩展名：如果扩展名指向已知的非纯文本格式，用扩展名结果
+            if (detectedFormat == FileFormat.Text)
+            {
+                var origExt = Path.GetExtension(item.Name);
+                var extFormat = FileFormatDetector.DetectByExtension(origExt);
+                if (extFormat != FileFormat.Unknown && extFormat != FileFormat.Text)
+                {
+                    detectedFormat = extFormat;
+                    realFormatName = FileFormatHelper.GetDisplayName(extFormat);
+                    App.LogDebug("TextSubtype fallback: using extension {0} -> {1}", origExt, detectedFormat);
+                }
+            }
+
+            // Zip 子类型兜底：魔数只检测到通用 Zip，但扩展名指向已知的 ZIP 子类型格式
+            if (detectedFormat == FileFormat.Zip)
+            {
+                var origExt = Path.GetExtension(item.Name);
+                var extFormat = FileFormatDetector.DetectByExtension(origExt);
+                if (extFormat is FileFormat.Docx or FileFormat.Xlsx or FileFormat.Pptx
+                    or FileFormat.Epub or FileFormat.Odt or FileFormat.Ods or FileFormat.Odp)
+                {
+                    detectedFormat = extFormat;
+                    realFormatName = FileFormatHelper.GetDisplayName(extFormat) + "（ZIP 子类型）";
+                    App.LogDebug("Zip subtype override: detected Zip but extension {0} -> {1}", origExt, detectedFormat);
+                }
+            }
+
             // 各格式方法控制自己的标题，魔数结果放到信息栏
             PreviewHeader.Text = $"📄 {item.Name}";
 

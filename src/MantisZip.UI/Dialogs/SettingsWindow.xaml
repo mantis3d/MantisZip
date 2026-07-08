@@ -292,6 +292,23 @@
                         <CheckBox x:Name="OpenFolderCheck" Content="{l:L Settings_Extract_OpenFolderAfter}" Margin="0,16,0,0"/>
                         <CheckBox x:Name="EnableDragExtractCheck" Content="{l:L Settings_Extract_EnableDragExtract}" Margin="0,8,0,0"/>
                         <CheckBox x:Name="ExtractPreservePathCheck" Content="{l:L Settings_Extract_PreserveFullPath}" Margin="0,8,0,0"/>
+
+                        <Border BorderBrush="{DynamicResource Theme_BorderLight}" BorderThickness="1" CornerRadius="4" Padding="8" Margin="0,12,0,0"
+                                Background="{DynamicResource Theme_SurfaceBg}">
+                            <StackPanel>
+                                <TextBlock Text="{l:L Settings_Extract_DoubleClickOpenThreshold}" FontWeight="SemiBold" Margin="0,0,0,8"
+                                           Foreground="{DynamicResource Theme_TextPrimary}"/>
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBox x:Name="DoubleClickThresholdBox" Width="80" Height="22" VerticalAlignment="Center"
+                                             Background="{DynamicResource Theme_WindowBg}"
+                                             Foreground="{DynamicResource Theme_TextPrimary}"
+                                             BorderBrush="{DynamicResource Theme_Border}"
+                                             PreviewTextInput="IntInput_PreviewTextInput"
+                                             TextChanged="DoubleClickThresholdBox_TextChanged"/>
+                                    <TextBlock Text="MB" FontSize="12" Foreground="{DynamicResource Theme_TextSecondary}" VerticalAlignment="Center" Margin="6,0,0,0"/>
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
                     </StackPanel>
                 </ScrollViewer>
             </TabItem>

@@ -94,6 +94,10 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "ISCC compilation failed (exit code: $LASTEXITCODE)" }
           Write-Host "Installer built successfully"
 
+      - name: Download WebView2 Runtime (for offline installer)
+        shell: pwsh
+        run: installer\download-redist.ps1
+
       - name: Build self-contained installer
         shell: pwsh
         run: |

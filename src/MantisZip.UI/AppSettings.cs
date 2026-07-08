@@ -32,6 +32,8 @@ public class AppSettings
     public string ExtractDestination { get; set; } = "ask"; // same-dir / desktop / last / ask
     public string FileConflictAction { get; set; } = "ask"; // overwrite / rename / skip / ask
     public bool OpenFolderAfterExtract { get; set; } = false;
+    /// <summary>双击文件打开阈值（字节），超过此大小弹出确认框。0 = 禁用双击打开。</summary>
+    public long DoubleClickOpenThreshold { get; set; } = 10 * 1024 * 1024; // 默认 10 MB
 
     // ===== 上下文菜单 / 文件关联 =====
     public bool EnableCompressMenu { get; set; } = true;

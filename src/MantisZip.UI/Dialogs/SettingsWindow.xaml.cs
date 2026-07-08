@@ -116,6 +116,7 @@ public partial class SettingsWindow : Window
         OpenFolderCheck.IsChecked = s.OpenFolderAfterExtract;
         EnableDragExtractCheck.IsChecked = s.EnableDragExtract;
         ExtractPreservePathCheck.IsChecked = s.ExtractPreserveFullPath;
+        DoubleClickThresholdBox.Text = (s.DoubleClickOpenThreshold / (1024 * 1024)).ToString();
 
         // 上下文菜单
         EnableCompressCheck.IsChecked = s.EnableCompressMenu;
@@ -245,6 +246,8 @@ public partial class SettingsWindow : Window
         s.OpenFolderAfterExtract = OpenFolderCheck.IsChecked == true;
         s.EnableDragExtract = EnableDragExtractCheck.IsChecked == true;
         s.ExtractPreserveFullPath = ExtractPreservePathCheck.IsChecked == true;
+        s.DoubleClickOpenThreshold = long.TryParse(DoubleClickThresholdBox.Text, out var threshold)
+            ? threshold * 1024 * 1024 : 10 * 1024 * 1024;
 
         s.EnableCompressMenu = EnableCompressCheck.IsChecked == true;
         s.EnableCompressSeparate = EnableCompressSeparateCheck.IsChecked == true;
@@ -334,9 +337,22 @@ public partial class SettingsWindow : Window
     private void UpdateShellStatus()
     {
         var installed = ShellIntegration.IsInstalled;
-        ShellStatusText.Text = installed
-            ? L.T(L.Settings_Menu_Installed)
-            : L.T(L.Settings_Menu_NotInstalled);
+        if (installed)
+        {
+            var dynStatus = ShellIntegration.GetDynamicMenuStatus();
+            ShellStatusText.Text = dynStatus switch
+            {
+                "active"     => L.T(L.Settings_Menu_StatusDynamicActive),
+                "pending"    => L.T(L.Settings_Menu_StatusDynamicPending),
+                "fallback"   => L.T(L.Settings_Menu_StatusDynamicFallback),
+                "disabled"   => L.T(L.Settings_Menu_Installed),
+                _            => L.T(L.Settings_Menu_Installed)
+            };
+        }
+        else
+        {
+            ShellStatusText.Text = L.T(L.Settings_Menu_NotInstalled);
+        }
         InstallBtn.IsEnabled = !installed;
         UninstallBtn.IsEnabled = installed;
         // 应用按钮的状态由 OnChanged 事件单独管理
@@ -351,6 +367,9 @@ public partial class SettingsWindow : Window
             SaveSettings();
             ShellIntegration.Uninstall();
             ShellIntegration.Install();
+            // 安装后立即检查 COM 状态：如果 COM 尚未被 Explorer 加载，
+            // CheckComStatus 会自动安装级联菜单作为兜底。
+            ShellIntegration.CheckComStatus();
             UpdateShellStatus();
             App.LogDebug("SettingsWindow: shell context menu installed");
             AppMessageBox.Show(L.T(L.Settings_Menu_InstalledMsg), L.T(L.App_MantisZipTitle), MessageBoxButton.OK, MessageBoxImage.Information);
@@ -396,6 +415,14 @@ public partial class SettingsWindow : Window
         foreach (var c in e.Text)
         {
             if (!char.IsDigit(c)) { e.Handled = true; return; }
+        }
+    }
+
+    private void DoubleClickThresholdBox_TextChanged(object sender, System.Windows.Controls.TextChangedEventArgs e)
+    {
+        if (int.TryParse(DoubleClickThresholdBox.Text, out var val))
+        {
+            if (val < 0) { DoubleClickThresholdBox.Text = "0"; }
         }
     }
 
