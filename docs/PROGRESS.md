@@ -58,6 +58,15 @@
    - `src/MantisZip.UI/Localization/L.cs` (新增 Settings_Menu_StatusDynamicPending)
    - `src/MantisZip.UI/Resources/strings.zh.json` / `strings.en.json` (pending 状态文本)
 
+### v0.4.4+ (2026-07-08) AddToArchiveAsync 加密条目预检 — CI 环境下预期异常修复
+
+1. **修复 CI 测试失败** `AddToArchiveAsync_CopyMode_ThrowsOnEncryptedSource`：该测试依赖 SharpCompress 在解压加密条目时抛出 `CryptographicException`，但此行为随环境和版本变化，CI 环境下不会抛出。
+2. **ZipEngine.AddToArchiveAsync 旧路径**：
+   - 传入 `options.Password` 给 `OpenArchiveWithEncodingFallback`，使带密码时能正确解压加密条目。
+   - 新增显式预检：遍历 `archive.Entries` 检查是否有非目录加密条目但未提供密码 → 提前抛出 `InvalidOperationException`。
+3. **测试更新**：改为预期 `InvalidOperationException`（确定性异常，不依赖 SharpCompress 的环境特定行为）。移除未使用的 `using SharpCompress.Common`。
+4. **修改文件**：`src/MantisZip.Core/Engines/ZipEngine.cs`、`tests/MantisZip.Tests/Utils/ZipBinaryRewriterTests.cs`
+
 ### v0.4.4+ (2026-07-03) 双击文件默认程序打开 + 上级目录预览刷新修复
 
 1. **新功能：双击文件调用系统默认程序打开** — 在 `FileListGrid_PreviewMouseDoubleClick` 中添加文件双击处理分支：
