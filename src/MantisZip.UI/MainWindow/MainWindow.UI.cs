@@ -1,5 +1,7 @@
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.Diagnostics;
+using System.IO;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
@@ -745,13 +747,117 @@ public partial class MainWindow
         SizeMaxUnit.SelectedIndex = 0; // B
     }
 
-    private void FileListGrid_PreviewMouseDoubleClick(object sender, MouseButtonEventArgs e)
+    private async void FileListGrid_PreviewMouseDoubleClick(object sender, MouseButtonEventArgs e)
     {
-        if (FileListGrid.SelectedItem is ArchiveItem item && item.IsDirectory)
+        if (FileListGrid.SelectedItem is not ArchiveItem item) return;
+
+        if (item.IsDirectory)
         {
             FilterFiles(item.FullPath);
             SelectFolderInTree(item.FullPath);
             e.Handled = true;
+            return;
+        }
+
+        // 导航条目不处理
+        if (item.IsNavigationEntry) return;
+
+        // 文件双击：提取到临时目录并用系统默认方式打开
+        if (!string.IsNullOrEmpty(_currentArchivePath))
+            await DoubleClickOpenFileAsync(item);
+    }
+
+    /// <summary>
+    /// 双击文件时提取到临时目录并用系统默认程序打开。
+    /// </summary>
+    private async Task DoubleClickOpenFileAsync(ArchiveItem item)
+    {
+        var threshold = AppSettings.Instance.DoubleClickOpenThreshold;
+
+        // 功能禁用（阈值为 0）
+        if (threshold <= 0) return;
+
+        // 检查格式是否支持单项提取（Tar/GZip/ISO 不支持）
+        if (_currentFormat is ArchiveFormat.Tar or ArchiveFormat.GZip or ArchiveFormat.Iso)
+        {
+            AppMessageBox.Show(L.T(L.Main_DoubleClickFormatNotSupported),
+                L.T(L.App_ErrorTitle), MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        // 检查密码
+        if (_hasEncryptedArchive && string.IsNullOrEmpty(_currentPassword))
+        {
+            AppMessageBox.Show(L.T(L.Main_DoubleClickPasswordNeeded),
+                L.T(L.App_ErrorTitle), MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        // 超过阈值时弹出确认框
+        if (item.Size > threshold)
+        {
+            var sizeStr = ArchiveItem.FormatSize(item.Size);
+            var result = AppMessageBox.Show(
+                L.TF(L.Main_DoubleClickOpenConfirm, sizeStr),
+                L.T(L.App_ConfirmTitle), MessageBoxButton.YesNo, MessageBoxImage.Question);
+            if (result != MessageBoxResult.Yes) return;
+        }
+
+        // 临时目录（独立于预览临时目录，避免被 ClearPreviewTemp 清理）
+        var tempDir = Path.Combine(Path.GetTempPath(), L.T(L.App_MantisZipTitle), "OpenWith", Guid.NewGuid().ToString());
+        Directory.CreateDirectory(tempDir);
+        var tempFile = Path.Combine(tempDir, item.Name);
+
+        // 大文件显示进度窗口（>= 1MB）
+        ProgressWindow? pw = null;
+        CancellationToken ct = CancellationToken.None;
+        if (item.Size >= 1024 * 1024)
+        {
+            pw = new ProgressWindow();
+            pw.InitCancellation();
+            pw.Show();
+            pw.SetProgress(0, L.TF(L.Main_Status_Extracting, item.Name));
+            ct = pw.CancellationToken;
+        }
+
+        try
+        {
+            App.LogDebug("DoubleClickOpenFileAsync: extracting '{0}' ({1}) from '{2}'",
+                item.FullPath, ArchiveItem.FormatSize(item.Size), _currentArchivePath);
+
+            await ArchiveEntryExtractor.ExtractEntryAsync(
+                _currentArchivePath!, item.FullPath, tempFile, _currentFormat, _currentPassword, ct);
+
+            ct.ThrowIfCancellationRequested();
+
+            App.LogDebug("DoubleClickOpenFileAsync: extracted to '{0}', opening with default app", tempFile);
+
+            // 用系统默认程序打开
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = tempFile,
+                UseShellExecute = true
+            });
+
+            SetStatus(L.TF(L.Main_Status_DoubleClickOpened, item.Name));
+        }
+        catch (OperationCanceledException)
+        {
+            App.LogDebug("DoubleClickOpenFileAsync: cancelled by user");
+            try { if (Directory.Exists(tempDir)) Directory.Delete(tempDir, recursive: true); }
+            catch { }
+        }
+        catch (Exception ex)
+        {
+            App.LogDebug("DoubleClickOpenFileAsync: failed: {0}", ex.Message);
+            AppMessageBox.Show(L.TF(L.Main_Status_ExtractFailed, ex.Message),
+                L.T(L.App_ErrorTitle), MessageBoxButton.OK, MessageBoxImage.Error);
+            try { if (Directory.Exists(tempDir)) Directory.Delete(tempDir, recursive: true); }
+            catch { }
+        }
+        finally
+        {
+            pw?.Close();
         }
     }
 
@@ -775,7 +881,7 @@ public partial class MainWindow
                 ? e.AddedItems[e.AddedItems.Count - 1] as ArchiveItem
                 : e.RemovedItems.Count == 1 ? e.RemovedItems[0] as ArchiveItem : null;
 
-            if (lastClicked != null && !lastClicked.IsNavigationEntry && !string.IsNullOrEmpty(_currentArchivePath))
+            if (lastClicked != null && !string.IsNullOrEmpty(_currentArchivePath))
             {
                 if (lastClicked.IsDirectory) ShowDirectoryPreview(lastClicked);
                 else

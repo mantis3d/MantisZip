@@ -3,7 +3,8 @@ bin/
 obj/
 out/
 publish_output*/
-installer/
+installer/*
+!installer/download-redist.ps1
 
 
 # IDE
@@ -31,6 +32,8 @@ debug.log
 # Test
 TestResults/
 TestPreview/
+publish_test/
+qa_test_temp/
 
 # Packages
 packages/
