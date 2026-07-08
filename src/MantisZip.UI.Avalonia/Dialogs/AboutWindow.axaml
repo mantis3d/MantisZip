@@ -2,71 +2,430 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         x:Class="MantisZip.UI.Avalonia.Dialogs.AboutWindow"
         x:CompileBindings="False"
-        Title="{Binding LocalizedStrings[About_Title]}"
-        Width="400"
-        Height="300"
+        Title="{Binding AboutTitle}"
+        Width="840" Height="480"
+        MinWidth="580" MinHeight="350"
         WindowStartupLocation="CenterOwner"
+        ShowInTaskbar="False"
         Background="{DynamicResource ThemeWindowBgBrush}"
         Padding="16">
+  <DockPanel>
+    <!-- ═══════ Close button (outside TabControl, always visible) ═══════ -->
+    <Button Content="{Binding AboutClose}"
+            DockPanel.Dock="Bottom"
+            Width="80" Height="28"
+            HorizontalAlignment="Right"
+            Margin="0,8,0,0"
+            Click="OnCloseClick"
+            IsDefault="True"
+            IsCancel="True"
+            Background="{DynamicResource ThemeAccentBrush}"
+            Foreground="White"
+            BorderThickness="0" />
 
-  <Grid Margin="24">
-    <StackPanel VerticalAlignment="Center"
-                HorizontalAlignment="Center"
-                Spacing="12">
-      <!-- App icon placeholder -->
-      <Border Width="64"
-              Height="64"
-              CornerRadius="14"
-              Background="{DynamicResource ThemeAccentBrush}"
-              HorizontalAlignment="Center">
-        <TextBlock Text="MZ"
-                   FontSize="24"
-                   FontWeight="Bold"
-                   Foreground="White"
-                   HorizontalAlignment="Center"
-                   VerticalAlignment="Center" />
-      </Border>
+    <!-- ═══════ Tabs ═══════ -->
+    <TabControl>
 
-      <!-- App name -->
-      <TextBlock Text="MantisZip"
-                 FontSize="24"
-                 FontWeight="Bold"
-                 HorizontalAlignment="Center" />
+      <!-- ─────── Tab 1: 关于 / About ─────── -->
+      <TabItem Classes="compactTab">
+        <TabItem.Header>
+          <TextBlock x:Name="TabAboutHeader" />
+        </TabItem.Header>
+        <ScrollViewer VerticalScrollBarVisibility="Auto"
+                      Background="{DynamicResource ThemeWindowBgBrush}">
+          <Grid Margin="24" ColumnDefinitions="Auto,*">
 
-      <!-- Version -->
-      <TextBlock Text="{Binding VersionText}"
-                 FontSize="14"
-                 Foreground="{DynamicResource ThemeTextSecondaryBrush}"
-                 HorizontalAlignment="Center" />
+            <!-- Left: Icon + Name + Version -->
+            <StackPanel Grid.Column="0"
+                        VerticalAlignment="Center"
+                        HorizontalAlignment="Center"
+                        MinWidth="120" Margin="0,0,40,0">
+              <Image Width="160" Height="160"
+                     Source="avares://MantisZip.UI.Avalonia/Resources/Logo.png"
+                     Margin="0,0,0,12"
+                     HorizontalAlignment="Center" />
+              <TextBlock Text="MantisZip"
+                         FontSize="22" FontWeight="Bold"
+                         HorizontalAlignment="Center"
+                         Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+              <TextBlock Text="{Binding VersionDisplay}"
+                         FontSize="13"
+                         HorizontalAlignment="Center" Margin="0,4,0,0"
+                         Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+            </StackPanel>
 
-      <!-- Tech stack -->
-      <TextBlock Text="{Binding LocalizedStrings[About_Technology]}"
-                 FontSize="12"
-                 Foreground="{DynamicResource ThemeTextSecondaryBrush}"
-                 TextWrapping="Wrap"
-                 TextAlignment="Center"
-                 HorizontalAlignment="Center" />
+            <!-- Right: Info Grid -->
+            <Grid Grid.Column="1" VerticalAlignment="Center"
+                  ColumnDefinitions="Auto,*"
+                  RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto">
 
-      <!-- License link -->
-      <Button Content="{Binding LocalizedStrings[About_License]}"
-              HorizontalAlignment="Center"
-              Background="Transparent"
-              Foreground="{DynamicResource ThemeAccentBrush}"
-              BorderThickness="0"
-              Cursor="Hand"
-              Click="OnLicenseClick">
-      </Button>
+              <!-- 介绍 / Introduction -->
+              <TextBlock Grid.Row="0" Grid.Column="0"
+                         Text="{Binding AboutLabelIntro}"
+                         FontWeight="Bold"
+                         Foreground="{DynamicResource ThemeTextSecondaryBrush}"
+                         VerticalAlignment="Center"
+                         Margin="0,0,16,8" />
+              <TextBlock Grid.Row="0" Grid.Column="1"
+                         Text="{Binding AboutIntro}"
+                         TextWrapping="Wrap" Margin="0,0,0,8"
+                         Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
 
-      <!-- Close button -->
-      <Button Content="{Binding LocalizedStrings[About_Close]}"
-              HorizontalAlignment="Center"
-              Width="100"
-              Padding="8,6"
-              Click="OnCloseClick"
-              Background="{DynamicResource ThemeButtonBgBrush}"
-              Foreground="{DynamicResource ThemeTextPrimaryBrush}"
-              BorderBrush="{DynamicResource ThemeBorderBrush}">
-      </Button>
-    </StackPanel>
-  </Grid>
+              <!-- 描述 / Description -->
+              <TextBlock Grid.Row="1" Grid.Column="0"
+                         Text="{Binding AboutLabelDescription}"
+                         FontWeight="Bold"
+                         Foreground="{DynamicResource ThemeTextSecondaryBrush}"
+                         VerticalAlignment="Center"
+                         Margin="0,0,16,8" />
+              <TextBlock Grid.Row="1" Grid.Column="1"
+                         Text="{Binding AboutDescription}"
+                         TextWrapping="Wrap" Margin="0,0,0,8"
+                         Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+
+              <!-- 格式 / Format -->
+              <TextBlock Grid.Row="2" Grid.Column="0"
+                         Text="{Binding AboutLabelFormat}"
+                         FontWeight="Bold"
+                         Foreground="{DynamicResource ThemeTextSecondaryBrush}"
+                         VerticalAlignment="Center"
+                         Margin="0,0,16,8" />
+              <TextBlock Grid.Row="2" Grid.Column="1"
+                         Text="{Binding AboutFormats}"
+                         TextWrapping="Wrap" Margin="0,0,0,8"
+                         Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+
+              <!-- 许可证 / License -->
+              <TextBlock Grid.Row="3" Grid.Column="0"
+                         Text="{Binding AboutLabelLicense}"
+                         FontWeight="Bold"
+                         Foreground="{DynamicResource ThemeTextSecondaryBrush}"
+                         VerticalAlignment="Center"
+                         Margin="0,0,16,8" />
+              <TextBlock Grid.Row="3" Grid.Column="1"
+                         Text="{Binding AboutLicense}"
+                         TextWrapping="Wrap" Margin="0,0,0,8"
+                         Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+
+              <!-- GitHub -->
+              <TextBlock Grid.Row="4" Grid.Column="0"
+                         Text="{Binding AboutLabelGitHub}"
+                         FontWeight="Bold"
+                         Foreground="{DynamicResource ThemeTextSecondaryBrush}"
+                         VerticalAlignment="Center"
+                         Margin="0,0,16,8" />
+              <Button Grid.Row="4" Grid.Column="1"
+                      Content="github.com/mantis3d/MantisZip"
+                      Background="Transparent"
+                      BorderThickness="0"
+                      Foreground="{DynamicResource ThemeAccentBrush}"
+                      Cursor="Hand"
+                      HorizontalAlignment="Left"
+                      Padding="0"
+                      Margin="0,0,0,8"
+                      Click="OnGitHubClick" />
+
+              <!-- Gitee -->
+              <TextBlock Grid.Row="5" Grid.Column="0"
+                         Text="{Binding AboutLabelGitee}"
+                         FontWeight="Bold"
+                         Foreground="{DynamicResource ThemeTextSecondaryBrush}"
+                         VerticalAlignment="Center"
+                         Margin="0,0,16,8" />
+              <Button Grid.Row="5" Grid.Column="1"
+                      Content="gitee.com/mantis3d/MantisZip"
+                      Background="Transparent"
+                      BorderThickness="0"
+                      Foreground="{DynamicResource ThemeAccentBrush}"
+                      Cursor="Hand"
+                      HorizontalAlignment="Left"
+                      Padding="0"
+                      Margin="0,0,0,8"
+                      Click="OnGiteeClick" />
+
+              <!-- QQ group -->
+              <TextBlock Grid.Row="6" Grid.Column="0"
+                         Text="{Binding AboutLabelQQ}"
+                         FontWeight="Bold"
+                         Foreground="{DynamicResource ThemeTextSecondaryBrush}"
+                         VerticalAlignment="Center"
+                         Margin="0,0,16,8" />
+              <Button Grid.Row="6" Grid.Column="1"
+                      Content="778347352"
+                      Background="Transparent"
+                      BorderThickness="0"
+                      Foreground="{DynamicResource ThemeAccentBrush}"
+                      Cursor="Hand"
+                      HorizontalAlignment="Left"
+                      Padding="0"
+                      Margin="0,0,0,8"
+                      Click="OnQQClick" />
+            </Grid>
+          </Grid>
+        </ScrollViewer>
+      </TabItem>
+
+      <!-- ─────── Tab 2: 作者 / Author ─────── -->
+      <TabItem Classes="compactTab">
+        <TabItem.Header>
+          <TextBlock x:Name="TabAuthorHeader" />
+        </TabItem.Header>
+        <Grid Margin="24,24,24,0" VerticalAlignment="Top"
+              ColumnDefinitions="Auto,*"
+              RowDefinitions="Auto,Auto,Auto,Auto,Auto">
+          <!-- 作者 / Author Name -->
+          <TextBlock Grid.Row="0" Grid.Column="0"
+                     Text="{Binding AboutLabelAuthorName}"
+                     FontWeight="Bold"
+                     Foreground="{DynamicResource ThemeTextSecondaryBrush}"
+                     VerticalAlignment="Center"
+                     Margin="0,0,16,12" />
+          <TextBlock Grid.Row="0" Grid.Column="1"
+                     Text="MantisZen"
+                     FontSize="16" FontWeight="Bold"
+                     Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                     Margin="0,0,0,12" />
+
+          <!-- 邮箱 / Email -->
+          <TextBlock Grid.Row="1" Grid.Column="0"
+                     Text="{Binding AboutLabelEmail}"
+                     FontWeight="Bold"
+                     Foreground="{DynamicResource ThemeTextSecondaryBrush}"
+                     VerticalAlignment="Center"
+                     Margin="0,0,16,8" />
+          <Button Grid.Row="1" Grid.Column="1"
+                  Content="micheal.liu@163.com"
+                  Background="Transparent"
+                  BorderThickness="0"
+                  Foreground="{DynamicResource ThemeAccentBrush}"
+                  Cursor="Hand"
+                  HorizontalAlignment="Left"
+                  Padding="0"
+                  Margin="0,0,0,8"
+                  Click="OnEmailClick" />
+
+          <!-- GitHub -->
+          <TextBlock Grid.Row="2" Grid.Column="0"
+                     Text="{Binding AboutLabelGitHub}"
+                     FontWeight="Bold"
+                     Foreground="{DynamicResource ThemeTextSecondaryBrush}"
+                     VerticalAlignment="Center"
+                     Margin="0,0,16,8" />
+          <Button Grid.Row="2" Grid.Column="1"
+                  Content="github.com/mantis3d"
+                  Background="Transparent"
+                  BorderThickness="0"
+                  Foreground="{DynamicResource ThemeAccentBrush}"
+                  Cursor="Hand"
+                  HorizontalAlignment="Left"
+                  Padding="0"
+                  Margin="0,0,0,8"
+                  Click="OnAuthorGitHubClick" />
+
+          <!-- Gitee -->
+          <TextBlock Grid.Row="3" Grid.Column="0"
+                     Text="{Binding AboutLabelGitee}"
+                     FontWeight="Bold"
+                     Foreground="{DynamicResource ThemeTextSecondaryBrush}"
+                     VerticalAlignment="Center"
+                     Margin="0,0,16,8" />
+          <Button Grid.Row="3" Grid.Column="1"
+                  Content="gitee.com/mantis3d"
+                  Background="Transparent"
+                  BorderThickness="0"
+                  Foreground="{DynamicResource ThemeAccentBrush}"
+                  Cursor="Hand"
+                  HorizontalAlignment="Left"
+                  Padding="0"
+                  Margin="0,0,0,8"
+                  Click="OnAuthorGiteeClick" />
+
+          <!-- Bilibili -->
+          <TextBlock Grid.Row="4" Grid.Column="0"
+                     Text="{Binding AboutLabelBilibili}"
+                     FontWeight="Bold"
+                     Foreground="{DynamicResource ThemeTextSecondaryBrush}"
+                     VerticalAlignment="Center"
+                     Margin="0,0,16,8" />
+          <Button Grid.Row="4" Grid.Column="1"
+                  Content="space.bilibili.com/44202554"
+                  Background="Transparent"
+                  BorderThickness="0"
+                  Foreground="{DynamicResource ThemeAccentBrush}"
+                  Cursor="Hand"
+                  HorizontalAlignment="Left"
+                  Padding="0"
+                  Margin="0,0,0,8"
+                  Click="OnAuthorBilibiliClick" />
+        </Grid>
+      </TabItem>
+
+      <!-- ─────── Tab 3: 依赖库 / Dependencies ─────── -->
+      <TabItem Classes="compactTab">
+        <TabItem.Header>
+          <TextBlock x:Name="TabDependenciesHeader" />
+        </TabItem.Header>
+        <ScrollViewer VerticalScrollBarVisibility="Auto"
+                      Background="{DynamicResource ThemeWindowBgBrush}">
+          <Grid Margin="16" TextElement.FontSize="13"
+                ColumnDefinitions="2*,*,*,2*"
+                RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto">
+            <!-- Header row -->
+            <TextBlock Grid.Row="0" Grid.Column="0"
+                       Text="{Binding AboutLibraryName}"
+                       FontWeight="Bold" Padding="4,2" />
+            <TextBlock Grid.Row="0" Grid.Column="1"
+                       Text="{Binding AboutLibraryVersion}"
+                       FontWeight="Bold" Padding="8,2" />
+            <TextBlock Grid.Row="0" Grid.Column="2"
+                       Text="{Binding AboutLibraryLicense}"
+                       FontWeight="Bold" Padding="8,2" />
+            <TextBlock Grid.Row="0" Grid.Column="3"
+                       Text="{Binding AboutLibraryPurpose}"
+                       FontWeight="Bold" Padding="4,2" />
+
+            <!-- Separator -->
+            <Rectangle Grid.Row="1" Grid.ColumnSpan="4"
+                       Height="1" Margin="0,2,0,4"
+                       Fill="{DynamicResource ThemeBorderBrush}" />
+
+            <!-- Data rows -->
+            <TextBlock Grid.Row="2" Grid.Column="0" Text="Avalonia" Padding="4,3" />
+            <TextBlock Grid.Row="2" Grid.Column="1" Text="12.0.4" Padding="8,3" />
+            <TextBlock Grid.Row="2" Grid.Column="2" Text="MIT" Padding="8,3" />
+            <TextBlock Grid.Row="2" Grid.Column="3" Text="UI framework" Padding="4,3" />
+
+            <TextBlock Grid.Row="3" Grid.Column="0" Text="Avalonia.Controls.WebView" Padding="4,3" />
+            <TextBlock Grid.Row="3" Grid.Column="1" Text="12.0.1" Padding="8,3" />
+            <TextBlock Grid.Row="3" Grid.Column="2" Text="BSD-3-Clause" Padding="8,3" />
+            <TextBlock Grid.Row="3" Grid.Column="3" Text="HTML/PDF preview" Padding="4,3" />
+
+            <TextBlock Grid.Row="4" Grid.Column="0" Text="Avalonia.Controls.DataGrid" Padding="4,3" />
+            <TextBlock Grid.Row="4" Grid.Column="1" Text="12.0.0" Padding="8,3" />
+            <TextBlock Grid.Row="4" Grid.Column="2" Text="MIT" Padding="8,3" />
+            <TextBlock Grid.Row="4" Grid.Column="3" Text="DataGrid control" Padding="4,3" />
+
+            <TextBlock Grid.Row="5" Grid.Column="0" Text="CommunityToolkit.Mvvm" Padding="4,3" />
+            <TextBlock Grid.Row="5" Grid.Column="1" Text="8.4.2" Padding="8,3" />
+            <TextBlock Grid.Row="5" Grid.Column="2" Text="MIT" Padding="8,3" />
+            <TextBlock Grid.Row="5" Grid.Column="3" Text="MVVM helpers" Padding="4,3" />
+
+            <TextBlock Grid.Row="6" Grid.Column="0" Text="SharpCompress" Padding="4,3" />
+            <TextBlock Grid.Row="6" Grid.Column="1" Text="0.48.1" Padding="8,3" />
+            <TextBlock Grid.Row="6" Grid.Column="2" Text="MIT" Padding="8,3" />
+            <TextBlock Grid.Row="6" Grid.Column="3" Text="ZIP/TAR/GZ engine" Padding="4,3" />
+
+            <TextBlock Grid.Row="7" Grid.Column="0" Text="SharpSevenZip" Padding="4,3" />
+            <TextBlock Grid.Row="7" Grid.Column="1" Text="2.0.45" Padding="8,3" />
+            <TextBlock Grid.Row="7" Grid.Column="2" Text="LGPL-2.1" Padding="8,3" />
+            <TextBlock Grid.Row="7" Grid.Column="3" Text="7z/RAR engine" Padding="4,3" />
+
+            <TextBlock Grid.Row="8" Grid.Column="0" Text="Microsoft.Data.Sqlite" Padding="4,3" />
+            <TextBlock Grid.Row="8" Grid.Column="1" Text="10.0.8" Padding="8,3" />
+            <TextBlock Grid.Row="8" Grid.Column="2" Text="MIT" Padding="8,3" />
+            <TextBlock Grid.Row="8" Grid.Column="3" Text="SQLite preview" Padding="4,3" />
+
+            <TextBlock Grid.Row="9" Grid.Column="0" Text="SkiaSharp" Padding="4,3" />
+            <TextBlock Grid.Row="9" Grid.Column="1" Text="3.119.4" Padding="8,3" />
+            <TextBlock Grid.Row="9" Grid.Column="2" Text="MIT" Padding="8,3" />
+            <TextBlock Grid.Row="9" Grid.Column="3" Text="2D graphics" Padding="4,3" />
+
+            <TextBlock Grid.Row="10" Grid.Column="0" Text="Markdig" Padding="4,3" />
+            <TextBlock Grid.Row="10" Grid.Column="1" Text="0.40.0" Padding="8,3" />
+            <TextBlock Grid.Row="10" Grid.Column="2" Text="BSD-2-Clause" Padding="8,3" />
+            <TextBlock Grid.Row="10" Grid.Column="3" Text="Markdown rendering" Padding="4,3" />
+
+            <TextBlock Grid.Row="11" Grid.Column="0" Text="Ude.NetStandard" Padding="4,3" />
+            <TextBlock Grid.Row="11" Grid.Column="1" Text="1.2.0" Padding="8,3" />
+            <TextBlock Grid.Row="11" Grid.Column="2" Text="MIT" Padding="8,3" />
+            <TextBlock Grid.Row="11" Grid.Column="3" Text="Encoding detection" Padding="4,3" />
+          </Grid>
+        </ScrollViewer>
+      </TabItem>
+
+      <!-- ─────── Tab 4: 致谢 / Acknowledgments ─────── -->
+      <TabItem Classes="compactTab">
+        <TabItem.Header>
+          <TextBlock x:Name="TabAcknowledgmentsHeader" />
+        </TabItem.Header>
+        <ScrollViewer VerticalScrollBarVisibility="Auto"
+                      Background="{DynamicResource ThemeWindowBgBrush}">
+          <StackPanel Margin="24" Spacing="0">
+            <TextBlock Text="{Binding AboutThanksOSS}"
+                       TextWrapping="Wrap" FontSize="13"
+                       Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+            <TextBlock Text="{Binding AboutThanks7Zip}"
+                       TextWrapping="Wrap" FontSize="13" Margin="0,12,0,0"
+                       Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+            <TextBlock Text="{Binding AboutThanksAI}"
+                       TextWrapping="Wrap" FontSize="13" Margin="0,12,0,0"
+                       Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+
+            <!-- ─── 资金支持者 / Financial Supporters ─── -->
+            <Rectangle Height="1" Margin="0,16,0,8"
+                       Fill="{DynamicResource ThemeBorderBrush}" />
+            <TextBlock Text="{Binding AboutContributorsFinancial}"
+                       FontSize="14" FontWeight="Bold" Margin="0,0,0,8"
+                       Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+            <ItemsControl x:Name="ContributorsFinancialList"
+                          Background="Transparent" BorderThickness="0">
+              <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                  <WrapPanel Orientation="Horizontal"
+                             ItemWidth="140" ItemHeight="26" />
+                </ItemsPanelTemplate>
+              </ItemsControl.ItemsPanel>
+              <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                  <TextBlock Text="{Binding Name}"
+                             Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                             FontSize="13"
+                             VerticalAlignment="Center"
+                             Margin="4,2" />
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+            <TextBlock x:Name="ContributorsFinancialEmpty"
+                       Text="{Binding AboutContributorsNone}"
+                       Foreground="{DynamicResource ThemeTextSecondaryBrush}"
+                       FontSize="13"
+                       IsVisible="False"
+                       Margin="0,4,0,0" />
+
+            <!-- ─── 技术贡献者 / Technical Contributors ─── -->
+            <Rectangle Height="1" Margin="0,16,0,8"
+                       Fill="{DynamicResource ThemeBorderBrush}" />
+            <TextBlock Text="{Binding AboutContributorsTechnical}"
+                       FontSize="14" FontWeight="Bold" Margin="0,0,0,8"
+                       Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+            <ItemsControl x:Name="ContributorsTechnicalList"
+                          Background="Transparent" BorderThickness="0">
+              <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                  <WrapPanel Orientation="Horizontal"
+                             ItemWidth="140" ItemHeight="26" />
+                </ItemsPanelTemplate>
+              </ItemsControl.ItemsPanel>
+              <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                  <TextBlock Text="{Binding Name}"
+                             Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                             FontSize="13"
+                             VerticalAlignment="Center"
+                             Margin="4,2" />
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+            <TextBlock x:Name="ContributorsTechnicalEmpty"
+                       Text="{Binding AboutContributorsNone}"
+                       Foreground="{DynamicResource ThemeTextSecondaryBrush}"
+                       FontSize="13"
+                       IsVisible="False"
+                       Margin="0,4,0,0" />
+          </StackPanel>
+        </ScrollViewer>
+      </TabItem>
+
+    </TabControl>
+  </DockPanel>
 </Window>

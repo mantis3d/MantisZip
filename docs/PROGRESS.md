@@ -10,6 +10,9 @@
 - **当前版本**: 0.4.4
 - **发布日期**: 2026-06-29
 
+### 0.4.4 (2026-07-08)
+  - **Avalonia AboutWindow 迁移** — WPF 四标签页（关于/作者/依赖库/致谢）完整迁移到 Avalonia；修复 `{Binding LocalizedStrings[key]}` 字典索引器绑定在 TabItem.Header 不解析的问题，改为直接属性绑定 + x:Name 直接赋值；依赖库列表更新为实际 Avalonia 项目真实版本号；贡献者列表 CSV 支持 (2026-07-08)
+
 ## 规划中
 - Avalonia 跨平台移植后续 Phase
 
