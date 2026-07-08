@@ -395,6 +395,37 @@ public class ContextMenuHandler : IShellExtInit, IContextMenu
     {
         ShellExtLog.Info($"IContextMenu.QueryContextMenu #{_instanceId} entered, idCmdFirst={idCmdFirst}, idCmdLast={idCmdLast}, uFlags=0x{uFlags:x8}, _selectedFiles.Count={_selectedFiles.Count}");
 
+        // If the menu is in "pending" state (COM shellex registered but not yet
+        // confirmed active), show a thin disabled separator instead of full menus.
+        // This prevents dual menus while Explorer loads the COM component.
+        // The cascade (static) menus installed as fallback handle actual operations.
+        string dynStatus = GetDynamicMenuStatus();
+        if (dynStatus == "pending")
+        {
+            ShellExtLog.Info("QueryContextMenu: status=pending, inserting separator as placeholder");
+            var sepMii = new MenuItemInfo
+            {
+                cbSize = Marshal.SizeOf<MenuItemInfo>(),
+                fMask = NativeMethods.MIIM_STRING | NativeMethods.MIIM_FTYPE | NativeMethods.MIIM_STATE,
+                fType = NativeMethods.MFT_STRING,
+                fState = NativeMethods.MFS_DISABLED | NativeMethods.MFS_GRAYED,
+                dwTypeData = Marshal.StringToCoTaskMemUni("────────"),
+                cch = 8,
+            };
+            bool sepOk = NativeMethods.InsertMenuItem(hMenu, indexMenu, true, ref sepMii);
+            Marshal.FreeCoTaskMem(sepMii.dwTypeData);
+            ShellExtLog.Info($"QueryContextMenu: separator placeholder inserted={sepOk}");
+            return sepOk ? 1 : 0;
+        }
+
+        // Guard: if status is neither "pending" nor "active" (e.g. "disabled"),
+        // don't add any items either — the COM component shouldn't show.
+        if (dynStatus != "active")
+        {
+            ShellExtLog.Info($"QueryContextMenu: status=\"{dynStatus}\", not active — returning 0");
+            return 0;
+        }
+
         // Popup submenu handle — declared outside try so catch can clean up.
         IntPtr popupMenu = IntPtr.Zero;
 
@@ -1199,6 +1230,32 @@ public class ContextMenuHandler : IShellExtInit, IContextMenu
         _cachedIconCompressSeparate = IntPtr.Zero;
         _cachedIconCompressCombined = IntPtr.Zero;
         _cachedIconCompressDialog = IntPtr.Zero;
+    }
+
+    /// <summary>
+    /// Read DynamicMenuStatus from registry. Returns "active", "pending", or "unknown".
+    /// Written by ShellIntegration.SetDynamicMenuStatus in the UI project.
+    /// </summary>
+    private static string GetDynamicMenuStatus()
+    {
+        try
+        {
+            using var key = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(
+                @"Software\MantisZip\ContextMenu", writable: false);
+            if (key is null) return "unknown";
+            var val = key.GetValue("DynamicMenuStatus") as string;
+            return val switch
+            {
+                "active" => "active",
+                "pending" => "pending",
+                _ => "unknown"
+            };
+        }
+        catch (Exception ex)
+        {
+            ShellExtLog.Warn($"GetDynamicMenuStatus: registry read failed — {ex.Message}");
+            return "unknown";
+        }
     }
 
     /// <summary>Read settings from HKCU\Software\MantisZip\ContextMenu (set by AppSettings sync).</summary>

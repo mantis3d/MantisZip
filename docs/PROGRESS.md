@@ -59,6 +59,16 @@
    - `src/MantisZip.ShellExt/ContextMenuHandler.cs` (+8 行进程名日志)
    - `src/MantisZip.UI/Shell/ShellIntegration.Menu.cs` (+/-：Install 延迟级联、CheckComStatus、UninstallStaticMenus、删除 TestComActivation/TestComInExplorerContext)
    - `src/MantisZip.UI/Shell/ShellIntegration.cs` (新增 DynamicMenuStatus_Pending)
+7. **pending 态 COM 菜单占位符** — COM handler 检测到 pending 状态时插入灰色禁用分隔符 `"────────"` 而不是隐藏或显示完整菜单
+   - 避免初次右键时 COM 菜单 + 级联同时出现的重复问题
+   - 不自晋升、不写注册表、不卸级联——完全在 COM handler 内封闭
+   - 新增 `GetDynamicMenuStatus()` 读取 `HKCU\Software\MantisZip\ContextMenu\DynamicMenuStatus`
+   - `src/MantisZip.ShellExt/ContextMenuHandler.cs`
+8. **安装包 .NET 9 检测修复** — `IsDotNet9Installed` 无法检测已安装的 .NET 9 Desktop Runtime
+   - 根因：.NET 9 把版本号存为注册表**值名称**（DWORD）而非子键，`RegGetSubkeyNames` 永远找不到
+   - 修复：增加文件系统回退检测 `cmd /c dir ...\9.*`
+   - 同时也修复了 `IsWebView2Installed` 缺少 HKLM (32-bit 视图) 回退的问题
+   - `installer.iss`
    - `src/MantisZip.UI/App.xaml.cs` (启动时调用 CheckComStatus)
    - `src/MantisZip.UI/Dialogs/SettingsWindow.xaml.cs` (UpdateShellStatus pending 分支 + InstallBtn 调用 CheckComStatus)
    - `src/MantisZip.UI/Localization/L.cs` (新增 Settings_Menu_StatusDynamicPending)

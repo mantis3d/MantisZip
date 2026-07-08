@@ -360,8 +360,10 @@ var
 begin
   // NOTE: This installer is 32-bit. On 64-bit Windows, HKLM is
   // redirected to WOW6432Node — use HKLM64 for the native 64-bit view.
+  // Fall back to HKLM (32-bit view) since WebView2 may register there.
   Result := RegQueryStringValue(HKLM64, WebView2RegKey, 'pv', version) or
-            RegQueryStringValue(HKCU, WebView2RegKey, 'pv', version);
+            RegQueryStringValue(HKCU, WebView2RegKey, 'pv', version) or
+            RegQueryStringValue(HKLM, WebView2RegKey, 'pv', version);
   if Result then
   begin
     // Double-check: registry key is present, but are the actual runtime files intact?
@@ -376,16 +378,22 @@ begin
 end;
 
 // Check if .NET 9 Desktop Runtime is already installed.
-// Checks for any subkey starting with "9." under the WindowsDesktop.App registry path.
+// Checks both registry (subkey-based) and filesystem (runtime directory).
+// NOTE: .NET 9 stores version info as registry *value names* (DWORD) rather
+// than subkeys, so RegGetSubkeyNames is unreliable. We fall back to checking
+// whether a "9.*" subdirectory exists under the dotnet WindowsDesktop.App
+// shared runtime folder.
 function IsDotNet9Installed: Boolean;
 var
   subkeys: TArrayOfString;
   i: Integer;
+  TmpFile: String;
+  Content: AnsiString;
+  ResultCode: Integer;
 begin
   Result := False;
-  // NOTE: This installer is 32-bit. On 64-bit Windows, HKLM is
-  // redirected to WOW6432Node — use HKLM64 for the native 64-bit view.
-  // .NET 9 Desktop Runtime registers in the native 64-bit registry only.
+
+  // Check 64-bit registry view first (native HKLM64)
   if RegGetSubkeyNames(HKLM64, DotNet9RegKey, subkeys) then
   begin
     for i := 0 to GetArrayLength(subkeys) - 1 do
@@ -395,6 +403,38 @@ begin
         Result := True;
         Exit;
       end;
+    end;
+  end;
+
+  // Fallback: check 32-bit view (WOW6432Node)
+  if not Result then
+  begin
+    if RegGetSubkeyNames(HKLM, DotNet9RegKey, subkeys) then
+    begin
+      for i := 0 to GetArrayLength(subkeys) - 1 do
+      begin
+        if Copy(subkeys[i], 1, 2) = '9.' then
+        begin
+          Result := True;
+          Exit;
+        end;
+      end;
+    end;
+  end;
+
+  // Final fallback: check filesystem for a 9.x runtime directory.
+  // .NET 9 stores version as value names (DWORD) under the sharedfx key,
+  // which RegGetSubkeyNames cannot enumerate. The runtime DLLs are always
+  // present on disk under {commonpf64}\dotnet\shared\Microsoft.WindowsDesktop.App\9.*\.
+  if not Result then
+  begin
+    TmpFile := ExpandConstant('{tmp}\dotnet_ver_check.txt');
+    if Exec(ExpandConstant('{cmd}'), '/c dir /b /ad "' +
+        ExpandConstant('{commonpf64}') + '\dotnet\shared\Microsoft.WindowsDesktop.App\9.*" 2>nul > "' +
+        TmpFile + '"', '', SW_HIDE, ewWaitUntilTerminated, ResultCode) and (ResultCode = 0) then
+    begin
+      if LoadStringFromFile(TmpFile, Content) and (Trim(Content) <> '') then
+        Result := True;
     end;
   end;
 end;
