@@ -4,7 +4,7 @@
         x:CompileBindings="False"
         Title="{Binding WinTitle}"
         Width="520"
-        Height="460"
+        Height="500"
         WindowStartupLocation="CenterOwner"
         Background="{DynamicResource ThemeWindowBgBrush}"
         Padding="16">
