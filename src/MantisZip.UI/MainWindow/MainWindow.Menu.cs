@@ -636,11 +636,13 @@ public partial class MainWindow
 
         try
         {
+            var opts = App.CreateExtractOptions();
+
             for (int i = 0; i < filesToExtract.Count; i++)
             {
                 var item = filesToExtract[i];
                 pw.CancellationToken.ThrowIfCancellationRequested();
-                pw.SetProgress((double)i / filesToExtract.Count * 100, L.TF(L.Main_Status_Extracting, item.Name));
+                pw.SetProgress((double)i / filesToExtract.Count * 100, item.Name);
 
                 // 根据设置决定输出路径：
                 // - 关闭保留完整路径时，以当前浏览目录为基准裁剪路径前缀
@@ -657,8 +659,13 @@ public partial class MainWindow
                 var dir = Path.GetDirectoryName(outputPath);
                 if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir)) Directory.CreateDirectory(dir);
 
+                // 文件冲突处理：检查目标文件是否已存在，按用户设置弹窗或自动处理
+                var resolvedPath = FileConflictHelper.ResolvePath(outputPath, opts, item.LastModified, item.Size);
+                if (resolvedPath == null) // Skip
+                    continue;
+
                 await ArchiveEntryExtractor.ExtractEntryAsync(
-                    _currentArchivePath!, item.FullPath, outputPath, _currentFormat, _currentPassword, pw.CancellationToken);
+                    _currentArchivePath!, item.FullPath, resolvedPath, _currentFormat, _currentPassword, pw.CancellationToken);
             }
 
             pw.SetComplete(L.T(L.Main_Status_ExtractItemsDone));
@@ -667,8 +674,8 @@ public partial class MainWindow
             await pw.AutoCloseOrWaitAsync(800, () => pw.Close());
             SetStatus(L.T(L.Main_Status_ExtractItemsDone));
         }
-        catch (OperationCanceledException) { App.LogDebug("ExtractSelectedAsync: cancelled"); pw.Close(); SetStatus(L.T(L.Main_Status_AddCancel)); }
-        catch (Exception ex) { App.LogDebug("ExtractSelectedAsync: failed: {0}", ex.Message); pw.Close(); AppMessageBox.Show(L.TF(L.Main_Status_ExtractFailed, ex.Message), L.T(L.App_ErrorTitle), MessageBoxButton.OK, MessageBoxImage.Error); SetStatus(L.T(L.Main_Status_ExtractFailed)); }
+        catch (OperationCanceledException) { App.LogDebug("ExtractSelectedAsync: cancelled"); try { pw.Close(); } catch { } SetStatus(L.T(L.Main_Status_AddCancel)); }
+        catch (Exception ex) { App.LogDebug("ExtractSelectedAsync: failed: {0}", ex.Message); try { pw.Close(); } catch { } AppMessageBox.Show(L.TF(L.Main_Status_ExtractFailed, ex.Message), L.T(L.App_ErrorTitle), MessageBoxButton.OK, MessageBoxImage.Error); SetStatus(L.T(L.Main_Status_ExtractFailed)); }
     }
 
     #region 最近打开的文件
