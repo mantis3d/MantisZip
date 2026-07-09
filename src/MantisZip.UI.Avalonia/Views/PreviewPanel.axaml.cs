@@ -1,10 +1,12 @@
 using System;
 using System.ComponentModel;
+using System.Data;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Data;
 using Avalonia.Layout;
 using MantisZip.UI.Avalonia.ViewModels;
 
@@ -51,6 +53,40 @@ public partial class PreviewPanel : UserControl
         if (args.PropertyName == nameof(PreviewViewModel.InfoPanelOrientation))
         {
             ApplyInfoPanelOrientation(vm.InfoPanelOrientation);
+        }
+        // CSV/SQLite: DataView 在 Avalonia DataGrid 中无法自动生成正确列，
+        // 数据源变化或切换可见时都需要手动设置列。
+        bool csvDataChanged = args.PropertyName == nameof(PreviewViewModel.IsCsvVisible)
+                           || args.PropertyName == nameof(PreviewViewModel.CsvData);
+        if (csvDataChanged && vm.IsCsvVisible)
+        {
+            SetupDataGridColumns(CsvDataGrid, vm.CsvDataTable);
+        }
+        bool sqliteDataChanged = args.PropertyName == nameof(PreviewViewModel.IsSqliteVisible)
+                              || args.PropertyName == nameof(PreviewViewModel.SqliteTableData);
+        if (sqliteDataChanged && vm.IsSqliteVisible)
+        {
+            SetupDataGridColumns(SqliteDataGrid, vm.CurrentSqliteTable);
+        }
+    }
+
+    /// <summary>
+    /// 为 DataGrid 手动创建列，绑定到 DataRowView.Row.ItemArray[index]。
+    /// 绕过 Avalonia DataGrid 无法从 DataView 正确自动生成列的问题。
+    /// 参见 https://github.com/AvaloniaUI/Avalonia.Controls.DataGrid/issues/27
+    /// </summary>
+    private static void SetupDataGridColumns(DataGrid grid, DataTable? table)
+    {
+        if (table == null) return;
+        grid.Columns.Clear();
+        for (int i = 0; i < table.Columns.Count; i++)
+        {
+            grid.Columns.Add(new DataGridTextColumn
+            {
+                Header = table.Columns[i].ColumnName,
+                Binding = new Binding($"Row.ItemArray[{i}]"),
+                IsReadOnly = true,
+            });
         }
     }
 

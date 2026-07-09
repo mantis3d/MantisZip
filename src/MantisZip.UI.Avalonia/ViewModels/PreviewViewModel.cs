@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.ComponentModel;
 using System.Data;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -129,6 +130,8 @@ public partial class PreviewViewModel : ObservableObject
 
     // DataView 实现了 IEnumerable，可绑定到 ItemsControl
     private DataTable? _csvDataTable;
+    /// <summary>供代码后置访问原始 DataTable 以设置 DataGrid 列。</summary>
+    public DataTable? CsvDataTable => _csvDataTable;
 
     [ObservableProperty]
     private System.Data.DataView? _csvData;
@@ -160,7 +163,7 @@ public partial class PreviewViewModel : ObservableObject
     // ── Torrent ──
 
     [ObservableProperty]
-    private ObservableCollection<TorrentFileItem> _torrentFileItems = [];
+    private ObservableCollection<TorrentTreeNode> _torrentTreeRoots = [];
 
     // ── SQLite ──
 
@@ -175,6 +178,8 @@ public partial class PreviewViewModel : ObservableObject
 
     private string? _lastPreviewFilePath;
     private System.Data.DataTable? _currentSqliteTable;
+    /// <summary>供代码后置访问原始 DataTable 以设置 DataGrid 列。</summary>
+    public System.Data.DataTable? CurrentSqliteTable => _currentSqliteTable;
 
     // ── GIF animation ──
 
@@ -663,7 +668,7 @@ public partial class PreviewViewModel : ObservableObject
         PreviewType = PreviewType.Font;
         IsPreviewVisible = true;
         IsToolbarVisible = true;
-        PreviewHeaderText = "字体预览";
+        PreviewHeaderText = info.FontName ?? "字体预览";
         FormatMetadata.Clear();
         FormatMetadata.Add(new("字体名称", info.FontName ?? "未知"));
         FormatMetadata.Add(new("样式", info.FontStyle ?? "常规"));
@@ -1150,7 +1155,7 @@ public partial class PreviewViewModel : ObservableObject
         PreviewType = PreviewType.Torrent;
         IsPreviewVisible = true;
         IsToolbarVisible = true;
-        PreviewHeaderText = "BT 种子";
+        PreviewHeaderText = info.TorrentFileName ?? "BT 种子";
         FormatMetadata.Clear();
         if (info.InfoHashV1 != null)
             FormatMetadata.Add(new("InfoHash", info.InfoHashV1));
@@ -1173,12 +1178,65 @@ public partial class PreviewViewModel : ObservableObject
         if (info.TorrentTotalSize.HasValue)
             FormatMetadata.Add(new("总大小", FormatFileSize(info.TorrentTotalSize.Value)));
 
-        // 种子内文件列表
-        if (info.TorrentFileEntries != null)
+        // 种子内文件列表（目录树结构）
+        TorrentTreeRoots = new ObservableCollection<TorrentTreeNode>(
+            info.TorrentFileEntries != null ? BuildTorrentTree(info.TorrentFileEntries) : []);
+    }
+
+    /// <summary>
+    /// 从扁平的 (路径, 大小) 列表构建目录树。
+    /// </summary>
+    private static List<TorrentTreeNode> BuildTorrentTree(List<(string Path, long Size)> entries)
+    {
+        var rootNodes = new List<TorrentTreeNode>();
+        var dirLookup = new Dictionary<string, TorrentTreeNode>();
+
+        foreach (var (path, size) in entries)
         {
-            TorrentFileItems = new ObservableCollection<TorrentFileItem>(
-                info.TorrentFileEntries.Select(f => new TorrentFileItem(f.Path, f.Size)));
+            var parts = path.Split('/');
+            TorrentTreeNode? parent = null;
+            string currentPath = "";
+
+            for (int i = 0; i < parts.Length; i++)
+            {
+                currentPath = i == 0 ? parts[i] : currentPath + "/" + parts[i];
+
+                if (i == parts.Length - 1)
+                {
+                    // 叶子文件
+                    var fileNode = new TorrentTreeNode
+                    {
+                        Name = parts[i],
+                        IsDirectory = false,
+                        Size = size,
+                    };
+                    if (parent != null)
+                        parent.Children.Add(fileNode);
+                    else
+                        rootNodes.Add(fileNode);
+                }
+                else
+                {
+                    // 目录节点
+                    if (!dirLookup.TryGetValue(currentPath, out var dirNode))
+                    {
+                        dirNode = new TorrentTreeNode
+                        {
+                            Name = parts[i],
+                            IsDirectory = true,
+                        };
+                        dirLookup[currentPath] = dirNode;
+                        if (parent != null)
+                            parent.Children.Add(dirNode);
+                        else
+                            rootNodes.Add(dirNode);
+                    }
+                    parent = dirNode;
+                }
+            }
         }
+
+        return rootNodes;
     }
 
     // ── Office ──
@@ -1334,7 +1392,7 @@ td, th {{ border: 1px solid #ccc; padding: 6px; }}
         ImageHeight = 0;
         HtmlContent = string.Empty;
         IsTransparencySupported = false;
-        TorrentFileItems.Clear();
+        TorrentTreeRoots.Clear();
         SqliteTableData = null;
         SqliteTableNames.Clear();
         SelectedTableIndex = 0;
@@ -1378,9 +1436,29 @@ public class PeMetadataItem
 }
 
 /// <summary>
-/// Torrent 文件列表条目。
+/// 种子文件树节点，支持展开/折叠。
 /// </summary>
-public record TorrentFileItem(string Path, long Size)
+public class TorrentTreeNode : INotifyPropertyChanged
 {
-    public string SizeDisplay => FormatUtil.FormatSize(Size);
+    public string Name { get; set; } = string.Empty;
+    public bool IsDirectory { get; set; }
+    public long Size { get; set; }
+    public string SizeDisplay => IsDirectory ? string.Empty : FormatUtil.FormatSize(Size);
+    public ObservableCollection<TorrentTreeNode> Children { get; set; } = [];
+
+    private bool _isExpanded = true;
+    public bool IsExpanded
+    {
+        get => _isExpanded;
+        set
+        {
+            if (_isExpanded != value)
+            {
+                _isExpanded = value;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsExpanded)));
+            }
+        }
+    }
+
+    public event PropertyChangedEventHandler? PropertyChanged;
 }

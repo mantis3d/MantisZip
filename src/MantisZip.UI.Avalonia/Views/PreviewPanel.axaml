@@ -88,12 +88,14 @@
         </ScrollViewer>
 
         <!-- CSV preview -->
-        <ScrollViewer IsVisible="{Binding IsCsvVisible}">
-          <DataGrid ItemsSource="{Binding CsvData}"
-                    AutoGenerateColumns="True"
-                    IsReadOnly="True"
-                    CanUserResizeColumns="True" />
-        </ScrollViewer>
+        <DataGrid x:Name="CsvDataGrid"
+                  IsVisible="{Binding IsCsvVisible}"
+                  ItemsSource="{Binding CsvData}"
+                  AutoGenerateColumns="False"
+                  IsReadOnly="True"
+                  CanUserResizeColumns="True"
+                  CanUserSortColumns="True"
+                  GridLinesVisibility="All" />
 
         <!-- PE preview -->
         <StackPanel IsVisible="{Binding IsPeVisible}"
@@ -214,11 +216,14 @@
               </DataTemplate>
             </TabControl.ItemTemplate>
           </TabControl>
-          <DataGrid Grid.Row="1"
+          <DataGrid x:Name="SqliteDataGrid"
+                    Grid.Row="1"
                     ItemsSource="{Binding SqliteTableData}"
-                    AutoGenerateColumns="True"
+                    AutoGenerateColumns="False"
                     IsReadOnly="True"
-                    CanUserResizeColumns="True" />
+                    CanUserResizeColumns="True"
+                    CanUserSortColumns="True"
+                    GridLinesVisibility="All" />
         </Grid>
 
         <!-- ISO preview (metadata only) -->
@@ -241,37 +246,39 @@
         </StackPanel>
 
         <!-- Torrent preview -->
-        <ScrollViewer IsVisible="{Binding IsTorrentVisible}">
-          <StackPanel Spacing="8">
-            <TextBlock Text="{Binding PreviewHeaderText}"
-                       FontSize="20"
-                       FontWeight="Bold" />
-            <ItemsControl ItemsSource="{Binding FormatMetadata}">
-              <ItemsControl.ItemTemplate>
-                <DataTemplate x:DataType="models:FormatMetadataItem">
-                  <Grid ColumnDefinitions="Auto,8,*" Margin="0,2">
-                    <TextBlock Text="{Binding Key}" FontWeight="Bold"
-                               Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
-                    <TextBlock Grid.Column="2" Text="{Binding Value}" />
-                  </Grid>
-                </DataTemplate>
-              </ItemsControl.ItemTemplate>
-            </ItemsControl>
-            <Separator />
-            <TextBlock Text="文件列表" FontWeight="SemiBold" />
-            <ItemsControl ItemsSource="{Binding TorrentFileItems}">
-              <ItemsControl.ItemTemplate>
-                <DataTemplate x:DataType="vm:TorrentFileItem">
-                  <Grid ColumnDefinitions="*,80" Margin="0,1">
-                    <TextBlock Text="{Binding Path}" />
-                    <TextBlock Grid.Column="1" Text="{Binding SizeDisplay}"
-                               Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
-                  </Grid>
-                </DataTemplate>
-              </ItemsControl.ItemTemplate>
-            </ItemsControl>
-          </StackPanel>
-        </ScrollViewer>
+        <StackPanel IsVisible="{Binding IsTorrentVisible}"
+                    Spacing="8">
+          <TextBlock Text="{Binding PreviewHeaderText}"
+                     FontSize="20"
+                     FontWeight="Bold" />
+          <ItemsControl ItemsSource="{Binding FormatMetadata}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="models:FormatMetadataItem">
+                <Grid ColumnDefinitions="Auto,8,*" Margin="0,2">
+                  <TextBlock Text="{Binding Key}" FontWeight="Bold"
+                             Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+                  <TextBlock Grid.Column="2" Text="{Binding Value}" />
+                </Grid>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+          <Separator />
+          <TextBlock Text="文件列表" FontWeight="SemiBold" />
+          <TreeView ItemsSource="{Binding TorrentTreeRoots}"
+                    BorderThickness="0"
+                    Background="Transparent">
+            <TreeView.ItemTemplate>
+              <TreeDataTemplate ItemsSource="{Binding Children}"
+                                x:DataType="vm:TorrentTreeNode">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                  <TextBlock Text="{Binding Name}" />
+                  <TextBlock Text="{Binding SizeDisplay}"
+                             Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+                </StackPanel>
+              </TreeDataTemplate>
+            </TreeView.ItemTemplate>
+          </TreeView>
+        </StackPanel>
 
         <!-- Office preview (metadata only) -->
         <StackPanel IsVisible="{Binding IsOfficeVisible}"
