@@ -67,6 +67,7 @@ public static class FontParser
 
         string? family = null, subfamily = null, fullName = null;
         ushort familyPid = 0, subfamilyPid = 0, fullNamePid = 0;
+        ushort familyLid = 0, subfamilyLid = 0, fullNameLid = 0;
         string? prefFamily = null; // name ID 16 (preferred family) fallback
 
         if (foundName && nameOff > 0 && nameLen >= 6
@@ -81,7 +82,7 @@ public static class FontParser
             {
                 ushort pid = ReadBEU16(reader);
                 ReadBEU16(reader); // eid
-                ReadBEU16(reader); // lid
+                ushort lid = ReadBEU16(reader);
                 ushort nid = ReadBEU16(reader);
                 ushort len = ReadBEU16(reader);
                 ushort off = ReadBEU16(reader);
@@ -104,14 +105,15 @@ public static class FontParser
                     if (nul >= 0) val = val[..nul];
 
                     // Priority: pid=3 (Windows Unicode) > pid=1 (Mac) > other
-                    if (nid == 1 && ShouldReplaceNameEntry(familyPid, pid))
-                    { family = val; familyPid = pid; }
-                    else if (nid == 2 && ShouldReplaceNameEntry(subfamilyPid, pid))
-                    { subfamily = val; subfamilyPid = pid; }
-                    else if (nid == 4 && ShouldReplaceNameEntry(fullNamePid, pid))
-                    { fullName = val; fullNamePid = pid; }
+                    // Same platform: prefer Chinese Simplified (lid=0x0804) over other languages
+                    if (nid == 1 && ShouldReplaceNameEntry(familyPid, pid, familyLid, lid))
+                    { family = val; familyPid = pid; familyLid = lid; }
+                    else if (nid == 2 && ShouldReplaceNameEntry(subfamilyPid, pid, subfamilyLid, lid))
+                    { subfamily = val; subfamilyPid = pid; subfamilyLid = lid; }
+                    else if (nid == 4 && ShouldReplaceNameEntry(fullNamePid, pid, fullNameLid, lid))
+                    { fullName = val; fullNamePid = pid; fullNameLid = lid; }
                     // Collect Preferred Family (name ID 16) as fallback
-                    else if (nid == 16 && ShouldReplaceNameEntry(familyPid, pid))
+                    else if (nid == 16 && ShouldReplaceNameEntry(familyPid, pid, familyLid, lid))
                     { prefFamily = val; }
                 }
                 finally { fs.Seek(saved, SeekOrigin.Begin); }
@@ -122,9 +124,15 @@ public static class FontParser
                 family = prefFamily;
         }
 
-        static bool ShouldReplaceNameEntry(ushort currentPid, ushort newPid)
+        static bool ShouldReplaceNameEntry(ushort currentPid, ushort newPid,
+            ushort currentLid, ushort newLid)
         {
-            return currentPid == 0 || (currentPid == 1 && newPid == 3);
+            if (currentPid == 0) return true;
+            // Prefer Windows platform (pid=3) over Mac (pid=1) or other
+            if (currentPid != 3 && newPid == 3) return true;
+            if (currentPid == 3 && newPid != 3) return false;
+            // Same platform: prefer Chinese Simplified (lid=0x0804)
+            return currentLid != 0x0804 && newLid == 0x0804;
         }
 
         int? glyphs = null;
