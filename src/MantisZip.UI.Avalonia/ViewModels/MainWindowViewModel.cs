@@ -217,6 +217,12 @@ public partial class MainWindowViewModel : ObservableObject
     [ObservableProperty]
     private FolderNode? _selectedFolder;
 
+    /// <summary>
+    /// TreeView 的 ItemsSource：包含根节点的集合，确保根节点（压缩包名）可见。
+    /// 当 FolderTreeRoot 更新时同步更新此集合。
+    /// </summary>
+    public ObservableCollection<FolderNode> FolderTreeItems { get; } = [];
+
     [ObservableProperty]
     private string? _currentFolder;
 
@@ -349,6 +355,16 @@ public partial class MainWindowViewModel : ObservableObject
         {
             NavigateToFolder(value);
         }
+    }
+
+    /// <summary>
+    /// 当 FolderTreeRoot 更新时同步 FolderTreeItems，确保根节点在 TreeView 中可见。
+    /// </summary>
+    partial void OnFolderTreeRootChanged(FolderNode? value)
+    {
+        FolderTreeItems.Clear();
+        if (value != null)
+            FolderTreeItems.Add(value);
     }
 
     partial void OnFilterTextChanged(string? value) => ApplyFilter();

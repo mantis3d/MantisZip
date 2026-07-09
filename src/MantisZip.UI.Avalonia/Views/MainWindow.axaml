@@ -712,7 +712,7 @@
                      FontWeight="SemiBold"
                      Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
           <TreeView Grid.Row="1"
-                    ItemsSource="{Binding FolderTreeRoot.Children}"
+                    ItemsSource="{Binding FolderTreeItems}"
                     SelectedItem="{Binding SelectedFolder}"
                     BorderThickness="0"
                     Background="Transparent">
@@ -720,6 +720,8 @@
               <TreeDataTemplate ItemsSource="{Binding Children}">
                 <StackPanel Orientation="Horizontal" Spacing="4"
                             Margin="4,2">
+                  <TextBlock Text="{Binding Icon}"
+                             FontSize="14" />
                   <TextBlock Text="{Binding Name}"
                              Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
                 </StackPanel>
