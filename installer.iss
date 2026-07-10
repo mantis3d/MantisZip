@@ -3,7 +3,7 @@
 
 #define MyAppName "MantisZip"
 #ifndef MyAppVersion
-#define MyAppVersion "0.4.0"
+#define MyAppVersion "0.4.4"
 #endif
 #define MyAppPublisher "MantisZip Contributors"
 #define MyAppURL "https://github.com/mantis3d/MantisZip"
@@ -45,6 +45,10 @@ english.ShellGroup=System Integration
 english.InstallShell=Add to Windows context menu
 english.AssocGroup=File type associations
 
+; Download page (shown before installation begins)
+english.DownloadPageCaption=Download required components
+english.DownloadPageDescription=MantisZip requires .NET 9 Runtime and WebView2 Runtime to run. They will be downloaded automatically.
+
 ; Chinese (Simplified)
 chinese.ConfigPageTitle=安装配置
 chinese.ConfigDesc=选择偏好的外观和系统集成设置
@@ -54,6 +58,8 @@ chinese.ThemeDark=深色主题
 chinese.ShellGroup=系统集成
 chinese.InstallShell=添加到 Windows 右键菜单
 chinese.AssocGroup=文件关联
+chinese.DownloadPageCaption=正在下载必要组件
+chinese.DownloadPageDescription=MantisZip 需要 .NET 9 运行时和 WebView2 运行时才能运行。正在自动下载中。
 
 [Tasks]
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"
@@ -72,6 +78,9 @@ Source: "publish_output\MantisZip.UI.pdb"; DestDir: "{app}"; Flags: ignoreversio
 ; === Runtime config (required for .NET assembly resolution) ===
 Source: "publish_output\MantisZip.UI.deps.json"; DestDir: "{app}"; Flags: ignoreversion
 Source: "publish_output\MantisZip.UI.runtimeconfig.json"; DestDir: "{app}"; Flags: ignoreversion
+
+; === ShellExt COM host (dynamic context menu) — runtimeconfig.json required for COM activation ===
+Source: "publish_output\MantisZip.ShellExt.runtimeconfig.json"; DestDir: "{app}"; Flags: ignoreversion
 
 ; === 7z.dll (SharpSevenZip): architecture-specific subdirectories ===
 Source: "publish_output\x64\7z.dll"; DestDir: "{app}\x64"; Flags: ignoreversion
@@ -102,8 +111,6 @@ Name: "{autoprograms}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; WorkingD
 Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; WorkingDir: "{app}"; Tasks: desktopicon
 
 [Run]
-Filename: "{app}\{#MyAppExeName}"; Parameters: "--install-shell"; Flags: nowait skipifsilent; WorkingDir: "{app}"; Check: IsShellInstallChecked
-Filename: "{app}\{#MyAppExeName}"; Parameters: "--install-assoc {code:GetAssocParams}"; Flags: nowait skipifsilent; WorkingDir: "{app}"; Check: IsAnyAssocChecked
 Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#StringChange(MyAppName, '&', '&&')}}"; Flags: nowait postinstall skipifsilent; WorkingDir: "{app}"
 
 [UninstallRun]
@@ -131,6 +138,11 @@ var
   AssocCheckTarGz: TNewCheckBox;
   AssocCheckGz: TNewCheckBox;
   AssocCheckIso: TNewCheckBox;
+  // Download progress page
+  DownloadPage: TDownloadWizardPage;
+
+// Import Sleep from kernel32 for post-install delay (let .NET registration settle)
+procedure Sleep(Milliseconds: DWord); external 'Sleep@kernel32.dll stdcall';
 
 // Create the custom configuration wizard page (theme + system integration)
 procedure CreateConfigPage;
@@ -330,33 +342,59 @@ end;
 
 procedure InitializeWizard;
 begin
+  DownloadPage := CreateDownloadPage(
+    CustomMessage('DownloadPageCaption'),
+    CustomMessage('DownloadPageDescription'),
+    nil);
   CreateConfigPage;
 end;
 
 // Check if WebView2 Runtime is already installed.
 // Checks multiple registry locations and confirms a version value exists (not just a key).
+// Also validates the WebView2Loader.dll file exists on disk to guard against
+// stale registry entries from aborted/corrupted installations.
 function IsWebView2Installed: Boolean;
 var
   version: string;
+  loaderPath: string;
 begin
-  // 64-bit view (HKLM) or HKCU
-  Result := RegQueryStringValue(HKLM, WebView2RegKey, 'pv', version) or
-            RegQueryStringValue(HKCU, WebView2RegKey, 'pv', version);
-  // 32-bit (WOW6432Node) view — WebView2 installer often registers here on 64-bit Windows
-  if not Result then
-    Result := RegQueryStringValue(HKLM32, WebView2RegKey, 'pv', version);
+  // NOTE: This installer is 32-bit. On 64-bit Windows, HKLM is
+  // redirected to WOW6432Node — use HKLM64 for the native 64-bit view.
+  // Fall back to HKLM (32-bit view) since WebView2 may register there.
+  Result := RegQueryStringValue(HKLM64, WebView2RegKey, 'pv', version) or
+            RegQueryStringValue(HKCU, WebView2RegKey, 'pv', version) or
+            RegQueryStringValue(HKLM, WebView2RegKey, 'pv', version);
+  if Result then
+  begin
+    // Double-check: registry key is present, but are the actual runtime files intact?
+    // WebView2 Runtime (x64) installs to {commonpf64}\Microsoft Edge WebView2 Runtime\
+    loaderPath := ExpandConstant('{commonpf64}') + '\Microsoft Edge WebView2 Runtime\WebView2Loader.dll';
+    if not FileExists(loaderPath) then
+    begin
+      Log('WebView2 registry key found but WebView2Loader.dll is missing at: ' + loaderPath + ' — treating as not installed');
+      Result := False;
+    end;
+  end;
 end;
 
 // Check if .NET 9 Desktop Runtime is already installed.
-// Checks for any subkey starting with "9." under the WindowsDesktop.App registry path.
+// Checks both registry (subkey-based) and filesystem (runtime directory).
+// NOTE: .NET 9 stores version info as registry *value names* (DWORD) rather
+// than subkeys, so RegGetSubkeyNames is unreliable. We fall back to checking
+// whether a "9.*" subdirectory exists under the dotnet WindowsDesktop.App
+// shared runtime folder.
 function IsDotNet9Installed: Boolean;
 var
   subkeys: TArrayOfString;
   i: Integer;
+  TmpFile: String;
+  Content: AnsiString;
+  ResultCode: Integer;
 begin
   Result := False;
-  // 64-bit view (HKLM)
-  if RegGetSubkeyNames(HKLM, DotNet9RegKey, subkeys) then
+
+  // Check 64-bit registry view first (native HKLM64)
+  if RegGetSubkeyNames(HKLM64, DotNet9RegKey, subkeys) then
   begin
     for i := 0 to GetArrayLength(subkeys) - 1 do
     begin
@@ -367,9 +405,11 @@ begin
       end;
     end;
   end;
-  // 32-bit (WOW6432Node) view
+
+  // Fallback: check 32-bit view (WOW6432Node)
   if not Result then
-    if RegGetSubkeyNames(HKLM32, DotNet9RegKey, subkeys) then
+  begin
+    if RegGetSubkeyNames(HKLM, DotNet9RegKey, subkeys) then
     begin
       for i := 0 to GetArrayLength(subkeys) - 1 do
       begin
@@ -380,13 +420,67 @@ begin
         end;
       end;
     end;
+  end;
+
+  // Final fallback: check filesystem for a 9.x runtime directory.
+  // .NET 9 stores version as value names (DWORD) under the sharedfx key,
+  // which RegGetSubkeyNames cannot enumerate. The runtime DLLs are always
+  // present on disk under {commonpf64}\dotnet\shared\Microsoft.WindowsDesktop.App\9.*\.
+  if not Result then
+  begin
+    TmpFile := ExpandConstant('{tmp}\dotnet_ver_check.txt');
+    if Exec(ExpandConstant('{cmd}'), '/c dir /b /ad "' +
+        ExpandConstant('{commonpf64}') + '\dotnet\shared\Microsoft.WindowsDesktop.App\9.*" 2>nul > "' +
+        TmpFile + '"', '', SW_HIDE, ewWaitUntilTerminated, ResultCode) and (ResultCode = 0) then
+    begin
+      if LoadStringFromFile(TmpFile, Content) and (Trim(Content) <> '') then
+        Result := True;
+    end;
+  end;
 end;
 
-// Download file via URLMon (built-in Windows API, no extra DLLs needed)
-function URLDownloadToFile(pCaller: Cardinal; szURL: string; szFileName: string; dwReserved: Cardinal; lpfnCB: Cardinal): Integer;
-  external 'URLDownloadToFileW@urlmon.dll stdcall';
+// Intercept the "Ready to Install" page — download prerequisites before installation begins.
+// The download happens AFTER the user clicks Install but BEFORE file copying.
+function NextButtonClick(CurPageID: Integer): Boolean;
+var
+  NeedDownload: Boolean;
+begin
+  if CurPageID = wpReady then
+  begin
+    NeedDownload := False;
+    DownloadPage.Clear;
+    if not IsDotNet9Installed then
+    begin
+      DownloadPage.Add(DotNet9RuntimeUrl, 'dotnet-runtime-9.0-win-x64.exe', '');
+      NeedDownload := True;
+    end;
+    if not IsWebView2Installed then
+    begin
+      DownloadPage.Add(EvergreenBootstrapperUrl, 'MicrosoftEdgeWebview2Setup.exe', '');
+      NeedDownload := True;
+    end;
 
-// Install WebView2 Runtime before app starts
+    // Only show the download page if there are items to download.
+    if NeedDownload then
+    begin
+      DownloadPage.Show;
+      try
+        try
+          DownloadPage.Download;
+          Result := True;
+        except
+          Result := False;
+        end;
+      finally
+        DownloadPage.Hide;
+      end;
+    end else
+      Result := True;
+  end else
+    Result := True;
+end;
+
+// Install runtimes (already downloaded via DownloadPage)
 // Write installer settings to AppData after install completes
 procedure CurStepChanged(CurStep: TSetupStep);
 var
@@ -396,21 +490,37 @@ var
   SettingsDir: string;
   SettingsFile: string;
   WindowFile: string;
+  i: Integer;
 begin
   if CurStep = ssPostInstall then
   begin
     // 1. First: .NET 9 Desktop Runtime (more critical — app won't start without it)
+    // File was already downloaded via DownloadPage before installation began.
     if not IsDotNet9Installed then
     begin
       BootstrapperPath := ExpandConstant('{tmp}\dotnet-runtime-9.0-win-x64.exe');
-      Log('.NET 9 Desktop Runtime not found. Downloading...');
-      if URLDownloadToFile(0, DotNet9RuntimeUrl, BootstrapperPath, 0, 0) = 0 then
+      if FileExists(BootstrapperPath) then
       begin
-        Log('Downloaded .NET 9 bootstrapper. Installing silently...');
+        Log('Installing .NET 9 Desktop Runtime...');
         if Exec(BootstrapperPath, '/quiet /install /norestart', '', SW_SHOW, ewWaitUntilTerminated, ResultCode) then
         begin
           if ResultCode = 0 then
-            Log('.NET 9 Desktop Runtime installed successfully.')
+          begin
+            Log('.NET 9 Desktop Runtime installed successfully.');
+            // Wait for .NET registry registration to complete before running
+            // shell/assoc registration (which also launch MantisZip.exe).
+            // The installer process exits before the registry is fully synced.
+            i := 0;
+            while (i < 60) and (not IsDotNet9Installed) do
+            begin
+              Sleep(500);
+              i := i + 1;
+            end;
+            if IsDotNet9Installed then
+              Log('.NET registration confirmed after ~' + IntToStr(i * 500) + 'ms')
+            else
+              Log('.NET registration not detected after ~30s, proceeding anyway');
+          end
           else
             Log('.NET 9 Desktop Runtime installer exited with code: ' + IntToStr(ResultCode));
         end
@@ -418,19 +528,18 @@ begin
           Log('Failed to launch .NET 9 bootstrapper.');
       end
       else
-        Log('Failed to download .NET 9 bootstrapper. User may need to install manually.');
+        Log('.NET 9 bootstrapper not found. Download may have failed; user may need to install manually.');
     end
     else
       Log('.NET 9 Desktop Runtime is already installed.');
 
-    // 2. Then: WebView2 Runtime（避免阻塞文件安装进度条）
+    // 2. Then: WebView2 Runtime
     if not IsWebView2Installed then
     begin
       BootstrapperPath := ExpandConstant('{tmp}\MicrosoftEdgeWebview2Setup.exe');
-      Log('WebView2 Runtime not found. Downloading Evergreen Bootstrapper...');
-      if URLDownloadToFile(0, EvergreenBootstrapperUrl, BootstrapperPath, 0, 0) = 0 then
+      if FileExists(BootstrapperPath) then
       begin
-        Log('Downloaded bootstrapper. Installing silently...');
+        Log('Installing WebView2 Runtime...');
         if Exec(BootstrapperPath, '/silent /install', '', SW_SHOW, ewWaitUntilTerminated, ResultCode) then
         begin
           if ResultCode = 0 then
@@ -442,10 +551,28 @@ begin
           Log('Failed to launch WebView2 bootstrapper.');
       end
       else
-        Log('Failed to download WebView2 bootstrapper. User may need to install manually.');
+        Log('WebView2 bootstrapper not found. Download may have failed; user may need to install manually.');
     end
     else
       Log('WebView2 Runtime is already installed.');
+
+    // 3. Shell integration deferred to first user launch (non-elevated context).
+    //    SHChangeNotify from an elevated (installer) process does NOT propagate
+    //    to the non-elevated Explorer.exe, so dynamic COM context menus appear
+    //    missing until reinstalled from MantisZip's Settings window.
+    //    Instead: write a FirstRun marker. MantisZip's App.OnStartup detects it
+    //    on the first normal (non-elevated) launch and calls ShellIntegration.Install()
+    //    — which includes SHChangeNotify from the correct integrity level.
+    if InstallShellCheck.Checked then
+    begin
+      RegWriteStringValue(HKCU, 'Software\MantisZip', 'FirstRunShell', '1');
+      Log('FirstRunShell marker written (shell integration will install on first user launch)');
+    end;
+    if IsAnyAssocChecked then
+    begin
+      RegWriteStringValue(HKCU, 'Software\MantisZip', 'FirstRunAssoc', '1');
+      Log('FirstRunAssoc marker written (file associations will register on first user launch)');
+    end;
 
     SettingsDir := ExpandConstant('{localappdata}\MantisZip');
     SettingsFile := SettingsDir + '\settings.json';

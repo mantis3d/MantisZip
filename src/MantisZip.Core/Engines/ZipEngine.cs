@@ -883,8 +883,24 @@ public class ZipEngine : IArchiveEngine
                 });
                 CoreLog.Trace("[TRACE] ZipEngine.AddToArchiveAsync: Phase 1 — extracting old entries");
 
-                using (var archive = OpenArchiveWithEncodingFallback(archivePath))
+                using (var archive = OpenArchiveWithEncodingFallback(archivePath, options.Password))
                 {
+                    // Check for encrypted entries before starting extraction.
+                    // If any non-directory entry is encrypted and no password is
+                    // provided, fail early with a clear message instead of relying
+                    // on SharpCompress to throw CryptographiceException (which is
+                    // environment/version dependent).
+                    if (string.IsNullOrEmpty(options.Password))
+                    {
+                        var hasEncryptedEntry = archive.Entries.Any(e => !e.IsDirectory && e.IsEncrypted);
+                        if (hasEncryptedEntry)
+                        {
+                            CoreLog.Info("AddToArchiveAsync: archive has encrypted entries but no password provided");
+                            throw new InvalidOperationException(
+                                "此压缩包包含加密条目，需要密码才能添加文件。 (Archive contains encrypted entries, password required to add files.)");
+                        }
+                    }
+
                     foreach (var entry in archive.Entries)
                     {
                         cancellationToken.ThrowIfCancellationRequested();

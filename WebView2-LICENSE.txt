@@ -1,0 +1,18 @@
+MantisZip 包含 Microsoft Edge WebView2 Runtime
+Copyright (C) Microsoft Corporation。保留所有权利。
+
+根据微软软件许可条款，本软件再分发了 Microsoft Edge WebView2 Runtime。
+
+完整许可条款请参见:
+https://aka.ms/WebView2License
+
+---
+
+MantisZip includes Microsoft Edge WebView2 Runtime
+Copyright (C) Microsoft Corporation. All rights reserved.
+
+This software redistributes Microsoft Edge WebView2 Runtime
+under the Microsoft Software License Terms.
+
+For the full license terms, see:
+https://aka.ms/WebView2License
