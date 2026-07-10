@@ -18,6 +18,14 @@
 
 ## 版本历史（从新到旧）
 
+### v0.4.4+++ (2026-07-10) 视图菜单添加"隐藏预览信息"开关
+
+1. **预览信息面板独立显隐控制** — 在视图菜单新增 `IsCheckable` 菜单项"隐藏预览信息(_I)"
+   - 关闭后：`PreviewInfoPanel`（文件名、大小、压缩比、日期）和 `PreviewExtraInfoPanel`（格式元数据）同时隐藏，预览内容区独占空间
+   - 两级控制：`PreviewToggleMenu` 控制预览整体开关，`PreviewInfoToggleMenu` 控制信息面板开关
+   - 状态持久化到 `settings.json`（`ShowPreviewInfoPanel`）
+2. **修改文件**：`AppSettings.cs`、`strings.zh.json`、`strings.en.json`、`L.cs`、`MainWindow.xaml`、`MainWindow.xaml.cs`、`MainWindow.Menu.cs`、`MainWindow.Preview.cs`
+
 ### v0.4.4+ (2026-07-09) 移除 Applications shell\open\command 防止安装时错误路由
 
 1. **移除 `Applications\MantisZip.UI.exe\shell\open\command` 注册** — 避免新软件安装时 Windows Shell 关联刷新将 exe 打开操作错误地路由到 MantisZip

@@ -61,6 +61,7 @@ public partial class MainWindow : Window
     private string? _savedSortColumnPath;    // 持久化的排序列 SortMemberPath
     private int _savedSortDirection;         // 持久化的排序方向 (0=无, 1=升, 2=降)
     private bool _previewPanelEnabled = true; // 工具栏预览开关状态
+    private bool _previewInfoPanelEnabled = true; // 预览信息面板开关状态
     private Point _dragStartPoint;           // 文件列表拖拽起点
     private string? _dragTempDir;            // 拖拽提取临时目录
     private bool _isOwnDrag;                 // 当前拖拽是否来自本窗口
@@ -114,6 +115,18 @@ public partial class MainWindow : Window
         }
         if (!_previewPanelEnabled)
             PreviewPanel.Visibility = Visibility.Collapsed;
+
+        _previewInfoPanelEnabled = AppSettings.Instance.ShowPreviewInfoPanel;
+        if (PreviewInfoToggleMenu.Icon is Emoji.Wpf.TextBlock infoIcon)
+        {
+            PreviewInfoToggleMenu.IsChecked = !_previewInfoPanelEnabled;
+            infoIcon.Opacity = _previewInfoPanelEnabled ? 1.0 : 0.2;
+        }
+        if (!_previewInfoPanelEnabled)
+        {
+            PreviewInfoPanel.Visibility = Visibility.Collapsed;
+            PreviewExtraInfoPanel.Visibility = Visibility.Collapsed;
+        }
         Activated += MainWindow_Activated;
         Loaded += async (_, _) =>
         {
