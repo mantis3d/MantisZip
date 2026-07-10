@@ -225,6 +225,7 @@
   "Main_Menu_Refresh": "刷新(_R)",
   "Main_Menu_ProgressBars": "比例填充条(_F)",
   "Main_Menu_SepDirBaseline": "目录独立基准(_D)",
+  "Main_Menu_HidePreviewInfo": "隐藏预览信息(_I)",
   "Main_Menu_BookmarkManager": "书签管理器(_B)...",
   "Main_Menu_Settings": "设置(_S)...",
   "Main_Menu_Tools": "工具(_T)",
