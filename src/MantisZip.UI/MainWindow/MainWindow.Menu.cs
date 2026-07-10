@@ -5,6 +5,7 @@ using System.Windows.Controls;
 using MantisZip.Core;
 using MantisZip.Core.Abstractions;
 using MantisZip.Core.Engines;
+using MantisZip.Core.Models;
 using MantisZip.Core.Utils;
 using Microsoft.Win32;
 using MantisZip.UI.Localization;
@@ -38,9 +39,86 @@ public partial class MainWindow
     private async void Extract_Click(object sender, RoutedEventArgs e)
     {
         if (string.IsNullOrEmpty(_currentArchivePath)) return;
-        var dest = ResolveExtractDestination(_currentArchivePath);
-        if (dest != null)
-            await ExtractAsync(_currentArchivePath, dest);
+
+        var engine = ArchiveEngineFactory.GetEngineByExtension(_currentArchivePath);
+        if (engine == null) return;
+
+        // 列出条目用于过滤
+        IReadOnlyList<Core.Abstractions.ArchiveItem>? entries = null;
+        try
+        {
+            entries = await engine.ListEntriesAsync(_currentArchivePath, _currentPassword);
+        }
+        catch { /* 列出失败也不妨碍使用传统提取 */ }
+
+        if (entries == null || entries.Count == 0)
+        {
+            // 传统路径
+            var dest = ResolveExtractDestination(_currentArchivePath);
+            if (dest != null)
+                await ExtractAsync(_currentArchivePath, dest);
+            return;
+        }
+
+        // 弹出 ExtractSettingsWindow 带条目过滤
+        var dlg = new ExtractSettingsWindow(
+            new[] { _currentArchivePath },
+            entries)
+        {
+            Owner = this
+        };
+
+        if (dlg.ShowDialog() == true)
+        {
+            var dest = dlg.CustomDestination;
+            if (string.IsNullOrEmpty(dest))
+            {
+                dest = dlg.OutputMode switch
+                {
+                    ExtractOutputMode.Here => Path.GetDirectoryName(_currentArchivePath) ?? Environment.GetFolderPath(Environment.SpecialFolder.Desktop),
+                    ExtractOutputMode.Smart => ResolveSmartExtractDest(_currentArchivePath, entries),
+                    ExtractOutputMode.ToName => Path.Combine(
+                        Path.GetDirectoryName(_currentArchivePath) ?? Environment.GetFolderPath(Environment.SpecialFolder.Desktop),
+                        Path.GetFileNameWithoutExtension(_currentArchivePath)),
+                    _ => Environment.GetFolderPath(Environment.SpecialFolder.Desktop),
+                };
+            }
+
+            var filter = dlg.GetFilter();
+            var filteredKeys = dlg.GetFilteredEntryKeys();
+
+            if (filter != null && filteredKeys != null && filteredKeys.Count > 0)
+            {
+                // 过滤模式：只提取匹配的条目
+                await engine.ExtractEntriesAsync(
+                    _currentArchivePath,
+                    filteredKeys,
+                    dest,
+                    _currentPassword,
+                    options: new ArchiveOptions
+                    {
+                        ConflictAction = Core.Abstractions.FileConflictAction.Overwrite,
+                    });
+            }
+            else
+            {
+                // 无过滤：传统提取
+                await ExtractAsync(_currentArchivePath, dest);
+            }
+        }
+    }
+
+    /// <summary>
+    /// 根据条目列表确定智能解压目标目录。
+    /// </summary>
+    private static string ResolveSmartExtractDest(string archivePath, IReadOnlyList<MantisZip.Core.Abstractions.ArchiveItem> entries)
+    {
+        var parentDir = Path.GetDirectoryName(archivePath)
+                        ?? Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
+        var archiveName = Path.GetFileNameWithoutExtension(archivePath);
+        return ArchiveStructureAnalyzer.HasSingleRootDirectory(entries)
+            ? parentDir
+            : Path.Combine(parentDir, archiveName);
     }
 
     private async void ExtractSelected_Click(object sender, RoutedEventArgs e)

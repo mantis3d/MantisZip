@@ -1,6 +1,7 @@
 using MantisZip.Core;
 using MantisZip.Core.Abstractions;
 using MantisZip.Core.Engines;
+using MantisZip.Core.FileFilter;
 using MantisZip.Core.Models;
 using MantisZip.Core.Services;
 using MantisZip.Core.Utils;
@@ -49,6 +50,50 @@ public partial class CompressSettingsWindow : Window
                 FileNameTextBox.Text = name;
             }
         });
+
+        // 初始化过滤控件
+        if (CompressFilterControl != null)
+        {
+            CompressFilterControl.LoadPresets(AppSettings.Instance.FilterPresets);
+            CompressFilterControl.SavePresetRequested += OnCompressSavePreset;
+            CompressFilterControl.DeletePresetRequested += OnCompressDeletePreset;
+        }
+    }
+
+    /// <summary>
+    /// 获取当前激活的过滤条件（仅当启用且非空时返回）。
+    /// </summary>
+    public FileFilterCriteria? GetActiveFilter()
+    {
+        if (CompressFilterControl == null) return null;
+        if (!CompressFilterControl.IsFilterEnabled) return null;
+        var filter = CompressFilterControl.GetFilter();
+        return filter.IsActive ? filter : null;
+    }
+
+    private void OnCompressSavePreset(string name)
+    {
+        if (CompressFilterControl == null) return;
+        var filter = CompressFilterControl.GetFilter();
+        var preset = new FileFilterPreset(name, filter, isBuiltIn: false);
+        try
+        {
+            AppSettings.Instance.AddPreset(preset);
+            AppSettings.Instance.Save();
+            CompressFilterControl.LoadPresets(AppSettings.Instance.FilterPresets);
+        }
+        catch (InvalidOperationException ex)
+        {
+            AppMessageBox.Show(ex.Message, L.T(L.FileFilter_SavePresetTitle),
+                MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+    }
+
+    private void OnCompressDeletePreset(FileFilterPreset preset)
+    {
+        AppSettings.Instance.FilterPresets.Remove(preset);
+        AppSettings.Instance.Save();
+        CompressFilterControl.LoadPresets(AppSettings.Instance.FilterPresets);
     }
 
     private string GetFormatExtension()
@@ -389,6 +434,22 @@ public partial class CompressSettingsWindow : Window
                     return;
                 }
             }
+        }
+
+        // 应用文件过滤
+        var filter = GetActiveFilter();
+        if (filter != null)
+        {
+            var filtered = FileFilterHelper.ApplyFilter(_sourcePaths.ToArray(), filter);
+            if (filtered.Length == 0)
+            {
+                AppMessageBox.Show(L.T(L.Compress_Validation_NoFiles), L.T(L.Compress_Title), MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+            // 用过滤后的路径替换原始源路径列表
+            _sourcePaths.Clear();
+            _sourcePaths.AddRange(filtered);
+            App.Log("CompressButton_Click: 过滤后剩余 {0} 个文件", filtered.Length);
         }
 
         App.Log(L.T(L.Shell_Compress));

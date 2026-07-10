@@ -19,7 +19,7 @@
 | **P1** | 统一路径快捷选择 (QuickPathControl → Avalonia) | [quickpath-unified.md](.sisyphus/plans/quickpath-unified.md) | 🟡中 | 4-6h | WPF 已完成数据层 + QuickPathControl 组件 + CompressSettingsWindow 嵌入；WPF 新增 QuickPathPreDialog 前置窗（系统对话框前先选路径）；Avalonia 阶段以 CustomFilePickerDialog + QuickPathBuddy 统一替换 |
 | **P1** | Win11 一级右键菜单 | [win11-first-level-menu.md](.sisyphus/plans/win11-first-level-menu.md) | 🔴高 | 1-2周 | IExplorerCommand 实现，HKLM 提权注册，双接口共存 |
 | **P1** | 解压路径统一（前置：文件筛选） | [extract-path-unification.md](.sisyphus/plans/extract-path-unification.md) | 🟢低 | 1.5h | 三路解压合并为 `ExtractEntriesAsync` + `pathOverrides`，消除重复循环 |
-| **P1** | 压缩解压文件筛选 | [file-filter-feature.md](.sisyphus/plans/file-filter-feature.md) | 🟢低 | 1-2h | 压缩解压文件筛选 |
+| **P1** | 压缩解压文件筛选 | [file-filter-feature.md](.sisyphus/plans/file-filter-feature.md) | 🟢低 | 1-2h | ✅ 已完成 |
 | **P1** | 新增压缩格式（BZip2/XZ/CAB 等） | [new-format-support.md](.sisyphus/plans/new-format-support.md) | 🟡中 | 12-20h | 6 阶段渐进：TAR 裸格式/GZip 单文件 → BZip2 → XZ → CAB 只读 → UI 统一化 → Zstandard（需依赖） |
 | **P1** | 自包含体积优化（Avalonia 迁移后） | [selfcontained-size-optimization.md](.sisyphus/plans/selfcontained-size-optimization.md) | 🟡中 | 4-6h | 三步渐进：InvariantGlobalization → 保守修剪 → 激进修剪，目标降至 20–25 MB |
 | **P1** | Avalonia 拖拽直接解压 | [drag-drop-direct-extract.md](.sisyphus/plans/drag-drop-direct-extract.md) | 🟡中 | 5-7h | 纯 Win32 独立线程覆盖层（三色状态机 + 呼吸动画）+ WindowFromPoint+ShellWindows 检测目标路径；UIA 降级支持；需等 Avalonia 移植基本就绪后实施 |
@@ -78,7 +78,7 @@
 
 ### 🟡 需调整 — Core 可复用，UI 需移植（11 个）
 
-`archive-diff.md`、`archive-rename-entry.md`、`compress-preset.md`、`compression-estimator.md`、`custom-columns.md`、`extract-journal-undo.md`、`file-filter-feature.md`、`ico-file-icon-extract.md`、`office-content-preview.md`、`preview-magic-detection.md`（Phase1 Core 🟢 可先行）、`外部工具视频元数据（无计划文件）`
+`archive-diff.md`、`archive-rename-entry.md`、`compress-preset.md`、`compression-estimator.md`、`custom-columns.md`、`extract-journal-undo.md`、`ico-file-icon-extract.md`、`office-content-preview.md`、`preview-magic-detection.md`（Phase1 Core 🟢 可先行）、`外部工具视频元数据（无计划文件）`
 
 ### 🔴 冲突 — 需完全重写或废弃（9 个）
 
@@ -89,7 +89,7 @@
 1. **🔴 的共性**：全部依赖 Windows Shell API（COM/注册表/P/Invoke/Shell32）或 WPF 独占控件/DataGrid 特定行为。跨平台后这些功能要么砍掉（COM 右键菜单、UAC 提权），要么需要 OS 级不同实现（Linux `.desktop` actions / macOS `NSExtension`）。
 2. **🟡 的规律一致**：Core 层的解析器/算法/模型全是纯 C# 可复用，只有 UI 渲染层（WPF XAML + 控件）需要移植到 Avalonia 等价物。
 3. **🟢 的 3 个计划**：基本是纯工具代码（正则、IO、字节操作）或发布配置，开箱即跨平台。
-4. **最值得跨平台前实现的计划**：优先完成 `file-filter-feature.md`（纯 Core 逻辑轻度依赖 UI）、`compress-preset.md`（设置持久化）等 🟢/🟡 计划，积累跨平台经验后再攻坚 🔴 计划。
+4. **最值得跨平台前实现的计划**：优先完成 `compress-preset.md`（设置持久化）等 🟢/🟡 计划（`file-filter-feature.md` 已实现），积累跨平台经验后再攻坚 🔴 计划。
 5. **Core 层遗留问题**：`PasswordManager`（DPAPI → 已实现 `AesGcmDataProtector` 抽象）和 `SevenZipEngine`（7z.dll Windows-only）已在跨平台准备中。
 
 *此文档将随开发进度持续更新*

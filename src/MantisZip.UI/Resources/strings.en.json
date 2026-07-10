@@ -834,6 +834,37 @@
   "Settings_CompressOpt_WordSize": "Word Size:",
   "Settings_CompressOpt_MatchFinder": "Match Finder:",
   "Settings_CompressOpt_EncryptionMethod": "Encryption Method:",
-  "Settings_CompressOpt_EncryptHeaders": "Encrypt Headers"
+  "Settings_CompressOpt_EncryptHeaders": "Encrypt Headers",
+
+  "Compress_Tab_Filter": "File Filter",
+
+  "Extract_Tab_Filter": "File Filter",
+  "ExtractFilter_CountLabel": "{0} files total, {1} will be extracted after filtering",
+
+  "FileFilter_Enable": "Enable file filter",
+  "FileFilter_Presets": "Presets",
+  "FileFilter_PresetSelect": "Select a preset…",
+  "FileFilter_PresetSave": "Save",
+  "FileFilter_PresetDelete": "Delete",
+  "FileFilter_Extensions": "Extensions",
+  "FileFilter_Audio": "Audio",
+  "FileFilter_Video": "Video",
+  "FileFilter_Image": "Image",
+  "FileFilter_Document": "Document",
+  "FileFilter_Archive": "Archive",
+  "FileFilter_CustomExtensions": "Custom extensions (comma-separated):",
+  "FileFilter_NamePattern": "File Name",
+  "FileFilter_NamePatternHint": "Supports * (any characters) and ? (single character) wildcards",
+  "FileFilter_Size": "File Size",
+  "FileFilter_MinSize": "Min:",
+  "FileFilter_MaxSize": "Max:",
+  "FileFilter_SizeUnit": "Unit",
+  "FileFilter_Date": "Modified Date",
+  "FileFilter_StartDate": "Start:",
+  "FileFilter_EndDate": "End:",
+  "FileFilter_PresetDeleteConfirm": "Are you sure you want to delete preset \"{0}\"?",
+  "FileFilter_NoPresetName": "Please enter a preset name",
+  "FileFilter_PresetNamePrompt": "Preset name:",
+  "FileFilter_SavePresetTitle": "Save Preset"
 }
 

@@ -18,6 +18,17 @@
 
 ## 版本历史（从新到旧）
 
+### v0.4.5+ (2026-07-10) 文件过滤功能
+
+1. **新功能：文件过滤（压缩/解压）** — `file-filter-feature.md`
+   - **FileFilterCriteria 数据模型**：扩展名/文件名/大小/日期四维过滤条件
+   - **FileFilterMatcher 匹配引擎**：AND 逻辑，支持通配符 `*` `?`
+   - **FileFilterPreset 预设系统**：8 内置预设（图片/音频/视频/文档/压缩包/大文件/月内修改/排除临时文件）+ 用户自定义预设（上限 20 条），通过 `AppSettings.FilterPresets` JSON 持久化
+   - **FileFilterEditor UserControl**：启用开关、预设下拉框、扩展名复选框组、名称/大小/日期输入面板
+   - **ExtractSettingsWindow**：Tab 3 嵌入 FileFilterEditor，实时过滤统计（匹配数/总数），预设保存/删除
+   - **CompressSettingsWindow**：Tab 4 嵌入 FileFilterEditor，压缩时通过 `FileFilterHelper.ApplyFilter` 递归枚举目录并过滤
+   - **MainWindow 提取流**：`Extract_Click` 获取条目列表传给 `ExtractSettingsWindow`，`HandleExtractBatch` 接收过滤参数逐压缩包应用滤件
+
 ### v0.4.5+ (2026-07-10) 便携模式 + Release 便携包
 
 1. **便携模式** — exe 同级存在 `Portable.txt` 时自动启用：

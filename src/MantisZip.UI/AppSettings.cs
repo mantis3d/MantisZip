@@ -1,8 +1,10 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Text.Json;
 using Microsoft.Win32;
 using MantisZip.Core;
+using MantisZip.Core.FileFilter;
 using MantisZip.Core.Utils;
 
 namespace MantisZip.UI;
@@ -111,6 +113,20 @@ public class AppSettings
     public bool CleanTempOnStartup { get; set; } = true;
     /// <summary>CLI 模式下遇到权限不足时，是否弹提权窗口（默认 false = 仅提示不可写目录）</summary>
     public bool AllowElevation { get; set; } = false;
+
+    // ===== 文件过滤预设 =====
+    /// <summary>用户自定义文件过滤预设（上限 20，不含内置预设）。</summary>
+    public List<FileFilterPreset> FilterPresets { get; set; } = new();
+
+    /// <summary>
+    /// 添加用户预设。超过上限时抛出 InvalidOperationException。
+    /// </summary>
+    public void AddPreset(FileFilterPreset preset)
+    {
+        if (FilterPresets.Count >= 20)
+            throw new InvalidOperationException("文件过滤预设数量已达上限（20）");
+        FilterPresets.Add(preset);
+    }
 
     // ===== 默认路径优先级 =====
     /// <summary>

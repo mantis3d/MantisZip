@@ -1,8 +1,11 @@
+using MantisZip.Core.Abstractions;
+using MantisZip.Core.FileFilter;
 using MantisZip.Core.Models;
 using MantisZip.Core.Utils;
 using MantisZip.UI.Localization;
 using System.Collections.ObjectModel;
 using System.IO;
+using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 
@@ -26,6 +29,34 @@ public partial class ExtractSettingsWindow : Window
     /// <summary>手动模式下用户选择的目录</summary>
     public string? CustomDestination { get; private set; }
 
+    // ── Filter Support ──
+
+    /// <summary>提取模式使用的条目列表（用于过滤统计）。</summary>
+    private IReadOnlyList<MantisZip.Core.Abstractions.ArchiveItem>? _entries;
+
+    /// <summary>获取当前过滤条件。仅当启用过滤且 filter.IsActive 时有效。</summary>
+    public FileFilterCriteria? GetFilter()
+    {
+        if (FileFilterControl == null) return null;
+        if (!FileFilterControl.IsFilterEnabled) return null;
+        var filter = FileFilterControl.GetFilter();
+        return filter.IsActive ? filter : null;
+    }
+
+    /// <summary>
+    /// 对 _entries 应用过滤条件，返回匹配条目的 key 列表。
+    /// </summary>
+    public List<string>? GetFilteredEntryKeys()
+    {
+        var filter = GetFilter();
+        if (filter == null || _entries == null) return null;
+
+        return _entries
+            .Where(e => FileFilterMatcher.IsMatch(filter, e))
+            .Select(e => e.FullPath)
+            .ToList();
+    }
+
     // ── Internal State ──
 
     private readonly ObservableCollection<string> _files;
@@ -33,7 +64,7 @@ public partial class ExtractSettingsWindow : Window
     private readonly string _firstArchiveNameOnly = "";
 
     /// <summary>
-    /// 创建解压设置窗口。
+    /// 创建解压设置窗口（无条目列表，不启用过滤）。
     /// </summary>
     /// <param name="archivePaths">初始压缩包路径列表</param>
     public ExtractSettingsWindow(IReadOnlyList<string> archivePaths)
@@ -63,6 +94,49 @@ public partial class ExtractSettingsWindow : Window
 
         RefreshOutputPathState();
         UpdateExtractButton();
+    }
+
+    /// <summary>
+    /// 创建解压设置窗口（带压缩包条目列表，支持过滤）。
+    /// </summary>
+    /// <param name="archivePaths">初始压缩包路径列表</param>
+    /// <param name="entries">压缩包内条目列表（用于过滤统计和提取）</param>
+    public ExtractSettingsWindow(IReadOnlyList<string> archivePaths, IReadOnlyList<MantisZip.Core.Abstractions.ArchiveItem> entries)
+        : this(archivePaths)
+    {
+        _entries = entries;
+
+        // 加载预设
+        if (FileFilterControl != null)
+        {
+            FileFilterControl.LoadPresets(AppSettings.Instance.FilterPresets);
+            FileFilterControl.SavePresetRequested += OnSavePreset;
+            FileFilterControl.DeletePresetRequested += OnDeletePreset;
+        }
+    }
+
+    private void OnSavePreset(string name)
+    {
+        var filter = FileFilterControl.GetFilter();
+        var preset = new FileFilterPreset(name, filter, isBuiltIn: false);
+        try
+        {
+            AppSettings.Instance.AddPreset(preset);
+            AppSettings.Instance.Save();
+            FileFilterControl.LoadPresets(AppSettings.Instance.FilterPresets);
+        }
+        catch (InvalidOperationException ex)
+        {
+            AppMessageBox.Show(ex.Message, L.T(L.FileFilter_SavePresetTitle),
+                MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+    }
+
+    private void OnDeletePreset(FileFilterPreset preset)
+    {
+        AppSettings.Instance.FilterPresets.Remove(preset);
+        AppSettings.Instance.Save();
+        FileFilterControl.LoadPresets(AppSettings.Instance.FilterPresets);
     }
 
     private void LoadDefaultsFromSettings()
@@ -218,5 +292,23 @@ public partial class ExtractSettingsWindow : Window
     private void UpdateFileCount()
     {
         FileCountText.Text = L.TF(L.ExtractSettings_FileCount, _files.Count);
+    }
+
+    private void OnFilterChanged()
+    {
+        if (_entries == null || FileFilterControl == null) return;
+
+        var filter = FileFilterControl.GetFilter();
+        if (FileFilterControl.IsFilterEnabled && filter.IsActive)
+        {
+            var matched = _entries.Count(e => FileFilterMatcher.IsMatch(filter, e));
+            FileFilterControl.SetFilterStats(
+                L.TF(L.ExtractFilter_CountLabel, _entries.Count, matched));
+            FileFilterControl.ShowFilterStats(true);
+        }
+        else
+        {
+            FileFilterControl.ShowFilterStats(false);
+        }
     }
 }

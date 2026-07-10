@@ -836,6 +836,36 @@ public const string Settings_Appearance_Theme                  = "Settings_Appea
     public const string Settings_CompressOpt_EncryptionMethod         = "Settings_CompressOpt_EncryptionMethod";
     public const string Settings_CompressOpt_EncryptHeaders           = "Settings_CompressOpt_EncryptHeaders";
 
+    // ─── File filter ───
+    public const string Compress_Tab_Filter                           = "Compress_Tab_Filter";
+    public const string Extract_Tab_Filter                            = "Extract_Tab_Filter";
+    public const string ExtractFilter_CountLabel                     = "ExtractFilter_CountLabel";
+    public const string FileFilter_Enable                             = "FileFilter_Enable";
+    public const string FileFilter_Presets                            = "FileFilter_Presets";
+    public const string FileFilter_PresetSelect                       = "FileFilter_PresetSelect";
+    public const string FileFilter_PresetSave                         = "FileFilter_PresetSave";
+    public const string FileFilter_PresetDelete                       = "FileFilter_PresetDelete";
+    public const string FileFilter_Extensions                         = "FileFilter_Extensions";
+    public const string FileFilter_Audio                              = "FileFilter_Audio";
+    public const string FileFilter_Video                              = "FileFilter_Video";
+    public const string FileFilter_Image                              = "FileFilter_Image";
+    public const string FileFilter_Document                           = "FileFilter_Document";
+    public const string FileFilter_Archive                            = "FileFilter_Archive";
+    public const string FileFilter_CustomExtensions                   = "FileFilter_CustomExtensions";
+    public const string FileFilter_NamePattern                        = "FileFilter_NamePattern";
+    public const string FileFilter_NamePatternHint                    = "FileFilter_NamePatternHint";
+    public const string FileFilter_Size                               = "FileFilter_Size";
+    public const string FileFilter_MinSize                            = "FileFilter_MinSize";
+    public const string FileFilter_MaxSize                            = "FileFilter_MaxSize";
+    public const string FileFilter_SizeUnit                           = "FileFilter_SizeUnit";
+    public const string FileFilter_Date                               = "FileFilter_Date";
+    public const string FileFilter_StartDate                          = "FileFilter_StartDate";
+    public const string FileFilter_EndDate                            = "FileFilter_EndDate";
+    public const string FileFilter_PresetDeleteConfirm                 = "FileFilter_PresetDeleteConfirm";
+    public const string FileFilter_NoPresetName                       = "FileFilter_NoPresetName";
+    public const string FileFilter_PresetNamePrompt                   = "FileFilter_PresetNamePrompt";
+    public const string FileFilter_SavePresetTitle                    = "FileFilter_SavePresetTitle";
+
     /// <summary>Translate a key using LanguageManager.</summary>
     public static string T(string key) => LanguageManager.Instance[key];
 

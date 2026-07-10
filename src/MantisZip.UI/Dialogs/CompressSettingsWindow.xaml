@@ -3,6 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:l="clr-namespace:MantisZip.UI.Localization"
          xmlns:controls="clr-namespace:MantisZip.UI.Controls"
+        xmlns:filter="clr-namespace:MantisZip.UI.Controls"
         Title="{l:L Compress_Title}" Height="660" Width="530"
         WindowStartupLocation="CenterScreen"
         ResizeMode="NoResize"
@@ -362,6 +363,12 @@
                                    Margin="0,8,0,0"/>
                     </StackPanel>
                 </ScrollViewer>
+            </TabItem>
+            <!-- ============ 文件过滤 ============ -->
+            <TabItem Header="{l:L Compress_Tab_Filter}">
+                <Grid Background="{StaticResource Theme_WindowBg}">
+                    <filter:FileFilterEditor x:Name="CompressFilterControl"/>
+                </Grid>
             </TabItem>
         </TabControl>
 

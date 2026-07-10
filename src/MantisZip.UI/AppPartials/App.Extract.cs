@@ -8,6 +8,7 @@ using System.Windows.Threading;
 using MantisZip.Core;
 using MantisZip.Core.Abstractions;
 using MantisZip.Core.Engines;
+using MantisZip.Core.FileFilter;
 using MantisZip.Core.Models;
 using MantisZip.Core.Services;
 using MantisZip.Core.Utils;
@@ -253,10 +254,32 @@ public partial class App : Application
         {
             ExtractOutputMode selectedMode = ExtractOutputMode.ToName;
             string? customDest = null;
+            FileFilterCriteria? filter = null;
+            List<string>? filteredKeys = null;
             LogStartup("HandleExtractBatch: 准备弹出 ExtractSettingsWindow");
             var ok = app.Dispatcher.Invoke(() =>
             {
-                var dlg = new ExtractSettingsWindow(allPaths);
+                IReadOnlyList<MantisZip.Core.Abstractions.ArchiveItem>? entries = null;
+                // 尝试获取第一个压缩包的条目列表（用于过滤）
+                if (allPaths.Count > 0)
+                {
+                    try
+                    {
+                        var engine = ArchiveEngineFactory.GetEngineByExtension(allPaths[0]);
+                        if (engine != null)
+                        {
+                            var task = engine.ListEntriesAsync(allPaths[0], null);
+                            task.Wait(3000);
+                            if (task.IsCompletedSuccessfully)
+                                entries = task.Result;
+                        }
+                    }
+                    catch { /* 条目获取失败时无过滤支持 */ }
+                }
+
+                var dlg = entries != null
+                    ? new ExtractSettingsWindow(allPaths, entries)
+                    : new ExtractSettingsWindow(allPaths);
                 dlg.Owner = Application.Current?.Windows.OfType<Window>().FirstOrDefault(w => w.IsActive);
                 LogStartup("HandleExtractBatch: ExtractSettingsWindow 已创建，准备 ShowDialog");
                 var result = dlg.ShowDialog();
@@ -264,7 +287,9 @@ public partial class App : Application
                 if (result != true) return false;
                 selectedMode = dlg.OutputMode;
                 customDest = dlg.CustomDestination;
-                LogStartup($"HandleExtractBatch: 用户选择 mode={selectedMode}, dest={customDest}");
+                filter = dlg.GetFilter();
+                filteredKeys = dlg.GetFilteredEntryKeys();
+                LogStartup($"HandleExtractBatch: 用户选择 mode={selectedMode}, dest={customDest}, filter={(filter?.IsActive ?? false)}");
                 return true;
             });
 
@@ -279,9 +304,9 @@ public partial class App : Application
                 _ => "toname"
             };
             if (effectiveMode == "manual")
-                HandleExtractBatchCore(allPaths, effectiveMode, app, customDest);
+                HandleExtractBatchCore(allPaths, effectiveMode, app, customDest, filter, filteredKeys);
             else
-                HandleExtractBatchCore(allPaths, effectiveMode, app, null);
+                HandleExtractBatchCore(allPaths, effectiveMode, app, null, filter, filteredKeys);
             return;
         }
 
@@ -293,7 +318,8 @@ public partial class App : Application
     /// 批量解压核心循环。遍历 allPaths，对每个文件按 mode 决定目标目录后调用 engine.ExtractAsync。
     /// 支持取消。完成后自动退出。
     /// </summary>
-    private static void HandleExtractBatchCore(List<string> allPaths, string mode, Application app, string? manualDest)
+    private static void HandleExtractBatchCore(List<string> allPaths, string mode, Application app, string? manualDest,
+        FileFilterCriteria? filter = null, List<string>? filteredEntryKeys = null)
     {
         LogStartup($"HandleExtractBatchCore: mode={mode}, count={allPaths.Count}, manualDest={manualDest}");
         var settings = AppSettings.Instance;
@@ -375,7 +401,20 @@ public partial class App : Application
                         var progress = progressWindow.CreatePauseAwareProgress(
                             ProgressWindow.CreateBackgroundProgress(progressWindow));
 
-                        var extractResult = await engine.ExtractAsync(archivePath, dest, password, progress, ct, batchOptions);
+                        ExtractResult extractResult;
+                        // 有过滤条件且为第一个压缩包时，使用 ExtractEntriesAsync（仅提取匹配条目）
+                        if (filter != null && filteredEntryKeys != null && i == 0)
+                        {
+                            Log("--extract batch: applying filter, extracting {0} of {1} entries",
+                                filteredEntryKeys.Count, "?");
+                            await engine.ExtractEntriesAsync(
+                                archivePath, filteredEntryKeys, dest, password, progress, ct, batchOptions);
+                            extractResult = new ExtractResult { SucceededEntries = filteredEntryKeys.Count };
+                        }
+                        else
+                        {
+                            extractResult = await engine.ExtractAsync(archivePath, dest, password, progress, ct, batchOptions);
+                        }
 
                         // 逐条目权限不足 → 首次弹窗，后续静默
                         if (extractResult.HasFailures)
