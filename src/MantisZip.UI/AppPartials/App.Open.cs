@@ -22,9 +22,35 @@ public partial class App : Application
 {
     /// <summary>
     /// 处理 --open 模式：启动主窗口并加载压缩包供浏览。
+    /// 如果传入的不是受支持的压缩格式（如 .exe），说明被 Shell 路由错误，
+    /// 则改用系统默认程序打开该文件，不显示 MantisZip 窗口。
     /// </summary>
     private static void HandleOpen(string? archivePath)
     {
+        // 防御：检查文件是否为支持的压缩格式。
+        // Explorer/iTop Easy Desktop 等可能通过 COM ContextMenuHandler 的
+        // InvokeCommand 错误地将非压缩文件路由到 --open，导致安装软件时
+        // MantisZip 意外弹出。此时应重定向到系统默认处理程序。
+        if (!string.IsNullOrEmpty(archivePath) && File.Exists(archivePath))
+        {
+            var ext = Path.GetExtension(archivePath);
+            if (!string.IsNullOrEmpty(ext) &&
+                !ArchiveEngineFactory.SupportedExtensions.Contains(ext, StringComparer.OrdinalIgnoreCase))
+            {
+                LogStartup($"HandleOpen: non-archive extension '{ext}', redirecting to default handler: \"{archivePath}\"");
+                try
+                {
+                    Process.Start(new ProcessStartInfo(archivePath) { UseShellExecute = true });
+                }
+                catch (Exception ex)
+                {
+                    Log("HandleOpen: failed to launch default handler: {0}", ex.Message);
+                }
+                Current?.Shutdown();
+                return;
+            }
+        }
+
         var mainWin = new MainWindow();
 
         if (!string.IsNullOrEmpty(archivePath) && File.Exists(archivePath))
