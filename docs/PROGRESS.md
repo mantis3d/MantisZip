@@ -25,6 +25,16 @@
    - 右键菜单（COM handler）、双击走 per-format ProgId 均不受影响
 2. **修改文件**：`src/MantisZip.UI/Shell/ShellIntegration.Assoc.cs`（删 1 行 + 注释）
 
+### v0.4.4++ (2026-07-07) 修复 COM handler 动词名"open"与系统标准动词冲突
+
+1. **COM handler 动词名冲突修复** — COM 右键菜单的 GCS_VERB 返回动词名与系统标准 "open" 重名，
+   导致新软件安装时 Windows Shell 关联刷新可能误将 MantisZip 的"打开"动词当作 exe 的默认打开程序
+   - `GetCommandString` GCS_VERB: `"open"` → `"mantiszipopen"`
+   - `ResolveCommandId` 字符串映射: `"open" => CmdIdOpen` → `"mantiszipopen" => CmdIdOpen`
+   - 正常右键菜单操作不受影响（走整数偏移路径，不经动词名）
+   - 不影响 SFX 自解压文件的打开支持
+2. **修改文件**：`src/MantisZip.ShellExt/ContextMenuHandler.cs`（改 2 行）
+
 ### v0.4.4 (2026-07-07) COM 动态菜单 + pending 状态 + 延迟级联安装
 
 1. **COM 动态菜单组件** — `MantisZip.ShellExt` 实现 `IShellExtInit` + `IContextMenu` 作为 COM 组件

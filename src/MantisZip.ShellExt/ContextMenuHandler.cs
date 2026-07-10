@@ -806,7 +806,7 @@ public class ContextMenuHandler : IShellExtInit, IContextMenu
             {
                 text = cmdId switch
                 {
-                    CmdIdOpen => "open",
+                    CmdIdOpen => "mantiszipopen",
                     CmdIdExtractHere => "extracthere",
                     CmdIdSmartExtract => "smartextract",
                     CmdIdExtractToNamed => "extracttonamed",
@@ -962,7 +962,7 @@ public class ContextMenuHandler : IShellExtInit, IContextMenu
         // Map verb string → command ID (matching GetCommandString GCS_VERB output)
         return verb.ToLowerInvariant() switch
         {
-            "open" => CmdIdOpen,
+            "mantiszipopen" => CmdIdOpen,
             "extracthere" => CmdIdExtractHere,
             "smartextract" => CmdIdSmartExtract,
             "extracttonamed" => CmdIdExtractToNamed,
