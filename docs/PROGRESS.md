@@ -18,16 +18,12 @@
 
 ## 版本历史（从新到旧）
 
-### v0.4.4+ (2026-07-10) HandleOpen 非压缩格式防御 + Applications shell\open\command 移除
+### v0.4.4+ (2026-07-09) 移除 Applications shell\open\command 防止安装时错误路由
 
-1. **`HandleOpen` 增加格式校验防御** — 当 `--open` 被传入非压缩格式文件（如 .exe）时，不弹出 MantisZip 主窗口，而是用 ShellExecute 重定向到系统默认处理程序后退出
-   - 根源：explorer.exe（或 iTop Easy Desktop 等 Shell 扩展）通过 COM ContextMenuHandler 的 InvokeCommand 将新安装软件创建的文件错误路由到 MantisZip
-   - 检查 `ArchiveEngineFactory.SupportedExtensions`，不在列表中的扩展名（如 .exe、.dll、.txt 等）直接重定向
-   - 修改文件：`src/MantisZip.UI/AppPartials/App.Open.cs`（+26 行）
-2. **移除 `Applications\MantisZip.UI.exe\shell\open\command` 注册** — 避免新软件安装时 Windows Shell 关联刷新将 exe 打开操作错误地路由到 MantisZip
+1. **移除 `Applications\MantisZip.UI.exe\shell\open\command` 注册** — 避免新软件安装时 Windows Shell 关联刷新将 exe 打开操作错误地路由到 MantisZip
    - `SupportedTypes` 保留，不影响"打开方式"的展示
    - 右键菜单（COM handler）、双击走 per-format ProgId 均不受影响
-3. **修改文件**：`src/MantisZip.UI/Shell/ShellIntegration.Assoc.cs`（删 1 行 + 注释）
+2. **修改文件**：`src/MantisZip.UI/Shell/ShellIntegration.Assoc.cs`（删 1 行 + 注释）
 
 ### v0.4.4 (2026-07-07) COM 动态菜单 + pending 状态 + 延迟级联安装
 
