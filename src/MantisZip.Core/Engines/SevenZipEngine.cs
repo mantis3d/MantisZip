@@ -637,7 +637,8 @@ public class SevenZipEngine : IArchiveEngine
         string? password = null,
         IProgress<ArchiveProgress>? progress = null,
         CancellationToken cancellationToken = default,
-        ArchiveOptions? options = null)
+        ArchiveOptions? options = null,
+        IReadOnlyDictionary<string, string>? outputPathOverrides = null)
     {
         CoreLog.Entry();
         CoreLog.Info($"ExtractEntriesAsync: {archivePath}, {entryKeys.Count} entries -> {destinationPath}");
@@ -677,7 +678,8 @@ public class SevenZipEngine : IArchiveEngine
                     continue;
                 }
 
-                var outputPath = FileConflictHelper.GetSafePath(destinationPath, fileName);
+                var outputPath = outputPathOverrides?.GetValueOrDefault(fileName)
+                    ?? FileConflictHelper.GetSafePath(destinationPath, fileName);
                 var outDir = Path.GetDirectoryName(outputPath);
                 if (!string.IsNullOrEmpty(outDir) && !Directory.Exists(outDir))
                     Directory.CreateDirectory(outDir);

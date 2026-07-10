@@ -4,6 +4,7 @@ using System.Windows;
 using System.Windows.Controls;
 using MantisZip.Core;
 using MantisZip.Core.Abstractions;
+using MantisZip.Core.Engines;
 using MantisZip.Core.Utils;
 using Microsoft.Win32;
 using MantisZip.UI.Localization;
@@ -638,15 +639,15 @@ public partial class MainWindow
         {
             var opts = App.CreateExtractOptions();
 
-            for (int i = 0; i < filesToExtract.Count; i++)
-            {
-                var item = filesToExtract[i];
-                pw.CancellationToken.ThrowIfCancellationRequested();
-                pw.SetProgress((double)i / filesToExtract.Count * 100, item.Name);
+            // Build entryKeys and pathOverrides
+            var entryKeys = new List<string>();
+            var pathOverrides = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
-                // 根据设置决定输出路径：
-                // - 关闭保留完整路径时，以当前浏览目录为基准裁剪路径前缀
-                // - item.FullPath 仍然用于 ArchiveEntryExtractor 查找条目
+            foreach (var item in filesToExtract)
+            {
+                entryKeys.Add(item.FullPath);
+
+                // 路径裁剪（与原来相同的逻辑）
                 var outputEntryPath = item.FullPath;
                 if (!AppSettings.Instance.ExtractPreserveFullPath && !string.IsNullOrEmpty(_currentFolder))
                 {
@@ -654,18 +655,27 @@ public partial class MainWindow
                     if (outputEntryPath.StartsWith(cf, StringComparison.OrdinalIgnoreCase))
                         outputEntryPath = outputEntryPath.Substring(cf.Length);
                 }
+
                 var safeEntryPath = FileConflictHelper.SanitizeEntryPath(outputEntryPath);
                 var outputPath = FileConflictHelper.GetSafePath(dest, safeEntryPath);
-                var dir = Path.GetDirectoryName(outputPath);
-                if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir)) Directory.CreateDirectory(dir);
+                pathOverrides[item.FullPath] = outputPath;
+            }
 
-                // 文件冲突处理：检查目标文件是否已存在，按用户设置弹窗或自动处理
-                var resolvedPath = FileConflictHelper.ResolvePath(outputPath, opts, item.LastModified, item.Size);
-                if (resolvedPath == null) // Skip
-                    continue;
+            var engine = ArchiveEngineFactory.GetEngineByExtension(_currentArchivePath!);
+            if (engine == null) throw new NotSupportedException("不支持的压缩格式");
 
-                await ArchiveEntryExtractor.ExtractEntryAsync(
-                    _currentArchivePath!, item.FullPath, resolvedPath, _currentFormat, _currentPassword, pw.CancellationToken);
+            var progress = ProgressWindow.CreateBackgroundProgress(pw);
+
+            if (_currentFormat is ArchiveFormat.Tar or ArchiveFormat.GZip)
+            {
+                // Tar/Gz 不支持按条目解压，降级为完整解压
+                await engine.ExtractAsync(_currentArchivePath!, dest, _currentPassword,
+                    progress, pw.CancellationToken, opts);
+            }
+            else
+            {
+                await engine.ExtractEntriesAsync(_currentArchivePath!, entryKeys, dest,
+                    _currentPassword, progress, pw.CancellationToken, opts, pathOverrides);
             }
 
             pw.SetComplete(L.T(L.Main_Status_ExtractItemsDone));

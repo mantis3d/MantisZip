@@ -473,7 +473,8 @@ public class TarGzEngine : IArchiveEngine
         string? password = null,
         IProgress<ArchiveProgress>? progress = null,
         CancellationToken cancellationToken = default,
-        ArchiveOptions? options = null)
+        ArchiveOptions? options = null,
+        IReadOnlyDictionary<string, string>? outputPathOverrides = null)
     {
         // TAR/GZ 不支持按条目选择性解压（需要完整顺序遍历流）。
         CoreLog.Entry();

@@ -344,7 +344,8 @@ public class ZipEngine : IArchiveEngine
         string? password = null,
         IProgress<ArchiveProgress>? progress = null,
         CancellationToken cancellationToken = default,
-        ArchiveOptions? options = null)
+        ArchiveOptions? options = null,
+        IReadOnlyDictionary<string, string>? outputPathOverrides = null)
     {
         CoreLog.Entry();
         CoreLog.Info($"ExtractEntriesAsync: {archivePath}, {entryKeys.Count} entries -> {destinationPath}");
@@ -375,7 +376,8 @@ public class ZipEngine : IArchiveEngine
                     continue;
                 }
 
-                var outputPath = FileConflictHelper.GetSafePath(destinationPath, entryKey);
+                var outputPath = outputPathOverrides?.GetValueOrDefault(entryKey)
+                    ?? FileConflictHelper.GetSafePath(destinationPath, entryKey);
                 var outputDir = Path.GetDirectoryName(outputPath);
                 if (!string.IsNullOrEmpty(outputDir) && !Directory.Exists(outputDir))
                     Directory.CreateDirectory(outputDir);

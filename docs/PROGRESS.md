@@ -30,7 +30,14 @@
    - **i18n**：24 个新本地化键（中/英），全部 XAML 绑定 `{l:L ...}`
    - **文本优化**：ComboBox 默认值显示 7z.dll 内部默认值（273/BT4/16MB/全固实）
    - **Bug 修复**：`SolidCheck_Changed` 空引用保护（XAML 初始化时序）
-   - **前置优化**：固实块大小选项扩展至 10 档（16MB~4GB）
+    - **前置优化**：固实块大小选项扩展至 10 档（16MB~4GB）
+
+1. **解压路径统一** — `extract-path-unification.md`
+   - **IArchiveEngine 接口扩展**：`ExtractEntriesAsync` 新增 `outputPathOverrides` 可选参数，支持调用方覆写条目输出路径
+   - **ZipEngine/SevenZipEngine**：应用 `outputPathOverrides` 逻辑，匹配 key 时用覆写路径，未匹配时回退 `GetSafePath`
+   - **TarGzEngine**：仅补齐接口签名（仍抛出 `NotSupportedException`）
+   - **ExtractSelectedAsync 重写**：去掉手写 for 循环 + `ArchiveEntryExtractor` 调用，改为构建 `entryKeys` + `pathOverrides` 字典后统一调用引擎 `ExtractEntriesAsync`；Tar/Gz 格式降级为完整解压
+   - **清理**：移除手动进度/取消管理代码，进度由 `ProgressWindow.CreateBackgroundProgress` 桥接引擎上报
 
 ### v0.4.4 (2026-07-07) COM 动态菜单 + pending 状态 + 延迟级联安装
 

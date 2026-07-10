@@ -289,22 +289,22 @@ ExtractSelected_Click → 计算 selectedEntryKeys
 
 ## TODOs
 
-- [ ] **1. IArchiveEngine 接口 + 引擎实现**
-  - [ ] 1.1 `IArchiveEngine.ExtractEntriesAsync` 加 `outputPathOverrides` 参数
-  - [ ] 1.2 `ZipEngine.ExtractEntriesAsync` 应用 override
-  - [ ] 1.3 `SevenZipEngine.ExtractEntriesAsync` 应用 override
-  - [ ] 1.4 `dotnet build` Core 验证
+- [x] **1. IArchiveEngine 接口 + 引擎实现**
+  - [x] 1.1 `IArchiveEngine.ExtractEntriesAsync` 加 `outputPathOverrides` 参数
+  - [x] 1.2 `ZipEngine.ExtractEntriesAsync` 应用 override
+  - [x] 1.3 `SevenZipEngine.ExtractEntriesAsync` 应用 override
+  - [x] 1.4 `dotnet build` Core 验证
 
-- [ ] **2. 重写 `ExtractSelectedAsync`**
-  - [ ] 2.1 构建 entryKeys 列表 + pathOverrides 字典（保留路径裁剪逻辑）
-  - [ ] 2.2 改为调用 `engine.ExtractEntriesAsync()`，Tar/Gz 降级
-  - [ ] 2.3 清理过时的手动进度/取消管理代码
-  - [ ] 2.4 `dotnet build` UI 验证
+- [x] **2. 重写 `ExtractSelectedAsync`**
+  - [x] 2.1 构建 entryKeys 列表 + pathOverrides 字典（保留路径裁剪逻辑）
+  - [x] 2.2 改为调用 `engine.ExtractEntriesAsync()`，Tar/Gz 降级
+  - [x] 2.3 清理过时的手动进度/取消管理代码
+  - [x] 2.4 `dotnet build` UI 验证
 
-- [ ] **3. 验证**
-  - [ ] 3.1 `dotnet build` 完整项目
-  - [ ] 3.2 阅读确认各路径的正确性
-  - [ ] 3.3 更新 `docs/PROGRESS.md`
+- [x] **3. 验证**
+  - [x] 3.1 `dotnet build` 完整项目
+  - [x] 3.2 阅读确认各路径的正确性
+  - [x] 3.3 更新 `docs/PROGRESS.md`
 
 - [ ] **4.（可选）简化 `ExtractAsync`**
   - [ ] 4.1 引擎层将 `ExtractAsync` 改为委托给 `ExtractEntriesAsync`

@@ -309,7 +309,8 @@ public class ExtractResult
             string? password = null,
             IProgress<ArchiveProgress>? progress = null,
             CancellationToken cancellationToken = default,
-            ArchiveOptions? options = null);
+            ArchiveOptions? options = null,
+            IReadOnlyDictionary<string, string>? outputPathOverrides = null);
 
         /// <summary>
         /// 向已存在的压缩包中添加文件（原地更新）
