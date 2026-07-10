@@ -18,6 +18,13 @@
 
 ## 版本历史（从新到旧）
 
+### v0.4.4+ (2026-07-09) 移除 Applications shell\open\command 防止安装时错误路由
+
+1. **移除 `Applications\MantisZip.UI.exe\shell\open\command` 注册** — 避免新软件安装时 Windows Shell 关联刷新将 exe 打开操作错误地路由到 MantisZip
+   - `SupportedTypes` 保留，不影响"打开方式"的展示
+   - 右键菜单（COM handler）、双击走 per-format ProgId 均不受影响
+2. **修改文件**：`src/MantisZip.UI/Shell/ShellIntegration.Assoc.cs`（删 1 行 + 注释）
+
 ### v0.4.4 (2026-07-07) COM 动态菜单 + pending 状态 + 延迟级联安装
 
 1. **COM 动态菜单组件** — `MantisZip.ShellExt` 实现 `IShellExtInit` + `IContextMenu` 作为 COM 组件
