@@ -142,7 +142,9 @@ public partial class App : Application
         {
             try
             {
-                var tempDir = Path.Combine(Path.GetTempPath(), L.T(L.App_MantisZipTitle));
+                var tempDir = AppSettings.IsPortableMode
+                    ? Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Data", "Temp")
+                    : Path.Combine(Path.GetTempPath(), L.T(L.App_MantisZipTitle));
                 if (Directory.Exists(tempDir))
                 {
                     Directory.Delete(tempDir, recursive: true);
@@ -161,48 +163,52 @@ public partial class App : Application
         TraceLog("OnStartup: after args log");
 
         // ===== 首次运行：Shell 集成安装（延迟到用户进程，非提权）=====
-        // 安装程序以管理员权限运行时，SHChangeNotify 无法传播到非提权的
-        // Explorer.exe，导致动态右键菜单不显示。安装程序改为写入 FirstRun
-        // 标记，由首次用户级启动时在这里安装 Shell 集成，
-        // 确保 SHChangeNotify 来自正确的完整性级别。
-        try
+        // 便携版不写注册表，跳过 Shell 注册和文件关联注册
+        if (!AppSettings.IsPortableMode)
         {
-            using var firstRunKey = Registry.CurrentUser.OpenSubKey(
-                @"Software\MantisZip", writable: true);
-            if (firstRunKey != null)
+            try
             {
-                var firstRunShell = firstRunKey.GetValue("FirstRunShell") as string;
-                if (firstRunShell == "1")
+                using var firstRunKey = Registry.CurrentUser.OpenSubKey(
+                    @"Software\MantisZip", writable: true);
+                if (firstRunKey != null)
                 {
-                    TraceLog("OnStartup: FirstRunShell marker found, installing shell integration...");
-                    ShellIntegration.Install();
-                    firstRunKey.DeleteValue("FirstRunShell");
-                    TraceLog("OnStartup: first-run shell integration installed");
-                }
+                    var firstRunShell = firstRunKey.GetValue("FirstRunShell") as string;
+                    if (firstRunShell == "1")
+                    {
+                        TraceLog("OnStartup: FirstRunShell marker found, installing shell integration...");
+                        ShellIntegration.Install();
+                        firstRunKey.DeleteValue("FirstRunShell");
+                        TraceLog("OnStartup: first-run shell integration installed");
+                    }
 
-                var firstRunAssoc = firstRunKey.GetValue("FirstRunAssoc") as string;
-                if (firstRunAssoc == "1")
-                {
-                    TraceLog("OnStartup: FirstRunAssoc marker found, registering file associations...");
-                    ShellIntegration.InstallAssociations();
-                    firstRunKey.DeleteValue("FirstRunAssoc");
-                    TraceLog("OnStartup: first-run file associations registered");
+                    var firstRunAssoc = firstRunKey.GetValue("FirstRunAssoc") as string;
+                    if (firstRunAssoc == "1")
+                    {
+                        TraceLog("OnStartup: FirstRunAssoc marker found, registering file associations...");
+                        ShellIntegration.InstallAssociations();
+                        firstRunKey.DeleteValue("FirstRunAssoc");
+                        TraceLog("OnStartup: first-run file associations registered");
+                    }
                 }
             }
-        }
-        catch (Exception firstRunEx)
-        {
-            TraceLog("OnStartup: first-run handling failed: {0}", firstRunEx.Message);
-        }
+            catch (Exception firstRunEx)
+            {
+                TraceLog("OnStartup: first-run handling failed: {0}", firstRunEx.Message);
+            }
 
-        // 检查 COM 动态菜单状态（如果 pending，检测 Explorer 是否已加载 comhost.dll）
-        try
-        {
-            ShellIntegration.CheckComStatus();
+            // 检查 COM 动态菜单状态（如果 pending，检测 Explorer 是否已加载 comhost.dll）
+            try
+            {
+                ShellIntegration.CheckComStatus();
+            }
+            catch (Exception comCheckEx)
+            {
+                TraceLog("OnStartup: CheckComStatus failed: {0}", comCheckEx.Message);
+            }
         }
-        catch (Exception comCheckEx)
+        else
         {
-            TraceLog("OnStartup: CheckComStatus failed: {0}", comCheckEx.Message);
+            TraceLog("OnStartup: portable mode, skipping shell integration and file association registration");
         }
 
         // ═══════ 全局异常捕获（诊断闪退用）═══════
@@ -236,6 +242,12 @@ public partial class App : Application
                 switch (cmd)
                 {
                     case "--install-shell":
+                        if (AppSettings.IsPortableMode)
+                        {
+                            LogStartup("便携模式不支持 Shell 集成安装");
+                            Shutdown();
+                            return;
+                        }
                         ShellIntegration.Install();
                         // 安装程序（Inno Setup）以 nowait 调用此命令，
                         // 无需弹确认框，安装程序已向用户报告状态。
@@ -243,6 +255,12 @@ public partial class App : Application
                         return;
 
                     case "--uninstall-shell":
+                        if (AppSettings.IsPortableMode)
+                        {
+                            LogStartup("便携模式不支持 Shell 集成卸载");
+                            Shutdown();
+                            return;
+                        }
                         ShellIntegration.Uninstall();
                         // 由安装程序/卸载程序（Inno Setup）调用时使用 runhidden 标志，
                         // 无 UI 界面，直接退出即可。
@@ -250,6 +268,12 @@ public partial class App : Application
                         return;
 
                     case "--install-assoc":
+                        if (AppSettings.IsPortableMode)
+                        {
+                            LogStartup("便携模式不支持文件关联安装");
+                            Shutdown();
+                            return;
+                        }
                         if (e.Args.Length > 1 && !string.IsNullOrWhiteSpace(e.Args[1]))
                             ShellIntegration.InstallAssociations(
                                 e.Args[1].Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
@@ -260,6 +284,12 @@ public partial class App : Application
                         return;
 
                     case "--uninstall-assoc":
+                        if (AppSettings.IsPortableMode)
+                        {
+                            LogStartup("便携模式不支持文件关联卸载");
+                            Shutdown();
+                            return;
+                        }
                         ShellIntegration.UninstallAssociations();
                         // 同上——卸载程序 runhidden 调用，无 UI。
                         Shutdown();
@@ -558,7 +588,9 @@ public partial class App : Application
         // 清理预览临时文件
         try
         {
-            var tempDir = Path.Combine(Path.GetTempPath(), L.T(L.App_MantisZipTitle));
+            var tempDir = AppSettings.IsPortableMode
+                ? Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Data", "Temp")
+                : Path.Combine(Path.GetTempPath(), L.T(L.App_MantisZipTitle));
             if (Directory.Exists(tempDir))
             {
                 for (int i = 0; i < 5; i++)

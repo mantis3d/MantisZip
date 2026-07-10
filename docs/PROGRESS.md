@@ -18,6 +18,20 @@
 
 ## 版本历史（从新到旧）
 
+### v0.4.5+ (2026-07-10) 便携模式 + Release 便携包
+
+1. **便携模式** — exe 同级存在 `Portable.txt` 时自动启用：
+   - 设置文件、密码库重定向到 `Data/` 目录（%APPDATA%/Local → exe 同级 Data/）
+   - 预览/拖拽临时目录重定向到 `Data/Temp/`（%TEMP% → Data/Temp/）
+   - 跳过 Shell 集成、文件关联注册（便携版不写注册表）
+   - 跳过 COM 菜单状态检测
+   - 跳过 `--install-shell` / `--uninstall-shell` / `--install-assoc` / `--uninstall-assoc` CLI 命令（便携版不支持）
+   - 7z.dll 搜索路径增加 exe 同级目录（便携版将 7z.dll 放在 exe 旁）
+2. **CI 生成便携包** — `release.yml` 新增 `Package portable zip` 步骤：
+   - 自包含发布输出中加入 `Portable.txt` 哨兵文件 + `x64\7z.dll`
+   - 压缩为 `MantisZip-{version}-Portable.zip`
+   - 与安装程序一同上传到 GitHub Release
+
 ### v0.4.5 (2026-07-06) 压缩选项增强（7z/ZIP 参数扩展）完成
 
 1. **新功能：7z/ZIP 压缩选项扩展** — `compression-options-enhancement.md`

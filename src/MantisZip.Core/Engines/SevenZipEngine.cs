@@ -44,6 +44,8 @@ public class SevenZipEngine : IArchiveEngine
     {
         var candidates = new List<string>
         {
+            // 便携版：exe 同目录下的 7z.dll
+            Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "7z.dll"),
             // 应用目录下的平台子目录（SharpSevenZip 默认搜索路径）
             Path.Combine(AppDomain.CurrentDomain.BaseDirectory, Environment.Is64BitProcess ? "x64" : "x86", "7z.dll"),
             // 标准 7-Zip 安装路径

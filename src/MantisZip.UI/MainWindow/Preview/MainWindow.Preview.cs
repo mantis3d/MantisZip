@@ -163,12 +163,20 @@ public partial class MainWindow
     // ═══════════════════════════════════════════
 
     /// <summary>
+    /// 获取临时文件根目录。便携版使用 Data/Temp/，普通版使用 %TEMP%/MantisZip/。
+    /// </summary>
+    private static string GetTempDir() =>
+        AppSettings.IsPortableMode
+            ? Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Data", "Temp")
+            : Path.Combine(Path.GetTempPath(), L.T(L.App_MantisZipTitle));
+
+    /// <summary>
     /// 提取压缩包内条目到临时目录，返回临时文件路径。
     /// 自动设置 _previewTempDir 供后续 Cleanup 使用。
     /// </summary>
     private async Task<string> ExtractPreviewFileAsync(ArchiveItem item, string fallbackName, CancellationToken ct)
     {
-        _previewTempDir = Path.Combine(Path.GetTempPath(), L.T(L.App_MantisZipTitle), Guid.NewGuid().ToString());
+        _previewTempDir = Path.Combine(GetTempDir(), Guid.NewGuid().ToString());
         Directory.CreateDirectory(_previewTempDir);
         var tempFile = Path.Combine(_previewTempDir, fallbackName);
         await Core.Utils.ArchiveEntryExtractor.ExtractEntryAsync(

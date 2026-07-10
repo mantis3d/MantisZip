@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using System.Text.Json;
 using Microsoft.Win32;
+using MantisZip.Core;
 using MantisZip.Core.Utils;
 
 namespace MantisZip.UI;
@@ -122,9 +123,31 @@ public class AppSettings
     public string DefaultPathPriority { get; set; } = "context";
 
     // ===== 持久化 =====
-    private static readonly string SettingsDir = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "MantisZip");
-    private static readonly string SettingsFile = Path.Combine(SettingsDir, "settings.json");
+    /// <summary>便携模式：exe 同级存在 Portable.txt 时启用，路径重定向到 Data/ 目录。</summary>
+    public static bool IsPortableMode { get; private set; }
+    private static string SettingsDir { get; set; } = "";
+    private static string SettingsFile { get; set; } = "";
+
+    static AppSettings()
+    {
+        IsPortableMode = File.Exists(Path.Combine(
+            AppDomain.CurrentDomain.BaseDirectory, "Portable.txt"));
+
+        if (IsPortableMode)
+        {
+            var dataDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Data");
+            Directory.CreateDirectory(dataDir);
+            SettingsDir = dataDir;
+            SettingsFile = Path.Combine(dataDir, "settings.json");
+            PasswordManager.CustomDataDir = dataDir;
+        }
+        else
+        {
+            SettingsDir = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "MantisZip");
+            SettingsFile = Path.Combine(SettingsDir, "settings.json");
+        }
+    }
 
     private static readonly Lazy<AppSettings> _instance = new(() => Load(), LazyThreadSafetyMode.ExecutionAndPublication);
     public static AppSettings Instance => _instance.Value;
@@ -141,8 +164,12 @@ public class AppSettings
                 Directory.CreateDirectory(SettingsDir);
             var json = JsonSerializer.Serialize(this, new JsonSerializerOptions { WriteIndented = true });
             File.WriteAllText(SettingsFile, json);
-            // 同步上下文菜单设置到注册表（供 COM 组件读取）
-            SyncContextMenuToRegistry();
+            // 便携版不写注册表
+            if (!IsPortableMode)
+            {
+                // 同步上下文菜单设置到注册表（供 COM 组件读取）
+                SyncContextMenuToRegistry();
+            }
             return true;
         }
         catch (Exception ex)
