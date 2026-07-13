@@ -345,6 +345,14 @@ public partial class App : Application
                     {
                         var path = e.Args.Length > 1 ? e.Args[1] : null;
                         if (string.IsNullOrEmpty(path)) { HandleOpen(null); return; }
+                        HandleOpen(path);
+                        return;
+                    }
+
+                    case "--open-dispatch":
+                    {
+                        var path = e.Args.Length > 1 ? e.Args[1] : null;
+                        if (string.IsNullOrEmpty(path)) { HandleOpen(null); return; }
 
                         var action = AppSettings.Instance.DoubleClickAction;
                         switch (action)

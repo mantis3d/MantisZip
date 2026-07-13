@@ -30,7 +30,9 @@
    - 重试 3 次（200ms 间隔）应对 7z.dll 句柄延迟释放
    - 预览/双击打开/拖拽提取不触发删除
 3. **修复文件占用导致删除失败** — `HasEncryptedEntries` 和 `QuickVerifyPassword` 的 ZIP 分支改用 `FileShare.Read | FileShare.Delete` 打开文件流，避免 SharpCompress 内部默认 `FileShare.Read` 句柄阻止 Shell 回收站操作
-4. **修改文件**：`AppSettings.cs`、`strings.zh.json`、`strings.en.json`、`SettingsWindow.xaml`、`SettingsWindow.xaml.cs`、`App.xaml.cs`、`App.Extract.cs`、`App.Password.cs`、`MainWindow.xaml.cs`、`MainWindow.Menu.cs`
+4. **解压后智能打开目标目录** — 全部 4 个 `OpenFolderAfterExtract` 调用点增加公共根目录检测：如果压缩包内所有条目共享同一根目录（如 `my_project/a.txt`、`my_project/b.txt`），打开 `dest/my_project/` 而非 `dest/`，减少一次手动点进目录的操作
+   - 新增 `GetCommonRootDirectory` + `ResolveSmartOpenPathAsync` 方法
+5. **修改文件**：`AppSettings.cs`、`strings.zh.json`、`strings.en.json`、`SettingsWindow.xaml`、`SettingsWindow.xaml.cs`、`App.xaml.cs`、`App.Extract.cs`、`App.Password.cs`、`MainWindow.xaml.cs`、`MainWindow.Menu.cs`
 
 ### v0.4.4+++ (2026-07-10) 视图菜单添加"隐藏预览信息"开关
 

@@ -347,6 +347,11 @@ public partial class App : Application
         {
         int succeeded = 0, failed = 0, skipped = 0;
             bool permissionDialogShown = false;
+            // 追踪最后一次成功解压的信息，用于完成后智能打开资源管理器
+            IArchiveEngine? lastEngine = null;
+            string? lastArchivePath = null;
+            string? lastDest = null;
+            string? lastPassword = null;
             try
             {
                 for (int i = 0; i < total; i++)
@@ -481,6 +486,10 @@ public partial class App : Application
                                     extractResult.SucceededEntries, extractResult.FailedEntries);
                             }
                             succeeded++;
+                            lastEngine = engine;
+                            lastArchivePath = archivePath;
+                            lastDest = dest;
+                            lastPassword = password;
                             TryDeleteArchiveAfterExtract(archivePath);
                             await progressWindow.Dispatcher.InvokeAsync(() =>
                                 progressWindow.UpdateBatchItemStatus(i, BatchItemStatus.Completed));
@@ -599,12 +608,14 @@ public partial class App : Application
             {
                 await progressWindow.Dispatcher.InvokeAsync(() =>
                     progressWindow.SetComplete(L.T(L.App_ExtractComplete)));
-                // 全部成功：最后一个解压的目录用于打开资源管理器（仅单文件模式）
-                if (settings.OpenFolderAfterExtract && allPaths.Count == 1)
+                // 全部成功：打开资源管理器到实际解压位置（仅单文件模式）
+                // 智能判断：如果压缩包内所有条目共享同一根目录（如 my_project/*），
+                // 直接打开 dest/my_project/ 而非 dest/，避免用户多点一次。
+                if (settings.OpenFolderAfterExtract && allPaths.Count == 1 && lastDest != null && lastEngine != null)
                 {
-                    var lastDest = Path.GetDirectoryName(allPaths[0])
-                        ?? Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
-                    OpenInExplorerStatic(lastDest);
+                    var openPath = await ResolveSmartOpenPathAsync(
+                        lastArchivePath!, lastDest, lastEngine, lastPassword);
+                    OpenInExplorerStatic(openPath);
                 }
                 await progressWindow.AutoCloseOrWaitAsync(2500, () => progressWindow.Dispatcher.Invoke(() => app.Shutdown()));
             }
@@ -641,6 +652,52 @@ public partial class App : Application
             CoreLog.Trace("GetSmartExtractDestination: failed: {0}", ex.Message);
             return Path.Combine(parentDir, archiveName);
         }
+    }
+
+    /// <summary>
+    /// 获取压缩包内所有非目录条目的公共根目录。
+    /// 例如压缩包内容为 my_project/a.txt、my_project/b.txt → 返回 "my_project"。
+    /// 若条目不共享公共根目录（如 a.txt、b.txt 混在），返回 null。
+    /// </summary>
+    private static string? GetCommonRootDirectory(IReadOnlyList<MantisZip.Core.Abstractions.ArchiveItem> entries)
+    {
+        string? commonRoot = null;
+        foreach (var entry in entries)
+        {
+            if (entry.IsDirectory) continue;
+            var path = entry.Name ?? entry.FullPath ?? "";
+            var firstSlash = path.IndexOf('/');
+            if (firstSlash < 0) return null;
+            var root = path[..firstSlash];
+            if (commonRoot == null)
+                commonRoot = root;
+            else if (!string.Equals(commonRoot, root, StringComparison.Ordinal))
+                return null;
+        }
+        return commonRoot;
+    }
+
+    /// <summary>
+    /// 解压后智能决定打开哪个路径。
+    /// 如果压缩包内所有条目共享一个公共根目录，打开 dest/公共根目录，
+    /// 否则直接打开 dest。例如压缩包只包含 my_project/... 目录树，
+    /// 原生解压到 dest/，实际内容在 dest/my_project/，用户希望打开后者。
+    /// </summary>
+    internal static async Task<string> ResolveSmartOpenPathAsync(
+        string archivePath, string dest, IArchiveEngine engine, string? password)
+    {
+        try
+        {
+            var entries = await engine.ListEntriesAsync(archivePath, password);
+            var commonRoot = GetCommonRootDirectory(entries);
+            if (commonRoot != null)
+                return Path.Combine(dest, commonRoot);
+        }
+        catch (Exception ex)
+        {
+            CoreLog.Trace("ResolveSmartOpenPathAsync: failed for '{0}': {1}", archivePath, ex.Message);
+        }
+        return dest;
     }
 
     /// <summary>
