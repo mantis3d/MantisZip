@@ -866,6 +866,13 @@
   "FileFilter_PresetDeleteConfirm": "Are you sure you want to delete preset \"{0}\"?",
   "FileFilter_NoPresetName": "Please enter a preset name",
   "FileFilter_PresetNamePrompt": "Preset name:",
-  "FileFilter_SavePresetTitle": "Save Preset"
+  "FileFilter_SavePresetTitle": "Save Preset",
+  "Settings_Assoc_DoubleClickGroup": "Double-click behavior",
+  "Settings_Assoc_DoubleClickLabel": "When double-clicking archives in Explorer",
+  "Settings_Assoc_DoubleClick_Open": "Open (browse archive)",
+  "Settings_Assoc_DoubleClick_ExtractHere": "Extract here",
+  "Settings_Assoc_DoubleClick_SmartExtract": "Smart extract",
+  "Settings_Assoc_DoubleClick_ExtractDialog": "Open extract dialog",
+  "Settings_Extract_DeleteAfterExtract": "Move original archive to Recycle Bin after extraction"
 }
 

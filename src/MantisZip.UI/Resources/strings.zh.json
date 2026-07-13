@@ -884,5 +884,12 @@
   "FileFilter_PresetDeleteConfirm": "确定要删除预设「{0}」吗？",
   "FileFilter_NoPresetName": "请输入预设名称",
   "FileFilter_PresetNamePrompt": "预设名称:",
-  "FileFilter_SavePresetTitle": "保存预设"
+  "FileFilter_SavePresetTitle": "保存预设",
+  "Settings_Assoc_DoubleClickGroup": "双击行为",
+  "Settings_Assoc_DoubleClickLabel": "资源管理器双击压缩包时",
+  "Settings_Assoc_DoubleClick_Open": "打开（浏览压缩包）",
+  "Settings_Assoc_DoubleClick_ExtractHere": "原地解压",
+  "Settings_Assoc_DoubleClick_SmartExtract": "智能原地解压",
+  "Settings_Assoc_DoubleClick_ExtractDialog": "打开解压窗口",
+  "Settings_Extract_DeleteAfterExtract": "解压完成后将原压缩包移到回收站"
 }
