@@ -635,6 +635,22 @@ public class ZipEngine : IArchiveEngine
             }).ToList();
 
             CoreLog.Info($"ListEntriesAsync: {items.Count} entries, {sw.ElapsedMilliseconds}ms");
+
+            // 交叉校验：SharpCompress 报告了加密条目 → 用二进制解析直接检查中央目录的 flags
+            // 这是针对 SharpCompress 在某些环境（如 Win11 日文版）的假阳性 bug
+            if (items.Any(i => i.IsEncrypted))
+            {
+                var actuallyEncrypted = VerifyZipEncryptionFlags(archivePath);
+                if (!actuallyEncrypted)
+                {
+                    CoreLog.Info("WARN: ListEntriesAsync: SharpCompress reported encrypted entries but binary CD flags show none — overriding IsEncrypted to false (possible false positive on {0})", archivePath);
+                    foreach (var item in items)
+                    {
+                        item.IsEncrypted = false;
+                    }
+                }
+            }
+
             return (IReadOnlyList<ArchiveItem>)items;
         }, cancellationToken).ConfigureAwait(false);
 
@@ -1635,5 +1651,29 @@ public class ZipEngine : IArchiveEngine
             }
         }
         return false;
+    }
+
+    /// <summary>
+    /// 使用二进制解析直接读取 ZIP 中央目录的通用位标记，
+    /// 验证是否有任何条目的加密位（bit 0）被设置。
+    /// 用于交叉校验 SharpCompress 报告的 IsEncrypted，防范假阳性。
+    /// </summary>
+    internal static bool VerifyZipEncryptionFlags(string archivePath)
+    {
+        try
+        {
+            using var fs = File.Open(archivePath, FileMode.Open, FileAccess.Read, FileShare.Read | FileShare.Delete);
+            var (cdOffset, entryCount, _) = ZipBinaryRewriter.ReadEocd(fs);
+            var entries = ZipBinaryRewriter.ReadCentralDirectory(fs, cdOffset, entryCount);
+            bool encrypted = entries.Any(e => (e.Flags & 0x0001) != 0);
+            CoreLog.Trace("VerifyZipEncryptionFlags: {0} entries, encrypted={1}", entryCount, encrypted);
+            return encrypted;
+        }
+        catch (Exception ex)
+        {
+            // Zip64 或其它无法解析的情况 → 保守信任 SharpCompress
+            CoreLog.Trace("VerifyZipEncryptionFlags: failed to verify (will trust SharpCompress): {0}", ex.Message);
+            return true;
+        }
     }
 }

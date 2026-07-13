@@ -709,6 +709,10 @@ public partial class MainWindow : Window
                 _currentPasswordDescription = null;
                 _currentPasswordPatterns = null;
                 _hasEncryptedArchive = items.Any(i => i.IsEncrypted);
+                int encryptedCount = items.Count(i => i.IsEncrypted);
+                App.LogDebug("LoadArchiveAsync: format={0}, engine={1}, encryptedEntries={2}/{3}, hasEncryptedArchive={4}",
+                    _currentFormat, engine.GetType().Name, encryptedCount, items.Count, _hasEncryptedArchive);
+
                 if (_hasEncryptedArchive)
                 {
                     var pwdResult = await App.ResolvePasswordAsync(archivePath, engine,
@@ -718,7 +722,13 @@ public partial class MainWindow : Window
                         _currentPassword = pwdResult.Password;
                         _currentPasswordDescription = pwdResult.Description;
                         _currentPasswordPatterns = pwdResult.Patterns;
+                        App.LogDebug("LoadArchiveAsync: password resolved");
                     }
+                    else
+                    {
+                        App.LogDebug("LoadArchiveAsync: password resolution returned null (user cancelled or no match)");
+                    }
+                
                 }
             }
 
