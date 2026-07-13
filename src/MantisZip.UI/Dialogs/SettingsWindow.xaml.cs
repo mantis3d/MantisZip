@@ -117,6 +117,7 @@ public partial class SettingsWindow : Window
         EnableDragExtractCheck.IsChecked = s.EnableDragExtract;
         ExtractPreservePathCheck.IsChecked = s.ExtractPreserveFullPath;
         DoubleClickThresholdBox.Text = (s.DoubleClickOpenThreshold / (1024 * 1024)).ToString();
+        DeleteAfterExtractCheck.IsChecked = s.DeleteArchiveAfterExtract;
 
         // 上下文菜单
         EnableCompressCheck.IsChecked = s.EnableCompressMenu;
@@ -217,6 +218,10 @@ public partial class SettingsWindow : Window
 
         AboutVersionText.Text = AppConstants.Version;
 
+        // 双击行为
+        foreach (ComboBoxItem item in DoubleClickActionCombo.Items)
+            if ((string)item.Tag == s.DoubleClickAction) { DoubleClickActionCombo.SelectedItem = item; break; }
+
         App.ApplyTextRenderingMode(SettingsTabs);
     }
 
@@ -248,6 +253,7 @@ public partial class SettingsWindow : Window
         s.ExtractPreserveFullPath = ExtractPreservePathCheck.IsChecked == true;
         s.DoubleClickOpenThreshold = long.TryParse(DoubleClickThresholdBox.Text, out var threshold)
             ? threshold * 1024 * 1024 : 10 * 1024 * 1024;
+        s.DeleteArchiveAfterExtract = DeleteAfterExtractCheck.IsChecked == true;
 
         s.EnableCompressMenu = EnableCompressCheck.IsChecked == true;
         s.EnableCompressSeparate = EnableCompressSeparateCheck.IsChecked == true;
@@ -319,6 +325,7 @@ public partial class SettingsWindow : Window
                     MessageBoxButton.OK, MessageBoxImage.Information);
             }
         }
+        s.DoubleClickAction = (DoubleClickActionCombo.SelectedItem as ComboBoxItem)?.Tag as string ?? "open";
         App.ApplyTextRenderingMode(SettingsTabs);
     }
 
