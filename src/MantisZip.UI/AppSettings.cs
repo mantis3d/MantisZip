@@ -64,6 +64,10 @@ public class AppSettings
 
     // ===== 交互 =====
     public bool EnableDragExtract { get; set; } = true;
+    /// <summary>资源管理器双击压缩包时的行为：open / extract-here / smart-extract / extract-dialog</summary>
+    public string DoubleClickAction { get; set; } = "open";
+    /// <summary>解压完成后将原压缩包移到回收站</summary>
+    public bool DeleteArchiveAfterExtract { get; set; } = false;
 
     // ===== 解压 ====
     /// <summary>解压条目时保留压缩包内的完整路径（默认关闭 = 相对当前浏览目录）</summary>
