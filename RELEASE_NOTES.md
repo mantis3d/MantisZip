@@ -1,3 +1,40 @@
+## v0.4.5
+
+### 文件说明 / File Description
+
+MantisZip-0.4.5-Setup-WebSetup.exe 是需要联网才能安装的。MantisZip-0.4.5-Setup-Offline.exe 是离线安装包。MantisZip-0.4.5-Portable.zip 是便携版，解压即用。
+
+MantisZip-0.4.5-Setup-WebSetup.exe requires internet during installation. MantisZip-0.4.5-Setup-Offline.exe is a fully offline installer. MantisZip-0.4.5-Portable.zip is the portable version, extract and run.
+
+
+### 更新内容 / Changelog
+
+- 完成 [压缩选项增强](.sisyphus/plans/compression-options-enhancement.md) 计划 — 7z 字典大小、固实块、Word Size、匹配器可配置；ZIP 压缩方法（Deflate/Deflate64/BZip2/LZMA/PPMd/Store）可配置；ZIP/7z 加密方式可配置，7z 支持加密文件名开关
+- Completed [Compression Options Enhancement](.sisyphus/plans/compression-options-enhancement.md) plan — configurable 7z dictionary size, solid block, word size, match finder; configurable ZIP compression method (Deflate/Deflate64/BZip2/LZMA/PPMd/Store); configurable ZIP/7z encryption method, 7z encrypt headers toggle
+- ![压缩选项增强](docs/images/version/v0.4.5/CompressionOptions.png)
+- 完成 [文件过滤功能](.sisyphus/plans/file-filter-feature.md) 计划 — 支持按扩展名、文件名、尺寸、日期过滤，可保存为命名预设
+- Completed [File Filter](.sisyphus/plans/file-filter-feature.md) plan — filter by extension, filename, size, or date range; supports named presets persisted in settings
+- ![文件过滤](docs/images/version/v0.4.5/FileFilter.png)
+- 新增便携模式，CI 自动生成 Portable 压缩包
+- Added portable mode; CI automatically generates Portable zip
+- 解压路径统一 — `ExtractSelectedAsync` 改为调用引擎 `ExtractEntriesAsync`
+- Unified extract path — `ExtractSelectedAsync` now delegates to engine `ExtractEntriesAsync`
+- 视图菜单新增"隐藏预览信息"开关，预览信息面板可独立显隐控制
+- Added "Hide Preview Info" toggle in View menu for independent control of preview info panel visibility
+- ![隐藏预览信息](docs/images/version/v0.4.5/PreviewInfoToggle.png)
+- 可配置双击行为 — 设置窗口新增"双击压缩包"选项（打开/原地解压/智能原地解压/打开解压窗口），`--open` CLI 按配置路由
+- Configurable double-click behavior — new "double-click archive" option in Settings (open/extract-here/smart-extract/extract-dialog); `--open` CLI routes accordingly
+- ![可配置双击行为](docs/images/version/v0.4.5/DoubleClickAction.png)
+- 解压后自动删除原压缩包 — 新增"解压完成后将原压缩包移到回收站"选项，
+- Auto-delete archive after extraction — new option to move original archive to Recycle Bin
+- ![删除原压缩包](docs/images/version/v0.4.5/DeleteAfterExtract.png)
+- 解压后智能打开目标目录 — 自动检测公共根目录，减少一次手动点进目录的操作
+- Smart open path after extraction — auto-detects common root directory, saves one manual navigation step
+- 修复安装后会导致别的软件安装完启动时错误本软件的问题。
+- Fixed issue where installing other software could incorrectly route their startup to MantisZip.
+
+
+
 ## v0.4.4
 
 ### 文件说明 / File Description
