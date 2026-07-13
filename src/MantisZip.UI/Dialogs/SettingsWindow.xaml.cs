@@ -306,6 +306,8 @@ public partial class SettingsWindow : Window
         else if (DefaultPathRecent.IsChecked   == true) s.DefaultPathPriority = "recent";
         else if (DefaultPathDesktop.IsChecked  == true) s.DefaultPathPriority = "desktop";
 
+        s.DoubleClickAction = (DoubleClickActionCombo.SelectedItem as ComboBoxItem)?.Tag as string ?? "open";
+
         SaveAssocSettings();
 
         if (!s.Save())
@@ -325,7 +327,6 @@ public partial class SettingsWindow : Window
                     MessageBoxButton.OK, MessageBoxImage.Information);
             }
         }
-        s.DoubleClickAction = (DoubleClickActionCombo.SelectedItem as ComboBoxItem)?.Tag as string ?? "open";
         App.ApplyTextRenderingMode(SettingsTabs);
     }
 
