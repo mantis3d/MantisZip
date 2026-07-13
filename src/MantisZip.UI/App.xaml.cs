@@ -342,8 +342,28 @@ public partial class App : Application
                         return;
 
                     case "--open":
-                        HandleOpen(e.Args.Length > 1 ? e.Args[1] : null);
+                    {
+                        var path = e.Args.Length > 1 ? e.Args[1] : null;
+                        if (string.IsNullOrEmpty(path)) { HandleOpen(null); return; }
+
+                        var action = AppSettings.Instance.DoubleClickAction;
+                        switch (action)
+                        {
+                            case "extract-here":
+                                HandleExtractHere(new[] { path });
+                                break;
+                            case "smart-extract":
+                                HandleExtractSmart(new[] { path });
+                                break;
+                            case "extract-dialog":
+                                HandleExtract(new[] { path });
+                                break;
+                            default: // "open"
+                                HandleOpen(path);
+                                break;
+                        }
                         return;
+                    }
 
                     default:
                         LogStartup($"警告: 无法识别的命令行参数 '{e.Args[0]}'。使用 --help 查看可用命令。");
