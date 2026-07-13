@@ -607,6 +607,19 @@ public partial class MainWindow
             HidePreview();
     }
 
+    private void PreviewInfoToggleMenu_Click(object sender, RoutedEventArgs e)
+    {
+        _previewInfoPanelEnabled = PreviewInfoToggleMenu.IsChecked != true;
+        AppSettings.Instance.ShowPreviewInfoPanel = _previewInfoPanelEnabled;
+        AppSettings.Instance.Save();
+
+        // 图标透明度随状态变化（与进度条/目录独立基准/预览整体风格一致）
+        if (PreviewInfoToggleMenu.Icon is Emoji.Wpf.TextBlock icon)
+            icon.Opacity = _previewInfoPanelEnabled ? 1.0 : 0.2;
+
+        UpdatePreviewInfoPanelVisibility();
+    }
+
     private void OpenHint_Click(object sender, RoutedEventArgs e)
     {
         OpenArchive_Click(sender, e);

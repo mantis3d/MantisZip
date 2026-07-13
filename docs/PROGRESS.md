@@ -18,12 +18,30 @@
 
 ## 版本历史（从新到旧）
 
+### v0.4.4+++ (2026-07-10) 视图菜单添加"隐藏预览信息"开关
+
+1. **预览信息面板独立显隐控制** — 在视图菜单新增 `IsCheckable` 菜单项"隐藏预览信息(_I)"
+   - 关闭后：`PreviewInfoPanel`（文件名、大小、压缩比、日期）和 `PreviewExtraInfoPanel`（格式元数据）同时隐藏，预览内容区独占空间
+   - 两级控制：`PreviewToggleMenu` 控制预览整体开关，`PreviewInfoToggleMenu` 控制信息面板开关
+   - 状态持久化到 `settings.json`（`ShowPreviewInfoPanel`）
+2. **修改文件**：`AppSettings.cs`、`strings.zh.json`、`strings.en.json`、`L.cs`、`MainWindow.xaml`、`MainWindow.xaml.cs`、`MainWindow.Menu.cs`、`MainWindow.Preview.cs`
+
 ### v0.4.4+ (2026-07-09) 移除 Applications shell\open\command 防止安装时错误路由
 
 1. **移除 `Applications\MantisZip.UI.exe\shell\open\command` 注册** — 避免新软件安装时 Windows Shell 关联刷新将 exe 打开操作错误地路由到 MantisZip
    - `SupportedTypes` 保留，不影响"打开方式"的展示
    - 右键菜单（COM handler）、双击走 per-format ProgId 均不受影响
 2. **修改文件**：`src/MantisZip.UI/Shell/ShellIntegration.Assoc.cs`（删 1 行 + 注释）
+
+### v0.4.4++ (2026-07-07) 修复 COM handler 动词名"open"与系统标准动词冲突
+
+1. **COM handler 动词名冲突修复** — COM 右键菜单的 GCS_VERB 返回动词名与系统标准 "open" 重名，
+   导致新软件安装时 Windows Shell 关联刷新可能误将 MantisZip 的"打开"动词当作 exe 的默认打开程序
+   - `GetCommandString` GCS_VERB: `"open"` → `"mantiszipopen"`
+   - `ResolveCommandId` 字符串映射: `"open" => CmdIdOpen` → `"mantiszipopen" => CmdIdOpen`
+   - 正常右键菜单操作不受影响（走整数偏移路径，不经动词名）
+   - 不影响 SFX 自解压文件的打开支持
+2. **修改文件**：`src/MantisZip.ShellExt/ContextMenuHandler.cs`（改 2 行）
 
 ### v0.4.4 (2026-07-07) COM 动态菜单 + pending 状态 + 延迟级联安装
 
