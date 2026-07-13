@@ -20,6 +20,8 @@ namespace MantisZip.Core.Engines;
 /// </summary>
 public class ZipEngine : IArchiveEngine
 {
+    private const int CopyBufferSize = 262144;
+
     /// <summary>
     /// 使用 SharpCompress 打开 ZIP 文件，自动检测编码（UTF-8 → GBK 回退）。
     /// SharpCompress 每实例设置编码，无全局副作用。
@@ -277,7 +279,7 @@ public class ZipEngine : IArchiveEngine
                     using (var entryStream = entry.OpenEntryStream())
                     using (var outputStream = File.Create(resolvedPath))
                     {
-                        var buffer = new byte[81920];
+                        var buffer = new byte[CopyBufferSize];
                         var entryProcessed = 0L;
                         var lastReportTime = DateTime.Now;
                         var reportInterval = TimeSpan.FromMilliseconds(100);
@@ -392,7 +394,7 @@ public class ZipEngine : IArchiveEngine
                 using (var entryStream = entry.OpenEntryStream())
                 using (var outputStream = File.Create(resolvedPath))
                 {
-                    var buffer = new byte[81920];
+                    var buffer = new byte[CopyBufferSize];
                     long entryProcessed = 0;
                     var lastReportTime = DateTime.Now;
                     var reportInterval = TimeSpan.FromMilliseconds(100);
@@ -939,7 +941,7 @@ public class ZipEngine : IArchiveEngine
                         using (var entryStream = entry.OpenEntryStream())
                         using (var outStream = File.Create(outPath))
                         {
-                            var buffer = new byte[81920];
+                            var buffer = new byte[CopyBufferSize];
                             long entryProcessed = 0;
                             while (true)
                             {
@@ -1088,7 +1090,7 @@ public class ZipEngine : IArchiveEngine
                             using (var entryStream = zipWriter.WriteToStream(entryPath, entryOptions))
                             using (var fsInput = File.OpenRead(fullPath))
                             {
-                                var buffer = new byte[81920];
+                                var buffer = new byte[CopyBufferSize];
                                 long totalRead = 0;
                                 var fiLen = fi.Length;
 
@@ -1371,7 +1373,7 @@ public class ZipEngine : IArchiveEngine
                         using (var entryStream = entry.OpenEntryStream())
                         using (var outStream = File.Create(outPath))
                         {
-                            var buffer = new byte[81920];
+                            var buffer = new byte[CopyBufferSize];
                             long entryProcessed = 0;
                             while (true)
                             {
@@ -1492,7 +1494,7 @@ public class ZipEngine : IArchiveEngine
                             using (var entryStream = zipWriter.WriteToStream(entryPath, entryOptions))
                             using (var fsInput = File.OpenRead(fullPath))
                             {
-                                var buffer = new byte[81920];
+                                var buffer = new byte[CopyBufferSize];
                                 long totalRead = 0;
                                 var fiLen = fi.Length;
 
@@ -1589,7 +1591,7 @@ public class ZipEngine : IArchiveEngine
                 using (var entryStream = zipWriter.WriteToStream(entryPath, entryOptions))
                 using (var fsInput = File.OpenRead(fullPath))
                 {
-                    var buffer = new byte[81920];
+                    var buffer = new byte[CopyBufferSize];
                     long totalRead = 0;
                     var fiLen = fi.Length;
 

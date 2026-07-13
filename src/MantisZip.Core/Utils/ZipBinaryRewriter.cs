@@ -60,6 +60,8 @@ public readonly record struct NewEntry(
 /// </summary>
 internal static partial class ZipBinaryRewriter
 {
+    private const int CopyBufferSize = 262144;
+
     // ────────────────────────────── EOCD ──────────────────────────────
 
     /// <summary>
@@ -648,7 +650,7 @@ internal static partial class ZipBinaryRewriter
 
         using (var deflate = new DeflateStream(ms, CompressionLevel.Optimal, leaveOpen: true))
         {
-            byte[] buffer = new byte[81920];
+            byte[] buffer = new byte[CopyBufferSize];
             long totalRead = 0;
 
             while (totalRead < entry.Size)
@@ -880,7 +882,7 @@ internal static partial class ZipBinaryRewriter
         IProgress<ArchiveProgress>? progress,
         CancellationToken cancellationToken)
     {
-        byte[] buffer = new byte[81920];
+        byte[] buffer = new byte[CopyBufferSize];
         long remaining = count;
         long totalRead = 0;
         var lastReportTime = DateTime.Now;
