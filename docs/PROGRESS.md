@@ -18,6 +18,20 @@
 
 ## 版本历史（从新到旧）
 
+### v0.4.5+ (2026-07-13) 可配置双击行为 + 解压后自动删除原压缩包
+
+1. **可配置双击行为** — SettingsWindow 文件关联 Tab 新增「双击压缩包」GroupBox + ComboBox（打开/原地解压/智能原地解压/打开解压窗口）
+   - `DoubleClickAction` 设置持久化到 settings.json，默认 `"open"` 保持现有行为
+   - `App.xaml.cs` 的 `--open` 分发改为按 `DoubleClickAction` 路由到 `HandleOpen`/`HandleExtractHere`/`HandleExtractSmart`/`HandleExtract`
+2. **解压后自动删除原压缩包** — SettingsWindow 解压 Tab 新增「解压完成后将原压缩包移到回收站」CheckBox
+   - `DeleteArchiveAfterExtract` 设置持久化到 settings.json，默认关闭
+   - 所有解压成功路径（批量/单文件 CLI + MainWindow 界面解压）完成后调用 `TryDeleteArchiveAfterExtract`
+   - 使用 `Microsoft.VisualBasic.FileIO.FileSystem.DeleteFile` 移到回收站
+   - 重试 3 次（200ms 间隔）应对 7z.dll 句柄延迟释放
+   - 预览/双击打开/拖拽提取不触发删除
+3. **修复文件占用导致删除失败** — `HasEncryptedEntries` 和 `QuickVerifyPassword` 的 ZIP 分支改用 `FileShare.Read | FileShare.Delete` 打开文件流，避免 SharpCompress 内部默认 `FileShare.Read` 句柄阻止 Shell 回收站操作
+4. **修改文件**：`AppSettings.cs`、`strings.zh.json`、`strings.en.json`、`SettingsWindow.xaml`、`SettingsWindow.xaml.cs`、`App.xaml.cs`、`App.Extract.cs`、`App.Password.cs`、`MainWindow.xaml.cs`、`MainWindow.Menu.cs`
+
 ### v0.4.4+++ (2026-07-10) 视图菜单添加"隐藏预览信息"开关
 
 1. **预览信息面板独立显隐控制** — 在视图菜单新增 `IsCheckable` 菜单项"隐藏预览信息(_I)"
