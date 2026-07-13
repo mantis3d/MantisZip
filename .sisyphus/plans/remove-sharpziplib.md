@@ -86,7 +86,7 @@ ZIP 注释存储在文件末尾的 **EOCD（End of Central Directory）** 记录
 - [x] 无注释的 ZIP 文件也能正常处理（返回 null/空）
 - [x] 大文件 ZIP 时操作正常
 - [x] 所有 import 清理干净（`App.xaml.cs` 已无 SharpZipLib 引用；`App.Cli.cs` 已合并/删除）
-- [ ] `SharpZipLib` 从 `.csproj` 移除后构建通过 — ⏸️ **阻塞：`ZipEngine.cs` 仍依赖 SharpZipLib (加密 ZIP 回退)**，详见 scope-correction 更新
+- [x] `SharpZipLib` 从 `.csproj` 移除后构建通过 ✅（方案 B via SharpSevenZip 已执行，```MantisZip.Core.csproj``` 已无 SharpZipLib 引用，Core 构建 0 错误。测试项目仍保留 SharpZipLib 用于测试用例 fixture 构建）
 - [x] 全部 171 个测试通过（经 `zipengine-sharpcompress-migration` 后为 183/183）
 
 ### Must Have

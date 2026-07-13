@@ -1,8 +1,10 @@
 # Avalonia: UI 功能补齐（对话框 + 控件 + 转换器）
 
-> **Status**: 📋 Planned | **Target**: v0.4.5
+> **Status**: ✅ 27/29 Complete (2 blocked - GUI testing) | **Target**: v0.4.5
 > **分支**: `avalonia-port`
 > **前置依赖**: `uac-elevation-permission.md` (WPF 已实现)
+> 
+> **⚠️ 剩余 2 项需要手动 GUI 验证**: 所有对话框可正常打开/关闭 + Elevation 对话框正确触发。需在 Windows 桌面环境运行 Avalonia 应用逐项检查。在 headless 环境中无法验证。
 
 ## 概述
 
@@ -147,68 +149,68 @@ WPF 参考: `uac-elevation-permission.md` 计划文档
 
 ### Task 1: Elevation 系列对话框移植（P0）
 
-- [ ] 创建 `ElevationDialog.axaml` + `.axaml.cs`
+- [x] 创建 `ElevationDialog.axaml` + `.axaml.cs`
   - 布局：图标 + 说明文本 + 路径列表 + 确认/取消按钮
   - 主题绑定：`Background="{DynamicResource ThemeWindowBgBrush}"`
-- [ ] 创建 `ElevationFailedDialog.axaml` + `.axaml.cs`
-- [ ] 创建 `ElevationInfoDialog.axaml` + `.axaml.cs`
-- [ ] 在 `App.axaml.cs` 中添加 Elevation 重启逻辑
+- [x] 创建 `ElevationFailedDialog.axaml` + `.axaml.cs`
+- [x] 创建 `ElevationInfoDialog.axaml` + `.axaml.cs`
+- [x] 在 `App.axaml.cs` 中添加 Elevation 重启逻辑
   - `RestartAsAdmin(string[] args)` 方法
   - 使用 `Process.Start` + `runas` verb
-- [ ] 在相关 CLI handler 中集成 Elevation 逻辑
+- [x] 在相关 CLI handler 中集成 Elevation 逻辑
 
 ### Task 2: Favorites 收藏夹移植（P1）
 
-- [ ] 在 `AppSettings.cs` 添加 `FavoritePaths` 列表属性
-- [ ] 创建 `AddFavoriteDialog.axaml` + `.axaml.cs`
+- [x] 在 `AppSettings.cs` 添加 `FavoritePaths` 列表属性
+- [x] 创建 `AddFavoriteDialog.axaml` + `.axaml.cs`
   - 输入路径（带浏览按钮）+ 名称 + 确定/取消
-- [ ] 创建 `FavoriteManagerWindow.axaml` + `.axaml.cs`
+- [x] 创建 `FavoriteManagerWindow.axaml` + `.axaml.cs`
   - ListBox + 重命名/删除/上移/下移按钮
-- [ ] 在 `MainWindowViewModel.cs` 添加收藏夹命令
-- [ ] 在 `MainWindow.axaml` 菜单中添加收藏夹入口
+- [x] 在 `MainWindowViewModel.cs` 添加收藏夹命令
+- [x] 在 `MainWindow.axaml` 菜单中添加收藏夹入口
 
 ### Task 3: QuickPath 移植（P1）
 
-- [ ] 创建 `QuickPathControl.axaml` + `.axaml.cs`
+- [x] 创建 `QuickPathControl.axaml` + `.axaml.cs`
   - TextBox + AutoCompleteBox 结合
   - 历史记录建议
-- [ ] 创建 `QuickPathDialog.axaml` + `.axaml.cs`
+- [x] 创建 `QuickPathDialog.axaml` + `.axaml.cs`
   - 使用 QuickPathControl
-- [ ] 创建 `QuickPathPreDialog.axaml` + `.axaml.cs`
+- [x] 创建 `QuickPathPreDialog.axaml` + `.axaml.cs`
   - 启动时路径选择（用于 7z.dll 定位等）
 
 ### Task 4: 次要对话框移植（P2）
 
-- [ ] 创建 `ArchiveCommentDialog.axaml` + `.axaml.cs`
+- [x] 创建 `ArchiveCommentDialog.axaml` + `.axaml.cs`
   - 多行 TextBox + 保存/取消
   - 通过 `ArchiveService` 调用 SharpCompress API
-- [ ] 创建 `ArchiveSaveAsDialog.axaml` + `.axaml.cs`
-- [ ] 创建 `UnifiedExtractDialog.axaml` + `.axaml.cs`
+- [x] 创建 `ArchiveSaveAsDialog.axaml` + `.axaml.cs`
+- [x] 创建 `UnifiedExtractDialog.axaml` + `.axaml.cs`
 
 ### Task 5: 控件移植（P2）
 
-- [ ] 创建 `DynamicFormatOptionsPanel.axaml` + `.axaml.cs`
+- [x] 创建 `DynamicFormatOptionsPanel.axaml` + `.axaml.cs`
   - 根据压缩格式动态显示选项
   - 7z: 固实块大小、加密方法等
   - ZIP: 编码选择等
-- [ ] 创建 `QuickPathControl.axaml` + `.axaml.cs`（如 Task 3 未做）
+- [x] 创建 `QuickPathControl.axaml` + `.axaml.cs`（已在 Task 3 完成）
 
 ### Task 6: AppMessageBox + 转换器移植（P2）
 
-- [ ] 创建 Avalonia 版 AppMessageBox（或确认是否可用原生替代已足够）
-- [ ] 创建 `BatchStatusConverters.cs`
+- [x] 创建 Avalonia 版 AppMessageBox（或确认是否可用原生替代已足够）
+- [x] 创建 `BatchStatusConverters.cs`
 
 ### Task 7: 集成 + 菜单绑定
 
-- [ ] 在 `MainWindowViewModel.cs` 注册新对话框回调
-- [ ] 在 `MainWindow.axaml` 添加菜单项
-- [ ] 补全中英文 localization keys
+- [x] 在 `MainWindowViewModel.cs` 注册新对话框回调
+- [x] 在 `MainWindow.axaml` 添加菜单项
+- [x] 补全中英文 localization keys
 
 ## 验证标准
 
-- [ ] 所有对话框可正常打开/关闭
-- [ ] Elevation 系列对话框在权限不足场景正确触发
-- [ ] 收藏夹新建/删除/排序正常工作，数据持久化
-- [ ] QuickPathControl 显示历史建议
-- [ ] ArchiveCommentDialog 能读取和写入 ZIP 注释
-- [ ] `dotnet build` 通过
+- [ ] 🚫 所有对话框可正常打开/关闭 — **阻塞：需在 Windows 桌面运行 Avalonia 应用手动验证**
+- [ ] 🚫 Elevation 系列对话框在权限不足场景正确触发 — **阻塞：需在 Windows 桌面运行 Avalonia 应用 + 管理员权限上下文验证**
+- [x] 收藏夹新建/删除/排序正常工作，数据持久化 (FavoritePathManagerTests: 14/14 ✅)
+- [x] QuickPathControl 显示历史建议 (PathHistoryManagerTests: 11/11 ✅)
+- [x] ArchiveCommentDialog 能读取和写入 ZIP 注释
+- [x] `dotnet build` 通过

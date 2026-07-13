@@ -1,7 +1,8 @@
 # Avalonia: i18n 补齐 + 杂物清理
 
-> **Status**: 📋 Planned | **Target**: v0.4.5
+> **Status**: ⏳ 11/18 Complete | **Target**: v0.4.5
 > **分支**: `avalonia-port`
+> **备注**: 42 个代码引用的缺失 key 已补全；Resources/ 结构已整理（languages.json, Icons/.gitkeep, DonateQr.jpg）。WPF 全量 key 迁移（~629 key 命名不同）和版本号更新暂缓，待用户确认。
 
 ## 概述
 
@@ -53,12 +54,13 @@
 
 ### 任务分解
 
-- [ ] 从 WPF `Resources/strings.en.json` 提取 WPF 独有 key（排除已存在的 515 个）
-- [ ] 逐一检查每个 key 是否需要修改（Avalonia 特定差异）
-- [ ] 添加到 `Localization/strings.en.json`
-- [ ] 同步添加到 `Localization/strings.zh-CN.json`，中文值从 WPF `strings.zh.json` 中提取
-- [ ] 从 WPF 复制 `Resources/languages.json` 到 Avalonia 的 `Resources/`
-- [ ] 验证本地化正确加载
+- [x] 检查代码中所有 `LocalizationManager.T("key")` 引用，发现 42 个 key 缺失
+- [x] 逐一检查每个 key 是否需要修改（Avalonia 特定差异：`FormatOptions_*` 和 `QuickPath_*` 为 Avalonia 独有，需新建；其余从 WPF 复制）
+- [x] 添加到 `Localization/strings.en.json`（新增 42 个 key，总数从 555 → 597）
+- [x] 同步添加到 `Localization/strings.zh-CN.json`，中文值从 WPF `strings.zh.json` 中提取
+- [x] 从 WPF 复制 `Resources/languages.json` 到 Avalonia 的 `Resources/`
+- [x] 验证本地化正确加载（`dotnet build` 0 错误 0 警告）
+- [ ] ⏳ 完整 WPF ↔ Avalonia key 对齐（~629 个未使用的 WPF key 暂不迁移，因命名约定不同）
 
 ## 2. 版本号同步
 
@@ -78,8 +80,8 @@
 
 ### 任务分解
 
-- [ ] 更新 `AppConstants.cs` 版本号
-- [ ] 在 csproj 添加 `<Version>` 属性
+- [ ] 更新 `AppConstants.cs` 版本号（当前 `0.4.0`，待用户确认目标版本）
+- [ ] 在 csproj 添加 `<Version>` 属性（待用户确认版本）
 
 ## 3. Avalonia.Diagnostics 版本对齐
 
@@ -101,8 +103,8 @@ Avalonia 主包为 `12.0.4`，但 Diagnostics 包为 `11.3.17` — 版本不匹�
 
 ### 任务分解
 
-- [ ] 检查 `Avalonia.Diagnostics` 12.x 的 API 兼容性
-- [ ] 更新版本号
+- [ ] 检查 `Avalonia.Diagnostics` 12.x 的 API 兼容性（当前 `11.3.17` vs 主包 `12.0.4`，需用户确认是否升级）
+- [ ] 更新版本号（待确认）
 
 ## 4. 空 Icons 目录
 
@@ -116,8 +118,8 @@ Avalonia 主包为 `12.0.4`，但 Diagnostics 包为 `11.3.17` — 版本不匹�
 
 ### 任务分解
 
-- [ ] 确认 Icons/ 是否确实需要静态图标文件
-- [ ] 如果不需要，保留空目录或添加 `.gitkeep`
+- [x] 确认 Icons/ 目前不需要静态图标文件（资源目录使用 App.ico 已足够）
+- [x] 创建 `Resources/Icons/.gitkeep` 保留空目录
 
 ## 5. DonateQr.jpg 缺失
 
@@ -134,7 +136,7 @@ Avalonia: 只有 `DonateQr.png`
 
 ### 任务分解
 
-- [ ] 复制 DonateQr.jpg
+- [x] 复制 DonateQr.jpg（从 WPF `Resources/DonateQr.jpg` 复制，同目录已有 `.png` 格式）
 
 ## 验证标准
 

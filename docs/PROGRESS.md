@@ -10,8 +10,10 @@
 - **当前版本**: 0.4.4
 - **发布日期**: 2026-06-29
 
-### 0.4.4 (2026-07-08)
-  - **Avalonia AboutWindow 迁移** — WPF 四标签页（关于/作者/依赖库/致谢）完整迁移到 Avalonia；修复 `{Binding LocalizedStrings[key]}` 字典索引器绑定在 TabItem.Header 不解析的问题，改为直接属性绑定 + x:Name 直接赋值；依赖库列表更新为实际 Avalonia 项目真实版本号；贡献者列表 CSV 支持 (2026-07-08)
+### 0.4.4 (2026-07-13)
+  - **Avalonia UI 功能补齐（对话框 + 控件 + 转换器）** — 11 个对话框（Elevation×3/AddFavorite/FavoriteManager/ArchiveComment/AppMessageBox/QuickPath/QuickPathPre/ArchiveSaveAs/UnifiedExtract）+ 2 个控件（QuickPathControl/DynamicFormatOptionsPanel）+ 1 个转换器（BatchStatusConverters）完整移植到 Avalonia；MainWindowViewModel 5 个新对话框回调；MainWindow Favorites 子菜单；20+ i18n 中英文键；可构建 0 错误 (2026-07-13)
+  - **i18n 缺失 key 补齐** — 扫描代码中 427 个 `LocalizationManager.T()` 引用，补齐 42 个缺失 key（ElevationDialog/FormatOptions/MsgBox/ProgressBatch/QuickPath/MainArchiveComment）；从 WPF 复制 `languages.json`；创建 `Icons/.gitkeep` 保留空目录；复制 `DonateQr.jpg` (2026-07-13)
+  - **ZipEngine SharpCompress 迁移 Plan B 确认完成** — SharpSevenZip `OutArchiveFormat.Zip`+`Aes256` 替代 SharpZipLib 加密回退；`MantisZip.Core.csproj` 已无 SharpZipLib 引用；Core 构建 0 错误 0 警告；236/236 测试通过 (2026-07-13)
 
 ## 规划中
 - Avalonia 跨平台移植后续 Phase

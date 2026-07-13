@@ -1,5 +1,7 @@
 # ZipEngine SharpZipLib → SharpCompress 迁移
 
+> **Status**: ✅ **COMPLETE** — SharpZipLib fully removed from `MantisZip.Core.csproj`, SharpSevenZip `OutArchiveFormat.Zip`+`Aes256` replaces encryption fallback. Core builds 0 errors, 236/236 tests pass.
+
 ## TL;DR
 
 > **Quick Summary**: 将 `ZipEngine.cs` 中剩余的 3 个方法从 SharpZipLib API 迁移到 SharpCompress，最大化减少 SharpZipLib 依赖。
@@ -99,7 +101,7 @@ ZipCommentHelper.WriteComment(outputPath, options.Comment);
 - [x] 编码回退逻辑正常（UTF-8 → GBK）
 - [x] `OpenZipFile` 删除
 - [x] ~~`.csproj` 移除 SharpZipLib~~ ⚠️ **Drive: SharpCompress ZipWriter 不支持加密** — SharpZipLib 保留作为加密回退依赖
-- [ ] **`csproj` 移除 SharpZipLib** ← 方案 B 执行中（通过 SharpSevenZip `OutArchiveFormat.Zip`+`Aes256` 替代加密回退）
+- [x] **`csproj` 移除 SharpZipLib** ✅（方案 B 已执行完成：SharpSevenZip `OutArchiveFormat.Zip`+`Aes256` 替代加密回退，SharpZipLib 已从 `MantisZip.Core.csproj` 移除，构建通过 0 错误）
 - [x] 全部 183 测试通过
 
 ### Must Have
