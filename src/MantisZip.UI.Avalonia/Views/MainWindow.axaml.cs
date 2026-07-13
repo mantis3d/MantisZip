@@ -85,6 +85,39 @@ public partial class MainWindow : Window
             await dialog.ShowDialog(this);
         };
 
+        vm.ShowFavoritesDialog = async () =>
+        {
+            var dialog = new FavoriteManagerWindow();
+            await dialog.ShowDialog(this);
+        };
+
+        vm.ShowQuickPathDialog = async (isFolderMode) =>
+        {
+            var dialog = new QuickPathDialog(isFolderMode) { WindowStartupLocation = WindowStartupLocation.CenterOwner };
+            var result = await dialog.ShowDialog<bool>(this);
+            return result ? dialog.SelectedPath : null;
+        };
+
+        vm.ShowArchiveSaveAsDialog = async (archivePath) =>
+        {
+            var dialog = new ArchiveSaveAsDialog(archivePath) { WindowStartupLocation = WindowStartupLocation.CenterOwner };
+            var result = await dialog.ShowDialog<bool>(this);
+            return result ? dialog.SavePath : null;
+        };
+
+        vm.ShowQuickPathPreDialog = async (isPickFolderMode, isFileOpenMode) =>
+        {
+            var dialog = new QuickPathPreDialog(isPickFolderMode, isFileOpenMode) { WindowStartupLocation = WindowStartupLocation.CenterOwner };
+            var result = await dialog.ShowDialog<bool>(this);
+            return result ? dialog.SelectedPath : null;
+        };
+
+        vm.ShowUnifiedExtractDialog = async (presetPath) =>
+        {
+            var dialog = new UnifiedExtractDialog(this) { WindowStartupLocation = WindowStartupLocation.CenterOwner };
+            return await dialog.ShowDialog<bool>(this) ? dialog.SelectedPath : null;
+        };
+
         vm.RunWithProgress = async (title, operation) =>
         {
             var pw = new ProgressWindow(title);

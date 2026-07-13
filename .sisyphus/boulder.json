@@ -1,32 +1,8 @@
 {
-  "active_plan": null,
-  "started_at": "2026-07-01T11:58:05.453Z",
+  "active_plan": "E:/github/MantisZip/.sisyphus/plans/portable-mode.md",
+  "started_at": "2026-07-13T15:00:00.000Z",
   "session_ids": [],
-  "session_origins": {},
-  "plan_name": null,
+  "plan_name": "portable-mode",
   "agent": "atlas",
-  "summary": {
-    "phase1_core": "completed",
-    "phase2_ui": "completed",
-    "files_created": [
-      "src/MantisZip.Core/Utils/FileFormatDetector.cs",
-      "src/MantisZip.Core/Utils/FileFormatHelper.cs"
-    ],
-    "files_modified": [
-      "src/MantisZip.Core/Utils/FileFormatInfo.cs",
-      "src/MantisZip.Core/Utils/ArchiveEntryExtractor.cs",
-      "src/MantisZip.UI/AppSettings.cs",
-      "src/MantisZip.UI/MainWindow/Preview/MainWindow.Preview.cs"
-    ],
-    "build": "0 errors, 0 new warnings",
-    "tests": "233/234 pass (1 pre-existing unrelated failure)"
-  },
-  "session_origins": {
-    "ses_0e99dfcbaffeoMXGRjml4gj76W": "direct"
-  },
-  "task_sessions": {},
-  "active_work_id": "preview-magic-detection-legacy",
-  "ended_at": "2026-06-30T03:02:53.017Z",
-  "elapsed_ms": 1613017,
-  "updated_at": "2026-06-30T03:02:53.017Z"
+  "worktree_path": null
 }

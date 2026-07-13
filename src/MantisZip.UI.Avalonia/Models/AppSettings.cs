@@ -80,6 +80,9 @@ public class AppSettings
     public bool AssocIso { get; set; } = false;
     public List<string> CustomAssocExtensions { get; set; } = new();
 
+    // ===== 收藏夹 =====
+    public List<string> FavoritePaths { get; set; } = new();
+
     // ===== 调试 =====
     public bool EnableDebugLogging { get; set; } = false;
     public string LogPrivacyMode { get; set; } = "extension";

@@ -99,6 +99,17 @@
             </StackPanel>
           </MenuItem.Header>
         </MenuItem>
+        <Separator />
+        <MenuItem Header="⭐ 收藏夹">
+          <MenuItem Command="{Binding OpenFavoritesManagerCommand}">
+            <MenuItem.Header>
+              <StackPanel Orientation="Horizontal" Spacing="4">
+                <TextBlock Text="⭐" FontSize="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+                <TextBlock Text="{Binding LocalizedStrings[FavMgr_OpenManager]}" />
+              </StackPanel>
+            </MenuItem.Header>
+          </MenuItem>
+        </MenuItem>
       </MenuItem>
       <MenuItem Header="{Binding LocalizedStrings[Menu_Edit]}">
         <MenuItem Command="{Binding ExtractArchiveCommand}" InputGesture="Ctrl+E"

@@ -17,6 +17,7 @@ using MantisZip.UI.Avalonia.Views;
 using System.Diagnostics;
 using System.IO.Pipes;
 using System.Runtime.InteropServices;
+using System.Security.Principal;
 using System.Threading;
 
 namespace MantisZip.UI.Avalonia;
@@ -86,15 +87,17 @@ public partial class App : Application
                     case "--extract":
                         // Extract to same directory as archive
                         if (!string.IsNullOrEmpty(path) && File.Exists(path))
-                            ExtractArchive(path, Path.GetDirectoryName(path) ?? ".");
-                        desktop.Shutdown();
+                            _ = RunExtractCliAsync(path, Path.GetDirectoryName(path) ?? ".", args, desktop);
+                        else
+                            desktop.Shutdown();
                         break;
 
                     case "--extract-here":
                         // Extract to current directory
                         if (!string.IsNullOrEmpty(path) && File.Exists(path))
-                            ExtractArchive(path, Directory.GetCurrentDirectory());
-                        desktop.Shutdown();
+                            _ = RunExtractCliAsync(path, Directory.GetCurrentDirectory(), args, desktop);
+                        else
+                            desktop.Shutdown();
                         break;
 
                     case "--extract-to-name":
@@ -107,16 +110,18 @@ public partial class App : Application
                                 dirName = Path.GetFileNameWithoutExtension(Path.GetFileNameWithoutExtension(path));
                             var targetDir = Path.Combine(Path.GetDirectoryName(path) ?? ".", dirName);
                             Directory.CreateDirectory(targetDir);
-                            ExtractArchive(path, targetDir);
+                            _ = RunExtractCliAsync(path, targetDir, args, desktop);
                         }
-                        desktop.Shutdown();
+                        else
+                            desktop.Shutdown();
                         break;
 
                     case "--extract-smart":
                         // Smart extract: analyze archive structure and choose extraction mode
                         if (!string.IsNullOrEmpty(path) && File.Exists(path))
-                            ExtractSmart(path);
-                        desktop.Shutdown();
+                            _ = RunExtractSmartCliAsync(path, args, desktop);
+                        else
+                            desktop.Shutdown();
                         break;
 
                     case "--compress":
@@ -255,42 +260,74 @@ public partial class App : Application
     //  Extract helpers
     // ════════════════════════════════════════════════════════════════
 
-    private static void ExtractArchive(string archivePath, string targetDir)
+    /// <summary>
+    /// 带提权支持的异步解压。先检查目标目录可写性，权限不足时弹出提权对话框。
+    /// </summary>
+    private static async Task<bool> TryExtractArchiveAsync(
+        string archivePath,
+        string targetDir,
+        string[] originalArgs,
+        IClassicDesktopStyleApplicationLifetime desktop)
     {
         try
         {
+            // Pre-check target directory writability
+            var unwritable = new List<string>();
+            if (!IsDirectoryWritable(targetDir))
+                unwritable.Add(targetDir);
+
+            if (unwritable.Count > 0)
+            {
+                var restarted = await HandleElevationAsync(unwritable, originalArgs, desktop);
+                // If user chose to restart as admin, we return without extracting.
+                // If user declined or already elevated, we still return (can't proceed).
+                return restarted;
+            }
+
             var engine = ArchiveEngineFactory.GetEngineByExtension(archivePath);
             if (engine == null)
             {
                 Console.Error.WriteLine($"Unsupported archive format: {archivePath}");
-                return;
+                return false;
             }
 
-            engine.ExtractAsync(archivePath, targetDir).GetAwaiter().GetResult();
+            await engine.ExtractAsync(archivePath, targetDir);
             Console.WriteLine($"Extracted: {archivePath} -> {targetDir}");
+            return false;
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return await HandleElevationAsync(new[] { targetDir }, originalArgs, desktop);
         }
         catch (Exception ex)
         {
             Console.Error.WriteLine($"Extraction failed: {ex.Message}");
+            return false;
         }
     }
 
-    private static void ExtractSmart(string archivePath)
+    /// <summary>
+    /// 带提权支持的异步智能解压。先分析目标目录可写性，权限不足时弹出提权对话框。
+    /// </summary>
+    private static async Task<bool> TryExtractSmartAsync(
+        string archivePath,
+        string[] originalArgs,
+        IClassicDesktopStyleApplicationLifetime desktop)
     {
+        string targetDir = string.Empty;
         try
         {
             var engine = ArchiveEngineFactory.GetEngineByExtension(archivePath);
             if (engine == null)
             {
                 Console.Error.WriteLine($"Unsupported archive format: {archivePath}");
-                return;
+                return false;
             }
 
             // List entries to analyze structure
-            var items = engine.ListEntriesAsync(archivePath).GetAwaiter().GetResult();
+            var items = await engine.ListEntriesAsync(archivePath);
             var hasSingleRoot = ArchiveStructureAnalyzer.HasSingleRootDirectory(items);
 
-            string targetDir;
             if (hasSingleRoot)
             {
                 // Single root folder: extract to current directory
@@ -308,13 +345,56 @@ public partial class App : Application
                 Console.WriteLine($"SmartExtract: dispersed structure, extracting to {targetDir}");
             }
 
-            engine.ExtractAsync(archivePath, targetDir).GetAwaiter().GetResult();
+            // Check writability before extraction
+            var unwritable = new List<string>();
+            if (!IsDirectoryWritable(targetDir))
+                unwritable.Add(targetDir);
+
+            if (unwritable.Count > 0)
+                return await HandleElevationAsync(unwritable, originalArgs, desktop);
+
+            await engine.ExtractAsync(archivePath, targetDir);
             Console.WriteLine($"Extracted: {archivePath} -> {targetDir}");
+            return false;
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return !string.IsNullOrEmpty(targetDir)
+                ? await HandleElevationAsync(new[] { targetDir }, originalArgs, desktop)
+                : false;
         }
         catch (Exception ex)
         {
             Console.Error.WriteLine($"Smart extraction failed: {ex.Message}");
+            return false;
         }
+    }
+
+    /// <summary>
+    /// CLI 解压入口包装：调用 TryExtractArchiveAsync，完成后 shutdown。
+    /// </summary>
+    private static async Task RunExtractCliAsync(
+        string archivePath,
+        string targetDir,
+        string[] originalArgs,
+        IClassicDesktopStyleApplicationLifetime desktop)
+    {
+        var restarted = await TryExtractArchiveAsync(archivePath, targetDir, originalArgs, desktop);
+        if (!restarted)
+            desktop.Shutdown();
+    }
+
+    /// <summary>
+    /// CLI 智能解压入口包装：调用 TryExtractSmartAsync，完成后 shutdown。
+    /// </summary>
+    private static async Task RunExtractSmartCliAsync(
+        string archivePath,
+        string[] originalArgs,
+        IClassicDesktopStyleApplicationLifetime desktop)
+    {
+        var restarted = await TryExtractSmartAsync(archivePath, originalArgs, desktop);
+        if (!restarted)
+            desktop.Shutdown();
     }
 
     // ════════════════════════════════════════════════════════════════
@@ -426,6 +506,116 @@ public partial class App : Application
             dir = Path.GetDirectoryName(dir);
         }
         return null;
+    }
+
+    // ════════════════════════════════════════════════════════════════
+    //  Elevation helpers
+    // ════════════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// 检测指定目录是否可写入。尝试创建测试文件并用 DeleteOnClose 自动清理。
+    /// </summary>
+    private static bool IsDirectoryWritable(string dirPath)
+    {
+        try
+        {
+            if (!Directory.Exists(dirPath))
+                Directory.CreateDirectory(dirPath);
+
+            var testFile = Path.Combine(dirPath, Path.GetRandomFileName());
+            using (var fs = File.Create(testFile, 1, FileOptions.DeleteOnClose)) { }
+            return true;
+        }
+        catch (UnauthorizedAccessException) { return false; }
+        catch (IOException) { return false; }
+    }
+
+    /// <summary>
+    /// 检测当前进程是否以管理员权限运行。
+    /// </summary>
+    private static bool IsElevated()
+    {
+        if (!OperatingSystem.IsWindows()) return false;
+        using var identity = WindowsIdentity.GetCurrent();
+        var principal = new WindowsPrincipal(identity);
+        return principal.IsInRole(WindowsBuiltInRole.Administrator);
+    }
+
+    /// <summary>
+    /// 以管理员权限重新启动当前进程，传递原始 CLI 参数。
+    /// </summary>
+    private static void RestartAsAdmin(string[] originalArgs)
+    {
+        var exePath = Environment.ProcessPath;
+        if (string.IsNullOrEmpty(exePath)) return;
+
+        var args = string.Join(" ", originalArgs.Select(a => $"\"{a}\""));
+        Process.Start(new ProcessStartInfo
+        {
+            FileName = exePath,
+            Arguments = args,
+            Verb = "runas",
+            UseShellExecute = true,
+        });
+    }
+
+    /// <summary>
+    /// 弹出权限不足对话框处理流程：
+    ///   - 已提权 → 显示 ElevationFailedDialog
+    ///   - 允许提权 → 显示 ElevationDialog → 用户选择提权则 RestartAsAdmin 后 shutdown
+    ///   - 不允许/取消 → 显示 ElevationInfoDialog
+    /// 返回 true 表示进程已重启（调用方无需再 shutdown），false 表示用户取消或已失败。
+    /// </summary>
+    private static async Task<bool> HandleElevationAsync(
+        IReadOnlyList<string> unwritable,
+        string[] originalArgs,
+        IClassicDesktopStyleApplicationLifetime desktop)
+    {
+        var owner = desktop.MainWindow;
+
+        if (IsElevated())
+        {
+            // Already elevated but still failing — show failed dialog
+            var dlg = new Dialogs.ElevationFailedDialog(unwritable);
+            if (owner != null)
+                await dlg.ShowDialog<bool?>(owner);
+            else
+                dlg.Show();
+            return false;
+        }
+
+        // Show elevation confirm dialog
+        var elevationDlg = new Dialogs.ElevationDialog(unwritable);
+        bool? result;
+        if (owner != null)
+        {
+            result = await elevationDlg.ShowDialog<bool?>(owner);
+        }
+        else
+        {
+            // No window available yet (CLI mode), use a temp owner
+            var tempOwner = new Window { IsVisible = false };
+            desktop.MainWindow = tempOwner;
+            result = await elevationDlg.ShowDialog<bool?>(tempOwner);
+        }
+
+        if (result == true)
+        {
+            // User chose to elevate — restart as admin and shutdown current process
+            RestartAsAdmin(originalArgs);
+            desktop.Shutdown();
+            return true;
+        }
+        else
+        {
+            // User declined — show info dialog
+            var infoDlg = new Dialogs.ElevationInfoDialog(unwritable);
+            if (owner != null)
+                await infoDlg.ShowDialog<bool?>(owner);
+            else
+                infoDlg.Show();
+            return false;
+        }
     }
 
     // ════════════════════════════════════════════════════════════════

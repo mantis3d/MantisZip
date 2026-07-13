@@ -56,6 +56,31 @@ public partial class MainWindowViewModel : ObservableObject
     public Func<Task>? ShowAboutDialog { get; set; }
 
     /// <summary>
+    /// 收藏管理器窗口回调。
+    /// </summary>
+    public Func<Task>? ShowFavoritesDialog { get; set; }
+
+    /// <summary>
+    /// QuickPath 路径选择对话框回调。返回所选路径或 null=取消。
+    /// </summary>
+    public Func<bool, Task<string?>>? ShowQuickPathDialog { get; set; }
+
+    /// <summary>
+    /// 另存为对话框回调。传入当前压缩包路径，返回保存路径或 null=取消。
+    /// </summary>
+    public Func<string, Task<string?>>? ShowArchiveSaveAsDialog { get; set; }
+
+    /// <summary>
+    /// 统一解压对话框回调。参数为预设路径，返回选择的解压路径或 null=取消。
+    /// </summary>
+    public Func<string, Task<string?>>? ShowUnifiedExtractDialog { get; set; }
+
+    /// <summary>
+    /// QuickPathPre 前置路径选择对话框回调。返回所选路径或 null=取消。
+    /// </summary>
+    public Func<bool, bool, Task<string?>>? ShowQuickPathPreDialog { get; set; }
+
+    /// <summary>
     /// 由 View 设置的回调，用于复制文字到剪贴板。
     /// </summary>
     public Func<string, Task>? CopyToClipboard { get; set; }
@@ -154,7 +179,8 @@ public partial class MainWindowViewModel : ObservableObject
             "Test_CommentDialog", "Test_PasswordEditDialog", "Test_PasswordDialog",
             "Test_ProgressWindow", "Test_ErrorDialog",
             "Test_CompressSettings", "Test_ExtractSettings",
-            "Test_CompressConflict", "Test_ConflictDialog", "Test_MatchedPassword"
+            "Test_CompressConflict", "Test_ConflictDialog", "Test_MatchedPassword",
+            "FavMgr_OpenManager"
         };
         foreach (var key in keys)
         {
@@ -988,6 +1014,13 @@ public partial class MainWindowViewModel : ObservableObject
     {
         if (ShowPasswordManager != null)
             await ShowPasswordManager();
+    }
+
+    [RelayCommand]
+    private async Task OpenFavoritesManager()
+    {
+        if (ShowFavoritesDialog != null)
+            await ShowFavoritesDialog();
     }
 
     [RelayCommand]
