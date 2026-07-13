@@ -266,6 +266,7 @@ public static class L
     public const string Main_Menu_Settings                         = "Main_Menu_Settings";
     public const string Main_Menu_Tools                            = "Main_Menu_Tools";
     public const string Main_Menu_View                             = "Main_Menu_View";
+    public const string Main_Menu_HidePreviewInfo                  = "Main_Menu_HidePreviewInfo";
     public const string Main_OpenArchiveBtn                        = "Main_OpenArchiveBtn";
     public const string Main_OpenFileFilter                        = "Main_OpenFileFilter";
     public const string Main_OpenFileTitle                         = "Main_OpenFileTitle";

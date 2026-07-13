@@ -359,3 +359,14 @@ MantisZip 是一款完全免费且独立开发的开源项目。如果它提升�
 * **Discord 交流群**: （👉 [点击一键加入群聊](https://discord.gg/PpuyhceJpZ)）
 
 > 💡 **小提示**：进群请备注 “GitHub / MantisZip”。
+
+
+## Star History
+
+<a href="https://www.star-history.com/?repos=mantis3d%2FMantisZip&type=date&legend=top-left">
+ <picture>
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=mantis3d/MantisZip&type=date&theme=dark&legend=top-left&sealed_token=nsZLw4F-DYdClMW8mHT8lwCV9ExHMuy4eC0Ebz22DGp8NwLlC9IeKT3cZ4St3gycAR-apUAwJHJQb_Ubr50GXL9coXR1_qyce_ljatXgN40WEtu__3LiPKBw94SyCSYK6YfgYgoMdU_JtzH6GPpNIlPCD5VsAQOr2yHW8s2qH64b9BJlbpdqn3TojxdQ" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=mantis3d/MantisZip&type=date&legend=top-left&sealed_token=nsZLw4F-DYdClMW8mHT8lwCV9ExHMuy4eC0Ebz22DGp8NwLlC9IeKT3cZ4St3gycAR-apUAwJHJQb_Ubr50GXL9coXR1_qyce_ljatXgN40WEtu__3LiPKBw94SyCSYK6YfgYgoMdU_JtzH6GPpNIlPCD5VsAQOr2yHW8s2qH64b9BJlbpdqn3TojxdQ" />
+   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=mantis3d/MantisZip&type=date&legend=top-left&sealed_token=nsZLw4F-DYdClMW8mHT8lwCV9ExHMuy4eC0Ebz22DGp8NwLlC9IeKT3cZ4St3gycAR-apUAwJHJQb_Ubr50GXL9coXR1_qyce_ljatXgN40WEtu__3LiPKBw94SyCSYK6YfgYgoMdU_JtzH6GPpNIlPCD5VsAQOr2yHW8s2qH64b9BJlbpdqn3TojxdQ" />
+ </picture>
+</a>

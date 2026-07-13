@@ -86,6 +86,7 @@ public class AppSettings
     public int PreviewPosition { get; set; } = 4; // 1=Bottom, 2=Below tree, 3=Below file list, 4=Right
     public string InfoPanelOrientation { get; set; } = "Vertical"; // Horizontal / Vertical
     public bool ShowPreviewPanel { get; set; } = true;
+    public bool ShowPreviewInfoPanel { get; set; } = true;
     /// <summary>格式检测头部字节数（默认 4KB），用于魔数检测读取的文件头部大小</summary>
     public int PreviewHeadSize { get; set; } = 4096;
     /// <summary>启用魔数检测文件真实格式（默认开启）。当扩展名缺失或错误时，通过文件头 magic byte 识别真实格式。关闭时回退到纯扩展名判断。</summary>

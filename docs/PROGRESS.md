@@ -18,51 +18,30 @@
 
 ## 版本历史（从新到旧）
 
-### v0.4.5+ (2026-07-10) 文件过滤功能
+### v0.4.4+++ (2026-07-10) 视图菜单添加"隐藏预览信息"开关
 
-1. **新功能：文件过滤（压缩/解压）** — `file-filter-feature.md`
-   - **FileFilterCriteria 数据模型**：扩展名/文件名/大小/日期四维过滤条件
-   - **FileFilterMatcher 匹配引擎**：AND 逻辑，支持通配符 `*` `?`
-   - **FileFilterPreset 预设系统**：8 内置预设（图片/音频/视频/文档/压缩包/大文件/月内修改/排除临时文件）+ 用户自定义预设（上限 20 条），通过 `AppSettings.FilterPresets` JSON 持久化
-   - **FileFilterEditor UserControl**：启用开关、预设下拉框、扩展名复选框组、名称/大小/日期输入面板
-   - **ExtractSettingsWindow**：Tab 3 嵌入 FileFilterEditor，实时过滤统计（匹配数/总数），预设保存/删除
-   - **CompressSettingsWindow**：Tab 4 嵌入 FileFilterEditor，压缩时通过 `FileFilterHelper.ApplyFilter` 递归枚举目录并过滤
-   - **MainWindow 提取流**：`Extract_Click` 获取条目列表传给 `ExtractSettingsWindow`，`HandleExtractBatch` 接收过滤参数逐压缩包应用滤件
+1. **预览信息面板独立显隐控制** — 在视图菜单新增 `IsCheckable` 菜单项"隐藏预览信息(_I)"
+   - 关闭后：`PreviewInfoPanel`（文件名、大小、压缩比、日期）和 `PreviewExtraInfoPanel`（格式元数据）同时隐藏，预览内容区独占空间
+   - 两级控制：`PreviewToggleMenu` 控制预览整体开关，`PreviewInfoToggleMenu` 控制信息面板开关
+   - 状态持久化到 `settings.json`（`ShowPreviewInfoPanel`）
+2. **修改文件**：`AppSettings.cs`、`strings.zh.json`、`strings.en.json`、`L.cs`、`MainWindow.xaml`、`MainWindow.xaml.cs`、`MainWindow.Menu.cs`、`MainWindow.Preview.cs`
 
-### v0.4.5+ (2026-07-10) 便携模式 + Release 便携包
+### v0.4.4+ (2026-07-09) 移除 Applications shell\open\command 防止安装时错误路由
 
-1. **便携模式** — exe 同级存在 `Portable.txt` 时自动启用：
-   - 设置文件、密码库重定向到 `Data/` 目录（%APPDATA%/Local → exe 同级 Data/）
-   - 预览/拖拽临时目录重定向到 `Data/Temp/`（%TEMP% → Data/Temp/）
-   - 跳过 Shell 集成、文件关联注册（便携版不写注册表）
-   - 跳过 COM 菜单状态检测
-   - 跳过 `--install-shell` / `--uninstall-shell` / `--install-assoc` / `--uninstall-assoc` CLI 命令（便携版不支持）
-   - 7z.dll 搜索路径增加 exe 同级目录（便携版将 7z.dll 放在 exe 旁）
-2. **CI 生成便携包** — `release.yml` 新增 `Package portable zip` 步骤：
-   - 自包含发布输出中加入 `Portable.txt` 哨兵文件 + `x64\7z.dll`
-   - 压缩为 `MantisZip-{version}-Portable.zip`
-   - 与安装程序一同上传到 GitHub Release
+1. **移除 `Applications\MantisZip.UI.exe\shell\open\command` 注册** — 避免新软件安装时 Windows Shell 关联刷新将 exe 打开操作错误地路由到 MantisZip
+   - `SupportedTypes` 保留，不影响"打开方式"的展示
+   - 右键菜单（COM handler）、双击走 per-format ProgId 均不受影响
+2. **修改文件**：`src/MantisZip.UI/Shell/ShellIntegration.Assoc.cs`（删 1 行 + 注释）
 
-### v0.4.5 (2026-07-06) 压缩选项增强（7z/ZIP 参数扩展）完成
+### v0.4.4++ (2026-07-07) 修复 COM handler 动词名"open"与系统标准动词冲突
 
-1. **新功能：7z/ZIP 压缩选项扩展** — `compression-options-enhancement.md`
-   - **7z 参数**：固实块大小、字典大小(Dictionary Size)、单词大小(Word Size)、匹配器(Match Finder)、加密文件名(Encrypt Headers)
-   - **ZIP 参数**：压缩方法(Deflate/Deflate64/BZip2/LZMA/PPMd/Store)、加密方式(AES-256/192/128/ZipCrypto)
-   - **AppSettings**：7 个新属性作为默认值，可在 SettingsWindow → 压缩 Tab 配置
-   - **DynamicFormatOptionsPanel**：7z 面板（固实块/字典/单词/匹配器组合框 + 固实联动）+ ZIP 面板（压缩方法组合框）
-   - **加密 Tab 整合**：ZIP 加密方式 + 7z 加密文件名置于 CompressSettingsWindow 加密 Tab
-   - **引擎实现**：SevenZipEngine.ConfigureCompressor 应用所有参数；ZipEngine 同时支持 SharpCompress（非加密）和 SharpSevenZip（加密）路径
-   - **i18n**：24 个新本地化键（中/英），全部 XAML 绑定 `{l:L ...}`
-   - **文本优化**：ComboBox 默认值显示 7z.dll 内部默认值（273/BT4/16MB/全固实）
-   - **Bug 修复**：`SolidCheck_Changed` 空引用保护（XAML 初始化时序）
-    - **前置优化**：固实块大小选项扩展至 10 档（16MB~4GB）
-
-1. **解压路径统一** — `extract-path-unification.md`
-   - **IArchiveEngine 接口扩展**：`ExtractEntriesAsync` 新增 `outputPathOverrides` 可选参数，支持调用方覆写条目输出路径
-   - **ZipEngine/SevenZipEngine**：应用 `outputPathOverrides` 逻辑，匹配 key 时用覆写路径，未匹配时回退 `GetSafePath`
-   - **TarGzEngine**：仅补齐接口签名（仍抛出 `NotSupportedException`）
-   - **ExtractSelectedAsync 重写**：去掉手写 for 循环 + `ArchiveEntryExtractor` 调用，改为构建 `entryKeys` + `pathOverrides` 字典后统一调用引擎 `ExtractEntriesAsync`；Tar/Gz 格式降级为完整解压
-   - **清理**：移除手动进度/取消管理代码，进度由 `ProgressWindow.CreateBackgroundProgress` 桥接引擎上报
+1. **COM handler 动词名冲突修复** — COM 右键菜单的 GCS_VERB 返回动词名与系统标准 "open" 重名，
+   导致新软件安装时 Windows Shell 关联刷新可能误将 MantisZip 的"打开"动词当作 exe 的默认打开程序
+   - `GetCommandString` GCS_VERB: `"open"` → `"mantiszipopen"`
+   - `ResolveCommandId` 字符串映射: `"open" => CmdIdOpen` → `"mantiszipopen" => CmdIdOpen`
+   - 正常右键菜单操作不受影响（走整数偏移路径，不经动词名）
+   - 不影响 SFX 自解压文件的打开支持
+2. **修改文件**：`src/MantisZip.ShellExt/ContextMenuHandler.cs`（改 2 行）
 
 ### v0.4.4 (2026-07-07) COM 动态菜单 + pending 状态 + 延迟级联安装
 
