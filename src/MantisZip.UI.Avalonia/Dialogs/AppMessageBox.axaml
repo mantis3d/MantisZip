@@ -1,0 +1,91 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="MantisZip.UI.Avalonia.Dialogs.AppMessageBox"
+        x:CompileBindings="False"
+        Title="{Binding WinTitle}"
+        Width="420"
+        SizeToContent="Height"
+        WindowStartupLocation="CenterOwner"
+        CanResize="False"
+        ShowInTaskbar="False"
+        Background="{DynamicResource ThemeWindowBgBrush}"
+        Padding="16">
+  <Grid ColumnDefinitions="Auto,12,*"
+        RowDefinitions="Auto,Auto"
+        Margin="16">
+
+    <!-- Icon -->
+    <TextBlock Grid.Row="0" Grid.Column="0"
+               x:Name="IconText"
+               FontSize="32"
+               VerticalAlignment="Top"
+               IsVisible="False" />
+
+    <!-- Message -->
+    <TextBlock Grid.Row="0" Grid.Column="2"
+               x:Name="MessageText"
+               TextWrapping="Wrap"
+               FontSize="13"
+               Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+               VerticalAlignment="Center" />
+
+    <!-- Buttons panel -->
+    <StackPanel Grid.Row="1" Grid.ColumnSpan="3"
+                x:Name="ButtonPanel"
+                Orientation="Horizontal"
+                HorizontalAlignment="Center"
+                Spacing="8"
+                Margin="0,16,0,0">
+      <!-- Action button (for ShowWithAction) -->
+      <Button x:Name="ActionBtn"
+              Width="110"
+              Height="28"
+              IsVisible="False"
+              Click="OnActionBtnClick"
+              Background="{DynamicResource ThemeAccentBrush}"
+              Foreground="White"
+              BorderThickness="0" />
+      <!-- OK -->
+      <Button x:Name="OkBtn"
+              Content="OK"
+              Width="80"
+              Height="28"
+              IsVisible="False"
+              Click="OnOkClick"
+              Background="{DynamicResource ThemeAccentBrush}"
+              Foreground="White"
+              BorderThickness="0" />
+      <!-- Cancel -->
+      <Button x:Name="CancelBtn"
+              Content="{Binding CancelText}"
+              Width="80"
+              Height="28"
+              IsVisible="False"
+              IsCancel="True"
+              Click="OnCancelClick"
+              Background="{DynamicResource ThemeButtonBgBrush}"
+              Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+              BorderBrush="{DynamicResource ThemeBorderBrush}" />
+      <!-- Yes -->
+      <Button x:Name="YesBtn"
+              Content="{Binding YesText}"
+              Width="80"
+              Height="28"
+              IsVisible="False"
+              Click="OnYesClick"
+              Background="{DynamicResource ThemeButtonBgBrush}"
+              Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+              BorderBrush="{DynamicResource ThemeBorderBrush}" />
+      <!-- No -->
+      <Button x:Name="NoBtn"
+              Content="{Binding NoText}"
+              Width="80"
+              Height="28"
+              IsVisible="False"
+              Click="OnNoClick"
+              Background="{DynamicResource ThemeButtonBgBrush}"
+              Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+              BorderBrush="{DynamicResource ThemeBorderBrush}" />
+    </StackPanel>
+  </Grid>
+</Window>

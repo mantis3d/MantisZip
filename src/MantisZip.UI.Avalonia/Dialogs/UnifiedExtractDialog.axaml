@@ -1,0 +1,94 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:controls="clr-namespace:MantisZip.UI.Avalonia.Controls"
+        x:Class="MantisZip.UI.Avalonia.Dialogs.UnifiedExtractDialog"
+        x:CompileBindings="False"
+        Title="{Binding WinTitle}"
+        Width="500"
+        WindowStartupLocation="CenterOwner"
+        SizeToContent="Height"
+        CanResize="False"
+        ShowInTaskbar="False"
+        Background="{DynamicResource ThemeWindowBgBrush}">
+
+  <Grid Margin="12"
+        RowDefinitions="Auto,Auto,Auto,*,Auto">
+
+    <!-- Row 0: Header -->
+    <TextBlock Grid.Row="0"
+               Text="{Binding HeaderText}"
+               FontSize="14"
+               FontWeight="SemiBold"
+               Margin="0,0,0,8"
+               Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+
+    <!-- Row 1: QuickPathControl (folder mode) -->
+    <controls:QuickPathControl x:Name="PathControl"
+                               Grid.Row="1"
+                               IsFolderMode="True"
+                               Margin="0,0,0,10" />
+
+    <!-- Row 2: Extract options -->
+    <GroupBox Grid.Row="2"
+              Header="{Binding OptionsTitle}"
+              Padding="8"
+              Margin="0,0,0,10"
+              BorderBrush="{DynamicResource ThemeBorderBrush}"
+              Background="{DynamicResource ThemeSurfaceBgBrush}">
+      <StackPanel Spacing="6">
+        <!-- Conflict action row -->
+        <Grid ColumnDefinitions="100,*">
+          <TextBlock Grid.Column="0"
+                     Text="{Binding ConflictLabel}"
+                     VerticalAlignment="Center"
+                     Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+          <ComboBox x:Name="ConflictCombo"
+                    Grid.Column="1"
+                    SelectedIndex="0"
+                    Height="28"
+                    Background="{DynamicResource ThemeSurfaceBgBrush}"
+                    Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                    BorderBrush="{DynamicResource ThemeBorderBrush}">
+            <ComboBoxItem Content="覆盖" />
+            <ComboBoxItem Content="跳过" />
+            <ComboBoxItem Content="自动重命名" />
+            <ComboBoxItem Content="覆盖旧文件" />
+            <ComboBoxItem Content="覆盖小文件" />
+          </ComboBox>
+        </Grid>
+        <!-- Preserve directory root checkbox -->
+        <CheckBox x:Name="PreserveRootCheck"
+                  Content="{Binding PreserveRootLabel}"
+                  IsChecked="True"
+                  Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+      </StackPanel>
+    </GroupBox>
+
+    <!-- Row 3: Filler -->
+    <TextBlock Grid.Row="3" />
+
+    <!-- Row 4: OK/Cancel buttons -->
+    <StackPanel Grid.Row="4"
+                Orientation="Horizontal"
+                HorizontalAlignment="Right"
+                Spacing="8"
+                Margin="0,10,0,0">
+      <Button Content="{Binding OkText}"
+              Width="80"
+              Height="28"
+              IsDefault="True"
+              Click="Ok_Click"
+              Background="{DynamicResource ThemeAccentBrush}"
+              Foreground="White"
+              BorderThickness="0" />
+      <Button Content="{Binding CancelText}"
+              Width="80"
+              Height="28"
+              IsCancel="True"
+              Click="Cancel_Click"
+              Background="{DynamicResource ThemeButtonBgBrush}"
+              Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+              BorderBrush="{DynamicResource ThemeBorderBrush}" />
+    </StackPanel>
+  </Grid>
+</Window>

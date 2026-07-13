@@ -1,0 +1,79 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="MantisZip.UI.Avalonia.Dialogs.ArchiveCommentDialog"
+        x:CompileBindings="False"
+        Title="{Binding WinTitle}"
+        Width="480"
+        SizeToContent="Height"
+        WindowStartupLocation="CenterOwner"
+        CanResize="False"
+        ShowInTaskbar="False"
+        Background="{DynamicResource ThemeWindowBgBrush}"
+        Padding="16">
+  <Grid RowDefinitions="Auto,*,Auto,Auto,Auto"
+        Margin="16">
+
+    <!-- Row 0: Prompt text -->
+    <TextBlock Grid.Row="0"
+               Text="{Binding PromptText}"
+               Margin="0,0,0,8"
+               Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+
+    <!-- Row 1: Comment multi-line editor -->
+    <TextBox Grid.Row="1"
+             x:Name="CommentTextBox"
+             AcceptsReturn="True"
+             TextWrapping="Wrap"
+             ScrollViewer.VerticalScrollBarVisibility="Auto"
+             MinHeight="120"
+             Padding="8"
+             Background="{DynamicResource ThemeSurfaceBgBrush}"
+             Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+             BorderBrush="{DynamicResource ThemeBorderBrush}"
+             BorderThickness="1" />
+
+    <!-- Row 2: Format hint -->
+    <TextBlock Grid.Row="2"
+               Text="{Binding ZipOnlyHint}"
+               Foreground="{DynamicResource ThemeTextDisabledBrush}"
+               FontSize="12"
+               Margin="0,8,0,0" />
+
+    <!-- Row 3: Saving status text (hidden by default) -->
+    <TextBlock Grid.Row="3"
+               x:Name="SavingStatusBlock"
+               Text="{Binding SavingStatusText}"
+               Foreground="{DynamicResource ThemeTextSecondaryBrush}"
+               FontStyle="Italic"
+               VerticalAlignment="Center"
+               IsVisible="False"
+               Margin="0,12,0,0" />
+
+    <!-- Row 4: Button panel -->
+    <StackPanel Grid.Row="4"
+                x:Name="ButtonPanel"
+                Orientation="Horizontal"
+                HorizontalAlignment="Right"
+                Spacing="8"
+                Margin="0,12,0,0">
+      <Button x:Name="CancelBtn"
+              Content="{Binding CancelText}"
+              Width="80"
+              Height="28"
+              IsCancel="True"
+              Click="OnCancelClick"
+              Background="{DynamicResource ThemeButtonBgBrush}"
+              Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+              BorderBrush="{DynamicResource ThemeBorderBrush}" />
+      <Button x:Name="SaveBtn"
+              Content="{Binding SaveText}"
+              Width="80"
+              Height="28"
+              IsDefault="True"
+              Click="OnSaveClick"
+              Background="{DynamicResource ThemeAccentBrush}"
+              Foreground="White"
+              BorderThickness="0" />
+    </StackPanel>
+  </Grid>
+</Window>

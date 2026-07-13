@@ -1,0 +1,53 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:controls="clr-namespace:MantisZip.UI.Avalonia.Controls"
+        x:Class="MantisZip.UI.Avalonia.Dialogs.QuickPathDialog"
+        x:CompileBindings="False"
+        Title="{Binding WinTitle}"
+        Width="480"
+        WindowStartupLocation="CenterOwner"
+        SizeToContent="Height"
+        CanResize="False"
+        ShowInTaskbar="False"
+        Background="{DynamicResource ThemeWindowBgBrush}">
+
+  <Grid Margin="16"
+        RowDefinitions="Auto,Auto,Auto">
+
+    <!-- Row 0: Prompt -->
+    <TextBlock Grid.Row="0"
+               Text="{Binding PromptText}"
+               Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+               Margin="0,0,0,8"
+               TextWrapping="Wrap" />
+
+    <!-- Row 1: QuickPathControl -->
+    <controls:QuickPathControl x:Name="PathControl"
+                               Grid.Row="1"
+                               IsFolderMode="True" />
+
+    <!-- Row 2: OK/Cancel buttons -->
+    <StackPanel Grid.Row="2"
+                Orientation="Horizontal"
+                HorizontalAlignment="Right"
+                Spacing="8"
+                Margin="0,12,0,0">
+      <Button Content="{Binding OkText}"
+              Width="80"
+              Height="32"
+              IsDefault="True"
+              Click="Ok_Click"
+              Background="{DynamicResource ThemeAccentBrush}"
+              Foreground="White"
+              BorderThickness="0" />
+      <Button Content="{Binding CancelText}"
+              Width="80"
+              Height="32"
+              IsCancel="True"
+              Click="Cancel_Click"
+              Background="{DynamicResource ThemeButtonBgBrush}"
+              Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+              BorderBrush="{DynamicResource ThemeBorderBrush}" />
+    </StackPanel>
+  </Grid>
+</Window>

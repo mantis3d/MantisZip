@@ -1,0 +1,60 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="MantisZip.UI.Avalonia.Dialogs.ElevationInfoDialog"
+        x:CompileBindings="False"
+        Title="{Binding WinTitle}"
+        Width="480"
+        WindowStartupLocation="CenterOwner"
+        SizeToContent="Height"
+        CanResize="False"
+        Background="{DynamicResource ThemeWindowBgBrush}"
+        Padding="16">
+
+  <Grid RowDefinitions="Auto,Auto,Auto"
+        Margin="8">
+
+    <!-- Row 0: Message -->
+    <TextBlock Grid.Row="0"
+               Text="{Binding MessageText}"
+               FontSize="13"
+               FontWeight="SemiBold"
+               Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+               TextWrapping="Wrap" />
+
+    <!-- Row 1: Directory list -->
+    <ItemsControl Grid.Row="1"
+                  x:Name="DirectoryList"
+                  Foreground="{DynamicResource ThemeTextSecondaryBrush}"
+                  FontSize="12"
+                  Margin="0,12,0,0">
+      <ItemsControl.ItemTemplate>
+        <DataTemplate>
+          <TextBlock Text="{Binding}"
+                     Margin="12,2,0,2"
+                     TextWrapping="Wrap"
+                     FontFamily="Consolas, Courier New, monospace" />
+        </DataTemplate>
+      </ItemsControl.ItemTemplate>
+    </ItemsControl>
+
+    <!-- Row 2: Hint + OK button -->
+    <StackPanel Grid.Row="2"
+                Margin="0,16,0,0">
+      <TextBlock Text="{Binding HintText}"
+                 Foreground="{DynamicResource ThemeTextSecondaryBrush}"
+                 FontSize="11"
+                 TextWrapping="Wrap"
+                 Margin="0,0,0,16" />
+
+      <Button Content="{Binding OkText}"
+              Width="100"
+              Height="32"
+              HorizontalAlignment="Right"
+              IsDefault="True"
+              IsCancel="True"
+              Click="Ok_Click"
+              Background="{DynamicResource ThemeAccentBrush}"
+              Foreground="White" />
+    </StackPanel>
+  </Grid>
+</Window>

@@ -1,0 +1,74 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="MantisZip.UI.Avalonia.Dialogs.AddFavoriteDialog"
+        x:CompileBindings="False"
+        Title="{Binding WinTitle}"
+        Width="460"
+        SizeToContent="Height"
+        WindowStartupLocation="CenterOwner"
+        CanResize="False"
+        Background="{DynamicResource ThemeWindowBgBrush}"
+        Padding="16">
+
+  <Grid RowDefinitions="Auto,Auto,Auto"
+        Margin="8">
+
+    <!-- Row 0: Name input -->
+    <Grid Grid.Row="0"
+          ColumnDefinitions="60,*"
+          Margin="0,0,0,8">
+      <TextBlock Text="{Binding NameLabel}"
+                 VerticalAlignment="Center"
+                 Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+      <TextBox Grid.Column="1"
+               x:Name="NameTextBox"
+               PlaceholderText="{Binding NameLabel}"
+               Background="{DynamicResource ThemeSurfaceBgBrush}"
+               Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+               BorderBrush="{DynamicResource ThemeBorderBrush}" />
+    </Grid>
+
+    <!-- Row 1: Path input + Browse -->
+    <Grid Grid.Row="1"
+          ColumnDefinitions="60,*,Auto"
+          Margin="0,0,0,12">
+      <TextBlock Text="{Binding PathLabel}"
+                 VerticalAlignment="Center"
+                 Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+      <TextBox Grid.Column="1"
+               x:Name="PathTextBox"
+               PlaceholderText="{Binding PathLabel}"
+               Background="{DynamicResource ThemeSurfaceBgBrush}"
+               Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+               BorderBrush="{DynamicResource ThemeBorderBrush}" />
+      <Button Grid.Column="2"
+              Content="{Binding BrowseText}"
+              Margin="6,0,0,0"
+              Padding="12,4"
+              Click="BrowsePath_Click"
+              Background="{DynamicResource ThemeButtonBgBrush}"
+              Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+              BorderBrush="{DynamicResource ThemeBorderBrush}" />
+    </Grid>
+
+    <!-- Row 2: OK/Cancel buttons -->
+    <StackPanel Grid.Row="2"
+                Orientation="Horizontal"
+                HorizontalAlignment="Right"
+                Spacing="8">
+      <Button x:Name="OkButton"
+              Content="{Binding OkText}"
+              Padding="20,6"
+              Click="Ok_Click"
+              Background="{DynamicResource ThemeAccentBrush}"
+              Foreground="{DynamicResource ThemeTextOnAccentBrush}"
+              BorderThickness="0" />
+      <Button Content="{Binding CancelText}"
+              Padding="20,6"
+              Click="Cancel_Click"
+              Background="{DynamicResource ThemeButtonBgBrush}"
+              Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+              BorderBrush="{DynamicResource ThemeBorderBrush}" />
+    </StackPanel>
+  </Grid>
+</Window>

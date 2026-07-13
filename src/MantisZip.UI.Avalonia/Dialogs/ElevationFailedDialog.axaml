@@ -1,0 +1,69 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="MantisZip.UI.Avalonia.Dialogs.ElevationFailedDialog"
+        x:CompileBindings="False"
+        Title="{Binding WinTitle}"
+        Width="480"
+        WindowStartupLocation="CenterOwner"
+        SizeToContent="Height"
+        CanResize="False"
+        Background="{DynamicResource ThemeWindowBgBrush}"
+        Padding="16">
+
+  <Grid RowDefinitions="Auto,Auto,Auto,Auto"
+        Margin="8">
+
+    <!-- Row 0: Title -->
+    <TextBlock Grid.Row="0"
+               Text="{Binding TitleText}"
+               FontSize="15"
+               FontWeight="Bold"
+               Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+
+    <!-- Row 1: Message -->
+    <TextBlock Grid.Row="1"
+               Text="{Binding MessageText}"
+               FontSize="12"
+               Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+               TextWrapping="Wrap"
+               Margin="0,12,0,0" />
+
+    <!-- Row 2: Directory list with bullet items -->
+    <ItemsControl Grid.Row="2"
+                  x:Name="DirectoryList"
+                  Foreground="{DynamicResource ThemeTextSecondaryBrush}"
+                  FontSize="12"
+                  Margin="0,12,0,0">
+      <ItemsControl.ItemTemplate>
+        <DataTemplate>
+          <TextBlock Margin="12,2,0,2"
+                     TextWrapping="Wrap"
+                     FontFamily="Consolas, Courier New, monospace">
+            <Run Text="&#x2022; " />
+            <Run Text="{Binding}" />
+          </TextBlock>
+        </DataTemplate>
+      </ItemsControl.ItemTemplate>
+    </ItemsControl>
+
+    <!-- Row 3: Possible reasons + OK button -->
+    <StackPanel Grid.Row="3"
+                Margin="0,16,0,0">
+      <TextBlock Text="{Binding ReasonsText}"
+                 Foreground="{DynamicResource ThemeTextSecondaryBrush}"
+                 FontSize="11"
+                 TextWrapping="Wrap"
+                 Margin="0,0,0,16" />
+
+      <Button Content="{Binding OkText}"
+              Width="100"
+              Height="32"
+              HorizontalAlignment="Right"
+              IsDefault="True"
+              IsCancel="True"
+              Click="Ok_Click"
+              Background="{DynamicResource ThemeAccentBrush}"
+              Foreground="White" />
+    </StackPanel>
+  </Grid>
+</Window>

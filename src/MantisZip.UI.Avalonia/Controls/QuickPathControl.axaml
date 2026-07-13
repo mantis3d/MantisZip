@@ -1,0 +1,23 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="MantisZip.UI.Avalonia.Controls.QuickPathControl"
+             x:Name="RootControl">
+  <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
+    <AutoCompleteBox x:Name="PathAutoComplete"
+                     PlaceholderText=""
+                     FilterMode="Contains"
+                     MinimumPrefixLength="0"
+                     Background="{DynamicResource ThemeSurfaceBgBrush}"
+                     Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                     BorderBrush="{DynamicResource ThemeBorderBrush}" />
+    <Button Grid.Column="1"
+            x:Name="BrowseButton"
+            Content="..."
+            Width="32"
+            MinHeight="28"
+            Click="OnBrowseClick"
+            Background="{DynamicResource ThemeButtonBgBrush}"
+            Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+            BorderBrush="{DynamicResource ThemeBorderBrush}" />
+  </Grid>
+</UserControl>

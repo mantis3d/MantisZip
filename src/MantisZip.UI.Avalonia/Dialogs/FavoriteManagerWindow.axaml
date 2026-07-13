@@ -1,0 +1,104 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="MantisZip.UI.Avalonia.Dialogs.FavoriteManagerWindow"
+        x:CompileBindings="False"
+        Title="{Binding WinTitle}"
+        Width="520"
+        Height="450"
+        MinWidth="400"
+        MinHeight="300"
+        WindowStartupLocation="CenterOwner"
+        Background="{DynamicResource ThemeWindowBgBrush}"
+        Padding="16">
+
+  <Grid RowDefinitions="Auto,*,Auto"
+        Margin="8">
+
+    <!-- Row 0: Header -->
+    <TextBlock Grid.Row="0"
+               Text="{Binding WinTitle}"
+               FontSize="16"
+               FontWeight="SemiBold"
+               Margin="0,0,0,8"
+               Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+
+    <!-- Row 1: DataGrid -->
+    <DataGrid Grid.Row="1"
+              x:Name="FavoritesGrid"
+              AutoGenerateColumns="False"
+              IsReadOnly="True"
+              SelectionMode="Single"
+              SelectionChanged="FavoritesGrid_SelectionChanged">
+      <DataGrid.Columns>
+        <DataGridTextColumn Header="{Binding NameColumnHeader}"
+                            Binding="{Binding Name}"
+                            Width="*" />
+        <DataGridTextColumn Header="{Binding PathColumnHeader}"
+                            Binding="{Binding PathDisplay}"
+                            Width="2*" />
+        <DataGridTextColumn Header="{Binding TypeColumnHeader}"
+                            Binding="{Binding TypeLabel}"
+                            Width="80" />
+      </DataGrid.Columns>
+    </DataGrid>
+
+    <!-- Row 2: Button rows -->
+    <Grid Grid.Row="2"
+          Margin="0,8,0,0">
+
+      <!-- Left buttons -->
+      <StackPanel Orientation="Horizontal"
+                  Spacing="6"
+                  HorizontalAlignment="Left">
+        <Button x:Name="AddButton"
+                Content="{Binding AddText}"
+                Padding="12,6"
+                Click="AddButton_Click"
+                Background="{DynamicResource ThemeButtonBgBrush}"
+                Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                BorderBrush="{DynamicResource ThemeBorderBrush}" />
+        <Button x:Name="EditButton"
+                Content="{Binding EditText}"
+                Padding="12,6"
+                IsEnabled="False"
+                Click="EditButton_Click"
+                Background="{DynamicResource ThemeButtonBgBrush}"
+                Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                BorderBrush="{DynamicResource ThemeBorderBrush}" />
+        <Button x:Name="DeleteButton"
+                Content="{Binding DeleteText}"
+                Padding="12,6"
+                IsEnabled="False"
+                Click="DeleteButton_Click"
+                Background="{DynamicResource ThemeButtonBgBrush}"
+                Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                BorderBrush="{DynamicResource ThemeBorderBrush}" />
+        <Button x:Name="MoveUpButton"
+                Content="{Binding MoveUpText}"
+                Padding="12,6"
+                IsEnabled="False"
+                Click="MoveUpButton_Click"
+                Background="{DynamicResource ThemeButtonBgBrush}"
+                Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                BorderBrush="{DynamicResource ThemeBorderBrush}" />
+        <Button x:Name="MoveDownButton"
+                Content="{Binding MoveDownText}"
+                Padding="12,6"
+                IsEnabled="False"
+                Click="MoveDownButton_Click"
+                Background="{DynamicResource ThemeButtonBgBrush}"
+                Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                BorderBrush="{DynamicResource ThemeBorderBrush}" />
+      </StackPanel>
+
+      <!-- Right button -->
+      <Button Content="{Binding OkText}"
+              Padding="20,6"
+              HorizontalAlignment="Right"
+              Click="Ok_Click"
+              Background="{DynamicResource ThemeAccentBrush}"
+              Foreground="{DynamicResource ThemeTextOnAccentBrush}"
+              BorderThickness="0" />
+    </Grid>
+  </Grid>
+</Window>
