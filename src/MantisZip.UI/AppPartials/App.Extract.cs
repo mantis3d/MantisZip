@@ -13,6 +13,7 @@ using MantisZip.Core.Models;
 using MantisZip.Core.Services;
 using MantisZip.Core.Utils;
 using MantisZip.UI.Localization;
+using Microsoft.VisualBasic.FileIO;
 
 namespace MantisZip.UI;
 
@@ -480,6 +481,7 @@ public partial class App : Application
                                     extractResult.SucceededEntries, extractResult.FailedEntries);
                             }
                             succeeded++;
+                            TryDeleteArchiveAfterExtract(archivePath);
                             await progressWindow.Dispatcher.InvokeAsync(() =>
                                 progressWindow.UpdateBatchItemStatus(i, BatchItemStatus.Completed));
                         }
@@ -642,6 +644,43 @@ public partial class App : Application
     }
 
     /// <summary>
+    /// 解压成功后，将原压缩包移到回收站（如果设置启用）。
+    /// 仅在删除成功时记录日志，失败时仅记录警告（不影响解压结果）。
+    /// </summary>
+    internal static void TryDeleteArchiveAfterExtract(string archivePath)
+    {
+        if (!AppSettings.Instance.DeleteArchiveAfterExtract) return;
+        if (string.IsNullOrEmpty(archivePath) || !File.Exists(archivePath)) return;
+
+        // 重试 3 次（200ms 间隔），给 7z.dll 等外部组件释放文件句柄的时间。
+        // 即使 OpenArchiveWithEncodingFallback 已设 FileShare.Delete，
+        // SharpSevenZipExtractor（7z.dll）可能在 Dispose 后仍有延迟释放。
+        for (int retry = 0; retry < 3; retry++)
+        {
+            try
+            {
+                FileSystem.DeleteFile(
+                    archivePath,
+                    UIOption.OnlyErrorDialogs,
+                    RecycleOption.SendToRecycleBin);
+                App.LogDebug("TryDeleteArchiveAfterExtract: moved '{0}' to recycle bin", archivePath);
+                return;
+            }
+            catch (Exception ex) when (retry < 2)
+            {
+                App.LogDebug("TryDeleteArchiveAfterExtract: attempt {0} failed for '{1}': {2}",
+                    retry + 1, archivePath, ex.Message);
+                Thread.Sleep(200);
+            }
+            catch (Exception ex)
+            {
+                App.LogDebug("TryDeleteArchiveAfterExtract: failed for '{0}' after 3 attempts: {1}",
+                    archivePath, ex.Message);
+            }
+        }
+    }
+
+    /// <summary>
     /// 公共解压逻辑：获取引擎、创建进度窗口、执行解压，完成后退出。
     /// 支持从 PasswordManager 加载已保存密码，以及在加密时弹出密码输入框。
     /// </summary>
@@ -695,6 +734,7 @@ public partial class App : Application
 
                 var opts = CreateExtractOptions();
                 await engine.ExtractAsync(archivePath, dest, password, progress, progressWindow.CancellationToken, opts);
+                TryDeleteArchiveAfterExtract(archivePath);
 
                 await progressWindow.Dispatcher.InvokeAsync(() =>
                 {

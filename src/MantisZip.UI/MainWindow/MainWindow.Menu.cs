@@ -770,6 +770,7 @@ public partial class MainWindow
             }
 
             pw.SetComplete(L.T(L.Main_Status_ExtractItemsDone));
+            App.TryDeleteArchiveAfterExtract(_currentArchivePath!);
             App.LogDebug("ExtractSelectedAsync: done, {0} files extracted to '{1}'", filesToExtract.Count, dest);
             if (AppSettings.Instance.OpenFolderAfterExtract) OpenInExplorer(dest);
             await pw.AutoCloseOrWaitAsync(800, () => pw.Close());
