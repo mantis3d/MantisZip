@@ -441,7 +441,6 @@ public partial class App : Application
                     return chosenAction.Value;
                 }
 
-                // 调度到 UI 线程显示模态对话框
                 var dispatcher = Current?.Dispatcher;
                 if (dispatcher == null)
                 {
@@ -449,26 +448,84 @@ public partial class App : Application
                     return FileConflictAction.Overwrite;
                 }
 
-                var result = dispatcher.Invoke(() =>
+                // 循环重入：暂停后恢复时重新弹窗
+                while (true)
                 {
-                    var dialog = new ConflictDialog(info);
-                    dialog.ShowDialog();
-                    info.CustomName = dialog.CustomName;
-                    LogDebug("ConflictResolver dialog: action={0}, applyToAll={1}, customName='{2}'",
-                        dialog.ResultAction, dialog.ApplyToAll, dialog.CustomName ?? "(null)");
-                    return (Action: dialog.ResultAction, All: dialog.ApplyToAll);
-                });
+                    var result = dispatcher.Invoke(() =>
+                    {
+                        var dialog = new ConflictDialog(info);
+                        dialog.ShowDialog();
 
-                LogDebug("ConflictResolver #{0}: dialog returned (Action={1}, All={2})", callCount, result.Action, result.All);
+                        // 暂停
+                        if (dialog.IsPaused)
+                        {
+                            LogDebug("ConflictResolver #{0}: dialog paused", callCount);
+                            return (Action: FileConflictAction.Overwrite, IsPaused: true, IsCancelled: false, ApplyAll: false);
+                        }
 
-                if (result.All)
-                {
-                    applyToAll = true;
-                    chosenAction = result.Action;
-                    LogDebug("ConflictResolver #{0}: applyToAll set to true, chosenAction={1}", callCount, chosenAction.Value);
+                        // 取消整个操作
+                        if (dialog.CancelOperation)
+                        {
+                            LogDebug("ConflictResolver #{0}: dialog cancelled operation", callCount);
+                            return (Action: FileConflictAction.Overwrite, IsPaused: false, IsCancelled: true, ApplyAll: false);
+                        }
+
+                        info.CustomName = dialog.CustomName;
+                        LogDebug("ConflictResolver dialog: action={0}, applyToAll={1}, customName='{2}'",
+                            dialog.ResultAction, dialog.ApplyToAll, dialog.CustomName ?? "(null)");
+
+                        if (dialog.ApplyToAll)
+                        {
+                            applyToAll = true;
+                            chosenAction = dialog.ResultAction;
+                            LogDebug("ConflictResolver #{0}: applyToAll set to true, chosenAction={1}", callCount, chosenAction.Value);
+                        }
+
+                        return (Action: dialog.ResultAction, IsPaused: false, IsCancelled: false, ApplyAll: dialog.ApplyToAll);
+                    });
+
+                    if (result.IsCancelled)
+                    {
+                        LogDebug("ConflictResolver #{0}: cancelling entire operation via throw", callCount);
+                        throw new OperationCanceledException();
+                    }
+
+                    if (result.IsPaused)
+                    {
+                        LogDebug("ConflictResolver #{0}: paused, waiting for resume...", callCount);
+                        try
+                        {
+                            // 在 UI 线程获取 ProgressWindow 引用并调用 PauseFromConflict，
+                            // 然后在后台线程等待暂停事件（不阻塞 UI 线程）
+                            ProgressWindow? pw = null;
+                            CancellationToken ct = CancellationToken.None;
+                            dispatcher.Invoke(() =>
+                            {
+                                pw = Current?.Windows.OfType<ProgressWindow>().FirstOrDefault();
+                                if (pw != null)
+                                {
+                                    pw.PauseFromConflict();
+                                    ct = pw.CancellationToken;
+                                }
+                            });
+
+                            if (pw != null)
+                            {
+                                pw.PauseEvent.Wait(ct);
+                            }
+                            LogDebug("ConflictResolver #{0}: resumed, re-showing dialog", callCount);
+                            continue;
+                        }
+                        catch (OperationCanceledException)
+                        {
+                            LogDebug("ConflictResolver #{0}: cancelled while paused", callCount);
+                            throw;
+                        }
+                    }
+
+                    LogDebug("ConflictResolver #{0}: dialog returned (Action={1})", callCount, result.Action);
+                    return result.Action;
                 }
-
-                return result.Action;
             }
         };
     }
