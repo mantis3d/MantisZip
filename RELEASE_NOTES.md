@@ -28,8 +28,9 @@ MantisZip-0.4.5-Setup-WebSetup.exe requires internet during installation. Mantis
 - 解压后自动删除原压缩包 — 新增"解压完成后将原压缩包移到回收站"选项，
 - Auto-delete archive after extraction — new option to move original archive to Recycle Bin
 - ![删除原压缩包](docs/images/version/v0.4.5/DeleteAfterExtract.png)
-- 解压后智能打开目标目录 — 自动检测公共根目录，减少一次手动点进目录的操作
-- Smart open path after extraction — auto-detects common root directory, saves one manual navigation step
+- 文件冲突窗口增加“暂停”和“取消”按钮。
+- Add ‘Pause’ and ‘Cancel’ buttons to the file conflict window.
+- ![解压文件冲突](docs\images\version\v0.4.5\CancelOnConflictCompress.png)
 - 修复安装后会导致别的软件安装完启动时错误本软件的问题。
 - Fixed issue where installing other software could incorrectly route their startup to MantisZip.
 

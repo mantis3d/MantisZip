@@ -47,6 +47,8 @@ MantisZip 是一款面向 Windows 的免费开源压缩/解压工具，主打**�
 
 可以在压缩包内直接预览 **图片**、**文本**、**HTML/Markdown**、**SVG**、**字体** 等内容。
 
+从v0.4.4版本开始，是以内容识别实际格式，不需要担心扩展名不对预览不了的问题。
+
 #### 🔍 深度探索：各类型高级预览特写
 
 <table width="100%">
@@ -121,9 +123,9 @@ MantisZip 是一款面向 Windows 的免费开源压缩/解压工具，主打**�
 
 除了其他软件的「覆盖」「跳过」和「自动重命名」之外，还增加了「覆盖旧文件」和「覆盖小文件」，「自动重命名」也可无缝切换至手动重命名。
 
-![解压文件冲突](docs/images/ConflictCompress.png)
+![解压文件冲突](docs\images\version\v0.4.5\CancelOnConflictCompress.png)
 
-![压缩文件冲突](docs/images/ConflictExtract.png)
+![压缩文件冲突](docs\images\version\v0.4.5\CancelOnConflictExtract.png)
 
 ----
 
