@@ -14,7 +14,8 @@
     <TextBlock x:Name="StatusText"
                Text="{Binding StatusMessage}"
                TextTrimming="CharacterEllipsis"
-               VerticalAlignment="Center" />
+               VerticalAlignment="Center"
+               Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
 
     <!-- Row 1: Per-file progress bar (file-level granularity) -->
     <Grid Grid.Row="1">

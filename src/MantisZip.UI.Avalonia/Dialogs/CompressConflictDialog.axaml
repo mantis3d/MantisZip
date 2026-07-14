@@ -17,7 +17,8 @@
     <TextBlock Grid.Row="0"
                x:Name="HeaderText"
                FontSize="13"
-               TextWrapping="Wrap" />
+               TextWrapping="Wrap"
+               Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
 
     <!-- Row 1: Target file info panel -->
     <Border Grid.Row="1"

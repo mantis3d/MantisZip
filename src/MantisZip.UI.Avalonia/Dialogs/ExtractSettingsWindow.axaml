@@ -13,7 +13,8 @@
         Margin="16">
     <!-- Content -->
     <ScrollViewer Grid.Row="0"
-                  Background="{DynamicResource ThemeWindowBgBrush}">
+                  Background="{DynamicResource ThemeWindowBgBrush}"
+                  TextElement.Foreground="{DynamicResource ThemeTextPrimaryBrush}">
       <StackPanel Spacing="12">
         <!-- Source files -->
         <Border BorderBrush="{DynamicResource ThemeBorderBrush}"

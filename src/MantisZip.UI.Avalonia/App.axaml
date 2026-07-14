@@ -177,21 +177,23 @@
     </Style>
     <Style Selector="TabItem">
       <Setter Property="Foreground" Value="{DynamicResource ThemeTextPrimaryBrush}" />
+      <Setter Property="Background" Value="{DynamicResource ThemeHeaderBgBrush}" />
+      <Setter Property="BorderThickness" Value="0" />
+    </Style>
+    <Style Selector="TabItem:pointerover">
+      <Setter Property="Background" Value="{DynamicResource ThemeButtonHoverBrush}" />
     </Style>
     <Style Selector="TabItem:selected">
-      <Setter Property="Background" Value="{DynamicResource ThemeAccentBrush}" />
-      <Setter Property="Foreground" Value="{DynamicResource ThemeTextPrimaryBrush}" />
-    </Style>
-    <Style Selector="TabItem:pointerover /template/ Border#PART_LayoutRoot">
-      <Setter Property="TextElement.Foreground" Value="{DynamicResource ThemeTextPrimaryBrush}" />
-    </Style>
-    <Style Selector="TabItem:selected:pointerover /template/ Border#PART_LayoutRoot">
-      <Setter Property="TextElement.Foreground" Value="{DynamicResource ThemeTextPrimaryBrush}" />
+      <Setter Property="Background" Value="{DynamicResource ThemeSurfaceBgBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource ThemeAccentBrush}" />
+      <Setter Property="BorderThickness" Value="0,0,0,2" />
     </Style>
 
-    <!-- TabItem.compactTab - reduced padding for dialog TabControls -->
+    <!-- TabItem.compactTab — compact tab headers for settings windows -->
     <Style Selector="TabItem.compactTab">
-      <Setter Property="Padding" Value="8,4" />
+      <Setter Property="Padding" Value="8,6,8,6" />
+      <Setter Property="MinHeight" Value="36" />
+      <Setter Property="FontSize" Value="18" />
     </Style>
 
     <!-- DataGrid -->
@@ -265,11 +267,6 @@
       <Setter Property="Foreground" Value="{DynamicResource ThemeTextPrimaryBrush}" />
     </Style>
 
-    <!-- TabItem.compactTab — compact tab headers for settings windows -->
-    <Style Selector="TabItem.compactTab">
-      <Setter Property="MinHeight" Value="36" />
-      <Setter Property="Padding" Value="8,6,8,6" />
-      <Setter Property="FontSize" Value="18" />
-    </Style>
+
   </Application.Styles>
 </Application>

@@ -99,7 +99,7 @@
   <SolidColorBrush x:Key="MenuFlyoutItemForegroundDisabled" Color="{StaticResource ThemeTextSecondary}" />
   <SolidColorBrush x:Key="ButtonForegroundDisabled" Color="{StaticResource ThemeTextSecondary}" />
   <!-- TabControl -->
-  <SolidColorBrush x:Key="TabItemHeaderForegroundUnselected" Color="{StaticResource ThemeTextPrimary}" />
+  <SolidColorBrush x:Key="TabItemHeaderForegroundUnselected" Color="{StaticResource ThemeTextSecondary}" />
   <SolidColorBrush x:Key="TabItemHeaderForegroundSelected" Color="{StaticResource ThemeTextPrimary}" />
   <!-- ComboBox -->
   <SolidColorBrush x:Key="ComboBoxForeground" Color="{StaticResource ThemeTextPrimary}" />

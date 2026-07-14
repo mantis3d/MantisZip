@@ -21,7 +21,8 @@
       <!-- Tab 1: General -->
       <TabItem Header="{Binding LocalizedStrings[Compress_TabGeneral]}"
                Classes="compactTab">
-        <ScrollViewer Background="{DynamicResource ThemeWindowBgBrush}">
+        <ScrollViewer Background="{DynamicResource ThemeWindowBgBrush}"
+                       TextElement.Foreground="{DynamicResource ThemeTextPrimaryBrush}">
           <StackPanel Spacing="12"
                        Margin="0,8,0,0">
             <!-- Group: Source files (first, like WPF) -->
@@ -127,7 +128,8 @@
       <!-- Tab 2: Password -->
       <TabItem Header="{Binding LocalizedStrings[Compress_TabPassword]}"
                Classes="compactTab">
-        <ScrollViewer Background="{DynamicResource ThemeWindowBgBrush}">
+        <ScrollViewer Background="{DynamicResource ThemeWindowBgBrush}"
+                       TextElement.Foreground="{DynamicResource ThemeTextPrimaryBrush}">
           <StackPanel Spacing="12"
                        Margin="0,8,0,0">
             <!-- Group: Password mode -->
@@ -297,7 +299,8 @@
       <!-- Tab 3: Comment -->
       <TabItem Header="{Binding LocalizedStrings[Compress_TabComment]}"
                Classes="compactTab">
-        <ScrollViewer Background="{DynamicResource ThemeWindowBgBrush}">
+        <ScrollViewer Background="{DynamicResource ThemeWindowBgBrush}"
+                       TextElement.Foreground="{DynamicResource ThemeTextPrimaryBrush}">
           <StackPanel Spacing="12"
                        Margin="0,8,0,0">
             <!-- Group: Comment content -->

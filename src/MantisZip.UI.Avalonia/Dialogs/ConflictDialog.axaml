@@ -18,7 +18,8 @@
                x:Name="HeaderText"
                FontSize="13"
                FontWeight="SemiBold"
-               TextWrapping="Wrap" />
+               TextWrapping="Wrap"
+               Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
 
     <!-- Row 1: Comparison panel (disk vs archive) -->
     <Border Grid.Row="1"

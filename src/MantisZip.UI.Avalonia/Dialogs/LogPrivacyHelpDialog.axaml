@@ -21,7 +21,8 @@
             Foreground="White"
             Margin="0,8,0,0" />
 
-    <ScrollViewer VerticalScrollBarVisibility="Auto">
+    <ScrollViewer VerticalScrollBarVisibility="Auto"
+                  TextElement.Foreground="{DynamicResource ThemeTextPrimaryBrush}">
       <StackPanel Margin="20,20,20,0" Spacing="16">
 
         <!-- 标题 -->
