@@ -522,14 +522,67 @@ public partial class CompressSettingsWindow : Window
                 request,
                 conflictResolver: info =>
                 {
+                    // 已勾选"应用到全部" → 直接返回记忆的选择
                     if (applyToAll && chosenAction.HasValue)
                         return new CompressConflictResolution(chosenAction.Value, null);
 
-                    var dlg = new CompressConflictDialog(info.OutputPath, info.CanAdd, info.SuggestedName);
-                    dlg.Owner = progressWindow;
-                    dlg.ShowDialog();
-                    if (dlg.ApplyToAll) { applyToAll = true; chosenAction = (Core.Abstractions.CompressConflictAction)dlg.ResultAction; }
-                    return new CompressConflictResolution((Core.Abstractions.CompressConflictAction)dlg.ResultAction, dlg.CustomName);
+                    // 循环重入：暂停后恢复时重新弹窗
+                    while (true)
+                    {
+                        var resolution = progressWindow.Dispatcher.Invoke(() =>
+                        {
+                            var dlg = new CompressConflictDialog(info.OutputPath, info.CanAdd, info.SuggestedName);
+                            dlg.Owner = progressWindow;
+                            dlg.ShowDialog();
+
+                            if (dlg.IsPaused)
+                            {
+                                App.LogDebug("CompressConflictResolver: paused for '{0}'", info.OutputPath);
+                                return (Action: Core.Abstractions.CompressConflictAction.Cancel, IsPaused: true, IsCancelled: false, CustomName: (string?)null);
+                            }
+
+                            if (dlg.CancelOperation)
+                            {
+                                App.LogDebug("CompressConflictResolver: cancelled operation for '{0}'", info.OutputPath);
+                                return (Action: Core.Abstractions.CompressConflictAction.Cancel, IsPaused: false, IsCancelled: true, CustomName: (string?)null);
+                            }
+
+                            if (dlg.ApplyToAll)
+                            {
+                                applyToAll = true;
+                                chosenAction = (Core.Abstractions.CompressConflictAction)dlg.ResultAction;
+                            }
+
+                            return (Action: (Core.Abstractions.CompressConflictAction)dlg.ResultAction, IsPaused: false, IsCancelled: false, CustomName: dlg.CustomName);
+                        });
+
+                        if (resolution.IsCancelled)
+                        {
+                            App.LogDebug("CompressConflictResolver: cancelling entire operation via throw");
+                            throw new OperationCanceledException();
+                        }
+
+                        if (resolution.IsPaused)
+                        {
+                            App.LogDebug("CompressConflictResolver: paused, waiting for resume...");
+                            try
+                            {
+                                progressWindow.Dispatcher.Invoke(() => progressWindow.PauseFromConflict());
+                                progressWindow.PauseEvent.Wait(progressWindow.CancellationToken);
+                                App.LogDebug("CompressConflictResolver: resumed, re-showing dialog");
+                                continue;
+                            }
+                            catch (OperationCanceledException)
+                            {
+                                App.LogDebug("CompressConflictResolver: cancelled while paused");
+                                throw;
+                            }
+                        }
+
+                        return new CompressConflictResolution(
+                            (Core.Abstractions.CompressConflictAction)resolution.Action,
+                            resolution.CustomName);
+                    }
                 },
                 progress,
                 progressWindow.CancellationToken);
@@ -604,17 +657,67 @@ public partial class CompressSettingsWindow : Window
                 request,
                 conflictResolver: info =>
                 {
+                    // 已勾选"应用到全部" → 直接返回记忆的选择
                     if (applyToAll && chosenAction.HasValue)
                         return new CompressConflictResolution(chosenAction.Value, null);
 
-                    return progressWindow.Dispatcher.Invoke(() =>
+                    // 循环重入：暂停后恢复时重新弹窗
+                    while (true)
                     {
-                        var dlg = new CompressConflictDialog(info.OutputPath, info.CanAdd, info.SuggestedName);
-                        dlg.Owner = progressWindow;
-                        dlg.ShowDialog();
-                        if (dlg.ApplyToAll) { applyToAll = true; chosenAction = (Core.Abstractions.CompressConflictAction)dlg.ResultAction; }
-                        return new CompressConflictResolution((Core.Abstractions.CompressConflictAction)dlg.ResultAction, dlg.CustomName);
-                    });
+                        var resolution = progressWindow.Dispatcher.Invoke(() =>
+                        {
+                            var dlg = new CompressConflictDialog(info.OutputPath, info.CanAdd, info.SuggestedName);
+                            dlg.Owner = progressWindow;
+                            dlg.ShowDialog();
+
+                            if (dlg.IsPaused)
+                            {
+                                App.LogDebug("CompressConflictResolver: paused for '{0}'", info.OutputPath);
+                                return (Action: Core.Abstractions.CompressConflictAction.Cancel, IsPaused: true, IsCancelled: false, CustomName: (string?)null);
+                            }
+
+                            if (dlg.CancelOperation)
+                            {
+                                App.LogDebug("CompressConflictResolver: cancelled operation for '{0}'", info.OutputPath);
+                                return (Action: Core.Abstractions.CompressConflictAction.Cancel, IsPaused: false, IsCancelled: true, CustomName: (string?)null);
+                            }
+
+                            if (dlg.ApplyToAll)
+                            {
+                                applyToAll = true;
+                                chosenAction = (Core.Abstractions.CompressConflictAction)dlg.ResultAction;
+                            }
+
+                            return (Action: (Core.Abstractions.CompressConflictAction)dlg.ResultAction, IsPaused: false, IsCancelled: false, CustomName: dlg.CustomName);
+                        });
+
+                        if (resolution.IsCancelled)
+                        {
+                            App.LogDebug("CompressConflictResolver: cancelling entire operation via throw");
+                            throw new OperationCanceledException();
+                        }
+
+                        if (resolution.IsPaused)
+                        {
+                            App.LogDebug("CompressConflictResolver: paused, waiting for resume...");
+                            try
+                            {
+                                progressWindow.Dispatcher.Invoke(() => progressWindow.PauseFromConflict());
+                                progressWindow.PauseEvent.Wait(progressWindow.CancellationToken);
+                                App.LogDebug("CompressConflictResolver: resumed, re-showing dialog");
+                                continue;
+                            }
+                            catch (OperationCanceledException)
+                            {
+                                App.LogDebug("CompressConflictResolver: cancelled while paused");
+                                throw;
+                            }
+                        }
+
+                        return new CompressConflictResolution(
+                            (Core.Abstractions.CompressConflictAction)resolution.Action,
+                            resolution.CustomName);
+                    }
                 },
                 progress,
                 progressWindow.CancellationToken,
@@ -713,14 +816,67 @@ public partial class CompressSettingsWindow : Window
                 request,
                 conflictResolver: info =>
                 {
+                    // 已勾选"应用到全部" → 直接返回记忆的选择
                     if (applyToAll && chosenAction.HasValue)
                         return new CompressConflictResolution(chosenAction.Value, null);
 
-                    var dlg = new CompressConflictDialog(info.OutputPath, info.CanAdd, info.SuggestedName);
-                    dlg.Owner = progressWindow;
-                    dlg.ShowDialog();
-                    if (dlg.ApplyToAll) { applyToAll = true; chosenAction = (Core.Abstractions.CompressConflictAction)dlg.ResultAction; }
-                    return new CompressConflictResolution((Core.Abstractions.CompressConflictAction)dlg.ResultAction, dlg.CustomName);
+                    // 循环重入：暂停后恢复时重新弹窗
+                    while (true)
+                    {
+                        var resolution = progressWindow.Dispatcher.Invoke(() =>
+                        {
+                            var dlg = new CompressConflictDialog(info.OutputPath, info.CanAdd, info.SuggestedName);
+                            dlg.Owner = progressWindow;
+                            dlg.ShowDialog();
+
+                            if (dlg.IsPaused)
+                            {
+                                App.LogDebug("CompressConflictResolver: paused for '{0}'", info.OutputPath);
+                                return (Action: Core.Abstractions.CompressConflictAction.Cancel, IsPaused: true, IsCancelled: false, CustomName: (string?)null);
+                            }
+
+                            if (dlg.CancelOperation)
+                            {
+                                App.LogDebug("CompressConflictResolver: cancelled operation for '{0}'", info.OutputPath);
+                                return (Action: Core.Abstractions.CompressConflictAction.Cancel, IsPaused: false, IsCancelled: true, CustomName: (string?)null);
+                            }
+
+                            if (dlg.ApplyToAll)
+                            {
+                                applyToAll = true;
+                                chosenAction = (Core.Abstractions.CompressConflictAction)dlg.ResultAction;
+                            }
+
+                            return (Action: (Core.Abstractions.CompressConflictAction)dlg.ResultAction, IsPaused: false, IsCancelled: false, CustomName: dlg.CustomName);
+                        });
+
+                        if (resolution.IsCancelled)
+                        {
+                            App.LogDebug("CompressConflictResolver: cancelling entire operation via throw");
+                            throw new OperationCanceledException();
+                        }
+
+                        if (resolution.IsPaused)
+                        {
+                            App.LogDebug("CompressConflictResolver: paused, waiting for resume...");
+                            try
+                            {
+                                progressWindow.Dispatcher.Invoke(() => progressWindow.PauseFromConflict());
+                                progressWindow.PauseEvent.Wait(progressWindow.CancellationToken);
+                                App.LogDebug("CompressConflictResolver: resumed, re-showing dialog");
+                                continue;
+                            }
+                            catch (OperationCanceledException)
+                            {
+                                App.LogDebug("CompressConflictResolver: cancelled while paused");
+                                throw;
+                            }
+                        }
+
+                        return new CompressConflictResolution(
+                            (Core.Abstractions.CompressConflictAction)resolution.Action,
+                            resolution.CustomName);
+                    }
                 },
                 progress,
                 progressWindow.CancellationToken);
