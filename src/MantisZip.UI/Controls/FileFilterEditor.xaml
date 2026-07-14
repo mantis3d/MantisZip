@@ -48,11 +48,10 @@
                             Foreground="{DynamicResource Theme_TextPrimary}"
                             BorderBrush="{DynamicResource Theme_Border}"/>
 
-                    <!-- 统计标签（提取模式使用） -->
+                    <!-- 统计标签（提取模式使用），始终显示以避免 UI 跳动 -->
                     <TextBlock x:Name="FilterStatsText" Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="3"
                                Margin="0,6,0,0"
-                               Foreground="{DynamicResource Theme_TextSecondary}"
-                               Visibility="Collapsed"/>
+                               Foreground="{DynamicResource Theme_TextSecondary}"/>
                 </Grid>
             </GroupBox>
 

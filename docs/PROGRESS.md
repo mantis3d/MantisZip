@@ -34,6 +34,26 @@
    - 新增 `GetCommonRootDirectory` + `ResolveSmartOpenPathAsync` 方法
 5. **修改文件**：`AppSettings.cs`、`strings.zh.json`、`strings.en.json`、`SettingsWindow.xaml`、`SettingsWindow.xaml.cs`、`App.xaml.cs`、`App.Extract.cs`、`App.Password.cs`、`MainWindow.xaml.cs`、`MainWindow.Menu.cs`
 
+### v0.4.5++ (2026-07-14) 便携版模式
+
+1. **便携模式** — 完整实现 `portable-mode.md`
+   - `AppSettings.cs`：`Portable.txt` 哨兵检测 → `IsPortableMode`，settings 和 passwords 文件重定向到 `exe 目录/Data/`，`Save()` 跳过 `SyncContextMenuToRegistry()`
+   - `PasswordManager.cs`：`CustomDataDir` 注入 + `GetPasswordPath()` 动态路径
+   - `App.xaml.cs`（OnStartup）：便携模式下跳过 FirstRunShell/FirstRunAssoc 注册；`--install-shell`/`--uninstall-shell`/`--install-assoc`/`--uninstall-assoc` 报错退出
+   - `MainWindow.Preview.cs`：`GetTempDir()` 便携版返回 `Data/Temp/`
+   - `MainWindow.DragDrop.cs`：拖拽临时目录使用 `GetTempDir() + "DragDrop/"`
+   - `SevenZipEngine.cs`：`ResolveDefaultSevenZipDllPath()` 首候选 `{BaseDir}/7z.dll`
+   - `App.OnExit`：清理指向 `Data/Temp/` 而非系统 `%TEMP%`
+2. **修改文件（6 个）**：`AppSettings.cs`、`PasswordManager.cs`、`App.xaml.cs`、`MainWindow.Preview.cs`、`MainWindow.DragDrop.cs`、`SevenZipEngine.cs`
+
+### v0.4.5++ (2026-07-14) 文件过滤预设显示 + 过滤统计文本始终显示
+
+1. **修复预设 ComboBox 显示类型名** — `FileFilterPreset` 添加 `ToString()` 返回 `Name`，确保预设名称正确显示
+2. **过滤统计文本始终显示** — 去掉 `FilterStatsText` 的 `Collapsed`/`Visible` 切换，始终占位避免 UI 跳动
+   - `ShowFilterStats` 改为空方法（保持兼容）
+   - 未启用过滤时显示空文本
+3. **修改文件**：`FileFilterPreset.cs`、`FileFilterEditor.xaml`、`FileFilterEditor.xaml.cs`、`ExtractSettingsWindow.xaml.cs`
+
 ### v0.4.5++ (2026-07-14) 文件冲突对话框添加暂停/取消按钮
 
 1. **暂停/取消功能** — CompressConflictDialog 和 ConflictDialog 各添加两个底部按钮
@@ -853,3 +873,4 @@
 | 密码流程统一 (ResolvePasswordAsync) | [password-flow-unification.md](.sisyphus/plans/password-flow-unification.md) | v0.4.5+ |
 | 安装包 .NET 9 自动下载 | [installer-dotnet-autodownload.md](.sisyphus/plans/installer-dotnet-autodownload.md) | v0.4.3+ |
 | 贡献者鸣谢面板 | [contributors-panel.md](.sisyphus/plans/contributors-panel.md) | v0.4.3+ |
+| 便携版模式 | [portable-mode.md](.sisyphus/plans/portable-mode.md) | v0.4.5++ |

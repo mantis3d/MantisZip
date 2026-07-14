@@ -15,7 +15,6 @@
 
 | 优先级 | 功能 | 设计文档 | 难度 | 预估工时 | 说明 |
 |--------|------|----------|:----:|:--------:|------|
-| **P0** | 便携版模式 | [portable-mode.md](.sisyphus/plans/portable-mode.md) | 🟢低 | 1-2h | 哨兵文件触发，路径重定向到 exe 目录 |
 | **P1** | 统一路径快捷选择 (QuickPathControl → Avalonia) | [quickpath-unified.md](.sisyphus/plans/quickpath-unified.md) | 🟡中 | 4-6h | WPF 已完成数据层 + QuickPathControl 组件 + CompressSettingsWindow 嵌入；WPF 新增 QuickPathPreDialog 前置窗（系统对话框前先选路径）；Avalonia 阶段以 CustomFilePickerDialog + QuickPathBuddy 统一替换 |
 | **P1** | Win11 一级右键菜单 | [win11-first-level-menu.md](.sisyphus/plans/win11-first-level-menu.md) | 🔴高 | 1-2周 | IExplorerCommand 实现，HKLM 提权注册，双接口共存 |
 | **P1** | 解压路径统一（前置：文件筛选） | [extract-path-unification.md](.sisyphus/plans/extract-path-unification.md) | 🟢低 | 1.5h | 三路解压合并为 `ExtractEntriesAsync` + `pathOverrides`，消除重复循环 |
@@ -76,7 +75,7 @@
 
 ### 🟢 无影响（4 个）
 
-`portable-mode.md`、`preview-modular-providers.md`、`selfcontained-size-optimization.md`
+`preview-modular-providers.md`、`selfcontained-size-optimization.md`
 
 ### 🟡 需调整 — Core 可复用，UI 需移植（11 个）
 

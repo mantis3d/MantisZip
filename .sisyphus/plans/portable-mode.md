@@ -1,7 +1,7 @@
 # 便携版模式
 
 > 为 MantisZip 增加便携模式：免安装、不写注册表、路径重定向到 exe 同目录。
-> **状态**: 📋 待定（已修订 2026-07-08）| **任务**: [⬜⬜⬜⬜⬜⬜⬜] (0/7)
+> **状态**: ✅ 已完成（已修订 2026-07-14）| **任务**: [✅✅✅✅✅✅✅] (7/7)
 > 创建日期：2026-05-18，修订日期：2026-07-08
 >
 > **修订说明**：SharpSevenZip（7z.dll）已取代旧版 7z.exe 外部进程；补充了拖拽临时目录和启动清理的重定向；更新代码示例匹配当前 `Lazy<AppSettings>` 模式。
@@ -29,13 +29,13 @@ exe 同级放一个空文本文件 `Portable.txt`（或 `.portable`），程序�
 
 ## 任务清单
 
-- [ ] **1. `AppSettings.cs` — 路径重定向** — 哨兵文件检测 + Data 目录重定向
-- [ ] **2. `PasswordManager.cs` — 数据路径注入** — `CustomDataDir` 支持
-- [ ] **3. `App.OnStartup` — 跳过 Shell 注册** — 便携版不安装右键菜单和文件关联
-- [ ] **4. `MainWindow.Preview.cs` — 预览临时目录重定向**
-- [ ] **5. `SevenZipEngine.cs` — 便携 7z.dll 路径检测**
-- [ ] **6. `MainWindow.DragDrop.cs` — 拖拽临时目录重定向**
-- [ ] **7. `App.OnStartup` / `App.OnExit` — 启动及退出时仅清理便携 Temp**
+- [x] **1. `AppSettings.cs` — 路径重定向** — 哨兵文件检测 + Data 目录重定向
+- [x] **2. `PasswordManager.cs` — 数据路径注入** — `CustomDataDir` 支持
+- [x] **3. `App.OnStartup` — 跳过 Shell 注册** — 便携版不安装右键菜单和文件关联
+- [x] **4. `MainWindow.Preview.cs` — 预览临时目录重定向**
+- [x] **5. `SevenZipEngine.cs` — 便携 7z.dll 路径检测**
+- [x] **6. `MainWindow.DragDrop.cs` — 拖拽临时目录重定向**
+- [x] **7. `App.OnStartup` / `App.OnExit` — 启动及退出时仅清理便携 Temp**
 
 ## 代码改动
 
@@ -327,27 +327,27 @@ Compress-Archive -Path portable_output\* -DestinationPath MantisZip-Portable.zip
 
 ## Definition of Done
 
-- [ ] 哨兵文件 `Portable.txt` 检测完成，进入便携模式
-- [ ] 设置文件（settings.json）保存到 exe 同目录 Data/ 下
-- [ ] 密码库（passwords.json）保存到 Data/ 下
-- [ ] 便携模式下跳过 Shell 右键菜单注册（不在 `OnStartup` 调用 Shell 安装逻辑）
-- [ ] 便携模式下跳过文件关联注册（`--install-assoc` 报错提示不可用）
-- [ ] 便携模式 CLI `--install-shell` / `--uninstall-shell` / `--install-assoc` 报错退出
-- [ ] 预览临时文件保存到 Data/Temp/ 下，不影响系统 %TEMP%
-- [ ] 拖拽临时文件保存到 Data/Temp/DragDrop/ 下
-- [ ] 启动清理 / 退出清理指向 Data/Temp/ 而非系统 %TEMP%
-- [ ] 7z.dll 在 exe 同目录或 `x64/` 子目录时自动检测使用
-- [ ] `dotnet build` 通过
+- [x] 哨兵文件 `Portable.txt` 检测完成，进入便携模式
+- [x] 设置文件（settings.json）保存到 exe 同目录 Data/ 下
+- [x] 密码库（passwords.json）保存到 Data/ 下
+- [x] 便携模式下跳过 Shell 右键菜单注册（不在 `OnStartup` 调用 Shell 安装逻辑）
+- [x] 便携模式下跳过文件关联注册（`--install-assoc` 报错提示不可用）
+- [x] 便携模式 CLI `--install-shell` / `--uninstall-shell` / `--install-assoc` 报错退出
+- [x] 预览临时文件保存到 Data/Temp/ 下，不影响系统 %TEMP%
+- [x] 拖拽临时文件保存到 Data/Temp/DragDrop/ 下
+- [x] 启动清理 / 退出清理指向 Data/Temp/ 而非系统 %TEMP%
+- [x] 7z.dll 在 exe 同目录或 `x64/` 子目录时自动检测使用
+- [x] `dotnet build` 通过
 
 ### Final Checklist
 
-- [ ] 普通模式下行为不变（不回归）
-- [ ] `Portable.txt` 存在时进入便携模式
-- [ ] 便携版设置随 exe 位置移动
-- [ ] 便携版密码库随 exe 位置移动
-- [ ] 便携版不写注册表（Shell 菜单、文件关联、COM CLSID、设置同步均不写入）
-- [ ] 便携版预览临时文件不写入系统 Temp
-- [ ] 便携版拖拽临时文件不写入系统 Temp
-- [ ] 便携版启动/退出清理指向 Data/Temp/ 而非系统 Temp
-- [ ] 便携版 7z.dll 自动检测（exe 同目录 / `x64/` 子目录）
-- [ ] 便携版 `--install-shell` 等 CLI 命令正确报错
+- [x] 普通模式下行为不变（不回归）
+- [x] `Portable.txt` 存在时进入便携模式
+- [x] 便携版设置随 exe 位置移动
+- [x] 便携版密码库随 exe 位置移动
+- [x] 便携版不写注册表（Shell 菜单、文件关联、COM CLSID、设置同步均不写入）
+- [x] 便携版预览临时文件不写入系统 Temp
+- [x] 便携版拖拽临时文件不写入系统 Temp
+- [x] 便携版启动/退出清理指向 Data/Temp/ 而非系统 Temp
+- [x] 便携版 7z.dll 自动检测（exe 同目录 / `x64/` 子目录）
+- [x] 便携版 `--install-shell` 等 CLI 命令正确报错

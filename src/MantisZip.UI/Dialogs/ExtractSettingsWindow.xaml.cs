@@ -304,11 +304,10 @@ public partial class ExtractSettingsWindow : Window
             var matched = _entries.Count(e => FileFilterMatcher.IsMatch(filter, e));
             FileFilterControl.SetFilterStats(
                 L.TF(L.ExtractFilter_CountLabel, _entries.Count, matched));
-            FileFilterControl.ShowFilterStats(true);
         }
         else
         {
-            FileFilterControl.ShowFilterStats(false);
+            FileFilterControl.SetFilterStats("");
         }
     }
 }

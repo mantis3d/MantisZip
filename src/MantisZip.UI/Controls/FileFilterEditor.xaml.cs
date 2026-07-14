@@ -155,20 +155,19 @@ public partial class FileFilterEditor : UserControl
         => PresetCombo.SelectedItem as FileFilterPreset;
 
     /// <summary>
-    /// 设置过滤统计文本（提取模式使用）。
+    /// 设置过滤统计文本（提取模式使用）。始终显示，避免 UI 跳动。
     /// </summary>
     public void SetFilterStats(string text)
     {
         FilterStatsText.Text = text;
-        FilterStatsText.Visibility = string.IsNullOrEmpty(text) ? Visibility.Collapsed : Visibility.Visible;
     }
 
     /// <summary>
-    /// 显示/隐藏过滤统计。
+    /// 显示/隐藏过滤统计（已弃用——始终显示以避免 UI 跳动）。
     /// </summary>
     public void ShowFilterStats(bool show)
     {
-        FilterStatsText.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
+        // 始终显示，不做折叠
     }
 
     // ═══════════════════════════════════════════
