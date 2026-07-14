@@ -1,0 +1,215 @@
+<UserControl x:Class="MantisZip.UI.Controls.FileFilterEditor"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:l="clr-namespace:MantisZip.UI.Localization"
+             Background="{DynamicResource Theme_WindowBg}">
+    <ScrollViewer VerticalScrollBarVisibility="Auto" Background="{DynamicResource Theme_WindowBg}">
+        <StackPanel Margin="0,0,0,4">
+
+            <!-- ═══════ 启用过滤 ═══════ -->
+            <CheckBox x:Name="EnableFilterCheck" Margin="0,0,0,8"
+                      Content="{l:L FileFilter_Enable}"
+                      Checked="OnEnableFilterChanged" Unchecked="OnEnableFilterChanged"
+                      Foreground="{DynamicResource Theme_TextPrimary}" />
+
+            <!-- ═══════ 预设栏 ═══════ -->
+            <GroupBox Header="{l:L FileFilter_Presets}" Margin="0,0,0,8"
+                      BorderBrush="{DynamicResource Theme_Border}"
+                      Foreground="{DynamicResource Theme_TextPrimary}">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
+                    <ComboBox x:Name="PresetCombo" Grid.Row="0" Grid.Column="0" Margin="0,0,6,0"
+                              DisplayMemberPath="Name"
+                              SelectionChanged="PresetCombo_SelectionChanged"
+                              Background="{DynamicResource Theme_WindowBg}"
+                              Foreground="{DynamicResource Theme_TextPrimary}"
+                              BorderBrush="{DynamicResource Theme_Border}"
+                              IsEditable="False"
+                              MinHeight="26"/>
+                    <Button x:Name="SavePresetBtn" Grid.Row="0" Grid.Column="1" MinWidth="50" Height="26" Margin="0,0,4,0"
+                            Content="{l:L FileFilter_PresetSave}"
+                            Click="SavePresetBtn_Click"
+                            Background="{DynamicResource Theme_ButtonBg}"
+                            Foreground="{DynamicResource Theme_TextPrimary}"
+                            BorderBrush="{DynamicResource Theme_Border}"/>
+                    <Button x:Name="DeletePresetBtn" Grid.Row="0" Grid.Column="2" MinWidth="50" Height="26"
+                            Content="{l:L FileFilter_PresetDelete}"
+                            Click="DeletePresetBtn_Click"
+                            Background="{DynamicResource Theme_ButtonBg}"
+                            Foreground="{DynamicResource Theme_TextPrimary}"
+                            BorderBrush="{DynamicResource Theme_Border}"/>
+
+                    <!-- 统计标签（提取模式使用） -->
+                    <TextBlock x:Name="FilterStatsText" Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="3"
+                               Margin="0,6,0,0"
+                               Foreground="{DynamicResource Theme_TextSecondary}"
+                               Visibility="Collapsed"/>
+                </Grid>
+            </GroupBox>
+
+            <!-- ═══════ 扩展名 ═══════ -->
+            <GroupBox Header="{l:L FileFilter_Extensions}" Margin="0,0,0,8"
+                      BorderBrush="{DynamicResource Theme_Border}"
+                      Foreground="{DynamicResource Theme_TextPrimary}">
+                <StackPanel>
+                    <!-- 常用类型勾选框 -->
+                    <WrapPanel Margin="0,0,0,6">
+                        <CheckBox x:Name="ExtAudioCheck" Content="{l:L FileFilter_Audio}" Margin="0,0,12,4"
+                                  Checked="OnExtCheckChanged" Unchecked="OnExtCheckChanged"
+                                  Foreground="{DynamicResource Theme_TextPrimary}"/>
+                        <CheckBox x:Name="ExtVideoCheck" Content="{l:L FileFilter_Video}" Margin="0,0,12,4"
+                                  Checked="OnExtCheckChanged" Unchecked="OnExtCheckChanged"
+                                  Foreground="{DynamicResource Theme_TextPrimary}"/>
+                        <CheckBox x:Name="ExtImageCheck" Content="{l:L FileFilter_Image}" Margin="0,0,12,4"
+                                  Checked="OnExtCheckChanged" Unchecked="OnExtCheckChanged"
+                                  Foreground="{DynamicResource Theme_TextPrimary}"/>
+                        <CheckBox x:Name="ExtDocumentCheck" Content="{l:L FileFilter_Document}" Margin="0,0,12,4"
+                                  Checked="OnExtCheckChanged" Unchecked="OnExtCheckChanged"
+                                  Foreground="{DynamicResource Theme_TextPrimary}"/>
+                        <CheckBox x:Name="ExtArchiveCheck" Content="{l:L FileFilter_Archive}" Margin="0,0,0,4"
+                                  Checked="OnExtCheckChanged" Unchecked="OnExtCheckChanged"
+                                  Foreground="{DynamicResource Theme_TextPrimary}"/>
+                    </WrapPanel>
+
+                    <!-- 自定义扩展名 -->
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0" Text="{l:L FileFilter_CustomExtensions}"
+                                   VerticalAlignment="Center" Margin="0,0,8,0"
+                                   Foreground="{DynamicResource Theme_TextSecondary}"/>
+                        <TextBox x:Name="CustomExtTextBox" Grid.Column="1"
+                                 TextChanged="CustomExtTextBox_TextChanged"
+                                 MinHeight="22"
+                                 Background="{DynamicResource Theme_WindowBg}"
+                                 Foreground="{DynamicResource Theme_TextPrimary}"
+                                 BorderBrush="{DynamicResource Theme_Border}"/>
+                    </Grid>
+                </StackPanel>
+            </GroupBox>
+
+            <!-- ═══════ 文件名 ═══════ -->
+            <GroupBox Header="{l:L FileFilter_NamePattern}" Margin="0,0,0,8"
+                      BorderBrush="{DynamicResource Theme_Border}"
+                      Foreground="{DynamicResource Theme_TextPrimary}">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+                    <TextBox x:Name="NamePatternBox" Grid.Row="0"
+                             TextChanged="NamePatternBox_TextChanged"
+                             MinHeight="22"
+                             Background="{DynamicResource Theme_WindowBg}"
+                             Foreground="{DynamicResource Theme_TextPrimary}"
+                             BorderBrush="{DynamicResource Theme_Border}"/>
+                    <TextBlock Grid.Row="1" Text="{l:L FileFilter_NamePatternHint}"
+                               Margin="0,4,0,0" FontSize="11"
+                               Foreground="{DynamicResource Theme_TextSecondary}"/>
+                </Grid>
+            </GroupBox>
+
+            <!-- ═══════ 大小 ═══════ -->
+            <GroupBox Header="{l:L FileFilter_Size}" Margin="0,0,0,8"
+                      BorderBrush="{DynamicResource Theme_Border}"
+                      Foreground="{DynamicResource Theme_TextPrimary}">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="40"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="10"/>
+                        <ColumnDefinition Width="40"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
+                    <TextBlock Grid.Row="0" Grid.Column="0" Text="{l:L FileFilter_MinSize}"
+                               VerticalAlignment="Center"
+                               Foreground="{DynamicResource Theme_TextSecondary}"/>
+                    <TextBox x:Name="MinSizeBox" Grid.Row="0" Grid.Column="1"
+                             TextChanged="OnSizeFilterChanged"
+                             MinHeight="22"
+                             Background="{DynamicResource Theme_WindowBg}"
+                             Foreground="{DynamicResource Theme_TextPrimary}"
+                             BorderBrush="{DynamicResource Theme_Border}"/>
+
+                    <TextBlock Grid.Row="0" Grid.Column="3" Text="{l:L FileFilter_MaxSize}"
+                               VerticalAlignment="Center"
+                               Foreground="{DynamicResource Theme_TextSecondary}"/>
+                    <TextBox x:Name="MaxSizeBox" Grid.Row="0" Grid.Column="4"
+                             TextChanged="OnSizeFilterChanged"
+                             MinHeight="22"
+                             Background="{DynamicResource Theme_WindowBg}"
+                             Foreground="{DynamicResource Theme_TextPrimary}"
+                             BorderBrush="{DynamicResource Theme_Border}"/>
+
+                    <ComboBox x:Name="SizeUnitCombo" Grid.Row="0" Grid.Column="5" Margin="6,0,0,0"
+                              SelectedIndex="2" MinWidth="60" MinHeight="26"
+                              SelectionChanged="OnSizeUnitChanged"
+                              Background="{DynamicResource Theme_WindowBg}"
+                              Foreground="{DynamicResource Theme_TextPrimary}"
+                              BorderBrush="{DynamicResource Theme_Border}">
+                        <ComboBoxItem Content="B" Tag="1"/>
+                        <ComboBoxItem Content="KB" Tag="1024"/>
+                        <ComboBoxItem Content="MB" Tag="1048576"/>
+                        <ComboBoxItem Content="GB" Tag="1073741824"/>
+                    </ComboBox>
+                </Grid>
+            </GroupBox>
+
+            <!-- ═══════ 日期 ═══════ -->
+            <GroupBox Header="{l:L FileFilter_Date}" Margin="0,0,0,0"
+                      BorderBrush="{DynamicResource Theme_Border}"
+                      Foreground="{DynamicResource Theme_TextPrimary}">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="40"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="10"/>
+                        <ColumnDefinition Width="40"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <TextBlock Grid.Row="0" Grid.Column="0" Text="{l:L FileFilter_StartDate}"
+                               VerticalAlignment="Center" Margin="0,0,6,0" HorizontalAlignment="Right"
+                               Foreground="{DynamicResource Theme_TextSecondary}"/>
+                    <DatePicker x:Name="StartDatePicker" Grid.Row="0" Grid.Column="1"
+                                SelectedDateChanged="OnDateFilterChanged"
+                                MinHeight="22"
+                                Background="{DynamicResource Theme_WindowBg}"
+                                Foreground="{DynamicResource Theme_TextPrimary}"
+                                BorderBrush="{DynamicResource Theme_Border}"/>
+
+                    <TextBlock Grid.Row="0" Grid.Column="3" Text="{l:L FileFilter_EndDate}"
+                               VerticalAlignment="Center" Margin="6,0,6,0" HorizontalAlignment="Right"
+                               Foreground="{DynamicResource Theme_TextSecondary}"/>
+                    <DatePicker x:Name="EndDatePicker" Grid.Row="0" Grid.Column="4"
+                                SelectedDateChanged="OnDateFilterChanged"
+                                MinHeight="22"
+                                Background="{DynamicResource Theme_WindowBg}"
+                                Foreground="{DynamicResource Theme_TextPrimary}"
+                                BorderBrush="{DynamicResource Theme_Border}"/>
+                </Grid>
+            </GroupBox>
+
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

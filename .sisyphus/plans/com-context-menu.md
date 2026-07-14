@@ -1,7 +1,7 @@
 # COM 右键菜单（Shell Context Menu）
 
 > 将当前基于注册表静态动词的右键菜单替换为 COM `IContextMenu` 实现，支持动态菜单文本、子菜单、自定义图标、预设集成。
-> **状态**: 🚧 进行中 | **阶段**: [████████░░] (8/9)
+> **状态**: ✅ 已完成（v0.3.7）| **阶段**: [████████████████████] (全部完成)
 > **前置依赖**: ✅ SharpCompress 引擎迁移完成（v0.3.4，`ListEntriesAsync` 用于动态显示压缩包文件名）
 >
 > ⚠️ **重要架构变更**: 本计划最初假设在 `MantisZip.UI` (WinExe) 项目内创建 COM 组件。但 .NET 9 的 COM 托管使用 `comhost.dll` 机制（非传统 regasm），且 WPF WinExe 不适合加载到 Explorer 进程。

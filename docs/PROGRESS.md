@@ -7,8 +7,8 @@
 - **技术栈**: .NET 9 + WPF + SharpCompress + SharpSevenZip
 
 ## 版本
-- **当前版本**: 0.4.4
-- **发布日期**: 2026-06-29
+- **当前版本**: 0.4.5
+- **发布日期**: 2026-07-06
 
 ## 规划中
 
@@ -17,6 +17,35 @@
 | [跨平台移植可行性研究](.sisyphus/plans/cross-platform-port.md) | 砍 ShellExt，WPF→Avalonia，SharpSevenZip→SharpCompress/p7zip，DPAPI→AES-GCM |
 
 ## 版本历史（从新到旧）
+
+### v0.4.5+ (2026-07-13) 可配置双击行为 + 解压后自动删除原压缩包
+
+1. **可配置双击行为** — SettingsWindow 文件关联 Tab 新增「双击压缩包」GroupBox + ComboBox（打开/原地解压/智能原地解压/打开解压窗口）
+   - `DoubleClickAction` 设置持久化到 settings.json，默认 `"open"` 保持现有行为
+   - `App.xaml.cs` 的 `--open` 分发改为按 `DoubleClickAction` 路由到 `HandleOpen`/`HandleExtractHere`/`HandleExtractSmart`/`HandleExtract`
+2. **解压后自动删除原压缩包** — SettingsWindow 解压 Tab 新增「解压完成后将原压缩包移到回收站」CheckBox
+   - `DeleteArchiveAfterExtract` 设置持久化到 settings.json，默认关闭
+   - 所有解压成功路径（批量/单文件 CLI + MainWindow 界面解压）完成后调用 `TryDeleteArchiveAfterExtract`
+   - 使用 `Microsoft.VisualBasic.FileIO.FileSystem.DeleteFile` 移到回收站
+   - 重试 3 次（200ms 间隔）应对 7z.dll 句柄延迟释放
+   - 预览/双击打开/拖拽提取不触发删除
+3. **修复文件占用导致删除失败** — `HasEncryptedEntries` 和 `QuickVerifyPassword` 的 ZIP 分支改用 `FileShare.Read | FileShare.Delete` 打开文件流，避免 SharpCompress 内部默认 `FileShare.Read` 句柄阻止 Shell 回收站操作
+4. **解压后智能打开目标目录** — 全部 4 个 `OpenFolderAfterExtract` 调用点增加公共根目录检测：如果压缩包内所有条目共享同一根目录（如 `my_project/a.txt`、`my_project/b.txt`），打开 `dest/my_project/` 而非 `dest/`，减少一次手动点进目录的操作
+   - 新增 `GetCommonRootDirectory` + `ResolveSmartOpenPathAsync` 方法
+5. **修改文件**：`AppSettings.cs`、`strings.zh.json`、`strings.en.json`、`SettingsWindow.xaml`、`SettingsWindow.xaml.cs`、`App.xaml.cs`、`App.Extract.cs`、`App.Password.cs`、`MainWindow.xaml.cs`、`MainWindow.Menu.cs`
+
+### v0.4.5++ (2026-07-14) 文件冲突对话框添加暂停/取消按钮
+
+1. **暂停/取消功能** — CompressConflictDialog 和 ConflictDialog 各添加两个底部按钮
+   - **暂停**：收起对话框 → 进度窗口进入暂停状态（后台 `ManualResetEventSlim` 等待）→ 进度窗口继续时重新弹出冲突对话框
+   - **取消**：通过 conflictResolver 抛出 `OperationCanceledException` 终止整个压缩/解压操作，等同于进度条上的取消
+   - 暂停按钮图标（⏸/✕）仅存在于本地化字符串，XAML 不再硬编码（修复图标重复 bug）
+2. **循环重入改造** — 所有调用方 conflictResolver 支持暂停/取消循环：
+   - `App.xaml.cs` — `CreateExtractOptions()` 解压循环
+   - `App.Compress.cs` — 批量压缩循环
+   - `CompressSettingsWindow.xaml.cs` — `RunCompressAsync` / `RunSeparateCompressAsync` / `RunCombinedCompressAsync` 3 处循环
+3. **暂停状态控制** — `ProgressWindow.PauseFromConflict()` 打开 `_pauseEvent`（后台 `Wait(ct)`）→ 恢复时关闭 `_pauseEvent` 并重新调用 conflictResolver
+4. **修改文件**：`App.xaml.cs`、`App.Compress.cs`、`CompressConflictDialog.xaml`、`CompressConflictDialog.xaml.cs`、`CompressSettingsWindow.xaml.cs`、`ConflictDialog.xaml`、`ConflictDialog.xaml.cs`、`ProgressWindow.xaml.cs`、`strings.zh.json`、`strings.en.json`
 
 ### v0.4.4+++ (2026-07-10) 视图菜单添加"隐藏预览信息"开关
 
@@ -148,6 +177,37 @@
 3. **修改文件（11 个）**：`ArchivePathExtensions.cs`（新建）、`ZipEngine.cs`、`SevenZipEngine.cs`、`ArchiveEntryExtractor.cs`、`ArchiveStructureAnalyzer.cs`、`FileConflictHelper.cs`、`MainWindow.DragDrop.cs`、`App.Compress.cs`、`App.Open.cs`、`CompressSettingsWindow.xaml.cs`、`CompressSettingsWindow.Password.cs`
 
 ### v0.4.4 (2026-07-01) NoDotNet 安装包增强——.NET 9 自动下载
+### v0.4.5+ (2026-07-03) 压缩选项增强——7z 字典/块/匹配器 + ZIP 方法 + 加密方式
+
+1. **压缩选项增强计划** — `.sisyphus/plans/compression-options-enhancement.md`
+2. **AppSettings 新增 7 个默认属性**：`SevenZipSolidBlockSize`、`SevenZipDictionarySize`、`SevenZipNumFastBytes`、`SevenZipMatchFinder`、`ZipCompressionMethod`、`ZipEncryptionMethod`、`SevenZipEncryptHeaders`
+3. **ArchiveOptions 新增对应属性** — `ArchiveEngine.cs` 添加 7 个属性 + 默认值 + XML 文档
+4. **CompressRequest + BuildOptions** — `CompressService.cs` 添加 7 个 init 属性 + `BuildOptions` 传递
+5. **DynamicFormatOptionsPanel** — 7z 面板新增 4 个 ComboBox（固实块大小、字典大小、Word Size、匹配器）+ 固实联动禁用；ZIP 面板新增"压缩方法"ComboBox（Deflate/Deflate64/BZip2/LZMA/PPMd/Store）
+6. **SettingsWindow** — 压缩 Tab 新增 6 个 ComboBox + 1 个 CheckBox 设置默认值；已在 `LoadSettings`/`SaveSettings` 中添加对应逻辑
+7. **CompressSettingsWindow** — 加密 Tab 新增"加密方式"GroupBox（ZIP 加密方式 ComboBox + 7z 加密文件头 CheckBox）
+8. **SevenZipEngine** — `ConfigureCompressor` 应用新参数（CustomParameters `s`、LzmaDictionarySize、LzmaNumFastBytes、LzmaMatchFinder、EncryptHeaders）
+9. **ZipEngine** — 加密路径使用 SharpSevenZip `CompressionMethod` + `ZipEncryptionMethod`；非加密路径使用 SharpCompress `CompressionType`；支持 Deflate64/BZip2/LZMA/PPMd/Store
+10. **修改文件（12 个）**：`AppSettings.cs`、`ArchiveEngine.cs`、`CompressService.cs`、`DynamicFormatOptionsPanel.xaml`、`DynamicFormatOptionsPanel.xaml.cs`、`SettingsWindow.xaml`、`SettingsWindow.xaml.cs`、`CompressSettingsWindow.xaml`、`CompressSettingsWindow.xaml.cs`、`SevenZipEngine.cs`、`ZipEngine.cs`、`PROGRESS.md`
+11. **后续修复**：Word Size 中文标签、匹配器/字典/固实块"默认"改为带数值显示（默认(273)/默认(BT4)/默认(16MB)/默认(全固实)）、固实块选项扩展到 10 个（16MB~4GB）、`SolidCheck_Changed` null 保护
+
+### v0.4.4+ (2026-07-02) 压缩包路径处理一站式重构——ArchivePath 统一入口
+
+1. **新建 `ArchivePath` 类** — `ArchivePathExtensions.cs` → `ArchivePath`，压缩包路径处理的一站式入口
+   - `Normalize()`：`\` → `/` 统一分隔符，null 安全
+   - `TrimEndSeparator()`：去除尾部斜杠（保留根路径 `C:\`）
+   - `GetFileName()` / `GetDirectoryName()` / `GetFileNameWithoutExtension()`：自动处理尾部斜杠，无需调用方手动 TrimEnd
+   - `GetFileNameWithoutExtension()` 特殊处理 `.tar.gz` 双扩展名，与 `ArchiveEngine.GetFormatByExtension` 保持一致
+   - `FindEntry()`：按归一化路径在条目集合中查找
+2. **消除 4 种遗留路径处理模式**：
+   - 去除 29 处内联 `.Replace('\\', '/')` → `ArchivePath.Normalize()`
+   - 去除 16 处 `.TrimEnd('\\', '/')` → `ArchivePath.GetFileName`/`GetDirectoryName`/`GetFileNameWithoutExtension`/`TrimEndSeparator`
+   - 消除 `NormalizePathSeparators()` 扩展方法
+   - `ContextMenuHandler.cs` 保留 2 处（ShellExt 不引用 Core）
+3. **修改文件（11 个）**：`ArchivePathExtensions.cs`（新建）、`ZipEngine.cs`、`SevenZipEngine.cs`、`ArchiveEntryExtractor.cs`、`ArchiveStructureAnalyzer.cs`、`FileConflictHelper.cs`、`MainWindow.DragDrop.cs`、`App.Compress.cs`、`App.Open.cs`、`CompressSettingsWindow.xaml.cs`、`CompressSettingsWindow.Password.cs`
+
+
+### v0.4.3+ (2026-07-01) NoDotNet 安装包增强——.NET 9 自动下载
 
 1. **installer.iss 新增 .NET 9 Desktop Runtime 自动检测 + 下载安装** — 安装时自动检测注册表 `HKLM\SOFTWARE\dotnet\Setup\InstalledVersions\x64\sharedfx\Microsoft.WindowsDesktop.App`，缺失时从 `aka.ms/dotnet/9.0/windowsdesktop-runtime-win-x64.exe` 下载并静默安装 `/quiet /install /norestart`。完全复用已有 WebView2 模式（`URLDownloadToFile` + `Exec`）。失败不阻塞安装（仅记日志）。
 2. **安装包文件名重命名** — `installer.iss` 输出：`NoDotNet` → `WebSetup`（因现支持自动下载 .NET）；`installer-selfcontained.iss` 输出：`Setup` → `Offline`（自包含离线包）。感谢用户建议。
@@ -789,3 +849,7 @@
 | ZIP 压缩流直拷优化 (ZipBinaryRewriter) | [zip-copy-mode-optimization.md](.sisyphus/plans/zip-copy-mode-optimization.md) | v0.4.2 |
 | UAC 提权 + 权限不足处理 | [uac-elevation-permission.md](.sisyphus/plans/uac-elevation-permission.md) | v0.4.2 |
 | 自包含安装包发布 | [self-contained-installer.md](.sisyphus/plans/self-contained-installer.md) | v0.4.2 |
+| 压缩选项增强（7z/ZIP 参数扩展） | [compression-options-enhancement.md](.sisyphus/plans/compression-options-enhancement.md) | v0.4.5 |
+| 密码流程统一 (ResolvePasswordAsync) | [password-flow-unification.md](.sisyphus/plans/password-flow-unification.md) | v0.4.5+ |
+| 安装包 .NET 9 自动下载 | [installer-dotnet-autodownload.md](.sisyphus/plans/installer-dotnet-autodownload.md) | v0.4.3+ |
+| 贡献者鸣谢面板 | [contributors-panel.md](.sisyphus/plans/contributors-panel.md) | v0.4.3+ |

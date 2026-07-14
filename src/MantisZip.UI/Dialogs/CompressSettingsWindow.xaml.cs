@@ -1,6 +1,7 @@
 using MantisZip.Core;
 using MantisZip.Core.Abstractions;
 using MantisZip.Core.Engines;
+using MantisZip.Core.FileFilter;
 using MantisZip.Core.Models;
 using MantisZip.Core.Services;
 using MantisZip.Core.Utils;
@@ -49,6 +50,50 @@ public partial class CompressSettingsWindow : Window
                 FileNameTextBox.Text = name;
             }
         });
+
+        // 初始化过滤控件
+        if (CompressFilterControl != null)
+        {
+            CompressFilterControl.LoadPresets(AppSettings.Instance.FilterPresets);
+            CompressFilterControl.SavePresetRequested += OnCompressSavePreset;
+            CompressFilterControl.DeletePresetRequested += OnCompressDeletePreset;
+        }
+    }
+
+    /// <summary>
+    /// 获取当前激活的过滤条件（仅当启用且非空时返回）。
+    /// </summary>
+    public FileFilterCriteria? GetActiveFilter()
+    {
+        if (CompressFilterControl == null) return null;
+        if (!CompressFilterControl.IsFilterEnabled) return null;
+        var filter = CompressFilterControl.GetFilter();
+        return filter.IsActive ? filter : null;
+    }
+
+    private void OnCompressSavePreset(string name)
+    {
+        if (CompressFilterControl == null) return;
+        var filter = CompressFilterControl.GetFilter();
+        var preset = new FileFilterPreset(name, filter, isBuiltIn: false);
+        try
+        {
+            AppSettings.Instance.AddPreset(preset);
+            AppSettings.Instance.Save();
+            CompressFilterControl.LoadPresets(AppSettings.Instance.FilterPresets);
+        }
+        catch (InvalidOperationException ex)
+        {
+            AppMessageBox.Show(ex.Message, L.T(L.FileFilter_SavePresetTitle),
+                MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+    }
+
+    private void OnCompressDeletePreset(FileFilterPreset preset)
+    {
+        AppSettings.Instance.FilterPresets.Remove(preset);
+        AppSettings.Instance.Save();
+        CompressFilterControl.LoadPresets(AppSettings.Instance.FilterPresets);
     }
 
     private string GetFormatExtension()
@@ -296,6 +341,22 @@ public partial class CompressSettingsWindow : Window
         CommentDistributionPanel.IsEnabled = _outputMode == CompressOutputMode.Separate;
     }
 
+    /// <summary>读取密码 Tab 的 ZIP 加密方式选择。</summary>
+    private string GetZipEncryptionMethod()
+    {
+        if (EncryptMethodCombo?.SelectedItem is ComboBoxItem item)
+            return item.Tag?.ToString() ?? "aes256";
+        return "aes256";
+    }
+
+    /// <summary>读取密码 Tab 的 7z 加密文件头选项。</summary>
+    private bool GetSevenZipEncryptHeaders()
+    {
+        if (EncryptHeadersCheck?.IsChecked == true)
+            return true;
+        return false;
+    }
+
     private void TabControl_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
     {
         if (e.Source is TabControl)
@@ -375,6 +436,22 @@ public partial class CompressSettingsWindow : Window
             }
         }
 
+        // 应用文件过滤
+        var filter = GetActiveFilter();
+        if (filter != null)
+        {
+            var filtered = FileFilterHelper.ApplyFilter(_sourcePaths.ToArray(), filter);
+            if (filtered.Length == 0)
+            {
+                AppMessageBox.Show(L.T(L.Compress_Validation_NoFiles), L.T(L.Compress_Title), MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+            // 用过滤后的路径替换原始源路径列表
+            _sourcePaths.Clear();
+            _sourcePaths.AddRange(filtered);
+            App.Log("CompressButton_Click: 过滤后剩余 {0} 个文件", filtered.Length);
+        }
+
         App.Log(L.T(L.Shell_Compress));
 
         var format = (FormatComboBox.SelectedItem as System.Windows.Controls.ComboBoxItem)?.Tag?.ToString() ?? "zip";
@@ -422,6 +499,13 @@ public partial class CompressSettingsWindow : Window
             FileNameEncoding = FormatOptionsPanel.FileNameEncoding,
             SevenZipCompressionMethod = FormatOptionsPanel.SevenZipCompressionMethod,
             SevenZipSolid = FormatOptionsPanel.SevenZipSolid,
+            SevenZipSolidBlockSize = FormatOptionsPanel.SevenZipSolidBlockSize,
+            SevenZipDictionarySize = FormatOptionsPanel.SevenZipDictionarySize,
+            SevenZipNumFastBytes = FormatOptionsPanel.SevenZipNumFastBytes,
+            SevenZipMatchFinder = FormatOptionsPanel.SevenZipMatchFinder,
+            ZipCompressionMethod = FormatOptionsPanel.ZipCompressionMethod,
+            ZipEncryptionMethod = GetZipEncryptionMethod(),
+            SevenZipEncryptHeaders = GetSevenZipEncryptHeaders(),
         };
         var outputPaths = CompressService.GetOutputPaths(request);
         progressWindow.InitBatchMode(outputPaths);
@@ -438,14 +522,67 @@ public partial class CompressSettingsWindow : Window
                 request,
                 conflictResolver: info =>
                 {
+                    // 已勾选"应用到全部" → 直接返回记忆的选择
                     if (applyToAll && chosenAction.HasValue)
                         return new CompressConflictResolution(chosenAction.Value, null);
 
-                    var dlg = new CompressConflictDialog(info.OutputPath, info.CanAdd, info.SuggestedName);
-                    dlg.Owner = progressWindow;
-                    dlg.ShowDialog();
-                    if (dlg.ApplyToAll) { applyToAll = true; chosenAction = (Core.Abstractions.CompressConflictAction)dlg.ResultAction; }
-                    return new CompressConflictResolution((Core.Abstractions.CompressConflictAction)dlg.ResultAction, dlg.CustomName);
+                    // 循环重入：暂停后恢复时重新弹窗
+                    while (true)
+                    {
+                        var resolution = progressWindow.Dispatcher.Invoke(() =>
+                        {
+                            var dlg = new CompressConflictDialog(info.OutputPath, info.CanAdd, info.SuggestedName);
+                            dlg.Owner = progressWindow;
+                            dlg.ShowDialog();
+
+                            if (dlg.IsPaused)
+                            {
+                                App.LogDebug("CompressConflictResolver: paused for '{0}'", info.OutputPath);
+                                return (Action: Core.Abstractions.CompressConflictAction.Cancel, IsPaused: true, IsCancelled: false, CustomName: (string?)null);
+                            }
+
+                            if (dlg.CancelOperation)
+                            {
+                                App.LogDebug("CompressConflictResolver: cancelled operation for '{0}'", info.OutputPath);
+                                return (Action: Core.Abstractions.CompressConflictAction.Cancel, IsPaused: false, IsCancelled: true, CustomName: (string?)null);
+                            }
+
+                            if (dlg.ApplyToAll)
+                            {
+                                applyToAll = true;
+                                chosenAction = (Core.Abstractions.CompressConflictAction)dlg.ResultAction;
+                            }
+
+                            return (Action: (Core.Abstractions.CompressConflictAction)dlg.ResultAction, IsPaused: false, IsCancelled: false, CustomName: dlg.CustomName);
+                        });
+
+                        if (resolution.IsCancelled)
+                        {
+                            App.LogDebug("CompressConflictResolver: cancelling entire operation via throw");
+                            throw new OperationCanceledException();
+                        }
+
+                        if (resolution.IsPaused)
+                        {
+                            App.LogDebug("CompressConflictResolver: paused, waiting for resume...");
+                            try
+                            {
+                                progressWindow.Dispatcher.Invoke(() => progressWindow.PauseFromConflict());
+                                progressWindow.PauseEvent.Wait(progressWindow.CancellationToken);
+                                App.LogDebug("CompressConflictResolver: resumed, re-showing dialog");
+                                continue;
+                            }
+                            catch (OperationCanceledException)
+                            {
+                                App.LogDebug("CompressConflictResolver: cancelled while paused");
+                                throw;
+                            }
+                        }
+
+                        return new CompressConflictResolution(
+                            (Core.Abstractions.CompressConflictAction)resolution.Action,
+                            resolution.CustomName);
+                    }
                 },
                 progress,
                 progressWindow.CancellationToken);
@@ -498,6 +635,13 @@ public partial class CompressSettingsWindow : Window
             FileNameEncoding = FormatOptionsPanel.FileNameEncoding,
             SevenZipCompressionMethod = FormatOptionsPanel.SevenZipCompressionMethod,
             SevenZipSolid = FormatOptionsPanel.SevenZipSolid,
+            SevenZipSolidBlockSize = FormatOptionsPanel.SevenZipSolidBlockSize,
+            SevenZipDictionarySize = FormatOptionsPanel.SevenZipDictionarySize,
+            SevenZipNumFastBytes = FormatOptionsPanel.SevenZipNumFastBytes,
+            SevenZipMatchFinder = FormatOptionsPanel.SevenZipMatchFinder,
+            ZipCompressionMethod = FormatOptionsPanel.ZipCompressionMethod,
+            ZipEncryptionMethod = GetZipEncryptionMethod(),
+            SevenZipEncryptHeaders = GetSevenZipEncryptHeaders(),
         };
         var outputPaths = CompressService.GetOutputPaths(request);
         progressWindow.InitBatchMode(outputPaths);
@@ -513,17 +657,67 @@ public partial class CompressSettingsWindow : Window
                 request,
                 conflictResolver: info =>
                 {
+                    // 已勾选"应用到全部" → 直接返回记忆的选择
                     if (applyToAll && chosenAction.HasValue)
                         return new CompressConflictResolution(chosenAction.Value, null);
 
-                    return progressWindow.Dispatcher.Invoke(() =>
+                    // 循环重入：暂停后恢复时重新弹窗
+                    while (true)
                     {
-                        var dlg = new CompressConflictDialog(info.OutputPath, info.CanAdd, info.SuggestedName);
-                        dlg.Owner = progressWindow;
-                        dlg.ShowDialog();
-                        if (dlg.ApplyToAll) { applyToAll = true; chosenAction = (Core.Abstractions.CompressConflictAction)dlg.ResultAction; }
-                        return new CompressConflictResolution((Core.Abstractions.CompressConflictAction)dlg.ResultAction, dlg.CustomName);
-                    });
+                        var resolution = progressWindow.Dispatcher.Invoke(() =>
+                        {
+                            var dlg = new CompressConflictDialog(info.OutputPath, info.CanAdd, info.SuggestedName);
+                            dlg.Owner = progressWindow;
+                            dlg.ShowDialog();
+
+                            if (dlg.IsPaused)
+                            {
+                                App.LogDebug("CompressConflictResolver: paused for '{0}'", info.OutputPath);
+                                return (Action: Core.Abstractions.CompressConflictAction.Cancel, IsPaused: true, IsCancelled: false, CustomName: (string?)null);
+                            }
+
+                            if (dlg.CancelOperation)
+                            {
+                                App.LogDebug("CompressConflictResolver: cancelled operation for '{0}'", info.OutputPath);
+                                return (Action: Core.Abstractions.CompressConflictAction.Cancel, IsPaused: false, IsCancelled: true, CustomName: (string?)null);
+                            }
+
+                            if (dlg.ApplyToAll)
+                            {
+                                applyToAll = true;
+                                chosenAction = (Core.Abstractions.CompressConflictAction)dlg.ResultAction;
+                            }
+
+                            return (Action: (Core.Abstractions.CompressConflictAction)dlg.ResultAction, IsPaused: false, IsCancelled: false, CustomName: dlg.CustomName);
+                        });
+
+                        if (resolution.IsCancelled)
+                        {
+                            App.LogDebug("CompressConflictResolver: cancelling entire operation via throw");
+                            throw new OperationCanceledException();
+                        }
+
+                        if (resolution.IsPaused)
+                        {
+                            App.LogDebug("CompressConflictResolver: paused, waiting for resume...");
+                            try
+                            {
+                                progressWindow.Dispatcher.Invoke(() => progressWindow.PauseFromConflict());
+                                progressWindow.PauseEvent.Wait(progressWindow.CancellationToken);
+                                App.LogDebug("CompressConflictResolver: resumed, re-showing dialog");
+                                continue;
+                            }
+                            catch (OperationCanceledException)
+                            {
+                                App.LogDebug("CompressConflictResolver: cancelled while paused");
+                                throw;
+                            }
+                        }
+
+                        return new CompressConflictResolution(
+                            (Core.Abstractions.CompressConflictAction)resolution.Action,
+                            resolution.CustomName);
+                    }
                 },
                 progress,
                 progressWindow.CancellationToken,
@@ -599,6 +793,13 @@ public partial class CompressSettingsWindow : Window
             FileNameEncoding = FormatOptionsPanel.FileNameEncoding,
             SevenZipCompressionMethod = FormatOptionsPanel.SevenZipCompressionMethod,
             SevenZipSolid = FormatOptionsPanel.SevenZipSolid,
+            SevenZipSolidBlockSize = FormatOptionsPanel.SevenZipSolidBlockSize,
+            SevenZipDictionarySize = FormatOptionsPanel.SevenZipDictionarySize,
+            SevenZipNumFastBytes = FormatOptionsPanel.SevenZipNumFastBytes,
+            SevenZipMatchFinder = FormatOptionsPanel.SevenZipMatchFinder,
+            ZipCompressionMethod = FormatOptionsPanel.ZipCompressionMethod,
+            ZipEncryptionMethod = GetZipEncryptionMethod(),
+            SevenZipEncryptHeaders = GetSevenZipEncryptHeaders(),
         };
         var outputPaths = CompressService.GetOutputPaths(request);
         progressWindow.InitBatchMode(outputPaths);
@@ -615,14 +816,67 @@ public partial class CompressSettingsWindow : Window
                 request,
                 conflictResolver: info =>
                 {
+                    // 已勾选"应用到全部" → 直接返回记忆的选择
                     if (applyToAll && chosenAction.HasValue)
                         return new CompressConflictResolution(chosenAction.Value, null);
 
-                    var dlg = new CompressConflictDialog(info.OutputPath, info.CanAdd, info.SuggestedName);
-                    dlg.Owner = progressWindow;
-                    dlg.ShowDialog();
-                    if (dlg.ApplyToAll) { applyToAll = true; chosenAction = (Core.Abstractions.CompressConflictAction)dlg.ResultAction; }
-                    return new CompressConflictResolution((Core.Abstractions.CompressConflictAction)dlg.ResultAction, dlg.CustomName);
+                    // 循环重入：暂停后恢复时重新弹窗
+                    while (true)
+                    {
+                        var resolution = progressWindow.Dispatcher.Invoke(() =>
+                        {
+                            var dlg = new CompressConflictDialog(info.OutputPath, info.CanAdd, info.SuggestedName);
+                            dlg.Owner = progressWindow;
+                            dlg.ShowDialog();
+
+                            if (dlg.IsPaused)
+                            {
+                                App.LogDebug("CompressConflictResolver: paused for '{0}'", info.OutputPath);
+                                return (Action: Core.Abstractions.CompressConflictAction.Cancel, IsPaused: true, IsCancelled: false, CustomName: (string?)null);
+                            }
+
+                            if (dlg.CancelOperation)
+                            {
+                                App.LogDebug("CompressConflictResolver: cancelled operation for '{0}'", info.OutputPath);
+                                return (Action: Core.Abstractions.CompressConflictAction.Cancel, IsPaused: false, IsCancelled: true, CustomName: (string?)null);
+                            }
+
+                            if (dlg.ApplyToAll)
+                            {
+                                applyToAll = true;
+                                chosenAction = (Core.Abstractions.CompressConflictAction)dlg.ResultAction;
+                            }
+
+                            return (Action: (Core.Abstractions.CompressConflictAction)dlg.ResultAction, IsPaused: false, IsCancelled: false, CustomName: dlg.CustomName);
+                        });
+
+                        if (resolution.IsCancelled)
+                        {
+                            App.LogDebug("CompressConflictResolver: cancelling entire operation via throw");
+                            throw new OperationCanceledException();
+                        }
+
+                        if (resolution.IsPaused)
+                        {
+                            App.LogDebug("CompressConflictResolver: paused, waiting for resume...");
+                            try
+                            {
+                                progressWindow.Dispatcher.Invoke(() => progressWindow.PauseFromConflict());
+                                progressWindow.PauseEvent.Wait(progressWindow.CancellationToken);
+                                App.LogDebug("CompressConflictResolver: resumed, re-showing dialog");
+                                continue;
+                            }
+                            catch (OperationCanceledException)
+                            {
+                                App.LogDebug("CompressConflictResolver: cancelled while paused");
+                                throw;
+                            }
+                        }
+
+                        return new CompressConflictResolution(
+                            (Core.Abstractions.CompressConflictAction)resolution.Action,
+                            resolution.CustomName);
+                    }
                 },
                 progress,
                 progressWindow.CancellationToken);

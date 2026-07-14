@@ -253,23 +253,71 @@ public partial class App : Application
                     request,
                     conflictResolver: info =>
                     {
-                        return progressWindow.Dispatcher.Invoke(() =>
-                        {
-                            if (applyToAll && chosenAction.HasValue)
-                                return new CompressConflictResolution(chosenAction.Value, null);
+                        // 已勾选"应用到全部" → 直接返回记忆的选择
+                        if (applyToAll && chosenAction.HasValue)
+                            return new CompressConflictResolution(chosenAction.Value, null);
 
-                            var dlg = new CompressConflictDialog(info.OutputPath, info.CanAdd, info.SuggestedName);
-                            dlg.Owner = progressWindow;
-                            var shown = dlg.ShowDialog() == true;
-                            if (dlg.ApplyToAll)
+                        // 循环重入：暂停后恢复时重新弹窗
+                        while (true)
+                        {
+                            var resolution = progressWindow.Dispatcher.Invoke(() =>
                             {
-                                applyToAll = true;
-                                chosenAction = (Core.Abstractions.CompressConflictAction)dlg.ResultAction;
+                                var dlg = new CompressConflictDialog(info.OutputPath, info.CanAdd, info.SuggestedName);
+                                dlg.Owner = progressWindow;
+                                dlg.ShowDialog();
+
+                                // 暂停
+                                if (dlg.IsPaused)
+                                {
+                                    App.LogDebug("CompressConflictResolver: paused for '{0}'", info.OutputPath);
+                                    return (Action: Core.Abstractions.CompressConflictAction.Cancel, IsPaused: true, IsCancelled: false, CustomName: (string?)null);
+                                }
+
+                                // 取消整个操作
+                                if (dlg.CancelOperation)
+                                {
+                                    App.LogDebug("CompressConflictResolver: cancelled entire operation for '{0}'", info.OutputPath);
+                                    return (Action: Core.Abstractions.CompressConflictAction.Cancel, IsPaused: false, IsCancelled: true, CustomName: (string?)null);
+                                }
+
+                                if (dlg.ApplyToAll)
+                                {
+                                    applyToAll = true;
+                                    chosenAction = (Core.Abstractions.CompressConflictAction)dlg.ResultAction;
+                                }
+
+                                App.LogDebug("CompressConflictResolver: resolved '{0}' action={1}, applyToAll={2}", info.OutputPath, dlg.ResultAction, dlg.ApplyToAll);
+                                return (Action: (Core.Abstractions.CompressConflictAction)dlg.ResultAction, IsPaused: false, IsCancelled: false, CustomName: dlg.CustomName);
+                            });
+
+                            if (resolution.IsCancelled)
+                            {
+                                App.LogDebug("CompressConflictResolver: cancelling entire operation via throw");
+                                throw new OperationCanceledException();
                             }
+
+                            if (resolution.IsPaused)
+                            {
+                                App.LogDebug("CompressConflictResolver: paused, waiting for resume...");
+                                try
+                                {
+                                    // 在 UI 线程调用 PauseFromConflict，然后在后台线程等待暂停事件
+                                    progressWindow.Dispatcher.Invoke(() => progressWindow.PauseFromConflict());
+                                    progressWindow.PauseEvent.Wait(progressWindow.CancellationToken);
+                                    App.LogDebug("CompressConflictResolver: resumed, re-showing dialog");
+                                    continue;
+                                }
+                                catch (OperationCanceledException)
+                                {
+                                    App.LogDebug("CompressConflictResolver: cancelled while paused");
+                                    throw;
+                                }
+                            }
+
                             return new CompressConflictResolution(
-                                shown ? (Core.Abstractions.CompressConflictAction)dlg.ResultAction : Core.Abstractions.CompressConflictAction.Cancel,
-                                dlg.CustomName);
-                        });
+                                (Core.Abstractions.CompressConflictAction)resolution.Action,
+                                resolution.CustomName);
+                        }
                     },
                     progress,
                     ct,

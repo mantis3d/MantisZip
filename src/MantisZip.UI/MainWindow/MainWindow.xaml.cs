@@ -848,9 +848,14 @@ public partial class MainWindow : Window
                     var currentPwdOpts = App.CreateExtractOptions();
                     await engine.ExtractAsync(archivePath, destinationPath, _currentPassword, progress, ct, currentPwdOpts);
                     progressWindow.Close();
+                    App.TryDeleteArchiveAfterExtract(archivePath);
                     App.LogDebug("ExtractAsync: done (_currentPassword), dest='{0}'", destinationPath);
                     SetStatus(L.TF(L.Main_Status_ExtractDone, Path.GetFileName(archivePath)));
-                    if (AppSettings.Instance.OpenFolderAfterExtract) OpenInExplorer(destinationPath);
+                    if (AppSettings.Instance.OpenFolderAfterExtract)
+                    {
+                        var smartPath = await App.ResolveSmartOpenPathAsync(archivePath, destinationPath, engine, _currentPassword);
+                        OpenInExplorer(smartPath);
+                    }
                     return;
                 }
                 catch (Exception innerEx) when (engine is SevenZipEngine && _hasEncryptedArchive)
@@ -891,9 +896,14 @@ public partial class MainWindow : Window
             await engine.ExtractAsync(archivePath, destinationPath, password, progress, ct, opts);
 
             progressWindow.Close();
+            App.TryDeleteArchiveAfterExtract(archivePath);
             App.LogDebug("ExtractAsync: done, dest='{0}'", destinationPath);
             SetStatus(L.TF(L.Main_Status_ExtractDone, Path.GetFileName(archivePath)));
-            if (AppSettings.Instance.OpenFolderAfterExtract) OpenInExplorer(destinationPath);
+            if (AppSettings.Instance.OpenFolderAfterExtract)
+            {
+                var smartPath = await App.ResolveSmartOpenPathAsync(archivePath, destinationPath, engine, password);
+                OpenInExplorer(smartPath);
+            }
         }
         catch (OperationCanceledException)
         {

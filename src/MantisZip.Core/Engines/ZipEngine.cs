@@ -346,7 +346,8 @@ public class ZipEngine : IArchiveEngine
         string? password = null,
         IProgress<ArchiveProgress>? progress = null,
         CancellationToken cancellationToken = default,
-        ArchiveOptions? options = null)
+        ArchiveOptions? options = null,
+        IReadOnlyDictionary<string, string>? outputPathOverrides = null)
     {
         CoreLog.Entry();
         CoreLog.Info($"ExtractEntriesAsync: {archivePath}, {entryKeys.Count} entries -> {destinationPath}");
@@ -377,7 +378,8 @@ public class ZipEngine : IArchiveEngine
                     continue;
                 }
 
-                var outputPath = FileConflictHelper.GetSafePath(destinationPath, entryKey);
+                var outputPath = outputPathOverrides?.GetValueOrDefault(entryKey)
+                    ?? FileConflictHelper.GetSafePath(destinationPath, entryKey);
                 var outputDir = Path.GetDirectoryName(outputPath);
                 if (!string.IsNullOrEmpty(outputDir) && !Directory.Exists(outputDir))
                     Directory.CreateDirectory(outputDir);
@@ -487,11 +489,28 @@ public class ZipEngine : IArchiveEngine
 
                     SevenZipEngine.EnsureLibraryPath();
 
+                    var zipMethod = options.ZipCompressionMethod?.ToLowerInvariant() switch
+                    {
+                        "deflate64" => CompressionMethod.Deflate64,
+                        "bzip2" => CompressionMethod.BZip2,
+                        "lzma" => CompressionMethod.Lzma,
+                        "ppmd" => CompressionMethod.Ppmd,
+                        "copy" or "store" => CompressionMethod.Copy,
+                        _ => CompressionMethod.Deflate,
+                    };
+                    var zipEncrypt = options.ZipEncryptionMethod?.ToLowerInvariant() switch
+                    {
+                        "zipcrypto" => ZipEncryptionMethod.ZipCrypto,
+                        "aes128" => ZipEncryptionMethod.Aes128,
+                        "aes192" => ZipEncryptionMethod.Aes192,
+                        _ => ZipEncryptionMethod.Aes256,
+                    };
+
                     var s7zCompressor = new SharpSevenZipCompressor
                     {
                         ArchiveFormat = OutArchiveFormat.Zip,
-                        ZipEncryptionMethod = ZipEncryptionMethod.Aes256,
-                        CompressionMethod = CompressionMethod.Deflate,
+                        ZipEncryptionMethod = zipEncrypt,
+                        CompressionMethod = zipMethod,
                         CompressionLevel = MapCompressionLevelToS7Z(options.CompressionLevel),
                         IncludeEmptyDirectories = true,
                         DirectoryStructure = true,
@@ -548,7 +567,16 @@ public class ZipEngine : IArchiveEngine
                         "default" => Encoding.Default,
                         _ => Encoding.UTF8,
                     };
-                    var writerOptions = new ZipWriterOptions(CompressionType.Deflate)
+                    var compressionType = options.ZipCompressionMethod?.ToLowerInvariant() switch
+                    {
+                        "deflate64" => CompressionType.Deflate64,
+                        "bzip2" => CompressionType.BZip2,
+                        "lzma" => CompressionType.LZMA,
+                        "ppmd" => CompressionType.PPMd,
+                        "store" => CompressionType.None,
+                        _ => CompressionType.Deflate,
+                    };
+                    var writerOptions = new ZipWriterOptions(compressionType)
                     {
                         CompressionLevel = options.CompressionLevel,
                         ArchiveComment = options.Comment ?? "",

@@ -1,7 +1,10 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Text.Json;
 using Microsoft.Win32;
+using MantisZip.Core;
+using MantisZip.Core.FileFilter;
 using MantisZip.Core.Utils;
 
 namespace MantisZip.UI;
@@ -20,6 +23,13 @@ public class AppSettings
     public string ZipEncoding { get; set; } = "utf-8";         // ZIP 文件名编码：utf-8 / gbk / default
     public string SevenZipCompressionMethod { get; set; } = "LZMA2"; // 7z 压缩方法：LZMA / LZMA2 / PPMd / BZip2 / Deflate
     public bool SevenZipSolid { get; set; } = true;            // 7z 固实压缩
+    public string SevenZipSolidBlockSize { get; set; } = "";   // 7z 固实块大小：""=默认 / "64m" / "256m" / "512m" / "1g"
+    public int SevenZipDictionarySize { get; set; } = 0;       // 7z 字典大小（字节）：0=默认 / 2^24 / 2^25 / 2^27 / 2^28
+    public int SevenZipNumFastBytes { get; set; } = 0;         // 7z Word Size：0=默认 / 32 / 64 / 128 / 255
+    public string SevenZipMatchFinder { get; set; } = "";      // 7z 匹配器：""=默认 / "bt2" / "bt3" / "bt4"
+    public string ZipCompressionMethod { get; set; } = "deflate"; // ZIP 压缩方法：deflate / deflate64 / bzip2 / lzma / ppmd / store
+    public string ZipEncryptionMethod { get; set; } = "aes256";   // ZIP 加密方式：aes256 / aes192 / aes128 / zipcrypto
+    public bool SevenZipEncryptHeaders { get; set; } = true;      // 7z 加密文件名
 
     // ===== 解压 =====
     public string ExtractDestination { get; set; } = "ask"; // same-dir / desktop / last / ask
@@ -54,6 +64,10 @@ public class AppSettings
 
     // ===== 交互 =====
     public bool EnableDragExtract { get; set; } = true;
+    /// <summary>资源管理器双击压缩包时的行为：open / extract-here / smart-extract / extract-dialog</summary>
+    public string DoubleClickAction { get; set; } = "open";
+    /// <summary>解压完成后将原压缩包移到回收站</summary>
+    public bool DeleteArchiveAfterExtract { get; set; } = false;
 
     // ===== 解压 ====
     /// <summary>解压条目时保留压缩包内的完整路径（默认关闭 = 相对当前浏览目录）</summary>
@@ -105,6 +119,20 @@ public class AppSettings
     /// <summary>CLI 模式下遇到权限不足时，是否弹提权窗口（默认 false = 仅提示不可写目录）</summary>
     public bool AllowElevation { get; set; } = false;
 
+    // ===== 文件过滤预设 =====
+    /// <summary>用户自定义文件过滤预设（上限 20，不含内置预设）。</summary>
+    public List<FileFilterPreset> FilterPresets { get; set; } = new();
+
+    /// <summary>
+    /// 添加用户预设。超过上限时抛出 InvalidOperationException。
+    /// </summary>
+    public void AddPreset(FileFilterPreset preset)
+    {
+        if (FilterPresets.Count >= 20)
+            throw new InvalidOperationException("文件过滤预设数量已达上限（20）");
+        FilterPresets.Add(preset);
+    }
+
     // ===== 默认路径优先级 =====
     /// <summary>
     /// QuickPathPreDialog 默认路径优先级策略。
@@ -116,9 +144,31 @@ public class AppSettings
     public string DefaultPathPriority { get; set; } = "context";
 
     // ===== 持久化 =====
-    private static readonly string SettingsDir = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "MantisZip");
-    private static readonly string SettingsFile = Path.Combine(SettingsDir, "settings.json");
+    /// <summary>便携模式：exe 同级存在 Portable.txt 时启用，路径重定向到 Data/ 目录。</summary>
+    public static bool IsPortableMode { get; private set; }
+    private static string SettingsDir { get; set; } = "";
+    private static string SettingsFile { get; set; } = "";
+
+    static AppSettings()
+    {
+        IsPortableMode = File.Exists(Path.Combine(
+            AppDomain.CurrentDomain.BaseDirectory, "Portable.txt"));
+
+        if (IsPortableMode)
+        {
+            var dataDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Data");
+            Directory.CreateDirectory(dataDir);
+            SettingsDir = dataDir;
+            SettingsFile = Path.Combine(dataDir, "settings.json");
+            PasswordManager.CustomDataDir = dataDir;
+        }
+        else
+        {
+            SettingsDir = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "MantisZip");
+            SettingsFile = Path.Combine(SettingsDir, "settings.json");
+        }
+    }
 
     private static readonly Lazy<AppSettings> _instance = new(() => Load(), LazyThreadSafetyMode.ExecutionAndPublication);
     public static AppSettings Instance => _instance.Value;
@@ -135,8 +185,12 @@ public class AppSettings
                 Directory.CreateDirectory(SettingsDir);
             var json = JsonSerializer.Serialize(this, new JsonSerializerOptions { WriteIndented = true });
             File.WriteAllText(SettingsFile, json);
-            // 同步上下文菜单设置到注册表（供 COM 组件读取）
-            SyncContextMenuToRegistry();
+            // 便携版不写注册表
+            if (!IsPortableMode)
+            {
+                // 同步上下文菜单设置到注册表（供 COM 组件读取）
+                SyncContextMenuToRegistry();
+            }
             return true;
         }
         catch (Exception ex)
