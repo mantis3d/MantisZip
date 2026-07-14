@@ -65,6 +65,27 @@
   <SolidColorBrush x:Key="ToggleButtonBackgroundCheckedPressed" Color="{StaticResource ThemeButtonPressed}" />
 
   <!-- ════════════════════════════════════════════ -->
+  <!-- Fluent Theme Overrides — TextBox / TextControl -->
+  <!-- ════════════════════════════════════════════ -->
+  <SolidColorBrush x:Key="TextControlBackground" Color="#FFEDEDED" />
+  <SolidColorBrush x:Key="TextControlBackgroundPointerOver" Color="#FFEDEDED" />
+  <SolidColorBrush x:Key="TextControlBackgroundDisabled" Color="{StaticResource ThemeButtonBg}" />
+  <SolidColorBrush x:Key="TextControlBackgroundFocused" Color="#FFEDEDED" />
+  <SolidColorBrush x:Key="TextControlBorderBrush" Color="#FFC0C0C0" />
+  <SolidColorBrush x:Key="TextControlBorderBrushPointerOver" Color="#FFC0C0C0" />
+  <SolidColorBrush x:Key="TextControlBorderBrushDisabled" Color="{StaticResource ThemeBorder}" />
+  <SolidColorBrush x:Key="TextControlBorderBrushFocused" Color="{StaticResource ThemeAccent}" />
+  <SolidColorBrush x:Key="TextControlForeground" Color="{StaticResource ThemeTextPrimary}" />
+  <SolidColorBrush x:Key="TextControlForegroundPointerOver" Color="{StaticResource ThemeTextPrimary}" />
+  <SolidColorBrush x:Key="TextControlForegroundDisabled" Color="{StaticResource ThemeTextSecondary}" />
+  <SolidColorBrush x:Key="TextControlForegroundFocused" Color="{StaticResource ThemeTextPrimary}" />
+  <SolidColorBrush x:Key="TextControlPlaceholderForeground" Color="{StaticResource ThemeTextSecondary}" />
+  <SolidColorBrush x:Key="TextControlPlaceholderForegroundPointerOver" Color="{StaticResource ThemeTextSecondary}" />
+  <SolidColorBrush x:Key="TextControlPlaceholderForegroundDisabled" Color="{StaticResource ThemeTextSecondary}" />
+  <SolidColorBrush x:Key="TextControlPlaceholderForegroundFocused" Color="{StaticResource ThemeTextSecondary}" />
+  <SolidColorBrush x:Key="TextControlSelectionHighlightColor" Color="{StaticResource ThemeAccent}" />
+
+  <!-- ════════════════════════════════════════════ -->
   <!-- Fluent Theme Overrides — MenuFlyoutPresenter -->
   <!-- ════════════════════════════════════════════ -->
   <SolidColorBrush x:Key="MenuFlyoutPresenterBackground" Color="{StaticResource ThemeHeaderBg}" />

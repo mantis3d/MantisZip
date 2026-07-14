@@ -592,6 +592,14 @@ public partial class MainWindow : Window
         if (sender is not MenuItem mi || mi.Tag is not string tag)
             return;
 
+        // AppMessageBox uses static Show() — handle separately
+        if (tag == "AppMessageBox")
+        {
+            await AppMessageBox.Show("这是一个测试消息框\n可用于测试消息弹窗的显示效果。",
+                "测试", MessageBoxButton.OKCancel, MessageBoxImage.Information, this);
+            return;
+        }
+
         Window? window = tag switch
         {
             "AboutWindow" => new AboutWindow(),
@@ -610,6 +618,16 @@ public partial class MainWindow : Window
             "CompressConflictDialog" => new CompressConflictDialog(@"C:\test\file.txt", "file.txt"),
             "ConflictDialog" => new ConflictDialog(new FileConflictInfo { FilePath = @"C:\existing\file.txt" }),
             "MatchedPasswordDialog" => new MatchedPasswordDialog(new PasswordEntry { Description = "测试密码", Patterns = { "*.zip" }, Password = "test123" }, "test.zip"),
+            "ElevationDialog" => new ElevationDialog(new[] { @"C:\Protected\Dir" }),
+            "ElevationFailedDialog" => new ElevationFailedDialog(new[] { @"C:\Protected\Dir" }),
+            "ElevationInfoDialog" => new ElevationInfoDialog(new[] { @"C:\Protected\Dir" }),
+            "AddFavoriteDialog" => new AddFavoriteDialog(),
+            "FavoriteManagerWindow" => new FavoriteManagerWindow(),
+            "QuickPathDialog" => new QuickPathDialog(true),
+            "QuickPathPreDialog" => new QuickPathPreDialog(true, false),
+            "ArchiveCommentDialog" => new ArchiveCommentDialog(@"C:\test.zip", ArchiveFormat.Zip, "测试注释"),
+            "ArchiveSaveAsDialog" => new ArchiveSaveAsDialog(@"C:\test.zip"),
+            "UnifiedExtractDialog" => new UnifiedExtractDialog(this),
             _ => null
         };
 

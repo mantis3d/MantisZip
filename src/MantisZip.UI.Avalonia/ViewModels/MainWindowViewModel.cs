@@ -180,6 +180,11 @@ public partial class MainWindowViewModel : ObservableObject
             "Test_ProgressWindow", "Test_ErrorDialog",
             "Test_CompressSettings", "Test_ExtractSettings",
             "Test_CompressConflict", "Test_ConflictDialog", "Test_MatchedPassword",
+            "Test_AddFavoriteDialog", "Test_AppMessageBox",
+            "Test_ArchiveCommentDialog", "Test_ArchiveSaveAsDialog",
+            "Test_ElevationDialog", "Test_ElevationFailedDialog", "Test_ElevationInfoDialog",
+            "Test_FavoriteManagerWindow", "Test_QuickPathDialog", "Test_QuickPathPreDialog",
+            "Test_UnifiedExtractDialog",
             "FavMgr_OpenManager"
         };
         foreach (var key in keys)

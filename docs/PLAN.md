@@ -3,7 +3,7 @@
 > 未来待开发功能规划。已实现功能请见 [docs/PROGRESS.md](docs/PROGRESS.md)，技术架构请见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)。
 
 **项目状态**: 🟢 开发中  
-**最后更新**: 2026-07-09  
+**最后更新**: 2026-07-14  
 **当前版本**: 0.4.4
 
 ---
@@ -16,7 +16,8 @@
 | 优先级 | 功能 | 设计文档 | 难度 | 预估工时 | 说明 |
 |--------|------|----------|:----:|:--------:|------|
 | **P0** | 便携版模式 | [portable-mode.md](.sisyphus/plans/portable-mode.md) | 🟢低 | 1-2h | 哨兵文件触发，路径重定向到 exe 目录 |
-| **P1** | 统一路径快捷选择 (QuickPathControl → Avalonia) | [quickpath-unified.md](.sisyphus/plans/quickpath-unified.md) | 🟡中 | 4-6h | WPF 已完成数据层 + QuickPathControl 组件 + CompressSettingsWindow 嵌入；WPF 新增 QuickPathPreDialog 前置窗（系统对话框前先选路径）；Avalonia 阶段以 CustomFilePickerDialog + QuickPathBuddy 统一替换 |
+| **P1** | QuickPathControl 重构 — Tab 式路径速选（Avalonia） | [quickpath-control-redesign.md](.sisyphus/plans/quickpath-control-redesign.md) | 🟡中 | 6-8h | 彻底重构 QuickPathControl：Tab 式 ⭐收藏/🕐历史/🪟窗口 + 🔍 搜索框常驻 + 地址栏文件系统实时补全 + 只读额外内容插槽。QuickPathPreDialog 复用同一组件。替换 5 处系统对话框调用。WPF 阶段的数据层（FavoritePathManager/PathHistoryManager/ExplorerWindowTracker）直接复用 |
+| **P1** | ✅统一路径快捷选择 (WPF QuickPathControl) | [quickpath-unified.md](.sisyphus/plans/quickpath-unified.md) | 🟢低 | — | **WPF 阶段已完成**：QuickPathControl + QuickPathPreDialog + CompressSettingsWindow 嵌入。Avalonia 阶段方案已由 [quickpath-control-redesign.md](.sisyphus/plans/quickpath-control-redesign.md) 取代 |
 | **P1** | Win11 一级右键菜单 | [win11-first-level-menu.md](.sisyphus/plans/win11-first-level-menu.md) | 🔴高 | 1-2周 | IExplorerCommand 实现，HKLM 提权注册，双接口共存 |
 | **P1** | 压缩解压文件筛选 | [file-filter-feature.md](.sisyphus/plans/file-filter-feature.md) | 🟢低 | 1-2h | 压缩解压文件筛选 |
 | **P1** | 新增压缩格式（BZip2/XZ/CAB 等） | [new-format-support.md](.sisyphus/plans/new-format-support.md) | 🟡中 | 12-20h | 6 阶段渐进：TAR 裸格式/GZip 单文件 → BZip2 → XZ → CAB 只读 → UI 统一化 → Zstandard（需依赖） |

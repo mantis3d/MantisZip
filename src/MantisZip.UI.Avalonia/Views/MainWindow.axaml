@@ -399,6 +399,98 @@
             </StackPanel>
           </MenuItem.Header>
         </MenuItem>
+        <Separator />
+        <MenuItem Click="TestWindow_Click" Tag="ElevationDialog">
+          <MenuItem.Header>
+            <StackPanel Orientation="Horizontal" Spacing="4">
+              <TextBlock Text="🛡" FontSize="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+              <TextBlock Text="{Binding LocalizedStrings[Test_ElevationDialog]}" />
+            </StackPanel>
+          </MenuItem.Header>
+        </MenuItem>
+        <MenuItem Click="TestWindow_Click" Tag="ElevationFailedDialog">
+          <MenuItem.Header>
+            <StackPanel Orientation="Horizontal" Spacing="4">
+              <TextBlock Text="⚠" FontSize="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+              <TextBlock Text="{Binding LocalizedStrings[Test_ElevationFailedDialog]}" />
+            </StackPanel>
+          </MenuItem.Header>
+        </MenuItem>
+        <MenuItem Click="TestWindow_Click" Tag="ElevationInfoDialog">
+          <MenuItem.Header>
+            <StackPanel Orientation="Horizontal" Spacing="4">
+              <TextBlock Text="ℹ" FontSize="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+              <TextBlock Text="{Binding LocalizedStrings[Test_ElevationInfoDialog]}" />
+            </StackPanel>
+          </MenuItem.Header>
+        </MenuItem>
+        <Separator />
+        <MenuItem Click="TestWindow_Click" Tag="AddFavoriteDialog">
+          <MenuItem.Header>
+            <StackPanel Orientation="Horizontal" Spacing="4">
+              <TextBlock Text="⭐" FontSize="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+              <TextBlock Text="{Binding LocalizedStrings[Test_AddFavoriteDialog]}" />
+            </StackPanel>
+          </MenuItem.Header>
+        </MenuItem>
+        <MenuItem Click="TestWindow_Click" Tag="FavoriteManagerWindow">
+          <MenuItem.Header>
+            <StackPanel Orientation="Horizontal" Spacing="4">
+              <TextBlock Text="📋" FontSize="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+              <TextBlock Text="{Binding LocalizedStrings[Test_FavoriteManagerWindow]}" />
+            </StackPanel>
+          </MenuItem.Header>
+        </MenuItem>
+        <MenuItem Click="TestWindow_Click" Tag="QuickPathDialog">
+          <MenuItem.Header>
+            <StackPanel Orientation="Horizontal" Spacing="4">
+              <TextBlock Text="🔗" FontSize="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+              <TextBlock Text="{Binding LocalizedStrings[Test_QuickPathDialog]}" />
+            </StackPanel>
+          </MenuItem.Header>
+        </MenuItem>
+        <MenuItem Click="TestWindow_Click" Tag="QuickPathPreDialog">
+          <MenuItem.Header>
+            <StackPanel Orientation="Horizontal" Spacing="4">
+              <TextBlock Text="🔗" FontSize="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+              <TextBlock Text="{Binding LocalizedStrings[Test_QuickPathPreDialog]}" />
+            </StackPanel>
+          </MenuItem.Header>
+        </MenuItem>
+        <Separator />
+        <MenuItem Click="TestWindow_Click" Tag="ArchiveCommentDialog">
+          <MenuItem.Header>
+            <StackPanel Orientation="Horizontal" Spacing="4">
+              <TextBlock Text="💬" FontSize="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+              <TextBlock Text="{Binding LocalizedStrings[Test_ArchiveCommentDialog]}" />
+            </StackPanel>
+          </MenuItem.Header>
+        </MenuItem>
+        <MenuItem Click="TestWindow_Click" Tag="ArchiveSaveAsDialog">
+          <MenuItem.Header>
+            <StackPanel Orientation="Horizontal" Spacing="4">
+              <TextBlock Text="💾" FontSize="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+              <TextBlock Text="{Binding LocalizedStrings[Test_ArchiveSaveAsDialog]}" />
+            </StackPanel>
+          </MenuItem.Header>
+        </MenuItem>
+        <MenuItem Click="TestWindow_Click" Tag="UnifiedExtractDialog">
+          <MenuItem.Header>
+            <StackPanel Orientation="Horizontal" Spacing="4">
+              <TextBlock Text="📦" FontSize="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+              <TextBlock Text="{Binding LocalizedStrings[Test_UnifiedExtractDialog]}" />
+            </StackPanel>
+          </MenuItem.Header>
+        </MenuItem>
+        <Separator />
+        <MenuItem Click="TestWindow_Click" Tag="AppMessageBox">
+          <MenuItem.Header>
+            <StackPanel Orientation="Horizontal" Spacing="4">
+              <TextBlock Text="💬" FontSize="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+              <TextBlock Text="{Binding LocalizedStrings[Test_AppMessageBox]}" />
+            </StackPanel>
+          </MenuItem.Header>
+        </MenuItem>
       </MenuItem>
       <MenuItem Header="{Binding LocalizedStrings[Menu_Language]}">
         <MenuItem Header="{Binding LocalizedStrings[Menu_LangChinese]}"

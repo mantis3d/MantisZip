@@ -28,11 +28,14 @@
            flatten emoji to theme color instead of native multicolor. -->
     </Style>
 
-    <!-- TextBox -->
+    <!-- TextBox
+         Note: Use /template/ selectors targeting PART_BorderElement directly for normal state,
+         because Fluent theme's Default theme-dictionary resources (TextControlBackground,
+         TextControlBorderBrush) shadow Application.Resources overrides in Light mode.
+         Pointerover/focus/disabled states are handled by Fluent ControlTheme with our
+         TextControl* resource overrides (which work via the different resolution path).  -->
     <Style Selector="TextBox">
-      <Setter Property="Background" Value="{DynamicResource ThemeSurfaceBgBrush}" />
       <Setter Property="Foreground" Value="{DynamicResource ThemeTextPrimaryBrush}" />
-      <Setter Property="BorderBrush" Value="{DynamicResource ThemeBorderBrush}" />
       <Setter Property="CornerRadius" Value="6" />
       <Setter Property="Padding" Value="8,8" />
       <Setter Property="Transitions">
@@ -43,7 +46,11 @@
         </Setter.Value>
       </Setter>
     </Style>
-    <Style Selector="TextBox:focus-within">
+    <Style Selector="TextBox:not(:pointerover):not(:focus-within):not(:disabled) /template/ Border#PART_BorderElement">
+      <Setter Property="Background" Value="{DynamicResource ThemeSurfaceBgBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource ThemeBorderBrush}" />
+    </Style>
+    <Style Selector="TextBox:focus-within /template/ Border#PART_BorderElement">
       <Setter Property="BorderBrush" Value="{DynamicResource ThemeAccentBrush}" />
     </Style>
 
