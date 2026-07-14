@@ -34,6 +34,19 @@
    - 新增 `GetCommonRootDirectory` + `ResolveSmartOpenPathAsync` 方法
 5. **修改文件**：`AppSettings.cs`、`strings.zh.json`、`strings.en.json`、`SettingsWindow.xaml`、`SettingsWindow.xaml.cs`、`App.xaml.cs`、`App.Extract.cs`、`App.Password.cs`、`MainWindow.xaml.cs`、`MainWindow.Menu.cs`
 
+### v0.4.5++ (2026-07-14) 文件冲突对话框添加暂停/取消按钮
+
+1. **暂停/取消功能** — CompressConflictDialog 和 ConflictDialog 各添加两个底部按钮
+   - **暂停**：收起对话框 → 进度窗口进入暂停状态（后台 `ManualResetEventSlim` 等待）→ 进度窗口继续时重新弹出冲突对话框
+   - **取消**：通过 conflictResolver 抛出 `OperationCanceledException` 终止整个压缩/解压操作，等同于进度条上的取消
+   - 暂停按钮图标（⏸/✕）仅存在于本地化字符串，XAML 不再硬编码（修复图标重复 bug）
+2. **循环重入改造** — 所有调用方 conflictResolver 支持暂停/取消循环：
+   - `App.xaml.cs` — `CreateExtractOptions()` 解压循环
+   - `App.Compress.cs` — 批量压缩循环
+   - `CompressSettingsWindow.xaml.cs` — `RunCompressAsync` / `RunSeparateCompressAsync` / `RunCombinedCompressAsync` 3 处循环
+3. **暂停状态控制** — `ProgressWindow.PauseFromConflict()` 打开 `_pauseEvent`（后台 `Wait(ct)`）→ 恢复时关闭 `_pauseEvent` 并重新调用 conflictResolver
+4. **修改文件**：`App.xaml.cs`、`App.Compress.cs`、`CompressConflictDialog.xaml`、`CompressConflictDialog.xaml.cs`、`CompressSettingsWindow.xaml.cs`、`ConflictDialog.xaml`、`ConflictDialog.xaml.cs`、`ProgressWindow.xaml.cs`、`strings.zh.json`、`strings.en.json`
+
 ### v0.4.4+++ (2026-07-10) 视图菜单添加"隐藏预览信息"开关
 
 1. **预览信息面板独立显隐控制** — 在视图菜单新增 `IsCheckable` 菜单项"隐藏预览信息(_I)"
