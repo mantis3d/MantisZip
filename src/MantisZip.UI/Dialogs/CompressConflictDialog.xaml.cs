@@ -20,6 +20,8 @@ public partial class CompressConflictDialog : Window
     private bool _capturedApplyToAll;
     private string? _capturedCustomName;
     private bool _resultCaptured;
+    private bool _isPaused;
+    private bool _cancelOperation;
 
     /// <summary>对话框关闭后读取此属性获取用户选择的处理方式</summary>
     public CompressConflictAction ResultAction => _resultCaptured ? _capturedAction : CompressConflictAction.Cancel;
@@ -27,6 +29,11 @@ public partial class CompressConflictDialog : Window
     public string? CustomName => _resultCaptured ? _capturedCustomName : RenameTextBox.Text;
     /// <summary>用户是否勾选了"应用到全部"</summary>
     public bool ApplyToAll => _resultCaptured && _capturedApplyToAll;
+
+    /// <summary>用户是否点击了"暂停"按钮</summary>
+    public bool IsPaused => _isPaused;
+    /// <summary>用户是否点击了"取消"（取消整个操作）按钮</summary>
+    public bool CancelOperation => _cancelOperation;
 
     /// <param name="filePath">目标文件路径</param>
     /// <param name="canAdd">是否支持"添加到压缩包"（Tar 不支持）</param>
@@ -121,6 +128,22 @@ public partial class CompressConflictDialog : Window
     private void Cancel_Click(object sender, RoutedEventArgs e)
     {
         App.LogDebug("CompressConflictDialog: user cancelled for '{0}'", HeaderText.Text);
+        CaptureResult(CompressConflictAction.Cancel, RenameTextBox.Text);
+        DialogResult = false;
+    }
+
+    private void Pause_Click(object sender, RoutedEventArgs e)
+    {
+        App.LogDebug("CompressConflictDialog: user paused for '{0}'", HeaderText.Text);
+        _isPaused = true;
+        DialogResult = false;
+    }
+
+    private void CancelOperation_Click(object sender, RoutedEventArgs e)
+    {
+        App.LogDebug("CompressConflictDialog: user cancelled entire operation for '{0}'", HeaderText.Text);
+        _cancelOperation = true;
+        // 捕获为重命名动作以防调用方使用 Default 行为
         CaptureResult(CompressConflictAction.Cancel, RenameTextBox.Text);
         DialogResult = false;
     }
