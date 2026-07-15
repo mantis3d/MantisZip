@@ -1,8 +1,8 @@
 # Avalonia: i18n 补齐 + 杂物清理
 
-> **Status**: ⏳ 17/19 Complete | **Target**: v0.4.5
+> **Status**: ⏳ 18/19 Complete | **Target**: v0.4.5
 > **分支**: `avalonia-port`
-> **备注**: 版本号同步 0.4.4 ✓, Diagnostics 11.3.18 ✓, languages.json 集成 ✓, 42 个代码缺失 key 补全 ✓, Resources/ 结构整理 ✓。WPF 全量 key 对齐已验证无需执行（425/426 代码引用已覆盖，余下 WPF-only key 无对应 Avalonia 代码）。剩余 2 项：UI 文本正确性和 key 数量对比需运行时验证。
+> **备注**: 版本号同步 0.4.4 ✓, Diagnostics 11.3.18 ✓, languages.json 集成 ✓, 42 个代码缺失 key 补全 ✓, Resources/ 结构整理 ✓。WPF 全量 key 对齐已确认无需执行（425/426 代码引用已覆盖，余下 WPF-only key 无对应 Avalonia 代码）。剩余 1 项：UI 文本正确性需运行时验证。
 
 ## 概述
 
