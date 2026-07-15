@@ -76,6 +76,13 @@ Source: "publish_output_selfcontained\MantisZip.UI.exe"; DestDir: "{app}"; Flags
 Source: "publish_output_selfcontained\MantisZip.Core.pdb"; DestDir: "{app}"; Flags: ignoreversion
 Source: "publish_output_selfcontained\MantisZip.UI.pdb"; DestDir: "{app}"; Flags: ignoreversion
 
+; === Runtime config (required for .NET assembly resolution) ===
+Source: "publish_output_selfcontained\MantisZip.UI.deps.json"; DestDir: "{app}"; Flags: ignoreversion
+Source: "publish_output_selfcontained\MantisZip.UI.runtimeconfig.json"; DestDir: "{app}"; Flags: ignoreversion
+
+; === ShellExt COM host (dynamic context menu) ===
+Source: "publish_output_selfcontained\MantisZip.ShellExt.runtimeconfig.json"; DestDir: "{app}"; Flags: ignoreversion
+
 ; === 7z.dll (SharpSevenZip): architecture-specific subdirectories ===
 Source: "publish_output_selfcontained\x64\7z.dll"; DestDir: "{app}\x64"; Flags: ignoreversion
 Source: "publish_output_selfcontained\x86\7z.dll"; DestDir: "{app}\x86"; Flags: ignoreversion
@@ -112,8 +119,6 @@ Name: "{autoprograms}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; WorkingD
 Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; WorkingDir: "{app}"; Tasks: desktopicon
 
 [Run]
-Filename: "{app}\{#MyAppExeName}"; Parameters: "--install-shell"; Flags: nowait skipifsilent; WorkingDir: "{app}"; Check: IsShellInstallChecked
-Filename: "{app}\{#MyAppExeName}"; Parameters: "--install-assoc {code:GetAssocParams}"; Flags: nowait skipifsilent; WorkingDir: "{app}"; Check: IsAnyAssocChecked
 Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#StringChange(MyAppName, '&', '&&')}}"; Flags: nowait postinstall skipifsilent; WorkingDir: "{app}"
 
 [UninstallRun]
@@ -342,9 +347,12 @@ end;
 
 // Check if WebView2 Runtime is already installed.
 // Checks multiple registry locations and confirms a version value exists (not just a key).
+// Also validates the WebView2Loader.dll file exists on disk to guard against
+// stale registry entries from aborted/corrupted installations.
 function IsWebView2Installed: Boolean;
 var
   version: string;
+  loaderPath: string;
 begin
   // 64-bit view (HKLM) or HKCU
   Result := RegQueryStringValue(HKLM, WebView2RegKey, 'pv', version) or
@@ -352,6 +360,17 @@ begin
   // 32-bit (WOW6432Node) view — WebView2 installer often registers here on 64-bit Windows
   if not Result then
     Result := RegQueryStringValue(HKLM32, WebView2RegKey, 'pv', version);
+  if Result then
+  begin
+    // Double-check: registry key is present, but are the actual runtime files intact?
+    // WebView2 Runtime (x64) installs to {commonpf64}\Microsoft Edge WebView2 Runtime\
+    loaderPath := ExpandConstant('{commonpf64}') + '\Microsoft Edge WebView2 Runtime\WebView2Loader.dll';
+    if not FileExists(loaderPath) then
+    begin
+      Log('WebView2 registry key found but WebView2Loader.dll is missing at: ' + loaderPath + ' — treating as not installed');
+      Result := False;
+    end;
+  end;
 end;
 
 // Install WebView2 Runtime from bundled package before app starts
@@ -385,6 +404,21 @@ begin
     end
     else
       Log('WebView2 Runtime is already installed.');
+
+    // Shell integration deferred to first user launch (non-elevated context).
+    // SHChangeNotify from an elevated (installer) process does NOT propagate
+    // to the non-elevated Explorer.exe, so dynamic COM context menus appear
+    // missing until reinstalled from MantisZip's Settings window.
+    if InstallShellCheck.Checked then
+    begin
+      RegWriteStringValue(HKCU, 'Software\MantisZip', 'FirstRunShell', '1');
+      Log('FirstRunShell marker written (shell integration will install on first user launch)');
+    end;
+    if IsAnyAssocChecked then
+    begin
+      RegWriteStringValue(HKCU, 'Software\MantisZip', 'FirstRunAssoc', '1');
+      Log('FirstRunAssoc marker written (file associations will register on first user launch)');
+    end;
 
     SettingsDir := ExpandConstant('{localappdata}\MantisZip');
     SettingsFile := SettingsDir + '\settings.json';

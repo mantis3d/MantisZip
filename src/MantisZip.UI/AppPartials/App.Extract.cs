@@ -8,10 +8,12 @@ using System.Windows.Threading;
 using MantisZip.Core;
 using MantisZip.Core.Abstractions;
 using MantisZip.Core.Engines;
+using MantisZip.Core.FileFilter;
 using MantisZip.Core.Models;
 using MantisZip.Core.Services;
 using MantisZip.Core.Utils;
 using MantisZip.UI.Localization;
+using Microsoft.VisualBasic.FileIO;
 
 namespace MantisZip.UI;
 
@@ -253,10 +255,32 @@ public partial class App : Application
         {
             ExtractOutputMode selectedMode = ExtractOutputMode.ToName;
             string? customDest = null;
+            FileFilterCriteria? filter = null;
+            List<string>? filteredKeys = null;
             LogStartup("HandleExtractBatch: 准备弹出 ExtractSettingsWindow");
             var ok = app.Dispatcher.Invoke(() =>
             {
-                var dlg = new ExtractSettingsWindow(allPaths);
+                IReadOnlyList<MantisZip.Core.Abstractions.ArchiveItem>? entries = null;
+                // 尝试获取第一个压缩包的条目列表（用于过滤）
+                if (allPaths.Count > 0)
+                {
+                    try
+                    {
+                        var engine = ArchiveEngineFactory.GetEngineByExtension(allPaths[0]);
+                        if (engine != null)
+                        {
+                            var task = engine.ListEntriesAsync(allPaths[0], null);
+                            task.Wait(3000);
+                            if (task.IsCompletedSuccessfully)
+                                entries = task.Result;
+                        }
+                    }
+                    catch { /* 条目获取失败时无过滤支持 */ }
+                }
+
+                var dlg = entries != null
+                    ? new ExtractSettingsWindow(allPaths, entries)
+                    : new ExtractSettingsWindow(allPaths);
                 dlg.Owner = Application.Current?.Windows.OfType<Window>().FirstOrDefault(w => w.IsActive);
                 LogStartup("HandleExtractBatch: ExtractSettingsWindow 已创建，准备 ShowDialog");
                 var result = dlg.ShowDialog();
@@ -264,7 +288,9 @@ public partial class App : Application
                 if (result != true) return false;
                 selectedMode = dlg.OutputMode;
                 customDest = dlg.CustomDestination;
-                LogStartup($"HandleExtractBatch: 用户选择 mode={selectedMode}, dest={customDest}");
+                filter = dlg.GetFilter();
+                filteredKeys = dlg.GetFilteredEntryKeys();
+                LogStartup($"HandleExtractBatch: 用户选择 mode={selectedMode}, dest={customDest}, filter={(filter?.IsActive ?? false)}");
                 return true;
             });
 
@@ -279,9 +305,9 @@ public partial class App : Application
                 _ => "toname"
             };
             if (effectiveMode == "manual")
-                HandleExtractBatchCore(allPaths, effectiveMode, app, customDest);
+                HandleExtractBatchCore(allPaths, effectiveMode, app, customDest, filter, filteredKeys);
             else
-                HandleExtractBatchCore(allPaths, effectiveMode, app, null);
+                HandleExtractBatchCore(allPaths, effectiveMode, app, null, filter, filteredKeys);
             return;
         }
 
@@ -293,7 +319,8 @@ public partial class App : Application
     /// 批量解压核心循环。遍历 allPaths，对每个文件按 mode 决定目标目录后调用 engine.ExtractAsync。
     /// 支持取消。完成后自动退出。
     /// </summary>
-    private static void HandleExtractBatchCore(List<string> allPaths, string mode, Application app, string? manualDest)
+    private static void HandleExtractBatchCore(List<string> allPaths, string mode, Application app, string? manualDest,
+        FileFilterCriteria? filter = null, List<string>? filteredEntryKeys = null)
     {
         LogStartup($"HandleExtractBatchCore: mode={mode}, count={allPaths.Count}, manualDest={manualDest}");
         var settings = AppSettings.Instance;
@@ -320,6 +347,11 @@ public partial class App : Application
         {
         int succeeded = 0, failed = 0, skipped = 0;
             bool permissionDialogShown = false;
+            // 追踪最后一次成功解压的信息，用于完成后智能打开资源管理器
+            IArchiveEngine? lastEngine = null;
+            string? lastArchivePath = null;
+            string? lastDest = null;
+            string? lastPassword = null;
             try
             {
                 for (int i = 0; i < total; i++)
@@ -375,7 +407,20 @@ public partial class App : Application
                         var progress = progressWindow.CreatePauseAwareProgress(
                             ProgressWindow.CreateBackgroundProgress(progressWindow));
 
-                        var extractResult = await engine.ExtractAsync(archivePath, dest, password, progress, ct, batchOptions);
+                        ExtractResult extractResult;
+                        // 有过滤条件且为第一个压缩包时，使用 ExtractEntriesAsync（仅提取匹配条目）
+                        if (filter != null && filteredEntryKeys != null && i == 0)
+                        {
+                            Log("--extract batch: applying filter, extracting {0} of {1} entries",
+                                filteredEntryKeys.Count, "?");
+                            await engine.ExtractEntriesAsync(
+                                archivePath, filteredEntryKeys, dest, password, progress, ct, batchOptions);
+                            extractResult = new ExtractResult { SucceededEntries = filteredEntryKeys.Count };
+                        }
+                        else
+                        {
+                            extractResult = await engine.ExtractAsync(archivePath, dest, password, progress, ct, batchOptions);
+                        }
 
                         // 逐条目权限不足 → 首次弹窗，后续静默
                         if (extractResult.HasFailures)
@@ -441,6 +486,11 @@ public partial class App : Application
                                     extractResult.SucceededEntries, extractResult.FailedEntries);
                             }
                             succeeded++;
+                            lastEngine = engine;
+                            lastArchivePath = archivePath;
+                            lastDest = dest;
+                            lastPassword = password;
+                            TryDeleteArchiveAfterExtract(archivePath);
                             await progressWindow.Dispatcher.InvokeAsync(() =>
                                 progressWindow.UpdateBatchItemStatus(i, BatchItemStatus.Completed));
                         }
@@ -558,12 +608,14 @@ public partial class App : Application
             {
                 await progressWindow.Dispatcher.InvokeAsync(() =>
                     progressWindow.SetComplete(L.T(L.App_ExtractComplete)));
-                // 全部成功：最后一个解压的目录用于打开资源管理器（仅单文件模式）
-                if (settings.OpenFolderAfterExtract && allPaths.Count == 1)
+                // 全部成功：打开资源管理器到实际解压位置（仅单文件模式）
+                // 智能判断：如果压缩包内所有条目共享同一根目录（如 my_project/*），
+                // 直接打开 dest/my_project/ 而非 dest/，避免用户多点一次。
+                if (settings.OpenFolderAfterExtract && allPaths.Count == 1 && lastDest != null && lastEngine != null)
                 {
-                    var lastDest = Path.GetDirectoryName(allPaths[0])
-                        ?? Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
-                    OpenInExplorerStatic(lastDest);
+                    var openPath = await ResolveSmartOpenPathAsync(
+                        lastArchivePath!, lastDest, lastEngine, lastPassword);
+                    OpenInExplorerStatic(openPath);
                 }
                 await progressWindow.AutoCloseOrWaitAsync(2500, () => progressWindow.Dispatcher.Invoke(() => app.Shutdown()));
             }
@@ -599,6 +651,89 @@ public partial class App : Application
         {
             CoreLog.Trace("GetSmartExtractDestination: failed: {0}", ex.Message);
             return Path.Combine(parentDir, archiveName);
+        }
+    }
+
+    /// <summary>
+    /// 获取压缩包内所有非目录条目的公共根目录。
+    /// 例如压缩包内容为 my_project/a.txt、my_project/b.txt → 返回 "my_project"。
+    /// 若条目不共享公共根目录（如 a.txt、b.txt 混在），返回 null。
+    /// </summary>
+    private static string? GetCommonRootDirectory(IReadOnlyList<MantisZip.Core.Abstractions.ArchiveItem> entries)
+    {
+        string? commonRoot = null;
+        foreach (var entry in entries)
+        {
+            if (entry.IsDirectory) continue;
+            var path = entry.Name ?? entry.FullPath ?? "";
+            var firstSlash = path.IndexOf('/');
+            if (firstSlash < 0) return null;
+            var root = path[..firstSlash];
+            if (commonRoot == null)
+                commonRoot = root;
+            else if (!string.Equals(commonRoot, root, StringComparison.Ordinal))
+                return null;
+        }
+        return commonRoot;
+    }
+
+    /// <summary>
+    /// 解压后智能决定打开哪个路径。
+    /// 如果压缩包内所有条目共享一个公共根目录，打开 dest/公共根目录，
+    /// 否则直接打开 dest。例如压缩包只包含 my_project/... 目录树，
+    /// 原生解压到 dest/，实际内容在 dest/my_project/，用户希望打开后者。
+    /// </summary>
+    internal static async Task<string> ResolveSmartOpenPathAsync(
+        string archivePath, string dest, IArchiveEngine engine, string? password)
+    {
+        try
+        {
+            var entries = await engine.ListEntriesAsync(archivePath, password);
+            var commonRoot = GetCommonRootDirectory(entries);
+            if (commonRoot != null)
+                return Path.Combine(dest, commonRoot);
+        }
+        catch (Exception ex)
+        {
+            CoreLog.Trace("ResolveSmartOpenPathAsync: failed for '{0}': {1}", archivePath, ex.Message);
+        }
+        return dest;
+    }
+
+    /// <summary>
+    /// 解压成功后，将原压缩包移到回收站（如果设置启用）。
+    /// 仅在删除成功时记录日志，失败时仅记录警告（不影响解压结果）。
+    /// </summary>
+    internal static void TryDeleteArchiveAfterExtract(string archivePath)
+    {
+        if (!AppSettings.Instance.DeleteArchiveAfterExtract) return;
+        if (string.IsNullOrEmpty(archivePath) || !File.Exists(archivePath)) return;
+
+        // 重试 3 次（200ms 间隔），给 7z.dll 等外部组件释放文件句柄的时间。
+        // 即使 OpenArchiveWithEncodingFallback 已设 FileShare.Delete，
+        // SharpSevenZipExtractor（7z.dll）可能在 Dispose 后仍有延迟释放。
+        for (int retry = 0; retry < 3; retry++)
+        {
+            try
+            {
+                FileSystem.DeleteFile(
+                    archivePath,
+                    UIOption.OnlyErrorDialogs,
+                    RecycleOption.SendToRecycleBin);
+                App.LogDebug("TryDeleteArchiveAfterExtract: moved '{0}' to recycle bin", archivePath);
+                return;
+            }
+            catch (Exception ex) when (retry < 2)
+            {
+                App.LogDebug("TryDeleteArchiveAfterExtract: attempt {0} failed for '{1}': {2}",
+                    retry + 1, archivePath, ex.Message);
+                Thread.Sleep(200);
+            }
+            catch (Exception ex)
+            {
+                App.LogDebug("TryDeleteArchiveAfterExtract: failed for '{0}' after 3 attempts: {1}",
+                    archivePath, ex.Message);
+            }
         }
     }
 
@@ -656,6 +791,7 @@ public partial class App : Application
 
                 var opts = CreateExtractOptions();
                 await engine.ExtractAsync(archivePath, dest, password, progress, progressWindow.CancellationToken, opts);
+                TryDeleteArchiveAfterExtract(archivePath);
 
                 await progressWindow.Dispatcher.InvokeAsync(() =>
                 {

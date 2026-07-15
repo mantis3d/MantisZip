@@ -1,5 +1,7 @@
 # 压缩窗口密码 Tab 设计
 
+> **状态**: ✅ 已完成（v0.3.7-refined-2）| **阶段**: [████████████████████] (全部完成)
+>
 > 将 CompressSettingsWindow 的密码输入从通用 Tab 内联移至独立 Tab，并与 PasswordManager 深度集成。
 
 ---

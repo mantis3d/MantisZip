@@ -20,6 +20,8 @@ namespace MantisZip.Core.Engines;
 /// </summary>
 public class ZipEngine : IArchiveEngine
 {
+    private const int CopyBufferSize = 262144;
+
     /// <summary>
     /// 使用 SharpCompress 打开 ZIP 文件，自动检测编码（UTF-8 → GBK 回退）。
     /// SharpCompress 每实例设置编码，无全局副作用。
@@ -277,7 +279,7 @@ public class ZipEngine : IArchiveEngine
                     using (var entryStream = entry.OpenEntryStream())
                     using (var outputStream = File.Create(resolvedPath))
                     {
-                        var buffer = new byte[81920];
+                        var buffer = new byte[CopyBufferSize];
                         var entryProcessed = 0L;
                         var lastReportTime = DateTime.Now;
                         var reportInterval = TimeSpan.FromMilliseconds(100);
@@ -344,7 +346,8 @@ public class ZipEngine : IArchiveEngine
         string? password = null,
         IProgress<ArchiveProgress>? progress = null,
         CancellationToken cancellationToken = default,
-        ArchiveOptions? options = null)
+        ArchiveOptions? options = null,
+        IReadOnlyDictionary<string, string>? outputPathOverrides = null)
     {
         CoreLog.Entry();
         CoreLog.Info($"ExtractEntriesAsync: {archivePath}, {entryKeys.Count} entries -> {destinationPath}");
@@ -375,7 +378,8 @@ public class ZipEngine : IArchiveEngine
                     continue;
                 }
 
-                var outputPath = FileConflictHelper.GetSafePath(destinationPath, entryKey);
+                var outputPath = outputPathOverrides?.GetValueOrDefault(entryKey)
+                    ?? FileConflictHelper.GetSafePath(destinationPath, entryKey);
                 var outputDir = Path.GetDirectoryName(outputPath);
                 if (!string.IsNullOrEmpty(outputDir) && !Directory.Exists(outputDir))
                     Directory.CreateDirectory(outputDir);
@@ -392,7 +396,7 @@ public class ZipEngine : IArchiveEngine
                 using (var entryStream = entry.OpenEntryStream())
                 using (var outputStream = File.Create(resolvedPath))
                 {
-                    var buffer = new byte[81920];
+                    var buffer = new byte[CopyBufferSize];
                     long entryProcessed = 0;
                     var lastReportTime = DateTime.Now;
                     var reportInterval = TimeSpan.FromMilliseconds(100);
@@ -485,11 +489,28 @@ public class ZipEngine : IArchiveEngine
 
                     SevenZipEngine.EnsureLibraryPath();
 
+                    var zipMethod = options.ZipCompressionMethod?.ToLowerInvariant() switch
+                    {
+                        "deflate64" => CompressionMethod.Deflate64,
+                        "bzip2" => CompressionMethod.BZip2,
+                        "lzma" => CompressionMethod.Lzma,
+                        "ppmd" => CompressionMethod.Ppmd,
+                        "copy" or "store" => CompressionMethod.Copy,
+                        _ => CompressionMethod.Deflate,
+                    };
+                    var zipEncrypt = options.ZipEncryptionMethod?.ToLowerInvariant() switch
+                    {
+                        "zipcrypto" => ZipEncryptionMethod.ZipCrypto,
+                        "aes128" => ZipEncryptionMethod.Aes128,
+                        "aes192" => ZipEncryptionMethod.Aes192,
+                        _ => ZipEncryptionMethod.Aes256,
+                    };
+
                     var s7zCompressor = new SharpSevenZipCompressor
                     {
                         ArchiveFormat = OutArchiveFormat.Zip,
-                        ZipEncryptionMethod = ZipEncryptionMethod.Aes256,
-                        CompressionMethod = CompressionMethod.Deflate,
+                        ZipEncryptionMethod = zipEncrypt,
+                        CompressionMethod = zipMethod,
                         CompressionLevel = MapCompressionLevelToS7Z(options.CompressionLevel),
                         IncludeEmptyDirectories = true,
                         DirectoryStructure = true,
@@ -546,7 +567,16 @@ public class ZipEngine : IArchiveEngine
                         "default" => Encoding.Default,
                         _ => Encoding.UTF8,
                     };
-                    var writerOptions = new ZipWriterOptions(CompressionType.Deflate)
+                    var compressionType = options.ZipCompressionMethod?.ToLowerInvariant() switch
+                    {
+                        "deflate64" => CompressionType.Deflate64,
+                        "bzip2" => CompressionType.BZip2,
+                        "lzma" => CompressionType.LZMA,
+                        "ppmd" => CompressionType.PPMd,
+                        "store" => CompressionType.None,
+                        _ => CompressionType.Deflate,
+                    };
+                    var writerOptions = new ZipWriterOptions(compressionType)
                     {
                         CompressionLevel = options.CompressionLevel,
                         ArchiveComment = options.Comment ?? "",
@@ -635,6 +665,22 @@ public class ZipEngine : IArchiveEngine
             }).ToList();
 
             CoreLog.Info($"ListEntriesAsync: {items.Count} entries, {sw.ElapsedMilliseconds}ms");
+
+            // 交叉校验：SharpCompress 报告了加密条目 → 用二进制解析直接检查中央目录的 flags
+            // 这是针对 SharpCompress 在某些环境（如 Win11 日文版）的假阳性 bug
+            if (items.Any(i => i.IsEncrypted))
+            {
+                var actuallyEncrypted = VerifyZipEncryptionFlags(archivePath);
+                if (!actuallyEncrypted)
+                {
+                    CoreLog.Info("WARN: ListEntriesAsync: SharpCompress reported encrypted entries but binary CD flags show none — overriding IsEncrypted to false (possible false positive on {0})", archivePath);
+                    foreach (var item in items)
+                    {
+                        item.IsEncrypted = false;
+                    }
+                }
+            }
+
             return (IReadOnlyList<ArchiveItem>)items;
         }, cancellationToken).ConfigureAwait(false);
 
@@ -883,8 +929,24 @@ public class ZipEngine : IArchiveEngine
                 });
                 CoreLog.Trace("[TRACE] ZipEngine.AddToArchiveAsync: Phase 1 — extracting old entries");
 
-                using (var archive = OpenArchiveWithEncodingFallback(archivePath))
+                using (var archive = OpenArchiveWithEncodingFallback(archivePath, options.Password))
                 {
+                    // Check for encrypted entries before starting extraction.
+                    // If any non-directory entry is encrypted and no password is
+                    // provided, fail early with a clear message instead of relying
+                    // on SharpCompress to throw CryptographiceException (which is
+                    // environment/version dependent).
+                    if (string.IsNullOrEmpty(options.Password))
+                    {
+                        var hasEncryptedEntry = archive.Entries.Any(e => !e.IsDirectory && e.IsEncrypted);
+                        if (hasEncryptedEntry)
+                        {
+                            CoreLog.Info("AddToArchiveAsync: archive has encrypted entries but no password provided");
+                            throw new InvalidOperationException(
+                                "此压缩包包含加密条目，需要密码才能添加文件。 (Archive contains encrypted entries, password required to add files.)");
+                        }
+                    }
+
                     foreach (var entry in archive.Entries)
                     {
                         cancellationToken.ThrowIfCancellationRequested();
@@ -907,7 +969,7 @@ public class ZipEngine : IArchiveEngine
                         using (var entryStream = entry.OpenEntryStream())
                         using (var outStream = File.Create(outPath))
                         {
-                            var buffer = new byte[81920];
+                            var buffer = new byte[CopyBufferSize];
                             long entryProcessed = 0;
                             while (true)
                             {
@@ -1056,7 +1118,7 @@ public class ZipEngine : IArchiveEngine
                             using (var entryStream = zipWriter.WriteToStream(entryPath, entryOptions))
                             using (var fsInput = File.OpenRead(fullPath))
                             {
-                                var buffer = new byte[81920];
+                                var buffer = new byte[CopyBufferSize];
                                 long totalRead = 0;
                                 var fiLen = fi.Length;
 
@@ -1339,7 +1401,7 @@ public class ZipEngine : IArchiveEngine
                         using (var entryStream = entry.OpenEntryStream())
                         using (var outStream = File.Create(outPath))
                         {
-                            var buffer = new byte[81920];
+                            var buffer = new byte[CopyBufferSize];
                             long entryProcessed = 0;
                             while (true)
                             {
@@ -1460,7 +1522,7 @@ public class ZipEngine : IArchiveEngine
                             using (var entryStream = zipWriter.WriteToStream(entryPath, entryOptions))
                             using (var fsInput = File.OpenRead(fullPath))
                             {
-                                var buffer = new byte[81920];
+                                var buffer = new byte[CopyBufferSize];
                                 long totalRead = 0;
                                 var fiLen = fi.Length;
 
@@ -1557,7 +1619,7 @@ public class ZipEngine : IArchiveEngine
                 using (var entryStream = zipWriter.WriteToStream(entryPath, entryOptions))
                 using (var fsInput = File.OpenRead(fullPath))
                 {
-                    var buffer = new byte[81920];
+                    var buffer = new byte[CopyBufferSize];
                     long totalRead = 0;
                     var fiLen = fi.Length;
 
@@ -1619,5 +1681,29 @@ public class ZipEngine : IArchiveEngine
             }
         }
         return false;
+    }
+
+    /// <summary>
+    /// 使用二进制解析直接读取 ZIP 中央目录的通用位标记，
+    /// 验证是否有任何条目的加密位（bit 0）被设置。
+    /// 用于交叉校验 SharpCompress 报告的 IsEncrypted，防范假阳性。
+    /// </summary>
+    internal static bool VerifyZipEncryptionFlags(string archivePath)
+    {
+        try
+        {
+            using var fs = File.Open(archivePath, FileMode.Open, FileAccess.Read, FileShare.Read | FileShare.Delete);
+            var (cdOffset, entryCount, _) = ZipBinaryRewriter.ReadEocd(fs);
+            var entries = ZipBinaryRewriter.ReadCentralDirectory(fs, cdOffset, entryCount);
+            bool encrypted = entries.Any(e => (e.Flags & 0x0001) != 0);
+            CoreLog.Trace("VerifyZipEncryptionFlags: {0} entries, encrypted={1}", entryCount, encrypted);
+            return encrypted;
+        }
+        catch (Exception ex)
+        {
+            // Zip64 或其它无法解析的情况 → 保守信任 SharpCompress
+            CoreLog.Trace("VerifyZipEncryptionFlags: failed to verify (will trust SharpCompress): {0}", ex.Message);
+            return true;
+        }
     }
 }

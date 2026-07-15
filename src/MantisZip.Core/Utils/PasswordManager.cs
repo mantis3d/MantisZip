@@ -57,10 +57,20 @@ public class PasswordManager
     /// <summary>AES-GCM 格式文件前缀</summary>
     internal const string FormatPrefix = "MZPAES|";
 
-    private static readonly string AppDataPath = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-        "MantisZip");
-    private static readonly string PasswordFilePath = Path.Combine(AppDataPath, "passwords.json");
+    /// <summary>便携模式时由 AppSettings 静态构造函数注入，重定向到 exe 同目录 Data/。</summary>
+    public static string? CustomDataDir { get; set; }
+
+    /// <summary>
+    /// 根据 CustomDataDir（便携模式）或 %APPDATA%/MantisZip 返回密码文件路径。
+    /// </summary>
+    private static string GetPasswordPath()
+    {
+        if (CustomDataDir != null)
+            return Path.Combine(CustomDataDir, "passwords.json");
+        return Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+            "MantisZip", "passwords.json");
+    }
 
     private PasswordData _data = new();
     private static readonly Lazy<PasswordManager> _instance = new(() => new PasswordManager(), LazyThreadSafetyMode.ExecutionAndPublication);
@@ -87,12 +97,12 @@ public class PasswordManager
     /// </summary>
     public void Load()
     {
-        CoreLog.Info($"PasswordManager.Load: path={PasswordFilePath}");
+        CoreLog.Info($"PasswordManager.Load: path={GetPasswordPath()}");
         try
         {
-            if (File.Exists(PasswordFilePath))
+            if (File.Exists(GetPasswordPath()))
             {
-                var raw = File.ReadAllText(PasswordFilePath);
+                var raw = File.ReadAllText(GetPasswordPath());
                 var trimmed = raw.TrimStart();
 
                 // Format 1: 明文 JSON（v0.x 早期版本）
@@ -130,10 +140,10 @@ public class PasswordManager
             // 备份损坏的文件，避免用户永久丢失密码数据
             try
             {
-                if (File.Exists(PasswordFilePath))
+                if (File.Exists(GetPasswordPath()))
                 {
-                    var backupPath = PasswordFilePath + ".corrupted." + DateTime.Now.ToString("yyyyMMddHHmmss");
-                    File.Move(PasswordFilePath, backupPath);
+                    var backupPath = GetPasswordPath() + ".corrupted." + DateTime.Now.ToString("yyyyMMddHHmmss");
+                    File.Move(GetPasswordPath(), backupPath);
                     CoreLog.Trace("PasswordManager.Load: backed up corrupted file to {0}", backupPath);
                 }
             }
@@ -161,10 +171,10 @@ public class PasswordManager
             CoreLog.Info($"PasswordManager.Load: loaded {_data.Passwords.Count} entries (DPAPI encrypted), migrating to AES-GCM");
 
             // 备份旧 DPAPI 文件
-            var backupPath = PasswordFilePath + ".dpapi-backup";
+            var backupPath = GetPasswordPath() + ".dpapi-backup";
             if (!File.Exists(backupPath))
             {
-                File.Copy(PasswordFilePath, backupPath);
+                File.Copy(GetPasswordPath(), backupPath);
                 CoreLog.Info("PasswordManager.Load: backed up DPAPI file to {0}", backupPath);
             }
 
@@ -194,14 +204,15 @@ public class PasswordManager
     /// </summary>
     public void Save()
     {
-        if (!Directory.Exists(AppDataPath))
-            Directory.CreateDirectory(AppDataPath);
+        var dir = Path.GetDirectoryName(GetPasswordPath());
+        if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
+            Directory.CreateDirectory(dir);
 
         var json = JsonSerializer.Serialize(_data, new JsonSerializerOptions { WriteIndented = true });
         var plaintext = Encoding.UTF8.GetBytes(json);
         var encrypted = Protector.Protect(plaintext);
         var encoded = FormatPrefix + Convert.ToBase64String(encrypted);
-        File.WriteAllText(PasswordFilePath, encoded);
+        File.WriteAllText(GetPasswordPath(), encoded);
         CoreLog.Info($"PasswordManager.Save: saved {_data.Passwords.Count} entries (AES-GCM encrypted)");
     }
 
@@ -395,5 +406,5 @@ public class PasswordManager
     /// <summary>
     /// 获取密码文件路径
     /// </summary>
-    public static string GetPasswordFilePath() => PasswordFilePath;
+    public static string GetPasswordFilePath() => GetPasswordPath();
 }

@@ -444,6 +444,17 @@ public partial class ProgressWindow : Window
         }
     }
 
+    /// <summary>
+    /// 由冲突对话框触发暂停。将进度窗口设为暂停状态，
+    /// 但不切换暂停按钮文本（因为暂停后用户是在进度窗口操作）。
+    /// </summary>
+    public void PauseFromConflict()
+    {
+        _pauseEvent.Reset();
+        PauseButton.Content = L.T(L.Progress_Button_Resume);
+        FileNameText.Text = L.T(L.Progress_Paused);
+    }
+
     #region 密码匹配区
 
     private string? _password;

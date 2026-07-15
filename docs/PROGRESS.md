@@ -7,14 +7,8 @@
 - **技术栈**: .NET 9 + WPF → Avalonia 迁移中 + SharpCompress + SharpSevenZip
 
 ## 版本
-- **当前版本**: 0.4.4
-- **发布日期**: 2026-06-29
-
-### 0.4.4 (2026-07-14)
-  - **TextBox Fluent 主题样式修复** — Fluent 主题 `ThemeDictionaries` 的 `Default` (Light) 词典中定义的 `TextControlBorderBrush`/`TextControlBackground` 会遮蔽 `Application.Resources` 覆盖值（Dark 侧无此问题）；改为 `App.axaml` 中 `:not(:pointerover):not(:focus-within):not(:disabled) /template/ Border#PART_BorderElement` 选择器绕开该限制，直接设置普通状态背景/边框，不干扰划过/焦点/禁用的 ControlTheme 处理；Light/Dark 新增 `TextControlBackground*`/`TextControlBorderBrush*`/`TextControlForeground*` 等 17 项资源覆盖 `SolidColorBrush` (2026-07-14)
-  - **Avalonia UI 功能补齐（对话框 + 控件 + 转换器）** — 11 个对话框（Elevation×3/AddFavorite/FavoriteManager/ArchiveComment/AppMessageBox/QuickPath/QuickPathPre/ArchiveSaveAs/UnifiedExtract）+ 2 个控件（QuickPathControl/DynamicFormatOptionsPanel）+ 1 个转换器（BatchStatusConverters）完整移植到 Avalonia；MainWindowViewModel 5 个新对话框回调；MainWindow Favorites 子菜单；20+ i18n 中英文键；可构建 0 错误 (2026-07-13)
-  - **i18n 缺失 key 补齐** — 扫描代码中 427 个 `LocalizationManager.T()` 引用，补齐 42 个缺失 key（ElevationDialog/FormatOptions/MsgBox/ProgressBatch/QuickPath/MainArchiveComment）；从 WPF 复制 `languages.json`；创建 `Icons/.gitkeep` 保留空目录；复制 `DonateQr.jpg` (2026-07-13)
-  - **ZipEngine SharpCompress 迁移 Plan B 确认完成** — SharpSevenZip `OutArchiveFormat.Zip`+`Aes256` 替代 SharpZipLib 加密回退；`MantisZip.Core.csproj` 已无 SharpZipLib 引用；Core 构建 0 错误 0 警告；236/236 测试通过 (2026-07-13)
+- **当前版本**: 0.4.5
+- **发布日期**: 2026-07-06
 
 ## 规划中
 - Avalonia 跨平台移植后续 Phase
@@ -47,23 +41,144 @@
 
 ## 版本历史（从新到旧）
 
-### v0.4.4 (2026-06-30) 魔数检测预览系统 Phase 1+2+3 完成
+### v0.4.5+ (2026-07-13) 可配置双击行为 + 解压后自动删除原压缩包
 
-1. **新功能：魔数检测文件真实格式** — `preview-magic-detection.md`（全部 44 项任务完成）
-   - **Phase 1 — Core**：`FileFormatDetector`（35+ 魔数签名 + ZIP 子类型 + PE 双重验证）
-   - `LooksLikeText()` 启发式检测：纯文本文件（无魔数签名）的兜底识别，基于 null 字节比例 + 可打印字符 + UTF-8 序列分析
-   - `ExtractHeadAsync`/`ExtractHeadTailAsync`：压缩包条目头部/尾部字节提取，支持 ZIP Deflate/Store、7z 固态降级、RAR
-   - MP4 moov box 解析：mvhd 时长 + tkhd 分辨率
-   - `FileFormatHelper`：90+ 格式中文显示名
-   - `PreviewHeadSize` 设置（默认 4096）
-   - **Phase 2 — UI（WPF）**：魔数优先路由重构（`TryMagicPreview`），将魔数检测结果写入 `PreviewExtraInfoPanel`（冲突时红色提示），扩展名回退仅作为魔数 Unknown 时的兜底
-   - **冲突检测 + 切换按钮**：魔数检测结果与扩展名不一致时，在预览工具栏两组按钮之间插入"按扩展名/按魔数"切换按钮，点击后重新预览
-   - `AppSettings.EnableFormatDetection` 开关（默认 true）
-   - **Phase 3 — ArchiveEngineFactory 魔数兜底**：`GetEngineByExtension` 在扩展名未匹配时，读取文件头部字节调用 `FileFormatDetector.Detect()` 识别真实档案格式，支持 .epub/.docx/.xlsx/.pptx 等 ZIP 子类型自动路由到 ZipEngine
-2. 新建文件：`FileFormatDetector.cs`（650+ 行）、`FileFormatHelper.cs`（95 行）
-3. 修改文件：`FileFormatInfo.cs`（追加 11 枚举值）、`ArchiveEntryExtractor.cs`（+224 行）、`AppSettings.cs`、`ArchiveEngine.cs`（+60 行魔数兜底 + 映射）、`MainWindow.Preview.cs`（+180 行魔数路由 + 冲突切换）、`MainWindow.Preview.Text.cs`（文本左对齐修复）
+1. **可配置双击行为** — SettingsWindow 文件关联 Tab 新增「双击压缩包」GroupBox + ComboBox（打开/原地解压/智能原地解压/打开解压窗口）
+   - `DoubleClickAction` 设置持久化到 settings.json，默认 `"open"` 保持现有行为
+   - `App.xaml.cs` 的 `--open` 分发改为按 `DoubleClickAction` 路由到 `HandleOpen`/`HandleExtractHere`/`HandleExtractSmart`/`HandleExtract`
+2. **解压后自动删除原压缩包** — SettingsWindow 解压 Tab 新增「解压完成后将原压缩包移到回收站」CheckBox
+   - `DeleteArchiveAfterExtract` 设置持久化到 settings.json，默认关闭
+   - 所有解压成功路径（批量/单文件 CLI + MainWindow 界面解压）完成后调用 `TryDeleteArchiveAfterExtract`
+   - 使用 `Microsoft.VisualBasic.FileIO.FileSystem.DeleteFile` 移到回收站
+   - 重试 3 次（200ms 间隔）应对 7z.dll 句柄延迟释放
+   - 预览/双击打开/拖拽提取不触发删除
+3. **修复文件占用导致删除失败** — `HasEncryptedEntries` 和 `QuickVerifyPassword` 的 ZIP 分支改用 `FileShare.Read | FileShare.Delete` 打开文件流，避免 SharpCompress 内部默认 `FileShare.Read` 句柄阻止 Shell 回收站操作
+4. **解压后智能打开目标目录** — 全部 4 个 `OpenFolderAfterExtract` 调用点增加公共根目录检测：如果压缩包内所有条目共享同一根目录（如 `my_project/a.txt`、`my_project/b.txt`），打开 `dest/my_project/` 而非 `dest/`，减少一次手动点进目录的操作
+   - 新增 `GetCommonRootDirectory` + `ResolveSmartOpenPathAsync` 方法
+5. **修改文件**：`AppSettings.cs`、`strings.zh.json`、`strings.en.json`、`SettingsWindow.xaml`、`SettingsWindow.xaml.cs`、`App.xaml.cs`、`App.Extract.cs`、`App.Password.cs`、`MainWindow.xaml.cs`、`MainWindow.Menu.cs`
 
-### v0.4.5 (2026-07-03) 密码流程统一 + QuickVerify 7z 扩展
+### v0.4.5++ (2026-07-14) 便携版模式
+
+1. **便携模式** — 完整实现 `portable-mode.md`
+   - `AppSettings.cs`：`Portable.txt` 哨兵检测 → `IsPortableMode`，settings 和 passwords 文件重定向到 `exe 目录/Data/`，`Save()` 跳过 `SyncContextMenuToRegistry()`
+   - `PasswordManager.cs`：`CustomDataDir` 注入 + `GetPasswordPath()` 动态路径
+   - `App.xaml.cs`（OnStartup）：便携模式下跳过 FirstRunShell/FirstRunAssoc 注册；`--install-shell`/`--uninstall-shell`/`--install-assoc`/`--uninstall-assoc` 报错退出
+   - `MainWindow.Preview.cs`：`GetTempDir()` 便携版返回 `Data/Temp/`
+   - `MainWindow.DragDrop.cs`：拖拽临时目录使用 `GetTempDir() + "DragDrop/"`
+   - `SevenZipEngine.cs`：`ResolveDefaultSevenZipDllPath()` 首候选 `{BaseDir}/7z.dll`
+   - `App.OnExit`：清理指向 `Data/Temp/` 而非系统 `%TEMP%`
+2. **修改文件（6 个）**：`AppSettings.cs`、`PasswordManager.cs`、`App.xaml.cs`、`MainWindow.Preview.cs`、`MainWindow.DragDrop.cs`、`SevenZipEngine.cs`
+
+### v0.4.5++ (2026-07-14) 文件过滤预设显示 + 过滤统计文本始终显示
+
+1. **修复预设 ComboBox 显示类型名** — `FileFilterPreset` 添加 `ToString()` 返回 `Name`，确保预设名称正确显示
+2. **过滤统计文本始终显示** — 去掉 `FilterStatsText` 的 `Collapsed`/`Visible` 切换，始终占位避免 UI 跳动
+   - `ShowFilterStats` 改为空方法（保持兼容）
+   - 未启用过滤时显示空文本
+3. **修改文件**：`FileFilterPreset.cs`、`FileFilterEditor.xaml`、`FileFilterEditor.xaml.cs`、`ExtractSettingsWindow.xaml.cs`
+
+### v0.4.5++ (2026-07-14) 文件冲突对话框添加暂停/取消按钮
+
+1. **暂停/取消功能** — CompressConflictDialog 和 ConflictDialog 各添加两个底部按钮
+   - **暂停**：收起对话框 → 进度窗口进入暂停状态（后台 `ManualResetEventSlim` 等待）→ 进度窗口继续时重新弹出冲突对话框
+   - **取消**：通过 conflictResolver 抛出 `OperationCanceledException` 终止整个压缩/解压操作，等同于进度条上的取消
+   - 暂停按钮图标（⏸/✕）仅存在于本地化字符串，XAML 不再硬编码（修复图标重复 bug）
+2. **循环重入改造** — 所有调用方 conflictResolver 支持暂停/取消循环：
+   - `App.xaml.cs` — `CreateExtractOptions()` 解压循环
+   - `App.Compress.cs` — 批量压缩循环
+   - `CompressSettingsWindow.xaml.cs` — `RunCompressAsync` / `RunSeparateCompressAsync` / `RunCombinedCompressAsync` 3 处循环
+3. **暂停状态控制** — `ProgressWindow.PauseFromConflict()` 打开 `_pauseEvent`（后台 `Wait(ct)`）→ 恢复时关闭 `_pauseEvent` 并重新调用 conflictResolver
+4. **修改文件**：`App.xaml.cs`、`App.Compress.cs`、`CompressConflictDialog.xaml`、`CompressConflictDialog.xaml.cs`、`CompressSettingsWindow.xaml.cs`、`ConflictDialog.xaml`、`ConflictDialog.xaml.cs`、`ProgressWindow.xaml.cs`、`strings.zh.json`、`strings.en.json`
+
+### v0.4.4+++ (2026-07-10) 视图菜单添加"隐藏预览信息"开关
+
+1. **预览信息面板独立显隐控制** — 在视图菜单新增 `IsCheckable` 菜单项"隐藏预览信息(_I)"
+   - 关闭后：`PreviewInfoPanel`（文件名、大小、压缩比、日期）和 `PreviewExtraInfoPanel`（格式元数据）同时隐藏，预览内容区独占空间
+   - 两级控制：`PreviewToggleMenu` 控制预览整体开关，`PreviewInfoToggleMenu` 控制信息面板开关
+   - 状态持久化到 `settings.json`（`ShowPreviewInfoPanel`）
+2. **修改文件**：`AppSettings.cs`、`strings.zh.json`、`strings.en.json`、`L.cs`、`MainWindow.xaml`、`MainWindow.xaml.cs`、`MainWindow.Menu.cs`、`MainWindow.Preview.cs`
+
+### v0.4.4+ (2026-07-09) 移除 Applications shell\open\command 防止安装时错误路由
+
+1. **移除 `Applications\MantisZip.UI.exe\shell\open\command` 注册** — 避免新软件安装时 Windows Shell 关联刷新将 exe 打开操作错误地路由到 MantisZip
+   - `SupportedTypes` 保留，不影响"打开方式"的展示
+   - 右键菜单（COM handler）、双击走 per-format ProgId 均不受影响
+2. **修改文件**：`src/MantisZip.UI/Shell/ShellIntegration.Assoc.cs`（删 1 行 + 注释）
+
+### v0.4.4++ (2026-07-07) 修复 COM handler 动词名"open"与系统标准动词冲突
+
+1. **COM handler 动词名冲突修复** — COM 右键菜单的 GCS_VERB 返回动词名与系统标准 "open" 重名，
+   导致新软件安装时 Windows Shell 关联刷新可能误将 MantisZip 的"打开"动词当作 exe 的默认打开程序
+   - `GetCommandString` GCS_VERB: `"open"` → `"mantiszipopen"`
+   - `ResolveCommandId` 字符串映射: `"open" => CmdIdOpen` → `"mantiszipopen" => CmdIdOpen`
+   - 正常右键菜单操作不受影响（走整数偏移路径，不经动词名）
+   - 不影响 SFX 自解压文件的打开支持
+2. **修改文件**：`src/MantisZip.ShellExt/ContextMenuHandler.cs`（改 2 行）
+
+### v0.4.4 (2026-07-07) COM 动态菜单 + pending 状态 + 延迟级联安装
+
+1. **COM 动态菜单组件** — `MantisZip.ShellExt` 实现 `IShellExtInit` + `IContextMenu` 作为 COM 组件
+   - 动态菜单文本（根据文件名生成「解压到 {name}」「压缩到 {name}.zip」）
+   - 纯 Win32 图标加载（无 `System.Drawing` 依赖）
+   - 多选文件数量显示（「打开压缩包 等 {N} 个文件」）
+   - 本地化菜单文本（通过注册表 + AppSettings 的 `L.T()`）
+   - 子母菜单模式（cascade/verb 两种注册方式）
+   - 单个菜单项开关（8 个独立 toggle）
+2. **COM + 延迟级联安装流程** — Install 仅注册 COM，级联菜单在检测到 COM 未加载时自动安装
+   - COM 注册成功 → 状态 `pending`（仅 COM shellex，无 cascade）
+   - COM DLL 不存在 → 状态 `disabled`（安装 cascade 兜底）
+   - 启动时 `CheckComStatus()` 扫 Explorer 模块 → 未加载 comhost.dll 则安装 cascade
+   - Settings 安装按钮和首次运行流程均立即调用 CheckComStatus，确保菜单立即可用
+   - 避免安装时同时注册两个菜单导致右键出现重复菜单
+3. **动态菜单状态跟踪** — `DynamicMenuStatus`（Active/Pending/Fallback/Disabled）
+   - `CheckComStatus()` 找到 comhost.dll → 升级 `active` + `UninstallStaticMenus()` 清理级联
+   - 未找到 → 安装 cascade 兜底，状态保持 `pending`
+   - 状态文字：pending→"动态菜单加载失败，暂时回退到静态菜单"、active→"动态菜单已启用"
+4. **ShellExt 进程名日志** — `ContextMenuHandler` 构造函数记录宿主进程名（Explorer.exe 或其它）
+5. **移除废弃代码**：`TestComInExplorerContext()`、`TestComActivation()`、三级回退分支
+6. **修改文件**:
+   - `src/MantisZip.ShellExt/ContextMenuHandler.cs` (+8 行进程名日志)
+   - `src/MantisZip.UI/Shell/ShellIntegration.Menu.cs` (+/-：Install 延迟级联、CheckComStatus、UninstallStaticMenus、删除 TestComActivation/TestComInExplorerContext)
+   - `src/MantisZip.UI/Shell/ShellIntegration.cs` (新增 DynamicMenuStatus_Pending)
+7. **pending 态 COM 菜单占位符** — COM handler 检测到 pending 状态时插入灰色禁用分隔符 `"────────"` 而不是隐藏或显示完整菜单
+   - 避免初次右键时 COM 菜单 + 级联同时出现的重复问题
+   - 不自晋升、不写注册表、不卸级联——完全在 COM handler 内封闭
+   - 新增 `GetDynamicMenuStatus()` 读取 `HKCU\Software\MantisZip\ContextMenu\DynamicMenuStatus`
+   - `src/MantisZip.ShellExt/ContextMenuHandler.cs`
+8. **安装包 .NET 9 检测修复** — `IsDotNet9Installed` 无法检测已安装的 .NET 9 Desktop Runtime
+   - 根因：.NET 9 把版本号存为注册表**值名称**（DWORD）而非子键，`RegGetSubkeyNames` 永远找不到
+   - 修复：增加文件系统回退检测 `cmd /c dir ...\9.*`
+   - 同时也修复了 `IsWebView2Installed` 缺少 HKLM (32-bit 视图) 回退的问题
+   - `installer.iss`
+   - `src/MantisZip.UI/App.xaml.cs` (启动时调用 CheckComStatus)
+   - `src/MantisZip.UI/Dialogs/SettingsWindow.xaml.cs` (UpdateShellStatus pending 分支 + InstallBtn 调用 CheckComStatus)
+   - `src/MantisZip.UI/Localization/L.cs` (新增 Settings_Menu_StatusDynamicPending)
+   - `src/MantisZip.UI/Resources/strings.zh.json` / `strings.en.json` (pending 状态文本)
+
+### v0.4.4+ (2026-07-08) AddToArchiveAsync 加密条目预检 — CI 环境下预期异常修复
+
+1. **修复 CI 测试失败** `AddToArchiveAsync_CopyMode_ThrowsOnEncryptedSource`：该测试依赖 SharpCompress 在解压加密条目时抛出 `CryptographicException`，但此行为随环境和版本变化，CI 环境下不会抛出。
+2. **ZipEngine.AddToArchiveAsync 旧路径**：
+   - 传入 `options.Password` 给 `OpenArchiveWithEncodingFallback`，使带密码时能正确解压加密条目。
+   - 新增显式预检：遍历 `archive.Entries` 检查是否有非目录加密条目但未提供密码 → 提前抛出 `InvalidOperationException`。
+3. **测试更新**：改为预期 `InvalidOperationException`（确定性异常，不依赖 SharpCompress 的环境特定行为）。移除未使用的 `using SharpCompress.Common`。
+4. **修改文件**：`src/MantisZip.Core/Engines/ZipEngine.cs`、`tests/MantisZip.Tests/Utils/ZipBinaryRewriterTests.cs`
+
+### v0.4.4+ (2026-07-03) 双击文件默认程序打开 + 上级目录预览刷新修复
+
+1. **新功能：双击文件调用系统默认程序打开** — 在 `FileListGrid_PreviewMouseDoubleClick` 中添加文件双击处理分支：
+   - `AppSettings.DoubleClickOpenThreshold` 设置阈值（MB 为单位，默认 10MB，0=禁用），在设置窗口解压缩 Tab 末尾配置
+   - 超过阈值时弹出确认对话框："文件超过 X MB，确定要解压并打开吗？"
+   - 文件 >= 1MB 时显示 ProgressWindow 显示提取进度，< 1MB 则静默提取
+   - 提取到 `%TEMP%\MantisZip\OpenWith\{GUID}\` 后通过 `Process.Start(UseShellExecute=true)` 调用系统默认程序打开
+   - Tar/GZip/ISO 不支持单文件提取，弹出"该格式不支持双击打开"
+   - 加密未输入密码时提示"请先输入密码"
+   - 状态栏更新为"已用默认程序打开 {文件名}"
+   - Temp 文件随 App.OnExit 自动清理
+2. **修复 Bug：上级目录（..）选中时预览面板不刷新** — 移除 `FileListGrid_SelectionChanged` 中的 `!lastClicked.IsNavigationEntry` 守卫条件
+3. **修改文件（7 个）**：`AppSettings.cs`（+2 行）、`SettingsWindow.xaml`（+17 行）、`SettingsWindow.xaml.cs`（+11 行）、`L.cs`（+6 行）、`MainWindow.UI.cs`（+112 行）、`strings.zh.json`（+6 行）、`strings.en.json`（+6 行）
+
+### v0.4.4 (2026-07-03) 密码流程统一 + QuickVerify 7z 扩展
 
 1. **QuickVerifyPassword 扩展支持 7z EncryptHeaders=false** — 新增 `BoundedWriteStream`（写入 ~8KB 后静默丢弃），提取最小加密条目验证密码。所有格式的 QuickVerify 现在都可靠。
 2. **删除 `CanTrustQuickVerify`** — QuickVerify 对所有格式可靠，不再需要此区分。
@@ -82,6 +197,12 @@
    - 新增 `installer\download-redist.ps1` 预下载脚本
    - 新增 `installer\redist\MicrosoftEdgeWebView2RuntimeInstallerX64.exe`（从微软官方下载）
    - 删除 `URLDownloadToFile` 函数和 `EvergreenBootstrapperUrl` 常量
+10. **installer.iss 下载进度可视化 + WebSetup 修复**：
+    - 用 `TDownloadWizardPage` 替代 `URLDownloadToFile` 静默下载，用户可见 .NET/WebView2 下载进度条
+    - 修复 `Type Mismatch` 运行时错误：补全 `Show/try-except/finally/Hide` 生命周期和 `nil` 回调参数
+    - 修复 32 位安装程序在 64 位系统上检测不到已安装运行时：`HKLM` → `HKLM64`（避免 WOW6432Node 重定向）
+    - 修复 .NET 安装后立即启动 MantisZip 触发 Windows 下载提示：安装成功后在 `CurStepChanged` 追加 3 秒 `Sleep` 等待注册完成
+11. **installer-selfcontained.iss 同步更新**：移除 `deps.json`/`runtimeconfig.json` 引用（自包含发布不生成）
 
 ### v0.4.4+ (2026-07-02) 压缩包路径处理一站式重构——ArchivePath 统一入口
 
@@ -98,19 +219,22 @@
    - `ContextMenuHandler.cs` 保留 2 处（ShellExt 不引用 Core）
 3. **修改文件（11 个）**：`ArchivePathExtensions.cs`（新建）、`ZipEngine.cs`、`SevenZipEngine.cs`、`ArchiveEntryExtractor.cs`、`ArchiveStructureAnalyzer.cs`、`FileConflictHelper.cs`、`MainWindow.DragDrop.cs`、`App.Compress.cs`、`App.Open.cs`、`CompressSettingsWindow.xaml.cs`、`CompressSettingsWindow.Password.cs`
 
-### v0.4.4+ (2026-07-03) 双击文件默认程序打开 + 上级目录预览刷新修复
+### v0.4.4 (2026-07-01) NoDotNet 安装包增强——.NET 9 自动下载
+### v0.4.5+ (2026-07-03) 压缩选项增强——7z 字典/块/匹配器 + ZIP 方法 + 加密方式
 
-1. **新功能：双击文件调用系统默认程序打开** — 在 `FileListGrid_PreviewMouseDoubleClick` 中添加文件双击处理分支：
-   - `AppSettings.DoubleClickOpenThreshold` 设置阈值（MB 为单位，默认 10MB，0=禁用），在设置窗口解压缩 Tab 末尾配置
-   - 超过阈值时弹出确认对话框："文件超过 X MB，确定要解压并打开吗？"
-   - 文件 >= 1MB 时显示 ProgressWindow 显示提取进度，< 1MB 则静默提取
-   - 提取到 `%TEMP%\MantisZip\OpenWith\{GUID}\` 后通过 `Process.Start(UseShellExecute=true)` 调用系统默认程序打开
-   - Tar/GZip/ISO 不支持单文件提取，弹出"该格式不支持双击打开"
-   - 加密未输入密码时提示"请先输入密码"
-   - 状态栏更新为"已用默认程序打开 {文件名}"
-   - Temp 文件随 App.OnExit 自动清理
-2. **修复 Bug：上级目录（..）选中时预览面板不刷新** — 移除 `FileListGrid_SelectionChanged` 中的 `!lastClicked.IsNavigationEntry` 守卫条件
-3. **修改文件（7 个）**：`AppSettings.cs`（+2 行）、`SettingsWindow.xaml`（+17 行）、`SettingsWindow.xaml.cs`（+11 行）、`L.cs`（+6 行）、`MainWindow.UI.cs`（+112 行）、`strings.zh.json`（+6 行）、`strings.en.json`（+6 行）
+1. **压缩选项增强计划** — `.sisyphus/plans/compression-options-enhancement.md`
+2. **AppSettings 新增 7 个默认属性**：`SevenZipSolidBlockSize`、`SevenZipDictionarySize`、`SevenZipNumFastBytes`、`SevenZipMatchFinder`、`ZipCompressionMethod`、`ZipEncryptionMethod`、`SevenZipEncryptHeaders`
+3. **ArchiveOptions 新增对应属性** — `ArchiveEngine.cs` 添加 7 个属性 + 默认值 + XML 文档
+4. **CompressRequest + BuildOptions** — `CompressService.cs` 添加 7 个 init 属性 + `BuildOptions` 传递
+5. **DynamicFormatOptionsPanel** — 7z 面板新增 4 个 ComboBox（固实块大小、字典大小、Word Size、匹配器）+ 固实联动禁用；ZIP 面板新增"压缩方法"ComboBox（Deflate/Deflate64/BZip2/LZMA/PPMd/Store）
+6. **SettingsWindow** — 压缩 Tab 新增 6 个 ComboBox + 1 个 CheckBox 设置默认值；已在 `LoadSettings`/`SaveSettings` 中添加对应逻辑
+7. **CompressSettingsWindow** — 加密 Tab 新增"加密方式"GroupBox（ZIP 加密方式 ComboBox + 7z 加密文件头 CheckBox）
+8. **SevenZipEngine** — `ConfigureCompressor` 应用新参数（CustomParameters `s`、LzmaDictionarySize、LzmaNumFastBytes、LzmaMatchFinder、EncryptHeaders）
+9. **ZipEngine** — 加密路径使用 SharpSevenZip `CompressionMethod` + `ZipEncryptionMethod`；非加密路径使用 SharpCompress `CompressionType`；支持 Deflate64/BZip2/LZMA/PPMd/Store
+10. **修改文件（12 个）**：`AppSettings.cs`、`ArchiveEngine.cs`、`CompressService.cs`、`DynamicFormatOptionsPanel.xaml`、`DynamicFormatOptionsPanel.xaml.cs`、`SettingsWindow.xaml`、`SettingsWindow.xaml.cs`、`CompressSettingsWindow.xaml`、`CompressSettingsWindow.xaml.cs`、`SevenZipEngine.cs`、`ZipEngine.cs`、`PROGRESS.md`
+11. **后续修复**：Word Size 中文标签、匹配器/字典/固实块"默认"改为带数值显示（默认(273)/默认(BT4)/默认(16MB)/默认(全固实)）、固实块选项扩展到 10 个（16MB~4GB）、`SolidCheck_Changed` null 保护
+
+### v0.4.4+ (2026-07-02) 压缩包路径处理一站式重构——ArchivePath 统一入口
 
 1. **新建 `ArchivePath` 类** — `ArchivePathExtensions.cs` → `ArchivePath`，压缩包路径处理的一站式入口
    - `Normalize()`：`\` → `/` 统一分隔符，null 安全
@@ -125,12 +249,29 @@
    - `ContextMenuHandler.cs` 保留 2 处（ShellExt 不引用 Core）
 3. **修改文件（11 个）**：`ArchivePathExtensions.cs`（新建）、`ZipEngine.cs`、`SevenZipEngine.cs`、`ArchiveEntryExtractor.cs`、`ArchiveStructureAnalyzer.cs`、`FileConflictHelper.cs`、`MainWindow.DragDrop.cs`、`App.Compress.cs`、`App.Open.cs`、`CompressSettingsWindow.xaml.cs`、`CompressSettingsWindow.Password.cs`
 
+
 ### v0.4.3+ (2026-07-01) NoDotNet 安装包增强——.NET 9 自动下载
 
 1. **installer.iss 新增 .NET 9 Desktop Runtime 自动检测 + 下载安装** — 安装时自动检测注册表 `HKLM\SOFTWARE\dotnet\Setup\InstalledVersions\x64\sharedfx\Microsoft.WindowsDesktop.App`，缺失时从 `aka.ms/dotnet/9.0/windowsdesktop-runtime-win-x64.exe` 下载并静默安装 `/quiet /install /norestart`。完全复用已有 WebView2 模式（`URLDownloadToFile` + `Exec`）。失败不阻塞安装（仅记日志）。
 2. **安装包文件名重命名** — `installer.iss` 输出：`NoDotNet` → `WebSetup`（因现支持自动下载 .NET）；`installer-selfcontained.iss` 输出：`Setup` → `Offline`（自包含离线包）。感谢用户建议。
 3. **贡献者鸣谢页面更新** — `AboutWindow.xaml` 新增财务贡献者显示区。由上一轮计划（contributors-panel）完成。
 4. **文本子类型检测已关闭**：`DetectTextSubtype()` 启发式精度不足暂禁用，代码保留，`Detect()` 中改回返回 `FileFormat.Text`
+
+### v0.4.4 (2026-06-30) 魔数检测预览系统 Phase 1+2+3 完成
+
+1. **新功能：魔数检测文件真实格式** — `preview-magic-detection.md`（全部 44 项任务完成）
+   - **Phase 1 — Core**：`FileFormatDetector`（35+ 魔数签名 + ZIP 子类型 + PE 双重验证）
+   - `LooksLikeText()` 启发式检测：纯文本文件（无魔数签名）的兜底识别，基于 null 字节比例 + 可打印字符 + UTF-8 序列分析
+   - `ExtractHeadAsync`/`ExtractHeadTailAsync`：压缩包条目头部/尾部字节提取，支持 ZIP Deflate/Store、7z 固态降级、RAR
+   - MP4 moov box 解析：mvhd 时长 + tkhd 分辨率
+   - `FileFormatHelper`：90+ 格式中文显示名
+   - `PreviewHeadSize` 设置（默认 4096）
+   - **Phase 2 — UI（WPF）**：魔数优先路由重构（`TryMagicPreview`），将魔数检测结果写入 `PreviewExtraInfoPanel`（冲突时红色提示），扩展名回退仅作为魔数 Unknown 时的兜底
+   - **冲突检测 + 切换按钮**：魔数检测结果与扩展名不一致时，在预览工具栏两组按钮之间插入"按扩展名/按魔数"切换按钮，点击后重新预览
+   - `AppSettings.EnableFormatDetection` 开关（默认 true）
+   - **Phase 3 — ArchiveEngineFactory 魔数兜底**：`GetEngineByExtension` 在扩展名未匹配时，读取文件头部字节调用 `FileFormatDetector.Detect()` 识别真实档案格式，支持 .epub/.docx/.xlsx/.pptx 等 ZIP 子类型自动路由到 ZipEngine
+2. 新建文件：`FileFormatDetector.cs`（650+ 行）、`FileFormatHelper.cs`（95 行）
+3. 修改文件：`FileFormatInfo.cs`（追加 11 枚举值）、`ArchiveEntryExtractor.cs`（+224 行）、`AppSettings.cs`、`ArchiveEngine.cs`（+60 行魔数兜底 + 映射）、`MainWindow.Preview.cs`（+180 行魔数路由 + 冲突切换）、`MainWindow.Preview.Text.cs`（文本左对齐修复）
 
 ### v0.4.3+ (2026-06-30) 工具栏新增「解压选择文件」按钮
 
@@ -232,24 +373,24 @@
    - GitHub workflow 提取 RELEASE_NOTES.md 内容时 regex 缺少 `(?s)` 单行模式标志，导致 `.` 不匹配换行符，捕获组 `(.*?)` 无法跨行截取，回退到读取全文
    - 修复后正确提取首个 `## v` 标题到下一个 `##` 之间的文本
 
-2. **RELEASE_NOTES.md 双语化**：
+3. **RELEASE_NOTES.md 双语化**：
    - 所有版本条目的中文说明下方增加英文对照翻译
    - 标题统一添加 `/ English` 双语标注
-3. 修复动态菜单bug
-4. 文件列表增加“返回父目录”项目。
-5. **计划文档整理**：
+4. 修复动态菜单bug
+5. 文件列表增加"返回父目录"项目。
+6. **计划文档整理**：
    - `drag-drop-direct-extract.md` 更新：纳入纯 Win32 覆盖层方案、UIA 降级、颜色状态机、呼吸动画等设计细节
    - `parent-directory-entry.md` 补充到 PROGRESS.md 历史设计方案索引
    - `quick-path-control.md` 归档（被 `quickpath-unified.md` 取代）
    - 跨平台影响分析重建：从 43（含已完成/已废弃）精简为 26 个待实现计划
    - PLAN.md 新增 `self-contained-installer.md`（P1）待实现条目
-5. **UAC 提权机制 — 双模式权限不足处理**：
+7. **UAC 提权机制 — 双模式权限不足处理**：
    - `AppSettings.AllowElevation` 属性（默认 false），设置在设置 → 高级 → 权限提升
    - 新建 `App.Elevation.cs` 含 6 个辅助方法：`IsDirectoryWritable`, `IsElevated`, `RelaunchAsAdmin`, `ShowElevationInfoDialog`, `ShowElevationDialog`, `ShowElevationFailedDialog`
    - 三个新对话框：`ElevationInfoDialog`（仅提示不可写目录+确定）、`ElevationDialog`（提权/取消）、`ElevationFailedDialog`（提权后仍不可写错误）
    - 注入 3 个 CLI 入口点：`HandleExtractBatchCore`、`RunCompressSeparateBatch`、`HandleCompressQuick`
    - 默认行为仅弹提示（不提权）；仅当 `AllowElevation=true` 才弹出 UAC 提权窗口
-   - 设置窗口高级标签新增“权限提升” GroupBox
+   - 设置窗口高级标签新增"权限提升" GroupBox
    - 中/英文各 17 个本地化键
    - 设计文档：`.sisyphus/plans/uac-elevation-permission.md`
     - 解压侧新增 `catch(UnauthorizedAccessException)` 响应式拦截：解压中遇到 Access to the path 时触发提权/提示流程，不做事前预检
@@ -289,42 +430,6 @@
     - 根因：在 DataTemplate 中使用 `$parent[Menu]` 或 `$parent[Window]` 绑定 `OpenRecentFileCommand`，但 Avalonia 弹出菜单的视觉树独立，无法通过 `$parent` 找到祖先
     - 改用 `MenuItem.Click` 事件 + 代码后置直接调用 ViewModel 的 `OpenRecentFileCommand` 绕过绑定限制
 
-13. **文件列表新增「返回上级目录」导航行 (`..`)**：
-    - 子目录顶部固定显示 `..` 行，点击/回车进入上级目录
-    - 排序机制从 `SortDescriptions` 迁移到 `CustomSort`，`..` 永远在最顶
-    - 过滤后 `..` 不受文字/日期/大小过滤条件影响，始终显示
-    - 键盘快捷键：Enter 进入目录（文件无反应）、Backspace 返回上级目录
-    - 右键菜单/拖拽/删除/选中统计均排除 `..` 行
-    - 设计文档：`.sisyphus/plans/parent-directory-entry.md`
-
-11. **修复 CLI 参数识别 + 右键菜单 Win10 不显示**：
-    - CLI 参数归一化：`install-assoc`、`install-shell` 等不带 `--` 前缀的命令现在也能正确识别（自动添加 `--`）；无法识别的参数记录日志警告
-    - 右键菜单安装改为全平台统一的静态级联方案（`InstallCascade`），移除 COM 默认安装路径，避免部分 Win10 设备上 `MantisZip.ShellExt.comhost.dll` 加载失败导致菜单不显示的问题
-    - `InstallCom()` 代码保留但不再默认调用；`ShellIntegration.Install()` 统一走级联注册
-
-12. **设置窗口新增"动态菜单"选项**：
-    - 上下文菜单 Tab 中新增"动态菜单"复选框（`EnableDynamicMenu`，默认开启）
-    - 开启时安装 COM 组件（`InstallCom`），关闭时安装静态级联菜单（`InstallCascade`）
-    - 移除已死代码的"层叠上下文菜单"复选框（`EnableCascadingMenu`，早就是 cascade-only）
-    - 切换选项时弹出提示，告知需重新安装才能生效
-    - `com-context-menu.md` 计划补充 Explorer DLL 锁定问题
-
-10. **设置窗口新增「临时文件管理」GroupBox + 启动时自动清理**：
-    - 高级 Tab 中原有的「清理预览临时文件」按钮与新增的「清理所有临时文件」按钮归入 GroupBox「临时文件管理」
-    - 新增 `AppSettings.CleanTempOnStartup` 设置（默认启用），启动时自动清理 `%TEMP%\MantisZip\` 中的孤儿临时文件（死机/崩溃后的残留）
-    - 两个按钮共用 `CleanMantisZipTempFiles()` 方法，删除 `%TEMP%\MantisZip\` 下的所有文件（预览、拖拽导出、引擎重建/删除、字体解析等全部临时文件）
-
-8. **修复 Win11 右键菜单不显示**：
-   - 根因：Windows 11 忽略 HKCU 下的 COM Shell Extension 注册（`shellex\ContextMenuHandlers`），即使注册成功 Explorer 也不会加载 COM 组件
-   - `ShellIntegration.Install()` 检测到 Win11（build ≥ 22000）时跳过 COM 注册，直接使用静态级联方案（`InstallCascade`）
-   - Win10 行为不变（先试 COM，失败则回退静态）
-   - 参考：[Microsoft Q&A: Context menu shell extensions on Win11](https://learn.microsoft.com/en-us/answers/questions/1685103)
-
-7. **RELEASE_NOTES.md 移至根目录**：
-   - `docs/RELEASE_NOTES.md` → `RELEASE_NOTES.md`，方便根目录直接访问
-   - 更新 CI release workflow 中的读取路径
-   - 图片相对路径同步修正为 `docs/images/...`
-
 1. **CI 修复 — TarGzEngineTests.TestArchiveAsync_InvalidArchive_ReturnsFalse DirectoryNotFoundException**：
    - 测试在写入 corrupt .tar.gz 前未创建 `MantisZipTest\` 目录，CI 裸机上目录不存在导致 `DirectoryNotFoundException`
    - 添加 `Directory.CreateDirectory` 确保目录存在，与 ArchiveFixtures 中所有 fixture 方法的做法一致
@@ -353,19 +458,55 @@
    - `AGENTS.md`：Version bump checklist 移除 `installer.iss`（不再需要手动同步版本号）
    - 版本号统一同步到 **0.4.0**（`AppConstants.cs`、`MantisZip.UI.csproj`、`docs/PLAN.md`）
 
-7. **全局调试日志增强 — CoreLog.Trace 注入 + DiagnosticsEnabled 开关**：
+7. **RELEASE_NOTES.md 移至根目录**：
+   - `docs/RELEASE_NOTES.md` → `RELEASE_NOTES.md`，方便根目录直接访问
+   - 更新 CI release workflow 中的读取路径
+   - 图片相对路径同步修正为 `docs/images/...`
+
+8. **修复 Win11 右键菜单不显示**：
+   - 根因：Windows 11 忽略 HKCU 下的 COM Shell Extension 注册（`shellex\ContextMenuHandlers`），即使注册成功 Explorer 也不会加载 COM 组件
+   - `ShellIntegration.Install()` 检测到 Win11（build ≥ 22000）时跳过 COM 注册，直接使用静态级联方案（`InstallCascade`）
+   - Win10 行为不变（先试 COM，失败则回退静态）
+   - 参考：[Microsoft Q&A: Context menu shell extensions on Win11](https://learn.microsoft.com/en-us/answers/questions/1685103)
+
+9. **全局调试日志增强 — CoreLog.Trace 注入 + DiagnosticsEnabled 开关**：
    - `CoreLog.cs`：`ShouldWriteOverride` 委托 → `DiagnosticsEnabled` 静态 bool，所有 Info/Error/Entry/Exit/Trace/Write 方法统一受控；`[Conditional("DEBUG")]` 的 Info/Error 仅在 DEBUG 编译，Trace 全编译
    - **43 个 catch 块**注入 `CoreLog.Trace` 以捕获静默异常路径：ZipEngine（AddToArchiveAsync、DeleteEntriesAsync、OpenZipFile）、TarGzEngine（ListEntriesAsync、CompressAsync、ExtractAsync）、PasswordManager（AddPassword、DeletePassword、FindMatchingPasswords、DeleteRule）、App.Password（TryMatchPassword）、PeParser/PdfParser/SQLiteParser（Close）、MainWindow.*（ShellExecPreview、SetFormatSpecificInfo、ShowVideoPreview、ExtractWithProgressAsync、DragDrop）、App.Open/Extract（PipeServer/冲突处理/批处理完成）、CompressSettingsWindow/ExtractSettingsWindow（压缩/解压过程中各阶段）、ProgressWindow（批处理初始化）、ShellIntegration.Assoc（SetupAssoc/Install）
    - `App.OnStartup`：设置 `CoreLog.DiagnosticsEnabled = AppSettings.Instance.EnableDebugLogging`
    - `SettingsWindow`：调试开关变更时弹出 `AppMessageBox` 提示重启生效，新增 `Settings_Debug_Restart` 中英文本地化字符串
 
-8. **LogRedactor 隐私脱敏修复 — 相对路径 regex 分支**：
-   - `LogRedactor.cs`：_pathRegex 新增第三条分支 `[^\\""<>|:]+(?:\\[^\\""<>|]+)+\\?` 匹配相对路径（如压缩包内条目路径 `字体\FiraCode-Medium.ttf`），不再依赖盘符前缀
-   - `AGENTS.md`：修正 LogPrivacyMode 默认值文档从 `"full"` → `"extension"`，补充 `extension` 模式描述，更新 regex 分支计数
+10. **LogRedactor 隐私脱敏修复 — 相对路径 regex 分支**：
+    - `LogRedactor.cs`：_pathRegex 新增第三条分支 `[^\\""<>|:]+(?:\\[^\\""<>|]+)+\\?` 匹配相对路径（如压缩包内条目路径 `字体\FiraCode-Medium.ttf`），不再依赖盘符前缀
+    - `AGENTS.md`：修正 LogPrivacyMode 默认值文档从 `"full"` → `"extension"`，补充 `extension` 模式描述，更新 regex 分支计数
 
-9. **README.md 路径修复 — 反斜杠 → 正斜杠**：
-   - 将 4 处 `docs\images\` 反斜杠路径替换为 `docs/images/` 正斜杠（GitHub 要求 URL 路径使用正斜杠）
-   - 修正 `SettingDebug.png` 的 alt 文本从「压缩文件冲突」改为「调试日志设置」
+11. **README.md 路径修复 — 反斜杠 → 正斜杠**：
+    - 将 4 处 `docs\images\` 反斜杠路径替换为 `docs/images/` 正斜杠（GitHub 要求 URL 路径使用正斜杠）
+    - 修正 `SettingDebug.png` 的 alt 文本从「压缩文件冲突」改为「调试日志设置」
+
+12. **设置窗口新增「临时文件管理」GroupBox + 启动时自动清理**：
+    - 高级 Tab 中原有的「清理预览临时文件」按钮与新增的「清理所有临时文件」按钮归入 GroupBox「临时文件管理」
+    - 新增 `AppSettings.CleanTempOnStartup` 设置（默认启用），启动时自动清理 `%TEMP%\MantisZip\` 中的孤儿临时文件（死机/崩溃后的残留）
+    - 两个按钮共用 `CleanMantisZipTempFiles()` 方法，删除 `%TEMP%\MantisZip\` 下的所有文件（预览、拖拽导出、引擎重建/删除、字体解析等全部临时文件）
+
+13. **修复 CLI 参数识别 + 右键菜单 Win10 不显示**：
+    - CLI 参数归一化：`install-assoc`、`install-shell` 等不带 `--` 前缀的命令现在也能正确识别（自动添加 `--`）；无法识别的参数记录日志警告
+    - 右键菜单安装改为全平台统一的静态级联方案（`InstallCascade`），移除 COM 默认安装路径，避免部分 Win10 设备上 `MantisZip.ShellExt.comhost.dll` 加载失败导致菜单不显示的问题
+    - `InstallCom()` 代码保留但不再默认调用；`ShellIntegration.Install()` 统一走级联注册
+
+14. **设置窗口新增"动态菜单"选项**：
+    - 上下文菜单 Tab 中新增"动态菜单"复选框（`EnableDynamicMenu`，默认开启）
+    - 开启时安装 COM 组件（`InstallCom`），关闭时安装静态级联菜单（`InstallCascade`）
+    - 移除已死代码的"层叠上下文菜单"复选框（`EnableCascadingMenu`，早就是 cascade-only）
+    - 切换选项时弹出提示，告知需重新安装才能生效
+    - `com-context-menu.md` 计划补充 Explorer DLL 锁定问题
+
+15. **文件列表新增「返回上级目录」导航行 (`..`)**：
+    - 子目录顶部固定显示 `..` 行，点击/回车进入上级目录
+    - 排序机制从 `SortDescriptions` 迁移到 `CustomSort`，`..` 永远在最顶
+    - 过滤后 `..` 不受文字/日期/大小过滤条件影响，始终显示
+    - 键盘快捷键：Enter 进入目录（文件无反应）、Backspace 返回上级目录
+    - 右键菜单/拖拽/删除/选中统计均排除 `..` 行
+    - 设计文档：`.sisyphus/plans/parent-directory-entry.md`
 
 10. **Avalonia 对话框本地化 + 工具栏修复**：
     - 压缩/解压/进度/关于对话框所有硬编码英文 → `LocalizedStrings` 字典绑定，支持中/英语言切换
@@ -435,7 +576,7 @@
    - 勾选"对后续文件使用相同操作"时，`RenameBtn.Content` 被替换为纯字符串（丢掉 ✏️ emoji）
    - 修复：XAML 中给按钮内 TextBlock 命名 `RenameBtnLabel`，代码改设 `.Text` 而非 `.Content`
 
- ### v0.3.13 (2026-06-13) DPAPI → AES-GCM 替换 + 安装脚本修正 + 对话框 Owner 修复 + Emoji.Wpf 依赖缺失修复 + ZIP 中文编码假阳性修复
+### v0.3.13 (2026-06-13) DPAPI → AES-GCM 替换 + 安装脚本修正 + 对话框 Owner 修复 + Emoji.Wpf 依赖缺失修复 + ZIP 中文编码假阳性修复
 
 0. **ZIP 中文文件名乱码修复**（写端 + 读端双向）：
    - **写端**：三个 `ZipWriterOptions` 构造位置全部添加 `ArchiveEncoding = new ArchiveEncoding { Default = Encoding.UTF8 }`，确保写入时使用 UTF-8 编码并设置 bit 11
@@ -449,19 +590,19 @@
    - 新增打包：`SQLitePCLRaw.*.dll`（3 个）、`WinRT.Runtime.dll`、`Microsoft.Windows.SDK.NET.dll`、`Microsoft.Web.WebView2.WinForms.dll`、`System.Security.Cryptography.ProtectedData.dll`
    - 添加 `ShellExt.runtimeconfig.json`
 
-1. **对话框 Owner 修正**（6 个文件）：修复弹窗被主窗口挡住的问题
+2. **对话框 Owner 修正**（6 个文件）：修复弹窗被主窗口挡住的问题
    - `AppMessageBox.xaml.cs`：`Show()`/`ShowWithAction()` 添加 `GetActiveWindow()` 自动检测 Owner，修复 85+ 个调用点
    - `MainWindow.Menu.cs`：`SettingsWindow` 设 Owner
    - `App.Compress.cs` / `App.Extract.cs` / `App.Open.cs`：CLI 模式下的冲突/命名对话框设 Owner
    - `CompressSettingsWindow.xaml.cs`：3 个冲突对话框设 Owner
 
-2. **App.xaml.cs**：`new MainWindow()` 包裹进 try-catch，防止 XAML 初始化闪退，改为显示错误对话框
+3. **App.xaml.cs**：`new MainWindow()` 包裹进 try-catch，防止 XAML 初始化闪退，改为显示错误对话框
 
-3. **installer.iss 修复**：
+4. **installer.iss 修复**：
    - 添加 `SetupIconFile`，安装包使用 `App.ico` 图标
    - `IsWebView2Installed` 改用 `RegQueryStringValue` 检查 `pv` 版本值，并补充 `HKLM32`（WOW6432Node）检测，防止每次重复下载 WebView2
 
-4. **预置用户设置机制**：
+5. **预置用户设置机制**：
    - 创建 `installer\prebuilt\settings.json` 和 `window.json`，安装器在首次安装时复制到 `%LOCALAPPDATA%\MantisZip\`
    - 用户替换这两个文件即可在安装后自动加载自己的配置
 
@@ -471,7 +612,7 @@
    - 失败时信息面板显示橙色警告及原因（CFF 轮廓 / Web 字体 / WPF 限制）
    - `ClearPreviewContent` 重置 `Image.Stretch`，避免字体渲染干扰图片预览
 
-5. **DPAPI → AES-GCM 替换**（跨平台移植 Phase 4 子任务）：
+7. **DPAPI → AES-GCM 替换**（跨平台移植 Phase 4 子任务）：
    - 新建 `IDataProtector` 接口（`Core/Abstractions/`），抽象数据保护操作
    - 新建 `AesGcmDataProtector`（`Core/Utils/`），基于 .NET `AesGcm`（AES-256-GCM）实现跨平台加密，密钥以文件形式存储于 `%APPDATA%/MantisZip/.masterkey`
    - `PasswordManager` 移除 `[SupportedOSPlatform("windows")]` 特性，改为通过 `IDataProtector` 接口调用加密，默认使用 `AesGcmDataProtector`
@@ -479,8 +620,6 @@
    - 旧 DPAPI 文件首次加载时自动解密并重写为 AES-GCM 格式，原文件备份为 `passwords.json.dpapi-backup`
    - 所有 7 个 UI 消费端无需修改（`PasswordManager.Instance.*` API 签名不变）
    - 参见 [跨平台移植计划](.sisyphus/plans/cross-platform-port.md)
-
-
 
 ### v0.3.13 (2026-06-12) ZipEngine SharpZipLib → SharpCompress 迁移 + 压缩批处理文件进度条修复 + 压缩完成后进程残留修复
 
@@ -554,7 +693,7 @@
 5. **目录拖拽支持**：新增 `ExpandDragItems` 方法，将选中的目录条目展开为其子文件列表；`GetDragExtractPath` 正确剥离父目录前缀保留子目录结构；`DoDragDrop` 传入 `Directory.EnumerateFileSystemEntries`（目录句柄列表而非扁平文件路径），Explorer 递归复制保留完整目录结构
 6. **自身拖拽光标修复**：`Window_DragOver` 顶部提前检查 `_isOwnDrag`，自身拖拽时显示 `None` 效果而非残留的 `Copy`
 
-### v0.3.10 (2026-06-08) 测试按钮完整性检查 + ProgressWindow 集成
+### v0.3.10 (2026-06-06→06-07) 测试按钮完整性检查 + ProgressWindow 集成
 
 1. **引擎测试完整性提升**：三个引擎的 `TestArchiveAsync` 从快速检查改为完整完整性验证
    - ZipEngine: `stream.ReadByte()`（每个条目只读 1 字节）→ `stream.CopyTo(Stream.Null)` 完整解压流
@@ -571,7 +710,7 @@
 5. **AGENTS.md 规则补充**：新增"每次 session 自动执行规则"第 3 条（新 UI 控件必须应用主题样式），并补充缺失主题资源时的处理方式；`Light.xaml` 进度条列颜色加深修复大小列对比度
 6. **QuickPathControl 设计完成**: 统一路径快捷选择组件系统（QuickPathControl UserControl + QuickPathDialog + FavoriteManagerWindow），覆盖压缩/解压/提取所有路径选择场景；旧 `explorer-path-switcher.md` 归档
 
-### v0.3.9 (2026-06-06 → 06-07) 文件关联 Bug 修复 + 独立 ProgId + 设置窗口 UI 统一
+### v0.3.9 (2026-06-06→06-07) 文件关联 Bug 修复 + 独立 ProgId + 设置窗口 UI 统一
 
 1. **文件关联 Bug 修复**：
    - `.tar.gz` 不再被跳过——设置勾选后真正写入注册表 `OpenWithProgids` + `DefaultIcon`
@@ -833,3 +972,8 @@
 | ZIP 压缩流直拷优化 (ZipBinaryRewriter) | [zip-copy-mode-optimization.md](.sisyphus/plans/zip-copy-mode-optimization.md) | v0.4.2 |
 | UAC 提权 + 权限不足处理 | [uac-elevation-permission.md](.sisyphus/plans/uac-elevation-permission.md) | v0.4.2 |
 | 自包含安装包发布 | [self-contained-installer.md](.sisyphus/plans/self-contained-installer.md) | v0.4.2 |
+| 压缩选项增强（7z/ZIP 参数扩展） | [compression-options-enhancement.md](.sisyphus/plans/compression-options-enhancement.md) | v0.4.5 |
+| 密码流程统一 (ResolvePasswordAsync) | [password-flow-unification.md](.sisyphus/plans/password-flow-unification.md) | v0.4.5+ |
+| 安装包 .NET 9 自动下载 | [installer-dotnet-autodownload.md](.sisyphus/plans/installer-dotnet-autodownload.md) | v0.4.3+ |
+| 贡献者鸣谢面板 | [contributors-panel.md](.sisyphus/plans/contributors-panel.md) | v0.4.3+ |
+| 便携版模式 | [portable-mode.md](.sisyphus/plans/portable-mode.md) | v0.4.5++ |

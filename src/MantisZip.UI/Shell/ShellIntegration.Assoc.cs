@@ -74,7 +74,15 @@ internal static partial class ShellIntegration
 
         var appKey = $@"Software\Classes\Applications\{Path.GetFileName(exePath)}";
         SetRegistryValue(appKey, "FriendlyAppName", L.T(L.App_MantisZipTitle));
-        SetRegistryValue($@"{appKey}\shell\open\command", null, $@"""{exePath}"" --open ""%1""");
+
+        // 防御性删除旧的 shell\open\command（v0.7.x 之前的版本注册过此键），
+        // 避免软件安装时 Shell 关联刷新导致 .exe 的打开操作被错误地路由到 Applications
+        // 入口来执行。OpenWithProgids + 各格式独立 ProgId 已能覆盖所有正常打开场景，
+        // 不再需要此命令入口。
+        DeleteRegistryKey($@"{appKey}\shell\open\command");
+
+        // 注意：仅注册 SupportedTypes，不注册 shell\open\command（已在上方删除）。
+        // SupportedTypes 用于"打开方式"对话框的候选列表，不含实际执行命令。
         foreach (var ext in ArchiveExtensions)
         {
             if (ext == ".tar.gz") continue;
@@ -99,7 +107,7 @@ internal static partial class ShellIntegration
         var displayName = L.T(L.Shell_ProgIdDesc) + " — " + ext.TrimStart('.');
         SetRegistryValue(progIdKey, null, displayName);
         SetRegistryValue($@"{progIdKey}\shell\open", null, L.T(L.Shell_OpenVerb));
-        SetRegistryValue($@"{progIdKey}\shell\open\command", null, $@"""{exePath}"" --open ""%1""");
+        SetRegistryValue($@"{progIdKey}\shell\open\command", null, $@"""{exePath}"" --open-dispatch ""%1""");
 
         // 具体格式图标
         var iconPath = GetIconPath(ext);

@@ -1,14 +1,69 @@
+## v0.4.5
+
+### 文件说明 / File Description
+
+MantisZip-0.4.5-Setup-WebSetup.exe 是需要联网才能安装的。MantisZip-0.4.5-Setup-Offline.exe 是离线安装包。MantisZip-0.4.5-Portable.zip 是便携版，解压即用。
+
+MantisZip-0.4.5-Setup-WebSetup.exe requires internet during installation. MantisZip-0.4.5-Setup-Offline.exe is a fully offline installer. MantisZip-0.4.5-Portable.zip is the portable version, extract and run.
+
+
+### 更新内容 / Changelog
+
+- 完成 [压缩选项增强](.sisyphus/plans/compression-options-enhancement.md) 计划 — 7z 字典大小、固实块、Word Size、匹配器可配置；ZIP 压缩方法（Deflate/Deflate64/BZip2/LZMA/PPMd/Store）可配置；ZIP/7z 加密方式可配置，7z 支持加密文件名开关
+- Completed [Compression Options Enhancement](.sisyphus/plans/compression-options-enhancement.md) plan — configurable 7z dictionary size, solid block, word size, match finder; configurable ZIP compression method (Deflate/Deflate64/BZip2/LZMA/PPMd/Store); configurable ZIP/7z encryption method, 7z encrypt headers toggle
+- ![压缩选项增强](docs/images/version/v0.4.5/CompressionOptions.png)
+- 完成 [文件过滤功能](.sisyphus/plans/file-filter-feature.md) 计划 — 支持按扩展名、文件名、尺寸、日期过滤，可保存为命名预设
+- Completed [File Filter](.sisyphus/plans/file-filter-feature.md) plan — filter by extension, filename, size, or date range; supports named presets persisted in settings
+- ![文件过滤](docs/images/version/v0.4.5/FileFilter.png)
+- 新增便携模式，CI 自动生成 Portable 压缩包
+- Added portable mode; CI automatically generates Portable zip
+- 解压路径统一 — `ExtractSelectedAsync` 改为调用引擎 `ExtractEntriesAsync`
+- Unified extract path — `ExtractSelectedAsync` now delegates to engine `ExtractEntriesAsync`
+- 视图菜单新增"隐藏预览信息"开关，预览信息面板可独立显隐控制
+- Added "Hide Preview Info" toggle in View menu for independent control of preview info panel visibility
+- ![隐藏预览信息](docs/images/version/v0.4.5/PreviewInfoToggle.png)
+- 可配置双击行为 — 设置窗口新增"双击压缩包"选项（打开/原地解压/智能原地解压/打开解压窗口），`--open` CLI 按配置路由 (#16)
+- Configurable double-click behavior — new "double-click archive" option in Settings (open/extract-here/smart-extract/extract-dialog); `--open` CLI routes accordingly
+- ![可配置双击行为](docs/images/version/v0.4.5/DoubleClickAction.png)
+- 解压后自动删除原压缩包 — 新增"解压完成后将原压缩包移到回收站"选项，(#16)
+- Auto-delete archive after extraction — new option to move original archive to Recycle Bin
+- ![删除原压缩包](docs/images/version/v0.4.5/DeleteAfterExtract.png)
+- 文件冲突窗口增加“暂停”和“取消”按钮。(#25)
+- Add ‘Pause’ and ‘Cancel’ buttons to the file conflict window.
+- ![解压文件冲突](docs\images\version\v0.4.5\CancelOnConflictCompress.png)
+- 修复安装后会导致别的软件安装完启动时错误本软件的问题。
+- Fixed issue where installing other software could incorrectly route their startup to MantisZip.
+
+
 ## v0.4.4
 
 ### 文件说明 / File Description
 
 MantisZip-0.4.4-Setup-WebSetup.exe 是需要联网才能安装的。MantisZip-0.4.4-Setup-Offline.exe 是离线安装包。
 
+MantisZip-0.4.4-Setup-WebSetup.exe requires internet during installation. MantisZip-0.4.4-Setup-Offline.exe is a fully offline installer.
+
 
 ### 更新内容 / Changelog
 
-- 完成 [快速路径选择](.sisyphus/plans/quickpath-unified.md) 计划。
-- 
+- 完成 [魔数检测预览系统](.sisyphus/plans/preview-magic-detection.md) 计划 — 通过文件内容（魔数）识别真实格式预览，不再依赖扩展名
+- Completed [Magic Detection Preview System](.sisyphus/plans/preview-magic-detection.md) plan — identifies file formats by content (magic bytes) for preview, no longer relies on file extensions
+- ![魔数检测](docs/images/version/v0.4.4/MagicNumber.gif)
+- 魔数检测结果与扩展名不一致时，可在工具栏切换"按扩展名/按魔数"预览
+- When magic detection conflicts with the file extension, toggle between "by extension / by magic number" preview in the toolbar
+- ![检测真实格式](docs/images/version/v0.4.4/DetectRealFormat.png)
+- 完成压缩包路径处理一站式重构 `ArchivePath`，统一了散落在各处的路径处理代码，并修复了加密压缩解压的多处 bug
+- Completed one-stop archive path refactoring (`ArchivePath`), unified scattered path handling code, and fixed multiple encryption-related compression/extraction bugs
+- 密码流程统一重构 — 统一密码入口 `ResolvePasswordAsync`，调用方大幅简化
+- Unified password flow refactoring — centralized password entry via `ResolvePasswordAsync`, significantly simplified callers
+- 双击文件用系统默认程序打开（可在设置中调整阈值）
+- Double-click files to open with system default program (threshold configurable in settings)
+- 安装包增强，文件名重命名：`WebSetup`（联网）/ `Offline`（离线），联网安装包可自动下载所需依赖
+- Installer improvements: renamed to `WebSetup` (online) / `Offline` (offline); online installer automatically downloads required dependencies
+- 离线安装包新增自包含模式，无需安装 .NET Runtime
+- Offline installer now includes self-contained mode, no .NET Runtime installation required
+
+
 
 ## v0.4.3
 

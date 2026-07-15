@@ -163,12 +163,20 @@ public partial class MainWindow
     // ═══════════════════════════════════════════
 
     /// <summary>
+    /// 获取临时文件根目录。便携版使用 Data/Temp/，普通版使用 %TEMP%/MantisZip/。
+    /// </summary>
+    private static string GetTempDir() =>
+        AppSettings.IsPortableMode
+            ? Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Data", "Temp")
+            : Path.Combine(Path.GetTempPath(), L.T(L.App_MantisZipTitle));
+
+    /// <summary>
     /// 提取压缩包内条目到临时目录，返回临时文件路径。
     /// 自动设置 _previewTempDir 供后续 Cleanup 使用。
     /// </summary>
     private async Task<string> ExtractPreviewFileAsync(ArchiveItem item, string fallbackName, CancellationToken ct)
     {
-        _previewTempDir = Path.Combine(Path.GetTempPath(), L.T(L.App_MantisZipTitle), Guid.NewGuid().ToString());
+        _previewTempDir = Path.Combine(GetTempDir(), Guid.NewGuid().ToString());
         Directory.CreateDirectory(_previewTempDir);
         var tempFile = Path.Combine(_previewTempDir, fallbackName);
         await Core.Utils.ArchiveEntryExtractor.ExtractEntryAsync(
@@ -273,6 +281,23 @@ public partial class MainWindow
         PreviewTabularContainer.Visibility = Visibility.Collapsed;
         PreviewUnsupportedPanel.Visibility = Visibility.Collapsed;
         PreviewWebView2.Visibility = Visibility.Collapsed;
+    }
+
+    /// <summary>
+    /// 根据 _previewInfoPanelEnabled 更新预览信息面板的显隐。
+    /// 在切换信息面板开关或每次设置预览信息时调用。
+    /// </summary>
+    private void UpdatePreviewInfoPanelVisibility()
+    {
+        if (_previewInfoPanelEnabled && PreviewPanel.Visibility == Visibility.Visible)
+        {
+            PreviewInfoPanel.Visibility = Visibility.Visible;
+        }
+        else
+        {
+            PreviewInfoPanel.Visibility = Visibility.Collapsed;
+            PreviewExtraInfoPanel.Visibility = Visibility.Collapsed;
+        }
     }
 
     private async Task ShowPreviewAsync(ArchiveItem item)
@@ -759,7 +784,7 @@ public partial class MainWindow
     private void ShowUnsupportedPreview(ArchiveItem? item, string? message = null)
     {
         HideAllPreviewControls();
-        PreviewInfoPanel.Visibility = Visibility.Visible;
+        UpdatePreviewInfoPanelVisibility();
 
         if (item != null)
         {
@@ -869,7 +894,7 @@ public partial class MainWindow
         PreviewRatioText.Text = L.TF(L.Preview_Ratio, ratio);
         PreviewDateText.Text = "";
         PreviewEncryptedText.Text = "";
-        PreviewInfoPanel.Visibility = Visibility.Visible;
+        UpdatePreviewInfoPanelVisibility();
 
         ShowPreviewPanel();
     }
@@ -1169,7 +1194,7 @@ public partial class MainWindow
             ? L.TF(L.Preview_Modified, item.LastModified.ToString("yyyy-MM-dd HH:mm"))
             : L.T(L.Preview_NoModified);
         PreviewEncryptedText.Text = item.IsEncrypted ? L.T(L.Preview_Encrypted) : "";
-        PreviewInfoPanel.Visibility = Visibility.Visible;
+        UpdatePreviewInfoPanelVisibility();
     }
 
     /// <summary>

@@ -4,7 +4,7 @@
     <OutputType>WinExe</OutputType>
     <TargetFramework>net9.0-windows10.0.17763.0</TargetFramework>
     <RuntimeIdentifiers>win-x64;win-x86</RuntimeIdentifiers>
-    <Version>0.4.4</Version>
+    <Version>0.4.5</Version>
     <SupportedOSPlatformVersion>10.0.17763.0</SupportedOSPlatformVersion>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
@@ -35,6 +35,20 @@
       <_ShellExtFiles Include="$(_ShellExtDir)\MantisZip.ShellExt.runtimeconfig.json" />
     </ItemGroup>
     <Copy SourceFiles="@(_ShellExtFiles)" DestinationFolder="$(OutputPath)" SkipUnchangedFiles="true" />
+  </Target>
+
+  <!-- Publish 后复制 ShellExt 输出（comhost.dll + DLL + runtimeconfig.json）到发布目录 -->
+  <Target Name="CopyShellExtComhostToPublish" AfterTargets="Publish">
+    <MSBuild Projects="..\MantisZip.ShellExt\MantisZip.ShellExt.csproj" Targets="Build" Properties="Configuration=$(Configuration)" />
+    <PropertyGroup>
+      <_ShellExtDir>..\MantisZip.ShellExt\bin\$(Configuration)\$(TargetFramework)</_ShellExtDir>
+    </PropertyGroup>
+    <ItemGroup>
+      <_ShellExtPublishFiles Include="$(_ShellExtDir)\MantisZip.ShellExt.comhost.dll" />
+      <_ShellExtPublishFiles Include="$(_ShellExtDir)\MantisZip.ShellExt.dll" />
+      <_ShellExtPublishFiles Include="$(_ShellExtDir)\MantisZip.ShellExt.runtimeconfig.json" />
+    </ItemGroup>
+    <Copy SourceFiles="@(_ShellExtPublishFiles)" DestinationFolder="$(PublishDir.TrimEnd('\\'))" SkipUnchangedFiles="true" />
   </Target>
 
   <!-- Publish 后自动从 7-Zip 安装目录复制 7z.dll 到发布目录 -->

@@ -221,7 +221,7 @@ public partial class MainWindow
             // 至此确认需要提取，置重入锁
             _isDragExtracting = true;
 
-            _dragTempDir = Path.Combine(Path.GetTempPath(), L.T(L.App_MantisZipTitle), "DragDrop", Guid.NewGuid().ToString());
+            _dragTempDir = Path.Combine(GetTempDir(), "DragDrop", Guid.NewGuid().ToString());
             Directory.CreateDirectory(_dragTempDir);
 
             pw = new ProgressWindow();

@@ -142,7 +142,9 @@ public partial class App : Application
         {
             try
             {
-                var tempDir = Path.Combine(Path.GetTempPath(), L.T(L.App_MantisZipTitle));
+                var tempDir = AppSettings.IsPortableMode
+                    ? Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Data", "Temp")
+                    : Path.Combine(Path.GetTempPath(), L.T(L.App_MantisZipTitle));
                 if (Directory.Exists(tempDir))
                 {
                     Directory.Delete(tempDir, recursive: true);
@@ -159,6 +161,55 @@ public partial class App : Application
 
         LogStartup($"启动参数: {string.Join(" ", e.Args)}");
         TraceLog("OnStartup: after args log");
+
+        // ===== 首次运行：Shell 集成安装（延迟到用户进程，非提权）=====
+        // 便携版不写注册表，跳过 Shell 注册和文件关联注册
+        if (!AppSettings.IsPortableMode)
+        {
+            try
+            {
+                using var firstRunKey = Registry.CurrentUser.OpenSubKey(
+                    @"Software\MantisZip", writable: true);
+                if (firstRunKey != null)
+                {
+                    var firstRunShell = firstRunKey.GetValue("FirstRunShell") as string;
+                    if (firstRunShell == "1")
+                    {
+                        TraceLog("OnStartup: FirstRunShell marker found, installing shell integration...");
+                        ShellIntegration.Install();
+                        firstRunKey.DeleteValue("FirstRunShell");
+                        TraceLog("OnStartup: first-run shell integration installed");
+                    }
+
+                    var firstRunAssoc = firstRunKey.GetValue("FirstRunAssoc") as string;
+                    if (firstRunAssoc == "1")
+                    {
+                        TraceLog("OnStartup: FirstRunAssoc marker found, registering file associations...");
+                        ShellIntegration.InstallAssociations();
+                        firstRunKey.DeleteValue("FirstRunAssoc");
+                        TraceLog("OnStartup: first-run file associations registered");
+                    }
+                }
+            }
+            catch (Exception firstRunEx)
+            {
+                TraceLog("OnStartup: first-run handling failed: {0}", firstRunEx.Message);
+            }
+
+            // 检查 COM 动态菜单状态（如果 pending，检测 Explorer 是否已加载 comhost.dll）
+            try
+            {
+                ShellIntegration.CheckComStatus();
+            }
+            catch (Exception comCheckEx)
+            {
+                TraceLog("OnStartup: CheckComStatus failed: {0}", comCheckEx.Message);
+            }
+        }
+        else
+        {
+            TraceLog("OnStartup: portable mode, skipping shell integration and file association registration");
+        }
 
         // ═══════ 全局异常捕获（诊断闪退用）═══════
         this.DispatcherUnhandledException += (s, e) =>
@@ -191,6 +242,12 @@ public partial class App : Application
                 switch (cmd)
                 {
                     case "--install-shell":
+                        if (AppSettings.IsPortableMode)
+                        {
+                            LogStartup("便携模式不支持 Shell 集成安装");
+                            Shutdown();
+                            return;
+                        }
                         ShellIntegration.Install();
                         // 安装程序（Inno Setup）以 nowait 调用此命令，
                         // 无需弹确认框，安装程序已向用户报告状态。
@@ -198,6 +255,12 @@ public partial class App : Application
                         return;
 
                     case "--uninstall-shell":
+                        if (AppSettings.IsPortableMode)
+                        {
+                            LogStartup("便携模式不支持 Shell 集成卸载");
+                            Shutdown();
+                            return;
+                        }
                         ShellIntegration.Uninstall();
                         // 由安装程序/卸载程序（Inno Setup）调用时使用 runhidden 标志，
                         // 无 UI 界面，直接退出即可。
@@ -205,6 +268,12 @@ public partial class App : Application
                         return;
 
                     case "--install-assoc":
+                        if (AppSettings.IsPortableMode)
+                        {
+                            LogStartup("便携模式不支持文件关联安装");
+                            Shutdown();
+                            return;
+                        }
                         if (e.Args.Length > 1 && !string.IsNullOrWhiteSpace(e.Args[1]))
                             ShellIntegration.InstallAssociations(
                                 e.Args[1].Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
@@ -215,6 +284,12 @@ public partial class App : Application
                         return;
 
                     case "--uninstall-assoc":
+                        if (AppSettings.IsPortableMode)
+                        {
+                            LogStartup("便携模式不支持文件关联卸载");
+                            Shutdown();
+                            return;
+                        }
                         ShellIntegration.UninstallAssociations();
                         // 同上——卸载程序 runhidden 调用，无 UI。
                         Shutdown();
@@ -267,8 +342,36 @@ public partial class App : Application
                         return;
 
                     case "--open":
-                        HandleOpen(e.Args.Length > 1 ? e.Args[1] : null);
+                    {
+                        var path = e.Args.Length > 1 ? e.Args[1] : null;
+                        if (string.IsNullOrEmpty(path)) { HandleOpen(null); return; }
+                        HandleOpen(path);
                         return;
+                    }
+
+                    case "--open-dispatch":
+                    {
+                        var path = e.Args.Length > 1 ? e.Args[1] : null;
+                        if (string.IsNullOrEmpty(path)) { HandleOpen(null); return; }
+
+                        var action = AppSettings.Instance.DoubleClickAction;
+                        switch (action)
+                        {
+                            case "extract-here":
+                                HandleExtractHere(new[] { path });
+                                break;
+                            case "smart-extract":
+                                HandleExtractSmart(new[] { path });
+                                break;
+                            case "extract-dialog":
+                                HandleExtract(new[] { path });
+                                break;
+                            default: // "open"
+                                HandleOpen(path);
+                                break;
+                        }
+                        return;
+                    }
 
                     default:
                         LogStartup($"警告: 无法识别的命令行参数 '{e.Args[0]}'。使用 --help 查看可用命令。");
@@ -338,7 +441,6 @@ public partial class App : Application
                     return chosenAction.Value;
                 }
 
-                // 调度到 UI 线程显示模态对话框
                 var dispatcher = Current?.Dispatcher;
                 if (dispatcher == null)
                 {
@@ -346,26 +448,84 @@ public partial class App : Application
                     return FileConflictAction.Overwrite;
                 }
 
-                var result = dispatcher.Invoke(() =>
+                // 循环重入：暂停后恢复时重新弹窗
+                while (true)
                 {
-                    var dialog = new ConflictDialog(info);
-                    dialog.ShowDialog();
-                    info.CustomName = dialog.CustomName;
-                    LogDebug("ConflictResolver dialog: action={0}, applyToAll={1}, customName='{2}'",
-                        dialog.ResultAction, dialog.ApplyToAll, dialog.CustomName ?? "(null)");
-                    return (Action: dialog.ResultAction, All: dialog.ApplyToAll);
-                });
+                    var result = dispatcher.Invoke(() =>
+                    {
+                        var dialog = new ConflictDialog(info);
+                        dialog.ShowDialog();
 
-                LogDebug("ConflictResolver #{0}: dialog returned (Action={1}, All={2})", callCount, result.Action, result.All);
+                        // 暂停
+                        if (dialog.IsPaused)
+                        {
+                            LogDebug("ConflictResolver #{0}: dialog paused", callCount);
+                            return (Action: FileConflictAction.Overwrite, IsPaused: true, IsCancelled: false, ApplyAll: false);
+                        }
 
-                if (result.All)
-                {
-                    applyToAll = true;
-                    chosenAction = result.Action;
-                    LogDebug("ConflictResolver #{0}: applyToAll set to true, chosenAction={1}", callCount, chosenAction.Value);
+                        // 取消整个操作
+                        if (dialog.CancelOperation)
+                        {
+                            LogDebug("ConflictResolver #{0}: dialog cancelled operation", callCount);
+                            return (Action: FileConflictAction.Overwrite, IsPaused: false, IsCancelled: true, ApplyAll: false);
+                        }
+
+                        info.CustomName = dialog.CustomName;
+                        LogDebug("ConflictResolver dialog: action={0}, applyToAll={1}, customName='{2}'",
+                            dialog.ResultAction, dialog.ApplyToAll, dialog.CustomName ?? "(null)");
+
+                        if (dialog.ApplyToAll)
+                        {
+                            applyToAll = true;
+                            chosenAction = dialog.ResultAction;
+                            LogDebug("ConflictResolver #{0}: applyToAll set to true, chosenAction={1}", callCount, chosenAction.Value);
+                        }
+
+                        return (Action: dialog.ResultAction, IsPaused: false, IsCancelled: false, ApplyAll: dialog.ApplyToAll);
+                    });
+
+                    if (result.IsCancelled)
+                    {
+                        LogDebug("ConflictResolver #{0}: cancelling entire operation via throw", callCount);
+                        throw new OperationCanceledException();
+                    }
+
+                    if (result.IsPaused)
+                    {
+                        LogDebug("ConflictResolver #{0}: paused, waiting for resume...", callCount);
+                        try
+                        {
+                            // 在 UI 线程获取 ProgressWindow 引用并调用 PauseFromConflict，
+                            // 然后在后台线程等待暂停事件（不阻塞 UI 线程）
+                            ProgressWindow? pw = null;
+                            CancellationToken ct = CancellationToken.None;
+                            dispatcher.Invoke(() =>
+                            {
+                                pw = Current?.Windows.OfType<ProgressWindow>().FirstOrDefault();
+                                if (pw != null)
+                                {
+                                    pw.PauseFromConflict();
+                                    ct = pw.CancellationToken;
+                                }
+                            });
+
+                            if (pw != null)
+                            {
+                                pw.PauseEvent.Wait(ct);
+                            }
+                            LogDebug("ConflictResolver #{0}: resumed, re-showing dialog", callCount);
+                            continue;
+                        }
+                        catch (OperationCanceledException)
+                        {
+                            LogDebug("ConflictResolver #{0}: cancelled while paused", callCount);
+                            throw;
+                        }
+                    }
+
+                    LogDebug("ConflictResolver #{0}: dialog returned (Action={1})", callCount, result.Action);
+                    return result.Action;
                 }
-
-                return result.Action;
             }
         };
     }
@@ -513,7 +673,9 @@ public partial class App : Application
         // 清理预览临时文件
         try
         {
-            var tempDir = Path.Combine(Path.GetTempPath(), L.T(L.App_MantisZipTitle));
+            var tempDir = AppSettings.IsPortableMode
+                ? Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Data", "Temp")
+                : Path.Combine(Path.GetTempPath(), L.T(L.App_MantisZipTitle));
             if (Directory.Exists(tempDir))
             {
                 for (int i = 0; i < 5; i++)

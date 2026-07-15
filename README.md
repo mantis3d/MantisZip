@@ -47,6 +47,8 @@ MantisZip 是一款面向 Windows 的免费开源压缩/解压工具，主打**�
 
 可以在压缩包内直接预览 **图片**、**文本**、**HTML/Markdown**、**SVG**、**字体** 等内容。
 
+从v0.4.4版本开始，是以内容识别实际格式，不需要担心扩展名不对预览不了的问题。
+
 #### 🔍 深度探索：各类型高级预览特写
 
 <table width="100%">
@@ -121,9 +123,9 @@ MantisZip 是一款面向 Windows 的免费开源压缩/解压工具，主打**�
 
 除了其他软件的「覆盖」「跳过」和「自动重命名」之外，还增加了「覆盖旧文件」和「覆盖小文件」，「自动重命名」也可无缝切换至手动重命名。
 
-![解压文件冲突](docs/images/ConflictCompress.png)
+![解压文件冲突](docs\images\version\v0.4.5\CancelOnConflictCompress.png)
 
-![压缩文件冲突](docs/images/ConflictExtract.png)
+![压缩文件冲突](docs\images\version\v0.4.5\CancelOnConflictExtract.png)
 
 ----
 
@@ -359,3 +361,14 @@ MantisZip 是一款完全免费且独立开发的开源项目。如果它提升�
 * **Discord 交流群**: （👉 [点击一键加入群聊](https://discord.gg/PpuyhceJpZ)）
 
 > 💡 **小提示**：进群请备注 “GitHub / MantisZip”。
+
+
+## Star History
+
+<a href="https://www.star-history.com/?repos=mantis3d%2FMantisZip&type=date&legend=top-left">
+ <picture>
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=mantis3d/MantisZip&type=date&theme=dark&legend=top-left&sealed_token=nsZLw4F-DYdClMW8mHT8lwCV9ExHMuy4eC0Ebz22DGp8NwLlC9IeKT3cZ4St3gycAR-apUAwJHJQb_Ubr50GXL9coXR1_qyce_ljatXgN40WEtu__3LiPKBw94SyCSYK6YfgYgoMdU_JtzH6GPpNIlPCD5VsAQOr2yHW8s2qH64b9BJlbpdqn3TojxdQ" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=mantis3d/MantisZip&type=date&legend=top-left&sealed_token=nsZLw4F-DYdClMW8mHT8lwCV9ExHMuy4eC0Ebz22DGp8NwLlC9IeKT3cZ4St3gycAR-apUAwJHJQb_Ubr50GXL9coXR1_qyce_ljatXgN40WEtu__3LiPKBw94SyCSYK6YfgYgoMdU_JtzH6GPpNIlPCD5VsAQOr2yHW8s2qH64b9BJlbpdqn3TojxdQ" />
+   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=mantis3d/MantisZip&type=date&legend=top-left&sealed_token=nsZLw4F-DYdClMW8mHT8lwCV9ExHMuy4eC0Ebz22DGp8NwLlC9IeKT3cZ4St3gycAR-apUAwJHJQb_Ubr50GXL9coXR1_qyce_ljatXgN40WEtu__3LiPKBw94SyCSYK6YfgYgoMdU_JtzH6GPpNIlPCD5VsAQOr2yHW8s2qH64b9BJlbpdqn3TojxdQ" />
+ </picture>
+</a>

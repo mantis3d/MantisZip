@@ -61,6 +61,27 @@ public class CompressRequest
 
     /// <summary>7z 固实压缩标志</summary>
     public bool SevenZipSolid { get; init; } = true;
+
+    /// <summary>7z 固实块大小：null/""=默认，或 "64m" / "256m" / "512m" / "1g"</summary>
+    public string? SevenZipSolidBlockSize { get; init; }
+
+    /// <summary>7z 字典大小（字节），null 表示引擎默认</summary>
+    public int? SevenZipDictionarySize { get; init; }
+
+    /// <summary>7z Word Size（快速字节数），null 表示引擎默认</summary>
+    public int? SevenZipNumFastBytes { get; init; }
+
+    /// <summary>7z 匹配器：null/""=默认，或 "bt2" / "bt3" / "bt4"</summary>
+    public string? SevenZipMatchFinder { get; init; }
+
+    /// <summary>ZIP 压缩方法：null/""=默认（Deflate），或 "deflate64" / "bzip2" / "lzma" / "ppmd" / "store"</summary>
+    public string? ZipCompressionMethod { get; init; }
+
+    /// <summary>ZIP 加密方式：null/""=默认（AES-256），或 "aes192" / "aes128" / "zipcrypto"</summary>
+    public string? ZipEncryptionMethod { get; init; }
+
+    /// <summary>7z 加密文件名（EncryptHeaders），默认 true</summary>
+    public bool SevenZipEncryptHeaders { get; init; } = true;
 }
 
 /// <summary>
@@ -394,6 +415,13 @@ public static class CompressService
             FileNameEncoding = request.FileNameEncoding,
             SevenZipCompressionMethod = request.SevenZipCompressionMethod,
             SevenZipSolid = request.SevenZipSolid,
+            SevenZipSolidBlockSize = request.SevenZipSolidBlockSize,
+            SevenZipDictionarySize = request.SevenZipDictionarySize,
+            SevenZipNumFastBytes = request.SevenZipNumFastBytes,
+            SevenZipMatchFinder = request.SevenZipMatchFinder,
+            ZipCompressionMethod = request.ZipCompressionMethod,
+            ZipEncryptionMethod = request.ZipEncryptionMethod,
+            SevenZipEncryptHeaders = request.SevenZipEncryptHeaders,
         };
     }
 
