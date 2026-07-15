@@ -117,6 +117,7 @@
     <Style Selector="Button.ToolbarButton, ToggleButton.ToolbarButton">
       <Setter Property="Height" Value="54" />
       <Setter Property="Padding" Value="8,2" />
+      <Setter Property="Background" Value="{DynamicResource ThemeHeaderBgBrush}" />
     </Style>
 
     <Style Selector="Button.ToolbarButton > StackPanel, ToggleButton.ToolbarButton > StackPanel">
@@ -174,19 +175,49 @@
     <Style Selector="TabControl">
       <Setter Property="Background" Value="{DynamicResource ThemeSurfaceBgBrush}" />
       <Setter Property="BorderBrush" Value="{DynamicResource ThemeBorderBrush}" />
+      <Setter Property="Padding" Value="0" />
+      <!-- Template override: wrap ItemsPresenter in a Border to set tab strip background -->
+      <Setter Property="Template">
+        <ControlTemplate>
+          <Border BorderBrush="{TemplateBinding BorderBrush}"
+                  BorderThickness="{TemplateBinding BorderThickness}"
+                  CornerRadius="{TemplateBinding CornerRadius}"
+                  Background="{TemplateBinding Background}"
+                  HorizontalAlignment="{TemplateBinding HorizontalAlignment}"
+                  VerticalAlignment="{TemplateBinding VerticalAlignment}">
+            <DockPanel>
+              <Border Background="{DynamicResource ThemeHeaderBgBrush}"
+                      DockPanel.Dock="{TemplateBinding TabStripPlacement}">
+                <ItemsPresenter Name="PART_ItemsPresenter"
+                                ItemsPanel="{TemplateBinding ItemsPanel}" />
+              </Border>
+              <Panel ClipToBounds="True"
+                     Background="{DynamicResource ThemeSurfaceBgBrush}">
+                <ContentPresenter Name="PART_SelectedContentHost2"
+                                  Margin="{TemplateBinding Padding}"
+                                  HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                  VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}"
+                                  IsVisible="False" />
+                <ContentPresenter Name="PART_SelectedContentHost"
+                                  Margin="{TemplateBinding Padding}"
+                                  HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                  VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}" />
+              </Panel>
+            </DockPanel>
+          </Border>
+        </ControlTemplate>
+      </Setter>
     </Style>
     <Style Selector="TabItem">
       <Setter Property="Foreground" Value="{DynamicResource ThemeTextPrimaryBrush}" />
       <Setter Property="Background" Value="{DynamicResource ThemeHeaderBgBrush}" />
       <Setter Property="BorderThickness" Value="0" />
     </Style>
-    <Style Selector="TabItem:pointerover">
-      <Setter Property="Background" Value="{DynamicResource ThemeButtonHoverBrush}" />
+    <Style Selector="TabItem:pointerover /template/ Border#PART_LayoutRoot">
+      <Setter Property="Background" Value="{DynamicResource ThemeTabHoverBrush}" />
     </Style>
     <Style Selector="TabItem:selected">
       <Setter Property="Background" Value="{DynamicResource ThemeSurfaceBgBrush}" />
-      <Setter Property="BorderBrush" Value="{DynamicResource ThemeAccentBrush}" />
-      <Setter Property="BorderThickness" Value="0,0,0,2" />
     </Style>
 
     <!-- TabItem.compactTab — compact tab headers for settings windows -->

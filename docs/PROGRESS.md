@@ -15,6 +15,7 @@
   - **Avalonia UI 功能补齐（对话框 + 控件 + 转换器）** — 11 个对话框（Elevation×3/AddFavorite/FavoriteManager/ArchiveComment/AppMessageBox/QuickPath/QuickPathPre/ArchiveSaveAs/UnifiedExtract）+ 2 个控件（QuickPathControl/DynamicFormatOptionsPanel）+ 1 个转换器（BatchStatusConverters）完整移植到 Avalonia；MainWindowViewModel 5 个新对话框回调；MainWindow Favorites 子菜单；20+ i18n 中英文键；可构建 0 错误 (2026-07-13)
   - **i18n 缺失 key 补齐** — 扫描代码中 427 个 `LocalizationManager.T()` 引用，补齐 42 个缺失 key（ElevationDialog/FormatOptions/MsgBox/ProgressBatch/QuickPath/MainArchiveComment）；从 WPF 复制 `languages.json`；创建 `Icons/.gitkeep` 保留空目录；复制 `DonateQr.jpg` (2026-07-13)
   - **ZipEngine SharpCompress 迁移 Plan B 确认完成** — SharpSevenZip `OutArchiveFormat.Zip`+`Aes256` 替代 SharpZipLib 加密回退；`MantisZip.Core.csproj` 已无 SharpZipLib 引用；Core 构建 0 错误 0 警告；236/236 测试通过 (2026-07-13)
+  - **TabControl UI 细节修复** — TabControl 模板 override 封装 ItemsPresenter 到 Border 设 tab strip 背景 `ThemeHeaderBgBrush` 消除 tab 标题间隙白色断层；`TabControl.Padding=0` 消除 ContentPresenter Margin 导致的内容区左右白边；内容 Panel 背景设 `ThemeSurfaceBgBrush`；消除 `TabItem:selected` 双下划线（去掉自定义 BorderThickness，仅用 Fluent 内置 `PART_SelectedPipe`）；`TabItem:pointerover` 改为直接 target `/template/ Border#PART_LayoutRoot` 修复 hover 色不生效，新增 `ThemeTabHover` 浅蓝色（Light `#FFE4F0FF`/Dark `#FF2A3A5A`）；ToolbarButton 默认背景改 `ThemeHeaderBgBrush` 与工具栏底色融合 (2026-07-15)
 
 ## 规划中
 - Avalonia 跨平台移植后续 Phase
