@@ -25,6 +25,10 @@ public partial class PreviewPanel : UserControl
         // FontPreviewScrollViewer 在 InitializeComponent 后可用，只订阅一次
         if (FontPreviewScrollViewer != null)
             FontPreviewScrollViewer.SizeChanged += OnFontPreviewScrollerSizeChanged;
+
+        // 订阅内容区域外层 ScrollViewer 的 SizeChanged，用于 ZoomFit 自适应视口
+        if (PreviewContentScroller != null)
+            PreviewContentScroller.SizeChanged += OnContentScrollerSizeChanged;
     }
 
     private void OnDataContextChanged(object? sender, EventArgs e)
@@ -88,6 +92,21 @@ public partial class PreviewPanel : UserControl
                 IsReadOnly = true,
             });
         }
+    }
+
+    /// <summary>
+    /// 内容区域外层 ScrollViewer 尺寸变化时更新 ViewModel 的视口大小，
+    /// 供 ZoomFit 和初始缩放计算使用（替代硬编码 600×500）。
+    /// </summary>
+    private void OnContentScrollerSizeChanged(object? sender, SizeChangedEventArgs e)
+    {
+        if (_vm == null || PreviewContentScroller == null) return;
+        var w = PreviewContentScroller.Bounds.Width;
+        var h = PreviewContentScroller.Bounds.Height;
+        if (w <= 0 || h <= 0) return;
+        _vm.ViewportWidth = w;
+        _vm.ViewportHeight = h;
+        _vm.ReFitIfNeeded();
     }
 
     private void OnFontPreviewScrollerSizeChanged(object? sender, SizeChangedEventArgs e)

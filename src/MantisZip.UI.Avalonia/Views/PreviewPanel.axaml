@@ -72,8 +72,8 @@
       </StackPanel>
     </Border>
 
-    <!-- Preview content area - will be populated by Tasks 6-11 -->
-    <ScrollViewer Grid.Row="1" Grid.Column="0"
+    <!-- Preview content area -->
+    <ScrollViewer x:Name="PreviewContentScroller" Grid.Row="1" Grid.Column="0"
                   Background="{DynamicResource ThemeSurfaceBgBrush}">
       <Grid>
         <!-- Unsupported / empty state -->
@@ -132,29 +132,23 @@
         </StackPanel>
 
         <!-- Image preview -->
-        <ScrollViewer IsVisible="{Binding IsImageVisible}"
+        <ScrollViewer x:Name="ImagePreviewScrollViewer" IsVisible="{Binding IsImageVisible}"
                       HorizontalScrollBarVisibility="Auto"
                       VerticalScrollBarVisibility="Auto">
           <Image Source="{Binding PreviewImage}"
-                 RenderTransformOrigin="0,0">
-            <Image.RenderTransform>
-              <ScaleTransform ScaleX="{Binding ZoomLevel}"
-                              ScaleY="{Binding ZoomLevel}" />
-            </Image.RenderTransform>
-          </Image>
+                 Width="{Binding ScaledWidth}"
+                 Height="{Binding ScaledHeight}"
+                 Stretch="Uniform" />
         </ScrollViewer>
 
         <!-- GIF preview (same image control) -->
-        <ScrollViewer IsVisible="{Binding IsGifVisible}"
+        <ScrollViewer x:Name="GifPreviewScrollViewer" IsVisible="{Binding IsGifVisible}"
                       HorizontalScrollBarVisibility="Auto"
                       VerticalScrollBarVisibility="Auto">
           <Image Source="{Binding PreviewImage}"
-                 RenderTransformOrigin="0,0">
-            <Image.RenderTransform>
-              <ScaleTransform ScaleX="{Binding ZoomLevel}"
-                              ScaleY="{Binding ZoomLevel}" />
-            </Image.RenderTransform>
-          </Image>
+                 Width="{Binding ScaledWidth}"
+                 Height="{Binding ScaledHeight}"
+                 Stretch="Uniform" />
         </ScrollViewer>
 
         <!-- ICO gallery -->

@@ -208,9 +208,11 @@ public class PreviewService
     {
         return format switch
         {
-            // 图像
-            FileFormat.Png or FileFormat.Jpeg or FileFormat.Gif
-                or FileFormat.Bmp or FileFormat.WebP or FileFormat.Ico
+            // 图像 (GIF 单独处理，走动画预览路径)
+            FileFormat.Gif => PreviewType.Gif,
+
+            FileFormat.Png or FileFormat.Jpeg or FileFormat.Bmp
+                or FileFormat.WebP or FileFormat.Ico
                 or FileFormat.Tga or FileFormat.Hdr or FileFormat.Exr
                 => PreviewType.Image,
 

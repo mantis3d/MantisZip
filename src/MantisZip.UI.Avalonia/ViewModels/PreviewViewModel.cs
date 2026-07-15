@@ -87,6 +87,13 @@ public partial class PreviewViewModel : ObservableObject
     [ObservableProperty]
     private double _zoomLevel = 1.0;
 
+    /// <summary>
+    /// 缩放后的图像逻辑尺寸，用于绑定 Image 的 Width/Height
+    /// （替代 ScaleTransform，使 ScrollViewer 正确计算滚动区域）。
+    /// </summary>
+    public double ScaledWidth => Math.Max(1, ImageWidth * ZoomLevel);
+    public double ScaledHeight => Math.Max(1, ImageHeight * ZoomLevel);
+
     [ObservableProperty]
     private int _fontSize = 13;
 
@@ -138,6 +145,22 @@ public partial class PreviewViewModel : ObservableObject
 
     }
 
+    partial void OnZoomLevelChanged(double value)
+    {
+        OnPropertyChanged(nameof(ScaledWidth));
+        OnPropertyChanged(nameof(ScaledHeight));
+    }
+
+    partial void OnImageWidthChanged(int value)
+    {
+        OnPropertyChanged(nameof(ScaledWidth));
+    }
+
+    partial void OnImageHeightChanged(int value)
+    {
+        OnPropertyChanged(nameof(ScaledHeight));
+    }
+
     partial void OnPreviewImageChanged(global::Avalonia.Media.Imaging.Bitmap? value)
     {
         OnPropertyChanged(nameof(IsFontTextFallbackVisible));
@@ -174,8 +197,12 @@ public partial class PreviewViewModel : ObservableObject
     [ObservableProperty]
     private int _imageHeight;
 
-    [ObservableProperty]
-    private bool _isTransparencySupported;
+    /// <summary>
+    /// 预览视口大小（由 PreviewPanel 代码后置在布局变化时更新）。
+    /// 用于 ZoomFit 和初始缩放计算，替代硬编码的 600×500。
+    /// </summary>
+    internal double ViewportWidth { get; set; } = 800;
+    internal double ViewportHeight { get; set; } = 600;
 
     // ── Torrent ──
 
@@ -274,25 +301,33 @@ public partial class PreviewViewModel : ObservableObject
 
     // ── Toolbar commands ──
 
+    /// <summary>
+    /// 标记当前是否为「适应视口」模式。为 true 时，视口尺寸变化会重新调用 ZoomFit。
+    /// </summary>
+    private bool _isZoomFitActive;
+
     [RelayCommand]
     private void ZoomIn()
     {
+        _isZoomFitActive = false;
         ZoomLevel = Math.Min(ZoomLevel + 0.25, 5.0);
     }
 
     [RelayCommand]
     private void ZoomOut()
     {
+        _isZoomFitActive = false;
         ZoomLevel = Math.Max(ZoomLevel - 0.25, 0.1);
     }
 
     [RelayCommand]
     private void ZoomFit()
     {
-        if (ImageWidth > 0 && ImageHeight > 0)
+        _isZoomFitActive = true;
+        if (ImageWidth > 0 && ImageHeight > 0 && ViewportWidth > 0 && ViewportHeight > 0)
         {
-            var fitX = 600.0 / ImageWidth;
-            var fitY = 500.0 / ImageHeight;
+            var fitX = ViewportWidth / ImageWidth;
+            var fitY = ViewportHeight / ImageHeight;
             ZoomLevel = Math.Min(fitX, fitY);
             if (ZoomLevel > 1.0) ZoomLevel = 1.0;
         }
@@ -300,6 +335,16 @@ public partial class PreviewViewModel : ObservableObject
         {
             ZoomLevel = 1.0;
         }
+    }
+
+    /// <summary>
+    /// 如果在「适应视口」模式（_isZoomFitActive），重新计算缩放比例。
+    /// 由 PreviewPanel 代码后置在视口尺寸变化时调用。
+    /// </summary>
+    public void ReFitIfNeeded()
+    {
+        if (_isZoomFitActive)
+            ZoomFit();
     }
 
     [RelayCommand]
@@ -430,7 +475,7 @@ public partial class PreviewViewModel : ObservableObject
         CsvData = table.DefaultView;  // DataView 可绑定到 ItemsControl
         PreviewType = PreviewType.Csv;
         IsPreviewVisible = true;
-        IsToolbarVisible = true;
+        IsToolbarVisible = false;
     }
 
     /// <summary>
@@ -457,7 +502,7 @@ public partial class PreviewViewModel : ObservableObject
 
         PreviewType = PreviewType.Pe;
         IsPreviewVisible = true;
-        IsToolbarVisible = true;
+        IsToolbarVisible = false;
     }
 
     // ── Image ──
@@ -481,15 +526,11 @@ public partial class PreviewViewModel : ObservableObject
         ImageWidth = bitmap.PixelSize.Width;
         ImageHeight = bitmap.PixelSize.Height;
         var ext = Path.GetExtension(filePath).ToLowerInvariant();
-        IsTransparencySupported = ext is ".png" or ".ico" or ".webp";
         IsPreviewVisible = true;
         IsToolbarVisible = true;
         PreviewHeaderText = "图片预览";
-        // 初始缩放：适应预览区域（预估 600×500）
-        var fitX = 600.0 / ImageWidth;
-        var fitY = 500.0 / ImageHeight;
-        ZoomLevel = Math.Min(fitX, fitY);
-        if (ZoomLevel > 1.0) ZoomLevel = 1.0;
+        // 初始缩放：适应视口
+        ZoomFit();
 
         var metaItems = new List<FormatMetadataItem>
         {
@@ -610,11 +651,8 @@ public partial class PreviewViewModel : ObservableObject
             if (frames.Count > 1)
                 StartGifAnimation();
 
-            // 初始缩放：适应预览区域
-            var fitX = 600.0 / ImageWidth;
-            var fitY = 500.0 / ImageHeight;
-            ZoomLevel = Math.Min(fitX, fitY);
-            if (ZoomLevel > 1.0) ZoomLevel = 1.0;
+            // 初始缩放：适应视口
+            ZoomFit();
 
             PreviewType = PreviewType.Gif;
             IsPreviewVisible = true;
@@ -720,7 +758,7 @@ public partial class PreviewViewModel : ObservableObject
 
             using var img = surface.Snapshot();
             using var data = img.Encode(SkiaSharp.SKEncodedImageFormat.Png, 100);
-            var ms = new MemoryStream(data.ToArray());
+            using var ms = new MemoryStream(data.ToArray());
             PreviewImage = new global::Avalonia.Media.Imaging.Bitmap(ms);
 
             PreviewType = PreviewType.Svg;
@@ -755,7 +793,7 @@ public partial class PreviewViewModel : ObservableObject
         }
         PreviewType = PreviewType.Font;
         IsPreviewVisible = true;
-        IsToolbarVisible = true;
+        IsToolbarVisible = false;
         PreviewHeaderText = info.FontName ?? "字体预览";
         FormatMetadata.Clear();
         FormatMetadata.Add(new("字体名称", info.FontName ?? "未知"));
@@ -1107,7 +1145,7 @@ public partial class PreviewViewModel : ObservableObject
         }
         PreviewType = PreviewType.Audio;
         IsPreviewVisible = true;
-        IsToolbarVisible = true;
+        IsToolbarVisible = false;
         PreviewHeaderText = "音频信息";
         FormatMetadata.Clear();
         if (info.Duration.HasValue)
@@ -1192,7 +1230,7 @@ public partial class PreviewViewModel : ObservableObject
 
             PreviewType = PreviewType.Sqlite;
             IsPreviewVisible = true;
-            IsToolbarVisible = true;
+            IsToolbarVisible = false;
             PreviewHeaderText = "SQLite 数据库";
             FormatMetadata.Clear();
             FormatMetadata.Add(new("表数量", tables.Count.ToString()));
@@ -1218,7 +1256,7 @@ public partial class PreviewViewModel : ObservableObject
         }
         PreviewType = PreviewType.Iso;
         IsPreviewVisible = true;
-        IsToolbarVisible = true;
+        IsToolbarVisible = false;
         PreviewHeaderText = "光盘镜像";
         FormatMetadata.Clear();
         FormatMetadata.Add(new("卷标", info.VolumeLabel ?? "未知"));
@@ -1242,7 +1280,7 @@ public partial class PreviewViewModel : ObservableObject
         }
         PreviewType = PreviewType.Torrent;
         IsPreviewVisible = true;
-        IsToolbarVisible = true;
+        IsToolbarVisible = false;
         PreviewHeaderText = info.TorrentFileName ?? "BT 种子";
         FormatMetadata.Clear();
         if (info.InfoHashV1 != null)
@@ -1342,7 +1380,7 @@ public partial class PreviewViewModel : ObservableObject
         }
         PreviewType = PreviewType.Office;
         IsPreviewVisible = true;
-        IsToolbarVisible = true;
+        IsToolbarVisible = false;
         var ext = Path.GetExtension(filePath).ToLowerInvariant();
         PreviewHeaderText = ext switch
         {
@@ -1375,7 +1413,7 @@ public partial class PreviewViewModel : ObservableObject
         }
         PreviewType = PreviewType.Video;
         IsPreviewVisible = true;
-        IsToolbarVisible = true;
+        IsToolbarVisible = false;
         PreviewHeaderText = "视频信息";
         FormatMetadata.Clear();
         if (info.VideoWidth.HasValue && info.VideoHeight.HasValue)
@@ -1462,6 +1500,7 @@ td, th {{ border: 1px solid #ccc; padding: 6px; }}
         TextContent = message ?? "暂不支持预览此文件格式";
         PreviewType = PreviewType.Unsupported;
         IsPreviewVisible = true;
+        IsToolbarVisible = false;
     }
 
     public void Clear()
@@ -1479,7 +1518,6 @@ td, th {{ border: 1px solid #ccc; padding: 6px; }}
         ImageWidth = 0;
         ImageHeight = 0;
         HtmlContent = string.Empty;
-        IsTransparencySupported = false;
         TorrentTreeRoots.Clear();
         SqliteTableData = null;
         SqliteTableNames.Clear();
