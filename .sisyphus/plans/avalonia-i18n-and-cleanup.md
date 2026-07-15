@@ -141,7 +141,7 @@ Avalonia: 只有 `DonateQr.png`
 ## 验证标准
 
 - [x] `strings.en.json` 和 `strings.zh-CN.json` 的 key 数量与 WPF 一致 — **已验证不需要**（425/426 代码引用 key 已存在；WPF-only key 如 Main_*, PwdMgr_*, ShellExt_* 无对应 Avalonia 代码）
-- [ ] 所有 UI 文本正确显示 — **需运行时验证**（启动 Avalonia 应用，检查各窗口文本）
+- [ ] 所有 UI 文本正确显示 — **需桌面端运行时验证**（`dotnet run` 启动成功无崩溃，libpng iCCP 警告为图标文件问题；LocalizationManager 静态构造函数正常初始化。完整 UI 文本检查需在 Windows 桌面上启动应用并浏览各窗口）
 - [x] `languages.json` 正常工作 — LocalizationManager 现在读取 Resources/languages.json 初始化 AvailableLanguages（带硬编码回退）
 - [x] `AppConstants.Version` = `0.4.4`
 - [x] `dotnet build` 无警告
