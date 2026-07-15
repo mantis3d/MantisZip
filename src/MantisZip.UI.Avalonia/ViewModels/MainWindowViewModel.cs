@@ -546,8 +546,47 @@ public partial class MainWindowViewModel : ObservableObject
         try
         {
             var ext = Path.GetExtension(entry.Name);
-            var previewType = PreviewService.ClassifyPreview(ext);
-            App.DebugLog($"[PRV] Classified as {previewType}");
+
+            // ── 魔数检测优先路由（EnableFormatDetection 已在 App.axaml.cs 从 AppSettings 初始化）──
+            var previewType = PreviewType.Unsupported;
+            FileFormat magicFormat = FileFormat.Unknown;
+            string? detectedFormatName = null;  // 用于信息栏显示的格式名
+            if (PreviewService.EnableFormatDetection && CurrentArchivePath != null)
+            {
+                try
+                {
+                    _sessionPasswords.TryGetValue(CurrentArchivePath, out var pwd);
+                    var (magicType, format, displayName) = await PreviewService.ClassifyPreviewByMagicAsync(
+                        CurrentArchivePath, entry, _currentFormat,
+                        PreviewService.PreviewHeadSize, pwd);
+                    if (magicType != PreviewType.Unsupported && format != FileFormat.Unknown)
+                    {
+                        previewType = magicType;
+                        magicFormat = format;
+                        detectedFormatName = displayName;
+                        App.DebugLog($"[PRV] Magic detected: {format} ({displayName}) -> {previewType}");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    App.DebugLog($"[PRV] Magic detection failed: {ex.Message}");
+                }
+            }
+
+            // 魔数未识别时回退到扩展名判定
+            if (previewType == PreviewType.Unsupported)
+            {
+                previewType = PreviewService.ClassifyPreview(ext);
+                App.DebugLog($"[PRV] Fallback to extension classification: {previewType}");
+            }
+
+            // 魔数未提供格式名时用扩展名回退（仅在魔数检测开启时才显示，WPF 一致行为）
+            if (detectedFormatName == null && PreviewService.EnableFormatDetection)
+            {
+                var extFormat = FileFormatDetector.DetectByExtension(ext);
+                if (extFormat != FileFormat.Unknown)
+                    detectedFormatName = FileFormatHelper.GetDisplayName(extFormat);
+            }
 
             if (previewType == PreviewType.Unsupported)
             {
@@ -649,6 +688,19 @@ public partial class MainWindowViewModel : ObservableObject
                     entry.CompressedSizeDisplay,
                     entry.Size > 0 ? $"{entry.CompressionRatio:F1}%" : "N/A",
                     entry.LastModifiedDisplay);
+            }
+
+            // 魔数检测结果写到信息栏（与 WPF 行为一致：显示格式名 + 扩展名冲突标记）
+            if (detectedFormatName != null)
+            {
+                var extFormat = FileFormatDetector.DetectByExtension(ext);
+                bool hasConflict = extFormat != FileFormat.Unknown
+                    && magicFormat != FileFormat.Unknown
+                    && extFormat != magicFormat;
+                string formatValue = hasConflict
+                    ? $"⚠️ {detectedFormatName}（扩展名: {ext}）"
+                    : detectedFormatName;
+                Preview.FormatMetadata.Insert(0, new FormatMetadataItem("格式", formatValue));
             }
         }
         catch (Exception ex)

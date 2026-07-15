@@ -61,6 +61,12 @@ public partial class SettingsWindowViewModel : ObservableObject
     private bool _useColorEmoji = true;
 
     [ObservableProperty]
+    private bool _enableFormatDetection = true;
+
+    [ObservableProperty]
+    private int _previewHeadSize = 4096;
+
+    [ObservableProperty]
     private bool _enableDebugLogging;
 
     [ObservableProperty]
@@ -68,6 +74,37 @@ public partial class SettingsWindowViewModel : ObservableObject
 
     [ObservableProperty]
     private bool _keepOriginalExtension;
+
+    // ── Compression advanced ──
+    [ObservableProperty]
+    private string _sevenZipCompressionMethod = "LZMA2";
+
+    [ObservableProperty]
+    private bool _sevenZipSolid = true;
+
+    [ObservableProperty]
+    private string _sevenZipSolidBlockSize = "";
+
+    [ObservableProperty]
+    private int _sevenZipDictionarySize = 0;
+
+    [ObservableProperty]
+    private int _sevenZipNumFastBytes = 0;
+
+    [ObservableProperty]
+    private string _sevenZipMatchFinder = "";
+
+    [ObservableProperty]
+    private string _zipCompressionMethod = "deflate";
+
+    [ObservableProperty]
+    private string _zipEncryptionMethod = "aes256";
+
+    [ObservableProperty]
+    private string _zipEncoding = "utf-8";
+
+    [ObservableProperty]
+    private bool _sevenZipEncryptHeaders = true;
 
     [ObservableProperty]
     private string _logPrivacyMode = "extension";
@@ -203,6 +240,31 @@ public partial class SettingsWindowViewModel : ObservableObject
     public System.Collections.ObjectModel.ObservableCollection<Option> AppFontFamilyOptions { get; } = new();
     [ObservableProperty] private Option? _selectedAppFontFamilyOption;
 
+    // ── Compression advanced combos ──
+    public System.Collections.ObjectModel.ObservableCollection<Option> SevenZipCompressionMethodOptions { get; } = new();
+    [ObservableProperty] private Option? _selectedSevenZipCompressionMethodOption;
+
+    public System.Collections.ObjectModel.ObservableCollection<Option> SevenZipSolidBlockSizeOptions { get; } = new();
+    [ObservableProperty] private Option? _selectedSevenZipSolidBlockSizeOption;
+
+    public System.Collections.ObjectModel.ObservableCollection<Option> SevenZipDictionarySizeOptions { get; } = new();
+    [ObservableProperty] private Option? _selectedSevenZipDictionarySizeOption;
+
+    public System.Collections.ObjectModel.ObservableCollection<Option> SevenZipNumFastBytesOptions { get; } = new();
+    [ObservableProperty] private Option? _selectedSevenZipNumFastBytesOption;
+
+    public System.Collections.ObjectModel.ObservableCollection<Option> SevenZipMatchFinderOptions { get; } = new();
+    [ObservableProperty] private Option? _selectedSevenZipMatchFinderOption;
+
+    public System.Collections.ObjectModel.ObservableCollection<Option> ZipCompressionMethodOptions { get; } = new();
+    [ObservableProperty] private Option? _selectedZipCompressionMethodOption;
+
+    public System.Collections.ObjectModel.ObservableCollection<Option> ZipEncryptionMethodOptions { get; } = new();
+    [ObservableProperty] private Option? _selectedZipEncryptionMethodOption;
+
+    public System.Collections.ObjectModel.ObservableCollection<Option> ZipEncodingOptions { get; } = new();
+    [ObservableProperty] private Option? _selectedZipEncodingOption;
+
     // ── Localized strings ──
 
     public string WindowTitle => LocalizationManager.T("Settings_Title");
@@ -250,6 +312,10 @@ public partial class SettingsWindowViewModel : ObservableObject
     public string PreviewShowPanelText => LocalizationManager.T("Settings_Preview_ShowPanel");
     public string PreviewMaxFileSizeText => LocalizationManager.T("Settings_Preview_MaxFileSize");
 
+    // Preview — Magic Detection
+    public string EnableFormatDetectionText => "启用格式检测（魔数识别）";
+    public string PreviewHeadSizeText => "检测头部字节数";
+
     // Preview — computed properties (slider-friendly MB)
     public double MaxTextPreviewMB
     {
@@ -266,6 +332,15 @@ public partial class SettingsWindowViewModel : ObservableObject
     }
 
     public string MaxPreviewFileSizeMBText => $"{(int)MaxPreviewFileSizeMB} MB";
+
+    // PreviewHeadSize slider — stored as bytes, slider-friendly in KB (1–64)
+    public double PreviewHeadSizeKB
+    {
+        get => PreviewHeadSize / 1024.0;
+        set => PreviewHeadSize = (int)(value * 1024);
+    }
+
+    public string PreviewHeadSizeKBText => $"{PreviewHeadSize / 1024} KB";
 
     // Compress strings
     public string DefaultFormatText => LocalizationManager.T("Settings_DefaultFormat");
@@ -385,6 +460,8 @@ public partial class SettingsWindowViewModel : ObservableObject
         _infoPanelOrientation = _settings.InfoPanelOrientation;
         _showPreviewPanel = _settings.ShowPreviewPanel;
         _useColorEmoji = _settings.UseColorEmoji;
+        _enableFormatDetection = _settings.EnableFormatDetection;
+        _previewHeadSize = _settings.PreviewHeadSize;
 
         // Debug
         _enableDebugLogging = _settings.EnableDebugLogging;
@@ -393,6 +470,18 @@ public partial class SettingsWindowViewModel : ObservableObject
         // Compress (additional)
         _closeAfterCompress = _settings.CloseAfterCompress;
         _keepOriginalExtension = _settings.KeepOriginalExtension;
+
+        // Compression advanced
+        _sevenZipCompressionMethod = _settings.SevenZipCompressionMethod;
+        _sevenZipSolid = _settings.SevenZipSolid;
+        _sevenZipSolidBlockSize = _settings.SevenZipSolidBlockSize;
+        _sevenZipDictionarySize = _settings.SevenZipDictionarySize;
+        _sevenZipNumFastBytes = _settings.SevenZipNumFastBytes;
+        _sevenZipMatchFinder = _settings.SevenZipMatchFinder;
+        _zipCompressionMethod = _settings.ZipCompressionMethod;
+        _zipEncryptionMethod = _settings.ZipEncryptionMethod;
+        _zipEncoding = _settings.ZipEncoding;
+        _sevenZipEncryptHeaders = _settings.SevenZipEncryptHeaders;
 
         // Extract
         _extractDestination = _settings.ExtractDestination;
@@ -491,6 +580,60 @@ public partial class SettingsWindowViewModel : ObservableObject
 
         // 字体列表（文本预览 + 全局界面共用同一份系统字体枚举）
         PopulateFontOptions();
+
+        // Compression advanced combos
+        SevenZipCompressionMethodOptions.Clear();
+        SevenZipCompressionMethodOptions.Add(new Option("LZMA", "LZMA"));
+        SevenZipCompressionMethodOptions.Add(new Option("LZMA2", "LZMA2"));
+        SevenZipCompressionMethodOptions.Add(new Option("PPMd", "PPMd"));
+        SevenZipCompressionMethodOptions.Add(new Option("BZip2", "BZip2"));
+        SevenZipCompressionMethodOptions.Add(new Option("Deflate", "Deflate"));
+
+        SevenZipSolidBlockSizeOptions.Clear();
+        SevenZipSolidBlockSizeOptions.Add(new Option("默认", ""));
+        SevenZipSolidBlockSizeOptions.Add(new Option("64 MB", "64m"));
+        SevenZipSolidBlockSizeOptions.Add(new Option("256 MB", "256m"));
+        SevenZipSolidBlockSizeOptions.Add(new Option("512 MB", "512m"));
+        SevenZipSolidBlockSizeOptions.Add(new Option("1 GB", "1g"));
+
+        SevenZipDictionarySizeOptions.Clear();
+        SevenZipDictionarySizeOptions.Add(new Option("默认", "0"));
+        SevenZipDictionarySizeOptions.Add(new Option("16 MB", "16777216"));
+        SevenZipDictionarySizeOptions.Add(new Option("32 MB", "33554432"));
+        SevenZipDictionarySizeOptions.Add(new Option("128 MB", "134217728"));
+        SevenZipDictionarySizeOptions.Add(new Option("256 MB", "268435456"));
+
+        SevenZipNumFastBytesOptions.Clear();
+        SevenZipNumFastBytesOptions.Add(new Option("默认", "0"));
+        SevenZipNumFastBytesOptions.Add(new Option("32", "32"));
+        SevenZipNumFastBytesOptions.Add(new Option("64", "64"));
+        SevenZipNumFastBytesOptions.Add(new Option("128", "128"));
+        SevenZipNumFastBytesOptions.Add(new Option("255", "255"));
+
+        SevenZipMatchFinderOptions.Clear();
+        SevenZipMatchFinderOptions.Add(new Option("默认", ""));
+        SevenZipMatchFinderOptions.Add(new Option("BT2", "bt2"));
+        SevenZipMatchFinderOptions.Add(new Option("BT3", "bt3"));
+        SevenZipMatchFinderOptions.Add(new Option("BT4", "bt4"));
+
+        ZipCompressionMethodOptions.Clear();
+        ZipCompressionMethodOptions.Add(new Option("deflate", "deflate"));
+        ZipCompressionMethodOptions.Add(new Option("deflate64", "deflate64"));
+        ZipCompressionMethodOptions.Add(new Option("bzip2", "bzip2"));
+        ZipCompressionMethodOptions.Add(new Option("lzma", "lzma"));
+        ZipCompressionMethodOptions.Add(new Option("ppmd", "ppmd"));
+        ZipCompressionMethodOptions.Add(new Option("store", "store"));
+
+        ZipEncryptionMethodOptions.Clear();
+        ZipEncryptionMethodOptions.Add(new Option("aes256", "aes256"));
+        ZipEncryptionMethodOptions.Add(new Option("aes192", "aes192"));
+        ZipEncryptionMethodOptions.Add(new Option("aes128", "aes128"));
+        ZipEncryptionMethodOptions.Add(new Option("zipcrypto", "zipcrypto"));
+
+        ZipEncodingOptions.Clear();
+        ZipEncodingOptions.Add(new Option("UTF-8", "utf-8"));
+        ZipEncodingOptions.Add(new Option("GBK", "gbk"));
+        ZipEncodingOptions.Add(new Option("系统默认", "default"));
     }
 
     /// <summary>
@@ -538,6 +681,16 @@ public partial class SettingsWindowViewModel : ObservableObject
 
         SelectedAppFontFamilyOption = AppFontFamilyOptions.FirstOrDefault(o => o.Value == AppFontFamily)
                                       ?? AppFontFamilyOptions.FirstOrDefault();
+
+        // Compression advanced
+        SelectedSevenZipCompressionMethodOption = SevenZipCompressionMethodOptions.FirstOrDefault(o => o.Value == SevenZipCompressionMethod);
+        SelectedSevenZipSolidBlockSizeOption = SevenZipSolidBlockSizeOptions.FirstOrDefault(o => o.Value == SevenZipSolidBlockSize);
+        SelectedSevenZipDictionarySizeOption = SevenZipDictionarySizeOptions.FirstOrDefault(o => o.Value == SevenZipDictionarySize.ToString());
+        SelectedSevenZipNumFastBytesOption = SevenZipNumFastBytesOptions.FirstOrDefault(o => o.Value == SevenZipNumFastBytes.ToString());
+        SelectedSevenZipMatchFinderOption = SevenZipMatchFinderOptions.FirstOrDefault(o => o.Value == SevenZipMatchFinder);
+        SelectedZipCompressionMethodOption = ZipCompressionMethodOptions.FirstOrDefault(o => o.Value == ZipCompressionMethod);
+        SelectedZipEncryptionMethodOption = ZipEncryptionMethodOptions.FirstOrDefault(o => o.Value == ZipEncryptionMethod);
+        SelectedZipEncodingOption = ZipEncodingOptions.FirstOrDefault(o => o.Value == ZipEncoding);
     }
 
     private void OnCultureChanged(object? sender, EventArgs e)
@@ -578,6 +731,10 @@ public partial class SettingsWindowViewModel : ObservableObject
         OnPropertyChanged(nameof(PreviewMaxFileSizeText));
         OnPropertyChanged(nameof(MaxTextPreviewMBText));
         OnPropertyChanged(nameof(MaxPreviewFileSizeMBText));
+
+        OnPropertyChanged(nameof(EnableFormatDetectionText));
+        OnPropertyChanged(nameof(PreviewHeadSizeText));
+        OnPropertyChanged(nameof(PreviewHeadSizeKBText));
 
         OnPropertyChanged(nameof(DefaultFormatText));
         OnPropertyChanged(nameof(CompressionLevelText));
@@ -669,6 +826,18 @@ public partial class SettingsWindowViewModel : ObservableObject
         _settings.CloseAfterCompress = CloseAfterCompress;
         _settings.KeepOriginalExtension = KeepOriginalExtension;
 
+        // Compression advanced
+        _settings.SevenZipCompressionMethod = SelectedSevenZipCompressionMethodOption?.Value ?? SevenZipCompressionMethod;
+        _settings.SevenZipSolid = SevenZipSolid;
+        _settings.SevenZipSolidBlockSize = SelectedSevenZipSolidBlockSizeOption?.Value ?? SevenZipSolidBlockSize;
+        _settings.SevenZipDictionarySize = int.Parse(SelectedSevenZipDictionarySizeOption?.Value ?? SevenZipDictionarySize.ToString());
+        _settings.SevenZipNumFastBytes = int.Parse(SelectedSevenZipNumFastBytesOption?.Value ?? SevenZipNumFastBytes.ToString());
+        _settings.SevenZipMatchFinder = SelectedSevenZipMatchFinderOption?.Value ?? SevenZipMatchFinder;
+        _settings.ZipCompressionMethod = SelectedZipCompressionMethodOption?.Value ?? ZipCompressionMethod;
+        _settings.ZipEncryptionMethod = SelectedZipEncryptionMethodOption?.Value ?? ZipEncryptionMethod;
+        _settings.ZipEncoding = SelectedZipEncodingOption?.Value ?? ZipEncoding;
+        _settings.SevenZipEncryptHeaders = SevenZipEncryptHeaders;
+
         // Preview
         _settings.EnableImagePreview = EnableImagePreview;
         _settings.EnableTextPreview = EnableTextPreview;
@@ -684,6 +853,8 @@ public partial class SettingsWindowViewModel : ObservableObject
         _settings.InfoPanelOrientation = SelectedInfoPanelOrientationOption?.Value ?? InfoPanelOrientation;
         _settings.ShowPreviewPanel = ShowPreviewPanel;
         _settings.UseColorEmoji = UseColorEmoji;
+        _settings.EnableFormatDetection = EnableFormatDetection;
+        _settings.PreviewHeadSize = PreviewHeadSize;
 
         // Debug
         _settings.EnableDebugLogging = EnableDebugLogging;

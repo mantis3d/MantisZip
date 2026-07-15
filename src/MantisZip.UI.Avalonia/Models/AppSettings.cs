@@ -13,6 +13,16 @@ public class AppSettings
     public int DefaultLevel { get; set; } = 5;
     public bool CloseAfterCompress { get; set; } = true;
     public bool KeepOriginalExtension { get; set; } = false;
+    public string ZipEncoding { get; set; } = "utf-8";
+    public string SevenZipCompressionMethod { get; set; } = "LZMA2";
+    public bool SevenZipSolid { get; set; } = true;
+    public string SevenZipSolidBlockSize { get; set; } = "";
+    public int SevenZipDictionarySize { get; set; } = 0;
+    public int SevenZipNumFastBytes { get; set; } = 0;
+    public string SevenZipMatchFinder { get; set; } = "";
+    public string ZipCompressionMethod { get; set; } = "deflate";
+    public string ZipEncryptionMethod { get; set; } = "aes256";
+    public bool SevenZipEncryptHeaders { get; set; } = true;
 
     // ===== 解压 =====
     public string ExtractDestination { get; set; } = "ask"; // same-dir / desktop / last / ask
@@ -57,6 +67,8 @@ public class AppSettings
     public string InfoPanelOrientation { get; set; } = "Vertical";
     public bool ShowPreviewPanel { get; set; } = true;
     public bool UseColorEmoji { get; set; } = true;
+    public bool EnableFormatDetection { get; set; } = true;
+    public int PreviewHeadSize { get; set; } = 4096;
 
     // ===== 密码管理 =====
     public bool ShowPasswordMatchNotification { get; set; } = true;

@@ -75,6 +75,121 @@
                           IsChecked="{Binding PreserveDirectoryRoot}" />
               </StackPanel>
             </Border>
+
+            <!-- 高级选项 -->
+            <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
+                    CornerRadius="4" Padding="12" Background="{DynamicResource ThemeSurfaceBgBrush}">
+              <StackPanel Spacing="8">
+                <TextBlock Text="高级选项" FontWeight="SemiBold" />
+
+                <Grid ColumnDefinitions="120,*">
+                  <TextBlock Text="ZIP 编码" VerticalAlignment="Center" />
+                  <ComboBox Grid.Column="1" ItemsSource="{Binding ZipEncodingOptions}"
+                            SelectedItem="{Binding SelectedZipEncodingOption}"
+                            Width="200" HorizontalAlignment="Left">
+                    <ComboBox.ItemTemplate>
+                      <DataTemplate>
+                        <TextBlock Text="{Binding Display}" />
+                      </DataTemplate>
+                    </ComboBox.ItemTemplate>
+                  </ComboBox>
+                </Grid>
+
+                <Grid ColumnDefinitions="120,*">
+                  <TextBlock Text="ZIP 压缩方法" VerticalAlignment="Center" />
+                  <ComboBox Grid.Column="1" ItemsSource="{Binding ZipCompressionMethodOptions}"
+                            SelectedItem="{Binding SelectedZipCompressionMethodOption}"
+                            Width="200" HorizontalAlignment="Left">
+                    <ComboBox.ItemTemplate>
+                      <DataTemplate>
+                        <TextBlock Text="{Binding Display}" />
+                      </DataTemplate>
+                    </ComboBox.ItemTemplate>
+                  </ComboBox>
+                </Grid>
+
+                <Grid ColumnDefinitions="120,*">
+                  <TextBlock Text="ZIP 加密方法" VerticalAlignment="Center" />
+                  <ComboBox Grid.Column="1" ItemsSource="{Binding ZipEncryptionMethodOptions}"
+                            SelectedItem="{Binding SelectedZipEncryptionMethodOption}"
+                            Width="200" HorizontalAlignment="Left">
+                    <ComboBox.ItemTemplate>
+                      <DataTemplate>
+                        <TextBlock Text="{Binding Display}" />
+                      </DataTemplate>
+                    </ComboBox.ItemTemplate>
+                  </ComboBox>
+                </Grid>
+
+                <Grid ColumnDefinitions="120,*">
+                  <TextBlock Text="7z 压缩方法" VerticalAlignment="Center" />
+                  <ComboBox Grid.Column="1" ItemsSource="{Binding SevenZipCompressionMethodOptions}"
+                            SelectedItem="{Binding SelectedSevenZipCompressionMethodOption}"
+                            Width="200" HorizontalAlignment="Left">
+                    <ComboBox.ItemTemplate>
+                      <DataTemplate>
+                        <TextBlock Text="{Binding Display}" />
+                      </DataTemplate>
+                    </ComboBox.ItemTemplate>
+                  </ComboBox>
+                </Grid>
+
+                <CheckBox Content="7z 固实压缩" IsChecked="{Binding SevenZipSolid}" />
+                <CheckBox Content="7z 加密文件名" IsChecked="{Binding SevenZipEncryptHeaders}" />
+
+                <Grid ColumnDefinitions="120,*">
+                  <TextBlock Text="7z 固实块大小" VerticalAlignment="Center" />
+                  <ComboBox Grid.Column="1" ItemsSource="{Binding SevenZipSolidBlockSizeOptions}"
+                            SelectedItem="{Binding SelectedSevenZipSolidBlockSizeOption}"
+                            Width="200" HorizontalAlignment="Left">
+                    <ComboBox.ItemTemplate>
+                      <DataTemplate>
+                        <TextBlock Text="{Binding Display}" />
+                      </DataTemplate>
+                    </ComboBox.ItemTemplate>
+                  </ComboBox>
+                </Grid>
+
+                <Grid ColumnDefinitions="120,*">
+                  <TextBlock Text="7z 字典大小" VerticalAlignment="Center" />
+                  <ComboBox Grid.Column="1" ItemsSource="{Binding SevenZipDictionarySizeOptions}"
+                            SelectedItem="{Binding SelectedSevenZipDictionarySizeOption}"
+                            Width="200" HorizontalAlignment="Left">
+                    <ComboBox.ItemTemplate>
+                      <DataTemplate>
+                        <TextBlock Text="{Binding Display}" />
+                      </DataTemplate>
+                    </ComboBox.ItemTemplate>
+                  </ComboBox>
+                </Grid>
+
+                <Grid ColumnDefinitions="120,*">
+                  <TextBlock Text="7z 单词大小" VerticalAlignment="Center" />
+                  <ComboBox Grid.Column="1" ItemsSource="{Binding SevenZipNumFastBytesOptions}"
+                            SelectedItem="{Binding SelectedSevenZipNumFastBytesOption}"
+                            Width="200" HorizontalAlignment="Left">
+                    <ComboBox.ItemTemplate>
+                      <DataTemplate>
+                        <TextBlock Text="{Binding Display}" />
+                      </DataTemplate>
+                    </ComboBox.ItemTemplate>
+                  </ComboBox>
+                </Grid>
+
+                <Grid ColumnDefinitions="120,*">
+                  <TextBlock Text="7z 匹配器" VerticalAlignment="Center" />
+                  <ComboBox Grid.Column="1" ItemsSource="{Binding SevenZipMatchFinderOptions}"
+                            SelectedItem="{Binding SelectedSevenZipMatchFinderOption}"
+                            Width="200" HorizontalAlignment="Left">
+                    <ComboBox.ItemTemplate>
+                      <DataTemplate>
+                        <TextBlock Text="{Binding Display}" />
+                      </DataTemplate>
+                    </ComboBox.ItemTemplate>
+                  </ComboBox>
+                </Grid>
+              </StackPanel>
+            </Border>
           </StackPanel>
         </ScrollViewer>
       </TabItem>
@@ -245,6 +360,25 @@
                           </DataTemplate>
                         </ComboBox.ItemTemplate>
                       </ComboBox>
+                    </StackPanel>
+                  </Border>
+
+                  <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
+                          CornerRadius="4" Padding="12" Background="{DynamicResource ThemeSurfaceBgBrush}">
+                    <StackPanel Spacing="8">
+                      <TextBlock Text="格式检测（魔数）" FontWeight="SemiBold" />
+                      <CheckBox Content="{Binding EnableFormatDetectionText}"
+                                IsChecked="{Binding EnableFormatDetection}" />
+                      <Grid ColumnDefinitions="*,Auto">
+                        <Slider Grid.Column="0" Minimum="1" Maximum="64"
+                                Value="{Binding PreviewHeadSizeKB}"
+                                TickFrequency="1" IsSnapToTickEnabled="True"
+                                Margin="0,0,8,0" />
+                        <Border Grid.Column="1" Padding="8,2">
+                          <TextBlock Text="{Binding PreviewHeadSizeKBText}"
+                                     VerticalAlignment="Center" FontWeight="SemiBold" />
+                        </Border>
+                      </Grid>
                     </StackPanel>
                   </Border>
 

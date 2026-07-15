@@ -108,8 +108,7 @@ public partial class DynamicFormatOptionsPanel : UserControl
 
     /// <summary>
     /// Load default values from AppSettings into the controls.
-    /// Note: Full settings integration requires ZipEncoding, SevenZipCompressionMethod,
-    /// and SevenZipSolid properties to be added to AppSettings. For now, sets sensible defaults.
+    /// Reads ZipEncoding, SevenZipCompressionMethod, and SevenZipSolid from AppSettings.
     /// </summary>
     public void LoadDefaults()
     {
@@ -128,14 +127,30 @@ public partial class DynamicFormatOptionsPanel : UserControl
                 break;
         }
 
-        // ZIP encoding — default to UTF-8 (index 0)
-        EncodingCombo.SelectedIndex = 0;
+        // ZIP encoding — select from settings
+        var encodingTag = (settings.ZipEncoding ?? "utf-8").ToLowerInvariant();
+        foreach (var item in EncodingCombo.Items)
+        {
+            if (item is ComboBoxItem comboItem && comboItem.Tag is string tag && tag.ToLowerInvariant() == encodingTag)
+            {
+                EncodingCombo.SelectedItem = comboItem;
+                break;
+            }
+        }
 
-        // 7z compression method — default to LZMA2 (index 1)
-        MethodCombo.SelectedIndex = 1;
+        // 7z compression method — select from settings
+        var methodTag = settings.SevenZipCompressionMethod ?? "LZMA2";
+        foreach (var item in MethodCombo.Items)
+        {
+            if (item is ComboBoxItem comboItem && comboItem.Tag is string tag && string.Equals(tag, methodTag, StringComparison.OrdinalIgnoreCase))
+            {
+                MethodCombo.SelectedItem = comboItem;
+                break;
+            }
+        }
 
-        // 7z solid — default true
-        SolidCheck.IsChecked = true;
+        // 7z solid — from settings
+        SolidCheck.IsChecked = settings.SevenZipSolid;
     }
 
     // ── Private Methods ────────────────────────────────────────────────────
