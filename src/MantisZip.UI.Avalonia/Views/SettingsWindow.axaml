@@ -76,11 +76,11 @@
               </StackPanel>
             </Border>
 
-            <!-- 高级选项 -->
+            <!-- ZIP 默认选项 -->
             <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
                     CornerRadius="4" Padding="12" Background="{DynamicResource ThemeSurfaceBgBrush}">
               <StackPanel Spacing="8">
-                <TextBlock Text="高级选项" FontWeight="SemiBold" />
+                <TextBlock Text="ZIP 默认选项" FontWeight="SemiBold" />
 
                 <Grid ColumnDefinitions="120,*">
                   <TextBlock Text="ZIP 编码" VerticalAlignment="Center" />
@@ -120,6 +120,14 @@
                     </ComboBox.ItemTemplate>
                   </ComboBox>
                 </Grid>
+              </StackPanel>
+            </Border>
+
+            <!-- 7z 默认选项 -->
+            <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
+                    CornerRadius="4" Padding="12" Background="{DynamicResource ThemeSurfaceBgBrush}">
+              <StackPanel Spacing="8">
+                <TextBlock Text="7z 默认选项" FontWeight="SemiBold" />
 
                 <Grid ColumnDefinitions="120,*">
                   <TextBlock Text="7z 压缩方法" VerticalAlignment="Center" />

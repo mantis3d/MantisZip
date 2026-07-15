@@ -537,9 +537,8 @@ public partial class SettingsWindowViewModel : ObservableObject
     private void PopulateComboOptions()
     {
         DefaultFormatOptions.Clear();
-        DefaultFormatOptions.Add(new Option("zip", "zip"));
-        DefaultFormatOptions.Add(new Option("7z", "7z"));
-        DefaultFormatOptions.Add(new Option("tar.gz", "tar.gz"));
+        foreach (var val in CompressionOptionData.ArchiveFormatValues)
+            DefaultFormatOptions.Add(new Option(val, val));
 
         PreviewPositionOptions.Clear();
         PreviewPositionOptions.Add(new Option(PreviewPositionBottomText, "1"));
@@ -581,59 +580,53 @@ public partial class SettingsWindowViewModel : ObservableObject
         // 字体列表（文本预览 + 全局界面共用同一份系统字体枚举）
         PopulateFontOptions();
 
-        // Compression advanced combos
+        // Compression advanced combos — populated from CompressionOptionData (single source of truth)
         SevenZipCompressionMethodOptions.Clear();
-        SevenZipCompressionMethodOptions.Add(new Option("LZMA", "LZMA"));
-        SevenZipCompressionMethodOptions.Add(new Option("LZMA2", "LZMA2"));
-        SevenZipCompressionMethodOptions.Add(new Option("PPMd", "PPMd"));
-        SevenZipCompressionMethodOptions.Add(new Option("BZip2", "BZip2"));
-        SevenZipCompressionMethodOptions.Add(new Option("Deflate", "Deflate"));
+        foreach (var opt in CompressionOptionData.SevenZipMethods)
+            SevenZipCompressionMethodOptions.Add(new Option(opt.Display, opt.Tag));
 
         SevenZipSolidBlockSizeOptions.Clear();
-        SevenZipSolidBlockSizeOptions.Add(new Option("默认", ""));
-        SevenZipSolidBlockSizeOptions.Add(new Option("64 MB", "64m"));
-        SevenZipSolidBlockSizeOptions.Add(new Option("256 MB", "256m"));
-        SevenZipSolidBlockSizeOptions.Add(new Option("512 MB", "512m"));
-        SevenZipSolidBlockSizeOptions.Add(new Option("1 GB", "1g"));
+        foreach (var opt in CompressionOptionData.SevenZipSolidBlockSizes)
+        {
+            var display = opt.Tag == "" ? LocalizationManager.T("FormatOptions_7z_SolidBlockSize_Default") : opt.Display;
+            SevenZipSolidBlockSizeOptions.Add(new Option(display, opt.Tag));
+        }
 
         SevenZipDictionarySizeOptions.Clear();
-        SevenZipDictionarySizeOptions.Add(new Option("默认", "0"));
-        SevenZipDictionarySizeOptions.Add(new Option("16 MB", "16777216"));
-        SevenZipDictionarySizeOptions.Add(new Option("32 MB", "33554432"));
-        SevenZipDictionarySizeOptions.Add(new Option("128 MB", "134217728"));
-        SevenZipDictionarySizeOptions.Add(new Option("256 MB", "268435456"));
+        foreach (var opt in CompressionOptionData.SevenZipDictionarySizes)
+        {
+            var display = opt.Tag == "0" ? LocalizationManager.T("FormatOptions_7z_DictSize_Default") : opt.Display;
+            SevenZipDictionarySizeOptions.Add(new Option(display, opt.Tag));
+        }
 
         SevenZipNumFastBytesOptions.Clear();
-        SevenZipNumFastBytesOptions.Add(new Option("默认", "0"));
-        SevenZipNumFastBytesOptions.Add(new Option("32", "32"));
-        SevenZipNumFastBytesOptions.Add(new Option("64", "64"));
-        SevenZipNumFastBytesOptions.Add(new Option("128", "128"));
-        SevenZipNumFastBytesOptions.Add(new Option("255", "255"));
+        foreach (var opt in CompressionOptionData.SevenZipNumFastBytes)
+        {
+            var display = opt.Tag == "0" ? LocalizationManager.T("FormatOptions_7z_WordSize_Default") : opt.Display;
+            SevenZipNumFastBytesOptions.Add(new Option(display, opt.Tag));
+        }
 
         SevenZipMatchFinderOptions.Clear();
-        SevenZipMatchFinderOptions.Add(new Option("默认", ""));
-        SevenZipMatchFinderOptions.Add(new Option("BT2", "bt2"));
-        SevenZipMatchFinderOptions.Add(new Option("BT3", "bt3"));
-        SevenZipMatchFinderOptions.Add(new Option("BT4", "bt4"));
+        foreach (var opt in CompressionOptionData.SevenZipMatchFinders)
+        {
+            var display = opt.Tag == "" ? LocalizationManager.T("FormatOptions_7z_MatchFinder_Default") : opt.Display;
+            SevenZipMatchFinderOptions.Add(new Option(display, opt.Tag));
+        }
 
         ZipCompressionMethodOptions.Clear();
-        ZipCompressionMethodOptions.Add(new Option("deflate", "deflate"));
-        ZipCompressionMethodOptions.Add(new Option("deflate64", "deflate64"));
-        ZipCompressionMethodOptions.Add(new Option("bzip2", "bzip2"));
-        ZipCompressionMethodOptions.Add(new Option("lzma", "lzma"));
-        ZipCompressionMethodOptions.Add(new Option("ppmd", "ppmd"));
-        ZipCompressionMethodOptions.Add(new Option("store", "store"));
+        foreach (var opt in CompressionOptionData.ZipCompressionMethods)
+            ZipCompressionMethodOptions.Add(new Option(opt.Display, opt.Tag));
 
         ZipEncryptionMethodOptions.Clear();
-        ZipEncryptionMethodOptions.Add(new Option("aes256", "aes256"));
-        ZipEncryptionMethodOptions.Add(new Option("aes192", "aes192"));
-        ZipEncryptionMethodOptions.Add(new Option("aes128", "aes128"));
-        ZipEncryptionMethodOptions.Add(new Option("zipcrypto", "zipcrypto"));
+        foreach (var opt in CompressionOptionData.ZipEncryptionMethods)
+            ZipEncryptionMethodOptions.Add(new Option(opt.Display, opt.Tag));
 
         ZipEncodingOptions.Clear();
-        ZipEncodingOptions.Add(new Option("UTF-8", "utf-8"));
-        ZipEncodingOptions.Add(new Option("GBK", "gbk"));
-        ZipEncodingOptions.Add(new Option("系统默认", "default"));
+        foreach (var opt in CompressionOptionData.ZipEncodings)
+        {
+            var display = opt.Tag == "default" ? LocalizationManager.T("FormatOptions_Zip_EncodingDefault") : opt.Display;
+            ZipEncodingOptions.Add(new Option(display, opt.Tag));
+        }
     }
 
     /// <summary>

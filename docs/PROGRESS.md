@@ -15,8 +15,12 @@
 
 ### avalonia-port 分支 (WIP)
   - **P0-3 魔数检测预览格式信息栏** — 魔数检测结果写入预览信息栏 `FormatMetadata`（`Insert(0, "格式")`）；扩展名冲突时显示 `⚠️ {name}（扩展名: .ext）`；匹配 WPF 行为（检测关闭时不显示、魔数失败时扩展名回退）(2026-07-15)
-  - **P0-3 魔数检测预览修复** — `App.axaml.cs` 启动时初始化 `PreviewService.EnableFormatDetection`/`PreviewHeadSize`；`ShowPreviewAsync` 第 549 行改为先调用 `ClassifyPreviewByMagicAsync` 魔数检测，失败则回退 `ClassifyPreview(ext)` 扩展名判定；魔数检测结果影响预览类型路由（扩展名不再硬编码）(2026-07-15)
+  - **P0-3 魔数检测预览修复** — `App.axaml.cs` 启动时初始化 `PreviewService.EnableFormatDetection`/`PreviewHeadSize`；`ShowPreviewAsync` 第 549 行改为先调用 `ClassifyPreviewByMagicAsync` 魔数检测，失败则回退 `ClassifyPreview(ext)` 扩展名判定；魔数检测结果影响预览类型路由（扩展名不再硬编码）；修复"格式"行累积 bug — 插入前先反向遍历移除旧 `Key == "格式"` 项 (2026-07-15)
   - **P0-2 压缩选项增强** — `AppSettings` 新增 10 个压缩属性（ZipEncoding/SevenZipCompressionMethod/SevenZipSolid/SevenZipSolidBlockSize/SevenZipDictionarySize/SevenZipNumFastBytes/SevenZipMatchFinder/ZipCompressionMethod/ZipEncryptionMethod/SevenZipEncryptHeaders）；`DynamicFormatOptionsPanel.LoadDefaults()` 从硬编码索引改为读取 AppSettings 实际值；`SettingsWindowViewModel` 新增 10 个 `[ObservableProperty]` + 8 个 ComboBox Option 集合；SettingsWindow 压缩 Tab 新增「高级选项」区域 10 个控件 (2026-07-15)
+  - **P0-2 压缩选项增强(二)** — SettingsWindow 压缩选项拆为 ZIP/7z 两个独立 Border 分组；DynamicFormatOptionsPanel 移除 `DataContext = self` 修复格式切换不联动；
+    DynamicFormatOptionsPanel 补齐 WPF 缺失的控件（ZIP 压缩方法、7z 固实块大小/字典大小/单词大小/匹配器）；文本与 WPF `CompressOpt_*` 完全对齐（en/zh-CN）；
+    新建 `Services/CompressionOptionData.cs` 共享数据类，SettingsWindowViewModel / DynamicFormatOptionsPanel / CompressSettingsViewModel 统一从此读取选项列表，消除 SettingsWindow 与压缩面板之间的选项不一致（固实块大小 WPF 的 10 项 vs 旧版 5 项等）；
+    CompressSettingsWindow 格式 ComboBox 补充 7z 选项、集成 DynamicFormatOptionsPanel、打开时从 AppSettings 加载默认值 (2026-07-15)
   - **CSV/SQLite 预览 DataGrid 修复** — Avalonia DataGrid `AutoGenerateColumns` 不兼容 `DataView`（已知 Issue #27），改为手动 `SetupDataGridColumns` 创建列绑定 `Row.ItemArray[i]`；修复水平滚动条缺失（移除外层 ScrollViewer）、列标题不刷新（监听 CsvData/SqliteTableData）、添加网格线；BT 种子文件列表改为目录树结构 (`TorrentTreeNode` + `TreeDataTemplate`)；预览标题使用种子/字体内部名称 (2026-07-09)
   - **FontParser 优先显示中文名称** — 字体 name 表解析新增 `lid`（language ID）追踪；`ShouldReplaceNameEntry` 同平台下优先取简体中文（lid=0x0804），中文字体标题栏显示中文名 (2026-07-09)
   - **全局界面字体设置 + 文本预览字体隔离** — 设置窗口外观 Tab 新增"全局界面字体" ComboBox（枚举系统字体）；`AppSettings.AppFontFamily` 持久化；`App.axaml` 添加 Window 级 `FontFamily="{DynamicResource AppGlobalFont}"` 样式；`ApplyAppFontFamily()` 在启动和保存设置后刷新资源 + 迭代已打开窗口应用（特定字体设本地值，默认字体清本地值避免 hover 回退）；文本预览 TextBox 改为绑定 `TextPreviewFontFamily` 而非继承的 `FontFamily`，避免被全局字体覆盖；文本预览字号调节（A+/A−）即时持久化到 `AppSettings.TextPreviewFontSize`；新增中英文键 `Settings_Preview_FontDefault` / `Settings_Appearance_AppFontFamily` (2026-07-06)

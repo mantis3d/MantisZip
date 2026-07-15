@@ -10,13 +10,15 @@
           MinHeight="100"
           Background="{DynamicResource ThemeSurfaceBgBrush}">
     <Grid>
-      <!-- ZIP panel -->
+      <!-- ═══════ ZIP panel ═══════ -->
       <StackPanel x:Name="ZipPanel" IsVisible="True">
         <TextBlock Text="{Binding ZipPanelTitle, RelativeSource={RelativeSource AncestorType=UserControl}}"
                    FontWeight="SemiBold"
                    Margin="0,0,0,6"
                    Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
-        <Grid>
+
+        <!-- ZIP encoding -->
+        <Grid Margin="0,0,0,6">
           <Grid.ColumnDefinitions>
             <ColumnDefinition Width="80" />
             <ColumnDefinition Width="*" />
@@ -28,23 +30,38 @@
           <ComboBox x:Name="EncodingCombo"
                     Grid.Column="1"
                     Height="24"
-                    SelectedIndex="0"
                     Background="{DynamicResource ThemeComboBoxBgBrush}"
                     Foreground="{DynamicResource ThemeTextPrimaryBrush}"
-                    BorderBrush="{DynamicResource ThemeComboBoxBorderBrush}">
-            <ComboBoxItem Content="UTF-8" Tag="utf-8" />
-            <ComboBoxItem Content="GBK" Tag="gbk" />
-            <ComboBoxItem Content="{Binding EncodingDefaultLabel, RelativeSource={RelativeSource AncestorType=UserControl}}" Tag="default" />
-          </ComboBox>
+                    BorderBrush="{DynamicResource ThemeComboBoxBorderBrush}" />
+        </Grid>
+
+        <!-- ZIP compression method -->
+        <Grid>
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="80" />
+            <ColumnDefinition Width="*" />
+          </Grid.ColumnDefinitions>
+          <TextBlock Grid.Column="0"
+                     Text="{Binding ZipCompressionMethodLabel, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                     VerticalAlignment="Center"
+                     Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+          <ComboBox x:Name="ZipMethodCombo"
+                    Grid.Column="1"
+                    Height="24"
+                    Background="{DynamicResource ThemeComboBoxBgBrush}"
+                    Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                    BorderBrush="{DynamicResource ThemeComboBoxBorderBrush}" />
         </Grid>
       </StackPanel>
 
-      <!-- 7z panel -->
+      <!-- ═══════ 7z panel ═══════ -->
       <StackPanel x:Name="SevenZPanel" IsVisible="False">
         <TextBlock Text="{Binding SevenZPanelTitle, RelativeSource={RelativeSource AncestorType=UserControl}}"
                    FontWeight="SemiBold"
                    Margin="0,0,0,6"
                    Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+
+        <!-- 7z compression method -->
         <Grid Margin="0,0,0,6">
           <Grid.ColumnDefinitions>
             <ColumnDefinition Width="80" />
@@ -57,24 +74,92 @@
           <ComboBox x:Name="MethodCombo"
                     Grid.Column="1"
                     Height="24"
-                    SelectedIndex="1"
                     Background="{DynamicResource ThemeComboBoxBgBrush}"
                     Foreground="{DynamicResource ThemeTextPrimaryBrush}"
-                    BorderBrush="{DynamicResource ThemeComboBoxBorderBrush}">
-            <ComboBoxItem Content="LZMA" Tag="LZMA" />
-            <ComboBoxItem Content="LZMA2" Tag="LZMA2" />
-            <ComboBoxItem Content="PPMd" Tag="PPMd" />
-            <ComboBoxItem Content="BZip2" Tag="BZip2" />
-            <ComboBoxItem Content="Deflate" Tag="Deflate" />
-          </ComboBox>
+                    BorderBrush="{DynamicResource ThemeComboBoxBorderBrush}" />
         </Grid>
+
+        <!-- 7z solid checkbox -->
         <CheckBox x:Name="SolidCheck"
                   Content="{Binding SolidLabel, RelativeSource={RelativeSource AncestorType=UserControl}}"
                   IsChecked="True"
+                  IsCheckedChanged="SolidCheck_IsCheckedChanged"
                   Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+
+        <!-- 7z solid block size -->
+        <Grid Margin="0,6,0,0">
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="80" />
+            <ColumnDefinition Width="*" />
+          </Grid.ColumnDefinitions>
+          <TextBlock Grid.Column="0"
+                     Text="{Binding SolidBlockSizeLabel, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                     VerticalAlignment="Center"
+                     Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+          <ComboBox x:Name="SolidBlockSizeCombo"
+                    Grid.Column="1"
+                    Height="24"
+                    Background="{DynamicResource ThemeComboBoxBgBrush}"
+                    Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                    BorderBrush="{DynamicResource ThemeComboBoxBorderBrush}" />
+        </Grid>
+
+        <!-- 7z dictionary size -->
+        <Grid Margin="0,6,0,0">
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="80" />
+            <ColumnDefinition Width="*" />
+          </Grid.ColumnDefinitions>
+          <TextBlock Grid.Column="0"
+                     Text="{Binding DictSizeLabel, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                     VerticalAlignment="Center"
+                     Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+          <ComboBox x:Name="DictSizeCombo"
+                    Grid.Column="1"
+                    Height="24"
+                    Background="{DynamicResource ThemeComboBoxBgBrush}"
+                    Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                    BorderBrush="{DynamicResource ThemeComboBoxBorderBrush}" />
+        </Grid>
+
+        <!-- 7z word size (num fast bytes) -->
+        <Grid Margin="0,6,0,0">
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="80" />
+            <ColumnDefinition Width="*" />
+          </Grid.ColumnDefinitions>
+          <TextBlock Grid.Column="0"
+                     Text="{Binding WordSizeLabel, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                     VerticalAlignment="Center"
+                     Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+          <ComboBox x:Name="WordSizeCombo"
+                    Grid.Column="1"
+                    Height="24"
+                    Background="{DynamicResource ThemeComboBoxBgBrush}"
+                    Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                    BorderBrush="{DynamicResource ThemeComboBoxBorderBrush}" />
+        </Grid>
+
+        <!-- 7z match finder -->
+        <Grid Margin="0,6,0,0">
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="80" />
+            <ColumnDefinition Width="*" />
+          </Grid.ColumnDefinitions>
+          <TextBlock Grid.Column="0"
+                     Text="{Binding MatchFinderLabel, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                     VerticalAlignment="Center"
+                     Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+          <ComboBox x:Name="MatchFinderCombo"
+                    Grid.Column="1"
+                    Height="24"
+                    Background="{DynamicResource ThemeComboBoxBgBrush}"
+                    Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                    BorderBrush="{DynamicResource ThemeComboBoxBorderBrush}" />
+        </Grid>
       </StackPanel>
 
-      <!-- TAR.GZ placeholder panel -->
+      <!-- ═══════ TAR.GZ placeholder panel ═══════ -->
       <StackPanel x:Name="TarGzPanel" IsVisible="False">
         <TextBlock Text="{Binding TarGzPlaceholder, RelativeSource={RelativeSource AncestorType=UserControl}}"
                    Foreground="{DynamicResource ThemeTextSecondaryBrush}"

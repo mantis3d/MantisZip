@@ -691,6 +691,7 @@ public partial class MainWindowViewModel : ObservableObject
             }
 
             // 魔数检测结果写到信息栏（与 WPF 行为一致：显示格式名 + 扩展名冲突标记）
+            // 先移除上一文件的"格式"行，防止切换不清理 FormatMetadata 的格式（Text/CSV/PE/SVG/HTML/Markdown）时累积
             if (detectedFormatName != null)
             {
                 var extFormat = FileFormatDetector.DetectByExtension(ext);
@@ -700,6 +701,11 @@ public partial class MainWindowViewModel : ObservableObject
                 string formatValue = hasConflict
                     ? $"⚠️ {detectedFormatName}（扩展名: {ext}）"
                     : detectedFormatName;
+                for (int i = Preview.FormatMetadata.Count - 1; i >= 0; i--)
+                {
+                    if (Preview.FormatMetadata[i].Key == "格式")
+                        Preview.FormatMetadata.RemoveAt(i);
+                }
                 Preview.FormatMetadata.Insert(0, new FormatMetadataItem("格式", formatValue));
             }
         }

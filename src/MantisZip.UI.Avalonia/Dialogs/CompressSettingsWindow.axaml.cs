@@ -14,6 +14,7 @@ namespace MantisZip.UI.Avalonia.Dialogs;
 /// </summary>
 public partial class CompressSettingsWindow : Window
 {
+    private bool _loaded;
     /// <summary>
     /// ViewModel，公开属性供调用方关闭后读取。
     /// </summary>
@@ -46,6 +47,7 @@ public partial class CompressSettingsWindow : Window
                 FileTypeChoices = new[]
                 {
                     new FilePickerFileType("ZIP archives") { Patterns = new[] { "*.zip" } },
+                    new FilePickerFileType("7z archives") { Patterns = new[] { "*.7z" } },
                     new FilePickerFileType("TAR.GZ archives") { Patterns = new[] { "*.tar.gz" } },
                 }
             });
@@ -82,6 +84,15 @@ public partial class CompressSettingsWindow : Window
 
         DataContext = ViewModel;
         SubscribeViewModel();
+        Loaded += OnLoaded;
+    }
+
+    private void OnLoaded(object? sender, RoutedEventArgs e)
+    {
+        if (_loaded) return;
+        _loaded = true;
+
+        FormatOptionsPanel.LoadDefaults();
     }
 
     /// <summary>
