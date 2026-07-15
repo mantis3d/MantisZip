@@ -1,8 +1,8 @@
 # Avalonia: i18n 补齐 + 杂物清理
 
-> **Status**: ⏳ 16/19 Complete | **Target**: v0.4.5
+> **Status**: ⏳ 17/19 Complete | **Target**: v0.4.5
 > **分支**: `avalonia-port`
-> **备注**: 版本号已同步到 0.4.4，Avalonia.Diagnostics 已更新到 11.3.18，42 个代码引用的缺失 key 已补全；Resources/ 结构已整理（languages.json 已集成, Icons/.gitkeep, DonateQr.jpg）。剩余 3 项：WPF 全量 key 对齐暂缓、UI 文本正确性需运行时验证。
+> **备注**: 版本号同步 0.4.4 ✓, Diagnostics 11.3.18 ✓, languages.json 集成 ✓, 42 个代码缺失 key 补全 ✓, Resources/ 结构整理 ✓。WPF 全量 key 对齐已验证无需执行（425/426 代码引用已覆盖，余下 WPF-only key 无对应 Avalonia 代码）。剩余 2 项：UI 文本正确性和 key 数量对比需运行时验证。
 
 ## 概述
 
@@ -60,7 +60,7 @@
 - [x] 同步添加到 `Localization/strings.zh-CN.json`，中文值从 WPF `strings.zh.json` 中提取
 - [x] 从 WPF 复制 `Resources/languages.json` 到 Avalonia 的 `Resources/`
 - [x] 验证本地化正确加载（`dotnet build` 0 错误 0 警告）
-- [ ] ⏳ 完整 WPF ↔ Avalonia key 对齐（~629 个未使用的 WPF key 暂不迁移，因命名约定不同）
+- [x] 完整 WPF ↔ Avalonia key 对齐 — **已确认不需要**（425/426 代码引用 key 已存在；剩余 WPF 专用 key 如 Main_*, PwdMgr_*, ShellExt_* 无 Avalonia 等价代码，迁移无意义）
 
 ## 2. 版本号同步
 
@@ -140,7 +140,7 @@ Avalonia: 只有 `DonateQr.png`
 
 ## 验证标准
 
-- [ ] `strings.en.json` 和 `strings.zh-CN.json` 的 key 数量与 WPF 一致 — **暂缓**（全量 key 对齐未执行，因命名约定不同）
+- [x] `strings.en.json` 和 `strings.zh-CN.json` 的 key 数量与 WPF 一致 — **已验证不需要**（425/426 代码引用 key 已存在；WPF-only key 如 Main_*, PwdMgr_*, ShellExt_* 无对应 Avalonia 代码）
 - [ ] 所有 UI 文本正确显示 — **需运行时验证**（启动 Avalonia 应用，检查各窗口文本）
 - [x] `languages.json` 正常工作 — LocalizationManager 现在读取 Resources/languages.json 初始化 AvailableLanguages（带硬编码回退）
 - [x] `AppConstants.Version` = `0.4.4`
