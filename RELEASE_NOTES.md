@@ -22,18 +22,17 @@ MantisZip-0.4.5-Setup-WebSetup.exe requires internet during installation. Mantis
 - 视图菜单新增"隐藏预览信息"开关，预览信息面板可独立显隐控制
 - Added "Hide Preview Info" toggle in View menu for independent control of preview info panel visibility
 - ![隐藏预览信息](docs/images/version/v0.4.5/PreviewInfoToggle.png)
-- 可配置双击行为 — 设置窗口新增"双击压缩包"选项（打开/原地解压/智能原地解压/打开解压窗口），`--open` CLI 按配置路由
+- 可配置双击行为 — 设置窗口新增"双击压缩包"选项（打开/原地解压/智能原地解压/打开解压窗口），`--open` CLI 按配置路由 (#16)
 - Configurable double-click behavior — new "double-click archive" option in Settings (open/extract-here/smart-extract/extract-dialog); `--open` CLI routes accordingly
 - ![可配置双击行为](docs/images/version/v0.4.5/DoubleClickAction.png)
-- 解压后自动删除原压缩包 — 新增"解压完成后将原压缩包移到回收站"选项，
+- 解压后自动删除原压缩包 — 新增"解压完成后将原压缩包移到回收站"选项，(#16)
 - Auto-delete archive after extraction — new option to move original archive to Recycle Bin
 - ![删除原压缩包](docs/images/version/v0.4.5/DeleteAfterExtract.png)
-- 文件冲突窗口增加“暂停”和“取消”按钮。
+- 文件冲突窗口增加“暂停”和“取消”按钮。(#25)
 - Add ‘Pause’ and ‘Cancel’ buttons to the file conflict window.
 - ![解压文件冲突](docs\images\version\v0.4.5\CancelOnConflictCompress.png)
 - 修复安装后会导致别的软件安装完启动时错误本软件的问题。
 - Fixed issue where installing other software could incorrectly route their startup to MantisZip.
-
 
 
 ## v0.4.4

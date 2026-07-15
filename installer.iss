@@ -45,7 +45,10 @@ english.ShellGroup=System Integration
 english.InstallShell=Add to Windows context menu
 english.AssocGroup=File type associations
 
-; Download page (shown before installation begins)
+; Download confirmation dialog (shown when dependencies are missing)
+english.DownloadConfirmMsg=MantisZip requires .NET 9 Runtime and/or WebView2 Runtime, which are not installed on your system.%n%nDo you want to download and install them automatically?%n%n• Yes — Download dependencies and continue setup%n• No — Skip download and continue setup without dependencies%n• Cancel — Exit the installer
+
+; Download page (shown after user confirms download)
 english.DownloadPageCaption=Download required components
 english.DownloadPageDescription=MantisZip requires .NET 9 Runtime and WebView2 Runtime to run. They will be downloaded automatically.
 
@@ -58,6 +61,11 @@ chinese.ThemeDark=深色主题
 chinese.ShellGroup=系统集成
 chinese.InstallShell=添加到 Windows 右键菜单
 chinese.AssocGroup=文件关联
+
+; Download confirmation dialog (shown when dependencies are missing)
+chinese.DownloadConfirmMsg=MantisZip 需要 .NET 9 运行时和/或 WebView2 运行时，但您的系统尚未安装。%n%n是否要自动下载并安装这些依赖？%n%n• 是 — 下载依赖并继续安装%n• 否 — 跳过下载，继续安装（不安装依赖）%n• 取消 — 退出安装程序
+
+; Download page (shown after user confirms download)
 chinese.DownloadPageCaption=正在下载必要组件
 chinese.DownloadPageDescription=MantisZip 需要 .NET 9 运行时和 WebView2 运行时才能运行。正在自动下载中。
 
@@ -463,16 +471,30 @@ begin
     // Only show the download page if there are items to download.
     if NeedDownload then
     begin
-      DownloadPage.Show;
-      try
-        try
-          DownloadPage.Download;
+      case MsgBox(CustomMessage('DownloadConfirmMsg'), MB_YESNOCANCEL + MB_ICONQUESTION) of
+        IDYES: begin
+          // User chose to download dependencies — show download page
+          DownloadPage.Show;
+          try
+            try
+              DownloadPage.Download;
+              Result := True;
+            except
+              Result := False;
+            end;
+          finally
+            DownloadPage.Hide;
+          end;
+        end;
+        IDNO: begin
+          // User chose to skip download — continue installation without dependencies
+          Log('User chose to skip dependency download.');
           Result := True;
-        except
+        end;
+        else begin
+          // IDCANCEL or any other result — exit installer
           Result := False;
         end;
-      finally
-        DownloadPage.Hide;
       end;
     end else
       Result := True;
