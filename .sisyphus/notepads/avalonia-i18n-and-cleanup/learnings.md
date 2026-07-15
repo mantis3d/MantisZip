@@ -13,4 +13,6 @@
 - Avalonia LocalizationManager.cs hardcodes AvailableLanguages list — does NOT read languages.json
 - languages.json was copied to Resources/ but is unused by current Avalonia code
 - To use languages.json, need LoadLanguageMetadata() similar to WPF's LanguageManager
+- Implemented LoadLanguageMetadata() in LocalizationManager — reads Resources/languages.json, maps "zh" → "zh-CN", falls back to hardcoded values on failure
+- csproj updated: None Update now includes Resources\languages.json for CopyToOutputDirectory
 

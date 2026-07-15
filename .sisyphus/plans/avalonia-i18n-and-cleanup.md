@@ -1,8 +1,8 @@
 # Avalonia: i18n 补齐 + 杂物清理
 
-> **Status**: ⏳ 15/19 Complete | **Target**: v0.4.5
+> **Status**: ⏳ 16/19 Complete | **Target**: v0.4.5
 > **分支**: `avalonia-port`
-> **备注**: 版本号已同步到 0.4.4，Avalonia.Diagnostics 已更新到 11.3.18，42 个代码引用的缺失 key 已补全；Resources/ 结构已整理（languages.json 已复制但 Avalonia 暂未使用, Icons/.gitkeep, DonateQr.jpg）。剩余 4 项：WPF 全量 key 对齐暂缓、languages.json 集成待后续实现、UI 文本正确性需运行时验证。
+> **备注**: 版本号已同步到 0.4.4，Avalonia.Diagnostics 已更新到 11.3.18，42 个代码引用的缺失 key 已补全；Resources/ 结构已整理（languages.json 已集成, Icons/.gitkeep, DonateQr.jpg）。剩余 3 项：WPF 全量 key 对齐暂缓、UI 文本正确性需运行时验证。
 
 ## 概述
 
@@ -142,6 +142,6 @@ Avalonia: 只有 `DonateQr.png`
 
 - [ ] `strings.en.json` 和 `strings.zh-CN.json` 的 key 数量与 WPF 一致 — **暂缓**（全量 key 对齐未执行，因命名约定不同）
 - [ ] 所有 UI 文本正确显示 — **需运行时验证**（启动 Avalonia 应用，检查各窗口文本）
-- [ ] `languages.json` 正常工作 — **当前未使用**（Avalonia LocalizationManager 硬编码 AvailableLanguages，不读取 languages.json。如需使用，需添加 LoadLanguageMetadata()）
+- [x] `languages.json` 正常工作 — LocalizationManager 现在读取 Resources/languages.json 初始化 AvailableLanguages（带硬编码回退）
 - [x] `AppConstants.Version` = `0.4.4`
 - [x] `dotnet build` 无警告

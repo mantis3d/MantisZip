@@ -13,6 +13,7 @@ public static class LocalizationManager
 {
     private static Dictionary<string, string> _strings = new(StringComparer.OrdinalIgnoreCase);
     private static AppLanguage _currentLanguage = AppLanguage.Chinese;
+    private static List<LanguageInfo> _availableLanguages = null!;
 
     public static event EventHandler? CultureChanged;
 
@@ -33,6 +34,7 @@ public static class LocalizationManager
 
     static LocalizationManager()
     {
+        LoadLanguageMetadata();
         LoadStrings(AppLanguage.Chinese);
     }
 
@@ -84,9 +86,54 @@ public static class LocalizationManager
         public string TranslatorText { get; set; } = string.Empty;
     }
 
-    public static List<LanguageInfo> AvailableLanguages { get; } = new()
+    public static List<LanguageInfo> AvailableLanguages => _availableLanguages;
+
+    private class LanguageMetadata
     {
-        new() { Code = "zh-CN", DisplayName = "中文", TranslatorText = "MantisZip 团队" },
-        new() { Code = "en", DisplayName = "English", TranslatorText = "Community Contributors" },
-    };
+        public string Name { get; set; } = string.Empty;
+        public string Translator { get; set; } = string.Empty;
+    }
+
+    private static void LoadLanguageMetadata()
+    {
+        var path = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Resources", "languages.json");
+        if (!File.Exists(path))
+        {
+            path = Path.Combine(Directory.GetCurrentDirectory(), "Resources", "languages.json");
+        }
+
+        if (File.Exists(path))
+        {
+            try
+            {
+                var json = File.ReadAllText(path);
+                var metadata = JsonSerializer.Deserialize<Dictionary<string, LanguageMetadata>>(json);
+                if (metadata != null && metadata.Count > 0)
+                {
+                    _availableLanguages = new List<LanguageInfo>(metadata.Count);
+                    foreach (var kvp in metadata)
+                    {
+                        var code = kvp.Key == "zh" ? "zh-CN" : kvp.Key;
+                        _availableLanguages.Add(new LanguageInfo
+                        {
+                            Code = code,
+                            DisplayName = kvp.Value.Name,
+                            TranslatorText = kvp.Value.Translator
+                        });
+                    }
+                    return;
+                }
+            }
+            catch
+            {
+                // Fall through to hardcoded defaults
+            }
+        }
+
+        _availableLanguages = new List<LanguageInfo>
+        {
+            new() { Code = "zh-CN", DisplayName = "中文", TranslatorText = "MantisZip 团队" },
+            new() { Code = "en", DisplayName = "English", TranslatorText = "Community Contributors" },
+        };
+    }
 }
