@@ -1,8 +1,8 @@
 {
-  "active_plan": "E:/github/MantisZip/.sisyphus/plans/portable-mode.md",
-  "started_at": "2026-07-13T15:00:00.000Z",
-  "session_ids": [],
-  "plan_name": "portable-mode",
+  "active_plan": "E:/github/MantisZip/.sisyphus/plans/avalonia-i18n-and-cleanup.md",
+  "started_at": "2026-07-15T10:29:13.390+08:00",
+  "session_ids": ["ses_09c65921bffeDCATTBVJyNtXrL"],
+  "plan_name": "avalonia-i18n-and-cleanup",
   "agent": "atlas",
   "worktree_path": null
 }

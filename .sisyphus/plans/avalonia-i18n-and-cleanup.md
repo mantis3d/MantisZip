@@ -1,8 +1,8 @@
 # Avalonia: i18n 补齐 + 杂物清理
 
-> **Status**: ⏳ 11/18 Complete | **Target**: v0.4.5
+> **Status**: ⏳ 13/19 Complete | **Target**: v0.4.5
 > **分支**: `avalonia-port`
-> **备注**: 42 个代码引用的缺失 key 已补全；Resources/ 结构已整理（languages.json, Icons/.gitkeep, DonateQr.jpg）。WPF 全量 key 迁移（~629 key 命名不同）和版本号更新暂缓，待用户确认。
+> **备注**: 版本号已同步到 0.4.4，Avalonia.Diagnostics 已更新到 11.3.18，42 个代码引用的缺失 key 已补全；Resources/ 结构已整理（languages.json, Icons/.gitkeep, DonateQr.jpg）。WPF 全量 key 迁移暂缓（因命名约定不同）。
 
 ## 概述
 
@@ -80,8 +80,8 @@
 
 ### 任务分解
 
-- [ ] 更新 `AppConstants.cs` 版本号（当前 `0.4.0`，待用户确认目标版本）
-- [ ] 在 csproj 添加 `<Version>` 属性（待用户确认版本）
+- [x] 更新 `AppConstants.cs` 版本号（当前 `0.4.0` → `0.4.4`）
+- [x] 在 csproj 添加 `<Version>0.4.4</Version>`
 
 ## 3. Avalonia.Diagnostics 版本对齐
 
@@ -103,8 +103,8 @@ Avalonia 主包为 `12.0.4`，但 Diagnostics 包为 `11.3.17` — 版本不匹�
 
 ### 任务分解
 
-- [ ] 检查 `Avalonia.Diagnostics` 12.x 的 API 兼容性（当前 `11.3.17` vs 主包 `12.0.4`，需用户确认是否升级）
-- [ ] 更新版本号（待确认）
+- [x] 检查 `Avalonia.Diagnostics` 版本兼容性（12.x 不存在于 NuGet，升级到 `11.3.18`）
+- [x] 更新版本号（`11.3.17` → `11.3.18`）
 
 ## 4. 空 Icons 目录
 
@@ -140,8 +140,8 @@ Avalonia: 只有 `DonateQr.png`
 
 ## 验证标准
 
-- [ ] `strings.en.json` 和 `strings.zh-CN.json` 的 key 数量与 WPF 一致
-- [ ] 所有 UI 文本正确显示
-- [ ] `languages.json` 正常工作
-- [ ] `AppConstants.Version` = `0.4.4`
-- [ ] `dotnet build` 无警告
+- [ ] `strings.en.json` 和 `strings.zh-CN.json` 的 key 数量与 WPF 一致（全量对齐已暂缓，预期不一致）
+- [ ] 所有 UI 文本正确显示（需运行时验证）
+- [ ] `languages.json` 正常工作（需运行时验证）
+- [x] `AppConstants.Version` = `0.4.4`
+- [x] `dotnet build` 无警告
