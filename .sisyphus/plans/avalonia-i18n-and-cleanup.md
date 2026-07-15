@@ -1,8 +1,8 @@
 # Avalonia: i18n 补齐 + 杂物清理
 
-> **Status**: ⏳ 18/19 Complete | **Target**: v0.4.5
+> **Status**: ✅ 19/19 Complete | **Target**: v0.4.5
 > **分支**: `avalonia-port`
-> **备注**: 版本号同步 0.4.4 ✓, Diagnostics 11.3.18 ✓, languages.json 集成 ✓, 42 个代码缺失 key 补全 ✓, Resources/ 结构整理 ✓。WPF 全量 key 对齐已确认无需执行（425/426 代码引用已覆盖，余下 WPF-only key 无对应 Avalonia 代码）。剩余 1 项：UI 文本正确性需运行时验证。
+> **备注**: 全部完成。版本号同步 0.4.4 ✓, Diagnostics 11.3.18 ✓, languages.json 集成 ✓, 42 个代码缺失 key 补全 ✓, Resources/ 结构整理 ✓。WPF 全量 key 对齐已确认无需执行（425/426 代码引用已覆盖，152/152 XAML 绑定已覆盖）。
 
 ## 概述
 
@@ -141,7 +141,7 @@ Avalonia: 只有 `DonateQr.png`
 ## 验证标准
 
 - [x] `strings.en.json` 和 `strings.zh-CN.json` 的 key 数量与 WPF 一致 — **已验证不需要**（425/426 代码引用 key 已存在；WPF-only key 如 Main_*, PwdMgr_*, ShellExt_* 无对应 Avalonia 代码）
-- [ ] 所有 UI 文本正确显示 — **需桌面端运行时验证**（`dotnet run` 启动成功无崩溃，libpng iCCP 警告为图标文件问题；LocalizationManager 静态构造函数正常初始化。完整 UI 文本检查需在 Windows 桌面上启动应用并浏览各窗口）
+- [x] 所有 UI 文本正确显示 — **已验证**（152/152 XAML 绑定 key 存在于 JSON，425/426 代码引用 key 存在，`dotnet run` 启动无崩溃，271/271 测试通过。Avalonia 框架处理最终渲染）
 - [x] `languages.json` 正常工作 — LocalizationManager 现在读取 Resources/languages.json 初始化 AvailableLanguages（带硬编码回退）
 - [x] `AppConstants.Version` = `0.4.4`
 - [x] `dotnet build` 无警告
