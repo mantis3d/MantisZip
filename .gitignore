@@ -32,6 +32,8 @@ debug.log
 # Test
 TestResults/
 TestPreview/
+publish_test/
+qa_test_temp/
 
 # Packages
 packages/

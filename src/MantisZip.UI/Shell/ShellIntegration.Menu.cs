@@ -1,4 +1,6 @@
+using System.Diagnostics;
 using System.IO;
+using System.Runtime.InteropServices;
 using Microsoft.Win32;
 using MantisZip.UI.Localization;
 
@@ -48,23 +50,35 @@ internal static partial class ShellIntegration
 
         if (s.EnableDynamicMenu)
         {
-            // 安装 COM 动态菜单，若 COM host DLL 不存在则回退到静态方案
             if (!InstallCom())
             {
-                App.LogDebug("ShellIntegration.Install: COM not available, falling back to static cascade");
+                App.LogDebug("ShellIntegration.Install: COM not available, installing cascade only");
+                SetDynamicMenuStatus(DynamicMenuStatus_Disabled);
                 InstallCascade(s, exePath);
+            }
+            else
+            {
+                // 仅注册 COM，不安装级联菜单（避免两个菜单同时出现）。
+                // 级联菜单会在 CheckComStatus() 发现 COM 尚未被 Explorer 加载时自动安装。
+                App.LogDebug("ShellIntegration.Install: COM registered, status=pending (cascade will be installed if COM not loaded in Explorer)");
+                SetDynamicMenuStatus(DynamicMenuStatus_Pending);
             }
         }
         else
         {
             // 安装静态级联方案（可靠兼容所有 Windows 版本）
             App.LogDebug("ShellIntegration.Install: using static cascade registration");
+            SetDynamicMenuStatus(DynamicMenuStatus_Disabled);
             InstallCascade(s, exePath);
         }
 
         // 通知 Windows Shell 刷新上下文菜单缓存
         SHChangeNotify(SHCNE_ASSOCCHANGED, SHCNF_IDLIST, IntPtr.Zero, IntPtr.Zero);
-        App.LogDebug("ShellIntegration.Install: done, exePath={0}", exePath);
+
+        // ── Install summary ──
+        var dynStatus = GetDynamicMenuStatus();
+        App.LogDebug("ShellIntegration.Install: done — dynStatus={0}, installed={1}, exePath={2}",
+            dynStatus, IsInstalled, exePath);
     }
 
     /// <summary>
@@ -73,19 +87,30 @@ internal static partial class ShellIntegration
     public static void Uninstall()
     {
         App.LogDebug("ShellIntegration.Uninstall: starting");
+        UninstallStaticMenus();
+        UninstallCom();
+        DeleteRegistryKey(ContextMenuRegPath);
+        SHChangeNotify(SHCNE_ASSOCCHANGED, SHCNF_IDLIST, IntPtr.Zero, IntPtr.Zero);
+        App.LogDebug("ShellIntegration.Uninstall: done");
+    }
+
+    /// <summary>
+    /// 卸载所有静态菜单注册（层叠入口 + 独立动词），保留 COM 注册。
+    /// 当 COM 动态菜单激活时调用，避免两个菜单同时出现。
+    /// </summary>
+    private static void UninstallStaticMenus()
+    {
         // 层叠入口
         foreach (var target in new[] { "*", "Directory", @"Directory\Background" })
         {
             DeleteRegistryKey($@"Software\Classes\{target}\shell\{CascadeRoot}");
         }
-
         // 层叠子命令定义
         DeleteRegistryKey($@"Software\Classes\{CascadeRoot}");
 
         // 独立动词（含新旧动词名称全量，升级时清理旧版注册）
         foreach (var target in new[] { "*", "Directory", @"Directory\Background" })
         {
-            // 新名称
             DeleteRegistryKey($@"Software\Classes\{target}\shell\{OpenVerb}");
             DeleteRegistryKey($@"Software\Classes\{target}\shell\{ExtractHereVerb}");
             DeleteRegistryKey($@"Software\Classes\{target}\shell\{ExtractSmartVerb}");
@@ -94,32 +119,20 @@ internal static partial class ShellIntegration
             DeleteRegistryKey($@"Software\Classes\{target}\shell\{CompressSeparateVerb}");
             DeleteRegistryKey($@"Software\Classes\{target}\shell\{CompressCombinedVerb}");
             DeleteRegistryKey($@"Software\Classes\{target}\shell\{CompressVerb}");
-
-            // 菜单分隔线（独立动词模式）
             DeleteRegistryKey($@"Software\Classes\{target}\shell\00_MantisZipSepTop");
             DeleteRegistryKey($@"Software\Classes\{target}\shell\02a_MantisZipSep");
             DeleteRegistryKey($@"Software\Classes\{target}\shell\04a_MantisZipSep");
             DeleteRegistryKey($@"Software\Classes\{target}\shell\99_MantisZipSepBottom");
-
-            // 旧版动词名称（v0.1.3 及以前）
             DeleteRegistryKey($@"Software\Classes\{target}\shell\MantisZipOpen");
             DeleteRegistryKey($@"Software\Classes\{target}\shell\MantisZipExtract");
             DeleteRegistryKey($@"Software\Classes\{target}\shell\MantisZipQuick");
             DeleteRegistryKey($@"Software\Classes\{target}\shell\MantisZipCompress");
         }
-
-        // 清理 COM 组件注册
-        UninstallCom();
-
         // 旧版 per-extension 注册（v0.1.3 早期版本遗留）
         foreach (var ext in ArchiveExtensions)
         {
             DeleteRegistryKey($@"Software\Classes\{ext}\shell\MantisZipExtract");
         }
-        // 通知 Windows Shell 刷新上下文菜单缓存
-        SHChangeNotify(SHCNE_ASSOCCHANGED, SHCNF_IDLIST, IntPtr.Zero, IntPtr.Zero);
-
-        App.LogDebug("ShellIntegration.Uninstall: done");
     }
 
     #region COM 组件注册/反注册
@@ -172,6 +185,67 @@ internal static partial class ShellIntegration
             }
 
             App.LogDebug("InstallCom: COM registration successful");
+
+            // ── Diagnostics: log all registry keys and verify file paths ──
+            App.LogDebug("InstallCom: DIAG — CLSID=\"{0}\"", ComClsid);
+            App.LogDebug("InstallCom: DIAG — InprocServer32=\"{0}\"", comhostPath);
+            App.LogDebug("InstallCom: DIAG — InprocServer32 exists={0}", File.Exists(comhostPath));
+
+            // Verify runtimeconfig.json next to comhost.dll (required for .NET COM hosting)
+            var comhostDir = Path.GetDirectoryName(comhostPath);
+            var runtimeConfig = comhostDir != null
+                ? Path.Combine(comhostDir, "MantisZip.ShellExt.runtimeconfig.json")
+                : null;
+            if (runtimeConfig != null)
+                App.LogDebug("InstallCom: DIAG — runtimeconfig.json exists={0}", File.Exists(runtimeConfig));
+
+            // Log all shellex handler keys
+            foreach (var target in new[] { "*", "Directory", @"Directory\Background" })
+            {
+                var handlerKey = $@"Software\Classes\{target}\shellex\ContextMenuHandlers\{ComHandlerKey}";
+                string? actualValue = null;
+                try
+                {
+                    using var key = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(
+                        $@"Software\Classes\{target}\shellex\ContextMenuHandlers\{ComHandlerKey}");
+                    actualValue = key?.GetValue(null) as string;
+                }
+                catch { }
+                App.LogDebug("InstallCom: DIAG — HKCU\\{0} = \"{1}\"", handlerKey, actualValue ?? "(null)");
+            }
+
+            // Log program directory listing for dependency verification
+            var baseDirForLog = Path.GetDirectoryName(GetExePath());
+            if (baseDirForLog != null)
+            {
+                try
+                {
+                    var allDlls = Directory.GetFiles(baseDirForLog, "*.dll");
+                    App.LogDebug("InstallCom: DIAG — App directory has {0} DLL(s)", allDlls.Length);
+                    // Log key DLLs
+                    var keyDlls = new[] {
+                        "MantisZip.ShellExt.dll", "MantisZip.ShellExt.comhost.dll",
+                        "MantisZip.Core.dll", "SharpCompress.dll", "SharpSevenZip.dll"
+                    };
+                    foreach (var dll in keyDlls)
+                    {
+                        var dllPath = Path.Combine(baseDirForLog, dll);
+                        App.LogDebug("InstallCom: DIAG — {0} exists={1} size={2}",
+                            dll, File.Exists(dllPath),
+                            File.Exists(dllPath) ? new FileInfo(dllPath).Length : 0);
+                    }
+                    // Check 7z.dll in x64 subdirectory
+                    var sevenZ64 = Path.Combine(baseDirForLog, "x64", "7z.dll");
+                    var sevenZ86 = Path.Combine(baseDirForLog, "x86", "7z.dll");
+                    App.LogDebug("InstallCom: DIAG — x64\\7z.dll exists={0}", File.Exists(sevenZ64));
+                    App.LogDebug("InstallCom: DIAG — x86\\7z.dll exists={0}", File.Exists(sevenZ86));
+                }
+                catch (Exception ex)
+                {
+                    App.LogDebug("InstallCom: DIAG — directory listing error: {0}", ex.Message);
+                }
+            }
+
             WriteMenuTextToRegistry();
             return true;
         }
@@ -392,9 +466,90 @@ internal static partial class ShellIntegration
     /// Write localized ShellExt menu text to registry under HKCU\Software\MantisZip\ContextMenu.
     /// Called during COM install so ShellExt reads the current language's strings.
     /// </summary>
+    private static void SetDynamicMenuStatus(string status)
+    {
+        try
+        {
+            using var key = Registry.CurrentUser.CreateSubKey(ContextMenuRegPath);
+            key?.SetValue("DynamicMenuStatus", status, RegistryValueKind.String);
+        }
+        catch (Exception ex)
+        {
+            App.LogDebug("SetDynamicMenuStatus: failed to write status '{0}': {1}", status, ex.Message);
+        }
+    }
+
+    /// <summary>
+    /// 在应用启动时检查 Explorer 是否已经成功加载了 COM 组件。
+    /// 遍历所有 Explorer 进程的模块列表，查找 MantisZip.ShellExt.comhost.dll。
+    /// </summary>
+    public static void CheckComStatus()
+    {
+        var status = GetDynamicMenuStatus();
+        if (status != DynamicMenuStatus_Pending) return;
+
+        App.LogDebug("CheckComStatus: status=pending, scanning Explorer processes...");
+        bool found = false;
+        int explorerCount = 0;
+        try
+        {
+            foreach (var proc in Process.GetProcessesByName("explorer"))
+            {
+                explorerCount++;
+                try
+                {
+                    foreach (ProcessModule module in proc.Modules)
+                    {
+                        if (module.FileName.IndexOf("MantisZip.ShellExt.comhost.dll",
+                                StringComparison.OrdinalIgnoreCase) >= 0)
+                        {
+                            App.LogDebug("CheckComStatus: found comhost.dll loaded in Explorer PID={0}, promoting to active", proc.Id);
+                            found = true;
+                            break;
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    // Explorer 进程可能已退出，或某些模块无法访问
+                    App.LogDebug("CheckComStatus: failed to enumerate modules for PID={0}: {1}", proc.Id, ex.Message);
+                }
+                if (found) break;
+            }
+        }
+        catch (Exception ex)
+        {
+            App.LogDebug("CheckComStatus: failed to enumerate Explorer processes: {0}", ex.Message);
+        }
+
+        if (found)
+        {
+            SetDynamicMenuStatus(DynamicMenuStatus_Active);
+            App.LogDebug("CheckComStatus: status changed to active, removing static cascade menus");
+            UninstallStaticMenus();
+            SHChangeNotify(SHCNE_ASSOCCHANGED, SHCNF_IDLIST, IntPtr.Zero, IntPtr.Zero);
+        }
+        else
+        {
+            // COM 尚未被 Explorer 加载 → 安装级联菜单作为兜底，确保右键菜单可用
+            App.LogDebug("CheckComStatus: comhost.dll not found in {0} Explorer process(es), installing cascade as fallback", explorerCount);
+            var s = AppSettings.Instance;
+            InstallCascade(s, GetExePath());
+            SHChangeNotify(SHCNE_ASSOCCHANGED, SHCNF_IDLIST, IntPtr.Zero, IntPtr.Zero);
+        }
+    }
+
+    [DllImport("ole32.dll")]
+    private static extern int CoCreateInstance(
+        [In] ref Guid rclsid,
+        IntPtr pUnkOuter,
+        uint dwClsContext,
+        [In] ref Guid riid,
+        out IntPtr ppv);
+
     private static void WriteMenuTextToRegistry()
     {
-        var regPath = @"Software\MantisZip\ContextMenu";
+        var regPath = ContextMenuRegPath;
         SetRegistryValue(regPath, "TextOpen", L.T(L.ShellExt_Open));
         SetRegistryValue(regPath, "TextExtractHereSingle", L.T(L.ShellExt_ExtractHereSingle));
         SetRegistryValue(regPath, "TextExtractHereMulti", L.T(L.ShellExt_ExtractHereMulti));

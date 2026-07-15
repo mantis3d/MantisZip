@@ -15,6 +15,7 @@
 
 | 优先级 | 功能 | 设计文档 | 难度 | 预估工时 | 说明 |
 |--------|------|----------|:----:|:--------:|------|
+| **P0** | 压缩选项增强（7z/ZIP 参数扩展） | [compression-options-enhancement.md](.sisyphus/plans/compression-options-enhancement.md) | 🟢低 | 2-3h | 7z：固实块大小/字典/Word Size/匹配器/加密文件名；ZIP：压缩方法/加密方式 |
 | **P0** | 便携版模式 | [portable-mode.md](.sisyphus/plans/portable-mode.md) | 🟢低 | 1-2h | 哨兵文件触发，路径重定向到 exe 目录 |
 | **P1** | QuickPathControl 重构 — Tab 式路径速选（Avalonia） | [quickpath-control-redesign.md](.sisyphus/plans/quickpath-control-redesign.md) | 🟡中 | 6-8h | 彻底重构 QuickPathControl：Tab 式 ⭐收藏/🕐历史/🪟窗口 + 🔍 搜索框常驻 + 地址栏文件系统实时补全 + 只读额外内容插槽。QuickPathPreDialog 复用同一组件。替换 5 处系统对话框调用。WPF 阶段的数据层（FavoritePathManager/PathHistoryManager/ExplorerWindowTracker）直接复用 |
 | **P1** | ✅统一路径快捷选择 (WPF QuickPathControl) | [quickpath-unified.md](.sisyphus/plans/quickpath-unified.md) | 🟢低 | — | **WPF 阶段已完成**：QuickPathControl + QuickPathPreDialog + CompressSettingsWindow 嵌入。Avalonia 阶段方案已由 [quickpath-control-redesign.md](.sisyphus/plans/quickpath-control-redesign.md) 取代 |
@@ -25,6 +26,7 @@
 | **P1** | Avalonia 拖拽直接解压 | [drag-drop-direct-extract.md](.sisyphus/plans/drag-drop-direct-extract.md) | 🟡中 | 5-7h | 纯 Win32 独立线程覆盖层（三色状态机 + 呼吸动画）+ WindowFromPoint+ShellWindows 检测目标路径；UIA 降级支持；需等 Avalonia 移植基本就绪后实施 |
 | **P2** | 魔数识别（内容检测替代扩展名检测） | [preview-magic-detection.md](.sisyphus/plans/preview-magic-detection.md) | 🟡中 | 4-5h | Phase1 Core 可立即执行（FileFormatDetector + ExtractHeadAsync + ZIP子类型 + MP4 tail），Phase2 UI 等 Avalonia<br>📋 **新增**: 文本子类型检测（DetectTextSubtype — HTML/XML/JSON/Markdown/CSV/INI 内容启发式判别）
 | **P2** | 压缩预估 (Compression Estimator) | [compression-estimator.md](.sisyphus/plans/compression-estimator.md) | 🟡中 | 4-5h | 压缩前估算大小/耗时 |
+| **P2** | Winget 发布 | [winget-publishing.md](.sisyphus/plans/winget-publishing.md) | 🟢低 | 1-2h | 发布到 Windows Package Manager 社区仓库；首次手动提交后 CI 自动化 |
 | **P2** | MSI 安装包 (WiX) | [msi-packaging-wix.md](.sisyphus/plans/msi-packaging-wix.md) | 🟡中 | 2-3h | Inno Setup → WiX MSI 迁移 |
 | **P2** | RAR 压缩（外置 rar.exe） | [rar-compression.md](.sisyphus/plans/rar-compression.md) | 🟡中 | 6-8h | 通过已安装的 WinRAR 实现 RAR 压缩 |
 | **P2** | 快速预览与渐进式加载 | [preview-quick-modes.md](.sisyphus/plans/preview-quick-modes.md) | 🟡中 | ~27h | 三种模式（快速/渐进/完整），所有格式分段消费。WPF 先行，Avalonia 迁移时只改 UI 层 |

@@ -6,7 +6,6 @@ using MantisZip.Core.Engines;
 using MantisZip.Core.Utils;
 using MantisZip.Tests.Fixtures;
 using SharpCompress.Archives;
-using SharpCompress.Common;
 using Xunit;
 
 namespace MantisZip.Tests.Utils;
@@ -637,9 +636,9 @@ public class ZipBinaryRewriterTests : IDisposable
     [Fact]
     public async Task AddToArchiveAsync_CopyMode_ThrowsOnEncryptedSource()
     {
-        // Encrypted source: copy-mode rejects it. Legacy path can't extract
-        // encrypted entries without password configured (AddToArchiveAsync doesn't
-        // pass password). Expected: CryptographicException from SharpCompress.
+        // Encrypted source: copy-mode rejects it via ZipCopyModeException.
+        // Legacy path now explicitly checks for encrypted entries before extraction
+        // and throws InvalidOperationException when no password is provided.
         var archive = TrackFile(ArchiveFixtures.CreateEncryptedZipArchive());
         var newFile = Path.Combine(
             Path.GetTempPath(), "MantisZipTest", Guid.NewGuid().ToString(), "new.txt");
@@ -647,10 +646,9 @@ public class ZipBinaryRewriterTests : IDisposable
         await File.WriteAllTextAsync(newFile, "new content");
         _tempFiles.Add(newFile);
 
-        // The copy-mode path handles ZipCopyModeException and falls through to the
-        // legacy path. The legacy path can't extract encrypted entries without a
-        // password → SharpCompress throws CryptographicException.
-        await Assert.ThrowsAsync<CryptographicException>(() =>
+        // Copy-mode throws ZipCopyModeException → falls to legacy path.
+        // Legacy path pre-checks for encrypted entries → InvalidOperationException.
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
             _engine.AddToArchiveAsync(archive, [newFile], new ArchiveOptions()));
     }
 
