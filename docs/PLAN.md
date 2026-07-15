@@ -41,7 +41,8 @@
 | **P3** | 可插拔预览模块体系 | [preview-modular-providers.md](.sisyphus/plans/preview-modular-providers.md) | 🟡中 | 3-4h | 格式类库独立分发 |
 | **P3** | 文件列表自定义列 | [custom-columns.md](.sisyphus/plans/custom-columns.md) | 🟡中 | 4-6h | 可自定义显示文件元数据列（文档标题、图片尺寸等） |
 | **P3** | 冻结列（水平滚动时列固定） | [frozen-column.md](.sisyphus/plans/frozen-column.md) | 🟢低 | 1-2h | 右键列标题冻结/取消冻结，分隔线，设置持久化 |
-| **P3** | Office 文档内容预览增强 | [office-content-preview.md](.sisyphus/plans/office-content-preview.md) | 🟡中 | 6-8h | docx/xlsx/pptx 从仅元数据扩展到富文本/表格/幻灯片文本渲染 |
+| **P3** | Office 文档内容预览增强（Avalonia） | [office-content-preview-avalonia.md](.sisyphus/plans/office-content-preview-avalonia.md) | 🟡中 | 6-8h | avalonia-port: docx 大纲+全文、xlsx 表格、pptx 幻灯片文本（无 WebView2） |
+| **P3** | 元数据信息面板可配置 | [metadata-panel-configurable.md](.sisyphus/plans/metadata-panel-configurable.md) | 🟡中 | 4-6h | 自定义每个格式在信息栏/内容区顶部的字段显示和同行布局 |
 | **P3** | ICO 文件自身图标显示 | [ico-file-icon-extract.md](.sisyphus/plans/ico-file-icon-extract.md) | 🟢低 | 2-3h | ico 文件列表显示自身嵌入图标 |
 | **P3** | 右键菜单目录结构预览 | [context-menu-tree-preview.md](.sisyphus/plans/context-menu-tree-preview.md) | 🔴高 | 6-8h | COM 菜单中展示压缩包顶层文件树 |
 | **P1** | Avalonia Phase 10: WPF 功能补齐 | [avalonia-phase10-feature-parity.md](.sisyphus/plans/avalonia-phase10-feature-parity.md) | 🟡中 | 3-5天 | 文件列表进度条、预览信息面板、状态栏增强 |
@@ -86,7 +87,7 @@
 
 ### 🟡 需调整 — Core 可复用，UI 需移植（11 个）
 
-`archive-diff.md`、`archive-rename-entry.md`、`compress-preset.md`、`compression-estimator.md`、`custom-columns.md`、`extract-journal-undo.md`、`file-filter-feature.md`、`ico-file-icon-extract.md`、`office-content-preview.md`、`preview-magic-detection.md`（Phase1 Core 🟢 可先行）、`外部工具视频元数据（无计划文件）`
+`archive-diff.md`、`archive-rename-entry.md`、`compress-preset.md`、`compression-estimator.md`、`custom-columns.md`、`extract-journal-undo.md`、`file-filter-feature.md`、`ico-file-icon-extract.md`、`office-content-preview-avalonia.md`、`preview-magic-detection.md`（Phase1 Core 🟢 可先行）、`外部工具视频元数据（无计划文件）`
 
 ### 🔴 冲突 — 需完全重写或废弃（9 个）
 
