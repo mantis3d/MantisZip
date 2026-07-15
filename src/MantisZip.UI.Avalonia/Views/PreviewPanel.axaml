@@ -3,8 +3,8 @@
              xmlns:vm="clr-namespace:MantisZip.UI.Avalonia.ViewModels"
              xmlns:models="clr-namespace:MantisZip.UI.Avalonia.Models"
              xmlns:wv2="clr-namespace:Avalonia.Controls;assembly=Avalonia.Controls.WebView"
-              x:Class="MantisZip.UI.Avalonia.Views.PreviewPanel"
-              x:DataType="vm:PreviewViewModel">
+             x:Class="MantisZip.UI.Avalonia.Views.PreviewPanel"
+             x:DataType="vm:PreviewViewModel">
     <Grid x:Name="PreviewRootGrid"
           RowDefinitions="Auto,*,Auto"
           ColumnDefinitions="*,Auto">
@@ -52,6 +52,14 @@
                       FontSize="14"
                       VerticalAlignment="Center" />
          </StackPanel>
+
+        <!-- ICO gallery controls -->
+        <StackPanel Orientation="Horizontal" Spacing="2"
+                    IsVisible="{Binding IsIcoGalleryVisible}">
+          <Button Content="🎨"
+                  Width="32" Height="28" FontSize="14" Padding="0"
+                  Command="{Binding ToggleIcoFlattenAlphaCommand}" />
+        </StackPanel>
 
         <!-- Ligature toggle (font preview) -->
         <StackPanel Orientation="Horizontal" Spacing="2"
@@ -147,6 +155,43 @@
                               ScaleY="{Binding ZoomLevel}" />
             </Image.RenderTransform>
           </Image>
+        </ScrollViewer>
+
+        <!-- ICO gallery -->
+        <ScrollViewer IsVisible="{Binding IsIcoGalleryVisible}"
+                      HorizontalScrollBarVisibility="Disabled"
+                      VerticalScrollBarVisibility="Auto">
+          <ItemsControl ItemsSource="{Binding IcoFrames}"
+                        Margin="16">
+            <ItemsControl.ItemsPanel>
+              <ItemsPanelTemplate>
+                <WrapPanel HorizontalAlignment="Center" />
+              </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+              <DataTemplate>
+                <Border BorderBrush="{DynamicResource ThemeBorderBrush}"
+                        BorderThickness="1"
+                        CornerRadius="4"
+                        Margin="8"
+                        Padding="10">
+                  <StackPanel Orientation="Vertical"
+                              HorizontalAlignment="Center">
+                    <Image Source="{Binding Bitmap}"
+                           Stretch="None"
+                           MaxWidth="256"
+                           MaxHeight="256"
+                           Margin="4" />
+                    <TextBlock Text="{Binding Label}"
+                               FontSize="11"
+                               Foreground="{DynamicResource ThemeTextSecondaryBrush}"
+                               HorizontalAlignment="Center"
+                               Margin="0,4,0,0" />
+                  </StackPanel>
+                </Border>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
         </ScrollViewer>
 
         <!-- SVG preview -->

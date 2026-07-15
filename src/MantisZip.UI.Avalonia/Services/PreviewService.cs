@@ -26,6 +26,7 @@ public enum PreviewType
     Html,
     Markdown,
     Pdf,
+    IcoGallery,
     Unsupported
 }
 

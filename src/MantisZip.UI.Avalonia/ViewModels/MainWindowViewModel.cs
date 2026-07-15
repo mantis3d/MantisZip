@@ -628,10 +628,21 @@ public partial class MainWindowViewModel : ObservableObject
                     StatusMessage = LocalizationManager.T("Preview_Pe", entry.DisplayName);
                     break;
                 case PreviewType.Image:
-                    App.DebugLog("[PRV] Calling ShowImage");
-                    Preview.ShowImage(tempFile);
-                    StatusMessage = LocalizationManager.T("Preview_Image", entry.DisplayName);
-                    App.DebugLog("[PRV] ShowImage returned");
+                    // ICO files — show gallery with all icon sizes
+                    var icoExt = Path.GetExtension(tempFile).ToLowerInvariant();
+                    if (icoExt == ".ico")
+                    {
+                        App.DebugLog("[PRV] Calling ShowIcoGallery");
+                        Preview.ShowIcoGallery(tempFile);
+                        StatusMessage = LocalizationManager.T("Preview_Ico", entry.DisplayName);
+                    }
+                    else
+                    {
+                        App.DebugLog("[PRV] Calling ShowImage");
+                        Preview.ShowImage(tempFile);
+                        StatusMessage = LocalizationManager.T("Preview_Image", entry.DisplayName);
+                        App.DebugLog("[PRV] ShowImage returned");
+                    }
                     break;
                 case PreviewType.Gif:
                     Preview.ShowGif(tempFile);

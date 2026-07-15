@@ -1,13 +1,16 @@
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Data;
+using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
+using Avalonia.Media.Imaging;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using HarfBuzzSharp;
 using MantisZip.Core.Utils;
+using SkiaSharp;
 using MantisZip.UI.Avalonia.Models;
 using MantisZip.UI.Avalonia.Services;
 using Markdig;
@@ -59,6 +62,18 @@ public partial class PreviewViewModel : ObservableObject
         set => SetProperty(ref _textPreviewFontFamily, value);
     }
 
+    // ── ICO Gallery ──
+
+    /// <summary>ICO 画廊的帧列表。</summary>
+    public ObservableCollection<IcoFrame> IcoFrames { get; } = [];
+
+    /// <summary>原始帧（保留 Alpha），用于去透明还原。</summary>
+    internal List<IcoFrame>? IcoOriginalFrames { get; set; }
+
+    /// <summary>当前是否压平 Alpha（显示 RGB 原始颜色）。</summary>
+    [ObservableProperty]
+    private bool _icoFlattenAlpha;
+
     /// <summary>
     /// 字体预览的自动换行宽度。由 PreviewPanel 代码后置根据 ScrollViewer 实际宽度设置。
     /// </summary>
@@ -95,6 +110,7 @@ public partial class PreviewViewModel : ObservableObject
     public bool IsOfficeVisible => PreviewType == PreviewType.Office;
     public bool IsVideoVisible => PreviewType == PreviewType.Video;
     public bool IsHtmlVisible => PreviewType is PreviewType.Html or PreviewType.Markdown;
+    public bool IsIcoGalleryVisible => PreviewType == PreviewType.IcoGallery;
 
     partial void OnPreviewTypeChanged(PreviewType value)
     {
@@ -117,6 +133,7 @@ public partial class PreviewViewModel : ObservableObject
         OnPropertyChanged(nameof(HasGifControls));
         OnPropertyChanged(nameof(HasLigatureControls));
         OnPropertyChanged(nameof(IsHtmlVisible));
+        OnPropertyChanged(nameof(IsIcoGalleryVisible));
         OnPropertyChanged(nameof(IsFontTextFallbackVisible));
 
     }
@@ -483,6 +500,77 @@ public partial class PreviewViewModel : ObservableObject
         metaItems.Add(new("DPI", $"{bitmap.Dpi.X:F0} × {bitmap.Dpi.Y:F0}"));
         FormatMetadata = [.. metaItems];
         App.DebugLog($"[IMG] ShowImage done: PreviewType={PreviewType}, Zoom={ZoomLevel}, IsToolbarVisible={IsToolbarVisible}");
+    }
+
+    // ── ICO Gallery ──
+
+    public void ShowIcoGallery(string filePath)
+    {
+        App.DebugLog($"[ICO] ShowIcoGallery: {filePath}");
+
+        var frames = IcoParser.ExtractFrames(filePath);
+        if (frames.Count == 0)
+        {
+            App.DebugLog("[ICO] No frames extracted, showing unsupported");
+            ShowUnsupported("");
+            return;
+        }
+
+        IcoFrames.Clear();
+        IcoOriginalFrames = frames;
+        IcoFlattenAlpha = false;
+        foreach (var f in frames)
+            IcoFrames.Add(f);
+
+        PreviewType = PreviewType.IcoGallery;
+        IsPreviewVisible = true;
+        IsToolbarVisible = true;
+        PreviewHeaderText = $"ICO 图标 — {frames.Count} 个尺寸";
+
+        var fi = new FileInfo(filePath);
+        FormatMetadata =
+        [
+            new("文件大小", FormatUtil.FormatSize(fi.Length)),
+            new("图标数量", frames.Count.ToString()),
+        ];
+    }
+
+    [RelayCommand]
+    private void ToggleIcoFlattenAlpha()
+    {
+        IcoFlattenAlpha = !IcoFlattenAlpha;
+        var src = IcoOriginalFrames;
+        if (src == null) return;
+
+        IcoFrames.Clear();
+        foreach (var f in src)
+        {
+            if (IcoFlattenAlpha)
+                IcoFrames.Add(new IcoFrame(FlattenAlpha(f.Bitmap), f.Width, f.Height));
+            else
+                IcoFrames.Add(f);
+        }
+    }
+
+    private static Bitmap FlattenAlpha(Bitmap source)
+    {
+        // Encode source to PNG bytes, decode with SkiaSharp, paint on white bg, re-encode
+        byte[] srcBytes;
+        using (var ms = new MemoryStream())
+        {
+            source.Save(ms);
+            srcBytes = ms.ToArray();
+        }
+        using var srcSk = SkiaSharp.SKBitmap.Decode(srcBytes);
+        if (srcSk == null) return source;
+        using var dstSk = new SkiaSharp.SKBitmap(srcSk.Width, srcSk.Height);
+        using var canvas = new SkiaSharp.SKCanvas(dstSk);
+        canvas.Clear(SkiaSharp.SKColors.White);
+        canvas.DrawBitmap(srcSk, 0, 0);
+        using var image = SkiaSharp.SKImage.FromBitmap(dstSk);
+        using var data = image.Encode(SkiaSharp.SKEncodedImageFormat.Png, 100);
+        using var ms2 = new MemoryStream(data.ToArray());
+        return new Bitmap(ms2);
     }
 
     // ── GIF ──
