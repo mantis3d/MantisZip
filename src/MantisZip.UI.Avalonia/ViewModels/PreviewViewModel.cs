@@ -664,7 +664,7 @@ public partial class PreviewViewModel : ObservableObject
 
     private static Bitmap FlattenAlpha(Bitmap source)
     {
-        // Encode source to PNG bytes, decode with SkiaSharp, paint on white bg, re-encode
+        // Encode source to PNG bytes, decode with SkiaSharp
         byte[] srcBytes;
         using (var ms = new MemoryStream())
         {
@@ -673,10 +673,22 @@ public partial class PreviewViewModel : ObservableObject
         }
         using var srcSk = SkiaSharp.SKBitmap.Decode(srcBytes);
         if (srcSk == null) return source;
+
+        // Copy bitmap and set alpha to 255 for all pixels,
+        // revealing the original RGB colors beneath transparency.
         using var dstSk = new SkiaSharp.SKBitmap(srcSk.Width, srcSk.Height);
-        using var canvas = new SkiaSharp.SKCanvas(dstSk);
-        canvas.Clear(SkiaSharp.SKColors.White);
-        canvas.DrawBitmap(srcSk, 0, 0);
+        using (var canvas = new SkiaSharp.SKCanvas(dstSk))
+        {
+            canvas.DrawBitmap(srcSk, 0, 0);
+        }
+        for (int y = 0; y < dstSk.Height; y++)
+        {
+            for (int x = 0; x < dstSk.Width; x++)
+            {
+                dstSk.SetPixel(x, y, dstSk.GetPixel(x, y).WithAlpha(255));
+            }
+        }
+
         using var image = SkiaSharp.SKImage.FromBitmap(dstSk);
         using var data = image.Encode(SkiaSharp.SKEncodedImageFormat.Png, 100);
         using var ms2 = new MemoryStream(data.ToArray());
