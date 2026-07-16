@@ -48,6 +48,7 @@
 | **P1** | Avalonia Phase 10: WPF 功能补齐 | [avalonia-phase10-feature-parity.md](.sisyphus/plans/avalonia-phase10-feature-parity.md) | 🟡中 | ✅ 已完成 | 文件列表进度条、预览信息面板、状态栏增强 |
 | **P1** | Avalonia: Shell/COM 集成移植 | [avalonia-shell-com-integration.md](.sisyphus/plans/avalonia-shell-com-integration.md) | 🟡中 | 3-5天 | ShellIntegration 移植、ShellExt 项目引用、COM host 部署、文件关联CLI、MenuIcons 资源 |
 | **P1** | Avalonia: UI 功能补齐 | [avalonia-ui-feature-parity.md](.sisyphus/plans/avalonia-ui-feature-parity.md) | 🟡中 | 27/29 🟡 | Elevation×3、Favorites×2、QuickPath×2 等 11 个对话框、2 个控件、1 个转换器（2 项阻塞于 GUI 测试） |
+| **P1** | Avalonia: 预览两阶段加载（信息栏+内容分离） | [preview-two-phase-loading.md](.sisyphus/plans/preview-two-phase-loading.md) | 🟢低 | 1-2h | 立即显示加载状态+信息栏(Phase 1) → 异步提取后显示内容(Phase 2) + 版本号守卫防竞态；WPF 已有此模式，Avalonia 补齐 |
 | **P2** | Avalonia: i18n 补齐 + 杂物清理 | [avalonia-i18n-and-cleanup.md](.sisyphus/plans/avalonia-i18n-and-cleanup.md) | 🟢低 | ✅ 已完成 | ~290 个缺失 i18n key、版本号同步、Diagnostics 版本对齐、空目录清理 |
 | **P4** | 外部工具视频元数据 | — | 🟢低 | 2-3h | ffprobe 集成 |
 | **🔍调研** | 跨平台移植可行性 | [cross-platform-port.md](.sisyphus/plans/cross-platform-port.md) | 🟡中大 | 2-3月 | 砍 ShellExt，WPF→Avalonia，WebView2→WebKit，SharpSevenZip→SharpCompress/p7zip，DPAPI→AES-GCM |
