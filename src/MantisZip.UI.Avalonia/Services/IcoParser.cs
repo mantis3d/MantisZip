@@ -147,6 +147,10 @@ internal static class IcoParser
         int pixelHeight = biHeight / 2;
         if (pixelHeight <= 0) pixelHeight = biHeight;
 
+        // 修正 DIB header 中的 biHeight，否则 SkiaSharp 会多读 pixelHeight 行垃圾数据
+        byte[] biHeightBytes = BitConverter.GetBytes(pixelHeight);
+        Buffer.BlockCopy(biHeightBytes, 0, dibData, 8, 4);
+
         // ── Calculate palette size ──────────────────────────────────────
         int paletteSize = 0;
         if (bpp <= 8)
