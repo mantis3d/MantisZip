@@ -1469,6 +1469,8 @@ public partial class PreviewViewModel : ObservableObject
     /// </summary>
     public async Task ShowPdfAsync(string filePath)
     {
+        // 先保留加载状态（由调用方 ShowPreviewAsync 的 ShowLoading 设置），
+        // 渲染完成后再设置 PreviewType 和 UI 内容，避免空白中间状态。
         var info = PdfParser.Parse(filePath);
         if (info == null)
         {
@@ -1476,26 +1478,12 @@ public partial class PreviewViewModel : ObservableObject
             return;
         }
 
-        // 先设置 UI 状态（格式元数据、标题），渲染完成后更新实际预览内容
-        PreviewType = PreviewType.Pdf;
-        IsPreviewVisible = true;
-        IsToolbarVisible = false;
-        PreviewHeaderText = $"PDF {info.AdditionalInfo ?? ""}";
-
-        FormatMetadata.Clear();
-        if (info.Title != null) FormatMetadata.Add(new("标题", info.Title));
-        if (info.Author != null) FormatMetadata.Add(new("作者", info.Author));
-        if (info.Subject != null) FormatMetadata.Add(new("主题", info.Subject));
-        if (info.PageCount.HasValue) FormatMetadata.Add(new("页数", info.PageCount.Value.ToString()));
-        FormatMetadata.Add(new("加密", info.IsEncrypted == true ? "是" : "否"));
-        if (info.CreationDate.HasValue) FormatMetadata.Add(new("创建日期", info.CreationDate.Value.ToString("yyyy-MM-dd HH:mm")));
-        if (info.ModifiedDate.HasValue) FormatMetadata.Add(new("修改日期", info.ModifiedDate.Value.ToString("yyyy-MM-dd HH:mm")));
-
-        // 后台线程：打开文档 + 渲染第一页
-        _pdfDocument?.Dispose();
-        _pdfDocument = null;
         try
         {
+            // 后台线程：打开文档 + 渲染第一页
+            _pdfDocument?.Dispose();
+            _pdfDocument = null;
+
             (PdfDocument doc, int totalPages, float renderScale) = await Task.Run(() =>
             {
                 var d = PdfDocument.Open(filePath, SkiaRenderingParsingOptions.Instance);
@@ -1521,7 +1509,22 @@ public partial class PreviewViewModel : ObservableObject
             _pdfTotalPages = totalPages;
             _pdfRenderScale = renderScale;
             PdfPageInfo = $"1 / {_pdfTotalPages}";
+
             await LoadPdfPageAsync(1);
+
+            // 渲染完成，一次性设置 UI 状态
+            PreviewType = PreviewType.Pdf;
+            IsPreviewVisible = true;
+            IsToolbarVisible = false;
+            PreviewHeaderText = $"PDF {info.AdditionalInfo ?? ""}";
+            FormatMetadata.Clear();
+            if (info.Title != null) FormatMetadata.Add(new("标题", info.Title));
+            if (info.Author != null) FormatMetadata.Add(new("作者", info.Author));
+            if (info.Subject != null) FormatMetadata.Add(new("主题", info.Subject));
+            if (info.PageCount.HasValue) FormatMetadata.Add(new("页数", info.PageCount.Value.ToString()));
+            FormatMetadata.Add(new("加密", info.IsEncrypted == true ? "是" : "否"));
+            if (info.CreationDate.HasValue) FormatMetadata.Add(new("创建日期", info.CreationDate.Value.ToString("yyyy-MM-dd HH:mm")));
+            if (info.ModifiedDate.HasValue) FormatMetadata.Add(new("修改日期", info.ModifiedDate.Value.ToString("yyyy-MM-dd HH:mm")));
         }
         catch (Exception ex)
         {

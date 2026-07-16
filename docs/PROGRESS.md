@@ -51,6 +51,10 @@
   - 避免大页面 PDF（如键盘图海报）渲染出数百 MB 的超大位图
   - PDF 改为元数据格式 `IsToolbarVisible = false`，对齐其他元数据格式
 
+**2026-07-16** — PDF 预览渲染完成前保留加载状态
+  - 将 PreviewType/FormatMetadata/PreviewHeaderText 等 UI 设置移到渲染完成后设置
+  - 避免 `OnPreviewTypeChanged` 提前关闭 `IsLoadingPreview` 导致渲染期间显示空白
+
 **2026-07-15** — 预览图像行为一致性与 ZoomFit 自适应视口
   - GIF 魔数路由修复：`FileFormat.Gif` → `PreviewType.Gif`（而非错误地归入图片预览）
   - 9 个元数据格式隐藏空工具栏边框（PE/CSV/SQLite/ISO/Torrent/Office/Video/Audio/Font）
