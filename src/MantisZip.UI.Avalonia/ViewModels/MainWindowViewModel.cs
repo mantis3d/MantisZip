@@ -698,6 +698,10 @@ public partial class MainWindowViewModel : ObservableObject
                     Preview.ShowHtmlPreview(tempFile);
                     StatusMessage = LocalizationManager.T("Preview_Html", entry.DisplayName);
                     break;
+                case PreviewType.Pdf:
+                    await Preview.ShowPdfAsync(tempFile);
+                    StatusMessage = LocalizationManager.T("Preview_Pdf", entry.DisplayName);
+                    break;
                 case PreviewType.Markdown:
                     Preview.ShowMarkdownPreview(tempFile);
                     StatusMessage = LocalizationManager.T("Preview_Markdown", entry.DisplayName);
