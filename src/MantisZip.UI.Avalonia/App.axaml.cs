@@ -57,6 +57,11 @@ public partial class App : Application
         // ── Apply global font from settings ──
         ApplyAppFontFamily();
 
+        // ── Initialize magic detection settings ──
+        var appSettings = AppSettings.Load();
+        PreviewService.EnableFormatDetection = appSettings.EnableFormatDetection;
+        PreviewService.PreviewHeadSize = appSettings.PreviewHeadSize;
+
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
             var args = Environment.GetCommandLineArgs().Skip(1).ToArray();

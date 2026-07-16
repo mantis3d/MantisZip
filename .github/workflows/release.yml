@@ -120,6 +120,26 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "ISCC compilation failed (exit code: $LASTEXITCODE)" }
           Write-Host "Self-contained installer built successfully"
 
+      - name: Package portable zip
+        shell: pwsh
+        run: |
+          $src = "publish_output_selfcontained"
+          # Portable.txt sentinel file
+          "" | Out-File -FilePath "$src\Portable.txt" -Encoding ascii
+          # Copy 7z.dll for 7z compression support
+          $sevenZ = "$env:ProgramFiles\7-Zip\7z.dll"
+          if (Test-Path $sevenZ) {
+            $x64Dir = "$src\x64"
+            New-Item -ItemType Directory -Path $x64Dir -Force | Out-Null
+            Copy-Item $sevenZ "$x64Dir\7z.dll"
+            Write-Host "7z.dll copied to x64 subdirectory"
+          } else {
+            Write-Host "7z.dll not found, 7z compression will not be available"
+          }
+          $zipName = "MantisZip-$env:VERSION-Portable.zip"
+          Compress-Archive -Path "$src\*" -DestinationPath $zipName -CompressionLevel Optimal
+          Write-Host "Portable zip created: $zipName ($((Get-Item $zipName).Length / 1MB -as [int]) MB)"
+
       - name: List installer artifacts
         shell: pwsh
         run: Get-ChildItem -Path installer -Filter "*.exe" | Select-Object Name, Length
@@ -151,9 +171,11 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           $installers = Get-ChildItem -Path installer -Filter "*.exe" | ForEach-Object FullName
-          if (-not $installers) { throw "No installer executable found" }
+          $portableZip = Get-ChildItem -Filter "*-Portable.zip" | ForEach-Object FullName
+          $assets = $installers + $portableZip
+          if (-not $assets) { throw "No release assets found" }
           $notes = Get-Content release_notes.txt -Raw
           gh release create "${{ github.ref_name }}" `
             --title "MantisZip ${{ env.VERSION }}" `
             --notes "$notes" `
-            $installers
+            $assets

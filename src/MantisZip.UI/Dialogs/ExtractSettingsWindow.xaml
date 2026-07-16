@@ -3,7 +3,8 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:l="clr-namespace:MantisZip.UI.Localization"
         xmlns:controls="clr-namespace:MantisZip.UI.Controls"
-        Title="{l:L ExtractSettings_Title}" Height="520" Width="530"
+        xmlns:filter="clr-namespace:MantisZip.UI.Controls"
+        Title="{l:L ExtractSettings_Title}" Height="580" Width="530"
         WindowStartupLocation="CenterScreen"
         ResizeMode="NoResize"
         Background="{DynamicResource Theme_WindowBg}">
@@ -90,6 +91,18 @@
                         </GroupBox>
                     </StackPanel>
                 </ScrollViewer>
+            </TabItem>
+
+            <!-- ============ 文件过滤 ============ -->
+            <TabItem Header="{l:L Extract_Tab_Filter}">
+                <Grid Background="{StaticResource Theme_WindowBg}">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+                    <filter:FileFilterEditor x:Name="FileFilterControl" Grid.Row="1"
+                                              FilterChanged="OnFilterChanged"/>
+                </Grid>
             </TabItem>
 
             <!-- ============ 高级 ============ -->

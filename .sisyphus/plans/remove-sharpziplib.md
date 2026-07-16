@@ -1,5 +1,7 @@
 # 移除 SharpZipLib 依赖 — 自定义 ZIP 注释读写
 
+> **状态**: ✅ 已完成（v0.3.9）| **阶段**: [████████████████████] (全部完成)
+
 ## TL;DR
 
 > **Quick Summary**: 为 ZIP 注释读写创建 `ZipCommentHelper`（直接操作 EOCD 字节），替换 `ArchiveCommentDialog` 中的 SharpZipLib 直接调用，并添加"正在保存注释"文字提示 UX。

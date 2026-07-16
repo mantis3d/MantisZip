@@ -1,8 +1,20 @@
 {
-  "active_plan": "E:/github/MantisZip/.sisyphus/plans/portable-mode.md",
-  "started_at": "2026-07-13T15:00:00.000Z",
-  "session_ids": [],
-  "plan_name": "portable-mode",
+  "active_plan": "E:/github/MantisZip/.sisyphus/plans/avalonia-i18n-and-cleanup.md",
+  "started_at": "2026-07-15T10:29:13.390+08:00",
+  "ended_at": "2026-07-15T02:47:17.411Z",
+  "session_ids": [
+    "ses_09c65921bffeDCATTBVJyNtXrL"
+  ],
+  "plan_name": "avalonia-i18n-and-cleanup",
   "agent": "atlas",
-  "worktree_path": null
+  "worktree_path": null,
+  "status": "completed",
+  "completion_note": "19/19 - Plan complete. 7 commits. AvaloniaFromWpf branch.",
+  "session_origins": {
+    "ses_09c65921bffeDCATTBVJyNtXrL": "direct"
+  },
+  "task_sessions": {},
+  "active_work_id": "avalonia-i18n-and-cleanup-legacy",
+  "elapsed_ms": 1084021,
+  "updated_at": "2026-07-15T02:47:17.411Z"
 }

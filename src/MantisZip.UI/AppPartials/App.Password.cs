@@ -303,7 +303,8 @@ public partial class App : Application
         {
             if (engine is ZipEngine)
             {
-                using var archive = ArchiveFactory.OpenArchive(archivePath, new ReaderOptions());
+                using var fs = File.Open(archivePath, FileMode.Open, FileAccess.Read, FileShare.Read | FileShare.Delete);
+                using var archive = ArchiveFactory.OpenArchive(fs, new ReaderOptions());
                 return archive.Entries.Any(e => e.IsEncrypted);
             }
             if (engine is SevenZipEngine)
@@ -335,7 +336,8 @@ public partial class App : Application
         {
             if (engine is ZipEngine)
             {
-                using var archive = ArchiveFactory.OpenArchive(archivePath, new ReaderOptions { Password = password });
+                using var fs = File.Open(archivePath, FileMode.Open, FileAccess.Read, FileShare.Read | FileShare.Delete);
+                using var archive = ArchiveFactory.OpenArchive(fs, new ReaderOptions { Password = password });
                 var entry = archive.Entries.FirstOrDefault(e => e.IsEncrypted);
                 TraceLog("QuickVerifyPassword(Zip): archive='{0}', foundEncrypted={1}, entryKey='{2}'",
                     archivePath, entry != null, entry?.Key ?? "(none)");

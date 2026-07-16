@@ -18,6 +18,8 @@ public partial class ConflictDialog : Window
     private bool _capturedApplyToAll;
     private string? _capturedCustomName;
     private bool _resultCaptured;
+    private bool _isPaused;
+    private bool _cancelOperation;
 
     /// <summary>对话框关闭后读取此属性获取用户选择的处理方式</summary>
     public FileConflictAction ResultAction => _resultCaptured ? _capturedAction : FileConflictAction.Overwrite;
@@ -26,6 +28,11 @@ public partial class ConflictDialog : Window
 
     /// <summary>用户输入的自定义文件名（未修改时返回建议名）</summary>
     public string? CustomName => _resultCaptured ? _capturedCustomName : RenameTextBox.Text;
+
+    /// <summary>用户是否点击了"暂停"按钮</summary>
+    public bool IsPaused => _isPaused;
+    /// <summary>用户是否点击了"取消"（取消整个操作）按钮</summary>
+    public bool CancelOperation => _cancelOperation;
 
     public ConflictDialog(FileConflictInfo info)
     {
@@ -131,5 +138,18 @@ public partial class ConflictDialog : Window
         DialogResult = true;
     }
 
+    private void Pause_Click(object sender, RoutedEventArgs e)
+    {
+        App.LogDebug("ConflictDialog: user paused for '{0}'", HeaderText.Text);
+        _isPaused = true;
+        DialogResult = false;
+    }
 
+    private void CancelOperation_Click(object sender, RoutedEventArgs e)
+    {
+        App.LogDebug("ConflictDialog: user cancelled entire operation for '{0}'", HeaderText.Text);
+        _cancelOperation = true;
+        CaptureResult(FileConflictAction.Skip, ApplyAllCheck.IsChecked == true, RenameTextBox.Text);
+        DialogResult = false;
+    }
 }

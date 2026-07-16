@@ -98,6 +98,47 @@ public class ArchiveOptions
     /// 7z 固实压缩标志。默认 true。
     /// </summary>
     public bool SevenZipSolid { get; set; } = true;
+
+    /// <summary>
+    /// 7z 固实块大小：null/""=默认，或 "64m" / "256m" / "512m" / "1g"。
+    /// 仅当 <see cref="SevenZipSolid"/> 为 true 时有效。
+    /// </summary>
+    public string? SevenZipSolidBlockSize { get; set; }
+
+    /// <summary>
+    /// 7z 字典大小（字节），null 表示引擎默认。
+    /// 仅对 LZMA/LZMA2 压缩方法有效。
+    /// </summary>
+    public int? SevenZipDictionarySize { get; set; }
+
+    /// <summary>
+    /// 7z Word Size（快速字节数），null 表示引擎默认。
+    /// 仅对 LZMA/LZMA2 压缩方法有效。
+    /// </summary>
+    public int? SevenZipNumFastBytes { get; set; }
+
+    /// <summary>
+    /// 7z 匹配器：null/""=默认，或 "bt2" / "bt3" / "bt4"。
+    /// 仅对 LZMA/LZMA2 压缩方法有效。
+    /// </summary>
+    public string? SevenZipMatchFinder { get; set; }
+
+    /// <summary>
+    /// ZIP 压缩方法：null/""=默认（Deflate），或 "deflate64" / "bzip2" / "lzma" / "ppmd" / "store"。
+    /// </summary>
+    public string? ZipCompressionMethod { get; set; }
+
+    /// <summary>
+    /// ZIP 加密方式：null/""=默认（AES-256），或 "aes192" / "aes128" / "zipcrypto"。
+    /// 仅当 <see cref="Encrypt"/> 为 true 时有效。
+    /// </summary>
+    public string? ZipEncryptionMethod { get; set; }
+
+    /// <summary>
+    /// 7z 加密文件名（EncryptHeaders）。默认 true。
+    /// 仅当 <see cref="Encrypt"/> 为 true 且格式为 7z 时有效。
+    /// </summary>
+    public bool SevenZipEncryptHeaders { get; set; } = true;
 }
 
 /// <summary>
@@ -268,7 +309,8 @@ public class ExtractResult
             string? password = null,
             IProgress<ArchiveProgress>? progress = null,
             CancellationToken cancellationToken = default,
-            ArchiveOptions? options = null);
+            ArchiveOptions? options = null,
+            IReadOnlyDictionary<string, string>? outputPathOverrides = null);
 
         /// <summary>
         /// 向已存在的压缩包中添加文件（原地更新）

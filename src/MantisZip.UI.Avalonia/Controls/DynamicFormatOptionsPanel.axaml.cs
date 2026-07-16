@@ -1,6 +1,7 @@
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Data;
+using Avalonia.Interactivity;
 using MantisZip.UI.Avalonia.Models;
 using MantisZip.UI.Avalonia.Services;
 
@@ -8,7 +9,11 @@ namespace MantisZip.UI.Avalonia.Controls;
 
 /// <summary>
 /// A panel that shows format-specific compression options based on the SelectedFormat property.
-/// Supports ZIP (filename encoding), 7z (compression method + solid flag), and TAR.GZ (placeholder).
+/// Supports ZIP (encoding, compression method), 7z (method, solid, block size, dict size,
+/// word size, match finder), and TAR.GZ (placeholder).
+///
+/// Combo box items are populated from <see cref="CompressionOptionData"/> — the single
+/// source of truth shared with <see cref="ViewModels.SettingsWindowViewModel"/>.
 /// </summary>
 public partial class DynamicFormatOptionsPanel : UserControl
 {
@@ -23,28 +28,24 @@ public partial class DynamicFormatOptionsPanel : UserControl
 
     public string ZipPanelTitle => LocalizationManager.T("FormatOptions_Zip_Title");
     public string EncodingLabel => LocalizationManager.T("FormatOptions_Zip_Encoding");
-    public string EncodingDefaultLabel => LocalizationManager.T("FormatOptions_Zip_EncodingDefault");
+    public string ZipCompressionMethodLabel => LocalizationManager.T("FormatOptions_Zip_CompressionMethod");
     public string SevenZPanelTitle => LocalizationManager.T("FormatOptions_7z_Title");
     public string MethodLabel => LocalizationManager.T("FormatOptions_7z_Method");
     public string SolidLabel => LocalizationManager.T("FormatOptions_7z_Solid");
+    public string SolidBlockSizeLabel => LocalizationManager.T("FormatOptions_7z_SolidBlockSize");
+    public string DictSizeLabel => LocalizationManager.T("FormatOptions_7z_DictionarySize");
+    public string WordSizeLabel => LocalizationManager.T("FormatOptions_7z_WordSize");
+    public string MatchFinderLabel => LocalizationManager.T("FormatOptions_7z_MatchFinder");
     public string TarGzPlaceholder => LocalizationManager.T("FormatOptions_TarGz_Placeholder");
 
     // ── CLR Properties ─────────────────────────────────────────────────────
 
-    /// <summary>
-    /// Selected archive format: "zip", "7z", or "tar.gz" (or "tgz" / "tar").
-    /// Determines which sub-panel is visible.
-    /// </summary>
     public string SelectedFormat
     {
         get => GetValue(SelectedFormatProperty);
         set => SetValue(SelectedFormatProperty, value);
     }
 
-    /// <summary>
-    /// ZIP filename encoding. Null if not ZIP mode.
-    /// Returns "utf-8", "gbk", or "default".
-    /// </summary>
     public string? FileNameEncoding
     {
         get
@@ -56,10 +57,17 @@ public partial class DynamicFormatOptionsPanel : UserControl
         }
     }
 
-    /// <summary>
-    /// 7z compression method tag. Null if not 7z mode.
-    /// Returns "LZMA", "LZMA2", "PPMd", "BZip2", or "Deflate".
-    /// </summary>
+    public string? ZipCompressionMethod
+    {
+        get
+        {
+            if (SelectedFormat != "zip") return null;
+            if (ZipMethodCombo.SelectedItem is ComboBoxItem item)
+                return item.Tag as string;
+            return "deflate";
+        }
+    }
+
     public string? SevenZipCompressionMethod
     {
         get
@@ -71,9 +79,6 @@ public partial class DynamicFormatOptionsPanel : UserControl
         }
     }
 
-    /// <summary>
-    /// 7z solid archive flag. False if not 7z mode.
-    /// </summary>
     public bool SevenZipSolid
     {
         get
@@ -83,12 +88,60 @@ public partial class DynamicFormatOptionsPanel : UserControl
         }
     }
 
+    public string? SevenZipSolidBlockSize
+    {
+        get
+        {
+            if (SelectedFormat != "7z") return null;
+            if (SolidBlockSizeCombo.SelectedItem is ComboBoxItem item)
+                return item.Tag as string;
+            return "";
+        }
+    }
+
+    public int SevenZipDictionarySize
+    {
+        get
+        {
+            if (SelectedFormat != "7z") return 0;
+            if (DictSizeCombo.SelectedItem is ComboBoxItem item
+                && item.Tag is string tag
+                && int.TryParse(tag, out var val))
+                return val;
+            return 0;
+        }
+    }
+
+    public int SevenZipNumFastBytes
+    {
+        get
+        {
+            if (SelectedFormat != "7z") return 0;
+            if (WordSizeCombo.SelectedItem is ComboBoxItem item
+                && item.Tag is string tag
+                && int.TryParse(tag, out var val))
+                return val;
+            return 0;
+        }
+    }
+
+    public string? SevenZipMatchFinder
+    {
+        get
+        {
+            if (SelectedFormat != "7z") return null;
+            if (MatchFinderCombo.SelectedItem is ComboBoxItem item)
+                return item.Tag as string;
+            return "";
+        }
+    }
+
     // ── Constructor ────────────────────────────────────────────────────────
 
     public DynamicFormatOptionsPanel()
     {
         InitializeComponent();
-        DataContext = this;
+        PopulateCombos();
         UpdatePanel();
     }
 
@@ -104,50 +157,91 @@ public partial class DynamicFormatOptionsPanel : UserControl
         }
     }
 
+    // ── Events ─────────────────────────────────────────────────────────────
+
+    private void SolidCheck_IsCheckedChanged(object? sender, RoutedEventArgs e)
+    {
+        if (SolidBlockSizeCombo != null)
+            SolidBlockSizeCombo.IsEnabled = SolidCheck.IsChecked == true;
+    }
+
     // ── Public Methods ─────────────────────────────────────────────────────
 
     /// <summary>
-    /// Load default values from AppSettings into the controls.
-    /// Note: Full settings integration requires ZipEncoding, SevenZipCompressionMethod,
-    /// and SevenZipSolid properties to be added to AppSettings. For now, sets sensible defaults.
+    /// Load default values from AppSettings into all controls.
     /// </summary>
     public void LoadDefaults()
     {
-        var settings = AppSettings.Load();
+        var s = AppSettings.Load();
 
-        // Set format from settings if available
-        switch (settings.DefaultFormat.ToLowerInvariant())
+        switch (s.DefaultFormat.ToLowerInvariant())
         {
             case "zip":
             case "7z":
             case "tar.gz":
-                SelectedFormat = settings.DefaultFormat;
+                SelectedFormat = s.DefaultFormat;
                 break;
             default:
                 SelectedFormat = "zip";
                 break;
         }
 
-        // ZIP encoding — default to UTF-8 (index 0)
-        EncodingCombo.SelectedIndex = 0;
+        SelectComboByTag(EncodingCombo, s.ZipEncoding ?? "utf-8");
+        SelectComboByTag(ZipMethodCombo, s.ZipCompressionMethod ?? "deflate");
+        SelectComboByTag(MethodCombo, s.SevenZipCompressionMethod ?? "LZMA2");
 
-        // 7z compression method — default to LZMA2 (index 1)
-        MethodCombo.SelectedIndex = 1;
+        SolidCheck.IsChecked = s.SevenZipSolid;
+        SolidBlockSizeCombo.IsEnabled = s.SevenZipSolid;
 
-        // 7z solid — default true
-        SolidCheck.IsChecked = true;
+        SelectComboByTag(SolidBlockSizeCombo, s.SevenZipSolidBlockSize ?? "");
+        SelectComboByIntValue(DictSizeCombo, s.SevenZipDictionarySize);
+        SelectComboByIntValue(WordSizeCombo, s.SevenZipNumFastBytes);
+        SelectComboByTag(MatchFinderCombo, s.SevenZipMatchFinder ?? "");
     }
 
-    // ── Private Methods ────────────────────────────────────────────────────
+    // ── Populate combos ────────────────────────────────────────────────────
+
+    private void PopulateCombos()
+    {
+        void Fill(ComboBox combo, CompressionOptionData.ComboOption[] options,
+                  Func<CompressionOptionData.ComboOption, string>? displayResolver = null)
+        {
+            combo.Items.Clear();
+            foreach (var opt in options)
+            {
+                var display = displayResolver?.Invoke(opt) ?? opt.Display;
+                if (string.IsNullOrEmpty(display)) display = opt.Tag;
+                combo.Items.Add(new ComboBoxItem { Content = display, Tag = opt.Tag });
+            }
+        }
+
+        Fill(EncodingCombo, CompressionOptionData.ZipEncodings, opt =>
+            opt.Tag == "default" ? LocalizationManager.T("FormatOptions_Zip_EncodingDefault") : opt.Display);
+
+        Fill(ZipMethodCombo, CompressionOptionData.ZipCompressionMethods);
+        Fill(MethodCombo, CompressionOptionData.SevenZipMethods);
+
+        Fill(SolidBlockSizeCombo, CompressionOptionData.SevenZipSolidBlockSizes, opt =>
+            opt.Tag == "" ? LocalizationManager.T("FormatOptions_7z_SolidBlockSize_Default") : opt.Display);
+
+        Fill(DictSizeCombo, CompressionOptionData.SevenZipDictionarySizes, opt =>
+            opt.Tag == "0" ? LocalizationManager.T("FormatOptions_7z_DictSize_Default") : opt.Display);
+
+        Fill(WordSizeCombo, CompressionOptionData.SevenZipNumFastBytes, opt =>
+            opt.Tag == "0" ? LocalizationManager.T("FormatOptions_7z_WordSize_Default") : opt.Display);
+
+        Fill(MatchFinderCombo, CompressionOptionData.SevenZipMatchFinders, opt =>
+            opt.Tag == "" ? LocalizationManager.T("FormatOptions_7z_MatchFinder_Default") : opt.Display);
+    }
+
+    // ── Private Helpers ────────────────────────────────────────────────────
 
     private void UpdatePanel()
     {
-        // Hide all panels first
         ZipPanel.IsVisible = false;
         SevenZPanel.IsVisible = false;
         TarGzPanel.IsVisible = false;
 
-        // Show the matching panel
         switch (SelectedFormat?.ToLowerInvariant())
         {
             case "zip":
@@ -155,6 +249,8 @@ public partial class DynamicFormatOptionsPanel : UserControl
                 break;
             case "7z":
                 SevenZPanel.IsVisible = true;
+                if (SolidBlockSizeCombo != null)
+                    SolidBlockSizeCombo.IsEnabled = SolidCheck.IsChecked == true;
                 break;
             case "tar.gz":
             case "tgz":
@@ -165,5 +261,33 @@ public partial class DynamicFormatOptionsPanel : UserControl
                 TarGzPanel.IsVisible = true;
                 break;
         }
+    }
+
+    private static void SelectComboByTag(ComboBox combo, string targetTag)
+    {
+        foreach (var item in combo.Items)
+        {
+            if (item is ComboBoxItem ci && ci.Tag is string tag
+                && string.Equals(tag, targetTag, StringComparison.OrdinalIgnoreCase))
+            {
+                combo.SelectedItem = ci;
+                return;
+            }
+        }
+    }
+
+    private static void SelectComboByIntValue(ComboBox combo, int targetValue)
+    {
+        foreach (var item in combo.Items)
+        {
+            if (item is ComboBoxItem ci && ci.Tag is string tag
+                && int.TryParse(tag, out var val) && val > 0 && val == targetValue)
+            {
+                combo.SelectedItem = ci;
+                return;
+            }
+        }
+        if (targetValue == 0 && combo.Items.Count > 0)
+            combo.SelectedIndex = 0;
     }
 }

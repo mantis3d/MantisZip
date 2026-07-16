@@ -21,6 +21,8 @@
             <RowDefinition Height="Auto"/>  <!-- Row 7: 自定义重命名输入 -->
             <RowDefinition Height="8"/>
             <RowDefinition Height="Auto"/>  <!-- Row 9: 应用到全部 -->
+            <RowDefinition Height="Auto"/>  <!-- Row 10: 分割线 -->
+            <RowDefinition Height="Auto"/>  <!-- Row 11: 暂停/取消按钮 -->
         </Grid.RowDefinitions>
 
         <!-- Row 0: Title -->
@@ -122,5 +124,20 @@
                   Content="{l:L Error_ApplyToAll}"
                   FontSize="12" Foreground="{StaticResource Theme_TextSecondary}"
                   HorizontalAlignment="Center"/>
+
+        <!-- Row 10: 分割线 -->
+        <Rectangle Grid.Row="10" Height="1" Fill="{StaticResource Theme_BorderLight}" Margin="0,6,0,6"/>
+
+        <!-- Row 11: 暂停/取消按钮 -->
+        <StackPanel Grid.Row="11" Orientation="Horizontal" HorizontalAlignment="Center">
+            <Button x:Name="PauseBtn" Height="Auto" Padding="10,5" MinWidth="80" Click="Pause_Click"
+                    Background="{StaticResource Theme_ButtonBg}" BorderBrush="{StaticResource Theme_Border}" BorderThickness="1" Margin="0,0,8,0">
+                <TextBlock Text="{l:L Conflict_Btn_Pause}" FontSize="12" Foreground="{StaticResource Theme_TextPrimary}" HorizontalAlignment="Center"/>
+            </Button>
+            <Button x:Name="CancelAllBtn" Height="Auto" Padding="10,5" MinWidth="80" Click="CancelOperation_Click"
+                    Background="{StaticResource Theme_ButtonBg}" BorderBrush="{StaticResource Theme_Border}" BorderThickness="1">
+                <TextBlock Text="{l:L Conflict_Btn_CancelOperation}" FontSize="12" Foreground="{StaticResource Theme_TextPrimary}" HorizontalAlignment="Center"/>
+            </Button>
+        </StackPanel>
     </Grid>
 </Window>

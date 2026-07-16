@@ -61,6 +61,7 @@ public partial class MainWindow : Window
     private string? _savedSortColumnPath;    // 持久化的排序列 SortMemberPath
     private int _savedSortDirection;         // 持久化的排序方向 (0=无, 1=升, 2=降)
     private bool _previewPanelEnabled = true; // 工具栏预览开关状态
+    private bool _previewInfoPanelEnabled = true; // 预览信息面板开关状态
     private Point _dragStartPoint;           // 文件列表拖拽起点
     private string? _dragTempDir;            // 拖拽提取临时目录
     private bool _isOwnDrag;                 // 当前拖拽是否来自本窗口
@@ -114,6 +115,18 @@ public partial class MainWindow : Window
         }
         if (!_previewPanelEnabled)
             PreviewPanel.Visibility = Visibility.Collapsed;
+
+        _previewInfoPanelEnabled = AppSettings.Instance.ShowPreviewInfoPanel;
+        if (PreviewInfoToggleMenu.Icon is Emoji.Wpf.TextBlock infoIcon)
+        {
+            PreviewInfoToggleMenu.IsChecked = !_previewInfoPanelEnabled;
+            infoIcon.Opacity = _previewInfoPanelEnabled ? 1.0 : 0.2;
+        }
+        if (!_previewInfoPanelEnabled)
+        {
+            PreviewInfoPanel.Visibility = Visibility.Collapsed;
+            PreviewExtraInfoPanel.Visibility = Visibility.Collapsed;
+        }
         Activated += MainWindow_Activated;
         Loaded += async (_, _) =>
         {
@@ -696,6 +709,10 @@ public partial class MainWindow : Window
                 _currentPasswordDescription = null;
                 _currentPasswordPatterns = null;
                 _hasEncryptedArchive = items.Any(i => i.IsEncrypted);
+                int encryptedCount = items.Count(i => i.IsEncrypted);
+                App.LogDebug("LoadArchiveAsync: format={0}, engine={1}, encryptedEntries={2}/{3}, hasEncryptedArchive={4}",
+                    _currentFormat, engine.GetType().Name, encryptedCount, items.Count, _hasEncryptedArchive);
+
                 if (_hasEncryptedArchive)
                 {
                     var pwdResult = await App.ResolvePasswordAsync(archivePath, engine,
@@ -705,7 +722,13 @@ public partial class MainWindow : Window
                         _currentPassword = pwdResult.Password;
                         _currentPasswordDescription = pwdResult.Description;
                         _currentPasswordPatterns = pwdResult.Patterns;
+                        App.LogDebug("LoadArchiveAsync: password resolved");
                     }
+                    else
+                    {
+                        App.LogDebug("LoadArchiveAsync: password resolution returned null (user cancelled or no match)");
+                    }
+                
                 }
             }
 
@@ -825,9 +848,14 @@ public partial class MainWindow : Window
                     var currentPwdOpts = App.CreateExtractOptions();
                     await engine.ExtractAsync(archivePath, destinationPath, _currentPassword, progress, ct, currentPwdOpts);
                     progressWindow.Close();
+                    App.TryDeleteArchiveAfterExtract(archivePath);
                     App.LogDebug("ExtractAsync: done (_currentPassword), dest='{0}'", destinationPath);
                     SetStatus(L.TF(L.Main_Status_ExtractDone, Path.GetFileName(archivePath)));
-                    if (AppSettings.Instance.OpenFolderAfterExtract) OpenInExplorer(destinationPath);
+                    if (AppSettings.Instance.OpenFolderAfterExtract)
+                    {
+                        var smartPath = await App.ResolveSmartOpenPathAsync(archivePath, destinationPath, engine, _currentPassword);
+                        OpenInExplorer(smartPath);
+                    }
                     return;
                 }
                 catch (Exception innerEx) when (engine is SevenZipEngine && _hasEncryptedArchive)
@@ -868,9 +896,14 @@ public partial class MainWindow : Window
             await engine.ExtractAsync(archivePath, destinationPath, password, progress, ct, opts);
 
             progressWindow.Close();
+            App.TryDeleteArchiveAfterExtract(archivePath);
             App.LogDebug("ExtractAsync: done, dest='{0}'", destinationPath);
             SetStatus(L.TF(L.Main_Status_ExtractDone, Path.GetFileName(archivePath)));
-            if (AppSettings.Instance.OpenFolderAfterExtract) OpenInExplorer(destinationPath);
+            if (AppSettings.Instance.OpenFolderAfterExtract)
+            {
+                var smartPath = await App.ResolveSmartOpenPathAsync(archivePath, destinationPath, engine, password);
+                OpenInExplorer(smartPath);
+            }
         }
         catch (OperationCanceledException)
         {

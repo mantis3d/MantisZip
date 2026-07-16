@@ -94,6 +94,19 @@ public partial class SettingsWindow : Window
         foreach (ComboBoxItem item in SevenZipMethodCombo.Items)
             if ((string)item.Tag == s.SevenZipCompressionMethod) { SevenZipMethodCombo.SelectedItem = item; break; }
         SevenZipSolidCheck.IsChecked = s.SevenZipSolid;
+        foreach (ComboBoxItem item in SevenZipBlockSizeCombo.Items)
+            if ((string)item.Tag == s.SevenZipSolidBlockSize) { SevenZipBlockSizeCombo.SelectedItem = item; break; }
+        foreach (ComboBoxItem item in SevenZipDictCombo.Items)
+            if (item.Tag?.ToString() == s.SevenZipDictionarySize.ToString()) { SevenZipDictCombo.SelectedItem = item; break; }
+        foreach (ComboBoxItem item in SevenZipWordSizeCombo.Items)
+            if (item.Tag?.ToString() == s.SevenZipNumFastBytes.ToString()) { SevenZipWordSizeCombo.SelectedItem = item; break; }
+        foreach (ComboBoxItem item in SevenZipMatchFinderCombo.Items)
+            if ((string)item.Tag == s.SevenZipMatchFinder) { SevenZipMatchFinderCombo.SelectedItem = item; break; }
+        foreach (ComboBoxItem item in ZipMethodCombo.Items)
+            if ((string)item.Tag == s.ZipCompressionMethod) { ZipMethodCombo.SelectedItem = item; break; }
+        foreach (ComboBoxItem item in ZipEncryptionCombo.Items)
+            if ((string)item.Tag == s.ZipEncryptionMethod) { ZipEncryptionCombo.SelectedItem = item; break; }
+        SevenZipEncryptHeadersCheck.IsChecked = s.SevenZipEncryptHeaders;
 
         // 解压
         foreach (ComboBoxItem item in ExtractDestCombo.Items)
@@ -104,6 +117,7 @@ public partial class SettingsWindow : Window
         EnableDragExtractCheck.IsChecked = s.EnableDragExtract;
         ExtractPreservePathCheck.IsChecked = s.ExtractPreserveFullPath;
         DoubleClickThresholdBox.Text = (s.DoubleClickOpenThreshold / (1024 * 1024)).ToString();
+        DeleteAfterExtractCheck.IsChecked = s.DeleteArchiveAfterExtract;
 
         // 上下文菜单
         EnableCompressCheck.IsChecked = s.EnableCompressMenu;
@@ -204,6 +218,10 @@ public partial class SettingsWindow : Window
 
         AboutVersionText.Text = AppConstants.Version;
 
+        // 双击行为
+        foreach (ComboBoxItem item in DoubleClickActionCombo.Items)
+            if ((string)item.Tag == s.DoubleClickAction) { DoubleClickActionCombo.SelectedItem = item; break; }
+
         App.ApplyTextRenderingMode(SettingsTabs);
     }
 
@@ -220,6 +238,13 @@ public partial class SettingsWindow : Window
         s.ZipEncoding = (ZipEncodingCombo.SelectedItem as ComboBoxItem)?.Tag as string ?? "utf-8";
         s.SevenZipCompressionMethod = (SevenZipMethodCombo.SelectedItem as ComboBoxItem)?.Tag as string ?? "LZMA2";
         s.SevenZipSolid = SevenZipSolidCheck.IsChecked == true;
+        s.SevenZipSolidBlockSize = (SevenZipBlockSizeCombo.SelectedItem as ComboBoxItem)?.Tag as string ?? "";
+        s.SevenZipDictionarySize = int.TryParse((SevenZipDictCombo.SelectedItem as ComboBoxItem)?.Tag?.ToString(), out var dict) ? dict : 0;
+        s.SevenZipNumFastBytes = int.TryParse((SevenZipWordSizeCombo.SelectedItem as ComboBoxItem)?.Tag?.ToString(), out var ws) ? ws : 0;
+        s.SevenZipMatchFinder = (SevenZipMatchFinderCombo.SelectedItem as ComboBoxItem)?.Tag as string ?? "";
+        s.ZipCompressionMethod = (ZipMethodCombo.SelectedItem as ComboBoxItem)?.Tag as string ?? "deflate";
+        s.ZipEncryptionMethod = (ZipEncryptionCombo.SelectedItem as ComboBoxItem)?.Tag as string ?? "aes256";
+        s.SevenZipEncryptHeaders = SevenZipEncryptHeadersCheck.IsChecked == true;
 
         s.ExtractDestination = ((ComboBoxItem)ExtractDestCombo.SelectedItem)?.Tag as string ?? "ask";
         s.FileConflictAction = ((ComboBoxItem)ConflictCombo.SelectedItem)?.Tag as string ?? "ask";
@@ -228,6 +253,7 @@ public partial class SettingsWindow : Window
         s.ExtractPreserveFullPath = ExtractPreservePathCheck.IsChecked == true;
         s.DoubleClickOpenThreshold = long.TryParse(DoubleClickThresholdBox.Text, out var threshold)
             ? threshold * 1024 * 1024 : 10 * 1024 * 1024;
+        s.DeleteArchiveAfterExtract = DeleteAfterExtractCheck.IsChecked == true;
 
         s.EnableCompressMenu = EnableCompressCheck.IsChecked == true;
         s.EnableCompressSeparate = EnableCompressSeparateCheck.IsChecked == true;
@@ -279,6 +305,8 @@ public partial class SettingsWindow : Window
         else if (DefaultPathExplorer.IsChecked == true) s.DefaultPathPriority = "explorer";
         else if (DefaultPathRecent.IsChecked   == true) s.DefaultPathPriority = "recent";
         else if (DefaultPathDesktop.IsChecked  == true) s.DefaultPathPriority = "desktop";
+
+        s.DoubleClickAction = (DoubleClickActionCombo.SelectedItem as ComboBoxItem)?.Tag as string ?? "open";
 
         SaveAssocSettings();
 

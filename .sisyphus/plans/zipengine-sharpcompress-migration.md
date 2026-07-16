@@ -1,5 +1,7 @@
 # ZipEngine SharpZipLib → SharpCompress 迁移
 
+> **状态**: ✅ 已完成（v0.3.13）| **阶段**: [████████████████████] (全部完成)
+
 > **Status**: ✅ **COMPLETE** — SharpZipLib fully removed from `MantisZip.Core.csproj`, SharpSevenZip `OutArchiveFormat.Zip`+`Aes256` replaces encryption fallback. Core builds 0 errors, 236/236 tests pass.
 
 ## TL;DR

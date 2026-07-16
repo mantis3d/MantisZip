@@ -8,6 +8,7 @@
     <NoWarn>CA1416</NoWarn>
     <BuiltInComInteropSupport>true</BuiltInComInteropSupport>
     <ApplicationManifest>app.manifest</ApplicationManifest>
+    <Version>0.4.4</Version>
   </PropertyGroup>
 
   <ItemGroup>
@@ -27,7 +28,7 @@
   </ItemGroup>
 
   <ItemGroup Condition="'$(Configuration)' == 'Debug'">
-    <PackageReference Include="Avalonia.Diagnostics" Version="11.3.17" />
+    <PackageReference Include="Avalonia.Diagnostics" Version="11.3.18" />
   </ItemGroup>
 
   <ItemGroup>
@@ -39,7 +40,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <None Update="Localization\*.json">
+    <None Update="Localization\*.json;Resources\languages.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
     <None Update="contributors-*.csv">

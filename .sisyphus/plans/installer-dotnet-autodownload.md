@@ -1,5 +1,7 @@
 # Plan: installer.iss — .NET 9 Desktop Runtime 自动下载安装
 
+> **状态**: ✅ 已完成（v0.4.3+）| **阶段**: [████████████████████] (全部完成)
+
 ## TL;DR
 
 > **Quick Summary**: 在现有 `installer.iss` 中添加 .NET 9 Desktop Runtime 的注册表检测、自动下载和静默安装功能，完全复用已有的 WebView2 自动安装模式（`URLDownloadToFile` + `Exec`）。

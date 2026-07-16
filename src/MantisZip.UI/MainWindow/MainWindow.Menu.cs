@@ -4,6 +4,8 @@ using System.Windows;
 using System.Windows.Controls;
 using MantisZip.Core;
 using MantisZip.Core.Abstractions;
+using MantisZip.Core.Engines;
+using MantisZip.Core.Models;
 using MantisZip.Core.Utils;
 using Microsoft.Win32;
 using MantisZip.UI.Localization;
@@ -37,9 +39,86 @@ public partial class MainWindow
     private async void Extract_Click(object sender, RoutedEventArgs e)
     {
         if (string.IsNullOrEmpty(_currentArchivePath)) return;
-        var dest = ResolveExtractDestination(_currentArchivePath);
-        if (dest != null)
-            await ExtractAsync(_currentArchivePath, dest);
+
+        var engine = ArchiveEngineFactory.GetEngineByExtension(_currentArchivePath);
+        if (engine == null) return;
+
+        // 列出条目用于过滤
+        IReadOnlyList<Core.Abstractions.ArchiveItem>? entries = null;
+        try
+        {
+            entries = await engine.ListEntriesAsync(_currentArchivePath, _currentPassword);
+        }
+        catch { /* 列出失败也不妨碍使用传统提取 */ }
+
+        if (entries == null || entries.Count == 0)
+        {
+            // 传统路径
+            var dest = ResolveExtractDestination(_currentArchivePath);
+            if (dest != null)
+                await ExtractAsync(_currentArchivePath, dest);
+            return;
+        }
+
+        // 弹出 ExtractSettingsWindow 带条目过滤
+        var dlg = new ExtractSettingsWindow(
+            new[] { _currentArchivePath },
+            entries)
+        {
+            Owner = this
+        };
+
+        if (dlg.ShowDialog() == true)
+        {
+            var dest = dlg.CustomDestination;
+            if (string.IsNullOrEmpty(dest))
+            {
+                dest = dlg.OutputMode switch
+                {
+                    ExtractOutputMode.Here => Path.GetDirectoryName(_currentArchivePath) ?? Environment.GetFolderPath(Environment.SpecialFolder.Desktop),
+                    ExtractOutputMode.Smart => ResolveSmartExtractDest(_currentArchivePath, entries),
+                    ExtractOutputMode.ToName => Path.Combine(
+                        Path.GetDirectoryName(_currentArchivePath) ?? Environment.GetFolderPath(Environment.SpecialFolder.Desktop),
+                        Path.GetFileNameWithoutExtension(_currentArchivePath)),
+                    _ => Environment.GetFolderPath(Environment.SpecialFolder.Desktop),
+                };
+            }
+
+            var filter = dlg.GetFilter();
+            var filteredKeys = dlg.GetFilteredEntryKeys();
+
+            if (filter != null && filteredKeys != null && filteredKeys.Count > 0)
+            {
+                // 过滤模式：只提取匹配的条目
+                await engine.ExtractEntriesAsync(
+                    _currentArchivePath,
+                    filteredKeys,
+                    dest,
+                    _currentPassword,
+                    options: new ArchiveOptions
+                    {
+                        ConflictAction = Core.Abstractions.FileConflictAction.Overwrite,
+                    });
+            }
+            else
+            {
+                // 无过滤：传统提取
+                await ExtractAsync(_currentArchivePath, dest);
+            }
+        }
+    }
+
+    /// <summary>
+    /// 根据条目列表确定智能解压目标目录。
+    /// </summary>
+    private static string ResolveSmartExtractDest(string archivePath, IReadOnlyList<MantisZip.Core.Abstractions.ArchiveItem> entries)
+    {
+        var parentDir = Path.GetDirectoryName(archivePath)
+                        ?? Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
+        var archiveName = Path.GetFileNameWithoutExtension(archivePath);
+        return ArchiveStructureAnalyzer.HasSingleRootDirectory(entries)
+            ? parentDir
+            : Path.Combine(parentDir, archiveName);
     }
 
     private async void ExtractSelected_Click(object sender, RoutedEventArgs e)
@@ -607,6 +686,19 @@ public partial class MainWindow
             HidePreview();
     }
 
+    private void PreviewInfoToggleMenu_Click(object sender, RoutedEventArgs e)
+    {
+        _previewInfoPanelEnabled = PreviewInfoToggleMenu.IsChecked != true;
+        AppSettings.Instance.ShowPreviewInfoPanel = _previewInfoPanelEnabled;
+        AppSettings.Instance.Save();
+
+        // 图标透明度随状态变化（与进度条/目录独立基准/预览整体风格一致）
+        if (PreviewInfoToggleMenu.Icon is Emoji.Wpf.TextBlock icon)
+            icon.Opacity = _previewInfoPanelEnabled ? 1.0 : 0.2;
+
+        UpdatePreviewInfoPanelVisibility();
+    }
+
     private void OpenHint_Click(object sender, RoutedEventArgs e)
     {
         OpenArchive_Click(sender, e);
@@ -636,15 +728,17 @@ public partial class MainWindow
 
         try
         {
-            for (int i = 0; i < filesToExtract.Count; i++)
-            {
-                var item = filesToExtract[i];
-                pw.CancellationToken.ThrowIfCancellationRequested();
-                pw.SetProgress((double)i / filesToExtract.Count * 100, L.TF(L.Main_Status_Extracting, item.Name));
+            var opts = App.CreateExtractOptions();
 
-                // 根据设置决定输出路径：
-                // - 关闭保留完整路径时，以当前浏览目录为基准裁剪路径前缀
-                // - item.FullPath 仍然用于 ArchiveEntryExtractor 查找条目
+            // Build entryKeys and pathOverrides
+            var entryKeys = new List<string>();
+            var pathOverrides = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var item in filesToExtract)
+            {
+                entryKeys.Add(item.FullPath);
+
+                // 路径裁剪（与原来相同的逻辑）
                 var outputEntryPath = item.FullPath;
                 if (!AppSettings.Instance.ExtractPreserveFullPath && !string.IsNullOrEmpty(_currentFolder))
                 {
@@ -652,23 +746,43 @@ public partial class MainWindow
                     if (outputEntryPath.StartsWith(cf, StringComparison.OrdinalIgnoreCase))
                         outputEntryPath = outputEntryPath.Substring(cf.Length);
                 }
+
                 var safeEntryPath = FileConflictHelper.SanitizeEntryPath(outputEntryPath);
                 var outputPath = FileConflictHelper.GetSafePath(dest, safeEntryPath);
-                var dir = Path.GetDirectoryName(outputPath);
-                if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir)) Directory.CreateDirectory(dir);
+                pathOverrides[item.FullPath] = outputPath;
+            }
 
-                await ArchiveEntryExtractor.ExtractEntryAsync(
-                    _currentArchivePath!, item.FullPath, outputPath, _currentFormat, _currentPassword, pw.CancellationToken);
+            var engine = ArchiveEngineFactory.GetEngineByExtension(_currentArchivePath!);
+            if (engine == null) throw new NotSupportedException("不支持的压缩格式");
+
+            var progress = ProgressWindow.CreateBackgroundProgress(pw);
+
+            if (_currentFormat is ArchiveFormat.Tar or ArchiveFormat.GZip)
+            {
+                // Tar/Gz 不支持按条目解压，降级为完整解压
+                await engine.ExtractAsync(_currentArchivePath!, dest, _currentPassword,
+                    progress, pw.CancellationToken, opts);
+            }
+            else
+            {
+                await engine.ExtractEntriesAsync(_currentArchivePath!, entryKeys, dest,
+                    _currentPassword, progress, pw.CancellationToken, opts, pathOverrides);
             }
 
             pw.SetComplete(L.T(L.Main_Status_ExtractItemsDone));
+            App.TryDeleteArchiveAfterExtract(_currentArchivePath!);
             App.LogDebug("ExtractSelectedAsync: done, {0} files extracted to '{1}'", filesToExtract.Count, dest);
-            if (AppSettings.Instance.OpenFolderAfterExtract) OpenInExplorer(dest);
+            if (AppSettings.Instance.OpenFolderAfterExtract)
+            {
+                var smartPath = await App.ResolveSmartOpenPathAsync(
+                    _currentArchivePath!, dest, engine, _currentPassword);
+                OpenInExplorer(smartPath);
+            }
             await pw.AutoCloseOrWaitAsync(800, () => pw.Close());
             SetStatus(L.T(L.Main_Status_ExtractItemsDone));
         }
-        catch (OperationCanceledException) { App.LogDebug("ExtractSelectedAsync: cancelled"); pw.Close(); SetStatus(L.T(L.Main_Status_AddCancel)); }
-        catch (Exception ex) { App.LogDebug("ExtractSelectedAsync: failed: {0}", ex.Message); pw.Close(); AppMessageBox.Show(L.TF(L.Main_Status_ExtractFailed, ex.Message), L.T(L.App_ErrorTitle), MessageBoxButton.OK, MessageBoxImage.Error); SetStatus(L.T(L.Main_Status_ExtractFailed)); }
+        catch (OperationCanceledException) { App.LogDebug("ExtractSelectedAsync: cancelled"); try { pw.Close(); } catch { } SetStatus(L.T(L.Main_Status_AddCancel)); }
+        catch (Exception ex) { App.LogDebug("ExtractSelectedAsync: failed: {0}", ex.Message); try { pw.Close(); } catch { } AppMessageBox.Show(L.TF(L.Main_Status_ExtractFailed, ex.Message), L.T(L.App_ErrorTitle), MessageBoxButton.OK, MessageBoxImage.Error); SetStatus(L.T(L.Main_Status_ExtractFailed)); }
     }
 
     #region 最近打开的文件

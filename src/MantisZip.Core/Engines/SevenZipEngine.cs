@@ -44,6 +44,8 @@ public class SevenZipEngine : IArchiveEngine
     {
         var candidates = new List<string>
         {
+            // 便携版：exe 同目录下的 7z.dll
+            Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "7z.dll"),
             // 应用目录下的平台子目录（SharpSevenZip 默认搜索路径）
             Path.Combine(AppDomain.CurrentDomain.BaseDirectory, Environment.Is64BitProcess ? "x64" : "x86", "7z.dll"),
             // 标准 7-Zip 安装路径
@@ -245,10 +247,29 @@ public class SevenZipEngine : IArchiveEngine
         };
 
         // 固实压缩（SharpSevenZip 无原生属性，通过 CustomParameters 传递）
-        if (!options.SevenZipSolid)
+        if (!string.IsNullOrEmpty(options.SevenZipSolidBlockSize))
+        {
+            // 既有固实块大小值，设为 s=N 直接启用固实+指定块大小
+            compr.CustomParameters["s"] = options.SevenZipSolidBlockSize;
+        }
+        else if (!options.SevenZipSolid)
         {
             compr.CustomParameters["s"] = "off";
         }
+        // 默认（固实开启但无块大小）→ 不设 s，7z.dll 使用默认固实行为
+
+        // 字典大小（仅 LZMA/LZMA2 有效，但设了也无害）
+        // 在 SharpSevenZip 中这些是静态属性（全局生效于 7z.dll 上下文）
+        if (options.SevenZipDictionarySize.HasValue)
+            SharpSevenZipCompressor.LzmaDictionarySize = options.SevenZipDictionarySize.Value;
+
+        // Word Size（快速字节数）
+        if (options.SevenZipNumFastBytes.HasValue)
+            SharpSevenZipCompressor.LzmaNumFastBytes = options.SevenZipNumFastBytes.Value;
+
+        // 匹配器
+        if (!string.IsNullOrEmpty(options.SevenZipMatchFinder))
+            SharpSevenZipCompressor.LzmaMatchFinder = options.SevenZipMatchFinder;
 
         compr.IncludeEmptyDirectories = true;
         compr.DirectoryStructure = true;
@@ -256,7 +277,7 @@ public class SevenZipEngine : IArchiveEngine
         // 加密（密码通过 CompressFilesEncrypted/CompressDirectory 的方法参数传递）
         if (options.Encrypt && !string.IsNullOrEmpty(options.Password))
         {
-            compr.EncryptHeaders = true;
+            compr.EncryptHeaders = options.SevenZipEncryptHeaders;
         }
 
         // 分卷
@@ -618,7 +639,8 @@ public class SevenZipEngine : IArchiveEngine
         string? password = null,
         IProgress<ArchiveProgress>? progress = null,
         CancellationToken cancellationToken = default,
-        ArchiveOptions? options = null)
+        ArchiveOptions? options = null,
+        IReadOnlyDictionary<string, string>? outputPathOverrides = null)
     {
         CoreLog.Entry();
         CoreLog.Info($"ExtractEntriesAsync: {archivePath}, {entryKeys.Count} entries -> {destinationPath}");
@@ -658,7 +680,8 @@ public class SevenZipEngine : IArchiveEngine
                     continue;
                 }
 
-                var outputPath = FileConflictHelper.GetSafePath(destinationPath, fileName);
+                var outputPath = outputPathOverrides?.GetValueOrDefault(fileName)
+                    ?? FileConflictHelper.GetSafePath(destinationPath, fileName);
                 var outDir = Path.GetDirectoryName(outputPath);
                 if (!string.IsNullOrEmpty(outDir) && !Directory.Exists(outDir))
                     Directory.CreateDirectory(outDir);

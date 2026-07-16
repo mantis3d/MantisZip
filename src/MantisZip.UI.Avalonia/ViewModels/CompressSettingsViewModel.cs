@@ -20,6 +20,9 @@ public partial class CompressSettingsViewModel : ObservableObject
     /// <summary>本地化字符串字典，XAML 通过 {Binding LocalizedStrings[Key]} 访问。</summary>
     public Dictionary<string, string> LocalizedStrings { get; } = new();
 
+    /// <summary>支持的格式选项列表，绑定到格式 ComboBox。来自 <see cref="CompressionOptionData"/> 共享数据源。</summary>
+    public List<string> FormatOptions { get; } = new(CompressionOptionData.ArchiveFormatValues);
+
     /// <summary>源文件摘要文字，用于界面显示。</summary>
     public string SelectedPathsSummary => SelectedPaths.Count > 0
         ? LocalizationManager.T("Compress_NItemsSelected", SelectedPaths.Count)

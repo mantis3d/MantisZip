@@ -107,7 +107,7 @@ internal static partial class ShellIntegration
         var displayName = L.T(L.Shell_ProgIdDesc) + " — " + ext.TrimStart('.');
         SetRegistryValue(progIdKey, null, displayName);
         SetRegistryValue($@"{progIdKey}\shell\open", null, L.T(L.Shell_OpenVerb));
-        SetRegistryValue($@"{progIdKey}\shell\open\command", null, $@"""{exePath}"" --open ""%1""");
+        SetRegistryValue($@"{progIdKey}\shell\open\command", null, $@"""{exePath}"" --open-dispatch ""%1""");
 
         // 具体格式图标
         var iconPath = GetIconPath(ext);

@@ -1,6 +1,7 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:conv="clr-namespace:MantisZip.UI.Avalonia.Converters"
+        xmlns:controls="clr-namespace:MantisZip.UI.Avalonia.Controls"
         x:Class="MantisZip.UI.Avalonia.Dialogs.CompressSettingsWindow"
         x:CompileBindings="False"
         Title="{Binding WindowTitle}"
@@ -82,10 +83,8 @@
                 <TextBlock Text="{Binding LocalizedStrings[Compress_Format]}"
                            FontSize="12"
                            Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
-                <ComboBox SelectedItem="{Binding DefaultFormat}">
-                  <ComboBoxItem Content="zip" />
-                  <ComboBoxItem Content="tar.gz" />
-                </ComboBox>
+                <ComboBox ItemsSource="{Binding FormatOptions}"
+                          SelectedItem="{Binding DefaultFormat}" />
 
                 <TextBlock Text="{Binding LocalizedStrings[Compress_Level]}"
                            FontWeight="SemiBold" />
@@ -119,6 +118,10 @@
                           Foreground="{DynamicResource ThemeTextPrimaryBrush}"
                           BorderBrush="{DynamicResource ThemeBorderBrush}" />
                 </Grid>
+
+                <!-- Format-specific advanced options (ZIP encoding, 7z method/solid) -->
+                <controls:DynamicFormatOptionsPanel x:Name="FormatOptionsPanel"
+                                                    SelectedFormat="{Binding DefaultFormat}" />
               </StackPanel>
             </Border>
           </StackPanel>
