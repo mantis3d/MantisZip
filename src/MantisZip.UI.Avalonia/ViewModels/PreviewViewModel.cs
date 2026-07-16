@@ -161,6 +161,7 @@ public partial class PreviewViewModel : ObservableObject
         OnPropertyChanged(nameof(HasZoomControls));
         OnPropertyChanged(nameof(HasFontSizeControls));
         OnPropertyChanged(nameof(HasGifControls));
+        OnPropertyChanged(nameof(HasTransparencyControls));
         OnPropertyChanged(nameof(HasLigatureControls));
         OnPropertyChanged(nameof(IsHtmlVisible));
         OnPropertyChanged(nameof(IsMarkdownVisible));
@@ -320,9 +321,13 @@ public partial class PreviewViewModel : ObservableObject
     // ── Ligature toggle ──
 
     public bool HasLigatureControls => PreviewType == PreviewType.Font;
+    public bool HasTransparencyControls => PreviewType is PreviewType.Image or PreviewType.IcoGallery;
 
     [ObservableProperty]
     private bool _isLigatureEnabled = true;
+
+    [ObservableProperty]
+    private bool _isTransparencyBgShown;
 
     public bool CanLigatureToggle => _fontSupportsLigature;
 
@@ -430,6 +435,12 @@ public partial class PreviewViewModel : ObservableObject
     }
 
     // ── Ligature toggle ──
+
+    [RelayCommand]
+    private void ToggleTransparencyBg()
+    {
+        IsTransparencyBgShown = !IsTransparencyBgShown;
+    }
 
     [RelayCommand]
     private void ToggleLigature()
@@ -1704,6 +1715,7 @@ public partial class PreviewViewModel : ObservableObject
         IsToolbarVisible = false;
         ZoomLevel = 1.0;
         FontSize = 13;
+        IsTransparencyBgShown = false;
 
         // Reset info panel
         FileName = string.Empty;

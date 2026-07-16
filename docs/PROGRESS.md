@@ -45,6 +45,12 @@
   - 解码 XOR 像素后解析 AND 掩码，对掩码位=1 的像素设置 alpha=0
   - AND 掩码在原始 DIB 中 bottom-up 存储，解码后位图 top-down，需 y-mirror
 
+**2026-07-16** — 图片/ICO 预览透明棋盘格背景切换
+  - ViewModel 新增 `IsTransparencyBgShown`/`ToggleTransparencyBgCommand`/`HasTransparencyControls`
+  - PreviewPanel.axaml 新增 `DrawingBrush` 棋盘格画刷（8×8 平铺）
+  - 工具栏新增 🏁 按钮（绑定 `ToggleTransparencyBgCommand`，图片和 ICO 画廊可见）
+  - Image/GIF 预览 Image 控件用 Grid 叠加棋盘格 Rectangle，`IsVisible` 绑定 `IsTransparencyBgShown`
+
 **2026-07-16** — PDF 预览性能优化：限制渲染分辨率 + 隐藏工具栏
   - `ShowPdfAsync` 中获取 PDF 页面原始尺寸（PdfPig GetPage），计算合适的缩放比例限制渲染最大宽度 1920/高度 1080
   - `LoadPdfPageAsync` 改用动态 `_pdfRenderScale` 替代硬编码 1.0f

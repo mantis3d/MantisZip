@@ -5,6 +5,30 @@
 
              x:Class="MantisZip.UI.Avalonia.Views.PreviewPanel"
              x:DataType="vm:PreviewViewModel">
+    <UserControl.Resources>
+      <!-- 透明棋盘格背景画刷 -->
+      <DrawingBrush x:Key="TransparencyCheckerboardBrush"
+                    TileMode="Tile" Stretch="None"
+                    DestinationRect="0,0,8,8">
+        <DrawingBrush.Drawing>
+          <DrawingGroup>
+            <GeometryDrawing Brush="#CCCCCC">
+              <GeometryDrawing.Geometry>
+                <RectangleGeometry Rect="0,0,8,8" />
+              </GeometryDrawing.Geometry>
+            </GeometryDrawing>
+            <GeometryDrawing Brush="#FFFFFF">
+              <GeometryDrawing.Geometry>
+                <GeometryGroup>
+                  <RectangleGeometry Rect="0,0,4,4" />
+                  <RectangleGeometry Rect="4,4,4,4" />
+                </GeometryGroup>
+              </GeometryDrawing.Geometry>
+            </GeometryDrawing>
+          </DrawingGroup>
+        </DrawingBrush.Drawing>
+      </DrawingBrush>
+    </UserControl.Resources>
     <Grid x:Name="PreviewRootGrid"
           RowDefinitions="Auto,*,Auto"
           ColumnDefinitions="*,Auto">
@@ -52,6 +76,14 @@
                       FontSize="14"
                       VerticalAlignment="Center" />
          </StackPanel>
+
+        <!-- Transparency toggle (image / ICO gallery) -->
+        <StackPanel Orientation="Horizontal" Spacing="2"
+                    IsVisible="{Binding HasTransparencyControls}">
+          <Button Content="🏁"
+                  Width="32" Height="28" FontSize="14" Padding="0"
+                  Command="{Binding ToggleTransparencyBgCommand}" />
+        </StackPanel>
 
         <!-- ICO gallery controls -->
         <StackPanel Orientation="Horizontal" Spacing="2"
@@ -135,20 +167,28 @@
         <ScrollViewer x:Name="ImagePreviewScrollViewer" IsVisible="{Binding IsImageVisible}"
                       HorizontalScrollBarVisibility="Auto"
                       VerticalScrollBarVisibility="Auto">
-          <Image Source="{Binding PreviewImage}"
-                 Width="{Binding ScaledWidth}"
-                 Height="{Binding ScaledHeight}"
-                 Stretch="Uniform" />
+          <Grid>
+            <Rectangle Fill="{DynamicResource TransparencyCheckerboardBrush}"
+                       IsVisible="{Binding IsTransparencyBgShown}" />
+            <Image Source="{Binding PreviewImage}"
+                   Width="{Binding ScaledWidth}"
+                   Height="{Binding ScaledHeight}"
+                   Stretch="Uniform" />
+          </Grid>
         </ScrollViewer>
 
         <!-- GIF preview (same image control) -->
         <ScrollViewer x:Name="GifPreviewScrollViewer" IsVisible="{Binding IsGifVisible}"
                       HorizontalScrollBarVisibility="Auto"
                       VerticalScrollBarVisibility="Auto">
-          <Image Source="{Binding PreviewImage}"
-                 Width="{Binding ScaledWidth}"
-                 Height="{Binding ScaledHeight}"
-                 Stretch="Uniform" />
+          <Grid>
+            <Rectangle Fill="{DynamicResource TransparencyCheckerboardBrush}"
+                       IsVisible="{Binding IsTransparencyBgShown}" />
+            <Image Source="{Binding PreviewImage}"
+                   Width="{Binding ScaledWidth}"
+                   Height="{Binding ScaledHeight}"
+                   Stretch="Uniform" />
+          </Grid>
         </ScrollViewer>
 
         <!-- ICO gallery -->
