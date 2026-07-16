@@ -2,36 +2,73 @@
 
 ## Project overview
 
-WPF desktop compression/decompression app (.NET 9, Windows only). Three projects: `MantisZip.Core` (class library) + `MantisZip.ShellExt` (COM component class library) + `MantisZip.UI` (WinExe).
+WPF→Avalonia 迁移中的压缩/解压桌面应用。当前存在两个 UI 项目并存：
+
+| 项目 | 框架 | 状态 | 目标 |
+|------|------|------|------|
+| `MantisZip.UI` | WPF (`net9.0-windows`) | 🟡 维护模式，迁移完成后废弃 | 遗留版本 |
+| `MantisZip.UI.Avalonia` | Avalonia (`net9.0`) | 🟢 主力开发 | 迁移目标，完成后废弃 WPF |
+
+三个项目共享：`MantisZip.Core` (class library) + `MantisZip.ShellExt` (COM 组件 class library)。
+
+**迁移完成后的计划**：
+- 废弃 `MantisZip.UI`（WPF）项目
+- 移除 WebView2 依赖（HTML/Markdown 预览改用 WebView2 之外的方案）
 
 ## Quick start
 
 ```powershell
-# Build everything
+# 构建 Avalonia 版（当前主力）
+dotnet build src\MantisZip.UI.Avalonia\MantisZip.UI.Avalonia.csproj
+
+# 运行 Avalonia 版（Windows）
+dotnet run --project src\MantisZip.UI.Avalonia\MantisZip.UI.Avalonia.csproj
+
+# 构建 WPF 版（遗留）
 dotnet build src\MantisZip.UI\MantisZip.UI.csproj
 
-# Run (requires Windows)
+# 运行 WPF 版
 dotnet run --project src\MantisZip.UI\MantisZip.UI.csproj
 
-# Tests are in tests/MantisZip.Tests/ (xUnit, 40+ test cases).
-# test_encoding/ is a throwaway CLI tool for debugging ZIP encoding, not a test suite.
+# Tests（Core 层测试，与 UI 框架无关）
+dotnet test tests\MantisZip.Tests\MantisZip.Tests.csproj
+
+# Avalonia 测试
+dotnet test tests\MantisZip.UI.Avalonia.Tests\MantisZip.UI.Avalonia.Tests.csproj
 ```
 
 ## Architecture
 
-### Dependency flow
+### 迁移阶段状态
+
+Avalonia 移植 Phases 0–10 已完成，当前处于功能补齐后期：
+
+| Phase | 内容 | 状态 |
+|-------|------|------|
+| 0–9 | 项目骨架·浏览·预览·设置·压缩解压·编辑·样式·交互 | ✅ 已完成 |
+| 10 | WPF 功能补齐（进度条·信息面板·状态栏） | ✅ 已完成 |
+| UI 功能补齐 | 对话框·控件·转换器补齐 | ✅ 已完成 |
+| Shell/COM 集成 | ShellIntegration·ShellExt·文件关联·CLI | 📋 待实施 |
+| i18n + 清理 | 缺失 key 补齐·空目录清理·版本对齐 | 📋 待实施 |
+
+### 依赖流向
 
 ```
-MantisZip.UI (WPF) ──reference──▶ MantisZip.Core (net9.0)
-                                        │
-                        ┌───────────────┼───────────────┐
-                   ZipEngine    SevenZipEngine    TarGzEngine
-                  (SharpCompress) (SharpSevenZip) (SharpCompress)
-
-MantisZip.ShellExt (COM) ──独立──▶ (Explorer.exe 宿主，无直接项目引用)
+                    ┌─── MantisZip.UI (WPF) ──reference──┐
+                    │   (net9.0-windows, 待废弃)          │
+                    │                                     │
+MantisZip.Core ──────┤                                     ├── MantisZip.ShellExt (COM)
+(net9.0)            │                                     │   (Explorer.exe 宿主)
+                    │   MantisZip.UI.Avalonia ──reference─┘
+                    │   (net9.0, 主力开发)
+                    │
+               ZipEngine    SevenZipEngine    TarGzEngine
+              (SharpCompress) (SharpSevenZip) (SharpCompress)
 ```
 
 ### Engine pattern (strategy + factory)
+
+所有引擎均在 `MantisZip.Core`，与 UI 框架无关：
 
 - `IArchiveEngine` interface: `ListEntriesAsync`, `ExtractAsync`, `CompressAsync`, `TestArchiveAsync`
 - `ArchiveEngineFactory` registers engines in static constructor, dispatches by file extension
@@ -44,58 +81,64 @@ MantisZip.ShellExt (COM) ──独立──▶ (Explorer.exe 宿主，无直接�
 - `ZipEngine` reports per-file progress via buffered I/O copy loop with 100ms throttle; reports initial 0% and final 100% for each file
 - `SevenZipEngine.ExtractAsync` and `TarGzEngine.ExtractAsync` report progress only at completion (100%)
 - `SevenZipEngine.CompressAsync` reports progress via `SharpSevenZipCompressor.Compressing` event
-- `ProgressWindow` shows two progress bars: file-level (top) and overall (bottom); `SetProgress(ArchiveProgress)` overload drives both
 
 ### ArchiveItem duality
 
 - **Core**: `MantisZip.Core.Abstractions.ArchiveItem` — engines produce these
-- **UI**: `MainWindow.xaml.cs` defines a subclass `ArchiveItem : Core.Abstractions.ArchiveItem` adding `DisplayName`, `SizeDisplay`, `NameDisplay`, `SortOrder` — all engine output is mapped into UI instances in `LoadArchiveAsync`
+- **WPF UI**: `MainWindow.xaml.cs` defines a subclass `ArchiveItem : Core.Abstractions.ArchiveItem` adding `DisplayName`, `SizeDisplay`, `NameDisplay`, `SortOrder`
+- **Avalonia UI**: `ArchiveItemModel` (Models/) wraps `ArchiveItem` with `IconSource`, display properties, `SizeRatio` (progress bar width), `SortOrder`
 
-### UI pattern: code-behind, not MVVM
+### UI 模式：项目间差异
+
+#### WPF（遗留版）：code-behind
 
 Despite using `CommunityToolkit.Mvvm`, **all logic lives in `MainWindow.xaml.cs`**. No ViewModel classes exist. The `FolderNode` class at the bottom of that file implements `INotifyPropertyChanged` for TreeView binding only.
 
-### Preview subsystem
+#### Avalonia（主力版）：MVVM
 
-- Trigger: `FileListGrid_SelectionChanged` → files via `ShowPreviewAsync(item)`, directories via `ShowDirectoryPreview(item)` (system folder icon + directory info panel)
-- **`ExtractPreviewFileAsync(item, fallbackName, ct)`** — shared helper (lines ~139) for temp extraction; creates temp dir, extracts, returns file path. Replaces 14 identical 5-line extraction blocks. Callers just `var tempFile = await ExtractPreviewFileAsync(item, "preview" + ext, ct);`
-- **`HideAllPreviewControls()`** — collapses all 5 content controls (`PreviewImage`, `PreviewTextBox`, `PreviewFileIcon`, `PreviewUnsupported`, `PreviewWebView2`). Called at the start of every `Show*Preview` method before showing the relevant control. Ensures no orphaned visibility states from previous formats.
-- **`SetToolbar(ToolbarButton[] leftButtons, ToolbarButton[] rightButtons)`** — left side is common controls (zoom, font size), right side is format-specific (transparency toggle, ligature toggle, GIF frame nav). Separator auto-inserted between left and right arrays. Callers specify both arrays explicitly.
-- **Info panel clearing** is centralized in `ShowPreviewAsync` (line ~165-167) — `PreviewExtraInfoPanel.Children.Clear()` + `.Visibility = Collapsed` before any format's display method runs. Individual format methods no longer need to clean up.
-- **`SetFormatSpecificInfo(params (string, string)[] pairs)`** — adds key-value rows to `PreviewExtraInfoPanel`; used by all metadata formats (PE/PDF/Font/Audio/SQLite/ISO/Office/Video) and Image/GIF.
-- Display (per format):
-  - **Image**: `ShowImagePreviewAsync` — BitmapImage with DecodePixelWidth=1920 downsampling; zoom toolbar + transparency toggle for PNG/ICO/WebP
-  - **GIF**: Same `ShowImagePreviewAsync` path with `WpfAnimatedGif` — play/pause/frame-nav toolbar + editable frame input (TextBox + total label)
-  - **Text**: `ShowTextPreview` — UTF-8/GBK detection via Ude.NetStandard; font size toolbar
-  - **HTML**: `ShowHtmlPreview` — WebView2 rendering (network requests blocked)
-  - **Markdown**: `ShowMarkdownPreview` — Markdig → HTML → WebView2 (dark theme support via `prefers-color-scheme`)
-  - **PE**: `ShowPePreview` — product name, company, version, architecture, subsystem
-  - **PDF**: `ShowPdfPreview` — metadata + WebView2 PDF content rendering (size-gated)
-  - **Font**: `ShowFontPreview` — font name/style/glyph count; sample text rendering; ligature toggle (re-sets TextBox.Text to force WPF redraw)
-  - **Audio**: `ShowAudioPreview` — WAV/FLAC duration, sample rate, channels, bitrate
-   - **SQLite**: `ShowSqlitePreview` — encoding, page size, table count + DataGrid table(s) via `SqliteDataReader` (Microsoft.Data.Sqlite); multi-table via `ShowMultiTablePreview` (TabControl)
-  - **ISO**: `ShowIsoPreview` — volume label, format, size
-  - **Torrent**: `ShowTorrentPreview` — file tree, InfoHash, Magnet, tracker, creator
-  - **Office**: `ShowOfficePreview` — docx/xlsx/pptx title, author, page/slide/sheet count
-  - **SVG**: `ShowSvgPreview` — WebView2 rendering
-  - **Video**: `ShowVideoPreview` — MP4/MKV/AVI resolution, duration, codec
-- **`ShowTablePreview(DataTable, ArchiveItem, title)`** — shared method for tabular data (CSV, SQLite, future formats). Uses `PreviewCsvGrid` (DataGrid) with 100-row × 100-col limit. Params: `DataTable`, `ArchiveItem` for info panel, string title for header.
-- **`ITableDataProvider`** — optional interface in `Core/Abstractions/` for pluggable table data readers (SQLite, Office, etc.). See [modular preview providers plan](.sisyphus/plans/preview-modular-providers.md) for future extraction into separate class libraries.
-- Metadata-only formats (PE, Office, audio, SQLite, ISO, torrent, video) skip the `MaxPreviewFileSize` check since they only read file headers. PDF is also metadata-only (exempt from the outer size check) but conditionally renders content if `item.Size <= MaxPreviewFileSize`
-- Toolbar: `SetToolbar(left, right)` — common controls left, format-specific right, separator between. Image zoom / Text font-size / GIF play-pause-frame / Font ligature toggle / Transparency toggle.
-- `ClearPreviewContent()` clears all sources without resetting grid layout; `HidePreview()` does full cleanup
-- Image side panel: `PreviewInfoPanel` shows name, size, compression ratio, date — now with format-specific key-value pairs below general info
-- Cleanup: `ClearPreviewTemp()` before each new preview; `App.OnExit` deletes `%TEMP%\MantisZip`
-- `MetadataOnlyExtensions` set defines formats exempt from size limits
+使用 `CommunityToolkit.Mvvm` 的 `ObservableObject` + source generators (`[ObservableProperty]`, `[RelayCommand]`)：
 
-### Window persistence
+- **ViewModels**: `MainWindowViewModel`, `PreviewViewModel`, `ProgressViewModel`, `CompressSettingsViewModel`, `ExtractSettingsViewModel`, `SettingsWindowViewModel`
+- **Services**: `ArchiveService`, `CompressService`, `ExtractService`, `PreviewService`, `IconService`, `LocalizationManager`
+- **Views**: `MainWindow.axaml`, `PreviewPanel.axaml` (UserControl), `SettingsWindow.axaml`
+- 对话框通过 ViewModel 的回调委托（`ShowPasswordDialog`, `ShowExtractSettingsDialog` 等）与 View 解耦
 
-Window size, tree column width, and preview row height saved to `%LOCALAPPDATA%\MantisZip\window.json` as JSON. Restored on startup. Preview row height supports both `Pixel` and `Star` `GridLength` types.
+### 预览子系统
 
-### Settings system
+#### WPF 版（遗留）
 
-`AppSettings` singleton stores all user preferences in `%LOCALAPPDATA%\MantisZip\settings.json` as JSON. Sections:
+预览入口在 `MainWindow/Preview/` 的多个 partial 文件，code-behind 模式：
 
+- `MainWindow.Preview.cs` — 入口 + 格式分发
+- `MainWindow.Preview.Image.cs` — 图片/GIF（`WpfAnimatedGif`）
+- `MainWindow.Preview.Metadata.cs` — PE/PDF/字体/音视频等元数据
+- `MainWindow.Preview.Text.cs` — 文本/CSV
+- `MainWindow.Preview.Web.cs` — HTML/Markdown/SVG（WebView2）
+- WebView2 用于 HTML/Markdown/SVG/PDF 渲染（网络请求已拦截）
+- `PreviewWebView2` 控件名
+
+#### Avalonia 版（主力）
+
+预览系统在独立的 `PreviewPanel.axaml` (UserControl) + `PreviewViewModel` + `PreviewService`，MVVM 模式：
+
+- **预览类型枚举**: `PreviewType` (Services/PreviewService.cs)
+- **格式分发**: `PreviewService.ClassifyPreview(ext)` → `PreviewViewModel.ShowXxx(filePath)` 方法
+- **HTML/Markdown**: 仍使用 `Avalonia.Controls.WebView`（底层 WebView2），通过 `data:` URI 嵌入内容（无需临时文件）
+- **SVG**: `Svg.Skia` 直接栅格化 → `WriteableBitmap`（无需 WebView2）
+- **字体预览**: `HarfBuzzSharp` shaping + `SkiaSharp` 位图渲染 + 自动折行 + 连字检测
+- **GIF**: 自实现 `GifDecoder` + `DispatcherTimer` 逐帧动画（无需 `WpfAnimatedGif`）
+- **信息面板**: 托管在 PreviewPanel 右侧/下方，`ApplyInfoPanelOrientation()` 切换
+- **DataGrid**: CSV/SQLite 预览用 `Avalonia.Controls.DataGrid`（手动列创建以绕过 `AutoGenerateColumns` 对 `DataView` 的 bug）
+
+### 设置系统
+
+`AppSettings` singleton 存在于两个 UI 项目中，格式兼容但各自独立序列化：
+
+- **WPF**: `MantisZip.UI/AppSettings.cs` → `%LOCALAPPDATA%\MantisZip\settings.json`
+- **Avalonia**: `MantisZip.UI.Avalonia/Models/AppSettings.cs` → 相同路径
+- 两边的 `AppSettings` 字段定义保持同步
+
+设置包含以下分类：
 - **压缩**: DefaultFormat (zip/7z/tar.gz), DefaultLevel (1–9), CloseAfterCompress, KeepOriginalExtension
 - **解压**: ExtractDestination (ask/same-dir/desktop), FileConflictAction (ask/overwrite/rename/skip), OpenFolderAfterExtract
 - **上下文菜单**: EnableCompressMenu, EnableOpenMenu, EnableCascadingMenu, ShowMenuIcons, EnableSmartExtractMenu, EnableExtractHereMenu, EnableExtractToNamedMenu, EnableExtractToMenu, EnableCompressSeparate, EnableCompressCombined
@@ -104,11 +147,11 @@ Window size, tree column width, and preview row height saved to `%LOCALAPPDATA%\
 - **密码管理**: ShowPasswordMatchNotification, PasswordRevealByDefault
 - **高级**: SevenZipPath, PreserveDirectoryRoot
 
-`SettingsWindow` (tabbed UI) provides GUI editing; `CompressSettingsWindow` loads defaults from `AppSettings`.
+### Shell integration（WPF-only，Avalonia 待移植）
 
-### Shell integration
+`ShellIntegration` (static class) 当前仅在 WPF 项目中。Avalonia 版计划在 `avalonia-shell-com-integration` 阶段移植。
 
-`ShellIntegration` (static class) installs Windows Explorer context menu entries via `HKCU\Software\Classes` — no admin required.
+安装 Windows Explorer 上下文菜单条目 via `HKCU\Software\Classes` — no admin required.
 
 Since v0.3.7, `Install()` tries COM component registration first (`MantisZip.ShellExt.comhost.dll` via `InstallCom()`), falling back to static registry verbs if the COM host file is missing. `Uninstall()` clears both COM CLSID + shellex and all static verbs. `IsInstalled` checks the COM CLSID first.
 
@@ -159,7 +202,7 @@ Open and Extract verbs use `AppliesTo` filter (archive extensions only). Icons v
 
 ### CLI entry points
 
-All handled in `App.OnStartup` before normal UI startup:
+两套 UI 项目各自实现 CLI 入口，行为一致：
 
 | Argument | Behavior |
 |---|---|
@@ -176,130 +219,40 @@ All handled in `App.OnStartup` before normal UI startup:
 | `--open <path>` | Launch MainWindow and load archive for browsing |
 | _(no args)_ | Normal MainWindow launch |
 
-`--extract`, `--extract-here`, `--extract-smart`, and `--extract-to-name` bypass MainWindow entirely (avoid `Loaded` event timing issues). `--open` uses MainWindow with archive loaded.
+- **Avalonia**: `App.axaml.cs` `OnFrameworkInitializationCompleted` 中处理所有 CLI 路由
+- **WPF**: `App.OnStartup` + `AppPartials/App.Cli.cs` 等 partial 文件
 
 ### System icon helper
 
-`SystemIconHelper` uses `SHGetFileInfo` (Windows Shell API) to retrieve 16x16 file type icons by extension. Supports virtual/nonexistent files via `SHGFI_USEFILEATTRIBUTES`. Results cached in `ConcurrentDictionary`. Folder icon support included. Used in file list to show native Windows icons for archive entries.
+`SystemIconHelper` (WPF) / `IconService` + `IconProvider` (Avalonia) uses `SHGetFileInfo` (Windows Shell API) to retrieve 16x16 file type icons by extension. Supports virtual/nonexistent files via `SHGFI_USEFILEATTRIBUTES`. Results cached in `ConcurrentDictionary`. Folder icon support included. Used in file list to show native Windows icons for archive entries.
 
-## Key gotchas
+## 迁移关键差异对照
 
-## Version 0.3.0 — Preview Format Expansion (✅ Completed)
+| 维度 | WPF (MantisZip.UI) | Avalonia (MantisZip.UI.Avalonia) |
+|------|-------------------|---------------------------------|
+| UI 模式 | Code-behind | MVVM (ObservableObject) |
+| 命名空间 | `System.Windows.*` | `Avalonia.*` |
+| XAML 扩展名 | `.xaml` | `.axaml` |
+| 数据绑定 | `{Binding}` | `{Binding}` + compiled bindings (`x:DataType`) |
+| 图片 | `BitmapImage` | `Avalonia.Media.Imaging.Bitmap` |
+| SVG | WebView2 | `Svg.Skia` → WriteableBitmap |
+| GIF | `WpfAnimatedGif` | 自实现 `GifDecoder` + `DispatcherTimer` |
+| 字体预览 | WPF GlyphTypeface + RenderTargetBitmap | HarfBuzzSharp + SkiaSharp 位图渲染 |
+| HTML/Markdown | WebView2 (Microsoft.Web.WebView2) | `Avalonia.Controls.WebView` (待移除) |
+| 对话框 | `Ookii.Dialogs.Wpf` | 原生 Avalonia + system dialogs |
+| DataGrid | `System.Windows.Controls.DataGrid` | `Avalonia.Controls.DataGrid` |
+| 主题资源 | `SolidColorBrush` 在 `Themes/Light.xaml` / `Dark.xaml` | 类似结构，但资源键名略有差异 |
+| 目标框架 | `net9.0-windows` | `net9.0` (跨平台就绪) |
 
-Added metadata-based preview for 12 new format types across Core parsers and UI preview methods. Also includes info panel restructuring, torrent file tree, WOFF font support, PDF metadata, and toolbar restoration.
+## 关键注意事项
 
-## Upcoming work
-
-Already implemented in v0.3.1:
-- Archive comment editing (MainWindow edit menu)
-- CompressSettingsWindow TabControl (General + Comment tabs)
-- Comment distribution (AllSame / FirstOnly / PerLine)
-
-Plans tracked under `.sisyphus/plans/`:
-
-| Plan | Status | Dependency |
-|------|--------|------------|
-| [engine-unification-sharpcompress.md](.sisyphus/plans/engine-unification-sharpcompress.md) | ✅ Completed (v0.3.4) | None |
-| [file-filter-feature.md](.sisyphus/plans/file-filter-feature.md) | 📋 Planned | SharpCompress migration |
-| [file-size-progress-bar.md](.sisyphus/plans/file-size-progress-bar.md) | ✅ Completed (v0.3.4) | None |
-| [portable-mode.md](.sisyphus/plans/portable-mode.md) | 📋 Planned | None |
-| [preview-magic-detection.md](.sisyphus/plans/preview-magic-detection.md) | 📋 Planned | None |
-| [preview-modular-providers.md](.sisyphus/plans/preview-modular-providers.md) | 📋 Planned | Preview system |
-| [extract-journal-undo.md](.sisyphus/plans/extract-journal-undo.md) | 📋 Planned | None |
-| [archive-rename-entry.md](.sisyphus/plans/archive-rename-entry.md) | 📋 Planned | None |
-| [batch-progress-list.md](.sisyphus/plans/batch-progress-list.md) | ✅ Completed (v0.3.5) | None |
-| [extract-settings-window.md](.sisyphus/plans/extract-settings-window.md) | ✅ Completed (v0.3.5, v0.3.6 重设计) | ExtractSettingsWindow redesign — TabControl + GroupBox + 2-column Grid, visual alignment with CompressSettingsWindow |
-| [explorer-path-switcher.md](.sisyphus/plans/explorer-path-switcher.md) | 📋 Planned | None |
-| [msi-packaging-wix.md](.sisyphus/plans/msi-packaging-wix.md) | 📋 Planned | Inno Setup installer |
-| [compression-estimator.md](.sisyphus/plans/compression-estimator.md) | 📋 Planned | None |
-| [archive-diff.md](.sisyphus/plans/archive-diff.md) | 📋 Planned | None |
-| [virtual-file-data-object.md](.sisyphus/plans/virtual-file-data-object.md) | 📋 Planned | None |
-| [compress-preset.md](.sisyphus/plans/compress-preset.md) | 📋 Planned | COM context menu (Phase 2) |
-| [com-context-menu.md](.sisyphus/plans/com-context-menu.md) | ✅ Completed (v0.3.7) | None |
-| [png-transparency-3way.md](.sisyphus/plans/png-transparency-3way.md) | ✅ Completed | None |
-
-### ✅ Completed: Engine unification (SharpZipLib → SharpCompress + 7z.exe → SharpSevenZip)
-
-SharpZipLib replaced with SharpCompress, 7z.exe external process replaced with SharpSevenZip COM binding:
-- Unified `IArchive` / `IReader` API across all formats
-- Per-instance encoding (no more `ZipStrings.CodePage` global state)
-- Native async/await
-- Selective extraction via `IArchiveEntry.WriteToFile()` — enables per-entry filtering
-- New `IArchiveEngine.ExtractEntriesAsync()` method for filtered extraction
-- ZIP add/delete progress smoothing — no more `CommitUpdate` black box jumps
-
-See [plan](.sisyphus/plans/engine-unification-sharpcompress.md) for phased implementation details (TarGzEngine → ArchiveEntryExtractor → ZipEngine → SevenZipEngine → cleanup).
-
-### Planned: File filter feature
-
-Add filtering to compress/extract operations — filter by file type extension, filename pattern, size range, or date range. Supports named presets persisted in settings.
-
-See [plan](.sisyphus/plans/file-filter-feature.md).
-
-## v0.3.1 — Archive comment features
-
-### Archive comment editing (MainWindow)
-
-- **Trigger**: 编辑 → 压缩包注释 (EditMenuArchiveComment)
-- **Dialog**: `ArchiveCommentDialog` (new XAML + .cs) opens Modal, fetches existing comment via `ZipFile.ZipFileComment` (read-only property for display)
-- **Save**: Uses `ZipFile.BeginUpdate()` + `zipFile.SetComment(comment)` + `zipFile.CommitUpdate()` — this modifies the ZIP EOCD comment **in-place without recompression**
-- **Guard**: Only enabled when archive is ZIP format (checked via `_currentFormat == ArchiveFormat.Zip` in `UpdateAddDeleteBtnState`)
-- **Flow**: `EditArchiveComment_Click` → `OpenArchiveStream` → `ZipFile` instance → show dialog → if OK: `BeginUpdate/SetComment/CommitUpdate`
-
-### CompressSettingsWindow TabControl
-
-- **Layout**: `TabControl` with 3 tabs — "通用" (General), "加密" (Password), and "注释" (Comment)
-- **General tab**: Existing compress options (format/level/split volumes), wrapped in `ScrollViewer` (encryption moved to Password tab)
-- **Password tab**: Two-mode password selection:
-  - **Library mode**: List of saved passwords (two-line display: description + patterns per entry), search filter, selection status always visible
-  - **New password mode**: Manual entry with PasswordBox/TextBox reveal toggle (👁), confirm-password field with inline strength indicator (colored `●` circle), auto-fallback to new-password mode when user types
-  - **Shared area**: Save-to-library checkbox (default on), description field, auto-rules toggle, rules TextBox; checkbox label switches between "更新匹配规则" (library) and "保存到密码库" (new pwd)
-  - Radio buttons always enabled, only content panels disable/dim
-  - `RefreshPasswordTabUI()` called on every tab switch to sync all UI state
-- **Comment tab**: Multi-line TextBox + radio group for distribution strategy
-- **Theme**: TabControl/TabItem styled with `Theme_HeaderBg`, `Theme_WindowBg`, `Theme_Accent`, `Theme_ButtonHover` — matches dark/light mode system
-- **WPF content virtualization**: TabItem content is lazily created (not loaded until first selection). **All event handlers and state-update helpers must guard against null controls** in Comment tab until it's been displayed once.
-- **Output mode linkage**: Distribution radio group is always visible but only enabled when `OutputMode.Separate` is selected. Other modes ignore the distribution setting and pass the raw comment text as-is.
-
-### Comment distribution (separate output only)
-
-- **`ArchiveOptions.Comment`** (string?) — optional comment text to embed in archive
-- **`CommentDistribution`** enum in `ArchiveEngine.cs`:
-  - `AllSame`: Every archive gets the full comment text
-  - `FirstOnly`: Only the first archive gets the comment; others get empty string
-  - `PerLine`: Comment is split by newline; line N → archive N; empty lines skipped; excess archives get no comment
-- **Implementation in UI layer**: `RunSeparateCompressAsync` (CompressSettingsWindow.xaml.cs) pre-computes `perLineComments` and sets `options.Comment` per iteration based on selected distribution mode
-
-### Key gotchas
-
-- **`ZipFile.ZipFileComment` is read-only**: SharpZipLib exposes the ZIP comment as a read-only property. To write, you must call `SetComment(comment)` **after** `BeginUpdate()`.
-- **TabItem controls null until first selection**: WPF virtualizes TabItem content. Don't access `x:Name` controls inside an unselected TabItem without null guards.
-- **Comment distribution ignored outside Separate mode**: When `OutputMode` is `SingleArchive` or `QuickCompress`, the distribution radio selection has no effect — the raw comment is passed as-is.
-- **Only ZIP supports comments**: Other archive formats (7z, tar.gz) do not have a comment field. The Comment tab shows a "仅 ZIP 格式支持注释" hint.
-
-## Known issues (already fixed)
-
-### Context menu cascade mode — CommandFlags=8 hides items
-
-Setting `ECF_SEPARATORBEFORE` (`CommandFlags=8`) directly on verbs in an `ExtendedSubCommandsKey` cascade submenu causes those verbs to not appear on some Windows versions. Fixed by using explicit separator verbs instead.
-
-### IPC pipe server only accepted one connection
-
-`StartPipeServer` created one `NamedPipeServerStream` and called `WaitForConnectionAsync` once. With 3+ selected files, only 2 processes could communicate — the 3rd+ process's `Connect()` timed out. Fixed by wrapping in a `while (!ct.IsCancellationRequested)` loop creating a new pipe per client.
-
-### `CompressConflictDialog` shown twice on auto-rename
-
-When clicking "自动重命名" in the file conflict dialog, the `Rename` case re-created a new `CompressConflictDialog`. Fixed by capturing `CustomName` from the first dialog and using it directly, skipping the second popup.
-
-## Key gotchas
-
-### Chinese filename encoding (ZIP)
+### 中文 filename encoding (ZIP)
 
 ```csharp
 Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
 ```
 
-This is set once in `App.InitializeApp()`. ZIP encoding is handled per-instance via `StringCodec` (no global `ZipStrings.CodePage`). SharpCompress's `ZipArchive` uses `ReaderOptions.ArchiveEncoding` for per-instance encoding settings, respecting the system locale.
+This is set once in `App.InitializeApp()` (WPF) / `App.OnFrameworkInitializationCompleted` (Avalonia). ZIP encoding is handled per-instance via `StringCodec` (no global `ZipStrings.CodePage`). SharpCompress's `ZipArchive` uses `ReaderOptions.ArchiveEncoding` for per-instance encoding settings, respecting the system locale.
 
 ### 7z compression uses SharpSevenZip (7z.dll) — no external 7z.exe required
 
@@ -369,7 +322,7 @@ Triggered via `--extract-smart` CLI or smart extract context menu item.
 
 Implements the **7-Zip eager-extraction model**: extract files to temp before `DoDragDrop`, show `ProgressWindow` during extraction + drag.
 
-### Architecture
+### WPF 版实现
 
 1. `FileListGrid_PreviewMouseMove` detects drag start (threshold: `MinimumHorizontalDragDistance`)
 2. Creates temp dir at `%TEMP%\MantisZip\DragDrop\{GUID}\`
@@ -390,13 +343,17 @@ Uses `ArchiveItem.FullPath` for the output temp path so files from subdirectorie
 
 `ProgressWindow` provides cancel via `CancellationToken`. If cancelled before extraction finishes, `DoDragDrop` is skipped entirely.
 
+### Avalonia 版
+
+拖拽待移植，方案见 [drag-drop-direct-extract.md](.sisyphus/plans/drag-drop-direct-extract.md)（纯 Win32 独立覆层）。
+
 ### Custom `IDataObject` attempt (archived)
 
 **Tried**: `System.Windows.IDataObject` (`DragDropDataObject` nested class) for delayed rendering — extraction in `GetData()` at drop time so ProgressWindow would show only after mouse release. **Result**: crashes Explorer.
 
 **Root cause**: WPF OLE bridge (`IComDataObject`) has an internal bug when converting `string[]` → `CF_HDROP` for non-`DataStore` `_innerData` implementations. Confirmed by WPF source code (v8.0.1). Not fixable from app side.
 
-**Status**: Abandoned. Code removed. If a delayed-rendering solution is needed in the future, use `VirtualFileDataObject` (Microsoft.VisualStudio.OLE.Interop / Shell32 community wrappers) instead of `System.Windows.IDataObject`.
+**Status**: Abandoned. Code removed. Avalonia 迁移后不再依赖 WPF OLE 桥，此 bug 不复存在。
 
 ### Log privacy redaction
 
@@ -414,26 +371,21 @@ Four modes controlled by `AppSettings.LogPrivacyMode` (defaults to `"extension"`
 
 **Help dialog**: `LogPrivacyHelpDialog` opened from Settings → Debug tab's `[?]` button, matching the PasswordManager help dialog style.
 
-**Key files**: `Core/Utils/LogRedactor.cs` (new), `UI/LogPrivacyHelpDialog.xaml/.cs` (new).
+**Key files**: `Core/Utils/LogRedactor.cs` (framework-agnostic), `UI/LogPrivacyHelpDialog.xaml/.cs` (WPF), `UI.Avalonia/Dialogs/LogPrivacyHelpDialog.axaml/.cs` (Avalonia).
 
-### Future: COM context menu + VirtualFileDataObject
+## Known issues (already fixed)
 
-Both improvements require COM component integration:
+### Context menu cascade mode — CommandFlags=8 hides items
 
-**Dynamic shell context menu** — Replace static registry verbs with a COM `IContextMenu` handler:
-- Right-click file name is available at menu-build time → dynamic display text (e.g. "添加到 (文件名).zip")
-- Full control over menu ordering, icons, submenus
-- Registration via `*\shellex\ContextMenuHandlers\{GUID}`
-- Effort: medium (COM registration, `IContextMenu` / `IShellExtInit` implementation)
+Setting `ECF_SEPARATORBEFORE` (`CommandFlags=8`) directly on verbs in an `ExtendedSubCommandsKey` cascade submenu causes those verbs to not appear on some Windows versions. Fixed by using explicit separator verbs instead.
 
-**VirtualFileDataObject** (drag-out delayed rendering):
-- Delayed rendering without Explorer crash
-- Files appear in Explorer before fully extracted
-- Explorer requests data chunk by chunk via `GetData`
-- Works around WPF OLE bridge bug by implementing `System.Runtime.InteropServices.ComTypes.IDataObject` directly in COM
-- Effort: medium (P/Invoke for `COMStreamWrapper`, `FORMATETC`, `STGMEDIUM`)
+### IPC pipe server only accepted one connection
 
-Both can be packaged as a single helper library if desired.
+`StartPipeServer` created one `NamedPipeServerStream` and called `WaitForConnectionAsync` once. With 3+ selected files, only 2 processes could communicate — the 3rd+ process's `Connect()` timed out. Fixed by wrapping in a `while (!ct.IsCancellationRequested)` loop creating a new pipe per client.
+
+### `CompressConflictDialog` shown twice on auto-rename
+
+When clicking "自动重命名" in the file conflict dialog, the `Rename` case re-created a new `CompressConflictDialog`. Fixed by capturing `CustomName` from the first dialog and using it directly, skipping the second popup.
 
 ## Version bump checklist
 
@@ -441,19 +393,25 @@ When releasing a new version, update the version string in ALL of these location
 
 | # | File | Line | Content |
 |---|------|------|---------|
-| 1 | `src/MantisZip.UI/AppConstants.cs` | `public const string Version = "x.y.z"` | Single source of truth for the app display |
-| 2 | `src/MantisZip.UI/MantisZip.UI.csproj` | `<Version>x.y.z</Version>` | NuGet/assembly version |
-| 3 | `docs/PLAN.md` | `**当前版本**: x.y.z` | Plan document header |
-| 4 | `docs/PROGRESS.md` | `**当前版本**: x.y.z` | Changelog document header (also add a new version entry) |
+| 1 | `src/MantisZip.UI/AppConstants.cs` | `public const string Version = "x.y.z"` | WPF 版 |
+| 2 | `src/MantisZip.UI.Avalonia/AppConstants.cs` | `public const string Version = "x.y.z"` | Avalonia 版 |
+| 3 | `src/MantisZip.UI/MantisZip.UI.csproj` | `<Version>x.y.z</Version>` | WPF 版 assembly version |
+| 4 | `src/MantisZip.UI.Avalonia/MantisZip.UI.Avalonia.csproj` | `<Version>x.y.z</Version>` | Avalonia 版 assembly version |
+| 5 | `docs/PLAN.md` | `**当前版本**: x.y.z` | Plan document header |
+| 6 | `docs/PROGRESS.md` | `**当前版本**: x.y.z` | Changelog document header (also add a new version entry) |
 
-These 4 files must all be updated together. The `AppConstants.cs` value is the primary source — the other 3 must match it.
+WPF 废弃后，#1 和 #3 将移除。
 
 **Note:** `installer.iss` no longer requires manual version bumps. The release workflow (`release.yml`) passes the version from the git tag via `/dMyAppVersion=${{ env.VERSION }}` to ISCC at compile time. The `#define MyAppVersion` in `installer.iss` is wrapped in `#ifndef` and serves only as a fallback default for local builds — update it occasionally but it is no longer a release-blocking item.
 
 ## Build output
 
-```
+```powershell
+# WPF（遗留）
 src/MantisZip.UI/bin/Debug/net9.0-windows/MantisZip.UI.exe
+
+# Avalonia（主力）
+src/MantisZip.UI.Avalonia/bin/Debug/net9.0/MantisZip.UI.Avalonia.exe
 ```
 
 Build artifacts (bin/, obj/) are gitignored.
@@ -465,6 +423,8 @@ Build artifacts (bin/, obj/) are gitignored.
 ### 规则 0：描述不清时必须追问
 
 如果我的需求描述不清晰、有歧义、或者缺少关键信息，**必须**停下来向我提问澄清，直到完全确定后再执行。绝对不能猜测、假设或用「合理默认值」擅自推进。
+
+如果用户是以疑问的方式描述某个问题，则先找到问题所在和解决方案后，必须先与用户沟通，待用户完全确定问题与解决方案后，再执行。
 
 ### 规则 1：Plan 变更同步
 
@@ -486,27 +446,48 @@ Build artifacts (bin/, obj/) are gitignored.
 - 如果当前版本号已有条目，追加到该条目下；否则创建新版本条目
 - 注意条目排序是 从新到旧 。
 
-### 规则 4：新 UI 控件必须应用主题样式
+### 规则 4：新 UI 控件必须应用主题样式（跨框架适用）
 
-新增任何 WPF UI 控件（包括复制粘贴过来的代码），**必须显式设置主题样式键**，禁止使用系统默认颜色：
+新增任何 UI 控件（WPF 或 Avalonia），**必须显式设置主题样式键**，禁止使用系统默认颜色：
 
-- 背景必须绑定 `Background="{DynamicResource Theme_WindowBg}"` 或对应语义色（`Theme_SurfaceBg`、`Theme_HeaderBg` 等）
-- 前景/文字色绑定 `Foreground="{DynamicResource Theme_TextPrimary}"` 或 `Theme_TextSecondary`
-- 边框绑定 `BorderBrush="{DynamicResource Theme_Border}"` 或 `Theme_BorderLight`
+#### Avalonia（主力—优先遵循）
+- `Background` 绑定 `"{DynamicResource ThemeSurfaceBgBrush}"` 或对应语义色
+- `Foreground` 绑定 `"{DynamicResource ThemeTextPrimaryBrush}"` 或 `ThemeTextSecondaryBrush`
+- `BorderBrush` 绑定 `"{DynamicResource ThemeBorderBrush}"` 或 `ThemeBorderLightBrush`
+- 按钮用 `ThemeButtonBgBrush` / `ThemeButtonHoverBrush` / `ThemeButtonPressedBrush`
+- **Avalonia 资源键名均以 `Brush` 结尾**（`ThemeWindowBgBrush` 而非 `Theme_WindowBg`）
+- 如果新增控件类型在主题文件中尚无对应资源，需在 `ThemeLight.axaml` 和 `ThemeDark.axaml` 中成对添加
+
+#### WPF（遗留维护）
+- `Background` 绑定 `"{DynamicResource Theme_WindowBg}"`
+- `Foreground` 绑定 `"{DynamicResource Theme_TextPrimary}"`
+- `BorderBrush` 绑定 `"{DynamicResource Theme_Border}"`
 - 按钮用 `Theme_ButtonBg` / `Theme_ButtonHover` / `Theme_ButtonPressed`
-- ComboBox、DatePicker 等控件补齐 `Background` + `Foreground` 绑定
-- 不设置 `Height` 固定值除非有充分理由（已有 `22`/`26`/`28` 统一高度可按需复用）
-- **如果新增的控件类型在主题文件中尚无对应的资源键**，必须先在 Light.xaml 和 Dark.xaml 中成对添加该控件所需的颜色/Brush 资源（遵循 `Theme_*` 命名风格），再在控件上绑定。禁止直接使用系统默认颜色。
+- 新增资源在 `Themes/Light.xaml` 和 `Dark.xaml` 中成对添加
 
-示例（错误 → 正确）：
+#### 通用约束（两框架均适用）
+- 不设置 `Height` 固定值除非有充分理由（已有统一高度可按需复用）
+- **迁移期特别注意**：在 Avalonia 中新增控件时，优先使用 Avalonia 的资源键名（以 `Brush` 结尾）；不要混用 WPF 风格的下划线资源键名
+
+示例 — Avalonia：
 ```xml
-<!-- ❌ 错误：使用默认系统颜色，亮/暗色切换后不可见 -->
-<TextBox x:Name="MyTextBox" Width="200"/>
-
-<!-- ✅ 正确：显式绑定主题色 -->
-<TextBox x:Name="MyTextBox" Width="200"
-         Background="{DynamicResource Theme_WindowBg}"
-         Foreground="{DynamicResource Theme_TextPrimary}"
-         BorderBrush="{DynamicResource Theme_Border}"/>
+<!-- ✅ 正确：Avalonia 主题绑定 -->
+<TextBox Name="MyTextBox" Width="200"
+         Background="{DynamicResource ThemeSurfaceBgBrush}"
+         Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+         BorderBrush="{DynamicResource ThemeBorderBrush}"/>
 ```
 
+## 未来工作
+
+### 迁移完成后的清理
+
+1. **废弃 WPF 项目**: 删除 `src/MantisZip.UI/` 目录
+2. **移除 WebView2 依赖**: 从 `MantisZip.UI.Avalonia.csproj` 移除 `Avalonia.Controls.WebView`（及间接的 WebView2 依赖）
+3. **Sln 文件更新**: 从解决方案中移除 WPF 项目
+4. **构建脚本更新**: 移除 WPF 构建命令
+5. **README 更新**: 删除 WebView2 Runtime 依赖说明
+
+### 待实施计划
+
+见 [docs/PLAN.md](docs/PLAN.md) 和 `.sisyphus/plans/` 下的设计文档。
