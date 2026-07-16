@@ -97,6 +97,14 @@ public partial class PreviewViewModel : ObservableObject
     [ObservableProperty]
     private int _fontSize = 13;
 
+    // ── Loading state ──
+
+    [ObservableProperty]
+    private bool _isLoadingPreview;
+
+    [ObservableProperty]
+    private string _loadingFileName = string.Empty;
+
     public bool HasZoomControls => PreviewType is PreviewType.Image or PreviewType.Gif;
     public bool HasFontSizeControls => PreviewType == PreviewType.Text;
 
@@ -143,6 +151,11 @@ public partial class PreviewViewModel : ObservableObject
         OnPropertyChanged(nameof(IsIcoGalleryVisible));
         OnPropertyChanged(nameof(IsFontTextFallbackVisible));
 
+        // Auto-dismiss loading overlay when switching to actual preview content.
+        // PreviewType.None is set by ShowLoading() — keep the overlay visible.
+        // All other PreviewType values represent actual content — hide the overlay.
+        if (value != PreviewType.None)
+            IsLoadingPreview = false;
     }
 
     partial void OnZoomLevelChanged(double value)
@@ -1538,6 +1551,22 @@ td, th {{ border: 1px solid #ccc; padding: 6px; }}
         CompressionRatio = string.Empty;
         ModifiedDate = string.Empty;
         IsInfoPanelVisible = false;
+        IsLoadingPreview = false;
+        LoadingFileName = string.Empty;
+    }
+
+    /// <summary>
+    /// Switch to loading state: clear old content, show loading indicator with file name.
+    /// Phase 1 of two-phase preview — called immediately when user selects a new file.
+    /// </summary>
+    public void ShowLoading(string? fileName = null)
+    {
+        // Reuse Clear() to reset all preview state, then override for loading phase.
+        // This avoids duplicated reset logic — Clear() and ShowLoading() stay in sync.
+        Clear();
+        LoadingFileName = fileName ?? string.Empty;
+        IsLoadingPreview = true;
+        IsPreviewVisible = true;
     }
 
     private void AddPeMeta(string key, string? value)
