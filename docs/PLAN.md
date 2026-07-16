@@ -34,6 +34,7 @@
 | **P2** | 进度窗口增强改造 | [progress-window-enhancement.md](.sisyphus/plans/progress-window-enhancement.md) | 🟡中 | 3-4h | 路径/文件名分离三行显示、文件级计数、实时统计栏、批处理每包摘要；计算逻辑抽到 Core 层 |
 | **P2** | 压缩文件名后缀模板 | [filename-suffix-template.md](.sisyphus/plans/filename-suffix-template.md) | 🟢低 | 2-3h | `{date}`/`{datetime}`/`{seq}` 占位符替换，防同名覆盖 |
 | **P2** | 嵌入缩略图预览 | [embedded-thumbnail-preview.md](.sisyphus/plans/embedded-thumbnail-preview.md) | 🟢低 | 2-3天 | MetadataExtractor(RAW) + Shell API(通用) 两层提取嵌入缩略图；完成后可扩展文件列表缩略图模式 |
+| **P2** | emoji 替换为 Fluent UI PathIcon + 文件列表行图标改用系统原生 | [emoji-to-pathicon.md](.sisyphus/plans/emoji-to-pathicon.md) | 🟢低 | 3-4h | Phase1: 菜单/工具栏/列头的 emoji → PathIcon（Fluent UI 矢量）；Phase2: 文件列表行图标从 SkiaSharp 自绘 → SHGetFileInfo 系统原生图标，非 Windows 回退自绘 |
 | **P2** | 字体预览连字效果开关 | [font-preview-ligature.md](.sisyphus/plans/font-preview-ligature.md) | 🟡中 | 3-4h | HarfBuzzSharp shaping + `liga` feature toggle，工具栏按钮 |
 | **P2** | 提取日志与解压「后悔药」 | [extract-journal-undo.md](.sisyphus/plans/extract-journal-undo.md) | 🟡中 | 3-4h | 解压记录 + 一键回滚 |
 | **P3** | 压缩包对比 (Archive Diff) | [archive-diff.md](.sisyphus/plans/archive-diff.md) | 🟡中 | 3-4h | 压缩包文件级差异对比 |
