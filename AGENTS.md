@@ -398,7 +398,7 @@ When releasing a new version, update the version string in ALL of these location
 | 3 | `src/MantisZip.UI/MantisZip.UI.csproj` | `<Version>x.y.z</Version>` | WPF 版 assembly version |
 | 4 | `src/MantisZip.UI.Avalonia/MantisZip.UI.Avalonia.csproj` | `<Version>x.y.z</Version>` | Avalonia 版 assembly version |
 | 5 | `docs/PLAN.md` | `**当前版本**: x.y.z` | Plan document header |
-| 6 | `docs/PROGRESS.md` | `**当前版本**: x.y.z` | Changelog document header (also add a new version entry) |
+| 6 | `docs/PROGRESS.md` | `**当前版本**: x.y.z` | 顶部版本号（三轨制：Avalonia 以日期为标识、WPF 以版本号为标识、共享层以版本号为标识） |
 
 WPF 废弃后，#1 和 #3 将移除。
 
@@ -437,14 +437,22 @@ Build artifacts (bin/, obj/) are gitignored.
 - 只有在用户明确说明变更版本号时才会变更，不要未经用户允许擅自变更版本号。如果你觉得应该变更版本号，需要向用户询问。
 - 当变更版本号时，需遵循 Version bump checklist 的部分全部更新。
 
-### 规则 3：提交前更新 PROGRESS.md
+### 规则 3：提交前更新 PROGRESS.md（三轨制）
 
-在每次执行 `git commit` 之前（也就是在 commit 相关的操作中），**必须先更新** `docs/PROGRESS.md`：
-- 在文件顶部的版本条目下新增当前变更记录
-- 格式模仿已有的版本条目（日期 + 变更点列表）
+在每次执行 `git commit` 之前（也就是在 commit 相关的操作中），**必须先更新** `docs/PROGRESS.md`。
+
+PROGRESS.md 分三个独立线索，根据变更影响范围选择对应线索追加条目：
+
+- **Avalonia 版**（`### MantisZip.UI.Avalonia（主力版）`）— 以日期为标识，格式 `**2026-07-16** — 标题`
+  - 多条同一日期时按时间从晚到早排列（同一日期下最新的在最上方）
+- **WPF 版**（`### MantisZip.UI（WPF 遗留版）`）— 以版本号为标识，格式 `#### v0.x.x (2026-07-16)`
+  - 如果当前版本号已有条目，追加到该条目下；否则创建新版本条目
+- **共享层**（`### 共享层（Core / ShellExt / 构建）`）— 以版本号为标识，与 WPF 规则一致
+
+通用规则：
+- 条目排序均是 **从新到旧**
 - 如果本次变更属于某个已有规划任务，在该任务后标注进度
-- 如果当前版本号已有条目，追加到该条目下；否则创建新版本条目
-- 注意条目排序是 从新到旧 。
+- 如果变更涉及多个线索（例如 Core 引擎变更同时影响 WPF 和 Avalonia），在对应线索下各加一条
 
 ### 规则 4：新 UI 控件必须应用主题样式（跨框架适用）
 
