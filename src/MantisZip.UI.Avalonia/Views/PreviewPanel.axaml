@@ -83,6 +83,10 @@
           <Button Content="🏁"
                   Width="32" Height="28" FontSize="14" Padding="0"
                   Command="{Binding ToggleTransparencyBgCommand}" />
+          <Button Content="🎨"
+                  Width="32" Height="28" FontSize="14" Padding="0"
+                  Command="{Binding ToggleFlattenAlphaCommand}"
+                  IsVisible="{Binding HasFlattenAlphaControls}" />
         </StackPanel>
 
         <!-- ICO gallery controls -->

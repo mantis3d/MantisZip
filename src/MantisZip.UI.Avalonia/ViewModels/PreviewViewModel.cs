@@ -162,6 +162,7 @@ public partial class PreviewViewModel : ObservableObject
         OnPropertyChanged(nameof(HasFontSizeControls));
         OnPropertyChanged(nameof(HasGifControls));
         OnPropertyChanged(nameof(HasTransparencyControls));
+        OnPropertyChanged(nameof(HasFlattenAlphaControls));
         OnPropertyChanged(nameof(HasLigatureControls));
         OnPropertyChanged(nameof(IsHtmlVisible));
         OnPropertyChanged(nameof(IsMarkdownVisible));
@@ -322,12 +323,20 @@ public partial class PreviewViewModel : ObservableObject
 
     public bool HasLigatureControls => PreviewType == PreviewType.Font;
     public bool HasTransparencyControls => PreviewType is PreviewType.Image or PreviewType.Svg or PreviewType.IcoGallery;
+    public bool HasFlattenAlphaControls => PreviewType is PreviewType.Image or PreviewType.Svg;
 
     [ObservableProperty]
     private bool _isLigatureEnabled = true;
 
     [ObservableProperty]
     private bool _isTransparencyBgShown;
+
+    /// <summary>原始预览位图（未压平 Alpha 时的备份）。</summary>
+    private Bitmap? _originalPreviewImage;
+
+    /// <summary>是否已压平 Alpha（不显示透明）。</summary>
+    [ObservableProperty]
+    private bool _isFlattenAlpha;
 
     public bool CanLigatureToggle => _fontSupportsLigature;
 
@@ -382,6 +391,22 @@ public partial class PreviewViewModel : ObservableObject
     {
         if (_isZoomFitActive)
             ZoomFit();
+    }
+
+    [RelayCommand]
+    private void ToggleFlattenAlpha()
+    {
+        IsFlattenAlpha = !IsFlattenAlpha;
+        if (IsFlattenAlpha)
+        {
+            if (PreviewImage != null)
+                PreviewImage = FlattenAlpha(PreviewImage);
+        }
+        else
+        {
+            if (_originalPreviewImage != null)
+                PreviewImage = _originalPreviewImage;
+        }
     }
 
     [RelayCommand]
@@ -566,6 +591,7 @@ public partial class PreviewViewModel : ObservableObject
         // 先设置 PreviewType 让 Image 控件进入可见状态，再设置 Source
         PreviewType = PreviewType.Image;
         PreviewImage = bitmap;
+        _originalPreviewImage = bitmap;
         ImageWidth = bitmap.PixelSize.Width;
         ImageHeight = bitmap.PixelSize.Height;
         var ext = Path.GetExtension(filePath).ToLowerInvariant();
@@ -686,7 +712,7 @@ public partial class PreviewViewModel : ObservableObject
             if (frames.Count > 0)
             {
                 PreviewImage = frames[0].Bitmap;
-                ImageWidth = frames[0].Bitmap.PixelSize.Width;
+                _originalPreviewImage = frames[0].Bitmap;
                 ImageHeight = frames[0].Bitmap.PixelSize.Height;
             }
 
@@ -803,8 +829,7 @@ public partial class PreviewViewModel : ObservableObject
             using var data = img.Encode(SkiaSharp.SKEncodedImageFormat.Png, 100);
             using var ms = new MemoryStream(data.ToArray());
             PreviewImage = new global::Avalonia.Media.Imaging.Bitmap(ms);
-
-            PreviewType = PreviewType.Svg;
+            _originalPreviewImage = PreviewImage;
             IsPreviewVisible = true;
             IsToolbarVisible = true;
             PreviewHeaderText = "SVG 预览";
@@ -1716,6 +1741,8 @@ public partial class PreviewViewModel : ObservableObject
         ZoomLevel = 1.0;
         FontSize = 13;
         IsTransparencyBgShown = false;
+        IsFlattenAlpha = false;
+        _originalPreviewImage = null;
 
         // Reset info panel
         FileName = string.Empty;
