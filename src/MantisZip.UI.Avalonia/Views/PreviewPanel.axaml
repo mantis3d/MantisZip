@@ -211,11 +211,16 @@
                         Padding="10">
                   <StackPanel Orientation="Vertical"
                               HorizontalAlignment="Center">
-                    <Image Source="{Binding Bitmap}"
-                           Stretch="None"
-                           MaxWidth="256"
-                           MaxHeight="256"
-                           Margin="4" />
+                    <Grid>
+                      <Rectangle Fill="{DynamicResource TransparencyCheckerboardBrush}"
+                                 x:CompileBindings="False"
+                                 IsVisible="{Binding DataContext.IsTransparencyBgShown, RelativeSource={RelativeSource FindAncestor, AncestorType={x:Type UserControl}}}" />
+                      <Image Source="{Binding Bitmap}"
+                             Stretch="None"
+                             MaxWidth="256"
+                             MaxHeight="256"
+                             Margin="4" />
+                    </Grid>
                     <TextBlock Text="{Binding Label}"
                                FontSize="11"
                                Foreground="{DynamicResource ThemeTextSecondaryBrush}"
@@ -230,7 +235,11 @@
 
         <!-- SVG preview -->
         <ScrollViewer IsVisible="{Binding IsSvgVisible}">
-          <Image Source="{Binding PreviewImage}" />
+          <Grid>
+            <Rectangle Fill="{DynamicResource TransparencyCheckerboardBrush}"
+                       IsVisible="{Binding IsTransparencyBgShown}" />
+            <Image Source="{Binding PreviewImage}" />
+          </Grid>
         </ScrollViewer>
 
         <!-- Font preview -->

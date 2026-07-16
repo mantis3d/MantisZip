@@ -321,7 +321,7 @@ public partial class PreviewViewModel : ObservableObject
     // ── Ligature toggle ──
 
     public bool HasLigatureControls => PreviewType == PreviewType.Font;
-    public bool HasTransparencyControls => PreviewType is PreviewType.Image or PreviewType.IcoGallery;
+    public bool HasTransparencyControls => PreviewType is PreviewType.Image or PreviewType.Svg or PreviewType.IcoGallery;
 
     [ObservableProperty]
     private bool _isLigatureEnabled = true;
