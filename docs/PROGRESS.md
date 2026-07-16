@@ -21,6 +21,41 @@
 
 ### MantisZip.UI.Avalonia（主力版）
 
+**2026-07-16** — 修正 ICO BMP 帧 biHeight 翻倍导致的小图标黑色方块
+  - `IcoParser.DecodeBmpFrame` 在写入 BMP 文件前修正 DIB header 的 biHeight 为实际像素高度
+  - SkiaSharp 多读 pixelHeight 行垃圾数据导致小图标上方渲染出黑色方块
+
+**2026-07-15** — 预览图像行为一致性与 ZoomFit 自适应视口
+  - GIF 魔数路由修复：`FileFormat.Gif` → `PreviewType.Gif`（而非错误地归入图片预览）
+  - 9 个元数据格式隐藏空工具栏边框（PE/CSV/SQLite/ISO/Torrent/Office/Video/Audio/Font）
+  - ZoomFit 改用实际视口尺寸（`PreviewContentScroller.SizeChanged`）替代固定 600×500
+  - ShowImage/ShowGif 初始缩放统一调用 ZoomFit()
+  - `_isZoomFitActive` 标记：ZoomFit 模式窗口缩放自动重适应，手动缩放后不覆盖
+  - 图像改用 `Width/Height + Stretch=Uniform` 替代 ScaleTransform，修复滚动区空白
+
+**2026-07-15** — ICO 多帧画廊预览
+  - 新增 `IcoParser`：解析 ICO 目录，提取所有帧（PNG 直接解码，BMP 经 SkiaSharp 带 AND 掩码剥离）
+  - PreviewViewModel: ShowIcoGallery、IcoFrames 集合、FlattenAlpha 切换
+  - PreviewPanel: ItemsControl + WrapPanel 画廊布局，每帧带尺寸标签
+  - MainWindowViewModel: `.ico` 文件路由到 ICO 画廊而非 Image 预览
+  - 工具栏新增 FlattenAlpha 切换（白色背景上渲染半透明像素）
+
+**2026-07-15** — P0-2 压缩选项统一 + SettingsWindow 分组 + 格式行修复
+  - SettingsWindow 压缩选项拆分为 ZIP/7z 两组，与 WPF 布局对齐
+  - DynamicFormatOptionsPanel 修复格式切换；补充 ZIP 压缩方法、7z 固实块大小/字典大小/单词大小/匹配器
+  - 新增 `CompressionOptionData` 共享类：所有选项列表统一数据源，消除 ViewModel 间不一致
+  - 本地化键全部与 WPF 对齐（`FormatOptions_*` ↔ `CompressOpt_*`）
+  - CompressSettingsWindow 新增 7z 格式选项和 DynamicFormatOptionsPanel
+  - MainWindowViewModel 修复预览信息面板格式行累加
+
+**2026-07-15** — P0-2 压缩选项 + P0-3 魔数检测预览集成
+  - AppSettings 新增 10 个压缩属性（格式/压缩级别/编码/方法/固实选项等）
+  - DynamicFormatOptionsPanel 从设置读取默认值
+  - SettingsWindow 高级选项 UI（压缩选项分组面板）
+  - PreviewService.ClassifyPreviewByMagicAsync：魔数优先的格式分类
+  - App 启动时初始化魔数检测；ShowPreviewAsync 魔数优先路由 + 扩展名回退
+  - FormatMetadata 信息面板显示格式检测结果（冲突时：警告图标 + 扩展名提示）
+
 **2026-07-15** — TabControl UI 细节修复 + 工具栏按钮背景统一
   - TabControl 模板 override 封装 ItemsPresenter 到 Border 设 tab strip 背景 `ThemeHeaderBgBrush` 消除 tab 标题间隙白色断层
   - `TabControl.Padding=0` 消除 ContentPresenter Margin 导致的内容区左右白边
@@ -456,6 +491,14 @@
 
 | 功能 | 设计文档 | 实现版本 |
 |------|----------|:--------:|
+| 便携版模式 | [portable-mode.md](.sisyphus/plans/portable-mode.md) | v0.4.5 |
+| 文件冲突对话框暂停/取消 | [conflict-dialog-pause-cancel.md](.sisyphus/plans/conflict-dialog-pause-cancel.md) | v0.4.5 |
+| 压缩选项增强（7z/ZIP 格式参数扩展） | [compression-options-enhancement.md](.sisyphus/plans/compression-options-enhancement.md) | v0.4.5 |
+| 双击行为 + 解压后删原包 | [doubleclick-extract-settings.md](.sisyphus/plans/doubleclick-extract-settings.md) | v0.4.4+ |
+| 魔数检测文件真实格式 | [preview-magic-detection.md](.sisyphus/plans/preview-magic-detection.md) | v0.4.4 |
+| 密码流程统一 | [password-flow-unification.md](.sisyphus/plans/password-flow-unification.md) | v0.4.4 |
+| 致谢贡献者名单 | [contributors-panel.md](.sisyphus/plans/contributors-panel.md) | v0.4.3+ |
+| 安装程序 .NET 9 自动下载 | [installer-dotnet-autodownload.md](.sisyphus/plans/installer-dotnet-autodownload.md) | v0.4.3+ |
 | 预览格式扩展（12 种元数据格式） | [preview-extended-formats.md](.sisyphus/plans/preview-extended-formats.md) | v0.3.0 |
 | 快速压缩拆分为独立/合并两项 | [split-compress.md](.sisyphus/plans/split-compress.md) | v0.2.10 |
 | 加载大文件 overlay | [archive-loading-progress.md](.sisyphus/plans/archive-loading-progress.md) | v0.3.1 |
