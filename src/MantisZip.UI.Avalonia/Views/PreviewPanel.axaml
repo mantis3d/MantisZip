@@ -2,7 +2,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="clr-namespace:MantisZip.UI.Avalonia.ViewModels"
              xmlns:models="clr-namespace:MantisZip.UI.Avalonia.Models"
-             xmlns:wv2="clr-namespace:Avalonia.Controls;assembly=Avalonia.Controls.WebView"
+
              x:Class="MantisZip.UI.Avalonia.Views.PreviewPanel"
              x:DataType="vm:PreviewViewModel">
     <Grid x:Name="PreviewRootGrid"
@@ -357,11 +357,133 @@
           </ItemsControl>
         </StackPanel>
 
-        <!-- HTML/Markdown preview (WebView2) -->
-        <ScrollViewer IsVisible="{Binding IsHtmlVisible}"
-                      Background="{DynamicResource ThemeSurfaceBgBrush}">
-          <wv2:NativeWebView x:Name="HtmlWebView" />
+        <!-- Markdown 预览（控件树） -->
+        <ScrollViewer IsVisible="{Binding IsMarkdownOrHtmlVisible}"
+                      Background="{DynamicResource ThemeSurfaceBgBrush}"
+                      Padding="16">
+          <ContentControl Content="{Binding MarkdownPreviewPanel}" />
         </ScrollViewer>
+
+
+        <!-- PDF 预览（PdfPig + SkiaSharp 逐页位图渲染） -->
+        <ScrollViewer IsVisible="{Binding IsPdfVisible}"
+                      Background="{DynamicResource ThemeSurfaceBgBrush}">
+          <Grid RowDefinitions="Auto,*">
+            <!-- 翻页栏 -->
+            <StackPanel Grid.Row="0" Orientation="Horizontal"
+                        HorizontalAlignment="Center" Spacing="8"
+                        IsVisible="{Binding HasPdfNavigation}">
+              <Button Content="◀" Command="{Binding PdfPreviousPageCommand}"
+                      Width="28" Height="26" FontSize="14" Padding="0" />
+              <TextBox Text="{Binding PdfCurrentPage}"
+                       Width="50" Height="26"
+                       HorizontalContentAlignment="Center"
+                       VerticalContentAlignment="Center" />
+              <TextBlock Text="{Binding PdfPageInfo}"
+                         VerticalAlignment="Center" />
+              <Button Content="▶" Command="{Binding PdfNextPageCommand}"
+                      Width="28" Height="26" FontSize="14" Padding="0" />
+            </StackPanel>
+            <!-- PDF 页内容（缩放联动 ImagePreview 的 ScrollViewer） -->
+            <ScrollViewer Grid.Row="1"
+                          HorizontalScrollBarVisibility="Auto"
+                          VerticalScrollBarVisibility="Auto">
+              <Image Source="{Binding PreviewImage}"
+                     Width="{Binding ScaledWidth}"
+                     Height="{Binding ScaledHeight}"
+                     Stretch="Uniform" />
+            </ScrollViewer>
+          </Grid>
+        </ScrollViewer>
+
+        <!-- Loading page (Phase 1 — replaces preview content area entirely) -->
+        <StackPanel IsVisible="{Binding IsLoadingPreview}"
+                    VerticalAlignment="Center"
+                    HorizontalAlignment="Center"
+                    Spacing="20">
+          <!-- Bouncing dots spinner -->
+          <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Spacing="8">
+            <Border Width="10" Height="10" CornerRadius="5"
+                    Background="{DynamicResource ThemeTextSecondaryBrush}">
+              <Border.Styles>
+                <Style Selector="Border">
+                  <Style.Animations>
+                    <Animation Duration="0:0:1.0" IterationCount="Infinite">
+                      <KeyFrame Cue="0%">
+                        <Setter Property="Opacity" Value="0.25"/>
+                      </KeyFrame>
+                      <KeyFrame Cue="40%">
+                        <Setter Property="Opacity" Value="1.0"/>
+                      </KeyFrame>
+                      <KeyFrame Cue="60%">
+                        <Setter Property="Opacity" Value="0.25"/>
+                      </KeyFrame>
+                      <KeyFrame Cue="100%">
+                        <Setter Property="Opacity" Value="0.25"/>
+                      </KeyFrame>
+                    </Animation>
+                  </Style.Animations>
+                </Style>
+              </Border.Styles>
+            </Border>
+            <Border Width="10" Height="10" CornerRadius="5"
+                    Background="{DynamicResource ThemeTextSecondaryBrush}">
+              <Border.Styles>
+                <Style Selector="Border">
+                  <Style.Animations>
+                    <Animation Duration="0:0:1.0" IterationCount="Infinite"
+                               Delay="0:0:0.2">
+                      <KeyFrame Cue="0%">
+                        <Setter Property="Opacity" Value="0.25"/>
+                      </KeyFrame>
+                      <KeyFrame Cue="40%">
+                        <Setter Property="Opacity" Value="1.0"/>
+                      </KeyFrame>
+                      <KeyFrame Cue="60%">
+                        <Setter Property="Opacity" Value="0.25"/>
+                      </KeyFrame>
+                      <KeyFrame Cue="100%">
+                        <Setter Property="Opacity" Value="0.25"/>
+                      </KeyFrame>
+                    </Animation>
+                  </Style.Animations>
+                </Style>
+              </Border.Styles>
+            </Border>
+            <Border Width="10" Height="10" CornerRadius="5"
+                    Background="{DynamicResource ThemeTextSecondaryBrush}">
+              <Border.Styles>
+                <Style Selector="Border">
+                  <Style.Animations>
+                    <Animation Duration="0:0:1.0" IterationCount="Infinite"
+                               Delay="0:0:0.4">
+                      <KeyFrame Cue="0%">
+                        <Setter Property="Opacity" Value="0.25"/>
+                      </KeyFrame>
+                      <KeyFrame Cue="40%">
+                        <Setter Property="Opacity" Value="1.0"/>
+                      </KeyFrame>
+                      <KeyFrame Cue="60%">
+                        <Setter Property="Opacity" Value="0.25"/>
+                      </KeyFrame>
+                      <KeyFrame Cue="100%">
+                        <Setter Property="Opacity" Value="0.25"/>
+                      </KeyFrame>
+                    </Animation>
+                  </Style.Animations>
+                </Style>
+              </Border.Styles>
+            </Border>
+          </StackPanel>
+
+          <TextBlock Text="{Binding LoadingFileName, StringFormat=正在加载: {0}}"
+                     HorizontalAlignment="Center"
+                     FontSize="14"
+                     Foreground="{DynamicResource ThemeTextSecondaryBrush}"
+                     TextWrapping="Wrap"
+                     MaxWidth="450"
+                     TextAlignment="Center" />
+        </StackPanel>
       </Grid>
     </ScrollViewer>
 

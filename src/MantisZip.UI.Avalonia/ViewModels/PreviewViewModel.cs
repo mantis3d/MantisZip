@@ -4,6 +4,7 @@ using System.Data;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
+using Avalonia.Controls;
 using Avalonia.Media.Imaging;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -14,7 +15,10 @@ using SkiaSharp;
 using MantisZip.UI.Avalonia.Models;
 using MantisZip.UI.Avalonia.Services;
 using Markdig;
+using ReverseMarkdown;
 using Microsoft.Data.Sqlite;
+using UglyToad.PdfPig;
+using UglyToad.PdfPig.Rendering.Skia;
 
 namespace MantisZip.UI.Avalonia.ViewModels;
 
@@ -37,9 +41,6 @@ public partial class PreviewViewModel : ObservableObject
 
     [ObservableProperty]
     private string _previewHeaderText = string.Empty;
-
-    [ObservableProperty]
-    private string _htmlContent = string.Empty;
 
     // FontFamily 手动实现，不使用 [ObservableProperty]（源生成器对 Avalonia.Media 命名空间有已知问题）
     private global::Avalonia.Media.FontFamily _fontFamily = global::Avalonia.Media.FontFamily.Default;
@@ -66,6 +67,16 @@ public partial class PreviewViewModel : ObservableObject
 
     /// <summary>ICO 画廊的帧列表。</summary>
     public ObservableCollection<IcoFrame> IcoFrames { get; } = [];
+
+    /// <summary>
+    /// Markdown 预览控件树（由 MarkdownPreviewBuilder 生成）。
+    /// </summary>
+    private Panel? _markdownPreviewPanel;
+    public Panel? MarkdownPreviewPanel
+    {
+        get => _markdownPreviewPanel;
+        set => SetProperty(ref _markdownPreviewPanel, value);
+    }
 
     /// <summary>原始帧（保留 Alpha），用于去透明还原。</summary>
     internal List<IcoFrame>? IcoOriginalFrames { get; set; }
@@ -97,6 +108,14 @@ public partial class PreviewViewModel : ObservableObject
     [ObservableProperty]
     private int _fontSize = 13;
 
+    // ── Loading state ──
+
+    [ObservableProperty]
+    private bool _isLoadingPreview;
+
+    [ObservableProperty]
+    private string _loadingFileName = string.Empty;
+
     public bool HasZoomControls => PreviewType is PreviewType.Image or PreviewType.Gif;
     public bool HasFontSizeControls => PreviewType == PreviewType.Text;
 
@@ -116,7 +135,11 @@ public partial class PreviewViewModel : ObservableObject
     public bool IsTorrentVisible => PreviewType == PreviewType.Torrent;
     public bool IsOfficeVisible => PreviewType == PreviewType.Office;
     public bool IsVideoVisible => PreviewType == PreviewType.Video;
-    public bool IsHtmlVisible => PreviewType is PreviewType.Html or PreviewType.Markdown;
+    public bool IsHtmlVisible => PreviewType == PreviewType.Html;
+    public bool IsMarkdownVisible => PreviewType == PreviewType.Markdown;
+    public bool IsMarkdownOrHtmlVisible => PreviewType is PreviewType.Markdown or PreviewType.Html;
+    public bool IsPdfVisible => PreviewType == PreviewType.Pdf;
+    public bool HasPdfNavigation => IsPdfVisible && _pdfTotalPages > 1;
     public bool IsIcoGalleryVisible => PreviewType == PreviewType.IcoGallery;
 
     partial void OnPreviewTypeChanged(PreviewType value)
@@ -140,9 +163,18 @@ public partial class PreviewViewModel : ObservableObject
         OnPropertyChanged(nameof(HasGifControls));
         OnPropertyChanged(nameof(HasLigatureControls));
         OnPropertyChanged(nameof(IsHtmlVisible));
+        OnPropertyChanged(nameof(IsMarkdownVisible));
+        OnPropertyChanged(nameof(IsMarkdownOrHtmlVisible));
+        OnPropertyChanged(nameof(IsPdfVisible));
+        OnPropertyChanged(nameof(HasPdfNavigation));
         OnPropertyChanged(nameof(IsIcoGalleryVisible));
         OnPropertyChanged(nameof(IsFontTextFallbackVisible));
 
+        // Auto-dismiss loading overlay when switching to actual preview content.
+        // PreviewType.None is set by ShowLoading() — keep the overlay visible.
+        // All other PreviewType values represent actual content — hide the overlay.
+        if (value != PreviewType.None)
+            IsLoadingPreview = false;
     }
 
     partial void OnZoomLevelChanged(double value)
@@ -1398,6 +1430,141 @@ public partial class PreviewViewModel : ObservableObject
         if (info.ModifiedDate.HasValue) FormatMetadata.Add(new("修改日期", info.ModifiedDate.Value.ToString("yyyy-MM-dd HH:mm")));
     }
 
+    // ── PDF ──
+
+    private PdfDocument? _pdfDocument;
+    private int _pdfTotalPages;
+
+    [ObservableProperty]
+    private int _pdfCurrentPage = 1;
+
+    [ObservableProperty]
+    private string _pdfPageInfo = string.Empty;
+
+    partial void OnPdfCurrentPageChanged(int value)
+    {
+        if (_pdfDocument != null && value >= 1 && value <= _pdfTotalPages)
+            _ = LoadPdfPageAsync(value);
+    }
+
+    [RelayCommand]
+    private void PdfPreviousPage()
+    {
+        if (PdfCurrentPage > 1)
+            PdfCurrentPage--;
+    }
+
+    [RelayCommand]
+    private void PdfNextPage()
+    {
+        if (PdfCurrentPage < _pdfTotalPages)
+            PdfCurrentPage++;
+    }
+
+    /// <summary>
+    /// 显示 PDF 预览：PdfPig 解析元数据 + SkiaSharp 逐页位图渲染。
+    /// 渲染在后台线程进行，避免阻塞 UI。
+    /// </summary>
+    public async Task ShowPdfAsync(string filePath)
+    {
+        var info = PdfParser.Parse(filePath);
+        if (info == null)
+        {
+            ShowUnsupported("无法解析 PDF 文件");
+            return;
+        }
+
+        // 先设置 UI 状态（格式元数据、标题），渲染完成后更新实际预览内容
+        PreviewType = PreviewType.Pdf;
+        IsPreviewVisible = true;
+        IsToolbarVisible = true;
+        PreviewHeaderText = $"PDF {info.AdditionalInfo ?? ""}";
+
+        FormatMetadata.Clear();
+        if (info.Title != null) FormatMetadata.Add(new("标题", info.Title));
+        if (info.Author != null) FormatMetadata.Add(new("作者", info.Author));
+        if (info.Subject != null) FormatMetadata.Add(new("主题", info.Subject));
+        if (info.PageCount.HasValue) FormatMetadata.Add(new("页数", info.PageCount.Value.ToString()));
+        FormatMetadata.Add(new("加密", info.IsEncrypted == true ? "是" : "否"));
+        if (info.CreationDate.HasValue) FormatMetadata.Add(new("创建日期", info.CreationDate.Value.ToString("yyyy-MM-dd HH:mm")));
+        if (info.ModifiedDate.HasValue) FormatMetadata.Add(new("修改日期", info.ModifiedDate.Value.ToString("yyyy-MM-dd HH:mm")));
+
+        // 后台线程：打开文档 + 渲染第一页
+        _pdfDocument?.Dispose();
+        _pdfDocument = null;
+        try
+        {
+            var (doc, totalPages) = await Task.Run(() =>
+            {
+                var d = PdfDocument.Open(filePath, SkiaRenderingParsingOptions.Instance);
+                d.AddSkiaPageFactory();
+                return (d, d.NumberOfPages);
+            });
+
+            _pdfDocument = doc;
+            _pdfTotalPages = totalPages;
+            PdfPageInfo = $"1 / {_pdfTotalPages}";
+            await LoadPdfPageAsync(1);
+        }
+        catch (Exception ex)
+        {
+            App.DebugLog($"[PDF] Failed to open or render PDF: {ex.Message}");
+            ShowUnsupported("无法打开 PDF 文件");
+        }
+    }
+
+    private async Task LoadPdfPageAsync(int pageNumber)
+    {
+        if (_pdfDocument == null) return;
+
+        byte[]? pixelData = null;
+        int width = 0, height = 0;
+
+        try
+        {
+            // 后台线程：渲染 + 像素数据拷贝
+            await Task.Run(() =>
+            {
+                using var bitmap = _pdfDocument.GetPageAsSKBitmap(pageNumber, 1.0f, SKColors.White);
+                if (bitmap == null) return;
+
+                width = bitmap.Width;
+                height = bitmap.Height;
+                int stride = width * 4;
+                int totalBytes = stride * height;
+                pixelData = new byte[totalBytes];
+                System.Runtime.InteropServices.Marshal.Copy(bitmap.GetPixels(), pixelData, 0, totalBytes);
+            });
+
+            if (pixelData == null)
+            {
+                App.DebugLog($"[PDF] GetPageAsSKBitmap returned null for page {pageNumber}");
+                return;
+            }
+
+            // UI 线程：创建 WriteableBitmap 并设置属性
+            var wb = new global::Avalonia.Media.Imaging.WriteableBitmap(
+                new global::Avalonia.PixelSize(width, height),
+                new global::Avalonia.Vector(96, 96),
+                global::Avalonia.Platform.PixelFormat.Bgra8888,
+                global::Avalonia.Platform.AlphaFormat.Premul);
+
+            using var locked = wb.Lock();
+            System.Runtime.InteropServices.Marshal.Copy(pixelData, 0, locked.Address, pixelData.Length);
+
+            PreviewImage = wb;
+            ImageWidth = width;
+            ImageHeight = height;
+            PdfPageInfo = $"{pageNumber} / {_pdfTotalPages}";
+            PdfCurrentPage = pageNumber;
+            ZoomFit();
+        }
+        catch (Exception ex)
+        {
+            App.DebugLog($"[PDF] LoadPdfPageAsync({pageNumber}) failed: {ex.Message}");
+        }
+    }
+
     // ── Video ──
 
     /// <summary>
@@ -1444,49 +1611,30 @@ public partial class PreviewViewModel : ObservableObject
     }
 
     /// <summary>
-    /// 显示 HTML 预览（WebView2）。
+    /// 显示 HTML 预览（通过 ReverseMarkdown → Markdown → 控件树）。
     /// </summary>
     public void ShowHtmlPreview(string filePath)
     {
-        HtmlContent = File.ReadAllText(filePath);
+        var html = File.ReadAllText(filePath);
+        var converter = new Converter();
+        var markdown = converter.Convert(html);
+        var panel = MarkdownPreviewBuilder.Build(markdown);
+        MarkdownPreviewPanel = panel;
         PreviewType = PreviewType.Html;
         IsPreviewVisible = true;
         IsToolbarVisible = false;
     }
 
     /// <summary>
-    /// 显示 Markdown 预览（Markdig → HTML → WebView2）。
+    /// 显示 Markdown 预览（Markdig AST → Avalonia 控件树）。
+    /// 使用 <see cref="MarkdownPreviewBuilder"/> 将 Markdown 转换为纯控件树，
+    /// 替代原有的 Markdig → HTML → WebView2 管线。
     /// </summary>
     public void ShowMarkdownPreview(string filePath)
     {
         var markdown = File.ReadAllText(filePath);
-        var pipeline = new MarkdownPipelineBuilder().UseAdvancedExtensions().Build();
-        var bodyHtml = Markdown.ToHtml(markdown, pipeline);
-
-        HtmlContent = $@"<!DOCTYPE html>
-<html><head><meta charset='utf-8'/>
-<style>
-* {{ font-family: sans-serif; margin: 0; padding: 0; box-sizing: border-box; }}
-body {{ padding: 16px; line-height: 1.6; }}
-/* Light theme defaults */
-body {{ background: #ffffff; color: #1a1a1a; }}
-a {{ color: #1a73e8; }}
-code, pre {{ background: #f5f5f5; padding: 2px 4px; border-radius: 3px; }}
-pre {{ padding: 12px; overflow-x: auto; }}
-blockquote {{ border-left: 4px solid #ddd; margin: 0.5em 0; padding-left: 12px; }}
-h1, h2, h3, h4 {{ margin: 0.8em 0 0.4em; }}
-p, li {{ margin: 0.5em 0; }}
-img {{ max-width: 100%; }}
-table {{ border-collapse: collapse; }}
-td, th {{ border: 1px solid #ccc; padding: 6px; }}
-/* Dark theme via prefers-color-scheme */
-@media (prefers-color-scheme: dark) {{
-  body {{ background: #1e1e1e; color: #e0e0e0; }}
-  a {{ color: #8ab4f8; }}
-  code, pre {{ background: #2d2d2d; }}
-  blockquote {{ border-left-color: #555; }}
-}}
-</style></head><body>{bodyHtml}</body></html>";
+        var panel = MarkdownPreviewBuilder.Build(markdown);
+        MarkdownPreviewPanel = panel;
         PreviewType = PreviewType.Markdown;
         IsPreviewVisible = true;
         IsToolbarVisible = false;
@@ -1517,7 +1665,12 @@ td, th {{ border: 1px solid #ccc; padding: 6px; }}
         PreviewImage = null;
         ImageWidth = 0;
         ImageHeight = 0;
-        HtmlContent = string.Empty;
+        _pdfDocument?.Dispose();
+        _pdfDocument = null;
+        _pdfTotalPages = 0;
+        PdfCurrentPage = 1;
+        PdfPageInfo = string.Empty;
+        MarkdownPreviewPanel = null;
         TorrentTreeRoots.Clear();
         SqliteTableData = null;
         SqliteTableNames.Clear();
@@ -1538,6 +1691,22 @@ td, th {{ border: 1px solid #ccc; padding: 6px; }}
         CompressionRatio = string.Empty;
         ModifiedDate = string.Empty;
         IsInfoPanelVisible = false;
+        IsLoadingPreview = false;
+        LoadingFileName = string.Empty;
+    }
+
+    /// <summary>
+    /// Switch to loading state: clear old content, show loading indicator with file name.
+    /// Phase 1 of two-phase preview — called immediately when user selects a new file.
+    /// </summary>
+    public void ShowLoading(string? fileName = null)
+    {
+        // Reuse Clear() to reset all preview state, then override for loading phase.
+        // This avoids duplicated reset logic — Clear() and ShowLoading() stay in sync.
+        Clear();
+        LoadingFileName = fileName ?? string.Empty;
+        IsLoadingPreview = true;
+        IsPreviewVisible = true;
     }
 
     private void AddPeMeta(string key, string? value)

@@ -183,9 +183,44 @@ internal static class IcoParser
             ms.Position = 0;
 
             using var skStream = new SkiaSharp.SKMemoryStream(ms.ToArray());
-            using var skBitmap = SkiaSharp.SKBitmap.Decode(skStream);
-            if (skBitmap != null)
-                return SkiaSharpToAvalonia(skBitmap);
+            using var xorBitmap = SkiaSharp.SKBitmap.Decode(skStream);
+            if (xorBitmap == null) return null;
+
+            // ── 创建带 alpha 通道的结果位图 ────────────────────────────
+            var imageInfo = new SkiaSharp.SKImageInfo(
+                width, pixelHeight,
+                SkiaSharp.SKColorType.Bgra8888,
+                SkiaSharp.SKAlphaType.Premul);
+            using var resultBitmap = new SkiaSharp.SKBitmap(imageInfo);
+            using (var canvas = new SkiaSharp.SKCanvas(resultBitmap))
+            {
+                canvas.DrawBitmap(xorBitmap, 0, 0);
+            }
+
+            // ── 应用 AND 掩码设置透明像素 ──────────────────────────────
+            // AND 掩码位于 XOR 数据之后，1 bit/pixel，行对齐到 32bit。
+            // 原始 DIB 中 AND 掩码是 bottom-up 顺序，resultBitmap 是 top-down，
+            // 所以 mask 行索引要 y-mirror。
+            int andRowSize = ((width + 31) / 32) * 4;
+            int andMaskStart = headerSize + paletteSize + xorDataSize;
+            if (andMaskStart + andRowSize * pixelHeight <= dibData.Length)
+            {
+                for (int y = 0; y < pixelHeight; y++)
+                {
+                    int maskY = pixelHeight - 1 - y; // mirror
+                    int rowStart = andMaskStart + maskY * andRowSize;
+                    for (int x = 0; x < width; x++)
+                    {
+                        if ((dibData[rowStart + x / 8] & (1 << (7 - (x % 8)))) != 0)
+                        {
+                            resultBitmap.SetPixel(x, y,
+                                resultBitmap.GetPixel(x, y).WithAlpha(0));
+                        }
+                    }
+                }
+            }
+
+            return SkiaSharpToAvalonia(resultBitmap);
         }
         catch
         {

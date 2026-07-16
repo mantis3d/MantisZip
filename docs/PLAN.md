@@ -50,6 +50,7 @@
 | **P1** | Avalonia: UI 功能补齐 | [avalonia-ui-feature-parity.md](.sisyphus/plans/avalonia-ui-feature-parity.md) | 🟡中 | 27/29 🟡 | Elevation×3、Favorites×2、QuickPath×2 等 11 个对话框、2 个控件、1 个转换器（2 项阻塞于 GUI 测试） |
 | **P1** | 上下文工具栏重构（目录树+文件列表） | [context-toolbars.md](.sisyphus/plans/context-toolbars.md) | 🟡中 | 6-8h | 目录树工具栏（展开/收起/展开到当前+树过滤），文件列表工具栏（导航组+地址栏+复制名/列选择器/视图过滤/全选反选/刷新+筛选/展平），导航历史栈，精简全局工具栏 |
 | **P1** | 解压/压缩结果预览面板 | [result-preview-panel.md](.sisyphus/plans/result-preview-panel.md) | 🟡中 | 8-10h | ExtractSettings/CompressSettings 窗口右侧新增预览面板，ResultTreeView 可复用控件（精简模式/冲突高亮/过滤灰显/摘要栏），拖拽导出等场景复用 |
+| **P1** | Avalonia: 预览两阶段加载（信息栏+内容分离） | [preview-two-phase-loading.md](.sisyphus/plans/preview-two-phase-loading.md) | 🟢低 | 1-2h | 立即显示加载状态+信息栏(Phase 1) → 异步提取后显示内容(Phase 2) + 版本号守卫防竞态；WPF 已有此模式，Avalonia 补齐 |
 | **P2** | Avalonia: i18n 补齐 + 杂物清理 | [avalonia-i18n-and-cleanup.md](.sisyphus/plans/avalonia-i18n-and-cleanup.md) | 🟢低 | ✅ 已完成 | ~290 个缺失 i18n key、版本号同步、Diagnostics 版本对齐、空目录清理 |
 | **P4** | 外部工具视频元数据 | — | 🟢低 | 2-3h | ffprobe 集成 |
 | **🔍调研** | 跨平台移植可行性 | [cross-platform-port.md](.sisyphus/plans/cross-platform-port.md) | 🟡中大 | 2-3月 | 砍 ShellExt，WPF→Avalonia，WebView2→WebKit，SharpSevenZip→SharpCompress/p7zip，DPAPI→AES-GCM |

@@ -1,7 +1,6 @@
 using System;
 using System.ComponentModel;
 using System.Data;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Avalonia;
@@ -49,11 +48,6 @@ public partial class PreviewPanel : UserControl
     {
         var vm = _vm;
         if (vm == null) return;
-        if (args.PropertyName == nameof(PreviewViewModel.IsHtmlVisible) ||
-            args.PropertyName == nameof(PreviewViewModel.HtmlContent))
-        {
-            UpdateWebViewContent(vm);
-        }
         if (args.PropertyName == nameof(PreviewViewModel.InfoPanelOrientation))
         {
             ApplyInfoPanelOrientation(vm.InfoPanelOrientation);
@@ -171,13 +165,4 @@ public partial class PreviewPanel : UserControl
         }
     }
 
-    private void UpdateWebViewContent(PreviewViewModel vm)
-    {
-        if (vm.IsHtmlVisible && !string.IsNullOrEmpty(vm.HtmlContent))
-        {
-            // data URI: embed HTML inline so no temp files needed
-            var base64 = Convert.ToBase64String(Encoding.UTF8.GetBytes(vm.HtmlContent));
-            HtmlWebView.Source = new Uri($"data:text/html;base64,{base64}");
-        }
-    }
 }

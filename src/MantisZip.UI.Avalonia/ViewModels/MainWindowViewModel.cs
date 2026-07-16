@@ -10,6 +10,7 @@ using MantisZip.Core.Utils;
 using MantisZip.UI.Avalonia.Models;
 using MantisZip.UI.Avalonia.Services;
 using System.Collections.ObjectModel;
+using System.Threading;
 
 namespace MantisZip.UI.Avalonia.ViewModels;
 
@@ -18,6 +19,7 @@ public partial class MainWindowViewModel : ObservableObject
     private readonly ArchiveService _archiveService = new();
     private ArchiveFormat _currentFormat;
     private IReadOnlyList<ArchiveItem>? _allRawItems;
+    private int _previewLoadVersion;
     private bool _isProgrammaticFilter;
 
     /// <summary>
@@ -540,17 +542,27 @@ public partial class MainWindowViewModel : ObservableObject
     {
         App.DebugLog($"[PRV] ShowPreviewAsync start: {entry.Name}, fmt={_currentFormat}");
 
-        // 切换文件前停止上一个 GIF 动画
+        // Phase 1: Immediate — show loading state + populate info panel from in-memory data.
+        // This runs synchronously before any async extraction, so user never sees stale content.
+        var version = Interlocked.Increment(ref _previewLoadVersion);
         Preview.StopGifTimer();
+        Preview.ShowLoading(entry.NameDisplay ?? entry.Name);
+        Preview.SetFileInfo(
+            entry.NameDisplay,
+            entry.SizeDisplay,
+            entry.CompressedSizeDisplay,
+            entry.Size > 0 ? $"{entry.CompressionRatio:F1}%" : "N/A",
+            entry.LastModifiedDisplay);
+        StatusMessage = LocalizationManager.T("Status_Extracting");
 
         try
         {
             var ext = Path.GetExtension(entry.Name);
 
-            // ── 魔数检测优先路由（EnableFormatDetection 已在 App.axaml.cs 从 AppSettings 初始化）──
+            // ── Magic detection ──
             var previewType = PreviewType.Unsupported;
             FileFormat magicFormat = FileFormat.Unknown;
-            string? detectedFormatName = null;  // 用于信息栏显示的格式名
+            string? detectedFormatName = null;
             if (PreviewService.EnableFormatDetection && CurrentArchivePath != null)
             {
                 try
@@ -573,14 +585,12 @@ public partial class MainWindowViewModel : ObservableObject
                 }
             }
 
-            // 魔数未识别时回退到扩展名判定
             if (previewType == PreviewType.Unsupported)
             {
                 previewType = PreviewService.ClassifyPreview(ext);
                 App.DebugLog($"[PRV] Fallback to extension classification: {previewType}");
             }
 
-            // 魔数未提供格式名时用扩展名回退（仅在魔数检测开启时才显示，WPF 一致行为）
             if (detectedFormatName == null && PreviewService.EnableFormatDetection)
             {
                 var extFormat = FileFormatDetector.DetectByExtension(ext);
@@ -601,8 +611,7 @@ public partial class MainWindowViewModel : ObservableObject
                 return;
             }
 
-            StatusMessage = LocalizationManager.T("Status_Extracting");
-
+            // ── Extract to temp (async, slow) ──
             var tempFile = await PreviewService.ExtractToTempAsync(
                 CurrentArchivePath, entry, _currentFormat);
             App.DebugLog($"[PRV] Extracted to: {tempFile}");
@@ -613,6 +622,15 @@ public partial class MainWindowViewModel : ObservableObject
                 return;
             }
 
+            // Version guard: if user selected another file while extracting, discard
+            if (version != _previewLoadVersion)
+            {
+                App.DebugLog($"[PRV] Stale preview result discarded (version {version} != {_previewLoadVersion})");
+                try { File.Delete(tempFile); } catch { /* best effort */ }
+                return;
+            }
+
+            // Phase 2: Content loaded — show the actual preview
             switch (previewType)
             {
                 case PreviewType.Text:
@@ -628,20 +646,16 @@ public partial class MainWindowViewModel : ObservableObject
                     StatusMessage = LocalizationManager.T("Preview_Pe", entry.DisplayName);
                     break;
                 case PreviewType.Image:
-                    // ICO files — show gallery with all icon sizes
                     var icoExt = Path.GetExtension(tempFile).ToLowerInvariant();
                     if (icoExt == ".ico")
                     {
-                        App.DebugLog("[PRV] Calling ShowIcoGallery");
                         Preview.ShowIcoGallery(tempFile);
                         StatusMessage = LocalizationManager.T("Preview_Ico", entry.DisplayName);
                     }
                     else
                     {
-                        App.DebugLog("[PRV] Calling ShowImage");
                         Preview.ShowImage(tempFile);
                         StatusMessage = LocalizationManager.T("Preview_Image", entry.DisplayName);
-                        App.DebugLog("[PRV] ShowImage returned");
                     }
                     break;
                 case PreviewType.Gif:
@@ -684,25 +698,17 @@ public partial class MainWindowViewModel : ObservableObject
                     Preview.ShowHtmlPreview(tempFile);
                     StatusMessage = LocalizationManager.T("Preview_Html", entry.DisplayName);
                     break;
+                case PreviewType.Pdf:
+                    await Preview.ShowPdfAsync(tempFile);
+                    StatusMessage = LocalizationManager.T("Preview_Pdf", entry.DisplayName);
+                    break;
                 case PreviewType.Markdown:
                     Preview.ShowMarkdownPreview(tempFile);
                     StatusMessage = LocalizationManager.T("Preview_Markdown", entry.DisplayName);
                     break;
             }
 
-            // Populate preview info panel (only for supported, not for unsupported)
-            if (Preview.PreviewType != PreviewType.Unsupported && Preview.PreviewType != PreviewType.None)
-            {
-                Preview.SetFileInfo(
-                    entry.NameDisplay,
-                    entry.SizeDisplay,
-                    entry.CompressedSizeDisplay,
-                    entry.Size > 0 ? $"{entry.CompressionRatio:F1}%" : "N/A",
-                    entry.LastModifiedDisplay);
-            }
-
-            // 魔数检测结果写到信息栏（与 WPF 行为一致：显示格式名 + 扩展名冲突标记）
-            // 先移除上一文件的"格式"行，防止切换不清理 FormatMetadata 的格式（Text/CSV/PE/SVG/HTML/Markdown）时累积
+            // Populate format metadata from magic detection (if any)
             if (detectedFormatName != null)
             {
                 var extFormat = FileFormatDetector.DetectByExtension(ext);

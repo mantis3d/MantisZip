@@ -21,6 +21,21 @@
 
 ### MantisZip.UI.Avalonia（主力版）
 
+**2026-07-16** — 移除 WebView2 依赖：Markdown/HTML/PDF 预览改用纯 .NET 跨平台实现
+  - Markdown: Markdig AST → `MarkdownPreviewBuilder` → Avalonia 原生控件树（替代 Markdig→HTML→WebView2）
+  - HTML: `ReverseMarkdown` 转为 Markdown → 复用 MarkdownPreviewBuilder 控件树（替代 WebView2 直接渲染）
+  - PDF: `UglyToad.PdfPig` + `SkiaSharp` 逐页位图渲染 + 翻页导航（替代 WebView2 加载 PDF）
+  - 移除 `Avalonia.Controls.WebView` 包引用和所有 WebView2 相关代码（csproj/axaml/cs）
+  - 新增依赖：ReverseMarkdown 4.7.0、PdfPig 0.1.15、PdfPig.Rendering.Skia 0.1.15.4
+  - Build 0 errors 0 warnings
+
+**2026-07-16** — 预览两阶段加载：立即信息栏 + 弹跳点加载页 → 异步内容
+  - ShowPreviewAsync 拆分 Phase 1（同步显示加载状态+信息栏）与 Phase 2（异步提取后显示内容）
+  - `_previewLoadVersion` 版本号守卫防止异步结果覆盖新选择文件
+  - PreviewViewModel 新增 `IsLoadingPreview`/`LoadingFileName` 属性和 `ShowLoading()` 方法
+  - `OnPreviewTypeChanged` 自动在内容就绪时关闭加载页
+  - PreviewPanel.axaml 新增全页居中弹跳点动画加载页，替代旧的 ProgressBar
+
 **2026-07-16** — 修正 ICO BMP 帧 biHeight 翻倍导致的小图标黑色方块
   - `IcoParser.DecodeBmpFrame` 在写入 BMP 文件前修正 DIB header 的 biHeight 为实际像素高度
   - SkiaSharp 多读 pixelHeight 行垃圾数据导致小图标上方渲染出黑色方块
@@ -491,6 +506,7 @@
 
 | 功能 | 设计文档 | 实现版本 |
 |------|----------|:--------:|
+| 移除 WebView2 依赖（Markdown/HTML/PDF 跨平台预览） | [remove-webview2-preview.md](.sisyphus/plans/remove-webview2-preview.md) | v0.4.5 |
 | 便携版模式 | [portable-mode.md](.sisyphus/plans/portable-mode.md) | v0.4.5 |
 | 文件冲突对话框暂停/取消 | [conflict-dialog-pause-cancel.md](.sisyphus/plans/conflict-dialog-pause-cancel.md) | v0.4.5 |
 | 压缩选项增强（7z/ZIP 格式参数扩展） | [compression-options-enhancement.md](.sisyphus/plans/compression-options-enhancement.md) | v0.4.5 |

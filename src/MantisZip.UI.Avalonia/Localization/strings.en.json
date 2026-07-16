@@ -309,6 +309,7 @@
   "Preview_Markdown": "Markdown preview: {0}",
   "Preview_Office": "Office document: {0}",
   "Preview_Pe": "PE metadata: {0}",
+  "Preview_Pdf": "PDF preview: {0}",
   "Preview_Sqlite": "SQLite database: {0}",
   "Preview_Svg": "SVG preview: {0}",
   "Preview_Text": "Text preview: {0}",
