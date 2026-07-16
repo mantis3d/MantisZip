@@ -40,6 +40,17 @@
   - `IcoParser.DecodeBmpFrame` 在写入 BMP 文件前修正 DIB header 的 biHeight 为实际像素高度
   - SkiaSharp 多读 pixelHeight 行垃圾数据导致小图标上方渲染出黑色方块
 
+**2026-07-16** — 修复 ICO BMP 帧透明度丢失
+  - ICO BMP 帧透明度来自 AND 掩码（1 bit/pixel，位于 XOR 像素数据之后）
+  - 解码 XOR 像素后解析 AND 掩码，对掩码位=1 的像素设置 alpha=0
+  - AND 掩码在原始 DIB 中 bottom-up 存储，解码后位图 top-down，需 y-mirror
+
+**2026-07-16** — PDF 预览性能优化：限制渲染分辨率 + 隐藏工具栏
+  - `ShowPdfAsync` 中获取 PDF 页面原始尺寸（PdfPig GetPage），计算合适的缩放比例限制渲染最大宽度 1920/高度 1080
+  - `LoadPdfPageAsync` 改用动态 `_pdfRenderScale` 替代硬编码 1.0f
+  - 避免大页面 PDF（如键盘图海报）渲染出数百 MB 的超大位图
+  - PDF 改为元数据格式 `IsToolbarVisible = false`，对齐其他元数据格式
+
 **2026-07-15** — 预览图像行为一致性与 ZoomFit 自适应视口
   - GIF 魔数路由修复：`FileFormat.Gif` → `PreviewType.Gif`（而非错误地归入图片预览）
   - 9 个元数据格式隐藏空工具栏边框（PE/CSV/SQLite/ISO/Torrent/Office/Video/Audio/Font）

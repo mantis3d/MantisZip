@@ -1434,6 +1434,8 @@ public partial class PreviewViewModel : ObservableObject
 
     private PdfDocument? _pdfDocument;
     private int _pdfTotalPages;
+    /// <summary>PDF 页面渲染缩放比例，限制大页面位图尺寸。</summary>
+    private float _pdfRenderScale = 1.0f;
 
     [ObservableProperty]
     private int _pdfCurrentPage = 1;
@@ -1477,7 +1479,7 @@ public partial class PreviewViewModel : ObservableObject
         // 先设置 UI 状态（格式元数据、标题），渲染完成后更新实际预览内容
         PreviewType = PreviewType.Pdf;
         IsPreviewVisible = true;
-        IsToolbarVisible = true;
+        IsToolbarVisible = false;
         PreviewHeaderText = $"PDF {info.AdditionalInfo ?? ""}";
 
         FormatMetadata.Clear();
@@ -1494,15 +1496,30 @@ public partial class PreviewViewModel : ObservableObject
         _pdfDocument = null;
         try
         {
-            var (doc, totalPages) = await Task.Run(() =>
+            (PdfDocument doc, int totalPages, float renderScale) = await Task.Run(() =>
             {
                 var d = PdfDocument.Open(filePath, SkiaRenderingParsingOptions.Instance);
                 d.AddSkiaPageFactory();
-                return (d, d.NumberOfPages);
+
+                // 获取第 1 页实际尺寸，计算合适的渲染缩放比例
+                float scale = 1.0f;
+                try
+                {
+                    var page = d.GetPage(1);
+                    float pw = (float)page.Width;
+                    float ph = (float)page.Height;
+                    const float maxW = 1920f, maxH = 1080f;
+                    if (pw > maxW || ph > maxH)
+                        scale = Math.Min(maxW / pw, maxH / ph);
+                }
+                catch { /* 尺寸获取失败，用默认 1.0 */ }
+
+                return (d, d.NumberOfPages, scale);
             });
 
             _pdfDocument = doc;
             _pdfTotalPages = totalPages;
+            _pdfRenderScale = renderScale;
             PdfPageInfo = $"1 / {_pdfTotalPages}";
             await LoadPdfPageAsync(1);
         }
@@ -1525,7 +1542,7 @@ public partial class PreviewViewModel : ObservableObject
             // 后台线程：渲染 + 像素数据拷贝
             await Task.Run(() =>
             {
-                using var bitmap = _pdfDocument.GetPageAsSKBitmap(pageNumber, 1.0f, SKColors.White);
+                using var bitmap = _pdfDocument.GetPageAsSKBitmap(pageNumber, _pdfRenderScale, SKColors.White);
                 if (bitmap == null) return;
 
                 width = bitmap.Width;
@@ -1668,6 +1685,7 @@ public partial class PreviewViewModel : ObservableObject
         _pdfDocument?.Dispose();
         _pdfDocument = null;
         _pdfTotalPages = 0;
+        _pdfRenderScale = 1.0f;
         PdfCurrentPage = 1;
         PdfPageInfo = string.Empty;
         MarkdownPreviewPanel = null;
