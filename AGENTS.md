@@ -13,7 +13,6 @@ WPF→Avalonia 迁移中的压缩/解压桌面应用。当前存在两个 UI 项
 
 **迁移完成后的计划**：
 - 废弃 `MantisZip.UI`（WPF）项目
-- 移除 WebView2 依赖（HTML/Markdown 预览改用 WebView2 之外的方案）
 
 ## Quick start
 
@@ -50,6 +49,7 @@ Avalonia 移植 Phases 0–10 已完成，当前处于功能补齐后期：
 | UI 功能补齐 | 对话框·控件·转换器补齐 | ✅ 已完成 |
 | Shell/COM 集成 | ShellIntegration·ShellExt·文件关联·CLI | 📋 待实施 |
 | i18n + 清理 | 缺失 key 补齐·空目录清理·版本对齐 | 📋 待实施 |
+| HTML 预览升级 | 跨平台 WebView + ReverseMarkdown 降级 | 📋 待实施 |
 
 ### 依赖流向
 
@@ -114,7 +114,7 @@ Despite using `CommunityToolkit.Mvvm`, **all logic lives in `MainWindow.xaml.cs`
 - `MainWindow.Preview.Metadata.cs` — PE/PDF/字体/音视频等元数据
 - `MainWindow.Preview.Text.cs` — 文本/CSV
 - `MainWindow.Preview.Web.cs` — HTML/Markdown/SVG（WebView2）
-- WebView2 用于 HTML/Markdown/SVG/PDF 渲染（网络请求已拦截）
+- WebView2 用于 HTML/Markdown/SVG/PDF 渲染（网络请求已拦截），Avalonia 版已移除 WPF 的 WebView2 依赖
 - `PreviewWebView2` 控件名
 
 #### Avalonia 版（主力）
@@ -123,7 +123,7 @@ Despite using `CommunityToolkit.Mvvm`, **all logic lives in `MainWindow.xaml.cs`
 
 - **预览类型枚举**: `PreviewType` (Services/PreviewService.cs)
 - **格式分发**: `PreviewService.ClassifyPreview(ext)` → `PreviewViewModel.ShowXxx(filePath)` 方法
-- **HTML/Markdown**: 仍使用 `Avalonia.Controls.WebView`（底层 WebView2），通过 `data:` URI 嵌入内容（无需临时文件）
+- **HTML/Markdown**: HTML 用双轨方案——优先 WebView（各平台原生引擎，Win/Mac/Linux 各用各自后端），不可用时降级到 ReverseMarkdown → Markdown 控件树。Markdown 直接用 Markdig AST → 控件树（详见 `.sisyphus/plans/html-preview-webview-fallback.md`）
 - **SVG**: `Svg.Skia` 直接栅格化 → `WriteableBitmap`（无需 WebView2）
 - **字体预览**: `HarfBuzzSharp` shaping + `SkiaSharp` 位图渲染 + 自动折行 + 连字检测
 - **GIF**: 自实现 `GifDecoder` + `DispatcherTimer` 逐帧动画（无需 `WpfAnimatedGif`）
@@ -238,7 +238,7 @@ Open and Extract verbs use `AppliesTo` filter (archive extensions only). Icons v
 | SVG | WebView2 | `Svg.Skia` → WriteableBitmap |
 | GIF | `WpfAnimatedGif` | 自实现 `GifDecoder` + `DispatcherTimer` |
 | 字体预览 | WPF GlyphTypeface + RenderTargetBitmap | HarfBuzzSharp + SkiaSharp 位图渲染 |
-| HTML/Markdown | WebView2 (Microsoft.Web.WebView2) | `Avalonia.Controls.WebView` (待移除) |
+| HTML/Markdown | WebView2 (Microsoft.Web.WebView2) | 双轨：`Avalonia.Controls.WebView`（各平台原生，Win/Mac/Linux 各不同后端），不可用时降级到 ReverseMarkdown → Markdig → 控件树 |
 | 对话框 | `Ookii.Dialogs.Wpf` | 原生 Avalonia + system dialogs |
 | DataGrid | `System.Windows.Controls.DataGrid` | `Avalonia.Controls.DataGrid` |
 | 主题资源 | `SolidColorBrush` 在 `Themes/Light.xaml` / `Dark.xaml` | 类似结构，但资源键名略有差异 |
@@ -491,10 +491,10 @@ PROGRESS.md 分三个独立线索，根据变更影响范围选择对应线索�
 ### 迁移完成后的清理
 
 1. **废弃 WPF 项目**: 删除 `src/MantisZip.UI/` 目录
-2. **移除 WebView2 依赖**: 从 `MantisZip.UI.Avalonia.csproj` 移除 `Avalonia.Controls.WebView`（及间接的 WebView2 依赖）
+2. **清理 WebView 依赖**: `Avalonia.Controls.WebView` 保留为跨平台 WebView 抽象（Win→WebView2，Mac→WKWebView，Linux→WPE WebKit），不需要清理。仅在 WPF 废弃时清理 WPF 项目的 WebView2 引用。
 3. **Sln 文件更新**: 从解决方案中移除 WPF 项目
 4. **构建脚本更新**: 移除 WPF 构建命令
-5. **README 更新**: 删除 WebView2 Runtime 依赖说明
+5. **README 更新**: 更新为 WebView 跨平台说明（Win→WebView2，Mac→WKWebView，Linux→WPE WebKit，非 Windows 平台无需额外安装）
 
 ### 待实施计划
 
