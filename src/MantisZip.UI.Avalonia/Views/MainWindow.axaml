@@ -41,7 +41,7 @@
                   IsEnabled="{Binding IsArchiveLoaded}">
           <MenuItem.Header>
             <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
-              <TextBlock Text="🚪" FontSize="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+              <PathIcon Data="{StaticResource IconSignOut}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
               <TextBlock Text="{Binding LocalizedStrings[Menu_CloseArchive]}" />
             </StackPanel>
           </MenuItem.Header>
@@ -55,7 +55,7 @@
                         CommandParameter="{Binding .}">
                 <MenuItem.Header>
                   <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
-                    <TextBlock Text="🕐" FontSize="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+                    <PathIcon Data="{StaticResource IconHistory}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
                     <TextBlock Text="{Binding .}" />
                   </StackPanel>
                 </MenuItem.Header>
@@ -85,7 +85,7 @@
         <MenuItem Command="{Binding OpenSettingsCommand}">
           <MenuItem.Header>
             <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
-              <TextBlock Text="⚙" FontSize="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+              <PathIcon Data="{StaticResource IconSettings}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
               <TextBlock Text="{Binding LocalizedStrings[Menu_Settings]}" />
             </StackPanel>
           </MenuItem.Header>
@@ -94,7 +94,7 @@
         <MenuItem Command="{Binding ExitCommand}">
           <MenuItem.Header>
             <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
-              <TextBlock Text="🚪" FontSize="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+              <PathIcon Data="{StaticResource IconSignOut}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
               <TextBlock Text="{Binding LocalizedStrings[Menu_Exit]}" />
             </StackPanel>
           </MenuItem.Header>
@@ -116,7 +116,7 @@
                   IsEnabled="{Binding IsArchiveLoaded}">
           <MenuItem.Header>
             <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
-              <TextBlock Text="📤" FontSize="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+              <PathIcon Data="{StaticResource IconExport}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
               <TextBlock Text="{Binding LocalizedStrings[Menu_ExtractArchive]}" />
             </StackPanel>
           </MenuItem.Header>
@@ -143,7 +143,7 @@
                   IsEnabled="{Binding IsArchiveLoaded}">
           <MenuItem.Header>
             <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
-              <TextBlock Text="🤖" FontSize="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+              <PathIcon Data="{StaticResource IconWand}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
               <TextBlock Text="{Binding LocalizedStrings[Menu_SmartExtract]}" />
             </StackPanel>
           </MenuItem.Header>
@@ -182,7 +182,7 @@
                   IsEnabled="{Binding IsArchiveLoaded}">
           <MenuItem.Header>
             <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
-              <TextBlock Text="💬" FontSize="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+              <PathIcon Data="{StaticResource IconChat}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
               <TextBlock Text="{Binding LocalizedStrings[Menu_ArchiveComment]}" />
             </StackPanel>
           </MenuItem.Header>
@@ -191,7 +191,7 @@
         <MenuItem Command="{Binding NewArchiveCommand}" InputGesture="Ctrl+N">
           <MenuItem.Header>
             <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
-              <TextBlock Text="🆕" FontSize="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+              <PathIcon Data="{StaticResource IconNewFile}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
               <TextBlock Text="{Binding LocalizedStrings[Menu_NewArchive]}" />
             </StackPanel>
           </MenuItem.Header>
@@ -199,7 +199,7 @@
         <MenuItem Command="{Binding CompressSelectedCommand}" InputGesture="Ctrl+C">
           <MenuItem.Header>
             <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
-              <TextBlock Text="📥" FontSize="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+              <PathIcon Data="{StaticResource IconDownload}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
               <TextBlock Text="{Binding LocalizedStrings[Menu_Compress]}" />
             </StackPanel>
           </MenuItem.Header>
@@ -212,7 +212,7 @@
         <MenuItem Command="{Binding ToggleThemeCommand}">
           <MenuItem.Header>
             <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
-              <TextBlock Text="🌓" FontSize="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+              <PathIcon Data="{StaticResource IconMoon}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
               <TextBlock Text="{Binding LocalizedStrings[Menu_ToggleTheme]}" />
             </StackPanel>
           </MenuItem.Header>
@@ -244,7 +244,7 @@
         <MenuItem Command="{Binding ToggleInfoPanelOrientationCommand}">
           <MenuItem.Header>
             <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
-              <TextBlock Text="📐" FontSize="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+              <PathIcon Data="{StaticResource IconOrientation}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
               <TextBlock Text="{Binding LocalizedStrings[Menu_InfoPanelOrientation]}" />
             </StackPanel>
           </MenuItem.Header>
@@ -278,7 +278,7 @@
         <MenuItem Click="TestWindow_Click" Tag="SettingsWindow">
           <MenuItem.Header>
             <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
-              <TextBlock Text="⚙" FontSize="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+              <PathIcon Data="{StaticResource IconSettings}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
               <TextBlock Text="{Binding LocalizedStrings[Test_SettingsWindow]}" />
             </StackPanel>
           </MenuItem.Header>
@@ -294,7 +294,7 @@
         <MenuItem Click="TestWindow_Click" Tag="DonationDialog">
           <MenuItem.Header>
             <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
-              <TextBlock Text="❤" FontSize="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+              <PathIcon Data="{StaticResource IconHeart}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
               <TextBlock Text="{Binding LocalizedStrings[Test_DonationDialog]}" />
             </StackPanel>
           </MenuItem.Header>
@@ -311,7 +311,7 @@
         <MenuItem Click="TestWindow_Click" Tag="PasswordHelpDialog">
           <MenuItem.Header>
             <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
-              <TextBlock Text="❓" FontSize="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+              <PathIcon Data="{StaticResource IconQuestion}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
               <TextBlock Text="{Binding LocalizedStrings[Test_PasswordHelp]}" />
             </StackPanel>
           </MenuItem.Header>
@@ -320,7 +320,7 @@
         <MenuItem Click="TestWindow_Click" Tag="CommentDialog">
           <MenuItem.Header>
             <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
-              <TextBlock Text="💬" FontSize="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+              <PathIcon Data="{StaticResource IconChat}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
               <TextBlock Text="{Binding LocalizedStrings[Test_CommentDialog]}" />
             </StackPanel>
           </MenuItem.Header>
@@ -328,7 +328,7 @@
         <MenuItem Click="TestWindow_Click" Tag="PasswordEditDialog">
           <MenuItem.Header>
             <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
-              <TextBlock Text="✏" FontSize="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+              <PathIcon Data="{StaticResource IconEdit}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
               <TextBlock Text="{Binding LocalizedStrings[Test_PasswordEditDialog]}" />
             </StackPanel>
           </MenuItem.Header>
@@ -345,7 +345,7 @@
         <MenuItem Click="TestWindow_Click" Tag="ProgressWindow">
           <MenuItem.Header>
             <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
-              <TextBlock Text="⏳" FontSize="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+              <PathIcon Data="{StaticResource IconTimer}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
               <TextBlock Text="{Binding LocalizedStrings[Test_ProgressWindow]}" />
             </StackPanel>
           </MenuItem.Header>
@@ -362,7 +362,7 @@
         <MenuItem Click="TestWindow_Click" Tag="CompressSettingsWindow">
           <MenuItem.Header>
             <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
-              <TextBlock Text="🗜" FontSize="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+              <PathIcon Data="{StaticResource IconCompress}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
               <TextBlock Text="{Binding LocalizedStrings[Test_CompressSettings]}" />
             </StackPanel>
           </MenuItem.Header>
@@ -386,7 +386,7 @@
         <MenuItem Click="TestWindow_Click" Tag="ConflictDialog">
           <MenuItem.Header>
             <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
-              <TextBlock Text="⚡" FontSize="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+              <PathIcon Data="{StaticResource IconLightning}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
               <TextBlock Text="{Binding LocalizedStrings[Test_ConflictDialog]}" />
             </StackPanel>
           </MenuItem.Header>
@@ -403,7 +403,7 @@
         <MenuItem Click="TestWindow_Click" Tag="ElevationDialog">
           <MenuItem.Header>
             <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
-              <TextBlock Text="🛡" FontSize="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+              <PathIcon Data="{StaticResource IconShieldLock}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
               <TextBlock Text="{Binding LocalizedStrings[Test_ElevationDialog]}" />
             </StackPanel>
           </MenuItem.Header>
@@ -461,7 +461,7 @@
         <MenuItem Click="TestWindow_Click" Tag="ArchiveCommentDialog">
           <MenuItem.Header>
             <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
-              <TextBlock Text="💬" FontSize="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+              <PathIcon Data="{StaticResource IconChat}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
               <TextBlock Text="{Binding LocalizedStrings[Test_ArchiveCommentDialog]}" />
             </StackPanel>
           </MenuItem.Header>
@@ -486,7 +486,7 @@
         <MenuItem Click="TestWindow_Click" Tag="AppMessageBox">
           <MenuItem.Header>
             <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
-              <TextBlock Text="💬" FontSize="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+              <PathIcon Data="{StaticResource IconChat}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
               <TextBlock Text="{Binding LocalizedStrings[Test_AppMessageBox]}" />
             </StackPanel>
           </MenuItem.Header>
@@ -509,7 +509,7 @@
                 Command="{Binding NewArchiveCommand}"
                 ToolTip.Tip="{Binding LocalizedStrings[Tooltip_New]}">
           <StackPanel >
-            <TextBlock Text="🆕" Classes="ToolbarButtonIcon" />
+            <PathIcon Data="{StaticResource IconNewFile}" Classes="ToolbarButtonIcon" Width="14" Height="14" />
             <TextBlock Text="{Binding LocalizedStrings[Toolbar_New]}"
                        Classes="ToolbarButtonLabel" />
           </StackPanel>
@@ -528,7 +528,7 @@
                 IsEnabled="{Binding IsArchiveLoaded}"
                 ToolTip.Tip="{Binding LocalizedStrings[Tooltip_Extract]}">
           <StackPanel >
-            <TextBlock Text="📤" Classes="ToolbarButtonIcon" />
+            <PathIcon Data="{StaticResource IconExport}" Classes="ToolbarButtonIcon" Width="14" Height="14" />
             <TextBlock Text="{Binding LocalizedStrings[Toolbar_Extract]}"
                        Classes="ToolbarButtonLabel" />
           </StackPanel>
@@ -538,7 +538,7 @@
                 IsEnabled="{Binding IsArchiveLoaded}"
                 ToolTip.Tip="{Binding LocalizedStrings[Tooltip_SmartExtract]}">
           <StackPanel >
-            <TextBlock Text="🤖" Classes="ToolbarButtonIcon" />
+            <PathIcon Data="{StaticResource IconWand}" Classes="ToolbarButtonIcon" Width="14" Height="14" />
             <TextBlock Text="{Binding LocalizedStrings[Toolbar_SmartExtract]}"
                        Classes="ToolbarButtonLabel" />
           </StackPanel>
@@ -547,7 +547,7 @@
                 Command="{Binding CompressSelectedCommand}"
                 ToolTip.Tip="{Binding LocalizedStrings[Tooltip_Compress]}">
           <StackPanel >
-            <TextBlock Text="📥" Classes="ToolbarButtonIcon" />
+            <PathIcon Data="{StaticResource IconDownload}" Classes="ToolbarButtonIcon" Width="14" Height="14" />
             <TextBlock Text="{Binding LocalizedStrings[Toolbar_Compress]}"
                        Classes="ToolbarButtonLabel" />
           </StackPanel>
@@ -572,7 +572,7 @@
                 IsEnabled="{Binding IsArchiveLoaded}"
                 ToolTip.Tip="{Binding LocalizedStrings[Tooltip_DeleteFiles]}">
           <StackPanel >
-            <TextBlock Text="✖" Classes="ToolbarButtonIcon" />
+            <PathIcon Data="{StaticResource IconDismiss}" Classes="ToolbarButtonIcon" Width="14" Height="14" />
             <TextBlock Text="{Binding LocalizedStrings[Toolbar_DeleteFiles]}"
                        Classes="ToolbarButtonLabel" />
           </StackPanel>
@@ -596,7 +596,7 @@
                       IsChecked="{Binding IsPreviewVisible}"
                       ToolTip.Tip="{Binding LocalizedStrings[Tooltip_Preview]}">
           <StackPanel >
-            <TextBlock Text="👁" Classes="ToolbarButtonIcon" />
+            <PathIcon Data="{StaticResource IconEye}" Classes="ToolbarButtonIcon" Width="14" Height="14" />
             <TextBlock Text="{Binding LocalizedStrings[Toolbar_Preview]}"
                        Classes="ToolbarButtonLabel" />
           </StackPanel>
@@ -673,14 +673,14 @@
 
         <!-- Section 2: 日期范围 + 🧪 picker buttons -->
         <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="4,0">
-          <TextBlock Text="📅" FontSize="14" Margin="0,0,4,0" VerticalAlignment="Center" />
+          <PathIcon Data="{StaticResource IconCalendar}" Width="14" Height="14" Margin="0,0,4,0" VerticalAlignment="Center" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
           <StackPanel Orientation="Vertical" VerticalAlignment="Center">
             <StackPanel Orientation="Horizontal" Margin="0,0,0,2">
               <Button Width="20" Height="20" Padding="0" Margin="0,0,2,0" Click="PickDateFrom_Click"
                       Background="{DynamicResource ThemeButtonBgBrush}"
                       Foreground="{DynamicResource ThemeTextPrimaryBrush}"
                       BorderBrush="{DynamicResource ThemeBorderBrush}">
-                <TextBlock Text="🧪" FontSize="11" />
+                <PathIcon Data="{StaticResource IconEyedropper}" Width="11" Height="11" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
               </Button>
               <TextBlock Text="{Binding LocalizedStrings[Filter_DateFrom]}"
                          FontSize="11" VerticalAlignment="Center" Margin="0,0,2,0"
@@ -696,7 +696,7 @@
                       Background="{DynamicResource ThemeButtonBgBrush}"
                       Foreground="{DynamicResource ThemeTextPrimaryBrush}"
                       BorderBrush="{DynamicResource ThemeBorderBrush}">
-                <TextBlock Text="🧪" FontSize="11" />
+                <PathIcon Data="{StaticResource IconEyedropper}" Width="11" Height="11" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
               </Button>
               <TextBlock Text="{Binding LocalizedStrings[Filter_DateTo]}"
                          FontSize="11" VerticalAlignment="Center" Margin="0,0,2,0"
@@ -714,14 +714,14 @@
 
         <!-- Section 3: 大小范围 + 🧪 picker buttons -->
         <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="4,0">
-          <TextBlock Text="📏" FontSize="14" Margin="0,0,4,0" VerticalAlignment="Center" />
+          <PathIcon Data="{StaticResource IconRuler}" Width="14" Height="14" Margin="0,0,4,0" VerticalAlignment="Center" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
           <StackPanel Orientation="Vertical" VerticalAlignment="Center">
             <StackPanel Orientation="Horizontal" Margin="0,0,0,2">
               <Button Width="20" Height="20" Padding="0" Margin="0,0,2,0" Click="PickSizeMin_Click"
                       Background="{DynamicResource ThemeButtonBgBrush}"
                       Foreground="{DynamicResource ThemeTextPrimaryBrush}"
                       BorderBrush="{DynamicResource ThemeBorderBrush}">
-                <TextBlock Text="🧪" FontSize="11" />
+                <PathIcon Data="{StaticResource IconEyedropper}" Width="11" Height="11" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
               </Button>
               <TextBlock Text="{Binding LocalizedStrings[Filter_SizeMin]}"
                          FontSize="11" VerticalAlignment="Center" Margin="0,0,2,0"
@@ -745,7 +745,7 @@
                       Background="{DynamicResource ThemeButtonBgBrush}"
                       Foreground="{DynamicResource ThemeTextPrimaryBrush}"
                       BorderBrush="{DynamicResource ThemeBorderBrush}">
-                <TextBlock Text="🧪" FontSize="11" />
+                <PathIcon Data="{StaticResource IconEyedropper}" Width="11" Height="11" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
               </Button>
               <TextBlock Text="{Binding LocalizedStrings[Filter_SizeMax]}"
                          FontSize="11" VerticalAlignment="Center" Margin="0,0,2,0"
@@ -933,7 +933,7 @@
                       Command="{Binding CycleViewModeCommand}"
                       IsEnabled="{Binding IsArchiveLoaded}"
                       ToolTip.Tip="{Binding LocalizedStrings[Toolbar_ViewMode]}">
-                <TextBlock Text="▧" FontSize="13" />
+                <PathIcon Data="{StaticResource IconGrid}" Width="13" Height="13" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
               </Button>
               <TextBlock Text="{Binding ViewModeLabel}"
                          FontSize="10"
@@ -979,7 +979,7 @@
                             IsChecked="{Binding IsFilterBarVisible}"
                             IsEnabled="{Binding IsArchiveLoaded}"
                             ToolTip.Tip="{Binding LocalizedStrings[Tooltip_Filter]}">
-                <TextBlock Text="🔍" FontSize="13" />
+                <PathIcon Data="{StaticResource IconSearch}" Width="13" Height="13" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
               </ToggleButton>
               <ToggleButton Classes="ToolbarButton"
                             IsChecked="{Binding ShowSubfolders}"
@@ -1045,7 +1045,7 @@
                                       Width="80">
                 <DataGridTemplateColumn.Header>
                     <StackPanel Orientation="Horizontal" Spacing="3">
-                        <TextBlock Text="📏" FontSize="13" />
+                        <PathIcon Data="{StaticResource IconRuler}" Width="13" Height="13" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
                         <TextBlock Text="{Binding LocalizedStrings[DataGrid_Size]}" />
                     </StackPanel>
                 </DataGridTemplateColumn.Header>
