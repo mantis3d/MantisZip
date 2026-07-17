@@ -1,92 +1,120 @@
 <Window xmlns="https://github.com/avaloniaui"
-        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        x:Class="MantisZip.UI.Avalonia.Dialogs.ExtractSettingsWindow"
-        x:CompileBindings="False"
-        Title="{Binding LocalizedStrings[Extract_Title]}"
-        Width="530"
-        SizeToContent="Height"
-        WindowStartupLocation="CenterOwner"
-        CanResize="False"
-        Background="{DynamicResource ThemeWindowBgBrush}">
+         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+         xmlns:controls="clr-namespace:MantisZip.UI.Avalonia.Controls"
+         x:Class="MantisZip.UI.Avalonia.Dialogs.ExtractSettingsWindow"
+         x:CompileBindings="False"
+         Title="{Binding LocalizedStrings[Extract_Title]}"
+         Width="800"
+         SizeToContent="Height"
+         WindowStartupLocation="CenterOwner"
+         CanResize="True"
+         Background="{DynamicResource ThemeWindowBgBrush}">
 
   <Grid RowDefinitions="*,Auto"
+        ColumnDefinitions="*,Auto"
         Margin="16">
-    <!-- Content -->
-    <ScrollViewer Grid.Row="0"
-                  Background="{DynamicResource ThemeWindowBgBrush}"
-                  TextElement.Foreground="{DynamicResource ThemeTextPrimaryBrush}">
-      <StackPanel Spacing="12">
-        <!-- Source files -->
-        <Border BorderBrush="{DynamicResource ThemeBorderBrush}"
-                BorderThickness="1" CornerRadius="4" Padding="12"
-                Background="{DynamicResource ThemeSurfaceBgBrush}">
-          <StackPanel Spacing="8">
-            <TextBlock Text="{Binding LocalizedStrings[Extract_SourceArchives]}"
-                       FontWeight="SemiBold" />
-            <ListBox x:Name="FileListBox"
-                     Height="100"
-                     BorderBrush="{DynamicResource ThemeBorderBrush}">
-              <ListBox.ItemTemplate>
-                <DataTemplate>
-                  <TextBlock Text="{Binding}"
-                             TextTrimming="CharacterEllipsis"
-                             ToolTip.Tip="{Binding}" />
-                </DataTemplate>
-              </ListBox.ItemTemplate>
-            </ListBox>
-          </StackPanel>
-        </Border>
+    <!-- ═══════ Left: TabControl with settings ═══════ -->
+    <TabControl Grid.Column="0" Grid.Row="0"
+                Background="{DynamicResource ThemeWindowBgBrush}"
+                TextElement.Foreground="{DynamicResource ThemeTextPrimaryBrush}">
+      <!-- Tab: General -->
+      <TabItem Header="{Binding LocalizedStrings[Extract_Title]}"
+               Classes="compactTab">
+        <ScrollViewer Background="{DynamicResource ThemeWindowBgBrush}"
+                       TextElement.Foreground="{DynamicResource ThemeTextPrimaryBrush}">
+          <StackPanel Spacing="12"
+                       Margin="0,8,0,0">
+            <!-- Source archives -->
+            <Border BorderBrush="{DynamicResource ThemeBorderBrush}"
+                    BorderThickness="1" CornerRadius="4" Padding="12"
+                    Background="{DynamicResource ThemeSurfaceBgBrush}">
+              <StackPanel Spacing="8">
+                <TextBlock Text="{Binding LocalizedStrings[Extract_SourceArchives]}"
+                           FontWeight="SemiBold" />
+                <ListBox x:Name="FileListBox"
+                         Height="100"
+                         BorderBrush="{DynamicResource ThemeBorderBrush}">
+                  <ListBox.ItemTemplate>
+                    <DataTemplate>
+                      <TextBlock Text="{Binding}"
+                                 TextTrimming="CharacterEllipsis"
+                                 ToolTip.Tip="{Binding}" />
+                    </DataTemplate>
+                  </ListBox.ItemTemplate>
+                </ListBox>
+              </StackPanel>
+            </Border>
 
-        <!-- Destination path -->
-        <Border BorderBrush="{DynamicResource ThemeBorderBrush}"
-                BorderThickness="1" CornerRadius="4" Padding="12"
-                Background="{DynamicResource ThemeSurfaceBgBrush}">
-          <StackPanel Spacing="8">
-            <TextBlock Text="{Binding LocalizedStrings[Extract_Destination]}"
-                       FontWeight="SemiBold" />
-            <Grid ColumnDefinitions="*,Auto">
-              <TextBox Grid.Column="0"
-                       PlaceholderText="{Binding LocalizedStrings[Extract_DestinationPlaceholder]}"
-                       Text="{Binding DestinationPath}" />
-              <Button Grid.Column="1"
-                      Content="{Binding LocalizedStrings[Extract_Browse]}"
-                      Width="80"
-                      Height="28"
-                      Margin="8,0,0,0"
-                      Command="{Binding BrowseDestinationCommand}"
-                      Background="{DynamicResource ThemeButtonBgBrush}"
-                      Foreground="{DynamicResource ThemeTextPrimaryBrush}"
-                      BorderBrush="{DynamicResource ThemeBorderBrush}">
-              </Button>
-            </Grid>
-          </StackPanel>
-        </Border>
+            <!-- Destination path -->
+            <Border BorderBrush="{DynamicResource ThemeBorderBrush}"
+                    BorderThickness="1" CornerRadius="4" Padding="12"
+                    Background="{DynamicResource ThemeSurfaceBgBrush}">
+              <StackPanel Spacing="8">
+                <TextBlock Text="{Binding LocalizedStrings[Extract_Destination]}"
+                           FontWeight="SemiBold" />
+                <Grid ColumnDefinitions="*,Auto">
+                  <TextBox Grid.Column="0"
+                           PlaceholderText="{Binding LocalizedStrings[Extract_DestinationPlaceholder]}"
+                           Text="{Binding DestinationPath}" />
+                  <Button Grid.Column="1"
+                          Content="{Binding LocalizedStrings[Extract_Browse]}"
+                          Width="80"
+                          Height="28"
+                          Margin="8,0,0,0"
+                          Command="{Binding BrowseDestinationCommand}"
+                          Background="{DynamicResource ThemeButtonBgBrush}"
+                          Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                          BorderBrush="{DynamicResource ThemeBorderBrush}">
+                  </Button>
+                </Grid>
+              </StackPanel>
+            </Border>
 
-        <!-- Conflict action -->
-        <Border BorderBrush="{DynamicResource ThemeBorderBrush}"
-                BorderThickness="1" CornerRadius="4" Padding="12"
-                Background="{DynamicResource ThemeSurfaceBgBrush}">
-          <StackPanel Spacing="8">
-            <TextBlock Text="{Binding LocalizedStrings[Extract_WhenFileExists]}"
-                       FontWeight="SemiBold" />
-            <ComboBox SelectedItem="{Binding ConflictAction}"
-                      HorizontalAlignment="Stretch">
-              <ComboBoxItem Content="{Binding LocalizedStrings[Extract_Conflict_Ask]}" />
-              <ComboBoxItem Content="{Binding LocalizedStrings[Extract_Conflict_Overwrite]}" />
-              <ComboBoxItem Content="{Binding LocalizedStrings[Extract_Conflict_Rename]}" />
-              <ComboBoxItem Content="{Binding LocalizedStrings[Extract_Conflict_Skip]}" />
-            </ComboBox>
-            <CheckBox IsChecked="{Binding OpenFolderAfterExtract}">
-              <TextBlock Text="{Binding LocalizedStrings[Extract_OpenFolder]}"
-                         TextWrapping="Wrap" />
-            </CheckBox>
+            <!-- Conflict action -->
+            <Border BorderBrush="{DynamicResource ThemeBorderBrush}"
+                    BorderThickness="1" CornerRadius="4" Padding="12"
+                    Background="{DynamicResource ThemeSurfaceBgBrush}">
+              <StackPanel Spacing="8">
+                <TextBlock Text="{Binding LocalizedStrings[Extract_WhenFileExists]}"
+                           FontWeight="SemiBold" />
+                <ComboBox SelectedItem="{Binding ConflictAction}"
+                          HorizontalAlignment="Stretch">
+                  <ComboBoxItem Content="{Binding LocalizedStrings[Extract_Conflict_Ask]}" />
+                  <ComboBoxItem Content="{Binding LocalizedStrings[Extract_Conflict_Overwrite]}" />
+                  <ComboBoxItem Content="{Binding LocalizedStrings[Extract_Conflict_Rename]}" />
+                  <ComboBoxItem Content="{Binding LocalizedStrings[Extract_Conflict_Skip]}" />
+                </ComboBox>
+                <CheckBox IsChecked="{Binding OpenFolderAfterExtract}">
+                  <TextBlock Text="{Binding LocalizedStrings[Extract_OpenFolder]}"
+                             TextWrapping="Wrap" />
+                </CheckBox>
+              </StackPanel>
+            </Border>
           </StackPanel>
-        </Border>
-      </StackPanel>
-    </ScrollViewer>
+        </ScrollViewer>
+      </TabItem>
+    </TabControl>
 
-    <!-- Bottom buttons -->
+    <!-- ═══════ GridSplitter ═══════ -->
+    <GridSplitter Grid.Column="1" Grid.Row="0"
+                  Width="5"
+                  Background="{DynamicResource ThemeSplitterBgBrush}"
+                  ResizeDirection="Auto" />
+
+    <!-- ═══════ Right: Preview panel ═══════ -->
+    <controls:ResultTreeView Grid.Column="2" Grid.Row="0"
+                              x:Name="PreviewTree"
+                              Root="{Binding PreviewRoot}"
+                              CompactMode="{Binding PreviewCompactMode}"
+                              MaxItemsPerDirectory="5"
+                              MaxDepth="5"
+                              ShowFilteredGhosts="{Binding ShowFilteredGhosts}"
+                              Width="280"
+                              MinWidth="200" />
+
+    <!-- ═══════ Bottom buttons (span all columns) ═══════ -->
     <StackPanel Grid.Row="1"
+                Grid.ColumnSpan="3"
                 Orientation="Horizontal"
                 HorizontalAlignment="Right"
                 Spacing="8"

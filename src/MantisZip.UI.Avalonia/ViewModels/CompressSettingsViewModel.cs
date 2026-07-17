@@ -4,6 +4,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using MantisZip.Core;
 using MantisZip.Core.Abstractions;
+using MantisZip.UI.Avalonia.Models;
 using MantisZip.UI.Avalonia.Services;
 
 namespace MantisZip.UI.Avalonia.ViewModels;
@@ -130,6 +131,20 @@ public partial class CompressSettingsViewModel : ObservableObject
     [ObservableProperty]
     private bool _commentPerLine;
 
+    // ── Preview tree ──
+
+    /// <summary>预览树的根节点。</summary>
+    [ObservableProperty]
+    private PreviewTreeNode? _previewRoot;
+
+    /// <summary>预览面板是否启用精简模式。</summary>
+    [ObservableProperty]
+    private bool _previewCompactMode = true;
+
+    /// <summary>是否显示过滤项。</summary>
+    [ObservableProperty]
+    private bool _showFilteredGhosts;
+
     /// <summary>密码与确认密码是否匹配。</summary>
     public bool PasswordsMatch => Password == ConfirmPassword;
 
@@ -169,6 +184,7 @@ public partial class CompressSettingsViewModel : ObservableObject
         {
             OnPropertyChanged(nameof(SelectedPathsSummary));
             UpdateAutoRules();
+            BuildCompressPreview();
         };
 
         // Populate localized strings
@@ -220,6 +236,25 @@ public partial class CompressSettingsViewModel : ObservableObject
 
         // Load password library
         LoadPasswordLibrary();
+
+        // Build initial compress preview from source paths
+        BuildCompressPreview();
+    }
+
+    /// <summary>
+    /// 构建压缩预览树。由构造函数自动调用，也可在源文件变更后重新调用。
+    /// </summary>
+    public void BuildCompressPreview()
+    {
+        if (SelectedPaths.Count == 0)
+        {
+            PreviewRoot = null;
+            return;
+        }
+
+        PreviewRoot = ResultPreviewService.BuildCompressPreview(
+            SelectedPaths.ToList(),
+            rootName: LocalizationManager.T("Compress_Title"));
     }
 
     partial void OnPasswordChanged(string? value)

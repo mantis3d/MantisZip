@@ -1,5 +1,8 @@
+using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using MantisZip.Core.Abstractions;
+using MantisZip.UI.Avalonia.Models;
 using MantisZip.UI.Avalonia.Services;
 
 namespace MantisZip.UI.Avalonia.ViewModels;
@@ -33,6 +36,20 @@ public partial class ExtractSettingsViewModel : ObservableObject
 
     [ObservableProperty]
     private bool _openFolderAfterExtract;
+
+    // ── Preview tree ──
+
+    /// <summary>预览树的根节点。</summary>
+    [ObservableProperty]
+    private PreviewTreeNode? _previewRoot;
+
+    /// <summary>预览面板是否启用精简模式。</summary>
+    [ObservableProperty]
+    private bool _previewCompactMode = true;
+
+    /// <summary>是否显示过滤项。</summary>
+    [ObservableProperty]
+    private bool _showFilteredGhosts;
 
     public ExtractSettingsViewModel(IReadOnlyList<string> archivePaths)
     {
@@ -71,6 +88,28 @@ public partial class ExtractSettingsViewModel : ObservableObject
             dict[key] = LocalizationManager.T(key);
         }
         LocalizedStrings = dict;
+    }
+
+    /// <summary>
+    /// 构建解压预览树。由窗口在加载完成后调用。
+    /// </summary>
+    /// <param name="entries">压缩包内的条目列表。</param>
+    /// <param name="checkExists">是否逐文件检查目标位置是否存在。</param>
+    public void BuildExtractPreview(IEnumerable<ArchiveItem> entries, bool checkExists = false)
+    {
+        if (string.IsNullOrWhiteSpace(DestinationPath)) return;
+
+        PreviewRoot = ResultPreviewService.BuildExtractPreview(
+            entries,
+            DestinationPath,
+            rootName: Path.GetFileName(DestinationPath),
+            checkExists: checkExists);
+    }
+
+    partial void OnDestinationPathChanged(string value)
+    {
+        // When destination path changes, update the preview tree if we have entries
+        // The caller should call BuildExtractPreview again
     }
 
     [RelayCommand]
