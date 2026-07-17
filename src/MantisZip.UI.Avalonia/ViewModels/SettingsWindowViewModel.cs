@@ -180,6 +180,9 @@ public partial class SettingsWindowViewModel : ObservableObject
     [ObservableProperty]
     private string _appFontFamily = "";
 
+    [ObservableProperty]
+    private string _compactnessMode = "Normal";
+
     // ── Password ──
     [ObservableProperty]
     private bool _showPasswordMatchNotification;
@@ -221,6 +224,9 @@ public partial class SettingsWindowViewModel : ObservableObject
 
     public System.Collections.ObjectModel.ObservableCollection<Option> ThemeOptions { get; } = new();
     [ObservableProperty] private Option? _selectedThemeOption;
+
+    public System.Collections.ObjectModel.ObservableCollection<Option> CompactnessModeOptions { get; } = new();
+    [ObservableProperty] private Option? _selectedCompactnessModeOption;
 
     public System.Collections.ObjectModel.ObservableCollection<Option> SelectedLanguageOptions { get; } = new();
     [ObservableProperty] private Option? _selectedSelectedLanguageOption;
@@ -424,6 +430,10 @@ public partial class SettingsWindowViewModel : ObservableObject
     public string AppearanceThemeDarkText => LocalizationManager.T("Settings_Appearance_Theme_Dark");
     public string AppearanceMaxRecentFilesText => LocalizationManager.T("Settings_Appearance_MaxRecentFiles");
     public string AppearanceAppFontFamilyText => LocalizationManager.T("Settings_Appearance_AppFontFamily");
+    public string AppearanceCompactnessText => LocalizationManager.T("Settings_Appearance_Compactness");
+    public string AppearanceCompactnessCompactText => LocalizationManager.T("Settings_Appearance_Compactness_Compact");
+    public string AppearanceCompactnessNormalText => LocalizationManager.T("Settings_Appearance_Compactness_Normal");
+    public string AppearanceCompactnessLooseText => LocalizationManager.T("Settings_Appearance_Compactness_Loose");
 
     // ── Password strings ──
     public string PwdShowNotificationText => LocalizationManager.T("Settings_Pwd_ShowNotification");
@@ -514,6 +524,7 @@ public partial class SettingsWindowViewModel : ObservableObject
         _theme = _settings.Theme;
         _maxRecentFiles = _settings.MaxRecentFiles;
         _appFontFamily = _settings.AppFontFamily;
+        _compactnessMode = _settings.CompactnessMode;
 
         // Password
         _showPasswordMatchNotification = _settings.ShowPasswordMatchNotification;
@@ -553,6 +564,11 @@ public partial class SettingsWindowViewModel : ObservableObject
         ThemeOptions.Clear();
         ThemeOptions.Add(new Option(AppearanceThemeLightText, "Light"));
         ThemeOptions.Add(new Option(AppearanceThemeDarkText, "Dark"));
+
+        CompactnessModeOptions.Clear();
+        CompactnessModeOptions.Add(new Option(AppearanceCompactnessCompactText, "Compact"));
+        CompactnessModeOptions.Add(new Option(AppearanceCompactnessNormalText, "Normal"));
+        CompactnessModeOptions.Add(new Option(AppearanceCompactnessLooseText, "Loose"));
 
         SelectedLanguageOptions.Clear();
         SelectedLanguageOptions.Add(new Option("中文", "zh"));
@@ -664,6 +680,7 @@ public partial class SettingsWindowViewModel : ObservableObject
         SelectedPreviewPositionOption = PreviewPositionOptions.FirstOrDefault(o => o.Value == PreviewPosition.ToString());
         SelectedInfoPanelOrientationOption = InfoPanelOrientationOptions.FirstOrDefault(o => o.Value == InfoPanelOrientation);
         SelectedThemeOption = ThemeOptions.FirstOrDefault(o => o.Value == Theme);
+        SelectedCompactnessModeOption = CompactnessModeOptions.FirstOrDefault(o => o.Value == CompactnessMode);
         SelectedSelectedLanguageOption = SelectedLanguageOptions.FirstOrDefault(o => o.Value == SelectedLanguage);
         SelectedLogPrivacyModeOption = LogPrivacyModeOptions.FirstOrDefault(o => o.Value == LogPrivacyMode);
         SelectedExtractDestinationOption = ExtractDestinationOptions.FirstOrDefault(o => o.Value == ExtractDestination);
@@ -796,6 +813,10 @@ public partial class SettingsWindowViewModel : ObservableObject
         OnPropertyChanged(nameof(AppearanceThemeLightText));
         OnPropertyChanged(nameof(AppearanceThemeDarkText));
         OnPropertyChanged(nameof(AppearanceMaxRecentFilesText));
+        OnPropertyChanged(nameof(AppearanceCompactnessText));
+        OnPropertyChanged(nameof(AppearanceCompactnessCompactText));
+        OnPropertyChanged(nameof(AppearanceCompactnessNormalText));
+        OnPropertyChanged(nameof(AppearanceCompactnessLooseText));
         OnPropertyChanged(nameof(PwdShowNotificationText));
         OnPropertyChanged(nameof(PwdRevealDefaultText));
         OnPropertyChanged(nameof(FileAssocDescText));
@@ -884,6 +905,7 @@ public partial class SettingsWindowViewModel : ObservableObject
         _settings.Theme = SelectedThemeOption?.Value ?? Theme;
         _settings.MaxRecentFiles = MaxRecentFiles;
         _settings.AppFontFamily = SelectedAppFontFamilyOption?.Value ?? AppFontFamily;
+        _settings.CompactnessMode = SelectedCompactnessModeOption?.Value ?? CompactnessMode;
 
         // Password
         _settings.ShowPasswordMatchNotification = ShowPasswordMatchNotification;

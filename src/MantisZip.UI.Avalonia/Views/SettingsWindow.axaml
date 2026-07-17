@@ -29,10 +29,10 @@
           </Grid>
         </TabItem.Header>
         <ScrollViewer Background="{DynamicResource ThemeWindowBgBrush}">
-          <StackPanel Spacing="12" Margin="12">
+          <StackPanel Spacing="{DynamicResource SpacingSm}" Margin="{DynamicResource SpacingSmThk}">
             <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
-                    CornerRadius="4" Padding="12" Background="{DynamicResource ThemeSurfaceBgBrush}">
-              <StackPanel Spacing="8">
+                    CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}" Background="{DynamicResource ThemeSurfaceBgBrush}">
+              <StackPanel Spacing="{DynamicResource SpacingXs}">
                 <TextBlock Text="{Binding DefaultFormatText}" FontWeight="SemiBold" />
                 <ComboBox ItemsSource="{Binding DefaultFormatOptions}"
                           SelectedItem="{Binding SelectedDefaultFormatOption}"
@@ -47,8 +47,8 @@
             </Border>
 
             <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
-                    CornerRadius="4" Padding="12" Background="{DynamicResource ThemeSurfaceBgBrush}">
-              <StackPanel Spacing="8">
+                    CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}" Background="{DynamicResource ThemeSurfaceBgBrush}">
+              <StackPanel Spacing="{DynamicResource SpacingXs}">
                 <TextBlock Text="{Binding CompressionLevelText}" FontWeight="SemiBold" />
                 <Grid ColumnDefinitions="*,Auto">
                   <Slider Grid.Column="0" Minimum="1" Maximum="9"
@@ -64,8 +64,8 @@
             </Border>
 
             <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
-                    CornerRadius="4" Padding="12" Background="{DynamicResource ThemeSurfaceBgBrush}">
-              <StackPanel Spacing="8">
+                    CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}" Background="{DynamicResource ThemeSurfaceBgBrush}">
+              <StackPanel Spacing="{DynamicResource SpacingXs}">
                 <TextBlock Text="选项" FontWeight="SemiBold" />
                 <CheckBox Content="{Binding CloseAfterCompressText}"
                           IsChecked="{Binding CloseAfterCompress}" />
@@ -78,8 +78,8 @@
 
             <!-- ZIP 默认选项 -->
             <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
-                    CornerRadius="4" Padding="12" Background="{DynamicResource ThemeSurfaceBgBrush}">
-              <StackPanel Spacing="8">
+                    CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}" Background="{DynamicResource ThemeSurfaceBgBrush}">
+              <StackPanel Spacing="{DynamicResource SpacingXs}">
                 <TextBlock Text="ZIP 默认选项" FontWeight="SemiBold" />
 
                 <Grid ColumnDefinitions="120,*">
@@ -125,8 +125,8 @@
 
             <!-- 7z 默认选项 -->
             <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
-                    CornerRadius="4" Padding="12" Background="{DynamicResource ThemeSurfaceBgBrush}">
-              <StackPanel Spacing="8">
+                    CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}" Background="{DynamicResource ThemeSurfaceBgBrush}">
+              <StackPanel Spacing="{DynamicResource SpacingXs}">
                 <TextBlock Text="7z 默认选项" FontWeight="SemiBold" />
 
                 <Grid ColumnDefinitions="120,*">
@@ -212,10 +212,10 @@
           </Grid>
         </TabItem.Header>
         <ScrollViewer Background="{DynamicResource ThemeWindowBgBrush}">
-          <StackPanel Spacing="12" Margin="12">
+          <StackPanel Spacing="{DynamicResource SpacingSm}" Margin="{DynamicResource SpacingSmThk}">
             <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
-                    CornerRadius="4" Padding="12" Background="{DynamicResource ThemeSurfaceBgBrush}">
-              <StackPanel Spacing="8">
+                    CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}" Background="{DynamicResource ThemeSurfaceBgBrush}">
+              <StackPanel Spacing="{DynamicResource SpacingXs}">
                 <TextBlock Text="{Binding ExtractDefaultDestText}" FontWeight="SemiBold" />
                 <ComboBox ItemsSource="{Binding ExtractDestinationOptions}"
                           SelectedItem="{Binding SelectedExtractDestinationOption}"
@@ -230,8 +230,8 @@
             </Border>
 
             <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
-                    CornerRadius="4" Padding="12" Background="{DynamicResource ThemeSurfaceBgBrush}">
-              <StackPanel Spacing="8">
+                    CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}" Background="{DynamicResource ThemeSurfaceBgBrush}">
+              <StackPanel Spacing="{DynamicResource SpacingXs}">
                 <TextBlock Text="{Binding ExtractConflictActionText}" FontWeight="SemiBold" />
                 <ComboBox ItemsSource="{Binding FileConflictActionOptions}"
                           SelectedItem="{Binding SelectedFileConflictActionOption}"
@@ -246,8 +246,8 @@
             </Border>
 
             <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
-                    CornerRadius="4" Padding="12" Background="{DynamicResource ThemeSurfaceBgBrush}">
-              <StackPanel Spacing="8">
+                    CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}" Background="{DynamicResource ThemeSurfaceBgBrush}">
+              <StackPanel Spacing="{DynamicResource SpacingXs}">
                 <TextBlock Text="选项" FontWeight="SemiBold" />
                 <CheckBox Content="{Binding ExtractOpenFolderAfterText}"
                           IsChecked="{Binding OpenFolderAfterExtract}" />
@@ -271,10 +271,10 @@
           </Grid>
         </TabItem.Header>
         <ScrollViewer Background="{DynamicResource ThemeWindowBgBrush}">
-          <StackPanel Spacing="12" Margin="12">
+          <StackPanel Spacing="{DynamicResource SpacingSm}" Margin="{DynamicResource SpacingSmThk}">
             <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
-                    CornerRadius="4" Padding="12" Background="{DynamicResource ThemeSurfaceBgBrush}">
-              <StackPanel Spacing="8">
+                    CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}" Background="{DynamicResource ThemeSurfaceBgBrush}">
+              <StackPanel Spacing="{DynamicResource SpacingXs}">
                 <TextBlock Text="{Binding AppearanceThemeText}" FontWeight="SemiBold" />
                 <ComboBox ItemsSource="{Binding ThemeOptions}"
                           SelectedItem="{Binding SelectedThemeOption}"
@@ -289,8 +289,24 @@
             </Border>
 
             <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
-                    CornerRadius="4" Padding="12" Background="{DynamicResource ThemeSurfaceBgBrush}">
-              <StackPanel Spacing="8">
+                    CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}" Background="{DynamicResource ThemeSurfaceBgBrush}">
+              <StackPanel Spacing="{DynamicResource SpacingXs}">
+                <TextBlock Text="{Binding AppearanceCompactnessText}" FontWeight="SemiBold" />
+                <ComboBox ItemsSource="{Binding CompactnessModeOptions}"
+                          SelectedItem="{Binding SelectedCompactnessModeOption}"
+                          Width="200" HorizontalAlignment="Left">
+                  <ComboBox.ItemTemplate>
+                    <DataTemplate>
+                      <TextBlock Text="{Binding Display}" />
+                    </DataTemplate>
+                  </ComboBox.ItemTemplate>
+                </ComboBox>
+              </StackPanel>
+            </Border>
+
+            <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
+                    CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}" Background="{DynamicResource ThemeSurfaceBgBrush}">
+              <StackPanel Spacing="{DynamicResource SpacingXs}">
                 <TextBlock Text="{Binding AppearanceMaxRecentFilesText}" FontWeight="SemiBold" />
                 <TextBox Text="{Binding MaxRecentFiles}"
                          Width="120" HorizontalAlignment="Left"
@@ -301,8 +317,8 @@
             </Border>
 
             <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
-                    CornerRadius="4" Padding="12" Background="{DynamicResource ThemeSurfaceBgBrush}">
-              <StackPanel Spacing="8">
+                    CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}" Background="{DynamicResource ThemeSurfaceBgBrush}">
+              <StackPanel Spacing="{DynamicResource SpacingXs}">
                 <TextBlock Text="{Binding AppearanceAppFontFamilyText}" FontWeight="SemiBold" />
                 <ComboBox ItemsSource="{Binding AppFontFamilyOptions}"
                           SelectedItem="{Binding SelectedAppFontFamilyOption}"
@@ -335,13 +351,13 @@
             <!-- 通用 General -->
             <TabItem Header="通用" Classes="compactTab">
               <ScrollViewer Background="{DynamicResource ThemeWindowBgBrush}">
-                <StackPanel Spacing="12" Margin="12">
+                <StackPanel Spacing="{DynamicResource SpacingSm}" Margin="{DynamicResource SpacingSmThk}">
                   <CheckBox Content="{Binding PreviewShowPanelText}"
                             IsChecked="{Binding ShowPreviewPanel}" />
 
                   <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
-                          CornerRadius="4" Padding="12" Background="{DynamicResource ThemeSurfaceBgBrush}">
-                    <StackPanel Spacing="8">
+                          CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}" Background="{DynamicResource ThemeSurfaceBgBrush}">
+                    <StackPanel Spacing="{DynamicResource SpacingXs}">
                       <TextBlock Text="{Binding PreviewPositionText}" FontWeight="SemiBold" />
                       <ComboBox ItemsSource="{Binding PreviewPositionOptions}"
                                 SelectedItem="{Binding SelectedPreviewPositionOption}"
@@ -356,8 +372,8 @@
                   </Border>
 
                   <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
-                          CornerRadius="4" Padding="12" Background="{DynamicResource ThemeSurfaceBgBrush}">
-                    <StackPanel Spacing="8">
+                          CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}" Background="{DynamicResource ThemeSurfaceBgBrush}">
+                    <StackPanel Spacing="{DynamicResource SpacingXs}">
                       <TextBlock Text="{Binding PreviewInfoOrientationText}" FontWeight="SemiBold" />
                       <ComboBox ItemsSource="{Binding InfoPanelOrientationOptions}"
                                 SelectedItem="{Binding SelectedInfoPanelOrientationOption}"
@@ -372,8 +388,8 @@
                   </Border>
 
                   <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
-                          CornerRadius="4" Padding="12" Background="{DynamicResource ThemeSurfaceBgBrush}">
-                    <StackPanel Spacing="8">
+                          CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}" Background="{DynamicResource ThemeSurfaceBgBrush}">
+                    <StackPanel Spacing="{DynamicResource SpacingXs}">
                       <TextBlock Text="格式检测（魔数）" FontWeight="SemiBold" />
                       <CheckBox Content="{Binding EnableFormatDetectionText}"
                                 IsChecked="{Binding EnableFormatDetection}" />
@@ -391,8 +407,8 @@
                   </Border>
 
                   <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
-                          CornerRadius="4" Padding="12" Background="{DynamicResource ThemeSurfaceBgBrush}">
-                    <StackPanel Spacing="8">
+                          CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}" Background="{DynamicResource ThemeSurfaceBgBrush}">
+                    <StackPanel Spacing="{DynamicResource SpacingXs}">
                       <TextBlock Text="{Binding PreviewMaxFileSizeText}" FontWeight="SemiBold" />
                       <Grid ColumnDefinitions="*,Auto">
                         <Slider Grid.Column="0" Minimum="1" Maximum="200"
@@ -413,7 +429,7 @@
             <!-- 图片 Image -->
             <TabItem Header="图片" Classes="compactTab">
               <ScrollViewer Background="{DynamicResource ThemeWindowBgBrush}">
-                <StackPanel Spacing="12" Margin="12">
+                <StackPanel Spacing="{DynamicResource SpacingSm}" Margin="{DynamicResource SpacingSmThk}">
                   <CheckBox Content="{Binding EnableImagePreviewText}"
                             IsChecked="{Binding EnableImagePreview}" />
                 </StackPanel>
@@ -423,10 +439,10 @@
             <!-- 文本 Text -->
             <TabItem Header="{Binding PreviewTabTextHeader}" Classes="compactTab">
               <ScrollViewer Background="{DynamicResource ThemeWindowBgBrush}">
-                <StackPanel Spacing="12" Margin="12">
+                <StackPanel Spacing="{DynamicResource SpacingSm}" Margin="{DynamicResource SpacingSmThk}">
                   <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
-                          CornerRadius="4" Padding="12" Background="{DynamicResource ThemeSurfaceBgBrush}">
-                    <StackPanel Spacing="8">
+                          CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}" Background="{DynamicResource ThemeSurfaceBgBrush}">
+                    <StackPanel Spacing="{DynamicResource SpacingXs}">
                       <TextBlock Text="{Binding TextPreviewFontSizeText}" FontWeight="SemiBold" />
                       <Grid ColumnDefinitions="*,Auto">
                         <Slider Grid.Column="0" Minimum="8" Maximum="48"
@@ -442,8 +458,8 @@
                   </Border>
 
                   <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
-                          CornerRadius="4" Padding="12" Background="{DynamicResource ThemeSurfaceBgBrush}">
-                    <StackPanel Spacing="8">
+                          CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}" Background="{DynamicResource ThemeSurfaceBgBrush}">
+                    <StackPanel Spacing="{DynamicResource SpacingXs}">
                       <TextBlock Text="{Binding PreviewTextFontFamilyText}" FontWeight="SemiBold" />
                       <ComboBox Width="240" HorizontalAlignment="Left"
                                 ItemsSource="{Binding TextFontFamilyOptions}"
@@ -462,8 +478,8 @@
                   </Border>
 
                   <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
-                          CornerRadius="4" Padding="12" Background="{DynamicResource ThemeSurfaceBgBrush}">
-                    <StackPanel Spacing="8">
+                          CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}" Background="{DynamicResource ThemeSurfaceBgBrush}">
+                    <StackPanel Spacing="{DynamicResource SpacingXs}">
                       <TextBlock Text="{Binding PreviewTextMaxSizeText}" FontWeight="SemiBold" />
                       <Grid ColumnDefinitions="*,Auto">
                         <Slider Grid.Column="0" Minimum="1" Maximum="100"
@@ -489,10 +505,10 @@
             <!-- 字体 Font -->
             <TabItem Header="{Binding PreviewTabFontHeader}" Classes="compactTab">
               <ScrollViewer Background="{DynamicResource ThemeWindowBgBrush}">
-                <StackPanel Spacing="12" Margin="12">
+                <StackPanel Spacing="{DynamicResource SpacingSm}" Margin="{DynamicResource SpacingSmThk}">
                   <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
-                          CornerRadius="4" Padding="12" Background="{DynamicResource ThemeSurfaceBgBrush}">
-                    <StackPanel Spacing="8">
+                          CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}" Background="{DynamicResource ThemeSurfaceBgBrush}">
+                    <StackPanel Spacing="{DynamicResource SpacingXs}">
                       <TextBlock Text="{Binding PreviewFontSampleText}" FontWeight="SemiBold" />
                       <TextBox Text="{Binding FontPreviewSampleText}"
                                AcceptsReturn="True"
@@ -505,8 +521,8 @@
                   </Border>
 
                   <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
-                          CornerRadius="4" Padding="12" Background="{DynamicResource ThemeSurfaceBgBrush}">
-                    <StackPanel Spacing="8">
+                          CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}" Background="{DynamicResource ThemeSurfaceBgBrush}">
+                    <StackPanel Spacing="{DynamicResource SpacingXs}">
                       <TextBlock Text="{Binding PreviewFontPreviewSizeText}" FontWeight="SemiBold" />
                       <Grid ColumnDefinitions="*,Auto">
                         <Slider Grid.Column="0" Minimum="8" Maximum="72"
@@ -527,7 +543,7 @@
             <!-- 种子 Torrent -->
             <TabItem Header="种子" Classes="compactTab">
               <ScrollViewer Background="{DynamicResource ThemeWindowBgBrush}">
-                <StackPanel Spacing="12" Margin="12">
+                <StackPanel Spacing="{DynamicResource SpacingSm}" Margin="{DynamicResource SpacingSmThk}">
                   <TextBlock Text="Torrent 预览设置将在后续版本中添加。"
                              Foreground="{DynamicResource ThemeTextSecondaryBrush}"
                              FontSize="12" TextWrapping="Wrap" />
@@ -538,7 +554,7 @@
             <!-- 可执行文件 PE -->
             <TabItem Header="可执行文件" Classes="compactTab">
               <ScrollViewer Background="{DynamicResource ThemeWindowBgBrush}">
-                <StackPanel Spacing="12" Margin="12">
+                <StackPanel Spacing="{DynamicResource SpacingSm}" Margin="{DynamicResource SpacingSmThk}">
                   <TextBlock Text="PE 文件预览设置将在后续版本中添加。"
                              Foreground="{DynamicResource ThemeTextSecondaryBrush}"
                              FontSize="12" TextWrapping="Wrap" />
@@ -549,10 +565,10 @@
             <!-- 数据表格 Datatable -->
             <TabItem Header="{Binding PreviewTabTableHeader}" Classes="compactTab">
               <ScrollViewer Background="{DynamicResource ThemeWindowBgBrush}">
-                <StackPanel Spacing="12" Margin="12">
+                <StackPanel Spacing="{DynamicResource SpacingSm}" Margin="{DynamicResource SpacingSmThk}">
                   <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
-                          CornerRadius="4" Padding="12" Background="{DynamicResource ThemeSurfaceBgBrush}">
-                    <StackPanel Spacing="8">
+                          CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}" Background="{DynamicResource ThemeSurfaceBgBrush}">
+                    <StackPanel Spacing="{DynamicResource SpacingXs}">
                       <TextBlock Text="{Binding PreviewTableMaxRowsText}" FontWeight="SemiBold" />
                       <TextBox Text="{Binding MaxTablePreviewRows}"
                                Width="120" HorizontalAlignment="Left"
@@ -563,8 +579,8 @@
                   </Border>
 
                   <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
-                          CornerRadius="4" Padding="12" Background="{DynamicResource ThemeSurfaceBgBrush}">
-                    <StackPanel Spacing="8">
+                          CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}" Background="{DynamicResource ThemeSurfaceBgBrush}">
+                    <StackPanel Spacing="{DynamicResource SpacingXs}">
                       <TextBlock Text="{Binding PreviewTableMaxColsText}" FontWeight="SemiBold" />
                       <TextBox Text="{Binding MaxTablePreviewCols}"
                                Width="120" HorizontalAlignment="Left"
@@ -590,10 +606,10 @@
           </Grid>
         </TabItem.Header>
         <ScrollViewer Background="{DynamicResource ThemeWindowBgBrush}">
-          <StackPanel Spacing="12" Margin="12">
+          <StackPanel Spacing="{DynamicResource SpacingSm}" Margin="{DynamicResource SpacingSmThk}">
             <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
-                    CornerRadius="4" Padding="12" Background="{DynamicResource ThemeSurfaceBgBrush}">
-              <StackPanel Spacing="8">
+                    CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}" Background="{DynamicResource ThemeSurfaceBgBrush}">
+              <StackPanel Spacing="{DynamicResource SpacingXs}">
                 <TextBlock Text="密码选项" FontWeight="SemiBold" />
                 <CheckBox Content="{Binding PwdShowNotificationText}"
                           IsChecked="{Binding ShowPasswordMatchNotification}" />
@@ -615,10 +631,10 @@
           </Grid>
         </TabItem.Header>
         <ScrollViewer Background="{DynamicResource ThemeWindowBgBrush}">
-          <StackPanel Spacing="12" Margin="12">
+          <StackPanel Spacing="{DynamicResource SpacingSm}" Margin="{DynamicResource SpacingSmThk}">
             <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
-                    CornerRadius="4" Padding="12" Background="{DynamicResource ThemeSurfaceBgBrush}">
-              <StackPanel Spacing="8">
+                    CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}" Background="{DynamicResource ThemeSurfaceBgBrush}">
+              <StackPanel Spacing="{DynamicResource SpacingXs}">
                 <TextBlock Text="{Binding LanguageText}" FontWeight="SemiBold" />
                 <ComboBox ItemsSource="{Binding SelectedLanguageOptions}"
                           SelectedItem="{Binding SelectedSelectedLanguageOption}"
@@ -649,11 +665,11 @@
           </Grid>
         </TabItem.Header>
         <ScrollViewer Background="{DynamicResource ThemeWindowBgBrush}">
-          <StackPanel Spacing="12" Margin="12">
+          <StackPanel Spacing="{DynamicResource SpacingSm}" Margin="{DynamicResource SpacingSmThk}">
             <!-- 菜单项目组 -->
             <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
-                    CornerRadius="4" Padding="12" Background="{DynamicResource ThemeSurfaceBgBrush}">
-              <StackPanel Spacing="8">
+                    CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}" Background="{DynamicResource ThemeSurfaceBgBrush}">
+              <StackPanel Spacing="{DynamicResource SpacingXs}">
                 <TextBlock Text="{Binding ContextMenuGroupHeader}"
                            FontWeight="SemiBold" FontSize="13" Margin="0,0,0,4" />
 
@@ -696,8 +712,8 @@
 
             <!-- 显示组 -->
             <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
-                    CornerRadius="4" Padding="12" Background="{DynamicResource ThemeSurfaceBgBrush}">
-              <StackPanel Spacing="8">
+                    CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}" Background="{DynamicResource ThemeSurfaceBgBrush}">
+              <StackPanel Spacing="{DynamicResource SpacingXs}">
                 <TextBlock Text="{Binding ContextMenuGroupDisplay}"
                            FontWeight="SemiBold" FontSize="13" Margin="0,0,0,4" />
                 <CheckBox Content="{Binding ContextMenuEnableDynamicMenu}"
@@ -710,7 +726,7 @@
             <!-- 安装/卸载 -->
             <StackPanel Orientation="Horizontal"
                         HorizontalAlignment="Right"
-                        Spacing="8">
+                        Spacing="{DynamicResource SpacingXs}">
               <Button Content="{Binding ContextMenuInstall}"
                       Command="{Binding InstallShellCommand}"
                       Padding="12,4"
@@ -738,10 +754,10 @@
           </Grid>
         </TabItem.Header>
         <ScrollViewer Background="{DynamicResource ThemeWindowBgBrush}">
-          <StackPanel Spacing="12" Margin="12">
+          <StackPanel Spacing="{DynamicResource SpacingSm}" Margin="{DynamicResource SpacingSmThk}">
             <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
-                    CornerRadius="4" Padding="12" Background="{DynamicResource ThemeSurfaceBgBrush}">
-              <StackPanel Spacing="8">
+                    CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}" Background="{DynamicResource ThemeSurfaceBgBrush}">
+              <StackPanel Spacing="{DynamicResource SpacingXs}">
                 <TextBlock Text="文件类型关联" FontWeight="SemiBold" />
                 <TextBlock Text="{Binding FileAssocDescText}"
                            FontSize="12"
@@ -762,7 +778,7 @@
                 </Grid>
 
                 <StackPanel Orientation="Horizontal"
-                            Spacing="8"
+                            Spacing="{DynamicResource SpacingXs}"
                             Margin="0,8,0,0">
                   <Button Content="{Binding FileAssocSelectAllText}"
                           Command="{Binding SelectAllAssocCommand}"
@@ -794,10 +810,10 @@
           </Grid>
         </TabItem.Header>
         <ScrollViewer Background="{DynamicResource ThemeWindowBgBrush}">
-          <StackPanel Spacing="12" Margin="12">
+          <StackPanel Spacing="{DynamicResource SpacingSm}" Margin="{DynamicResource SpacingSmThk}">
             <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
-                    CornerRadius="4" Padding="12" Background="{DynamicResource ThemeSurfaceBgBrush}">
-              <StackPanel Spacing="8">
+                    CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}" Background="{DynamicResource ThemeSurfaceBgBrush}">
+              <StackPanel Spacing="{DynamicResource SpacingXs}">
                 <TextBlock Text="调试选项" FontWeight="SemiBold" />
                 <CheckBox Content="{Binding DebugText}"
                           IsChecked="{Binding EnableDebugLogging}" />
@@ -805,8 +821,8 @@
             </Border>
 
             <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
-                    CornerRadius="4" Padding="12" Background="{DynamicResource ThemeSurfaceBgBrush}">
-              <StackPanel Spacing="8">
+                    CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}" Background="{DynamicResource ThemeSurfaceBgBrush}">
+              <StackPanel Spacing="{DynamicResource SpacingXs}">
                 <TextBlock Text="{Binding LogPrivacyModeText}" FontWeight="SemiBold" />
                 <Grid ColumnDefinitions="*,Auto">
                   <ComboBox Grid.Column="0"
@@ -833,8 +849,8 @@
             </Border>
 
             <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
-                    CornerRadius="4" Padding="12" Background="{DynamicResource ThemeSurfaceBgBrush}">
-              <StackPanel Spacing="8">
+                    CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}" Background="{DynamicResource ThemeSurfaceBgBrush}">
+              <StackPanel Spacing="{DynamicResource SpacingXs}">
                 <TextBlock Text="{Binding LogPathText}" FontWeight="SemiBold" />
                 <TextBlock Text="{Binding LogFilePath}"
                            FontSize="12"
@@ -855,10 +871,10 @@
           </Grid>
         </TabItem.Header>
         <ScrollViewer Background="{DynamicResource ThemeWindowBgBrush}">
-          <StackPanel Spacing="12" Margin="12">
+          <StackPanel Spacing="{DynamicResource SpacingSm}" Margin="{DynamicResource SpacingSmThk}">
             <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
-                    CornerRadius="4" Padding="12" Background="{DynamicResource ThemeSurfaceBgBrush}">
-              <StackPanel Spacing="8">
+                    CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}" Background="{DynamicResource ThemeSurfaceBgBrush}">
+              <StackPanel Spacing="{DynamicResource SpacingXs}">
                 <TextBlock Text="{Binding AdvancedSevenZipPathText}" FontWeight="SemiBold" />
                 <Grid ColumnDefinitions="*,Auto">
                   <TextBox Grid.Column="0"
@@ -880,8 +896,8 @@
             </Border>
 
             <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
-                    CornerRadius="4" Padding="12" Background="{DynamicResource ThemeSurfaceBgBrush}">
-              <StackPanel Spacing="8">
+                    CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}" Background="{DynamicResource ThemeSurfaceBgBrush}">
+              <StackPanel Spacing="{DynamicResource SpacingXs}">
                 <TextBlock Text="{Binding AdvancedTempGroupText}"
                            FontWeight="SemiBold" />
                 <Button Content="{Binding AdvancedCleanPreviewTempText}"
@@ -912,7 +928,7 @@
     <StackPanel Grid.Row="1"
                 Orientation="Horizontal"
                 HorizontalAlignment="Right"
-                Spacing="8"
+                Spacing="{DynamicResource SpacingXs}"
                 Margin="0,12,0,0">
       <Button Content="{Binding SaveText}"
               Padding="16,6"
