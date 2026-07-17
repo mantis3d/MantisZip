@@ -796,19 +796,19 @@
                       Command="{Binding ExpandAllCommand}"
                       IsEnabled="{Binding IsArchiveLoaded}"
                       ToolTip.Tip="{Binding LocalizedStrings[Tree_ExpandAll]}">
-                <PathIcon Data="{StaticResource IconArrowUp}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+                <PathIcon Data="{StaticResource IconArrowExpand}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
               </Button>
               <Button Classes="ToolbarButton ToolbarIcon"
                       Command="{Binding CollapseAllCommand}"
                       IsEnabled="{Binding IsArchiveLoaded}"
                       ToolTip.Tip="{Binding LocalizedStrings[Tree_CollapseAll]}">
-                <PathIcon Data="{StaticResource IconChevronLeft}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+                <PathIcon Data="{StaticResource IconArrowCollapse}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
               </Button>
               <Button Classes="ToolbarButton ToolbarIcon"
                       Command="{Binding ExpandToCurrentCommand}"
                       IsEnabled="{Binding IsArchiveLoaded}"
                       ToolTip.Tip="{Binding LocalizedStrings[Tree_ExpandToCurrent]}">
-                <PathIcon Data="{StaticResource IconPin}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+                <PathIcon Data="{StaticResource IconLocation}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
               </Button>
             </StackPanel>
           </Border>
