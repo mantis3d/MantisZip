@@ -36,8 +36,8 @@
          TextControl* resource overrides (which work via the different resolution path).  -->
     <Style Selector="TextBox">
       <Setter Property="Foreground" Value="{DynamicResource ThemeTextPrimaryBrush}" />
-      <Setter Property="CornerRadius" Value="6" />
-      <Setter Property="Padding" Value="8,8" />
+      <Setter Property="CornerRadius" Value="{DynamicResource BorderRadius}" />
+      <Setter Property="Padding" Value="{DynamicResource SpacingXsThk}" />
       <Setter Property="Transitions">
         <Setter.Value>
           <Transitions>
@@ -59,9 +59,9 @@
       <Setter Property="Background" Value="{DynamicResource ThemeButtonBgBrush}" />
       <Setter Property="Foreground" Value="{DynamicResource ThemeTextPrimaryBrush}" />
       <Setter Property="BorderBrush" Value="{DynamicResource ThemeBorderBrush}" />
-      <Setter Property="CornerRadius" Value="6" />
+      <Setter Property="CornerRadius" Value="{DynamicResource BorderRadius}" />
       <Setter Property="Padding" Value="8,4" />
-      <Setter Property="MinHeight" Value="26" />
+      <Setter Property="MinHeight" Value="{DynamicResource ControlHeightSm}" />
       <Setter Property="Transitions">
         <Setter.Value>
           <Transitions>
@@ -85,9 +85,9 @@
       <Setter Property="Background" Value="{DynamicResource ThemeButtonBgBrush}" />
       <Setter Property="Foreground" Value="{DynamicResource ThemeTextPrimaryBrush}" />
       <Setter Property="BorderBrush" Value="{DynamicResource ThemeBorderBrush}" />
-      <Setter Property="CornerRadius" Value="6" />
+      <Setter Property="CornerRadius" Value="{DynamicResource BorderRadius}" />
       <Setter Property="Padding" Value="8,4" />
-      <Setter Property="MinHeight" Value="26" />
+      <Setter Property="MinHeight" Value="{DynamicResource ControlHeightSm}" />
       <Setter Property="Transitions">
         <Setter.Value>
           <Transitions>
@@ -115,7 +115,7 @@
     <!-- ════════════════════════════════════════════ -->
 
     <Style Selector="Button.ToolbarButton, ToggleButton.ToolbarButton">
-      <Setter Property="Height" Value="54" />
+      <Setter Property="Height" Value="{DynamicResource ControlHeightLg}" />
       <Setter Property="Padding" Value="8,2" />
       <Setter Property="Background" Value="{DynamicResource ThemeHeaderBgBrush}" />
     </Style>
@@ -140,7 +140,7 @@
       <Setter Property="Background" Value="{DynamicResource ThemeComboBoxBgBrush}" />
       <Setter Property="Foreground" Value="{DynamicResource ThemeTextPrimaryBrush}" />
       <Setter Property="BorderBrush" Value="{DynamicResource ThemeComboBoxBorderBrush}" />
-      <Setter Property="CornerRadius" Value="6" />
+      <Setter Property="CornerRadius" Value="{DynamicResource BorderRadius}" />
       <Setter Property="Padding" Value="8,6" />
       <Setter Property="Transitions">
         <Setter.Value>
@@ -259,7 +259,7 @@
     <Style Selector="ProgressBar">
       <Setter Property="Foreground" Value="{DynamicResource ThemeAccentBrush}" />
       <Setter Property="Background" Value="{DynamicResource ThemeBorderBrush}" />
-      <Setter Property="CornerRadius" Value="4" />
+      <Setter Property="CornerRadius" Value="{DynamicResource BorderRadius}" />
     </Style>
 
     <!-- ScrollViewer -->
@@ -267,7 +267,7 @@
       <Setter Property="Background" Value="{DynamicResource ThemeWindowBgBrush}" />
     </Style>
     <Style Selector="ScrollBar Thumb">
-      <Setter Property="CornerRadius" Value="4" />
+      <Setter Property="CornerRadius" Value="{DynamicResource BorderRadius}" />
     </Style>
 
     <!-- Menu / MenuItem -->

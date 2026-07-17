@@ -57,8 +57,17 @@ public partial class App : Application
         // ── Apply global font from settings ──
         ApplyAppFontFamily();
 
-        // ── Initialize magic detection settings ──
+        // ── Apply compactness mode ──
         var appSettings = AppSettings.Load();
+        var compactMode = appSettings.CompactnessMode switch
+        {
+            "Compact" => CompactnessMode.Compact,
+            "Loose" => CompactnessMode.Loose,
+            _ => CompactnessMode.Normal,
+        };
+        ApplyCompactness(compactMode);
+
+        // ── Initialize magic detection settings ──
         PreviewService.EnableFormatDetection = appSettings.EnableFormatDetection;
         PreviewService.PreviewHeadSize = appSettings.PreviewHeadSize;
 
@@ -244,6 +253,104 @@ public partial class App : Application
     {
         if (Current is App app)
             app.ApplyAppFontFamily();
+    }
+
+    /// <summary>
+    /// 应用紧凑度模式，覆盖 12 个间距/控件高度资源的运行时值。
+    /// 使用 DynamicResource 的自动更新机制即时生效（无需重启）。
+    /// </summary>
+    private void ApplyCompactness(CompactnessMode mode)
+    {
+        DebugLog($"[Compactness] Applying mode: {mode}");
+
+        // 三档间距数值
+        static double GetSpacing(string key, CompactnessMode m) => (key, m) switch
+        {
+            ("SpacingXxs", CompactnessMode.Compact) => 2,
+            ("SpacingXxs", CompactnessMode.Normal) => 4,
+            ("SpacingXxs", CompactnessMode.Loose) => 6,
+
+            ("SpacingXs", CompactnessMode.Compact) => 4,
+            ("SpacingXs", CompactnessMode.Normal) => 8,
+            ("SpacingXs", CompactnessMode.Loose) => 12,
+
+            ("SpacingSm", CompactnessMode.Compact) => 8,
+            ("SpacingSm", CompactnessMode.Normal) => 12,
+            ("SpacingSm", CompactnessMode.Loose) => 16,
+
+            ("SpacingMd", CompactnessMode.Compact) => 12,
+            ("SpacingMd", CompactnessMode.Normal) => 16,
+            ("SpacingMd", CompactnessMode.Loose) => 24,
+
+            ("SpacingLg", CompactnessMode.Compact) => 16,
+            ("SpacingLg", CompactnessMode.Normal) => 24,
+            ("SpacingLg", CompactnessMode.Loose) => 32,
+
+            ("SpacingXl", CompactnessMode.Compact) => 24,
+            ("SpacingXl", CompactnessMode.Normal) => 32,
+            ("SpacingXl", CompactnessMode.Loose) => 48,
+
+            ("ControlHeightSm", CompactnessMode.Compact) => 22,
+            ("ControlHeightSm", CompactnessMode.Normal) => 26,
+            ("ControlHeightSm", CompactnessMode.Loose) => 30,
+
+            ("ControlHeightMd", CompactnessMode.Compact) => 28,
+            ("ControlHeightMd", CompactnessMode.Normal) => 32,
+            ("ControlHeightMd", CompactnessMode.Loose) => 38,
+
+            ("ControlHeightLg", CompactnessMode.Compact) => 42,
+            ("ControlHeightLg", CompactnessMode.Normal) => 48,
+            ("ControlHeightLg", CompactnessMode.Loose) => 54,
+
+            ("ControlMinHeight", CompactnessMode.Compact) => 32,
+            ("ControlMinHeight", CompactnessMode.Normal) => 40,
+            ("ControlMinHeight", CompactnessMode.Loose) => 48,
+
+            ("BorderRadius", CompactnessMode.Compact) => 4,
+            ("BorderRadius", CompactnessMode.Normal) => 6,
+            ("BorderRadius", CompactnessMode.Loose) => 8,
+
+            ("DialogPadding", CompactnessMode.Compact) => 12,
+            ("DialogPadding", CompactnessMode.Normal) => 16,
+            ("DialogPadding", CompactnessMode.Loose) => 24,
+
+            _ => 0,
+        };
+
+        var keys = new[]
+        {
+            "SpacingXxs", "SpacingXs", "SpacingSm", "SpacingMd", "SpacingLg", "SpacingXl",
+            "ControlHeightSm", "ControlHeightMd", "ControlHeightLg", "ControlMinHeight",
+        };
+
+        foreach (var key in keys)
+            Resources[key] = GetSpacing(key, mode);
+
+        // Typed resources — double primitive cannot be used directly on
+        // CornerRadius / Thickness properties via DynamicResource.
+        Resources["BorderRadius"] = new CornerRadius(GetSpacing("BorderRadius", mode));
+        Resources["DialogPadding"] = new Thickness(GetSpacing("DialogPadding", mode));
+        // Thickness variants of spacing keys (for Margin / Padding)
+        foreach (var k in new[] { "SpacingXxs", "SpacingXs", "SpacingSm", "SpacingMd", "SpacingLg", "SpacingXl" })
+            Resources[k + "Thk"] = new Thickness(GetSpacing(k, mode));
+    }
+
+    /// <summary>
+    /// 供 SettingsWindow 保存设置后立即刷新紧凑度（无需重启）。
+    /// </summary>
+    internal static void RefreshCompactness()
+    {
+        if (Current is App app)
+        {
+            var settings = AppSettings.Load();
+            var mode = settings.CompactnessMode switch
+            {
+                "Compact" => CompactnessMode.Compact,
+                "Loose" => CompactnessMode.Loose,
+                _ => CompactnessMode.Normal,
+            };
+            app.ApplyCompactness(mode);
+        }
     }
 
     internal static void DebugLog(string msg)

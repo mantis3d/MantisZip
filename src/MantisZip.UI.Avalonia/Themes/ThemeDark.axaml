@@ -1,5 +1,6 @@
 <ResourceDictionary xmlns="https://github.com/avaloniaui"
-                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                     xmlns:sys="clr-namespace:System;assembly=netstandard">
   <!-- Window -->
   <Color x:Key="ThemeWindowBg">#FF1E1E1E</Color>
   <Color x:Key="ThemeTextPrimary">#FFE0E0E0</Color>
@@ -25,6 +26,27 @@
   <!-- ComboBox -->
   <Color x:Key="ThemeComboBoxBg">#FF252525</Color>
   <Color x:Key="ThemeComboBoxBorder">#FF3E3E3E</Color>
+
+  <!-- ════════════════════════════════════════════ -->
+  <!-- 紧凑度模式间距资源 (Normal) — 亮暗共用同值 -->
+  <!-- ════════════════════════════════════════════ -->
+  <sys:Double x:Key="SpacingXxs">4</sys:Double>
+  <sys:Double x:Key="SpacingXs">8</sys:Double>
+  <sys:Double x:Key="SpacingSm">12</sys:Double>
+  <sys:Double x:Key="SpacingMd">16</sys:Double>
+  <sys:Double x:Key="SpacingLg">24</sys:Double>
+  <sys:Double x:Key="SpacingXl">32</sys:Double>
+  <sys:Double x:Key="SpacingXxl">48</sys:Double>
+  <sys:Double x:Key="ControlHeightXs">22</sys:Double>
+  <sys:Double x:Key="ControlHeightSm">26</sys:Double>
+  <sys:Double x:Key="ControlHeight">28</sys:Double>
+  <sys:Double x:Key="ControlHeightMd">32</sys:Double>
+  <sys:Double x:Key="ControlHeightLg">42</sys:Double>
+  <sys:Double x:Key="ControlHeightXl">48</sys:Double>
+  <sys:Double x:Key="ControlHeightXxl">54</sys:Double>
+  <sys:Double x:Key="ControlMinHeight">40</sys:Double>
+  <sys:Double x:Key="BorderRadius">6</sys:Double>
+  <sys:Double x:Key="DialogPadding">16</sys:Double>
 
   <!-- SolidColorBrush resources -->
   <SolidColorBrush x:Key="ThemeWindowBgBrush" Color="{StaticResource ThemeWindowBg}" />
