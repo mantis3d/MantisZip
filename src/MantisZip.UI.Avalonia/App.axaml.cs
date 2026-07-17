@@ -343,9 +343,11 @@ public partial class App : Application
         // TextControlPadding: use smaller horizontal padding (SpacingXxs) and
         // larger vertical padding (SpacingXs) so switching to Loose mode increases
         // vertical breathing room without shrinking the editable width too much.
+        // Reduce TextControlPadding to half to keep TextBox padding visually aligned
+        // with other controls while preserving increased vertical breathing room.
         Resources["TextControlPadding"] = new Thickness(
-            GetSpacing("SpacingXxs", mode), // left/right
-            GetSpacing("SpacingXs", mode)   // top/bottom
+            GetSpacing("SpacingXxs", mode) * 0.5, // left/right (half)
+            GetSpacing("SpacingXs", mode) * 0.5   // top/bottom (half)
         );
     }
 
