@@ -548,7 +548,7 @@ public partial class MainWindowViewModel : ObservableObject
         Preview.StopGifTimer();
         Preview.ShowLoading(entry.NameDisplay ?? entry.Name);
         Preview.SetFileInfo(
-            entry.NameDisplay,
+            entry.NameDisplay ?? entry.Name,
             entry.SizeDisplay,
             entry.CompressedSizeDisplay,
             entry.Size > 0 ? $"{entry.CompressionRatio:F1}%" : "N/A",

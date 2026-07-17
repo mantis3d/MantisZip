@@ -1,6 +1,8 @@
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 
+#pragma warning disable CA1416 // This class is Windows-only (P/Invoke + COM)
+
 namespace MantisZip.Core.Utils;
 
 public record ExplorerWindowInfo(string Path, string DisplayName, IntPtr HWND, bool IsActive);
@@ -84,8 +86,8 @@ public static class ExplorerWindowTracker
 
         try
         {
-            var count = (int)shellWindowsType.InvokeMember("Count",
-                System.Reflection.BindingFlags.GetProperty, null, shellWindows, null);
+            var count = shellWindowsType.InvokeMember("Count",
+                System.Reflection.BindingFlags.GetProperty, null, shellWindows, null) is int c ? c : 0;
 
             for (int i = 0; i < count; i++)
             {

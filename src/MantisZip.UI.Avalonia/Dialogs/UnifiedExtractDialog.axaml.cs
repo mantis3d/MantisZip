@@ -49,8 +49,9 @@ public partial class UnifiedExtractDialog : Window
     /// <summary>
     /// 创建统一解压对话框，指定拥有者窗口。
     /// </summary>
-    public UnifiedExtractDialog(Window owner) : this()
+    public UnifiedExtractDialog(Window owner)
     {
+        InitializeComponent();
     }
 
     // ── Event handlers ──────────────────────────────────────────────────────

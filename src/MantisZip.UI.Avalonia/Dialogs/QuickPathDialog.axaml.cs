@@ -79,8 +79,9 @@ public partial class QuickPathDialog : Window
         DataContext = this;
     }
 
-    public QuickPathDialog(bool isFolderMode) : this()
+    public QuickPathDialog(bool isFolderMode)
     {
+        InitializeComponent();
         IsFolderMode = isFolderMode;
     }
 
