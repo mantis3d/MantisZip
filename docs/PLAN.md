@@ -3,7 +3,7 @@
 > 未来待开发功能规划。已实现功能请见 [docs/PROGRESS.md](docs/PROGRESS.md)，技术架构请见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)。
 
 **项目状态**: 🟢 开发中  
-**最后更新**: 2026-07-16  
+**最后更新**: 2026-07-17  
 **当前版本**: 0.4.5
 
 ---
@@ -24,6 +24,7 @@
 | **P1** | 新增压缩格式（BZip2/XZ/CAB 等） | [new-format-support.md](.sisyphus/plans/new-format-support.md) | 🟡中 | 12-20h | 6 阶段渐进：TAR 裸格式/GZip 单文件 → BZip2 → XZ → CAB 只读 → UI 统一化 → Zstandard（需依赖） |
 | **P1** | 自包含体积优化（Avalonia 迁移后） | [selfcontained-size-optimization.md](.sisyphus/plans/selfcontained-size-optimization.md) | 🟡中 | 4-6h | 三步渐进：InvariantGlobalization → 保守修剪 → 激进修剪，目标降至 20–25 MB |
 | **P1** | Avalonia 拖拽直接解压 | [drag-drop-direct-extract.md](.sisyphus/plans/drag-drop-direct-extract.md) | 🟡中 | 5-7h | 纯 Win32 独立线程覆盖层（三色状态机 + 呼吸动画）+ WindowFromPoint+ShellWindows 检测目标路径；UIA 降级支持；需等 Avalonia 移植基本就绪后实施 |
+| **P1** | HTML 预览升级：跨平台 WebView + 降级 | [html-preview-webview-fallback.md](.sisyphus/plans/html-preview-webview-fallback.md) | 🟡中 | 4-6h | 用 `Avalonia.Controls.WebView`（各平台原生引擎）替代当前 ReverseMarkdown 有损管线；WebView 不可用时自动降级到 ReverseMarkdown + 修 MarkdownPreviewBuilder table 支持；加工具栏和源码切换 |
 | **P2** | 压缩预估 (Compression Estimator) | [compression-estimator.md](.sisyphus/plans/compression-estimator.md) | 🟡中 | 4-5h | 压缩前估算大小/耗时 |
 | **P2** | Winget 发布 | [winget-publishing.md](.sisyphus/plans/winget-publishing.md) | 🟢低 | 1-2h | 发布到 Windows Package Manager 社区仓库；首次手动提交后 CI 自动化 |
 | **P2** | MSI 安装包 (WiX) | [msi-packaging-wix.md](.sisyphus/plans/msi-packaging-wix.md) | 🟡中 | 2-3h | Inno Setup → WiX MSI 迁移 |
@@ -34,6 +35,7 @@
 | **P2** | 进度窗口增强改造 | [progress-window-enhancement.md](.sisyphus/plans/progress-window-enhancement.md) | 🟡中 | 3-4h | 路径/文件名分离三行显示、文件级计数、实时统计栏、批处理每包摘要；计算逻辑抽到 Core 层 |
 | **P2** | 压缩文件名后缀模板 | [filename-suffix-template.md](.sisyphus/plans/filename-suffix-template.md) | 🟢低 | 2-3h | `{date}`/`{datetime}`/`{seq}` 占位符替换，防同名覆盖 |
 | **P2** | 嵌入缩略图预览 | [embedded-thumbnail-preview.md](.sisyphus/plans/embedded-thumbnail-preview.md) | 🟢低 | 2-3天 | MetadataExtractor(RAW) + Shell API(通用) 两层提取嵌入缩略图；完成后可扩展文件列表缩略图模式 |
+| **P2** | emoji 替换为 Fluent UI PathIcon + 文件列表行图标改用系统原生 | [emoji-to-pathicon.md](.sisyphus/plans/emoji-to-pathicon.md) | 🟢低 | 3-4h | Phase1: 菜单/工具栏/列头的 emoji → PathIcon（Fluent UI 矢量）；Phase2: 文件列表行图标从 SkiaSharp 自绘 → SHGetFileInfo 系统原生图标，非 Windows 回退自绘 |
 | **P2** | 字体预览连字效果开关 | [font-preview-ligature.md](.sisyphus/plans/font-preview-ligature.md) | 🟡中 | 3-4h | HarfBuzzSharp shaping + `liga` feature toggle，工具栏按钮 |
 | **P2** | 提取日志与解压「后悔药」 | [extract-journal-undo.md](.sisyphus/plans/extract-journal-undo.md) | 🟡中 | 3-4h | 解压记录 + 一键回滚 |
 | **P3** | 压缩包对比 (Archive Diff) | [archive-diff.md](.sisyphus/plans/archive-diff.md) | 🟡中 | 3-4h | 压缩包文件级差异对比 |
@@ -48,6 +50,8 @@
 | **P1** | Avalonia Phase 10: WPF 功能补齐 | [avalonia-phase10-feature-parity.md](.sisyphus/plans/avalonia-phase10-feature-parity.md) | 🟡中 | ✅ 已完成 | 文件列表进度条、预览信息面板、状态栏增强 |
 | **P1** | Avalonia: Shell/COM 集成移植 | [avalonia-shell-com-integration.md](.sisyphus/plans/avalonia-shell-com-integration.md) | 🟡中 | 3-5天 | ShellIntegration 移植、ShellExt 项目引用、COM host 部署、文件关联CLI、MenuIcons 资源 |
 | **P1** | Avalonia: UI 功能补齐 | [avalonia-ui-feature-parity.md](.sisyphus/plans/avalonia-ui-feature-parity.md) | 🟡中 | 27/29 🟡 | Elevation×3、Favorites×2、QuickPath×2 等 11 个对话框、2 个控件、1 个转换器（2 项阻塞于 GUI 测试） |
+| **P1** | 上下文工具栏重构（目录树+文件列表） | [context-toolbars.md](.sisyphus/plans/context-toolbars.md) | 🟡中 | 6-8h | 目录树工具栏（展开/收起/展开到当前+树过滤），文件列表工具栏（导航组+地址栏+复制名/列选择器/视图过滤/全选反选/刷新+筛选/展平），导航历史栈，精简全局工具栏 |
+| **P1** | 解压/压缩结果预览面板 | [result-preview-panel.md](.sisyphus/plans/result-preview-panel.md) | 🟡中 | 8-10h | ExtractSettings/CompressSettings 窗口右侧新增预览面板，ResultTreeView 可复用控件（精简模式/冲突高亮/过滤灰显/摘要栏），拖拽导出等场景复用 |
 | **P1** | Avalonia: 预览两阶段加载（信息栏+内容分离） | [preview-two-phase-loading.md](.sisyphus/plans/preview-two-phase-loading.md) | 🟢低 | 1-2h | 立即显示加载状态+信息栏(Phase 1) → 异步提取后显示内容(Phase 2) + 版本号守卫防竞态；WPF 已有此模式，Avalonia 补齐 |
 | **P2** | Avalonia: i18n 补齐 + 杂物清理 | [avalonia-i18n-and-cleanup.md](.sisyphus/plans/avalonia-i18n-and-cleanup.md) | 🟢低 | ✅ 已完成 | ~290 个缺失 i18n key、版本号同步、Diagnostics 版本对齐、空目录清理 |
 | **P4** | 外部工具视频元数据 | — | 🟢低 | 2-3h | ffprobe 集成 |
