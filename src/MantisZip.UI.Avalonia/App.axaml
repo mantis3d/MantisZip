@@ -125,6 +125,14 @@
       <Setter Property="Background" Value="{DynamicResource ThemeHeaderBgBrush}" />
     </Style>
 
+    <!-- Compact square toolbar buttons for tree/file-list toolbars -->
+    <Style Selector="Button.ToolbarIcon, ToggleButton.ToolbarIcon">
+      <Setter Property="Width" Value="{DynamicResource ControlHeightSm}" />
+      <Setter Property="Height" Value="{DynamicResource ControlHeightSm}" />
+      <Setter Property="Padding" Value="6" />
+      <Setter Property="Background" Value="{DynamicResource ThemeHeaderBgBrush}" />
+    </Style>
+
     <Style Selector="Button.ToolbarButton > StackPanel, ToggleButton.ToolbarButton > StackPanel">
       <Setter Property="Spacing" Value="2" />
     </Style>

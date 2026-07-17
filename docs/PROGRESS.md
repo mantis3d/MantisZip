@@ -39,6 +39,7 @@
   - 3 列布局重构（树工具栏 ↔ 文件列表工具栏 ↔ 预览面板）
   - ResultTreeView 可复用控件 + 解压/压缩结果预览面板（冲突高亮/过滤器灰显）
   - 提取/压缩设置窗口改为 2 列布局带实时文件树预览
+  - UI 调整（2026-07-17）：将目录树和文件列表工具栏的按钮设为紧凑正方形（ToolbarIcon），并把目录树工具栏的三颗按钮从 emoji 文本替换为纯 PathIcon（IconArrowUp / IconChevronLeft / IconPin），保留 ToolTip 以维持可访问性。
 
 **2026-07-16** — 移除 WebView2 依赖：Markdown/HTML/PDF 预览改用纯 .NET 跨平台实现
   - Markdown: Markdig AST → `MarkdownPreviewBuilder` → Avalonia 原生控件树（替代 Markdig→HTML→WebView2）
