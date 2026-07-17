@@ -28,6 +28,7 @@
   - Phase 2：新建 Win32IconProvider.cs，通过 SHGetFileInfo+System.Drawing 获取 Windows 系统原生图标
   - IconService 改为 Win32 优先策略：系统图标 > SkiaSharp 自绘图标（非 Windows 回退）
   - 新增 System.Drawing.Common 依赖项（仅 Windows 生效，非 Windows 自动走回退路径）
+  - 🐛 修复：ApplySystemTheme 的 MergedDictionaries.Clear() 会清掉 AppIcons.axaml，Clear() 后重载
 
 **2026-07-17** — 紧凑度模式 + 上下文工具栏 + 结果预览面板
   - 紧凑度模式：Compact/Normal/Loose 三档，资源框架 + ApplyCompactness 运行时切换
