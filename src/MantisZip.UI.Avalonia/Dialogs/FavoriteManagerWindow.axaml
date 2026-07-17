@@ -9,10 +9,10 @@
         MinHeight="300"
         WindowStartupLocation="CenterOwner"
         Background="{DynamicResource ThemeWindowBgBrush}"
-        Padding="16">
+        Padding="{DynamicResource SpacingMdThk}">
 
   <Grid RowDefinitions="Auto,*,Auto"
-        Margin="8">
+        Margin="{DynamicResource SpacingXsThk}">
 
     <!-- Row 0: Header -->
     <TextBlock Grid.Row="0"

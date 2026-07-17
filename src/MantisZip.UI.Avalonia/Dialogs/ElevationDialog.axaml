@@ -8,10 +8,10 @@
         SizeToContent="Height"
         CanResize="False"
         Background="{DynamicResource ThemeWindowBgBrush}"
-        Padding="16">
+        Padding="{DynamicResource SpacingMdThk}">
 
   <Grid RowDefinitions="Auto,Auto,Auto"
-        Margin="8">
+        Margin="{DynamicResource SpacingXsThk}">
 
     <!-- Row 0: Message -->
     <TextBlock Grid.Row="0"
@@ -49,17 +49,17 @@
 
       <StackPanel Orientation="Horizontal"
                   HorizontalAlignment="Right"
-                  Spacing="8">
+                  Spacing="{DynamicResource SpacingXs}">
         <Button Content="{Binding ElevateText}"
                 Width="140"
-                Height="32"
+                Height="{DynamicResource ControlHeightMd}"
                 Click="Elevate_Click"
                 IsDefault="True"
                 Background="{DynamicResource ThemeAccentBrush}"
                 Foreground="White" />
         <Button Content="{Binding CancelText}"
                 Width="80"
-                Height="32"
+                Height="{DynamicResource ControlHeightMd}"
                 Click="Cancel_Click"
                 IsCancel="True"
                 Background="{DynamicResource ThemeButtonBgBrush}"

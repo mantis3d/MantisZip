@@ -9,9 +9,9 @@
         CanResize="False"
         ShowInTaskbar="False"
         Background="{DynamicResource ThemeWindowBgBrush}"
-        Padding="16">
+        Padding="{DynamicResource SpacingMdThk}">
   <Grid RowDefinitions="Auto,*,Auto,Auto,Auto"
-        Margin="16">
+        Margin="{DynamicResource SpacingMdThk}">
 
     <!-- Row 0: Prompt text -->
     <TextBlock Grid.Row="0"
@@ -26,7 +26,7 @@
              TextWrapping="Wrap"
              ScrollViewer.VerticalScrollBarVisibility="Auto"
              MinHeight="120"
-             Padding="8"
+             Padding="{DynamicResource SpacingXsThk}"
              Background="{DynamicResource ThemeSurfaceBgBrush}"
              Foreground="{DynamicResource ThemeTextPrimaryBrush}"
              BorderBrush="{DynamicResource ThemeBorderBrush}"
@@ -54,12 +54,12 @@
                 x:Name="ButtonPanel"
                 Orientation="Horizontal"
                 HorizontalAlignment="Right"
-                Spacing="8"
+                Spacing="{DynamicResource SpacingXs}"
                 Margin="0,12,0,0">
       <Button x:Name="CancelBtn"
               Content="{Binding CancelText}"
               Width="80"
-              Height="28"
+              Height="{DynamicResource ControlHeight}"
               IsCancel="True"
               Click="OnCancelClick"
               Background="{DynamicResource ThemeButtonBgBrush}"
@@ -68,7 +68,7 @@
       <Button x:Name="SaveBtn"
               Content="{Binding SaveText}"
               Width="80"
-              Height="28"
+              Height="{DynamicResource ControlHeight}"
               IsDefault="True"
               Click="OnSaveClick"
               Background="{DynamicResource ThemeAccentBrush}"

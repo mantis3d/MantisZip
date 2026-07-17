@@ -8,7 +8,7 @@
         Background="{DynamicResource ThemeWindowBgBrush}">
 
   <Grid RowDefinitions="*,Auto,Auto,Auto,Auto"
-        Margin="16"
+        Margin="{DynamicResource SpacingMdThk}"
         RowSpacing="6">
     <!-- Row 0: Status message -->
     <TextBlock x:Name="StatusText"
@@ -68,6 +68,6 @@
             Content="{Binding LocalizedStrings[Progress_Cancel]}"
             Command="{Binding CancelCommand}"
             HorizontalAlignment="Right"
-            Padding="16" />
+            Padding="{DynamicResource SpacingMdThk}" />
   </Grid>
 </Window>

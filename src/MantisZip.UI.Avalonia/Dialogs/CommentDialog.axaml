@@ -7,9 +7,9 @@
         SizeToContent="Height"
         WindowStartupLocation="CenterOwner"
         Background="{DynamicResource ThemeWindowBgBrush}"
-        Padding="16">
+        Padding="{DynamicResource SpacingMdThk}">
   <Grid RowDefinitions="*,Auto"
-        Margin="16">
+        Margin="{DynamicResource SpacingMdThk}">
     <TextBox Grid.Row="0"
              x:Name="CommentTextBox"
              AcceptsReturn="True"
@@ -22,14 +22,14 @@
     <StackPanel Grid.Row="1"
                 Orientation="Horizontal"
                 HorizontalAlignment="Right"
-                Spacing="8">
+                Spacing="{DynamicResource SpacingXs}">
       <Button Content="{Binding SaveText}"
               Width="80"
-              Height="28"
+              Height="{DynamicResource ControlHeight}"
               Click="OnSaveClick" />
       <Button Content="{Binding CancelText}"
               Width="80"
-              Height="28"
+              Height="{DynamicResource ControlHeight}"
               Click="OnCancelClick" />
     </StackPanel>
   </Grid>

@@ -7,14 +7,14 @@
         Height="500"
         WindowStartupLocation="CenterOwner"
         Background="{DynamicResource ThemeWindowBgBrush}"
-        Padding="16">
+        Padding="{DynamicResource SpacingMdThk}">
   <DockPanel>
     <!-- 关闭按钮 - 底部，不在 ScrollViewer 内，滚动时固定可见 -->
     <Button Content="{Binding CloseText}"
             DockPanel.Dock="Bottom"
             HorizontalAlignment="Right"
             Width="100"
-            Height="28"
+            Height="{DynamicResource ControlHeight}"
             IsDefault="True"
             Click="OnCloseClick"
             Background="{DynamicResource ThemeAccentBrush}"
@@ -23,7 +23,7 @@
 
     <ScrollViewer VerticalScrollBarVisibility="Auto"
                   TextElement.Foreground="{DynamicResource ThemeTextPrimaryBrush}">
-      <StackPanel Margin="20,20,20,0" Spacing="16">
+      <StackPanel Margin="20,20,20,0" Spacing="{DynamicResource SpacingMd}">
 
         <!-- 标题 -->
         <TextBlock Text="{Binding WinTitle}"
@@ -37,7 +37,7 @@
 
         <!-- 四种模式说明 -->
         <Border Background="{DynamicResource ThemeSurfaceBgBrush}"
-                CornerRadius="4"
+                CornerRadius="{DynamicResource BorderRadius}"
                 Padding="14"
                 BorderBrush="{DynamicResource ThemeBorderBrush}"
                 BorderThickness="1">

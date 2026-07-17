@@ -7,10 +7,10 @@
         SizeToContent="Height"
         WindowStartupLocation="CenterOwner"
         Background="{DynamicResource ThemeWindowBgBrush}"
-        Padding="16">
+        Padding="{DynamicResource SpacingMdThk}">
 
   <Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto"
-        Margin="24">
+        Margin="{DynamicResource SpacingLgThk}">
     <!-- Row 0: Header -->
     <TextBlock Grid.Row="0"
                Text="{Binding HeaderText}"
@@ -25,7 +25,7 @@
             Background="{DynamicResource ThemeSurfaceBgBrush}"
             BorderBrush="{DynamicResource ThemeBorderBrush}"
             BorderThickness="1"
-            CornerRadius="8"
+            CornerRadius="{DynamicResource BorderRadius}"
             Padding="20"
             Margin="0,0,0,16"
             HorizontalAlignment="Center">
@@ -51,11 +51,11 @@
 
     <!-- Row 3: Platform link buttons -->
     <StackPanel Grid.Row="3"
-                Spacing="8"
+                Spacing="{DynamicResource SpacingXs}"
                 Margin="0,0,0,20"
                 HorizontalAlignment="Center">
       <Button Content="🔗 爱发电 / Afdian"
-              Height="48"
+              Height="{DynamicResource ControlHeightXl}"
               Width="440"
               Background="{DynamicResource ThemeSurfaceBgBrush}"
               BorderBrush="{DynamicResource ThemeBorderBrush}"
@@ -65,7 +65,7 @@
               HorizontalContentAlignment="Center"
               Click="OpenAfdian_Click" />
       <Button Content="☕ Polar"
-              Height="48"
+              Height="{DynamicResource ControlHeightXl}"
               Width="440"
               Background="{DynamicResource ThemeSurfaceBgBrush}"
               BorderBrush="{DynamicResource ThemeBorderBrush}"
@@ -80,7 +80,7 @@
     <Button Grid.Row="4"
             Content="{Binding CloseText}"
             Width="80"
-            Height="32"
+            Height="{DynamicResource ControlHeightMd}"
             HorizontalAlignment="Right"
             IsDefault="True"
             IsCancel="True"

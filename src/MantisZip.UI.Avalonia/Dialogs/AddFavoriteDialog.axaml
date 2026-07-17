@@ -8,10 +8,10 @@
         WindowStartupLocation="CenterOwner"
         CanResize="False"
         Background="{DynamicResource ThemeWindowBgBrush}"
-        Padding="16">
+        Padding="{DynamicResource SpacingMdThk}">
 
   <Grid RowDefinitions="Auto,Auto,Auto"
-        Margin="8">
+        Margin="{DynamicResource SpacingXsThk}">
 
     <!-- Row 0: Name input -->
     <Grid Grid.Row="0"
@@ -55,7 +55,7 @@
     <StackPanel Grid.Row="2"
                 Orientation="Horizontal"
                 HorizontalAlignment="Right"
-                Spacing="8">
+                Spacing="{DynamicResource SpacingXs}">
       <Button x:Name="OkButton"
               Content="{Binding OkText}"
               Padding="20,6"

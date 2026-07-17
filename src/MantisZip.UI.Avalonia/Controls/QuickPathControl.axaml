@@ -14,7 +14,7 @@
             x:Name="BrowseButton"
             Content="..."
             Width="32"
-            MinHeight="28"
+            MinHeight="{DynamicResource ControlHeight}"
             Click="OnBrowseClick"
             Background="{DynamicResource ThemeButtonBgBrush}"
             Foreground="{DynamicResource ThemeTextPrimaryBrush}"

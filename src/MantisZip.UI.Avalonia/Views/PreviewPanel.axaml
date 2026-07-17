@@ -37,36 +37,36 @@
             Padding="4,2"
             Background="{DynamicResource ThemeHeaderBgBrush}"
             IsVisible="{Binding IsToolbarVisible}">
-      <StackPanel Orientation="Horizontal" Spacing="4">
+      <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
         <!-- Zoom controls (image/gif) -->
         <StackPanel Orientation="Horizontal" Spacing="2"
                     IsVisible="{Binding HasZoomControls}">
           <Button Content="−" Command="{Binding ZoomOutCommand}"
-                  Width="32" Height="28" FontSize="16" Padding="0" />
+                  Width="32" Height="{DynamicResource ControlHeight}" FontSize="16" Padding="0" />
           <Button Content="+" Command="{Binding ZoomInCommand}"
-                  Width="32" Height="28" FontSize="16" Padding="0" />
+                  Width="32" Height="{DynamicResource ControlHeight}" FontSize="16" Padding="0" />
           <Button Content="⟲" Command="{Binding ZoomFitCommand}"
-                  Width="32" Height="28" FontSize="14" Padding="0" />
+                  Width="32" Height="{DynamicResource ControlHeight}" FontSize="14" Padding="0" />
         </StackPanel>
 
         <!-- Font size controls (text) -->
         <StackPanel Orientation="Horizontal" Spacing="2"
                     IsVisible="{Binding HasFontSizeControls}">
           <Button Content="A−" Command="{Binding DecreaseFontSizeCommand}"
-                  Width="36" Height="28" FontSize="13" Padding="0" />
+                  Width="36" Height="{DynamicResource ControlHeight}" FontSize="13" Padding="0" />
           <Button Content="A+" Command="{Binding IncreaseFontSizeCommand}"
-                  Width="36" Height="28" FontSize="13" Padding="0" />
+                  Width="36" Height="{DynamicResource ControlHeight}" FontSize="13" Padding="0" />
         </StackPanel>
 
         <!-- GIF controls -->
         <StackPanel Orientation="Horizontal" Spacing="2"
                     IsVisible="{Binding HasGifControls}">
           <Button Content="⏮" Command="{Binding PreviousGifFrameCommand}"
-                  Width="32" Height="28" FontSize="16" Padding="0" />
+                  Width="32" Height="{DynamicResource ControlHeight}" FontSize="16" Padding="0" />
           <Button Content="⏯" Command="{Binding PlayPauseGifCommand}"
-                  Width="32" Height="28" FontSize="16" Padding="0" />
+                  Width="32" Height="{DynamicResource ControlHeight}" FontSize="16" Padding="0" />
           <Button Content="⏭" Command="{Binding NextGifFrameCommand}"
-                  Width="32" Height="28" FontSize="16" Padding="0" />
+                  Width="32" Height="{DynamicResource ControlHeight}" FontSize="16" Padding="0" />
           <TextBox Text="{Binding CurrentFrame}"
                    Width="36" Height="26"
                    FontSize="14"
@@ -81,10 +81,10 @@
         <StackPanel Orientation="Horizontal" Spacing="2"
                     IsVisible="{Binding HasTransparencyControls}">
           <Button Content="🏁"
-                  Width="32" Height="28" FontSize="14" Padding="0"
+                  Width="32" Height="{DynamicResource ControlHeight}" FontSize="14" Padding="0"
                   Command="{Binding ToggleTransparencyBgCommand}" />
           <Button Content="🎨"
-                  Width="32" Height="28" FontSize="14" Padding="0"
+                  Width="32" Height="{DynamicResource ControlHeight}" FontSize="14" Padding="0"
                   Command="{Binding ToggleFlattenAlphaCommand}"
                   IsVisible="{Binding HasFlattenAlphaControls}" />
         </StackPanel>
@@ -93,7 +93,7 @@
         <StackPanel Orientation="Horizontal" Spacing="2"
                     IsVisible="{Binding IsIcoGalleryVisible}">
           <Button Content="🎨"
-                  Width="32" Height="28" FontSize="14" Padding="0"
+                  Width="32" Height="{DynamicResource ControlHeight}" FontSize="14" Padding="0"
                   Command="{Binding ToggleIcoFlattenAlphaCommand}" />
         </StackPanel>
 
@@ -102,7 +102,7 @@
                     IsVisible="{Binding HasLigatureControls}">
           <Button Content="连字"
                   Command="{Binding ToggleLigatureCommand}"
-                  Width="48" Height="28" FontSize="12" Padding="0"
+                  Width="48" Height="{DynamicResource ControlHeight}" FontSize="12" Padding="0"
                   IsEnabled="{Binding CanLigatureToggle}" />
         </StackPanel>
       </StackPanel>
@@ -143,7 +143,7 @@
 
         <!-- PE preview -->
         <StackPanel IsVisible="{Binding IsPeVisible}"
-                    Spacing="8">
+                    Spacing="{DynamicResource SpacingXs}">
           <TextBlock Text="{Binding PeTitle}"
                      FontSize="20"
                      FontWeight="Bold" />
@@ -200,7 +200,7 @@
                       HorizontalScrollBarVisibility="Disabled"
                       VerticalScrollBarVisibility="Auto">
           <ItemsControl ItemsSource="{Binding IcoFrames}"
-                        Margin="16">
+                        Margin="{DynamicResource SpacingMdThk}">
             <ItemsControl.ItemsPanel>
               <ItemsPanelTemplate>
                 <WrapPanel HorizontalAlignment="Center" />
@@ -210,7 +210,7 @@
               <DataTemplate>
                 <Border BorderBrush="{DynamicResource ThemeBorderBrush}"
                         BorderThickness="1"
-                        CornerRadius="4"
+                        CornerRadius="{DynamicResource BorderRadius}"
                         Margin="8"
                         Padding="10">
                   <StackPanel Orientation="Vertical"
@@ -223,7 +223,7 @@
                              Stretch="None"
                              MaxWidth="256"
                              MaxHeight="256"
-                             Margin="4" />
+                             Margin="{DynamicResource SpacingXxsThk}" />
                     </Grid>
                     <TextBlock Text="{Binding Label}"
                                FontSize="11"
@@ -248,7 +248,7 @@
 
         <!-- Font preview -->
         <ScrollViewer x:Name="FontPreviewScrollViewer" IsVisible="{Binding IsFontVisible}">
-          <StackPanel Spacing="12">
+          <StackPanel Spacing="{DynamicResource SpacingSm}">
             <TextBlock Text="{Binding PreviewHeaderText}"
                        FontSize="20"
                        FontWeight="Bold" />
@@ -279,7 +279,7 @@
 
         <!-- Audio preview (metadata only) -->
         <StackPanel IsVisible="{Binding IsAudioVisible}"
-                    Spacing="8">
+                    Spacing="{DynamicResource SpacingXs}">
           <TextBlock Text="{Binding PreviewHeaderText}"
                      FontSize="20"
                      FontWeight="Bold" />
@@ -320,7 +320,7 @@
 
         <!-- ISO preview (metadata only) -->
         <StackPanel IsVisible="{Binding IsIsoVisible}"
-                    Spacing="8">
+                    Spacing="{DynamicResource SpacingXs}">
           <TextBlock Text="{Binding PreviewHeaderText}"
                      FontSize="20"
                      FontWeight="Bold" />
@@ -339,7 +339,7 @@
 
         <!-- Torrent preview -->
         <StackPanel IsVisible="{Binding IsTorrentVisible}"
-                    Spacing="8">
+                    Spacing="{DynamicResource SpacingXs}">
           <TextBlock Text="{Binding PreviewHeaderText}"
                      FontSize="20"
                      FontWeight="Bold" />
@@ -374,7 +374,7 @@
 
         <!-- Office preview (metadata only) -->
         <StackPanel IsVisible="{Binding IsOfficeVisible}"
-                    Spacing="8">
+                    Spacing="{DynamicResource SpacingXs}">
           <TextBlock Text="{Binding PreviewHeaderText}"
                      FontSize="20"
                      FontWeight="Bold" />
@@ -393,7 +393,7 @@
 
         <!-- Video preview (metadata only) -->
         <StackPanel IsVisible="{Binding IsVideoVisible}"
-                    Spacing="8">
+                    Spacing="{DynamicResource SpacingXs}">
           <TextBlock Text="{Binding PreviewHeaderText}"
                      FontSize="20"
                      FontWeight="Bold" />
@@ -413,7 +413,7 @@
         <!-- Markdown 预览（控件树） -->
         <ScrollViewer IsVisible="{Binding IsMarkdownOrHtmlVisible}"
                       Background="{DynamicResource ThemeSurfaceBgBrush}"
-                      Padding="16">
+                      Padding="{DynamicResource SpacingMdThk}">
           <ContentControl Content="{Binding MarkdownPreviewPanel}" />
         </ScrollViewer>
 
@@ -424,7 +424,7 @@
           <Grid RowDefinitions="Auto,*">
             <!-- 翻页栏 -->
             <StackPanel Grid.Row="0" Orientation="Horizontal"
-                        HorizontalAlignment="Center" Spacing="8"
+                        HorizontalAlignment="Center" Spacing="{DynamicResource SpacingXs}"
                         IsVisible="{Binding HasPdfNavigation}">
               <Button Content="◀" Command="{Binding PdfPreviousPageCommand}"
                       Width="28" Height="26" FontSize="14" Padding="0" />
@@ -455,7 +455,7 @@
                     HorizontalAlignment="Center"
                     Spacing="20">
           <!-- Bouncing dots spinner -->
-          <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Spacing="8">
+          <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Spacing="{DynamicResource SpacingXs}">
             <Border Width="10" Height="10" CornerRadius="5"
                     Background="{DynamicResource ThemeTextSecondaryBrush}">
               <Border.Styles>
@@ -549,7 +549,7 @@
             BorderThickness="1,0,0,0"
             IsVisible="{Binding IsInfoPanelVisible}">
       <ScrollViewer Padding="10">
-        <StackPanel Spacing="8">
+        <StackPanel Spacing="{DynamicResource SpacingXs}">
           <!-- Format metadata (top section) -->
           <TextBlock Text="详细信息" FontWeight="SemiBold"
                      Foreground="{DynamicResource ThemeTextSecondaryBrush}" />

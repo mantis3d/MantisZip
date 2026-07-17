@@ -8,12 +8,12 @@
         WindowStartupLocation="CenterOwner"
         ShowInTaskbar="False"
         Background="{DynamicResource ThemeWindowBgBrush}"
-        Padding="16">
+        Padding="{DynamicResource SpacingMdThk}">
   <DockPanel>
     <!-- ═══════ Close button (outside TabControl, always visible) ═══════ -->
     <Button Content="{Binding AboutClose}"
             DockPanel.Dock="Bottom"
-            Width="80" Height="28"
+            Width="80" Height="{DynamicResource ControlHeight}"
             HorizontalAlignment="Right"
             Margin="0,8,0,0"
             Click="OnCloseClick"
@@ -267,7 +267,7 @@
         </TabItem.Header>
         <ScrollViewer VerticalScrollBarVisibility="Auto"
                       Background="{DynamicResource ThemeWindowBgBrush}">
-          <Grid Margin="16" TextElement.FontSize="13"
+          <Grid Margin="{DynamicResource SpacingMdThk}" TextElement.FontSize="13"
                 TextElement.Foreground="{DynamicResource ThemeTextPrimaryBrush}"
                 ColumnDefinitions="2*,*,*,2*"
                 RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto">

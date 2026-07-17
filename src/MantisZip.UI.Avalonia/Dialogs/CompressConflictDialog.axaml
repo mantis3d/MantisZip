@@ -8,10 +8,10 @@
         SizeToContent="Height"
         CanResize="False"
         Background="{DynamicResource ThemeWindowBgBrush}"
-        Padding="16">
+        Padding="{DynamicResource SpacingMdThk}">
 
   <Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto"
-        Margin="8">
+        Margin="{DynamicResource SpacingXsThk}">
 
     <!-- Row 0: Header -->
     <TextBlock Grid.Row="0"
@@ -23,12 +23,12 @@
     <!-- Row 1: Target file info panel -->
     <Border Grid.Row="1"
             Margin="0,8,0,0"
-            Padding="12"
+            Padding="{DynamicResource SpacingSmThk}"
             Background="{DynamicResource ThemeSurfaceBgBrush}"
             BorderBrush="{DynamicResource ThemeBorderBrush}"
             BorderThickness="1"
-            CornerRadius="4">
-      <StackPanel Spacing="4">
+            CornerRadius="{DynamicResource BorderRadius}">
+      <StackPanel Spacing="{DynamicResource SpacingXxs}">
         <TextBlock Text="{Binding TargetLabel}"
                    FontWeight="SemiBold"
                    FontSize="12"

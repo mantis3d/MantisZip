@@ -9,10 +9,10 @@
         CanResize="False"
         ShowInTaskbar="False"
         Background="{DynamicResource ThemeWindowBgBrush}"
-        Padding="16">
+        Padding="{DynamicResource SpacingMdThk}">
   <Grid ColumnDefinitions="Auto,12,*"
         RowDefinitions="Auto,Auto"
-        Margin="16">
+        Margin="{DynamicResource SpacingMdThk}">
 
     <!-- Icon -->
     <TextBlock Grid.Row="0" Grid.Column="0"
@@ -34,12 +34,12 @@
                 x:Name="ButtonPanel"
                 Orientation="Horizontal"
                 HorizontalAlignment="Center"
-                Spacing="8"
+                Spacing="{DynamicResource SpacingXs}"
                 Margin="0,16,0,0">
       <!-- Action button (for ShowWithAction) -->
       <Button x:Name="ActionBtn"
               Width="110"
-              Height="28"
+              Height="{DynamicResource ControlHeight}"
               IsVisible="False"
               Click="OnActionBtnClick"
               Background="{DynamicResource ThemeAccentBrush}"
@@ -49,7 +49,7 @@
       <Button x:Name="OkBtn"
               Content="OK"
               Width="80"
-              Height="28"
+              Height="{DynamicResource ControlHeight}"
               IsVisible="False"
               Click="OnOkClick"
               Background="{DynamicResource ThemeAccentBrush}"
@@ -59,7 +59,7 @@
       <Button x:Name="CancelBtn"
               Content="{Binding CancelText}"
               Width="80"
-              Height="28"
+              Height="{DynamicResource ControlHeight}"
               IsVisible="False"
               IsCancel="True"
               Click="OnCancelClick"
@@ -70,7 +70,7 @@
       <Button x:Name="YesBtn"
               Content="{Binding YesText}"
               Width="80"
-              Height="28"
+              Height="{DynamicResource ControlHeight}"
               IsVisible="False"
               Click="OnYesClick"
               Background="{DynamicResource ThemeButtonBgBrush}"
@@ -80,7 +80,7 @@
       <Button x:Name="NoBtn"
               Content="{Binding NoText}"
               Width="80"
-              Height="28"
+              Height="{DynamicResource ControlHeight}"
               IsVisible="False"
               Click="OnNoClick"
               Background="{DynamicResource ThemeButtonBgBrush}"

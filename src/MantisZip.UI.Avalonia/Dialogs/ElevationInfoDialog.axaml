@@ -8,10 +8,10 @@
         SizeToContent="Height"
         CanResize="False"
         Background="{DynamicResource ThemeWindowBgBrush}"
-        Padding="16">
+        Padding="{DynamicResource SpacingMdThk}">
 
   <Grid RowDefinitions="Auto,Auto,Auto"
-        Margin="8">
+        Margin="{DynamicResource SpacingXsThk}">
 
     <!-- Row 0: Message -->
     <TextBlock Grid.Row="0"
@@ -48,7 +48,7 @@
 
       <Button Content="{Binding OkText}"
               Width="100"
-              Height="32"
+              Height="{DynamicResource ControlHeightMd}"
               HorizontalAlignment="Right"
               IsDefault="True"
               IsCancel="True"

@@ -8,10 +8,10 @@
         SizeToContent="Height"
         CanResize="False"
         Background="{DynamicResource ThemeWindowBgBrush}"
-        Padding="16">
+        Padding="{DynamicResource SpacingMdThk}">
 
   <Grid RowDefinitions="Auto,Auto,Auto,Auto"
-        Margin="8">
+        Margin="{DynamicResource SpacingXsThk}">
 
     <!-- Row 0: Header -->
     <TextBlock Grid.Row="0"
@@ -36,7 +36,7 @@
                 Margin="0,14,0,0">
       <Button x:Name="RetryBtn"
               Width="72"
-              Height="28"
+              Height="{DynamicResource ControlHeight}"
               Content="{Binding RetryText}"
               Margin="0,0,6,0"
               Background="{DynamicResource ThemeButtonBgBrush}"
@@ -44,7 +44,7 @@
               BorderBrush="{DynamicResource ThemeBorderBrush}"
               Click="Retry_Click" />
       <Button Width="72"
-              Height="28"
+              Height="{DynamicResource ControlHeight}"
               Content="{Binding SkipText}"
               Margin="6,0,6,0"
               Background="{DynamicResource ThemeButtonBgBrush}"
@@ -52,7 +52,7 @@
               BorderBrush="{DynamicResource ThemeBorderBrush}"
               Click="Skip_Click" />
       <Button Width="72"
-              Height="28"
+              Height="{DynamicResource ControlHeight}"
               Content="{Binding AbortText}"
               Margin="6,0,0,0"
               Background="{DynamicResource ThemeButtonBgBrush}"

@@ -11,7 +11,7 @@
         ShowInTaskbar="False"
         Background="{DynamicResource ThemeWindowBgBrush}">
 
-  <Grid Margin="16"
+  <Grid Margin="{DynamicResource SpacingMdThk}"
         RowDefinitions="Auto,Auto,Auto">
 
     <!-- Row 0: Prompt -->
@@ -30,11 +30,11 @@
     <StackPanel Grid.Row="2"
                 Orientation="Horizontal"
                 HorizontalAlignment="Right"
-                Spacing="8"
+                Spacing="{DynamicResource SpacingXs}"
                 Margin="0,12,0,0">
       <Button Content="{Binding OkText}"
               Width="80"
-              Height="32"
+              Height="{DynamicResource ControlHeightMd}"
               IsDefault="True"
               Click="Ok_Click"
               Background="{DynamicResource ThemeAccentBrush}"
@@ -42,7 +42,7 @@
               BorderThickness="0" />
       <Button Content="{Binding CancelText}"
               Width="80"
-              Height="32"
+              Height="{DynamicResource ControlHeightMd}"
               IsCancel="True"
               Click="Cancel_Click"
               Background="{DynamicResource ThemeButtonBgBrush}"

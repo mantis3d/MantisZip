@@ -8,10 +8,10 @@
         SizeToContent="Height"
         CanResize="False"
         Background="{DynamicResource ThemeWindowBgBrush}"
-        Padding="16">
+        Padding="{DynamicResource SpacingMdThk}">
 
   <Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto"
-        Margin="8">
+        Margin="{DynamicResource SpacingXsThk}">
 
     <!-- Row 0: Header -->
     <TextBlock Grid.Row="0"
@@ -24,11 +24,11 @@
     <!-- Row 1: Comparison panel (disk vs archive) -->
     <Border Grid.Row="1"
             Margin="0,8,0,0"
-            Padding="12"
+            Padding="{DynamicResource SpacingSmThk}"
             Background="{DynamicResource ThemeSurfaceBgBrush}"
             BorderBrush="{DynamicResource ThemeBorderBrush}"
             BorderThickness="1"
-            CornerRadius="4">
+            CornerRadius="{DynamicResource BorderRadius}">
       <Grid ColumnDefinitions="*,Auto,*">
         <!-- Left: Disk file info -->
         <StackPanel Grid.Column="0">
@@ -54,7 +54,7 @@
         <!-- Center: VS badge -->
         <Border Grid.Column="1"
                 Width="32"
-                Height="22"
+                Height="{DynamicResource ControlHeightXs}"
                 CornerRadius="10"
                 Background="{DynamicResource ThemeAccentBrush}"
                 Margin="12,10"

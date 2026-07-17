@@ -5,8 +5,8 @@
              Background="{DynamicResource ThemeWindowBgBrush}">
   <Border BorderBrush="{DynamicResource ThemeBorderBrush}"
           BorderThickness="1"
-          Padding="8"
-          CornerRadius="4"
+          Padding="{DynamicResource SpacingXsThk}"
+          CornerRadius="{DynamicResource BorderRadius}"
           MinHeight="100"
           Background="{DynamicResource ThemeSurfaceBgBrush}">
     <Grid>
