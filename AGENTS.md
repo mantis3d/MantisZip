@@ -486,6 +486,24 @@ PROGRESS.md 分三个独立线索，根据变更影响范围选择对应线索�
          BorderBrush="{DynamicResource ThemeBorderBrush}"/>
 ```
 
+### 规则 5：紧凑度模式资源键名约定
+
+紧凑度模式提供三档间距/控件高度，通过 `{DynamicResource}` 引用。**注意 double 与 Thickness 的类型差异**：
+
+| 用途 | 资源键名 | C# 类型 | 适用属性 |
+|------|---------|---------|---------|
+| 间距（数字） | `SpacingXxs` / `Xs` / `Sm` / `Md` / `Lg` / `Xl` | `double` | `Spacing` |
+| 间距（厚度） | `SpacingXxsThk` / `XsThk` / `SmThk` / `MdThk` / `LgThk` / `XlThk` | `Thickness` | `Margin` / `Padding` |
+| 控件高度 | `ControlHeightSm` / `ControlHeight` / `ControlHeightMd` / `ControlHeightLg` / `ControlHeightXl` / `ControlHeightXxl` | `double` | `Height` / `MinHeight` / `MaxHeight` |
+| 圆角 | `BorderRadius` | `CornerRadius`（由 `ApplyCompactness()` 运行时注入） | `CornerRadius` |
+| 对话框内边距 | `DialogPadding` | `Thickness` | `Padding`（对话框级别） |
+
+**核心规则**：
+- `Margin`/`Padding` **必须使用** `SpacingXxxThk` 后缀变体（因为 `DynamicResource` 无法隐式将 `double` 转换为 `Thickness`）
+- `Spacing` 属性必须使用无后缀的 `SpacingXxx`（`double` 类型）
+- 新增控件时，不要硬编码间距/高度/圆角数值，优先使用这些 `{DynamicResource}` 引用
+- 所有资源由 `App.axaml.cs` 的 `ApplyCompactness()` 在启动时注入三档数值，运行时切换无需重启
+
 ## 未来工作
 
 ### 迁移完成后的清理

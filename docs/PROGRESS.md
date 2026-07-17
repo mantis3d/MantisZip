@@ -21,6 +21,16 @@
 
 ### MantisZip.UI.Avalonia（主力版）
 
+**2026-07-17** — 紧凑度模式 + 上下文工具栏 + 结果预览面板
+  - 紧凑度模式：Compact/Normal/Loose 三档，资源框架 + ApplyCompactness 运行时切换
+  - 间距资源双键约定：SpacingXxx（double 用于 Spacing）、SpacingXxxThk（Thickness 用于 Margin/Padding）
+  - 32 个 .axaml 文件全部替换为 DynamicResource 引用，告别硬编码间距
+  - 目录树工具栏：展开/折叠全部、过滤器、显示/隐藏分隔符
+  - 文件列表工具栏：选择/反选/展平目录/列排序/地址栏导航
+  - 3 列布局重构（树工具栏 ↔ 文件列表工具栏 ↔ 预览面板）
+  - ResultTreeView 可复用控件 + 解压/压缩结果预览面板（冲突高亮/过滤器灰显）
+  - 提取/压缩设置窗口改为 2 列布局带实时文件树预览
+
 **2026-07-16** — 移除 WebView2 依赖：Markdown/HTML/PDF 预览改用纯 .NET 跨平台实现
   - Markdown: Markdig AST → `MarkdownPreviewBuilder` → Avalonia 原生控件树（替代 Markdig→HTML→WebView2）
   - HTML: `ReverseMarkdown` 转为 Markdown → 复用 MarkdownPreviewBuilder 控件树（替代 WebView2 直接渲染）
