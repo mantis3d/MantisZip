@@ -26,6 +26,7 @@ public partial class App : Application
 {
     private const string LightThemeUri = "avares://MantisZip.UI.Avalonia/Themes/ThemeLight.axaml";
     private const string DarkThemeUri = "avares://MantisZip.UI.Avalonia/Themes/ThemeDark.axaml";
+    private const string IconResourcesUri = "avares://MantisZip.UI.Avalonia/Resources/Icons/AppIcons.axaml";
 
     // ── IPC Mutex/Pipe names ──
     private const string CompressMutexName = "MantisZipCompressMutex";
@@ -193,6 +194,11 @@ public partial class App : Application
             Resources.MergedDictionaries.Clear();
             if (AvaloniaXamlLoader.Load(uri) is IResourceProvider themeProvider)
                 Resources.MergedDictionaries.Add(themeProvider);
+
+            // ── Re-add icon resources (cleared above) ──
+            var iconUri = new Uri(IconResourcesUri);
+            if (AvaloniaXamlLoader.Load(iconUri) is IResourceProvider iconProvider)
+                Resources.MergedDictionaries.Add(iconProvider);
 
             // ── Set theme variant for FluentTheme ──
             RequestedThemeVariant = isDark
