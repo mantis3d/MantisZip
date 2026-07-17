@@ -65,9 +65,7 @@
               Click="Overwrite_Click">
         <StackPanel Orientation="Vertical"
                     HorizontalAlignment="Center">
-          <TextBlock Text="🔄"
-                     FontSize="24"
-                     HorizontalAlignment="Center" />
+          <PathIcon Data="{StaticResource IconRefresh}" Width="24" Height="24" HorizontalAlignment="Center" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
           <TextBlock Text="{Binding OverwriteText}"
                      FontSize="11"
                      HorizontalAlignment="Center"
@@ -112,9 +110,7 @@
               Click="Cancel_Click">
         <StackPanel Orientation="Vertical"
                     HorizontalAlignment="Center">
-          <TextBlock Text="❌"
-                     FontSize="24"
-                     HorizontalAlignment="Center" />
+          <PathIcon Data="{StaticResource IconDismiss}" Width="24" Height="24" HorizontalAlignment="Center" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
           <TextBlock Text="{Binding CancelText}"
                      FontSize="11"
                      HorizontalAlignment="Center"

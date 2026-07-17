@@ -21,6 +21,14 @@
 
 ### MantisZip.UI.Avalonia（主力版）
 
+**2026-07-18** — emoji 图标替换为 PathIcon + 文件列表行图标改用系统原生
+  - Phase 1：32 个 Fluent UI System Icons 矢量路径批量提取，创建 AppIcons.axaml 资源字典
+  - 菜单、工具栏、状态栏、列头、设置分类、对话框等 ~50 处 emoji TextBlock → PathIcon
+  - 保留 ~15 个无直接 Fluent UI 对应的 emoji（🚪 ⚙ 🤖 💬 🕐 等）暂不替换
+  - Phase 2：新建 Win32IconProvider.cs，通过 SHGetFileInfo+System.Drawing 获取 Windows 系统原生图标
+  - IconService 改为 Win32 优先策略：系统图标 > SkiaSharp 自绘图标（非 Windows 回退）
+  - 新增 System.Drawing.Common 依赖项（仅 Windows 生效，非 Windows 自动走回退路径）
+
 **2026-07-17** — 紧凑度模式 + 上下文工具栏 + 结果预览面板
   - 紧凑度模式：Compact/Normal/Loose 三档，资源框架 + ApplyCompactness 运行时切换
   - 间距资源双键约定：SpacingXxx（double 用于 Spacing）、SpacingXxxThk（Thickness 用于 Margin/Padding）

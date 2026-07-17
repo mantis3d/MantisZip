@@ -25,6 +25,7 @@
     <PackageReference Include="Markdig" Version="0.40.0" />
     <PackageReference Include="ReverseMarkdown" Version="4.7.0" />
     <PackageReference Include="SkiaSharp" Version="3.119.4" />
+    <PackageReference Include="System.Drawing.Common" Version="9.0.4" />
     <PackageReference Include="PdfPig" Version="0.1.15" />
     <PackageReference Include="PdfPig.Rendering.Skia" Version="0.1.15.4" />
   </ItemGroup>

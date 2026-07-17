@@ -6,6 +6,8 @@
       <ResourceDictionary.MergedDictionaries>
         <!-- 默认 light 主题，运行时由 App.axaml.cs 根据系统设置切换为 Dark -->
         <ResourceInclude Source="avares://MantisZip.UI.Avalonia/Themes/ThemeLight.axaml" />
+        <!-- PathIcon 图标资源字典 -->
+        <ResourceInclude Source="avares://MantisZip.UI.Avalonia/Resources/Icons/AppIcons.axaml" />
       </ResourceDictionary.MergedDictionaries>
     </ResourceDictionary>
   </Application.Resources>

@@ -23,7 +23,7 @@
       <TabItem Classes="compactTab">
         <TabItem.Header>
           <Grid ColumnDefinitions="Auto,*">
-            <TextBlock Text="📦" FontSize="18" VerticalAlignment="Center" />
+            <PathIcon Data="{StaticResource IconCompress}" Width="18" Height="18" VerticalAlignment="Center" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
             <TextBlock Text="{Binding TabCompressHeader}" Grid.Column="1" Margin="4,0,0,0"
                        VerticalAlignment="Center" />
           </Grid>
@@ -206,7 +206,7 @@
       <TabItem Classes="compactTab">
         <TabItem.Header>
           <Grid ColumnDefinitions="Auto,*">
-            <TextBlock Text="📂" FontSize="18" VerticalAlignment="Center" />
+            <PathIcon Data="{StaticResource IconFolder}" Width="18" Height="18" VerticalAlignment="Center" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
             <TextBlock Text="{Binding TabExtractHeader}" Grid.Column="1" Margin="4,0,0,0"
                        VerticalAlignment="Center" />
           </Grid>
@@ -265,7 +265,7 @@
       <TabItem Classes="compactTab">
         <TabItem.Header>
           <Grid ColumnDefinitions="Auto,*">
-            <TextBlock Text="🎨" FontSize="18" VerticalAlignment="Center" />
+            <PathIcon Data="{StaticResource IconPaintBrush}" Width="18" Height="18" VerticalAlignment="Center" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
             <TextBlock Text="{Binding TabAppearanceHeader}" Grid.Column="1" Margin="4,0,0,0"
                        VerticalAlignment="Center" />
           </Grid>
@@ -600,7 +600,7 @@
       <TabItem Classes="compactTab">
         <TabItem.Header>
           <Grid ColumnDefinitions="Auto,*">
-            <TextBlock Text="🔐" FontSize="18" VerticalAlignment="Center" />
+            <PathIcon Data="{StaticResource IconShieldLock}" Width="18" Height="18" VerticalAlignment="Center" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
             <TextBlock Text="{Binding TabPasswordHeader}" Grid.Column="1" Margin="4,0,0,0"
                        VerticalAlignment="Center" />
           </Grid>
@@ -625,7 +625,7 @@
       <TabItem Classes="compactTab">
         <TabItem.Header>
           <Grid ColumnDefinitions="Auto,*">
-            <TextBlock Text="🌐" FontSize="18" VerticalAlignment="Center" />
+            <PathIcon Data="{StaticResource IconGlobe}" Width="18" Height="18" VerticalAlignment="Center" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
             <TextBlock Text="{Binding TabLanguageHeader}" Grid.Column="1" Margin="4,0,0,0"
                        VerticalAlignment="Center" />
           </Grid>
@@ -659,7 +659,7 @@
       <TabItem Classes="compactTab">
         <TabItem.Header>
           <Grid ColumnDefinitions="Auto,*">
-            <TextBlock Text="📋" FontSize="18" VerticalAlignment="Center" />
+            <PathIcon Data="{StaticResource IconCopy}" Width="18" Height="18" VerticalAlignment="Center" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
             <TextBlock Text="{Binding TabContextMenuHeader}" Grid.Column="1" Margin="4,0,0,0"
                        VerticalAlignment="Center" />
           </Grid>
@@ -748,7 +748,7 @@
       <TabItem Classes="compactTab">
         <TabItem.Header>
           <Grid ColumnDefinitions="Auto,*">
-            <TextBlock Text="🔗" FontSize="18" VerticalAlignment="Center" />
+            <PathIcon Data="{StaticResource IconLink}" Width="18" Height="18" VerticalAlignment="Center" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
             <TextBlock Text="{Binding TabFileAssocHeader}" Grid.Column="1" Margin="4,0,0,0"
                        VerticalAlignment="Center" />
           </Grid>

@@ -172,6 +172,29 @@ return icon;
 | 统计 | `IconDataBarVertical` | `DataBarVertical` | 📊 |
 | 信息面板 | `IconPanelRight` | `PanelRightContract` | 📋 |
 
+### 关联计划补充图标
+
+以下图标来自其他计划文档（`context-toolbars.md`、`file-list-filter-search.md`），在实施对应计划时需要。为避免后续重复工作，**一并纳入本计划的图标资源字典**（只定义 Geometry，不替换任何 XAML，等对应计划实施时直接引用）。
+
+| 语义 | 资源键 | Fluent UI 图标名 | 来源计划 | 对应符号 |
+|------|--------|-----------------|---------|:--------:|
+| 主页/根目录 | `IconHome` | `Home` | context-toolbars | 🏠 |
+| 上移/父目录 | `IconArrowUp` | `ArrowUp` | context-toolbars | ↑ |
+| 后退 | `IconChevronLeft` | `ChevronLeft` | context-toolbars | ◀ |
+| 前进 | `IconChevronRight` | `ChevronRight` | context-toolbars | ▶ |
+| 菜单/列选择器 | `IconMenu` | `Navigation`、`MoreHorizontal` | context-toolbars | ☰ |
+| 视图模式 | `IconViewMode` | `Filter`、`Tab` | context-toolbars | ▧ |
+| 全选 | `IconSelectAll` | `SelectAll`、`CheckmarkCircle` | context-toolbars | ◐ |
+| 反选 | `IconInvertSelection` | `SelectAllOff`、`DismissCircle` | context-toolbars | ⊗ |
+| 日期 | `IconCalendar` | `Calendar` | file-list-filter-search | 📅 |
+| 尺寸/大小 | `IconSize` | `Ruler`、`ScaleFit` | file-list-filter-search | 📏 |
+| 吸管/取值 | `IconEyedropper` | `Eyedropper` | file-list-filter-search | 🧪 |
+| 排除/过滤 | `IconProhibited` | `Prohibited`、`Block` | file-list-filter-search | ⊘ 🚫 |
+| 关闭筛选栏 | `IconDismiss` | `Dismiss` | file-list-filter-search | ✕ |
+| 子树/展平 | `IconFolder` | `Folder` | file-list-filter-search | 🌲 |
+
+> **注：** `IconDismiss` 和 `IconFolder` 已在主映射表中定义，此处列出仅为标明关联关系。实际不重复添加。
+
 ### 格式类
 
 | 语义 | 资源键 | Fluent UI 图标名 |
@@ -192,7 +215,7 @@ return icon;
 
 **提取工具辅助：** 实施阶段编写一个简单脚本（Node.js），用 `fetch` 批量下载并提取 `d` 属性，直接拼接成 XAML 格式输出。
 
-预计每个图标耗时约 2 分钟，全部 ~25 个图标约 50 分钟。
+预计每个图标耗时约 2 分钟。主映射表 ~25 个 + 关联补充 ~13 个 = **共约 38 个图标**，提取时间约 75 分钟。建议首次实施时先提取主映射表的 25 个（满足当前替换需求），关联补充的 13 个留到对应计划实施时再取。
 
 ## 替换文件清单
 
