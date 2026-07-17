@@ -80,21 +80,24 @@
         <!-- Transparency toggle (image / ICO gallery) -->
         <StackPanel Orientation="Horizontal" Spacing="2"
                     IsVisible="{Binding HasTransparencyControls}">
-          <Button Content="🏁"
-                  Width="32" Height="{DynamicResource ControlHeight}" FontSize="14" Padding="0"
-                  Command="{Binding ToggleTransparencyBgCommand}" />
-          <Button Content="🎨"
-                  Width="32" Height="{DynamicResource ControlHeight}" FontSize="14" Padding="0"
+          <Button Width="32" Height="{DynamicResource ControlHeight}" Padding="0"
+                  Command="{Binding ToggleTransparencyBgCommand}">
+            <PathIcon Data="{StaticResource IconGrid}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+          </Button>
+          <Button Width="32" Height="{DynamicResource ControlHeight}" Padding="0"
                   Command="{Binding ToggleFlattenAlphaCommand}"
-                  IsVisible="{Binding HasFlattenAlphaControls}" />
+                  IsVisible="{Binding HasFlattenAlphaControls}">
+            <PathIcon Data="{StaticResource IconPaintBrush}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+          </Button>
         </StackPanel>
 
         <!-- ICO gallery controls -->
         <StackPanel Orientation="Horizontal" Spacing="2"
                     IsVisible="{Binding IsIcoGalleryVisible}">
-          <Button Content="🎨"
-                  Width="32" Height="{DynamicResource ControlHeight}" FontSize="14" Padding="0"
-                  Command="{Binding ToggleIcoFlattenAlphaCommand}" />
+          <Button Width="32" Height="{DynamicResource ControlHeight}" Padding="0"
+                  Command="{Binding ToggleIcoFlattenAlphaCommand}">
+            <PathIcon Data="{StaticResource IconPaintBrush}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+          </Button>
         </StackPanel>
 
         <!-- Ligature toggle (font preview) -->

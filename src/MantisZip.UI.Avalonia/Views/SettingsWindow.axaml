@@ -339,7 +339,7 @@
       <TabItem Classes="compactTab">
         <TabItem.Header>
           <Grid ColumnDefinitions="Auto,*">
-            <TextBlock Text="👁" FontSize="18" VerticalAlignment="Center" />
+            <PathIcon Data="{StaticResource IconEye}" Width="18" Height="18" VerticalAlignment="Center" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
             <TextBlock Text="{Binding TabPreviewHeader}" Grid.Column="1" Margin="4,0,0,0"
                        VerticalAlignment="Center" />
           </Grid>
@@ -804,7 +804,7 @@
       <TabItem Classes="compactTab">
         <TabItem.Header>
           <Grid ColumnDefinitions="Auto,*">
-            <TextBlock Text="🐛" FontSize="18" VerticalAlignment="Center" />
+            <PathIcon Data="{StaticResource IconBug}" Width="18" Height="18" VerticalAlignment="Center" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
             <TextBlock Text="{Binding TabDebugHeader}" Grid.Column="1" Margin="4,0,0,0"
                        VerticalAlignment="Center" />
           </Grid>
@@ -865,7 +865,7 @@
       <TabItem Classes="compactTab">
         <TabItem.Header>
           <Grid ColumnDefinitions="Auto,*">
-            <TextBlock Text="🛠" FontSize="18" VerticalAlignment="Center" />
+            <PathIcon Data="{StaticResource IconWrench}" Width="18" Height="18" VerticalAlignment="Center" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
             <TextBlock Text="{Binding TabAdvancedHeader}" Grid.Column="1" Margin="4,0,0,0"
                        VerticalAlignment="Center" />
           </Grid>
