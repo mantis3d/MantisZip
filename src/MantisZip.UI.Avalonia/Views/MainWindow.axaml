@@ -784,7 +784,7 @@
             ColumnDefinitions="1*,5,2.5*,5,3*">
       <!-- Folder tree panel (col 0) with tree toolbar -->
       <Border Grid.Column="0"
-              MinWidth="220"
+              MinWidth="100"
               Background="{DynamicResource ThemeSurfaceBgBrush}">
         <Grid RowDefinitions="Auto,Auto,Auto,*">
           <!-- Tree toolbar -->
@@ -792,19 +792,19 @@
                   Padding="4,2"
                   Background="{DynamicResource ThemeHeaderBgBrush}">
             <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
-              <Button Classes="ToolbarButton"
+              <Button Classes="ToolbarButton ToolbarIcon"
                       Command="{Binding ExpandAllCommand}"
                       IsEnabled="{Binding IsArchiveLoaded}"
                       ToolTip.Tip="{Binding LocalizedStrings[Tree_ExpandAll]}">
                 <TextBlock Text="📂+" FontSize="13" />
               </Button>
-              <Button Classes="ToolbarButton"
+              <Button Classes="ToolbarButton ToolbarIcon"
                       Command="{Binding CollapseAllCommand}"
                       IsEnabled="{Binding IsArchiveLoaded}"
                       ToolTip.Tip="{Binding LocalizedStrings[Tree_CollapseAll]}">
                 <TextBlock Text="📂−" FontSize="13" />
               </Button>
-              <Button Classes="ToolbarButton"
+              <Button Classes="ToolbarButton ToolbarIcon"
                       Command="{Binding ExpandToCurrentCommand}"
                       IsEnabled="{Binding IsArchiveLoaded}"
                       ToolTip.Tip="{Binding LocalizedStrings[Tree_ExpandToCurrent]}">
@@ -868,25 +868,25 @@
                   Background="{DynamicResource ThemeHeaderBgBrush}">
             <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
               <!-- Navigation group -->
-              <Button Classes="ToolbarButton"
+              <Button Classes="ToolbarButton ToolbarIcon"
                       Command="{Binding GoRootCommand}"
                       IsEnabled="{Binding IsArchiveLoaded}"
                       ToolTip.Tip="{Binding LocalizedStrings[Nav_GoRoot]}">
                 <PathIcon Data="{StaticResource IconHome}" Width="13" Height="13" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
               </Button>
-              <Button Classes="ToolbarButton"
+              <Button Classes="ToolbarButton ToolbarIcon"
                       Command="{Binding GoUpCommand}"
                       IsEnabled="{Binding IsArchiveLoaded}"
                       ToolTip.Tip="{Binding LocalizedStrings[Menu_ExtractHere]}">
                 <PathIcon Data="{StaticResource IconArrowUp}" Width="13" Height="13" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
               </Button>
-              <Button Classes="ToolbarButton"
+              <Button Classes="ToolbarButton ToolbarIcon"
                       Command="{Binding GoBackCommand}"
                       IsEnabled="{Binding CanGoBack}"
                       ToolTip.Tip="{Binding LocalizedStrings[Nav_GoBack]}">
                 <PathIcon Data="{StaticResource IconChevronLeft}" Width="13" Height="13" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
               </Button>
-              <Button Classes="ToolbarButton"
+              <Button Classes="ToolbarButton ToolbarIcon"
                       Command="{Binding GoForwardCommand}"
                       IsEnabled="{Binding CanGoForward}"
                       ToolTip.Tip="{Binding LocalizedStrings[Nav_GoForward]}">
@@ -914,7 +914,7 @@
                       Background="{DynamicResource ThemeBorderBrush}" />
 
               <!-- Copy name -->
-              <Button Classes="ToolbarButton"
+              <Button Classes="ToolbarButton ToolbarIcon"
                       Command="{Binding CopyFileNameCommand}"
                       IsEnabled="{Binding IsArchiveLoaded}"
                       ToolTip.Tip="{Binding LocalizedStrings[Toolbar_CopyName]}">
@@ -922,7 +922,7 @@
               </Button>
 
               <!-- Column picker -->
-              <Button x:Name="ColumnPickerButton" Classes="ToolbarButton"
+              <Button x:Name="ColumnPickerButton" Classes="ToolbarButton ToolbarIcon"
                       Command="{Binding ShowColumnPickerCommand}"
                       IsEnabled="{Binding IsArchiveLoaded}"
                       ToolTip.Tip="{Binding LocalizedStrings[Toolbar_Columns]}">
@@ -930,7 +930,7 @@
               </Button>
 
               <!-- View mode toggle -->
-              <Button Classes="ToolbarButton"
+              <Button Classes="ToolbarButton ToolbarIcon"
                       Command="{Binding CycleViewModeCommand}"
                       IsEnabled="{Binding IsArchiveLoaded}"
                       ToolTip.Tip="{Binding LocalizedStrings[Toolbar_ViewMode]}">
@@ -946,13 +946,13 @@
                       Background="{DynamicResource ThemeBorderBrush}" />
 
               <!-- Select All / Invert -->
-              <Button Classes="ToolbarButton"
+              <Button Classes="ToolbarButton ToolbarIcon"
                       Command="{Binding SelectAllCommand}"
                       IsEnabled="{Binding IsArchiveLoaded}"
                       ToolTip.Tip="{Binding LocalizedStrings[Toolbar_SelectAll]}">
                 <PathIcon Data="{StaticResource IconSelectAll}" Width="13" Height="13" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
               </Button>
-              <Button Classes="ToolbarButton"
+              <Button Classes="ToolbarButton ToolbarIcon"
                       Command="{Binding InvertSelectionCommand}"
                       IsEnabled="{Binding IsArchiveLoaded}"
                       ToolTip.Tip="{Binding LocalizedStrings[Toolbar_InvertSelection]}">
@@ -964,7 +964,7 @@
                       Background="{DynamicResource ThemeBorderBrush}" />
 
               <!-- Refresh -->
-              <Button Classes="ToolbarButton"
+              <Button Classes="ToolbarButton ToolbarIcon"
                       Command="{Binding RefreshArchiveCommand}"
                       IsEnabled="{Binding IsArchiveLoaded}"
                       ToolTip.Tip="{Binding LocalizedStrings[Toolbar_Refresh]}">
@@ -976,13 +976,13 @@
                       Background="{DynamicResource ThemeBorderBrush}" />
 
               <!-- Filter toggle + Flatten toggle (moved from global toolbar) -->
-              <ToggleButton Classes="ToolbarButton"
+              <ToggleButton Classes="ToolbarButton ToolbarIcon"
                             IsChecked="{Binding IsFilterBarVisible}"
                             IsEnabled="{Binding IsArchiveLoaded}"
                             ToolTip.Tip="{Binding LocalizedStrings[Tooltip_Filter]}">
                 <PathIcon Data="{StaticResource IconSearch}" Width="13" Height="13" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
               </ToggleButton>
-              <ToggleButton Classes="ToolbarButton"
+              <ToggleButton Classes="ToolbarButton ToolbarIcon"
                             IsChecked="{Binding ShowSubfolders}"
                             IsEnabled="{Binding IsArchiveLoaded}"
                             ToolTip.Tip="{Binding LocalizedStrings[Tooltip_Subfolders]}">
