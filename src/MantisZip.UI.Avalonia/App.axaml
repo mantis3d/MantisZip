@@ -39,7 +39,10 @@
     <Style Selector="TextBox">
       <Setter Property="Foreground" Value="{DynamicResource ThemeTextPrimaryBrush}" />
       <Setter Property="CornerRadius" Value="{DynamicResource BorderRadius}" />
-      <Setter Property="Padding" Value="{DynamicResource SpacingXsThk}" />
+      <!-- Use a dedicated TextControlPadding resource so horizontal padding stays reasonable
+           even in Loose compactness mode (avoid overly large left/right padding that
+           reduces the editable area). -->
+      <Setter Property="Padding" Value="{DynamicResource TextControlPadding}" />
       <Setter Property="Transitions">
         <Setter.Value>
           <Transitions>

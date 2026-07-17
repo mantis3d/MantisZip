@@ -339,6 +339,14 @@ public partial class App : Application
         // Thickness variants of spacing keys (for Margin / Padding)
         foreach (var k in new[] { "SpacingXxs", "SpacingXs", "SpacingSm", "SpacingMd", "SpacingLg", "SpacingXl" })
             Resources[k + "Thk"] = new Thickness(GetSpacing(k, mode));
+
+        // TextControlPadding: use smaller horizontal padding (SpacingXxs) and
+        // larger vertical padding (SpacingXs) so switching to Loose mode increases
+        // vertical breathing room without shrinking the editable width too much.
+        Resources["TextControlPadding"] = new Thickness(
+            GetSpacing("SpacingXxs", mode), // left/right
+            GetSpacing("SpacingXs", mode)   // top/bottom
+        );
     }
 
     /// <summary>

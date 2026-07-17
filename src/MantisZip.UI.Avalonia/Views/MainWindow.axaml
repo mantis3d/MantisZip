@@ -781,10 +781,10 @@
 
       <!-- Archive content (hidden when no archive loaded) -->
       <Grid IsVisible="{Binding IsArchiveLoaded}"
-            ColumnDefinitions="Auto,5,2.5*,5,3*">
+            ColumnDefinitions="1*,5,2.5*,5,3*">
       <!-- Folder tree panel (col 0) with tree toolbar -->
       <Border Grid.Column="0"
-              Width="220"
+              MinWidth="220"
               Background="{DynamicResource ThemeSurfaceBgBrush}">
         <Grid RowDefinitions="Auto,Auto,Auto,*">
           <!-- Tree toolbar -->
@@ -820,7 +820,7 @@
                      Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
           <!-- Tree search -->
           <TextBox Grid.Row="2"
-                   Height="{DynamicResource ControlHeightSm}"
+                   MinHeight="{DynamicResource ControlHeightSm}"
                    x:Name="TreeSearchBox"
                    Text="{Binding TreeFilterText}"
                    PlaceholderText="{Binding LocalizedStrings[Tree_Filter]}"
