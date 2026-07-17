@@ -10,6 +10,9 @@ using MantisZip.UI.Avalonia.Dialogs;
 using MantisZip.UI.Avalonia.Models;
 using MantisZip.UI.Avalonia.ViewModels;
 using MantisZip.Core;
+using System.Collections.Generic;
+using System.Linq;
+using Avalonia.Layout;
 
 namespace MantisZip.UI.Avalonia.Views;
 
@@ -170,6 +173,39 @@ public partial class MainWindow : Window
             var result = await dialog.ShowDialog<bool>(this);
             return result ? dialog.Comment : null;
         };
+
+        // ── Wire up select-all / invert-selection callbacks ──
+        vm.SelectAllEntriesAction = () =>
+        {
+            FileListGrid.SelectedItems.Clear();
+            if (FileListGrid.ItemsSource is System.Collections.IList source)
+            {
+                foreach (var item in source)
+                {
+                    if (item is ArchiveItemModel)
+                        FileListGrid.SelectedItems.Add(item);
+                }
+            }
+        };
+        vm.InvertSelectionAction = () =>
+        {
+            var selected = new HashSet<object>();
+            foreach (var item in FileListGrid.SelectedItems)
+                selected.Add(item);
+            var allItems = new List<object>();
+            if (FileListGrid.ItemsSource is System.Collections.IList source)
+            {
+                foreach (var item in source)
+                    allItems.Add(item);
+            }
+            FileListGrid.SelectedItems.Clear();
+            foreach (var item in allItems)
+            {
+                if (!selected.Contains(item))
+                    FileListGrid.SelectedItems.Add(item);
+            }
+        };
+        vm.ShowColumnPickerAction = () => ShowColumnPickerMenu();
 
         vm.GetOpenFilePaths = async () =>
         {
@@ -574,6 +610,64 @@ public partial class MainWindow : Window
         if (sizes.Count == 0) return;
         vm.FilterSizeMax = sizes.Max();
         vm.FilterSizeUnit = "B";
+    }
+
+    private void AddressBar_KeyDown(object? sender, global::Avalonia.Input.KeyEventArgs e)
+    {
+        if (e.Key == global::Avalonia.Input.Key.Enter)
+        {
+            if (sender is AutoCompleteBox box)
+            {
+                var vm = DataContext as MainWindowViewModel;
+                vm?.NavigateToFolderPath(box.Text ?? "");
+            }
+            e.Handled = true;
+        }
+    }
+
+    private void ShowColumnPickerMenu()
+    {
+        var menu = new ContextMenu();
+        foreach (var column in FileListGrid.Columns)
+        {
+            var header = GetColumnHeaderText(column);
+            // Name column cannot be hidden
+            if (header == "Name" || string.IsNullOrEmpty(header))
+                continue;
+
+            var menuItem = new MenuItem
+            {
+                Header = header,
+                Icon = new CheckBox
+                {
+                    IsChecked = column.IsVisible,
+                    IsHitTestVisible = false,
+                    VerticalAlignment = VerticalAlignment.Center
+                },
+                Tag = column
+            };
+            menuItem.Click += (s, args) =>
+            {
+                column.IsVisible = !column.IsVisible;
+                if (menuItem.Icon is CheckBox cb)
+                    cb.IsChecked = column.IsVisible;
+            };
+            menu.Items.Add(menuItem);
+        }
+        menu.Open(ColumnPickerButton);
+    }
+
+    private static string GetColumnHeaderText(DataGridColumn column)
+    {
+        if (column.Header is string s)
+            return s.TrimEnd('▲', '▼', ' ').TrimEnd();
+        if (column.Header is StackPanel panel)
+        {
+            var tb = panel.Children.OfType<TextBlock>().LastOrDefault();
+            if (tb != null)
+                return tb.Text ?? "";
+        }
+        return "";
     }
 
     private async void RecentFileMenuItem_Click(object? sender, RoutedEventArgs e)

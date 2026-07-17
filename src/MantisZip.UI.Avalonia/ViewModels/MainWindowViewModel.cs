@@ -22,6 +22,25 @@ public partial class MainWindowViewModel : ObservableObject
     private int _previewLoadVersion;
     private bool _isProgrammaticFilter;
 
+    // ── Navigation history stacks ──
+    private readonly List<string> _backStack = new();
+    private readonly List<string> _forwardStack = new();
+
+    /// <summary>
+    /// 可由 View 设置的全选回调（DataGrid.SelectAll）。
+    /// </summary>
+    public Action? SelectAllEntriesAction { get; set; }
+
+    /// <summary>
+    /// 可由 View 设置的反选回调。
+    /// </summary>
+    public Action? InvertSelectionAction { get; set; }
+
+    /// <summary>
+    /// 可由 View 设置的列选择器弹出回调。
+    /// </summary>
+    public Action? ShowColumnPickerAction { get; set; }
+
     /// <summary>
     /// 由 View 设置的对话框回调。返回选择的文件路径，取消返回 null。
     /// </summary>
@@ -176,6 +195,11 @@ public partial class MainWindowViewModel : ObservableObject
             "Main_NoRecentFiles", "Main_ClearRecentFiles", "Main_RecentFiles",
             "Toolbar_Password", "Tooltip_Password",
             "Menu_Test",
+            "Tree_ExpandAll", "Tree_CollapseAll", "Tree_ExpandToCurrent", "Tree_Filter",
+            "Nav_GoRoot", "Nav_GoBack", "Nav_GoForward", "Nav_AddressBar",
+            "Toolbar_CopyName", "Toolbar_Columns", "Toolbar_Refresh",
+            "Toolbar_SelectAll", "Toolbar_InvertSelection", "Toolbar_ViewMode",
+            "ViewMode_All", "ViewMode_Files", "ViewMode_Dirs",
             "Test_AboutWindow", "Test_SettingsWindow", "Test_PasswordManager",
             "Test_DonationDialog", "Test_LogPrivacyHelp", "Test_PasswordHelp",
             "Test_CommentDialog", "Test_PasswordEditDialog", "Test_PasswordDialog",
@@ -195,6 +219,7 @@ public partial class MainWindowViewModel : ObservableObject
         }
         LocalizedStrings = newDict;
         OnPropertyChanged(nameof(LocalizedStrings));
+        OnPropertyChanged(nameof(ViewModeLabel));
 
         // Refresh match mode options display text
         MatchModeOptions.Clear();
@@ -346,6 +371,94 @@ public partial class MainWindowViewModel : ObservableObject
 
     [ObservableProperty]
     private bool _showSubfolders;
+
+    // ── Navigation history ──
+
+    public bool CanGoBack => _backStack.Count > 0;
+    public bool CanGoForward => _forwardStack.Count > 0;
+
+    private void NotifyNavigationState()
+    {
+        OnPropertyChanged(nameof(CanGoBack));
+        OnPropertyChanged(nameof(CanGoForward));
+    }
+
+    /// <summary>
+    /// 地址栏自动补全的目录路径集合。
+    /// </summary>
+    public ObservableCollection<string> FolderPaths { get; } = new();
+
+    // ── Tree filter ──
+
+    [ObservableProperty]
+    private string? _treeFilterText;
+
+    partial void OnTreeFilterTextChanged(string? value)
+    {
+        ApplyTreeFilter(value);
+    }
+
+    private void ApplyTreeFilter(string? filter)
+    {
+        if (FolderTreeRoot == null) return;
+        ApplyTreeFilterRecursive(FolderTreeRoot, filter);
+    }
+
+    private static bool ApplyTreeFilterRecursive(FolderNode node, string? filter)
+    {
+        if (string.IsNullOrWhiteSpace(filter))
+        {
+            node.IsVisible = true;
+            foreach (var child in node.Children)
+                ApplyTreeFilterRecursive(child, filter);
+            return true;
+        }
+
+        var selfMatch = node.Name.Contains(filter, StringComparison.OrdinalIgnoreCase);
+        var anyChildMatch = false;
+        foreach (var child in node.Children)
+        {
+            if (ApplyTreeFilterRecursive(child, filter))
+                anyChildMatch = true;
+        }
+
+        node.IsVisible = selfMatch || anyChildMatch;
+        if (selfMatch && !string.IsNullOrEmpty(filter))
+            node.IsExpanded = true;
+
+        return node.IsVisible;
+    }
+
+    // ── View mode (All / Files / Directories) ──
+
+    public enum FileListViewMode { All, FilesOnly, DirectoriesOnly }
+
+    [ObservableProperty]
+    private FileListViewMode _viewMode = FileListViewMode.All;
+
+    partial void OnViewModeChanged(FileListViewMode value)
+    {
+        OnPropertyChanged(nameof(ViewModeLabel));
+        PopulateEntries();
+    }
+
+    [RelayCommand]
+    private void CycleViewMode()
+    {
+        ViewMode = ViewMode switch
+        {
+            FileListViewMode.All => FileListViewMode.FilesOnly,
+            FileListViewMode.FilesOnly => FileListViewMode.DirectoriesOnly,
+            _ => FileListViewMode.All
+        };
+    }
+
+    public string ViewModeLabel => ViewMode switch
+    {
+        FileListViewMode.All => LocalizationManager.T("ViewMode_All"),
+        FileListViewMode.FilesOnly => LocalizationManager.T("ViewMode_Files"),
+        _ => LocalizationManager.T("ViewMode_Dirs")
+    };
 
     /// <summary>
     /// 匹配模式选项列表（子串匹配 / 通配符）。显示文本通过 UpdateLocalizedStrings() 刷新。
@@ -501,6 +614,27 @@ public partial class MainWindowViewModel : ObservableObject
                     FolderTreeRoot = ArchiveTreeBuilder.BuildTree(_allRawItems, Path.GetFileNameWithoutExtension(path));
                     FolderTreeRoot.IsExpanded = true;
                     SelectedFolder = FolderTreeRoot;
+
+                    // Populate address bar with unique directory paths
+                    FolderPaths.Clear();
+                    var dirs = new HashSet<string> { "" };
+                    foreach (var item in _allRawItems)
+                    {
+                        var fullPath = item.FullPath;
+                        var lastSlash = fullPath.LastIndexOf('/');
+                        while (lastSlash >= 0)
+                        {
+                            var dirPath = fullPath[..lastSlash];
+                            if (dirs.Add(dirPath))
+                                FolderPaths.Add(dirPath);
+                            lastSlash = dirPath.LastIndexOf('/');
+                        }
+                    }
+                    // Sort paths
+                    var sorted = FolderPaths.OrderBy(p => p).ToList();
+                    FolderPaths.Clear();
+                    foreach (var p in sorted)
+                        FolderPaths.Add(p);
                 }
 
                 CurrentArchivePath = path;
@@ -735,11 +869,43 @@ public partial class MainWindowViewModel : ObservableObject
         App.DebugLog("[PRV] ShowPreviewAsync end");
     }
 
+    /// <summary>
+    /// 统一导航入口：记录历史，更新 CurrentFolder，刷新条目列表，同步目录树选择。
+    /// </summary>
+    private void NavigateAndPushHistory(string path)
+    {
+        if (_allRawItems == null) return;
+        if (CurrentFolder == path) return;
+
+        if (CurrentFolder != null)
+            _backStack.Add(CurrentFolder);
+        _forwardStack.Clear();
+
+        CurrentFolder = path;
+        PopulateEntries();
+
+        var node = FindNode(FolderTreeRoot, path);
+        if (node != null)
+            SelectedFolder = node;
+
+        NotifyNavigationState();
+    }
+
     private void NavigateToFolder(FolderNode node)
     {
         if (_allRawItems == null) return;
+        // OnSelectedFolderChanged calls NavigateToFolder — we push history here
+        // but skip push if already at the same folder
+        if (CurrentFolder == node.FullPath) return;
+
+        if (CurrentFolder != null)
+            _backStack.Add(CurrentFolder);
+        _forwardStack.Clear();
+
         CurrentFolder = node.FullPath;
         PopulateEntries();
+
+        NotifyNavigationState();
     }
 
     /// <summary>
@@ -748,6 +914,11 @@ public partial class MainWindowViewModel : ObservableObject
     public void NavigateToFolderPath(string path)
     {
         if (_allRawItems == null) return;
+
+        if (CurrentFolder != null)
+            _backStack.Add(CurrentFolder);
+        _forwardStack.Clear();
+
         _isProgrammaticFilter = true;
         try
         {
@@ -757,6 +928,8 @@ public partial class MainWindowViewModel : ObservableObject
             var node = FindNode(FolderTreeRoot, path);
             if (node != null)
                 SelectedFolder = node;
+
+            NotifyNavigationState();
         }
         finally
         {
@@ -782,6 +955,12 @@ public partial class MainWindowViewModel : ObservableObject
             var filteredSource = GetFilteredSource();
             var entries = ArchiveEntryLister.GetEntriesInFolder(
                 filteredSource, CurrentFolder ?? "", ShowSubfolders);
+
+            // Apply view mode filter
+            if (ViewMode == FileListViewMode.FilesOnly)
+                entries = entries.Where(e => !e.IsDirectory).ToList();
+            else if (ViewMode == FileListViewMode.DirectoriesOnly)
+                entries = entries.Where(e => e.IsDirectory).ToList();
 
             CurrentEntries.Clear();
             foreach (var item in entries)
@@ -883,6 +1062,8 @@ public partial class MainWindowViewModel : ObservableObject
         _ => 1L
     };
 
+    // ── Navigation commands ──
+
     [RelayCommand]
     private void GoUp()
     {
@@ -892,8 +1073,134 @@ public partial class MainWindowViewModel : ObservableObject
         var lastSlash = currentPath.LastIndexOf('/');
         var parentPath = lastSlash >= 0 ? currentPath[..lastSlash] : "";
 
-        var parent = FindNode(FolderTreeRoot, parentPath);
-        SelectedFolder = parent ?? FolderTreeRoot;
+        NavigateAndPushHistory(parentPath);
+    }
+
+    [RelayCommand]
+    private void GoRoot()
+    {
+        if (FolderTreeRoot == null) return;
+        NavigateAndPushHistory("");
+    }
+
+    [RelayCommand]
+    private void GoBack()
+    {
+        if (_backStack.Count == 0) return;
+        var target = _backStack[^1];
+        _backStack.RemoveAt(_backStack.Count - 1);
+
+        if (CurrentFolder != null)
+            _forwardStack.Add(CurrentFolder);
+
+        _isProgrammaticFilter = true;
+        try
+        {
+            CurrentFolder = target;
+            PopulateEntries();
+            var node = FindNode(FolderTreeRoot, target) ?? FolderTreeRoot;
+            if (node != null)
+                SelectedFolder = node;
+        }
+        finally
+        {
+            _isProgrammaticFilter = false;
+        }
+
+        NotifyNavigationState();
+    }
+
+    [RelayCommand]
+    private void GoForward()
+    {
+        if (_forwardStack.Count == 0) return;
+        var target = _forwardStack[^1];
+        _forwardStack.RemoveAt(_forwardStack.Count - 1);
+
+        if (CurrentFolder != null)
+            _backStack.Add(CurrentFolder);
+
+        _isProgrammaticFilter = true;
+        try
+        {
+            CurrentFolder = target;
+            PopulateEntries();
+            var node = FindNode(FolderTreeRoot, target) ?? FolderTreeRoot;
+            if (node != null)
+                SelectedFolder = node;
+        }
+        finally
+        {
+            _isProgrammaticFilter = false;
+        }
+
+        NotifyNavigationState();
+    }
+
+    // ── Tree expand / collapse commands ──
+
+    [RelayCommand]
+    private void ExpandAll()
+    {
+        FolderTreeRoot?.ExpandAll();
+    }
+
+    [RelayCommand]
+    private void CollapseAll()
+    {
+        FolderTreeRoot?.CollapseAll();
+    }
+
+    [RelayCommand]
+    private void ExpandToCurrent()
+    {
+        if (FolderTreeRoot == null || SelectedFolder == null) return;
+        // Collapse all first
+        FolderTreeRoot.CollapseAll();
+        // Expand root
+        FolderTreeRoot.IsExpanded = true;
+        // Then expand ancestors of current selection
+        ExpandAncestorsOf(FolderTreeRoot, SelectedFolder.FullPath);
+    }
+
+    private static void ExpandAncestorsOf(FolderNode node, string targetPath)
+    {
+        if (node.FullPath == targetPath) return;
+        foreach (var child in node.Children)
+        {
+            if (IsAncestorOf(child, targetPath))
+            {
+                child.IsExpanded = true;
+                ExpandAncestorsOf(child, targetPath);
+                return;
+            }
+        }
+    }
+
+    private static bool IsAncestorOf(FolderNode node, string targetPath)
+    {
+        if (node.FullPath == targetPath) return true;
+        return node.Children.Any(c => IsAncestorOf(c, targetPath));
+    }
+
+    // ── Selection commands ──
+
+    [RelayCommand]
+    private void SelectAll()
+    {
+        SelectAllEntriesAction?.Invoke();
+    }
+
+    [RelayCommand]
+    private void InvertSelection()
+    {
+        InvertSelectionAction?.Invoke();
+    }
+
+    [RelayCommand]
+    private void ShowColumnPicker()
+    {
+        ShowColumnPickerAction?.Invoke();
     }
 
     private static FolderNode? FindNode(FolderNode? node, string path)
@@ -930,6 +1237,10 @@ public partial class MainWindowViewModel : ObservableObject
         FilterStats = string.Empty;
         EncodingInfo = string.Empty;
         Preview.Clear();
+        FolderPaths.Clear();
+        _backStack.Clear();
+        _forwardStack.Clear();
+        NotifyNavigationState();
     }
 
     [RelayCommand]
@@ -1106,8 +1417,19 @@ public partial class MainWindowViewModel : ObservableObject
     [RelayCommand]
     private async Task CopyFileName()
     {
-        if (SelectedEntry == null) return;
-        var text = SelectedEntry.FullPath ?? SelectedEntry.Name;
+        if (SelectedEntries.Count == 0 && SelectedEntry == null) return;
+
+        string text;
+        if (SelectedEntries.Count > 1)
+        {
+            text = string.Join(Environment.NewLine, SelectedEntries.Select(e => e.FullPath ?? e.Name));
+        }
+        else if (SelectedEntry != null)
+        {
+            text = SelectedEntry.FullPath ?? SelectedEntry.Name;
+        }
+        else return;
+
         if (CopyToClipboard != null)
             await CopyToClipboard(text);
         StatusMessage = $"{LocalizationManager.T("Status_Copied")}: {text}";

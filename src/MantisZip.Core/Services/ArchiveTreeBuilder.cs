@@ -41,7 +41,42 @@ public class FolderNode : INotifyPropertyChanged
         }
     }
 
+    private bool _isVisible = true;
+    public bool IsVisible
+    {
+        get => _isVisible;
+        set
+        {
+            if (_isVisible != value)
+            {
+                _isVisible = value;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsVisible)));
+            }
+        }
+    }
+
     public event PropertyChangedEventHandler? PropertyChanged;
+
+    public void ExpandAll()
+    {
+        IsExpanded = true;
+        foreach (var child in Children)
+            child.ExpandAll();
+    }
+
+    public void CollapseAll()
+    {
+        // Keep root expanded
+        foreach (var child in Children)
+            child.CollapseSelfAndDescendants();
+    }
+
+    private void CollapseSelfAndDescendants()
+    {
+        IsExpanded = false;
+        foreach (var child in Children)
+            child.CollapseSelfAndDescendants();
+    }
 }
 
 /// <summary>

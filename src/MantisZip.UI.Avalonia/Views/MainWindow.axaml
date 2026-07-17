@@ -31,7 +31,7 @@
       <MenuItem Header="{Binding LocalizedStrings[Menu_File]}">
         <MenuItem Command="{Binding OpenArchiveCommand}" InputGesture="Ctrl+O">
           <MenuItem.Header>
-            <StackPanel Orientation="Horizontal" Spacing="4">
+            <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
               <TextBlock Text="📂" FontSize="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
               <TextBlock Text="{Binding LocalizedStrings[Menu_OpenArchive]}" />
             </StackPanel>
@@ -40,7 +40,7 @@
         <MenuItem Command="{Binding CloseArchiveCommand}" InputGesture="Ctrl+W"
                   IsEnabled="{Binding IsArchiveLoaded}">
           <MenuItem.Header>
-            <StackPanel Orientation="Horizontal" Spacing="4">
+            <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
               <TextBlock Text="🚪" FontSize="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
               <TextBlock Text="{Binding LocalizedStrings[Menu_CloseArchive]}" />
             </StackPanel>
@@ -54,7 +54,7 @@
               <MenuItem Click="RecentFileMenuItem_Click"
                         CommandParameter="{Binding .}">
                 <MenuItem.Header>
-                  <StackPanel Orientation="Horizontal" Spacing="4">
+                  <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
                     <TextBlock Text="🕐" FontSize="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
                     <TextBlock Text="{Binding .}" />
                   </StackPanel>
@@ -66,7 +66,7 @@
         <Separator />
         <MenuItem Command="{Binding ClearRecentFilesCommand}">
           <MenuItem.Header>
-            <StackPanel Orientation="Horizontal" Spacing="4">
+            <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
               <TextBlock Text="🗑" FontSize="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
               <TextBlock Text="{Binding LocalizedStrings[Main_ClearRecentFiles]}" />
             </StackPanel>
@@ -75,7 +75,7 @@
         <MenuItem Command="{Binding RefreshArchiveCommand}" InputGesture="F5"
                   IsEnabled="{Binding IsArchiveLoaded}">
           <MenuItem.Header>
-            <StackPanel Orientation="Horizontal" Spacing="4">
+            <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
               <TextBlock Text="🔄" FontSize="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
               <TextBlock Text="{Binding LocalizedStrings[Menu_Refresh]}" />
             </StackPanel>
@@ -84,7 +84,7 @@
         <Separator />
         <MenuItem Command="{Binding OpenSettingsCommand}">
           <MenuItem.Header>
-            <StackPanel Orientation="Horizontal" Spacing="4">
+            <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
               <TextBlock Text="⚙" FontSize="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
               <TextBlock Text="{Binding LocalizedStrings[Menu_Settings]}" />
             </StackPanel>
@@ -93,7 +93,7 @@
         <Separator />
         <MenuItem Command="{Binding ExitCommand}">
           <MenuItem.Header>
-            <StackPanel Orientation="Horizontal" Spacing="4">
+            <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
               <TextBlock Text="🚪" FontSize="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
               <TextBlock Text="{Binding LocalizedStrings[Menu_Exit]}" />
             </StackPanel>
@@ -103,7 +103,7 @@
         <MenuItem Header="⭐ 收藏夹">
           <MenuItem Command="{Binding OpenFavoritesManagerCommand}">
             <MenuItem.Header>
-              <StackPanel Orientation="Horizontal" Spacing="4">
+              <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
                 <TextBlock Text="⭐" FontSize="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
                 <TextBlock Text="{Binding LocalizedStrings[FavMgr_OpenManager]}" />
               </StackPanel>
@@ -115,7 +115,7 @@
         <MenuItem Command="{Binding ExtractArchiveCommand}" InputGesture="Ctrl+E"
                   IsEnabled="{Binding IsArchiveLoaded}">
           <MenuItem.Header>
-            <StackPanel Orientation="Horizontal" Spacing="4">
+            <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
               <TextBlock Text="📤" FontSize="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
               <TextBlock Text="{Binding LocalizedStrings[Menu_ExtractArchive]}" />
             </StackPanel>
@@ -124,7 +124,7 @@
         <MenuItem Command="{Binding ExtractArchiveHereCommand}"
                   IsEnabled="{Binding IsArchiveLoaded}">
           <MenuItem.Header>
-            <StackPanel Orientation="Horizontal" Spacing="4">
+            <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
               <TextBlock Text="📍" FontSize="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
               <TextBlock Text="{Binding LocalizedStrings[Menu_ExtractHere]}" />
             </StackPanel>
@@ -133,7 +133,7 @@
         <MenuItem Command="{Binding ExtractArchiveToNameCommand}"
                   IsEnabled="{Binding IsArchiveLoaded}">
           <MenuItem.Header>
-            <StackPanel Orientation="Horizontal" Spacing="4">
+            <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
               <TextBlock Text="📁" FontSize="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
               <TextBlock Text="{Binding LocalizedStrings[Menu_ExtractToName]}" />
             </StackPanel>
@@ -142,7 +142,7 @@
         <MenuItem Command="{Binding SmartExtractCommand}"
                   IsEnabled="{Binding IsArchiveLoaded}">
           <MenuItem.Header>
-            <StackPanel Orientation="Horizontal" Spacing="4">
+            <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
               <TextBlock Text="🤖" FontSize="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
               <TextBlock Text="{Binding LocalizedStrings[Menu_SmartExtract]}" />
             </StackPanel>
@@ -152,7 +152,7 @@
         <MenuItem Command="{Binding AddFilesCommand}"
                   IsEnabled="{Binding IsArchiveLoaded}">
           <MenuItem.Header>
-            <StackPanel Orientation="Horizontal" Spacing="4">
+            <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
               <TextBlock Text="➕" FontSize="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
               <TextBlock Text="{Binding LocalizedStrings[Menu_AddFiles]}" />
             </StackPanel>
@@ -161,7 +161,7 @@
         <MenuItem Command="{Binding DeleteFilesCommand}"
                   IsEnabled="{Binding IsArchiveLoaded}">
           <MenuItem.Header>
-            <StackPanel Orientation="Horizontal" Spacing="4">
+            <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
               <TextBlock Text="✖" FontSize="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
               <TextBlock Text="{Binding LocalizedStrings[Menu_DeleteFiles]}" />
             </StackPanel>
@@ -171,7 +171,7 @@
         <MenuItem Command="{Binding TestArchiveCommand}"
                   IsEnabled="{Binding IsArchiveLoaded}">
           <MenuItem.Header>
-            <StackPanel Orientation="Horizontal" Spacing="4">
+            <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
               <TextBlock Text="✅" FontSize="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
               <TextBlock Text="{Binding LocalizedStrings[Menu_TestArchive]}" />
             </StackPanel>
@@ -181,7 +181,7 @@
         <MenuItem Command="{Binding EditCommentCommand}"
                   IsEnabled="{Binding IsArchiveLoaded}">
           <MenuItem.Header>
-            <StackPanel Orientation="Horizontal" Spacing="4">
+            <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
               <TextBlock Text="💬" FontSize="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
               <TextBlock Text="{Binding LocalizedStrings[Menu_ArchiveComment]}" />
             </StackPanel>
@@ -190,7 +190,7 @@
         <Separator />
         <MenuItem Command="{Binding NewArchiveCommand}" InputGesture="Ctrl+N">
           <MenuItem.Header>
-            <StackPanel Orientation="Horizontal" Spacing="4">
+            <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
               <TextBlock Text="🆕" FontSize="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
               <TextBlock Text="{Binding LocalizedStrings[Menu_NewArchive]}" />
             </StackPanel>
@@ -198,7 +198,7 @@
         </MenuItem>
         <MenuItem Command="{Binding CompressSelectedCommand}" InputGesture="Ctrl+C">
           <MenuItem.Header>
-            <StackPanel Orientation="Horizontal" Spacing="4">
+            <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
               <TextBlock Text="📥" FontSize="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
               <TextBlock Text="{Binding LocalizedStrings[Menu_Compress]}" />
             </StackPanel>
@@ -211,7 +211,7 @@
       <MenuItem Header="{Binding LocalizedStrings[Menu_View]}">
         <MenuItem Command="{Binding ToggleThemeCommand}">
           <MenuItem.Header>
-            <StackPanel Orientation="Horizontal" Spacing="4">
+            <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
               <TextBlock Text="🌓" FontSize="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
               <TextBlock Text="{Binding LocalizedStrings[Menu_ToggleTheme]}" />
             </StackPanel>
@@ -221,7 +221,7 @@
         <MenuItem Command="{Binding ToggleProgressBarsCommand}"
                   IsEnabled="{Binding IsArchiveLoaded}">
           <MenuItem.Header>
-            <StackPanel Orientation="Horizontal" Spacing="4">
+            <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
               <CheckBox IsChecked="{Binding ShowProgressBars}"
                         IsHitTestVisible="False"
                         VerticalAlignment="Center" />
@@ -232,7 +232,7 @@
         <MenuItem Command="{Binding ToggleSepDirBaselineCommand}"
                   IsEnabled="{Binding IsArchiveLoaded}">
           <MenuItem.Header>
-            <StackPanel Orientation="Horizontal" Spacing="4">
+            <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
               <CheckBox IsChecked="{Binding SeparateDirBaseline}"
                         IsHitTestVisible="False"
                         VerticalAlignment="Center" />
@@ -243,7 +243,7 @@
         <Separator />
         <MenuItem Command="{Binding ToggleInfoPanelOrientationCommand}">
           <MenuItem.Header>
-            <StackPanel Orientation="Horizontal" Spacing="4">
+            <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
               <TextBlock Text="📐" FontSize="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
               <TextBlock Text="{Binding LocalizedStrings[Menu_InfoPanelOrientation]}" />
             </StackPanel>
@@ -253,7 +253,7 @@
       <MenuItem Header="{Binding LocalizedStrings[Menu_Help]}">
         <MenuItem Command="{Binding OpenAboutCommand}">
           <MenuItem.Header>
-            <StackPanel Orientation="Horizontal" Spacing="4">
+            <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
               <TextBlock Text="ℹ" FontSize="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
               <TextBlock Text="{Binding LocalizedStrings[Menu_About]}" />
             </StackPanel>
@@ -262,14 +262,14 @@
       </MenuItem>
       <MenuItem>
         <MenuItem.Header>
-          <StackPanel Orientation="Horizontal" Spacing="4">
+          <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
             <TextBlock Text="🧪" FontSize="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
             <TextBlock Text="{Binding LocalizedStrings[Menu_Test]}" />
           </StackPanel>
         </MenuItem.Header>
         <MenuItem Click="TestWindow_Click" Tag="AboutWindow">
           <MenuItem.Header>
-            <StackPanel Orientation="Horizontal" Spacing="4">
+            <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
               <TextBlock Text="ℹ" FontSize="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
               <TextBlock Text="{Binding LocalizedStrings[Test_AboutWindow]}" />
             </StackPanel>
@@ -277,7 +277,7 @@
         </MenuItem>
         <MenuItem Click="TestWindow_Click" Tag="SettingsWindow">
           <MenuItem.Header>
-            <StackPanel Orientation="Horizontal" Spacing="4">
+            <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
               <TextBlock Text="⚙" FontSize="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
               <TextBlock Text="{Binding LocalizedStrings[Test_SettingsWindow]}" />
             </StackPanel>
@@ -285,7 +285,7 @@
         </MenuItem>
         <MenuItem Click="TestWindow_Click" Tag="PasswordManagerWindow">
           <MenuItem.Header>
-            <StackPanel Orientation="Horizontal" Spacing="4">
+            <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
               <TextBlock Text="🔑" FontSize="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
               <TextBlock Text="{Binding LocalizedStrings[Test_PasswordManager]}" />
             </StackPanel>
@@ -293,7 +293,7 @@
         </MenuItem>
         <MenuItem Click="TestWindow_Click" Tag="DonationDialog">
           <MenuItem.Header>
-            <StackPanel Orientation="Horizontal" Spacing="4">
+            <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
               <TextBlock Text="❤" FontSize="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
               <TextBlock Text="{Binding LocalizedStrings[Test_DonationDialog]}" />
             </StackPanel>
@@ -302,7 +302,7 @@
         <Separator />
         <MenuItem Click="TestWindow_Click" Tag="LogPrivacyHelpDialog">
           <MenuItem.Header>
-            <StackPanel Orientation="Horizontal" Spacing="4">
+            <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
               <TextBlock Text="🔒" FontSize="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
               <TextBlock Text="{Binding LocalizedStrings[Test_LogPrivacyHelp]}" />
             </StackPanel>
@@ -310,7 +310,7 @@
         </MenuItem>
         <MenuItem Click="TestWindow_Click" Tag="PasswordHelpDialog">
           <MenuItem.Header>
-            <StackPanel Orientation="Horizontal" Spacing="4">
+            <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
               <TextBlock Text="❓" FontSize="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
               <TextBlock Text="{Binding LocalizedStrings[Test_PasswordHelp]}" />
             </StackPanel>
@@ -319,7 +319,7 @@
         <Separator />
         <MenuItem Click="TestWindow_Click" Tag="CommentDialog">
           <MenuItem.Header>
-            <StackPanel Orientation="Horizontal" Spacing="4">
+            <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
               <TextBlock Text="💬" FontSize="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
               <TextBlock Text="{Binding LocalizedStrings[Test_CommentDialog]}" />
             </StackPanel>
@@ -327,7 +327,7 @@
         </MenuItem>
         <MenuItem Click="TestWindow_Click" Tag="PasswordEditDialog">
           <MenuItem.Header>
-            <StackPanel Orientation="Horizontal" Spacing="4">
+            <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
               <TextBlock Text="✏" FontSize="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
               <TextBlock Text="{Binding LocalizedStrings[Test_PasswordEditDialog]}" />
             </StackPanel>
@@ -335,7 +335,7 @@
         </MenuItem>
         <MenuItem Click="TestWindow_Click" Tag="PasswordDialog">
           <MenuItem.Header>
-            <StackPanel Orientation="Horizontal" Spacing="4">
+            <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
               <TextBlock Text="🔐" FontSize="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
               <TextBlock Text="{Binding LocalizedStrings[Test_PasswordDialog]}" />
             </StackPanel>
@@ -344,7 +344,7 @@
         <Separator />
         <MenuItem Click="TestWindow_Click" Tag="ProgressWindow">
           <MenuItem.Header>
-            <StackPanel Orientation="Horizontal" Spacing="4">
+            <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
               <TextBlock Text="⏳" FontSize="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
               <TextBlock Text="{Binding LocalizedStrings[Test_ProgressWindow]}" />
             </StackPanel>
@@ -352,7 +352,7 @@
         </MenuItem>
         <MenuItem Click="TestWindow_Click" Tag="ErrorDialog">
           <MenuItem.Header>
-            <StackPanel Orientation="Horizontal" Spacing="4">
+            <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
               <TextBlock Text="⚠" FontSize="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
               <TextBlock Text="{Binding LocalizedStrings[Test_ErrorDialog]}" />
             </StackPanel>
@@ -361,7 +361,7 @@
         <Separator />
         <MenuItem Click="TestWindow_Click" Tag="CompressSettingsWindow">
           <MenuItem.Header>
-            <StackPanel Orientation="Horizontal" Spacing="4">
+            <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
               <TextBlock Text="🗜" FontSize="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
               <TextBlock Text="{Binding LocalizedStrings[Test_CompressSettings]}" />
             </StackPanel>
@@ -369,7 +369,7 @@
         </MenuItem>
         <MenuItem Click="TestWindow_Click" Tag="ExtractSettingsWindow">
           <MenuItem.Header>
-            <StackPanel Orientation="Horizontal" Spacing="4">
+            <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
               <TextBlock Text="📦" FontSize="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
               <TextBlock Text="{Binding LocalizedStrings[Test_ExtractSettings]}" />
             </StackPanel>
@@ -377,7 +377,7 @@
         </MenuItem>
         <MenuItem Click="TestWindow_Click" Tag="CompressConflictDialog">
           <MenuItem.Header>
-            <StackPanel Orientation="Horizontal" Spacing="4">
+            <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
               <TextBlock Text="🔄" FontSize="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
               <TextBlock Text="{Binding LocalizedStrings[Test_CompressConflict]}" />
             </StackPanel>
@@ -385,7 +385,7 @@
         </MenuItem>
         <MenuItem Click="TestWindow_Click" Tag="ConflictDialog">
           <MenuItem.Header>
-            <StackPanel Orientation="Horizontal" Spacing="4">
+            <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
               <TextBlock Text="⚡" FontSize="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
               <TextBlock Text="{Binding LocalizedStrings[Test_ConflictDialog]}" />
             </StackPanel>
@@ -393,7 +393,7 @@
         </MenuItem>
         <MenuItem Click="TestWindow_Click" Tag="MatchedPasswordDialog">
           <MenuItem.Header>
-            <StackPanel Orientation="Horizontal" Spacing="4">
+            <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
               <TextBlock Text="🔓" FontSize="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
               <TextBlock Text="{Binding LocalizedStrings[Test_MatchedPassword]}" />
             </StackPanel>
@@ -402,7 +402,7 @@
         <Separator />
         <MenuItem Click="TestWindow_Click" Tag="ElevationDialog">
           <MenuItem.Header>
-            <StackPanel Orientation="Horizontal" Spacing="4">
+            <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
               <TextBlock Text="🛡" FontSize="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
               <TextBlock Text="{Binding LocalizedStrings[Test_ElevationDialog]}" />
             </StackPanel>
@@ -410,7 +410,7 @@
         </MenuItem>
         <MenuItem Click="TestWindow_Click" Tag="ElevationFailedDialog">
           <MenuItem.Header>
-            <StackPanel Orientation="Horizontal" Spacing="4">
+            <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
               <TextBlock Text="⚠" FontSize="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
               <TextBlock Text="{Binding LocalizedStrings[Test_ElevationFailedDialog]}" />
             </StackPanel>
@@ -418,7 +418,7 @@
         </MenuItem>
         <MenuItem Click="TestWindow_Click" Tag="ElevationInfoDialog">
           <MenuItem.Header>
-            <StackPanel Orientation="Horizontal" Spacing="4">
+            <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
               <TextBlock Text="ℹ" FontSize="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
               <TextBlock Text="{Binding LocalizedStrings[Test_ElevationInfoDialog]}" />
             </StackPanel>
@@ -427,7 +427,7 @@
         <Separator />
         <MenuItem Click="TestWindow_Click" Tag="AddFavoriteDialog">
           <MenuItem.Header>
-            <StackPanel Orientation="Horizontal" Spacing="4">
+            <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
               <TextBlock Text="⭐" FontSize="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
               <TextBlock Text="{Binding LocalizedStrings[Test_AddFavoriteDialog]}" />
             </StackPanel>
@@ -435,7 +435,7 @@
         </MenuItem>
         <MenuItem Click="TestWindow_Click" Tag="FavoriteManagerWindow">
           <MenuItem.Header>
-            <StackPanel Orientation="Horizontal" Spacing="4">
+            <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
               <TextBlock Text="📋" FontSize="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
               <TextBlock Text="{Binding LocalizedStrings[Test_FavoriteManagerWindow]}" />
             </StackPanel>
@@ -443,7 +443,7 @@
         </MenuItem>
         <MenuItem Click="TestWindow_Click" Tag="QuickPathDialog">
           <MenuItem.Header>
-            <StackPanel Orientation="Horizontal" Spacing="4">
+            <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
               <TextBlock Text="🔗" FontSize="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
               <TextBlock Text="{Binding LocalizedStrings[Test_QuickPathDialog]}" />
             </StackPanel>
@@ -451,7 +451,7 @@
         </MenuItem>
         <MenuItem Click="TestWindow_Click" Tag="QuickPathPreDialog">
           <MenuItem.Header>
-            <StackPanel Orientation="Horizontal" Spacing="4">
+            <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
               <TextBlock Text="🔗" FontSize="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
               <TextBlock Text="{Binding LocalizedStrings[Test_QuickPathPreDialog]}" />
             </StackPanel>
@@ -460,7 +460,7 @@
         <Separator />
         <MenuItem Click="TestWindow_Click" Tag="ArchiveCommentDialog">
           <MenuItem.Header>
-            <StackPanel Orientation="Horizontal" Spacing="4">
+            <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
               <TextBlock Text="💬" FontSize="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
               <TextBlock Text="{Binding LocalizedStrings[Test_ArchiveCommentDialog]}" />
             </StackPanel>
@@ -468,7 +468,7 @@
         </MenuItem>
         <MenuItem Click="TestWindow_Click" Tag="ArchiveSaveAsDialog">
           <MenuItem.Header>
-            <StackPanel Orientation="Horizontal" Spacing="4">
+            <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
               <TextBlock Text="💾" FontSize="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
               <TextBlock Text="{Binding LocalizedStrings[Test_ArchiveSaveAsDialog]}" />
             </StackPanel>
@@ -476,7 +476,7 @@
         </MenuItem>
         <MenuItem Click="TestWindow_Click" Tag="UnifiedExtractDialog">
           <MenuItem.Header>
-            <StackPanel Orientation="Horizontal" Spacing="4">
+            <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
               <TextBlock Text="📦" FontSize="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
               <TextBlock Text="{Binding LocalizedStrings[Test_UnifiedExtractDialog]}" />
             </StackPanel>
@@ -485,7 +485,7 @@
         <Separator />
         <MenuItem Click="TestWindow_Click" Tag="AppMessageBox">
           <MenuItem.Header>
-            <StackPanel Orientation="Horizontal" Spacing="4">
+            <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
               <TextBlock Text="💬" FontSize="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
               <TextBlock Text="{Binding LocalizedStrings[Test_AppMessageBox]}" />
             </StackPanel>
@@ -500,11 +500,11 @@
       </MenuItem>
     </Menu>
 
-    <!-- Toolbar (Row 1) -->
+    <!-- Toolbar (Row 1) — simplified: archive operations only -->
     <Border Grid.Row="1"
             Padding="6,4"
             Background="{DynamicResource ThemeHeaderBgBrush}">
-      <StackPanel Orientation="Horizontal" Spacing="4">
+      <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
         <Button Classes="ToolbarButton"
                 Command="{Binding NewArchiveCommand}"
                 ToolTip.Tip="{Binding LocalizedStrings[Tooltip_New]}">
@@ -534,15 +534,6 @@
           </StackPanel>
         </Button>
         <Button Classes="ToolbarButton"
-                Command="{Binding CompressSelectedCommand}"
-                ToolTip.Tip="{Binding LocalizedStrings[Tooltip_Compress]}">
-          <StackPanel >
-            <TextBlock Text="📥" Classes="ToolbarButtonIcon" />
-            <TextBlock Text="{Binding LocalizedStrings[Toolbar_Compress]}"
-                       Classes="ToolbarButtonLabel" />
-          </StackPanel>
-        </Button>
-        <Button Classes="ToolbarButton"
                 Command="{Binding SmartExtractCommand}"
                 IsEnabled="{Binding IsArchiveLoaded}"
                 ToolTip.Tip="{Binding LocalizedStrings[Tooltip_SmartExtract]}">
@@ -552,29 +543,15 @@
                        Classes="ToolbarButtonLabel" />
           </StackPanel>
         </Button>
-        <Border Width="1"
-                Height="24"
-                VerticalAlignment="Center"
-                Background="{DynamicResource ThemeBorderBrush}"
-                Margin="4,0" />
-        <ToggleButton Classes="ToolbarButton"
-                      IsChecked="{Binding IsFilterBarVisible}"
-                      ToolTip.Tip="{Binding LocalizedStrings[Tooltip_Filter]}">
+        <Button Classes="ToolbarButton"
+                Command="{Binding CompressSelectedCommand}"
+                ToolTip.Tip="{Binding LocalizedStrings[Tooltip_Compress]}">
           <StackPanel >
-            <TextBlock Text="🔍" Classes="ToolbarButtonIcon" />
-            <TextBlock Text="{Binding LocalizedStrings[Toolbar_Filter]}"
+            <TextBlock Text="📥" Classes="ToolbarButtonIcon" />
+            <TextBlock Text="{Binding LocalizedStrings[Toolbar_Compress]}"
                        Classes="ToolbarButtonLabel" />
           </StackPanel>
-        </ToggleButton>
-        <ToggleButton Classes="ToolbarButton"
-                      IsChecked="{Binding IsPreviewVisible}"
-                      ToolTip.Tip="{Binding LocalizedStrings[Tooltip_Preview]}">
-          <StackPanel >
-            <TextBlock Text="👁" Classes="ToolbarButtonIcon" />
-            <TextBlock Text="{Binding LocalizedStrings[Toolbar_Preview]}"
-                       Classes="ToolbarButtonLabel" />
-          </StackPanel>
-        </ToggleButton>
+        </Button>
         <Border Width="1"
                 Height="24"
                 VerticalAlignment="Center"
@@ -600,20 +577,6 @@
                        Classes="ToolbarButtonLabel" />
           </StackPanel>
         </Button>
-        <ToggleButton Classes="ToolbarButton"
-                      IsChecked="{Binding ShowSubfolders}"
-                      ToolTip.Tip="{Binding LocalizedStrings[Tooltip_Subfolders]}">
-          <StackPanel >
-            <TextBlock Text="📂" Classes="ToolbarButtonIcon" />
-            <TextBlock Text="{Binding LocalizedStrings[Filter_ShowSubfolders]}"
-                       Classes="ToolbarButtonLabel" />
-          </StackPanel>
-        </ToggleButton>
-        <Border Width="1"
-                Height="24"
-                VerticalAlignment="Center"
-                Background="{DynamicResource ThemeBorderBrush}"
-                Margin="4,0" />
         <Button Classes="ToolbarButton"
                 Command="{Binding TestArchiveCommand}"
                 IsEnabled="{Binding IsArchiveLoaded}"
@@ -624,6 +587,20 @@
                        Classes="ToolbarButtonLabel" />
           </StackPanel>
         </Button>
+        <Border Width="1"
+                Height="24"
+                VerticalAlignment="Center"
+                Background="{DynamicResource ThemeBorderBrush}"
+                Margin="4,0" />
+        <ToggleButton Classes="ToolbarButton"
+                      IsChecked="{Binding IsPreviewVisible}"
+                      ToolTip.Tip="{Binding LocalizedStrings[Tooltip_Preview]}">
+          <StackPanel >
+            <TextBlock Text="👁" Classes="ToolbarButtonIcon" />
+            <TextBlock Text="{Binding LocalizedStrings[Toolbar_Preview]}"
+                       Classes="ToolbarButtonLabel" />
+          </StackPanel>
+        </ToggleButton>
         <Border Width="1"
                 Height="24"
                 VerticalAlignment="Center"
@@ -663,12 +640,12 @@
           </Grid.ColumnDefinitions>
           <!-- Row 0: 🔍 + search box + match mode -->
           <TextBlock Grid.Row="0" Grid.Column="0" Text="🔍" FontSize="13" Margin="2,0,4,2" VerticalAlignment="Center" />
-          <TextBox Grid.Row="0" Grid.Column="1" Height="22" FontSize="11"
+          <TextBox Grid.Row="0" Grid.Column="1" Height="{DynamicResource ControlHeightXs}" FontSize="11"
                    Text="{Binding FilterText}" Margin="0,0,0,2"
                    Background="{DynamicResource ThemeWindowBgBrush}"
                    Foreground="{DynamicResource ThemeTextPrimaryBrush}"
                    BorderBrush="{DynamicResource ThemeBorderBrush}" />
-          <ComboBox Grid.Row="0" Grid.Column="2" Height="22" FontSize="11" Margin="2,0,0,2"
+          <ComboBox Grid.Row="0" Grid.Column="2" Height="{DynamicResource ControlHeightXs}" FontSize="11" Margin="2,0,0,2"
                     ItemsSource="{Binding MatchModeOptions}"
                     SelectedItem="{Binding SelectedMatchModeOption}"
                     Background="{DynamicResource ThemeWindowBgBrush}"
@@ -683,7 +660,7 @@
           </ComboBox>
           <!-- Row 1: ⊘ + exclude box -->
           <TextBlock Grid.Row="1" Grid.Column="0" Text="⊘" FontSize="13" Margin="2,0,4,0" VerticalAlignment="Center" />
-          <TextBox Grid.Row="1" Grid.Column="1" Height="22" FontSize="11"
+          <TextBox Grid.Row="1" Grid.Column="1" Height="{DynamicResource ControlHeightXs}" FontSize="11"
                    Text="{Binding FilterExcludeText}"
                    ToolTip.Tip="{Binding LocalizedStrings[Filter_Exclude]}"
                    PlaceholderText="{Binding LocalizedStrings[Filter_Exclude]}"
@@ -708,7 +685,7 @@
               <TextBlock Text="{Binding LocalizedStrings[Filter_DateFrom]}"
                          FontSize="11" VerticalAlignment="Center" Margin="0,0,2,0"
                          Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
-              <DatePicker x:Name="FilterDateFromPicker" Width="105" Height="22"
+              <DatePicker x:Name="FilterDateFromPicker" Width="105" Height="{DynamicResource ControlHeightXs}"
                           SelectedDate="{Binding FilterDateFrom, Converter={StaticResource DateTimeToOffsetConverter}}"
                           Background="{DynamicResource ThemeWindowBgBrush}"
                           Foreground="{DynamicResource ThemeTextPrimaryBrush}"
@@ -724,7 +701,7 @@
               <TextBlock Text="{Binding LocalizedStrings[Filter_DateTo]}"
                          FontSize="11" VerticalAlignment="Center" Margin="0,0,2,0"
                          Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
-              <DatePicker x:Name="FilterDateToPicker" Width="105" Height="22"
+              <DatePicker x:Name="FilterDateToPicker" Width="105" Height="{DynamicResource ControlHeightXs}"
                           SelectedDate="{Binding FilterDateTo, Converter={StaticResource DateTimeToOffsetConverter}}"
                           Background="{DynamicResource ThemeWindowBgBrush}"
                           Foreground="{DynamicResource ThemeTextPrimaryBrush}"
@@ -749,13 +726,13 @@
               <TextBlock Text="{Binding LocalizedStrings[Filter_SizeMin]}"
                          FontSize="11" VerticalAlignment="Center" Margin="0,0,2,0"
                          Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
-              <TextBox Width="60" Height="22"
+              <TextBox Width="60" Height="{DynamicResource ControlHeightXs}"
                        Text="{Binding FilterSizeMin, Converter={StaticResource NullableLongConverter}}"
                        Background="{DynamicResource ThemeWindowBgBrush}"
                        Foreground="{DynamicResource ThemeTextPrimaryBrush}"
                        BorderBrush="{DynamicResource ThemeBorderBrush}"
                        Padding="2,0" BorderThickness="1" />
-              <ComboBox Width="65" Height="22" Margin="2,0,0,0"
+              <ComboBox Width="65" Height="{DynamicResource ControlHeightXs}" Margin="2,0,0,0"
                          ItemsSource="{Binding SizeUnitOptions}"
                          SelectedItem="{Binding FilterSizeUnit}"
                          Background="{DynamicResource ThemeWindowBgBrush}"
@@ -773,7 +750,7 @@
               <TextBlock Text="{Binding LocalizedStrings[Filter_SizeMax]}"
                          FontSize="11" VerticalAlignment="Center" Margin="0,0,2,0"
                          Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
-              <TextBox Width="60" Height="22"
+              <TextBox Width="60" Height="{DynamicResource ControlHeightXs}"
                        Text="{Binding FilterSizeMax, Converter={StaticResource NullableLongConverter}}"
                        Background="{DynamicResource ThemeWindowBgBrush}"
                        Foreground="{DynamicResource ThemeTextPrimaryBrush}"
@@ -792,7 +769,7 @@
               Background="{DynamicResource ThemeWindowBgBrush}">
         <StackPanel VerticalAlignment="Center"
                     HorizontalAlignment="Center"
-                    Spacing="8">
+                    Spacing="{DynamicResource SpacingXs}">
           <TextBlock Text="📂" FontSize="64" HorizontalAlignment="Center" />
           <TextBlock Text="{Binding LocalizedStrings[Main_DropHint]}"
                      FontSize="16"
@@ -805,23 +782,67 @@
       <!-- Archive content (hidden when no archive loaded) -->
       <Grid IsVisible="{Binding IsArchiveLoaded}"
             ColumnDefinitions="Auto,5,2.5*,5,3*">
-      <!-- Folder tree -->
+      <!-- Folder tree panel (col 0) with tree toolbar -->
       <Border Grid.Column="0"
               Width="220"
               Background="{DynamicResource ThemeSurfaceBgBrush}">
-        <Grid RowDefinitions="Auto,*">
-          <TextBlock Text="{Binding LocalizedStrings[Tree_Browse]}"
-                     Margin="8,6"
+        <Grid RowDefinitions="Auto,Auto,Auto,*">
+          <!-- Tree toolbar -->
+          <Border Grid.Row="0"
+                  Padding="4,2"
+                  Background="{DynamicResource ThemeHeaderBgBrush}">
+            <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
+              <Button Classes="ToolbarButton"
+                      Command="{Binding ExpandAllCommand}"
+                      IsEnabled="{Binding IsArchiveLoaded}"
+                      ToolTip.Tip="{Binding LocalizedStrings[Tree_ExpandAll]}">
+                <TextBlock Text="📂+" FontSize="13" />
+              </Button>
+              <Button Classes="ToolbarButton"
+                      Command="{Binding CollapseAllCommand}"
+                      IsEnabled="{Binding IsArchiveLoaded}"
+                      ToolTip.Tip="{Binding LocalizedStrings[Tree_CollapseAll]}">
+                <TextBlock Text="📂−" FontSize="13" />
+              </Button>
+              <Button Classes="ToolbarButton"
+                      Command="{Binding ExpandToCurrentCommand}"
+                      IsEnabled="{Binding IsArchiveLoaded}"
+                      ToolTip.Tip="{Binding LocalizedStrings[Tree_ExpandToCurrent]}">
+                <TextBlock Text="📂→" FontSize="13" />
+              </Button>
+            </StackPanel>
+          </Border>
+          <!-- Header -->
+          <TextBlock Grid.Row="1"
+                     Text="{Binding LocalizedStrings[Tree_Browse]}"
+                     Margin="8,4"
                      FontWeight="SemiBold"
                      Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
-          <TreeView Grid.Row="1"
+          <!-- Tree search -->
+          <TextBox Grid.Row="2"
+                   Height="{DynamicResource ControlHeightSm}"
+                   x:Name="TreeSearchBox"
+                   Text="{Binding TreeFilterText}"
+                   PlaceholderText="{Binding LocalizedStrings[Tree_Filter]}"
+                   Margin="4,0,4,2"
+                   Background="{DynamicResource ThemeWindowBgBrush}"
+                   Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                   BorderBrush="{DynamicResource ThemeBorderBrush}" />
+          <!-- TreeView with IsExpanded/IsVisible bindings -->
+          <TreeView Grid.Row="3"
                     ItemsSource="{Binding FolderTreeItems}"
                     SelectedItem="{Binding SelectedFolder}"
                     BorderThickness="0"
                     Background="Transparent">
+            <TreeView.Styles>
+              <Style Selector="TreeViewItem" x:CompileBindings="False">
+                <Setter Property="IsExpanded" Value="{Binding IsExpanded}" />
+                <Setter Property="IsVisible" Value="{Binding IsVisible}" />
+              </Style>
+            </TreeView.Styles>
             <TreeView.ItemTemplate>
               <TreeDataTemplate ItemsSource="{Binding Children}">
-                <StackPanel Orientation="Horizontal" Spacing="4"
+                <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}"
                             Margin="4,2">
                   <TextBlock Text="{Binding Icon}"
                              FontSize="14" />
@@ -837,171 +858,305 @@
       <GridSplitter Grid.Column="1"
                     Width="5" />
 
-      <!-- File list as DataGrid -->
-      <DataGrid x:Name="FileListGrid"
-                Grid.Column="2"
-                ItemsSource="{Binding CurrentEntries}"
-                SelectedItem="{Binding SelectedEntry}"
-                AutoGenerateColumns="False"
-                CanUserSortColumns="True"
-                IsReadOnly="True"
-                SelectionChanged="FileListGrid_SelectionChanged"
-                DoubleTapped="FileListGrid_DoubleTapped"
-                KeyDown="FileListGrid_KeyDown"
-                Sorting="FileListGrid_Sorting">
-        <DataGrid.ContextMenu>
-          <ContextMenu>
-            <MenuItem Header="{Binding LocalizedStrings[Ctx_Extract]}"
-                      Command="{Binding ExtractArchiveCommand}" />
-            <MenuItem Header="{Binding LocalizedStrings[Ctx_SmartExtract]}"
-                      Command="{Binding SmartExtractCommand}" />
-            <MenuItem Header="{Binding LocalizedStrings[Ctx_ExtractTo]}"
-                      Command="{Binding ExtractToCommand}" />
-            <Separator />
-            <MenuItem Header="{Binding LocalizedStrings[Ctx_CopyName]}"
-                      Command="{Binding CopyFileNameCommand}" />
-            <MenuItem Header="{Binding LocalizedStrings[Ctx_Test]}"
-                      Command="{Binding TestEntryCommand}" />
-            <Separator />
-            <MenuItem Header="{Binding LocalizedStrings[Ctx_Delete]}"
-                      Command="{Binding DeleteFilesCommand}" />
-          </ContextMenu>
-        </DataGrid.ContextMenu>
-        <DataGrid.Columns>
-          <DataGridTemplateColumn Header="" Width="22">
-            <DataTemplate>
-              <Image Source="{Binding IconSource}"
-                     Width="16" Height="16"
-                     VerticalAlignment="Center"
-                     HorizontalAlignment="Center" />
-            </DataTemplate>
-          </DataGridTemplateColumn>
-          <DataGridTextColumn SortMemberPath="Name"
-                              Width="*">
-            <DataGridTextColumn.Header>
-              <StackPanel Orientation="Horizontal" Spacing="3">
+      <!-- File list panel (col 2) with file list toolbar -->
+      <Grid Grid.Column="2">
+        <Grid RowDefinitions="Auto,*">
+          <!-- File list toolbar -->
+          <Border Grid.Row="0"
+                  Padding="4,2"
+                  Background="{DynamicResource ThemeHeaderBgBrush}">
+            <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
+              <!-- Navigation group -->
+              <Button Classes="ToolbarButton"
+                      Command="{Binding GoRootCommand}"
+                      IsEnabled="{Binding IsArchiveLoaded}"
+                      ToolTip.Tip="{Binding LocalizedStrings[Nav_GoRoot]}">
+                <TextBlock Text="🏠" FontSize="13" />
+              </Button>
+              <Button Classes="ToolbarButton"
+                      Command="{Binding GoUpCommand}"
+                      IsEnabled="{Binding IsArchiveLoaded}"
+                      ToolTip.Tip="{Binding LocalizedStrings[Menu_ExtractHere]}">
+                <TextBlock Text="↑" FontSize="13" />
+              </Button>
+              <Button Classes="ToolbarButton"
+                      Command="{Binding GoBackCommand}"
+                      IsEnabled="{Binding CanGoBack}"
+                      ToolTip.Tip="{Binding LocalizedStrings[Nav_GoBack]}">
+                <TextBlock Text="◀" FontSize="13" />
+              </Button>
+              <Button Classes="ToolbarButton"
+                      Command="{Binding GoForwardCommand}"
+                      IsEnabled="{Binding CanGoForward}"
+                      ToolTip.Tip="{Binding LocalizedStrings[Nav_GoForward]}">
+                <TextBlock Text="▶" FontSize="13" />
+              </Button>
+
+              <Border Width="1" Height="20" Margin="2,0"
+                      VerticalAlignment="Center"
+                      Background="{DynamicResource ThemeBorderBrush}" />
+
+              <!-- Address bar -->
+              <AutoCompleteBox Width="160" Height="{DynamicResource ControlHeightSm}"
+                               x:Name="AddressBar"
+                               Text="{Binding CurrentFolder}"
+                               ItemsSource="{Binding FolderPaths}"
+                               FilterMode="StartsWith"
+                               PlaceholderText="{Binding LocalizedStrings[Nav_AddressBar]}"
+                               KeyDown="AddressBar_KeyDown"
+                               Background="{DynamicResource ThemeWindowBgBrush}"
+                               Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                               BorderBrush="{DynamicResource ThemeBorderBrush}" />
+
+              <Border Width="1" Height="20" Margin="2,0"
+                      VerticalAlignment="Center"
+                      Background="{DynamicResource ThemeBorderBrush}" />
+
+              <!-- Copy name -->
+              <Button Classes="ToolbarButton"
+                      Command="{Binding CopyFileNameCommand}"
+                      IsEnabled="{Binding IsArchiveLoaded}"
+                      ToolTip.Tip="{Binding LocalizedStrings[Toolbar_CopyName]}">
                 <TextBlock Text="📋" FontSize="13" />
-                <TextBlock Text="{Binding LocalizedStrings[DataGrid_Name]}" />
-              </StackPanel>
-            </DataGridTextColumn.Header>
-            <DataGridTextColumn.Binding>
-              <Binding Path="NameDisplay" />
-            </DataGridTextColumn.Binding>
-          </DataGridTextColumn>
-          <DataGridTemplateColumn SortMemberPath="Size"
-                                  Width="80">
-            <DataGridTemplateColumn.Header>
-              <StackPanel Orientation="Horizontal" Spacing="3">
-                <TextBlock Text="📏" FontSize="13" />
-                <TextBlock Text="{Binding LocalizedStrings[DataGrid_Size]}" />
-              </StackPanel>
-            </DataGridTemplateColumn.Header>
-            <DataGridTemplateColumn.CellTemplate>
-              <DataTemplate>
-                <Grid>
-                  <Rectangle Fill="{DynamicResource ProgressBarSizeBrush}"
-                             HorizontalAlignment="Left">
-                    <Rectangle.Width>
-                      <MultiBinding Converter="{StaticResource RatioToWidthConverter}">
-                        <Binding Path="SizeRatio" />
-                        <Binding Path="Bounds.Width"
-                                 RelativeSource="{RelativeSource AncestorType=ContentPresenter}" />
-                      </MultiBinding>
-                    </Rectangle.Width>
-                  </Rectangle>
-                  <TextBlock Text="{Binding SizeDisplay}"
-                             VerticalAlignment="Center"
-                             Margin="4,0" />
-                </Grid>
-              </DataTemplate>
-            </DataGridTemplateColumn.CellTemplate>
-          </DataGridTemplateColumn>
-          <DataGridTemplateColumn SortMemberPath="CompressedSize"
-                                  Width="70">
-            <DataGridTemplateColumn.Header>
-              <StackPanel Orientation="Horizontal" Spacing="3">
-                <TextBlock Text="📦" FontSize="13" />
-                <TextBlock Text="{Binding LocalizedStrings[DataGrid_Compressed]}" />
-              </StackPanel>
-            </DataGridTemplateColumn.Header>
-            <DataGridTemplateColumn.CellTemplate>
-              <DataTemplate>
-                <Grid>
-                  <Rectangle Fill="{DynamicResource ProgressBarCompressedSizeBrush}"
-                             HorizontalAlignment="Left">
-                    <Rectangle.Width>
-                      <MultiBinding Converter="{StaticResource RatioToWidthConverter}">
-                        <Binding Path="CompressedSizeRatio" />
-                        <Binding Path="Bounds.Width"
-                                 RelativeSource="{RelativeSource AncestorType=ContentPresenter}" />
-                      </MultiBinding>
-                    </Rectangle.Width>
-                  </Rectangle>
-                  <TextBlock Text="{Binding CompressedSizeDisplay}"
-                             VerticalAlignment="Center"
-                             Margin="4,0" />
-                </Grid>
-              </DataTemplate>
-            </DataGridTemplateColumn.CellTemplate>
-          </DataGridTemplateColumn>
-          <DataGridTemplateColumn SortMemberPath="RatioSort"
-                                  Width="70">
-            <DataGridTemplateColumn.Header>
-              <StackPanel Orientation="Horizontal" Spacing="3">
-                <TextBlock Text="📊" FontSize="13" />
-                <TextBlock Text="{Binding LocalizedStrings[DataGrid_Ratio]}" />
-              </StackPanel>
-            </DataGridTemplateColumn.Header>
-            <DataGridTemplateColumn.CellTemplate>
-              <DataTemplate>
-                <Grid>
-                  <Rectangle Fill="{DynamicResource ProgressBarRatioBrush}"
-                             HorizontalAlignment="Left">
-                    <Rectangle.Width>
-                      <MultiBinding Converter="{StaticResource RatioToWidthConverter}">
-                        <Binding Path="RatioBarValue" />
-                        <Binding Path="Bounds.Width"
-                                 RelativeSource="{RelativeSource AncestorType=ContentPresenter}" />
-                      </MultiBinding>
-                    </Rectangle.Width>
-                  </Rectangle>
-                  <TextBlock Text="{Binding RatioDisplay}"
-                             VerticalAlignment="Center"
-                             Margin="4,0" />
-                </Grid>
-              </DataTemplate>
-            </DataGridTemplateColumn.CellTemplate>
-          </DataGridTemplateColumn>
-          <DataGridTemplateColumn SortMemberPath="LastModified"
-                                  Width="100">
-            <DataGridTemplateColumn.Header>
-              <StackPanel Orientation="Horizontal" Spacing="3">
-                <TextBlock Text="📅" FontSize="13" />
-                <TextBlock Text="{Binding LocalizedStrings[DataGrid_Modified]}" />
-              </StackPanel>
-            </DataGridTemplateColumn.Header>
-            <DataGridTemplateColumn.CellTemplate>
-              <DataTemplate>
-                <Grid>
-                  <Rectangle Fill="{DynamicResource ProgressBarDateBrush}"
-                             HorizontalAlignment="Left">
-                    <Rectangle.Width>
-                      <MultiBinding Converter="{StaticResource RatioToWidthConverter}">
-                        <Binding Path="DateRatio" />
-                        <Binding Path="Bounds.Width"
-                                 RelativeSource="{RelativeSource AncestorType=ContentPresenter}" />
-                      </MultiBinding>
-                    </Rectangle.Width>
-                  </Rectangle>
-                  <TextBlock Text="{Binding LastModifiedDisplay}"
-                             VerticalAlignment="Center"
-                             Margin="4,0" />
-                </Grid>
-              </DataTemplate>
-            </DataGridTemplateColumn.CellTemplate>
-          </DataGridTemplateColumn>
-        </DataGrid.Columns>
-      </DataGrid>
+              </Button>
+
+              <!-- Column picker -->
+              <Button x:Name="ColumnPickerButton" Classes="ToolbarButton"
+                      Command="{Binding ShowColumnPickerCommand}"
+                      IsEnabled="{Binding IsArchiveLoaded}"
+                      ToolTip.Tip="{Binding LocalizedStrings[Toolbar_Columns]}">
+                <TextBlock Text="☰" FontSize="13" />
+              </Button>
+
+              <!-- View mode toggle -->
+              <Button Classes="ToolbarButton"
+                      Command="{Binding CycleViewModeCommand}"
+                      IsEnabled="{Binding IsArchiveLoaded}"
+                      ToolTip.Tip="{Binding LocalizedStrings[Toolbar_ViewMode]}">
+                <TextBlock Text="▧" FontSize="13" />
+              </Button>
+              <TextBlock Text="{Binding ViewModeLabel}"
+                         FontSize="10"
+                         Foreground="{DynamicResource ThemeTextSecondaryBrush}"
+                         VerticalAlignment="Center" />
+
+              <Border Width="1" Height="20" Margin="2,0"
+                      VerticalAlignment="Center"
+                      Background="{DynamicResource ThemeBorderBrush}" />
+
+              <!-- Select All / Invert -->
+              <Button Classes="ToolbarButton"
+                      Command="{Binding SelectAllCommand}"
+                      IsEnabled="{Binding IsArchiveLoaded}"
+                      ToolTip.Tip="{Binding LocalizedStrings[Toolbar_SelectAll]}">
+                <TextBlock Text="◐" FontSize="13" />
+              </Button>
+              <Button Classes="ToolbarButton"
+                      Command="{Binding InvertSelectionCommand}"
+                      IsEnabled="{Binding IsArchiveLoaded}"
+                      ToolTip.Tip="{Binding LocalizedStrings[Toolbar_InvertSelection]}">
+                <TextBlock Text="⊗" FontSize="13" />
+              </Button>
+
+              <Border Width="1" Height="20" Margin="2,0"
+                      VerticalAlignment="Center"
+                      Background="{DynamicResource ThemeBorderBrush}" />
+
+              <!-- Refresh -->
+              <Button Classes="ToolbarButton"
+                      Command="{Binding RefreshArchiveCommand}"
+                      IsEnabled="{Binding IsArchiveLoaded}"
+                      ToolTip.Tip="{Binding LocalizedStrings[Toolbar_Refresh]}">
+                <TextBlock Text="🔄" FontSize="13" />
+              </Button>
+
+              <Border Width="1" Height="20" Margin="2,0"
+                      VerticalAlignment="Center"
+                      Background="{DynamicResource ThemeBorderBrush}" />
+
+              <!-- Filter toggle + Flatten toggle (moved from global toolbar) -->
+              <ToggleButton Classes="ToolbarButton"
+                            IsChecked="{Binding IsFilterBarVisible}"
+                            IsEnabled="{Binding IsArchiveLoaded}"
+                            ToolTip.Tip="{Binding LocalizedStrings[Tooltip_Filter]}">
+                <TextBlock Text="🔍" FontSize="13" />
+              </ToggleButton>
+              <ToggleButton Classes="ToolbarButton"
+                            IsChecked="{Binding ShowSubfolders}"
+                            IsEnabled="{Binding IsArchiveLoaded}"
+                            ToolTip.Tip="{Binding LocalizedStrings[Tooltip_Subfolders]}">
+                <TextBlock Text="📂" FontSize="13" />
+              </ToggleButton>
+            </StackPanel>
+          </Border>
+
+          <!-- DataGrid -->
+          <DataGrid x:Name="FileListGrid"
+                    Grid.Row="1"
+                    ItemsSource="{Binding CurrentEntries}"
+                    SelectedItem="{Binding SelectedEntry}"
+                    AutoGenerateColumns="False"
+                    CanUserSortColumns="True"
+                    IsReadOnly="True"
+                    SelectionChanged="FileListGrid_SelectionChanged"
+                    DoubleTapped="FileListGrid_DoubleTapped"
+                    KeyDown="FileListGrid_KeyDown"
+                    Sorting="FileListGrid_Sorting">
+            <DataGrid.ContextMenu>
+              <ContextMenu>
+                <MenuItem Header="{Binding LocalizedStrings[Ctx_Extract]}"
+                          Command="{Binding ExtractArchiveCommand}" />
+                <MenuItem Header="{Binding LocalizedStrings[Ctx_SmartExtract]}"
+                          Command="{Binding SmartExtractCommand}" />
+                <MenuItem Header="{Binding LocalizedStrings[Ctx_ExtractTo]}"
+                          Command="{Binding ExtractToCommand}" />
+                <Separator />
+                <MenuItem Header="{Binding LocalizedStrings[Ctx_CopyName]}"
+                          Command="{Binding CopyFileNameCommand}" />
+                <MenuItem Header="{Binding LocalizedStrings[Ctx_Test]}"
+                          Command="{Binding TestEntryCommand}" />
+                <Separator />
+                <MenuItem Header="{Binding LocalizedStrings[Ctx_Delete]}"
+                          Command="{Binding DeleteFilesCommand}" />
+              </ContextMenu>
+            </DataGrid.ContextMenu>
+            <DataGrid.Columns>
+              <DataGridTemplateColumn Header="" Width="22">
+                <DataTemplate>
+                  <Image Source="{Binding IconSource}"
+                         Width="16" Height="16"
+                         VerticalAlignment="Center"
+                         HorizontalAlignment="Center" />
+                </DataTemplate>
+              </DataGridTemplateColumn>
+              <DataGridTextColumn SortMemberPath="Name"
+                                  Width="*">
+                <DataGridTextColumn.Header>
+                    <StackPanel Orientation="Horizontal" Spacing="3">
+                        <TextBlock Text="📋" FontSize="13" />
+                        <TextBlock Text="{Binding LocalizedStrings[DataGrid_Name]}" />
+                    </StackPanel>
+                </DataGridTextColumn.Header>
+                <DataGridTextColumn.Binding>
+                  <Binding Path="NameDisplay" />
+                </DataGridTextColumn.Binding>
+              </DataGridTextColumn>
+              <DataGridTemplateColumn SortMemberPath="Size"
+                                      Width="80">
+                <DataGridTemplateColumn.Header>
+                    <StackPanel Orientation="Horizontal" Spacing="3">
+                        <TextBlock Text="📏" FontSize="13" />
+                        <TextBlock Text="{Binding LocalizedStrings[DataGrid_Size]}" />
+                    </StackPanel>
+                </DataGridTemplateColumn.Header>
+                <DataGridTemplateColumn.CellTemplate>
+                  <DataTemplate>
+                    <Grid>
+                      <Rectangle Fill="{DynamicResource ProgressBarSizeBrush}"
+                                 HorizontalAlignment="Left">
+                        <Rectangle.Width>
+                          <MultiBinding Converter="{StaticResource RatioToWidthConverter}">
+                            <Binding Path="SizeRatio" />
+                            <Binding Path="Bounds.Width"
+                                     RelativeSource="{RelativeSource AncestorType=ContentPresenter}" />
+                          </MultiBinding>
+                        </Rectangle.Width>
+                      </Rectangle>
+                      <TextBlock Text="{Binding SizeDisplay}"
+                                 VerticalAlignment="Center"
+                                 Margin="4,0" />
+                    </Grid>
+                  </DataTemplate>
+                </DataGridTemplateColumn.CellTemplate>
+              </DataGridTemplateColumn>
+              <DataGridTemplateColumn SortMemberPath="CompressedSize"
+                                      Width="70">
+                <DataGridTemplateColumn.Header>
+                    <StackPanel Orientation="Horizontal" Spacing="3">
+                        <TextBlock Text="📦" FontSize="13" />
+                        <TextBlock Text="{Binding LocalizedStrings[DataGrid_Compressed]}" />
+                    </StackPanel>
+                </DataGridTemplateColumn.Header>
+                <DataGridTemplateColumn.CellTemplate>
+                  <DataTemplate>
+                    <Grid>
+                      <Rectangle Fill="{DynamicResource ProgressBarCompressedSizeBrush}"
+                                 HorizontalAlignment="Left">
+                        <Rectangle.Width>
+                          <MultiBinding Converter="{StaticResource RatioToWidthConverter}">
+                            <Binding Path="CompressedSizeRatio" />
+                            <Binding Path="Bounds.Width"
+                                     RelativeSource="{RelativeSource AncestorType=ContentPresenter}" />
+                          </MultiBinding>
+                        </Rectangle.Width>
+                      </Rectangle>
+                      <TextBlock Text="{Binding CompressedSizeDisplay}"
+                                 VerticalAlignment="Center"
+                                 Margin="4,0" />
+                    </Grid>
+                  </DataTemplate>
+                </DataGridTemplateColumn.CellTemplate>
+              </DataGridTemplateColumn>
+              <DataGridTemplateColumn SortMemberPath="RatioSort"
+                                      Width="70">
+                <DataGridTemplateColumn.Header>
+                    <StackPanel Orientation="Horizontal" Spacing="3">
+                        <TextBlock Text="📊" FontSize="13" />
+                        <TextBlock Text="{Binding LocalizedStrings[DataGrid_Ratio]}" />
+                    </StackPanel>
+                </DataGridTemplateColumn.Header>
+                <DataGridTemplateColumn.CellTemplate>
+                  <DataTemplate>
+                    <Grid>
+                      <Rectangle Fill="{DynamicResource ProgressBarRatioBrush}"
+                                 HorizontalAlignment="Left">
+                        <Rectangle.Width>
+                          <MultiBinding Converter="{StaticResource RatioToWidthConverter}">
+                            <Binding Path="RatioBarValue" />
+                            <Binding Path="Bounds.Width"
+                                     RelativeSource="{RelativeSource AncestorType=ContentPresenter}" />
+                          </MultiBinding>
+                        </Rectangle.Width>
+                      </Rectangle>
+                      <TextBlock Text="{Binding RatioDisplay}"
+                                 VerticalAlignment="Center"
+                                 Margin="4,0" />
+                    </Grid>
+                  </DataTemplate>
+                </DataGridTemplateColumn.CellTemplate>
+              </DataGridTemplateColumn>
+              <DataGridTemplateColumn SortMemberPath="LastModified"
+                                      Width="100">
+                <DataGridTemplateColumn.Header>
+                    <StackPanel Orientation="Horizontal" Spacing="3">
+                        <TextBlock Text="📅" FontSize="13" />
+                        <TextBlock Text="{Binding LocalizedStrings[DataGrid_Modified]}" />
+                    </StackPanel>
+                </DataGridTemplateColumn.Header>
+                <DataGridTemplateColumn.CellTemplate>
+                  <DataTemplate>
+                    <Grid>
+                      <Rectangle Fill="{DynamicResource ProgressBarDateBrush}"
+                                 HorizontalAlignment="Left">
+                        <Rectangle.Width>
+                          <MultiBinding Converter="{StaticResource RatioToWidthConverter}">
+                            <Binding Path="DateRatio" />
+                            <Binding Path="Bounds.Width"
+                                     RelativeSource="{RelativeSource AncestorType=ContentPresenter}" />
+                          </MultiBinding>
+                        </Rectangle.Width>
+                      </Rectangle>
+                      <TextBlock Text="{Binding LastModifiedDisplay}"
+                                 VerticalAlignment="Center"
+                                 Margin="4,0" />
+                    </Grid>
+                  </DataTemplate>
+                </DataGridTemplateColumn.CellTemplate>
+              </DataGridTemplateColumn>
+            </DataGrid.Columns>
+          </DataGrid>
+        </Grid>
+      </Grid>
 
       <GridSplitter Grid.Column="3"
                     Width="5" />
