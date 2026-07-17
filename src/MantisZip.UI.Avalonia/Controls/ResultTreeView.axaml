@@ -1,0 +1,86 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="MantisZip.UI.Avalonia.Controls.ResultTreeView"
+             x:CompileBindings="False">
+  <Grid RowDefinitions="Auto,Auto,*">
+    <!-- Row 0: Top toolbar (compact/full toggle + summary) -->
+    <Border Grid.Row="0"
+            Padding="8,4"
+            Background="{DynamicResource ThemeHeaderBgBrush}">
+      <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
+        <ToggleButton x:Name="CompactToggle"
+                      Width="28" Height="{DynamicResource ControlHeightXs}"
+                      FontSize="12"
+                      Padding="4,0"
+                      Background="{DynamicResource ThemeButtonBgBrush}"
+                      Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                      BorderBrush="{DynamicResource ThemeBorderBrush}"
+                      IsCheckedChanged="OnCompactToggleChanged">
+          <TextBlock Text="📂" FontSize="12" />
+        </ToggleButton>
+        <TextBlock x:Name="SummaryTextBlock"
+                   FontSize="12"
+                   VerticalAlignment="Center"
+                   Foreground="{DynamicResource ThemeTextSecondaryBrush}"
+                   Text="{Binding SummaryText, RelativeSource={RelativeSource AncestorType=UserControl}}" />
+      </StackPanel>
+    </Border>
+
+    <!-- Row 1: Summary bar (file count + total size with conflict highlight) -->
+    <Border Grid.Row="1"
+            Padding="8,2"
+            Background="{DynamicResource ThemeSurfaceBgBrush}"
+            BorderBrush="{DynamicResource ThemeBorderBrush}"
+            BorderThickness="0,0,0,1"
+            IsVisible="{Binding ShowSummaryBar, RelativeSource={RelativeSource AncestorType=UserControl}}">
+      <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXs}">
+        <TextBlock x:Name="FileCountText"
+                   FontSize="11"
+                   Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+        <TextBlock x:Name="TotalSizeText"
+                   FontSize="11"
+                   Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+        <TextBlock x:Name="ConflictCountText"
+                   FontSize="11"
+                   Foreground="#FFD32F2F"
+                   IsVisible="False" />
+      </StackPanel>
+    </Border>
+
+    <!-- Row 2: Tree -->
+    <ScrollViewer Grid.Row="2"
+                  Background="{DynamicResource ThemeSurfaceBgBrush}">
+      <TreeView x:Name="PreviewTreeView"
+                ItemsSource="{Binding DisplayNodes, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                BorderThickness="0"
+                Background="Transparent">
+        <TreeView.ItemTemplate>
+          <TreeDataTemplate ItemsSource="{Binding Children}">
+            <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}"
+                        Margin="2,1"
+                        Opacity="{Binding TextOpacity}">
+              <TextBlock Text="{Binding NodeIcon}"
+                         FontSize="13"
+                         VerticalAlignment="Center" />
+              <TextBlock Text="{Binding DisplayLabel}"
+                         FontSize="12"
+                         VerticalAlignment="Center"
+                         Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+              <TextBlock Text="{Binding SizeDisplay}"
+                         FontSize="11"
+                         VerticalAlignment="Center"
+                         Margin="4,0,0,0"
+                         Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+              <!-- Conflict suffix for items that exist at destination -->
+              <TextBlock Text="⚠️"
+                         FontSize="12"
+                         VerticalAlignment="Center"
+                         IsVisible="{Binding ExistsAtDestination}"
+                         ToolTip.Tip="同名文件已存在" />
+            </StackPanel>
+          </TreeDataTemplate>
+        </TreeView.ItemTemplate>
+      </TreeView>
+    </ScrollViewer>
+  </Grid>
+</UserControl>
