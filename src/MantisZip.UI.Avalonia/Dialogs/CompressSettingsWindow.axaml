@@ -153,10 +153,39 @@
         <ScrollViewer Background="{DynamicResource ThemeWindowBgBrush}"
                        TextElement.Foreground="{DynamicResource ThemeTextPrimaryBrush}">
           <StackPanel Spacing="{DynamicResource SpacingSm}"
-                       Margin="0,8,0,0">
+                        Margin="0,8,0,0">
             <!-- Format-specific advanced options -->
             <controls:DynamicFormatOptionsPanel x:Name="FormatOptionsPanel"
                                                 SelectedFormat="{Binding DefaultFormat}" />
+
+            <!-- Group: Volume / split size -->
+            <Border BorderBrush="{DynamicResource ThemeBorderBrush}"
+                    BorderThickness="1" CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}"
+                    Background="{DynamicResource ThemeSurfaceBgBrush}">
+              <StackPanel Spacing="{DynamicResource SpacingXs}">
+                <TextBlock Text="{Binding LocalizedStrings[Compress_VolumeSize]}"
+                           FontWeight="SemiBold" />
+                <Grid ColumnDefinitions="140,*,Auto">
+                  <ComboBox Grid.Column="0"
+                            ItemsSource="{Binding SplitSizeOptions}"
+                            SelectedItem="{Binding SelectedSplitSizeOption}"
+                            DisplayMemberBinding="{Binding Display}"
+                            Width="180"
+                            HorizontalAlignment="Left" />
+                  <TextBox Grid.Column="1"
+                           Text="{Binding CustomSplitSizeText}"
+                           IsVisible="{Binding IsCustomSplitSizeVisible}"
+                           PlaceholderText="MB"
+                           Margin="8,0,0,0" />
+                  <TextBlock Grid.Column="2"
+                             Text="MB"
+                             IsVisible="{Binding IsCustomSplitSizeVisible}"
+                             VerticalAlignment="Center"
+                             Margin="4,0,0,0"
+                             Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+                </Grid>
+              </StackPanel>
+            </Border>
           </StackPanel>
         </ScrollViewer>
       </TabItem>
@@ -218,17 +247,21 @@
                       Background="{DynamicResource ThemeSurfaceBgBrush}">
                 <StackPanel Spacing="{DynamicResource SpacingXs}">
                   <TextBlock Text="{Binding LocalizedStrings[Compress_TabPassword]}"
-                             FontWeight="SemiBold" />
-                  <RadioButton GroupName="PwdMode"
-                                IsChecked="{Binding IsPasswordLibraryMode}">
-                    <TextBlock Text="{Binding LocalizedStrings[Compress_Pwd_Library]}"
-                                TextWrapping="Wrap" />
-                  </RadioButton>
-                  <RadioButton GroupName="PwdMode"
-                                IsChecked="{Binding IsPasswordLibraryMode, Converter={StaticResource BoolInvertConverter}}">
-                    <TextBlock Text="{Binding LocalizedStrings[Compress_Pwd_NewPassword]}"
-                                TextWrapping="Wrap" />
-                  </RadioButton>
+                            FontWeight="SemiBold" />
+                            
+
+                  <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingMd}">
+                    <RadioButton GroupName="PwdMode"
+                                  IsChecked="{Binding IsPasswordLibraryMode}">
+                      <TextBlock Text="{Binding LocalizedStrings[Compress_Pwd_Library]}"
+                                  TextWrapping="Wrap" />
+                    </RadioButton>
+                    <RadioButton GroupName="PwdMode"
+                                  IsChecked="{Binding IsPasswordLibraryMode, Converter={StaticResource BoolInvertConverter}}">
+                      <TextBlock Text="{Binding LocalizedStrings[Compress_Pwd_NewPassword]}"
+                                  TextWrapping="Wrap" />
+                    </RadioButton>
+                  </StackPanel>
                 </StackPanel>
               </Border>
 
@@ -325,28 +358,43 @@
                       Background="{DynamicResource ThemeSurfaceBgBrush}">
                 <StackPanel Spacing="{DynamicResource SpacingXs}">
                   <TextBlock Text="{Binding LocalizedStrings[Compress_Pwd_SaveToLibrary]}"
-                             FontWeight="SemiBold" />
+                            FontWeight="SemiBold" />
                   <CheckBox IsChecked="{Binding SaveToLibrary}">
                     <TextBlock Text="{Binding LocalizedStrings[Compress_Pwd_SaveToLibrary]}"
                                 TextWrapping="Wrap" />
                   </CheckBox>
-                  <TextBlock Text="{Binding LocalizedStrings[Compress_Pwd_Description]}"
-                             FontWeight="SemiBold" />
-                  <TextBox PlaceholderText="{Binding LocalizedStrings[Compress_Pwd_DescWatermark]}"
+                  <Grid Margin="0,6,0,0">
+                    <Grid.ColumnDefinitions>
+                      <ColumnDefinition Width="80" />
+                      <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                  <TextBlock Grid.Column="0"
+                    Text="{Binding LocalizedStrings[Compress_Pwd_Description]}"
+                            FontWeight="SemiBold" />
+                  <TextBox Grid.Column="1" PlaceholderText="{Binding LocalizedStrings[Compress_Pwd_DescWatermark]}"
                             Text="{Binding PasswordDescription}"
                             IsReadOnly="{Binding IsPasswordLibraryMode}" />
+                  </Grid>
                   <CheckBox IsChecked="{Binding AutoGenerateRules}"
-                             IsEnabled="{Binding IsPasswordLibraryMode, Converter={StaticResource BoolInvertConverter}}">
+                            IsEnabled="{Binding IsPasswordLibraryMode, Converter={StaticResource BoolInvertConverter}}">
                     <TextBlock Text="{Binding LocalizedStrings[Compress_Pwd_AutoRules]}"
                                 TextWrapping="Wrap" />
                   </CheckBox>
-                  <TextBlock Text="{Binding LocalizedStrings[Compress_Pwd_Rules]}"
-                             FontWeight="SemiBold" />
-                  <TextBox Text="{Binding RulesText}"
+
+                  <Grid Margin="0,6,0,0">
+                    <Grid.ColumnDefinitions>
+                      <ColumnDefinition Width="80" />
+                      <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                  <TextBlock Grid.Column="0"
+                      Text="{Binding LocalizedStrings[Compress_Pwd_Rules]}"
+                              FontWeight="SemiBold" />
+                  <TextBox Grid.Column="1" Text="{Binding RulesText}"
                             PlaceholderText="{Binding LocalizedStrings[Compress_Pwd_RulesWatermark]}"
                             AcceptsReturn="True"
                             MinHeight="60"
                             TextWrapping="Wrap" />
+                   </Grid>
                 </StackPanel>
               </Border>
             </StackPanel>

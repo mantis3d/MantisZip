@@ -3,6 +3,7 @@ using Avalonia.Controls;
 using Avalonia.Interactivity;
 using Avalonia.Media;
 using Avalonia.Platform.Storage;
+using MantisZip.UI.Avalonia.Models;
 using MantisZip.UI.Avalonia.Services;
 using MantisZip.UI.Avalonia.ViewModels;
 
@@ -78,6 +79,11 @@ public partial class CompressSettingsWindow : Window
         // 设置关闭回调
         ViewModel.CloseAction = async (result) =>
         {
+            if (result)
+            {
+                // 关闭前将 DynamicFormatOptionsPanel 当前值写回 AppSettings
+                SaveFormatOptionsToSettings();
+            }
             Close(result);
             await Task.CompletedTask;
         };
@@ -93,6 +99,48 @@ public partial class CompressSettingsWindow : Window
         _loaded = true;
 
         FormatOptionsPanel.LoadDefaults();
+        LoadSplitSizeFromSettings();
+    }
+
+    /// <summary>
+    /// 从 AppSettings 加载分卷大小设置。
+    /// </summary>
+    private void LoadSplitSizeFromSettings()
+    {
+        var s = AppSettings.Load();
+        if (!string.IsNullOrEmpty(s.SplitSizeTag))
+        {
+            var option = ViewModel.SplitSizeOptions.FirstOrDefault(o => o.Tag == s.SplitSizeTag);
+            if (option != null)
+                ViewModel.SelectedSplitSizeOption = option;
+        }
+        if (!string.IsNullOrEmpty(s.CustomSplitSizeMB))
+            ViewModel.CustomSplitSizeText = s.CustomSplitSizeMB;
+    }
+
+    /// <summary>
+    /// 将 DynamicFormatOptionsPanel 的当前值保存到 AppSettings。
+    /// 在关闭前调用，确保后续压缩流程能读取到最新的高级选项设置。
+    /// </summary>
+    private void SaveFormatOptionsToSettings()
+    {
+        var s = AppSettings.Load();
+
+        s.DefaultFormat = ViewModel.DefaultFormat;
+        s.ZipEncoding = FormatOptionsPanel.FileNameEncoding ?? "utf-8";
+        s.ZipCompressionMethod = FormatOptionsPanel.ZipCompressionMethod ?? "deflate";
+        s.SevenZipCompressionMethod = FormatOptionsPanel.SevenZipCompressionMethod ?? "LZMA2";
+        s.SevenZipSolid = FormatOptionsPanel.SevenZipSolid;
+        s.SevenZipSolidBlockSize = FormatOptionsPanel.SevenZipSolidBlockSize ?? "";
+        s.SevenZipDictionarySize = FormatOptionsPanel.SevenZipDictionarySize;
+        s.SevenZipNumFastBytes = FormatOptionsPanel.SevenZipNumFastBytes;
+        s.SevenZipMatchFinder = FormatOptionsPanel.SevenZipMatchFinder ?? "";
+        s.ZipEncryptionMethod = ViewModel.ZipEncryptionMethod;
+        s.SevenZipEncryptHeaders = ViewModel.SevenZipEncryptHeaders;
+        s.SplitSizeTag = ViewModel.SelectedSplitSizeOption?.Tag ?? "0";
+        s.CustomSplitSizeMB = ViewModel.CustomSplitSizeText;
+
+        s.Save();
     }
 
     /// <summary>

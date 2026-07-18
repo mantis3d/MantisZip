@@ -21,6 +21,12 @@
 
 ### MantisZip.UI.Avalonia（主力版）
 
+**2026-07-18** — 分卷大小 + 密码模式 RadioButton 横向排列
+  - Advanced Tab 新增 "分卷大小" 区域：ComboBox（不分卷/1MB/10MB/50MB/100MB/650MB/4GB/自定义）+ 自定义大小 TextBox（仅自定义时显示）
+  - 分卷选择持久化到 AppSettings（SplitSizeTag + CustomSplitSizeMB），下次打开自动恢复
+  - 密码模式 RadioButton（密码库/新密码）从上下排列改为左右排列
+  - 修复 `TextBox.Watermark` 废弃警告 → 改为 `PlaceholderText`
+
 **2026-07-18** — 压缩设置窗口增强：加密 Tab 整理 + 压缩级别 ComboBox + 加密方法
   - 修复输出模式 RadioButton 偶发不同步：`RefreshOutputPathState()` 进入 Manual 模式时始终还原缓存路径
   - 压缩级别从 Slider 改为 ComboBox，共享数据源 `CompressionOptionData.LevelOptions`

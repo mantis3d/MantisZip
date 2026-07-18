@@ -142,6 +142,41 @@ public partial class CompressSettingsViewModel : ObservableObject
     [ObservableProperty]
     private bool _sevenZipEncryptHeaders;
 
+    // ── 分卷 ──
+
+    /// <summary>分卷大小选项（共享数据源）。</summary>
+    public List<CompressionOptionData.ComboOption> SplitSizeOptions { get; }
+
+    [ObservableProperty]
+    private CompressionOptionData.ComboOption? _selectedSplitSizeOption;
+
+    /// <summary>自定义分卷大小文本（仅自定义模式可用）。</summary>
+    [ObservableProperty]
+    private string _customSplitSizeText = "";
+
+    /// <summary>是否显示自定义分卷大小输入框。</summary>
+    public bool IsCustomSplitSizeVisible => SelectedSplitSizeOption?.Tag == "-1";
+
+    /// <summary>当前分卷大小（字节），0 表示不分卷。</summary>
+    public long SplitSize
+    {
+        get
+        {
+            if (SelectedSplitSizeOption == null) return 0;
+            var tag = SelectedSplitSizeOption.Tag;
+            if (tag == "0") return 0;
+            if (tag == "-1")
+            {
+                if (long.TryParse(CustomSplitSizeText, out var mb) && mb > 0)
+                    return mb * 1024L * 1024L;
+                return 0;
+            }
+            if (long.TryParse(tag, out var bytes))
+                return bytes;
+            return 0;
+        }
+    }
+
     // -- Password mode (library vs new password)
 
     [ObservableProperty]
@@ -269,6 +304,7 @@ public partial class CompressSettingsViewModel : ObservableObject
         // Populate localized strings
         LocalizedStrings["Compress_TabGeneral"] = LocalizationManager.T("Compress_TabGeneral");
         LocalizedStrings["Compress_TabAdvanced"] = LocalizationManager.T("Compress_TabAdvanced");
+        LocalizedStrings["Compress_VolumeSize"] = LocalizationManager.T("Compress_VolumeSize");
         LocalizedStrings["Compress_TabPassword"] = LocalizationManager.T("Compress_TabPassword");
         LocalizedStrings["Compress_TabComment"] = LocalizationManager.T("Compress_TabComment");
         LocalizedStrings["Compress_Format"] = LocalizationManager.T("Compress_Format");
@@ -341,6 +377,19 @@ public partial class CompressSettingsViewModel : ObservableObject
             .ToList();
         SelectedZipEncryptionMethodOption = ZipEncryptionMethodOptions.FirstOrDefault(
             o => o.Tag == ZipEncryptionMethod);
+
+        // 初始化分卷大小下拉选项
+        SplitSizeOptions = CompressionOptionData.SplitSizeOptions
+            .Select(o => new CompressionOptionData.ComboOption(
+                o.Tag,
+                o.Tag switch
+                {
+                    "0" => LocalizationManager.T("Compress_Volume_None"),
+                    "-1" => LocalizationManager.T("Compress_Volume_Custom"),
+                    _ => o.Display,
+                }))
+            .ToList();
+        SelectedSplitSizeOption = SplitSizeOptions.FirstOrDefault(o => o.Tag == "0");
 
         // Load password library
         LoadPasswordLibrary();
@@ -490,6 +539,17 @@ public partial class CompressSettingsViewModel : ObservableObject
             CommentFirstOnly = false;
             CommentDistribution = CommentDistribution.PerLine;
         }
+    }
+
+    partial void OnSelectedSplitSizeOptionChanged(CompressionOptionData.ComboOption? value)
+    {
+        OnPropertyChanged(nameof(IsCustomSplitSizeVisible));
+        OnPropertyChanged(nameof(SplitSize));
+    }
+
+    partial void OnCustomSplitSizeTextChanged(string value)
+    {
+        OnPropertyChanged(nameof(SplitSize));
     }
 
     /// <summary>

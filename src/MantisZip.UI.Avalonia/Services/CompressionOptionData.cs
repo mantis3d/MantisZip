@@ -53,6 +53,21 @@ public static class CompressionOptionData
         new("zipcrypto", "ZipCrypto"),
     ];
 
+    // ─── 分卷 ──────────────────────────────────────────────────────────────
+
+    /// <summary>分卷大小选项（Tag 为字节数，0=不分卷，-1=自定义）。</summary>
+    public static readonly ComboOption[] SplitSizeOptions =
+    [
+        new("0",          "Compress_Volume_None"),
+        new("1048576",    "1 MB"),
+        new("10485760",   "10 MB"),
+        new("52428800",   "50 MB"),
+        new("104857600",  "100 MB"),
+        new("681574400",  "650 MB (CD)"),
+        new("4294967296", "4 GB (FAT32)"),
+        new("-1",         "Compress_Volume_Custom"),
+    ];
+
     // ─── 7z ───────────────────────────────────────────────────────────────
 
     /// <summary>7z 压缩方法。</summary>
