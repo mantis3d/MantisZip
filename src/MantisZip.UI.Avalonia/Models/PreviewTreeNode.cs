@@ -41,17 +41,20 @@ public class PreviewTreeNode : FolderNode
     /// <summary>是否为目录节点。</summary>
     public bool IsDirectoryNode => Children.Count > 0 || string.IsNullOrEmpty(FullPath);
 
-    /// <summary>节点图标字符串（📁 📄 ⚠️ 等）。</summary>
-    public string NodeIcon
+    /// <summary>图标资源键（IconFolder / IconDocument / IconWarning），用于 PathIcon 绑定。</summary>
+    public string? IconKey
     {
         get
         {
-            if (IsTruncated) return "…";
-            if (ExistsAtDestination && Children.Count == 0 && !string.IsNullOrEmpty(FullPath)) return "📄⚠️";
-            if (Children.Count > 0 || string.IsNullOrEmpty(FullPath)) return "📁";
-            return "📄";
+            if (IsTruncated) return null;
+            if (ExistsAtDestination && Children.Count == 0 && !string.IsNullOrEmpty(FullPath)) return "IconWarning";
+            if (Children.Count > 0 || string.IsNullOrEmpty(FullPath)) return "IconFolder";
+            return "IconDocument";
         }
     }
+
+    /// <summary>是否为截断节点（显示 … 文本）。</summary>
+    public bool IsTruncatedNode => IsTruncated;
 
     /// <summary>
     /// 节点的前景色不透明度（过滤项半透明，其他正常）。

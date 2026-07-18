@@ -41,32 +41,48 @@
         <!-- Zoom controls (image/gif) -->
         <StackPanel Orientation="Horizontal" Spacing="2"
                     IsVisible="{Binding HasZoomControls}">
-          <Button Content="−" Command="{Binding ZoomOutCommand}"
-                  Width="32" Height="{DynamicResource ControlHeight}" FontSize="16" Padding="0" />
-          <Button Content="+" Command="{Binding ZoomInCommand}"
-                  Width="32" Height="{DynamicResource ControlHeight}" FontSize="16" Padding="0" />
-          <Button Content="⟲" Command="{Binding ZoomFitCommand}"
-                  Width="32" Height="{DynamicResource ControlHeight}" FontSize="14" Padding="0" />
+          <Button Command="{Binding ZoomOutCommand}"
+                  Width="32" Height="{DynamicResource ControlHeight}" Padding="0">
+            <PathIcon Data="{StaticResource IconSubtract}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+          </Button>
+          <Button Command="{Binding ZoomInCommand}"
+                  Width="32" Height="{DynamicResource ControlHeight}" Padding="0">
+            <PathIcon Data="{StaticResource IconAdd}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+          </Button>
+          <Button Command="{Binding ZoomFitCommand}"
+                  Width="32" Height="{DynamicResource ControlHeight}" Padding="0">
+            <PathIcon Data="{StaticResource IconArrowFitIn}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+          </Button>
         </StackPanel>
 
         <!-- Font size controls (text) -->
         <StackPanel Orientation="Horizontal" Spacing="2"
                     IsVisible="{Binding HasFontSizeControls}">
-          <Button Content="A−" Command="{Binding DecreaseFontSizeCommand}"
-                  Width="36" Height="{DynamicResource ControlHeight}" FontSize="13" Padding="0" />
-          <Button Content="A+" Command="{Binding IncreaseFontSizeCommand}"
-                  Width="36" Height="{DynamicResource ControlHeight}" FontSize="13" Padding="0" />
+          <Button Command="{Binding DecreaseFontSizeCommand}"
+                  Width="36" Height="{DynamicResource ControlHeight}" Padding="0">
+            <PathIcon Data="{StaticResource IconFontDecrease}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+          </Button>
+          <Button Command="{Binding IncreaseFontSizeCommand}"
+                  Width="36" Height="{DynamicResource ControlHeight}" Padding="0">
+            <PathIcon Data="{StaticResource IconFontIncrease}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+          </Button>
         </StackPanel>
 
         <!-- GIF controls -->
         <StackPanel Orientation="Horizontal" Spacing="2"
                     IsVisible="{Binding HasGifControls}">
-          <Button Content="⏮" Command="{Binding PreviousGifFrameCommand}"
-                  Width="32" Height="{DynamicResource ControlHeight}" FontSize="16" Padding="0" />
-          <Button Content="⏯" Command="{Binding PlayPauseGifCommand}"
-                  Width="32" Height="{DynamicResource ControlHeight}" FontSize="16" Padding="0" />
-          <Button Content="⏭" Command="{Binding NextGifFrameCommand}"
-                  Width="32" Height="{DynamicResource ControlHeight}" FontSize="16" Padding="0" />
+          <Button Command="{Binding PreviousGifFrameCommand}"
+                  Width="32" Height="{DynamicResource ControlHeight}" Padding="0">
+            <PathIcon Data="{StaticResource IconPrevious}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+          </Button>
+          <Button Command="{Binding PlayPauseGifCommand}"
+                  Width="32" Height="{DynamicResource ControlHeight}" Padding="0">
+            <PathIcon Data="{StaticResource IconPlay}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+          </Button>
+          <Button Command="{Binding NextGifFrameCommand}"
+                  Width="32" Height="{DynamicResource ControlHeight}" Padding="0">
+            <PathIcon Data="{StaticResource IconNext}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+          </Button>
           <TextBox Text="{Binding CurrentFrame}"
                    Width="36" Height="26"
                    FontSize="14"

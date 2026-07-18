@@ -2,6 +2,7 @@ using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Input.Platform;
 using Avalonia.Interactivity;
+using Avalonia.Media;
 using MantisZip.Core;
 using MantisZip.UI.Avalonia.Services;
 
@@ -59,7 +60,8 @@ public partial class MatchedPasswordDialog : Window
         _isRevealed = !_isRevealed;
         PwdMaskedText.IsVisible = !_isRevealed;
         PwdPlainText.IsVisible = _isRevealed;
-        PwdRevealBtn.Content = _isRevealed ? "🙈" : "👁";
+        RevealEyeIcon.IsVisible = !_isRevealed;
+        RevealEyeOffIcon.IsVisible = _isRevealed;
     }
 
     private async void OnCopyClick(object? sender, RoutedEventArgs e)
@@ -77,11 +79,19 @@ public partial class MatchedPasswordDialog : Window
                 await clipboard.SetDataAsync(transfer);
             }
 
-            var originalText = PwdCopyBtn.Content;
-            PwdCopyBtn.Content = "✅";
+            // Save original icon reference
+            var copyIcon = PwdCopyBtn.Content;
+            // Create a temporary checkmark icon
+            PwdCopyBtn.Content = new PathIcon
+            {
+                Data = (Geometry?)global::Avalonia.Application.Current?.FindResource("IconCheckmark"),
+                Width = 14,
+                Height = 14,
+                Foreground = (Brush?)global::Avalonia.Application.Current?.FindResource("ThemeTextPrimaryBrush")
+            };
 
             await Task.Delay(1500);
-            PwdCopyBtn.Content = originalText;
+            PwdCopyBtn.Content = copyIcon;
         }
         catch
         {

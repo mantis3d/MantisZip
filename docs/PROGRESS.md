@@ -21,6 +21,17 @@
 
 ### MantisZip.UI.Avalonia（主力版）
 
+**2026-07-18** — Phase 2 emoji→PathIcon 替换：预览按钮 + 对话框 + 文件树 + 过滤栏
+  - 新增 11 个 Fluent UI 图标 Geometry：IconSubtract/Play/Pause/Previous/Next/ArrowRight/ArrowFitIn/EyeOff/Document/FontDecrease/FontIncrease
+  - PreviewPanel.axaml：8 个预览工具栏按钮 emoji（− + ⟲ A− A+ ⏮ ⏯ ⏭）→ PathIcon
+  - ConflictDialog + CompressConflictDialog：✏️ → IconEdit，⏭️ → IconArrowRight
+  - PasswordDialog：👁 → IconEye；MatchedPasswordDialog：👁🔑🙈→IconEye/EyeOff/Key，✅→IconCheckmark
+  - PreviewTreeNode.cs：📁→IconFolder，📄→IconDocument，📄⚠️→IconWarning（冲突节点改用标准警告图标）
+  - ResultPreviewService.cs：📂 根节点名 → "解压预览"
+  - ResultTreeView.axaml：📂→IconFolder，⚠️→IconWarning；改用 GeometryResourceConverter 动态绑定 PathIcon
+  - MainWindow.axaml：⭐收藏夹标题去除 emoji，🔍搜索→IconSearch，⊘排除→IconProhibited
+  - 至此 emoji→PathIcon 替换进度：50/75（已替换 66%）
+
 **2026-07-18** — 图标测试窗口 + GIF 预览宽度 Bug 修复
   - 🐛 修复：GIF 预览 `ImageWidth` 缺失赋值（ShowGif 中只设了 ImageHeight 漏了 ImageWidth），导致显示为 `0 × height` 且 ZoomFit 异常
   - 新增 IconTestWindow（图标测试窗口）：列出程序所有图标的位置、名称、类型（emoji/PathIcon/PathIcon-待替换）、来源文件路径和状态

@@ -27,7 +27,7 @@ public static class ResultPreviewService
     {
         var root = new PreviewTreeNode
         {
-            Name = rootName ?? "📂",
+            Name = rootName ?? "解压预览",
             FullPath = "",
             DisplayLabel = rootName ?? destDir
         };

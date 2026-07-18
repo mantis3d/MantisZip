@@ -79,9 +79,7 @@
               Click="Rename_Click">
         <StackPanel Orientation="Vertical"
                     HorizontalAlignment="Center">
-          <TextBlock Text="✏️"
-                     FontSize="24"
-                     HorizontalAlignment="Center" />
+          <PathIcon Data="{StaticResource IconEdit}" Width="22" Height="22" HorizontalAlignment="Center" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
           <TextBlock x:Name="RenameBtnLabel"
                      Text="{Binding RenameText}"
                      FontSize="11"
@@ -95,9 +93,7 @@
               Click="Skip_Click">
         <StackPanel Orientation="Vertical"
                     HorizontalAlignment="Center">
-          <TextBlock Text="⏭️"
-                     FontSize="24"
-                     HorizontalAlignment="Center" />
+          <PathIcon Data="{StaticResource IconArrowRight}" Width="22" Height="22" HorizontalAlignment="Center" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
           <TextBlock Text="{Binding SkipText}"
                      FontSize="11"
                      HorizontalAlignment="Center"

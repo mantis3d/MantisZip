@@ -1,7 +1,11 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:conv="clr-namespace:MantisZip.UI.Avalonia.Converters"
              x:Class="MantisZip.UI.Avalonia.Controls.ResultTreeView"
              x:CompileBindings="False">
+  <UserControl.Resources>
+    <conv:GeometryResourceConverter x:Key="GeometryResourceConverter" />
+  </UserControl.Resources>
   <Grid RowDefinitions="Auto,Auto,*">
     <!-- Row 0: Top toolbar (compact/full toggle + summary) -->
     <Border Grid.Row="0"
@@ -16,7 +20,7 @@
                       Foreground="{DynamicResource ThemeTextPrimaryBrush}"
                       BorderBrush="{DynamicResource ThemeBorderBrush}"
                       IsCheckedChanged="OnCompactToggleChanged">
-          <TextBlock Text="📂" FontSize="12" />
+          <PathIcon Data="{StaticResource IconFolder}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
         </ToggleButton>
         <TextBlock x:Name="SummaryTextBlock"
                    FontSize="12"
@@ -59,9 +63,13 @@
             <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}"
                         Margin="2,1"
                         Opacity="{Binding TextOpacity}">
-              <TextBlock Text="{Binding NodeIcon}"
-                         FontSize="13"
-                         VerticalAlignment="Center" />
+              <!-- PathIcon for folder/file/warning, TextBlock for "…" truncated -->
+              <PathIcon Data="{Binding IconKey, Converter={StaticResource GeometryResourceConverter}}"
+                        Width="14" Height="14"
+                        VerticalAlignment="Center"
+                        Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+              <TextBlock Text="…" FontSize="13" VerticalAlignment="Center"
+                         IsVisible="{Binding IsTruncatedNode}" />
               <TextBlock Text="{Binding DisplayLabel}"
                          FontSize="12"
                          VerticalAlignment="Center"
@@ -71,12 +79,13 @@
                          VerticalAlignment="Center"
                          Margin="4,0,0,0"
                          Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
-              <!-- Conflict suffix for items that exist at destination -->
-              <TextBlock Text="⚠️"
-                         FontSize="12"
-                         VerticalAlignment="Center"
-                         IsVisible="{Binding ExistsAtDestination}"
-                         ToolTip.Tip="同名文件已存在" />
+              <!-- Conflict suffix - warning icon for existing files -->
+              <PathIcon Data="{StaticResource IconWarning}"
+                        Width="12" Height="12"
+                        VerticalAlignment="Center"
+                        Foreground="#FFD32F2F"
+                        IsVisible="{Binding ExistsAtDestination}"
+                        ToolTip.Tip="同名文件已存在" />
             </StackPanel>
           </TreeDataTemplate>
         </TreeView.ItemTemplate>
