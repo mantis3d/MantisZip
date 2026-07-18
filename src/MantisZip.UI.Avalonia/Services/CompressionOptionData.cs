@@ -14,6 +14,15 @@ public static class CompressionOptionData
 
     public sealed record ComboOption(string Tag, string Display);
 
+    /// <summary>压缩级别（与 WPF 一致：0=仅存储, 3=快速, 5=正常, 9=极限）。</summary>
+    public static readonly ComboOption[] LevelOptions =
+    [
+        new("0", "0 - Store only"),
+        new("3", "3 - Fast"),
+        new("5", "5 - Normal"),
+        new("9", "9 - Maximum"),
+    ];
+
     // ─── ZIP ──────────────────────────────────────────────────────────────
 
     /// <summary>ZIP 文件名编码。</summary>
