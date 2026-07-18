@@ -34,7 +34,7 @@
               <StackPanel Spacing="{DynamicResource SpacingXs}">
                 <TextBlock Text="{Binding LocalizedStrings[Compress_SourceFiles]}"
                            FontWeight="SemiBold" />
-                <StackPanel Orientation="Horizontal" Spacing="6">
+                <StackPanel Orientation="Horizontal" Spacing="8">
                   <Button Content="{Binding LocalizedStrings[Compress_AddFile]}"
                           Height="26" Padding="8,0"
                           Command="{Binding AddFilesCommand}"
@@ -57,7 +57,7 @@
                 </StackPanel>
                 <ListBox x:Name="SourceFilesList"
                          ItemsSource="{Binding SelectedPaths}"
-                         MinHeight="80" MaxHeight="160"
+                         MinHeight="160" MaxHeight="240"
                          BorderBrush="{DynamicResource ThemeBorderBrush}"
                          Background="{DynamicResource ThemeSurfaceBgBrush}">
                   <ListBox.ItemTemplate>
@@ -81,207 +81,328 @@
               <StackPanel Spacing="{DynamicResource SpacingXs}">
                 <TextBlock Text="{Binding LocalizedStrings[Compress_Archive_Group]}"
                            FontWeight="SemiBold" />
-                <TextBlock Text="{Binding LocalizedStrings[Compress_Format]}"
-                           FontSize="12"
-                           Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
-                <ComboBox ItemsSource="{Binding FormatOptions}"
-                          SelectedItem="{Binding DefaultFormat}" />
-
-                <TextBlock Text="{Binding LocalizedStrings[Compress_Level]}"
-                           FontWeight="SemiBold" />
-                <Grid ColumnDefinitions="*,Auto">
-                  <Slider Grid.Column="0"
-                          Minimum="1"
-                          Maximum="9"
-                          TickFrequency="1"
-                          IsSnapToTickEnabled="True"
-                          Value="{Binding CompressionLevel}" />
-                  <TextBlock Grid.Column="1"
-                              Text="{Binding CompressionLevel}"
-                              Margin="12,0,0,0"
-                              VerticalAlignment="Center"
-                              FontWeight="Bold" />
+                <Grid Margin="0,6,0,0">
+                    <Grid.ColumnDefinitions>
+                      <ColumnDefinition Width="80" />
+                      <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                  <TextBlock Grid.Column="0"
+                        Text="{Binding LocalizedStrings[Compress_Format]}"
+                        VerticalAlignment="Center"
+                        Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+                  <ComboBox Grid.Column="1"
+                            ItemsSource="{Binding FormatOptions}"
+                            SelectedItem="{Binding DefaultFormat}" />
+                </Grid>
+                <Grid Margin="0,6,0,0">
+                    <Grid.ColumnDefinitions>
+                      <ColumnDefinition Width="80" />
+                      <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                  <TextBlock Grid.Column="0"
+                        Text="{Binding LocalizedStrings[Compress_Level]}"
+                        VerticalAlignment="Center"
+                        Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+                  <ComboBox Grid.Column="1"
+                            ItemsSource="{Binding CompressionLevelOptions}"
+                            SelectedItem="{Binding SelectedLevelOption}"
+                            DisplayMemberBinding="{Binding Display}" />
                 </Grid>
 
-                <TextBlock Text="{Binding LocalizedStrings[Compress_OutputPath]}"
+                <!-- Output mode radios -->
+                <TextBlock Text="{Binding LocalizedStrings[Compress_OutputMode]}"
+                           FontWeight="SemiBold" />
+                <RadioButton GroupName="CompressOutputMode"
+                             IsChecked="{Binding IsManualMode}"
+                             Content="{Binding LocalizedStrings[Compress_OutputMode_Manual]}" />
+                <RadioButton GroupName="CompressOutputMode"
+                             IsChecked="{Binding IsSeparateMode}"
+                             Content="{Binding LocalizedStrings[Compress_OutputMode_Separate]}" />
+                <RadioButton GroupName="CompressOutputMode"
+                             IsChecked="{Binding IsCombinedMode}"
+                             Content="{Binding LocalizedStrings[Compress_OutputMode_Combined]}" />
+
+                <TextBlock Text="{Binding OutputPathLabel}"
                            FontWeight="SemiBold" />
                 <Grid ColumnDefinitions="*,Auto">
                   <TextBox Grid.Column="0"
                             PlaceholderText="{Binding LocalizedStrings[Compress_OutputPlaceholder]}"
-                            Text="{Binding OutputPath}" />
+                            Text="{Binding OutputPath}"
+                            IsReadOnly="{Binding IsOutputPathReadOnly}" />
                   <Button Grid.Column="1"
                           Content="{Binding LocalizedStrings[Compress_Browse]}"
                           Width="80"
                           Height="{DynamicResource ControlHeight}"
                           Margin="8,0,0,0"
                           Command="{Binding BrowseOutputPathCommand}"
+                          IsVisible="{Binding IsBrowseButtonVisible}"
                           Background="{DynamicResource ThemeButtonBgBrush}"
                           Foreground="{DynamicResource ThemeTextPrimaryBrush}"
                           BorderBrush="{DynamicResource ThemeBorderBrush}" />
                 </Grid>
 
-                <!-- Format-specific advanced options -->
-                <controls:DynamicFormatOptionsPanel x:Name="FormatOptionsPanel"
-                                                    SelectedFormat="{Binding DefaultFormat}" />
               </StackPanel>
             </Border>
           </StackPanel>
         </ScrollViewer>
       </TabItem>
 
-      <!-- Tab 2: Password -->
+      <!-- Tab 2: Advanced (format options, volume/split, etc.) -->
+      <TabItem Header="{Binding LocalizedStrings[Compress_TabAdvanced]}"
+               Classes="compactTab">
+        <ScrollViewer Background="{DynamicResource ThemeWindowBgBrush}"
+                       TextElement.Foreground="{DynamicResource ThemeTextPrimaryBrush}">
+          <StackPanel Spacing="{DynamicResource SpacingSm}"
+                        Margin="0,8,0,0">
+            <!-- Format-specific advanced options -->
+            <controls:DynamicFormatOptionsPanel x:Name="FormatOptionsPanel"
+                                                SelectedFormat="{Binding DefaultFormat}" />
+
+            <!-- Group: Volume / split size -->
+            <Border BorderBrush="{DynamicResource ThemeBorderBrush}"
+                    BorderThickness="1" CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}"
+                    Background="{DynamicResource ThemeSurfaceBgBrush}">
+              <StackPanel Spacing="{DynamicResource SpacingXs}">
+                <TextBlock Text="{Binding LocalizedStrings[Compress_VolumeSize]}"
+                           FontWeight="SemiBold" />
+                <Grid ColumnDefinitions="140,*,Auto">
+                  <ComboBox Grid.Column="0"
+                            ItemsSource="{Binding SplitSizeOptions}"
+                            SelectedItem="{Binding SelectedSplitSizeOption}"
+                            DisplayMemberBinding="{Binding Display}"
+                            Width="180"
+                            HorizontalAlignment="Left" />
+                  <TextBox Grid.Column="1"
+                           Text="{Binding CustomSplitSizeText}"
+                           IsVisible="{Binding IsCustomSplitSizeVisible}"
+                           PlaceholderText="MB"
+                           Margin="8,0,0,0" />
+                  <TextBlock Grid.Column="2"
+                             Text="MB"
+                             IsVisible="{Binding IsCustomSplitSizeVisible}"
+                             VerticalAlignment="Center"
+                             Margin="4,0,0,0"
+                             Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+                </Grid>
+              </StackPanel>
+            </Border>
+          </StackPanel>
+        </ScrollViewer>
+      </TabItem>
+
+      <!-- Tab 3: Password -->
       <TabItem Header="{Binding LocalizedStrings[Compress_TabPassword]}"
                Classes="compactTab">
         <ScrollViewer Background="{DynamicResource ThemeWindowBgBrush}"
                        TextElement.Foreground="{DynamicResource ThemeTextPrimaryBrush}">
           <StackPanel Spacing="{DynamicResource SpacingSm}"
                        Margin="0,8,0,0">
-            <!-- Group: Password mode -->
+            <!-- Encrypt archive checkbox (always visible, disabled for tar.gz) -->
             <Border BorderBrush="{DynamicResource ThemeBorderBrush}"
                     BorderThickness="1" CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}"
                     Background="{DynamicResource ThemeSurfaceBgBrush}">
-              <StackPanel Spacing="{DynamicResource SpacingXs}">
-                <TextBlock Text="{Binding LocalizedStrings[Compress_TabPassword]}"
-                           FontWeight="SemiBold" />
-                <RadioButton GroupName="PwdMode"
-                              IsChecked="{Binding IsPasswordLibraryMode}">
-                  <TextBlock Text="{Binding LocalizedStrings[Compress_Pwd_Library]}"
-                              TextWrapping="Wrap" />
-                </RadioButton>
-                <RadioButton GroupName="PwdMode"
-                              IsChecked="{Binding IsPasswordLibraryMode, Converter={StaticResource BoolInvertConverter}}">
-                  <TextBlock Text="{Binding LocalizedStrings[Compress_Pwd_NewPassword]}"
-                              TextWrapping="Wrap" />
-                </RadioButton>
-              </StackPanel>
+              <CheckBox IsChecked="{Binding Encrypt}"
+                        IsEnabled="{Binding IsFormatEncryptionSupported}">
+                <TextBlock Text="{Binding LocalizedStrings[Compress_EncryptArchive]}"
+                            TextWrapping="Wrap" FontWeight="SemiBold" />
+              </CheckBox>
             </Border>
 
-            <!-- Group: Password library -->
-            <Border BorderBrush="{DynamicResource ThemeBorderBrush}"
-                    BorderThickness="1" CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}"
-                    Background="{DynamicResource ThemeSurfaceBgBrush}"
-                    IsVisible="{Binding IsPasswordLibraryMode}">
-              <StackPanel Spacing="{DynamicResource SpacingXs}">
-                <TextBlock Text="{Binding LocalizedStrings[Compress_Pwd_Library]}"
-                           FontWeight="SemiBold" />
-                <TextBox PlaceholderText="{Binding LocalizedStrings[Compress_Pwd_Search]}"
-                          Text="{Binding PasswordSearchText}" />
-                <ListBox ItemsSource="{Binding FilteredPasswordEntries}"
-                          SelectedItem="{Binding SelectedPasswordEntry}"
-                          MinHeight="100"
-                          MaxHeight="200"
-                          BorderBrush="{DynamicResource ThemeBorderBrush}">
-                  <ListBox.ItemTemplate>
-                    <DataTemplate>
-                      <StackPanel>
-                        <TextBlock Text="{Binding Description}"
-                                    FontWeight="SemiBold"
-                                    Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
-                        <TextBlock Text="{Binding PatternsDisplay}"
-                                    FontSize="11"
-                                    Opacity="0.6"
-                                    Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
-                      </StackPanel>
-                    </DataTemplate>
-                  </ListBox.ItemTemplate>
-                </ListBox>
-                <TextBlock Text="{Binding LocalizedStrings[Compress_Pwd_NoEntry]}"
-                            Foreground="{DynamicResource ThemeTextSecondaryBrush}"
-                            FontSize="12"
-                            FontStyle="Italic" />
-              </StackPanel>
-            </Border>
+            <!-- Content below is hidden when encryption is off (方案A) -->
+            <StackPanel Spacing="{DynamicResource SpacingSm}"
+                         IsVisible="{Binding Encrypt}">
 
-            <!-- Group: New password -->
-            <Border BorderBrush="{DynamicResource ThemeBorderBrush}"
-                    BorderThickness="1" CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}"
-                    Background="{DynamicResource ThemeSurfaceBgBrush}"
-                    IsVisible="{Binding IsPasswordLibraryMode, Converter={StaticResource BoolInvertConverter}}">
-              <StackPanel Spacing="{DynamicResource SpacingXs}">
-                <TextBlock Text="{Binding LocalizedStrings[Compress_Pwd_NewPassword]}"
-                           FontWeight="SemiBold" />
-                <Grid ColumnDefinitions="*,Auto">
-                  <TextBox Grid.Column="0"
-                            x:Name="PasswordTextBox"
-                            PlaceholderText="{Binding LocalizedStrings[Compress_PasswordPlaceholder]}"
-                            Text="{Binding Password}"
-                            PasswordChar="●" />
-                  <Button Grid.Column="1"
-                          x:Name="RevealButton"
-                          Content="{Binding LocalizedStrings[Compress_ShowPassword]}"
-                          Width="60"
-                          Height="{DynamicResource ControlHeight}"
-                          Margin="8,0,0,0"
-                          Click="TogglePasswordReveal"
-                          Background="{DynamicResource ThemeButtonBgBrush}"
-                          Foreground="{DynamicResource ThemeTextPrimaryBrush}"
-                          BorderBrush="{DynamicResource ThemeBorderBrush}" />
-                </Grid>
+              <!-- Encryption method section (format-specific content) -->
+              <Border BorderBrush="{DynamicResource ThemeBorderBrush}"
+                      BorderThickness="1" CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}"
+                      Background="{DynamicResource ThemeSurfaceBgBrush}">
+                <StackPanel Spacing="{DynamicResource SpacingXs}">
+                  <TextBlock Text="{Binding LocalizedStrings[Compress_EncryptionMethod]}"
+                             FontWeight="SemiBold" />
 
-                <TextBlock Text="{Binding LocalizedStrings[Compress_Pwd_ConfirmPwd]}"
-                           FontWeight="SemiBold" />
-                <TextBox PlaceholderText="{Binding LocalizedStrings[Compress_ConfirmPlaceholder]}"
-                          Text="{Binding ConfirmPassword}"
-                          PasswordChar="●" />
+                  <!-- ZIP encryption method (only for zip format) -->
+                  <Grid ColumnDefinitions="80,*"
+                        IsVisible="{Binding IsZipFormat}">
+                    <TextBlock Grid.Column="0"
+                               Text="{Binding LocalizedStrings[Compress_ZipEncryption]}"
+                               VerticalAlignment="Center" />
+                    <ComboBox Grid.Column="1"
+                              ItemsSource="{Binding ZipEncryptionMethodOptions}"
+                              SelectedItem="{Binding SelectedZipEncryptionMethodOption}"
+                              DisplayMemberBinding="{Binding Display}" />
+                  </Grid>
 
-                <StackPanel Orientation="Horizontal"
-                             Spacing="6">
-                  <TextBlock Text="{Binding LocalizedStrings[Compress_Strength]}"
-                              Foreground="{DynamicResource ThemeTextSecondaryBrush}"
-                              FontSize="12" />
-                  <TextBlock Text="{Binding PasswordStrength}"
-                              FontWeight="Bold"
-                              Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
-                  <TextBlock Text="{Binding PasswordStrengthIndicator}"
-                              FontSize="14"
-                              Foreground="{DynamicResource ThemeAccentBrush}" />
+                  <!-- 7z encrypt headers (only for 7z format) -->
+                  <CheckBox IsChecked="{Binding SevenZipEncryptHeaders}"
+                            IsVisible="{Binding IsSevenZipFormat}">
+                    <TextBlock Text="{Binding LocalizedStrings[Compress_EncryptHeaders]}"
+                                TextWrapping="Wrap" />
+                  </CheckBox>
                 </StackPanel>
+              </Border>
 
-                <TextBlock x:Name="PasswordMatchIndicator"
-                            FontSize="12"
-                            IsVisible="False" />
-              </StackPanel>
-            </Border>
+              <!-- Group: Password mode -->
+              <Border BorderBrush="{DynamicResource ThemeBorderBrush}"
+                      BorderThickness="1" CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}"
+                      Background="{DynamicResource ThemeSurfaceBgBrush}">
+                <StackPanel Spacing="{DynamicResource SpacingXs}">
+                  <TextBlock Text="{Binding LocalizedStrings[Compress_TabPassword]}"
+                            FontWeight="SemiBold" />
+                            
 
-            <!-- Group: Password library settings -->
-            <Border BorderBrush="{DynamicResource ThemeBorderBrush}"
-                    BorderThickness="1" CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}"
-                    Background="{DynamicResource ThemeSurfaceBgBrush}">
-              <StackPanel Spacing="{DynamicResource SpacingXs}">
-                <TextBlock Text="{Binding LocalizedStrings[Compress_Pwd_SaveToLibrary]}"
-                           FontWeight="SemiBold" />
-                <CheckBox IsChecked="{Binding SaveToLibrary}">
+                  <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingMd}">
+                    <RadioButton GroupName="PwdMode"
+                                  IsChecked="{Binding IsPasswordLibraryMode}">
+                      <TextBlock Text="{Binding LocalizedStrings[Compress_Pwd_Library]}"
+                                  TextWrapping="Wrap" />
+                    </RadioButton>
+                    <RadioButton GroupName="PwdMode"
+                                  IsChecked="{Binding IsPasswordLibraryMode, Converter={StaticResource BoolInvertConverter}}">
+                      <TextBlock Text="{Binding LocalizedStrings[Compress_Pwd_NewPassword]}"
+                                  TextWrapping="Wrap" />
+                    </RadioButton>
+                  </StackPanel>
+                </StackPanel>
+              </Border>
+
+              <!-- Group: Password library -->
+              <Border BorderBrush="{DynamicResource ThemeBorderBrush}"
+                      BorderThickness="1" CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}"
+                      Background="{DynamicResource ThemeSurfaceBgBrush}"
+                      IsVisible="{Binding IsPasswordLibraryMode}">
+                <StackPanel Spacing="{DynamicResource SpacingXs}">
+                  <TextBlock Text="{Binding LocalizedStrings[Compress_Pwd_Library]}"
+                             FontWeight="SemiBold" />
+                  <TextBox PlaceholderText="{Binding LocalizedStrings[Compress_Pwd_Search]}"
+                            Text="{Binding PasswordSearchText}" />
+                  <ListBox ItemsSource="{Binding FilteredPasswordEntries}"
+                            SelectedItem="{Binding SelectedPasswordEntry}"
+                            MinHeight="100"
+                            MaxHeight="200"
+                            BorderBrush="{DynamicResource ThemeBorderBrush}">
+                    <ListBox.ItemTemplate>
+                      <DataTemplate>
+                        <StackPanel>
+                          <TextBlock Text="{Binding Description}"
+                                      FontWeight="SemiBold"
+                                      Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+                          <TextBlock Text="{Binding PatternsDisplay}"
+                                      FontSize="11"
+                                      Opacity="0.6"
+                                      Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+                        </StackPanel>
+                      </DataTemplate>
+                    </ListBox.ItemTemplate>
+                  </ListBox>
+                  <TextBlock Text="{Binding LocalizedStrings[Compress_Pwd_NoEntry]}"
+                              Foreground="{DynamicResource ThemeTextSecondaryBrush}"
+                              FontSize="12"
+                              FontStyle="Italic" />
+                </StackPanel>
+              </Border>
+
+              <!-- Group: New password -->
+              <Border BorderBrush="{DynamicResource ThemeBorderBrush}"
+                      BorderThickness="1" CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}"
+                      Background="{DynamicResource ThemeSurfaceBgBrush}"
+                      IsVisible="{Binding IsPasswordLibraryMode, Converter={StaticResource BoolInvertConverter}}">
+                <StackPanel Spacing="{DynamicResource SpacingXs}">
+                  <TextBlock Text="{Binding LocalizedStrings[Compress_Pwd_NewPassword]}"
+                             FontWeight="SemiBold" />
+                  <Grid ColumnDefinitions="*,Auto">
+                    <TextBox Grid.Column="0"
+                              x:Name="PasswordTextBox"
+                              PlaceholderText="{Binding LocalizedStrings[Compress_PasswordPlaceholder]}"
+                              Text="{Binding Password}"
+                              PasswordChar="●" />
+                    <Button Grid.Column="1"
+                            x:Name="RevealButton"
+                            Content="{Binding LocalizedStrings[Compress_ShowPassword]}"
+                            Width="60"
+                            Height="{DynamicResource ControlHeight}"
+                            Margin="8,0,0,0"
+                            Click="TogglePasswordReveal"
+                            Background="{DynamicResource ThemeButtonBgBrush}"
+                            Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                            BorderBrush="{DynamicResource ThemeBorderBrush}" />
+                  </Grid>
+
+                  <TextBlock Text="{Binding LocalizedStrings[Compress_Pwd_ConfirmPwd]}"
+                             FontWeight="SemiBold" />
+                  <TextBox PlaceholderText="{Binding LocalizedStrings[Compress_ConfirmPlaceholder]}"
+                            Text="{Binding ConfirmPassword}"
+                            PasswordChar="●" />
+
+                  <StackPanel Orientation="Horizontal"
+                               Spacing="6">
+                    <TextBlock Text="{Binding LocalizedStrings[Compress_Strength]}"
+                                Foreground="{DynamicResource ThemeTextSecondaryBrush}"
+                                FontSize="12" />
+                    <TextBlock Text="{Binding PasswordStrength}"
+                                FontWeight="Bold"
+                                Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+                    <TextBlock Text="{Binding PasswordStrengthIndicator}"
+                                FontSize="14"
+                                Foreground="{DynamicResource ThemeAccentBrush}" />
+                  </StackPanel>
+
+                  <TextBlock x:Name="PasswordMatchIndicator"
+                              FontSize="12"
+                              IsVisible="False" />
+                </StackPanel>
+              </Border>
+
+              <!-- Group: Password library settings -->
+              <Border BorderBrush="{DynamicResource ThemeBorderBrush}"
+                      BorderThickness="1" CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}"
+                      Background="{DynamicResource ThemeSurfaceBgBrush}">
+                <StackPanel Spacing="{DynamicResource SpacingXs}">
                   <TextBlock Text="{Binding LocalizedStrings[Compress_Pwd_SaveToLibrary]}"
-                              TextWrapping="Wrap" />
-                </CheckBox>
-                <TextBlock Text="{Binding LocalizedStrings[Compress_Pwd_Description]}"
-                           FontWeight="SemiBold" />
-                <TextBox PlaceholderText="{Binding LocalizedStrings[Compress_Pwd_DescWatermark]}"
-                          Text="{Binding PasswordDescription}"
-                          IsReadOnly="{Binding IsPasswordLibraryMode}" />
-                <CheckBox IsChecked="{Binding AutoGenerateRules}"
-                           IsEnabled="{Binding IsPasswordLibraryMode, Converter={StaticResource BoolInvertConverter}}">
-                  <TextBlock Text="{Binding LocalizedStrings[Compress_Pwd_AutoRules]}"
-                              TextWrapping="Wrap" />
-                </CheckBox>
-                <TextBlock Text="{Binding LocalizedStrings[Compress_Pwd_Rules]}"
-                           FontWeight="SemiBold" />
-                <TextBox Text="{Binding RulesText}"
-                          PlaceholderText="{Binding LocalizedStrings[Compress_Pwd_RulesWatermark]}"
-                          AcceptsReturn="True"
-                          MinHeight="60"
-                          TextWrapping="Wrap" />
-                <CheckBox IsChecked="{Binding Encrypt}">
-                  <TextBlock Text="{Binding LocalizedStrings[Compress_EncryptArchive]}"
-                              TextWrapping="Wrap" />
-                </CheckBox>
-              </StackPanel>
-            </Border>
+                            FontWeight="SemiBold" />
+                  <CheckBox IsChecked="{Binding SaveToLibrary}">
+                    <TextBlock Text="{Binding LocalizedStrings[Compress_Pwd_SaveToLibrary]}"
+                                TextWrapping="Wrap" />
+                  </CheckBox>
+                  <Grid Margin="0,6,0,0">
+                    <Grid.ColumnDefinitions>
+                      <ColumnDefinition Width="80" />
+                      <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                  <TextBlock Grid.Column="0"
+                    Text="{Binding LocalizedStrings[Compress_Pwd_Description]}"
+                            FontWeight="SemiBold" />
+                  <TextBox Grid.Column="1" PlaceholderText="{Binding LocalizedStrings[Compress_Pwd_DescWatermark]}"
+                            Text="{Binding PasswordDescription}"
+                            IsReadOnly="{Binding IsPasswordLibraryMode}" />
+                  </Grid>
+                  <CheckBox IsChecked="{Binding AutoGenerateRules}"
+                            IsEnabled="{Binding IsPasswordLibraryMode, Converter={StaticResource BoolInvertConverter}}">
+                    <TextBlock Text="{Binding LocalizedStrings[Compress_Pwd_AutoRules]}"
+                                TextWrapping="Wrap" />
+                  </CheckBox>
+
+                  <Grid Margin="0,6,0,0">
+                    <Grid.ColumnDefinitions>
+                      <ColumnDefinition Width="80" />
+                      <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                  <TextBlock Grid.Column="0"
+                      Text="{Binding LocalizedStrings[Compress_Pwd_Rules]}"
+                              FontWeight="SemiBold" />
+                  <TextBox Grid.Column="1" Text="{Binding RulesText}"
+                            PlaceholderText="{Binding LocalizedStrings[Compress_Pwd_RulesWatermark]}"
+                            AcceptsReturn="True"
+                            MinHeight="60"
+                            TextWrapping="Wrap" />
+                   </Grid>
+                </StackPanel>
+              </Border>
+            </StackPanel>
           </StackPanel>
         </ScrollViewer>
       </TabItem>
 
-      <!-- Tab 3: Comment -->
+      <!-- Tab 4: Comment -->
       <TabItem Header="{Binding LocalizedStrings[Compress_TabComment]}"
                Classes="compactTab">
         <ScrollViewer Background="{DynamicResource ThemeWindowBgBrush}"

@@ -50,16 +50,15 @@
                     CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}" Background="{DynamicResource ThemeSurfaceBgBrush}">
               <StackPanel Spacing="{DynamicResource SpacingXs}">
                 <TextBlock Text="{Binding CompressionLevelText}" FontWeight="SemiBold" />
-                <Grid ColumnDefinitions="*,Auto">
-                  <Slider Grid.Column="0" Minimum="1" Maximum="9"
-                          Value="{Binding DefaultLevel}"
-                          TickFrequency="1" IsSnapToTickEnabled="True"
-                          Margin="0,0,8,0" />
-                  <Border Grid.Column="1" Padding="8,2">
-                    <TextBlock Text="{Binding DefaultLevel}"
-                               VerticalAlignment="Center" FontWeight="SemiBold" />
-                  </Border>
-                </Grid>
+                <ComboBox ItemsSource="{Binding DefaultLevelOptions}"
+                          SelectedItem="{Binding SelectedDefaultLevelOption}"
+                          Width="240" HorizontalAlignment="Left">
+                  <ComboBox.ItemTemplate>
+                    <DataTemplate>
+                      <TextBlock Text="{Binding Display}" />
+                    </DataTemplate>
+                  </ComboBox.ItemTemplate>
+                </ComboBox>
               </StackPanel>
             </Border>
 

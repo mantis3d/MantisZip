@@ -24,6 +24,10 @@ public class AppSettings
     public string ZipEncryptionMethod { get; set; } = "aes256";
     public bool SevenZipEncryptHeaders { get; set; } = true;
 
+    // ===== 分卷 =====
+    public string SplitSizeTag { get; set; } = "0";
+    public string CustomSplitSizeMB { get; set; } = "";
+
     // ===== 解压 =====
     public string ExtractDestination { get; set; } = "ask"; // same-dir / desktop / last / ask
     public string FileConflictAction { get; set; } = "ask"; // overwrite / rename / skip / ask

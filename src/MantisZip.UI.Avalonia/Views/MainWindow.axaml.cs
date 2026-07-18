@@ -67,6 +67,7 @@ public partial class MainWindow : Window
             {
                 cvm.DefaultFormat = dialog.ViewModel.DefaultFormat;
                 cvm.CompressionLevel = dialog.ViewModel.CompressionLevel;
+                cvm.OutputMode = dialog.ViewModel.OutputMode;
                 cvm.OutputPath = dialog.ViewModel.OutputPath;
                 cvm.Password = dialog.ViewModel.Password;
                 cvm.Encrypt = dialog.ViewModel.Encrypt;

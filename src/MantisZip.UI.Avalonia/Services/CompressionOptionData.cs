@@ -14,6 +14,15 @@ public static class CompressionOptionData
 
     public sealed record ComboOption(string Tag, string Display);
 
+    /// <summary>压缩级别（与 WPF 一致：0=仅存储, 3=快速, 5=正常, 9=极限）。</summary>
+    public static readonly ComboOption[] LevelOptions =
+    [
+        new("0", "0 - Store only"),
+        new("3", "3 - Fast"),
+        new("5", "5 - Normal"),
+        new("9", "9 - Maximum"),
+    ];
+
     // ─── ZIP ──────────────────────────────────────────────────────────────
 
     /// <summary>ZIP 文件名编码。</summary>
@@ -42,6 +51,21 @@ public static class CompressionOptionData
         new("aes192", "AES-192"),
         new("aes128", "AES-128"),
         new("zipcrypto", "ZipCrypto"),
+    ];
+
+    // ─── 分卷 ──────────────────────────────────────────────────────────────
+
+    /// <summary>分卷大小选项（Tag 为字节数，0=不分卷，-1=自定义）。</summary>
+    public static readonly ComboOption[] SplitSizeOptions =
+    [
+        new("0",          "Compress_Volume_None"),
+        new("1048576",    "1 MB"),
+        new("10485760",   "10 MB"),
+        new("52428800",   "50 MB"),
+        new("104857600",  "100 MB"),
+        new("681574400",  "650 MB (CD)"),
+        new("4294967296", "4 GB (FAT32)"),
+        new("-1",         "Compress_Volume_Custom"),
     ];
 
     // ─── 7z ───────────────────────────────────────────────────────────────

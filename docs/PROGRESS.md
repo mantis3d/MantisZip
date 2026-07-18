@@ -30,6 +30,22 @@
   - 新增 System.Drawing.Common 依赖项（仅 Windows 生效，非 Windows 自动走回退路径）
   - 🐛 修复：ApplySystemTheme 的 MergedDictionaries.Clear() 会清掉 AppIcons.axaml，Clear() 后重载
 
+**2026-07-18** — 分卷大小 + 密码模式 RadioButton 横向排列
+  - Advanced Tab 新增 "分卷大小" 区域：ComboBox（不分卷/1MB/10MB/50MB/100MB/650MB/4GB/自定义）+ 自定义大小 TextBox（仅自定义时显示）
+  - 分卷选择持久化到 AppSettings（SplitSizeTag + CustomSplitSizeMB），下次打开自动恢复
+  - 密码模式 RadioButton（密码库/新密码）从上下排列改为左右排列
+  - 修复 `TextBox.Watermark` 废弃警告 → 改为 `PlaceholderText`
+
+**2026-07-18** — 压缩设置窗口增强：加密 Tab 整理 + 压缩级别 ComboBox + 加密方法
+  - 修复输出模式 RadioButton 偶发不同步：`RefreshOutputPathState()` 进入 Manual 模式时始终还原缓存路径
+  - 压缩级别从 Slider 改为 ComboBox，共享数据源 `CompressionOptionData.LevelOptions`
+  - 新增 Advanced Tab（Tab 2）存放动态格式选项面板，原 Password/Comment Tab 后移
+  - 新增 ZIP 加密方法 ComboBox（AES-256/192/128/ZipCrypto）和 7z 加密文件头 Checkbox
+  - "加密压缩包" checkbox 移至 Tab 顶部，取消勾选时隐藏全部密码内容（方案A）
+  - 加密方式区域根据格式切换：ZIP→显示 AES 选择，7z→显示加密文件头，tar.gz→禁用 Encrypt 并自动清理
+  - 新增空键保护（所有加密相关 key 已注册到 ViewModel LocalizedStrings，消除空白 checkbox）
+  - 消耗的加密 key：Compress_EncryptionMethod / Compress_ZipEncryption / Compress_EncryptHeaders
+
 **2026-07-17** — 紧凑度模式 + 上下文工具栏 + 结果预览面板
   - 紧凑度模式：Compact/Normal/Loose 三档，资源框架 + ApplyCompactness 运行时切换
   - 间距资源双键约定：SpacingXxx（double 用于 Spacing）、SpacingXxxThk（Thickness 用于 Margin/Padding）

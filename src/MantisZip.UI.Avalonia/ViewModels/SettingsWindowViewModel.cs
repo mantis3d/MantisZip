@@ -216,6 +216,9 @@ public partial class SettingsWindowViewModel : ObservableObject
     public System.Collections.ObjectModel.ObservableCollection<Option> DefaultFormatOptions { get; } = new();
     [ObservableProperty] private Option? _selectedDefaultFormatOption;
 
+    public System.Collections.ObjectModel.ObservableCollection<Option> DefaultLevelOptions { get; } = new();
+    [ObservableProperty] private Option? _selectedDefaultLevelOption;
+
     public System.Collections.ObjectModel.ObservableCollection<Option> PreviewPositionOptions { get; } = new();
     [ObservableProperty] private Option? _selectedPreviewPositionOption;
 
@@ -551,6 +554,20 @@ public partial class SettingsWindowViewModel : ObservableObject
         foreach (var val in CompressionOptionData.ArchiveFormatValues)
             DefaultFormatOptions.Add(new Option(val, val));
 
+        DefaultLevelOptions.Clear();
+        foreach (var opt in CompressionOptionData.LevelOptions)
+        {
+            var display = LocalizationManager.T("Compress_Level_" + opt.Tag switch
+            {
+                "0" => "Store",
+                "3" => "Fast",
+                "5" => "Normal",
+                "9" => "Max",
+                _ => "Normal",
+            });
+            DefaultLevelOptions.Add(new Option(display, opt.Tag));
+        }
+
         PreviewPositionOptions.Clear();
         PreviewPositionOptions.Add(new Option(PreviewPositionBottomText, "1"));
         PreviewPositionOptions.Add(new Option(PreviewPositionBelowTreeText, "2"));
@@ -677,6 +694,7 @@ public partial class SettingsWindowViewModel : ObservableObject
     private void SetSelectedOptions()
     {
         SelectedDefaultFormatOption = DefaultFormatOptions.FirstOrDefault(o => o.Value == DefaultFormat);
+        SelectedDefaultLevelOption = DefaultLevelOptions.FirstOrDefault(o => o.Value == DefaultLevel.ToString());
         SelectedPreviewPositionOption = PreviewPositionOptions.FirstOrDefault(o => o.Value == PreviewPosition.ToString());
         SelectedInfoPanelOrientationOption = InfoPanelOrientationOptions.FirstOrDefault(o => o.Value == InfoPanelOrientation);
         SelectedThemeOption = ThemeOptions.FirstOrDefault(o => o.Value == Theme);
@@ -836,7 +854,7 @@ public partial class SettingsWindowViewModel : ObservableObject
     {
         // Compress
         _settings.DefaultFormat = SelectedDefaultFormatOption?.Value ?? DefaultFormat;
-        _settings.DefaultLevel = DefaultLevel;
+        _settings.DefaultLevel = int.TryParse(SelectedDefaultLevelOption?.Value, out var l) ? l : 5;
         _settings.CloseAfterCompress = CloseAfterCompress;
         _settings.KeepOriginalExtension = KeepOriginalExtension;
 

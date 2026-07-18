@@ -1,9 +1,13 @@
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
+using System.IO;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using MantisZip.Core;
 using MantisZip.Core.Abstractions;
+using MantisZip.Core.Utils;
+using MantisZip.UI.Avalonia;
+using MantisZip.UI.Avalonia.Dialogs;
 using MantisZip.UI.Avalonia.Models;
 using MantisZip.UI.Avalonia.Services;
 
@@ -41,11 +45,72 @@ public partial class CompressSettingsViewModel : ObservableObject
     /// <summary>由 View 设置的关闭回调。参数 true=确认压缩，false=取消。</summary>
     public Func<bool, Task>? CloseAction { get; set; }
 
+    // ── Output mode ──
+
+    /// <summary>Manual 模式下的输出路径缓存，切换模式不丢失。</summary>
+    private string? _cachedManualPath;
+
+    [ObservableProperty]
+    private CompressOutputMode _outputMode = CompressOutputMode.Manual;
+
+    /// <summary>输出路径在非 Manual 模式下只读。</summary>
+    public bool IsOutputPathReadOnly => OutputMode != CompressOutputMode.Manual;
+
+    /// <summary>浏览按钮仅在 Manual 模式下显示。</summary>
+    public bool IsBrowseButtonVisible => OutputMode == CompressOutputMode.Manual;
+
+    /// <summary>文件名 / 扩展名区域仅在 Manual/Combined 模式下可见。</summary>
+    public bool IsFileNameSectionVisible => OutputMode != CompressOutputMode.Separate;
+
+    /// <summary>输出路径标签文字随模式变化。</summary>
+    public string OutputPathLabel => OutputMode switch
+    {
+        CompressOutputMode.Separate => LocalizationManager.T("Compress_OutputMode_Separate"),
+        CompressOutputMode.Combined => LocalizationManager.T("Compress_OutputMode_Combined"),
+        _ => LocalizationManager.T("Compress_OutputPath"),
+    };
+
+    /// <summary>RadioButton 绑定：Manual 模式。</summary>
+    public bool IsManualMode
+    {
+        get => OutputMode == CompressOutputMode.Manual;
+        set { if (value) OutputMode = CompressOutputMode.Manual; }
+    }
+
+    /// <summary>RadioButton 绑定：Separate 模式。</summary>
+    public bool IsSeparateMode
+    {
+        get => OutputMode == CompressOutputMode.Separate;
+        set { if (value) OutputMode = CompressOutputMode.Separate; }
+    }
+
+    /// <summary>RadioButton 绑定：Combined 模式。</summary>
+    public bool IsCombinedMode
+    {
+        get => OutputMode == CompressOutputMode.Combined;
+        set { if (value) OutputMode = CompressOutputMode.Combined; }
+    }
+
     [ObservableProperty]
     private string _defaultFormat = "zip";
 
+    /// <summary>当前格式是否为 ZIP。</summary>
+    public bool IsZipFormat => DefaultFormat == "zip";
+
+    /// <summary>当前格式是否为 7z。</summary>
+    public bool IsSevenZipFormat => DefaultFormat == "7z";
+
+    /// <summary>当前格式是否支持加密（tar.gz 不支持）。</summary>
+    public bool IsFormatEncryptionSupported => DefaultFormat != "tar.gz";
+
+    /// <summary>压缩级别下拉列表（来自共享数据源 CompressionOptionData）。</summary>
+    public List<CompressionOptionData.ComboOption> CompressionLevelOptions { get; }
+
     [ObservableProperty]
     private int _compressionLevel = 5;
+
+    [ObservableProperty]
+    private CompressionOptionData.ComboOption? _selectedLevelOption;
 
     [ObservableProperty]
     private string? _outputPath;
@@ -64,6 +129,53 @@ public partial class CompressSettingsViewModel : ObservableObject
 
     [ObservableProperty]
     private CommentDistribution _commentDistribution = CommentDistribution.AllSame;
+
+    /// <summary>ZIP 加密方法（共享数据源）。</summary>
+    public List<CompressionOptionData.ComboOption> ZipEncryptionMethodOptions { get; }
+
+    [ObservableProperty]
+    private string _zipEncryptionMethod = "aes256";
+
+    [ObservableProperty]
+    private CompressionOptionData.ComboOption? _selectedZipEncryptionMethodOption;
+
+    [ObservableProperty]
+    private bool _sevenZipEncryptHeaders;
+
+    // ── 分卷 ──
+
+    /// <summary>分卷大小选项（共享数据源）。</summary>
+    public List<CompressionOptionData.ComboOption> SplitSizeOptions { get; }
+
+    [ObservableProperty]
+    private CompressionOptionData.ComboOption? _selectedSplitSizeOption;
+
+    /// <summary>自定义分卷大小文本（仅自定义模式可用）。</summary>
+    [ObservableProperty]
+    private string _customSplitSizeText = "";
+
+    /// <summary>是否显示自定义分卷大小输入框。</summary>
+    public bool IsCustomSplitSizeVisible => SelectedSplitSizeOption?.Tag == "-1";
+
+    /// <summary>当前分卷大小（字节），0 表示不分卷。</summary>
+    public long SplitSize
+    {
+        get
+        {
+            if (SelectedSplitSizeOption == null) return 0;
+            var tag = SelectedSplitSizeOption.Tag;
+            if (tag == "0") return 0;
+            if (tag == "-1")
+            {
+                if (long.TryParse(CustomSplitSizeText, out var mb) && mb > 0)
+                    return mb * 1024L * 1024L;
+                return 0;
+            }
+            if (long.TryParse(tag, out var bytes))
+                return bytes;
+            return 0;
+        }
+    }
 
     // -- Password mode (library vs new password)
 
@@ -185,14 +297,22 @@ public partial class CompressSettingsViewModel : ObservableObject
             OnPropertyChanged(nameof(SelectedPathsSummary));
             UpdateAutoRules();
             BuildCompressPreview();
+            if (OutputMode != CompressOutputMode.Manual)
+                RefreshOutputPathState();
         };
 
         // Populate localized strings
         LocalizedStrings["Compress_TabGeneral"] = LocalizationManager.T("Compress_TabGeneral");
+        LocalizedStrings["Compress_TabAdvanced"] = LocalizationManager.T("Compress_TabAdvanced");
+        LocalizedStrings["Compress_VolumeSize"] = LocalizationManager.T("Compress_VolumeSize");
         LocalizedStrings["Compress_TabPassword"] = LocalizationManager.T("Compress_TabPassword");
         LocalizedStrings["Compress_TabComment"] = LocalizationManager.T("Compress_TabComment");
         LocalizedStrings["Compress_Format"] = LocalizationManager.T("Compress_Format");
         LocalizedStrings["Compress_Level"] = LocalizationManager.T("Compress_Level");
+        LocalizedStrings["Compress_OutputMode"] = LocalizationManager.T("Compress_OutputMode");
+        LocalizedStrings["Compress_OutputMode_Manual"] = LocalizationManager.T("Compress_OutputMode_Manual");
+        LocalizedStrings["Compress_OutputMode_Separate"] = LocalizationManager.T("Compress_OutputMode_Separate");
+        LocalizedStrings["Compress_OutputMode_Combined"] = LocalizationManager.T("Compress_OutputMode_Combined");
         LocalizedStrings["Compress_OutputPath"] = LocalizationManager.T("Compress_OutputPath");
         LocalizedStrings["Compress_OutputPlaceholder"] = LocalizationManager.T("Compress_OutputPlaceholder");
         LocalizedStrings["Compress_SourceFiles"] = LocalizationManager.T("Compress_SourceFiles");
@@ -207,6 +327,9 @@ public partial class CompressSettingsViewModel : ObservableObject
         LocalizedStrings["Compress_ConfirmPlaceholder"] = LocalizationManager.T("Compress_ConfirmPlaceholder");
         LocalizedStrings["Compress_ShowPassword"] = LocalizationManager.T("Compress_ShowPassword");
         LocalizedStrings["Compress_EncryptArchive"] = LocalizationManager.T("Compress_EncryptArchive");
+        LocalizedStrings["Compress_EncryptionMethod"] = LocalizationManager.T("Compress_EncryptionMethod");
+        LocalizedStrings["Compress_ZipEncryption"] = LocalizationManager.T("Compress_ZipEncryption");
+        LocalizedStrings["Compress_EncryptHeaders"] = LocalizationManager.T("Compress_EncryptHeaders");
         LocalizedStrings["Compress_Strength"] = LocalizationManager.T("Compress_Strength");
         LocalizedStrings["Compress_Comment"] = LocalizationManager.T("Compress_Comment");
         LocalizedStrings["Compress_CommentPlaceholder"] = LocalizationManager.T("Compress_CommentPlaceholder");
@@ -234,6 +357,40 @@ public partial class CompressSettingsViewModel : ObservableObject
         LocalizedStrings["Compress_Start"] = LocalizationManager.T("Compress_Start");
         LocalizedStrings["Compress_Cancel"] = LocalizationManager.T("Compress_Cancel");
 
+        // 初始化压缩级别下拉选项（共享数据源，本地化 Display）
+        CompressionLevelOptions = CompressionOptionData.LevelOptions
+            .Select(o => new CompressionOptionData.ComboOption(o.Tag, LocalizationManager.T("Compress_Level_" + o.Tag switch
+            {
+                "0" => "Store",
+                "3" => "Fast",
+                "5" => "Normal",
+                "9" => "Max",
+                _ => "Normal",
+            })))
+            .ToList();
+        SelectedLevelOption = CompressionLevelOptions.FirstOrDefault(
+            o => o.Tag == CompressionLevel.ToString());
+
+        // 初始化 ZIP 加密方式下拉选项（共享数据源）
+        ZipEncryptionMethodOptions = CompressionOptionData.ZipEncryptionMethods
+            .Select(o => new CompressionOptionData.ComboOption(o.Tag, o.Display))
+            .ToList();
+        SelectedZipEncryptionMethodOption = ZipEncryptionMethodOptions.FirstOrDefault(
+            o => o.Tag == ZipEncryptionMethod);
+
+        // 初始化分卷大小下拉选项
+        SplitSizeOptions = CompressionOptionData.SplitSizeOptions
+            .Select(o => new CompressionOptionData.ComboOption(
+                o.Tag,
+                o.Tag switch
+                {
+                    "0" => LocalizationManager.T("Compress_Volume_None"),
+                    "-1" => LocalizationManager.T("Compress_Volume_Custom"),
+                    _ => o.Display,
+                }))
+            .ToList();
+        SelectedSplitSizeOption = SplitSizeOptions.FirstOrDefault(o => o.Tag == "0");
+
         // Load password library
         LoadPasswordLibrary();
 
@@ -257,6 +414,31 @@ public partial class CompressSettingsViewModel : ObservableObject
             rootName: LocalizationManager.T("Compress_Title"));
     }
 
+    partial void OnCompressionLevelChanged(int value)
+    {
+        // Sync the ComboBox selection when CompressionLevel is set programmatically
+        if (CompressionLevelOptions is { } options)
+            SelectedLevelOption = options.FirstOrDefault(o => o.Tag == value.ToString());
+    }
+
+    partial void OnSelectedLevelOptionChanged(CompressionOptionData.ComboOption? value)
+    {
+        if (value != null && int.TryParse(value.Tag, out var level))
+            CompressionLevel = level;
+    }
+
+    partial void OnSelectedZipEncryptionMethodOptionChanged(CompressionOptionData.ComboOption? value)
+    {
+        if (value != null)
+            ZipEncryptionMethod = value.Tag;
+    }
+
+    partial void OnZipEncryptionMethodChanged(string value)
+    {
+        if (ZipEncryptionMethodOptions is { } options)
+            SelectedZipEncryptionMethodOption = options.FirstOrDefault(o => o.Tag == value);
+    }
+
     partial void OnPasswordChanged(string? value)
     {
         OnPropertyChanged(nameof(PasswordStrength));
@@ -268,6 +450,34 @@ public partial class CompressSettingsViewModel : ObservableObject
     partial void OnConfirmPasswordChanged(string? value)
     {
         OnPropertyChanged(nameof(PasswordsMatch));
+    }
+
+    partial void OnOutputModeChanged(CompressOutputMode value)
+    {
+        // Notify all dependent properties (including RadioButton bindings)
+        OnPropertyChanged(nameof(IsOutputPathReadOnly));
+        OnPropertyChanged(nameof(IsBrowseButtonVisible));
+        OnPropertyChanged(nameof(IsFileNameSectionVisible));
+        OnPropertyChanged(nameof(OutputPathLabel));
+        OnPropertyChanged(nameof(IsManualMode));
+        OnPropertyChanged(nameof(IsSeparateMode));
+        OnPropertyChanged(nameof(IsCombinedMode));
+        RefreshOutputPathState();
+        UpdateCanCompress();
+    }
+
+    partial void OnDefaultFormatChanged(string value)
+    {
+        if (OutputMode == CompressOutputMode.Combined)
+            RefreshCombinedPath();
+
+        // tar.gz 不支持加密，切过去时自动取消加密
+        if (value == "tar.gz")
+            Encrypt = false;
+
+        OnPropertyChanged(nameof(IsZipFormat));
+        OnPropertyChanged(nameof(IsSevenZipFormat));
+        OnPropertyChanged(nameof(IsFormatEncryptionSupported));
     }
 
     partial void OnIsPasswordLibraryModeChanged(bool value)
@@ -329,6 +539,17 @@ public partial class CompressSettingsViewModel : ObservableObject
             CommentFirstOnly = false;
             CommentDistribution = CommentDistribution.PerLine;
         }
+    }
+
+    partial void OnSelectedSplitSizeOptionChanged(CompressionOptionData.ComboOption? value)
+    {
+        OnPropertyChanged(nameof(IsCustomSplitSizeVisible));
+        OnPropertyChanged(nameof(SplitSize));
+    }
+
+    partial void OnCustomSplitSizeTextChanged(string value)
+    {
+        OnPropertyChanged(nameof(SplitSize));
     }
 
     /// <summary>
@@ -501,5 +722,101 @@ public partial class CompressSettingsViewModel : ObservableObject
         {
             RulesText = string.Join(", ", extensions);
         }
+    }
+
+    // ── Output mode helpers ──
+
+    /// <summary>
+    /// 根据当前模式刷新输出路径的显示内容（路径 + 可编辑状态）。
+    /// </summary>
+    private void RefreshOutputPathState()
+    {
+        switch (OutputMode)
+        {
+            case CompressOutputMode.Manual:
+                // 回到 Manual：恢复缓存路径；无缓存则清空（避免残留其他模式的说明文本）
+                OutputPath = _cachedManualPath;
+                _cachedManualPath = null;
+                break;
+
+            case CompressOutputMode.Separate:
+                // 首次离开 Manual 时缓存路径；之后不再覆盖（避免转两次模式后丢失原始路径）
+                _cachedManualPath ??= OutputPath;
+                OutputPath = LocalizationManager.T("Compress_SeparateSummary", SelectedPaths.Count);
+                break;
+
+            case CompressOutputMode.Combined:
+                // 首次离开 Manual 时缓存路径；之后不再覆盖
+                _cachedManualPath ??= OutputPath;
+                RefreshCombinedPath();
+                break;
+        }
+    }
+
+    /// <summary>
+    /// 计算 Combined 模式的输出路径：公共父目录下的合并压缩包。
+    /// </summary>
+    private void RefreshCombinedPath()
+    {
+        if (SelectedPaths.Count == 0)
+        {
+            OutputPath = "";
+            return;
+        }
+
+        var commonParent = App.FindCommonParent(SelectedPaths.ToList());
+        if (commonParent != null && !App.IsDriveRoot(commonParent))
+        {
+            var archiveName = ArchivePath.GetFileName(commonParent);
+            var ext = GetFormatExtension();
+            OutputPath = System.IO.Path.Combine(commonParent, archiveName + ext);
+        }
+        else
+        {
+            // 跨驱动器或根目录 — 回退到手动模式
+            OutputMode = CompressOutputMode.Manual;
+            // 通知用户
+            _ = AppMessageBox.Show(
+                LocalizationManager.T("Compress_CombinedUnavailable"),
+                LocalizationManager.T("Compress_Title"),
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+        }
+    }
+
+    /// <summary>
+    /// 从当前选择的格式推断文件扩展名。
+    /// </summary>
+    private string GetFormatExtension()
+    {
+        return DefaultFormat switch
+        {
+            "tar.gz" => ".tar.gz",
+            _ => "." + DefaultFormat,
+        };
+    }
+
+    /// <summary>
+    /// 根据源路径推断默认文件名。
+    /// </summary>
+    private string GetDefaultFileName()
+    {
+        if (SelectedPaths.Count == 0) return "archive";
+        if (SelectedPaths.Count == 1 && File.Exists(SelectedPaths[0]))
+            return Path.GetFileNameWithoutExtension(SelectedPaths[0]);
+        if (SelectedPaths.Count == 1 && Directory.Exists(SelectedPaths[0]))
+            return ArchivePath.GetFileName(SelectedPaths[0]);
+        return $"archive_{DateTime.Now:yyyyMMddHHmmss}";
+    }
+
+    /// <summary>
+    /// 更新"开始压缩"按钮的启用状态。由模式切换和源文件变化时调用。
+    /// </summary>
+    private void UpdateCanCompress()
+    {
+        // 通知 CloseAction 调用方重新评估按钮状态
+        // 实际按钮启用由 Command 的 CanExecute 决定，
+        // 这里触发 CanExecuteChanged 刷新
+        StartCompressCommand.NotifyCanExecuteChanged();
     }
 }
