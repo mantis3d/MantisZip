@@ -697,6 +697,7 @@ public partial class MainWindow : Window
 
         Window? window = tag switch
         {
+            "IconTestWindow" => new Dialogs.IconTestWindow(),
             "AboutWindow" => new AboutWindow(),
             "SettingsWindow" => new Views.SettingsWindow(),
             "PasswordManagerWindow" => new PasswordManagerWindow(),

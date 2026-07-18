@@ -21,6 +21,13 @@
 
 ### MantisZip.UI.Avalonia（主力版）
 
+**2026-07-18** — 图标测试窗口 + GIF 预览宽度 Bug 修复
+  - 🐛 修复：GIF 预览 `ImageWidth` 缺失赋值（ShowGif 中只设了 ImageHeight 漏了 ImageWidth），导致显示为 `0 × height` 且 ZoomFit 异常
+  - 新增 IconTestWindow（图标测试窗口）：列出程序所有图标的位置、名称、类型（emoji/PathIcon/PathIcon-待替换）、来源文件路径和状态
+  - 新增 IconTestItem 模型、IconTestViewModel（含 70+ 条图标数据）、GeometryResourceConverter / StringNotEmptyConverter
+  - 通过测试菜单可打开图标测试窗口，支持按名称筛选和分类统计
+  - 为 .sisyphus/plans/emoji-to-pathicon.md 计划提供实时验证和数据补充
+
 **2026-07-18** — emoji 图标替换为 PathIcon + 文件列表行图标改用系统原生
   - Phase 1：32 个 Fluent UI System Icons 矢量路径批量提取，创建 AppIcons.axaml 资源字典
   - 菜单、工具栏、状态栏、列头、设置分类、对话框等 ~50 处 emoji TextBlock → PathIcon

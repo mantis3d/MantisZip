@@ -267,6 +267,15 @@
             <TextBlock Text="{Binding LocalizedStrings[Menu_Test]}" />
           </StackPanel>
         </MenuItem.Header>
+        <MenuItem Click="TestWindow_Click" Tag="IconTestWindow">
+          <MenuItem.Header>
+            <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
+              <PathIcon Data="{StaticResource IconGrid}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+              <TextBlock Text="图标测试 — 所有图标列表" />
+            </StackPanel>
+          </MenuItem.Header>
+        </MenuItem>
+        <Separator />
         <MenuItem Click="TestWindow_Click" Tag="AboutWindow">
           <MenuItem.Header>
             <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">

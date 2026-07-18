@@ -725,6 +725,7 @@ public partial class PreviewViewModel : ObservableObject
             {
                 PreviewImage = frames[0].Bitmap;
                 _originalPreviewImage = frames[0].Bitmap;
+                ImageWidth = frames[0].Bitmap.PixelSize.Width;
                 ImageHeight = frames[0].Bitmap.PixelSize.Height;
             }
 
