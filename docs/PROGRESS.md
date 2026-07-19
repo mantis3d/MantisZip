@@ -21,6 +21,14 @@
 
 ### MantisZip.UI.Avalonia（主力版）
 
+**2026-07-19** — PasswordManagerWindow 图标补全 + 搜索栏图标 + 布局调整
+  - AppIcons.axaml 新增 IconImport（arrowImport 24 filled）几何图标
+  - IconEye/IconEyeOff 从 Regular 路径替换为 Filled 路径，16px 下清晰可见
+  - 密码管理器工具栏全部按钮（Add/Edit/Delete/Export/Import/TogglePwd/Help）添加 PathIcon
+  - 显示/隐藏密码按钮支持图标切换（IconEye ↔ IconEyeOff）
+  - 密码管理器搜索栏添加搜索图标（IconSearch 覆盖在输入框左侧）
+  - 搜索栏与工具栏位置交换（工具栏在上，搜索栏在下）
+
 **2026-07-19** — 冲突对话框 UI 补全 + 计划审计
   - ConflictDialog：补全 Topmost、"覆盖较旧"/"覆盖较小"条件覆盖按钮、暂停/取消操作按钮、分隔线；删除多余 Cancel 按钮
   - CompressConflictDialog：补全 Topmost、"添加到压缩包"按钮（CompressConflictAction.Add）、暂停/取消操作按钮、分隔线；删除多余 Cancel 按钮

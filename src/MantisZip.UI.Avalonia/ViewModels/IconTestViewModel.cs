@@ -77,6 +77,8 @@ public partial class IconTestViewModel : ObservableObject
             "Views/MainWindow.axaml:107", "菜单栏「文件→收藏夹→管理」");
         Add("菜单", "解压到……", null, "IconExport", IconStatus.Converted,
             "Views/MainWindow.axaml:119", "菜单栏「编辑→解压到……」");
+        Add("密码", "导入密码", null, "IconImport", IconStatus.Converted,
+            "Dialogs/PasswordManagerWindow.axaml:59", "密码管理器工具栏「导入」");
         Add("菜单", "原地解压", null, "IconPin", IconStatus.Converted,
             "Views/MainWindow.axaml:128", "菜单栏「编辑→原地解压」");
         Add("菜单", "解压到命名目录", null, "IconFolder", IconStatus.Converted,
