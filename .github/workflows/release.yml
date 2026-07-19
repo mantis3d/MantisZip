@@ -35,10 +35,11 @@ jobs:
           --filter "FullyQualifiedName!~SevenZipEngine"
           --logger "console;verbosity=normal"
 
-      - name: Publish (framework-dependent)
+      - name: Publish (framework-dependent, win-x64)
         run: >
           dotnet publish src\MantisZip.UI\MantisZip.UI.csproj
           --no-restore --configuration Release
+          --runtime win-x64
           --output publish_output
           -p:DebugType=portable
           -p:DebugSymbols=true
@@ -120,7 +121,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "ISCC compilation failed (exit code: $LASTEXITCODE)" }
           Write-Host "Self-contained installer built successfully"
 
-      - name: Package portable zip
+      - name: Package portable zip (self-contained)
         shell: pwsh
         run: |
           $src = "publish_output_selfcontained"
@@ -136,9 +137,39 @@ jobs:
           } else {
             Write-Host "7z.dll not found, 7z compression will not be available"
           }
+          # Strip .NET runtime satellite assemblies (cs, de, es, fr, it, ja, ko,
+          # pl, pt-BR, ru, tr) — they're unused by MantisZip's JSON-based i18n
+          $runtimeLocales = @("cs","de","es","fr","it","ja","ko","pl","pt-BR","ru","tr")
+          foreach ($locale in $runtimeLocales) {
+            $localeDir = Join-Path $src $locale
+            if (Test-Path $localeDir) {
+              Remove-Item -Recurse -Force $localeDir
+              Write-Host "Stripped runtime locale: $locale"
+            }
+          }
           $zipName = "MantisZip-$env:VERSION-Portable.zip"
           Compress-Archive -Path "$src\*" -DestinationPath $zipName -CompressionLevel Optimal
           Write-Host "Portable zip created: $zipName ($((Get-Item $zipName).Length / 1MB -as [int]) MB)"
+
+      - name: Package portable web zip (framework-dependent)
+        shell: pwsh
+        run: |
+          $src = "publish_output"
+          # Portable.txt sentinel file
+          "" | Out-File -FilePath "$src\Portable.txt" -Encoding ascii
+          # Copy 7z.dll for 7z compression support
+          $sevenZ = "$env:ProgramFiles\7-Zip\7z.dll"
+          if (Test-Path $sevenZ) {
+            $x64Dir = "$src\x64"
+            New-Item -ItemType Directory -Path $x64Dir -Force | Out-Null
+            Copy-Item $sevenZ "$x64Dir\7z.dll"
+            Write-Host "7z.dll copied to x64 subdirectory"
+          } else {
+            Write-Host "7z.dll not found, 7z compression will not be available"
+          }
+          $zipName = "MantisZip-$env:VERSION-Portable-Web.zip"
+          Compress-Archive -Path "$src\*" -DestinationPath $zipName -CompressionLevel Optimal
+          Write-Host "Portable web zip created: $zipName ($((Get-Item $zipName).Length / 1MB -as [int]) MB)"
 
       - name: List installer artifacts
         shell: pwsh
@@ -171,7 +202,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           $installers = Get-ChildItem -Path installer -Filter "*.exe" | ForEach-Object FullName
-          $portableZip = Get-ChildItem -Filter "*-Portable.zip" | ForEach-Object FullName
+          $portableZip = Get-ChildItem -Filter "*-Portable*.zip" | ForEach-Object FullName
           $assets = $installers + $portableZip
           if (-not $assets) { throw "No release assets found" }
           $notes = Get-Content release_notes.txt -Raw
