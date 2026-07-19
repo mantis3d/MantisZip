@@ -18,6 +18,8 @@ public partial class ConflictDialog : Window
     private bool _capturedApplyToAll;
     private string? _capturedCustomName;
     private bool _resultCaptured;
+    private bool _isPaused;
+    private bool _cancelOperation;
 
     /// <summary>用户选择的处理方式</summary>
     public FileConflictAction ResultAction => _resultCaptured ? _capturedAction : FileConflictAction.Overwrite;
@@ -25,6 +27,11 @@ public partial class ConflictDialog : Window
     public bool ApplyToAll => _resultCaptured && _capturedApplyToAll;
     /// <summary>用户输入的自定义文件名</summary>
     public string? CustomName => _resultCaptured ? _capturedCustomName : RenameTextBox.Text;
+
+    /// <summary>用户是否点击了"暂停"按钮</summary>
+    public bool IsPaused => _isPaused;
+    /// <summary>用户是否点击了"取消"（取消整个操作）按钮</summary>
+    public bool CancelOperation => _cancelOperation;
 
     // ── Localized string properties ──
     public string WinTitle => LocalizationManager.T("Conflict_Title");
@@ -35,10 +42,13 @@ public partial class ConflictDialog : Window
     public string OverwriteText => LocalizationManager.T("CompressConflict_Overwrite");
     public string RenameText => LocalizationManager.T("CompressConflict_Rename");
     public string SkipText => LocalizationManager.T("Conflict_Skip");
-    public string CancelText => LocalizationManager.T("Conflict_Cancel");
     public string ApplyAllText => LocalizationManager.T("Conflict_ApplyAll");
     public string NewNameLabel => LocalizationManager.T("Conflict_NewNameLabel");
     public string RenameHint => LocalizationManager.T("Conflict_RenameHint");
+    public string OverwriteOlderText => LocalizationManager.T("Conflict_Btn_OverwriteOlder");
+    public string OverwriteSmallerText => LocalizationManager.T("Conflict_Btn_OverwriteSmaller");
+    public string PauseText => LocalizationManager.T("Conflict_Btn_Pause");
+    public string CancelOpText => LocalizationManager.T("Conflict_Btn_CancelOperation");
 
     /// <summary>
     /// 设计时需要的无参构造函数。不要直接使用，调用 <see cref="ConflictDialog(FileConflictInfo)"/>。
@@ -126,8 +136,27 @@ public partial class ConflictDialog : Window
         Close(true);
     }
 
-    private void Cancel_Click(object? sender, RoutedEventArgs e)
+    private void OverwriteIfOlder_Click(object? sender, RoutedEventArgs e)
     {
+        CaptureResult(FileConflictAction.OverwriteIfOlder, ApplyAllCheck.IsChecked == true, RenameTextBox.Text);
+        Close(true);
+    }
+
+    private void OverwriteIfSmaller_Click(object? sender, RoutedEventArgs e)
+    {
+        CaptureResult(FileConflictAction.OverwriteIfSmaller, ApplyAllCheck.IsChecked == true, RenameTextBox.Text);
+        Close(true);
+    }
+
+    private void Pause_Click(object? sender, RoutedEventArgs e)
+    {
+        _isPaused = true;
+        Close(false);
+    }
+
+    private void CancelOperation_Click(object? sender, RoutedEventArgs e)
+    {
+        _cancelOperation = true;
         CaptureResult(FileConflictAction.Overwrite, false, null);
         Close(false);
     }

@@ -21,6 +21,14 @@
 
 ### MantisZip.UI.Avalonia（主力版）
 
+**2026-07-19** — 冲突对话框 UI 补全 + 计划审计
+  - ConflictDialog：补全 Topmost、"覆盖较旧"/"覆盖较小"条件覆盖按钮、暂停/取消操作按钮、分隔线；删除多余 Cancel 按钮
+  - CompressConflictDialog：补全 Topmost、"添加到压缩包"按钮（CompressConflictAction.Add）、暂停/取消操作按钮、分隔线；删除多余 Cancel 按钮
+  - 动作行底部样式统一：PauseBtn/CancelAllBtn 从 Horizontal 改为 Vertical 布局，图标 22×22、FontSize 11
+  - AppIcons.axaml 新增 IconPause 几何图标
+  - 本地化 keys 补充（9 条 EN/ZH），`dotnet build` 通过，0 错误
+  - 审计 `.sisyphus/plans/avalonia-wpf-diff-plan.md`：发现 P0-2（压缩选项 9 属性）、P0-3（魔数检测）已实现但未更新；更新汇总统计和已完成章节
+
 **2026-07-18** — Phase 2 emoji→PathIcon 替换：预览按钮 + 对话框 + 文件树 + 过滤栏
   - 新增 11 个 Fluent UI 图标 Geometry：IconSubtract/Play/Pause/Previous/Next/ArrowRight/ArrowFitIn/EyeOff/Document/FontDecrease/FontIncrease
   - PreviewPanel.axaml：8 个预览工具栏按钮 emoji（− + ⟲ A− A+ ⏮ ⏯ ⏭）→ PathIcon

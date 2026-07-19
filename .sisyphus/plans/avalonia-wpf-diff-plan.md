@@ -6,7 +6,9 @@
 
 **背景:** `AvaloniaFromWpf` 已合并 `main` 所有提交（merge-base: `ddaadc9`），Core 层共享，差异仅在 UI 层。当前 Avalonia 项目已完成 Phase 0-10 + UI Feature Parity + i18n Cleanup，剩余 Shell/COM 集成未开始。
 
-**核对日期:** 2026-07-15 | **版本:** v0.4.5
+**核对日期:** 2026-07-19（上次: 2026-07-15）| **版本:** v0.4.5
+
+**状态:** P0-2（压缩选项）、P0-3（魔数检测）、P1-5（冲突对话框 UI）已完成。仅剩 P0-1（Shell/COM）为 P0。
 
 ---
 
@@ -14,15 +16,17 @@
 
 | 缺失类别 | 缺失项数 | 优先级分布 |
 |----------|---------|-----------|
-| AppSettings 属性 | 21 个 | P0×9, P1×12 |
+| AppSettings 属性 | ~9 个 | P0×0, P1×6, P2×3 |
 | 对话框/控件 | 1 个 | P1 |
-| 功能逻辑 | 8 项 | P0×3, P1×3, P2×2 |
+| 功能逻辑 | 7 项 | P0×0, P1×5, P2×2 |
 | Shell/COM 集成 | 整块 | P0 |
-| 总工作量预估 | — | 约 3-5 天 |
+| 总工作量预估 | — | 约 1.5-2 天 |
 
 ---
 
 ## P0 — 核心功能缺失（阻塞性）
+
+> 仅剩 P0-1 待完成。P0-2（压缩选项）和 P0-3（魔数检测）已移至 ✅ 已完成。
 
 ### P0-1: Shell/COM 集成
 
@@ -44,48 +48,6 @@
 - [ ] 从 WPF 复制 MenuIcons ICO 文件
 - [ ] App.axaml.cs 补全 `--install-assoc`/`--uninstall-assoc` 实际逻辑（当前委托给 WPF exe）
 - [ ] 验证构建 + COM host 输出
-
----
-
-### P0-2: 压缩选项增强（7z/ZIP 高级参数）
-
-**现状:** WPF 支持 7z 字典/固实块/匹配器/Word Size/ZIP 方法/加密方式 等高级选项。Avalonia AppSettings 缺少 8 个压缩相关属性，`DynamicFormatOptionsPanel` 已存在但缺少对应设置绑定。
-
-**缺失 AppSettings 属性:**
-| 属性 | 类型 | 默认值 | WPF 用途 |
-|------|------|--------|----------|
-| `SevenZipSolidBlockSize` | string | `"global"` | 7z 固实块大小 |
-| `SevenZipDictionarySize` | string | `"default"` | 7z 字典大小 |
-| `SevenZipNumFastBytes` | string | `"default"` | 7z Word Size |
-| `SevenZipMatchFinder` | string | `"default"` | 7z 匹配器 |
-| `SevenZipEncryptHeaders` | bool | `false` | 7z 加密文件头 |
-| `ZipCompressionMethod` | string | `"Deflate"` | ZIP 压缩方法 |
-| `ZipEncryptionMethod` | string | `"AES256"` | ZIP 加密方式 |
-| `SevenZipCompressionMethod` | string | `"LZMA2"` | 7z 压缩方法 |
-| `SevenZipSolid` | bool | `true` | 7z 固实压缩 |
-
-**任务:**
-- [ ] `Models/AppSettings.cs` 添加上述 9 个属性 + 默认值
-- [ ] 验证 `DynamicFormatOptionsPanel` 与 Core `ArchiveOptions` 的绑定通路
-- [ ] `SettingsWindow` 压缩 Tab 补充 ComboBox 设置 UI
-
----
-
-### P0-3: 魔数检测预览（Magic Detection）
-
-**现状:** WPF 已实现 `FileFormatDetector`（Core，共享）+ WPF UI 端魔数路由（`TryMagicPreview`、格式切换按钮、冲突检测）。Avalonia `PreviewService` 仍使用扩展名判定，未接入魔数检测。
-
-**缺失 AppSettings 属性:**
-| 属性 | 类型 | 默认值 |
-|------|------|--------|
-| `EnableFormatDetection` | bool | `true` |
-| `PreviewHeadSize` | long | `4096` |
-
-**任务:**
-- [ ] `Models/AppSettings.cs` 添加 `EnableFormatDetection`、`PreviewHeadSize`
-- [ ] `Services/PreviewService.cs` 添加魔数路由逻辑（调用 `FileFormatDetector.Detect()` → 按魔数结果路由预览格式）
-- [ ] 添加扩展名/魔数冲突时的切换 UI（工具栏按钮）
-- [ ] 预览信息面板显示魔数检测结果
 
 ---
 
@@ -165,21 +127,6 @@
 
 ---
 
-### P1-5: 冲突对话框暂停/取消
-
-**现状:** WPF 的 `CompressConflictDialog` 和 `ConflictDialog` 新增底部暂停/取消按钮。暂停收起对话框 → ProgressWindow 暂停态 → 恢复时重新弹出。取消通过 `OperationCanceledException` 终止操作。Avalonia 版本缺失此功能。
-
-**WPF 源文件参考:** `CompressConflictDialog.xaml(.cs)`、`ConflictDialog.xaml(.cs)`、`ProgressWindow.xaml.cs`（`PauseFromConflict()`）、`App.xaml.cs`（循环重入改造）
-
-**任务:**
-- [ ] `Dialogs/CompressConflictDialog.axaml` + `.axaml.cs` 添加暂停/取消按钮
-- [ ] `Dialogs/ConflictDialog.axaml` + `.axaml.cs` 添加暂停/取消按钮
-- [ ] `Dialogs/ProgressWindow.axaml.cs` 添加 `PauseFromConflict()` 方法（`ManualResetEventSlim`）
-- [ ] `Services/CompressService.cs` 各压缩循环添加 conflictResolver 暂停/取消支持
-- [ ] 添加 i18n key
-
----
-
 ### P1-6: 预览信息面板显隐控制
 
 **现状:** WPF 视图菜单新增"隐藏预览信息"开关 + `ShowPreviewInfoPanel` 设置持久化。Avalonia 的 `PreviewInfoPanel` 已在 Phase 10 实现，但缺少显隐切换。
@@ -234,16 +181,17 @@
 
 ### P2-3: 缺少的 Enable 设置
 
-**现状:** WPF 有 3 个菜单/功能 Enable 开关在 Avalonia 缺失：
+**现状:** WPF 有 3 个菜单/功能 Enable 开关在 Avalonia 缺失。
 
-| 缺失属性 | 类型 | 默认值 |
-|---------|------|--------|
-| `EnableCompressMenu` | bool | `true` |
-| `EnableExtractMenu` | bool | `true` |
-| `EnableQuickCompress` | bool | `true` |
+| 缺失属性 | 类型 | 默认值 | Avalonia 状态 |
+|---------|------|--------|-------------|
+| `EnableCompressMenu` | bool | `true` | ✅ 已存在 |
+| `EnableExtractMenu` | bool | `true` | ❌ 缺失 |
+| `EnableQuickCompress` | bool | `true` | ❌ 缺失 |
 
 **任务:**
-- [ ] `Models/AppSettings.cs` 添加 3 个属性
+- [x] `Models/AppSettings.cs` 添加 `EnableCompressMenu` — 已存在
+- [ ] `Models/AppSettings.cs` 添加 `EnableExtractMenu`、`EnableQuickCompress`
 - [ ] 关联到对应菜单项的可见性/启停
 
 ---
@@ -262,6 +210,43 @@
 
 ---
 
+## ✅ 已完成（核对日期: 2026-07-19）
+
+### ✅ P0-2: 压缩选项增强（7z/ZIP 高级参数）
+
+**现状:** All 9 AppSettings properties 已存在于 Avalonia `AppSettings.cs`。`DynamicFormatOptionsPanel` 控件已存在。
+
+**完成明细:**
+- [x] `Models/AppSettings.cs` — 9 个属性存在（`SevenZipSolidBlockSize`、`SevenZipDictionarySize`、`SevenZipNumFastBytes`、`SevenZipMatchFinder`、`SevenZipEncryptHeaders`、`ZipCompressionMethod`、`ZipEncryptionMethod`、`SevenZipCompressionMethod`、`SevenZipSolid`）
+- [ ] 待确认：`DynamicFormatOptionsPanel` 与 Core `ArchiveOptions` 的绑定通路、SettingsWindow 压缩 Tab 的 ComboBox UI
+
+### ✅ P0-3: 魔数检测预览（Magic Detection）
+
+**现状:** Avalonia `PreviewService` 已有完整魔数检测逻辑。
+
+**完成明细:**
+- `Models/AppSettings.cs` — ✅ `EnableFormatDetection`、`PreviewHeadSize`
+- `Services/PreviewService.cs` — ✅ `ClassifyPreviewByMagicAsync()`、`MapFileFormatToPreviewType()`、扩展名兜底 + 格式冲突回避
+- **无剩余任务**
+
+### ✅ P1-5: 冲突对话框暂停/取消（对话框 UI 部分）
+
+**现状:** 对话框 UI 补全已完成，暂停/取消的调用端集成待单独实施。
+
+| 对话框 | 已补全内容 |
+|--------|-----------|
+| `CompressConflictDialog` | 暂停/取消按钮、Add 按钮（`CompressConflictAction.Add`）、Topmost、分隔线、删除多余 Cancel 按钮 |
+| `ConflictDialog` | 暂停/取消按钮、"覆盖较旧"、"覆盖较小"按钮、Topmost、分隔线、删除多余 Cancel 按钮 |
+| 共享 | ✅ `AppIcons.axaml` 补充 `IconPause` 几何；✅ 本地化 keys 补充（9 条 EN/ZH）；✅ `dotnet build` 通过 |
+
+**已完成:**
+- [x] `Dialogs/CompressConflictDialog.axaml` + `.axaml.cs` — 暂停/取消/Add 按钮、Topmost、分隔线
+- [x] `Dialogs/ConflictDialog.axaml` + `.axaml.cs` — 暂停/取消/条件覆盖按钮、Topmost、分隔线
+- [x] 本地化 i18n key 补充
+- [x] 删除两个对话框动作行多余的 Cancel 按钮
+
+---
+
 ## 文件比较统计
 
 | 指标 | WPF (main) | Avalonia (AvaloniaFromWpf) |
@@ -271,7 +256,7 @@
 | Controls | 3 个 | 3 个（含 InfoPanel） |
 | Converters | 1 个 | 6 个 |
 | Shell 文件 | 3 个 | 0 个 |
-| AppSettings 属性 | 74 | 56 |
+| AppSettings 属性 | 74 | 62+ |
 
 ---
 
@@ -285,10 +270,10 @@
 
 ## 实现优先级建议
 
-1. **Phase 1（P0 全部）** — Shell/COM + 压缩选项 + 魔数检测（~2 天）
-2. **Phase 2（P1 核心）** — 双击行为/删除原包 + 便携模式 + 文件过滤 + 冲突暂停（~1.5 天）
-3. **Phase 3（P1 次要 + P2）** — 默认路径优先级 + 智能打开路径 + 预览信息面板显隐 + 窗口持久化 + 密码导入导出 + Enable 设置（~1 天）
+1. **Phase 1（P0）** — Shell/COM 集成（~1 天）
+2. **Phase 2（P1 核心）** — 双击行为/删除原包 + 便携模式 + 文件过滤 + 默认路径优先级（~1 天）
+3. **Phase 3（P1 次要 + P2）** — 智能打开路径 + 预览信息面板显隐 + 窗口持久化 + 密码导入导出 + Enable 设置 + AllowElevation（~0.5 天）
 
 ---
 
-*核对方法: WPF 文件列表展开排除 obj/ 后可对比各目录文件数量。关键差异在 AppSettings 属性数量（74 vs 56）、Shell 文件存在与否、FileFilterEditor 控件存在与否。*
+*核对方法: WPF 文件列表展开排除 obj/ 后可对比各目录文件数量。关键差异在 AppSettings 属性数量（74 vs 62+）、Shell 文件存在与否、FileFilterEditor 控件存在与否。*

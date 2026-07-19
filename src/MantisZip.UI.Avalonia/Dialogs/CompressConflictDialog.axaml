@@ -3,14 +3,15 @@
         x:Class="MantisZip.UI.Avalonia.Dialogs.CompressConflictDialog"
         x:CompileBindings="False"
         Title="{Binding WinTitle}"
-        Width="440"
+        Width="600"
         WindowStartupLocation="CenterOwner"
         SizeToContent="Height"
         CanResize="False"
+        Topmost="True"
         Background="{DynamicResource ThemeWindowBgBrush}"
         Padding="{DynamicResource SpacingMdThk}">
 
-  <Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto"
+  <Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto"
         Margin="{DynamicResource SpacingXsThk}">
 
     <!-- Row 0: Header -->
@@ -72,6 +73,21 @@
                      Margin="0,2,0,0" />
         </StackPanel>
       </Button>
+      <Button x:Name="AddBtn"
+              MinWidth="80"
+              Padding="6,4"
+              Margin="6,0,6,0"
+              IsEnabled="False"
+              Click="Add_Click">
+        <StackPanel Orientation="Vertical"
+                    HorizontalAlignment="Center">
+          <PathIcon Data="{StaticResource IconAdd}" Width="24" Height="24" HorizontalAlignment="Center" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+          <TextBlock Text="{Binding AddText}"
+                     FontSize="11"
+                     HorizontalAlignment="Center"
+                     Margin="0,2,0,0" />
+        </StackPanel>
+      </Button>
       <Button x:Name="RenameBtn"
               MinWidth="80"
               Padding="6,4"
@@ -100,19 +116,6 @@
                      Margin="0,2,0,0" />
         </StackPanel>
       </Button>
-      <Button MinWidth="80"
-              Padding="6,4"
-              Margin="6,0,0,0"
-              Click="Cancel_Click">
-        <StackPanel Orientation="Vertical"
-                    HorizontalAlignment="Center">
-          <PathIcon Data="{StaticResource IconDismiss}" Width="24" Height="24" HorizontalAlignment="Center" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
-          <TextBlock Text="{Binding CancelText}"
-                     FontSize="11"
-                     HorizontalAlignment="Center"
-                     Margin="0,2,0,0" />
-        </StackPanel>
-      </Button>
     </StackPanel>
 
     <!-- Row 3: Custom rename input -->
@@ -131,5 +134,45 @@
               Foreground="{DynamicResource ThemeTextSecondaryBrush}"
               HorizontalAlignment="Center"
               Margin="0,8,0,0" />
+
+    <!-- Row 5: Separator -->
+    <Rectangle Grid.Row="5"
+               Height="1"
+               Fill="{DynamicResource ThemeBorderBrush}"
+               Margin="0,6,0,6" />
+
+    <!-- Row 6: Pause / Cancel buttons -->
+    <StackPanel Grid.Row="6"
+                Orientation="Horizontal"
+                HorizontalAlignment="Center"
+                Margin="0,4,0,0">
+      <Button x:Name="PauseBtn"
+              MinWidth="80"
+              Padding="10,5"
+              Click="Pause_Click">
+        <StackPanel Orientation="Vertical"
+                    HorizontalAlignment="Center">
+          <PathIcon Data="{StaticResource IconPause}" Width="22" Height="22" HorizontalAlignment="Center" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+          <TextBlock Text="{Binding PauseText}"
+                     FontSize="11"
+                     HorizontalAlignment="Center"
+                     Margin="0,2,0,0" />
+        </StackPanel>
+      </Button>
+      <Button x:Name="CancelAllBtn"
+              MinWidth="80"
+              Padding="10,5"
+              Margin="8,0,0,0"
+              Click="CancelOperation_Click">
+        <StackPanel Orientation="Vertical"
+                    HorizontalAlignment="Center">
+          <PathIcon Data="{StaticResource IconDismiss}" Width="22" Height="22" HorizontalAlignment="Center" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+          <TextBlock Text="{Binding CancelOpText}"
+                     FontSize="11"
+                     HorizontalAlignment="Center"
+                     Margin="0,2,0,0" />
+        </StackPanel>
+      </Button>
+    </StackPanel>
   </Grid>
 </Window>

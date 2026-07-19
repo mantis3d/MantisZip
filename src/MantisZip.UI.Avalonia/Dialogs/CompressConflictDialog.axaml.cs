@@ -12,6 +12,7 @@ namespace MantisZip.UI.Avalonia.Dialogs;
 public enum CompressConflictAction
 {
     Overwrite,
+    Add,
     Rename,
     Skip,
     Cancel
@@ -23,6 +24,8 @@ public partial class CompressConflictDialog : Window
     private bool _capturedApplyToAll;
     private string? _capturedCustomName;
     private bool _resultCaptured;
+    private bool _isPaused;
+    private bool _cancelOperation;
 
     /// <summary>用户选择的处理方式</summary>
     public CompressConflictAction ResultAction => _resultCaptured ? _capturedAction : CompressConflictAction.Cancel;
@@ -30,6 +33,11 @@ public partial class CompressConflictDialog : Window
     public string? CustomName => _resultCaptured ? _capturedCustomName : RenameTextBox.Text;
     /// <summary>用户是否勾选了"应用到全部"</summary>
     public bool ApplyToAll => _resultCaptured && _capturedApplyToAll;
+
+    /// <summary>用户是否点击了"暂停"按钮</summary>
+    public bool IsPaused => _isPaused;
+    /// <summary>用户是否点击了"取消整个操作"按钮</summary>
+    public bool CancelOperation => _cancelOperation;
 
     // ── Localized string properties (bound via DataContext=self) ──
     public string WinTitle => LocalizationManager.T("CompressConflict_Title");
@@ -39,9 +47,13 @@ public partial class CompressConflictDialog : Window
     public string OverwriteText => LocalizationManager.T("CompressConflict_Overwrite");
     public string RenameText => LocalizationManager.T("CompressConflict_Rename");
     public string SkipText => LocalizationManager.T("CompressConflict_Skip");
-    public string CancelText => LocalizationManager.T("CompressConflict_Cancel");
+
     public string ApplyAllText => LocalizationManager.T("Error_ApplyToAll");
     public string RenameHint => LocalizationManager.T("Conflict_RenameHint");
+    public string AddText => LocalizationManager.T("CompressConflict_Add");
+    public string PauseText => LocalizationManager.T("CompressConflict_Pause");
+    public string CancelOpText => LocalizationManager.T("CompressConflict_CancelOperation");
+    public string TooltipNoAddText => LocalizationManager.T("CompressConflict_Tooltip_NoAdd");
 
     /// <summary>
     /// 设计时需要的无参构造函数。不要直接使用，调用 <see cref="CompressConflictDialog(string, string?)"/>。
@@ -61,11 +73,22 @@ public partial class CompressConflictDialog : Window
 
         HeaderText.Text = string.Format(LocalizationManager.T("CompressConflict_Header"), $"\"{Path.GetFileName(filePath)}\"");
 
+        // Enable Add button by default (caller disables for Tar format)
+        AddBtn.IsEnabled = true;
+        ToolTip.SetTip(AddBtn, TooltipNoAddText);
+
         // 预填重命名建议名
         RenameTextBox.Text = suggestedName ?? Path.GetFileName(filePath);
 
-        // 勾选"应用到全部"时禁用重命名输入框（后续文件不支持自定义名）
-        ApplyAllCheck.IsCheckedChanged += (_, _) => RenameTextBox.IsEnabled = ApplyAllCheck.IsChecked != true;
+        // 勾选"应用到全部"时禁用重命名输入框并切换按钮文本
+        ApplyAllCheck.IsCheckedChanged += (_, _) =>
+        {
+            var isChecked = ApplyAllCheck.IsChecked == true;
+            RenameTextBox.IsEnabled = !isChecked;
+            RenameBtnLabel.Text = isChecked
+                ? LocalizationManager.T("CompressConflict_AutoRename")
+                : LocalizationManager.T("CompressConflict_Rename");
+        };
 
         // 填充目标文件信息
         PopulateTargetInfo(filePath);
@@ -121,8 +144,21 @@ public partial class CompressConflictDialog : Window
         Close(true);
     }
 
-    private void Cancel_Click(object? sender, RoutedEventArgs e)
+    private void Add_Click(object? sender, RoutedEventArgs e)
     {
+        CaptureResult(CompressConflictAction.Add, RenameTextBox.Text);
+        Close(true);
+    }
+
+    private void Pause_Click(object? sender, RoutedEventArgs e)
+    {
+        _isPaused = true;
+        Close(false);
+    }
+
+    private void CancelOperation_Click(object? sender, RoutedEventArgs e)
+    {
+        _cancelOperation = true;
         CaptureResult(CompressConflictAction.Cancel, RenameTextBox.Text);
         Close(false);
     }
