@@ -46,6 +46,20 @@
    - `App.OnExit`：清理指向 `Data/Temp/` 而非系统 `%TEMP%`
 2. **修改文件（6 个）**：`AppSettings.cs`、`PasswordManager.cs`、`App.xaml.cs`、`MainWindow.Preview.cs`、`MainWindow.DragDrop.cs`、`SevenZipEngine.cs`
 
+### v0.4.5++ (2026-07-14) 新增 Portable-Web 便携版
+
+1. **新增 Portable-Web 便携版** — release.yml 新增 `Package portable web zip` 步骤
+   - `publish_output`（framework-dependent）打包为 `MantisZip-{version}-Portable-Web.zip`
+   - 不捆绑 .NET 运行时，体积大幅减小，用户需自行安装 .NET 9 Runtime
+   - 原有的 self-contained Portable zip 保持不变
+   - 关联 issue #28
+2. **剥离非 Windows 运行时库** — framework-dependent 发布增加 `--runtime win-x64`，仅保留 win-x64 的原生资产
+   - `runtimes/` 从 31 MB 减到 ~1.9 MB（仅 win-x64/native）
+   - Portable-Web zip 从 28 MB 降为 ~13 MB
+3. **剥离 .NET 运行时卫星语言程序集** — self-contained 便携版打包时删除 `cs/de/es/fr/it/ja/ko/pl/pt-BR/ru/tr` 目录
+   - Portable zip 减少 ~15 MB 无用体积
+   - MantisZip 使用 JSON 文件实现国际化，不依赖 .NET 卫星程序集
+
 ### v0.4.5++ (2026-07-14) 文件过滤预设显示 + 过滤统计文本始终显示
 
 1. **修复预设 ComboBox 显示类型名** — `FileFilterPreset` 添加 `ToString()` 返回 `Name`，确保预设名称正确显示
