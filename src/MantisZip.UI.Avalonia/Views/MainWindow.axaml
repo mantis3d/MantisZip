@@ -46,9 +46,14 @@
             </StackPanel>
           </MenuItem.Header>
         </MenuItem>
-        <MenuItem Header="{Binding LocalizedStrings[Main_RecentFiles]}"
-                  ItemsSource="{Binding RecentFiles}"
+        <MenuItem ItemsSource="{Binding RecentFiles}"
                   IsEnabled="{Binding RecentFiles.Count}">
+          <MenuItem.Header>
+            <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
+              <PathIcon Data="{StaticResource IconHistory}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+              <TextBlock Text="{Binding LocalizedStrings[Main_RecentFiles]}" />
+            </StackPanel>
+          </MenuItem.Header>
           <MenuItem.ItemTemplate>
             <DataTemplate>
               <MenuItem Click="RecentFileMenuItem_Click"
@@ -870,7 +875,7 @@
 
       <!-- File list panel (col 2) with file list toolbar -->
       <Grid Grid.Column="2">
-        <Grid RowDefinitions="Auto,*">
+        <Grid RowDefinitions="Auto,Auto,*">
           <!-- File list toolbar -->
           <Border Grid.Row="0"
                   Padding="4,2"
@@ -886,7 +891,7 @@
               <Button Classes="ToolbarButton ToolbarIcon"
                       Command="{Binding GoUpCommand}"
                       IsEnabled="{Binding IsArchiveLoaded}"
-                      ToolTip.Tip="{Binding LocalizedStrings[Menu_ExtractHere]}">
+                       ToolTip.Tip="{Binding LocalizedStrings[Nav_GoUp]}">
                 <PathIcon Data="{StaticResource IconArrowUp}" Width="13" Height="13" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
               </Button>
               <Button Classes="ToolbarButton ToolbarIcon"
@@ -901,26 +906,6 @@
                       ToolTip.Tip="{Binding LocalizedStrings[Nav_GoForward]}">
                 <PathIcon Data="{StaticResource IconChevronRight}" Width="13" Height="13" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
               </Button>
-
-              <Border Width="1" Height="20" Margin="2,0"
-                      VerticalAlignment="Center"
-                      Background="{DynamicResource ThemeBorderBrush}" />
-
-              <!-- Address bar -->
-              <AutoCompleteBox Width="160" Height="{DynamicResource ControlHeightSm}"
-                               x:Name="AddressBar"
-                               Text="{Binding CurrentFolder}"
-                               ItemsSource="{Binding FolderPaths}"
-                               FilterMode="StartsWith"
-                               PlaceholderText="{Binding LocalizedStrings[Nav_AddressBar]}"
-                               KeyDown="AddressBar_KeyDown"
-                               Background="{DynamicResource ThemeWindowBgBrush}"
-                               Foreground="{DynamicResource ThemeTextPrimaryBrush}"
-                               BorderBrush="{DynamicResource ThemeBorderBrush}" />
-
-              <Border Width="1" Height="20" Margin="2,0"
-                      VerticalAlignment="Center"
-                      Background="{DynamicResource ThemeBorderBrush}" />
 
               <!-- Copy name -->
               <Button Classes="ToolbarButton ToolbarIcon"
@@ -1000,9 +985,25 @@
             </StackPanel>
           </Border>
 
+          <!-- Address bar row -->
+          <Border Grid.Row="1"
+                  Padding="6,3"
+                  Background="{DynamicResource ThemeHeaderBgBrush}">
+            <AutoCompleteBox Height="{DynamicResource ControlHeightSm}"
+                             x:Name="AddressBar"
+                             Text="{Binding CurrentFolder}"
+                             ItemsSource="{Binding FolderPaths}"
+                             FilterMode="StartsWith"
+                             PlaceholderText="{Binding LocalizedStrings[Nav_AddressBar]}"
+                             KeyDown="AddressBar_KeyDown"
+                             Background="{DynamicResource ThemeWindowBgBrush}"
+                             Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                             BorderBrush="{DynamicResource ThemeBorderBrush}" />
+          </Border>
+
           <!-- DataGrid -->
           <DataGrid x:Name="FileListGrid"
-                    Grid.Row="1"
+                    Grid.Row="2"
                     ItemsSource="{Binding CurrentEntries}"
                     SelectedItem="{Binding SelectedEntry}"
                     AutoGenerateColumns="False"

@@ -247,8 +247,8 @@
       <Setter Property="BorderBrush" Value="{DynamicResource ThemeBorderBrush}" />
     </Style>
     <Style Selector="DataGridColumnHeader">
-      <Setter Property="Background" Value="{DynamicResource ThemeAccentBrush}" />
-      <Setter Property="Foreground" Value="White" />
+      <Setter Property="Background" Value="{DynamicResource ThemeHeaderBgBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource ThemeTextPrimaryBrush}" />
       <Setter Property="BorderBrush" Value="{DynamicResource ThemeBorderBrush}" />
     </Style>
     <Style Selector="DataGridRow">

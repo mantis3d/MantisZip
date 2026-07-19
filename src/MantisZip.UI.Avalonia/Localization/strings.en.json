@@ -671,6 +671,7 @@
   "Tree_ExpandToCurrent": "Expand to Current",
   "Tree_Filter": "Filter tree...",
   "Nav_GoRoot": "Root",
+  "Nav_GoUp": "Parent",
   "Nav_GoBack": "Back",
   "Nav_GoForward": "Forward",
   "Nav_AddressBar": "Path...",

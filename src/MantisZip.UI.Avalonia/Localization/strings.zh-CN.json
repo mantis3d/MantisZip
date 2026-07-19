@@ -669,6 +669,7 @@
   "Tree_ExpandToCurrent": "展开到当前",
   "Tree_Filter": "过滤目录...",
   "Nav_GoRoot": "根目录",
+  "Nav_GoUp": "父目录",
   "Nav_GoBack": "后退",
   "Nav_GoForward": "前进",
   "Nav_AddressBar": "路径...",
