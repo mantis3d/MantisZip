@@ -1,6 +1,5 @@
 using System.Diagnostics;
 using System.IO;
-using System.Runtime.InteropServices;
 using Microsoft.Win32;
 using MantisZip.UI.Avalonia.Models;
 
@@ -536,14 +535,6 @@ internal static partial class ShellIntegration
             SHChangeNotify(SHCNE_ASSOCCHANGED, SHCNF_IDLIST, IntPtr.Zero, IntPtr.Zero);
         }
     }
-
-    [DllImport("ole32.dll")]
-    private static extern int CoCreateInstance(
-        [In] ref Guid rclsid,
-        IntPtr pUnkOuter,
-        uint dwClsContext,
-        [In] ref Guid riid,
-        out IntPtr ppv);
 
     private static void WriteMenuTextToRegistry()
     {
