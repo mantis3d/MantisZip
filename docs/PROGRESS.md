@@ -21,6 +21,12 @@
 
 ### MantisZip.UI.Avalonia（主力版）
 
+**2026-07-20** — P1-1：双击行为 CLI 分发 + 解压后删除原包后端逻辑
+  - App.axaml.cs：新增 `--open-dispatch` CLI handler，根据 DoubleClickAction 设置分发到 extract-here/smart-extract/extract-dialog/open
+  - App.axaml.cs：新增 TryDeleteArchiveAfterExtract 方法（retry 3x+200ms 间隔，FileSystem.DeleteFile 移入回收站）
+  - TryExtractArchiveAsync 和 TryExtractSmartAsync 解压成功后调用 TryDeleteArchiveAfterExtract
+  - Build 0 errors
+
 **2026-07-20** — WPF 差异补齐：SettingsWindow 缺失控件移植（DeleteArchiveAfterExtract + DoubleClickAction + AllowElevation + EnableExtractMenu/EnableQuickCompress）
   - AppSettings.cs：新增 6 属性（DeleteArchiveAfterExtract/DoubleClickAction/DoubleClickOpenThreshold/AllowElevation/EnableExtractMenu/EnableQuickCompress）
   - SettingsWindowViewModel.cs：6 个 ObservableProperty + DoubleClickActionOptions Combo + DoubleClickOpenThresholdMB 属性 + Load Save

@@ -20,6 +20,7 @@ using System.IO.Pipes;
 using System.Runtime.InteropServices;
 using System.Security.Principal;
 using System.Threading;
+using Microsoft.VisualBasic.FileIO;
 using Microsoft.Win32;
 
 namespace MantisZip.UI.Avalonia;
@@ -148,6 +149,36 @@ public partial class App : Application
                         {
                             var mainWindow = (MainWindow)desktop.MainWindow;
                             mainWindow.LoadArchiveOnStartup(path);
+                        }
+                        break;
+
+                    case "--open-dispatch":
+                        // Dispatch based on DoubleClickAction setting (used by file association / shell verb)
+                        if (!string.IsNullOrEmpty(path) && File.Exists(path))
+                        {
+                            var settings = AppSettings.Load();
+                            var action = settings.DoubleClickAction ?? "open";
+                            switch (action)
+                            {
+                                case "extract-here":
+                                    _ = RunExtractCliAsync(path, Directory.GetCurrentDirectory(), args, desktop);
+                                    break;
+                                case "smart-extract":
+                                    _ = RunExtractSmartCliAsync(path, args, desktop);
+                                    break;
+                                case "extract-dialog":
+                                    _ = RunExtractCliAsync(path, Path.GetDirectoryName(path) ?? ".", args, desktop);
+                                    break;
+                                default: // "open"
+                                    desktop.MainWindow = new MainWindow();
+                                    var mainWindow = (MainWindow)desktop.MainWindow;
+                                    mainWindow.LoadArchiveOnStartup(path);
+                                    break;
+                            }
+                        }
+                        else
+                        {
+                            desktop.MainWindow = new MainWindow();
                         }
                         break;
 
@@ -473,6 +504,7 @@ public partial class App : Application
 
             await engine.ExtractAsync(archivePath, targetDir);
             Console.WriteLine($"Extracted: {archivePath} -> {targetDir}");
+            TryDeleteArchiveAfterExtract(archivePath);
             return false;
         }
         catch (UnauthorizedAccessException)
@@ -488,6 +520,7 @@ public partial class App : Application
 
     /// <summary>
     /// 带提权支持的异步智能解压。先分析目标目录可写性，权限不足时弹出提权对话框。
+    /// 解压成功后根据 DeleteArchiveAfterExtract 设置尝试删除原包。
     /// </summary>
     private static async Task<bool> TryExtractSmartAsync(
         string archivePath,
@@ -535,6 +568,7 @@ public partial class App : Application
 
             await engine.ExtractAsync(archivePath, targetDir);
             Console.WriteLine($"Extracted: {archivePath} -> {targetDir}");
+            TryDeleteArchiveAfterExtract(archivePath);
             return false;
         }
         catch (UnauthorizedAccessException)
@@ -547,6 +581,41 @@ public partial class App : Application
         {
             Console.Error.WriteLine($"Smart extraction failed: {ex.Message}");
             return false;
+        }
+    }
+
+    /// <summary>
+    /// 尝试在解压后删除原始压缩包（移动到回收站）。
+    /// 基于 DoubleClickOpenThreshold 的文件大小检查由 UI 侧的点击事件完成，
+    /// CLI 模式不做额外大小检查。
+    /// 重试 3 次（200ms 间隔），给 7z.dll 等外部组件释放文件句柄的时间。
+    /// </summary>
+    private static void TryDeleteArchiveAfterExtract(string archivePath)
+    {
+        var settings = AppSettings.Load();
+        if (!settings.DeleteArchiveAfterExtract) return;
+        if (string.IsNullOrEmpty(archivePath) || !File.Exists(archivePath)) return;
+
+        for (int retry = 0; retry < 3; retry++)
+        {
+            try
+            {
+                FileSystem.DeleteFile(
+                    archivePath,
+                    UIOption.OnlyErrorDialogs,
+                    RecycleOption.SendToRecycleBin);
+                DebugLog($"TryDeleteArchiveAfterExtract: moved '{archivePath}' to recycle bin");
+                return;
+            }
+            catch (Exception ex) when (retry < 2)
+            {
+                DebugLog($"TryDeleteArchiveAfterExtract: attempt {retry + 1} failed for '{archivePath}': {ex.Message}");
+                Thread.Sleep(200);
+            }
+            catch (Exception ex)
+            {
+                DebugLog($"TryDeleteArchiveAfterExtract: failed for '{archivePath}' after 3 attempts: {ex.Message}");
+            }
         }
     }
 
