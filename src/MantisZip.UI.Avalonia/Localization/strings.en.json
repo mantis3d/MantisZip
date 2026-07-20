@@ -504,6 +504,9 @@
   "Settings_ContextMenu_Install": "Install Context Menu",
   "Settings_ContextMenu_ShowMenuIcons": "Show menu icons",
   "Settings_ContextMenu_Uninstall": "Uninstall Context Menu",
+  "Settings_Assoc_Install": "Install file associations",
+  "Settings_Assoc_Uninstall": "Uninstall file associations",
+
   "Settings_ContextMenu_BtnApply": "Apply",
   "Settings_ContextMenu_StatusGroup": "Status",
   "Settings_ContextMenu_StatusChecking": "Checking...",

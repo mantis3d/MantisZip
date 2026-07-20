@@ -231,26 +231,37 @@ public partial class SettingsWindowViewModel : ObservableObject
     [RelayCommand]
     private async Task AddCustomAssoc()
     {
-        var dlg = new MantisZip.UI.Avalonia.Dialogs.AddAssocDialog();
-        var result = await dlg.ShowDialog<bool?>(null);
-        if (result != true) return;
-        var ext = dlg.Extension;
-        // validate duplicates
-        if (string.IsNullOrEmpty(ext)) return;
-        if (AssocItems.Any(i => i.Extension.Equals(ext, StringComparison.OrdinalIgnoreCase)))
+        try
         {
-            await AppMessageBox.Show(LocalizationManager.T("Settings_Assoc_CustomAlreadyExists"), "", MessageBoxButton.OK, MessageBoxImage.Warning);
-            return;
+            var dlg = new MantisZip.UI.Avalonia.Dialogs.AddAssocDialog();
+
+            // Prefer owning dialog to MainWindow to avoid null-owner dialog issues
+            var ownerWindow = (global::Avalonia.Application.Current?.ApplicationLifetime as global::Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime)?.MainWindow;
+            var result = await dlg.ShowDialog<bool?>(ownerWindow);
+            if (result != true) return;
+            var ext = dlg.Extension;
+            // validate duplicates
+            if (string.IsNullOrEmpty(ext)) return;
+            if (AssocItems.Any(i => i.Extension.Equals(ext, StringComparison.OrdinalIgnoreCase)))
+            {
+                await AppMessageBox.Show(LocalizationManager.T("Settings_Assoc_CustomAlreadyExists"), "", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+            if ((_settings.CustomAssocExtensions?.Count ?? 0) >= 20)
+            {
+                await AppMessageBox.Show(LocalizationManager.T("Settings_Assoc_CustomMaxReached"), "", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+            _settings.CustomAssocExtensions.Add(ext);
+            var item = CreateAssocItem(ext, isCustom: true);
+            item.DeleteCommand = new RelayCommand(() => DeleteCustomExtension(item));
+            AssocItems.Add(item);
         }
-        if ((_settings.CustomAssocExtensions?.Count ?? 0) >= 20)
+        catch (Exception ex)
         {
-            await AppMessageBox.Show(LocalizationManager.T("Settings_Assoc_CustomMaxReached"), "", MessageBoxButton.OK, MessageBoxImage.Warning);
-            return;
+            App.DebugLog($"AddCustomAssoc failed: {ex.Message}");
+            try { await AppMessageBox.Show(string.Format(LocalizationManager.T("Settings_Assoc_AddFailed"), ex.Message), LocalizationManager.T("Settings_Title"), MessageBoxButton.OK, MessageBoxImage.Error); } catch { }
         }
-        _settings.CustomAssocExtensions.Add(ext);
-        var item = CreateAssocItem(ext, isCustom: true);
-        item.DeleteCommand = new RelayCommand(() => DeleteCustomExtension(item));
-        AssocItems.Add(item);
     }
 
     private void DeleteCustomExtension(FormatAssocItemModel item)
@@ -607,8 +618,8 @@ public partial class SettingsWindowViewModel : ObservableObject
     public string FileAssocSelectAllText => LocalizationManager.T("Settings_Assoc_SelectAll");
     public string FileAssocDeselectAllText => LocalizationManager.T("Settings_Assoc_DeselectAll");
     public string FileAssocAddText => LocalizationManager.T("Settings_Assoc_Add");
-    public string FileAssocInstallText => LocalizationManager.T("Settings_ContextMenu_Install");
-    public string FileAssocUninstallText => LocalizationManager.T("Settings_ContextMenu_Uninstall");
+    public string FileAssocInstallText => LocalizationManager.T("Settings_Assoc_Install");
+        public string FileAssocUninstallText => LocalizationManager.T("Settings_Assoc_Uninstall");
 
     public string SaveText => LocalizationManager.T("Settings_Save");
     public string CancelText => LocalizationManager.T("Settings_Cancel");

@@ -502,6 +502,9 @@
   "Settings_ContextMenu_Install": "安装上下文菜单",
   "Settings_ContextMenu_ShowMenuIcons": "显示菜单图标",
   "Settings_ContextMenu_Uninstall": "卸载上下文菜单",
+  "Settings_Assoc_Install": "安装文件类型关联",
+  "Settings_Assoc_Uninstall": "卸载文件类型关联",
+
   "Settings_ContextMenu_BtnApply": "应用",
   "Settings_ContextMenu_StatusGroup": "状态",
   "Settings_ContextMenu_StatusChecking": "检测中……",
