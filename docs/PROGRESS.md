@@ -21,6 +21,14 @@
 
 ### MantisZip.UI.Avalonia（主力版）
 
+**2026-07-20** — WPF 差异补齐：SettingsWindow 缺失控件移植（DeleteArchiveAfterExtract + DoubleClickAction + AllowElevation + EnableExtractMenu/EnableQuickCompress）
+  - AppSettings.cs：新增 6 属性（DeleteArchiveAfterExtract/DoubleClickAction/DoubleClickOpenThreshold/AllowElevation/EnableExtractMenu/EnableQuickCompress）
+  - SettingsWindowViewModel.cs：6 个 ObservableProperty + DoubleClickActionOptions Combo + DoubleClickOpenThresholdMB 属性 + Load Save
+  - SettingsWindow.axaml 解压 Tab：DeleteArchiveAfterExtract 复选框 + 双击行为区域（ComboBox + MB TextBox）
+  - SettingsWindow.axaml 高级 Tab：AllowElevation 复选框
+  - 本地化：新增 9 键（zh-CN + en）
+  - Build 0 errors
+
 **2026-07-20** — 窗口位置持久化（P2-1）：WindowStateManager + MainWindow 集成
   - 新建 Models/WindowStateManager.cs：将窗口 Width/Height/Position(PixelPoint)/WindowState 持久化到 %LOCALAPPDATA%\MantisZip\window.json
   - MainWindow.axaml.cs 构造函数调用 WindowStateManager.Load(this) 恢复上次位置

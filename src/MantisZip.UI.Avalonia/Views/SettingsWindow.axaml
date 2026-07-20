@@ -254,6 +254,33 @@
                           IsChecked="{Binding EnableDragExtract}" />
                 <CheckBox Content="{Binding ExtractPreserveFullPathText}"
                           IsChecked="{Binding ExtractPreserveFullPath}" />
+                <CheckBox Content="{Binding ExtractDeleteAfterExtractText}"
+                          IsChecked="{Binding DeleteArchiveAfterExtract}" />
+              </StackPanel>
+            </Border>
+
+            <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
+                    CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}" Background="{DynamicResource ThemeSurfaceBgBrush}">
+              <StackPanel Spacing="{DynamicResource SpacingXs}">
+                <TextBlock Text="{Binding ExtractDoubleClickActionText}" FontWeight="SemiBold" />
+                <ComboBox ItemsSource="{Binding DoubleClickActionOptions}"
+                          SelectedItem="{Binding SelectedDoubleClickActionOption}"
+                          Width="240" HorizontalAlignment="Left">
+                  <ComboBox.ItemTemplate>
+                    <DataTemplate>
+                      <TextBlock Text="{Binding Display}" />
+                    </DataTemplate>
+                  </ComboBox.ItemTemplate>
+                </ComboBox>
+                <Grid ColumnDefinitions="Auto,*">
+                  <TextBlock Text="{Binding ExtractDoubleClickThresholdText}"
+                             VerticalAlignment="Center" Margin="0,0,8,0" />
+                  <TextBox Grid.Column="1" Text="{Binding DoubleClickOpenThresholdMB}"
+                           Width="80" HorizontalAlignment="Left"
+                           Background="{DynamicResource ThemeWindowBgBrush}"
+                           Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                           BorderBrush="{DynamicResource ThemeBorderBrush}" />
+                </Grid>
               </StackPanel>
             </Border>
           </StackPanel>
@@ -918,6 +945,14 @@
                           Foreground="{DynamicResource ThemeTextPrimaryBrush}"
                           BorderBrush="{DynamicResource ThemeBorderBrush}" />
                 </Grid>
+              </StackPanel>
+            </Border>
+
+            <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
+                    CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}" Background="{DynamicResource ThemeSurfaceBgBrush}">
+              <StackPanel Spacing="{DynamicResource SpacingXs}">
+                <CheckBox Content="{Binding AdvancedAllowElevationText}"
+                          IsChecked="{Binding AllowElevation}" />
               </StackPanel>
             </Border>
 
