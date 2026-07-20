@@ -722,18 +722,38 @@
               </StackPanel>
             </Border>
 
-            <!-- 安装/卸载 -->
+            <!-- 状态组 -->
+            <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
+                    CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}" Background="{DynamicResource ThemeSurfaceBgBrush}">
+              <StackPanel Spacing="{DynamicResource SpacingXs}">
+                <TextBlock Text="{Binding ContextMenuStatusGroup}"
+                           FontWeight="SemiBold" FontSize="13" Margin="0,0,0,4" />
+                <TextBlock Text="{Binding ShellStatusText}"
+                           FontSize="12" TextWrapping="Wrap"
+                           Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+              </StackPanel>
+            </Border>
+
+            <!-- 操作按钮 -->
             <StackPanel Orientation="Horizontal"
                         HorizontalAlignment="Right"
                         Spacing="{DynamicResource SpacingXs}">
+              <Button Content="{Binding ContextMenuBtnApply}"
+                      Command="{Binding ApplyShellChangesCommand}"
+                      Padding="12,4"
+                      Background="{DynamicResource ThemeButtonBgBrush}"
+                      Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                      BorderBrush="{DynamicResource ThemeBorderBrush}" />
               <Button Content="{Binding ContextMenuInstall}"
                       Command="{Binding InstallShellCommand}"
+                      IsEnabled="{Binding IsShellNotInstalled}"
                       Padding="12,4"
                       Background="{DynamicResource ThemeButtonBgBrush}"
                       Foreground="{DynamicResource ThemeTextPrimaryBrush}"
                       BorderBrush="{DynamicResource ThemeBorderBrush}" />
               <Button Content="{Binding ContextMenuUninstall}"
                       Command="{Binding UninstallShellCommand}"
+                      IsEnabled="{Binding IsShellInstalled}"
                       Padding="12,4"
                       Background="{DynamicResource ThemeButtonBgBrush}"
                       Foreground="{DynamicResource ThemeTextPrimaryBrush}"

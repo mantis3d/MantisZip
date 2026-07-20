@@ -156,6 +156,19 @@ public partial class SettingsWindowViewModel : ObservableObject
     [ObservableProperty]
     private bool _enableDynamicMenu;
 
+    [ObservableProperty]
+    private string _shellStatusText = "";
+
+    [ObservableProperty]
+    private bool _isShellInstalled;
+
+    public bool IsShellNotInstalled => !IsShellInstalled;
+
+    partial void OnIsShellInstalledChanged(bool value)
+    {
+        OnPropertyChanged(nameof(IsShellNotInstalled));
+    }
+
     // ── Advanced ──
     [ObservableProperty]
     private string _sevenZipPath;
@@ -395,6 +408,8 @@ public partial class SettingsWindowViewModel : ObservableObject
     public string ContextMenuEnableDynamicMenu => LocalizationManager.T("Settings_ContextMenu_EnableDynamicMenu");
     public string ContextMenuInstall => LocalizationManager.T("Settings_ContextMenu_Install");
     public string ContextMenuUninstall => LocalizationManager.T("Settings_ContextMenu_Uninstall");
+    public string ContextMenuStatusGroup => LocalizationManager.T("Settings_ContextMenu_StatusGroup");
+    public string ContextMenuBtnApply => LocalizationManager.T("Settings_ContextMenu_BtnApply");
 
     // Advanced strings
     public string AdvancedSevenZipPathText => LocalizationManager.T("Settings_Advanced_SevenZipPath");
@@ -514,6 +529,8 @@ public partial class SettingsWindowViewModel : ObservableObject
         _enableExtractToMenu = _settings.EnableExtractToMenu;
         _showMenuIcons = _settings.ShowMenuIcons;
         _enableDynamicMenu = _settings.EnableDynamicMenu;
+        _shellStatusText = LocalizationManager.T("Settings_ContextMenu_StatusChecking");
+        RefreshShellStatus();
 
         // Advanced
         _sevenZipPath = _settings.SevenZipPath;
@@ -802,6 +819,11 @@ public partial class SettingsWindowViewModel : ObservableObject
         OnPropertyChanged(nameof(ContextMenuEnableDynamicMenu));
         OnPropertyChanged(nameof(ContextMenuInstall));
         OnPropertyChanged(nameof(ContextMenuUninstall));
+        OnPropertyChanged(nameof(ContextMenuStatusGroup));
+        OnPropertyChanged(nameof(ContextMenuBtnApply));
+
+        // Refresh shell status display (localized text)
+        RefreshShellStatus();
 
         OnPropertyChanged(nameof(AdvancedSevenZipPathText));
         OnPropertyChanged(nameof(AdvancedBrowseText));
@@ -941,19 +963,110 @@ public partial class SettingsWindowViewModel : ObservableObject
         _settings.Save();
     }
 
-    [RelayCommand]
-    private void InstallShell()
+    private void RefreshShellStatus()
     {
-        // Placeholder: In a full implementation, this would call ShellIntegration
-        // For now, we log the action
-        Debug.WriteLine("Install context menu requested");
+        try
+        {
+            var installed = ShellIntegration.IsInstalled;
+            if (installed)
+            {
+                var dynStatus = ShellIntegration.GetDynamicMenuStatus();
+                ShellStatusText = dynStatus switch
+                {
+                    "active" => LocalizationManager.T("Settings_ContextMenu_StatusDynamicActive"),
+                    "fallback" => LocalizationManager.T("Settings_ContextMenu_StatusDynamicFallback"),
+                    _ => LocalizationManager.T("Settings_ContextMenu_StatusInstalled")
+                };
+            }
+            else
+            {
+                ShellStatusText = LocalizationManager.T("Settings_ContextMenu_StatusNotInstalled");
+            }
+            IsShellInstalled = installed;
+        }
+        catch (Exception ex)
+        {
+            App.DebugLog($"RefreshShellStatus failed: {ex.Message}");
+            ShellStatusText = ex.Message;
+            IsShellInstalled = false;
+        }
     }
 
     [RelayCommand]
-    private void UninstallShell()
+    private async Task InstallShell()
     {
-        // Placeholder: In a full implementation, this would call ShellIntegration
-        Debug.WriteLine("Uninstall context menu requested");
+        try
+        {
+            ShellStatusText = LocalizationManager.T("Settings_ContextMenu_StatusChecking");
+            Save();
+            ShellIntegration.Uninstall();
+            ShellIntegration.Install();
+            ShellIntegration.CheckComStatus();
+            RefreshShellStatus();
+            await AppMessageBox.Show(
+                LocalizationManager.T("Settings_ContextMenu_InstalledMsg"),
+                LocalizationManager.T("Settings_Title"),
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+        }
+        catch (Exception ex)
+        {
+            App.DebugLog($"InstallShell failed: {ex.Message}");
+            ShellStatusText = string.Format(
+                LocalizationManager.T("Settings_ContextMenu_InstallFailed"), ex.Message);
+            await AppMessageBox.Show(
+                string.Format(LocalizationManager.T("Settings_ContextMenu_InstallFailed"), ex.Message),
+                LocalizationManager.T("Settings_Title"),
+                MessageBoxButton.OK,
+                MessageBoxImage.Error);
+        }
+    }
+
+    [RelayCommand]
+    private async Task UninstallShell()
+    {
+        try
+        {
+            ShellStatusText = LocalizationManager.T("Settings_ContextMenu_StatusChecking");
+            ShellIntegration.Uninstall();
+            RefreshShellStatus();
+            await AppMessageBox.Show(
+                LocalizationManager.T("Settings_ContextMenu_UpdatedMsg"),
+                LocalizationManager.T("Settings_Title"),
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+        }
+        catch (Exception ex)
+        {
+            App.DebugLog($"UninstallShell failed: {ex.Message}");
+            ShellStatusText = string.Format(
+                LocalizationManager.T("Settings_ContextMenu_UninstallFailed"), ex.Message);
+            await AppMessageBox.Show(
+                string.Format(LocalizationManager.T("Settings_ContextMenu_UninstallFailed"), ex.Message),
+                LocalizationManager.T("Settings_Title"),
+                MessageBoxButton.OK,
+                MessageBoxImage.Error);
+        }
+    }
+
+    [RelayCommand]
+    private void ApplyShellChanges()
+    {
+        try
+        {
+            ShellStatusText = LocalizationManager.T("Settings_ContextMenu_StatusChecking");
+            Save();
+            ShellIntegration.Uninstall();
+            ShellIntegration.Install();
+            ShellIntegration.CheckComStatus();
+            RefreshShellStatus();
+        }
+        catch (Exception ex)
+        {
+            App.DebugLog($"ApplyShellChanges failed: {ex.Message}");
+            ShellStatusText = string.Format(
+                LocalizationManager.T("Settings_ContextMenu_InstallFailed"), ex.Message);
+        }
     }
 
     [RelayCommand]
