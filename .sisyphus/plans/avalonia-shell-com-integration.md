@@ -42,7 +42,7 @@
 
 | 文件 | 说明 |
 |------|------|
-| `src/MantisZip.UI.Avalonia/Resources/MenuIcons/` | 从 WPF 复制 11 个 .ico 文件 |
+| `src/MantisZip.UI.Avalonia/Resources/MenuIcons/` | 从 WPF 复制 10 个 .ico 文件 |
 
 ## 任务分解
 
