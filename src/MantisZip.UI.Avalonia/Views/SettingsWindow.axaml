@@ -798,7 +798,9 @@
                           </StackPanel>
                           <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
                             <TextBlock Text="{Binding CurrentHandler}" FontSize="11" Foreground="{DynamicResource ThemeTextSecondaryBrush}" VerticalAlignment="Center" />
-                            <Button Content="✕" Width="24" Height="24" Command="{Binding DeleteCommand}" IsVisible="{Binding IsCustom}" />
+                            <Button Width="28" Height="28" Command="{Binding DeleteCommand}" IsVisible="{Binding IsCustom}" Background="{DynamicResource ThemeButtonBgBrush}" BorderBrush="{DynamicResource ThemeBorderBrush}" Padding="4">
+                                <PathIcon Data="{StaticResource IconDelete}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+                              </Button>
                           </StackPanel>
                         </Grid>
                       </DataTemplate>
