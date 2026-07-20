@@ -48,46 +48,47 @@
 
 ### Task 1: ShellIntegration 基础类移植
 
-- [ ] 读取 WPF 版 `ShellIntegration.cs`，提取与 Avalonia 兼容的部分
-- [ ] 创建 `src/MantisZip.UI.Avalonia/Services/ShellIntegration.cs`
-- [ ] 注册表操作部分 (`HKCU\Software\Classes`) 可直接移植（Windows only）
-- [ ] 移除 WPF 特定依赖（`System.Windows`），替换为 `Microsoft.Win32` 或原生 API
-- [ ] 保留 `ShellIntegration.Install()` / `Uninstall()` / `IsInstalled` 接口
+- [x] 读取 WPF 版 `ShellIntegration.cs`，提取与 Avalonia 兼容的部分
+- [x] 创建 `src/MantisZip.UI.Avalonia/Services/ShellIntegration.cs`
+- [x] 注册表操作部分 (`HKCU\Software\Classes`) 可直接移植（Windows only）
+- [x] 移除 WPF 特定依赖（`System.Windows`），替换为 `Microsoft.Win32` 或原生 API
+- [x] 保留 `ShellIntegration.Install()` / `Uninstall()` / `IsInstalled` 接口
 
 ### Task 2: 文件关联逻辑移植
 
-- [ ] 读取 `ShellIntegration.Assoc.cs`，提取安装/卸载扩展名关联逻辑
-- [ ] 创建 `src/MantisZip.UI.Avalonia/Services/ShellIntegration.Assoc.cs`
-- [ ] 保留 `InstallAssociations()` / `UninstallAssociations()` 接口
-- [ ] 验证开-关单个扩展名关联的功能
+- [x] 读取 `ShellIntegration.Assoc.cs`，提取安装/卸载扩展名关联逻辑
+- [x] 创建 `src/MantisZip.UI.Avalonia/Services/ShellIntegration.Assoc.cs`
+- [x] 保留 `InstallAssociations()` / `UninstallAssociations()` 接口
+- [x] 验证开-关单个扩展名关联的功能
 
 ### Task 3: 右键菜单管理移植
 
-- [ ] 读取 `ShellIntegration.Menu.cs`，提取注册表动词注册逻辑
-- [ ] 创建 `src/MantisZip.UI.Avalonia/Services/ShellIntegration.Menu.cs`
-- [ ] 保留静态菜单（非 COM）的注册/注销逻辑
-- [ ] 注意 `CommandFlags=8` 的已知问题已在 WPF 中修复，确保同样处理
+- [x] 读取 `ShellIntegration.Menu.cs`，提取注册表动词注册逻辑
+- [x] 创建 `src/MantisZip.UI.Avalonia/Services/ShellIntegration.Menu.cs`
+- [x] 保留静态菜单（非 COM）的注册/注销逻辑
+- [x] 注意 `CommandFlags=8` 的已知问题已在 WPF 中修复，确保同样处理
 
 ### Task 4: ShellExt 项目引用 + COM host 部署
 
-- [ ] 在 `MantisZip.UI.Avalonia.csproj` 添加 `ProjectReference` 到 `MantisZip.ShellExt`
-- [ ] 添加 `CopyShellExtComhost` AfterTargets Build target（参考 WPF csproj）
-- [ ] 确保 `comhost.dll` + `MantisZip.ShellExt.dll` + `runtimeconfig.json` 复制到输出目录
-- [ ] 验证构建：`dotnet build src\MantisZip.UI.Avalonia\MantisZip.UI.Avalonia.csproj`
+- [x] 在 `MantisZip.UI.Avalonia.csproj` 添加 CopyShellExtComhost 构建目标（参考 WPF csproj，注意 TFM 差异使用 hardcoded path）
+- [x] 添加 `CopyShellExtComhost` AfterTargets Build target（参考 WPF csproj）
+- [x] 确保 `comhost.dll` + `MantisZip.ShellExt.dll` + `runtimeconfig.json` 复制到输出目录
+- [x] 验证构建：`dotnet build src\MantisZip.UI.Avalonia\MantisZip.UI.Avalonia.csproj` ✅ 通过
 
 ### Task 5: CLI 命令补齐
 
-- [ ] 在 `App.axaml.cs` 的 CLI switch 中添加：
-  - `case "--install-assoc"`: 调用 ShellIntegration.InstallAssociations()
-  - `case "--uninstall-assoc"`: 调用 ShellIntegration.UninstallAssociations()
-  - 参数归一化（允许无 `--` 前缀的 `install-assoc` 等）
-- [ ] 验证每个命令的 Shutdown 行为（安装/卸载后应退出）
+- [x] 替换 HandleShellCommand 为原生实现，移除 WPF fallback
+- [x] `--install-shell` 调用 ShellIntegration.Install()
+- [x] `--uninstall-shell` 调用 ShellIntegration.Uninstall()
+- [x] `--install-assoc` 调用 ShellIntegration.InstallAssociations()
+- [x] `--uninstall-assoc` 调用 ShellIntegration.UninstallAssociations()
+- [x] 验证每个命令的 Shutdown 行为（安装/卸载后应退出）
 
 ### Task 6: MenuIcons 资源迁移
 
-- [ ] 从 `src/MantisZip.UI/Resources/MenuIcons/` 复制所有 .ico 文件到 `src/MantisZip.UI.Avalonia/Resources/MenuIcons/`
-- [ ] 确保 csproj 包含 `<AvaloniaResource Include="Resources\**" />`（已存在）
-- [ ] 验证资源嵌入是否正常
+- [x] 从 `src/MantisZip.UI/Resources/MenuIcons/` 复制所有 .ico 文件到 `src/MantisZip.UI.Avalonia/Resources/MenuIcons/`
+- [x] 确保 csproj 包含 `<AvaloniaResource Include="Resources\**" />`（已存在）
+- [x] 验证资源嵌入是否正常
 
 ## 验证标准
 

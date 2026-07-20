@@ -21,6 +21,15 @@
 
 ### MantisZip.UI.Avalonia（主力版）
 
+**2026-07-20** — Shell/COM 集成移植（ShellIntegration + 文件关联 + 右键菜单 + COM host）
+  - 新建 3 个 Services 文件：ShellIntegration.cs（基类）、ShellIntegration.Assoc.cs（文件关联 per-extension）、ShellIntegration.Menu.cs（右键菜单 COM+cascade 注册）
+  - CLI 全部原生化：--install-shell/--uninstall-shell/--install-assoc/--uninstall-assoc 直接调用 ShellIntegration，移除 WPF exe fallback
+  - 文件关联 per-extension: 单个扩展名独立开关、MantisZip.{ext} 独立 ProgId、格式图标
+  - COM host 部署：csproj 添加 CopyShellExtComhost MSBuild 目标，构建后自动复制 comhost.dll+ShellExt.dll+runtimeconfig.json
+  - MenuIcons 10 个 .ico 从 WPF 复制到 Avalonia Resources/MenuIcons/
+  - 本地化：Shell_* + ShellExt_* 19 条 key 添加（zh-CN + en）
+  - Build 0 errors；Avalonia 测试 35 passed / 2 skipped；Core 测试 236 passed
+
 **2026-07-19** — PasswordManagerWindow 图标补全 + 搜索栏图标 + 布局调整
   - AppIcons.axaml 新增 IconImport（arrowImport 24 filled）几何图标
   - IconEye/IconEyeOff 从 Regular 路径替换为 Filled 路径，16px 下清晰可见
@@ -498,6 +507,11 @@
 ### 共享层（Core / ShellExt / 构建）
 
 这些变更影响两项目共用代码，按时间从新到旧排列。
+
+#### v0.4.5 (2026-07-20) Avalonia Shell/COM 集成—CopyShellExtComhost MSBuild 目标
+  - MantisZip.UI.Avalonia.csproj 添加 CopyShellExtComhost 构建目标（AfterTargets Build/Publish）
+  - 使用硬编码路径引用 ShellExt 输出（避免跨 TFM ProjectReference 冲突：Avalonia net9.0 × ShellExt net9.0-windows10.0.17763.0）
+  - 构建后自动复制 comhost.dll + MantisZip.ShellExt.dll + runtimeconfig.json 到 Avalonia 输出目录
 
 #### v0.4.4 (2026-07-13) ZipEngine SharpCompress 迁移 Plan B 确认完成
   - SharpSevenZip `OutArchiveFormat.Zip`+`Aes256` 替代 SharpZipLib 加密回退

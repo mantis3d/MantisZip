@@ -690,5 +690,27 @@
   "Preview_Result_TruncatedMixed": "… 还有 {0} 项（{1} 个目录，{2} 个文件）",
   "Preview_Result_TruncatedDepth": "… 还有 {0} 层",
   "Preview_Result_ConflictSuffix": "⚠️",
-  "Preview_Result_ShowFiltered": "显示过滤项"
+  "Preview_Result_ShowFiltered": "显示过滤项",
+
+  "App_MantisZipTitle": "MantisZip",
+
+  "Shell_Open": "打开压缩包",
+  "Shell_ExtractHere": "解压到此处",
+  "Shell_ExtractTo": "解压到……",
+  "Shell_ExtractToNamed": "解压到目录（压缩包名）",
+  "Shell_OpenVerb": "用 MantisZip 打开",
+  "Shell_ProgIdDesc": "MantisZip 压缩包",
+  "Shell_CompressCombined": "压缩到（父目录名）",
+  "Shell_CompressSeparate": "压缩到独立的（文件名）",
+  "Shell_SmartExtract": "智能解压到此处",
+  "Shell_Compress": "压缩到……",
+
+  "ShellExt_Open": "打开压缩包",
+  "ShellExt_ExtractHereSingle": "原地解压包",
+  "ShellExt_ExtractHereMulti": "原地解压{0}个压缩包",
+  "ShellExt_SmartExtractSingle": "智能原地解压",
+  "ShellExt_SmartExtractMulti": "智能原地解压{0}个压缩包",
+  "ShellExt_ExtractToNamed": "解压到目录",
+  "ShellExt_ExtractTo": "解压到……",
+  "ShellExt_Compress": "压缩到……"
 }

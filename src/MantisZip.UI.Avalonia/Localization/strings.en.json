@@ -692,5 +692,27 @@
   "Preview_Result_TruncatedMixed": "… {0} more items ({1} dirs, {2} files)",
   "Preview_Result_TruncatedDepth": "… {0} more levels",
   "Preview_Result_ConflictSuffix": "⚠️",
-  "Preview_Result_ShowFiltered": "Show filtered"
+  "Preview_Result_ShowFiltered": "Show filtered",
+
+  "App_MantisZipTitle": "MantisZip",
+
+  "Shell_Open": "Open Archive",
+  "Shell_ExtractHere": "Extract Here",
+  "Shell_ExtractTo": "Extract to...",
+  "Shell_ExtractToNamed": "Extract to folder (archive name)",
+  "Shell_OpenVerb": "Open with MantisZip",
+  "Shell_ProgIdDesc": "MantisZip Archive",
+  "Shell_CompressCombined": "Compress to (Parent Folder)",
+  "Shell_CompressSeparate": "Compress to Separate (File Name)",
+  "Shell_SmartExtract": "Smart Extract Here",
+  "Shell_Compress": "Compress to…",
+
+  "ShellExt_Open": "Open archive",
+  "ShellExt_ExtractHereSingle": "Extract here",
+  "ShellExt_ExtractHereMulti": "Extract {0} archives",
+  "ShellExt_SmartExtractSingle": "Smart extract",
+  "ShellExt_SmartExtractMulti": "Smart extract {0} archives",
+  "ShellExt_ExtractToNamed": "Extract to folder",
+  "ShellExt_ExtractTo": "Extract to\u2026",
+  "ShellExt_Compress": "Compress to\u2026"
 }
