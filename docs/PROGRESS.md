@@ -28,6 +28,9 @@
   - COM host 部署：csproj 添加 CopyShellExtComhost MSBuild 目标，构建后自动复制 comhost.dll+ShellExt.dll+runtimeconfig.json
   - MenuIcons 10 个 .ico 从 WPF 复制到 Avalonia Resources/MenuIcons/
   - 本地化：Shell_* + ShellExt_* 19 条 key 添加（zh-CN + en）
+  - 🐛 修复：HandleShellCommand 改用 Environment.Exit(0) 替代 desktop.Shutdown()，避免 Dispatcher 在 CLI-only 命令后 crash（InvalidOperationException）
+  - 🐛 修复：MenuIcons .ico 文件未复制到输出目录（csproj 添加 None Include + CopyToOutputDirectory）
+  - CLI 全部 4 个命令验证通过：注册表写入/清理完整（CLSID、shellex handlers、OpenWithProgids、ProgId、ContextMenu text）
   - Build 0 errors；Avalonia 测试 35 passed / 2 skipped；Core 测试 236 passed
 
 **2026-07-19** — PasswordManagerWindow 图标补全 + 搜索栏图标 + 布局调整

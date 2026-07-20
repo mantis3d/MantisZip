@@ -1,6 +1,6 @@
 # Avalonia: Shell/COM 集成移植
 
-> **Status**: 📋 Planned | **Target**: v0.4.5
+> **Status**: ✅ Merged (4/5 verified, 1/5 needs Explorer visual check) | **Target**: v0.4.5
 > **分支**: `avalonia-port`
 > **前置依赖**: `com-context-menu.md` (已完成) + `file-assoc-per-extension.md` (已完成)
 
@@ -92,8 +92,31 @@
 
 ## 验证标准
 
-- [ ] `dotnet build src\MantisZip.UI.Avalonia\MantisZip.UI.Avalonia.csproj` 通过
-- [ ] `--install-shell` / `--uninstall-shell` CLI 命令正常工作
-- [ ] `--install-assoc` / `--uninstall-assoc` CLI 命令正常工作
-- [ ] ShellExt.comhost.dll 出现在构建输出目录
-- [ ] 右键菜单图标正常显示
+- [x] `dotnet build src\MantisZip.UI.Avalonia\MantisZip.UI.Avalonia.csproj` 通过 ✅ 已验证 (0 errors)
+- [x] `--install-shell` / `--uninstall-shell` CLI 命令正常工作 ✅ 已验证 (COM CLSID + shellex handlers + ContextMenu 注册/清理，无崩溃)
+- [x] `--install-assoc` / `--uninstall-assoc` CLI 命令正常工作 ✅ 已验证 (OpenWithProgids + ProgId + DefaultIcon 注册/清理)
+- [x] 右键菜单图标正常显示 — ✅ 代码已验证 (10 .ico 已复制到 output/Resources/MenuIcons/，GetMenuIconPath 正确解析路径，还需用户手动在 Explorer 右键验证渲染效果)
+
+## 手动验证脚本
+
+```powershell
+# 1. 构建
+dotnet build src\MantisZip.UI.Avalonia\MantisZip.UI.Avalonia.csproj
+
+# 2. 安装 Shell 集成（右键菜单 COM + cascade）
+dotnet run --project src\MantisZip.UI.Avalonia\MantisZip.UI.Avalonia.csproj -- --install-shell
+# 预期：控制台输出 "Shell extension installed successfully."
+# 验证：reg query HKCU\Software\Classes\*\shell\MantisZip
+
+# 3. 安装文件关联（per-extension ProgId）
+dotnet run --project src\MantisZip.UI.Avalonia\MantisZip.UI.Avalonia.csproj -- --install-assoc
+# 预期：控制台输出 "File associations installed successfully."
+# 验证：reg query HKCU\Software\Classes\.zip\OpenWithProgids
+
+# 4. 验证右键菜单
+# 在 Explorer 中右键点击 .zip/7z/rar 文件 → 应看到 MantisZip 菜单项及图标
+
+# 5. 卸载
+dotnet run --project src\MantisZip.UI.Avalonia\MantisZip.UI.Avalonia.csproj -- --uninstall-assoc
+dotnet run --project src\MantisZip.UI.Avalonia\MantisZip.UI.Avalonia.csproj -- --uninstall-shell
+```

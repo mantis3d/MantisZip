@@ -529,14 +529,22 @@ public partial class App : Application
     //  Shell commands (--install-shell, --uninstall-shell, etc.)
     // ════════════════════════════════════════════════════════════════
 
+    /// <summary>
+    /// Handle headless shell commands (--install-shell, --uninstall-shell, etc.).
+    /// Uses Environment.Exit(0) instead of desktop.Shutdown() because these commands
+    /// run during OnFrameworkInitializationCompleted, before the Dispatcher main loop
+    /// starts — calling Shutdown() there causes InvalidOperationException.
+    /// </summary>
     private static void HandleShellCommand(string command, IClassicDesktopStyleApplicationLifetime desktop)
     {
         if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
         {
             Console.Error.WriteLine("Shell integration is only supported on Windows.");
-            desktop.Shutdown();
+            Environment.Exit(1);
             return;
         }
+
+        int exitCode = 0;
 
         try
         {
@@ -568,6 +576,7 @@ public partial class App : Application
 
                 default:
                     Console.Error.WriteLine($"Unknown shell command: {command}");
+                    exitCode = 1;
                     break;
             }
         }
@@ -575,9 +584,10 @@ public partial class App : Application
         {
             DebugLog($"HandleShellCommand: {command} failed: {ex.Message}");
             Console.Error.WriteLine($"Failed to execute {command}: {ex.Message}");
+            exitCode = 1;
         }
 
-        desktop.Shutdown();
+        Environment.Exit(exitCode);
     }
 
     // ════════════════════════════════════════════════════════════════
