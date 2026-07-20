@@ -29,6 +29,8 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
 
+        WindowStateManager.Load(this);
+
         var vm = new MainWindowViewModel();
         vm.GetOpenFilePath = OpenFileDialogAsync;
         vm.ShowSettingsWindow = async () =>
@@ -300,6 +302,9 @@ public partial class MainWindow : Window
             if (_isOwnDrag)
                 e.Handled = true;
         });
+
+        // Persist window position/size/state on close
+        Closing += (_, _) => WindowStateManager.Save(this);
     }
 
     private void FileListGrid_DoubleTapped(object? sender, TappedEventArgs e)

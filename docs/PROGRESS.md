@@ -21,6 +21,13 @@
 
 ### MantisZip.UI.Avalonia（主力版）
 
+**2026-07-20** — 窗口位置持久化（P2-1）：WindowStateManager + MainWindow 集成
+  - 新建 Models/WindowStateManager.cs：将窗口 Width/Height/Position(PixelPoint)/WindowState 持久化到 %LOCALAPPDATA%\MantisZip\window.json
+  - MainWindow.axaml.cs 构造函数调用 WindowStateManager.Load(this) 恢复上次位置
+  - MainWindow.axaml.cs Closing 事件调用 WindowStateManager.Save(this) 关闭时保存
+  - 最小化时不保存（避免 stale 位置），恢复时跳过 FullScreen
+  - Build 0 errors
+
 **2026-07-20** — Shell/COM 集成补齐：安装逻辑对齐 e41c45b + Settings 状态显示 + 首次运行注册
   - SettingsWindow 上下文菜单 tab 增加状态面板（ShellStatusText）和 Apply 按钮；ViewModel 新增 InstallShell/UninstallShell/ApplyShellCommands 真实实现（替换占位）
   - ShellIntegration.Install() 改为 COM-exclusive（仅在 COM 安装失败时安装级联菜单），对齐 WPF e41c45b 最终状态
