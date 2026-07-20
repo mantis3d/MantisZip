@@ -21,6 +21,14 @@
 
 ### MantisZip.UI.Avalonia（主力版）
 
+**2026-07-20** — Shell/COM 集成补齐：安装逻辑对齐 e41c45b + Settings 状态显示 + 首次运行注册
+  - SettingsWindow 上下文菜单 tab 增加状态面板（ShellStatusText）和 Apply 按钮；ViewModel 新增 InstallShell/UninstallShell/ApplyShellCommands 真实实现（替换占位）
+  - ShellIntegration.Install() 改为 COM-exclusive（仅在 COM 安装失败时安装级联菜单），对齐 WPF e41c45b 最终状态
+  - CheckComStatus() 在 COM 未被 Explorer 加载时安装级联菜单作为兜底（而非仅 pending）
+  - App.axaml.cs 新增首次运行处理（读取安装程序写入的 FirstRunShell/FirstRunAssoc 注册表标记，延迟到用户进程执行 Shell 注册）
+  - 本地化：新增 12 条 Settings_ContextMenu_* 键（zh-CN + en）
+  - Build 0 errors；Avalonia 测试 35 passed / 2 skipped
+
 **2026-07-20** — Shell/COM 集成移植（ShellIntegration + 文件关联 + 右键菜单 + COM host）
   - 新建 3 个 Services 文件：ShellIntegration.cs（基类）、ShellIntegration.Assoc.cs（文件关联 per-extension）、ShellIntegration.Menu.cs（右键菜单 COM+cascade 注册）
   - CLI 全部原生化：--install-shell/--uninstall-shell/--install-assoc/--uninstall-assoc 直接调用 ShellIntegration，移除 WPF exe fallback
