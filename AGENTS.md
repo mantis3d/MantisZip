@@ -46,10 +46,10 @@ Avalonia 移植 Phases 0–10 已完成，当前处于功能补齐后期：
 |-------|------|------|
 | 0–9 | 项目骨架·浏览·预览·设置·压缩解压·编辑·样式·交互 | ✅ 已完成 |
 | 10 | WPF 功能补齐（进度条·信息面板·状态栏） | ✅ 已完成 |
-| UI 功能补齐 | 对话框·控件·转换器补齐 | ✅ 已完成 |
+| UI 功能补齐 | 对话框·控件·转换器补齐 | 27/29 🟡(补齐中) |
 | Shell/COM 集成 | ShellIntegration·ShellExt·文件关联·CLI | 📋 待实施 |
-| i18n + 清理 | 缺失 key 补齐·空目录清理·版本对齐 | 📋 待实施 |
-| HTML 预览升级 | 跨平台 WebView + ReverseMarkdown 降级 | 📋 待实施 |
+| i18n + 清理 | 缺失 key 补齐·空目录清理·版本对齐 | ✅ 已完成 |
+| HTML 预览升级 | 跨平台 WebView + ReverseMarkdown 降级 | 📋 待实施（恢复 WebView 双轨方案） |
 
 ### 依赖流向
 
@@ -98,9 +98,13 @@ Despite using `CommunityToolkit.Mvvm`, **all logic lives in `MainWindow.xaml.cs`
 
 使用 `CommunityToolkit.Mvvm` 的 `ObservableObject` + source generators (`[ObservableProperty]`, `[RelayCommand]`)：
 
-- **ViewModels**: `MainWindowViewModel`, `PreviewViewModel`, `ProgressViewModel`, `CompressSettingsViewModel`, `ExtractSettingsViewModel`, `SettingsWindowViewModel`
-- **Services**: `ArchiveService`, `CompressService`, `ExtractService`, `PreviewService`, `IconService`, `LocalizationManager`
+- **ViewModels**: `MainWindowViewModel`, `PreviewViewModel`, `ProgressViewModel`, `CompressSettingsViewModel`, `ExtractSettingsViewModel`, `SettingsWindowViewModel`, `IconTestViewModel`（图标测试窗口）
+- **Services**: `ArchiveService`, `CompressService`, `ExtractService`, `PreviewService`, `IconService`, `LocalizationManager`, `CompressionOptionData`（选项数据源）、`GifDecoder`（自实现 GIF 解码）、`IcoParser`（ICO 多帧解析）、`MarkdownPreviewBuilder`（Markdig AST→控件树）、`ResultPreviewService`（结果预览树）
 - **Views**: `MainWindow.axaml`, `PreviewPanel.axaml` (UserControl), `SettingsWindow.axaml`
+- **Controls**: `ResultTreeView`（结果预览可复用控件，Compact/Full 模式、截断/过滤/冲突高亮）
+- **Converters**: `BrushResourceConverter`（主题色键→画刷）、`GeometryResourceConverter`（资源键→Geometry）
+- **紧凑度模式**: Compact/Normal/Loose 三档，`ApplyCompactness()` 运行时注入 12 个 `DynamicResource`（间距/控件高度/圆角），无需重启
+- **上下文工具栏**: 目录树工具栏（展开/折叠全部+过滤器+分隔符切换）+ 文件列表工具栏（选择/反选/展平/排序/地址栏），`PathIcon` 矢量按钮
 - 对话框通过 ViewModel 的回调委托（`ShowPasswordDialog`, `ShowExtractSettingsDialog` 等）与 View 解耦
 
 ### 预览子系统
@@ -121,14 +125,20 @@ Despite using `CommunityToolkit.Mvvm`, **all logic lives in `MainWindow.xaml.cs`
 
 预览系统在独立的 `PreviewPanel.axaml` (UserControl) + `PreviewViewModel` + `PreviewService`，MVVM 模式：
 
-- **预览类型枚举**: `PreviewType` (Services/PreviewService.cs)
-- **格式分发**: `PreviewService.ClassifyPreview(ext)` → `PreviewViewModel.ShowXxx(filePath)` 方法
-- **HTML/Markdown**: HTML 用双轨方案——优先 WebView（各平台原生引擎，Win/Mac/Linux 各用各自后端），不可用时降级到 ReverseMarkdown → Markdown 控件树。Markdown 直接用 Markdig AST → 控件树（详见 `.sisyphus/plans/html-preview-webview-fallback.md`）
+- **预览类型枚举**: `PreviewType` (Services/PreviewService.cs): `None`, `Text`, `Csv`, `Pe`, `Image`, `Gif`, `Svg`, `Font`, `Audio`, `Sqlite`, `Iso`, `Torrent`, `Office`, `Video`, `Html`, `Markdown`, `Pdf`, `IcoGallery`, `Unsupported`
+- **格式分发**: `PreviewService.ClassifyPreviewByMagicAsync()`（魔数优先）→ `PreviewViewModel.ShowXxx(filePath)` 方法，扩展名回退
+- **HTML/Markdown**: 当前 HTML 走 ReverseMarkdown → Markdig → 原生控件树，Markdown 直接 Markdig AST → 控件树。**计划恢复 WebView 双轨方案**：`Avalonia.Controls.WebView`（各平台原生引擎，Win→WebView2, Mac→WKWebView, Linux→WebKit GTK），不可用时降级到 ReverseMarkdown（详见 `.sisyphus/plans/html-preview-webview-fallback.md`）
+- **PDF**: `UglyToad.PdfPig` + `SkiaSharp` 逐页位图渲染 + 翻页导航（PdfPig 0.1.15 + PdfPig.Rendering.Skia 0.1.15.4）
+- **ICO 画廊**: 自实现 `IcoParser` 提取全部多帧，`WrapPanel` 画廊布局，FlattenAlpha 切换，透明背景棋盘格
 - **SVG**: `Svg.Skia` 直接栅格化 → `WriteableBitmap`（无需 WebView2）
-- **字体预览**: `HarfBuzzSharp` shaping + `SkiaSharp` 位图渲染 + 自动折行 + 连字检测
+- **字体预览**: `HarfBuzzSharp` shaping + `SkiaSharp` 位图渲染 + 自动折行 + 连字检测（`CheckFontSupportsLigature` 自动检测，`IsLigatureEnabled` 可开关）
 - **GIF**: 自实现 `GifDecoder` + `DispatcherTimer` 逐帧动画（无需 `WpfAnimatedGif`）
+- **两阶段加载**: `ShowPreviewAsync` 拆分 Phase 1（同步显示加载状态+弹跳点动画+信息栏）→ Phase 2（异步提取后显示内容），`_previewLoadVersion` 版本号守卫防竞态
+- **透明背景切换**: 图片/GIF/ICO 预览的 `DrawingBrush` 棋盘格（8×8），`IsTransparencyBgShown` 绑定 🏁 按钮
 - **信息面板**: 托管在 PreviewPanel 右侧/下方，`ApplyInfoPanelOrientation()` 切换
 - **DataGrid**: CSV/SQLite 预览用 `Avalonia.Controls.DataGrid`（手动列创建以绕过 `AutoGenerateColumns` 对 `DataView` 的 bug）
+- **结果预览面板**: `ResultPreviewService` 构建文件树 → `ResultTreeView` 控件（Compact/Full 模式、冲突高亮、过滤灰显、深度/文件数截断、摘要栏）
+- **魔数检测**: `PreviewService.ClassifyPreviewByMagicAsync` 通过文件魔数优先判定格式，与扩展名冲突时 FormatMetadata 显示警告提示
 
 ### 设置系统
 
@@ -139,13 +149,18 @@ Despite using `CommunityToolkit.Mvvm`, **all logic lives in `MainWindow.xaml.cs`
 - 两边的 `AppSettings` 字段定义保持同步
 
 设置包含以下分类：
-- **压缩**: DefaultFormat (zip/7z/tar.gz), DefaultLevel (1–9), CloseAfterCompress, KeepOriginalExtension
+- **压缩**: DefaultFormat (zip/7z/tar.gz), DefaultLevel (1–9), CloseAfterCompress, KeepOriginalExtension, ZipEncoding, ZipCompressionMethod, ZipEncryptionMethod, SevenZipCompressionMethod, SevenZipSolid, SevenZipSolidBlockSize, SevenZipDictionarySize, SevenZipNumFastBytes, SevenZipMatchFinder, SevenZipEncryptHeaders
+- **分卷**: SplitSizeTag (0=不分卷/1MB/10MB/…), CustomSplitSizeMB
 - **解压**: ExtractDestination (ask/same-dir/desktop), FileConflictAction (ask/overwrite/rename/skip), OpenFolderAfterExtract
-- **上下文菜单**: EnableCompressMenu, EnableOpenMenu, EnableCascadingMenu, ShowMenuIcons, EnableSmartExtractMenu, EnableExtractHereMenu, EnableExtractToNamedMenu, EnableExtractToMenu, EnableCompressSeparate, EnableCompressCombined
-- **预览**: EnableImagePreview, EnableTextPreview, MaxTextPreviewBytes, ShowPreviewPanel, TextPreviewFontSize
-- **调试**: EnableDebugLogging, LogPrivacyMode (off/filename/full)
+- **解压扩展**: EnableDragExtract, ExtractPreserveFullPath
+- **上下文菜单**: EnableCompressMenu, EnableOpenMenu, EnableCascadingMenu, ShowMenuIcons, EnableSmartExtractMenu, EnableExtractHereMenu, EnableExtractToNamedMenu, EnableExtractToMenu, EnableCompressSeparate, EnableCompressCombined, EnableDynamicMenu
+- **预览**: EnableImagePreview, EnableTextPreview, MaxTextPreviewBytes, ShowPreviewPanel, TextPreviewFontSize, TextPreviewFontFamily, TextEncodingPreference, MaxTablePreviewRows, MaxTablePreviewCols, MaxPreviewFileSize, FontPreviewFontSize, FontPreviewSampleText, FontPreviewEnableLigature, PreviewPosition, InfoPanelOrientation, UseColorEmoji, EnableFormatDetection, PreviewHeadSize
 - **密码管理**: ShowPasswordMatchNotification, PasswordRevealByDefault
-- **高级**: SevenZipPath, PreserveDirectoryRoot
+- **外观（Avalonia 新增）**: Theme (Light/Dark), MaxRecentFiles, AppFontFamily, CompactnessMode (Compact/Normal/Loose), Language, ShowProgressBars, SeparateDirBaseline
+- **文件关联（Avalonia 新增）**: AssocZip/7z/Rar/Tar/TarGz/Gz/Iso, CustomAssocExtensions
+- **收藏夹（Avalonia 新增）**: FavoritePaths (List<string>)
+- **调试**: EnableDebugLogging, LogPrivacyMode (off/filename/full)
+- **高级**: SevenZipPath, PreserveDirectoryRoot, CleanTempOnStartup
 
 ### Shell integration（WPF-only，Avalonia 待移植）
 

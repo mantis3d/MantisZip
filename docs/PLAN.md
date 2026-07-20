@@ -50,6 +50,7 @@
 | **P1** | Avalonia Phase 10: WPF 功能补齐 | [avalonia-phase10-feature-parity.md](.sisyphus/plans/avalonia-phase10-feature-parity.md) | 🟡中 | ✅ 已完成 | 文件列表进度条、预览信息面板、状态栏增强 |
 | **P1** | Avalonia: Shell/COM 集成移植 | [avalonia-shell-com-integration.md](.sisyphus/plans/avalonia-shell-com-integration.md) | 🟡中 | 3-5天 | ShellIntegration 移植、ShellExt 项目引用、COM host 部署、文件关联CLI、MenuIcons 资源 |
 | **P1** | Avalonia: UI 功能补齐 | [avalonia-ui-feature-parity.md](.sisyphus/plans/avalonia-ui-feature-parity.md) | 🟡中 | 27/29 🟡 | Elevation×3、Favorites×2、QuickPath×2 等 11 个对话框、2 个控件、1 个转换器（2 项阻塞于 GUI 测试） |
+| **P1** | 自动更新检测 | [auto-update.md](.sisyphus/plans/auto-update.md) | 🟡中 | 4-6h | GitHub Releases API 版本检查、AboutWindow 更新 Tab、UpdateAvailableDialog、设置开关、单元测试 |
 | **P1** | 上下文工具栏重构（目录树+文件列表） | [context-toolbars.md](.sisyphus/plans/context-toolbars.md) | 🟡中 | 6-8h | 目录树工具栏（展开/收起/展开到当前+树过滤），文件列表工具栏（导航组+地址栏+复制名/列选择器/视图过滤/全选反选/刷新+筛选/展平），导航历史栈，精简全局工具栏 |
 | **P1** | 解压/压缩结果预览面板 | [result-preview-panel.md](.sisyphus/plans/result-preview-panel.md) | 🟡中 | 8-10h | ExtractSettings/CompressSettings 窗口右侧新增预览面板，ResultTreeView 可复用控件（精简模式/冲突高亮/过滤灰显/摘要栏），拖拽导出等场景复用 |
 | **P1** | Avalonia: 预览两阶段加载（信息栏+内容分离） | [preview-two-phase-loading.md](.sisyphus/plans/preview-two-phase-loading.md) | 🟢低 | 1-2h | 立即显示加载状态+信息栏(Phase 1) → 异步提取后显示内容(Phase 2) + 版本号守卫防竞态；WPF 已有此模式，Avalonia 补齐 |
