@@ -225,6 +225,151 @@ public partial class SettingsWindowViewModel : ObservableObject
     [ObservableProperty]
     private bool _assocIso;
 
+    // Per-extension assoc items (UI list)
+    public System.Collections.ObjectModel.ObservableCollection<FormatAssocItemModel> AssocItems { get; } = new();
+
+    [RelayCommand]
+    private async Task AddCustomAssoc()
+    {
+        var dlg = new MantisZip.UI.Avalonia.Dialogs.AddAssocDialog();
+        var result = await dlg.ShowDialog<bool?>(null);
+        if (result != true) return;
+        var ext = dlg.Extension;
+        // validate duplicates
+        if (string.IsNullOrEmpty(ext)) return;
+        if (AssocItems.Any(i => i.Extension.Equals(ext, StringComparison.OrdinalIgnoreCase)))
+        {
+            await AppMessageBox.Show(LocalizationManager.T("Settings_Assoc_CustomAlreadyExists"), "", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+        if ((_settings.CustomAssocExtensions?.Count ?? 0) >= 20)
+        {
+            await AppMessageBox.Show(LocalizationManager.T("Settings_Assoc_CustomMaxReached"), "", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+        _settings.CustomAssocExtensions.Add(ext);
+        var item = CreateAssocItem(ext, isCustom: true);
+        item.DeleteCommand = new RelayCommand(() => DeleteCustomExtension(item));
+        AssocItems.Add(item);
+    }
+
+    private void DeleteCustomExtension(FormatAssocItemModel item)
+    {
+        if (item == null) return;
+        if (!item.IsCustom) return;
+        _settings.CustomAssocExtensions.Remove(item.Extension);
+        AssocItems.Remove(item);
+    }
+
+    [RelayCommand]
+    private void InstallSelectedAssoc()
+    {
+        // Install only checked items
+        var selected = AssocItems.Where(i => i.IsEnabled).Select(i => i.Extension).ToList();
+        if (selected.Count == 0) return;
+        try
+        {
+            ShellIntegration.PrepareAssocRegistration();
+            ShellIntegration.InstallAssociations(selected);
+            RefreshAssocStatus();
+            AppMessageBox.Show(LocalizationManager.T("Settings_Assoc_InstallDone"), LocalizationManager.T("Settings_Title"), MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+        catch (Exception ex)
+        {
+            App.DebugLog($"InstallSelectedAssoc failed: {ex.Message}");
+        }
+    }
+
+    [RelayCommand]
+    private void UninstallAllAssoc()
+    {
+        try
+        {
+            ShellIntegration.UninstallAssociations();
+            RefreshAssocStatus();
+            AppMessageBox.Show(LocalizationManager.T("Settings_Assoc_UninstallDone"), LocalizationManager.T("Settings_Title"), MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+        catch (Exception ex)
+        {
+            App.DebugLog($"UninstallAllAssoc failed: {ex.Message}");
+        }
+    }
+
+    private FormatAssocItemModel CreateAssocItem(string ext, bool isCustom = false)
+    {
+        var desc = ext switch
+        {
+            ".zip" => LocalizationManager.T("Settings_Assoc_FormatDesc_Zip"),
+            ".7z" => LocalizationManager.T("Settings_Assoc_FormatDesc_7z"),
+            ".rar" => LocalizationManager.T("Settings_Assoc_FormatDesc_Rar"),
+            ".tar" => LocalizationManager.T("Settings_Assoc_FormatDesc_Tar"),
+            ".tgz" or ".tar.gz" => LocalizationManager.T("Settings_Assoc_FormatDesc_TarGz"),
+            ".gz" => LocalizationManager.T("Settings_Assoc_FormatDesc_Gz"),
+            ".iso" => LocalizationManager.T("Settings_Assoc_FormatDesc_Iso"),
+            _ => LocalizationManager.T("Settings_Assoc_UserCustom")
+        };
+
+        var item = new FormatAssocItemModel
+        {
+            Extension = ext,
+            Description = desc,
+            Icon = IconService.GetFileIcon(ext),
+            IsCustom = isCustom,
+            IsEnabled = IsEnabledFromSettings(ext),
+            CurrentHandler = ShellIntegration.GetCurrentHandler(ext)
+        };
+
+        return item;
+    }
+
+    private bool IsEnabledFromSettings(string ext)
+    {
+        return ext switch
+        {
+            ".zip" => AssocZip,
+            ".7z" => Assoc7z,
+            ".rar" => AssocRar,
+            ".tar" => AssocTar,
+            ".tgz" or ".tar.gz" => AssocTarGz,
+            ".gz" => AssocGz,
+            ".iso" => AssocIso,
+            _ => _settings.CustomAssocExtensions?.Contains(ext) ?? false
+        };
+    }
+
+    private void RefreshAssocStatus()
+    {
+        foreach (var item in AssocItems)
+        {
+            item.CurrentHandler = ShellIntegration.GetCurrentHandler(item.Extension);
+            item.IsEnabled = IsEnabledFromSettings(item.Extension);
+        }
+    }
+
+    private void PopulateAssocItems()
+    {
+        AssocItems.Clear();
+        var builtins = new[] { ".zip", ".7z", ".rar", ".tar", ".tar.gz", ".gz", ".iso" };
+        foreach (var ext in builtins)
+        {
+            // normalize .tar.gz -> .tgz for display consistency
+            var displayExt = ext == ".tar.gz" ? ".tgz" : ext;
+            var item = CreateAssocItem(displayExt, isCustom: false);
+            item.DeleteCommand = null;
+            AssocItems.Add(item);
+        }
+
+        if (_settings.CustomAssocExtensions != null)
+        {
+            foreach (var c in _settings.CustomAssocExtensions)
+            {
+                var item = CreateAssocItem(c, isCustom: true);
+                item.DeleteCommand = new RelayCommand(() => DeleteCustomExtension(item));
+                AssocItems.Add(item);
+            }
+        }
+    }
+
     // ── Combo ItemSource properties ──
     public System.Collections.ObjectModel.ObservableCollection<Option> DefaultFormatOptions { get; } = new();
     [ObservableProperty] private Option? _selectedDefaultFormatOption;
@@ -461,6 +606,9 @@ public partial class SettingsWindowViewModel : ObservableObject
     public string FileAssocDescText => LocalizationManager.T("Settings_Assoc_Desc");
     public string FileAssocSelectAllText => LocalizationManager.T("Settings_Assoc_SelectAll");
     public string FileAssocDeselectAllText => LocalizationManager.T("Settings_Assoc_DeselectAll");
+    public string FileAssocAddText => LocalizationManager.T("Settings_Assoc_Add");
+    public string FileAssocInstallText => LocalizationManager.T("Settings_ContextMenu_Install");
+    public string FileAssocUninstallText => LocalizationManager.T("Settings_ContextMenu_Uninstall");
 
     public string SaveText => LocalizationManager.T("Settings_Save");
     public string CancelText => LocalizationManager.T("Settings_Cancel");
@@ -561,6 +709,10 @@ public partial class SettingsWindowViewModel : ObservableObject
 
         PopulateComboOptions();
         SetSelectedOptions();
+
+        // Populate per-extension assoc items
+        PopulateAssocItems();
+        RefreshAssocStatus();
 
         LocalizationManager.CultureChanged += OnCultureChanged;
     }
@@ -862,6 +1014,9 @@ public partial class SettingsWindowViewModel : ObservableObject
         OnPropertyChanged(nameof(FileAssocDescText));
         OnPropertyChanged(nameof(FileAssocSelectAllText));
         OnPropertyChanged(nameof(FileAssocDeselectAllText));
+        OnPropertyChanged(nameof(FileAssocAddText));
+        OnPropertyChanged(nameof(FileAssocInstallText));
+        OnPropertyChanged(nameof(FileAssocUninstallText));
 
         OnPropertyChanged(nameof(SaveText));
         OnPropertyChanged(nameof(CancelText));
@@ -959,6 +1114,10 @@ public partial class SettingsWindowViewModel : ObservableObject
         _settings.AssocTarGz = AssocTarGz;
         _settings.AssocGz = AssocGz;
         _settings.AssocIso = AssocIso;
+
+        // Persist custom extensions from the AssocItems list
+        var customList = AssocItems.Where(i => i.IsCustom).Select(i => i.Extension).ToList();
+        _settings.CustomAssocExtensions = customList;
 
         _settings.Save();
     }
