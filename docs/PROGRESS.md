@@ -21,6 +21,11 @@
 
 ### MantisZip.UI.Avalonia（主力版）
 
+**2026-07-21** — 修复文件列表目录图标显示为未知文件图标
+  - ArchiveService.cs: IsDirectory 分流调用 GetFolderIcon()（Entries 集合）
+  - MainWindowViewModel.cs: PopulateEntries() 中 IsDirectory 分流调用 GetFolderIcon()（CurrentEntries 集合，原代码对所有条目无差别调用 GetFileIcon）
+  - Build 0 errors
+
 **2026-07-20** — Shell/COM 集成补齐：安装逻辑对齐 e41c45b + Settings 状态显示 + 首次运行注册
   - SettingsWindow 上下文菜单 tab 增加状态面板（ShellStatusText）和 Apply 按钮；ViewModel 新增 InstallShell/UninstallShell/ApplyShellCommands 真实实现（替换占位）
   - ShellIntegration.Install() 改为 COM-exclusive（仅在 COM 安装失败时安装级联菜单），对齐 WPF e41c45b 最终状态
@@ -622,6 +627,7 @@
 
 | 功能 | 设计文档 | 实现版本 |
 |------|----------|:--------:|
+| emoji 替换为 Fluent UI PathIcon + 文件列表行图标改用系统原生 | [emoji-to-pathicon.md](.sisyphus/plans/emoji-to-pathicon.md) | v0.4.4+ |
 | 移除 WebView2 依赖（Markdown/HTML/PDF 跨平台预览） | [remove-webview2-preview.md](.sisyphus/plans/remove-webview2-preview.md) | v0.4.5 |
 | 便携版模式 | [portable-mode.md](.sisyphus/plans/portable-mode.md) | v0.4.5 |
 | 文件冲突对话框暂停/取消 | [conflict-dialog-pause-cancel.md](.sisyphus/plans/conflict-dialog-pause-cancel.md) | v0.4.5 |

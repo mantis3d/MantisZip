@@ -966,8 +966,15 @@ public partial class MainWindowViewModel : ObservableObject
             foreach (var item in entries)
             {
                 var model = ArchiveItemModel.FromCore(item);
-                var ext = Path.GetExtension(model.Name);
-                model.IconSource = IconService.GetFileIcon(ext);
+                if (model.IsDirectory)
+                {
+                    model.IconSource = IconService.GetFolderIcon();
+                }
+                else
+                {
+                    var ext = Path.GetExtension(model.Name);
+                    model.IconSource = IconService.GetFileIcon(ext);
+                }
                 model.ProgressBarEnabled = ShowProgressBars;
                 CurrentEntries.Add(model);
             }

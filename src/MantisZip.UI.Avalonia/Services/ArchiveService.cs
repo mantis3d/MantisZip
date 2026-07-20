@@ -28,11 +28,18 @@ public class ArchiveService
             var itemsList = items.ToList();
             var models = itemsList.Select(ArchiveItemModel.FromCore).ToList();
 
-            // Load file type icons
+            // Load file type icons (folder vs file)
             foreach (var model in models)
             {
-                var ext = Path.GetExtension(model.Name);
-                model.IconSource = IconService.GetFileIcon(ext);
+                if (model.IsDirectory)
+                {
+                    model.IconSource = IconService.GetFolderIcon();
+                }
+                else
+                {
+                    var ext = Path.GetExtension(model.Name);
+                    model.IconSource = IconService.GetFileIcon(ext);
+                }
             }
 
             return ArchiveLoadResult.Success(models, itemsList);
