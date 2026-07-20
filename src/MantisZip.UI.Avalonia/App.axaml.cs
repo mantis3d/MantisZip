@@ -15,10 +15,12 @@ using MantisZip.UI.Avalonia.Services;
 using MantisZip.UI.Avalonia.ViewModels;
 using MantisZip.UI.Avalonia.Views;
 using System.Diagnostics;
+using System.IO;
 using System.IO.Pipes;
 using System.Runtime.InteropServices;
 using System.Security.Principal;
 using System.Threading;
+using Microsoft.Win32;
 
 namespace MantisZip.UI.Avalonia;
 
@@ -71,6 +73,56 @@ public partial class App : Application
         // ── Initialize magic detection settings ──
         PreviewService.EnableFormatDetection = appSettings.EnableFormatDetection;
         PreviewService.PreviewHeadSize = appSettings.PreviewHeadSize;
+
+        // ── 首次运行：Shell 集成安装（延迟到用户进程，非提权）──
+        // 安装程序会写入 FirstRunShell=1 / FirstRunAssoc=1 到注册表，首次启动时处理
+        var isPortable = File.Exists(Path.Combine(AppContext.BaseDirectory, "Portable.txt"));
+        if (!isPortable)
+        {
+            try
+            {
+                using var firstRunKey = Registry.CurrentUser.OpenSubKey(
+                    @"Software\MantisZip", writable: true);
+                if (firstRunKey != null)
+                {
+                    var firstRunShell = firstRunKey.GetValue("FirstRunShell") as string;
+                    if (firstRunShell == "1")
+                    {
+                        App.DebugLog("OnFrameworkInitializationCompleted: FirstRunShell marker found, installing shell integration...");
+                        ShellIntegration.Install();
+                        firstRunKey.DeleteValue("FirstRunShell");
+                        App.DebugLog("OnFrameworkInitializationCompleted: first-run shell integration installed");
+                    }
+
+                    var firstRunAssoc = firstRunKey.GetValue("FirstRunAssoc") as string;
+                    if (firstRunAssoc == "1")
+                    {
+                        App.DebugLog("OnFrameworkInitializationCompleted: FirstRunAssoc marker found, registering file associations...");
+                        ShellIntegration.InstallAssociations();
+                        firstRunKey.DeleteValue("FirstRunAssoc");
+                        App.DebugLog("OnFrameworkInitializationCompleted: first-run file associations registered");
+                    }
+                }
+            }
+            catch (Exception firstRunEx)
+            {
+                App.DebugLog($"OnFrameworkInitializationCompleted: first-run handling failed: {firstRunEx.Message}");
+            }
+
+            // ── 检查 COM 动态菜单状态（如果 pending，检测 Explorer 是否已加载 comhost.dll）──
+            try
+            {
+                ShellIntegration.CheckComStatus();
+            }
+            catch (Exception comCheckEx)
+            {
+                App.DebugLog($"OnFrameworkInitializationCompleted: CheckComStatus failed: {comCheckEx.Message}");
+            }
+        }
+        else
+        {
+            App.DebugLog("OnFrameworkInitializationCompleted: portable mode detected, skipping shell integration and file association registration");
+        }
 
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
