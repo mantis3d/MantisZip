@@ -15,10 +15,12 @@ using MantisZip.UI.Avalonia.Services;
 using MantisZip.UI.Avalonia.ViewModels;
 using MantisZip.UI.Avalonia.Views;
 using System.Diagnostics;
+using System.IO;
 using System.IO.Pipes;
 using System.Runtime.InteropServices;
 using System.Security.Principal;
 using System.Threading;
+using Microsoft.Win32;
 
 namespace MantisZip.UI.Avalonia;
 
@@ -71,6 +73,56 @@ public partial class App : Application
         // ── Initialize magic detection settings ──
         PreviewService.EnableFormatDetection = appSettings.EnableFormatDetection;
         PreviewService.PreviewHeadSize = appSettings.PreviewHeadSize;
+
+        // ── 首次运行：Shell 集成安装（延迟到用户进程，非提权）──
+        // 安装程序会写入 FirstRunShell=1 / FirstRunAssoc=1 到注册表，首次启动时处理
+        var isPortable = File.Exists(Path.Combine(AppContext.BaseDirectory, "Portable.txt"));
+        if (!isPortable)
+        {
+            try
+            {
+                using var firstRunKey = Registry.CurrentUser.OpenSubKey(
+                    @"Software\MantisZip", writable: true);
+                if (firstRunKey != null)
+                {
+                    var firstRunShell = firstRunKey.GetValue("FirstRunShell") as string;
+                    if (firstRunShell == "1")
+                    {
+                        App.DebugLog("OnFrameworkInitializationCompleted: FirstRunShell marker found, installing shell integration...");
+                        ShellIntegration.Install();
+                        firstRunKey.DeleteValue("FirstRunShell");
+                        App.DebugLog("OnFrameworkInitializationCompleted: first-run shell integration installed");
+                    }
+
+                    var firstRunAssoc = firstRunKey.GetValue("FirstRunAssoc") as string;
+                    if (firstRunAssoc == "1")
+                    {
+                        App.DebugLog("OnFrameworkInitializationCompleted: FirstRunAssoc marker found, registering file associations...");
+                        ShellIntegration.InstallAssociations();
+                        firstRunKey.DeleteValue("FirstRunAssoc");
+                        App.DebugLog("OnFrameworkInitializationCompleted: first-run file associations registered");
+                    }
+                }
+            }
+            catch (Exception firstRunEx)
+            {
+                App.DebugLog($"OnFrameworkInitializationCompleted: first-run handling failed: {firstRunEx.Message}");
+            }
+
+            // ── 检查 COM 动态菜单状态（如果 pending，检测 Explorer 是否已加载 comhost.dll）──
+            try
+            {
+                ShellIntegration.CheckComStatus();
+            }
+            catch (Exception comCheckEx)
+            {
+                App.DebugLog($"OnFrameworkInitializationCompleted: CheckComStatus failed: {comCheckEx.Message}");
+            }
+        }
+        else
+        {
+            App.DebugLog("OnFrameworkInitializationCompleted: portable mode detected, skipping shell integration and file association registration");
+        }
 
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
@@ -529,111 +581,65 @@ public partial class App : Application
     //  Shell commands (--install-shell, --uninstall-shell, etc.)
     // ════════════════════════════════════════════════════════════════
 
+    /// <summary>
+    /// Handle headless shell commands (--install-shell, --uninstall-shell, etc.).
+    /// Uses Environment.Exit(0) instead of desktop.Shutdown() because these commands
+    /// run during OnFrameworkInitializationCompleted, before the Dispatcher main loop
+    /// starts — calling Shutdown() there causes InvalidOperationException.
+    /// </summary>
     private static void HandleShellCommand(string command, IClassicDesktopStyleApplicationLifetime desktop)
     {
         if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
         {
-            Console.Error.WriteLine("当前平台不支持");
-            desktop.Shutdown();
+            Console.Error.WriteLine("Shell integration is only supported on Windows.");
+            Environment.Exit(1);
             return;
         }
 
+        int exitCode = 0;
+
         try
         {
-            // Shell integration is in the WPF MantisZip.UI assembly.
-            // On Windows, try to locate and run the WPF exe with the same argument.
-            // If the WPF exe is not found, show a helpful message.
-            var wpfExe = FindWpfExe();
-            if (wpfExe != null)
+            switch (command)
             {
-                var psi = new ProcessStartInfo(wpfExe, command) { UseShellExecute = false };
-                using var proc = Process.Start(psi);
-                proc?.WaitForExit();
-            }
-            else
-            {
-                var cmdName = command switch
-                {
-                    "--install-shell" => "Install shell extension",
-                    "--uninstall-shell" => "Uninstall shell extension",
-                    "--install-assoc" => "Install file associations",
-                    "--uninstall-assoc" => "Uninstall file associations",
-                    _ => command
-                };
-                Console.Error.WriteLine($"Shell integration is not available in the Avalonia version. Please use the WPF version (MantisZip.UI.exe) to run: {cmdName}");
-                Console.Error.WriteLine($"Command: {command}");
+                case "--install-shell":
+                    DebugLog("Shell command: --install-shell (native)");
+                    ShellIntegration.Install();
+                    Console.WriteLine("Shell extension installed successfully.");
+                    break;
+
+                case "--uninstall-shell":
+                    DebugLog("Shell command: --uninstall-shell (native)");
+                    ShellIntegration.Uninstall();
+                    Console.WriteLine("Shell extension uninstalled successfully.");
+                    break;
+
+                case "--install-assoc":
+                    DebugLog("Shell command: --install-assoc (native)");
+                    ShellIntegration.InstallAssociations();
+                    Console.WriteLine("File associations installed successfully.");
+                    break;
+
+                case "--uninstall-assoc":
+                    DebugLog("Shell command: --uninstall-assoc (native)");
+                    ShellIntegration.UninstallAssociations();
+                    Console.WriteLine("File associations uninstalled successfully.");
+                    break;
+
+                default:
+                    Console.Error.WriteLine($"Unknown shell command: {command}");
+                    exitCode = 1;
+                    break;
             }
         }
         catch (Exception ex)
         {
+            DebugLog($"HandleShellCommand: {command} failed: {ex.Message}");
             Console.Error.WriteLine($"Failed to execute {command}: {ex.Message}");
+            exitCode = 1;
         }
 
-        desktop.Shutdown();
-    }
-
-    /// <summary>
-    /// Attempt to locate the WPF MantisZip.UI.exe next to the Avalonia binary.
-    /// This is a best-effort lookup for shell integration commands.
-    /// </summary>
-    private static string? FindWpfExe()
-    {
-        try
-        {
-            // Look for MantisZip.UI.exe in common relative locations
-            var baseDir = AppContext.BaseDirectory;
-
-            // Same directory (side-by-side deployment)
-            var sameDir = Path.Combine(baseDir, "MantisZip.UI.exe");
-            if (File.Exists(sameDir)) return sameDir;
-
-            // Up one level (e.g., both in sibling directories under a common output root)
-            var parentDir = Path.GetDirectoryName(baseDir.TrimEnd('\\', '/'));
-            if (parentDir != null)
-            {
-                var siblingDir = Path.Combine(parentDir, "MantisZip.UI", "net9.0-windows", "MantisZip.UI.exe");
-                if (File.Exists(siblingDir)) return siblingDir;
-            }
-
-            // Check for dotnet run / published layout
-            // Relative from the solution root: src/MantisZip.UI/bin/.../MantisZip.UI.exe
-            var slnDir = FindSolutionDirectory(baseDir);
-            if (slnDir != null)
-            {
-                var buildDir = Path.Combine(slnDir, "src", "MantisZip.UI", "bin");
-                if (Directory.Exists(buildDir))
-                {
-                    var configDirs = Directory.GetDirectories(buildDir, "*", SearchOption.TopDirectoryOnly);
-                    foreach (var cfg in configDirs)
-                    {
-                        var tfDir = Path.Combine(cfg, "net9.0-windows");
-                        if (Directory.Exists(tfDir))
-                        {
-                            var exe = Path.Combine(tfDir, "MantisZip.UI.exe");
-                            if (File.Exists(exe)) return exe;
-                        }
-                    }
-                }
-            }
-        }
-        catch
-        {
-            // Best-effort
-        }
-
-        return null;
-    }
-
-    private static string? FindSolutionDirectory(string startDir)
-    {
-        var dir = startDir;
-        while (dir != null)
-        {
-            if (File.Exists(Path.Combine(dir, "MantisZip.sln")))
-                return dir;
-            dir = Path.GetDirectoryName(dir);
-        }
-        return null;
+        Environment.Exit(exitCode);
     }
 
     // ════════════════════════════════════════════════════════════════

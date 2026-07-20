@@ -16,7 +16,7 @@
 
 | 缺失类别 | 缺失项数 | 优先级分布 |
 |----------|---------|-----------|
-| AppSettings 属性 | ~9 个 | P0×0, P1×6, P2×3 |
+| AppSettings 属性 | 10 个 | P0×0, P1×6, P2×3, P1-2 静态×1 |
 | 对话框/控件 | 1 个 | P1 |
 | 功能逻辑 | 7 项 | P0×0, P1×5, P2×2 |
 | Shell/COM 集成 | 整块 | P0 |
@@ -36,7 +36,7 @@
 - `src/MantisZip.UI/Shell/ShellIntegration.cs` — 基础类
 - `src/MantisZip.UI/Shell/ShellIntegration.Assoc.cs` — 文件关联
 - `src/MantisZip.UI/Shell/ShellIntegration.Menu.cs` — 右键菜单
-- `src/MantisZip.UI/Resources/MenuIcons/*.ico` — 11 个图标
+- `src/MantisZip.UI/Resources/MenuIcons/*.ico` — 10 个图标
 
 **Avalonia 已有计划:** `.sisyphus/plans/avalonia-shell-com-integration.md`（📋 Planned，未启动）
 
@@ -106,6 +106,7 @@
 **任务:**
 - [ ] 创建 `MantisZip.UI.Avalonia/Controls/FileFilterEditor.axaml(.cs)` — 移植自 WPF 版
 - [ ] 集成到 `CompressSettingsWindow` 和 `ExtractSettingsWindow`
+- [ ] `Models/AppSettings.cs` 添加 `FilterPresets` 属性（`List<FileFilterPreset>`，默认 `new()`）
 - [ ] 添加 i18n key
 
 ---
@@ -127,9 +128,9 @@
 
 ---
 
-### P1-6: 预览信息面板显隐控制
+### P1-6: 预览信息面板持久化显隐
 
-**现状:** WPF 视图菜单新增"隐藏预览信息"开关 + `ShowPreviewInfoPanel` 设置持久化。Avalonia 的 `PreviewInfoPanel` 已在 Phase 10 实现，但缺少显隐切换。
+**现状:** Avalonia 已有运行时信息面板显隐功能（`PreviewViewModel.IsInfoPanelVisible` + `InfoPanelOrientation` + 菜单切换），但缺少持久化设置。重启后显隐状态会重置。WPF 通过 `ShowPreviewInfoPanel` 设置实现跨会话持久化。
 
 **缺失 AppSettings 属性:**
 | 属性 | 类型 | 默认值 |
@@ -137,10 +138,10 @@
 | `ShowPreviewInfoPanel` | bool | `true` |
 
 **任务:**
-- [ ] `Models/AppSettings.cs` 添加 `ShowPreviewInfoPanel`
-- [ ] `ViewModels/MainWindowViewModel.cs` 添加 `ShowPreviewInfoPanel` 可观察属性
-- [ ] `Views/MainWindow.axaml` 视图菜单添加"隐藏预览信息"切换项
-- [ ] 添加 i18n key
+- [ ] `Models/AppSettings.cs` 添加 `ShowPreviewInfoPanel` 属性
+- [ ] `ViewModels/MainWindowViewModel.cs` 或 `PreviewViewModel.cs` 启动时从 `ShowPreviewInfoPanel` 初始化 `IsInfoPanelVisible`
+- [ ] 菜单切换时同步回写 `ShowPreviewInfoPanel`
+- [ ] `Views/SettingsWindow` 外观 Tab 添加信息面板默认显隐开关（可选）
 
 ---
 
@@ -251,12 +252,12 @@
 
 | 指标 | WPF (main) | Avalonia (AvaloniaFromWpf) |
 |------|-----------|---------------------------|
-| UI 项目 .cs 文件 | ~97 | ~95 |
-| Dialogs | 13 对 | 12 对 + CommentDialog |
-| Controls | 3 个 | 3 个（含 InfoPanel） |
-| Converters | 1 个 | 6 个 |
+| UI 项目 .cs 文件 | 64 | 73 |
+| Dialogs | 17 个 dialog .cs | 19 个 dialog .cs |
+| Controls | 3 个 | 4 个（含 InfoPanel、ResultTreeView） |
+| Converters | 3 个 | 8 个 |
 | Shell 文件 | 3 个 | 0 个 |
-| AppSettings 属性 | 74 | 62+ |
+| AppSettings 属性 | 75 实例 + 1 静态 | 72 |
 
 ---
 
@@ -272,8 +273,8 @@
 
 1. **Phase 1（P0）** — Shell/COM 集成（~1 天）
 2. **Phase 2（P1 核心）** — 双击行为/删除原包 + 便携模式 + 文件过滤 + 默认路径优先级（~1 天）
-3. **Phase 3（P1 次要 + P2）** — 智能打开路径 + 预览信息面板显隐 + 窗口持久化 + 密码导入导出 + Enable 设置 + AllowElevation（~0.5 天）
+3. **Phase 3（P1 次要 + P2）** — 智能打开路径 + 预览信息面板持久化 + 窗口持久化 + 密码导入导出 + Enable 设置 + AllowElevation（~0.5 天）
 
 ---
 
-*核对方法: WPF 文件列表展开排除 obj/ 后可对比各目录文件数量。关键差异在 AppSettings 属性数量（74 vs 62+）、Shell 文件存在与否、FileFilterEditor 控件存在与否。*
+*核对方法: WPF 文件列表展开排除 obj/ 后可对比各目录文件数量。关键差异在 AppSettings 属性数量（75 vs 72）、Shell 文件存在与否、FileFilterEditor 控件存在与否。*

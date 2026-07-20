@@ -156,6 +156,19 @@ public partial class SettingsWindowViewModel : ObservableObject
     [ObservableProperty]
     private bool _enableDynamicMenu;
 
+    [ObservableProperty]
+    private string _shellStatusText = "";
+
+    [ObservableProperty]
+    private bool _isShellInstalled;
+
+    public bool IsShellNotInstalled => !IsShellInstalled;
+
+    partial void OnIsShellInstalledChanged(bool value)
+    {
+        OnPropertyChanged(nameof(IsShellNotInstalled));
+    }
+
     // ── Advanced ──
     [ObservableProperty]
     private string _sevenZipPath;
@@ -211,6 +224,162 @@ public partial class SettingsWindowViewModel : ObservableObject
 
     [ObservableProperty]
     private bool _assocIso;
+
+    // Per-extension assoc items (UI list)
+    public System.Collections.ObjectModel.ObservableCollection<FormatAssocItemModel> AssocItems { get; } = new();
+
+    [RelayCommand]
+    private async Task AddCustomAssoc()
+    {
+        try
+        {
+            var dlg = new MantisZip.UI.Avalonia.Dialogs.AddAssocDialog();
+
+            // Prefer owning dialog to MainWindow to avoid null-owner dialog issues
+            var ownerWindow = (global::Avalonia.Application.Current?.ApplicationLifetime as global::Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime)?.MainWindow;
+            var result = await dlg.ShowDialog<bool?>(ownerWindow);
+            if (result != true) return;
+            var ext = dlg.Extension;
+            // validate duplicates
+            if (string.IsNullOrEmpty(ext)) return;
+            if (AssocItems.Any(i => i.Extension.Equals(ext, StringComparison.OrdinalIgnoreCase)))
+            {
+                await AppMessageBox.Show(LocalizationManager.T("Settings_Assoc_CustomAlreadyExists"), "", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+            if ((_settings.CustomAssocExtensions?.Count ?? 0) >= 20)
+            {
+                await AppMessageBox.Show(LocalizationManager.T("Settings_Assoc_CustomMaxReached"), "", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+            _settings.CustomAssocExtensions.Add(ext);
+            var item = CreateAssocItem(ext, isCustom: true);
+            item.DeleteCommand = new RelayCommand(() => DeleteCustomExtension(item));
+            AssocItems.Add(item);
+        }
+        catch (Exception ex)
+        {
+            App.DebugLog($"AddCustomAssoc failed: {ex.Message}");
+            try { await AppMessageBox.Show(string.Format(LocalizationManager.T("Settings_Assoc_AddFailed"), ex.Message), LocalizationManager.T("Settings_Title"), MessageBoxButton.OK, MessageBoxImage.Error); } catch { }
+        }
+    }
+
+    private void DeleteCustomExtension(FormatAssocItemModel item)
+    {
+        if (item == null) return;
+        if (!item.IsCustom) return;
+        _settings.CustomAssocExtensions.Remove(item.Extension);
+        AssocItems.Remove(item);
+    }
+
+    [RelayCommand]
+    private void InstallSelectedAssoc()
+    {
+        // Install only checked items
+        var selected = AssocItems.Where(i => i.IsEnabled).Select(i => i.Extension).ToList();
+        if (selected.Count == 0) return;
+        try
+        {
+            ShellIntegration.PrepareAssocRegistration();
+            ShellIntegration.InstallAssociations(selected);
+            RefreshAssocStatus();
+            AppMessageBox.Show(LocalizationManager.T("Settings_Assoc_InstallDone"), LocalizationManager.T("Settings_Title"), MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+        catch (Exception ex)
+        {
+            App.DebugLog($"InstallSelectedAssoc failed: {ex.Message}");
+        }
+    }
+
+    [RelayCommand]
+    private void UninstallAllAssoc()
+    {
+        try
+        {
+            ShellIntegration.UninstallAssociations();
+            RefreshAssocStatus();
+            AppMessageBox.Show(LocalizationManager.T("Settings_Assoc_UninstallDone"), LocalizationManager.T("Settings_Title"), MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+        catch (Exception ex)
+        {
+            App.DebugLog($"UninstallAllAssoc failed: {ex.Message}");
+        }
+    }
+
+    private FormatAssocItemModel CreateAssocItem(string ext, bool isCustom = false)
+    {
+        var desc = ext switch
+        {
+            ".zip" => LocalizationManager.T("Settings_Assoc_FormatDesc_Zip"),
+            ".7z" => LocalizationManager.T("Settings_Assoc_FormatDesc_7z"),
+            ".rar" => LocalizationManager.T("Settings_Assoc_FormatDesc_Rar"),
+            ".tar" => LocalizationManager.T("Settings_Assoc_FormatDesc_Tar"),
+            ".tgz" or ".tar.gz" => LocalizationManager.T("Settings_Assoc_FormatDesc_TarGz"),
+            ".gz" => LocalizationManager.T("Settings_Assoc_FormatDesc_Gz"),
+            ".iso" => LocalizationManager.T("Settings_Assoc_FormatDesc_Iso"),
+            _ => LocalizationManager.T("Settings_Assoc_UserCustom")
+        };
+
+        var item = new FormatAssocItemModel
+        {
+            Extension = ext,
+            Description = desc,
+            Icon = IconService.GetFileIcon(ext),
+            IsCustom = isCustom,
+            IsEnabled = IsEnabledFromSettings(ext),
+            CurrentHandler = ShellIntegration.GetCurrentHandler(ext)
+        };
+
+        return item;
+    }
+
+    private bool IsEnabledFromSettings(string ext)
+    {
+        return ext switch
+        {
+            ".zip" => AssocZip,
+            ".7z" => Assoc7z,
+            ".rar" => AssocRar,
+            ".tar" => AssocTar,
+            ".tgz" or ".tar.gz" => AssocTarGz,
+            ".gz" => AssocGz,
+            ".iso" => AssocIso,
+            _ => _settings.CustomAssocExtensions?.Contains(ext) ?? false
+        };
+    }
+
+    private void RefreshAssocStatus()
+    {
+        foreach (var item in AssocItems)
+        {
+            item.CurrentHandler = ShellIntegration.GetCurrentHandler(item.Extension);
+            item.IsEnabled = IsEnabledFromSettings(item.Extension);
+        }
+    }
+
+    private void PopulateAssocItems()
+    {
+        AssocItems.Clear();
+        var builtins = new[] { ".zip", ".7z", ".rar", ".tar", ".tar.gz", ".gz", ".iso" };
+        foreach (var ext in builtins)
+        {
+            // normalize .tar.gz -> .tgz for display consistency
+            var displayExt = ext == ".tar.gz" ? ".tgz" : ext;
+            var item = CreateAssocItem(displayExt, isCustom: false);
+            item.DeleteCommand = null;
+            AssocItems.Add(item);
+        }
+
+        if (_settings.CustomAssocExtensions != null)
+        {
+            foreach (var c in _settings.CustomAssocExtensions)
+            {
+                var item = CreateAssocItem(c, isCustom: true);
+                item.DeleteCommand = new RelayCommand(() => DeleteCustomExtension(item));
+                AssocItems.Add(item);
+            }
+        }
+    }
 
     // ── Combo ItemSource properties ──
     public System.Collections.ObjectModel.ObservableCollection<Option> DefaultFormatOptions { get; } = new();
@@ -395,6 +564,8 @@ public partial class SettingsWindowViewModel : ObservableObject
     public string ContextMenuEnableDynamicMenu => LocalizationManager.T("Settings_ContextMenu_EnableDynamicMenu");
     public string ContextMenuInstall => LocalizationManager.T("Settings_ContextMenu_Install");
     public string ContextMenuUninstall => LocalizationManager.T("Settings_ContextMenu_Uninstall");
+    public string ContextMenuStatusGroup => LocalizationManager.T("Settings_ContextMenu_StatusGroup");
+    public string ContextMenuBtnApply => LocalizationManager.T("Settings_ContextMenu_BtnApply");
 
     // Advanced strings
     public string AdvancedSevenZipPathText => LocalizationManager.T("Settings_Advanced_SevenZipPath");
@@ -446,6 +617,9 @@ public partial class SettingsWindowViewModel : ObservableObject
     public string FileAssocDescText => LocalizationManager.T("Settings_Assoc_Desc");
     public string FileAssocSelectAllText => LocalizationManager.T("Settings_Assoc_SelectAll");
     public string FileAssocDeselectAllText => LocalizationManager.T("Settings_Assoc_DeselectAll");
+    public string FileAssocAddText => LocalizationManager.T("Settings_Assoc_Add");
+    public string FileAssocInstallText => LocalizationManager.T("Settings_Assoc_Install");
+        public string FileAssocUninstallText => LocalizationManager.T("Settings_Assoc_Uninstall");
 
     public string SaveText => LocalizationManager.T("Settings_Save");
     public string CancelText => LocalizationManager.T("Settings_Cancel");
@@ -514,6 +688,8 @@ public partial class SettingsWindowViewModel : ObservableObject
         _enableExtractToMenu = _settings.EnableExtractToMenu;
         _showMenuIcons = _settings.ShowMenuIcons;
         _enableDynamicMenu = _settings.EnableDynamicMenu;
+        _shellStatusText = LocalizationManager.T("Settings_ContextMenu_StatusChecking");
+        RefreshShellStatus();
 
         // Advanced
         _sevenZipPath = _settings.SevenZipPath;
@@ -544,6 +720,10 @@ public partial class SettingsWindowViewModel : ObservableObject
 
         PopulateComboOptions();
         SetSelectedOptions();
+
+        // Populate per-extension assoc items
+        PopulateAssocItems();
+        RefreshAssocStatus();
 
         LocalizationManager.CultureChanged += OnCultureChanged;
     }
@@ -802,6 +982,11 @@ public partial class SettingsWindowViewModel : ObservableObject
         OnPropertyChanged(nameof(ContextMenuEnableDynamicMenu));
         OnPropertyChanged(nameof(ContextMenuInstall));
         OnPropertyChanged(nameof(ContextMenuUninstall));
+        OnPropertyChanged(nameof(ContextMenuStatusGroup));
+        OnPropertyChanged(nameof(ContextMenuBtnApply));
+
+        // Refresh shell status display (localized text)
+        RefreshShellStatus();
 
         OnPropertyChanged(nameof(AdvancedSevenZipPathText));
         OnPropertyChanged(nameof(AdvancedBrowseText));
@@ -840,6 +1025,9 @@ public partial class SettingsWindowViewModel : ObservableObject
         OnPropertyChanged(nameof(FileAssocDescText));
         OnPropertyChanged(nameof(FileAssocSelectAllText));
         OnPropertyChanged(nameof(FileAssocDeselectAllText));
+        OnPropertyChanged(nameof(FileAssocAddText));
+        OnPropertyChanged(nameof(FileAssocInstallText));
+        OnPropertyChanged(nameof(FileAssocUninstallText));
 
         OnPropertyChanged(nameof(SaveText));
         OnPropertyChanged(nameof(CancelText));
@@ -938,22 +1126,117 @@ public partial class SettingsWindowViewModel : ObservableObject
         _settings.AssocGz = AssocGz;
         _settings.AssocIso = AssocIso;
 
+        // Persist custom extensions from the AssocItems list
+        var customList = AssocItems.Where(i => i.IsCustom).Select(i => i.Extension).ToList();
+        _settings.CustomAssocExtensions = customList;
+
         _settings.Save();
     }
 
-    [RelayCommand]
-    private void InstallShell()
+    private void RefreshShellStatus()
     {
-        // Placeholder: In a full implementation, this would call ShellIntegration
-        // For now, we log the action
-        Debug.WriteLine("Install context menu requested");
+        try
+        {
+            var installed = ShellIntegration.IsInstalled;
+            if (installed)
+            {
+                var dynStatus = ShellIntegration.GetDynamicMenuStatus();
+                ShellStatusText = dynStatus switch
+                {
+                    "active" => LocalizationManager.T("Settings_ContextMenu_StatusDynamicActive"),
+                    "fallback" => LocalizationManager.T("Settings_ContextMenu_StatusDynamicFallback"),
+                    _ => LocalizationManager.T("Settings_ContextMenu_StatusInstalled")
+                };
+            }
+            else
+            {
+                ShellStatusText = LocalizationManager.T("Settings_ContextMenu_StatusNotInstalled");
+            }
+            IsShellInstalled = installed;
+        }
+        catch (Exception ex)
+        {
+            App.DebugLog($"RefreshShellStatus failed: {ex.Message}");
+            ShellStatusText = ex.Message;
+            IsShellInstalled = false;
+        }
     }
 
     [RelayCommand]
-    private void UninstallShell()
+    private async Task InstallShell()
     {
-        // Placeholder: In a full implementation, this would call ShellIntegration
-        Debug.WriteLine("Uninstall context menu requested");
+        try
+        {
+            ShellStatusText = LocalizationManager.T("Settings_ContextMenu_StatusChecking");
+            Save();
+            ShellIntegration.Uninstall();
+            ShellIntegration.Install();
+            ShellIntegration.CheckComStatus();
+            RefreshShellStatus();
+            await AppMessageBox.Show(
+                LocalizationManager.T("Settings_ContextMenu_InstalledMsg"),
+                LocalizationManager.T("Settings_Title"),
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+        }
+        catch (Exception ex)
+        {
+            App.DebugLog($"InstallShell failed: {ex.Message}");
+            ShellStatusText = string.Format(
+                LocalizationManager.T("Settings_ContextMenu_InstallFailed"), ex.Message);
+            await AppMessageBox.Show(
+                string.Format(LocalizationManager.T("Settings_ContextMenu_InstallFailed"), ex.Message),
+                LocalizationManager.T("Settings_Title"),
+                MessageBoxButton.OK,
+                MessageBoxImage.Error);
+        }
+    }
+
+    [RelayCommand]
+    private async Task UninstallShell()
+    {
+        try
+        {
+            ShellStatusText = LocalizationManager.T("Settings_ContextMenu_StatusChecking");
+            ShellIntegration.Uninstall();
+            RefreshShellStatus();
+            await AppMessageBox.Show(
+                LocalizationManager.T("Settings_ContextMenu_UpdatedMsg"),
+                LocalizationManager.T("Settings_Title"),
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+        }
+        catch (Exception ex)
+        {
+            App.DebugLog($"UninstallShell failed: {ex.Message}");
+            ShellStatusText = string.Format(
+                LocalizationManager.T("Settings_ContextMenu_UninstallFailed"), ex.Message);
+            await AppMessageBox.Show(
+                string.Format(LocalizationManager.T("Settings_ContextMenu_UninstallFailed"), ex.Message),
+                LocalizationManager.T("Settings_Title"),
+                MessageBoxButton.OK,
+                MessageBoxImage.Error);
+        }
+    }
+
+    [RelayCommand]
+    private void ApplyShellChanges()
+    {
+        try
+        {
+            ShellStatusText = LocalizationManager.T("Settings_ContextMenu_StatusChecking");
+            Save();
+            ShellIntegration.Uninstall();
+            ShellIntegration.Install();
+            ShellIntegration.CheckComStatus();
+            RefreshShellStatus();
+        }
+        catch (Exception ex)
+        {
+            App.DebugLog($"ApplyShellChanges failed: {ex.Message}");
+            ShellStatusText = string.Format(
+                LocalizationManager.T("Settings_ContextMenu_InstallFailed"), ex.Message);
+        }
     }
 
     [RelayCommand]
