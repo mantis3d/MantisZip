@@ -46,8 +46,8 @@ Avalonia 移植 Phases 0–10 已完成，当前处于功能补齐后期：
 |-------|------|------|
 | 0–9 | 项目骨架·浏览·预览·设置·压缩解压·编辑·样式·交互 | ✅ 已完成 |
 | 10 | WPF 功能补齐（进度条·信息面板·状态栏） | ✅ 已完成 |
-| UI 功能补齐 | 对话框·控件·转换器补齐 | 27/29 🟡(补齐中) |
-| Shell/COM 集成 | ShellIntegration·ShellExt·文件关联·CLI | 📋 待实施 |
+| UI 功能补齐 | 对话框·控件·转换器补齐 | 29/29 ✅(已完成) |
+| Shell/COM 集成 | ShellIntegration·ShellExt·文件关联·CLI | ✅ 已完成 |
 | i18n + 清理 | 缺失 key 补齐·空目录清理·版本对齐 | ✅ 已完成 |
 | HTML 预览升级 | 跨平台 WebView + ReverseMarkdown 降级 | 📋 待实施（恢复 WebView 双轨方案） |
 
@@ -162,9 +162,9 @@ Despite using `CommunityToolkit.Mvvm`, **all logic lives in `MainWindow.xaml.cs`
 - **调试**: EnableDebugLogging, LogPrivacyMode (off/filename/full)
 - **高级**: SevenZipPath, PreserveDirectoryRoot, CleanTempOnStartup
 
-### Shell integration（WPF-only，Avalonia 待移植）
+### Shell integration（两项目均有）
 
-`ShellIntegration` (static class) 当前仅在 WPF 项目中。Avalonia 版计划在 `avalonia-shell-com-integration` 阶段移植。
+`ShellIntegration` (static class) 已移植到 Avalonia，两项目均实现。CLI 全部原生化（`--install-shell`/`--uninstall-shell` 等直接调用 ShellIntegration，不再委托 WPF exe）。
 
 安装 Windows Explorer 上下文菜单条目 via `HKCU\Software\Classes` — no admin required.
 
