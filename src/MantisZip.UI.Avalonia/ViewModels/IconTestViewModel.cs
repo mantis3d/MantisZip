@@ -119,10 +119,10 @@ public partial class IconTestViewModel : ObservableObject
             "Views/MainWindow.axaml:348", "菜单栏「工具→测试→进度窗口」");
 
         // ═══════════════════════════════════════════════════════════
-        // 2. 菜单图标（仍为 emoji）
+        // 2. 菜单图标（已替换）
         // ═══════════════════════════════════════════════════════════
-        Add("菜单", "收藏夹（标题）", "⭐", null, IconStatus.Pending,
-            "Views/MainWindow.axaml:103", "菜单栏「文件→⭐ 收藏夹」Menu Header 中直接嵌入 emoji");
+        Add("菜单", "收藏夹（标题）", null, null, IconStatus.Converted,
+            "Views/MainWindow.axaml:103", "菜单栏「文件→收藏夹」，emoji 已移除");
 
         // ═══════════════════════════════════════════════════════════
         // 3. 设置窗口图标（SettingsWindow.axaml）— 已替换
@@ -149,24 +149,24 @@ public partial class IconTestViewModel : ObservableObject
             "Views/SettingsWindow.axaml:867", "Tab 标签图标");
 
         // ═══════════════════════════════════════════════════════════
-        // 4. 预览面板图标（PreviewPanel.axaml）
+        // 4. 预览面板图标（PreviewPanel.axaml）— 已替换
         // ═══════════════════════════════════════════════════════════
-        Add("预览", "缩小", "−", null, IconStatus.Pending,
-            "Views/PreviewPanel.axaml:44", "ZoomOut 按钮，Button.Content");
-        Add("预览", "放大", "+", null, IconStatus.Pending,
-            "Views/PreviewPanel.axaml:46", "ZoomIn 按钮，Button.Content");
-        Add("预览", "适应视口", "⟲", null, IconStatus.Pending,
-            "Views/PreviewPanel.axaml:48", "ZoomFit 按钮，Button.Content");
-        Add("预览", "减小字号", "A−", null, IconStatus.Pending,
-            "Views/PreviewPanel.axaml:55", "文字预览缩小字号按钮");
-        Add("预览", "增大字号", "A+", null, IconStatus.Pending,
-            "Views/PreviewPanel.axaml:57", "文字预览增大字号按钮");
-        Add("预览", "上一帧", "⏮", null, IconStatus.Pending,
-            "Views/PreviewPanel.axaml:64", "GIF 上一帧按钮，Button.Content");
-        Add("预览", "播放/暂停", "⏯", null, IconStatus.Pending,
-            "Views/PreviewPanel.axaml:66", "GIF 播放暂停按钮，Button.Content");
-        Add("预览", "下一帧", "⏭", null, IconStatus.Pending,
-            "Views/PreviewPanel.axaml:68", "GIF 下一帧按钮，Button.Content");
+        Add("预览", "缩小", null, "IconSubtract", IconStatus.Converted,
+            "Views/PreviewPanel.axaml:46", "ZoomOut 按钮 PathIcon");
+        Add("预览", "放大", null, "IconAdd", IconStatus.Converted,
+            "Views/PreviewPanel.axaml:50", "ZoomIn 按钮 PathIcon");
+        Add("预览", "适应视口", null, "IconArrowFitIn", IconStatus.Converted,
+            "Views/PreviewPanel.axaml:54", "ZoomFit 按钮 PathIcon");
+        Add("预览", "减小字号", null, "IconFontDecrease", IconStatus.Converted,
+            "Views/PreviewPanel.axaml:63", "文字预览缩小字号按钮 PathIcon");
+        Add("预览", "增大字号", null, "IconFontIncrease", IconStatus.Converted,
+            "Views/PreviewPanel.axaml:67", "文字预览增大字号按钮 PathIcon");
+        Add("预览", "上一帧", null, "IconPrevious", IconStatus.Converted,
+            "Views/PreviewPanel.axaml:76", "GIF 上一帧按钮 PathIcon");
+        Add("预览", "播放/暂停", null, "IconPlay", IconStatus.Converted,
+            "Views/PreviewPanel.axaml:80", "GIF 播放暂停按钮 PathIcon");
+        Add("预览", "下一帧", null, "IconNext", IconStatus.Converted,
+            "Views/PreviewPanel.axaml:84", "GIF 下一帧按钮 PathIcon");
         Add("预览", "透明网格", null, "IconGrid", IconStatus.Converted,
             "Views/PreviewPanel.axaml:85", "透明背景切换按钮 PathIcon");
         Add("预览", "压平 Alpha", null, "IconPaintBrush", IconStatus.Converted,
@@ -181,48 +181,48 @@ public partial class IconTestViewModel : ObservableObject
         Add("对话框", "取消（冲突）", null, "IconDismiss", IconStatus.Converted,
             "Dialogs/ConflictDialog.axaml:158, CompressConflictDialog.axaml:113",
             "文件冲突对话框取消按钮 PathIcon");
-        Add("对话框", "重命名（冲突）", "✏️", null, IconStatus.Pending,
-            "Dialogs/ConflictDialog.axaml:128, CompressConflictDialog.axaml:82",
-            "文件冲突对话框重命名按钮 TextBlock emoji");
-        Add("对话框", "跳过（冲突）", "⏭️", null, IconStatus.Pending,
-            "Dialogs/ConflictDialog.axaml:143, CompressConflictDialog.axaml:98",
-            "文件冲突对话框跳过按钮 TextBlock emoji");
-        Add("对话框", "显示密码", "👁", null, IconStatus.Pending,
-            "Views/PasswordDialog.axaml:26", "密码输入框显示/隐藏按钮 Button.Content");
-        Add("对话框", "隐藏密码", "🙈", null, IconStatus.Pending,
-            "Dialogs/MatchedPasswordDialog.axaml.cs:62", "C# 动态设置匹配密码对话框的显示切换图标");
-        Add("对话框", "显示密码（匹配）", "👁", null, IconStatus.Pending,
-            "Dialogs/MatchedPasswordDialog.axaml.cs:62", "C# 动态设置匹配密码对话框的显示切换图标");
-        Add("对话框", "复制完成", "✅", null, IconStatus.Pending,
-            "Dialogs/MatchedPasswordDialog.axaml.cs:81", "C# 动态设置复制成功确认图标");
+        Add("对话框", "重命名（冲突）", null, "IconEdit", IconStatus.Converted,
+            "Dialogs/ConflictDialog.axaml:155, CompressConflictDialog.axaml:98",
+            "文件冲突对话框重命名按钮 PathIcon");
+        Add("对话框", "跳过（冲突）", null, "IconArrowRight", IconStatus.Converted,
+            "Dialogs/ConflictDialog.axaml:168, CompressConflictDialog.axaml:112",
+            "文件冲突对话框跳过按钮 PathIcon");
+        Add("对话框", "显示密码", null, "IconEye", IconStatus.Converted,
+            "Views/PasswordDialog.axaml:33", "密码输入框显示/隐藏按钮 PathIcon");
+        Add("对话框", "隐藏密码", null, "IconEyeOff", IconStatus.Converted,
+            "Dialogs/MatchedPasswordDialog.axaml:70", "匹配密码对话框显示切换 PathIcon");
+        Add("对话框", "显示密码（匹配）", null, "IconEye", IconStatus.Converted,
+            "Dialogs/MatchedPasswordDialog.axaml:69", "匹配密码对话框显示切换 PathIcon");
+        Add("对话框", "复制完成", null, "IconCheckmark", IconStatus.Converted,
+            "Dialogs/MatchedPasswordDialog.axaml.cs:85", "C# 动态设置复制成功确认 PathIcon");
 
         // ═══════════════════════════════════════════════════════════
-        // 6. 文件列表/树形图标（C# 动态）
+        // 6. 文件列表/树形图标（C# 动态）— 已替换为 IconKey 属性
         // ═══════════════════════════════════════════════════════════
-        Add("文件列表", "文件夹节点", "📁", null, IconStatus.Pending,
-            "Models/PreviewTreeNode.cs:51", "C# 属性返回，ResultTreeView 树节点图标");
-        Add("文件列表", "文件节点", "📄", null, IconStatus.Pending,
-            "Models/PreviewTreeNode.cs:52", "C# 属性返回，ResultTreeView 树节点图标");
-        Add("文件列表", "冲突文件", "📄⚠️", null, IconStatus.Pending,
-            "Models/PreviewTreeNode.cs:50", "C# 属性返回，目标位置已存在的文件节点图标");
-        Add("文件列表", "根目录", "📂", null, IconStatus.Pending,
-            "Services/ResultPreviewService.cs:30", "C# 创建根节点时使用");
+        Add("文件列表", "文件夹节点", null, "IconFolder", IconStatus.Converted,
+            "Models/PreviewTreeNode.cs:51", "PreviewTreeNode.IconKey 返回 IconFolder");
+        Add("文件列表", "文件节点", null, "IconDocument", IconStatus.Converted,
+            "Models/PreviewTreeNode.cs:52", "PreviewTreeNode.IconKey 返回 IconDocument");
+        Add("文件列表", "冲突文件", null, "IconWarning", IconStatus.Converted,
+            "Models/PreviewTreeNode.cs:50", "PreviewTreeNode.IconKey 返回 IconWarning");
+        Add("文件列表", "根目录", null, "IconFolder", IconStatus.Converted,
+            "Services/ResultPreviewService.cs:30", "根节点自动通过 IconKey 获取 IconFolder");
 
         // ═══════════════════════════════════════════════════════════
-        // 7. 搜索过滤栏图标（MainWindow.axaml — 仍为 emoji）
+        // 7. 搜索过滤栏图标（MainWindow.axaml — 已替换为 PathIcon）
         // ═══════════════════════════════════════════════════════════
-        Add("过滤栏", "搜索", "🔍", null, IconStatus.Pending,
-            "Views/MainWindow.axaml:642", "过滤栏搜索框左侧图标 TextBlock emoji");
-        Add("过滤栏", "排除", "⊘", null, IconStatus.Pending,
-            "Views/MainWindow.axaml:662", "过滤栏排除框左侧 TextBlock 符号");
+        Add("过滤栏", "搜索", null, "IconSearch", IconStatus.Converted,
+            "Views/MainWindow.axaml:651", "过滤栏搜索框左侧 PathIcon");
+        Add("过滤栏", "排除", null, "IconProhibited", IconStatus.Converted,
+            "Views/MainWindow.axaml:671", "过滤栏排除框左侧 PathIcon");
 
         // ═══════════════════════════════════════════════════════════
-        // 8. 树形预览图标（ResultTreeView.axaml）
+        // 8. 树形预览图标（ResultTreeView.axaml — 已替换为 PathIcon）
         // ═══════════════════════════════════════════════════════════
-        Add("文件列表", "紧凑切换", "📂", null, IconStatus.Pending,
-            "Controls/ResultTreeView.axaml:19", "ToggleButton 内 TextBlock emoji 图标");
-        Add("文件列表", "冲突警告", "⚠️", null, IconStatus.Pending,
-            "Controls/ResultTreeView.axaml:75", "已存在的文件旁 TextBlock emoji 警告");
+        Add("文件列表", "紧凑切换", null, "IconFolder", IconStatus.Converted,
+            "Controls/ResultTreeView.axaml:23", "ToggleButton 内 PathIcon");
+        Add("文件列表", "冲突警告", null, "IconWarning", IconStatus.Converted,
+            "Controls/ResultTreeView.axaml:83", "已存在的文件旁 PathIcon 警告");
 
         // ═══════════════════════════════════════════════════════════
         // 9. 空状态图标（已替换）

@@ -1,6 +1,6 @@
 # Office 文档内容预览（Avalonia 版）
 
-> **状态**: 📋 计划中
+> **状态**: 🟡 实施中（Tasks 1-5 已完成，Task 6 待处理）
 > **基于**: Avalonia 端口（`avalonia-port` 分支，Phase 0-10 已完成）
 > **替代**: `.sisyphus/plans/office-content-preview.md`（WPF 版计划，已过时）
 
@@ -8,15 +8,31 @@
 
 **核心目标**: 将 Avalonia 端口的 Office 文档预览从"仅元数据"升级为"实质性内容预览"。
 
-无需 WebView2，DOCX 走纯文本路线。
+**渲染架构（三轨制）**：
 
-| 格式 | 方案 | 显示方式 |
+```
+优先：Avalonia.Controls.WebView（各平台原生浏览器引擎）
+  ├── DOCX    → Mammoth → HTML
+  ├── Markdown → Markdig → HTML
+  └── HTML    → 直接传入
+        ↓ WebView 不可用时
+降级：纯文本/原生控件方案（已实现）
+  ├── DOCX    → DocumentFormat.OpenXml 提取大纲+全文（左右分栏 TextBlock）
+  ├── Markdown → Markdig AST → Avalonia 控件树
+  └── HTML    → ReverseMarkdown → Markdown 管线
+```
+
+- WebView 后端跨平台：Win→WebView2 / Mac→WKWebView / Linux→WebKit GTK
+- 表格/粗体/列表等格式问题由浏览器引擎解决，无需自定义渲染
+- 现有纯文本方案保留为 fallback，不浪费
+
+| 格式 | WebView 方案 | 纯文本 fallback |
 |:---|:---|:---|
-| **DOCX** | `DocumentFormat.OpenXml` 提取大纲（标题层级）+ 全文 | **左右分栏**：大纲缩进列表（左）+ 全文 TextBlock（右），GridSplitter 可调，点击大纲跳转 |
-| **XLSX** | ClosedXML → DataTable | Avalonia DataGrid（复用现有 CSV 模式） |
-| **PPTX** | 手动解析 XML 提取 `a:t` 文本 | 幻灯片文本列表 |
-
-> 旧计划的 Mammoth → HTML → Avalonia.HtmlRenderer 路线作为未来备选。
+| **DOCX** | Mammoth → HTML → WebView | 现有左右分栏（大纲 + 全文 TextBlock） |
+| **XLSX** | — | ClosedXML → DataGrid（不变） |
+| **PPTX** | — | `a:t` 提取 + Canvas 定位预览（待实施） |
+| **Markdown** | Markdig → HTML → WebView | 现有 MarkdownPreviewBuilder 控件树 |
+| **HTML** | 直接 HTML → WebView | 现有 ReverseMarkdown 管线 |
 
 ## 设计理念
 
@@ -159,12 +175,29 @@ OutlineItemClicked:
 
 这是一种近似跳转（按字符比例映射到滚动位置），不是精确的行级定位，但对大纲导航来说效果足够好。
 
-### 不采用 Mammoth
+### 渲染架构：WebView 优先 + 纯文本降级
 
-理由：
-- DocumentFormat.OpenXml 一次遍历可同时提取大纲 + 全文
-- 不增加额外依赖
-- 备选方案（Mammoth → HtmlRenderer）留待将来
+本计划最初走纯文本路线（不依赖 WebView），但后续发现表格、粗体、列表等格式问题的自定义渲染工作量远超预期。因此改为 **WebView 优先方案**：
+
+| 层级 | 方案 | 依赖 | 覆盖格式 |
+|:---|:---|:---|:---:|
+| 🥇 主路线 | `Avalonia.Controls.WebView` 渲染 HTML | 系统原生浏览器引擎 | DOCX / Markdown / HTML |
+| 🥈 降级 | 纯文本/原生控件树 | 已有实现（DocumentFormat.OpenXml / Markdig AST） | DOCX / Markdown / HTML |
+
+**WebView 优势**：
+- 表格、列表、粗体、图片等格式由浏览器引擎原生渲染，零代码
+- 跨平台统一：Win→WebView2, Mac→WKWebView, Linux→WebKit GTK
+- 一条管线解决三种格式（DOCX + Markdown + HTML），避免碎片化
+
+**降级策略**：
+- 启动时检测 `WebView` 控件是否可用（如 WebView2 Runtime 未安装）
+- 可用 → 走 WebView 路线
+- 不可用 → 走纯文本 fallback，已有代码不浪费
+- 运行时提供切换按钮（可选）
+
+**Mammoth 角色**：
+- 仅作为 DOCX → HTML 转换器（Mammoth 本身是很小的纯 C# 库）
+- 不用于富文本渲染（渲染交给 WebView）
 
 ### 未来复用：左右分栏模型
 
@@ -194,22 +227,22 @@ ViewModel 侧只需保证 `DocxOutline`（`ObservableCollection<DocxOutlineItem>
 
 ### 必须包含
 
-- [ ] DOCX: 左右分栏（大纲左 | GridSplitter | 全文右），点击大纲跳转
-- [ ] XLSX: ClosedXML → DataTable → DataGrid
-- [ ] PPTX: 手动解析 `ppt/slides/slideN.xml` → `a:t` 文本 → 文本列表
-- [ ] 大文件保护（>50MB 仅显示元数据）
-- [ ] 三种格式通过 `PreviewType` 切换自动互斥显示
+- [x] DOCX: 左右分栏（大纲左 | GridSplitter | 全文右），点击大纲跳转
+- [x] XLSX: ClosedXML → DataTable → DataGrid
+- [x] PPTX: 手动解析 `ppt/slides/slideN.xml` → `a:t` 文本 → 文本列表
+- [x] 大文件保护（>50MB 仅显示元数据）
+- [x] 三种格式通过 `PreviewType` 切换自动互斥显示
 
 ### 必须不包含（护栏）
 
-- [ ] 不处理信息面板（有单独计划）
-- [ ] 不解析 DOCX 嵌入图片
-- [ ] 不支持 .docm/.xlsm/.pptm
-- [ ] 不支持 .doc/.xls/.ppt（二进制格式）
-- [ ] PPTX 不解析 SmartArt/dgm、图表/c:、数学/m: 命名空间
-- [ ] XLSX 只读第一个工作表
-- [ ] 不实现 Mammoth → HtmlRenderer（备选，未来再做）
-- [ ] 不修改 `OfficeParser.cs`
+- [x] 不处理信息面板（有单独计划）
+- [x] 不解析 DOCX 嵌入图片
+- [x] 不支持 .docm/.xlsm/.pptm
+- [x] 不支持 .doc/.xls/.ppt（二进制格式）
+- [x] PPTX 不解析 SmartArt/dgm、图表/c:、数学/m: 命名空间
+- [x] XLSX 只读第一个工作表
+- [x] 不实现 Mammoth → HtmlRenderer（备选，未来再做）
+- [x] 不修改 `OfficeParser.cs`
 
 ---
 
@@ -244,8 +277,8 @@ Wave 2（集成）:
 - 不添加 Mammoth（备选，未来再决定）
 
 **验收标准**:
-- [ ] `dotnet build` 通过
-- [ ] DocumentFormat.OpenXml 和 ClosedXML 在包列表中
+- [x] `dotnet build` 通过
+- [x] DocumentFormat.OpenXml 和 ClosedXML 在包列表中
 
 **提交**: YES
 - Message: `dep(avalonia): add DocumentFormat.OpenXml + ClosedXML NuGet packages for Office content preview`
@@ -374,11 +407,11 @@ private void OnOutlineItemClicked(object? sender, PointerPressedEventArgs e)
 - 不处理 SmartArt
 
 **验收标准**:
-- [ ] DOCX 预览为左右分栏，中间有可拖拽的 GridSplitter
-- [ ] 大纲显示缩进层级（Heading1 无缩进，Heading2 缩进 20px...）
-- [ ] 点击大纲条目 → 全文区滚动到对应标题位置
-- [ ] 无标题文档 → 大纲区显示回退提示，全文区正常
-- [ ] >50MB 文档 → 显示"文档过大"回退
+- [x] DOCX 预览为左右分栏，中间有可拖拽的 GridSplitter
+- [x] 大纲显示缩进层级（Heading1 无缩进，Heading2 缩进 20px...）
+- [x] 点击大纲条目 → 全文区滚动到对应标题位置
+- [x] 无标题文档 → 大纲区显示回退提示，全文区正常
+- [x] >50MB 文档 → 显示"文档过大"回退
 
 **提交**: YES
 - Message: `feat(avalonia): add DOCX outline + full text preview with left-right split layout and click-to-scroll`
@@ -440,10 +473,10 @@ private void OnOutlineItemClicked(object? sender, PointerPressedEventArgs e)
 - 不依赖信息面板
 
 **验收标准**:
-- [ ] 有数据的 .xlsx → DataGrid 显示前 100 行 × 100 列
-- [ ] 列名取自首行
-- [ ] 空工作表显示回退
-- [ ] 密码保护的 .xlsx 不崩溃
+- [x] 有数据的 .xlsx → DataGrid 显示前 100 行 × 100 列
+- [x] 列名取自首行
+- [x] 空工作表显示回退
+- [x] 密码保护的 .xlsx 不崩溃
 
 **提交**: YES
 - Message: `feat(avalonia): add XLSX worksheet preview via ClosedXML`
@@ -512,9 +545,9 @@ private void OnOutlineItemClicked(object? sender, PointerPressedEventArgs e)
 - 不解析页脚/字段
 
 **验收标准**:
-- [ ] 含文字的 .pptx → 每张幻灯片文本分段显示，带 `── 幻灯片 N ──` 分隔线
-- [ ] 纯图片的 .pptx 对应幻灯片 → "(此幻灯片无文字)"
-- [ ] 空演示文稿 → "此演示文稿为空"
+- [x] 含文字的 .pptx → 每张幻灯片文本分段显示，带 `── 幻灯片 N ──` 分隔线
+- [x] 纯图片的 .pptx 对应幻灯片 → "(此幻灯片无文字)"
+- [x] 空演示文稿 → "此演示文稿为空"
 
 **提交**: YES
 - Message: `feat(avalonia): add PPTX slide text preview via manual XML parsing`
@@ -578,10 +611,10 @@ private void OnOutlineItemClicked(object? sender, PointerPressedEventArgs e)
 - 或在现有面板后追加（`Grid` 内多个面板互斥显示，不会有冲突）
 
 **验收标准**:
-- [ ] `.docx` → `PreviewType.Docx` → `ShowDocx` → 左右分栏
-- [ ] `.xlsx` → `PreviewType.Xlsx` → `ShowXlsx` → DataGrid
-- [ ] `.pptx` → `PreviewType.Pptx` → `ShowPptx` → 文本列表
-- [ ] 现有非 Office 格式预览不受影响
+- [x] `.docx` → `PreviewType.Docx` → `ShowDocx` → 左右分栏
+- [x] `.xlsx` → `PreviewType.Xlsx` → `ShowXlsx` → DataGrid
+- [x] `.pptx` → `PreviewType.Pptx` → `ShowPptx` → 文本列表
+- [x] 现有非 Office 格式预览不受影响
 
 **提交**: YES
 - Message: `refactor(avalonia): split PreviewType.Office into Docx/Xlsx/Pptx with content preview dispatch`
@@ -609,8 +642,8 @@ private void OnOutlineItemClicked(object? sender, PointerPressedEventArgs e)
 - 运行 `dotnet build src\MantisZip.UI.Avalonia\MantisZip.UI.Avalonia.csproj` 确认通过
 
 **验收标准**:
-- [ ] 构建通过
-- [ ] 新增翻译键在 zh 和 en 中均存在
+- [x] 构建通过
+- [x] 新增翻译键在 zh 和 en 中均存在
 
 **提交**: NO（与 Task 5 合并提交）
 
@@ -641,6 +674,221 @@ dotnet build src\MantisZip.UI.Avalonia\MantisZip.UI.Avalonia.csproj
 
 ---
 
+## 后续增强
+
+### DOCX 表格内容提取（WebView 路径）
+
+当前 `ShowDocx()` 仅遍历 `body.Elements<Paragraph>()`，跳过表格（`Table`）内部的文本。很多文档使用表格组织内容。
+
+**优先方案**（WebView 路线）：
+
+Mammoth 在将 DOCX 转 HTML 时自动处理表格（`<table>` → `<tr>` → `<td>`）。WebView 渲染 HTML 表格无需任何额外代码。
+
+```
+DOCX → Mammoth → HTML（含 <table>）→ WebView（原生渲染）
+```
+
+一旦 WebView 管线就绪，DOCX 表格问题自动解决。
+
+**降级方案**（纯文本路线）：
+
+WebView 不可用时，在现有 `ShowDocx()` 中补充表格提取，用 `|` 分隔符模拟表格：
+
+```csharp
+// 在现有 Paragraph 遍历后补充表格检测
+foreach (var table in body.Descendants<Table>())
+{
+    foreach (var row in table.Descendants<TableRow>())
+    {
+        var cellTexts = new List<string>();
+        foreach (var cell in row.Descendants<TableCell>())
+        {
+            var cellText = string.Concat(cell.Descendants<Text>().Select(t => t.Text ?? string.Empty));
+            cellTexts.Add(cellText.Trim());
+        }
+        fullText.AppendLine("| " + string.Join(" | ", cellTexts) + " |");
+    }
+}
+```
+
+**状态**: 📋 待实施（WebView 优先级更高）
+
+### 页眉/页脚/脚注内容提取
+
+可选的增强方向，从对应的 OpenXml Parts 中提取文本：
+
+| 内容 | OpenXml Part | 实现方式 |
+|:---|:---|:---|
+| 页眉 | `HeaderPart` | `doc.MainDocumentPart.HeaderParts` → `Descendants<Paragraph>()` |
+| 页脚 | `FooterPart` | `doc.MainDocumentPart.FooterParts` → `Descendants<Paragraph>()` |
+| 脚注/尾注 | `FootnotesPart` / `EndnotesPart` | `doc.MainDocumentPart.FootnotesPart` → `Descendants<Footnote>()` |
+
+**状态**: 📋 待定（按需再实施）
+
+---
+
+### Markdown 表格渲染（WebView 路径）
+
+当前 `MarkdownPreviewBuilder`（`Services/MarkdownPreviewBuilder.cs`）已启用 `.UsePipeTables()`（line 25），Markdig 正确解析表格为 `Table` AST block，但 `TryBuildBlock` 的 `switch` 中缺少 `case Table:`，被 `default: return null` 静默丢弃。
+
+**原因**: 原计划（HTML 预览降级方案）中已知此缺失。
+
+**优先方案**（WebView 路线）：
+
+Markdig 可以直接输出 HTML（`markdig.ToHtml()`），WebView 渲染 HTML 表格原生支持。
+
+```
+Markdown → Markdig → HTML（含 <table>）→ WebView（原生渲染）
+```
+
+一旦 WebView 管线就绪，Markdown 表格问题自动解决。
+
+**降级方案**（原生控件树路线）：
+
+WebView 不可用时，在 `TryBuildBlock` 中添加 `case Table t:`，用 Avalonia Grid 构建表格：
+
+```csharp
+case Table t:
+    return BuildTable(t, source);
+```
+
+详见 `.sisyphus/plans/html-preview-webview-fallback.md` Task 5（第 229–283 行）已有完整的 `BuildTable` 实现方案。
+
+**状态**: 📋 待实施（WebView 优先级更高）
+
+---
+
+### PPTX 文本按原始位置预览
+
+当前 `ShowPptx()` 把幻灯片内所有 `a:t` 打平输出，丢失了文本在幻灯片上的位置信息。PPTX 的每个形状（`a:sp`）都包含 `a:xfrm` → `a:off`（x,y 坐标，单位 EMU），可以据此还原近似布局。
+
+#### 方案：Canvas 绝对定位
+
+**ViewModel 侧新增结构** — 每张幻灯片一个模型：
+
+```csharp
+public class PptxSlideModel
+{
+    public int SlideNumber { get; set; }
+    public ObservableCollection<PptxTextItem> TextItems { get; set; } = [];
+}
+
+public class PptxTextItem
+{
+    public string Text { get; set; } = string.Empty;
+    public double X { get; set; }    // 缩放后的 Canvas 坐标
+    public double Y { get; set; }
+    public double FontSize { get; set; } = 14;
+    public bool IsBold { get; set; }
+}
+```
+
+**ShowPptx 改造** — 提取每个形状的位置和文本：
+
+```csharp
+// EMU → 点（1pt = 12700 EMU ≈ 按 slide 尺寸归一化）
+const double emuPerPt = 12700;
+var slideWidth = 12192000;  // 默认 10" × 7.5" (12192000 × 9144000 EMU)
+var slideHeight = 9144000;
+
+var items = new List<PptxTextItem>();
+foreach (var shape in slideDoc.Descendants(a + "sp"))
+{
+    var xfrm = shape.Descendants(a + "xfrm").FirstOrDefault();
+    if (xfrm == null) continue;
+    
+    var xEmu = (int)(xfrm.Descendants(a + "off").FirstOrDefault()?.Attribute("x") ?? 0);
+    var yEmu = (int)(xfrm.Descendants(a + "off").FirstOrDefault()?.Attribute("y") ?? 0);
+    
+    var text = string.Join("\n", shape.Descendants(a + "t").Select(t => t.Value));
+    if (string.IsNullOrWhiteSpace(text)) continue;
+    
+    // 缩放比例：预览区域固定宽高比（如 960×540），按比例缩放
+    double scaleX = 960.0 / slideWidth;
+    double scaleY = 540.0 / slideHeight;
+    
+    items.Add(new PptxTextItem
+    {
+        Text = text,
+        X = xEmu * scaleX,
+        Y = yEmu * scaleY,
+    });
+}
+
+// 按 y 排序（从上到下）
+items = items.OrderBy(i => i.Y).ThenBy(i => i.X).ToList();
+```
+
+**XAML 侧 — Canvas 面板** — 替换当前 TextBox：
+
+```xml
+<!-- PPTX preview: Canvas 按位置渲染 -->
+<Border IsVisible="{Binding IsPptxVisible}"
+        Background="{DynamicResource ThemeSurfaceBgBrush}">
+  <ScrollViewer>
+    <Border Width="960" Height="540"  <!-- 16:9 比例 -->
+            Background="White"
+            CornerRadius="4">
+      <Canvas Name="SlideCanvas">
+        <!-- TextBlock 通过代码绑定 -->
+      </Canvas>
+    </Border>
+  </ScrollViewer>
+</Border>
+```
+
+**PreviewPanel.axaml.cs** — 监听 `IsPptxVisible`，构建 Canvas 子控件：
+
+```csharp
+if (args.PropertyName == nameof(PreviewViewModel.IsPptxVisible) && vm.IsPptxVisible)
+{
+    SlideCanvas.Children.Clear();
+    if (vm.CurrentSlideItems != null)
+    {
+        foreach (var item in vm.CurrentSlideItems)
+        {
+            var tb = new TextBlock
+            {
+                Text = item.Text,
+                FontSize = item.FontSize,
+                FontWeight = item.IsBold ? FontWeight.Bold : FontWeight.Normal,
+                TextWrapping = TextWrapping.Wrap,
+                MaxWidth = 200,  // 防止溢出
+            };
+            Canvas.SetLeft(tb, item.X);
+            Canvas.SetTop(tb, item.Y);
+            SlideCanvas.Children.Add(tb);
+        }
+    }
+}
+```
+
+**翻页控制** — 新增 `PptxCurrentSlide` 属性 + 上一页/下一页按钮：
+
+```csharp
+[ObservableProperty] private int _pptxCurrentSlide = 1;
+[ObservableProperty] private int _pptxTotalSlides = 0;
+[ObservableProperty] private ObservableCollection<PptxSlideModel> _pptxSlides = [];
+
+partial void OnPptxCurrentSlideChanged(int value)
+{
+    var slide = PptxSlides.ElementAtOrDefault(value - 1);
+    CurrentSlideItems = slide?.TextItems;
+}
+```
+
+**边缘情况**：
+- 无文字幻灯片 → 显示空白 Canvas + "此幻灯片无文字" 叠加提示
+- 文本过长 → `MaxWidth` 限制 + `TextWrapping.Wrap` 自动折行
+- EMU → 像素缩放保持比例，不扭曲
+
+**不做**：
+- 不解析 SmartArt（dgm 命名空间）
+- 不渲染图片/形状（仅文本）
+- 不处理动画/过渡
+
+**状态**: 📋 待实施
+
 ## 未来可复用方向
 
 左右分栏的 `OutlineItem + FullText` 模型天然适配：
@@ -657,11 +905,10 @@ dotnet build src\MantisZip.UI.Avalonia\MantisZip.UI.Avalonia.csproj
 
 ## 备选方案
 
-### Mammoth → Avalonia.HtmlRenderer
+### Avalonia.HtmlRenderer（已废弃）
 
-如果将来需要 DOCX 富文本渲染（保留粗体/列表/表格），可按此路线扩展：
-1. 添加 `Mammoth` + `Avalonia.HtmlRenderer` NuGet 包
-2. `ShowDocx` 中增加分支：如果安装了 HtmlRenderer，走 `Mammoth.ConvertToHtml()` → HtmlRenderer
-3. 纯文本方案作为回退
+`Avalonia.HtmlRenderer` 能力有限（README 明确说明不支持现代 HTML 特性），且生态尚不成熟（总下载 166K）。**不采用此路线**——WebView 可用就走 WebView，不可用直接降级纯文本，中间方案两头不讨好。
 
-当前不实现此路线。
+### PPTX → WebView
+
+PPTX 也可以通过 Mammoth 转 HTML？**不行**。Mammoth 只支持 DOCX，不支持 PPTX。PPTX 仍然走现有的 `a:t` 提取 + Canvas 定位预览方案。

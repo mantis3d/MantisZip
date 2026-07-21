@@ -821,8 +821,21 @@ public partial class MainWindowViewModel : ObservableObject
                     StatusMessage = LocalizationManager.T("Preview_Torrent", entry.DisplayName);
                     break;
                 case PreviewType.Office:
+                    // Legacy Office type: try magic-detected types
                     Preview.ShowOffice(tempFile);
                     StatusMessage = LocalizationManager.T("Preview_Office", entry.DisplayName);
+                    break;
+                case PreviewType.Docx:
+                    Preview.ShowDocx(tempFile);
+                    StatusMessage = LocalizationManager.T("Preview_Docx", entry.DisplayName);
+                    break;
+                case PreviewType.Xlsx:
+                    Preview.ShowXlsx(tempFile);
+                    StatusMessage = LocalizationManager.T("Preview_Xlsx", entry.DisplayName);
+                    break;
+                case PreviewType.Pptx:
+                    Preview.ShowPptx(tempFile);
+                    StatusMessage = LocalizationManager.T("Preview_Pptx", entry.DisplayName);
                     break;
                 case PreviewType.Video:
                     Preview.ShowVideo(tempFile);
@@ -966,8 +979,15 @@ public partial class MainWindowViewModel : ObservableObject
             foreach (var item in entries)
             {
                 var model = ArchiveItemModel.FromCore(item);
-                var ext = Path.GetExtension(model.Name);
-                model.IconSource = IconService.GetFileIcon(ext);
+                if (model.IsDirectory)
+                {
+                    model.IconSource = IconService.GetFolderIcon();
+                }
+                else
+                {
+                    var ext = Path.GetExtension(model.Name);
+                    model.IconSource = IconService.GetFileIcon(ext);
+                }
                 model.ProgressBarEnabled = ShowProgressBars;
                 CurrentEntries.Add(model);
             }

@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Data;
+using Avalonia.Input;
 using Avalonia.Layout;
 using MantisZip.UI.Avalonia.ViewModels;
 
@@ -65,6 +66,12 @@ public partial class PreviewPanel : UserControl
         if (sqliteDataChanged && vm.IsSqliteVisible)
         {
             SetupDataGridColumns(SqliteDataGrid, vm.CurrentSqliteTable);
+        }
+        bool xlsxDataChanged = args.PropertyName == nameof(PreviewViewModel.IsXlsxVisible)
+                            || args.PropertyName == nameof(PreviewViewModel.XlsxData);
+        if (xlsxDataChanged && vm.IsXlsxVisible)
+        {
+            SetupDataGridColumns(XlsxDataGrid, vm.XlsxDataTable);
         }
     }
 
@@ -128,6 +135,19 @@ public partial class PreviewPanel : UserControl
                 }, null);
             }
         }, ct);
+    }
+
+    private void OnOutlineItemClicked(object? sender, PointerPressedEventArgs e)
+    {
+        if (sender is TextBlock tb && tb.DataContext is DocxOutlineItem item && _vm != null)
+        {
+            var totalLen = _vm.DocxFullText.Length;
+            if (totalLen == 0) return;
+            var ratio = (double)item.CharOffset / totalLen;
+            var maxY = DocxFullTextScroller.ScrollBarMaximum.Y;
+            var offsetY = ratio * maxY;
+            DocxFullTextScroller.Offset = new Vector(DocxFullTextScroller.Offset.X, offsetY);
+        }
     }
 
     public void ApplyInfoPanelOrientation(string orientation)
