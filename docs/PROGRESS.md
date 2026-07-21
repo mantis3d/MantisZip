@@ -21,6 +21,27 @@
 
 ### MantisZip.UI.Avalonia（主力版）
 
+**2026-07-21** — 修复 DOCX 预览中文标题检测 + 计划补充表格渲染方案
+  - 修复 `ShowDocx()` 标题检测仅匹配 `"Heading"`（大小写敏感）的问题：
+    - StyleId 改为 `OrdinalIgnoreCase` 匹配（`"heading1"`/`"HEADING1"`）
+    - 新增 StyleName 显示名称检测（`"标题 1"`、`"heading 1"`）
+    - 新增 `OutlineLevel` 段落属性检测（跨语言区最可靠的方式）
+    - 级别提取改为通用数字提取（`"Heading1"`→1、`"标题 1"`→1）
+  - `.sisyphus/plans/office-content-preview-avalonia.md` 补充两条路线：
+    - DOCX 表格内容提取（纯文本分隔符 A / Mammoth→HtmlRenderer B）
+    - Markdown 表格渲染补齐（原生 Grid B 路线 A / HtmlRenderer B）
+  - 交叉引用 `html-preview-webview-fallback.md` Task 5（已有 BuildTable 方案）
+  - Build 0 errors, 0 warnings
+
+**2026-07-21** — Office 文档内容预览（DOCX/XLSX/PPTX 纯文本+表格+文本）
+  - NuGet: 添加 DocumentFormat.OpenXml 3.5.1 + ClosedXML 0.105.0
+  - DOCX: 左右分栏（GridSplitter + 大纲缩进 + 全文 TextBlock），点击大纲条目跳转到对应位置；大文件保护（>50MB）；无标题回退提示
+  - XLSX: ClosedXML → DataTable → DataGrid（首工作表，100 行 × 100 列，首行为列名）；空/密码保护 gracefully handle
+  - PPTX: 手动 ZipFile → XDocument → a:t 元素提取 → 幻灯片文本列表；纯图片幻灯片回退显示"（此幻灯片无文字）"
+  - PreviewType 枚举拆分：Office → Docx/Xlsx/Pptx，扩展名→PreviewType 映射、魔数映射、ShowPreviewAsync 分发三路同步更新
+  - 本地化: 添加 13 条 Preview_Docx/Preview_Xlsx/Preview_Pptx 键（zh-CN + en）
+  - Build 0 errors, 0 warnings；Commit 4f02074
+
 **2026-07-21** — 修复文件列表目录图标显示为未知文件图标
   - ArchiveService.cs: IsDirectory 分流调用 GetFolderIcon()（Entries 集合）
   - MainWindowViewModel.cs: PopulateEntries() 中 IsDirectory 分流调用 GetFolderIcon()（CurrentEntries 集合，原代码对所有条目无差别调用 GetFileIcon）

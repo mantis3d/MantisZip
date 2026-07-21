@@ -1515,6 +1515,10 @@ public partial class PreviewViewModel : ObservableObject
 
     /// <summary>
     /// 显示 DOCX 文档大纲 + 全文（左右分栏布局）。
+    /// 标题检测采用三种方式（满足任一即视为标题）：
+    /// 1. StyleId 以 "Heading" 开头（不区分大小写）
+    /// 2. 样式的显示名称（StyleName）包含 "heading" 或 "标题"
+    /// 3. ParagraphProperties.OutlineLevel 已设置（比样式更可靠）
     /// </summary>
     public void ShowDocx(string filePath)
     {
@@ -1536,6 +1540,37 @@ public partial class PreviewViewModel : ObservableObject
                 return;
             }
 
+            // 构建标题样式 ID 集合（不区分大小写）：
+            // - StyleId 以 "Heading" 开头的样式
+            // - 显示名称（StyleName）包含 "heading" 或 "标题" 的样式
+            var headingStyleIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var stylesPart = doc.MainDocumentPart?.StyleDefinitionsPart;
+            if (stylesPart?.Styles != null)
+            {
+                foreach (var style in stylesPart.Styles.Descendants<Style>())
+                {
+                    var sid = style.StyleId?.Value;
+                    if (sid == null) continue;
+
+                    // 直接匹配 StyleId
+                    if (sid.StartsWith("Heading", StringComparison.OrdinalIgnoreCase))
+                    {
+                        headingStyleIds.Add(sid);
+                        continue;
+                    }
+
+                    // 匹配显示名称
+                    var nameVal = style.Descendants<StyleName>()
+                        .FirstOrDefault()?.Val?.Value;
+                    if (nameVal != null)
+                    {
+                        var nameLower = nameVal.ToLowerInvariant();
+                        if (nameLower.Contains("heading") || nameLower.Contains("标题"))
+                            headingStyleIds.Add(sid);
+                    }
+                }
+            }
+
             var outline = new List<DocxOutlineItem>();
             var fullText = new StringBuilder();
 
@@ -1548,10 +1583,33 @@ public partial class PreviewViewModel : ObservableObject
                     continue;
                 }
 
-                var styleId = para.ParagraphProperties?.ParagraphStyleId?.Val?.Value;
-                if (styleId != null && styleId.StartsWith("Heading"))
+                var paraProps = para.ParagraphProperties;
+                var styleId = paraProps?.ParagraphStyleId?.Val?.Value;
+
+                // 标题检测方式 1: StyleId 在 headingStyleIds 集合中
+                bool isHeading = styleId != null && headingStyleIds.Contains(styleId);
+                int level = 1;
+                if (isHeading && styleId != null)
                 {
-                    var level = int.TryParse(styleId["Heading".Length..], out var l) ? l : 1;
+                    // 从 styleId 提取尾随数字（"Heading1"→1, "heading2"→2, "标题 1"→1）
+                    var numStr = new string(styleId.SkipWhile(c => !char.IsDigit(c))
+                                                   .TakeWhile(char.IsDigit)
+                                                   .ToArray());
+                    if (int.TryParse(numStr, out var parsedLevel))
+                        level = parsedLevel;
+                }
+
+                // 标题检测方式 2: OutlineLevel（覆盖样式检测，因为显式设置的大纲级别更可靠）
+                // OutlineLevel 在 OpenXml 中：1=Heading1 ... 9=Heading9
+                var outlineLevelVal = paraProps?.OutlineLevel?.Val?.Value;
+                if (outlineLevelVal.HasValue && outlineLevelVal.Value > 0 && outlineLevelVal.Value <= 9)
+                {
+                    isHeading = true;
+                    level = outlineLevelVal.Value;
+                }
+
+                if (isHeading)
+                {
                     level = Math.Clamp(level, 1, 6);
                     outline.Add(new DocxOutlineItem
                     {

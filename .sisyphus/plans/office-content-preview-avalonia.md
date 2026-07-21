@@ -1,6 +1,6 @@
 # Office 文档内容预览（Avalonia 版）
 
-> **状态**: 📋 计划中
+> **状态**: 🟡 实施中（Tasks 1-5 已完成，Task 6 待处理）
 > **基于**: Avalonia 端口（`avalonia-port` 分支，Phase 0-10 已完成）
 > **替代**: `.sisyphus/plans/office-content-preview.md`（WPF 版计划，已过时）
 
@@ -194,22 +194,22 @@ ViewModel 侧只需保证 `DocxOutline`（`ObservableCollection<DocxOutlineItem>
 
 ### 必须包含
 
-- [ ] DOCX: 左右分栏（大纲左 | GridSplitter | 全文右），点击大纲跳转
-- [ ] XLSX: ClosedXML → DataTable → DataGrid
-- [ ] PPTX: 手动解析 `ppt/slides/slideN.xml` → `a:t` 文本 → 文本列表
-- [ ] 大文件保护（>50MB 仅显示元数据）
-- [ ] 三种格式通过 `PreviewType` 切换自动互斥显示
+- [x] DOCX: 左右分栏（大纲左 | GridSplitter | 全文右），点击大纲跳转
+- [x] XLSX: ClosedXML → DataTable → DataGrid
+- [x] PPTX: 手动解析 `ppt/slides/slideN.xml` → `a:t` 文本 → 文本列表
+- [x] 大文件保护（>50MB 仅显示元数据）
+- [x] 三种格式通过 `PreviewType` 切换自动互斥显示
 
 ### 必须不包含（护栏）
 
-- [ ] 不处理信息面板（有单独计划）
-- [ ] 不解析 DOCX 嵌入图片
-- [ ] 不支持 .docm/.xlsm/.pptm
-- [ ] 不支持 .doc/.xls/.ppt（二进制格式）
-- [ ] PPTX 不解析 SmartArt/dgm、图表/c:、数学/m: 命名空间
-- [ ] XLSX 只读第一个工作表
-- [ ] 不实现 Mammoth → HtmlRenderer（备选，未来再做）
-- [ ] 不修改 `OfficeParser.cs`
+- [x] 不处理信息面板（有单独计划）
+- [x] 不解析 DOCX 嵌入图片
+- [x] 不支持 .docm/.xlsm/.pptm
+- [x] 不支持 .doc/.xls/.ppt（二进制格式）
+- [x] PPTX 不解析 SmartArt/dgm、图表/c:、数学/m: 命名空间
+- [x] XLSX 只读第一个工作表
+- [x] 不实现 Mammoth → HtmlRenderer（备选，未来再做）
+- [x] 不修改 `OfficeParser.cs`
 
 ---
 
@@ -244,8 +244,8 @@ Wave 2（集成）:
 - 不添加 Mammoth（备选，未来再决定）
 
 **验收标准**:
-- [ ] `dotnet build` 通过
-- [ ] DocumentFormat.OpenXml 和 ClosedXML 在包列表中
+- [x] `dotnet build` 通过
+- [x] DocumentFormat.OpenXml 和 ClosedXML 在包列表中
 
 **提交**: YES
 - Message: `dep(avalonia): add DocumentFormat.OpenXml + ClosedXML NuGet packages for Office content preview`
@@ -374,11 +374,11 @@ private void OnOutlineItemClicked(object? sender, PointerPressedEventArgs e)
 - 不处理 SmartArt
 
 **验收标准**:
-- [ ] DOCX 预览为左右分栏，中间有可拖拽的 GridSplitter
-- [ ] 大纲显示缩进层级（Heading1 无缩进，Heading2 缩进 20px...）
-- [ ] 点击大纲条目 → 全文区滚动到对应标题位置
-- [ ] 无标题文档 → 大纲区显示回退提示，全文区正常
-- [ ] >50MB 文档 → 显示"文档过大"回退
+- [x] DOCX 预览为左右分栏，中间有可拖拽的 GridSplitter
+- [x] 大纲显示缩进层级（Heading1 无缩进，Heading2 缩进 20px...）
+- [x] 点击大纲条目 → 全文区滚动到对应标题位置
+- [x] 无标题文档 → 大纲区显示回退提示，全文区正常
+- [x] >50MB 文档 → 显示"文档过大"回退
 
 **提交**: YES
 - Message: `feat(avalonia): add DOCX outline + full text preview with left-right split layout and click-to-scroll`
@@ -440,10 +440,10 @@ private void OnOutlineItemClicked(object? sender, PointerPressedEventArgs e)
 - 不依赖信息面板
 
 **验收标准**:
-- [ ] 有数据的 .xlsx → DataGrid 显示前 100 行 × 100 列
-- [ ] 列名取自首行
-- [ ] 空工作表显示回退
-- [ ] 密码保护的 .xlsx 不崩溃
+- [x] 有数据的 .xlsx → DataGrid 显示前 100 行 × 100 列
+- [x] 列名取自首行
+- [x] 空工作表显示回退
+- [x] 密码保护的 .xlsx 不崩溃
 
 **提交**: YES
 - Message: `feat(avalonia): add XLSX worksheet preview via ClosedXML`
@@ -512,9 +512,9 @@ private void OnOutlineItemClicked(object? sender, PointerPressedEventArgs e)
 - 不解析页脚/字段
 
 **验收标准**:
-- [ ] 含文字的 .pptx → 每张幻灯片文本分段显示，带 `── 幻灯片 N ──` 分隔线
-- [ ] 纯图片的 .pptx 对应幻灯片 → "(此幻灯片无文字)"
-- [ ] 空演示文稿 → "此演示文稿为空"
+- [x] 含文字的 .pptx → 每张幻灯片文本分段显示，带 `── 幻灯片 N ──` 分隔线
+- [x] 纯图片的 .pptx 对应幻灯片 → "(此幻灯片无文字)"
+- [x] 空演示文稿 → "此演示文稿为空"
 
 **提交**: YES
 - Message: `feat(avalonia): add PPTX slide text preview via manual XML parsing`
@@ -578,10 +578,10 @@ private void OnOutlineItemClicked(object? sender, PointerPressedEventArgs e)
 - 或在现有面板后追加（`Grid` 内多个面板互斥显示，不会有冲突）
 
 **验收标准**:
-- [ ] `.docx` → `PreviewType.Docx` → `ShowDocx` → 左右分栏
-- [ ] `.xlsx` → `PreviewType.Xlsx` → `ShowXlsx` → DataGrid
-- [ ] `.pptx` → `PreviewType.Pptx` → `ShowPptx` → 文本列表
-- [ ] 现有非 Office 格式预览不受影响
+- [x] `.docx` → `PreviewType.Docx` → `ShowDocx` → 左右分栏
+- [x] `.xlsx` → `PreviewType.Xlsx` → `ShowXlsx` → DataGrid
+- [x] `.pptx` → `PreviewType.Pptx` → `ShowPptx` → 文本列表
+- [x] 现有非 Office 格式预览不受影响
 
 **提交**: YES
 - Message: `refactor(avalonia): split PreviewType.Office into Docx/Xlsx/Pptx with content preview dispatch`
@@ -609,8 +609,8 @@ private void OnOutlineItemClicked(object? sender, PointerPressedEventArgs e)
 - 运行 `dotnet build src\MantisZip.UI.Avalonia\MantisZip.UI.Avalonia.csproj` 确认通过
 
 **验收标准**:
-- [ ] 构建通过
-- [ ] 新增翻译键在 zh 和 en 中均存在
+- [x] 构建通过
+- [x] 新增翻译键在 zh 和 en 中均存在
 
 **提交**: NO（与 Task 5 合并提交）
 
@@ -638,6 +638,183 @@ dotnet build src\MantisZip.UI.Avalonia\MantisZip.UI.Avalonia.csproj
    - .docx ↔ .xlsx ↔ .pptx ↔ .txt ↔ .png
    - 无控件残留
 5. **大文件**: >50MB .docx → 回退提示
+
+---
+
+## 后续增强
+
+### DOCX 表格内容提取
+
+当前 `ShowDocx()` 仅遍历 `body.Elements<Paragraph>()`，跳过表格（`Table`）内部的文本。很多文档使用表格组织内容，表格内的段落也应该被提取。
+
+**显示方案分两条路线，可先后实施**：
+
+---
+
+#### 路线 A：纯文本格式化（低成本）
+
+在现有 TextBlock 方案下，提取表格单元格时用分隔符模拟表格显示：
+
+```
+| 产品 | 价格 | 库存 |
+|------|------|------|
+| 苹果 | 5.00 | 100  |
+| 香蕉 | 3.00 | 50   |
+```
+
+**实现方式** — 在现有遍历中补充表格检测，将表格单元格内的段落并入全文（用 `|` 分隔、`---|---` 作表头分隔线）：
+
+```csharp
+// 当前：仅顶层段落
+foreach (var para in body.Elements<Paragraph>())
+{
+    // ...
+}
+
+// 补充：遍历表格内的段落
+foreach (var table in body.Descendants<Table>())
+{
+    // 处理每个表格行
+    foreach (var row in table.Descendants<TableRow>())
+    {
+        var cellTexts = new List<string>();
+        foreach (var cell in row.Descendants<TableCell>())
+        {
+            var cellText = string.Concat(cell.Descendants<Text>().Select(t => t.Text ?? string.Empty));
+            cellTexts.Add(cellText.Trim());
+        }
+        fullText.AppendLine("| " + string.Join(" | ", cellTexts) + " |");
+    }
+}
+```
+
+**优点**：不改 UI，只改文本提取逻辑，一行改动
+**缺点**：不是真正的表格，合并单元格/复杂表格显示会乱，无网格线/列宽调整
+
+**状态**: 📋 待实施
+
+---
+
+#### 路线 B：Mammoth → HtmlRenderer 富文本渲染（完整方案）
+
+也是计划中已有的备选路线。用 Mammoth 将 DOCX 转 HTML（保留表格、列表、粗体、斜体），再用 Avalonia.HtmlRenderer 渲染：
+
+```xml
+<!-- DOCX 富文本预览（HtmlRenderer 渲染） -->
+<Border IsVisible="{Binding IsDocxVisible}"
+        Background="{DynamicResource ThemeSurfaceBgBrush}">
+  <ScrollViewer>
+    <HtmlRenderer Html="{Binding DocxHtml}">
+  </ScrollViewer>
+</Border>
+```
+
+1. 添加 `Mammoth` + `Avalonia.HtmlRenderer` NuGet 包
+2. `ShowDocx` 中新增分支：调用 `Mammoth.ConvertToHtml()` → 存 `DocxHtml`
+3. XAML 用 `HtmlRenderer` 替代 `TextBlock`
+4. 现有纯文本方案作为降级（HtmlRenderer 不可用时 fallback）
+
+**优点**：真正的表格渲染（网格线、列宽、合并单元格），同时解决粗体/斜体/列表等所有富文本问题
+**缺点**：加两个依赖，`Avalonia.HtmlRenderer` 是社区方案，质量待验证
+
+**状态**: 📋 待定（取决于 HtmlRenderer 生态成熟度）
+
+---
+
+**影响范围**：
+- 仅 `PreviewViewModel.cs` 的 `ShowDocx()` 方法
+- 需注意 `Descendants` 会取到表格嵌套表格的子段落，只需 `TableCell` → `Paragraph` 路径即可
+
+---
+
+### 页眉/页脚/脚注内容提取
+
+可选的增强方向，从对应的 OpenXml Parts 中提取文本：
+
+| 内容 | OpenXml Part | 实现方式 |
+|:---|:---|:---|
+| 页眉 | `HeaderPart` | `doc.MainDocumentPart.HeaderParts` → `Descendants<Paragraph>()` |
+| 页脚 | `FooterPart` | `doc.MainDocumentPart.FooterParts` → `Descendants<Paragraph>()` |
+| 脚注/尾注 | `FootnotesPart` / `EndnotesPart` | `doc.MainDocumentPart.FootnotesPart` → `Descendants<Footnote>()` |
+
+**状态**: 📋 待定（按需再实施）
+
+---
+
+### Markdown 表格渲染
+
+当前 `MarkdownPreviewBuilder`（`Services/MarkdownPreviewBuilder.cs`）已启用 `.UsePipeTables()`（line 25），Markdig 正确解析表格为 `Table` AST block，但 `TryBuildBlock` 的 `switch` 中缺少 `case Table:`，被 `default: return null` 静默丢弃。
+
+**原因**: 原计划（HTML 预览降级方案）中已知此缺失，见 `.sisyphus/plans/html-preview-webview-fallback.md`：「修 MarkdownPreviewBuilder table 支持」。
+
+**显示方案分两条路线**（与 DOCX 表格一致）：
+
+#### 路线 A：Avalonia 原生控件树渲染
+
+在 `TryBuildBlock` 中添加 `case Table t:`，用 Avalonia 原生控件构建表格：
+
+```csharp
+case Table t:
+    return BuildTable(t, source);
+
+private static Control BuildTable(Table table, string source)
+{
+    var grid = new Grid();
+    bool isHeader = true;
+    
+    // 解析列定义
+    foreach (var column in table.ColumnDefinitions)
+        grid.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Auto));
+    
+    // 遍历行
+    foreach (var rowObj in table)
+    {
+        if (rowObj is not TableRow row) continue;
+        int col = 0;
+        foreach (var cellObj in row)
+        {
+            if (cellObj is not TableCell cell) continue;
+            
+            var cellText = string.Concat(cell.Descendants<LiteralInline>()
+                .Select(l => l.Content.ToString()));
+            
+            var tb = new TextBlock
+            {
+                Text = cellText,
+                FontWeight = isHeader ? FontWeight.Bold : FontWeight.Normal,
+                Margin = new Thickness(4),
+            };
+            Grid.SetColumn(tb, col);
+            Grid.SetRow(tb, grid.RowDefinitions.Count);
+            grid.Children.Add(tb);
+            col++;
+        }
+        isHeader = false;
+    }
+    
+    // 用 Border 包裹模拟表格框线
+    return new Border
+    {
+        BorderBrush = new SolidColorBrush(Colors.Gray),
+        BorderThickness = new Thickness(1),
+        Child = grid,
+    };
+}
+```
+
+**优点**: 无额外依赖、轻量
+**缺点**: 列宽不会自动按内容撑开（可用 `GridLength.Star` + Measure 改进）、不支持合并单元格
+
+#### 路线 B：HtmlRenderer 统一渲染（与 DOCX 共享降级路径）
+
+和 DOCX 共用 HtmlRenderer 方案：
+1. Markdown 走 Markdig → HTML（已有 Markdig 的 HTML 渲染器）
+2. HTML 走 HtmlRenderer 渲染
+3. HtmlRenderer 不可用时降级到路线 A
+
+**状态**: 📋 待实施
+
+> **另见**：`.sisyphus/plans/html-preview-webview-fallback.md` Task 5（第 229–283 行）已有更详细的 `BuildTable` 实现方案（包含列对齐、单元格内联元素处理），实施时可直接参考。
 
 ---
 
