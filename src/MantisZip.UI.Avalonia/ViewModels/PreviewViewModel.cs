@@ -14,6 +14,11 @@ using MantisZip.Core.Utils;
 using SkiaSharp;
 using MantisZip.UI.Avalonia.Models;
 using MantisZip.UI.Avalonia.Services;
+using DocumentFormat.OpenXml.Packaging;
+using DocumentFormat.OpenXml.Wordprocessing;
+using ClosedXML.Excel;
+using System.IO.Compression;
+using System.Xml.Linq;
 using Markdig;
 using ReverseMarkdown;
 using Microsoft.Data.Sqlite;
@@ -134,6 +139,9 @@ public partial class PreviewViewModel : ObservableObject
     public bool IsIsoVisible => PreviewType == PreviewType.Iso;
     public bool IsTorrentVisible => PreviewType == PreviewType.Torrent;
     public bool IsOfficeVisible => PreviewType == PreviewType.Office;
+    public bool IsDocxVisible => PreviewType == PreviewType.Docx;
+    public bool IsXlsxVisible => PreviewType == PreviewType.Xlsx;
+    public bool IsPptxVisible => PreviewType == PreviewType.Pptx;
     public bool IsVideoVisible => PreviewType == PreviewType.Video;
     public bool IsHtmlVisible => PreviewType == PreviewType.Html;
     public bool IsMarkdownVisible => PreviewType == PreviewType.Markdown;
@@ -141,6 +149,7 @@ public partial class PreviewViewModel : ObservableObject
     public bool IsPdfVisible => PreviewType == PreviewType.Pdf;
     public bool HasPdfNavigation => IsPdfVisible && _pdfTotalPages > 1;
     public bool IsIcoGalleryVisible => PreviewType == PreviewType.IcoGallery;
+    public bool HasDocxOutline => DocxOutline.Count > 0;
 
     partial void OnPreviewTypeChanged(PreviewType value)
     {
@@ -156,6 +165,10 @@ public partial class PreviewViewModel : ObservableObject
         OnPropertyChanged(nameof(IsIsoVisible));
         OnPropertyChanged(nameof(IsTorrentVisible));
         OnPropertyChanged(nameof(IsOfficeVisible));
+        OnPropertyChanged(nameof(IsDocxVisible));
+        OnPropertyChanged(nameof(IsXlsxVisible));
+        OnPropertyChanged(nameof(IsPptxVisible));
+        OnPropertyChanged(nameof(HasDocxOutline));
         OnPropertyChanged(nameof(IsVideoVisible));
         OnPropertyChanged(nameof(IsUnsupportedVisible));
         OnPropertyChanged(nameof(HasZoomControls));
@@ -258,6 +271,25 @@ public partial class PreviewViewModel : ObservableObject
     private System.Data.DataTable? _currentSqliteTable;
     /// <summary>供代码后置访问原始 DataTable 以设置 DataGrid 列。</summary>
     public System.Data.DataTable? CurrentSqliteTable => _currentSqliteTable;
+
+    // ── DOCX ──
+
+    [ObservableProperty]
+    private ObservableCollection<DocxOutlineItem> _docxOutline = [];
+
+    [ObservableProperty]
+    private string _docxFullText = string.Empty;
+
+    [ObservableProperty]
+    private string _docxNoOutlineText = string.Empty;
+
+    // ── XLSX ──
+
+    private DataTable? _xlsxDataTable;
+    public DataTable? XlsxDataTable => _xlsxDataTable;
+
+    [ObservableProperty]
+    private System.Data.DataView? _xlsxData;
 
     // ── GIF animation ──
 
@@ -1479,6 +1511,238 @@ public partial class PreviewViewModel : ObservableObject
         if (info.ModifiedDate.HasValue) FormatMetadata.Add(new("修改日期", info.ModifiedDate.Value.ToString("yyyy-MM-dd HH:mm")));
     }
 
+    // ── DOCX ──
+
+    /// <summary>
+    /// 显示 DOCX 文档大纲 + 全文（左右分栏布局）。
+    /// </summary>
+    public void ShowDocx(string filePath)
+    {
+        try
+        {
+            // 大文件保护
+            var fileInfo = new FileInfo(filePath);
+            if (fileInfo.Exists && fileInfo.Length > 50 * 1024 * 1024)
+            {
+                ShowUnsupported("文档过大（超过 50MB 限制）");
+                return;
+            }
+
+            using var doc = WordprocessingDocument.Open(filePath, false);
+            var body = doc.MainDocumentPart?.Document?.Body;
+            if (body == null)
+            {
+                ShowUnsupported("此文档为空");
+                return;
+            }
+
+            var outline = new List<DocxOutlineItem>();
+            var fullText = new StringBuilder();
+
+            foreach (var para in body.Elements<Paragraph>())
+            {
+                var text = string.Concat(para.Descendants<Text>().Select(t => t.Text ?? string.Empty));
+                if (string.IsNullOrWhiteSpace(text))
+                {
+                    fullText.AppendLine();
+                    continue;
+                }
+
+                var styleId = para.ParagraphProperties?.ParagraphStyleId?.Val?.Value;
+                if (styleId != null && styleId.StartsWith("Heading"))
+                {
+                    var level = int.TryParse(styleId["Heading".Length..], out var l) ? l : 1;
+                    level = Math.Clamp(level, 1, 6);
+                    outline.Add(new DocxOutlineItem
+                    {
+                        Text = text,
+                        Level = level,
+                        CharOffset = fullText.Length
+                    });
+                }
+
+                fullText.AppendLine(text);
+            }
+
+            DocxOutline = new ObservableCollection<DocxOutlineItem>(outline);
+            DocxFullText = fullText.ToString();
+            DocxNoOutlineText = outline.Count > 0 ? string.Empty : "（无标题结构）";
+
+            if (DocxFullText.Length == 0)
+            {
+                DocxFullText = "此文档为空";
+                DocxNoOutlineText = string.Empty;
+            }
+
+            PreviewType = PreviewType.Docx;
+            IsPreviewVisible = true;
+            IsToolbarVisible = false;
+        }
+        catch (Exception ex)
+        {
+            App.DebugLog($"ShowDocx failed: {ex.Message}");
+            ShowUnsupported("无法解析 Word 文档");
+        }
+    }
+
+    // ── XLSX ──
+
+    /// <summary>
+    /// 显示 XLSX 工作表预览（ClosedXML → DataGrid）。
+    /// </summary>
+    public void ShowXlsx(string filePath)
+    {
+        XLWorkbook? workbook = null;
+        try
+        {
+            workbook = new XLWorkbook(filePath);
+            var ws = workbook.Worksheet(1);
+            var range = ws.RangeUsed();
+
+            if (range == null)
+            {
+                TextContent = "此工作表中没有数据";
+                PreviewType = PreviewType.Xlsx;
+                IsPreviewVisible = true;
+                IsToolbarVisible = false;
+                return;
+            }
+
+            var table = new DataTable();
+            var firstRow = range.FirstRow().CellsUsed().Take(100).ToList();
+
+            // Column headers from first row
+            for (int i = 0; i < firstRow.Count; i++)
+            {
+                var colName = firstRow[i].GetFormattedString();
+                if (string.IsNullOrWhiteSpace(colName))
+                    colName = $"Column{i + 1}";
+                // Ensure unique column names
+                var uniqueName = colName;
+                int suffix = 1;
+                while (table.Columns.Contains(uniqueName))
+                    uniqueName = $"{colName}_{suffix++}";
+                table.Columns.Add(uniqueName);
+            }
+
+            if (table.Columns.Count == 0)
+            {
+                TextContent = "此工作表中没有数据";
+                PreviewType = PreviewType.Xlsx;
+                IsPreviewVisible = true;
+                IsToolbarVisible = false;
+                return;
+            }
+
+            // Data rows (limit 100)
+            int rowCount = 0;
+            foreach (var row in range.RowsUsed().Skip(1))
+            {
+                if (rowCount >= 100) break;
+                var dataRow = table.NewRow();
+                for (int i = 0; i < table.Columns.Count && i < row.CellsUsed().Count(); i++)
+                {
+                    dataRow[i] = row.Cell(i + 1).GetFormattedString();
+                }
+                table.Rows.Add(dataRow);
+                rowCount++;
+            }
+
+            _xlsxDataTable = table;
+            XlsxData = table.DefaultView;
+
+            PreviewType = PreviewType.Xlsx;
+            IsPreviewVisible = true;
+            IsToolbarVisible = false;
+        }
+        catch (Exception ex)
+        {
+            App.DebugLog($"ShowXlsx failed: {ex.Message}");
+            if (ex.Message.Contains("password") || ex.Message.Contains("protected"))
+                ShowUnsupported("工作表受密码保护");
+            else
+                ShowUnsupported("无法加载 Excel 工作表");
+        }
+        finally
+        {
+            workbook?.Dispose();
+        }
+    }
+
+    // ── PPTX ──
+
+    /// <summary>
+    /// 显示 PPTX 幻灯片文本预览（手动解析 a:t 元素）。
+    /// </summary>
+    public void ShowPptx(string filePath)
+    {
+        try
+        {
+            using var archive = ZipFile.OpenRead(filePath);
+            var slideEntries = archive.Entries
+                .Where(e => e.FullName.StartsWith("ppt/slides/slide", StringComparison.OrdinalIgnoreCase)
+                         && e.FullName.EndsWith(".xml", StringComparison.OrdinalIgnoreCase))
+                .OrderBy(e => e.FullName)
+                .ToList();
+
+            if (slideEntries.Count == 0)
+            {
+                TextContent = "此演示文稿为空";
+                PreviewType = PreviewType.Pptx;
+                IsPreviewVisible = true;
+                IsToolbarVisible = false;
+                return;
+            }
+
+            XNamespace a = "http://schemas.openxmlformats.org/drawingml/2006/main";
+            var result = new StringBuilder();
+            int slideNumber = 0;
+
+            foreach (var entry in slideEntries)
+            {
+                slideNumber++;
+                try
+                {
+                    using var stream = entry.Open();
+                    var slideDoc = XDocument.Load(stream);
+                    var texts = slideDoc.Descendants(a + "t")
+                        .Select(t => t.Value)
+                        .Where(v => !string.IsNullOrWhiteSpace(v))
+                        .ToList();
+
+                    result.AppendLine($"── 幻灯片 {slideNumber} ──");
+                    if (texts.Count > 0)
+                    {
+                        foreach (var text in texts)
+                            result.AppendLine(text);
+                    }
+                    else
+                    {
+                        result.AppendLine("（此幻灯片无文字）");
+                    }
+                    result.AppendLine();
+                }
+                catch (Exception ex)
+                {
+                    App.DebugLog($"ShowPptx: failed to parse slide {slideNumber}: {ex.Message}");
+                    result.AppendLine($"── 幻灯片 {slideNumber} ──");
+                    result.AppendLine("（解析失败）");
+                    result.AppendLine();
+                }
+            }
+
+            TextContent = result.ToString().TrimEnd();
+            PreviewType = PreviewType.Pptx;
+            IsPreviewVisible = true;
+            IsToolbarVisible = false;
+        }
+        catch (Exception ex)
+        {
+            App.DebugLog($"ShowPptx failed: {ex.Message}");
+            ShowUnsupported("无法解析演示文稿");
+        }
+    }
+
     // ── PDF ──
 
     private PdfDocument? _pdfDocument;
@@ -1741,6 +2005,11 @@ public partial class PreviewViewModel : ObservableObject
         PdfCurrentPage = 1;
         PdfPageInfo = string.Empty;
         MarkdownPreviewPanel = null;
+        DocxOutline.Clear();
+        DocxFullText = string.Empty;
+        DocxNoOutlineText = string.Empty;
+        XlsxData = null;
+        _xlsxDataTable = null;
         TorrentTreeRoots.Clear();
         SqliteTableData = null;
         SqliteTableNames.Clear();
@@ -1829,4 +2098,15 @@ public class TorrentTreeNode : INotifyPropertyChanged
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;
+}
+
+/// <summary>
+/// DOCX 文档大纲条目，用于左右分栏预览。
+/// </summary>
+public class DocxOutlineItem
+{
+    public string Text { get; set; } = string.Empty;
+    public int Level { get; set; }
+    public int CharOffset { get; set; }
+    public global::Avalonia.Thickness Indent => new global::Avalonia.Thickness((Level - 1) * 20, 2, 0, 2);
 }

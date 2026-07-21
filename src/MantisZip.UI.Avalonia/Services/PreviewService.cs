@@ -22,6 +22,9 @@ public enum PreviewType
     Iso,
     Torrent,
     Office,
+    Docx,
+    Xlsx,
+    Pptx,
     Video,
     Html,
     Markdown,
@@ -133,7 +136,9 @@ public class PreviewService
         if (SqliteExtensions.Contains(ext)) return PreviewType.Sqlite;
         if (IsoExtensions.Contains(ext)) return PreviewType.Iso;
         if (TorrentExtensions.Contains(ext)) return PreviewType.Torrent;
-        if (OfficeExtensions.Contains(ext)) return PreviewType.Office;
+        if (ext == ".docx") return PreviewType.Docx;
+        if (ext == ".xlsx") return PreviewType.Xlsx;
+        if (ext == ".pptx") return PreviewType.Pptx;
         if (VideoExtensions.Contains(ext)) return PreviewType.Video;
         if (HtmlExtensions.Contains(ext)) return PreviewType.Html;
         if (MarkdownExtensions.Contains(ext)) return PreviewType.Markdown;
@@ -253,9 +258,13 @@ public class PreviewService
             // 数据库
             FileFormat.Sqlite => PreviewType.Sqlite,
 
-            // Office / 文档
-            FileFormat.Docx or FileFormat.Xlsx or FileFormat.Pptx
-                or FileFormat.Epub or FileFormat.Odt or FileFormat.Ods
+            // Office 文档
+            FileFormat.Docx => PreviewType.Docx,
+            FileFormat.Xlsx => PreviewType.Xlsx,
+            FileFormat.Pptx => PreviewType.Pptx,
+
+            // 其他文档格式
+            FileFormat.Epub or FileFormat.Odt or FileFormat.Ods
                 or FileFormat.Odp or FileFormat.OfficeOpenXml
                 => PreviewType.Office,
 
