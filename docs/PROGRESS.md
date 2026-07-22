@@ -21,6 +21,14 @@
 
 ### MantisZip.UI.Avalonia（主力版）
 
+**2026-07-22** — P0 列表控件紧凑度联动 + AGENTS.md 规则 7
+  - ExtractSettingsWindow FileListBox：`ItemContainerTheme` + `ControlHeightMd`
+  - MainWindow FileListGrid：`RowHeight="{DynamicResource ControlHeightMd}"`
+  - MainWindow Folder TreeView：`TreeViewItem` Style 加 `MinHeight="{DynamicResource ControlHeightSm}"`
+  - PreviewPanel CsvDataGrid / SqliteDataGrid：`RowHeight="{DynamicResource ControlHeightMd}"`
+  - AGENTS.md 新增 规则 7：列表/树形/表格控件必须使用紧凑度感知的行高（含对照表 + 三种控件示例）
+  - Build 0 errors
+
 **2026-07-22** — 文件列表多选 + 预设重命名 + CanExecute 守卫 + 紧凑度联动 + 开关行为统一
   - CompressSettingsWindow：源文件列表改为多选（`SelectionMode="Multiple"`），移除按钮改为 Click code-behind 批量删除
   - Preset rename：新增 Rename 按钮 + `RenamePresetRequested` 事件 + InputDialog 预填当前名 + 重名检查（Compress/Extract 两窗口）

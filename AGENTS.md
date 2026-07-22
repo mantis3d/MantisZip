@@ -535,6 +535,48 @@ PROGRESS.md 分三个独立线索，根据变更影响范围选择对应线索�
 
 **不推荐**的方案 B（逐个设置 `IsEnabled = false`）已废弃，新增面板无需再实现。
 
+### 规则 7：列表/树形/表格控件必须使用紧凑度感知的行高
+
+新增任何 `ListBox`、`DataGrid`、`TreeView`、`ItemsControl` 等列表类控件时，**必须设置行高/项最小高度为紧凑度资源键**，禁止使用固定数值：
+
+| 控件类型 | 属性 | 推荐资源键 | 三档值 |
+|---------|------|-----------|-------|
+| `ListBox` | `ListBox.ItemContainerTheme` → `Setter Property="MinHeight"` | `ControlHeightMd` | 28/32/38 |
+| `DataGrid` | `RowHeight` | `ControlHeightMd` | 28/32/38 |
+| `TreeView` | `Style Selector="TreeViewItem"` → `Setter Property="MinHeight"` | `ControlHeightSm` | 22/26/30 |
+| `ItemsControl` | 项模板最外层容器 `MinHeight` | `ControlHeightSm` | 22/26/30 |
+
+**示例 — ListBox：**
+```xml
+<ListBox ItemsSource="{Binding ...}">
+  <ListBox.ItemContainerTheme>
+    <ControlTheme TargetType="ListBoxItem">
+      <Setter Property="MinHeight" Value="{DynamicResource ControlHeightMd}" />
+    </ControlTheme>
+  </ListBox.ItemContainerTheme>
+  ...
+</ListBox>
+```
+
+**示例 — DataGrid：**
+```xml
+<DataGrid ItemsSource="{Binding ...}"
+          RowHeight="{DynamicResource ControlHeightMd}" ... />
+```
+
+**示例 — TreeView：**
+```xml
+<TreeView ItemsSource="{Binding ...}">
+  <TreeView.Styles>
+    <Style Selector="TreeViewItem">
+      <Setter Property="MinHeight" Value="{DynamicResource ControlHeightSm}" />
+    </Style>
+  </TreeView.Styles>
+</TreeView>
+```
+
+**例外**：非数据行类列表（如 WrapPanel 标签云、图标画廊等不受紧凑度影响的控件）可豁免。
+
 ## 未来工作
 
 ### 迁移完成后的清理

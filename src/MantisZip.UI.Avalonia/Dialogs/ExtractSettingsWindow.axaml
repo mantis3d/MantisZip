@@ -34,6 +34,11 @@
                 <ListBox x:Name="FileListBox"
                          Height="100"
                          BorderBrush="{DynamicResource ThemeBorderBrush}">
+                  <ListBox.ItemContainerTheme>
+                    <ControlTheme TargetType="ListBoxItem">
+                      <Setter Property="MinHeight" Value="{DynamicResource ControlHeightMd}" />
+                    </ControlTheme>
+                  </ListBox.ItemContainerTheme>
                   <ListBox.ItemTemplate>
                     <DataTemplate>
                       <TextBlock Text="{Binding}"

@@ -852,6 +852,7 @@
               <Style Selector="TreeViewItem" x:CompileBindings="False">
                 <Setter Property="IsExpanded" Value="{Binding IsExpanded}" />
                 <Setter Property="IsVisible" Value="{Binding IsVisible}" />
+                <Setter Property="MinHeight" Value="{DynamicResource ControlHeightSm}" />
               </Style>
             </TreeView.Styles>
             <TreeView.ItemTemplate>
@@ -1009,6 +1010,7 @@
                     AutoGenerateColumns="False"
                     CanUserSortColumns="True"
                     IsReadOnly="True"
+                    RowHeight="{DynamicResource ControlHeightMd}"
                     SelectionChanged="FileListGrid_SelectionChanged"
                     DoubleTapped="FileListGrid_DoubleTapped"
                     KeyDown="FileListGrid_KeyDown"
