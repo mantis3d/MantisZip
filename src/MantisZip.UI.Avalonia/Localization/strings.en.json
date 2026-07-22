@@ -752,5 +752,36 @@
   "ShellExt_SmartExtractMulti": "Smart extract {0} archives",
   "ShellExt_ExtractToNamed": "Extract to folder",
   "ShellExt_ExtractTo": "Extract to\u2026",
-  "ShellExt_Compress": "Compress to\u2026"
+  "ShellExt_Compress": "Compress to\u2026",
+
+  "Common_OK": "OK",
+  "Common_Cancel": "Cancel",
+
+  "FileFilter_Enable": "Enable filter",
+  "FileFilter_Presets": "Filter Presets",
+  "FileFilter_PresetSave": "Save",
+  "FileFilter_PresetDelete": "Delete",
+  "FileFilter_PresetDeleteConfirm": "Delete preset \"{0}\"?",
+  "FileFilter_SavePresetTitle": "Save Filter Preset",
+  "FileFilter_PresetNamePrompt": "Preset name:",
+  "FileFilter_Extensions": "File Extensions",
+  "FileFilter_Audio": "Audio",
+  "FileFilter_Video": "Video",
+  "FileFilter_Image": "Image",
+  "FileFilter_Document": "Document",
+  "FileFilter_Archive": "Archive",
+  "FileFilter_CustomExtensions": "Custom (comma separated):",
+  "FileFilter_NamePattern": "File Name Pattern",
+  "FileFilter_NamePatternHint": "Supports * (multiple chars) and ? (single char), e.g. *report*",
+  "FileFilter_Size": "File Size",
+  "FileFilter_MinSize": "Min:",
+  "FileFilter_MaxSize": "Max:",
+  "FileFilter_DateRange": "Date Range",
+  "FileFilter_StartDate": "From:",
+  "FileFilter_EndDate": "To:",
+  "FileFilter_None": "— None —",
+  "FileFilter_Modified": " (Modified)",
+
+  "Compress_TabFilter": "File Filter",
+  "Extract_TabFilter": "File Filter"
 }

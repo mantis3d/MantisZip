@@ -750,5 +750,36 @@
   "ShellExt_SmartExtractMulti": "智能原地解压{0}个压缩包",
   "ShellExt_ExtractToNamed": "解压到目录",
   "ShellExt_ExtractTo": "解压到……",
-  "ShellExt_Compress": "压缩到……"
+  "ShellExt_Compress": "压缩到……",
+
+  "Common_OK": "确定",
+  "Common_Cancel": "取消",
+
+  "FileFilter_Enable": "启用过滤",
+  "FileFilter_Presets": "过滤预设",
+  "FileFilter_PresetSave": "保存",
+  "FileFilter_PresetDelete": "删除",
+  "FileFilter_PresetDeleteConfirm": "删除预设\"{0}\"?",
+  "FileFilter_SavePresetTitle": "保存过滤预设",
+  "FileFilter_PresetNamePrompt": "预设名称:",
+  "FileFilter_Extensions": "文件扩展名",
+  "FileFilter_Audio": "音频",
+  "FileFilter_Video": "视频",
+  "FileFilter_Image": "图片",
+  "FileFilter_Document": "文档",
+  "FileFilter_Archive": "压缩包",
+  "FileFilter_CustomExtensions": "自定义（英文逗号分隔）:",
+  "FileFilter_NamePattern": "文件名模式",
+  "FileFilter_NamePatternHint": "支持 *（多字符）和 ?（单字符），如 *报告*",
+  "FileFilter_Size": "文件大小",
+  "FileFilter_MinSize": "最小值:",
+  "FileFilter_MaxSize": "最大值:",
+  "FileFilter_DateRange": "日期范围",
+  "FileFilter_StartDate": "起始日期:",
+  "FileFilter_EndDate": "截止日期:",
+  "FileFilter_None": "— 无 —",
+  "FileFilter_Modified": "（已修改）",
+
+  "Compress_TabFilter": "文件过滤",
+  "Extract_TabFilter": "文件过滤"
 }
