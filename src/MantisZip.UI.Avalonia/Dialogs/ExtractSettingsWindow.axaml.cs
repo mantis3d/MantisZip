@@ -4,7 +4,9 @@ using Avalonia.Platform.Storage;
 using MantisZip.Core.Abstractions;
 using MantisZip.Core.FileFilter;
 using MantisZip.UI.Avalonia.Models;
+using MantisZip.UI.Avalonia.Services;
 using MantisZip.UI.Avalonia.ViewModels;
+using System.Linq;
 
 namespace MantisZip.UI.Avalonia.Dialogs;
 
@@ -121,6 +123,24 @@ public partial class ExtractSettingsWindow : Window
             settings.FilterPresets.Remove(preset);
             settings.Save();
             FileFilterControl.LoadPresets(settings.FilterPresets);
+        };
+
+        FileFilterControl.RenamePresetRequested += (preset, newName) =>
+        {
+            var existing = settings.FilterPresets.FirstOrDefault(p => p.Name == newName);
+            if (existing != null)
+            {
+                _ = AppMessageBox.Show(
+                    LocalizationManager.T("FileFilter_PresetNameExists"),
+                    LocalizationManager.T("FileFilter_RenamePresetTitle"),
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning,
+                    this);
+                return;
+            }
+            preset.Name = newName;
+            settings.Save();
+            FileFilterControl.LoadPresets(settings.FilterPresets, newName);
         };
 
         // 更新过滤统计

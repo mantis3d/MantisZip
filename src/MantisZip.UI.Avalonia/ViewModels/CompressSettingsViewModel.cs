@@ -299,6 +299,7 @@ public partial class CompressSettingsViewModel : ObservableObject
             BuildCompressPreview();
             if (OutputMode != CompressOutputMode.Manual)
                 RefreshOutputPathState();
+            UpdateCanCompress();
         };
 
         // Populate localized strings
@@ -652,6 +653,8 @@ public partial class CompressSettingsViewModel : ObservableObject
             OutputPath = path;
         }
     }
+
+    private bool CanExecuteStartCompress() => SelectedPaths.Count > 0;
 
     [RelayCommand]
     private async Task StartCompress()

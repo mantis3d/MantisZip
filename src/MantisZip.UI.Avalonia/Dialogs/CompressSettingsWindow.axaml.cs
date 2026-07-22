@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using System.Linq;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
 using Avalonia.Media;
@@ -136,6 +137,24 @@ public partial class CompressSettingsWindow : Window
             settings.Save();
             FileFilterControl.LoadPresets(settings.FilterPresets);
         };
+
+        FileFilterControl.RenamePresetRequested += (preset, newName) =>
+        {
+            var existing = settings.FilterPresets.FirstOrDefault(p => p.Name == newName);
+            if (existing != null)
+            {
+                _ = AppMessageBox.Show(
+                    LocalizationManager.T("FileFilter_PresetNameExists"),
+                    LocalizationManager.T("FileFilter_RenamePresetTitle"),
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning,
+                    this);
+                return;
+            }
+            preset.Name = newName;
+            settings.Save();
+            FileFilterControl.LoadPresets(settings.FilterPresets, newName);
+        };
     }
 
     /// <summary>
@@ -186,6 +205,18 @@ public partial class CompressSettingsWindow : Window
     private void SubscribeViewModel()
     {
         ViewModel.PropertyChanged += OnViewModelPropertyChanged;
+    }
+
+    /// <summary>
+    /// 批量移除选中的源文件。
+    /// </summary>
+    private void RemoveSelected_Click(object? sender, RoutedEventArgs e)
+    {
+        var toRemove = SourceFilesList.SelectedItems.Cast<string>().ToList();
+        foreach (var path in toRemove)
+        {
+            ViewModel.SelectedPaths.Remove(path);
+        }
     }
 
     private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)

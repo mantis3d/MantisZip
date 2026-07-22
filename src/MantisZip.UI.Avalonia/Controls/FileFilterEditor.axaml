@@ -12,15 +12,18 @@
                  IsCheckedChanged="OnEnableFilterChanged"
                  Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
 
-      <!-- ═══════ 预设栏 ═══════ -->
-      <Border BorderBrush="{DynamicResource ThemeBorderBrush}"
-              BorderThickness="1" CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}"
-              Background="{DynamicResource ThemeSurfaceBgBrush}">
+      <!-- ═══════ 过滤内容（启用时显示，未启用时隐藏）═══════ -->
+      <StackPanel x:Name="FilterContentPanel"
+                  Spacing="{DynamicResource SpacingSm}">
+        <!-- ═══════ 预设栏 ═══════ -->
+        <Border BorderBrush="{DynamicResource ThemeBorderBrush}"
+                BorderThickness="1" CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}"
+                Background="{DynamicResource ThemeSurfaceBgBrush}">
         <StackPanel Spacing="{DynamicResource SpacingXs}">
           <TextBlock x:Name="PresetsLabel"
                      FontWeight="SemiBold"
                      Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
-          <Grid ColumnDefinitions="*,Auto,Auto">
+          <Grid ColumnDefinitions="*,Auto,Auto,Auto">
             <ComboBox x:Name="PresetCombo" Grid.Column="0"
                       Margin="0,0,6,0"
                       DisplayMemberBinding="{Binding DisplayName}"
@@ -35,7 +38,13 @@
                     Background="{DynamicResource ThemeButtonBgBrush}"
                     Foreground="{DynamicResource ThemeTextPrimaryBrush}"
                     BorderBrush="{DynamicResource ThemeBorderBrush}" />
-            <Button x:Name="DeletePresetBtn" Grid.Column="2"
+            <Button x:Name="RenamePresetBtn" Grid.Column="2"
+                    MinWidth="50" Height="26" Margin="0,0,4,0"
+                    Click="RenamePresetBtn_Click"
+                    Background="{DynamicResource ThemeButtonBgBrush}"
+                    Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                    BorderBrush="{DynamicResource ThemeBorderBrush}" />
+            <Button x:Name="DeletePresetBtn" Grid.Column="3"
                     MinWidth="50" Height="26"
                     Click="DeletePresetBtn_Click"
                     Background="{DynamicResource ThemeButtonBgBrush}"
@@ -175,6 +184,8 @@
         </StackPanel>
       </Border>
 
+      <!-- ═══════ /过滤内容 ═══════ -->
+    </StackPanel>
     </StackPanel>
   </ScrollViewer>
 </UserControl>

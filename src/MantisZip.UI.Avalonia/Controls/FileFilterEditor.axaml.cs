@@ -90,6 +90,9 @@ public partial class FileFilterEditor : UserControl
     /// <summary>请求删除指定预设。</summary>
     public event Action<FileFilterPreset>? DeletePresetRequested;
 
+    /// <summary>请求重命名当前选中的预设。</summary>
+    public event Action<FileFilterPreset, string>? RenamePresetRequested;
+
     // ── 公共属性 ──
 
     /// <summary>过滤是否已启用。</summary>
@@ -135,6 +138,7 @@ public partial class FileFilterEditor : UserControl
         EnableFilterCheck.Content = LocalizationManager.T("FileFilter_Enable");
         PresetsLabel.Text = LocalizationManager.T("FileFilter_Presets");
         SavePresetBtn.Content = LocalizationManager.T("FileFilter_PresetSave");
+        RenamePresetBtn.Content = LocalizationManager.T("FileFilter_PresetRename");
         DeletePresetBtn.Content = LocalizationManager.T("FileFilter_PresetDelete");
         ExtensionsLabel.Text = LocalizationManager.T("FileFilter_Extensions");
         ExtAudioCheck.Content = LocalizationManager.T("FileFilter_Audio");
@@ -249,10 +253,10 @@ public partial class FileFilterEditor : UserControl
     /// <summary>
     /// 加载预设列表到下拉框（内置 + 用户）。
     /// </summary>
-    public void LoadPresets(List<FileFilterPreset> presets)
+    public void LoadPresets(List<FileFilterPreset> presets, string? autoSelectName = null)
     {
         _presets = presets ?? new List<FileFilterPreset>();
-        var autoSelect = _pendingSelectName;
+        var autoSelect = autoSelectName ?? _pendingSelectName;
         _pendingSelectName = null;
         RebuildDisplayItems(autoSelect);
     }
@@ -279,21 +283,8 @@ public partial class FileFilterEditor : UserControl
 
     private void SyncControlStates()
     {
-        var enabled = EnableFilterCheck.IsChecked == true && EnableFilterCheck.IsEnabled;
-        PresetCombo.IsEnabled = enabled;
-        SavePresetBtn.IsEnabled = enabled;
-        ExtAudioCheck.IsEnabled = enabled;
-        ExtVideoCheck.IsEnabled = enabled;
-        ExtImageCheck.IsEnabled = enabled;
-        ExtDocumentCheck.IsEnabled = enabled;
-        ExtArchiveCheck.IsEnabled = enabled;
-        CustomExtTextBox.IsEnabled = enabled;
-        NamePatternBox.IsEnabled = enabled;
-        MinSizeBox.IsEnabled = enabled;
-        MaxSizeBox.IsEnabled = enabled;
-        SizeUnitCombo.IsEnabled = enabled;
-        StartDatePicker.IsEnabled = enabled;
-        EndDatePicker.IsEnabled = enabled;
+        // 方案A：隐藏整个过滤内容区，而非逐个禁用控件
+        FilterContentPanel.IsVisible = EnableFilterCheck.IsChecked == true && EnableFilterCheck.IsEnabled;
 
         UpdateDeleteBtnState();
     }
@@ -301,8 +292,10 @@ public partial class FileFilterEditor : UserControl
     private void UpdateDeleteBtnState()
     {
         var preset = SelectedPreset;
-        DeletePresetBtn.IsEnabled = preset != null && !preset.IsBuiltIn
+        var canEdit = preset != null && !preset.IsBuiltIn
             && EnableFilterCheck.IsChecked == true && EnableFilterCheck.IsEnabled;
+        DeletePresetBtn.IsEnabled = canEdit;
+        RenamePresetBtn.IsEnabled = canEdit;
     }
 
     /// <summary>
@@ -671,6 +664,31 @@ public partial class FileFilterEditor : UserControl
         if (result == MessageBoxResult.Yes)
         {
             DeletePresetRequested?.Invoke(preset);
+        }
+    }
+
+    private async void RenamePresetBtn_Click(object? sender, RoutedEventArgs e)
+    {
+        var preset = SelectedPreset;
+        if (preset == null || preset.IsBuiltIn) return;
+
+        var window = TopLevel.GetTopLevel(this) as Window;
+        if (window == null) return;
+
+        var dialog = new InputDialog(
+            LocalizationManager.T("FileFilter_RenamePresetTitle"),
+            LocalizationManager.T("FileFilter_PresetNamePrompt"),
+            preset.Name)   // pre-fill with current name
+        {
+            Width = 350,
+            Height = 160,
+        };
+        var result = await dialog.ShowDialog<bool?>(window);
+        if (result == true && !string.IsNullOrWhiteSpace(dialog.InputText))
+        {
+            var newName = dialog.InputText.Trim();
+            if (newName != preset.Name)
+                RenamePresetRequested?.Invoke(preset, newName);
         }
     }
 

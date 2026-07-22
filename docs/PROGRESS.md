@@ -21,6 +21,16 @@
 
 ### MantisZip.UI.Avalonia（主力版）
 
+**2026-07-22** — 文件列表多选 + 预设重命名 + CanExecute 守卫 + 紧凑度联动 + 开关行为统一
+  - CompressSettingsWindow：源文件列表改为多选（`SelectionMode="Multiple"`），移除按钮改为 Click code-behind 批量删除
+  - Preset rename：新增 Rename 按钮 + `RenamePresetRequested` 事件 + InputDialog 预填当前名 + 重名检查（Compress/Extract 两窗口）
+  - CanExecuteStartCompress：`SelectedPaths.Count > 0` 守卫，`CollectionChanged` 时自动更新
+  - FileFilterEditor 切换开关统一为 方案 A（隐藏内容而非禁用），`SyncControlStates()` 简化为 `FilterContentPanel.IsVisible`
+  - AGENTS.md 新增 规则 6：开关控制面板区域时统一隐藏（方案 A）
+  - SourceFilesList 支持紧凑度：`ItemContainerTheme` 用 `ControlHeightMd`（28/32/38 三档）
+  - 本地化：新增 3 键（zh-CN + en）
+  - Build 0 errors
+
 **2026-07-22** — P1-3: FileFilterEditor 移植（文件过滤控件：三维过滤 + 预设管理 + 临时预设）
   - 新建 Controls/FileFilterEditor.axaml/.cs：完全移植 WPF 版文件过滤控件（扩展名/文件名/大小/日期四维过滤 + 预设管理 + ComboBox 临时预设机制）
   - 新建 Services/FileFilterHelper.cs：ApplyFilter + 递归目录枚举

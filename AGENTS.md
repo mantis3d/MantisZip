@@ -519,6 +519,22 @@ PROGRESS.md 分三个独立线索，根据变更影响范围选择对应线索�
 - 新增控件时，不要硬编码间距/高度/圆角数值，优先使用这些 `{DynamicResource}` 引用
 - 所有资源由 `App.axaml.cs` 的 `ApplyCompactness()` 在启动时注入三档数值，运行时切换无需重启
 
+### 规则 6：开关控制面板区域时统一隐藏（方案 A）
+
+当需要用一个 CheckBox/开关来控制一组控件（过滤条件、加密选项等）的可用性时，**统一使用隐藏（IsVisible）而非禁用（IsEnabled）**：
+
+- **开关关闭 → 内容隐藏**：整个内容区域从视觉树中移除（`IsVisible="False"`），不占布局空间
+- **开关打开 → 内容显示**：正常显示所有控件
+- **例外**：如果保持内容可见有确凿的用户体验理由，需在 PR/代码评审时说明
+
+**实现方式**：将受控内容包裹在一个命名容器（`StackPanel`/`Border`）中，在 switch 事件中切换容器的 `IsVisible`。
+
+**参考实现**：
+- `Controls/FileFilterEditor.axaml` — `FilterContentPanel` + `SyncControlStates()`
+- `Dialogs/CompressSettingsWindow.axaml`（Password Tab）— `IsVisible="{Binding Encrypt}"`
+
+**不推荐**的方案 B（逐个设置 `IsEnabled = false`）已废弃，新增面板无需再实现。
+
 ## 未来工作
 
 ### 迁移完成后的清理
