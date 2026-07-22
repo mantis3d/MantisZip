@@ -1651,7 +1651,7 @@ public partial class PreviewViewModel : ObservableObject
             var stylesPart = doc.MainDocumentPart?.StyleDefinitionsPart;
             if (stylesPart?.Styles != null)
             {
-                foreach (var style in stylesPart.Styles.Descendants<Style>())
+                foreach (var style in stylesPart.Styles.Descendants<DocumentFormat.OpenXml.Wordprocessing.Style>())
                 {
                     var sid = style.StyleId?.Value;
                     if (sid == null) continue;
