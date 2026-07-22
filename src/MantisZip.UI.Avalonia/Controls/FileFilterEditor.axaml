@@ -1,0 +1,180 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="MantisZip.UI.Avalonia.Controls.FileFilterEditor"
+             x:CompileBindings="False"
+             Background="{DynamicResource ThemeWindowBgBrush}">
+  <ScrollViewer VerticalScrollBarVisibility="Auto"
+                 Background="{DynamicResource ThemeWindowBgBrush}">
+    <StackPanel Margin="0,0,0,4" Spacing="{DynamicResource SpacingSm}">
+
+      <!-- ═══════ 启用过滤 ═══════ -->
+      <CheckBox x:Name="EnableFilterCheck"
+                 IsCheckedChanged="OnEnableFilterChanged"
+                 Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+
+      <!-- ═══════ 预设栏 ═══════ -->
+      <Border BorderBrush="{DynamicResource ThemeBorderBrush}"
+              BorderThickness="1" CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}"
+              Background="{DynamicResource ThemeSurfaceBgBrush}">
+        <StackPanel Spacing="{DynamicResource SpacingXs}">
+          <TextBlock x:Name="PresetsLabel"
+                     FontWeight="SemiBold"
+                     Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+          <Grid ColumnDefinitions="*,Auto,Auto">
+            <ComboBox x:Name="PresetCombo" Grid.Column="0"
+                      Margin="0,0,6,0"
+                      DisplayMemberBinding="{Binding DisplayName}"
+                      SelectionChanged="PresetCombo_SelectionChanged"
+                      Background="{DynamicResource ThemeSurfaceBgBrush}"
+                      Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                      BorderBrush="{DynamicResource ThemeBorderBrush}"
+                      MinHeight="26" />
+            <Button x:Name="SavePresetBtn" Grid.Column="1"
+                    MinWidth="50" Height="26" Margin="0,0,4,0"
+                    Click="SavePresetBtn_Click"
+                    Background="{DynamicResource ThemeButtonBgBrush}"
+                    Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                    BorderBrush="{DynamicResource ThemeBorderBrush}" />
+            <Button x:Name="DeletePresetBtn" Grid.Column="2"
+                    MinWidth="50" Height="26"
+                    Click="DeletePresetBtn_Click"
+                    Background="{DynamicResource ThemeButtonBgBrush}"
+                    Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                    BorderBrush="{DynamicResource ThemeBorderBrush}" />
+          </Grid>
+          <TextBlock x:Name="FilterStatsText"
+                     Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+        </StackPanel>
+      </Border>
+
+      <!-- ═══════ 扩展名 ═══════ -->
+      <Border BorderBrush="{DynamicResource ThemeBorderBrush}"
+              BorderThickness="1" CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}"
+              Background="{DynamicResource ThemeSurfaceBgBrush}">
+        <StackPanel Spacing="{DynamicResource SpacingXs}">
+          <TextBlock x:Name="ExtensionsLabel"
+                     FontWeight="SemiBold"
+                     Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+          <WrapPanel>
+            <CheckBox x:Name="ExtAudioCheck" Margin="0,0,12,0"
+                      IsCheckedChanged="OnExtCheckChanged"
+                      Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+            <CheckBox x:Name="ExtVideoCheck" Margin="0,0,12,0"
+                      IsCheckedChanged="OnExtCheckChanged"
+                      Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+            <CheckBox x:Name="ExtImageCheck" Margin="0,0,12,0"
+                      IsCheckedChanged="OnExtCheckChanged"
+                      Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+            <CheckBox x:Name="ExtDocumentCheck" Margin="0,0,12,0"
+                      IsCheckedChanged="OnExtCheckChanged"
+                      Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+            <CheckBox x:Name="ExtArchiveCheck" Margin="0,0,0,0"
+                      IsCheckedChanged="OnExtCheckChanged"
+                      Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+          </WrapPanel>
+
+          <Grid ColumnDefinitions="Auto,*">
+            <TextBlock Grid.Column="0" x:Name="CustomExtLabel"
+                       VerticalAlignment="Center" Margin="0,0,8,0"
+                       Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+            <TextBox x:Name="CustomExtTextBox" Grid.Column="1"
+                     TextChanged="CustomExtTextBox_TextChanged"
+                     MinHeight="22"
+                     Background="{DynamicResource ThemeSurfaceBgBrush}"
+                     Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                     BorderBrush="{DynamicResource ThemeBorderBrush}" />
+          </Grid>
+        </StackPanel>
+      </Border>
+
+      <!-- ═══════ 文件名 ═══════ -->
+      <Border BorderBrush="{DynamicResource ThemeBorderBrush}"
+              BorderThickness="1" CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}"
+              Background="{DynamicResource ThemeSurfaceBgBrush}">
+        <StackPanel Spacing="{DynamicResource SpacingXs}">
+          <TextBlock x:Name="NamePatternLabel"
+                     FontWeight="SemiBold"
+                     Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+          <TextBox x:Name="NamePatternBox"
+                   TextChanged="NamePatternBox_TextChanged"
+                   MinHeight="22"
+                   Background="{DynamicResource ThemeSurfaceBgBrush}"
+                   Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                   BorderBrush="{DynamicResource ThemeBorderBrush}" />
+          <TextBlock x:Name="NamePatternHint"
+                     FontSize="11"
+                     Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+        </StackPanel>
+      </Border>
+
+      <!-- ═══════ 大小 ═══════ -->
+      <Border BorderBrush="{DynamicResource ThemeBorderBrush}"
+              BorderThickness="1" CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}"
+              Background="{DynamicResource ThemeSurfaceBgBrush}">
+        <StackPanel Spacing="{DynamicResource SpacingXs}">
+          <TextBlock x:Name="SizeLabel"
+                     FontWeight="SemiBold"
+                     Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+          <Grid ColumnDefinitions="Auto,Auto,*,Auto">
+            <TextBlock Grid.Column="0" x:Name="MinSizeLabel"
+                       VerticalAlignment="Center" Margin="0,0,6,0"
+                       Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+            <TextBox x:Name="MinSizeBox" Grid.Column="1"
+                     Width="100" MinHeight="22"
+                     TextChanged="SizeBox_TextChanged"
+                     Background="{DynamicResource ThemeSurfaceBgBrush}"
+                     Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                     BorderBrush="{DynamicResource ThemeBorderBrush}" />
+            <ComboBox x:Name="SizeUnitCombo" Grid.Column="2"
+                      Margin="6,0,0,0"
+                      MinHeight="22" Width="80"
+                      SelectionChanged="SizeUnitCombo_SelectionChanged"
+                      Background="{DynamicResource ThemeSurfaceBgBrush}"
+                      Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                      BorderBrush="{DynamicResource ThemeBorderBrush}" />
+          </Grid>
+          <Grid ColumnDefinitions="Auto,Auto,*,Auto">
+            <TextBlock Grid.Column="0" x:Name="MaxSizeLabel"
+                       VerticalAlignment="Center" Margin="0,0,6,0"
+                       Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+            <TextBox x:Name="MaxSizeBox" Grid.Column="1"
+                     Width="100" MinHeight="22"
+                     TextChanged="SizeBox_TextChanged"
+                     Background="{DynamicResource ThemeSurfaceBgBrush}"
+                     Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                     BorderBrush="{DynamicResource ThemeBorderBrush}" />
+          </Grid>
+        </StackPanel>
+      </Border>
+
+      <!-- ═══════ 日期 ═══════ -->
+      <Border BorderBrush="{DynamicResource ThemeBorderBrush}"
+              BorderThickness="1" CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}"
+              Background="{DynamicResource ThemeSurfaceBgBrush}">
+        <StackPanel Spacing="{DynamicResource SpacingXs}">
+          <TextBlock x:Name="DateRangeLabel"
+                     FontWeight="SemiBold"
+                     Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+          <Grid ColumnDefinitions="Auto,Auto,*">
+            <TextBlock Grid.Column="0" x:Name="StartDateLabel"
+                       VerticalAlignment="Center" Margin="0,0,6,0"
+                       Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+            <DatePicker x:Name="StartDatePicker" Grid.Column="1"
+                        Margin="0,0,6,0"
+                        SelectedDateChanged="StartDatePicker_SelectedDateChanged"
+                        Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+          </Grid>
+          <Grid ColumnDefinitions="Auto,Auto,*">
+            <TextBlock Grid.Column="0" x:Name="EndDateLabel"
+                       VerticalAlignment="Center" Margin="0,0,6,0"
+                       Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+            <DatePicker x:Name="EndDatePicker" Grid.Column="1"
+                        SelectedDateChanged="EndDatePicker_SelectedDateChanged"
+                        Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+          </Grid>
+        </StackPanel>
+      </Border>
+
+    </StackPanel>
+  </ScrollViewer>
+</UserControl>
