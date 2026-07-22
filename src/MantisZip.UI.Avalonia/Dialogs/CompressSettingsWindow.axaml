@@ -449,6 +449,15 @@
           </StackPanel>
         </ScrollViewer>
       </TabItem>
+
+      <!-- Tab 5: File Filter -->
+      <TabItem Header="{Binding LocalizedStrings[Compress_TabFilter]}"
+               Classes="compactTab">
+        <ScrollViewer Background="{DynamicResource ThemeWindowBgBrush}"
+                       TextElement.Foreground="{DynamicResource ThemeTextPrimaryBrush}">
+          <controls:FileFilterEditor x:Name="FileFilterControl" />
+        </ScrollViewer>
+      </TabItem>
     </TabControl>
 
     <!-- ═══════ GridSplitter ═══════ -->

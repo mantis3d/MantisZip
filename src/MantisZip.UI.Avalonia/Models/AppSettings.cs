@@ -1,4 +1,5 @@
 using System.Text.Json;
+using MantisZip.Core.FileFilter;
 
 namespace MantisZip.UI.Avalonia.Models;
 
@@ -109,6 +110,17 @@ public class AppSettings
 
     // ===== 收藏夹 =====
     public List<string> FavoritePaths { get; set; } = new();
+
+    // ===== 文件过滤 =====
+    /// <summary>用户保存的过滤预设列表（上限 20 个）。内置预设由 <see cref="FileFilterPreset.GetBuiltInPresets"/> 提供。</summary>
+    public List<FileFilterPreset> FilterPresets { get; set; } = new();
+
+    /// <summary>添加用户预设（上限 20 个）。超过上限时静默忽略。</summary>
+    public void AddPreset(FileFilterPreset preset)
+    {
+        if (FilterPresets.Count >= 20) return;
+        FilterPresets.Add(preset);
+    }
 
     // ===== 调试 =====
     public bool EnableDebugLogging { get; set; } = false;

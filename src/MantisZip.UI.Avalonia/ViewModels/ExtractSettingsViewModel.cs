@@ -80,7 +80,8 @@ public partial class ExtractSettingsViewModel : ObservableObject
             "Extract_Conflict_Skip",
             "Extract_OpenFolder",
             "Extract_Start",
-            "Extract_Cancel"
+            "Extract_Cancel",
+            "Extract_TabFilter"
         };
         var dict = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         foreach (var key in keys)

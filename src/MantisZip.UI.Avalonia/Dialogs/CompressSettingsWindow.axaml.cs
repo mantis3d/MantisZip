@@ -3,6 +3,7 @@ using Avalonia.Controls;
 using Avalonia.Interactivity;
 using Avalonia.Media;
 using Avalonia.Platform.Storage;
+using MantisZip.Core.FileFilter;
 using MantisZip.UI.Avalonia.Models;
 using MantisZip.UI.Avalonia.Services;
 using MantisZip.UI.Avalonia.ViewModels;
@@ -93,6 +94,17 @@ public partial class CompressSettingsWindow : Window
         Loaded += OnLoaded;
     }
 
+    /// <summary>
+    /// 获取当前文件过滤条件。返回 null 表示不过滤。
+    /// </summary>
+    public FileFilterCriteria? GetFilter()
+    {
+        if (FileFilterControl == null) return null;
+        if (!FileFilterControl.IsFilterEnabled) return null;
+        var filter = FileFilterControl.GetFilter();
+        return filter.IsActive ? filter : null;
+    }
+
     private void OnLoaded(object? sender, RoutedEventArgs e)
     {
         if (_loaded) return;
@@ -100,6 +112,30 @@ public partial class CompressSettingsWindow : Window
 
         FormatOptionsPanel.LoadDefaults();
         LoadSplitSizeFromSettings();
+        InitFileFilter();
+    }
+
+    /// <summary>初始化文件过滤控件（预设 + 事件）。</summary>
+    private void InitFileFilter()
+    {
+        var settings = AppSettings.Load();
+        FileFilterControl.LoadPresets(settings.FilterPresets);
+
+        FileFilterControl.SavePresetRequested += name =>
+        {
+            var filter = FileFilterControl.GetFilter();
+            if (!filter.IsActive) return;
+            settings.AddPreset(new FileFilterPreset(name, filter));
+            settings.Save();
+            FileFilterControl.LoadPresets(settings.FilterPresets);
+        };
+
+        FileFilterControl.DeletePresetRequested += preset =>
+        {
+            settings.FilterPresets.Remove(preset);
+            settings.Save();
+            FileFilterControl.LoadPresets(settings.FilterPresets);
+        };
     }
 
     /// <summary>

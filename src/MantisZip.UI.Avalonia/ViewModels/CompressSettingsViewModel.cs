@@ -307,6 +307,7 @@ public partial class CompressSettingsViewModel : ObservableObject
         LocalizedStrings["Compress_VolumeSize"] = LocalizationManager.T("Compress_VolumeSize");
         LocalizedStrings["Compress_TabPassword"] = LocalizationManager.T("Compress_TabPassword");
         LocalizedStrings["Compress_TabComment"] = LocalizationManager.T("Compress_TabComment");
+        LocalizedStrings["Compress_TabFilter"] = LocalizationManager.T("Compress_TabFilter");
         LocalizedStrings["Compress_Format"] = LocalizationManager.T("Compress_Format");
         LocalizedStrings["Compress_Level"] = LocalizationManager.T("Compress_Level");
         LocalizedStrings["Compress_OutputMode"] = LocalizationManager.T("Compress_OutputMode");
