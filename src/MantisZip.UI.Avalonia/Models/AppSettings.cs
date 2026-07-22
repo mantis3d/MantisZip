@@ -1,4 +1,5 @@
 using System.Text.Json;
+using MantisZip.Core.FileFilter;
 
 namespace MantisZip.UI.Avalonia.Models;
 
@@ -32,10 +33,22 @@ public class AppSettings
     public string ExtractDestination { get; set; } = "ask"; // same-dir / desktop / last / ask
     public string FileConflictAction { get; set; } = "ask"; // overwrite / rename / skip / ask
     public bool OpenFolderAfterExtract { get; set; } = false;
+    public bool ExtractPreserveFullPath { get; set; } = false;
+
+    // ===== 交互 =====
+    public bool EnableDragExtract { get; set; } = true;
+    /// <summary>双击压缩包时的行为：open / extract-here / smart-extract / extract-dialog</summary>
+    public string DoubleClickAction { get; set; } = "open";
+    /// <summary>双击打开阈值（字节），超过此大小弹出确认框。0 = 禁用双击打开。</summary>
+    public long DoubleClickOpenThreshold { get; set; } = 10 * 1024 * 1024; // 默认 10 MB
+    /// <summary>解压完成后将原压缩包移到回收站</summary>
+    public bool DeleteArchiveAfterExtract { get; set; } = false;
 
     // ===== 上下文菜单 =====
     public bool EnableOpenMenu { get; set; } = true;
     public bool EnableCompressMenu { get; set; } = true;
+    public bool EnableExtractMenu { get; set; } = true;
+    public bool EnableQuickCompress { get; set; } = true;
     public bool EnableExtractHereMenu { get; set; } = true;
     public bool EnableExtractToNamedMenu { get; set; } = true;
     public bool EnableExtractToMenu { get; set; } = true;
@@ -45,14 +58,12 @@ public class AppSettings
     public bool ShowMenuIcons { get; set; } = true;
     public bool EnableDynamicMenu { get; set; } = true;
 
-    // ===== 解压扩展 =====
-    public bool EnableDragExtract { get; set; } = true;
-    public bool ExtractPreserveFullPath { get; set; } = false;
-
     // ===== 高级 =====
     public string SevenZipPath { get; set; } = "";
     public bool PreserveDirectoryRoot { get; set; } = true;
     public bool CleanTempOnStartup { get; set; } = true;
+    /// <summary>写入目标目录无权限时是否弹窗提权。false = 仅提示，不弹提权框。</summary>
+    public bool AllowElevation { get; set; } = false;
 
     // ===== 预览 =====
     public bool EnableImagePreview { get; set; } = true;
@@ -99,6 +110,17 @@ public class AppSettings
 
     // ===== 收藏夹 =====
     public List<string> FavoritePaths { get; set; } = new();
+
+    // ===== 文件过滤 =====
+    /// <summary>用户保存的过滤预设列表（上限 20 个）。内置预设由 <see cref="FileFilterPreset.GetBuiltInPresets"/> 提供。</summary>
+    public List<FileFilterPreset> FilterPresets { get; set; } = new();
+
+    /// <summary>添加用户预设（上限 20 个）。超过上限时静默忽略。</summary>
+    public void AddPreset(FileFilterPreset preset)
+    {
+        if (FilterPresets.Count >= 20) return;
+        FilterPresets.Add(preset);
+    }
 
     // ===== 调试 =====
     public bool EnableDebugLogging { get; set; } = false;

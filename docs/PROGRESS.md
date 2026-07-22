@@ -7,8 +7,8 @@
 - **技术栈**: .NET 9 + WPF → Avalonia 迁移中 + SharpCompress + SharpSevenZip
 
 ## 版本
-- **当前版本**: 0.4.4
-- **发布日期**: 2026-06-29
+- **当前版本**: 0.4.5
+- **发布日期**: 2026-07-15
 
 ## 版本历史
 
@@ -20,6 +20,54 @@
 ---
 
 ### MantisZip.UI.Avalonia（主力版）
+
+**2026-07-22** — P0 列表控件紧凑度联动 + AGENTS.md 规则 7
+  - ExtractSettingsWindow FileListBox：`ItemContainerTheme` + `ControlHeightMd`
+  - MainWindow FileListGrid：`RowHeight="{DynamicResource ControlHeightMd}"`
+  - MainWindow Folder TreeView：`TreeViewItem` Style 加 `MinHeight="{DynamicResource ControlHeightSm}"`
+  - PreviewPanel CsvDataGrid / SqliteDataGrid：`RowHeight="{DynamicResource ControlHeightMd}"`
+  - AGENTS.md 新增 规则 7：列表/树形/表格控件必须使用紧凑度感知的行高（含对照表 + 三种控件示例）
+  - Build 0 errors
+
+**2026-07-22** — 文件列表多选 + 预设重命名 + CanExecute 守卫 + 紧凑度联动 + 开关行为统一
+  - CompressSettingsWindow：源文件列表改为多选（`SelectionMode="Multiple"`），移除按钮改为 Click code-behind 批量删除
+  - Preset rename：新增 Rename 按钮 + `RenamePresetRequested` 事件 + InputDialog 预填当前名 + 重名检查（Compress/Extract 两窗口）
+  - CanExecuteStartCompress：`SelectedPaths.Count > 0` 守卫，`CollectionChanged` 时自动更新
+  - FileFilterEditor 切换开关统一为 方案 A（隐藏内容而非禁用），`SyncControlStates()` 简化为 `FilterContentPanel.IsVisible`
+  - AGENTS.md 新增 规则 6：开关控制面板区域时统一隐藏（方案 A）
+  - SourceFilesList 支持紧凑度：`ItemContainerTheme` 用 `ControlHeightMd`（28/32/38 三档）
+  - 本地化：新增 3 键（zh-CN + en）
+  - Build 0 errors
+
+**2026-07-22** — P1-3: FileFilterEditor 移植（文件过滤控件：三维过滤 + 预设管理 + 临时预设）
+  - 新建 Controls/FileFilterEditor.axaml/.cs：完全移植 WPF 版文件过滤控件（扩展名/文件名/大小/日期四维过滤 + 预设管理 + ComboBox 临时预设机制）
+  - 新建 Services/FileFilterHelper.cs：ApplyFilter + 递归目录枚举
+  - CompressSettingsWindow/ExtractSettingsWindow 各加一个过滤 Tab，接入 GetFilter/GetFilteredEntryKeys
+  - AppSettings.cs：FilterPresets 属性 + AddPreset 方法
+  - 本地化：新增 28 条键（FileFilter_* + Common_OK/Cancel + Compress/Extract_TabFilter）
+  - 主题绑定 + 紧凑度模式全量支持
+  - Build 0 errors, Tests 35 passed
+
+**2026-07-20** — P1-1：双击行为 CLI 分发 + 解压后删除原包后端逻辑
+  - App.axaml.cs：新增 `--open-dispatch` CLI handler，根据 DoubleClickAction 设置分发到 extract-here/smart-extract/extract-dialog/open
+  - App.axaml.cs：新增 TryDeleteArchiveAfterExtract 方法（retry 3x+200ms 间隔，FileSystem.DeleteFile 移入回收站）
+  - TryExtractArchiveAsync 和 TryExtractSmartAsync 解压成功后调用 TryDeleteArchiveAfterExtract
+  - Build 0 errors
+
+**2026-07-20** — WPF 差异补齐：SettingsWindow 缺失控件移植（DeleteArchiveAfterExtract + DoubleClickAction + AllowElevation + EnableExtractMenu/EnableQuickCompress）
+  - AppSettings.cs：新增 6 属性（DeleteArchiveAfterExtract/DoubleClickAction/DoubleClickOpenThreshold/AllowElevation/EnableExtractMenu/EnableQuickCompress）
+  - SettingsWindowViewModel.cs：6 个 ObservableProperty + DoubleClickActionOptions Combo + DoubleClickOpenThresholdMB 属性 + Load Save
+  - SettingsWindow.axaml 解压 Tab：DeleteArchiveAfterExtract 复选框 + 双击行为区域（ComboBox + MB TextBox）
+  - SettingsWindow.axaml 高级 Tab：AllowElevation 复选框
+  - 本地化：新增 9 键（zh-CN + en）
+  - Build 0 errors
+
+**2026-07-20** — 窗口位置持久化（P2-1）：WindowStateManager + MainWindow 集成
+  - 新建 Models/WindowStateManager.cs：将窗口 Width/Height/Position(PixelPoint)/WindowState 持久化到 %LOCALAPPDATA%\MantisZip\window.json
+  - MainWindow.axaml.cs 构造函数调用 WindowStateManager.Load(this) 恢复上次位置
+  - MainWindow.axaml.cs Closing 事件调用 WindowStateManager.Save(this) 关闭时保存
+  - 最小化时不保存（避免 stale 位置），恢复时跳过 FullScreen
+  - Build 0 errors
 
 **2026-07-21** — 修复 DOCX 预览中文标题检测 + 计划补充表格渲染方案
   - 修复 `ShowDocx()` 标题检测仅匹配 `"Heading"`（大小写敏感）的问题：

@@ -519,6 +519,64 @@ PROGRESS.md 分三个独立线索，根据变更影响范围选择对应线索�
 - 新增控件时，不要硬编码间距/高度/圆角数值，优先使用这些 `{DynamicResource}` 引用
 - 所有资源由 `App.axaml.cs` 的 `ApplyCompactness()` 在启动时注入三档数值，运行时切换无需重启
 
+### 规则 6：开关控制面板区域时统一隐藏（方案 A）
+
+当需要用一个 CheckBox/开关来控制一组控件（过滤条件、加密选项等）的可用性时，**统一使用隐藏（IsVisible）而非禁用（IsEnabled）**：
+
+- **开关关闭 → 内容隐藏**：整个内容区域从视觉树中移除（`IsVisible="False"`），不占布局空间
+- **开关打开 → 内容显示**：正常显示所有控件
+- **例外**：如果保持内容可见有确凿的用户体验理由，需在 PR/代码评审时说明
+
+**实现方式**：将受控内容包裹在一个命名容器（`StackPanel`/`Border`）中，在 switch 事件中切换容器的 `IsVisible`。
+
+**参考实现**：
+- `Controls/FileFilterEditor.axaml` — `FilterContentPanel` + `SyncControlStates()`
+- `Dialogs/CompressSettingsWindow.axaml`（Password Tab）— `IsVisible="{Binding Encrypt}"`
+
+**不推荐**的方案 B（逐个设置 `IsEnabled = false`）已废弃，新增面板无需再实现。
+
+### 规则 7：列表/树形/表格控件必须使用紧凑度感知的行高
+
+新增任何 `ListBox`、`DataGrid`、`TreeView`、`ItemsControl` 等列表类控件时，**必须设置行高/项最小高度为紧凑度资源键**，禁止使用固定数值：
+
+| 控件类型 | 属性 | 推荐资源键 | 三档值 |
+|---------|------|-----------|-------|
+| `ListBox` | `ListBox.ItemContainerTheme` → `Setter Property="MinHeight"` | `ControlHeightMd` | 28/32/38 |
+| `DataGrid` | `RowHeight` | `ControlHeightMd` | 28/32/38 |
+| `TreeView` | `Style Selector="TreeViewItem"` → `Setter Property="MinHeight"` | `ControlHeightSm` | 22/26/30 |
+| `ItemsControl` | 项模板最外层容器 `MinHeight` | `ControlHeightSm` | 22/26/30 |
+
+**示例 — ListBox：**
+```xml
+<ListBox ItemsSource="{Binding ...}">
+  <ListBox.ItemContainerTheme>
+    <ControlTheme TargetType="ListBoxItem">
+      <Setter Property="MinHeight" Value="{DynamicResource ControlHeightMd}" />
+    </ControlTheme>
+  </ListBox.ItemContainerTheme>
+  ...
+</ListBox>
+```
+
+**示例 — DataGrid：**
+```xml
+<DataGrid ItemsSource="{Binding ...}"
+          RowHeight="{DynamicResource ControlHeightMd}" ... />
+```
+
+**示例 — TreeView：**
+```xml
+<TreeView ItemsSource="{Binding ...}">
+  <TreeView.Styles>
+    <Style Selector="TreeViewItem">
+      <Setter Property="MinHeight" Value="{DynamicResource ControlHeightSm}" />
+    </Style>
+  </TreeView.Styles>
+</TreeView>
+```
+
+**例外**：非数据行类列表（如 WrapPanel 标签云、图标画廊等不受紧凑度影响的控件）可豁免。
+
 ## 未来工作
 
 ### 迁移完成后的清理

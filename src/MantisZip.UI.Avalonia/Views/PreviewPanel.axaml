@@ -158,6 +158,7 @@
                   IsReadOnly="True"
                   CanUserResizeColumns="True"
                   CanUserSortColumns="True"
+                  RowHeight="{DynamicResource ControlHeightMd}"
                   GridLinesVisibility="All" />
 
         <!-- PE preview -->
@@ -334,6 +335,7 @@
                     IsReadOnly="True"
                     CanUserResizeColumns="True"
                     CanUserSortColumns="True"
+                    RowHeight="{DynamicResource ControlHeightMd}"
                     GridLinesVisibility="All" />
         </Grid>
 

@@ -366,6 +366,9 @@ public partial class PreviewViewModel : ObservableObject
     /// <summary>原始预览位图（未压平 Alpha 时的备份）。</summary>
     private Bitmap? _originalPreviewImage;
 
+    /// <summary>图像的 SkiaSharp 缓存副本，用于快速像素级操作（压平 Alpha 等）。</summary>
+    private SkiaSharp.SKBitmap? _skOriginalPreview;
+
     /// <summary>是否已压平 Alpha（不显示透明）。</summary>
     [ObservableProperty]
     private bool _isFlattenAlpha;
@@ -431,7 +434,9 @@ public partial class PreviewViewModel : ObservableObject
         IsFlattenAlpha = !IsFlattenAlpha;
         if (IsFlattenAlpha)
         {
-            if (PreviewImage != null)
+            if (_skOriginalPreview != null)
+                PreviewImage = FlattenAlphaSkia(_skOriginalPreview);
+            else if (PreviewImage != null)
                 PreviewImage = FlattenAlpha(PreviewImage);
         }
         else
@@ -624,6 +629,11 @@ public partial class PreviewViewModel : ObservableObject
         PreviewType = PreviewType.Image;
         PreviewImage = bitmap;
         _originalPreviewImage = bitmap;
+
+        // 缓存 SkiaSharp 副本供像素级操作
+        _skOriginalPreview?.Dispose();
+        _skOriginalPreview = BitmapToSkia(bitmap);
+
         ImageWidth = bitmap.PixelSize.Width;
         ImageHeight = bitmap.PixelSize.Height;
         var ext = Path.GetExtension(filePath).ToLowerInvariant();
@@ -727,6 +737,47 @@ public partial class PreviewViewModel : ObservableObject
         return new Bitmap(ms2);
     }
 
+    /// <summary>
+    /// 将 Avalonia Bitmap 转为 SkiaSharp SKBitmap（一次性 PNG 解码代价，仅在加载时支付）。
+    /// </summary>
+    private static SkiaSharp.SKBitmap? BitmapToSkia(Bitmap? source)
+    {
+        if (source == null) return null;
+        byte[] bytes;
+        using (var ms = new MemoryStream())
+        {
+            source.Save(ms);
+            bytes = ms.ToArray();
+        }
+        return SkiaSharp.SKBitmap.Decode(bytes);
+    }
+
+    /// <summary>
+    /// 从 SKBitmap 批量操作像素并返回 Avalonia WriteableBitmap（零 PNG 编解码）。
+    /// 将所有像素 alpha 设为 255，显示 RGB 原始颜色。
+    /// </summary>
+    private static Bitmap FlattenAlphaSkia(SkiaSharp.SKBitmap src)
+    {
+        if (src == null) throw new ArgumentNullException(nameof(src));
+
+        int totalBytes = src.Height * src.RowBytes;
+        byte[] pixelData = new byte[totalBytes];
+        System.Runtime.InteropServices.Marshal.Copy(src.GetPixels(), pixelData, 0, totalBytes);
+
+        // 步进 4 字节（BGRA8888），第 4 字节是 alpha → 设为 255
+        for (int i = 3; i < totalBytes; i += 4)
+            pixelData[i] = 255;
+
+        var wb = new WriteableBitmap(
+            new global::Avalonia.PixelSize(src.Width, src.Height),
+            new global::Avalonia.Vector(96, 96),
+            global::Avalonia.Platform.PixelFormat.Bgra8888,
+            global::Avalonia.Platform.AlphaFormat.Premul);
+        using var locked = wb.Lock();
+        System.Runtime.InteropServices.Marshal.Copy(pixelData, 0, locked.Address, totalBytes);
+        return wb;
+    }
+
     // ── GIF ──
 
     /// <summary>
@@ -757,6 +808,11 @@ public partial class PreviewViewModel : ObservableObject
             {
                 PreviewImage = frames[0].Bitmap;
                 _originalPreviewImage = frames[0].Bitmap;
+
+                // 缓存 SkiaSharp 副本
+                _skOriginalPreview?.Dispose();
+                _skOriginalPreview = BitmapToSkia(frames[0].Bitmap);
+
                 ImageWidth = frames[0].Bitmap.PixelSize.Width;
                 ImageHeight = frames[0].Bitmap.PixelSize.Height;
             }
@@ -875,6 +931,11 @@ public partial class PreviewViewModel : ObservableObject
             using var ms = new MemoryStream(data.ToArray());
             PreviewImage = new global::Avalonia.Media.Imaging.Bitmap(ms);
             _originalPreviewImage = PreviewImage;
+
+            // 缓存 SkiaSharp 副本（从同一 Snapshot 直接转，无需第二次 PNG 编解码）
+            _skOriginalPreview?.Dispose();
+            _skOriginalPreview = SkiaSharp.SKBitmap.FromImage(img);
+
             IsPreviewVisible = true;
             IsToolbarVisible = true;
             PreviewHeaderText = "SVG 预览";
@@ -2083,6 +2144,8 @@ public partial class PreviewViewModel : ObservableObject
         IsTransparencyBgShown = false;
         IsFlattenAlpha = false;
         _originalPreviewImage = null;
+        _skOriginalPreview?.Dispose();
+        _skOriginalPreview = null;
 
         // Reset info panel
         FileName = string.Empty;

@@ -47,19 +47,24 @@
                           Background="{DynamicResource ThemeButtonBgBrush}"
                           Foreground="{DynamicResource ThemeTextPrimaryBrush}"
                           BorderBrush="{DynamicResource ThemeBorderBrush}" />
-                  <Button Content="{Binding LocalizedStrings[Compress_Remove]}"
-                          Height="26" Padding="8,0"
-                          Command="{Binding RemoveSelectedCommand}"
-                          CommandParameter="{Binding SelectedItem, ElementName=SourceFilesList}"
-                          Background="{DynamicResource ThemeButtonBgBrush}"
-                          Foreground="{DynamicResource ThemeTextPrimaryBrush}"
-                          BorderBrush="{DynamicResource ThemeBorderBrush}" />
-                </StackPanel>
-                <ListBox x:Name="SourceFilesList"
-                         ItemsSource="{Binding SelectedPaths}"
-                         MinHeight="160" MaxHeight="240"
-                         BorderBrush="{DynamicResource ThemeBorderBrush}"
-                         Background="{DynamicResource ThemeSurfaceBgBrush}">
+                   <Button Content="{Binding LocalizedStrings[Compress_Remove]}"
+                           Height="26" Padding="8,0"
+                           Click="RemoveSelected_Click"
+                           Background="{DynamicResource ThemeButtonBgBrush}"
+                           Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                           BorderBrush="{DynamicResource ThemeBorderBrush}" />
+                 </StackPanel>
+                 <ListBox x:Name="SourceFilesList"
+                          SelectionMode="Multiple"
+                          ItemsSource="{Binding SelectedPaths}"
+                          MinHeight="160" MaxHeight="240"
+                          BorderBrush="{DynamicResource ThemeBorderBrush}"
+                          Background="{DynamicResource ThemeSurfaceBgBrush}">
+                   <ListBox.ItemContainerTheme>
+                     <ControlTheme TargetType="ListBoxItem">
+                       <Setter Property="MinHeight" Value="{DynamicResource ControlHeightMd}" />
+                     </ControlTheme>
+                   </ListBox.ItemContainerTheme>
                   <ListBox.ItemTemplate>
                     <DataTemplate>
                       <TextBlock Text="{Binding}"
@@ -447,6 +452,15 @@
               </StackPanel>
             </Border>
           </StackPanel>
+        </ScrollViewer>
+      </TabItem>
+
+      <!-- Tab 5: File Filter -->
+      <TabItem Header="{Binding LocalizedStrings[Compress_TabFilter]}"
+               Classes="compactTab">
+        <ScrollViewer Background="{DynamicResource ThemeWindowBgBrush}"
+                       TextElement.Foreground="{DynamicResource ThemeTextPrimaryBrush}">
+          <controls:FileFilterEditor x:Name="FileFilterControl" />
         </ScrollViewer>
       </TabItem>
     </TabControl>

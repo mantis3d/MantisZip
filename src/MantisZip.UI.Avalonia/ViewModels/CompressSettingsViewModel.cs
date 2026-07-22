@@ -299,6 +299,7 @@ public partial class CompressSettingsViewModel : ObservableObject
             BuildCompressPreview();
             if (OutputMode != CompressOutputMode.Manual)
                 RefreshOutputPathState();
+            UpdateCanCompress();
         };
 
         // Populate localized strings
@@ -307,6 +308,7 @@ public partial class CompressSettingsViewModel : ObservableObject
         LocalizedStrings["Compress_VolumeSize"] = LocalizationManager.T("Compress_VolumeSize");
         LocalizedStrings["Compress_TabPassword"] = LocalizationManager.T("Compress_TabPassword");
         LocalizedStrings["Compress_TabComment"] = LocalizationManager.T("Compress_TabComment");
+        LocalizedStrings["Compress_TabFilter"] = LocalizationManager.T("Compress_TabFilter");
         LocalizedStrings["Compress_Format"] = LocalizationManager.T("Compress_Format");
         LocalizedStrings["Compress_Level"] = LocalizationManager.T("Compress_Level");
         LocalizedStrings["Compress_OutputMode"] = LocalizationManager.T("Compress_OutputMode");
@@ -651,6 +653,8 @@ public partial class CompressSettingsViewModel : ObservableObject
             OutputPath = path;
         }
     }
+
+    private bool CanExecuteStartCompress() => SelectedPaths.Count > 0;
 
     [RelayCommand]
     private async Task StartCompress()

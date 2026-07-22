@@ -15,7 +15,7 @@
 
 | 优先级 | 功能 | 设计文档 | 难度 | 预估工时 | 说明 |
 |--------|------|----------|:----:|:--------:|------|
-| **P0** | Avalonia: WPF 差异补齐总表 | [avalonia-wpf-diff-plan.md](.sisyphus/plans/avalonia-wpf-diff-plan.md) | 🟡中 | 3-5天 | 21 个缺失 AppSettings + 8 项功能 + Shell/COM 集成 + 魔数检测 UI 等完整比对 |
+| **P1** | Avalonia: WPF 差异补齐总表 | [avalonia-wpf-diff-plan.md](.sisyphus/plans/avalonia-wpf-diff-plan.md) | 🟡中 | 1.5天 | 8 个缺失 AppSettings + 6 项功能（P0 Shell/COM 已完成，P0-2/3 已完成，P2-2 已完成）|
 | **P1** | 统一路径快捷选择 (QuickPathControl → Avalonia) | [quickpath-unified.md](.sisyphus/plans/quickpath-unified.md) | 🟡中 | 4-6h | WPF 已完成数据层 + QuickPathControl 组件 + CompressSettingsWindow 嵌入；WPF 新增 QuickPathPreDialog 前置窗；Avalonia 阶段以 CustomFilePickerDialog + QuickPathBuddy 统一替换（更新设计：[quickpath-control-redesign.md](.sisyphus/plans/quickpath-control-redesign.md)）|
 | **P1** | Win11 一级右键菜单 | [win11-first-level-menu.md](.sisyphus/plans/win11-first-level-menu.md) | 🔴高 | 1-2周 | IExplorerCommand 实现，HKLM 提权注册，双接口共存 |
 | **P1** | 紧凑度模式（Compactness Mode） | [compactness-mode.md](.sisyphus/plans/compactness-mode.md) | 🟡中 | 2-3h | 三档间距（紧凑/正常/松散）切换，修复 Avalonia Fluent 主题间距过松问题，~600 处硬编码值替换为 DynamicResource 间距资源 |

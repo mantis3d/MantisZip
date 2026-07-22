@@ -34,6 +34,11 @@
                 <ListBox x:Name="FileListBox"
                          Height="100"
                          BorderBrush="{DynamicResource ThemeBorderBrush}">
+                  <ListBox.ItemContainerTheme>
+                    <ControlTheme TargetType="ListBoxItem">
+                      <Setter Property="MinHeight" Value="{DynamicResource ControlHeightMd}" />
+                    </ControlTheme>
+                  </ListBox.ItemContainerTheme>
                   <ListBox.ItemTemplate>
                     <DataTemplate>
                       <TextBlock Text="{Binding}"
@@ -91,6 +96,15 @@
               </StackPanel>
             </Border>
           </StackPanel>
+        </ScrollViewer>
+      </TabItem>
+
+      <!-- Tab 2: File Filter -->
+      <TabItem Header="{Binding LocalizedStrings[Extract_TabFilter]}"
+               Classes="compactTab">
+        <ScrollViewer Background="{DynamicResource ThemeWindowBgBrush}"
+                       TextElement.Foreground="{DynamicResource ThemeTextPrimaryBrush}">
+          <controls:FileFilterEditor x:Name="FileFilterControl" />
         </ScrollViewer>
       </TabItem>
     </TabControl>

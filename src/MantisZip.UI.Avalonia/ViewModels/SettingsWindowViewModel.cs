@@ -125,6 +125,32 @@ public partial class SettingsWindowViewModel : ObservableObject
     [ObservableProperty]
     private bool _extractPreserveFullPath;
 
+    [ObservableProperty]
+    private bool _deleteArchiveAfterExtract;
+
+    [ObservableProperty]
+    private string _doubleClickAction = "open";
+
+    [ObservableProperty]
+    private long _doubleClickOpenThreshold = 10 * 1024 * 1024;
+
+    /// <summary>DoubleClickOpenThreshold 的 MB 版本（UI 显示用）</summary>
+    public long DoubleClickOpenThresholdMB
+    {
+        get => DoubleClickOpenThreshold / (1024 * 1024);
+        set
+        {
+            if (value < 0) value = 0;
+            DoubleClickOpenThreshold = value * (1024 * 1024);
+            OnPropertyChanged();
+        }
+    }
+
+    partial void OnDoubleClickOpenThresholdChanged(long value)
+    {
+        OnPropertyChanged(nameof(DoubleClickOpenThresholdMB));
+    }
+
     // ── ContextMenu ──
     [ObservableProperty]
     private bool _enableOpenMenu;
@@ -178,6 +204,9 @@ public partial class SettingsWindowViewModel : ObservableObject
 
     [ObservableProperty]
     private bool _cleanTempOnStartup;
+
+    [ObservableProperty]
+    private bool _allowElevation;
 
     // ── Language ──
     [ObservableProperty]
@@ -412,6 +441,9 @@ public partial class SettingsWindowViewModel : ObservableObject
     public System.Collections.ObjectModel.ObservableCollection<Option> FileConflictActionOptions { get; } = new();
     [ObservableProperty] private Option? _selectedFileConflictActionOption;
 
+    public System.Collections.ObjectModel.ObservableCollection<Option> DoubleClickActionOptions { get; } = new();
+    [ObservableProperty] private Option? _selectedDoubleClickActionOption;
+
     public System.Collections.ObjectModel.ObservableCollection<Option> TextFontFamilyOptions { get; } = new();
     [ObservableProperty] private Option? _selectedTextFontFamilyOption;
 
@@ -533,6 +565,15 @@ public partial class SettingsWindowViewModel : ObservableObject
     public string ExtractOpenFolderAfterText => LocalizationManager.T("Settings_Extract_OpenFolderAfter");
     public string ExtractEnableDragText => LocalizationManager.T("Settings_Extract_EnableDragExtract");
     public string ExtractPreserveFullPathText => LocalizationManager.T("Settings_Extract_PreserveFullPath");
+    public string ExtractDeleteAfterExtractText => LocalizationManager.T("Settings_Extract_DeleteArchiveAfterExtract");
+    public string ExtractDoubleClickActionText => LocalizationManager.T("Settings_Extract_DoubleClickAction");
+    public string ExtractDoubleClickThresholdText => LocalizationManager.T("Settings_Extract_DoubleClickThreshold");
+
+    // DoubleClickAction option display texts
+    public string DoubleClickActionOpenText => LocalizationManager.T("Settings_DoubleClick_Open");
+    public string DoubleClickActionExtractHereText => LocalizationManager.T("Settings_DoubleClick_ExtractHere");
+    public string DoubleClickActionSmartExtractText => LocalizationManager.T("Settings_DoubleClick_SmartExtract");
+    public string DoubleClickActionExtractToText => LocalizationManager.T("Settings_DoubleClick_ExtractTo");
 
     // Extract option display texts
     public string ExtractDestAskText => LocalizationManager.T("Settings_Extract_Dest_Ask");
@@ -575,6 +616,7 @@ public partial class SettingsWindowViewModel : ObservableObject
     public string AdvancedCleanPreviewTempText => LocalizationManager.T("Settings_Advanced_CleanPreviewTemp");
     public string AdvancedCleanAllTempText => LocalizationManager.T("Settings_Advanced_CleanAllTemp");
     public string AdvancedCleanOnStartupText => LocalizationManager.T("Settings_Advanced_CleanOnStartup");
+    public string AdvancedAllowElevationText => LocalizationManager.T("Settings_Advanced_AllowElevation");
 
     public string DebugText => LocalizationManager.T("Settings_EnableDebugLog");
     public string LogPrivacyModeText => LocalizationManager.T("Settings_Debug_LogPrivacyMode");
@@ -676,6 +718,9 @@ public partial class SettingsWindowViewModel : ObservableObject
         _openFolderAfterExtract = _settings.OpenFolderAfterExtract;
         _enableDragExtract = _settings.EnableDragExtract;
         _extractPreserveFullPath = _settings.ExtractPreserveFullPath;
+        _deleteArchiveAfterExtract = _settings.DeleteArchiveAfterExtract;
+        _doubleClickAction = _settings.DoubleClickAction;
+        _doubleClickOpenThreshold = _settings.DoubleClickOpenThreshold;
 
         // ContextMenu
         _enableOpenMenu = _settings.EnableOpenMenu;
@@ -695,6 +740,7 @@ public partial class SettingsWindowViewModel : ObservableObject
         _sevenZipPath = _settings.SevenZipPath;
         _preserveDirectoryRoot = _settings.PreserveDirectoryRoot;
         _cleanTempOnStartup = _settings.CleanTempOnStartup;
+        _allowElevation = _settings.AllowElevation;
 
         // Language
         _selectedLanguage = _settings.Language;
@@ -790,6 +836,12 @@ public partial class SettingsWindowViewModel : ObservableObject
         FileConflictActionOptions.Add(new Option(ConflictRenameText, "rename"));
         FileConflictActionOptions.Add(new Option(ConflictSkipText, "skip"));
 
+        DoubleClickActionOptions.Clear();
+        DoubleClickActionOptions.Add(new Option(DoubleClickActionOpenText, "open"));
+        DoubleClickActionOptions.Add(new Option(DoubleClickActionExtractHereText, "extract-here"));
+        DoubleClickActionOptions.Add(new Option(DoubleClickActionSmartExtractText, "smart-extract"));
+        DoubleClickActionOptions.Add(new Option(DoubleClickActionExtractToText, "extract-dialog"));
+
         // 字体列表（文本预览 + 全局界面共用同一份系统字体枚举）
         PopulateFontOptions();
 
@@ -884,6 +936,8 @@ public partial class SettingsWindowViewModel : ObservableObject
         SelectedExtractDestinationOption = ExtractDestinationOptions.FirstOrDefault(o => o.Value == ExtractDestination);
         SelectedFileConflictActionOption = FileConflictActionOptions.FirstOrDefault(o => o.Value == FileConflictAction);
 
+        SelectedDoubleClickActionOption = DoubleClickActionOptions.FirstOrDefault(o => o.Value == DoubleClickAction);
+
         SelectedTextFontFamilyOption = TextFontFamilyOptions.FirstOrDefault(o => o.Value == TextPreviewFontFamily)
                                        ?? TextFontFamilyOptions.FirstOrDefault();
 
@@ -955,6 +1009,13 @@ public partial class SettingsWindowViewModel : ObservableObject
         OnPropertyChanged(nameof(ExtractOpenFolderAfterText));
         OnPropertyChanged(nameof(ExtractEnableDragText));
         OnPropertyChanged(nameof(ExtractPreserveFullPathText));
+        OnPropertyChanged(nameof(ExtractDeleteAfterExtractText));
+        OnPropertyChanged(nameof(ExtractDoubleClickActionText));
+        OnPropertyChanged(nameof(ExtractDoubleClickThresholdText));
+        OnPropertyChanged(nameof(DoubleClickActionOpenText));
+        OnPropertyChanged(nameof(DoubleClickActionExtractHereText));
+        OnPropertyChanged(nameof(DoubleClickActionSmartExtractText));
+        OnPropertyChanged(nameof(DoubleClickActionExtractToText));
         OnPropertyChanged(nameof(ExtractDestAskText));
         OnPropertyChanged(nameof(ExtractDestSameDirText));
         OnPropertyChanged(nameof(ExtractDestDesktopText));
@@ -995,6 +1056,7 @@ public partial class SettingsWindowViewModel : ObservableObject
         OnPropertyChanged(nameof(AdvancedCleanPreviewTempText));
         OnPropertyChanged(nameof(AdvancedCleanAllTempText));
         OnPropertyChanged(nameof(AdvancedCleanOnStartupText));
+        OnPropertyChanged(nameof(AdvancedAllowElevationText));
 
         OnPropertyChanged(nameof(DebugText));
         OnPropertyChanged(nameof(LogPrivacyModeText));
@@ -1086,6 +1148,9 @@ public partial class SettingsWindowViewModel : ObservableObject
         _settings.OpenFolderAfterExtract = OpenFolderAfterExtract;
         _settings.EnableDragExtract = EnableDragExtract;
         _settings.ExtractPreserveFullPath = ExtractPreserveFullPath;
+        _settings.DeleteArchiveAfterExtract = DeleteArchiveAfterExtract;
+        _settings.DoubleClickAction = SelectedDoubleClickActionOption?.Value ?? DoubleClickAction;
+        _settings.DoubleClickOpenThreshold = DoubleClickOpenThreshold;
 
         // ContextMenu
         _settings.EnableOpenMenu = EnableOpenMenu;
@@ -1103,6 +1168,7 @@ public partial class SettingsWindowViewModel : ObservableObject
         _settings.SevenZipPath = SevenZipPath;
         _settings.PreserveDirectoryRoot = PreserveDirectoryRoot;
         _settings.CleanTempOnStartup = CleanTempOnStartup;
+        _settings.AllowElevation = AllowElevation;
 
         // Language
         _settings.Language = SelectedSelectedLanguageOption?.Value ?? SelectedLanguage;
