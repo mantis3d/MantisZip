@@ -28,6 +28,7 @@
               AutoGenerateColumns="False"
               IsReadOnly="True"
               SelectionMode="Single"
+              RowHeight="{DynamicResource ControlHeightMd}"
               SelectionChanged="FavoritesGrid_SelectionChanged">
       <DataGrid.Columns>
         <DataGridTextColumn Header="{Binding NameColumnHeader}"

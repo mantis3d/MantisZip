@@ -26,6 +26,8 @@
   - MainWindow FileListGrid：`RowHeight="{DynamicResource ControlHeightMd}"`
   - MainWindow Folder TreeView：`TreeViewItem` Style 加 `MinHeight="{DynamicResource ControlHeightSm}"`
   - PreviewPanel CsvDataGrid / SqliteDataGrid：`RowHeight="{DynamicResource ControlHeightMd}"`
+  - PasswordManagerWindow PasswordGrid：`RowHeight="{DynamicResource ControlHeightMd}"`
+  - FavoriteManagerWindow FavoritesGrid：`RowHeight="{DynamicResource ControlHeightMd}"`
   - AGENTS.md 新增 规则 7：列表/树形/表格控件必须使用紧凑度感知的行高（含对照表 + 三种控件示例）
   - Build 0 errors
 

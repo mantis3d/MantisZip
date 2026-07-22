@@ -4,6 +4,7 @@ using System.Data;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Media.Imaging;
 using Avalonia.Threading;
@@ -19,6 +20,7 @@ using ReverseMarkdown;
 using Microsoft.Data.Sqlite;
 using UglyToad.PdfPig;
 using UglyToad.PdfPig.Rendering.Skia;
+using Avalonia.Styling;
 
 namespace MantisZip.UI.Avalonia.ViewModels;
 
@@ -144,6 +146,10 @@ public partial class PreviewViewModel : ObservableObject
 
     partial void OnPreviewTypeChanged(PreviewType value)
     {
+        // 离开字体预览时取消主题切换订阅
+        if (value != PreviewType.Font)
+            UnsubscribeThemeChanged();
+
         OnPropertyChanged(nameof(IsTextVisible));
         OnPropertyChanged(nameof(IsCsvVisible));
         OnPropertyChanged(nameof(IsPeVisible));
@@ -921,6 +927,8 @@ public partial class PreviewViewModel : ObservableObject
     private byte[]? _fontPreviewCachedData;
     private bool _fontPreviewIsDark;
     private bool _fontSupportsLigature;
+    /// <summary>主题切换时自动重渲染字体预览。</summary>
+    private bool _themeSubscribed;
 
     /// <summary>
     /// 显示字体元数据与示例文本。
@@ -935,7 +943,7 @@ public partial class PreviewViewModel : ObservableObject
         }
         PreviewType = PreviewType.Font;
         IsPreviewVisible = true;
-        IsToolbarVisible = false;
+        IsToolbarVisible = true;
         PreviewHeaderText = info.FontName ?? "字体预览";
         FormatMetadata.Clear();
         FormatMetadata.Add(new("字体名称", info.FontName ?? "未知"));
@@ -955,7 +963,7 @@ public partial class PreviewViewModel : ObservableObject
             sampleText = "The quick brown fox jumps over the lazy dog\n0123456789\nABCDEFGHIJKLMNOPQRSTUVWXYZ\nabcdefghijklmnopqrstuvwxyz\n天地玄黄 宇宙洪荒 日月盈昃 辰宿列张";
 
         FontSize = settings.FontPreviewFontSize;
-        _fontPreviewIsDark = settings.Theme == "Dark";
+        _fontPreviewIsDark = Application.Current?.RequestedThemeVariant == ThemeVariant.Dark;
         IsLigatureEnabled = settings.FontPreviewEnableLigature;
 
         // 检测连字支持
@@ -966,6 +974,9 @@ public partial class PreviewViewModel : ObservableObject
         // 统一走 SkiaSharp FromStream + 自动换行位图渲染。
         FontFamily = global::Avalonia.Media.FontFamily.Default;
         RenderFontPreview(_fontPreviewCachedData, sampleText, _fontPreviewIsDark);
+
+        // 订阅主题切换，自动重渲染字体预览
+        SubscribeThemeChanged();
     }
 
     /// <summary>
@@ -975,7 +986,39 @@ public partial class PreviewViewModel : ObservableObject
     public void ReRenderFontPreview()
     {
         if (_fontPreviewCachedData == null) return;
+        // 每次重新渲染时重新判断暗色模式（主题可能在预览期间已切换）
+        _fontPreviewIsDark = Application.Current?.RequestedThemeVariant == ThemeVariant.Dark;
         RenderFontPreview(_fontPreviewCachedData, _fontPreviewSampleText, _fontPreviewIsDark);
+    }
+
+    private void SubscribeThemeChanged()
+    {
+        if (_themeSubscribed) return;
+        var app = Application.Current;
+        if (app != null)
+        {
+            app.ActualThemeVariantChanged += OnAppThemeChanged;
+            _themeSubscribed = true;
+        }
+    }
+
+    private void UnsubscribeThemeChanged()
+    {
+        if (!_themeSubscribed) return;
+        var app = Application.Current;
+        if (app != null)
+            app.ActualThemeVariantChanged -= OnAppThemeChanged;
+        _themeSubscribed = false;
+    }
+
+    private void OnAppThemeChanged(object? sender, EventArgs e)
+    {
+        if (PreviewType != PreviewType.Font) return;
+        global::Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+        {
+            _fontPreviewIsDark = Application.Current?.RequestedThemeVariant == ThemeVariant.Dark;
+            RenderFontPreview(_fontPreviewCachedData, _fontPreviewSampleText, _fontPreviewIsDark);
+        });
     }
 
     /// <summary>
