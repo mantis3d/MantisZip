@@ -21,6 +21,15 @@
 
 ### MantisZip.UI.Avalonia（主力版）
 
+**2026-07-22** — P1-3: FileFilterEditor 移植（文件过滤控件：三维过滤 + 预设管理 + 临时预设）
+  - 新建 Controls/FileFilterEditor.axaml/.cs：完全移植 WPF 版文件过滤控件（扩展名/文件名/大小/日期四维过滤 + 预设管理 + ComboBox 临时预设机制）
+  - 新建 Services/FileFilterHelper.cs：ApplyFilter + 递归目录枚举
+  - CompressSettingsWindow/ExtractSettingsWindow 各加一个过滤 Tab，接入 GetFilter/GetFilteredEntryKeys
+  - AppSettings.cs：FilterPresets 属性 + AddPreset 方法
+  - 本地化：新增 28 条键（FileFilter_* + Common_OK/Cancel + Compress/Extract_TabFilter）
+  - 主题绑定 + 紧凑度模式全量支持
+  - Build 0 errors, Tests 35 passed
+
 **2026-07-20** — P1-1：双击行为 CLI 分发 + 解压后删除原包后端逻辑
   - App.axaml.cs：新增 `--open-dispatch` CLI handler，根据 DoubleClickAction 设置分发到 extract-here/smart-extract/extract-dialog/open
   - App.axaml.cs：新增 TryDeleteArchiveAfterExtract 方法（retry 3x+200ms 间隔，FileSystem.DeleteFile 移入回收站）
