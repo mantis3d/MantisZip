@@ -16,7 +16,9 @@
     <PackageReference Include="Avalonia.Controls.DataGrid" Version="12.0.0" />
     <PackageReference Include="Avalonia.Desktop" Version="12.0.4" />
     <PackageReference Include="Avalonia.Themes.Fluent" Version="12.0.4" />
+    <PackageReference Include="ClosedXML" Version="0.105.0" />
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
+    <PackageReference Include="DocumentFormat.OpenXml" Version="3.5.1" />
     <PackageReference Include="HarfBuzzSharp" Version="14.2.0" />
     <PackageReference Include="HarfBuzzSharp.NativeAssets.Win32" Version="14.2.0" />
     <PackageReference Include="Svg.Skia" Version="2.0.0.5" />
@@ -55,7 +57,7 @@
   </ItemGroup>
 
   <!-- 构建后将 ShellExt 输出（comhost.dll + DLL + runtimeconfig.json）复制到 UI 输出目录 -->
-  <Target Name="CopyShellExtComhost" AfterTargets="Build">
+  <Target Name="CopyShellExtComhost" AfterTargets="Build" Condition="'$(SkipShellExtCopy)' != 'true'">
     <MSBuild Projects="..\MantisZip.ShellExt\MantisZip.ShellExt.csproj" Targets="Build" Properties="Configuration=$(Configuration)" />
     <PropertyGroup>
       <_ShellExtDir>..\MantisZip.ShellExt\bin\$(Configuration)\net9.0-windows10.0.17763.0</_ShellExtDir>

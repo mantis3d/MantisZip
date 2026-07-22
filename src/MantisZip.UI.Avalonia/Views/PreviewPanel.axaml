@@ -393,7 +393,81 @@
           </TreeView>
         </StackPanel>
 
-        <!-- Office preview (metadata only) -->
+        <!-- DOCX preview: 大纲（左）+ GridSplitter + 全文（右） -->
+        <Grid IsVisible="{Binding IsDocxVisible}"
+              ColumnDefinitions="Auto,4,*">
+          <!-- 大纲 -->
+          <Border Grid.Column="0"
+                  Background="{DynamicResource ThemeSurfaceBgBrush}">
+            <ScrollViewer MinWidth="120" MaxWidth="400">
+              <StackPanel Spacing="2">
+                <TextBlock Text="文档大纲"
+                           FontWeight="SemiBold"
+                           Foreground="{DynamicResource ThemeTextSecondaryBrush}"
+                           Margin="4" />
+                <ItemsControl ItemsSource="{Binding DocxOutline}">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:DocxOutlineItem">
+                      <TextBlock Text="{Binding Text}"
+                                 Margin="{Binding Indent}"
+                                 Foreground="{DynamicResource ThemeAccentBrush}"
+                                 FontWeight="Bold"
+                                 TextWrapping="NoWrap"
+                                 PointerPressed="OnOutlineItemClicked" />
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <!-- 无大纲时的回退 -->
+                <TextBlock Text="{Binding DocxNoOutlineText}"
+                           IsVisible="{Binding !HasDocxOutline}"
+                           Foreground="{DynamicResource ThemeTextSecondaryBrush}"
+                           Margin="4" />
+              </StackPanel>
+            </ScrollViewer>
+          </Border>
+
+          <!-- Splitter -->
+          <GridSplitter Grid.Column="1" Width="4"
+                        Background="{DynamicResource ThemeBorderBrush}"
+                        ResizeBehavior="PreviousAndNext" />
+
+          <!-- 全文 -->
+          <Border Grid.Column="2"
+                  Background="{DynamicResource ThemeSurfaceBgBrush}">
+            <ScrollViewer x:Name="DocxFullTextScroller">
+              <TextBlock Text="{Binding DocxFullText}"
+                         TextWrapping="Wrap"
+                         Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                         Margin="8" />
+            </ScrollViewer>
+          </Border>
+        </Grid>
+
+        <!-- XLSX preview -->
+        <DataGrid x:Name="XlsxDataGrid"
+                  IsVisible="{Binding IsXlsxVisible}"
+                  ItemsSource="{Binding XlsxData}"
+                  AutoGenerateColumns="False"
+                  IsReadOnly="True"
+                  CanUserResizeColumns="True"
+                  CanUserSortColumns="True"
+                  GridLinesVisibility="All" />
+
+        <!-- PPTX preview -->
+        <Border IsVisible="{Binding IsPptxVisible}"
+                Background="{DynamicResource ThemeSurfaceBgBrush}">
+          <ScrollViewer>
+            <TextBox Text="{Binding TextContent}"
+                     IsReadOnly="True"
+                     TextWrapping="Wrap"
+                     Background="Transparent"
+                     Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                     BorderThickness="0"
+                     Margin="8" />
+          </ScrollViewer>
+        </Border>
+
+        <!-- Office preview (metadata only, legacy fallback) -->
         <StackPanel IsVisible="{Binding IsOfficeVisible}"
                     Spacing="{DynamicResource SpacingXs}">
           <TextBlock Text="{Binding PreviewHeaderText}"

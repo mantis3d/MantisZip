@@ -3,7 +3,7 @@
 > 未来待开发功能规划。已实现功能请见 [docs/PROGRESS.md](docs/PROGRESS.md)，技术架构请见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)。
 
 **项目状态**: 🟢 开发中  
-**最后更新**: 2026-07-20  
+**最后更新**: 2026-07-22  
 **当前版本**: 0.4.5
 
 ---
@@ -15,12 +15,10 @@
 
 | 优先级 | 功能 | 设计文档 | 难度 | 预估工时 | 说明 |
 |--------|------|----------|:----:|:--------:|------|
-| **P1** | Avalonia: WPF 差异补齐总表 | [avalonia-wpf-diff-plan.md](.sisyphus/plans/avalonia-wpf-diff-plan.md) | 🟡中 | 1.5天 | 8 个缺失 AppSettings + 6 项功能（P0 Shell/COM 已完成，P0-2/3 已完成，P2-2 已完成）|
+| **P0** | Avalonia: WPF 差异补齐总表 | [avalonia-wpf-diff-plan.md](.sisyphus/plans/avalonia-wpf-diff-plan.md) | 🟡中 | 1-2天 | Shell/COM 集成等各项已基本补齐，剩余少数差异项待确认 |
 | **P1** | 统一路径快捷选择 (QuickPathControl → Avalonia) | [quickpath-unified.md](.sisyphus/plans/quickpath-unified.md) | 🟡中 | 4-6h | WPF 已完成数据层 + QuickPathControl 组件 + CompressSettingsWindow 嵌入；WPF 新增 QuickPathPreDialog 前置窗；Avalonia 阶段以 CustomFilePickerDialog + QuickPathBuddy 统一替换（更新设计：[quickpath-control-redesign.md](.sisyphus/plans/quickpath-control-redesign.md)）|
 | **P1** | Win11 一级右键菜单 | [win11-first-level-menu.md](.sisyphus/plans/win11-first-level-menu.md) | 🔴高 | 1-2周 | IExplorerCommand 实现，HKLM 提权注册，双接口共存 |
-| **P1** | 紧凑度模式（Compactness Mode） | [compactness-mode.md](.sisyphus/plans/compactness-mode.md) | 🟡中 | 2-3h | 三档间距（紧凑/正常/松散）切换，修复 Avalonia Fluent 主题间距过松问题，~600 处硬编码值替换为 DynamicResource 间距资源 |
 | **P1** | 解压路径统一（前置：文件筛选） | [extract-path-unification.md](.sisyphus/plans/extract-path-unification.md) | 🟢低 | 1.5h | 三路解压合并为 `ExtractEntriesAsync` + `pathOverrides`，消除重复循环 |
-| **P1** | 压缩解压文件筛选 | [file-filter-feature.md](.sisyphus/plans/file-filter-feature.md) | 🟢低 | 1-2h | ✅ 已完成 |
 | **P1** | 新增压缩格式（BZip2/XZ/CAB 等） | [new-format-support.md](.sisyphus/plans/new-format-support.md) | 🟡中 | 12-20h | 6 阶段渐进：TAR 裸格式/GZip 单文件 → BZip2 → XZ → CAB 只读 → UI 统一化 → Zstandard（需依赖） |
 | **P1** | 自包含体积优化（Avalonia 迁移后） | [selfcontained-size-optimization.md](.sisyphus/plans/selfcontained-size-optimization.md) | 🟡中 | 4-6h | 三步渐进：InvariantGlobalization → 保守修剪 → 激进修剪，目标降至 20–25 MB |
 | **P1** | Avalonia 拖拽直接解压 | [drag-drop-direct-extract.md](.sisyphus/plans/drag-drop-direct-extract.md) | 🟡中 | 5-7h | 纯 Win32 独立线程覆盖层（三色状态机 + 呼吸动画）+ WindowFromPoint+ShellWindows 检测目标路径；UIA 降级支持；需等 Avalonia 移植基本就绪后实施 |
@@ -35,7 +33,6 @@
 | **P2** | 进度窗口增强改造 | [progress-window-enhancement.md](.sisyphus/plans/progress-window-enhancement.md) | 🟡中 | 3-4h | 路径/文件名分离三行显示、文件级计数、实时统计栏、批处理每包摘要；计算逻辑抽到 Core 层 |
 | **P2** | 压缩文件名后缀模板 | [filename-suffix-template.md](.sisyphus/plans/filename-suffix-template.md) | 🟢低 | 2-3h | `{date}`/`{datetime}`/`{seq}` 占位符替换，防同名覆盖 |
 | **P2** | 嵌入缩略图预览 | [embedded-thumbnail-preview.md](.sisyphus/plans/embedded-thumbnail-preview.md) | 🟢低 | 2-3天 | MetadataExtractor(RAW) + Shell API(通用) 两层提取嵌入缩略图；完成后可扩展文件列表缩略图模式 |
-| **P2** | emoji 替换为 Fluent UI PathIcon + 文件列表行图标改用系统原生 | [emoji-to-pathicon.md](.sisyphus/plans/emoji-to-pathicon.md) | 🟢低 | 4-5h | Phase1: 菜单/工具栏/列头的 emoji → PathIcon（Fluent UI 矢量）；Phase2: 文件列表行图标从 SkiaSharp 自绘 → SHGetFileInfo 系统原生图标，非 Windows 回退自绘；另预置 ~13 个供 context-toolbars/file-list-filter-search 使用的图标资源 |
 | **P2** | 字体预览连字效果开关 | [font-preview-ligature.md](.sisyphus/plans/font-preview-ligature.md) | 🟡中 | 3-4h | HarfBuzzSharp shaping + `liga` feature toggle，工具栏按钮 |
 | **P2** | 提取日志与解压「后悔药」 | [extract-journal-undo.md](.sisyphus/plans/extract-journal-undo.md) | 🟡中 | 3-4h | 解压记录 + 一键回滚 |
 | **P3** | 压缩包对比 (Archive Diff) | [archive-diff.md](.sisyphus/plans/archive-diff.md) | 🟡中 | 3-4h | 压缩包文件级差异对比 |
@@ -43,18 +40,12 @@
 | **P3** | 可插拔预览模块体系 | [preview-modular-providers.md](.sisyphus/plans/preview-modular-providers.md) | 🟡中 | 3-4h | 格式类库独立分发 |
 | **P3** | 文件列表自定义列 | [custom-columns.md](.sisyphus/plans/custom-columns.md) | 🟡中 | 4-6h | 可自定义显示文件元数据列（文档标题、图片尺寸等） |
 | **P3** | 冻结列（水平滚动时列固定） | [frozen-column.md](.sisyphus/plans/frozen-column.md) | 🟢低 | 1-2h | 右键列标题冻结/取消冻结，分隔线，设置持久化 |
-| **P3** | Office 文档内容预览增强（Avalonia） | [office-content-preview-avalonia.md](.sisyphus/plans/office-content-preview-avalonia.md) | 🟡中 | 6-8h | avalonia-port: docx 大纲+全文、xlsx 表格、pptx 幻灯片文本（无 WebView2） |
+| **P3** | Office 文档内容预览增强（Avalonia） | [office-content-preview-avalonia.md](.sisyphus/plans/office-content-preview-avalonia.md) | 🟡中 | 6-8h | ✅ 已完成一期（DOCX 纯文本大纲+全文、XLSX 表格、PPTX 文本）。后续：WebView 优先统一渲染管线（DOCX→Mammoth→HTML、Markdown→HTML）+ 纯文本降级 📋 + PPTX Canvas 定位预览 📋 |
 | **P3** | 元数据信息面板可配置 | [metadata-panel-configurable.md](.sisyphus/plans/metadata-panel-configurable.md) | 🟡中 | 4-6h | 自定义每个格式在信息栏/内容区顶部的字段显示和同行布局 |
 | **P3** | ICO 文件自身图标显示 | [ico-file-icon-extract.md](.sisyphus/plans/ico-file-icon-extract.md) | 🟢低 | 2-3h | ico 文件列表显示自身嵌入图标 |
 | **P3** | 右键菜单目录结构预览 | [context-menu-tree-preview.md](.sisyphus/plans/context-menu-tree-preview.md) | 🔴高 | 6-8h | COM 菜单中展示压缩包顶层文件树 |
-| **P1** | Avalonia Phase 10: WPF 功能补齐 | [avalonia-phase10-feature-parity.md](.sisyphus/plans/avalonia-phase10-feature-parity.md) | 🟡中 | ✅ 已完成 | 文件列表进度条、预览信息面板、状态栏增强 |
-| **P1** | Avalonia: Shell/COM 集成移植 | [avalonia-shell-com-integration.md](.sisyphus/plans/avalonia-shell-com-integration.md) | 🟡中 | 3-5天 | ShellIntegration 移植、ShellExt 项目引用、COM host 部署、文件关联CLI、MenuIcons 资源 |
-| **P1** | Avalonia: UI 功能补齐 | [avalonia-ui-feature-parity.md](.sisyphus/plans/avalonia-ui-feature-parity.md) | 🟡中 | 27/29 🟡 | Elevation×3、Favorites×2、QuickPath×2 等 11 个对话框、2 个控件、1 个转换器（2 项阻塞于 GUI 测试） |
+| **P1** | Avalonia: UI 功能补齐 | [avalonia-ui-feature-parity.md](.sisyphus/plans/avalonia-ui-feature-parity.md) | 🟡中 | 29/29 ✅ | Elevation×3、Favorites×2、QuickPath×2 等 11 个对话框、2 个控件、1 个转换器（2 项阻塞于 GUI 测试） |
 | **P1** | 自动更新检测 | [auto-update.md](.sisyphus/plans/auto-update.md) | 🟡中 | 4-6h | GitHub Releases API 版本检查、AboutWindow 更新 Tab、UpdateAvailableDialog、设置开关、单元测试 |
-| **P1** | 上下文工具栏重构（目录树+文件列表） | [context-toolbars.md](.sisyphus/plans/context-toolbars.md) | 🟡中 | 6-8h | 目录树工具栏（展开/收起/展开到当前+树过滤），文件列表工具栏（导航组+地址栏+复制名/列选择器/视图过滤/全选反选/刷新+筛选/展平），导航历史栈，精简全局工具栏 |
-| **P1** | 解压/压缩结果预览面板 | [result-preview-panel.md](.sisyphus/plans/result-preview-panel.md) | 🟡中 | 8-10h | ExtractSettings/CompressSettings 窗口右侧新增预览面板，ResultTreeView 可复用控件（精简模式/冲突高亮/过滤灰显/摘要栏），拖拽导出等场景复用 |
-| **P1** | Avalonia: 预览两阶段加载（信息栏+内容分离） | [preview-two-phase-loading.md](.sisyphus/plans/preview-two-phase-loading.md) | 🟢低 | 1-2h | 立即显示加载状态+信息栏(Phase 1) → 异步提取后显示内容(Phase 2) + 版本号守卫防竞态；WPF 已有此模式，Avalonia 补齐 |
-| **P2** | Avalonia: i18n 补齐 + 杂物清理 | [avalonia-i18n-and-cleanup.md](.sisyphus/plans/avalonia-i18n-and-cleanup.md) | 🟢低 | ✅ 已完成 | ~290 个缺失 i18n key、版本号同步、Diagnostics 版本对齐、空目录清理 |
 | **P4** | 外部工具视频元数据 | — | 🟢低 | 2-3h | ffprobe 集成 |
 | **🔍调研** | 跨平台移植可行性 | [cross-platform-port.md](.sisyphus/plans/cross-platform-port.md) | 🟡中大 | 2-3月 | 砍 ShellExt，WPF→Avalonia，WebView2→WebKit，SharpSevenZip→SharpCompress/p7zip，DPAPI→AES-GCM |
 | **🔍调研** | Avalonia 预览机会分析 | [preview-avalonia-opportunities.md](.sisyphus/plans/preview-avalonia-opportunities.md) | 🟡中 | — | 分析 Avalonia 迁移对预览系统的影响：SVG/HDR/PSD/AI 新能力、音视频替代方案、HDR 全景 360° 查看器方案 |
@@ -75,7 +66,7 @@
 
 ## 跨平台移植影响分析
 
-> 对 `docs/PLAN.md` 待实现全部 23 个计划进行的 WPF→Avalonia 兼容性评估（不含调研计划本身）。（2026-06-22）
+> 对 `docs/PLAN.md` 待实现全部 32 个计划进行的 WPF→Avalonia 兼容性评估。（2026-07-22）
 >
 > **注意**: 已完成方案（见 `docs/PROGRESS.md` 历史设计方案索引）不再列入本分析。已废弃方案仅作参考。
 
@@ -84,16 +75,16 @@
 | 影响等级 | 数量 | 含义 |
 |---------|:----:|------|
 | 🟢 无影响 | 3 | Core 层纯 C# 逻辑，开箱即用 |
-| 🟡 需调整 | 11 | Core 逻辑可复用，UI 层（XAML/控件）需移植到 Avalonia |
+| 🟡 需调整 | 20 | Core 逻辑可复用，UI 层（XAML/控件）需移植到 Avalonia |
 | 🔴 冲突 | 9 | 依赖 COM/注册表/Shell API/WPF 独占控件，需完全重写或平台替代方案 |
 
-### 🟢 无影响（4 个）
+### 🟢 无影响（3 个）
 
-`preview-modular-providers.md`、`selfcontained-size-optimization.md`
+`preview-modular-providers.md`、`selfcontained-size-optimization.md`、`winget-publishing.md`
 
-### 🟡 需调整 — Core 可复用，UI 需移植（11 个）
+### 🟡 需调整 — Core 可复用，UI 需移植（20 个）
 
-`archive-diff.md`、`archive-rename-entry.md`、`compress-preset.md`、`compression-estimator.md`、`custom-columns.md`、`extract-journal-undo.md`、`ico-file-icon-extract.md`、`office-content-preview-avalonia.md`、`外部工具视频元数据（无计划文件）`
+`archive-diff.md`、`archive-rename-entry.md`、`auto-update.md`、`compress-preset.md`、`compression-estimator.md`、`custom-columns.md`、`extract-journal-undo.md`、`extract-path-unification.md`、`filename-suffix-template.md`、`font-preview-ligature.md`、`html-preview-webview-fallback.md`、`ico-file-icon-extract.md`、`metadata-panel-configurable.md`、`new-format-support.md`、`office-content-preview-avalonia.md`、`preview-quick-modes.md`、`progress-window-enhancement.md`、`avalonia-ui-feature-parity.md`、`avalonia-wpf-diff-plan.md`、`外部工具视频元数据（无计划文件）`
 
 ### 🔴 冲突 — 需完全重写或废弃（9 个）
 
@@ -104,7 +95,7 @@
 1. **🔴 的共性**：全部依赖 Windows Shell API（COM/注册表/P/Invoke/Shell32）或 WPF 独占控件/DataGrid 特定行为。跨平台后这些功能要么砍掉（COM 右键菜单、UAC 提权），要么需要 OS 级不同实现（Linux `.desktop` actions / macOS `NSExtension`）。
 2. **🟡 的规律一致**：Core 层的解析器/算法/模型全是纯 C# 可复用，只有 UI 渲染层（WPF XAML + 控件）需要移植到 Avalonia 等价物。
 3. **🟢 的 3 个计划**：基本是纯工具代码（正则、IO、字节操作）或发布配置，开箱即跨平台。
-4. **最值得跨平台前实现的计划**：优先完成 `compress-preset.md`（设置持久化）等 🟢/🟡 计划（`file-filter-feature.md` 已实现），积累跨平台经验后再攻坚 🔴 计划。
+4. **最值得跨平台前实现的计划**：优先完成 🟢/🟡 计划（已有 `file-filter-feature.md` 等完成先例），积累跨平台经验后再攻坚 🔴 计划。
 5. **Core 层遗留问题**：`PasswordManager`（DPAPI → 已实现 `AesGcmDataProtector` 抽象）和 `SevenZipEngine`（7z.dll Windows-only）已在跨平台准备中。
 
 *此文档将随开发进度持续更新*

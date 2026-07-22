@@ -7,8 +7,8 @@
 - **技术栈**: .NET 9 + WPF → Avalonia 迁移中 + SharpCompress + SharpSevenZip
 
 ## 版本
-- **当前版本**: 0.4.4
-- **发布日期**: 2026-06-29
+- **当前版本**: 0.4.5
+- **发布日期**: 2026-07-22
 
 ## 版本历史
 
@@ -69,6 +69,32 @@
   - MainWindow.axaml.cs 构造函数调用 WindowStateManager.Load(this) 恢复上次位置
   - MainWindow.axaml.cs Closing 事件调用 WindowStateManager.Save(this) 关闭时保存
   - 最小化时不保存（避免 stale 位置），恢复时跳过 FullScreen
+  - Build 0 errors
+
+**2026-07-21** — 修复 DOCX 预览中文标题检测 + 计划补充表格渲染方案
+  - 修复 `ShowDocx()` 标题检测仅匹配 `"Heading"`（大小写敏感）的问题：
+    - StyleId 改为 `OrdinalIgnoreCase` 匹配（`"heading1"`/`"HEADING1"`）
+    - 新增 StyleName 显示名称检测（`"标题 1"`、`"heading 1"`）
+    - 新增 `OutlineLevel` 段落属性检测（跨语言区最可靠的方式）
+    - 级别提取改为通用数字提取（`"Heading1"`→1、`"标题 1"`→1）
+  - `.sisyphus/plans/office-content-preview-avalonia.md` 补充两条路线：
+    - DOCX 表格内容提取（纯文本分隔符 A / Mammoth→HtmlRenderer B）
+    - Markdown 表格渲染补齐（原生 Grid B 路线 A / HtmlRenderer B）
+  - 交叉引用 `html-preview-webview-fallback.md` Task 5（已有 BuildTable 方案）
+  - Build 0 errors, 0 warnings
+
+**2026-07-21** — Office 文档内容预览（DOCX/XLSX/PPTX 纯文本+表格+文本）
+  - NuGet: 添加 DocumentFormat.OpenXml 3.5.1 + ClosedXML 0.105.0
+  - DOCX: 左右分栏（GridSplitter + 大纲缩进 + 全文 TextBlock），点击大纲条目跳转到对应位置；大文件保护（>50MB）；无标题回退提示
+  - XLSX: ClosedXML → DataTable → DataGrid（首工作表，100 行 × 100 列，首行为列名）；空/密码保护 gracefully handle
+  - PPTX: 手动 ZipFile → XDocument → a:t 元素提取 → 幻灯片文本列表；纯图片幻灯片回退显示"（此幻灯片无文字）"
+  - PreviewType 枚举拆分：Office → Docx/Xlsx/Pptx，扩展名→PreviewType 映射、魔数映射、ShowPreviewAsync 分发三路同步更新
+  - 本地化: 添加 13 条 Preview_Docx/Preview_Xlsx/Preview_Pptx 键（zh-CN + en）
+  - Build 0 errors, 0 warnings；Commit 4f02074
+
+**2026-07-21** — 修复文件列表目录图标显示为未知文件图标
+  - ArchiveService.cs: IsDirectory 分流调用 GetFolderIcon()（Entries 集合）
+  - MainWindowViewModel.cs: PopulateEntries() 中 IsDirectory 分流调用 GetFolderIcon()（CurrentEntries 集合，原代码对所有条目无差别调用 GetFileIcon）
   - Build 0 errors
 
 **2026-07-20** — Shell/COM 集成补齐：安装逻辑对齐 e41c45b + Settings 状态显示 + 首次运行注册
@@ -672,10 +698,20 @@
 
 | 功能 | 设计文档 | 实现版本 |
 |------|----------|:--------:|
+| emoji 替换为 Fluent UI PathIcon + 文件列表行图标改用系统原生 | [emoji-to-pathicon.md](.sisyphus/plans/emoji-to-pathicon.md) | v0.4.4+ |
 | 移除 WebView2 依赖（Markdown/HTML/PDF 跨平台预览） | [remove-webview2-preview.md](.sisyphus/plans/remove-webview2-preview.md) | v0.4.5 |
 | 便携版模式 | [portable-mode.md](.sisyphus/plans/portable-mode.md) | v0.4.5 |
 | 文件冲突对话框暂停/取消 | [conflict-dialog-pause-cancel.md](.sisyphus/plans/conflict-dialog-pause-cancel.md) | v0.4.5 |
 | 压缩选项增强（7z/ZIP 格式参数扩展） | [compression-options-enhancement.md](.sisyphus/plans/compression-options-enhancement.md) | v0.4.5 |
+| 上下文工具栏重构（目录树+文件列表） | [context-toolbars.md](.sisyphus/plans/context-toolbars.md) | v0.4.5 |
+| 解压/压缩结果预览面板 | [result-preview-panel.md](.sisyphus/plans/result-preview-panel.md) | v0.4.5 |
+| 紧凑度模式（Compactness Mode） | [compactness-mode.md](.sisyphus/plans/compactness-mode.md) | v0.4.5 |
+| 预览两阶段加载（信息栏+内容分离） | [preview-two-phase-loading.md](.sisyphus/plans/preview-two-phase-loading.md) | v0.4.5 |
+| Avalonia: Shell/COM 集成移植 | [avalonia-shell-com-integration.md](.sisyphus/plans/avalonia-shell-com-integration.md) | v0.4.5 |
+| Avalonia Phase 10: WPF 功能补齐 | [avalonia-phase10-feature-parity.md](.sisyphus/plans/avalonia-phase10-feature-parity.md) | v0.4.5 |
+| Avalonia: i18n 补齐 + 杂物清理 | [avalonia-i18n-and-cleanup.md](.sisyphus/plans/avalonia-i18n-and-cleanup.md) | v0.4.5 |
+| 压缩解压文件筛选 | [file-filter-feature.md](.sisyphus/plans/file-filter-feature.md) | v0.4.5 |
+| emoji 替换为 Fluent UI PathIcon + 文件列表行图标改用系统原生 | [emoji-to-pathicon.md](.sisyphus/plans/emoji-to-pathicon.md) | v0.4.5 |
 | 双击行为 + 解压后删原包 | [doubleclick-extract-settings.md](.sisyphus/plans/doubleclick-extract-settings.md) | v0.4.4+ |
 | 魔数检测文件真实格式 | [preview-magic-detection.md](.sisyphus/plans/preview-magic-detection.md) | v0.4.4 |
 | 密码流程统一 | [password-flow-unification.md](.sisyphus/plans/password-flow-unification.md) | v0.4.4 |
