@@ -8,7 +8,7 @@ namespace MantisZip.UI.Avalonia.Services;
 /// <summary>
 /// Controls an existing overlay window (Avalonia Window) via Win32 API from a background thread.
 /// The window itself is created by Avalonia on the UI thread; this class only does cross-thread
-/// operations: SetWindowPos (position) and SetLayeredWindowAttributes (color + opacity).
+/// operations: UpdateLayeredWindow (position + size + content in one atomic call).
 /// </summary>
 internal class OverlayController : IDisposable
 {
@@ -18,7 +18,7 @@ internal class OverlayController : IDisposable
     private readonly ManualResetEvent _stopped = new(false);
 
     // Tracking state
-    private uint _currentColor = 0x0050AF4C; // BGR green
+    private uint _currentColor = 0x00808080; // BGR gray (default for no target)
     private DropTargetDetector.DropTargetStatus _currentStatus;
     private readonly object _stateLock = new();
 
@@ -132,22 +132,17 @@ internal class OverlayController : IDisposable
         }
 
         // Update color
-        DropTargetDetector.DropTargetStatus newStatus;
-        lock (_stateLock)
-        {
-            newStatus = _currentStatus;
-            if (status != _currentStatus)
+            DropTargetDetector.DropTargetStatus newStatus = status;
+            lock (_stateLock)
             {
                 _currentStatus = status;
                 _currentColor = status switch
                 {
                     DropTargetDetector.DropTargetStatus.Success => 0x0050AF4C, // Green
                     DropTargetDetector.DropTargetStatus.Warning => 0x004336F4, // Red
-                    _ => 0x00808080, // Gray
+                    _ => 0x00808080, // Gray (default for None/unrecognized)
                 };
-                newStatus = status;
             }
-        }
 
         // Position + opacity
         var w = rect.Right - rect.Left;
@@ -157,6 +152,8 @@ internal class OverlayController : IDisposable
             return;
         }
 
+        // Position + opacity — window was started fully transparent in MainWindow
+        // via SetLayeredWindowAttributes, so SetWindowPos resize is invisible.
         const uint swpFlags = NativeMethods.SWP_NOACTIVATE | NativeMethods.SWP_SHOWWINDOW;
         NativeMethods.SetWindowPos(_hwnd, NativeMethods.HWND_TOPMOST,
             rect.Left, rect.Top, w, h, swpFlags);
@@ -189,15 +186,31 @@ internal class OverlayController : IDisposable
         {
             NativeMethods.GetClassName(hWnd, sb, sb.Capacity);
             var cls = sb.ToString();
-            if (cls == "CabinetWClass" || cls == "Progman" || cls == "WorkerW")
+            if (cls == "CabinetWClass")
             {
-                var path = cls == "Progman" || cls == "WorkerW"
-                    ? "桌面"
-                    : "资源管理器";
-                return (DropTargetDetector.DropTargetStatus.Success, cls, path);
+                // Get actual folder path from Explorer window title
+                var title = new System.Text.StringBuilder(512);
+                NativeMethods.GetWindowText(hWnd, title, title.Capacity);
+                var windowTitle = title.ToString();
+                if (!string.IsNullOrEmpty(windowTitle))
+                    return (DropTargetDetector.DropTargetStatus.Success, cls, windowTitle);
+                return (DropTargetDetector.DropTargetStatus.Success, cls, "资源管理器");
+            }
+            if (cls == "Progman" || cls == "WorkerW")
+            {
+                var desktopPath = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
+                return (DropTargetDetector.DropTargetStatus.Success, cls, desktopPath);
             }
             if (cls == "#32770")
+            {
+                // Try to get title from dialog
+                var title = new System.Text.StringBuilder(512);
+                NativeMethods.GetWindowText(hWnd, title, title.Capacity);
+                var windowTitle = title.ToString();
+                if (!string.IsNullOrEmpty(windowTitle))
+                    return (DropTargetDetector.DropTargetStatus.Warning, cls, windowTitle);
                 return (DropTargetDetector.DropTargetStatus.Warning, cls, "无法识别路径");
+            }
             if (cls.StartsWith("Avalonia-", StringComparison.Ordinal) || cls == "TMainBox")
                 return (DropTargetDetector.DropTargetStatus.None, cls, "");
             hWnd = NativeMethods.GetParent(hWnd);
@@ -205,12 +218,12 @@ internal class OverlayController : IDisposable
         return (DropTargetDetector.DropTargetStatus.None, "", "");
     }
 
-    // (path detection uses DropTargetDetector after drag ends, not during overlay)
-
     /// <summary>
-    /// Render overlay content using UpdateLayeredWindow (color + text).
+    /// Render overlay content using UpdateLayeredWindow (color + border + text).
     /// Called from background thread; creates a 32bpp BGRA bitmap.
-    /// Uses SourceConstantAlpha (window-wide) for breathing transparency effect.
+    /// Uses SourceConstantAlpha (window-wide) for breathing — border and text breathe
+    /// with the background but use high-contrast bright colors and a drop shadow
+    /// to remain clearly readable at minimum breathAlpha.
     /// </summary>
     private static void OverlayRender(nint hwnd, uint colorBgr, string text, int posX, int posY, int w, int h, byte breathAlpha)
     {
@@ -224,7 +237,7 @@ internal class OverlayController : IDisposable
 
         try
         {
-            // Create a 32bpp BGRA DIB section (no pre-multiplied alpha — use SourceConstantAlpha instead)
+            // Create a 32bpp BGRA DIB section
             var bmi = new BITMAPINFO
             {
                 bmiHeader = new BITMAPINFOHEADER
@@ -242,36 +255,65 @@ internal class OverlayController : IDisposable
 
             var oldBitmap = GdiSelectObject(hdcMem, hBitmap);
 
-            // Fill with solid overlay color (opaque — transparency comes from SourceConstantAlpha)
             // colorBgr = 0x00BBGGRR (BGR format from GDI)
-            byte b = (byte)(colorBgr >> 16);
-            byte g = (byte)(colorBgr >> 8);
-            byte r = (byte)colorBgr;
+            byte bgB = (byte)(colorBgr >> 16);
+            byte bgG = (byte)(colorBgr >> 8);
+            byte bgR = (byte)colorBgr;
 
             int stride = w * 4;
             byte[] pixels = new byte[stride * h];
+
+            // Border: white (high-contrast, visible even at low SourceConstantAlpha)
+            const int borderThickness = 4;
+
+            // Fill: background + bright border (all alpha=255; SourceConstantAlpha handles breathing)
             for (int y = 0; y < h; y++)
             {
+                bool isBorderY = y < borderThickness || y >= h - borderThickness;
                 for (int x = 0; x < w; x++)
                 {
+                    bool isBorder = isBorderY || x < borderThickness || x >= w - borderThickness;
                     int idx = y * stride + x * 4;
-                    pixels[idx + 0] = b; // B
-                    pixels[idx + 1] = g; // G
-                    pixels[idx + 2] = r; // R
-                    pixels[idx + 3] = 255; // A (opaque — SourceConstantAlpha handles transparency)
+                    if (isBorder)
+                    {
+                        pixels[idx + 0] = 255; // B
+                        pixels[idx + 1] = 255; // G
+                        pixels[idx + 2] = 255; // R
+                        pixels[idx + 3] = 255; // A
+                    }
+                    else
+                    {
+                        pixels[idx + 0] = bgB;
+                        pixels[idx + 1] = bgG;
+                        pixels[idx + 2] = bgR;
+                        pixels[idx + 3] = 255; // A
+                    }
                 }
             }
             Marshal.Copy(pixels, 0, bitsPtr, pixels.Length);
 
-            // Draw text using GDI on the mem DC (white, breathing alpha handled by SourceConstantAlpha)
-            if (!string.IsNullOrEmpty(text))
+            // Draw text via GDI
+            if (!string.IsNullOrEmpty(text) && text.Length > 0)
             {
-                var oldFont = GdiSelectObject(hdcMem, GdiGetStockObject(17)); // DEFAULT_GUI_FONT
-                GdiSetBkMode(hdcMem, 1); // TRANSPARENT
-                GdiSetTextColor(hdcMem, 0x00FFFFFF); // White
-                var textRect = new NativeMethods.RECT { Left = 24, Top = 12, Right = w - 24, Bottom = h - 12 };
-                GdiDrawText(hdcMem, text, -1, ref textRect, 0x0124); // DT_CENTER | DT_VCENTER | DT_SINGLELINE
-                GdiSelectObject(hdcMem, oldFont);
+                var hFont = GdiCreateFont(-36, 0, 0, 0, 700, 0, 0, 0, 1, 0, 0, 0, 0, "Segoe UI");
+                if (hFont != nint.Zero)
+                {
+                    var oldFont = GdiSelectObject(hdcMem, hFont);
+                    GdiSetBkMode(hdcMem, 1); // TRANSPARENT
+
+                    // Shadow: dark gray, offset 3px down-right
+                    GdiSetTextColor(hdcMem, 0x00303030); // Dark gray
+                    var shadowRect = new NativeMethods.RECT { Left = 23, Top = 11, Right = w - 17, Bottom = h - 5 };
+                    GdiDrawText(hdcMem, text, text.Length, ref shadowRect, 0x0125);
+
+                    // Main text: white
+                    GdiSetTextColor(hdcMem, 0x00FFFFFF); // White
+                    var textRect = new NativeMethods.RECT { Left = 20, Top = 8, Right = w - 20, Bottom = h - 8 };
+                    GdiDrawText(hdcMem, text, text.Length, ref textRect, 0x0125);
+
+                    GdiSelectObject(hdcMem, oldFont);
+                    GdiDeleteObject(hFont);
+                }
             }
 
             // Update the layered window (hBitmap must still be selected in hdcMem!)
@@ -279,7 +321,7 @@ internal class OverlayController : IDisposable
             var ptWnd = new NativeMethods.POINT { X = posX, Y = posY };
             var szWnd = new NativeMethods.SIZE { cx = w, cy = h };
             var ptSrc = new NativeMethods.POINT { X = 0, Y = 0 };
-            // Use SourceConstantAlpha (window-wide) for breathing — no per-pixel alpha
+            // SourceConstantAlpha controls window-wide breathing (original working approach)
             var blend = new NativeMethods.BLENDFUNCTION { BlendOp = 0, BlendFlags = 0, SourceConstantAlpha = breathAlpha, AlphaFormat = 0 };
 
             NativeMethods.UpdateLayeredWindow(hwnd, nint.Zero, ref ptWnd, ref szWnd,
@@ -319,6 +361,9 @@ internal class OverlayController : IDisposable
 
     [DllImport("gdi32.dll", EntryPoint = "DeleteDC")]
     private static extern bool GdiDeleteDC(nint hdc);
+
+    [DllImport("gdi32.dll", EntryPoint = "CreateFontW", CharSet = CharSet.Unicode)]
+    private static extern nint GdiCreateFont(int nHeight, int nWidth, int nEscapement, int nOrientation, int fnWeight, uint fdwItalic, uint fdwUnderline, uint fdwStrikeOut, uint fdwCharSet, uint fdwOutputPrecision, uint fdwClipPrecision, uint fdwQuality, uint fdwPitchAndFamily, string lpszFace);
 
     [DllImport("gdi32.dll", EntryPoint = "GetStockObject")]
     private static extern nint GdiGetStockObject(int fnObject);
