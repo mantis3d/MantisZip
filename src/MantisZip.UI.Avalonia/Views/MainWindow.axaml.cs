@@ -291,7 +291,7 @@ public partial class MainWindow : Window
                 var overlayWin = new Window
                 {
                     ShowInTaskbar = false,
-                    Background = new SolidColorBrush(Color.Parse("#FF4CAF50")),
+                    Background = Brushes.Transparent,
                     Width = 1,
                     Height = 1,
                     Topmost = true,
@@ -307,6 +307,14 @@ public partial class MainWindow : Window
                     NativeMethods.SetWindowLong(overlayHwnd, NativeMethods.GWL_EXSTYLE,
                         exStyle | NativeMethods.WS_EX_LAYERED | NativeMethods.WS_EX_TRANSPARENT
                                 | NativeMethods.WS_EX_NOACTIVATE | NativeMethods.WS_EX_TOOLWINDOW);
+
+                    // Start fully transparent to prevent flash on first resize
+                    NativeMethods.SetLayeredWindowAttributes(overlayHwnd, 0, 0, NativeMethods.LWA_ALPHA);
+
+                    // Remove title bar via Win32 (avoids Avalonia 12 enum compatibility issues)
+                    var overlayStyle = NativeMethods.GetWindowLong(overlayHwnd, NativeMethods.GWL_STYLE);
+                    NativeMethods.SetWindowLong(overlayHwnd, NativeMethods.GWL_STYLE,
+                        overlayStyle & ~0x00C00000u); // clear WS_CAPTION (title bar)
                 }
 
                 using var controller = new OverlayController(overlayHwnd);
@@ -319,6 +327,11 @@ public partial class MainWindow : Window
                     var result = await DragDrop.DoDragDropAsync(
                         triggerEvent, data, DragDropEffects.Copy);
                     App.DebugLog($"[MainWindow] Avalonia DoDragDropAsync DONE: result={result}");
+
+                    // Close overlay IMMEDIATELY after drag completes, before dialog processing
+                    controller.Stop();
+                    overlayWin.Close();
+                    App.DebugLog("[MainWindow] Overlay closed");
 
                     NativeMethods.GetCursorPos(out var dropPt);
                     App.DebugLog($"[MainWindow] Drop point captured: ({dropPt.X}, {dropPt.Y})");
@@ -338,7 +351,9 @@ public partial class MainWindow : Window
                 }
                 finally
                 {
-                    overlayWin.Close();
+                    // Safety net: ensure overlay is closed even if early close was skipped
+                    try { overlayWin.Close(); } catch { }
+                    try { controller.Stop(); } catch { }
                     _isOwnDrag = false;
                     App.DebugLog("[MainWindow] DragDrop cleanup done");
                 }
