@@ -16,6 +16,12 @@ internal static class NativeMethods
     public static extern int GetClassName(nint hWnd, System.Text.StringBuilder lpClassName, int nMaxCount);
 
     [DllImport("user32.dll", SetLastError = true)]
+    public static extern nint GetParent(nint hWnd);
+
+    [DllImport("user32.dll")]
+    public static extern nint GetAncestor(nint hWnd, uint gaFlags);
+
+    [DllImport("user32.dll", SetLastError = true)]
     public static extern bool GetWindowRect(nint hWnd, out RECT lpRect);
 
     [DllImport("user32.dll", SetLastError = true)]
@@ -77,6 +83,11 @@ internal static class NativeMethods
 
     [DllImport("user32.dll")]
     public static extern int ReleaseDC(nint hWnd, nint hDC);
+
+    [DllImport("user32.dll")]
+    public static extern bool UpdateLayeredWindow(nint hWnd, nint hdcDst, ref POINT pptDst,
+        ref SIZE psize, nint hdcSrc, ref POINT pptSrc, uint crKey,
+        ref BLENDFUNCTION pblend, uint dwFlags);
 
     [DllImport("user32.dll", CharSet = CharSet.Auto)]
     public static extern int GetWindowText(nint hWnd, System.Text.StringBuilder lpString, int nMaxCount);
@@ -214,6 +225,22 @@ internal static class NativeMethods
         public int Top;
         public int Right;
         public int Bottom;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct SIZE
+    {
+        public int cx;
+        public int cy;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct BLENDFUNCTION
+    {
+        public byte BlendOp;
+        public byte BlendFlags;
+        public byte SourceConstantAlpha;
+        public byte AlphaFormat;
     }
 
     [StructLayout(LayoutKind.Sequential)]

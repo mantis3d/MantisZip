@@ -50,20 +50,40 @@ internal class DragDropService
         MainWindowViewModel? vm)
     {
         // 1. Detect target directory
-        var (targetDir, _) = DropTargetDetector.DetectTargetDirectory();
+        var (targetDir, status) = DropTargetDetector.DetectTargetDirectory();
+        App.DebugLog($"[DragDropService] DetectTargetDirectory: targetDir={targetDir ?? "(null)"}, status={status}");
 
         // 2. Fallback folder picker if detection failed
         if (string.IsNullOrEmpty(targetDir))
         {
+            // 如果在自己的窗口上松开，直接取消（不弹对话框）
+            if (IsOverOwnWindow())
+            {
+                App.DebugLog("[DragDropService] Dropped on own window — cancelling");
+                if (vm != null)
+                    vm.StatusMessage = "";
+                return;
+            }
+
+            App.DebugLog("[DragDropService] DetectTargetDirectory returned null, showing folder picker...");
             targetDir = await PickFolderAsync();
             if (targetDir == null)
+            {
+                App.DebugLog("[DragDropService] User cancelled folder picker");
                 return;
+            }
+            App.DebugLog($"[DragDropService] User picked folder: {targetDir}");
         }
+
 
         // 3. Expand selected items to flat file list
         var itemsToExtract = DragDropItemExpander.ExpandItems(selectedItems, allItems);
+        App.DebugLog($"[DragDropService] Expanded: {selectedItems.Count} selected → {itemsToExtract.Count} files to extract");
         if (itemsToExtract.Count == 0)
+        {
+            App.DebugLog("[DragDropService] No files to extract after expansion");
             return;
+        }
 
         // 4. Get conflict action from settings ("ask"/"overwrite"/"rename"/"skip")
         var conflictAction = _settings.FileConflictAction;
@@ -133,6 +153,7 @@ internal class DragDropService
             }, pw.CancellationToken);
 
             // 8. Post-extraction: status message and optional folder open
+            App.DebugLog($"[DragDropService] Extraction complete: {processedFiles}/{totalFiles} files to {targetDir}");
             if (vm != null)
                 vm.StatusMessage = $"解压完成: {processedFiles}/{totalFiles} 个文件到 {folderName}";
 
@@ -154,12 +175,14 @@ internal class DragDropService
         }
         catch (OperationCanceledException)
         {
+            App.DebugLog("[DragDropService] Extraction cancelled by user");
             // 9. Handle cancellation
             if (vm != null)
                 vm.StatusMessage = "拖拽解压已取消";
         }
         catch (Exception ex)
         {
+            App.DebugLog($"[DragDropService] Extraction failed: {ex.GetType().Name}: {ex.Message}");
             // 10. Handle errors
             if (vm != null)
                 vm.StatusMessage = $"解压失败: {ex.Message}";
@@ -218,5 +241,21 @@ internal class DragDropService
         }
 
         return path; // fallback: all 99 variants exist
+    }
+
+    /// <summary>
+    /// Check if the cursor is currently over our own application window.
+    /// </summary>
+    private static bool IsOverOwnWindow()
+    {
+        if (!NativeMethods.GetCursorPos(out var pt))
+            return false;
+        var hWnd = NativeMethods.WindowFromPoint(pt);
+        if (hWnd == nint.Zero)
+            return false;
+        var sb = new System.Text.StringBuilder(256);
+        NativeMethods.GetClassName(hWnd, sb, sb.Capacity);
+        var cls = sb.ToString();
+        return cls.StartsWith("Avalonia-", StringComparison.Ordinal) || cls == "TMainBox";
     }
 }

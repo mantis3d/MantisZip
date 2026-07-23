@@ -27,17 +27,27 @@ internal static class DropTargetDetector
     {
         // 1. Get cursor position
         if (!NativeMethods.GetCursorPos(out var pt))
+        {
+            App.DebugLog("[DropTargetDetector] GetCursorPos failed");
             return (null, DropTargetStatus.None);
+        }
 
         // 2. Find window at cursor position
         var hWnd = NativeMethods.WindowFromPoint(pt);
+        App.DebugLog($"[DropTargetDetector] Cursor ({pt.X}, {pt.Y}) → hWnd=0x{hWnd:X}");
         if (hWnd == nint.Zero)
+        {
+            App.DebugLog("[DropTargetDetector] WindowFromPoint returned null");
             return (null, DropTargetStatus.None);
+        }
 
         // 3. Check if it's the desktop
         var desktopPath = TryGetDesktopPath(hWnd);
         if (desktopPath is not null)
+        {
+            App.DebugLog($"[DropTargetDetector] Desktop detected: {desktopPath}");
             return (desktopPath, DropTargetStatus.Success);
+        }
 
         // 4. Check if it's an Explorer or dialog window
         return TryGetExplorerPath(hWnd);
@@ -71,12 +81,37 @@ internal static class DropTargetDetector
         NativeMethods.GetClassName(hWnd, sb, sb.Capacity);
         var className = sb.ToString();
 
+        App.DebugLog($"[DropTargetDetector] Window class: {className}");
+
         return className switch
         {
             "CabinetWClass" => TryGetExplorerPathFromShell(hWnd),
+            "DirectUIHWND" => TryGetExplorerPathFromChild(hWnd),
             "#32770" => TryGetDialogPath(hWnd),
             _ => (null, DropTargetStatus.None)
         };
+    }
+
+    /// <summary>
+    /// When WindowFromPoint returns a DirectUIHWND (modern Explorer's content area),
+    /// walk up to the parent CabinetWClass and get the path.
+    /// </summary>
+    private static (string? Path, DropTargetStatus Status) TryGetExplorerPathFromChild(nint hWnd)
+    {
+        // Walk up the parent chain to find CabinetWClass
+        var parent = NativeMethods.GetParent(hWnd);
+        var sb = new StringBuilder(256);
+        int maxWalk = 10;
+        while (parent != nint.Zero && maxWalk-- > 0)
+        {
+            NativeMethods.GetClassName(parent, sb, sb.Capacity);
+            var cls = sb.ToString();
+            App.DebugLog($"[DropTargetDetector] Walk parent: 0x{parent:X} -> {cls}");
+            if (cls == "CabinetWClass")
+                return TryGetExplorerPathFromShell(parent);
+            parent = NativeMethods.GetParent(parent);
+        }
+        return (null, DropTargetStatus.Warning);
     }
 
     /// <summary>

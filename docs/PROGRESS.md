@@ -21,6 +21,21 @@
 
 ### MantisZip.UI.Avalonia（主力版）
 
+**2026-07-23** — 拖拽系统重构：放弃 Win32 OLE/native CCW，改用 Avalonia DragDrop API + DragDropService 后置解压 + Avalonia Window 覆盖层
+  - **架构变更**：彻底放弃手写 COM `IDataObject`/`IDropSource`，改为 Avalonia 内置 `DragDrop.DoDragDropAsync`
+  - **移除**：`DragDataObject.cs`、`DropSource.cs`、`DragOverlayWindow.cs`、`DragPreviewPopup.cs`
+  - **新增**：`OverlayController.cs` — Avalonia Window + `UpdateLayeredWindow` 实现后台线程覆盖层
+  - **DropTargetDetector**：新增 `DirectUIHWND` → `CabinetWClass` 父链上溯 + `GetAncestor` 覆盖整个窗口
+  - **DragDropService**：新增 `IsOverOwnWindow()`，在自己窗口上松手时静默取消
+  - **MainWindow**：
+    - `PointerPressed` 改用隧道策略解决 DataGrid 事件消费问题
+    - 新增 `PointerReleased` 隧道监听清除拖拽状态
+    - 拖拽阈值 10px → 32px
+  - **NativeMethods**：新增 `GetParent`、`GetAncestor`、`UpdateLayeredWindow`、`SIZE`、`BLENDFUNCTION`
+  - **OLE 初始化**：移除 `NativeMethods.OleInitialize`（Avalonia 内部处理）
+  - DragDropService + DropTargetDetector + OverlayController 加 DebugLog
+  - 构建 0 errors
+
 **2026-07-22** — P0 列表控件紧凑度联动 + AGENTS.md 规则 7
   - ExtractSettingsWindow FileListBox：`ItemContainerTheme` + `ControlHeightMd`
   - MainWindow FileListGrid：`RowHeight="{DynamicResource ControlHeightMd}"`
