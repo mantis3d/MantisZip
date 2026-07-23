@@ -292,7 +292,6 @@ public partial class MainWindow : Window
                 {
                     ShowInTaskbar = false,
                     Background = Brushes.Transparent,
-                    Background = Brushes.Transparent,
                     Width = 1,
                     Height = 1,
                     Topmost = true,
@@ -317,13 +316,6 @@ public partial class MainWindow : Window
                     NativeMethods.SetWindowLong(overlayHwnd, NativeMethods.GWL_STYLE,
                         overlayStyle & ~0x00C00000u); // clear WS_CAPTION (title bar)
 
-                    // Start fully transparent to prevent flash on first resize
-                    NativeMethods.SetLayeredWindowAttributes(overlayHwnd, 0, 0, NativeMethods.LWA_ALPHA);
-
-                    // Remove title bar via Win32 (avoids Avalonia 12 enum compatibility issues)
-                    var overlayStyle = NativeMethods.GetWindowLong(overlayHwnd, NativeMethods.GWL_STYLE);
-                    NativeMethods.SetWindowLong(overlayHwnd, NativeMethods.GWL_STYLE,
-                        overlayStyle & ~0x00C00000u); // clear WS_CAPTION (title bar)
                 }
 
                 using var controller = new OverlayController(overlayHwnd);
