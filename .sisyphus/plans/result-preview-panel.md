@@ -404,17 +404,84 @@ public static class ResultPreviewService
 "Preview_Result_ShowFiltered": "Show filtered",
 ```
 
+## 压缩端预览设计（Separate 模式）
+
+选择「每项独立压缩包」时，预览树按输出目录分组，每组下是压缩包壳节点：
+
+```
+📦 输出位置
+├── 📁 E:\tool\              ← 输出目录（来源路径的父目录）
+│   ├── 🗜 src.zip           ← 压缩包壳（IsArchive=true, icon=IconArchive）
+│   │   ├── 📁 components\   ← 压缩包内目录
+│   │   ├── 📁 utils\
+│   │   └── 📁 styles\
+│   └── 🗜 README.zip
+│       └── README.md
+└── 📁 E:\download\          ← 不同输出目录
+    └── 🗜 config.json.zip
+        └── config.json
+```
+
+- 同一来源目录的压缩包归在一个输出目录下
+- 压缩包壳节点使用 `IconArchive`（区别于 `IconFolder`）
+- Combined / Manual 模式保持当前单棵树不变
+- 刷新时机：输出模式切换、源文件列表变化、过滤条件变化
+
+## 解压端预览设计（多压缩包）
+
+多个压缩包解压时，按来源目录分组：
+
+```
+📁 解压到: E:\Extracted\
+├── 📁 D:\downloads\              ← 压缩包来源目录
+│   ├── 🗜 photo_albums\          ← 压缩包名去扩展名（解压后根目录）
+│   │   ├── 📁 2024\
+│   │   │   └── DSC_001.jpg  ⚠️  ← 冲突标记
+│   │   └── README.txt
+│   └── 🗜 documents\
+│       └── report.docx
+└── 📁 E:\backup\                 ← 不同来源目录
+    └── 🗜 project\
+        └── src\
+```
+
+- 第一层：压缩包来源目录（相同路径归一起）
+- 第二层：压缩包名去扩展名（解压后根目录），图标 `IconArchive`
+- 第三层：压缩包内实际的目录/文件
+- 冲突标记 `ExistsAtDestination` 显示 ⚠️
+- 刷新时机：目标目录变化、压缩包列表变化、过滤条件变化
+
+## 文件过滤集成
+
+两端均已嵌入 `FileFilterEditor`（Tab: 筛选），需要连接：
+
+1. `FileFilterControl.FilterChanged` 事件 → 触发预览重建
+2. `FileFilterControl.GetFilter()` → 获取 `FileFilterCriteria`
+3. 构建树后对每个文件节点检查匹配条件，不匹配的标记 `IsFilteredOut = true`
+4. `ResultTreeView` 内根据 `ShowFilteredGhosts` 灰显或隐藏
+5. 切换过滤预设/修改条件/启用关闭过滤均触发刷新
+
 ## 实施步骤
 
 | 步骤 | 内容 | 文件 |
 |------|------|------|
-| 1 | 新建 PreviewTreeNode 模型 | `Models/PreviewTreeNode.cs` |
-| 2 | 新建 ResultPreviewService（构建原始树 + 冲突检测 + 过滤标记） | `Services/ResultPreviewService.cs` |
-| 3 | 新建 ResultTreeView 控件（显示树构建 + 折叠逻辑 + 省略号渲染 + 摘要计算） | `Controls/ResultTreeView.axaml` / `.cs` |
-| 4 | ExtractSettingsWindow 右侧加入 ResultTreeView | `Dialogs/ExtractSettingsWindow.axaml` / `.cs` + `ViewModels/ExtractSettingsViewModel.cs` |
-| 5 | CompressSettingsWindow 右侧加入 ResultTreeView | `Dialogs/CompressSettingsWindow.axaml` / `.cs` + `ViewModels/CompressSettingsViewModel.cs` |
-| 6 | i18n key 写入 | `strings.*.json` |
-| 7 | 构建验证 | `dotnet build` |
+| 1 | ✅ PreviewTreeNode 模型 | `Models/PreviewTreeNode.cs` |
+| 2 | ✅ ResultPreviewService（构建原始树 + 冲突检测） | `Services/ResultPreviewService.cs` |
+| 3 | ✅ ResultTreeView 控件（显示树构建 + 折叠 + 冲突标记 + 摘要） | `Controls/ResultTreeView.axaml` / `.cs` |
+| 4 | ✅ CompressSettingsWindow 嵌入 ResultTreeView | `Dialogs/CompressSettingsWindow.axaml` |
+| 5 | ✅ ExtractSettingsWindow 嵌入 ResultTreeView | `Dialogs/ExtractSettingsWindow.axaml` |
+| 6 | ✅ 两 ViewModel 已有 PreviewRoot / PreviewCompactMode / ShowFilteredGhosts | `ViewModels/CompressSettingsViewModel.cs`, `ViewModels/ExtractSettingsViewModel.cs` |
+| 7 | 🔲 PreviewTreeNode 新增 `IsArchive` 属性 + `IconKey` 返回 `"IconArchive"` | `Models/PreviewTreeNode.cs` |
+| 8 | 🔲 AppIcons.axaml 新增 `IconArchive` Geometry | `Resources/Icons/AppIcons.axaml` |
+| 9 | 🔲 ResultPreviewService.BuildCompressPreview 支持 Separate 模式（输出目录分组 + 压缩包壳节点） | `Services/ResultPreviewService.cs` |
+| 10 | 🔲 ResultPreviewService.BuildExtractPreview 支持多压缩包来源目录分组 | `Services/ResultPreviewService.cs` |
+| 11 | 🔲 ResultPreviewService 两方法增加 filter 参数，构建后标记 IsFilteredOut | `Services/ResultPreviewService.cs` |
+| 12 | 🔲 CompressSettingsWindow 连接 FileFilterControl.FilterChanged → ViewModel 重建预览 | `Dialogs/CompressSettingsWindow.axaml.cs` |
+| 13 | 🔲 ExtractSettingsWindow 连接 FileFilterControl.FilterChanged → ViewModel 重建预览 | `Dialogs/ExtractSettingsWindow.axaml.cs` |
+| 14 | 🔲 CompressSettingsViewModel 在输出模式切换时重建预览 | `ViewModels/CompressSettingsViewModel.cs` |
+| 15 | 🔲 ExtractSettingsViewModel 在目标路径变化时自动重建预览（`OnDestinationPathChanged` + 缓存 entries） | `ViewModels/ExtractSettingsViewModel.cs` |
+| 16 | 🔲 i18n key 写入 | `strings.*.json` |
+| 17 | 🔲 构建验证 | `dotnet build` |
 
 ## 复用场景
 

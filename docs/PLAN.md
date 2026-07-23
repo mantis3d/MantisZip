@@ -21,7 +21,7 @@
 | **P1** | 解压路径统一（前置：文件筛选） | [extract-path-unification.md](.sisyphus/plans/extract-path-unification.md) | 🟢低 | 1.5h | 三路解压合并为 `ExtractEntriesAsync` + `pathOverrides`，消除重复循环 |
 | **P1** | 新增压缩格式（BZip2/XZ/CAB 等） | [new-format-support.md](.sisyphus/plans/new-format-support.md) | 🟡中 | 12-20h | 6 阶段渐进：TAR 裸格式/GZip 单文件 → BZip2 → XZ → CAB 只读 → UI 统一化 → Zstandard（需依赖） |
 | **P1** | 自包含体积优化（Avalonia 迁移后） | [selfcontained-size-optimization.md](.sisyphus/plans/selfcontained-size-optimization.md) | 🟡中 | 4-6h | 三步渐进：InvariantGlobalization → 保守修剪 → 激进修剪，目标降至 20–25 MB |
-| **P1** | Avalonia 拖拽直接解压 | [drag-drop-direct-extract.md](.sisyphus/plans/drag-drop-direct-extract.md) | 🟡中 | 5-7h | 纯 Win32 独立线程覆盖层（三色状态机 + 呼吸动画）+ WindowFromPoint+ShellWindows 检测目标路径；UIA 降级支持；需等 Avalonia 移植基本就绪后实施 |
+| **P1** | Avalonia 拖拽直接解压 | [drag-drop-direct-extract.md](.sisyphus/plans/drag-drop-direct-extract.md) | 🟡中 | 5-7h | 纯 Win32 独立线程覆盖层（三色状态机 + 呼吸动画）+ WindowFromPoint+ShellWindows 检测目标路径；#32770 用 Win32 EnumChildWindows（方案 A，方案 B UIA 为未来可选项）；☑️ 2026-07-23 计划审查完成，Avalonia 分支 API 已确认 |
 | **P1** | HTML 预览升级：跨平台 WebView + 降级 | [html-preview-webview-fallback.md](.sisyphus/plans/html-preview-webview-fallback.md) | 🟡中 | 4-6h | 用 `Avalonia.Controls.WebView`（各平台原生引擎）替代当前 ReverseMarkdown 有损管线；WebView 不可用时自动降级到 ReverseMarkdown + 修 MarkdownPreviewBuilder table 支持；加工具栏和源码切换 |
 | **P2** | 压缩预估 (Compression Estimator) | [compression-estimator.md](.sisyphus/plans/compression-estimator.md) | 🟡中 | 4-5h | 压缩前估算大小/耗时 |
 | **P2** | Winget 发布 | [winget-publishing.md](.sisyphus/plans/winget-publishing.md) | 🟢低 | 1-2h | 发布到 Windows Package Manager 社区仓库；首次手动提交后 CI 自动化 |
@@ -46,6 +46,7 @@
 | **P3** | 右键菜单目录结构预览 | [context-menu-tree-preview.md](.sisyphus/plans/context-menu-tree-preview.md) | 🔴高 | 6-8h | COM 菜单中展示压缩包顶层文件树 |
 | **P1** | Avalonia: UI 功能补齐 | [avalonia-ui-feature-parity.md](.sisyphus/plans/avalonia-ui-feature-parity.md) | 🟡中 | 29/29 ✅ | Elevation×3、Favorites×2、QuickPath×2 等 11 个对话框、2 个控件、1 个转换器（2 项阻塞于 GUI 测试） |
 | **P1** | 自动更新检测 | [auto-update.md](.sisyphus/plans/auto-update.md) | 🟡中 | 4-6h | GitHub Releases API 版本检查、AboutWindow 更新 Tab、UpdateAvailableDialog、设置开关、单元测试 |
+| **P1** | 解压/压缩结果预览面板 | [result-preview-panel.md](.sisyphus/plans/result-preview-panel.md) | 🟡中 | 6-8h | ResultTreeView 控件已完成。待做：① Separate 模式按输出目录分组 + 压缩包壳节点（`IsArchive` + `IconArchive`）；② 解压多压缩包按来源目录分组；③ 压缩端模式/路径/过滤变更时刷新；④ 解压端目标路径/过滤变更时刷新；⑤ 两窗口的 FileFilterControl.FilterChanged → 重建预览树；⑥ i18n key |
 | **P4** | 外部工具视频元数据 | — | 🟢低 | 2-3h | ffprobe 集成 |
 | **🔍调研** | 跨平台移植可行性 | [cross-platform-port.md](.sisyphus/plans/cross-platform-port.md) | 🟡中大 | 2-3月 | 砍 ShellExt，WPF→Avalonia，WebView2→WebKit，SharpSevenZip→SharpCompress/p7zip，DPAPI→AES-GCM |
 | **🔍调研** | Avalonia 预览机会分析 | [preview-avalonia-opportunities.md](.sisyphus/plans/preview-avalonia-opportunities.md) | 🟡中 | — | 分析 Avalonia 迁移对预览系统的影响：SVG/HDR/PSD/AI 新能力、音视频替代方案、HDR 全景 360° 查看器方案 |

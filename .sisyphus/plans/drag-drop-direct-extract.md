@@ -1,6 +1,6 @@
 # 拖拽直接解压 — 放弃 CF_HDROP，Drop 后检测目标窗口路径直接提取
 
-> **状态**: 📋 待定 | **阶段**: [⬜⬜⬜⬜⬜⬜⬜⬜⬜] (0/9)
+> **状态**: 📋 待实施 | **阶段**: [⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜] (0/10) — ☑️ 计划审查已完成 (2026-07-23)
 > **分支**: `avalonia-port`
 
 ---
@@ -13,9 +13,10 @@
 ```
 用户按住拖拽 → DoDragDropAsync(自定义格式) 立即响应
     → 拖拽途中：独立 Win32 线程覆盖层实时高亮目标窗口
+    → 拖拽途中：Win32 预览弹窗跟随鼠标，预渲染的 ResultTreeView 文件树
     → 用户松手 → DoDragDropAsync 返回
     → 获取鼠标位置 (GetCursorPos)
-    → WindowFromPoint → ShellWindows COM / UIA → 取得目标路径
+    → WindowFromPoint → ShellWindows COM / Win32 EnumChildWindows → 取得目标路径
     → 如果是桌面路径 / 检测失败 → 弹文件夹选择对话框
     → ProgressWindow 显示解压进度
     → 直接提取到目标目录
@@ -26,22 +27,23 @@
 
 | 文件 | 操作 |
 |------|------|
-| `Services/DropTargetDetector.cs` | 🆕 新增 — 目标路径检测（含 UIA 扩展） |
+| `Services/DropTargetDetector.cs` | 🆕 新增 — 目标路径检测 |
 | `Services/DragDropService.cs` | 🆕 新增 — 拖拽编排 |
 | `Services/DragDropItemExpander.cs` | 🆕 新增 — 多选展开 + 路径裁剪 |
 | `Services/DragOverlayWindow.cs` | 🆕 新增 — Win32 覆盖层窗口（独立线程） |
+| `Services/DragPreviewPopup.cs` | 🆕 新增 — Win32 预览弹窗，跟随鼠标显示文件树 |
 | `Views/MainWindow.axaml.cs` | 🔧 修改 — 替换现有拖拽代码 |
 | `ViewModels/MainWindowViewModel.cs` | 🔧 修改 — 补充拖拽相关状态 |
 | `Models/ArchiveItemModel.cs` | 🔧 修改 — 补充 ToCoreItem 转换 |
 | `MantisZip.UI.Avalonia.csproj` | 🔧 修改 — ADD SHDocVw COM 引用 |
-| `Themes/Light.xaml` | 🔧 修改 — 新增覆盖层颜色键 |
-| `Themes/Dark.xaml` | 🔧 修改 — 新增覆盖层颜色键 |
+| `Themes/ThemeLight.axaml` | 🔧 修改 — 新增覆盖层颜色键 |
+| `Themes/ThemeDark.axaml` | 🔧 修改 — 新增覆盖层颜色键 |
 
 **运行时依赖变化**: 新增 SHDocVw COM 引用（Windows 内置，无需分发）
 
-> **⏳ 9 项 Avalonia 待定决策**：本计划中部分步骤依赖 Avalonia 分支的具体实现
-> （ViewModel 结构、DataGrid API、主题颜色值等），需在 Avalonia 移植完成前重新确认。
-> 详见末尾「Avalonia 移植待定事项」章节。已在该章节和相关 Task 中用 `[⏳]` 标注。
+> **2026-07-23 审查更新**：Avalonia 移植已基本完成。本计划中 7 项 `[⏳]` 已通过代码审查确认可解决，
+> 1 项（UIA）已决策（选方案 A，方案 B 作为未来计划），1 项保留（集成测试）。
+> 详见末尾「审查对照 & 待定事项」章节。
 
 ---
 
@@ -52,34 +54,20 @@
 | 决策 | 选择 |
 |------|------|
 | 拖拽光标策略 | 放弃 Avalonia 自定义光标，采用纯 Win32 独立线程覆盖层 |
-| Explorer 路径检测 | SHDocVw COM 引用 + UIA 备用（#32770 对话框） |
+| Explorer 路径检测 | SHDocVw COM 引用 + Win32 `EnumChildWindows` 备用（#32770 对话框） |
 | 多选拖拽 | 支持（移植 `ExpandDragItems` + `GetDragExtractPath`） |
 | 文件冲突处理 | 复用 `AppSettings.FileConflictAction`（string 类型，非枚举） |
 | 进度展示 | ProgressWindow（用户确认偏好这个体验） |
-| 视觉反馈 | 绿色=直接解压，红色=需确认，灰色=无效区域 |
+| 视觉反馈 | 覆盖层：绿色=直接解压，红色=需确认，灰色=无效区域 |
+| | 预览弹窗：跟随鼠标显示预渲染的 ResultTreeView 文件树 + 摘要栏 |
+| | 预览弹窗实现：预渲染位图（Avalonia RenderTargetBitmap → Win32 CreateDIBSection）|
+| #32770 路径提取 | 方案 A：Win32 `EnumChildWindows` + `GetWindowText`；方案 B（UIA，未来计划） |
 
-### ⏳ 待定决策（需 Avalonia 移植后决定）
+### 未来可选项
 
-| 待定决策 | 依赖项 | 参考位置 |
-|---------|--------|---------|
-| UIA 库取舍 | Avalonia 项目的依赖策略 & .csproj 构型 | Task 2.1 |
-| 对话框/设置类 API | Avalonia 分支的 `ProgressWindow`、`OpenFolderDialog`、`AppSettings` 实现 | Task 4.1 |
-| `MainWindowViewModel` 接口签名 | Avalonia 分支的 ViewModel 定义（属性名称、类型） | Task 5.1 ~ 5.2 |
-| `_allRawItems` 可见性策略 | Avalonia 分支的封装设计习惯 | Task 5.2 |
-| DataGrid `SelectedItems` API 签名 | Avalonia DataGrid 控件的具体 API | Task 5.3 |
-| `ArchiveItemModel` 字段定义 | Avalonia 分支的 Model 层设计 | Task 5.4 |
-| 拖入保护判断逻辑 | Avalonia 分支的 `DataTransfer.Formats` API | Task 6.2 |
-| 覆盖层颜色值 | Avalonia 最终主题系统（`Theme_Status*` 颜色键） | Task 7.2 |
-| 所有集成测试场景 | 可运行的 Avalonia 分支 | Task 8 |
-
-| 决策 | 选择 |
-|------|------|
-| 拖拽光标策略 | 放弃 Avalonia 自定义光标，采用纯 Win32 独立线程覆盖层 |
-| Explorer 路径检测 | SHDocVw COM 引用 + UIA 备用（#32770 对话框） |
-| 多选拖拽 | 支持（移植 `ExpandDragItems` + `GetDragExtractPath`） |
-| 文件冲突处理 | 复用 `AppSettings.FileConflictAction`（string 类型，非枚举） |
-| 进度展示 | ProgressWindow（用户确认偏好这个体验） |
-| 视觉反馈 | 绿色=直接解压，红色=需确认，灰色=无效区域 |
+| 项目 | 方向 | 触发条件 |
+|------|------|---------|
+| UIA 路径提取升级 | 改用 `System.Windows.Automation` 覆盖更多第三方管理器 | 方案 A 覆盖不足时按需启用 |
 
 ---
 
@@ -88,22 +76,24 @@
 ### 架构总览
 
 ```
-MainWindow.axaml.cs
+MainWindow.axaml.cs（UI 线程）
     │ PointerPressed → 记录起始点 + 选中项
-    │ PointerMoved → 超过阈值启动 DoDragDropAsync
+    │ PointerMoved → 预渲染 ResultTreeView 到位图
+    │              → 超过阈值启动 DoDragDropAsync
     │ DoDragDropAsync(自定义 DataTransfer) → 阻塞 UI 线程
-    │    ├─ 独立 Win32 线程启动 DragOverlayWindow
-    │    │   └─ 实时跟踪鼠标位置 → 高亮目标窗口
-    │    │   └─ 颜色状态：绿/红/灰
-    │    └─ 用户松手 → DoDragDropAsync 返回
+    │    └─ Win32 独立线程 (DragOverlayWindow)
+    │       ├─ 实时跟踪鼠标位置
+    │       ├─ 覆盖层：高亮目标窗口 (绿/红/灰)
+    │       └─ 预览弹窗：跟随鼠标显示文件树
+    └─ 用户松手 → DoDragDropAsync 返回
     └──────────────────────────────────────────────┐
-                                                   ▼
+                                                    ▼
 DragDropService.DetectAndExtractAsync()
-    │ 1. 销毁 DragOverlayWindow
+    │ 1. 销毁 DragOverlayWindow + DragPreviewPopup
     │ 2. GetCursorPos() → 获取松手时的鼠标坐标
     │ 3. DropTargetDetector.GetPathFromHwnd(hWnd)
     │    ├─ ShellWindows COM → Explorer 路径
-    │    ├─ UIA → #32770 对话框路径
+    │    ├─ Win32 EnumChildWindows → #32770 对话框路径
     │    ├─ 桌面 (Progman/WorkerW) → 桌面路径
     │    └─ 其他/失败 → 弹 OpenFolderDialog
     │ 4. 如果有多个文件→展开目录
@@ -128,23 +118,26 @@ DropTargetDetector.GetPathFromHwnd(hWnd)
     │       └─ 无匹配 → return (null, None)
     │
     ├─ GetClassName → "#32770"
-    │   └─ UIA 提取路径
-    │       ├─ 找到文件路径控件 → return (path, Warning)
+    │   └─ Win32 EnumChildWindows 提取路径
+    │       ├─ 找到路径 Edit 控件 → return (path, Warning)
     │       └─ 提取失败 → return (null, Warning)
     │
     └─ 全部失败 → return (null, None)
 ```
 
-### DragOverlayWindow 状态机
+### DragOverlayWindow 状态机（含 PreviewPopup）
 
 ```
 Hidden ──→ Showing ──→ Tracking ──→ Hiding ──→ Hidden
               │            │
               ↓            ↓
          淡入动画      实时位置更新
-                        ├─ 绿：成功识别 + 取到路径
-                        ├─ 红：识别到窗口但取路径失败
-                        └─ 灰：无效区域（桌面/任务栏）
+         覆盖层：          ├─ 绿：成功识别 + 取到路径
+         目标窗口高亮      ├─ 红：识别到窗口但取路径失败
+                          └─ 灰：无效区域
+         预览弹窗：
+         跟随鼠标 + 预渲染
+         文件树位图
 ```
 
 ### DragDropService 状态机
@@ -429,7 +422,7 @@ internal static class DropTargetDetector
         // #32770 对话框（另存为 / 打开）
         if (className == "#32770")
         {
-            var path = TryGetDialogPathViaUIA(hWnd);
+            var path = TryGetDialogPathViaWin32(hWnd);
             return (path, path != null ? DropTargetStatus.Warning : DropTargetStatus.None);
         }
 
@@ -437,17 +430,62 @@ internal static class DropTargetDetector
     }
 
     /// <summary>
-    /// 通过 UIA 提取 #32770 对话框中的文件路径。
+    /// 通过 Win32 EnumChildWindows 提取 #32770 对话框中的文件路径。
+    /// 搜索地址栏 Toolbar 或文件路径 Edit 控件。
+    /// 方案 A（已确认），方案 B（UIA）作为未来升级选项。
     /// </summary>
-    private static string? TryGetDialogPathViaUIA(nint hWnd)
+    private static string? TryGetDialogPathViaWin32(nint hWnd)
     {
-        // [⏳] UIA 库取舍：System.Windows.Automation 是 WPF 库。Avalonia 分支需评估：
-        //   1. 是否引入该依赖（过重则降级为 #32770 统一返回 Warning）
-        //   2. 或者使用自定义 COM UIA 接口（无外部依赖但实现复杂）
-        //   3. 或者通过 Win32 API 枚举子窗口获取 Edit 控件文本（user32.dll 即可）
-        // TODO: 实施时根据 Avalonia 分支的依赖策略选择方案
-        return null;
+        var path = new StringBuilder(260);
+        EnumChildWindows(hWnd, (childHwnd, _) =>
+        {
+            var className = new StringBuilder(128);
+            GetClassName(childHwnd, className, className.Capacity);
+            var cls = className.ToString();
+
+            // 1) 地址栏：Explorer 对话框的路径栏 (msctls_progress32 在旧版出现)
+            // 2) 新版 Explorer 对话框：ComboBox32 → Edit 子控件
+            if (cls == "ToolbarWindow32" || cls == "ComboBox32")
+            {
+                // 找第一个 Edit 子控件
+                EnumChildWindows(childHwnd, (editHwnd, _) =>
+                {
+                    var editClass = new StringBuilder(128);
+                    GetClassName(editHwnd, editClass, editClass.Capacity);
+                    if (editClass.ToString() == "Edit")
+                    {
+                        GetWindowText(editHwnd, path, path.Capacity);
+                        return false; // Stop
+                    }
+                    return true;
+                }, nint.Zero);
+
+                if (path.Length > 0) return false; // Stop
+            }
+
+            // 3) 直接 Edit 控件（旧式对话框）
+            if (cls == "Edit")
+            {
+                GetWindowText(childHwnd, path, path.Capacity);
+                // 只接受看起来像路径的内容
+                if (path.Length > 0 && Directory.Exists(path.ToString()))
+                    return false; // Stop
+                path.Clear();
+            }
+
+            return true; // Continue
+        }, nint.Zero);
+
+        return path.Length > 0 ? path.ToString() : null;
     }
+
+    [DllImport("user32.dll")]
+    private static extern bool EnumChildWindows(nint hWndParent, EnumChildProc lpEnumFunc, nint lParam);
+
+    [DllImport("user32.dll", CharSet = CharSet.Auto)]
+    private static extern int GetWindowText(nint hWnd, StringBuilder lpString, int nMaxCount);
+
+    private delegate bool EnumChildProc(nint hWnd, nint lParam);
 }
 ```
 
@@ -570,6 +608,7 @@ internal static class DragDropItemExpander
 
 ```csharp
 // Services/DragDropService.cs
+using System.Diagnostics;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using MantisZip.Core.Abstractions;
@@ -589,6 +628,7 @@ internal class DragDropService
     private readonly ArchiveFormat _format;
     private readonly string? _password;
     private readonly Window _ownerWindow;
+    private readonly Models.AppSettings _settings = Models.AppSettings.Load();
 
     public DragDropService(
         string archivePath,
@@ -635,7 +675,7 @@ internal class DragDropService
             return;
 
         // Step 3: 读取冲突处理策略（string 类型，非枚举）
-        var conflictAction = AppSettings.Default.FileConflictAction;
+        var conflictAction = _settings.FileConflictAction;
 
         // Step 4: 获取选中目录用于路径裁剪
         var selectedDirs = selectedItems.Where(i => i.IsDirectory).ToList();
@@ -711,7 +751,7 @@ internal class DragDropService
             }
 
             // 可选：完成后打开目标文件夹
-            if (AppSettings.Default.OpenFolderAfterExtract)
+            if (_settings.OpenFolderAfterExtract)
             {
                 try
                 {
@@ -756,13 +796,13 @@ internal class DragDropService
 }
 ```
 
-- [ ] **4.2 确认 using 补全 [⏳]**
+- [ ] **4.2 确认 using 补全**
 
 需要确认：
 - `Process` 命名空间：`using System.Diagnostics;`
-- `OpenFolderDialog`：[⏳] Avalonia 自带 `Avalonia.Controls.OpenFolderDialog`，但分支可能用不同的对话框方案
-- `AppSettings.Default`：[⏳] Avalonia 分支的 `Models/AppSettings.cs`，需确认命名空间和单例模式
-- `FileConflictAction`：[⏳] 检查 Core 中枚举定义 —— 当前 `AppSettings` 字段是 string 类型，代码中已做字符串匹配；若分支增加了真正枚举，可切换回枚举
+- `OpenFolderDialog`：Avalonia 自带 `Avalonia.Controls.OpenFolderDialog`，分支已在用 ✅
+- `AppSettings`：Avalonia 分支使用 `Models.AppSettings.Load()`（无 `Default` 单例），代码已适配 ✅
+- `FileConflictAction`：`AppSettings.FileConflictAction` 为 string 类型，代码中已做字符串匹配 ✅
 
 ### Task 5: 修改 MainWindow.axaml.cs — 替换拖拽代码
 
@@ -774,11 +814,10 @@ internal class DragDropService
 1. 拖拽时不再急切提取 → 只记录选中项 + 启动 `DoDragDropAsync(自定义格式)`
 2. `DoDragDropAsync` 返回后 → 调用 `DragDropService.ExecuteAfterDropAsync`
 
-- [ ] **5.1 移除当前急切提取代码 [⏳]**
+- [ ] **5.1 移除当前急切提取代码**
 
-> [⏳] 以下代码中 `MainWindowViewModel` 的属性名（`SelectedEntry`、`CurrentArchivePath`、`StatusMessage`）
-> 以及 `ArchiveFormatHelper`、`DataTransfer` 等 API 均取决于 Avalonia 分支的具体实现。
-> 实施时需对照 Avalonia 分支的实际代码调整。
+> Avalonia 分支已确认：`SelectedEntry`、`CurrentArchivePath`、`StatusMessage` 均存在于
+> `MainWindowViewModel`，`ArchiveFormatHelper.GetFormat()` 已在 `Models/ArchiveFormatHelper.cs` 中 ✅
 
 找到 `MainWindow.axaml.cs` 中 `PointerMoved` 事件处理内从 `// Create temp directory…` 到 `CleanupDragDropTemp()` 为止的全部代码。（approximate 行范围：当前文件 `PointerMoved` 内部的 `try-catch-finally` 块）
 
@@ -809,6 +848,10 @@ fileGrid.PointerMoved += async (s, e) =>
     var format = ArchiveFormatHelper.GetFormat(archivePath);
     var password = vm2.GetSessionPassword(archivePath); // 需要 ViewModel 暴露此方法
 
+    // ═══ 预渲染预览文件树（DragPreviewPopup 用）═══
+    var previewPopupContent = await DragPreviewBitmapBuilder.RenderAsync(
+        selectedItems, allItems, format, archivePath);
+
     // Start drag with custom data format (unrecognized by Explorer)
     var data = new DataTransfer();
     data.Set("MantisZipDragFormat", archivePath);
@@ -816,8 +859,9 @@ fileGrid.PointerMoved += async (s, e) =>
     _isOwnDrag = true;
     vm2.StatusMessage = "拖拽到 Explorer 或桌面以直接解压";
 
-    // ═══ 启动 Win32 覆盖层（独立线程，不阻塞 Avalonia UI）═══
+    // ═══ 启动 Win32 覆盖层 + 预览弹窗（独立线程）═══
     var overlay = new DragOverlayWindow();
+    overlay.SetPreviewBitmap(previewPopupContent);
     overlay.Show();
 
     await DragDrop.DoDragDropAsync(triggerEvent, data, DragDropEffects.Copy);
@@ -835,11 +879,10 @@ fileGrid.PointerMoved += async (s, e) =>
 };
 ```
 
-- [ ] **5.2 补充 ViewModel 需要的接口 [⏳]**
+- [ ] **5.2 补充 ViewModel 需要的接口**
 
-> [⏳] 以下接口完全依赖 Avalonia 分支的 ViewModel 架构。
-> 需等分支的 `MainWindowViewModel` 定义完成后再实施。
-> 重点关注：`_sessionPasswords` 字典是否存在、`_allRawItems` 的命名与类型。
+> Avalonia 分支已确认：`_allRawItems`（`IReadOnlyList<ArchiveItem>?`，private）和
+> `_sessionPasswords`（`Dictionary<string, string>`，private）均在 `MainWindowViewModel` 中存在 ✅
 
 在 `MainWindowViewModel.cs` 中添加：
 
@@ -862,11 +905,9 @@ public string? GetSessionPassword(string archivePath)
 
 需要同步修改 `_allRawItems` 的可见性（从 `private` 改为 `internal` 或添加 internal 属性）。
 
-- [ ] **5.3 处理多选状态保存 [⏳]**
+- [ ] **5.3 处理多选状态保存**
 
-> [⏳] Avalonia DataGrid 的 `SelectedItems` API 签名可能与 WPF 不同。
-> 需确认 Avalonia 分支使用的是什么 DataGrid 实现（内置 DataGrid、第三方、或自定义列表）。
-> 如果分支使用的不是 DataGrid，需改为对应控件的多选 API。
+> Avalonia 分支已确认使用 `Avalonia.Controls.DataGrid`，`SelectedItems` 可用 ✅
 
 当前 Avalonia 分支只处理了 `SelectedEntry`（单选）。需要在 `PointerPressed` 时保存 DataGrid 的多选状态，类似 WPF 版本的 `_dragPreservedSelection`。
 
@@ -894,11 +935,10 @@ fileGrid.PointerPressed += (s, e) =>
 };
 ```
 
-- [ ] **5.4 补充 ArchiveItemModel → ArchiveItem 转换 [⏳]**
+- [ ] **5.4 补充 ArchiveItemModel → ArchiveItem 转换**
 
-> [⏳] `ArchiveItemModel` 的字段定义取决于 Avalonia 分支的 Model 层设计。
-> 需等分支的 `Models/ArchiveItemModel.cs` 确定后再实施 `ToCoreItem()`。
-> 注意 Core 的 `ArchiveItem` 可能也在变化（两边的字段可能不对齐）。
+> Avalonia 分支已确认：`Models/ArchiveItemModel.cs` 有 `FromCore(ArchiveItem)` 但缺 `ToCoreItem()`，
+> 字段与 Core `ArchiveItem` 已对齐，可直接添加 ✅
 
 `ArchiveItemModel` 需要添加一个从 ViewModel 转为 Core `ArchiveItem` 的方法，以便 `DragDropService` 能处理：
 
@@ -940,18 +980,19 @@ private void CleanupDragDropTemp()  // ⛔ 不再需要
 
 保留 `_isOwnDrag`（仍用于 `DragDrop.DropEvent` 防止自我循环），但作用减弱（因为不再传真实文件路径）。
 
-- [ ] **6.2 更新 Window_Drop / DragOver 保护 [⏳]**
+- [ ] **6.2 更新 Window_Drop / DragOver 保护**
 
-> [⏳] Avalonia 的 `DragEventArgs.DataTransfer` API 与 WPF 的 `DragEventArgs.Data` 完全不同。
-> 需等分支的拖入事件处理代码定义好后，再判断是否需要调整。
-> 当前 `Window_DragOver` 和 `Window_Drop` 使用 `e.DataTransfer.Formats.Contains(DataFormat.File)` 来判断是否接受拖入。新格式是自定义字符串，需要更新判断逻辑，或者保留原样（拖入功能不变——从 Explorer 拖文件到 MantisZip 窗口）。
+> Avalonia 分支已确认：`DragDrop.DropEvent` 使用 `e.DataTransfer.Formats.Contains(DataFormat.File)`，
+> 拖入保护逻辑（`_isOwnDrag`）已存在 ✅
 
-### Task 7: 拖拽视觉反馈（Win32 覆盖层）
+### Task 7: 拖拽视觉反馈（Win32 覆盖层 + PreviewPopup）
 
 **Files:**
 - Create: `Services/DragOverlayWindow.cs`
-- Modify: `Themes/Light.xaml` — 新增覆盖层颜色键
-- Modify: `Themes/Dark.xaml` — 新增覆盖层颜色键
+- Create: `Services/DragPreviewPopup.cs`
+- Create: `Services/DragPreviewBitmapBuilder.cs`
+- Modify: `Themes/ThemeLight.axaml` — 新增覆盖层颜色键
+- Modify: `Themes/ThemeDark.axaml` — 新增覆盖层颜色键
 
 > **关键技术决策**：Avalonia 的 `DoDragDropAsync` 在 Windows 上调用 `ole32.dll!DoDragDrop`，该调用**阻塞 UI 线程**（虽然内部运行自己的消息泵，但 Avalonia 控件无法更新）。因此覆盖层必须使用**纯 Win32 窗口 + 独立线程**，不能是 Avalonia 控件。
 
@@ -959,6 +1000,7 @@ private void CleanupDragDropTemp()  // ⛔ 不再需要
 
 ```csharp
 // Services/DragOverlayWindow.cs
+using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Threading;
 
@@ -981,6 +1023,9 @@ public class DragOverlayWindow : IDisposable
     private string? _targetPath;
     private readonly object _stateLock = new();
 
+    // Win32 窗口过程委托（必须存字段防止 GC 回收）
+    private readonly WndProcDelegate _wndProcDelegate;
+
     // 动画
     private readonly System.Timers.Timer _animationTimer;
     private double _opacityPhase = 0; // 0~1
@@ -992,6 +1037,7 @@ public class DragOverlayWindow : IDisposable
 
     public DragOverlayWindow()
     {
+        _wndProcDelegate = WndProc; // 防止 GC 回收窗口过程委托
         _animationTimer = new System.Timers.Timer(50); // 20fps
         _animationTimer.Elapsed += (_, _) => UpdateAnimation();
     }
@@ -1045,7 +1091,7 @@ public class DragOverlayWindow : IDisposable
             var wndClass = new NativeMethods.WNDCLASSEX
             {
                 cbSize = (uint)Marshal.SizeOf<NativeMethods.WNDCLASSEX>(),
-                lpfnWndProc = Marshal.GetFunctionPointerForDelegate<WndProcDelegate>(WndProc),
+                lpfnWndProc = Marshal.GetFunctionPointerForDelegate(_wndProcDelegate),
                 hInstance = hInstance,
                 hCursor = nint.Zero,
                 hbrBackground = nint.Zero,
@@ -1215,30 +1261,405 @@ public class DragOverlayWindow : IDisposable
 }
 ```
 
-- [ ] **7.2 主题资源补充 [⏳]**
+- [ ] **7.2 实现 DragPreviewPopup（Win32 预览弹窗） + DragPreviewBitmapBuilder**
 
-> [⏳] 以下颜色值（`#4CAF50` / `#F44336` / `#808080`）目前为硬编码。
-> 需等 Avalonia 分支的主题系统确定后：
-> 1. 确认这些色值是否与 `Theme_StatusSuccess` / `Theme_StatusError` 等已有键对齐
-> 2. 在 Light.xaml / Dark.xaml 中添加实际资源
-> 3. 如果 Avalonia 分支使用不同的主题机制，需适配
+预览弹窗是一个纯 Win32 弹出窗口，在拖拽期间跟随鼠标显示预渲染的 ResultTreeView 位图。内容预先在 UI 线程渲染（因为 DoDragDropAsync 会阻塞 UI 线程，渲染必须在之前完成）。
 
-在 `Themes/Light.xaml` 和 `Themes/Dark.xaml` 中新增覆盖层颜色键：
+**DragPreviewBitmapBuilder**（UI 线程，拖拽启动前调用）：
 
-```xml
-<!-- Light.xaml / Dark.xaml 新增 -->
-<!-- 拖拽覆盖层 -->
-<SolidColorBrush x:Key="Theme_DragOverlayBorder" Color="#FF4CAF50"/>
-<SolidColorBrush x:Key="Theme_DragOverlayFill" Color="#664CAF50"/>
-<SolidColorBrush x:Key="Theme_DragOverlayBorderWarning" Color="#FFF44336"/>
-<SolidColorBrush x:Key="Theme_DragOverlayFillWarning" Color="#66F44336"/>
-<SolidColorBrush x:Key="Theme_DragOverlayBorderNone" Color="#FF808080"/>
-<SolidColorBrush x:Key="Theme_DragOverlayFillNone" Color="#22808080"/>
+```csharp
+// Services/DragPreviewBitmapBuilder.cs
+using System.Runtime.InteropServices;
+using Avalonia.Media.Imaging;
+using MantisZip.Core.Abstractions;
+using MantisZip.UI.Avalonia.Controls;
+
+namespace MantisZip.UI.Avalonia.Services;
+
+/// <summary>
+/// 预渲染 ResultTreeView 到位图，供 DragPreviewPopup 在 Win32 弹窗中显示。
+/// 必须在 UI 线程调用（在 DoDragDropAsync 之前）。
+/// </summary>
+internal static class DragPreviewBitmapBuilder
+{
+    /// <summary>
+    /// 构建预览树并渲染为 byte[] (BGRA 32bpp, top-down)。
+    /// <param name="maxWidth">弹窗最大宽度，超出裁剪</param>
+    /// <param name="maxHeight">弹窗最大高度，超出显示 "…还有 N 个"</param>
+    /// </summary>
+    public static async Task<PreviewBitmapData> RenderAsync(
+        IReadOnlyList<ArchiveItem> selectedItems,
+        IReadOnlyList<ArchiveItem> allItems,
+        ArchiveFormat format,
+        string archivePath,
+        int maxWidth = 320,
+        int maxHeight = 500)
+    {
+        // Step 1: 展开选中项
+        var expanded = DragDropItemExpander.ExpandItems(selectedItems, allItems);
+        if (expanded.Count == 0) return PreviewBitmapData.Empty;
+
+        // Step 2: 用 ResultPreviewService 构建预览树
+        var root = ResultPreviewService.BuildDragPreview(
+            archivePath, expanded, format);
+
+        // Step 3: 创建 ResultTreeView 并渲染到位图
+        var treeView = new ResultTreeView
+        {
+            Root = new PreviewTreeNode
+            {
+                DisplayName = Path.GetFileName(archivePath),
+                IsExpanded = true,
+                Children = root?.Children ?? new()
+            },
+            Width = maxWidth,
+            CompactMode = true,
+            MaxItemsPerDirectory = 10,
+            MaxDepth = 5,
+            ShowFilteredGhosts = false
+        };
+
+        // 测量 + 布置（必须在 UI 线程）
+        treeView.Measure(new Size(maxWidth, double.PositiveInfinity));
+        var desiredH = Math.Min(treeView.DesiredSize.Height, maxHeight);
+        treeView.Arrange(new Rect(0, 0, maxWidth, desiredH));
+
+        var pixelSize = new PixelSize((int)treeView.DesiredSize.Width, (int)desiredH);
+
+        // 对极小树设置最小高度
+        pixelSize = pixelSize with { Height = Math.Max(pixelSize.Height, 40) };
+
+        var rtb = new RenderTargetBitmap(pixelSize);
+        rtb.Render(treeView);
+
+        // Step 4: 提取像素数据
+        var pixels = new byte[pixelSize.Width * pixelSize.Height * 4];
+        rtb.CopyPixels(pixels, pixelSize.Width * 4, 0);
+
+        // Step 5: 计算摘要
+        var summary = BuildSummary(expanded);
+
+        return new PreviewBitmapData
+        {
+            Pixels = pixels,
+            Width = pixelSize.Width,
+            Height = pixelSize.Height,
+            Summary = summary,
+            TotalFiles = expanded.Count
+        };
+    }
+
+    private static string BuildSummary(IReadOnlyList<ArchiveItem> items)
+    {
+        var total = items.Count;
+        long totalSize = items.Sum(i => i.Size);
+        return $"{total} 个文件 / {FormatUtil.FormatSize(totalSize)}";
+    }
+}
+
+/// <summary>
+/// 预渲染的位图数据，从 UI 线程传递到 Win32 线程。
+/// </summary>
+public class PreviewBitmapData
+{
+    public byte[] Pixels { get; set; } = Array.Empty<byte>();
+    public int Width { get; set; }
+    public int Height { get; set; }
+    public string Summary { get; set; } = "";
+    public int TotalFiles { get; set; }
+
+    public static readonly PreviewBitmapData Empty = new();
+}
 ```
 
-> **注意**：这些颜色键供代码中硬编码颜色参考，Win32 覆盖层无法直接绑定 Avalonia 资源。颜色值需与主题保持一致。
+**DragPreviewPopup**（Win32 线程，与 DragOverlayWindow 同线程）：
 
-- [ ] **7.3 Win11 圆角适配**
+在 `DragOverlayWindow` 的构造函数接收位图数据，在消息循环中创建并更新弹出窗口：
+
+```csharp
+// Services/DragPreviewPopup.cs (partial, 在 DragOverlayWindow 内使用)
+// 作为 DragOverlayWindow 内部管理的辅助类，或 DragOverlayWindow 的组成部分
+
+/// <summary>
+/// 预渲染树位图的 Win32 预览弹窗。跟随鼠标，无焦点，可穿透点击。
+/// 与 DragOverlayWindow 运行在同一 Win32 线程。
+/// </summary>
+internal class DragPreviewPopup : IDisposable
+{
+    private nint _hwnd = nint.Zero;
+    private readonly nint _hBitmap;
+    private readonly int _width;
+    private readonly int _height;
+    private readonly string _summary;
+    private readonly int _offsetX = 20;  // 鼠标右偏
+    private readonly int _offsetY = 24;  // 鼠标下偏
+
+    // 窗口类名
+    private const string ClassName = "MantisZipDragPreview";
+
+    public DragPreviewPopup(nint hInstance, PreviewBitmapData bitmapData)
+    {
+        _width = bitmapData.Width;
+        _height = bitmapData.Height;
+        _summary = bitmapData.Summary;
+
+        // BGRA → HBITMAP (32bpp top-down DIB)
+        _hBitmap = CreateBitmapFromPixels(bitmapData.Pixels, _width, _height, hInstance);
+
+        CreateWindow(hInstance);
+    }
+
+    public void UpdatePosition(int cursorX, int cursorY)
+    {
+        if (_hwnd == nint.Zero) return;
+        NativeMethods.SetWindowPos(_hwnd, NativeMethods.HWND_TOPMOST,
+            cursorX + _offsetX, cursorY + _offsetY,
+            _width, _height + SummaryBarHeight,
+            NativeMethods.SWP_NOACTIVATE | NativeMethods.SWP_SHOWWINDOW);
+    }
+
+    private void CreateWindow(nint hInstance)
+    {
+        // 注册窗口类
+        var wndClass = new NativeMethods.WNDCLASSEX
+        {
+            cbSize = (uint)Marshal.SizeOf<NativeMethods.WNDCLASSEX>(),
+            lpfnWndProc = Marshal.GetFunctionPointerForDelegate(_wndProcDelegate),
+            hInstance = hInstance,
+            hCursor = nint.Zero,
+            hbrBackground = CreateSolidBrush(0x00F5F5F5), // 浅灰背景
+            lpszClassName = ClassName
+        };
+        RegisterClassEx(ref wndClass);
+
+        _hwnd = NativeMethods.CreateWindowEx(
+            NativeMethods.WS_EX_LAYERED | NativeMethods.WS_EX_NOACTIVATE | NativeMethods.WS_EX_TOOLWINDOW,
+            ClassName, "",
+            NativeMethods.WS_POPUP | NativeMethods.WS_BORDER,
+            0, 0, _width, _height + SummaryBarHeight,
+            nint.Zero, nint.Zero, hInstance, nint.Zero);
+
+        if (_hwnd != nint.Zero)
+        {
+            // 点击穿透
+            var exStyle = NativeMethods.GetWindowLong(_hwnd, NativeMethods.GWL_EXSTYLE);
+            NativeMethods.SetWindowLong(_hwnd, NativeMethods.GWL_EXSTYLE,
+                exStyle | NativeMethods.WS_EX_TRANSPARENT);
+            // 初始透明度
+            NativeMethods.SetLayeredWindowAttributes(_hwnd, 0, 230, NativeMethods.LWA_ALPHA);
+        }
+    }
+
+    // 从像素数据创建 HBITMAP
+    private static nint CreateBitmapFromPixels(byte[] pixels, int w, int h, nint hInstance)
+    {
+        var bmi = new BITMAPINFO
+        {
+            bmiHeader = new BITMAPINFOHEADER
+            {
+                biSize = Marshal.SizeOf<BITMAPINFOHEADER>(),
+                biWidth = w,
+                biHeight = -h, // top-down
+                biPlanes = 1,
+                biBitCount = 32,
+                biCompression = 0 // BI_RGB
+            }
+        };
+
+        var hdc = NativeMethods.GetDC(nint.Zero);
+        nint hBitmap;
+        try
+        {
+            hBitmap = CreateDIBSection(hdc, ref bmi, 0, out var bitsPtr, nint.Zero, 0);
+            Marshal.Copy(pixels, 0, bitsPtr, pixels.Length);
+        }
+        finally
+        {
+            NativeMethods.ReleaseDC(nint.Zero, hdc);
+        }
+        return hBitmap;
+    }
+
+    // WM_PAINT 绘制：摘要栏 + 树位图
+    private nint WndProc(nint hWnd, uint msg, nint wParam, nint lParam)
+    {
+        const int WM_PAINT = 0x000F;
+
+        switch (msg)
+        {
+            case WM_PAINT:
+            {
+                var ps = new PAINTSTRUCT();
+                var hdc = BeginPaint(hWnd, out ps);
+                
+                // 绘制位图
+                var hdcMem = CreateCompatibleDC(hdc);
+                var old = SelectObject(hdcMem, _hBitmap);
+                BitBlt(hdc, 0, SummaryBarHeight, _width, _height,
+                    hdcMem, 0, 0, SRCCOPY);
+                SelectObject(hdcMem, old);
+                DeleteDC(hdcMem);
+
+                // 绘制摘要栏
+                var bgBrush = CreateSolidBrush(0xFFFFFFFF);
+                var oldBrush = SelectObject(hdc, bgBrush);
+                Rectangle(hdc, 0, 0, _width, SummaryBarHeight);
+                SelectObject(hdc, oldBrush);
+                DeleteObject(bgBrush);
+
+                // 摘要文字
+                SetBkMode(hdc, 1); // TRANSPARENT
+                var rect = new RECT { Left = 6, Top = 0, Right = _width - 6, Bottom = SummaryBarHeight };
+                DrawText(hdc, _summary, -1, ref rect, 0x0000); // DT_LEFT
+
+                EndPaint(hWnd, ref ps);
+                return 0;
+            }
+            case 0x0084: // WM_NCHITTEST
+                return -1; // HTTRANSPARENT — 鼠标穿透
+        }
+        return DefWindowProc(hWnd, msg, wParam, lParam);
+    }
+
+    private const int SummaryBarHeight = 24;
+
+    // 需要补充的 P/Invoke
+    [DllImport("gdi32.dll")]
+    private static extern nint CreateCompatibleDC(nint hdc);
+    [DllImport("gdi32.dll")]
+    private static extern nint CreateDIBSection(nint hdc, ref BITMAPINFO pbmi,
+        uint usage, out nint ppvBits, nint hSection, uint offset);
+    [DllImport("gdi32.dll")]
+    private static extern nint SelectObject(nint hdc, nint h);
+    [DllImport("gdi32.dll")]
+    private static extern bool DeleteDC(nint hdc);
+    [DllImport("gdi32.dll")]
+    private static extern bool BitBlt(nint hdc, int x, int y, int cx, int cy,
+        nint hdcSrc, int x1, int y1, uint rop);
+    [DllImport("gdi32.dll")]
+    private static extern bool Rectangle(nint hdc, int left, int top, int right, int bottom);
+    [DllImport("user32.dll")]
+    private static extern nint BeginPaint(nint hWnd, out PAINTSTRUCT lpPaint);
+    [DllImport("user32.dll")]
+    private static extern bool EndPaint(nint hWnd, ref PAINTSTRUCT lpPaint);
+    [DllImport("user32.dll")]
+    private static extern int DrawText(nint hdc, string lpchText, int cchText,
+        ref RECT lprc, uint format);
+    [DllImport("gdi32.dll")]
+    private static extern int SetBkMode(nint hdc, int mode);
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct BITMAPINFO { public BITMAPINFOHEADER bmiHeader; }
+    [StructLayout(LayoutKind.Sequential)]
+    private struct BITMAPINFOHEADER
+    {
+        public int biSize; public int biWidth; public int biHeight;
+        public short biPlanes; public short biBitCount;
+        public int biCompression; public int biSizeImage;
+        public int biXPelsPerMeter; public int biYPelsPerMeter;
+        public int biClrUsed; public int biClrImportant;
+    }
+    [StructLayout(LayoutKind.Sequential)]
+    private struct PAINTSTRUCT { public nint hdc; public bool fErase; public RECT rcPaint; public bool fRestore; public bool fIncUpdate; public int reserved1; public int reserved2; public int reserved3; public int reserved4; public int reserved5; public int reserved6; public int reserved7; public int reserved8; }
+}
+```
+
+> **注意**：`BITMAPINFO` 和 `BITMAPINFOHEADER` 的 struct 布局需与 Win32 SDK 严格对齐（`Pack=1` 已默认），实际实施时请验证 `Marshal.SizeOf` 返回值。
+
+**集成到 DragOverlayWindow**：
+
+```csharp
+// DragOverlayWindow 新增
+
+// 预览弹窗数据（UI 线程预渲染，构造时传入）
+private PreviewBitmapData? _previewBitmapData;
+
+public void SetPreviewBitmap(PreviewBitmapData data)
+{
+    _previewBitmapData = data;
+}
+
+// 在 RunWindowLoop 中，窗口创建后初始化 PreviewPopup
+private DragPreviewPopup? _previewPopup;
+
+private void RunWindowLoop()
+{
+    // ... 现有窗口注册和创建代码 ...
+
+    // 创建预览弹窗（仅在提供了位图数据时）
+    if (_previewBitmapData != null && _previewBitmapData.Pixels.Length > 0)
+    {
+        _previewPopup = new DragPreviewPopup(hInstance, _previewBitmapData);
+    }
+
+    _windowCreated.Set();
+    _animationTimer.Start();
+
+    // 消息循环
+    while (!_cts!.IsCancellationRequested)
+    {
+        // ... 现有 PeekMessage 循环 ...
+        UpdateTargetDetection();
+        UpdatePreviewPopupPosition(); // 新增
+    }
+}
+
+private void UpdatePreviewPopupPosition()
+{
+    if (_previewPopup == null) return;
+    if (!NativeMethods.GetCursorPos(out var pt)) return;
+    _previewPopup.UpdatePosition(pt.X, pt.Y);
+}
+
+// Close 时销毁
+public void Close()
+{
+    _previewPopup?.Dispose();
+    _previewPopup = null;
+    // ... 现有销毁代码 ...
+}
+```
+
+**DragOverlayWindow NativeMethods 补充**：
+
+需要在原有 `NativeMethods.cs` 中补充以下 P/Invoke（部分已有则跳过）：
+- `GetDC` / `ReleaseDC`（已有或补充）
+- `CreateSolidBrush`（已有 ✅）
+- `DeleteObject`（已有 ✅）
+- `SetWindowLong` / `GetWindowLong`（已有 ✅）
+- `SetLayeredWindowAttributes`（已有 ✅）
+
+新增：
+- `CreateDIBSection` — gdi32.dll
+- `CreateCompatibleDC` — gdi32.dll
+- `SelectObject` — gdi32.dll
+- `DeleteDC` — gdi32.dll
+- `BitBlt` — gdi32.dll
+- `BeginPaint` / `EndPaint` — user32.dll
+- `DrawText` — user32.dll
+- `SetBkMode` — gdi32.dll
+- `Rectangle` — gdi32.dll
+
+> 实际实施时建议将 GDI 相关 P/Invoke 集中到 `NativeMethods.cs`，避免分散。
+
+- [ ] **7.3 主题资源补充**
+> 以下颜色值为硬编码参考，Win32 覆盖层无法直接绑定 Avalonia 资源，需保持值一致。
+> 若需在 Avalonia 控件中引用这些颜色，按 Avalonia 公约使用 `Brush` 后缀键名。
+
+在 `Themes/ThemeLight.axaml` 和 `Themes/ThemeDark.axaml` 中新增覆盖层颜色键（仅供未来参考）：
+
+```xml
+<!-- ThemeLight.axaml / ThemeDark.axaml 新增 -->
+<!-- 拖拽覆盖层（硬编码参考值，Win32 覆盖层直接使用） -->
+<SolidColorBrush x:Key="DragDropBorderSuccessBrush" Color="#FF4CAF50"/>
+<SolidColorBrush x:Key="DragDropFillSuccessBrush" Color="#664CAF50"/>
+<SolidColorBrush x:Key="DragDropBorderWarningBrush" Color="#FFF44336"/>
+<SolidColorBrush x:Key="DragDropFillWarningBrush" Color="#66F44336"/>
+<SolidColorBrush x:Key="DragDropBorderNoneBrush" Color="#FF808080"/>
+<SolidColorBrush x:Key="DragDropFillNoneBrush" Color="#22808080"/>
+```
+
+- [ ] **7.4 Win11 圆角适配**
 
 使用 `DwmGetWindowAttribute` 获取 `DWMWA_EXTENDED_FRAME_BOUNDS`，给覆盖层窗口设置对应的圆角：
 
@@ -1263,18 +1684,19 @@ if (NativeMethods.DwmGetWindowAttribute(hWnd, NativeMethods.DWMWA_EXTENDED_FRAME
 
 | 场景 | 预期 |
 |------|------|
-| 拖拽一个文件到 Explorer 窗口 | 覆盖层变绿 → 检测到目录 → ProgressWindow → 文件出现在该目录 |
-| 拖拽到桌面 | 覆盖层变绿 → 检测到桌面路径 → 提取到桌面 |
-| 拖拽到非 Explorer 区域（如 Chrome） | 覆盖层变灰/隐藏 → DropTargetDetector 返回 null → 弹出文件夹选择对话框 |
-| 拖拽到 #32770 对话框 | 覆盖层变红 → 提示需确认 → 弹出文件夹选择对话框 |
-| 拖拽多个文件（Ctrl+点击多选） | 全部解压到目标目录 |
-| 拖拽目录（子文件展开） | 目录内所有文件解压到目标，路径裁剪正确 |
-| 拖拽加密文件 | 使用会话密码提取（ViewModel 的 GetSessionPassword） |
-| 拖拽到一半按 Esc 取消 | DoDragDropAsync 返回 → Overlay 销毁 → StatusMessage 更新，无额外操作 |
+| 拖拽一个文件到 Explorer 窗口 | 覆盖层变绿 + 预览弹窗显示文件树 → 检测到目录 → ProgressWindow → 文件出现在该目录 |
+| 拖拽到桌面 | 覆盖层变绿 + 预览弹窗 → 检测到桌面路径 → 提取到桌面 |
+| 拖拽到非 Explorer 区域（如 Chrome） | 覆盖层变灰 + 预览弹窗依然可见 → DropTargetDetector 返回 null → 弹出文件夹选择对话框 |
+| 拖拽到 #32770 对话框 | 覆盖层变红 + 预览弹窗 → 提示需确认 → 弹出文件夹选择对话框 |
+| 拖拽多个文件（Ctrl+点击多选） | 预览弹窗显示展开后的完整文件树和摘要统计 |
+| 拖拽目录（子文件展开） | 预览弹窗正确显示目录展开后的文件树结构 |
+| 拖拽加密文件 | 预览弹窗包含加密文件，使用会话密码提取 |
+| 拖拽到一半按 Esc 取消 | DoDragDropAsync 返回 → Overlay + PreviewPopup 销毁 → StatusMessage 更新，无额外操作 |
 | 目标目录已有同名文件 | 根据 AppSettings.FileConflictAction 处理 |
 | EnableDragExtract = false | 不启动拖拽 |
-| 快速划过多个窗口 | 覆盖层不闪烁（150ms 防抖生效） |
-| DPI 缩放 150% | 覆盖层大小和位置正确 |
+| 快速划过多个窗口 | 覆盖层不闪烁（150ms 防抖生效）；预览弹窗始终跟随鼠标 |
+| 预览弹窗遮挡问题 | 预览弹窗应显示在鼠标右下 20px 偏移，不遮挡鼠标下方的目标窗口边界 |
+| DPI 缩放 150% | 覆盖层 + 预览弹窗大小和位置正确 |
 
 ---
 
@@ -1285,15 +1707,19 @@ if (NativeMethods.DwmGetWindowAttribute(hWnd, NativeMethods.DWMWA_EXTENDED_FRAME
 | `ShellWindows` COM 在某些 Windows 版本/Explorer 配置下不工作 | 🟡 | 回退到弹文件夹选择对话框 |
 | **Avalonia `DoDragDropAsync` 阻塞 UI 线程，无法使用 Avalonia 控件做覆盖层** | 🔴 | ✅ 已解决：使用纯 Win32 独立线程覆盖层 |
 | Win32 覆盖层窗口生命周期管理（创建/销毁/泄漏） | 🟡 | 严格的 Dispose 模式 + `CancellationToken` + `ManualResetEvent` 同步 |
-| DPI 缩放导致覆盖层位置和大小偏差 | 🟡 | 使用 `GetWindowRect`（物理像素）+ 测试多 DPI 场景 [⏳] |
+| DPI 缩放导致覆盖层位置和大小偏差 | 🟡 | 使用 `GetWindowRect`（物理像素）+ 测试多 DPI 场景 |
 | 多线程 COM：独立线程需 STA | 🟡 | `Thread.SetApartmentState(ApartmentState.STA)` |
 | Explorer HWND 在很多子窗口之间怎么匹配 | 🟡 | ShellWindows 的 HWND 匹配顶层窗口；`WindowFromPoint` 获取的是鼠标下的最上层窗口 |
-| 多选时 DataGrid 的 SelectedItems 在拖拽过程中被改变 [⏳] | 🟡 | PointerPressed 时保存到 `_dragPreservedSelection`；但需确认 Avalonia DataGrid 的 `SelectedItems` 行为 |
+| 多选时 DataGrid 的 SelectedItems 在拖拽过程中被改变 | 🟡 | PointerPressed 时保存到 `_dragPreservedSelection`；Avalonia DataGrid `SelectedItems` 已确认可用 |
 | 提取大量文件时窗口无响应 | 🟡 | 用了 `Task.Run` + ProgressWindow，UI 线程不阻塞 |
 | Process.Start 打开文件夹在某些环境中失败 | 🟢 | try-catch 静默 |
 | 用户拖拽后等不及解压完成就切走 | 🟢 | ProgressWindow 在任务完成前一直显示 |
-| UIA 提取 #32770 对话框路径实现复杂 [⏳] | 🟡 | 可降级：#32770 统一返回 Warning 状态，不提取具体路径 |
-| `MainWindowViewModel` 接口与分支实现不一致 [⏳] | 🟡 | 实施时对照分支代码逐项对齐，必要时调整本计划代码 |
+| **预览弹窗：ResultTreeView 位图预渲染在 UI 线程阻塞** | 🟡 | 渲染在 DoDragDropAsync 之前、同步测量/布置后一步完成；渲染 300 文件以下应在 50ms 内 |
+| **预览弹窗：位图转换 BGRA→HBITMAP 像素格式不兼容** | 🟡 | 使用 `CreateDIBSection` + `Marshal.Copy`，确保与 Avalonia `RenderTargetBitmap` 输出格式一致（32bpp BGRA，top-down） |
+| **预览弹窗：Win32 弹窗位置在 DPI 缩放下偏移** | 🟡 | `GetCursorPos` + `SetWindowPos` 使用物理像素，无额外缩放 |
+| **预览弹窗：弹出窗口遮挡目标窗口视图** | 🟡 | 弹窗位于鼠标右下 20px 偏移，不覆盖目标窗口本身；如需精细控制可动态计算偏移避免出屏 |
+| #32770 对话框路径提取（方案 A：Win32） | 🟡 | `EnumChildWindows` + `GetWindowText` 实现；失败时降级弹文件夹选择框 |
+| `MainWindowViewModel` 接口与分支实现不一致 | 🟡 | 已通过审查确认 ✅ 实施时仍建议逐项对照 |
 
 ---
 
@@ -1303,6 +1729,7 @@ if (NativeMethods.DwmGetWindowAttribute(hWnd, NativeMethods.DWMWA_EXTENDED_FRAME
 - `AppSettings.EnableDragExtract` — 控制是否允许从文件列表拖出。取值 false 时 PointerMoved 不启动拖拽（当前 Avalonia 分支已有此逻辑）。
 - `AppSettings.FileConflictAction` — 目标文件冲突处理策略（**string 类型**，取值 `"ask"` / `"overwrite"` / `"rename"` / `"skip"`）。
 - `AppSettings.OpenFolderAfterExtract` — 解压完成后是否打开目标文件夹。
+> **注意**：Avalonia 分支用 `AppSettings.Load()` 创建实例，无 `Default` 单例。
 
 ### 密码处理
 - 用 `_sessionPasswords` 缓存（已在 ViewModel 中），`GetSessionPassword()` 获取。
@@ -1317,60 +1744,56 @@ if (NativeMethods.DwmGetWindowAttribute(hWnd, NativeMethods.DWMWA_EXTENDED_FRAME
 
 ---
 
-## ⏳ Avalonia 移植待定事项
+## 审查对照 & 待定事项
 
-以下事项需在 Avalonia 分支移植到一定阶段后才能最终决定。按依赖类型分组：
+**2026-07-23 审查结论**：Avalonia 移植已完成，以下为审查结果。
 
-### 类型 A：依赖 ViewModel / Model 架构
+### ✅ 已确认（可直接实施）
 
-| 事项 | 依赖 | 解决方式 |
-|------|------|---------|
-| `MainWindowViewModel` 接口签名（Task 5.1 ~ 5.2） | `SelectedEntry`、`CurrentArchivePath`、`StatusMessage`、`_sessionPasswords` 等属性存在且命名一致 | 实施时对照分支代码逐项对齐，必要时调整本计划的代码 |
-| `_allRawItems` 可见性（Task 5.2） | ViewModel 中已有 `_allRawItems` 但为 `private` | 改为 `internal` 或新增 `GetAllRawItems()` 方法 |
-| `ArchiveItemModel` 字段定义（Task 5.4） | Model 层 `ArchiveItemModel` 的属性集 | 等 Model 定义稳定后实现 `ToCoreItem()` 映射 |
+| 事项 | 确认结果 |
+|------|---------|
+| `MainWindowViewModel` 接口 | `SelectedEntry`、`CurrentArchivePath`、`StatusMessage` 均存在 ✅ |
+| `_allRawItems` | 存在（`private IReadOnlyList<ArchiveItem>?`），需改为 `internal` 或新增方法 |
+| `_sessionPasswords` | 存在（`Dictionary<string, string>`，`private`）✅ |
+| `DataGrid SelectedItems` | `Avalonia.Controls.DataGrid` 已使用 ✅ |
+| `ArchiveItemModel` | 有 `FromCore()`，需补充 `ToCoreItem()` 反向转换 |
+| `DragEventArgs.DataTransfer` | 使用 `e.DataTransfer.Formats.Contains(DataFormat.File)` ✅ |
+| `ProgressWindow` | `Dialogs/ProgressWindow.axaml.cs` 存在，构造函数支持 title ✅ |
+| `OpenFolderDialog` | `Avalonia.Controls.OpenFolderDialog` 可用 ✅ |
+| `AppSettings` | 使用 `Models.AppSettings.Load()`（无 `Default` 单例）|
+| `ArchiveFormatHelper` | `Models/ArchiveFormatHelper.GetFormat()` 存在 ✅ |
+| 主题文件路径 | `Themes/ThemeLight.axaml` / `Themes/ThemeDark.axaml` |
+| 拖入保护 (`_isOwnDrag`) | 已在 `MainWindow.axaml.cs` 中使用 ✅ |
 
-### 类型 B：依赖控件 API
+### ⬜ 仍待实施时决策
 
-| 事项 | 依赖 | 解决方式 |
-|------|------|---------|
-| DataGrid `SelectedItems` API（Task 5.3） | Avalonia 分支使用的 DataGrid 实现 | 确认 `SelectedItems` 签名，若行为不同则用其他方式（如 CheckBox 选择模式） |
-| `DragEventArgs.DataTransfer` API（Task 6.2） | Avalonia 拖入事件处理代码 | 实施时根据分支的实际 `DragOver` / `Drop` 代码调整保护逻辑 |
-
-### 类型 C：依赖依赖库决策
-
-| 事项 | 依赖 | 解决方式 |
-|------|------|---------|
-| UIA 库取舍（Task 2.1） | Avalonia 项目是否接受 WPF 的 `System.Windows.Automation` 依赖 | 若不可接受，降级为 #32770 统一返回 Warning；或使用 `EnumChildWindows` 遍历子窗口获取路径 |
-| `System.Diagnostics.Stopwatch`（Task 7.1） | 已内置无需额外依赖 | 注意实际代码中确认 `using System.Diagnostics;` |
-
-### 类型 D：依赖最终视觉设计
-
-| 事项 | 依赖 | 解决方式 |
-|------|------|---------|
-| 覆盖层颜色值（Task 7.2） | `Light.xaml` / `Dark.xaml` 中的 `Theme_StatusSuccess` / `Theme_StatusError` 等颜色键 | 实施时对照主题文件选取与分支风格一致的色值 |
-| 圆角策略（Task 7.3） | `DwmGetWindowAttribute` 在 Windows 11 上的一致性 | 测试 Win10 + Win11，若圆角效果不稳定则回退到纯矩形边框 |
-
-### 类型 E：依赖完整运行环境
-
-| 事项 | 依赖 | 解决方式 |
-|------|------|---------|
-| 全部测试验证（Task 8） | 可运行的 Avalonia 分支 | 边构建边测试，建议按 Task 顺序逐步验证 |
-| `dotnet build` / `dotnet test` | `MantisZip.UI.Avalonia.csproj` 及测试项目 | 作为 CI 验收标准 |
+| 事项 | 说明 |
+|------|------|
+| `_allRawItems` 可见性方案 | 改为 `internal` 属性 vs 新增 `GetAllRawItems()` 方法 |
+| 圆角策略 | `DwmGetWindowAttribute` Win11 圆角效果需测试，不稳定则回退矩形边框 |
+| 预览弹窗位图渲染 | `RenderTargetBitmap.Render()` 需要控件在 `Measure`/`Arrange` 后调用；确认 `ResultTreeView` 在脱离视觉树时仍可正常渲染 |
+| 预览弹窗 BITMAPINFO 对齐 | `BITMAPINFOHEADER` 的 `Marshal.SizeOf` 返回 40 字节（标准 DIB 头大小），实施时需验证 |
+| 像素格式匹配 | Avalonia `RenderTargetBitmap.CopyPixels` 输出 BGRA 32bpp top-down；`CreateDIBSection` 设为同格式即不需要颜色转换 |
+| 全部测试验证 | 需实际运行时逐项验收 |
 
 ---
 
 ## Definition of Done
 
 - [ ] `DropTargetDetector` 能正确检测 Explorer 窗口路径和桌面路径
-- [ ] 检测失败时弹文件夹选择对话框 [⏳]
+- [ ] 检测失败时弹文件夹选择对话框
 - [ ] 多选拖拽展开目录，路径裁剪正确（与 WPF v0.3.8 行为一致）
 - [ ] 直接解压到目标目录，不走 temp
-- [ ] `ProgressWindow` 在解压期间正常显示进度 [⏳]
-- [ ] 加密文件使用会话密码解压 [⏳]
-- [ ] 文件冲突处理遵守 `AppSettings.FileConflictAction` [⏳]
+- [ ] `ProgressWindow` 在解压期间正常显示进度
+- [ ] 加密文件使用会话密码解压
+- [ ] 文件冲突处理遵守 `AppSettings.FileConflictAction`
 - [ ] 拖拽取消（Esc）无残留
 - [ ] `DragOverlayWindow` 在拖拽期间正确显示绿/红/灰状态
 - [ ] 覆盖层不遮挡目标窗口内容（鼠标穿透 + 低透明度）
+- [ ] `DragPreviewPopup` 在拖拽期间跟随鼠标显示预渲染的文件树
+- [ ] 预览弹窗位图生成正确（Avalonia `RenderTargetBitmap` → GDI `CreateDIBSection` 像素一致）
+- [ ] 预览弹窗不遮挡目标窗口内容（偏移右下 + 点击穿透）
+- [ ] 大文件树时渲染时间可接受（300 文件 < 100ms）
 - [ ] DragOverlayWindow 的动画不影响性能（20fps + 50ms 定时器足够低消耗）
-- [ ] `dotnet build src/MantisZip.UI.Avalonia/MantisZip.UI.Avalonia.csproj` 通过 [⏳]
-- [ ] `dotnet test tests/MantisZip.Tests/MantisZip.Tests.csproj` 通过 [⏳]
+- [ ] `dotnet build src/MantisZip.UI.Avalonia/MantisZip.UI.Avalonia.csproj` 通过
+- [ ] `dotnet test tests/MantisZip.Tests/MantisZip.Tests.csproj` 通过
