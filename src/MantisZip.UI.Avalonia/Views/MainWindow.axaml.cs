@@ -12,16 +12,18 @@ using MantisZip.UI.Avalonia.ViewModels;
 using MantisZip.Core;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.InteropServices;
 using Avalonia.Layout;
+using MantisZip.UI.Avalonia.Services;
 
 namespace MantisZip.UI.Avalonia.Views;
 
 public partial class MainWindow : Window
 {
     private bool _isOwnDrag;
-    private string? _dragDropTempDir;
     private PointerPressedEventArgs? _dragStartEvent;
     private Point _dragStartPoint;
+    private List<ArchiveItem>? _dragPreservedSelection;
     private string? _lastSortMemberPath;
     private bool _lastSortDescending;
 
@@ -228,6 +230,19 @@ public partial class MainWindow : Window
             {
                 _dragStartPoint = e.GetPosition(fileGrid);
                 _dragStartEvent = e;
+
+                // Save multi-selection state at press time (before drag starts)
+                if (s is DataGrid grid && grid.SelectedItems.Count > 1)
+                {
+                    _dragPreservedSelection = grid.SelectedItems
+                        .OfType<ArchiveItemModel>()
+                        .Select(m => m.ToCoreItem())
+                        .ToList();
+                }
+                else
+                {
+                    _dragPreservedSelection = null;
+                }
             };
 
             fileGrid.PointerMoved += async (s, e) =>
@@ -239,7 +254,6 @@ public partial class MainWindow : Window
                 if (Math.Abs(delta.X) < 10 && Math.Abs(delta.Y) < 10)
                     return;
 
-                var triggerEvent = _dragStartEvent;
                 _dragStartEvent = null; // Prevent re-entry
 
                 var vm2 = DataContext as MainWindowViewModel;
@@ -247,51 +261,57 @@ public partial class MainWindow : Window
                 var archivePath = vm2.CurrentArchivePath;
                 if (string.IsNullOrEmpty(archivePath)) return;
 
-                var entry = vm2.SelectedEntry;
-                var format = ArchiveFormatHelper.GetFormat(archivePath);
+                // Get selected items (support multi-select)
+                var selectedItems = _dragPreservedSelection
+                    ?? new List<ArchiveItem> { vm2.SelectedEntry.ToCoreItem() };
+                var allItems = vm2.GetAllRawItems();
 
-                // Create temp directory for extracted file
-                _dragDropTempDir = Path.Combine(Path.GetTempPath(), "MantisZip", "DragDrop", Guid.NewGuid().ToString());
-                Directory.CreateDirectory(_dragDropTempDir);
+                var format = ArchiveFormatHelper.GetFormat(archivePath);
+                var password = vm2.GetSessionPassword(archivePath);
+
+                // Pre-render preview bitmap (UI thread, before OLE DoDragDrop blocks)
+                vm2.StatusMessage = "正在构建预览...";
+                var previewBitmap = await DragPreviewBitmapBuilder.RenderAsync(
+                    selectedItems, allItems, format, archivePath);
+
+                // Expand items: directories become their contained files (flat list)
+                var expandedItems = DragDropItemExpander.ExpandItems(selectedItems, allItems);
+                if (expandedItems.Count == 0)
+                    return;
+
+                using var dataObject = new DragDataObject(expandedItems, archivePath, format, password);
+                var dropSource = new DropSource();
+
+                _isOwnDrag = true;
+                vm2.StatusMessage = "拖拽到 Explorer 或桌面以直接解压";
+
+                // Start Win32 overlay + preview popup on separate thread
+                var overlay = new DragOverlayWindow();
+                if (previewBitmap.Pixels.Length > 0)
+                    overlay.SetPreviewBitmap(previewBitmap);
+                overlay.Show();
 
                 try
                 {
-                    vm2.StatusMessage = "正在提取文件...";
+                    App.DebugLog($"[MainWindow] DoDragDrop START: items={expandedItems.Count}, format={format}, password={password != null}");
+                    var pDataObj = Marshal.GetComInterfaceForObject<DragDataObject, System.Runtime.InteropServices.ComTypes.IDataObject>(dataObject);
+                    var pDropSrc = Marshal.GetComInterfaceForObject<DropSource, Services.IDropSourceCom>(dropSource);
+                    App.DebugLog($"[MainWindow] DoDragDrop: pDataObj=0x{pDataObj:X}, pDropSrc=0x{pDropSrc:X}");
 
-                    var targetPath = Path.Combine(_dragDropTempDir, entry.Name);
-                    var dir = Path.GetDirectoryName(targetPath);
-                    if (dir != null && !Directory.Exists(dir))
-                        Directory.CreateDirectory(dir);
-
-                    await ArchiveEntryExtractor.ExtractEntryAsync(
-                        archivePath,
-                        entry.FullPath,
-                        targetPath,
-                        format);
-
-                    // Create data transfer with the extracted file
-                    var storageFile = await StorageProvider.TryGetFileFromPathAsync(new Uri(targetPath));
-                    if (storageFile != null)
-                    {
-                        var dataTransfer = new DataTransfer();
-                        dataTransfer.Add(DataTransferItem.CreateFile(storageFile));
-
-                        _isOwnDrag = true;
-                        vm2.StatusMessage = "正在拖拽 — 放到目标位置以复制文件";
-
-                        await DragDrop.DoDragDropAsync(triggerEvent, dataTransfer, DragDropEffects.Copy);
-                    }
+                    int hr = NativeMethods.DoDragDrop(pDataObj, pDropSrc, (int)DragDropEffects.Copy, out int effect);
+                    App.DebugLog($"[MainWindow] DoDragDrop DONE: hr=0x{hr:X8}, effect={effect}");
                 }
                 catch (Exception ex)
                 {
-                    System.Diagnostics.Debug.WriteLine($"Drag-drop failed: {ex.Message}");
+                    App.DebugLog($"[MainWindow] DoDragDrop EXCEPTION: {ex.GetType().Name}: {ex.Message}");
+                    throw;
                 }
                 finally
                 {
+                    overlay.Close();
+                    overlay.Dispose();
                     _isOwnDrag = false;
-                    CleanupDragDropTemp();
-                    if (DataContext is MainWindowViewModel vm3)
-                        vm3.StatusMessage = "";
+                    App.DebugLog("[MainWindow] DoDragDrop cleanup done");
                 }
             };
         }
@@ -460,22 +480,6 @@ public partial class MainWindow : Window
         {
             if (item is ArchiveItemModel model)
                 vm.SelectedEntries.Add(model);
-        }
-    }
-
-    private void CleanupDragDropTemp()
-    {
-        if (_dragDropTempDir != null && Directory.Exists(_dragDropTempDir))
-        {
-            try
-            {
-                Directory.Delete(_dragDropTempDir, recursive: true);
-            }
-            catch
-            {
-                // Best effort cleanup
-            }
-            _dragDropTempDir = null;
         }
     }
 

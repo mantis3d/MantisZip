@@ -1,17 +1,31 @@
 {
-  "active_plan": "E:/github/MantisZip/.sisyphus/plans/office-content-preview-avalonia.md",
-  "started_at": "2026-07-21T07:53:29.124Z",
+  "active_plan": "E:/github/MantisZip/.sisyphus/plans/drag-drop-direct-extract.md",
+  "started_at": "2026-07-23T03:34:36.322Z",
   "session_ids": [
-    "ses_07c55a0fbffeePFYwcxk6iusx2"
+    "ses_072f5e9f7ffeA0eV0mkGNV24fM",
+    "ses_072f54db1ffeZoj1mJLDs25Y2Z",
+    "ses_072f5462bffec2r9x3XULxvFAD",
+    "ses_072f53f6affeIwLYGciHKqYc05",
+    "ses_072af8f9affe7wMBgwvaMxCoZo",
+    "ses_072a72c4bffeyFYBTA64zx1J9d",
+    "ses_072a713e7ffe346Mp1avb1k36z",
+    "ses_072a70328ffe4Iii8HhR79MSDN"
   ],
-  "plan_name": "office-content-preview-avalonia",
+  "plan_name": "drag-drop-direct-extract",
   "agent": "atlas",
   "worktree_path": null,
-  "status": "completed",
-  "note": "All 6 implementation tasks + guardrails complete. DOCX/XLSX/PPTX content preview implemented. Commit 4f02074.",
+  "status": "in_progress",
+  "note": "Avalonia drag-drop: replace eager-extract with Win32 overlay + drop-target detection. Starting Task 1.",
   "session_origins": {
-    "ses_07c55a0fbffeePFYwcxk6iusx2": "direct"
+    "ses_072f5e9f7ffeA0eV0mkGNV24fM": "direct",
+    "ses_072f54db1ffeZoj1mJLDs25Y2Z": "appended",
+    "ses_072f5462bffec2r9x3XULxvFAD": "appended",
+    "ses_072f53f6affeIwLYGciHKqYc05": "appended",
+    "ses_072af8f9affe7wMBgwvaMxCoZo": "appended",
+    "ses_072a72c4bffeyFYBTA64zx1J9d": "appended",
+    "ses_072a713e7ffe346Mp1avb1k36z": "appended",
+    "ses_072a70328ffe4Iii8HhR79MSDN": "appended"
   },
   "task_sessions": {},
-  "updated_at": "2026-07-21T07:53:29.124Z"
+  "updated_at": "2026-07-23T03:34:36.322Z"
 }

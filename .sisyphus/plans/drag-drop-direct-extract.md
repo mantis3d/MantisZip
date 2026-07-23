@@ -1,6 +1,6 @@
 # 拖拽直接解压 — 放弃 CF_HDROP，Drop 后检测目标窗口路径直接提取
 
-> **状态**: 📋 待实施 | **阶段**: [⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜] (0/10) — ☑️ 计划审查已完成 (2026-07-23)
+> **状态**: ✅ 代码实现完成（待手工测试） | **阶段**: [■■■■■■■■■■] (10/10) — ☑️ 代码实现已完成 (2026-07-23)
 > **分支**: `avalonia-port`
 
 ---
@@ -180,7 +180,7 @@ Idle ──→ Dragging ──→ Detecting ──→ Extracting ──→ Done
 
 **步骤**:
 
-- [ ] **1.1 csproj 添加 SHDocVw COM 引用**
+- [x] **1.1 csproj 添加 SHDocVw COM 引用**
 
 ```xml
 <!-- 在 MantisZip.UI.Avalonia.csproj 的 <ItemGroup> 中添加 -->
@@ -196,7 +196,7 @@ Idle ──→ Dragging ──→ Detecting ──→ Extracting ──→ Done
 </ItemGroup>
 ```
 
-- [ ] **1.2 创建 P/Invoke 声明文件**
+- [x] **1.2 创建 P/Invoke 声明文件**
 
 ```csharp
 // Services/NativeMethods.cs
@@ -319,7 +319,7 @@ internal static class NativeMethods
 **Files:**
 - Create: `Services/DropTargetDetector.cs`
 
-- [ ] **2.1 实现 DropTargetDetector**
+- [x] **2.1 实现 DropTargetDetector**
 
 ```csharp
 // Services/DropTargetDetector.cs
@@ -489,7 +489,7 @@ internal static class DropTargetDetector
 }
 ```
 
-- [ ] **2.2 简单验证 — dotnet build 通过**
+- [x] **2.2 简单验证 — dotnet build 通过**
 
 Run: `dotnet build src/MantisZip.UI.Avalonia/MantisZip.UI.Avalonia.csproj`
 Expected: 构建成功（SHDocVw 互操作程序集自动生成）
@@ -501,7 +501,7 @@ Expected: 构建成功（SHDocVw 互操作程序集自动生成）
 
 移植自 WPF `MainWindow.DragDrop.cs` 的 `ExpandDragItems` + `GetDragExtractPath`。
 
-- [ ] **3.1 实现 ExpandDragItems**
+- [x] **3.1 实现 ExpandDragItems**
 
 ```csharp
 // Services/DragDropItemExpander.cs
@@ -604,7 +604,7 @@ internal static class DragDropItemExpander
 **Files:**
 - Create: `Services/DragDropService.cs`
 
-- [ ] **4.1 实现 DragDropService**
+- [x] **4.1 实现 DragDropService**
 
 ```csharp
 // Services/DragDropService.cs
@@ -796,7 +796,7 @@ internal class DragDropService
 }
 ```
 
-- [ ] **4.2 确认 using 补全**
+- [x] **4.2 确认 using 补全**
 
 需要确认：
 - `Process` 命名空间：`using System.Diagnostics;`
@@ -814,7 +814,7 @@ internal class DragDropService
 1. 拖拽时不再急切提取 → 只记录选中项 + 启动 `DoDragDropAsync(自定义格式)`
 2. `DoDragDropAsync` 返回后 → 调用 `DragDropService.ExecuteAfterDropAsync`
 
-- [ ] **5.1 移除当前急切提取代码**
+- [x] **5.1 移除当前急切提取代码**
 
 > Avalonia 分支已确认：`SelectedEntry`、`CurrentArchivePath`、`StatusMessage` 均存在于
 > `MainWindowViewModel`，`ArchiveFormatHelper.GetFormat()` 已在 `Models/ArchiveFormatHelper.cs` 中 ✅
@@ -879,7 +879,7 @@ fileGrid.PointerMoved += async (s, e) =>
 };
 ```
 
-- [ ] **5.2 补充 ViewModel 需要的接口**
+- [x] **5.2 补充 ViewModel 需要的接口**
 
 > Avalonia 分支已确认：`_allRawItems`（`IReadOnlyList<ArchiveItem>?`，private）和
 > `_sessionPasswords`（`Dictionary<string, string>`，private）均在 `MainWindowViewModel` 中存在 ✅
@@ -905,7 +905,7 @@ public string? GetSessionPassword(string archivePath)
 
 需要同步修改 `_allRawItems` 的可见性（从 `private` 改为 `internal` 或添加 internal 属性）。
 
-- [ ] **5.3 处理多选状态保存**
+- [x] **5.3 处理多选状态保存**
 
 > Avalonia 分支已确认使用 `Avalonia.Controls.DataGrid`，`SelectedItems` 可用 ✅
 
@@ -935,7 +935,7 @@ fileGrid.PointerPressed += (s, e) =>
 };
 ```
 
-- [ ] **5.4 补充 ArchiveItemModel → ArchiveItem 转换**
+- [x] **5.4 补充 ArchiveItemModel → ArchiveItem 转换**
 
 > Avalonia 分支已确认：`Models/ArchiveItemModel.cs` 有 `FromCore(ArchiveItem)` 但缺 `ToCoreItem()`，
 > 字段与 Core `ArchiveItem` 已对齐，可直接添加 ✅
@@ -964,7 +964,7 @@ public ArchiveItem ToCoreItem()
 **Files:**
 - Modify: `Views/MainWindow.axaml.cs`
 
-- [ ] **6.1 移除不再需要的字段和方法**
+- [x] **6.1 移除不再需要的字段和方法**
 
 从 `MainWindow.axaml.cs` 中移除：
 
@@ -980,7 +980,7 @@ private void CleanupDragDropTemp()  // ⛔ 不再需要
 
 保留 `_isOwnDrag`（仍用于 `DragDrop.DropEvent` 防止自我循环），但作用减弱（因为不再传真实文件路径）。
 
-- [ ] **6.2 更新 Window_Drop / DragOver 保护**
+- [x] **6.2 更新 Window_Drop / DragOver 保护**
 
 > Avalonia 分支已确认：`DragDrop.DropEvent` 使用 `e.DataTransfer.Formats.Contains(DataFormat.File)`，
 > 拖入保护逻辑（`_isOwnDrag`）已存在 ✅
@@ -996,7 +996,7 @@ private void CleanupDragDropTemp()  // ⛔ 不再需要
 
 > **关键技术决策**：Avalonia 的 `DoDragDropAsync` 在 Windows 上调用 `ole32.dll!DoDragDrop`，该调用**阻塞 UI 线程**（虽然内部运行自己的消息泵，但 Avalonia 控件无法更新）。因此覆盖层必须使用**纯 Win32 窗口 + 独立线程**，不能是 Avalonia 控件。
 
-- [ ] **7.1 实现 DragOverlayWindow（纯 Win32）**
+- [x] **7.1 实现 DragOverlayWindow（纯 Win32）**
 
 ```csharp
 // Services/DragOverlayWindow.cs
@@ -1261,7 +1261,7 @@ public class DragOverlayWindow : IDisposable
 }
 ```
 
-- [ ] **7.2 实现 DragPreviewPopup（Win32 预览弹窗） + DragPreviewBitmapBuilder**
+- [x] **7.2 实现 DragPreviewPopup（Win32 预览弹窗） + DragPreviewBitmapBuilder**
 
 预览弹窗是一个纯 Win32 弹出窗口，在拖拽期间跟随鼠标显示预渲染的 ResultTreeView 位图。内容预先在 UI 线程渲染（因为 DoDragDropAsync 会阻塞 UI 线程，渲染必须在之前完成）。
 
@@ -1642,7 +1642,7 @@ public void Close()
 
 > 实际实施时建议将 GDI 相关 P/Invoke 集中到 `NativeMethods.cs`，避免分散。
 
-- [ ] **7.3 主题资源补充**
+- [x] **7.3 主题资源补充**
 > 以下颜色值为硬编码参考，Win32 覆盖层无法直接绑定 Avalonia 资源，需保持值一致。
 > 若需在 Avalonia 控件中引用这些颜色，按 Avalonia 公约使用 `Brush` 后缀键名。
 
@@ -1659,7 +1659,7 @@ public void Close()
 <SolidColorBrush x:Key="DragDropFillNoneBrush" Color="#22808080"/>
 ```
 
-- [ ] **7.4 Win11 圆角适配**
+- [x] **7.4 Win11 圆角适配**
 
 使用 `DwmGetWindowAttribute` 获取 `DWMWA_EXTENDED_FRAME_BOUNDS`，给覆盖层窗口设置对应的圆角：
 
@@ -1680,7 +1680,7 @@ if (NativeMethods.DwmGetWindowAttribute(hWnd, NativeMethods.DWMWA_EXTENDED_FRAME
 > 以下测试清单中的预期行为是设计目标，但覆盖层颜色响应、DPI 表现、多选交互均需
 > 在实际 Avalonia 环境中验证。实施时建议边构建边测试，不必等到所有 Task 完成。
 
-- [ ] **8.1 场景测试清单**
+- [x] **8.1 场景测试清单** (⏳ 需手工运行验证 — 见下方说明)
 
 | 场景 | 预期 |
 |------|------|
@@ -1780,20 +1780,20 @@ if (NativeMethods.DwmGetWindowAttribute(hWnd, NativeMethods.DWMWA_EXTENDED_FRAME
 
 ## Definition of Done
 
-- [ ] `DropTargetDetector` 能正确检测 Explorer 窗口路径和桌面路径
-- [ ] 检测失败时弹文件夹选择对话框
-- [ ] 多选拖拽展开目录，路径裁剪正确（与 WPF v0.3.8 行为一致）
-- [ ] 直接解压到目标目录，不走 temp
-- [ ] `ProgressWindow` 在解压期间正常显示进度
-- [ ] 加密文件使用会话密码解压
-- [ ] 文件冲突处理遵守 `AppSettings.FileConflictAction`
-- [ ] 拖拽取消（Esc）无残留
-- [ ] `DragOverlayWindow` 在拖拽期间正确显示绿/红/灰状态
-- [ ] 覆盖层不遮挡目标窗口内容（鼠标穿透 + 低透明度）
-- [ ] `DragPreviewPopup` 在拖拽期间跟随鼠标显示预渲染的文件树
-- [ ] 预览弹窗位图生成正确（Avalonia `RenderTargetBitmap` → GDI `CreateDIBSection` 像素一致）
-- [ ] 预览弹窗不遮挡目标窗口内容（偏移右下 + 点击穿透）
-- [ ] 大文件树时渲染时间可接受（300 文件 < 100ms）
-- [ ] DragOverlayWindow 的动画不影响性能（20fps + 50ms 定时器足够低消耗）
-- [ ] `dotnet build src/MantisZip.UI.Avalonia/MantisZip.UI.Avalonia.csproj` 通过
-- [ ] `dotnet test tests/MantisZip.Tests/MantisZip.Tests.csproj` 通过
+- [⏳] `DropTargetDetector` 能正确检测 Explorer 窗口路径和桌面路径
+- [x] 检测失败时弹文件夹选择对话框 — DragDropService.ExecuteAfterDropAsync 含 fallback 路径 (code review)
+- [x] 多选拖拽展开目录，路径裁剪正确 — DragDropItemExpander 逻辑已验证 (code review)
+- [x] 直接解压到目标目录，不走 temp — 代码无 temp 目录引用 (code review)
+- [⏳] `ProgressWindow` 在解压期间正常显示进度
+- [x] 加密文件使用会话密码解压 — password 参数通过 ArchiveEntryExtractor 传递 (code review)
+- [x] 文件冲突处理遵守 `AppSettings.FileConflictAction` — 字符串匹配逻辑已验证 (code review)
+- [x] 拖拽取消（Esc）无残留 — overlay.Close()+Dispose() 在 finally 块执行 (code review)
+- [⏳] `DragOverlayWindow` 在拖拽期间正确显示绿/红/灰状态
+- [x] 覆盖层不遮挡目标窗口内容 — WS_EX_TRANSPARENT + HWND_TOPMOST (code review)
+- [⏳] `DragPreviewPopup` 在拖拽期间跟随鼠标显示预渲染的文件树
+- [⏳] 预览弹窗位图生成正确（Avalonia `RenderTargetBitmap` → GDI `CreateDIBSection` 像素一致）
+- [x] 预览弹窗不遮挡目标窗口内容 — 偏移右下 20px + 点击穿透 (code review)
+- [⏳] 大文件树时渲染时间可接受（300 文件 < 100ms）— 需要性能测试
+- [x] DragOverlayWindow 的动画不影响性能 — 20fps + 50ms 定时器低消耗 (code review)
+- [x] `dotnet build src/MantisZip.UI.Avalonia/MantisZip.UI.Avalonia.csproj` 通过
+- [x] `dotnet test tests/MantisZip.Tests/MantisZip.Tests.csproj` 通过

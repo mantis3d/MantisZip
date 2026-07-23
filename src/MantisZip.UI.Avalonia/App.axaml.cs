@@ -50,6 +50,10 @@ public partial class App : Application
 
     public override void OnFrameworkInitializationCompleted()
     {
+        // ── Initialize OLE for drag-drop ──
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+            NativeMethods.OleInitialize(nint.Zero);
+
         // ── Apply system theme ──
         ApplySystemTheme();
         if (PlatformSettings is IPlatformSettings ps)
