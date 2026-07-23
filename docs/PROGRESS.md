@@ -21,6 +21,16 @@
 
 ### MantisZip.UI.Avalonia（主力版）
 
+**2026-07-23** — 覆盖层 Bug 修复：OLE 初始化恢复 + GDI P/Invoke 入口名修正 + UpdateLayeredWindow 位置参数修复 + 呼吸动画
+  - **OleInitialize**：恢复 `NativeMethods.OleInitialize` 调用（Avalonia 内部不处理 OLE 初始化，移除后 `DoDragDropAsync` 失败）
+  - **GDI P/Invoke 入口名**：`GdiCreateCompatibleDC` → `CreateCompatibleDC` 等（C# 方法有 Gdi 前缀但 Win32 DLL 导出名无前缀，导致 `EntryPointNotFoundException` → 后台线程未捕获 → 进程终止）
+  - **UpdateLayeredWindow 位置**：`pptDst` 参数从 `{0,0}` 改为实际窗口坐标（`UpdateLayeredWindow` 同时设置位置和内容，`{0,0}` 将覆层重置到左上角，与 `SetWindowPos` 冲突导致位置跳动）
+  - **覆盖层保护**：后台线程增加全域 catch-all，异常捕获并记录后继续运行而非崩溃
+  - **Avalonia 窗口过滤**：`ClassifyWindow` 检测到自己的窗口时跳过渲染，避免覆层在 MantisZip 界面上闪烁
+  - **窗口位置稳定**：移除 `_lastTargetHwnd` 后备机制，`WindowFromPoint` 返回覆层/空时直接跳过本帧
+  - **呼吸动画**：`SourceConstantAlpha` 改为正弦波（40~120，周期 4s），覆层透明度缓慢脉动
+  - 构建 0 errors
+
 **2026-07-23** — 拖拽系统重构：放弃 Win32 OLE/native CCW，改用 Avalonia DragDrop API + DragDropService 后置解压 + Avalonia Window 覆盖层
   - **架构变更**：彻底放弃手写 COM `IDataObject`/`IDropSource`，改为 Avalonia 内置 `DragDrop.DoDragDropAsync`
   - **移除**：`DragDataObject.cs`、`DropSource.cs`、`DragOverlayWindow.cs`、`DragPreviewPopup.cs`

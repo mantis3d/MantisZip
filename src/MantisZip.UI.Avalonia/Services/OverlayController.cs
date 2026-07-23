@@ -1,5 +1,4 @@
 using System;
-using System;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Threading;
@@ -19,7 +18,6 @@ internal class OverlayController : IDisposable
     private readonly ManualResetEvent _stopped = new(false);
 
     // Tracking state
-    private nint _lastTargetHwnd;
     private uint _currentColor = 0x0050AF4C; // BGR green
     private DropTargetDetector.DropTargetStatus _currentStatus;
     private readonly object _stateLock = new();
@@ -63,11 +61,22 @@ internal class OverlayController : IDisposable
         {
             while (!_cts!.IsCancellationRequested)
             {
-                UpdatePosition();
+                try
+                {
+                    UpdatePosition();
+                }
+                catch (Exception ex)
+                {
+                    App.DebugLog($"[Overlay] UpdatePosition CRASHED: {ex.GetType().Name}: {ex.Message}");
+                }
                 Thread.Sleep(100);
             }
         }
         catch (ThreadAbortException) { }
+        catch (Exception ex)
+        {
+            App.DebugLog($"[Overlay] RunTrackingLoop CRASHED: {ex.GetType().Name}: {ex.Message}");
+        }
         finally
         {
             _stopped.Set();
@@ -91,35 +100,36 @@ internal class OverlayController : IDisposable
 
         // Find window under cursor
         var target = NativeMethods.WindowFromPoint(pt);
-        if (target == _hwnd || target == nint.Zero)
-            target = _lastTargetHwnd;
+        // If WindowFromPoint returned null or our overlay, skip this frame
+        // (don't fall back to _lastTargetHwnd — that causes position oscillation)
         if (target == nint.Zero || target == _hwnd)
         {
-            App.DebugLog($"[Overlay] No valid target (cursor=({pt.X},{pt.Y}), lastTarget=0x{_lastTargetHwnd:X})");
             return;
         }
 
-        // Get target bounds
-        if (!NativeMethods.GetWindowRect(target, out var rect))
-        {
-            App.DebugLog($"[Overlay] GetWindowRect failed for 0x{target:X}");
-            return;
-        }
-
-        // Walk up to root window to cover the entire frame, not just a child control
+        // Get target bounds (from root window, not just the child under cursor)
         var rootTarget = NativeMethods.GetAncestor(target, 2); // GA_ROOT = 2
-        if (rootTarget != nint.Zero && rootTarget != target)
+        if (rootTarget != nint.Zero)
         {
             if (!NativeMethods.GetWindowRect(rootTarget, out var rootRect))
                 rootTarget = nint.Zero;
             else
-                rect = rootRect;
+                target = rootTarget;
         }
 
-        _lastTargetHwnd = target;
+        if (!NativeMethods.GetWindowRect(target, out var rect))
+        {
+            return;
+        }
 
         // Lightweight status check
         var (status, className, displayPath) = ClassifyWindow(target);
+
+        // Skip overlay rendering if the window under cursor is our own Avalonia window
+        if (className.StartsWith("Avalonia-", StringComparison.Ordinal) || className == "TMainBox")
+        {
+            return;
+        }
 
         // Update color
         DropTargetDetector.DropTargetStatus newStatus;
@@ -144,7 +154,6 @@ internal class OverlayController : IDisposable
         var h = rect.Bottom - rect.Top;
         if (w <= 0 || h <= 0)
         {
-            App.DebugLog($"[Overlay] Invalid target size: {w}x{h}");
             return;
         }
 
@@ -152,8 +161,19 @@ internal class OverlayController : IDisposable
         NativeMethods.SetWindowPos(_hwnd, NativeMethods.HWND_TOPMOST,
             rect.Left, rect.Top, w, h, swpFlags);
 
+        // Compute breathing alpha: sine wave between 40 and 120 over ~4s (40 ticks)
+        double breath = 80 + 40 * Math.Sin(_tick * Math.PI / 20);
+        byte breathAlpha = (byte)Math.Clamp(breath, 40, 120);
+
         // Render overlay via UpdateLayeredWindow (from background thread, supports color + text)
-        OverlayRender(_hwnd, _currentColor, displayPath, w, h);
+        try
+        {
+            OverlayRender(_hwnd, _currentColor, displayPath, rect.Left, rect.Top, w, h, breathAlpha);
+        }
+        catch (Exception ex)
+        {
+            App.DebugLog($"[Overlay] OverlayRender CRASHED: {ex.GetType().Name}: {ex.Message}");
+        }
 
         _tick++;
         if (_tick % 10 == 0)
@@ -187,49 +207,12 @@ internal class OverlayController : IDisposable
 
     // (path detection uses DropTargetDetector after drag ends, not during overlay)
 
-    [DllImport("user32.dll")]
-    private static extern nint GetDC(nint hWnd);
-
-    [DllImport("user32.dll")]
-    private static extern int ReleaseDC(nint hWnd, nint hDC);
-
-    [DllImport("gdi32.dll")]
-    private static extern int SetBkMode(nint hdc, int mode);
-
-    [DllImport("gdi32.dll")]
-    private static extern uint SetTextColor(nint hdc, uint crColor);
-
-    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
-    private static extern int DrawText(nint hdc, string lpchText, int cchText, ref RECT lprc, uint format);
-
-    private struct RECT { public int Left, Top, Right, Bottom; }
-
-    private void DrawOverlayText(string text, int w, int h)
-    {
-        if (string.IsNullOrEmpty(text) || _hwnd == nint.Zero) return;
-
-        var hdc = GetDC(_hwnd);
-        if (hdc == nint.Zero) return;
-
-        try
-        {
-            SetBkMode(hdc, 1); // TRANSPARENT
-            SetTextColor(hdc, 0x00FFFFFF); // White text
-            var textRect = new RECT { Left = 16, Top = 0, Right = w - 16, Bottom = h };
-            DrawText(hdc, text, -1, ref textRect, 0x0124); // DT_CENTER | DT_VCENTER | DT_SINGLELINE
-        }
-        finally
-        {
-            ReleaseDC(_hwnd, hdc);
-        }
-}
-
-
     /// <summary>
     /// Render overlay content using UpdateLayeredWindow (color + text).
-    /// Called from background thread; creates a 32bpp BGRA bitmap with pre-multiplied alpha.
+    /// Called from background thread; creates a 32bpp BGRA bitmap.
+    /// Uses SourceConstantAlpha (window-wide) for breathing transparency effect.
     /// </summary>
-    private static void OverlayRender(nint hwnd, uint colorBgr, string text, int w, int h)
+    private static void OverlayRender(nint hwnd, uint colorBgr, string text, int posX, int posY, int w, int h, byte breathAlpha)
     {
         if (hwnd == nint.Zero || w <= 0 || h <= 0) return;
 
@@ -241,7 +224,7 @@ internal class OverlayController : IDisposable
 
         try
         {
-            // Create a 32bpp BGRA DIB section
+            // Create a 32bpp BGRA DIB section (no pre-multiplied alpha — use SourceConstantAlpha instead)
             var bmi = new BITMAPINFO
             {
                 bmiHeader = new BITMAPINFOHEADER
@@ -259,14 +242,12 @@ internal class OverlayController : IDisposable
 
             var oldBitmap = GdiSelectObject(hdcMem, hBitmap);
 
-            // Fill with overlay color (pre-multiplied alpha)
+            // Fill with solid overlay color (opaque — transparency comes from SourceConstantAlpha)
             // colorBgr = 0x00BBGGRR (BGR format from GDI)
             byte b = (byte)(colorBgr >> 16);
             byte g = (byte)(colorBgr >> 8);
             byte r = (byte)colorBgr;
-            byte alpha = 80; // ~31% opacity
 
-            // Fill pixels: BGRA with pre-multiplied alpha
             int stride = w * 4;
             byte[] pixels = new byte[stride * h];
             for (int y = 0; y < h; y++)
@@ -274,18 +255,18 @@ internal class OverlayController : IDisposable
                 for (int x = 0; x < w; x++)
                 {
                     int idx = y * stride + x * 4;
-                    pixels[idx + 0] = (byte)(b * alpha / 255); // B
-                    pixels[idx + 1] = (byte)(g * alpha / 255); // G
-                    pixels[idx + 2] = (byte)(r * alpha / 255); // R
-                    pixels[idx + 3] = alpha;                   // A
+                    pixels[idx + 0] = b; // B
+                    pixels[idx + 1] = g; // G
+                    pixels[idx + 2] = r; // R
+                    pixels[idx + 3] = 255; // A (opaque — SourceConstantAlpha handles transparency)
                 }
             }
             Marshal.Copy(pixels, 0, bitsPtr, pixels.Length);
 
-            // Draw text using GDI on the DC (white, full opacity, in the center area)
+            // Draw text using GDI on the mem DC (white, breathing alpha handled by SourceConstantAlpha)
             if (!string.IsNullOrEmpty(text))
             {
-                var oldFont = GdiSelectObject(hdcMem, GdiGetStockObject(18)); // DEFAULT_GUI_FONT
+                var oldFont = GdiSelectObject(hdcMem, GdiGetStockObject(17)); // DEFAULT_GUI_FONT
                 GdiSetBkMode(hdcMem, 1); // TRANSPARENT
                 GdiSetTextColor(hdcMem, 0x00FFFFFF); // White
                 var textRect = new NativeMethods.RECT { Left = 24, Top = 12, Right = w - 24, Bottom = h - 12 };
@@ -294,10 +275,12 @@ internal class OverlayController : IDisposable
             }
 
             // Update the layered window (hBitmap must still be selected in hdcMem!)
-            var ptWnd = new NativeMethods.POINT { X = 0, Y = 0 };
+            // NOTE: pptDst in UpdateLayeredWindow ALSO sets window position — must use actual coords!
+            var ptWnd = new NativeMethods.POINT { X = posX, Y = posY };
             var szWnd = new NativeMethods.SIZE { cx = w, cy = h };
             var ptSrc = new NativeMethods.POINT { X = 0, Y = 0 };
-            var blend = new NativeMethods.BLENDFUNCTION { BlendOp = 0, BlendFlags = 0, SourceConstantAlpha = 255, AlphaFormat = 1 }; // AC_SRC_ALPHA
+            // Use SourceConstantAlpha (window-wide) for breathing — no per-pixel alpha
+            var blend = new NativeMethods.BLENDFUNCTION { BlendOp = 0, BlendFlags = 0, SourceConstantAlpha = breathAlpha, AlphaFormat = 0 };
 
             NativeMethods.UpdateLayeredWindow(hwnd, nint.Zero, ref ptWnd, ref szWnd,
                 hdcMem, ref ptSrc, 0, ref blend, 2); // ULW_ALPHA = 2
@@ -305,6 +288,11 @@ internal class OverlayController : IDisposable
             // Cleanup: restore old bitmap before deleting ours
             GdiSelectObject(hdcMem, oldBitmap);
             GdiDeleteObject(hBitmap);
+        }
+        catch (Exception ex)
+        {
+            // GDI operation failed — log but don't crash the overlay thread
+            App.DebugLog($"[Overlay] OverlayRender error: {ex.GetType().Name}: {ex.Message}");
         }
         finally
         {
@@ -314,32 +302,34 @@ internal class OverlayController : IDisposable
     }
 
     // ── GDI P/Invokes for UpdateLayeredWindow ──
+    // NOTE: All use EntryPoint to map Gdi-prefixed C# names to the correct Win32 export
+    // (e.g. "GdiCreateCompatibleDC" → actually exported as "CreateCompatibleDC")
 
-    [DllImport("gdi32.dll")]
+    [DllImport("gdi32.dll", EntryPoint = "CreateCompatibleDC")]
     private static extern nint GdiCreateCompatibleDC(nint hdc);
 
-    [DllImport("gdi32.dll")]
+    [DllImport("gdi32.dll", EntryPoint = "CreateDIBSection")]
     private static extern nint GdiCreateDIBSection(nint hdc, ref BITMAPINFO pbmi, uint usage, out nint ppvBits, nint hSection, uint offset);
 
-    [DllImport("gdi32.dll")]
+    [DllImport("gdi32.dll", EntryPoint = "SelectObject")]
     private static extern nint GdiSelectObject(nint hdc, nint h);
 
-    [DllImport("gdi32.dll")]
+    [DllImport("gdi32.dll", EntryPoint = "DeleteObject")]
     private static extern bool GdiDeleteObject(nint hObject);
 
-    [DllImport("gdi32.dll")]
+    [DllImport("gdi32.dll", EntryPoint = "DeleteDC")]
     private static extern bool GdiDeleteDC(nint hdc);
 
-    [DllImport("gdi32.dll")]
+    [DllImport("gdi32.dll", EntryPoint = "GetStockObject")]
     private static extern nint GdiGetStockObject(int fnObject);
 
-    [DllImport("gdi32.dll")]
+    [DllImport("gdi32.dll", EntryPoint = "SetBkMode")]
     private static extern int GdiSetBkMode(nint hdc, int mode);
 
-    [DllImport("gdi32.dll")]
+    [DllImport("gdi32.dll", EntryPoint = "SetTextColor")]
     private static extern uint GdiSetTextColor(nint hdc, uint crColor);
 
-    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    [DllImport("user32.dll", CharSet = CharSet.Unicode, EntryPoint = "DrawTextW")]
     private static extern int GdiDrawText(nint hdc, string lpchText, int cchText, ref NativeMethods.RECT lprc, uint format);
 
     [StructLayout(LayoutKind.Sequential)]
