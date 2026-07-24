@@ -816,5 +816,11 @@
   "FileFilter_Modified": " (Modified)",
 
   "Compress_TabFilter": "File Filter",
-  "Extract_TabFilter": "File Filter"
+  "Extract_TabFilter": "File Filter",
+
+  "DragOverlay_TargetPath": "Extract to {0}",
+  "DragOverlay_DialogUnknownPath": "Cannot identify path for\n{0}",
+  "DragOverlay_DragToFolder": "Drag to a folder to extract",
+  "DragOverlay_NoPath": "Cannot identify path",
+  "DragOverlay_Explorer": "File Explorer"
 }

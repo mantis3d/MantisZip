@@ -124,5 +124,22 @@ public partial class ArchiveItemModel : ObservableObject
         };
     }
 
+    /// <summary>
+    /// Convert to Core ArchiveItem for drag-drop and service operations.
+    /// </summary>
+    public ArchiveItem ToCoreItem()
+    {
+        return new ArchiveItem
+        {
+            FullPath = FullPath,
+            Name = Name,
+            Size = Size,
+            CompressedSize = CompressedSize,
+            LastModified = LastModified,
+            IsDirectory = IsDirectory,
+            IsEncrypted = IsDirectory ? false : false
+        };
+    }
+
     private static string FormatSize(long bytes) => FormatUtil.FormatSize(bytes);
 }

@@ -160,4 +160,12 @@
   <SolidColorBrush x:Key="ProgressBarCompressedSizeDirBrush" Color="{StaticResource ProgressBarCompressedSizeDirColor}" />
   <SolidColorBrush x:Key="ProgressBarRatioBrush" Color="{StaticResource ProgressBarRatioColor}" />
   <SolidColorBrush x:Key="ProgressBarDateBrush" Color="{StaticResource ProgressBarDateColor}" />
+
+  <!-- Drag-drop overlay (Win32, hardcoded reference values) -->
+  <SolidColorBrush x:Key="DragDropBorderSuccessBrush" Color="#FF4CAF50"/>
+  <SolidColorBrush x:Key="DragDropFillSuccessBrush" Color="#664CAF50"/>
+  <SolidColorBrush x:Key="DragDropBorderWarningBrush" Color="#FFF44336"/>
+  <SolidColorBrush x:Key="DragDropFillWarningBrush" Color="#66F44336"/>
+  <SolidColorBrush x:Key="DragDropBorderNoneBrush" Color="#FF808080"/>
+  <SolidColorBrush x:Key="DragDropFillNoneBrush" Color="#22808080"/>
 </ResourceDictionary>

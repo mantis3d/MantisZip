@@ -21,6 +21,41 @@
 
 ### MantisZip.UI.Avalonia（主力版）
 
+**2026-07-24** — 拖拽覆盖层视觉优化：颜色/呼吸/文案 + 完整路径显示 + 本地化
+  - **颜色**：成功状态绿色调亮（RGB 76,175,80 → 107,212,107），无目标灰色改为暖金（RGB 255,215,0）
+  - **呼吸速度**：周期 4s → 2s（`Math.PI/20` → `Math.PI/10`）
+  - **Explorer 路径**：`ClassifyWindow` 改用 ShellWindows COM 获取完整路径（取代窗口标题短名称）
+  - **对话框路径**：`TryGetDialogPath` 从子控件枚举到路径时返回 `Success`（绿）而非 `Warning`（红）
+  - **文案新增**：对话框未知路径显示 `"识别不到此窗口路径\n{标题}"`，无目标显示 `"拖拽到文件夹以释放文件"`
+  - **本地化**：新增 `DragOverlay_*` × 5 keys（zh-CN + en），覆盖层所有文案通过 `LocalizationManager.T()`
+  - 改动的文件：`OverlayController.cs`、`DropTargetDetector.cs`、`strings.zh-CN.json`、`strings.en.json`
+  - 构建 0 errors
+
+**2026-07-23** — 覆盖层 Bug 修复：OLE 初始化恢复 + GDI P/Invoke 入口名修正 + UpdateLayeredWindow 位置参数修复 + 呼吸动画
+  - **OleInitialize**：恢复 `NativeMethods.OleInitialize` 调用（Avalonia 内部不处理 OLE 初始化，移除后 `DoDragDropAsync` 失败）
+  - **GDI P/Invoke 入口名**：`GdiCreateCompatibleDC` → `CreateCompatibleDC` 等（C# 方法有 Gdi 前缀但 Win32 DLL 导出名无前缀，导致 `EntryPointNotFoundException` → 后台线程未捕获 → 进程终止）
+  - **UpdateLayeredWindow 位置**：`pptDst` 参数从 `{0,0}` 改为实际窗口坐标（`UpdateLayeredWindow` 同时设置位置和内容，`{0,0}` 将覆层重置到左上角，与 `SetWindowPos` 冲突导致位置跳动）
+  - **覆盖层保护**：后台线程增加全域 catch-all，异常捕获并记录后继续运行而非崩溃
+  - **Avalonia 窗口过滤**：`ClassifyWindow` 检测到自己的窗口时跳过渲染，避免覆层在 MantisZip 界面上闪烁
+  - **窗口位置稳定**：移除 `_lastTargetHwnd` 后备机制，`WindowFromPoint` 返回覆层/空时直接跳过本帧
+  - **呼吸动画**：`SourceConstantAlpha` 改为正弦波（40~120，周期 4s），覆层透明度缓慢脉动
+  - 构建 0 errors
+
+**2026-07-23** — 拖拽系统重构：放弃 Win32 OLE/native CCW，改用 Avalonia DragDrop API + DragDropService 后置解压 + Avalonia Window 覆盖层
+  - **架构变更**：彻底放弃手写 COM `IDataObject`/`IDropSource`，改为 Avalonia 内置 `DragDrop.DoDragDropAsync`
+  - **移除**：`DragDataObject.cs`、`DropSource.cs`、`DragOverlayWindow.cs`、`DragPreviewPopup.cs`
+  - **新增**：`OverlayController.cs` — Avalonia Window + `UpdateLayeredWindow` 实现后台线程覆盖层
+  - **DropTargetDetector**：新增 `DirectUIHWND` → `CabinetWClass` 父链上溯 + `GetAncestor` 覆盖整个窗口
+  - **DragDropService**：新增 `IsOverOwnWindow()`，在自己窗口上松手时静默取消
+  - **MainWindow**：
+    - `PointerPressed` 改用隧道策略解决 DataGrid 事件消费问题
+    - 新增 `PointerReleased` 隧道监听清除拖拽状态
+    - 拖拽阈值 10px → 32px
+  - **NativeMethods**：新增 `GetParent`、`GetAncestor`、`UpdateLayeredWindow`、`SIZE`、`BLENDFUNCTION`
+  - **OLE 初始化**：移除 `NativeMethods.OleInitialize`（Avalonia 内部处理）
+  - DragDropService + DropTargetDetector + OverlayController 加 DebugLog
+  - 构建 0 errors
+
 **2026-07-22** — P0 列表控件紧凑度联动 + AGENTS.md 规则 7
   - ExtractSettingsWindow FileListBox：`ItemContainerTheme` + `ControlHeightMd`
   - MainWindow FileListGrid：`RowHeight="{DynamicResource ControlHeightMd}"`

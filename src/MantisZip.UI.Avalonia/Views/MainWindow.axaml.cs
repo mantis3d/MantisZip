@@ -12,16 +12,19 @@ using MantisZip.UI.Avalonia.ViewModels;
 using MantisZip.Core;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.InteropServices;
 using Avalonia.Layout;
+using Avalonia.Media;
+using MantisZip.UI.Avalonia.Services;
 
 namespace MantisZip.UI.Avalonia.Views;
 
 public partial class MainWindow : Window
 {
     private bool _isOwnDrag;
-    private string? _dragDropTempDir;
     private PointerPressedEventArgs? _dragStartEvent;
     private Point _dragStartPoint;
+    private List<ArchiveItem>? _dragPreservedSelection;
     private string? _lastSortMemberPath;
     private bool _lastSortDescending;
 
@@ -224,11 +227,31 @@ public partial class MainWindow : Window
         var fileGrid = this.FindControl<DataGrid>("FileListGrid");
         if (fileGrid != null)
         {
-            fileGrid.PointerPressed += (s, e) =>
+            fileGrid.AddHandler(InputElement.PointerPressedEvent, (s, e) =>
             {
                 _dragStartPoint = e.GetPosition(fileGrid);
                 _dragStartEvent = e;
-            };
+
+                // Save multi-selection state at press time (before drag starts)
+                if (fileGrid.SelectedItems.Count > 1)
+                {
+                    _dragPreservedSelection = fileGrid.SelectedItems
+                        .OfType<ArchiveItemModel>()
+                        .Select(m => m.ToCoreItem())
+                        .ToList();
+                }
+                else
+                {
+                    _dragPreservedSelection = null;
+                }
+            }, RoutingStrategies.Tunnel);
+
+            // Clear drag state on release to prevent click-selection from triggering drag
+            fileGrid.AddHandler(InputElement.PointerReleasedEvent, (s, e) =>
+            {
+                _dragStartEvent = null;
+                _dragPreservedSelection = null;
+            }, RoutingStrategies.Tunnel);
 
             fileGrid.PointerMoved += async (s, e) =>
             {
@@ -236,9 +259,10 @@ public partial class MainWindow : Window
 
                 var pos = e.GetPosition(fileGrid);
                 var delta = pos - _dragStartPoint;
-                if (Math.Abs(delta.X) < 10 && Math.Abs(delta.Y) < 10)
+                if (Math.Abs(delta.X) < 32 && Math.Abs(delta.Y) < 32)
                     return;
 
+                // Save trigger event before nulling (Avalonia DragDrop.DoDragDropAsync needs it)
                 var triggerEvent = _dragStartEvent;
                 _dragStartEvent = null; // Prevent re-entry
 
@@ -247,51 +271,89 @@ public partial class MainWindow : Window
                 var archivePath = vm2.CurrentArchivePath;
                 if (string.IsNullOrEmpty(archivePath)) return;
 
-                var entry = vm2.SelectedEntry;
-                var format = ArchiveFormatHelper.GetFormat(archivePath);
+                // Get selected items (support multi-select)
+                var selectedItems = _dragPreservedSelection
+                    ?? new List<ArchiveItem> { vm2.SelectedEntry.ToCoreItem() };
+                var allItems = vm2.GetAllRawItems();
 
-                // Create temp directory for extracted file
-                _dragDropTempDir = Path.Combine(Path.GetTempPath(), "MantisZip", "DragDrop", Guid.NewGuid().ToString());
-                Directory.CreateDirectory(_dragDropTempDir);
+                var format = ArchiveFormatHelper.GetFormat(archivePath);
+                var password = vm2.GetSessionPassword(archivePath);
+
+                // Expand items: directories become their contained files (flat list)
+                var expandedItems = DragDropItemExpander.ExpandItems(selectedItems, allItems);
+                if (expandedItems.Count == 0)
+                    return;
+
+                _isOwnDrag = true;
+                vm2.StatusMessage = "拖拽到 Explorer 或桌面以直接解压";
+
+                // ── Create Avalonia overlay window (works on UI thread, controlled via Win32 from background) ──
+                var overlayWin = new Window
+                {
+                    ShowInTaskbar = false,
+                    Background = Brushes.Transparent,
+                    Width = 1,
+                    Height = 1,
+                    Topmost = true,
+                    ShowActivated = false,
+                };
+                overlayWin.Show();
+
+                var overlayHwnd = overlayWin.TryGetPlatformHandle()?.Handle ?? nint.Zero;
+                App.DebugLog($"[MainWindow] Overlay HWND=0x{overlayHwnd:X}");
+                if (overlayHwnd != nint.Zero)
+                {
+                    var exStyle = NativeMethods.GetWindowLong(overlayHwnd, NativeMethods.GWL_EXSTYLE);
+                    NativeMethods.SetWindowLong(overlayHwnd, NativeMethods.GWL_EXSTYLE,
+                        exStyle | NativeMethods.WS_EX_LAYERED | NativeMethods.WS_EX_TRANSPARENT
+                                | NativeMethods.WS_EX_NOACTIVATE | NativeMethods.WS_EX_TOOLWINDOW);
+
+                    // Remove title bar via Win32 (avoids Avalonia 12 enum compatibility issues)
+                    var overlayStyle = NativeMethods.GetWindowLong(overlayHwnd, NativeMethods.GWL_STYLE);
+                    NativeMethods.SetWindowLong(overlayHwnd, NativeMethods.GWL_STYLE,
+                        overlayStyle & ~0x00C00000u); // clear WS_CAPTION (title bar)
+
+                }
+
+                using var controller = new OverlayController(overlayHwnd);
+                controller.Start();
 
                 try
                 {
-                    vm2.StatusMessage = "正在提取文件...";
+                    var data = new DataTransfer();
+                    App.DebugLog("[MainWindow] Avalonia DoDragDropAsync START");
+                    var result = await DragDrop.DoDragDropAsync(
+                        triggerEvent, data, DragDropEffects.Copy);
+                    App.DebugLog($"[MainWindow] Avalonia DoDragDropAsync DONE: result={result}");
 
-                    var targetPath = Path.Combine(_dragDropTempDir, entry.Name);
-                    var dir = Path.GetDirectoryName(targetPath);
-                    if (dir != null && !Directory.Exists(dir))
-                        Directory.CreateDirectory(dir);
+                    // Close overlay IMMEDIATELY after drag completes, before dialog processing
+                    controller.Stop();
+                    overlayWin.Close();
+                    App.DebugLog("[MainWindow] Overlay closed");
 
-                    await ArchiveEntryExtractor.ExtractEntryAsync(
-                        archivePath,
-                        entry.FullPath,
-                        targetPath,
-                        format);
+                    NativeMethods.GetCursorPos(out var dropPt);
+                    App.DebugLog($"[MainWindow] Drop point captured: ({dropPt.X}, {dropPt.Y})");
 
-                    // Create data transfer with the extracted file
-                    var storageFile = await StorageProvider.TryGetFileFromPathAsync(new Uri(targetPath));
-                    if (storageFile != null)
+                    if (vm2 != null && !string.IsNullOrEmpty(archivePath))
                     {
-                        var dataTransfer = new DataTransfer();
-                        dataTransfer.Add(DataTransferItem.CreateFile(storageFile));
-
-                        _isOwnDrag = true;
-                        vm2.StatusMessage = "正在拖拽 — 放到目标位置以复制文件";
-
-                        await DragDrop.DoDragDropAsync(triggerEvent, dataTransfer, DragDropEffects.Copy);
+                        vm2.StatusMessage = "正在检测目标位置...";
+                        var dragService = new DragDropService(
+                            archivePath, format, password, this);
+                        await dragService.ExecuteAfterDropAsync(
+                            selectedItems, allItems, vm2);
                     }
                 }
                 catch (Exception ex)
                 {
-                    System.Diagnostics.Debug.WriteLine($"Drag-drop failed: {ex.Message}");
+                    App.DebugLog($"[MainWindow] DragDropAsync EXCEPTION: {ex.GetType().Name}: {ex.Message}");
                 }
                 finally
                 {
+                    // Safety net: ensure overlay is closed even if early close was skipped
+                    try { overlayWin.Close(); } catch { }
+                    try { controller.Stop(); } catch { }
                     _isOwnDrag = false;
-                    CleanupDragDropTemp();
-                    if (DataContext is MainWindowViewModel vm3)
-                        vm3.StatusMessage = "";
+                    App.DebugLog("[MainWindow] DragDrop cleanup done");
                 }
             };
         }
@@ -460,22 +522,6 @@ public partial class MainWindow : Window
         {
             if (item is ArchiveItemModel model)
                 vm.SelectedEntries.Add(model);
-        }
-    }
-
-    private void CleanupDragDropTemp()
-    {
-        if (_dragDropTempDir != null && Directory.Exists(_dragDropTempDir))
-        {
-            try
-            {
-                Directory.Delete(_dragDropTempDir, recursive: true);
-            }
-            catch
-            {
-                // Best effort cleanup
-            }
-            _dragDropTempDir = null;
         }
     }
 

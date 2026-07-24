@@ -262,6 +262,23 @@ public partial class MainWindowViewModel : ObservableObject
     private ArchiveItemModel? _selectedEntry;
 
     /// <summary>
+    /// Get all raw archive items (for drag-drop item expansion).
+    /// </summary>
+    public IReadOnlyList<ArchiveItem> GetAllRawItems()
+    {
+        return _allRawItems ?? Array.Empty<ArchiveItem>();
+    }
+
+    /// <summary>
+    /// Get the session password for a given archive path.
+    /// </summary>
+    public string? GetSessionPassword(string archivePath)
+    {
+        _sessionPasswords.TryGetValue(archivePath, out var pwd);
+        return pwd;
+    }
+
+    /// <summary>
     /// 当前选中的条目列表（由 View 的 SelectionChanged 同步）。
     /// </summary>
     public List<ArchiveItemModel> SelectedEntries { get; } = new();
