@@ -21,6 +21,16 @@
 
 ### MantisZip.UI.Avalonia（主力版）
 
+**2026-07-24** — 拖拽覆盖层视觉优化：颜色/呼吸/文案 + 完整路径显示 + 本地化
+  - **颜色**：成功状态绿色调亮（RGB 76,175,80 → 107,212,107），无目标灰色改为暖金（RGB 255,215,0）
+  - **呼吸速度**：周期 4s → 2s（`Math.PI/20` → `Math.PI/10`）
+  - **Explorer 路径**：`ClassifyWindow` 改用 ShellWindows COM 获取完整路径（取代窗口标题短名称）
+  - **对话框路径**：`TryGetDialogPath` 从子控件枚举到路径时返回 `Success`（绿）而非 `Warning`（红）
+  - **文案新增**：对话框未知路径显示 `"识别不到此窗口路径\n{标题}"`，无目标显示 `"拖拽到文件夹以释放文件"`
+  - **本地化**：新增 `DragOverlay_*` × 5 keys（zh-CN + en），覆盖层所有文案通过 `LocalizationManager.T()`
+  - 改动的文件：`OverlayController.cs`、`DropTargetDetector.cs`、`strings.zh-CN.json`、`strings.en.json`
+  - 构建 0 errors
+
 **2026-07-23** — 覆盖层 Bug 修复：OLE 初始化恢复 + GDI P/Invoke 入口名修正 + UpdateLayeredWindow 位置参数修复 + 呼吸动画
   - **OleInitialize**：恢复 `NativeMethods.OleInitialize` 调用（Avalonia 内部不处理 OLE 初始化，移除后 `DoDragDropAsync` 失败）
   - **GDI P/Invoke 入口名**：`GdiCreateCompatibleDC` → `CreateCompatibleDC` 等（C# 方法有 Gdi 前缀但 Win32 DLL 导出名无前缀，导致 `EntryPointNotFoundException` → 后台线程未捕获 → 进程终止）

@@ -22,6 +22,30 @@ internal class OverlayController : IDisposable
     private DropTargetDetector.DropTargetStatus _currentStatus;
     private readonly object _stateLock = new();
 
+    // Preview image (set from UI thread after async render completes)
+    private volatile PreviewImageData? _preview;
+
+    /// <summary>
+    /// Holds a pre-rendered bitmap to be composited into the overlay.
+    /// Called from any thread; background thread reads via volatile.
+    /// </summary>
+    public void SetPreview(byte[] bgraPixels, int imageWidth, int imageHeight)
+    {
+        _preview = new PreviewImageData
+        {
+            Pixels = bgraPixels,
+            Width = imageWidth,
+            Height = imageHeight
+        };
+    }
+
+    public class PreviewImageData
+    {
+        public byte[] Pixels { get; init; } = Array.Empty<byte>();
+        public int Width { get; init; }
+        public int Height { get; init; }
+    }
+
     public OverlayController(nint hwnd)
     {
         _hwnd = hwnd;
@@ -132,15 +156,15 @@ internal class OverlayController : IDisposable
         }
 
         // Update color
-            DropTargetDetector.DropTargetStatus newStatus = status;
+                    DropTargetDetector.DropTargetStatus newStatus = status;
             lock (_stateLock)
             {
                 _currentStatus = status;
                 _currentColor = status switch
                 {
-                    DropTargetDetector.DropTargetStatus.Success => 0x0050AF4C, // Green
+                    DropTargetDetector.DropTargetStatus.Success => 0x006BD46B, // Brighter green
                     DropTargetDetector.DropTargetStatus.Warning => 0x004336F4, // Red
-                    _ => 0x00808080, // Gray (default for None/unrecognized)
+                    _ => 0x0000D7FF, // Warm gold (replaces neutral gray)
                 };
             }
 
@@ -158,14 +182,22 @@ internal class OverlayController : IDisposable
         NativeMethods.SetWindowPos(_hwnd, NativeMethods.HWND_TOPMOST,
             rect.Left, rect.Top, w, h, swpFlags);
 
-        // Compute breathing alpha: sine wave between 40 and 120 over ~4s (40 ticks)
-        double breath = 80 + 40 * Math.Sin(_tick * Math.PI / 20);
+        // Compute breathing alpha: sine wave between 40 and 120 over ~2s (20 ticks)
+        double breath = 80 + 40 * Math.Sin(_tick * Math.PI / 10);
         byte breathAlpha = (byte)Math.Clamp(breath, 40, 120);
 
         // Render overlay via UpdateLayeredWindow (from background thread, supports color + text)
         try
         {
-            OverlayRender(_hwnd, _currentColor, displayPath, rect.Left, rect.Top, w, h, breathAlpha);
+            // Build user-friendly display text based on status
+        string overlayText = status switch
+        {
+            DropTargetDetector.DropTargetStatus.Success => LocalizationManager.T("DragOverlay_TargetPath", displayPath),
+            DropTargetDetector.DropTargetStatus.Warning => displayPath,
+            _ => LocalizationManager.T("DragOverlay_DragToFolder")
+        };
+
+        OverlayRender(_hwnd, _currentColor, overlayText, rect.Left, rect.Top, w, h, breathAlpha, _preview, status);
         }
         catch (Exception ex)
         {
@@ -188,13 +220,12 @@ internal class OverlayController : IDisposable
             var cls = sb.ToString();
             if (cls == "CabinetWClass")
             {
-                // Get actual folder path from Explorer window title
-                var title = new System.Text.StringBuilder(512);
-                NativeMethods.GetWindowText(hWnd, title, title.Capacity);
-                var windowTitle = title.ToString();
-                if (!string.IsNullOrEmpty(windowTitle))
-                    return (DropTargetDetector.DropTargetStatus.Success, cls, windowTitle);
-                return (DropTargetDetector.DropTargetStatus.Success, cls, "资源管理器");
+                // Get full folder path via ShellWindows COM (not just window title)
+                var (fullPath, _) = DropTargetDetector.TryGetExplorerPathFromShell(hWnd);
+                if (!string.IsNullOrEmpty(fullPath))
+                    return (DropTargetDetector.DropTargetStatus.Success, cls, fullPath);
+                // Fallback: use window title
+                return (DropTargetDetector.DropTargetStatus.Success, cls, LocalizationManager.T("DragOverlay_Explorer"));
             }
             if (cls == "Progman" || cls == "WorkerW")
             {
@@ -203,13 +234,17 @@ internal class OverlayController : IDisposable
             }
             if (cls == "#32770")
             {
-                // Try to get title from dialog
+                // Try to get full path via child window enumeration
+                var (dlgPath, dlgStatus) = DropTargetDetector.TryGetDialogPath(hWnd);
+                if (!string.IsNullOrEmpty(dlgPath))
+                    return (dlgStatus, cls, dlgPath);
+                // Fallback: show dialog title with notice
                 var title = new System.Text.StringBuilder(512);
                 NativeMethods.GetWindowText(hWnd, title, title.Capacity);
                 var windowTitle = title.ToString();
                 if (!string.IsNullOrEmpty(windowTitle))
-                    return (DropTargetDetector.DropTargetStatus.Warning, cls, windowTitle);
-                return (DropTargetDetector.DropTargetStatus.Warning, cls, "无法识别路径");
+                    return (DropTargetDetector.DropTargetStatus.Warning, cls, LocalizationManager.T("DragOverlay_DialogUnknownPath", windowTitle));
+                return (DropTargetDetector.DropTargetStatus.Warning, cls, LocalizationManager.T("DragOverlay_NoPath"));
             }
             if (cls.StartsWith("Avalonia-", StringComparison.Ordinal) || cls == "TMainBox")
                 return (DropTargetDetector.DropTargetStatus.None, cls, "");
@@ -219,13 +254,13 @@ internal class OverlayController : IDisposable
     }
 
     /// <summary>
-    /// Render overlay content using UpdateLayeredWindow (color + border + text).
+    /// Render overlay content using UpdateLayeredWindow (color + border + text + preview).
     /// Called from background thread; creates a 32bpp BGRA bitmap.
     /// Uses SourceConstantAlpha (window-wide) for breathing — border and text breathe
     /// with the background but use high-contrast bright colors and a drop shadow
     /// to remain clearly readable at minimum breathAlpha.
     /// </summary>
-    private static void OverlayRender(nint hwnd, uint colorBgr, string text, int posX, int posY, int w, int h, byte breathAlpha)
+    private static void OverlayRender(nint hwnd, uint colorBgr, string text, int posX, int posY, int w, int h, byte breathAlpha, PreviewImageData? preview, DropTargetDetector.DropTargetStatus status)
     {
         if (hwnd == nint.Zero || w <= 0 || h <= 0) return;
 
@@ -260,39 +295,60 @@ internal class OverlayController : IDisposable
             byte bgG = (byte)(colorBgr >> 8);
             byte bgR = (byte)colorBgr;
 
+            const int borderThickness = 8;
             int stride = w * 4;
             byte[] pixels = new byte[stride * h];
 
-            // Border: white (high-contrast, visible even at low SourceConstantAlpha)
-            const int borderThickness = 4;
+            // ── Calculate areas that should stay opaque (border, text, preview/icon) ──
+            const int iconSize = 60;
+            bool hasPreview = preview != null && preview.Pixels.Length > 0 && preview.Width > 0 && preview.Height > 0;
+            int previewX = (w - iconSize) / 2;
+            int previewY = h - borderThickness - 8 - iconSize + 10;
+            int textTop = borderThickness + 8;
+            int textBottom = hasPreview ? previewY - 8 : h - borderThickness - 8;
 
-            // Fill: background + bright border (all alpha=255; SourceConstantAlpha handles breathing)
+            // Fill: background breathes (alpha=breathAlpha, pre-multiplied).
+            // Only border gets alpha=255. Text area and preview area are NOT made opaque here —
+            // GDI will draw text/icon later, and we'll detect changed pixels to fix their alpha.
             for (int y = 0; y < h; y++)
             {
                 bool isBorderY = y < borderThickness || y >= h - borderThickness;
+
                 for (int x = 0; x < w; x++)
                 {
                     bool isBorder = isBorderY || x < borderThickness || x >= w - borderThickness;
+
                     int idx = y * stride + x * 4;
                     if (isBorder)
                     {
-                        pixels[idx + 0] = 255; // B
-                        pixels[idx + 1] = 255; // G
-                        pixels[idx + 2] = 255; // R
-                        pixels[idx + 3] = 255; // A
+                        // Border uses same color as background but fully opaque (no breathing)
+                        pixels[idx + 0] = bgB; // B
+                        pixels[idx + 1] = bgG; // G
+                        pixels[idx + 2] = bgR; // R
+                        pixels[idx + 3] = 255; // A (fully opaque)
                     }
                     else
                     {
-                        pixels[idx + 0] = bgB;
-                        pixels[idx + 1] = bgG;
-                        pixels[idx + 2] = bgR;
-                        pixels[idx + 3] = 255; // A
+                        // Pre-multiplied background with breathing alpha
+                        pixels[idx + 0] = (byte)(bgB * breathAlpha / 255); // B
+                        pixels[idx + 1] = (byte)(bgG * breathAlpha / 255); // G
+                        pixels[idx + 2] = (byte)(bgR * breathAlpha / 255); // R
+                        pixels[idx + 3] = breathAlpha; // A (breathes 40-120)
                     }
                 }
             }
+
+            // ── Preview image (composited below text when available) ──
+            if (hasPreview)
+            {
+                CompositeImage(pixels, w, h, preview.Pixels, preview.Width, preview.Height,
+                    previewX, previewY, iconSize, iconSize);
+            }
+
+            // Write pixel data to DIB before GDI text overlay
             Marshal.Copy(pixels, 0, bitsPtr, pixels.Length);
 
-            // Draw text via GDI
+            // Main text — with single drop-shadow for readability
             if (!string.IsNullOrEmpty(text) && text.Length > 0)
             {
                 var hFont = GdiCreateFont(-36, 0, 0, 0, 700, 0, 0, 0, 1, 0, 0, 0, 0, "Segoe UI");
@@ -301,45 +357,237 @@ internal class OverlayController : IDisposable
                     var oldFont = GdiSelectObject(hdcMem, hFont);
                     GdiSetBkMode(hdcMem, 1); // TRANSPARENT
 
-                    // Shadow: dark gray, offset 3px down-right
-                    GdiSetTextColor(hdcMem, 0x00303030); // Dark gray
-                    var shadowRect = new NativeMethods.RECT { Left = 23, Top = 11, Right = w - 17, Bottom = h - 5 };
+                    // Shadow: single offset at (+2,+2) for a clean drop-shadow look.
+                    // Single shadow preserves GDI's native anti-aliasing (no overlapping AA edges).
+                    var baseRect = new NativeMethods.RECT { Left = 20, Top = textTop, Right = w - 20, Bottom = textBottom };
+                    GdiSetTextColor(hdcMem, 0x00101010); // near-black
+                    var shadowRect = new NativeMethods.RECT
+                    {
+                        Left = baseRect.Left + 2,
+                        Top = baseRect.Top + 2,
+                        Right = baseRect.Right + 2,
+                        Bottom = baseRect.Bottom + 2
+                    };
                     GdiDrawText(hdcMem, text, text.Length, ref shadowRect, 0x0125);
 
                     // Main text: white
-                    GdiSetTextColor(hdcMem, 0x00FFFFFF); // White
-                    var textRect = new NativeMethods.RECT { Left = 20, Top = 8, Right = w - 20, Bottom = h - 8 };
-                    GdiDrawText(hdcMem, text, text.Length, ref textRect, 0x0125);
+                    GdiSetTextColor(hdcMem, 0x00FFFFFF);
+                    GdiDrawText(hdcMem, text, text.Length, ref baseRect, 0x0125);
 
                     GdiSelectObject(hdcMem, oldFont);
                     GdiDeleteObject(hFont);
                 }
             }
 
+            // ── Status icon (only when no real preview image) ──
+            if (!hasPreview)
+            {
+                string iconChar = status switch
+                {
+                    DropTargetDetector.DropTargetStatus.Success => "\u2713", // ✓ check mark
+                    DropTargetDetector.DropTargetStatus.Warning => "\u26A0", // ⚠ warning sign
+                    _ => ""
+                };
+
+                if (!string.IsNullOrEmpty(iconChar))
+                {
+                    uint iconColor = status switch
+                    {
+                        DropTargetDetector.DropTargetStatus.Success => 0x0060E090, // Bright green-blue BGR
+                        DropTargetDetector.DropTargetStatus.Warning => 0x0020E0FF, // Bright amber/yellow BGR
+                        _ => 0x00FFFFFF
+                    };
+
+                    var hIconFont = GdiCreateFont(-56, 0, 0, 0, 700, 0, 0, 0, 1, 0, 0, 0, 0, "Segoe UI Symbol");
+                    if (hIconFont != nint.Zero)
+                    {
+                        var oldIconFont = GdiSelectObject(hdcMem, hIconFont);
+                        GdiSetBkMode(hdcMem, 1);
+
+                        // Icon shadow: single offset at (+1,+1)
+                        GdiSetTextColor(hdcMem, 0x00101010);
+                        var iconBaseRect = new NativeMethods.RECT
+                        {
+                            Left = previewX + 4, Top = previewY + 4,
+                            Right = previewX + iconSize + 4, Bottom = previewY + iconSize + 4
+                        };
+                        var iconShadowRect = new NativeMethods.RECT
+                        {
+                            Left = iconBaseRect.Left + 1,
+                            Top = iconBaseRect.Top + 1,
+                            Right = iconBaseRect.Right + 1,
+                            Bottom = iconBaseRect.Bottom + 1
+                        };
+                        GdiDrawText(hdcMem, iconChar, iconChar.Length, ref iconShadowRect,
+                            0x0125 | 0x0800);
+
+                        // Icon
+                        GdiSetTextColor(hdcMem, iconColor);
+                        GdiDrawText(hdcMem, iconChar, iconChar.Length, ref iconBaseRect,
+                            0x0125 | 0x0800);
+
+                        GdiSelectObject(hdcMem, oldIconFont);
+                        GdiDeleteObject(hIconFont);
+                    }
+                }
+            }
+
+            // ── Fix alpha channel in DIB bits after GDI operations ──
+            // GDI DrawText corrupts alpha (sets to 0) for text glyph pixels in 32-bit DIB.
+            // Strategy: compare DIB bits against the original pixel buffer to find pixels
+            // GDI modified (text/shadow/icon strokes), and fix only those to alpha=255.
+            // Background pixels (unmodified by GDI) keep their original alpha (breathe).
+            byte[] rowBuf = new byte[stride];
+
+            // Helper: for a pixel GDI modified, distinguish outline from text:
+            // - Dark pixels (max channel ≤ 60) → outline stroke → alpha=255 (fully opaque)
+            // - Bright pixels (max channel > 60) → text/anti-aliased → smooth alpha from brightness
+            //   with pre-multiplied RGB, preserving anti-aliasing edges.
+            void FixGdiPixel(byte[] row, int xOffset)
+            {
+                // row is BGRA: [B, G, R, A]
+                byte b = row[xOffset];
+                byte g = row[xOffset + 1];
+                byte r = row[xOffset + 2];
+                int maxChannel = Math.Max(r, Math.Max(g, b));
+                if (maxChannel > 0)
+                {
+                    // Dark pixels → outline stroke (drawn at 8 offsets around text)
+                    // Make fully opaque so dark outline is visible against background
+                    if (maxChannel <= 60)
+                    {
+                        // Outline is already the desired dark color (e.g. 0x10,0x10,0x10 BGR).
+                        // No pre-multiply needed since alpha=255.
+                        row[xOffset + 3] = 255;
+                    }
+                    else
+                    {
+                        // Bright pixels → white text or anti-aliased edge.
+                        // Graduated alpha preserves smooth text edges.
+                        int alpha = maxChannel;
+                        row[xOffset] = (byte)(b * alpha / 255);
+                        row[xOffset + 1] = (byte)(g * alpha / 255);
+                        row[xOffset + 2] = (byte)(r * alpha / 255);
+                        row[xOffset + 3] = (byte)alpha;
+                    }
+                }
+            }
+
+            if (!string.IsNullOrEmpty(text) && text.Length > 0)
+            {
+                int textLeft = 20;
+                int textRight = w - 20;
+                int top = textTop;
+                int bottom = Math.Min(textBottom, h);
+                for (int y = top; y < bottom; y++)
+                {
+                    int rowOffset = y * stride;
+                    // Read DIB row (post-GDI)
+                    Marshal.Copy(bitsPtr + rowOffset, rowBuf, 0, stride);
+                    for (int x = textLeft; x < textRight; x++)
+                    {
+                        int idx = x * 4;
+                        int bufIdx = rowOffset + idx;
+                        // Compare B, G, R with original pixel buffer
+                        // If any byte differs, GDI modified this pixel → fix alpha
+                        if (rowBuf[idx] != pixels[bufIdx] ||
+                            rowBuf[idx + 1] != pixels[bufIdx + 1] ||
+                            rowBuf[idx + 2] != pixels[bufIdx + 2])
+                        {
+                            FixGdiPixel(rowBuf, idx);
+                        }
+                    }
+                    Marshal.Copy(rowBuf, 0, bitsPtr + rowOffset, stride);
+                }
+            }
+
+            // Fix alpha in preview/icon area (GDI-drawn icon pixels)
+            int iconY1 = Math.Clamp(previewY, 0, h - 1);
+            int iconY2 = Math.Clamp(previewY + iconSize, 0, h);
+            int iconX1 = Math.Clamp(previewX, 0, w - 1);
+            int iconX2 = Math.Clamp(previewX + iconSize, 0, w);
+            for (int y = iconY1; y < iconY2; y++)
+            {
+                int rowOffset = y * stride;
+                Marshal.Copy(bitsPtr + rowOffset, rowBuf, 0, stride);
+                for (int x = iconX1; x < iconX2; x++)
+                {
+                    int idx = x * 4;
+                    int bufIdx = rowOffset + idx;
+                    if (rowBuf[idx] != pixels[bufIdx] ||
+                        rowBuf[idx + 1] != pixels[bufIdx + 1] ||
+                        rowBuf[idx + 2] != pixels[bufIdx + 2])
+                    {
+                        FixGdiPixel(rowBuf, idx);
+                    }
+                }
+                Marshal.Copy(rowBuf, 0, bitsPtr + rowOffset, stride);
+            }
+
             // Update the layered window (hBitmap must still be selected in hdcMem!)
-            // NOTE: pptDst in UpdateLayeredWindow ALSO sets window position — must use actual coords!
             var ptWnd = new NativeMethods.POINT { X = posX, Y = posY };
             var szWnd = new NativeMethods.SIZE { cx = w, cy = h };
             var ptSrc = new NativeMethods.POINT { X = 0, Y = 0 };
-            // SourceConstantAlpha controls window-wide breathing (original working approach)
-            var blend = new NativeMethods.BLENDFUNCTION { BlendOp = 0, BlendFlags = 0, SourceConstantAlpha = breathAlpha, AlphaFormat = 0 };
+            var blend = new NativeMethods.BLENDFUNCTION { BlendOp = 0, BlendFlags = 0, SourceConstantAlpha = 255, AlphaFormat = 1 };
 
             NativeMethods.UpdateLayeredWindow(hwnd, nint.Zero, ref ptWnd, ref szWnd,
                 hdcMem, ref ptSrc, 0, ref blend, 2); // ULW_ALPHA = 2
 
-            // Cleanup: restore old bitmap before deleting ours
+            // Cleanup
             GdiSelectObject(hdcMem, oldBitmap);
             GdiDeleteObject(hBitmap);
         }
         catch (Exception ex)
         {
-            // GDI operation failed — log but don't crash the overlay thread
             App.DebugLog($"[Overlay] OverlayRender error: {ex.GetType().Name}: {ex.Message}");
         }
         finally
         {
             GdiDeleteDC(hdcMem);
             NativeMethods.ReleaseDC(nint.Zero, hdcScreen);
+        }
+    }
+
+    /// <summary>
+    /// Composite a BGRA image into the pixel buffer, scaled to fit the target rect.
+    /// Simple nearest-neighbor scaling.
+    /// </summary>
+    private static void CompositeImage(byte[] destPixels, int destStride, int destH,
+        byte[] srcPixels, int srcW, int srcH,
+        int dstX, int dstY, int dstW, int dstH)
+    {
+        for (int dy = 0; dy < dstH; dy++)
+        {
+            int srcY = dy * srcH / dstH;
+            if (srcY >= srcH) srcY = srcH - 1;
+            for (int dx = 0; dx < dstW; dx++)
+            {
+                int srcX = dx * srcW / dstW;
+                if (srcX >= srcW) srcX = srcW - 1;
+
+                int destIdx = (dstY + dy) * destStride + (dstX + dx) * 4;
+                int srcIdx = srcY * srcW * 4 + srcX * 4;
+
+                // Source-over blend (premultiplied alpha)
+                byte sa = srcPixels[srcIdx + 3];
+                if (sa == 0) continue;
+                int da = 255;
+                int outA = da;
+                if (sa < 255)
+                {
+                    outA = 255; // opaque destination for overlay
+                    destPixels[destIdx + 0] = (byte)((srcPixels[srcIdx + 0] * sa + destPixels[destIdx + 0] * (255 - sa)) / 255);
+                    destPixels[destIdx + 1] = (byte)((srcPixels[srcIdx + 1] * sa + destPixels[destIdx + 1] * (255 - sa)) / 255);
+                    destPixels[destIdx + 2] = (byte)((srcPixels[srcIdx + 2] * sa + destPixels[destIdx + 2] * (255 - sa)) / 255);
+                }
+                else
+                {
+                    destPixels[destIdx + 0] = srcPixels[srcIdx + 0]; // B
+                    destPixels[destIdx + 1] = srcPixels[srcIdx + 1]; // G
+                    destPixels[destIdx + 2] = srcPixels[srcIdx + 2]; // R
+                }
+                destPixels[destIdx + 3] = 255; // A
+            }
         }
     }
 

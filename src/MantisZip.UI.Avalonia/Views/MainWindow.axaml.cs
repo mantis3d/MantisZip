@@ -308,9 +308,6 @@ public partial class MainWindow : Window
                         exStyle | NativeMethods.WS_EX_LAYERED | NativeMethods.WS_EX_TRANSPARENT
                                 | NativeMethods.WS_EX_NOACTIVATE | NativeMethods.WS_EX_TOOLWINDOW);
 
-                    // Start fully transparent to prevent flash on first resize
-                    NativeMethods.SetLayeredWindowAttributes(overlayHwnd, 0, 0, NativeMethods.LWA_ALPHA);
-
                     // Remove title bar via Win32 (avoids Avalonia 12 enum compatibility issues)
                     var overlayStyle = NativeMethods.GetWindowLong(overlayHwnd, NativeMethods.GWL_STYLE);
                     NativeMethods.SetWindowLong(overlayHwnd, NativeMethods.GWL_STYLE,

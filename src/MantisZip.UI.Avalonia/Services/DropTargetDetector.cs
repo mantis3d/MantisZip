@@ -118,7 +118,7 @@ internal static class DropTargetDetector
     /// Uses late-binding COM (ShellWindows CLSID) to find the Explorer
     /// window matching the given HWND and extract its folder path.
     /// </summary>
-    private static (string? Path, DropTargetStatus Status) TryGetExplorerPathFromShell(nint hWnd)
+    internal static (string? Path, DropTargetStatus Status) TryGetExplorerPathFromShell(nint hWnd)
     {
         try
         {
@@ -180,12 +180,12 @@ internal static class DropTargetDetector
     /// Attempts to extract the current directory path from a #32770 dialog
     /// (common file dialog, folder picker, etc.) by enumerating child windows.
     /// </summary>
-    private static (string? Path, DropTargetStatus Status) TryGetDialogPath(nint hWnd)
+    internal static (string? Path, DropTargetStatus Status) TryGetDialogPath(nint hWnd)
     {
         var path = TryGetDialogPathViaWin32(hWnd);
         if (path is not null)
         {
-            return (path, DropTargetStatus.Warning);
+            return (path, DropTargetStatus.Success);
         }
 
         return (null, DropTargetStatus.None);
