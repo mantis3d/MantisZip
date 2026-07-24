@@ -134,6 +134,18 @@
   <SolidColorBrush x:Key="CheckBoxForegroundUnchecked" Color="{StaticResource ThemeTextPrimary}" />
   <SolidColorBrush x:Key="CheckBoxForegroundChecked" Color="{StaticResource ThemeTextPrimary}" />
 
+  <!-- Status colors -->
+  <Color x:Key="ThemeStatusWarning">#FFFFE082</Color>
+  <Color x:Key="ThemeStatusSuccess">#FF4CAF50</Color>
+  <Color x:Key="ThemeStatusError">#FFF44336</Color>
+
+  <SolidColorBrush x:Key="ThemeStatusWarningBrush" Color="{StaticResource ThemeStatusWarning}" />
+  <SolidColorBrush x:Key="ThemeStatusSuccessBrush" Color="{StaticResource ThemeStatusSuccess}" />
+  <SolidColorBrush x:Key="ThemeStatusErrorBrush" Color="{StaticResource ThemeStatusError}" />
+  <!-- Progress bar foreground/background for progress window -->
+  <SolidColorBrush x:Key="ThemeProgressFillBrush" Color="#FF2196F3" />
+  <SolidColorBrush x:Key="ThemeProgressBgBrush" Color="#FFE0E0E0" />
+
   <!-- Progress bar colors -->
   <Color x:Key="ProgressBarSizeColor">#FFE0E7FF</Color>
   <Color x:Key="ProgressBarSizeDirColor">#FFA3B8FF</Color>
