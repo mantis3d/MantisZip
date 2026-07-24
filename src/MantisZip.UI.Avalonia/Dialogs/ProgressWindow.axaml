@@ -1,73 +1,270 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:converters="clr-namespace:MantisZip.UI.Avalonia.Converters"
         x:Class="MantisZip.UI.Avalonia.Dialogs.ProgressWindow"
         x:CompileBindings="False"
         Title="{Binding WindowTitle}"
-        Width="450" Height="180"
-        WindowStartupLocation="CenterOwner"
+        Width="500"
+        SizeToContent="Height"
+        WindowStartupLocation="CenterScreen"
+        CanResize="True"
+        Topmost="True"
+        ShowInTaskbar="False"
         Background="{DynamicResource ThemeWindowBgBrush}">
-
-  <Grid RowDefinitions="*,Auto,Auto,Auto,Auto"
-        Margin="{DynamicResource SpacingMdThk}"
+  <Window.Resources>
+    <converters:BatchStatusToIconConverter x:Key="BatchStatusIconConverter"/>
+    <converters:ProgressStatusToBackgroundConverter x:Key="ProgressStatusBackgroundConverter"/>
+  </Window.Resources>
+  <Grid Margin="{DynamicResource SpacingMdThk}"
         RowSpacing="6">
-    <!-- Row 0: Status message -->
-    <TextBlock x:Name="StatusText"
-               Text="{Binding StatusMessage}"
-               TextTrimming="CharacterEllipsis"
-               VerticalAlignment="Center"
-               Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+    <Grid.RowDefinitions>
+      <RowDefinition Height="Auto"/>  <!-- 0: 批处理文件列表 -->
+      <RowDefinition Height="Auto"/>  <!-- 1: 密码匹配区 -->
+      <RowDefinition Height="Auto"/>  <!-- 2: 当前文件名 -->
+      <RowDefinition Height="Auto"/>  <!-- 3: 文件进度条 -->
+      <RowDefinition Height="Auto"/>  <!-- 4: 总体进度条 -->
+      <RowDefinition Height="Auto"/>  <!-- 5: 文件计数 -->
+      <RowDefinition Height="Auto"/>  <!-- 6: 错误摘要 -->
+      <RowDefinition Height="*"/>      <!-- 7: 弹性填充 -->
+      <RowDefinition Height="Auto"/>  <!-- 8: 按钮行 -->
+    </Grid.RowDefinitions>
 
-    <!-- Row 1: Per-file progress bar (file-level granularity) -->
-    <Grid Grid.Row="1">
+    <!-- ═══ 批处理文件列表（默认隐藏，批处理模式时显示）═══ -->
+    <ListBox x:Name="BatchFileList" Grid.Row="0"
+             ItemsSource="{Binding BatchItems}"
+             IsVisible="False"
+             MaxHeight="160" Margin="0,0,0,8"
+             BorderThickness="1"
+             BorderBrush="{DynamicResource ThemeBorderBrush}"
+             Background="{DynamicResource ThemeSurfaceBgBrush}"
+             ScrollViewer.VerticalScrollBarVisibility="Auto"
+             SelectionMode="Single">
+      <ListBox.ItemContainerTheme>
+        <ControlTheme TargetType="ListBoxItem">
+          <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+          <Setter Property="Padding" Value="0"/>
+          <Setter Property="MinHeight" Value="{DynamicResource ControlHeightMd}"/>
+        </ControlTheme>
+      </ListBox.ItemContainerTheme>
+      <ListBox.ItemTemplate>
+        <DataTemplate>
+          <Grid>
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="28"/>
+              <ColumnDefinition Width="*"/>
+              <ColumnDefinition Width="50"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- 第 1 列: 状态图标 -->
+            <TextBlock Grid.Column="0"
+                       Text="{Binding Status, Converter={StaticResource BatchStatusIconConverter}}"
+                       FontSize="14" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+
+            <!-- 第 2 列: 文件名 + 进度条背景 -->
+            <TextBlock Grid.Column="1"
+                       Text="{Binding Name}"
+                       TextTrimming="CharacterEllipsis"
+                       VerticalAlignment="Center"
+                       Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                       Padding="4,2">
+              <TextBlock.Background>
+                <MultiBinding Converter="{StaticResource ProgressStatusBackgroundConverter}">
+                  <Binding Path="Progress"/>
+                  <Binding Path="Status"/>
+                </MultiBinding>
+              </TextBlock.Background>
+            </TextBlock>
+
+            <!-- 第 3 列: 进度百分比 -->
+            <TextBlock Grid.Column="2"
+                       Text="{Binding Progress, StringFormat=\{0:F0\}%}"
+                       HorizontalAlignment="Right"
+                       VerticalAlignment="Center"
+                       Foreground="{DynamicResource ThemeTextSecondaryBrush}"
+                       FontSize="11"
+                       Padding="0,0,6,0"/>
+          </Grid>
+        </DataTemplate>
+      </ListBox.ItemTemplate>
+    </ListBox>
+
+    <!-- ═══ 密码匹配区（默认隐藏，仅在尝试密码规则时显示）═══ -->
+    <Border x:Name="PasswordSection" Grid.Row="1"
+            Background="{DynamicResource ThemeStatusWarningBrush}"
+            BorderBrush="{DynamicResource ThemeStatusWarningBrush}"
+            BorderThickness="1"
+            CornerRadius="4" Padding="8,6" Margin="0,0,0,8"
+            IsVisible="{Binding IsPasswordSectionVisible}">
+      <Grid RowSpacing="2">
+        <Grid.RowDefinitions>
+          <RowDefinition Height="Auto"/>
+          <RowDefinition Height="Auto"/>
+          <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- 第 1 行：图标 + 密码文本 + 按钮 -->
+        <Grid Grid.Row="0">
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="Auto"/>
+            <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="Auto"/>
+            <ColumnDefinition Width="Auto"/>
+          </Grid.ColumnDefinitions>
+
+          <TextBlock Grid.Column="0" Text="&#x1F511;" FontSize="14"
+                     VerticalAlignment="Center" Margin="0,0,6,0"/>
+          <TextBlock x:Name="PwdMatchText" Grid.Column="1"
+                     Text="{Binding PasswordMatchText}"
+                     FontSize="14" FontWeight="SemiBold"
+                     Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                     VerticalAlignment="Center"
+                     TextTrimming="CharacterEllipsis"/>
+
+          <Button x:Name="PwdRevealBtn" Grid.Column="2"
+                  Width="24" Height="22" Margin="4,0,0,0"
+                  Content="{Binding PasswordRevealButtonText}"
+                  FontSize="10" Padding="0"
+                  Command="{Binding TogglePasswordRevealCommand}"
+                  IsEnabled="{Binding IsPasswordRevealEnabled}"
+                  Background="{DynamicResource ThemeButtonBgBrush}"
+                  BorderThickness="1"
+                  BorderBrush="{DynamicResource ThemeBorderBrush}"
+                  Foreground="{DynamicResource ThemeTextSecondaryBrush}"/>
+
+          <Button x:Name="PwdCopyBtn" Grid.Column="3"
+                  Width="24" Height="22" Margin="4,0,0,0"
+                  Content="&#x1F4CB;" FontSize="12" Padding="0"
+                  IsEnabled="{Binding IsPasswordCopyEnabled}"
+                  Background="{DynamicResource ThemeButtonBgBrush}"
+                  BorderThickness="1"
+                  BorderBrush="{DynamicResource ThemeBorderBrush}"
+                  Foreground="{DynamicResource ThemeTextSecondaryBrush}"
+                  Click="PwdCopyBtn_Click"/>
+        </Grid>
+
+        <!-- 第 2 行：规则描述 -->
+        <TextBlock Grid.Row="1"
+                   Text="{Binding PasswordRuleText}"
+                   FontSize="12" Foreground="{DynamicResource ThemeTextSecondaryBrush}"
+                   Margin="22,2,0,0"/>
+
+        <!-- 第 3 行：状态（验证通过 / 正在尝试） -->
+        <TextBlock Grid.Row="2"
+                   Text="{Binding PasswordStatusText}"
+                   FontSize="12" Foreground="{DynamicResource ThemeTextSecondaryBrush}"
+                   Margin="22,2,0,0"/>
+      </Grid>
+    </Border>
+
+    <!-- Row 2: 当前文件名 -->
+    <TextBlock Grid.Row="2"
+               Text="{Binding FileName}"
+               TextTrimming="CharacterEllipsis"
+               Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
+
+    <!-- Row 3: 文件进度条 -->
+    <Grid Grid.Row="3" Margin="0,6,0,2">
       <Grid.ColumnDefinitions>
-        <ColumnDefinition Width="*" />
-        <ColumnDefinition Width="Auto" />
+        <ColumnDefinition Width="*"/>
+        <ColumnDefinition Width="Auto"/>
       </Grid.ColumnDefinitions>
       <ProgressBar Grid.Column="0"
                    Value="{Binding FilePercentComplete}"
                    Minimum="0" Maximum="100"
-                   Height="12" />
+                   Height="14"
+                   Foreground="{DynamicResource ThemeProgressFillBrush}"
+                   Background="{DynamicResource ThemeProgressBgBrush}"/>
       <TextBlock Grid.Column="1"
                  Text="{Binding FilePercentComplete, StringFormat=\{0\}%}"
-                 Width="38"
-                 Margin="6,0,0,0"
+                 Width="42" Margin="6,0,0,0"
                  HorizontalAlignment="Right"
                  Foreground="{DynamicResource ThemeTextSecondaryBrush}"
-                 FontSize="11" />
+                 FontSize="12"/>
     </Grid>
 
-    <!-- Row 2: Overall progress bar -->
-    <Grid Grid.Row="2">
+    <!-- Row 4: 总体进度条 -->
+    <Grid Grid.Row="4" Margin="0,4,0,2">
       <Grid.ColumnDefinitions>
-        <ColumnDefinition Width="*" />
-        <ColumnDefinition Width="Auto" />
+        <ColumnDefinition Width="*"/>
+        <ColumnDefinition Width="Auto"/>
       </Grid.ColumnDefinitions>
       <ProgressBar Grid.Column="0"
                    Value="{Binding PercentComplete}"
                    Minimum="0" Maximum="100"
                    IsIndeterminate="{Binding IsIndeterminate}"
-                   Height="18" />
+                   Height="22"
+                   Foreground="{DynamicResource ThemeProgressFillBrush}"/>
       <TextBlock Grid.Column="1"
                  Text="{Binding PercentComplete, StringFormat=\{0\}%}"
-                 Width="38"
-                 Margin="6,0,0,0"
+                 Width="42" Margin="6,0,0,0"
                  HorizontalAlignment="Right"
                  FontWeight="Bold"
-                 Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+                 Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
     </Grid>
 
-    <!-- Row 3: Current file name -->
-    <TextBlock Grid.Row="3"
-               Text="{Binding FileName}"
-               TextTrimming="CharacterEllipsis"
+    <!-- Row 5: 文件计数 -->
+    <TextBlock x:Name="FileCountText" Grid.Row="5"
+               Text="{Binding FileCountText}"
+               FontSize="12"
                Foreground="{DynamicResource ThemeTextSecondaryBrush}"
-               FontSize="12" />
+               Margin="0,0,0,4"/>
 
-    <!-- Row 4: Cancel button -->
-    <Button Grid.Row="4"
-            Content="{Binding LocalizedStrings[Progress_Cancel]}"
-            Command="{Binding CancelCommand}"
-            HorizontalAlignment="Right"
-            Padding="{DynamicResource SpacingMdThk}" />
+    <!-- Row 6: 错误摘要 -->
+    <TextBox x:Name="ErrorSummaryBox" Grid.Row="6"
+             Text="{Binding ErrorSummaryText}"
+             IsReadOnly="True"
+             IsVisible="{Binding HasErrors}"
+             TextWrapping="Wrap"
+             FontSize="12"
+             Foreground="{DynamicResource ThemeStatusErrorBrush}"
+             Background="Transparent"
+             BorderThickness="0"
+             Padding="0,0,0,6"
+             IsTabStop="False"
+             Focusable="False"
+             Cursor="Arrow"/>
+
+    <!-- Row 8: 按钮行 -->
+    <Grid Grid.Row="8" Margin="0,4,0,2">
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="Auto"/>
+        <ColumnDefinition Width="*"/>
+        <ColumnDefinition Width="Auto"/>
+        <ColumnDefinition Width="Auto"/>
+      </Grid.ColumnDefinitions>
+      <ToggleButton x:Name="KeepOpenToggle" Grid.Column="0"
+               Height="34" Width="44"
+               IsChecked="{Binding KeepOpenOnComplete}"
+               ToolTip.Tip="{Binding LocalizedStrings[Progress_KeepOpen]}"
+               VerticalAlignment="Center" Margin="0,0,4,0"
+               Background="{DynamicResource ThemeButtonBgBrush}"
+               BorderBrush="{DynamicResource ThemeBorderBrush}"
+               BorderThickness="1">
+        <PathIcon Data="{StaticResource IconPin}" Width="16" Height="16" />
+      </ToggleButton>
+      <Button x:Name="PauseButton" Grid.Column="2"
+              Width="80" Height="34" Margin="0,0,8,0"
+              Click="PauseButton_Click"
+              Background="{DynamicResource ThemeButtonBgBrush}"
+              BorderBrush="{DynamicResource ThemeBorderBrush}"
+              BorderThickness="1">
+        <StackPanel Orientation="Horizontal" Spacing="4" HorizontalAlignment="Center" VerticalAlignment="Center">
+          <PathIcon x:Name="PauseButtonIcon" Data="{StaticResource IconPause}" Width="14" Height="14" />
+          <TextBlock x:Name="PauseButtonText" Text="{Binding LocalizedStrings[Progress_Button_Pause]}" />
+        </StackPanel>
+      </Button>
+      <Button x:Name="CancelButton" Grid.Column="3"
+              Width="80" Height="34"
+              Command="{Binding CancelCommand}"
+              IsEnabled="{Binding IsCancelEnabled}"
+              Background="{DynamicResource ThemeButtonBgBrush}"
+              BorderBrush="{DynamicResource ThemeBorderBrush}"
+              BorderThickness="1">
+        <StackPanel Orientation="Horizontal" Spacing="4" HorizontalAlignment="Center" VerticalAlignment="Center">
+          <PathIcon x:Name="CancelButtonIcon" Data="{StaticResource IconDismiss}" Width="14" Height="14" />
+          <TextBlock x:Name="CancelButtonText" Text="{Binding LocalizedStrings[Progress_Cancel]}" />
+        </StackPanel>
+      </Button>
+    </Grid>
   </Grid>
 </Window>
