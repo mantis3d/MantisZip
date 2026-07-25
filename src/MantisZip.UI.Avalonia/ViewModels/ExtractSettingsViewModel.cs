@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using MantisZip.Core.Abstractions;
+using MantisZip.Core.FileFilter;
 using MantisZip.UI.Avalonia.Models;
 using MantisZip.UI.Avalonia.Services;
 
@@ -95,8 +96,9 @@ public partial class ExtractSettingsViewModel : ObservableObject
     /// 构建解压预览树。由窗口在加载完成后调用。
     /// </summary>
     /// <param name="entries">压缩包内的条目列表。</param>
+    /// <param name="filter">文件过滤条件，传递到服务层标记 IsFilteredOut。</param>
     /// <param name="checkExists">是否逐文件检查目标位置是否存在。</param>
-    public void BuildExtractPreview(IEnumerable<ArchiveItem> entries, bool checkExists = false)
+    public void BuildExtractPreview(IEnumerable<ArchiveItem> entries, FileFilterCriteria? filter = null, bool checkExists = false)
     {
         if (string.IsNullOrWhiteSpace(DestinationPath)) return;
 
@@ -104,7 +106,8 @@ public partial class ExtractSettingsViewModel : ObservableObject
             entries,
             DestinationPath,
             rootName: Path.GetFileName(DestinationPath),
-            checkExists: checkExists);
+            checkExists: checkExists,
+            filter: filter);
     }
 
     partial void OnDestinationPathChanged(string value)

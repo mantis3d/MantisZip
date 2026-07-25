@@ -1,4 +1,5 @@
 using MantisZip.Core.Services;
+using MantisZip.Core.Utils;
 
 namespace MantisZip.UI.Avalonia.Models;
 
@@ -8,8 +9,13 @@ namespace MantisZip.UI.Avalonia.Models;
 /// </summary>
 public class PreviewTreeNode : FolderNode
 {
-    /// <summary>自定义显示名称（截断节点等场景用覆盖默认 Name）。</summary>
-    public string DisplayLabel { get; set; } = string.Empty;
+    /// <summary>自定义显示名称（截断节点等场景用覆盖默认 Name）。未显式设置时回退到 Name。</summary>
+    public string DisplayLabel
+    {
+        get => string.IsNullOrEmpty(_displayLabel) ? Name : _displayLabel;
+        set => _displayLabel = value;
+    }
+    private string _displayLabel = string.Empty;
 
     /// <summary>文件大小（字节）。目录时为 0。</summary>
     public long Size { get; set; }
@@ -26,8 +32,17 @@ public class PreviewTreeNode : FolderNode
     /// <summary>子孙节点总数（含所有层级的文件和目录）。</summary>
     public int TotalDescendantCount { get; set; }
 
+    /// <summary>子孙节点文件大小总和（字节）。</summary>
+    public long TotalDescendantSize { get; set; }
+
     /// <summary>子孙最大深度（用于截断判断）。</summary>
     public int MaxChildDepth { get; set; }
+
+    /// <summary>目录统计摘要文本，仅目录节点有值。</summary>
+    public string DirectoryInfoText =>
+        Children.Count > 0 && !string.IsNullOrEmpty(FullPath)
+            ? $"{TotalDescendantCount} 项 · {FormatUtil.FormatSize(TotalDescendantSize)}"
+            : string.Empty;
 
     /// <summary>是否被截断显示（超过 MaxItemsPerDirectory 或 MaxDepth）。</summary>
     public bool IsTruncated { get; set; }
@@ -76,6 +91,7 @@ public class PreviewTreeNode : FolderNode
             ExistsAtDestination = ExistsAtDestination,
             IsFilteredOut = IsFilteredOut,
             TotalDescendantCount = TotalDescendantCount,
+            TotalDescendantSize = TotalDescendantSize,
             MaxChildDepth = MaxChildDepth,
             IsTruncated = IsTruncated,
             TruncatedCount = TruncatedCount,

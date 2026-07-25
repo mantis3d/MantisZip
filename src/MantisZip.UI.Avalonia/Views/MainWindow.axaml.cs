@@ -54,6 +54,12 @@ public partial class MainWindow : Window
         vm.ShowExtractSettingsDialog = async (evm) =>
         {
             var dialog = new ExtractSettingsWindow(evm.ArchivePaths);
+
+            // Pass archive entries for preview tree
+            var allItems = vm.GetAllRawItems();
+            if (allItems.Count > 0)
+                dialog.SetEntries(allItems);
+
             var result = await dialog.ShowDialog<bool>(this);
             if (result)
             {

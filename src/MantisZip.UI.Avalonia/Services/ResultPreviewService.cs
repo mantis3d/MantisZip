@@ -1,5 +1,6 @@
 using MantisZip.Core.Abstractions;
 using MantisZip.Core.Services;
+using MantisZip.Core.FileFilter;
 using MantisZip.Core.Utils;
 using MantisZip.UI.Avalonia.Models;
 
@@ -18,12 +19,14 @@ public static class ResultPreviewService
     /// <param name="destDir">目标解压目录。</param>
     /// <param name="rootName">根节点显示名称（默认为 "解压预览"）。</param>
     /// <param name="checkExists">是否逐文件检查目标位置是否存在（默认 false 仅快速模式）。</param>
+    /// <param name="filter">文件过滤条件，不为空且 IsActive 时对文件节点标记 IsFilteredOut。</param>
     /// <returns>根节点，包含完整的树结构。</returns>
     public static PreviewTreeNode BuildExtractPreview(
         IEnumerable<ArchiveItem> entries,
         string destDir,
         string? rootName = null,
-        bool checkExists = false)
+        bool checkExists = false,
+        FileFilterCriteria? filter = null)
     {
         var root = new PreviewTreeNode
         {
@@ -81,6 +84,10 @@ public static class ResultPreviewService
                 var realPath = Path.Combine(destDir, fullPath.Replace('/', Path.DirectorySeparatorChar));
                 fileNode.ExistsAtDestination = File.Exists(realPath);
             }
+
+            // Apply file filter: mark non-matching files as filtered out
+            if (filter != null && filter.IsActive && !FileFilterMatcher.IsMatch(filter, item))
+                fileNode.IsFilteredOut = true;
 
             parent.Children.Add(fileNode);
         }
@@ -141,11 +148,12 @@ public static class ResultPreviewService
     }
 
     /// <summary>
-    /// 递归统计每个节点的 TotalDescendantCount 和 MaxChildDepth。
+    /// 递归统计每个节点的 TotalDescendantCount、TotalDescendantSize 和 MaxChildDepth。
     /// </summary>
     private static int CalculateDescendantStats(PreviewTreeNode node, int depth = 0)
     {
         int count = 0;
+        long totalSize = node.Size;
         int maxChildDepth = depth;
 
         foreach (var child in node.Children)
@@ -155,11 +163,13 @@ public static class ResultPreviewService
                 count++;
                 var childDescendantCount = CalculateDescendantStats(previewChild, depth + 1);
                 count += childDescendantCount;
+                totalSize += previewChild.TotalDescendantSize;
                 maxChildDepth = Math.Max(maxChildDepth, previewChild.MaxChildDepth);
             }
         }
 
         node.TotalDescendantCount = count;
+        node.TotalDescendantSize = totalSize;
         node.MaxChildDepth = maxChildDepth;
         return count;
     }
