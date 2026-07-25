@@ -761,6 +761,8 @@
   "Preview_Result_TruncatedDepth": "… {0} more levels",
   "Preview_Result_ConflictSuffix": "⚠️",
   "Preview_Result_ShowFiltered": "Show filtered",
+  "Preview_Result_HideFiltered": "Hide filtered",
+  "Preview_Result_Locate": "Locate",
 
   "App_MantisZipTitle": "MantisZip",
 

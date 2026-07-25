@@ -759,6 +759,8 @@
   "Preview_Result_TruncatedDepth": "… 还有 {0} 层",
   "Preview_Result_ConflictSuffix": "⚠️",
   "Preview_Result_ShowFiltered": "显示过滤项",
+  "Preview_Result_HideFiltered": "隐藏过滤项",
+  "Preview_Result_Locate": "定位到选中",
 
   "App_MantisZipTitle": "MantisZip",
 
