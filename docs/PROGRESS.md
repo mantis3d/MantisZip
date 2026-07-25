@@ -21,6 +21,13 @@
 
 ### MantisZip.UI.Avalonia（主力版）
 
+**2026-07-26** — 拖拽覆盖层修复：自身窗口改用 HWND 判定 + 多行文本支持 + 虚拟文件夹识别
+  - **自身窗口判定 Bug 修复**：之前用 `className.StartsWith("Avalonia-")` 检测自身窗口，但所有 Avalonia 应用共享 `Avalonia-` 前缀，导致其他 Avalonia 软件也被误识别为 MantisZip。改用 HWND 句柄比较（`target == _mainHwnd`）
+  - **多行文本支持**：`GdiDrawText` 格式标志从 `DT_SINGLELINE | DT_VCENTER`（`0x0125`）改为 `DT_WORDBREAK`（`0x0111`）+ `DT_CALCRECT` 手动垂直居中，支持 `\n` 换行
+  - **虚拟文件夹判定**：修正 `ClassifyWindow` 中丢弃 `TryGetExplorerPathFromShell` 返回状态的问题，"我的电脑"/"快速访问"等无合法路径的文件夹不再显示绿色（`Success`），改为 `Warning` 状态显示红色
+  - 改动的文件：`OverlayController.cs`（HWND 判定 + 多行文本 + 虚拟文件夹）、`MainWindow.axaml.cs`（传递主窗口 HWND）、`strings.zh-CN.json`（多行文案）
+  - 构建 0 errors
+
 **2026-07-25** — 预览树工具栏扩展：过滤显示切换 + 定位选中 + 过滤连接解压预览
   - **ShowFilteredGhosts 切换按钮**：ResultTreeView 工具栏新增 ToggleButton，绑定 ShowFilteredGhosts，切换"全部显示（标灰）"/"仅显示匹配"
   - **定位到选中按钮**：工具栏新增 LocateButton，多选支持，点击后折叠全部并展开所有选中项路径

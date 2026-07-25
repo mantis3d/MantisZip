@@ -13,6 +13,7 @@ namespace MantisZip.UI.Avalonia.Services;
 internal class OverlayController : IDisposable
 {
     private nint _hwnd;
+    private readonly nint _mainHwnd;
     private Thread? _trackingThread;
     private CancellationTokenSource? _cts;
     private readonly ManualResetEvent _stopped = new(false);
@@ -46,9 +47,10 @@ internal class OverlayController : IDisposable
         public int Height { get; init; }
     }
 
-    public OverlayController(nint hwnd)
+    public OverlayController(nint hwnd, nint mainHwnd)
     {
         _hwnd = hwnd;
+        _mainHwnd = mainHwnd;
     }
 
     public void Start()
@@ -146,27 +148,39 @@ internal class OverlayController : IDisposable
             return;
         }
 
+        // Clip to virtual screen bounds so overlay isn't placed off-screen
+        var screenRect = NativeMethods.GetVirtualScreenRect();
+        if (NativeMethods.IntersectRect(out var clippedRect, ref rect, ref screenRect))
+        {
+            rect = clippedRect;
+        }
+
         // Lightweight status check
         var (status, className, displayPath) = ClassifyWindow(target);
 
-        // Skip overlay rendering if the window under cursor is our own Avalonia window
-        if (className.StartsWith("Avalonia-", StringComparison.Ordinal) || className == "TMainBox")
-        {
-            return;
-        }
+        // Detect own app via HWND comparison (reliable — class name heuristic misidentifies
+        // other Avalonia apps as MantisZip since all Avalonia windows share "Avalonia-" prefix)
+        bool isOwnApp = _mainHwnd != nint.Zero && target == _mainHwnd;
 
         // Update color
-                    DropTargetDetector.DropTargetStatus newStatus = status;
-            lock (_stateLock)
+        DropTargetDetector.DropTargetStatus newStatus = status;
+        lock (_stateLock)
+        {
+            _currentStatus = status;
+            if (isOwnApp)
             {
-                _currentStatus = status;
+                _currentColor = 0x00333333; // Dark gray for own window
+            }
+            else
+            {
                 _currentColor = status switch
                 {
                     DropTargetDetector.DropTargetStatus.Success => 0x006BD46B, // Brighter green
                     DropTargetDetector.DropTargetStatus.Warning => 0x004336F4, // Red
-                    _ => 0x0000D7FF, // Warm gold (replaces neutral gray)
+                    _ => 0x0000D7FF, // Warm gold
                 };
             }
+        }
 
         // Position + opacity
         var w = rect.Right - rect.Left;
@@ -189,13 +203,20 @@ internal class OverlayController : IDisposable
         // Render overlay via UpdateLayeredWindow (from background thread, supports color + text)
         try
         {
+            // Abbreviate long paths for small windows
+            string displayText = status == DropTargetDetector.DropTargetStatus.Success && !string.IsNullOrEmpty(displayPath)
+                ? AbbreviatePath(displayPath)
+                : displayPath;
+
             // Build user-friendly display text based on status
-        string overlayText = status switch
-        {
-            DropTargetDetector.DropTargetStatus.Success => LocalizationManager.T("DragOverlay_TargetPath", displayPath),
-            DropTargetDetector.DropTargetStatus.Warning => displayPath,
-            _ => LocalizationManager.T("DragOverlay_DragToFolder")
-        };
+        string overlayText = isOwnApp
+            ? "拖拽到文件夹以释放文件，或者在此松开鼠标以取消"
+            : status switch
+            {
+                DropTargetDetector.DropTargetStatus.Success => LocalizationManager.T("DragOverlay_TargetPath", displayText),
+                DropTargetDetector.DropTargetStatus.Warning => displayText,
+                _ => LocalizationManager.T("DragOverlay_DragToFolder")
+            };
 
         OverlayRender(_hwnd, _currentColor, overlayText, rect.Left, rect.Top, w, h, breathAlpha, _preview, status);
         }
@@ -221,11 +242,11 @@ internal class OverlayController : IDisposable
             if (cls == "CabinetWClass")
             {
                 // Get full folder path via ShellWindows COM (not just window title)
-                var (fullPath, _) = DropTargetDetector.TryGetExplorerPathFromShell(hWnd);
+                var (fullPath, shellStatus) = DropTargetDetector.TryGetExplorerPathFromShell(hWnd);
                 if (!string.IsNullOrEmpty(fullPath))
                     return (DropTargetDetector.DropTargetStatus.Success, cls, fullPath);
-                // Fallback: use window title
-                return (DropTargetDetector.DropTargetStatus.Success, cls, LocalizationManager.T("DragOverlay_Explorer"));
+                // Virtual folders (This PC, Quick Access) → return Warning status
+                return (shellStatus, cls, LocalizationManager.T("DragOverlay_Explorer"));
             }
             if (cls == "Progman" || cls == "WorkerW")
             {
@@ -246,11 +267,34 @@ internal class OverlayController : IDisposable
                     return (DropTargetDetector.DropTargetStatus.Warning, cls, LocalizationManager.T("DragOverlay_DialogUnknownPath", windowTitle));
                 return (DropTargetDetector.DropTargetStatus.Warning, cls, LocalizationManager.T("DragOverlay_NoPath"));
             }
-            if (cls.StartsWith("Avalonia-", StringComparison.Ordinal) || cls == "TMainBox")
-                return (DropTargetDetector.DropTargetStatus.None, cls, "");
             hWnd = NativeMethods.GetParent(hWnd);
         }
         return (DropTargetDetector.DropTargetStatus.None, "", "");
+    }
+
+    /// <summary>
+    /// Abbreviates a long filesystem path by keeping drive + first directory,
+    /// removing middle components, and showing the last 2 directories.
+    /// Ex: "C:\Users\Admin\Documents\Projects\MantisZip\src\Core"
+    ///   → "C:\Users\...\src\Core"
+    /// Threshold: paths with ≤5 components are returned unchanged.
+    /// </summary>
+    private static string AbbreviatePath(string path, int threshold = 5)
+    {
+        if (string.IsNullOrEmpty(path))
+            return path;
+
+        var parts = path.Split('\\');
+        if (parts.Length <= threshold)
+            return path;
+
+        // Keep: [drive], [first dir], "...", [second-to-last], [last]
+        return string.Join("\\",
+            parts[0],
+            parts[1],
+            "...",
+            parts[parts.Length - 2],
+            parts[parts.Length - 1]);
     }
 
     /// <summary>
@@ -351,15 +395,49 @@ internal class OverlayController : IDisposable
             // Main text — with single drop-shadow for readability
             if (!string.IsNullOrEmpty(text) && text.Length > 0)
             {
-                var hFont = GdiCreateFont(-36, 0, 0, 0, 700, 0, 0, 0, 1, 0, 0, 0, 0, "Segoe UI");
+                GdiSetBkMode(hdcMem, 1); // TRANSPARENT
+
+                const uint dtCenter = 0x0001;
+                const uint dtWordBreak = 0x0010;
+                const uint dtNoClip = 0x0100;
+                const uint dtCalcRect = 0x0400;
+                const uint dtEditControl = 0x2000;
+                // DT_EDITCONTROL enables character-level line breaking (edit-control style),
+                // so long words without spaces (file paths) wrap at character boundaries.
+                const uint dtFormat = dtCenter | dtWordBreak | dtNoClip | dtEditControl;
+
+                // Font size proportional to window dimensions (simple, predictable)
+                int baseDim = Math.Min(w, h);
+                int chosenSize = baseDim switch
+                {
+                    >= 500 => 36,
+                    >= 350 => 28,
+                    >= 250 => 24,
+                    >= 180 => 20,
+                    _ => 16
+                };
+
+                App.DebugLog($"[Overlay] Font: {chosenSize}px (w={w}, h={h}, baseDim={baseDim})");
+
+                int availableHeight = textBottom - textTop;
+
+                // Draw with chosen size
+                var hFont = GdiCreateFont(-chosenSize, 0, 0, 0, 700, 0, 0, 0, 1, 0, 0, 0, 0, "Segoe UI");
                 if (hFont != nint.Zero)
                 {
                     var oldFont = GdiSelectObject(hdcMem, hFont);
-                    GdiSetBkMode(hdcMem, 1); // TRANSPARENT
 
-                    // Shadow: single offset at (+2,+2) for a clean drop-shadow look.
-                    // Single shadow preserves GDI's native anti-aliasing (no overlapping AA edges).
-                    var baseRect = new NativeMethods.RECT { Left = 20, Top = textTop, Right = w - 20, Bottom = textBottom };
+                    // Measure again with chosen size for centering
+                    var measureRect = new NativeMethods.RECT { Left = 20, Top = 0, Right = w - 20, Bottom = 0 };
+                    GdiDrawText(hdcMem, text, text.Length, ref measureRect, dtFormat | dtCalcRect);
+                    int textHeight = measureRect.Bottom;
+
+                    int vOffset = Math.Max(0, (availableHeight - textHeight) / 2);
+                    int adjustedTop = textTop + vOffset;
+
+                    var baseRect = new NativeMethods.RECT { Left = 20, Top = adjustedTop, Right = w - 20, Bottom = textBottom };
+
+                    // Shadow: single offset at (+2,+2)
                     GdiSetTextColor(hdcMem, 0x00101010); // near-black
                     var shadowRect = new NativeMethods.RECT
                     {
@@ -368,11 +446,11 @@ internal class OverlayController : IDisposable
                         Right = baseRect.Right + 2,
                         Bottom = baseRect.Bottom + 2
                     };
-                    GdiDrawText(hdcMem, text, text.Length, ref shadowRect, 0x0125);
+                    GdiDrawText(hdcMem, text, text.Length, ref shadowRect, dtFormat);
 
                     // Main text: white
                     GdiSetTextColor(hdcMem, 0x00FFFFFF);
-                    GdiDrawText(hdcMem, text, text.Length, ref baseRect, 0x0125);
+                    GdiDrawText(hdcMem, text, text.Length, ref baseRect, dtFormat);
 
                     GdiSelectObject(hdcMem, oldFont);
                     GdiDeleteObject(hFont);

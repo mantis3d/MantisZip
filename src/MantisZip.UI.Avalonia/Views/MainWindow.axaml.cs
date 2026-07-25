@@ -321,7 +321,9 @@ public partial class MainWindow : Window
 
                 }
 
-                using var controller = new OverlayController(overlayHwnd);
+                var mainHwnd = this.TryGetPlatformHandle()?.Handle ?? nint.Zero;
+                App.DebugLog($"[MainWindow] Main HWND=0x{mainHwnd:X}");
+                using var controller = new OverlayController(overlayHwnd, mainHwnd);
                 controller.Start();
 
                 try

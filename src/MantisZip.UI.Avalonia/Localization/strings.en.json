@@ -824,5 +824,5 @@
   "DragOverlay_DialogUnknownPath": "Cannot identify path for\n{0}",
   "DragOverlay_DragToFolder": "Drag to a folder to extract",
   "DragOverlay_NoPath": "Cannot identify path",
-  "DragOverlay_Explorer": "File Explorer"
+  "DragOverlay_Explorer": "Cannot identify path for File Explorer"
 }

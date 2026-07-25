@@ -818,9 +818,9 @@
   "Compress_TabFilter": "文件过滤",
   "Extract_TabFilter": "文件过滤",
 
-  "DragOverlay_TargetPath": "释放到 {0}",
-  "DragOverlay_DialogUnknownPath": "识别不到此窗口路径\n{0}",
-  "DragOverlay_DragToFolder": "拖拽到文件夹以释放文件",
+  "DragOverlay_TargetPath": "解压到\n {0}",
+  "DragOverlay_DialogUnknownPath": "识别不到此窗口路径\n“{0}”\n请尝试拖拽到资源管理器窗口或桌面",
+  "DragOverlay_DragToFolder": "请尝试拖拽到资源管理器窗口或桌面",
   "DragOverlay_NoPath": "无法识别路径",
-  "DragOverlay_Explorer": "资源管理器"
+  "DragOverlay_Explorer": "识别不到资源管理器窗口路径\n请尝试拖拽到一个路径的窗口"
 }
