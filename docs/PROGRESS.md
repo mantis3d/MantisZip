@@ -21,6 +21,19 @@
 
 ### MantisZip.UI.Avalonia（主力版）
 
+**2026-07-25** — 预览树工具栏扩展：过滤显示切换 + 定位选中 + 过滤连接解压预览
+  - **ShowFilteredGhosts 切换按钮**：ResultTreeView 工具栏新增 ToggleButton，绑定 ShowFilteredGhosts，切换"全部显示（标灰）"/"仅显示匹配"
+  - **定位到选中按钮**：工具栏新增 LocateButton，多选支持，点击后折叠全部并展开所有选中项路径
+  - **TreeView 多选**：启用 `SelectionMode="Multiple"` + 选中状态同步控制按钮启用/禁用
+  - **ExtractSettings 过滤→预览**：连接 `FileFilterControl.FilterChanged` → 重建预览树 + 更新过滤统计
+  - **PreviewTreeNode 目录信息**：新增 `TotalDescendantSize`、`DirectoryInfoText`，目录节点显示"3 项 · 1.2 MB"
+  - **ResultPreviewService**：提取 `BuildExtractPreview` 增加 `FileFilterCriteria? filter` 参数，过滤后标记 `IsFilteredOut`
+  - **ExtractSettingsViewModel**：增加 `ShowFilteredGhosts`/`PreviewCompactMode` 属性
+  - **定位图标**：新增 `IconLocate`（瞄准）和 `IconFilter`（漏斗）PathIcon Geometry
+  - **本地化**：新增 `Preview_Result_Locate`、`Preview_Result_HideFiltered` keys
+  - 改动的文件：`ResultTreeView.axaml/.cs`、`PreviewTreeNode.cs`、`AppIcons.axaml`、`ResultPreviewService.cs`、`ExtractSettingsWindow.axaml.cs`、`ExtractSettingsViewModel.cs`、`MainWindow.axaml.cs`、`strings.*.json`
+  - 构建 0 errors, 12 pre-existing warnings
+
 **2026-07-24** — 拖拽覆盖层视觉优化：颜色/呼吸/文案 + 完整路径显示 + 本地化
   - **颜色**：成功状态绿色调亮（RGB 76,175,80 → 107,212,107），无目标灰色改为暖金（RGB 255,215,0）
   - **呼吸速度**：周期 4s → 2s（`Math.PI/20` → `Math.PI/10`）

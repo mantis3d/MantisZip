@@ -106,10 +106,12 @@ public static class ResultPreviewService
     /// </summary>
     /// <param name="sourcePaths">用户选择的源路径列表（文件或目录）。</param>
     /// <param name="rootName">根节点显示名称。</param>
+    /// <param name="filter">文件过滤条件，不为空且 IsActive 时对文件节点标记 IsFilteredOut。</param>
     /// <returns>根节点，包含完整的树结构。</returns>
     public static PreviewTreeNode BuildCompressPreview(
         IReadOnlyList<string> sourcePaths,
-        string? rootName = null)
+        string? rootName = null,
+        FileFilterCriteria? filter = null)
     {
         var root = new PreviewTreeNode
         {
@@ -123,19 +125,21 @@ public static class ResultPreviewService
             if (Directory.Exists(path))
             {
                 // Add directory and its contents
-                var dirNode = BuildDirectoryNode(path, path);
+                var dirNode = BuildDirectoryNode(path, path, filter);
                 root.Children.Add(dirNode);
             }
             else if (File.Exists(path))
             {
                 var fi = new FileInfo(path);
+                var isFiltered = filter != null && filter.IsActive && !FileFilterMatcher.IsMatch(filter, path);
                 var fileNode = new PreviewTreeNode
                 {
                     Name = fi.Name,
                     FullPath = fi.Name,
                     Size = fi.Length,
                     SizeDisplay = FormatUtil.FormatSize(fi.Length),
-                    IsExpanded = false
+                    IsExpanded = false,
+                    IsFilteredOut = isFiltered
                 };
                 root.Children.Add(fileNode);
             }
@@ -177,7 +181,7 @@ public static class ResultPreviewService
     /// <summary>
     /// 根据路径构建一个目录节点及其内容的预览树。
     /// </summary>
-    private static PreviewTreeNode BuildDirectoryNode(string rootPath, string currentPath)
+    private static PreviewTreeNode BuildDirectoryNode(string rootPath, string currentPath, FileFilterCriteria? filter = null)
     {
         var dirInfo = new DirectoryInfo(currentPath);
         var relativePath = currentPath.Length >= rootPath.Length
@@ -187,7 +191,9 @@ public static class ResultPreviewService
         var node = new PreviewTreeNode
         {
             Name = dirInfo.Name,
-            FullPath = relativePath,
+            // 当 relativePath 为空（rootPath == currentPath，顶级源目录）时，
+            // 用目录名代替空字符串，确保 DirectoryInfoText 能正确显示统计文本。
+            FullPath = string.IsNullOrEmpty(relativePath) ? dirInfo.Name : relativePath,
             IsExpanded = false
         };
 
@@ -196,7 +202,7 @@ public static class ResultPreviewService
             // Add subdirectories
             foreach (var subDir in dirInfo.GetDirectories())
             {
-                var childNode = BuildDirectoryNode(rootPath, subDir.FullName);
+                var childNode = BuildDirectoryNode(rootPath, subDir.FullName, filter);
                 node.Children.Add(childNode);
             }
 
@@ -207,13 +213,15 @@ public static class ResultPreviewService
                     ? file.Name
                     : $"{relativePath}/{file.Name}";
 
+                var isFiltered = filter != null && filter.IsActive && !FileFilterMatcher.IsMatch(filter, file.FullName);
                 var fileNode = new PreviewTreeNode
                 {
                     Name = file.Name,
                     FullPath = fileRelPath,
                     Size = file.Length,
                     SizeDisplay = FormatUtil.FormatSize(file.Length),
-                    IsExpanded = false
+                    IsExpanded = false,
+                    IsFilteredOut = isFiltered
                 };
                 node.Children.Add(fileNode);
             }

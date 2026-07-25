@@ -502,3 +502,131 @@ public static class ResultPreviewService
 - **精简模式的截断优先级**：深度截断优先于文件数截断（先「切掉」深层节点，再在同一层内做文件数折叠）
 - **点击省略号展开**：点击截断占位符 → 在当前位置「展开」完整内容。本质上是在当前节点下方插入被截断的子节点，移除占位符并重建渲染
 - **ShowFilteredGhosts 切换**：仅影响显示树的重建，不需要重新调用 Service。切换时 `ResultTreeView` 内部重新遍历原始树并应用过滤规则
+
+## 工具栏扩展
+
+### 1. 工具栏布局
+
+现有工具栏（第 0 行 Grid）：
+
+```
+[🔘 精简/完整] [+] [摘要文字]
+```
+
+改为：
+
+```
+[🔘 精简/完整] [+] [🔍 定位到选中] [👁 显示过滤项] [摘要文字]
+```
+
+### 2. ShowFilteredGhosts 切换按钮
+
+- 类型：`ToggleButton`，绑定 `ShowFilteredGhosts`（ResultTreeView 已有 `StyledProperty<bool>`，默认 `false`）
+- 行为：
+  - 选中（`true`）：不匹配过滤条件的节点保留在树中，`TextOpacity = 0.4` 灰色虚影
+  - 未选中（`false`，默认）：`ApplyDisplayRules()` 中移除 `IsFilteredOut` 节点
+- `IsChecked` 绑定到 `ShowFilteredGhosts`（`RelativeSource AncestorType=UserControl`）
+- 图标：`PathIcon` + `Data="{StaticResource ...}"`，需在 `AppIcons.axaml` 新增筛选/眼睛图标 Geometry
+
+### 3. "定位到选中项"按钮
+
+- 类型：普通 `Button`，放在 ExpandAll 按钮右侧
+- 交互：
+  - **无选中项** → `IsEnabled = false`（灰色禁用）
+  - **有选中项** → 按钮可用
+  - **点击后**：
+    1. 获取 `DisplayNodes` 的根节点，调用 `CollapseAll()`（`FolderNode` 内置方法，折叠除根以外所有节点）
+    2. 遍历 `TreeView.SelectedItems`，对每个 `PreviewTreeNode`：
+       - 取其 `FullPath`，按 `/` 分割
+       - 从显示树根节点开始，逐层遍历找到每层祖先
+       - 设每层祖先的 `IsExpanded = true`
+       - 如果路径中的某节点因截断不存在 → 展开到最近存在的祖先后停止（不报错）
+- 多选支持：同时展开所有选中项的完整路径
+- 树重建（过滤/紧凑度切换）后选中自然丢失，按钮自动恢复禁用
+
+### 4. 实现细节
+
+#### 4a. TreeView 启用多选
+
+```xml
+<TreeView x:Name="PreviewTreeView"
+          SelectionMode="Multiple"
+          ...>
+```
+
+```csharp
+// 监听选中变化更新按钮状态
+private void OnSelectionChanged(object? sender, SelectionChangedEventArgs e)
+{
+    LocateButton.IsEnabled = PreviewTreeView.SelectedItems.Count > 0;
+}
+```
+
+#### 4b. 展开到路径
+
+```csharp
+private void OnLocateClick()
+{
+    var displayRoot = DisplayNodes.FirstOrDefault();
+    if (displayRoot == null) return;
+    
+    // 1. 折叠所有（保留根展开）
+    displayRoot.CollapseAll(); 
+    displayRoot.IsExpanded = true;
+    
+    // 2. 对每个选中项展开其祖先路径
+    foreach (var item in PreviewTreeView.SelectedItems)
+    {
+        if (item is PreviewTreeNode pt && !string.IsNullOrEmpty(pt.FullPath))
+            ExpandAncestors(displayRoot, pt.FullPath);
+    }
+}
+
+private static void ExpandAncestors(PreviewTreeNode root, string fullPath)
+{
+    var parts = fullPath.Split('/', StringSplitOptions.RemoveEmptyEntries);
+    var current = root;
+    foreach (var part in parts)
+    {
+        var child = current.Children
+            .OfType<PreviewTreeNode>()
+            .FirstOrDefault(c => c.Name == part && !c.IsTruncated);
+        if (child == null) break; // 截断或路径不存在则停止
+        child.IsExpanded = true;
+        current = child;
+    }
+}
+```
+
+#### 4c. 新 i18n Keys
+
+```json
+// strings.zh-CN.json
+"Preview_Result_Locate": "定位到选中",
+"Preview_Result_ShowFiltered": "显示过滤项",
+"Preview_Result_HideFiltered": "隐藏过滤项",
+
+// strings.en.json
+"Preview_Result_Locate": "Locate",
+"Preview_Result_ShowFiltered": "Show filtered",
+"Preview_Result_HideFiltered": "Hide filtered",
+```
+
+### 5. 变更文件
+
+| 文件 | 变更 |
+|------|------|
+| `Controls/ResultTreeView.axaml` | 工具栏新增两个按钮 + TreeView SelectionMode="Multiple" |
+| `Controls/ResultTreeView.axaml.cs` | 定位按钮点击逻辑 + 选中状态同步 |
+| `Resources/Icons/AppIcons.axaml` | 新增 ShowFilteredGhosts/Locate 按钮的 PathIcon Geometry |
+
+## 实施步骤（更新）
+
+| 步骤 | 内容 | 文件 |
+|------|------|------|
+| 18 | ✅ ResultTreeView 工具栏新增 ShowFilteredGhosts ToggleButton + 绑定 | `Controls/ResultTreeView.axaml` |
+| 19 | ✅ TreeView 启用 SelectionMode="Multiple" + 选中状态同步 | `Controls/ResultTreeView.axaml` + `.cs` |
+| 20 | ✅ 定位按钮 + ExpandAncestors 展开逻辑 | `Controls/ResultTreeView.axaml` + `.cs` |
+| 21 | ✅ AppIcons.axaml 新增 PathIcon Geometry（筛选/定位图标） | `Resources/Icons/AppIcons.axaml` |
+| 22 | ✅ i18n key 写入两语言文件 | `strings.*.json` |
+| 23 | ✅ 构建验证 | `dotnet build` |

@@ -5,6 +5,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using MantisZip.Core;
 using MantisZip.Core.Abstractions;
+using MantisZip.Core.FileFilter;
 using MantisZip.Core.Utils;
 using MantisZip.UI.Avalonia;
 using MantisZip.UI.Avalonia.Dialogs;
@@ -401,9 +402,10 @@ public partial class CompressSettingsViewModel : ObservableObject
     }
 
     /// <summary>
-    /// 构建压缩预览树。由构造函数自动调用，也可在源文件变更后重新调用。
+    /// 构建压缩预览树。由构造函数自动调用，也可在源文件变更或过滤条件变化后重新调用。
     /// </summary>
-    public void BuildCompressPreview()
+    /// <param name="filter">文件过滤条件，不为空且 IsActive 时对文件节点标记 IsFilteredOut。</param>
+    public void BuildCompressPreview(FileFilterCriteria? filter = null)
     {
         if (SelectedPaths.Count == 0)
         {
@@ -413,7 +415,8 @@ public partial class CompressSettingsViewModel : ObservableObject
 
         PreviewRoot = ResultPreviewService.BuildCompressPreview(
             SelectedPaths.ToList(),
-            rootName: LocalizationManager.T("Compress_Title"));
+            rootName: LocalizationManager.T("Compress_Title"),
+            filter: filter);
     }
 
     partial void OnCompressionLevelChanged(int value)
