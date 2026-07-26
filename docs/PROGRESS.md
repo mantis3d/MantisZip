@@ -21,6 +21,13 @@
 
 ### MantisZip.UI.Avalonia（主力版）
 
+**2026-07-27** — 解压文件冲突对话框死锁修复：async 端到端管线
+  - 根因：同步 `Post + GetAwaiter().GetResult()` 桥接在 Avalonia 异步 `ShowDialog` 下死锁（Avalonia 无 WPF 的嵌套消息泵）
+  - 修复：`ArchiveOptions.ConflictResolverAsync` 异步回调 + `FileConflictHelper.ResolvePathAsync` + 引擎 `Task.Run(async () => ... await ResolvePathAsync(...)`
+  - 所有三层引擎（Zip/SevenZip/TarGz）`ExtractAsync` 改为 `Task.Run(async () =>`，`ResolvePath` → `await ResolvePathAsync`
+  - `MainWindowViewModel.ShowExtractFileConflictDialogAsync` 使用 `await Dispatcher.UIThread.InvokeAsync` 显示对话框
+  - 构建 0 errors，Core 236/236 + Avalonia 35/37 测试通过
+
 **2026-07-24** — 拖拽覆盖层视觉优化：颜色/呼吸/文案 + 完整路径显示 + 本地化
   - **颜色**：成功状态绿色调亮（RGB 76,175,80 → 107,212,107），无目标灰色改为暖金（RGB 255,215,0）
   - **呼吸速度**：周期 4s → 2s（`Math.PI/20` → `Math.PI/10`）
@@ -629,6 +636,17 @@
 ### 共享层（Core / ShellExt / 构建）
 
 这些变更影响两项目共用代码，按时间从新到旧排列。
+
+#### v0.4.5 (2026-07-27) 引擎异步冲突解析 — Task.Run(async) + await ResolvePathAsync
+  - ZipEngine/SevenZipEngine/TarGzEngine 的 ExtractAsync/ExtractEntriesAsync Task.Run 改为 async() => await ResolvePathAsync
+  - 涉及文件：`ZipEngine.cs`、`SevenZipEngine.cs`、`TarGzEngine.cs`
+  - 构建 0 errors，Core 236/236 测试通过
+
+#### v0.4.5 (2026-07-27) 异步冲突解析 API — ConflictResolverAsync + ResolvePathAsync
+  - `ArchiveOptions` 新增 `ConflictResolverAsync`（`Func<FileConflictInfo, Task<FileConflictAction>>?`）
+  - `FileConflictHelper` 新增 `ResolvePathAsync`，优先使用异步回调，退回到同步 ResolvePath
+  - 涉及文件：`ArchiveEngine.cs`、`FileConflictHelper.cs`
+  - 构建 0 errors，Core 236/236 测试通过
 
 #### v0.4.5 (2026-07-20) Avalonia Shell/COM 集成—CopyShellExtComhost MSBuild 目标
   - MantisZip.UI.Avalonia.csproj 添加 CopyShellExtComhost 构建目标（AfterTargets Build/Publish）

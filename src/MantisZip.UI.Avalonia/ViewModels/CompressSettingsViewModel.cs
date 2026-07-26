@@ -5,6 +5,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using MantisZip.Core;
 using MantisZip.Core.Abstractions;
+using MantisZip.Core.FileFilter;
 using MantisZip.Core.Utils;
 using MantisZip.UI.Avalonia;
 using MantisZip.UI.Avalonia.Dialogs;
@@ -256,6 +257,9 @@ public partial class CompressSettingsViewModel : ObservableObject
     /// <summary>是否显示过滤项。</summary>
     [ObservableProperty]
     private bool _showFilteredGhosts;
+
+    /// <summary>文件过滤条件（由 View 在对话框关闭时从 FileFilterEditor 获取并设置）。</summary>
+    public FileFilterCriteria? FileFilter { get; set; }
 
     /// <summary>密码与确认密码是否匹配。</summary>
     public bool PasswordsMatch => Password == ConfirmPassword;
