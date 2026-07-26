@@ -222,7 +222,7 @@ public class ZipEngine : IArchiveEngine
         CoreLog.Info($"ExtractAsync: {archivePath} -> {destinationPath}, password={(password != null ? "***" : "null")}");
         var sw = Stopwatch.StartNew();
 
-        var result = await Task.Run(() =>
+        var result = await Task.Run(async () =>
         {
             using var archive = OpenArchiveWithEncodingFallback(archivePath, password);
 
@@ -265,7 +265,7 @@ public class ZipEngine : IArchiveEngine
                 }
 
                 var entryModified = entry.LastModifiedTime ?? DateTime.MinValue;
-                var resolvedPath = FileConflictHelper.ResolvePath(outputPath, options, entryModified, entry.Size);
+                var resolvedPath = await FileConflictHelper.ResolvePathAsync(outputPath, options, entryModified, entry.Size);
                 if (resolvedPath == null)
                 {
                     processedBytes += entry.Size;
@@ -353,7 +353,7 @@ public class ZipEngine : IArchiveEngine
         CoreLog.Info($"ExtractEntriesAsync: {archivePath}, {entryKeys.Count} entries -> {destinationPath}");
         var sw = Stopwatch.StartNew();
 
-        await Task.Run(() =>
+        await Task.Run(async () =>
         {
             using var archive = OpenArchiveWithEncodingFallback(archivePath, password);
             var entries = archive.Entries.ToList();
@@ -385,7 +385,7 @@ public class ZipEngine : IArchiveEngine
                     Directory.CreateDirectory(outputDir);
 
                 var entryModified = entry.LastModifiedTime ?? DateTime.MinValue;
-                var resolvedPath = FileConflictHelper.ResolvePath(outputPath, options, entryModified, entry.Size);
+                var resolvedPath = await FileConflictHelper.ResolvePathAsync(outputPath, options, entryModified, entry.Size);
                 if (resolvedPath == null)
                 {
                     processedBytes += entry.Size;
