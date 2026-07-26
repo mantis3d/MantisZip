@@ -4,6 +4,7 @@ using Avalonia.Input;
 using Avalonia.Input.Platform;
 using Avalonia.Interactivity;
 using Avalonia.Platform.Storage;
+using Avalonia.Threading;
 using MantisZip.Core.Abstractions;
 using MantisZip.Core.Utils;
 using MantisZip.UI.Avalonia.Dialogs;
@@ -13,6 +14,7 @@ using MantisZip.Core;
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.InteropServices;
+using System.Threading;
 using Avalonia.Layout;
 using Avalonia.Media;
 using MantisZip.UI.Avalonia.Services;
@@ -70,6 +72,11 @@ public partial class MainWindow : Window
             var result = await dialog.ShowDialog<bool>(this);
             if (result)
             {
+                // 复制 SelectedPaths：对话框有自己的 ViewModel，用户添加的文件仅存在 dialog.ViewModel 中
+                cvm.SelectedPaths.Clear();
+                foreach (var p in dialog.ViewModel.SelectedPaths)
+                    cvm.SelectedPaths.Add(p);
+
                 cvm.DefaultFormat = dialog.ViewModel.DefaultFormat;
                 cvm.CompressionLevel = dialog.ViewModel.CompressionLevel;
                 cvm.OutputMode = dialog.ViewModel.OutputMode;
@@ -78,6 +85,7 @@ public partial class MainWindow : Window
                 cvm.Encrypt = dialog.ViewModel.Encrypt;
                 cvm.Comment = dialog.ViewModel.Comment;
                 cvm.CommentDistribution = dialog.ViewModel.CommentDistribution;
+                cvm.FileFilter = dialog.GetFilter();
             }
             return result;
         };
@@ -178,6 +186,74 @@ public partial class MainWindow : Window
             var dialog = new CommentDialog(existingComment);
             var result = await dialog.ShowDialog<bool>(this);
             return result ? dialog.Comment : null;
+        };
+
+        // ════════════════════════════════════════════════
+        //  压缩/解压冲突对话框回调（从后台线程调用）
+        // ════════════════════════════════════════════════
+
+        vm.ShowCompressConflictDialog = info =>
+        {
+            var tcs = new TaskCompletionSource<(Core.Abstractions.CompressConflictAction Action, string? CustomName, bool ApplyToAll)>();
+
+            Dispatcher.UIThread.Post(async () =>
+            {
+                try
+                {
+                    var dlg = new CompressConflictDialog(
+                        info.OutputPath,
+                        info.SuggestedName,
+                        info.CanAdd);
+                    await dlg.ShowDialog(this);
+
+                    var dlgAction = dlg.ResultAction;
+                    Core.Abstractions.CompressConflictAction resultAction;
+                    string? customName = null;
+
+                    switch (dlgAction)
+                    {
+                        case Dialogs.CompressConflictAction.Overwrite:
+                            resultAction = Core.Abstractions.CompressConflictAction.Overwrite;
+                            break;
+                        case Dialogs.CompressConflictAction.Add:
+                            resultAction = Core.Abstractions.CompressConflictAction.Add;
+                            break;
+                        case Dialogs.CompressConflictAction.Rename:
+                            resultAction = Core.Abstractions.CompressConflictAction.Rename;
+                            customName = dlg.CustomName;
+                            break;
+                        case Dialogs.CompressConflictAction.Skip:
+                        case Dialogs.CompressConflictAction.Cancel:
+                        default:
+                            resultAction = Core.Abstractions.CompressConflictAction.Cancel;
+                            break;
+                    }
+
+                    tcs.TrySetResult((resultAction, customName, dlg.ApplyToAll));
+                }
+                catch (Exception ex)
+                {
+                    tcs.TrySetException(ex);
+                }
+            });
+
+            return tcs.Task.GetAwaiter().GetResult();
+        };
+
+        vm.ShowExtractFileConflictDialogAsync = async info =>
+        {
+            return await Dispatcher.UIThread.InvokeAsync(async () =>
+            {
+                var dlg = new ConflictDialog(info);
+                await dlg.ShowDialog(this);
+
+                if (dlg.ResultAction == FileConflictAction.Rename && !string.IsNullOrEmpty(dlg.CustomName))
+                {
+                    info.CustomName = dlg.CustomName;
+                }
+
+                return (dlg.ResultAction, dlg.ApplyToAll);
+            });
         };
 
         // ── Wire up select-all / invert-selection callbacks ──

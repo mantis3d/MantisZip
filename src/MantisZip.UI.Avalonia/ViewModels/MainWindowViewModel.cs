@@ -5,6 +5,7 @@ using Avalonia.Markup.Xaml.Styling;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using MantisZip.Core.Abstractions;
+using MantisZip.Core.FileFilter;
 using MantisZip.Core.Services;
 using MantisZip.Core.Utils;
 using MantisZip.UI.Avalonia.Models;
@@ -65,6 +66,27 @@ public partial class MainWindowViewModel : ObservableObject
     /// 压缩设置对话框回调。传入 CompressSettingsViewModel，返回 true=确认，false=取消。
     /// </summary>
     public Func<CompressSettingsViewModel, Task<bool?>>? ShowCompressSettingsDialog { get; set; }
+
+    /// <summary>
+    /// 压缩冲突对话框回调。从后台线程调用，返回用户选择的冲突处理方式。
+    /// 实现需通过 <see cref="Avalonia.Threading.Dispatcher.UIThread"/> 切换到 UI 线程显示对话框，
+    /// 并阻塞等待用户响应。
+    /// 返回值为 (处理方式, 用户自定义文件名, 是否应用到全部)。
+    /// </summary>
+    public Func<CompressConflictInfo, (Core.Abstractions.CompressConflictAction Action, string? CustomName, bool ApplyToAll)>? ShowCompressConflictDialog { get; set; }
+
+    /// <summary>
+    /// 解压文件冲突对话框回调。从解压引擎的后台线程调用，
+    /// 返回用户对单个文件冲突的处理方式，以及是否应用到全部。
+    /// 实现需切换到 UI 线程显示对话框。
+    /// </summary>
+    public Func<FileConflictInfo, (FileConflictAction Action, bool ApplyToAll)>? ShowExtractFileConflictDialog { get; set; }
+
+    /// <summary>
+    /// 异步版的文件冲突回调。返回用户对冲突的处理方式和是否应用到全部。
+    /// 此回调可在后台线程中 await，适用于 Avalonia 的异步对话框模式。
+    /// </summary>
+    public Func<FileConflictInfo, Task<(FileConflictAction Action, bool ApplyToAll)>>? ShowExtractFileConflictDialogAsync { get; set; }
 
     /// <summary>
     /// 密码管理器窗口回调。
@@ -1356,18 +1378,76 @@ public partial class MainWindowViewModel : ObservableObject
 
         _sessionPasswords.TryGetValue(CurrentArchivePath, out var password);
 
+        var options = CreateExtractOptions(vm.ConflictAction);
+
         var completed = await RunWithProgress(
             LocalizationManager.T("Status_Extracting"),
             async (progress, ct) =>
             {
                 await new ExtractService().ExtractAsync(
-                    CurrentArchivePath, dest, password, progress, ct);
+                    CurrentArchivePath, dest, password, progress, ct, options);
             });
 
         if (completed)
         {
             StatusMessage = LocalizationManager.T("Status_ExtractComplete");
         }
+    }
+
+    /// <summary>
+    /// 将 ExtractSettingsViewModel 的冲突策略字符串映射到 <see cref="FileConflictAction"/>。
+    /// </summary>
+    private static FileConflictAction MapConflictActionString(string value)
+    {
+        return value.ToLowerInvariant() switch
+        {
+            "ask" => FileConflictAction.Ask,
+            "rename" => FileConflictAction.Rename,
+            "skip" => FileConflictAction.Skip,
+            "overwriteifolder" or "overwrite_if_older" => FileConflictAction.OverwriteIfOlder,
+            "overwriteifsmaller" or "overwrite_if_smaller" => FileConflictAction.OverwriteIfSmaller,
+            _ => FileConflictAction.Overwrite,
+        };
+    }
+
+    /// <summary>
+    /// 集中创建解压选项，统一处理冲突回调 + ApplyToAll 记忆。
+    /// 对标 WPF 的 App.CreateExtractOptions()。
+    /// </summary>
+    /// <param name="conflictAction">ExtractSettingsViewModel.ConflictAction 字符串值。</param>
+    /// <returns>ArchiveOptions，Overwrite 且无 resolver 时返回 null。</returns>
+    private ArchiveOptions? CreateExtractOptions(string conflictAction)
+    {
+        var action = MapConflictActionString(conflictAction);
+        if (action == FileConflictAction.Overwrite)
+            return null; // 默认行为无需传 options
+
+        if (action != FileConflictAction.Ask || ShowExtractFileConflictDialogAsync == null)
+            return new ArchiveOptions { ConflictAction = action };
+
+        // Ask 模式：使用异步回调弹窗 + ApplyToAll 记忆
+        bool applyToAll = false;
+        FileConflictAction? chosenAction = null;
+
+        return new ArchiveOptions
+        {
+            ConflictAction = FileConflictAction.Ask,
+            ConflictResolverAsync = async info =>
+            {
+                if (applyToAll && chosenAction.HasValue)
+                    return chosenAction.Value;
+
+                var (resultAction, applyAll) = await ShowExtractFileConflictDialogAsync!(info);
+
+                if (applyAll)
+                {
+                    applyToAll = true;
+                    chosenAction = resultAction;
+                }
+
+                return resultAction;
+            },
+        };
     }
 
     [RelayCommand]
@@ -1423,18 +1503,112 @@ public partial class MainWindowViewModel : ObservableObject
     [RelayCommand]
     private async Task NewArchive()
     {
-        if (ShowCompressSettingsDialog == null) return;
+        if (ShowCompressSettingsDialog == null || RunWithProgress == null) return;
         var vm = new CompressSettingsViewModel(Array.Empty<string>());
-        await ShowCompressSettingsDialog(vm);
+        var result = await ShowCompressSettingsDialog(vm);
+        if (result != true || vm.SelectedPaths.Count == 0) return;
+
+        await ExecuteCompressFromSettings(vm);
     }
 
     [RelayCommand]
     private async Task CompressSelected()
     {
-        if (ShowCompressSettingsDialog == null) return;
+        if (ShowCompressSettingsDialog == null || RunWithProgress == null) return;
         // Opens compress dialog with empty list — user picks files from filesystem in dialog
         var vm = new CompressSettingsViewModel(Array.Empty<string>());
-        await ShowCompressSettingsDialog(vm);
+        var result = await ShowCompressSettingsDialog(vm);
+        if (result != true || vm.SelectedPaths.Count == 0) return;
+
+        await ExecuteCompressFromSettings(vm);
+    }
+
+    /// <summary>
+    /// 从 CompressSettingsViewModel 读取设置，构建 CompressRequest 并执行压缩。
+    /// </summary>
+    private async Task ExecuteCompressFromSettings(CompressSettingsViewModel vm)
+    {
+        // Apply file filter (handles directory recursion, matches per-file)
+        var sources = vm.FileFilter?.IsActive == true
+            ? FileFilterHelper.ApplyFilter(vm.SelectedPaths.ToArray(), vm.FileFilter).ToList()
+            : vm.SelectedPaths.ToList();
+        if (sources.Count == 0) return;
+
+        var settings = AppSettings.Load();
+        var request = new CompressRequest
+        {
+            SourcePaths = sources,
+            Mode = vm.OutputMode,
+            Format = vm.DefaultFormat,
+            CompressionLevel = vm.CompressionLevel,
+            Password = vm.Encrypt ? vm.Password : null,
+            Encrypt = vm.Encrypt,
+            Comment = vm.Comment,
+            CommentDistribution = vm.CommentDistribution,
+            OutputPath = vm.OutputMode switch
+            {
+                CompressOutputMode.Manual => vm.OutputPath,
+                CompressOutputMode.Separate => null,
+                CompressOutputMode.Combined => vm.OutputPath,
+                _ => null,
+            },
+            SplitSize = vm.SplitSize,
+            PreserveDirectoryRoot = settings.PreserveDirectoryRoot,
+            KeepOriginalExtension = settings.KeepOriginalExtension,
+            FileNameEncoding = settings.ZipEncoding,
+            ZipCompressionMethod = settings.ZipCompressionMethod,
+            ZipEncryptionMethod = settings.ZipEncryptionMethod,
+            SevenZipCompressionMethod = settings.SevenZipCompressionMethod,
+            SevenZipSolid = settings.SevenZipSolid,
+            SevenZipSolidBlockSize = settings.SevenZipSolidBlockSize,
+            SevenZipDictionarySize = settings.SevenZipDictionarySize,
+            SevenZipNumFastBytes = settings.SevenZipNumFastBytes,
+            SevenZipMatchFinder = settings.SevenZipMatchFinder,
+            SevenZipEncryptHeaders = settings.SevenZipEncryptHeaders,
+        };
+
+        if (RunWithProgress == null) return;
+        var completed = await RunWithProgress(
+            LocalizationManager.T("Status_Compressing"),
+            async (progress, ct) =>
+            {
+                var svc = new AvaloniaCompressService();
+                bool applyToAll = false;
+                Core.Abstractions.CompressConflictAction? chosenAction = null;
+
+                await svc.CompressAsync(request, progress, ct,
+                    conflictResolver: info =>
+                    {
+                        // 已勾选"应用到全部" → 直接返回记忆的选择
+                        if (applyToAll && chosenAction.HasValue)
+                            return new CompressConflictResolution(chosenAction.Value, null);
+
+                        if (ShowCompressConflictDialog != null)
+                        {
+                            var (action, customName, applyAll) = ShowCompressConflictDialog(info);
+                            if (applyAll)
+                            {
+                                applyToAll = true;
+                                chosenAction = action;
+                            }
+
+                            return action switch
+                            {
+                                Core.Abstractions.CompressConflictAction.Cancel
+                                    => new CompressConflictResolution(
+                                        Core.Abstractions.CompressConflictAction.Cancel, null),
+                                _ => new CompressConflictResolution(action, customName)
+                            };
+                        }
+
+                        // Fallback: silently overwrite if no dialog callback
+                        return new CompressConflictResolution(
+                            Core.Abstractions.CompressConflictAction.Overwrite, null);
+                    });
+            });
+
+        if (completed)
+            StatusMessage = LocalizationManager.T("Status_Compressed");
     }
 
     [RelayCommand]
