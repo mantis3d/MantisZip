@@ -4,10 +4,12 @@
         x:Class="MantisZip.UI.Avalonia.Views.SettingsWindow"
         x:DataType="vm:SettingsWindowViewModel"
         Title="{Binding WindowTitle}"
-        Width="720"
-        Height="540"
+        Width="820"
+        Height="640"
+        MinWidth="600"
+        MinHeight="400"
         WindowStartupLocation="CenterScreen"
-        CanResize="False"
+        CanResize="True"
         Foreground="{DynamicResource ThemeTextPrimaryBrush}"
         Background="{DynamicResource ThemeWindowBgBrush}">
 
