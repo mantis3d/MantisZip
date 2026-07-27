@@ -55,6 +55,32 @@
   - 改动的文件（修改）：`FieldConfig.cs`（+Row）、`PreviewViewModel.cs`、`PreviewPanel.axaml`、`SettingsWindow.axaml`、`SettingsWindowViewModel.cs`、`MetadataRenderEngine.cs`、`strings.zh-CN.json`、`strings.en.json`、`MainWindow.axaml.cs`
   - 废弃/删除：`MetadataPanelSettingsDialog.axaml/.cs`
   - 构建 0 errors
+**2026-07-27** — 密码子系统全面补齐：ZIP 加密检测/PasswordManager 集成/密码对话框升级
+  - 根因：`ArchiveService.LoadArchiveAsync` 在 `ListEntriesAsync` 成功后从不检查 `items.Any(i => i.IsEncrypted)`，加密 ZIP 包直接返回 Success，不弹出密码窗
+  - 修复：
+    - `ArchiveService.LoadArchiveAsync` 添加 `IsEncrypted` 检测，无密码时返回 `PasswordRequired`
+    - 创建 `PasswordService`（QuickVerifyPassword/TryMatchPassword/TrySavePassword/BoundedWriteStream）
+    - `MainWindowViewModel` 集成完整密码流：PasswordManager 自动匹配 → 对话框循环 → QuickVerify 验证 → 永久保存
+    - `PasswordDialog` 升级：已保存密码下拉列表、描述/匹配规则编辑、永久保存选项
+    - CLI 解压（`TryExtractArchiveAsync`/`TryExtractSmartAsync`）自动读取已保存密码
+    - 状态栏增加密码状态图标（🔒/🔓）+ 文字
+    - 补充 8 条本地化字符串（中/英）
+  - 涉及 11 个文件，Avalonia 构建 0 errors，Core 236/236 测试通过
+
+**2026-07-27** — 压缩文件冲突对话框死锁修复：CompressConflictResolver async 化
+  - 根因：Core 的 `ResolveConflict()` 在任何 `await` 之前同步执行 → 若从 UI 线程调用则死锁
+  - 修复：`CompressConflictResolver` 从同步委托改为异步（返回 `Task<CompressConflictResolution>`）
+  - `Core.CompressService.ResolveConflict` → `ResolveConflictAsync`，`await` 回调
+  - Avalonia View：移除 `Dispatcher.UIThread.Post` + `TaskCompletionSource` + `.GetAwaiter().GetResult()` 死锁桥接，改用 `await Dispatcher.UIThread.InvokeAsync`
+  - WPF 版同步 `Dispatcher.Invoke` 不变（已在 `Task.Run` 后台线程中运行）
+  - 涉及 8 个文件，构建 0 errors，Core 236/236 测试通过
+
+**2026-07-27** — 解压文件冲突对话框死锁修复：async 端到端管线
+  - 根因：同步 `Post + GetAwaiter().GetResult()` 桥接在 Avalonia 异步 `ShowDialog` 下死锁（Avalonia 无 WPF 的嵌套消息泵）
+  - 修复：`ArchiveOptions.ConflictResolverAsync` 异步回调 + `FileConflictHelper.ResolvePathAsync` + 引擎 `Task.Run(async () => ... await ResolvePathAsync(...)`
+  - 所有三层引擎（Zip/SevenZip/TarGz）`ExtractAsync` 改为 `Task.Run(async () =>`，`ResolvePath` → `await ResolvePathAsync`
+  - `MainWindowViewModel.ShowExtractFileConflictDialogAsync` 使用 `await Dispatcher.UIThread.InvokeAsync` 显示对话框
+  - 构建 0 errors，Core 236/236 + Avalonia 35/37 测试通过
 
 **2026-07-24** — 拖拽覆盖层视觉优化：颜色/呼吸/文案 + 完整路径显示 + 本地化
   - **颜色**：成功状态绿色调亮（RGB 76,175,80 → 107,212,107），无目标灰色改为暖金（RGB 255,215,0）
@@ -664,6 +690,23 @@
 ### 共享层（Core / ShellExt / 构建）
 
 这些变更影响两项目共用代码，按时间从新到旧排列。
+
+#### v0.4.5 (2026-07-27) CompressConflictResolver async 化 — ResolveConflictAsync
+  - `CompressConflictResolver` 从同步委托改为异步（`Task<CompressConflictResolution>`）
+  - `CompressService.ResolveConflict` → `ResolveConflictAsync`，所有调用处 `await`
+  - 涉及文件：`CompressConflict.cs`、`CompressService.cs`
+  - 构建 0 errors，Core 236/236 测试通过
+
+#### v0.4.5 (2026-07-27) 引擎异步冲突解析 — Task.Run(async) + await ResolvePathAsync
+  - ZipEngine/SevenZipEngine/TarGzEngine 的 ExtractAsync/ExtractEntriesAsync Task.Run 改为 async() => await ResolvePathAsync
+  - 涉及文件：`ZipEngine.cs`、`SevenZipEngine.cs`、`TarGzEngine.cs`
+  - 构建 0 errors，Core 236/236 测试通过
+
+#### v0.4.5 (2026-07-27) 异步冲突解析 API — ConflictResolverAsync + ResolvePathAsync
+  - `ArchiveOptions` 新增 `ConflictResolverAsync`（`Func<FileConflictInfo, Task<FileConflictAction>>?`）
+  - `FileConflictHelper` 新增 `ResolvePathAsync`，优先使用异步回调，退回到同步 ResolvePath
+  - 涉及文件：`ArchiveEngine.cs`、`FileConflictHelper.cs`
+  - 构建 0 errors，Core 236/236 测试通过
 
 #### v0.4.5 (2026-07-20) Avalonia Shell/COM 集成—CopyShellExtComhost MSBuild 目标
   - MantisZip.UI.Avalonia.csproj 添加 CopyShellExtComhost 构建目标（AfterTargets Build/Publish）

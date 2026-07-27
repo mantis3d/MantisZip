@@ -315,7 +315,7 @@ public class SevenZipEngine : IArchiveEngine
 
         EnsureLibraryPath();
 
-        var result = await Task.Run(() =>
+        var result = await Task.Run(async () =>
         {
             using var extractor = string.IsNullOrEmpty(password)
                 ? new SharpSevenZipExtractor(archivePath)
@@ -357,7 +357,7 @@ public class SevenZipEngine : IArchiveEngine
                 if (!string.IsNullOrEmpty(outDir) && !Directory.Exists(outDir))
                     Directory.CreateDirectory(outDir);
 
-                var resolvedPath = FileConflictHelper.ResolvePath(outputPath, options, entry.LastWriteTime, (long)entry.Size);
+                var resolvedPath = await FileConflictHelper.ResolvePathAsync(outputPath, options, entry.LastWriteTime, (long)entry.Size);
                 if (resolvedPath == null)
                 {
                     // 跳过（跳过/覆盖旧/覆盖小）
@@ -650,7 +650,7 @@ public class SevenZipEngine : IArchiveEngine
 
         EnsureLibraryPath();
 
-        await Task.Run(() =>
+        await Task.Run(async () =>
         {
             using var extractor = string.IsNullOrEmpty(password)
                 ? new SharpSevenZipExtractor(archivePath)
@@ -686,7 +686,7 @@ public class SevenZipEngine : IArchiveEngine
                 if (!string.IsNullOrEmpty(outDir) && !Directory.Exists(outDir))
                     Directory.CreateDirectory(outDir);
 
-                var resolvedPath = FileConflictHelper.ResolvePath(outputPath, options, entry.LastWriteTime, (long)entry.Size);
+                var resolvedPath = await FileConflictHelper.ResolvePathAsync(outputPath, options, entry.LastWriteTime, (long)entry.Size);
                 if (resolvedPath == null)
                     continue;
 

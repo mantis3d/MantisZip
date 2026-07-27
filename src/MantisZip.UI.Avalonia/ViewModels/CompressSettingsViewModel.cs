@@ -258,6 +258,9 @@ public partial class CompressSettingsViewModel : ObservableObject
     [ObservableProperty]
     private bool _showFilteredGhosts;
 
+    /// <summary>文件过滤条件（由 View 在对话框关闭时从 FileFilterEditor 获取并设置）。</summary>
+    public FileFilterCriteria? FileFilter { get; set; }
+
     /// <summary>密码与确认密码是否匹配。</summary>
     public bool PasswordsMatch => Password == ConfirmPassword;
 

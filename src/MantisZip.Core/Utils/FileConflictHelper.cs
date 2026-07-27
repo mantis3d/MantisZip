@@ -1,5 +1,7 @@
+using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Threading.Tasks;
 using MantisZip.Core.Abstractions;
 
 namespace MantisZip.Core.Utils;
@@ -55,6 +57,68 @@ public static class FileConflictHelper
         }
 
         return ResolveByAction(outputPath, action, entryModified, entrySize);
+    }
+
+    /// <summary>
+    /// 异步版的 <see cref="ResolvePath(string, ArchiveOptions?, DateTime?, long?)"/>。
+    /// 遇 Ask 时优先调用 <see cref="ArchiveOptions.ConflictResolverAsync"/>，其次退回到 <see cref="ArchiveOptions.ConflictResolver"/>。
+    /// 此方法可在后台线程中使用 <c>await</c> 等待异步回调完成（如 UI 对话框）。
+    /// </summary>
+    public static async Task<string?> ResolvePathAsync(string outputPath, ArchiveOptions? options, DateTime? entryModified = null, long? entrySize = null)
+    {
+        if (!File.Exists(outputPath))
+            return outputPath;
+
+        var action = options?.ConflictAction ?? FileConflictAction.Overwrite;
+
+        // Ask → 优先异步回调，其次退回到同步回调
+        if (action == FileConflictAction.Ask && options != null)
+        {
+            if (options.ConflictResolverAsync != null)
+            {
+                var info = BuildConflictInfo(outputPath, entryModified, entrySize);
+                action = await options.ConflictResolverAsync(info);
+
+                if (action == FileConflictAction.Rename && !string.IsNullOrWhiteSpace(info.CustomName))
+                {
+                    var dir = Path.GetDirectoryName(outputPath) ?? ".";
+                    return Path.Combine(dir, SanitizeFileName(info.CustomName));
+                }
+            }
+            else if (options.ConflictResolver != null)
+            {
+                // 退回到同步回调
+                return ResolvePath(outputPath, options, entryModified, entrySize);
+            }
+        }
+
+        return ResolveByAction(outputPath, action, entryModified, entrySize);
+    }
+
+    /// <summary>
+    /// 构建 FileConflictInfo，抽离公共逻辑。
+    /// </summary>
+    private static FileConflictInfo BuildConflictInfo(string outputPath, DateTime? entryModified, long? entrySize)
+    {
+        var info = new FileConflictInfo
+        {
+            FilePath = outputPath,
+            EntrySize = entrySize,
+            EntryModified = entryModified,
+        };
+        try
+        {
+            var fi = new FileInfo(outputPath);
+            if (fi.Exists)
+            {
+                info.ExistingSize = fi.Length;
+                info.ExistingModified = fi.LastWriteTime;
+            }
+        }
+        catch (Exception fiEx) { CoreLog.Info($"FileConflictHelper: failed to get file info for {outputPath}: {fiEx.Message}"); }
+
+        info.SuggestedName = Path.GetFileName(GetUniquePath(outputPath));
+        return info;
     }
 
     /// <summary>

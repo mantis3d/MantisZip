@@ -20,11 +20,14 @@ public class AvaloniaCompressService
     /// <param name="request">Compression request specifying source paths, format, options.</param>
     /// <param name="progress">Optional progress reporter for <see cref="ArchiveProgress"/> updates.</param>
     /// <param name="ct">Cancellation token.</param>
+    /// <param name="conflictResolver">Optional callback for resolving file conflicts during compression.
+    /// When null, existing files are silently overwritten.</param>
     /// <returns>A <see cref="CompressResult"/> with success/failure/skip counts.</returns>
     public async Task<CompressResult> CompressAsync(
         CompressRequest request,
         IProgress<ArchiveProgress>? progress = null,
-        CancellationToken ct = default)
+        CancellationToken ct = default,
+        CompressConflictResolver? conflictResolver = null)
     {
         ArgumentNullException.ThrowIfNull(request);
 
@@ -32,7 +35,7 @@ public class AvaloniaCompressService
         var innerProgress = progress ?? new Progress<ArchiveProgress>();
 
         return await MantisZip.Core.Services.CompressService.CompressAsync(
-            request, null, innerProgress, ct);
+            request, conflictResolver, innerProgress, ct);
     }
 
     /// <summary>

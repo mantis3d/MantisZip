@@ -520,7 +520,7 @@ public partial class CompressSettingsWindow : Window
 
             var result = await CompressService.CompressAsync(
                 request,
-                conflictResolver: info =>
+                conflictResolver: async info =>
                 {
                     // 已勾选"应用到全部" → 直接返回记忆的选择
                     if (applyToAll && chosenAction.HasValue)
@@ -655,7 +655,7 @@ public partial class CompressSettingsWindow : Window
 
             var result = await CompressService.CompressAsync(
                 request,
-                conflictResolver: info =>
+                conflictResolver: async info =>
                 {
                     // 已勾选"应用到全部" → 直接返回记忆的选择
                     if (applyToAll && chosenAction.HasValue)
@@ -814,7 +814,7 @@ public partial class CompressSettingsWindow : Window
 
             var result = await CompressService.CompressAsync(
                 request,
-                conflictResolver: info =>
+                conflictResolver: async info =>
                 {
                     // 已勾选"应用到全部" → 直接返回记忆的选择
                     if (applyToAll && chosenAction.HasValue)

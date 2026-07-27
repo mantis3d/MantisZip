@@ -5,6 +5,7 @@ using Avalonia.Markup.Xaml.Styling;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using MantisZip.Core.Abstractions;
+using MantisZip.Core.FileFilter;
 using MantisZip.Core.Services;
 using MantisZip.Core.Utils;
 using MantisZip.UI.Avalonia.Models;
@@ -52,9 +53,9 @@ public partial class MainWindowViewModel : ObservableObject
     public Func<Task>? ShowSettingsWindow { get; set; }
 
     /// <summary>
-    /// 由 View 设置的密码对话框回调。参数为压缩包路径，返回密码或取消时返回 null。
+    /// 由 View 设置的密码对话框回调。参数为压缩包路径，返回 <see cref="PasswordDialogResponse"/> 或取消时返回 null。
     /// </summary>
-    public Func<string, Task<string?>>? ShowPasswordDialog { get; set; }
+    public Func<string, Task<PasswordDialogResponse?>>? ShowPasswordDialog { get; set; }
 
     /// <summary>
     /// 解压设置对话框回调。传入 ExtractSettingsViewModel，返回 true=确认，false=取消。
@@ -65,6 +66,26 @@ public partial class MainWindowViewModel : ObservableObject
     /// 压缩设置对话框回调。传入 CompressSettingsViewModel，返回 true=确认，false=取消。
     /// </summary>
     public Func<CompressSettingsViewModel, Task<bool?>>? ShowCompressSettingsDialog { get; set; }
+
+    /// <summary>
+    /// 压缩冲突对话框回调。从后台线程调用，返回用户选择的冲突处理方式。
+    /// 实现需通过 <see cref="Avalonia.Threading.Dispatcher.UIThread"/> 切换到 UI 线程显示对话框。
+    /// 返回值为 (处理方式, 用户自定义文件名, 是否应用到全部)。
+    /// </summary>
+    public Func<CompressConflictInfo, Task<(Core.Abstractions.CompressConflictAction Action, string? CustomName, bool ApplyToAll)>>? ShowCompressConflictDialog { get; set; }
+
+    /// <summary>
+    /// 解压文件冲突对话框回调。从解压引擎的后台线程调用，
+    /// 返回用户对单个文件冲突的处理方式，以及是否应用到全部。
+    /// 实现需切换到 UI 线程显示对话框。
+    /// </summary>
+    public Func<FileConflictInfo, (FileConflictAction Action, bool ApplyToAll)>? ShowExtractFileConflictDialog { get; set; }
+
+    /// <summary>
+    /// 异步版的文件冲突回调。返回用户对冲突的处理方式和是否应用到全部。
+    /// 此回调可在后台线程中 await，适用于 Avalonia 的异步对话框模式。
+    /// </summary>
+    public Func<FileConflictInfo, Task<(FileConflictAction Action, bool ApplyToAll)>>? ShowExtractFileConflictDialogAsync { get; set; }
 
     /// <summary>
     /// 密码管理器窗口回调。
@@ -125,7 +146,10 @@ public partial class MainWindowViewModel : ObservableObject
     /// 会话密码缓存：压缩包路径 → 密码（仅内存，不持久化）。
     /// </summary>
     private readonly Dictionary<string, string> _sessionPasswords = new(StringComparer.OrdinalIgnoreCase);
+    private readonly PasswordService _passwordService = new();
     private readonly AppSettings _appSettings = AppSettings.Load();
+    private string? _currentPassword;
+    private bool _hasEncryptedArchive;
 
     // ── i18n ──
 
@@ -245,6 +269,18 @@ public partial class MainWindowViewModel : ObservableObject
 
     [ObservableProperty]
     private string? _statusMessage;
+
+    /// <summary>密码状态文字：为空=无加密；"已匹配"或"已加密"。</summary>
+    [ObservableProperty]
+    private string? _passwordStatusMessage;
+
+    /// <summary>密码状态图标 Geometry：为空=无加密。</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasPasswordStatus))]
+    private object? _passwordStatusIcon;
+
+    /// <summary>是否有密码状态显示。</summary>
+    public bool HasPasswordStatus => PasswordStatusIcon != null;
 
     /// <summary>目录/文件统计："3 dirs, 15 files"。</summary>
     [ObservableProperty]
@@ -584,36 +620,97 @@ public partial class MainWindowViewModel : ObservableObject
                 password = cachedPwd;
 
             var result = await _archiveService.LoadArchiveAsync(path, password);
+            var engine = ArchiveEngineFactory.GetEngineByExtension(path);
 
+            // ── Password resolution flow ──
             if (result.IsPasswordRequired)
             {
-                // Prompt for password
-                if (ShowPasswordDialog != null)
+                // Phase A: Try PasswordManager saved passwords
+                if (engine != null)
                 {
-                    password = await ShowPasswordDialog(path);
-                    if (password == null)
+                    var match = _passwordService.TryMatchPassword(path, engine);
+                    if (match != null)
                     {
-                        StatusMessage = LocalizationManager.T("Status_PasswordCancelled");
+                        password = match.Value.Password;
+                        result = await _archiveService.LoadArchiveAsync(path, password);
+                        if (!result.IsPasswordRequired)
+                        {
+                            _sessionPasswords[path] = password;
+                            _currentPassword = password;
+                            _hasEncryptedArchive = true;
+                            UpdatePasswordStatus(isMatched: true);
+                        }
+                    }
+                }
+
+                // Phase B: Dialog loop (still need password after saved attempts)
+                if (result.IsPasswordRequired)
+                {
+                    if (ShowPasswordDialog == null)
+                    {
+                        StatusMessage = LocalizationManager.T("Status_PasswordRequired");
                         IsLoading = false;
                         return;
                     }
 
-                    // Retry with password
-                    result = await _archiveService.LoadArchiveAsync(path, password);
-
-                    if (result.IsPasswordRequired)
+                    while (result.IsPasswordRequired)
                     {
-                        StatusMessage = LocalizationManager.T("Status_WrongPassword");
-                        IsLoading = false;
-                        return;
-                    }
+                        var dialogResponse = await ShowPasswordDialog(path);
+                        if (dialogResponse?.Password == null)
+                        {
+                            StatusMessage = LocalizationManager.T("Status_PasswordCancelled");
+                            IsLoading = false;
+                            return;
+                        }
 
-                    // Cache password on success
-                    _sessionPasswords[path] = password;
+                        password = dialogResponse.Password;
+
+                        // QuickVerify before full retry (fast path)
+                        if (engine != null && !_passwordService.QuickVerifyPassword(path, password, engine))
+                        {
+                            StatusMessage = LocalizationManager.T("Status_WrongPassword");
+                            continue;
+                        }
+
+                        // Full retry with password
+                        result = await _archiveService.LoadArchiveAsync(path, password);
+
+                        if (!result.IsPasswordRequired)
+                        {
+                            // Success
+                            _sessionPasswords[path] = password;
+                            _currentPassword = password;
+                            _hasEncryptedArchive = true;
+
+                            if (dialogResponse.SavePermanently)
+                            {
+                                _passwordService.TrySavePassword(password, path,
+                                    dialogResponse.Patterns, dialogResponse.Description);
+                            }
+
+                            UpdatePasswordStatus(isMatched: true);
+                        }
+                        else
+                        {
+                            StatusMessage = LocalizationManager.T("Status_WrongPassword");
+                        }
+                    }
+                }
+            }
+            else
+            {
+                // No password required: still check for encrypted entries (password may be from cache)
+                if (result.RawItems != null && result.RawItems.Any(i => i.IsEncrypted))
+                {
+                    _hasEncryptedArchive = true;
+                    _currentPassword = password;
+                    UpdatePasswordStatus(isMatched: password != null);
                 }
                 else
                 {
-                    StatusMessage = LocalizationManager.T("Status_PasswordRequired");
+                    _hasEncryptedArchive = false;
+                    _currentPassword = null;
+                    UpdatePasswordStatus(isMatched: false);
                 }
             }
 
@@ -687,6 +784,26 @@ public partial class MainWindowViewModel : ObservableObject
         {
             IsLoading = false;
         }
+    }
+
+    /// <summary>
+    /// 更新密码状态 UI（锁图标 + 状态文字）。
+    /// </summary>
+    private void UpdatePasswordStatus(bool isMatched)
+    {
+        if (!_hasEncryptedArchive)
+        {
+            PasswordStatusMessage = null;
+            PasswordStatusIcon = null;
+            return;
+        }
+
+        PasswordStatusIcon = isMatched
+            ? Application.Current?.FindResource("IconLockOpen")
+            : Application.Current?.FindResource("IconLockClosed");
+        PasswordStatusMessage = isMatched
+            ? LocalizationManager.T("Status_PasswordMatched")
+            : LocalizationManager.T("Status_Encrypted");
     }
 
     private async Task ShowPreviewAsync(ArchiveItemModel entry)
@@ -1274,6 +1391,10 @@ public partial class MainWindowViewModel : ObservableObject
         FilterStats = string.Empty;
         EncodingInfo = string.Empty;
         Preview.Clear();
+        _currentPassword = null;
+        _hasEncryptedArchive = false;
+        PasswordStatusMessage = null;
+        PasswordStatusIcon = null;
         FolderPaths.Clear();
         _backStack.Clear();
         _forwardStack.Clear();
@@ -1356,18 +1477,76 @@ public partial class MainWindowViewModel : ObservableObject
 
         _sessionPasswords.TryGetValue(CurrentArchivePath, out var password);
 
+        var options = CreateExtractOptions(vm.ConflictAction);
+
         var completed = await RunWithProgress(
             LocalizationManager.T("Status_Extracting"),
             async (progress, ct) =>
             {
                 await new ExtractService().ExtractAsync(
-                    CurrentArchivePath, dest, password, progress, ct);
+                    CurrentArchivePath, dest, password, progress, ct, options);
             });
 
         if (completed)
         {
             StatusMessage = LocalizationManager.T("Status_ExtractComplete");
         }
+    }
+
+    /// <summary>
+    /// 将 ExtractSettingsViewModel 的冲突策略字符串映射到 <see cref="FileConflictAction"/>。
+    /// </summary>
+    private static FileConflictAction MapConflictActionString(string value)
+    {
+        return value.ToLowerInvariant() switch
+        {
+            "ask" => FileConflictAction.Ask,
+            "rename" => FileConflictAction.Rename,
+            "skip" => FileConflictAction.Skip,
+            "overwriteifolder" or "overwrite_if_older" => FileConflictAction.OverwriteIfOlder,
+            "overwriteifsmaller" or "overwrite_if_smaller" => FileConflictAction.OverwriteIfSmaller,
+            _ => FileConflictAction.Overwrite,
+        };
+    }
+
+    /// <summary>
+    /// 集中创建解压选项，统一处理冲突回调 + ApplyToAll 记忆。
+    /// 对标 WPF 的 App.CreateExtractOptions()。
+    /// </summary>
+    /// <param name="conflictAction">ExtractSettingsViewModel.ConflictAction 字符串值。</param>
+    /// <returns>ArchiveOptions，Overwrite 且无 resolver 时返回 null。</returns>
+    private ArchiveOptions? CreateExtractOptions(string conflictAction)
+    {
+        var action = MapConflictActionString(conflictAction);
+        if (action == FileConflictAction.Overwrite)
+            return null; // 默认行为无需传 options
+
+        if (action != FileConflictAction.Ask || ShowExtractFileConflictDialogAsync == null)
+            return new ArchiveOptions { ConflictAction = action };
+
+        // Ask 模式：使用异步回调弹窗 + ApplyToAll 记忆
+        bool applyToAll = false;
+        FileConflictAction? chosenAction = null;
+
+        return new ArchiveOptions
+        {
+            ConflictAction = FileConflictAction.Ask,
+            ConflictResolverAsync = async info =>
+            {
+                if (applyToAll && chosenAction.HasValue)
+                    return chosenAction.Value;
+
+                var (resultAction, applyAll) = await ShowExtractFileConflictDialogAsync!(info);
+
+                if (applyAll)
+                {
+                    applyToAll = true;
+                    chosenAction = resultAction;
+                }
+
+                return resultAction;
+            },
+        };
     }
 
     [RelayCommand]
@@ -1423,18 +1602,112 @@ public partial class MainWindowViewModel : ObservableObject
     [RelayCommand]
     private async Task NewArchive()
     {
-        if (ShowCompressSettingsDialog == null) return;
+        if (ShowCompressSettingsDialog == null || RunWithProgress == null) return;
         var vm = new CompressSettingsViewModel(Array.Empty<string>());
-        await ShowCompressSettingsDialog(vm);
+        var result = await ShowCompressSettingsDialog(vm);
+        if (result != true || vm.SelectedPaths.Count == 0) return;
+
+        await ExecuteCompressFromSettings(vm);
     }
 
     [RelayCommand]
     private async Task CompressSelected()
     {
-        if (ShowCompressSettingsDialog == null) return;
+        if (ShowCompressSettingsDialog == null || RunWithProgress == null) return;
         // Opens compress dialog with empty list — user picks files from filesystem in dialog
         var vm = new CompressSettingsViewModel(Array.Empty<string>());
-        await ShowCompressSettingsDialog(vm);
+        var result = await ShowCompressSettingsDialog(vm);
+        if (result != true || vm.SelectedPaths.Count == 0) return;
+
+        await ExecuteCompressFromSettings(vm);
+    }
+
+    /// <summary>
+    /// 从 CompressSettingsViewModel 读取设置，构建 CompressRequest 并执行压缩。
+    /// </summary>
+    private async Task ExecuteCompressFromSettings(CompressSettingsViewModel vm)
+    {
+        // Apply file filter (handles directory recursion, matches per-file)
+        var sources = vm.FileFilter?.IsActive == true
+            ? FileFilterHelper.ApplyFilter(vm.SelectedPaths.ToArray(), vm.FileFilter).ToList()
+            : vm.SelectedPaths.ToList();
+        if (sources.Count == 0) return;
+
+        var settings = AppSettings.Load();
+        var request = new CompressRequest
+        {
+            SourcePaths = sources,
+            Mode = vm.OutputMode,
+            Format = vm.DefaultFormat,
+            CompressionLevel = vm.CompressionLevel,
+            Password = vm.Encrypt ? vm.Password : null,
+            Encrypt = vm.Encrypt,
+            Comment = vm.Comment,
+            CommentDistribution = vm.CommentDistribution,
+            OutputPath = vm.OutputMode switch
+            {
+                CompressOutputMode.Manual => vm.OutputPath,
+                CompressOutputMode.Separate => null,
+                CompressOutputMode.Combined => vm.OutputPath,
+                _ => null,
+            },
+            SplitSize = vm.SplitSize,
+            PreserveDirectoryRoot = settings.PreserveDirectoryRoot,
+            KeepOriginalExtension = settings.KeepOriginalExtension,
+            FileNameEncoding = settings.ZipEncoding,
+            ZipCompressionMethod = settings.ZipCompressionMethod,
+            ZipEncryptionMethod = settings.ZipEncryptionMethod,
+            SevenZipCompressionMethod = settings.SevenZipCompressionMethod,
+            SevenZipSolid = settings.SevenZipSolid,
+            SevenZipSolidBlockSize = settings.SevenZipSolidBlockSize,
+            SevenZipDictionarySize = settings.SevenZipDictionarySize,
+            SevenZipNumFastBytes = settings.SevenZipNumFastBytes,
+            SevenZipMatchFinder = settings.SevenZipMatchFinder,
+            SevenZipEncryptHeaders = settings.SevenZipEncryptHeaders,
+        };
+
+        if (RunWithProgress == null) return;
+        var completed = await RunWithProgress(
+            LocalizationManager.T("Status_Compressing"),
+            async (progress, ct) =>
+            {
+                var svc = new AvaloniaCompressService();
+                bool applyToAll = false;
+                Core.Abstractions.CompressConflictAction? chosenAction = null;
+
+                await svc.CompressAsync(request, progress, ct,
+                    conflictResolver: async info =>
+                    {
+                        // 已勾选"应用到全部" → 直接返回记忆的选择
+                        if (applyToAll && chosenAction.HasValue)
+                            return new CompressConflictResolution(chosenAction.Value, null);
+
+                        if (ShowCompressConflictDialog != null)
+                        {
+                            var (action, customName, applyAll) = await ShowCompressConflictDialog(info);
+                            if (applyAll)
+                            {
+                                applyToAll = true;
+                                chosenAction = action;
+                            }
+
+                            return action switch
+                            {
+                                Core.Abstractions.CompressConflictAction.Cancel
+                                    => new CompressConflictResolution(
+                                        Core.Abstractions.CompressConflictAction.Cancel, null),
+                                _ => new CompressConflictResolution(action, customName)
+                            };
+                        }
+
+                        // Fallback: silently overwrite if no dialog callback
+                        return new CompressConflictResolution(
+                            Core.Abstractions.CompressConflictAction.Overwrite, null);
+                    });
+            });
+
+        if (completed)
+            StatusMessage = LocalizationManager.T("Status_Compressed");
     }
 
     [RelayCommand]
