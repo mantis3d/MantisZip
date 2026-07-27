@@ -21,7 +21,19 @@
 
 ### MantisZip.UI.Avalonia（主力版）
 
-**2026-07-26** — 拖拽覆盖层修复：自身窗口改用 HWND 判定 + 多行文本支持 + 虚拟文件夹识别
+**2026-07-28** — 压缩设置加密面板行为对齐 WPF + ResultTreeView 宽度可调
+  - **密码面板行为对齐 WPF（7 项对齐）**：
+    1. 保存复选框标签按模式切换："更新匹配规则"（库模式）/"保存到密码库"（新密码模式）
+    2. 用户输入密码时清除密码库选中并自动切换到新密码模式
+    3. 描述文本框在库模式下禁止焦点（`IsEnabled=false` + `IsReadOnly=true`）
+    4. 匹配规则文本框在自动生成规则时只读（`IsReadOnly=true`）
+    5. 自动生成规则切换时自动刷新规则
+    6. `RefreshAutoRules` 改为基于输出模式生成规则（Manual→输出文件名，Separate→每文件一行，Combined→公共父目录名），而非基于源文件扩展名
+    7. 选中库条目不再写入 `Password` 属性（避免触发自动切模式），压缩时库模式下取 `SelectedPasswordEntry.Password`
+  - **ResultTreeView 宽度可调**：Grid `ColumnDefinitions` 改为三列显式布局（`*,Auto,280`），GridSplitter 添加 `ResizeBehavior="PreviousAndNext"`，拖动分割线可调整预览面板宽度
+  - **设置窗口可调**：`SettingsWindow` 改为 `CanResize=True`，增大默认尺寸（820×640），添加 `MinWidth/MinHeight` 约束
+  - 改动的文件：`CompressSettingsViewModel.cs`、`MainWindowViewModel.cs`、`CompressSettingsWindow.axaml`、`SettingsWindow.axaml`
+  - 构建 0 errors
   - **自身窗口判定 Bug 修复**：之前用 `className.StartsWith("Avalonia-")` 检测自身窗口，但所有 Avalonia 应用共享 `Avalonia-` 前缀，导致其他 Avalonia 软件也被误识别为 MantisZip。改用 HWND 句柄比较（`target == _mainHwnd`）
   - **多行文本支持**：`GdiDrawText` 格式标志从 `DT_SINGLELINE | DT_VCENTER`（`0x0125`）改为 `DT_WORDBREAK`（`0x0111`）+ `DT_CALCRECT` 手动垂直居中，支持 `\n` 换行
   - **虚拟文件夹判定**：修正 `ClassifyWindow` 中丢弃 `TryGetExplorerPathFromShell` 返回状态的问题，"我的电脑"/"快速访问"等无合法路径的文件夹不再显示绿色（`Success`），改为 `Warning` 状态显示红色
