@@ -1,11 +1,13 @@
 using System;
 using System.ComponentModel;
 using System.Data;
+using System.Globalization;
 using System.Threading;
 using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Data;
+using Avalonia.Data.Converters;
 using Avalonia.Input;
 using Avalonia.Layout;
 using MantisZip.UI.Avalonia.ViewModels;
@@ -184,5 +186,28 @@ public partial class PreviewPanel : UserControl
             PreviewInfoBorder.HorizontalAlignment = HorizontalAlignment.Left;
         }
     }
+}
 
+public class OrientationToBoolConverter : IValueConverter
+{
+    public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+    {
+        if (value is Orientation orientation && parameter is string mode)
+            return mode == "vertical"
+                ? orientation == Orientation.Vertical
+                : orientation == Orientation.Horizontal;
+        return false;
+    }
+
+    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+        => throw new NotSupportedException();
+}
+
+public class InvertBoolConverter : IValueConverter
+{
+    public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+        => value is bool b ? !b : value;
+
+    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+        => value is bool b ? !b : value;
 }

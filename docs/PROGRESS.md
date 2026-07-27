@@ -41,6 +41,21 @@
   - 改动的文件：`ResultTreeView.axaml/.cs`、`PreviewTreeNode.cs`、`AppIcons.axaml`、`ResultPreviewService.cs`、`ExtractSettingsWindow.axaml.cs`、`ExtractSettingsViewModel.cs`、`MainWindow.axaml.cs`、`strings.*.json`
   - 构建 0 errors, 12 pre-existing warnings
 
+**2026-07-27** — 元数据面板可配置系统：数据模型 + 渲染引擎 + 设置 UI 集成 + 内联迁移
+  - **FieldConfig.Row**：还原行控制字段，同 Row 字段并排显示，不同 Row 换行
+  - **MetadataRegistry**：新增 ico/pdf/xlsx/pptx 类型注册 + IconCount/Encrypted 键
+  - **MetadataRenderEngine**：完全重写为 `RenderCommon`/`RenderFormat` 双轨，支持 `Row` 分组
+  - **MetadataSettingsManager**：配置持久化到 `metadata-panel.json`，自动初始化默认字段
+  - **PreviewPanel 布局**：信息栏分为 CommonSections + FormatSections 两区；移除所有内联 `FormatMetadata` 显示；新增 ContentTop 内容区顶部横条（始终可见）；工具栏始终可见
+  - **设置 UI**：在预览标签页下新增「元数据面板」子标签，支持选择类型 + 编辑字段的 Row/Order/Position
+  - **入口**：预览工具栏齿轮按钮改为打开设置窗口
+  - **本地化**：所有字段键通过 `GetFieldDisplayName()` 三阶回退（i18n → registry DisplayName → raw key）；新增 Metadata_Type_ico/pdf 键
+  - **向后兼容**：`FormatMetadata` 合并 infoPanel + contentTop 字段，内联预览不受影响
+  - 改动的文件（新建）：`MetadataPanelSettings.cs`, `MetadataRegistry.cs`, `MetadataRenderEngine.cs`, `MetadataSettingsManager.cs`, `MetadataHelper.cs`, `MetadataPanelSettingsViewModel.cs`
+  - 改动的文件（修改）：`FieldConfig.cs`（+Row）、`PreviewViewModel.cs`、`PreviewPanel.axaml`、`SettingsWindow.axaml`、`SettingsWindowViewModel.cs`、`MetadataRenderEngine.cs`、`strings.zh-CN.json`、`strings.en.json`、`MainWindow.axaml.cs`
+  - 废弃/删除：`MetadataPanelSettingsDialog.axaml/.cs`
+  - 构建 0 errors
+
 **2026-07-24** — 拖拽覆盖层视觉优化：颜色/呼吸/文案 + 完整路径显示 + 本地化
   - **颜色**：成功状态绿色调亮（RGB 76,175,80 → 107,212,107），无目标灰色改为暖金（RGB 255,215,0）
   - **呼吸速度**：周期 4s → 2s（`Math.PI/20` → `Math.PI/10`）

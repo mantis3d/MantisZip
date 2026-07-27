@@ -46,6 +46,60 @@ public partial class PreviewViewModel : ObservableObject
     [ObservableProperty]
     private ObservableCollection<FormatMetadataItem> _formatMetadata = [];
 
+    public PreviewViewModel()
+    {
+        MetadataSettingsManager.SettingsChanged += OnMetadataSettingsChanged;
+    }
+
+    private void OnMetadataSettingsChanged()
+    {
+        OnPropertyChanged(nameof(FieldOrientation));
+    }
+
+    // ── 元数据系统属性（通用信息 / 格式信息分离） ──
+
+    /// <summary>通用文件信息（Phase 1，格式检测前设置）。</summary>
+    [ObservableProperty]
+    private ObservableCollection<MetadataSection> _commonSections = [];
+
+    /// <summary>格式特有信息（Phase 2，格式检测后设置）。</summary>
+    [ObservableProperty]
+    private ObservableCollection<MetadataSection> _formatSections = [];
+
+    /// <summary>格式信息正在提取中（Phase 1 → Phase 2 之间为 true）。</summary>
+    [ObservableProperty]
+    private bool _isFormatPending;
+
+    partial void OnIsFormatPendingChanged(bool value) => OnPropertyChanged(nameof(IsFormatEmpty));
+
+    /// <summary>是否有格式信息可显示。</summary>
+    [ObservableProperty]
+    private bool _hasFormatSections;
+
+    partial void OnHasFormatSectionsChanged(bool value) => OnPropertyChanged(nameof(IsFormatEmpty));
+
+    /// <summary>无格式信息且不在加载中（显示空提示）。</summary>
+    public bool IsFormatEmpty => !IsFormatPending && !HasFormatSections;
+
+    /// <summary>信息面板字段显示方向，从 MetadataPanelSettings 读取。</summary>
+    public global::Avalonia.Layout.Orientation FieldOrientation =>
+        MetadataSettingsManager.Load().FieldLayoutMode == "horizontal"
+            ? global::Avalonia.Layout.Orientation.Horizontal
+            : global::Avalonia.Layout.Orientation.Vertical;
+
+    /// <summary>文件列表顶部的元数据项（来自 common + format）。</summary>
+    [ObservableProperty]
+    private ObservableCollection<InfoPanelRow> _contentTopItems = [];
+
+    [ObservableProperty]
+    private bool _isContentTopVisible;
+
+    /// <summary>Phase 1 保存的通用字段值，供 Phase 2 ShowXxx 合并用。</summary>
+    internal Dictionary<string, string?>? CurrentCommonValues { get; set; }
+
+    /// <summary>打开设置窗口到元数据面板标签页，由 View 注入。</summary>
+    public Func<Task>? OpenSettingsToMetadataTab { get; set; }
+
     [ObservableProperty]
     private string _previewHeaderText = string.Empty;
 
@@ -343,6 +397,13 @@ public partial class PreviewViewModel : ObservableObject
     public void ToggleInfoPanelOrientation()
     {
         InfoPanelOrientation = InfoPanelOrientation == "Vertical" ? "Horizontal" : "Vertical";
+    }
+
+    [RelayCommand]
+    private async Task OpenMetadataSettings()
+    {
+        if (OpenSettingsToMetadataTab != null)
+            await OpenSettingsToMetadataTab();
     }
 
     public void SetFileInfo(string name, string size, string compressed, string ratio, string modified)
@@ -649,14 +710,12 @@ public partial class PreviewViewModel : ObservableObject
         // 初始缩放：适应视口
         ZoomFit();
 
-        var metaItems = new List<FormatMetadataItem>
+        var formatValues = new Dictionary<string, string?>
         {
-            new("尺寸", $"{ImageWidth} × {ImageHeight}"),
-            new("文件大小", FormatFileSize(new FileInfo(filePath).Length)),
+            [MetadataKeys.Dimensions] = $"{ImageWidth} × {ImageHeight}",
+            [MetadataKeys.ImageDpi] = $"{bitmap.Dpi.X:F0} × {bitmap.Dpi.Y:F0}",
         };
-        // DPI — Avalonia Bitmap 直接暴露，比 WPF 的 BitmapDecoder 方式简单
-        metaItems.Add(new("DPI", $"{bitmap.Dpi.X:F0} × {bitmap.Dpi.Y:F0}"));
-        FormatMetadata = [.. metaItems];
+        MetadataHelper.RenderFormatToViewModel(this, formatValues, "image");
         App.DebugLog($"[IMG] ShowImage done: PreviewType={PreviewType}, Zoom={ZoomLevel}, IsToolbarVisible={IsToolbarVisible}");
     }
 
@@ -686,11 +745,11 @@ public partial class PreviewViewModel : ObservableObject
         PreviewHeaderText = $"ICO 图标 — {frames.Count} 个尺寸";
 
         var fi = new FileInfo(filePath);
-        FormatMetadata =
-        [
-            new("文件大小", FormatUtil.FormatSize(fi.Length)),
-            new("图标数量", frames.Count.ToString()),
-        ];
+        var icoFormatValues = new Dictionary<string, string?>
+        {
+            ["IconCount"] = frames.Count.ToString(),
+        };
+        MetadataHelper.RenderFormatToViewModel(this, icoFormatValues, "ico");
     }
 
     [RelayCommand]
@@ -834,12 +893,12 @@ public partial class PreviewViewModel : ObservableObject
             IsPreviewVisible = true;
             IsToolbarVisible = true;
             PreviewHeaderText = "GIF 预览";
-            FormatMetadata =
-            [
-                new FormatMetadataItem("尺寸", $"{ImageWidth} × {ImageHeight}"),
-                new FormatMetadataItem("文件大小", FormatFileSize(new FileInfo(filePath).Length)),
-                new FormatMetadataItem("帧数", TotalFrames.ToString()),
-            ];
+            var gifFormatValues = new Dictionary<string, string?>
+            {
+                [MetadataKeys.Dimensions] = $"{ImageWidth} × {ImageHeight}",
+                [MetadataKeys.FrameCount] = TotalFrames.ToString(),
+            };
+            MetadataHelper.RenderFormatToViewModel(this, gifFormatValues, "image");
         }
         catch (Exception ex)
         {
@@ -977,10 +1036,13 @@ public partial class PreviewViewModel : ObservableObject
         IsPreviewVisible = true;
         IsToolbarVisible = true;
         PreviewHeaderText = info.FontName ?? "字体预览";
-        FormatMetadata.Clear();
-        FormatMetadata.Add(new("字体名称", info.FontName ?? "未知"));
-        FormatMetadata.Add(new("样式", info.FontStyle ?? "常规"));
-        FormatMetadata.Add(new("字形数", info.GlyphCount?.ToString() ?? "未知"));
+        var fontFormatValues = new Dictionary<string, string?>
+        {
+            [MetadataKeys.FontName] = info.FontName,
+            [MetadataKeys.FontStyle] = info.FontStyle,
+            [MetadataKeys.GlyphCount] = info.GlyphCount?.ToString(),
+        };
+        MetadataHelper.RenderFormatToViewModel(this, fontFormatValues, "font");
 
         var fontFilePath = info.FontDecompressedPath ?? filePath;
         _fontPreviewFontPath = fontFilePath;
@@ -1364,21 +1426,22 @@ public partial class PreviewViewModel : ObservableObject
         IsPreviewVisible = true;
         IsToolbarVisible = false;
         PreviewHeaderText = "音频信息";
-        FormatMetadata.Clear();
+        var audioFormatValues = new Dictionary<string, string?>();
         if (info.Duration.HasValue)
-            FormatMetadata.Add(new("时长", info.Duration.Value.ToString(@"mm\:ss")));
+            audioFormatValues[MetadataKeys.Duration] = info.Duration.Value.ToString(@"mm\:ss");
         if (info.SampleRate.HasValue)
-            FormatMetadata.Add(new("采样率", $"{info.SampleRate} Hz"));
+            audioFormatValues[MetadataKeys.SampleRate] = $"{info.SampleRate} Hz";
         if (info.Channels.HasValue)
-            FormatMetadata.Add(new("声道", info.Channels.Value.ToString()));
+            audioFormatValues[MetadataKeys.Channels] = info.Channels.Value.ToString();
         if (info.Bitrate.HasValue)
-            FormatMetadata.Add(new("比特率", $"{info.Bitrate} kbps"));
+            audioFormatValues[MetadataKeys.Bitrate] = $"{info.Bitrate} kbps";
         if (info.BitDepth.HasValue)
-            FormatMetadata.Add(new("位深", $"{info.BitDepth}-bit"));
+            audioFormatValues[MetadataKeys.BitDepth] = $"{info.BitDepth}-bit";
         if (info.Artist != null)
-            FormatMetadata.Add(new("艺术家", info.Artist));
+            audioFormatValues[MetadataKeys.Artist] = info.Artist;
         if (info.Album != null)
-            FormatMetadata.Add(new("专辑", info.Album));
+            audioFormatValues[MetadataKeys.Album] = info.Album;
+        MetadataHelper.RenderFormatToViewModel(this, audioFormatValues, "audio");
     }
 
     // ── SQLite ──
@@ -1449,8 +1512,11 @@ public partial class PreviewViewModel : ObservableObject
             IsPreviewVisible = true;
             IsToolbarVisible = false;
             PreviewHeaderText = "SQLite 数据库";
-            FormatMetadata.Clear();
-            FormatMetadata.Add(new("表数量", tables.Count.ToString()));
+            var sqliteFormatValues = new Dictionary<string, string?>
+            {
+                [MetadataKeys.TableCount] = tables.Count.ToString(),
+            };
+            MetadataHelper.RenderFormatToViewModel(this, sqliteFormatValues, "sqlite");
         }
         catch (Exception ex)
         {
@@ -1475,11 +1541,14 @@ public partial class PreviewViewModel : ObservableObject
         IsPreviewVisible = true;
         IsToolbarVisible = false;
         PreviewHeaderText = "光盘镜像";
-        FormatMetadata.Clear();
-        FormatMetadata.Add(new("卷标", info.VolumeLabel ?? "未知"));
-        FormatMetadata.Add(new("格式", info.DisplayName ?? "ISO 9660"));
+        var isoFormatValues = new Dictionary<string, string?>
+        {
+            [MetadataKeys.VolumeLabel] = info.VolumeLabel,
+            [MetadataKeys.IsoFormat] = info.DisplayName,
+        };
         if (info.DiskSize.HasValue)
-            FormatMetadata.Add(new("大小", FormatFileSize(info.DiskSize.Value)));
+            isoFormatValues[MetadataKeys.TotalSize] = FormatFileSize(info.DiskSize.Value);
+        MetadataHelper.RenderFormatToViewModel(this, isoFormatValues, "iso");
     }
 
     // ── Torrent ──
@@ -1499,27 +1568,29 @@ public partial class PreviewViewModel : ObservableObject
         IsPreviewVisible = true;
         IsToolbarVisible = false;
         PreviewHeaderText = info.TorrentFileName ?? "BT 种子";
-        FormatMetadata.Clear();
+        var torrentFormatValues = new Dictionary<string, string?>();
+        torrentFormatValues[MetadataKeys.TorrentFileName] = info.TorrentFileName;
         if (info.InfoHashV1 != null)
-            FormatMetadata.Add(new("InfoHash", info.InfoHashV1));
-        if (info.MagnetLink != null)
-            FormatMetadata.Add(new("Magnet 链接", info.MagnetLink));
-        if (info.TrackerUrl != null)
-            FormatMetadata.Add(new("Tracker", info.TrackerUrl));
-        if (info.CreationDate != null)
-            FormatMetadata.Add(new("创建日期", info.CreationDate.Value.ToString("yyyy-MM-dd HH:mm:ss")));
-        if (info.TrackerCount.HasValue && info.TrackerCount.Value > 1)
-            FormatMetadata.Add(new("Tracker 数量", info.TrackerCount.Value.ToString()));
-        if (info.IsPrivate == true)
-            FormatMetadata.Add(new("是否私有", "是"));
-        if (info.CreatedBy != null)
-            FormatMetadata.Add(new("创建者", info.CreatedBy));
-        if (!string.IsNullOrEmpty(info.AdditionalInfo))
-            FormatMetadata.Add(new("备注", info.AdditionalInfo));
+            torrentFormatValues[MetadataKeys.InfoHash] = info.InfoHashV1;
         if (info.FileCount.HasValue)
-            FormatMetadata.Add(new("文件数", info.FileCount.Value.ToString()));
+            torrentFormatValues[MetadataKeys.FileCount] = info.FileCount.Value.ToString();
         if (info.TorrentTotalSize.HasValue)
-            FormatMetadata.Add(new("总大小", FormatFileSize(info.TorrentTotalSize.Value)));
+            torrentFormatValues[MetadataKeys.TotalSize] = FormatFileSize(info.TorrentTotalSize.Value);
+        if (info.IsPrivate == true)
+            torrentFormatValues[MetadataKeys.IsPrivate] = "是";
+        if (info.CreatedBy != null)
+            torrentFormatValues[MetadataKeys.CreatedBy] = info.CreatedBy;
+        if (info.MagnetLink != null)
+            torrentFormatValues[MetadataKeys.MagnetLink] = info.MagnetLink;
+        if (info.TrackerUrl != null)
+            torrentFormatValues[MetadataKeys.TrackerUrl] = info.TrackerUrl;
+        if (info.TrackerCount.HasValue && info.TrackerCount.Value > 1)
+            torrentFormatValues[MetadataKeys.TrackerCount] = info.TrackerCount.Value.ToString();
+        if (info.CreationDate != null)
+            torrentFormatValues[MetadataKeys.CreatedDate] = info.CreationDate.Value.ToString("yyyy-MM-dd HH:mm:ss");
+        if (!string.IsNullOrEmpty(info.AdditionalInfo))
+            torrentFormatValues[MetadataKeys.AdditionalInfo] = info.AdditionalInfo;
+        MetadataHelper.RenderFormatToViewModel(this, torrentFormatValues, "torrent");
 
         // 种子内文件列表（目录树结构）
         TorrentTreeRoots = new ObservableCollection<TorrentTreeNode>(
@@ -1607,12 +1678,6 @@ public partial class PreviewViewModel : ObservableObject
             _ => "Office 文档信息"
         };
         FormatMetadata.Clear();
-        if (info.Title != null) FormatMetadata.Add(new("标题", info.Title));
-        if (info.Author != null) FormatMetadata.Add(new("作者", info.Author));
-        if (info.Subject != null) FormatMetadata.Add(new("主题", info.Subject));
-        if (info.PageCount.HasValue) FormatMetadata.Add(new("页数", info.PageCount.Value.ToString()));
-        if (info.CreationDate.HasValue) FormatMetadata.Add(new("创建日期", info.CreationDate.Value.ToString("yyyy-MM-dd HH:mm")));
-        if (info.ModifiedDate.HasValue) FormatMetadata.Add(new("修改日期", info.ModifiedDate.Value.ToString("yyyy-MM-dd HH:mm")));
     }
 
     // ── DOCX ──
@@ -1992,14 +2057,15 @@ public partial class PreviewViewModel : ObservableObject
             IsPreviewVisible = true;
             IsToolbarVisible = false;
             PreviewHeaderText = $"PDF {info.AdditionalInfo ?? ""}";
-            FormatMetadata.Clear();
-            if (info.Title != null) FormatMetadata.Add(new("标题", info.Title));
-            if (info.Author != null) FormatMetadata.Add(new("作者", info.Author));
-            if (info.Subject != null) FormatMetadata.Add(new("主题", info.Subject));
-            if (info.PageCount.HasValue) FormatMetadata.Add(new("页数", info.PageCount.Value.ToString()));
-            FormatMetadata.Add(new("加密", info.IsEncrypted == true ? "是" : "否"));
-            if (info.CreationDate.HasValue) FormatMetadata.Add(new("创建日期", info.CreationDate.Value.ToString("yyyy-MM-dd HH:mm")));
-            if (info.ModifiedDate.HasValue) FormatMetadata.Add(new("修改日期", info.ModifiedDate.Value.ToString("yyyy-MM-dd HH:mm")));
+            var pdfFormatValues = new Dictionary<string, string?>();
+            if (info.Title != null) pdfFormatValues[MetadataKeys.Title] = info.Title;
+            if (info.Author != null) pdfFormatValues[MetadataKeys.Author] = info.Author;
+            if (info.Subject != null) pdfFormatValues[MetadataKeys.Subject] = info.Subject;
+            if (info.PageCount.HasValue) pdfFormatValues[MetadataKeys.PageCount] = info.PageCount.Value.ToString();
+            pdfFormatValues[MetadataKeys.Encrypted] = info.IsEncrypted == true ? "是" : "否";
+            if (info.CreationDate.HasValue) pdfFormatValues[MetadataKeys.CreatedDate] = info.CreationDate.Value.ToString("yyyy-MM-dd HH:mm");
+            if (info.ModifiedDate.HasValue) pdfFormatValues[MetadataKeys.DocModifiedDate] = info.ModifiedDate.Value.ToString("yyyy-MM-dd HH:mm");
+            MetadataHelper.RenderFormatToViewModel(this, pdfFormatValues, "pdf");
         }
         catch (Exception ex)
         {
@@ -2077,15 +2143,16 @@ public partial class PreviewViewModel : ObservableObject
         IsPreviewVisible = true;
         IsToolbarVisible = false;
         PreviewHeaderText = "视频信息";
-        FormatMetadata.Clear();
+        var videoFormatValues = new Dictionary<string, string?>();
         if (info.VideoWidth.HasValue && info.VideoHeight.HasValue)
-            FormatMetadata.Add(new("分辨率", $"{info.VideoWidth} × {info.VideoHeight}"));
+            videoFormatValues[MetadataKeys.Resolution] = $"{info.VideoWidth} × {info.VideoHeight}";
         if (info.Duration.HasValue)
-            FormatMetadata.Add(new("时长", info.Duration.Value.ToString(@"hh\:mm\:ss")));
+            videoFormatValues[MetadataKeys.Duration] = info.Duration.Value.ToString(@"hh\:mm\:ss");
         if (info.Codec != null)
-            FormatMetadata.Add(new("编码", info.Codec));
+            videoFormatValues[MetadataKeys.Codec] = info.Codec;
         if (info.Bitrate.HasValue)
-            FormatMetadata.Add(new("比特率", $"{info.Bitrate} kbps"));
+            videoFormatValues[MetadataKeys.Bitrate] = $"{info.Bitrate} kbps";
+        MetadataHelper.RenderFormatToViewModel(this, videoFormatValues, "video");
     }
 
     /// <summary>
@@ -2146,6 +2213,53 @@ public partial class PreviewViewModel : ObservableObject
         IsToolbarVisible = false;
     }
 
+    /// <summary>
+    /// Phase 1 填充通用文件信息。只渲染通用 section，不碰格式 section。
+    /// 格式 section 留空并设置 IsFormatPending=true，等 Phase 2 的 ShowXxx 填充。
+    /// </summary>
+    public void UpdateCommonMetadata(
+        string fileName,
+        string fileSize,
+        string? compressedSize,
+        string compressionRatio,
+        string modifiedDate)
+    {
+        FileName = fileName;
+        FileSize = fileSize;
+        CompressedSize = compressedSize ?? string.Empty;
+        CompressionRatio = compressionRatio;
+        ModifiedDate = modifiedDate;
+        IsInfoPanelVisible = true;
+
+        CurrentCommonValues = new Dictionary<string, string?>
+        {
+            [MetadataKeys.FileName] = fileName,
+            [MetadataKeys.FileSize] = fileSize,
+            [MetadataKeys.CompressedSize] = compressedSize,
+            [MetadataKeys.CompressionRatio] = compressionRatio,
+            [MetadataKeys.FileModifiedDate] = modifiedDate,
+        };
+
+        MetadataHelper.RenderCommonToViewModel(this, CurrentCommonValues);
+    }
+
+    /// <summary>
+    /// 将格式字段与 Phase 1 保存的通用字段合并，供渲染使用。
+    /// 格式字段优先（可覆盖通用字段的同名键）。
+    /// </summary>
+    internal Dictionary<string, string?> MergeWithCommon(Dictionary<string, string?> formatValues)
+    {
+        var merged = new Dictionary<string, string?>();
+        if (CurrentCommonValues != null)
+        {
+            foreach (var kv in CurrentCommonValues)
+                merged[kv.Key] = kv.Value;
+        }
+        foreach (var kv in formatValues)
+            merged[kv.Key] = kv.Value;
+        return merged;
+    }
+
     public void Clear()
     {
         PreviewType = PreviewType.None;
@@ -2156,6 +2270,11 @@ public partial class PreviewViewModel : ObservableObject
         PeMetadata.Clear();
         CsvData = null;
         FormatMetadata.Clear();
+        CommonSections.Clear();
+        FormatSections.Clear();
+        IsFormatPending = false;
+        HasFormatSections = false;
+        ContentTopItems.Clear();
         PreviewHeaderText = string.Empty;
         PreviewImage = null;
         ImageWidth = 0;

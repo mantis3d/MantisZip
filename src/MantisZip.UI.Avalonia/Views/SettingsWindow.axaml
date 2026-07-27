@@ -618,6 +618,89 @@
                 </StackPanel>
               </ScrollViewer>
             </TabItem>
+
+            <!-- ═══════ 元数据面板 ═══════ -->
+            <TabItem Header="元数据面板" Classes="compactTab">
+              <Grid RowDefinitions="Auto,Auto,*" Margin="{DynamicResource SpacingSmThk}">
+                <!-- Field layout toggle -->
+                <CheckBox Grid.Row="0"
+                          IsChecked="{Binding MetadataPanelSettings.IsHorizontalLayout}"
+                          Content="字段左右并排显示"
+                          Margin="0,0,0,8"
+                          Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+
+                <!-- Type selector -->
+                <ComboBox Grid.Row="1"
+                          ItemsSource="{Binding MetadataPanelSettings.TypeOptions}"
+                          SelectedItem="{Binding MetadataPanelSettings.SelectedType}"
+                          Width="240" HorizontalAlignment="Left"
+                          Margin="0,0,0,8"
+                          Background="{DynamicResource ThemeWindowBgBrush}"
+                          Foreground="{DynamicResource ThemeTextPrimaryBrush}">
+                  <ComboBox.ItemTemplate>
+                    <DataTemplate>
+                      <TextBlock Text="{Binding DisplayName}" />
+                    </DataTemplate>
+                  </ComboBox.ItemTemplate>
+                </ComboBox>
+
+                <!-- Field list -->
+                <ScrollViewer Grid.Row="2" Background="{DynamicResource ThemeWindowBgBrush}">
+                  <ItemsControl ItemsSource="{Binding MetadataPanelSettings.Fields}">
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate>
+                        <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="0,0,0,1"
+                                Padding="4,6">
+                          <Grid ColumnDefinitions="*,80,80,110">
+                            <!-- Field name -->
+                            <TextBlock Grid.Column="0" Text="{Binding DisplayName}"
+                                       VerticalAlignment="Center"
+                                       Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+
+                            <!-- Row -->
+                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                              <TextBlock Text="Row" FontSize="10"
+                                         Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+                              <TextBox Text="{Binding Row}"
+                                       Width="50"
+                                       HorizontalContentAlignment="Center"
+                                       Background="{DynamicResource ThemeWindowBgBrush}"
+                                       Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                                       BorderBrush="{DynamicResource ThemeBorderBrush}"
+                                       Height="24" />
+                            </StackPanel>
+
+                            <!-- Order -->
+                            <StackPanel Grid.Column="2" VerticalAlignment="Center">
+                              <TextBlock Text="Order" FontSize="10"
+                                         Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+                              <TextBox Text="{Binding Order}"
+                                       Width="50"
+                                       HorizontalContentAlignment="Center"
+                                       Background="{DynamicResource ThemeWindowBgBrush}"
+                                       Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                                       BorderBrush="{DynamicResource ThemeBorderBrush}"
+                                       Height="24" />
+                            </StackPanel>
+
+                            <!-- Position -->
+                            <StackPanel Grid.Column="3" VerticalAlignment="Center">
+                              <TextBlock Text="位置" FontSize="10"
+                                         Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+                              <ComboBox ItemsSource="{Binding PositionOptions}"
+                                        SelectedItem="{Binding Position}"
+                                        Background="{DynamicResource ThemeWindowBgBrush}"
+                                        Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                                        Height="24" />
+                            </StackPanel>
+                          </Grid>
+                        </Border>
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                </ScrollViewer>
+              </Grid>
+            </TabItem>
           </TabControl>
         </Grid>
       </TabItem>
