@@ -1,22 +1,24 @@
 <Window xmlns="https://github.com/avaloniaui"
-         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-         xmlns:conv="clr-namespace:MantisZip.UI.Avalonia.Converters"
-         xmlns:controls="clr-namespace:MantisZip.UI.Avalonia.Controls"
-         x:Class="MantisZip.UI.Avalonia.Dialogs.CompressSettingsWindow"
-         x:CompileBindings="False"
-         Title="{Binding WindowTitle}"
-         Width="800"
-         SizeToContent="Height"
-         WindowStartupLocation="CenterOwner"
-         CanResize="True"
-         Background="{DynamicResource ThemeWindowBgBrush}">
+          xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+          xmlns:conv="clr-namespace:MantisZip.UI.Avalonia.Converters"
+          xmlns:controls="clr-namespace:MantisZip.UI.Avalonia.Controls"
+          x:Class="MantisZip.UI.Avalonia.Dialogs.CompressSettingsWindow"
+          x:CompileBindings="False"
+          Title="{Binding WindowTitle}"
+          Width="850"
+          MinWidth="700"
+          MinHeight="500"
+          SizeToContent="Height"
+          WindowStartupLocation="CenterOwner"
+          CanResize="True"
+          Background="{DynamicResource ThemeWindowBgBrush}">
 
   <Window.Resources>
     <conv:BoolInvertConverter x:Key="BoolInvertConverter" />
   </Window.Resources>
 
   <Grid RowDefinitions="*,Auto"
-        ColumnDefinitions="*,Auto"
+        ColumnDefinitions="450,Auto,*"
         Margin="16">
     <!-- ═══════ Left: TabControl with settings ═══════ -->
     <TabControl Grid.Column="0" Grid.Row="0">
@@ -299,7 +301,7 @@
                       </DataTemplate>
                     </ListBox.ItemTemplate>
                   </ListBox>
-                  <TextBlock Text="{Binding LocalizedStrings[Compress_Pwd_NoEntry]}"
+                  <TextBlock Text="{Binding PasswordLibraryStatusText}"
                               Foreground="{DynamicResource ThemeTextSecondaryBrush}"
                               FontSize="12"
                               FontStyle="Italic" />
@@ -362,10 +364,10 @@
                       BorderThickness="1" CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}"
                       Background="{DynamicResource ThemeSurfaceBgBrush}">
                 <StackPanel Spacing="{DynamicResource SpacingXs}">
-                  <TextBlock Text="{Binding LocalizedStrings[Compress_Pwd_SaveToLibrary]}"
+                  <TextBlock Text="{Binding SaveCheckLabel}"
                             FontWeight="SemiBold" />
                   <CheckBox IsChecked="{Binding SaveToLibrary}">
-                    <TextBlock Text="{Binding LocalizedStrings[Compress_Pwd_SaveToLibrary]}"
+                    <TextBlock Text="{Binding SaveCheckLabel}"
                                 TextWrapping="Wrap" />
                   </CheckBox>
                   <Grid Margin="0,6,0,0">
@@ -378,10 +380,10 @@
                             FontWeight="SemiBold" />
                   <TextBox Grid.Column="1" PlaceholderText="{Binding LocalizedStrings[Compress_Pwd_DescWatermark]}"
                             Text="{Binding PasswordDescription}"
-                            IsReadOnly="{Binding IsPasswordLibraryMode}" />
+                            IsReadOnly="{Binding IsPasswordLibraryMode}"
+                            IsEnabled="{Binding IsPasswordLibraryMode, Converter={StaticResource BoolInvertConverter}}" />
                   </Grid>
-                  <CheckBox IsChecked="{Binding AutoGenerateRules}"
-                            IsEnabled="{Binding IsPasswordLibraryMode, Converter={StaticResource BoolInvertConverter}}">
+                  <CheckBox IsChecked="{Binding AutoGenerateRules}">
                     <TextBlock Text="{Binding LocalizedStrings[Compress_Pwd_AutoRules]}"
                                 TextWrapping="Wrap" />
                   </CheckBox>
@@ -398,7 +400,8 @@
                             PlaceholderText="{Binding LocalizedStrings[Compress_Pwd_RulesWatermark]}"
                             AcceptsReturn="True"
                             MinHeight="60"
-                            TextWrapping="Wrap" />
+                            TextWrapping="Wrap"
+                            IsReadOnly="{Binding AutoGenerateRules}" />
                    </Grid>
                 </StackPanel>
               </Border>
@@ -469,6 +472,7 @@
     <GridSplitter Grid.Column="1" Grid.Row="0"
                   Width="5"
                   Background="{DynamicResource ThemeSplitterBgBrush}"
+                  ResizeBehavior="PreviousAndNext"
                   ResizeDirection="Auto" />
 
     <!-- ═══════ Right: Preview panel ═══════ -->
@@ -479,7 +483,6 @@
                               MaxItemsPerDirectory="5"
                               MaxDepth="5"
                               ShowFilteredGhosts="{Binding ShowFilteredGhosts}"
-                              Width="280"
                               MinWidth="200" />
 
     <!-- ═══════ Bottom buttons (span all columns) ═══════ -->
