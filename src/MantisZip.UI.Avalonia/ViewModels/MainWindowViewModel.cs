@@ -53,9 +53,9 @@ public partial class MainWindowViewModel : ObservableObject
     public Func<Task>? ShowSettingsWindow { get; set; }
 
     /// <summary>
-    /// 由 View 设置的密码对话框回调。参数为压缩包路径，返回密码或取消时返回 null。
+    /// 由 View 设置的密码对话框回调。参数为压缩包路径，返回 <see cref="PasswordDialogResponse"/> 或取消时返回 null。
     /// </summary>
-    public Func<string, Task<string?>>? ShowPasswordDialog { get; set; }
+    public Func<string, Task<PasswordDialogResponse?>>? ShowPasswordDialog { get; set; }
 
     /// <summary>
     /// 解压设置对话框回调。传入 ExtractSettingsViewModel，返回 true=确认，false=取消。
@@ -146,7 +146,10 @@ public partial class MainWindowViewModel : ObservableObject
     /// 会话密码缓存：压缩包路径 → 密码（仅内存，不持久化）。
     /// </summary>
     private readonly Dictionary<string, string> _sessionPasswords = new(StringComparer.OrdinalIgnoreCase);
+    private readonly PasswordService _passwordService = new();
     private readonly AppSettings _appSettings = AppSettings.Load();
+    private string? _currentPassword;
+    private bool _hasEncryptedArchive;
 
     // ── i18n ──
 
@@ -266,6 +269,18 @@ public partial class MainWindowViewModel : ObservableObject
 
     [ObservableProperty]
     private string? _statusMessage;
+
+    /// <summary>密码状态文字：为空=无加密；"已匹配"或"已加密"。</summary>
+    [ObservableProperty]
+    private string? _passwordStatusMessage;
+
+    /// <summary>密码状态图标 Geometry：为空=无加密。</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasPasswordStatus))]
+    private object? _passwordStatusIcon;
+
+    /// <summary>是否有密码状态显示。</summary>
+    public bool HasPasswordStatus => PasswordStatusIcon != null;
 
     /// <summary>目录/文件统计："3 dirs, 15 files"。</summary>
     [ObservableProperty]
@@ -605,36 +620,97 @@ public partial class MainWindowViewModel : ObservableObject
                 password = cachedPwd;
 
             var result = await _archiveService.LoadArchiveAsync(path, password);
+            var engine = ArchiveEngineFactory.GetEngineByExtension(path);
 
+            // ── Password resolution flow ──
             if (result.IsPasswordRequired)
             {
-                // Prompt for password
-                if (ShowPasswordDialog != null)
+                // Phase A: Try PasswordManager saved passwords
+                if (engine != null)
                 {
-                    password = await ShowPasswordDialog(path);
-                    if (password == null)
+                    var match = _passwordService.TryMatchPassword(path, engine);
+                    if (match != null)
                     {
-                        StatusMessage = LocalizationManager.T("Status_PasswordCancelled");
+                        password = match.Value.Password;
+                        result = await _archiveService.LoadArchiveAsync(path, password);
+                        if (!result.IsPasswordRequired)
+                        {
+                            _sessionPasswords[path] = password;
+                            _currentPassword = password;
+                            _hasEncryptedArchive = true;
+                            UpdatePasswordStatus(isMatched: true);
+                        }
+                    }
+                }
+
+                // Phase B: Dialog loop (still need password after saved attempts)
+                if (result.IsPasswordRequired)
+                {
+                    if (ShowPasswordDialog == null)
+                    {
+                        StatusMessage = LocalizationManager.T("Status_PasswordRequired");
                         IsLoading = false;
                         return;
                     }
 
-                    // Retry with password
-                    result = await _archiveService.LoadArchiveAsync(path, password);
-
-                    if (result.IsPasswordRequired)
+                    while (result.IsPasswordRequired)
                     {
-                        StatusMessage = LocalizationManager.T("Status_WrongPassword");
-                        IsLoading = false;
-                        return;
-                    }
+                        var dialogResponse = await ShowPasswordDialog(path);
+                        if (dialogResponse?.Password == null)
+                        {
+                            StatusMessage = LocalizationManager.T("Status_PasswordCancelled");
+                            IsLoading = false;
+                            return;
+                        }
 
-                    // Cache password on success
-                    _sessionPasswords[path] = password;
+                        password = dialogResponse.Password;
+
+                        // QuickVerify before full retry (fast path)
+                        if (engine != null && !_passwordService.QuickVerifyPassword(path, password, engine))
+                        {
+                            StatusMessage = LocalizationManager.T("Status_WrongPassword");
+                            continue;
+                        }
+
+                        // Full retry with password
+                        result = await _archiveService.LoadArchiveAsync(path, password);
+
+                        if (!result.IsPasswordRequired)
+                        {
+                            // Success
+                            _sessionPasswords[path] = password;
+                            _currentPassword = password;
+                            _hasEncryptedArchive = true;
+
+                            if (dialogResponse.SavePermanently)
+                            {
+                                _passwordService.TrySavePassword(password, path,
+                                    dialogResponse.Patterns, dialogResponse.Description);
+                            }
+
+                            UpdatePasswordStatus(isMatched: true);
+                        }
+                        else
+                        {
+                            StatusMessage = LocalizationManager.T("Status_WrongPassword");
+                        }
+                    }
+                }
+            }
+            else
+            {
+                // No password required: still check for encrypted entries (password may be from cache)
+                if (result.RawItems != null && result.RawItems.Any(i => i.IsEncrypted))
+                {
+                    _hasEncryptedArchive = true;
+                    _currentPassword = password;
+                    UpdatePasswordStatus(isMatched: password != null);
                 }
                 else
                 {
-                    StatusMessage = LocalizationManager.T("Status_PasswordRequired");
+                    _hasEncryptedArchive = false;
+                    _currentPassword = null;
+                    UpdatePasswordStatus(isMatched: false);
                 }
             }
 
@@ -708,6 +784,26 @@ public partial class MainWindowViewModel : ObservableObject
         {
             IsLoading = false;
         }
+    }
+
+    /// <summary>
+    /// 更新密码状态 UI（锁图标 + 状态文字）。
+    /// </summary>
+    private void UpdatePasswordStatus(bool isMatched)
+    {
+        if (!_hasEncryptedArchive)
+        {
+            PasswordStatusMessage = null;
+            PasswordStatusIcon = null;
+            return;
+        }
+
+        PasswordStatusIcon = isMatched
+            ? Application.Current?.FindResource("IconLockOpen")
+            : Application.Current?.FindResource("IconLockClosed");
+        PasswordStatusMessage = isMatched
+            ? LocalizationManager.T("Status_PasswordMatched")
+            : LocalizationManager.T("Status_Encrypted");
     }
 
     private async Task ShowPreviewAsync(ArchiveItemModel entry)
@@ -1295,6 +1391,10 @@ public partial class MainWindowViewModel : ObservableObject
         FilterStats = string.Empty;
         EncodingInfo = string.Empty;
         Preview.Clear();
+        _currentPassword = null;
+        _hasEncryptedArchive = false;
+        PasswordStatusMessage = null;
+        PasswordStatusIcon = null;
         FolderPaths.Clear();
         _backStack.Clear();
         _forwardStack.Clear();

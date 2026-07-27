@@ -47,7 +47,15 @@ public partial class MainWindow : Window
         {
             var dialog = new PasswordDialog(Path.GetFileName(archivePath));
             var result = await dialog.ShowDialog<bool>(this);
-            return result ? dialog.Password : null;
+            if (!result) return null;
+            return new PasswordDialogResponse
+            {
+                Password = dialog.Password,
+                RememberInSession = dialog.RememberInSession,
+                SavePermanently = dialog.SavePermanently,
+                Description = dialog.Description,
+                Patterns = dialog.Patterns
+            };
         };
         DataContext = vm;
 

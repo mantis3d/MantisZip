@@ -5,6 +5,7 @@ using Avalonia.Markup.Xaml;
 using Avalonia.Media;
 using Avalonia.Platform;
 using Avalonia.Threading;
+using MantisZip.Core;
 using MantisZip.Core.Abstractions;
 using MantisZip.Core.Engines;
 using MantisZip.Core.Services;
@@ -476,7 +477,36 @@ public partial class App : Application
     // ════════════════════════════════════════════════════════════════
 
     /// <summary>
+    /// 为 CLI 解压解析密码：从 PasswordManager 查找已保存密码并快速验证。
+    /// </summary>
+    private static string? ResolveCliPassword(string archivePath, IArchiveEngine engine)
+    {
+        try
+        {
+            var allMatches = PasswordManager.Instance.FindMatchingPasswords(archivePath);
+            foreach (var entry in allMatches)
+            {
+                var pwd = entry.Password;
+                if (string.IsNullOrEmpty(pwd)) continue;
+
+                var service = new PasswordService();
+                if (service.QuickVerifyPassword(archivePath, pwd, engine))
+                {
+                    DebugLog($"CLI extract: saved password matched for '{archivePath}'");
+                    return pwd;
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            DebugLog($"CLI extract: password lookup failed: {ex.Message}");
+        }
+        return null;
+    }
+
+    /// <summary>
     /// 带提权支持的异步解压。先检查目标目录可写性，权限不足时弹出提权对话框。
+    /// 自动尝试已保存密码。
     /// </summary>
     private static async Task<bool> TryExtractArchiveAsync(
         string archivePath,
@@ -506,7 +536,8 @@ public partial class App : Application
                 return false;
             }
 
-            await engine.ExtractAsync(archivePath, targetDir);
+            var password = ResolveCliPassword(archivePath, engine);
+            await engine.ExtractAsync(archivePath, targetDir, password);
             Console.WriteLine($"Extracted: {archivePath} -> {targetDir}");
             TryDeleteArchiveAfterExtract(archivePath);
             return false;
@@ -525,6 +556,7 @@ public partial class App : Application
     /// <summary>
     /// 带提权支持的异步智能解压。先分析目标目录可写性，权限不足时弹出提权对话框。
     /// 解压成功后根据 DeleteArchiveAfterExtract 设置尝试删除原包。
+    /// 自动尝试已保存密码。
     /// </summary>
     private static async Task<bool> TryExtractSmartAsync(
         string archivePath,
@@ -570,7 +602,8 @@ public partial class App : Application
             if (unwritable.Count > 0)
                 return await HandleElevationAsync(unwritable, originalArgs, desktop);
 
-            await engine.ExtractAsync(archivePath, targetDir);
+            var password = ResolveCliPassword(archivePath, engine);
+            await engine.ExtractAsync(archivePath, targetDir, password);
             Console.WriteLine($"Extracted: {archivePath} -> {targetDir}");
             TryDeleteArchiveAfterExtract(archivePath);
             return false;

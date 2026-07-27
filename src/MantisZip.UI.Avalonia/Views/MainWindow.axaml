@@ -1184,7 +1184,7 @@
     <Border Grid.Row="4"
             Padding="8,4"
             Background="{DynamicResource ThemeHeaderBgBrush}">
-      <Grid ColumnDefinitions="Auto,*,Auto">
+      <Grid ColumnDefinitions="Auto,*,Auto,Auto">
         <TextBlock Grid.Column="0"
                    Text="{Binding SelectionStats}"
                    Foreground="{DynamicResource ThemeTextPrimaryBrush}"
@@ -1194,7 +1194,20 @@
                    Foreground="{DynamicResource ThemeTextPrimaryBrush}"
                    FontSize="12"
                    HorizontalAlignment="Center" />
-        <TextBlock Grid.Column="2"
+        <!-- Password status -->
+        <StackPanel Grid.Column="2"
+                    Orientation="Horizontal"
+                    Spacing="4"
+                    IsVisible="{Binding HasPasswordStatus}"
+                    Margin="0,0,8,0">
+          <PathIcon Data="{Binding PasswordStatusIcon}"
+                    Width="14" Height="14"
+                    Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+          <TextBlock Text="{Binding PasswordStatusMessage}"
+                     Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                     FontSize="12" />
+        </StackPanel>
+        <TextBlock Grid.Column="3"
                    Text="{Binding StatusMessage}"
                    Foreground="{DynamicResource ThemeTextPrimaryBrush}"
                    FontSize="12"

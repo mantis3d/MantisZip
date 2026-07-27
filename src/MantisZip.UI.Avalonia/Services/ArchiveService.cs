@@ -26,6 +26,14 @@ public class ArchiveService
 
             var items = await engine.ListEntriesAsync(archivePath, password, cancellationToken);
             var itemsList = items.ToList();
+
+            // 检查加密条目：ZIP 格式在无密码时也能列出条目（标记 IsEncrypted=true），
+            // 此时需要提示用户输入密码。
+            if (string.IsNullOrEmpty(password) && itemsList.Any(i => i.IsEncrypted))
+            {
+                return ArchiveLoadResult.PasswordRequired();
+            }
+
             var models = itemsList.Select(ArchiveItemModel.FromCore).ToList();
 
             // Load file type icons (folder vs file)

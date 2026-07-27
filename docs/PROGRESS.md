@@ -21,6 +21,18 @@
 
 ### MantisZip.UI.Avalonia（主力版）
 
+**2026-07-27** — 密码子系统全面补齐：ZIP 加密检测/PasswordManager 集成/密码对话框升级
+  - 根因：`ArchiveService.LoadArchiveAsync` 在 `ListEntriesAsync` 成功后从不检查 `items.Any(i => i.IsEncrypted)`，加密 ZIP 包直接返回 Success，不弹出密码窗
+  - 修复：
+    - `ArchiveService.LoadArchiveAsync` 添加 `IsEncrypted` 检测，无密码时返回 `PasswordRequired`
+    - 创建 `PasswordService`（QuickVerifyPassword/TryMatchPassword/TrySavePassword/BoundedWriteStream）
+    - `MainWindowViewModel` 集成完整密码流：PasswordManager 自动匹配 → 对话框循环 → QuickVerify 验证 → 永久保存
+    - `PasswordDialog` 升级：已保存密码下拉列表、描述/匹配规则编辑、永久保存选项
+    - CLI 解压（`TryExtractArchiveAsync`/`TryExtractSmartAsync`）自动读取已保存密码
+    - 状态栏增加密码状态图标（🔒/🔓）+ 文字
+    - 补充 8 条本地化字符串（中/英）
+  - 涉及 11 个文件，Avalonia 构建 0 errors，Core 236/236 测试通过
+
 **2026-07-27** — 压缩文件冲突对话框死锁修复：CompressConflictResolver async 化
   - 根因：Core 的 `ResolveConflict()` 在任何 `await` 之前同步执行 → 若从 UI 线程调用则死锁
   - 修复：`CompressConflictResolver` 从同步委托改为异步（返回 `Task<CompressConflictResolution>`）
