@@ -69,11 +69,10 @@ public partial class MainWindowViewModel : ObservableObject
 
     /// <summary>
     /// 压缩冲突对话框回调。从后台线程调用，返回用户选择的冲突处理方式。
-    /// 实现需通过 <see cref="Avalonia.Threading.Dispatcher.UIThread"/> 切换到 UI 线程显示对话框，
-    /// 并阻塞等待用户响应。
+    /// 实现需通过 <see cref="Avalonia.Threading.Dispatcher.UIThread"/> 切换到 UI 线程显示对话框。
     /// 返回值为 (处理方式, 用户自定义文件名, 是否应用到全部)。
     /// </summary>
-    public Func<CompressConflictInfo, (Core.Abstractions.CompressConflictAction Action, string? CustomName, bool ApplyToAll)>? ShowCompressConflictDialog { get; set; }
+    public Func<CompressConflictInfo, Task<(Core.Abstractions.CompressConflictAction Action, string? CustomName, bool ApplyToAll)>>? ShowCompressConflictDialog { get; set; }
 
     /// <summary>
     /// 解压文件冲突对话框回调。从解压引擎的后台线程调用，
@@ -1577,7 +1576,7 @@ public partial class MainWindowViewModel : ObservableObject
                 Core.Abstractions.CompressConflictAction? chosenAction = null;
 
                 await svc.CompressAsync(request, progress, ct,
-                    conflictResolver: info =>
+                    conflictResolver: async info =>
                     {
                         // 已勾选"应用到全部" → 直接返回记忆的选择
                         if (applyToAll && chosenAction.HasValue)
@@ -1585,7 +1584,7 @@ public partial class MainWindowViewModel : ObservableObject
 
                         if (ShowCompressConflictDialog != null)
                         {
-                            var (action, customName, applyAll) = ShowCompressConflictDialog(info);
+                            var (action, customName, applyAll) = await ShowCompressConflictDialog(info);
                             if (applyAll)
                             {
                                 applyToAll = true;

@@ -192,52 +192,41 @@ public partial class MainWindow : Window
         //  压缩/解压冲突对话框回调（从后台线程调用）
         // ════════════════════════════════════════════════
 
-        vm.ShowCompressConflictDialog = info =>
+        vm.ShowCompressConflictDialog = async info =>
         {
-            var tcs = new TaskCompletionSource<(Core.Abstractions.CompressConflictAction Action, string? CustomName, bool ApplyToAll)>();
-
-            Dispatcher.UIThread.Post(async () =>
+            return await Dispatcher.UIThread.InvokeAsync(async () =>
             {
-                try
+                var dlg = new CompressConflictDialog(
+                    info.OutputPath,
+                    info.SuggestedName,
+                    info.CanAdd);
+                await dlg.ShowDialog(this);
+
+                var dlgAction = dlg.ResultAction;
+                Core.Abstractions.CompressConflictAction resultAction;
+                string? customName = null;
+
+                switch (dlgAction)
                 {
-                    var dlg = new CompressConflictDialog(
-                        info.OutputPath,
-                        info.SuggestedName,
-                        info.CanAdd);
-                    await dlg.ShowDialog(this);
-
-                    var dlgAction = dlg.ResultAction;
-                    Core.Abstractions.CompressConflictAction resultAction;
-                    string? customName = null;
-
-                    switch (dlgAction)
-                    {
-                        case Dialogs.CompressConflictAction.Overwrite:
-                            resultAction = Core.Abstractions.CompressConflictAction.Overwrite;
-                            break;
-                        case Dialogs.CompressConflictAction.Add:
-                            resultAction = Core.Abstractions.CompressConflictAction.Add;
-                            break;
-                        case Dialogs.CompressConflictAction.Rename:
-                            resultAction = Core.Abstractions.CompressConflictAction.Rename;
-                            customName = dlg.CustomName;
-                            break;
-                        case Dialogs.CompressConflictAction.Skip:
-                        case Dialogs.CompressConflictAction.Cancel:
-                        default:
-                            resultAction = Core.Abstractions.CompressConflictAction.Cancel;
-                            break;
-                    }
-
-                    tcs.TrySetResult((resultAction, customName, dlg.ApplyToAll));
+                    case Dialogs.CompressConflictAction.Overwrite:
+                        resultAction = Core.Abstractions.CompressConflictAction.Overwrite;
+                        break;
+                    case Dialogs.CompressConflictAction.Add:
+                        resultAction = Core.Abstractions.CompressConflictAction.Add;
+                        break;
+                    case Dialogs.CompressConflictAction.Rename:
+                        resultAction = Core.Abstractions.CompressConflictAction.Rename;
+                        customName = dlg.CustomName;
+                        break;
+                    case Dialogs.CompressConflictAction.Skip:
+                    case Dialogs.CompressConflictAction.Cancel:
+                    default:
+                        resultAction = Core.Abstractions.CompressConflictAction.Cancel;
+                        break;
                 }
-                catch (Exception ex)
-                {
-                    tcs.TrySetException(ex);
-                }
+
+                return (resultAction, customName, dlg.ApplyToAll);
             });
-
-            return tcs.Task.GetAwaiter().GetResult();
         };
 
         vm.ShowExtractFileConflictDialogAsync = async info =>
