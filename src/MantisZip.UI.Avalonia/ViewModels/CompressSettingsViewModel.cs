@@ -447,14 +447,6 @@ public partial class CompressSettingsViewModel : ObservableObject
             SelectedZipEncryptionMethodOption = options.FirstOrDefault(o => o.Tag == value);
     }
 
-    partial void OnPasswordChanged(string? value)
-    {
-        OnPropertyChanged(nameof(PasswordStrength));
-        OnPropertyChanged(nameof(PasswordStrengthValue));
-        OnPropertyChanged(nameof(PasswordStrengthIndicator));
-        OnPropertyChanged(nameof(PasswordsMatch));
-    }
-
     partial void OnConfirmPasswordChanged(string? value)
     {
         OnPropertyChanged(nameof(PasswordsMatch));
@@ -472,6 +464,8 @@ public partial class CompressSettingsViewModel : ObservableObject
         OnPropertyChanged(nameof(IsCombinedMode));
         RefreshOutputPathState();
         UpdateCanCompress();
+        if (AutoGenerateRules)
+            RefreshAutoRules();
     }
 
     partial void OnDefaultFormatChanged(string value)
@@ -485,6 +479,8 @@ public partial class CompressSettingsViewModel : ObservableObject
 
         OnPropertyChanged(nameof(IsZipFormat));
         OnPropertyChanged(nameof(IsSevenZipFormat));
+        if (AutoGenerateRules)
+            RefreshAutoRules();
         OnPropertyChanged(nameof(IsFormatEncryptionSupported));
     }
 
@@ -501,17 +497,62 @@ public partial class CompressSettingsViewModel : ObservableObject
             ApplyPasswordFilter();
         }
         OnPropertyChanged(nameof(IsPasswordLibraryMode));
+        OnPropertyChanged(nameof(SaveCheckLabel));
     }
+
+    /// <summary>
+    /// 密码库状态文本：未选中时显示"未选定密码"，选中后显示"已选定: {description}"。
+    /// </summary>
+    public string PasswordLibraryStatusText =>
+        SelectedPasswordEntry != null
+            ? string.Format(LocalizationManager.T("Compress_Pwd_Selected"), SelectedPasswordEntry.Description)
+            : LocalizationManager.T("Compress_Pwd_NoEntry");
+
+    /// <summary>
+    /// 保存复选框标签：密码库模式显示"更新匹配规则"，新密码模式显示"保存到密码库"。
+    /// 对标 WPF CompressSettingsWindow.Password.cs UpdatePasswordSourceUI。
+    /// </summary>
+    public string SaveCheckLabel =>
+        IsPasswordLibraryMode
+            ? LocalizationManager.T("Compress_Pwd_UpdateRules")
+            : LocalizationManager.T("Compress_Pwd_SaveToLibrary");
 
     partial void OnSelectedPasswordEntryChanged(Core.PasswordEntry? value)
     {
         if (value != null)
         {
-            Password = value.Password;
+            // 库模式下密码来自 SelectedPasswordEntry.Password，不写入 Password 属性
+            // （对标 WPF: PasswordBox.Password = "" 且 GetActivePassword 返回 _selectedLibraryEntry?.Password）
             PasswordDescription = value.Description;
-            RulesText = value.PatternsDisplay;
-            ConfirmPassword = value.Password; // auto-match in library mode
+            // RulesText 不由条目规则覆盖: WPF 在选中条目时不写 PwdRulesBox.Text，
+            // 规则始终来自自动规则（AutoGenerateRules 为 true 时由 RefreshAutoRules 生成）
+            // 或用户手动输入。选中条目后若 AutoGenerateRules 为 true 则重新生成。
+            if (AutoGenerateRules)
+                RefreshAutoRules();
         }
+        OnPropertyChanged(nameof(PasswordLibraryStatusText));
+    }
+
+    partial void OnPasswordChanged(string? value)
+    {
+        OnPropertyChanged(nameof(PasswordStrength));
+        OnPropertyChanged(nameof(PasswordStrengthValue));
+        OnPropertyChanged(nameof(PasswordStrengthIndicator));
+        OnPropertyChanged(nameof(PasswordsMatch));
+
+        // 用户手动输入密码时，清除密码库选中并自动切换到新密码模式
+        // 对标 WPF OnPasswordContentChanged
+        if (!string.IsNullOrEmpty(value) && IsPasswordLibraryMode)
+        {
+            SelectedPasswordEntry = null;
+            IsPasswordLibraryMode = false;
+        }
+    }
+
+    partial void OnAutoGenerateRulesChanged(bool value)
+    {
+        if (value)
+            RefreshAutoRules();
     }
 
     partial void OnPasswordSearchTextChanged(string value)
@@ -596,24 +637,52 @@ public partial class CompressSettingsViewModel : ObservableObject
     }
 
     /// <summary>
-    /// Refresh auto-rules from source file paths.
+    /// Refresh auto-rules from output mode + source file paths.
+    /// Matches WPF CompressSettingsWindow.Password.cs RefreshAutoRules logic.
+    /// Generates rules that match expected output archive file names (e.g. "document*.zip"),
+    /// not source file extensions.
     /// </summary>
     public void RefreshAutoRules()
     {
-        // Generate rules from file extensions of selected paths
-        var extensions = SelectedPaths
-            .Select(p => Path.GetExtension(p))
-            .Where(e => !string.IsNullOrEmpty(e))
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .ToList();
+        if (!AutoGenerateRules) return;
 
-        if (extensions.Count > 0)
+        var ext = DefaultFormat == "tar.gz" ? ".tar.gz" : "." + DefaultFormat;
+
+        switch (OutputMode)
         {
-            RulesText = string.Join(", ", extensions.Select(e => $"*{e}"));
-        }
-        else
-        {
-            RulesText = string.Join(", ", SelectedPaths.Select(p => Path.GetFileName(p)));
+            case CompressOutputMode.Manual:
+                if (!string.IsNullOrEmpty(OutputPath))
+                {
+                    var manualName = Path.GetFileNameWithoutExtension(OutputPath);
+                    if (!string.IsNullOrEmpty(manualName))
+                        RulesText = $"{manualName}*{ext}";
+                }
+                break;
+
+            case CompressOutputMode.Separate:
+                var rules = new List<string>();
+                foreach (var src in SelectedPaths)
+                {
+                    string baseName;
+                    if (File.Exists(src))
+                        baseName = Path.GetFileNameWithoutExtension(src);
+                    else if (Directory.Exists(src))
+                        baseName = ArchivePath.GetFileName(src);
+                    else
+                        continue;
+                    rules.Add($"{baseName}*{ext}");
+                }
+                RulesText = string.Join("\r\n", rules);
+                break;
+
+            case CompressOutputMode.Combined:
+                var commonParent = App.FindCommonParent(SelectedPaths.ToList());
+                if (commonParent != null && !App.IsDriveRoot(commonParent))
+                {
+                    var archiveName = ArchivePath.GetFileName(commonParent);
+                    RulesText = $"{archiveName}*{ext}";
+                }
+                break;
         }
     }
 
@@ -721,17 +790,9 @@ public partial class CompressSettingsViewModel : ObservableObject
 
     private void UpdateAutoRules()
     {
-        // Re-generate auto-rules from current file list
-        var extensions = SelectedPaths
-            .Select(p => Path.GetExtension(p))
-            .Where(e => !string.IsNullOrEmpty(e))
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .Select(e => $"*{e}")
-            .ToList();
-        if (extensions.Count > 0 && AutoGenerateRules)
-        {
-            RulesText = string.Join(", ", extensions);
-        }
+        // Delegate to RefreshAutoRules for output-mode-based rule generation.
+        if (AutoGenerateRules)
+            RefreshAutoRules();
     }
 
     // ── Output mode helpers ──

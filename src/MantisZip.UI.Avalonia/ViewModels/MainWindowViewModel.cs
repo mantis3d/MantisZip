@@ -1640,7 +1640,11 @@ public partial class MainWindowViewModel : ObservableObject
             Mode = vm.OutputMode,
             Format = vm.DefaultFormat,
             CompressionLevel = vm.CompressionLevel,
-            Password = vm.Encrypt ? vm.Password : null,
+            Password = vm.Encrypt
+                ? (vm.IsPasswordLibraryMode && vm.SelectedPasswordEntry != null
+                    ? vm.SelectedPasswordEntry.Password
+                    : vm.Password)
+                : null,
             Encrypt = vm.Encrypt,
             Comment = vm.Comment,
             CommentDistribution = vm.CommentDistribution,
