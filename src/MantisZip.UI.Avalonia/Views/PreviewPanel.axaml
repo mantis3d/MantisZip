@@ -2,8 +2,11 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="clr-namespace:MantisZip.UI.Avalonia.ViewModels"
              xmlns:models="clr-namespace:MantisZip.UI.Avalonia.Models"
+             xmlns:services="clr-namespace:MantisZip.UI.Avalonia.Services"
+             xmlns:local="clr-namespace:MantisZip.UI.Avalonia.Views"
 
              x:Class="MantisZip.UI.Avalonia.Views.PreviewPanel"
+             x:Name="ThisPanel"
              x:DataType="vm:PreviewViewModel">
     <UserControl.Resources>
       <!-- 透明棋盘格背景画刷 -->
@@ -28,6 +31,8 @@
           </DrawingGroup>
         </DrawingBrush.Drawing>
       </DrawingBrush>
+      <local:OrientationToBoolConverter x:Key="OrientationToBoolConverter" />
+      <local:InvertBoolConverter x:Key="InvertBoolConverter" />
     </UserControl.Resources>
     <Grid x:Name="PreviewRootGrid"
           RowDefinitions="Auto,*,Auto"
@@ -35,8 +40,7 @@
     <!-- Toolbar -->
     <Border Grid.Row="0" Grid.Column="0"
             Padding="4,2"
-            Background="{DynamicResource ThemeHeaderBgBrush}"
-            IsVisible="{Binding IsToolbarVisible}">
+            Background="{DynamicResource ThemeHeaderBgBrush}">
       <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
         <!-- Zoom controls (image/gif) -->
         <StackPanel Orientation="Horizontal" Spacing="2"
@@ -124,13 +128,74 @@
                   Width="48" Height="{DynamicResource ControlHeight}" FontSize="12" Padding="0"
                   IsEnabled="{Binding CanLigatureToggle}" />
         </StackPanel>
+
+        <!-- Metadata panel settings (right-aligned) -->
+        <StackPanel Orientation="Horizontal" Spacing="2"
+                    HorizontalAlignment="Right">
+          <Button Width="32" Height="{DynamicResource ControlHeight}" Padding="0"
+                  Command="{Binding OpenMetadataSettingsCommand}"
+                  ToolTip.Tip="元数据面板设置">
+            <PathIcon Data="{StaticResource IconSettings}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+          </Button>
+        </StackPanel>
       </StackPanel>
     </Border>
 
     <!-- Preview content area -->
     <ScrollViewer x:Name="PreviewContentScroller" Grid.Row="1" Grid.Column="0"
                   Background="{DynamicResource ThemeSurfaceBgBrush}">
-      <Grid>
+      <StackPanel>
+        <!-- Content-top metadata items -->
+        <Border Padding="{DynamicResource SpacingSmThk}"
+                Background="{DynamicResource ThemeSurfaceBgBrush}"
+                BorderBrush="{DynamicResource ThemeBorderBrush}"
+                BorderThickness="0,0,0,1">
+          <ItemsControl ItemsSource="{Binding ContentTopItems}">
+            <ItemsControl.ItemsPanel>
+              <ItemsPanelTemplate>
+                <StackPanel Spacing="2" />
+              </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="services:InfoPanelRow">
+                <ItemsControl ItemsSource="{Binding Items}">
+                  <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                      <WrapPanel />
+                    </ItemsPanelTemplate>
+                  </ItemsControl.ItemsPanel>
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="models:FormatMetadataItem">
+                      <StackPanel Margin="0,0,16,0" MinWidth="60">
+                        <!-- Vertical: Key above Value -->
+                        <StackPanel IsVisible="{Binding #ThisPanel.DataContext.FieldOrientation, Converter={StaticResource OrientationToBoolConverter}, ConverterParameter=vertical}">
+                          <TextBlock Text="{Binding Key}" FontSize="11"
+                                     Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+                          <TextBlock Text="{Binding Value}" FontSize="12"
+                                     Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                                     TextWrapping="Wrap" />
+                        </StackPanel>
+                        <!-- Horizontal: Key: Value side by side -->
+                        <StackPanel Orientation="Horizontal" Spacing="3"
+                                    IsVisible="{Binding #ThisPanel.DataContext.FieldOrientation, Converter={StaticResource OrientationToBoolConverter}, ConverterParameter=horizontal}">
+                          <TextBlock FontSize="11" Foreground="{DynamicResource ThemeTextSecondaryBrush}">
+                            <Run Text="{Binding Key}" />
+                            <Run Text=":" />
+                          </TextBlock>
+                          <TextBlock Text="{Binding Value}" FontSize="12"
+                                     Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                                     TextWrapping="Wrap" />
+                        </StackPanel>
+                      </StackPanel>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </Border>
+
+        <Grid>
         <!-- Unsupported / empty state -->
         <TextBlock Text="{Binding TextContent}"
                    VerticalAlignment="Center"
@@ -272,17 +337,7 @@
             <TextBlock Text="{Binding PreviewHeaderText}"
                        FontSize="20"
                        FontWeight="Bold" />
-            <ItemsControl ItemsSource="{Binding FormatMetadata}">
-              <ItemsControl.ItemTemplate>
-                <DataTemplate x:DataType="models:FormatMetadataItem">
-                  <Grid ColumnDefinitions="Auto,8,*" Margin="0,2">
-                    <TextBlock Text="{Binding Key}" FontWeight="Bold"
-                               Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
-                    <TextBlock Grid.Column="2" Text="{Binding Value}" />
-                  </Grid>
-                </DataTemplate>
-              </ItemsControl.ItemTemplate>
-            </ItemsControl>
+
             <Separator />
             <!-- SkiaSharp 渲染的字体样本位图（非空时显示） -->
             <Image Source="{Binding PreviewImage}"
@@ -303,19 +358,7 @@
           <TextBlock Text="{Binding PreviewHeaderText}"
                      FontSize="20"
                      FontWeight="Bold" />
-          <ItemsControl ItemsSource="{Binding FormatMetadata}">
-            <ItemsControl.ItemTemplate>
-              <DataTemplate x:DataType="models:FormatMetadataItem">
-                <Grid ColumnDefinitions="Auto,8,*" Margin="0,2">
-                  <TextBlock Text="{Binding Key}" FontWeight="Bold"
-                             Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
-                  <TextBlock Grid.Column="2" Text="{Binding Value}" />
-                </Grid>
-              </DataTemplate>
-            </ItemsControl.ItemTemplate>
-          </ItemsControl>
         </StackPanel>
-
         <!-- SQLite preview -->
         <Grid IsVisible="{Binding IsSqliteVisible}"
               RowDefinitions="Auto,*">
@@ -345,37 +388,14 @@
           <TextBlock Text="{Binding PreviewHeaderText}"
                      FontSize="20"
                      FontWeight="Bold" />
-          <ItemsControl ItemsSource="{Binding FormatMetadata}">
-            <ItemsControl.ItemTemplate>
-              <DataTemplate x:DataType="models:FormatMetadataItem">
-                <Grid ColumnDefinitions="Auto,8,*" Margin="0,2">
-                  <TextBlock Text="{Binding Key}" FontWeight="Bold"
-                             Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
-                  <TextBlock Grid.Column="2" Text="{Binding Value}" />
-                </Grid>
-              </DataTemplate>
-            </ItemsControl.ItemTemplate>
-          </ItemsControl>
         </StackPanel>
-
+        
         <!-- Torrent preview -->
         <StackPanel IsVisible="{Binding IsTorrentVisible}"
                     Spacing="{DynamicResource SpacingXs}">
           <TextBlock Text="{Binding PreviewHeaderText}"
                      FontSize="20"
                      FontWeight="Bold" />
-          <ItemsControl ItemsSource="{Binding FormatMetadata}">
-            <ItemsControl.ItemTemplate>
-              <DataTemplate x:DataType="models:FormatMetadataItem">
-                <Grid ColumnDefinitions="Auto,8,*" Margin="0,2">
-                  <TextBlock Text="{Binding Key}" FontWeight="Bold"
-                             Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
-                  <TextBlock Grid.Column="2" Text="{Binding Value}" />
-                </Grid>
-              </DataTemplate>
-            </ItemsControl.ItemTemplate>
-          </ItemsControl>
-          <Separator />
           <TextBlock Text="文件列表" FontWeight="SemiBold" />
           <TreeView ItemsSource="{Binding TorrentTreeRoots}"
                     BorderThickness="0"
@@ -473,38 +493,16 @@
           <TextBlock Text="{Binding PreviewHeaderText}"
                      FontSize="20"
                      FontWeight="Bold" />
-          <ItemsControl ItemsSource="{Binding FormatMetadata}">
-            <ItemsControl.ItemTemplate>
-              <DataTemplate x:DataType="models:FormatMetadataItem">
-                <Grid ColumnDefinitions="Auto,8,*" Margin="0,2">
-                  <TextBlock Text="{Binding Key}" FontWeight="Bold"
-                             Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
-                  <TextBlock Grid.Column="2" Text="{Binding Value}" />
-                </Grid>
-              </DataTemplate>
-            </ItemsControl.ItemTemplate>
-          </ItemsControl>
         </StackPanel>
-
+        
         <!-- Video preview (metadata only) -->
         <StackPanel IsVisible="{Binding IsVideoVisible}"
                     Spacing="{DynamicResource SpacingXs}">
           <TextBlock Text="{Binding PreviewHeaderText}"
                      FontSize="20"
                      FontWeight="Bold" />
-          <ItemsControl ItemsSource="{Binding FormatMetadata}">
-            <ItemsControl.ItemTemplate>
-              <DataTemplate x:DataType="models:FormatMetadataItem">
-                <Grid ColumnDefinitions="Auto,8,*" Margin="0,2">
-                  <TextBlock Text="{Binding Key}" FontWeight="Bold"
-                             Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
-                  <TextBlock Grid.Column="2" Text="{Binding Value}" />
-                </Grid>
-              </DataTemplate>
-            </ItemsControl.ItemTemplate>
-          </ItemsControl>
         </StackPanel>
-
+        
         <!-- Markdown 预览（控件树） -->
         <ScrollViewer IsVisible="{Binding IsMarkdownOrHtmlVisible}"
                       Background="{DynamicResource ThemeSurfaceBgBrush}"
@@ -633,6 +631,7 @@
                      TextAlignment="Center" />
         </StackPanel>
       </Grid>
+      </StackPanel>
     </ScrollViewer>
 
     <!-- Preview Info Panel (placed dynamically by ApplyInfoPanelOrientation) -->
@@ -645,55 +644,121 @@
             IsVisible="{Binding IsInfoPanelVisible}">
       <ScrollViewer Padding="10">
         <StackPanel Spacing="{DynamicResource SpacingXs}">
-          <!-- Format metadata (top section) -->
-          <TextBlock Text="详细信息" FontWeight="SemiBold"
-                     Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
-          <ItemsControl ItemsSource="{Binding FormatMetadata}">
+          <!-- Common file info section (Phase 1) -->
+          <ItemsControl ItemsSource="{Binding CommonSections}">
             <ItemsControl.ItemTemplate>
-              <DataTemplate x:DataType="models:FormatMetadataItem">
-                <Grid ColumnDefinitions="Auto,8,*" Margin="0,2">
-                  <TextBlock Text="{Binding Key}" FontWeight="Bold"
+              <DataTemplate x:DataType="services:MetadataSection">
+                <StackPanel Spacing="{DynamicResource SpacingXxs}">
+                  <TextBlock Text="{Binding Title}" FontWeight="SemiBold"
                              Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
-                  <TextBlock Grid.Column="2" Text="{Binding Value}"
-                             Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
-                </Grid>
+                  <ItemsControl ItemsSource="{Binding Rows}">
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate x:DataType="services:InfoPanelRow">
+                        <ItemsControl ItemsSource="{Binding Items}">
+                          <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                              <WrapPanel />
+                            </ItemsPanelTemplate>
+                          </ItemsControl.ItemsPanel>
+                          <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="models:FormatMetadataItem">
+                              <StackPanel Margin="0,0,12,4" MinWidth="80">
+                                <!-- Vertical: Key above Value -->
+                                <StackPanel IsVisible="{Binding #ThisPanel.DataContext.FieldOrientation, Converter={StaticResource OrientationToBoolConverter}, ConverterParameter=vertical}">
+                                  <TextBlock Text="{Binding Key}" FontSize="11"
+                                             Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+                                  <TextBlock Text="{Binding Value}" FontSize="12"
+                                             Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                                             TextWrapping="Wrap" />
+                                </StackPanel>
+                                <!-- Horizontal: Key: Value side by side -->
+                                <StackPanel Orientation="Horizontal" Spacing="3"
+                                            IsVisible="{Binding #ThisPanel.DataContext.FieldOrientation, Converter={StaticResource OrientationToBoolConverter}, ConverterParameter=horizontal}">
+                                  <TextBlock FontSize="11" Foreground="{DynamicResource ThemeTextSecondaryBrush}">
+                                    <Run Text="{Binding Key}" />
+                                    <Run Text=":" />
+                                  </TextBlock>
+                                  <TextBlock Text="{Binding Value}" FontSize="12"
+                                             Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                                             TextWrapping="Wrap" />
+                                </StackPanel>
+                              </StackPanel>
+                            </DataTemplate>
+                          </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                </StackPanel>
               </DataTemplate>
             </ItemsControl.ItemTemplate>
           </ItemsControl>
-          <Separator />
-          <!-- File name -->
-          <TextBlock Text="{Binding FileName}" FontWeight="Bold"
-                     Foreground="{DynamicResource ThemeTextPrimaryBrush}"
-                     TextWrapping="Wrap" />
-          <Separator />
-          <!-- Size / Compressed / Ratio (one row, 3 columns) -->
-          <Grid ColumnDefinitions="*,*,*">
-            <StackPanel>
-              <TextBlock Text="大小:" FontWeight="SemiBold"
-                         Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
-              <TextBlock Text="{Binding FileSize}"
-                         Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
-            </StackPanel>
-            <StackPanel Grid.Column="1">
-              <TextBlock Text="压缩后:" FontWeight="SemiBold"
-                         Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
-              <TextBlock Text="{Binding CompressedSize}"
-                         Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
-            </StackPanel>
-            <StackPanel Grid.Column="2">
-              <TextBlock Text="压缩率:" FontWeight="SemiBold"
-                         Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
-              <TextBlock Text="{Binding CompressionRatio}"
-                         Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
-            </StackPanel>
-          </Grid>
-          <!-- Date -->
-          <Grid ColumnDefinitions="Auto,*">
-            <TextBlock Text="修改日期:" FontWeight="SemiBold"
-                       Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
-            <TextBlock Grid.Column="1" Text="{Binding ModifiedDate}"
-                       Foreground="{DynamicResource ThemeTextPrimaryBrush}" Margin="8,0,0,0" />
-          </Grid>
+
+          <!-- Separator between common and format sections -->
+          <Separator IsVisible="{Binding HasFormatSections}" />
+
+          <!-- Loading indicator (Phase 1 → Phase 2) -->
+          <TextBlock Text="正在提取格式信息…"
+                     FontSize="11"
+                     Foreground="{DynamicResource ThemeTextSecondaryBrush}"
+                     IsVisible="{Binding IsFormatPending}" />
+
+          <!-- Empty format hint -->
+          <TextBlock Text="无格式信息"
+                     FontSize="11"
+                     Foreground="{DynamicResource ThemeTextSecondaryBrush}"
+                     IsVisible="{Binding IsFormatEmpty}" />
+
+          <!-- Format-specific info section (Phase 2) -->
+          <ItemsControl ItemsSource="{Binding FormatSections}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="services:MetadataSection">
+                <StackPanel Spacing="{DynamicResource SpacingXxs}">
+                  <TextBlock Text="{Binding Title}" FontWeight="SemiBold"
+                             Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+                  <ItemsControl ItemsSource="{Binding Rows}">
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate x:DataType="services:InfoPanelRow">
+                        <ItemsControl ItemsSource="{Binding Items}">
+                          <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                              <WrapPanel />
+                            </ItemsPanelTemplate>
+                          </ItemsControl.ItemsPanel>
+                          <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="models:FormatMetadataItem">
+                              <StackPanel Margin="0,0,12,4" MinWidth="80">
+                                <!-- Vertical: Key above Value -->
+                                <StackPanel IsVisible="{Binding #ThisPanel.DataContext.FieldOrientation, Converter={StaticResource OrientationToBoolConverter}, ConverterParameter=vertical}">
+                                  <TextBlock Text="{Binding Key}" FontSize="11"
+                                             Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+                                  <TextBlock Text="{Binding Value}" FontSize="12"
+                                             Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                                             TextWrapping="Wrap" />
+                                </StackPanel>
+                                <!-- Horizontal: Key: Value side by side -->
+                                <StackPanel Orientation="Horizontal" Spacing="3"
+                                            IsVisible="{Binding #ThisPanel.DataContext.FieldOrientation, Converter={StaticResource OrientationToBoolConverter}, ConverterParameter=horizontal}">
+                                  <TextBlock FontSize="11" Foreground="{DynamicResource ThemeTextSecondaryBrush}">
+                                    <Run Text="{Binding Key}" />
+                                    <Run Text=":" />
+                                  </TextBlock>
+                                  <TextBlock Text="{Binding Value}" FontSize="12"
+                                             Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                                             TextWrapping="Wrap" />
+                                </StackPanel>
+                              </StackPanel>
+                            </DataTemplate>
+                          </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                </StackPanel>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+
           <!-- Bottom spacer -->
           <Rectangle Height="6" Fill="Transparent" />
         </StackPanel>

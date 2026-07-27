@@ -698,7 +698,7 @@ public partial class MainWindowViewModel : ObservableObject
         var version = Interlocked.Increment(ref _previewLoadVersion);
         Preview.StopGifTimer();
         Preview.ShowLoading(entry.NameDisplay ?? entry.Name);
-        Preview.SetFileInfo(
+        Preview.UpdateCommonMetadata(
             entry.NameDisplay ?? entry.Name,
             entry.SizeDisplay,
             entry.CompressedSizeDisplay,

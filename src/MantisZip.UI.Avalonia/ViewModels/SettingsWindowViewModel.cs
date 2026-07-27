@@ -66,6 +66,9 @@ public partial class SettingsWindowViewModel : ObservableObject
     [ObservableProperty]
     private int _previewHeadSize = 4096;
 
+    // ── Metadata Panel Settings ──
+    public MetadataPanelSettingsViewModel MetadataPanelSettings { get; }
+
     [ObservableProperty]
     private bool _enableDebugLogging;
 
@@ -742,8 +745,12 @@ public partial class SettingsWindowViewModel : ObservableObject
         _cleanTempOnStartup = _settings.CleanTempOnStartup;
         _allowElevation = _settings.AllowElevation;
 
-        // Language
-        _selectedLanguage = _settings.Language;
+    // Language
+    _selectedLanguage = _settings.Language;
+
+    // Metadata panel
+    MetadataPanelSettings = new MetadataPanelSettingsViewModel();
+    MetadataPanelSettings.Load();
 
         // Appearance
         _theme = _settings.Theme;
@@ -1195,6 +1202,10 @@ public partial class SettingsWindowViewModel : ObservableObject
         // Persist custom extensions from the AssocItems list
         var customList = AssocItems.Where(i => i.IsCustom).Select(i => i.Extension).ToList();
         _settings.CustomAssocExtensions = customList;
+
+        // Metadata panel
+        MetadataPanelSettings.ApplyAllTypeConfigs();
+        MetadataPanelSettings.Save();
 
         _settings.Save();
     }

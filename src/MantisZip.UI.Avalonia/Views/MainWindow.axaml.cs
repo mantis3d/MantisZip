@@ -223,6 +223,13 @@ public partial class MainWindow : Window
             return result.Count > 0 ? result.Select(f => f.TryGetLocalPath()).Where(p => p != null).Cast<string>().ToList() : null;
         };
 
+        // ── Wire up metadata panel settings → open Settings window ──
+        vm.Preview.OpenSettingsToMetadataTab = async () =>
+        {
+            if (vm.ShowSettingsWindow != null)
+                await vm.ShowSettingsWindow();
+        };
+
         // Setup drag-drop from file list
         var fileGrid = this.FindControl<DataGrid>("FileListGrid");
         if (fileGrid != null)

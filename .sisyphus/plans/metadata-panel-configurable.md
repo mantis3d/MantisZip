@@ -1,6 +1,6 @@
 # 元数据信息面板重构（可配置系统）
 
-> **状态**: 📋 计划中
+> **状态**: ✅ 已完成（一期 Phase 1 + Phase 2）
 > **独立于**: Office 内容预览，互不阻塞
 
 ## TL;DR
@@ -13,6 +13,9 @@
 3. `enabled` 开关只控制该类型特有字段，不影响通用文件信息
 4. PE 预览的现有 `PeTitle`/`PeSubtitle` 将被新系统替代（不再重复）
 5. 内容区顶部是统一的横条，高度自适应，随内容滚动
+6. **字段隔离**：通用字段仅在 common 配置，格式字段仅在对应格式配置，禁止重复定义
+7. **区域排序**：用户可自定义“通用信息”与“格式信息”的上下显示顺序
+8. **交互入口**：预览工具栏增加快捷配置按钮，支持即时调整
 
 ## 信息面板布局
 
@@ -63,33 +66,37 @@ Common enabled = true, Format disabled:
 ```jsonc
 {
   "metadataPanel": {
-    // 每个类型一个配置，包括"通用文件信息"
+    // 1. 区域排序：决定通用和格式信息的上下位置
+    "sectionOrder": ["common", "format"], // 可选 ["format", "common"]
+
+    // 2. 通用字段：仅在此处配置位置和排序，格式配置中禁止重复
     "common": {
       "enabled": true,
       "fields": {
-        "FileName":         { "position": "infoPanel", "row": 1 },
-        "FileSize":         { "position": "infoPanel", "row": 2 },
-        "CompressedSize":   { "position": "infoPanel", "row": 2 },
-        "CompressionRatio": { "position": "hidden" },
-        "FileModifiedDate": { "position": "infoPanel", "row": 3 }
+        "FileName":         { "position": "infoPanel", "order": 10 },
+        "FileSize":         { "position": "infoPanel", "order": 20 },
+        "CompressedSize":   { "position": "infoPanel", "order": 21 },
+        "CompressionRatio": { "position": "contentTop", "order": 30 },
+        "FileModifiedDate": { "position": "hidden" }
       }
     },
+    // 3. 格式字段：仅定义该格式特有字段，禁止包含 common 字段
     "image": {
       "enabled": true,
       "fields": {
-        "Dimensions": { "position": "infoPanel", "row": 1 },
-        "ImageDpi":   { "position": "infoPanel", "row": 2 },
-        "FileSize":   { "position": "hidden" }   // 可以引用通用字段但不推荐
+        "Dimensions": { "position": "contentTop", "order": 10 },
+        "ImageDpi":   { "position": "infoPanel", "order": 20 }
+        // ⚠️ 此处禁止出现 FileSize 等通用字段
       }
     },
     "docx": {
       "enabled": true,
       "fields": {
-        "Title":     { "position": "infoPanel", "row": 1 },
-        "Author":    { "position": "infoPanel", "row": 2 },
-        "PageCount": { "position": "infoPanel", "row": 2 },
+        "Title":     { "position": "infoPanel", "order": 10 },
+        "Author":    { "position": "infoPanel", "order": 20 },
+        "PageCount": { "position": "infoPanel", "order": 21 },
         "Subject":   { "position": "hidden" },
-        "CreatedDate":{"position": "infoPanel", "row": 3 }
+        "CreatedDate":{"position": "infoPanel", "order": 30 }
       }
     }
     // ... audio, video, pptx, xlsx, font, torrent, iso, sqlite, pe
@@ -97,11 +104,17 @@ Common enabled = true, Format disabled:
 }
 ```
 
-注意：`"common"` 是一个特殊类型，与其他格式平级存放。渲染时信息面板先渲染 `common` 的 infoPanel 字段，再渲染当前格式的 infoPanel 字段，中间用分隔线隔开。
+注意：
+- **字段归属**：`common` 字段（如 FileSize）仅在 `common` 区块定义；格式区块（如 `image`）仅定义其特有字段。
+- **排序规则**：使用 `order` (10, 20, 30...) 控制同区域内字段的排列顺序，支持后续插入。
+- **区域排序**：`sectionOrder` 决定底部固定栏中“通用信息”和“格式信息”的上下位置。
 
 ```csharp
 public class MetadataPanelSettings
 {
+    // 决定通用和格式信息的上下顺序
+    public List<string> SectionOrder { get; set; } = new() { "common", "format" };
+    
     public Dictionary<string, TypeMetadataConfig> Types { get; set; } = new();
     // 键："common" | "image" | "docx" | "audio" | "video" | "pptx"
     //      | "xlsx" | "font" | "torrent" | "iso" | "sqlite" | "pe"
@@ -116,6 +129,9 @@ public class TypeMetadataConfig
 public class FieldConfig
 {
     public string Position { get; set; } = "infoPanel";
+    // 使用 10, 20, 30 间隔，方便后续插入新字段
+    public int Order { get; set; } = 10;
+    // 行号，相同 Row 的字段在同一行并排显示，不同 Row 换行
     public int Row { get; set; }
 }
 ```
@@ -253,11 +269,12 @@ ShowDocx(info)
   └── MetadataRenderEngine.Render(allValues, configs)
         │
         ├── 信息面板 InfoPanelRows:
-        │   ├── 通用段（configs["common"].enabled 时）
-        │   │   └── 筛选 position=infoPanel → 按 row 分组
-        │   ├── 分隔线（如果通用段和格式段都有内容）
-        │   └── 格式段（configs["docx"].enabled 时）
-        │       └── 筛选 position=infoPanel → 按 row 分组
+        │   ├── 根据 SectionOrder 决定渲染顺序（common 在前或 format 在前）
+        │   ├── 段落 A（例如 common）
+        │   │   └── 筛选 position=infoPanel → 按 order 排序并分行
+        │   ├── 分隔线（条件：Common 和 Format 均开启且有 content 时显示）
+        │   └── 段落 B（例如 docx）
+        │       └── 筛选 position=infoPanel → 按 order 排序并分行
         │
         └── 内容区顶部 ContentTopItems:
             ├── 通用段（contentTop 字段）
@@ -292,9 +309,11 @@ public class FormatMetadataItem
 
 ### XAML 绑定
 
+**工具栏**：始终可见（不按格式切换）
+
 **信息面板**:
 ```xml
-<!-- 信息栏（两个分区） -->
+<!-- 信息栏（两个分区，根据 SectionOrder 动态排序） -->
 <ItemsControl ItemsSource="{Binding MetadataSections}">
   <ItemsControl.ItemTemplate>
     <DataTemplate x:DataType="vm:MetadataSection">
@@ -305,7 +324,7 @@ public class FormatMetadataItem
                    Foreground="{DynamicResource ThemeTextSecondaryBrush}"
                    Margin="0,4,0,2" />
 
-        <!-- 各行 -->
+        <!-- 各行（自动换行） -->
         <ItemsControl ItemsSource="{Binding Rows}">
           <ItemsControl.ItemTemplate>
             <DataTemplate x:DataType="vm:InfoPanelRow">
@@ -313,12 +332,12 @@ public class FormatMetadataItem
                 <ItemsControl ItemsSource="{Binding Items}">
                   <ItemsControl.ItemsPanel>
                     <ItemsPanelTemplate>
-                      <StackPanel Orientation="Horizontal" Spacing="4" />
+                      <WrapPanel /> <!-- 改为 WrapPanel 以适应自适应布局 -->
                     </ItemsPanelTemplate>
                   </ItemsControl.ItemsPanel>
                   <ItemsControl.ItemTemplate>
                     <DataTemplate x:DataType="models:FormatMetadataItem">
-                      <TextBlock>
+                      <TextBlock Margin="0,0,12,0">
                         <Run Text="{Binding Key}" FontWeight="Bold" />
                         <Run Text=": " />
                         <Run Text="{Binding Value}" />
@@ -331,8 +350,8 @@ public class FormatMetadataItem
           </ItemsControl.ItemTemplate>
         </ItemsControl>
 
-        <!-- 分区间的分隔线 -->
-        <Separator Margin="0,4" />
+        <!-- 分区间分隔线（仅在双区域共存时渲染） -->
+        <Separator IsVisible="{Binding ShowSeparator}" Margin="0,4" />
       </StackPanel>
     </DataTemplate>
   </ItemsControl.ItemTemplate>
@@ -343,9 +362,8 @@ public class FormatMetadataItem
 ```xml
 <ScrollViewer Grid.Row="1" Grid.Column="0">
   <StackPanel>
-    <!-- 内容区顶部元数据横条（统一位置，随内容滚动） -->
-    <Border IsVisible="{Binding IsContentTopVisible}"
-            Background="{DynamicResource ThemeSurfaceBgBrush}"
+    <!-- 内容区顶部元数据横条（统一位置，始终显示，随内容滚动） -->
+    <Border Background="{DynamicResource ThemeSurfaceBgBrush}"
             BorderBrush="{DynamicResource ThemeBorderBrush}"
             BorderThickness="0,0,0,1"
             Padding="8,4">
@@ -426,15 +444,18 @@ public class FormatMetadataItem
 ├── 文本
 ├── 字体
 ├── 元数据面板       ← 新增
+│   ├── 区域排序: [通用文件信息 ▲/▼ 当前格式信息]  ← 新增排序控制
+│   │
 │   ├── 类型: [通用文件信息 ▼]
 │   │   [启用 ☑]
-│   │   ┌──────────┬──────────────────┬─────┐
-│   │   │ 字段     │ 显示位置         │ 行  │
-│   │   ├──────────┼──────────────────┼─────┤
-│   │   │ 文件名   │ 信息栏 ▼         │ 1   │
-│   │   │ 大小     │ 信息栏 ▼         │ 2   │
-│   │   │ 压缩后   │ 信息栏 ▼         │ 2   │
-│   │   └──────────┴──────────────────┴─────┘
+│   │   ┌──────────┬──────┬──────────────────┬─────┐
+│   │   │ 字段     │ 行   │ 显示位置         │ 序号│
+│   │   ├──────────┼──────┼──────────────────┼─────┤
+│   │   │ 文件名   │ 0    │ 信息栏 ▼         │ 10  │
+│   │   │ 大小     │ 0    │ 信息栏 ▼         │ 20  │
+│   │   │ 压缩后   │ 1    │ 信息栏 ▼         │ 10  │
+│   │   │ 压缩率   │ 1    │ 信息栏 ▼         │ 20  │
+│   │   └──────────┴──────┴──────────────────┴─────┘
 │   │
 │   │   ↓ 实时预览
 │   │   ┌──────────────────────────────┐
@@ -480,7 +501,8 @@ public class FormatMetadataItem
 
 ## 不做的
 
-- 不设计拖拽排序（行号控制顺序）
+- 不设计字段拖拽排序（使用 Order 数值控制顺序）
 - 不改动现有 `FileFormatInfo` 或各 Parser
 - 不改动 `AppSettings` 现有结构（新增 `MetadataPanel` 节）
 - 不改动字段键（固定为英文）
+- 格式配置中不重复定义通用字段（遵循字段隔离原则）
