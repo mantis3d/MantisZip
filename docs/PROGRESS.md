@@ -21,6 +21,14 @@
 
 ### MantisZip.UI.Avalonia（主力版）
 
+**2026-07-27** — 压缩文件冲突对话框死锁修复：CompressConflictResolver async 化
+  - 根因：Core 的 `ResolveConflict()` 在任何 `await` 之前同步执行 → 若从 UI 线程调用则死锁
+  - 修复：`CompressConflictResolver` 从同步委托改为异步（返回 `Task<CompressConflictResolution>`）
+  - `Core.CompressService.ResolveConflict` → `ResolveConflictAsync`，`await` 回调
+  - Avalonia View：移除 `Dispatcher.UIThread.Post` + `TaskCompletionSource` + `.GetAwaiter().GetResult()` 死锁桥接，改用 `await Dispatcher.UIThread.InvokeAsync`
+  - WPF 版同步 `Dispatcher.Invoke` 不变（已在 `Task.Run` 后台线程中运行）
+  - 涉及 8 个文件，构建 0 errors，Core 236/236 测试通过
+
 **2026-07-27** — 解压文件冲突对话框死锁修复：async 端到端管线
   - 根因：同步 `Post + GetAwaiter().GetResult()` 桥接在 Avalonia 异步 `ShowDialog` 下死锁（Avalonia 无 WPF 的嵌套消息泵）
   - 修复：`ArchiveOptions.ConflictResolverAsync` 异步回调 + `FileConflictHelper.ResolvePathAsync` + 引擎 `Task.Run(async () => ... await ResolvePathAsync(...)`
@@ -636,6 +644,12 @@
 ### 共享层（Core / ShellExt / 构建）
 
 这些变更影响两项目共用代码，按时间从新到旧排列。
+
+#### v0.4.5 (2026-07-27) CompressConflictResolver async 化 — ResolveConflictAsync
+  - `CompressConflictResolver` 从同步委托改为异步（`Task<CompressConflictResolution>`）
+  - `CompressService.ResolveConflict` → `ResolveConflictAsync`，所有调用处 `await`
+  - 涉及文件：`CompressConflict.cs`、`CompressService.cs`
+  - 构建 0 errors，Core 236/236 测试通过
 
 #### v0.4.5 (2026-07-27) 引擎异步冲突解析 — Task.Run(async) + await ResolvePathAsync
   - ZipEngine/SevenZipEngine/TarGzEngine 的 ExtractAsync/ExtractEntriesAsync Task.Run 改为 async() => await ResolvePathAsync
