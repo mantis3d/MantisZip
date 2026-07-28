@@ -29,14 +29,15 @@
 |------|---------|
 | `Controls/ResultTreeView.axaml` | 新建 - 可复用预览树控件 |
 | `Controls/ResultTreeView.axaml.cs` | 新建 - 控件逻辑、折叠展开、冲突标记、过滤可视化 |
-| `Models/PreviewTreeNode.cs` | 新建 - 树节点数据模型（继承/扩展 FolderNode） |
-| `Services/ResultPreviewService.cs` | 新建 - 构建预览树的逻辑 |
+| `Models/PreviewTreeNode.cs` | 新建 - 树节点数据模型（继承/扩展 FolderNode）；新增 `IsArchiveNode` |
+| `Services/ResultPreviewService.cs` | 新建 - 构建预览树逻辑；重构压缩/解压预览 |
+| `Resources/Icons/AppIcons.axaml` | 新增 - `IconArchive` 压缩包图标 |
 | `Dialogs/ExtractSettingsWindow.axaml` | 布局改造：加 TabControl + 右侧预览面板 |
 | `Dialogs/ExtractSettingsWindow.axaml.cs` | 预览面板联动设置 |
 | `ViewModels/ExtractSettingsViewModel.cs` | 新增预览树属性、刷新逻辑 |
 | `Dialogs/CompressSettingsWindow.axaml` | 布局改造：加右侧预览面板 |
 | `Dialogs/CompressSettingsWindow.axaml.cs` | 预览面板联动设置 |
-| `ViewModels/CompressSettingsViewModel.cs` | 新增预览树属性、刷新逻辑 |
+| `ViewModels/CompressSettingsViewModel.cs` | 新增预览树属性、刷新逻辑；`BuildCompressPreview` 传输出模式/路径/格式 |
 | `Localization/strings.zh-CN.json` | 新增 i18n key |
 | `Localization/strings.en.json` | 新增 i18n key |
 
@@ -55,6 +56,9 @@ public class PreviewTreeNode : FolderNode
     /// <summary>该节点是否被过滤排除（显示为灰色）</summary>
     public bool IsFilteredOut { get; set; }
 
+    /// <summary>是否为压缩包节点（显示归档图标）</summary>
+    public bool IsArchiveNode { get; set; }
+
     /// <summary>子孙节点总数（用于折叠预览）</summary>
     public int TotalDescendantCount { get; set; }
 
@@ -71,6 +75,24 @@ public class PreviewTreeNode : FolderNode
     public int TruncatedDepth { get; set; }
 }
 ```
+
+**`IconKey` 属性新增分支：**
+
+```csharp
+public string? IconKey
+{
+    get
+    {
+        if (IsArchiveNode) return "IconArchive";
+        if (IsTruncated) return null;
+        if (ExistsAtDestination && Children.Count == 0 && !string.IsNullOrEmpty(FullPath)) return "IconWarning";
+        if (Children.Count > 0 || string.IsNullOrEmpty(FullPath)) return "IconFolder";
+        return "IconDocument";
+    }
+}
+```
+
+**`IconArchive`** 新增在 `Resources/Icons/AppIcons.axaml`，一个简洁的压缩包 PathIcon（带拉链的文档轮廓）。
 
 ### 2. ResultTreeView 控件
 
@@ -272,46 +294,127 @@ private void UpdateSummary(PreviewTreeNode root)
 
 `Services/ResultPreviewService.cs`——从原始数据构建 PreviewTreeNode 树。
 
-```csharp
-public static class ResultPreviewService
-{
-    /// <summary>
-    /// 构建解压预览树
-    /// </summary>
-    /// <param name="archivePath">压缩包路径</param>
-    /// <param name="entries">归档条目列表（ArchiveItem）</param>
-    /// <param name="destDir">目标解压目录</param>
-    /// <param name="smartExtract">是否智能解压</param>
-    /// <param name="filters">文件过滤条件（可选）</param>
-    public static PreviewTreeNode BuildExtractPreview(
-        string archivePath,
-        IEnumerable<ArchiveItem> entries,
-        string destDir,
-        bool smartExtract = false,
-        SearchFilters? filters = null)
-    {
-        // 1. 用 ArchiveTreeBuilder 构建原始树（基于归档内路径）
-        // 2. 对每个节点，将 FullPath 转换为真实文件系统路径（destDir + relative）
-        // 3. 对每个文件节点，检查 File.Exists(realPath) 标记 ExistsAtDestination
-        // 4. 如果传入了 filters，标记 IsFilteredOut
-        // 5. 统计 TotalDescendantCount / MaxChildDepth
-    }
+两个方法均采用「概念容器 root → 输出节点 → 内容」的层级结构：
 
-    /// <summary>
-    /// 构建压缩预览树
-    /// </summary>
-    /// <param name="sourcePaths">用户选择的源路径列表</param>
-    /// <param name="filters">文件过滤条件（可选）</param>
-    public static PreviewTreeNode BuildCompressPreview(
-        IReadOnlyList<string> sourcePaths,
-        SearchFilters? filters = null)
-    {
-        // 1. 扫描源路径的文件系统，构建树
-        // 2. 如果传入了 filters，标记 IsFilteredOut
-        // 3. 统计 TotalDescendantCount / MaxChildDepth
-    }
+```
+┌─ root (概念容器，FullPath = "")
+├─ 输出节点（压缩包 / 目标目录，完整路径，冲突检测）
+│  └─ 内容（源文件/提取条目的目录树）
+```
+
+#### BuildCompressPreview — 构建压缩预览树
+
+根据 `CompressOutputMode` 分两种布局：
+
+**Manual / Combined（单压缩包）：**
+
+```
+📦 压缩内容                      ← root
+└── 📦 archive.zip               ← 输出压缩包，IsArchiveNode=true, ExistsAtDestination=File.Exists(输出路径)
+    ├── 📁 Docs\                 ← 源文件目录树
+    │   ├── report.docx
+    │   └── invoice.pdf
+    └── 📁 vacation\
+        └── IMG_001.jpg
+```
+
+**Separate（每源文件独立压缩包）：**
+
+```
+📦 压缩内容
+├── 📁 C:\Users\Docs\            ← 按输出父目录分组，DisplayLabel=完整路径
+│   ├── 📦 report.zip  ⚠️        ← 已存在冲突
+│   │   └── report.docx
+│   └── 📦 invoice.zip
+│       └── invoice.pdf
+└── 📁 D:\Photos\vacation\       ← 不同输出目录
+    └── 📦 IMG_001.zip
+        └── IMG_001.jpg
+```
+
+**压缩包名称计算（与 Core 层 `ComputeSeparateOutputPath` 保持一致）：**
+
+```csharp
+private static string ComputeArchiveName(string sourcePath, string format)
+{
+    string baseName;
+    if (Directory.Exists(sourcePath))
+        baseName = Path.GetFileName(sourcePath.TrimEnd('\\'));
+    else
+        baseName = Path.GetFileNameWithoutExtension(sourcePath);
+    string ext = format == "tar.gz" ? ".tar.gz" : "." + format;
+    return baseName + ext;
 }
 ```
+
+**方法签名：**
+
+```csharp
+public static PreviewTreeNode BuildCompressPreview(
+    IReadOnlyList<string> sourcePaths,
+    string? rootName = null,
+    FileFilterCriteria? filter = null,
+    CompressOutputMode outputMode = CompressOutputMode.Manual,
+    string? outputPath = null,
+    string format = "zip")
+```
+
+**构建逻辑：**
+
+1. 根据 `outputMode` 和源路径计算各压缩包的完整输出路径
+   - Manual：单路径 = `outputPath`
+   - Combined：单路径 = 自动计算（`RefreshOutputPathState` 逻辑）
+   - Separate：逐源路径调用 `ComputeArchiveName` + 父目录 → 多路径
+2. Separate 模式下按输出路径的 `Path.GetDirectoryName` 分组
+3. 对每个压缩包调用 `File.Exists(输出路径)` → 设置 `ExistsAtDestination`
+4. 创建 `PreviewTreeNode { IsArchiveNode = true }`，源文件/目录作为子节点
+5. 调用 `CalculateDescendantStats(root)` 统计
+
+#### BuildExtractPreview — 构建解压预览树
+
+当前 tree 缺少目标目录节点，root 直接挂载提取内容。改为与压缩统一：
+
+**Normal 模式解压到 D:\Dest\：**
+
+```
+📦 解压结果                      ← root（概念容器）
+└── 📁 D:\Dest\                  ← 目标目录节点（完整路径，DirectoryInfoText 显示统计）
+    ├── 📁 Docs\
+    │   ├── report.docx  ⚠️      ← 文件冲突检测（已实现）
+    │   └── invoice.pdf
+    └── 📁 vacation\
+        └── IMG_001.jpg
+```
+
+**Smart 模式解压到 D:\Dest\archive_name\：**
+
+```
+📦 解压结果
+└── 📁 D:\Dest\archive_name\     ← DestinationPath 已含智能子目录
+    ├── 📁 Docs\
+    │   ├── report.docx  ⚠️
+    │   └── invoice.pdf
+    └── 📁 vacation\
+        └── IMG_001.jpg
+```
+
+**方法签名（与当前一致，只改内部逻辑）：**
+
+```csharp
+public static PreviewTreeNode BuildExtractPreview(
+    IEnumerable<ArchiveItem> entries,
+    string destDir,
+    string? rootName = null,
+    bool checkExists = false,
+    FileFilterCriteria? filter = null)
+```
+
+**构建逻辑（调整项）：**
+
+1. root 的 `DisplayLabel` 从 `destDir` 改为固定"解压结果"
+2. 新增目标目录子节点：`PreviewTreeNode { FullPath = destDir, DisplayLabel = destDir }`
+3. 原有 tree 构建逻辑改为挂载到目标目录节点下，而非 root 下
+4. 文件冲突检测逻辑不变（`File.Exists(Path.Combine(destDir, fullPath))`）
 
 ### 4. ExtractSettingsWindow 布局改造
 
