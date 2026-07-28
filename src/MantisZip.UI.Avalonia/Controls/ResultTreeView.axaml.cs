@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.Linq;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
@@ -115,7 +116,14 @@ public partial class ResultTreeView : UserControl
     public ResultTreeView()
     {
         InitializeComponent();
+        ToolTip.SetTip(LocateButton, LocalizationManager.T("Preview_Result_Locate"));
+        ToolTip.SetTip(FilterToggle, LocalizationManager.T("Preview_Result_ShowFiltered"));
     }
+
+    /// <summary>
+    /// 强制刷新显示树（展开状态等非 Root 变更场景）。
+    /// </summary>
+    public void RefreshDisplay() => RebuildDisplayTree();
 
     /// <summary>
     /// 当 Root 属性变化时，保存原始树引用并重建显示树。
@@ -128,9 +136,15 @@ public partial class ResultTreeView : UserControl
 
     /// <summary>
     /// 重建显示树，应用精简/过滤规则。
+    /// 重建前后自动保存/恢复用户展开状态（从 DisplayNodes 中读取，因为用户操作的是克隆体）。
     /// </summary>
     private void RebuildDisplayTree()
     {
+        // 保存当前显示树的展开状态（用户手动展开的节点）
+        var expandedPaths = new HashSet<string>();
+        foreach (var node in DisplayNodes)
+            CollectExpandedPaths(node, expandedPaths);
+
         DisplayNodes.Clear();
 
         if (_originalRoot == null)
@@ -140,11 +154,29 @@ public partial class ResultTreeView : UserControl
         var displayRoot = DeepCloneNode(_originalRoot);
         ApplyDisplayRules(displayRoot, 0);
 
+        // 恢复展开状态
+        RestoreExpandedPaths(displayRoot, expandedPaths);
+
         DisplayNodes.Add(displayRoot);
 
         // Update summary
         UpdateSummary(displayRoot);
         UpdateConflictCount();
+    }
+
+    private static void CollectExpandedPaths(PreviewTreeNode node, HashSet<string> paths)
+    {
+        if (node.IsExpanded) paths.Add(node.FullPath);
+        foreach (var child in node.Children.OfType<PreviewTreeNode>())
+            CollectExpandedPaths(child, paths);
+    }
+
+    private static void RestoreExpandedPaths(PreviewTreeNode root, HashSet<string> paths)
+    {
+        if (paths.Contains(root.FullPath))
+            root.IsExpanded = true;
+        foreach (var child in root.Children.OfType<PreviewTreeNode>())
+            RestoreExpandedPaths(child, paths);
     }
 
     /// <summary>
@@ -164,12 +196,18 @@ public partial class ResultTreeView : UserControl
     }
 
     /// <summary>
-    /// 递归应用显示规则：深度截断 → 文件数截断 → 过滤项处理。
+    /// 递归应用显示规则：先移除过滤项（不占截断计数），再深度/数量截断。
     /// </summary>
     private void ApplyDisplayRules(PreviewTreeNode node, int depth)
     {
         if (!CompactMode)
             return; // Full mode: show everything as-is
+
+        // 0. 先移除过滤项，保证它们不占用截断名额
+        if (!ShowFilteredGhosts)
+        {
+            node.Children = node.Children.Where(c => !(c is PreviewTreeNode pt && pt.IsFilteredOut)).ToList();
+        }
 
         // 1. 深度截断 (CompactMode 且超过 MaxDepth)
         if (depth >= MaxDepth && node.Children.Count > 0)
@@ -215,13 +253,7 @@ public partial class ResultTreeView : UserControl
             });
         }
 
-        // 3. 过滤项灰显 / 移除
-        if (!ShowFilteredGhosts)
-        {
-            node.Children = node.Children.Where(c => !(c is PreviewTreeNode pt && pt.IsFilteredOut)).ToList();
-        }
-
-        // 4. 递归处理子节点
+        // 3. 递归处理子节点
         foreach (var child in node.Children.ToList())
         {
             if (child is PreviewTreeNode pt && !pt.IsTruncated)
@@ -343,4 +375,59 @@ public partial class ResultTreeView : UserControl
     }
 
     private static string FormatSize(long bytes) => Core.Utils.FormatUtil.FormatSize(bytes);
+
+    private void OnExpandAllClick(object? sender, RoutedEventArgs e)
+    {
+        if (_originalRoot == null) return;
+        _originalRoot.ExpandAll();
+        RebuildDisplayTree();
+    }
+
+    /// <summary>
+    /// 树选中项变化时更新定位按钮状态。
+    /// </summary>
+    private void OnTreeSelectionChanged(object? sender, SelectionChangedEventArgs e)
+    {
+        if (LocateButton != null)
+            LocateButton.IsEnabled = PreviewTreeView?.SelectedItems?.Count > 0;
+    }
+
+    /// <summary>
+    /// 定位到选中项：折叠全部，然后展开所有选中项的祖先路径。
+    /// </summary>
+    private void OnLocateClick(object? sender, RoutedEventArgs e)
+    {
+        var displayRoot = DisplayNodes.FirstOrDefault();
+        if (displayRoot == null || PreviewTreeView?.SelectedItems == null) return;
+
+        // 1. 折叠全部，保留根展开
+        displayRoot.CollapseAll();
+        displayRoot.IsExpanded = true;
+
+        // 2. 展开每个选中项的祖先路径
+        foreach (var item in PreviewTreeView.SelectedItems)
+        {
+            if (item is PreviewTreeNode pt && !string.IsNullOrEmpty(pt.FullPath))
+                ExpandAncestors(displayRoot, pt.FullPath);
+        }
+    }
+
+    /// <summary>
+    /// 从根节点开始，按 FullPath 的分段逐层展开祖先节点。
+    /// 如果某层节点因截断不存在则停止（不报错）。
+    /// </summary>
+    private static void ExpandAncestors(PreviewTreeNode root, string fullPath)
+    {
+        var parts = fullPath.Split('/', StringSplitOptions.RemoveEmptyEntries);
+        var current = root;
+        foreach (var part in parts)
+        {
+            var child = current.Children
+                .OfType<PreviewTreeNode>()
+                .FirstOrDefault(c => c.Name == part && !c.IsTruncated);
+            if (child == null) break;
+            child.IsExpanded = true;
+            current = child;
+        }
+    }
 }

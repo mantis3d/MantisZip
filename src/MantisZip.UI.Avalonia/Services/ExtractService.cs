@@ -21,6 +21,8 @@ public class ExtractService
     /// <param name="password">Optional archive password.</param>
     /// <param name="progress">Optional progress reporter for <see cref="ArchiveProgress"/> updates.</param>
     /// <param name="ct">Cancellation token.</param>
+    /// <param name="options">Optional extract options (conflict action, conflict resolver, etc.).
+    /// When null, existing files are silently overwritten.</param>
     /// <exception cref="InvalidOperationException">Thrown when the archive format is not supported.</exception>
     /// <exception cref="FileNotFoundException">Thrown when the archive file does not exist.</exception>
     public async Task ExtractAsync(
@@ -28,7 +30,8 @@ public class ExtractService
         string destinationPath,
         string? password = null,
         IProgress<ArchiveProgress>? progress = null,
-        CancellationToken ct = default)
+        CancellationToken ct = default,
+        ArchiveOptions? options = null)
     {
         if (string.IsNullOrWhiteSpace(archivePath))
             throw new ArgumentException("Archive path cannot be null or empty.", nameof(archivePath));
@@ -42,6 +45,6 @@ public class ExtractService
             throw new InvalidOperationException(
                 $"Unsupported archive format: {Path.GetExtension(archivePath)}");
 
-        await engine.ExtractAsync(archivePath, destinationPath, password, progress, ct);
+        await engine.ExtractAsync(archivePath, destinationPath, password, progress, ct, options);
     }
 }

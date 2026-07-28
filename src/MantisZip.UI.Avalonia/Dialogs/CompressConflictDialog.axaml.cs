@@ -66,16 +66,18 @@ public partial class CompressConflictDialog : Window
 
     /// <param name="filePath">目标文件路径</param>
     /// <param name="suggestedName">重命名的建议名（不含路径）</param>
-    public CompressConflictDialog(string filePath, string? suggestedName = null)
+    /// <param name="canAdd">是否支持"添加到已有压缩包"（Tar 等格式不支持）</param>
+    public CompressConflictDialog(string filePath, string? suggestedName = null, bool canAdd = true)
     {
         InitializeComponent();
         DataContext = this;
 
         HeaderText.Text = string.Format(LocalizationManager.T("CompressConflict_Header"), $"\"{Path.GetFileName(filePath)}\"");
 
-        // Enable Add button by default (caller disables for Tar format)
-        AddBtn.IsEnabled = true;
-        ToolTip.SetTip(AddBtn, TooltipNoAddText);
+        // Enable Add button based on engine capability
+        AddBtn.IsEnabled = canAdd;
+        if (!canAdd)
+            ToolTip.SetTip(AddBtn, TooltipNoAddText);
 
         // 预填重命名建议名
         RenameTextBox.Text = suggestedName ?? Path.GetFileName(filePath);

@@ -195,7 +195,7 @@ public static class CompressService
             var engine = ArchiveEngineFactory.GetEngineByExtension(outputPath, new ZipEngine());
 
             // 4. 冲突检测与解决
-            var resolution = ResolveConflict(outputPath, engine, conflictResolver);
+            var resolution = await ResolveConflictAsync(outputPath, engine, conflictResolver);
             CoreLog.Info($"CompressService: conflict resolution for {outputPath}: {resolution.Action}");
 
             if (resolution.Action == CompressConflictAction.Cancel)
@@ -275,7 +275,7 @@ public static class CompressService
         var engine = ArchiveEngineFactory.GetEngineByExtension(outputPath, new ZipEngine());
 
         // 冲突检测
-        var resolution = ResolveConflict(outputPath, engine, conflictResolver);
+        var resolution = await ResolveConflictAsync(outputPath, engine, conflictResolver);
         CoreLog.Info($"CompressService: conflict resolution for {outputPath}: {resolution.Action}");
 
         if (resolution.Action == CompressConflictAction.Cancel)
@@ -370,12 +370,12 @@ public static class CompressService
     }
 
     /// <summary>
-    /// 检测文件冲突并调用回调。
+    /// 检测文件冲突并异步调用回调。
     /// 文件不存在 → 直接返回 Overwrite（无需处理）；
     /// 文件存在且 resolver 为 null → 返回 Overwrite（静默覆盖）；
-    /// 文件存在且 resolver 非 null → 构造 CompressConflictInfo 并调用回调。
+    /// 文件存在且 resolver 非 null → 构造 CompressConflictInfo 并 await 回调。
     /// </summary>
-    private static CompressConflictResolution ResolveConflict(
+    private static async Task<CompressConflictResolution> ResolveConflictAsync(
         string outputPath,
         IArchiveEngine engine,
         CompressConflictResolver? conflictResolver)
@@ -393,7 +393,7 @@ public static class CompressService
         var suggestedName = Path.GetFileName(PathHelper.GetUniquePath(outputPath));
 
         var info = new CompressConflictInfo(outputPath, canAdd, suggestedName);
-        return conflictResolver(info);
+        return await conflictResolver(info);
     }
 
     /// <summary>

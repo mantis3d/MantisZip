@@ -155,6 +155,23 @@ public partial class CompressSettingsWindow : Window
             settings.Save();
             FileFilterControl.LoadPresets(settings.FilterPresets, newName);
         };
+
+        // 过滤条件变更时重建预览树
+        FileFilterControl.FilterChanged += OnFileFilterChanged;
+    }
+
+    /// <summary>
+    /// 根据当前过滤条件重建压缩预览树。
+    /// </summary>
+    private void BuildPreview()
+    {
+        var filter = GetFilter();
+        ViewModel.BuildCompressPreview(filter);
+    }
+
+    private void OnFileFilterChanged()
+    {
+        BuildPreview();
     }
 
     /// <summary>

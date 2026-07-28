@@ -24,6 +24,21 @@ internal static class NativeMethods
     [DllImport("user32.dll", SetLastError = true)]
     public static extern bool GetWindowRect(nint hWnd, out RECT lpRect);
 
+    [DllImport("user32.dll")]
+    public static extern int GetSystemMetrics(int nIndex);
+
+    [DllImport("user32.dll")]
+    public static extern bool IntersectRect(out RECT lprcDst, ref RECT lprcSrc1, ref RECT lprcSrc2);
+
+    public static RECT GetVirtualScreenRect()
+    {
+        int x = GetSystemMetrics(SM_XVIRTUALSCREEN);
+        int y = GetSystemMetrics(SM_YVIRTUALSCREEN);
+        int cx = GetSystemMetrics(SM_CXVIRTUALSCREEN);
+        int cy = GetSystemMetrics(SM_CYVIRTUALSCREEN);
+        return new RECT { Left = x, Top = y, Right = x + cx, Bottom = y + cy };
+    }
+
     [DllImport("user32.dll", SetLastError = true)]
     public static extern bool SetWindowPos(nint hWnd, nint hWndInsertAfter, int X, int Y, int cx, int cy, uint uFlags);
 
@@ -199,6 +214,12 @@ internal static class NativeMethods
     public const uint WM_NCHITTEST = 0x0084;
     public const uint DT_LEFT = 0x0000;
     public const int TRANSPARENT = 1;
+
+    // Virtual screen bounds (works across all monitors)
+    public const int SM_XVIRTUALSCREEN = 76;
+    public const int SM_YVIRTUALSCREEN = 77;
+    public const int SM_CXVIRTUALSCREEN = 78;
+    public const int SM_CYVIRTUALSCREEN = 79;
 
     public const uint TYMED_HGLOBAL = 1;
     public const uint TYMED_ISTREAM = 4;

@@ -28,7 +28,7 @@ public class TarGzEngine : IArchiveEngine
         CoreLog.Info($"ExtractAsync: {archivePath} -> {destinationPath}");
         var sw = Stopwatch.StartNew();
 
-        var result = await Task.Run(() =>
+        var result = await Task.Run(async () =>
         {
             var ext = Path.GetExtension(archivePath).ToLowerInvariant();
             var isTarGz = ext == ".tgz" || archivePath.EndsWith(".tar.gz");
@@ -84,7 +84,7 @@ public class TarGzEngine : IArchiveEngine
                     });
 
                     // 冲突处理
-                    var resolved = FileConflictHelper.ResolvePath(outputFilePath, options, entryModified, entry.Size);
+                    var resolved = await FileConflictHelper.ResolvePathAsync(outputFilePath, options, entryModified, entry.Size);
                     if (resolved == null)
                     {
                         // 跳过文件，TarReader.MoveToNextEntry 自动处理流推进
@@ -143,7 +143,7 @@ public class TarGzEngine : IArchiveEngine
                 using var inputStream = File.OpenRead(archivePath);
                 using var gzipStream = new GZipStream(inputStream, CompressionMode.Decompress);
                 var outputPath = Path.Combine(destinationPath, Path.GetFileNameWithoutExtension(archivePath));
-                var resolved = FileConflictHelper.ResolvePath(outputPath, options);
+                var resolved = await FileConflictHelper.ResolvePathAsync(outputPath, options);
                 if (resolved != null)
                 {
                     try

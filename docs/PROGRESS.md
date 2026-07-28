@@ -32,6 +32,38 @@
   - 改动的文件：`MetadataPanelSettings.cs`（+FieldLayoutMode）、`PreviewViewModel.cs`、`PreviewPanel.axaml`、`PreviewPanel.axaml.cs`、`SettingsWindow.axaml`、`SettingsWindow.axaml.cs`、`MetadataPanelSettingsViewModel.cs`、`MetadataRenderEngine.cs`、`MetadataHelper.cs`、`MetadataRegistry.cs`
   - 构建 0 errors
 
+**2026-07-28** — 压缩设置加密面板行为对齐 WPF + ResultTreeView 宽度可调
+  - **密码面板行为对齐 WPF（7 项对齐）**：
+    1. 保存复选框标签按模式切换："更新匹配规则"（库模式）/"保存到密码库"（新密码模式）
+    2. 用户输入密码时清除密码库选中并自动切换到新密码模式
+    3. 描述文本框在库模式下禁止焦点（`IsEnabled=false` + `IsReadOnly=true`）
+    4. 匹配规则文本框在自动生成规则时只读（`IsReadOnly=true`）
+    5. 自动生成规则切换时自动刷新规则
+    6. `RefreshAutoRules` 改为基于输出模式生成规则（Manual→输出文件名，Separate→每文件一行，Combined→公共父目录名），而非基于源文件扩展名
+    7. 选中库条目不再写入 `Password` 属性（避免触发自动切模式），压缩时库模式下取 `SelectedPasswordEntry.Password`
+  - **ResultTreeView 宽度可调**：Grid `ColumnDefinitions` 改为三列显式布局（`*,Auto,280`），GridSplitter 添加 `ResizeBehavior="PreviousAndNext"`，拖动分割线可调整预览面板宽度
+  - **设置窗口可调**：`SettingsWindow` 改为 `CanResize=True`，增大默认尺寸（820×640），添加 `MinWidth/MinHeight` 约束
+  - 改动的文件：`CompressSettingsViewModel.cs`、`MainWindowViewModel.cs`、`CompressSettingsWindow.axaml`、`SettingsWindow.axaml`
+  - 构建 0 errors
+  - **自身窗口判定 Bug 修复**：之前用 `className.StartsWith("Avalonia-")` 检测自身窗口，但所有 Avalonia 应用共享 `Avalonia-` 前缀，导致其他 Avalonia 软件也被误识别为 MantisZip。改用 HWND 句柄比较（`target == _mainHwnd`）
+  - **多行文本支持**：`GdiDrawText` 格式标志从 `DT_SINGLELINE | DT_VCENTER`（`0x0125`）改为 `DT_WORDBREAK`（`0x0111`）+ `DT_CALCRECT` 手动垂直居中，支持 `\n` 换行
+  - **虚拟文件夹判定**：修正 `ClassifyWindow` 中丢弃 `TryGetExplorerPathFromShell` 返回状态的问题，"我的电脑"/"快速访问"等无合法路径的文件夹不再显示绿色（`Success`），改为 `Warning` 状态显示红色
+  - 改动的文件：`OverlayController.cs`（HWND 判定 + 多行文本 + 虚拟文件夹）、`MainWindow.axaml.cs`（传递主窗口 HWND）、`strings.zh-CN.json`（多行文案）
+  - 构建 0 errors
+
+**2026-07-25** — 预览树工具栏扩展：过滤显示切换 + 定位选中 + 过滤连接解压预览
+  - **ShowFilteredGhosts 切换按钮**：ResultTreeView 工具栏新增 ToggleButton，绑定 ShowFilteredGhosts，切换"全部显示（标灰）"/"仅显示匹配"
+  - **定位到选中按钮**：工具栏新增 LocateButton，多选支持，点击后折叠全部并展开所有选中项路径
+  - **TreeView 多选**：启用 `SelectionMode="Multiple"` + 选中状态同步控制按钮启用/禁用
+  - **ExtractSettings 过滤→预览**：连接 `FileFilterControl.FilterChanged` → 重建预览树 + 更新过滤统计
+  - **PreviewTreeNode 目录信息**：新增 `TotalDescendantSize`、`DirectoryInfoText`，目录节点显示"3 项 · 1.2 MB"
+  - **ResultPreviewService**：提取 `BuildExtractPreview` 增加 `FileFilterCriteria? filter` 参数，过滤后标记 `IsFilteredOut`
+  - **ExtractSettingsViewModel**：增加 `ShowFilteredGhosts`/`PreviewCompactMode` 属性
+  - **定位图标**：新增 `IconLocate`（瞄准）和 `IconFilter`（漏斗）PathIcon Geometry
+  - **本地化**：新增 `Preview_Result_Locate`、`Preview_Result_HideFiltered` keys
+  - 改动的文件：`ResultTreeView.axaml/.cs`、`PreviewTreeNode.cs`、`AppIcons.axaml`、`ResultPreviewService.cs`、`ExtractSettingsWindow.axaml.cs`、`ExtractSettingsViewModel.cs`、`MainWindow.axaml.cs`、`strings.*.json`
+  - 构建 0 errors, 12 pre-existing warnings
+
 **2026-07-27** — 元数据面板可配置系统：数据模型 + 渲染引擎 + 设置 UI 集成 + 内联迁移
   - **FieldConfig.Row**：还原行控制字段，同 Row 字段并排显示，不同 Row 换行
   - **MetadataRegistry**：新增 ico/pdf/xlsx/pptx 类型注册 + IconCount/Encrypted 键
@@ -46,6 +78,32 @@
   - 改动的文件（修改）：`FieldConfig.cs`（+Row）、`PreviewViewModel.cs`、`PreviewPanel.axaml`、`SettingsWindow.axaml`、`SettingsWindowViewModel.cs`、`MetadataRenderEngine.cs`、`strings.zh-CN.json`、`strings.en.json`、`MainWindow.axaml.cs`
   - 废弃/删除：`MetadataPanelSettingsDialog.axaml/.cs`
   - 构建 0 errors
+**2026-07-27** — 密码子系统全面补齐：ZIP 加密检测/PasswordManager 集成/密码对话框升级
+  - 根因：`ArchiveService.LoadArchiveAsync` 在 `ListEntriesAsync` 成功后从不检查 `items.Any(i => i.IsEncrypted)`，加密 ZIP 包直接返回 Success，不弹出密码窗
+  - 修复：
+    - `ArchiveService.LoadArchiveAsync` 添加 `IsEncrypted` 检测，无密码时返回 `PasswordRequired`
+    - 创建 `PasswordService`（QuickVerifyPassword/TryMatchPassword/TrySavePassword/BoundedWriteStream）
+    - `MainWindowViewModel` 集成完整密码流：PasswordManager 自动匹配 → 对话框循环 → QuickVerify 验证 → 永久保存
+    - `PasswordDialog` 升级：已保存密码下拉列表、描述/匹配规则编辑、永久保存选项
+    - CLI 解压（`TryExtractArchiveAsync`/`TryExtractSmartAsync`）自动读取已保存密码
+    - 状态栏增加密码状态图标（🔒/🔓）+ 文字
+    - 补充 8 条本地化字符串（中/英）
+  - 涉及 11 个文件，Avalonia 构建 0 errors，Core 236/236 测试通过
+
+**2026-07-27** — 压缩文件冲突对话框死锁修复：CompressConflictResolver async 化
+  - 根因：Core 的 `ResolveConflict()` 在任何 `await` 之前同步执行 → 若从 UI 线程调用则死锁
+  - 修复：`CompressConflictResolver` 从同步委托改为异步（返回 `Task<CompressConflictResolution>`）
+  - `Core.CompressService.ResolveConflict` → `ResolveConflictAsync`，`await` 回调
+  - Avalonia View：移除 `Dispatcher.UIThread.Post` + `TaskCompletionSource` + `.GetAwaiter().GetResult()` 死锁桥接，改用 `await Dispatcher.UIThread.InvokeAsync`
+  - WPF 版同步 `Dispatcher.Invoke` 不变（已在 `Task.Run` 后台线程中运行）
+  - 涉及 8 个文件，构建 0 errors，Core 236/236 测试通过
+
+**2026-07-27** — 解压文件冲突对话框死锁修复：async 端到端管线
+  - 根因：同步 `Post + GetAwaiter().GetResult()` 桥接在 Avalonia 异步 `ShowDialog` 下死锁（Avalonia 无 WPF 的嵌套消息泵）
+  - 修复：`ArchiveOptions.ConflictResolverAsync` 异步回调 + `FileConflictHelper.ResolvePathAsync` + 引擎 `Task.Run(async () => ... await ResolvePathAsync(...)`
+  - 所有三层引擎（Zip/SevenZip/TarGz）`ExtractAsync` 改为 `Task.Run(async () =>`，`ResolvePath` → `await ResolvePathAsync`
+  - `MainWindowViewModel.ShowExtractFileConflictDialogAsync` 使用 `await Dispatcher.UIThread.InvokeAsync` 显示对话框
+  - 构建 0 errors，Core 236/236 + Avalonia 35/37 测试通过
 
 **2026-07-24** — 拖拽覆盖层视觉优化：颜色/呼吸/文案 + 完整路径显示 + 本地化
   - **颜色**：成功状态绿色调亮（RGB 76,175,80 → 107,212,107），无目标灰色改为暖金（RGB 255,215,0）
@@ -655,6 +713,23 @@
 ### 共享层（Core / ShellExt / 构建）
 
 这些变更影响两项目共用代码，按时间从新到旧排列。
+
+#### v0.4.5 (2026-07-27) CompressConflictResolver async 化 — ResolveConflictAsync
+  - `CompressConflictResolver` 从同步委托改为异步（`Task<CompressConflictResolution>`）
+  - `CompressService.ResolveConflict` → `ResolveConflictAsync`，所有调用处 `await`
+  - 涉及文件：`CompressConflict.cs`、`CompressService.cs`
+  - 构建 0 errors，Core 236/236 测试通过
+
+#### v0.4.5 (2026-07-27) 引擎异步冲突解析 — Task.Run(async) + await ResolvePathAsync
+  - ZipEngine/SevenZipEngine/TarGzEngine 的 ExtractAsync/ExtractEntriesAsync Task.Run 改为 async() => await ResolvePathAsync
+  - 涉及文件：`ZipEngine.cs`、`SevenZipEngine.cs`、`TarGzEngine.cs`
+  - 构建 0 errors，Core 236/236 测试通过
+
+#### v0.4.5 (2026-07-27) 异步冲突解析 API — ConflictResolverAsync + ResolvePathAsync
+  - `ArchiveOptions` 新增 `ConflictResolverAsync`（`Func<FileConflictInfo, Task<FileConflictAction>>?`）
+  - `FileConflictHelper` 新增 `ResolvePathAsync`，优先使用异步回调，退回到同步 ResolvePath
+  - 涉及文件：`ArchiveEngine.cs`、`FileConflictHelper.cs`
+  - 构建 0 errors，Core 236/236 测试通过
 
 #### v0.4.5 (2026-07-20) Avalonia Shell/COM 集成—CopyShellExtComhost MSBuild 目标
   - MantisZip.UI.Avalonia.csproj 添加 CopyShellExtComhost 构建目标（AfterTargets Build/Publish）

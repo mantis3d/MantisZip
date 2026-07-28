@@ -13,6 +13,7 @@
             Background="{DynamicResource ThemeHeaderBgBrush}">
       <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
         <ToggleButton x:Name="CompactToggle"
+                      IsChecked="{Binding CompactMode, RelativeSource={RelativeSource AncestorType=UserControl}}"
                       Width="28" Height="{DynamicResource ControlHeightXs}"
                       FontSize="12"
                       Padding="4,0"
@@ -21,6 +22,36 @@
                       BorderBrush="{DynamicResource ThemeBorderBrush}"
                       IsCheckedChanged="OnCompactToggleChanged">
           <PathIcon Data="{StaticResource IconFolder}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+        </ToggleButton>
+        <Button x:Name="ExpandAllButton"
+                Width="28" Height="{DynamicResource ControlHeightXs}"
+                FontSize="16" FontWeight="Bold"
+                Padding="0"
+                Background="{DynamicResource ThemeButtonBgBrush}"
+                Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                BorderBrush="{DynamicResource ThemeBorderBrush}"
+                Click="OnExpandAllClick"
+                ToolTip.Tip="展开全部">
+          <TextBlock Text="+" HorizontalAlignment="Center" VerticalAlignment="Center" />
+        </Button>
+        <Button x:Name="LocateButton"
+                Width="28" Height="{DynamicResource ControlHeightXs}"
+                Padding="2,0"
+                IsEnabled="False"
+                Background="{DynamicResource ThemeButtonBgBrush}"
+                Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                BorderBrush="{DynamicResource ThemeBorderBrush}"
+                Click="OnLocateClick">
+          <PathIcon Data="{StaticResource IconLocate}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+        </Button>
+        <ToggleButton x:Name="FilterToggle"
+                      IsChecked="{Binding ShowFilteredGhosts, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                      Width="28" Height="{DynamicResource ControlHeightXs}"
+                      Padding="2,0"
+                      Background="{DynamicResource ThemeButtonBgBrush}"
+                      Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                      BorderBrush="{DynamicResource ThemeBorderBrush}">
+          <PathIcon Data="{StaticResource IconFilter}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
         </ToggleButton>
         <TextBlock x:Name="SummaryTextBlock"
                    FontSize="12"
@@ -56,8 +87,15 @@
                   Background="{DynamicResource ThemeSurfaceBgBrush}">
       <TreeView x:Name="PreviewTreeView"
                 ItemsSource="{Binding DisplayNodes, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                SelectionMode="Multiple"
                 BorderThickness="0"
-                Background="Transparent">
+                Background="Transparent"
+                SelectionChanged="OnTreeSelectionChanged">
+        <TreeView.Styles>
+          <Style Selector="TreeViewItem">
+            <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}" />
+          </Style>
+        </TreeView.Styles>
         <TreeView.ItemTemplate>
           <TreeDataTemplate ItemsSource="{Binding Children}">
             <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}"
@@ -79,6 +117,12 @@
                          VerticalAlignment="Center"
                          Margin="4,0,0,0"
                          Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+              <TextBlock Text="{Binding DirectoryInfoText}"
+                         FontSize="11"
+                         VerticalAlignment="Center"
+                         Margin="4,0,0,0"
+                         Foreground="{DynamicResource ThemeTextSecondaryBrush}"
+                         IsVisible="{Binding IsDirectoryNode}" />
               <!-- Conflict suffix - warning icon for existing files -->
               <PathIcon Data="{StaticResource IconWarning}"
                         Width="12" Height="12"

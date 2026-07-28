@@ -6,6 +6,7 @@ using MantisZip.Core.FileFilter;
 using MantisZip.UI.Avalonia.Models;
 using MantisZip.UI.Avalonia.Services;
 using MantisZip.UI.Avalonia.ViewModels;
+using System.ComponentModel;
 using System.Linq;
 
 namespace MantisZip.UI.Avalonia.Dialogs;
@@ -66,10 +67,19 @@ public partial class ExtractSettingsWindow : Window
         Loaded += OnLoaded;
     }
 
-    /// <summary>设置压缩包条目列表，用于过滤统计和 GetFilteredEntryKeys。</summary>
+    /// <summary>设置压缩包条目列表，用于过滤统计和预览树构建。</summary>
     public void SetEntries(IReadOnlyList<ArchiveItem> entries)
     {
         _entries = entries;
+        BuildPreview();
+    }
+
+    /// <summary>根据当前 entries、DestinationPath 和过滤条件构建预览树。</summary>
+    private void BuildPreview()
+    {
+        if (_entries == null) return;
+        var filter = GetFilter();
+        ViewModel.BuildExtractPreview(_entries, filter, checkExists: false);
     }
 
     /// <summary>获取当前过滤条件。仅当启用过滤且 filter.IsActive 时有效。</summary>
@@ -101,6 +111,21 @@ public partial class ExtractSettingsWindow : Window
         _loaded = true;
 
         InitFileFilter();
+
+        // Subscribe to DestinationPath changes for preview rebuild
+        ViewModel.PropertyChanged += OnViewModelPropertyChanged;
+
+        // Build initial preview if entries are already set (e.g., via SetEntries before ShowDialog)
+        if (_entries != null && !string.IsNullOrWhiteSpace(ViewModel.DestinationPath))
+            BuildPreview();
+    }
+
+    private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(ExtractSettingsViewModel.DestinationPath))
+        {
+            BuildPreview();
+        }
     }
 
     /// <summary>初始化文件过滤控件（预设 + 事件）。</summary>
@@ -143,9 +168,9 @@ public partial class ExtractSettingsWindow : Window
             FileFilterControl.LoadPresets(settings.FilterPresets, newName);
         };
 
-        // 更新过滤统计
+        // 过滤条件变更时更新统计并重建预览树
         UpdateFilterStats();
-        FileFilterControl.FilterChanged += UpdateFilterStats;
+        FileFilterControl.FilterChanged += OnFileFilterChanged;
     }
 
     private void UpdateFilterStats()
@@ -163,5 +188,11 @@ public partial class ExtractSettingsWindow : Window
         {
             FileFilterControl.SetFilterStats("");
         }
+    }
+
+    private void OnFileFilterChanged()
+    {
+        UpdateFilterStats();
+        BuildPreview();
     }
 }
