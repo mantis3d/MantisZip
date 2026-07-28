@@ -95,6 +95,10 @@ public partial class CompressSettingsViewModel : ObservableObject
     [ObservableProperty]
     private string _defaultFormat = "zip";
 
+    /// <summary>Separate 模式下是否保留源文件扩展名（如 "file.txt" → "file.txt.zip"）。</summary>
+    [ObservableProperty]
+    private bool _keepOriginalExtension;
+
     /// <summary>当前格式是否为 ZIP。</summary>
     public bool IsZipFormat => DefaultFormat == "zip";
 
@@ -400,6 +404,14 @@ public partial class CompressSettingsViewModel : ObservableObject
         // Load password library
         LoadPasswordLibrary();
 
+        // 从 AppSettings 加载默认值
+        try
+        {
+            var settings = AppSettings.Load();
+            KeepOriginalExtension = settings.KeepOriginalExtension;
+        }
+        catch { /* 使用默认值 */ }
+
         // Build initial compress preview from source paths
         BuildCompressPreview();
     }
@@ -419,7 +431,11 @@ public partial class CompressSettingsViewModel : ObservableObject
         PreviewRoot = ResultPreviewService.BuildCompressPreview(
             SelectedPaths.ToList(),
             rootName: LocalizationManager.T("Compress_Title"),
-            filter: filter);
+            filter: filter,
+            outputMode: OutputMode,
+            outputPath: OutputPath,
+            format: DefaultFormat,
+            keepOriginalExtension: KeepOriginalExtension);
     }
 
     partial void OnCompressionLevelChanged(int value)
@@ -466,6 +482,8 @@ public partial class CompressSettingsViewModel : ObservableObject
         UpdateCanCompress();
         if (AutoGenerateRules)
             RefreshAutoRules();
+        // 切换输出方式时刷新预览树（不同模式树结构不同）
+        BuildCompressPreview();
     }
 
     partial void OnDefaultFormatChanged(string value)
@@ -482,6 +500,8 @@ public partial class CompressSettingsViewModel : ObservableObject
         if (AutoGenerateRules)
             RefreshAutoRules();
         OnPropertyChanged(nameof(IsFormatEncryptionSupported));
+        // 切换格式时刷新预览树（压缩包扩展名变化）
+        BuildCompressPreview();
     }
 
     partial void OnIsPasswordLibraryModeChanged(bool value)
@@ -682,6 +702,13 @@ public partial class CompressSettingsViewModel : ObservableObject
                     var archiveName = ArchivePath.GetFileName(commonParent);
                     RulesText = $"{archiveName}*{ext}";
                 }
+                else if (AllPathsSameDrive(SelectedPaths))
+                {
+                    // 同盘符但无公共子目录：压缩包名与盘符相同（如 C.zip）
+                    var root = Path.GetPathRoot(SelectedPaths[0]) ?? "C:\\";
+                    var driveLetter = root.TrimEnd('\\', '/').TrimEnd(':');
+                    RulesText = $"{driveLetter}*{ext}";
+                }
                 break;
         }
     }
@@ -842,9 +869,17 @@ public partial class CompressSettingsViewModel : ObservableObject
             var ext = GetFormatExtension();
             OutputPath = System.IO.Path.Combine(commonParent, archiveName + ext);
         }
+        else if (AllPathsSameDrive(SelectedPaths))
+        {
+            // 同盘符但无公共子目录 — 输出到盘符根目录，压缩包名与盘符相同（如 C:\C.zip）
+            var root = Path.GetPathRoot(SelectedPaths[0]) ?? "C:\\";
+            var driveLetter = root.TrimEnd('\\', '/').TrimEnd(':');
+            var ext = GetFormatExtension();
+            OutputPath = System.IO.Path.Combine(root, driveLetter + ext);
+        }
         else
         {
-            // 跨驱动器或根目录 — 回退到手动模式
+            // 跨驱动器 — 回退到手动模式
             OutputMode = CompressOutputMode.Manual;
             // 通知用户
             _ = AppMessageBox.Show(
@@ -853,6 +888,24 @@ public partial class CompressSettingsViewModel : ObservableObject
                 MessageBoxButton.OK,
                 MessageBoxImage.Warning);
         }
+    }
+
+    /// <summary>
+    /// 判断所有源路径是否在同一个盘符下。
+    /// </summary>
+    private static bool AllPathsSameDrive(IEnumerable<string> paths)
+    {
+        string? drive = null;
+        foreach (var p in paths)
+        {
+            var d = Path.GetPathRoot(p);
+            if (string.IsNullOrEmpty(d)) return false;
+            if (drive == null)
+                drive = d;
+            else if (!string.Equals(drive, d, StringComparison.OrdinalIgnoreCase))
+                return false;
+        }
+        return drive != null;
     }
 
     /// <summary>
