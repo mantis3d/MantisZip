@@ -402,6 +402,11 @@ public partial class CompressSettingsViewModel : ObservableObject
 
         // Build initial compress preview from source paths
         BuildCompressPreview();
+
+        // Auto-generate initial password rules from output mode + source paths
+        // Must be called after SelectedPaths is populated (the CollectionChanged
+        // handler won't fire for items added before it was attached).
+        UpdateAutoRules();
     }
 
     /// <summary>
