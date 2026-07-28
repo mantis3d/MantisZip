@@ -157,10 +157,19 @@ public partial class ResultTreeView : UserControl
         // 恢复展开状态
         RestoreExpandedPaths(displayRoot, expandedPaths);
 
-        DisplayNodes.Add(displayRoot);
+        // 虚拟根节点（空 DisplayLabel）不显示自身，其子节点直接作为顶级项
+        if (string.IsNullOrEmpty(displayRoot.DisplayLabel))
+        {
+            foreach (var child in displayRoot.Children.OfType<PreviewTreeNode>())
+                DisplayNodes.Add(child);
+            UpdateSummaryMulti(DisplayNodes);
+        }
+        else
+        {
+            DisplayNodes.Add(displayRoot);
+            UpdateSummary(displayRoot);
+        }
 
-        // Update summary
-        UpdateSummary(displayRoot);
         UpdateConflictCount();
     }
 
@@ -309,6 +318,27 @@ public partial class ResultTreeView : UserControl
         SummaryText = LocalizationManager.T("Preview_Result_Summary", totalFiles, FormatSize(totalSize));
 
         // Also update individual text blocks
+        if (FileCountText != null)
+            FileCountText.Text = $"{totalFiles} 个文件";
+        if (TotalSizeText != null)
+            TotalSizeText.Text = FormatSize(totalSize);
+    }
+
+    /// <summary>
+    /// 针对多个顶级项汇总统计（虚拟根节点场景）。
+    /// </summary>
+    private void UpdateSummaryMulti(IEnumerable<PreviewTreeNode> roots)
+    {
+        int totalFiles = 0;
+        long totalSize = 0;
+        foreach (var node in roots)
+        {
+            totalFiles += CountTotalFiles(node);
+            totalSize += CalculateTotalSize(node);
+        }
+
+        SummaryText = LocalizationManager.T("Preview_Result_Summary", totalFiles, FormatSize(totalSize));
+
         if (FileCountText != null)
             FileCountText.Text = $"{totalFiles} 个文件";
         if (TotalSizeText != null)
