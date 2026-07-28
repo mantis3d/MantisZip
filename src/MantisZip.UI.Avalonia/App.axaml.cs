@@ -986,7 +986,7 @@ public partial class App : Application
                     Mode = CompressOutputMode.Manual,
                     Format = vm.DefaultFormat,
                     CompressionLevel = vm.CompressionLevel,
-                    Password = vm.Password,
+                    Password = vm.GetActivePassword(),
                     Encrypt = vm.Encrypt,
                     Comment = vm.Comment,
                     CommentDistribution = vm.CommentDistribution,

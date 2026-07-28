@@ -700,6 +700,18 @@ public partial class CompressSettingsViewModel : ObservableObject
         return Math.Min(score, 4);
     }
 
+    /// <summary>
+    /// 获取当前激活的密码（无论库模式还是新密码模式）。
+    /// 库模式且选中条目时返回条目密码，否则返回 Password 属性值。
+    /// </summary>
+    public string? GetActivePassword()
+    {
+        if (!Encrypt) return null;
+        if (IsPasswordLibraryMode && SelectedPasswordEntry != null)
+            return SelectedPasswordEntry.Password;
+        return Password;
+    }
+
     [RelayCommand]
     private void TogglePasswordMode()
     {

@@ -622,6 +622,19 @@ public partial class MainWindowViewModel : ObservableObject
             var result = await _archiveService.LoadArchiveAsync(path, password);
             var engine = ArchiveEngineFactory.GetEngineByExtension(path);
 
+            // ── Verify session-cached password before trusting it ──
+            // SharpCompress can list ZIP entries without verifying the password,
+            // so IsEncrypted=true + password!=null from cache doesn't mean the
+            // password is correct. Quick-verify and redirect to resolution flow.
+            if (password != null && engine != null
+                && result.RawItems?.Any(i => i.IsEncrypted) == true
+                && !_passwordService.QuickVerifyPassword(path, password, engine))
+            {
+                _sessionPasswords.Remove(path);
+                password = null;
+                result = await _archiveService.LoadArchiveAsync(path, null);
+            }
+
             // ── Password resolution flow ──
             if (result.IsPasswordRequired)
             {
@@ -881,7 +894,7 @@ public partial class MainWindowViewModel : ObservableObject
 
             // ── Extract to temp (async, slow) ──
             var tempFile = await PreviewService.ExtractToTempAsync(
-                CurrentArchivePath, entry, _currentFormat);
+                CurrentArchivePath, entry, _currentFormat, _currentPassword);
             App.DebugLog($"[PRV] Extracted to: {tempFile}");
 
             if (tempFile == null)
