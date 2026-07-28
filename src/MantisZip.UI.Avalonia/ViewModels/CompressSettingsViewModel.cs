@@ -473,6 +473,12 @@ public partial class CompressSettingsViewModel : ObservableObject
             RefreshAutoRules();
     }
 
+    partial void OnOutputPathChanged(string? value)
+    {
+        if (AutoGenerateRules)
+            RefreshAutoRules();
+    }
+
     partial void OnDefaultFormatChanged(string value)
     {
         if (OutputMode == CompressOutputMode.Combined)
