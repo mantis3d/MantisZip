@@ -5,6 +5,10 @@
              x:CompileBindings="False">
   <UserControl.Resources>
     <conv:GeometryResourceConverter x:Key="GeometryResourceConverter" />
+    <conv:BoolToBoldConverter x:Key="BoolToBoldConverter" />
+    <conv:BoolToArchiveFontSizeConverter x:Key="BoolToArchiveFontSizeConverter" />
+    <conv:BoolToConflictBrushConverter x:Key="BoolToConflictBrushConverter" />
+    <conv:BoolToEmptyDirOpacityConverter x:Key="BoolToEmptyDirOpacityConverter" />
   </UserControl.Resources>
   <Grid RowDefinitions="Auto,Auto,*">
     <!-- Row 0: Top toolbar (compact/full toggle + summary) -->
@@ -101,35 +105,37 @@
             <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}"
                         Margin="2,1"
                         Opacity="{Binding TextOpacity}">
-              <!-- PathIcon for folder/file/warning, TextBlock for "…" truncated -->
-              <PathIcon Data="{Binding IconKey, Converter={StaticResource GeometryResourceConverter}}"
-                        Width="14" Height="14"
-                        VerticalAlignment="Center"
-                        Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
-              <TextBlock Text="…" FontSize="13" VerticalAlignment="Center"
-                         IsVisible="{Binding IsTruncatedNode}" />
-              <TextBlock Text="{Binding DisplayLabel}"
-                         FontSize="12"
-                         VerticalAlignment="Center"
-                         Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
-              <TextBlock Text="{Binding SizeDisplay}"
-                         FontSize="11"
-                         VerticalAlignment="Center"
-                         Margin="4,0,0,0"
-                         Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
-              <TextBlock Text="{Binding DirectoryInfoText}"
-                         FontSize="11"
-                         VerticalAlignment="Center"
-                         Margin="4,0,0,0"
-                         Foreground="{DynamicResource ThemeTextSecondaryBrush}"
-                         IsVisible="{Binding IsDirectoryNode}" />
-              <!-- Conflict suffix - warning icon for existing files -->
-              <PathIcon Data="{StaticResource IconWarning}"
-                        Width="12" Height="12"
-                        VerticalAlignment="Center"
-                        Foreground="#FFD32F2F"
-                        IsVisible="{Binding ExistsAtDestination}"
-                        ToolTip.Tip="同名文件已存在" />
+                <!-- PathIcon for folder/file/warning -->
+                <PathIcon Data="{Binding IconKey, Converter={StaticResource GeometryResourceConverter}}"
+                          Width="14" Height="14"
+                          VerticalAlignment="Center"
+                          Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                          Opacity="{Binding IsEmptyDirectory, Converter={StaticResource BoolToEmptyDirOpacityConverter}}" />
+                <TextBlock Text="…" FontSize="13" VerticalAlignment="Center"
+                           IsVisible="{Binding IsTruncatedNode}" />
+                <TextBlock Text="{Binding DisplayLabel}"
+                           VerticalAlignment="Center"
+                           FontWeight="{Binding IsArchiveNode, Converter={StaticResource BoolToBoldConverter}}"
+                           FontSize="{Binding IsArchiveNode, Converter={StaticResource BoolToArchiveFontSizeConverter}}"
+                           Foreground="{Binding ExistsAtDestination, Converter={StaticResource BoolToConflictBrushConverter}, FallbackValue={DynamicResource ThemeTextPrimaryBrush}}" />
+                <TextBlock Text="{Binding SizeDisplay}"
+                           FontSize="11"
+                           VerticalAlignment="Center"
+                           Margin="4,0,0,0"
+                           Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+                <TextBlock Text="{Binding DirectoryInfoText}"
+                           FontSize="11"
+                           VerticalAlignment="Center"
+                           Margin="4,0,0,0"
+                           Foreground="{DynamicResource ThemeTextSecondaryBrush}"
+                           IsVisible="{Binding IsDirectoryNode}" />
+                <!-- Conflict suffix - warning icon for existing files -->
+                <PathIcon Data="{StaticResource IconWarning}"
+                          Width="12" Height="12"
+                          VerticalAlignment="Center"
+                          Foreground="#FFD32F2F"
+                          IsVisible="{Binding ExistsAtDestination}"
+                          ToolTip.Tip="同名文件已存在" />
             </StackPanel>
           </TreeDataTemplate>
         </TreeView.ItemTemplate>
