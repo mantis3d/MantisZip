@@ -335,17 +335,23 @@ private void UpdateSummary(PreviewTreeNode root)
 **压缩包名称计算（与 Core 层 `ComputeSeparateOutputPath` 保持一致）：**
 
 ```csharp
-private static string ComputeArchiveName(string sourcePath, string format)
+private static string ComputeArchiveName(string sourcePath, string format, bool keepOriginalExt)
 {
     string baseName;
     if (Directory.Exists(sourcePath))
         baseName = Path.GetFileName(sourcePath.TrimEnd('\\'));
     else
-        baseName = Path.GetFileNameWithoutExtension(sourcePath);
+        baseName = keepOriginalExt 
+            ? Path.GetFileName(sourcePath) 
+            : Path.GetFileNameWithoutExtension(sourcePath);
     string ext = format == "tar.gz" ? ".tar.gz" : "." + format;
     return baseName + ext;
 }
 ```
+
+- `keepOriginalExt` 对应 AppSettings 的 `KeepOriginalExtension`
+- 文件模式时：`photo.jpg` + `keepOriginalExt=true` → `photo.jpg.zip`，`keepOriginalExt=false` → `photo.zip`
+- 目录模式时忽略该参数（GetFileName 替代逻辑）
 
 **方法签名：**
 
@@ -356,7 +362,8 @@ public static PreviewTreeNode BuildCompressPreview(
     FileFilterCriteria? filter = null,
     CompressOutputMode outputMode = CompressOutputMode.Manual,
     string? outputPath = null,
-    string format = "zip")
+    string format = "zip",
+    bool keepOriginalExtension = false)
 ```
 
 **构建逻辑：**
