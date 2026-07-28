@@ -32,6 +32,18 @@ public class PreviewTreeNode : FolderNode
     /// <summary>是否为压缩包节点（显示归档图标）。</summary>
     public bool IsArchiveNode { get; set; }
 
+    /// <summary>是否为目录节点（由构建代码在创建时标记，区别于文件节点）。</summary>
+    public bool IsDirectory { get; set; }
+
+    /// <summary>是否为空目录（目录类型且无子节点）。</summary>
+    public bool IsEmptyDirectory => IsDirectory && Children.Count == 0;
+
+    /// <summary>缩进深度（0 为顶级）。由 RebuildDisplayTree 的 SetIndentGuides 设置。</summary>
+    public int IndentDepth { get; set; }
+
+    /// <summary>每层祖先是否有下一兄弟节点（用于绘制缩进竖线）。</summary>
+    public bool[] AncestorHasNextSibling { get; set; } = [];
+
     /// <summary>子孙节点总数（含所有层级的文件和目录）。</summary>
     public int TotalDescendantCount { get; set; }
 
@@ -57,7 +69,7 @@ public class PreviewTreeNode : FolderNode
     public int TruncatedDepth { get; set; }
 
     /// <summary>是否为目录节点。</summary>
-    public bool IsDirectoryNode => Children.Count > 0 || string.IsNullOrEmpty(FullPath);
+    public bool IsDirectoryNode => IsDirectory || Children.Count > 0 || string.IsNullOrEmpty(FullPath);
 
     /// <summary>图标资源键（IconFolder / IconDocument / IconWarning / IconArchive），用于 PathIcon 绑定。</summary>
     public string? IconKey
@@ -66,8 +78,8 @@ public class PreviewTreeNode : FolderNode
         {
             if (IsArchiveNode) return "IconArchive";
             if (IsTruncated) return null;
-            if (ExistsAtDestination && Children.Count == 0 && !string.IsNullOrEmpty(FullPath)) return "IconWarning";
-            if (Children.Count > 0 || string.IsNullOrEmpty(FullPath)) return "IconFolder";
+            if (ExistsAtDestination && !IsDirectory && !string.IsNullOrEmpty(FullPath)) return "IconWarning";
+            if (IsEmptyDirectory || Children.Count > 0 || string.IsNullOrEmpty(FullPath)) return "IconFolder";
             return "IconDocument";
         }
     }
@@ -95,6 +107,9 @@ public class PreviewTreeNode : FolderNode
             ExistsAtDestination = ExistsAtDestination,
             IsFilteredOut = IsFilteredOut,
             IsArchiveNode = IsArchiveNode,
+            IsDirectory = IsDirectory,
+            IndentDepth = IndentDepth,
+            AncestorHasNextSibling = AncestorHasNextSibling,
             TotalDescendantCount = TotalDescendantCount,
             TotalDescendantSize = TotalDescendantSize,
             MaxChildDepth = MaxChildDepth,

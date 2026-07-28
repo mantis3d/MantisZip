@@ -391,7 +391,8 @@ public static class ResultPreviewService
         {
             Name = dirInfo.Name,
             FullPath = string.IsNullOrEmpty(relativePath) ? dirInfo.Name : relativePath,
-            IsExpanded = false
+            IsExpanded = false,
+            IsDirectory = true
         };
 
         try
@@ -451,7 +452,8 @@ public static class ResultPreviewService
                 {
                     Name = partName,
                     FullPath = currentPath,
-                    IsExpanded = false
+                    IsExpanded = false,
+                    IsDirectory = true
                 };
                 current.Children.Add(existing);
             }
@@ -485,7 +487,8 @@ public static class ResultPreviewService
                 {
                     Name = partName,
                     FullPath = currentPath,
-                    IsExpanded = false
+                    IsExpanded = false,
+                    IsDirectory = true
                 };
                 current.Children.Add(existing);
             }
