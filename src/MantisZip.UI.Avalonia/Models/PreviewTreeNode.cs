@@ -29,6 +29,9 @@ public class PreviewTreeNode : FolderNode
     /// <summary>该节点是否被过滤排除（显示为灰色/半透明）。</summary>
     public bool IsFilteredOut { get; set; }
 
+    /// <summary>是否为压缩包节点（显示归档图标）。</summary>
+    public bool IsArchiveNode { get; set; }
+
     /// <summary>子孙节点总数（含所有层级的文件和目录）。</summary>
     public int TotalDescendantCount { get; set; }
 
@@ -56,11 +59,12 @@ public class PreviewTreeNode : FolderNode
     /// <summary>是否为目录节点。</summary>
     public bool IsDirectoryNode => Children.Count > 0 || string.IsNullOrEmpty(FullPath);
 
-    /// <summary>图标资源键（IconFolder / IconDocument / IconWarning），用于 PathIcon 绑定。</summary>
+    /// <summary>图标资源键（IconFolder / IconDocument / IconWarning / IconArchive），用于 PathIcon 绑定。</summary>
     public string? IconKey
     {
         get
         {
+            if (IsArchiveNode) return "IconArchive";
             if (IsTruncated) return null;
             if (ExistsAtDestination && Children.Count == 0 && !string.IsNullOrEmpty(FullPath)) return "IconWarning";
             if (Children.Count > 0 || string.IsNullOrEmpty(FullPath)) return "IconFolder";
@@ -90,6 +94,7 @@ public class PreviewTreeNode : FolderNode
             SizeDisplay = SizeDisplay,
             ExistsAtDestination = ExistsAtDestination,
             IsFilteredOut = IsFilteredOut,
+            IsArchiveNode = IsArchiveNode,
             TotalDescendantCount = TotalDescendantCount,
             TotalDescendantSize = TotalDescendantSize,
             MaxChildDepth = MaxChildDepth,
