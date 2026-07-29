@@ -21,6 +21,17 @@
 
 ### MantisZip.UI.Avalonia（主力版）
 
+**2026-07-28** — 字段布局方向切换 + 两端对齐面板 + 设置内实时预览 + 信息栏顺序调整
+  - **FieldOrientation**：新增 `FieldLayoutMode`（vertical/horizontal），infoPanel + contentTop 字段名和值可切换左右并排显示，带冒号分隔
+  - **JustifyWrapPanel**：自定义 Panel，同一行内字段均匀分布（两端对齐），替代 WrapPanel
+  - **ContentTop 行分组**：contentTop 现在也按 Row 值分行，与 infoPanel 一致
+  - **设置实时预览**：元数据面板子标签底部增加预览区，显示 infoPanel + contentTop 的字段排布，每个字段带 ˄/˅ 按钮实时调整 Row
+  - **信息栏顺序**：格式信息在上、通用信息在下（对调），移除加载/空提示
+  - **字段补全**：Torrent 增加 TorrentFileName/MagnetLink/TrackerUrl/TrackerCount/AdditionalInfo 等 10 个字段；新增 IconCount/Encrypted 键；ISO 补充 TotalSize
+  - **显示名去重**：common 的 FileSize→"文件大小"、FileModifiedDate→"文件修改日期"
+  - 改动的文件：`MetadataPanelSettings.cs`（+FieldLayoutMode）、`PreviewViewModel.cs`、`PreviewPanel.axaml`、`PreviewPanel.axaml.cs`、`SettingsWindow.axaml`、`SettingsWindow.axaml.cs`、`MetadataPanelSettingsViewModel.cs`、`MetadataRenderEngine.cs`、`MetadataHelper.cs`、`MetadataRegistry.cs`
+  - 构建 0 errors
+
 **2026-07-28** — 压缩设置加密面板行为对齐 WPF + ResultTreeView 宽度可调
   - **密码面板行为对齐 WPF（7 项对齐）**：
     1. 保存复选框标签按模式切换："更新匹配规则"（库模式）/"保存到密码库"（新密码模式）

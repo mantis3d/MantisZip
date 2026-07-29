@@ -1,7 +1,11 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="clr-namespace:MantisZip.UI.Avalonia.ViewModels"
+        xmlns:services="clr-namespace:MantisZip.UI.Avalonia.Services"
+        xmlns:models="clr-namespace:MantisZip.UI.Avalonia.Models"
+        xmlns:local="clr-namespace:MantisZip.UI.Avalonia.Views"
         x:Class="MantisZip.UI.Avalonia.Views.SettingsWindow"
+        x:Name="SettingsWin"
         x:DataType="vm:SettingsWindowViewModel"
         Title="{Binding WindowTitle}"
         Width="820"
@@ -12,6 +16,9 @@
         CanResize="True"
         Foreground="{DynamicResource ThemeTextPrimaryBrush}"
         Background="{DynamicResource ThemeWindowBgBrush}">
+  <Window.Resources>
+    <local:PositionDisplayConverter x:Key="PositionDisplayConverter" />
+  </Window.Resources>
 
   <Grid RowDefinitions="*,Auto"
         Margin="16">
@@ -623,11 +630,11 @@
 
             <!-- ═══════ 元数据面板 ═══════ -->
             <TabItem Header="元数据面板" Classes="compactTab">
-              <Grid RowDefinitions="Auto,Auto,*" Margin="{DynamicResource SpacingSmThk}">
+              <Grid RowDefinitions="Auto,Auto,*,Auto" Margin="{DynamicResource SpacingSmThk}">
                 <!-- Field layout toggle -->
                 <CheckBox Grid.Row="0"
                           IsChecked="{Binding MetadataPanelSettings.IsHorizontalLayout}"
-                          Content="字段左右并排显示"
+                          Content="{Binding MetadataPanelSettings.FieldLayoutText}"
                           Margin="0,0,0,8"
                           Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
 
@@ -648,59 +655,125 @@
 
                 <!-- Field list -->
                 <ScrollViewer Grid.Row="2" Background="{DynamicResource ThemeWindowBgBrush}">
-                  <ItemsControl ItemsSource="{Binding MetadataPanelSettings.Fields}">
-                    <ItemsControl.ItemTemplate>
-                      <DataTemplate>
-                        <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="0,0,0,1"
-                                Padding="4,6">
-                          <Grid ColumnDefinitions="*,80,80,110">
-                            <!-- Field name -->
-                            <TextBlock Grid.Column="0" Text="{Binding DisplayName}"
-                                       VerticalAlignment="Center"
-                                       Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+                  <StackPanel>
+                    <!-- Header -->
+                    <Grid ColumnDefinitions="*,80,80,110" Margin="4,4,4,2">
+                    <TextBlock Grid.Column="0" Text="{Binding MetadataPanelSettings.ColumnFieldText}" FontWeight="SemiBold" FontSize="11"
+                               Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+                    <TextBlock Grid.Column="1" Text="{Binding MetadataPanelSettings.ColumnRowText}" FontWeight="SemiBold" FontSize="11"
+                               Foreground="{DynamicResource ThemeTextSecondaryBrush}"
+                               HorizontalAlignment="Center" />
+                    <TextBlock Grid.Column="2" Text="{Binding MetadataPanelSettings.ColumnOrderText}" FontWeight="SemiBold" FontSize="11"
+                               Foreground="{DynamicResource ThemeTextSecondaryBrush}"
+                               HorizontalAlignment="Center" />
+                    <TextBlock Grid.Column="3" Text="{Binding MetadataPanelSettings.ColumnPositionText}" FontWeight="SemiBold" FontSize="11"
+                               Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+                    </Grid>
+                    <ItemsControl ItemsSource="{Binding MetadataPanelSettings.Fields}">
+                      <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                          <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="0,0,0,1"
+                                  Padding="4,4">
+                            <Grid ColumnDefinitions="*,80,80,110">
+                              <!-- Field name -->
+                              <TextBlock Grid.Column="0" Text="{Binding DisplayName}"
+                                         VerticalAlignment="Center"
+                                         Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
 
-                            <!-- Row -->
-                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                              <TextBlock Text="Row" FontSize="10"
-                                         Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
-                              <TextBox Text="{Binding Row}"
-                                       Width="50"
-                                       HorizontalContentAlignment="Center"
+                              <!-- Row -->
+                              <TextBox Grid.Column="1" Text="{Binding Row}"
+                                       Width="50" HorizontalContentAlignment="Center"
                                        Background="{DynamicResource ThemeWindowBgBrush}"
                                        Foreground="{DynamicResource ThemeTextPrimaryBrush}"
                                        BorderBrush="{DynamicResource ThemeBorderBrush}"
-                                       Height="24" />
-                            </StackPanel>
+                                       Height="24" HorizontalAlignment="Center" />
 
-                            <!-- Order -->
-                            <StackPanel Grid.Column="2" VerticalAlignment="Center">
-                              <TextBlock Text="Order" FontSize="10"
-                                         Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
-                              <TextBox Text="{Binding Order}"
-                                       Width="50"
-                                       HorizontalContentAlignment="Center"
+                              <!-- Order -->
+                              <TextBox Grid.Column="2" Text="{Binding Order}"
+                                       Width="50" HorizontalContentAlignment="Center"
                                        Background="{DynamicResource ThemeWindowBgBrush}"
                                        Foreground="{DynamicResource ThemeTextPrimaryBrush}"
                                        BorderBrush="{DynamicResource ThemeBorderBrush}"
-                                       Height="24" />
-                            </StackPanel>
+                                       Height="24" HorizontalAlignment="Center" />
 
-                            <!-- Position -->
-                            <StackPanel Grid.Column="3" VerticalAlignment="Center">
-                              <TextBlock Text="位置" FontSize="10"
-                                         Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
-                              <ComboBox ItemsSource="{Binding PositionOptions}"
+                              <!-- Position -->
+                              <ComboBox Grid.Column="3" ItemsSource="{Binding PositionOptions}"
                                         SelectedItem="{Binding Position}"
                                         Background="{DynamicResource ThemeWindowBgBrush}"
                                         Foreground="{DynamicResource ThemeTextPrimaryBrush}"
-                                        Height="24" />
-                            </StackPanel>
-                          </Grid>
-                        </Border>
-                      </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                  </ItemsControl>
+                                        Height="24" Width="100" HorizontalAlignment="Left">
+                                <ComboBox.ItemTemplate>
+                                  <DataTemplate x:DataType="x:String">
+                                    <TextBlock Text="{Binding Converter={StaticResource PositionDisplayConverter}}" />
+                                  </DataTemplate>
+                                </ComboBox.ItemTemplate>
+                              </ComboBox>
+                            </Grid>
+                          </Border>
+                        </DataTemplate>
+                      </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                  </StackPanel>
                 </ScrollViewer>
+
+                <!-- Preview -->
+                <StackPanel Grid.Row="3" Margin="0,8,0,0">
+                  <TextBlock Text="{Binding MetadataPanelSettings.PreviewTitleText}" FontWeight="SemiBold" FontSize="11" Margin="0,0,0,4"
+                             Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+                  <ItemsControl ItemsSource="{Binding MetadataPanelSettings.PreviewSections}">
+                      <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="services:MetadataSection">
+                          <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
+                                  CornerRadius="{DynamicResource BorderRadius}" Padding="8,4" Margin="0,4,0,0"
+                                  Background="{DynamicResource ThemeWindowBgBrush}">
+                            <StackPanel Spacing="2">
+                              <TextBlock Text="{Binding Title}" FontWeight="SemiBold" FontSize="11"
+                                         Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+                              <ItemsControl ItemsSource="{Binding Rows}">
+                                <ItemsControl.ItemTemplate>
+                                  <DataTemplate x:DataType="services:InfoPanelRow">
+                                    <ItemsControl ItemsSource="{Binding Items}">
+                                      <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate>
+                                          <local:JustifyWrapPanel />
+                                        </ItemsPanelTemplate>
+                                      </ItemsControl.ItemsPanel>
+                                      <ItemsControl.ItemTemplate>
+                                        <DataTemplate x:DataType="models:FormatMetadataItem">
+                                          <StackPanel Orientation="Horizontal" Spacing="2" Margin="0,0,4,0">
+                                            <TextBlock Text="{Binding Key}" FontSize="11" VerticalAlignment="Center"
+                                                       Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+                                            <StackPanel Orientation="Horizontal" Spacing="1" VerticalAlignment="Center">
+                                              <Button Width="16" Height="16" Padding="0"
+                                                      BorderThickness="1"
+                                                      Background="{DynamicResource ThemeSurfaceBgBrush}"
+                                                      Foreground="{DynamicResource ThemeTextSecondaryBrush}"
+                                                      BorderBrush="{DynamicResource ThemeBorderBrush}"
+                                                      Click="OnPreviewFieldMoveUp">
+                                                <PathIcon Data="{StaticResource IconArrowUp}" Width="10" Height="10" />
+                                              </Button>
+                                              <Button Width="16" Height="16" Padding="0"
+                                                      BorderThickness="1"
+                                                      Background="{DynamicResource ThemeSurfaceBgBrush}"
+                                                      Foreground="{DynamicResource ThemeTextSecondaryBrush}"
+                                                      BorderBrush="{DynamicResource ThemeBorderBrush}"
+                                                      Click="OnPreviewFieldMoveDown">
+                                                <PathIcon Data="{StaticResource IconArrowDown}" Width="10" Height="10" />
+                                              </Button>
+                                            </StackPanel>
+                                          </StackPanel>
+                                        </DataTemplate>
+                                      </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                  </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                              </ItemsControl>
+                            </StackPanel>
+                          </Border>
+                        </DataTemplate>
+                      </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                  </StackPanel>
               </Grid>
             </TabItem>
           </TabControl>

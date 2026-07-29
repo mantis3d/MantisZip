@@ -577,6 +577,10 @@ PROGRESS.md 分三个独立线索，根据变更影响范围选择对应线索�
 
 **例外**：非数据行类列表（如 WrapPanel 标签云、图标画廊等不受紧凑度影响的控件）可豁免。
 
+### 规则 8：新增图标必须注册到 IconTestViewModel
+
+在 `src/MantisZip.UI.Avalonia/Resources/Icons/AppIcons.axaml` 中添加新的 `Geometry` 图标资源后，**必须同步**在 `src/MantisZip.UI.Avalonia/ViewModels/IconTestViewModel.cs` 的 `LoadAllIcons()` 方法中添加对应的 `Add()` 调用，否则图标测试窗口不会显示该图标。
+
 ## 未来工作
 
 ### 迁移完成后的清理

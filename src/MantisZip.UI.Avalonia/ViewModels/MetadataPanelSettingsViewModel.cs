@@ -1,7 +1,9 @@
 using System.Collections.ObjectModel;
+using System.Linq;
 using CommunityToolkit.Mvvm.ComponentModel;
 using MantisZip.Core.Models;
 using MantisZip.Core.Utils;
+using MantisZip.UI.Avalonia.Models;
 using MantisZip.UI.Avalonia.Services;
 
 namespace MantisZip.UI.Avalonia.ViewModels;
@@ -32,6 +34,7 @@ public partial class MetadataPanelSettingsViewModel : ObservableObject
                 _settings.FieldLayoutMode = value;
                 OnPropertyChanged();
                 OnPropertyChanged(nameof(IsHorizontalLayout));
+                RebuildPreview();
             }
         }
     }
@@ -47,6 +50,17 @@ public partial class MetadataPanelSettingsViewModel : ObservableObject
             OnPropertyChanged(nameof(FieldLayoutMode));
         }
     }
+
+    /// <summary>预览用的 sections（仅 infoPanel 位置）。</summary>
+    public ObservableCollection<MetadataSection> PreviewSections { get; } = [];
+
+    // ── 本地化文本 ──
+    public string FieldLayoutText => LocalizationManager.T("Metadata_Panel_FieldLayout");
+    public string ColumnFieldText => LocalizationManager.T("Metadata_Panel_ColumnField");
+    public string ColumnRowText => LocalizationManager.T("Metadata_Panel_ColumnRow");
+    public string ColumnOrderText => LocalizationManager.T("Metadata_Panel_ColumnOrder");
+    public string ColumnPositionText => LocalizationManager.T("Metadata_Panel_ColumnPosition");
+    public string PreviewTitleText => LocalizationManager.T("Metadata_Panel_PreviewTitle");
 
     public MetadataPanelSettingsViewModel()
     {
@@ -121,15 +135,73 @@ public partial class MetadataPanelSettingsViewModel : ObservableObject
         foreach (var def in registryFields)
         {
             var hasConfig = typeConfig.Fields.TryGetValue(def.Key, out var fieldConfig);
-            Fields.Add(new FieldEditItem
+            var item = new FieldEditItem
             {
                 Key = def.Key,
                 DisplayName = def.DisplayName,
                 Row = fieldConfig?.Row ?? 0,
                 Order = fieldConfig?.Order ?? 10,
                 Position = fieldConfig?.Position ?? "infoPanel",
-            });
+            };
+            item.SetChangeCallback(RebuildPreview);
+            Fields.Add(item);
         }
+
+        RebuildPreview();
+    }
+
+    /// <summary>根据当前 Fields 重建预览。</summary>
+    public void RebuildPreview()
+    {
+        PreviewSections.Clear();
+        var typeKey = _previousTypeKey;
+        if (typeKey == null) return;
+
+        var title = GetTypeDisplayName(typeKey);
+
+        // ── infoPanel section ──
+        var infoSection = new MetadataSection { Title = LocalizationManager.T("Metadata_Panel_SectionSidebar", title), ShowSeparator = true };
+        BuildRows(infoSection, f => f.Position == "infoPanel");
+
+        // ── contentTop section ──
+        var topSection = new MetadataSection { Title = LocalizationManager.T("Metadata_Panel_SectionContentTop", title), ShowSeparator = false };
+        BuildRows(topSection, f => f.Position == "contentTop");
+
+        if (infoSection.Rows.Count > 0)
+            PreviewSections.Add(infoSection);
+        if (topSection.Rows.Count > 0)
+            PreviewSections.Add(topSection);
+    }
+
+    private void BuildRows(MetadataSection section, Func<FieldEditItem, bool> filter)
+    {
+        var grouped = Fields
+            .Where(filter)
+            .GroupBy(f => f.Row)
+            .OrderBy(g => g.Key);
+
+        foreach (var group in grouped)
+        {
+            var row = new InfoPanelRow();
+            foreach (var item in group.OrderBy(f => f.Order))
+                row.Items.Add(new FormatMetadataItem(item.DisplayName, ""));
+            if (row.Items.Count > 0)
+                section.Rows.Add(row);
+        }
+    }
+
+    /// <summary>预览中移动字段到上一行。</summary>
+    public void MoveFieldUp(string fieldKeyOrDisplay)
+    {
+        var item = Fields.FirstOrDefault(f => f.Key == fieldKeyOrDisplay || f.DisplayName == fieldKeyOrDisplay);
+        if (item != null && item.Row > 0) item.Row--;
+    }
+
+    /// <summary>预览中移动字段到下一行。</summary>
+    public void MoveFieldDown(string fieldKeyOrDisplay)
+    {
+        var item = Fields.FirstOrDefault(f => f.Key == fieldKeyOrDisplay || f.DisplayName == fieldKeyOrDisplay);
+        if (item != null) item.Row++;
     }
 
     /// <summary>将所有类型的编辑写入 settings。</summary>
@@ -193,12 +265,44 @@ public class TypeOption
 }
 
 /// <summary>字段编辑项。</summary>
-public class FieldEditItem
+public class FieldEditItem : ObservableObject
 {
     public string Key { get; set; } = "";
     public string DisplayName { get; set; } = "";
-    public int Row { get; set; }
-    public int Order { get; set; }
-    public string Position { get; set; } = "infoPanel";
+
+    private int _row;
+    public int Row
+    {
+        get => _row;
+        set { if (SetProperty(ref _row, value)) _onChanged?.Invoke(); }
+    }
+
+    private int _order;
+    public int Order
+    {
+        get => _order;
+        set { if (SetProperty(ref _order, value)) _onChanged?.Invoke(); }
+    }
+
+    private string _position = "infoPanel";
+    public string Position
+    {
+        get => _position;
+        set
+        {
+            if (SetProperty(ref _position, value))
+            {
+                _onChanged?.Invoke();
+                OnPropertyChanged(nameof(PositionDisplay));
+            }
+        }
+    }
+
+    /// <summary>位置的显示名，只读绑定用。</summary>
+    public string PositionDisplay => LocalizationManager.T($"Metadata_Position{_position}");
+
     public string[] PositionOptions => ["infoPanel", "contentTop", "hidden"];
+
+    private Action? _onChanged;
+    public void SetChangeCallback(Action onChanged) => _onChanged = onChanged;
 }

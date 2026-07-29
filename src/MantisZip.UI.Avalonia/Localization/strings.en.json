@@ -859,5 +859,14 @@
   "Metadata_Type_sqlite": "Database Info",
   "Metadata_Type_pe": "Program Info",
   "Metadata_Type_ico": "Icon Info",
-  "Metadata_Type_pdf": "Document Info"
+  "Metadata_Type_pdf": "Document Info",
+  "Metadata_Panel_FieldLayout": "Show fields side by side",
+  "Metadata_Panel_ColumnField": "Field",
+  "Metadata_Panel_ColumnPosition": "Position",
+  "Metadata_Panel_PreviewTitle": "Preview",
+  "Metadata_Panel_SectionSidebar": "{0} (Sidebar)",
+  "Metadata_Panel_SectionContentTop": "{0} (Content Top)",
+  "Metadata_Panel_SettingsTooltip": "Metadata panel settings",
+  "Metadata_Panel_ColumnRow": "Row",
+  "Metadata_Panel_ColumnOrder": "Order"
 }
