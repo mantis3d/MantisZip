@@ -433,6 +433,19 @@ public partial class CompressSettingsViewModel : ObservableObject
             return;
         }
 
+        if (!IsOutputPathValid())
+        {
+            // 路径无效时显示"路径无效"节点，不调用 ResultPreviewService
+            PreviewRoot = new PreviewTreeNode
+            {
+                Name = LocalizationManager.T("Compress_OutputPathInvalid"),
+                FullPath = "",
+                DisplayLabel = LocalizationManager.T("Compress_OutputPathInvalid"),
+                IsExpanded = true
+            };
+            return;
+        }
+
         PreviewRoot = ResultPreviewService.BuildCompressPreview(
             SelectedPaths.ToList(),
             rootName: LocalizationManager.T("Compress_Title"),
@@ -496,6 +509,7 @@ public partial class CompressSettingsViewModel : ObservableObject
         StartCompressCommand.NotifyCanExecuteChanged();
         if (AutoGenerateRules)
             RefreshAutoRules();
+        BuildCompressPreview();
     }
 
     partial void OnDefaultFormatChanged(string value)
@@ -783,10 +797,7 @@ public partial class CompressSettingsViewModel : ObservableObject
     private bool CanExecuteStartCompress()
     {
         if (SelectedPaths.Count == 0) return false;
-        // Manual mode requires a valid output path (matches WPF UpdateCompressButton logic)
-        if (OutputMode == CompressOutputMode.Manual && string.IsNullOrEmpty(OutputPath))
-            return false;
-        return true;
+        return IsOutputPathValid();
     }
 
     [RelayCommand]
@@ -962,6 +973,33 @@ public partial class CompressSettingsViewModel : ObservableObject
         if (SelectedPaths.Count == 1 && Directory.Exists(SelectedPaths[0]))
             return ArchivePath.GetFileName(SelectedPaths[0]);
         return $"archive_{DateTime.Now:yyyyMMddHHmmss}";
+    }
+
+    /// <summary>
+    /// 检查输出路径在当前模式下是否有效。
+    /// Manual：路径不能为空且父目录必须存在。
+    /// Combined：路径非空即有效（由源文件推导）。
+    /// Separate：输出到源文件所在目录，始终有效。
+    /// </summary>
+    private bool IsOutputPathValid()
+    {
+        switch (OutputMode)
+        {
+            case CompressOutputMode.Manual:
+                if (string.IsNullOrEmpty(OutputPath))
+                    return false;
+                var dir = Path.GetDirectoryName(OutputPath);
+                return !string.IsNullOrEmpty(dir) && Directory.Exists(dir);
+
+            case CompressOutputMode.Combined:
+                return !string.IsNullOrEmpty(OutputPath);
+
+            case CompressOutputMode.Separate:
+                return true;
+
+            default:
+                return true;
+        }
     }
 
     /// <summary>

@@ -21,6 +21,16 @@
 
 ### MantisZip.UI.Avalonia（主力版）
 
+**2026-07-29** — 输出路径无效检测 + 预览树显示"输出路径无效" + 窗口超出屏幕自动上移
+  - **路径有效性检查**：新增 `IsOutputPathValid()` 公共方法（Manual 检查路径+父目录存在性、Combined 检查非空、Separate 始终有效）
+  - **CanExecuteStartCompress**：改调用 `IsOutputPathValid()`，路径无效时按钮禁用
+  - **预览树路径无效显示**：`BuildCompressPreview` 中路径不通过校验时，直接创建"输出路径无效"单节点，不调 ResultPreviewService
+  - **实时更新**：`OnOutputPathChanged` 增加 `BuildCompressPreview()` 调用，打字时预览树即时反映路径有效性
+  - **i18n**：新增 `Compress_OutputPathInvalid` → "输出路径无效" / "Output path invalid"
+  - **窗口自动上移**：新增 `AdjustWindowPosition()`，在 Loaded / Tab 切换 / 加密开关切换时触发，超出屏幕底部则自动上移到可见位置
+  - **修复**：`AppIcons.axaml` 重复 `IconArchive` 导致运行时崩溃
+  - 构建 0 errors
+
 **2026-07-28** — 字段布局方向切换 + 两端对齐面板 + 设置内实时预览 + 信息栏顺序调整
   - **FieldOrientation**：新增 `FieldLayoutMode`（vertical/horizontal），infoPanel + contentTop 字段名和值可切换左右并排显示，带冒号分隔
   - **JustifyWrapPanel**：自定义 Panel，同一行内字段均匀分布（两端对齐），替代 WrapPanel

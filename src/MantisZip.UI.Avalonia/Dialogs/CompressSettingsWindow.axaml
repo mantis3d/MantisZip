@@ -21,7 +21,8 @@
         ColumnDefinitions="450,Auto,*"
         Margin="16">
     <!-- ═══════ Left: TabControl with settings ═══════ -->
-    <TabControl Grid.Column="0" Grid.Row="0">
+    <TabControl Grid.Column="0" Grid.Row="0"
+                SelectionChanged="OnTabSelectionChanged">
       <!-- Tab 1: General -->
       <TabItem Header="{Binding LocalizedStrings[Compress_TabGeneral]}"
                Classes="compactTab">

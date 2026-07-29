@@ -83,6 +83,7 @@
   "Compress_OutputMode_Separate": "单独压缩每个文件",
   "Compress_OutputPath": "输出路径",
   "Compress_OutputPlaceholder": "选择输出文件路径",
+  "Compress_OutputPathInvalid": "输出路径无效",
   "Compress_Password": "密码",
   "Compress_PasswordPlaceholder": "输入密码",
   "Compress_Pwd_AutoRules": "自动生成规则",
