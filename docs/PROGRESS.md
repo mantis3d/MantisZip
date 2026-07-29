@@ -21,6 +21,14 @@
 
 ### MantisZip.UI.Avalonia（主力版）
 
+**2026-07-28** — 压缩设置"更新匹配规则"修复：压缩完成后从未保存密码/规则
+  - **Root Cause**: WPF 在三个完成路径后均调用 `SavePasswordAfterCompress()`，Avalonia 的 `ExecuteCompressFromSettings` 只设了 `StatusMessage`，完全没有密码持久化逻辑
+  - **修复**: 在 `ExecuteCompressFromSettings` 压缩成功后添加密码保存：
+    - 库模式：去重补充新规则到 `entry.Patterns` → `UpdatePassword` + `MarkUsed`
+    - 新密码模式：`AddPassword(password, desc, rules)`
+    - 空规则回退：自动生成 `*{ext}`
+  - 构建 0 errors
+
 **2026-07-28** — 压缩设置"自动生成规则"修复：OutputPath 变更时未刷新规则
   - **Root Cause**: WPF 有 `FileNameTextBox_TextChanged` 触发 `RefreshAutoRules()`，Avalonia 的 `OutputPath` 是 `[ObservableProperty]` 但缺少 `OnOutputPathChanged` 处理器
   - **修复**: 新增 `partial void OnOutputPathChanged(string? value)` → 用户输入/浏览输出路径时自动刷新密码规则
