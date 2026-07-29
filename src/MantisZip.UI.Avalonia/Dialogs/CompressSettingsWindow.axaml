@@ -18,8 +18,12 @@
   </Window.Resources>
 
   <Grid RowDefinitions="*,Auto"
-        ColumnDefinitions="450,Auto,*"
         Margin="16">
+    <Grid.ColumnDefinitions>
+      <ColumnDefinition Width="450" MinWidth="400" />
+      <ColumnDefinition Width="Auto" />
+      <ColumnDefinition Width="*" />
+    </Grid.ColumnDefinitions>
     <!-- ═══════ Left: TabControl with settings ═══════ -->
     <TabControl Grid.Column="0" Grid.Row="0"
                 SelectionChanged="OnTabSelectionChanged">

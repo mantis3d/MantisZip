@@ -21,6 +21,15 @@
 
 ### MantisZip.UI.Avalonia（主力版）
 
+**2026-07-30** — 解压/压缩设置窗口布局统一 + ResultTreeView 冲突/过滤计数修复 + FilterToggle  TwoWay 修复
+  - **解压窗口布局**：`ExtractSettingsWindow` 列定义 `450,Auto,*`，左栏 `MinWidth=400`，GridSplitter 加 `ResizeBehavior`，与压缩窗口一致
+  - **压缩窗口布局**：`CompressSettingsWindow` 左栏加 `MinWidth=400` ColumnDefinition
+  - **解压冲突检测**：`BuildExtractPreview` 启用 `checkExists`，新增 `MarkDirectoryConflicts` 递归检测目录是否存在
+  - **摘要计数修复**：`UpdateSummary` 改用原始树 `_originalRoot` 统计，避免 CompactMode 截断导致计数值偏小；`CountTotalFiles`/`CalculateTotalSize` 跳过 `IsFilteredOut` 节点
+  - **冲突计数修复**：`CountConflicts` 跳过 `IsFilteredOut` 节点
+  - **FilterToggle 修复**：绑定加 `Mode=TwoWay`；过滤项移除逻辑提到 `CompactMode` 判断之前，Full 模式也能生效
+  - 构建 0 errors
+
 **2026-07-29** — 过滤全排除预览树紫色显示 + 压缩时弹提示 + Manual 模式自动填充默认路径
   - **紫色空存档**：`PreviewTreeNode` 新增 `IsArchiveEmpty` + `ForegroundKey`，全子节点被过滤时显示紫色，优先级高于冲突红色
   - **NodeForegroundConverter**：新转换器，根据 ForegroundKey 返回紫色(Purple)/红色(ConflictRed)/默认

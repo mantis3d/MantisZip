@@ -94,7 +94,13 @@ public static class ResultPreviewService
             parent.Children.Add(fileNode);
         }
 
-        // Phase 2: Calculate descendant counts (destNode is now the root)
+        // Phase 2: Check directory existence at destination
+        if (checkExists)
+        {
+            MarkDirectoryConflicts(destNode, destDir);
+        }
+
+        // Phase 3: Calculate descendant counts (destNode is now the root)
         CalculateDescendantStats(destNode);
 
         // Expand by default
@@ -512,5 +518,21 @@ public static class ResultPreviewService
         }
 
         return current;
+    }
+
+    /// <summary>
+    /// 递归标记目录节点在目标路径是否已存在。
+    /// </summary>
+    private static void MarkDirectoryConflicts(PreviewTreeNode node, string destDir)
+    {
+        foreach (var child in node.Children.OfType<PreviewTreeNode>())
+        {
+            if (child.IsDirectory && !child.IsTruncated)
+            {
+                var realPath = Path.Combine(destDir, child.FullPath.Replace('/', Path.DirectorySeparatorChar));
+                child.ExistsAtDestination = Directory.Exists(realPath);
+                MarkDirectoryConflicts(child, destDir);
+            }
+        }
     }
 }

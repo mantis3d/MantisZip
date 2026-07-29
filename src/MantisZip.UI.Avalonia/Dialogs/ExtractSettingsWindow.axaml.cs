@@ -79,7 +79,7 @@ public partial class ExtractSettingsWindow : Window
     {
         if (_entries == null) return;
         var filter = GetFilter();
-        ViewModel.BuildExtractPreview(_entries, filter, checkExists: false);
+        ViewModel.BuildExtractPreview(_entries, filter, checkExists: true);
     }
 
     /// <summary>获取当前过滤条件。仅当启用过滤且 filter.IsActive 时有效。</summary>
