@@ -32,6 +32,9 @@ public class PreviewTreeNode : FolderNode
     /// <summary>是否为压缩包节点（显示归档图标）。</summary>
     public bool IsArchiveNode { get; set; }
 
+    /// <summary>压缩包内所有文件均被过滤，该压缩包不会生成。</summary>
+    public bool IsArchiveEmpty { get; set; }
+
     /// <summary>是否为目录节点（由构建代码在创建时标记，区别于文件节点）。</summary>
     public bool IsDirectory { get; set; }
 
@@ -88,6 +91,19 @@ public class PreviewTreeNode : FolderNode
     public bool IsTruncatedNode => IsTruncated;
 
     /// <summary>
+    /// 节点前景色状态键：空存档(紫) > 文件冲突(红) > 默认(null 回退主题色)。
+    /// </summary>
+    public string? ForegroundKey
+    {
+        get
+        {
+            if (IsArchiveEmpty) return "Purple";
+            if (ExistsAtDestination) return "ConflictRed";
+            return null;
+        }
+    }
+
+    /// <summary>
     /// 节点的前景色不透明度（过滤项半透明，其他正常）。
     /// </summary>
     public double TextOpacity => IsFilteredOut ? 0.4 : 1.0;
@@ -107,6 +123,7 @@ public class PreviewTreeNode : FolderNode
             ExistsAtDestination = ExistsAtDestination,
             IsFilteredOut = IsFilteredOut,
             IsArchiveNode = IsArchiveNode,
+            IsArchiveEmpty = IsArchiveEmpty,
             IsDirectory = IsDirectory,
             IndentDepth = IndentDepth,
             AncestorHasNextSibling = AncestorHasNextSibling,

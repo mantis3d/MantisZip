@@ -6,6 +6,7 @@
   <UserControl.Resources>
     <conv:GeometryResourceConverter x:Key="GeometryResourceConverter" />
     <conv:BoolToBoldConverter x:Key="BoolToBoldConverter" />
+    <conv:NodeForegroundConverter x:Key="NodeForegroundConverter" />
     <conv:BoolToArchiveFontSizeConverter x:Key="BoolToArchiveFontSizeConverter" />
     <conv:BoolToConflictBrushConverter x:Key="BoolToConflictBrushConverter" />
     <conv:BoolToEmptyDirOpacityConverter x:Key="BoolToEmptyDirOpacityConverter" />
@@ -114,10 +115,10 @@
                 <TextBlock Text="…" FontSize="13" VerticalAlignment="Center"
                            IsVisible="{Binding IsTruncatedNode}" />
                 <TextBlock Text="{Binding DisplayLabel}"
-                           VerticalAlignment="Center"
-                           FontWeight="{Binding IsArchiveNode, Converter={StaticResource BoolToBoldConverter}}"
-                           FontSize="{Binding IsArchiveNode, Converter={StaticResource BoolToArchiveFontSizeConverter}}"
-                           Foreground="{Binding ExistsAtDestination, Converter={StaticResource BoolToConflictBrushConverter}, FallbackValue={DynamicResource ThemeTextPrimaryBrush}}" />
+                            VerticalAlignment="Center"
+                            FontWeight="{Binding IsArchiveNode, Converter={StaticResource BoolToBoldConverter}}"
+                            FontSize="{Binding IsArchiveNode, Converter={StaticResource BoolToArchiveFontSizeConverter}}"
+                            Foreground="{Binding ForegroundKey, Converter={StaticResource NodeForegroundConverter}, FallbackValue={DynamicResource ThemeTextPrimaryBrush}}" />
                 <TextBlock Text="{Binding SizeDisplay}"
                            FontSize="11"
                            VerticalAlignment="Center"

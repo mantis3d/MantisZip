@@ -21,6 +21,15 @@
 
 ### MantisZip.UI.Avalonia（主力版）
 
+**2026-07-29** — 过滤全排除预览树紫色显示 + 压缩时弹提示 + Manual 模式自动填充默认路径
+  - **紫色空存档**：`PreviewTreeNode` 新增 `IsArchiveEmpty` + `ForegroundKey`，全子节点被过滤时显示紫色，优先级高于冲突红色
+  - **NodeForegroundConverter**：新转换器，根据 ForegroundKey 返回紫色(Purple)/红色(ConflictRed)/默认
+  - **空存档检测**：`ResultPreviewService` 在构建完成后递归检查 `NodeHasVisibleContent`，无可见内容时标记
+  - **压缩时提示**：`ExecuteCompressFromSettings` 过滤后 `sources.Count == 0` 时弹出 `AppMessageBox` 告知用户
+  - **Manual 自动填充路径**：`TryAutoFillOutputPath()` 在添加源文件时自动生成默认输出路径
+  - **i18n**：新增 `Compress_FilteredAllSkipped`
+  - 构建 0 errors
+
 **2026-07-29** — 输出路径无效检测 + 预览树显示"输出路径无效" + 窗口超出屏幕自动上移
   - **路径有效性检查**：新增 `IsOutputPathValid()` 公共方法（Manual 检查路径+父目录存在性、Combined 检查非空、Separate 始终有效）
   - **CanExecuteStartCompress**：改调用 `IsOutputPathValid()`，路径无效时按钮禁用

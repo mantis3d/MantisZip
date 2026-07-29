@@ -86,6 +86,7 @@
   "Compress_OutputPath": "Output Path",
   "Compress_OutputPlaceholder": "Select output file path",
   "Compress_OutputPathInvalid": "Output path invalid",
+  "Compress_FilteredAllSkipped": "All source files are excluded by the filter. No archive can be created.\nPlease check your filter settings.",
   "Compress_Password": "Password",
   "Compress_PasswordPlaceholder": "Enter password",
   "Compress_Pwd_AutoRules": "Auto-generate rules",

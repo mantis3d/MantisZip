@@ -259,7 +259,20 @@ public static class ResultPreviewService
             }
         }
 
+        // 检查压缩包内所有文件是否均被过滤（空存档标记）
+        archiveNode.IsArchiveEmpty = !NodeHasVisibleContent(archiveNode);
+
         root.Children.Add(archiveNode);
+    }
+
+    /// <summary>
+    /// 递归检查节点及其所有子节点中是否有未被过滤的可见节点。
+    /// </summary>
+    private static bool NodeHasVisibleContent(PreviewTreeNode node)
+    {
+        if (node.Children.Count == 0)
+            return !node.IsFilteredOut; // 叶子节点：本身未被过滤即可见
+        return node.Children.OfType<PreviewTreeNode>().Any(NodeHasVisibleContent);
     }
 
     /// <summary>
@@ -343,6 +356,8 @@ public static class ResultPreviewService
                     archiveNode.Children.Add(fileNode);
                 }
 
+                // 检查压缩包内所有文件是否均被过滤
+                archiveNode.IsArchiveEmpty = !NodeHasVisibleContent(archiveNode);
                 groupNode.Children.Add(archiveNode);
             }
 

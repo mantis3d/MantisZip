@@ -307,6 +307,8 @@ public partial class CompressSettingsViewModel : ObservableObject
             BuildCompressPreview();
             if (OutputMode != CompressOutputMode.Manual)
                 RefreshOutputPathState();
+            else
+                TryAutoFillOutputPath();
             UpdateCanCompress();
         };
 
@@ -891,6 +893,33 @@ public partial class CompressSettingsViewModel : ObservableObject
                 RefreshCombinedPath();
                 break;
         }
+    }
+
+    /// <summary>
+    /// Manual 模式下输出路径为空时，根据源文件自动生成默认路径。
+    /// 行为与 <see cref="RefreshCombinedPath"/> 一致但不弹跨盘符警告（保持空路径让用户手动设置）。
+    /// </summary>
+    private void TryAutoFillOutputPath()
+    {
+        if (OutputMode != CompressOutputMode.Manual) return;
+        if (!string.IsNullOrEmpty(OutputPath)) return;
+        if (SelectedPaths.Count == 0) return;
+
+        var commonParent = App.FindCommonParent(SelectedPaths.ToList());
+        if (commonParent != null && !App.IsDriveRoot(commonParent))
+        {
+            var archiveName = ArchivePath.GetFileName(commonParent);
+            var ext = GetFormatExtension();
+            OutputPath = System.IO.Path.Combine(commonParent, archiveName + ext);
+        }
+        else if (AllPathsSameDrive(SelectedPaths))
+        {
+            var root = Path.GetPathRoot(SelectedPaths[0]) ?? "C:\\";
+            var driveLetter = root.TrimEnd('\\', '/').TrimEnd(':');
+            var ext = GetFormatExtension();
+            OutputPath = System.IO.Path.Combine(root, driveLetter + ext);
+        }
+        // 跨盘符：保持空路径，用户手动设置
     }
 
     /// <summary>

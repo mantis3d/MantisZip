@@ -56,6 +56,33 @@ public class BoolToConflictBrushConverter : IValueConverter
 }
 
 /// <summary>
+/// 将 PreviewTreeNode.ForegroundKey 转换为对应画刷：Purple → 紫色，ConflictRed → 红色，其他 → UnsetValue。
+/// 优先级：空存档(紫) > 文件冲突(红) > 默认回退主题色。
+/// </summary>
+public class NodeForegroundConverter : IValueConverter
+{
+    private static readonly SolidColorBrush PurpleBrush = new(0xFF9C27B0);
+    private static readonly SolidColorBrush RedBrush = new(0xFFD32F2F);
+
+    public object? Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+    {
+        if (value is string key)
+        {
+            return key switch
+            {
+                "Purple" => PurpleBrush,
+                "ConflictRed" => RedBrush,
+                _ => BindingNotification.UnsetValue,
+            };
+        }
+        return BindingNotification.UnsetValue;
+    }
+
+    public object? ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
+        => BindingNotification.UnsetValue;
+}
+
+/// <summary>
 /// 将 bool（IsEmptyDirectory）转换为双精度不透明度：true → 0.45，false → 1.0。
 /// </summary>
 public class BoolToEmptyDirOpacityConverter : IValueConverter
