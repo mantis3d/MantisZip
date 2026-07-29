@@ -32,6 +32,31 @@
   - 改动的文件：`MetadataPanelSettings.cs`（+FieldLayoutMode）、`PreviewViewModel.cs`、`PreviewPanel.axaml`、`PreviewPanel.axaml.cs`、`SettingsWindow.axaml`、`SettingsWindow.axaml.cs`、`MetadataPanelSettingsViewModel.cs`、`MetadataRenderEngine.cs`、`MetadataHelper.cs`、`MetadataRegistry.cs`
   - 构建 0 errors
 
+**2026-07-28** — 压缩设置"更新匹配规则"修复：压缩完成后从未保存密码/规则
+  - **Root Cause**: WPF 在三个完成路径后均调用 `SavePasswordAfterCompress()`，Avalonia 的 `ExecuteCompressFromSettings` 只设了 `StatusMessage`，完全没有密码持久化逻辑
+  - **修复**: 在 `ExecuteCompressFromSettings` 压缩成功后添加密码保存：
+    - 库模式：去重补充新规则到 `entry.Patterns` → `UpdatePassword` + `MarkUsed`
+    - 新密码模式：`AddPassword(password, desc, rules)`
+    - 空规则回退：自动生成 `*{ext}`
+  - 构建 0 errors
+
+**2026-07-28** — 压缩按钮 Manual 模式输出路径为空时禁用
+  - **Root Cause**: `CanExecuteStartCompress` 只检查 `SelectedPaths.Count > 0`，与 WPF `UpdateCompressButton` 的 Manual 模式检查（hasDir + hasName）不一致
+  - **修复**: `CanExecuteStartCompress` 在 Manual 模式下增加 `string.IsNullOrEmpty(OutputPath)` 检查；`OnOutputPathChanged` 增加 `NotifyCanExecuteChanged()` 使用户输入路径时按钮状态即时更新
+  - 构建 0 errors
+
+**2026-07-28** — 压缩设置"自动生成规则"修复：OutputPath 变更时未刷新规则
+  - **Root Cause**: WPF 有 `FileNameTextBox_TextChanged` 触发 `RefreshAutoRules()`，Avalonia 的 `OutputPath` 是 `[ObservableProperty]` 但缺少 `OnOutputPathChanged` 处理器
+  - **修复**: 新增 `partial void OnOutputPathChanged(string? value)` → 用户输入/浏览输出路径时自动刷新密码规则
+  - 构建 0 errors
+
+**2026-07-28** — 加密 ZIP 密码 bug 修复：会话缓存错误密码验证 + 预览提取不传密码
+  - **Bug 2 修复：缓存错误密码仍显示"密码已匹配"**：`LoadArchiveAsync` 新增 QuickVerify 关卡，从会话缓存取得密码后，先调用 `QuickVerifyPassword` 验证是否正确才信任。验证失败则清缓存走密码解析流程。
+  - **预览提取不传密码修复**：`PreviewService.ExtractToTempAsync` 签名增加 `password` 参数，`MainWindowViewModel.ShowPreviewAsync` 调用时传 `_currentPassword`。之前写死 `password: null`，导致加密 ZIP 预览提取永远用空密码解密，SHA 校验失败报 `InvalidFormatException`
+  - **压缩设置密码库模式失灵修复**：`App.axaml.cs` 压缩流程和 `MainWindow.axaml.cs` 回调中改用 `GetActivePassword()` 获取密码（而非直接读 `Password` 属性），支持密码库模式下正确获得选中条目密码
+  - 改动的文件：`MainWindowViewModel.cs`、`PreviewService.cs`、`CompressSettingsViewModel.cs`（新增 `GetActivePassword()`）、`App.axaml.cs`、`MainWindow.axaml.cs`
+  - 构建 0 errors
+
 **2026-07-28** — 压缩设置加密面板行为对齐 WPF + ResultTreeView 宽度可调
   - **密码面板行为对齐 WPF（7 项对齐）**：
     1. 保存复选框标签按模式切换："更新匹配规则"（库模式）/"保存到密码库"（新密码模式）

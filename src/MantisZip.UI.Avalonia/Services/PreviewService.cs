@@ -293,6 +293,7 @@ public class PreviewService
         string archivePath,
         ArchiveItemModel entry,
         ArchiveFormat format,
+        string? password = null,
         CancellationToken ct = default)
     {
         var tempDir = Path.Combine(Path.GetTempPath(), "MantisZip", "Preview");
@@ -312,7 +313,7 @@ public class PreviewService
             entry.FullPath,
             tempFile,
             format,
-            password: null,
+            password: password,
             ct);
 
         return tempFile;

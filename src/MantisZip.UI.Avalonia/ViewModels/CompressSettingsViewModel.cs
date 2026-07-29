@@ -414,6 +414,11 @@ public partial class CompressSettingsViewModel : ObservableObject
 
         // Build initial compress preview from source paths
         BuildCompressPreview();
+
+        // Auto-generate initial password rules from output mode + source paths
+        // Must be called after SelectedPaths is populated (the CollectionChanged
+        // handler won't fire for items added before it was attached).
+        UpdateAutoRules();
     }
 
     /// <summary>
@@ -484,6 +489,13 @@ public partial class CompressSettingsViewModel : ObservableObject
             RefreshAutoRules();
         // 切换输出方式时刷新预览树（不同模式树结构不同）
         BuildCompressPreview();
+    }
+
+    partial void OnOutputPathChanged(string? value)
+    {
+        StartCompressCommand.NotifyCanExecuteChanged();
+        if (AutoGenerateRules)
+            RefreshAutoRules();
     }
 
     partial void OnDefaultFormatChanged(string value)
@@ -727,6 +739,18 @@ public partial class CompressSettingsViewModel : ObservableObject
         return Math.Min(score, 4);
     }
 
+    /// <summary>
+    /// 获取当前激活的密码（无论库模式还是新密码模式）。
+    /// 库模式且选中条目时返回条目密码，否则返回 Password 属性值。
+    /// </summary>
+    public string? GetActivePassword()
+    {
+        if (!Encrypt) return null;
+        if (IsPasswordLibraryMode && SelectedPasswordEntry != null)
+            return SelectedPasswordEntry.Password;
+        return Password;
+    }
+
     [RelayCommand]
     private void TogglePasswordMode()
     {
@@ -756,7 +780,14 @@ public partial class CompressSettingsViewModel : ObservableObject
         }
     }
 
-    private bool CanExecuteStartCompress() => SelectedPaths.Count > 0;
+    private bool CanExecuteStartCompress()
+    {
+        if (SelectedPaths.Count == 0) return false;
+        // Manual mode requires a valid output path (matches WPF UpdateCompressButton logic)
+        if (OutputMode == CompressOutputMode.Manual && string.IsNullOrEmpty(OutputPath))
+            return false;
+        return true;
+    }
 
     [RelayCommand]
     private async Task StartCompress()

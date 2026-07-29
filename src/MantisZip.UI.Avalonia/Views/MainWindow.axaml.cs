@@ -97,6 +97,8 @@ public partial class MainWindow : Window
                 cvm.OutputPath = dialog.ViewModel.OutputPath;
                 cvm.Password = dialog.ViewModel.Password;
                 cvm.Encrypt = dialog.ViewModel.Encrypt;
+                cvm.IsPasswordLibraryMode = dialog.ViewModel.IsPasswordLibraryMode;
+                cvm.SelectedPasswordEntry = dialog.ViewModel.SelectedPasswordEntry;
                 cvm.Comment = dialog.ViewModel.Comment;
                 cvm.CommentDistribution = dialog.ViewModel.CommentDistribution;
                 cvm.FileFilter = dialog.GetFilter();

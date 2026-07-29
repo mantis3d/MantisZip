@@ -7,6 +7,7 @@ using CommunityToolkit.Mvvm.Input;
 using MantisZip.Core.Abstractions;
 using MantisZip.Core.FileFilter;
 using MantisZip.Core.Services;
+using MantisZip.Core;
 using MantisZip.Core.Utils;
 using MantisZip.UI.Avalonia.Models;
 using MantisZip.UI.Avalonia.Services;
@@ -622,6 +623,19 @@ public partial class MainWindowViewModel : ObservableObject
             var result = await _archiveService.LoadArchiveAsync(path, password);
             var engine = ArchiveEngineFactory.GetEngineByExtension(path);
 
+            // ── Verify session-cached password before trusting it ──
+            // SharpCompress can list ZIP entries without verifying the password,
+            // so IsEncrypted=true + password!=null from cache doesn't mean the
+            // password is correct. Quick-verify and redirect to resolution flow.
+            if (password != null && engine != null
+                && result.RawItems?.Any(i => i.IsEncrypted) == true
+                && !_passwordService.QuickVerifyPassword(path, password, engine))
+            {
+                _sessionPasswords.Remove(path);
+                password = null;
+                result = await _archiveService.LoadArchiveAsync(path, null);
+            }
+
             // ── Password resolution flow ──
             if (result.IsPasswordRequired)
             {
@@ -881,7 +895,7 @@ public partial class MainWindowViewModel : ObservableObject
 
             // ── Extract to temp (async, slow) ──
             var tempFile = await PreviewService.ExtractToTempAsync(
-                CurrentArchivePath, entry, _currentFormat);
+                CurrentArchivePath, entry, _currentFormat, _currentPassword);
             App.DebugLog($"[PRV] Extracted to: {tempFile}");
 
             if (tempFile == null)
@@ -1711,7 +1725,66 @@ public partial class MainWindowViewModel : ObservableObject
             });
 
         if (completed)
+        {
             StatusMessage = LocalizationManager.T("Status_Compressed");
+
+            // Save or update password in the password library (matches WPF SavePasswordAfterCompress logic).
+            // Must run after compress succeeds, before the dialog closes.
+            if (vm.SaveToLibrary && vm.Encrypt)
+            {
+                try
+                {
+                    var rules = vm.RulesText
+                        ?.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)
+                        .Select(r => r.Trim())
+                        .Where(r => !string.IsNullOrWhiteSpace(r))
+                        .ToList() ?? new List<string>();
+
+                    if (rules.Count == 0)
+                    {
+                        var ext = vm.DefaultFormat == "tar.gz" ? ".tar.gz" : "." + vm.DefaultFormat;
+                        rules.Add($"*{ext}");
+                    }
+
+                    if (vm.IsPasswordLibraryMode && vm.SelectedPasswordEntry != null)
+                    {
+                        // Update matching rules: deduplicate and append
+                        var entry = vm.SelectedPasswordEntry;
+                        var updated = false;
+                        foreach (var rule in rules)
+                        {
+                            if (!entry.Patterns.Contains(rule))
+                            {
+                                entry.Patterns.Add(rule);
+                                updated = true;
+                            }
+                        }
+                        if (updated)
+                        {
+                            PasswordManager.Instance.UpdatePassword(
+                                entry.Id, entry.Password, entry.Description, entry.Patterns);
+                            PasswordManager.Instance.MarkUsed(entry.Id);
+                            App.DebugLog($"Password rules updated for entry: {entry.Description}");
+                        }
+                    }
+                    else if (!vm.IsPasswordLibraryMode)
+                    {
+                        // New password entry (not library mode)
+                        var password = vm.Password;
+                        var desc = vm.PasswordDescription?.Trim() ?? "";
+                        if (string.IsNullOrEmpty(desc))
+                            desc = $"Compressed on {DateTime.Now:yyyy-MM-dd HH:mm}";
+
+                        PasswordManager.Instance.AddPassword(password, desc, rules);
+                        App.DebugLog($"Password saved to library: {desc}");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    App.DebugLog($"SavePasswordAfterCompress failed: {ex.Message}");
+                }
+            }
+        }
     }
 
     [RelayCommand]
