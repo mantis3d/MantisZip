@@ -1,9 +1,12 @@
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Data.Converters;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using MantisZip.UI.Avalonia.Models;
+using MantisZip.UI.Avalonia.Services;
 using MantisZip.UI.Avalonia.ViewModels;
+using System.Globalization;
 
 namespace MantisZip.UI.Avalonia.Views;
 
@@ -61,13 +64,19 @@ public partial class SettingsWindow : Window
 
     private void OnPreviewFieldTapped(object sender, TappedEventArgs e)
     {
-        App.DebugLog($"[Preview] Tapped sender={sender?.GetType().Name}");
-        if (sender is Button btn && btn.DataContext is FormatMetadataItem item)
-        {
-            if (btn.Content?.ToString() == "˄")
-                GetMetadataPanelVM()?.MoveFieldUp(item.Key);
-            else
-                GetMetadataPanelVM()?.MoveFieldDown(item.Key);
-        }
+        // Kept for future use
     }
+}
+
+public class PositionDisplayConverter : IValueConverter
+{
+    public object? Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+    {
+        if (value is string pos)
+            return LocalizationManager.T($"Metadata_Position{pos}");
+        return value;
+    }
+
+    public object? ConvertBack(object? value, Type targetType, object? parameter, System.Globalization.CultureInfo culture)
+        => value;
 }

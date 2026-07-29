@@ -134,7 +134,7 @@
                     HorizontalAlignment="Right">
           <Button Width="32" Height="{DynamicResource ControlHeight}" Padding="0"
                   Command="{Binding OpenMetadataSettingsCommand}"
-                  ToolTip.Tip="元数据面板设置">
+                   ToolTip.Tip="{Binding MetadataSettingsTooltip}">
             <PathIcon Data="{StaticResource IconSettings}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
           </Button>
         </StackPanel>

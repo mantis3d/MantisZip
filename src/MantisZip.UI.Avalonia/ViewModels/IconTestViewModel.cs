@@ -249,8 +249,10 @@ public partial class IconTestViewModel : ObservableObject
             "Resources/Icons/AppIcons.axaml", "已定义 Geometry，未在 UI 中使用");
         Add("资源库", "主页", null, "IconHome", IconStatus.Defined,
             "Resources/Icons/AppIcons.axaml", "已定义 Geometry（context-toolbars 计划预留）");
-        Add("资源库", "上移", null, "IconArrowUp", IconStatus.Defined,
-            "Resources/Icons/AppIcons.axaml", "已定义 Geometry（context-toolbars 计划预留）");
+  Add("资源库", "上移", null, "IconArrowUp", IconStatus.Defined,
+  "Resources/Icons/AppIcons.axaml", "已定义 Geometry（context-toolbars 计划预留）");
+  Add("资源库", "下移", null, "IconArrowDown", IconStatus.Defined,
+  "Resources/Icons/AppIcons.axaml", "已定义 Geometry（元数据面板预览字段行移动用）");
         Add("资源库", "左箭头", null, "IconChevronLeft", IconStatus.Defined,
             "Resources/Icons/AppIcons.axaml", "已定义 Geometry（context-toolbars 计划预留）");
         Add("资源库", "右箭头", null, "IconChevronRight", IconStatus.Defined,
@@ -267,6 +269,88 @@ public partial class IconTestViewModel : ObservableObject
             "Resources/Icons/AppIcons.axaml", "已定义 Geometry，未在 UI 中使用");
         Add("资源库", "位置", null, "IconLocation", IconStatus.Defined,
             "Resources/Icons/AppIcons.axaml", "已定义 Geometry，未在 UI 中使用");
+        Add("资源库", "筛选", null, "IconFilter", IconStatus.Defined,
+            "Resources/Icons/AppIcons.axaml", "已定义 Geometry，未在 UI 中使用");
+        Add("资源库", "定位", null, "IconLocate", IconStatus.Defined,
+            "Resources/Icons/AppIcons.axaml", "已定义 Geometry，未在 UI 中使用");
+        Add("资源库", "暂停", null, "IconPause", IconStatus.Defined,
+            "Resources/Icons/AppIcons.axaml", "已定义 Geometry，未在 UI 中使用");
+        Add("资源库", "标尺", null, "IconRuler", IconStatus.Defined,
+            "Resources/Icons/AppIcons.axaml", "已定义 Geometry，未在 UI 中使用");
+        Add("资源库", "日历", null, "IconCalendar", IconStatus.Defined,
+            "Resources/Icons/AppIcons.axaml", "已定义 Geometry，未在 UI 中使用");
+        Add("资源库", "取色器", null, "IconEyedropper", IconStatus.Defined,
+            "Resources/Icons/AppIcons.axaml", "已定义 Geometry，未在 UI 中使用");
+        Add("资源库", "存档", null, "IconArchive", IconStatus.Defined,
+            "Resources/Icons/AppIcons.axaml", "Fluent UI System Icon");
+        Add("资源库", "应用设置", null, "IconAppsSettings", IconStatus.Defined,
+            "Resources/Icons/AppIcons.axaml", "Fluent UI System Icon");
+        Add("资源库", "存档箭头返回", null, "IconArchiveArrowBack", IconStatus.Defined,
+            "Resources/Icons/AppIcons.axaml", "Fluent UI System Icon");
+        Add("资源库", "存档时钟", null, "IconArchiveClock", IconStatus.Defined,
+            "Resources/Icons/AppIcons.axaml", "Fluent UI System Icon");
+        Add("资源库", "存档多个", null, "IconArchiveMultiple", IconStatus.Defined,
+            "Resources/Icons/AppIcons.axaml", "Fluent UI System Icon");
+        Add("资源库", "存档设置", null, "IconArchiveSettings", IconStatus.Defined,
+            "Resources/Icons/AppIcons.axaml", "Fluent UI System Icon");
+        Add("资源库", "自动适应内容", null, "IconArrowAutofitContent", IconStatus.Defined,
+            "Resources/Icons/AppIcons.axaml", "Fluent UI System Icon");
+        Add("资源库", "自动适应宽度", null, "IconArrowAutofitWidth", IconStatus.Defined,
+            "Resources/Icons/AppIcons.axaml", "Fluent UI System Icon");
+        Add("资源库", "自动适应宽度虚线", null, "IconArrowAutofitWidthDotted", IconStatus.Defined,
+            "Resources/Icons/AppIcons.axaml", "Fluent UI System Icon");
+        Add("资源库", "自动适应高度", null, "IconArrowAutofitHeight", IconStatus.Defined,
+            "Resources/Icons/AppIcons.axaml", "Fluent UI System Icon");
+        Add("资源库", "圆形箭头下", null, "IconArrowCircleDown", IconStatus.Defined,
+            "Resources/Icons/AppIcons.axaml", "Fluent UI System Icon");
+        Add("资源库", "圆形箭头下上", null, "IconArrowCircleDownUp", IconStatus.Defined,
+            "Resources/Icons/AppIcons.axaml", "Fluent UI System Icon");
+        Add("资源库", "圆形箭头左", null, "IconArrowCircleLeft", IconStatus.Defined,
+            "Resources/Icons/AppIcons.axaml", "Fluent UI System Icon");
+        Add("资源库", "圆形箭头右", null, "IconArrowCircleRight", IconStatus.Defined,
+            "Resources/Icons/AppIcons.axaml", "Fluent UI System Icon");
+        Add("资源库", "圆形箭头上", null, "IconArrowCircleUp", IconStatus.Defined,
+            "Resources/Icons/AppIcons.axaml", "Fluent UI System Icon");
+        Add("资源库", "全部折叠", null, "IconArrowCollapseAll", IconStatus.Defined,
+            "Resources/Icons/AppIcons.axaml", "Fluent UI System Icon");
+        Add("资源库", "箭头进入", null, "IconArrowEnter", IconStatus.Defined,
+            "Resources/Icons/AppIcons.axaml", "Fluent UI System Icon");
+        Add("资源库", "箭头退出", null, "IconArrowExit", IconStatus.Defined,
+            "Resources/Icons/AppIcons.axaml", "Fluent UI System Icon");
+        Add("资源库", "全部展开", null, "IconArrowExpandAll", IconStatus.Defined,
+            "Resources/Icons/AppIcons.axaml", "Fluent UI System Icon");
+        Add("资源库", "箭头移动", null, "IconArrowMove", IconStatus.Defined,
+            "Resources/Icons/AppIcons.axaml", "Fluent UI System Icon");
+        Add("资源库", "箭头向内移动", null, "IconArrowMoveInward", IconStatus.Defined,
+            "Resources/Icons/AppIcons.axaml", "Fluent UI System Icon");
+        Add("资源库", "日历勾选", null, "IconCalendarCheckmark", IconStatus.Defined,
+            "Resources/Icons/AppIcons.axaml", "Fluent UI System Icon");
+        Add("资源库", "Chevron 下上", null, "IconChevronDownUp", IconStatus.Defined,
+            "Resources/Icons/AppIcons.axaml", "Fluent UI System Icon");
+        Add("资源库", "Chevron 上下", null, "IconChevronUpDown", IconStatus.Defined,
+            "Resources/Icons/AppIcons.axaml", "Fluent UI System Icon");
+        Add("资源库", "文件夹箭头左", null, "IconFolderArrowLeft", IconStatus.Defined,
+            "Resources/Icons/AppIcons.axaml", "Fluent UI System Icon");
+        Add("资源库", "文件夹添加", null, "IconFolderAdd", IconStatus.Defined,
+            "Resources/Icons/AppIcons.axaml", "Fluent UI System Icon");
+        Add("资源库", "文件夹箭头右", null, "IconFolderArrowRight", IconStatus.Defined,
+            "Resources/Icons/AppIcons.axaml", "Fluent UI System Icon");
+        Add("资源库", "文件夹提示", null, "IconFolderHint", IconStatus.Defined,
+            "Resources/Icons/AppIcons.axaml", "Fluent UI System Icon");
+        Add("资源库", "文件夹多个", null, "IconFolderMultiple", IconStatus.Defined,
+            "Resources/Icons/AppIcons.axaml", "Fluent UI System Icon");
+        Add("资源库", "文件夹打开", null, "IconFolderOpen", IconStatus.Defined,
+            "Resources/Icons/AppIcons.axaml", "Fluent UI System Icon");
+        Add("资源库", "钥匙多个", null, "IconKeyMultiple", IconStatus.Defined,
+            "Resources/Icons/AppIcons.axaml", "Fluent UI System Icon");
+        Add("资源库", "位置勾选", null, "IconLocationCheckmark", IconStatus.Defined,
+            "Resources/Icons/AppIcons.axaml", "Fluent UI System Icon");
+        Add("资源库", "位置设置", null, "IconLocationSettings", IconStatus.Defined,
+            "Resources/Icons/AppIcons.axaml", "Fluent UI System Icon");
+        Add("资源库", "锁定钥匙", null, "IconLockClosedKey", IconStatus.Defined,
+            "Resources/Icons/AppIcons.axaml", "Fluent UI System Icon");
+        Add("资源库", "锁定多个", null, "IconLockMultiple", IconStatus.Defined,
+            "Resources/Icons/AppIcons.axaml", "Fluent UI System Icon");
 
         // 更新统计
         TotalCount = Icons.Count;

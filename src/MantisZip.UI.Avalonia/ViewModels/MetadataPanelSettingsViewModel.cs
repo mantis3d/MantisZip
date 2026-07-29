@@ -54,6 +54,14 @@ public partial class MetadataPanelSettingsViewModel : ObservableObject
     /// <summary>预览用的 sections（仅 infoPanel 位置）。</summary>
     public ObservableCollection<MetadataSection> PreviewSections { get; } = [];
 
+    // ── 本地化文本 ──
+    public string FieldLayoutText => LocalizationManager.T("Metadata_Panel_FieldLayout");
+    public string ColumnFieldText => LocalizationManager.T("Metadata_Panel_ColumnField");
+    public string ColumnRowText => LocalizationManager.T("Metadata_Panel_ColumnRow");
+    public string ColumnOrderText => LocalizationManager.T("Metadata_Panel_ColumnOrder");
+    public string ColumnPositionText => LocalizationManager.T("Metadata_Panel_ColumnPosition");
+    public string PreviewTitleText => LocalizationManager.T("Metadata_Panel_PreviewTitle");
+
     public MetadataPanelSettingsViewModel()
     {
         // 从 MetadataRegistry 加载所有已注册类型
@@ -152,11 +160,11 @@ public partial class MetadataPanelSettingsViewModel : ObservableObject
         var title = GetTypeDisplayName(typeKey);
 
         // ── infoPanel section ──
-        var infoSection = new MetadataSection { Title = $"{title}（侧边栏）", ShowSeparator = true };
+        var infoSection = new MetadataSection { Title = LocalizationManager.T("Metadata_Panel_SectionSidebar", title), ShowSeparator = true };
         BuildRows(infoSection, f => f.Position == "infoPanel");
 
         // ── contentTop section ──
-        var topSection = new MetadataSection { Title = $"{title}（内容区顶部）", ShowSeparator = false };
+        var topSection = new MetadataSection { Title = LocalizationManager.T("Metadata_Panel_SectionContentTop", title), ShowSeparator = false };
         BuildRows(topSection, f => f.Position == "contentTop");
 
         if (infoSection.Rows.Count > 0)
@@ -280,8 +288,18 @@ public class FieldEditItem : ObservableObject
     public string Position
     {
         get => _position;
-        set { if (SetProperty(ref _position, value)) _onChanged?.Invoke(); }
+        set
+        {
+            if (SetProperty(ref _position, value))
+            {
+                _onChanged?.Invoke();
+                OnPropertyChanged(nameof(PositionDisplay));
+            }
+        }
     }
+
+    /// <summary>位置的显示名，只读绑定用。</summary>
+    public string PositionDisplay => LocalizationManager.T($"Metadata_Position{_position}");
 
     public string[] PositionOptions => ["infoPanel", "contentTop", "hidden"];
 
