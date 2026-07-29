@@ -29,6 +29,11 @@
     - 空规则回退：自动生成 `*{ext}`
   - 构建 0 errors
 
+**2026-07-28** — 压缩按钮 Manual 模式输出路径为空时禁用
+  - **Root Cause**: `CanExecuteStartCompress` 只检查 `SelectedPaths.Count > 0`，与 WPF `UpdateCompressButton` 的 Manual 模式检查（hasDir + hasName）不一致
+  - **修复**: `CanExecuteStartCompress` 在 Manual 模式下增加 `string.IsNullOrEmpty(OutputPath)` 检查；`OnOutputPathChanged` 增加 `NotifyCanExecuteChanged()` 使用户输入路径时按钮状态即时更新
+  - 构建 0 errors
+
 **2026-07-28** — 压缩设置"自动生成规则"修复：OutputPath 变更时未刷新规则
   - **Root Cause**: WPF 有 `FileNameTextBox_TextChanged` 触发 `RefreshAutoRules()`，Avalonia 的 `OutputPath` 是 `[ObservableProperty]` 但缺少 `OnOutputPathChanged` 处理器
   - **修复**: 新增 `partial void OnOutputPathChanged(string? value)` → 用户输入/浏览输出路径时自动刷新密码规则

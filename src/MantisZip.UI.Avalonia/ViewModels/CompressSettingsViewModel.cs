@@ -475,6 +475,7 @@ public partial class CompressSettingsViewModel : ObservableObject
 
     partial void OnOutputPathChanged(string? value)
     {
+        StartCompressCommand.NotifyCanExecuteChanged();
         if (AutoGenerateRules)
             RefreshAutoRules();
     }
@@ -752,7 +753,14 @@ public partial class CompressSettingsViewModel : ObservableObject
         }
     }
 
-    private bool CanExecuteStartCompress() => SelectedPaths.Count > 0;
+    private bool CanExecuteStartCompress()
+    {
+        if (SelectedPaths.Count == 0) return false;
+        // Manual mode requires a valid output path (matches WPF UpdateCompressButton logic)
+        if (OutputMode == CompressOutputMode.Manual && string.IsNullOrEmpty(OutputPath))
+            return false;
+        return true;
+    }
 
     [RelayCommand]
     private async Task StartCompress()
