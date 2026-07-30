@@ -24,7 +24,7 @@
 **2026-07-30** — Toggle 图标方框风格（Total Commander 样式）+ ToggleButton checked 反白
   - **菜单 Toggle**：4 个 View 菜单切换项改用 `Border.ToggleIconBox`（20×20，3px 圆角，150ms 过渡动画），ON 态半透明强调色填充，OFF 态空心方框，替代原 CheckBox
   - **新增 ThemeToggleBrush**：Light `#400078D4` / Dark `#4D0078D4` 半透明强调色，专用 toggle 背景，避免直接使用 `ThemeAccentBrush` 导致图标看不清
-  - **ToggleButton checked 反白**：全局 `ToggleButton:checked` Foreground 改 White，移除 PathIcon 显式 Foreground 使继承生效，覆盖工具栏/ResultTreeView 共 4 处 ToggleButton
+  - **ToggleButton checked 反白**：全局 `ToggleButton:checked` Foreground 改 White + `ToggleButton:checked PathIcon Foreground="White"` 直接命中 PathIcon（不继承），移除 PathIcon 显式 Foreground，覆盖工具栏/ResultTreeView 共 4 处 ToggleButton
   - **新增 BoolToToggleBgBrushConverter**：`true` → `ThemeToggleBrush`，`false` → `Transparent`
   - 构建 0 errors
 

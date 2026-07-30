@@ -114,6 +114,14 @@
       <Setter Property="Background" Value="{DynamicResource ThemeAccentBrush}" />
       <Setter Property="Foreground" Value="White" />
     </Style>
+    <!--
+      PathIcon in Avalonia does NOT inherit Foreground from parent controls,
+      so we must target it directly. This selector covers all PathIcon children
+      (including those nested in StackPanel) via descendant combinator.
+    -->
+    <Style Selector="ToggleButton:checked PathIcon">
+      <Setter Property="Foreground" Value="White" />
+    </Style>
     <Style Selector="ToggleButton:checked:pointerover">
       <Setter Property="Foreground" Value="White" />
       <Setter Property="Background" Value="{DynamicResource ThemeAccentBrush}" />
