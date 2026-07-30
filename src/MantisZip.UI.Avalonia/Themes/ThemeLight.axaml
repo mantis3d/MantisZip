@@ -54,6 +54,7 @@
   <SolidColorBrush x:Key="ThemeTextSecondaryBrush" Color="{StaticResource ThemeTextSecondary}" />
   <SolidColorBrush x:Key="ThemeBorderBrush" Color="{StaticResource ThemeBorder}" />
   <SolidColorBrush x:Key="ThemeAccentBrush" Color="{StaticResource ThemeAccent}" />
+  <SolidColorBrush x:Key="ThemeToggleBrush" Color="#A90078D4" />
   <SolidColorBrush x:Key="ThemeSurfaceBgBrush" Color="{StaticResource ThemeSurfaceBg}" />
   <SolidColorBrush x:Key="ThemeHeaderBgBrush" Color="{StaticResource ThemeHeaderBg}" />
   <SolidColorBrush x:Key="ThemeButtonBgBrush" Color="{StaticResource ThemeButtonBg}" />
