@@ -1,4 +1,5 @@
 using System.Globalization;
+using Avalonia;
 using Avalonia.Data;
 using Avalonia.Data.Converters;
 using Avalonia.Media;
@@ -56,8 +57,8 @@ public class BoolToConflictBrushConverter : IValueConverter
 }
 
 /// <summary>
-/// 将 PreviewTreeNode.ForegroundKey 转换为对应画刷：Purple → 紫色，ConflictRed → 红色，其他 → UnsetValue。
-/// 优先级：空存档(紫) > 文件冲突(红) > 默认回退主题色。
+/// 将 PreviewTreeNode.ForegroundKey 转换为对应画刷：Purple → 紫色，ConflictRed → 红色，其他 → 主题色。
+/// 优先级：空存档(紫) > 文件冲突(红) > 默认回退主题色（从 Application.Current 动态解析）。
 /// </summary>
 public class NodeForegroundConverter : IValueConverter
 {
@@ -72,10 +73,25 @@ public class NodeForegroundConverter : IValueConverter
             {
                 "Purple" => PurpleBrush,
                 "ConflictRed" => RedBrush,
-                _ => BindingNotification.UnsetValue,
+                _ => GetThemeBrush(),
             };
         }
-        return BindingNotification.UnsetValue;
+        return GetThemeBrush();
+    }
+
+    /// <summary>
+    /// 从 Application.Current 动态解析 ThemeTextPrimaryBrush。
+    /// 每次调用时重新读取，确保在主题切换后绑定重新求值时返回正确的画刷。
+    /// Avalonia 12 的 TryGetResource 需要传入 ThemeVariant 参数。
+    /// </summary>
+    private static IBrush GetThemeBrush()
+    {
+        var app = Application.Current;
+        if (app != null
+            && app.TryGetResource("ThemeTextPrimaryBrush", app.ActualThemeVariant, out var rsc)
+            && rsc is IBrush brush)
+            return brush;
+        return new SolidColorBrush(Colors.Black);
     }
 
     public object? ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)

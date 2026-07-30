@@ -1,3 +1,5 @@
+using System.ComponentModel;
+using System.Linq;
 using MantisZip.Core.Services;
 using MantisZip.Core.Utils;
 
@@ -107,6 +109,25 @@ public class PreviewTreeNode : FolderNode
     /// 节点的前景色不透明度（过滤项半透明，其他正常）。
     /// </summary>
     public double TextOpacity => IsFilteredOut ? 0.4 : 1.0;
+
+    /// <summary>
+    /// 引发 ForegroundKey 属性变更通知。
+    /// </summary>
+    public void RaiseForegroundKeyChanged()
+    {
+        OnPropertyChanged(nameof(ForegroundKey));
+    }
+
+    /// <summary>
+    /// 递归引发本节点及所有子孙节点的 ForegroundKey 属性变更通知。
+    /// 用于主题切换后强制让绑定重新求值，使转换器返回新版主题画刷。
+    /// </summary>
+    public void RaiseForegroundKeyChangedRecursive()
+    {
+        RaiseForegroundKeyChanged();
+        foreach (var child in Children.OfType<PreviewTreeNode>())
+            child.RaiseForegroundKeyChangedRecursive();
+    }
 
     /// <summary>
     /// 深拷贝该节点（仅第一层，不拷贝子节点）。

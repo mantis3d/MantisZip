@@ -21,6 +21,12 @@
 
 ### MantisZip.UI.Avalonia（主力版）
 
+**2026-07-31** — 暗色模式预览树文件名黑色修复（NodeForegroundConverter 动态解析主题画刷）
+  - **NodeForegroundConverter**：正常项不再返回 `UnsetValue`，改为从 `Application.Current.TryGetResource` 动态解析 `ThemeTextPrimaryBrush`
+  - **ResultTreeView**：订阅 `ActualThemeVariantChanged`，主题切换时递归刷新所有节点 ForegroundKey 绑定
+  - **PreviewTreeNode**：新增 `RaiseForegroundKeyChanged` / `RaiseForegroundKeyChangedRecursive`
+  - 构建 0 errors
+
 **2026-07-30** — Toggle 图标方框风格（Total Commander 样式）+ ToggleButton checked 反白
   - **菜单 Toggle**：4 个 View 菜单切换项改用 `Border.ToggleIconBox`（20×20，3px 圆角，150ms 过渡动画），ON 态半透明强调色填充，OFF 态空心方框，替代原 CheckBox
   - **新增 ThemeToggleBrush**：Light `#400078D4` / Dark `#4D0078D4` 半透明强调色，专用 toggle 背景，避免直接使用 `ThemeAccentBrush` 导致图标看不清
@@ -773,6 +779,11 @@
 ### 共享层（Core / ShellExt / 构建）
 
 这些变更影响两项目共用代码，按时间从新到旧排列。
+
+#### v0.4.5 (2026-07-31) FolderNode 新增 OnPropertyChanged 受保护方法
+  - `FolderNode` 新增 `protected void OnPropertyChanged(string)`，供 PreviewTreeNode 继承使用
+  - 涉及文件：`ArchiveTreeBuilder.cs`
+  - 构建 0 errors
 
 #### v0.4.5 (2026-07-27) CompressConflictResolver async 化 — ResolveConflictAsync
   - `CompressConflictResolver` 从同步委托改为异步（`Task<CompressConflictResolution>`）

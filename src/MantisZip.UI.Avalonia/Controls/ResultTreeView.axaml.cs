@@ -118,6 +118,18 @@ public partial class ResultTreeView : UserControl
         InitializeComponent();
         ToolTip.SetTip(LocateButton, LocalizationManager.T("Preview_Result_Locate"));
         ToolTip.SetTip(FilterToggle, LocalizationManager.T("Preview_Result_ShowFiltered"));
+
+        // 主题切换时刷新 ForegroundKey 绑定，使转换器重新解析新版主题画刷
+        ActualThemeVariantChanged += OnActualThemeVariantChanged;
+    }
+
+    /// <summary>
+    /// 主题切换时刷新所有节点 ForegroundKey 绑定。
+    /// 使 NodeForegroundConverter 重新求值，返回新版主题画刷。
+    /// </summary>
+    private void OnActualThemeVariantChanged(object? sender, EventArgs e)
+    {
+        _originalRoot?.RaiseForegroundKeyChangedRecursive();
     }
 
     /// <summary>

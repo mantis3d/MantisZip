@@ -119,7 +119,7 @@
                             VerticalAlignment="Center"
                             FontWeight="{Binding IsArchiveNode, Converter={StaticResource BoolToBoldConverter}}"
                             FontSize="{Binding IsArchiveNode, Converter={StaticResource BoolToArchiveFontSizeConverter}}"
-                            Foreground="{Binding ForegroundKey, Converter={StaticResource NodeForegroundConverter}, FallbackValue={DynamicResource ThemeTextPrimaryBrush}}" />
+                            Foreground="{Binding ForegroundKey, Converter={StaticResource NodeForegroundConverter}}" />
                 <TextBlock Text="{Binding SizeDisplay}"
                            FontSize="11"
                            VerticalAlignment="Center"
