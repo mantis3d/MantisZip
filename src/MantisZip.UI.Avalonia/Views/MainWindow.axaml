@@ -23,6 +23,7 @@
     <conv:DateTimeToOffsetConverter x:Key="DateTimeToOffsetConverter" />
     <conv:NullableLongConverter x:Key="NullableLongConverter" />
     <conv:RatioToWidthConverter x:Key="RatioToWidthConverter" />
+    <conv:BoolToToggleBgBrushConverter x:Key="BoolToToggleBgBrushConverter" />
   </Window.Resources>
 
   <Grid RowDefinitions="Auto,Auto,Auto,*,Auto">
@@ -217,7 +218,11 @@
         <MenuItem Command="{Binding ToggleThemeCommand}">
           <MenuItem.Header>
             <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
-              <PathIcon Data="{StaticResource IconMoon}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+              <Border Classes="ToggleIconBox"
+                      Background="{Binding IsDarkTheme, Converter={StaticResource BoolToToggleBgBrushConverter}}">
+                <PathIcon Data="{StaticResource IconMoon}" Width="12" Height="12"
+                          Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+              </Border>
               <TextBlock Text="{Binding LocalizedStrings[Menu_ToggleTheme]}" />
             </StackPanel>
           </MenuItem.Header>
@@ -227,9 +232,11 @@
                   IsEnabled="{Binding IsArchiveLoaded}">
           <MenuItem.Header>
             <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
-              <CheckBox IsChecked="{Binding ShowProgressBars}"
-                        IsHitTestVisible="False"
-                        VerticalAlignment="Center" />
+              <Border Classes="ToggleIconBox"
+                      Background="{Binding ShowProgressBars, Converter={StaticResource BoolToToggleBgBrushConverter}}">
+                <PathIcon Data="{StaticResource IconDataBarVertical}" Width="12" Height="12"
+                          Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+              </Border>
               <TextBlock Text="{Binding LocalizedStrings[Menu_ProgressBars]}" />
             </StackPanel>
           </MenuItem.Header>
@@ -238,9 +245,11 @@
                   IsEnabled="{Binding IsArchiveLoaded}">
           <MenuItem.Header>
             <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
-              <CheckBox IsChecked="{Binding SeparateDirBaseline}"
-                        IsHitTestVisible="False"
-                        VerticalAlignment="Center" />
+              <Border Classes="ToggleIconBox"
+                      Background="{Binding SeparateDirBaseline, Converter={StaticResource BoolToToggleBgBrushConverter}}">
+                <PathIcon Data="{StaticResource IconFolder}" Width="12" Height="12"
+                          Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+              </Border>
               <TextBlock Text="{Binding LocalizedStrings[Menu_SepDirBaseline]}" />
             </StackPanel>
           </MenuItem.Header>
@@ -249,7 +258,11 @@
         <MenuItem Command="{Binding ToggleInfoPanelOrientationCommand}">
           <MenuItem.Header>
             <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
-              <PathIcon Data="{StaticResource IconOrientation}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+              <Border Classes="ToggleIconBox"
+                      Background="{Binding Preview.IsHorizontalInfoPanel, Converter={StaticResource BoolToToggleBgBrushConverter}}">
+                <PathIcon Data="{StaticResource IconOrientation}" Width="12" Height="12"
+                          Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+              </Border>
               <TextBlock Text="{Binding LocalizedStrings[Menu_InfoPanelOrientation]}" />
             </StackPanel>
           </MenuItem.Header>
@@ -975,13 +988,13 @@
                             IsChecked="{Binding IsFilterBarVisible}"
                             IsEnabled="{Binding IsArchiveLoaded}"
                             ToolTip.Tip="{Binding LocalizedStrings[Tooltip_Filter]}">
-                <PathIcon Data="{StaticResource IconSearch}" Width="13" Height="13" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+                <PathIcon Data="{StaticResource IconSearch}" Width="13" Height="13" />
               </ToggleButton>
               <ToggleButton Classes="ToolbarButton ToolbarIcon"
                             IsChecked="{Binding ShowSubfolders}"
                             IsEnabled="{Binding IsArchiveLoaded}"
                             ToolTip.Tip="{Binding LocalizedStrings[Tooltip_Subfolders]}">
-                <PathIcon Data="{StaticResource IconFolder}" Width="13" Height="13" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+                <PathIcon Data="{StaticResource IconFolder}" Width="13" Height="13" />
               </ToggleButton>
             </StackPanel>
           </Border>

@@ -23,11 +23,10 @@
                       FontSize="12"
                       Padding="4,0"
                       Background="{DynamicResource ThemeButtonBgBrush}"
-                      Foreground="{DynamicResource ThemeTextPrimaryBrush}"
                       BorderBrush="{DynamicResource ThemeBorderBrush}"
                       ToolTip.Tip="简略显示"
                       IsCheckedChanged="OnCompactToggleChanged">
-          <PathIcon Data="{StaticResource IconChevronDownUp}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+          <PathIcon Data="{StaticResource IconChevronDownUp}" Width="14" Height="14" />
         </ToggleButton>
         <Button x:Name="ExpandAllButton"
                 Width="28" Height="{DynamicResource ControlHeightXs}"
@@ -56,10 +55,9 @@
                       Width="28" Height="{DynamicResource ControlHeightXs}"
                       Padding="2,0"
                       Background="{DynamicResource ThemeButtonBgBrush}"
-                      Foreground="{DynamicResource ThemeTextPrimaryBrush}"
                       BorderBrush="{DynamicResource ThemeBorderBrush}"
                       ToolTip.Tip="显示过滤项">
-          <PathIcon Data="{StaticResource IconFilter}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+          <PathIcon Data="{StaticResource IconFilter}" Width="14" Height="14" />
         </ToggleButton>
         <TextBlock x:Name="SummaryTextBlock"
                    FontSize="12"
