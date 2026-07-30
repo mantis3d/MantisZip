@@ -21,6 +21,13 @@
 
 ### MantisZip.UI.Avalonia（主力版）
 
+**2026-07-30** — Toggle 图标方框风格（Total Commander 样式）+ ToggleButton checked 反白
+  - **菜单 Toggle**：4 个 View 菜单切换项改用 `Border.ToggleIconBox`（20×20，3px 圆角，150ms 过渡动画），ON 态半透明强调色填充，OFF 态空心方框，替代原 CheckBox
+  - **新增 ThemeToggleBrush**：Light `#400078D4` / Dark `#4D0078D4` 半透明强调色，专用 toggle 背景，避免直接使用 `ThemeAccentBrush` 导致图标看不清
+  - **ToggleButton checked 反白**：全局 `ToggleButton:checked` Foreground 改 White，移除 PathIcon 显式 Foreground 使继承生效，覆盖工具栏/ResultTreeView 共 4 处 ToggleButton
+  - **新增 BoolToToggleBgBrushConverter**：`true` → `ThemeToggleBrush`，`false` → `Transparent`
+  - 构建 0 errors
+
 **2026-07-30** — 解压/压缩设置窗口布局统一 + ResultTreeView 冲突/过滤计数修复 + FilterToggle  TwoWay 修复
   - **解压窗口布局**：`ExtractSettingsWindow` 列定义 `450,Auto,*`，左栏 `MinWidth=400`，GridSplitter 加 `ResizeBehavior`，与压缩窗口一致
   - **压缩窗口布局**：`CompressSettingsWindow` 左栏加 `MinWidth=400` ColumnDefinition
