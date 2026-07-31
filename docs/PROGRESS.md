@@ -21,6 +21,13 @@
 
 ### MantisZip.UI.Avalonia（主力版）
 
+**2026-07-31** — 预览树异步加载 — 解压/压缩设置窗口大量文件时不再卡 UI
+  - **原始树构建异步化**：`BuildExtractPreview`/`BuildCompressPreview` 移入后台线程（同步签名保留，所有调用点零改动），输入参数（SelectedPaths/OutputPath/DestinationPath 等）进后台前快照；`_previewBuildVersion` 版本号守卫丢弃过期异步结果，快速增删源/切换路径/过滤时不出现错乱
+  - **进度上报**：`ResultPreviewService.BuildExtractPreview` 新增可选 `IProgress<double>` 参数逐文件上报（1% 节流避免高频投递），`Progress<T>` 捕获 UI 同步上下文自动封送回主线程
+  - **加载覆层**：`ResultTreeView` 新增 `IsLoading`/`BuildProgress` StyledProperty，树区域覆盖半透明进度条 + 本地化文案（`Preview_Result_Building`，zh/en）；进度 <0 显示不定进度条（压缩树无法预估条目总数），≥0 显示确定进度（解压树按条目数）
+  - **250ms 延迟阈值**：快速构建（<250ms）不显示覆层，避免输入时闪烁；早期返回路径（无文件/路径无效/路径为空）同步清除构建状态，防止上一个慢构建的覆层卡死
+  - 构建 0 errors / Avalonia 测试 35 通过
+
 **2026-07-31** — 拖拽链路系统审查修复（8 问题全清：高危 3 + 中危 3 + 低危 2）
   - **高危#1 EnableDragExtract 开关失效**：Avalonia 拖拽块从未检查该设置（WPF 参考 `MainWindow.DragDrop.cs` 有检查），现于 PointerMoved 越过阈值后检查 `AppSettings.Load().EnableDragExtract`，关闭时不启动拖拽
   - **高危#2 多选拖拽拖错行**：PointerPressed 新增 `HitTestPressedRowItem`（`InputHitTest` + visual tree 找 `DataGridRow` 取 `DataContext`），仅当按下行已在当前选区时才保留旧多选区；按下未选中行时只拖新按下的行（镜像 WPF `InputHitTest` 语义）
