@@ -16,7 +16,7 @@
 | 优先级 | 功能 | 设计文档 | 难度 | 预估工时 | 说明 |
 |--------|------|----------|:----:|:--------:|------|
 | **P0** | Avalonia: WPF 差异补齐总表 | [avalonia-wpf-diff-plan.md](.sisyphus/plans/avalonia-wpf-diff-plan.md) | 🟡中 | 1-2天 | Shell/COM 集成等各项已基本补齐，剩余少数差异项待确认 |
-| **P1** | 统一路径快捷选择 (QuickPathControl → Avalonia) | [quickpath-unified.md](.sisyphus/plans/quickpath-unified.md) | 🟡中 | 4-6h | WPF 已完成数据层 + QuickPathControl 组件 + CompressSettingsWindow 嵌入；WPF 新增 QuickPathPreDialog 前置窗；Avalonia 阶段以 CustomFilePickerDialog + QuickPathBuddy 统一替换（更新设计：[quickpath-control-redesign.md](.sisyphus/plans/quickpath-control-redesign.md)）|
+| **P1** | 统一路径快捷选择 (QuickPathControl → Avalonia) | [quickpath-unified.md](.sisyphus/plans/quickpath-unified.md) | 🟡中 | 2.5-3.5天 | WPF 已完成数据层 + QuickPathControl 组件；Avalonia 阶段重构为 Tab 式速选面板 + CustomFilePickerDialog（左 QuickPath + 右文件浏览）统一替换 5 处路径选择场景，宿主全弹窗调用（无内嵌），废弃 QuickPathPreDialog 过渡方案；2026-07-31 审查修正：4 个测试菜单对话框（QuickPathDialog/QuickPathPreDialog/ArchiveSaveAsDialog/UnifiedExtractDialog）全删 + 4 个僵尸委托清理；布局决策：解压模式内建 ResultTreeView 底部横铺（方案 1，实时冲突检测），替代 ExtraContent 注入（更新设计：[quickpath-control-redesign.md](.sisyphus/plans/quickpath-control-redesign.md)）|
 | **P1** | Win11 一级右键菜单 | [win11-first-level-menu.md](.sisyphus/plans/win11-first-level-menu.md) | 🔴高 | 1-2周 | IExplorerCommand 实现，HKLM 提权注册，双接口共存 |
 | **P1** | 解压路径统一（前置：文件筛选） | [extract-path-unification.md](.sisyphus/plans/extract-path-unification.md) | 🟢低 | 1.5h | 三路解压合并为 `ExtractEntriesAsync` + `pathOverrides`，消除重复循环 |
 | **P1** | 新增压缩格式（BZip2/XZ/CAB 等） | [new-format-support.md](.sisyphus/plans/new-format-support.md) | 🟡中 | 12-20h | 6 阶段渐进：TAR 裸格式/GZip 单文件 → BZip2 → XZ → CAB 只读 → UI 统一化 → Zstandard（需依赖） |
