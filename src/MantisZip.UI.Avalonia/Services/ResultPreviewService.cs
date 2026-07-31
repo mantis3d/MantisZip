@@ -20,13 +20,15 @@ public static class ResultPreviewService
     /// <param name="rootName">根节点显示名称（未使用，保留参数兼容）。</param>
     /// <param name="checkExists">是否逐文件检查目标位置是否存在（默认 false 仅快速模式）。</param>
     /// <param name="filter">文件过滤条件，不为空且 IsActive 时对文件节点标记 IsFilteredOut。</param>
+    /// <param name="progress">进度回调（0–100），在后台线程调用，需自行节流/封送到 UI 线程。</param>
     /// <returns>根节点（destDir 自身），包含完整的树结构。</returns>
     public static PreviewTreeNode BuildExtractPreview(
         IEnumerable<ArchiveItem> entries,
         string destDir,
         string? rootName = null,
         bool checkExists = false,
-        FileFilterCriteria? filter = null)
+        FileFilterCriteria? filter = null,
+        IProgress<double>? progress = null)
     {
         // 根节点即解压目标目录本身（不再有概念容器层）
         var destNode = new PreviewTreeNode
@@ -38,6 +40,7 @@ public static class ResultPreviewService
         };
 
         var itemsList = entries.ToList();
+        var fileItems = itemsList.Where(i => !i.IsDirectory).ToList();
         var dirsAdded = new HashSet<string>();
 
         // Phase 1: Build tree structure from archive entries
@@ -48,7 +51,23 @@ public static class ResultPreviewService
                 AddFolderNode(destNode, path, item);
         }
 
-        foreach (var item in itemsList.Where(i => !i.IsDirectory))
+        // 进度节流：每 1% 上报一次，避免大量条目时向 UI 线程投递过多回调
+        int totalFiles = fileItems.Count;
+        int processedFiles = 0;
+        double lastReportedPct = -1;
+
+        void ReportProgress()
+        {
+            if (progress == null || totalFiles == 0) return;
+            var pct = processedFiles * 100.0 / totalFiles;
+            if (pct - lastReportedPct >= 1.0 || processedFiles == totalFiles)
+            {
+                lastReportedPct = pct;
+                progress.Report(pct);
+            }
+        }
+
+        foreach (var item in fileItems)
         {
             var fullPath = item.FullPath;
             var lastSlash = fullPath.LastIndexOf('/');
@@ -92,6 +111,9 @@ public static class ResultPreviewService
                 fileNode.IsFilteredOut = true;
 
             parent.Children.Add(fileNode);
+
+            processedFiles++;
+            ReportProgress();
         }
 
         // Phase 2: Check directory existence at destination
@@ -105,6 +127,8 @@ public static class ResultPreviewService
 
         // Expand by default
         destNode.IsExpanded = true;
+
+        progress?.Report(100);
 
         return destNode;
     }
