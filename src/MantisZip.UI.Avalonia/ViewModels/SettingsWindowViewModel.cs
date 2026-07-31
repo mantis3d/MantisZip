@@ -1317,10 +1317,24 @@ public partial class SettingsWindowViewModel : ObservableObject
     }
 
     [RelayCommand]
-    private void BrowseSevenZip()
+    private async Task BrowseSevenZip()
     {
-        // Placeholder: Would show a file dialog to select 7z.dll
-        Debug.WriteLine("Browse for 7z.dll requested");
+        try
+        {
+            var ownerWindow = (global::Avalonia.Application.Current?.ApplicationLifetime as global::Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime)?.MainWindow;
+            var path = await CustomFilePickerDialog.ShowOpenFileAsync(
+                ownerWindow!,
+                initialPath: string.IsNullOrEmpty(SevenZipPath) ? null : SevenZipPath,
+                fileExtensions: ["*.dll"]);
+            if (!string.IsNullOrEmpty(path))
+            {
+                SevenZipPath = path;
+            }
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[Settings] BrowseSevenZip failed: {ex.Message}");
+        }
     }
 
     [RelayCommand]

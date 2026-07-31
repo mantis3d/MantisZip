@@ -601,24 +601,13 @@ public partial class MainWindow : Window
 
     private async Task<string?> OpenFileDialogAsync()
     {
-        var result = await StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
-        {
-            Title = "选择压缩包",
-            AllowMultiple = false,
-            FileTypeFilter =
+        return await CustomFilePickerDialog.ShowOpenFileAsync(
+            this,
+            initialPath: null,
+            fileExtensions:
             [
-                new FilePickerFileType("压缩包")
-                {
-                    Patterns = ["*.zip", "*.7z", "*.rar", "*.tar", "*.tgz", "*.gz", "*.tar.gz", "*.iso"]
-                },
-                new FilePickerFileType("所有文件")
-                {
-                    Patterns = ["*.*"]
-                }
-            ]
-        });
-
-        return result.Count >= 1 ? result[0].Path.LocalPath : null;
+                "*.zip", "*.7z", "*.rar", "*.tar", "*.tgz", "*.tar.gz", "*.gz", "*.iso"
+            ]);
     }
 
     // ── Filter picker buttons (🧪 pick from selected items) ──

@@ -50,6 +50,7 @@ public partial class CustomFilePickerDialog : Window
     private readonly PickerMode _mode;
     private readonly IReadOnlyList<ArchiveItem>? _entries;
     private readonly string? _defaultExtension;
+    private readonly string[]? _fileExtensions;
 
     /// <summary>确定后返回的路径。</summary>
     public string? SelectedPath { get; private set; }
@@ -75,24 +76,25 @@ public partial class CustomFilePickerDialog : Window
 
     /// <summary>选择文件夹。返回所选目录路径，取消返回 null。</summary>
     public static Task<string?> ShowFolderAsync(Window owner, string? initialPath = null)
-        => ShowInternal(owner, PickerMode.PickFolder, null, null, initialPath);
+        => ShowInternal(owner, PickerMode.PickFolder, null, null, initialPath, null);
 
     /// <summary>保存文件。返回完整保存路径，取消返回 null。</summary>
     public static Task<string?> ShowSaveFileAsync(Window owner, string? initialPath = null, string? defaultExtension = null)
-        => ShowInternal(owner, PickerMode.SaveFile, null, defaultExtension, initialPath);
+        => ShowInternal(owner, PickerMode.SaveFile, null, defaultExtension, initialPath, null);
 
     /// <summary>打开文件（单文件）。返回文件路径，取消返回 null。</summary>
-    public static Task<string?> ShowOpenFileAsync(Window owner, string? initialPath = null)
-        => ShowInternal(owner, PickerMode.OpenFile, null, null, initialPath);
+    /// <param name="fileExtensions">文件筛选器（扩展名列表，如 "*.zip" / ".zip" 或 "zip"）。null 或空 = 显示所有文件。</param>
+    public static Task<string?> ShowOpenFileAsync(Window owner, string? initialPath = null, string[]? fileExtensions = null)
+        => ShowInternal(owner, PickerMode.OpenFile, null, null, initialPath, fileExtensions);
 
     /// <summary>解压模式：选择目标目录，底部实时显示解压冲突预览。返回目录路径，取消返回 null。</summary>
     public static Task<string?> ShowExtractFolderAsync(Window owner, IReadOnlyList<ArchiveItem> entries, string? initialPath = null)
-        => ShowInternal(owner, PickerMode.ExtractFolder, entries, null, initialPath);
+        => ShowInternal(owner, PickerMode.ExtractFolder, entries, null, initialPath, null);
 
     private static async Task<string?> ShowInternal(
-        Window owner, PickerMode mode, IReadOnlyList<ArchiveItem>? entries, string? defaultExtension, string? initialPath)
+        Window owner, PickerMode mode, IReadOnlyList<ArchiveItem>? entries, string? defaultExtension, string? initialPath, string[]? fileExtensions)
     {
-        var dialog = new CustomFilePickerDialog(mode, entries, defaultExtension, initialPath)
+        var dialog = new CustomFilePickerDialog(mode, entries, defaultExtension, initialPath, fileExtensions)
         {
             WindowStartupLocation = WindowStartupLocation.CenterOwner
         };
@@ -104,16 +106,17 @@ public partial class CustomFilePickerDialog : Window
 
     /// <summary>设计时无参构造函数。</summary>
     public CustomFilePickerDialog()
-        : this(PickerMode.PickFolder, null, null, null)
+        : this(PickerMode.PickFolder, null, null, null, null)
     {
     }
 
-    public CustomFilePickerDialog(PickerMode mode, IReadOnlyList<ArchiveItem>? entries = null, string? defaultExtension = null, string? initialPath = null)
+    public CustomFilePickerDialog(PickerMode mode, IReadOnlyList<ArchiveItem>? entries = null, string? defaultExtension = null, string? initialPath = null, string[]? fileExtensions = null)
     {
         InitializeComponent();
         _mode = mode;
         _entries = entries;
         _defaultExtension = defaultExtension;
+        _fileExtensions = fileExtensions;
 
         DataContext = this;
 
@@ -303,6 +306,7 @@ public partial class CustomFilePickerDialog : Window
                 .ToList();
             var files = showFiles
                 ? Directory.EnumerateFiles(dir)
+                    .Where(MatchesFileFilter)
                     .OrderBy(f => f, StringComparer.OrdinalIgnoreCase)
                     .ToList()
                 : new List<string>();
@@ -326,6 +330,34 @@ public partial class CustomFilePickerDialog : Window
         {
             System.Diagnostics.Debug.WriteLine($"[CustomFilePickerDialog] LoadDirectory failed: {ex.Message}");
         }
+    }
+
+    /// <summary>
+    /// 文件筛选器匹配（OpenFile 模式）。支持 "*.zip" / ".zip" / "zip" / "*.*" 格式。
+    /// 无筛选器（null/空）或含 "*.*" 时显示所有文件。
+    /// </summary>
+    private bool MatchesFileFilter(string filePath)
+    {
+        if (_mode != PickerMode.OpenFile || _fileExtensions == null || _fileExtensions.Length == 0)
+            return true;
+        if (_fileExtensions.Any(e => e == "*.*" || e == "*"))
+            return true;
+
+        var ext = Path.GetExtension(filePath);
+        foreach (var pattern in _fileExtensions)
+        {
+            var p = pattern.Trim().ToLowerInvariant();
+            if (p.StartsWith("*.")) p = p[1..]; // "*.zip" → ".zip"
+            if (p.StartsWith(".") || p.Length <= 1)
+            {
+                if (string.Equals(ext, p, StringComparison.OrdinalIgnoreCase)) return true;
+            }
+            else
+            {
+                if (string.Equals(ext, "." + p, StringComparison.OrdinalIgnoreCase)) return true;
+            }
+        }
+        return false;
     }
 
     private FileBrowserItem CreateDirItem(string path)
