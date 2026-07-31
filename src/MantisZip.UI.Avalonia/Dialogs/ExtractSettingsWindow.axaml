@@ -245,6 +245,8 @@
                               MaxItemsPerDirectory="5"
                               MaxDepth="5"
                               ShowFilteredGhosts="{Binding ShowFilteredGhosts}"
+                              IsLoading="{Binding IsPreviewBuilding}"
+                              BuildProgress="{Binding PreviewBuildProgress}"
                               MinWidth="200" />
 
     <!-- ═══════ Bottom buttons (span all columns) ═══════ -->
