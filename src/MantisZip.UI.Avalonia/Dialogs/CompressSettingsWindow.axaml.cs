@@ -88,18 +88,13 @@ public partial class CompressSettingsWindow : Window
         SubscribeViewModel();
         Loaded += OnLoaded;
 
-        // 配置 4 个单 Tab 面板（各弹出独立浮层）
+        // 配置 3 个单 Tab 面板（各弹出独立浮层；目录树按钮在压缩窗口不显示）
         OutputFavControl.SingleTab = PathTab.Favorites;
         OutputFavControl.ApplySingleTabMode();
         OutputHistControl.SingleTab = PathTab.History;
         OutputHistControl.ApplySingleTabMode();
         OutputWinControl.SingleTab = PathTab.Windows;
         OutputWinControl.ApplySingleTabMode();
-        OutputTreeControl.SingleTab = PathTab.Tree;
-        OutputTreeControl.ApplySingleTabMode();
-
-        // 双击确认（目录树节点双击 → 应用并关闭）
-        OutputTreeControl.PathConfirmed += OutputPathControl_PathConfirmed;
 
         // 手动 light dismiss：Popup 遮罩会拦截外部点击导致按钮收不到 Click，
         // 改为监听主窗口 PointerPressed——点击窗口任意处先关闭全部浮层，按钮 Click 再打开对应浮层
@@ -270,23 +265,10 @@ public partial class CompressSettingsWindow : Window
     }
 
     /// <summary>
-    /// QuickPathControl 单击选中路径 → 写入 OutputDirectory。
-    /// 目录树单击仅导航（不关闭浮层，允许展开浏览）；列表单击应用并关闭。
+    /// QuickPathControl 单击选中路径 → 写入 OutputDirectory 并关闭浮层。
+    /// （压缩窗口快捷面板无目录树，单击即确认。）
     /// </summary>
     private void OutputPathControl_PathSelected(object? sender, string path)
-    {
-        if (string.IsNullOrEmpty(path)) return;
-        if (ViewModel.OutputMode != CompressOutputMode.Manual) return;
-        ViewModel.OutputDirectory = path;
-
-        // 目录树单击 = 导航预览，不关闭（双击才确认）；其他来源单击即确认
-        if (sender is QuickPathControl qpc && qpc.CurrentTab == PathTab.Tree)
-            return;
-        CloseOutputPopups();
-    }
-
-    /// <summary>QuickPathControl 双击确认路径 → 写入并关闭全部浮层。</summary>
-    private void OutputPathControl_PathConfirmed(object? sender, string path)
     {
         if (string.IsNullOrEmpty(path)) return;
         if (ViewModel.OutputMode != CompressOutputMode.Manual) return;
@@ -300,7 +282,6 @@ public partial class CompressSettingsWindow : Window
         OutputFavPopup.IsOpen = false;
         OutputHistPopup.IsOpen = false;
         OutputWinPopup.IsOpen = false;
-        OutputTreePopup.IsOpen = false;
     }
 
     private void QuickFavButton_Click(object? sender, RoutedEventArgs e)
@@ -311,9 +292,6 @@ public partial class CompressSettingsWindow : Window
 
     private void QuickWinButton_Click(object? sender, RoutedEventArgs e)
         => OutputWinPopup.IsOpen = true;
-
-    private void QuickTreeButton_Click(object? sender, RoutedEventArgs e)
-        => OutputTreePopup.IsOpen = true;
 
     /// <summary>
     /// 浏览按钮：打开保存文件对话框（带格式联动），返回完整路径后拆分为目录 + 文件名。

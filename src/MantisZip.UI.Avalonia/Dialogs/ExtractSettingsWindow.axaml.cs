@@ -63,18 +63,13 @@ public partial class ExtractSettingsWindow : Window
         // 绑定文件列表
         FileListBox.ItemsSource = archivePaths;
 
-        // 配置 4 个单 Tab 面板（各弹出独立浮层）
+        // 配置 3 个单 Tab 面板（各弹出独立浮层；目录树按钮在解压窗口不显示）
         DestFavControl.SingleTab = PathTab.Favorites;
         DestFavControl.ApplySingleTabMode();
         DestHistControl.SingleTab = PathTab.History;
         DestHistControl.ApplySingleTabMode();
         DestWinControl.SingleTab = PathTab.Windows;
         DestWinControl.ApplySingleTabMode();
-        DestTreeControl.SingleTab = PathTab.Tree;
-        DestTreeControl.ApplySingleTabMode();
-
-        // 双击确认（目录树节点双击 → 应用并关闭）
-        DestTreeControl.PathConfirmed += DestPathControl_PathConfirmed;
 
         // 手动 light dismiss：Popup 遮罩会拦截外部点击导致按钮收不到 Click，
         // 改为监听主窗口 PointerPressed——点击窗口任意处先关闭全部浮层，按钮 Click 再打开对应浮层
@@ -104,26 +99,8 @@ public partial class ExtractSettingsWindow : Window
     private void QuickWinButton_Click(object? sender, RoutedEventArgs e)
         => DestWinPopup.IsOpen = true;
 
-    private void QuickTreeButton_Click(object? sender, RoutedEventArgs e)
-        => DestTreePopup.IsOpen = true;
-
-    /// <summary>
-    /// QuickPathControl 单击选中路径 → 写入 DestinationPath。
-    /// 目录树单击仅导航（不关闭浮层，允许展开浏览）；其他来源单击即确认。
-    /// </summary>
+    /// <summary>QuickPathControl 单击选中路径 → 写入 DestinationPath 并关闭浮层。</summary>
     private void DestPathControl_PathSelected(object? sender, string path)
-    {
-        if (string.IsNullOrEmpty(path)) return;
-        ViewModel.DestinationPath = path;
-
-        // 目录树单击 = 导航预览，不关闭（双击才确认）；其他来源单击即确认
-        if (sender is QuickPathControl qpc && qpc.CurrentTab == PathTab.Tree)
-            return;
-        CloseDestPopups();
-    }
-
-    /// <summary>QuickPathControl 双击确认路径 → 写入并关闭全部浮层。</summary>
-    private void DestPathControl_PathConfirmed(object? sender, string path)
     {
         if (string.IsNullOrEmpty(path)) return;
         ViewModel.DestinationPath = path;
@@ -136,7 +113,6 @@ public partial class ExtractSettingsWindow : Window
         DestFavPopup.IsOpen = false;
         DestHistPopup.IsOpen = false;
         DestWinPopup.IsOpen = false;
-        DestTreePopup.IsOpen = false;
     }
 
     /// <summary>浏览按钮：解压模式对话框（内建 ResultTreeView 冲突预览）。</summary>

@@ -82,8 +82,8 @@
                   </Button>
                 </Grid>
 
-                <!-- Quick buttons row: ⭐ 🕐 🪟 🌲 + 📁 (extract folder dialog) -->
-                <Grid ColumnDefinitions="Auto,Auto,Auto,Auto,Auto"
+                <!-- Quick buttons row: ⭐ 🕐 🪟 + 📁 (extract folder dialog) -->
+                <Grid ColumnDefinitions="Auto,Auto,Auto,Auto"
                       ColumnSpacing="{DynamicResource SpacingXxs}">
                   <Button x:Name="QuickFavButton"
                           MinHeight="{DynamicResource ControlHeightSm}"
@@ -123,21 +123,8 @@
                               Width="14" Height="14"
                               Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
                   </Button>
-                  <Button Grid.Column="3"
-                          x:Name="QuickTreeButton"
-                          MinHeight="{DynamicResource ControlHeightSm}"
-                          Padding="{DynamicResource SpacingXsThk}"
-                          Click="QuickTreeButton_Click"
-                          ToolTip.Tip="{Binding LocalizedStrings[QuickPath_TabTree]}"
-                          Background="{DynamicResource ThemeButtonBgBrush}"
-                          Foreground="{DynamicResource ThemeTextPrimaryBrush}"
-                          BorderBrush="{DynamicResource ThemeBorderBrush}">
-                    <PathIcon Data="{StaticResource IconFolder}"
-                              Width="14" Height="14"
-                              Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
-                  </Button>
-                  <Button Grid.Column="4"
-                          x:Name="QuickBrowseButton"
+                    <Button Grid.Column="3"
+                            x:Name="QuickBrowseButton"
                           MinHeight="{DynamicResource ControlHeightSm}"
                           Padding="{DynamicResource SpacingXsThk}"
                           Click="QuickBrowseButton_Click"
@@ -205,21 +192,7 @@
                   </Border>
                 </Popup>
 
-                <!-- 🌲 Tree popup -->
-                <Popup x:Name="DestTreePopup"
-                       PlacementTarget="{Binding #QuickTreeButton}"
-                       Placement="Bottom"
-                       IsLightDismissEnabled="False">
-                  <Border Background="{DynamicResource ThemeWindowBgBrush}"
-                          BorderBrush="{DynamicResource ThemeBorderBrush}"
-                          BorderThickness="1" CornerRadius="4" Padding="6"
-                          Width="320" MaxHeight="420"
-                          BoxShadow="0 2 8 0 #40000000">
-                    <controls:QuickPathControl x:Name="DestTreeControl"
-                                               Width="308"
-                                               PathSelected="DestPathControl_PathSelected" />
-                  </Border>
-                </Popup>
+                <!-- ⭐ Favorites popup -->
               </StackPanel>
             </Border>
 
