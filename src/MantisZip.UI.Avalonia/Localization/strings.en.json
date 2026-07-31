@@ -811,6 +811,10 @@
   "Picker_Back": "Back",
   "Picker_Forward": "Forward",
   "Picker_Up": "Up",
+  "Picker_FileName": "File name",
+  "Picker_FileType": "File type",
+  "Picker_FileTypeArchive": "Archive files",
+  "Picker_FileTypeAll": "All files",
 
   "FileFilter_Enable": "Enable filter",
   "FileFilter_Presets": "Filter Presets",

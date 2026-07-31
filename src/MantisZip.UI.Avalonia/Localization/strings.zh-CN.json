@@ -809,6 +809,10 @@
   "Picker_Back": "后退",
   "Picker_Forward": "前进",
   "Picker_Up": "上级目录",
+  "Picker_FileName": "文件名",
+  "Picker_FileType": "文件类型",
+  "Picker_FileTypeArchive": "压缩包文件",
+  "Picker_FileTypeAll": "所有文件",
 
   "FileFilter_Enable": "启用过滤",
   "FileFilter_Presets": "过滤预设",

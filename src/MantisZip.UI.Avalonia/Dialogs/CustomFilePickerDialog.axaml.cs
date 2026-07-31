@@ -74,6 +74,8 @@ public partial class CustomFilePickerDialog : Window
     public string BackText => LocalizationManager.T("Picker_Back");
     public string ForwardText => LocalizationManager.T("Picker_Forward");
     public string UpText => LocalizationManager.T("Picker_Up");
+    public string FileNameLabel => LocalizationManager.T("Picker_FileName");
+    public string FileTypeLabel => LocalizationManager.T("Picker_FileType");
 
     // ── Static entry points ────────────────────────────────────────────────
 
@@ -137,6 +139,16 @@ public partial class CustomFilePickerDialog : Window
             PreviewArea.IsVisible = false;
         }
 
+        // 文件名/文件类型行：仅 SaveFile / OpenFile 模式显示
+        if (mode is PickerMode.SaveFile or PickerMode.OpenFile)
+        {
+            InitFileNameArea(mode);
+        }
+        else
+        {
+            FileNameArea.IsVisible = false;
+        }
+
         // 窗口高度：解压模式含预览区更高
         if (mode == PickerMode.ExtractFolder)
         {
@@ -157,6 +169,99 @@ public partial class CustomFilePickerDialog : Window
 
         // 地址栏补全/历史
         InitPathAutoComplete();
+    }
+
+    // ── File name + File type row ──────────────────────────────────────────
+
+    private bool _isSyncingFileType;
+
+    /// <summary>
+    /// 初始化底部文件名 + 文件类型行。
+    /// - SaveFile：文件类型 = 压缩格式（zip/7z/tar.gz），切换时更新文件名扩展名（格式联动）
+    /// - OpenFile：文件类型 = 筛选器（传入扩展名组 + 所有文件），切换时重新过滤列表
+    /// </summary>
+    private void InitFileNameArea(PickerMode mode)
+    {
+        if (mode == PickerMode.SaveFile)
+        {
+            FileTypeSelector.ItemsSource = new List<string>
+            {
+                "*.zip",
+                "*.7z",
+                "*.tar.gz"
+            };
+            FileTypeSelector.SelectedIndex = _defaultExtension switch
+            {
+                ".7z" => 1,
+                ".tar.gz" => 2,
+                _ => 0
+            };
+
+            // 预填文件名（来自 initialPath 的末尾，或默认扩展名）
+            FileNameBox.Text = _defaultExtension == null
+                ? string.Empty
+                : "untitled" + _defaultExtension;
+        }
+        else // OpenFile
+        {
+            FileTypeSelector.ItemsSource = new List<string>
+            {
+                LocalizationManager.T("Picker_FileTypeArchive"),
+                LocalizationManager.T("Picker_FileTypeAll")
+            };
+            FileTypeSelector.SelectedIndex = 0;
+        }
+    }
+
+    private void FileNameBox_TextChanged(object? sender, TextChangedEventArgs e)
+    {
+        // 用户在文件名框输入时清除选中（避免选中文件覆盖输入）
+        if (FileList.SelectedItem is FileBrowserItem { IsDirectory: false })
+        {
+            FileList.SelectedItem = null;
+        }
+    }
+
+    private void FileTypeSelector_SelectionChanged(object? sender, SelectionChangedEventArgs e)
+    {
+        if (_isSyncingFileType) return;
+        if (FileTypeSelector.SelectedIndex < 0) return;
+
+        if (_mode == PickerMode.OpenFile)
+        {
+            // 重新加载当前目录应用新筛选
+            LoadDirectory(_currentDir);
+        }
+        else if (_mode == PickerMode.SaveFile)
+        {
+            UpdateSaveFileExtension();
+        }
+    }
+
+    /// <summary>SaveFile 模式：文件类型切换时更新文件名扩展名（格式联动）。</summary>
+    private void UpdateSaveFileExtension()
+    {
+        var extension = GetSelectedSaveExtension();
+        if (string.IsNullOrEmpty(extension)) return;
+
+        var name = FileNameBox.Text?.Trim() ?? string.Empty;
+        if (string.IsNullOrEmpty(name)) return;
+
+        // 去掉旧扩展名，换上当前类型扩展名
+        var baseName = Path.GetFileNameWithoutExtension(name);
+        FileNameBox.Text = baseName + extension;
+    }
+
+    private string GetSelectedSaveExtension()
+    {
+        var ext = FileTypeSelector.SelectedItem as string;
+        return ext switch
+        {
+            "*.zip" => ".zip",
+            "*.7z" => ".7z",
+            "*.tar.gz" => ".tar.gz",
+            _ => _defaultExtension ?? ".zip"
+        };
     }
 
     // ── Drive selector ─────────────────────────────────────────────────────
@@ -414,12 +519,16 @@ public partial class CustomFilePickerDialog : Window
     /// <summary>
     /// 文件筛选器匹配（OpenFile 模式）。支持 "*.zip" / ".zip" / "zip" / "*.*" 格式。
     /// 无筛选器（null/空）或含 "*.*" 时显示所有文件。
+    /// 文件类型下拉选中「所有文件」（index 1）时同样不过滤。
     /// </summary>
     private bool MatchesFileFilter(string filePath)
     {
         if (_mode != PickerMode.OpenFile || _fileExtensions == null || _fileExtensions.Length == 0)
             return true;
         if (_fileExtensions.Any(e => e == "*.*" || e == "*"))
+            return true;
+        // 文件类型下拉选中「所有文件」→ 不过滤
+        if (FileTypeSelector.SelectedIndex == 1)
             return true;
 
         var ext = Path.GetExtension(filePath);
@@ -520,6 +629,11 @@ public partial class CustomFilePickerDialog : Window
         {
             NavigateTo(item.FullPath);
         }
+        else if (_mode == PickerMode.SaveFile)
+        {
+            // 保存模式：双击文件 → 填入文件名框（可再改格式）
+            FileNameBox.Text = item.DisplayName;
+        }
         else
         {
             TryConfirmFile(item.FullPath);
@@ -534,6 +648,8 @@ public partial class CustomFilePickerDialog : Window
             {
                 if (item.IsDirectory)
                     NavigateTo(item.FullPath);
+                else if (_mode == PickerMode.SaveFile)
+                    FileNameBox.Text = item.DisplayName; // 保存模式 Enter 文件 → 填入文件名
                 else
                     TryConfirmFile(item.FullPath);
                 e.Handled = true;
@@ -615,8 +731,8 @@ public partial class CustomFilePickerDialog : Window
                 break;
 
             case PickerMode.SaveFile:
-                // 文件名输入：地址栏文本或浏览区选中文件
-                var name = GetSaveFileName();
+                // 文件名来自底部文件名文本框
+                var name = FileNameBox.Text?.Trim() ?? string.Empty;
                 if (string.IsNullOrWhiteSpace(name))
                 {
                     _ = AppMessageBox.Show(
@@ -625,10 +741,10 @@ public partial class CustomFilePickerDialog : Window
                         MessageBoxButton.OK, MessageBoxImage.Warning, this);
                     return;
                 }
-                // 格式联动：应用默认扩展名
-                if (!string.IsNullOrEmpty(_defaultExtension) && !Path.HasExtension(name))
+                // 格式联动：应用当前文件类型扩展名
+                if (!Path.HasExtension(name))
                 {
-                    name = name + _defaultExtension;
+                    name = name + GetSelectedSaveExtension();
                 }
                 SelectedPath = Path.Combine(_currentDir, name);
                 SelectedFileName = name;
