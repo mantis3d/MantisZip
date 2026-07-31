@@ -115,6 +115,34 @@ internal static class NativeMethods
     [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
     public static extern ushort RegisterClipboardFormatW(string lpszFormat);
 
+    [DllImport("user32.dll", SetLastError = true)]
+    public static extern nint SetWindowsHookEx(int idHook, LowLevelKeyboardProc lpfn, nint hMod, uint dwThreadId);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    public static extern bool UnhookWindowsHookEx(nint hhk);
+
+    [DllImport("user32.dll")]
+    public static extern nint CallNextHookEx(nint hhk, int nCode, nint wParam, nint lParam);
+
+    public delegate nint LowLevelKeyboardProc(int nCode, nint wParam, nint lParam);
+
+    // ── Cursor API (方案 A：拖拽期间替换系统"禁止"光标) ──
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    public static extern nint LoadCursorFromFile(string lpFileName);
+
+    [DllImport("user32.dll")]
+    public static extern nint LoadCursor(nint hInstance, nint lpCursorName);
+
+    [DllImport("user32.dll")]
+    public static extern nint CopyIcon(nint hIcon);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    public static extern bool SetSystemCursor(nint hcur, uint id);
+
+    [DllImport("user32.dll")]
+    public static extern bool DestroyIcon(nint hIcon);
+
     // ── gdi32.dll ──
 
     [DllImport("gdi32.dll")]
@@ -229,6 +257,15 @@ internal static class NativeMethods
     public const uint DV_E_DVASPECT = 0x8004006B;
     public const uint STG_E_MEDIUMFULL = 0x80030070;
     public const uint S_OK = 0;
+
+    // Keyboard hook (for Esc-cancel detection during drag)
+    public const int WH_KEYBOARD_LL = 13;
+    public const int WM_KEYDOWN = 0x0100;
+    public const int VK_ESCAPE = 0x1B;
+
+    // System cursor IDs (for SetSystemCursor replacement during drag)
+    public const uint OCR_NORMAL = 32512;
+    public const uint OCR_NO = 32651;
 
     // ── Structs ──
 

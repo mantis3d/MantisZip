@@ -457,8 +457,21 @@ public partial class App : Application
         }
     }
 
+    /// <summary>调试日志文件大小上限（10 MB），超过时自动轮转（与 WPF 版一致）。</summary>
+    private const long MaxDebugLogFileSize = 10L * 1024 * 1024;
+
+    /// <summary>调试日志开关缓存（首次调用时从设置读取；SettingsWindow 保存后调用 <see cref="RefreshDebugLogSettings"/> 刷新）</summary>
+    private static bool? _debugLogEnabled;
+    private static string _debugLogPrivacyMode = "extension";
+
     internal static void DebugLog(string msg)
     {
+        // 惰性读取设置并缓存（AppSettings.Load() 每次读磁盘，不能每次调用都读）
+        if (!_debugLogEnabled.HasValue)
+            RefreshDebugLogSettings();
+        if (_debugLogEnabled != true)
+            return;
+
         try
         {
             var logPath = Path.Combine(
@@ -467,9 +480,41 @@ public partial class App : Application
             var dir = Path.GetDirectoryName(logPath);
             if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
                 Directory.CreateDirectory(dir);
-            File.AppendAllText(logPath, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}] {msg}\n");
+
+            RotateDebugLogIfNeeded(logPath);
+
+            // 与 App.Log 保持一致：写入前做路径脱敏
+            var redacted = LogRedactor.RedactPaths(msg, LogRedactor.ParseMode(_debugLogPrivacyMode));
+            File.AppendAllText(logPath, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}] {redacted}\n");
         }
         catch { }
+    }
+
+    /// <summary>
+    /// 刷新调试日志开关与脱敏模式缓存。SettingsWindow 保存设置后调用。
+    /// </summary>
+    internal static void RefreshDebugLogSettings()
+    {
+        var settings = AppSettings.Load();
+        _debugLogEnabled = settings.EnableDebugLogging;
+        _debugLogPrivacyMode = settings.LogPrivacyMode;
+    }
+
+    /// <summary>
+    /// 检查日志文件大小，超过上限时自动轮转（添加时间戳后缀）。与 WPF 版行为一致。
+    /// </summary>
+    private static void RotateDebugLogIfNeeded(string logPath)
+    {
+        try
+        {
+            var fileInfo = new FileInfo(logPath);
+            if (fileInfo.Exists && fileInfo.Length > MaxDebugLogFileSize)
+            {
+                var backupPath = logPath + "." + DateTime.Now.ToString("yyyyMMddHHmmss") + ".bak";
+                File.Move(logPath, backupPath);
+            }
+        }
+        catch { /* 轮转失败不影响继续写入 */ }
     }
 
     // ════════════════════════════════════════════════════════════════

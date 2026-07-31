@@ -226,8 +226,6 @@ internal class OverlayController : IDisposable
         }
 
         _tick++;
-        if (_tick % 10 == 0)
-            App.DebugLog($"[Overlay] target=0x{target:X} pos=({rect.Left},{rect.Top}) size={w}x{h} status={newStatus} path={displayPath}");
     }
     private int _tick;
 
@@ -416,8 +414,6 @@ internal class OverlayController : IDisposable
                     >= 180 => 20,
                     _ => 16
                 };
-
-                App.DebugLog($"[Overlay] Font: {chosenSize}px (w={w}, h={h}, baseDim={baseDim})");
 
                 int availableHeight = textBottom - textTop;
 

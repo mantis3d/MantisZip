@@ -21,6 +21,15 @@
 
 ### MantisZip.UI.Avalonia（主力版）
 
+**2026-07-31** — 拖拽解压高危修复 + 拖拽光标方案（A 实施 / C 计划入库）
+  - **Esc 取消**：`WH_KEYBOARD_LL` 钩子检测 Esc，拖拽中按 Esc 取消解压并提示（用户验证通过）
+  - **ask 冲突**：拖拽解压遇到重名文件弹 `ConflictDialog`，支持"应用到全部"（用户验证通过）
+  - **DataTransfer**：改用自定义格式 `MantisZipDragFormat`（Avalonia 12 新 API）；Explorer 不识别，光标仍为禁止
+  - **DebugLog**：`EnableDebugLogging` 开关 + `LogRedactor` 脱敏 + 10MB 轮转；移除 overlay 每帧/每秒热路径日志
+  - **光标方案 A**：`SetSystemCursor` 替换系统 OCR_NO + `DragCursor.cur` 支持；实测无效（替换后 `LoadCursor(OCR_NO)` 仍返回旧句柄，已用独立进程实证）
+  - **光标方案 C**：自实现 OLE 拖拽 + 虚拟文件（根治光标 + 让 Explorer 接受拖放）已写入 `drag-drop-direct-extract.md` 计划文档，docs/PLAN.md 同步
+  - 构建 0 errors
+
 **2026-07-31** — 暗色模式预览树文件名黑色修复（NodeForegroundConverter 动态解析主题画刷）
   - **NodeForegroundConverter**：正常项不再返回 `UnsetValue`，改为从 `Application.Current.TryGetResource` 动态解析 `ThemeTextPrimaryBrush`
   - **ResultTreeView**：订阅 `ActualThemeVariantChanged`，主题切换时递归刷新所有节点 ForegroundKey 绑定

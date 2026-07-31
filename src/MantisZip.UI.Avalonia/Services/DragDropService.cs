@@ -27,6 +27,9 @@ internal class DragDropService
     private readonly Window _ownerWindow;
     private readonly AppSettings _settings;
 
+    /// <summary>用户勾选"应用到全部"后记住的冲突处理方式（null = 未决定，继续弹窗）</summary>
+    private FileConflictAction? _applyAllAction;
+
     public DragDropService(string archivePath, ArchiveFormat format, string? password, Window ownerWindow)
     {
         _archivePath = archivePath;
@@ -131,9 +134,40 @@ internal class DragDropService
                                 outputPath = GetUniquePath(outputPath);
                                 break;
                             case "overwrite":
-                            default:
                                 File.Delete(outputPath);
                                 break;
+                            case "ask":
+                            {
+                                // 弹 ConflictDialog，由 Core 的 ResolvePathAsync 处理各策略分支
+                                // （Overwrite / Rename / Skip / OverwriteIfOlder / OverwriteIfSmaller / 自定义名）
+                                var options = new ArchiveOptions
+                                {
+                                    ConflictAction = FileConflictAction.Ask,
+                                    ConflictResolverAsync = async info =>
+                                    {
+                                        if (_applyAllAction.HasValue)
+                                            return _applyAllAction.Value;
+
+                                        var dlg = await ShowConflictDialogAsync(info);
+                                        if (dlg.CancelOperation)
+                                            throw new OperationCanceledException("用户取消整个拖拽解压操作");
+                                        if (dlg.ApplyToAll)
+                                            _applyAllAction = dlg.ResultAction;
+                                        info.CustomName = dlg.CustomName;
+                                        return dlg.ResultAction;
+                                    }
+                                };
+                                var resolved = await FileConflictHelper.ResolvePathAsync(
+                                    outputPath, options, item.LastModified, item.Size);
+                                if (resolved == null)
+                                {
+                                    // Skip / 条件不满足（不覆盖旧文件或小文件）→ 跳过当前文件
+                                    Interlocked.Increment(ref processedFiles);
+                                    continue;
+                                }
+                                outputPath = resolved;
+                                break;
+                            }
                         }
                     }
 
@@ -218,6 +252,29 @@ internal class DragDropService
         {
             return null;
         }
+    }
+
+    /// <summary>
+    /// 在 UI 线程弹出冲突对话框，等待用户选择。
+    /// 从后台线程调用；通过 Dispatcher.Post 切换到 UI 线程，用 TaskCompletionSource 回传结果。
+    /// </summary>
+    private Task<ConflictDialog> ShowConflictDialogAsync(FileConflictInfo info)
+    {
+        var tcs = new TaskCompletionSource<ConflictDialog>(TaskCreationOptions.RunContinuationsAsynchronously);
+        _ownerWindow.Dispatcher.Post(async () =>
+        {
+            try
+            {
+                var dlg = new ConflictDialog(info);
+                await dlg.ShowDialog(_ownerWindow);
+                tcs.SetResult(dlg);
+            }
+            catch (Exception ex)
+            {
+                tcs.SetException(ex);
+            }
+        });
+        return tcs.Task;
     }
 
     /// <summary>

@@ -68,6 +68,7 @@
 | 项目 | 方向 | 触发条件 |
 |------|------|---------|
 | UIA 路径提取升级 | 改用 `System.Windows.Automation` 覆盖更多第三方管理器 | 方案 A 覆盖不足时按需启用 |
+| OLE 虚拟文件拖拽（方案 C） | 自实现 `IDataObject` + `IDropSource` + `CFSTR_FILEDESCRIPTOR`/`CFSTR_FILECONTENTS`，Explorer 识别为真实文件拖拽，光标恢复正常（根治方案） | A 方案（`SetSystemCursor` 替换）仍不满足体验时启动，详见文末「方案 C：OLE 虚拟文件拖拽（后续计划）」 |
 
 ---
 
@@ -1797,3 +1798,105 @@ if (NativeMethods.DwmGetWindowAttribute(hWnd, NativeMethods.DWMWA_EXTENDED_FRAME
 - [x] DragOverlayWindow 的动画不影响性能 — 20fps + 50ms 定时器低消耗 (code review)
 - [x] `dotnet build src/MantisZip.UI.Avalonia/MantisZip.UI.Avalonia.csproj` 通过
 - [x] `dotnet test tests/MantisZip.Tests/MantisZip.Tests.csproj` 通过
+
+---
+
+## 方案 C：OLE 虚拟文件拖拽（后续计划）
+
+> **2026-07-31 加入**。方案 A（`SetSystemCursor` 替换 OCR_NO）只是视觉缓解；本方案从根上解决「Explorer 不识别自定义格式 → 光标显示禁止」问题，是拖拽光标的根治路径。
+
+### 背景与动机
+
+Avalonia 12 的 `OleDragSource.GiveFeedback` 固定返回 `DRAGDROP_S_USEDEFAULTCURSORS`（见 [Avalonia 源码](https://github.com/AvaloniaUI/Avalonia/blob/main/src/Windows/Avalonia.Win32/OleDragSource.cs)），即 OLE 每次鼠标移动都用系统光标资源设置默认光标。由此推导出三个事实：
+
+1. 空 DataTransfer / 自定义格式 → Explorer 的 `IDropTarget::DragEnter` 返回 `DROPEFFECT_NONE` → 光标显示禁止（OCR_NO），无法通过格式名解决
+2. 定时 `SetCursor` 会被 OLE 在下一次鼠标移动时用默认资源覆盖 → 拖动中闪烁，**不可行**
+3. `SetSystemCursor`（方案 A）替换系统资源表本身 → OLE 每次取到的都是替换后的光标，稳定生效；但副作用是全局短暂影响 + 进程崩溃时还原失败会残留
+
+方案 C 完全绕开 Avalonia 的 OLE 拖拽，自实现源侧 OLE 接口，在 `GiveFeedback` 中完全控制光标；升级版进一步暴露 `CFSTR_FILEDESCRIPTOR`/`CFSTR_FILECONTENTS` 虚拟文件格式，让 Explorer 把拖拽识别为真实文件拖拽（显示标准复制光标 + 文件名跟随），并支持松手时按需解压。
+
+### 目标
+
+| 优先级 | 目标 |
+|--------|------|
+| P0 | 自实现 `IDataObject` + `IDropSource` + `OleDoDragDrop`，`GiveFeedback` 中 `SetCursor(自定义)` + `return S_FALSE`，光标完全可控 |
+| P1 | 暴露 `CFSTR_FILEDESCRIPTOR`（`FileGroupDescriptorW`）+ `CFSTR_FILECONTENTS`（`FileContents`，`TYMED_ISTREAM` 延迟渲染）→ Explorer 显示标准复制光标与文件名提示 |
+| P1 | 保留现有 OverlayController 视觉高亮（目标窗口三色边框 + 状态文字），二者互补 |
+| P2 | 松手时通过 `GetData(FileContents)` 按需解压，取代/补充现有 `ExecuteAfterDropAsync` 路径 |
+
+### 已就绪的基础设施
+
+`NativeMethods.cs` 已含：`DoDragDrop`、`STGMEDIUM`、`GlobalAlloc/GlobalLock/GlobalUnlock/GlobalFree/GlobalSize`、`RtlMoveMemory`、`TYMED_HGLOBAL/TYMED_ISTREAM`、`DV_E_*`、`S_OK`、`RegisterClipboardFormatW`。缺 `IDataObject` / `IDropSource` / `IEnumFORMATETC` 接口定义与实现类。
+
+### 接口骨架（C# COM Interop）
+
+```csharp
+[ComImport, Guid("0000010E-0000-0000-C000-000000000046"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+interface IDataObject
+{
+    void GetData(ref FORMATETC pFormatetc, ref STGMEDIUM pMedium);
+    void GetDataHere(ref FORMATETC pFormatetc, ref STGMEDIUM pMedium);
+    int QueryGetData(ref FORMATETC pFormatetc);
+    int GetCanonicalFormatEtc(ref FORMATETC pFormatetcIn, out FORMATETC pFormatetcOut);
+    int SetData(ref FORMATETC pFormatetc, ref STGMEDIUM pMedium, int fRelease);
+    void EnumFormatEtc(uint dwDirection, out IEnumFORMATETC ppenumFormatEtc);
+    int DAdvise(ref FORMATETC pFormatetc, uint advf, nint pAdvSink, out uint pdwConnection);
+    int DUnadvise(uint dwConnection);
+    int EnumDAdvise(out nint ppenumAdvise);
+}
+
+[ComImport, Guid("00000122-0000-0000-C000-000000000046"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+interface IDropSource
+{
+    int QueryContinueDrag(int fEscapePressed, int grfKeyState);
+    int GiveFeedback(int dwEffect);
+}
+
+[StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+struct FILEDESCRIPTORW
+{
+    public uint dwFlags;
+    public Guid clsid;
+    public NativeMethods.SIZE sizel;
+    public NativeMethods.POINT pointl;
+    public uint dwFileAttributes;
+    public long ftCreationTime;
+    public long ftLastAccessTime;
+    public long ftLastWriteTime;
+    public uint nFileSizeHigh;
+    public uint nFileSizeLow;
+    [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 260)] public string cFileName;
+}
+```
+
+### 关键技术点
+
+| 主题 | 说明 |
+|------|------|
+| GiveFeedback | `SetCursor(hCustomCursor); return S_FALSE;` — S_FALSE 表示 OLE 不干预光标，由源完全控制 |
+| QueryContinueDrag | Esc 按下 → `DRAGDROP_S_CANCEL`；左键松开 → `DRAGDROP_S_DROP`（标准键态检查，可复用现有 WH_KEYBOARD_LL Esc 检测思路） |
+| IDataObject 最小实现 | 只需实现 `EnumFormatEtc` / `GetData` / `QueryGetData`，其余返回 `E_NOTIMPL`；`EnumFormatEtc` 需提供 `IEnumFORMATETC` |
+| FileContents 延迟渲染 | `GetData(lindex=i)` 时用 `IStream` 提供第 i 个条目的解压流（`TYMED_ISTREAM`）；Explorer 在 drop 之后才请求内容 |
+| 多文件拖拽 | `FILEGROUPDESCRIPTORW` 一次性列出全部条目；`GetData` 的 `lindex` 区分具体文件 |
+| 文件名编码 | `FILEDESCRIPTORW.cFileName` 为 Unicode，天然支持中文文件名 |
+| 失败教训 | WPF 版自定义 `System.Windows.IDataObject` 因 WPF OLE 桥内部 bug 崩溃 Explorer（见 AGENTS.md「Custom IDataObject attempt (archived)」）；**Avalonia 无 WPF OLE 桥**，纯 Win32 COM 接口实现可绕开该 bug |
+| 光标句柄 | 自定义光标需 `CopyIcon` 持有副本（`LoadCursor` 返回共享句柄）；结束 `DestroyCursor` 清理 |
+| COM 生命周期 | CLR COM Interop 自动管理引用计数；实现类需在拖拽期间持有引用防 GC |
+
+### 风险与验收
+
+**风险**
+- COM 接口细节 bug（FORMATETC/STGMEDIUM 语义、流式 `IStream` 实现）
+- 大文件/多文件时 `FileContents` 流式解压的性能与取消响应
+- 加密压缩包在拖拽阶段（描述符阶段）不触发解压，实际内容在 drop 后请求，密码传递链路需保持
+
+**验收标准**
+- 拖到 Explorer 任意文件夹显示标准复制光标（非禁止）
+- drop 到文件夹后文件按需解压到目标路径（可暂存复用现有 `ExecuteAfterDropAsync` 逻辑）
+- 多文件、中文文件名、加密压缩包均正常
+- `dotnet build src/MantisZip.UI.Avalonia/MantisZip.UI.Avalonia.csproj` 通过
+
+### 备注
+
+- 方案 A（`SetSystemCursor`，已实施）作为过渡，不影响本方案的独立性
+- 实施时若 Avalonia 版本升级改变了 `OleDragSource.GiveFeedback` 行为（不再返回 `USEDEFAULTCURSORS`），可重新评估是否仍需自实现
