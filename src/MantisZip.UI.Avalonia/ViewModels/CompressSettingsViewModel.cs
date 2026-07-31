@@ -279,6 +279,17 @@ public partial class CompressSettingsViewModel : ObservableObject
     [ObservableProperty]
     private bool _showFilteredGhosts;
 
+    /// <summary>预览树是否正在后台构建（构建超过阈值后置 true，驱动加载覆层显示）。</summary>
+    [ObservableProperty]
+    private bool _isPreviewBuilding;
+
+    /// <summary>预览树构建进度（0–100，-1 表示不确定进度/不定进度条）。</summary>
+    [ObservableProperty]
+    private double _previewBuildProgress = -1;
+
+    /// <summary>预览树构建版本号，用于丢弃过期异步结果。</summary>
+    private int _previewBuildVersion;
+
     /// <summary>文件过滤条件（由 View 在对话框关闭时从 FileFilterEditor 获取并设置）。</summary>
     public FileFilterCriteria? FileFilter { get; set; }
 
@@ -442,13 +453,20 @@ public partial class CompressSettingsViewModel : ObservableObject
 
     /// <summary>
     /// 构建压缩预览树。由构造函数自动调用，也可在源文件变更或过滤条件变化后重新调用。
+    /// 原始树构建在后台线程执行，快速操作时通过版本号丢弃过期结果。
     /// </summary>
     /// <param name="filter">文件过滤条件，不为空且 IsActive 时对文件节点标记 IsFilteredOut。</param>
     public void BuildCompressPreview(FileFilterCriteria? filter = null)
+        => _ = BuildCompressPreviewCoreAsync(filter);
+
+    private async Task BuildCompressPreviewCoreAsync(FileFilterCriteria? filter)
     {
+        var version = ++_previewBuildVersion;
+
         if (SelectedPaths.Count == 0)
         {
             PreviewRoot = null;
+            IsPreviewBuilding = false;
             return;
         }
 
@@ -462,17 +480,53 @@ public partial class CompressSettingsViewModel : ObservableObject
                 DisplayLabel = LocalizationManager.T("Compress_OutputPathInvalid"),
                 IsExpanded = true
             };
+            IsPreviewBuilding = false;
             return;
         }
 
-        PreviewRoot = ResultPreviewService.BuildCompressPreview(
-            SelectedPaths.ToList(),
-            rootName: LocalizationManager.T("Compress_Title"),
-            filter: filter,
-            outputMode: OutputMode,
-            outputPath: OutputPath,
-            format: DefaultFormat,
-            keepOriginalExtension: KeepOriginalExtension);
+        try
+        {
+            // 快照输入（后台构建期间 SelectedPaths/OutputPath 等可能被用户修改）
+            var paths = SelectedPaths.ToList();
+            var outputMode = OutputMode;
+            var outputPath = OutputPath;
+            var format = DefaultFormat;
+            var keepOriginalExtension = KeepOriginalExtension;
+            var rootName = LocalizationManager.T("Compress_Title");
+
+            var buildTask = Task.Run(() => ResultPreviewService.BuildCompressPreview(
+                paths,
+                rootName: rootName,
+                filter: filter,
+                outputMode: outputMode,
+                outputPath: outputPath,
+                format: format,
+                keepOriginalExtension: keepOriginalExtension));
+
+            // 快速构建（<250ms）不显示加载态，避免输入时预览树闪烁；
+            // 慢构建显示不定进度加载覆层（压缩树无法预估条目总数）
+            var delayTask = Task.Delay(250);
+            if (await Task.WhenAny(buildTask, delayTask) == delayTask)
+            {
+                if (version != _previewBuildVersion) return; // 已有更新的构建
+                PreviewBuildProgress = -1;
+                IsPreviewBuilding = true;
+            }
+
+            var root = await buildTask;
+            if (version != _previewBuildVersion) return; // 过期结果丢弃
+
+            PreviewRoot = root;
+        }
+        catch (Exception ex)
+        {
+            App.DebugLog($"BuildCompressPreview failed: {ex.Message}");
+        }
+        finally
+        {
+            if (version == _previewBuildVersion)
+                IsPreviewBuilding = false;
+        }
     }
 
     partial void OnCompressionLevelChanged(int value)

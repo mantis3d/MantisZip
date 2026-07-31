@@ -52,6 +52,17 @@ public partial class ExtractSettingsViewModel : ObservableObject
     [ObservableProperty]
     private bool _showFilteredGhosts;
 
+    /// <summary>预览树是否正在后台构建（构建超过阈值后置 true，驱动加载覆层显示）。</summary>
+    [ObservableProperty]
+    private bool _isPreviewBuilding;
+
+    /// <summary>预览树构建进度（0–100，-1 表示不确定进度/不定进度条）。</summary>
+    [ObservableProperty]
+    private double _previewBuildProgress = -1;
+
+    /// <summary>预览树构建版本号，用于丢弃过期异步结果。</summary>
+    private int _previewBuildVersion;
+
     public ExtractSettingsViewModel(IReadOnlyList<string> archivePaths)
     {
         ArchivePaths = archivePaths;
@@ -94,20 +105,73 @@ public partial class ExtractSettingsViewModel : ObservableObject
 
     /// <summary>
     /// 构建解压预览树。由窗口在加载完成后调用。
+    /// 原始树构建在后台线程执行，快速操作时通过版本号丢弃过期结果。
     /// </summary>
     /// <param name="entries">压缩包内的条目列表。</param>
     /// <param name="filter">文件过滤条件，传递到服务层标记 IsFilteredOut。</param>
     /// <param name="checkExists">是否逐文件检查目标位置是否存在。</param>
     public void BuildExtractPreview(IEnumerable<ArchiveItem> entries, FileFilterCriteria? filter = null, bool checkExists = false)
-    {
-        if (string.IsNullOrWhiteSpace(DestinationPath)) return;
+        => _ = BuildExtractPreviewCoreAsync(entries, filter, checkExists);
 
-        PreviewRoot = ResultPreviewService.BuildExtractPreview(
-            entries,
-            DestinationPath,
-            rootName: Path.GetFileName(DestinationPath),
-            checkExists: checkExists,
-            filter: filter);
+    private async Task BuildExtractPreviewCoreAsync(IEnumerable<ArchiveItem> entries, FileFilterCriteria? filter, bool checkExists)
+    {
+        var version = ++_previewBuildVersion;
+        PreviewBuildProgress = -1;
+
+        if (string.IsNullOrWhiteSpace(DestinationPath))
+        {
+            PreviewRoot = null;
+            IsPreviewBuilding = false;
+            return;
+        }
+
+        // 快照输入（后台构建期间 DestinationPath 等可能被用户修改）
+        var snapshot = entries.ToList();
+        var destDir = DestinationPath;
+
+        // Progress<T> 捕获构造时的 SynchronizationContext（UI 线程），自动封送回 UI；
+        // 版本号守卫丢弃过期构建的进度回调
+        var progress = new Progress<double>(v =>
+        {
+            if (version == _previewBuildVersion)
+                PreviewBuildProgress = v;
+        });
+
+        try
+        {
+            var rootName = Path.GetFileName(destDir);
+
+            var buildTask = Task.Run(() => ResultPreviewService.BuildExtractPreview(
+                snapshot,
+                destDir,
+                rootName: rootName,
+                checkExists: checkExists,
+                filter: filter,
+                progress: progress));
+
+            // 快速构建（<250ms）不显示加载态，避免切换目标路径时预览树闪烁；
+            // 慢构建显示确定性进度条（服务按条目数上报 0–100）
+            var delayTask = Task.Delay(250);
+            if (await Task.WhenAny(buildTask, delayTask) == delayTask)
+            {
+                if (version != _previewBuildVersion) return; // 已有更新的构建
+                IsPreviewBuilding = true;
+            }
+
+            var root = await buildTask;
+            if (version != _previewBuildVersion) return; // 过期结果丢弃
+
+            PreviewRoot = root;
+        }
+        catch (Exception ex)
+        {
+            App.DebugLog($"BuildExtractPreview failed: {ex.Message}");
+        }
+        finally
+        {
+            if (version == _previewBuildVersion)
+                IsPreviewBuilding = false;
+        }
     }
 
     partial void OnDestinationPathChanged(string value)
