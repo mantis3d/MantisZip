@@ -63,6 +63,12 @@ public partial class CompressSettingsViewModel : ObservableObject
     /// <summary>文件名 / 扩展名区域仅在 Manual/Combined 模式下可见。</summary>
     public bool IsFileNameSectionVisible => OutputMode != CompressOutputMode.Separate;
 
+    /// <summary>内嵌 QuickPathControl 仅在 Manual 模式下可见（Separate/Combined 自动计算路径）。</summary>
+    public bool IsQuickPathVisible => OutputMode == CompressOutputMode.Manual;
+
+    /// <summary>输出文件扩展名标签（跟随格式）。</summary>
+    public string OutputExtensionLabel => GetFormatExtension();
+
     /// <summary>输出路径标签文字随模式变化。</summary>
     public string OutputPathLabel => OutputMode switch
     {
@@ -119,6 +125,17 @@ public partial class CompressSettingsViewModel : ObservableObject
 
     [ObservableProperty]
     private string? _outputPath;
+
+    /// <summary>输出路径的目录部分（内嵌 QuickPathControl 选择）。仅 Manual 模式使用。</summary>
+    [ObservableProperty]
+    private string? _outputDirectory;
+
+    /// <summary>输出文件名（不含扩展名，扩展名由格式决定）。仅 Manual 模式使用。</summary>
+    [ObservableProperty]
+    private string? _outputFileName;
+
+    /// <summary>防重入标记：OutputPath ↔ (OutputDirectory+OutputFileName) 双向同步。</summary>
+    private bool _isSyncingOutputPath;
 
     [ObservableProperty]
     private string? _password;
@@ -494,6 +511,7 @@ public partial class CompressSettingsViewModel : ObservableObject
         OnPropertyChanged(nameof(IsOutputPathReadOnly));
         OnPropertyChanged(nameof(IsBrowseButtonVisible));
         OnPropertyChanged(nameof(IsFileNameSectionVisible));
+        OnPropertyChanged(nameof(IsQuickPathVisible));
         OnPropertyChanged(nameof(OutputPathLabel));
         OnPropertyChanged(nameof(IsManualMode));
         OnPropertyChanged(nameof(IsSeparateMode));
@@ -512,6 +530,88 @@ public partial class CompressSettingsViewModel : ObservableObject
         if (AutoGenerateRules)
             RefreshAutoRules();
         BuildCompressPreview();
+
+        // 外部设置完整路径（如自动填充/Combined 合成）时，拆分为目录 + 文件名供 UI 展示
+        if (!_isSyncingOutputPath && OutputMode == CompressOutputMode.Manual)
+        {
+            SplitOutputPath(value);
+        }
+    }
+
+    /// <summary>QuickPathControl 选择目录 → 合成完整输出路径。</summary>
+    partial void OnOutputDirectoryChanged(string? value)
+    {
+        ComposeManualOutputPath();
+    }
+
+    /// <summary>文件名输入 → 合成完整输出路径。</summary>
+    partial void OnOutputFileNameChanged(string? value)
+    {
+        ComposeManualOutputPath();
+    }
+
+    /// <summary>格式切换 → 重新合成（扩展名变化）。</summary>
+    private void OnOutputFileNameOrFormatChanged()
+    {
+        if (OutputMode == CompressOutputMode.Manual)
+            ComposeManualOutputPath();
+    }
+
+    /// <summary>
+    /// 将完整输出路径拆分为目录 + 文件名（不含扩展名）。
+    /// </summary>
+    private void SplitOutputPath(string? fullPath)
+    {
+        if (string.IsNullOrWhiteSpace(fullPath)) return;
+
+        _isSyncingOutputPath = true;
+        try
+        {
+            // 去掉扩展名（含 .tar.gz 双段）
+            var dir = Path.GetDirectoryName(fullPath) ?? string.Empty;
+            var fileName = Path.GetFileName(fullPath);
+            foreach (var ext in new[] { ".tar.gz", ".7z", ".zip" })
+            {
+                if (fileName.EndsWith(ext, StringComparison.OrdinalIgnoreCase))
+                {
+                    fileName = fileName[..^ext.Length];
+                    break;
+                }
+            }
+            if (!string.IsNullOrEmpty(fileName))
+                OutputFileName = fileName;
+            if (!string.IsNullOrEmpty(dir))
+                OutputDirectory = dir;
+        }
+        finally
+        {
+            _isSyncingOutputPath = false;
+        }
+    }
+
+    /// <summary>
+    /// Manual 模式：由目录 + 文件名 + 格式扩展名合成完整输出路径。
+    /// </summary>
+    private void ComposeManualOutputPath()
+    {
+        if (_isSyncingOutputPath) return;
+        if (OutputMode != CompressOutputMode.Manual) return;
+
+        var dir = OutputDirectory;
+        var name = OutputFileName;
+        if (string.IsNullOrEmpty(dir) || string.IsNullOrEmpty(name))
+            return;
+
+        _isSyncingOutputPath = true;
+        try
+        {
+            var ext = GetFormatExtension();
+            OutputPath = Path.Combine(dir, name + ext);
+        }
+        finally
+        {
+            _isSyncingOutputPath = false;
+        }
     }
 
     partial void OnDefaultFormatChanged(string value)
@@ -523,8 +623,13 @@ public partial class CompressSettingsViewModel : ObservableObject
         if (value == "tar.gz")
             Encrypt = false;
 
+        // Manual 模式：格式切换 → 重新合成输出路径（扩展名变化）
+        if (OutputMode == CompressOutputMode.Manual)
+            ComposeManualOutputPath();
+
         OnPropertyChanged(nameof(IsZipFormat));
         OnPropertyChanged(nameof(IsSevenZipFormat));
+        OnPropertyChanged(nameof(OutputExtensionLabel));
         if (AutoGenerateRules)
             RefreshAutoRules();
         OnPropertyChanged(nameof(IsFormatEncryptionSupported));

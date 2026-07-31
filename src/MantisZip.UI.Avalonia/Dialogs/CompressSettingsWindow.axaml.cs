@@ -5,7 +5,9 @@ using Avalonia.Interactivity;
 using Avalonia.Media;
 using Avalonia.Platform.Storage;
 using Avalonia.Threading;
+using MantisZip.Core.Abstractions;
 using MantisZip.Core.FileFilter;
+using MantisZip.UI.Avalonia.Controls;
 using MantisZip.UI.Avalonia.Models;
 using MantisZip.UI.Avalonia.Services;
 using MantisZip.UI.Avalonia.ViewModels;
@@ -44,18 +46,14 @@ public partial class CompressSettingsWindow : Window
         // 设置文件保存浏览回调
         ViewModel.BrowseOutput = async () =>
         {
-            var file = await StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
+            // 格式联动：根据当前 DefaultFormat 计算默认扩展名（弹窗内 SaveFile 模式应用）
+            var defaultExt = ViewModel.DefaultFormat switch
             {
-                Title = "Save archive",
-                DefaultExtension = ".zip",
-                FileTypeChoices = new[]
-                {
-                    new FilePickerFileType("ZIP archives") { Patterns = new[] { "*.zip" } },
-                    new FilePickerFileType("7z archives") { Patterns = new[] { "*.7z" } },
-                    new FilePickerFileType("TAR.GZ archives") { Patterns = new[] { "*.tar.gz" } },
-                }
-            });
-            return file?.Path?.LocalPath;
+                "tar.gz" => ".tar.gz",
+                "7z" => ".7z",
+                _ => ".zip"
+            };
+            return await CustomFilePickerDialog.ShowSaveFileAsync(this, initialPath: ViewModel.OutputPath, defaultExtension: defaultExt);
         };
 
         // 设置文件/文件夹选择回调
@@ -71,12 +69,7 @@ public partial class CompressSettingsWindow : Window
 
         ViewModel.PickFolder = async () =>
         {
-            var folders = await StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions
-            {
-                Title = "Select folder to compress",
-                AllowMultiple = false
-            });
-            return folders.Count >= 1 ? folders[0].Path?.LocalPath : null;
+            return await CustomFilePickerDialog.ShowFolderAsync(this);
         };
 
         // 设置关闭回调
@@ -94,6 +87,20 @@ public partial class CompressSettingsWindow : Window
         DataContext = ViewModel;
         SubscribeViewModel();
         Loaded += OnLoaded;
+
+        // 配置 3 个单 Tab 面板（各弹出独立浮层；目录树按钮在压缩窗口不显示）
+        OutputFavControl.SingleTab = PathTab.Favorites;
+        OutputFavControl.ApplySingleTabMode();
+        OutputHistControl.SingleTab = PathTab.History;
+        OutputHistControl.ApplySingleTabMode();
+        OutputWinControl.SingleTab = PathTab.Windows;
+        OutputWinControl.ApplySingleTabMode();
+
+        // 手动 light dismiss：Popup 遮罩会拦截外部点击导致按钮收不到 Click，
+        // 改为监听主窗口 PointerPressed——点击窗口任意处先关闭全部浮层，按钮 Click 再打开对应浮层
+        AddHandler(global::Avalonia.Input.InputElement.PointerPressedEvent,
+            (_, _) => CloseOutputPopups(),
+            RoutingStrategies.Tunnel);
     }
 
     /// <summary>
@@ -123,6 +130,7 @@ public partial class CompressSettingsWindow : Window
         FormatOptionsPanel.LoadDefaults();
         LoadSplitSizeFromSettings();
         InitFileFilter();
+        SyncOutputPathControl();
     }
 
     private void OnTabSelectionChanged(object? sender, SelectionChangedEventArgs e)
@@ -257,6 +265,81 @@ public partial class CompressSettingsWindow : Window
     }
 
     /// <summary>
+    /// QuickPathControl 单击选中路径 → 写入 OutputDirectory 并关闭浮层。
+    /// （压缩窗口快捷面板无目录树，单击即确认。）
+    /// </summary>
+    private void OutputPathControl_PathSelected(object? sender, string path)
+    {
+        if (string.IsNullOrEmpty(path)) return;
+        if (ViewModel.OutputMode != CompressOutputMode.Manual) return;
+        ViewModel.OutputDirectory = path;
+        CloseOutputPopups();
+    }
+
+    /// <summary>关闭全部输出路径浮层。</summary>
+    private void CloseOutputPopups()
+    {
+        OutputFavPopup.IsOpen = false;
+        OutputHistPopup.IsOpen = false;
+        OutputWinPopup.IsOpen = false;
+    }
+
+    private void QuickFavButton_Click(object? sender, RoutedEventArgs e)
+        => OutputFavPopup.IsOpen = true;
+
+    private void QuickHistButton_Click(object? sender, RoutedEventArgs e)
+        => OutputHistPopup.IsOpen = true;
+
+    private void QuickWinButton_Click(object? sender, RoutedEventArgs e)
+        => OutputWinPopup.IsOpen = true;
+
+    /// <summary>
+    /// 浏览按钮：打开保存文件对话框（带格式联动），返回完整路径后拆分为目录 + 文件名。
+    /// </summary>
+    private async void QuickBrowseButton_Click(object? sender, RoutedEventArgs e)
+    {
+        if (ViewModel.OutputMode != CompressOutputMode.Manual) return;
+        var defaultExt = ViewModel.DefaultFormat switch
+        {
+            "tar.gz" => ".tar.gz",
+            "7z" => ".7z",
+            _ => ".zip"
+        };
+        var path = await CustomFilePickerDialog.ShowSaveFileAsync(
+            this, initialPath: ViewModel.OutputPath, defaultExtension: defaultExt);
+        if (string.IsNullOrEmpty(path)) return;
+
+        // 拆分完整路径 → 目录 + 文件名
+        var dir = System.IO.Path.GetDirectoryName(path);
+        var name = System.IO.Path.GetFileName(path);
+        foreach (var ext in new[] { ".tar.gz", ".7z", ".zip" })
+        {
+            if (name.EndsWith(ext, StringComparison.OrdinalIgnoreCase))
+            {
+                name = name[..^ext.Length];
+                break;
+            }
+        }
+        if (!string.IsNullOrEmpty(dir))
+            ViewModel.OutputDirectory = dir;
+        if (!string.IsNullOrEmpty(name))
+            ViewModel.OutputFileName = name;
+    }
+
+    /// <summary>OutputPath/OutputMode 变化时同步各 QuickPathControl 当前路径高亮。</summary>
+    private void SyncOutputPathControl()
+    {
+        var dir = ViewModel.OutputMode == CompressOutputMode.Manual
+            ? ViewModel.OutputDirectory
+            : null;
+        if (string.IsNullOrEmpty(dir)) return;
+        OutputFavControl.SetCurrentPath(dir);
+        OutputHistControl.SetCurrentPath(dir);
+        OutputWinControl.SetCurrentPath(dir);
+        // 目录树无需高亮（TreeView 有自己的选中态）
+    }
+
+    /// <summary>
     /// 批量移除选中的源文件。
     /// </summary>
     private void RemoveSelected_Click(object? sender, RoutedEventArgs e)
@@ -282,6 +365,10 @@ public partial class CompressSettingsWindow : Window
             case nameof(ViewModel.Encrypt):
                 // 切换加密时密码区域展开/折叠，等布局完成后再检查位置
                 Dispatcher.UIThread.Post(AdjustWindowPosition, DispatcherPriority.Background);
+                break;
+            case nameof(ViewModel.OutputDirectory):
+            case nameof(ViewModel.OutputMode):
+                SyncOutputPathControl();
                 break;
         }
     }

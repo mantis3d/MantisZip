@@ -1,254 +1,453 @@
 using System.Collections.ObjectModel;
 using Avalonia;
 using Avalonia.Controls;
-using Avalonia.Data;
+using Avalonia.Input;
 using Avalonia.Interactivity;
-using Avalonia.Platform.Storage;
+using Avalonia.Media.Imaging;
+using MantisZip.Core.Utils;
 using MantisZip.UI.Avalonia.Services;
 
 namespace MantisZip.UI.Avalonia.Controls;
 
 /// <summary>
-/// A reusable path selection control with:
-/// - AutoCompleteBox for path input with history suggestions
-/// - Browse button that opens system folder/file picker
-/// - Configurable mode: folder picker, file-open, or file-save
+/// 路径速选面板（左面板）：
+/// - Tab 行：⭐收藏 / 🕐历史 / 🪟窗口 三个来源切换
+/// - 搜索框：输入时跨三个来源聚合过滤
+/// - 列表：当前 Tab 的路径列表，选中即触发 <see cref="PathSelected"/> 事件
+/// 不含地址栏/文件浏览（归宿主 CustomFilePickerDialog 管理）。
 /// </summary>
 public partial class QuickPathControl : UserControl
 {
-    // ── Styled Properties ──────────────────────────────────────────────────
+    /// <summary>选中路径后触发（参数为路径字符串）。列表 Tab 单击、目录树单击均触发。</summary>
+    public event EventHandler<string>? PathSelected;
 
-    public static readonly StyledProperty<bool> IsFolderModeProperty =
-        AvaloniaProperty.Register<QuickPathControl, bool>(nameof(IsFolderMode), true);
+    /// <summary>双击确认路径后触发（目录树双击节点；列表双击由宿主自行处理）。</summary>
+    public event EventHandler<string>? PathConfirmed;
 
-    public static readonly StyledProperty<bool> IsFileOpenModeProperty =
-        AvaloniaProperty.Register<QuickPathControl, bool>(nameof(IsFileOpenMode), false);
+    /// <summary>当前激活的 Tab（宿主可据此区分单击导航 vs 双击确认）。</summary>
+    public PathTab CurrentTab => _currentTab;
 
-    public static readonly StyledProperty<string> FileTypeFilterProperty =
-        AvaloniaProperty.Register<QuickPathControl, string>(nameof(FileTypeFilter), string.Empty);
+    private PathTab _currentTab = PathTab.Favorites;
 
-    public static readonly StyledProperty<string> FileNameProperty =
-        AvaloniaProperty.Register<QuickPathControl, string>(nameof(FileName), string.Empty);
+    /// <summary>当前 Tab 展示的列表项。</summary>
+    private readonly ObservableCollection<QuickPathItem> _items = new();
 
-    public static readonly StyledProperty<string> DefaultFileNameProperty =
-        AvaloniaProperty.Register<QuickPathControl, string>(nameof(DefaultFileName), string.Empty);
+    /// <summary>目录树根节点（盘符列表）。</summary>
+    private readonly ObservableCollection<DirectoryTreeNode> _treeRoots = new();
 
-    public static readonly StyledProperty<string> PathTextProperty =
-        AvaloniaProperty.Register<QuickPathControl, string>(nameof(PathText), string.Empty,
-            defaultBindingMode: BindingMode.TwoWay);
-
-    // ── CLR Properties ─────────────────────────────────────────────────────
-
-    /// <summary>
-    /// When true, browse button opens a folder picker. When false, opens file picker.
-    /// </summary>
-    public bool IsFolderMode
-    {
-        get => GetValue(IsFolderModeProperty);
-        set => SetValue(IsFolderModeProperty, value);
-    }
-
-    /// <summary>
-    /// When IsFolderMode=false and IsFileOpenMode=true, browse opens a file-open dialog.
-    /// When IsFolderMode=false and IsFileOpenMode=false, browse opens a folder picker then
-    /// combines the selected folder with the FileName/DefaultFileName.
-    /// </summary>
-    public bool IsFileOpenMode
-    {
-        get => GetValue(IsFileOpenModeProperty);
-        set => SetValue(IsFileOpenModeProperty, value);
-    }
-
-    /// <summary>
-    /// File filter string for file dialogs (e.g. "ZIP files|*.zip|All files|*.*").
-    /// </summary>
-    public string FileTypeFilter
-    {
-        get => GetValue(FileTypeFilterProperty);
-        set => SetValue(FileTypeFilterProperty, value);
-    }
-
-    /// <summary>
-    /// Current filename (used in save mode).
-    /// </summary>
-    public string FileName
-    {
-        get => GetValue(FileNameProperty);
-        set => SetValue(FileNameProperty, value);
-    }
-
-    /// <summary>
-    /// Default filename when FileName is empty (used in save mode).
-    /// </summary>
-    public string DefaultFileName
-    {
-        get => GetValue(DefaultFileNameProperty);
-        set => SetValue(DefaultFileNameProperty, value);
-    }
-
-    /// <summary>
-    /// The current path text displayed in the AutoCompleteBox.
-    /// </summary>
-    public string PathText
-    {
-        get => GetValue(PathTextProperty);
-        set => SetValue(PathTextProperty, value);
-    }
-
-    // ── History ────────────────────────────────────────────────────────────
-
-    /// <summary>
-    /// Collection of recent paths shown as AutoCompleteBox suggestions.
-    /// </summary>
-    public ObservableCollection<string> RecentPaths { get; } = new();
-
-    // ── Flag to prevent re-entrant updates ─────────────────────────────────
-
-    private bool _isUpdatingText;
-
-    // ── Constructor ────────────────────────────────────────────────────────
+    /// <summary>搜索框非空时的聚合过滤结果缓存（用于快速重建）。</summary>
+    private List<QuickPathItem> _favorites = new();
+    private List<QuickPathItem> _history = new();
+    private List<QuickPathItem> _windows = new();
 
     public QuickPathControl()
     {
         InitializeComponent();
 
-        PathAutoComplete.ItemsSource = RecentPaths;
-        PathAutoComplete.PlaceholderText = LocalizationManager.T("QuickPath_Hint");
-        PathAutoComplete.TextChanged += OnPathTextChanged;
+        PathList.ItemsSource = _items;
+        SearchBox.PlaceholderText = LocalizationManager.T("QuickPath_SearchPlaceholder");
+        ToolTip.SetTip(FavoritesTab, LocalizationManager.T("QuickPath_TabFavorites"));
+        ToolTip.SetTip(HistoryTab, LocalizationManager.T("QuickPath_TabHistory"));
+        ToolTip.SetTip(WindowsTab, LocalizationManager.T("QuickPath_TabWindows"));
+        ToolTip.SetTip(TreeTab, LocalizationManager.T("QuickPath_TabTree"));
+
+        LoadTreeRoots();
+        DirTree.ItemsSource = _treeRoots;
+        // 惰性加载：展开节点时才枚举子目录
+        DirTree.AddHandler(TreeViewItem.ExpandedEvent, DirTree_Expanded);
+
+        LoadSources();
+        ShowCurrentTab();
     }
 
-    // ── Property Changed ───────────────────────────────────────────────────
+    // ── Public API ──────────────────────────────────────────────────────────
 
-    protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
+    /// <summary>
+    /// 单 Tab 模式：设置为非 null 时隐藏 Tab 行 + 搜索框，只显示指定来源。
+    /// 用于宿主弹出独立面板（每个按钮一个 Popup 场景）。
+    /// </summary>
+    public PathTab? SingleTab { get; set; }
+
+    /// <summary>
+    /// 设置当前浏览路径，用于在列表中高亮匹配项。
+    /// </summary>
+    public void SetCurrentPath(string path)
     {
-        base.OnPropertyChanged(change);
-
-        if (change.Property == PathTextProperty && !_isUpdatingText)
+        var norm = NormalizePath(path);
+        foreach (var item in _items)
         {
-            PathAutoComplete.Text = change.GetNewValue<string>() ?? string.Empty;
+            item.IsCurrent = string.Equals(item.Path, norm, StringComparison.OrdinalIgnoreCase);
         }
     }
 
-    // ── Handlers ───────────────────────────────────────────────────────────
-
-    private void OnPathTextChanged(object? sender, TextChangedEventArgs e)
+    /// <summary>强制刷新数据源（宿主在收藏/历史变化后可调用）。</summary>
+    public void RefreshSources()
     {
-        if (!_isUpdatingText)
-        {
-            _isUpdatingText = true;
-            PathText = PathAutoComplete.Text ?? string.Empty;
-            _isUpdatingText = false;
-        }
+        LoadSources();
+        ShowCurrentTab();
     }
 
-    private async void OnBrowseClick(object? sender, RoutedEventArgs e)
+    /// <summary>
+    /// 由宿主（如压缩窗口的快捷按钮行）调用，切换到指定 Tab。
+    /// </summary>
+    public void SelectTab(PathTab tab)
     {
-        var topLevel = TopLevel.GetTopLevel(this);
-        if (topLevel?.StorageProvider is not { } storage) return;
+        SetTab(tab);
+    }
 
+    /// <summary>启用单 Tab 模式（在 SingleTab 赋值后调用）。</summary>
+    public void ApplySingleTabMode()
+    {
+        if (SingleTab == null) return;
+        TabRow.IsVisible = false;
+        // 搜索框在 TabRow 内，随 TabRow 一起隐藏
+        SetTab(SingleTab.Value);
+    }
+
+    // ── Tab switching ───────────────────────────────────────────────────────
+
+    private void FavoritesTab_Click(object? sender, RoutedEventArgs e)
+    {
+        SetTab(PathTab.Favorites);
+    }
+
+    private void HistoryTab_Click(object? sender, RoutedEventArgs e)
+    {
+        SetTab(PathTab.History);
+    }
+
+    private void WindowsTab_Click(object? sender, RoutedEventArgs e)
+    {
+        SetTab(PathTab.Windows);
+    }
+
+    private void TreeTab_Click(object? sender, RoutedEventArgs e)
+    {
+        SetTab(PathTab.Tree);
+    }
+
+    private void SetTab(PathTab tab)
+    {
+        _currentTab = tab;
+        FavoritesTab.IsChecked = tab == PathTab.Favorites;
+        HistoryTab.IsChecked = tab == PathTab.History;
+        WindowsTab.IsChecked = tab == PathTab.Windows;
+        TreeTab.IsChecked = tab == PathTab.Tree;
+
+        // 每次切 Tab 时刷新窗口来源（窗口列表是动态的）
+        if (tab == PathTab.Windows)
+            LoadWindowsSource();
+
+        // 内容区可见性：目录树 Tab 显示 TreeView，其余显示 ListBox
+        PathList.IsVisible = tab != PathTab.Tree;
+        DirTree.IsVisible = tab == PathTab.Tree;
+        // 搜索框仅覆盖收藏/历史/窗口三来源，目录树 Tab 下隐藏
+        SearchBox.IsVisible = tab != PathTab.Tree;
+
+        ShowCurrentTab();
+    }
+
+    // ── Data loading ────────────────────────────────────────────────────────
+
+    private void LoadSources()
+    {
+        var folderIcon = IconService.GetFolderIcon();
+        _favorites = FavoritePathManager.GetAll().Select(f => new QuickPathItem
+        {
+            DisplayName = f.Name,
+            Path = f.Path,
+            Icon = folderIcon,
+            IconKey = "IconFolder",
+            SourceTag = "⭐",
+            ShowSourceTag = false
+        }).ToList();
+
+        _history = PathHistoryManager.GetRecent(50).Select(h => new QuickPathItem
+        {
+            DisplayName = GetDisplayName(h.Path),
+            Path = h.Path,
+            Icon = folderIcon,
+            IconKey = "IconHistory",
+            SourceTag = "🕐",
+            ShowSourceTag = false
+        }).ToList();
+
+        LoadWindowsSource();
+    }
+
+    private void LoadWindowsSource()
+    {
         try
         {
-            if (IsFolderMode)
+            var folderIcon = IconService.GetFolderIcon();
+            _windows = ExplorerWindowTracker.GetOpenExplorerWindows().Select(w => new QuickPathItem
             {
-                var folders = await storage.OpenFolderPickerAsync(new FolderPickerOpenOptions
-                {
-                    Title = LocalizationManager.T("QuickPath_SelectFolder"),
-                    AllowMultiple = false
-                });
+                DisplayName = !string.IsNullOrEmpty(w.DisplayName) ? w.DisplayName : GetDisplayName(w.Path),
+                Path = w.Path,
+                Icon = folderIcon,
+                IconKey = "IconHome",
+                SourceTag = "🪟",
+                ShowSourceTag = false,
+                IsActive = w.IsActive
+            }).ToList();
+        }
+        catch
+        {
+            _windows = new List<QuickPathItem>();
+        }
+    }
 
-                if (folders.Count >= 1)
-                {
-                    var path = folders[0].Path?.LocalPath ?? string.Empty;
-                    SetPath(path);
-                }
-            }
-            else if (IsFileOpenMode)
+    private void ShowCurrentTab()
+    {
+        // 目录树 Tab 不操作列表
+        if (_currentTab == PathTab.Tree)
+        {
+            EmptyText.IsVisible = false;
+            return;
+        }
+
+        _items.Clear();
+        List<QuickPathItem> source = _currentTab switch
+        {
+            PathTab.Favorites => _favorites,
+            PathTab.History => _history,
+            _ => _windows
+        };
+        foreach (var item in source)
+            _items.Add(item);
+
+        UpdateEmptyState();
+    }
+
+    // ── Directory tree (Tree tab) ───────────────────────────────────────────
+
+    /// <summary>
+    /// 加载目录树根节点：所有可读盘符（平铺，无「此电脑」虚拟根）。
+    /// 每个盘符预置占位子节点，使展开箭头可见。
+    /// </summary>
+    private void LoadTreeRoots()
+    {
+        try
+        {
+            var folderIcon = IconService.GetFolderIcon();
+            _treeRoots.Clear();
+            foreach (var drive in DriveInfo.GetDrives())
             {
-                var files = await storage.OpenFilePickerAsync(new FilePickerOpenOptions
+                if (!drive.IsReady) continue;
+                var root = drive.RootDirectory.FullName; // "C:\"
+                var node = new DirectoryTreeNode
                 {
-                    Title = LocalizationManager.T("QuickPath_SelectFile"),
-                    AllowMultiple = false,
-                    FileTypeFilter = ParseFileFilter(FileTypeFilter)
-                });
-
-                if (files.Count >= 1)
-                {
-                    var path = files[0].Path?.LocalPath ?? string.Empty;
-                    SetPath(path);
-                }
-            }
-            else
-            {
-                // Save mode: pick a directory then combine with file name
-                var folders = await storage.OpenFolderPickerAsync(new FolderPickerOpenOptions
-                {
-                    Title = LocalizationManager.T("QuickPath_SelectSaveFolder"),
-                    AllowMultiple = false
-                });
-
-                if (folders.Count >= 1)
-                {
-                    var folderPath = folders[0].Path?.LocalPath ?? string.Empty;
-                    var fileName = !string.IsNullOrEmpty(FileName) ? FileName : DefaultFileName;
-                    var fullPath = !string.IsNullOrEmpty(fileName)
-                        ? System.IO.Path.Combine(folderPath, fileName)
-                        : folderPath;
-                    SetPath(fullPath);
-                }
+                    Name = root.TrimEnd('\\', '/'),
+                    FullPath = root,
+                    Icon = folderIcon
+                };
+                // 预置占位子节点 → 显示展开箭头
+                node.Children.Add(new DirectoryTreeNode { IsPlaceholder = true });
+                _treeRoots.Add(node);
             }
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"[QuickPathControl] Browse error: {ex.Message}");
+            System.Diagnostics.Debug.WriteLine($"[QuickPathControl] LoadTreeRoots failed: {ex.Message}");
         }
     }
 
-    // ── Helpers ────────────────────────────────────────────────────────────
-
-    private void SetPath(string path)
-    {
-        if (string.IsNullOrEmpty(path)) return;
-
-        PathAutoComplete.Text = path;
-        // TextChanged handler will update PathText
-
-        AddToHistory(path);
-    }
-
     /// <summary>
-    /// Add a path to the recent history (deduplicated, max 20).
+    /// 节点展开时惰性加载其子目录（异步枚举，防 UI 卡顿；已加载过则跳过）。
+    /// 先清掉占位节点，再填充真实子目录（每个也预置占位让下一层箭头可见）。
     /// </summary>
-    public void AddToHistory(string path)
+    private async void DirTree_Expanded(object? sender, RoutedEventArgs e)
     {
-        if (string.IsNullOrEmpty(path)) return;
-        RecentPaths.Remove(path);
-        RecentPaths.Insert(0, path);
-        while (RecentPaths.Count > 20)
-            RecentPaths.RemoveAt(RecentPaths.Count - 1);
-    }
+        if (e.Source is not TreeViewItem item || item.DataContext is not DirectoryTreeNode node)
+            return;
+        if (node.IsLoaded) return;
+        node.IsLoaded = true;
 
-    /// <summary>
-    /// Parse a file filter string into Avalonia FilePickerFileType list.
-    /// Format: "Display name|*.ext1;*.ext2|Display name 2|*.ext3"
-    /// </summary>
-    private static List<FilePickerFileType>? ParseFileFilter(string filter)
-    {
-        if (string.IsNullOrWhiteSpace(filter)) return null;
-
-        var types = new List<FilePickerFileType>();
-        var parts = filter.Split('|');
-
-        for (int i = 0; i + 1 < parts.Length; i += 2)
+        // 移除占位节点
+        for (int i = node.Children.Count - 1; i >= 0; i--)
         {
-            var name = parts[i].Trim();
-            var pattern = parts[i + 1].Trim();
-            var patterns = pattern.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-            if (patterns.Length > 0)
+            if (node.Children[i].IsPlaceholder)
+                node.Children.RemoveAt(i);
+        }
+
+        try
+        {
+            var dirs = await Task.Run(() =>
+                Directory.EnumerateDirectories(node.FullPath)
+                    .OrderBy(d => d, StringComparer.OrdinalIgnoreCase)
+                    .ToList());
+
+            var folderIcon = IconService.GetFolderIcon();
+            foreach (var dir in dirs)
             {
-                types.Add(new FilePickerFileType(name) { Patterns = patterns });
+                var child = new DirectoryTreeNode
+                {
+                    Name = Path.GetFileName(dir),
+                    FullPath = dir,
+                    Icon = folderIcon
+                };
+                // 预置占位子节点 → 下一层展开箭头可见
+                child.Children.Add(new DirectoryTreeNode { IsPlaceholder = true });
+                node.Children.Add(child);
+            }
+        }
+        catch
+        {
+            // 无权限/不可访问目录：保持空（不弹错）
+        }
+    }
+
+    private void DirTree_SelectionChanged(object? sender, SelectionChangedEventArgs e)
+    {
+        if (DirTree.SelectedItem is not DirectoryTreeNode node) return;
+        if (string.IsNullOrEmpty(node.FullPath)) return;
+
+        PathHistoryManager.Record(node.FullPath);
+        PathSelected?.Invoke(this, node.FullPath);
+    }
+
+    /// <summary>目录树节点双击 → 确认选择该目录。</summary>
+    private void DirTree_DoubleTapped(object? sender, TappedEventArgs e)
+    {
+        if (DirTree.SelectedItem is not DirectoryTreeNode node) return;
+        if (string.IsNullOrEmpty(node.FullPath)) return;
+
+        PathHistoryManager.Record(node.FullPath);
+        PathConfirmed?.Invoke(this, node.FullPath);
+    }
+
+    // ── Search filtering ────────────────────────────────────────────────────
+
+    private void SearchBox_TextChanged(object? sender, TextChangedEventArgs e)
+    {
+        var query = SearchBox.Text?.Trim() ?? string.Empty;
+        if (string.IsNullOrEmpty(query))
+        {
+            ShowCurrentTab();
+            return;
+        }
+
+        // 跨三个来源聚合过滤
+        var filtered = new List<QuickPathItem>();
+        foreach (var item in _favorites.Concat(_history).Concat(_windows))
+        {
+            if (item.DisplayName.Contains(query, StringComparison.OrdinalIgnoreCase) ||
+                item.Path.Contains(query, StringComparison.OrdinalIgnoreCase))
+            {
+                // 搜索时显示来源标签
+                var clone = item.Clone();
+                clone.ShowSourceTag = true;
+                filtered.Add(clone);
             }
         }
 
-        return types.Count > 0 ? types : null;
+        _items.Clear();
+        foreach (var item in filtered)
+            _items.Add(item);
+
+        UpdateEmptyState();
     }
+
+    // ── Selection ───────────────────────────────────────────────────────────
+
+    private void PathList_SelectionChanged(object? sender, SelectionChangedEventArgs e)
+    {
+        if (PathList.SelectedItem is not QuickPathItem item) return;
+
+        var path = item.Path;
+        PathHistoryManager.Record(path);
+        PathSelected?.Invoke(this, path);
+    }
+
+    // ── Helpers ─────────────────────────────────────────────────────────────
+
+    private void UpdateEmptyState()
+    {
+        if (_items.Count == 0)
+        {
+            EmptyText.Text = _currentTab switch
+            {
+                PathTab.Favorites => LocalizationManager.T("QuickPath_EmptyFavorites"),
+                PathTab.History => LocalizationManager.T("QuickPath_EmptyHistory"),
+                _ => LocalizationManager.T("QuickPath_EmptyWindows")
+            };
+            EmptyText.IsVisible = true;
+        }
+        else
+        {
+            EmptyText.IsVisible = false;
+        }
+    }
+
+    private static string GetDisplayName(string path)
+    {
+        var name = System.IO.Path.GetFileName(path.TrimEnd('\\', '/'));
+        return string.IsNullOrEmpty(name) ? path : name;
+    }
+
+    private static string NormalizePath(string path)
+    {
+        if (string.IsNullOrEmpty(path)) return path;
+        while (path.Length > 3 && (path[^1] == '\\' || path[^1] == '/'))
+            path = path[..^1];
+        return path;
+    }
+}
+
+/// <summary>路径列表项（来源标签 + 图标 + 路径）。</summary>
+public class QuickPathItem
+{
+    public string DisplayName { get; set; } = string.Empty;
+    public string Path { get; set; } = string.Empty;
+    /// <summary>真实文件系统图标（文件夹图标等）。null 时回退 <see cref="IconKey"/> 矢量图标。</summary>
+    public Bitmap? Icon { get; set; }
+    /// <summary>Icon 为 null 时用于 PathIcon 的矢量资源键（IconFolder / IconHistory / IconHome 等）。</summary>
+    public string? IconKey { get; set; }
+    /// <summary>Icon 是否为 null（决定显示 Image 还是 PathIcon）。</summary>
+    public bool IsNullIcon => Icon == null;
+    public string SourceTag { get; set; } = string.Empty;
+    public bool ShowSourceTag { get; set; }
+    public bool IsActive { get; set; }
+    public bool IsCurrent { get; set; }
+
+    public QuickPathItem Clone() => new()
+    {
+        DisplayName = DisplayName,
+        Path = Path,
+        Icon = Icon,
+        IconKey = IconKey,
+        SourceTag = SourceTag,
+        ShowSourceTag = ShowSourceTag,
+        IsActive = IsActive,
+        IsCurrent = IsCurrent
+    };
+}
+
+/// <summary>路径速选来源 Tab。</summary>
+public enum PathTab
+{
+    Favorites,
+    History,
+    Windows,
+    Tree
+}
+
+/// <summary>目录树节点（惰性加载子目录）。</summary>
+public class DirectoryTreeNode
+{
+    public string Name { get; set; } = string.Empty;
+    public string FullPath { get; set; } = string.Empty;
+    public Bitmap? Icon { get; set; }
+
+    /// <summary>子目录（展开时异步填充）。</summary>
+    public ObservableCollection<DirectoryTreeNode> Children { get; } = new();
+
+    /// <summary>该层是否已枚举过（防止展开重复加载）。</summary>
+    public bool IsLoaded { get; set; }
+
+    /// <summary>
+    /// 是否为占位节点：Avalonia TreeView 只有节点含子节点时才显示展开箭头，
+    /// 因此每个未加载目录预置一个占位子节点让箭头出现；展开时被替换为真实子目录。
+    /// </summary>
+    public bool IsPlaceholder { get; set; }
 }

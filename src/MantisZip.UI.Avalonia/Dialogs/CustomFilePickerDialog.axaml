@@ -1,0 +1,263 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:controls="clr-namespace:MantisZip.UI.Avalonia.Controls"
+        xmlns:dialogs="clr-namespace:MantisZip.UI.Avalonia.Dialogs"
+        x:Class="MantisZip.UI.Avalonia.Dialogs.CustomFilePickerDialog"
+        x:CompileBindings="False"
+        Width="800"
+        Height="620"
+        MinWidth="700"
+        MinHeight="420"
+        WindowStartupLocation="CenterOwner"
+        CanResize="True"
+        Background="{DynamicResource ThemeWindowBgBrush}">
+
+  <Grid x:Name="RootGrid"
+        RowDefinitions="Auto,*,Auto,Auto,Auto"
+        Margin="{DynamicResource SpacingMdThk}">
+
+    <!-- ═══════ Row 0: Address bar + navigation ═══════ -->
+    <Grid Grid.Row="0"
+          ColumnDefinitions="Auto,Auto,Auto,Auto,*"
+          ColumnSpacing="{DynamicResource SpacingXxs}"
+          Margin="0,0,0,8">
+      <Button x:Name="BackButton"
+              Width="32"
+              MinHeight="{DynamicResource ControlHeightSm}"
+              Click="Back_Click"
+              ToolTip.Tip="{Binding BackText}"
+              Background="{DynamicResource ThemeButtonBgBrush}"
+              Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+              BorderBrush="{DynamicResource ThemeBorderBrush}">
+        <PathIcon Data="{StaticResource IconChevronLeft}"
+                  Width="14"
+                  Height="14"
+                  Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+      </Button>
+      <Button Grid.Column="1"
+              x:Name="ForwardButton"
+              Width="32"
+              MinHeight="{DynamicResource ControlHeightSm}"
+              Click="Forward_Click"
+              ToolTip.Tip="{Binding ForwardText}"
+              Background="{DynamicResource ThemeButtonBgBrush}"
+              Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+              BorderBrush="{DynamicResource ThemeBorderBrush}">
+        <PathIcon Data="{StaticResource IconChevronRight}"
+                  Width="14"
+                  Height="14"
+                  Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+      </Button>
+      <Button Grid.Column="2"
+              x:Name="UpButton"
+              Width="32"
+              MinHeight="{DynamicResource ControlHeightSm}"
+              Click="Up_Click"
+              ToolTip.Tip="{Binding UpText}"
+              Background="{DynamicResource ThemeButtonBgBrush}"
+              Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+              BorderBrush="{DynamicResource ThemeBorderBrush}">
+        <PathIcon Data="{StaticResource IconArrowUp}"
+                  Width="14"
+                  Height="14"
+                  Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+      </Button>
+      <Button Grid.Column="3"
+              x:Name="SystemBrowseButton"
+              Width="32"
+              MinHeight="{DynamicResource ControlHeightSm}"
+              Click="SystemBrowse_Click"
+              Background="{DynamicResource ThemeButtonBgBrush}"
+              Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+              BorderBrush="{DynamicResource ThemeBorderBrush}">
+        <PathIcon Data="{StaticResource IconFolder}"
+                  Width="14"
+                  Height="14"
+                  Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+      </Button>
+      <AutoCompleteBox Grid.Column="4"
+                       x:Name="PathAutoComplete"
+                       MinHeight="{DynamicResource ControlHeightSm}"
+                       FilterMode="Contains"
+                       MinimumPrefixLength="0"
+                       KeyDown="PathAutoComplete_KeyDown"
+                       Background="{DynamicResource ThemeSurfaceBgBrush}"
+                       Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                       BorderBrush="{DynamicResource ThemeBorderBrush}" />
+    </Grid>
+
+    <!-- ═══════ Row 1: QuickPath (left) + file browser (right) ═══════ -->
+    <Grid Grid.Row="1"
+          ColumnDefinitions="220,5,*"
+          ColumnSpacing="0">
+      <Border BorderBrush="{DynamicResource ThemeBorderBrush}"
+              BorderThickness="1"
+              CornerRadius="4"
+              Padding="6"
+              Background="{DynamicResource ThemeSurfaceBgBrush}">
+        <controls:QuickPathControl x:Name="QuickPath"
+                                   PathSelected="QuickPath_PathSelected" />
+      </Border>
+
+      <GridSplitter Grid.Column="1"
+                    Width="5"
+                    Background="{DynamicResource ThemeSplitterBgBrush}"
+                    ResizeBehavior="PreviousAndNext"
+                    ResizeDirection="Auto" />
+
+      <Border Grid.Column="2"
+              BorderBrush="{DynamicResource ThemeBorderBrush}"
+              BorderThickness="1"
+              CornerRadius="4"
+              Background="{DynamicResource ThemeSurfaceBgBrush}">
+        <Grid RowDefinitions="Auto,*">
+          <!-- Current path header -->
+          <TextBlock x:Name="CurrentPathText"
+                     Grid.Row="0"
+                     Margin="8,6"
+                     FontSize="11"
+                     Foreground="{DynamicResource ThemeTextSecondaryBrush}"
+                     TextTrimming="CharacterEllipsis" />
+          <!-- File/dir list -->
+          <ListBox x:Name="FileList"
+                   Grid.Row="1"
+                   Background="Transparent"
+                   BorderThickness="0"
+                   SelectionChanged="FileList_SelectionChanged"
+                   DoubleTapped="FileList_DoubleTapped"
+                   KeyDown="FileList_KeyDown">
+            <ListBox.ItemContainerTheme>
+              <ControlTheme TargetType="ListBoxItem">
+                <Setter Property="MinHeight" Value="{DynamicResource ControlHeightMd}" />
+                <Setter Property="Padding" Value="{DynamicResource SpacingXxsThk}" />
+                <!-- 选中/悬停高亮 -->
+                <Style Selector="^:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+                  <Setter Property="Background" Value="{DynamicResource ThemeTabHoverBrush}" />
+                </Style>
+                <Style Selector="^:selected /template/ ContentPresenter#PART_ContentPresenter">
+                  <Setter Property="Background" Value="{DynamicResource ThemeListSelectedBrush}" />
+                </Style>
+                <Style Selector="^:selected:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+                  <Setter Property="Background" Value="{DynamicResource ThemeListSelectedBrush}" />
+                </Style>
+              </ControlTheme>
+            </ListBox.ItemContainerTheme>
+            <ListBox.ItemTemplate>
+              <DataTemplate>
+                <Grid ColumnDefinitions="20,*,80,110">
+                  <Image Source="{Binding Icon}"
+                         Width="16"
+                         Height="16"
+                         VerticalAlignment="Center" />
+                  <StackPanel Grid.Column="1" Orientation="Vertical" Spacing="0">
+                    <TextBlock Text="{Binding DisplayName}"
+                               Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                               TextTrimming="CharacterEllipsis" />
+                    <TextBlock Text="{Binding SubText}"
+                               FontSize="10"
+                               Foreground="{DynamicResource ThemeTextSecondaryBrush}"
+                               TextTrimming="CharacterEllipsis"
+                               IsVisible="{Binding ShowSubText}" />
+                  </StackPanel>
+                  <TextBlock Grid.Column="2"
+                             Text="{Binding SizeText}"
+                             FontSize="11"
+                             HorizontalAlignment="Right"
+                             Margin="0,0,8,0"
+                             Foreground="{DynamicResource ThemeTextSecondaryBrush}"
+                             VerticalAlignment="Center" />
+                  <TextBlock Grid.Column="3"
+                             Text="{Binding ModifiedText}"
+                             FontSize="11"
+                             HorizontalAlignment="Right"
+                             Margin="0,0,4,0"
+                             Foreground="{DynamicResource ThemeTextSecondaryBrush}"
+                             VerticalAlignment="Center" />
+                </Grid>
+              </DataTemplate>
+            </ListBox.ItemTemplate>
+          </ListBox>
+        </Grid>
+      </Border>
+    </Grid>
+
+    <!-- ═══════ Row 2: Extract preview area (ExtractFolder mode only) ═══════ -->
+    <Grid x:Name="PreviewArea"
+          Grid.Row="2"
+          RowDefinitions="Auto,*"
+          Margin="0,8,0,0">
+      <GridSplitter x:Name="PreviewSplitter"
+                    Grid.Row="0"
+                    Height="5"
+                    HorizontalAlignment="Stretch"
+                    Background="{DynamicResource ThemeSplitterBgBrush}"
+                    ResizeBehavior="PreviousAndNext"
+                    ResizeDirection="Auto" />
+      <Border Grid.Row="1"
+              BorderBrush="{DynamicResource ThemeBorderBrush}"
+              BorderThickness="1"
+              CornerRadius="4"
+              Padding="6"
+              Background="{DynamicResource ThemeSurfaceBgBrush}">
+        <controls:ResultTreeView x:Name="PreviewTree"
+                                 CompactMode="True"
+                                 MaxItemsPerDirectory="8"
+                                 MaxDepth="4"
+                                 ShowFilteredGhosts="False" />
+      </Border>
+    </Grid>
+
+    <!-- ═══════ Row 3: File name + File type (SaveFile/OpenFile modes) ═══════ -->
+    <Grid x:Name="FileNameArea"
+          Grid.Row="3"
+          ColumnDefinitions="60,*,60,110"
+          ColumnSpacing="{DynamicResource SpacingXs}"
+          Margin="0,12,0,0">
+      <TextBlock Text="{Binding FileNameLabel}"
+                 VerticalAlignment="Center"
+                 Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+      <TextBox Grid.Column="1"
+               x:Name="FileNameBox"
+               MinHeight="{DynamicResource ControlHeightSm}"
+               TextChanged="FileNameBox_TextChanged"
+               Background="{DynamicResource ThemeSurfaceBgBrush}"
+               Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+               BorderBrush="{DynamicResource ThemeBorderBrush}" />
+      <TextBlock Grid.Column="2"
+                 Text="{Binding FileTypeLabel}"
+                 VerticalAlignment="Center"
+                 Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+      <ComboBox Grid.Column="3"
+                x:Name="FileTypeSelector"
+                MinHeight="{DynamicResource ControlHeightSm}"
+                SelectionChanged="FileTypeSelector_SelectionChanged"
+                Background="{DynamicResource ThemeSurfaceBgBrush}"
+                Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                BorderBrush="{DynamicResource ThemeBorderBrush}" />
+    </Grid>
+
+    <!-- ═══════ Row 4: OK/Cancel ═══════ -->
+    <StackPanel Grid.Row="4"
+                Orientation="Horizontal"
+                HorizontalAlignment="Right"
+                Spacing="{DynamicResource SpacingXs}"
+                Margin="0,12,0,0">
+      <Button x:Name="OkButton"
+              Content="{Binding OkText}"
+              MinWidth="96"
+              MinHeight="{DynamicResource ControlHeightMd}"
+              Click="Ok_Click"
+              Background="{DynamicResource ThemeAccentBrush}"
+              Foreground="{DynamicResource ThemeTextOnAccentBrush}"
+              BorderThickness="0" />
+      <Button x:Name="CancelButton"
+              Content="{Binding CancelText}"
+              MinWidth="96"
+              MinHeight="{DynamicResource ControlHeightMd}"
+              Click="Cancel_Click"
+              Background="{DynamicResource ThemeButtonBgBrush}"
+              Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+              BorderBrush="{DynamicResource ThemeBorderBrush}" />
+    </StackPanel>
+  </Grid>
+</Window>
