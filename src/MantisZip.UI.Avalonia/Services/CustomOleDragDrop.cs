@@ -141,26 +141,26 @@ internal interface IOleEnumFormatEtc
 
 /// <summary>
 /// 自定义 IDropSource：GiveFeedback 返回 S_OK 并自设光标（系统不再用默认光标覆盖），
-/// QueryContinueDrag 处理 Esc 与鼠标按钮释放（与 Avalonia OleDragSource 行为一致）。
+/// QueryContinueDrag 处理 Esc / 右键取消 / 鼠标按钮释放（与 Avalonia OleDragSource 行为一致）。
 /// 光标由调用方提供的 <see cref="Func{nint}"/> 在每次 GiveFeedback 时按当前状态动态获取，
 /// 从而支持"状态 → 不同图标"（对应 overlay 的不同颜色）。
 /// </summary>
 internal sealed class CustomDropSource : IOleDropSource
 {
     private readonly Func<nint> _cursorProvider;
-    private readonly Action? _onEscPressed;
+    private readonly Action? _onCancelled;
 
-    public CustomDropSource(Func<nint> cursorProvider, Action? onEscPressed = null)
+    public CustomDropSource(Func<nint> cursorProvider, Action? onCancelled = null)
     {
         _cursorProvider = cursorProvider;
-        _onEscPressed = onEscPressed;
+        _onCancelled = onCancelled;
     }
 
     public int QueryContinueDrag(int fEscapePressed, int grfKeyState)
     {
         if (fEscapePressed != 0)
         {
-            _onEscPressed?.Invoke();
+            _onCancelled?.Invoke();
             return OleDragConstants.DRAGDROP_S_CANCEL;
         }
 
@@ -170,7 +170,12 @@ internal sealed class CustomDropSource : IOleDropSource
         if ((grfKeyState & OleDragConstants.MK_RBUTTON) != 0) pressed++;
         if ((grfKeyState & OleDragConstants.MK_MBUTTON) != 0) pressed++;
         if (pressed >= 2)
+        {
+            // 左键拖拽中按下右键/中键 = 标准 OLE 取消手势 → 同样触发取消回调，
+            // 与 Esc 分支一致，否则 MainWindow 会误以为拖拽成功而继续解压。
+            _onCancelled?.Invoke();
             return OleDragConstants.DRAGDROP_S_CANCEL;
+        }
         if (pressed == 0)
             return OleDragConstants.DRAGDROP_S_DROP;
         return OleDragConstants.S_OK;
@@ -348,14 +353,14 @@ internal static class CustomOleDragDrop
     /// <param name="formatName">自定义剪贴板格式名</param>
     /// <param name="value">格式载荷（压缩包路径，UTF-16）</param>
     /// <param name="cursorProvider">拖拽期间按当前状态返回光标句柄的函数（由调用方加载/销毁）。每次 GiveFeedback 调用一次</param>
-    /// <param name="onEscPressed">用户按 Esc 时回调（QueryContinueDrag 同步触发，早于返回）</param>
+    /// <param name="onCancelled">拖拽被取消（按 Esc 或左键拖拽中按下右键/中键）时回调（QueryContinueDrag 同步触发，早于返回）</param>
     public static DragDropEffects PerformDragDrop(
         PointerPressedEventArgs triggerEvent,
         string formatName,
         string value,
         Func<nint> cursorProvider,
         DragDropEffects allowedEffects,
-        Action? onEscPressed)
+        Action? onCancelled)
     {
         triggerEvent.Pointer.Capture(null);
 
@@ -364,7 +369,7 @@ internal static class CustomOleDragDrop
             return DragDropEffects.None;
 
         var dataObj = new CustomDataObject(cf, value);
-        var dropSource = new CustomDropSource(cursorProvider, onEscPressed);
+        var dropSource = new CustomDropSource(cursorProvider, onCancelled);
 
         var objPtr = Marshal.GetComInterfaceForObject(dataObj, typeof(IOleDataObject));
         var srcPtr = Marshal.GetComInterfaceForObject(dropSource, typeof(IOleDropSource));

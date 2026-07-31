@@ -5,6 +5,7 @@ using Avalonia.Input.Platform;
 using Avalonia.Interactivity;
 using Avalonia.Platform.Storage;
 using Avalonia.Threading;
+using Avalonia.VisualTree;
 using MantisZip.Core.Abstractions;
 using MantisZip.Core.Utils;
 using MantisZip.UI.Avalonia.Dialogs;
@@ -33,8 +34,8 @@ public partial class MainWindow : Window
     /// <summary>拖拽时写入数据对象的自定义格式名（使 IDataObject 非空，避免 Explorer 显示禁止光标）</summary>
     private const string MantisZipDragFormatName = "MantisZipDragFormat";
 
-    /// <summary>拖拽期间是否按下了 Esc（由自实现 IDropSource.QueryContinueDrag 同步置位）</summary>
-    private bool _dragEscPressed;
+    /// <summary>拖拽期间是否被取消（Esc 或右键取消手势，由自实现 IDropSource.QueryContinueDrag 同步置位）</summary>
+    private bool _dragCancelled;
 
     public MainWindow()
     {
@@ -326,8 +327,15 @@ public partial class MainWindow : Window
                 _dragStartPoint = e.GetPosition(fileGrid);
                 _dragStartEvent = e;
 
+                // 命中测试：按下行是否已属于当前选区（镜像 WPF InputHitTest 语义）。
+                // Tunnel 阶段先于 DataGrid 行自身的选中处理，此时 SelectedItems 仍是旧选区；
+                // 若按下的是未选中行，则不保留旧多选区 —— 拖拽只拖新按下的行。
+                var pressedItem = HitTestPressedRowItem(fileGrid, _dragStartPoint);
+                var pressedInSelection = pressedItem != null
+                    && fileGrid.SelectedItems.Contains(pressedItem);
+
                 // Save multi-selection state at press time (before drag starts)
-                if (fileGrid.SelectedItems.Count > 1)
+                if (fileGrid.SelectedItems.Count > 1 && pressedInSelection)
                 {
                     _dragPreservedSelection = fileGrid.SelectedItems
                         .OfType<ArchiveItemModel>()
@@ -353,8 +361,19 @@ public partial class MainWindow : Window
 
                 var pos = e.GetPosition(fileGrid);
                 var delta = pos - _dragStartPoint;
-                if (Math.Abs(delta.X) < 32 && Math.Abs(delta.Y) < 32)
+                // 拖拽启动阈值：镜像 WPF SystemParameters.MinimumHorizontalDragDistance (~4px)，
+                // 避免 32px 造成的"拖起来黏手"感
+                if (Math.Abs(delta.X) < 4 && Math.Abs(delta.Y) < 4)
                     return;
+
+                // 设置开关：EnableDragExtract = false 时不启动拖拽（与 WPF MainWindow.DragDrop.cs 行为一致）
+                if (!AppSettings.Load().EnableDragExtract)
+                {
+                    App.DebugLog("[MainWindow] EnableDragExtract off — drag skipped");
+                    _dragStartEvent = null;
+                    _dragPreservedSelection = null;
+                    return;
+                }
 
                 // Save trigger event before nulling (Avalonia DragDrop.DoDragDropAsync needs it)
                 var triggerEvent = _dragStartEvent;
@@ -468,11 +487,11 @@ public partial class MainWindow : Window
                     // LoadCursor(OCR_NO) 显示禁止光标，而替换 OCR_NO 资源表在本机无效（已实证），
                     // 因此绕开它自行控制光标。Esc 由 QueryContinueDrag 的 fEscapePressed 处理。
                     App.DebugLog("[MainWindow] Custom OLE DoDragDrop START");
-                    _dragEscPressed = false;
+                    _dragCancelled = false;
                     var result = CustomOleDragDrop.PerformDragDrop(
                         triggerEvent, MantisZipDragFormatName, archivePath,
                         cursorProvider, DragDropEffects.Copy,
-                        () => _dragEscPressed = true);
+                        () => _dragCancelled = true);
                     App.DebugLog($"[MainWindow] Custom OLE DoDragDrop DONE: result={result}");
 
                     // Close overlay IMMEDIATELY after drag completes, before dialog processing
@@ -480,10 +499,10 @@ public partial class MainWindow : Window
                     overlayWin.Close();
                     App.DebugLog("[MainWindow] Overlay closed");
 
-                    if (_dragEscPressed)
+                    if (_dragCancelled)
                     {
-                        // 用户按 Esc 取消拖拽 → 不执行解压
-                        App.DebugLog("[MainWindow] Esc pressed during drag — extraction cancelled");
+                        // 用户按 Esc 或右键取消拖拽 → 不执行解压
+                        App.DebugLog("[MainWindow] Drag cancelled during drag — extraction skipped");
                         if (vm2 != null)
                             vm2.StatusMessage = "拖拽已取消";
                     }
@@ -531,9 +550,23 @@ public partial class MainWindow : Window
         Closing += (_, _) => WindowStateManager.Save(this);
     }
 
-    private void FileListGrid_DoubleTapped(object? sender, TappedEventArgs e)
+    /// <summary>
+    /// 命中测试：返回按下位置所在行的数据项（ArchiveItemModel）；未命中任何行时返回 null。
+    /// 镜像 WPF MainWindow.DragDrop.cs 的 InputHitTest 语义：判断按下的行是否已在当前选区中。
+    /// </summary>
+    private static ArchiveItemModel? HitTestPressedRowItem(DataGrid grid, Point position)
     {
-        if (sender is not DataGrid grid) return;
+        var hit = grid.InputHitTest(position);
+        for (var v = hit as Visual; v != null; v = v.GetVisualParent())
+        {
+            if (v is DataGridRow row && row.DataContext is ArchiveItemModel model)
+                return model;
+        }
+        return null;
+    }
+
+    private void FileListGrid_DoubleTapped(object? sender, TappedEventArgs e)
+    {        if (sender is not DataGrid grid) return;
         if (grid.SelectedItem is ArchiveItemModel item && item.IsDirectory)
         {
             if (DataContext is MainWindowViewModel vm)

@@ -21,6 +21,17 @@
 
 ### MantisZip.UI.Avalonia（主力版）
 
+**2026-07-31** — 拖拽链路系统审查修复（8 问题全清：高危 3 + 中危 3 + 低危 2）
+  - **高危#1 EnableDragExtract 开关失效**：Avalonia 拖拽块从未检查该设置（WPF 参考 `MainWindow.DragDrop.cs` 有检查），现于 PointerMoved 越过阈值后检查 `AppSettings.Load().EnableDragExtract`，关闭时不启动拖拽
+  - **高危#2 多选拖拽拖错行**：PointerPressed 新增 `HitTestPressedRowItem`（`InputHitTest` + visual tree 找 `DataGridRow` 取 `DataContext`），仅当按下行已在当前选区时才保留旧多选区；按下未选中行时只拖新按下的行（镜像 WPF `InputHitTest` 语义）
+  - **高危#3 右键取消拖拽仍解压**：`CustomDropSource.QueryContinueDrag` 的 `pressed >= 2`（左键拖拽中按下右键/中键 = 标准 OLE 取消手势）分支现在也触发取消回调；回调命名 `onEscPressed`→`onCancelled`（Esc + 右键取消统一语义）
+  - **中危#5 自家窗口误判**：`DragDropService.IsOverOwnWindow` 弃用类名启发式（`Avalonia-` 前缀会误认其他 Avalonia 应用），改用 HWND 比较（`WindowFromPoint` → `GetAncestor(GA_ROOT)` → 与 `_ownerWindow` 句柄比较，同 OverlayController）
+  - **中危#6 Sanitize 弱化**：`DragDropItemExpander` 删除本地弱 `SanitizeRelativePath`，复用 Core `FileConflictHelper.SanitizeEntryPath`（剔 `..`/`.`、剔非法字符、空结果抛异常）
+  - **中危#7 拖拽阈值**：32px → 4px（镜像 WPF `MinimumHorizontalDragDistance`，消除"黏手"感）
+  - **低危#8a GetUniquePath 重复**：删除 DragDropService 本地 99 次尝试版本，复用 Core `PathHelper.GetUniquePath`（支持 `.tar.gz` 双扩展名、1000 次尝试）
+  - **低危#8b 盘根标题空**：目标为盘根（如 `C:\`）时 `folderName` 回退用完整路径
+  - 构建 0 errors
+
 **2026-07-31** — C 方案第一阶段落地（路线 2：自实现 OLE 拖拽）+ 拖拽光标按状态切换 + 光标文件入库
   - **C 方案第一阶段（路线 2）实施**：`CustomOleDragDrop.cs` 新建，自实现 `IOleDataObject`/`IOleDropSource`/`IOleEnumFormatEtc` + `CustomDataObject`（HGLOBAL UTF-16 延迟渲染）/`CustomDropSource`/`CustomEnumFormatEtc`；`GiveFeedback` 返回 S_OK + 直接 `SetCursor`，根治 Avalonia `OleDragSource` 固定返回 `USEDEFAULTCURSORS` 导致的禁止光标；Esc 检测改用 OLE `fEscapePressed`，`WH_KEYBOARD_LL` 钩子整体退役（用户验证：拖拽光标成功）
   - **拖拽光标按 overlay 状态切换（绿/红/金/灰 四状态）**：`OverlayController` 新增线程安全只读属性 `CurrentStatus` / `IsOverOwnWindow`（`_stateLock` 保护）；`CustomDropSource` 改收 `Func<nint>` 光标提供器，`GiveFeedback` 每次回调按当前状态动态取光标（与覆层颜色同一状态源）

@@ -1,4 +1,5 @@
 using MantisZip.Core.Abstractions;
+using MantisZip.Core.Utils;
 
 namespace MantisZip.UI.Avalonia.Services;
 
@@ -73,16 +74,9 @@ internal static class DragDropItemExpander
             }
         }
 
-        var safePath = SanitizeRelativePath(relative);
+        // 复用 Core 的 SanitizeEntryPath：剔除 ".."/"." 路径穿越组件与非法文件名字符，
+        // 净化后为空时抛异常（比本地弱版本更严格，与 WPF 参考行为一致）
+        var safePath = FileConflictHelper.SanitizeEntryPath(relative);
         return Path.GetFullPath(Path.Combine(targetDirectory, safePath));
-    }
-
-    private static string SanitizeRelativePath(string relativePath)
-    {
-        var parts = relativePath.Replace('\\', '/')
-            .Split('/', StringSplitOptions.RemoveEmptyEntries)
-            .Where(p => p != "..")
-            .ToArray();
-        return string.Join(Path.DirectorySeparatorChar.ToString(), parts);
     }
 }

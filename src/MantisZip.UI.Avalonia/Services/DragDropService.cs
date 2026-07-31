@@ -95,7 +95,10 @@ internal class DragDropService
         var selectedDirs = selectedItems.Where(i => i.IsDirectory).ToList();
 
         // 6. Show ProgressWindow (non-modal)
+        // 盘根目录（如 C:\）的 GetFileName 为空 → 回退用完整路径
         var folderName = Path.GetFileName(targetDir);
+        if (string.IsNullOrEmpty(folderName))
+            folderName = targetDir;
         var pw = new ProgressWindow($"正在解压到 {folderName}...");
         pw.InitCancellation();
         pw.Show();
@@ -131,7 +134,7 @@ internal class DragDropService
                                 Interlocked.Increment(ref processedFiles);
                                 continue;
                             case "rename":
-                                outputPath = GetUniquePath(outputPath);
+                                outputPath = PathHelper.GetUniquePath(outputPath);
                                 break;
                             case "overwrite":
                                 File.Delete(outputPath);
@@ -278,41 +281,22 @@ internal class DragDropService
     }
 
     /// <summary>
-    /// Generate a unique file path by appending " (1)", " (2)" etc. before the extension.
-    /// Returns the original path if no unique variant is found (up to 99 attempts).
-    /// </summary>
-    private static string GetUniquePath(string path)
-    {
-        if (!File.Exists(path))
-            return path;
-
-        var dir = Path.GetDirectoryName(path) ?? ".";
-        var nameWithoutExt = Path.GetFileNameWithoutExtension(path);
-        var ext = Path.GetExtension(path);
-
-        for (int i = 1; i <= 99; i++)
-        {
-            var candidate = Path.Combine(dir, $"{nameWithoutExt} ({i}){ext}");
-            if (!File.Exists(candidate))
-                return candidate;
-        }
-
-        return path; // fallback: all 99 variants exist
-    }
-
-    /// <summary>
     /// Check if the cursor is currently over our own application window.
+    /// Uses HWND comparison against the owner window (mirrors OverlayController) —
+    /// the class-name heuristic misidentifies other Avalonia apps since all
+    /// Avalonia windows share the "Avalonia-" prefix.
     /// </summary>
-    private static bool IsOverOwnWindow()
+    private bool IsOverOwnWindow()
     {
         if (!NativeMethods.GetCursorPos(out var pt))
             return false;
         var hWnd = NativeMethods.WindowFromPoint(pt);
         if (hWnd == nint.Zero)
             return false;
-        var sb = new System.Text.StringBuilder(256);
-        NativeMethods.GetClassName(hWnd, sb, sb.Capacity);
-        var cls = sb.ToString();
-        return cls.StartsWith("Avalonia-", StringComparison.Ordinal) || cls == "TMainBox";
+        var rootTarget = NativeMethods.GetAncestor(hWnd, 2); // GA_ROOT = 2
+        if (rootTarget == nint.Zero)
+            rootTarget = hWnd;
+        var mainHwnd = _ownerWindow.TryGetPlatformHandle()?.Handle ?? nint.Zero;
+        return mainHwnd != nint.Zero && rootTarget == mainHwnd;
     }
 }
