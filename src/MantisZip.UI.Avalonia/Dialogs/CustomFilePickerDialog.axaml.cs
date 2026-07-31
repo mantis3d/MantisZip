@@ -213,12 +213,31 @@ public partial class CustomFilePickerDialog : Window
         }
     }
 
+    private bool _isSyncingFileName;
+
     private void FileNameBox_TextChanged(object? sender, TextChangedEventArgs e)
     {
+        // 程序内同步文件名框（选中文件）时不触发清除选中
+        if (_isSyncingFileName) return;
+
         // 用户在文件名框输入时清除选中（避免选中文件覆盖输入）
         if (FileList.SelectedItem is FileBrowserItem { IsDirectory: false })
         {
             FileList.SelectedItem = null;
+        }
+    }
+
+    /// <summary>同步文件名框内容（不触发清除选中逻辑）。</summary>
+    private void SyncFileNameBox(string fileName)
+    {
+        _isSyncingFileName = true;
+        try
+        {
+            FileNameBox.Text = fileName;
+        }
+        finally
+        {
+            _isSyncingFileName = false;
         }
     }
 
@@ -620,6 +639,11 @@ public partial class CustomFilePickerDialog : Window
             // 选择目录：预览/高亮，但不自动进入（等待双击或 Enter）
             QuickPath.SetCurrentPath(item.FullPath);
         }
+        else if (_mode is PickerMode.SaveFile or PickerMode.OpenFile)
+        {
+            // 选中文件 → 文件名框自动同步
+            SyncFileNameBox(item.DisplayName);
+        }
     }
 
     private void FileList_DoubleTapped(object? sender, TappedEventArgs e)
@@ -632,7 +656,7 @@ public partial class CustomFilePickerDialog : Window
         else if (_mode == PickerMode.SaveFile)
         {
             // 保存模式：双击文件 → 填入文件名框（可再改格式）
-            FileNameBox.Text = item.DisplayName;
+            SyncFileNameBox(item.DisplayName);
         }
         else
         {
@@ -649,7 +673,7 @@ public partial class CustomFilePickerDialog : Window
                 if (item.IsDirectory)
                     NavigateTo(item.FullPath);
                 else if (_mode == PickerMode.SaveFile)
-                    FileNameBox.Text = item.DisplayName; // 保存模式 Enter 文件 → 填入文件名
+                    SyncFileNameBox(item.DisplayName); // 保存模式 Enter 文件 → 填入文件名
                 else
                     TryConfirmFile(item.FullPath);
                 e.Handled = true;
@@ -694,6 +718,26 @@ public partial class CustomFilePickerDialog : Window
         Close(true);
     }
 
+    /// <summary>
+    /// 解析文件名框输入的文件路径。
+    /// 支持绝对路径或相对当前目录的文件名；文件不存在时返回 null。
+    /// </summary>
+    private string? ResolveTypedFilePath(string? input)
+    {
+        if (string.IsNullOrWhiteSpace(input)) return null;
+        var text = input.Trim();
+
+        // 绝对路径
+        if (Path.IsPathRooted(text))
+        {
+            return File.Exists(text) ? text : null;
+        }
+
+        // 相对当前目录
+        var combined = Path.Combine(_currentDir, text);
+        return File.Exists(combined) ? combined : null;
+    }
+
     private void Ok_Click(object? sender, RoutedEventArgs e)
     {
         var selected = FileList.SelectedItem as FileBrowserItem;
@@ -715,6 +759,17 @@ public partial class CustomFilePickerDialog : Window
                 break;
 
             case PickerMode.OpenFile:
+                // 优先文件名框输入：完整路径或相对当前目录的文件名
+                var typedPath = ResolveTypedFilePath(FileNameBox.Text);
+                if (typedPath != null)
+                {
+                    SelectedPath = typedPath;
+                    SelectedFileName = Path.GetFileName(typedPath);
+                    Close(true);
+                    break;
+                }
+
+                // 回退：浏览区选中文件
                 if (selected is { IsDirectory: false })
                 {
                     SelectedPath = selected.FullPath;
