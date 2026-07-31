@@ -144,27 +144,60 @@
                              IsChecked="{Binding IsCombinedMode}"
                              Content="{Binding LocalizedStrings[Compress_OutputMode_Combined]}" />
 
-                <!-- Output path: embedded QuickPathControl (Manual mode) -->
+                <!-- Output path: text box + dropdown QuickPathControl popup (Manual mode) -->
                 <Grid Margin="0,6,0,0"
                       IsVisible="{Binding IsQuickPathVisible}">
                   <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="80" />
                     <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
                   </Grid.ColumnDefinitions>
                   <TextBlock Grid.Column="0"
                              Text="{Binding LocalizedStrings[Compress_OutputPath]}"
                              VerticalAlignment="Center"
                              Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
-                  <Border Grid.Column="1"
+                  <TextBox Grid.Column="1"
+                           Text="{Binding OutputDirectory}"
+                           PlaceholderText="{Binding LocalizedStrings[Compress_OutputPlaceholder]}"
+                           MinHeight="{DynamicResource ControlHeightSm}"
+                           IsReadOnly="{Binding IsOutputPathReadOnly}"
+                           Background="{DynamicResource ThemeSurfaceBgBrush}"
+                           Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                           BorderBrush="{DynamicResource ThemeBorderBrush}" />
+                  <ToggleButton Grid.Column="2"
+                                x:Name="OutputPathToggle"
+                                Width="32"
+                                MinHeight="{DynamicResource ControlHeightSm}"
+                                Margin="6,0,0,0"
+                                Background="{DynamicResource ThemeButtonBgBrush}"
+                                Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                                BorderBrush="{DynamicResource ThemeBorderBrush}">
+                    <PathIcon Data="{StaticResource IconFolder}"
+                              Width="14"
+                              Height="14"
+                              Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+                  </ToggleButton>
+                </Grid>
+
+                <!-- Dropdown popup: QuickPathControl panel -->
+                <Popup x:Name="OutputPathPopup"
+                       PlacementTarget="{Binding #OutputPathToggle}"
+                       Placement="Bottom"
+                       IsLightDismissEnabled="True"
+                       IsOpen="{Binding #OutputPathToggle.IsChecked, Mode=TwoWay}">
+                  <Border Background="{DynamicResource ThemeWindowBgBrush}"
                           BorderBrush="{DynamicResource ThemeBorderBrush}"
                           BorderThickness="1"
                           CornerRadius="4"
-                          Padding="4"
-                          Background="{DynamicResource ThemeSurfaceBgBrush}">
+                          Padding="6"
+                          Width="320"
+                          MaxHeight="420"
+                          BoxShadow="0 2 8 0 #40000000">
                     <controls:QuickPathControl x:Name="OutputPathControl"
+                                               Width="308"
                                                PathSelected="OutputPathControl_PathSelected" />
                   </Border>
-                </Grid>
+                </Popup>
 
                 <!-- File name + extension label -->
                 <Grid Margin="0,6,0,0"

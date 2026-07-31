@@ -250,13 +250,17 @@ public partial class CompressSettingsWindow : Window
     }
 
     /// <summary>
-    /// QuickPathControl 选中路径 → 写入 ViewModel.OutputDirectory（Manual 模式）。
+    /// QuickPathControl 选中路径 → 写入 ViewModel.OutputDirectory（Manual 模式），关闭下拉浮层。
     /// </summary>
     private void OutputPathControl_PathSelected(object? sender, string path)
     {
         if (string.IsNullOrEmpty(path)) return;
         if (ViewModel.OutputMode != CompressOutputMode.Manual) return;
         ViewModel.OutputDirectory = path;
+
+        // 收起下拉浮层
+        OutputPathToggle.IsChecked = false;
+        OutputPathPopup.IsOpen = false;
     }
 
     /// <summary>OutputPath/OutputMode 变化时同步 QuickPathControl 当前路径高亮。</summary>
