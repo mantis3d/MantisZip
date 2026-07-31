@@ -806,6 +806,9 @@
   "Picker_AddressPlaceholder": "输入路径，或从速选列表选择...",
   "Picker_WarningSelectFile": "请选择一个文件",
   "Picker_WarningEnterName": "请输入文件名",
+  "Picker_Back": "后退",
+  "Picker_Forward": "前进",
+  "Picker_Up": "上级目录",
 
   "FileFilter_Enable": "启用过滤",
   "FileFilter_Presets": "过滤预设",

@@ -808,6 +808,9 @@
   "Picker_AddressPlaceholder": "Type a path, or pick from quick list...",
   "Picker_WarningSelectFile": "Please select a file",
   "Picker_WarningEnterName": "Please enter a file name",
+  "Picker_Back": "Back",
+  "Picker_Forward": "Forward",
+  "Picker_Up": "Up",
 
   "FileFilter_Enable": "Enable filter",
   "FileFilter_Presets": "Filter Presets",

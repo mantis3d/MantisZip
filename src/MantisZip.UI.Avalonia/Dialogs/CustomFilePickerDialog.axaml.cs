@@ -71,6 +71,9 @@ public partial class CustomFilePickerDialog : Window
     /// <summary>根节点元素（XAML 中通过名称引用窗口自身）。</summary>
     public string OkText => LocalizationManager.T("Common_OK");
     public string CancelText => LocalizationManager.T("Common_Cancel");
+    public string BackText => LocalizationManager.T("Picker_Back");
+    public string ForwardText => LocalizationManager.T("Picker_Forward");
+    public string UpText => LocalizationManager.T("Picker_Up");
 
     // ── Static entry points ────────────────────────────────────────────────
 
