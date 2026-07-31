@@ -12,7 +12,7 @@
 
     <!-- Row 0: Tab row + search box -->
     <Grid Grid.Row="0"
-          ColumnDefinitions="Auto,Auto,Auto,*"
+          ColumnDefinitions="Auto,Auto,Auto,Auto,*"
           ColumnSpacing="{DynamicResource SpacingXxs}">
       <ToggleButton x:Name="FavoritesTab"
                     IsChecked="True"
@@ -53,7 +53,20 @@
                   Height="14"
                   Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
       </ToggleButton>
-      <TextBox Grid.Column="3"
+      <ToggleButton Grid.Column="3"
+                    x:Name="TreeTab"
+                    MinHeight="{DynamicResource ControlHeightSm}"
+                    Padding="{DynamicResource SpacingXsThk}"
+                    Click="TreeTab_Click"
+                    Background="{DynamicResource ThemeButtonBgBrush}"
+                    Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                    BorderBrush="{DynamicResource ThemeBorderBrush}">
+        <PathIcon Data="{StaticResource IconFolder}"
+                  Width="14"
+                  Height="14"
+                  Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+      </ToggleButton>
+      <TextBox Grid.Column="4"
                x:Name="SearchBox"
                MinHeight="{DynamicResource ControlHeightSm}"
                TextChanged="SearchBox_TextChanged"
@@ -134,6 +147,42 @@
                  VerticalAlignment="Center"
                  Foreground="{DynamicResource ThemeTextSecondaryBrush}"
                  IsVisible="False" />
+
+      <!-- Directory tree (Tree tab only) -->
+      <TreeView x:Name="DirTree"
+                Background="Transparent"
+                BorderThickness="0"
+                IsVisible="False"
+                SelectionChanged="DirTree_SelectionChanged">
+        <TreeView.Styles>
+          <Style Selector="TreeViewItem">
+            <Setter Property="MinHeight" Value="{DynamicResource ControlHeightSm}" />
+            <Setter Property="Padding" Value="{DynamicResource SpacingXxsThk}" />
+          </Style>
+          <Style Selector="TreeViewItem:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource ThemeTabHoverBrush}" />
+          </Style>
+          <Style Selector="TreeViewItem:selected /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource ThemeListSelectedBrush}" />
+          </Style>
+        </TreeView.Styles>
+        <TreeView.ItemTemplate>
+          <TreeDataTemplate x:DataType="controls:DirectoryTreeNode"
+                            ItemsSource="{Binding Children}">
+            <Grid ColumnDefinitions="18,*">
+              <Image Source="{Binding Icon}"
+                     Width="16"
+                     Height="16"
+                     VerticalAlignment="Center" />
+              <TextBlock Grid.Column="1"
+                         Text="{Binding Name}"
+                         VerticalAlignment="Center"
+                         Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                         TextTrimming="CharacterEllipsis" />
+            </Grid>
+          </TreeDataTemplate>
+        </TreeView.ItemTemplate>
+      </TreeView>
     </Grid>
   </Grid>
 </UserControl>

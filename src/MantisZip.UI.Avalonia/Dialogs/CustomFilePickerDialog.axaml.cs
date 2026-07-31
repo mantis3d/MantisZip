@@ -163,7 +163,6 @@ public partial class CustomFilePickerDialog : Window
         // 通过过滤实现：见 LoadDirectory
 
         // 初始目录
-        InitDriveSelector();
         var startDir = ResolveInitialPath(initialPath);
         NavigateTo(startDir);
 
@@ -285,75 +284,7 @@ public partial class CustomFilePickerDialog : Window
 
     // ── Drive selector ─────────────────────────────────────────────────────
 
-    private bool _isSyncingDrive;
-
-    /// <summary>
-    /// 填充盘符下拉列表（C:\ / D:\ 等），并选中当前目录所在盘。
-    /// </summary>
-    private void InitDriveSelector()
-    {
-        try
-        {
-            var drives = DriveInfo.GetDrives()
-                .Where(d => d.IsReady)
-                .Select(d => d.Name.TrimEnd('\\', '/') + "\\") // "C:\"
-                .ToList();
-
-            DriveSelector.ItemsSource = drives;
-            if (drives.Count > 0)
-                DriveSelector.SelectedIndex = 0;
-        }
-        catch (Exception ex)
-        {
-            System.Diagnostics.Debug.WriteLine($"[CustomFilePickerDialog] InitDriveSelector failed: {ex.Message}");
-        }
-    }
-
-    private void DriveSelector_SelectionChanged(object? sender, SelectionChangedEventArgs e)
-    {
-        if (_isSyncingDrive) return;
-        if (DriveSelector.SelectedItem is not string drive) return;
-        if (string.IsNullOrEmpty(drive)) return;
-
-        // 确保盘符带根路径分隔符
-        var root = drive.EndsWith('\\') ? drive : drive + "\\";
-        if (Directory.Exists(root))
-        {
-            NavigateTo(root);
-        }
-    }
-
-    /// <summary>同步盘符下拉选中到当前目录所在盘（NavigateTo 内部调用）。</summary>
-    private void SyncDriveSelector(string dir)
-    {
-        try
-        {
-            var root = Path.GetPathRoot(dir);
-            if (string.IsNullOrEmpty(root)) return;
-
-            _isSyncingDrive = true;
-            try
-            {
-                foreach (var item in DriveSelector.ItemsSource ?? Array.Empty<string>())
-                {
-                    if (item is string drive &&
-                        string.Equals(drive.TrimEnd('\\', '/') + "\\", root, StringComparison.OrdinalIgnoreCase))
-                    {
-                        DriveSelector.SelectedItem = drive;
-                        break;
-                    }
-                }
-            }
-            finally
-            {
-                _isSyncingDrive = false;
-            }
-        }
-        catch (Exception ex)
-        {
-            System.Diagnostics.Debug.WriteLine($"[CustomFilePickerDialog] SyncDriveSelector failed: {ex.Message}");
-        }
-    }
+    // （盘符下拉已移除——目录树 Tab（QuickPathControl）取代盘符选择入口）
 
     // ── Path resolution ────────────────────────────────────────────────────
 
@@ -448,7 +379,6 @@ public partial class CustomFilePickerDialog : Window
         PathAutoComplete.Text = dir;
         PathHistoryManager.Record(dir);
 
-        SyncDriveSelector(dir);
         LoadDirectory(dir);
         QuickPath.SetCurrentPath(dir);
     }
@@ -463,7 +393,6 @@ public partial class CustomFilePickerDialog : Window
         _currentDir = dir;
         CurrentPathText.Text = dir;
         PathAutoComplete.Text = dir;
-        SyncDriveSelector(dir);
         LoadDirectory(dir);
         QuickPath.SetCurrentPath(dir);
     }
@@ -478,7 +407,6 @@ public partial class CustomFilePickerDialog : Window
         _currentDir = dir;
         CurrentPathText.Text = dir;
         PathAutoComplete.Text = dir;
-        SyncDriveSelector(dir);
         LoadDirectory(dir);
         QuickPath.SetCurrentPath(dir);
     }

@@ -20,12 +20,15 @@ public partial class QuickPathControl : UserControl
     /// <summary>选中路径后触发（参数为路径字符串）。</summary>
     public event EventHandler<string>? PathSelected;
 
-    private enum PathTab { Favorites, History, Windows }
+    private enum PathTab { Favorites, History, Windows, Tree }
 
     private PathTab _currentTab = PathTab.Favorites;
 
     /// <summary>当前 Tab 展示的列表项。</summary>
     private readonly ObservableCollection<QuickPathItem> _items = new();
+
+    /// <summary>目录树根节点（盘符列表）。</summary>
+    private readonly ObservableCollection<DirectoryTreeNode> _treeRoots = new();
 
     /// <summary>搜索框非空时的聚合过滤结果缓存（用于快速重建）。</summary>
     private List<QuickPathItem> _favorites = new();
@@ -41,6 +44,12 @@ public partial class QuickPathControl : UserControl
         ToolTip.SetTip(FavoritesTab, LocalizationManager.T("QuickPath_TabFavorites"));
         ToolTip.SetTip(HistoryTab, LocalizationManager.T("QuickPath_TabHistory"));
         ToolTip.SetTip(WindowsTab, LocalizationManager.T("QuickPath_TabWindows"));
+        ToolTip.SetTip(TreeTab, LocalizationManager.T("QuickPath_TabTree"));
+
+        LoadTreeRoots();
+        DirTree.ItemsSource = _treeRoots;
+        // 惰性加载：展开节点时才枚举子目录
+        DirTree.AddHandler(TreeViewItem.ExpandedEvent, DirTree_Expanded);
 
         LoadSources();
         ShowCurrentTab();
@@ -84,16 +93,28 @@ public partial class QuickPathControl : UserControl
         SetTab(PathTab.Windows);
     }
 
+    private void TreeTab_Click(object? sender, RoutedEventArgs e)
+    {
+        SetTab(PathTab.Tree);
+    }
+
     private void SetTab(PathTab tab)
     {
         _currentTab = tab;
         FavoritesTab.IsChecked = tab == PathTab.Favorites;
         HistoryTab.IsChecked = tab == PathTab.History;
         WindowsTab.IsChecked = tab == PathTab.Windows;
+        TreeTab.IsChecked = tab == PathTab.Tree;
 
         // 每次切 Tab 时刷新窗口来源（窗口列表是动态的）
         if (tab == PathTab.Windows)
             LoadWindowsSource();
+
+        // 内容区可见性：目录树 Tab 显示 TreeView，其余显示 ListBox
+        PathList.IsVisible = tab != PathTab.Tree;
+        DirTree.IsVisible = tab == PathTab.Tree;
+        // 搜索框仅覆盖收藏/历史/窗口三来源，目录树 Tab 下隐藏
+        SearchBox.IsVisible = tab != PathTab.Tree;
 
         ShowCurrentTab();
     }
@@ -150,6 +171,13 @@ public partial class QuickPathControl : UserControl
 
     private void ShowCurrentTab()
     {
+        // 目录树 Tab 不操作列表
+        if (_currentTab == PathTab.Tree)
+        {
+            EmptyText.IsVisible = false;
+            return;
+        }
+
         _items.Clear();
         List<QuickPathItem> source = _currentTab switch
         {
@@ -161,6 +189,78 @@ public partial class QuickPathControl : UserControl
             _items.Add(item);
 
         UpdateEmptyState();
+    }
+
+    // ── Directory tree (Tree tab) ───────────────────────────────────────────
+
+    /// <summary>
+    /// 加载目录树根节点：所有可读盘符（平铺，无「此电脑」虚拟根）。
+    /// </summary>
+    private void LoadTreeRoots()
+    {
+        try
+        {
+            var folderIcon = IconService.GetFolderIcon();
+            _treeRoots.Clear();
+            foreach (var drive in DriveInfo.GetDrives())
+            {
+                if (!drive.IsReady) continue;
+                var root = drive.RootDirectory.FullName; // "C:\"
+                _treeRoots.Add(new DirectoryTreeNode
+                {
+                    Name = root.TrimEnd('\\', '/'),
+                    FullPath = root,
+                    Icon = folderIcon
+                });
+            }
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[QuickPathControl] LoadTreeRoots failed: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// 节点展开时惰性加载其子目录（异步枚举，防 UI 卡顿；已加载过则跳过）。
+    /// </summary>
+    private async void DirTree_Expanded(object? sender, RoutedEventArgs e)
+    {
+        if (e.Source is not TreeViewItem item || item.DataContext is not DirectoryTreeNode node)
+            return;
+        if (node.IsLoaded) return;
+        node.IsLoaded = true;
+
+        try
+        {
+            var dirs = await Task.Run(() =>
+                Directory.EnumerateDirectories(node.FullPath)
+                    .OrderBy(d => d, StringComparer.OrdinalIgnoreCase)
+                    .ToList());
+
+            var folderIcon = IconService.GetFolderIcon();
+            foreach (var dir in dirs)
+            {
+                node.Children.Add(new DirectoryTreeNode
+                {
+                    Name = Path.GetFileName(dir),
+                    FullPath = dir,
+                    Icon = folderIcon
+                });
+            }
+        }
+        catch
+        {
+            // 无权限/不可访问目录：保持空（不弹错）
+        }
+    }
+
+    private void DirTree_SelectionChanged(object? sender, SelectionChangedEventArgs e)
+    {
+        if (DirTree.SelectedItem is not DirectoryTreeNode node) return;
+        if (string.IsNullOrEmpty(node.FullPath)) return;
+
+        PathHistoryManager.Record(node.FullPath);
+        PathSelected?.Invoke(this, node.FullPath);
     }
 
     // ── Search filtering ────────────────────────────────────────────────────
@@ -268,4 +368,18 @@ public class QuickPathItem
         IsActive = IsActive,
         IsCurrent = IsCurrent
     };
+}
+
+/// <summary>目录树节点（惰性加载子目录）。</summary>
+public class DirectoryTreeNode
+{
+    public string Name { get; set; } = string.Empty;
+    public string FullPath { get; set; } = string.Empty;
+    public Bitmap? Icon { get; set; }
+
+    /// <summary>子目录（展开时异步填充）。</summary>
+    public ObservableCollection<DirectoryTreeNode> Children { get; } = new();
+
+    /// <summary>该层是否已枚举过（防止展开重复加载）。</summary>
+    public bool IsLoaded { get; set; }
 }

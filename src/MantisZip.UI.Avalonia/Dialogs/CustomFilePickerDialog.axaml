@@ -16,20 +16,12 @@
         RowDefinitions="Auto,*,Auto,Auto,Auto"
         Margin="{DynamicResource SpacingMdThk}">
 
-    <!-- ═══════ Row 0: Drive selector + address bar + navigation ═══════ -->
+    <!-- ═══════ Row 0: Address bar + navigation ═══════ -->
     <Grid Grid.Row="0"
-          ColumnDefinitions="Auto,Auto,Auto,Auto,Auto,*"
+          ColumnDefinitions="Auto,Auto,Auto,Auto,*"
           ColumnSpacing="{DynamicResource SpacingXxs}"
           Margin="0,0,0,8">
-      <ComboBox x:Name="DriveSelector"
-                MinWidth="64"
-                MinHeight="{DynamicResource ControlHeightSm}"
-                SelectionChanged="DriveSelector_SelectionChanged"
-                Background="{DynamicResource ThemeSurfaceBgBrush}"
-                Foreground="{DynamicResource ThemeTextPrimaryBrush}"
-                BorderBrush="{DynamicResource ThemeBorderBrush}" />
-      <Button Grid.Column="1"
-              x:Name="BackButton"
+      <Button x:Name="BackButton"
               Width="32"
               MinHeight="{DynamicResource ControlHeightSm}"
               Click="Back_Click"
@@ -42,7 +34,7 @@
                   Height="14"
                   Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
       </Button>
-      <Button Grid.Column="2"
+      <Button Grid.Column="1"
               x:Name="ForwardButton"
               Width="32"
               MinHeight="{DynamicResource ControlHeightSm}"
@@ -56,7 +48,7 @@
                   Height="14"
                   Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
       </Button>
-      <Button Grid.Column="3"
+      <Button Grid.Column="2"
               x:Name="UpButton"
               Width="32"
               MinHeight="{DynamicResource ControlHeightSm}"
@@ -70,7 +62,7 @@
                   Height="14"
                   Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
       </Button>
-      <Button Grid.Column="4"
+      <Button Grid.Column="3"
               x:Name="SystemBrowseButton"
               Width="32"
               MinHeight="{DynamicResource ControlHeightSm}"
@@ -83,7 +75,7 @@
                   Height="14"
                   Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
       </Button>
-      <AutoCompleteBox Grid.Column="5"
+      <AutoCompleteBox Grid.Column="4"
                        x:Name="PathAutoComplete"
                        MinHeight="{DynamicResource ControlHeightSm}"
                        FilterMode="Contains"
