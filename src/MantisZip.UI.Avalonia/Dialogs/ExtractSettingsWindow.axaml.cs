@@ -73,6 +73,12 @@ public partial class ExtractSettingsWindow : Window
         DestTreeControl.SingleTab = PathTab.Tree;
         DestTreeControl.ApplySingleTabMode();
 
+        // 手动 light dismiss：Popup 遮罩会拦截外部点击导致按钮收不到 Click，
+        // 改为监听主窗口 PointerPressed——点击窗口任意处先关闭全部浮层，按钮 Click 再打开对应浮层
+        AddHandler(global::Avalonia.Input.InputElement.PointerPressedEvent,
+            (_, _) => CloseDestPopups(),
+            RoutingStrategies.Tunnel);
+
         Loaded += OnLoaded;
     }
 
@@ -103,6 +109,12 @@ public partial class ExtractSettingsWindow : Window
     {
         if (string.IsNullOrEmpty(path)) return;
         ViewModel.DestinationPath = path;
+        CloseDestPopups();
+    }
+
+    /// <summary>关闭全部解压路径浮层。</summary>
+    private void CloseDestPopups()
+    {
         DestFavPopup.IsOpen = false;
         DestHistPopup.IsOpen = false;
         DestWinPopup.IsOpen = false;

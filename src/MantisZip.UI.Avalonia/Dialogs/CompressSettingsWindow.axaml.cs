@@ -97,6 +97,12 @@ public partial class CompressSettingsWindow : Window
         OutputWinControl.ApplySingleTabMode();
         OutputTreeControl.SingleTab = PathTab.Tree;
         OutputTreeControl.ApplySingleTabMode();
+
+        // 手动 light dismiss：Popup 遮罩会拦截外部点击导致按钮收不到 Click，
+        // 改为监听主窗口 PointerPressed——点击窗口任意处先关闭全部浮层，按钮 Click 再打开对应浮层
+        AddHandler(global::Avalonia.Input.InputElement.PointerPressedEvent,
+            (_, _) => CloseOutputPopups(),
+            RoutingStrategies.Tunnel);
     }
 
     /// <summary>

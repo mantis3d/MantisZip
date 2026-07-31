@@ -243,7 +243,7 @@
                 <Popup x:Name="OutputFavPopup"
                        PlacementTarget="{Binding #QuickFavButton}"
                        Placement="Bottom"
-                       IsLightDismissEnabled="True">
+                       IsLightDismissEnabled="False">
                   <Border Background="{DynamicResource ThemeWindowBgBrush}"
                           BorderBrush="{DynamicResource ThemeBorderBrush}"
                           BorderThickness="1" CornerRadius="4" Padding="6"
@@ -259,7 +259,7 @@
                 <Popup x:Name="OutputHistPopup"
                        PlacementTarget="{Binding #QuickHistButton}"
                        Placement="Bottom"
-                       IsLightDismissEnabled="True">
+                       IsLightDismissEnabled="False">
                   <Border Background="{DynamicResource ThemeWindowBgBrush}"
                           BorderBrush="{DynamicResource ThemeBorderBrush}"
                           BorderThickness="1" CornerRadius="4" Padding="6"
@@ -275,7 +275,7 @@
                 <Popup x:Name="OutputWinPopup"
                        PlacementTarget="{Binding #QuickWinButton}"
                        Placement="Bottom"
-                       IsLightDismissEnabled="True">
+                       IsLightDismissEnabled="False">
                   <Border Background="{DynamicResource ThemeWindowBgBrush}"
                           BorderBrush="{DynamicResource ThemeBorderBrush}"
                           BorderThickness="1" CornerRadius="4" Padding="6"
@@ -291,7 +291,7 @@
                 <Popup x:Name="OutputTreePopup"
                        PlacementTarget="{Binding #QuickTreeButton}"
                        Placement="Bottom"
-                       IsLightDismissEnabled="True">
+                       IsLightDismissEnabled="False">
                   <Border Background="{DynamicResource ThemeWindowBgBrush}"
                           BorderBrush="{DynamicResource ThemeBorderBrush}"
                           BorderThickness="1" CornerRadius="4" Padding="6"
