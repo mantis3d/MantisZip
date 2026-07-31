@@ -82,6 +82,7 @@
   "Compress_OutputMode_Manual": "手动设置路径",
   "Compress_OutputMode_Separate": "单独压缩每个文件",
   "Compress_OutputPath": "输出路径",
+  "Compress_OutputFileName": "文件名",
   "Compress_OutputPlaceholder": "选择输出文件路径",
   "Compress_OutputPathInvalid": "输出路径无效",
   "Compress_FilteredAllSkipped": "所有源文件均被过滤条件排除，无法创建压缩包。\n请检查过滤设置后重试。",

@@ -144,23 +144,52 @@
                              IsChecked="{Binding IsCombinedMode}"
                              Content="{Binding LocalizedStrings[Compress_OutputMode_Combined]}" />
 
-                <TextBlock Text="{Binding OutputPathLabel}"
-                           FontWeight="SemiBold" />
-                <Grid ColumnDefinitions="*,Auto">
-                  <TextBox Grid.Column="0"
-                            PlaceholderText="{Binding LocalizedStrings[Compress_OutputPlaceholder]}"
-                            Text="{Binding OutputPath}"
-                            IsReadOnly="{Binding IsOutputPathReadOnly}" />
-                  <Button Grid.Column="1"
-                          Content="{Binding LocalizedStrings[Compress_Browse]}"
-                          Width="80"
-                          Height="{DynamicResource ControlHeight}"
-                          Margin="8,0,0,0"
-                          Command="{Binding BrowseOutputPathCommand}"
-                          IsVisible="{Binding IsBrowseButtonVisible}"
-                          Background="{DynamicResource ThemeButtonBgBrush}"
-                          Foreground="{DynamicResource ThemeTextPrimaryBrush}"
-                          BorderBrush="{DynamicResource ThemeBorderBrush}" />
+                <!-- Output path: embedded QuickPathControl (Manual mode) -->
+                <Grid Margin="0,6,0,0"
+                      IsVisible="{Binding IsQuickPathVisible}">
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="80" />
+                    <ColumnDefinition Width="*" />
+                  </Grid.ColumnDefinitions>
+                  <TextBlock Grid.Column="0"
+                             Text="{Binding LocalizedStrings[Compress_OutputPath]}"
+                             VerticalAlignment="Center"
+                             Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+                  <Border Grid.Column="1"
+                          BorderBrush="{DynamicResource ThemeBorderBrush}"
+                          BorderThickness="1"
+                          CornerRadius="4"
+                          Padding="4"
+                          Background="{DynamicResource ThemeSurfaceBgBrush}">
+                    <controls:QuickPathControl x:Name="OutputPathControl"
+                                               PathSelected="OutputPathControl_PathSelected" />
+                  </Border>
+                </Grid>
+
+                <!-- File name + extension label -->
+                <Grid Margin="0,6,0,0"
+                      IsVisible="{Binding IsFileNameSectionVisible}">
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="80" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                  </Grid.ColumnDefinitions>
+                  <TextBlock Grid.Column="0"
+                             Text="{Binding LocalizedStrings[Compress_OutputFileName]}"
+                             VerticalAlignment="Center"
+                             Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+                  <TextBox Grid.Column="1"
+                           Text="{Binding OutputFileName}"
+                           IsReadOnly="{Binding IsOutputPathReadOnly}"
+                           MinHeight="{DynamicResource ControlHeightSm}"
+                           Background="{DynamicResource ThemeSurfaceBgBrush}"
+                           Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                           BorderBrush="{DynamicResource ThemeBorderBrush}" />
+                  <TextBlock Grid.Column="2"
+                             Text="{Binding OutputExtensionLabel}"
+                             Margin="6,0,0,0"
+                             VerticalAlignment="Center"
+                             Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
                 </Grid>
 
               </StackPanel>

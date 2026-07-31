@@ -84,6 +84,7 @@
   "Compress_OutputMode_Manual": "Manual output path",
   "Compress_OutputMode_Separate": "Separate per item",
   "Compress_OutputPath": "Output Path",
+  "Compress_OutputFileName": "File name",
   "Compress_OutputPlaceholder": "Select output file path",
   "Compress_OutputPathInvalid": "Output path invalid",
   "Compress_FilteredAllSkipped": "All source files are excluded by the filter. No archive can be created.\nPlease check your filter settings.",

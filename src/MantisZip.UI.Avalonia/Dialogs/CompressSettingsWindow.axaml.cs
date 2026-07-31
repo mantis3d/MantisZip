@@ -5,6 +5,7 @@ using Avalonia.Interactivity;
 using Avalonia.Media;
 using Avalonia.Platform.Storage;
 using Avalonia.Threading;
+using MantisZip.Core.Abstractions;
 using MantisZip.Core.FileFilter;
 using MantisZip.UI.Avalonia.Models;
 using MantisZip.UI.Avalonia.Services;
@@ -114,6 +115,7 @@ public partial class CompressSettingsWindow : Window
         FormatOptionsPanel.LoadDefaults();
         LoadSplitSizeFromSettings();
         InitFileFilter();
+        SyncOutputPathControl();
     }
 
     private void OnTabSelectionChanged(object? sender, SelectionChangedEventArgs e)
@@ -248,6 +250,29 @@ public partial class CompressSettingsWindow : Window
     }
 
     /// <summary>
+    /// QuickPathControl 选中路径 → 写入 ViewModel.OutputDirectory（Manual 模式）。
+    /// </summary>
+    private void OutputPathControl_PathSelected(object? sender, string path)
+    {
+        if (string.IsNullOrEmpty(path)) return;
+        if (ViewModel.OutputMode != CompressOutputMode.Manual) return;
+        ViewModel.OutputDirectory = path;
+    }
+
+    /// <summary>OutputPath/OutputMode 变化时同步 QuickPathControl 当前路径高亮。</summary>
+    private void SyncOutputPathControl()
+    {
+        if (OutputPathControl == null) return;
+        var dir = ViewModel.OutputMode == CompressOutputMode.Manual
+            ? ViewModel.OutputDirectory
+            : null;
+        if (!string.IsNullOrEmpty(dir))
+        {
+            OutputPathControl.SetCurrentPath(dir);
+        }
+    }
+
+    /// <summary>
     /// 批量移除选中的源文件。
     /// </summary>
     private void RemoveSelected_Click(object? sender, RoutedEventArgs e)
@@ -273,6 +298,10 @@ public partial class CompressSettingsWindow : Window
             case nameof(ViewModel.Encrypt):
                 // 切换加密时密码区域展开/折叠，等布局完成后再检查位置
                 Dispatcher.UIThread.Post(AdjustWindowPosition, DispatcherPriority.Background);
+                break;
+            case nameof(ViewModel.OutputDirectory):
+            case nameof(ViewModel.OutputMode):
+                SyncOutputPathControl();
                 break;
         }
     }
