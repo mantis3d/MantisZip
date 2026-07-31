@@ -1,6 +1,7 @@
 using Avalonia.Controls;
 using Avalonia.Interactivity;
 using Avalonia.Platform.Storage;
+using Avalonia.Threading;
 using MantisZip.Core.Abstractions;
 using MantisZip.Core.FileFilter;
 using MantisZip.UI.Avalonia.Controls;
@@ -74,12 +75,16 @@ public partial class ExtractSettingsWindow : Window
 
     // ── Destination path quick buttons ─────────────────────────────────────
 
-    /// <summary>打开 QuickPathControl 面板并切换到指定 Tab。</summary>
+    /// <summary>
+    /// 打开 QuickPathControl 面板并切换到指定 Tab。
+    /// 注意：Popup 的 IsLightDismissEnabled 会把点击按钮当作"点击外部"先关闭浮层，
+    /// 因此这里延迟到 light dismiss 完成后再重新打开——点另一个按钮 = 直接切换面板，无需点两次。
+    /// </summary>
     private void OpenQuickPath(PathTab tab)
     {
         if (DestPathControl == null) return;
         DestPathControl.SelectTab(tab);
-        DestPathPopup.IsOpen = true;
+        Dispatcher.UIThread.Post(() => DestPathPopup.IsOpen = true, DispatcherPriority.Input);
     }
 
     private void QuickFavButton_Click(object? sender, RoutedEventArgs e)

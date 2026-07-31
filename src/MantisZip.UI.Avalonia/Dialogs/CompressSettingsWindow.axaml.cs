@@ -263,12 +263,16 @@ public partial class CompressSettingsWindow : Window
         OutputPathPopup.IsOpen = false;
     }
 
-    /// <summary>打开 QuickPathControl 面板并切换到指定 Tab。</summary>
+    /// <summary>
+    /// 打开 QuickPathControl 面板并切换到指定 Tab。
+    /// 注意：Popup 的 IsLightDismissEnabled 会把点击按钮当作"点击外部"先关闭浮层，
+    /// 因此这里延迟到 light dismiss 完成后再重新打开——点另一个按钮 = 直接切换面板，无需点两次。
+    /// </summary>
     private void OpenQuickPath(PathTab tab)
     {
         if (OutputPathControl == null) return;
         OutputPathControl.SelectTab(tab);
-        OutputPathPopup.IsOpen = true;
+        Dispatcher.UIThread.Post(() => OutputPathPopup.IsOpen = true, DispatcherPriority.Input);
     }
 
     private void QuickFavButton_Click(object? sender, RoutedEventArgs e)
