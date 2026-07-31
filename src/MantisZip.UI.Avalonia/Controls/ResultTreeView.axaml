@@ -88,15 +88,15 @@
       </StackPanel>
     </Border>
 
-    <!-- Row 2: Tree -->
-    <ScrollViewer Grid.Row="2"
-                  Background="{DynamicResource ThemeSurfaceBgBrush}">
-      <TreeView x:Name="PreviewTreeView"
-                ItemsSource="{Binding DisplayNodes, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                SelectionMode="Multiple"
-                BorderThickness="0"
-                Background="Transparent"
-                SelectionChanged="OnTreeSelectionChanged">
+    <!-- Row 2: Tree + loading overlay -->
+    <Grid Grid.Row="2">
+      <ScrollViewer Background="{DynamicResource ThemeSurfaceBgBrush}">
+        <TreeView x:Name="PreviewTreeView"
+                  ItemsSource="{Binding DisplayNodes, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                  SelectionMode="Multiple"
+                  BorderThickness="0"
+                  Background="Transparent"
+                  SelectionChanged="OnTreeSelectionChanged">
         <TreeView.Styles>
           <Style Selector="TreeViewItem">
             <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}" />
@@ -142,6 +142,33 @@
           </TreeDataTemplate>
         </TreeView.ItemTemplate>
       </TreeView>
-    </ScrollViewer>
+      </ScrollViewer>
+
+      <!-- Loading overlay: shown while the raw tree builds on the background thread -->
+      <Border x:Name="LoadingOverlay"
+              IsVisible="False"
+              Background="{DynamicResource ThemeSurfaceBgBrush}"
+              Opacity="0.95"
+              Padding="{DynamicResource SpacingLgThk}">
+        <StackPanel VerticalAlignment="Center"
+                    HorizontalAlignment="Center"
+                    Spacing="{DynamicResource SpacingSm}">
+          <ProgressBar x:Name="LoadingProgressBar"
+                       Width="220"
+                       Height="6"
+                       Minimum="0"
+                       Maximum="100"
+                       Value="0"
+                       IsIndeterminate="False"
+                       Foreground="{DynamicResource ThemeAccentBrush}"
+                       Background="{DynamicResource ThemeBorderBrush}" />
+          <TextBlock x:Name="LoadingTextBlock"
+                     Text="正在构建预览树…"
+                     FontSize="12"
+                     HorizontalAlignment="Center"
+                     Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+        </StackPanel>
+      </Border>
+    </Grid>
   </Grid>
 </UserControl>

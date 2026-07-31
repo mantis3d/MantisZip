@@ -47,6 +47,14 @@ public partial class ResultTreeView : UserControl
     public static readonly StyledProperty<bool> ShowSummaryBarProperty =
         AvaloniaProperty.Register<ResultTreeView, bool>(nameof(ShowSummaryBar), true);
 
+    /// <summary>预览树是否正在后台构建（显示加载覆层）。</summary>
+    public static readonly StyledProperty<bool> IsLoadingProperty =
+        AvaloniaProperty.Register<ResultTreeView, bool>(nameof(IsLoading), false);
+
+    /// <summary>预览树构建进度（0–100，-1 表示不确定进度/不定进度条）。</summary>
+    public static readonly StyledProperty<double> BuildProgressProperty =
+        AvaloniaProperty.Register<ResultTreeView, double>(nameof(BuildProgress), -1);
+
     // ── Observable collection for display tree ──
 
     /// <summary>显示树节点集合（已应用精简/过滤规则）。</summary>
@@ -96,6 +104,18 @@ public partial class ResultTreeView : UserControl
         set => SetValue(ShowSummaryBarProperty, value);
     }
 
+    public bool IsLoading
+    {
+        get => GetValue(IsLoadingProperty);
+        set => SetValue(IsLoadingProperty, value);
+    }
+
+    public double BuildProgress
+    {
+        get => GetValue(BuildProgressProperty);
+        set => SetValue(BuildProgressProperty, value);
+    }
+
     /// <summary>
     /// 静态构造函数：注册属性变更回调。
     /// </summary>
@@ -111,6 +131,39 @@ public partial class ResultTreeView : UserControl
             view.RebuildDisplayTree());
         ShowFilteredGhostsProperty.Changed.AddClassHandler<ResultTreeView>((view, _) =>
             view.RebuildDisplayTree());
+        IsLoadingProperty.Changed.AddClassHandler<ResultTreeView>((view, e) =>
+            view.OnIsLoadingChanged(e.NewValue is true));
+        BuildProgressProperty.Changed.AddClassHandler<ResultTreeView>((view, e) =>
+            view.OnBuildProgressChanged(e.NewValue as double? ?? -1));
+    }
+
+    /// <summary>
+    /// 加载覆层显示状态变化：隐藏时进度条复位，避免下次出现残留进度。
+    /// </summary>
+    private void OnIsLoadingChanged(bool isLoading)
+    {
+        if (LoadingOverlay == null || LoadingProgressBar == null) return;
+        LoadingOverlay.IsVisible = isLoading;
+        if (!isLoading)
+        {
+            LoadingProgressBar.Value = 0;
+            LoadingProgressBar.IsIndeterminate = false;
+        }
+    }
+
+    /// <summary>
+    /// 构建进度变化：-1 显示不定进度条，否则更新确定进度（0–100）。
+    /// </summary>
+    private void OnBuildProgressChanged(double progress)
+    {
+        if (LoadingProgressBar == null) return;
+        if (progress < 0)
+        {
+            LoadingProgressBar.IsIndeterminate = true;
+            return;
+        }
+        LoadingProgressBar.IsIndeterminate = false;
+        LoadingProgressBar.Value = Math.Clamp(progress, 0, 100);
     }
 
     public ResultTreeView()
@@ -118,6 +171,7 @@ public partial class ResultTreeView : UserControl
         InitializeComponent();
         ToolTip.SetTip(LocateButton, LocalizationManager.T("Preview_Result_Locate"));
         ToolTip.SetTip(FilterToggle, LocalizationManager.T("Preview_Result_ShowFiltered"));
+        LoadingTextBlock.Text = LocalizationManager.T("Preview_Result_Building");
 
         // 主题切换时刷新 ForegroundKey 绑定，使转换器重新解析新版主题画刷
         ActualThemeVariantChanged += OnActualThemeVariantChanged;
