@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Media.Imaging;
 using MantisZip.Core.Utils;
@@ -17,8 +18,14 @@ namespace MantisZip.UI.Avalonia.Controls;
 /// </summary>
 public partial class QuickPathControl : UserControl
 {
-    /// <summary>选中路径后触发（参数为路径字符串）。</summary>
+    /// <summary>选中路径后触发（参数为路径字符串）。列表 Tab 单击、目录树单击均触发。</summary>
     public event EventHandler<string>? PathSelected;
+
+    /// <summary>双击确认路径后触发（目录树双击节点；列表双击由宿主自行处理）。</summary>
+    public event EventHandler<string>? PathConfirmed;
+
+    /// <summary>当前激活的 Tab（宿主可据此区分单击导航 vs 双击确认）。</summary>
+    public PathTab CurrentTab => _currentTab;
 
     private PathTab _currentTab = PathTab.Favorites;
 
@@ -297,6 +304,16 @@ public partial class QuickPathControl : UserControl
 
         PathHistoryManager.Record(node.FullPath);
         PathSelected?.Invoke(this, node.FullPath);
+    }
+
+    /// <summary>目录树节点双击 → 确认选择该目录。</summary>
+    private void DirTree_DoubleTapped(object? sender, TappedEventArgs e)
+    {
+        if (DirTree.SelectedItem is not DirectoryTreeNode node) return;
+        if (string.IsNullOrEmpty(node.FullPath)) return;
+
+        PathHistoryManager.Record(node.FullPath);
+        PathConfirmed?.Invoke(this, node.FullPath);
     }
 
     // ── Search filtering ────────────────────────────────────────────────────

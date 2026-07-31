@@ -154,7 +154,8 @@
                 Background="Transparent"
                 BorderThickness="0"
                 IsVisible="False"
-                SelectionChanged="DirTree_SelectionChanged">
+                SelectionChanged="DirTree_SelectionChanged"
+                DoubleTapped="DirTree_DoubleTapped">
         <TreeView.Styles>
           <Style Selector="TreeViewItem">
             <Setter Property="MinHeight" Value="{DynamicResource ControlHeightSm}" />

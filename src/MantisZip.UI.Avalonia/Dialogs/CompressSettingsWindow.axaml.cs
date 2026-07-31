@@ -98,6 +98,9 @@ public partial class CompressSettingsWindow : Window
         OutputTreeControl.SingleTab = PathTab.Tree;
         OutputTreeControl.ApplySingleTabMode();
 
+        // 双击确认（目录树节点双击 → 应用并关闭）
+        OutputTreeControl.PathConfirmed += OutputPathControl_PathConfirmed;
+
         // 手动 light dismiss：Popup 遮罩会拦截外部点击导致按钮收不到 Click，
         // 改为监听主窗口 PointerPressed——点击窗口任意处先关闭全部浮层，按钮 Click 再打开对应浮层
         AddHandler(global::Avalonia.Input.InputElement.PointerPressedEvent,
@@ -267,7 +270,8 @@ public partial class CompressSettingsWindow : Window
     }
 
     /// <summary>
-    /// QuickPathControl 选中路径 → 写入 ViewModel.OutputDirectory（Manual 模式），关闭所有浮层。
+    /// QuickPathControl 单击选中路径 → 写入 OutputDirectory。
+    /// 目录树单击仅导航（不关闭浮层，允许展开浏览）；列表单击应用并关闭。
     /// </summary>
     private void OutputPathControl_PathSelected(object? sender, string path)
     {
@@ -275,6 +279,18 @@ public partial class CompressSettingsWindow : Window
         if (ViewModel.OutputMode != CompressOutputMode.Manual) return;
         ViewModel.OutputDirectory = path;
 
+        // 目录树单击 = 导航预览，不关闭（双击才确认）；其他来源单击即确认
+        if (sender is QuickPathControl qpc && qpc.CurrentTab == PathTab.Tree)
+            return;
+        CloseOutputPopups();
+    }
+
+    /// <summary>QuickPathControl 双击确认路径 → 写入并关闭全部浮层。</summary>
+    private void OutputPathControl_PathConfirmed(object? sender, string path)
+    {
+        if (string.IsNullOrEmpty(path)) return;
+        if (ViewModel.OutputMode != CompressOutputMode.Manual) return;
+        ViewModel.OutputDirectory = path;
         CloseOutputPopups();
     }
 
