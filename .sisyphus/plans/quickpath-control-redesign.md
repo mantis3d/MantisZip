@@ -4,6 +4,7 @@
 > **2026-07-31 修订**: 取消 QuickPathPreDialog 过渡方案，直接实现 CustomFilePickerDialog（左 QuickPath + 右文件浏览）。宿主一律弹窗调用，不做内嵌——压缩/解压设置窗口本身已拥挤，内嵌 Tab 面板太占空间。
 > **2026-07-31 审查修正**（探索代理 + 全量 grep 验证）: Avalonia 版 4 个 QuickPathControl 宿主对话框（QuickPathDialog/QuickPathPreDialog/ArchiveSaveAsDialog/UnifiedExtractDialog）**全部只挂在测试菜单**（`MainWindow.axaml` L458-495 + `TestWindow_Click` L863-867），4 个 VM 委托（ShowQuickPathDialog 等，L109-124）**零 Invoke 调用点**——生产代码零引用。结论：Task 1 重构控件无生产兼容包袱；Task 6 清理范围扩大为全部 4 个对话框。另修正：格式联动为新增功能、由宿主传入 defaultExtension（Task 3）；地址栏补全/历史数据源明确（Task 2）。
 > **2026-07-31 布局决策（方案 1）**: CustomFilePickerDialog 内建 ResultTreeView 解压预览区（用户提出「选择解压路径时应有 ResultTreeView」）。布局：底部横铺 + GridSplitter（默认 160px，120–280px），仅解压模式（`ShowExtractFolderAsync`）显示，非解压模式整行隐藏（800×420）。数据跟随当前浏览路径防抖重建（`checkExists:true` 实时冲突检测）。原「ExtraContent 宿主注入」方案取消（宿主注入只能给静态树，无法随路径更新）。ExtractSettingsWindow 右侧现有树保留（`checkExists:false`，语义互补）。详见 ADR-3/ADR-7。
+> **2026-07-31 合并影响（分支合并 a80933f）**: ① Task 6 行号漂移（MainWindow.axaml L471-508、MainWindowViewModel L110-125/L236-239；MainWindow.axaml.cs 未改仍准确）已更新。② ExtractSettingsWindow 宿主树已升级 `checkExists:true`（合并改），ADR-7 语义调整为「确认后 vs 探索中」。③ `BuildExtractPreview` 增强：根节点改为 destDir 自身 + 新增目录级冲突检测——弹窗内树语义更准确，计划受益无需改。④ Task 3 格式联动结论不变（BrowseOutput 仍硬编码 `.zip`）。
 
 ## TL;DR
 
@@ -133,9 +134,9 @@ public static Task<string?> ShowExtractFolderAsync(
 
 ### ADR-7: 解压预览区跟随当前路径实时重建（冲突检测）
 - **状态**: 已确认（2026-07-31）
-- **理由**: ResultTreeView 的 `checkExists` 冲突检测（`ExistsAtDestination = File.Exists(destDir + entry.FullPath)`）依赖目标路径——路径不同，冲突标记不同。内建后跟随浏览区当前路径，用户翻到哪棵树就重建为「解压到该路径」的冲突预览
+- **理由**: ResultTreeView 的 `checkExists` 冲突检测（`ExistsAtDestination = File.Exists(destDir + entry.FullPath)`，合并后新增目录级 `MarkDirectoryConflicts`）依赖目标路径——路径不同，冲突标记不同。内建后跟随浏览区当前路径，用户翻到哪棵树就重建为「解压到该路径」的冲突预览
 - **性能防护**: 路径变化 → 防抖 ~300ms 重建（`checkExists:true` 构建阶段逐文件 `File.Exists`，大包不能每跳一次全量算）；树显示阶段由 ResultTreeView 的 `MaxItemsPerDirectory/MaxDepth` 截断兜底
-- **与宿主树的关系**: ExtractSettingsWindow 右侧现有 ResultTreeView（`checkExists:false` 静态结构预览）**保留不动**——弹窗树是「探索中的路径」实时决策支持，宿主树是「确认后的最终预览」，语义互补不冲突
+- **与宿主树的关系**: ExtractSettingsWindow 右侧现有 ResultTreeView 已升级为 `checkExists:true`（2026-07-31 合并）。两棵树的区别从「静态 vs 实时」变为「**确认后 vs 探索中**」——宿主树在 DestinationPath 变化（关闭弹窗后）才重建，弹窗内树跟随浏览路径实时重建，语义互补不冲突
 
 ---
 
@@ -229,7 +230,7 @@ public static Task<string?> ShowExtractFolderAsync(
 - 替换浏览解压路径为 `CustomFilePickerDialog.ShowExtractFolderAsync(_entries)` 弹窗（解压模式）
 - **宿主只传 `_entries`**（已有字段），不构造树、不监听路径变化——弹窗内部完成解压预览区（ResultTreeView + 防抖冲突检测）
 - ExtractSettingsWindow 已有 `_entries` 字段 + `SetEntries()` 全套接线（`Dialogs/ExtractSettingsWindow.axaml.cs` L21, L71-75），Task 4 只需改 BrowseFolder 回调为 `ShowExtractFolderAsync` 调用
-- ExtractSettingsWindow 右侧现有 ResultTreeView（`checkExists:false`）**保留不动**——与弹窗内树语义互补（已确认路径 vs 探索中路径）
+- ExtractSettingsWindow 右侧现有 ResultTreeView（已升级 `checkExists:true`，2026-07-31 合并）**保留不动**——与弹窗内树语义互补（已确认路径 vs 探索中路径）
 
 ---
 
@@ -251,11 +252,13 @@ public static Task<string?> ShowExtractFolderAsync(
 
 **做什么**:
 - 删除 4 个对话框文件（QuickPathPreDialog / QuickPathDialog / ArchiveSaveAsDialog / UnifiedExtractDialog）
-- 删除 MainWindowViewModel 中 4 个僵尸委托（L109-124：ShowQuickPathDialog / ShowArchiveSaveAsDialog / ShowUnifiedExtractDialog / ShowQuickPathPreDialog）
+- 删除 MainWindowViewModel 中 4 个僵尸委托（L110-125：ShowQuickPathDialog / ShowArchiveSaveAsDialog / ShowUnifiedExtractDialog / ShowQuickPathPreDialog）
 - 删除 MainWindow.axaml.cs 委托接线（L127-152）
-- 删除 MainWindow.axaml 测试菜单 4 项（L458-495：QuickPathDialog / QuickPathPreDialog / ArchiveSaveAsDialog / UnifiedExtractDialog）
+- 删除 MainWindow.axaml 测试菜单 4 项（L471-508：QuickPathDialog / QuickPathPreDialog / ArchiveSaveAsDialog / UnifiedExtractDialog）
 - 删除 `TestWindow_Click` switch 对应分支（MainWindow.axaml.cs L863-867）
-- 删除 MainWindowViewModel 测试 key 列表中的 4 个 key（L235-238）+ 两个 strings json 中的对应翻译
+- 删除 MainWindowViewModel 测试 key 列表中的 4 个 key（L236-239）+ 两个 strings json 中的对应翻译
+
+**行号说明**: 2026-07-31 合并分支后行号已漂移（MainWindow.axaml +13 行、MainWindowViewModel +1 行），上述为合并后行号。MainWindow.axaml.cs 未在合并中改动（L127-152 / L863-867 仍准确）。
 
 ---
 
