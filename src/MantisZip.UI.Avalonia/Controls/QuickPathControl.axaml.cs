@@ -195,6 +195,7 @@ public partial class QuickPathControl : UserControl
 
     /// <summary>
     /// 加载目录树根节点：所有可读盘符（平铺，无「此电脑」虚拟根）。
+    /// 每个盘符预置占位子节点，使展开箭头可见。
     /// </summary>
     private void LoadTreeRoots()
     {
@@ -206,12 +207,15 @@ public partial class QuickPathControl : UserControl
             {
                 if (!drive.IsReady) continue;
                 var root = drive.RootDirectory.FullName; // "C:\"
-                _treeRoots.Add(new DirectoryTreeNode
+                var node = new DirectoryTreeNode
                 {
                     Name = root.TrimEnd('\\', '/'),
                     FullPath = root,
                     Icon = folderIcon
-                });
+                };
+                // 预置占位子节点 → 显示展开箭头
+                node.Children.Add(new DirectoryTreeNode { IsPlaceholder = true });
+                _treeRoots.Add(node);
             }
         }
         catch (Exception ex)
@@ -222,6 +226,7 @@ public partial class QuickPathControl : UserControl
 
     /// <summary>
     /// 节点展开时惰性加载其子目录（异步枚举，防 UI 卡顿；已加载过则跳过）。
+    /// 先清掉占位节点，再填充真实子目录（每个也预置占位让下一层箭头可见）。
     /// </summary>
     private async void DirTree_Expanded(object? sender, RoutedEventArgs e)
     {
@@ -229,6 +234,13 @@ public partial class QuickPathControl : UserControl
             return;
         if (node.IsLoaded) return;
         node.IsLoaded = true;
+
+        // 移除占位节点
+        for (int i = node.Children.Count - 1; i >= 0; i--)
+        {
+            if (node.Children[i].IsPlaceholder)
+                node.Children.RemoveAt(i);
+        }
 
         try
         {
@@ -240,12 +252,15 @@ public partial class QuickPathControl : UserControl
             var folderIcon = IconService.GetFolderIcon();
             foreach (var dir in dirs)
             {
-                node.Children.Add(new DirectoryTreeNode
+                var child = new DirectoryTreeNode
                 {
                     Name = Path.GetFileName(dir),
                     FullPath = dir,
                     Icon = folderIcon
-                });
+                };
+                // 预置占位子节点 → 下一层展开箭头可见
+                child.Children.Add(new DirectoryTreeNode { IsPlaceholder = true });
+                node.Children.Add(child);
             }
         }
         catch
@@ -382,4 +397,10 @@ public class DirectoryTreeNode
 
     /// <summary>该层是否已枚举过（防止展开重复加载）。</summary>
     public bool IsLoaded { get; set; }
+
+    /// <summary>
+    /// 是否为占位节点：Avalonia TreeView 只有节点含子节点时才显示展开箭头，
+    /// 因此每个未加载目录预置一个占位子节点让箭头出现；展开时被替换为真实子目录。
+    /// </summary>
+    public bool IsPlaceholder { get; set; }
 }
