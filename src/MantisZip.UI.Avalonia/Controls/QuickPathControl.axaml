@@ -11,7 +11,8 @@
         RowSpacing="{DynamicResource SpacingXxs}">
 
     <!-- Row 0: Tab row + search box -->
-    <Grid Grid.Row="0"
+    <Grid x:Name="TabRow"
+          Grid.Row="0"
           ColumnDefinitions="Auto,Auto,Auto,Auto,*"
           ColumnSpacing="{DynamicResource SpacingXxs}">
       <ToggleButton x:Name="FavoritesTab"

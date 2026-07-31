@@ -87,6 +87,16 @@ public partial class CompressSettingsWindow : Window
         DataContext = ViewModel;
         SubscribeViewModel();
         Loaded += OnLoaded;
+
+        // 配置 4 个单 Tab 面板（各弹出独立浮层）
+        OutputFavControl.SingleTab = PathTab.Favorites;
+        OutputFavControl.ApplySingleTabMode();
+        OutputHistControl.SingleTab = PathTab.History;
+        OutputHistControl.ApplySingleTabMode();
+        OutputWinControl.SingleTab = PathTab.Windows;
+        OutputWinControl.ApplySingleTabMode();
+        OutputTreeControl.SingleTab = PathTab.Tree;
+        OutputTreeControl.ApplySingleTabMode();
     }
 
     /// <summary>
@@ -251,7 +261,7 @@ public partial class CompressSettingsWindow : Window
     }
 
     /// <summary>
-    /// QuickPathControl 选中路径 → 写入 ViewModel.OutputDirectory（Manual 模式），关闭下拉浮层。
+    /// QuickPathControl 选中路径 → 写入 ViewModel.OutputDirectory（Manual 模式），关闭所有浮层。
     /// </summary>
     private void OutputPathControl_PathSelected(object? sender, string path)
     {
@@ -259,33 +269,29 @@ public partial class CompressSettingsWindow : Window
         if (ViewModel.OutputMode != CompressOutputMode.Manual) return;
         ViewModel.OutputDirectory = path;
 
-        // 收起下拉浮层
-        OutputPathPopup.IsOpen = false;
+        CloseOutputPopups();
     }
 
-    /// <summary>
-    /// 打开 QuickPathControl 面板并切换到指定 Tab。
-    /// 注意：Popup 的 IsLightDismissEnabled 会把点击按钮当作"点击外部"先关闭浮层，
-    /// 因此这里延迟到 light dismiss 完成后再重新打开——点另一个按钮 = 直接切换面板，无需点两次。
-    /// </summary>
-    private void OpenQuickPath(PathTab tab)
+    /// <summary>关闭全部输出路径浮层。</summary>
+    private void CloseOutputPopups()
     {
-        if (OutputPathControl == null) return;
-        OutputPathControl.SelectTab(tab);
-        Dispatcher.UIThread.Post(() => OutputPathPopup.IsOpen = true, DispatcherPriority.Input);
+        OutputFavPopup.IsOpen = false;
+        OutputHistPopup.IsOpen = false;
+        OutputWinPopup.IsOpen = false;
+        OutputTreePopup.IsOpen = false;
     }
 
     private void QuickFavButton_Click(object? sender, RoutedEventArgs e)
-        => OpenQuickPath(PathTab.Favorites);
+        => OutputFavPopup.IsOpen = true;
 
     private void QuickHistButton_Click(object? sender, RoutedEventArgs e)
-        => OpenQuickPath(PathTab.History);
+        => OutputHistPopup.IsOpen = true;
 
     private void QuickWinButton_Click(object? sender, RoutedEventArgs e)
-        => OpenQuickPath(PathTab.Windows);
+        => OutputWinPopup.IsOpen = true;
 
     private void QuickTreeButton_Click(object? sender, RoutedEventArgs e)
-        => OpenQuickPath(PathTab.Tree);
+        => OutputTreePopup.IsOpen = true;
 
     /// <summary>
     /// 浏览按钮：打开保存文件对话框（带格式联动），返回完整路径后拆分为目录 + 文件名。
@@ -320,17 +326,17 @@ public partial class CompressSettingsWindow : Window
             ViewModel.OutputFileName = name;
     }
 
-    /// <summary>OutputPath/OutputMode 变化时同步 QuickPathControl 当前路径高亮。</summary>
+    /// <summary>OutputPath/OutputMode 变化时同步各 QuickPathControl 当前路径高亮。</summary>
     private void SyncOutputPathControl()
     {
-        if (OutputPathControl == null) return;
         var dir = ViewModel.OutputMode == CompressOutputMode.Manual
             ? ViewModel.OutputDirectory
             : null;
-        if (!string.IsNullOrEmpty(dir))
-        {
-            OutputPathControl.SetCurrentPath(dir);
-        }
+        if (string.IsNullOrEmpty(dir)) return;
+        OutputFavControl.SetCurrentPath(dir);
+        OutputHistControl.SetCurrentPath(dir);
+        OutputWinControl.SetCurrentPath(dir);
+        // 目录树无需高亮（TreeView 有自己的选中态）
     }
 
     /// <summary>

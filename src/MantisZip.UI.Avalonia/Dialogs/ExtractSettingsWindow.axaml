@@ -157,20 +157,65 @@
                   </Button>
                 </Grid>
 
-                <!-- Dropdown popup: QuickPathControl panel -->
-                <Popup x:Name="DestPathPopup"
+                <!-- ⭐ Favorites popup -->
+                <Popup x:Name="DestFavPopup"
                        PlacementTarget="{Binding #QuickFavButton}"
                        Placement="Bottom"
                        IsLightDismissEnabled="True">
                   <Border Background="{DynamicResource ThemeWindowBgBrush}"
                           BorderBrush="{DynamicResource ThemeBorderBrush}"
-                          BorderThickness="1"
-                          CornerRadius="4"
-                          Padding="6"
-                          Width="320"
-                          MaxHeight="420"
+                          BorderThickness="1" CornerRadius="4" Padding="6"
+                          Width="320" MaxHeight="420"
                           BoxShadow="0 2 8 0 #40000000">
-                    <controls:QuickPathControl x:Name="DestPathControl"
+                    <controls:QuickPathControl x:Name="DestFavControl"
+                                               Width="308"
+                                               PathSelected="DestPathControl_PathSelected" />
+                  </Border>
+                </Popup>
+
+                <!-- 🕐 History popup -->
+                <Popup x:Name="DestHistPopup"
+                       PlacementTarget="{Binding #QuickHistButton}"
+                       Placement="Bottom"
+                       IsLightDismissEnabled="True">
+                  <Border Background="{DynamicResource ThemeWindowBgBrush}"
+                          BorderBrush="{DynamicResource ThemeBorderBrush}"
+                          BorderThickness="1" CornerRadius="4" Padding="6"
+                          Width="320" MaxHeight="420"
+                          BoxShadow="0 2 8 0 #40000000">
+                    <controls:QuickPathControl x:Name="DestHistControl"
+                                               Width="308"
+                                               PathSelected="DestPathControl_PathSelected" />
+                  </Border>
+                </Popup>
+
+                <!-- 🪟 Windows popup -->
+                <Popup x:Name="DestWinPopup"
+                       PlacementTarget="{Binding #QuickWinButton}"
+                       Placement="Bottom"
+                       IsLightDismissEnabled="True">
+                  <Border Background="{DynamicResource ThemeWindowBgBrush}"
+                          BorderBrush="{DynamicResource ThemeBorderBrush}"
+                          BorderThickness="1" CornerRadius="4" Padding="6"
+                          Width="320" MaxHeight="420"
+                          BoxShadow="0 2 8 0 #40000000">
+                    <controls:QuickPathControl x:Name="DestWinControl"
+                                               Width="308"
+                                               PathSelected="DestPathControl_PathSelected" />
+                  </Border>
+                </Popup>
+
+                <!-- 🌲 Tree popup -->
+                <Popup x:Name="DestTreePopup"
+                       PlacementTarget="{Binding #QuickTreeButton}"
+                       Placement="Bottom"
+                       IsLightDismissEnabled="True">
+                  <Border Background="{DynamicResource ThemeWindowBgBrush}"
+                          BorderBrush="{DynamicResource ThemeBorderBrush}"
+                          BorderThickness="1" CornerRadius="4" Padding="6"
+                          Width="320" MaxHeight="420"
+                          BoxShadow="0 2 8 0 #40000000">
+                    <controls:QuickPathControl x:Name="DestTreeControl"
                                                Width="308"
                                                PathSelected="DestPathControl_PathSelected" />
                   </Border>

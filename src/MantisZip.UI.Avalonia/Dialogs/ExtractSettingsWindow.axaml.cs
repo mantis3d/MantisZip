@@ -63,6 +63,16 @@ public partial class ExtractSettingsWindow : Window
         // 绑定文件列表
         FileListBox.ItemsSource = archivePaths;
 
+        // 配置 4 个单 Tab 面板（各弹出独立浮层）
+        DestFavControl.SingleTab = PathTab.Favorites;
+        DestFavControl.ApplySingleTabMode();
+        DestHistControl.SingleTab = PathTab.History;
+        DestHistControl.ApplySingleTabMode();
+        DestWinControl.SingleTab = PathTab.Windows;
+        DestWinControl.ApplySingleTabMode();
+        DestTreeControl.SingleTab = PathTab.Tree;
+        DestTreeControl.ApplySingleTabMode();
+
         Loaded += OnLoaded;
     }
 
@@ -75,36 +85,28 @@ public partial class ExtractSettingsWindow : Window
 
     // ── Destination path quick buttons ─────────────────────────────────────
 
-    /// <summary>
-    /// 打开 QuickPathControl 面板并切换到指定 Tab。
-    /// 注意：Popup 的 IsLightDismissEnabled 会把点击按钮当作"点击外部"先关闭浮层，
-    /// 因此这里延迟到 light dismiss 完成后再重新打开——点另一个按钮 = 直接切换面板，无需点两次。
-    /// </summary>
-    private void OpenQuickPath(PathTab tab)
-    {
-        if (DestPathControl == null) return;
-        DestPathControl.SelectTab(tab);
-        Dispatcher.UIThread.Post(() => DestPathPopup.IsOpen = true, DispatcherPriority.Input);
-    }
-
+    /// <summary>打开指定浮层（点击按钮时其它浮层已由 light dismiss 关闭）。</summary>
     private void QuickFavButton_Click(object? sender, RoutedEventArgs e)
-        => OpenQuickPath(PathTab.Favorites);
+        => DestFavPopup.IsOpen = true;
 
     private void QuickHistButton_Click(object? sender, RoutedEventArgs e)
-        => OpenQuickPath(PathTab.History);
+        => DestHistPopup.IsOpen = true;
 
     private void QuickWinButton_Click(object? sender, RoutedEventArgs e)
-        => OpenQuickPath(PathTab.Windows);
+        => DestWinPopup.IsOpen = true;
 
     private void QuickTreeButton_Click(object? sender, RoutedEventArgs e)
-        => OpenQuickPath(PathTab.Tree);
+        => DestTreePopup.IsOpen = true;
 
-    /// <summary>QuickPathControl 选中路径 → 写入 DestinationPath，关闭浮层。</summary>
+    /// <summary>QuickPathControl 选中路径 → 写入 DestinationPath，关闭全部浮层。</summary>
     private void DestPathControl_PathSelected(object? sender, string path)
     {
         if (string.IsNullOrEmpty(path)) return;
         ViewModel.DestinationPath = path;
-        DestPathPopup.IsOpen = false;
+        DestFavPopup.IsOpen = false;
+        DestHistPopup.IsOpen = false;
+        DestWinPopup.IsOpen = false;
+        DestTreePopup.IsOpen = false;
     }
 
     /// <summary>浏览按钮：解压模式对话框（内建 ResultTreeView 冲突预览）。</summary>

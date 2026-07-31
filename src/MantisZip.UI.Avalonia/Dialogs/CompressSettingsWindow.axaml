@@ -239,20 +239,65 @@
                   </Grid>
                 </StackPanel>
 
-                <!-- Dropdown popup: QuickPathControl panel -->
-                <Popup x:Name="OutputPathPopup"
+                <!-- ⭐ Favorites popup -->
+                <Popup x:Name="OutputFavPopup"
                        PlacementTarget="{Binding #QuickFavButton}"
                        Placement="Bottom"
                        IsLightDismissEnabled="True">
                   <Border Background="{DynamicResource ThemeWindowBgBrush}"
                           BorderBrush="{DynamicResource ThemeBorderBrush}"
-                          BorderThickness="1"
-                          CornerRadius="4"
-                          Padding="6"
-                          Width="320"
-                          MaxHeight="420"
+                          BorderThickness="1" CornerRadius="4" Padding="6"
+                          Width="320" MaxHeight="420"
                           BoxShadow="0 2 8 0 #40000000">
-                    <controls:QuickPathControl x:Name="OutputPathControl"
+                    <controls:QuickPathControl x:Name="OutputFavControl"
+                                               Width="308"
+                                               PathSelected="OutputPathControl_PathSelected" />
+                  </Border>
+                </Popup>
+
+                <!-- 🕐 History popup -->
+                <Popup x:Name="OutputHistPopup"
+                       PlacementTarget="{Binding #QuickHistButton}"
+                       Placement="Bottom"
+                       IsLightDismissEnabled="True">
+                  <Border Background="{DynamicResource ThemeWindowBgBrush}"
+                          BorderBrush="{DynamicResource ThemeBorderBrush}"
+                          BorderThickness="1" CornerRadius="4" Padding="6"
+                          Width="320" MaxHeight="420"
+                          BoxShadow="0 2 8 0 #40000000">
+                    <controls:QuickPathControl x:Name="OutputHistControl"
+                                               Width="308"
+                                               PathSelected="OutputPathControl_PathSelected" />
+                  </Border>
+                </Popup>
+
+                <!-- 🪟 Windows popup -->
+                <Popup x:Name="OutputWinPopup"
+                       PlacementTarget="{Binding #QuickWinButton}"
+                       Placement="Bottom"
+                       IsLightDismissEnabled="True">
+                  <Border Background="{DynamicResource ThemeWindowBgBrush}"
+                          BorderBrush="{DynamicResource ThemeBorderBrush}"
+                          BorderThickness="1" CornerRadius="4" Padding="6"
+                          Width="320" MaxHeight="420"
+                          BoxShadow="0 2 8 0 #40000000">
+                    <controls:QuickPathControl x:Name="OutputWinControl"
+                                               Width="308"
+                                               PathSelected="OutputPathControl_PathSelected" />
+                  </Border>
+                </Popup>
+
+                <!-- 🌲 Tree popup -->
+                <Popup x:Name="OutputTreePopup"
+                       PlacementTarget="{Binding #QuickTreeButton}"
+                       Placement="Bottom"
+                       IsLightDismissEnabled="True">
+                  <Border Background="{DynamicResource ThemeWindowBgBrush}"
+                          BorderBrush="{DynamicResource ThemeBorderBrush}"
+                          BorderThickness="1" CornerRadius="4" Padding="6"
+                          Width="320" MaxHeight="420"
+                          BoxShadow="0 2 8 0 #40000000">
+                    <controls:QuickPathControl x:Name="OutputTreeControl"
                                                Width="308"
                                                PathSelected="OutputPathControl_PathSelected" />
                   </Border>

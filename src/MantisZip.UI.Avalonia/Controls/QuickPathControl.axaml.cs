@@ -56,6 +56,12 @@ public partial class QuickPathControl : UserControl
     // ── Public API ──────────────────────────────────────────────────────────
 
     /// <summary>
+    /// 单 Tab 模式：设置为非 null 时隐藏 Tab 行 + 搜索框，只显示指定来源。
+    /// 用于宿主弹出独立面板（每个按钮一个 Popup 场景）。
+    /// </summary>
+    public PathTab? SingleTab { get; set; }
+
+    /// <summary>
     /// 设置当前浏览路径，用于在列表中高亮匹配项。
     /// </summary>
     public void SetCurrentPath(string path)
@@ -80,6 +86,15 @@ public partial class QuickPathControl : UserControl
     public void SelectTab(PathTab tab)
     {
         SetTab(tab);
+    }
+
+    /// <summary>启用单 Tab 模式（在 SingleTab 赋值后调用）。</summary>
+    public void ApplySingleTabMode()
+    {
+        if (SingleTab == null) return;
+        TabRow.IsVisible = false;
+        // 搜索框在 TabRow 内，随 TabRow 一起隐藏
+        SetTab(SingleTab.Value);
     }
 
     // ── Tab switching ───────────────────────────────────────────────────────
