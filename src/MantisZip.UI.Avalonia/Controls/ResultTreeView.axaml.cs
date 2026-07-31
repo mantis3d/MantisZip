@@ -157,10 +157,19 @@ public partial class ResultTreeView : UserControl
         // 恢复展开状态
         RestoreExpandedPaths(displayRoot, expandedPaths);
 
-        DisplayNodes.Add(displayRoot);
+        // 虚拟根节点（空 DisplayLabel）不显示自身，其子节点直接作为顶级项
+        if (string.IsNullOrEmpty(displayRoot.DisplayLabel))
+        {
+            foreach (var child in displayRoot.Children.OfType<PreviewTreeNode>())
+                DisplayNodes.Add(child);
+        }
+        else
+        {
+            DisplayNodes.Add(displayRoot);
+        }
 
-        // Update summary
-        UpdateSummary(displayRoot);
+        // 汇总统计使用原始树（_originalRoot），避免 CompactMode 截断导致计数偏小
+        UpdateSummary();
         UpdateConflictCount();
     }
 
@@ -200,13 +209,21 @@ public partial class ResultTreeView : UserControl
     /// </summary>
     private void ApplyDisplayRules(PreviewTreeNode node, int depth)
     {
-        if (!CompactMode)
-            return; // Full mode: show everything as-is
-
-        // 0. 先移除过滤项，保证它们不占用截断名额
+        // 0. 先移除过滤项（不受 CompactMode 影响，Full 模式也递归生效）
         if (!ShowFilteredGhosts)
         {
             node.Children = node.Children.Where(c => !(c is PreviewTreeNode pt && pt.IsFilteredOut)).ToList();
+        }
+
+        if (!CompactMode)
+        {
+            // Full mode: 仅递归过滤子目录，跳过截断
+            foreach (var child in node.Children.ToList())
+            {
+                if (child is PreviewTreeNode pt && !pt.IsTruncated)
+                    ApplyDisplayRules(pt, depth + 1);
+            }
+            return;
         }
 
         // 1. 深度截断 (CompactMode 且超过 MaxDepth)
@@ -283,8 +300,12 @@ public partial class ResultTreeView : UserControl
     /// <summary>
     /// 统计节点下所有文件（非目录项）的数量。
     /// </summary>
-    private static int CountTotalFiles(PreviewTreeNode node)
+    /// <param name="includeFiltered">为 true 时包括 IsFilteredOut 节点，false 时跳过。</param>
+    private static int CountTotalFiles(PreviewTreeNode node, bool includeFiltered = true)
     {
+        if (!includeFiltered && node.IsFilteredOut)
+            return 0;
+
         int files = 0;
         foreach (var child in node.Children)
         {
@@ -292,23 +313,40 @@ public partial class ResultTreeView : UserControl
             {
                 if (pt.Children.Count == 0 && !pt.IsTruncated)
                     files++;
-                files += CountTotalFiles(pt);
+                files += CountTotalFiles(pt, includeFiltered);
             }
         }
         return files;
     }
 
     /// <summary>
-    /// 统计总文件数和总大小，更新摘要文本。
+    /// 从原始树（_originalRoot）统计实际文件数和总大小，更新摘要文本。
+    /// 使用原始树而非显示树，避免 CompactMode 截断导致计数偏小。
     /// </summary>
-    private void UpdateSummary(PreviewTreeNode root)
+    private void UpdateSummary()
     {
-        var totalFiles = CountTotalFiles(root);
-        var totalSize = CalculateTotalSize(root);
+        if (_originalRoot == null) return;
+
+        int totalFiles;
+        long totalSize;
+
+        // 始终排除过滤项：过滤掉的文件/目录不参与实际解压/压缩，不应计入总量
+        if (string.IsNullOrEmpty(_originalRoot.DisplayLabel))
+        {
+            // 虚拟根节点：子节点直接作为顶级项
+            totalFiles = _originalRoot.Children.OfType<PreviewTreeNode>()
+                .Sum(n => CountTotalFiles(n, includeFiltered: false));
+            totalSize = _originalRoot.Children.OfType<PreviewTreeNode>()
+                .Sum(n => CalculateTotalSize(n, includeFiltered: false));
+        }
+        else
+        {
+            totalFiles = CountTotalFiles(_originalRoot, includeFiltered: false);
+            totalSize = CalculateTotalSize(_originalRoot, includeFiltered: false);
+        }
 
         SummaryText = LocalizationManager.T("Preview_Result_Summary", totalFiles, FormatSize(totalSize));
 
-        // Also update individual text blocks
         if (FileCountText != null)
             FileCountText.Text = $"{totalFiles} 个文件";
         if (TotalSizeText != null)
@@ -342,6 +380,10 @@ public partial class ResultTreeView : UserControl
     /// </summary>
     private static int CountConflicts(PreviewTreeNode node)
     {
+        // 过滤掉的节点不计入冲突（用户看不到它们，数了也无意义）
+        if (node.IsFilteredOut)
+            return 0;
+
         int count = node.ExistsAtDestination ? 1 : 0;
         foreach (var child in node.Children)
         {
@@ -354,13 +396,17 @@ public partial class ResultTreeView : UserControl
     /// <summary>
     /// 计算节点下所有文件的总大小。
     /// </summary>
-    private static long CalculateTotalSize(PreviewTreeNode node)
+    /// <param name="includeFiltered">为 true 时包括 IsFilteredOut 节点，false 时跳过。</param>
+    private static long CalculateTotalSize(PreviewTreeNode node, bool includeFiltered = true)
     {
+        if (!includeFiltered && node.IsFilteredOut)
+            return 0;
+
         long size = node.Size;
         foreach (var child in node.Children)
         {
             if (child is PreviewTreeNode pt)
-                size += CalculateTotalSize(pt);
+                size += CalculateTotalSize(pt, includeFiltered);
         }
         return size;
     }

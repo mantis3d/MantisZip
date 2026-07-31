@@ -4,15 +4,21 @@
          x:Class="MantisZip.UI.Avalonia.Dialogs.ExtractSettingsWindow"
          x:CompileBindings="False"
          Title="{Binding LocalizedStrings[Extract_Title]}"
-         Width="800"
+         Width="850"
+         MinWidth="700"
+          MinHeight="500"
          SizeToContent="Height"
          WindowStartupLocation="CenterOwner"
          CanResize="True"
          Background="{DynamicResource ThemeWindowBgBrush}">
 
   <Grid RowDefinitions="*,Auto"
-        ColumnDefinitions="*,Auto"
         Margin="16">
+    <Grid.ColumnDefinitions>
+      <ColumnDefinition Width="450" MinWidth="400" />
+      <ColumnDefinition Width="Auto" />
+      <ColumnDefinition Width="*" />
+    </Grid.ColumnDefinitions>
     <!-- ═══════ Left: TabControl with settings ═══════ -->
     <TabControl Grid.Column="0" Grid.Row="0"
                 Background="{DynamicResource ThemeWindowBgBrush}"
@@ -113,6 +119,7 @@
     <GridSplitter Grid.Column="1" Grid.Row="0"
                   Width="5"
                   Background="{DynamicResource ThemeSplitterBgBrush}"
+                  ResizeBehavior="PreviousAndNext"
                   ResizeDirection="Auto" />
 
     <!-- ═══════ Right: Preview panel ═══════ -->
@@ -123,7 +130,6 @@
                               MaxItemsPerDirectory="5"
                               MaxDepth="5"
                               ShowFilteredGhosts="{Binding ShowFilteredGhosts}"
-                              Width="280"
                               MinWidth="200" />
 
     <!-- ═══════ Bottom buttons (span all columns) ═══════ -->

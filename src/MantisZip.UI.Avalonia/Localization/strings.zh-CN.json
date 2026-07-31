@@ -83,6 +83,8 @@
   "Compress_OutputMode_Separate": "单独压缩每个文件",
   "Compress_OutputPath": "输出路径",
   "Compress_OutputPlaceholder": "选择输出文件路径",
+  "Compress_OutputPathInvalid": "输出路径无效",
+  "Compress_FilteredAllSkipped": "所有源文件均被过滤条件排除，无法创建压缩包。\n请检查过滤设置后重试。",
   "Compress_Password": "密码",
   "Compress_PasswordPlaceholder": "输入密码",
   "Compress_Pwd_AutoRules": "自动生成规则",
@@ -857,5 +859,14 @@
   "Metadata_Type_sqlite": "数据库信息",
   "Metadata_Type_pe": "程序信息",
   "Metadata_Type_ico": "图标信息",
-  "Metadata_Type_pdf": "文档信息"
+  "Metadata_Type_pdf": "文档信息",
+  "Metadata_Panel_FieldLayout": "字段左右并排显示",
+  "Metadata_Panel_ColumnField": "字段",
+  "Metadata_Panel_ColumnPosition": "位置",
+  "Metadata_Panel_PreviewTitle": "预览",
+  "Metadata_Panel_SectionSidebar": "{0}（侧边栏）",
+  "Metadata_Panel_SectionContentTop": "{0}（内容区顶部）",
+  "Metadata_Panel_SettingsTooltip": "元数据面板设置",
+  "Metadata_Panel_ColumnRow": "行",
+  "Metadata_Panel_ColumnOrder": "序号"
 }

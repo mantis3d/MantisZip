@@ -100,6 +100,9 @@ public partial class PreviewViewModel : ObservableObject
     /// <summary>打开设置窗口到元数据面板标签页，由 View 注入。</summary>
     public Func<Task>? OpenSettingsToMetadataTab { get; set; }
 
+    /// <summary>元数据面板设置按钮的提示文字。</summary>
+    public string MetadataSettingsTooltip => LocalizationManager.T("Metadata_Panel_SettingsTooltip");
+
     [ObservableProperty]
     private string _previewHeaderText = string.Empty;
 

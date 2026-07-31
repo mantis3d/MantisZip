@@ -9,6 +9,7 @@ using MantisZip.Core.FileFilter;
 using MantisZip.Core.Services;
 using MantisZip.Core;
 using MantisZip.Core.Utils;
+using MantisZip.UI.Avalonia.Dialogs;
 using MantisZip.UI.Avalonia.Models;
 using MantisZip.UI.Avalonia.Services;
 using System.Collections.ObjectModel;
@@ -1645,7 +1646,15 @@ public partial class MainWindowViewModel : ObservableObject
         var sources = vm.FileFilter?.IsActive == true
             ? FileFilterHelper.ApplyFilter(vm.SelectedPaths.ToArray(), vm.FileFilter).ToList()
             : vm.SelectedPaths.ToList();
-        if (sources.Count == 0) return;
+        if (sources.Count == 0)
+        {
+            await AppMessageBox.Show(
+                LocalizationManager.T("Compress_FilteredAllSkipped"),
+                LocalizationManager.T("Compress_Title"),
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+            return;
+        }
 
         var settings = AppSettings.Load();
         var request = new CompressRequest

@@ -37,7 +37,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <AvaloniaResource Include="Resources\**" />
+    <!-- 排除 .axaml，Avalonia 构建目标会自动处理 -->
+    <AvaloniaResource Include="Resources\**" Exclude="Resources\**\*.axaml" />
   </ItemGroup>
 
   <ItemGroup>

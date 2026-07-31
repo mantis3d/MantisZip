@@ -134,7 +134,7 @@
                     HorizontalAlignment="Right">
           <Button Width="32" Height="{DynamicResource ControlHeight}" Padding="0"
                   Command="{Binding OpenMetadataSettingsCommand}"
-                  ToolTip.Tip="元数据面板设置">
+                   ToolTip.Tip="{Binding MetadataSettingsTooltip}">
             <PathIcon Data="{StaticResource IconSettings}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
           </Button>
         </StackPanel>
@@ -158,10 +158,10 @@
             </ItemsControl.ItemsPanel>
             <ItemsControl.ItemTemplate>
               <DataTemplate x:DataType="services:InfoPanelRow">
-                <ItemsControl ItemsSource="{Binding Items}">
+                <ItemsControl ItemsSource="{Binding Items}" Padding="8,0">
                   <ItemsControl.ItemsPanel>
                     <ItemsPanelTemplate>
-                      <WrapPanel />
+                      <local:JustifyWrapPanel />
                     </ItemsPanelTemplate>
                   </ItemsControl.ItemsPanel>
                   <ItemsControl.ItemTemplate>
@@ -644,8 +644,8 @@
             IsVisible="{Binding IsInfoPanelVisible}">
       <ScrollViewer Padding="10">
         <StackPanel Spacing="{DynamicResource SpacingXs}">
-          <!-- Common file info section (Phase 1) -->
-          <ItemsControl ItemsSource="{Binding CommonSections}">
+          <!-- Format-specific info section (Phase 2) — shown first -->
+          <ItemsControl ItemsSource="{Binding FormatSections}">
             <ItemsControl.ItemTemplate>
               <DataTemplate x:DataType="services:MetadataSection">
                 <StackPanel Spacing="{DynamicResource SpacingXxs}">
@@ -654,10 +654,10 @@
                   <ItemsControl ItemsSource="{Binding Rows}">
                     <ItemsControl.ItemTemplate>
                       <DataTemplate x:DataType="services:InfoPanelRow">
-                        <ItemsControl ItemsSource="{Binding Items}">
+                        <ItemsControl ItemsSource="{Binding Items}" Padding="8,0">
                           <ItemsControl.ItemsPanel>
                             <ItemsPanelTemplate>
-                              <WrapPanel />
+                              <local:JustifyWrapPanel />
                             </ItemsPanelTemplate>
                           </ItemsControl.ItemsPanel>
                           <ItemsControl.ItemTemplate>
@@ -694,23 +694,11 @@
             </ItemsControl.ItemTemplate>
           </ItemsControl>
 
-          <!-- Separator between common and format sections -->
-          <Separator IsVisible="{Binding HasFormatSections}" />
+          <!-- Separator -->
+          <Separator />
 
-          <!-- Loading indicator (Phase 1 → Phase 2) -->
-          <TextBlock Text="正在提取格式信息…"
-                     FontSize="11"
-                     Foreground="{DynamicResource ThemeTextSecondaryBrush}"
-                     IsVisible="{Binding IsFormatPending}" />
-
-          <!-- Empty format hint -->
-          <TextBlock Text="无格式信息"
-                     FontSize="11"
-                     Foreground="{DynamicResource ThemeTextSecondaryBrush}"
-                     IsVisible="{Binding IsFormatEmpty}" />
-
-          <!-- Format-specific info section (Phase 2) -->
-          <ItemsControl ItemsSource="{Binding FormatSections}">
+          <!-- Common file info section — shown below -->
+          <ItemsControl ItemsSource="{Binding CommonSections}">
             <ItemsControl.ItemTemplate>
               <DataTemplate x:DataType="services:MetadataSection">
                 <StackPanel Spacing="{DynamicResource SpacingXxs}">
@@ -719,10 +707,10 @@
                   <ItemsControl ItemsSource="{Binding Rows}">
                     <ItemsControl.ItemTemplate>
                       <DataTemplate x:DataType="services:InfoPanelRow">
-                        <ItemsControl ItemsSource="{Binding Items}">
+                        <ItemsControl ItemsSource="{Binding Items}" Padding="8,0">
                           <ItemsControl.ItemsPanel>
                             <ItemsPanelTemplate>
-                              <WrapPanel />
+                              <local:JustifyWrapPanel />
                             </ItemsPanelTemplate>
                           </ItemsControl.ItemsPanel>
                           <ItemsControl.ItemTemplate>

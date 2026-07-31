@@ -18,10 +18,15 @@
   </Window.Resources>
 
   <Grid RowDefinitions="*,Auto"
-        ColumnDefinitions="450,Auto,*"
         Margin="16">
+    <Grid.ColumnDefinitions>
+      <ColumnDefinition Width="450" MinWidth="400" />
+      <ColumnDefinition Width="Auto" />
+      <ColumnDefinition Width="*" />
+    </Grid.ColumnDefinitions>
     <!-- ═══════ Left: TabControl with settings ═══════ -->
-    <TabControl Grid.Column="0" Grid.Row="0">
+    <TabControl Grid.Column="0" Grid.Row="0"
+                SelectionChanged="OnTabSelectionChanged">
       <!-- Tab 1: General -->
       <TabItem Header="{Binding LocalizedStrings[Compress_TabGeneral]}"
                Classes="compactTab">
@@ -65,6 +70,16 @@
                    <ListBox.ItemContainerTheme>
                      <ControlTheme TargetType="ListBoxItem">
                        <Setter Property="MinHeight" Value="{DynamicResource ControlHeightMd}" />
+                       <Setter Property="Background" Value="Transparent" />
+                       <Style Selector="^:pointerover">
+                         <Setter Property="Background" Value="{DynamicResource ThemeListSelectedBrush}" />
+                       </Style>
+                       <Style Selector="^:selected">
+                         <Setter Property="Background" Value="{DynamicResource ThemeListSelectedBrush}" />
+                       </Style>
+                       <Style Selector="^:selected:focus">
+                         <Setter Property="Background" Value="{DynamicResource ThemeListSelectedBrush}" />
+                       </Style>
                      </ControlTheme>
                    </ListBox.ItemContainerTheme>
                   <ListBox.ItemTemplate>

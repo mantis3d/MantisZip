@@ -203,11 +203,95 @@ public class OrientationToBoolConverter : IValueConverter
         => throw new NotSupportedException();
 }
 
-public class InvertBoolConverter : IValueConverter
-{
-    public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
-        => value is bool b ? !b : value;
+    public class InvertBoolConverter : IValueConverter
+    {
+        public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+            => value is bool b ? !b : value;
 
-    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
-        => value is bool b ? !b : value;
+        public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+            => value is bool b ? !b : value;
+    }
+
+/// <summary>
+/// 两端对齐的 WrapPanel。同一行内的子元素均匀分布，间距自动分配。
+/// </summary>
+public class JustifyWrapPanel : Panel
+{
+    protected override Size MeasureOverride(Size availableSize)
+    {
+        var width = availableSize.Width;
+        if (double.IsInfinity(width)) width = 10000;
+
+        double totalHeight = 0;
+        double rowWidth = 0;
+        double rowHeight = 0;
+
+        foreach (var child in Children)
+        {
+            child.Measure(new Size(double.PositiveInfinity, availableSize.Height));
+            var childWidth = child.DesiredSize.Width;
+            var childHeight = child.DesiredSize.Height;
+
+            if (rowWidth + childWidth > width && rowWidth > 0)
+            {
+                totalHeight += rowHeight;
+                rowWidth = childWidth;
+                rowHeight = childHeight;
+            }
+            else
+            {
+                rowWidth += childWidth;
+                rowHeight = Math.Max(rowHeight, childHeight);
+            }
+        }
+        totalHeight += rowHeight;
+        return new Size(width, totalHeight);
+    }
+
+    protected override Size ArrangeOverride(Size finalSize)
+    {
+        var width = finalSize.Width;
+        if (width <= 0) return finalSize;
+
+        double y = 0;
+        var row = new List<Control>();
+        double rowWidth = 0;
+        double rowHeight = 0;
+
+        void ArrangeRow()
+        {
+            if (row.Count == 0) return;
+            double spacing = row.Count > 1
+                ? (width - rowWidth) / (row.Count - 1)
+                : 0;
+            double x = 0;
+            foreach (var child in row)
+            {
+                child.Arrange(new Rect(x, y, child.DesiredSize.Width, child.DesiredSize.Height));
+                x += child.DesiredSize.Width + spacing;
+            }
+            y += rowHeight;
+        }
+
+        foreach (Control child in Children)
+        {
+            var childWidth = child.DesiredSize.Width;
+            var childHeight = child.DesiredSize.Height;
+
+            if (rowWidth + childWidth > width && row.Count > 0)
+            {
+                ArrangeRow();
+                row.Clear();
+                rowWidth = 0;
+                rowHeight = 0;
+            }
+
+            row.Add(child);
+            rowWidth += childWidth;
+            rowHeight = Math.Max(rowHeight, childHeight);
+        }
+        ArrangeRow();
+
+        return finalSize;
+    }
 }

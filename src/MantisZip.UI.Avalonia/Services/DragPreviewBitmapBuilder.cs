@@ -42,6 +42,10 @@ internal static class DragPreviewBitmapBuilder
             expanded, rootName, rootName, checkExists: false);
 
         // 3. Create a ResultTreeView control with the preview root
+        //    BuildExtractPreview returns destDir → content; wrap content under an
+        //    archive-name root for the drag preview display.
+        var contentChildren = previewTree.Children;
+
         var treeView = new ResultTreeView
         {
             Root = new PreviewTreeNode
@@ -50,7 +54,7 @@ internal static class DragPreviewBitmapBuilder
                 FullPath = "",
                 DisplayLabel = rootName,
                 IsExpanded = true,
-                Children = previewTree.Children
+                Children = contentChildren
             },
             Width = maxWidth,
             CompactMode = true,

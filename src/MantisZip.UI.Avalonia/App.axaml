@@ -112,7 +112,22 @@
     </Style>
     <Style Selector="ToggleButton:checked">
       <Setter Property="Background" Value="{DynamicResource ThemeAccentBrush}" />
-      <Setter Property="Foreground" Value="{DynamicResource ThemeTextPrimaryBrush}" />
+      <Setter Property="Foreground" Value="White" />
+    </Style>
+    <!--
+      PathIcon in Avalonia does NOT inherit Foreground from parent controls,
+      so we must target it directly. This selector covers all PathIcon children
+      (including those nested in StackPanel) via descendant combinator.
+    -->
+    <Style Selector="ToggleButton:checked PathIcon">
+      <Setter Property="Foreground" Value="White" />
+    </Style>
+    <Style Selector="ToggleButton:checked:pointerover">
+      <Setter Property="Foreground" Value="White" />
+      <Setter Property="Background" Value="{DynamicResource ThemeAccentBrush}" />
+    </Style>
+    <Style Selector="ToggleButton:checked:pressed">
+      <Setter Property="Foreground" Value="White" />
     </Style>
 
     <!-- ════════════════════════════════════════════ -->
@@ -294,6 +309,23 @@
     <Style Selector="MenuItem:pointerover">
       <Setter Property="Background" Value="{DynamicResource ThemeButtonHoverBrush}" />
       <Setter Property="Foreground" Value="{DynamicResource ThemeTextPrimaryBrush}" />
+    </Style>
+
+    <!-- ToggleIconBox — Total Commander-style toggle indicator for menu items -->
+    <Style Selector="Border.ToggleIconBox">
+      <Setter Property="Width" Value="20" />
+      <Setter Property="Height" Value="20" />
+      <Setter Property="CornerRadius" Value="3" />
+      <Setter Property="BorderThickness" Value="1.5" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+      <Setter Property="BorderBrush" Value="{DynamicResource ThemeBorderBrush}" />
+      <Setter Property="Transitions">
+        <Setter.Value>
+          <Transitions>
+            <BrushTransition Property="Background" Duration="0:0:0.15" />
+          </Transitions>
+        </Setter.Value>
+      </Setter>
     </Style>
 
     <!-- GridSplitter -->

@@ -4,6 +4,7 @@ using Avalonia.Controls;
 using Avalonia.Interactivity;
 using Avalonia.Media;
 using Avalonia.Platform.Storage;
+using Avalonia.Threading;
 using MantisZip.Core.FileFilter;
 using MantisZip.UI.Avalonia.Models;
 using MantisZip.UI.Avalonia.Services;
@@ -111,9 +112,40 @@ public partial class CompressSettingsWindow : Window
         if (_loaded) return;
         _loaded = true;
 
+        // 限制最大高度不超过屏幕可用高度的 90%，防止内容撑高后按钮被推出屏幕
+        var screen = Screens.ScreenFromWindow(this);
+        if (screen != null)
+        {
+            MaxHeight = screen.WorkingArea.Height * 0.9;
+        }
+
+        AdjustWindowPosition();
         FormatOptionsPanel.LoadDefaults();
         LoadSplitSizeFromSettings();
         InitFileFilter();
+    }
+
+    private void OnTabSelectionChanged(object? sender, SelectionChangedEventArgs e)
+    {
+        // 切换 Tab 后窗口高度可能变化，等布局完成后再检查位置
+        Dispatcher.UIThread.Post(AdjustWindowPosition, DispatcherPriority.Background);
+    }
+
+    /// <summary>
+    /// 检查窗口底部是否超出屏幕，超出则自动上移到刚好可见的位置。
+    /// </summary>
+    private void AdjustWindowPosition()
+    {
+        var screen = Screens.ScreenFromWindow(this);
+        if (screen == null) return;
+
+        // Height 是设备独立单位 (DIPs)，需乘 RenderScaling 转为屏幕像素
+        var windowBottomPx = Position.Y + (int)(Height * RenderScaling);
+        var overflowPx = windowBottomPx - screen.WorkingArea.Bottom;
+        if (overflowPx > 0)
+        {
+            Position = Position.WithY(Position.Y - overflowPx);
+        }
     }
 
     /// <summary>初始化文件过滤控件（预设 + 事件）。</summary>
@@ -246,6 +278,10 @@ public partial class CompressSettingsWindow : Window
                 break;
             case nameof(ViewModel.IsPasswordLibraryMode):
                 UpdateSaveCheckLabel();
+                break;
+            case nameof(ViewModel.Encrypt):
+                // 切换加密时密码区域展开/折叠，等布局完成后再检查位置
+                Dispatcher.UIThread.Post(AdjustWindowPosition, DispatcherPriority.Background);
                 break;
         }
     }

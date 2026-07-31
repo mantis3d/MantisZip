@@ -21,6 +21,52 @@
 
 ### MantisZip.UI.Avalonia（主力版）
 
+**2026-07-30** — Toggle 图标方框风格（Total Commander 样式）+ ToggleButton checked 反白
+  - **菜单 Toggle**：4 个 View 菜单切换项改用 `Border.ToggleIconBox`（20×20，3px 圆角，150ms 过渡动画），ON 态半透明强调色填充，OFF 态空心方框，替代原 CheckBox
+  - **新增 ThemeToggleBrush**：Light `#400078D4` / Dark `#4D0078D4` 半透明强调色，专用 toggle 背景，避免直接使用 `ThemeAccentBrush` 导致图标看不清
+  - **ToggleButton checked 反白**：全局 `ToggleButton:checked` Foreground 改 White + `ToggleButton:checked PathIcon Foreground="White"` 直接命中 PathIcon（不继承），移除 PathIcon 显式 Foreground，覆盖工具栏/ResultTreeView 共 4 处 ToggleButton
+  - **新增 BoolToToggleBgBrushConverter**：`true` → `ThemeToggleBrush`，`false` → `Transparent`
+  - 构建 0 errors
+
+**2026-07-30** — 解压/压缩设置窗口布局统一 + ResultTreeView 冲突/过滤计数修复 + FilterToggle  TwoWay 修复
+  - **解压窗口布局**：`ExtractSettingsWindow` 列定义 `450,Auto,*`，左栏 `MinWidth=400`，GridSplitter 加 `ResizeBehavior`，与压缩窗口一致
+  - **压缩窗口布局**：`CompressSettingsWindow` 左栏加 `MinWidth=400` ColumnDefinition
+  - **解压冲突检测**：`BuildExtractPreview` 启用 `checkExists`，新增 `MarkDirectoryConflicts` 递归检测目录是否存在
+  - **摘要计数修复**：`UpdateSummary` 改用原始树 `_originalRoot` 统计，避免 CompactMode 截断导致计数值偏小；`CountTotalFiles`/`CalculateTotalSize` 跳过 `IsFilteredOut` 节点
+  - **冲突计数修复**：`CountConflicts` 跳过 `IsFilteredOut` 节点
+  - **FilterToggle 修复**：绑定加 `Mode=TwoWay`；过滤项移除逻辑提到 `CompactMode` 判断之前，Full 模式也能生效
+  - 构建 0 errors
+
+**2026-07-29** — 过滤全排除预览树紫色显示 + 压缩时弹提示 + Manual 模式自动填充默认路径
+  - **紫色空存档**：`PreviewTreeNode` 新增 `IsArchiveEmpty` + `ForegroundKey`，全子节点被过滤时显示紫色，优先级高于冲突红色
+  - **NodeForegroundConverter**：新转换器，根据 ForegroundKey 返回紫色(Purple)/红色(ConflictRed)/默认
+  - **空存档检测**：`ResultPreviewService` 在构建完成后递归检查 `NodeHasVisibleContent`，无可见内容时标记
+  - **压缩时提示**：`ExecuteCompressFromSettings` 过滤后 `sources.Count == 0` 时弹出 `AppMessageBox` 告知用户
+  - **Manual 自动填充路径**：`TryAutoFillOutputPath()` 在添加源文件时自动生成默认输出路径
+  - **i18n**：新增 `Compress_FilteredAllSkipped`
+  - 构建 0 errors
+
+**2026-07-29** — 输出路径无效检测 + 预览树显示"输出路径无效" + 窗口超出屏幕自动上移
+  - **路径有效性检查**：新增 `IsOutputPathValid()` 公共方法（Manual 检查路径+父目录存在性、Combined 检查非空、Separate 始终有效）
+  - **CanExecuteStartCompress**：改调用 `IsOutputPathValid()`，路径无效时按钮禁用
+  - **预览树路径无效显示**：`BuildCompressPreview` 中路径不通过校验时，直接创建"输出路径无效"单节点，不调 ResultPreviewService
+  - **实时更新**：`OnOutputPathChanged` 增加 `BuildCompressPreview()` 调用，打字时预览树即时反映路径有效性
+  - **i18n**：新增 `Compress_OutputPathInvalid` → "输出路径无效" / "Output path invalid"
+  - **窗口自动上移**：新增 `AdjustWindowPosition()`，在 Loaded / Tab 切换 / 加密开关切换时触发，超出屏幕底部则自动上移到可见位置
+  - **修复**：`AppIcons.axaml` 重复 `IconArchive` 导致运行时崩溃
+  - 构建 0 errors
+
+**2026-07-28** — 字段布局方向切换 + 两端对齐面板 + 设置内实时预览 + 信息栏顺序调整
+  - **FieldOrientation**：新增 `FieldLayoutMode`（vertical/horizontal），infoPanel + contentTop 字段名和值可切换左右并排显示，带冒号分隔
+  - **JustifyWrapPanel**：自定义 Panel，同一行内字段均匀分布（两端对齐），替代 WrapPanel
+  - **ContentTop 行分组**：contentTop 现在也按 Row 值分行，与 infoPanel 一致
+  - **设置实时预览**：元数据面板子标签底部增加预览区，显示 infoPanel + contentTop 的字段排布，每个字段带 ˄/˅ 按钮实时调整 Row
+  - **信息栏顺序**：格式信息在上、通用信息在下（对调），移除加载/空提示
+  - **字段补全**：Torrent 增加 TorrentFileName/MagnetLink/TrackerUrl/TrackerCount/AdditionalInfo 等 10 个字段；新增 IconCount/Encrypted 键；ISO 补充 TotalSize
+  - **显示名去重**：common 的 FileSize→"文件大小"、FileModifiedDate→"文件修改日期"
+  - 改动的文件：`MetadataPanelSettings.cs`（+FieldLayoutMode）、`PreviewViewModel.cs`、`PreviewPanel.axaml`、`PreviewPanel.axaml.cs`、`SettingsWindow.axaml`、`SettingsWindow.axaml.cs`、`MetadataPanelSettingsViewModel.cs`、`MetadataRenderEngine.cs`、`MetadataHelper.cs`、`MetadataRegistry.cs`
+  - 构建 0 errors
+
 **2026-07-28** — 压缩设置"更新匹配规则"修复：压缩完成后从未保存密码/规则
   - **Root Cause**: WPF 在三个完成路径后均调用 `SavePasswordAfterCompress()`，Avalonia 的 `ExecuteCompressFromSettings` 只设了 `StatusMessage`，完全没有密码持久化逻辑
   - **修复**: 在 `ExecuteCompressFromSettings` 压缩成功后添加密码保存：

@@ -95,6 +95,10 @@ public partial class CompressSettingsViewModel : ObservableObject
     [ObservableProperty]
     private string _defaultFormat = "zip";
 
+    /// <summary>Separate 模式下是否保留源文件扩展名（如 "file.txt" → "file.txt.zip"）。</summary>
+    [ObservableProperty]
+    private bool _keepOriginalExtension;
+
     /// <summary>当前格式是否为 ZIP。</summary>
     public bool IsZipFormat => DefaultFormat == "zip";
 
@@ -303,6 +307,8 @@ public partial class CompressSettingsViewModel : ObservableObject
             BuildCompressPreview();
             if (OutputMode != CompressOutputMode.Manual)
                 RefreshOutputPathState();
+            else
+                TryAutoFillOutputPath();
             UpdateCanCompress();
         };
 
@@ -400,6 +406,14 @@ public partial class CompressSettingsViewModel : ObservableObject
         // Load password library
         LoadPasswordLibrary();
 
+        // 从 AppSettings 加载默认值
+        try
+        {
+            var settings = AppSettings.Load();
+            KeepOriginalExtension = settings.KeepOriginalExtension;
+        }
+        catch { /* 使用默认值 */ }
+
         // Build initial compress preview from source paths
         BuildCompressPreview();
 
@@ -421,10 +435,27 @@ public partial class CompressSettingsViewModel : ObservableObject
             return;
         }
 
+        if (!IsOutputPathValid())
+        {
+            // 路径无效时显示"路径无效"节点，不调用 ResultPreviewService
+            PreviewRoot = new PreviewTreeNode
+            {
+                Name = LocalizationManager.T("Compress_OutputPathInvalid"),
+                FullPath = "",
+                DisplayLabel = LocalizationManager.T("Compress_OutputPathInvalid"),
+                IsExpanded = true
+            };
+            return;
+        }
+
         PreviewRoot = ResultPreviewService.BuildCompressPreview(
             SelectedPaths.ToList(),
             rootName: LocalizationManager.T("Compress_Title"),
-            filter: filter);
+            filter: filter,
+            outputMode: OutputMode,
+            outputPath: OutputPath,
+            format: DefaultFormat,
+            keepOriginalExtension: KeepOriginalExtension);
     }
 
     partial void OnCompressionLevelChanged(int value)
@@ -471,6 +502,8 @@ public partial class CompressSettingsViewModel : ObservableObject
         UpdateCanCompress();
         if (AutoGenerateRules)
             RefreshAutoRules();
+        // 切换输出方式时刷新预览树（不同模式树结构不同）
+        BuildCompressPreview();
     }
 
     partial void OnOutputPathChanged(string? value)
@@ -478,6 +511,7 @@ public partial class CompressSettingsViewModel : ObservableObject
         StartCompressCommand.NotifyCanExecuteChanged();
         if (AutoGenerateRules)
             RefreshAutoRules();
+        BuildCompressPreview();
     }
 
     partial void OnDefaultFormatChanged(string value)
@@ -494,6 +528,8 @@ public partial class CompressSettingsViewModel : ObservableObject
         if (AutoGenerateRules)
             RefreshAutoRules();
         OnPropertyChanged(nameof(IsFormatEncryptionSupported));
+        // 切换格式时刷新预览树（压缩包扩展名变化）
+        BuildCompressPreview();
     }
 
     partial void OnIsPasswordLibraryModeChanged(bool value)
@@ -694,6 +730,13 @@ public partial class CompressSettingsViewModel : ObservableObject
                     var archiveName = ArchivePath.GetFileName(commonParent);
                     RulesText = $"{archiveName}*{ext}";
                 }
+                else if (AllPathsSameDrive(SelectedPaths))
+                {
+                    // 同盘符但无公共子目录：压缩包名与盘符相同（如 C.zip）
+                    var root = Path.GetPathRoot(SelectedPaths[0]) ?? "C:\\";
+                    var driveLetter = root.TrimEnd('\\', '/').TrimEnd(':');
+                    RulesText = $"{driveLetter}*{ext}";
+                }
                 break;
         }
     }
@@ -756,10 +799,7 @@ public partial class CompressSettingsViewModel : ObservableObject
     private bool CanExecuteStartCompress()
     {
         if (SelectedPaths.Count == 0) return false;
-        // Manual mode requires a valid output path (matches WPF UpdateCompressButton logic)
-        if (OutputMode == CompressOutputMode.Manual && string.IsNullOrEmpty(OutputPath))
-            return false;
-        return true;
+        return IsOutputPathValid();
     }
 
     [RelayCommand]
@@ -856,6 +896,33 @@ public partial class CompressSettingsViewModel : ObservableObject
     }
 
     /// <summary>
+    /// Manual 模式下输出路径为空时，根据源文件自动生成默认路径。
+    /// 行为与 <see cref="RefreshCombinedPath"/> 一致但不弹跨盘符警告（保持空路径让用户手动设置）。
+    /// </summary>
+    private void TryAutoFillOutputPath()
+    {
+        if (OutputMode != CompressOutputMode.Manual) return;
+        if (!string.IsNullOrEmpty(OutputPath)) return;
+        if (SelectedPaths.Count == 0) return;
+
+        var commonParent = App.FindCommonParent(SelectedPaths.ToList());
+        if (commonParent != null && !App.IsDriveRoot(commonParent))
+        {
+            var archiveName = ArchivePath.GetFileName(commonParent);
+            var ext = GetFormatExtension();
+            OutputPath = System.IO.Path.Combine(commonParent, archiveName + ext);
+        }
+        else if (AllPathsSameDrive(SelectedPaths))
+        {
+            var root = Path.GetPathRoot(SelectedPaths[0]) ?? "C:\\";
+            var driveLetter = root.TrimEnd('\\', '/').TrimEnd(':');
+            var ext = GetFormatExtension();
+            OutputPath = System.IO.Path.Combine(root, driveLetter + ext);
+        }
+        // 跨盘符：保持空路径，用户手动设置
+    }
+
+    /// <summary>
     /// 计算 Combined 模式的输出路径：公共父目录下的合并压缩包。
     /// </summary>
     private void RefreshCombinedPath()
@@ -873,9 +940,17 @@ public partial class CompressSettingsViewModel : ObservableObject
             var ext = GetFormatExtension();
             OutputPath = System.IO.Path.Combine(commonParent, archiveName + ext);
         }
+        else if (AllPathsSameDrive(SelectedPaths))
+        {
+            // 同盘符但无公共子目录 — 输出到盘符根目录，压缩包名与盘符相同（如 C:\C.zip）
+            var root = Path.GetPathRoot(SelectedPaths[0]) ?? "C:\\";
+            var driveLetter = root.TrimEnd('\\', '/').TrimEnd(':');
+            var ext = GetFormatExtension();
+            OutputPath = System.IO.Path.Combine(root, driveLetter + ext);
+        }
         else
         {
-            // 跨驱动器或根目录 — 回退到手动模式
+            // 跨驱动器 — 回退到手动模式
             OutputMode = CompressOutputMode.Manual;
             // 通知用户
             _ = AppMessageBox.Show(
@@ -884,6 +959,24 @@ public partial class CompressSettingsViewModel : ObservableObject
                 MessageBoxButton.OK,
                 MessageBoxImage.Warning);
         }
+    }
+
+    /// <summary>
+    /// 判断所有源路径是否在同一个盘符下。
+    /// </summary>
+    private static bool AllPathsSameDrive(IEnumerable<string> paths)
+    {
+        string? drive = null;
+        foreach (var p in paths)
+        {
+            var d = Path.GetPathRoot(p);
+            if (string.IsNullOrEmpty(d)) return false;
+            if (drive == null)
+                drive = d;
+            else if (!string.Equals(drive, d, StringComparison.OrdinalIgnoreCase))
+                return false;
+        }
+        return drive != null;
     }
 
     /// <summary>
@@ -909,6 +1002,33 @@ public partial class CompressSettingsViewModel : ObservableObject
         if (SelectedPaths.Count == 1 && Directory.Exists(SelectedPaths[0]))
             return ArchivePath.GetFileName(SelectedPaths[0]);
         return $"archive_{DateTime.Now:yyyyMMddHHmmss}";
+    }
+
+    /// <summary>
+    /// 检查输出路径在当前模式下是否有效。
+    /// Manual：路径不能为空且父目录必须存在。
+    /// Combined：路径非空即有效（由源文件推导）。
+    /// Separate：输出到源文件所在目录，始终有效。
+    /// </summary>
+    private bool IsOutputPathValid()
+    {
+        switch (OutputMode)
+        {
+            case CompressOutputMode.Manual:
+                if (string.IsNullOrEmpty(OutputPath))
+                    return false;
+                var dir = Path.GetDirectoryName(OutputPath);
+                return !string.IsNullOrEmpty(dir) && Directory.Exists(dir);
+
+            case CompressOutputMode.Combined:
+                return !string.IsNullOrEmpty(OutputPath);
+
+            case CompressOutputMode.Separate:
+                return true;
+
+            default:
+                return true;
+        }
     }
 
     /// <summary>
