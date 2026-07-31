@@ -105,26 +105,6 @@ public partial class MainWindowViewModel : ObservableObject
     public Func<Task>? ShowFavoritesDialog { get; set; }
 
     /// <summary>
-    /// QuickPath 路径选择对话框回调。返回所选路径或 null=取消。
-    /// </summary>
-    public Func<bool, Task<string?>>? ShowQuickPathDialog { get; set; }
-
-    /// <summary>
-    /// 另存为对话框回调。传入当前压缩包路径，返回保存路径或 null=取消。
-    /// </summary>
-    public Func<string, Task<string?>>? ShowArchiveSaveAsDialog { get; set; }
-
-    /// <summary>
-    /// 统一解压对话框回调。参数为预设路径，返回选择的解压路径或 null=取消。
-    /// </summary>
-    public Func<string, Task<string?>>? ShowUnifiedExtractDialog { get; set; }
-
-    /// <summary>
-    /// QuickPathPre 前置路径选择对话框回调。返回所选路径或 null=取消。
-    /// </summary>
-    public Func<bool, bool, Task<string?>>? ShowQuickPathPreDialog { get; set; }
-
-    /// <summary>
     /// 由 View 设置的回调，用于复制文字到剪贴板。
     /// </summary>
     public Func<string, Task>? CopyToClipboard { get; set; }
@@ -233,10 +213,9 @@ public partial class MainWindowViewModel : ObservableObject
             "Test_CompressSettings", "Test_ExtractSettings",
             "Test_CompressConflict", "Test_ConflictDialog", "Test_MatchedPassword",
             "Test_AddFavoriteDialog", "Test_AppMessageBox",
-            "Test_ArchiveCommentDialog", "Test_ArchiveSaveAsDialog",
+            "Test_ArchiveCommentDialog",
             "Test_ElevationDialog", "Test_ElevationFailedDialog", "Test_ElevationInfoDialog",
-            "Test_FavoriteManagerWindow", "Test_QuickPathDialog", "Test_QuickPathPreDialog",
-            "Test_UnifiedExtractDialog",
+            "Test_FavoriteManagerWindow",
             "FavMgr_OpenManager"
         };
         foreach (var key in keys)

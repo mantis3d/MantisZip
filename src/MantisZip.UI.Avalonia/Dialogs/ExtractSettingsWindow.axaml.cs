@@ -41,15 +41,12 @@ public partial class ExtractSettingsWindow : Window
 
         ViewModel = new ExtractSettingsViewModel(archivePaths);
 
-        // 设置文件夹浏览回调
+        // 设置文件夹浏览回调（解压模式：弹窗内建 ResultTreeView 实时冲突检测）
         ViewModel.BrowseFolder = async () =>
         {
-            var folders = await StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions
-            {
-                Title = "Select destination folder",
-                AllowMultiple = false
-            });
-            return folders.Count >= 1 ? folders[0].Path.LocalPath : null;
+            if (_entries == null)
+                return null;
+            return await CustomFilePickerDialog.ShowExtractFolderAsync(this, _entries, ViewModel.DestinationPath);
         };
 
         // 设置关闭回调

@@ -21,6 +21,14 @@
 
 ### MantisZip.UI.Avalonia（主力版）
 
+**2026-07-31** — QuickPathControl 重构为 Tab 式速选面板 + 新增 CustomFilePickerDialog 统一替换路径选择
+  - **QuickPathControl 重构**：剥离地址栏/浏览按钮，改为 ⭐收藏/🕐历史/🪟窗口 三 Tab + 搜索框常驻（输入跨三来源聚合过滤，带来源标签）；新增 `PathSelected` 事件（选中即触发 + `PathHistoryManager.Record`）；`SetCurrentPath` 供宿主高亮；紧凑度感知行高
+  - **CustomFilePickerDialog 新增**：自建文件/目录选择器（800×620 解压 / 800×420 其他）。四模式 `PickerMode`（PickFolder/SaveFile/OpenFile/ExtractFolder），静态入口 `ShowFolderAsync` / `ShowSaveFileAsync` / `ShowOpenFileAsync` / `ShowExtractFolderAsync`。布局：顶部地址栏（AutoCompleteBox 文件系统补全 + 历史建议 + ◀▶▲📁 导航）+ 左 QuickPathControl（220px）+ 右文件浏览（系统图标/大小/日期，双击进入，Enter/Backspace/Alt+←→ 键盘导航）+ 底部解压预览区（仅解压模式：GridSplitter + ResultTreeView 内建，路径变化防抖 ~300ms 重建，`checkExists:true` 实时冲突检测，MaxItemsPerDirectory=8/MaxDepth=4）
+  - **宿主集成**：CompressSettingsWindow BrowseOutput→`ShowSaveFileAsync`（格式联动：按 DefaultFormat 计算默认扩展名）、PickFolder→`ShowFolderAsync`；ExtractSettingsWindow BrowseFolder→`ShowExtractFolderAsync(_entries)`；AddFavoriteDialog 浏览→`ShowFolderAsync`；保留 3 处系统对话框（打开压缩包/多选文件/添加文件）
+  - **清理**：删除 4 个测试菜单对话框（QuickPathDialog/QuickPathPreDialog/ArchiveSaveAsDialog/UnifiedExtractDialog）+ 4 个 VM 僵尸委托 + 测试菜单/switch 分支/测试 key/strings 翻译
+  - i18n：新增 `QuickPath_Tab*`/`QuickPath_SearchPlaceholder`/`QuickPath_Empty*`/`Picker_*` 等 key（zh + en）
+  - 构建 0 errors；测试 35 passed / 2 skipped
+
 **2026-07-30** — Toggle 图标方框风格（Total Commander 样式）+ ToggleButton checked 反白
   - **菜单 Toggle**：4 个 View 菜单切换项改用 `Border.ToggleIconBox`（20×20，3px 圆角，150ms 过渡动画），ON 态半透明强调色填充，OFF 态空心方框，替代原 CheckBox
   - **新增 ThemeToggleBrush**：Light `#400078D4` / Dark `#4D0078D4` 半透明强调色，专用 toggle 背景，避免直接使用 `ThemeAccentBrush` 导致图标看不清

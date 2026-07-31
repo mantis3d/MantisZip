@@ -1,23 +1,101 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:controls="clr-namespace:MantisZip.UI.Avalonia.Controls"
              x:Class="MantisZip.UI.Avalonia.Controls.QuickPathControl"
              x:Name="RootControl">
-  <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
-    <AutoCompleteBox x:Name="PathAutoComplete"
-                     PlaceholderText=""
-                     FilterMode="Contains"
-                     MinimumPrefixLength="0"
-                     Background="{DynamicResource ThemeSurfaceBgBrush}"
-                     Foreground="{DynamicResource ThemeTextPrimaryBrush}"
-                     BorderBrush="{DynamicResource ThemeBorderBrush}" />
-    <Button Grid.Column="1"
-            x:Name="BrowseButton"
-            Content="..."
-            Width="32"
-            MinHeight="{DynamicResource ControlHeight}"
-            Click="OnBrowseClick"
-            Background="{DynamicResource ThemeButtonBgBrush}"
-            Foreground="{DynamicResource ThemeTextPrimaryBrush}"
-            BorderBrush="{DynamicResource ThemeBorderBrush}" />
+  <Grid RowDefinitions="Auto,*"
+        RowSpacing="{DynamicResource SpacingXxs}">
+
+    <!-- Row 0: Tab row + search box -->
+    <Grid Grid.Row="0"
+          ColumnDefinitions="Auto,Auto,Auto,*"
+          ColumnSpacing="{DynamicResource SpacingXxs}">
+      <ToggleButton x:Name="FavoritesTab"
+                    Content="⭐"
+                    IsChecked="True"
+                    MinHeight="{DynamicResource ControlHeightSm}"
+                    Padding="{DynamicResource SpacingXsThk}"
+                    Click="FavoritesTab_Click"
+                    Background="{DynamicResource ThemeButtonBgBrush}"
+                    Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                    BorderBrush="{DynamicResource ThemeBorderBrush}" />
+      <ToggleButton Grid.Column="1"
+                    x:Name="HistoryTab"
+                    Content="🕐"
+                    MinHeight="{DynamicResource ControlHeightSm}"
+                    Padding="{DynamicResource SpacingXsThk}"
+                    Click="HistoryTab_Click"
+                    Background="{DynamicResource ThemeButtonBgBrush}"
+                    Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                    BorderBrush="{DynamicResource ThemeBorderBrush}" />
+      <ToggleButton Grid.Column="2"
+                    x:Name="WindowsTab"
+                    Content="🪟"
+                    MinHeight="{DynamicResource ControlHeightSm}"
+                    Padding="{DynamicResource SpacingXsThk}"
+                    Click="WindowsTab_Click"
+                    Background="{DynamicResource ThemeButtonBgBrush}"
+                    Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                    BorderBrush="{DynamicResource ThemeBorderBrush}" />
+      <TextBox Grid.Column="3"
+               x:Name="SearchBox"
+               MinHeight="{DynamicResource ControlHeightSm}"
+               TextChanged="SearchBox_TextChanged"
+               Background="{DynamicResource ThemeSurfaceBgBrush}"
+               Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+               BorderBrush="{DynamicResource ThemeBorderBrush}" />
+    </Grid>
+
+    <!-- Row 1: Path list -->
+    <Grid Grid.Row="1">
+      <ListBox x:Name="PathList"
+               Background="Transparent"
+               Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+               BorderThickness="0"
+               SelectionChanged="PathList_SelectionChanged">
+        <ListBox.ItemContainerTheme>
+          <ControlTheme TargetType="ListBoxItem">
+            <Setter Property="MinHeight" Value="{DynamicResource ControlHeightMd}" />
+            <Setter Property="Padding" Value="{DynamicResource SpacingXxsThk}" />
+          </ControlTheme>
+        </ListBox.ItemContainerTheme>
+        <ListBox.ItemTemplate>
+          <DataTemplate x:DataType="controls:QuickPathItem">
+            <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
+              <TextBlock Text="{Binding Icon}"
+                         FontSize="12"
+                         VerticalAlignment="Center" />
+              <StackPanel Orientation="Vertical" Spacing="0">
+                <TextBlock Text="{Binding DisplayName}"
+                           Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                           TextTrimming="CharacterEllipsis"
+                           MaxWidth="150" />
+                <TextBlock Text="{Binding Path}"
+                           Foreground="{DynamicResource ThemeTextSecondaryBrush}"
+                           FontSize="11"
+                           TextTrimming="CharacterEllipsis"
+                           MaxWidth="150" />
+              </StackPanel>
+              <Border Background="{DynamicResource ThemeSurfaceBgBrush}"
+                      CornerRadius="3"
+                      Padding="4,0"
+                      VerticalAlignment="Center"
+                      IsVisible="{Binding ShowSourceTag}">
+                <TextBlock Text="{Binding SourceTag}"
+                           FontSize="10"
+                           Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+              </Border>
+            </StackPanel>
+          </DataTemplate>
+        </ListBox.ItemTemplate>
+      </ListBox>
+
+      <!-- Empty state placeholder -->
+      <TextBlock x:Name="EmptyText"
+                 HorizontalAlignment="Center"
+                 VerticalAlignment="Center"
+                 Foreground="{DynamicResource ThemeTextSecondaryBrush}"
+                 IsVisible="False" />
+    </Grid>
   </Grid>
 </UserControl>

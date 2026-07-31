@@ -44,18 +44,14 @@ public partial class CompressSettingsWindow : Window
         // 设置文件保存浏览回调
         ViewModel.BrowseOutput = async () =>
         {
-            var file = await StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
+            // 格式联动：根据当前 DefaultFormat 计算默认扩展名（弹窗内 SaveFile 模式应用）
+            var defaultExt = ViewModel.DefaultFormat switch
             {
-                Title = "Save archive",
-                DefaultExtension = ".zip",
-                FileTypeChoices = new[]
-                {
-                    new FilePickerFileType("ZIP archives") { Patterns = new[] { "*.zip" } },
-                    new FilePickerFileType("7z archives") { Patterns = new[] { "*.7z" } },
-                    new FilePickerFileType("TAR.GZ archives") { Patterns = new[] { "*.tar.gz" } },
-                }
-            });
-            return file?.Path?.LocalPath;
+                "tar.gz" => ".tar.gz",
+                "7z" => ".7z",
+                _ => ".zip"
+            };
+            return await CustomFilePickerDialog.ShowSaveFileAsync(this, initialPath: ViewModel.OutputPath, defaultExtension: defaultExt);
         };
 
         // 设置文件/文件夹选择回调
@@ -71,12 +67,7 @@ public partial class CompressSettingsWindow : Window
 
         ViewModel.PickFolder = async () =>
         {
-            var folders = await StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions
-            {
-                Title = "Select folder to compress",
-                AllowMultiple = false
-            });
-            return folders.Count >= 1 ? folders[0].Path?.LocalPath : null;
+            return await CustomFilePickerDialog.ShowFolderAsync(this);
         };
 
         // 设置关闭回调

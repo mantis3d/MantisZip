@@ -74,16 +74,10 @@ public partial class AddFavoriteDialog : Window
 
     private async void BrowsePath_Click(object? sender, RoutedEventArgs e)
     {
-        var folders = await StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions
+        var path = await CustomFilePickerDialog.ShowFolderAsync(this, initialPath: PathTextBox.Text);
+        if (!string.IsNullOrEmpty(path))
         {
-            Title = BrowseText,
-            AllowMultiple = false,
-        });
-
-        var folder = folders?.FirstOrDefault();
-        if (folder != null && folder.TryGetLocalPath() is { } localPath)
-        {
-            PathTextBox.Text = localPath;
+            PathTextBox.Text = path;
         }
     }
 }
