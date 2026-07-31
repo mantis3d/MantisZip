@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
+using Avalonia.Media.Imaging;
 using MantisZip.Core.Utils;
 using MantisZip.UI.Avalonia.Services;
 
@@ -101,11 +102,13 @@ public partial class QuickPathControl : UserControl
 
     private void LoadSources()
     {
+        var folderIcon = IconService.GetFolderIcon();
         _favorites = FavoritePathManager.GetAll().Select(f => new QuickPathItem
         {
             DisplayName = f.Name,
             Path = f.Path,
-            Icon = f.IsSystem ? FavoritePathManager.GetSystemIcon(f.SystemKey) : "📁",
+            Icon = folderIcon,
+            IconKey = "IconFolder",
             SourceTag = "⭐",
             ShowSourceTag = false
         }).ToList();
@@ -114,7 +117,8 @@ public partial class QuickPathControl : UserControl
         {
             DisplayName = GetDisplayName(h.Path),
             Path = h.Path,
-            Icon = "🕐",
+            Icon = folderIcon,
+            IconKey = "IconHistory",
             SourceTag = "🕐",
             ShowSourceTag = false
         }).ToList();
@@ -126,11 +130,13 @@ public partial class QuickPathControl : UserControl
     {
         try
         {
+            var folderIcon = IconService.GetFolderIcon();
             _windows = ExplorerWindowTracker.GetOpenExplorerWindows().Select(w => new QuickPathItem
             {
                 DisplayName = !string.IsNullOrEmpty(w.DisplayName) ? w.DisplayName : GetDisplayName(w.Path),
                 Path = w.Path,
-                Icon = "🪟",
+                Icon = folderIcon,
+                IconKey = "IconHome",
                 SourceTag = "🪟",
                 ShowSourceTag = false,
                 IsActive = w.IsActive
@@ -240,7 +246,12 @@ public class QuickPathItem
 {
     public string DisplayName { get; set; } = string.Empty;
     public string Path { get; set; } = string.Empty;
-    public string Icon { get; set; } = "📁";
+    /// <summary>真实文件系统图标（文件夹图标等）。null 时回退 <see cref="IconKey"/> 矢量图标。</summary>
+    public Bitmap? Icon { get; set; }
+    /// <summary>Icon 为 null 时用于 PathIcon 的矢量资源键（IconFolder / IconHistory / IconHome 等）。</summary>
+    public string? IconKey { get; set; }
+    /// <summary>Icon 是否为 null（决定显示 Image 还是 PathIcon）。</summary>
+    public bool IsNullIcon => Icon == null;
     public string SourceTag { get; set; } = string.Empty;
     public bool ShowSourceTag { get; set; }
     public bool IsActive { get; set; }
@@ -251,6 +262,7 @@ public class QuickPathItem
         DisplayName = DisplayName,
         Path = Path,
         Icon = Icon,
+        IconKey = IconKey,
         SourceTag = SourceTag,
         ShowSourceTag = ShowSourceTag,
         IsActive = IsActive,

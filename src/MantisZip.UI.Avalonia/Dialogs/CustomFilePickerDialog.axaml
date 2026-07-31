@@ -15,12 +15,20 @@
   <Grid RowDefinitions="Auto,*,Auto,Auto"
         Margin="{DynamicResource SpacingMdThk}">
 
-    <!-- ═══════ Row 0: Address bar + navigation ═══════ -->
+    <!-- ═══════ Row 0: Drive selector + address bar + navigation ═══════ -->
     <Grid Grid.Row="0"
-          ColumnDefinitions="Auto,Auto,Auto,Auto,*"
+          ColumnDefinitions="Auto,Auto,Auto,Auto,Auto,*"
           ColumnSpacing="{DynamicResource SpacingXxs}"
           Margin="0,0,0,8">
-      <Button x:Name="BackButton"
+      <ComboBox x:Name="DriveSelector"
+                MinWidth="64"
+                MinHeight="{DynamicResource ControlHeightSm}"
+                SelectionChanged="DriveSelector_SelectionChanged"
+                Background="{DynamicResource ThemeSurfaceBgBrush}"
+                Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                BorderBrush="{DynamicResource ThemeBorderBrush}" />
+      <Button Grid.Column="1"
+              x:Name="BackButton"
               Content="◀"
               Width="32"
               MinHeight="{DynamicResource ControlHeightSm}"
@@ -28,7 +36,7 @@
               Background="{DynamicResource ThemeButtonBgBrush}"
               Foreground="{DynamicResource ThemeTextPrimaryBrush}"
               BorderBrush="{DynamicResource ThemeBorderBrush}" />
-      <Button Grid.Column="1"
+      <Button Grid.Column="2"
               x:Name="ForwardButton"
               Content="▶"
               Width="32"
@@ -37,7 +45,7 @@
               Background="{DynamicResource ThemeButtonBgBrush}"
               Foreground="{DynamicResource ThemeTextPrimaryBrush}"
               BorderBrush="{DynamicResource ThemeBorderBrush}" />
-      <Button Grid.Column="2"
+      <Button Grid.Column="3"
               x:Name="UpButton"
               Content="▲"
               Width="32"
@@ -46,16 +54,20 @@
               Background="{DynamicResource ThemeButtonBgBrush}"
               Foreground="{DynamicResource ThemeTextPrimaryBrush}"
               BorderBrush="{DynamicResource ThemeBorderBrush}" />
-      <Button Grid.Column="3"
+      <Button Grid.Column="4"
               x:Name="SystemBrowseButton"
-              Content="📁"
               Width="32"
               MinHeight="{DynamicResource ControlHeightSm}"
               Click="SystemBrowse_Click"
               Background="{DynamicResource ThemeButtonBgBrush}"
               Foreground="{DynamicResource ThemeTextPrimaryBrush}"
-              BorderBrush="{DynamicResource ThemeBorderBrush}" />
-      <AutoCompleteBox Grid.Column="4"
+              BorderBrush="{DynamicResource ThemeBorderBrush}">
+        <PathIcon Data="{StaticResource IconFolder}"
+                  Width="14"
+                  Height="14"
+                  Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+      </Button>
+      <AutoCompleteBox Grid.Column="5"
                        x:Name="PathAutoComplete"
                        MinHeight="{DynamicResource ControlHeightSm}"
                        FilterMode="Contains"
@@ -110,6 +122,16 @@
               <ControlTheme TargetType="ListBoxItem">
                 <Setter Property="MinHeight" Value="{DynamicResource ControlHeightMd}" />
                 <Setter Property="Padding" Value="{DynamicResource SpacingXxsThk}" />
+                <!-- 选中/悬停高亮 -->
+                <Style Selector="^:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+                  <Setter Property="Background" Value="{DynamicResource ThemeTabHoverBrush}" />
+                </Style>
+                <Style Selector="^:selected /template/ ContentPresenter#PART_ContentPresenter">
+                  <Setter Property="Background" Value="{DynamicResource ThemeListSelectedBrush}" />
+                </Style>
+                <Style Selector="^:selected:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+                  <Setter Property="Background" Value="{DynamicResource ThemeListSelectedBrush}" />
+                </Style>
               </ControlTheme>
             </ListBox.ItemContainerTheme>
             <ListBox.ItemTemplate>

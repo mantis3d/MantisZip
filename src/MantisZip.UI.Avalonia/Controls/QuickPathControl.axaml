@@ -1,8 +1,12 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:controls="clr-namespace:MantisZip.UI.Avalonia.Controls"
+             xmlns:conv="clr-namespace:MantisZip.UI.Avalonia.Converters"
              x:Class="MantisZip.UI.Avalonia.Controls.QuickPathControl"
              x:Name="RootControl">
+  <UserControl.Resources>
+    <conv:GeometryResourceConverter x:Key="GeometryResourceConverter" />
+  </UserControl.Resources>
   <Grid RowDefinitions="Auto,*"
         RowSpacing="{DynamicResource SpacingXxs}">
 
@@ -11,32 +15,44 @@
           ColumnDefinitions="Auto,Auto,Auto,*"
           ColumnSpacing="{DynamicResource SpacingXxs}">
       <ToggleButton x:Name="FavoritesTab"
-                    Content="⭐"
                     IsChecked="True"
                     MinHeight="{DynamicResource ControlHeightSm}"
                     Padding="{DynamicResource SpacingXsThk}"
                     Click="FavoritesTab_Click"
                     Background="{DynamicResource ThemeButtonBgBrush}"
                     Foreground="{DynamicResource ThemeTextPrimaryBrush}"
-                    BorderBrush="{DynamicResource ThemeBorderBrush}" />
+                    BorderBrush="{DynamicResource ThemeBorderBrush}">
+        <PathIcon Data="{StaticResource IconStar}"
+                  Width="14"
+                  Height="14"
+                  Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+      </ToggleButton>
       <ToggleButton Grid.Column="1"
                     x:Name="HistoryTab"
-                    Content="🕐"
                     MinHeight="{DynamicResource ControlHeightSm}"
                     Padding="{DynamicResource SpacingXsThk}"
                     Click="HistoryTab_Click"
                     Background="{DynamicResource ThemeButtonBgBrush}"
                     Foreground="{DynamicResource ThemeTextPrimaryBrush}"
-                    BorderBrush="{DynamicResource ThemeBorderBrush}" />
+                    BorderBrush="{DynamicResource ThemeBorderBrush}">
+        <PathIcon Data="{StaticResource IconHistory}"
+                  Width="14"
+                  Height="14"
+                  Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+      </ToggleButton>
       <ToggleButton Grid.Column="2"
                     x:Name="WindowsTab"
-                    Content="🪟"
                     MinHeight="{DynamicResource ControlHeightSm}"
                     Padding="{DynamicResource SpacingXsThk}"
                     Click="WindowsTab_Click"
                     Background="{DynamicResource ThemeButtonBgBrush}"
                     Foreground="{DynamicResource ThemeTextPrimaryBrush}"
-                    BorderBrush="{DynamicResource ThemeBorderBrush}" />
+                    BorderBrush="{DynamicResource ThemeBorderBrush}">
+        <PathIcon Data="{StaticResource IconHome}"
+                  Width="14"
+                  Height="14"
+                  Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+      </ToggleButton>
       <TextBox Grid.Column="3"
                x:Name="SearchBox"
                MinHeight="{DynamicResource ControlHeightSm}"
@@ -57,15 +73,36 @@
           <ControlTheme TargetType="ListBoxItem">
             <Setter Property="MinHeight" Value="{DynamicResource ControlHeightMd}" />
             <Setter Property="Padding" Value="{DynamicResource SpacingXxsThk}" />
+            <!-- 选中高亮（伪类选择器作用于默认模板的 ContentPresenter） -->
+            <Style Selector="^:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+              <Setter Property="Background" Value="{DynamicResource ThemeTabHoverBrush}" />
+            </Style>
+            <Style Selector="^:selected /template/ ContentPresenter#PART_ContentPresenter">
+              <Setter Property="Background" Value="{DynamicResource ThemeListSelectedBrush}" />
+            </Style>
+            <Style Selector="^:selected:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+              <Setter Property="Background" Value="{DynamicResource ThemeListSelectedBrush}" />
+            </Style>
           </ControlTheme>
         </ListBox.ItemContainerTheme>
         <ListBox.ItemTemplate>
           <DataTemplate x:DataType="controls:QuickPathItem">
-            <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
-              <TextBlock Text="{Binding Icon}"
-                         FontSize="12"
-                         VerticalAlignment="Center" />
-              <StackPanel Orientation="Vertical" Spacing="0">
+            <Grid ColumnDefinitions="20,*,Auto">
+              <!-- 真实图标优先；Icon 为空时用矢量 PathIcon 回退 -->
+              <Image Source="{Binding Icon}"
+                     Width="16"
+                     Height="16"
+                     VerticalAlignment="Center"
+                     IsVisible="{Binding !IsNullIcon}" />
+              <PathIcon Data="{Binding IconKey, Converter={StaticResource GeometryResourceConverter}}"
+                        Width="16"
+                        Height="16"
+                        VerticalAlignment="Center"
+                        Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                        IsVisible="{Binding IsNullIcon}" />
+              <StackPanel Grid.Column="1"
+                          Orientation="Vertical"
+                          Spacing="0">
                 <TextBlock Text="{Binding DisplayName}"
                            Foreground="{DynamicResource ThemeTextPrimaryBrush}"
                            TextTrimming="CharacterEllipsis"
@@ -76,7 +113,8 @@
                            TextTrimming="CharacterEllipsis"
                            MaxWidth="150" />
               </StackPanel>
-              <Border Background="{DynamicResource ThemeSurfaceBgBrush}"
+              <Border Grid.Column="2"
+                      Background="{DynamicResource ThemeSurfaceBgBrush}"
                       CornerRadius="3"
                       Padding="4,0"
                       VerticalAlignment="Center"
@@ -85,7 +123,7 @@
                            FontSize="10"
                            Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
               </Border>
-            </StackPanel>
+            </Grid>
           </DataTemplate>
         </ListBox.ItemTemplate>
       </ListBox>
