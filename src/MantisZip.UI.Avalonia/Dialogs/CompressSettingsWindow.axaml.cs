@@ -7,6 +7,7 @@ using Avalonia.Platform.Storage;
 using Avalonia.Threading;
 using MantisZip.Core.Abstractions;
 using MantisZip.Core.FileFilter;
+using MantisZip.UI.Avalonia.Controls;
 using MantisZip.UI.Avalonia.Models;
 using MantisZip.UI.Avalonia.Services;
 using MantisZip.UI.Avalonia.ViewModels;
@@ -259,8 +260,60 @@ public partial class CompressSettingsWindow : Window
         ViewModel.OutputDirectory = path;
 
         // 收起下拉浮层
-        OutputPathToggle.IsChecked = false;
         OutputPathPopup.IsOpen = false;
+    }
+
+    /// <summary>打开 QuickPathControl 面板并切换到指定 Tab。</summary>
+    private void OpenQuickPath(PathTab tab)
+    {
+        if (OutputPathControl == null) return;
+        OutputPathControl.SelectTab(tab);
+        OutputPathPopup.IsOpen = true;
+    }
+
+    private void QuickFavButton_Click(object? sender, RoutedEventArgs e)
+        => OpenQuickPath(PathTab.Favorites);
+
+    private void QuickHistButton_Click(object? sender, RoutedEventArgs e)
+        => OpenQuickPath(PathTab.History);
+
+    private void QuickWinButton_Click(object? sender, RoutedEventArgs e)
+        => OpenQuickPath(PathTab.Windows);
+
+    private void QuickTreeButton_Click(object? sender, RoutedEventArgs e)
+        => OpenQuickPath(PathTab.Tree);
+
+    /// <summary>
+    /// 浏览按钮：打开保存文件对话框（带格式联动），返回完整路径后拆分为目录 + 文件名。
+    /// </summary>
+    private async void QuickBrowseButton_Click(object? sender, RoutedEventArgs e)
+    {
+        if (ViewModel.OutputMode != CompressOutputMode.Manual) return;
+        var defaultExt = ViewModel.DefaultFormat switch
+        {
+            "tar.gz" => ".tar.gz",
+            "7z" => ".7z",
+            _ => ".zip"
+        };
+        var path = await CustomFilePickerDialog.ShowSaveFileAsync(
+            this, initialPath: ViewModel.OutputPath, defaultExtension: defaultExt);
+        if (string.IsNullOrEmpty(path)) return;
+
+        // 拆分完整路径 → 目录 + 文件名
+        var dir = System.IO.Path.GetDirectoryName(path);
+        var name = System.IO.Path.GetFileName(path);
+        foreach (var ext in new[] { ".tar.gz", ".7z", ".zip" })
+        {
+            if (name.EndsWith(ext, StringComparison.OrdinalIgnoreCase))
+            {
+                name = name[..^ext.Length];
+                break;
+            }
+        }
+        if (!string.IsNullOrEmpty(dir))
+            ViewModel.OutputDirectory = dir;
+        if (!string.IsNullOrEmpty(name))
+            ViewModel.OutputFileName = name;
     }
 
     /// <summary>OutputPath/OutputMode 变化时同步 QuickPathControl 当前路径高亮。</summary>

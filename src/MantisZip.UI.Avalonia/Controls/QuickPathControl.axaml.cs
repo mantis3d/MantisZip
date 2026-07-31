@@ -20,8 +20,6 @@ public partial class QuickPathControl : UserControl
     /// <summary>选中路径后触发（参数为路径字符串）。</summary>
     public event EventHandler<string>? PathSelected;
 
-    private enum PathTab { Favorites, History, Windows, Tree }
-
     private PathTab _currentTab = PathTab.Favorites;
 
     /// <summary>当前 Tab 展示的列表项。</summary>
@@ -74,6 +72,14 @@ public partial class QuickPathControl : UserControl
     {
         LoadSources();
         ShowCurrentTab();
+    }
+
+    /// <summary>
+    /// 由宿主（如压缩窗口的快捷按钮行）调用，切换到指定 Tab。
+    /// </summary>
+    public void SelectTab(PathTab tab)
+    {
+        SetTab(tab);
     }
 
     // ── Tab switching ───────────────────────────────────────────────────────
@@ -383,6 +389,15 @@ public class QuickPathItem
         IsActive = IsActive,
         IsCurrent = IsCurrent
     };
+}
+
+/// <summary>路径速选来源 Tab。</summary>
+public enum PathTab
+{
+    Favorites,
+    History,
+    Windows,
+    Tree
 }
 
 /// <summary>目录树节点（惰性加载子目录）。</summary>
