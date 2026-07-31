@@ -30,16 +30,11 @@ public partial class MainWindow : Window
     private string? _lastSortMemberPath;
     private bool _lastSortDescending;
 
-    /// <summary>拖拽时写入 DataTransfer 的自定义格式名（使 IDataObject 非空，避免 Explorer 显示禁止光标）</summary>
+    /// <summary>拖拽时写入数据对象的自定义格式名（使 IDataObject 非空，避免 Explorer 显示禁止光标）</summary>
     private const string MantisZipDragFormatName = "MantisZipDragFormat";
 
-    /// <summary>Esc 检测钩子委托（字段持有防止 GC 回收导致原生回调悬空）</summary>
-    private NativeMethods.LowLevelKeyboardProc? _dragEscHookProc;
-    /// <summary>拖拽期间是否按下了 Esc</summary>
+    /// <summary>拖拽期间是否按下了 Esc（由自实现 IDropSource.QueryContinueDrag 同步置位）</summary>
     private bool _dragEscPressed;
-
-    /// <summary>A 方案：拖拽期间替换 OCR_NO 后保存的原始光标副本（finally 还原用）；nint.Zero 表示未替换</summary>
-    private nint _originalNoCursor;
 
     public MainWindow()
     {
@@ -419,40 +414,66 @@ public partial class MainWindow : Window
                 using var controller = new OverlayController(overlayHwnd, mainHwnd);
                 controller.Start();
 
-                // A 方案：拖拽期间把系统"禁止"光标（OCR_NO）替换为正常箭头/自定义 .cur。
-                // OLE 每次鼠标移动都用系统资源设置光标，替换资源表本身即可稳定生效。
-                ReplaceSystemNoCursor();
+                // 拖拽光标：按 overlay 状态加载不同 .cur，源文件位于项目 Resources\Cursors\，
+                // 构建时复制到输出目录的 Resources\Cursors\ 下（与 MenuIcons 同模式）。
+                // 状态→文件约定：
+                //   None/默认        → DragCursor.cur     （金色）
+                //   Success(可放置)  → DragCursorOk.cur   （绿色）
+                //   Warning(警告)    → DragCursorWarn.cur （红色）
+                //   自家窗口         → DragCursorSelf.cur （灰色）
+                // 缺失文件回退基础 DragCursor.cur，再回退系统标准箭头（共享句柄，不可销毁）。
+                // 仅从文件加载的自定义句柄在拖拽结束后销毁。
+                var cursorHandles = new HashSet<nint>();
+                var cursorsDir = Path.Combine(AppContext.BaseDirectory, "Resources", "Cursors");
 
-                nint escHook = nint.Zero;
+                nint LoadStateCursor(string fileName, nint fallback)
+                {
+                    var path = Path.Combine(cursorsDir, fileName);
+                    if (File.Exists(path))
+                    {
+                        var h = NativeMethods.LoadCursorFromFile(path);
+                        if (h != nint.Zero)
+                        {
+                            cursorHandles.Add(h);
+                            return h;
+                        }
+                    }
+                    return fallback;
+                }
+
+                var baseCursor = LoadStateCursor("DragCursor.cur", nint.Zero);
+                if (baseCursor == nint.Zero)
+                    baseCursor = NativeMethods.LoadCursor(nint.Zero, new nint(NativeMethods.OCR_NORMAL));
+                var okCursor = LoadStateCursor("DragCursorOk.cur", baseCursor);
+                var warnCursor = LoadStateCursor("DragCursorWarn.cur", baseCursor);
+                var selfCursor = LoadStateCursor("DragCursorSelf.cur", baseCursor);
+
+                // 每次 GiveFeedback 按 overlay 当前状态动态选光标（与覆层颜色同一状态源）
+                Func<nint> cursorProvider = () =>
+                {
+                    if (controller.IsOverOwnWindow)
+                        return selfCursor;
+                    return controller.CurrentStatus switch
+                    {
+                        DropTargetDetector.DropTargetStatus.Success => okCursor,
+                        DropTargetDetector.DropTargetStatus.Warning => warnCursor,
+                        _ => baseCursor
+                    };
+                };
+
                 try
                 {
-                    var data = new DataTransfer();
-                    // 注册自定义平台格式，使 IDataObject 非空（空 DataObject 会让 Explorer 显示禁止光标）
-                    data.Add(DataTransferItem.Create(
-                        DataFormat.CreateStringPlatformFormat(MantisZipDragFormatName), archivePath));
-                    App.DebugLog("[MainWindow] Avalonia DoDragDropAsync START");
-
-                    // 安装低级键盘钩子检测 Esc 取消。OLE 拖拽模态循环会派发钩子消息，
-                    // 回调在键盘消息被处理前同步触发，因此 DoDragDropAsync 返回时标志已确定。
+                    // 自实现 OLE 拖拽：GiveFeedback 返回 S_OK 并直接 SetCursor 自定义光标。
+                    // Avalonia 的 DoDragDropAsync 内部固定返回 USEDEFAULTCURSORS，会让系统用
+                    // LoadCursor(OCR_NO) 显示禁止光标，而替换 OCR_NO 资源表在本机无效（已实证），
+                    // 因此绕开它自行控制光标。Esc 由 QueryContinueDrag 的 fEscapePressed 处理。
+                    App.DebugLog("[MainWindow] Custom OLE DoDragDrop START");
                     _dragEscPressed = false;
-                    _dragEscHookProc = (nCode, wParam, lParam) =>
-                    {
-                        if (nCode >= 0 && (int)wParam == NativeMethods.WM_KEYDOWN &&
-                            Marshal.ReadInt32(lParam) == NativeMethods.VK_ESCAPE)
-                        {
-                            _dragEscPressed = true;
-                        }
-                        return NativeMethods.CallNextHookEx(escHook, nCode, wParam, lParam);
-                    };
-                    escHook = NativeMethods.SetWindowsHookEx(
-                        NativeMethods.WH_KEYBOARD_LL, _dragEscHookProc,
-                        NativeMethods.GetModuleHandle(null), 0);
-                    if (escHook == nint.Zero)
-                        App.DebugLog("[MainWindow] Esc hook install FAILED");
-
-                    var result = await DragDrop.DoDragDropAsync(
-                        triggerEvent, data, DragDropEffects.Copy);
-                    App.DebugLog($"[MainWindow] Avalonia DoDragDropAsync DONE: result={result}");
+                    var result = CustomOleDragDrop.PerformDragDrop(
+                        triggerEvent, MantisZipDragFormatName, archivePath,
+                        cursorProvider, DragDropEffects.Copy,
+                        () => _dragEscPressed = true);
+                    App.DebugLog($"[MainWindow] Custom OLE DoDragDrop DONE: result={result}");
 
                     // Close overlay IMMEDIATELY after drag completes, before dialog processing
                     controller.Stop();
@@ -483,18 +504,13 @@ public partial class MainWindow : Window
                 }
                 catch (Exception ex)
                 {
-                    App.DebugLog($"[MainWindow] DragDropAsync EXCEPTION: {ex.GetType().Name}: {ex.Message}");
+                    App.DebugLog($"[MainWindow] DragDrop EXCEPTION: {ex.GetType().Name}: {ex.Message}");
                 }
                 finally
                 {
-                    // 还原系统"禁止"光标（与 ReplaceSystemNoCursor 配对，异常路径也执行）
-                    RestoreSystemNoCursor();
-                    // 卸载键盘钩子（正常/异常路径统一处理）
-                    if (escHook != nint.Zero)
-                    {
-                        NativeMethods.UnhookWindowsHookEx(escHook);
-                        _dragEscHookProc = null;
-                    }
+                    // 释放自定义光标句柄（仅从文件加载的；共享标准箭头不销毁）
+                    foreach (var h in cursorHandles)
+                        NativeMethods.DestroyIcon(h);
                     // Safety net: ensure overlay is closed even if early close was skipped
                     try { overlayWin.Close(); } catch { }
                     try { controller.Stop(); } catch { }
@@ -513,82 +529,6 @@ public partial class MainWindow : Window
 
         // Persist window position/size/state on close
         Closing += (_, _) => WindowStateManager.Save(this);
-    }
-
-    /// <summary>
-    /// A 方案（拖拽光标临时修复）：拖拽期间用正常箭头（或自定义 .cur）替换系统"禁止"光标（OCR_NO）。
-    /// 背景：Explorer 不识别我们的自定义格式 → DragEnter 返回 DROPEFFECT_NONE → 显示禁止光标。
-    /// OLE 每次鼠标移动都用系统光标资源设置默认光标（Avalonia GiveFeedback 返回 USEDEFAULTCURSORS），
-    /// 定时 SetCursor 会被覆盖，唯有替换资源表本身（SetSystemCursor）能稳定生效。
-    /// 副作用：拖拽期间全系统"禁止"光标临时变为箭头/自定义图标；进程崩溃时可能残留（需重启还原）。
-    /// </summary>
-    private void ReplaceSystemNoCursor()
-    {
-        try
-        {
-            // 防御：上次异常未还原时先还原
-            if (_originalNoCursor != nint.Zero)
-                RestoreSystemNoCursor();
-
-            var original = NativeMethods.LoadCursor(nint.Zero, new nint(NativeMethods.OCR_NO));
-            if (original == nint.Zero)
-                return;
-            // CopyIcon 保存副本供还原（LoadCursor 返回的是共享句柄，不能直接持有销毁）
-            var saved = NativeMethods.CopyIcon(original);
-            if (saved == nint.Zero)
-                return;
-
-            // 优先加载自定义 .cur（程序同目录 DragCursor.cur），否则用系统标准箭头兜底
-            var custom = nint.Zero;
-            var curPath = Path.Combine(AppContext.BaseDirectory, "DragCursor.cur");
-            if (File.Exists(curPath))
-                custom = NativeMethods.LoadCursorFromFile(curPath);
-            if (custom == nint.Zero)
-                custom = NativeMethods.LoadCursor(nint.Zero, new nint(NativeMethods.OCR_NORMAL));
-            if (custom == nint.Zero)
-            {
-                NativeMethods.DestroyIcon(saved);
-                return;
-            }
-
-            if (NativeMethods.SetSystemCursor(custom, NativeMethods.OCR_NO))
-            {
-                _originalNoCursor = saved;
-            }
-            else
-            {
-                // 替换失败：释放副本，保持未替换状态
-                NativeMethods.DestroyIcon(saved);
-                App.DebugLog("[MainWindow] SetSystemCursor(OCR_NO) FAILED");
-            }
-        }
-        catch (Exception ex)
-        {
-            App.DebugLog($"[MainWindow] ReplaceSystemNoCursor FAILED: {ex.GetType().Name}: {ex.Message}");
-            _originalNoCursor = nint.Zero;
-        }
-    }
-
-    /// <summary>
-    /// 还原系统"禁止"光标（与 <see cref="ReplaceSystemNoCursor"/> 配对）。必须在拖拽结束后调用。
-    /// </summary>
-    private void RestoreSystemNoCursor()
-    {
-        if (_originalNoCursor == nint.Zero)
-            return;
-        try
-        {
-            // 还原后系统持有该句柄，不销毁
-            NativeMethods.SetSystemCursor(_originalNoCursor, NativeMethods.OCR_NO);
-        }
-        catch (Exception ex)
-        {
-            App.DebugLog($"[MainWindow] RestoreSystemNoCursor FAILED: {ex.GetType().Name}: {ex.Message}");
-        }
-        finally
-        {
-            _originalNoCursor = nint.Zero;
-        }
     }
 
     private void FileListGrid_DoubleTapped(object? sender, TappedEventArgs e)

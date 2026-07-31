@@ -21,6 +21,7 @@ internal class OverlayController : IDisposable
     // Tracking state
     private uint _currentColor = 0x00808080; // BGR gray (default for no target)
     private DropTargetDetector.DropTargetStatus _currentStatus;
+    private bool _isOwnApp;
     private readonly object _stateLock = new();
 
     // Preview image (set from UI thread after async render completes)
@@ -51,6 +52,18 @@ internal class OverlayController : IDisposable
     {
         _hwnd = hwnd;
         _mainHwnd = mainHwnd;
+    }
+
+    /// <summary>当前目标检测状态（跟踪线程写、拖拽线程读，加锁安全）。</summary>
+    public DropTargetDetector.DropTargetStatus CurrentStatus
+    {
+        get { lock (_stateLock) return _currentStatus; }
+    }
+
+    /// <summary>当前是否悬停在自己应用窗口上（对应深灰状态）。</summary>
+    public bool IsOverOwnWindow
+    {
+        get { lock (_stateLock) return _isOwnApp; }
     }
 
     public void Start()
@@ -167,6 +180,7 @@ internal class OverlayController : IDisposable
         lock (_stateLock)
         {
             _currentStatus = status;
+            _isOwnApp = isOwnApp;
             if (isOwnApp)
             {
                 _currentColor = 0x00333333; // Dark gray for own window

@@ -21,6 +21,12 @@
 
 ### MantisZip.UI.Avalonia（主力版）
 
+**2026-07-31** — C 方案第一阶段落地（路线 2：自实现 OLE 拖拽）+ 拖拽光标按状态切换 + 光标文件入库
+  - **C 方案第一阶段（路线 2）实施**：`CustomOleDragDrop.cs` 新建，自实现 `IOleDataObject`/`IOleDropSource`/`IOleEnumFormatEtc` + `CustomDataObject`（HGLOBAL UTF-16 延迟渲染）/`CustomDropSource`/`CustomEnumFormatEtc`；`GiveFeedback` 返回 S_OK + 直接 `SetCursor`，根治 Avalonia `OleDragSource` 固定返回 `USEDEFAULTCURSORS` 导致的禁止光标；Esc 检测改用 OLE `fEscapePressed`，`WH_KEYBOARD_LL` 钩子整体退役（用户验证：拖拽光标成功）
+  - **拖拽光标按 overlay 状态切换（绿/红/金/灰 四状态）**：`OverlayController` 新增线程安全只读属性 `CurrentStatus` / `IsOverOwnWindow`（`_stateLock` 保护）；`CustomDropSource` 改收 `Func<nint>` 光标提供器，`GiveFeedback` 每次回调按当前状态动态取光标（与覆层颜色同一状态源）
+  - **光标文件入库**：`.cur` 从 bin 移入 `Resources\Cursors\`，csproj 加 `<None Include="Resources\Cursors\**">` 复制规则（与 MenuIcons 同模式），运行时按 `Resources\Cursors\` 子目录读取；文件约定 `DragCursor.cur`（金色/默认）、`DragCursorOk.cur`（绿色/可放置）、`DragCursorWarn.cur`（红色/警告）、`DragCursorSelf.cur`（灰色/自家窗口）；缺失回退基础箭头 → 系统标准箭头；仅文件句柄 finally 中 `DestroyIcon`
+  - 构建 0 errors
+
 **2026-07-31** — 拖拽解压高危修复 + 拖拽光标方案（A 实施 / C 计划入库）
   - **Esc 取消**：`WH_KEYBOARD_LL` 钩子检测 Esc，拖拽中按 Esc 取消解压并提示（用户验证通过）
   - **ask 冲突**：拖拽解压遇到重名文件弹 `ConflictDialog`，支持"应用到全部"（用户验证通过）
