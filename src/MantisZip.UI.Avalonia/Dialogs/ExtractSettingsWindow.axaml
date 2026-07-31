@@ -66,18 +66,115 @@
                 <Grid ColumnDefinitions="*,Auto">
                   <TextBox Grid.Column="0"
                            PlaceholderText="{Binding LocalizedStrings[Extract_DestinationPlaceholder]}"
-                           Text="{Binding DestinationPath}" />
+                           Text="{Binding DestinationPath}"
+                           Background="{DynamicResource ThemeSurfaceBgBrush}"
+                           Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                           BorderBrush="{DynamicResource ThemeBorderBrush}" />
                   <Button Grid.Column="1"
                           Content="{Binding LocalizedStrings[Extract_Browse]}"
                           Width="80"
-                          Height="28"
+                          MinHeight="{DynamicResource ControlHeight}"
                           Margin="8,0,0,0"
-                          Command="{Binding BrowseDestinationCommand}"
+                          Click="BrowsePath_Click"
                           Background="{DynamicResource ThemeButtonBgBrush}"
                           Foreground="{DynamicResource ThemeTextPrimaryBrush}"
                           BorderBrush="{DynamicResource ThemeBorderBrush}">
                   </Button>
                 </Grid>
+
+                <!-- Quick buttons row: ⭐ 🕐 🪟 🌲 + 📁 (extract folder dialog) -->
+                <Grid ColumnDefinitions="Auto,Auto,Auto,Auto,Auto"
+                      ColumnSpacing="{DynamicResource SpacingXxs}">
+                  <Button x:Name="QuickFavButton"
+                          MinHeight="{DynamicResource ControlHeightSm}"
+                          Padding="{DynamicResource SpacingXsThk}"
+                          Click="QuickFavButton_Click"
+                          ToolTip.Tip="{Binding LocalizedStrings[QuickPath_TabFavorites]}"
+                          Background="{DynamicResource ThemeButtonBgBrush}"
+                          Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                          BorderBrush="{DynamicResource ThemeBorderBrush}">
+                    <PathIcon Data="{StaticResource IconStar}"
+                              Width="14" Height="14"
+                              Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+                  </Button>
+                  <Button Grid.Column="1"
+                          x:Name="QuickHistButton"
+                          MinHeight="{DynamicResource ControlHeightSm}"
+                          Padding="{DynamicResource SpacingXsThk}"
+                          Click="QuickHistButton_Click"
+                          ToolTip.Tip="{Binding LocalizedStrings[QuickPath_TabHistory]}"
+                          Background="{DynamicResource ThemeButtonBgBrush}"
+                          Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                          BorderBrush="{DynamicResource ThemeBorderBrush}">
+                    <PathIcon Data="{StaticResource IconHistory}"
+                              Width="14" Height="14"
+                              Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+                  </Button>
+                  <Button Grid.Column="2"
+                          x:Name="QuickWinButton"
+                          MinHeight="{DynamicResource ControlHeightSm}"
+                          Padding="{DynamicResource SpacingXsThk}"
+                          Click="QuickWinButton_Click"
+                          ToolTip.Tip="{Binding LocalizedStrings[QuickPath_TabWindows]}"
+                          Background="{DynamicResource ThemeButtonBgBrush}"
+                          Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                          BorderBrush="{DynamicResource ThemeBorderBrush}">
+                    <PathIcon Data="{StaticResource IconHome}"
+                              Width="14" Height="14"
+                              Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+                  </Button>
+                  <Button Grid.Column="3"
+                          x:Name="QuickTreeButton"
+                          MinHeight="{DynamicResource ControlHeightSm}"
+                          Padding="{DynamicResource SpacingXsThk}"
+                          Click="QuickTreeButton_Click"
+                          ToolTip.Tip="{Binding LocalizedStrings[QuickPath_TabTree]}"
+                          Background="{DynamicResource ThemeButtonBgBrush}"
+                          Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                          BorderBrush="{DynamicResource ThemeBorderBrush}">
+                    <PathIcon Data="{StaticResource IconFolder}"
+                              Width="14" Height="14"
+                              Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+                  </Button>
+                  <Button Grid.Column="4"
+                          x:Name="QuickBrowseButton"
+                          MinHeight="{DynamicResource ControlHeightSm}"
+                          Padding="{DynamicResource SpacingXsThk}"
+                          Click="QuickBrowseButton_Click"
+                          ToolTip.Tip="{Binding LocalizedStrings[Extract_Browse]}"
+                          Background="{DynamicResource ThemeButtonBgBrush}"
+                          Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                          BorderBrush="{DynamicResource ThemeBorderBrush}">
+                    <StackPanel Orientation="Horizontal" Spacing="4">
+                      <PathIcon Data="{StaticResource IconFolderOpen}"
+                                Width="14" Height="14"
+                                Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+                      <TextBlock Text="{Binding LocalizedStrings[Extract_Browse]}"
+                                 FontSize="11"
+                                 VerticalAlignment="Center"
+                                 Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+                    </StackPanel>
+                  </Button>
+                </Grid>
+
+                <!-- Dropdown popup: QuickPathControl panel -->
+                <Popup x:Name="DestPathPopup"
+                       PlacementTarget="{Binding #QuickFavButton}"
+                       Placement="Bottom"
+                       IsLightDismissEnabled="True">
+                  <Border Background="{DynamicResource ThemeWindowBgBrush}"
+                          BorderBrush="{DynamicResource ThemeBorderBrush}"
+                          BorderThickness="1"
+                          CornerRadius="4"
+                          Padding="6"
+                          Width="320"
+                          MaxHeight="420"
+                          BoxShadow="0 2 8 0 #40000000">
+                    <controls:QuickPathControl x:Name="DestPathControl"
+                                               Width="308"
+                                               PathSelected="DestPathControl_PathSelected" />
+                  </Border>
+                </Popup>
               </StackPanel>
             </Border>
 

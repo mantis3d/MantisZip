@@ -3,6 +3,7 @@ using Avalonia.Interactivity;
 using Avalonia.Platform.Storage;
 using MantisZip.Core.Abstractions;
 using MantisZip.Core.FileFilter;
+using MantisZip.UI.Avalonia.Controls;
 using MantisZip.UI.Avalonia.Models;
 using MantisZip.UI.Avalonia.Services;
 using MantisZip.UI.Avalonia.ViewModels;
@@ -69,6 +70,58 @@ public partial class ExtractSettingsWindow : Window
     {
         _entries = entries;
         BuildPreview();
+    }
+
+    // ── Destination path quick buttons ─────────────────────────────────────
+
+    /// <summary>打开 QuickPathControl 面板并切换到指定 Tab。</summary>
+    private void OpenQuickPath(PathTab tab)
+    {
+        if (DestPathControl == null) return;
+        DestPathControl.SelectTab(tab);
+        DestPathPopup.IsOpen = true;
+    }
+
+    private void QuickFavButton_Click(object? sender, RoutedEventArgs e)
+        => OpenQuickPath(PathTab.Favorites);
+
+    private void QuickHistButton_Click(object? sender, RoutedEventArgs e)
+        => OpenQuickPath(PathTab.History);
+
+    private void QuickWinButton_Click(object? sender, RoutedEventArgs e)
+        => OpenQuickPath(PathTab.Windows);
+
+    private void QuickTreeButton_Click(object? sender, RoutedEventArgs e)
+        => OpenQuickPath(PathTab.Tree);
+
+    /// <summary>QuickPathControl 选中路径 → 写入 DestinationPath，关闭浮层。</summary>
+    private void DestPathControl_PathSelected(object? sender, string path)
+    {
+        if (string.IsNullOrEmpty(path)) return;
+        ViewModel.DestinationPath = path;
+        DestPathPopup.IsOpen = false;
+    }
+
+    /// <summary>浏览按钮：解压模式对话框（内建 ResultTreeView 冲突预览）。</summary>
+    private async void BrowsePath_Click(object? sender, RoutedEventArgs e)
+    {
+        if (_entries == null) return;
+        var path = await CustomFilePickerDialog.ShowExtractFolderAsync(this, _entries, ViewModel.DestinationPath);
+        if (!string.IsNullOrEmpty(path))
+        {
+            ViewModel.DestinationPath = path;
+        }
+    }
+
+    /// <summary>快捷按钮行 📁：同浏览按钮（解压模式对话框）。</summary>
+    private async void QuickBrowseButton_Click(object? sender, RoutedEventArgs e)
+    {
+        if (_entries == null) return;
+        var path = await CustomFilePickerDialog.ShowExtractFolderAsync(this, _entries, ViewModel.DestinationPath);
+        if (!string.IsNullOrEmpty(path))
+        {
+            ViewModel.DestinationPath = path;
+        }
     }
 
     /// <summary>根据当前 entries、DestinationPath 和过滤条件构建预览树。</summary>
