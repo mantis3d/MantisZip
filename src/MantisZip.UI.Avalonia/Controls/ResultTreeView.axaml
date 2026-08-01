@@ -104,8 +104,10 @@
         </TreeView.Styles>
         <TreeView.ItemTemplate>
           <TreeDataTemplate ItemsSource="{Binding Children}">
+            <!-- Background=Transparent：让整行参与命中测试，点击行内任意位置均可选中 -->
             <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}"
                         Margin="2,1"
+                        Background="Transparent"
                         Opacity="{Binding TextOpacity}">
                 <!-- PathIcon for folder/file/warning -->
                 <PathIcon Data="{Binding IconKey, Converter={StaticResource GeometryResourceConverter}}"
@@ -114,23 +116,23 @@
                           Foreground="{DynamicResource ThemeTextPrimaryBrush}"
                           Opacity="{Binding IsEmptyDirectory, Converter={StaticResource BoolToEmptyDirOpacityConverter}}" />
                 <TextBlock Text="…" FontSize="13" VerticalAlignment="Center"
-                           IsVisible="{Binding IsTruncatedNode}" />
+                          IsVisible="{Binding IsTruncatedNode}" />
                 <TextBlock Text="{Binding DisplayLabel}"
                             VerticalAlignment="Center"
                             FontWeight="{Binding IsArchiveNode, Converter={StaticResource BoolToBoldConverter}}"
                             FontSize="{Binding IsArchiveNode, Converter={StaticResource BoolToArchiveFontSizeConverter}}"
                             Foreground="{Binding ForegroundKey, Converter={StaticResource NodeForegroundConverter}}" />
                 <TextBlock Text="{Binding SizeDisplay}"
-                           FontSize="11"
-                           VerticalAlignment="Center"
-                           Margin="4,0,0,0"
-                           Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+                          FontSize="11"
+                          VerticalAlignment="Center"
+                          Margin="4,0,0,0"
+                          Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
                 <TextBlock Text="{Binding DirectoryInfoText}"
-                           FontSize="11"
-                           VerticalAlignment="Center"
-                           Margin="4,0,0,0"
-                           Foreground="{DynamicResource ThemeTextSecondaryBrush}"
-                           IsVisible="{Binding IsDirectoryNode}" />
+                          FontSize="11"
+                          VerticalAlignment="Center"
+                          Margin="4,0,0,0"
+                          Foreground="{DynamicResource ThemeTextSecondaryBrush}"
+                          IsVisible="{Binding IsDirectoryNode}" />
                 <!-- Conflict suffix - warning icon for existing files -->
                 <PathIcon Data="{StaticResource IconWarning}"
                           Width="12" Height="12"
@@ -155,7 +157,7 @@
                     Spacing="{DynamicResource SpacingSm}">
           <ProgressBar x:Name="LoadingProgressBar"
                        Width="220"
-                       Height="6"
+                       Height="12"
                        Minimum="0"
                        Maximum="100"
                        Value="0"

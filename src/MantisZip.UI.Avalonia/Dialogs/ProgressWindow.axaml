@@ -48,7 +48,8 @@
       </ListBox.ItemContainerTheme>
       <ListBox.ItemTemplate>
         <DataTemplate>
-          <Grid>
+          <!-- Background=Transparent：让整行参与命中测试，点击行内任意位置均可选中 -->
+          <Grid Background="Transparent">
             <Grid.ColumnDefinitions>
               <ColumnDefinition Width="28"/>
               <ColumnDefinition Width="*"/>

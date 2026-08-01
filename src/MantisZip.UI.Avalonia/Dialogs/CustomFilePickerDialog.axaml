@@ -144,7 +144,8 @@
             </ListBox.ItemContainerTheme>
             <ListBox.ItemTemplate>
               <DataTemplate>
-                <Grid ColumnDefinitions="20,*,80,110">
+                <!-- Background=Transparent：让整行参与命中测试，点击行内任意位置均可选中 -->
+                <Grid ColumnDefinitions="20,*,80,110" Background="Transparent">
                   <Image Source="{Binding Icon}"
                          Width="16"
                          Height="16"

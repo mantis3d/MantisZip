@@ -3,7 +3,7 @@
 > 未来待开发功能规划。已实现功能请见 [docs/PROGRESS.md](docs/PROGRESS.md)，技术架构请见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)。
 
 **项目状态**: 🟢 开发中  
-**最后更新**: 2026-07-22  
+**最后更新**: 2026-07-31  
 **当前版本**: 0.4.5
 
 ---
@@ -35,6 +35,7 @@
 | **P2** | 嵌入缩略图预览 | [embedded-thumbnail-preview.md](.sisyphus/plans/embedded-thumbnail-preview.md) | 🟢低 | 2-3天 | MetadataExtractor(RAW) + Shell API(通用) 两层提取嵌入缩略图；完成后可扩展文件列表缩略图模式 |
 | **P2** | 字体预览连字效果开关 | [font-preview-ligature.md](.sisyphus/plans/font-preview-ligature.md) | 🟡中 | 3-4h | HarfBuzzSharp shaping + `liga` feature toggle，工具栏按钮 |
 | **P2** | 提取日志与解压「后悔药」 | [extract-journal-undo.md](.sisyphus/plans/extract-journal-undo.md) | 🟡中 | 3-4h | 解压记录 + 一键回滚 |
+| **P2** | 文件选择器多选（文件+目录） | [file-picker-multi-select.md](.sisyphus/plans/file-picker-multi-select.md) | 🟡中 | 4-6h | CustomFilePickerDialog 新增 PickItems 模式：勾选框累积 + 跨目录保留 + 已选项目区；CompressSettingsWindow 合并为「添加文件/文件夹」单按钮（2026-07-31 决策：勾选框方案，根除单击累积导致双击目录误入列表的冲突） |
 | **P3** | 压缩包对比 (Archive Diff) | [archive-diff.md](.sisyphus/plans/archive-diff.md) | 🟡中 | 3-4h | 压缩包文件级差异对比 |
 | **P3** | 原生图标 DLL | [icon-dll.md](.sisyphus/plans/icon-dll.md) | 🟡中 | 2-3h | 将 7 个 .ico 编译进原生资源 DLL，消除路径依赖 |
 | **P3** | 可插拔预览模块体系 | [preview-modular-providers.md](.sisyphus/plans/preview-modular-providers.md) | 🟡中 | 3-4h | 格式类库独立分发 |

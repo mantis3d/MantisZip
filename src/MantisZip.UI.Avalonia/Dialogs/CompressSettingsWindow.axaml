@@ -29,18 +29,18 @@
                 SelectionChanged="OnTabSelectionChanged">
       <!-- Tab 1: General -->
       <TabItem Header="{Binding LocalizedStrings[Compress_TabGeneral]}"
-               Classes="compactTab">
+                Classes="compactTab">
         <ScrollViewer Background="{DynamicResource ThemeWindowBgBrush}"
-                       TextElement.Foreground="{DynamicResource ThemeTextPrimaryBrush}">
+                      TextElement.Foreground="{DynamicResource ThemeTextPrimaryBrush}">
           <StackPanel Spacing="{DynamicResource SpacingSm}"
-                       Margin="0,8,0,0">
+                      Margin="0,8,0,0">
             <!-- Group: Source files -->
             <Border BorderBrush="{DynamicResource ThemeBorderBrush}"
                     BorderThickness="1" CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}"
                     Background="{DynamicResource ThemeSurfaceBgBrush}">
               <StackPanel Spacing="{DynamicResource SpacingXs}">
                 <TextBlock Text="{Binding LocalizedStrings[Compress_SourceFiles]}"
-                           FontWeight="SemiBold" />
+                          FontWeight="SemiBold" />
                 <StackPanel Orientation="Horizontal" Spacing="8">
                   <Button Content="{Binding LocalizedStrings[Compress_AddFile]}"
                           Height="26" Padding="8,0"
@@ -54,14 +54,14 @@
                           Background="{DynamicResource ThemeButtonBgBrush}"
                           Foreground="{DynamicResource ThemeTextPrimaryBrush}"
                           BorderBrush="{DynamicResource ThemeBorderBrush}" />
-                   <Button Content="{Binding LocalizedStrings[Compress_Remove]}"
-                           Height="26" Padding="8,0"
-                           Click="RemoveSelected_Click"
-                           Background="{DynamicResource ThemeButtonBgBrush}"
-                           Foreground="{DynamicResource ThemeTextPrimaryBrush}"
-                           BorderBrush="{DynamicResource ThemeBorderBrush}" />
-                 </StackPanel>
-                 <ListBox x:Name="SourceFilesList"
+                  <Button Content="{Binding LocalizedStrings[Compress_Remove]}"
+                          Height="26" Padding="8,0"
+                          Click="RemoveSelected_Click"
+                          Background="{DynamicResource ThemeButtonBgBrush}"
+                          Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                          BorderBrush="{DynamicResource ThemeBorderBrush}" />
+                </StackPanel>
+                <ListBox x:Name="SourceFilesList"
                           SelectionMode="Multiple"
                           ItemsSource="{Binding SelectedPaths}"
                           MinHeight="160" MaxHeight="240"
@@ -102,7 +102,7 @@
                     Background="{DynamicResource ThemeSurfaceBgBrush}">
               <StackPanel Spacing="{DynamicResource SpacingXs}">
                 <TextBlock Text="{Binding LocalizedStrings[Compress_Archive_Group]}"
-                           FontWeight="SemiBold" />
+                          FontWeight="SemiBold" />
                 <Grid Margin="0,6,0,0">
                     <Grid.ColumnDefinitions>
                       <ColumnDefinition Width="80" />
@@ -130,7 +130,13 @@
                             SelectedItem="{Binding SelectedLevelOption}"
                             DisplayMemberBinding="{Binding Display}" />
                 </Grid>
+              </StackPanel>
+              </Border>
 
+              <Border BorderBrush="{DynamicResource ThemeBorderBrush}"
+              BorderThickness="1" CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}"
+                    Background="{DynamicResource ThemeSurfaceBgBrush}">
+                    <StackPanel Spacing="{DynamicResource SpacingXs}">
                 <!-- Output mode radios -->
                 <TextBlock Text="{Binding LocalizedStrings[Compress_OutputMode]}"
                            FontWeight="SemiBold" />
@@ -441,7 +447,8 @@
                             BorderBrush="{DynamicResource ThemeBorderBrush}">
                     <ListBox.ItemTemplate>
                       <DataTemplate>
-                        <StackPanel>
+                        <!-- Background=Transparent：让整行参与命中测试，点击行内任意位置均可选中 -->
+                        <StackPanel Background="Transparent">
                           <TextBlock Text="{Binding Description}"
                                       FontWeight="SemiBold"
                                       Foreground="{DynamicResource ThemeTextPrimaryBrush}" />

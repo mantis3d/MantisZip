@@ -403,7 +403,8 @@
             <TreeView.ItemTemplate>
               <TreeDataTemplate ItemsSource="{Binding Children}"
                                 x:DataType="vm:TorrentTreeNode">
-                <StackPanel Orientation="Horizontal" Spacing="6">
+                <!-- Background=Transparent：让整行参与命中测试，点击行内任意位置均可选中 -->
+                <StackPanel Orientation="Horizontal" Spacing="6" Background="Transparent">
                   <TextBlock Text="{Binding Name}" />
                   <TextBlock Text="{Binding SizeDisplay}"
                              Foreground="{DynamicResource ThemeTextSecondaryBrush}" />

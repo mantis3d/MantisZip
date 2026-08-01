@@ -836,8 +836,10 @@
             </TreeView.Styles>
             <TreeView.ItemTemplate>
               <TreeDataTemplate ItemsSource="{Binding Children}">
+                <!-- Background=Transparent：让整行参与命中测试，点击行内任意位置均可选中 -->
                 <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}"
-                            Margin="4,2">
+                            Margin="4,2"
+                            Background="Transparent">
                   <PathIcon Data="{StaticResource IconFolder}"
                             Width="14" Height="14"
                             Foreground="{DynamicResource ThemeTextPrimaryBrush}" />

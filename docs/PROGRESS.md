@@ -21,6 +21,13 @@
 
 ### MantisZip.UI.Avalonia（主力版）
 
+**2026-08-01** — 列表/树控件整行命中测试修复 + 主题色/图标调整 + 文件选择器多选设计文档
+  - **整行可点修复（8 处）**：Avalonia 命中测试规则是 `Background=null` 的控件不参与命中（透明区穿透），导致 ListBox/TreeView 项模板根元素无背景时「必须点击文字才能选中」。为 8 处项模板根元素补 `Background="Transparent"`：CustomFilePickerDialog.FileList、QuickPathControl.PathList/DirTree、ResultTreeView 预览树、CompressSettingsWindow 密码库、ProgressWindow 批量列表、MainWindow 目录树、PreviewPanel Torrent 树；hover/选中高亮同步铺满整行（也为后续 PickItems 勾选框方案铺路）
+  - **主题色调整（ThemeLight）**：ThemeAccent `#0078D4→#60B8FC`、ThemeButtonHover `#D0D0D0→#AFC1FF`、ThemeListSelected `#E0F0FF→#81C6FF`、ThemeTabHover `#E4F0FF→#AAC2FF`（蓝色系）
+  - **QuickPathControl 图标与格式**：收藏夹 Tab 图标 `IconHome→IconLightning`；多处缩进统一重排
+  - **文件选择器多选设计文档**：新增 `.sisyphus/plans/file-picker-multi-select.md`（PickItems 模式：勾选框累积 + 跨目录保留 + 右侧已选项目面板 + 批量添加/移除按钮，Task 1–7 全展开），同步 PLAN.md 新增 P2 条目
+  - 构建 0 errors / 0 warnings
+
 **2026-07-31** — 预览树异步加载 — 解压/压缩设置窗口大量文件时不再卡 UI
   - **原始树构建异步化**：`BuildExtractPreview`/`BuildCompressPreview` 移入后台线程（同步签名保留，所有调用点零改动），输入参数（SelectedPaths/OutputPath/DestinationPath 等）进后台前快照；`_previewBuildVersion` 版本号守卫丢弃过期异步结果，快速增删源/切换路径/过滤时不出现错乱
   - **进度上报**：`ResultPreviewService.BuildExtractPreview` 新增可选 `IProgress<double>` 参数逐文件上报（1% 节流避免高频投递），`Progress<T>` 捕获 UI 同步上下文自动封送回主线程
