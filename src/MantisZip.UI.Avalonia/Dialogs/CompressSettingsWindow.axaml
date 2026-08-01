@@ -42,15 +42,9 @@
                 <TextBlock Text="{Binding LocalizedStrings[Compress_SourceFiles]}"
                           FontWeight="SemiBold" />
                 <StackPanel Orientation="Horizontal" Spacing="8">
-                  <Button Content="{Binding LocalizedStrings[Compress_AddFile]}"
+                  <Button Content="{Binding LocalizedStrings[Compress_AddItems]}"
                           Height="26" Padding="8,0"
                           Command="{Binding AddFilesCommand}"
-                          Background="{DynamicResource ThemeButtonBgBrush}"
-                          Foreground="{DynamicResource ThemeTextPrimaryBrush}"
-                          BorderBrush="{DynamicResource ThemeBorderBrush}" />
-                  <Button Content="{Binding LocalizedStrings[Compress_AddFolder]}"
-                          Height="26" Padding="8,0"
-                          Command="{Binding AddFolderCommand}"
                           Background="{DynamicResource ThemeButtonBgBrush}"
                           Foreground="{DynamicResource ThemeTextPrimaryBrush}"
                           BorderBrush="{DynamicResource ThemeBorderBrush}" />

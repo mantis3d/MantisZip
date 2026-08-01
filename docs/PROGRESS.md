@@ -21,6 +21,14 @@
 
 ### MantisZip.UI.Avalonia（主力版）
 
+**2026-08-01** — 文件选择器多选（PickItems 模式）实施完成 — CompressSettingsWindow 合并「添加文件/文件夹」单按钮
+  - **CustomFilePickerDialog PickItems 模式（Task 1–4）**：新增 `PickerMode.PickItems` 与静态入口 `ShowOpenItemsAsync`（返回 `IReadOnlyList<string>?`，取消返回 null）；文件+目录混合勾选累积，跨目录导航保留；`FileBrowserItem` 继承 `ObservableObject`（`IsSelected` TwoWay 绑定勾选框，`CanCheck` 控制勾选框显隐，订阅 PropertyChanged 统一走 `ToggleAccumulated` 单入口）；右侧面板（PickItems 累积列表 / ExtractFolder 原底部 PreviewArea 迁入）按模式切换；批量「＋添加所选 (N)/－移除所选 (M)」计数联动高亮、逐项 × 移除、清空、空态占位；双击/Enter 文件切换勾选不关闭、目录进入导航；系统浏览按钮 PickItems/ExtractFolder 隐藏；布局重构 `220,5,*,5,Auto` 三列 + 右栏、窗口 900×620、FileNameArea/OK 行顺移
+  - **CompressSettingsWindow 合并按钮（Task 6）**：「添加文件」「添加文件夹」双按钮 → 单按钮「添加文件/文件夹」（`Compress_AddItems`）；`PickFiles` 回调改调 `ShowOpenItemsAsync`，`AddFiles` 命令体零改动；VM 删除 `PickFolder` 属性 + `AddFolder` 命令 + `Compress_AddFolder` 注册；原生 `StorageProvider` 依赖移除
+  - **本地化（Task 5）**：新增 8 key（`Picker_PickItemsTitle`/`Picker_SelectedCount`/`Picker_AddSelected`/`Picker_RemoveSelected`/`Picker_ClearSelection`/`Picker_AccumulatedEmpty`/`Picker_ExtractPreviewTitle`/`Compress_AddItems`）zh/en 双语；修复 3 个死 key（标题 switch 补 PickItems case、清空按钮/空态占位补文案绑定）
+  - **评审修复**：spec 评审 4 项（清空按钮无标签、空态占位空白、PickItems 窗口标题误导、死 key）+ 代码质量评审 4 项（非 PickItems 模式右栏 GridSplitter 可见回归、取消契约返回非 null、双路径冗余累积清理、Rule 7 行高/ToolTip）全部修复
+  - 构建 0 errors（新增代码 0 warnings）/ Avalonia 测试 35 通过
+  - ⏳ 手动验收待做：PickItems 勾选/批量/逐项/清空/跨目录/双击不关闭/OK 返回/取消 null；ExtractFolder 右栏预览回归；OpenFile/PickFolder/SaveFile 布局回归
+
 **2026-08-01** — 列表/树控件整行命中测试修复 + 主题色/图标调整 + 文件选择器多选设计文档
   - **整行可点修复（8 处）**：Avalonia 命中测试规则是 `Background=null` 的控件不参与命中（透明区穿透），导致 ListBox/TreeView 项模板根元素无背景时「必须点击文字才能选中」。为 8 处项模板根元素补 `Background="Transparent"`：CustomFilePickerDialog.FileList、QuickPathControl.PathList/DirTree、ResultTreeView 预览树、CompressSettingsWindow 密码库、ProgressWindow 批量列表、MainWindow 目录树、PreviewPanel Torrent 树；hover/选中高亮同步铺满整行（也为后续 PickItems 勾选框方案铺路）
   - **主题色调整（ThemeLight）**：ThemeAccent `#0078D4→#60B8FC`、ThemeButtonHover `#D0D0D0→#AFC1FF`、ThemeListSelected `#E0F0FF→#81C6FF`、ThemeTabHover `#E4F0FF→#AAC2FF`（蓝色系）

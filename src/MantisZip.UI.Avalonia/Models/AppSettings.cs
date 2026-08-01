@@ -122,6 +122,12 @@ public class AppSettings
         FilterPresets.Add(preset);
     }
 
+    // ===== 默认路径优先级 =====
+    /// <summary>文件选择器初始路径的优先级顺序（不含桌面，桌面始终兜底）。值域: context / explorer / recent / custom。</summary>
+    public List<string> DefaultPathOrder { get; set; } = new() { "context", "explorer", "recent", "custom" };
+    /// <summary>手动路径值（对应 <see cref="DefaultPathOrder"/> 中的 "custom" 项）。留空 = 跳过该项。</summary>
+    public string CustomDefaultPath { get; set; } = "";
+
     // ===== 调试 =====
     public bool EnableDebugLogging { get; set; } = false;
     public string LogPrivacyMode { get; set; } = "extension";

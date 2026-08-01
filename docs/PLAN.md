@@ -48,6 +48,7 @@
 | **P1** | Avalonia: UI 功能补齐 | [avalonia-ui-feature-parity.md](.sisyphus/plans/avalonia-ui-feature-parity.md) | 🟡中 | 29/29 ✅ | Elevation×3、Favorites×2、QuickPath×2 等 11 个对话框、2 个控件、1 个转换器（2 项阻塞于 GUI 测试） |
 | **P1** | 自动更新检测 | [auto-update.md](.sisyphus/plans/auto-update.md) | 🟡中 | 4-6h | GitHub Releases API 版本检查、AboutWindow 更新 Tab、UpdateAvailableDialog、设置开关、单元测试 |
 | **P1** | 解压/压缩结果预览面板 | [result-preview-panel.md](.sisyphus/plans/result-preview-panel.md) | 🟡中 | 6-8h | ResultTreeView 控件已完成。待做：① Separate 模式按输出目录分组 + 压缩包壳节点（`IsArchive` + `IconArchive`）；② 解压多压缩包按来源目录分组；③ 压缩端模式/路径/过滤变更时刷新；④ 解压端目标路径/过滤变更时刷新；⑤ 两窗口的 FileFilterControl.FilterChanged → 重建预览树；⑥ i18n key |
+| **P2** | 可排序的默认路径优先级（文件选择器初始路径） | [path-priority-sortable.md](.sisyphus/plans/path-priority-sortable.md) | 🟢低 | 3-4h | CustomFilePickerDialog 初始路径改为用户可排序的优先级链（场景/资源管理器/最近访问/手动路径，桌面兜底），↑↓ 按钮调整顺序 + 手动路径 TextBox；替代 WPF 四档预设 |
 | **P4** | 外部工具视频元数据 | — | 🟢低 | 2-3h | ffprobe 集成 |
 | **🔍调研** | 跨平台移植可行性 | [cross-platform-port.md](.sisyphus/plans/cross-platform-port.md) | 🟡中大 | 2-3月 | 砍 ShellExt，WPF→Avalonia，WebView2→WebKit，SharpSevenZip→SharpCompress/p7zip，DPAPI→AES-GCM |
 | **🔍调研** | Avalonia 预览机会分析 | [preview-avalonia-opportunities.md](.sisyphus/plans/preview-avalonia-opportunities.md) | 🟡中 | — | 分析 Avalonia 迁移对预览系统的影响：SVG/HDR/PSD/AI 新能力、音视频替代方案、HDR 全景 360° 查看器方案 |

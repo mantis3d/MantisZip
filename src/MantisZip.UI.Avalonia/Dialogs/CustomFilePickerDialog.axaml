@@ -4,16 +4,16 @@
         xmlns:dialogs="clr-namespace:MantisZip.UI.Avalonia.Dialogs"
         x:Class="MantisZip.UI.Avalonia.Dialogs.CustomFilePickerDialog"
         x:CompileBindings="False"
-        Width="800"
+        Width="900"
         Height="620"
-        MinWidth="700"
+        MinWidth="800"
         MinHeight="420"
         WindowStartupLocation="CenterOwner"
         CanResize="True"
         Background="{DynamicResource ThemeWindowBgBrush}">
 
   <Grid x:Name="RootGrid"
-        RowDefinitions="Auto,*,Auto,Auto,Auto"
+        RowDefinitions="Auto,*,Auto,Auto"
         Margin="{DynamicResource SpacingMdThk}">
 
     <!-- ═══════ Row 0: Address bar + navigation ═══════ -->
@@ -86,9 +86,9 @@
                        BorderBrush="{DynamicResource ThemeBorderBrush}" />
     </Grid>
 
-    <!-- ═══════ Row 1: QuickPath (left) + file browser (right) ═══════ -->
+    <!-- ═══════ Row 1: QuickPath | file browser | right panel ═══════ -->
     <Grid Grid.Row="1"
-          ColumnDefinitions="220,5,*"
+          ColumnDefinitions="220,5,*,5,Auto"
           ColumnSpacing="0">
       <Border BorderBrush="{DynamicResource ThemeBorderBrush}"
               BorderThickness="1"
@@ -123,6 +123,7 @@
                    Grid.Row="1"
                    Background="Transparent"
                    BorderThickness="0"
+                   SelectionMode="Multiple"
                    SelectionChanged="FileList_SelectionChanged"
                    DoubleTapped="FileList_DoubleTapped"
                    KeyDown="FileList_KeyDown">
@@ -145,12 +146,17 @@
             <ListBox.ItemTemplate>
               <DataTemplate>
                 <!-- Background=Transparent：让整行参与命中测试，点击行内任意位置均可选中 -->
-                <Grid ColumnDefinitions="20,*,80,110" Background="Transparent">
-                  <Image Source="{Binding Icon}"
+                <Grid ColumnDefinitions="24,20,*,80,110" Background="Transparent">
+                  <CheckBox Grid.Column="0"
+                            IsChecked="{Binding IsSelected, Mode=TwoWay}"
+                            IsVisible="{Binding CanCheck}"
+                            VerticalAlignment="Center" />
+                  <Image Grid.Column="1"
+                         Source="{Binding Icon}"
                          Width="16"
                          Height="16"
                          VerticalAlignment="Center" />
-                  <StackPanel Grid.Column="1" Orientation="Vertical" Spacing="0">
+                  <StackPanel Grid.Column="2" Orientation="Vertical" Spacing="0">
                     <TextBlock Text="{Binding DisplayName}"
                                Foreground="{DynamicResource ThemeTextPrimaryBrush}"
                                TextTrimming="CharacterEllipsis" />
@@ -160,14 +166,14 @@
                                TextTrimming="CharacterEllipsis"
                                IsVisible="{Binding ShowSubText}" />
                   </StackPanel>
-                  <TextBlock Grid.Column="2"
+                  <TextBlock Grid.Column="3"
                              Text="{Binding SizeText}"
                              FontSize="11"
                              HorizontalAlignment="Right"
                              Margin="0,0,8,0"
                              Foreground="{DynamicResource ThemeTextSecondaryBrush}"
                              VerticalAlignment="Center" />
-                  <TextBlock Grid.Column="3"
+                  <TextBlock Grid.Column="4"
                              Text="{Binding ModifiedText}"
                              FontSize="11"
                              HorizontalAlignment="Right"
@@ -180,37 +186,164 @@
           </ListBox>
         </Grid>
       </Border>
-    </Grid>
 
-    <!-- ═══════ Row 2: Extract preview area (ExtractFolder mode only) ═══════ -->
-    <Grid x:Name="PreviewArea"
-          Grid.Row="2"
-          RowDefinitions="Auto,*"
-          Margin="0,8,0,0">
-      <GridSplitter x:Name="PreviewSplitter"
-                    Grid.Row="0"
-                    Height="5"
-                    HorizontalAlignment="Stretch"
+      <GridSplitter x:Name="RightSplitter"
+                    Grid.Column="3"
+                    Width="5"
                     Background="{DynamicResource ThemeSplitterBgBrush}"
                     ResizeBehavior="PreviousAndNext"
                     ResizeDirection="Auto" />
-      <Border Grid.Row="1"
-              BorderBrush="{DynamicResource ThemeBorderBrush}"
-              BorderThickness="1"
-              CornerRadius="4"
-              Padding="6"
-              Background="{DynamicResource ThemeSurfaceBgBrush}">
-        <controls:ResultTreeView x:Name="PreviewTree"
-                                 CompactMode="True"
-                                 MaxItemsPerDirectory="8"
-                                 MaxDepth="4"
-                                 ShowFilteredGhosts="False" />
-      </Border>
+
+      <!-- ═══════ Column 4: right panel (PickItems 累积 / ExtractFolder 解压预览) ═══════ -->
+      <Grid x:Name="PickItemsPanel"
+            Grid.Row="1"
+            Grid.Column="4"
+            Width="260"
+            Margin="12,0,0,0"
+            IsVisible="False">
+        <Grid.RowDefinitions>
+          <RowDefinition Height="Auto"/>
+          <RowDefinition Height="Auto"/>
+          <RowDefinition Height="Auto"/>
+          <RowDefinition Height="Auto"/>
+          <RowDefinition Height="Auto"/>
+          <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+        <TextBlock Grid.Row="0"
+                   x:Name="PickTitleText"
+                   FontWeight="SemiBold"
+                   Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+        <StackPanel Grid.Row="1"
+                    Orientation="Horizontal"
+                    Spacing="{DynamicResource SpacingXs}"
+                    Margin="0,8,0,0">
+          <Button x:Name="AddSelectedButton"
+                  MinHeight="{DynamicResource ControlHeightSm}"
+                  Padding="10,0"
+                  Click="AddSelected_Click"
+                  Background="{DynamicResource ThemeButtonBgBrush}"
+                  Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                  BorderBrush="{DynamicResource ThemeBorderBrush}">
+            <StackPanel Orientation="Horizontal" Spacing="4">
+              <PathIcon Data="{StaticResource IconAdd}" Width="16" Height="16" VerticalAlignment="Center" />
+              <TextBlock x:Name="AddSelectedButtonText" VerticalAlignment="Center" />
+            </StackPanel>
+          </Button>
+          <Button x:Name="RemoveSelectedButton"
+                  MinHeight="{DynamicResource ControlHeightSm}"
+                  Padding="10,0"
+                  Click="RemoveSelected_Click"
+                  IsEnabled="False"
+                  Background="{DynamicResource ThemeButtonBgBrush}"
+                  Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                  BorderBrush="{DynamicResource ThemeBorderBrush}">
+            <StackPanel Orientation="Horizontal" Spacing="4">
+              <PathIcon Data="{StaticResource IconSubtract}" Width="16" Height="16" VerticalAlignment="Center" />
+              <TextBlock x:Name="RemoveSelectedButtonText" VerticalAlignment="Center" />
+            </StackPanel>
+          </Button>
+        </StackPanel>
+        <TextBlock Grid.Row="2"
+                   x:Name="PickActionCountText"
+                   Margin="0,4,0,0"
+                   TextWrapping="Wrap"
+                   Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+        <Button Grid.Row="3"
+                x:Name="ClearAccumulatedButton"
+                Margin="0,4,0,0"
+                HorizontalAlignment="Left"
+                MinHeight="{DynamicResource ControlHeightSm}"
+                Padding="10,0"
+                Click="ClearAccumulated_Click"
+                Background="{DynamicResource ThemeButtonBgBrush}"
+                Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                BorderBrush="{DynamicResource ThemeBorderBrush}">
+          <StackPanel Orientation="Horizontal" Spacing="4">
+            <PathIcon Data="{StaticResource IconDismiss}" Width="16" Height="16" VerticalAlignment="Center" />
+            <TextBlock x:Name="ClearAccumulatedButtonText" VerticalAlignment="Center" />
+          </StackPanel>
+        </Button>
+        <TextBlock Grid.Row="4"
+                   x:Name="PickEmptyText"
+                   Margin="0,12,0,0"
+                   Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+        <Border Grid.Row="5"
+                Margin="0,8,0,0"
+                BorderBrush="{DynamicResource ThemeBorderBrush}"
+                BorderThickness="1"
+                CornerRadius="4"
+                Padding="6"
+                Background="{DynamicResource ThemeSurfaceBgBrush}">
+          <ItemsControl x:Name="AccumulatedItemsControl">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate>
+                <Grid ColumnDefinitions="*,Auto"
+                      MinHeight="{DynamicResource ControlHeightSm}">
+                  <TextBlock Text="{Binding Path}"
+                             TextTrimming="CharacterEllipsis"
+                             ToolTip.Tip="{Binding Path}"
+                             Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                             VerticalAlignment="Center" />
+                  <Button Grid.Column="1"
+                          Content="×"
+                          Width="24"
+                          Height="24"
+                          Padding="0"
+                          Margin="4,0,0,0"
+                          Tag="{Binding Path}"
+                          ToolTip.Tip="{Binding Path}"
+                          Click="RemoveItem_Click"
+                          Background="{DynamicResource ThemeButtonBgBrush}"
+                          Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                          BorderBrush="{DynamicResource ThemeBorderBrush}" />
+                </Grid>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </Border>
+      </Grid>
+
+      <Grid x:Name="ExtractFolderPanel"
+            Grid.Row="1"
+            Grid.Column="4"
+            Width="260"
+            Margin="12,0,0,0"
+            IsVisible="False">
+        <Grid.RowDefinitions>
+          <RowDefinition Height="Auto"/>
+          <RowDefinition Height="Auto"/>
+          <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+        <TextBlock Grid.Row="0"
+                   x:Name="ExtractPreviewTitleText"
+                   FontWeight="SemiBold"
+                   Text="{Binding ExtractPreviewTitle}"
+                   Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+        <GridSplitter x:Name="PreviewSplitter"
+                      Grid.Row="1"
+                      Height="5"
+                      HorizontalAlignment="Stretch"
+                      Background="{DynamicResource ThemeSplitterBgBrush}"
+                      ResizeBehavior="PreviousAndNext"
+                      ResizeDirection="Auto" />
+        <Border Grid.Row="2"
+                BorderBrush="{DynamicResource ThemeBorderBrush}"
+                BorderThickness="1"
+                CornerRadius="4"
+                Padding="6"
+                Background="{DynamicResource ThemeSurfaceBgBrush}">
+          <controls:ResultTreeView x:Name="PreviewTree"
+                                   CompactMode="True"
+                                   MaxItemsPerDirectory="8"
+                                   MaxDepth="4"
+                                   ShowFilteredGhosts="False" />
+        </Border>
+      </Grid>
     </Grid>
 
-    <!-- ═══════ Row 3: File name + File type (SaveFile/OpenFile modes) ═══════ -->
+    <!-- ═══════ Row 2: File name + File type (SaveFile/OpenFile modes) ═══════ -->
     <Grid x:Name="FileNameArea"
-          Grid.Row="3"
+          Grid.Row="2"
           ColumnDefinitions="60,*,60,110"
           ColumnSpacing="{DynamicResource SpacingXs}"
           Margin="0,12,0,0">
@@ -237,8 +370,8 @@
                 BorderBrush="{DynamicResource ThemeBorderBrush}" />
     </Grid>
 
-    <!-- ═══════ Row 4: OK/Cancel ═══════ -->
-    <StackPanel Grid.Row="4"
+    <!-- ═══════ Row 3: OK/Cancel ═══════ -->
+    <StackPanel Grid.Row="3"
                 Orientation="Horizontal"
                 HorizontalAlignment="Right"
                 Spacing="{DynamicResource SpacingXs}"

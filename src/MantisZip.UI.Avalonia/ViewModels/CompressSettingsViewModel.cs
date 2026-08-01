@@ -40,9 +40,6 @@ public partial class CompressSettingsViewModel : ObservableObject
     /// <summary>由 View 设置的文件选择回调。返回选择的文件路径列表，取消返回 null。</summary>
     public Func<Task<IReadOnlyList<string>?>>? PickFiles { get; set; }
 
-    /// <summary>由 View 设置的文件夹选择回调。返回选择的路径，取消返回 null。</summary>
-    public Func<Task<string?>>? PickFolder { get; set; }
-
     /// <summary>由 View 设置的关闭回调。参数 true=确认压缩，false=取消。</summary>
     public Func<bool, Task>? CloseAction { get; set; }
 
@@ -357,8 +354,7 @@ public partial class CompressSettingsViewModel : ObservableObject
         LocalizedStrings["Compress_OutputPlaceholder"] = LocalizationManager.T("Compress_OutputPlaceholder");
         LocalizedStrings["Compress_SourceFiles"] = LocalizationManager.T("Compress_SourceFiles");
         LocalizedStrings["Compress_Archive_Group"] = LocalizationManager.T("Compress_Archive_Group");
-        LocalizedStrings["Compress_AddFile"] = LocalizationManager.T("Compress_AddFile");
-        LocalizedStrings["Compress_AddFolder"] = LocalizationManager.T("Compress_AddFolder");
+        LocalizedStrings["Compress_AddItems"] = LocalizationManager.T("Compress_AddItems");
         LocalizedStrings["Compress_Remove"] = LocalizationManager.T("Compress_Remove");
         LocalizedStrings["Compress_Browse"] = LocalizationManager.T("Compress_Browse");
         LocalizedStrings["Compress_Password"] = LocalizationManager.T("Compress_Password");
@@ -995,17 +991,6 @@ public partial class CompressSettingsViewModel : ObservableObject
                 if (!SelectedPaths.Contains(f))
                     SelectedPaths.Add(f);
             }
-        }
-    }
-
-    [RelayCommand]
-    private async Task AddFolder()
-    {
-        if (PickFolder == null) return;
-        var folder = await PickFolder();
-        if (!string.IsNullOrEmpty(folder) && !SelectedPaths.Contains(folder))
-        {
-            SelectedPaths.Add(folder);
         }
     }
 

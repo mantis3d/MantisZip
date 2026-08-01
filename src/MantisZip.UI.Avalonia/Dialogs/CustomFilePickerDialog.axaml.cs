@@ -1,8 +1,10 @@
 using System.Collections.ObjectModel;
+using CommunityToolkit.Mvvm.ComponentModel;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
+using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using Avalonia.Platform.Storage;
 using Avalonia.Threading;
@@ -23,11 +25,13 @@ public enum PickerMode
     /// <summary>打开文件，文件筛选器，确定返回文件路径（单文件）。</summary>
     OpenFile,
     /// <summary>解压模式：PickFolder + 底部解压预览区（ResultTreeView 实时冲突检测）。</summary>
-    ExtractFolder
+    ExtractFolder,
+    /// <summary>多选模式：文件+目录混合选择，勾选累积，跨目录保留。</summary>
+    PickItems
 }
 
 /// <summary>文件浏览列表项。</summary>
-public class FileBrowserItem
+public class FileBrowserItem : ObservableObject
 {
     public string FullPath { get; set; } = string.Empty;
     public string DisplayName { get; set; } = string.Empty;
@@ -37,6 +41,18 @@ public class FileBrowserItem
     public string ModifiedText { get; set; } = string.Empty;
     public string SubText { get; set; } = string.Empty;
     public bool ShowSubText { get; set; }
+
+    /// <summary>是否可勾选（PickItems 模式文件+目录可勾选；其他模式 false 隐藏勾选框）。</summary>
+    public bool CanCheck { get; set; }
+
+    private bool _isSelected;
+
+    /// <summary>勾选状态（PickItems 模式累积）。</summary>
+    public bool IsSelected
+    {
+        get => _isSelected;
+        set => SetProperty(ref _isSelected, value);
+    }
 }
 
 /// <summary>
@@ -58,6 +74,12 @@ public partial class CustomFilePickerDialog : Window
     /// <summary>保存模式下用户输入的文件名。</summary>
     public string SelectedFileName { get; private set; } = string.Empty;
 
+    /// <summary>PickItems 模式累积选中的路径列表（按路径排序，FullPath 去重）。</summary>
+    public IReadOnlyList<string> SelectedPaths { get; private set; } = Array.Empty<string>();
+
+    /// <summary>PickItems 模式累积中的路径（内部可变集合）。</summary>
+    private readonly List<string> _accumulatedPaths = new();
+
     // ── Navigation state ──
 
     private readonly List<string> _backStack = new();
@@ -76,6 +98,7 @@ public partial class CustomFilePickerDialog : Window
     public string UpText => LocalizationManager.T("Picker_Up");
     public string FileNameLabel => LocalizationManager.T("Picker_FileName");
     public string FileTypeLabel => LocalizationManager.T("Picker_FileType");
+    public string ExtractPreviewTitle => LocalizationManager.T("Picker_ExtractPreviewTitle");
 
     // ── Static entry points ────────────────────────────────────────────────
 
@@ -95,6 +118,18 @@ public partial class CustomFilePickerDialog : Window
     /// <summary>解压模式：选择目标目录，底部实时显示解压冲突预览。返回目录路径，取消返回 null。</summary>
     public static Task<string?> ShowExtractFolderAsync(Window owner, IReadOnlyList<ArchiveItem> entries, string? initialPath = null)
         => ShowInternal(owner, PickerMode.ExtractFolder, entries, null, initialPath, null);
+
+    /// <summary>打开文件/文件夹（多选，PickItems 模式）。返回选中路径列表，取消返回 null。</summary>
+    public static async Task<IReadOnlyList<string>?> ShowOpenItemsAsync(Window owner, string? initialPath = null)
+    {
+        var dialog = new CustomFilePickerDialog(PickerMode.PickItems, null, null, initialPath, null)
+        {
+            WindowStartupLocation = WindowStartupLocation.CenterOwner
+        };
+        // Close(true) 由 Ok 分支设置，Close(false) 由取消设置 → 结果即是否确认
+        var confirmed = await dialog.ShowDialog<bool>(owner);
+        return confirmed ? dialog.SelectedPaths : null;
+    }
 
     private static async Task<string?> ShowInternal(
         Window owner, PickerMode mode, IReadOnlyList<ArchiveItem>? entries, string? defaultExtension, string? initialPath, string[]? fileExtensions)
@@ -130,13 +165,32 @@ public partial class CustomFilePickerDialog : Window
         {
             PickerMode.SaveFile => LocalizationManager.T("Picker_SaveFileTitle"),
             PickerMode.OpenFile => LocalizationManager.T("Picker_OpenFileTitle"),
+            PickerMode.PickItems => LocalizationManager.T("Picker_PickItemsTitle"),
             _ => LocalizationManager.T("Picker_PickFolderTitle")
         };
 
-        // 解压预览区仅解压模式显示
-        if (mode != PickerMode.ExtractFolder)
+        // 右侧面板切换：PickItems 显示累积面板，ExtractFolder 显示解压预览面板
+        PickItemsPanel.IsVisible = mode == PickerMode.PickItems;
+        ExtractFolderPanel.IsVisible = mode == PickerMode.ExtractFolder;
+        // 右栏分隔条：仅当右栏面板可见时显示（否则拖动无意义）
+        RightSplitter.IsVisible = mode is PickerMode.PickItems or PickerMode.ExtractFolder;
+        AccumulatedItemsControl.ItemsSource = _accumulatedItems;
+        ClearAccumulatedButtonText.Text = LocalizationManager.T("Picker_ClearSelection");
+
+        // PickItems 模式：批量按钮文案固定（计数显示在下方 PickActionCountText，避免按钮宽度跳变）
+        if (mode == PickerMode.PickItems)
         {
-            PreviewArea.IsVisible = false;
+            AddSelectedButtonText.Text = LocalizationManager.T("Picker_AddSelected");
+            RemoveSelectedButtonText.Text = LocalizationManager.T("Picker_RemoveSelected");
+            // 初始计数文本：未选中任何项时的灰字占位
+            PickActionCountText.Text = LocalizationManager.T("Picker_AddRemoveEmpty");
+            PickActionCountText.Foreground = GetThemeBrush("ThemeTextSecondaryBrush");
+        }
+
+        // 系统浏览按钮：PickItems / ExtractFolder 模式隐藏
+        if (mode is PickerMode.PickItems or PickerMode.ExtractFolder)
+        {
+            SystemBrowseButton.IsVisible = false;
         }
 
         // 文件名/文件类型行：仅 SaveFile / OpenFile 模式显示
@@ -149,15 +203,13 @@ public partial class CustomFilePickerDialog : Window
             FileNameArea.IsVisible = false;
         }
 
-        // 窗口高度：解压模式含预览区更高
-        if (mode == PickerMode.ExtractFolder)
+        // 窗口高度：解压/多选模式更高
+        Height = mode switch
         {
-            Height = 620;
-        }
-        else
-        {
-            Height = 420;
-        }
+            PickerMode.ExtractFolder => 620,
+            PickerMode.PickItems => 500,
+            _ => 420
+        };
 
         // 文件列表是否显示文件（PickFolder/ExtractFolder 只显示目录）
         // 通过过滤实现：见 LoadDirectory
@@ -288,17 +340,55 @@ public partial class CustomFilePickerDialog : Window
 
     // ── Path resolution ────────────────────────────────────────────────────
 
+    /// <summary>
+    /// 按用户设置的优先级链解析初始路径。
+    /// 链顺序来自 <see cref="AppSettings.DefaultPathOrder"/>（值域 context/explorer/recent/custom），
+    /// 依次探测第一个存在的路径；桌面始终作为最终兜底。
+    /// </summary>
     private static string ResolveInitialPath(string? initialPath)
     {
-        if (!string.IsNullOrWhiteSpace(initialPath))
+        var settings = AppSettings.Load();
+        var order = settings.DefaultPathOrder ?? new List<string>();
+
+        // 依次尝试链上的每一项；未知值跳过
+        foreach (var kind in order)
         {
-            var p = Environment.ExpandEnvironmentVariables(initialPath.Trim());
-            if (Directory.Exists(p)) return p;
-            var dir = Path.GetDirectoryName(p);
-            if (!string.IsNullOrEmpty(dir) && Directory.Exists(dir)) return dir;
-            if (File.Exists(p)) return Path.GetDirectoryName(p) ?? Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
+            var candidate = kind switch
+            {
+                "context" => ResolveContextPath(initialPath),
+                "explorer" => ExplorerWindowTracker.GetActiveExplorerPath(),
+                "recent" => PathHistoryManager.GetRecent(1).FirstOrDefault()?.Path,
+                "custom" => ResolveCustomPath(settings.CustomDefaultPath),
+                _ => null
+            };
+            if (!string.IsNullOrEmpty(candidate) && Directory.Exists(candidate))
+            {
+                return candidate;
+            }
         }
+
+        // 兜底：桌面
         return Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
+    }
+
+    /// <summary>场景路径：调用方传入的上下文路径（存在则用，否则 null 跳过）。</summary>
+    private static string? ResolveContextPath(string? initialPath)
+    {
+        if (string.IsNullOrWhiteSpace(initialPath)) return null;
+        var p = Environment.ExpandEnvironmentVariables(initialPath.Trim());
+        if (Directory.Exists(p)) return p;
+        var dir = Path.GetDirectoryName(p);
+        if (!string.IsNullOrEmpty(dir) && Directory.Exists(dir)) return dir;
+        if (File.Exists(p)) return Path.GetDirectoryName(p);
+        return null;
+    }
+
+    /// <summary>手动路径：用户填写的固定路径（留空或不存在则 null 跳过）。</summary>
+    private static string? ResolveCustomPath(string? customPath)
+    {
+        if (string.IsNullOrWhiteSpace(customPath)) return null;
+        var p = Environment.ExpandEnvironmentVariables(customPath.Trim());
+        return Directory.Exists(p) ? p : null;
     }
 
     // ── Address bar ────────────────────────────────────────────────────────
@@ -422,6 +512,11 @@ public partial class CustomFilePickerDialog : Window
 
     private readonly ObservableCollection<FileBrowserItem> _fileItems = new();
 
+    /// <summary>右侧累积面板显示项（PickItems 模式）。</summary>
+    private sealed record AccumulatedPathItem(string Path);
+
+    private readonly ObservableCollection<AccumulatedPathItem> _accumulatedItems = new();
+
     private void LoadDirectory(string dir)
     {
         _fileItems.Clear();
@@ -431,7 +526,7 @@ public partial class CustomFilePickerDialog : Window
         try
         {
             // 目录列表
-            var showFiles = _mode is PickerMode.SaveFile or PickerMode.OpenFile;
+            var showFiles = _mode is PickerMode.SaveFile or PickerMode.OpenFile or PickerMode.PickItems;
             var dirs = Directory.EnumerateDirectories(dir)
                 .OrderBy(d => d, StringComparer.OrdinalIgnoreCase)
                 .ToList();
@@ -498,7 +593,7 @@ public partial class CustomFilePickerDialog : Window
     private FileBrowserItem CreateDirItem(string path)
     {
         var info = new DirectoryInfo(path);
-        return new FileBrowserItem
+        var item = new FileBrowserItem
         {
             FullPath = path,
             DisplayName = info.Name,
@@ -506,15 +601,19 @@ public partial class CustomFilePickerDialog : Window
             Icon = IconService.GetFolderIcon(),
             SizeText = string.Empty,
             ModifiedText = info.LastWriteTime.ToString("yyyy-MM-dd HH:mm"),
-            ShowSubText = false
+            ShowSubText = false,
+            CanCheck = _mode == PickerMode.PickItems
         };
+        SubscribeIsSelected(item);
+        item.IsSelected = _accumulatedPaths.Contains(path, StringComparer.OrdinalIgnoreCase);
+        return item;
     }
 
     private FileBrowserItem CreateFileItem(string path)
     {
         var info = new FileInfo(path);
         var ext = info.Extension;
-        return new FileBrowserItem
+        var item = new FileBrowserItem
         {
             FullPath = path,
             DisplayName = info.Name,
@@ -522,7 +621,26 @@ public partial class CustomFilePickerDialog : Window
             Icon = IconService.GetFileIcon(string.IsNullOrEmpty(ext) ? ".file" : ext),
             SizeText = FormatUtil.FormatSize(info.Length),
             ModifiedText = info.LastWriteTime.ToString("yyyy-MM-dd HH:mm"),
-            ShowSubText = false
+            ShowSubText = false,
+            CanCheck = _mode == PickerMode.PickItems
+        };
+        SubscribeIsSelected(item);
+        item.IsSelected = _accumulatedPaths.Contains(path, StringComparer.OrdinalIgnoreCase);
+        return item;
+    }
+
+    /// <summary>
+    /// 订阅勾选状态变更：勾选框点击等通过 TwoWay 绑定修改 IsSelected 时，
+    /// 统一走 <see cref="ToggleAccumulated"/> 累积/移除。
+    /// </summary>
+    private void SubscribeIsSelected(FileBrowserItem item)
+    {
+        item.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(FileBrowserItem.IsSelected))
+            {
+                ToggleAccumulated(item.FullPath, item.IsSelected);
+            }
         };
     }
 
@@ -561,6 +679,13 @@ public partial class CustomFilePickerDialog : Window
 
     private void FileList_SelectionChanged(object? sender, SelectionChangedEventArgs e)
     {
+        // PickItems：仅刷新批量按钮计数（Extended 多选）
+        if (_mode == PickerMode.PickItems)
+        {
+            UpdatePickPanel();
+            return;
+        }
+
         if (FileList.SelectedItem is not FileBrowserItem item) return;
         if (item.IsDirectory)
         {
@@ -581,6 +706,11 @@ public partial class CustomFilePickerDialog : Window
         {
             NavigateTo(item.FullPath);
         }
+        else if (_mode == PickerMode.PickItems)
+        {
+            // 双击文件：切换勾选累积（IsSelected setter 经订阅累积），不关闭对话框
+            item.IsSelected = !item.IsSelected;
+        }
         else if (_mode == PickerMode.SaveFile)
         {
             // 保存模式：双击文件 → 填入文件名框（可再改格式）
@@ -600,6 +730,11 @@ public partial class CustomFilePickerDialog : Window
             {
                 if (item.IsDirectory)
                     NavigateTo(item.FullPath);
+                else if (_mode == PickerMode.PickItems)
+                {
+                    // PickItems：Enter 切换勾选（同双击），不关闭
+                    item.IsSelected = !item.IsSelected;
+                }
                 else if (_mode == PickerMode.SaveFile)
                     SyncFileNameBox(item.DisplayName); // 保存模式 Enter 文件 → 填入文件名
                 else
@@ -622,6 +757,116 @@ public partial class CustomFilePickerDialog : Window
             Forward_Click(sender, e);
             e.Handled = true;
         }
+    }
+
+    // ── PickItems accumulation ─────────────────────────────────────────────
+
+    /// <summary>统一累积入口：勾选框/双击/批量/清空/回填全部经过此方法。</summary>
+    private void ToggleAccumulated(string path, bool isChecked)
+    {
+        if (isChecked)
+        {
+            if (!_accumulatedPaths.Contains(path, StringComparer.OrdinalIgnoreCase))
+                _accumulatedPaths.Add(path);
+        }
+        else
+        {
+            _accumulatedPaths.RemoveAll(p => string.Equals(p, path, StringComparison.OrdinalIgnoreCase));
+        }
+        UpdatePickPanel();
+    }
+
+    /// <summary>批量添加当前高亮项（勾选 + 累积）。IsSelected setter 经订阅自动累积。</summary>
+    private void AddSelected_Click(object? sender, RoutedEventArgs e)
+    {
+        foreach (var item in (FileList.SelectedItems ?? Array.Empty<object>()).OfType<FileBrowserItem>().Where(i => i.CanCheck))
+        {
+            item.IsSelected = true;
+        }
+    }
+
+    /// <summary>批量移除当前高亮项（取消勾选 + 取消累积）。IsSelected setter 经订阅自动移除。</summary>
+    private void RemoveSelected_Click(object? sender, RoutedEventArgs e)
+    {
+        foreach (var item in (FileList.SelectedItems ?? Array.Empty<object>()).OfType<FileBrowserItem>())
+        {
+            item.IsSelected = false;
+        }
+    }
+
+    /// <summary>累积面板逐项移除（× 按钮）。同步回当前可见列表中对应项。</summary>
+    private void RemoveItem_Click(object? sender, RoutedEventArgs e)
+    {
+        if (sender is Button { Tag: string path })
+        {
+            ToggleAccumulated(path, false);
+            foreach (var item in _fileItems.Where(i =>
+                         string.Equals(i.FullPath, path, StringComparison.OrdinalIgnoreCase)))
+            {
+                item.IsSelected = false;
+            }
+        }
+    }
+
+    /// <summary>清空全部累积。</summary>
+    private void ClearAccumulated_Click(object? sender, RoutedEventArgs e)
+    {
+        _accumulatedPaths.Clear();
+        foreach (var item in _fileItems)
+        {
+            item.IsSelected = false;
+        }
+        UpdatePickPanel();
+    }
+
+    /// <summary>刷新右侧累积面板：标题计数、累积列表、批量按钮计数、空占位。</summary>
+    private void UpdatePickPanel()
+    {
+        var count = _accumulatedPaths.Count;
+
+        // 标题计数
+        PickTitleText.Text = LocalizationManager.T("Picker_SelectedCount", count);
+
+        // 累积列表（按路径排序）
+        _accumulatedItems.Clear();
+        foreach (var p in _accumulatedPaths.OrderBy(p => p, StringComparer.OrdinalIgnoreCase))
+        {
+            _accumulatedItems.Add(new AccumulatedPathItem(p));
+        }
+
+        // 高亮项 → 添加/移除按钮可用性 + 计数文本
+        var highlighted = (FileList.SelectedItems ?? Array.Empty<object>())
+            .OfType<FileBrowserItem>()
+            .Where(i => i.CanCheck)
+            .ToList();
+        var addable = highlighted.Count(i => !_accumulatedPaths.Contains(i.FullPath, StringComparer.OrdinalIgnoreCase));
+        var removable = highlighted.Count(i => _accumulatedPaths.Contains(i.FullPath, StringComparer.OrdinalIgnoreCase));
+        AddSelectedButton.IsEnabled = addable > 0;
+        RemoveSelectedButton.IsEnabled = removable > 0;
+        if (addable > 0 || removable > 0)
+        {
+            PickActionCountText.Text = LocalizationManager.T("Picker_AddRemoveCount", addable, removable);
+            PickActionCountText.Foreground = GetThemeBrush("ThemeTextPrimaryBrush");
+        }
+        else
+        {
+            PickActionCountText.Text = LocalizationManager.T("Picker_AddRemoveEmpty");
+            PickActionCountText.Foreground = GetThemeBrush("ThemeTextSecondaryBrush");
+        }
+
+        // 空占位
+        PickEmptyText.Text = LocalizationManager.T("Picker_AccumulatedEmpty");
+        PickEmptyText.IsVisible = count == 0;
+    }
+
+    /// <summary>从当前应用资源中取主题画刷（主题切换后动态解析）。</summary>
+    private static IBrush GetThemeBrush(string key)
+    {
+        if (Application.Current?.TryFindResource(key, out var brush) == true && brush is IBrush b)
+        {
+            return b;
+        }
+        return Brushes.Gray;
     }
 
     private void QuickPath_PathSelected(object? sender, string path)
@@ -683,6 +928,13 @@ public partial class CustomFilePickerDialog : Window
                 {
                     SelectedPath = _currentDir;
                 }
+                Close(true);
+                break;
+
+            case PickerMode.PickItems:
+                SelectedPaths = _accumulatedPaths
+                    .OrderBy(p => p, StringComparer.OrdinalIgnoreCase)
+                    .ToArray();
                 Close(true);
                 break;
 
@@ -815,6 +1067,9 @@ public partial class CustomFilePickerDialog : Window
                     }
                     break;
                 }
+                case PickerMode.PickItems:
+                    // PickItems 模式系统浏览按钮已隐藏；此处仅防御
+                    break;
             }
         }
         catch (Exception ex)

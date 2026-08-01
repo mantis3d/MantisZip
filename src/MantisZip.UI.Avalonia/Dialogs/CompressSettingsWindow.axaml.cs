@@ -3,7 +3,6 @@ using System.Linq;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
 using Avalonia.Media;
-using Avalonia.Platform.Storage;
 using Avalonia.Threading;
 using MantisZip.Core.Abstractions;
 using MantisZip.Core.FileFilter;
@@ -59,17 +58,7 @@ public partial class CompressSettingsWindow : Window
         // 设置文件/文件夹选择回调
         ViewModel.PickFiles = async () =>
         {
-            var files = await StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
-            {
-                Title = "Select files to compress",
-                AllowMultiple = true
-            });
-            return files?.Select(f => f.Path?.LocalPath).Where(p => p != null).ToList()!;
-        };
-
-        ViewModel.PickFolder = async () =>
-        {
-            return await CustomFilePickerDialog.ShowFolderAsync(this);
+            return await CustomFilePickerDialog.ShowOpenItemsAsync(this);
         };
 
         // 设置关闭回调
