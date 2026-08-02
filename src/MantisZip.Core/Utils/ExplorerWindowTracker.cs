@@ -224,7 +224,12 @@ public static class ExplorerWindowTracker
         try
         {
             var windows = GetOpenExplorerWindows();
-            return windows.FirstOrDefault(w => w.IsActive)?.Path;
+            // 优先前台活动窗口；否则返回枚举到的第一个资源管理器窗口。
+            // 注意：MantisZip 打开对话框时前台窗口是 MantisZip 自己，资源管理器已不可能是 IsActive，
+            // 因此此处不能只认 IsActive —— 否则该来源永远返回 null。
+            var active = windows.FirstOrDefault(w => w.IsActive);
+            if (active != null) return active.Path;
+            return windows.FirstOrDefault()?.Path;
         }
         catch { return null; }
     }

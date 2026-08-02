@@ -58,7 +58,9 @@ public partial class CompressSettingsWindow : Window
         // 设置文件/文件夹选择回调
         ViewModel.PickFiles = async () =>
         {
-            return await CustomFilePickerDialog.ShowOpenItemsAsync(this);
+            // 将第一个源路径的目录作为「场景相关路径」传给 picker，作为默认路径优先级链的 context 来源
+            var contextPath = ResolveContextPath(sourcePaths);
+            return await CustomFilePickerDialog.ShowOpenItemsAsync(this, initialPath: contextPath);
         };
 
         // 设置关闭回调
@@ -416,5 +418,20 @@ public partial class CompressSettingsWindow : Window
             PasswordTextBox.PasswordChar = '●';
             RevealButton.Content = LocalizationManager.T("Compress_ShowPassword");
         }
+    }
+
+    /// <summary>从源路径列表中推导「场景相关路径」：取第一个文件/目录所在目录，供默认路径优先级链 context 使用。</summary>
+    private static string? ResolveContextPath(IReadOnlyList<string> sourcePaths)
+    {
+        if (sourcePaths == null || sourcePaths.Count == 0) return null;
+        var first = sourcePaths[0];
+        if (string.IsNullOrWhiteSpace(first)) return null;
+        try
+        {
+            if (Directory.Exists(first)) return System.IO.Path.GetFullPath(first);
+            if (File.Exists(first)) return System.IO.Path.GetDirectoryName(first);
+            return null;
+        }
+        catch { return null; }
     }
 }
