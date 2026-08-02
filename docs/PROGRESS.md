@@ -21,6 +21,14 @@
 
 ### MantisZip.UI.Avalonia（主力版）
 
+**2026-08-03** — 默认路径优先级功能 — 文件选择器初始路径可自定义排序来源（context/explorer/recent/custom）+ 手动路径
+  - **AppSettings（Task 1）**：新增 `DefaultPathOrder`（`List<string>`，默认 `["context","explorer","recent","custom"]`）+ `CustomDefaultPath`（手动路径值，留空跳过）
+  - **CustomFilePickerDialog 解析链（Task 2）**：`ResolveInitialPath` 改从 `DefaultPathOrder` 顺序逐个尝试第一个可用来源（context→场景相关路径、explorer→当前资源管理器窗口、recent→最近使用路径、custom→`CustomDefaultPath`），全部不可用则桌面兜底；新增 `ResolveContextPath`/`ResolveCustomPath` 帮助函数
+  - **设置 UI（Task 3–4）**：新增 `PathPriorityItemModel`（Kind/DisplayName/CanMoveUp/CanMoveDown）；`SettingsWindowViewModel` 增 `PathPriorityItems` 集合 + `MovePathUp/Down` RelayCommand + `CustomPath`（加载/保存/语言切换刷新）；设置窗口「高级」Tab 新增「默认路径优先级」分组（↑↓ 排序 ItemsControl + 桌面兜底说明 + 手动路径 TextBox + 提示文案）
+  - **本地化（Task 5）**：新增 7 key（`Settings_DefaultPath_GroupHeader/Context/Explorer/Recent/Custom/DesktopRow/Hint`）zh/en 双语
+  - 构建 0 errors / Avalonia 测试 35 通过（Core 测试受 Explorer.exe 锁定 ShellExt.dll 的既有环境阻塞，自身编译 0 错误）
+  - ⏳ 手动验收待做：设置里 ↑↓ 重排并保存后重新打开校验持久化；语言切换后排序项名称刷新
+
 **2026-08-01** — 文件选择器多选（PickItems 模式）实施完成 — CompressSettingsWindow 合并「添加文件/文件夹」单按钮
   - **CustomFilePickerDialog PickItems 模式（Task 1–4）**：新增 `PickerMode.PickItems` 与静态入口 `ShowOpenItemsAsync`（返回 `IReadOnlyList<string>?`，取消返回 null）；文件+目录混合勾选累积，跨目录导航保留；`FileBrowserItem` 继承 `ObservableObject`（`IsSelected` TwoWay 绑定勾选框，`CanCheck` 控制勾选框显隐，订阅 PropertyChanged 统一走 `ToggleAccumulated` 单入口）；右侧面板（PickItems 累积列表 / ExtractFolder 原底部 PreviewArea 迁入）按模式切换；批量「＋添加所选 (N)/－移除所选 (M)」计数联动高亮、逐项 × 移除、清空、空态占位；双击/Enter 文件切换勾选不关闭、目录进入导航；系统浏览按钮 PickItems/ExtractFolder 隐藏；布局重构 `220,5,*,5,Auto` 三列 + 右栏、窗口 900×620、FileNameArea/OK 行顺移
   - **CompressSettingsWindow 合并按钮（Task 6）**：「添加文件」「添加文件夹」双按钮 → 单按钮「添加文件/文件夹」（`Compress_AddItems`）；`PickFiles` 回调改调 `ShowOpenItemsAsync`，`AddFiles` 命令体零改动；VM 删除 `PickFolder` 属性 + `AddFolder` 命令 + `Compress_AddFolder` 注册；原生 `StorageProvider` 依赖移除

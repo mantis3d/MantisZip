@@ -5,6 +5,7 @@ using MantisZip.UI.Avalonia.Models;
 using MantisZip.UI.Avalonia.Services;
 using System.Diagnostics;
 using System.IO;
+using System.Collections.ObjectModel;
 
 namespace MantisZip.UI.Avalonia.ViewModels;
 
@@ -210,6 +211,12 @@ public partial class SettingsWindowViewModel : ObservableObject
 
     [ObservableProperty]
     private bool _allowElevation;
+
+    // ── Default path priority ──
+    public ObservableCollection<PathPriorityItemModel> PathPriorityItems { get; } = new();
+
+    [ObservableProperty]
+    private string _customPath = "";
 
     // ── Language ──
     [ObservableProperty]
@@ -621,6 +628,10 @@ public partial class SettingsWindowViewModel : ObservableObject
     public string AdvancedCleanOnStartupText => LocalizationManager.T("Settings_Advanced_CleanOnStartup");
     public string AdvancedAllowElevationText => LocalizationManager.T("Settings_Advanced_AllowElevation");
 
+    public string DefaultPathGroupHeader => LocalizationManager.T("Settings_DefaultPath_GroupHeader");
+    public string DefaultPathDesktopRow => LocalizationManager.T("Settings_DefaultPath_DesktopRow");
+    public string DefaultPathHint => LocalizationManager.T("Settings_DefaultPath_Hint");
+
     public string DebugText => LocalizationManager.T("Settings_EnableDebugLog");
     public string LogPrivacyModeText => LocalizationManager.T("Settings_Debug_LogPrivacyMode");
     public string LogPrivacyModeOffText => LocalizationManager.T("Settings_Debug_LogPrivacyMode_Off");
@@ -744,6 +755,10 @@ public partial class SettingsWindowViewModel : ObservableObject
         _preserveDirectoryRoot = _settings.PreserveDirectoryRoot;
         _cleanTempOnStartup = _settings.CleanTempOnStartup;
         _allowElevation = _settings.AllowElevation;
+
+        // Default path priority
+        _customPath = _settings.CustomDefaultPath ?? "";
+        ReloadPathPriorityItems();
 
     // Language
     _selectedLanguage = _settings.Language;
@@ -1064,6 +1079,11 @@ public partial class SettingsWindowViewModel : ObservableObject
         OnPropertyChanged(nameof(AdvancedCleanAllTempText));
         OnPropertyChanged(nameof(AdvancedCleanOnStartupText));
         OnPropertyChanged(nameof(AdvancedAllowElevationText));
+        OnPropertyChanged(nameof(DefaultPathGroupHeader));
+        OnPropertyChanged(nameof(DefaultPathDesktopRow));
+        OnPropertyChanged(nameof(DefaultPathHint));
+        // 刷新排序项的名称（本地化文案随语言切换）
+        RefreshPathPriorityDisplayNames();
 
         OnPropertyChanged(nameof(DebugText));
         OnPropertyChanged(nameof(LogPrivacyModeText));
@@ -1207,7 +1227,94 @@ public partial class SettingsWindowViewModel : ObservableObject
         MetadataPanelSettings.ApplyAllTypeConfigs();
         MetadataPanelSettings.Save();
 
+        // Default path priority
+        _settings.DefaultPathOrder = PathPriorityItems.Select(p => p.Kind).ToList();
+        _settings.CustomDefaultPath = CustomPath ?? "";
+
         _settings.Save();
+    }
+
+    // ── Default path priority helpers ──────────────────────────────────────
+
+    /// <summary>从 AppSettings.DefaultPathOrder 重建排序列表项（Kind→DisplayName 映射 + 首末可移动状态）。</summary>
+    private void ReloadPathPriorityItems()
+    {
+        var order = _settings.DefaultPathOrder ?? new List<string>();
+        // 过滤已知值、去重，保持用户顺序
+        var distinct = new List<string>();
+        foreach (var kind in order)
+        {
+            if (kind is "context" or "explorer" or "recent" or "custom" && !distinct.Contains(kind))
+                distinct.Add(kind);
+        }
+        // 补上缺失的已知项（防止持久化数据不全导致链不完整）
+        foreach (var kind in new[] { "context", "explorer", "recent", "custom" })
+        {
+            if (!distinct.Contains(kind)) distinct.Add(kind);
+        }
+
+        PathPriorityItems.Clear();
+        foreach (var kind in distinct)
+        {
+            PathPriorityItems.Add(new PathPriorityItemModel
+            {
+                Kind = kind,
+                DisplayName = kind switch
+                {
+                    "context" => LocalizationManager.T("Settings_DefaultPath_Context"),
+                    "explorer" => LocalizationManager.T("Settings_DefaultPath_Explorer"),
+                    "recent" => LocalizationManager.T("Settings_DefaultPath_Recent"),
+                    "custom" => LocalizationManager.T("Settings_DefaultPath_Custom"),
+                    _ => kind
+                }
+            });
+        }
+        RefreshPathPriorityMoveState();
+    }
+
+    /// <summary>语言切换时刷新排序项的名称（保持 Kind 顺序不变）。</summary>
+    private void RefreshPathPriorityDisplayNames()
+    {
+        foreach (var item in PathPriorityItems)
+        {
+            item.DisplayName = item.Kind switch
+            {
+                "context" => LocalizationManager.T("Settings_DefaultPath_Context"),
+                "explorer" => LocalizationManager.T("Settings_DefaultPath_Explorer"),
+                "recent" => LocalizationManager.T("Settings_DefaultPath_Recent"),
+                "custom" => LocalizationManager.T("Settings_DefaultPath_Custom"),
+                _ => item.Kind
+            };
+        }
+    }
+
+    private void RefreshPathPriorityMoveState()
+    {
+        for (var i = 0; i < PathPriorityItems.Count; i++)
+        {
+            PathPriorityItems[i].CanMoveUp = i > 0;
+            PathPriorityItems[i].CanMoveDown = i < PathPriorityItems.Count - 1;
+        }
+    }
+
+    [RelayCommand]
+    private void MovePathUp(PathPriorityItemModel? item)
+    {
+        if (item == null) return;
+        var idx = PathPriorityItems.IndexOf(item);
+        if (idx <= 0) return;
+        PathPriorityItems.Move(idx, idx - 1);
+        RefreshPathPriorityMoveState();
+    }
+
+    [RelayCommand]
+    private void MovePathDown(PathPriorityItemModel? item)
+    {
+        if (item == null) return;
+        var idx = PathPriorityItems.IndexOf(item);
+        if (idx < 0 || idx >= PathPriorityItems.Count - 1) return;
+        PathPriorityItems.Move(idx, idx + 1);
+        RefreshPathPriorityMoveState();
     }
 
     private void RefreshShellStatus()
