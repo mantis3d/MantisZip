@@ -21,12 +21,16 @@
 
 ### MantisZip.UI.Avalonia（主力版）
 
-**2026-08-03** — 全新 QuickPathPicker 自包含可复用路径速选控件（进行中：控件已完成，宿主集成待接入）
+**2026-08-03** — 全新 QuickPathPicker 自包含可复用路径速选控件（已完成：控件 + 三宿主全部集成）
   - **QuickPathPicker 控件**（`Controls/QuickPathPicker.axaml`）：URL 路径输入框（AutoCompleteBox，复用 CustomFilePicker 补全逻辑：历史匹配 + 父目录枚举）+ ⭐🕐🪟 三单 Tab 快捷浮层（复用 `QuickPathControl.SingleTab`+`ApplySingleTabMode`，无目录树）+ 📁 浏览按钮；内置 PointerPressed tunnel light-dismiss；控件永远只收目录——浏览/输入选到文件自动收敛为父目录（`CoerceToDirectory` 纯函数，TDD 覆盖），文件名归其它控件职责
   - **公共 API**：`Path` StyledProperty（TwoWay 双向绑定）+ 可注入 `BrowseAction(Func<Window?, string?, Task<string?>>?)`（默认内置纯目录选择 `ShowFolderAsync`），浏览差异经注入委托解决
   - **本地化**：新增 1 key `QuickPath_Browse`（zh/en）；⭐🕐🪟 ToolTip 复用既有 `QuickPath_Tab*`
-  - **宿主集成（进行中）**：SettingsWindow 已接入（替换手动 TextBox+📁 → `<QuickPathPicker Path="{Binding CustomPath}" />`，默认零配置内置目录选择，移除旧单面板与 PointerPressed handler）；Compress/Extract 后续接
-  - 测试：新增 `QuickPathPickerDirectoryNormalizationTests`（5 归一化用例）；Avalonia 测试 42 通过（40+2 skip）/ 构建 0 errors / lsp 干净
+  - **宿主集成（全部完成）**：
+    - `SettingsWindow`：替换手动 TextBox+📁 → `<QuickPathPicker Path="{Binding CustomPath}" />`，默认零配置
+    - `CompressSettingsWindow`：替换 Output 区 StackPanel（输出目录 TextBox + 快捷按钮行）+ 3 个 Popup → `<QuickPathPicker Path="{Binding OutputDirectory}" />`；注入 `OutputPathPicker.BrowseAction`（保存对话框 + 格式联动，拆目录/文件名，文件名仍写回独立 `OutputFileName`）；删除全部旧处理器（Quick*_Click / OutputPathControl_PathSelected / CloseOutputPopups / SyncOutputPathControl）
+    - `ExtractSettingsWindow`：替换目标路径 TextBox+Browse+快捷按钮行+3 个 Popup → `<QuickPathPicker Path="{Binding DestinationPath}" />`；注入 `DestinationPicker.BrowseAction`（解压模式文件夹对话框 `ShowExtractFolderAsync`）；删除旧处理器（Quick*_Click / DestPathControl_PathSelected / CloseDestPopups / BrowsePath_Click / QuickBrowseButton_Click）
+  - **净删除**：Compress/Extract 两窗口 AXAML 大幅精简（各 -130 余行），code-behind 冗余处理器删除
+  - 测试：新增 `QuickPathPickerDirectoryNormalizationTests`（5 归一化用例，纯 temp 目录不依赖真实文件）；Avalonia 测试 42 通过（40+2 skip）/ 构建 0 errors / lsp 干净
 
 **2026-08-03** — 设置窗口自定义路径 QuickPath — 「手动路径」输入框旁加快捷路径选择浮层
   - **QuickPath 浮层**：`SettingsWindow`「高级」Tab 默认路径优先级分组内，自定义路径 TextBox 右侧加文件夹图标按钮，点击弹出 `QuickPathControl`（全部来源：收藏/历史/窗口/目录树），选中路径写回 `CustomPath` 并关闭；复用 CompressSettings 的「PointerPressed tunnel 手动 light-dismiss」交互模式；ToolTip 本地化（`QuickPath_Title`）

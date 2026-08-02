@@ -63,19 +63,12 @@ public partial class ExtractSettingsWindow : Window
         // 绑定文件列表
         FileListBox.ItemsSource = archivePaths;
 
-        // 配置 3 个单 Tab 面板（各弹出独立浮层；目录树按钮在解压窗口不显示）
-        DestFavControl.SingleTab = PathTab.Favorites;
-        DestFavControl.ApplySingleTabMode();
-        DestHistControl.SingleTab = PathTab.History;
-        DestHistControl.ApplySingleTabMode();
-        DestWinControl.SingleTab = PathTab.Windows;
-        DestWinControl.ApplySingleTabMode();
-
-        // 手动 light dismiss：Popup 遮罩会拦截外部点击导致按钮收不到 Click，
-        // 改为监听主窗口 PointerPressed——点击窗口任意处先关闭全部浮层，按钮 Click 再打开对应浮层
-        AddHandler(global::Avalonia.Input.InputElement.PointerPressedEvent,
-            (_, _) => CloseDestPopups(),
-            RoutingStrategies.Tunnel);
+        // 浏览回调：解压模式文件夹对话框（内建 ResultTreeView 实时冲突检测）。
+        // QuickPathPicker 只收目录，此处返回目录即可。
+        DestinationPicker.BrowseAction = (owner, current) =>
+            _entries == null
+                ? Task.FromResult<string?>(null)
+                : CustomFilePickerDialog.ShowExtractFolderAsync(owner ?? this, _entries, ViewModel.DestinationPath);
 
         Loaded += OnLoaded;
     }
@@ -85,56 +78,6 @@ public partial class ExtractSettingsWindow : Window
     {
         _entries = entries;
         BuildPreview();
-    }
-
-    // ── Destination path quick buttons ─────────────────────────────────────
-
-    /// <summary>打开指定浮层（点击按钮时其它浮层已由 light dismiss 关闭）。</summary>
-    private void QuickFavButton_Click(object? sender, RoutedEventArgs e)
-        => DestFavPopup.IsOpen = true;
-
-    private void QuickHistButton_Click(object? sender, RoutedEventArgs e)
-        => DestHistPopup.IsOpen = true;
-
-    private void QuickWinButton_Click(object? sender, RoutedEventArgs e)
-        => DestWinPopup.IsOpen = true;
-
-    /// <summary>QuickPathControl 单击选中路径 → 写入 DestinationPath 并关闭浮层。</summary>
-    private void DestPathControl_PathSelected(object? sender, string path)
-    {
-        if (string.IsNullOrEmpty(path)) return;
-        ViewModel.DestinationPath = path;
-        CloseDestPopups();
-    }
-
-    /// <summary>关闭全部解压路径浮层。</summary>
-    private void CloseDestPopups()
-    {
-        DestFavPopup.IsOpen = false;
-        DestHistPopup.IsOpen = false;
-        DestWinPopup.IsOpen = false;
-    }
-
-    /// <summary>浏览按钮：解压模式对话框（内建 ResultTreeView 冲突预览）。</summary>
-    private async void BrowsePath_Click(object? sender, RoutedEventArgs e)
-    {
-        if (_entries == null) return;
-        var path = await CustomFilePickerDialog.ShowExtractFolderAsync(this, _entries, ViewModel.DestinationPath);
-        if (!string.IsNullOrEmpty(path))
-        {
-            ViewModel.DestinationPath = path;
-        }
-    }
-
-    /// <summary>快捷按钮行 📁：同浏览按钮（解压模式对话框）。</summary>
-    private async void QuickBrowseButton_Click(object? sender, RoutedEventArgs e)
-    {
-        if (_entries == null) return;
-        var path = await CustomFilePickerDialog.ShowExtractFolderAsync(this, _entries, ViewModel.DestinationPath);
-        if (!string.IsNullOrEmpty(path))
-        {
-            ViewModel.DestinationPath = path;
-        }
     }
 
     /// <summary>根据当前 entries、DestinationPath 和过滤条件构建预览树。</summary>
