@@ -25,6 +25,7 @@
   - **QuickPathPicker 控件**（`Controls/QuickPathPicker.axaml`）：URL 路径输入框（AutoCompleteBox，复用 CustomFilePicker 补全逻辑：历史匹配 + 父目录枚举）+ ⭐🕐🪟 三单 Tab 快捷浮层（复用 `QuickPathControl.SingleTab`+`ApplySingleTabMode`，无目录树）+ 📁 浏览按钮；内置 PointerPressed tunnel light-dismiss；控件永远只收目录——浏览/输入选到文件自动收敛为父目录（`CoerceToDirectory` 纯函数，TDD 覆盖），文件名归其它控件职责
   - **公共 API**：`Path` StyledProperty（TwoWay 双向绑定）+ 可注入 `BrowseAction(Func<Window?, string?, Task<string?>>?)`（默认内置纯目录选择 `ShowFolderAsync`），浏览差异经注入委托解决
   - **本地化**：新增 1 key `QuickPath_Browse`（zh/en）；⭐🕐🪟 ToolTip 复用既有 `QuickPath_Tab*`
+  - **宿主集成（进行中）**：SettingsWindow 已接入（替换手动 TextBox+📁 → `<QuickPathPicker Path="{Binding CustomPath}" />`，默认零配置内置目录选择，移除旧单面板与 PointerPressed handler）；Compress/Extract 后续接
   - 测试：新增 `QuickPathPickerDirectoryNormalizationTests`（5 归一化用例）；Avalonia 测试 42 通过（40+2 skip）/ 构建 0 errors / lsp 干净
 
 **2026-08-03** — 设置窗口自定义路径 QuickPath — 「手动路径」输入框旁加快捷路径选择浮层
