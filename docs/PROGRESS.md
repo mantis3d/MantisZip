@@ -21,6 +21,10 @@
 
 ### MantisZip.UI.Avalonia（主力版）
 
+**2026-08-03** — 设置窗口自定义路径 QuickPath — 「手动路径」输入框旁加快捷路径选择浮层
+  - **QuickPath 浮层**：`SettingsWindow`「高级」Tab 默认路径优先级分组内，自定义路径 TextBox 右侧加文件夹图标按钮，点击弹出 `QuickPathControl`（全部来源：收藏/历史/窗口/目录树），选中路径写回 `CustomPath` 并关闭；复用 CompressSettings 的「PointerPressed tunnel 手动 light-dismiss」交互模式；ToolTip 本地化（`QuickPath_Title`）
+  - 构建 0 errors / Avalonia 测试 35 通过 / lsp 干净
+
 **2026-08-03** — 默认路径优先级功能 — 文件选择器初始路径可自定义排序来源（context/explorer/recent/custom）+ 手动路径
   - **AppSettings（Task 1）**：新增 `DefaultPathOrder`（`List<string>`，默认 `["context","explorer","recent","custom"]`）+ `CustomDefaultPath`（手动路径值，留空跳过）
   - **CustomFilePickerDialog 解析链（Task 2）**：`ResolveInitialPath` 改从 `DefaultPathOrder` 顺序逐个尝试第一个可用来源（context→场景相关路径、explorer→当前资源管理器窗口、recent→最近使用路径、custom→`CustomDefaultPath`），全部不可用则桌面兜底；新增 `ResolveContextPath`/`ResolveCustomPath` 帮助函数

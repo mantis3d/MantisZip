@@ -16,6 +16,12 @@ public partial class SettingsWindow : Window
     {
         InitializeComponent();
         DataContext = new SettingsWindowViewModel();
+
+        // 手动 light dismiss：Popup 遮罩会拦截外部点击导致按钮收不到 Click，
+        // 改为监听窗口任意 PointerPressed——先关闭快捷浮层，按钮 Click 再打开
+        AddHandler(InputElement.PointerPressedEvent,
+            (_, _) => CustomPathQuickPopup.IsOpen = false,
+            RoutingStrategies.Tunnel);
     }
 
     private void OnSaveClick(object sender, RoutedEventArgs e)
@@ -66,6 +72,24 @@ public partial class SettingsWindow : Window
     private void OnPreviewFieldTapped(object sender, TappedEventArgs e)
     {
         // Kept for future use
+    }
+
+    // ── 自定义路径 QuickPath ────────────────────────────────────────────────
+
+    private void CustomPathQuickButton_Click(object? sender, RoutedEventArgs e)
+    {
+        // 打开 Popup 前刷新数据源（收藏/历史可能已变化）
+        CustomPathQuickControl.RefreshSources();
+        CustomPathQuickPopup.IsOpen = true;
+    }
+
+    /// <summary>QuickPathControl 选中路径 → 写入自定义路径并关闭浮层。</summary>
+    private void CustomPathQuickControl_PathSelected(object? sender, string path)
+    {
+        if (string.IsNullOrEmpty(path)) return;
+        if (DataContext is SettingsWindowViewModel vm)
+            vm.CustomPath = path;
+        CustomPathQuickPopup.IsOpen = false;
     }
 }
 

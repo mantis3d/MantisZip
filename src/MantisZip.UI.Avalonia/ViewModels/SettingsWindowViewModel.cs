@@ -631,6 +631,7 @@ public partial class SettingsWindowViewModel : ObservableObject
     public string DefaultPathGroupHeader => LocalizationManager.T("Settings_DefaultPath_GroupHeader");
     public string DefaultPathDesktopRow => LocalizationManager.T("Settings_DefaultPath_DesktopRow");
     public string DefaultPathHint => LocalizationManager.T("Settings_DefaultPath_Hint");
+    public string DefaultPathQuickTip => LocalizationManager.T("QuickPath_Title");
 
     public string DebugText => LocalizationManager.T("Settings_EnableDebugLog");
     public string LogPrivacyModeText => LocalizationManager.T("Settings_Debug_LogPrivacyMode");
@@ -1082,6 +1083,7 @@ public partial class SettingsWindowViewModel : ObservableObject
         OnPropertyChanged(nameof(DefaultPathGroupHeader));
         OnPropertyChanged(nameof(DefaultPathDesktopRow));
         OnPropertyChanged(nameof(DefaultPathHint));
+        OnPropertyChanged(nameof(DefaultPathQuickTip));
         // 刷新排序项的名称（本地化文案随语言切换）
         RefreshPathPriorityDisplayNames();
 

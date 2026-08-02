@@ -2,6 +2,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="clr-namespace:MantisZip.UI.Avalonia.ViewModels"
         xmlns:services="clr-namespace:MantisZip.UI.Avalonia.Services"
+        xmlns:controls="clr-namespace:MantisZip.UI.Avalonia.Controls"
         xmlns:models="clr-namespace:MantisZip.UI.Avalonia.Models"
         xmlns:local="clr-namespace:MantisZip.UI.Avalonia.Views"
         x:Class="MantisZip.UI.Avalonia.Views.SettingsWindow"
@@ -1157,18 +1158,50 @@
                              VerticalAlignment="Center"
                              Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
                 </StackPanel>
-                <TextBox Text="{Binding CustomPath}"
-                         PlaceholderText="C:\...\custom"
-                         Margin="0,4,0,0"
-                         Background="{DynamicResource ThemeWindowBgBrush}"
-                         Foreground="{DynamicResource ThemeTextPrimaryBrush}"
-                         BorderBrush="{DynamicResource ThemeBorderBrush}" />
+                <Grid ColumnDefinitions="*,Auto" Margin="0,4,0,0">
+                  <TextBox Grid.Column="0"
+                           Text="{Binding CustomPath}"
+                           PlaceholderText="C:\...\custom"
+                           Margin="0,0,8,0"
+                           Background="{DynamicResource ThemeWindowBgBrush}"
+                           Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                           BorderBrush="{DynamicResource ThemeBorderBrush}" />
+                  <Button Grid.Column="1"
+                          x:Name="CustomPathQuickButton"
+                          MinHeight="{DynamicResource ControlHeight}"
+                          Padding="{DynamicResource SpacingXsThk}"
+                          Click="CustomPathQuickButton_Click"
+                          ToolTip.Tip="{Binding DefaultPathQuickTip}"
+                          Background="{DynamicResource ThemeButtonBgBrush}"
+                          Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                          BorderBrush="{DynamicResource ThemeBorderBrush}">
+                    <PathIcon Data="{StaticResource IconFolderOpen}"
+                              Width="14" Height="14"
+                              Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+                  </Button>
+                </Grid>
                 <TextBlock Text="{Binding DefaultPathHint}"
                            FontSize="11"
                            TextWrapping="Wrap"
-                           Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
               </StackPanel>
             </Border>
+
+            <Popup x:Name="CustomPathQuickPopup"
+                   PlacementTarget="{Binding #CustomPathQuickButton}"
+                   Placement="Bottom"
+                   IsLightDismissEnabled="False">
+              <Border Background="{DynamicResource ThemeWindowBgBrush}"
+                      BorderBrush="{DynamicResource ThemeBorderBrush}"
+                      BorderThickness="1" CornerRadius="4" Padding="6"
+                      Width="320" MaxHeight="420"
+                      BoxShadow="0 2 8 0 #40000000">
+                <controls:QuickPathControl x:Name="CustomPathQuickControl"
+                                           Width="308"
+                                           PathConfirmed="CustomPathQuickControl_PathSelected"
+                                           PathSelected="CustomPathQuickControl_PathSelected" />
+              </Border>
+            </Popup>
 
             <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
                     CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}" Background="{DynamicResource ThemeSurfaceBgBrush}">
