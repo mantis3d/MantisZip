@@ -34,6 +34,10 @@
   - **context 来源失效（Avalonia）**：压缩设置「添加文件/文件夹」原来 `ShowOpenItemsAsync(this)` 不传 `initialPath`，context 场景路径无源而跳过。改为从第一个源路径推导目录（文件→所在目录，目录→本身）作为 `initialPath` 传入
   - 构建 0 errors / Avalonia 测试 35 通过 / lsp 干净
 
+**2026-08-03** — 默认路径优先级 context 补充 — 主窗口「打开/浏览」入口也传入场景路径（当前压缩包所在目录）
+  - 修复上一轮遗漏：压缩设置入口已传 context，但主窗口 `OpenFileDialogAsync`（打开压缩包/浏览）仍传 null，导致经主窗口打开选择器时 context 来源恒为空。现改为将当前已打开压缩包的所在目录（`CurrentArchivePath` 的父目录）作为场景路径初值传入，无当前存档时退回优先级链其它来源
+  - 构建 0 errors / Avalonia 测试 35 通过 / lsp 干净
+
 **2026-08-01** — 文件选择器多选（PickItems 模式）实施完成 — CompressSettingsWindow 合并「添加文件/文件夹」单按钮
   - **CustomFilePickerDialog PickItems 模式（Task 1–4）**：新增 `PickerMode.PickItems` 与静态入口 `ShowOpenItemsAsync`（返回 `IReadOnlyList<string>?`，取消返回 null）；文件+目录混合勾选累积，跨目录导航保留；`FileBrowserItem` 继承 `ObservableObject`（`IsSelected` TwoWay 绑定勾选框，`CanCheck` 控制勾选框显隐，订阅 PropertyChanged 统一走 `ToggleAccumulated` 单入口）；右侧面板（PickItems 累积列表 / ExtractFolder 原底部 PreviewArea 迁入）按模式切换；批量「＋添加所选 (N)/－移除所选 (M)」计数联动高亮、逐项 × 移除、清空、空态占位；双击/Enter 文件切换勾选不关闭、目录进入导航；系统浏览按钮 PickItems/ExtractFolder 隐藏；布局重构 `220,5,*,5,Auto` 三列 + 右栏、窗口 900×620、FileNameArea/OK 行顺移
   - **CompressSettingsWindow 合并按钮（Task 6）**：「添加文件」「添加文件夹」双按钮 → 单按钮「添加文件/文件夹」（`Compress_AddItems`）；`PickFiles` 回调改调 `ShowOpenItemsAsync`，`AddFiles` 命令体零改动；VM 删除 `PickFolder` 属性 + `AddFolder` 命令 + `Compress_AddFolder` 注册；原生 `StorageProvider` 依赖移除

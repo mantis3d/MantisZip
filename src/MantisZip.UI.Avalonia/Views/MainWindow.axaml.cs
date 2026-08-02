@@ -706,9 +706,13 @@ public partial class MainWindow : Window
 
     private async Task<string?> OpenFileDialogAsync()
     {
+        // 以当前已打开压缩包的所在目录作为「场景相关路径」初值（无则 null → 走优先级链其它来源）
+        var contextPath = (DataContext as MainWindowViewModel)?.CurrentArchivePath is { } c
+            ? Path.GetDirectoryName(c)
+            : null;
         return await CustomFilePickerDialog.ShowOpenFileAsync(
             this,
-            initialPath: null,
+            initialPath: contextPath,
             fileExtensions:
             [
                 "*.zip", "*.7z", "*.rar", "*.tar", "*.tgz", "*.tar.gz", "*.gz", "*.iso"
