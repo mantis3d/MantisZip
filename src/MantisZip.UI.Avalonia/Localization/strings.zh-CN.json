@@ -485,6 +485,7 @@
   "QuickPath_EmptyFavorites": "暂无收藏",
   "QuickPath_EmptyHistory": "暂无历史记录",
   "QuickPath_EmptyWindows": "没有打开的文件夹",
+  "QuickPath_Browse": "📁 浏览…",
   "SaveAs_Hint_Convert": "转换格式后，部分元数据可能丢失。RAR 等只读格式不支持压缩。",
   "SaveAs_Hint_KeepFormat": "选择保存位置和文件名，保持原格式。",
   "SaveAs_Title": "另存为",

@@ -487,6 +487,7 @@
   "QuickPath_EmptyFavorites": "No favorites",
   "QuickPath_EmptyHistory": "No history",
   "QuickPath_EmptyWindows": "No open folders",
+  "QuickPath_Browse": "📁 Browse…",
   "SaveAs_Hint_Convert": "Some metadata may be lost when converting format. Read-only formats like RAR do not support compression.",
   "SaveAs_Hint_KeepFormat": "Choose save location and filename, keeping original format.",
   "SaveAs_Title": "Save As",
