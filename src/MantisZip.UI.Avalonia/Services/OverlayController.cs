@@ -224,7 +224,7 @@ internal class OverlayController : IDisposable
 
             // Build user-friendly display text based on status
         string overlayText = isOwnApp
-            ? "拖拽到文件夹以释放文件，或者在此松开鼠标以取消"
+            ? LocalizationManager.T("DragOverlay_OwnWindow")
             : status switch
             {
                 DropTargetDetector.DropTargetStatus.Success => LocalizationManager.T("DragOverlay_TargetPath", displayText),

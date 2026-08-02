@@ -21,6 +21,12 @@
 
 ### MantisZip.UI.Avalonia（主力版）
 
+**2026-08-03** — 拖拽解压修复（P1/P2）：.gz/.iso 提取支持 + 状态消息 i18n + 失败弹窗
+  - **Core 单条目提取（共享层）**：`ArchiveEntryExtractor` 支持纯 `.gz` 单文件（新增 `ExtractGZipEntry` + `IsPlainGZipFile` 判定，GZipStream 直解，修复拖拽解压 .gz 必然抛 `InvalidFormatException`）；`ArchiveFormat.Iso` 并入 SharpSevenZipExtractor 分支（`ExtractEntryAsync`/`ExtractHeadAsync`/`ExtractTailSync`，修复拖拽/预览 ISO 必然抛 `NotSupportedException`）
+  - **i18n**：新增 9 key（`Status_DragHint/DetectingTarget/ExtractingTo/Done/Cancelled/DragCancelled/Failed/PickFolder` + `DragOverlay_OwnWindow`）zh/en 双语；`DragDropService`/`MainWindow`/`OverlayController` 的拖拽状态消息全部改走 `LocalizationManager`（原为硬编码中文）
+  - **失败反馈**：`DragDropService` 失败分支追加 `AppMessageBox` 错误弹窗（带 owner 窗口，弹窗自身异常被包裹，不影响 finally 清理）
+  - 验证：Avalonia 构建 0 errors / Avalonia 测试 40 通过（2 skip）/ 实测 .gz、.iso、tar.gz 对照组单条目提取全部成功（手工构造最小 ISO9660 镜像经 7z.dll 读取）
+
 **2026-08-03** — 全新 QuickPathPicker 自包含可复用路径速选控件（已完成：控件 + 三宿主全部集成）
   - **QuickPathPicker 控件**（`Controls/QuickPathPicker.axaml`）：URL 路径输入框（AutoCompleteBox，复用 CustomFilePicker 补全逻辑：历史匹配 + 父目录枚举）+ ⭐🕐🪟 三单 Tab 快捷浮层（复用 `QuickPathControl.SingleTab`+`ApplySingleTabMode`，无目录树）+ 📁 浏览按钮；内置 PointerPressed tunnel light-dismiss；控件永远只收目录——浏览/输入选到文件自动收敛为父目录（`CoerceToDirectory` 纯函数，TDD 覆盖），文件名归其它控件职责
   - **公共 API**：`Path` StyledProperty（TwoWay 双向绑定）+ 可注入 `BrowseAction(Func<Window?, string?, Task<string?>>?)`（默认内置纯目录选择 `ShowFolderAsync`），浏览差异经注入委托解决
@@ -869,6 +875,12 @@
 ### 共享层（Core / ShellExt / 构建）
 
 这些变更影响两项目共用代码，按时间从新到旧排列。
+
+#### v0.4.5 (2026-08-03) ArchiveEntryExtractor 支持纯 GZip 单文件与 ISO 单条目提取
+  - `ExtractEntryAsync`：新增 `.gz` 单文件分支（`ExtractGZipEntry`，GZipStream 直接解压；`IsPlainGZipFile` 判定 `.gz` 且非 `.tar.gz`），修复拖拽解压 .gz 抛 `InvalidFormatException`（TarReader 无法解析纯 gzip 流）
+  - `ExtractEntryAsync`/`ExtractHeadAsync`/`ExtractTailSync`：`ArchiveFormat.Iso` 并入 SharpSevenZipExtractor 分支，修复 ISO 单条目提取/头部提取抛 `NotSupportedException`（7z.dll 原生支持 ISO9660，与 `SevenZipEngine.CanHandle(Iso)` 一致）
+  - 涉及文件：`ArchiveEntryExtractor.cs`
+  - 构建 0 errors；实测 .gz/.iso/tar.gz 提取成功（WPF 拖拽解压同源受益）
 
 #### v0.4.5 (2026-07-31) FolderNode 新增 OnPropertyChanged 受保护方法
   - `FolderNode` 新增 `protected void OnPropertyChanged(string)`，供 PreviewTreeNode 继承使用

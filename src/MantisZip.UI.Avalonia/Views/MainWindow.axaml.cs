@@ -371,7 +371,7 @@ public partial class MainWindow : Window
                     return;
 
                 _isOwnDrag = true;
-                vm2.StatusMessage = "拖拽到 Explorer 或桌面以直接解压";
+                vm2.StatusMessage = LocalizationManager.T("Status_DragHint");
 
                 // ── Create Avalonia overlay window (works on UI thread, controlled via Win32 from background) ──
                 var overlayWin = new Window
@@ -477,7 +477,7 @@ public partial class MainWindow : Window
                         // 用户按 Esc 或右键取消拖拽 → 不执行解压
                         App.DebugLog("[MainWindow] Drag cancelled during drag — extraction skipped");
                         if (vm2 != null)
-                            vm2.StatusMessage = "拖拽已取消";
+                            vm2.StatusMessage = LocalizationManager.T("Status_DragDragCancelled");
                     }
                     else
                     {
@@ -486,7 +486,7 @@ public partial class MainWindow : Window
 
                         if (vm2 != null && !string.IsNullOrEmpty(archivePath))
                         {
-                            vm2.StatusMessage = "正在检测目标位置...";
+                            vm2.StatusMessage = LocalizationManager.T("Status_DragDetectingTarget");
                             var dragService = new DragDropService(
                                 archivePath, format, password, this);
                             await dragService.ExecuteAfterDropAsync(

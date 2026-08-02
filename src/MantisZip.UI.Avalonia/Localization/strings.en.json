@@ -873,6 +873,16 @@
   "DragOverlay_DragToFolder": "Drag to a folder to extract",
   "DragOverlay_NoPath": "Cannot identify path",
   "DragOverlay_Explorer": "Cannot identify path for File Explorer",
+  "DragOverlay_OwnWindow": "Drag to a folder to release files, or release here to cancel",
+
+  "Status_DragHint": "Drag to Explorer or desktop to extract",
+  "Status_DragDetectingTarget": "Detecting target location...",
+  "Status_DragExtractingTo": "Extracting to {0}...",
+  "Status_DragDone": "Extracted: {0}/{1} files to {2}",
+  "Status_DragCancelled": "Drag extract cancelled",
+  "Status_DragDragCancelled": "Drag cancelled",
+  "Status_DragFailed": "Extraction failed: {0}",
+  "Status_DragPickFolder": "Choose extract target folder",
 
   "Metadata_FileInfo": "File Info",
   "Metadata_FormatInfo": "Details",

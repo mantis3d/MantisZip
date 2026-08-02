@@ -5,6 +5,7 @@ using MantisZip.Core.Abstractions;
 using MantisZip.Core.Engines;
 using MantisZip.Core.Utils;
 using SharpCompress.Archives;
+using SharpCompress.Compressors.Deflate;
 using SharpCompress.Readers;
 using SharpSevenZip;
 using SharpSevenZip.Exceptions;
@@ -43,12 +44,19 @@ public static class ArchiveEntryExtractor
 
                 case ArchiveFormat.SevenZip:
                 case ArchiveFormat.Rar:
+                case ArchiveFormat.Iso:
                     ExtractSevenZipEntry(archivePath, entryName, outputPath, password);
                     break;
 
                 case ArchiveFormat.Tar:
+                    if (IsPlainGZipFile(archivePath))
+                        ExtractGZipEntry(archivePath, entryName, outputPath);
+                    else
+                        ExtractTarGzEntry(archivePath, entryName, outputPath);
+                    break;
+
                 case ArchiveFormat.GZip:
-                    ExtractTarGzEntry(archivePath, entryName, outputPath);
+                    ExtractGZipEntry(archivePath, entryName, outputPath);
                     break;
 
                 default:
@@ -121,6 +129,41 @@ public static class ArchiveEntryExtractor
         CoreLog.Info($"ExtractSevenZipEntry: done");
     }
 
+    /// <summary>
+    /// 判断是否为纯 GZip 单文件（.gz，非 .tar.gz / .tgz）。
+    /// 纯 GZip 无 tar 容器，TarReader 无法解析，需走 GZipStream 直接解压。
+    /// 与 <see cref="TarGzEngine.ExtractAsync"/> 的 .gz 分支保持一致。
+    /// </summary>
+    private static bool IsPlainGZipFile(string archivePath)
+    {
+        var ext = Path.GetExtension(archivePath).ToLowerInvariant();
+        return ext == ".gz" && !archivePath.EndsWith(".tar.gz", StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    /// 提取纯 GZip 单文件（.gz）：将压缩包内容直接解压到输出文件。
+    /// 条目名（解压后的文件名）仅用于匹配，实际内容来自整个 gzip 流。
+    /// </summary>
+    private static void ExtractGZipEntry(string archivePath, string entryName, string outputPath)
+    {
+        CoreLog.Info($"ExtractGZipEntry: archive={archivePath}, entry={entryName}");
+
+        // 最终路径安全检查
+        ValidateOutputPath(outputPath);
+
+        var dir = Path.GetDirectoryName(outputPath);
+        if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
+        {
+            Directory.CreateDirectory(dir);
+        }
+
+        using var inputStream = File.OpenRead(archivePath);
+        using var gzipStream = new GZipStream(inputStream, SharpCompress.Compressors.CompressionMode.Decompress);
+        using var outStream = File.Create(outputPath);
+        gzipStream.CopyTo(outStream);
+        CoreLog.Info($"ExtractGZipEntry: done");
+    }
+
     private static void ExtractTarGzEntry(string archivePath, string entryName, string outputPath)
     {
         CoreLog.Info($"ExtractTarGzEntry: archive={archivePath}, entry={entryName}");
@@ -185,6 +228,7 @@ public static class ArchiveEntryExtractor
 
                 case ArchiveFormat.SevenZip:
                 case ArchiveFormat.Rar:
+                case ArchiveFormat.Iso:
                     using (var extractor = string.IsNullOrEmpty(password)
                         ? new SharpSevenZipExtractor(archivePath)
                         : new SharpSevenZipExtractor(archivePath, password))
@@ -345,6 +389,7 @@ public static class ArchiveEntryExtractor
 
             case ArchiveFormat.SevenZip:
             case ArchiveFormat.Rar:
+            case ArchiveFormat.Iso:
             {
                 using var extractor = string.IsNullOrEmpty(password)
                     ? new SharpSevenZipExtractor(archivePath)

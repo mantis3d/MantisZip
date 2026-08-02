@@ -99,7 +99,7 @@ internal class DragDropService
         var folderName = Path.GetFileName(targetDir);
         if (string.IsNullOrEmpty(folderName))
             folderName = targetDir;
-        var pw = new ProgressWindow($"正在解压到 {folderName}...");
+        var pw = new ProgressWindow(LocalizationManager.T("Status_DragExtractingTo", folderName));
         pw.InitCancellation();
         pw.Show();
 
@@ -192,7 +192,7 @@ internal class DragDropService
             // 8. Post-extraction: status message and optional folder open
             App.DebugLog($"[DragDropService] Extraction complete: {processedFiles}/{totalFiles} files to {targetDir}");
             if (vm != null)
-                vm.StatusMessage = $"解压完成: {processedFiles}/{totalFiles} 个文件到 {folderName}";
+                vm.StatusMessage = LocalizationManager.T("Status_DragDone", processedFiles, totalFiles, folderName);
 
             if (_settings.OpenFolderAfterExtract)
             {
@@ -215,14 +215,26 @@ internal class DragDropService
             App.DebugLog("[DragDropService] Extraction cancelled by user");
             // 9. Handle cancellation
             if (vm != null)
-                vm.StatusMessage = "拖拽解压已取消";
+                vm.StatusMessage = LocalizationManager.T("Status_DragCancelled");
         }
         catch (Exception ex)
         {
             App.DebugLog($"[DragDropService] Extraction failed: {ex.GetType().Name}: {ex.Message}");
-            // 10. Handle errors
+            // 10. Handle errors: status bar message + explicit error dialog
+            // （失败必须弹窗提示——拖拽解压无确认环节，用户容易忽略状态栏小字）
             if (vm != null)
-                vm.StatusMessage = $"解压失败: {ex.Message}";
+                vm.StatusMessage = LocalizationManager.T("Status_DragFailed", ex.Message);
+            try
+            {
+                await AppMessageBox.Show(
+                    LocalizationManager.T("Status_DragFailed", ex.Message),
+                    LocalizationManager.T("App_ErrorTitle"),
+                    MessageBoxButton.OK, MessageBoxImage.Error, _ownerWindow);
+            }
+            catch (Exception dlgEx)
+            {
+                App.DebugLog($"[DragDropService] Failed to show error dialog: {dlgEx.Message}");
+            }
         }
         finally
         {
@@ -245,7 +257,7 @@ internal class DragDropService
 
             var folders = await topLevel.StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions
             {
-                Title = "选择解压目标文件夹",
+                Title = LocalizationManager.T("Status_DragPickFolder"),
                 AllowMultiple = false
             });
 

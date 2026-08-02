@@ -871,6 +871,16 @@
   "DragOverlay_DragToFolder": "请尝试拖拽到资源管理器窗口或桌面",
   "DragOverlay_NoPath": "无法识别路径",
   "DragOverlay_Explorer": "识别不到资源管理器窗口路径\n请尝试拖拽到一个路径的窗口",
+  "DragOverlay_OwnWindow": "拖拽到文件夹以释放文件，或者在此松开鼠标以取消",
+
+  "Status_DragHint": "拖拽到 Explorer 或桌面以直接解压",
+  "Status_DragDetectingTarget": "正在检测目标位置...",
+  "Status_DragExtractingTo": "正在解压到 {0}...",
+  "Status_DragDone": "解压完成: {0}/{1} 个文件到 {2}",
+  "Status_DragCancelled": "拖拽解压已取消",
+  "Status_DragDragCancelled": "拖拽已取消",
+  "Status_DragFailed": "解压失败: {0}",
+  "Status_DragPickFolder": "选择解压目标文件夹",
 
   "Metadata_FileInfo": "文件信息",
   "Metadata_FormatInfo": "详细信息",
