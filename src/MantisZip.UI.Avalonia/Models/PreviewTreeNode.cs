@@ -2,6 +2,7 @@ using System.ComponentModel;
 using System.Linq;
 using MantisZip.Core.Services;
 using MantisZip.Core.Utils;
+using MantisZip.UI.Avalonia.Services;
 
 namespace MantisZip.UI.Avalonia.Models;
 
@@ -61,8 +62,11 @@ public class PreviewTreeNode : FolderNode
     /// <summary>目录统计摘要文本，仅目录节点有值。</summary>
     public string DirectoryInfoText =>
         Children.Count > 0 && !string.IsNullOrEmpty(FullPath)
-            ? $"{TotalDescendantCount} 项 · {FormatUtil.FormatSize(TotalDescendantSize)}"
+            ? LocalizationManager.T("Preview_Result_DirInfo", TotalDescendantCount, FormatUtil.FormatSize(TotalDescendantSize))
             : string.Empty;
+
+    /// <summary>冲突标记（⚠️）的工具提示文本。</summary>
+    public string ConflictToolTip => LocalizationManager.T("Preview_Result_FileExists");
 
     /// <summary>是否被截断显示（超过 MaxItemsPerDirectory 或 MaxDepth）。</summary>
     public bool IsTruncated { get; set; }

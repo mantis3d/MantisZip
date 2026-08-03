@@ -24,7 +24,6 @@
                       Padding="4,0"
                       Background="{DynamicResource ThemeButtonBgBrush}"
                       BorderBrush="{DynamicResource ThemeBorderBrush}"
-                      ToolTip.Tip="简略显示"
                       IsCheckedChanged="OnCompactToggleChanged">
           <PathIcon Data="{StaticResource IconChevronDownUp}" Width="14" Height="14" />
         </ToggleButton>
@@ -35,8 +34,7 @@
                 Background="{DynamicResource ThemeButtonBgBrush}"
                 Foreground="{DynamicResource ThemeTextPrimaryBrush}"
                 BorderBrush="{DynamicResource ThemeBorderBrush}"
-                Click="OnExpandAllClick"
-                ToolTip.Tip="展开全部">
+                Click="OnExpandAllClick">
           <PathIcon Data="{StaticResource IconArrowExpandAll}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
         </Button>
         <Button x:Name="LocateButton"
@@ -46,8 +44,7 @@
                 Background="{DynamicResource ThemeButtonBgBrush}"
                 Foreground="{DynamicResource ThemeTextPrimaryBrush}"
                 BorderBrush="{DynamicResource ThemeBorderBrush}"
-                Click="OnLocateClick"
-                ToolTip.Tip="收起到选择项">
+                Click="OnLocateClick">
           <PathIcon Data="{StaticResource IconLocation}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
         </Button>
         <ToggleButton x:Name="FilterToggle"
@@ -56,7 +53,7 @@
                       Padding="2,0"
                       Background="{DynamicResource ThemeButtonBgBrush}"
                       BorderBrush="{DynamicResource ThemeBorderBrush}"
-                      ToolTip.Tip="显示过滤项">
+                      IsCheckedChanged="OnFilterToggleChanged">
           <PathIcon Data="{StaticResource IconFilter}" Width="14" Height="14" />
         </ToggleButton>
         <TextBlock x:Name="SummaryTextBlock"
@@ -139,7 +136,7 @@
                           VerticalAlignment="Center"
                           Foreground="#FFD32F2F"
                           IsVisible="{Binding ExistsAtDestination}"
-                          ToolTip.Tip="同名文件已存在" />
+                          ToolTip.Tip="{Binding ConflictToolTip}" />
             </StackPanel>
           </TreeDataTemplate>
         </TreeView.ItemTemplate>

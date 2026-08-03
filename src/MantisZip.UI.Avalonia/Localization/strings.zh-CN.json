@@ -774,7 +774,6 @@
   "ViewMode_Files": "Files",
   "ViewMode_Dirs": "Dirs",
 
-  "Preview_Result_Title": "预览",
   "Preview_Result_Compact": "精简",
   "Preview_Result_Full": "完整",
   "Preview_Result_Summary": "📂 {0} 个文件 / {1}",
@@ -786,6 +785,10 @@
   "Preview_Result_HideFiltered": "隐藏过滤项",
   "Preview_Result_Locate": "定位到选中",
   "Preview_Result_Building": "正在构建预览树…",
+  "Preview_Result_FileCount": "{0} 个文件",
+  "Preview_Result_DirInfo": "{0} 项 · {1}",
+  "Preview_Result_ConflictCount": "⚠️ {0} 个冲突",
+  "Preview_Result_FileExists": "同名文件已存在",
 
   "App_MantisZipTitle": "MantisZip",
 

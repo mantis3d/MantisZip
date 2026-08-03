@@ -169,8 +169,10 @@ public partial class ResultTreeView : UserControl
     public ResultTreeView()
     {
         InitializeComponent();
+        ToolTip.SetTip(CompactToggle, LocalizationManager.T("Preview_Result_Compact"));
+        ToolTip.SetTip(ExpandAllButton, LocalizationManager.T("Tree_ExpandAll"));
         ToolTip.SetTip(LocateButton, LocalizationManager.T("Preview_Result_Locate"));
-        ToolTip.SetTip(FilterToggle, LocalizationManager.T("Preview_Result_ShowFiltered"));
+        ToolTip.SetTip(FilterToggle, LocalizationManager.T(FilterToggle.IsChecked == true ? "Preview_Result_HideFiltered" : "Preview_Result_ShowFiltered"));
         LoadingTextBlock.Text = LocalizationManager.T("Preview_Result_Building");
 
         // 主题切换时刷新 ForegroundKey 绑定，使转换器重新解析新版主题画刷
@@ -413,10 +415,16 @@ public partial class ResultTreeView : UserControl
 
         SummaryText = LocalizationManager.T("Preview_Result_Summary", totalFiles, FormatSize(totalSize));
 
-        if (FileCountText != null)
-            FileCountText.Text = $"{totalFiles} 个文件";
-        if (TotalSizeText != null)
-            TotalSizeText.Text = FormatSize(totalSize);
+        SetText(FileCountText, LocalizationManager.T("Preview_Result_FileCount", totalFiles));
+        SetText(TotalSizeText, FormatSize(totalSize));
+    }
+
+    /// <summary>
+    /// 安全设置文本（控件可能尚未在构造函数中初始化完成时为 null）。
+    /// </summary>
+    private static void SetText(TextBlock? textBlock, string? text)
+    {
+        if (textBlock != null) textBlock.Text = text;
     }
 
     /// <summary>
@@ -431,7 +439,7 @@ public partial class ResultTreeView : UserControl
         {
             if (conflictCount > 0)
             {
-                ConflictCountText.Text = $"⚠️ {conflictCount} 个冲突";
+                ConflictCountText.Text = LocalizationManager.T("Preview_Result_ConflictCount", conflictCount);
                 ConflictCountText.IsVisible = true;
             }
             else
@@ -478,12 +486,25 @@ public partial class ResultTreeView : UserControl
     }
 
     /// <summary>
-    /// Compact/Full 模式切换按钮事件。
+    /// Compact/Full 模式切换按钮事件：同步更新 CompactToggle 的动态工具提示。
     /// </summary>
     private void OnCompactToggleChanged(object? sender, RoutedEventArgs e)
     {
         CompactMode = CompactToggle?.IsChecked ?? true;
+        if (CompactToggle != null)
+            ToolTip.SetTip(CompactToggle, LocalizationManager.T(CompactMode ? "Preview_Result_Full" : "Preview_Result_Compact"));
         RebuildDisplayTree();
+    }
+
+    /// <summary>
+    /// 过滤项显示开关切换事件：同步更新 FilterToggle 的动态工具提示。
+    /// </summary>
+    private void OnFilterToggleChanged(object? sender, RoutedEventArgs e)
+    {
+        if (FilterToggle == null) return;
+        ToolTip.SetTip(FilterToggle, LocalizationManager.T(FilterToggle.IsChecked == true
+            ? "Preview_Result_HideFiltered"
+            : "Preview_Result_ShowFiltered"));
     }
 
     private static string FormatSize(long bytes) => Core.Utils.FormatUtil.FormatSize(bytes);
