@@ -5,7 +5,7 @@ namespace MantisZip.Core.Services;
 /// <summary>
 /// 目录统计信息。
 /// </summary>
-public readonly record struct DirStats(int Count, long Size, long CompressedSize);
+public readonly record struct DirStats(int Count, long Size, long CompressedSize, DateTime NewestModified);
 
 /// <summary>
 /// 按文件夹路径筛选压缩包条目，处理扁平/默认两种浏览模式。
@@ -169,7 +169,9 @@ public static class ArchiveEntryLister
     }
 
     /// <summary>
-    /// 预计算目录统计信息：每个目录包含的文件数、总大小、压缩后大小。
+    /// 预计算目录统计信息：每个目录包含的文件数、总大小、压缩后大小、最新文件修改时间。
+    /// 每个文件计入其全部祖先目录（递归语义），最新日期取子树内的最大值。
+    /// 修改时间为 <see cref="DateTime.MinValue"/> 的文件不参与日期聚合。
     /// </summary>
     public static Dictionary<string, DirStats> ComputeDirectoryStats(IReadOnlyList<ArchiveItem> allItems)
     {
@@ -188,7 +190,9 @@ public static class ArchiveEntryLister
             {
                 var dirPath = string.Join("/", parts, 0, i + 1);
                 var stat = stats.GetValueOrDefault(dirPath);
-                stats[dirPath] = new DirStats(stat.Count + 1, stat.Size + item.Size, stat.CompressedSize + item.CompressedSize);
+                var newest = item.LastModified > stat.NewestModified ? item.LastModified : stat.NewestModified;
+                stats[dirPath] = new DirStats(stat.Count + 1, stat.Size + item.Size,
+                    stat.CompressedSize + item.CompressedSize, newest);
             }
         }
 

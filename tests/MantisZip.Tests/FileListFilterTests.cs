@@ -1,4 +1,5 @@
 using MantisZip.Core.Abstractions;
+using MantisZip.Core.Services;
 using MantisZip.Core.Utils;
 using Xunit;
 
@@ -603,5 +604,111 @@ public class FileListFilterTests
         Assert.Equal(first.Count, second.Count);
         Assert.Equal(first.Select(i => i.FullPath).OrderBy(x => x),
                      second.Select(i => i.FullPath).OrderBy(x => x));
+    }
+
+    // ===== ComputeDirectoryStats 目录聚合测试 =====
+
+    /// <summary>
+    /// 构造与真实引擎输出一致的条目（Name = 压缩包内完整路径），供目录聚合测试使用。
+    /// </summary>
+    private static List<ArchiveItem> CreateDirStatItems()
+    {
+        var baseDate = new DateTime(2026, 3, 15, 10, 0, 0);
+        return new List<ArchiveItem>
+        {
+            // 根目录文件（不应产生任何目录统计）
+            new() { Name = "readme.txt", FullPath = "readme.txt", Size = 100, CompressedSize = 50, LastModified = baseDate, IsDirectory = false },
+
+            // src/ 直接文件
+            new() { Name = "src/main.cs", FullPath = "src/main.cs", Size = 1500, CompressedSize = 700, LastModified = baseDate.AddDays(2), IsDirectory = false },
+            new() { Name = "src/util.cs", FullPath = "src/util.cs", Size = 800, CompressedSize = 400, LastModified = baseDate.AddMonths(1), IsDirectory = false },
+
+            // src/utils/ 嵌套文件
+            new() { Name = "src/utils/helper.cs", FullPath = "src/utils/helper.cs", Size = 3000, CompressedSize = 1500, LastModified = baseDate.AddDays(10), IsDirectory = false },
+            new() { Name = "src/utils/converter.cs", FullPath = "src/utils/converter.cs", Size = 12000, CompressedSize = 6000, LastModified = baseDate.AddDays(-1), IsDirectory = false },
+
+            // 修改时间为 MinValue 的文件（不参与日期聚合）
+            new() { Name = "src/utils/no-date.bin", FullPath = "src/utils/no-date.bin", Size = 500, CompressedSize = 500, LastModified = DateTime.MinValue, IsDirectory = false },
+
+            // 其他目录
+            new() { Name = "docs/index.html", FullPath = "docs/index.html", Size = 2500, CompressedSize = 1200, LastModified = baseDate.AddDays(3), IsDirectory = false },
+
+            // 显式空目录条目（无文件，不应产生统计）
+            new() { Name = "empty/", FullPath = "empty", Size = 0, LastModified = baseDate, IsDirectory = true },
+        };
+    }
+
+    /// <summary>
+    /// 目录大小 = 整个子树（含递归子目录）所有文件大小之和。
+    /// src/utils 计入 helper+converter+no-date；src 计入 main+util+utils 全部。
+    /// </summary>
+    [Fact]
+    public void ComputeDirectoryStats_Size_IsRecursiveSubtreeSum()
+    {
+        var stats = ArchiveEntryLister.ComputeDirectoryStats(CreateDirStatItems());
+
+        // src/utils: 3000 + 12000 + 500 = 15500
+        Assert.Equal(15500, stats["src/utils"].Size);
+        // src: 1500 + 800 + 3000 + 12000 + 500 = 17800
+        Assert.Equal(17800, stats["src"].Size);
+        // docs: 2500
+        Assert.Equal(2500, stats["docs"].Size);
+    }
+
+    /// <summary>
+    /// 目录压缩后大小 = 子树内所有文件压缩后大小之和。
+    /// </summary>
+    [Fact]
+    public void ComputeDirectoryStats_CompressedSize_IsRecursiveSubtreeSum()
+    {
+        var stats = ArchiveEntryLister.ComputeDirectoryStats(CreateDirStatItems());
+
+        // src/utils: 1500 + 6000 + 500 = 8000
+        Assert.Equal(8000, stats["src/utils"].CompressedSize);
+        // src: 700 + 400 + 1500 + 6000 + 500 = 9100
+        Assert.Equal(9100, stats["src"].CompressedSize);
+    }
+
+    /// <summary>
+    /// 目录最新日期 = 子树内所有文件（含递归子目录）的最新修改时间；
+    /// MinValue 文件不参与日期聚合。
+    /// </summary>
+    [Fact]
+    public void ComputeDirectoryStats_NewestModified_IsSubtreeMax_IgnoringMinValue()
+    {
+        var stats = ArchiveEntryLister.ComputeDirectoryStats(CreateDirStatItems());
+        var baseDate = new DateTime(2026, 3, 15, 10, 0, 0);
+
+        // src/utils: helper(+10d) vs converter(-1d) vs no-date(MinValue 忽略) → +10d
+        Assert.Equal(baseDate.AddDays(10), stats["src/utils"].NewestModified);
+        // src: main(+2d) vs util(+1M) vs utils 子目录(+10d) → +1M
+        Assert.Equal(baseDate.AddMonths(1), stats["src"].NewestModified);
+        // docs: +3d
+        Assert.Equal(baseDate.AddDays(3), stats["docs"].NewestModified);
+    }
+
+    /// <summary>
+    /// 文件计数：目录统计其子树内的文件数（MinValue 文件也计数）。
+    /// </summary>
+    [Fact]
+    public void ComputeDirectoryStats_Count_IncludesAllSubtreeFiles()
+    {
+        var stats = ArchiveEntryLister.ComputeDirectoryStats(CreateDirStatItems());
+
+        Assert.Equal(3, stats["src/utils"].Count); // helper + converter + no-date
+        Assert.Equal(5, stats["src"].Count);       // main + util + utils 下 3 个
+        Assert.Equal(1, stats["docs"].Count);
+    }
+
+    /// <summary>
+    /// 根目录文件不产生目录统计；空目录（显式目录条目）不产生统计。
+    /// </summary>
+    [Fact]
+    public void ComputeDirectoryStats_NoEntry_ForRootFilesAndEmptyDirs()
+    {
+        var stats = ArchiveEntryLister.ComputeDirectoryStats(CreateDirStatItems());
+
+        Assert.False(stats.ContainsKey("readme.txt"));
+        Assert.False(stats.ContainsKey("empty"));
     }
 }
