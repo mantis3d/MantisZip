@@ -21,6 +21,11 @@
 
 ### MantisZip.UI.Avalonia（主力版）
 
+**2026-08-04** — 设置窗口「压缩」tab 拆分为「通用 / 格式」两个子 tab
+  - **结构重构**：「压缩」tab 由单层 `ScrollViewer` 改为嵌套 `TabControl`（`TabStripPlacement="Top"`，样式对齐「预览」tab 子 tab）；「通用」子 tab 承载 默认格式/压缩级别/选项，「格式」子 tab 承载 ZIP 默认选项 + 7z 默认选项，各自独立滚动
+  - **本地化补全**：压缩 tab 内 13 处硬编码中文全部替换为 i18n 绑定；新增 15 个 key（`Settings_Compress_Tab_General`/`Settings_Compress_Tab_Format` + `Settings_Compress_Options` + `Settings_Zip_*` ×4 + `Settings_SevenZip_*` ×8），zh/en 双语；`SettingsWindowViewModel` 新增 15 个本地化属性并注册语言切换通知
+  - 构建 0 errors
+
 **2026-08-03** — 拖拽解压与「解压选中项」流程统一（[drag-extract-unify.md](.sisyphus/plans/drag-extract-unify.md)）
   - **统一解压流程**：新建 `SelectedItemsExtractService`（Services/）统一「拿到输出路径后」的解压动作；右键「解压选中项到…/到此处」与拖拽解压差异仅剩获取输出路径的方式（文件选择器 vs 目标检测）；统一引擎批量通道（一次开包）+ `pathOverrides` 路径计算 + 统一 `ArchiveOptions` 冲突处理
   - **拖拽路径语义改与右键一致**：删除 `DragDropItemExpander.GetExtractPath`（选中目录锚点），路径计算统一走 `ExtractPreserveFullPath` + 裁剪当前浏览层（`currentFolder` 由拖拽入口传入）；拖出单文件即为文件本身、不再带路径
