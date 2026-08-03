@@ -495,6 +495,10 @@ public partial class SettingsWindowViewModel : ObservableObject
     public string TabAdvancedHeader => LocalizationManager.T("Settings_TabAdvanced");
     public string TabDebugHeader => LocalizationManager.T("Settings_TabDebug");
 
+    // Compress sub-tab headers
+    public string CompressTabGeneralHeader => LocalizationManager.T("Settings_Compress_Tab_General");
+    public string CompressTabFormatHeader => LocalizationManager.T("Settings_Compress_Tab_Format");
+
     // Preview strings
     public string EnableImagePreviewText => LocalizationManager.T("Settings_EnableImagePreview");
     public string EnableTextPreviewText => LocalizationManager.T("Settings_EnableTextPreview");
@@ -568,6 +572,19 @@ public partial class SettingsWindowViewModel : ObservableObject
     public string CloseAfterCompressText => LocalizationManager.T("Settings_Compress_CloseAfterDone");
     public string KeepOriginalExtensionText => LocalizationManager.T("Settings_Compress_KeepExt");
     public string PreserveDirectoryRootText => LocalizationManager.T("Settings_Compress_PreserveRoot");
+    public string CompressOptionsText => LocalizationManager.T("Settings_Compress_Options");
+    public string ZipDefaultOptionsText => LocalizationManager.T("Settings_Zip_DefaultOptions");
+    public string ZipEncodingText => LocalizationManager.T("Settings_Zip_Encoding");
+    public string ZipCompressionMethodText => LocalizationManager.T("Settings_Zip_CompressionMethod");
+    public string ZipEncryptionMethodText => LocalizationManager.T("Settings_Zip_EncryptionMethod");
+    public string SevenZipDefaultOptionsText => LocalizationManager.T("Settings_SevenZip_DefaultOptions");
+    public string SevenZipCompressionMethodText => LocalizationManager.T("Settings_SevenZip_CompressionMethod");
+    public string SevenZipSolidText => LocalizationManager.T("Settings_SevenZip_Solid");
+    public string SevenZipEncryptHeadersText => LocalizationManager.T("Settings_SevenZip_EncryptHeaders");
+    public string SevenZipSolidBlockSizeText => LocalizationManager.T("Settings_SevenZip_SolidBlockSize");
+    public string SevenZipDictionarySizeText => LocalizationManager.T("Settings_SevenZip_DictionarySize");
+    public string SevenZipNumFastBytesText => LocalizationManager.T("Settings_SevenZip_NumFastBytes");
+    public string SevenZipMatchFinderText => LocalizationManager.T("Settings_SevenZip_MatchFinder");
 
     // Extract strings
     public string ExtractDefaultDestText => LocalizationManager.T("Settings_Extract_DefaultDest");
@@ -986,6 +1003,8 @@ public partial class SettingsWindowViewModel : ObservableObject
         OnPropertyChanged(nameof(TabContextMenuHeader));
         OnPropertyChanged(nameof(TabAdvancedHeader));
         OnPropertyChanged(nameof(TabDebugHeader));
+        OnPropertyChanged(nameof(CompressTabGeneralHeader));
+        OnPropertyChanged(nameof(CompressTabFormatHeader));
 
         OnPropertyChanged(nameof(EnableImagePreviewText));
         OnPropertyChanged(nameof(EnableTextPreviewText));
@@ -1025,6 +1044,19 @@ public partial class SettingsWindowViewModel : ObservableObject
         OnPropertyChanged(nameof(CloseAfterCompressText));
         OnPropertyChanged(nameof(KeepOriginalExtensionText));
         OnPropertyChanged(nameof(PreserveDirectoryRootText));
+        OnPropertyChanged(nameof(CompressOptionsText));
+        OnPropertyChanged(nameof(ZipDefaultOptionsText));
+        OnPropertyChanged(nameof(ZipEncodingText));
+        OnPropertyChanged(nameof(ZipCompressionMethodText));
+        OnPropertyChanged(nameof(ZipEncryptionMethodText));
+        OnPropertyChanged(nameof(SevenZipDefaultOptionsText));
+        OnPropertyChanged(nameof(SevenZipCompressionMethodText));
+        OnPropertyChanged(nameof(SevenZipSolidText));
+        OnPropertyChanged(nameof(SevenZipEncryptHeadersText));
+        OnPropertyChanged(nameof(SevenZipSolidBlockSizeText));
+        OnPropertyChanged(nameof(SevenZipDictionarySizeText));
+        OnPropertyChanged(nameof(SevenZipNumFastBytesText));
+        OnPropertyChanged(nameof(SevenZipMatchFinderText));
 
         OnPropertyChanged(nameof(ExtractDefaultDestText));
         OnPropertyChanged(nameof(ExtractConflictActionText));
