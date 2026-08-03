@@ -38,6 +38,7 @@
 | **P2** | 字体预览连字效果开关 | [font-preview-ligature.md](.sisyphus/plans/font-preview-ligature.md) | 🟡中 | 3-4h | HarfBuzzSharp shaping + `liga` feature toggle，工具栏按钮 |
 | **P2** | 提取日志与解压「后悔药」 | [extract-journal-undo.md](.sisyphus/plans/extract-journal-undo.md) | 🟡中 | 3-4h | 解压记录 + 一键回滚 |
 | **P2** | 文件选择器多选（文件+目录） | [file-picker-multi-select.md](.sisyphus/plans/file-picker-multi-select.md) | 🟡中 | 4-6h | CustomFilePickerDialog 新增 PickItems 模式：勾选框累积 + 跨目录保留 + 已选项目区；CompressSettingsWindow 合并为「添加文件/文件夹」单按钮（2026-07-31 决策：勾选框方案，根除单击累积导致双击目录误入列表的冲突） |
+| **P2** | 目录行聚合显示（大小=子树和 / 日期=最新文件 / 压缩后大小按格式可用性） | [directory-size-date-aggregate.md](.sisyphus/plans/directory-size-date-aggregate.md) | 🟢低 | 3-5h | Core `DirStats`+`ComputeDirectoryStats` 增加 `NewestModified`（共享契约，WPF 维护模式不动）；Avalonia `ArchiveItemModel` 显示属性改派生计算属性 + 新增 `CompressedSizeAvailable`（7z/RAR/.tgz/.gz 压缩后大小列显示空，文件/目录一致，对齐 WPF `CompressedDisplayMode.Unavailable`）；`PopulateEntries` 基于过滤后 `filteredSource` 应用聚合 |
 | **P3** | 压缩包对比 (Archive Diff) | [archive-diff.md](.sisyphus/plans/archive-diff.md) | 🟡中 | 3-4h | 压缩包文件级差异对比 |
 | **P3** | 原生图标 DLL | [icon-dll.md](.sisyphus/plans/icon-dll.md) | 🟡中 | 2-3h | 将 7 个 .ico 编译进原生资源 DLL，消除路径依赖 |
 | **P3** | 可插拔预览模块体系 | [preview-modular-providers.md](.sisyphus/plans/preview-modular-providers.md) | 🟡中 | 3-4h | 格式类库独立分发 |

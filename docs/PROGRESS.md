@@ -45,6 +45,14 @@
   - **i18n 清理**：`ResultTreeView` 5 处硬编码中文 ToolTip 全部本地化（复用 `Tree_ExpandAll`，新增 `Preview_Result_FileCount/DirInfo/ConflictCount/FileExists`，移除未用 `Preview_Result_Title`）；冲突计数/文件计数/目录统计文本改用 i18n key
   - 构建 0 errors
 
+**2026-08-03** — 目录行聚合显示（大小=子树和 / 日期=最新文件 / 压缩后大小按格式可用性 / 压缩率方案 A）
+  - **目录聚合**：`PopulateEntries` 基于过滤后 `filteredSource` 调用 Core `ComputeDirectoryStats`，目录行应用聚合——大小 = 子树所有文件之和、日期 = 子树最新文件时间、压缩后大小 = 子树和（zip 等可得格式）
+  - **派生属性重构**（`ArchiveItemModel`）：`SizeDisplay`/`LastModifiedDisplay`/`CompressedSizeDisplay` 由一次性字符串字段改为派生计算属性 + `[NotifyPropertyChangedFor]` 联动，设置 `Size`/`LastModified` 即自动刷新；`CompressionRatio` 同样改派生属性（目录聚合后自动重算）
+  - **压缩后大小可用性**：新增 `CompressedSizeAvailable` 标志（zip/iso/.tar 可用；7z/rar/.tgz/.gz 不可用），不可用时文件与目录的压缩后大小列显示空（对齐 WPF `CompressedDisplayMode.Unavailable`）
+  - **压缩率列（方案 A）**：移除 `RatioDisplay` 的 `IsDirectory` 门控，目录显示聚合压缩率；不可用格式下目录/文件压缩率一律空；`RatioSort` 保留目录 → -1 排序
+  - 行为变化：7z 等格式文件行的压缩后大小由 `0 B` → 空、压缩率由 `0.0%` → 空；`LastModified=MinValue` 文件日期列由 `0001-01-01` → 空
+  - 验证：Avalonia 构建 0 errors / Avalonia 测试 40 通过（2 skip）/ Core 241 通过（含 5 个 `ComputeDirectoryStats` 新用例）
+
 **2026-08-03** — 拖拽解压修复（P1/P2）：.gz/.iso 提取支持 + 状态消息 i18n + 失败弹窗
   - **Core 单条目提取（共享层）**：`ArchiveEntryExtractor` 支持纯 `.gz` 单文件（新增 `ExtractGZipEntry` + `IsPlainGZipFile` 判定，GZipStream 直解，修复拖拽解压 .gz 必然抛 `InvalidFormatException`）；`ArchiveFormat.Iso` 并入 SharpSevenZipExtractor 分支（`ExtractEntryAsync`/`ExtractHeadAsync`/`ExtractTailSync`，修复拖拽/预览 ISO 必然抛 `NotSupportedException`）
   - **i18n**：新增 9 key（`Status_DragHint/DetectingTarget/ExtractingTo/Done/Cancelled/DragCancelled/Failed/PickFolder` + `DragOverlay_OwnWindow`）zh/en 双语；`DragDropService`/`MainWindow`/`OverlayController` 的拖拽状态消息全部改走 `LocalizationManager`（原为硬编码中文）
@@ -899,6 +907,12 @@
 ### 共享层（Core / ShellExt / 构建）
 
 这些变更影响两项目共用代码，按时间从新到旧排列。
+
+#### v0.4.5 (2026-08-03) 目录聚合统计 DirStats 增加 NewestModified
+  - `DirStats` 记录新增 `DateTime NewestModified` 字段（Count/Size/CompressedSize/NewestModified）
+  - `ComputeDirectoryStats` 同一趟遍历聚合子树最新文件修改时间（`Max`，`DateTime.MinValue` 文件不参与），递归累加语义不变
+  - 涉及文件：`ArchiveEntryLister.cs`；新增 `FileListFilterTests.cs` 5 个用例（子树和 / 压缩和 / 最新日期忽略 MinValue / 文件计数 / 根文件与空目录无条目）
+  - Core 241/241 测试通过，构建 0 errors
 
 #### v0.4.5 (2026-08-03) ArchiveEntryExtractor 支持纯 GZip 单文件与 ISO 单条目提取
   - `ExtractEntryAsync`：新增 `.gz` 单文件分支（`ExtractGZipEntry`，GZipStream 直接解压；`IsPlainGZipFile` 判定 `.gz` 且非 `.tar.gz`），修复拖拽解压 .gz 抛 `InvalidFormatException`（TarReader 无法解析纯 gzip 流）
