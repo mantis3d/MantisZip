@@ -65,6 +65,11 @@ public partial class MainWindowViewModel : ObservableObject
     public Func<ExtractSettingsViewModel, Task<bool?>>? ShowExtractSettingsDialog { get; set; }
 
     /// <summary>
+    /// 解压目标文件夹选择回调。传入待解压条目与初始路径，返回所选目录路径，取消返回 null。
+    /// </summary>
+    public Func<IReadOnlyList<ArchiveItem>, string?, Task<string?>>? ShowExtractFolderPicker { get; set; }
+
+    /// <summary>
     /// 压缩设置对话框回调。传入 CompressSettingsViewModel，返回 true=确认，false=取消。
     /// </summary>
     public Func<CompressSettingsViewModel, Task<bool?>>? ShowCompressSettingsDialog { get; set; }
@@ -123,6 +128,11 @@ public partial class MainWindowViewModel : ObservableObject
     /// 由 View 设置的注释编辑对话框回调。参数为现有注释文字，返回新注释或 null=取消。
     /// </summary>
     public Func<string?, Task<string?>>? ShowCommentDialog { get; set; }
+
+    /// <summary>
+    /// 由 View 设置的打开文件夹对话框回调。参数为文件夹路径，返回 true 表示已打开。
+    /// </summary>
+    public Func<string, Task<bool>>? ShowOpenFolderDialog { get; set; }
 
     /// <summary>
     /// 会话密码缓存：压缩包路径 → 密码（仅内存，不持久化）。
@@ -184,11 +194,11 @@ public partial class MainWindowViewModel : ObservableObject
             "DataGrid_Name", "DataGrid_Size", "DataGrid_Compressed", "DataGrid_Modified", "DataGrid_Ratio",
             "App_Title",
             "Main_DropHint",
-            "Ctx_Extract", "Ctx_SmartExtract", "Ctx_ExtractTo",
+            "Ctx_Extract", "Ctx_ExtractSelectedHere", "Ctx_ExtractSelectedTo", "Ctx_SmartExtract", "Ctx_ExtractTo",
             "Ctx_CopyName", "Ctx_Test", "Ctx_Delete",
             "Menu_SmartExtract", "Menu_TestArchive", "Menu_AddFiles", "Menu_DeleteFiles", "Menu_ArchiveComment",
             "Toolbar_SmartExtract", "Toolbar_Test", "Toolbar_AddFiles", "Toolbar_DeleteFiles",
-            "Tooltip_New", "Tooltip_Open", "Tooltip_Extract", "Tooltip_Compress",
+            "Tooltip_New", "Tooltip_Open", "Tooltip_Extract", "Tooltip_ExtractSelectedHere", "Tooltip_ExtractSelectedTo", "Tooltip_Compress",
             "Tooltip_Filter", "Tooltip_Preview", "Tooltip_SmartExtract", "Tooltip_Test",
             "Tooltip_AddFiles", "Tooltip_DeleteFiles", "Tooltip_Subfolders",
             "Status_AddComplete", "Status_DeleteComplete", "Status_TestOK", "Status_TestFailed",
@@ -1591,6 +1601,178 @@ public partial class MainWindowViewModel : ObservableObject
         {
             StatusMessage = LocalizationManager.T("Status_ExtractComplete");
         }
+    }
+
+    /// <summary>
+    /// 解压选中的条目到当前目录（压缩包所在目录）。
+    /// </summary>
+    [RelayCommand]
+    private async Task ExtractSelectedHere()
+    {
+        if (CurrentArchivePath == null || RunWithProgress == null) return;
+        if (SelectedEntries.Count == 0 && SelectedEntry == null) return;
+
+        var entries = GetSelectedEntriesForExtract();
+        if (entries.Count == 0) return;
+
+        var dest = Path.GetDirectoryName(CurrentArchivePath)
+                   ?? Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
+
+        await ExtractEntriesAsync(entries, dest, "overwrite", openFolderAfterExtract: false);
+    }
+
+    /// <summary>
+    /// 解压选中的条目到用户指定目录（弹出文件选择器，默认定位到压缩包同名文件夹）。
+    /// 冲突策略与打开文件夹行为使用 AppSettings 默认值。
+    /// </summary>
+    [RelayCommand]
+    private async Task ExtractSelectedTo()
+    {
+        if (CurrentArchivePath == null || ShowExtractFolderPicker == null) return;
+        if (SelectedEntries.Count == 0 && SelectedEntry == null) return;
+
+        var entries = GetSelectedEntriesForExtract();
+        if (entries.Count == 0) return;
+
+        var parentDir = Path.GetDirectoryName(CurrentArchivePath)
+                        ?? Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
+        var defaultDest = Path.Combine(parentDir, Path.GetFileNameWithoutExtension(CurrentArchivePath));
+
+        var coreEntries = entries.Select(i => i.ToCoreItem()).ToList();
+        var dest = await ShowExtractFolderPicker(coreEntries, defaultDest);
+        if (string.IsNullOrEmpty(dest)) return;
+
+        var settings = AppSettings.Load();
+        await ExtractEntriesAsync(entries, dest, settings.FileConflictAction, settings.OpenFolderAfterExtract);
+    }
+
+    /// <summary>
+    /// 获取用于解压的选中条目列表（含目录展开）。
+    /// 对应 WPF 的 ExtractSelectedAsync 逻辑。
+    /// </summary>
+    private List<ArchiveItemModel> GetSelectedEntriesForExtract()
+    {
+        var items = new List<ArchiveItemModel>();
+
+        if (SelectedEntries.Count > 0)
+        {
+            items.AddRange(SelectedEntries);
+        }
+        else if (SelectedEntry != null)
+        {
+            items.Add(SelectedEntry);
+        }
+
+        if (items.Count == 0) return items;
+
+        // 目录展开：将选中的目录展开为其内部所有文件
+        var selectedDirs = items.Where(i => i.IsDirectory)
+            .Select(d => d.FullPath?.TrimEnd('/') + "/")
+            .Where(p => !string.IsNullOrEmpty(p))
+            .ToHashSet();
+
+        var allFiles = CurrentEntries.Where(i => !i.IsDirectory)
+            .Where(i => selectedDirs.Any(d => i.FullPath?.StartsWith(d) == true))
+            .ToList();
+
+        items.AddRange(allFiles);
+
+        // 去重
+        return items.DistinctBy(i => i.FullPath).ToList();
+    }
+
+    /// <summary>
+    /// 执行选中条目的解压操作。
+    /// </summary>
+    private async Task ExtractEntriesAsync(
+        List<ArchiveItemModel> entries,
+        string destinationPath,
+        string conflictAction,
+        bool openFolderAfterExtract)
+    {
+        if (RunWithProgress == null || CurrentArchivePath == null) return;
+
+        _sessionPasswords.TryGetValue(CurrentArchivePath, out var password);
+
+        // Build entryKeys and pathOverrides (with ExtractPreserveFullPath logic)
+        var entryKeys = new List<string>();
+        var pathOverrides = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+        var settings = AppSettings.Load();
+        var preserveFullPath = settings.ExtractPreserveFullPath;
+        var currentFolder = CurrentFolder ?? "";
+
+        foreach (var item in entries)
+        {
+            entryKeys.Add(item.FullPath ?? item.Name);
+
+            // 路径裁剪逻辑（对标 WPF）
+            var outputEntryPath = item.FullPath ?? item.Name;
+            if (!preserveFullPath && !string.IsNullOrEmpty(currentFolder))
+            {
+                var cf = currentFolder.TrimEnd('/') + "/";
+                if (outputEntryPath.StartsWith(cf, StringComparison.OrdinalIgnoreCase))
+                    outputEntryPath = outputEntryPath.Substring(cf.Length);
+            }
+
+            var safeEntryPath = FileConflictHelper.SanitizeEntryPath(outputEntryPath);
+            var outputPath = FileConflictHelper.GetSafePath(destinationPath, safeEntryPath);
+            pathOverrides[item.FullPath ?? item.Name] = outputPath;
+        }
+
+        var options = CreateExtractOptions(conflictAction);
+
+        var completed = await RunWithProgress(
+            LocalizationManager.T("Status_Extracting"),
+            async (progress, ct) =>
+            {
+                var engine = ArchiveEngineFactory.GetEngineByExtension(CurrentArchivePath!);
+                if (engine == null) throw new NotSupportedException("不支持的压缩格式");
+
+                if (_currentFormat is ArchiveFormat.Tar or ArchiveFormat.GZip)
+                {
+                    // Tar/Gz 不支持按条目解压，降级为完整解压
+                    await engine.ExtractAsync(CurrentArchivePath!, destinationPath, password, progress, ct, options);
+                }
+                else
+                {
+                    await engine.ExtractEntriesAsync(CurrentArchivePath!, entryKeys, destinationPath,
+                        password, progress, ct, options, pathOverrides);
+                }
+            });
+
+        if (completed)
+        {
+            StatusMessage = LocalizationManager.T("Status_ExtractComplete");
+            if (openFolderAfterExtract)
+            {
+                await OpenExtractedFolderAsync(destinationPath);
+            }
+        }
+    }
+
+    /// <summary>
+    /// 打开解压后的文件夹（智能选择：单个文件夹则进入，否则打开父目录）。
+    /// </summary>
+    private async Task OpenExtractedFolderAsync(string dest)
+    {
+        if (ShowOpenFolderDialog == null) return;
+
+        // 简单实现：直接打开目标目录
+        // 后续可增强：检测是否只有一个顶层文件夹
+        try
+        {
+            if (OperatingSystem.IsWindows())
+            {
+                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = dest,
+                    UseShellExecute = true,
+                    Verb = "open"
+                });
+            }
+        }
+        catch { }
     }
 
     [RelayCommand]

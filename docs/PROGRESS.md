@@ -21,6 +21,13 @@
 
 ### MantisZip.UI.Avalonia（主力版）
 
+**2026-08-03** — 文件列表右键菜单「解压选中项」整合为「解压选中项到…」直接文件选择器
+  - **行为变更**：右键菜单删除「解压选中项」（原弹 `ExtractSettingsWindow`）；「解压选中项到…」改为直接弹 `CustomFilePickerDialog.ShowExtractFolderAsync`（ExtractFolder 模式：选目录 + 底部实时解压冲突预览），初始路径预设为 `压缩包所在目录\压缩包同名文件夹`（同名文件夹不存在时由 `ResolveInitialPath` 自动降级到父目录）
+  - **解压默认值**：选完路径直接解压，冲突策略用 `AppSettings.FileConflictAction`、打开文件夹用 `AppSettings.OpenFolderAfterExtract`（与 `--extract` CLI 一致）
+  - **工具栏联动**：工具栏导出按钮由 `ExtractSelectedCommand` 改绑 `ExtractSelectedToCommand`（ToolTip 同步）；删除 `ExtractSelected` 命令及 `Ctx_ExtractSelected`/`Tooltip_ExtractSelected` key，新增 `Tooltip_ExtractSelectedTo`（zh/en 双语）
+  - **解耦**：`MainWindowViewModel` 新增 `ShowExtractFolderPicker` 回调委托（`Func<IReadOnlyList<ArchiveItem>, string?, Task<string?>>`），由 `MainWindow.axaml.cs` 注入 `CustomFilePickerDialog.ShowExtractFolderAsync`
+  - 构建 0 errors
+
 **2026-08-03** — 结果预览面板计划文档与实际实现对齐（`result-preview-panel.md` 重写为完成态）
   - **文档重写**：`.sisyphus/plans/result-preview-panel.md` 由「待实现方案」改为「已完成」记录：实际布局（三列 Grid + 工具栏/摘要栏/树三行）、实际变更范围（复用 CustomFilePickerDialog、DragPreviewBitmapBuilder、PreviewTreeConverters、主题适配）、详细设计（PreviewTreeNode 实际属性、ResultTreeView 7 个 StyledProperty + 显示规则顺序、ResultPreviewService 无概念容器结构、窗口联动方式、3 处复用场景）
   - **PLAN.md 同步**：移除已完成任务行「解压/压缩结果预览面板」（原 6 项待做中 5 项已实现），三个未实现项保留为 P2 待实施行

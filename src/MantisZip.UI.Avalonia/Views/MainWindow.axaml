@@ -939,6 +939,24 @@
                       VerticalAlignment="Center"
                       Background="{DynamicResource ThemeBorderBrush}" />
 
+              <!-- Extract Selected To... -->
+              <Button Classes="ToolbarButton ToolbarIcon"
+                      Command="{Binding ExtractSelectedToCommand}"
+                      IsEnabled="{Binding IsArchiveLoaded}"
+                      ToolTip.Tip="{Binding LocalizedStrings[Tooltip_ExtractSelectedTo]}">
+                <PathIcon Data="{StaticResource IconExport}" Width="13" Height="13" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+              </Button>
+              <Button Classes="ToolbarButton ToolbarIcon"
+                      Command="{Binding ExtractSelectedHereCommand}"
+                      IsEnabled="{Binding IsArchiveLoaded}"
+                      ToolTip.Tip="{Binding LocalizedStrings[Tooltip_ExtractSelectedHere]}">
+                <PathIcon Data="{StaticResource IconPin}" Width="13" Height="13" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+              </Button>
+
+              <Border Width="1" Height="20" Margin="2,0"
+                      VerticalAlignment="Center"
+                      Background="{DynamicResource ThemeBorderBrush}" />
+
               <!-- Refresh -->
               <Button Classes="ToolbarButton ToolbarIcon"
                       Command="{Binding RefreshArchiveCommand}"
@@ -1000,6 +1018,11 @@
               <ContextMenu>
                 <MenuItem Header="{Binding LocalizedStrings[Ctx_Extract]}"
                           Command="{Binding ExtractArchiveCommand}" />
+                <MenuItem Header="{Binding LocalizedStrings[Ctx_ExtractSelectedHere]}"
+                          Command="{Binding ExtractSelectedHereCommand}" />
+                <MenuItem Header="{Binding LocalizedStrings[Ctx_ExtractSelectedTo]}"
+                          Command="{Binding ExtractSelectedToCommand}" />
+                <Separator />
                 <MenuItem Header="{Binding LocalizedStrings[Ctx_SmartExtract]}"
                           Command="{Binding SmartExtractCommand}" />
                 <MenuItem Header="{Binding LocalizedStrings[Ctx_ExtractTo]}"

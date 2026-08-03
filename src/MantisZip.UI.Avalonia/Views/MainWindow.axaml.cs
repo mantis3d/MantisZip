@@ -87,6 +87,9 @@ public partial class MainWindow : Window
             return result;
         };
 
+        vm.ShowExtractFolderPicker = (entries, initialPath) =>
+            CustomFilePickerDialog.ShowExtractFolderAsync(this, entries, initialPath);
+
         vm.ShowCompressSettingsDialog = async (cvm) =>
         {
             var dialog = new CompressSettingsWindow(cvm.SelectedPaths);
