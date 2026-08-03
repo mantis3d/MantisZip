@@ -21,6 +21,13 @@
 
 ### MantisZip.UI.Avalonia（主力版）
 
+**2026-08-03** — 结果预览面板计划文档与实际实现对齐（`result-preview-panel.md` 重写为完成态）
+  - **文档重写**：`.sisyphus/plans/result-preview-panel.md` 由「待实现方案」改为「已完成」记录：实际布局（三列 Grid + 工具栏/摘要栏/树三行）、实际变更范围（复用 CustomFilePickerDialog、DragPreviewBitmapBuilder、PreviewTreeConverters、主题适配）、详细设计（PreviewTreeNode 实际属性、ResultTreeView 7 个 StyledProperty + 显示规则顺序、ResultPreviewService 无概念容器结构、窗口联动方式、3 处复用场景）
+  - **PLAN.md 同步**：移除已完成任务行「解压/压缩结果预览面板」（原 6 项待做中 5 项已实现），三个未实现项保留为 P2 待实施行
+  - **三个遗留项（后续可做）**：① 解压多压缩包按来源目录分组（当前 `GetAllRawItems()` 合并平铺）；② 截断占位符点击就地展开（当前静态"…"文本）；③ 快速/完整冲突检测双模式（当前固定全量 `checkExists`）
+  - **i18n 清理**：`ResultTreeView` 5 处硬编码中文 ToolTip 全部本地化（复用 `Tree_ExpandAll`，新增 `Preview_Result_FileCount/DirInfo/ConflictCount/FileExists`，移除未用 `Preview_Result_Title`）；冲突计数/文件计数/目录统计文本改用 i18n key
+  - 构建 0 errors
+
 **2026-08-03** — 拖拽解压修复（P1/P2）：.gz/.iso 提取支持 + 状态消息 i18n + 失败弹窗
   - **Core 单条目提取（共享层）**：`ArchiveEntryExtractor` 支持纯 `.gz` 单文件（新增 `ExtractGZipEntry` + `IsPlainGZipFile` 判定，GZipStream 直解，修复拖拽解压 .gz 必然抛 `InvalidFormatException`）；`ArchiveFormat.Iso` 并入 SharpSevenZipExtractor 分支（`ExtractEntryAsync`/`ExtractHeadAsync`/`ExtractTailSync`，修复拖拽/预览 ISO 必然抛 `NotSupportedException`）
   - **i18n**：新增 9 key（`Status_DragHint/DetectingTarget/ExtractingTo/Done/Cancelled/DragCancelled/Failed/PickFolder` + `DragOverlay_OwnWindow`）zh/en 双语；`DragDropService`/`MainWindow`/`OverlayController` 的拖拽状态消息全部改走 `LocalizationManager`（原为硬编码中文）
@@ -1007,7 +1014,6 @@
 
 | 功能 | 设计文档 | 实现版本 |
 |------|----------|:--------:|
-| emoji 替换为 Fluent UI PathIcon + 文件列表行图标改用系统原生 | [emoji-to-pathicon.md](.sisyphus/plans/emoji-to-pathicon.md) | v0.4.4+ |
 | 移除 WebView2 依赖（Markdown/HTML/PDF 跨平台预览） | [remove-webview2-preview.md](.sisyphus/plans/remove-webview2-preview.md) | v0.4.5 |
 | 便携版模式 | [portable-mode.md](.sisyphus/plans/portable-mode.md) | v0.4.5 |
 | 文件冲突对话框暂停/取消 | [conflict-dialog-pause-cancel.md](.sisyphus/plans/conflict-dialog-pause-cancel.md) | v0.4.5 |
