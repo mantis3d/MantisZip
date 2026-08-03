@@ -21,6 +21,16 @@
 
 ### MantisZip.UI.Avalonia（主力版）
 
+**2026-08-03** — 拖拽解压与「解压选中项」流程统一（[drag-extract-unify.md](.sisyphus/plans/drag-extract-unify.md)）
+  - **统一解压流程**：新建 `SelectedItemsExtractService`（Services/）统一「拿到输出路径后」的解压动作；右键「解压选中项到…/到此处」与拖拽解压差异仅剩获取输出路径的方式（文件选择器 vs 目标检测）；统一引擎批量通道（一次开包）+ `pathOverrides` 路径计算 + 统一 `ArchiveOptions` 冲突处理
+  - **拖拽路径语义改与右键一致**：删除 `DragDropItemExpander.GetExtractPath`（选中目录锚点），路径计算统一走 `ExtractPreserveFullPath` + 裁剪当前浏览层（`currentFolder` 由拖拽入口传入）；拖出单文件即为文件本身、不再带路径
+  - **TarGzEngine 实现按条目提取**：`ExtractEntriesAsync` 从抛 `NotSupportedException` 改为实现（tar/tar.gz 单次扫描匹配 keySet + 纯 .gz 整流解压），推翻原「降级全量」决策；右键 tar/gz 不再降级全量（选中子目录文件按条目解压，语义修正）
+  - **冲突统一走设置 6 策略**：拖拽删除手动 switch / 自建 `ShowConflictDialogAsync` / `_applyAllAction`，统一 `AppSettings.FileConflictAction` + VM `ShowExtractFileConflictDialogAsync`（补 `CancelOperation` → 抛 OCE，保留「取消整个操作」语义）；修 `MapConflictActionString` 连字符映射漏洞（`overwrite-if-older`/`overwrite-if-smaller` 此前被漏匹配落成 Overwrite）
+  - **进度窗口统一模态**：拖拽删除自身非模态 `ProgressWindow` + 外层 `Task.Run`，改为模态阻塞（与右键同模式）；「解压选中项到此处」冲突策略由硬编码 `"overwrite"` 改用设置值，打开文件夹行为统一走 `settings.OpenFolderAfterExtract`
+  - **保留差异**：拖拽失败仍弹 `AppMessageBox`（无确认环节）；状态消息 key 各自保留（`Status_DragXxx` / `Status_ExtractXxx`）
+  - **展开逻辑统一 + 修复目录空解压 bug**：`GetSelectedEntriesForExtract` 数据源从 `CurrentEntries`（当前视图）改为 `GetAllRawItems()`（全量条目），内部复用 `DragDropItemExpander.ExpandItems`（与拖拽同一展开实现）；修复「浏览到某层选中目录右键解压只解压空目录」问题（目录内部文件不在当前视图中导致匹配不到）；返回类型改 `List<ArchiveItem>` 简化调用链（去掉 `ToCoreItem` 中间转换）
+  - 构建 0 errors（Core/Avalonia/WPF）/ Avalonia 测试 40 通过（2 skip）
+
 **2026-08-03** — 文件列表右键菜单「解压选中项」整合为「解压选中项到…」直接文件选择器
   - **行为变更**：右键菜单删除「解压选中项」（原弹 `ExtractSettingsWindow`）；「解压选中项到…」改为直接弹 `CustomFilePickerDialog.ShowExtractFolderAsync`（ExtractFolder 模式：选目录 + 底部实时解压冲突预览），初始路径预设为 `压缩包所在目录\压缩包同名文件夹`（同名文件夹不存在时由 `ResolveInitialPath` 自动降级到父目录）
   - **解压默认值**：选完路径直接解压，冲突策略用 `AppSettings.FileConflictAction`、打开文件夹用 `AppSettings.OpenFolderAfterExtract`（与 `--extract` CLI 一致）

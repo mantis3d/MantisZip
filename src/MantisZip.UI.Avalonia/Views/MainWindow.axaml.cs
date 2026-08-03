@@ -235,6 +235,10 @@ public partial class MainWindow : Window
                 var dlg = new ConflictDialog(info);
                 await dlg.ShowDialog(this);
 
+                // 用户选择"取消整个操作" → 抛异常终止解压（与拖拽原有语义一致）
+                if (dlg.CancelOperation)
+                    throw new OperationCanceledException("用户取消整个解压操作");
+
                 if (dlg.ResultAction == FileConflictAction.Rename && !string.IsNullOrEmpty(dlg.CustomName))
                 {
                     info.CustomName = dlg.CustomName;
@@ -365,7 +369,6 @@ public partial class MainWindow : Window
                     ?? new List<ArchiveItem> { vm2.SelectedEntry.ToCoreItem() };
                 var allItems = vm2.GetAllRawItems();
 
-                var format = ArchiveFormatHelper.GetFormat(archivePath);
                 var password = vm2.GetSessionPassword(archivePath);
 
                 // Expand items: directories become their contained files (flat list)
@@ -491,7 +494,7 @@ public partial class MainWindow : Window
                         {
                             vm2.StatusMessage = LocalizationManager.T("Status_DragDetectingTarget");
                             var dragService = new DragDropService(
-                                archivePath, format, password, this);
+                                archivePath, password, this, vm2.CurrentFolder ?? "");
                             await dragService.ExecuteAfterDropAsync(
                                 selectedItems, allItems, vm2);
                         }

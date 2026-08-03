@@ -1,11 +1,11 @@
 using MantisZip.Core.Abstractions;
-using MantisZip.Core.Utils;
 
 namespace MantisZip.UI.Avalonia.Services;
 
 /// <summary>
-/// Expand directory selections into flat file lists and compute extract target paths.
-/// Ported from WPF MainWindow.DragDrop.cs ExpandDragItems + GetDragExtractPath.
+/// Expand directory selections into flat file lists.
+/// Ported from WPF MainWindow.DragDrop.cs ExpandDragItems.
+/// 输出路径计算已统一到 <see cref="SelectedItemsExtractService"/>（右键/拖拽同一语义）。
 /// </summary>
 internal static class DragDropItemExpander
 {
@@ -47,36 +47,5 @@ internal static class DragDropItemExpander
 
         return result;
     }
-
-    /// <summary>
-    /// Compute the output path for a file in the target directory.
-    /// For items inside selected directories: trim ancestor path to keep relative structure.
-    /// </summary>
-    public static string GetExtractPath(
-        ArchiveItem item,
-        IReadOnlyList<ArchiveItem> selectedDirs,
-        string targetDirectory)
-    {
-        var normalized = item.FullPath.Replace('\\', '/');
-        var relative = normalized;
-
-        foreach (var dir in selectedDirs)
-        {
-            var dirPath = dir.FullPath.Replace('\\', '/').TrimEnd('/');
-            var prefix = dirPath + "/";
-            if (normalized.StartsWith(prefix, StringComparison.Ordinal))
-            {
-                var lastSlash = dirPath.LastIndexOf('/');
-                relative = lastSlash >= 0
-                    ? normalized[(lastSlash + 1)..]
-                    : normalized;
-                break;
-            }
-        }
-
-        // 复用 Core 的 SanitizeEntryPath：剔除 ".."/"." 路径穿越组件与非法文件名字符，
-        // 净化后为空时抛异常（比本地弱版本更严格，与 WPF 参考行为一致）
-        var safePath = FileConflictHelper.SanitizeEntryPath(relative);
-        return Path.GetFullPath(Path.Combine(targetDirectory, safePath));
-    }
 }
+

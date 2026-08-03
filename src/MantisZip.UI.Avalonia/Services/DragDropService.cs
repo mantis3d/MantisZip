@@ -3,12 +3,10 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
-using System.Threading;
 using System.Threading.Tasks;
 using Avalonia.Controls;
 using Avalonia.Platform.Storage;
 using MantisZip.Core.Abstractions;
-using MantisZip.Core.Utils;
 using MantisZip.UI.Avalonia.Dialogs;
 using MantisZip.UI.Avalonia.Models;
 using MantisZip.UI.Avalonia.ViewModels;
@@ -17,35 +15,31 @@ namespace MantisZip.UI.Avalonia.Services;
 
 /// <summary>
 /// Orchestrates the post-drop extraction workflow:
-/// detect target directory, expand items, extract with progress, handle conflicts.
+/// detect target directory → expand items → 统一走 <see cref="SelectedItemsExtractService"/>（模态进度，与右键同模式）。
 /// </summary>
 internal class DragDropService
 {
     private readonly string _archivePath;
-    private readonly ArchiveFormat _format;
     private readonly string? _password;
     private readonly Window _ownerWindow;
     private readonly AppSettings _settings;
+    private readonly string _currentFolder;
 
-    /// <summary>用户勾选"应用到全部"后记住的冲突处理方式（null = 未决定，继续弹窗）</summary>
-    private FileConflictAction? _applyAllAction;
-
-    public DragDropService(string archivePath, ArchiveFormat format, string? password, Window ownerWindow)
+    public DragDropService(string archivePath, string? password, Window ownerWindow, string currentFolder)
     {
         _archivePath = archivePath;
-        _format = format;
         _password = password;
         _ownerWindow = ownerWindow;
         _settings = AppSettings.Load();
+        _currentFolder = currentFolder;
     }
 
     /// <summary>
     /// Execute the full post-drop workflow:
     /// 1. Detect target directory (fallback to folder picker)
     /// 2. Expand selected items to flat file list
-    /// 3. Show ProgressWindow and extract files with progress
-    /// 4. Handle conflicts, cancellation, errors
-    /// 5. Optionally open target folder after extraction
+    /// 3. Show modal ProgressWindow and extract via SelectedItemsExtractService (conflicts/cancellation/errors)
+    /// 4. Status message, error dialog, optionally open target folder
     /// </summary>
     public async Task ExecuteAfterDropAsync(
         IReadOnlyList<ArchiveItem> selectedItems,
@@ -78,7 +72,6 @@ internal class DragDropService
             App.DebugLog($"[DragDropService] User picked folder: {targetDir}");
         }
 
-
         // 3. Expand selected items to flat file list
         var itemsToExtract = DragDropItemExpander.ExpandItems(selectedItems, allItems);
         App.DebugLog($"[DragDropService] Expanded: {selectedItems.Count} selected → {itemsToExtract.Count} files to extract");
@@ -88,111 +81,71 @@ internal class DragDropService
             return;
         }
 
-        // 4. Get conflict action from settings ("ask"/"overwrite"/"rename"/"skip")
-        var conflictAction = _settings.FileConflictAction;
-
-        // 5. Get selected directories for path trimming
-        var selectedDirs = selectedItems.Where(i => i.IsDirectory).ToList();
-
-        // 6. Show ProgressWindow (non-modal)
+        // 4. 统一走 SelectedItemsExtractService：
+        //    模态进度窗口（与右键同模式）、冲突走设置 6 策略 + 统一 Ask 弹窗、
+        //    路径语义与右键一致（ExtractPreserveFullPath + 裁剪当前浏览层）
         // 盘根目录（如 C:\）的 GetFileName 为空 → 回退用完整路径
         var folderName = Path.GetFileName(targetDir);
         if (string.IsNullOrEmpty(folderName))
             folderName = targetDir;
+
         var pw = new ProgressWindow(LocalizationManager.T("Status_DragExtractingTo", folderName));
         pw.InitCancellation();
-        pw.Show();
 
-        int totalFiles = itemsToExtract.Count;
-        int processedFiles = 0;
+        bool completed = false;
+        bool failed = false;
+        string? failureMessage = null;
 
         try
         {
-            // Create progress dispatcher that marshals to UI thread at Background priority
+            pw.Show();
             var progress = ProgressViewModel.CreateBackgroundProgress(pw, p => pw.SetProgress(p));
 
-            // 7. Extract in background thread
-            await Task.Run(async () =>
-            {
-                foreach (var item in itemsToExtract)
-                {
-                    pw.CancellationToken.ThrowIfCancellationRequested();
+            await new SelectedItemsExtractService().ExtractEntriesAsync(
+                _archivePath, _password, itemsToExtract, targetDir,
+                _settings.FileConflictAction, _currentFolder, _settings.ExtractPreserveFullPath,
+                vm?.ShowExtractFileConflictDialogAsync, progress, pw.CancellationToken);
 
-                    var outputPath = DragDropItemExpander.GetExtractPath(item, selectedDirs, targetDir);
+            completed = true;
+        }
+        catch (OperationCanceledException)
+        {
+            App.DebugLog("[DragDropService] Extraction cancelled by user");
+        }
+        catch (Exception ex)
+        {
+            failed = true;
+            failureMessage = ex.Message;
+            App.DebugLog($"[DragDropService] Extraction failed: {ex.GetType().Name}: {ex.Message}");
+        }
+        finally
+        {
+            pw.Close();
+        }
 
-                    // Create output directory if needed
-                    var outputDir = Path.GetDirectoryName(outputPath);
-                    if (!string.IsNullOrEmpty(outputDir) && !Directory.Exists(outputDir))
-                        Directory.CreateDirectory(outputDir);
-
-                    // Handle file conflicts
-                    if (File.Exists(outputPath))
-                    {
-                        switch (conflictAction)
-                        {
-                            case "skip":
-                                Interlocked.Increment(ref processedFiles);
-                                continue;
-                            case "rename":
-                                outputPath = PathHelper.GetUniquePath(outputPath);
-                                break;
-                            case "overwrite":
-                                File.Delete(outputPath);
-                                break;
-                            case "ask":
-                            {
-                                // 弹 ConflictDialog，由 Core 的 ResolvePathAsync 处理各策略分支
-                                // （Overwrite / Rename / Skip / OverwriteIfOlder / OverwriteIfSmaller / 自定义名）
-                                var options = new ArchiveOptions
-                                {
-                                    ConflictAction = FileConflictAction.Ask,
-                                    ConflictResolverAsync = async info =>
-                                    {
-                                        if (_applyAllAction.HasValue)
-                                            return _applyAllAction.Value;
-
-                                        var dlg = await ShowConflictDialogAsync(info);
-                                        if (dlg.CancelOperation)
-                                            throw new OperationCanceledException("用户取消整个拖拽解压操作");
-                                        if (dlg.ApplyToAll)
-                                            _applyAllAction = dlg.ResultAction;
-                                        info.CustomName = dlg.CustomName;
-                                        return dlg.ResultAction;
-                                    }
-                                };
-                                var resolved = await FileConflictHelper.ResolvePathAsync(
-                                    outputPath, options, item.LastModified, item.Size);
-                                if (resolved == null)
-                                {
-                                    // Skip / 条件不满足（不覆盖旧文件或小文件）→ 跳过当前文件
-                                    Interlocked.Increment(ref processedFiles);
-                                    continue;
-                                }
-                                outputPath = resolved;
-                                break;
-                            }
-                        }
-                    }
-
-                    // Extract the entry
-                    await ArchiveEntryExtractor.ExtractEntryAsync(
-                        _archivePath, item.FullPath, outputPath,
-                        _format, _password, pw.CancellationToken);
-
-                    int current = Interlocked.Increment(ref processedFiles);
-                    double pct = totalFiles > 0 ? (double)current / totalFiles * 100 : 100;
-                    progress.Report(new ArchiveProgress
-                    {
-                        PercentComplete = pct,
-                        CurrentFile = item.Name
-                    });
-                }
-            }, pw.CancellationToken);
-
-            // 8. Post-extraction: status message and optional folder open
-            App.DebugLog($"[DragDropService] Extraction complete: {processedFiles}/{totalFiles} files to {targetDir}");
+        // 5. Post-extraction: status message, error dialog, optional folder open
+        if (failed)
+        {
+            // 失败必须弹窗提示——拖拽解压无确认环节，用户容易忽略状态栏小字
             if (vm != null)
-                vm.StatusMessage = LocalizationManager.T("Status_DragDone", processedFiles, totalFiles, folderName);
+                vm.StatusMessage = LocalizationManager.T("Status_DragFailed", failureMessage);
+            try
+            {
+                await AppMessageBox.Show(
+                    LocalizationManager.T("Status_DragFailed", failureMessage),
+                    LocalizationManager.T("App_ErrorTitle"),
+                    MessageBoxButton.OK, MessageBoxImage.Error, _ownerWindow);
+            }
+            catch (Exception dlgEx)
+            {
+                App.DebugLog($"[DragDropService] Failed to show error dialog: {dlgEx.Message}");
+            }
+        }
+        else if (completed)
+        {
+            App.DebugLog($"[DragDropService] Extraction complete: {itemsToExtract.Count} files to {targetDir}");
+            if (vm != null)
+                vm.StatusMessage = LocalizationManager.T("Status_DragDone", itemsToExtract.Count, itemsToExtract.Count, folderName);
 
             if (_settings.OpenFolderAfterExtract)
             {
@@ -210,36 +163,10 @@ internal class DragDropService
                 }
             }
         }
-        catch (OperationCanceledException)
+        else
         {
-            App.DebugLog("[DragDropService] Extraction cancelled by user");
-            // 9. Handle cancellation
             if (vm != null)
                 vm.StatusMessage = LocalizationManager.T("Status_DragCancelled");
-        }
-        catch (Exception ex)
-        {
-            App.DebugLog($"[DragDropService] Extraction failed: {ex.GetType().Name}: {ex.Message}");
-            // 10. Handle errors: status bar message + explicit error dialog
-            // （失败必须弹窗提示——拖拽解压无确认环节，用户容易忽略状态栏小字）
-            if (vm != null)
-                vm.StatusMessage = LocalizationManager.T("Status_DragFailed", ex.Message);
-            try
-            {
-                await AppMessageBox.Show(
-                    LocalizationManager.T("Status_DragFailed", ex.Message),
-                    LocalizationManager.T("App_ErrorTitle"),
-                    MessageBoxButton.OK, MessageBoxImage.Error, _ownerWindow);
-            }
-            catch (Exception dlgEx)
-            {
-                App.DebugLog($"[DragDropService] Failed to show error dialog: {dlgEx.Message}");
-            }
-        }
-        finally
-        {
-            // 11. Always close the progress window
-            pw.Close();
         }
     }
 
@@ -267,29 +194,6 @@ internal class DragDropService
         {
             return null;
         }
-    }
-
-    /// <summary>
-    /// 在 UI 线程弹出冲突对话框，等待用户选择。
-    /// 从后台线程调用；通过 Dispatcher.Post 切换到 UI 线程，用 TaskCompletionSource 回传结果。
-    /// </summary>
-    private Task<ConflictDialog> ShowConflictDialogAsync(FileConflictInfo info)
-    {
-        var tcs = new TaskCompletionSource<ConflictDialog>(TaskCreationOptions.RunContinuationsAsynchronously);
-        _ownerWindow.Dispatcher.Post(async () =>
-        {
-            try
-            {
-                var dlg = new ConflictDialog(info);
-                await dlg.ShowDialog(_ownerWindow);
-                tcs.SetResult(dlg);
-            }
-            catch (Exception ex)
-            {
-                tcs.SetException(ex);
-            }
-        });
-        return tcs.Task;
     }
 
     /// <summary>

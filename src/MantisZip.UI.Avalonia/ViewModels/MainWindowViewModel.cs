@@ -1499,6 +1499,7 @@ public partial class MainWindowViewModel : ObservableObject
 
     /// <summary>
     /// 将 ExtractSettingsViewModel 的冲突策略字符串映射到 <see cref="FileConflictAction"/>。
+    /// 支持设置中的全部 6 种值（含带连字符的 "overwrite-if-older" / "overwrite-if-smaller"）。
     /// </summary>
     private static FileConflictAction MapConflictActionString(string value)
     {
@@ -1507,8 +1508,8 @@ public partial class MainWindowViewModel : ObservableObject
             "ask" => FileConflictAction.Ask,
             "rename" => FileConflictAction.Rename,
             "skip" => FileConflictAction.Skip,
-            "overwriteifolder" or "overwrite_if_older" => FileConflictAction.OverwriteIfOlder,
-            "overwriteifsmaller" or "overwrite_if_smaller" => FileConflictAction.OverwriteIfSmaller,
+            "overwriteifolder" or "overwrite_if_older" or "overwrite-if-older" => FileConflictAction.OverwriteIfOlder,
+            "overwriteifsmaller" or "overwrite_if_smaller" or "overwrite-if-smaller" => FileConflictAction.OverwriteIfSmaller,
             _ => FileConflictAction.Overwrite,
         };
     }
@@ -1618,7 +1619,7 @@ public partial class MainWindowViewModel : ObservableObject
         var dest = Path.GetDirectoryName(CurrentArchivePath)
                    ?? Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
 
-        await ExtractEntriesAsync(entries, dest, "overwrite", openFolderAfterExtract: false);
+        await ExtractSelectedEntriesCoreAsync(entries, dest);
     }
 
     /// <summary>
@@ -1638,117 +1639,65 @@ public partial class MainWindowViewModel : ObservableObject
                         ?? Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
         var defaultDest = Path.Combine(parentDir, Path.GetFileNameWithoutExtension(CurrentArchivePath));
 
-        var coreEntries = entries.Select(i => i.ToCoreItem()).ToList();
-        var dest = await ShowExtractFolderPicker(coreEntries, defaultDest);
+        var dest = await ShowExtractFolderPicker(entries, defaultDest);
         if (string.IsNullOrEmpty(dest)) return;
 
-        var settings = AppSettings.Load();
-        await ExtractEntriesAsync(entries, dest, settings.FileConflictAction, settings.OpenFolderAfterExtract);
+        await ExtractSelectedEntriesCoreAsync(entries, dest);
     }
 
     /// <summary>
-    /// 获取用于解压的选中条目列表（含目录展开）。
-    /// 对应 WPF 的 ExtractSelectedAsync 逻辑。
+    /// 执行选中条目的解压（统一走 <see cref="SelectedItemsExtractService"/>，模态进度窗口）。
+    /// 冲突策略与打开文件夹行为使用 AppSettings 默认值。
     /// </summary>
-    private List<ArchiveItemModel> GetSelectedEntriesForExtract()
-    {
-        var items = new List<ArchiveItemModel>();
-
-        if (SelectedEntries.Count > 0)
-        {
-            items.AddRange(SelectedEntries);
-        }
-        else if (SelectedEntry != null)
-        {
-            items.Add(SelectedEntry);
-        }
-
-        if (items.Count == 0) return items;
-
-        // 目录展开：将选中的目录展开为其内部所有文件
-        var selectedDirs = items.Where(i => i.IsDirectory)
-            .Select(d => d.FullPath?.TrimEnd('/') + "/")
-            .Where(p => !string.IsNullOrEmpty(p))
-            .ToHashSet();
-
-        var allFiles = CurrentEntries.Where(i => !i.IsDirectory)
-            .Where(i => selectedDirs.Any(d => i.FullPath?.StartsWith(d) == true))
-            .ToList();
-
-        items.AddRange(allFiles);
-
-        // 去重
-        return items.DistinctBy(i => i.FullPath).ToList();
-    }
-
-    /// <summary>
-    /// 执行选中条目的解压操作。
-    /// </summary>
-    private async Task ExtractEntriesAsync(
-        List<ArchiveItemModel> entries,
-        string destinationPath,
-        string conflictAction,
-        bool openFolderAfterExtract)
+    private async Task ExtractSelectedEntriesCoreAsync(List<ArchiveItem> entries, string destinationPath)
     {
         if (RunWithProgress == null || CurrentArchivePath == null) return;
 
         _sessionPasswords.TryGetValue(CurrentArchivePath, out var password);
 
-        // Build entryKeys and pathOverrides (with ExtractPreserveFullPath logic)
-        var entryKeys = new List<string>();
-        var pathOverrides = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-
         var settings = AppSettings.Load();
-        var preserveFullPath = settings.ExtractPreserveFullPath;
-        var currentFolder = CurrentFolder ?? "";
-
-        foreach (var item in entries)
-        {
-            entryKeys.Add(item.FullPath ?? item.Name);
-
-            // 路径裁剪逻辑（对标 WPF）
-            var outputEntryPath = item.FullPath ?? item.Name;
-            if (!preserveFullPath && !string.IsNullOrEmpty(currentFolder))
-            {
-                var cf = currentFolder.TrimEnd('/') + "/";
-                if (outputEntryPath.StartsWith(cf, StringComparison.OrdinalIgnoreCase))
-                    outputEntryPath = outputEntryPath.Substring(cf.Length);
-            }
-
-            var safeEntryPath = FileConflictHelper.SanitizeEntryPath(outputEntryPath);
-            var outputPath = FileConflictHelper.GetSafePath(destinationPath, safeEntryPath);
-            pathOverrides[item.FullPath ?? item.Name] = outputPath;
-        }
-
-        var options = CreateExtractOptions(conflictAction);
 
         var completed = await RunWithProgress(
             LocalizationManager.T("Status_Extracting"),
             async (progress, ct) =>
             {
-                var engine = ArchiveEngineFactory.GetEngineByExtension(CurrentArchivePath!);
-                if (engine == null) throw new NotSupportedException("不支持的压缩格式");
-
-                if (_currentFormat is ArchiveFormat.Tar or ArchiveFormat.GZip)
-                {
-                    // Tar/Gz 不支持按条目解压，降级为完整解压
-                    await engine.ExtractAsync(CurrentArchivePath!, destinationPath, password, progress, ct, options);
-                }
-                else
-                {
-                    await engine.ExtractEntriesAsync(CurrentArchivePath!, entryKeys, destinationPath,
-                        password, progress, ct, options, pathOverrides);
-                }
+                await new SelectedItemsExtractService().ExtractEntriesAsync(
+                    CurrentArchivePath!, password, entries, destinationPath,
+                    settings.FileConflictAction, CurrentFolder ?? "", settings.ExtractPreserveFullPath,
+                    ShowExtractFileConflictDialogAsync, progress, ct);
             });
 
         if (completed)
         {
             StatusMessage = LocalizationManager.T("Status_ExtractComplete");
-            if (openFolderAfterExtract)
+            if (settings.OpenFolderAfterExtract)
             {
                 await OpenExtractedFolderAsync(destinationPath);
             }
         }
+    }
+
+    /// <summary>
+    /// 获取用于解压的选中条目列表（含目录展开，全量条目展开与拖拽共用同一实现）。
+    /// 对应 WPF 的 ExtractSelectedAsync 逻辑。
+    /// </summary>
+    private List<ArchiveItem> GetSelectedEntriesForExtract()
+    {
+        var selected = new List<ArchiveItem>();
+
+        if (SelectedEntries.Count > 0)
+        {
+            selected.AddRange(SelectedEntries.Select(i => i.ToCoreItem()));
+        }
+        else if (SelectedEntry != null)
+        {
+            selected.Add(SelectedEntry.ToCoreItem());
+        }
+
+        if (selected.Count == 0) return selected;
+
+        // 目录展开：复用 DragDropItemExpander.ExpandItems（与拖拽同源，全量条目）
+        return DragDropItemExpander.ExpandItems(selected, GetAllRawItems()).ToList();
     }
 
     /// <summary>
