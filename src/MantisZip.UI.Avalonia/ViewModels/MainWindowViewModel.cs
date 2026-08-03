@@ -1097,11 +1097,17 @@ public partial class MainWindowViewModel : ObservableObject
             var entries = ArchiveEntryLister.GetEntriesInFolder(
                 filteredSource, CurrentFolder ?? "", ShowSubfolders);
 
+            // 计算目录聚合统计（基于过滤后的数据源，与显示一致）：
+            // 目录大小 = 子树内所有文件大小之和，日期 = 子树内最新文件修改时间
+            var dirStats = ArchiveEntryLister.ComputeDirectoryStats(filteredSource);
+
             // Apply view mode filter
             if (ViewMode == FileListViewMode.FilesOnly)
                 entries = entries.Where(e => !e.IsDirectory).ToList();
             else if (ViewMode == FileListViewMode.DirectoriesOnly)
                 entries = entries.Where(e => e.IsDirectory).ToList();
+
+            var compressedSizeAvailable = GetCompressedSizeAvailable(_currentFormat);
 
             CurrentEntries.Clear();
             foreach (var item in entries)
@@ -1109,6 +1115,13 @@ public partial class MainWindowViewModel : ObservableObject
                 var model = ArchiveItemModel.FromCore(item);
                 if (model.IsDirectory)
                 {
+                    // 应用目录聚合：大小 = 子树和，日期 = 子树最新，压缩后大小 = 子树和
+                    if (dirStats.TryGetValue(model.FullPath, out var stat))
+                    {
+                        model.Size = stat.Size;
+                        model.CompressedSize = stat.CompressedSize;
+                        model.LastModified = stat.NewestModified;
+                    }
                     model.IconSource = IconService.GetFolderIcon();
                 }
                 else
@@ -1116,6 +1129,8 @@ public partial class MainWindowViewModel : ObservableObject
                     var ext = Path.GetExtension(model.Name);
                     model.IconSource = IconService.GetFileIcon(ext);
                 }
+                // 按当前格式设置压缩后大小可用性（文件 + 目录一致）
+                model.CompressedSizeAvailable = compressedSizeAvailable;
                 model.ProgressBarEnabled = ShowProgressBars;
                 CurrentEntries.Add(model);
             }
@@ -1148,6 +1163,19 @@ public partial class MainWindowViewModel : ObservableObject
         {
             _isProgrammaticFilter = false;
         }
+    }
+
+    /// <summary>
+    /// 当前格式是否能提供逐项压缩后大小。
+    /// Zip 可用；ISO/.tar 未压缩（引擎以原大小填充，等价可用）；
+    /// 7z/RAR/.tgz/.tar.gz/.gz 无法获得逐项压缩后大小（不可用，压缩后大小列显示空）。
+    /// </summary>
+    private static bool GetCompressedSizeAvailable(ArchiveFormat format)
+    {
+        if (format == ArchiveFormat.Zip) return true;
+        if (format == ArchiveFormat.Iso) return true;
+        if (format == ArchiveFormat.Tar) return true; // .tar 未压缩，引擎用原大小
+        return false; // 7z, RAR, .tgz/.gz
     }
 
     /// <summary>

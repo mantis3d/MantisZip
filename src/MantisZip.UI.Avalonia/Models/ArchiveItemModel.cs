@@ -20,28 +20,29 @@ public partial class ArchiveItemModel : ObservableObject
     private string _fullPath = string.Empty;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(SizeDisplay))]
+    [NotifyPropertyChangedFor(nameof(CompressionRatio))]
     private long _size;
 
     [ObservableProperty]
-    private string _sizeDisplay = string.Empty;
-
-    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CompressedSizeDisplay))]
+    [NotifyPropertyChangedFor(nameof(CompressionRatio))]
     private long _compressedSize;
 
     [ObservableProperty]
-    private string _compressedSizeDisplay = string.Empty;
-
-    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(LastModifiedDisplay))]
     private DateTime _lastModified;
-
-    [ObservableProperty]
-    private string _lastModifiedDisplay = string.Empty;
 
     [ObservableProperty]
     private bool _isDirectory;
 
+    /// <summary>
+    /// 当前压缩格式是否能提供逐项压缩后大小。
+    /// false（如 7z/RAR/.tgz/.gz）时，文件与目录的压缩后大小列均显示空。
+    /// </summary>
     [ObservableProperty]
-    private double _compressionRatio;
+    [NotifyPropertyChangedFor(nameof(CompressedSizeDisplay))]
+    private bool _compressedSizeAvailable = true;
 
     [ObservableProperty]
     private Bitmap? _iconSource;
@@ -77,14 +78,36 @@ public partial class ArchiveItemModel : ObservableObject
     /// </summary>
     public int SortOrder => IsDirectory ? 0 : 1;
 
+    /// <summary>大小显示：始终格式化，0 显示 "0 B"（文件/目录一致）。</summary>
+    public string SizeDisplay => FormatSize(Size);
+
     /// <summary>
-    /// 压缩率显示文本（如 "75.0%"）。目录或 Size=0 返回空。
+    /// 压缩后大小显示：格式无法提供逐项压缩后大小时（如 7z/RAR/.tgz/.gz）显示空，否则格式化。
+    /// </summary>
+    public string CompressedSizeDisplay => CompressedSizeAvailable ? FormatSize(CompressedSize) : "";
+
+    /// <summary>日期显示：MinValue 显示空，否则格式化为 "yyyy-MM-dd HH:mm:ss"。</summary>
+    public string LastModifiedDisplay =>
+        LastModified > DateTime.MinValue ? LastModified.ToString("yyyy-MM-dd HH:mm:ss") : "";
+
+    /// <summary>
+    /// 压缩率（0–100 的百分比数值）。Size<=0 时返回 0。
+    /// 派生自 <see cref="Size"/> / <see cref="CompressedSize"/>，聚合后自动重算。
+    /// </summary>
+    public double CompressionRatio => Size > 0
+        ? Math.Round((double)CompressedSize / Size * 100, 1)
+        : 0;
+
+    /// <summary>
+    /// 压缩率显示文本（如 "75.0%"）。
+    /// Size=0 或格式无法提供逐项压缩后大小时（<see cref="CompressedSizeAvailable"/> 为 false）返回空；
+    /// 目录与文件一视同仁（目录显示聚合压缩率）。
     /// </summary>
     public string RatioDisplay
     {
         get
         {
-            if (IsDirectory || Size == 0) return "";
+            if (Size == 0 || !CompressedSizeAvailable) return "";
             if (CompressedSize == 0) return "0.0%";
             if (CompressedSize >= Size) return "100.0%";
             return $"{CompressionRatio:F1}%";
@@ -112,15 +135,9 @@ public partial class ArchiveItemModel : ObservableObject
             DisplayName = item.DisplayName,
             FullPath = item.FullPath,
             Size = item.Size,
-            SizeDisplay = FormatSize(item.Size),
             CompressedSize = item.CompressedSize,
-            CompressedSizeDisplay = FormatSize(item.CompressedSize),
             LastModified = item.LastModified,
-            LastModifiedDisplay = item.LastModified.ToString("yyyy-MM-dd HH:mm:ss"),
-            IsDirectory = item.IsDirectory,
-            CompressionRatio = item.Size > 0
-                ? Math.Round((double)item.CompressedSize / item.Size * 100, 1)
-                : 0
+            IsDirectory = item.IsDirectory
         };
     }
 
