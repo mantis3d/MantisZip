@@ -21,6 +21,15 @@
 
 ### MantisZip.UI.Avalonia（主力版）
 
+**2026-08-04** — 字体预览空白修复（自定义样本文本含中文标签前缀时整行被 CJK 过滤删除）
+  - **根因**：`RenderFontPreview` 对不支持 CJK 的字体按「整行」过滤——行内含任一汉字即整行删除。自定义样本文本每行带中文标签（英文：/数字：/汉字：…）时全部行被删 → 样本文本变空字符串
+  - **连字路径异常**：空样本文本拆出的空行经 HarfBuzz shaping 得 `glyphCount=0`，`SKTextBlobBuilder.Build()` 返回 null → `SKCanvas.DrawText(null)` 抛 `ArgumentNullException("text")`（日志 `[FONT] SkiaSharp render failed: Value cannot be null. (Parameter 'text')`）
+  - **无连字路径**：空字符串 `DrawText("")` 不抛异常，安静渲染空白位图（BitcountGridDouble 表现）
+  - **A 根因修复**：CJK 过滤改按字符过滤（仅剔除 CJK Unified/Symbols/Fullwidth/Radicals，保留英文/数字/符号/emoji 含 surrogate pair）；过滤结果为空时回退默认英文样本文本
+  - **B 防御修复**：HarfBuzz 路径 `glyphCount==0` 跳过绘制仅推进行距；`Build()` 返回 null 时同样跳过
+  - **C 健壮性**：渲染失败回退的 `TextContent` 改用原始（未过滤）样本文本，不再显示空文本
+  - 复现验证：用户真实样本文本 × 3 字体 × 2 路径全部正常渲染；构建 0 errors；核心测试 241/241 通过
+
 **2026-08-04** — 设置窗口「压缩」tab 拆分为「通用 / 格式」两个子 tab
   - **结构重构**：「压缩」tab 由单层 `ScrollViewer` 改为嵌套 `TabControl`（`TabStripPlacement="Top"`，样式对齐「预览」tab 子 tab）；「通用」子 tab 承载 默认格式/压缩级别/选项，「格式」子 tab 承载 ZIP 默认选项 + 7z 默认选项，各自独立滚动
   - **本地化补全**：压缩 tab 内 13 处硬编码中文全部替换为 i18n 绑定；新增 15 个 key（`Settings_Compress_Tab_General`/`Settings_Compress_Tab_Format` + `Settings_Compress_Options` + `Settings_Zip_*` ×4 + `Settings_SevenZip_*` ×8），zh/en 双语；`SettingsWindowViewModel` 新增 15 个本地化属性并注册语言切换通知

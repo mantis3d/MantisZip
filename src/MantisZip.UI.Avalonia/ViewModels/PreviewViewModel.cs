@@ -1195,6 +1195,8 @@ public partial class PreviewViewModel : ObservableObject
     {
         PreviewImage = null;
         _fontPreviewSampleText = sampleText;
+        // 保留原始（未过滤）样本文本，供渲染失败时回退显示，避免显示被过滤后的空文本
+        var originalSampleText = sampleText;
         try
         {
             using var memStream = new MemoryStream(fontData);
@@ -1208,14 +1210,30 @@ public partial class PreviewViewModel : ObservableObject
 
                 if (!supportsCjk)
                 {
-                    // 不支持 CJK 时从样本中移除中文行
-                    var allLines = sampleText.Split('\n');
-                    var nonCjkLines = allLines
-                        .Where(l => !l.Any(c => c >= 0x4E00 && c <= 0x9FFF))
-                        .ToList();
-                    if (nonCjkLines.Count == 0)
-                        nonCjkLines.Add("(The preview sample text contains Chinese characters\nwhich are not supported by this font.)");
-                    sampleText = string.Join("\n", nonCjkLines);
+                    // 不支持 CJK 时按字符移除中文字符，而不是删除整行——
+                    // 行首中文标签（如「英文：」「数字：」）不应导致整行内容丢失。
+                    // 保留英文/数字/符号/emoji（含 surrogate pair），仅剔除 CJK 区字符。
+                    var filtered = new StringBuilder(sampleText.Length);
+                    foreach (char c in sampleText)
+                    {
+                        if (c >= 0x4E00 && c <= 0x9FFF) continue;  // CJK Unified
+                        if (c >= 0x3000 && c <= 0x303F) continue;  // CJK Symbols
+                        if (c >= 0xFF00 && c <= 0xFFEF) continue;  // Fullwidth / Halfwidth
+                        if (c >= 0x2E80 && c <= 0x2EFF) continue;  // CJK Radicals
+                        filtered.Append(c);
+                    }
+
+                    var filteredText = filtered.ToString().Trim();
+                    if (string.IsNullOrEmpty(filteredText))
+                    {
+                        // 全部字符被过滤（样本文本全为中文）时，回退到默认英文样本文本，
+                        // 避免空文本导致后续渲染异常或空白预览。
+                        sampleText = "The quick brown fox jumps over the lazy dog\n0123456789\nABCDEFGHIJKLMNOPQRSTUVWXYZ\nabcdefghijklmnopqrstuvwxyz";
+                    }
+                    else
+                    {
+                        sampleText = filteredText;
+                    }
                 }
 
                 var textColor = isDark ? SkiaSharp.SKColors.White : SkiaSharp.SKColors.Black;
@@ -1327,6 +1345,15 @@ public partial class PreviewViewModel : ObservableObject
                             var positions = buffer.GlyphPositions;
 
                             int glyphCount = infos.Length;
+                            if (glyphCount == 0)
+                            {
+                                // 空行或无可 shaping 字形（如纯空格行）：
+                                // 跳过绘制（SKTextBlobBuilder.Build() 对 0 glyph 返回 null，
+                                // DrawText(null) 会抛 ArgumentNullException），仅推进行距。
+                                y += font.Spacing;
+                                continue;
+                            }
+
                             var skPositions = new SkiaSharp.SKPoint[glyphCount];
                             float cx = 0;
                             float scale = FontSize / upem;
@@ -1348,6 +1375,12 @@ public partial class PreviewViewModel : ObservableObject
                                 run.Positions[i] = skPositions[i];
                             }
                             using var blob = builder.Build();
+                            if (blob == null)
+                            {
+                                // 防御：Build() 意外返回 null 时跳过绘制，避免 DrawText(null) 抛异常
+                                y += font.Spacing;
+                                continue;
+                            }
                             canvas.DrawText(blob, padding, 0, paint);
                             y += font.Spacing;
                         }
@@ -1392,7 +1425,8 @@ public partial class PreviewViewModel : ObservableObject
 
         if (PreviewImage == null)
         {
-            TextContent = sampleText;
+            // 渲染失败时回退显示原始样本文本（未过滤），避免显示空文本导致空白预览
+            TextContent = originalSampleText;
         }
         else
         {
