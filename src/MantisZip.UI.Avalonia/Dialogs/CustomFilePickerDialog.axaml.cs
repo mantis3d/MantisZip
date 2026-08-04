@@ -471,6 +471,7 @@ public partial class CustomFilePickerDialog : Window
 
         LoadDirectory(dir);
         QuickPath.SetCurrentPath(dir);
+        UpdateFavoriteButtonState();
     }
 
     private void Back_Click(object? sender, RoutedEventArgs e)
@@ -485,6 +486,7 @@ public partial class CustomFilePickerDialog : Window
         PathAutoComplete.Text = dir;
         LoadDirectory(dir);
         QuickPath.SetCurrentPath(dir);
+        UpdateFavoriteButtonState();
     }
 
     private void Forward_Click(object? sender, RoutedEventArgs e)
@@ -499,6 +501,7 @@ public partial class CustomFilePickerDialog : Window
         PathAutoComplete.Text = dir;
         LoadDirectory(dir);
         QuickPath.SetCurrentPath(dir);
+        UpdateFavoriteButtonState();
     }
 
     private void Up_Click(object? sender, RoutedEventArgs e)
@@ -879,6 +882,41 @@ public partial class CustomFilePickerDialog : Window
         {
             TryConfirmFile(path);
         }
+    }
+
+    // ── Add to favorites ────────────────────────────────────────────────────
+
+    /// <summary>
+    /// 收藏按钮点击：弹出 <see cref="AddFavoriteDialog"/>（预填当前目录名+路径），
+    /// 确认后加入收藏并刷新速选面板。
+    /// </summary>
+    private async void AddFavorite_Click(object? sender, RoutedEventArgs e)
+    {
+        if (string.IsNullOrEmpty(_currentDir) || FavoritePathManager.Exists(_currentDir)) return;
+
+        var dirName = Path.GetFileName(_currentDir.TrimEnd('\\', '/'));
+        var dialog = new AddFavoriteDialog(dirName, _currentDir);
+        if (await dialog.ShowDialog<bool>(this))
+        {
+            FavoritePathManager.Add(dialog.FavoriteName, dialog.FavoritePath);
+            QuickPath.RefreshSources();
+            QuickPath.SetCurrentPath(_currentDir);
+            UpdateFavoriteButtonState();
+        }
+    }
+
+    /// <summary>
+    /// 同步收藏按钮状态：当前目录已在收藏（含系统路径）时置灰并提示，否则可点击。
+    /// 导航路径变化时调用。
+    /// </summary>
+    private void UpdateFavoriteButtonState()
+    {
+        var isFavorite = !string.IsNullOrEmpty(_currentDir) && FavoritePathManager.Exists(_currentDir);
+        AddFavoriteButton.IsEnabled = !isFavorite;
+        ToolTip.SetTip(AddFavoriteButton,
+            isFavorite
+                ? LocalizationManager.T("Picker_AlreadyFavorite")
+                : LocalizationManager.T("Picker_AddFavorite"));
     }
 
     // ── Confirm / Cancel ───────────────────────────────────────────────────

@@ -843,6 +843,8 @@
   "Picker_Back": "后退",
   "Picker_Forward": "前进",
   "Picker_Up": "上级目录",
+  "Picker_AddFavorite": "添加到收藏",
+  "Picker_AlreadyFavorite": "已在收藏夹",
   "Picker_FileName": "文件名",
   "Picker_FileType": "文件类型",
   "Picker_FileTypeArchive": "压缩包文件",

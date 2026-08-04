@@ -21,6 +21,12 @@
 
 ### MantisZip.UI.Avalonia（主力版）
 
+**2026-08-04** — 文件选择器地址栏新增「添加到收藏」入口
+  - **入口**：`CustomFilePickerDialog` 地址栏输入框右侧新增 ⭐ 按钮（复用 `IconStar` 资源，主题样式对齐导航按钮），点击弹 `AddFavoriteDialog`（预填当前目录名+路径）确认后经 `FavoritePathManager.Add` 写入收藏
+  - **联动**：收藏后速选面板 `RefreshSources()` 立即刷新并高亮当前目录；`UpdateFavoriteButtonState()` 随导航同步——当前目录已在收藏（含桌面/文档/下载系统路径）时按钮置灰 + ToolTip「已在收藏夹」
+  - **本地化**：新增 `Picker_AddFavorite` / `Picker_AlreadyFavorite`（zh/en 双语）；`QuickPathControl` 保持纯速选职责未改动
+  - 构建 0 errors
+
 **2026-08-04** — 字体预览空白修复（自定义样本文本含中文标签前缀时整行被 CJK 过滤删除）
   - **根因**：`RenderFontPreview` 对不支持 CJK 的字体按「整行」过滤——行内含任一汉字即整行删除。自定义样本文本每行带中文标签（英文：/数字：/汉字：…）时全部行被删 → 样本文本变空字符串
   - **连字路径异常**：空样本文本拆出的空行经 HarfBuzz shaping 得 `glyphCount=0`，`SKTextBlobBuilder.Build()` 返回 null → `SKCanvas.DrawText(null)` 抛 `ArgumentNullException("text")`（日志 `[FONT] SkiaSharp render failed: Value cannot be null. (Parameter 'text')`）

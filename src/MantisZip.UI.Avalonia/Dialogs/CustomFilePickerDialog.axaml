@@ -18,7 +18,7 @@
 
     <!-- ═══════ Row 0: Address bar + navigation ═══════ -->
     <Grid Grid.Row="0"
-          ColumnDefinitions="Auto,Auto,Auto,Auto,*"
+          ColumnDefinitions="Auto,Auto,Auto,Auto,*,Auto"
           ColumnSpacing="{DynamicResource SpacingXxs}"
           Margin="0,0,0,8">
       <Button x:Name="BackButton"
@@ -84,6 +84,19 @@
                        Background="{DynamicResource ThemeSurfaceBgBrush}"
                        Foreground="{DynamicResource ThemeTextPrimaryBrush}"
                        BorderBrush="{DynamicResource ThemeBorderBrush}" />
+      <Button Grid.Column="5"
+              x:Name="AddFavoriteButton"
+              Width="32"
+              MinHeight="{DynamicResource ControlHeightSm}"
+              Click="AddFavorite_Click"
+              Background="{DynamicResource ThemeButtonBgBrush}"
+              Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+              BorderBrush="{DynamicResource ThemeBorderBrush}">
+        <PathIcon Data="{StaticResource IconStar}"
+                  Width="14"
+                  Height="14"
+                  Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+      </Button>
     </Grid>
 
     <!-- ═══════ Row 1: QuickPath | file browser | right panel ═══════ -->
