@@ -997,6 +997,8 @@ public partial class PreviewViewModel : ObservableObject
             using var img = surface.Snapshot();
             using var data = img.Encode(SkiaSharp.SKEncodedImageFormat.Png, 100);
             using var ms = new MemoryStream(data.ToArray());
+            // 先设置 PreviewType 让 Image 控件进入可见状态并关闭加载遮罩，再设置 Source
+            PreviewType = PreviewType.Svg;
             PreviewImage = new global::Avalonia.Media.Imaging.Bitmap(ms);
             _originalPreviewImage = PreviewImage;
 

@@ -88,6 +88,16 @@ MantisZip.Core ──────┤                                     ├─�
 - **WPF UI**: `MainWindow.xaml.cs` defines a subclass `ArchiveItem : Core.Abstractions.ArchiveItem` adding `DisplayName`, `SizeDisplay`, `NameDisplay`, `SortOrder`
 - **Avalonia UI**: `ArchiveItemModel` (Models/) wraps `ArchiveItem` with `IconSource`, display properties, `SizeRatio` (progress bar width), `SortOrder`
 
+### Directory aggregation — ComputeDirectoryStats
+
+`ArchiveEntryLister.ComputeDirectoryStats` (`Core/Services/ArchiveEntryLister.cs`) 是目录聚合的共享契约，返回 `Dictionary<string, DirStats>`，`DirStats(Count, Size, CompressedSize, NewestModified)`：
+
+- **递归子树语义**：每个文件计入其全部祖先目录（`a/b/c.txt` 同时计入 `a` 与 `a/b`），目录大小/压缩后大小 = 子树内所有文件之和
+- `Count` **仅统计文件**（跳过目录条目）
+- `NewestModified` = 子树内最新文件修改时间，`DateTime.MinValue` 文件不参与
+- **消费者**：Avalonia `MainWindowViewModel.PopulateEntries`（基于过滤后的 `filteredSource` 计算，目录行的大小/日期/压缩后大小由聚合填充）
+- **注意**：ResultTreeView 的 `CalculateDescendantStats`（`Services/ResultPreviewService.cs`）是独立的树状聚合，`TotalDescendantCount` 含目录、无压缩后大小/日期 —— 与 `DirStats` 语义不同，勿混用
+
 ### UI 模式：项目间差异
 
 #### WPF（遗留版）：code-behind
