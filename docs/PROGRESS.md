@@ -1092,6 +1092,7 @@
 | 压缩选项增强（7z/ZIP 格式参数扩展） | [compression-options-enhancement.md](.sisyphus/plans/compression-options-enhancement.md) | v0.4.5 |
 | 上下文工具栏重构（目录树+文件列表） | [context-toolbars.md](.sisyphus/plans/context-toolbars.md) | v0.4.5 |
 | 解压/压缩结果预览面板 | [result-preview-panel.md](.sisyphus/plans/result-preview-panel.md) | v0.4.5 |
+| 元数据信息面板可配置 | [metadata-panel-configurable.md](.sisyphus/plans/metadata-panel-configurable.md) | v0.4.5 |
 | 紧凑度模式（Compactness Mode） | [compactness-mode.md](.sisyphus/plans/compactness-mode.md) | v0.4.5 |
 | 预览两阶段加载（信息栏+内容分离） | [preview-two-phase-loading.md](.sisyphus/plans/preview-two-phase-loading.md) | v0.4.5 |
 | Avalonia: Shell/COM 集成移植 | [avalonia-shell-com-integration.md](.sisyphus/plans/avalonia-shell-com-integration.md) | v0.4.5 |
