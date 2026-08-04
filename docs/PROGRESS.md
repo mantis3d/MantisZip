@@ -884,6 +884,10 @@
 
 这些变更影响两项目共用代码，按时间从新到旧排列。
 
+#### v0.4.5 (2026-08-03) AGENTS.md 新增 ComputeDirectoryStats 目录聚合契约说明
+  - 新增「Directory aggregation — ComputeDirectoryStats」小节：`DirStats` 字段语义（递归子树和 / Count 仅文件 / NewestModified 忽略 MinValue）、消费者（Avalonia `PopulateEntries`）、与 ResultTreeView `CalculateDescendantStats` 的差异（`TotalDescendantCount` 含目录、无压缩后大小/日期）
+  - 涉及文件：`AGENTS.md`（纯文档，无代码变更）
+
 #### v0.4.5 (2026-08-03) 目录聚合统计 DirStats 增加 NewestModified
   - `DirStats` 记录新增 `DateTime NewestModified` 字段（Count/Size/CompressedSize/NewestModified）
   - `ComputeDirectoryStats` 同一趟遍历聚合子树最新文件修改时间（`Max`，`DateTime.MinValue` 文件不参与），递归累加语义不变
