@@ -90,7 +90,8 @@ public class AppSettings
     public bool PasswordRevealByDefault { get; set; } = false;
 
     // ===== 外观 =====
-    public string Theme { get; set; } = "Light";
+    /// <summary>主题：System=跟随系统 / Light=亮色 / Dark=暗色（三态）</summary>
+    public string Theme { get; set; } = "System";
     public int MaxRecentFiles { get; set; } = 10;
     public string AppFontFamily { get; set; } = "";
     public string CompactnessMode { get; set; } = "Normal";

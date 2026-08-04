@@ -21,6 +21,16 @@
 
 ### MantisZip.UI.Avalonia（主力版）
 
+**2026-08-04** — 主题三态化（跟随系统 / 亮色 / 暗色）+ 菜单显示当前主题
+  - **问题根因**：Avalonia 版实际上「永远跟随系统」，设置里的亮/暗保存到 `AppSettings.Theme` 但从未被任何代码读取（死配置）；菜单「切换主题」只临时替换 `MergedDictionaries[0]`、不写回设置、未设 `RequestedThemeVariant`（Fluent 控件样式也不跟随切换）
+  - **三态改造**：`AppSettings.Theme` 值域扩展为 `System`/`Light`/`Dark`（默认 `System`）；`App.axaml.cs` `ApplySystemTheme()` 重构为读设置的 `ApplyTheme()`（System 才查系统，Light/Dark 直接应用）+ 新增 `RefreshTheme()` 供设置窗口保存后立即生效；`ColorValuesChanged` 仅在 System 模式响应系统主题变化
+  - **设置窗口**：`SettingsWindowViewModel` `ThemeOptions` 新增「跟随系统」项 + `AppearanceThemeSystemText` 本地化属性；`SettingsWindow.axaml.cs` 保存后调 `App.RefreshTheme()`（无需重启）
+  - **菜单**：`MainWindowViewModel.ToggleTheme()` 改为三态循环 System→Light→Dark，写回设置并 `Save()`，补上漏设的 `RequestedThemeVariant`；菜单项文本动态显示当前主题（`Menu_ToggleThemeFormat`，如「切换颜色模式：跟随系统」），切换后与设置窗口关闭后均即时刷新
+  - **暗色判定**：`MarkdownPreviewBuilder` 三处 `settings.Theme == "Dark"` 改为 `RequestedThemeVariant`（避免漏判 `"System"`）
+  - **WPF 防御**：`MantisZip.UI/App.xaml.cs` `ApplyTheme()` 入口将 `"System"` 回退 `"Light"`——两版共享 `settings.json`，防止 Avalonia 写入 `"System"` 后 WPF 加载不存在的 `Themes/System.xaml` 崩溃（WPF 版未加跟随系统功能，按决策保留）
+  - 本地化新增 key：`Settings_Appearance_Theme_System` + `Menu_ToggleThemeFormat`（zh/en 成对）；en 的 `Menu_ToggleTheme` 由 "Toggle Dark Theme" 改为通用 "Toggle Theme"
+  - 构建 0 errors / Avalonia 测试通过 / 改动文件 lsp 无错误
+
 **2026-08-04** — 硬编码文案本地化清扫（Avalonia 全项目）
   - **预览子系统**：`PreviewViewModel` 约 45 处硬编码中文全部替换为 i18n（PE 元数据 `Preview_Pe_Subtitle`/`Preview_Pe_*`、各格式 `PreviewHeaderText`（Image/Ico/Gif/Svg/Font/Audio/Sqlite/Iso/Torrent/Video）、`ShowUnsupported` 变体、doc 消息（DocxEmpty/NoOutline/TooLarge/Failed、XlsxEmpty/Protected/Failed、PptxSlideHeader/SlideEmpty/ParseFailed/Failed）、Pdf open/parse、Torrent「是」→`MsgBox_Yes`、Video parse）；新增 `LocalizedStrings` 字典 + `UpdateLocalizedStrings()` + `OnCultureChanged` 订阅，供 `Preview_Ligature`/`Preview_FileListLabel`/`Preview_OutlineLabel` 三项绑定；新增 `LoadingFileDisplay` 计算属性（`Preview_LoadingFile` 格式，含文件名，culture 变更时刷新）
   - **元数据渲染**：`MetadataRenderEngine`（`GetTypeDisplayName`）与 `MetadataPanelSettingsViewModel` 两处 13/14 分支的硬编码 fallback switch 删除，统一走 `Metadata_Type_*` key + `Metadata_FormatInfo` 兜底；补 `Metadata_Type_common`（文件信息/File Info）key

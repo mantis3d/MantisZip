@@ -224,7 +224,7 @@ public partial class SettingsWindowViewModel : ObservableObject
 
     // ── Appearance ──
     [ObservableProperty]
-    private string _theme = "Light";
+    private string _theme = "System";
 
     [ObservableProperty]
     private int _maxRecentFiles = 10;
@@ -688,6 +688,7 @@ public partial class SettingsWindowViewModel : ObservableObject
 
     // ── Appearance strings ──
     public string AppearanceThemeText => LocalizationManager.T("Settings_Appearance_Theme");
+    public string AppearanceThemeSystemText => LocalizationManager.T("Settings_Appearance_Theme_System");
     public string AppearanceThemeLightText => LocalizationManager.T("Settings_Appearance_Theme_Light");
     public string AppearanceThemeDarkText => LocalizationManager.T("Settings_Appearance_Theme_Dark");
     public string AppearanceMaxRecentFilesText => LocalizationManager.T("Settings_Appearance_MaxRecentFiles");
@@ -859,6 +860,7 @@ public partial class SettingsWindowViewModel : ObservableObject
         InfoPanelOrientationOptions.Add(new Option(PreviewInfoOrientationVerticalText, "Vertical"));
 
         ThemeOptions.Clear();
+        ThemeOptions.Add(new Option(AppearanceThemeSystemText, "System"));
         ThemeOptions.Add(new Option(AppearanceThemeLightText, "Light"));
         ThemeOptions.Add(new Option(AppearanceThemeDarkText, "Dark"));
 
@@ -1161,6 +1163,7 @@ public partial class SettingsWindowViewModel : ObservableObject
         OnPropertyChanged(nameof(LanguageText));
         OnPropertyChanged(nameof(LanguageTranslatorText));
         OnPropertyChanged(nameof(AppearanceThemeText));
+        OnPropertyChanged(nameof(AppearanceThemeSystemText));
         OnPropertyChanged(nameof(AppearanceThemeLightText));
         OnPropertyChanged(nameof(AppearanceThemeDarkText));
         OnPropertyChanged(nameof(AppearanceMaxRecentFilesText));

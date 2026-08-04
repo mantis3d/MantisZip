@@ -1,7 +1,6 @@
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
-using Avalonia.Markup.Xaml.Styling;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using MantisZip.Core.Abstractions;
@@ -171,6 +170,11 @@ public partial class MainWindowViewModel : ObservableObject
         UpdateLocalizedStrings();
     }
 
+    /// <summary>
+    /// 供 View（设置窗口关闭后）刷新全部本地化字符串与当前主题菜单文案。
+    /// </summary>
+    public void RefreshLocalizedStrings() => UpdateLocalizedStrings();
+
     private void UpdateLocalizedStrings()
     {
         Title = LocalizationManager.T("App_Title");
@@ -238,6 +242,16 @@ public partial class MainWindowViewModel : ObservableObject
         {
             newDict[key] = LocalizationManager.T(key);
         }
+
+        // 主题菜单项显示当前主题状态（三态）
+        var themeLabel = _appSettings.Theme switch
+        {
+            "Light" => LocalizationManager.T("Settings_Appearance_Theme_Light"),
+            "Dark" => LocalizationManager.T("Settings_Appearance_Theme_Dark"),
+            _ => LocalizationManager.T("Settings_Appearance_Theme_System"),
+        };
+        newDict["Menu_ToggleTheme"] = LocalizationManager.T("Menu_ToggleThemeFormat", themeLabel);
+
         LocalizedStrings = newDict;
         OnPropertyChanged(nameof(LocalizedStrings));
         OnPropertyChanged(nameof(ViewModeLabel));
@@ -523,6 +537,14 @@ public partial class MainWindowViewModel : ObservableObject
         // Load settings
         ShowProgressBars = _appSettings.ShowProgressBars;
         SeparateDirBaseline = _appSettings.SeparateDirBaseline;
+
+        // 主题（三态）：初始化菜单按钮暗色状态显示
+        IsDarkTheme = _appSettings.Theme switch
+        {
+            "Dark" => true,
+            "Light" => false,
+            _ => Application.Current?.RequestedThemeVariant == global::Avalonia.Styling.ThemeVariant.Dark,
+        };
     }
 
     private void OnCultureChanged(object? sender, EventArgs e)
@@ -1449,17 +1471,29 @@ public partial class MainWindowViewModel : ObservableObject
     [RelayCommand]
     private void ToggleTheme()
     {
-        IsDarkTheme = !IsDarkTheme;
-        var theme = IsDarkTheme ? "ThemeDark.axaml" : "ThemeLight.axaml";
-
-        if (Application.Current?.Resources.MergedDictionaries.Count > 0)
+        // 三态循环：System → Light → Dark → System
+        var theme = _appSettings.Theme switch
         {
-            Application.Current.Resources.MergedDictionaries[0] =
-                new ResourceInclude(new Uri($"avares://MantisZip.UI.Avalonia/Themes/{theme}"))
-                {
-                    Source = new Uri($"avares://MantisZip.UI.Avalonia/Themes/{theme}")
-                };
-        }
+            "System" => "Light",
+            "Light" => "Dark",
+            _ => "System",
+        };
+        _appSettings.Theme = theme;
+        _ = _appSettings.Save();
+
+        // 立即应用（RefreshTheme 会读取 AppSettings 并设置 RequestedThemeVariant）
+        App.RefreshTheme();
+
+        // 同步菜单按钮的暗色状态显示
+        IsDarkTheme = theme switch
+        {
+            "Dark" => true,
+            "Light" => false,
+            _ => Application.Current?.RequestedThemeVariant == global::Avalonia.Styling.ThemeVariant.Dark,
+        };
+
+        // 刷新菜单项「切换颜色模式」显示的当前主题文案
+        UpdateLocalizedStrings();
     }
 
     // ── Phase 3: Archive commands ──
