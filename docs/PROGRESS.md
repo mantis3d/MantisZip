@@ -21,6 +21,14 @@
 
 ### MantisZip.UI.Avalonia（主力版）
 
+**2026-08-05** — 解压路径统一为单一事实源（`ExtractPathResolver`）+ ExtractSettings 文件过滤接入实际解压
+  - **问题根因**：「解压选择文件到」实际解压按 `ExtractPreserveFullPath` 裁剪路径，但 `ResultPreviewService.BuildExtractPreview` 恒按「保留完整路径」建树 → 预览树与实际落盘不一致
+  - **核心改造**：新增 Core `ExtractPathResolver`（`TrimCurrentFolderPrefix`/`ResolveRelativePath`/`ResolveAll`，语义与解压侧历史逻辑逐字一致），预览树与实际解压共用同一路径计算，从结构上杜绝不一致；`BuildExtractPreview` 新增 `preserveFullPath`（默认 `true`）/`currentFolder`（默认 `""`）参数，恶意路径条目逐条 try-catch 跳过（解压侧保持抛异常整批失败）
+  - **Select 链路闭环**：`CustomFilePickerDialog.ShowExtractFolderAsync` 贯穿 `currentFolder`+`preserveFullPath`，`MainWindowViewModel.ExtractSelectedTo` 把 `CurrentFolder`+设置同时传给预览与实际解压，输入相同故结果必然一致
+  - **文件过滤补全**：Avalonia 版 `ExtractSettingsWindow` 过滤后 `MainWindowViewModel.ExtractArchive` 在 `FilteredEntryKeys` 非空时改走 `engine.ExtractEntriesAsync` 只解压匹配项（此前预览灰显过滤项但实际全量解压——与 WPF 版行为对齐）
+  - **测试**：新增 `tests/MantisZip.Tests/ExtractPathResolverTests.cs` 12 项全过；Avalonia 构建 0 errors；Avalonia 测试 41/41 通过（2 跳过）
+  - **文档**：AGENTS.md 新增「Extract path resolution」契约小节 + Services 列表补 `SelectedItemsExtractService`；result-preview-panel.md 补「预览=实际一致性」说明
+
 **2026-08-04** — 列选择菜单切换图标与主菜单 ToggleIconBox 样式对齐 + AGENTS.md 全局类样式约定补全
   - **切换图标对齐**：`ColumnHeaderContextMenu_Opening` 的列可见性菜单项图标由 `MenuItem.Icon` 槽位 CheckBox 改为与主菜单切换项同构的 `Border.ToggleIconBox`（继承 App.axaml 全局样式：20×20、圆角 3、边框 1.5、背景过渡动画）+ 12×12 `PathIcon`（几何取自列标题自身，保证与列头图标一致）；`Background` 用 `BoolToToggleBgBrushConverter`（可见 → `ThemeToggleBrush` 强调色底，隐藏 → 透明空心）
   - **放置位置对齐**：切换盒与文字改放 `MenuItem.Header` 的 `StackPanel`（`Spacing` 解析 `SpacingXxs` 紧凑度资源，新增 `GetSpacingXxs` helper），不再放 Icon 槽位——与主菜单 4 处切换项（MainWindow.axaml:217-269）逐项一致
@@ -1109,6 +1117,7 @@
 
 | 功能 | 设计文档 | 实现版本 |
 |------|----------|:--------:|
+| 解压路径统一（`ExtractEntriesAsync` + `pathOverrides`，单一事实源 `ExtractPathResolver`） | [extract-path-unification.md](.sisyphus/plans/extract-path-unification.md) | v0.4.5 |
 | 移除 WebView2 依赖（Markdown/HTML/PDF 跨平台预览） | [remove-webview2-preview.md](.sisyphus/plans/remove-webview2-preview.md) | v0.4.5 |
 | 便携版模式 | [portable-mode.md](.sisyphus/plans/portable-mode.md) | v0.4.5 |
 | 文件冲突对话框暂停/取消 | [conflict-dialog-pause-cancel.md](.sisyphus/plans/conflict-dialog-pause-cancel.md) | v0.4.5 |

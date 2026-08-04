@@ -98,6 +98,18 @@ MantisZip.Core ──────┤                                     ├─�
 - **消费者**：Avalonia `MainWindowViewModel.PopulateEntries`（基于过滤后的 `filteredSource` 计算，目录行的大小/日期/压缩后大小由聚合填充）
 - **注意**：ResultTreeView 的 `CalculateDescendantStats`（`Services/ResultPreviewService.cs`）是独立的树状聚合，`TotalDescendantCount` 含目录、无压缩后大小/日期 —— 与 `DirStats` 语义不同，勿混用
 
+### Extract path resolution — ExtractPathResolver
+
+`ExtractPathResolver`（`Core/Utils/ExtractPathResolver.cs`）是**预览树与实际解压**输出路径计算的单一事实来源，杜绝两者不一致：
+
+- **核心方法**：`ResolveRelativePath(entryKey, currentFolder, preserveFullPath)`（裁剪当前浏览层前缀 + `FileConflictHelper.SanitizeEntryPath` 防 Zip Slip），另有 `TrimCurrentFolderPrefix` / `ResolveAll` 便捷封装
+- **语义**：`preserveFullPath=false` 且 `currentFolder` 非空时裁剪前缀；前缀不匹配的条目保持原路径；`SanitizeEntryPath` 丢弃 `..`/`.` 段但保留普通目录段（`docs/../../evil.txt` → `docs/evil.txt`；真正的路径逃逸拦截在 `GetSafePath`）
+- **消费者**（必须用同一 resolver，勿另写路径逻辑）：
+  - `SelectedItemsExtractService.ExtractEntriesAsync`（实际解压，经 `pathOverrides` 喂给引擎）
+  - `ResultPreviewService.BuildExtractPreview`（预览树，`preserveFullPath`/`currentFolder` 参数，恶意路径条目逐条跳过以防整树损毁 —— 解压侧保持抛异常整批失败）
+- **入口**：`MainWindowViewModel.ExtractSelectedTo` 把 `CurrentFolder` + 设置传给 `CustomFilePickerDialog.ShowExtractFolderAsync`（→ 预览）与实际解压，输入相同故结果必然一致
+- **文件过滤**：Avalonia 版 `ExtractSettingsWindow` 过滤后，`MainWindowViewModel.ExtractArchive` 在 `FilteredEntryKeys` 非空时改走 `engine.ExtractEntriesAsync` 只解压匹配项；否则保持 `ExtractService.ExtractAsync` 全量
+
 ### UI 模式：项目间差异
 
 #### WPF（遗留版）：code-behind
@@ -109,7 +121,7 @@ Despite using `CommunityToolkit.Mvvm`, **all logic lives in `MainWindow.xaml.cs`
 使用 `CommunityToolkit.Mvvm` 的 `ObservableObject` + source generators (`[ObservableProperty]`, `[RelayCommand]`)：
 
 - **ViewModels**: `MainWindowViewModel`, `PreviewViewModel`, `ProgressViewModel`, `CompressSettingsViewModel`, `ExtractSettingsViewModel`, `SettingsWindowViewModel`, `IconTestViewModel`（图标测试窗口）
-- **Services**: `ArchiveService`, `CompressService`, `ExtractService`, `PreviewService`, `IconService`, `LocalizationManager`, `CompressionOptionData`（选项数据源）、`GifDecoder`（自实现 GIF 解码）、`IcoParser`（ICO 多帧解析）、`MarkdownPreviewBuilder`（Markdig AST→控件树）、`ResultPreviewService`（结果预览树）
+- **Services**: `ArchiveService`, `CompressService`, `ExtractService`, `SelectedItemsExtractService`（选择条目解压，消费 `ExtractPathResolver`）、`PreviewService`, `IconService`, `LocalizationManager`, `CompressionOptionData`（选项数据源）、`GifDecoder`（自实现 GIF 解码）、`IcoParser`（ICO 多帧解析）、`MarkdownPreviewBuilder`（Markdig AST→控件树）、`ResultPreviewService`（结果预览树，`BuildExtractPreview` 与解压共用 `ExtractPathResolver` 保证预览=实际）
 - **Views**: `MainWindow.axaml`, `PreviewPanel.axaml` (UserControl), `SettingsWindow.axaml`
 - **Controls**: `ResultTreeView`（结果预览可复用控件，Compact/Full 模式、截断/过滤/冲突高亮）、`QuickPathPicker`（自包含路径速选控件，见下方「路径速选子系统」）
 - **Converters**: `BrushResourceConverter`（主题色键→画刷）、`GeometryResourceConverter`（资源键→Geometry）

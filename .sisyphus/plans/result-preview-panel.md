@@ -7,6 +7,8 @@
 
 在 ExtractSettingsWindow 和 CompressSettingsWindow 的右侧新增一个预览面板，实时显示解压/压缩后的文件目录树。实现一个可复用的 `ResultTreeView` 控件，并复用于 `CustomFilePickerDialog`（解压目标选择）和 `DragPreviewBitmapBuilder`（拖拽预览位图）。
 
+> **后续补充（2026-08）— 预览=实际路径一致性**：`ResultPreviewService.BuildExtractPreview` 新增 `preserveFullPath`（默认 `true`）/`currentFolder`（默认 `""`）两个参数。解压目标选择场景（`CustomFilePickerDialog.ShowExtractFolderAsync`）由 `MainWindowViewModel.ExtractSelectedTo` 透传 `CurrentFolder` + 设置，预览树与实际解压（`SelectedItemsExtractService`）共用 `ExtractPathResolver`（Core/Utils）计算输出路径，输入相同故预览必然等于实际。详见 AGENTS.md「Extract path resolution」小节。
+
 ## 实际最终布局
 
 两个设置窗口统一为三列布局，预览面板内部为三行（工具栏 / 摘要栏 / 树）：
