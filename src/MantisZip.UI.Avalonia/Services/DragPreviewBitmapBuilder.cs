@@ -98,7 +98,7 @@ internal static class DragPreviewBitmapBuilder
 
         // 9. Build summary string (total files + total size)
         long totalSize = expanded.Sum(i => i.Size);
-        var summary = $"{FormatUtil.FormatSize(totalSize)} — {expanded.Count} 个文件";
+        var summary = LocalizationManager.T("Drag_FileCount", FormatUtil.FormatSize(totalSize), expanded.Count);
 
         return Task.FromResult(new PreviewBitmapData
         {

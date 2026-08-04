@@ -43,6 +43,9 @@ public partial class ResultTreeView : UserControl
     public static readonly StyledProperty<string> SummaryTextProperty =
         AvaloniaProperty.Register<ResultTreeView, string>(nameof(SummaryText), "");
 
+    /// <summary>加载提示文案（本地化）。</summary>
+    public string LoadingText => LocalizationManager.T("Preview_Result_Building");
+
     /// <summary>是否显示摘要栏。</summary>
     public static readonly StyledProperty<bool> ShowSummaryBarProperty =
         AvaloniaProperty.Register<ResultTreeView, bool>(nameof(ShowSummaryBar), true);

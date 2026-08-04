@@ -16,6 +16,8 @@ public partial class DonationDialog : Window
     public string QrHintText => LocalizationManager.T("Donate_QrHint");
     public string PlatformsHintText => LocalizationManager.T("Donate_Platforms_Hint");
     public string CloseText => LocalizationManager.T("Donate_Close");
+    public string AfdianText => LocalizationManager.T("Donate_Platform_Afdian");
+    public string PolarText => LocalizationManager.T("Donate_Platform_Polar");
 
     public DonationDialog()
     {

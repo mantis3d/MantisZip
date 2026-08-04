@@ -21,7 +21,7 @@ public class ArchiveService
             var engine = ArchiveEngineFactory.GetEngineByExtension(archivePath);
             if (engine == null)
             {
-                return ArchiveLoadResult.Failure($"不支持的文件格式: {Path.GetExtension(archivePath)}");
+                return ArchiveLoadResult.Failure(LocalizationManager.T("Status_UnsupportedFormat", Path.GetExtension(archivePath)));
             }
 
             var items = await engine.ListEntriesAsync(archivePath, password, cancellationToken);
@@ -66,7 +66,7 @@ public class ArchiveService
                 return ArchiveLoadResult.PasswordRequired();
             }
 
-            return ArchiveLoadResult.Failure($"无法打开压缩包: {ex.Message}");
+            return ArchiveLoadResult.Failure(LocalizationManager.T("Status_OpenArchiveFailed", ex.Message));
         }
     }
 }
@@ -104,7 +104,7 @@ public class ArchiveLoadResult
     {
         IsSuccess = false,
         IsPasswordRequired = true,
-        ErrorMessage = "此压缩包已加密，请输入密码"
+        ErrorMessage = LocalizationManager.T("Error_ArchiveEncrypted")
     };
 
     public static ArchiveLoadResult Cancelled() => new()

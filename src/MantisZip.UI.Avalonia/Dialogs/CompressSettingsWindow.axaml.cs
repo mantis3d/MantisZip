@@ -355,7 +355,7 @@ DataContext = ViewModel;
         if (PasswordTextBox.PasswordChar == '●')
         {
             PasswordTextBox.PasswordChar = default;
-            RevealButton.Content = LocalizationManager.T("Compress_ShowPassword") == "Show" ? "Hide" : "隐藏";
+            RevealButton.Content = LocalizationManager.T("Compress_HidePassword");
         }
         else
         {

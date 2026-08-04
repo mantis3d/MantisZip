@@ -80,6 +80,10 @@ public partial class App : Application
         PreviewService.EnableFormatDetection = appSettings.EnableFormatDetection;
         PreviewService.PreviewHeadSize = appSettings.PreviewHeadSize;
 
+        // ── Restore saved language (AppSettings uses "zh"/"en", LocalizationManager uses zh-CN/en) ──
+        if (appSettings.Language == "en")
+            LocalizationManager.CurrentLanguage = AppLanguage.English;
+
         // ── 首次运行：Shell 集成安装（延迟到用户进程，非提权）──
         // 安装程序会写入 FirstRunShell=1 / FirstRunAssoc=1 到注册表，首次启动时处理
         var isPortable = File.Exists(Path.Combine(AppContext.BaseDirectory, "Portable.txt"));
@@ -1039,7 +1043,7 @@ public partial class App : Application
                     PreserveDirectoryRoot = true,
                 };
 
-                await CompressWithProgress(request, "压缩", desktop);
+                await CompressWithProgress(request, LocalizationManager.T("Cli_Compress"), desktop);
             }
             await Task.CompletedTask;
         };
@@ -1079,7 +1083,7 @@ public partial class App : Application
             PreserveDirectoryRoot = true,
         };
 
-        _ = CompressWithProgress(request, "快速压缩", desktop);
+        _ = CompressWithProgress(request, LocalizationManager.T("Cli_QuickCompress"), desktop);
     }
 
     // ════════════════════════════════════════════════════════════════
@@ -1145,7 +1149,7 @@ public partial class App : Application
             PreserveDirectoryRoot = true,
         };
 
-        await CompressWithProgress(request, "批量压缩", desktop);
+        await CompressWithProgress(request, LocalizationManager.T("Cli_BatchCompress"), desktop);
     }
 
     // ════════════════════════════════════════════════════════════════
@@ -1233,7 +1237,7 @@ public partial class App : Application
             PreserveDirectoryRoot = true,
         };
 
-        await CompressWithProgress(request, "合并压缩", desktop);
+        await CompressWithProgress(request, LocalizationManager.T("Cli_CombinedCompress"), desktop);
     }
 
     // ════════════════════════════════════════════════════════════════
@@ -1262,7 +1266,7 @@ public partial class App : Application
 
                 await Dispatcher.UIThread.InvokeAsync(() =>
                 {
-                    progressWindow.SetStatus(result.Failed > 0 ? "失败" : "完成");
+                    progressWindow.SetStatus(result.Failed > 0 ? LocalizationManager.T("Cli_StatusFailed") : LocalizationManager.T("Cli_StatusDone"));
                     progressWindow.SetProgress(new ArchiveProgress { PercentComplete = 100 });
                 });
 

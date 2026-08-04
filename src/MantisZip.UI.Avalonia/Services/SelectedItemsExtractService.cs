@@ -62,7 +62,7 @@ public sealed class SelectedItemsExtractService
         var options = CreateExtractOptions(conflictAction, conflictDialog);
 
         var engine = ArchiveEngineFactory.GetEngineByExtension(archivePath);
-        if (engine == null) throw new NotSupportedException("不支持的压缩格式");
+        if (engine == null) throw new NotSupportedException(LocalizationManager.T("Error_UnsupportedArchiveFormat"));
 
         // 所有格式统一走按条目提取（TarGzEngine 已实现，不再降级全量解压）
         await engine.ExtractEntriesAsync(

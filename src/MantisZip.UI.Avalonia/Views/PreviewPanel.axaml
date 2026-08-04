@@ -123,7 +123,7 @@
         <!-- Ligature toggle (font preview) -->
         <StackPanel Orientation="Horizontal" Spacing="2"
                     IsVisible="{Binding HasLigatureControls}">
-          <Button Content="连字"
+          <Button Content="{Binding LocalizedStrings[Preview_Ligature]}"
                   Command="{Binding ToggleLigatureCommand}"
                   Width="48" Height="{DynamicResource ControlHeight}" FontSize="12" Padding="0"
                   IsEnabled="{Binding CanLigatureToggle}" />
@@ -396,7 +396,7 @@
           <TextBlock Text="{Binding PreviewHeaderText}"
                      FontSize="20"
                      FontWeight="Bold" />
-          <TextBlock Text="文件列表" FontWeight="SemiBold" />
+          <TextBlock Text="{Binding LocalizedStrings[Preview_FileListLabel]}" FontWeight="SemiBold" />
           <TreeView ItemsSource="{Binding TorrentTreeRoots}"
                     BorderThickness="0"
                     Background="Transparent">
@@ -422,7 +422,7 @@
                   Background="{DynamicResource ThemeSurfaceBgBrush}">
             <ScrollViewer MinWidth="120" MaxWidth="400">
               <StackPanel Spacing="2">
-                <TextBlock Text="文档大纲"
+                <TextBlock Text="{Binding LocalizedStrings[Preview_OutlineLabel]}"
                            FontWeight="SemiBold"
                            Foreground="{DynamicResource ThemeTextSecondaryBrush}"
                            Margin="4" />
@@ -623,7 +623,7 @@
             </Border>
           </StackPanel>
 
-          <TextBlock Text="{Binding LoadingFileName, StringFormat=正在加载: {0}}"
+          <TextBlock Text="{Binding LoadingFileDisplay}"
                      HorizontalAlignment="Center"
                      FontSize="14"
                      Foreground="{DynamicResource ThemeTextSecondaryBrush}"

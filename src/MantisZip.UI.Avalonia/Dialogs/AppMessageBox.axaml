@@ -47,7 +47,7 @@
               BorderThickness="0" />
       <!-- OK -->
       <Button x:Name="OkBtn"
-              Content="OK"
+              Content="{Binding OkText}"
               Width="80"
               Height="{DynamicResource ControlHeight}"
               IsVisible="False"

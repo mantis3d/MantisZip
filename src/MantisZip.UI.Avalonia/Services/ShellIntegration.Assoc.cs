@@ -239,7 +239,7 @@ internal static partial class ShellIntegration
             var progId = key?.GetValue("Progid") as string;
 
             if (string.IsNullOrEmpty(progId))
-                return "未设置";
+                return LocalizationManager.T("Settings_Assoc_CurrentHandler_None");
 
             // 检查是否是我们
             if (progId.Contains("MantisZip", StringComparison.OrdinalIgnoreCase))
@@ -275,7 +275,7 @@ internal static partial class ShellIntegration
         catch (Exception ex)
         {
             App.DebugLog($"ShellIntegration.GetCurrentHandler: failed to read handler: {ex.Message}");
-            return "未设置";
+            return LocalizationManager.T("Settings_Assoc_CurrentHandler_None");
         }
     }
 

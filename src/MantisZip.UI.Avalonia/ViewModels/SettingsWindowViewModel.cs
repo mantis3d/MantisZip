@@ -537,8 +537,23 @@ public partial class SettingsWindowViewModel : ObservableObject
     public string PreviewMaxFileSizeText => LocalizationManager.T("Settings_Preview_MaxFileSize");
 
     // Preview — Magic Detection
-    public string EnableFormatDetectionText => "启用格式检测（魔数识别）";
-    public string PreviewHeadSizeText => "检测头部字节数";
+    public string EnableFormatDetectionText => LocalizationManager.T("Settings_EnableFormatDetection");
+    public string PreviewHeadSizeText => LocalizationManager.T("Settings_PreviewHeadSize");
+
+    // Preview sub-tab headers (General / Image / Torrent / Executable / Metadata Panel)
+    public string PreviewTabGeneralHeader => LocalizationManager.T("Settings_Preview_Tab_General");
+    public string PreviewTabImageHeader => LocalizationManager.T("Settings_Preview_Tab_Image");
+    public string PreviewTabTorrentHeader => LocalizationManager.T("Settings_Preview_Tab_Torrent");
+    public string PreviewTabExecutableHeader => LocalizationManager.T("Settings_Preview_Tab_Executable");
+    public string PreviewTabMetadataPanelHeader => LocalizationManager.T("Settings_Preview_Tab_MetadataPanel");
+
+    // Section titles
+    public string FormatDetectionSectionText => LocalizationManager.T("Settings_FormatDetection");
+    public string TorrentComingSoonText => LocalizationManager.T("Settings_Preview_TorrentComingSoon");
+    public string PeComingSoonText => LocalizationManager.T("Settings_Preview_PeComingSoon");
+    public string PasswordOptionsSectionText => LocalizationManager.T("Settings_Pwd_Options");
+    public string AssocSectionText => LocalizationManager.T("Settings_Assoc_Title");
+    public string DebugSectionText => LocalizationManager.T("Settings_Debug_Title");
 
     // Preview — computed properties (slider-friendly MB)
     public double MaxTextPreviewMB
@@ -1039,6 +1054,18 @@ public partial class SettingsWindowViewModel : ObservableObject
         OnPropertyChanged(nameof(PreviewHeadSizeText));
         OnPropertyChanged(nameof(PreviewHeadSizeKBText));
 
+        OnPropertyChanged(nameof(PreviewTabGeneralHeader));
+        OnPropertyChanged(nameof(PreviewTabImageHeader));
+        OnPropertyChanged(nameof(PreviewTabTorrentHeader));
+        OnPropertyChanged(nameof(PreviewTabExecutableHeader));
+        OnPropertyChanged(nameof(PreviewTabMetadataPanelHeader));
+        OnPropertyChanged(nameof(FormatDetectionSectionText));
+        OnPropertyChanged(nameof(TorrentComingSoonText));
+        OnPropertyChanged(nameof(PeComingSoonText));
+        OnPropertyChanged(nameof(PasswordOptionsSectionText));
+        OnPropertyChanged(nameof(AssocSectionText));
+        OnPropertyChanged(nameof(DebugSectionText));
+
         OnPropertyChanged(nameof(DefaultFormatText));
         OnPropertyChanged(nameof(CompressionLevelText));
         OnPropertyChanged(nameof(CloseAfterCompressText));
@@ -1230,7 +1257,11 @@ public partial class SettingsWindowViewModel : ObservableObject
         _settings.AllowElevation = AllowElevation;
 
         // Language
-        _settings.Language = SelectedSelectedLanguageOption?.Value ?? SelectedLanguage;
+        var languageCode = SelectedSelectedLanguageOption?.Value ?? SelectedLanguage;
+        _settings.Language = languageCode;
+        // Apply immediately so the change takes effect without restart
+        // (matches WPF LanguageManager.SwitchTo behavior)
+        LocalizationManager.CurrentLanguage = languageCode == "en" ? AppLanguage.English : AppLanguage.Chinese;
 
         // Appearance
         _settings.Theme = SelectedThemeOption?.Value ?? Theme;
