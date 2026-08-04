@@ -37,7 +37,7 @@ public sealed class SelectedItemsExtractService
         IProgress<ArchiveProgress> progress,
         CancellationToken cancellationToken)
     {
-        // Build entryKeys and pathOverrides (with ExtractPreserveFullPath logic)
+        // Build entryKeys and pathOverrides via 统一路径计算（单一事实来源，预览树共用）
         var entryKeys = new List<string>();
         var pathOverrides = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
@@ -46,16 +46,8 @@ public sealed class SelectedItemsExtractService
             var key = item.FullPath ?? item.Name;
             entryKeys.Add(key);
 
-            // 路径裁剪：preserveFullPath=false 时裁剪当前浏览文件夹前缀
-            var outputEntryPath = key;
-            if (!preserveFullPath && !string.IsNullOrEmpty(currentFolder))
-            {
-                var cf = currentFolder.TrimEnd('/') + "/";
-                if (outputEntryPath.StartsWith(cf, StringComparison.OrdinalIgnoreCase))
-                    outputEntryPath = outputEntryPath.Substring(cf.Length);
-            }
-
-            var safeEntryPath = FileConflictHelper.SanitizeEntryPath(outputEntryPath);
+            // 净化后的目标相对路径：ExtractPathResolver = TrimCurrentFolderPrefix + SanitizeEntryPath
+            var safeEntryPath = ExtractPathResolver.ResolveRelativePath(key, currentFolder, preserveFullPath);
             pathOverrides[key] = FileConflictHelper.GetSafePath(destinationPath, safeEntryPath);
         }
 

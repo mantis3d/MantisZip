@@ -59,9 +59,10 @@ public partial class MainWindowViewModel : ObservableObject
     public Func<ExtractSettingsViewModel, Task<bool?>>? ShowExtractSettingsDialog { get; set; }
 
     /// <summary>
-    /// 解压目标文件夹选择回调。传入待解压条目与初始路径，返回所选目录路径，取消返回 null。
+    /// 解压目标文件夹选择回调。传入待解压条目、初始路径、当前浏览目录（压缩包内）与保留完整路径设置，
+    /// 返回所选目录路径，取消返回 null。
     /// </summary>
-    public Func<IReadOnlyList<ArchiveItem>, string?, Task<string?>>? ShowExtractFolderPicker { get; set; }
+    public Func<IReadOnlyList<ArchiveItem>, string?, string, bool, Task<string?>>? ShowExtractFolderPicker { get; set; }
 
     /// <summary>
     /// 压缩设置对话框回调。传入 CompressSettingsViewModel，返回 true=确认，false=取消。
@@ -1539,11 +1540,22 @@ public partial class MainWindowViewModel : ObservableObject
         _sessionPasswords.TryGetValue(CurrentArchivePath, out var password);
 
         var options = CreateExtractOptions(vm.ConflictAction);
+        var filteredKeys = vm.FilteredEntryKeys;
 
         var completed = await RunWithProgress(
             LocalizationManager.T("Status_Extracting"),
             async (progress, ct) =>
             {
+                // 有过滤条件：仅解压匹配条目（复用统一路径计算模块的入口；无 pathOverrides = 保留完整路径）
+                if (filteredKeys is { Count: > 0 })
+                {
+                    var engine = ArchiveEngineFactory.GetEngineByExtension(CurrentArchivePath!);
+                    if (engine == null) return;
+                    await engine.ExtractEntriesAsync(
+                        CurrentArchivePath!, filteredKeys, dest, password, progress, ct, options);
+                    return;
+                }
+
                 await new ExtractService().ExtractAsync(
                     CurrentArchivePath, dest, password, progress, ct, options);
             });
@@ -1696,7 +1708,8 @@ public partial class MainWindowViewModel : ObservableObject
                         ?? Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
         var defaultDest = Path.Combine(parentDir, Path.GetFileNameWithoutExtension(CurrentArchivePath));
 
-        var dest = await ShowExtractFolderPicker(entries, defaultDest);
+        var settings = AppSettings.Load();
+        var dest = await ShowExtractFolderPicker(entries, defaultDest, CurrentFolder ?? "", settings.ExtractPreserveFullPath);
         if (string.IsNullOrEmpty(dest)) return;
 
         await ExtractSelectedEntriesCoreAsync(entries, dest);

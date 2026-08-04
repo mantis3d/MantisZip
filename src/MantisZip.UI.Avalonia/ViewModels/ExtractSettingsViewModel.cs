@@ -38,6 +38,9 @@ public partial class ExtractSettingsViewModel : ObservableObject
     [ObservableProperty]
     private bool _openFolderAfterExtract;
 
+    /// <summary>过滤后需实际解压的条目 key 列表（由 View 从对话框回传；null = 未启用过滤，全量解压）。</summary>
+    public List<string>? FilteredEntryKeys { get; set; }
+
     // ── Preview tree ──
 
     /// <summary>预览树的根节点。</summary>

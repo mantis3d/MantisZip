@@ -67,6 +67,8 @@ public partial class CustomFilePickerDialog : Window
     private readonly IReadOnlyList<ArchiveItem>? _entries;
     private readonly string? _defaultExtension;
     private readonly string[]? _fileExtensions;
+    private readonly string _extractCurrentFolder;
+    private readonly bool _extractPreserveFullPath;
 
     /// <summary>确定后返回的路径。</summary>
     public string? SelectedPath { get; private set; }
@@ -116,8 +118,10 @@ public partial class CustomFilePickerDialog : Window
         => ShowInternal(owner, PickerMode.OpenFile, null, null, initialPath, fileExtensions);
 
     /// <summary>解压模式：选择目标目录，底部实时显示解压冲突预览。返回目录路径，取消返回 null。</summary>
-    public static Task<string?> ShowExtractFolderAsync(Window owner, IReadOnlyList<ArchiveItem> entries, string? initialPath = null)
-        => ShowInternal(owner, PickerMode.ExtractFolder, entries, null, initialPath, null);
+    public static Task<string?> ShowExtractFolderAsync(
+        Window owner, IReadOnlyList<ArchiveItem> entries, string? initialPath = null,
+        string currentFolder = "", bool preserveFullPath = true)
+        => ShowInternal(owner, PickerMode.ExtractFolder, entries, null, initialPath, null, currentFolder, preserveFullPath);
 
     /// <summary>打开文件/文件夹（多选，PickItems 模式）。返回选中路径列表，取消返回 null。</summary>
     public static async Task<IReadOnlyList<string>?> ShowOpenItemsAsync(Window owner, string? initialPath = null)
@@ -132,9 +136,10 @@ public partial class CustomFilePickerDialog : Window
     }
 
     private static async Task<string?> ShowInternal(
-        Window owner, PickerMode mode, IReadOnlyList<ArchiveItem>? entries, string? defaultExtension, string? initialPath, string[]? fileExtensions)
+        Window owner, PickerMode mode, IReadOnlyList<ArchiveItem>? entries, string? defaultExtension, string? initialPath, string[]? fileExtensions,
+        string currentFolder = "", bool preserveFullPath = true)
     {
-        var dialog = new CustomFilePickerDialog(mode, entries, defaultExtension, initialPath, fileExtensions)
+        var dialog = new CustomFilePickerDialog(mode, entries, defaultExtension, initialPath, fileExtensions, currentFolder, preserveFullPath)
         {
             WindowStartupLocation = WindowStartupLocation.CenterOwner
         };
@@ -150,13 +155,16 @@ public partial class CustomFilePickerDialog : Window
     {
     }
 
-    public CustomFilePickerDialog(PickerMode mode, IReadOnlyList<ArchiveItem>? entries = null, string? defaultExtension = null, string? initialPath = null, string[]? fileExtensions = null)
+    public CustomFilePickerDialog(PickerMode mode, IReadOnlyList<ArchiveItem>? entries = null, string? defaultExtension = null, string? initialPath = null, string[]? fileExtensions = null,
+        string currentFolder = "", bool preserveFullPath = true)
     {
         InitializeComponent();
         _mode = mode;
         _entries = entries;
         _defaultExtension = defaultExtension;
         _fileExtensions = fileExtensions;
+        _extractCurrentFolder = currentFolder;
+        _extractPreserveFullPath = preserveFullPath;
 
         DataContext = this;
 
@@ -667,7 +675,9 @@ public partial class CustomFilePickerDialog : Window
                     var root = ResultPreviewService.BuildExtractPreview(
                         _entries ?? Array.Empty<ArchiveItem>(),
                         destDir,
-                        checkExists: true);
+                        checkExists: true,
+                        preserveFullPath: _extractPreserveFullPath,
+                        currentFolder: _extractCurrentFolder);
                     PreviewTree.Root = root;
                 }
                 catch (Exception ex)

@@ -21,6 +21,8 @@ public static class ResultPreviewService
     /// <param name="checkExists">是否逐文件检查目标位置是否存在（默认 false 仅快速模式）。</param>
     /// <param name="filter">文件过滤条件，不为空且 IsActive 时对文件节点标记 IsFilteredOut。</param>
     /// <param name="progress">进度回调（0–100），在后台线程调用，需自行节流/封送到 UI 线程。</param>
+    /// <param name="preserveFullPath">是否保留完整路径（AppSettings.ExtractPreserveFullPath）。</param>
+    /// <param name="currentFolder">当前浏览的压缩包内路径（路径裁剪锚点，与解压侧 ExtractPathResolver 同语义）。</param>
     /// <returns>根节点（destDir 自身），包含完整的树结构。</returns>
     public static PreviewTreeNode BuildExtractPreview(
         IEnumerable<ArchiveItem> entries,
@@ -28,7 +30,9 @@ public static class ResultPreviewService
         string? rootName = null,
         bool checkExists = false,
         FileFilterCriteria? filter = null,
-        IProgress<double>? progress = null)
+        IProgress<double>? progress = null,
+        bool preserveFullPath = true,
+        string currentFolder = "")
     {
         // 根节点即解压目标目录本身（不再有概念容器层）
         var destNode = new PreviewTreeNode
@@ -44,10 +48,20 @@ public static class ResultPreviewService
         var dirsAdded = new HashSet<string>();
 
         // Phase 1: Build tree structure from archive entries
+        // 统一路径计算（与解压侧 ExtractPathResolver 同语义）；恶意路径条目逐条跳过，不影响整树
         foreach (var item in itemsList.Where(i => i.IsDirectory))
         {
-            var path = item.FullPath.TrimEnd('/');
-            if (dirsAdded.Add(path))
+            string path;
+            try
+            {
+                path = ExtractPathResolver.ResolveRelativePath(item.FullPath ?? item.Name, currentFolder, preserveFullPath);
+            }
+            catch
+            {
+                continue;
+            }
+            path = path.TrimEnd('/');
+            if (path.Length > 0 && dirsAdded.Add(path))
                 AddFolderNode(destNode, path, item);
         }
 
@@ -69,7 +83,16 @@ public static class ResultPreviewService
 
         foreach (var item in fileItems)
         {
-            var fullPath = item.FullPath;
+            string fullPath;
+            try
+            {
+                fullPath = ExtractPathResolver.ResolveRelativePath(item.FullPath ?? item.Name, currentFolder, preserveFullPath);
+            }
+            catch
+            {
+                // 恶意路径条目：跳过，不进入预览树
+                continue;
+            }
             var lastSlash = fullPath.LastIndexOf('/');
             while (lastSlash >= 0)
             {
