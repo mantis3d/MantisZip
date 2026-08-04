@@ -21,6 +21,13 @@
 
 ### MantisZip.UI.Avalonia（主力版）
 
+**2026-08-04** — SVG 预览永久加载修复 + headless 回归测试（测试项目迁移 xunit v3）
+  - **Bug 修复**：`PreviewViewModel.ShowSvg` 成功渲染后从未设置 `PreviewType = PreviewType.Svg`，导致加载遮罩永不关闭（`OnPreviewTypeChanged` 仅在 `PreviewType != None` 时清除 `IsLoadingPreview`）——预览 SVG 文件会一直显示加载动画
+  - **同类问题审计**：逐一核对 Avalonia `PreviewViewModel` 全部 22 个 `Show*` 方法，唯一缺失 `PreviewType` 赋值的是 `ShowSvg`；分发路径（`MainWindowViewModel.ShowPreviewAsync` switch 全覆盖）与 WPF 遗留版（`finally { HidePreviewLoading(); }` 结构免疫）均无同类问题
+  - **回归测试**：新增 `PreviewViewModelTests` + `TestAppBuilder`（headless `AppBuilder` + `[assembly: AvaloniaTestApplication]`），用例验证 `ShowSvg` 后 `PreviewType==Svg`、`!IsLoadingPreview`、`IsSvgVisible`、`PreviewImage!=null`
+  - **测试项目迁移**：`Avalonia.Headless.XUnit` 12.0.4 仅支持 xunit v3，与既有 xunit 2.9.2 冲突（CS0433）→ 迁移 `xunit.v3` 3.2.2 + `xunit.runner.visualstudio` 3.1.0；v12 headless 用 `[AvaloniaFact]`（替代 8.x `[AvaloniaTest]`），既有测试代码零改动
+  - 验证：Avalonia 构建 0 errors / Avalonia 测试 41 通过（2 skip，均为既有显式 Skip）
+
 **2026-08-03** — 目录行聚合显示（大小=子树和 / 日期=最新文件 / 压缩后大小按格式可用性 / 压缩率方案 A）
   - **目录聚合**：`PopulateEntries` 基于过滤后 `filteredSource` 调用 Core `ComputeDirectoryStats`，目录行应用聚合——大小 = 子树所有文件之和、日期 = 子树最新文件时间、压缩后大小 = 子树和（zip 等可得格式）
   - **派生属性重构**（`ArchiveItemModel`）：`SizeDisplay`/`LastModifiedDisplay`/`CompressedSizeDisplay` 由一次性字符串字段改为派生计算属性 + `[NotifyPropertyChangedFor]` 联动，设置 `Size`/`LastModified` 即自动刷新；`CompressionRatio` 同样改派生属性（目录聚合后自动重算）
