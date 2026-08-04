@@ -21,6 +21,12 @@
 
 ### MantisZip.UI.Avalonia（主力版）
 
+**2026-08-04** — 列选择菜单切换图标与主菜单 ToggleIconBox 样式对齐 + AGENTS.md 全局类样式约定补全
+  - **切换图标对齐**：`ColumnHeaderContextMenu_Opening` 的列可见性菜单项图标由 `MenuItem.Icon` 槽位 CheckBox 改为与主菜单切换项同构的 `Border.ToggleIconBox`（继承 App.axaml 全局样式：20×20、圆角 3、边框 1.5、背景过渡动画）+ 12×12 `PathIcon`（几何取自列标题自身，保证与列头图标一致）；`Background` 用 `BoolToToggleBgBrushConverter`（可见 → `ThemeToggleBrush` 强调色底，隐藏 → 透明空心）
+  - **放置位置对齐**：切换盒与文字改放 `MenuItem.Header` 的 `StackPanel`（`Spacing` 解析 `SpacingXxs` 紧凑度资源，新增 `GetSpacingXxs` helper），不再放 Icon 槽位——与主菜单 4 处切换项（MainWindow.axaml:217-269）逐项一致
+  - **AGENTS.md 规则 4 补全**：新增「Avalonia 全局类样式」小节，文档化 App.axaml 定义的 6 个类（`ToolbarButton`/`ToolbarIcon`/`ToolbarButtonIcon`/`ToolbarButtonLabel`/`compactTab`/`ToggleIconBox`）+ 两条注意（PathIcon 不继承 Foreground、全局 TextBlock 不设 Foreground 以保护 emoji）
+  - 构建 0 errors
+
 **2026-08-04** — 文件选择器地址栏新增「添加到收藏」入口
   - **入口**：`CustomFilePickerDialog` 地址栏输入框右侧新增 ⭐ 按钮（复用 `IconStar` 资源，主题样式对齐导航按钮），点击弹 `AddFavoriteDialog`（预填当前目录名+路径）确认后经 `FavoritePathManager.Add` 写入收藏
   - **联动**：收藏后速选面板 `RefreshSources()` 立即刷新并高亮当前目录；`UpdateFavoriteButtonState()` 随导航同步——当前目录已在收藏（含桌面/文档/下载系统路径）时按钮置灰 + ToolTip「已在收藏夹」
