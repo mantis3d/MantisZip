@@ -581,6 +581,22 @@ PROGRESS.md 分三个独立线索，根据变更影响范围选择对应线索�
 
 在 `src/MantisZip.UI.Avalonia/Resources/Icons/AppIcons.axaml` 中添加新的 `Geometry` 图标资源后，**必须同步**在 `src/MantisZip.UI.Avalonia/ViewModels/IconTestViewModel.cs` 的 `LoadAllIcons()` 方法中添加对应的 `Add()` 调用，否则图标测试窗口不会显示该图标。
 
+### 规则 9：新增 UI 文案必须走本地化（禁止硬编码）
+
+新增任何用户可见字符串（中文或英文）时，**禁止**在 `.cs` / `.axaml` 中直接写死，必须通过本地化机制：
+
+- **C# 代码**：`LocalizationManager.T("Key")`；带占位符用 `T("Key", arg1, arg2)`（`{0}` 格式）
+- **XAML 静态文案**：绑定到 ViewModel 属性或 `LocalizedStrings[Key]`（字典索引器绑定需要 VM 实现 `LocalizedStrings` 字典并在 `OnCultureChanged` 中刷新）
+- **Window/UserControl code-behind（DataContext=self）**：暴露 `public string XxxText => LocalizationManager.T("Key")` 属性并绑定，同时加 `x:CompileBindings="False"`
+- **新增 key 必须成对添加**到 `src/MantisZip.UI.Avalonia/Localization/strings.zh-CN.json` 和 `strings.en.json`，保持两文件 key 集完全同步；插入到文件头 `{` 之后（key 不排序），维持 UTF-8 无 BOM + CRLF + 2 空格缩进
+- 完成后自检：`dotnet build src\MantisZip.UI.Avalonia\MantisZip.UI.Avalonia.csproj` 无新增错误，并扫描确认无遗漏硬编码
+
+**豁免**（须在代码注释中注明原因）：
+- 开发者诊断工具（如 `IconTestWindow` 的图标元数据、调试菜单 `TestWindow_Click` 的测试内容）
+- 启发式匹配逻辑（如 `message.Contains("密码")` 检测加密异常、`Contains("标题")` 检测文档大纲）
+- 内容数据（字体预览示例文本）与语言本族原生名（如「中文」）
+- `App.DebugLog` 日志与仅作控制流用的异常消息（非用户可见）
+
 ## 未来工作
 
 ### 迁移完成后的清理

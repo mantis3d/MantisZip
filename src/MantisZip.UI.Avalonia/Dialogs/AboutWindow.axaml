@@ -294,52 +294,52 @@
             <TextBlock Grid.Row="2" Grid.Column="0" Text="Avalonia" Padding="4,3" />
             <TextBlock Grid.Row="2" Grid.Column="1" Text="12.0.4" Padding="8,3" />
             <TextBlock Grid.Row="2" Grid.Column="2" Text="MIT" Padding="8,3" />
-            <TextBlock Grid.Row="2" Grid.Column="3" Text="UI framework" Padding="4,3" />
+            <TextBlock Grid.Row="2" Grid.Column="3" Text="{Binding AboutDepAvalonia}" Padding="4,3" />
 
             <TextBlock Grid.Row="3" Grid.Column="0" Text="Avalonia.Controls.WebView" Padding="4,3" />
             <TextBlock Grid.Row="3" Grid.Column="1" Text="12.0.1" Padding="8,3" />
             <TextBlock Grid.Row="3" Grid.Column="2" Text="BSD-3-Clause" Padding="8,3" />
-            <TextBlock Grid.Row="3" Grid.Column="3" Text="HTML/PDF preview" Padding="4,3" />
+            <TextBlock Grid.Row="3" Grid.Column="3" Text="{Binding AboutDepWebView}" Padding="4,3" />
 
             <TextBlock Grid.Row="4" Grid.Column="0" Text="Avalonia.Controls.DataGrid" Padding="4,3" />
             <TextBlock Grid.Row="4" Grid.Column="1" Text="12.0.0" Padding="8,3" />
             <TextBlock Grid.Row="4" Grid.Column="2" Text="MIT" Padding="8,3" />
-            <TextBlock Grid.Row="4" Grid.Column="3" Text="DataGrid control" Padding="4,3" />
+            <TextBlock Grid.Row="4" Grid.Column="3" Text="{Binding AboutDepDataGrid}" Padding="4,3" />
 
             <TextBlock Grid.Row="5" Grid.Column="0" Text="CommunityToolkit.Mvvm" Padding="4,3" />
             <TextBlock Grid.Row="5" Grid.Column="1" Text="8.4.2" Padding="8,3" />
             <TextBlock Grid.Row="5" Grid.Column="2" Text="MIT" Padding="8,3" />
-            <TextBlock Grid.Row="5" Grid.Column="3" Text="MVVM helpers" Padding="4,3" />
+            <TextBlock Grid.Row="5" Grid.Column="3" Text="{Binding AboutDepMvvm}" Padding="4,3" />
 
             <TextBlock Grid.Row="6" Grid.Column="0" Text="SharpCompress" Padding="4,3" />
             <TextBlock Grid.Row="6" Grid.Column="1" Text="0.48.1" Padding="8,3" />
             <TextBlock Grid.Row="6" Grid.Column="2" Text="MIT" Padding="8,3" />
-            <TextBlock Grid.Row="6" Grid.Column="3" Text="ZIP/TAR/GZ engine" Padding="4,3" />
+            <TextBlock Grid.Row="6" Grid.Column="3" Text="{Binding AboutDepSharpCompress}" Padding="4,3" />
 
             <TextBlock Grid.Row="7" Grid.Column="0" Text="SharpSevenZip" Padding="4,3" />
             <TextBlock Grid.Row="7" Grid.Column="1" Text="2.0.45" Padding="8,3" />
             <TextBlock Grid.Row="7" Grid.Column="2" Text="LGPL-2.1" Padding="8,3" />
-            <TextBlock Grid.Row="7" Grid.Column="3" Text="7z/RAR engine" Padding="4,3" />
+            <TextBlock Grid.Row="7" Grid.Column="3" Text="{Binding AboutDepSevenZip}" Padding="4,3" />
 
             <TextBlock Grid.Row="8" Grid.Column="0" Text="Microsoft.Data.Sqlite" Padding="4,3" />
             <TextBlock Grid.Row="8" Grid.Column="1" Text="10.0.8" Padding="8,3" />
             <TextBlock Grid.Row="8" Grid.Column="2" Text="MIT" Padding="8,3" />
-            <TextBlock Grid.Row="8" Grid.Column="3" Text="SQLite preview" Padding="4,3" />
+            <TextBlock Grid.Row="8" Grid.Column="3" Text="{Binding AboutDepSqlite}" Padding="4,3" />
 
             <TextBlock Grid.Row="9" Grid.Column="0" Text="SkiaSharp" Padding="4,3" />
             <TextBlock Grid.Row="9" Grid.Column="1" Text="3.119.4" Padding="8,3" />
             <TextBlock Grid.Row="9" Grid.Column="2" Text="MIT" Padding="8,3" />
-            <TextBlock Grid.Row="9" Grid.Column="3" Text="2D graphics" Padding="4,3" />
+            <TextBlock Grid.Row="9" Grid.Column="3" Text="{Binding AboutDepSkia}" Padding="4,3" />
 
             <TextBlock Grid.Row="10" Grid.Column="0" Text="Markdig" Padding="4,3" />
             <TextBlock Grid.Row="10" Grid.Column="1" Text="0.40.0" Padding="8,3" />
             <TextBlock Grid.Row="10" Grid.Column="2" Text="BSD-2-Clause" Padding="8,3" />
-            <TextBlock Grid.Row="10" Grid.Column="3" Text="Markdown rendering" Padding="4,3" />
+            <TextBlock Grid.Row="10" Grid.Column="3" Text="{Binding AboutDepMarkdig}" Padding="4,3" />
 
             <TextBlock Grid.Row="11" Grid.Column="0" Text="Ude.NetStandard" Padding="4,3" />
             <TextBlock Grid.Row="11" Grid.Column="1" Text="1.2.0" Padding="8,3" />
             <TextBlock Grid.Row="11" Grid.Column="2" Text="MIT" Padding="8,3" />
-            <TextBlock Grid.Row="11" Grid.Column="3" Text="Encoding detection" Padding="4,3" />
+            <TextBlock Grid.Row="11" Grid.Column="3" Text="{Binding AboutDepUde}" Padding="4,3" />
           </Grid>
         </ScrollViewer>
       </TabItem>

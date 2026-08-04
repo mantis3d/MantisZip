@@ -106,7 +106,7 @@
           </MenuItem.Header>
         </MenuItem>
         <Separator />
-        <MenuItem Header="收藏夹">
+        <MenuItem Header="{Binding LocalizedStrings[Main_Favorites]}">
           <MenuItem Command="{Binding OpenFavoritesManagerCommand}">
             <MenuItem.Header>
               <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
@@ -289,7 +289,7 @@
           <MenuItem.Header>
             <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
               <PathIcon Data="{StaticResource IconGrid}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
-              <TextBlock Text="图标测试 — 所有图标列表" />
+              <TextBlock Text="{Binding LocalizedStrings[Main_IconTestTitle]}" />
             </StackPanel>
           </MenuItem.Header>
         </MenuItem>

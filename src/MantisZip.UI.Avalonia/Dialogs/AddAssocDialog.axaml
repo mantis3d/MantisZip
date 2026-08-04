@@ -1,15 +1,16 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         x:Class="MantisZip.UI.Avalonia.Dialogs.AddAssocDialog"
+        x:CompileBindings="False"
         Width="360" Height="140" WindowStartupLocation="CenterOwner"
         CanResize="False"
-        Title="添加自定义扩展名">
+        Title="{Binding AddTitle}">
   <StackPanel Margin="12" Spacing="8">
-    <TextBlock Text="请输入扩展名（例如 .zipx）:" />
+    <TextBlock Text="{Binding AddPrompt}" />
     <TextBox x:Name="InputTextBox" />
     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
-      <Button Content="取消" Click="Cancel_Click" />
-      <Button Content="确定" Click="Ok_Click" />
+      <Button Content="{Binding CancelText}" Click="Cancel_Click" />
+      <Button Content="{Binding OkText}" Click="Ok_Click" />
     </StackPanel>
   </StackPanel>
 </Window>

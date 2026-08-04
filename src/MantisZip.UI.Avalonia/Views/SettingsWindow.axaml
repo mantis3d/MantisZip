@@ -401,7 +401,7 @@
                       Background="{DynamicResource ThemeSurfaceBgBrush}"
                       BorderBrush="{DynamicResource ThemeBorderBrush}">
             <!-- 通用 General -->
-            <TabItem Header="通用" Classes="compactTab">
+            <TabItem Header="{Binding PreviewTabGeneralHeader}" Classes="compactTab">
               <ScrollViewer Background="{DynamicResource ThemeWindowBgBrush}">
                 <StackPanel Spacing="{DynamicResource SpacingSm}" Margin="{DynamicResource SpacingSmThk}">
                   <CheckBox Content="{Binding PreviewShowPanelText}"
@@ -442,7 +442,7 @@
                   <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
                           CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}" Background="{DynamicResource ThemeSurfaceBgBrush}">
                     <StackPanel Spacing="{DynamicResource SpacingXs}">
-                      <TextBlock Text="格式检测（魔数）" FontWeight="SemiBold" />
+                      <TextBlock Text="{Binding FormatDetectionSectionText}" FontWeight="SemiBold" />
                       <CheckBox Content="{Binding EnableFormatDetectionText}"
                                 IsChecked="{Binding EnableFormatDetection}" />
                       <Grid ColumnDefinitions="*,Auto">
@@ -479,7 +479,7 @@
             </TabItem>
 
             <!-- 图片 Image -->
-            <TabItem Header="图片" Classes="compactTab">
+            <TabItem Header="{Binding PreviewTabImageHeader}" Classes="compactTab">
               <ScrollViewer Background="{DynamicResource ThemeWindowBgBrush}">
                 <StackPanel Spacing="{DynamicResource SpacingSm}" Margin="{DynamicResource SpacingSmThk}">
                   <CheckBox Content="{Binding EnableImagePreviewText}"
@@ -593,10 +593,10 @@
             </TabItem>
 
             <!-- 种子 Torrent -->
-            <TabItem Header="种子" Classes="compactTab">
+            <TabItem Header="{Binding PreviewTabTorrentHeader}" Classes="compactTab">
               <ScrollViewer Background="{DynamicResource ThemeWindowBgBrush}">
                 <StackPanel Spacing="{DynamicResource SpacingSm}" Margin="{DynamicResource SpacingSmThk}">
-                  <TextBlock Text="Torrent 预览设置将在后续版本中添加。"
+                  <TextBlock Text="{Binding TorrentComingSoonText}"
                              Foreground="{DynamicResource ThemeTextSecondaryBrush}"
                              FontSize="12" TextWrapping="Wrap" />
                 </StackPanel>
@@ -604,10 +604,10 @@
             </TabItem>
 
             <!-- 可执行文件 PE -->
-            <TabItem Header="可执行文件" Classes="compactTab">
+            <TabItem Header="{Binding PreviewTabExecutableHeader}" Classes="compactTab">
               <ScrollViewer Background="{DynamicResource ThemeWindowBgBrush}">
                 <StackPanel Spacing="{DynamicResource SpacingSm}" Margin="{DynamicResource SpacingSmThk}">
-                  <TextBlock Text="PE 文件预览设置将在后续版本中添加。"
+                  <TextBlock Text="{Binding PeComingSoonText}"
                              Foreground="{DynamicResource ThemeTextSecondaryBrush}"
                              FontSize="12" TextWrapping="Wrap" />
                 </StackPanel>
@@ -646,7 +646,7 @@
             </TabItem>
 
             <!-- ═══════ 元数据面板 ═══════ -->
-            <TabItem Header="元数据面板" Classes="compactTab">
+            <TabItem Header="{Binding PreviewTabMetadataPanelHeader}" Classes="compactTab">
               <Grid RowDefinitions="Auto,Auto,*,Auto" Margin="{DynamicResource SpacingSmThk}">
                 <!-- Field layout toggle -->
                 <CheckBox Grid.Row="0"
@@ -811,7 +811,7 @@
             <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
                     CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}" Background="{DynamicResource ThemeSurfaceBgBrush}">
               <StackPanel Spacing="{DynamicResource SpacingXs}">
-                <TextBlock Text="密码选项" FontWeight="SemiBold" />
+                <TextBlock Text="{Binding PasswordOptionsSectionText}" FontWeight="SemiBold" />
                 <CheckBox Content="{Binding PwdShowNotificationText}"
                           IsChecked="{Binding ShowPasswordMatchNotification}" />
                 <CheckBox Content="{Binding PwdRevealDefaultText}"
@@ -979,7 +979,7 @@
             <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
                     CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}" Background="{DynamicResource ThemeSurfaceBgBrush}">
               <StackPanel Spacing="{DynamicResource SpacingXs}">
-                <TextBlock Text="文件类型关联" FontWeight="SemiBold" />
+                <TextBlock Text="{Binding AssocSectionText}" FontWeight="SemiBold" />
                 <TextBlock Text="{Binding FileAssocDescText}"
                            FontSize="12"
                            Foreground="{DynamicResource ThemeTextSecondaryBrush}"
@@ -1042,7 +1042,7 @@
             <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
                     CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}" Background="{DynamicResource ThemeSurfaceBgBrush}">
               <StackPanel Spacing="{DynamicResource SpacingXs}">
-                <TextBlock Text="调试选项" FontWeight="SemiBold" />
+                <TextBlock Text="{Binding DebugSectionText}" FontWeight="SemiBold" />
                 <CheckBox Content="{Binding DebugText}"
                           IsChecked="{Binding EnableDebugLogging}" />
               </StackPanel>

@@ -163,6 +163,11 @@ public partial class MainWindowViewModel : ObservableObject
                 : AppLanguage.Chinese
         };
         CurrentLanguage = LocalizationManager.CurrentLanguageCode;
+
+        // Persist so the selection survives restart (AppSettings uses "zh"/"en")
+        _appSettings.Language = LocalizationManager.CurrentLanguage == AppLanguage.English ? "en" : "zh";
+        _appSettings.Save();
+
         UpdateLocalizedStrings();
     }
 
@@ -209,6 +214,7 @@ public partial class MainWindowViewModel : ObservableObject
             "Status_TestingEntry", "Status_TestingArchive", "Status_SmartExtracting",
             "Status_AddingFiles", "Status_DeletingFiles", "Status_Entries",
             "Main_NoRecentFiles", "Main_ClearRecentFiles", "Main_RecentFiles",
+            "Main_Favorites", "Main_IconTestTitle",
             "Toolbar_Password", "Tooltip_Password",
             "Menu_Test",
             "Tree_ExpandAll", "Tree_CollapseAll", "Tree_ExpandToCurrent", "Tree_Filter",
@@ -1001,14 +1007,14 @@ public partial class MainWindowViewModel : ObservableObject
                     && magicFormat != FileFormat.Unknown
                     && extFormat != magicFormat;
                 string formatValue = hasConflict
-                    ? $"⚠️ {detectedFormatName}（扩展名: {ext}）"
+                    ? LocalizationManager.T("Preview_FormatConflictWarn", detectedFormatName, ext)
                     : detectedFormatName;
                 for (int i = Preview.FormatMetadata.Count - 1; i >= 0; i--)
                 {
-                    if (Preview.FormatMetadata[i].Key == "格式")
+                    if (Preview.FormatMetadata[i].Key == LocalizationManager.T("Preview_FormatLabel"))
                         Preview.FormatMetadata.RemoveAt(i);
                 }
-                Preview.FormatMetadata.Insert(0, new FormatMetadataItem("格式", formatValue));
+                Preview.FormatMetadata.Insert(0, new FormatMetadataItem(LocalizationManager.T("Preview_FormatLabel"), formatValue));
             }
         }
         catch (Exception ex)

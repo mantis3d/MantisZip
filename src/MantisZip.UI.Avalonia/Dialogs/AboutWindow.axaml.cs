@@ -40,6 +40,18 @@ public partial class AboutWindow : Window
     public string AboutContributorsTechnical => LocalizationManager.T("About_Contributors_Technical");
     public string AboutContributorsNone => LocalizationManager.T("About_Contributors_None");
 
+    // Dependency purposes (About → Dependencies tab)
+    public string AboutDepAvalonia => LocalizationManager.T("About_Dep_Avalonia");
+    public string AboutDepWebView => LocalizationManager.T("About_Dep_WebView");
+    public string AboutDepDataGrid => LocalizationManager.T("About_Dep_DataGrid");
+    public string AboutDepMvvm => LocalizationManager.T("About_Dep_Mvvm");
+    public string AboutDepSharpCompress => LocalizationManager.T("About_Dep_SharpCompress");
+    public string AboutDepSevenZip => LocalizationManager.T("About_Dep_SevenZip");
+    public string AboutDepSqlite => LocalizationManager.T("About_Dep_Sqlite");
+    public string AboutDepSkia => LocalizationManager.T("About_Dep_Skia");
+    public string AboutDepMarkdig => LocalizationManager.T("About_Dep_Markdig");
+    public string AboutDepUde => LocalizationManager.T("About_Dep_Ude");
+
     public AboutWindow()
     {
         InitializeComponent();

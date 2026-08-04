@@ -56,6 +56,7 @@ public partial class AppMessageBox : Window
     public string CancelText => LocalizationManager.T("MsgBox_Cancel");
     public string YesText => LocalizationManager.T("MsgBox_Yes");
     public string NoText => LocalizationManager.T("MsgBox_No");
+    public string OkText => LocalizationManager.T("MsgBox_Ok");
     public string WinTitle => "MantisZip";
 
     /// <summary>

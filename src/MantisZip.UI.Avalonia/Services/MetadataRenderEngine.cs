@@ -159,23 +159,7 @@ public static class MetadataRenderEngine
         var localized = LocalizationManager.T(key);
         if (localized != key) return localized;
 
-        return typeKey switch
-        {
-            "image" => "图片信息",
-            "docx" => "文档信息",
-            "xlsx" => "表格信息",
-            "pptx" => "演示文稿信息",
-            "audio" => "音频信息",
-            "video" => "视频信息",
-            "font" => "字体信息",
-            "torrent" => "种子信息",
-            "iso" => "镜像信息",
-            "sqlite" => "数据库信息",
-            "pe" => "程序信息",
-            "ico" => "图标信息",
-            "pdf" => "文档信息",
-            _ => LocalizationManager.T("Metadata_FormatInfo")
-        };
+        return LocalizationManager.T("Metadata_FormatInfo");
     }
 
     /// <summary>

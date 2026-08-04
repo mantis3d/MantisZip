@@ -285,7 +285,7 @@ public partial class MainWindow : Window
         {
             var result = await StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
             {
-                Title = "Select files to add",
+                Title = LocalizationManager.T("Main_SelectFilesTitle"),
                 AllowMultiple = true
             });
             return result.Count > 0 ? result.Select(f => f.TryGetLocalPath()).Where(p => p != null).Cast<string>().ToList() : null;

@@ -8,6 +8,12 @@ namespace MantisZip.UI.Avalonia.Dialogs
     {
         public string Extension { get; private set; } = "";
 
+        // ── Localized string properties ──
+        public string AddTitle => LocalizationManager.T("Settings_Assoc_AddTitle");
+        public string AddPrompt => LocalizationManager.T("Settings_Assoc_AddPrompt");
+        public string CancelText => LocalizationManager.T("MsgBox_Cancel");
+        public string OkText => LocalizationManager.T("MsgBox_Ok");
+
         public AddAssocDialog()
         {
             InitializeComponent();

@@ -31,6 +31,9 @@ namespace MantisZip.UI.Avalonia.ViewModels;
 
 public partial class PreviewViewModel : ObservableObject
 {
+    /// <summary>本地化字符串字典，XAML 通过 {Binding LocalizedStrings[Key]} 访问。</summary>
+    public Dictionary<string, string> LocalizedStrings { get; } = new();
+
     [ObservableProperty]
     private PreviewType _previewType = PreviewType.None;
 
@@ -49,6 +52,22 @@ public partial class PreviewViewModel : ObservableObject
     public PreviewViewModel()
     {
         MetadataSettingsManager.SettingsChanged += OnMetadataSettingsChanged;
+        LocalizationManager.CultureChanged += OnCultureChanged;
+        UpdateLocalizedStrings();
+    }
+
+    private void OnCultureChanged(object? sender, EventArgs e)
+    {
+        UpdateLocalizedStrings();
+    }
+
+    private void UpdateLocalizedStrings()
+    {
+        LocalizedStrings["Preview_Ligature"] = LocalizationManager.T("Preview_Ligature");
+        LocalizedStrings["Preview_FileListLabel"] = LocalizationManager.T("Preview_FileListLabel");
+        LocalizedStrings["Preview_OutlineLabel"] = LocalizationManager.T("Preview_OutlineLabel");
+        OnPropertyChanged(nameof(LocalizedStrings));
+        OnPropertyChanged(nameof(LoadingFileDisplay));
     }
 
     private void OnMetadataSettingsChanged()
@@ -179,6 +198,15 @@ public partial class PreviewViewModel : ObservableObject
 
     [ObservableProperty]
     private string _loadingFileName = string.Empty;
+
+    /// <summary>加载中提示文案（本地化，含文件名）。</summary>
+    public string LoadingFileDisplay =>
+        string.IsNullOrEmpty(LoadingFileName)
+            ? string.Empty
+            : LocalizationManager.T("Preview_LoadingFile", LoadingFileName);
+
+    partial void OnLoadingFileNameChanged(string value) =>
+        OnPropertyChanged(nameof(LoadingFileDisplay));
 
     public bool HasZoomControls => PreviewType is PreviewType.Image or PreviewType.Gif;
     public bool HasFontSizeControls => PreviewType == PreviewType.Text;
@@ -661,19 +689,21 @@ public partial class PreviewViewModel : ObservableObject
         var info = PeParser.Parse(filePath);
         if (info == null)
         {
-            ShowUnsupported("无法解析 PE 文件");
+            ShowUnsupported(LocalizationManager.T("Preview_PeFailed"));
             return;
         }
 
         PeTitle = info.ProductName ?? info.AdditionalInfo ?? Path.GetFileName(filePath);
-        PeSubtitle = $"架构: {info.Architecture ?? "未知"} | 子系统: {info.Subsystem ?? "未知"}";
+        PeSubtitle = LocalizationManager.T("Preview_Pe_Subtitle",
+            info.Architecture ?? LocalizationManager.T("Preview_Pe_Unknown"),
+            info.Subsystem ?? LocalizationManager.T("Preview_Pe_Unknown"));
         PeMetadata.Clear();
 
-        AddPeMeta("产品名称", info.ProductName);
-        AddPeMeta("公司", info.CompanyName);
-        AddPeMeta("文件版本", info.FileVersion);
-        AddPeMeta("产品版本", info.ProductVersion);
-        AddPeMeta("说明", info.AdditionalInfo);
+        AddPeMeta(LocalizationManager.T("Preview_Pe_ProductName"), info.ProductName);
+        AddPeMeta(LocalizationManager.T("Preview_Pe_Company"), info.CompanyName);
+        AddPeMeta(LocalizationManager.T("Preview_Pe_FileVersion"), info.FileVersion);
+        AddPeMeta(LocalizationManager.T("Preview_Pe_ProductVersion"), info.ProductVersion);
+        AddPeMeta(LocalizationManager.T("Preview_Pe_Description"), info.AdditionalInfo);
 
         PreviewType = PreviewType.Pe;
         IsPreviewVisible = true;
@@ -709,7 +739,7 @@ public partial class PreviewViewModel : ObservableObject
         var ext = Path.GetExtension(filePath).ToLowerInvariant();
         IsPreviewVisible = true;
         IsToolbarVisible = true;
-        PreviewHeaderText = "图片预览";
+        PreviewHeaderText = LocalizationManager.T("Preview_Header_Image");
         // 初始缩放：适应视口
         ZoomFit();
 
@@ -745,7 +775,7 @@ public partial class PreviewViewModel : ObservableObject
         PreviewType = PreviewType.IcoGallery;
         IsPreviewVisible = true;
         IsToolbarVisible = true;
-        PreviewHeaderText = $"ICO 图标 — {frames.Count} 个尺寸";
+        PreviewHeaderText = LocalizationManager.T("Preview_Header_IcoSizes", frames.Count);
 
         var fi = new FileInfo(filePath);
         var icoFormatValues = new Dictionary<string, string?>
@@ -861,7 +891,7 @@ public partial class PreviewViewModel : ObservableObject
             var frames = GifDecoder.DecodeFrames(filePath);
             if (frames == null || frames.Count == 0)
             {
-                ShowUnsupported("无法解码 GIF");
+                ShowUnsupported(LocalizationManager.T("Preview_GifDecodeFailed"));
                 return;
             }
 
@@ -895,7 +925,7 @@ public partial class PreviewViewModel : ObservableObject
             PreviewType = PreviewType.Gif;
             IsPreviewVisible = true;
             IsToolbarVisible = true;
-            PreviewHeaderText = "GIF 预览";
+            PreviewHeaderText = LocalizationManager.T("Preview_Header_Gif");
             var gifFormatValues = new Dictionary<string, string?>
             {
                 [MetadataKeys.Dimensions] = $"{ImageWidth} × {ImageHeight}",
@@ -905,7 +935,7 @@ public partial class PreviewViewModel : ObservableObject
         }
         catch (Exception ex)
         {
-            ShowUnsupported($"GIF 加载失败: {ex.Message}");
+            ShowUnsupported(LocalizationManager.T("Preview_GifLoadFailed", ex.Message));
         }
     }
 
@@ -967,7 +997,7 @@ public partial class PreviewViewModel : ObservableObject
 
             if (svg.Picture == null)
             {
-                ShowUnsupported("无法解析 SVG 文件");
+                ShowUnsupported(LocalizationManager.T("Preview_SvgParseFailed"));
                 return;
             }
 
@@ -1006,11 +1036,11 @@ public partial class PreviewViewModel : ObservableObject
 
             IsPreviewVisible = true;
             IsToolbarVisible = true;
-            PreviewHeaderText = "SVG 预览";
+            PreviewHeaderText = LocalizationManager.T("Preview_Header_Svg");
         }
         catch (Exception ex)
         {
-            ShowUnsupported($"SVG 渲染失败: {ex.Message}");
+            ShowUnsupported(LocalizationManager.T("Preview_SvgRenderFailed", ex.Message));
         }
     }
 
@@ -1032,13 +1062,13 @@ public partial class PreviewViewModel : ObservableObject
         var info = FontParser.Parse(filePath);
         if (info == null)
         {
-            ShowUnsupported("无法解析字体文件");
+            ShowUnsupported(LocalizationManager.T("Preview_FontParseFailed"));
             return;
         }
         PreviewType = PreviewType.Font;
         IsPreviewVisible = true;
         IsToolbarVisible = true;
-        PreviewHeaderText = info.FontName ?? "字体预览";
+        PreviewHeaderText = info.FontName ?? LocalizationManager.T("Preview_Header_Font");
         var fontFormatValues = new Dictionary<string, string?>
         {
             [MetadataKeys.FontName] = info.FontName,
@@ -1422,13 +1452,13 @@ public partial class PreviewViewModel : ObservableObject
         };
         if (info == null)
         {
-            ShowUnsupported("无法解析音频文件");
+            ShowUnsupported(LocalizationManager.T("Preview_AudioFailed"));
             return;
         }
         PreviewType = PreviewType.Audio;
         IsPreviewVisible = true;
         IsToolbarVisible = false;
-        PreviewHeaderText = "音频信息";
+        PreviewHeaderText = LocalizationManager.T("Preview_Header_Audio");
         var audioFormatValues = new Dictionary<string, string?>();
         if (info.Duration.HasValue)
             audioFormatValues[MetadataKeys.Duration] = info.Duration.Value.ToString(@"mm\:ss");
@@ -1514,7 +1544,7 @@ public partial class PreviewViewModel : ObservableObject
             PreviewType = PreviewType.Sqlite;
             IsPreviewVisible = true;
             IsToolbarVisible = false;
-            PreviewHeaderText = "SQLite 数据库";
+            PreviewHeaderText = LocalizationManager.T("Preview_Header_Sqlite");
             var sqliteFormatValues = new Dictionary<string, string?>
             {
                 [MetadataKeys.TableCount] = tables.Count.ToString(),
@@ -1523,7 +1553,7 @@ public partial class PreviewViewModel : ObservableObject
         }
         catch (Exception ex)
         {
-            ShowUnsupported($"无法读取 SQLite 数据库: {ex.Message}");
+            ShowUnsupported(LocalizationManager.T("Preview_SqliteFailed", ex.Message));
         }
     }
 
@@ -1537,13 +1567,13 @@ public partial class PreviewViewModel : ObservableObject
         var info = IsoParser.Parse(filePath);
         if (info == null)
         {
-            ShowUnsupported("无法解析光盘镜像");
+            ShowUnsupported(LocalizationManager.T("Preview_IsoFailed"));
             return;
         }
         PreviewType = PreviewType.Iso;
         IsPreviewVisible = true;
         IsToolbarVisible = false;
-        PreviewHeaderText = "光盘镜像";
+        PreviewHeaderText = LocalizationManager.T("Preview_Header_Iso");
         var isoFormatValues = new Dictionary<string, string?>
         {
             [MetadataKeys.VolumeLabel] = info.VolumeLabel,
@@ -1564,13 +1594,13 @@ public partial class PreviewViewModel : ObservableObject
         var info = TorrentParser.Parse(filePath);
         if (info == null)
         {
-            ShowUnsupported("无法解析种子文件");
+            ShowUnsupported(LocalizationManager.T("Preview_TorrentFailed"));
             return;
         }
         PreviewType = PreviewType.Torrent;
         IsPreviewVisible = true;
         IsToolbarVisible = false;
-        PreviewHeaderText = info.TorrentFileName ?? "BT 种子";
+        PreviewHeaderText = info.TorrentFileName ?? LocalizationManager.T("Preview_Header_Torrent");
         var torrentFormatValues = new Dictionary<string, string?>();
         torrentFormatValues[MetadataKeys.TorrentFileName] = info.TorrentFileName;
         if (info.InfoHashV1 != null)
@@ -1580,7 +1610,7 @@ public partial class PreviewViewModel : ObservableObject
         if (info.TorrentTotalSize.HasValue)
             torrentFormatValues[MetadataKeys.TotalSize] = FormatFileSize(info.TorrentTotalSize.Value);
         if (info.IsPrivate == true)
-            torrentFormatValues[MetadataKeys.IsPrivate] = "是";
+            torrentFormatValues[MetadataKeys.IsPrivate] = LocalizationManager.T("MsgBox_Yes");
         if (info.CreatedBy != null)
             torrentFormatValues[MetadataKeys.CreatedBy] = info.CreatedBy;
         if (info.MagnetLink != null)
@@ -1666,7 +1696,7 @@ public partial class PreviewViewModel : ObservableObject
         var info = OfficeParser.Parse(filePath);
         if (info == null)
         {
-            ShowUnsupported("无法解析 Office 文档");
+            ShowUnsupported(LocalizationManager.T("Preview_OfficeFailed"));
             return;
         }
         PreviewType = PreviewType.Office;
@@ -1675,10 +1705,10 @@ public partial class PreviewViewModel : ObservableObject
         var ext = Path.GetExtension(filePath).ToLowerInvariant();
         PreviewHeaderText = ext switch
         {
-            ".docx" => "Word 文档信息",
-            ".xlsx" => "Excel 工作簿信息",
-            ".pptx" => "PowerPoint 演示文稿信息",
-            _ => "Office 文档信息"
+            ".docx" => LocalizationManager.T("Preview_OfficeDocx"),
+            ".xlsx" => LocalizationManager.T("Preview_OfficeXlsx"),
+            ".pptx" => LocalizationManager.T("Preview_OfficePptx"),
+            _ => LocalizationManager.T("Preview_OfficeGeneric")
         };
         FormatMetadata.Clear();
     }
@@ -1700,7 +1730,7 @@ public partial class PreviewViewModel : ObservableObject
             var fileInfo = new FileInfo(filePath);
             if (fileInfo.Exists && fileInfo.Length > 50 * 1024 * 1024)
             {
-                ShowUnsupported("文档过大（超过 50MB 限制）");
+                ShowUnsupported(LocalizationManager.T("Preview_DocxTooLarge"));
                 return;
             }
 
@@ -1708,7 +1738,7 @@ public partial class PreviewViewModel : ObservableObject
             var body = doc.MainDocumentPart?.Document?.Body;
             if (body == null)
             {
-                ShowUnsupported("此文档为空");
+                ShowUnsupported(LocalizationManager.T("Preview_DocxEmpty"));
                 return;
             }
 
@@ -1796,11 +1826,11 @@ public partial class PreviewViewModel : ObservableObject
 
             DocxOutline = new ObservableCollection<DocxOutlineItem>(outline);
             DocxFullText = fullText.ToString();
-            DocxNoOutlineText = outline.Count > 0 ? string.Empty : "（无标题结构）";
+            DocxNoOutlineText = outline.Count > 0 ? string.Empty : LocalizationManager.T("Preview_DocxNoOutline");
 
             if (DocxFullText.Length == 0)
             {
-                DocxFullText = "此文档为空";
+                DocxFullText = LocalizationManager.T("Preview_DocxEmpty");
                 DocxNoOutlineText = string.Empty;
             }
 
@@ -1811,7 +1841,7 @@ public partial class PreviewViewModel : ObservableObject
         catch (Exception ex)
         {
             App.DebugLog($"ShowDocx failed: {ex.Message}");
-            ShowUnsupported("无法解析 Word 文档");
+            ShowUnsupported(LocalizationManager.T("Preview_DocxFailed"));
         }
     }
 
@@ -1831,7 +1861,7 @@ public partial class PreviewViewModel : ObservableObject
 
             if (range == null)
             {
-                TextContent = "此工作表中没有数据";
+                TextContent = LocalizationManager.T("Preview_XlsxEmpty");
                 PreviewType = PreviewType.Xlsx;
                 IsPreviewVisible = true;
                 IsToolbarVisible = false;
@@ -1857,7 +1887,7 @@ public partial class PreviewViewModel : ObservableObject
 
             if (table.Columns.Count == 0)
             {
-                TextContent = "此工作表中没有数据";
+                TextContent = LocalizationManager.T("Preview_XlsxEmpty");
                 PreviewType = PreviewType.Xlsx;
                 IsPreviewVisible = true;
                 IsToolbarVisible = false;
@@ -1889,9 +1919,9 @@ public partial class PreviewViewModel : ObservableObject
         {
             App.DebugLog($"ShowXlsx failed: {ex.Message}");
             if (ex.Message.Contains("password") || ex.Message.Contains("protected"))
-                ShowUnsupported("工作表受密码保护");
+                ShowUnsupported(LocalizationManager.T("Preview_XlsxProtected"));
             else
-                ShowUnsupported("无法加载 Excel 工作表");
+                ShowUnsupported(LocalizationManager.T("Preview_XlsxFailed"));
         }
         finally
         {
@@ -1917,7 +1947,7 @@ public partial class PreviewViewModel : ObservableObject
 
             if (slideEntries.Count == 0)
             {
-                TextContent = "此演示文稿为空";
+                TextContent = LocalizationManager.T("Preview_PptxEmpty");
                 PreviewType = PreviewType.Pptx;
                 IsPreviewVisible = true;
                 IsToolbarVisible = false;
@@ -1940,7 +1970,7 @@ public partial class PreviewViewModel : ObservableObject
                         .Where(v => !string.IsNullOrWhiteSpace(v))
                         .ToList();
 
-                    result.AppendLine($"── 幻灯片 {slideNumber} ──");
+                    result.AppendLine(LocalizationManager.T("Preview_PptxSlideHeader", slideNumber));
                     if (texts.Count > 0)
                     {
                         foreach (var text in texts)
@@ -1948,15 +1978,15 @@ public partial class PreviewViewModel : ObservableObject
                     }
                     else
                     {
-                        result.AppendLine("（此幻灯片无文字）");
+                        result.AppendLine(LocalizationManager.T("Preview_PptxSlideEmpty"));
                     }
                     result.AppendLine();
                 }
                 catch (Exception ex)
                 {
                     App.DebugLog($"ShowPptx: failed to parse slide {slideNumber}: {ex.Message}");
-                    result.AppendLine($"── 幻灯片 {slideNumber} ──");
-                    result.AppendLine("（解析失败）");
+                    result.AppendLine(LocalizationManager.T("Preview_PptxSlideHeader", slideNumber));
+                    result.AppendLine(LocalizationManager.T("Preview_ParseFailed"));
                     result.AppendLine();
                 }
             }
@@ -1969,7 +1999,7 @@ public partial class PreviewViewModel : ObservableObject
         catch (Exception ex)
         {
             App.DebugLog($"ShowPptx failed: {ex.Message}");
-            ShowUnsupported("无法解析演示文稿");
+            ShowUnsupported(LocalizationManager.T("Preview_PptxFailed"));
         }
     }
 
@@ -2017,7 +2047,7 @@ public partial class PreviewViewModel : ObservableObject
         var info = PdfParser.Parse(filePath);
         if (info == null)
         {
-            ShowUnsupported("无法解析 PDF 文件");
+            ShowUnsupported(LocalizationManager.T("Preview_PdfParseFailed"));
             return;
         }
 
@@ -2065,7 +2095,7 @@ public partial class PreviewViewModel : ObservableObject
             if (info.Author != null) pdfFormatValues[MetadataKeys.Author] = info.Author;
             if (info.Subject != null) pdfFormatValues[MetadataKeys.Subject] = info.Subject;
             if (info.PageCount.HasValue) pdfFormatValues[MetadataKeys.PageCount] = info.PageCount.Value.ToString();
-            pdfFormatValues[MetadataKeys.Encrypted] = info.IsEncrypted == true ? "是" : "否";
+            pdfFormatValues[MetadataKeys.Encrypted] = info.IsEncrypted == true ? LocalizationManager.T("MsgBox_Yes") : LocalizationManager.T("MsgBox_No");
             if (info.CreationDate.HasValue) pdfFormatValues[MetadataKeys.CreatedDate] = info.CreationDate.Value.ToString("yyyy-MM-dd HH:mm");
             if (info.ModifiedDate.HasValue) pdfFormatValues[MetadataKeys.DocModifiedDate] = info.ModifiedDate.Value.ToString("yyyy-MM-dd HH:mm");
             MetadataHelper.RenderFormatToViewModel(this, pdfFormatValues, "pdf");
@@ -2073,7 +2103,7 @@ public partial class PreviewViewModel : ObservableObject
         catch (Exception ex)
         {
             App.DebugLog($"[PDF] Failed to open or render PDF: {ex.Message}");
-            ShowUnsupported("无法打开 PDF 文件");
+            ShowUnsupported(LocalizationManager.T("Preview_PdfOpenFailed"));
         }
     }
 
@@ -2139,13 +2169,13 @@ public partial class PreviewViewModel : ObservableObject
         var info = VideoParser.Parse(filePath);
         if (info == null)
         {
-            ShowUnsupported("无法解析视频文件");
+            ShowUnsupported(LocalizationManager.T("Preview_VideoFailed"));
             return;
         }
         PreviewType = PreviewType.Video;
         IsPreviewVisible = true;
         IsToolbarVisible = false;
-        PreviewHeaderText = "视频信息";
+        PreviewHeaderText = LocalizationManager.T("Preview_Header_Video");
         var videoFormatValues = new Dictionary<string, string?>();
         if (info.VideoWidth.HasValue && info.VideoHeight.HasValue)
             videoFormatValues[MetadataKeys.Resolution] = $"{info.VideoWidth} × {info.VideoHeight}";
@@ -2210,7 +2240,7 @@ public partial class PreviewViewModel : ObservableObject
     /// </summary>
     public void ShowUnsupported(string? message = null)
     {
-        TextContent = message ?? "暂不支持预览此文件格式";
+        TextContent = message ?? LocalizationManager.T("Preview_Unsupported");
         PreviewType = PreviewType.Unsupported;
         IsPreviewVisible = true;
         IsToolbarVisible = false;
