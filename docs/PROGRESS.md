@@ -935,6 +935,13 @@
 
 这些变更影响两项目共用代码，按时间从新到旧排列。
 
+#### v0.4.5 (2026-08-04) AGENTS.md 新增 session 自动执行规则 9–12
+  - 规则 9：Windows 环境下禁止 Unix 风格 shell 命令（PowerShell 语法 + `rg`/内置工具优先）
+  - 规则 10：提交信息必须使用 conventional commits 风格（`<type>(<scope>): 中文描述`）
+  - 规则 11：新功能默认只改 Avalonia，WPF 仅在修复 bug 时动（共享层不受限但需评估兼容性）
+  - 规则 12：修改后必须构建验证（对应项目 `dotnet build` + 测试，`lsp_diagnostics` 无错误）
+  - 涉及文件：`AGENTS.md`（纯文档，无代码变更）
+
 #### v0.4.5 (2026-08-03) AGENTS.md 新增 ComputeDirectoryStats 目录聚合契约说明
   - 新增「Directory aggregation — ComputeDirectoryStats」小节：`DirStats` 字段语义（递归子树和 / Count 仅文件 / NewestModified 忽略 MinValue）、消费者（Avalonia `PopulateEntries`）、与 ResultTreeView `CalculateDescendantStats` 的差异（`TotalDescendantCount` 含目录、无压缩后大小/日期）
   - 涉及文件：`AGENTS.md`（纯文档，无代码变更）

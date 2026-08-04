@@ -591,6 +591,63 @@ PROGRESS.md 分三个独立线索，根据变更影响范围选择对应线索�
 
 在 `src/MantisZip.UI.Avalonia/Resources/Icons/AppIcons.axaml` 中添加新的 `Geometry` 图标资源后，**必须同步**在 `src/MantisZip.UI.Avalonia/ViewModels/IconTestViewModel.cs` 的 `LoadAllIcons()` 方法中添加对应的 `Add()` 调用，否则图标测试窗口不会显示该图标。
 
+### 规则 9：Windows 环境下禁止 Unix 风格 shell 命令
+
+开发环境为 **Windows + PowerShell 7**（pwsh）。所有 shell 命令必须使用 PowerShell 语法，禁止 Unix 风格命令（`grep`/`cat`/`ls`/`rm`/`cp`/`mv`/`which` 等），否则会报"无法识别"错误。
+
+- **搜索任务优先使用内置工具**（`grep`/`glob`/`ast_grep_search`/`codegraph`），这些工具跨平台，不依赖 shell 命令
+- **必须用 shell 命令时**，使用 PowerShell 原生 cmdlet 或已安装的 `rg`（ripgrep，scoop 安装）：
+
+| Unix 习惯 | Windows 正确写法 |
+|-----------|-----------------|
+| `grep "xxx" dir` | `rg "xxx" dir` 或 `Select-String -Path ... -Pattern "xxx"` |
+| `ls` / `ls -la` | `Get-ChildItem` / `Get-ChildItem -Force` |
+| `cat file` | `Get-Content file` |
+| `which cmd` | `Get-Command cmd` |
+| `rm -rf dir` | `Remove-Item -Recurse -Force dir` |
+| `cp a b` | `Copy-Item a b` |
+| `mv a b` | `Move-Item a b` |
+| `head` / `tail` | `Get-Content -Head 5` / `-Tail 5` |
+
+- 不确定某命令在 Windows 上是否存在时，先 `Get-Command` 验证再执行
+
+### 规则 10：提交信息必须使用 conventional commits 风格
+
+提交信息遵循仓库既有风格：`<type>(<scope>): 中文描述`，`type` 使用 `feat`/`fix`/`docs`/`refactor`/`test`/`chore` 等，`scope` 标明影响项目（`core`/`avalonia`/`wpf`/`shell` 等，可组合如 `core,avalonia`）。
+
+示例（来自仓库 git log）：
+- `feat(avalonia): 文件选择器地址栏新增收藏当前路径入口`
+- `fix(core,avalonia): 拖拽/右键解压流程统一`
+- `docs: AGENTS.md 新增 ComputeDirectoryStats 目录聚合契约说明`
+
+### 规则 11：新功能默认只改 Avalonia，WPF 仅在修复 bug 时动
+
+`MantisZip.UI`（WPF）处于**维护模式**，迁移完成后将废弃。因此：
+
+- **新功能**：默认只添加到 `MantisZip.UI.Avalonia`（主力版），不要在 WPF 项目中实现新功能
+- **Bug 修复**：如果 bug 存在于两个 UI 项目，修复 Avalonia 即可；只有用户明确要求或 bug 只在 WPF 中出现时才修改 WPF
+- **共享层**（`MantisZip.Core`/`MantisZip.ShellExt`）不受此限制，但改动会影响两个 UI，需评估兼容性（如 `AppSettings` 字段两边保持同步）
+
+### 规则 12：修改后必须构建验证
+
+完成任何代码修改后，必须运行对应项目的 `dotnet build` 验证编译通过（测试项目改动另跑 `dotnet test`）：
+
+```powershell
+# Avalonia 版（主力）
+dotnet build src\MantisZip.UI.Avalonia\MantisZip.UI.Avalonia.csproj
+
+# WPF 版（仅当修改了它）
+dotnet build src\MantisZip.UI\MantisZip.UI.csproj
+
+# Core 层（仅当修改了 Core）
+dotnet build src\MantisZip.Core\MantisZip.Core.csproj
+
+# 测试
+dotnet test tests\MantisZip.Tests\MantisZip.Tests.csproj
+```
+
+只有构建通过、`lsp_diagnostics` 无错误后，任务才算完成。
+
 ## 未来工作
 
 ### 迁移完成后的清理
