@@ -875,10 +875,19 @@ public partial class MainWindow : Window
                     : null
             };
 
+            // 与主菜单切换项同构：Header 内 StackPanel（ToggleIconBox + 文字）
             var menuItem = new MenuItem
             {
-                Header = header,
-                Icon = iconBox,
+                Header = new StackPanel
+                {
+                    Orientation = Orientation.Horizontal,
+                    Spacing = GetSpacingXxs(),
+                    Children =
+                    {
+                        iconBox,
+                        new TextBlock { Text = header }
+                    }
+                },
                 Tag = column
             };
             menuItem.Click += (s, args) =>
@@ -915,6 +924,14 @@ public partial class MainWindow : Window
         if (Application.Current?.TryFindResource(key, out var brush) == true && brush is IBrush b)
             return b;
         return Brushes.Gray;
+    }
+
+    /// <summary>解析紧凑度间距资源（与主菜单 Header StackPanel 的 SpacingXxs 一致）。</summary>
+    private static double GetSpacingXxs()
+    {
+        if (Application.Current?.TryFindResource("SpacingXxs", out var spacing) == true && spacing is double d)
+            return d;
+        return 4;
     }
 
     private static string GetColumnHeaderText(DataGridColumn column)
