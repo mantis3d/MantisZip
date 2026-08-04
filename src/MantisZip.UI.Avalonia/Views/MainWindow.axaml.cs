@@ -8,17 +8,21 @@ using Avalonia.Threading;
 using Avalonia.VisualTree;
 using MantisZip.Core.Abstractions;
 using MantisZip.Core.Utils;
+using MantisZip.UI.Avalonia.Converters;
 using MantisZip.UI.Avalonia.Dialogs;
 using MantisZip.UI.Avalonia.Models;
 using MantisZip.UI.Avalonia.ViewModels;
 using MantisZip.Core;
 using System.Collections.Generic;
+using System.ComponentModel;
+using System.Globalization;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Threading;
 using Avalonia.Layout;
 using Avalonia.Media;
 using MantisZip.UI.Avalonia.Services;
+using System.ComponentModel;
 
 namespace MantisZip.UI.Avalonia.Views;
 
@@ -281,7 +285,6 @@ public partial class MainWindow : Window
                     FileListGrid.SelectedItems.Add(item);
             }
         };
-        vm.ShowColumnPickerAction = () => ShowColumnPickerMenu();
 
         vm.GetOpenFilePaths = async () =>
         {
@@ -846,36 +849,91 @@ public partial class MainWindow : Window
         }
     }
 
-    private void ShowColumnPickerMenu()
+    private void ColumnHeaderContextMenu_Opening(object? sender, CancelEventArgs e)
     {
-        var menu = new ContextMenu();
+        if (sender is not ContextMenu menu) return;
+        menu.Items.Clear();
+
         foreach (var column in FileListGrid.Columns)
         {
             var header = GetColumnHeaderText(column);
-            // Name column cannot be hidden
-            if (header == "Name" || string.IsNullOrEmpty(header))
+            // 名称列不允许隐藏（图标列无表头文字，同样跳过）
+            if (header == LocalizationManager.T("DataGrid_Name") || string.IsNullOrEmpty(header))
                 continue;
 
+            // 与主菜单切换图标同构：ToggleIconBox（可见=强调色底，隐藏=透明空心）
+            var iconBox = new Border
+            {
+                Classes = { "ToggleIconBox" },
+                Background = ToggleIconBackground(column.IsVisible),
+                Child = GetColumnHeaderIcon(column) is { } iconData
+                    ? new PathIcon
+                    {
+                        Data = iconData,
+                        Width = 12,
+                        Height = 12,
+                        Foreground = GetThemeBrush("ThemeTextPrimaryBrush")
+                    }
+                    : null
+            };
+
+            // 与主菜单切换项同构：Header 内 StackPanel（ToggleIconBox + 文字）
             var menuItem = new MenuItem
             {
-                Header = header,
-                Icon = new CheckBox
+                Header = new StackPanel
                 {
-                    IsChecked = column.IsVisible,
-                    IsHitTestVisible = false,
-                    VerticalAlignment = VerticalAlignment.Center
+                    Orientation = Orientation.Horizontal,
+                    Spacing = GetSpacingXxs(),
+                    Children =
+                    {
+                        iconBox,
+                        new TextBlock { Text = header }
+                    }
                 },
                 Tag = column
             };
             menuItem.Click += (s, args) =>
             {
                 column.IsVisible = !column.IsVisible;
-                if (menuItem.Icon is CheckBox cb)
-                    cb.IsChecked = column.IsVisible;
+                iconBox.Background = ToggleIconBackground(column.IsVisible);
             };
             menu.Items.Add(menuItem);
         }
-        menu.Open(ColumnPickerButton);
+    }
+
+    /// <summary>可见 → ThemeToggleBrush（强调色底），隐藏 → Transparent（空心），与主菜单切换图标一致。</summary>
+    private static IBrush ToggleIconBackground(bool isVisible)
+    {
+        return new BoolToToggleBgBrushConverter().Convert(isVisible, typeof(IBrush), null, CultureInfo.InvariantCulture) as IBrush
+            ?? Brushes.Transparent;
+    }
+
+    /// <summary>从列标题的 StackPanel 中提取 PathIcon 的几何，与列头图标同款，保证视觉一致。</summary>
+    private static Geometry? GetColumnHeaderIcon(DataGridColumn column)
+    {
+        if (column.Header is StackPanel panel)
+        {
+            var icon = panel.Children.OfType<PathIcon>().FirstOrDefault();
+            if (icon != null)
+                return icon.Data;
+        }
+        return null;
+    }
+
+    /// <summary>从当前应用资源中取主题画刷（主题切换后动态解析）。</summary>
+    private static IBrush GetThemeBrush(string key)
+    {
+        if (Application.Current?.TryFindResource(key, out var brush) == true && brush is IBrush b)
+            return b;
+        return Brushes.Gray;
+    }
+
+    /// <summary>解析紧凑度间距资源（与主菜单 Header StackPanel 的 SpacingXxs 一致）。</summary>
+    private static double GetSpacingXxs()
+    {
+        if (Application.Current?.TryFindResource("SpacingXxs", out var spacing) == true && spacing is double d)
+            return d;
+        return 4;
     }
 
     private static string GetColumnHeaderText(DataGridColumn column)

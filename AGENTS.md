@@ -491,6 +491,29 @@ PROGRESS.md 分三个独立线索，根据变更影响范围选择对应线索�
 - **Avalonia 资源键名均以 `Brush` 结尾**（`ThemeWindowBgBrush` 而非 `Theme_WindowBg`）
 - 如果新增控件类型在主题文件中尚无对应资源，需在 `ThemeLight.axaml` 和 `ThemeDark.axaml` 中成对添加
 
+#### Avalonia 全局类样式（App.axaml 已定义，直接挂 Classes 即可）
+
+以下类样式定义于 `App.axaml` 全局层，新增控件时**优先用 `Classes` 挂载**，禁止手动重复设置这些属性（尺寸/圆角/边框等已由全局样式统一）：
+
+| 类名 | 适用控件 | 效果 | 典型用途 |
+|------|---------|------|---------|
+| `ToolbarButton` | `Button` / `ToggleButton` | 高 `ControlHeightLg`、Padding `8,2`、背景 `ThemeHeaderBgBrush` | 带文字标签的工具栏按钮 |
+| `ToolbarIcon` | `Button` / `ToggleButton` | 方形紧凑（宽高 `ControlHeightSm`、Padding 6），常与 `ToolbarButton` 组合（`Classes="ToolbarButton ToolbarIcon"`） | 树/文件列表工具栏的矢量图标按钮 |
+| `ToolbarButtonIcon` | `TextBlock` | FontSize 20、水平居中 | 工具栏按钮内的图标字符 |
+| `ToolbarButtonLabel` | `TextBlock` | FontSize 13、水平居中 | 工具栏按钮的文字标签 |
+| `compactTab` | `TabItem` | Padding `8,6`、MinHeight 36、FontSize 18 | 设置/对话框窗口的紧凑 tab 头 |
+| `ToggleIconBox` | `Border` | 20×20、圆角 3、边框 1.5、背景过渡动画 | 菜单切换指示图标（见下） |
+
+**ToggleIconBox 切换图标**：开关/切换类菜单项的指示图标，用法：
+- `Background` 绑定 `{Binding <bool>, Converter={StaticResource BoolToToggleBgBrushConverter}}`（true → `ThemeToggleBrush` 强调色底，false → `Transparent` 空心）
+- 内部放 12×12 `PathIcon`，`Foreground` 用 `ThemeTextPrimaryBrush`
+- 菜单项中放在 `MenuItem.Header` 的 `StackPanel` 内（`Spacing` 用 `SpacingXxs`），**不要**放 `MenuItem.Icon` 槽位
+- code-behind 动态构建时 `Classes = { "ToggleIconBox" }` 同样生效（继承全局样式）
+
+**PathIcon 注意**：Avalonia 的 PathIcon **不继承父控件 Foreground**，必须显式设置（App.axaml 用 `ToggleButton:checked PathIcon` 等选择器直接命中）。
+
+**TextBlock 注意**：全局 `TextBlock` 样式**故意不设 Foreground**（继承父控件，避免把 emoji 压成单色）——新增 TextBlock 时除非有明确理由，不要显式设置 Foreground。
+
 #### WPF（遗留维护）
 - `Background` 绑定 `"{DynamicResource Theme_WindowBg}"`
 - `Foreground` 绑定 `"{DynamicResource Theme_TextPrimary}"`

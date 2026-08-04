@@ -897,14 +897,6 @@
                 <PathIcon Data="{StaticResource IconCopy}" Width="13" Height="13" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
               </Button>
 
-              <!-- Column picker -->
-              <Button x:Name="ColumnPickerButton" Classes="ToolbarButton ToolbarIcon"
-                      Command="{Binding ShowColumnPickerCommand}"
-                      IsEnabled="{Binding IsArchiveLoaded}"
-                      ToolTip.Tip="{Binding LocalizedStrings[Toolbar_Columns]}">
-                <PathIcon Data="{StaticResource IconNavigation}" Width="13" Height="13" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
-              </Button>
-
               <!-- View mode toggle -->
               <Button Classes="ToolbarButton ToolbarIcon"
                       Command="{Binding CycleViewModeCommand}"
@@ -1014,6 +1006,14 @@
                     DoubleTapped="FileListGrid_DoubleTapped"
                     KeyDown="FileListGrid_KeyDown"
                     Sorting="FileListGrid_Sorting">
+            <DataGrid.Styles>
+              <!-- 列标题右键菜单：切换列显隐（菜单项在 Opening 事件中动态构建，见 ColumnHeaderContextMenu_Opening） -->
+              <Style Selector="DataGridColumnHeader">
+                <Setter Property="ContextMenu">
+                  <ContextMenu Opening="ColumnHeaderContextMenu_Opening" />
+                </Setter>
+              </Style>
+            </DataGrid.Styles>
             <DataGrid.ContextMenu>
               <ContextMenu>
                 <MenuItem Header="{Binding LocalizedStrings[Ctx_Extract]}"

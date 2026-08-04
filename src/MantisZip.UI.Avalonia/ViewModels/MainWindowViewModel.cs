@@ -39,11 +39,6 @@ public partial class MainWindowViewModel : ObservableObject
     public Action? InvertSelectionAction { get; set; }
 
     /// <summary>
-    /// 可由 View 设置的列选择器弹出回调。
-    /// </summary>
-    public Action? ShowColumnPickerAction { get; set; }
-
-    /// <summary>
     /// 由 View 设置的对话框回调。返回选择的文件路径，取消返回 null。
     /// </summary>
     public Func<Task<string?>>? GetOpenFilePath { get; set; }
@@ -223,7 +218,7 @@ public partial class MainWindowViewModel : ObservableObject
             "Menu_Test",
             "Tree_ExpandAll", "Tree_CollapseAll", "Tree_ExpandToCurrent", "Tree_Filter",
             "Nav_GoRoot", "Nav_GoBack", "Nav_GoForward", "Nav_AddressBar",
-            "Toolbar_CopyName", "Toolbar_Columns", "Toolbar_Refresh",
+            "Toolbar_CopyName", "Toolbar_Refresh",
             "Toolbar_SelectAll", "Toolbar_InvertSelection", "Toolbar_ViewMode",
             "ViewMode_All", "ViewMode_Files", "ViewMode_Dirs",
             "Test_AboutWindow", "Test_SettingsWindow", "Test_PasswordManager",
@@ -1409,12 +1404,6 @@ public partial class MainWindowViewModel : ObservableObject
     private void InvertSelection()
     {
         InvertSelectionAction?.Invoke();
-    }
-
-    [RelayCommand]
-    private void ShowColumnPicker()
-    {
-        ShowColumnPickerAction?.Invoke();
     }
 
     private static FolderNode? FindNode(FolderNode? node, string path)
