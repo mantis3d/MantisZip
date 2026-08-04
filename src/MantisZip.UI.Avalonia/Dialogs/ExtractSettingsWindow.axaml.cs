@@ -188,7 +188,7 @@ public partial class ExtractSettingsWindow : Window
         {
             var matched = _entries.Count(e => !e.IsDirectory && FileFilterMatcher.IsMatch(filter, e));
             var total = _entries.Count(e => !e.IsDirectory);
-            FileFilterControl.SetFilterStats($"{matched} / {total} 文件匹配");
+            FileFilterControl.SetFilterStats(LocalizationManager.T("Extract_FilterStatsFormat", matched, total));
         }
         else
         {

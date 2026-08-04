@@ -23,9 +23,10 @@ public partial class SettingsWindow : Window
         if (DataContext is SettingsWindowViewModel vm)
             vm.SaveCommand.Execute(null);
 
-        // 刷新全局字体、紧凑度、调试日志开关等需要立即生效的设置
+        // 刷新全局字体、紧凑度、主题、调试日志开关等需要立即生效的设置
         App.RefreshAppFontFamily();
         App.RefreshCompactness();
+        App.RefreshTheme();
         App.RefreshDebugLogSettings();
 
         Close();

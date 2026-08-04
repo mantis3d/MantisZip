@@ -49,6 +49,8 @@ public partial class MainWindow : Window
         {
             var dialog = new SettingsWindow();
             await dialog.ShowDialog(this);
+            // 设置窗口可能改动了主题，刷新主窗口菜单里「切换颜色模式」的当前主题文案
+            vm.RefreshLocalizedStrings();
         };
         vm.ShowPasswordDialog = async (archivePath) =>
         {
@@ -285,7 +287,7 @@ public partial class MainWindow : Window
         {
             var result = await StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
             {
-                Title = "Select files to add",
+                Title = LocalizationManager.T("Main_SelectFilesTitle"),
                 AllowMultiple = true
             });
             return result.Count > 0 ? result.Select(f => f.TryGetLocalPath()).Where(p => p != null).Cast<string>().ToList() : null;

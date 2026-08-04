@@ -162,7 +162,7 @@
                        Foreground="{DynamicResource ThemeAccentBrush}"
                        Background="{DynamicResource ThemeBorderBrush}" />
           <TextBlock x:Name="LoadingTextBlock"
-                     Text="正在构建预览树…"
+                     Text="{Binding LoadingText, RelativeSource={RelativeSource Self}}"
                      FontSize="12"
                      HorizontalAlignment="Center"
                      Foreground="{DynamicResource ThemeTextSecondaryBrush}" />

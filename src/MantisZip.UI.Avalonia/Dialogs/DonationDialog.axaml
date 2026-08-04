@@ -54,7 +54,7 @@
                 Spacing="{DynamicResource SpacingXs}"
                 Margin="0,0,0,20"
                 HorizontalAlignment="Center">
-      <Button Content="🔗 爱发电 / Afdian"
+      <Button Content="{Binding AfdianText}"
               Height="{DynamicResource ControlHeightXl}"
               Width="440"
               Background="{DynamicResource ThemeSurfaceBgBrush}"
@@ -64,7 +64,7 @@
               FontSize="18"
               HorizontalContentAlignment="Center"
               Click="OpenAfdian_Click" />
-      <Button Content="☕ Polar"
+      <Button Content="{Binding PolarText}"
               Height="{DynamicResource ControlHeightXl}"
               Width="440"
               Background="{DynamicResource ThemeSurfaceBgBrush}"

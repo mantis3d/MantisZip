@@ -55,12 +55,17 @@ public partial class App : Application
         if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
             NativeMethods.OleInitialize(nint.Zero);
 
-        // ── Apply system theme ──
-        ApplySystemTheme();
+        // ── Apply theme (System/Light/Dark) ──
+        ApplyTheme();
         if (PlatformSettings is IPlatformSettings ps)
         {
             ps.ColorValuesChanged += (_, _) =>
-                global::Avalonia.Threading.Dispatcher.UIThread.Post(() => ApplySystemTheme());
+                global::Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+                {
+                    // 仅「跟随系统」模式需要响应系统主题变化
+                    if (AppSettings.Load().Theme == "System")
+                        ApplyTheme();
+                });
         }
 
         // ── Apply global font from settings ──
@@ -79,6 +84,10 @@ public partial class App : Application
         // ── Initialize magic detection settings ──
         PreviewService.EnableFormatDetection = appSettings.EnableFormatDetection;
         PreviewService.PreviewHeadSize = appSettings.PreviewHeadSize;
+
+        // ── Restore saved language (AppSettings uses "zh"/"en", LocalizationManager uses zh-CN/en) ──
+        if (appSettings.Language == "en")
+            LocalizationManager.CurrentLanguage = AppLanguage.English;
 
         // ── 首次运行：Shell 集成安装（延迟到用户进程，非提权）──
         // 安装程序会写入 FirstRunShell=1 / FirstRunAssoc=1 到注册表，首次启动时处理
@@ -269,13 +278,23 @@ public partial class App : Application
     //  Theme
     // ════════════════════════════════════════════════════════════════
 
-    private void ApplySystemTheme()
+    /// <summary>
+    /// 应用主题（三态）：System=跟随系统，Light=亮色，Dark=暗色。
+    /// 替换主题 ResourceDictionary 并设置 RequestedThemeVariant 供 FluentTheme 使用。
+    /// </summary>
+    private void ApplyTheme()
     {
         if (PlatformSettings is not IPlatformSettings ps) return;
         try
         {
-            var isDark = ps.GetColorValues().ThemeVariant == PlatformThemeVariant.Dark;
-            DebugLog($"[Theme] ApplySystemTheme dark={isDark}");
+            var settings = AppSettings.Load();
+            bool isDark = settings.Theme switch
+            {
+                "Light" => false,
+                "Dark" => true,
+                _ => ps.GetColorValues().ThemeVariant == PlatformThemeVariant.Dark,
+            };
+            DebugLog($"[Theme] ApplyTheme theme={settings.Theme} dark={isDark}");
 
             // ── Swap resource dictionary ──
             var uri = new Uri(isDark ? DarkThemeUri : LightThemeUri);
@@ -295,8 +314,17 @@ public partial class App : Application
         }
         catch (Exception ex)
         {
-            DebugLog($"[Theme] ApplySystemTheme ERROR: {ex.Message}");
+            DebugLog($"[Theme] ApplyTheme ERROR: {ex.Message}");
         }
+    }
+
+    /// <summary>
+    /// 供 SettingsWindow 保存设置后立即刷新主题（无需重启）。
+    /// </summary>
+    internal static void RefreshTheme()
+    {
+        if (Current is App app)
+            app.ApplyTheme();
     }
 
     /// <summary>
@@ -1039,7 +1067,7 @@ public partial class App : Application
                     PreserveDirectoryRoot = true,
                 };
 
-                await CompressWithProgress(request, "压缩", desktop);
+                await CompressWithProgress(request, LocalizationManager.T("Cli_Compress"), desktop);
             }
             await Task.CompletedTask;
         };
@@ -1079,7 +1107,7 @@ public partial class App : Application
             PreserveDirectoryRoot = true,
         };
 
-        _ = CompressWithProgress(request, "快速压缩", desktop);
+        _ = CompressWithProgress(request, LocalizationManager.T("Cli_QuickCompress"), desktop);
     }
 
     // ════════════════════════════════════════════════════════════════
@@ -1145,7 +1173,7 @@ public partial class App : Application
             PreserveDirectoryRoot = true,
         };
 
-        await CompressWithProgress(request, "批量压缩", desktop);
+        await CompressWithProgress(request, LocalizationManager.T("Cli_BatchCompress"), desktop);
     }
 
     // ════════════════════════════════════════════════════════════════
@@ -1233,7 +1261,7 @@ public partial class App : Application
             PreserveDirectoryRoot = true,
         };
 
-        await CompressWithProgress(request, "合并压缩", desktop);
+        await CompressWithProgress(request, LocalizationManager.T("Cli_CombinedCompress"), desktop);
     }
 
     // ════════════════════════════════════════════════════════════════
@@ -1262,7 +1290,7 @@ public partial class App : Application
 
                 await Dispatcher.UIThread.InvokeAsync(() =>
                 {
-                    progressWindow.SetStatus(result.Failed > 0 ? "失败" : "完成");
+                    progressWindow.SetStatus(result.Failed > 0 ? LocalizationManager.T("Cli_StatusFailed") : LocalizationManager.T("Cli_StatusDone"));
                     progressWindow.SetProgress(new ArchiveProgress { PercentComplete = 100 });
                 });
 

@@ -711,6 +711,11 @@ public partial class App : Application
     /// </summary>
     public static void ApplyTheme(string themeName)
     {
+        // 防御：WPF 版无「跟随系统」功能。若共享 settings.json 被 Avalonia 版写入了
+        // "System"（三态主题），回退到亮色，避免加载不存在的 Themes/System.xaml 崩溃。
+        // 设置窗口再次保存时会将其规范化为 Light/Dark。
+        if (themeName == "System") themeName = "Light";
+
         var uri = new Uri($"Themes/{themeName}.xaml", UriKind.Relative);
         var newDict = new ResourceDictionary { Source = uri };
 

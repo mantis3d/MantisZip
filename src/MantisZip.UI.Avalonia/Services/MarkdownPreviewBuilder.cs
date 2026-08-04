@@ -103,8 +103,7 @@ public static class MarkdownPreviewBuilder
 
     private static Border CreateCodeBorder(string code)
     {
-        var settings = AppSettings.Load();
-        var isDark = settings.Theme == "Dark";
+        var isDark = IsDarkTheme();
         var bgColor = isDark ? Color.Parse("#2d2d2d") : Color.Parse("#f0f0f0");
         var fgColor = isDark ? Color.Parse("#e0e0e0") : Color.Parse("#1a1a1a");
 
@@ -203,8 +202,7 @@ public static class MarkdownPreviewBuilder
 
     private static Control BuildQuote(QuoteBlock quoteBlock, string source)
     {
-        var settings = AppSettings.Load();
-        var isDark = settings.Theme == "Dark";
+        var isDark = IsDarkTheme();
         var borderColor = isDark ? Color.Parse("#555") : Color.Parse("#ddd");
 
         var innerPanel = new StackPanel { Spacing = 4 };
@@ -248,8 +246,7 @@ public static class MarkdownPreviewBuilder
                     break;
 
                 case CodeInline code:
-                    var settings = AppSettings.Load();
-                    var isDark = settings.Theme == "Dark";
+                    var isDark = IsDarkTheme();
                     var codeBg = isDark ? Color.Parse("#2d2d2d") : Color.Parse("#e8e8e8");
                     target.Add(new Run
                     {
@@ -301,4 +298,11 @@ public static class MarkdownPreviewBuilder
     }
 
     #endregion
+
+    /// <summary>
+    /// 判断当前是否为暗色主题。基于 RequestedThemeVariant（App.ApplyTheme 已解析
+    /// System 模式并设置该值），避免直接读取 AppSettings.Theme 漏判 "System"。
+    /// </summary>
+    private static bool IsDarkTheme()
+        => Application.Current?.RequestedThemeVariant == global::Avalonia.Styling.ThemeVariant.Dark;
 }
