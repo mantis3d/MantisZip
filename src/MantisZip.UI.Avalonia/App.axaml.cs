@@ -8,6 +8,7 @@ using Avalonia.Threading;
 using MantisZip.Core;
 using MantisZip.Core.Abstractions;
 using MantisZip.Core.Engines;
+using MantisZip.Core.Models;
 using MantisZip.Core.Services;
 using MantisZip.Core.Utils;
 using MantisZip.UI.Avalonia.Dialogs;
@@ -610,10 +611,8 @@ public partial class App : Application
             }
 
             var password = ResolveCliPassword(archivePath, engine);
-            await engine.ExtractAsync(archivePath, targetDir, password);
-            Console.WriteLine($"Extracted: {archivePath} -> {targetDir}");
-            TryDeleteArchiveAfterExtract(archivePath);
-            return false;
+            return await RunCliExtractWithProgressAsync(
+                archivePath, targetDir, password, engine, originalArgs, desktop);
         }
         catch (UnauthorizedAccessException)
         {
@@ -676,10 +675,8 @@ public partial class App : Application
                 return await HandleElevationAsync(unwritable, originalArgs, desktop);
 
             var password = ResolveCliPassword(archivePath, engine);
-            await engine.ExtractAsync(archivePath, targetDir, password);
-            Console.WriteLine($"Extracted: {archivePath} -> {targetDir}");
-            TryDeleteArchiveAfterExtract(archivePath);
-            return false;
+            return await RunCliExtractWithProgressAsync(
+                archivePath, targetDir, password, engine, originalArgs, desktop);
         }
         catch (UnauthorizedAccessException)
         {
@@ -754,6 +751,139 @@ public partial class App : Application
         var restarted = await TryExtractSmartAsync(archivePath, originalArgs, desktop);
         if (!restarted)
             desktop.Shutdown();
+    }
+
+    /// <summary>
+    /// 在进度窗口中执行 CLI 解压（对齐 WPF HandleExtractBatchCore）。
+    /// 显示批处理文件列表（单文件也显示）、逐项状态、可暂停/取消；
+    /// 成功时自动关闭（2.5s，尊重 📌 KeepOpenOnComplete），失败时等待用户手动关闭。
+    /// 权限不足时关闭窗口后走提权流程。
+    /// </summary>
+    private static async Task<bool> RunCliExtractWithProgressAsync(
+        string archivePath,
+        string targetDir,
+        string? password,
+        IArchiveEngine engine,
+        string[] originalArgs,
+        IClassicDesktopStyleApplicationLifetime desktop)
+    {
+        var progressWindow = new ProgressWindow(LocalizationManager.T("Progress_Title_Extract"));
+        progressWindow.InitCancellation();
+        progressWindow.Show();
+        desktop.MainWindow = progressWindow;
+
+        // 始终显示文件列表（单文件也显示）：批处理列表项 = 压缩包路径
+        progressWindow.InitBatchMode(new[] { archivePath });
+        progressWindow.SetCurrentBatchItem(0);
+
+        var ct = progressWindow.CancellationToken;
+        var doneEvent = new ManualResetEventSlim(false);
+        Exception? captureException = null;
+        bool cancelled = false;
+        bool elevationRequested = false;
+
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                var rawProgress = progressWindow.CreatePauseAwareProgress(
+                    ProgressWindow.CreateBackgroundProgress(progressWindow));
+
+                var extractResult = await engine.ExtractAsync(archivePath, targetDir, password, rawProgress, ct);
+
+                progressWindow.FinalizeBatch();
+                await Dispatcher.UIThread.InvokeAsync(() =>
+                {
+                    if (extractResult.HasFailures)
+                    {
+                        // 部分条目失败（如权限不足）：显示错误汇总（对齐 WPF ExtractResult.HasFailures 路径）
+                        progressWindow.SetErrorSummary(
+                            $"{extractResult.FailedEntries} 个文件未能写入到 {targetDir}（可能权限不足）");
+                    }
+                    progressWindow.SetComplete(LocalizationManager.T("Cli_StatusDone"));
+                });
+                Console.WriteLine($"Extracted: {archivePath} -> {targetDir}");
+                TryDeleteArchiveAfterExtract(archivePath);
+            }
+            catch (OperationCanceledException)
+            {
+                cancelled = true;
+            }
+            catch (UnauthorizedAccessException)
+            {
+                // 目录创建级权限不足：关闭窗口后由外层走提权流程
+                elevationRequested = true;
+                await Dispatcher.UIThread.InvokeAsync(() =>
+                {
+                    progressWindow.Close();
+                    desktop.MainWindow = null;
+                });
+            }
+            catch (Exception ex)
+            {
+                captureException = ex;
+                Console.Error.WriteLine($"Extraction failed: {ex.Message}");
+            }
+            finally
+            {
+                doneEvent.Set();
+            }
+        });
+
+        await Task.Run(() => doneEvent.Wait());
+        progressWindow.FinalizeBatch();
+
+        if (elevationRequested)
+        {
+            return await HandleElevationAsync(new[] { targetDir }, originalArgs, desktop);
+        }
+
+        if (cancelled)
+        {
+            await Dispatcher.UIThread.InvokeAsync(() => progressWindow.Close());
+            return false;
+        }
+
+        if (captureException != null)
+        {
+            // 失败：标记批次项为 Failed（FinalizeBatch 已把 InProgress 置为 Completed，这里覆盖为失败）
+            progressWindow.UpdateBatchItemStatus(0, BatchItemStatus.Failed, captureException.Message);
+            // 显示错误汇总并等待用户手动关闭窗口
+            await Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                progressWindow.SetErrorSummary(captureException!.Message);
+                progressWindow.CompleteWithErrors();
+            });
+            await WaitForWindowCloseAsync(progressWindow);
+            return false;
+        }
+
+        // 成功：自动关闭或等待（KeepOpenOnComplete 生效）
+        await progressWindow.AutoCloseOrWaitAsync(2500, () => progressWindow.Close());
+        return false;
+    }
+
+    /// <summary>
+    /// 等待用户手动关闭进度窗口（等待 Closed 事件）。
+    /// 若窗口已不可见（如取消流程已关闭），立即返回。
+    /// </summary>
+    private static async Task WaitForWindowCloseAsync(ProgressWindow window)
+    {
+        if (!window.IsVisible)
+            return;
+
+        var closed = new ManualResetEventSlim(false);
+        EventHandler handler = null!;
+        handler = (_, _) => { closed.Set(); window.Closed -= handler; };
+        window.Closed += handler;
+        try
+        {
+            await Task.Run(() => closed.Wait());
+        }
+        finally
+        {
+            window.Closed -= handler;
+        }
     }
 
     // ════════════════════════════════════════════════════════════════
@@ -1001,6 +1131,11 @@ public partial class App : Application
         var myPaths = paths.Where(p => File.Exists(p) || Directory.Exists(p)).ToList();
         if (myPaths.Count == 0) { desktop.Shutdown(); return; }
 
+        // 显式管理退出：对话框关闭时默认 ShutdownMode(OnLastWindowClose) 会立即退出进程，
+        // 但压缩流程需要在对话框关闭后继续显示 ProgressWindow（对齐 WPF HandleCompress 的
+        // app.ShutdownMode = OnExplicitShutdown 用法）
+        desktop.ShutdownMode = ShutdownMode.OnExplicitShutdown;
+
         if (OperatingSystem.IsWindows())
         {
             bool firstInstance;
@@ -1021,7 +1156,7 @@ public partial class App : Application
                     Dispatcher.UIThread.Post(async () =>
                     {
                         try { await ShowCompressDialogAndRun(allPaths, desktop); }
-                        finally { desktop.Shutdown(); }
+                        catch (Exception ex) { App.DebugLog($"HandleCompress: ShowCompressDialogAndRun 异常: {ex.Message}"); desktop.Shutdown(); }
                     });
                 });
             }
@@ -1037,7 +1172,7 @@ public partial class App : Application
             Dispatcher.UIThread.Post(async () =>
             {
                 try { await ShowCompressDialogAndRun(myPaths, desktop); }
-                finally { desktop.Shutdown(); }
+                catch (Exception ex) { App.DebugLog($"HandleCompress: ShowCompressDialogAndRun 异常: {ex.Message}"); desktop.Shutdown(); }
             });
         }
     }
@@ -1046,12 +1181,23 @@ public partial class App : Application
     {
         var dlg = new CompressSettingsWindow(paths);
 
+        // 压缩流程是否已接管（接管后由 CompressWithProgress 负责退出进程，这里不再退出）
+        bool compressStarted = false;
+
+        // 对话框关闭（用户点 X 或取消）→ 退出进程（对齐 WPF ShowCompressWindow 的 win.Closed += Shutdown）
+        dlg.Closed += (_, _) =>
+        {
+            if (!compressStarted)
+                desktop.Shutdown();
+        };
+
         // Intercept CloseAction: on "Compress", run the compression
         dlg.ViewModel.CloseAction = async (result) =>
         {
-            dlg.Close();
             if (result)
             {
+                compressStarted = true;
+                dlg.Close();
                 var vm = dlg.ViewModel;
                 var request = new CompressRequest
                 {
@@ -1068,6 +1214,11 @@ public partial class App : Application
                 };
 
                 await CompressWithProgress(request, LocalizationManager.T("Cli_Compress"), desktop);
+            }
+            else
+            {
+                // 取消 → 关闭对话框，Closed 事件触发退出
+                dlg.Close();
             }
             await Task.CompletedTask;
         };
@@ -1129,6 +1280,18 @@ public partial class App : Application
                 var allPaths = new List<string>(myPaths);
                 var cts = new CancellationTokenSource();
                 var pipeReady = new ManualResetEventSlim(false);
+
+        // 立即显示进度窗口，避免 IPC 收集期间用户无反馈（对齐 WPF HandleCompressSeparate）
+        var progressWindow = new ProgressWindow(LocalizationManager.T("Progress_Batch_Title"));
+        progressWindow.InitCancellation();
+        progressWindow.Show();
+        desktop.MainWindow = progressWindow;
+        // 收集期预填充首个实例的路径，列表始终可见
+        progressWindow.InitBatchMode(myPaths);
+        progressWindow.SetProgress(0, LocalizationManager.T("App_CompressCollecting"));
+                // IPC 收集期间点取消 → 同步终止管道收集
+                progressWindow.CancellationToken.Register(() => cts.Cancel());
+
                 StartPipeServer(allPaths, cts.Token, CompressSeparatePipeName, pipeReady);
                 pipeReady.Wait(3000);
 
@@ -1138,7 +1301,7 @@ public partial class App : Application
                     mutex.Dispose();
                     Dispatcher.UIThread.Post(async () =>
                     {
-                        try { await RunCompressSeparate(allPaths, desktop); }
+                        try { await RunCompressSeparate(allPaths, desktop, progressWindow); }
                         finally { desktop.Shutdown(); }
                     });
                 });
@@ -1159,7 +1322,10 @@ public partial class App : Application
         }
     }
 
-    private static async Task RunCompressSeparate(List<string> paths, IClassicDesktopStyleApplicationLifetime desktop)
+    private static async Task RunCompressSeparate(
+        List<string> paths,
+        IClassicDesktopStyleApplicationLifetime desktop,
+        ProgressWindow? existingWindow = null)
     {
         var settings = AppSettings.Load();
 
@@ -1173,7 +1339,12 @@ public partial class App : Application
             PreserveDirectoryRoot = true,
         };
 
-        await CompressWithProgress(request, LocalizationManager.T("Cli_BatchCompress"), desktop);
+        // 标题用批处理专用标题（InitBatchMode 不再覆盖标题，由调用方传入）
+        await CompressWithProgress(
+            request,
+            LocalizationManager.T("Progress_Batch_Title"),
+            desktop,
+            existingWindow);
     }
 
     // ════════════════════════════════════════════════════════════════
@@ -1268,36 +1439,71 @@ public partial class App : Application
     //  Shared: compress with ProgressWindow
     // ════════════════════════════════════════════════════════════════
 
-    private static async Task CompressWithProgress(CompressRequest request, string title, IClassicDesktopStyleApplicationLifetime desktop)
+    private static async Task CompressWithProgress(
+        CompressRequest request,
+        string title,
+        IClassicDesktopStyleApplicationLifetime desktop,
+        ProgressWindow? existingWindow = null)
     {
-        var progressWindow = new ProgressWindow(title);
-        progressWindow.InitCancellation();
-        progressWindow.Show();
+        var progressWindow = existingWindow ?? new ProgressWindow(title);
+        if (existingWindow == null)
+        {
+            progressWindow.InitCancellation();
+            progressWindow.Show();
+        }
         desktop.MainWindow = progressWindow;
+
+        // 始终显示文件列表（单文件也显示）：批处理列表项 = 输出路径
+        var outputPaths = AvaloniaCompressService.GetOutputPaths(request);
+        if (outputPaths is { Count: > 0 })
+            progressWindow.InitBatchMode(outputPaths);
 
         var doneEvent = new ManualResetEventSlim(false);
         Exception? captureException = null;
+        bool cancelled = false;
+        bool partialFailure = false;
 
         _ = Task.Run(async () =>
         {
             try
             {
-                var rawProgress = ProgressViewModel.CreateBackgroundProgress(
-                    progressWindow, p => progressWindow.SetProgress(p));
+                var rawProgress = progressWindow.CreatePauseAwareProgress(
+                    ProgressViewModel.CreateBackgroundProgress(
+                        progressWindow, p => progressWindow.SetProgress(p)));
 
                 var avCompress = new AvaloniaCompressService();
-                var result = await avCompress.CompressAsync(request, rawProgress, progressWindow.CancellationToken);
+                var result = await avCompress.CompressAsync(
+                    request,
+                    rawProgress,
+                    progressWindow.CancellationToken,
+                    onItemStatus: (index, status) =>
+                    {
+                        // 逐项状态更新驱动批处理文件列表（对齐 WPF CompressAsync onItemStatus 接线）
+                        progressWindow.SetCurrentBatchItem(index);
+                        progressWindow.UpdateBatchItemStatus(index, status);
+                    });
+                progressWindow.FinalizeBatch();
 
+                partialFailure = result.Failed > 0;
                 await Dispatcher.UIThread.InvokeAsync(() =>
                 {
-                    progressWindow.SetStatus(result.Failed > 0 ? LocalizationManager.T("Cli_StatusFailed") : LocalizationManager.T("Cli_StatusDone"));
-                    progressWindow.SetProgress(new ArchiveProgress { PercentComplete = 100 });
+                    if (partialFailure)
+                    {
+                        // 部分条目失败（如权限不足）：显示错误汇总（对齐 WPF result.Failed > 0 → CompleteWithErrors 分支）
+                        progressWindow.SetErrorSummary(
+                            $"{result.Failed} 个文件未能写入到 {request.OutputPath}（可能权限不足）");
+                        progressWindow.CompleteWithErrors();
+                    }
+                    else
+                    {
+                        progressWindow.SetComplete(LocalizationManager.T("Cli_StatusDone"));
+                    }
                 });
-
-                // Small delay so user can see completion
-                await Task.Delay(1500);
             }
-            catch (OperationCanceledException) { }
+            catch (OperationCanceledException)
+            {
+                cancelled = true;
+            }
             catch (Exception ex)
             {
                 captureException = ex;
@@ -1312,12 +1518,38 @@ public partial class App : Application
         // Wait for completion (non-blocking via the ongoing main loop)
         await Task.Run(() => doneEvent.Wait());
 
-        progressWindow.Close();
+        if (cancelled)
+        {
+            await Dispatcher.UIThread.InvokeAsync(() => progressWindow.Close());
+            desktop.Shutdown();
+            return;
+        }
 
         if (captureException != null)
-            Console.Error.WriteLine($"Compression error: {captureException.Message}");
+        {
+            // 失败：标记批次项为 Failed（FinalizeBatch 已把 InProgress 置为 Completed，这里覆盖为失败）
+            progressWindow.UpdateBatchItemStatus(0, BatchItemStatus.Failed, captureException.Message);
+            // 显示错误汇总并等待用户手动关闭窗口（对齐 WPF 失败分支 CompleteWithErrors + wait Closed）
+            await Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                progressWindow.SetErrorSummary(captureException!.Message);
+                progressWindow.CompleteWithErrors();
+            });
+            await WaitForWindowCloseAsync(progressWindow);
+            desktop.Shutdown();
+            return;
+        }
 
-        desktop.Shutdown();
+        if (partialFailure)
+        {
+            // 部分失败：等待用户手动关闭窗口后退出
+            await WaitForWindowCloseAsync(progressWindow);
+            desktop.Shutdown();
+            return;
+        }
+
+        // 成功：自动关闭（2.5s）或等待（📌 KeepOpenOnComplete 生效），窗口关闭后退出进程
+        await progressWindow.AutoCloseOrWaitAsync(2500, () => desktop.Shutdown());
     }
 
     // ════════════════════════════════════════════════════════════════

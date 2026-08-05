@@ -5,6 +5,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using MantisZip.Core.Abstractions;
 using MantisZip.Core.FileFilter;
+using MantisZip.Core.Models;
 using MantisZip.Core.Services;
 using MantisZip.Core;
 using MantisZip.Core.Utils;
@@ -111,8 +112,15 @@ public partial class MainWindowViewModel : ObservableObject
 
     /// <summary>
     /// 运行带进度窗口的操作。View 负责创建进度窗口、显示、执行操作、关闭窗口。
+    /// filePaths 非空时显示批处理文件列表（始终可见，单文件也显示）。
     /// </summary>
-    public Func<string, Func<IProgress<ArchiveProgress>, CancellationToken, Task>, Task<bool>>? RunWithProgress { get; set; }
+    public Func<string, IReadOnlyList<string>?, Func<IProgress<ArchiveProgress>, CancellationToken, Task>, Task<bool>>? RunWithProgress { get; set; }
+
+    /// <summary>
+    /// 由 View 设置的批处理状态上报回调（索引 + 状态）。
+    /// 操作闭包内可将其作为 onItemStatus 传给引擎，实时更新批处理列表项状态。
+    /// </summary>
+    public Action<int, BatchItemStatus>? BatchStatusReporter { get; set; }
 
     /// <summary>
     /// 由 View 设置的文件选择回调。返回选中的文件路径列表，取消返回 null。
@@ -1544,6 +1552,7 @@ public partial class MainWindowViewModel : ObservableObject
 
         var completed = await RunWithProgress(
             LocalizationManager.T("Status_Extracting"),
+            new[] { CurrentArchivePath! },
             async (progress, ct) =>
             {
                 // 有过滤条件：仅解压匹配条目（复用统一路径计算模块的入口；无 pathOverrides = 保留完整路径）
@@ -1635,6 +1644,7 @@ public partial class MainWindowViewModel : ObservableObject
 
         var completed = await RunWithProgress(
             LocalizationManager.T("Status_Extracting"),
+            new[] { CurrentArchivePath! },
             async (progress, ct) =>
             {
                 await new ExtractService().ExtractAsync(
@@ -1661,6 +1671,7 @@ public partial class MainWindowViewModel : ObservableObject
 
         var completed = await RunWithProgress(
             LocalizationManager.T("Status_Extracting"),
+            new[] { CurrentArchivePath! },
             async (progress, ct) =>
             {
                 await new ExtractService().ExtractAsync(
@@ -1729,6 +1740,7 @@ public partial class MainWindowViewModel : ObservableObject
 
         var completed = await RunWithProgress(
             LocalizationManager.T("Status_Extracting"),
+            new[] { CurrentArchivePath! },
             async (progress, ct) =>
             {
                 await new SelectedItemsExtractService().ExtractEntriesAsync(
@@ -1876,6 +1888,7 @@ public partial class MainWindowViewModel : ObservableObject
         if (RunWithProgress == null) return;
         var completed = await RunWithProgress(
             LocalizationManager.T("Status_Compressing"),
+            AvaloniaCompressService.GetOutputPaths(request),
             async (progress, ct) =>
             {
                 var svc = new AvaloniaCompressService();
@@ -1910,7 +1923,8 @@ public partial class MainWindowViewModel : ObservableObject
                         // Fallback: silently overwrite if no dialog callback
                         return new CompressConflictResolution(
                             Core.Abstractions.CompressConflictAction.Overwrite, null);
-                    });
+                    },
+                    onItemStatus: BatchStatusReporter);
             });
 
         if (completed)
@@ -2018,6 +2032,7 @@ public partial class MainWindowViewModel : ObservableObject
 
         var completed = await RunWithProgress(
             LocalizationManager.T("Status_TestingEntry"),
+            new[] { SelectedEntry.Name ?? string.Empty },
             async (progress, ct) =>
             {
                 // Simulate test by checking entry exists in archive
@@ -2046,6 +2061,7 @@ public partial class MainWindowViewModel : ObservableObject
 
         var completed = await RunWithProgress(
             LocalizationManager.T("Status_Extracting"),
+            new[] { CurrentArchivePath! },
             async (progress, ct) =>
             {
                 await new ExtractService().ExtractAsync(
@@ -2074,6 +2090,7 @@ public partial class MainWindowViewModel : ObservableObject
 
         var completed = await RunWithProgress(
             LocalizationManager.T("Status_SmartExtracting"),
+            new[] { CurrentArchivePath! },
             async (progress, ct) =>
             {
                 await new ExtractService().ExtractAsync(
@@ -2100,6 +2117,7 @@ public partial class MainWindowViewModel : ObservableObject
 
         var completed = await RunWithProgress(
             LocalizationManager.T("Status_TestingArchive"),
+            new[] { CurrentArchivePath! },
             async (progress, ct) =>
             {
                 await engine.TestArchiveAsync(CurrentArchivePath, password, progress, ct);
@@ -2163,6 +2181,7 @@ public partial class MainWindowViewModel : ObservableObject
 
         var completed = await RunWithProgress(
             LocalizationManager.T("Status_AddingFiles"),
+            files.ToArray(),
             async (progress, ct) =>
             {
                 var options = new ArchiveOptions { Password = password };
@@ -2190,6 +2209,7 @@ public partial class MainWindowViewModel : ObservableObject
 
         var completed = await RunWithProgress(
             LocalizationManager.T("Status_DeletingFiles"),
+            new[] { entryPath ?? string.Empty },
             async (progress, ct) =>
             {
                 await engine.DeleteEntriesAsync(CurrentArchivePath, new[] { entryPath }, password, progress, ct);

@@ -149,13 +149,14 @@ public partial class ProgressViewModel : ObservableObject
 
     /// <summary>
     /// Cancel the current operation. Called by the Cancel button.
+    /// Always requests window close (matches WPF CancelButton_Click), regardless of batch mode.
+    /// The window close is a no-op when the caller already owns the close (e.g. RunWithProgress's finally).
     /// </summary>
     [RelayCommand]
     private void Cancel()
     {
         _cts?.Cancel();
-        if (_isBatchMode)
-            RequestClose?.Invoke();
+        RequestClose?.Invoke();
     }
 
     /// <summary>
@@ -291,7 +292,7 @@ public partial class ProgressViewModel : ObservableObject
             }));
         OnPropertyChanged(nameof(BatchItems));
         OnPropertyChanged(nameof(IsBatchMode));
-        WindowTitle = LocalizationManager.T("Progress_Batch_Title");
+        // 注意：不在此处覆盖 WindowTitle —— 标题由调用方传入（非批处理操作也显示列表，标题不能只属于批处理）
     }
 
     /// <summary>

@@ -445,6 +445,10 @@ public partial class CompressSettingsViewModel : ObservableObject
         // Must be called after SelectedPaths is populated (the CollectionChanged
         // handler won't fire for items added before it was attached).
         UpdateAutoRules();
+
+        // 自动填充输出路径：CollectionChanged 不会为构造时已添加的路径触发，
+        // 需显式调用（对齐 WPF ShowCompressWindow 自动填充输出路径；CLI --compress 依赖此逻辑）
+        TryAutoFillOutputPath();
     }
 
     /// <summary>

@@ -99,7 +99,10 @@ internal class DragDropService
         try
         {
             pw.Show();
-            var progress = ProgressViewModel.CreateBackgroundProgress(pw, p => pw.SetProgress(p));
+            // 始终显示文件列表（单文件拖出也显示）：列表项 = 待解压条目
+            pw.InitBatchMode(itemsToExtract.Select(i => i.FullPath ?? i.Name ?? string.Empty).ToList());
+            var progress = pw.CreatePauseAwareProgress(
+                ProgressViewModel.CreateBackgroundProgress(pw, p => pw.SetProgress(p)));
 
             await new SelectedItemsExtractService().ExtractEntriesAsync(
                 _archivePath, _password, itemsToExtract, targetDir,

@@ -21,6 +21,16 @@
 
 ### MantisZip.UI.Avalonia（主力版）
 
+**2026-08-05** — 进度窗口全面对齐 WPF：批处理列表始终可见 + 暂停真实生效 + 完成态/钉住 + CLI 解压/压缩全程进度窗口 + `--compress` 对话框修复
+  - **批处理文件列表始终可见**：`ProgressWindow.axaml` 移除 `IsVisible="False"`（单文件操作也显示列表）；`MainWindowViewModel.RunWithProgress` 签名扩展为 `(title, filePaths, operation)`，11 个调用点传入列表项（解压=压缩包路径、压缩=输出路径、测试=条目名）；新增 `BatchStatusReporter` 回调把引擎 `onItemStatus` 逐项状态接到 `SetCurrentBatchItem`/`UpdateBatchItemStatus`；`InitBatchMode` 不再覆盖 WindowTitle（标题由调用方传入）
+  - **暂停真实生效**：`RunWithProgress`/拖拽解压/CLI 解压/压缩的进度经 `CreatePauseAwareProgress` 嵌套包装，暂停事件真实阻断操作（此前多路径直接 `CreateBackgroundProgress` 导致暂停键无效果）
+  - **完成态与 📌 钉住**：`RunWithProgress` 成功路径 `SetComplete` + `AutoCloseOrWaitAsync(0, Close)`（尊重 KeepOpenOnComplete，对齐 WPF MainWindow.Menu.cs）；`CompressWithProgress` 重写结尾四分支——成功 `SetComplete` + `AutoCloseOrWaitAsync(2500, Shutdown)`、部分失败 `result.Failed>0` → `SetErrorSummary`+`CompleteWithErrors`+等待手动关闭、异常 → `UpdateBatchItemStatus(Failed)`+错误汇总+等待手动关闭、取消 → 关窗+退出；移除内部 `Task.Delay(1500)`
+  - **CLI 解压进度窗口**：新增 `RunCliExtractWithProgressAsync`（对齐 WPF HandleExtractBatchCore）——CLI 解压（`--extract`/`--extract-smart` 等 5 个分发点）全程显示 ProgressWindow（列表+逐项状态+暂停/取消），成功 2.5s 自动关闭、`ExtractResult.HasFailures` 显示错误汇总等待手动关闭、`UnauthorizedAccessException` 关闭窗口后走提权流程；`WaitForWindowCloseAsync` helper 复用
+  - **`--compress` 对话框修复（3 层 bug，实测暴露）**：① `ShowCompressDialogAndRun` 非阻塞 `dlg.Show()` + `finally { desktop.Shutdown(); }` 导致对话框出现即被杀死 → 改 `Closed` 事件 + `compressStarted` 标志（对齐 WPF `win.Closed += Shutdown`）；② `CompressSettingsViewModel` 构造函数在挂载 `CollectionChanged` 前添加路径，`TryAutoFillOutputPath()` 永不触发 → 构造函数末尾显式调用（对齐 WPF ShowCompressWindow 自动填充，CLI `--compress` 依赖此逻辑，此前 OutputPath 为空直接报错）；③ `HandleCompress` 设置 `ShutdownMode.OnExplicitShutdown`（对话框关闭触发默认 OnLastWindowClose 会在压缩开始前杀死进程——日志证实 ZipEngine 已进入但无完成记录）
+  - **`--compress-separate` IPC 期间进度窗口**：管道收集期立即显示 ProgressWindow（`InitBatchMode` 预填首个实例路径 + `App_CompressCollecting` 收集提示），取消同步终止管道；`CompressWithProgress` 支持复用现有窗口
+  - **实测验证**（UI Automation 驱动真实进程）：`--extract`/`--extract-smart`/`--compress-quick`/`--compress-separate`/`--compress-combined` 全部退出码 0、产物正确；失败路径（损坏 zip）不自动退出等待手动关闭；`--compress` 对话框→点击开始压缩→生成正确 zip→自动关闭→退出；取消路径正常退出
+  - 本地化：新增 `App_CompressCollecting`（zh/en 成对）；构建 0 errors 0 warnings；Core 253 测试通过；Avalonia 41 通过（2 跳过）
+
 **2026-08-05** — 解压路径统一为单一事实源（`ExtractPathResolver`）+ ExtractSettings 文件过滤接入实际解压
   - **问题根因**：「解压选择文件到」实际解压按 `ExtractPreserveFullPath` 裁剪路径，但 `ResultPreviewService.BuildExtractPreview` 恒按「保留完整路径」建树 → 预览树与实际落盘不一致
   - **核心改造**：新增 Core `ExtractPathResolver`（`TrimCurrentFolderPrefix`/`ResolveRelativePath`/`ResolveAll`，语义与解压侧历史逻辑逐字一致），预览树与实际解压共用同一路径计算，从结构上杜绝不一致；`BuildExtractPreview` 新增 `preserveFullPath`（默认 `true`）/`currentFolder`（默认 `""`）参数，恶意路径条目逐条 try-catch 跳过（解压侧保持抛异常整批失败）
