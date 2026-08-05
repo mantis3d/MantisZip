@@ -25,18 +25,19 @@ internal static class WindowStateManager
     /// <summary>
     /// 从 JSON 恢复窗口状态。
     /// 仅在 Width/Height > 0 时恢复；忽略 Position 为默认值的情况。
+    /// 返回保存的列状态（可能为 null，表示无列数据或加载失败）。
     /// </summary>
-    public static void Load(Window window)
+    public static List<ColumnStateDto>? Load(Window window)
     {
         if (!File.Exists(ConfigFile))
-            return;
+            return null;
 
         try
         {
             var json = File.ReadAllText(ConfigFile);
             var snapshot = JsonSerializer.Deserialize<WindowStateSnapshot>(json);
             if (snapshot == null)
-                return;
+                return null;
 
             if (snapshot.Width > 0 && snapshot.Height > 0)
             {
@@ -58,10 +59,13 @@ internal static class WindowStateManager
                 if (ws is WindowState.Normal or WindowState.Maximized or WindowState.Minimized)
                     window.WindowState = ws;
             }
+
+            return snapshot.ColumnStates;
         }
         catch (Exception ex)
         {
             App.DebugLog($"WindowStateManager.Load: failed: {ex.Message}");
+            return null;
         }
     }
 
@@ -69,7 +73,9 @@ internal static class WindowStateManager
     /// 将当前窗口状态序列化到 JSON。
     /// 仅保存 Normal / Maximized 窗口的大小位置；最小化或全屏时跳过。
     /// </summary>
-    public static void Save(Window window)
+    /// <param name="window">目标窗口。</param>
+    /// <param name="columnStates">DataGrid 列状态快照（可为 null，兼容仅窗口尺寸的旧格式）。</param>
+    public static void Save(Window window, IReadOnlyList<ColumnStateDto>? columnStates = null)
     {
         try
         {
@@ -84,6 +90,7 @@ internal static class WindowStateManager
                 X = window.Position.X,
                 Y = window.Position.Y,
                 State = (int)window.WindowState,
+                ColumnStates = columnStates?.ToList() ?? new List<ColumnStateDto>(),
             };
 
             if (!Directory.Exists(BaseDir))
@@ -98,6 +105,18 @@ internal static class WindowStateManager
         }
     }
 
+    /// <summary>
+    /// DataGrid 列状态。字段与 WPF 版 window.json 的 ColumnStates 兼容：
+    /// ColumnId = 列的 SortMemberPath（无 SortMemberPath 的列不参与持久化）。
+    /// </summary>
+    public sealed class ColumnStateDto
+    {
+        public string? ColumnId { get; set; }
+        public double Width { get; set; }
+        public bool Visible { get; set; }
+        public int DisplayIndex { get; set; }
+    }
+
     private class WindowStateSnapshot
     {
         public double Width { get; set; }
@@ -105,5 +124,6 @@ internal static class WindowStateManager
         public int X { get; set; }
         public int Y { get; set; }
         public int State { get; set; } = (int)WindowState.Normal;
+        public List<ColumnStateDto> ColumnStates { get; set; } = new();
     }
 }
