@@ -1808,16 +1808,17 @@ public partial class MainWindowViewModel : ObservableObject
             SplitSize = vm.SplitSize,
             PreserveDirectoryRoot = settings.PreserveDirectoryRoot,
             KeepOriginalExtension = settings.KeepOriginalExtension,
-            FileNameEncoding = settings.ZipEncoding,
-            ZipCompressionMethod = settings.ZipCompressionMethod,
-            ZipEncryptionMethod = settings.ZipEncryptionMethod,
-            SevenZipCompressionMethod = settings.SevenZipCompressionMethod,
-            SevenZipSolid = settings.SevenZipSolid,
-            SevenZipSolidBlockSize = settings.SevenZipSolidBlockSize,
-            SevenZipDictionarySize = settings.SevenZipDictionarySize,
-            SevenZipNumFastBytes = settings.SevenZipNumFastBytes,
-            SevenZipMatchFinder = settings.SevenZipMatchFinder,
-            SevenZipEncryptHeaders = settings.SevenZipEncryptHeaders,
+            // 高级格式选项从对话框 ViewModel 读取（仅本次压缩生效），不再从 AppSettings 中转
+            FileNameEncoding = vm.FileNameEncoding,
+            ZipCompressionMethod = vm.ZipCompressionMethod,
+            ZipEncryptionMethod = vm.ZipEncryptionMethod,
+            SevenZipCompressionMethod = vm.SevenZipCompressionMethod,
+            SevenZipSolid = vm.SevenZipSolid,
+            SevenZipSolidBlockSize = vm.SevenZipSolidBlockSize,
+            SevenZipDictionarySize = vm.SevenZipDictionarySize,
+            SevenZipNumFastBytes = vm.SevenZipNumFastBytes,
+            SevenZipMatchFinder = vm.SevenZipMatchFinder,
+            SevenZipEncryptHeaders = vm.SevenZipEncryptHeaders,
         };
 
         if (RunWithProgress == null) return;

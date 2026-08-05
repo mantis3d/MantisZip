@@ -117,6 +117,21 @@ public partial class MainWindow : Window
                 cvm.Comment = dialog.ViewModel.Comment;
                 cvm.CommentDistribution = dialog.ViewModel.CommentDistribution;
                 cvm.FileFilter = dialog.GetFilter();
+
+                // 高级格式选项（仅本次压缩生效，来源为对话框面板快照，不再经 AppSettings 中转）
+                cvm.FileNameEncoding = dialog.ViewModel.FileNameEncoding;
+                cvm.ZipCompressionMethod = dialog.ViewModel.ZipCompressionMethod;
+                cvm.ZipEncryptionMethod = dialog.ViewModel.ZipEncryptionMethod;
+                cvm.SevenZipCompressionMethod = dialog.ViewModel.SevenZipCompressionMethod;
+                cvm.SevenZipSolid = dialog.ViewModel.SevenZipSolid;
+                cvm.SevenZipSolidBlockSize = dialog.ViewModel.SevenZipSolidBlockSize;
+                cvm.SevenZipDictionarySize = dialog.ViewModel.SevenZipDictionarySize;
+                cvm.SevenZipNumFastBytes = dialog.ViewModel.SevenZipNumFastBytes;
+                cvm.SevenZipMatchFinder = dialog.ViewModel.SevenZipMatchFinder;
+                cvm.SevenZipEncryptHeaders = dialog.ViewModel.SevenZipEncryptHeaders;
+                // 分卷设置（同样仅本次生效；此前未复制导致 cvm.SplitSize 恒为 0，对话框分卷选择丢失）
+                cvm.SelectedSplitSizeOption = dialog.ViewModel.SelectedSplitSizeOption;
+                cvm.CustomSplitSizeText = dialog.ViewModel.CustomSplitSizeText;
             }
             return result;
         };
