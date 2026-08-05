@@ -21,7 +21,12 @@
 
 ### MantisZip.UI.Avalonia（主力版）
 
-**2026-08-04** — 列选择菜单切换图标与主菜单 ToggleIconBox 样式对齐 + AGENTS.md 全局类样式约定补全
+**2026-08-05** — 文件列表列宽可拖拽调整 + 列状态持久化（WPF 功能补齐）
+  - **启用拖拽**：`FileListGrid` 加 `CanUserResizeColumns="True"`——Avalonia 12 DataGrid 该属性默认 `false`（源码核实 `Register<DataGrid, bool>` 未传默认值，`DATAGRID_defaultCanUserResizeColumns=true` 为移植遗留的未使用常量），与 WPF 默认 `true` 相反，必须显式开启
+  - **名称列像素化**：`Width="*"` → `Width="250" MinWidth="120" MaxWidth="800"`——源码核实 Star sizing 下最后可见列不可拖（`CanResizeColumn` 对 `LastVisibleColumn` 返回 false），像素化后 6 列全部可拖；其余列补 `MinWidth/MaxWidth`（大小 60/400、压缩后 60/400、比率 60/300、日期 80/400），拖拽结果受列级 Min/Max 强制约束，均对齐 WPF
+  - **持久化**：`WindowStateManager` 扩展 `ColumnStates`（`ColumnId=SortMemberPath`/`Width`/`Visible`/`DisplayIndex`），与 WPF window.json 的 ColumnStates 结构双向兼容（未知字段忽略、无匹配列跳过）；`MainWindow` 构造时 `ApplyColumnStates` 恢复、`Closing` 时 `CaptureColumnStates` 保存；名称列强制不可隐藏；图标列（无 SortMemberPath）不参与
+  - **端到端验证**：写入 WPF 格式 window.json（含 TreeColumnWidth/Crc32/IsEncrypted 等 Avalonia 无字段）→ 启动恢复 5 列宽 → WM_CLOSE 正常关闭回写一致；Crc32/IsEncrypted 正确跳过；构建 0 errors
+
   - **切换图标对齐**：`ColumnHeaderContextMenu_Opening` 的列可见性菜单项图标由 `MenuItem.Icon` 槽位 CheckBox 改为与主菜单切换项同构的 `Border.ToggleIconBox`（继承 App.axaml 全局样式：20×20、圆角 3、边框 1.5、背景过渡动画）+ 12×12 `PathIcon`（几何取自列标题自身，保证与列头图标一致）；`Background` 用 `BoolToToggleBgBrushConverter`（可见 → `ThemeToggleBrush` 强调色底，隐藏 → 透明空心）
   - **放置位置对齐**：切换盒与文字改放 `MenuItem.Header` 的 `StackPanel`（`Spacing` 解析 `SpacingXxs` 紧凑度资源，新增 `GetSpacingXxs` helper），不再放 Icon 槽位——与主菜单 4 处切换项（MainWindow.axaml:217-269）逐项一致
   - **AGENTS.md 规则 4 补全**：新增「Avalonia 全局类样式」小节，文档化 App.axaml 定义的 6 个类（`ToolbarButton`/`ToolbarIcon`/`ToolbarButtonIcon`/`ToolbarButtonLabel`/`compactTab`/`ToggleIconBox`）+ 两条注意（PathIcon 不继承 Foreground、全局 TextBlock 不设 Foreground 以保护 emoji）
