@@ -1024,6 +1024,8 @@ public partial class App : Application
             dlg.Close();
             if (result)
             {
+                // 此入口覆盖了窗口内部 CloseAction，需显式快照高级选项（仅本次压缩生效）
+                dlg.SnapshotFormatOptionsToViewModel();
                 var vm = dlg.ViewModel;
                 var request = new CompressRequest
                 {
@@ -1037,6 +1039,17 @@ public partial class App : Application
                     CommentDistribution = vm.CommentDistribution,
                     OutputPath = vm.OutputPath,
                     PreserveDirectoryRoot = true,
+                    SplitSize = vm.SplitSize,
+                    FileNameEncoding = vm.FileNameEncoding,
+                    ZipCompressionMethod = vm.ZipCompressionMethod,
+                    ZipEncryptionMethod = vm.ZipEncryptionMethod,
+                    SevenZipCompressionMethod = vm.SevenZipCompressionMethod,
+                    SevenZipSolid = vm.SevenZipSolid,
+                    SevenZipSolidBlockSize = vm.SevenZipSolidBlockSize,
+                    SevenZipDictionarySize = vm.SevenZipDictionarySize,
+                    SevenZipNumFastBytes = vm.SevenZipNumFastBytes,
+                    SevenZipMatchFinder = vm.SevenZipMatchFinder,
+                    SevenZipEncryptHeaders = vm.SevenZipEncryptHeaders,
                 };
 
                 await CompressWithProgress(request, "压缩", desktop);
