@@ -35,6 +35,55 @@ public class CompressSettingsViewModelTests
     }
 
     [Fact]
+    public void AdvancedFormatOptions_Constructor_MirrorsAppSettings()
+    {
+        // 高级格式选项在构造函数中从 AppSettings 读取默认值，
+        // 保证对话框初始值与设置窗口一致（此后用户修改仅影响本次压缩）
+        var s = AppSettings.Load();
+        var vm = new CompressSettingsViewModel(Array.Empty<string>());
+
+        Assert.Equal(s.ZipEncoding ?? "utf-8", vm.FileNameEncoding);
+        Assert.Equal(s.ZipCompressionMethod ?? "deflate", vm.ZipCompressionMethod);
+        Assert.Equal(s.SevenZipCompressionMethod ?? "LZMA2", vm.SevenZipCompressionMethod);
+        Assert.Equal(s.SevenZipSolid, vm.SevenZipSolid);
+        Assert.Equal(s.SevenZipSolidBlockSize ?? "", vm.SevenZipSolidBlockSize);
+        Assert.Equal(s.SevenZipDictionarySize, vm.SevenZipDictionarySize);
+        Assert.Equal(s.SevenZipNumFastBytes, vm.SevenZipNumFastBytes);
+        Assert.Equal(s.SevenZipMatchFinder ?? "", vm.SevenZipMatchFinder);
+        Assert.Equal(s.ZipEncryptionMethod ?? "aes256", vm.ZipEncryptionMethod);
+        Assert.Equal(s.SevenZipEncryptHeaders, vm.SevenZipEncryptHeaders);
+    }
+
+    [Fact]
+    public void AdvancedFormatOptions_AreSettable()
+    {
+        // 请求构建点（ExecuteCompressFromSettings / CLI）从这些属性读取，
+        // 验证它们可被对话框快照写入并原样读出
+        var vm = new CompressSettingsViewModel(Array.Empty<string>());
+        vm.FileNameEncoding = "gbk";
+        vm.ZipCompressionMethod = "deflate64";
+        vm.SevenZipCompressionMethod = "PPMd";
+        vm.SevenZipSolid = false;
+        vm.SevenZipSolidBlockSize = "64m";
+        vm.SevenZipDictionarySize = 64 * 1024 * 1024;
+        vm.SevenZipNumFastBytes = 128;
+        vm.SevenZipMatchFinder = "bt4";
+        vm.ZipEncryptionMethod = "zipcrypto";
+        vm.SevenZipEncryptHeaders = false;
+
+        Assert.Equal("gbk", vm.FileNameEncoding);
+        Assert.Equal("deflate64", vm.ZipCompressionMethod);
+        Assert.Equal("PPMd", vm.SevenZipCompressionMethod);
+        Assert.False(vm.SevenZipSolid);
+        Assert.Equal("64m", vm.SevenZipSolidBlockSize);
+        Assert.Equal(64 * 1024 * 1024, vm.SevenZipDictionarySize);
+        Assert.Equal(128, vm.SevenZipNumFastBytes);
+        Assert.Equal("bt4", vm.SevenZipMatchFinder);
+        Assert.Equal("zipcrypto", vm.ZipEncryptionMethod);
+        Assert.False(vm.SevenZipEncryptHeaders);
+    }
+
+    [Fact]
     public void PasswordStrength_Empty_ReturnsNone()
     {
         var vm = new CompressSettingsViewModel(Array.Empty<string>());

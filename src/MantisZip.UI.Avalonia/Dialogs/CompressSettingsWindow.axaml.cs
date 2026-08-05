@@ -68,8 +68,9 @@ public partial class CompressSettingsWindow : Window
         {
             if (result)
             {
-                // 关闭前将 DynamicFormatOptionsPanel 当前值写回 AppSettings
-                SaveFormatOptionsToSettings();
+                // 关闭前将 DynamicFormatOptionsPanel 当前值快照到 ViewModel，
+                // 供压缩流程读取本次对话框设置的高级选项（仅本次压缩生效，不写回 AppSettings）
+                SnapshotFormatOptionsToViewModel();
             }
             Close(result);
             await Task.CompletedTask;
@@ -245,28 +246,21 @@ DataContext = ViewModel;
     }
 
     /// <summary>
-    /// 将 DynamicFormatOptionsPanel 的当前值保存到 AppSettings。
-    /// 在关闭前调用，确保后续压缩流程能读取到最新的高级选项设置。
+    /// 将 DynamicFormatOptionsPanel 的当前值快照到 ViewModel，供压缩流程读取。
+    /// 在关闭前调用；不再写回 AppSettings，避免污染设置窗口的全局默认值。
+    /// 公开供 CLI 入口（App.axaml.cs 覆盖 CloseAction 后）显式调用。
     /// </summary>
-    private void SaveFormatOptionsToSettings()
+    public void SnapshotFormatOptionsToViewModel()
     {
-        var s = AppSettings.Load();
-
-        s.DefaultFormat = ViewModel.DefaultFormat;
-        s.ZipEncoding = FormatOptionsPanel.FileNameEncoding ?? "utf-8";
-        s.ZipCompressionMethod = FormatOptionsPanel.ZipCompressionMethod ?? "deflate";
-        s.SevenZipCompressionMethod = FormatOptionsPanel.SevenZipCompressionMethod ?? "LZMA2";
-        s.SevenZipSolid = FormatOptionsPanel.SevenZipSolid;
-        s.SevenZipSolidBlockSize = FormatOptionsPanel.SevenZipSolidBlockSize ?? "";
-        s.SevenZipDictionarySize = FormatOptionsPanel.SevenZipDictionarySize;
-        s.SevenZipNumFastBytes = FormatOptionsPanel.SevenZipNumFastBytes;
-        s.SevenZipMatchFinder = FormatOptionsPanel.SevenZipMatchFinder ?? "";
-        s.ZipEncryptionMethod = ViewModel.ZipEncryptionMethod;
-        s.SevenZipEncryptHeaders = ViewModel.SevenZipEncryptHeaders;
-        s.SplitSizeTag = ViewModel.SelectedSplitSizeOption?.Tag ?? "0";
-        s.CustomSplitSizeMB = ViewModel.CustomSplitSizeText;
-
-        s.Save();
+        ViewModel.FileNameEncoding = FormatOptionsPanel.FileNameEncoding ?? "utf-8";
+        ViewModel.ZipCompressionMethod = FormatOptionsPanel.ZipCompressionMethod ?? "deflate";
+        ViewModel.SevenZipCompressionMethod = FormatOptionsPanel.SevenZipCompressionMethod ?? "LZMA2";
+        ViewModel.SevenZipSolid = FormatOptionsPanel.SevenZipSolid;
+        ViewModel.SevenZipSolidBlockSize = FormatOptionsPanel.SevenZipSolidBlockSize ?? "";
+        ViewModel.SevenZipDictionarySize = FormatOptionsPanel.SevenZipDictionarySize;
+        ViewModel.SevenZipNumFastBytes = FormatOptionsPanel.SevenZipNumFastBytes;
+        ViewModel.SevenZipMatchFinder = FormatOptionsPanel.SevenZipMatchFinder ?? "";
+        // ZipEncryptionMethod / SevenZipEncryptHeaders 已通过 XAML 双向绑定到 ViewModel，无需快照
     }
 
     /// <summary>

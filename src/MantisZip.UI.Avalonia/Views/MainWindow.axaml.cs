@@ -46,7 +46,8 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
 
-        WindowStateManager.Load(this);
+        var columnStates = WindowStateManager.Load(this);
+        ApplyColumnStates(columnStates);
 
         var vm = new MainWindowViewModel();
         vm.GetOpenFilePath = OpenFileDialogAsync;
@@ -121,6 +122,21 @@ public partial class MainWindow : Window
                 cvm.Comment = dialog.ViewModel.Comment;
                 cvm.CommentDistribution = dialog.ViewModel.CommentDistribution;
                 cvm.FileFilter = dialog.GetFilter();
+
+                // 高级格式选项（仅本次压缩生效，来源为对话框面板快照，不再经 AppSettings 中转）
+                cvm.FileNameEncoding = dialog.ViewModel.FileNameEncoding;
+                cvm.ZipCompressionMethod = dialog.ViewModel.ZipCompressionMethod;
+                cvm.ZipEncryptionMethod = dialog.ViewModel.ZipEncryptionMethod;
+                cvm.SevenZipCompressionMethod = dialog.ViewModel.SevenZipCompressionMethod;
+                cvm.SevenZipSolid = dialog.ViewModel.SevenZipSolid;
+                cvm.SevenZipSolidBlockSize = dialog.ViewModel.SevenZipSolidBlockSize;
+                cvm.SevenZipDictionarySize = dialog.ViewModel.SevenZipDictionarySize;
+                cvm.SevenZipNumFastBytes = dialog.ViewModel.SevenZipNumFastBytes;
+                cvm.SevenZipMatchFinder = dialog.ViewModel.SevenZipMatchFinder;
+                cvm.SevenZipEncryptHeaders = dialog.ViewModel.SevenZipEncryptHeaders;
+                // 分卷设置（同样仅本次生效；此前未复制导致 cvm.SplitSize 恒为 0，对话框分卷选择丢失）
+                cvm.SelectedSplitSizeOption = dialog.ViewModel.SelectedSplitSizeOption;
+                cvm.CustomSplitSizeText = dialog.ViewModel.CustomSplitSizeText;
             }
             return result;
         };
@@ -558,8 +574,80 @@ public partial class MainWindow : Window
                 e.Handled = true;
         });
 
-        // Persist window position/size/state on close
-        Closing += (_, _) => WindowStateManager.Save(this);
+        // Persist window position/size/state + column widths on close
+        Closing += (_, _) => WindowStateManager.Save(this, CaptureColumnStates());
+    }
+
+    /// <summary>
+    /// 将 window.json 中保存的列状态应用到 FileListGrid（按 ColumnId=SortMemberPath 匹配）。
+    /// 名称列不允许隐藏；无 SortMemberPath 的列（图标列）不参与。
+    /// </summary>
+    private void ApplyColumnStates(List<WindowStateManager.ColumnStateDto>? states)
+    {
+        if (states == null || states.Count == 0)
+            return;
+
+        try
+        {
+            var columnDict = new Dictionary<string, DataGridColumn>();
+            foreach (var col in FileListGrid.Columns)
+            {
+                if (!string.IsNullOrEmpty(col.SortMemberPath) && !columnDict.ContainsKey(col.SortMemberPath))
+                    columnDict[col.SortMemberPath] = col;
+            }
+
+            // 按保存的 DisplayIndex 升序应用，避免设置顺序冲突
+            foreach (var state in states.Where(s => !string.IsNullOrEmpty(s.ColumnId))
+                                        .OrderBy(s => s.DisplayIndex))
+            {
+                if (state.ColumnId == null || !columnDict.TryGetValue(state.ColumnId, out var col))
+                    continue;
+
+                if (state.Width > 0)
+                    col.Width = new DataGridLength(state.Width);
+
+                // 名称列不可隐藏
+                if (state.ColumnId != "Name")
+                    col.IsVisible = state.Visible;
+
+                col.DisplayIndex = state.DisplayIndex;
+            }
+        }
+        catch (Exception ex)
+        {
+            App.DebugLog($"ApplyColumnStates: failed: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// 捕获 FileListGrid 各列的宽度/可见性/顺序快照（仅限有 SortMemberPath 的列），
+    /// 供 WindowStateManager.Save 持久化到 window.json。
+    /// </summary>
+    private List<WindowStateManager.ColumnStateDto>? CaptureColumnStates()
+    {
+        try
+        {
+            var states = new List<WindowStateManager.ColumnStateDto>();
+            foreach (var col in FileListGrid.Columns)
+            {
+                if (string.IsNullOrEmpty(col.SortMemberPath))
+                    continue;
+
+                states.Add(new WindowStateManager.ColumnStateDto
+                {
+                    ColumnId = col.SortMemberPath,
+                    Width = col.Width.Value,
+                    Visible = col.IsVisible,
+                    DisplayIndex = col.DisplayIndex
+                });
+            }
+            return states;
+        }
+        catch (Exception ex)
+        {
+            App.DebugLog($"CaptureColumnStates: failed: {ex.Message}");
+            return null;
+        }
     }
 
     /// <summary>
@@ -577,13 +665,21 @@ public partial class MainWindow : Window
         return null;
     }
 
-    private void FileListGrid_DoubleTapped(object? sender, TappedEventArgs e)
-    {        if (sender is not DataGrid grid) return;
-        if (grid.SelectedItem is ArchiveItemModel item && item.IsDirectory)
+    private async void FileListGrid_DoubleTapped(object? sender, TappedEventArgs e)
+    {
+        if (sender is not DataGrid grid) return;
+        if (grid.SelectedItem is not ArchiveItemModel item) return;
+        if (DataContext is not MainWindowViewModel vm) return;
+
+        if (item.IsDirectory)
         {
-            if (DataContext is MainWindowViewModel vm)
-                vm.NavigateToFolderPath(item.FullPath);
+            vm.NavigateToFolderPath(item.FullPath);
+            return;
         }
+
+        // 文件双击：提取到临时目录并用系统默认方式打开
+        if (!string.IsNullOrEmpty(vm.CurrentArchivePath))
+            await vm.OpenEntryWithDefaultAppAsync(item);
     }
 
     private void FileListGrid_KeyDown(object? sender, global::Avalonia.Input.KeyEventArgs e)

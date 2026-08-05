@@ -31,6 +31,26 @@
   - **实测验证**（UI Automation 驱动真实进程）：`--extract`/`--extract-smart`/`--compress-quick`/`--compress-separate`/`--compress-combined` 全部退出码 0、产物正确；失败路径（损坏 zip）不自动退出等待手动关闭；`--compress` 对话框→点击开始压缩→生成正确 zip→自动关闭→退出；取消路径正常退出
   - 本地化：新增 `App_CompressCollecting`（zh/en 成对）；构建 0 errors 0 warnings；Core 253 测试通过；Avalonia 41 通过（2 跳过）
 
+**2026-08-05** — 文件列表双击文件打开：提取临时目录 + 系统默认程序（WPF 功能补齐）
+  - **根因**：`FileListGrid_DoubleTapped` 只处理目录导航（`NavigateToFolderPath`），文件双击分支缺失——双击文件"没效果"。功能未从 WPF 移植。
+  - **移植**：`MainWindowViewModel` 新增 `OpenEntryWithDefaultAppAsync`，对齐 WPF `DoubleClickOpenFileAsync`：① 阈值 `DoubleClickOpenThreshold`（0=禁用，默认 10MB）；② 格式检查（Tar/GZip/ISO 不支持单项提取 → 提示）；③ 密码检查（`_hasEncryptedArchive` 且无密码 → 提示）；④ 超过阈值弹确认框；⑤ 提取到 `%TEMP%\MantisZip\OpenWith\{GUID}\`（独立于预览临时目录）；⑥ ≥1MB 走 `RunWithProgress` 进度窗口；⑦ `ArchiveEntryExtractor.ExtractEntryAsync` + `Process.Start(UseShellExecute)` 默认程序打开；⑧ 失败/取消清理临时目录
+  - **View**：`FileListGrid_DoubleTapped` 改为 async void，文件分支调用 VM 方法
+  - **本地化**：新增 `Main_DoubleClickFormatNotSupported`/`Main_DoubleClickOpenConfirm`/`Main_DoubleClickPasswordNeeded`/`Main_Status_DoubleClickOpened`/`Main_Status_ExtractFailed`/`App_ConfirmTitle`（zh/en，文案对齐 WPF）
+  - **验证**：构建 0 errors、Avalonia 测试 43 通过 / 2 跳过（既有 IconProvider）
+
+**2026-08-05** — 压缩设置对话框高级选项仅本次压缩生效（不再污染设置窗口默认值）
+  - **根因**：`CompressSettingsWindow` 关闭时 `SaveFormatOptionsToSettings()` 将 12 项高级选项写回 `AppSettings` 并 `Save()`；设置窗口读取同一 AppSettings → 对话框修改泄漏为全局默认值（写回是为了让 request 构建点读到值，代价是被持久化）
+  - **方案 A**：删除写回方法，改 `SnapshotFormatOptionsToViewModel()` 关闭时快照到对话框自己的 `CompressSettingsViewModel`（8 项面板选项 + 分卷）；`CompressSettingsViewModel` 新增 8 个高级选项属性（FileNameEncoding/ZipCompressionMethod/SevenZipCompressionMethod/SevenZipSolid/SevenZipSolidBlockSize/SevenZipDictionarySize/SevenZipNumFastBytes/SevenZipMatchFinder），构造函数从 AppSettings 读默认值——对话框下次打开仍预填设置窗口默认值
+  - **request 构建改从 VM 读取**：`ExecuteCompressFromSettings`（应用内）与 `ShowCompressDialogAndRun`（CLI `--compress`）高级选项不再经 AppSettings 中转；`MainWindow` 对话框回调补复制全部高级选项 + 分卷字段（`SelectedSplitSizeOption`/`CustomSplitSizeText`）
+  - **顺带修复**：① CLI `--compress` 入口 request 此前缺全部高级选项与分卷（对话框里改了不生效），现补齐并显式调用快照（该入口覆盖了窗口内部 CloseAction）；② 应用内路径分卷字段从不复制导致 `cvm.SplitSize` 恒为 0（对话框分卷选择丢失）；③ VM 构造器此前未从设置加载 `ZipEncryptionMethod`/`SevenZipEncryptHeaders`（对话框显示与设置窗口不一致）
+  - **测试**：`CompressSettingsViewModelTests` 新增构造器镜像 AppSettings + 高级选项可写读回；构建 0 errors、41 通过（2 跳过为既有 IconProvider）
+
+**2026-08-05** — 文件列表列宽可拖拽调整 + 列状态持久化（WPF 功能补齐）
+  - **启用拖拽**：`FileListGrid` 加 `CanUserResizeColumns="True"`——Avalonia 12 DataGrid 该属性默认 `false`（源码核实 `Register<DataGrid, bool>` 未传默认值，`DATAGRID_defaultCanUserResizeColumns=true` 为移植遗留的未使用常量），与 WPF 默认 `true` 相反，必须显式开启
+  - **名称列像素化**：`Width="*"` → `Width="250" MinWidth="120" MaxWidth="800"`——源码核实 Star sizing 下最后可见列不可拖（`CanResizeColumn` 对 `LastVisibleColumn` 返回 false），像素化后 6 列全部可拖；其余列补 `MinWidth/MaxWidth`（大小 60/400、压缩后 60/400、比率 60/300、日期 80/400），拖拽结果受列级 Min/Max 强制约束，均对齐 WPF
+  - **持久化**：`WindowStateManager` 扩展 `ColumnStates`（`ColumnId=SortMemberPath`/`Width`/`Visible`/`DisplayIndex`），与 WPF window.json 的 ColumnStates 结构双向兼容（未知字段忽略、无匹配列跳过）；`MainWindow` 构造时 `ApplyColumnStates` 恢复、`Closing` 时 `CaptureColumnStates` 保存；名称列强制不可隐藏；图标列（无 SortMemberPath）不参与
+  - **端到端验证**：写入 WPF 格式 window.json（含 TreeColumnWidth/Crc32/IsEncrypted 等 Avalonia 无字段）→ 启动恢复 5 列宽 → WM_CLOSE 正常关闭回写一致；Crc32/IsEncrypted 正确跳过；构建 0 errors
+
 **2026-08-05** — 解压路径统一为单一事实源（`ExtractPathResolver`）+ ExtractSettings 文件过滤接入实际解压
   - **问题根因**：「解压选择文件到」实际解压按 `ExtractPreserveFullPath` 裁剪路径，但 `ResultPreviewService.BuildExtractPreview` 恒按「保留完整路径」建树 → 预览树与实际落盘不一致
   - **核心改造**：新增 Core `ExtractPathResolver`（`TrimCurrentFolderPrefix`/`ResolveRelativePath`/`ResolveAll`，语义与解压侧历史逻辑逐字一致），预览树与实际解压共用同一路径计算，从结构上杜绝不一致；`BuildExtractPreview` 新增 `preserveFullPath`（默认 `true`）/`currentFolder`（默认 `""`）参数，恶意路径条目逐条 try-catch 跳过（解压侧保持抛异常整批失败）

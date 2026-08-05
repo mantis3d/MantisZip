@@ -1000,6 +1000,7 @@
                     SelectedItem="{Binding SelectedEntry}"
                     AutoGenerateColumns="False"
                     CanUserSortColumns="True"
+                    CanUserResizeColumns="True"
                     IsReadOnly="True"
                     RowHeight="{DynamicResource ControlHeightMd}"
                     SelectionChanged="FileListGrid_SelectionChanged"
@@ -1047,7 +1048,9 @@
                 </DataTemplate>
               </DataGridTemplateColumn>
               <DataGridTextColumn SortMemberPath="Name"
-                                  Width="*">
+                                  Width="250"
+                                  MinWidth="120"
+                                  MaxWidth="800">
                 <DataGridTextColumn.Header>
                     <StackPanel Orientation="Horizontal" Spacing="3">
                         <PathIcon Data="{StaticResource IconCopy}" Width="13" Height="13" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
@@ -1059,7 +1062,9 @@
                 </DataGridTextColumn.Binding>
               </DataGridTextColumn>
               <DataGridTemplateColumn SortMemberPath="Size"
-                                      Width="80">
+                                      Width="80"
+                                      MinWidth="60"
+                                      MaxWidth="400">
                 <DataGridTemplateColumn.Header>
                     <StackPanel Orientation="Horizontal" Spacing="3">
                         <PathIcon Data="{StaticResource IconRuler}" Width="13" Height="13" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
@@ -1087,7 +1092,9 @@
                 </DataGridTemplateColumn.CellTemplate>
               </DataGridTemplateColumn>
               <DataGridTemplateColumn SortMemberPath="CompressedSize"
-                                      Width="70">
+                                      Width="70"
+                                      MinWidth="60"
+                                      MaxWidth="400">
                 <DataGridTemplateColumn.Header>
                     <StackPanel Orientation="Horizontal" Spacing="3">
                         <PathIcon Data="{StaticResource IconCompress}" Width="13" Height="13" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
@@ -1115,7 +1122,9 @@
                 </DataGridTemplateColumn.CellTemplate>
               </DataGridTemplateColumn>
               <DataGridTemplateColumn SortMemberPath="RatioSort"
-                                      Width="70">
+                                      Width="70"
+                                      MinWidth="60"
+                                      MaxWidth="300">
                 <DataGridTemplateColumn.Header>
                     <StackPanel Orientation="Horizontal" Spacing="3">
                         <PathIcon Data="{StaticResource IconDataBarVertical}" Width="13" Height="13" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
@@ -1143,7 +1152,9 @@
                 </DataGridTemplateColumn.CellTemplate>
               </DataGridTemplateColumn>
               <DataGridTemplateColumn SortMemberPath="LastModified"
-                                      Width="100">
+                                      Width="100"
+                                      MinWidth="80"
+                                      MaxWidth="400">
                 <DataGridTemplateColumn.Header>
                     <StackPanel Orientation="Horizontal" Spacing="3">
                         <PathIcon Data="{StaticResource IconCalendar}" Width="13" Height="13" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
