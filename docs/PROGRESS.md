@@ -21,6 +21,13 @@
 
 ### MantisZip.UI.Avalonia（主力版）
 
+**2026-08-05** — 压缩设置对话框高级选项仅本次压缩生效（不再污染设置窗口默认值）
+  - **根因**：`CompressSettingsWindow` 关闭时 `SaveFormatOptionsToSettings()` 将 12 项高级选项写回 `AppSettings` 并 `Save()`；设置窗口读取同一 AppSettings → 对话框修改泄漏为全局默认值（写回是为了让 request 构建点读到值，代价是被持久化）
+  - **方案 A**：删除写回方法，改 `SnapshotFormatOptionsToViewModel()` 关闭时快照到对话框自己的 `CompressSettingsViewModel`（8 项面板选项 + 分卷）；`CompressSettingsViewModel` 新增 8 个高级选项属性（FileNameEncoding/ZipCompressionMethod/SevenZipCompressionMethod/SevenZipSolid/SevenZipSolidBlockSize/SevenZipDictionarySize/SevenZipNumFastBytes/SevenZipMatchFinder），构造函数从 AppSettings 读默认值——对话框下次打开仍预填设置窗口默认值
+  - **request 构建改从 VM 读取**：`ExecuteCompressFromSettings`（应用内）与 `ShowCompressDialogAndRun`（CLI `--compress`）高级选项不再经 AppSettings 中转；`MainWindow` 对话框回调补复制全部高级选项 + 分卷字段（`SelectedSplitSizeOption`/`CustomSplitSizeText`）
+  - **顺带修复**：① CLI `--compress` 入口 request 此前缺全部高级选项与分卷（对话框里改了不生效），现补齐并显式调用快照（该入口覆盖了窗口内部 CloseAction）；② 应用内路径分卷字段从不复制导致 `cvm.SplitSize` 恒为 0（对话框分卷选择丢失）；③ VM 构造器此前未从设置加载 `ZipEncryptionMethod`/`SevenZipEncryptHeaders`（对话框显示与设置窗口不一致）
+  - **测试**：`CompressSettingsViewModelTests` 新增构造器镜像 AppSettings + 高级选项可写读回；构建 0 errors、41 通过（2 跳过为既有 IconProvider）
+
 **2026-08-05** — 文件列表列宽可拖拽调整 + 列状态持久化（WPF 功能补齐）
   - **启用拖拽**：`FileListGrid` 加 `CanUserResizeColumns="True"`——Avalonia 12 DataGrid 该属性默认 `false`（源码核实 `Register<DataGrid, bool>` 未传默认值，`DATAGRID_defaultCanUserResizeColumns=true` 为移植遗留的未使用常量），与 WPF 默认 `true` 相反，必须显式开启
   - **名称列像素化**：`Width="*"` → `Width="250" MinWidth="120" MaxWidth="800"`——源码核实 Star sizing 下最后可见列不可拖（`CanResizeColumn` 对 `LastVisibleColumn` 返回 false），像素化后 6 列全部可拖；其余列补 `MinWidth/MaxWidth`（大小 60/400、压缩后 60/400、比率 60/300、日期 80/400），拖拽结果受列级 Min/Max 强制约束，均对齐 WPF
