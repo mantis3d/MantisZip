@@ -21,6 +21,13 @@
 
 ### MantisZip.UI.Avalonia（主力版）
 
+**2026-08-05** — 文件列表双击文件打开：提取临时目录 + 系统默认程序（WPF 功能补齐）
+  - **根因**：`FileListGrid_DoubleTapped` 只处理目录导航（`NavigateToFolderPath`），文件双击分支缺失——双击文件"没效果"。功能未从 WPF 移植。
+  - **移植**：`MainWindowViewModel` 新增 `OpenEntryWithDefaultAppAsync`，对齐 WPF `DoubleClickOpenFileAsync`：① 阈值 `DoubleClickOpenThreshold`（0=禁用，默认 10MB）；② 格式检查（Tar/GZip/ISO 不支持单项提取 → 提示）；③ 密码检查（`_hasEncryptedArchive` 且无密码 → 提示）；④ 超过阈值弹确认框；⑤ 提取到 `%TEMP%\MantisZip\OpenWith\{GUID}\`（独立于预览临时目录）；⑥ ≥1MB 走 `RunWithProgress` 进度窗口；⑦ `ArchiveEntryExtractor.ExtractEntryAsync` + `Process.Start(UseShellExecute)` 默认程序打开；⑧ 失败/取消清理临时目录
+  - **View**：`FileListGrid_DoubleTapped` 改为 async void，文件分支调用 VM 方法
+  - **本地化**：新增 `Main_DoubleClickFormatNotSupported`/`Main_DoubleClickOpenConfirm`/`Main_DoubleClickPasswordNeeded`/`Main_Status_DoubleClickOpened`/`Main_Status_ExtractFailed`/`App_ConfirmTitle`（zh/en，文案对齐 WPF）
+  - **验证**：构建 0 errors、Avalonia 测试 43 通过 / 2 跳过（既有 IconProvider）
+
 **2026-08-05** — 压缩设置对话框高级选项仅本次压缩生效（不再污染设置窗口默认值）
   - **根因**：`CompressSettingsWindow` 关闭时 `SaveFormatOptionsToSettings()` 将 12 项高级选项写回 `AppSettings` 并 `Save()`；设置窗口读取同一 AppSettings → 对话框修改泄漏为全局默认值（写回是为了让 request 构建点读到值，代价是被持久化）
   - **方案 A**：删除写回方法，改 `SnapshotFormatOptionsToViewModel()` 关闭时快照到对话框自己的 `CompressSettingsViewModel`（8 项面板选项 + 分卷）；`CompressSettingsViewModel` 新增 8 个高级选项属性（FileNameEncoding/ZipCompressionMethod/SevenZipCompressionMethod/SevenZipSolid/SevenZipSolidBlockSize/SevenZipDictionarySize/SevenZipNumFastBytes/SevenZipMatchFinder），构造函数从 AppSettings 读默认值——对话框下次打开仍预填设置窗口默认值

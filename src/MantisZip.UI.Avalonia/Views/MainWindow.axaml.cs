@@ -635,13 +635,21 @@ public partial class MainWindow : Window
         return null;
     }
 
-    private void FileListGrid_DoubleTapped(object? sender, TappedEventArgs e)
-    {        if (sender is not DataGrid grid) return;
-        if (grid.SelectedItem is ArchiveItemModel item && item.IsDirectory)
+    private async void FileListGrid_DoubleTapped(object? sender, TappedEventArgs e)
+    {
+        if (sender is not DataGrid grid) return;
+        if (grid.SelectedItem is not ArchiveItemModel item) return;
+        if (DataContext is not MainWindowViewModel vm) return;
+
+        if (item.IsDirectory)
         {
-            if (DataContext is MainWindowViewModel vm)
-                vm.NavigateToFolderPath(item.FullPath);
+            vm.NavigateToFolderPath(item.FullPath);
+            return;
         }
+
+        // 文件双击：提取到临时目录并用系统默认方式打开
+        if (!string.IsNullOrEmpty(vm.CurrentArchivePath))
+            await vm.OpenEntryWithDefaultAppAsync(item);
     }
 
     private void FileListGrid_KeyDown(object? sender, global::Avalonia.Input.KeyEventArgs e)

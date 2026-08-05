@@ -301,6 +301,119 @@ public partial class MainWindowViewModel : ObservableObject
     }
 
     /// <summary>
+    /// 双击文件：提取到临时目录并用系统默认程序打开。
+    /// 与 WPF 版 DoubleClickOpenFileAsync 行为对齐。
+    /// </summary>
+    public async Task OpenEntryWithDefaultAppAsync(ArchiveItemModel entry)
+    {
+        var threshold = _appSettings.DoubleClickOpenThreshold;
+
+        // 功能禁用（阈值为 0）
+        if (threshold <= 0) return;
+        if (CurrentArchivePath == null) return;
+
+        // 检查格式是否支持单项提取（Tar/GZip/ISO 不支持）
+        if (_currentFormat is ArchiveFormat.Tar or ArchiveFormat.GZip or ArchiveFormat.Iso)
+        {
+            await AppMessageBox.Show(
+                LocalizationManager.T("Main_DoubleClickFormatNotSupported"),
+                LocalizationManager.T("App_ErrorTitle"),
+                MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        // 检查密码
+        if (_hasEncryptedArchive && string.IsNullOrEmpty(_currentPassword))
+        {
+            await AppMessageBox.Show(
+                LocalizationManager.T("Main_DoubleClickPasswordNeeded"),
+                LocalizationManager.T("App_ErrorTitle"),
+                MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        // 超过阈值时弹出确认框
+        if (entry.Size > threshold)
+        {
+            var sizeStr = FormatUtil.FormatSize(entry.Size);
+            var result = await AppMessageBox.Show(
+                LocalizationManager.T("Main_DoubleClickOpenConfirm", sizeStr),
+                LocalizationManager.T("App_ConfirmTitle"),
+                MessageBoxButton.YesNo, MessageBoxImage.Question);
+            if (result != MessageBoxResult.Yes) return;
+        }
+
+        // 临时目录（独立于预览临时目录，避免被 ClearPreviewTemp 清理）
+        var tempDir = Path.Combine(Path.GetTempPath(), "MantisZip", "OpenWith", Guid.NewGuid().ToString());
+        Directory.CreateDirectory(tempDir);
+        var tempFile = Path.Combine(tempDir, entry.Name);
+
+        try
+        {
+            App.DebugLog($"OpenEntryWithDefaultAppAsync: extracting '{entry.FullPath}' ({FormatUtil.FormatSize(entry.Size)}) from '{CurrentArchivePath}'");
+
+            var password = _currentPassword ?? GetSessionPassword(CurrentArchivePath);
+
+            // 大文件（>= 1MB）显示进度窗口，否则直接提取
+            if (entry.Size >= 1024 * 1024 && RunWithProgress != null)
+            {
+                var completed = await RunWithProgress(
+                    LocalizationManager.T("Status_Extracting"),
+                    async (progress, ct) =>
+                    {
+                        await ArchiveEntryExtractor.ExtractEntryAsync(
+                            CurrentArchivePath, entry.FullPath, tempFile, _currentFormat, password, ct);
+                    });
+
+                if (!completed)
+                {
+                    // 取消或失败：清理临时目录
+                    TryDeleteTempDir(tempDir);
+                    return;
+                }
+            }
+            else
+            {
+                await ArchiveEntryExtractor.ExtractEntryAsync(
+                    CurrentArchivePath, entry.FullPath, tempFile, _currentFormat, password);
+            }
+
+            App.DebugLog($"OpenEntryWithDefaultAppAsync: extracted to '{tempFile}', opening with default app");
+
+            // 用系统默认程序打开
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = tempFile,
+                UseShellExecute = true
+            });
+
+            StatusMessage = LocalizationManager.T("Main_Status_DoubleClickOpened", entry.Name);
+        }
+        catch (Exception ex)
+        {
+            App.DebugLog($"OpenEntryWithDefaultAppAsync: failed: {ex.Message}");
+            await AppMessageBox.Show(
+                LocalizationManager.T("Main_Status_ExtractFailed", ex.Message),
+                LocalizationManager.T("App_ErrorTitle"),
+                MessageBoxButton.OK, MessageBoxImage.Error);
+            TryDeleteTempDir(tempDir);
+        }
+    }
+
+    private static void TryDeleteTempDir(string tempDir)
+    {
+        try
+        {
+            if (Directory.Exists(tempDir))
+                Directory.Delete(tempDir, recursive: true);
+        }
+        catch
+        {
+            // Best effort cleanup
+        }
+    }
+
+    /// <summary>
     /// 当前选中的条目列表（由 View 的 SelectionChanged 同步）。
     /// </summary>
     public List<ArchiveItemModel> SelectedEntries { get; } = new();
