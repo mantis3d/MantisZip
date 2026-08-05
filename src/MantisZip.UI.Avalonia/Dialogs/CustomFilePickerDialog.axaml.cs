@@ -182,6 +182,25 @@ public partial class CustomFilePickerDialog : Window
         ExtractFolderPanel.IsVisible = mode == PickerMode.ExtractFolder;
         // 右栏分隔条：仅当右栏面板可见时显示（否则拖动无意义）
         RightSplitter.IsVisible = mode is PickerMode.PickItems or PickerMode.ExtractFolder;
+
+        // 右栏列宽：显示面板的模式用持久化像素宽度（拖拽范围受 ColumnDefinition Min/Max 约束），
+        // 其余模式保持 Auto（面板隐藏时列塌缩为 0，文件列表占满整行）
+        if (mode is PickerMode.PickItems or PickerMode.ExtractFolder)
+        {
+            var settings = AppSettings.Load();
+            var saved = mode == PickerMode.PickItems ? settings.PickItemsPanelWidth : settings.ExtractFolderPanelWidth;
+            var rightCol = BrowserGrid.ColumnDefinitions[4];
+            rightCol.Width = new GridLength(saved is >= 200 and <= 800 ? saved : 260);
+            rightCol.MinWidth = 200;
+            rightCol.MaxWidth = 800;
+        }
+        else
+        {
+            var rightCol = BrowserGrid.ColumnDefinitions[4];
+            rightCol.Width = GridLength.Auto;
+            rightCol.MinWidth = 0;
+            rightCol.MaxWidth = double.PositiveInfinity;
+        }
         AccumulatedItemsControl.ItemsSource = _accumulatedItems;
         ClearAccumulatedButtonText.Text = LocalizationManager.T("Picker_ClearSelection");
 
@@ -1124,5 +1143,28 @@ public partial class CustomFilePickerDialog : Window
         {
             System.Diagnostics.Debug.WriteLine($"[CustomFilePickerDialog] SystemBrowse failed: {ex.Message}");
         }
+    }
+
+    /// <summary>
+    /// 关闭时保存右栏面板宽度（PickItems / ExtractFolder 模式各自独立记忆）。
+    /// </summary>
+    protected override void OnClosing(WindowClosingEventArgs e)
+    {
+        base.OnClosing(e);
+
+        // 仅 PickItems / ExtractFolder 模式右栏可见；其余模式右栏 Auto 塌缩，无需保存
+        if (_mode is not (PickerMode.PickItems or PickerMode.ExtractFolder)) return;
+
+        // 取列的实际宽度（拖拽后 rightCol.Width 为像素值，此时等于实际宽度）
+        var rightCol = BrowserGrid.ColumnDefinitions[4];
+        double width = rightCol.Width.IsAbsolute ? rightCol.Width.Value : rightCol.ActualWidth;
+        if (width is < 200 or > 800) return; // 超出面板 Min/Max 约束的宽度不保存（防御）
+
+        var settings = AppSettings.Load();
+        if (_mode == PickerMode.PickItems)
+            settings.PickItemsPanelWidth = width;
+        else
+            settings.ExtractFolderPanelWidth = width;
+        settings.Save();
     }
 }

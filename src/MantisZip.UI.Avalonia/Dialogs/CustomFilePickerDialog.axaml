@@ -100,9 +100,16 @@
     </Grid>
 
     <!-- ═══════ Row 1: QuickPath | file browser | right panel ═══════ -->
-    <Grid Grid.Row="1"
-          ColumnDefinitions="220,5,*,5,Auto"
+    <Grid x:Name="BrowserGrid"
+          Grid.Row="1"
           ColumnSpacing="0">
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="220" />
+        <ColumnDefinition Width="5" />
+        <ColumnDefinition Width="*" />
+        <ColumnDefinition Width="5" />
+        <ColumnDefinition Width="Auto" />
+      </Grid.ColumnDefinitions>
       <Border BorderBrush="{DynamicResource ThemeBorderBrush}"
               BorderThickness="1"
               CornerRadius="4"
@@ -208,10 +215,12 @@
                     ResizeDirection="Auto" />
 
       <!-- ═══════ Column 4: right panel (PickItems 累积 / ExtractFolder 解压预览) ═══════ -->
+      <!-- 宽度：去掉固定 Width，由 MinWidth/MaxWidth 约束 + Stretch 填满列，随 RightSplitter 拖拽实时变化 -->
       <Grid x:Name="PickItemsPanel"
             Grid.Row="1"
             Grid.Column="4"
-            Width="260"
+            MinWidth="200"
+            MaxWidth="800"
             Margin="12,0,0,0"
             IsVisible="False">
         <Grid.RowDefinitions>
@@ -319,7 +328,8 @@
       <Grid x:Name="ExtractFolderPanel"
             Grid.Row="1"
             Grid.Column="4"
-            Width="260"
+            MinWidth="200"
+            MaxWidth="800"
             Margin="12,0,0,0"
             IsVisible="False">
         <Grid.RowDefinitions>

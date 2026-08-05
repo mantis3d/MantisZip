@@ -21,6 +21,14 @@
 
 ### MantisZip.UI.Avalonia（主力版）
 
+**2026-08-05** — 文件选择器右栏面板宽度可拖拽调整 + 持久化（PickItems / ExtractFolder）
+  - **根因**：`PickItemsPanel`/`ExtractFolderPanel` 显式 `Width="260"` + 所在列 `Auto`——显式 Width 覆盖 Stretch，面板不随 `RightSplitter` 拖拽变化（表现为"宽度固定拖不动"）
+  - **修复**：面板去掉固定 `Width`，改 `MinWidth="200" MaxWidth="800"`（Stretch 填满列 → 拖拽实时跟随）；Row 1 Grid 命名 `BrowserGrid` 并把 `ColumnDefinitions` 拆为显式元素
+  - **拖拽范围约束**：显示面板的模式（PickItems/ExtractFolder）在构造时给 `ColumnDefinition[4]` 设 `MinWidth=200 MaxWidth=800`（GridSplitter 尊重列级约束）；其余模式列保持 `Auto` 且列级 Min=0——避免 Avalonia issue #5323（列级 MinWidth 导致面板隐藏时列不塌缩，OpenFile/SaveFile 布局被挤）
+  - **持久化**：`AppSettings` 新增 `PickItemsPanelWidth`/`ExtractFolderPanelWidth`（两模式各自记忆，0=默认 260）；构造恢复（[200,800] 外回退 260）、`OnClosing` 保存列实际像素宽（超界防御跳过）
+  - **Avalonia 适配**：`ColumnDefinition` 的 `x:Name` 不生成字段（CS0103），改 `BrowserGrid.ColumnDefinitions[4]` 索引访问（对齐 `PreviewPanel` 先例）；`GridLength.IsPixel` 在 Avalonia 为 `IsAbsolute`
+  - 验证：构建 0 errors、Avalonia 测试 43 通过 / 2 跳过（既有 IconProvider）
+
 **2026-08-05** — 进度窗口全面对齐 WPF：批处理列表始终可见 + 暂停真实生效 + 完成态/钉住 + CLI 解压/压缩全程进度窗口 + `--compress` 对话框修复
   - **批处理文件列表始终可见**：`ProgressWindow.axaml` 移除 `IsVisible="False"`（单文件操作也显示列表）；`MainWindowViewModel.RunWithProgress` 签名扩展为 `(title, filePaths, operation)`，11 个调用点传入列表项（解压=压缩包路径、压缩=输出路径、测试=条目名）；新增 `BatchStatusReporter` 回调把引擎 `onItemStatus` 逐项状态接到 `SetCurrentBatchItem`/`UpdateBatchItemStatus`；`InitBatchMode` 不再覆盖 WindowTitle（标题由调用方传入）
   - **暂停真实生效**：`RunWithProgress`/拖拽解压/CLI 解压/压缩的进度经 `CreatePauseAwareProgress` 嵌套包装，暂停事件真实阻断操作（此前多路径直接 `CreateBackgroundProgress` 导致暂停键无效果）
