@@ -241,42 +241,9 @@ public partial class MainWindow : Window
         //  压缩/解压冲突对话框回调（从后台线程调用）
         // ════════════════════════════════════════════════
 
-        vm.ShowCompressConflictDialog = async info =>
-        {
-            return await Dispatcher.UIThread.InvokeAsync(async () =>
-            {
-                var dlg = new CompressConflictDialog(
-                    info.OutputPath,
-                    info.SuggestedName,
-                    info.CanAdd);
-                await dlg.ShowDialog(this);
-
-                var dlgAction = dlg.ResultAction;
-                Core.Abstractions.CompressConflictAction resultAction;
-                string? customName = null;
-
-                switch (dlgAction)
-                {
-                    case Dialogs.CompressConflictAction.Overwrite:
-                        resultAction = Core.Abstractions.CompressConflictAction.Overwrite;
-                        break;
-                    case Dialogs.CompressConflictAction.Add:
-                        resultAction = Core.Abstractions.CompressConflictAction.Add;
-                        break;
-                    case Dialogs.CompressConflictAction.Rename:
-                        resultAction = Core.Abstractions.CompressConflictAction.Rename;
-                        customName = dlg.CustomName;
-                        break;
-                    case Dialogs.CompressConflictAction.Skip:
-                    case Dialogs.CompressConflictAction.Cancel:
-                    default:
-                        resultAction = Core.Abstractions.CompressConflictAction.Cancel;
-                        break;
-                }
-
-                return (resultAction, customName, dlg.ApplyToAll);
-            });
-        };
+        // 弹窗逻辑统一走 CompressFlow.ShowConflictDialogAsync（与 CLI 右键菜单共用），
+        // 本回调仅把 owner 窗口（MainWindow）与 VM 委托接线
+        vm.ShowCompressConflictDialog = info => CompressFlow.ShowConflictDialogAsync(this, info);
 
         vm.ShowExtractFileConflictDialogAsync = async info =>
         {

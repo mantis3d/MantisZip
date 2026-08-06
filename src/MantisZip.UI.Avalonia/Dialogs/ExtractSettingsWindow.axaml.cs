@@ -23,6 +23,12 @@ public partial class ExtractSettingsWindow : Window
     private IReadOnlyList<ArchiveItem>? _entries;
 
     /// <summary>
+    /// 对话框结果（true=确认解压，false=取消）。CLI 无 owner 场景下配合
+    /// <see cref="Show"/> + Closed 事件使用（ShowDialog 必须传 owner，CLI 模式没有主窗口）。
+    /// </summary>
+    public bool? DialogResult { get; private set; }
+
+    /// <summary>
     /// ViewModel，公开属性供调用方关闭后读取。
     /// </summary>
     public ExtractSettingsViewModel ViewModel { get; }
@@ -54,6 +60,7 @@ public partial class ExtractSettingsWindow : Window
         // 设置关闭回调
         ViewModel.CloseAction = async (result) =>
         {
+            DialogResult = result;
             Close(result);
             await Task.CompletedTask;
         };

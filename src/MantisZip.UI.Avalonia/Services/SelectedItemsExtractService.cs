@@ -66,7 +66,7 @@ public sealed class SelectedItemsExtractService
     /// 将 ExtractSettingsViewModel 的冲突策略字符串映射到 <see cref="FileConflictAction"/>。
     /// 支持设置中的全部 6 种值（含带连字符的 "overwrite-if-older" / "overwrite-if-smaller"）。
     /// </summary>
-    private static FileConflictAction MapConflictActionString(string value)
+    internal static FileConflictAction MapConflictActionString(string value)
     {
         return value.ToLowerInvariant() switch
         {
@@ -85,7 +85,7 @@ public sealed class SelectedItemsExtractService
     /// <param name="conflictAction">冲突策略字符串值。</param>
     /// <param name="conflictDialog">Ask 冲突弹窗回调（null 时 Ask 降级为直接弹引擎默认）。</param>
     /// <returns>ArchiveOptions，Overwrite 且无 resolver 时返回 null。</returns>
-    private static ArchiveOptions? CreateExtractOptions(
+    internal static ArchiveOptions? CreateExtractOptions(
         string conflictAction,
         Func<FileConflictInfo, Task<(FileConflictAction Action, bool ApplyToAll)>>? conflictDialog)
     {

@@ -21,6 +21,14 @@
 
 ### MantisZip.UI.Avalonia（主力版）
 
+**2026-08-07** — 压缩/解压 CLI 流程对齐主窗口 + 公共流程抽取统一（CompressFlow/ExtractFlow）
+  - **`--extract` CLI 弹窗化**：右键「解压到……」由「直接解压到压缩包同目录」改为弹出 `ExtractSettingsWindow`（目标路径/冲突策略/过滤条件），确认后批处理进度窗口逐文件解压；CLI 无主窗口无法 `ShowDialog(owner)` → 非模态 `Show()` + Closed 事件 + `ExtractSettingsWindow.DialogResult` 记录结果
+  - **生命周期竞态修复**：CLI 弹窗关闭瞬间 `OnLastWindowClose` 自动 Shutdown 抢先于解压 continuation → 弹窗前设 `ShutdownMode.OnExplicitShutdown`，退出时机由流程显式控制（取消立即退出、确认完成后退出）
+  - **`--compress` CLI 对齐主窗口**：修复硬编码 `Mode=Manual`（对话框「单独压缩」模式无效）、未应用文件过滤、`PreserveDirectoryRoot` 硬编码、未接冲突处理（目标存在时静默覆盖）
+  - **公共流程抽取（消除两套漂移）**：新建 `Services/CompressFlow.cs`（`BuildRequest`/`CreateResolver`/`ShowConflictDialogAsync`）与 `Services/ExtractFlow.cs`（`ExtractAsync`），主窗口 VM（`ExecuteCompressFromSettings`/`ExtractArchive`）与 App CLI 全部改用；删除主窗口重复的 `CreateExtractOptions`/`MapConflictActionString`、App 的 `CreateCliCompressConflictResolver`；`SelectedItemsExtractService` 冲突映射/选项构建改 `internal` 共享
+  - **冲突「取消操作」修复（review 发现既有 bug）**：`CompressConflictDialog` 的「取消操作」按钮此前与「跳过」同映射为 Core `Cancel`（仅跳过当前项继续）→ 现 `CancelOperation=true` 时抛 `OperationCanceledException` 真正终止压缩（对齐解压 Ask 弹窗语义）
+  - 涉及文件：`App.axaml.cs`、`ViewModels/MainWindowViewModel.cs`、`Views/MainWindow.axaml.cs`、`Dialogs/ExtractSettingsWindow.axaml.cs`、`Services/SelectedItemsExtractService.cs`，新增 `Services/CompressFlow.cs`/`ExtractFlow.cs`；构建 0 错误，`--compress`/`--extract` 冒烟测试弹窗正常
+
 **2026-08-07** — `preview-extended-formats.md` 完成度核实修正（多处文档与实际不符）
   - **Phase 3 修正**：文档原声称"SVG/字体/LNK/DBF/ICO/字幕/Office/EPUB/HDR 已完成"→ 实际 **LNK/DBF/EPUB/字幕 从未实现**（`FileFormat` 枚举含 `Lnk/Dbf/Epub/Subtitle` 且魔数可识别，但两项目均无对应 ShowXxx 方法，路由到 Unsupported）；**STL 也未实现**（无 `ShowStlPreview`）；HDR 依赖 Magick.NET 插件（未实施）；SVG/字体/ICO 画廊/Office(Docx/Xlsx/Pptx) 确认完成
   - **Phase 4 修正**：文档声称"0/8 均未开始"→ 实际 **4.3 MKV/WebM 元数据已实现**（`VideoParser.ParseMkv`，`VideoExtensions` 含 `.mkv/.webm`）；其余 4.1/4.2/4.4-4.9 未实施

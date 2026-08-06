@@ -198,11 +198,9 @@ public partial class App : Application
                         break;
 
                     case "--extract":
-                        // Extract to same directory as archive
-                        if (!string.IsNullOrEmpty(path) && File.Exists(path))
-                            _ = RunExtractCliAsync(path, Path.GetDirectoryName(path) ?? ".", args, desktop);
-                        else
-                            desktop.Shutdown();
+                        // 弹出解压设置窗口（对齐 WPF HandleExtractBatch mode=extract）：
+                        // 用户选择目标路径 / 冲突策略 / 过滤条件后批处理解压，取消则退出
+                        _ = RunExtractDialogCliAsync(cmdPaths.ToList(), desktop);
                         break;
 
                     case "--extract-here":
@@ -754,6 +752,81 @@ public partial class App : Application
     }
 
     /// <summary>
+    /// CLI --extract 弹窗解压入口（对齐 WPF HandleExtractBatch mode=extract）：
+    /// 弹出 ExtractSettingsWindow 让用户选择目标路径 / 冲突策略 / 过滤条件，
+    /// 确认后批处理解压到所选目录，取消则直接退出。
+    /// </summary>
+    private static async Task RunExtractDialogCliAsync(
+        List<string> paths,
+        IClassicDesktopStyleApplicationLifetime desktop)
+    {
+        try
+        {
+            var existing = paths.Where(p => File.Exists(p) || Directory.Exists(p)).ToList();
+            if (existing.Count == 0)
+            {
+                desktop.Shutdown();
+                return;
+            }
+
+            // 尝试获取第一个压缩包的条目列表（供过滤/预览树），3 秒超时，失败则无过滤支持
+            IReadOnlyList<ArchiveItem>? entries = null;
+            try
+            {
+                var engine = ArchiveEngineFactory.GetEngineByExtension(existing[0]);
+                if (engine != null)
+                {
+                    var listTask = engine.ListEntriesAsync(existing[0], null);
+                    if (await Task.WhenAny(listTask, Task.Delay(3000)) == listTask && listTask.IsCompletedSuccessfully)
+                        entries = listTask.Result;
+                }
+            }
+            catch (Exception listEx)
+            {
+                DebugLog($"RunExtractDialogCliAsync: ListEntriesAsync failed: {listEx.Message}");
+            }
+
+            var dialog = new ExtractSettingsWindow(existing);
+            if (entries is { Count: > 0 })
+                dialog.SetEntries(entries);
+
+            // CLI 模式没有主窗口，无法用 ShowDialog(owner)，改用非模态 Show + Closed 事件等待结果。
+            // 同时必须把 ShutdownMode 改为 OnExplicitShutdown：默认 OnLastWindowClose 会在弹窗
+            // （唯一窗口）关闭瞬间同步触发应用退出，导致确认后的解压 continuation 来不及执行。
+            // 退出时机改由我们显式控制：取消 → 立即退出；确认 → 批处理解压完成后退出。
+            desktop.ShutdownMode = ShutdownMode.OnExplicitShutdown;
+            var closeTcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+            dialog.Closed += (_, _) => closeTcs.TrySetResult(dialog.DialogResult == true);
+            dialog.Show();
+            var ok = await closeTcs.Task;
+            if (!ok)
+            {
+                desktop.Shutdown();
+                return;
+            }
+
+            var vm = dialog.ViewModel;
+            var dest = vm.DestinationPath;
+            var conflictAction = vm.ConflictAction;
+            var filteredKeys = vm.FilteredEntryKeys;
+
+            if (string.IsNullOrWhiteSpace(dest))
+            {
+                desktop.Shutdown();
+                return;
+            }
+
+            await RunCliExtractBatchWithProgressAsync(
+                existing, dest, conflictAction, filteredKeys, desktop);
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Extract dialog failed: {ex.Message}");
+            desktop.Shutdown();
+        }
+    }
+
+    /// <summary>
     /// 在进度窗口中执行 CLI 解压（对齐 WPF HandleExtractBatchCore）。
     /// 显示批处理文件列表（单文件也显示）、逐项状态、可暂停/取消；
     /// 成功时自动关闭（2.5s，尊重 📌 KeepOpenOnComplete），失败时等待用户手动关闭。
@@ -861,6 +934,122 @@ public partial class App : Application
         // 成功：自动关闭或等待（KeepOpenOnComplete 生效）
         await progressWindow.AutoCloseOrWaitAsync(2500, () => progressWindow.Close());
         return false;
+    }
+
+    /// <summary>
+    /// CLI 弹窗解压确认后的批处理执行：一个进度窗口逐文件解压到统一目标目录。
+    /// 对齐 WPF HandleExtractBatchCore（manual 模式；过滤仅对第一个压缩包生效）。
+    /// 冲突策略来自弹窗选择（Ask 无对话框回调时由 CreateExtractOptions 降级）。
+    /// </summary>
+    private static async Task RunCliExtractBatchWithProgressAsync(
+        List<string> archivePaths,
+        string targetDir,
+        string conflictAction,
+        List<string>? filteredEntryKeys,
+        IClassicDesktopStyleApplicationLifetime desktop)
+    {
+        var progressWindow = new ProgressWindow(LocalizationManager.T("Progress_Title_Extract"));
+        progressWindow.InitCancellation();
+        progressWindow.Show();
+        desktop.MainWindow = progressWindow;
+        progressWindow.InitBatchMode(archivePaths);
+
+        var ct = progressWindow.CancellationToken;
+        var doneEvent = new ManualResetEventSlim(false);
+        Exception? captureException = null;
+        bool cancelled = false;
+
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                for (int i = 0; i < archivePaths.Count; i++)
+                {
+                    ct.ThrowIfCancellationRequested();
+                    var archivePath = archivePaths[i];
+                    await Dispatcher.UIThread.InvokeAsync(() => progressWindow.SetCurrentBatchItem(i));
+
+                    try
+                    {
+                        var engine = ArchiveEngineFactory.GetEngineByExtension(archivePath);
+                        if (engine == null)
+                        {
+                            await Dispatcher.UIThread.InvokeAsync(() =>
+                                progressWindow.UpdateBatchItemStatus(i, BatchItemStatus.Failed,
+                                    LocalizationManager.T("Error_UnsupportedArchiveFormat")));
+                            continue;
+                        }
+
+                        var password = ResolveCliPassword(archivePath, engine);
+                        var progress = progressWindow.CreatePauseAwareProgress(
+                            ProgressWindow.CreateBackgroundProgress(progressWindow));
+
+                        // 统一解压执行入口（与主窗口 ExtractArchive 共用 ExtractFlow）；
+                        // 冲突策略来自弹窗选择（Ask 无对话框回调时由 CreateExtractOptions 降级）；
+                        // 过滤仅对第一个压缩包生效（对齐 WPF HandleExtractBatchCore：i == 0）
+                        await ExtractFlow.ExtractAsync(
+                            archivePath, targetDir, conflictAction,
+                            i == 0 ? filteredEntryKeys : null,
+                            password, null, progress, ct);
+
+                        await Dispatcher.UIThread.InvokeAsync(() =>
+                            progressWindow.UpdateBatchItemStatus(i, BatchItemStatus.Completed));
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        throw;
+                    }
+                    catch (Exception ex)
+                    {
+                        await Dispatcher.UIThread.InvokeAsync(() =>
+                            progressWindow.UpdateBatchItemStatus(i, BatchItemStatus.Failed, ex.Message));
+                    }
+                }
+
+                progressWindow.FinalizeBatch();
+                await Dispatcher.UIThread.InvokeAsync(() =>
+                    progressWindow.SetComplete(LocalizationManager.T("Cli_StatusDone")));
+            }
+            catch (OperationCanceledException)
+            {
+                cancelled = true;
+            }
+            catch (Exception ex)
+            {
+                captureException = ex;
+                Console.Error.WriteLine($"Extraction failed: {ex.Message}");
+            }
+            finally
+            {
+                doneEvent.Set();
+            }
+        });
+
+        await Task.Run(() => doneEvent.Wait());
+
+        if (cancelled)
+        {
+            await Dispatcher.UIThread.InvokeAsync(() => progressWindow.Close());
+            desktop.Shutdown();
+            return;
+        }
+
+        if (captureException != null)
+        {
+            // 失败：标记首项为 Failed（FinalizeBatch 已把 InProgress 置为 Completed，这里覆盖为失败）
+            progressWindow.UpdateBatchItemStatus(0, BatchItemStatus.Failed, captureException.Message);
+            await Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                progressWindow.SetErrorSummary(captureException!.Message);
+                progressWindow.CompleteWithErrors();
+            });
+            await WaitForWindowCloseAsync(progressWindow);
+            desktop.Shutdown();
+            return;
+        }
+
+        // 成功：自动关闭（2.5s）或等待用户手动关闭后退出
+        await progressWindow.AutoCloseOrWaitAsync(2500, () => desktop.Shutdown());
     }
 
     /// <summary>
@@ -1201,30 +1390,14 @@ public partial class App : Application
                 dlg.SnapshotFormatOptionsToViewModel();
                 dlg.Close();
                 var vm = dlg.ViewModel;
-                var request = new CompressRequest
+
+                // 统一构建（含文件过滤），与主窗口 ExecuteCompressFromSettings 共用 CompressFlow
+                var request = CompressFlow.BuildRequest(vm);
+                if (request == null)
                 {
-                    SourcePaths = paths.ToList(),
-                    Mode = CompressOutputMode.Manual,
-                    Format = vm.DefaultFormat,
-                    CompressionLevel = vm.CompressionLevel,
-                    Password = vm.GetActivePassword(),
-                    Encrypt = vm.Encrypt,
-                    Comment = vm.Comment,
-                    CommentDistribution = vm.CommentDistribution,
-                    OutputPath = vm.OutputPath,
-                    PreserveDirectoryRoot = true,
-                    SplitSize = vm.SplitSize,
-                    FileNameEncoding = vm.FileNameEncoding,
-                    ZipCompressionMethod = vm.ZipCompressionMethod,
-                    ZipEncryptionMethod = vm.ZipEncryptionMethod,
-                    SevenZipCompressionMethod = vm.SevenZipCompressionMethod,
-                    SevenZipSolid = vm.SevenZipSolid,
-                    SevenZipSolidBlockSize = vm.SevenZipSolidBlockSize,
-                    SevenZipDictionarySize = vm.SevenZipDictionarySize,
-                    SevenZipNumFastBytes = vm.SevenZipNumFastBytes,
-                    SevenZipMatchFinder = vm.SevenZipMatchFinder,
-                    SevenZipEncryptHeaders = vm.SevenZipEncryptHeaders,
-                };
+                    desktop.Shutdown();
+                    return;
+                }
 
                 await CompressWithProgress(request, LocalizationManager.T("Cli_Compress"), desktop);
             }
@@ -1489,6 +1662,9 @@ public partial class App : Application
                     request,
                     rawProgress,
                     progressWindow.CancellationToken,
+                    // 冲突处理统一走 CompressFlow（弹窗 + ApplyToAll 记忆），与主窗口共用
+                    conflictResolver: CompressFlow.CreateResolver(
+                        info => CompressFlow.ShowConflictDialogAsync(progressWindow, info)),
                     onItemStatus: (index, status) =>
                     {
                         // 逐项状态更新驱动批处理文件列表（对齐 WPF CompressAsync onItemStatus 接线）

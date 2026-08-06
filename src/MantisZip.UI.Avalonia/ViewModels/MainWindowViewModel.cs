@@ -1662,8 +1662,6 @@ public partial class MainWindowViewModel : ObservableObject
         if (RunWithProgress == null) return;
 
         _sessionPasswords.TryGetValue(CurrentArchivePath, out var password);
-
-        var options = CreateExtractOptions(vm.ConflictAction);
         var filteredKeys = vm.FilteredEntryKeys;
 
         var completed = await RunWithProgress(
@@ -1671,81 +1669,16 @@ public partial class MainWindowViewModel : ObservableObject
             new[] { CurrentArchivePath! },
             async (progress, ct) =>
             {
-                // 有过滤条件：仅解压匹配条目（复用统一路径计算模块的入口；无 pathOverrides = 保留完整路径）
-                if (filteredKeys is { Count: > 0 })
-                {
-                    var engine = ArchiveEngineFactory.GetEngineByExtension(CurrentArchivePath!);
-                    if (engine == null) return;
-                    await engine.ExtractEntriesAsync(
-                        CurrentArchivePath!, filteredKeys, dest, password, progress, ct, options);
-                    return;
-                }
-
-                await new ExtractService().ExtractAsync(
-                    CurrentArchivePath, dest, password, progress, ct, options);
+                // 统一解压执行入口（冲突策略/过滤/全量分支）——与 CLI 弹窗批处理共用 ExtractFlow
+                await ExtractFlow.ExtractAsync(
+                    CurrentArchivePath, dest, vm.ConflictAction, filteredKeys, password,
+                    ShowExtractFileConflictDialogAsync, progress, ct);
             });
 
         if (completed)
         {
             StatusMessage = LocalizationManager.T("Status_ExtractComplete");
         }
-    }
-
-    /// <summary>
-    /// 将 ExtractSettingsViewModel 的冲突策略字符串映射到 <see cref="FileConflictAction"/>。
-    /// 支持设置中的全部 6 种值（含带连字符的 "overwrite-if-older" / "overwrite-if-smaller"）。
-    /// </summary>
-    private static FileConflictAction MapConflictActionString(string value)
-    {
-        return value.ToLowerInvariant() switch
-        {
-            "ask" => FileConflictAction.Ask,
-            "rename" => FileConflictAction.Rename,
-            "skip" => FileConflictAction.Skip,
-            "overwriteifolder" or "overwrite_if_older" or "overwrite-if-older" => FileConflictAction.OverwriteIfOlder,
-            "overwriteifsmaller" or "overwrite_if_smaller" or "overwrite-if-smaller" => FileConflictAction.OverwriteIfSmaller,
-            _ => FileConflictAction.Overwrite,
-        };
-    }
-
-    /// <summary>
-    /// 集中创建解压选项，统一处理冲突回调 + ApplyToAll 记忆。
-    /// 对标 WPF 的 App.CreateExtractOptions()。
-    /// </summary>
-    /// <param name="conflictAction">ExtractSettingsViewModel.ConflictAction 字符串值。</param>
-    /// <returns>ArchiveOptions，Overwrite 且无 resolver 时返回 null。</returns>
-    private ArchiveOptions? CreateExtractOptions(string conflictAction)
-    {
-        var action = MapConflictActionString(conflictAction);
-        if (action == FileConflictAction.Overwrite)
-            return null; // 默认行为无需传 options
-
-        if (action != FileConflictAction.Ask || ShowExtractFileConflictDialogAsync == null)
-            return new ArchiveOptions { ConflictAction = action };
-
-        // Ask 模式：使用异步回调弹窗 + ApplyToAll 记忆
-        bool applyToAll = false;
-        FileConflictAction? chosenAction = null;
-
-        return new ArchiveOptions
-        {
-            ConflictAction = FileConflictAction.Ask,
-            ConflictResolverAsync = async info =>
-            {
-                if (applyToAll && chosenAction.HasValue)
-                    return chosenAction.Value;
-
-                var (resultAction, applyAll) = await ShowExtractFileConflictDialogAsync!(info);
-
-                if (applyAll)
-                {
-                    applyToAll = true;
-                    chosenAction = resultAction;
-                }
-
-                return resultAction;
-            },
-        };
     }
 
     [RelayCommand]
@@ -1947,14 +1880,12 @@ public partial class MainWindowViewModel : ObservableObject
 
     /// <summary>
     /// 从 CompressSettingsViewModel 读取设置，构建 CompressRequest 并执行压缩。
+    /// Request 构建与冲突处理复用 CompressFlow（与 CLI 右键菜单共用同一流程）。
     /// </summary>
     private async Task ExecuteCompressFromSettings(CompressSettingsViewModel vm)
     {
-        // Apply file filter (handles directory recursion, matches per-file)
-        var sources = vm.FileFilter?.IsActive == true
-            ? FileFilterHelper.ApplyFilter(vm.SelectedPaths.ToArray(), vm.FileFilter).ToList()
-            : vm.SelectedPaths.ToList();
-        if (sources.Count == 0)
+        var request = CompressFlow.BuildRequest(vm);
+        if (request == null)
         {
             await AppMessageBox.Show(
                 LocalizationManager.T("Compress_FilteredAllSkipped"),
@@ -1964,44 +1895,6 @@ public partial class MainWindowViewModel : ObservableObject
             return;
         }
 
-        var settings = AppSettings.Load();
-        var request = new CompressRequest
-        {
-            SourcePaths = sources,
-            Mode = vm.OutputMode,
-            Format = vm.DefaultFormat,
-            CompressionLevel = vm.CompressionLevel,
-            Password = vm.Encrypt
-                ? (vm.IsPasswordLibraryMode && vm.SelectedPasswordEntry != null
-                    ? vm.SelectedPasswordEntry.Password
-                    : vm.Password)
-                : null,
-            Encrypt = vm.Encrypt,
-            Comment = vm.Comment,
-            CommentDistribution = vm.CommentDistribution,
-            OutputPath = vm.OutputMode switch
-            {
-                CompressOutputMode.Manual => vm.OutputPath,
-                CompressOutputMode.Separate => null,
-                CompressOutputMode.Combined => vm.OutputPath,
-                _ => null,
-            },
-            SplitSize = vm.SplitSize,
-            PreserveDirectoryRoot = settings.PreserveDirectoryRoot,
-            KeepOriginalExtension = settings.KeepOriginalExtension,
-            // 高级格式选项从对话框 ViewModel 读取（仅本次压缩生效），不再从 AppSettings 中转
-            FileNameEncoding = vm.FileNameEncoding,
-            ZipCompressionMethod = vm.ZipCompressionMethod,
-            ZipEncryptionMethod = vm.ZipEncryptionMethod,
-            SevenZipCompressionMethod = vm.SevenZipCompressionMethod,
-            SevenZipSolid = vm.SevenZipSolid,
-            SevenZipSolidBlockSize = vm.SevenZipSolidBlockSize,
-            SevenZipDictionarySize = vm.SevenZipDictionarySize,
-            SevenZipNumFastBytes = vm.SevenZipNumFastBytes,
-            SevenZipMatchFinder = vm.SevenZipMatchFinder,
-            SevenZipEncryptHeaders = vm.SevenZipEncryptHeaders,
-        };
-
         if (RunWithProgress == null) return;
         var completed = await RunWithProgress(
             LocalizationManager.T("Status_Compressing"),
@@ -2009,38 +1902,13 @@ public partial class MainWindowViewModel : ObservableObject
             async (progress, ct) =>
             {
                 var svc = new AvaloniaCompressService();
-                bool applyToAll = false;
-                Core.Abstractions.CompressConflictAction? chosenAction = null;
-
                 await svc.CompressAsync(request, progress, ct,
-                    conflictResolver: async info =>
+                    conflictResolver: CompressFlow.CreateResolver(async info =>
                     {
-                        // 已勾选"应用到全部" → 直接返回记忆的选择
-                        if (applyToAll && chosenAction.HasValue)
-                            return new CompressConflictResolution(chosenAction.Value, null);
-
-                        if (ShowCompressConflictDialog != null)
-                        {
-                            var (action, customName, applyAll) = await ShowCompressConflictDialog(info);
-                            if (applyAll)
-                            {
-                                applyToAll = true;
-                                chosenAction = action;
-                            }
-
-                            return action switch
-                            {
-                                Core.Abstractions.CompressConflictAction.Cancel
-                                    => new CompressConflictResolution(
-                                        Core.Abstractions.CompressConflictAction.Cancel, null),
-                                _ => new CompressConflictResolution(action, customName)
-                            };
-                        }
-
-                        // Fallback: silently overwrite if no dialog callback
-                        return new CompressConflictResolution(
-                            Core.Abstractions.CompressConflictAction.Overwrite, null);
-                    },
+                        if (ShowCompressConflictDialog == null)
+                            return (Core.Abstractions.CompressConflictAction.Overwrite, null, false);
+                        return await ShowCompressConflictDialog(info);
+                    }),
                     onItemStatus: BatchStatusReporter);
             });
 
