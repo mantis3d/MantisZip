@@ -21,6 +21,11 @@
 
 ### MantisZip.UI.Avalonia（主力版）
 
+**2026-08-06** — `avalonia-shell-com-integration.md` 完成状态核实 + AGENTS.md Shell 图标描述修正
+  - **计划核实**：文档声明全部与现状一致——3 个 ShellIntegration 文件（`Services/ShellIntegration.cs`/`.Assoc.cs`/`.Menu.cs`）存在、10 个 MenuIcons .ico 存在、csproj `CopyShellExtComhost`/`CopyShellExtComhostToPublish` target 存在、4 个 CLI 命令（`--install-shell`/`--uninstall-shell`/`--install-assoc`/`--uninstall-assoc`）齐全；头部状态更新为 ✅ Completed（原"4/5 verified, 1/5 needs Explorer visual check"，图标渲染已在实际使用中验证）
+  - **AGENTS.md 图标描述修正**：L242 原写"Icons via `shell32.dll,3`"→ 实际两项目 `ShellIntegration.Menu.cs` 均用 `GetMenuIconPath()` 从输出目录 `Resources\MenuIcons\*.ico` 读取（Open/ExtractHere/ExtractSmart/ExtractToNamed/ExtractTo/CompressSeparate/CompressCombined/CompressDialog 8 个映射，无 shell32.dll 引用）
+  - 涉及文件：`.sisyphus/plans/avalonia-shell-com-integration.md`、`AGENTS.md`
+
 **2026-08-06** — AGENTS.md 同步信息面板可配置系统 + 结果预览加载覆层描述
   - **信息面板描述升级**：L160 由过时的一句话（"托管在 PreviewPanel 右侧/下方"）改为可配置元数据系统完整描述（4 子要点）——`MetadataSettingsManager` 独立 `metadata-panel.json` 持久化、`MetadataRegistry`→`MetadataRenderEngine` 字段分发（infoPanel/contentTop/hidden + Order/Row + SectionOrder）、`MetadataHelper` 接线 + `FormatMetadata` 向后兼容、全局显隐 `IsInfoPanelEffectiveVisible`（内容 && 用户偏好）持久化 + 菜单/设置双入口
   - **Services 列表补充**：`MetadataSettingsManager`、`MetadataRenderEngine` 两个新服务

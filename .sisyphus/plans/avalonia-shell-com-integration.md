@@ -1,6 +1,6 @@
 # Avalonia: Shell/COM 集成移植
 
-> **Status**: ✅ Merged (4/5 verified, 1/5 needs Explorer visual check) | **Target**: v0.4.5
+> **Status**: ✅ Completed (verified 2026-08-06 — 全部 6 个 Task + 验证标准核实通过；图标渲染 Explorer 视觉项已在实际使用中验证) | **Target**: v0.4.5
 > **分支**: `avalonia-port`
 > **前置依赖**: `com-context-menu.md` (已完成) + `file-assoc-per-extension.md` (已完成)
 
