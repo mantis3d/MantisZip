@@ -2,6 +2,8 @@
 
 ### 更新内容 / Changelog
 
+- 完成迁移 avalonia
+- 
 
 
 ## v0.4.5
