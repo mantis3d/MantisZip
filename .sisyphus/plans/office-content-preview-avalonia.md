@@ -711,7 +711,7 @@ foreach (var table in body.Descendants<Table>())
 }
 ```
 
-**状态**: ✅ 已实现（`ShowDocx` 按文档顺序遍历 `body.ChildElements`，表格行用 `"| a | b |"` 分隔符追加到全文，段落走原有大纲逻辑）
+**状态**: ✅ 已实现（`ShowDocx` 按文档顺序遍历 `body.ChildElements`，全文区升级为控件树 `DocxContentPanel`——段落渲染为 TextBlock、表格渲染为真 Grid 网格（均分列 + `ThemeBorderBrush` 边框 + `ThemeSurfaceBgBrush` 底色），大纲跳转改 `BlockIndex` + `TranslatePoint` 精确定位）
 
 ### 页眉/页脚/脚注内容提取
 

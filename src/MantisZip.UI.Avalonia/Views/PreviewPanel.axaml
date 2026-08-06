@@ -457,14 +457,13 @@
                         Background="{DynamicResource ThemeBorderBrush}"
                         ResizeBehavior="PreviousAndNext" />
 
-          <!-- 全文 -->
+          <!-- 全文（控件树：段落 TextBlock + 表格 Grid，由 ViewModel 构建） -->
           <Border Grid.Column="2"
                   Background="{DynamicResource ThemeSurfaceBgBrush}">
             <ScrollViewer x:Name="DocxFullTextScroller">
-              <TextBlock Text="{Binding DocxFullText}"
-                         TextWrapping="Wrap"
-                         Foreground="{DynamicResource ThemeTextPrimaryBrush}"
-                         Margin="8" />
+              <ContentControl Content="{Binding DocxContentPanel}"
+                              Margin="8"
+                              HorizontalContentAlignment="Stretch" />
             </ScrollViewer>
           </Border>
         </Grid>

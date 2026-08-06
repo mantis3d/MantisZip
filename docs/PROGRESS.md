@@ -21,6 +21,15 @@
 
 ### MantisZip.UI.Avalonia（主力版）
 
+**2026-08-06** — DOCX 预览表格升级：全文区控件树化（段落 TextBlock + 表格真 Grid 网格）+ 大纲精确跳转
+  - **背景**：DOCX 表格此前以 `"| a | b |"` 分隔符模拟（纯文本 fallback 形态），用户要求真表格显示
+  - **改造**：`ShowDocx` 全文从单一 `DocxFullText`（string）升级为控件树 `DocxContentPanel`（`Panel?`，对齐 `MarkdownPreviewPanel` 先例）——按文档顺序遍历 `body.ChildElements`，段落 → `TextBlock`（`TextWrapping.Wrap`），表格 → 真 `Grid` 网格（列数取最宽行、列宽按内容自适应 `Auto` + 单元格 `MaxWidth=400` 防超长撑宽、每单元格 `Border` 带 `ThemeBorderBrush` 边框 + `ThemeSurfaceBgBrush` 底色，忽略合并单元格布局）；新增 `AppendDocxParagraph`（构建 TextBlock + 记录 `BlockIndex`）与 `AppendDocxTable`（构建 Grid）重构，`GetThemeBrush` helper 对齐 `MarkdownPreviewBuilder`
+  - **大纲跳转精确化**：`DocxOutlineItem.CharOffset`（字符比例近似滚动）→ `BlockIndex`（控件树子元素索引）；`OnOutlineItemClicked` 用 `panel.Children[BlockIndex]` + `TranslatePoint` 相对 `DocxFullTextScroller` 定位，滚动到块顶部（-8px 留白）——块高度不均匀时不再有比例误差
+  - **BlockIndex 语义**：在 `AppendDocxParagraph` 中于 `content.Children.Add` 前取 `Children.Count`，指向该块在控件树中的实际索引；空段落不产生块（跳过），索引自洽不错位
+  - **XAML**：全文区 `TextBlock Text="{Binding DocxFullText}"` → `ContentControl Content="{Binding DocxContentPanel}"`（`HorizontalContentAlignment="Stretch"` 保证表格拉伸铺满）
+  - 命名冲突：`Border` 与 `DocumentFormat.OpenXml.Wordprocessing.Border` 二义 → 用 `global::Avalonia.Controls.Border`；`PreviewViewModel` 补 `using Avalonia.Media`（`TextWrapping`/`IBrush`）
+  - 验证：真实 DOCX（标题×2 + 表格 2×3 + 正文）解析验证——BlockIndex 0/3、表格块索引 2、单元格提取正确；`dotnet build` 0 errors（29 个既有警告）；Avalonia 测试 43 通过 / 2 跳过
+
 **2026-08-06** — Office 预览后续增强：DOCX 表格提取 + Markdown 表格渲染 + PPTX Canvas 定位预览（含命名空间 bug 修复）
   - **DOCX 表格提取**：`ShowDocx` 从 `body.Elements<Paragraph>()` 改为按文档顺序遍历 `body.ChildElements`——表格（`Table`）内的文本此前被完全跳过（仅图片/SmartArt 形状会丢失，但表格是常见内容组织方式）；新增 `AppendDocxParagraph`（原大纲+全文逻辑）与 `AppendDocxTable`（`TableCell` 逐行提取 → `"| a | b |"` 分隔符追加到全文，与降级方案一致）
   - **Markdown 表格渲染**：`MarkdownPreviewBuilder.TryBuildBlock` 新增 `case Table` → `BuildTable`（此前被 `default: return null` 静默丢弃，`UsePipeTables` 已启用但表格不可见）；用 Avalonia Grid 构建——列宽按 `TableColumnDefinition.Width`（>0 → `GridUnitType.Star` 比率，0 → Auto），表头行 `ThemeHeaderBgBrush` / 正文行 `ThemeSurfaceBgBrush` / 周围 `ThemeBorderBrush` 边框，单元格经 `BuildInlines` 渲染；`TryFindResource` 用 `IResourceHost` 扩展方法 + `global::Avalonia.Controls` 限定（仓库自身 `MantisZip.UI.Avalonia.Controls` 命名空间遮蔽系统命名空间）

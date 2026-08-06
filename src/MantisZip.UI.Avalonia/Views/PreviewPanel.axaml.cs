@@ -233,12 +233,17 @@ public partial class PreviewPanel : UserControl
     {
         if (sender is TextBlock tb && tb.DataContext is DocxOutlineItem item && _vm != null)
         {
-            var totalLen = _vm.DocxFullText.Length;
-            if (totalLen == 0) return;
-            var ratio = (double)item.CharOffset / totalLen;
-            var maxY = DocxFullTextScroller.ScrollBarMaximum.Y;
-            var offsetY = ratio * maxY;
-            DocxFullTextScroller.Offset = new Vector(DocxFullTextScroller.Offset.X, offsetY);
+            // 通过 BlockIndex 在全文控件树中找到目标块，TranslatePoint 精确滚动到该位置。
+            // 旧实现按字符比例近似滚动，块高度不均匀时误差明显。
+            if (_vm.DocxContentPanel is Panel panel
+                && item.BlockIndex >= 0 && item.BlockIndex < panel.Children.Count
+                && panel.Children[item.BlockIndex] is Control target
+                && DocxFullTextScroller != null)
+            {
+                var pos = target.TranslatePoint(new Point(0, 0), DocxFullTextScroller);
+                if (pos.HasValue)
+                    DocxFullTextScroller.Offset = new Vector(0, Math.Max(0, pos.Value.Y - 8));
+            }
         }
     }
 

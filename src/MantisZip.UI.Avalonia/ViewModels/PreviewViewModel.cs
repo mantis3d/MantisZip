@@ -6,6 +6,7 @@ using System.Runtime.InteropServices;
 using System.Text;
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -370,8 +371,16 @@ public partial class PreviewViewModel : ObservableObject
     [ObservableProperty]
     private ObservableCollection<DocxOutlineItem> _docxOutline = [];
 
-    [ObservableProperty]
-    private string _docxFullText = string.Empty;
+    /// <summary>
+    /// DOCX 全文控件树（段落 TextBlock 与表格 Grid 按文档顺序交替），
+    /// 由 ShowDocx 构建，替代原先的纯文本 DocxFullText。
+    /// </summary>
+    private Panel? _docxContentPanel;
+    public Panel? DocxContentPanel
+    {
+        get => _docxContentPanel;
+        set => SetProperty(ref _docxContentPanel, value);
+    }
 
     [ObservableProperty]
     private string _docxNoOutlineText = string.Empty;
@@ -1870,29 +1879,35 @@ public partial class PreviewViewModel : ObservableObject
             }
 
             var outline = new List<DocxOutlineItem>();
-            var fullText = new StringBuilder();
+            // 全文控件树：段落与表格按文档顺序交替排列
+            var content = new StackPanel { Spacing = 6 };
 
             // 按文档顺序遍历 body 子元素（段落与表格交替出现，需保持顺序）。
-            // 之前仅遍历 Paragraph 会丢失表格文本；现在 Table 用 | 分隔符模拟。
+            // 表格渲染为真正的 Grid 网格（带边框），不再用 | 分隔符模拟。
             foreach (var element in body.ChildElements)
             {
                 if (element is Paragraph para)
                 {
-                    AppendDocxParagraph(para, headingStyleIds, outline, fullText);
+                    AppendDocxParagraph(para, headingStyleIds, outline, content);
                 }
                 else if (element is Table table)
                 {
-                    AppendDocxTable(table, fullText);
+                    AppendDocxTable(table, content);
                 }
             }
 
             DocxOutline = new ObservableCollection<DocxOutlineItem>(outline);
-            DocxFullText = fullText.ToString();
+            DocxContentPanel = content;
             DocxNoOutlineText = outline.Count > 0 ? string.Empty : LocalizationManager.T("Preview_DocxNoOutline");
 
-            if (DocxFullText.Length == 0)
+            if (content.Children.Count == 0)
             {
-                DocxFullText = LocalizationManager.T("Preview_DocxEmpty");
+                content.Children.Add(new TextBlock
+                {
+                    Text = LocalizationManager.T("Preview_DocxEmpty"),
+                    Foreground = GetThemeBrush("ThemeTextSecondaryBrush"),
+                    TextWrapping = TextWrapping.Wrap,
+                });
                 DocxNoOutlineText = string.Empty;
             }
 
@@ -1908,19 +1923,21 @@ public partial class PreviewViewModel : ObservableObject
     }
 
     /// <summary>
-    /// 将单个 DOCX 段落追加到全文，并检测标题写入大纲。
+    /// 将单个 DOCX 段落追加为全文控件树中的 TextBlock，并检测标题写入大纲。
     /// 标题检测三路：StyleId 集合匹配 / OutlineLevel 显式属性。
     /// </summary>
     private static void AppendDocxParagraph(
         Paragraph para,
         HashSet<string> headingStyleIds,
         List<DocxOutlineItem> outline,
-        StringBuilder fullText)
+        Panel content)
     {
         var text = string.Concat(para.Descendants<Text>().Select(t => t.Text ?? string.Empty));
+        // 记录该段落块在控件树中的索引（大纲跳转用）
+        int blockIndex = content.Children.Count;
+
         if (string.IsNullOrWhiteSpace(text))
         {
-            fullText.AppendLine();
             return;
         }
 
@@ -1956,31 +1973,79 @@ public partial class PreviewViewModel : ObservableObject
             {
                 Text = text,
                 Level = level,
-                CharOffset = fullText.Length
+                BlockIndex = blockIndex
             });
         }
 
-        fullText.AppendLine(text);
+        content.Children.Add(new TextBlock
+        {
+            Text = text,
+            TextWrapping = TextWrapping.Wrap,
+        });
     }
 
     /// <summary>
-    /// 将 DOCX 表格追加到全文，用 | 分隔符模拟表格行。
-    /// 仅提取单元格内直接文本（含嵌套段落），忽略合并单元格布局。
+    /// 将 DOCX 表格渲染为全文控件树中的 Grid 网格（带边框/底色），保留文档顺序。
+    /// 列数取最宽行；合并单元格（GridSpan/VerticalMerge）按存在单元格计数，忽略其布局合并。
     /// </summary>
-    private static void AppendDocxTable(Table table, StringBuilder fullText)
+    private static void AppendDocxTable(Table table, Panel content)
     {
-        foreach (var row in table.Elements<TableRow>())
+        var rows = table.Elements<TableRow>().ToList();
+        if (rows.Count == 0) return;
+
+        // 列数 = 最宽行的单元格数
+        int colCount = rows.Max(r => r.Elements<TableCell>().Count());
+        if (colCount == 0) return;
+
+        var borderBrush = GetThemeBrush("ThemeBorderBrush");
+        var cellBg = GetThemeBrush("ThemeSurfaceBgBrush");
+
+        var grid = new Grid
         {
-            var cellTexts = new List<string>();
-            foreach (var cell in row.Elements<TableCell>())
+            Margin = new Thickness(0, 2),
+            ClipToBounds = true,
+        };
+
+        // 列宽按内容自适应（Auto）：内容短的列收缩、内容长的列自然变宽。
+        // 单元格 MaxWidth 限制单列最大宽度，超长内容换行而非无限撑宽表格。
+        for (int i = 0; i < colCount; i++)
+            grid.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Auto));
+
+        int rowIdx = 0;
+        foreach (var row in rows)
+        {
+            grid.RowDefinitions.Add(new RowDefinition(GridLength.Auto));
+            var cells = row.Elements<TableCell>().ToList();
+
+            for (int colIdx = 0; colIdx < colCount; colIdx++)
             {
-                var cellText = string.Concat(cell.Descendants<Text>().Select(t => t.Text ?? string.Empty));
-                cellTexts.Add(cellText.Trim());
+                string cellText = colIdx < cells.Count
+                    ? string.Concat(cells[colIdx].Descendants<Text>().Select(t => t.Text ?? string.Empty)).Trim()
+                    : string.Empty;
+
+                var cellBorder = new global::Avalonia.Controls.Border
+                {
+                    BorderBrush = borderBrush,
+                    BorderThickness = new Thickness(1),
+                    Background = cellBg,
+                    Padding = new Thickness(6, 3),
+                    Child = new TextBlock
+                    {
+                        Text = cellText,
+                        TextWrapping = TextWrapping.Wrap,
+                        // 限制单列最大宽度，配合 Auto 列宽：长内容换行而非无限撑宽表格
+                        MaxWidth = 400,
+                    },
+                };
+                // TextBlock 前景色继承自内容面板视觉祖先，无需显式设置
+                Grid.SetRow(cellBorder, rowIdx);
+                Grid.SetColumn(cellBorder, colIdx);
+                grid.Children.Add(cellBorder);
             }
-            if (cellTexts.Count == 0) continue;
-            fullText.AppendLine("| " + string.Join(" | ", cellTexts) + " |");
+            rowIdx++;
         }
-        fullText.AppendLine();
+
+        content.Children.Add(grid);
     }
 
     // ── XLSX ──
@@ -2422,6 +2487,17 @@ public partial class PreviewViewModel : ObservableObject
     }
 
     /// <summary>
+    /// 按资源键解析主题画刷（如 "ThemeBorderBrush"）。资源缺失时返回 null，由调用方回退。
+    /// 与 MarkdownPreviewBuilder.GetThemeBrush 实现一致。
+    /// </summary>
+    private static IBrush? GetThemeBrush(string key)
+    {
+        if (Application.Current is not global::Avalonia.Controls.IResourceHost host)
+            return null;
+        return host.TryFindResource(key, out var value) ? value as IBrush : null;
+    }
+
+    /// <summary>
     /// 显示 HTML 预览（通过 ReverseMarkdown → Markdown → 控件树）。
     /// </summary>
     public void ShowHtmlPreview(string filePath)
@@ -2536,7 +2612,7 @@ public partial class PreviewViewModel : ObservableObject
         PdfPageInfo = string.Empty;
         MarkdownPreviewPanel = null;
         DocxOutline.Clear();
-        DocxFullText = string.Empty;
+        DocxContentPanel = null;
         DocxNoOutlineText = string.Empty;
         XlsxData = null;
         _xlsxDataTable = null;
@@ -2638,12 +2714,13 @@ public class TorrentTreeNode : INotifyPropertyChanged
 
 /// <summary>
 /// DOCX 文档大纲条目，用于左右分栏预览。
+/// BlockIndex 指向全文控件树（DocxContentPanel.Children）中的块索引，用于点击跳转。
 /// </summary>
 public class DocxOutlineItem
 {
     public string Text { get; set; } = string.Empty;
     public int Level { get; set; }
-    public int CharOffset { get; set; }
+    public int BlockIndex { get; set; }
     public global::Avalonia.Thickness Indent => new global::Avalonia.Thickness((Level - 1) * 20, 2, 0, 2);
 }
 
