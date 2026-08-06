@@ -1082,6 +1082,11 @@
 
 这些变更影响两项目共用代码，按时间从新到旧排列。
 
+#### v0.4.5 (2026-08-07) ShellExt COM 右键菜单 exe 名修复（Avalonia 点击无效果）
+  - `ContextMenuHandler.InvokeCommand` 硬编码查找 `MantisZip.UI.exe`（WPF 版 exe 名），而 ShellExt 为两 UI 项目共享 → Avalonia 部署目录下只有 `MantisZip.UI.Avalonia.exe`，Explorer 点击菜单时找不到 exe 返回 E_FAIL，表现为「菜单能显示但点击无反应」（WPF 正常）
+  - 修复：优先探测 `MantisZip.UI.Avalonia.exe`、回退 `MantisZip.UI.exe`（部署目录只会存在其中一个，WPF 行为不变）
+  - 涉及文件：`src/MantisZip.ShellExt/ContextMenuHandler.cs`；构建 0 错误
+
 #### v0.4.5 (2026-08-06) new-format-support 计划扩展（方案 A+B 并入 + 外部库调研）
   - 计划重写为 9 阶段：P0 基础设施 → P1 UI 放开 TAR/GZIP → P2 BZip2 → P3 XZ → P4 Zstd（SharpCompress 0.48.1 内置）→ P5 Brotli（.NET 内置 BrotliStream，方案 B）→ P6 7z.dll 只读解锁（CAB/ARJ/LZH/CHM/CPIO/DEB/RPM/WIM/XAR/LZMA/MSI 共 11 种，纯映射零引擎改动，决策 8 已验证 6 处 extractor 构造均为自动检测）→ P7 文件关联独立开关 → P8 验证
   - 枚举扩展：`ArchiveFormat` 4→15 成员、`SevenZipEngine.CanHandle` 白名单 3→14、新增 `BrotliEngine.cs`

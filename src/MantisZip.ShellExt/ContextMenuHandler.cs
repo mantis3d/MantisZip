@@ -660,15 +660,19 @@ public class ContextMenuHandler : IShellExtInit, IContextMenu
             string cmdName = cmdId >= 0 && cmdId < cmdNames.Length ? cmdNames[cmdId] : $"UNKNOWN({cmdId})";
             ShellExtLog.Info($"InvokeCommand: resolved to cmdId={cmdId} ({cmdName})");
 
-            // Build the executable path (same directory as our assembly = MantisZip install dir)
+            // Build the executable path (same directory as our assembly = MantisZip install dir).
+            // ShellExt is shared by both UI projects — probe the Avalonia exe first (主力版),
+            // fall back to the legacy WPF exe. The deployed dir only ever contains one of them.
             string asmDir = Path.GetDirectoryName(typeof(ContextMenuHandler).Assembly.Location) ?? ".";
-            string exePath = Path.Combine(asmDir, "MantisZip.UI.exe");
+            string exePath = Path.Combine(asmDir, "MantisZip.UI.Avalonia.exe");
+            if (!File.Exists(exePath))
+                exePath = Path.Combine(asmDir, "MantisZip.UI.exe");
             bool exeExists = File.Exists(exePath);
             ShellExtLog.Info($"InvokeCommand: assemblyDir=\"{asmDir}\", exePath=\"{exePath}\", exists={exeExists}");
 
             if (!exeExists)
             {
-                ShellExtLog.Error($"InvokeCommand: MantisZip.UI.exe not found at \"{exePath}\"");
+                ShellExtLog.Error($"InvokeCommand: MantisZip.UI.Avalonia.exe / MantisZip.UI.exe not found in \"{asmDir}\"");
                 return NativeMethods.E_FAIL;
             }
 
