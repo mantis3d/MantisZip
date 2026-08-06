@@ -21,6 +21,11 @@
 
 ### MantisZip.UI.Avalonia（主力版）
 
+**2026-08-06** — 修复刷新/重新打开压缩包后文件列表为空（根目录必现）
+  - **根因**：`ClearArchiveInternal` 清空压缩包状态时遗漏 `CurrentFolder`（残留上一浏览位置的 `""`）；`LoadArchiveAsync` 重建后依赖 `SelectedFolder = FolderTreeRoot` 触发 `OnSelectedFolderChanged → NavigateToFolder` 填充列表，而 `NavigateToFolder` 对 `CurrentFolder == node.FullPath` 短路返回（L1196 跳过 `PopulateEntries`）。根节点 `FullPath = ""`（`ArchiveTreeBuilder.BuildTree`）→ 根目录点刷新、或上个压缩包停在根目录后打开新包时，残留 `CurrentFolder` 恰好等于根路径 → 短路 → 列表空白，切换目录后 `PopulateEntries` 正常执行才恢复（与用户测试完全吻合）
+  - **修复**：`ClearArchiveInternal()` 补 `CurrentFolder = null`，使所有重载路径（刷新/增删文件/打开）统一走正常填充路径
+  - 验证：`dotnet build` 0 errors（29 个既有警告，与本次改动无关）
+
 **2026-08-05** — 文件选择器右栏面板宽度可拖拽调整 + 持久化（PickItems / ExtractFolder）
   - **根因**：`PickItemsPanel`/`ExtractFolderPanel` 显式 `Width="260"` + 所在列 `Auto`——显式 Width 覆盖 Stretch，面板不随 `RightSplitter` 拖拽变化（表现为"宽度固定拖不动"）
   - **修复**：面板去掉固定 `Width`，改 `MinWidth="200" MaxWidth="800"`（Stretch 填满列 → 拖拽实时跟随）；Row 1 Grid 命名 `BrowserGrid` 并把 `ColumnDefinitions` 拆为显式元素

@@ -1557,6 +1557,7 @@ public partial class MainWindowViewModel : ObservableObject
         IsArchiveLoaded = false;
         SelectedEntry = null;
         SelectedFolder = null;
+        CurrentFolder = null;
         FolderTreeRoot = null;
         _allRawItems = null;
         DirStats = string.Empty;
