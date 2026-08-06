@@ -1024,8 +1024,10 @@ public partial class App : Application
             dlg.Close();
             if (result)
             {
+                compressStarted = true;
                 // 此入口覆盖了窗口内部 CloseAction，需显式快照高级选项（仅本次压缩生效）
                 dlg.SnapshotFormatOptionsToViewModel();
+                dlg.Close();
                 var vm = dlg.ViewModel;
                 var request = new CompressRequest
                 {

@@ -1006,9 +1006,15 @@ public partial class PreviewViewModel : ObservableObject
             _skOriginalPreview?.Dispose();
             _skOriginalPreview = SkiaSharp.SKBitmap.FromImage(img);
 
+            // 缩放基础尺寸 = 栅格化后的位图尺寸（与 ShowImage 对齐，供 ZoomFit/ScaledWidth 使用）
+            ImageWidth = w;
+            ImageHeight = h;
+
             IsPreviewVisible = true;
             IsToolbarVisible = true;
-            PreviewHeaderText = "SVG 预览";
+            PreviewHeaderText = LocalizationManager.T("Preview_Header_Svg");
+            // 初始缩放：适应视口（与 ShowImage 对齐）
+            ZoomFit();
         }
         catch (Exception ex)
         {

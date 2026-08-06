@@ -359,6 +359,7 @@ public partial class MainWindowViewModel : ObservableObject
             {
                 var completed = await RunWithProgress(
                     LocalizationManager.T("Status_Extracting"),
+                    new[] { tempFile },
                     async (progress, ct) =>
                     {
                         await ArchiveEntryExtractor.ExtractEntryAsync(
@@ -1519,6 +1520,7 @@ public partial class MainWindowViewModel : ObservableObject
         IsArchiveLoaded = false;
         SelectedEntry = null;
         SelectedFolder = null;
+        CurrentFolder = null;
         FolderTreeRoot = null;
         _allRawItems = null;
         DirStats = string.Empty;

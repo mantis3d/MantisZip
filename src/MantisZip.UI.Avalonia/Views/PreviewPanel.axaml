@@ -146,7 +146,7 @@
                   Background="{DynamicResource ThemeSurfaceBgBrush}">
       <StackPanel>
         <!-- Content-top metadata items -->
-        <Border Padding="{DynamicResource SpacingSmThk}"
+        <Border x:Name="ContentTopBorder" Padding="{DynamicResource SpacingSmThk}"
                 Background="{DynamicResource ThemeSurfaceBgBrush}"
                 BorderBrush="{DynamicResource ThemeBorderBrush}"
                 BorderThickness="0,0,0,1">
@@ -323,11 +323,16 @@
         </ScrollViewer>
 
         <!-- SVG preview -->
-        <ScrollViewer IsVisible="{Binding IsSvgVisible}">
+        <ScrollViewer IsVisible="{Binding IsSvgVisible}"
+                      HorizontalScrollBarVisibility="Auto"
+                      VerticalScrollBarVisibility="Auto">
           <Grid>
             <Rectangle Fill="{DynamicResource TransparencyCheckerboardBrush}"
                        IsVisible="{Binding IsTransparencyBgShown}" />
-            <Image Source="{Binding PreviewImage}" />
+            <Image Source="{Binding PreviewImage}"
+                   Width="{Binding ScaledWidth}"
+                   Height="{Binding ScaledHeight}"
+                   Stretch="Uniform" />
           </Grid>
         </ScrollViewer>
 

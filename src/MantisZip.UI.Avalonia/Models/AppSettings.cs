@@ -128,6 +128,12 @@ public class AppSettings
     /// <summary>手动路径值（对应 <see cref="DefaultPathOrder"/> 中的 "custom" 项）。留空 = 跳过该项。</summary>
     public string CustomDefaultPath { get; set; } = "";
 
+    // ===== 文件选择器 =====
+    /// <summary>PickItems 模式右侧累积面板宽度（像素）。0 = 未设置，使用默认宽度 260。</summary>
+    public double PickItemsPanelWidth { get; set; }
+    /// <summary>ExtractFolder 模式右侧解压预览面板宽度（像素）。0 = 未设置，使用默认宽度 260。</summary>
+    public double ExtractFolderPanelWidth { get; set; }
+
     // ===== 调试 =====
     public bool EnableDebugLogging { get; set; } = false;
     public string LogPrivacyMode { get; set; } = "extension";
