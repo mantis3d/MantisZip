@@ -2,6 +2,7 @@
 
 > **状态**: ✅ 代码实现完成（待手工测试） | **阶段**: [■■■■■■■■■■] (10/10) — ☑️ 代码实现已完成 (2026-07-23)
 > **分支**: `avalonia-port`
+> **2026-08-06 补充**: 预览弹窗（DragPreviewPopup）实施设计已确认——独立 Win32 弹窗跟随鼠标（不合成进覆盖层）+ PointerPressed 预取式渲染 + 双阈值降级。待实施，详见文末「预览弹窗实施补充」章节。
 
 ---
 
@@ -30,8 +31,8 @@
 | `Services/DropTargetDetector.cs` | 🆕 新增 — 目标路径检测 |
 | `Services/DragDropService.cs` | 🆕 新增 — 拖拽编排 |
 | `Services/DragDropItemExpander.cs` | 🆕 新增 — 多选展开 + 路径裁剪 |
-| `Services/DragOverlayWindow.cs` | 🆕 新增 — Win32 覆盖层窗口（独立线程） |
-| `Services/DragPreviewPopup.cs` | 🆕 新增 — Win32 预览弹窗，跟随鼠标显示文件树 |
+| `Services/DragOverlayWindow.cs` | ⛔ 已废弃 — 重构为 Avalonia Window + `OverlayController`（后台线程 UpdateLayeredWindow） |
+| `Services/DragPreviewPopup.cs` | 🆕 待新增 — 独立 Win32 预览弹窗（跟随鼠标，460×680，预取式渲染 + 双阈值降级） |
 | `Views/MainWindow.axaml.cs` | 🔧 修改 — 替换现有拖拽代码 |
 | `ViewModels/MainWindowViewModel.cs` | 🔧 修改 — 补充拖拽相关状态 |
 | `Models/ArchiveItemModel.cs` | 🔧 修改 — 补充 ToCoreItem 转换 |
@@ -61,6 +62,7 @@
 | 视觉反馈 | 覆盖层：绿色=直接解压，红色=需确认，灰色=无效区域 |
 | | 预览弹窗：跟随鼠标显示预渲染的 ResultTreeView 文件树 + 摘要栏 |
 | | 预览弹窗实现：预渲染位图（Avalonia RenderTargetBitmap → Win32 CreateDIBSection）|
+| | 预览弹窗形态（2026-08-06 确认）：**独立 Win32 弹窗跟随鼠标**（不合成进覆盖层，避免遮挡目标窗口内容）；尺寸 **460×680** + 屏幕边缘自动翻转；渲染时机 **PointerPressed 预取式**（按下即渲染，超阈值时通常已就绪，零延迟启动）；**双阈值降级**（>300 文件 或 渲染超 250ms → 只渲染前 2 层 + 摘要；>2000 文件 或 超 500ms → 纯摘要文字）|
 | #32770 路径提取 | 方案 A：Win32 `EnumChildWindows` + `GetWindowText`；方案 B（UIA，未来计划） |
 
 ### 未来可选项
@@ -1900,3 +1902,95 @@ struct FILEDESCRIPTORW
 
 - 方案 A（`SetSystemCursor`，已实施）作为过渡，不影响本方案的独立性
 - 实施时若 Avalonia 版本升级改变了 `OleDragSource.GiveFeedback` 行为（不再返回 `USEDEFAULTCURSORS`），可重新评估是否仍需自实现
+
+---
+
+## 预览弹窗实施补充（2026-08-06）
+
+> **状态**: 📋 设计已确认，待实施 | 需求：**完整目录树 + 拖拽过程中持续可见**
+
+### 决策背景
+
+预览弹窗的需求被明确为两点：显示**完整目录树**（非摘要文字），且在**拖拽过程中持续可见**。由此排除三条候选路线：
+
+| 候选方案 | 排除原因 |
+|---------|---------|
+| 主窗口覆盖预览（ResultTreeView 盖住目录树/文件列表） | `DoDragDrop` 同步阻塞 UI 线程，拖拽期间主窗口控件无法更新；且用户拖出时视线已离开主窗口，预览在拖拽中不可见 |
+| 合成进覆盖层（现有 60×60 preview 槽位） | 槽位是**缩略图级别**（`iconSize = 60`，固定底中），装不下完整树；树要完整就得大，必然糊在目标窗口内容上，遮挡用户要看的文件列表 |
+| 覆盖层文字摘要 | 信息量不足（用户明确要完整树） |
+
+**选定方案**：独立 Win32 预览弹窗跟随鼠标（恢复原计划 `DragPreviewPopup` 语义），复用已验证的 OverlayController 模式（后台线程 + `UpdateLayeredWindow`）。
+
+### 现状盘点（两端代码已存在，只缺接线）
+
+- `DragPreviewBitmapBuilder` — ✅ 已完成：展开 → `BuildExtractPreview` → ResultTreeView → Measure/Arrange → `RenderTargetBitmap` → BGRA 像素 + i18n 摘要（`Drag_FileCount`）。当前 **0 调用者**
+- `OverlayController.SetPreview()` / `PreviewImageData` / `CompositeImage` — ✅ 已实现，当前 **0 调用者**（将移除，见下）
+- `OverlayRender` 的 60×60 preview 合成槽位 — ✅ 已实现（preview 存在时合成、否则画 status 图标，二者互斥）— ⛔ **将移除**
+
+### 关键约束（决定时序设计）
+
+1. `RenderTargetBitmap.Render` 必须在 **UI 线程**执行；`DoDragDrop` 同步阻塞 UI 线程 → **预览渲染必须在拖拽启动前完成，拖拽启动后永远无法补渲染**（"先启动拖拽、渲染完再喂"不可行）
+2. 渲染不可中断（RenderTargetBitmap 无 cancel）→ 成本靠**渲染前分类**控制（按展开文件数决定渲染形态）
+3. 弹窗显示/跟随不依赖 UI 线程（后台线程 + 位图数据），与覆盖层同生命周期
+
+### 预取式渲染时序
+
+```
+PointerPressed（鼠标按下）
+    │ 记录选中项 → 统计展开文件数（O(n) 遍历，毫秒级）
+    │ 按数量分类：完整树 / 截断树(前2层) / 纯摘要
+    │ 启动异步渲染任务（UI 线程）
+    ▼
+PointerMoved 超过 4px 阈值（通常已过 100–400ms）
+    ├─ 渲染已完成 → 创建预览弹窗 + SetPreview → 立即显示树，零延迟启动拖拽
+    ├─ 渲染未完成（大树）→ 等待至上限 250ms，弹窗显示「构建中」占位（GDI 文字，后台线程可画）
+    │     ├─ 250ms 内完成 → 显示树
+    │     └─ 超过 250ms → 放弃树，切换为纯摘要文字，立即启动拖拽（不阻塞）
+    ▼
+PerformDragDrop（自实现 OLE）→ 拖拽中弹窗持续显示 → 松手/取消 → 销毁弹窗
+```
+
+> 预取利用「按下 → 移动超阈值」的天然时间窗口把渲染藏进去，常见场景（≤300 文件）零感知延迟。极端场景由 250ms 上限兜底，拖拽启动永不阻塞。
+
+### 降级策略（双阈值，已确认）
+
+| 展开文件数 | 渲染形态 | 目标耗时 |
+|-----------|---------|---------|
+| ≤300 | 完整树（ResultTreeView 全量，截断显示「…还有 N 个」） | <100ms |
+| 301 – 2000 | 前 2 层 + 摘要栏「共 N 个文件 / XX MB，仅显示前 M 项」 | <250ms |
+| >2000 | 纯摘要文字（无树，GDI 绘制，毫秒级） | 即时 |
+
+兜底：等待渲染 >250ms 仍未完 → 强制切纯摘要并立即启动拖拽。
+
+### 弹窗规格（已确认）
+
+- **尺寸**：460×680（位图），超出摘要栏显示截断统计
+- **跟随**：鼠标右下 20px 偏移，后台追踪循环（100ms 节流，与覆盖层一致）
+- **出屏翻转**：右/下越出虚拟屏幕边界时翻转到鼠标另一侧
+- **绘制**：`UpdateLayeredWindow` + BGRA DIB，`DragPreviewBitmapBuilder` 输出的位图 + GDI 摘要栏
+- **不遮挡**：弹窗跟随鼠标，目标窗口覆盖层（高亮边框 + 路径文字）职责不变，二者互不干扰
+
+### 涉及文件
+
+| 文件 | 操作 |
+|------|------|
+| `Services/DragPreviewPopup.cs` | 🆕 新增 — 独立 Win32 预览弹窗（后台线程 + UpdateLayeredWindow，460×680，跟随鼠标 + 出屏翻转 + 摘要栏 + 「构建中」占位） |
+| `Services/DragPreviewBitmapBuilder.cs` | 🔧 修改 — 增加复杂度分类入口（按展开文件数选择 完整树/截断树/纯摘要 路径）；移除未使用的 `format` 参数 |
+| `Services/OverlayController.cs` | 🔧 修改 — 移除 preview 合成槽位（`SetPreview`/`PreviewImageData`/`CompositeImage` 及 OverlayRender 的 preview 参数）；恢复 status 图标逻辑为无条件绘制 |
+| `Views/MainWindow.axaml.cs` | 🔧 修改 — PointerPressed 启动预渲染任务 → PointerMoved 超阈值检查完成状态/等待上限 → 弹窗创建/关闭与 overlay 同生命周期 |
+
+### 任务清单
+
+- [ ] **1. DragPreviewBitmapBuilder 分类改造**：新增按展开文件数选择渲染形态的入口；截断树（前 2 层）与纯摘要两条新路径；清理 `format` 参数
+- [ ] **2. 新建 DragPreviewPopup**：窗口注册/创建（模式参照 OverlayController）；`SetPreview(byte[], w, h)` 位图 + GDI 摘要栏；「构建中」占位文字；跟随鼠标 + 出屏翻转
+- [ ] **3. OverlayController 清理**：移除 preview 合成槽位，恢复 status 图标无条件绘制
+- [ ] **4. MainWindow 接线**：PointerPressed 预渲染 → PointerMoved 分类检查/等待上限 → 弹窗生命周期（创建/显示/销毁，与 overlay 同步）
+- [ ] **5. 验证**：拖拽启动延迟（≤300 文件零感知、>2000 文件 ≤250ms）；弹窗跟随/出屏翻转；遮挡关系；覆盖层功能回归（高亮/文字/光标四态）
+
+### Definition of Done 补充
+
+- [ ] 预览弹窗在拖拽过程中持续可见，跟随鼠标（右下 20px，出屏翻转）
+- [ ] 完整目录树在 460×680 弹窗内清晰可读（截断显示「…还有 N 个」）
+- [ ] ≤300 文件渲染 <100ms；301–2000 走前 2 层截断；>2000 走纯摘要
+- [ ] 拖拽启动零感知延迟（预取覆盖常见场景，250ms 上限兜底极端场景）
+- [ ] 覆盖层高亮/路径文字/四态光标功能无回归

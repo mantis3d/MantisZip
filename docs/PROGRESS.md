@@ -21,6 +21,13 @@
 
 ### MantisZip.UI.Avalonia（主力版）
 
+**2026-08-06** — 拖拽预览弹窗实施设计确认（独立 Win32 弹窗跟随鼠标 + 预取式渲染 + 双阈值降级）
+  - **背景**：预览弹窗需求明确为「完整目录树 + 拖拽过程中持续可见」；现有 `DragPreviewBitmapBuilder`（预渲染 ResultTreeView 位图）与 `OverlayController.SetPreview` 两端代码已完成但 0 调用者，仅缺接线与形态决策
+  - **决策**：排除三条候选路线——主窗口覆盖预览（`DoDragDrop` 阻塞 UI 线程期间不可见/不可更新）、合成进覆盖层（现有槽位是 60×60 缩略图级，装不下完整树且遮挡目标窗口）、文字摘要（信息量不足）；选定**独立 Win32 弹窗跟随鼠标**（复用 OverlayController 后台线程 + `UpdateLayeredWindow` 模式）
+  - **关键约束**：`RenderTargetBitmap.Render` 必须在 UI 线程、`DoDragDrop` 同步阻塞 UI 线程 → 预览渲染必须在拖拽启动前完成，拖拽启动后无法补渲染；据此修正时序为「PointerPressed 预取渲染 → 超阈值检查 → 未完成等待至 250ms 上限（显示「构建中」占位）→ 超时强制降级纯摘要立即启动」
+  - **规格**：460×680、鼠标右下 20px 偏移、出屏自动翻转、摘要栏；双阈值降级（≤300 文件完整树 <100ms；301–2000 前 2 层 + 摘要 <250ms；>2000 纯摘要即时）
+  - **文档**：`drag-drop-direct-extract.md` 新增「预览弹窗实施补充（2026-08-06）」章节（决策背景/现状盘点/时序图/降级表/任务清单/DoD 补充）+ 头部状态与决策记录同步；`docs/PLAN.md` 拖拽条目追加 2026-08-06 说明（规则 1）
+
 **2026-08-05** — 解压路径统一为单一事实源（`ExtractPathResolver`）+ ExtractSettings 文件过滤接入实际解压
   - **问题根因**：「解压选择文件到」实际解压按 `ExtractPreserveFullPath` 裁剪路径，但 `ResultPreviewService.BuildExtractPreview` 恒按「保留完整路径」建树 → 预览树与实际落盘不一致
   - **核心改造**：新增 Core `ExtractPathResolver`（`TrimCurrentFolderPrefix`/`ResolveRelativePath`/`ResolveAll`，语义与解压侧历史逻辑逐字一致），预览树与实际解压共用同一路径计算，从结构上杜绝不一致；`BuildExtractPreview` 新增 `preserveFullPath`（默认 `true`）/`currentFolder`（默认 `""`）参数，恶意路径条目逐条 try-catch 跳过（解压侧保持抛异常整批失败）
