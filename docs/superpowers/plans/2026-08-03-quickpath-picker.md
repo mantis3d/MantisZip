@@ -98,14 +98,14 @@
 
 - [x] `dotnet build src\MantisZip.UI.Avalonia.csproj`（确保运行实例已 kill，避免文件锁）
 - [x] `dotnet test tests\MantisZip.UI.Avalonia.Tests`（含新 CoerceToDirectory 测试；旧 VM 测试不应破坏）
-- [ ] 手动验收三家窗口：⭐🕐🪟 浮层开关、light-dismiss、选中写回、📁/浏览目录归一化、AutoComplete 提示
+- [ ] 手动验收三家窗口：⭐🕐🪟 浮层开关、light-dismiss、选中写回、📁/浏览目录归一化、AutoComplete 提示（⏳ 待用户 GUI 验证）
 - [x] 更新 `docs/PROGRESS.md`（三轨制 Avalonia 2026-08-03 条目，追加快捷速选控件）
 - [x] commit（cd6778f）
 
 ### 任务 8 — 收尾
 
-- [ ] 确认 `git status` 干净、无遗留临时文件
-- [ ] 汇总改动给用户，标注手动验收项待他确认
+- [ ] 确认 `git status` 干净、无遗留临时文件（⏳ 待用户 GUI 验证完成后一并确认）
+- [ ] 汇总改动给用户，标注手动验收项待他确认（⏳ 待用户 GUI 验证）
 
 ## 测试策略
 
