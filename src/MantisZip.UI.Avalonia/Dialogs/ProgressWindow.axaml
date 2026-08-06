@@ -24,15 +24,15 @@
       <RowDefinition Height="Auto"/>  <!-- 3: 文件进度条 -->
       <RowDefinition Height="Auto"/>  <!-- 4: 总体进度条 -->
       <RowDefinition Height="Auto"/>  <!-- 5: 文件计数 -->
-      <RowDefinition Height="Auto"/>  <!-- 6: 错误摘要 -->
-      <RowDefinition Height="*"/>      <!-- 7: 弹性填充 -->
-      <RowDefinition Height="Auto"/>  <!-- 8: 按钮行 -->
+      <RowDefinition Height="Auto"/>  <!-- 6: 状态消息 -->
+      <RowDefinition Height="Auto"/>  <!-- 7: 错误摘要 -->
+      <RowDefinition Height="*"/>      <!-- 8: 弹性填充 -->
+      <RowDefinition Height="Auto"/>  <!-- 9: 按钮行 -->
     </Grid.RowDefinitions>
 
-    <!-- ═══ 批处理文件列表（默认隐藏，批处理模式时显示）═══ -->
+    <!-- ═══ 批处理文件列表（始终可见，单文件操作也显示列表）═══ -->
     <ListBox x:Name="BatchFileList" Grid.Row="0"
              ItemsSource="{Binding BatchItems}"
-             IsVisible="False"
              MaxHeight="160" Margin="0,0,0,8"
              BorderThickness="1"
              BorderBrush="{DynamicResource ThemeBorderBrush}"
@@ -210,8 +210,17 @@
                Foreground="{DynamicResource ThemeTextSecondaryBrush}"
                Margin="0,0,0,4"/>
 
-    <!-- Row 6: 错误摘要 -->
-    <TextBox x:Name="ErrorSummaryBox" Grid.Row="6"
+    <!-- Row 6: 状态消息（暂停/恢复/完成/失败状态文字） -->
+    <TextBlock Grid.Row="6"
+               Text="{Binding StatusMessage}"
+               FontSize="12"
+               FontWeight="SemiBold"
+               Foreground="{DynamicResource ThemeTextSecondaryBrush}"
+               Margin="0,0,0,4"
+               TextTrimming="CharacterEllipsis"/>
+
+    <!-- Row 7: 错误摘要 -->
+    <TextBox x:Name="ErrorSummaryBox" Grid.Row="7"
              Text="{Binding ErrorSummaryText}"
              IsReadOnly="True"
              IsVisible="{Binding HasErrors}"
@@ -225,8 +234,8 @@
              Focusable="False"
              Cursor="Arrow"/>
 
-    <!-- Row 8: 按钮行 -->
-    <Grid Grid.Row="8" Margin="0,4,0,2">
+    <!-- Row 9: 按钮行 -->
+    <Grid Grid.Row="9" Margin="0,4,0,2">
       <Grid.ColumnDefinitions>
         <ColumnDefinition Width="Auto"/>
         <ColumnDefinition Width="*"/>

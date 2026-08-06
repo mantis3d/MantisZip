@@ -4,6 +4,7 @@ using Avalonia.Controls.Documents;
 using Avalonia.Layout;
 using Avalonia.Media;
 using Markdig;
+using Markdig.Extensions.Tables;
 using Markdig.Syntax;
 using Markdig.Syntax.Inlines;
 using MantisZip.UI.Avalonia.Models;
@@ -61,6 +62,8 @@ public static class MarkdownPreviewBuilder
                 return BuildList(lb, source);
             case QuoteBlock qb:
                 return BuildQuote(qb, source);
+            case Table table:
+                return BuildTable(table, source);
             case ThematicBreakBlock:
                 return new Separator { Margin = new Thickness(0, 8) };
             default:
@@ -221,9 +224,103 @@ public static class MarkdownPreviewBuilder
         };
     }
 
-    #endregion
+    /// <summary>
+    /// Build an Avalonia Grid from a Markdig pipe-table <see cref="Table"/> block.
+    /// Header row uses ThemeHeaderBgBrush, body rows use ThemeSurfaceBgBrush,
+    /// column widths follow the parsed table's percent/auto definitions.
+    /// Merged cells (colspan/rowspan) are not supported.
+    /// </summary>
+    private static Control BuildTable(Table table, string source)
+    {
+        // Column count: prefer parsed definitions, fall back to widest row
+        var colCount = table.ColumnDefinitions.Count;
+        if (colCount == 0)
+        {
+            foreach (var row in table)
+            {
+                if (row is TableRow tr && tr.Count > colCount)
+                    colCount = tr.Count;
+            }
+        }
+        if (colCount == 0) return new TextBlock { Text = string.Empty };
 
-    #region Inline builders
+        var borderBrush = GetThemeBrush("ThemeBorderBrush");
+        var headerBg = GetThemeBrush("ThemeHeaderBgBrush");
+        var cellBg = GetThemeBrush("ThemeSurfaceBgBrush");
+
+        var grid = new Grid { Margin = new Thickness(0, 4) };
+
+        // Column definitions: percent width (float > 0) → Star with ratio, otherwise Auto
+        for (int i = 0; i < colCount; i++)
+        {
+            if (i < table.ColumnDefinitions.Count)
+            {
+                var width = table.ColumnDefinitions[i].Width;
+                if (width > 0)
+                {
+                    grid.ColumnDefinitions.Add(new ColumnDefinition(
+                        new GridLength(width, GridUnitType.Star)));
+                    continue;
+                }
+            }
+            grid.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Auto));
+        }
+
+        int rowIdx = 0;
+        foreach (var rowObj in table)
+        {
+            if (rowObj is not TableRow row) continue;
+
+            grid.RowDefinitions.Add(new RowDefinition(GridLength.Auto));
+            bool isHeader = row.IsHeader;
+
+            for (int colIdx = 0; colIdx < colCount; colIdx++)
+            {
+                var cellObj = colIdx < row.Count ? row[colIdx] : null;
+                var content = new StackPanel();
+
+                if (cellObj is TableCell cell)
+                {
+                    foreach (var block in cell)
+                    {
+                        if (TryBuildBlock(block, source) is Control c)
+                            content.Children.Add(c);
+                    }
+                }
+
+                var cellBorder = new Border
+                {
+                    BorderBrush = borderBrush,
+                    BorderThickness = new Thickness(1),
+                    Background = isHeader ? headerBg : cellBg,
+                    Padding = new Thickness(6, 3),
+                    Child = content,
+                };
+                // TextBlocks inside inherit Foreground from the content panel's visual
+                // ancestors, which are set by the preview ScrollViewer — no explicit
+                // Foreground needed (Border has no Foreground property in Avalonia).
+                Grid.SetRow(cellBorder, rowIdx);
+                Grid.SetColumn(cellBorder, colIdx);
+                grid.Children.Add(cellBorder);
+            }
+            rowIdx++;
+        }
+
+        return grid;
+    }
+
+    /// <summary>
+    /// Resolve a theme resource brush by key (e.g. "ThemeBorderBrush").
+    /// Returns null when the resource is missing, letting callers fall back.
+    /// </summary>
+    private static IBrush? GetThemeBrush(string key)
+    {
+        if (Application.Current is not global::Avalonia.Controls.IResourceHost host)
+            return null;
+        return host.TryFindResource(key, out var value) ? value as IBrush : null;
+    }
+
+
 
     /// <summary>
     /// Recursively build Avalonia Inline elements from a Markdig inline container.

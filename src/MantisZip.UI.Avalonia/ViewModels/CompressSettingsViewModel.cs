@@ -161,6 +161,35 @@ public partial class CompressSettingsViewModel : ObservableObject
     [ObservableProperty]
     private bool _sevenZipEncryptHeaders;
 
+    // ── 高级格式选项（仅本次压缩生效）──
+    // 由 View 在对话框关闭时从 DynamicFormatOptionsPanel 快照到此处；
+    // 构造函数中从 AppSettings 读取当前默认值，保证对话框初始值与设置窗口一致。
+    // 不再写回 AppSettings —— 避免压缩设置污染设置窗口的全局默认值。
+
+    /// <summary>ZIP 文件名编码："utf-8" / "gbk" / "default"。</summary>
+    public string FileNameEncoding { get; set; } = "utf-8";
+
+    /// <summary>ZIP 压缩方法：""=默认（Deflate），或 "deflate64" / "bzip2" / "lzma" / "ppmd" / "store"。</summary>
+    public string ZipCompressionMethod { get; set; } = "deflate";
+
+    /// <summary>7z 压缩方法："LZMA" / "LZMA2" / "PPMd" / "BZip2" / "Deflate"。</summary>
+    public string SevenZipCompressionMethod { get; set; } = "LZMA2";
+
+    /// <summary>7z 固实压缩标志。</summary>
+    public bool SevenZipSolid { get; set; } = true;
+
+    /// <summary>7z 固实块大小：""=默认，或 "64m" / "256m" / "512m" / "1g"。</summary>
+    public string SevenZipSolidBlockSize { get; set; } = "";
+
+    /// <summary>7z 字典大小（字节），0 表示引擎默认。</summary>
+    public int SevenZipDictionarySize { get; set; }
+
+    /// <summary>7z Word Size（快速字节数），0 表示引擎默认。</summary>
+    public int SevenZipNumFastBytes { get; set; }
+
+    /// <summary>7z 匹配器：""=默认，或 "bt2" / "bt3" / "bt4"。</summary>
+    public string SevenZipMatchFinder { get; set; } = "";
+
     // ── 分卷 ──
 
     /// <summary>分卷大小选项（共享数据源）。</summary>
@@ -435,6 +464,16 @@ public partial class CompressSettingsViewModel : ObservableObject
         {
             var settings = AppSettings.Load();
             KeepOriginalExtension = settings.KeepOriginalExtension;
+            FileNameEncoding = settings.ZipEncoding ?? "utf-8";
+            ZipCompressionMethod = settings.ZipCompressionMethod ?? "deflate";
+            SevenZipCompressionMethod = settings.SevenZipCompressionMethod ?? "LZMA2";
+            SevenZipSolid = settings.SevenZipSolid;
+            SevenZipSolidBlockSize = settings.SevenZipSolidBlockSize ?? "";
+            SevenZipDictionarySize = settings.SevenZipDictionarySize;
+            SevenZipNumFastBytes = settings.SevenZipNumFastBytes;
+            SevenZipMatchFinder = settings.SevenZipMatchFinder ?? "";
+            ZipEncryptionMethod = settings.ZipEncryptionMethod ?? "aes256";
+            SevenZipEncryptHeaders = settings.SevenZipEncryptHeaders;
         }
         catch { /* 使用默认值 */ }
 
@@ -445,6 +484,10 @@ public partial class CompressSettingsViewModel : ObservableObject
         // Must be called after SelectedPaths is populated (the CollectionChanged
         // handler won't fire for items added before it was attached).
         UpdateAutoRules();
+
+        // 自动填充输出路径：CollectionChanged 不会为构造时已添加的路径触发，
+        // 需显式调用（对齐 WPF ShowCompressWindow 自动填充输出路径；CLI --compress 依赖此逻辑）
+        TryAutoFillOutputPath();
     }
 
     /// <summary>

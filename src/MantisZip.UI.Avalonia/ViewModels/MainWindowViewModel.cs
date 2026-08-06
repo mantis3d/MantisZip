@@ -5,6 +5,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using MantisZip.Core.Abstractions;
 using MantisZip.Core.FileFilter;
+using MantisZip.Core.Models;
 using MantisZip.Core.Services;
 using MantisZip.Core;
 using MantisZip.Core.Utils;
@@ -111,8 +112,15 @@ public partial class MainWindowViewModel : ObservableObject
 
     /// <summary>
     /// 运行带进度窗口的操作。View 负责创建进度窗口、显示、执行操作、关闭窗口。
+    /// filePaths 非空时显示批处理文件列表（始终可见，单文件也显示）。
     /// </summary>
-    public Func<string, Func<IProgress<ArchiveProgress>, CancellationToken, Task>, Task<bool>>? RunWithProgress { get; set; }
+    public Func<string, IReadOnlyList<string>?, Func<IProgress<ArchiveProgress>, CancellationToken, Task>, Task<bool>>? RunWithProgress { get; set; }
+
+    /// <summary>
+    /// 由 View 设置的批处理状态上报回调（索引 + 状态）。
+    /// 操作闭包内可将其作为 onItemStatus 传给引擎，实时更新批处理列表项状态。
+    /// </summary>
+    public Action<int, BatchItemStatus>? BatchStatusReporter { get; set; }
 
     /// <summary>
     /// 由 View 设置的文件选择回调。返回选中的文件路径列表，取消返回 null。
@@ -319,6 +327,120 @@ public partial class MainWindowViewModel : ObservableObject
     {
         _sessionPasswords.TryGetValue(archivePath, out var pwd);
         return pwd;
+    }
+
+    /// <summary>
+    /// 双击文件：提取到临时目录并用系统默认程序打开。
+    /// 与 WPF 版 DoubleClickOpenFileAsync 行为对齐。
+    /// </summary>
+    public async Task OpenEntryWithDefaultAppAsync(ArchiveItemModel entry)
+    {
+        var threshold = _appSettings.DoubleClickOpenThreshold;
+
+        // 功能禁用（阈值为 0）
+        if (threshold <= 0) return;
+        if (CurrentArchivePath == null) return;
+
+        // 检查格式是否支持单项提取（Tar/GZip/ISO 不支持）
+        if (_currentFormat is ArchiveFormat.Tar or ArchiveFormat.GZip or ArchiveFormat.Iso)
+        {
+            await AppMessageBox.Show(
+                LocalizationManager.T("Main_DoubleClickFormatNotSupported"),
+                LocalizationManager.T("App_ErrorTitle"),
+                MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        // 检查密码
+        if (_hasEncryptedArchive && string.IsNullOrEmpty(_currentPassword))
+        {
+            await AppMessageBox.Show(
+                LocalizationManager.T("Main_DoubleClickPasswordNeeded"),
+                LocalizationManager.T("App_ErrorTitle"),
+                MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        // 超过阈值时弹出确认框
+        if (entry.Size > threshold)
+        {
+            var sizeStr = FormatUtil.FormatSize(entry.Size);
+            var result = await AppMessageBox.Show(
+                LocalizationManager.T("Main_DoubleClickOpenConfirm", sizeStr),
+                LocalizationManager.T("App_ConfirmTitle"),
+                MessageBoxButton.YesNo, MessageBoxImage.Question);
+            if (result != MessageBoxResult.Yes) return;
+        }
+
+        // 临时目录（独立于预览临时目录，避免被 ClearPreviewTemp 清理）
+        var tempDir = Path.Combine(Path.GetTempPath(), "MantisZip", "OpenWith", Guid.NewGuid().ToString());
+        Directory.CreateDirectory(tempDir);
+        var tempFile = Path.Combine(tempDir, entry.Name);
+
+        try
+        {
+            App.DebugLog($"OpenEntryWithDefaultAppAsync: extracting '{entry.FullPath}' ({FormatUtil.FormatSize(entry.Size)}) from '{CurrentArchivePath}'");
+
+            var password = _currentPassword ?? GetSessionPassword(CurrentArchivePath);
+
+            // 大文件（>= 1MB）显示进度窗口，否则直接提取
+            if (entry.Size >= 1024 * 1024 && RunWithProgress != null)
+            {
+                var completed = await RunWithProgress(
+                    LocalizationManager.T("Status_Extracting"),
+                    new[] { tempFile },
+                    async (progress, ct) =>
+                    {
+                        await ArchiveEntryExtractor.ExtractEntryAsync(
+                            CurrentArchivePath, entry.FullPath, tempFile, _currentFormat, password, ct);
+                    });
+
+                if (!completed)
+                {
+                    // 取消或失败：清理临时目录
+                    TryDeleteTempDir(tempDir);
+                    return;
+                }
+            }
+            else
+            {
+                await ArchiveEntryExtractor.ExtractEntryAsync(
+                    CurrentArchivePath, entry.FullPath, tempFile, _currentFormat, password);
+            }
+
+            App.DebugLog($"OpenEntryWithDefaultAppAsync: extracted to '{tempFile}', opening with default app");
+
+            // 用系统默认程序打开
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = tempFile,
+                UseShellExecute = true
+            });
+
+            StatusMessage = LocalizationManager.T("Main_Status_DoubleClickOpened", entry.Name);
+        }
+        catch (Exception ex)
+        {
+            App.DebugLog($"OpenEntryWithDefaultAppAsync: failed: {ex.Message}");
+            await AppMessageBox.Show(
+                LocalizationManager.T("Main_Status_ExtractFailed", ex.Message),
+                LocalizationManager.T("App_ErrorTitle"),
+                MessageBoxButton.OK, MessageBoxImage.Error);
+            TryDeleteTempDir(tempDir);
+        }
+    }
+
+    private static void TryDeleteTempDir(string tempDir)
+    {
+        try
+        {
+            if (Directory.Exists(tempDir))
+                Directory.Delete(tempDir, recursive: true);
+        }
+        catch
+        {
+            // Best effort cleanup
+        }
     }
 
     /// <summary>
@@ -1435,6 +1557,7 @@ public partial class MainWindowViewModel : ObservableObject
         IsArchiveLoaded = false;
         SelectedEntry = null;
         SelectedFolder = null;
+        CurrentFolder = null;
         FolderTreeRoot = null;
         _allRawItems = null;
         DirStats = string.Empty;
@@ -1544,6 +1667,7 @@ public partial class MainWindowViewModel : ObservableObject
 
         var completed = await RunWithProgress(
             LocalizationManager.T("Status_Extracting"),
+            new[] { CurrentArchivePath! },
             async (progress, ct) =>
             {
                 // 有过滤条件：仅解压匹配条目（复用统一路径计算模块的入口；无 pathOverrides = 保留完整路径）
@@ -1635,6 +1759,7 @@ public partial class MainWindowViewModel : ObservableObject
 
         var completed = await RunWithProgress(
             LocalizationManager.T("Status_Extracting"),
+            new[] { CurrentArchivePath! },
             async (progress, ct) =>
             {
                 await new ExtractService().ExtractAsync(
@@ -1661,6 +1786,7 @@ public partial class MainWindowViewModel : ObservableObject
 
         var completed = await RunWithProgress(
             LocalizationManager.T("Status_Extracting"),
+            new[] { CurrentArchivePath! },
             async (progress, ct) =>
             {
                 await new ExtractService().ExtractAsync(
@@ -1729,6 +1855,7 @@ public partial class MainWindowViewModel : ObservableObject
 
         var completed = await RunWithProgress(
             LocalizationManager.T("Status_Extracting"),
+            new[] { CurrentArchivePath! },
             async (progress, ct) =>
             {
                 await new SelectedItemsExtractService().ExtractEntriesAsync(
@@ -1861,21 +1988,23 @@ public partial class MainWindowViewModel : ObservableObject
             SplitSize = vm.SplitSize,
             PreserveDirectoryRoot = settings.PreserveDirectoryRoot,
             KeepOriginalExtension = settings.KeepOriginalExtension,
-            FileNameEncoding = settings.ZipEncoding,
-            ZipCompressionMethod = settings.ZipCompressionMethod,
-            ZipEncryptionMethod = settings.ZipEncryptionMethod,
-            SevenZipCompressionMethod = settings.SevenZipCompressionMethod,
-            SevenZipSolid = settings.SevenZipSolid,
-            SevenZipSolidBlockSize = settings.SevenZipSolidBlockSize,
-            SevenZipDictionarySize = settings.SevenZipDictionarySize,
-            SevenZipNumFastBytes = settings.SevenZipNumFastBytes,
-            SevenZipMatchFinder = settings.SevenZipMatchFinder,
-            SevenZipEncryptHeaders = settings.SevenZipEncryptHeaders,
+            // 高级格式选项从对话框 ViewModel 读取（仅本次压缩生效），不再从 AppSettings 中转
+            FileNameEncoding = vm.FileNameEncoding,
+            ZipCompressionMethod = vm.ZipCompressionMethod,
+            ZipEncryptionMethod = vm.ZipEncryptionMethod,
+            SevenZipCompressionMethod = vm.SevenZipCompressionMethod,
+            SevenZipSolid = vm.SevenZipSolid,
+            SevenZipSolidBlockSize = vm.SevenZipSolidBlockSize,
+            SevenZipDictionarySize = vm.SevenZipDictionarySize,
+            SevenZipNumFastBytes = vm.SevenZipNumFastBytes,
+            SevenZipMatchFinder = vm.SevenZipMatchFinder,
+            SevenZipEncryptHeaders = vm.SevenZipEncryptHeaders,
         };
 
         if (RunWithProgress == null) return;
         var completed = await RunWithProgress(
             LocalizationManager.T("Status_Compressing"),
+            AvaloniaCompressService.GetOutputPaths(request),
             async (progress, ct) =>
             {
                 var svc = new AvaloniaCompressService();
@@ -1910,7 +2039,8 @@ public partial class MainWindowViewModel : ObservableObject
                         // Fallback: silently overwrite if no dialog callback
                         return new CompressConflictResolution(
                             Core.Abstractions.CompressConflictAction.Overwrite, null);
-                    });
+                    },
+                    onItemStatus: BatchStatusReporter);
             });
 
         if (completed)
@@ -2018,6 +2148,7 @@ public partial class MainWindowViewModel : ObservableObject
 
         var completed = await RunWithProgress(
             LocalizationManager.T("Status_TestingEntry"),
+            new[] { SelectedEntry.Name ?? string.Empty },
             async (progress, ct) =>
             {
                 // Simulate test by checking entry exists in archive
@@ -2046,6 +2177,7 @@ public partial class MainWindowViewModel : ObservableObject
 
         var completed = await RunWithProgress(
             LocalizationManager.T("Status_Extracting"),
+            new[] { CurrentArchivePath! },
             async (progress, ct) =>
             {
                 await new ExtractService().ExtractAsync(
@@ -2074,6 +2206,7 @@ public partial class MainWindowViewModel : ObservableObject
 
         var completed = await RunWithProgress(
             LocalizationManager.T("Status_SmartExtracting"),
+            new[] { CurrentArchivePath! },
             async (progress, ct) =>
             {
                 await new ExtractService().ExtractAsync(
@@ -2100,6 +2233,7 @@ public partial class MainWindowViewModel : ObservableObject
 
         var completed = await RunWithProgress(
             LocalizationManager.T("Status_TestingArchive"),
+            new[] { CurrentArchivePath! },
             async (progress, ct) =>
             {
                 await engine.TestArchiveAsync(CurrentArchivePath, password, progress, ct);
@@ -2163,6 +2297,7 @@ public partial class MainWindowViewModel : ObservableObject
 
         var completed = await RunWithProgress(
             LocalizationManager.T("Status_AddingFiles"),
+            files.ToArray(),
             async (progress, ct) =>
             {
                 var options = new ArchiveOptions { Password = password };
@@ -2190,6 +2325,7 @@ public partial class MainWindowViewModel : ObservableObject
 
         var completed = await RunWithProgress(
             LocalizationManager.T("Status_DeletingFiles"),
+            new[] { entryPath ?? string.Empty },
             async (progress, ct) =>
             {
                 await engine.DeleteEntriesAsync(CurrentArchivePath, new[] { entryPath }, password, progress, ct);

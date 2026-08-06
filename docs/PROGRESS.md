@@ -28,6 +28,77 @@
   - **规格**：460×680、鼠标右下 20px 偏移、出屏自动翻转、摘要栏；双阈值降级（≤300 文件完整树 <100ms；301–2000 前 2 层 + 摘要 <250ms；>2000 纯摘要即时）
   - **文档**：`drag-drop-direct-extract.md` 新增「预览弹窗实施补充（2026-08-06）」章节（决策背景/现状盘点/时序图/降级表/任务清单/DoD 补充）+ 头部状态与决策记录同步；`docs/PLAN.md` 拖拽条目追加 2026-08-06 说明（规则 1）
 
+**2026-08-06** — quickpath 系列计划归档：`quickpath-unified.md`（WPF 阶段完成、Avalonia 部分被 redesign 取代）移入 `.sisyphus/plans/archived/` 并标注演进关系；`quickpath-control-redesign.md` / `file-picker-multi-select.md` / `path-priority-sortable.md` / `2026-08-03-quickpath-picker.md` 四份已实施计划从 PLAN.md 移除，统一登记到历史设计方案索引（QuickPathPicker 标记「⏳ 待用户 GUI 验证」）；PLAN.md 跨平台影响分析同步剔除已归档项
+
+**2026-08-06** — DOCX 预览表格升级：全文区控件树化（段落 TextBlock + 表格真 Grid 网格）+ 大纲精确跳转
+  - **背景**：DOCX 表格此前以 `"| a | b |"` 分隔符模拟（纯文本 fallback 形态），用户要求真表格显示
+  - **改造**：`ShowDocx` 全文从单一 `DocxFullText`（string）升级为控件树 `DocxContentPanel`（`Panel?`，对齐 `MarkdownPreviewPanel` 先例）——按文档顺序遍历 `body.ChildElements`，段落 → `TextBlock`（`TextWrapping.Wrap`），表格 → 真 `Grid` 网格（列数取最宽行、列宽按内容自适应 `Auto` + 单元格 `MaxWidth=400` 防超长撑宽、每单元格 `Border` 带 `ThemeBorderBrush` 边框 + `ThemeSurfaceBgBrush` 底色，忽略合并单元格布局）；新增 `AppendDocxParagraph`（构建 TextBlock + 记录 `BlockIndex`）与 `AppendDocxTable`（构建 Grid）重构，`GetThemeBrush` helper 对齐 `MarkdownPreviewBuilder`
+  - **大纲跳转精确化**：`DocxOutlineItem.CharOffset`（字符比例近似滚动）→ `BlockIndex`（控件树子元素索引）；`OnOutlineItemClicked` 用 `panel.Children[BlockIndex]` + `TranslatePoint` 相对 `DocxFullTextScroller` 定位，滚动到块顶部（-8px 留白）——块高度不均匀时不再有比例误差
+  - **BlockIndex 语义**：在 `AppendDocxParagraph` 中于 `content.Children.Add` 前取 `Children.Count`，指向该块在控件树中的实际索引；空段落不产生块（跳过），索引自洽不错位
+  - **XAML**：全文区 `TextBlock Text="{Binding DocxFullText}"` → `ContentControl Content="{Binding DocxContentPanel}"`（`HorizontalContentAlignment="Stretch"` 保证表格拉伸铺满）
+  - 命名冲突：`Border` 与 `DocumentFormat.OpenXml.Wordprocessing.Border` 二义 → 用 `global::Avalonia.Controls.Border`；`PreviewViewModel` 补 `using Avalonia.Media`（`TextWrapping`/`IBrush`）
+  - 验证：真实 DOCX（标题×2 + 表格 2×3 + 正文）解析验证——BlockIndex 0/3、表格块索引 2、单元格提取正确；`dotnet build` 0 errors（29 个既有警告）；Avalonia 测试 43 通过 / 2 跳过
+
+**2026-08-06** — Office 预览后续增强：DOCX 表格提取 + Markdown 表格渲染 + PPTX Canvas 定位预览（含命名空间 bug 修复）
+  - **DOCX 表格提取**：`ShowDocx` 从 `body.Elements<Paragraph>()` 改为按文档顺序遍历 `body.ChildElements`——表格（`Table`）内的文本此前被完全跳过（仅图片/SmartArt 形状会丢失，但表格是常见内容组织方式）；新增 `AppendDocxParagraph`（原大纲+全文逻辑）与 `AppendDocxTable`（`TableCell` 逐行提取 → `"| a | b |"` 分隔符追加到全文，与降级方案一致）
+  - **Markdown 表格渲染**：`MarkdownPreviewBuilder.TryBuildBlock` 新增 `case Table` → `BuildTable`（此前被 `default: return null` 静默丢弃，`UsePipeTables` 已启用但表格不可见）；用 Avalonia Grid 构建——列宽按 `TableColumnDefinition.Width`（>0 → `GridUnitType.Star` 比率，0 → Auto），表头行 `ThemeHeaderBgBrush` / 正文行 `ThemeSurfaceBgBrush` / 周围 `ThemeBorderBrush` 边框，单元格经 `BuildInlines` 渲染；`TryFindResource` 用 `IResourceHost` 扩展方法 + `global::Avalonia.Controls` 限定（仓库自身 `MantisZip.UI.Avalonia.Controls` 命名空间遮蔽系统命名空间）
+  - **PPTX Canvas 定位预览**：`ShowPptx` 从平铺 `a:t` 文本升级为按原始位置渲染——读取 `ppt/presentation.xml` 的 `p:sldSz`（EMU，默认 12192000×9144000），固定 Canvas 宽 960 等比缩放（高度按 slide 比例）；每个形状提取 `a:xfrm/a:off` 坐标 + 段落文本（`a:p` → `a:t` 拼接，保留段落间换行）+ 首个 run 的 `a:rPr`（`sz/100` 字号、`b="1"` 加粗），按 Y 再按 X 排序；`PreviewPanel.axaml` 新增翻页栏（◀ 页码/总页数 ▶，`PptxPrevious/NextSlideCommand`）+ 白色 Canvas 幻灯片面板，`BuildPptxSlide` 构建 TextBlock 子控件（`Canvas.SetLeft/SetTop` 定位、`MaxWidth=400` + `TextWrapping.Wrap` 防溢出、黑字）；空演示文稿（无 slide）显示 `Preview_PptxEmpty`、有幻灯片但当前张无文字显示 `Preview_PptxSlideEmpty`
+  - **命名空间 bug（实测必现）**：`ShowPptx` 用 `slideDoc.Descendants(a + "sp")` 遍历形状——`a` 是 drawingml 命名空间，但 `<sp>` 元素属于 presentationml 命名空间（`p`），drawingml 无独立 `sp` 元素 → 永远匹配不到任何形状 → 所有幻灯片只显示"此幻灯片无文字"。修复为 `Descendants(p + "sp")`（形状内部 `a:xfrm`/`a:p`/`a:t`/`a:rPr` 仍属 drawingml，保持 `a`）；用真实结构测试 PPTX（标题+正文两形状、16:9）验证坐标缩放/字号/加粗/换行全部正确
+  - 清理：删除死 key `Preview_ParseFailed`/`Preview_PptxSlideHeader`（zh/en 两文件，代码已无引用）
+  - 计划同步：`.sisyphus/plans/office-content-preview-avalonia.md` 状态更新为 ✅ 已完成（Tasks 1-6 + 三个增强项），`docs/PLAN.md` P3 条目同步
+  - 验证：`dotnet build` 0 errors（29 个既有警告，与本次改动无关）；Avalonia 测试 43 通过 / 2 跳过（既有 IconProvider）
+
+**2026-08-06** — 预览缩放修复：适应高度受 contentTop 横条影响 + SVG 预览接入缩放系统
+  - **图像适应高度回归**：contentTop 横条（元数据面板可配置系统引入）位于内容区 ScrollViewer 内部、图像上方，其高度从未从可用视口高度中扣除 → 图像按完整视口缩放导致出现滚动条
+  - **修复**：`PreviewPanel.axaml.cs` 抽出 `UpdateViewportSize()`，可用高度 = 外层 `PreviewContentScroller.Bounds.Height` − `ContentTopBorder.Bounds.Height`（`double.IsFinite` + `> 0` 防御未布局时 NaN/0）；横条加 `x:Name="ContentTopBorder"` 并订阅其 `SizeChanged`——横条高度变化（Phase 2 合并 format 行/字段换行）不触发外层 ScrollViewer SizeChanged，必须单独重算；`ZoomIn/ZoomOut` 置 `_isZoomFitActive = false` 后不再强制重算（手动缩放不回归）
+  - **SVG 适应高度无效**：`ShowSvg` 从未设置 `ImageWidth/ImageHeight`、未调用 `ZoomFit()`，XAML 的 Image 无 `ScaledWidth/ScaledHeight` 绑定 → 完全未接入缩放系统
+  - **修复**：`ShowSvg` 补 `ImageWidth/ImageHeight = 栅格化尺寸` + 末尾 `ZoomFit()`；SVG ScrollViewer 的 Image 加 `Width/Height="{Binding ScaledWidth/ScaledHeight}" Stretch="Uniform"`，ScrollViewer 加 Auto 滚动条（与 Image/GIF 对齐）
+  - 影响面：Image/GIF/PDF 共用 `ViewportHeight`，一处修复三方受益（PDF 同类潜在滚动条一并解决）
+  - 验证：`dotnet build` 0 errors（29 个既有警告，与本次改动无关）
+
+**2026-08-06** — 修复刷新/重新打开压缩包后文件列表为空（根目录必现）
+  - **根因**：`ClearArchiveInternal` 清空压缩包状态时遗漏 `CurrentFolder`（残留上一浏览位置的 `""`）；`LoadArchiveAsync` 重建后依赖 `SelectedFolder = FolderTreeRoot` 触发 `OnSelectedFolderChanged → NavigateToFolder` 填充列表，而 `NavigateToFolder` 对 `CurrentFolder == node.FullPath` 短路返回（L1196 跳过 `PopulateEntries`）。根节点 `FullPath = ""`（`ArchiveTreeBuilder.BuildTree`）→ 根目录点刷新、或上个压缩包停在根目录后打开新包时，残留 `CurrentFolder` 恰好等于根路径 → 短路 → 列表空白，切换目录后 `PopulateEntries` 正常执行才恢复（与用户测试完全吻合）
+  - **修复**：`ClearArchiveInternal()` 补 `CurrentFolder = null`，使所有重载路径（刷新/增删文件/打开）统一走正常填充路径
+  - 验证：`dotnet build` 0 errors（29 个既有警告，与本次改动无关）
+
+**2026-08-05** — 文件选择器右栏面板宽度可拖拽调整 + 持久化（PickItems / ExtractFolder）
+  - **根因**：`PickItemsPanel`/`ExtractFolderPanel` 显式 `Width="260"` + 所在列 `Auto`——显式 Width 覆盖 Stretch，面板不随 `RightSplitter` 拖拽变化（表现为"宽度固定拖不动"）
+  - **修复**：面板去掉固定 `Width`，改 `MinWidth="200" MaxWidth="800"`（Stretch 填满列 → 拖拽实时跟随）；Row 1 Grid 命名 `BrowserGrid` 并把 `ColumnDefinitions` 拆为显式元素
+  - **拖拽范围约束**：显示面板的模式（PickItems/ExtractFolder）在构造时给 `ColumnDefinition[4]` 设 `MinWidth=200 MaxWidth=800`（GridSplitter 尊重列级约束）；其余模式列保持 `Auto` 且列级 Min=0——避免 Avalonia issue #5323（列级 MinWidth 导致面板隐藏时列不塌缩，OpenFile/SaveFile 布局被挤）
+  - **持久化**：`AppSettings` 新增 `PickItemsPanelWidth`/`ExtractFolderPanelWidth`（两模式各自记忆，0=默认 260）；构造恢复（[200,800] 外回退 260）、`OnClosing` 保存列实际像素宽（超界防御跳过）
+  - **Avalonia 适配**：`ColumnDefinition` 的 `x:Name` 不生成字段（CS0103），改 `BrowserGrid.ColumnDefinitions[4]` 索引访问（对齐 `PreviewPanel` 先例）；`GridLength.IsPixel` 在 Avalonia 为 `IsAbsolute`
+  - 验证：构建 0 errors、Avalonia 测试 43 通过 / 2 跳过（既有 IconProvider）
+
+**2026-08-05** — 进度窗口全面对齐 WPF：批处理列表始终可见 + 暂停真实生效 + 完成态/钉住 + CLI 解压/压缩全程进度窗口 + `--compress` 对话框修复
+  - **批处理文件列表始终可见**：`ProgressWindow.axaml` 移除 `IsVisible="False"`（单文件操作也显示列表）；`MainWindowViewModel.RunWithProgress` 签名扩展为 `(title, filePaths, operation)`，11 个调用点传入列表项（解压=压缩包路径、压缩=输出路径、测试=条目名）；新增 `BatchStatusReporter` 回调把引擎 `onItemStatus` 逐项状态接到 `SetCurrentBatchItem`/`UpdateBatchItemStatus`；`InitBatchMode` 不再覆盖 WindowTitle（标题由调用方传入）
+  - **暂停真实生效**：`RunWithProgress`/拖拽解压/CLI 解压/压缩的进度经 `CreatePauseAwareProgress` 嵌套包装，暂停事件真实阻断操作（此前多路径直接 `CreateBackgroundProgress` 导致暂停键无效果）
+  - **完成态与 📌 钉住**：`RunWithProgress` 成功路径 `SetComplete` + `AutoCloseOrWaitAsync(0, Close)`（尊重 KeepOpenOnComplete，对齐 WPF MainWindow.Menu.cs）；`CompressWithProgress` 重写结尾四分支——成功 `SetComplete` + `AutoCloseOrWaitAsync(2500, Shutdown)`、部分失败 `result.Failed>0` → `SetErrorSummary`+`CompleteWithErrors`+等待手动关闭、异常 → `UpdateBatchItemStatus(Failed)`+错误汇总+等待手动关闭、取消 → 关窗+退出；移除内部 `Task.Delay(1500)`
+  - **CLI 解压进度窗口**：新增 `RunCliExtractWithProgressAsync`（对齐 WPF HandleExtractBatchCore）——CLI 解压（`--extract`/`--extract-smart` 等 5 个分发点）全程显示 ProgressWindow（列表+逐项状态+暂停/取消），成功 2.5s 自动关闭、`ExtractResult.HasFailures` 显示错误汇总等待手动关闭、`UnauthorizedAccessException` 关闭窗口后走提权流程；`WaitForWindowCloseAsync` helper 复用
+  - **`--compress` 对话框修复（3 层 bug，实测暴露）**：① `ShowCompressDialogAndRun` 非阻塞 `dlg.Show()` + `finally { desktop.Shutdown(); }` 导致对话框出现即被杀死 → 改 `Closed` 事件 + `compressStarted` 标志（对齐 WPF `win.Closed += Shutdown`）；② `CompressSettingsViewModel` 构造函数在挂载 `CollectionChanged` 前添加路径，`TryAutoFillOutputPath()` 永不触发 → 构造函数末尾显式调用（对齐 WPF ShowCompressWindow 自动填充，CLI `--compress` 依赖此逻辑，此前 OutputPath 为空直接报错）；③ `HandleCompress` 设置 `ShutdownMode.OnExplicitShutdown`（对话框关闭触发默认 OnLastWindowClose 会在压缩开始前杀死进程——日志证实 ZipEngine 已进入但无完成记录）
+  - **`--compress-separate` IPC 期间进度窗口**：管道收集期立即显示 ProgressWindow（`InitBatchMode` 预填首个实例路径 + `App_CompressCollecting` 收集提示），取消同步终止管道；`CompressWithProgress` 支持复用现有窗口
+  - **实测验证**（UI Automation 驱动真实进程）：`--extract`/`--extract-smart`/`--compress-quick`/`--compress-separate`/`--compress-combined` 全部退出码 0、产物正确；失败路径（损坏 zip）不自动退出等待手动关闭；`--compress` 对话框→点击开始压缩→生成正确 zip→自动关闭→退出；取消路径正常退出
+  - 本地化：新增 `App_CompressCollecting`（zh/en 成对）；构建 0 errors 0 warnings；Core 253 测试通过；Avalonia 41 通过（2 跳过）
+
+**2026-08-05** — 文件列表双击文件打开：提取临时目录 + 系统默认程序（WPF 功能补齐）
+  - **根因**：`FileListGrid_DoubleTapped` 只处理目录导航（`NavigateToFolderPath`），文件双击分支缺失——双击文件"没效果"。功能未从 WPF 移植。
+  - **移植**：`MainWindowViewModel` 新增 `OpenEntryWithDefaultAppAsync`，对齐 WPF `DoubleClickOpenFileAsync`：① 阈值 `DoubleClickOpenThreshold`（0=禁用，默认 10MB）；② 格式检查（Tar/GZip/ISO 不支持单项提取 → 提示）；③ 密码检查（`_hasEncryptedArchive` 且无密码 → 提示）；④ 超过阈值弹确认框；⑤ 提取到 `%TEMP%\MantisZip\OpenWith\{GUID}\`（独立于预览临时目录）；⑥ ≥1MB 走 `RunWithProgress` 进度窗口；⑦ `ArchiveEntryExtractor.ExtractEntryAsync` + `Process.Start(UseShellExecute)` 默认程序打开；⑧ 失败/取消清理临时目录
+  - **View**：`FileListGrid_DoubleTapped` 改为 async void，文件分支调用 VM 方法
+  - **本地化**：新增 `Main_DoubleClickFormatNotSupported`/`Main_DoubleClickOpenConfirm`/`Main_DoubleClickPasswordNeeded`/`Main_Status_DoubleClickOpened`/`Main_Status_ExtractFailed`/`App_ConfirmTitle`（zh/en，文案对齐 WPF）
+  - **验证**：构建 0 errors、Avalonia 测试 43 通过 / 2 跳过（既有 IconProvider）
+
+**2026-08-05** — 压缩设置对话框高级选项仅本次压缩生效（不再污染设置窗口默认值）
+  - **根因**：`CompressSettingsWindow` 关闭时 `SaveFormatOptionsToSettings()` 将 12 项高级选项写回 `AppSettings` 并 `Save()`；设置窗口读取同一 AppSettings → 对话框修改泄漏为全局默认值（写回是为了让 request 构建点读到值，代价是被持久化）
+  - **方案 A**：删除写回方法，改 `SnapshotFormatOptionsToViewModel()` 关闭时快照到对话框自己的 `CompressSettingsViewModel`（8 项面板选项 + 分卷）；`CompressSettingsViewModel` 新增 8 个高级选项属性（FileNameEncoding/ZipCompressionMethod/SevenZipCompressionMethod/SevenZipSolid/SevenZipSolidBlockSize/SevenZipDictionarySize/SevenZipNumFastBytes/SevenZipMatchFinder），构造函数从 AppSettings 读默认值——对话框下次打开仍预填设置窗口默认值
+  - **request 构建改从 VM 读取**：`ExecuteCompressFromSettings`（应用内）与 `ShowCompressDialogAndRun`（CLI `--compress`）高级选项不再经 AppSettings 中转；`MainWindow` 对话框回调补复制全部高级选项 + 分卷字段（`SelectedSplitSizeOption`/`CustomSplitSizeText`）
+  - **顺带修复**：① CLI `--compress` 入口 request 此前缺全部高级选项与分卷（对话框里改了不生效），现补齐并显式调用快照（该入口覆盖了窗口内部 CloseAction）；② 应用内路径分卷字段从不复制导致 `cvm.SplitSize` 恒为 0（对话框分卷选择丢失）；③ VM 构造器此前未从设置加载 `ZipEncryptionMethod`/`SevenZipEncryptHeaders`（对话框显示与设置窗口不一致）
+  - **测试**：`CompressSettingsViewModelTests` 新增构造器镜像 AppSettings + 高级选项可写读回；构建 0 errors、41 通过（2 跳过为既有 IconProvider）
+
+**2026-08-05** — 文件列表列宽可拖拽调整 + 列状态持久化（WPF 功能补齐）
+  - **启用拖拽**：`FileListGrid` 加 `CanUserResizeColumns="True"`——Avalonia 12 DataGrid 该属性默认 `false`（源码核实 `Register<DataGrid, bool>` 未传默认值，`DATAGRID_defaultCanUserResizeColumns=true` 为移植遗留的未使用常量），与 WPF 默认 `true` 相反，必须显式开启
+  - **名称列像素化**：`Width="*"` → `Width="250" MinWidth="120" MaxWidth="800"`——源码核实 Star sizing 下最后可见列不可拖（`CanResizeColumn` 对 `LastVisibleColumn` 返回 false），像素化后 6 列全部可拖；其余列补 `MinWidth/MaxWidth`（大小 60/400、压缩后 60/400、比率 60/300、日期 80/400），拖拽结果受列级 Min/Max 强制约束，均对齐 WPF
+  - **持久化**：`WindowStateManager` 扩展 `ColumnStates`（`ColumnId=SortMemberPath`/`Width`/`Visible`/`DisplayIndex`），与 WPF window.json 的 ColumnStates 结构双向兼容（未知字段忽略、无匹配列跳过）；`MainWindow` 构造时 `ApplyColumnStates` 恢复、`Closing` 时 `CaptureColumnStates` 保存；名称列强制不可隐藏；图标列（无 SortMemberPath）不参与
+  - **端到端验证**：写入 WPF 格式 window.json（含 TreeColumnWidth/Crc32/IsEncrypted 等 Avalonia 无字段）→ 启动恢复 5 列宽 → WM_CLOSE 正常关闭回写一致；Crc32/IsEncrypted 正确跳过；构建 0 errors
+
 **2026-08-05** — 解压路径统一为单一事实源（`ExtractPathResolver`）+ ExtractSettings 文件过滤接入实际解压
   - **问题根因**：「解压选择文件到」实际解压按 `ExtractPreserveFullPath` 裁剪路径，但 `ResultPreviewService.BuildExtractPreview` 恒按「保留完整路径」建树 → 预览树与实际落盘不一致
   - **核心改造**：新增 Core `ExtractPathResolver`（`TrimCurrentFolderPrefix`/`ResolveRelativePath`/`ResolveAll`，语义与解压侧历史逻辑逐字一致），预览树与实际解压共用同一路径计算，从结构上杜绝不一致；`BuildExtractPreview` 新增 `preserveFullPath`（默认 `true`）/`currentFolder`（默认 `""`）参数，恶意路径条目逐条 try-catch 跳过（解压侧保持抛异常整批失败）
@@ -1124,6 +1195,10 @@
 
 | 功能 | 设计文档 | 实现版本 |
 |------|----------|:--------:|
+| 统一路径快捷选择（WPF QuickPathControl + 数据层；Avalonia 演进为 Tab 式速选面板 + CustomFilePickerDialog，QuickPathBuddy 概念并入 Tab+搜索一体化，QuickPathPreDialog 过渡方案废弃） | [quickpath-unified.md](.sisyphus/plans/archived/quickpath-unified.md)（已归档，Avalonia 部分被 [quickpath-control-redesign.md](.sisyphus/plans/quickpath-control-redesign.md) 取代） | v0.4.3+（Avalonia 演进 v0.4.5） |
+| QuickPathPicker 自包含路径速选控件（Compress/Extract/Settings 三宿主，AutoCompleteBox 补全 + ⭐🕐🪟 浮层 + 目录归一化，浏览器差异经注入委托） | [2026-08-03-quickpath-picker.md](docs/superpowers/plans/2026-08-03-quickpath-picker.md) + [设计](docs/superpowers/specs/2026-08-03-quickpath-picker-design.md) | v0.4.5（⏳ 待用户 GUI 验证） |
+| 文件选择器多选（PickItems 模式：勾选累积 + 跨目录保留 + 右栏已选面板；CompressSettingsWindow 合并「添加文件/文件夹」单按钮） | [file-picker-multi-select.md](.sisyphus/plans/file-picker-multi-select.md) | v0.4.5 |
+| 可排序的默认路径优先级（文件选择器初始路径 context/explorer/recent/custom） | [path-priority-sortable.md](.sisyphus/plans/path-priority-sortable.md) | v0.4.5 |
 | 解压路径统一（`ExtractEntriesAsync` + `pathOverrides`，单一事实源 `ExtractPathResolver`） | [extract-path-unification.md](.sisyphus/plans/extract-path-unification.md) | v0.4.5 |
 | 移除 WebView2 依赖（Markdown/HTML/PDF 跨平台预览） | [remove-webview2-preview.md](.sisyphus/plans/remove-webview2-preview.md) | v0.4.5 |
 | 便携版模式 | [portable-mode.md](.sisyphus/plans/portable-mode.md) | v0.4.5 |

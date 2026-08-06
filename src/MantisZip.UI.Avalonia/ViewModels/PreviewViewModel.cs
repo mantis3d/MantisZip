@@ -6,6 +6,7 @@ using System.Runtime.InteropServices;
 using System.Text;
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -260,6 +261,8 @@ public partial class PreviewViewModel : ObservableObject
         OnPropertyChanged(nameof(IsXlsxVisible));
         OnPropertyChanged(nameof(IsPptxVisible));
         OnPropertyChanged(nameof(HasDocxOutline));
+        OnPropertyChanged(nameof(HasPptxNavigation));
+        OnPropertyChanged(nameof(PptxPageInfo));
         OnPropertyChanged(nameof(IsVideoVisible));
         OnPropertyChanged(nameof(IsUnsupportedVisible));
         OnPropertyChanged(nameof(HasZoomControls));
@@ -368,8 +371,16 @@ public partial class PreviewViewModel : ObservableObject
     [ObservableProperty]
     private ObservableCollection<DocxOutlineItem> _docxOutline = [];
 
-    [ObservableProperty]
-    private string _docxFullText = string.Empty;
+    /// <summary>
+    /// DOCX 全文控件树（段落 TextBlock 与表格 Grid 按文档顺序交替），
+    /// 由 ShowDocx 构建，替代原先的纯文本 DocxFullText。
+    /// </summary>
+    private Panel? _docxContentPanel;
+    public Panel? DocxContentPanel
+    {
+        get => _docxContentPanel;
+        set => SetProperty(ref _docxContentPanel, value);
+    }
 
     [ObservableProperty]
     private string _docxNoOutlineText = string.Empty;
@@ -381,6 +392,58 @@ public partial class PreviewViewModel : ObservableObject
 
     [ObservableProperty]
     private System.Data.DataView? _xlsxData;
+
+    // ── PPTX ──
+
+    [ObservableProperty]
+    private ObservableCollection<PptxSlideModel> _pptxSlides = [];
+
+    [ObservableProperty]
+    private int _pptxCurrentSlide = 1;
+
+    [ObservableProperty]
+    private int _pptxTotalSlides;
+
+    [ObservableProperty]
+    private double _pptxCanvasWidth = 960;
+
+    [ObservableProperty]
+    private double _pptxCanvasHeight = 540;
+
+    /// <summary>当前幻灯片文本项（Canvas 定位用），由 OnPptxCurrentSlideChanged 维护。</summary>
+    [ObservableProperty]
+    private List<PptxTextItem>? _currentSlideItems;
+
+    public bool HasPptxNavigation => IsPptxVisible && PptxTotalSlides > 1;
+
+    public string PptxPageInfo => PptxTotalSlides > 0 ? $"{PptxCurrentSlide} / {PptxTotalSlides}" : string.Empty;
+
+    partial void OnPptxCurrentSlideChanged(int value)
+    {
+        var slide = PptxSlides.ElementAtOrDefault(value - 1);
+        CurrentSlideItems = slide?.TextItems;
+        OnPropertyChanged(nameof(PptxPageInfo));
+    }
+
+    partial void OnPptxTotalSlidesChanged(int value)
+    {
+        OnPropertyChanged(nameof(HasPptxNavigation));
+        OnPropertyChanged(nameof(PptxPageInfo));
+    }
+
+    [RelayCommand]
+    private void PptxPreviousSlide()
+    {
+        if (PptxCurrentSlide > 1)
+            PptxCurrentSlide--;
+    }
+
+    [RelayCommand]
+    private void PptxNextSlide()
+    {
+        if (PptxCurrentSlide < PptxTotalSlides)
+            PptxCurrentSlide++;
+    }
 
     // ── GIF animation ──
 
@@ -1036,9 +1099,15 @@ public partial class PreviewViewModel : ObservableObject
             _skOriginalPreview?.Dispose();
             _skOriginalPreview = SkiaSharp.SKBitmap.FromImage(img);
 
+            // 缩放基础尺寸 = 栅格化后的位图尺寸（与 ShowImage 对齐，供 ZoomFit/ScaledWidth 使用）
+            ImageWidth = w;
+            ImageHeight = h;
+
             IsPreviewVisible = true;
             IsToolbarVisible = true;
             PreviewHeaderText = LocalizationManager.T("Preview_Header_Svg");
+            // 初始缩放：适应视口（与 ShowImage 对齐）
+            ZoomFit();
         }
         catch (Exception ex)
         {
@@ -1810,63 +1879,35 @@ public partial class PreviewViewModel : ObservableObject
             }
 
             var outline = new List<DocxOutlineItem>();
-            var fullText = new StringBuilder();
+            // 全文控件树：段落与表格按文档顺序交替排列
+            var content = new StackPanel { Spacing = 6 };
 
-            foreach (var para in body.Elements<Paragraph>())
+            // 按文档顺序遍历 body 子元素（段落与表格交替出现，需保持顺序）。
+            // 表格渲染为真正的 Grid 网格（带边框），不再用 | 分隔符模拟。
+            foreach (var element in body.ChildElements)
             {
-                var text = string.Concat(para.Descendants<Text>().Select(t => t.Text ?? string.Empty));
-                if (string.IsNullOrWhiteSpace(text))
+                if (element is Paragraph para)
                 {
-                    fullText.AppendLine();
-                    continue;
+                    AppendDocxParagraph(para, headingStyleIds, outline, content);
                 }
-
-                var paraProps = para.ParagraphProperties;
-                var styleId = paraProps?.ParagraphStyleId?.Val?.Value;
-
-                // 标题检测方式 1: StyleId 在 headingStyleIds 集合中
-                bool isHeading = styleId != null && headingStyleIds.Contains(styleId);
-                int level = 1;
-                if (isHeading && styleId != null)
+                else if (element is Table table)
                 {
-                    // 从 styleId 提取尾随数字（"Heading1"→1, "heading2"→2, "标题 1"→1）
-                    var numStr = new string(styleId.SkipWhile(c => !char.IsDigit(c))
-                                                   .TakeWhile(char.IsDigit)
-                                                   .ToArray());
-                    if (int.TryParse(numStr, out var parsedLevel))
-                        level = parsedLevel;
+                    AppendDocxTable(table, content);
                 }
-
-                // 标题检测方式 2: OutlineLevel（覆盖样式检测，因为显式设置的大纲级别更可靠）
-                // OutlineLevel 在 OpenXml 中：1=Heading1 ... 9=Heading9
-                var outlineLevelVal = paraProps?.OutlineLevel?.Val?.Value;
-                if (outlineLevelVal.HasValue && outlineLevelVal.Value > 0 && outlineLevelVal.Value <= 9)
-                {
-                    isHeading = true;
-                    level = outlineLevelVal.Value;
-                }
-
-                if (isHeading)
-                {
-                    level = Math.Clamp(level, 1, 6);
-                    outline.Add(new DocxOutlineItem
-                    {
-                        Text = text,
-                        Level = level,
-                        CharOffset = fullText.Length
-                    });
-                }
-
-                fullText.AppendLine(text);
             }
 
             DocxOutline = new ObservableCollection<DocxOutlineItem>(outline);
-            DocxFullText = fullText.ToString();
+            DocxContentPanel = content;
             DocxNoOutlineText = outline.Count > 0 ? string.Empty : LocalizationManager.T("Preview_DocxNoOutline");
 
-            if (DocxFullText.Length == 0)
+            if (content.Children.Count == 0)
             {
-                DocxFullText = LocalizationManager.T("Preview_DocxEmpty");
+                content.Children.Add(new TextBlock
+                {
+                    Text = LocalizationManager.T("Preview_DocxEmpty"),
+                    Foreground = GetThemeBrush("ThemeTextSecondaryBrush"),
+                    TextWrapping = TextWrapping.Wrap,
+                });
                 DocxNoOutlineText = string.Empty;
             }
 
@@ -1879,6 +1920,132 @@ public partial class PreviewViewModel : ObservableObject
             App.DebugLog($"ShowDocx failed: {ex.Message}");
             ShowUnsupported(LocalizationManager.T("Preview_DocxFailed"));
         }
+    }
+
+    /// <summary>
+    /// 将单个 DOCX 段落追加为全文控件树中的 TextBlock，并检测标题写入大纲。
+    /// 标题检测三路：StyleId 集合匹配 / OutlineLevel 显式属性。
+    /// </summary>
+    private static void AppendDocxParagraph(
+        Paragraph para,
+        HashSet<string> headingStyleIds,
+        List<DocxOutlineItem> outline,
+        Panel content)
+    {
+        var text = string.Concat(para.Descendants<Text>().Select(t => t.Text ?? string.Empty));
+        // 记录该段落块在控件树中的索引（大纲跳转用）
+        int blockIndex = content.Children.Count;
+
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return;
+        }
+
+        var paraProps = para.ParagraphProperties;
+        var styleId = paraProps?.ParagraphStyleId?.Val?.Value;
+
+        // 标题检测方式 1: StyleId 在 headingStyleIds 集合中
+        bool isHeading = styleId != null && headingStyleIds.Contains(styleId);
+        int level = 1;
+        if (isHeading && styleId != null)
+        {
+            // 从 styleId 提取尾随数字（"Heading1"→1, "heading2"→2, "标题 1"→1）
+            var numStr = new string(styleId.SkipWhile(c => !char.IsDigit(c))
+                                           .TakeWhile(char.IsDigit)
+                                           .ToArray());
+            if (int.TryParse(numStr, out var parsedLevel))
+                level = parsedLevel;
+        }
+
+        // 标题检测方式 2: OutlineLevel（覆盖样式检测，因为显式设置的大纲级别更可靠）
+        // OutlineLevel 在 OpenXml 中：1=Heading1 ... 9=Heading9
+        var outlineLevelVal = paraProps?.OutlineLevel?.Val?.Value;
+        if (outlineLevelVal.HasValue && outlineLevelVal.Value > 0 && outlineLevelVal.Value <= 9)
+        {
+            isHeading = true;
+            level = outlineLevelVal.Value;
+        }
+
+        if (isHeading)
+        {
+            level = Math.Clamp(level, 1, 6);
+            outline.Add(new DocxOutlineItem
+            {
+                Text = text,
+                Level = level,
+                BlockIndex = blockIndex
+            });
+        }
+
+        content.Children.Add(new TextBlock
+        {
+            Text = text,
+            TextWrapping = TextWrapping.Wrap,
+        });
+    }
+
+    /// <summary>
+    /// 将 DOCX 表格渲染为全文控件树中的 Grid 网格（带边框/底色），保留文档顺序。
+    /// 列数取最宽行；合并单元格（GridSpan/VerticalMerge）按存在单元格计数，忽略其布局合并。
+    /// </summary>
+    private static void AppendDocxTable(Table table, Panel content)
+    {
+        var rows = table.Elements<TableRow>().ToList();
+        if (rows.Count == 0) return;
+
+        // 列数 = 最宽行的单元格数
+        int colCount = rows.Max(r => r.Elements<TableCell>().Count());
+        if (colCount == 0) return;
+
+        var borderBrush = GetThemeBrush("ThemeBorderBrush");
+        var cellBg = GetThemeBrush("ThemeSurfaceBgBrush");
+
+        var grid = new Grid
+        {
+            Margin = new Thickness(0, 2),
+            ClipToBounds = true,
+        };
+
+        // 列宽按内容自适应（Auto）：内容短的列收缩、内容长的列自然变宽。
+        // 单元格 MaxWidth 限制单列最大宽度，超长内容换行而非无限撑宽表格。
+        for (int i = 0; i < colCount; i++)
+            grid.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Auto));
+
+        int rowIdx = 0;
+        foreach (var row in rows)
+        {
+            grid.RowDefinitions.Add(new RowDefinition(GridLength.Auto));
+            var cells = row.Elements<TableCell>().ToList();
+
+            for (int colIdx = 0; colIdx < colCount; colIdx++)
+            {
+                string cellText = colIdx < cells.Count
+                    ? string.Concat(cells[colIdx].Descendants<Text>().Select(t => t.Text ?? string.Empty)).Trim()
+                    : string.Empty;
+
+                var cellBorder = new global::Avalonia.Controls.Border
+                {
+                    BorderBrush = borderBrush,
+                    BorderThickness = new Thickness(1),
+                    Background = cellBg,
+                    Padding = new Thickness(6, 3),
+                    Child = new TextBlock
+                    {
+                        Text = cellText,
+                        TextWrapping = TextWrapping.Wrap,
+                        // 限制单列最大宽度，配合 Auto 列宽：长内容换行而非无限撑宽表格
+                        MaxWidth = 400,
+                    },
+                };
+                // TextBlock 前景色继承自内容面板视觉祖先，无需显式设置
+                Grid.SetRow(cellBorder, rowIdx);
+                Grid.SetColumn(cellBorder, colIdx);
+                grid.Children.Add(cellBorder);
+            }
+            rowIdx++;
+        }
+
+        content.Children.Add(grid);
     }
 
     // ── XLSX ──
@@ -1968,7 +2135,10 @@ public partial class PreviewViewModel : ObservableObject
     // ── PPTX ──
 
     /// <summary>
-    /// 显示 PPTX 幻灯片文本预览（手动解析 a:t 元素）。
+    /// 显示 PPTX 幻灯片文本预览（手动解析 a:t 元素 + Canvas 按形状位置定位）。
+    /// 每张幻灯片一个 <see cref="PptxSlideModel"/>，文本项按 a:sp 形状的 xfrm 坐标
+    /// 缩放映射到固定宽度 Canvas（比例来自 presentation.xml 的 sldSz，默认 16:9）。
+    /// 翻页通过 PptxCurrentSlide / PptxPreviousSlideCommand / PptxNextSlideCommand 控制。
     /// </summary>
     public void ShowPptx(string filePath)
     {
@@ -1983,7 +2153,11 @@ public partial class PreviewViewModel : ObservableObject
 
             if (slideEntries.Count == 0)
             {
-                TextContent = LocalizationManager.T("Preview_PptxEmpty");
+                // 空演示文稿：PptxSlides 为空，Canvas 面板显示 Preview_PptxEmpty 占位
+                PptxSlides.Clear();
+                PptxTotalSlides = 0;
+                PptxCurrentSlide = 1;
+                CurrentSlideItems = null;
                 PreviewType = PreviewType.Pptx;
                 IsPreviewVisible = true;
                 IsToolbarVisible = false;
@@ -1991,43 +2165,114 @@ public partial class PreviewViewModel : ObservableObject
             }
 
             XNamespace a = "http://schemas.openxmlformats.org/drawingml/2006/main";
-            var result = new StringBuilder();
+            XNamespace p = "http://schemas.openxmlformats.org/presentationml/2006/main";
+
+            // 读取幻灯片尺寸（EMU）。默认 10" × 7.5" (12192000 × 9144000 EMU)
+            long slideWidthEmu = 12192000, slideHeightEmu = 9144000;
+            var presEntry = archive.GetEntry("ppt/presentation.xml");
+            if (presEntry != null)
+            {
+                try
+                {
+                    using var presStream = presEntry.Open();
+                    var presDoc = XDocument.Load(presStream);
+                    var sldSz = presDoc.Descendants(p + "sldSz").FirstOrDefault();
+                    if (sldSz != null)
+                    {
+                        if (long.TryParse(sldSz.Attribute("cx")?.Value, out var cx) && cx > 0)
+                            slideWidthEmu = cx;
+                        if (long.TryParse(sldSz.Attribute("cy")?.Value, out var cy) && cy > 0)
+                            slideHeightEmu = cy;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    App.DebugLog($"ShowPptx: failed to read presentation.xml size: {ex.Message}");
+                }
+            }
+
+            // 缩放比例：固定 Canvas 宽度（默认 960），高度按 slide 比例
+            const double canvasWidth = 960;
+            double scaleX = canvasWidth / slideWidthEmu;
+            double canvasHeight = Math.Round(slideHeightEmu * scaleX);
+
+            var slides = new List<PptxSlideModel>();
             int slideNumber = 0;
 
             foreach (var entry in slideEntries)
             {
                 slideNumber++;
+                var model = new PptxSlideModel { SlideNumber = slideNumber };
                 try
                 {
                     using var stream = entry.Open();
                     var slideDoc = XDocument.Load(stream);
-                    var texts = slideDoc.Descendants(a + "t")
-                        .Select(t => t.Value)
-                        .Where(v => !string.IsNullOrWhiteSpace(v))
-                        .ToList();
 
-                    result.AppendLine(LocalizationManager.T("Preview_PptxSlideHeader", slideNumber));
-                    if (texts.Count > 0)
+                    // 每个 p:sp 形状：位置 (xfrm/off) + 文本 (a:t)
+                    // 注意：形状元素 sp 属于 presentationml 命名空间（p），
+                    // 其内部属性 xfrm/p/t/rPr 才属于 drawingml（a）
+                    foreach (var shape in slideDoc.Descendants(p + "sp"))
                     {
-                        foreach (var text in texts)
-                            result.AppendLine(text);
+                        var xfrm = shape.Descendants(a + "xfrm").FirstOrDefault();
+                        if (xfrm == null) continue;
+
+                        var off = xfrm.Descendants(a + "off").FirstOrDefault();
+                        double x = 0, y = 0;
+                        if (off != null)
+                        {
+                            double.TryParse(off.Attribute("x")?.Value, out x);
+                            double.TryParse(off.Attribute("y")?.Value, out y);
+                        }
+
+                        // 形状内所有 a:t 文本（保留段落间换行）
+                        var text = string.Join("\n",
+                            shape.Descendants(a + "p")
+                                .Select(pPara => string.Concat(pPara.Descendants(a + "t").Select(t => t.Value)))
+                                .Where(v => !string.IsNullOrWhiteSpace(v)));
+                        if (string.IsNullOrWhiteSpace(text)) continue;
+
+                        // 字体属性：首个 run 的 rPr（sz 单位 = 1/100 pt，b="1" 加粗）
+                        double fontSize = 14;
+                        bool isBold = false;
+                        var rPr = shape.Descendants(a + "rPr").FirstOrDefault();
+                        if (rPr != null)
+                        {
+                            if (double.TryParse(rPr.Attribute("sz")?.Value, out var sz) && sz > 0)
+                                fontSize = sz / 100.0;
+                            isBold = rPr.Attribute("b")?.Value == "1";
+                        }
+
+                        model.TextItems.Add(new PptxTextItem
+                        {
+                            Text = text,
+                            X = Math.Round(x * scaleX),
+                            Y = Math.Round(y * scaleX),
+                            FontSize = Math.Clamp(fontSize, 8, 72),
+                            IsBold = isBold,
+                        });
                     }
-                    else
+
+                    // 按 y（从上到下）再按 x（从左到右）排序
+                    model.TextItems.Sort((i1, i2) =>
                     {
-                        result.AppendLine(LocalizationManager.T("Preview_PptxSlideEmpty"));
-                    }
-                    result.AppendLine();
+                        int cmp = i1.Y.CompareTo(i2.Y);
+                        return cmp != 0 ? cmp : i1.X.CompareTo(i2.X);
+                    });
                 }
                 catch (Exception ex)
                 {
                     App.DebugLog($"ShowPptx: failed to parse slide {slideNumber}: {ex.Message}");
-                    result.AppendLine(LocalizationManager.T("Preview_PptxSlideHeader", slideNumber));
-                    result.AppendLine(LocalizationManager.T("Preview_ParseFailed"));
-                    result.AppendLine();
                 }
+                slides.Add(model);
             }
 
-            TextContent = result.ToString().TrimEnd();
+            PptxSlides = new ObservableCollection<PptxSlideModel>(slides);
+            PptxTotalSlides = slides.Count;
+            PptxCanvasWidth = canvasWidth;
+            PptxCanvasHeight = canvasHeight;
+            PptxCurrentSlide = 1;
+            CurrentSlideItems = slides.FirstOrDefault()?.TextItems;
+
             PreviewType = PreviewType.Pptx;
             IsPreviewVisible = true;
             IsToolbarVisible = false;
@@ -2242,6 +2487,17 @@ public partial class PreviewViewModel : ObservableObject
     }
 
     /// <summary>
+    /// 按资源键解析主题画刷（如 "ThemeBorderBrush"）。资源缺失时返回 null，由调用方回退。
+    /// 与 MarkdownPreviewBuilder.GetThemeBrush 实现一致。
+    /// </summary>
+    private static IBrush? GetThemeBrush(string key)
+    {
+        if (Application.Current is not global::Avalonia.Controls.IResourceHost host)
+            return null;
+        return host.TryFindResource(key, out var value) ? value as IBrush : null;
+    }
+
+    /// <summary>
     /// 显示 HTML 预览（通过 ReverseMarkdown → Markdown → 控件树）。
     /// </summary>
     public void ShowHtmlPreview(string filePath)
@@ -2356,10 +2612,14 @@ public partial class PreviewViewModel : ObservableObject
         PdfPageInfo = string.Empty;
         MarkdownPreviewPanel = null;
         DocxOutline.Clear();
-        DocxFullText = string.Empty;
+        DocxContentPanel = null;
         DocxNoOutlineText = string.Empty;
         XlsxData = null;
         _xlsxDataTable = null;
+        PptxSlides.Clear();
+        PptxTotalSlides = 0;
+        PptxCurrentSlide = 1;
+        CurrentSlideItems = null;
         TorrentTreeRoots.Clear();
         SqliteTableData = null;
         SqliteTableNames.Clear();
@@ -2454,11 +2714,35 @@ public class TorrentTreeNode : INotifyPropertyChanged
 
 /// <summary>
 /// DOCX 文档大纲条目，用于左右分栏预览。
+/// BlockIndex 指向全文控件树（DocxContentPanel.Children）中的块索引，用于点击跳转。
 /// </summary>
 public class DocxOutlineItem
 {
     public string Text { get; set; } = string.Empty;
     public int Level { get; set; }
-    public int CharOffset { get; set; }
+    public int BlockIndex { get; set; }
     public global::Avalonia.Thickness Indent => new global::Avalonia.Thickness((Level - 1) * 20, 2, 0, 2);
+}
+
+/// <summary>
+/// PPTX 单张幻灯片的文本项集合（Canvas 按位置渲染）。
+/// </summary>
+public class PptxSlideModel
+{
+    public int SlideNumber { get; set; }
+    public List<PptxTextItem> TextItems { get; set; } = [];
+}
+
+/// <summary>
+/// PPTX 幻灯片内的单个文本形状（已按 Canvas 缩放比例转换坐标）。
+/// </summary>
+public class PptxTextItem
+{
+    public string Text { get; set; } = string.Empty;
+    /// <summary>Canvas 左上角 X 坐标（px）。</summary>
+    public double X { get; set; }
+    /// <summary>Canvas 左上角 Y 坐标（px）。</summary>
+    public double Y { get; set; }
+    public double FontSize { get; set; } = 14;
+    public bool IsBold { get; set; }
 }

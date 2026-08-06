@@ -146,7 +146,7 @@
                   Background="{DynamicResource ThemeSurfaceBgBrush}">
       <StackPanel>
         <!-- Content-top metadata items -->
-        <Border Padding="{DynamicResource SpacingSmThk}"
+        <Border x:Name="ContentTopBorder" Padding="{DynamicResource SpacingSmThk}"
                 Background="{DynamicResource ThemeSurfaceBgBrush}"
                 BorderBrush="{DynamicResource ThemeBorderBrush}"
                 BorderThickness="0,0,0,1">
@@ -323,11 +323,16 @@
         </ScrollViewer>
 
         <!-- SVG preview -->
-        <ScrollViewer IsVisible="{Binding IsSvgVisible}">
+        <ScrollViewer IsVisible="{Binding IsSvgVisible}"
+                      HorizontalScrollBarVisibility="Auto"
+                      VerticalScrollBarVisibility="Auto">
           <Grid>
             <Rectangle Fill="{DynamicResource TransparencyCheckerboardBrush}"
                        IsVisible="{Binding IsTransparencyBgShown}" />
-            <Image Source="{Binding PreviewImage}" />
+            <Image Source="{Binding PreviewImage}"
+                   Width="{Binding ScaledWidth}"
+                   Height="{Binding ScaledHeight}"
+                   Stretch="Uniform" />
           </Grid>
         </ScrollViewer>
 
@@ -452,14 +457,13 @@
                         Background="{DynamicResource ThemeBorderBrush}"
                         ResizeBehavior="PreviousAndNext" />
 
-          <!-- 全文 -->
+          <!-- 全文（控件树：段落 TextBlock + 表格 Grid，由 ViewModel 构建） -->
           <Border Grid.Column="2"
                   Background="{DynamicResource ThemeSurfaceBgBrush}">
             <ScrollViewer x:Name="DocxFullTextScroller">
-              <TextBlock Text="{Binding DocxFullText}"
-                         TextWrapping="Wrap"
-                         Foreground="{DynamicResource ThemeTextPrimaryBrush}"
-                         Margin="8" />
+              <ContentControl Content="{Binding DocxContentPanel}"
+                              Margin="8"
+                              HorizontalContentAlignment="Stretch" />
             </ScrollViewer>
           </Border>
         </Grid>
@@ -474,18 +478,41 @@
                   CanUserSortColumns="True"
                   GridLinesVisibility="All" />
 
-        <!-- PPTX preview -->
+        <!-- PPTX preview: 翻页栏 + Canvas 按形状位置渲染 -->
         <Border IsVisible="{Binding IsPptxVisible}"
                 Background="{DynamicResource ThemeSurfaceBgBrush}">
-          <ScrollViewer>
-            <TextBox Text="{Binding TextContent}"
-                     IsReadOnly="True"
-                     TextWrapping="Wrap"
-                     Background="Transparent"
-                     Foreground="{DynamicResource ThemeTextPrimaryBrush}"
-                     BorderThickness="0"
-                     Margin="8" />
-          </ScrollViewer>
+          <Grid RowDefinitions="Auto,*">
+            <!-- 翻页栏 -->
+            <StackPanel Grid.Row="0" Orientation="Horizontal"
+                        HorizontalAlignment="Center" Spacing="{DynamicResource SpacingXs}"
+                        IsVisible="{Binding HasPptxNavigation}">
+              <Button Content="◀" Command="{Binding PptxPreviousSlideCommand}"
+                      Width="28" Height="26" FontSize="14" Padding="0" />
+              <TextBlock Text="{Binding PptxCurrentSlide}"
+                         VerticalAlignment="Center" />
+              <TextBlock Text="/" VerticalAlignment="Center" />
+              <TextBlock Text="{Binding PptxTotalSlides}"
+                         VerticalAlignment="Center" />
+              <Button Content="▶" Command="{Binding PptxNextSlideCommand}"
+                      Width="28" Height="26" FontSize="14" Padding="0" />
+            </StackPanel>
+            <!-- 幻灯片 Canvas（固定宽高，超出滚动） -->
+            <ScrollViewer Grid.Row="1"
+                          HorizontalScrollBarVisibility="Auto"
+                          VerticalScrollBarVisibility="Auto">
+              <Border x:Name="PptxSlideBorder"
+                      Width="{Binding PptxCanvasWidth}"
+                      Height="{Binding PptxCanvasHeight}"
+                      Background="White"
+                      CornerRadius="4"
+                      BorderBrush="{DynamicResource ThemeBorderBrush}"
+                      BorderThickness="1">
+                <Canvas x:Name="PptxSlideCanvas">
+                  <!-- 文本项由 PreviewPanel.axaml.cs 构建 -->
+                </Canvas>
+              </Border>
+            </ScrollViewer>
+          </Grid>
         </Border>
 
         <!-- Office preview (metadata only, legacy fallback) -->
