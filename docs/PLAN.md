@@ -43,7 +43,7 @@
 | **P3** | 可插拔预览模块体系 | [preview-modular-providers.md](.sisyphus/plans/preview-modular-providers.md) | 🟡中 | 3-4h | 格式类库独立分发 |
 | **P3** | 文件列表自定义列 | [custom-columns.md](.sisyphus/plans/custom-columns.md) | 🟡中 | 4-6h | 可自定义显示文件元数据列（文档标题、图片尺寸等） |
 | **P3** | 冻结列（水平滚动时列固定） | [frozen-column.md](.sisyphus/plans/frozen-column.md) | 🟢低 | 1-2h | 右键列标题冻结/取消冻结，分隔线，设置持久化 |
-| **P3** | Office 文档内容预览增强（Avalonia） | [office-content-preview-avalonia.md](.sisyphus/plans/office-content-preview-avalonia.md) | 🟡中 | 6-8h | ✅ 已完成一期（DOCX 纯文本大纲+全文、XLSX 表格、PPTX 文本）。后续：WebView 优先统一渲染管线（DOCX→Mammoth→HTML、Markdown→HTML）+ 纯文本降级 📋 + PPTX Canvas 定位预览 📋 |
+| **P3** | Office 文档内容预览增强（Avalonia） | [office-content-preview-avalonia.md](.sisyphus/plans/office-content-preview-avalonia.md) | 🟡中 | 6-8h | ✅ 已完成（DOCX 纯文本大纲+全文+表格提取、XLSX 表格、PPTX 文本 + Canvas 定位预览、Markdown 表格渲染）。剩余：WebView 优先统一渲染管线（DOCX→Mammoth→HTML、Markdown→HTML）📋 |
 | **P3** | ICO 文件自身图标显示 | [ico-file-icon-extract.md](.sisyphus/plans/ico-file-icon-extract.md) | 🟢低 | 2-3h | ico 文件列表显示自身嵌入图标 |
 | **P3** | 右键菜单目录结构预览 | [context-menu-tree-preview.md](.sisyphus/plans/context-menu-tree-preview.md) | 🔴高 | 6-8h | COM 菜单中展示压缩包顶层文件树 |
 | **P1** | Avalonia: UI 功能补齐 | [avalonia-ui-feature-parity.md](.sisyphus/plans/avalonia-ui-feature-parity.md) | 🟡中 | 27/29 完成，2 项待 GUI 验证 | Elevation×3、Favorites×2、QuickPath×2 等 11 个对话框、2 个控件、1 个转换器（2 项阻塞于 GUI 测试） |

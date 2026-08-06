@@ -21,6 +21,15 @@
 
 ### MantisZip.UI.Avalonia（主力版）
 
+**2026-08-06** — Office 预览后续增强：DOCX 表格提取 + Markdown 表格渲染 + PPTX Canvas 定位预览（含命名空间 bug 修复）
+  - **DOCX 表格提取**：`ShowDocx` 从 `body.Elements<Paragraph>()` 改为按文档顺序遍历 `body.ChildElements`——表格（`Table`）内的文本此前被完全跳过（仅图片/SmartArt 形状会丢失，但表格是常见内容组织方式）；新增 `AppendDocxParagraph`（原大纲+全文逻辑）与 `AppendDocxTable`（`TableCell` 逐行提取 → `"| a | b |"` 分隔符追加到全文，与降级方案一致）
+  - **Markdown 表格渲染**：`MarkdownPreviewBuilder.TryBuildBlock` 新增 `case Table` → `BuildTable`（此前被 `default: return null` 静默丢弃，`UsePipeTables` 已启用但表格不可见）；用 Avalonia Grid 构建——列宽按 `TableColumnDefinition.Width`（>0 → `GridUnitType.Star` 比率，0 → Auto），表头行 `ThemeHeaderBgBrush` / 正文行 `ThemeSurfaceBgBrush` / 周围 `ThemeBorderBrush` 边框，单元格经 `BuildInlines` 渲染；`TryFindResource` 用 `IResourceHost` 扩展方法 + `global::Avalonia.Controls` 限定（仓库自身 `MantisZip.UI.Avalonia.Controls` 命名空间遮蔽系统命名空间）
+  - **PPTX Canvas 定位预览**：`ShowPptx` 从平铺 `a:t` 文本升级为按原始位置渲染——读取 `ppt/presentation.xml` 的 `p:sldSz`（EMU，默认 12192000×9144000），固定 Canvas 宽 960 等比缩放（高度按 slide 比例）；每个形状提取 `a:xfrm/a:off` 坐标 + 段落文本（`a:p` → `a:t` 拼接，保留段落间换行）+ 首个 run 的 `a:rPr`（`sz/100` 字号、`b="1"` 加粗），按 Y 再按 X 排序；`PreviewPanel.axaml` 新增翻页栏（◀ 页码/总页数 ▶，`PptxPrevious/NextSlideCommand`）+ 白色 Canvas 幻灯片面板，`BuildPptxSlide` 构建 TextBlock 子控件（`Canvas.SetLeft/SetTop` 定位、`MaxWidth=400` + `TextWrapping.Wrap` 防溢出、黑字）；空演示文稿（无 slide）显示 `Preview_PptxEmpty`、有幻灯片但当前张无文字显示 `Preview_PptxSlideEmpty`
+  - **命名空间 bug（实测必现）**：`ShowPptx` 用 `slideDoc.Descendants(a + "sp")` 遍历形状——`a` 是 drawingml 命名空间，但 `<sp>` 元素属于 presentationml 命名空间（`p`），drawingml 无独立 `sp` 元素 → 永远匹配不到任何形状 → 所有幻灯片只显示"此幻灯片无文字"。修复为 `Descendants(p + "sp")`（形状内部 `a:xfrm`/`a:p`/`a:t`/`a:rPr` 仍属 drawingml，保持 `a`）；用真实结构测试 PPTX（标题+正文两形状、16:9）验证坐标缩放/字号/加粗/换行全部正确
+  - 清理：删除死 key `Preview_ParseFailed`/`Preview_PptxSlideHeader`（zh/en 两文件，代码已无引用）
+  - 计划同步：`.sisyphus/plans/office-content-preview-avalonia.md` 状态更新为 ✅ 已完成（Tasks 1-6 + 三个增强项），`docs/PLAN.md` P3 条目同步
+  - 验证：`dotnet build` 0 errors（29 个既有警告，与本次改动无关）；Avalonia 测试 43 通过 / 2 跳过（既有 IconProvider）
+
 **2026-08-06** — 预览缩放修复：适应高度受 contentTop 横条影响 + SVG 预览接入缩放系统
   - **图像适应高度回归**：contentTop 横条（元数据面板可配置系统引入）位于内容区 ScrollViewer 内部、图像上方，其高度从未从可用视口高度中扣除 → 图像按完整视口缩放导致出现滚动条
   - **修复**：`PreviewPanel.axaml.cs` 抽出 `UpdateViewportSize()`，可用高度 = 外层 `PreviewContentScroller.Bounds.Height` − `ContentTopBorder.Bounds.Height`（`double.IsFinite` + `> 0` 防御未布局时 NaN/0）；横条加 `x:Name="ContentTopBorder"` 并订阅其 `SizeChanged`——横条高度变化（Phase 2 合并 format 行/字段换行）不触发外层 ScrollViewer SizeChanged，必须单独重算；`ZoomIn/ZoomOut` 置 `_isZoomFitActive = false` 后不再强制重算（手动缩放不回归）

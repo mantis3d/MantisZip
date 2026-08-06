@@ -1,6 +1,6 @@
 # Office 文档内容预览（Avalonia 版）
 
-> **状态**: 🟡 实施中（Tasks 1-5 已完成，Task 6 待处理）
+> **状态**: ✅ 已完成（Tasks 1-6 全部完成；后续增强项 DOCX 表格提取 / Markdown 表格渲染 / PPTX Canvas 定位预览 已实现）
 > **基于**: Avalonia 端口（`avalonia-port` 分支，Phase 0-10 已完成）
 > **替代**: `.sisyphus/plans/office-content-preview.md`（WPF 版计划，已过时）
 
@@ -28,10 +28,10 @@
 
 | 格式 | WebView 方案 | 纯文本 fallback |
 |:---|:---|:---|
-| **DOCX** | Mammoth → HTML → WebView | 现有左右分栏（大纲 + 全文 TextBlock） |
-| **XLSX** | — | ClosedXML → DataGrid（不变） |
-| **PPTX** | — | `a:t` 提取 + Canvas 定位预览（待实施） |
-| **Markdown** | Markdig → HTML → WebView | 现有 MarkdownPreviewBuilder 控件树 |
+| **DOCX** | Mammoth → HTML → WebView | ✅ 左右分栏（大纲 + 全文）+ 表格提取（`| a | b |` 分隔符） |
+| **XLSX** | — | ✅ ClosedXML → DataGrid（不变） |
+| **PPTX** | — | ✅ `a:sp` xfrm 坐标 + Canvas 定位预览（翻页 + 字号/加粗） |
+| **Markdown** | Markdig → HTML → WebView | ✅ MarkdownPreviewBuilder 控件树（含表格 Grid 渲染） |
 | **HTML** | 直接 HTML → WebView | 现有 ReverseMarkdown 管线 |
 
 ## 设计理念
@@ -711,7 +711,7 @@ foreach (var table in body.Descendants<Table>())
 }
 ```
 
-**状态**: 📋 待实施（WebView 优先级更高）
+**状态**: ✅ 已实现（`ShowDocx` 按文档顺序遍历 `body.ChildElements`，表格行用 `"| a | b |"` 分隔符追加到全文，段落走原有大纲逻辑）
 
 ### 页眉/页脚/脚注内容提取
 
@@ -754,7 +754,7 @@ case Table t:
 
 详见 `.sisyphus/plans/html-preview-webview-fallback.md` Task 5（第 229–283 行）已有完整的 `BuildTable` 实现方案。
 
-**状态**: 📋 待实施（WebView 优先级更高）
+**状态**: ✅ 已实现（`MarkdownPreviewBuilder.TryBuildBlock` 新增 `case Table` → `BuildTable`，Grid 按 `TableColumnDefinition.Width` 生成 Star/Auto 列，表头行 `ThemeHeaderBgBrush`、正文行 `ThemeSurfaceBgBrush`、周围 `ThemeBorderBrush`）
 
 ---
 
@@ -887,7 +887,7 @@ partial void OnPptxCurrentSlideChanged(int value)
 - 不渲染图片/形状（仅文本）
 - 不处理动画/过渡
 
-**状态**: 📋 待实施
+**状态**: ✅ 已实现（`ShowPptx` 从 `presentation.xml` 读取 `p:sldSz` EMU 尺寸，固定 Canvas 宽 960 等比缩放；每个 `a:sp` 提取 `a:xfrm/a:off` 坐标 + 段落文本 + `a:rPr` 字号/加粗，按 Y 再按 X 排序；翻页栏 ◀ 页码/总页数 ▶ + `BuildPptxSlide` 在 `PreviewPanel.axaml.cs` 构建 TextBlock 子控件，空演示文稿显示 `Preview_PptxEmpty`、无文字幻灯片显示 `Preview_PptxSlideEmpty`）
 
 ## 未来可复用方向
 

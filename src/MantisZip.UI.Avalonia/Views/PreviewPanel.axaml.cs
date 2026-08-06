@@ -10,6 +10,8 @@ using Avalonia.Data;
 using Avalonia.Data.Converters;
 using Avalonia.Input;
 using Avalonia.Layout;
+using Avalonia.Media;
+using MantisZip.UI.Avalonia.Services;
 using MantisZip.UI.Avalonia.ViewModels;
 
 namespace MantisZip.UI.Avalonia.Views;
@@ -80,6 +82,12 @@ public partial class PreviewPanel : UserControl
         {
             SetupDataGridColumns(XlsxDataGrid, vm.XlsxDataTable);
         }
+        bool pptxChanged = args.PropertyName == nameof(PreviewViewModel.IsPptxVisible)
+                        || args.PropertyName == nameof(PreviewViewModel.CurrentSlideItems);
+        if (pptxChanged && vm.IsPptxVisible)
+        {
+            BuildPptxSlide(vm);
+        }
     }
 
     /// <summary>
@@ -99,6 +107,53 @@ public partial class PreviewPanel : UserControl
                 Binding = new Binding($"Row.ItemArray[{i}]"),
                 IsReadOnly = true,
             });
+        }
+    }
+
+    /// <summary>
+    /// 根据当前幻灯片的文本项构建 Canvas 子控件（按坐标绝对定位）。
+    /// 白底画布使用深色文字；无文本项时显示占位提示。
+    /// </summary>
+    private void BuildPptxSlide(PreviewViewModel vm)
+    {
+        if (PptxSlideCanvas == null) return;
+        PptxSlideCanvas.Children.Clear();
+
+        var items = vm.CurrentSlideItems;
+        if (items == null || items.Count == 0)
+        {
+            // 空演示文稿（无幻灯片）显示 "此演示文稿为空"；
+            // 有幻灯片但当前张无文字则显示 "（此幻灯片无文字）"
+            var msg = vm.PptxTotalSlides == 0
+                ? MantisZip.UI.Avalonia.Services.LocalizationManager.T("Preview_PptxEmpty")
+                : MantisZip.UI.Avalonia.Services.LocalizationManager.T("Preview_PptxSlideEmpty");
+            var placeholder = new TextBlock
+            {
+                Text = msg,
+                Foreground = new SolidColorBrush(Colors.Gray),
+                TextWrapping = TextWrapping.Wrap,
+            };
+            // Canvas 子元素不响应对齐，用绝对定位居中占位
+            Canvas.SetLeft(placeholder, 20);
+            Canvas.SetTop(placeholder, 20);
+            PptxSlideCanvas.Children.Add(placeholder);
+            return;
+        }
+
+        foreach (var item in items)
+        {
+            var tb = new TextBlock
+            {
+                Text = item.Text,
+                FontSize = item.FontSize,
+                FontWeight = item.IsBold ? FontWeight.Bold : FontWeight.Normal,
+                Foreground = new SolidColorBrush(Colors.Black),
+                TextWrapping = TextWrapping.Wrap,
+                MaxWidth = 400,
+            };
+            Canvas.SetLeft(tb, item.X);
+            Canvas.SetTop(tb, item.Y);
+            PptxSlideCanvas.Children.Add(tb);
         }
     }
 
