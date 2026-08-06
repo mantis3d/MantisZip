@@ -21,6 +21,11 @@
 
 ### MantisZip.UI.Avalonia（主力版）
 
+**2026-08-06** — 计划整理：`preview-quick-modes.md` 6 点修正 + `preview-two-phase-loading.md` 归档收尾
+  - **preview-quick-modes 修正（Avalonia-first）**：①平台策略 WPF 先行 → Avalonia-only（规则 11，WPF 不做 UI 适配）；②HTML 假设校准（ReverseMarkdown→Markdig 控件树已实现，非纯文本）；③设置项整合——删除重复的 `QuickPreviewTextMaxBytes`/`QuickPreviewCsvMaxRows`，复用现有 `MaxTextPreviewBytes`/`MaxTablePreviewRows` + 快速档位（`Math.Min` 常量 2048/50）；④与已实施的两阶段加载对接（叠加在 Phase 2 内，`_progressiveCts` 效率取消 + `_previewLoadVersion` 版本守卫双机制）；⑤格式清单校准——DBF/LNK/STL/GZ/证书/VHD/VMDK/DICOM/MOBI/DXF 现状均为 `PreviewType.Unsupported`，降级为独立前置工作项；⑥缩略图 `DecodePixelWidth` → `SKBitmap` 降采样；总工时 27h → 25h（不含 🔴 前置）；DoD 同步
+  - **preview-two-phase-loading 归档**：头部状态 ✅ 已完成（2026-07-16）、8 个 checkbox 勾选、修正三处与现实不符（`ShowLoading` 复用 `Clear()` 非复制重置逻辑、弹跳点动画替代 ProgressBar、`UpdateCommonMetadata` 5 参数含 `CompressedSizeDisplay`）、补 `OnPreviewTypeChanged` 自动关闭机制与对应自动化测试、文末【归档记录（2026-08-06）】差异汇总表
+  - 涉及文件：`.sisyphus/plans/preview-quick-modes.md`、`.sisyphus/plans/preview-two-phase-loading.md`、`docs/PLAN.md`（规则 1）
+
 **2026-08-06** — 拖拽预览弹窗实施设计确认（独立 Win32 弹窗跟随鼠标 + 预取式渲染 + 双阈值降级）
   - **背景**：预览弹窗需求明确为「完整目录树 + 拖拽过程中持续可见」；现有 `DragPreviewBitmapBuilder`（预渲染 ResultTreeView 位图）与 `OverlayController.SetPreview` 两端代码已完成但 0 调用者，仅缺接线与形态决策
   - **决策**：排除三条候选路线——主窗口覆盖预览（`DoDragDrop` 阻塞 UI 线程期间不可见/不可更新）、合成进覆盖层（现有槽位是 60×60 缩略图级，装不下完整树且遮挡目标窗口）、文字摘要（信息量不足）；选定**独立 Win32 弹窗跟随鼠标**（复用 OverlayController 后台线程 + `UpdateLayeredWindow` 模式）
@@ -1046,6 +1051,12 @@
 ### 共享层（Core / ShellExt / 构建）
 
 这些变更影响两项目共用代码，按时间从新到旧排列。
+
+#### v0.4.5 (2026-08-06) new-format-support 计划扩展（方案 A+B 并入 + 外部库调研）
+  - 计划重写为 9 阶段：P0 基础设施 → P1 UI 放开 TAR/GZIP → P2 BZip2 → P3 XZ → P4 Zstd（SharpCompress 0.48.1 内置）→ P5 Brotli（.NET 内置 BrotliStream，方案 B）→ P6 7z.dll 只读解锁（CAB/ARJ/LZH/CHM/CPIO/DEB/RPM/WIM/XAR/LZMA/MSI 共 11 种，纯映射零引擎改动，决策 8 已验证 6 处 extractor 构造均为自动检测）→ P7 文件关联独立开关 → P8 验证
+  - 枚举扩展：`ArchiveFormat` 4→15 成员、`SevenZipEngine.CanHandle` 白名单 3→14、新增 `BrotliEngine.cs`
+  - 外部库调研结论：libarchive（LibArchive.Net，重叠高）不引入、wimlib/SharpZipLib 冗余、LZH/LHA 7z.dll 已读、RAR 写入无解（保留外置 rar.exe）
+  - 涉及文件：`.sisyphus/plans/new-format-support.md`、`docs/PLAN.md`（规则 1，工时 12-20h → 11-16h）
 
 #### v0.4.5 (2026-08-04) AGENTS.md 新增 session 自动执行规则 9–12
   - 规则 9：Windows 环境下禁止 Unix 风格 shell 命令（PowerShell 语法 + `rg`/内置工具优先）

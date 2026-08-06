@@ -26,7 +26,7 @@
 | **P2** | Winget 发布 | [winget-publishing.md](.sisyphus/plans/winget-publishing.md) | 🟢低 | 1-2h | 发布到 Windows Package Manager 社区仓库；首次手动提交后 CI 自动化 |
 | **P2** | MSI 安装包 (WiX) | [msi-packaging-wix.md](.sisyphus/plans/msi-packaging-wix.md) | 🟡中 | 2-3h | Inno Setup → WiX MSI 迁移 |
 | **P2** | RAR 压缩（外置 rar.exe） | [rar-compression.md](.sisyphus/plans/rar-compression.md) | 🟡中 | 8-10h | 通过已安装的 WinRAR 实现 RAR 压缩（含 SevenZipEngine 注册冲突处理） |
-| **P2** | 快速预览与渐进式加载 | [preview-quick-modes.md](.sisyphus/plans/preview-quick-modes.md) | 🟡中 | ~27h | 三种模式（快速/渐进/完整），所有格式分段消费。WPF 先行，Avalonia 迁移时只改 UI 层 |
+| **P2** | 快速预览与渐进式加载 | [preview-quick-modes.md](.sisyphus/plans/preview-quick-modes.md) | 🟡中 | ~25h | 三种模式（快速/渐进/完整），叠加在已实施的两阶段加载（Phase 2）之上。**Avalonia-first（规则 11，WPF 不做 UI 适配）**；☑️ 2026-08-06 计划修正：WPF 先行→Avalonia-only、HTML 现状（ReverseMarkdown→Markdig 已实现）校准、设置项与现有 `MaxTextPreviewBytes`/`MaxTablePreviewRows` 整合（不新增重复字段）、CTS+`_previewLoadVersion` 双取消机制、DBF/LNK/STL/GZ 等 Unsupported 格式降级为独立前置、Markdown 渐进降为 ~2h（控件树渲染已实现）、总工时 27h→25h（不含 🔴 格式基础预览前置） |
 | **P2** | 压缩包内重命名/移动条目 | [archive-rename-entry.md](.sisyphus/plans/archive-rename-entry.md) | 🟡中 | 3-4h | 右键重命名(F2)/移动到… |
 | **P2** | 压缩/解压配置预设 | [compress-preset.md](.sisyphus/plans/compress-preset.md) | 🟡中 | 3-4h | 命名预设保存全部设置 |
 | **P2** | 进度窗口增强改造 | [progress-window-enhancement.md](.sisyphus/plans/progress-window-enhancement.md) | 🟡中 | 3-4h | 路径/文件名分离三行显示、文件级计数、实时统计栏、批处理每包摘要；计算逻辑抽到 Core 层 |
