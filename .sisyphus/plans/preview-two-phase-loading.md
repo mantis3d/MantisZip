@@ -1,5 +1,6 @@
 # Two-Phase Preview Loading Implementation Plan
 
+> **状态**: ✅ 已完成（2026-07-16 实施落地，PROGRESS.md 有完整记录；本文档已按实际实现修正归档）
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Eliminate "stale content" confusion in Avalonia preview panel by implementing immediate loading state + info panel population before async content extraction, plus version-stamp guard against race conditions.
@@ -15,7 +16,7 @@
 **Files:**
 - Modify: `src/MantisZip.UI.Avalonia/ViewModels/PreviewViewModel.cs`
 
-- [ ] **Step 1: Add loading state properties**
+- [x] **Step 1: Add loading state properties** ✅ 已实施（`PreviewViewModel.cs`，属性位于类字段区）
 
 Add these properties inside the `PreviewViewModel` class (near other `[ObservableProperty]` fields, after line 42):
 
@@ -27,9 +28,11 @@ private bool _isLoadingPreview;
 private string _loadingFileName = string.Empty;
 ```
 
-- [ ] **Step 2: Add `ShowLoading()` method**
+- [x] **Step 2: Add `ShowLoading()` method** ✅ 已实施（`PreviewViewModel.cs:2656`）
 
-Add this method near `Clear()` (around line 1506):
+> **实际实现与计划差异**：计划初稿要求复制 `Clear()` 的全部重置逻辑（~30 行字段清空）；最终实现更简洁——`ShowLoading()` 直接调用 `Clear()` 复用重置逻辑，再覆盖 loading 状态，避免两处重置逻辑漂移。另新增 `LoadingFileDisplay` 只读属性（本地化文案"正在加载: {0}"）与 `OnLoadingFileNameChanged` 同步通知。
+
+实际代码（与 `Clear()` 保持同步，后续新增预览字段只需维护 `Clear()`）：
 
 ```csharp
 /// <summary>
@@ -38,44 +41,18 @@ Add this method near `Clear()` (around line 1506):
 /// </summary>
 public void ShowLoading(string? fileName = null)
 {
-    // Full clear like Clear() but sets loading state instead of None
-    PreviewType = PreviewType.None;
-    TextContent = string.Empty;
-    HeaderText = string.Empty;
-    PeTitle = string.Empty;
-    PeSubtitle = string.Empty;
-    PeMetadata.Clear();
-    CsvData = null;
-    FormatMetadata.Clear();
-    PreviewHeaderText = string.Empty;
-    PreviewImage = null;
-    ImageWidth = 0;
-    ImageHeight = 0;
-    HtmlContent = string.Empty;
-    TorrentTreeRoots.Clear();
-    SqliteTableData = null;
-    SqliteTableNames.Clear();
-    SelectedTableIndex = 0;
-    _lastPreviewFilePath = null;
-    StopGifTimer();
-    _gifFrames = null;
-    FontFamily = global::Avalonia.Media.FontFamily.Default;
-    IsToolbarVisible = false;
-    ZoomLevel = 1.0;
-    FontSize = 13;
-
-    // Don't reset info panel — SetFileInfo will be called immediately after ShowLoading
-
-    // Show loading overlay
+    // Reuse Clear() to reset all preview state, then override for loading phase.
+    // This avoids duplicated reset logic — Clear() and ShowLoading() stay in sync.
+    Clear();
     LoadingFileName = fileName ?? string.Empty;
     IsLoadingPreview = true;
     IsPreviewVisible = true;
 }
 ```
 
-- [ ] **Step 3: Update `Clear()` to also reset loading state**
+- [x] **Step 3: Update `Clear()` to also reset loading state** ✅ 已实施（`PreviewViewModel.cs:2648-2649`）
 
-In `Clear()` (line 1506), add these two lines after `IsInfoPanelVisible = false;`:
+In `Clear()`, these two lines were added at the end (after `IsInfoPanelVisible = false;`):
 
 ```csharp
 IsLoadingPreview = false;
@@ -89,28 +66,42 @@ LoadingFileName = string.Empty;
 **Files:**
 - Modify: `src/MantisZip.UI.Avalonia/Views/PreviewPanel.axaml`
 
-- [ ] **Step 1: Add loading state UI layer**
+- [x] **Step 1: Add loading state UI layer** ✅ 已实施（`PreviewPanel.axaml:573-627`）
 
-Inside the preview content area `<Grid>` (after the `<ScrollViewer x:Name="PreviewContentScroller">` opens, before the existing `<Grid>` with all preview type sections at line 78), add as the **first child** of that inner `<Grid>`:
+> **实际实现与计划差异**：计划初稿用普通 `ProgressBar IsIndeterminate`；最终实现为**全页居中弹跳点动画**（3 个圆形 Border，Opacity 0.25↔1.0 循环，各自 `Delay` 0/0.2/0.4s 错开相位），`Spacing=20`，文件名用本地化后的 `LoadingFileDisplay` 属性绑定（而非 `StringFormat` 硬编码"正在加载: "前缀）。
 
 ```xml
-<!-- Loading state overlay (Phase 1 — shown immediately on file selection) -->
+<!-- Loading page (Phase 1 — replaces preview content area entirely) -->
 <StackPanel IsVisible="{Binding IsLoadingPreview}"
             VerticalAlignment="Center"
             HorizontalAlignment="Center"
-            Spacing="12">
-  <ProgressBar IsIndeterminate="True"
-               Width="200"
-               Height="6" />
-  <TextBlock Text="{Binding LoadingFileName, StringFormat=正在加载: {0}}"
-             HorizontalAlignment="Center"
-             FontSize="14"
+            Spacing="20">
+  <!-- Bouncing dots spinner (3 Borders, staggered Delay 0/0.2/0.4s) -->
+  <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Spacing="{DynamicResource SpacingXs}">
+    <Border Width="10" Height="10" CornerRadius="5" Background="{DynamicResource ThemeTextSecondaryBrush}">
+      <Border.Styles>
+        <Style Selector="Border">
+          <Style.Animations>
+            <Animation Duration="0:0:1.0" IterationCount="Infinite">
+              <KeyFrame Cue="0%"><Setter Property="Opacity" Value="0.25"/></KeyFrame>
+              <KeyFrame Cue="40%"><Setter Property="Opacity" Value="1.0"/></KeyFrame>
+              <KeyFrame Cue="60%"><Setter Property="Opacity" Value="0.25"/></KeyFrame>
+              <KeyFrame Cue="100%"><Setter Property="Opacity" Value="0.25"/></KeyFrame>
+            </Animation>
+          </Style.Animations>
+        </Style>
+      </Border.Styles>
+    </Border>
+    <!-- ... 第 2/3 个 Border 同构，Animation Delay 分别 0:0:0.2 / 0:0:0.4 ... -->
+  </StackPanel>
+  <TextBlock Text="{Binding LoadingFileDisplay}"
+             HorizontalAlignment="Center" FontSize="14"
              Foreground="{DynamicResource ThemeTextSecondaryBrush}"
-             TextWrapping="Wrap"
-             MaxWidth="400"
-             TextAlignment="Center" />
+             TextWrapping="Wrap" MaxWidth="400" TextAlignment="Center" />
 </StackPanel>
 ```
+
+**加载页关闭时机**：内容就绪后由 `OnPreviewTypeChanged` 观察 `PreviewType != None` 自动关闭（计划未覆盖的补充机制，避免手动逐处关闭）。
 
 ---
 
@@ -119,7 +110,7 @@ Inside the preview content area `<Grid>` (after the `<ScrollViewer x:Name="Previ
 **Files:**
 - Modify: `src/MantisZip.UI.Avalonia/ViewModels/MainWindowViewModel.cs`
 
-- [ ] **Step 1: Add version counter field**
+- [x] **Step 1: Add version counter field** ✅ 已实施（`MainWindowViewModel.cs:25`）
 
 Add near the top of `MainWindowViewModel` class (among other private fields, around line 50):
 
@@ -127,7 +118,9 @@ Add near the top of `MainWindowViewModel` class (among other private fields, aro
 private int _previewLoadVersion;
 ```
 
-- [ ] **Step 2: Restructure `ShowPreviewAsync` for two-phase + version guard**
+- [x] **Step 2: Restructure `ShowPreviewAsync` for two-phase + version guard** ✅ 已实施（`MainWindowViewModel.cs:960+`）
+
+> **实际实现与计划差异**：计划的 `Preview.SetFileInfo(...)` 已随信息面板重构更名为 **`Preview.UpdateCommonMetadata(...)`**（`PreviewViewModel.cs:2545`）——签名扩展为 `(fileName, fileSize, compressedSize, compressionRatio, modifiedDate)` 五个参数，内部走 `MetadataHelper.RenderCommonToViewModel` 渲染通用 section，并设置 `IsFormatPending=true` 等 Phase 2 的 `ShowXxx` 填充格式 section（详见下方代码中 Phase 1 部分）。其余两阶段结构、版本守卫、异常路径与计划一致。
 
 Replace the current `ShowPreviewAsync` method body (lines 539–730) with the following two-phase implementation:
 
@@ -141,7 +134,7 @@ private async Task ShowPreviewAsync(ArchiveItemModel entry)
     var version = Interlocked.Increment(ref _previewLoadVersion);
     Preview.StopGifTimer();
     Preview.ShowLoading(entry.NameDisplay ?? entry.Name);
-    Preview.SetFileInfo(
+    Preview.UpdateCommonMetadata(
         entry.NameDisplay,
         entry.SizeDisplay,
         entry.CompressedSizeDisplay,
@@ -328,17 +321,17 @@ private async Task ShowPreviewAsync(ArchiveItemModel entry)
 ```
 
 Key changes from current code:
-1. **Lines 2-3**: Phase 1 — `ShowLoading()` + `SetFileInfo()` called immediately, before any `await`
+1. **Lines 2-3**: Phase 1 — `ShowLoading()` + `UpdateCommonMetadata()` called immediately, before any `await`
 2. **Line 1**: `Interlocked.Increment` for version stamp
 3. **Lines 4-5**: Reordered — `StopGifTimer()` moved before the async work, immediately at entry
 4. **Lines after extract**: Version guard check `if (version != _previewLoadVersion)`
-5. **Removed**: The old `SetFileInfo` call at the end (now done in Phase 1 instead)
+5. **Removed**: The old `SetFileInfo`/`UpdateCommonMetadata` call at the end (now done in Phase 1 instead)
 
 ---
 
 ### Task 4: Verify and test
 
-- [ ] **Step 1: LSP diagnostics**
+- [x] **Step 1: LSP diagnostics** ✅ 已通过（2026-07-16 实施时 Build 0 errors 0 warnings）
 
 Run diagnostics on all modified files:
 
@@ -349,7 +342,7 @@ dotnet build src\MantisZip.UI.Avalonia\MantisZip.UI.Avalonia.csproj --no-restore
 
 Expected: No errors.
 
-- [ ] **Step 2: Run application and verify behavior**
+- [x] **Step 2: Run application and verify behavior** ✅ 已通过 + 自动化回归测试
 
 ```powershell
 dotnet run --project src\MantisZip.UI.Avalonia\MantisZip.UI.Avalonia.csproj
@@ -362,3 +355,26 @@ Manual verification checklist:
 4. Click another file rapidly → loading overlay replaces previous content immediately
 5. Click a small file then a large file → fast file's result is not overwritten by slow file
 6. Verify GIF timer is stopped on file switch (stop + restart)
+
+**自动化回归测试**（`tests/MantisZip.UI.Avalonia.Tests/PreviewViewModelTests.cs`）：`ShowSvg_AfterShowLoading_SetsPreviewTypeAndDismissesLoading` — 验证 `ShowSvg` 成功后必须设置 `PreviewType = Svg` 并关闭加载页（缺失该赋值会导致预览永远停留在加载状态，曾为真实 bug）。
+
+> **备注**：版本守卫 `_previewLoadVersion` 本身（手动验证清单第 5 条的竞态场景）目前无专门自动化单测，仅有上述 ShowLoading→ShowSvg 回归测试。
+
+---
+
+## 归档记录（2026-08-06）
+
+**实施完成情况**：本计划于 **2026-07-16** 全部实施落地，PROGRESS.md 对应条目已记录（"预览两阶段加载：立即信息栏 + 弹跳点加载页 → 异步内容"）。PLAN.md 条目已移除，PROGRESS.md【历史设计方案索引】保留引用。
+
+**实际实现与计划的差异汇总**：
+
+> **行号说明**：计划正文中的行号引用（`line 42` / `line 1506` / `lines 539–730` / `around line 50` 等）为撰写时的定位指引，随代码演进已全部失效；归档后不再作为操作依据，实际位置以各 Step 标注的当前行号为准。
+
+| 计划文本 | 实际实现 |
+|---------|---------|
+| `ShowLoading()` 复制 `Clear()` 全部重置逻辑 | 直接调用 `Clear()` 复用重置逻辑，仅覆盖 loading 状态（`PreviewViewModel.cs:2656`） |
+| loading overlay 用 `ProgressBar IsIndeterminate` | 全页居中**弹跳点动画**（3 个 Border 循环 Opacity，Delay 错相），`Spacing=20`（`PreviewPanel.axaml:573`） |
+| 文件名用 `LoadingFileName` + `StringFormat=正在加载: {0}` | 新增 `LoadingFileDisplay` 本地化属性（`Preview_LoadingFile` key），绑定即含文案 |
+| Phase 1 调用 `SetFileInfo(...)`（4 参数） | 信息面板重构后改为 `UpdateCommonMetadata(...)`（5 参数，含 `CompressedSizeDisplay`），内部走 `MetadataHelper` + `IsFormatPending` 机制 |
+| 加载页关闭时机未明确 | `OnPreviewTypeChanged` 观察 `PreviewType != None` 自动关闭，覆盖全部 ShowXxx 路径 |
+| 无自动化测试 | 新增 `PreviewViewModelTests.ShowSvg_AfterShowLoading_SetsPreviewTypeAndDismissesLoading` 回归测试 |
