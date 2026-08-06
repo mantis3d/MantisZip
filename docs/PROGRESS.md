@@ -21,6 +21,11 @@
 
 ### MantisZip.UI.Avalonia（主力版）
 
+**2026-08-06** — 计划整理：`result-preview-panel.md` 归档修正 + `preview-show-content-toggle.md` 新计划
+  - **result-preview-panel 归档修正**：文末注记「未合入 AvaloniaAlpha」→ 已合入（`04229be`/`31e041e` 为 HEAD 祖先）；§2a StyledProperties 实际 7 → 9 个（补 `IsLoading`/`BuildProgress`）；§2b 布局 ToolTip 硬编码中文 → i18n 键（6 个 `Preview_Result_*`，0 残留）；冲突 ToolTip 修正（不存在的 `Preview_Result_ConflictToolTip` → 节点属性 `ConflictToolTip` = `Preview_Result_FileExists`）；§2c 补加载覆层小节；§3 `BuildExtractPreview` 签名补 3 参（`IProgress<double>?`/`preserveFullPath`/`currentFolder`）+ ExtractPathResolver 统一路径 + 恶意条目逐条跳过；变更范围表 11 key（5 未用）→ 15 key（仅 `Title`/`ConflictSuffix` 未用）
+  - **preview-show-content-toggle 新计划**：预览树「显示内容」开关（ResultTreeView 工具栏）——关闭后只显示压缩包/目标路径骨架、内容彻底隐藏不可展开、跳过 `BuildDirectoryNode` 磁盘递归扫描（大型源目录预览加速）；持久化 `AppSettings.PreviewShowContent`；压缩+解压都支持（共享控件）；摘要栏隐藏时显示输出路径；i18n 4 key + IconEye 图标（规则 8/13）；工时 2-3h
+  - 涉及文件：`.sisyphus/plans/result-preview-panel.md`、`.sisyphus/plans/preview-show-content-toggle.md`、`docs/PLAN.md`（规则 1）
+
 **2026-08-06** — 计划整理：`preview-quick-modes.md` 6 点修正 + `preview-two-phase-loading.md` 归档收尾
   - **preview-quick-modes 修正（Avalonia-first）**：①平台策略 WPF 先行 → Avalonia-only（规则 11，WPF 不做 UI 适配）；②HTML 假设校准（ReverseMarkdown→Markdig 控件树已实现，非纯文本）；③设置项整合——删除重复的 `QuickPreviewTextMaxBytes`/`QuickPreviewCsvMaxRows`，复用现有 `MaxTextPreviewBytes`/`MaxTablePreviewRows` + 快速档位（`Math.Min` 常量 2048/50）；④与已实施的两阶段加载对接（叠加在 Phase 2 内，`_progressiveCts` 效率取消 + `_previewLoadVersion` 版本守卫双机制）；⑤格式清单校准——DBF/LNK/STL/GZ/证书/VHD/VMDK/DICOM/MOBI/DXF 现状均为 `PreviewType.Unsupported`，降级为独立前置工作项；⑥缩略图 `DecodePixelWidth` → `SKBitmap` 降采样；总工时 27h → 25h（不含 🔴 前置）；DoD 同步
   - **preview-two-phase-loading 归档**：头部状态 ✅ 已完成（2026-07-16）、8 个 checkbox 勾选、修正三处与现实不符（`ShowLoading` 复用 `Clear()` 非复制重置逻辑、弹跳点动画替代 ProgressBar、`UpdateCommonMetadata` 5 参数含 `CompressedSizeDisplay`）、补 `OnPreviewTypeChanged` 自动关闭机制与对应自动化测试、文末【归档记录（2026-08-06）】差异汇总表

@@ -33,6 +33,7 @@
 | **P2** | 压缩文件名后缀模板 | [filename-suffix-template.md](.sisyphus/plans/filename-suffix-template.md) | 🟢低 | 2-3h | `{date}`/`{datetime}`/`{seq}` 占位符替换，防同名覆盖 |
 | **P2** | 嵌入缩略图预览 | [embedded-thumbnail-preview.md](.sisyphus/plans/embedded-thumbnail-preview.md) | 🟢低 | 2-3天 | MetadataExtractor(RAW) + Shell API(通用) 两层提取嵌入缩略图；完成后可扩展文件列表缩略图模式 |
 | **P2** | 字体预览连字效果开关 | [font-preview-ligature.md](.sisyphus/plans/font-preview-ligature.md) | 🟡中 | 3-4h | HarfBuzzSharp shaping + `liga` feature toggle，工具栏按钮 |
+| **P2** | 预览"显示内容"开关 | [preview-show-content-toggle.md](.sisyphus/plans/preview-show-content-toggle.md) | 🟡中 | 2-3h | 压缩/解压预览树新增"显示内容"开关（ResultTreeView 工具栏）：关闭后只显示压缩包/目标路径骨架，内容彻底隐藏不可展开，同时跳过 `BuildDirectoryNode` 磁盘递归扫描（大型源目录预览加速）；持久化 `AppSettings.PreviewShowContent`；摘要栏隐藏时显示输出路径 |
 | **P2** | 提取日志与解压「后悔药」 | [extract-journal-undo.md](.sisyphus/plans/extract-journal-undo.md) | 🟡中 | 3-4h | 解压记录 + 一键回滚 |
 | **P2** | 目录行聚合显示（大小=子树和 / 日期=最新文件 / 压缩后大小按格式可用性） | [directory-size-date-aggregate.md](.sisyphus/plans/directory-size-date-aggregate.md) | 🟢低 | 3-5h | Core `DirStats`+`ComputeDirectoryStats` 增加 `NewestModified`（共享契约，WPF 维护模式不动）；Avalonia `ArchiveItemModel` 显示属性改派生计算属性 + 新增 `CompressedSizeAvailable`（7z/RAR/.tgz/.gz 压缩后大小列显示空，文件/目录一致，对齐 WPF `CompressedDisplayMode.Unavailable`）；`PopulateEntries` 基于过滤后 `filteredSource` 应用聚合 |
 | **P3** | 压缩包对比 (Archive Diff) | [archive-diff.md](.sisyphus/plans/archive-diff.md) | 🟡中 | 3-4h | 压缩包文件级差异对比 |
