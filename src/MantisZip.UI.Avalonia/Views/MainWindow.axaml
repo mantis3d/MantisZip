@@ -255,6 +255,18 @@
           </MenuItem.Header>
         </MenuItem>
         <Separator />
+        <MenuItem Command="{Binding ToggleInfoPanelVisibilityCommand}">
+          <MenuItem.Header>
+            <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
+              <Border Classes="ToggleIconBox"
+                      Background="{Binding Preview.ShowInfoPanel, Converter={StaticResource BoolToToggleBgBrushConverter}}">
+                <PathIcon Data="{StaticResource IconPanelRight}" Width="12" Height="12"
+                          Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+              </Border>
+              <TextBlock Text="{Binding LocalizedStrings[Menu_ShowInfoPanel]}" />
+            </StackPanel>
+          </MenuItem.Header>
+        </MenuItem>
         <MenuItem Command="{Binding ToggleInfoPanelOrientationCommand}">
           <MenuItem.Header>
             <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">

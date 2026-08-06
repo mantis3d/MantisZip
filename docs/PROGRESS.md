@@ -21,6 +21,11 @@
 
 ### MantisZip.UI.Avalonia（主力版）
 
+**2026-08-06** — `avalonia-wpf-diff-plan.md` 现状核实修正 + 信息面板持久化全局显隐入口实施
+  - **差异计划核实**：双击行为/删除原包（P1-1）、文件过滤控件（P1-3）、默认路径优先级（P1-4，已演进为 `DefaultPathOrder` 可排序 List）、Enable 设置（P2-3）、AllowElevation（P2-4，默认值文档误记 `true` → 实际 `false`）均已实现；P1-6 信息面板持久化被 `metadata-panel-configurable.md` 取代；剩余仅便携模式路径重定向（P1-2 部分）+ 智能打开路径（P1-7）
+  - **全局显隐入口实施**：`AppSettings.ShowPreviewInfoPanel`（默认 true，与 WPF 同名）+ `PreviewViewModel.ShowInfoPanel` 用户偏好 + `IsInfoPanelEffectiveVisible`（内容驱动 `IsInfoPanelVisible` && 用户偏好）；启动初始化 + `ToggleInfoPanelVisibility` 菜单切换写回保存；`MainWindow.axaml` 预览菜单新增开关项（`Menu_ShowInfoPanel`，IconPanelRight）；PreviewPanel 绑定改合并可见性；设置窗口预览→通用 Tab 同步增加"显示信息面板"开关（`Settings_Preview_ShowInfoPanel`）
+  - 涉及文件：`.sisyphus/plans/avalonia-wpf-diff-plan.md`、`docs/PLAN.md`（规则 1）、Avalonia 5 个源文件 + 2 个 i18n 文件（规则 13）；构建通过（ShellExt.dll 被 WizTree64 锁定为环境问题）
+
 **2026-08-06** — 计划整理：`result-preview-panel.md` 归档修正 + `preview-show-content-toggle.md` 新计划
   - **result-preview-panel 归档修正**：文末注记「未合入 AvaloniaAlpha」→ 已合入（`04229be`/`31e041e` 为 HEAD 祖先）；§2a StyledProperties 实际 7 → 9 个（补 `IsLoading`/`BuildProgress`）；§2b 布局 ToolTip 硬编码中文 → i18n 键（6 个 `Preview_Result_*`，0 残留）；冲突 ToolTip 修正（不存在的 `Preview_Result_ConflictToolTip` → 节点属性 `ConflictToolTip` = `Preview_Result_FileExists`）；§2c 补加载覆层小节；§3 `BuildExtractPreview` 签名补 3 参（`IProgress<double>?`/`preserveFullPath`/`currentFolder`）+ ExtractPathResolver 统一路径 + 恶意条目逐条跳过；变更范围表 11 key（5 未用）→ 15 key（仅 `Title`/`ConflictSuffix` 未用）
   - **preview-show-content-toggle 新计划**：预览树「显示内容」开关（ResultTreeView 工具栏）——关闭后只显示压缩包/目标路径骨架、内容彻底隐藏不可展开、跳过 `BuildDirectoryNode` 磁盘递归扫描（大型源目录预览加速）；持久化 `AppSettings.PreviewShowContent`；压缩+解压都支持（共享控件）；摘要栏隐藏时显示输出路径；i18n 4 key + IconEye 图标（规则 8/13）；工时 2-3h

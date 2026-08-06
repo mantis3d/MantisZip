@@ -59,6 +59,9 @@ public partial class SettingsWindowViewModel : ObservableObject
     private bool _showPreviewPanel = true;
 
     [ObservableProperty]
+    private bool _showPreviewInfoPanel = true;
+
+    [ObservableProperty]
     private bool _useColorEmoji = true;
 
     [ObservableProperty]
@@ -534,6 +537,7 @@ public partial class SettingsWindowViewModel : ObservableObject
     public string PreviewInfoOrientationHorizontalText => LocalizationManager.T("Settings_Preview_InfoPanel_Horizontal");
     public string PreviewInfoOrientationVerticalText => LocalizationManager.T("Settings_Preview_InfoPanel_Vertical");
     public string PreviewShowPanelText => LocalizationManager.T("Settings_Preview_ShowPanel");
+    public string PreviewShowInfoPanelText => LocalizationManager.T("Settings_Preview_ShowInfoPanel");
     public string PreviewMaxFileSizeText => LocalizationManager.T("Settings_Preview_MaxFileSize");
 
     // Preview — Magic Detection
@@ -735,6 +739,7 @@ public partial class SettingsWindowViewModel : ObservableObject
         _previewPosition = _settings.PreviewPosition;
         _infoPanelOrientation = _settings.InfoPanelOrientation;
         _showPreviewPanel = _settings.ShowPreviewPanel;
+        _showPreviewInfoPanel = _settings.ShowPreviewInfoPanel;
         _useColorEmoji = _settings.UseColorEmoji;
         _enableFormatDetection = _settings.EnableFormatDetection;
         _previewHeadSize = _settings.PreviewHeadSize;
@@ -1048,6 +1053,7 @@ public partial class SettingsWindowViewModel : ObservableObject
         OnPropertyChanged(nameof(PreviewInfoOrientationHorizontalText));
         OnPropertyChanged(nameof(PreviewInfoOrientationVerticalText));
         OnPropertyChanged(nameof(PreviewShowPanelText));
+    OnPropertyChanged(nameof(PreviewShowInfoPanelText));
         OnPropertyChanged(nameof(PreviewMaxFileSizeText));
         OnPropertyChanged(nameof(MaxTextPreviewMBText));
         OnPropertyChanged(nameof(MaxPreviewFileSizeMBText));
@@ -1223,6 +1229,7 @@ public partial class SettingsWindowViewModel : ObservableObject
         _settings.PreviewPosition = int.Parse(SelectedPreviewPositionOption?.Value ?? "4");
         _settings.InfoPanelOrientation = SelectedInfoPanelOrientationOption?.Value ?? InfoPanelOrientation;
         _settings.ShowPreviewPanel = ShowPreviewPanel;
+        _settings.ShowPreviewInfoPanel = ShowPreviewInfoPanel;
         _settings.UseColorEmoji = UseColorEmoji;
         _settings.EnableFormatDetection = EnableFormatDetection;
         _settings.PreviewHeadSize = PreviewHeadSize;

@@ -15,7 +15,7 @@
 
 | 优先级 | 功能 | 设计文档 | 难度 | 预估工时 | 说明 |
 |--------|------|----------|:----:|:--------:|------|
-| **P0** | Avalonia: WPF 差异补齐总表 | [avalonia-wpf-diff-plan.md](.sisyphus/plans/avalonia-wpf-diff-plan.md) | 🟡中 | 1-2天 | Shell/COM 集成等各项已基本补齐，剩余少数差异项待确认 |
+| **P0** | Avalonia: WPF 差异补齐总表 | [avalonia-wpf-diff-plan.md](.sisyphus/plans/avalonia-wpf-diff-plan.md) | 🟡中 | 0.5-1天 | ☑️ 2026-08-06 核实修正：双击行为/删除原包、文件过滤控件、默认路径优先级、Enable 设置、AllowElevation 均已实现，P1-6 信息面板持久化已被 metadata-panel-configurable 取代并实施（新增持久化全局显隐入口）；剩余仅便携模式路径重定向 + 智能打开路径 |
 | **P1** | Win11 一级右键菜单 | [win11-first-level-menu.md](.sisyphus/plans/win11-first-level-menu.md) | 🔴高 | 1-2周 | IExplorerCommand 实现，HKLM 提权注册，双接口共存 |
 | **P1** | 拖拽/右键解压流程统一 | [drag-extract-unify.md](.sisyphus/plans/drag-extract-unify.md) | 🟡中 | 2-3h | 新建 `SelectedItemsExtractService` 统一两条解压流程（差异仅剩获取输出路径）；拖拽路径语义改与右键一致（`ExtractPreserveFullPath`+裁剪当前浏览层）；`TarGzEngine` 实现按条目提取（推翻原「降级全量」决策）；冲突统一走设置 6 策略 + 统一 Ask 弹窗；拖拽进度统一模态；修 `MapConflictActionString` 连字符映射漏洞 |
 | **P1** | 新增压缩格式（BZip2/XZ/Zstd/Brotli + 7z.dll 只读解锁） | [new-format-support.md](.sisyphus/plans/new-format-support.md) | 🟡中 | 11-16h | Avalonia-first：TAR 裸格式/GZip 单文件（Core 已实现，仅 UI 放开）→ BZip2 → XZ → Zstd（SharpCompress 0.48.1 内置，无外部依赖，原 P3 提升）→ Brotli（.NET 内置 BrotliStream，方案 B）→ 7z.dll 只读格式解锁（CAB/ARJ/LZH/CHM/CPIO/DEB/RPM/WIM/XAR/LZMA/MSI 共 11 种，自动检测零引擎改动，方案 B 扩展）→ 文件关联独立开关；外部库调研结论：libarchive 重叠度高不引入，wimlib/SharpZipLib 冗余 |

@@ -406,6 +406,8 @@
                 <StackPanel Spacing="{DynamicResource SpacingSm}" Margin="{DynamicResource SpacingSmThk}">
                   <CheckBox Content="{Binding PreviewShowPanelText}"
                             IsChecked="{Binding ShowPreviewPanel}" />
+                  <CheckBox Content="{Binding PreviewShowInfoPanelText}"
+                            IsChecked="{Binding ShowPreviewInfoPanel}" />
 
                   <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
                           CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}" Background="{DynamicResource ThemeSurfaceBgBrush}">

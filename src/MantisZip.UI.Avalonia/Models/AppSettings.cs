@@ -80,6 +80,7 @@ public class AppSettings
     public bool FontPreviewEnableLigature { get; set; } = true;
     public int PreviewPosition { get; set; } = 4;
     public string InfoPanelOrientation { get; set; } = "Vertical";
+    public bool ShowPreviewInfoPanel { get; set; } = true;
     public bool ShowPreviewPanel { get; set; } = true;
     public bool UseColorEmoji { get; set; } = true;
     public bool EnableFormatDetection { get; set; } = true;

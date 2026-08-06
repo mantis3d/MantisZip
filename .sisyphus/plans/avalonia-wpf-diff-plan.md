@@ -6,9 +6,9 @@
 
 **背景:** `AvaloniaFromWpf` 已合并 `main` 所有提交（merge-base: `ddaadc9`），Core 层共享，差异仅在 UI 层。当前 Avalonia 项目已完成 Phase 0-10 + UI Feature Parity + P0 项目 + i18n Cleanup + Shell/COM 集成。
 
-**核对日期:** 2026-07-20（上次: 2026-07-19）| **版本:** v0.4.5
+**核对日期:** 2026-08-06（上次: 2026-07-20）| **版本:** v0.4.5
 
-**状态:** P0 全部完成。P1 剩余 5 项，P2 剩余 2 项。
+**状态:** P0 全部完成。P1 剩余 2 项（P1-2 便携模式部分、P1-7 智能打开路径），P2 剩余 0 项。P1-6 已被 [metadata-panel-configurable.md](metadata-panel-configurable.md) 取代并实施（2026-08-06）。
 
 ---
 
@@ -16,11 +16,11 @@
 
 | 缺失类别 | 缺失项数 | 优先级分布 |
 |----------|---------|-----------|
-| AppSettings 属性 | 8 个 | P1×5, P2×2, 部分完成×1 |
+| AppSettings 属性 | 1 个 | P1（便携模式路径重定向） |
 | 对话框/控件 | 1 个 | P1 |
-| 功能逻辑 | 5 项 | P1×5, P2×0 |
+| 功能逻辑 | 1 项 | P1 |
 | Shell/COM 集成 | 整块 | P0 ✅ 已完成 |
-| 总工作量预估 | — | 约 1.5 天 |
+| 总工作量预估 | — | 约 0.5 天 |
 
 ---
 
@@ -94,25 +94,15 @@
 
 ## P1 — 功能缺失（重要）
 
-### P1-1: 双击行为 + 删除原压缩包设置
+### ✅ P1-1: 双击行为 + 删除原压缩包设置
 
 **现状:** WPF 支持 `DoubleClickAction`（打开/原地解压/智能解压/解压到…）和 `DeleteArchiveAfterExtract`（解压后删除原文件）。Avalonia 完全缺失。
 
-**缺失 AppSettings 属性:**
-| 属性 | 类型 | 默认值 |
-|------|------|--------|
-| `DoubleClickAction` | string | `"open"` |
-| `DoubleClickOpenThreshold` | int | `10`（MB, 0=禁用） |
-| `DeleteArchiveAfterExtract` | bool | `false` |
-
-**WPF 源文件参考:** `App.xaml.cs`（`--open` 分发按 DoubleClickAction 路由）、`App.Extract.cs`（`TryDeleteArchiveAfterExtract`）、`MainWindow.UI.cs`（双击处理）
-
-**任务:**
-- [ ] `Models/AppSettings.cs` 添加 3 个属性
-- [ ] `App.axaml.cs` `--open` 分支改为按 `DoubleClickAction` 分发（HandleOpen/HandleExtractHere/HandleExtractSmart/HandleExtract）
-- [ ] `Services/ExtractService.cs` 添加 `TryDeleteArchiveAfterExtract`（解压成功后移到回收站）
-- [ ] `Views/SettingsWindow` 添加双击行为 + 删除原文件设置 UI
-- [ ] 添加 i18n key
+**✅ 核实结论（2026-08-06）:** 已完整实现。
+- [x] `Models/AppSettings.cs` — `DoubleClickAction`/`DoubleClickOpenThreshold`/`DeleteArchiveAfterExtract` 3 个属性存在
+- [x] `App.axaml.cs` — `--open` 分支按 `DoubleClickAction` 分发（L171-175）
+- [x] `MainWindowViewModel` — 双击处理（阈值检查 + 密码/格式提示）
+- [x] `App.axaml.cs` — `TryDeleteArchiveAfterExtract`（回收站 + 3 次重试，L700）
 
 ---
 
@@ -133,55 +123,40 @@
 
 ---
 
-### P1-3: 文件过滤控件（FileFilterEditor）
+### ✅ P1-3: 文件过滤控件（FileFilterEditor）
 
 **现状:** WPF 有 `Controls/FileFilterEditor.xaml(.cs)` + `FileFilterHelper.cs` + `FileFilterPreset` 模型（Core，共享）。Avalonia 完全缺失 UI 控件。
 
-**WPF 源文件:**
-- `src/MantisZip.UI/Controls/FileFilterEditor.xaml(.cs)`
-- `src/MantisZip.UI/FileFilterHelper.cs`
-
-**注意:** Core 层 `FileFilterPreset`、`FileFilterRule`、`ArchiveFilter` 等模型已在共享 Core 中，只需移植 UI 控件。
-
-**任务:**
-- [ ] 创建 `MantisZip.UI.Avalonia/Controls/FileFilterEditor.axaml(.cs)` — 移植自 WPF 版
-- [ ] 集成到 `CompressSettingsWindow` 和 `ExtractSettingsWindow`
-- [ ] `Models/AppSettings.cs` 添加 `FilterPresets` 属性（`List<FileFilterPreset>`，默认 `new()`）
-- [ ] 添加 i18n key
+**✅ 核实结论（2026-08-06）:** 已完整实现。
+- [x] `Controls/FileFilterEditor.axaml(.cs)` 存在（全 i18n）
+- [x] 集成到 `CompressSettingsWindow` 和 `ExtractSettingsWindow`（`GetFilter()`/`FilterChanged`）
+- [x] `Models/AppSettings.cs` — `FilterPresets` (`List<FileFilterPreset>`) 存在
 
 ---
 
-### P1-4: 默认路径优先级
+### ✅ P1-4: 默认路径优先级
 
 **现状:** WPF 支持 `DefaultPathPriority`（场景相关/资源管理器/最近使用/桌面 4 种策略）。Avalonia 缺失。
 
-**缺失 AppSettings 属性:**
-| 属性 | 类型 | 默认值 |
-|------|------|--------|
-| `DefaultPathPriority` | string | `"context"` |
-
-**任务:**
-- [ ] `Models/AppSettings.cs` 添加 `DefaultPathPriority` 属性
-- [ ] 移植 `ResolveDefaultPath()` 静态方法（按优先级链自动选取最佳默认路径）
-- [ ] 在 `SettingsWindow` 高级 Tab 添加 4 个 RadioButton
-- [ ] 接入 7 个 `QuickPathPreDialog` 调用点
+**✅ 核实结论（2026-08-06）:** 已实现且演进为更先进形态 —— 单一 `DefaultPathPriority` string 已升级为可排序的 `DefaultPathOrder` (List<string>) + `CustomDefaultPath`。
+- [x] `Models/AppSettings.cs` — `DefaultPathOrder` (List，默认 {context, explorer, recent, custom}) + `CustomDefaultPath` 存在
+- [x] `Dialogs/CustomFilePickerDialog` — `ResolveDefaultPath` 等价物（按优先级链遍历，L372-387）
+- [x] `SettingsWindowViewModel` — `PathPriorityItemModel` 可排序 UI（L1297/1305）
 
 ---
 
-### P1-6: 预览信息面板持久化显隐
+### ✅ P1-6: 预览信息面板持久化显隐（已被 metadata-panel-configurable 取代并实施）
 
 **现状:** Avalonia 已有运行时信息面板显隐功能（`PreviewViewModel.IsInfoPanelVisible` + `InfoPanelOrientation` + 菜单切换），但缺少持久化设置。重启后显隐状态会重置。WPF 通过 `ShowPreviewInfoPanel` 设置实现跨会话持久化。
 
-**缺失 AppSettings 属性:**
-| 属性 | 类型 | 默认值 |
-|------|------|--------|
-| `ShowPreviewInfoPanel` | bool | `true` |
+**✅ 处理结论（2026-08-06）:** 该需求已被 [metadata-panel-configurable.md](metadata-panel-configurable.md) 重构取代——新系统将信息面板改为可配置系统（内容/字段/位置/区域排序持久化到独立 `metadata-panel.json`，`InfoPanelOrientation` 已入 AppSettings）。原单一 `ShowPreviewInfoPanel` bool 在新系统粒度下反而倒退。
 
-**任务:**
-- [ ] `Models/AppSettings.cs` 添加 `ShowPreviewInfoPanel` 属性
-- [ ] `ViewModels/PreviewViewModel.cs` 启动时从 `ShowPreviewInfoPanel` 初始化 `IsInfoPanelVisible`
-- [ ] 菜单切换时同步回写 `ShowPreviewInfoPanel`
-- [ ] `Views/SettingsWindow` 外观 Tab 添加信息面板默认显隐开关（可选）
+**补充实施（2026-08-06）:** 按决策补做持久化全局显隐入口：
+- [x] `Models/AppSettings.cs` 添加 `ShowPreviewInfoPanel` 属性（默认 `true`）
+- [x] `ViewModels/PreviewViewModel.cs` 新增用户偏好 `ShowInfoPanel` + 合并可见性 `IsInfoPanelEffectiveVisible`（= 内容驱动 `IsInfoPanelVisible` && 用户偏好 `ShowInfoPanel`），启动时从 `ShowPreviewInfoPanel` 初始化
+- [x] 菜单切换时同步回写 `ShowPreviewInfoPanel`（`MainWindowViewModel.ToggleInfoPanelVisibility`）
+- [x] `Views/MainWindow.axaml` 预览菜单增加"显示信息面板"开关项（`Menu_ShowInfoPanel`，IconPanelRight）
+- [x] `Views/SettingsWindow` 预览 → 通用 Tab 添加"显示信息面板"开关（`Settings_Preview_ShowInfoPanel`，与菜单入口同步持久化到同一 `ShowPreviewInfoPanel`）
 
 ---
 
@@ -214,32 +189,18 @@
 
 **现状:** WPF 有 3 个菜单/功能 Enable 开关，Avalonia 仍缺 2 个。
 
-| 缺失属性 | 类型 | 默认值 | Avalonia 状态 |
-|---------|------|--------|-------------|
-| `EnableCompressMenu` | bool | `true` | ✅ 已存在 |
-| `EnableExtractMenu` | bool | `true` | ❌ 缺失 |
-| `EnableQuickCompress` | bool | `true` | ❌ 缺失 |
-
-**任务:**
-- [x] `Models/AppSettings.cs` 添加 `EnableCompressMenu` — 已存在
-- [ ] `Models/AppSettings.cs` 添加 `EnableExtractMenu`、`EnableQuickCompress`
-- [ ] 关联到对应菜单项的可见性/启停
+**✅ 核实结论（2026-08-06）:** 3 个开关全部存在。
+- [x] `Models/AppSettings.cs` — `EnableCompressMenu` 已存在
+- [x] `Models/AppSettings.cs` — `EnableExtractMenu` 已存在
+- [x] `Models/AppSettings.cs` — `EnableQuickCompress` 已存在
 
 ---
 
-### P2-4: AllowElevation 设置
+### ✅ P2-4: AllowElevation 设置
 
 **现状:** WPF 有 `AllowElevation` 设置（控制是否允许提权操作）。Avalonia 缺失。
 
-| 缺失属性 | 类型 | 默认值 |
-|---------|------|--------|
-| `AllowElevation` | bool | `true` |
-
-**注意:** 提权相关的对话框（`ElevationDialog`、`ElevationFailedDialog`、`ElevationInfoDialog`）和 `HandleElevationAsync` 方法在 Avalonia 已存在。缺失的是控制提权行为的启用开关。
-
-**任务:**
-- [ ] `Models/AppSettings.cs` 添加 `AllowElevation`
-- [ ] `App.axaml.cs` 提权流程检查此设置
+**✅ 核实结论（2026-08-06）:** 已存在。`Models/AppSettings.cs` — `AllowElevation`（默认 `false`，文档原记默认 `true` 有误）。
 
 ---
 
@@ -252,7 +213,7 @@
 | Controls | 3 个 | 4 个（含 InfoPanel、ResultTreeView） |
 | Converters | 3 个 | 8 个 |
 | Shell 文件 | 3 个 | 3 个 ✅（已移植） |
-| AppSettings 属性 | 75 实例 + 1 静态 | 约 60（缺 8 个属性） |
+| AppSettings 属性 | 75 实例 + 1 静态 | 约 60（缺 1 个：便携路径重定向相关） |
 
 ---
 
@@ -266,8 +227,8 @@
 
 ## 实现优先级建议
 
-1. **Phase 1（P1 核心）** — 双击行为/删除原包 + 便携模式补齐 + 文件过滤控件 + 默认路径优先级（~1 天）
-2. **Phase 2（P1 次要 + P2）** — 智能打开路径 + 预览信息面板持久化 + 窗口持久化 + Enable 设置 + AllowElevation（~0.5 天）
+1. **Phase 1（P1 核心）** — ~~双击行为/删除原包 + 文件过滤控件 + 默认路径优先级~~（已实现）→ 仅剩便携模式补齐（~0.5 天）
+2. **Phase 2（P1 次要 + P2）** — ~~智能打开路径 + 预览信息面板持久化 + Enable 设置 + AllowElevation~~（已实现/已取代）→ 仅剩智能打开路径（~0.5 天）
 
 ---
 

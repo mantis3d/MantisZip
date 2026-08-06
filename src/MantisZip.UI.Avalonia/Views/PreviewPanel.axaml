@@ -669,7 +669,7 @@
             Background="{DynamicResource ThemeHeaderBgBrush}"
             BorderBrush="{DynamicResource ThemeBorderBrush}"
             BorderThickness="1,0,0,0"
-            IsVisible="{Binding IsInfoPanelVisible}">
+            IsVisible="{Binding IsInfoPanelEffectiveVisible}">
       <ScrollViewer Padding="10">
         <StackPanel Spacing="{DynamicResource SpacingXs}">
           <!-- Format-specific info section (Phase 2) — shown first -->

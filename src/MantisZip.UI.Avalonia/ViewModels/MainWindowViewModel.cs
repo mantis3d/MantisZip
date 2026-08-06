@@ -198,7 +198,7 @@ public partial class MainWindowViewModel : ObservableObject
             "Toolbar_New", "Toolbar_Open", "Toolbar_Extract", "Toolbar_Compress",
             "Toolbar_Filter", "Toolbar_Preview",
             "Menu_Toolbar", "Menu_FilterBar",
-            "Menu_ProgressBars", "Menu_SepDirBaseline", "Menu_InfoPanelOrientation",
+            "Menu_ProgressBars", "Menu_SepDirBaseline", "Menu_InfoPanelOrientation", "Menu_ShowInfoPanel",
             "Filter_Search", "Filter_Exclude", "Filter_DateFrom", "Filter_DateTo",
             "Filter_SizeMin", "Filter_SizeMax", "Filter_ShowSubfolders",
             "Filter_MatchModeSubstring", "Filter_MatchModeWildcard",
@@ -655,6 +655,7 @@ public partial class MainWindowViewModel : ObservableObject
         // Load settings
         ShowProgressBars = _appSettings.ShowProgressBars;
         SeparateDirBaseline = _appSettings.SeparateDirBaseline;
+        Preview.ShowInfoPanel = _appSettings.ShowPreviewInfoPanel;
 
         // 主题（三态）：初始化菜单按钮暗色状态显示
         IsDarkTheme = _appSettings.Theme switch
@@ -2390,6 +2391,14 @@ public partial class MainWindowViewModel : ObservableObject
     private void ToggleInfoPanelOrientation()
     {
         Preview.ToggleInfoPanelOrientation();
+    }
+
+    [RelayCommand]
+    private void ToggleInfoPanelVisibility()
+    {
+        Preview.ShowInfoPanel = !Preview.ShowInfoPanel;
+        _appSettings.ShowPreviewInfoPanel = Preview.ShowInfoPanel;
+        _ = _appSettings.Save();
     }
 
     // ── Recent Files ──

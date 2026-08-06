@@ -476,6 +476,23 @@ public partial class PreviewViewModel : ObservableObject
     [ObservableProperty]
     private bool _isInfoPanelVisible;
 
+    /// <summary>用户偏好：是否显示信息面板（持久化，与内容驱动状态独立）。</summary>
+    [ObservableProperty]
+    private bool _showInfoPanel = true;
+
+    /// <summary>信息面板最终可见性 = 内容驱动状态 &amp;&amp; 用户偏好。</summary>
+    public bool IsInfoPanelEffectiveVisible => IsInfoPanelVisible && ShowInfoPanel;
+
+    partial void OnIsInfoPanelVisibleChanged(bool value)
+    {
+        OnPropertyChanged(nameof(IsInfoPanelEffectiveVisible));
+    }
+
+    partial void OnShowInfoPanelChanged(bool value)
+    {
+        OnPropertyChanged(nameof(IsInfoPanelEffectiveVisible));
+    }
+
     [ObservableProperty]
     private string _infoPanelOrientation = "Vertical";
 
