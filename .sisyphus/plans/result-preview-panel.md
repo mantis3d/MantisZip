@@ -72,7 +72,7 @@
 | `Converters/PreviewTreeConverters.cs` | 新建 - 预览树专用 5 个转换器 |
 | `Resources/Icons/AppIcons.axaml` | 新增 `IconArchive`/`IconFolder`/`IconDocument`/`IconWarning`/`IconChevronDownUp`/`IconArrowExpandAll`/`IconLocation`/`IconFilter` |
 | `Themes/ThemeLight.axaml` + `ThemeDark.axaml` | 新增 `ThemeHeaderBgBrush`、`ThemeSplitterBgBrush` |
-| `Localization/strings.zh-CN.json` | 新增 11 个 `Preview_Result_*` key（其中 5 个未使用，见下） |
+| `Localization/strings.zh-CN.json` | 新增 15 个 `Preview_Result_*` key（其中 `Preview_Result_Title`/`Preview_Result_ConflictSuffix` 2 个未使用，见文末 i18n 清理附注） |
 | `Localization/strings.en.json` | 同上 |
 | `Views/MainWindow.axaml.cs` | `ShowExtractSettingsDialog` → `dialog.SetEntries(vm.GetAllRawItems())` |
 
@@ -147,27 +147,29 @@ public string? ForegroundKey
 
 `Controls/ResultTreeView.axaml` + `.axaml.cs`——可复用 UserControl。
 
-#### 2a. StyledProperties（实际 7 个）
+#### 2a. StyledProperties（实际 9 个）
 
 ```csharp
-public static readonly StyledProperty<PreviewTreeNode?> RootProperty;      // 根节点
-public static readonly StyledProperty<int> MaxItemsPerDirectoryProperty;   // 每目录最多平铺数，默认 5
-public static readonly StyledProperty<int> MaxDepthProperty;               // 最大深度，默认 5
-public static readonly StyledProperty<bool> CompactModeProperty;           // 精简模式，默认 true
-public static readonly StyledProperty<bool> ShowFilteredGhostsProperty;    // 显示过滤灰显项，默认 false
-public static readonly StyledProperty<string> SummaryTextProperty;         // 摘要文本（控件内部计算）
-public static readonly StyledProperty<bool> ShowSummaryBarProperty;        // 显示摘要栏，默认 true
+public static readonly StyledProperty<PreviewTreeNode?> RootProperty;            // 根节点
+public static readonly StyledProperty<int> MaxItemsPerDirectoryProperty;         // 每目录最多平铺数，默认 5
+public static readonly StyledProperty<int> MaxDepthProperty;                     // 最大深度，默认 5
+public static readonly StyledProperty<bool> CompactModeProperty;                 // 精简模式，默认 true
+public static readonly StyledProperty<bool> ShowFilteredGhostsProperty;          // 显示过滤灰显项，默认 false
+public static readonly StyledProperty<string> SummaryTextProperty;               // 摘要文本（控件内部计算）
+public static readonly StyledProperty<bool> ShowSummaryBarProperty;              // 显示摘要栏，默认 true
+public static readonly StyledProperty<bool> IsLoadingProperty;                   // 加载覆层显示（构建中）
+public static readonly StyledProperty<double> BuildProgressProperty;             // 构建进度（-1 = 不定进度条）
 ```
 
-Root/CompactMode/MaxItemsPerDirectory/MaxDepth/ShowFilteredGhosts 任一变化 → `RebuildDisplayTree()`。
+Root/CompactMode/MaxItemsPerDirectory/MaxDepth/ShowFilteredGhosts 任一变化 → `RebuildDisplayTree()`；`IsLoading`/`BuildProgress` 驱动加载覆层（`OnIsLoadingChanged`/`OnBuildProgressChanged`，见 2c）。
 
 #### 2b. 布局（三行 Grid）
 
-- **Row 0 工具栏**（`ThemeHeaderBgBrush` 底）：`CompactToggle`（IconChevronDownUp，ToolTip "简略显示"）、`ExpandAllButton`（IconArrowExpandAll，ToolTip "展开全部"）、`LocateButton`（IconLocation，ctor 里 ToolTip= `Preview_Result_Locate`，初始禁用）、`FilterToggle`（IconFilter，ctor 里 ToolTip= `Preview_Result_ShowFiltered`）、`SummaryTextBlock`（绑定 `SummaryText`）
-- **Row 1 摘要栏**（`ShowSummaryBar` 控制可见，底部 1px `ThemeBorderBrush`）：`FileCountText`（"23 个文件"）、`TotalSizeText`（"156 MB"）、`ConflictCountText`（红色 `#FFD32F2F`，"⚠️ 3 个冲突"，0 时隐藏）
-- **Row 2 树**：`TreeView SelectionMode="Multiple"`，节点模板 = PathIcon(`IconKey`→`GeometryResourceConverter`) + "…"（`IsTruncatedNode` 可见）+ `DisplayLabel`（`IsArchiveNode` 加粗 + 字号 14）+ `SizeDisplay` + `DirectoryInfoText`（`IsDirectoryNode` 可见）+ 冲突 ⚠️ PathIcon（`ExistsAtDestination` 可见，红色，ToolTip "同名文件已存在"）
+- **Row 0 工具栏**（`ThemeHeaderBgBrush` 底）：`CompactToggle`（IconChevronDownUp，ToolTip `Preview_Result_Compact`/`Preview_Result_Full` 按模式切换）、`ExpandAllButton`（IconArrowExpandAll，ToolTip `Tree_ExpandAll`）、`LocateButton`（IconLocation，ToolTip `Preview_Result_Locate`，初始禁用）、`FilterToggle`（IconFilter，ToolTip `Preview_Result_HideFiltered`/`Preview_Result_ShowFiltered` 按状态切换）、`SummaryTextBlock`（绑定 `SummaryText`）
+- **Row 1 摘要栏**（`ShowSummaryBar` 控制可见，底部 1px `ThemeBorderBrush`）：`FileCountText`（"23 个文件"，i18n 键 `Preview_Result_FileCount`）、`TotalSizeText`（"156 MB"）、`ConflictCountText`（红色 `#FFD32F2F`，"⚠️ 3 个冲突"，0 时隐藏）
+- **Row 2 树**：`TreeView SelectionMode="Multiple"`，节点模板 = PathIcon(`IconKey`→`GeometryResourceConverter`) + "…"（`IsTruncatedNode` 可见）+ `DisplayLabel`（`IsArchiveNode` 加粗 + 字号 14）+ `SizeDisplay` + `DirectoryInfoText`（`IsDirectoryNode` 可见）+ 冲突 ⚠️ PathIcon（`ExistsAtDestination` 可见，红色，ToolTip = 节点属性 `ConflictToolTip`，即 `Preview_Result_FileExists`）
 
-工具栏 / 摘要栏按钮 ToolTip 有 **5 处硬编码中文**（"简略显示"/"展开全部"/"收起到选择项"/"显示过滤项"/"同名文件已存在"），其中 LocateButton 与 FilterToggle 在 ctor 中被 i18n 覆盖；其余硬编码未本地化。
+所有按钮 ToolTip 均已在 ctor 中通过 `LocalizationManager.T(...)` 本地化（`CompactToggle`/`ExpandAllButton`/`LocateButton`/`FilterToggle`/`LoadingTextBlock`；CompactToggle 与 FilterToggle 在模式/状态切换时更新 ToolTip 文本）。
 
 #### 2c. 核心逻辑（实际，含后加项）
 
@@ -226,6 +228,11 @@ private void UpdateSummary()
 
 **主题切换刷新**（`af6e7e4` 后加）：订阅 `ActualThemeVariantChanged` → `_originalRoot.RaiseForegroundKeyChangedRecursive()`，使 `NodeForegroundConverter` 重新从 `Application.Current.TryGetResource` 解析主题画刷。
 
+**加载覆层**（`04229be`/`31e041e` 合入后加）：预览树异步构建期间显示加载覆层（`LoadingOverlay` + `LoadingProgressBar`，文案 `Preview_Result_Building`）：
+- `IsLoading=true` → 显示覆层；`false` → 隐藏并复位进度条（避免下次残留进度）
+- `BuildProgress`：`-1` → 不定进度条（`IsIndeterminate`）；`0–100` → 确定进度条（`Math.Clamp`）
+- 驱动方：`ExtractSettingsViewModel.BuildExtractPreviewCoreAsync` 快构建（<250ms）不显示加载态，慢构建置 `IsPreviewBuilding=true`；`ResultPreviewService.BuildExtractPreview` 按条目数经 `IProgress<double>` 上报（1% 节流），进度回调经版本号守卫丢弃过期构建
+
 **展开状态保持**（后加）：`CollectExpandedPaths` / `RestoreExpandedPaths` 按 `FullPath` 哈希集实现（见上文第 1/4 步）。
 
 **工具栏动作**：
@@ -251,15 +258,19 @@ public static PreviewTreeNode BuildExtractPreview(
     string destDir,
     string? rootName = null,        // 未使用，保留参数兼容
     bool checkExists = false,
-    FileFilterCriteria? filter = null)
+    FileFilterCriteria? filter = null,
+    IProgress<double>? progress = null,   // 后加（04229be）：构建进度上报（1% 节流），驱动加载覆层
+    bool preserveFullPath = true,         // 后加（2026-08）：路径裁剪开关，与解压侧 ExtractPathResolver 同语义
+    string currentFolder = "")            // 后加（2026-08）：当前浏览层锚点，路径裁剪用
 ```
 
 构建流程：
 1. root = `destDir` 自身（无概念容器层）
-2. Phase 1：目录条目先行（`dirsAdded` HashSet 去重，`AddFolderNode` 逐段建链）
+2. Phase 1：目录条目先行（`dirsAdded` HashSet 去重，`AddFolderNode` 逐段建链）；目录/文件路径统一经 `ExtractPathResolver.ResolveRelativePath` 计算，恶意路径条目 try-catch 跳过不毁整树
 3. Phase 2：文件条目（`FindOrCreateParent` 建父目录链）：
    - `checkExists=true` → `File.Exists(Path.Combine(destDir, fullPath))` 标记冲突
    - `filter.IsActive` → `FileFilterMatcher.IsMatch` 不匹配标 `IsFilteredOut`
+   - 进度：每处理 1% 上报一次（`progress.Report`，`totalFiles==0` 时跳过）
 4. Phase 2b：`checkExists=true` → `MarkDirectoryConflicts`（目录级冲突检测）
 5. Phase 3：`CalculateDescendantStats`（TotalDescendantCount/Size/MaxChildDepth）
 
@@ -310,6 +321,7 @@ C:\Output\                      ← root（输出路径父目录，DisplayLabel=
 - `MainWindow.ShowExtractSettingsDialog` → `dialog.SetEntries(vm.GetAllRawItems())`（**多压缩包条目合并平铺**，未做来源分组）
 - `SetEntries(IReadOnlyList<ArchiveItem>)` 缓存 `_entries`；窗口订阅 `ViewModel.PropertyChanged`，`DestinationPath`/`ConflictAction`/`OpenFolderAfterExtract` 变化时重建
 - 重建调用：`ViewModel.BuildExtractPreview(_entries, filter, checkExists: true)` —— **解压端固定全量冲突检测**
+- 预览构建异步化（`04229be`/`31e041e`）：VM `BuildExtractPreviewCoreAsync` 后台线程构建 + 版本号丢弃过期结果 + 250ms 加载阈值（快构建不闪加载态）→ `IsPreviewBuilding`/`PreviewBuildProgress` 驱动 ResultTreeView 加载覆层
 - `FileFilterControl.FilterChanged` → 重建预览树 + 更新过滤统计
 - `BrowseFolder` → `CustomFilePickerDialog.ShowExtractFolderAsync(this, _entries, ViewModel.DestinationPath)`
 - **VM 的 `OnDestinationPathChanged` partial method 为空实现**——实际刷新逻辑在窗口 code-behind（计划中的「VM 缓存 entries + 自动重建」未按原样实现）
@@ -326,7 +338,7 @@ C:\Output\                      ← root（输出路径父目录，DisplayLabel=
 |------|---------|
 | ExtractSettingsWindow 解压预览 | 内嵌 ResultTreeView，`checkExists:true` |
 | CompressSettingsWindow 压缩预览 | 内嵌 ResultTreeView |
-| `CustomFilePickerDialog` ExtractFolder 模式 | 800×620 布局；`BuildExtractPreview(_entries, destDir, checkExists:true)` + `SchedulePreviewRebuild` 防抖 ~300ms；`MaxItemsPerDirectory=8` / `MaxDepth=4` |
+| `CustomFilePickerDialog` ExtractFolder 模式 | 800×620 布局；`BuildExtractPreview(_entries, destDir, checkExists:true)` + `SchedulePreviewRebuild` 防抖 ~300ms；`MaxItemsPerDirectory=8` / `MaxDepth=4`；`preserveFullPath`/`currentFolder` 由 `MainWindowViewModel.ExtractSelectedTo` 透传（预览=实际路径一致性，见概述后补） |
 | `DragPreviewBitmapBuilder` 拖拽位图 | `DragDropItemExpander.ExpandItems` 后 `BuildExtractPreview(expanded, rootName, rootName, checkExists:false)`（**快速模式**）；外包一层空 `DisplayLabel` wrapper 根 → 实例化 ResultTreeView 离屏渲染 BGRA 位图给 `DragPreviewPopup` |
 
 ## 未实现项（后续可做）
@@ -353,7 +365,12 @@ C:\Output\                      ← root（输出路径父目录，DisplayLabel=
 
 ### 附：i18n 清理（可选）
 
-5 个 `Preview_Result_*` key 已定义但**从未在代码中引用**：`Preview_Result_Title`、`Preview_Result_Compact`、`Preview_Result_Full`、`Preview_Result_ConflictSuffix`、`Preview_Result_HideFiltered`。另 5 处 ToolTip/文本硬编码中文未走 i18n（见上文 2b）。
+**2026-08-06 修正**：原记录"5 个 `Preview_Result_*` key 从未引用 + 5 处 ToolTip/文本硬编码中文"已大部分过时——硬编码中文已全部清除（ctor 统一走 `LocalizationManager.T`），5 个 key 中 `Preview_Result_Compact`/`Preview_Result_Full`/`Preview_Result_HideFiltered` 已随切换 ToolTip 引用。当前仍**未引用**仅 2 个：
+
+- `Preview_Result_Title` — 0 引用
+- `Preview_Result_ConflictSuffix` — 0 引用
+
+可清理（从 strings 两文件删除）或补用，二选一。
 
 ## 实施记录
 
@@ -390,4 +407,4 @@ C:\Output\                      ← root（输出路径父目录，DisplayLabel=
 - 2026-07-28 — 压缩设置加密面板对齐 + ResultTreeView 宽度可调
 - 2026-07-31 — 暗色模式预览树文件名黑色修复
 
-> **注**：`04229be`（解压预览构建进度上报 IProgress 1% 节流）与 `31e041e`（ResultTreeView IsLoading/BuildProgress 加载覆层 + `Preview_Result_Building` 文案）在 `AvaloniaFromWpf` 分支上存在但**未合入 `AvaloniaAlpha`**，当前 HEAD 未包含，故本文档不将其列为已实现。
+> **注**：`04229be`（解压预览构建进度上报 — 可选 IProgress 参数逐文件上报 1% 节流）与 `31e041e`（ResultTreeView 加载覆层 — IsLoading/BuildProgress 属性 + 进度条不定/确定自动切换 + `Preview_Result_Building` 文案）已随 `AvaloniaFromWpf` 分支合入（2026-07-31），当前 HEAD 已包含。二者为本文档实现的一部分，正文 §2 已补记（见 2a 的 IsLoadingProperty/BuildProgressProperty 与 2c 的加载覆层逻辑）。
