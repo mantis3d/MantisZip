@@ -21,6 +21,11 @@
 
 ### MantisZip.UI.Avalonia（主力版）
 
+**2026-08-07** — XamlIl 预编译恢复（csproj AvaloniaXaml 声明）+ 解压冲突选项绑定修复
+  - **构建修复（dotnet run 崩溃）**：csproj 缺 `<AvaloniaXaml>` 显式声明（Avalonia 12 包内默认 glob 在本项目构建中未生效），obj 无 XamlIl 产物，运行时 `AvaloniaXamlLoader.Load` 抛 "No precompiled XAML found for ...App"；修复为 `<AvaloniaXaml Remove="**\*.axaml" />` + `<AvaloniaXaml Include="**\*.axaml" Exclude="Resources\**\*.axaml" />`（先清默认 glob 避免 AVLN2002 duplicate x:Class；AppIcons.axaml 保留在 `AvaloniaResource` 供运行时 avares:// 加载），XamlIl 预编译恢复正常
+  - **解压冲突选项绑定修复**：`ExtractSettingsWindow` 冲突 ComboBox 原 `SelectedItem="{Binding ConflictAction}"`（string ↔ ComboBoxItem 对象类型不匹配，选择永不生效恒为 "ask"）；初修误用 WPF 风格 `SelectedValuePath`（Avalonia ComboBox 无此属性，AVLN2000 编译失败，正是 XamlIl 恢复后暴露的连锁错误）；最终改为 Option 对象集合（`ConflictActionOptions` + `SelectedConflictActionOption`，partial 同步写回 `ConflictAction`）+ 补全 6 档选项（overwrite-if-older/overwrite-if-smaller，复用设置窗口文案 key 不新增翻译）+ 从 `AppSettings.FileConflictAction` 预选（对齐 WPF）
+  - 涉及文件：`MantisZip.UI.Avalonia.csproj`、`Dialogs/ExtractSettingsWindow.axaml`、`ViewModels/ExtractSettingsViewModel.cs`；构建 0 错误，`dotnet run` 恢复
+
 **2026-08-07** — 压缩/解压 CLI 流程对齐主窗口 + 公共流程抽取统一（CompressFlow/ExtractFlow）
   - **`--extract` CLI 弹窗化**：右键「解压到……」由「直接解压到压缩包同目录」改为弹出 `ExtractSettingsWindow`（目标路径/冲突策略/过滤条件），确认后批处理进度窗口逐文件解压；CLI 无主窗口无法 `ShowDialog(owner)` → 非模态 `Show()` + Closed 事件 + `ExtractSettingsWindow.DialogResult` 记录结果
   - **生命周期竞态修复**：CLI 弹窗关闭瞬间 `OnLastWindowClose` 自动 Shutdown 抢先于解压 continuation → 弹窗前设 `ShutdownMode.OnExplicitShutdown`，退出时机由流程显式控制（取消立即退出、确认完成后退出）

@@ -76,13 +76,10 @@
               <StackPanel Spacing="8">
                 <TextBlock Text="{Binding LocalizedStrings[Extract_WhenFileExists]}"
                            FontWeight="SemiBold" />
-                <ComboBox SelectedItem="{Binding ConflictAction}"
-                          HorizontalAlignment="Stretch">
-                  <ComboBoxItem Content="{Binding LocalizedStrings[Extract_Conflict_Ask]}" />
-                  <ComboBoxItem Content="{Binding LocalizedStrings[Extract_Conflict_Overwrite]}" />
-                  <ComboBoxItem Content="{Binding LocalizedStrings[Extract_Conflict_Rename]}" />
-                  <ComboBoxItem Content="{Binding LocalizedStrings[Extract_Conflict_Skip]}" />
-                </ComboBox>
+                <ComboBox ItemsSource="{Binding ConflictActionOptions}"
+                          SelectedItem="{Binding SelectedConflictActionOption}"
+                          DisplayMemberBinding="{Binding Display}"
+                          HorizontalAlignment="Stretch" />
                 <CheckBox IsChecked="{Binding OpenFolderAfterExtract}">
                   <TextBlock Text="{Binding LocalizedStrings[Extract_OpenFolder]}"
                              TextWrapping="Wrap" />

@@ -79,6 +79,21 @@ public partial class ExtractSettingsViewModel : ObservableObject
             DestinationPath = Path.Combine(dir, name);
         }
 
+        // 预选当前设置中的冲突策略（对齐 WPF ExtractSettingsWindow 从 FileConflictAction 预选）
+        var settings = AppSettings.Load();
+        if (!string.IsNullOrEmpty(settings.FileConflictAction))
+            ConflictAction = settings.FileConflictAction;
+
+        // 冲突策略选项（ComboBox 用对象绑定——Avalonia 无 WPF 的 SelectedValuePath）
+        ConflictActionOptions.Add(new Option(LocalizationManager.T("Extract_Conflict_Ask"), "ask"));
+        ConflictActionOptions.Add(new Option(LocalizationManager.T("Extract_Conflict_Overwrite"), "overwrite"));
+        ConflictActionOptions.Add(new Option(LocalizationManager.T("Settings_Extract_Conflict_OverwriteOlder"), "overwrite-if-older"));
+        ConflictActionOptions.Add(new Option(LocalizationManager.T("Settings_Extract_Conflict_OverwriteSmaller"), "overwrite-if-smaller"));
+        ConflictActionOptions.Add(new Option(LocalizationManager.T("Extract_Conflict_Rename"), "rename"));
+        ConflictActionOptions.Add(new Option(LocalizationManager.T("Extract_Conflict_Skip"), "skip"));
+        SelectedConflictActionOption =
+            ConflictActionOptions.FirstOrDefault(o => o.Value == ConflictAction) ?? ConflictActionOptions[0];
+
         // 初始化本地化字符串
         var keys = new[]
         {
@@ -104,6 +119,19 @@ public partial class ExtractSettingsViewModel : ObservableObject
             dict[key] = LocalizationManager.T(key);
         }
         LocalizedStrings = dict;
+    }
+
+    /// <summary>冲突策略下拉选项（显示文本 + 存储值）。</summary>
+    public ObservableCollection<Option> ConflictActionOptions { get; } = new();
+
+    /// <summary>当前选中的冲突策略选项（同步写回 <see cref="ConflictAction"/> 字符串值）。</summary>
+    [ObservableProperty]
+    private Option? _selectedConflictActionOption;
+
+    partial void OnSelectedConflictActionOptionChanged(Option? value)
+    {
+        if (value != null)
+            ConflictAction = value.Value;
     }
 
     /// <summary>

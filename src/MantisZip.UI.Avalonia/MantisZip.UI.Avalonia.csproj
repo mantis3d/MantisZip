@@ -37,8 +37,16 @@
   </ItemGroup>
 
   <ItemGroup>
-    <!-- 排除 .axaml，Avalonia 构建目标会自动处理 -->
-    <AvaloniaResource Include="Resources\**" Exclude="Resources\**\*.axaml" />
+    <!-- 非 XAML 资源 + AppIcons.axaml：AppIcons.axaml 由 App 在运行时用 avares:// URI 显式加载
+         （App.OnFrameworkInitializationCompleted），必须作为 AvaloniaResource 嵌入原始 xaml；
+         Resources 下其余为非 axaml 资源（图标/光标等） -->
+    <AvaloniaResource Include="Resources\**" />
+    <!-- .axaml 交给 Avalonia XamlIl 预编译（生成 .g.cs）。先 Remove 清掉包内默认 glob 收集的条目
+         （默认 glob 带 Exclude/SubType 元数据，与自定义 Include pattern 不同不会去重，会导致
+         AVLN2002 duplicate x:Class），再按本规则重新 Include；Resources\** 下的 axaml
+         （AppIcons.axaml）留在 AvaloniaResource 供运行时 avares:// 加载 -->
+    <AvaloniaXaml Remove="**\*.axaml" />
+    <AvaloniaXaml Include="**\*.axaml" Exclude="Resources\**\*.axaml" />
   </ItemGroup>
 
   <ItemGroup>
