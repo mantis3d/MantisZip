@@ -1,5 +1,8 @@
+using Avalonia.Controls;
+using Avalonia.Threading;
 using MantisZip.Core.Abstractions;
 using MantisZip.Core.Engines;
+using MantisZip.UI.Avalonia.Dialogs;
 
 namespace MantisZip.UI.Avalonia.Services;
 
@@ -54,5 +57,29 @@ public static class ExtractFlow
             await new ExtractService().ExtractAsync(
                 archivePath, dest, password, progress, ct, options);
         }
+    }
+
+    /// <summary>
+    /// 弹 ConflictDialog 处理单个文件冲突（Ask 策略），主窗口与 CLI 共用。
+    /// resolver 由 Core 在后台线程调用，本方法内部通过 Dispatcher 封送回 UI 线程弹窗。
+    /// 用户选择"取消整个操作"时抛 <see cref="OperationCanceledException"/> 终止解压
+    /// （与拖拽/主窗口原有语义一致）。Rename 时把用户自定义名写回 <paramref name="info"/>。
+    /// </summary>
+    public static Task<(FileConflictAction Action, bool ApplyToAll)>
+        ShowConflictDialogAsync(Window owner, FileConflictInfo info)
+    {
+        return Dispatcher.UIThread.InvokeAsync(async () =>
+        {
+            var dlg = new ConflictDialog(info);
+            await dlg.ShowDialog(owner);
+
+            if (dlg.CancelOperation)
+                throw new OperationCanceledException("用户取消整个解压操作");
+
+            if (dlg.ResultAction == FileConflictAction.Rename && !string.IsNullOrEmpty(dlg.CustomName))
+                info.CustomName = dlg.CustomName;
+
+            return (dlg.ResultAction, dlg.ApplyToAll);
+        });
     }
 }

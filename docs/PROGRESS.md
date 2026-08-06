@@ -21,6 +21,11 @@
 
 ### MantisZip.UI.Avalonia（主力版）
 
+**2026-08-07** — CLI 解压"每次询问"不弹窗修复（ExtractFlow.ShowConflictDialogAsync 统一）
+  - **根因**：CLI `RunCliExtractBatchWithProgressAsync` 调 `ExtractFlow.ExtractAsync` 时 `conflictDialog` 传 null → `Ask` 无 resolver → `FileConflictHelper.ResolveByAction` 落 `_ => outputPath`（Ask 被当作 Overwrite 直接覆盖）；主窗口路径有回调所以正常，CLI 从移植起缺这半截
+  - **修复**：`ExtractFlow` 新增 `ShowConflictDialogAsync(owner, info)`（弹 ConflictDialog，含"取消整个操作"抛 OperationCanceledException、Rename 自定义名写回，与压缩侧 `CompressFlow.ShowConflictDialogAsync` 对称）；CLI 传 `info => ExtractFlow.ShowConflictDialogAsync(progressWindow, info)`；主窗口 `ShowExtractFileConflictDialogAsync` 回调简化为一行接线复用同一实现
+  - 涉及文件：`Services/ExtractFlow.cs`、`App.axaml.cs`、`Views/MainWindow.axaml.cs`；构建 0 错误
+
 **2026-08-07** — XamlIl 预编译恢复（csproj AvaloniaXaml 声明）+ 解压冲突选项绑定修复
   - **构建修复（dotnet run 崩溃）**：csproj 缺 `<AvaloniaXaml>` 显式声明（Avalonia 12 包内默认 glob 在本项目构建中未生效），obj 无 XamlIl 产物，运行时 `AvaloniaXamlLoader.Load` 抛 "No precompiled XAML found for ...App"；修复为 `<AvaloniaXaml Remove="**\*.axaml" />` + `<AvaloniaXaml Include="**\*.axaml" Exclude="Resources\**\*.axaml" />`（先清默认 glob 避免 AVLN2002 duplicate x:Class；AppIcons.axaml 保留在 `AvaloniaResource` 供运行时 avares:// 加载），XamlIl 预编译恢复正常
   - **解压冲突选项绑定修复**：`ExtractSettingsWindow` 冲突 ComboBox 原 `SelectedItem="{Binding ConflictAction}"`（string ↔ ComboBoxItem 对象类型不匹配，选择永不生效恒为 "ask"）；初修误用 WPF 风格 `SelectedValuePath`（Avalonia ComboBox 无此属性，AVLN2000 编译失败，正是 XamlIl 恢复后暴露的连锁错误）；最终改为 Option 对象集合（`ConflictActionOptions` + `SelectedConflictActionOption`，partial 同步写回 `ConflictAction`）+ 补全 6 档选项（overwrite-if-older/overwrite-if-smaller，复用设置窗口文案 key 不新增翻译）+ 从 `AppSettings.FileConflictAction` 预选（对齐 WPF）

@@ -245,25 +245,9 @@ public partial class MainWindow : Window
         // 本回调仅把 owner 窗口（MainWindow）与 VM 委托接线
         vm.ShowCompressConflictDialog = info => CompressFlow.ShowConflictDialogAsync(this, info);
 
-        vm.ShowExtractFileConflictDialogAsync = async info =>
-        {
-            return await Dispatcher.UIThread.InvokeAsync(async () =>
-            {
-                var dlg = new ConflictDialog(info);
-                await dlg.ShowDialog(this);
-
-                // 用户选择"取消整个操作" → 抛异常终止解压（与拖拽原有语义一致）
-                if (dlg.CancelOperation)
-                    throw new OperationCanceledException("用户取消整个解压操作");
-
-                if (dlg.ResultAction == FileConflictAction.Rename && !string.IsNullOrEmpty(dlg.CustomName))
-                {
-                    info.CustomName = dlg.CustomName;
-                }
-
-                return (dlg.ResultAction, dlg.ApplyToAll);
-            });
-        };
+        // 弹窗逻辑统一走 ExtractFlow.ShowConflictDialogAsync（与 CLI 右键菜单共用），
+        // 本回调仅把 owner 窗口（MainWindow）与 VM 委托接线
+        vm.ShowExtractFileConflictDialogAsync = info => ExtractFlow.ShowConflictDialogAsync(this, info);
 
         // ── Wire up select-all / invert-selection callbacks ──
         vm.SelectAllEntriesAction = () =>

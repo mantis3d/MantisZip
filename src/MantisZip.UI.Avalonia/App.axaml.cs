@@ -985,12 +985,14 @@ public partial class App : Application
                             ProgressWindow.CreateBackgroundProgress(progressWindow));
 
                         // 统一解压执行入口（与主窗口 ExtractArchive 共用 ExtractFlow）；
-                        // 冲突策略来自弹窗选择（Ask 无对话框回调时由 CreateExtractOptions 降级）；
+                        // 冲突策略来自弹窗选择；Ask 时弹 ConflictDialog（owner=进度窗口，与主窗口同逻辑）；
                         // 过滤仅对第一个压缩包生效（对齐 WPF HandleExtractBatchCore：i == 0）
                         await ExtractFlow.ExtractAsync(
                             archivePath, targetDir, conflictAction,
                             i == 0 ? filteredEntryKeys : null,
-                            password, null, progress, ct);
+                            password,
+                            info => ExtractFlow.ShowConflictDialogAsync(progressWindow, info),
+                            progress, ct);
 
                         await Dispatcher.UIThread.InvokeAsync(() =>
                             progressWindow.UpdateBatchItemStatus(i, BatchItemStatus.Completed));
