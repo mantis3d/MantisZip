@@ -22,7 +22,7 @@
 | **P1** | 新增压缩格式（BZip2/XZ/CAB 等） | [new-format-support.md](.sisyphus/plans/new-format-support.md) | 🟡中 | 12-20h | 6 阶段渐进：TAR 裸格式/GZip 单文件 → BZip2 → XZ → CAB 只读 → UI 统一化 → Zstandard（需依赖） |
 | **P1** | 自包含体积优化（Avalonia 迁移后） | [selfcontained-size-optimization.md](.sisyphus/plans/selfcontained-size-optimization.md) | 🟡中 | 4-6h | 三步渐进：InvariantGlobalization → 保守修剪 → 激进修剪，目标降至 20–25 MB |
 | **P1** | Avalonia 拖拽直接解压 | [drag-drop-direct-extract.md](.sisyphus/plans/drag-drop-direct-extract.md) | 🟡中 | 5-7h | 纯 Win32 独立线程覆盖层（三色状态机 + 呼吸动画）+ WindowFromPoint+ShellWindows 检测目标路径；#32770 用 Win32 EnumChildWindows（方案 A，方案 B UIA 为未来可选项）；☑️ 2026-07-23 计划审查完成，Avalonia 分支 API 已确认；☑️ 2026-07-31 高危修复（Esc 取消/ask 冲突/DebugLog）+ 光标临时方案 A（SetSystemCursor）；方案 C（OLE 虚拟文件拖拽，根治光标）已列入未来可选项 |
-| **P1** | HTML 预览升级：跨平台 WebView + 降级 | [html-preview-webview-fallback.md](.sisyphus/plans/html-preview-webview-fallback.md) | 🟡中 | 4-6h | 用 `Avalonia.Controls.WebView`（各平台原生引擎）替代当前 ReverseMarkdown 有损管线；WebView 不可用时自动降级到 ReverseMarkdown + 修 MarkdownPreviewBuilder table 支持；加工具栏和源码切换 |
+| **P1** | HTML 预览升级：跨平台 WebView + 降级 | [html-preview-webview-fallback.md](.sisyphus/plans/html-preview-webview-fallback.md) | 🟡中 | 3.5-4.5h | 用 `Avalonia.Controls.WebView`（各平台原生引擎）替代当前 ReverseMarkdown 有损管线；WebView 不可用时自动降级到 ReverseMarkdown（table 支持已由 81e5609 提前完成）；加工具栏和源码切换。**仅 HTML**：DOCX/Markdown 的 WebView 路线属 office 计划剩余项（见 P3 条目） |
 | **P1** | QuickPathPicker 自包含路径速选控件 | [2026-08-03-quickpath-picker-design.md](docs/superpowers/specs/2026-08-03-quickpath-picker-design.md) | 🟢低 | 2-4h | 把 CompressSettings/ExtractSettings/Settings 三处重复的「路径输入框 + ⭐🕐🪟📁 + 三个单 Tab 浮层 + 手写 light-dismiss」抽成自包含可复用控件；输入框用 AutoCompleteBox（复用 CustomFilePicker 补全逻辑），浏览差异经注入委托（SaveFile/ExtractFolder/纯目录）解决，文件路径自动归一化为父目录；后续再有路径速选场景一行集成 |
 | **P2** | 压缩预估 (Compression Estimator) | [compression-estimator.md](.sisyphus/plans/compression-estimator.md) | 🟡中 | 4-5h | 压缩前估算大小/耗时 |
 | **P2** | Winget 发布 | [winget-publishing.md](.sisyphus/plans/winget-publishing.md) | 🟢低 | 1-2h | 发布到 Windows Package Manager 社区仓库；首次手动提交后 CI 自动化 |
@@ -43,7 +43,7 @@
 | **P3** | 可插拔预览模块体系 | [preview-modular-providers.md](.sisyphus/plans/preview-modular-providers.md) | 🟡中 | 3-4h | 格式类库独立分发 |
 | **P3** | 文件列表自定义列 | [custom-columns.md](.sisyphus/plans/custom-columns.md) | 🟡中 | 4-6h | 可自定义显示文件元数据列（文档标题、图片尺寸等） |
 | **P3** | 冻结列（水平滚动时列固定） | [frozen-column.md](.sisyphus/plans/frozen-column.md) | 🟢低 | 1-2h | 右键列标题冻结/取消冻结，分隔线，设置持久化 |
-| **P3** | Office 文档内容预览增强（Avalonia） | [office-content-preview-avalonia.md](.sisyphus/plans/office-content-preview-avalonia.md) | 🟡中 | 6-8h | ✅ 已完成（DOCX 纯文本大纲+全文+表格提取、XLSX 表格、PPTX 文本 + Canvas 定位预览、Markdown 表格渲染）。剩余：WebView 优先统一渲染管线（DOCX→Mammoth→HTML、Markdown→HTML）📋 |
+| **P3** | Office 文档内容预览增强（Avalonia） | [office-content-preview-avalonia.md](.sisyphus/plans/office-content-preview-avalonia.md) | 🟡中 | 6-8h | ✅ 已完成（DOCX 纯文本大纲+全文+表格提取、XLSX 表格、PPTX 文本 + Canvas 定位预览、Markdown 表格渲染）。剩余：WebView 优先统一渲染管线（DOCX→Mammoth→HTML、Markdown→HTML）📋（复用 [html-preview-webview-fallback.md](.sisyphus/plans/html-preview-webview-fallback.md) 的 WebView 初始化/降级基建） |
 | **P3** | ICO 文件自身图标显示 | [ico-file-icon-extract.md](.sisyphus/plans/ico-file-icon-extract.md) | 🟢低 | 2-3h | ico 文件列表显示自身嵌入图标 |
 | **P3** | 右键菜单目录结构预览 | [context-menu-tree-preview.md](.sisyphus/plans/context-menu-tree-preview.md) | 🔴高 | 6-8h | COM 菜单中展示压缩包顶层文件树 |
 | **P1** | Avalonia: UI 功能补齐 | [avalonia-ui-feature-parity.md](.sisyphus/plans/avalonia-ui-feature-parity.md) | 🟡中 | 27/29 完成，2 项待 GUI 验证 | Elevation×3、Favorites×2、QuickPath×2 等 11 个对话框、2 个控件、1 个转换器（2 项阻塞于 GUI 测试） |

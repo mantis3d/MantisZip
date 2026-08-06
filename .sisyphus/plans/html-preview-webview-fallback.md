@@ -4,6 +4,11 @@
 
 **Goal:** 将 Avalonia 版 HTML 预览从「ReverseMarkdown → Markdown → 控件树」有损管线升级为「跨平台原生 WebView + ReverseMarkdown 降级」双轨方案。Markdown 预览保持现有控件树管线不变。
 
+> **计划边界（与 office-content-preview-avalonia.md 的分工）：**
+> 本计划**只覆盖 HTML 预览的 WebView 升级**。DOCX（→Mammoth→HTML）与 Markdown（→Markdig→HTML）的 WebView 路线属于 office 计划的剩余项（`docs/PLAN.md` P3 条目），**不在本计划范围内**——实施时勿扩展范围。两份计划共享同一条 WebView 初始化/降级基建，office 剩余项可在本计划完成后复用同一套 `IsWebViewAvailable` 检测与降级信号机制。
+>
+> **状态说明：** 原 Task 5（MarkdownPreviewBuilder Table 支持）已由 `81e5609` 提交提前完成（`TryBuildBlock` 现有 `case Table` → `BuildTable`），故本计划删除该 Task，后续编号顺延。
+
 **Architecture:**
 ```
 ShowHtmlPreview(filePath)
@@ -36,7 +41,6 @@ ShowHtmlPreview(filePath)
 | `ViewModels/PreviewViewModel.cs` | 修改 | 新增 `ShowHtmlFallback()`、`IsWebViewAvailable`、源码切换逻辑、WebView URI 属性；改 `ShowHtmlPreview` |
 | `Views/PreviewPanel.axaml` | 修改 | 新增 WebView 元素，与现有 Markdown 控件树共存 |
 | `Views/PreviewPanel.axaml.cs` | 修改 | 注册 WebView 初始化回调，处理 fallback 信号 |
-| `Services/MarkdownPreviewBuilder.cs` | 修改 | 新增 Table 支持（pipe table 目前静默丢弃） |
 | `Localization/strings.*.json` | 修改 | 新增降级提示 key |
 
 ---
@@ -78,6 +82,8 @@ private string _htmlSourceContent = string.Empty; // HTML 源码文本
 ```
 
 #### 2.2 现有属性修改
+
+> **实现说明：** 以下两种可见性方案是设计草案。当前代码 `ShowHtmlPreview` 为同步方法（`PreviewViewModel.cs:2503`），实施时应**以现有属性结构为准**——先阅读现有 `IsMarkdownOrHtmlVisible`/`IsHtmlVisible` 等计算属性的实际命名与语义再对齐，勿照抄本草案属性名。
 
 `IsMarkdownOrHtmlVisible` 改为排除 WebView 渲染的 HTML：
 ```csharp
@@ -226,42 +232,7 @@ private static bool IsWebViewAvailable()
 
 ---
 
-### Task 5: 改进 MarkdownPreviewBuilder — 添加 Table 支持
-
-**文件：** `Services/MarkdownPreviewBuilder.cs`
-
-当前 `TryBuildBlock` 没有处理 `Table` 节点（Markdig pipe table 产生）。WebView fallback 模式下 reverse markdown 产生的 pipe table 会被静默丢弃。
-
-#### 5.1 在 switch 中添加 Table case
-
-```csharp
-case Table table:
-    return BuildTable(table);
-```
-
-#### 5.2 实现 BuildTable 方法
-
-```csharp
-private static Control BuildTable(Table table)
-{
-    var grid = new Grid();
-    // 解析列数（table.ColumnDefinitions）
-    // 遍历 table.Rows:
-    //   - 第一行如果是表头 → 用 ThemeHeaderBgBrush 背景
-    //   - 后续行交替背景色
-    // 使用 Border + TextBlock 构建单元格
-    // 列宽按 ColumnDefinition 分配
-}
-```
-
-**限制：**
-- 不支持合并单元格（colspan/rowspan）
-- 不支持表格内嵌套复杂元素
-- 文本自动换行
-
----
-
-### Task 6: 工具栏支持
+### Task 5: 工具栏支持
 
 **文件：** `ViewModels/PreviewViewModel.cs` + `Views/PreviewPanel.axaml`
 
@@ -277,7 +248,7 @@ private static Control BuildTable(Table table)
 
 ---
 
-### Task 7: 清理与验证
+### Task 6: 清理与验证
 
 1. `dotnet build` 0 errors 0 warnings
 2. 测试 HTML 文件预览（含 tables/images/css）
@@ -291,7 +262,8 @@ private static Control BuildTable(Table table)
 ## 注意事项
 
 1. **data: URI 大小限制：** 极大型 HTML 文件（>2MB）可能受 data: URI 限制。如果遇到此问题，改为提取到临时文件后 `Navigate` 文件路径。
-2. **WebView 与 Avalonia 主题：** WebView 渲染的 HTML 页面不感知 Avalonia 主题色。如果需要深色模式同步，在 HTML 中注入 CSS media query 或内联样式。
-3. **WebView 背景透明：** 无法实现 Avalonia 控件级的背景透明。`Background` 绑定 `ThemeSurfaceBgBrush` 作为底色。
-4. **Linux WPE WebKit：** 用户需安装 `libwpewebkit-2.0`、`libwpe-1.0`、`libWPEBackend-fdo-1.0` 运行时库（见 [Avalonia 文档](https://docs.avaloniaui.net/docs/app-development/embedding-web-content#linux)）。
-5. **降级策略触发时机：** 建议只检测一次并缓存结果，避免每次打开 HTML 都重复检测。
+2. **data: URI 支持性（技术风险点）：** `Avalonia.Controls.WebView` 12.0.1 的跨平台后端（Win→WebView2 / Mac→WKWebView / Linux→WPE WebKit）对 `data:` URI 的支持程度需在 Task 1 加依赖后**先做 5 分钟冒烟验证**（导航一个 `data:text/html,<h1>test</h1>` 看是否渲染）。若某平台后端不支持 `data:` URI，改为 `Navigate` 临时文件路径方案，并将 `HtmlWebViewUri` 属性改为文件路径类型。此验证应作为 Task 1 验收的一部分。
+3. **WebView 与 Avalonia 主题：** WebView 渲染的 HTML 页面不感知 Avalonia 主题色。如果需要深色模式同步，在 HTML 中注入 CSS media query 或内联样式。
+4. **WebView 背景透明：** 无法实现 Avalonia 控件级的背景透明。`Background` 绑定 `ThemeSurfaceBgBrush` 作为底色。
+5. **Linux WPE WebKit：** 用户需安装 `libwpewebkit-2.0`、`libwpe-1.0`、`libWPEBackend-fdo-1.0` 运行时库（见 [Avalonia 文档](https://docs.avaloniaui.net/docs/app-development/embedding-web-content#linux)）。
+6. **降级策略触发时机：** 建议只检测一次并缓存结果，避免每次打开 HTML 都重复检测。
