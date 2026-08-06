@@ -21,6 +21,8 @@
 
 ### MantisZip.UI.Avalonia（主力版）
 
+**2026-08-06** — quickpath 系列计划归档：`quickpath-unified.md`（WPF 阶段完成、Avalonia 部分被 redesign 取代）移入 `.sisyphus/plans/archived/` 并标注演进关系；`quickpath-control-redesign.md` / `file-picker-multi-select.md` / `path-priority-sortable.md` / `2026-08-03-quickpath-picker.md` 四份已实施计划从 PLAN.md 移除，统一登记到历史设计方案索引（QuickPathPicker 标记「⏳ 待用户 GUI 验证」）；PLAN.md 跨平台影响分析同步剔除已归档项
+
 **2026-08-06** — DOCX 预览表格升级：全文区控件树化（段落 TextBlock + 表格真 Grid 网格）+ 大纲精确跳转
   - **背景**：DOCX 表格此前以 `"| a | b |"` 分隔符模拟（纯文本 fallback 形态），用户要求真表格显示
   - **改造**：`ShowDocx` 全文从单一 `DocxFullText`（string）升级为控件树 `DocxContentPanel`（`Panel?`，对齐 `MarkdownPreviewPanel` 先例）——按文档顺序遍历 `body.ChildElements`，段落 → `TextBlock`（`TextWrapping.Wrap`），表格 → 真 `Grid` 网格（列数取最宽行、列宽按内容自适应 `Auto` + 单元格 `MaxWidth=400` 防超长撑宽、每单元格 `Border` 带 `ThemeBorderBrush` 边框 + `ThemeSurfaceBgBrush` 底色，忽略合并单元格布局）；新增 `AppendDocxParagraph`（构建 TextBlock + 记录 `BlockIndex`）与 `AppendDocxTable`（构建 Grid）重构，`GetThemeBrush` helper 对齐 `MarkdownPreviewBuilder`
@@ -1186,6 +1188,10 @@
 
 | 功能 | 设计文档 | 实现版本 |
 |------|----------|:--------:|
+| 统一路径快捷选择（WPF QuickPathControl + 数据层；Avalonia 演进为 Tab 式速选面板 + CustomFilePickerDialog，QuickPathBuddy 概念并入 Tab+搜索一体化，QuickPathPreDialog 过渡方案废弃） | [quickpath-unified.md](.sisyphus/plans/archived/quickpath-unified.md)（已归档，Avalonia 部分被 [quickpath-control-redesign.md](.sisyphus/plans/quickpath-control-redesign.md) 取代） | v0.4.3+（Avalonia 演进 v0.4.5） |
+| QuickPathPicker 自包含路径速选控件（Compress/Extract/Settings 三宿主，AutoCompleteBox 补全 + ⭐🕐🪟 浮层 + 目录归一化，浏览器差异经注入委托） | [2026-08-03-quickpath-picker.md](docs/superpowers/plans/2026-08-03-quickpath-picker.md) + [设计](docs/superpowers/specs/2026-08-03-quickpath-picker-design.md) | v0.4.5（⏳ 待用户 GUI 验证） |
+| 文件选择器多选（PickItems 模式：勾选累积 + 跨目录保留 + 右栏已选面板；CompressSettingsWindow 合并「添加文件/文件夹」单按钮） | [file-picker-multi-select.md](.sisyphus/plans/file-picker-multi-select.md) | v0.4.5 |
+| 可排序的默认路径优先级（文件选择器初始路径 context/explorer/recent/custom） | [path-priority-sortable.md](.sisyphus/plans/path-priority-sortable.md) | v0.4.5 |
 | 解压路径统一（`ExtractEntriesAsync` + `pathOverrides`，单一事实源 `ExtractPathResolver`） | [extract-path-unification.md](.sisyphus/plans/extract-path-unification.md) | v0.4.5 |
 | 移除 WebView2 依赖（Markdown/HTML/PDF 跨平台预览） | [remove-webview2-preview.md](.sisyphus/plans/remove-webview2-preview.md) | v0.4.5 |
 | 便携版模式 | [portable-mode.md](.sisyphus/plans/portable-mode.md) | v0.4.5 |

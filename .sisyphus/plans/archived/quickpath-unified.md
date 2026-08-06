@@ -1,5 +1,7 @@
 # QuickPathControl + Custom Save Dialog 统一实施计划
 
+> **状态**: 已归档（2026-08-06）——WPF 阶段（Task 1–17 + F1/F2/F4）已完成；Avalonia 阶段设计已被 [quickpath-control-redesign.md](../quickpath-control-redesign.md)（Tab 式速选面板 + CustomFilePickerDialog，QuickPathBuddy 概念并入 Tab+搜索一体化）取代，QuickPathPreDialog 过渡方案废弃。后续演进见 [2026-08-03-quickpath-picker.md](../../../docs/superpowers/plans/2026-08-03-quickpath-picker.md)、[file-picker-multi-select.md](../file-picker-multi-select.md)、[path-priority-sortable.md](../path-priority-sortable.md)。
+>
 > **For agentic workers:** REQUIRED SUB-SKILL: Use subagent-driven-development (recommended) or executing-plans to implement plan task-by-task.
 
 **Goal:** 统一 MantisZip 所有路径选择场景，用带 ⭐收藏/🕐历史/🪟资源管理器快捷入口的自定义文件选择器替换系统对话框。WPF 阶段的 QuickPathControl + 数据层已实现基础能力；**最终形态在 Avalonia 版本中实现**——构建一个跨平台的 CustomFilePickerDialog，包含文件浏览区域 + ⭐🕐🪟 快捷入口 + 可扩展底部控件插槽，以及 QuickPathBuddy 智能路径速选浮层。
