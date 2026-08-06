@@ -165,6 +165,7 @@ Despite using `CommunityToolkit.Mvvm`, **all logic lives in `MainWindow.xaml.cs`
 - **DataGrid**: CSV/SQLite 预览用 `Avalonia.Controls.DataGrid`（手动列创建以绕过 `AutoGenerateColumns` 对 `DataView` 的 bug）
 - **结果预览面板**: `ResultPreviewService` 构建文件树 → `ResultTreeView` 控件（Compact/Full 模式、冲突高亮、过滤灰显、深度/文件数截断、摘要栏）。构建期间显示加载覆层：`IsLoading`/`BuildProgress` StyledProperties 驱动（`OnIsLoadingChanged`/`OnBuildProgressChanged`，进度经 `IProgress<double>` 上报，<250ms 快速构建闪覆层、慢构建显示确定/不定进度条）
 - **魔数检测**: `PreviewService.ClassifyPreviewByMagicAsync` 通过文件魔数优先判定格式，与扩展名冲突时 FormatMetadata 显示警告提示
+- **部分提取（元数据优先）**: `ArchiveEntryExtractor.ExtractHeadAsync`（Core/Utils，`ArchiveEntryExtractor.cs:213`）提取条目前 N 字节到内存，`ExtractHeadTailAsync`（:257）双端提取（head + tail）；ZIP/7z/RAR/Tar/Gz 均支持，**7z 固实自动降级**（`IsSevenZipSolid` 检测 + `ExtractHeadViaFullExtractAsync` 全量提取），Deflate ZIP 尾部提取有 10MB 上限。被魔数检测消费，为元数据优先预览的横切基础设施（对应 preview-extended-formats.md Phase 5）
 
 ### 设置系统
 

@@ -21,6 +21,14 @@
 
 ### MantisZip.UI.Avalonia（主力版）
 
+**2026-08-07** — `preview-extended-formats.md` 完成度核实修正（多处文档与实际不符）
+  - **Phase 3 修正**：文档原声称"SVG/字体/LNK/DBF/ICO/字幕/Office/EPUB/HDR 已完成"→ 实际 **LNK/DBF/EPUB/字幕 从未实现**（`FileFormat` 枚举含 `Lnk/Dbf/Epub/Subtitle` 且魔数可识别，但两项目均无对应 ShowXxx 方法，路由到 Unsupported）；**STL 也未实现**（无 `ShowStlPreview`）；HDR 依赖 Magick.NET 插件（未实施）；SVG/字体/ICO 画廊/Office(Docx/Xlsx/Pptx) 确认完成
+  - **Phase 4 修正**：文档声称"0/8 均未开始"→ 实际 **4.3 MKV/WebM 元数据已实现**（`VideoParser.ParseMkv`，`VideoExtensions` 含 `.mkv/.webm`）；其余 4.1/4.2/4.4-4.9 未实施
+  - **Phase 5 修正**：文档声称"0/5 均未开始"→ 实际 **5.1/5.3/5.5 已完成**（5.1 `ExtractHeadAsync`/`ExtractHeadTailAsync` + 7z 固实降级；5.3 Avalonia 两阶段加载 + `_previewLoadVersion` 版本守卫，独立子计划 `preview-two-phase-loading.md` 已完成；5.5 `IsSevenZipSolid`）；5.2 部分（MetadataHelper 模式）；5.4 未实施
+  - **插件化确认**：Phase 2D（Magick.NET）/Phase M（MediaPlayer）均未实施（`src/` 仅 4 项目，sln 无插件项目）
+  - **AGENTS.md 补充**：魔数检测条目后新增「部分提取（元数据优先）」描述（`ExtractHeadAsync`/`ExtractHeadTailAsync`/`IsSevenZipSolid` 一行）
+  - 涉及文件：`.sisyphus/plans/preview-extended-formats.md`、`AGENTS.md`（仅文档，无代码变更）
+
 **2026-08-06** — `avalonia-shell-com-integration.md` 完成状态核实 + AGENTS.md Shell 图标描述修正
   - **计划核实**：文档声明全部与现状一致——3 个 ShellIntegration 文件（`Services/ShellIntegration.cs`/`.Assoc.cs`/`.Menu.cs`）存在、10 个 MenuIcons .ico 存在、csproj `CopyShellExtComhost`/`CopyShellExtComhostToPublish` target 存在、4 个 CLI 命令（`--install-shell`/`--uninstall-shell`/`--install-assoc`/`--uninstall-assoc`）齐全；头部状态更新为 ✅ Completed（原"4/5 verified, 1/5 needs Explorer visual check"，图标渲染已在实际使用中验证）
   - **AGENTS.md 图标描述修正**：L242 原写"Icons via `shell32.dll,3`"→ 实际两项目 `ShellIntegration.Menu.cs` 均用 `GetMenuIconPath()` 从输出目录 `Resources\MenuIcons\*.ico` 读取（Open/ExtractHere/ExtractSmart/ExtractToNamed/ExtractTo/CompressSeparate/CompressCombined/CompressDialog 8 个映射，无 shell32.dll 引用）
