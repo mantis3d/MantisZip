@@ -21,6 +21,14 @@
 
 ### MantisZip.UI.Avalonia（主力版）
 
+**2026-08-06** — 预览缩放修复：适应高度受 contentTop 横条影响 + SVG 预览接入缩放系统
+  - **图像适应高度回归**：contentTop 横条（元数据面板可配置系统引入）位于内容区 ScrollViewer 内部、图像上方，其高度从未从可用视口高度中扣除 → 图像按完整视口缩放导致出现滚动条
+  - **修复**：`PreviewPanel.axaml.cs` 抽出 `UpdateViewportSize()`，可用高度 = 外层 `PreviewContentScroller.Bounds.Height` − `ContentTopBorder.Bounds.Height`（`double.IsFinite` + `> 0` 防御未布局时 NaN/0）；横条加 `x:Name="ContentTopBorder"` 并订阅其 `SizeChanged`——横条高度变化（Phase 2 合并 format 行/字段换行）不触发外层 ScrollViewer SizeChanged，必须单独重算；`ZoomIn/ZoomOut` 置 `_isZoomFitActive = false` 后不再强制重算（手动缩放不回归）
+  - **SVG 适应高度无效**：`ShowSvg` 从未设置 `ImageWidth/ImageHeight`、未调用 `ZoomFit()`，XAML 的 Image 无 `ScaledWidth/ScaledHeight` 绑定 → 完全未接入缩放系统
+  - **修复**：`ShowSvg` 补 `ImageWidth/ImageHeight = 栅格化尺寸` + 末尾 `ZoomFit()`；SVG ScrollViewer 的 Image 加 `Width/Height="{Binding ScaledWidth/ScaledHeight}" Stretch="Uniform"`，ScrollViewer 加 Auto 滚动条（与 Image/GIF 对齐）
+  - 影响面：Image/GIF/PDF 共用 `ViewportHeight`，一处修复三方受益（PDF 同类潜在滚动条一并解决）
+  - 验证：`dotnet build` 0 errors（29 个既有警告，与本次改动无关）
+
 **2026-08-06** — 修复刷新/重新打开压缩包后文件列表为空（根目录必现）
   - **根因**：`ClearArchiveInternal` 清空压缩包状态时遗漏 `CurrentFolder`（残留上一浏览位置的 `""`）；`LoadArchiveAsync` 重建后依赖 `SelectedFolder = FolderTreeRoot` 触发 `OnSelectedFolderChanged → NavigateToFolder` 填充列表，而 `NavigateToFolder` 对 `CurrentFolder == node.FullPath` 短路返回（L1196 跳过 `PopulateEntries`）。根节点 `FullPath = ""`（`ArchiveTreeBuilder.BuildTree`）→ 根目录点刷新、或上个压缩包停在根目录后打开新包时，残留 `CurrentFolder` 恰好等于根路径 → 短路 → 列表空白，切换目录后 `PopulateEntries` 正常执行才恢复（与用户测试完全吻合）
   - **修复**：`ClearArchiveInternal()` 补 `CurrentFolder = null`，使所有重载路径（刷新/增删文件/打开）统一走正常填充路径

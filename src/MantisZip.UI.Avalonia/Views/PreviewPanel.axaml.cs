@@ -31,6 +31,11 @@ public partial class PreviewPanel : UserControl
         // 订阅内容区域外层 ScrollViewer 的 SizeChanged，用于 ZoomFit 自适应视口
         if (PreviewContentScroller != null)
             PreviewContentScroller.SizeChanged += OnContentScrollerSizeChanged;
+
+        // 订阅 contentTop 横条的 SizeChanged：横条高度变化（字段增删/换行）不会触发
+        // 外层 ScrollViewer 的 SizeChanged，但会改变图像的可用视口高度，必须单独重算
+        if (ContentTopBorder != null)
+            ContentTopBorder.SizeChanged += OnContentTopSizeChanged;
     }
 
     private void OnDataContextChanged(object? sender, EventArgs e)
@@ -100,12 +105,42 @@ public partial class PreviewPanel : UserControl
     /// <summary>
     /// 内容区域外层 ScrollViewer 尺寸变化时更新 ViewModel 的视口大小，
     /// 供 ZoomFit 和初始缩放计算使用（替代硬编码 600×500）。
+    /// 可用高度 = 外层 ScrollViewer 高度 - contentTop 横条高度，
+    /// 否则图像按完整视口缩放会超出可用区域产生滚动条。
     /// </summary>
     private void OnContentScrollerSizeChanged(object? sender, SizeChangedEventArgs e)
+    {
+        UpdateViewportSize();
+    }
+
+    /// <summary>
+    /// contentTop 横条高度变化（字段增删/内容换行）时更新视口高度。
+    /// 横条位于外层 ScrollViewer 内部，其尺寸变化不会触发外层 SizeChanged，
+    /// 但会直接改变图像可用高度，必须单独处理。
+    /// </summary>
+    private void OnContentTopSizeChanged(object? sender, SizeChangedEventArgs e)
+    {
+        UpdateViewportSize();
+    }
+
+    /// <summary>
+    /// 统一计算可用视口尺寸：外层 ScrollViewer 完整尺寸减去 contentTop 横条占用高度。
+    /// 防御：横条未布局时 Bounds.Height 为 NaN/0，一律按 0 处理。
+    /// </summary>
+    private void UpdateViewportSize()
     {
         if (_vm == null || PreviewContentScroller == null) return;
         var w = PreviewContentScroller.Bounds.Width;
         var h = PreviewContentScroller.Bounds.Height;
+
+        // contentTop 横条占用顶部高度，从可用视口高度中扣除
+        if (ContentTopBorder != null)
+        {
+            var topHeight = ContentTopBorder.Bounds.Height;
+            if (double.IsFinite(topHeight) && topHeight > 0)
+                h -= topHeight;
+        }
+
         if (w <= 0 || h <= 0) return;
         _vm.ViewportWidth = w;
         _vm.ViewportHeight = h;
