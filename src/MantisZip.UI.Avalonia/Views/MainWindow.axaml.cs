@@ -7,6 +7,7 @@ using Avalonia.Platform.Storage;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using MantisZip.Core.Abstractions;
+using MantisZip.Core.Models;
 using MantisZip.Core.Utils;
 using MantisZip.UI.Avalonia.Converters;
 using MantisZip.UI.Avalonia.Dialogs;
@@ -154,16 +155,38 @@ public partial class MainWindow : Window
             await dialog.ShowDialog(this);
         };
 
-        vm.RunWithProgress = async (title, operation) =>
+        vm.RunWithProgress = async (title, filePaths, operation) =>
         {
             var pw = new ProgressWindow(title);
             pw.InitCancellation();
+            var hasFileList = filePaths is { Count: > 0 };
+
+            // 批处理状态上报：操作闭包内经 BatchStatusReporter 传给引擎 onItemStatus
+            vm.BatchStatusReporter = (index, status) =>
+            {
+                pw.SetCurrentBatchItem(index);
+                pw.UpdateBatchItemStatus(index, status);
+            };
 
             try
             {
                 pw.Show();
-                var progress = ProgressViewModel.CreateBackgroundProgress(pw, p => pw.SetProgress(p));
+                if (hasFileList)
+                {
+                    pw.InitBatchMode(filePaths!);
+                    pw.SetCurrentBatchItem(0);
+                }
+
+                var progress = pw.CreatePauseAwareProgress(
+                    ProgressViewModel.CreateBackgroundProgress(pw, p => pw.SetProgress(p)));
                 await operation(progress, pw.CancellationToken);
+
+                if (hasFileList)
+                    pw.UpdateBatchItemStatus(0, BatchItemStatus.Completed);
+
+                // 成功：标记完成态 + 尊重 📌 KeepOpenOnComplete（对应 WPF MainWindow.Menu.cs AutoCloseOrWaitAsync(0, ...)）
+                pw.SetComplete(LocalizationManager.T("Cli_StatusDone"));
+                await pw.AutoCloseOrWaitAsync(0, () => pw.Close());
                 return true;
             }
             catch (OperationCanceledException)
@@ -172,11 +195,14 @@ public partial class MainWindow : Window
             }
             catch (Exception)
             {
+                if (hasFileList)
+                    pw.UpdateBatchItemStatus(0, BatchItemStatus.Failed);
                 return false;
             }
             finally
             {
                 pw.Close();
+                vm.BatchStatusReporter = null;
             }
         };
 

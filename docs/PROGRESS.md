@@ -21,6 +21,14 @@
 
 ### MantisZip.UI.Avalonia（主力版）
 
+**2026-08-06** — merge 冲突修复：恢复 AvaloniaAlpha 批量进度功能（`RunWithProgress` 3 参 + 文件列表始终可见 + `--compress` 对话框退出语义 + strings 补全）
+  - **根因**：merge `origin/AvaloniaAlpha` → `AvaloniaFromWpf`（手动解决冲突）时「签名取了一边、调用取了另一边」——Parent 1 (`508041d`) 的 `RunWithProgress` 为 2 参，Parent 2 (`4eb8683`) 为 3 参（`105fc8a` 引入批量文件列表），冲突解决后 2 处编译错误：`MainWindowViewModel.cs(360)` CS1593（委托 3 参 vs 2 参签名）+ `App.axaml.cs(1027)` CS0103（`compressStarted` 不存在）
+  - **第一阶段（方向 A，用户确认后覆盖）**：删 3 行使编译通过 → 用户要求检查是否影响合并分支新功能 → 确认 AvaloniaAlpha 的「进度窗口批处理列表 + 逐项状态上报」被合并丢失 → 用户选择方向 B 完整恢复
+  - **恢复内容**：① `MainWindowViewModel.RunWithProgress` 签名恢复 3 参 `(title, filePaths, operation)`，12 处调用点补齐列表项（解压=压缩包路径、压缩=`GetOutputPaths`、测试=条目名、添加=`files.ToArray()`、双击打开=`tempFile`、删除=`entryPath ?? string.Empty`）；② 补回 `BatchStatusReporter` 属性 + 压缩调用点 `onItemStatus` 透传（`CompressService.cs` 同步补参数）；③ `MainWindow.axaml.cs` 实现恢复 `InitBatchMode`/`SetCurrentBatchItem`/`UpdateBatchItemStatus`/`CreatePauseAwareProgress`/`SetComplete`/`AutoCloseOrWaitAsync` 完整链路；④ `App.axaml.cs` 恢复 `compressStarted` + `dlg.Closed` 处理器（取消时退出/压缩中不退出）+ else 分支 + `Cli_Compress` 本地化标题 + 外层 `finally` → Parent 2 的 `catch` 兜底
+  - **顺带修复（strings 整体回退）**：merge 时 `strings.zh-CN.json`/`strings.en.json` 整体回退到旧版，丢失 90 个 key（`Cli_*`/`Preview_*`/`About_Dep_*`/`Settings_Assoc_*` 等），已从 Parent 2 补齐（各 1023 个 key）
+  - **遗留**：`Settings_Assoc_InstallDone`/`UninstallDone` 在两个父提交中均不存在但代码引用（merge 前的历史遗留，未处理）；`MainWindowViewModel.cs(2278)` CS8620 警告（`new[] { entryPath }` 传 string?，预先存在）；`Menu_ToggleTheme` 文案保留当前值「切换颜色主题」（Parent 2 为「切换颜色模式」，差异存疑未动）
+  - 验证：`dotnet build` 0 errors（26 个既有警告，与本次改动无关）；Avalonia 测试 43 通过 / 2 跳过（IconProvider 需交互桌面）；Core 测试 241 通过（WPF 项目因 Explorer 锁定 ShellExt.dll 复制失败，与代码无关，改用 vstest 直跑已构建 dll）
+
 **2026-08-06** — 预览缩放修复：适应高度受 contentTop 横条影响 + SVG 预览接入缩放系统
   - **图像适应高度回归**：contentTop 横条（元数据面板可配置系统引入）位于内容区 ScrollViewer 内部、图像上方，其高度从未从可用视口高度中扣除 → 图像按完整视口缩放导致出现滚动条
   - **修复**：`PreviewPanel.axaml.cs` 抽出 `UpdateViewportSize()`，可用高度 = 外层 `PreviewContentScroller.Bounds.Height` − `ContentTopBorder.Bounds.Height`（`double.IsFinite` + `> 0` 防御未布局时 NaN/0）；横条加 `x:Name="ContentTopBorder"` 并订阅其 `SizeChanged`——横条高度变化（Phase 2 合并 format 行/字段换行）不触发外层 ScrollViewer SizeChanged，必须单独重算；`ZoomIn/ZoomOut` 置 `_isZoomFitActive = false` 后不再强制重算（手动缩放不回归）

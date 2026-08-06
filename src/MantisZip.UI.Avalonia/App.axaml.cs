@@ -993,7 +993,7 @@ public partial class App : Application
                     Dispatcher.UIThread.Post(async () =>
                     {
                         try { await ShowCompressDialogAndRun(allPaths, desktop); }
-                        finally { desktop.Shutdown(); }
+                        catch (Exception ex) { App.DebugLog($"HandleCompress: ShowCompressDialogAndRun 异常: {ex.Message}"); desktop.Shutdown(); }
                     });
                 });
             }
@@ -1009,7 +1009,7 @@ public partial class App : Application
             Dispatcher.UIThread.Post(async () =>
             {
                 try { await ShowCompressDialogAndRun(myPaths, desktop); }
-                finally { desktop.Shutdown(); }
+                catch (Exception ex) { App.DebugLog($"HandleCompress: ShowCompressDialogAndRun 异常: {ex.Message}"); desktop.Shutdown(); }
             });
         }
     }
@@ -1018,10 +1018,19 @@ public partial class App : Application
     {
         var dlg = new CompressSettingsWindow(paths);
 
+        // 压缩流程是否已接管（接管后由 CompressWithProgress 负责退出进程，这里不再退出）
+        bool compressStarted = false;
+
+        // 对话框关闭（用户点 X 或取消）→ 退出进程（对齐 WPF ShowCompressWindow 的 win.Closed += Shutdown）
+        dlg.Closed += (_, _) =>
+        {
+            if (!compressStarted)
+                desktop.Shutdown();
+        };
+
         // Intercept CloseAction: on "Compress", run the compression
         dlg.ViewModel.CloseAction = async (result) =>
         {
-            dlg.Close();
             if (result)
             {
                 compressStarted = true;
@@ -1054,7 +1063,12 @@ public partial class App : Application
                     SevenZipEncryptHeaders = vm.SevenZipEncryptHeaders,
                 };
 
-                await CompressWithProgress(request, "压缩", desktop);
+                await CompressWithProgress(request, LocalizationManager.T("Cli_Compress"), desktop);
+            }
+            else
+            {
+                // 取消 → 关闭对话框，Closed 事件触发退出
+                dlg.Close();
             }
             await Task.CompletedTask;
         };

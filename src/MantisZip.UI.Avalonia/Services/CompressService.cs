@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using MantisZip.Core.Abstractions;
+using MantisZip.Core.Models;
 using MantisZip.Core.Services;
 
 namespace MantisZip.UI.Avalonia.Services;
@@ -22,12 +23,15 @@ public class AvaloniaCompressService
     /// <param name="ct">Cancellation token.</param>
     /// <param name="conflictResolver">Optional callback for resolving file conflicts during compression.
     /// When null, existing files are silently overwritten.</param>
+    /// <param name="onItemStatus">Optional callback for per-item status updates (Separate mode batch list).
+    /// Invoked from a background thread with the item index and its status.</param>
     /// <returns>A <see cref="CompressResult"/> with success/failure/skip counts.</returns>
     public async Task<CompressResult> CompressAsync(
         CompressRequest request,
         IProgress<ArchiveProgress>? progress = null,
         CancellationToken ct = default,
-        CompressConflictResolver? conflictResolver = null)
+        CompressConflictResolver? conflictResolver = null,
+        Action<int, BatchItemStatus>? onItemStatus = null)
     {
         ArgumentNullException.ThrowIfNull(request);
 
@@ -35,7 +39,7 @@ public class AvaloniaCompressService
         var innerProgress = progress ?? new Progress<ArchiveProgress>();
 
         return await MantisZip.Core.Services.CompressService.CompressAsync(
-            request, conflictResolver, innerProgress, ct);
+            request, conflictResolver, innerProgress, ct, onItemStatus);
     }
 
     /// <summary>
