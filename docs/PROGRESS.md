@@ -21,6 +21,13 @@
 
 ### MantisZip.UI.Avalonia（主力版）
 
+**2026-08-06** — AGENTS.md 同步信息面板可配置系统 + 结果预览加载覆层描述
+  - **信息面板描述升级**：L160 由过时的一句话（"托管在 PreviewPanel 右侧/下方"）改为可配置元数据系统完整描述（4 子要点）——`MetadataSettingsManager` 独立 `metadata-panel.json` 持久化、`MetadataRegistry`→`MetadataRenderEngine` 字段分发（infoPanel/contentTop/hidden + Order/Row + SectionOrder）、`MetadataHelper` 接线 + `FormatMetadata` 向后兼容、全局显隐 `IsInfoPanelEffectiveVisible`（内容 && 用户偏好）持久化 + 菜单/设置双入口
+  - **Services 列表补充**：`MetadataSettingsManager`、`MetadataRenderEngine` 两个新服务
+  - **预览设置分类补充**：`ShowPreviewInfoPanel` 字段
+  - **结果预览面板描述补充**：加载覆层机制（`IsLoading`/`BuildProgress` StyledProperties + `IProgress<double>` 进度上报 + <250ms 闪覆层）
+  - 涉及文件：`AGENTS.md`（仅文档，无代码变更）
+
 **2026-08-06** — `avalonia-wpf-diff-plan.md` 现状核实修正 + 信息面板持久化全局显隐入口实施
   - **差异计划核实**：双击行为/删除原包（P1-1）、文件过滤控件（P1-3）、默认路径优先级（P1-4，已演进为 `DefaultPathOrder` 可排序 List）、Enable 设置（P2-3）、AllowElevation（P2-4，默认值文档误记 `true` → 实际 `false`）均已实现；P1-6 信息面板持久化被 `metadata-panel-configurable.md` 取代；剩余仅便携模式路径重定向（P1-2 部分）+ 智能打开路径（P1-7）
   - **全局显隐入口实施**：`AppSettings.ShowPreviewInfoPanel`（默认 true，与 WPF 同名）+ `PreviewViewModel.ShowInfoPanel` 用户偏好 + `IsInfoPanelEffectiveVisible`（内容驱动 `IsInfoPanelVisible` && 用户偏好）；启动初始化 + `ToggleInfoPanelVisibility` 菜单切换写回保存；`MainWindow.axaml` 预览菜单新增开关项（`Menu_ShowInfoPanel`，IconPanelRight）；PreviewPanel 绑定改合并可见性；设置窗口预览→通用 Tab 同步增加"显示信息面板"开关（`Settings_Preview_ShowInfoPanel`）
