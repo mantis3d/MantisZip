@@ -4,6 +4,7 @@ using Avalonia.Input;
 using Avalonia.Input.Platform;
 using Avalonia.Interactivity;
 using Avalonia.Platform.Storage;
+using Avalonia.Platform;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using MantisZip.Core.Abstractions;
@@ -45,6 +46,17 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+
+        // 窗口图标：从嵌入资源加载（与 WPF 版 Icon="/Resources/App.ico" 一致）
+        try
+        {
+            using var iconStream = AssetLoader.Open(new Uri("avares://MantisZip.UI.Avalonia/Resources/App.ico"));
+            Icon = new WindowIcon(iconStream);
+        }
+        catch (Exception ex)
+        {
+            App.DebugLog($"[MainWindow] Failed to load window icon: {ex.Message}");
+        }
 
         var columnStates = WindowStateManager.Load(this);
         ApplyColumnStates(columnStates);

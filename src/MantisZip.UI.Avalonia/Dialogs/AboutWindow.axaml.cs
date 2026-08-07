@@ -1,5 +1,6 @@
 using Avalonia.Controls;
 using Avalonia.Interactivity;
+using Avalonia.Platform;
 using Avalonia.Threading;
 using MantisZip.UI.Avalonia.Services;
 using System.Collections.Generic;
@@ -56,6 +57,17 @@ public partial class AboutWindow : Window
     {
         InitializeComponent();
         DataContext = this;
+
+        // 窗口图标：从嵌入资源加载（与 WPF 版 Icon="/Resources/App.ico" 一致）
+        try
+        {
+            using var iconStream = AssetLoader.Open(new Uri("avares://MantisZip.UI.Avalonia/Resources/App.ico"));
+            Icon = new WindowIcon(iconStream);
+        }
+        catch (Exception ex)
+        {
+            App.DebugLog($"[AboutWindow] Failed to load window icon: {ex.Message}");
+        }
 
         // Tab headers — direct property set to avoid binding issues with dictionary indexer
         TabAboutHeader.Text = LocalizationManager.T("About_Tab_About");

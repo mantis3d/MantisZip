@@ -21,6 +21,12 @@
 
 ### MantisZip.UI.Avalonia（主力版）
 
+**2026-08-07** — 应用图标接入（exe + 主窗口 + 关于窗口，此前完全缺失）
+  - **背景**：Avalonia 版从移植起未配置任何图标（csproj 无 `ApplicationIcon`、窗口未设 `Icon`），任务栏/标题栏一直用默认图标；WPF 版三处均有（csproj + MainWindow + AboutWindow）。两项目 `Resources\App.ico` 经 MD5 校验为同一文件，无需替换内容
+  - **exe 图标**：csproj 新增 `<ApplicationIcon>Resources\App.ico</ApplicationIcon>`（已验证构建产物可提取出 32×32 图标资源）
+  - **窗口图标**：`MainWindow.axaml.cs` / `AboutWindow.axaml.cs` 构造函数中经 `AssetLoader.Open` 加载 `avares://MantisZip.UI.Avalonia/Resources/App.ico` 设置 `Icon`（Avalonia `WindowIcon` 无无参构造函数不能走 XAML；Win32 `LoadIcon(string)` 只认文件路径，故用 stream 重载），异常时 `App.DebugLog` 记录不阻断启动
+  - 涉及文件：`MantisZip.UI.Avalonia.csproj`、`Views/MainWindow.axaml.cs`、`Dialogs/AboutWindow.axaml.cs`；构建 0 错误
+
 **2026-08-07** — 批处理压缩进度条停驻修复（压缩包完成时进度不到 100%）
   - **触发**：用户测试发现批量压缩多个压缩包时，一个压缩包完成时其文件进度条停留在最后一个文件完成前的进度，而不是 100%
   - **UI 层兜底**：`ProgressViewModel.UpdateBatchItemStatus` 在批处理项 Completed/Skipped 且为当前项时同步 `FilePercentComplete = 100`（此前只置列表行 `Progress = 100`，文件进度条从不补满）；`SetCurrentBatchItem` 切换压缩包时 `FilePercentComplete = 0` 重置，避免残留上一包的脏值
