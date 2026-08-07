@@ -1133,6 +1133,11 @@
 
 这些变更影响两项目共用代码，按时间从新到旧排列。
 
+#### v0.5.0 (2026-08-07) 便携版双变体 + WebSetup native 库缺失修复
+  - **双便携版**：release.yml 的 portable 打包步骤改为生成两个——自包含（`-Portable.zip`，捆绑 .NET 9 运行时，85MB）+ framework-dependent（`-Portable-FrameworkDependent.zip`，需系统预装 .NET 9，51MB）；Create Release 资产收集通配符改 `*-Portable*.zip`
+  - **修复 WebSetup 缺 native 库（既有 bug）**：release.yml 的 framework-dependent publish 原本不带 RID（`net9.0` 跨平台 TFM）→ 输出全平台 runtimes（linux/osx/arm 等 632MB 垃圾），且 native 库（libSkiaSharp.dll 等）落在 `runtimes\win-x64\native\` 子目录，而 installer.iss 的 `publish_output\*.dll` 只匹配根目录 → **WebSetup 安装包缺 SkiaSharp/HarfBuzzSharp native，装上无法运行**（11.7MB 异常偏小）。改为 `--runtime win-x64` 后 native 进根目录，通配符覆盖，WebSetup 增至 17.9MB（已用 ISCC 日志确认 libSkiaSharp.dll/libHarfBuzzSharp.dll/av_libglesv2.dll/e_sqlite3.dll 均打包）
+  - 涉及文件：`.github/workflows/release.yml`；本地验证两个便携版（自包含 292 条目含 hostfxr/coreclr；framework-dependent 108 条目 native 齐全、零全平台垃圾）+ WebSetup 重编译成功
+
 #### v0.5.0 (2026-08-07) 版本号 0.5.0 + 安装包重新生成
   - 版本号同步更新到 0.5.0（两个 UI 项目 AppConstants.cs + csproj，Avalonia csproj 从落后的 0.4.4 对齐）；docs/PLAN.md、docs/PROGRESS.md 顶部当前版本同步
   - 重新生成 Avalonia 安装包：framework-dependent + self-contained publish（exe FileVersion 0.5.0.0）→ ISCC 编译 `MantisZip-0.5.0-Setup-WebSetup.exe` / `MantisZip-0.5.0-Setup-Offline.exe`，ProductVersion 验证 0.5.0
