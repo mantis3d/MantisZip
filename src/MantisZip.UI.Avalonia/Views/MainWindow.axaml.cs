@@ -47,6 +47,9 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
 
+        // 测试菜单仅 Debug 构建显示（Release 自动隐藏）
+        TestMenu.IsVisible = AppConstants.ShowTestMenu;
+
         // 窗口图标：从嵌入资源加载（与 WPF 版 Icon="/Resources/App.ico" 一致）
         try
         {

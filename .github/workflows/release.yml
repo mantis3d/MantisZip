@@ -156,7 +156,7 @@ jobs:
           # 自包含便携版（保持原名，向后兼容）
           New-PortableZip -Src "publish_output_selfcontained" -ZipName "MantisZip-$env:VERSION-Portable.zip"
           # framework-dependent 便携版
-          New-PortableZip -Src "publish_output" -ZipName "MantisZip-$env:VERSION-Portable-FrameworkDependent.zip"
+          New-PortableZip -Src "publish_output" -ZipName "MantisZip-$env:VERSION-Portable-Web.zip"
 
       - name: List installer artifacts
         shell: pwsh

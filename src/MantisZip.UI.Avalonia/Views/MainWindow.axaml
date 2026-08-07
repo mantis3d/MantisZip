@@ -290,7 +290,7 @@
           </MenuItem.Header>
         </MenuItem>
       </MenuItem>
-      <MenuItem>
+      <MenuItem x:Name="TestMenu">
         <MenuItem.Header>
           <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
             <PathIcon Data="{StaticResource IconEyedropper}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />

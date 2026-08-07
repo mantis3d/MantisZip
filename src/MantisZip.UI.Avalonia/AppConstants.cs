@@ -14,4 +14,14 @@ public static class AppConstants
     /// 状态栏显示的版本号（自动加 v 前缀）
     /// </summary>
     public static string VersionDisplay => "v" + Version;
+
+    /// <summary>
+    /// 是否显示主菜单的「测试」菜单（Debug 构建显示，Release 构建自动隐藏）
+    /// </summary>
+    public const bool ShowTestMenu =
+#if DEBUG
+        true;
+#else
+        false;
+#endif
 }

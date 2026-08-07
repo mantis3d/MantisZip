@@ -21,6 +21,12 @@
 
 ### MantisZip.UI.Avalonia（主力版）
 
+**2026-08-07** — 测试菜单仅 Debug 构建显示（Release 自动隐藏）
+  - **背景**：主菜单「测试」菜单（图标测试、各对话框预览入口）此前在所有构建中可见，正式发布不应暴露测试入口
+  - **方案**：`AppConstants.ShowTestMenu` 常量（`#if DEBUG` → true/false）；`MainWindow.axaml` 测试菜单加 `x:Name="TestMenu"`；`MainWindow` 构造函数 `TestMenu.IsVisible = AppConstants.ShowTestMenu`
+  - **效果**：本地开发（Debug 默认）显示，CI/发布（Release 配置，`ci.yml`/`release.yml` 均 `--configuration Release`）自动隐藏，编译期剔除
+  - 涉及文件：`AppConstants.cs`、`Views/MainWindow.axaml`、`Views/MainWindow.axaml.cs`；Release 构建 0 错误
+
 **2026-08-07** — 版本号更新到 0.5.0（AppConstants.cs + csproj，此前 csproj 落后为 0.4.4）
 
 **2026-08-07** — csproj 新增 CopySevenZipDll target（publish 后自动复制 7z.dll 到 x64/x86）
