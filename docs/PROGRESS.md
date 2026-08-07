@@ -21,6 +21,11 @@
 
 ### MantisZip.UI.Avalonia（主力版）
 
+**2026-08-07** — `path-manifest-unification.md` 方案重写为 A/B 数据集设计（预览=实际绝对一致）
+  - **触发**：用户测试发现压缩 Separate 模式目录名含点（`project.v2`）生成 `project.zip`（预览 `project.v2.zip`）；讨论中进一步挖出过滤语义分裂根因——预览保留完整树标 `IsFilteredOut` 灰显，执行侧 `FileFilterHelper.ApplyFilter` 却把目录展开成匹配文件列表 → 10 目录/1 万文件/过滤剩 1000 时 Separate 实际生成 **1000 个压缩包**（预览显示 10 个）
+  - **新设计**：A/B 数据集——A=过滤前路径数据集，B=过滤后压缩计划 `CompressPlanItem(SourcePath, OutputArchivePath, IncludedFiles)`；**过滤只算一次**，预览构建时从树派生 B 并缓存，执行只读 B（不重算输出路径、不重新过滤）；预览 A/B 切换复用现成 `ResultTreeView.ShowFilteredGhosts`（默认 false=只显示匹配，已核实）；按钮门禁 `IsBuildPending`（预览构建期间禁用确定按钮）保证 B 不过期；CLI 无 B → 同一 `CompressPathPlanner` 重算（公式同源无双轨）；输出包路径唯一实现收敛 Bug 2（目录源用完整目录名）；引擎加文件白名单（`ArchiveOptions.FileWhitelist` + `FileScanner` 透传 + SevenZip 过滤激活改走展开路径）修 Bug 3；解压侧 `FilteredEntryKeys` 即天然 B，仅修 Bug 1（ExtractFlow 空匹配降级全量 + ZipEngine key 未归一化三处，TarGz/SevenZip 已归一化）；包内条目路径=同公式保证（Phase 2 再闭环）
+  - 涉及文件：`.sisyphus/plans/path-manifest-unification.md`（重写）、`docs/PLAN.md`（P1 行同步，~2.5h→~4.5h）（仅文档，无代码变更）
+
 **2026-08-07** — CLI 解压"每次询问"不弹窗修复（ExtractFlow.ShowConflictDialogAsync 统一）
   - **根因**：CLI `RunCliExtractBatchWithProgressAsync` 调 `ExtractFlow.ExtractAsync` 时 `conflictDialog` 传 null → `Ask` 无 resolver → `FileConflictHelper.ResolveByAction` 落 `_ => outputPath`（Ask 被当作 Overwrite 直接覆盖）；主窗口路径有回调所以正常，CLI 从移植起缺这半截
   - **修复**：`ExtractFlow` 新增 `ShowConflictDialogAsync(owner, info)`（弹 ConflictDialog，含"取消整个操作"抛 OperationCanceledException、Rename 自定义名写回，与压缩侧 `CompressFlow.ShowConflictDialogAsync` 对称）；CLI 传 `info => ExtractFlow.ShowConflictDialogAsync(progressWindow, info)`；主窗口 `ShowExtractFileConflictDialogAsync` 回调简化为一行接线复用同一实现
