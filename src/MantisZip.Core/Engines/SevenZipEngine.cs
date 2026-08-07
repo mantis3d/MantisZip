@@ -496,10 +496,12 @@ public class SevenZipEngine : IArchiveEngine
                     files);
             }
 
+            // 压缩完成后必须把文件进度条也置满（仅 PercentComplete=100 时文件进度条会停在 accumulatedPercent）
             progress?.Report(new ArchiveProgress
             {
                 CurrentFile = string.Empty,
                 PercentComplete = 100,
+                FilePercentComplete = 100,
             });
 
             CoreLog.Info($"CompressAsync: done, {sw.ElapsedMilliseconds}ms");

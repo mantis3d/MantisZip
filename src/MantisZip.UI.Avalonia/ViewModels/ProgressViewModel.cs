@@ -319,6 +319,8 @@ public partial class ProgressViewModel : ObservableObject
         _batchItems[index].Status = BatchItemStatus.InProgress;
         _batchItems[index].Progress = 0;
         FileName = _batchItems[index].Name;
+        // 切换压缩包时重置文件进度条，避免残留上一个包未置满的脏值
+        FilePercentComplete = 0;
     }
 
     /// <summary>
@@ -334,7 +336,14 @@ public partial class ProgressViewModel : ObservableObject
         if (status == BatchItemStatus.Failed)
             _batchItems[index].ErrorMessage = errorMessage;
         if (status is BatchItemStatus.Skipped or BatchItemStatus.Completed)
+        {
             _batchItems[index].Progress = 100;
+            // 当前项完成/跳过时，文件进度条同步置满。
+            // 引擎不一定发出最终 FilePercentComplete=100（加密 ZIP 的 s7zAccumPct
+            // 累积到不了 100、7z 最终报告缺失等），UI 层在此兜底保证显示正确。
+            if (index == _currentBatchIndex)
+                FilePercentComplete = 100;
+        }
     }
 
     /// <summary>

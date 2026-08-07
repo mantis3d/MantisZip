@@ -552,6 +552,17 @@ public class ZipEngine : IArchiveEngine
                         s7zCompressor.CompressFilesEncrypted(outputPath, options.Password ?? "", sourceFilePaths);
                     }
 
+                    // SharpSevenZip 的 Compressing 事件 delta 累积通常达不到 100，
+                    // 压缩完成后必须补发最终报告，否则进度条停在最后一个文件的中间值。
+                    progress?.Report(new ArchiveProgress
+                    {
+                        CurrentFile = string.Empty,
+                        PercentComplete = 100,
+                        FilePercentComplete = 100,
+                        TotalFiles = totalFiles,
+                        ProcessedFiles = totalFiles,
+                    });
+
                     processedBytes = totalBytes;
                     processedFiles = totalFiles;
 

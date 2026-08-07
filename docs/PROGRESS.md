@@ -21,6 +21,12 @@
 
 ### MantisZip.UI.Avalonia（主力版）
 
+**2026-08-07** — 批处理压缩进度条停驻修复（压缩包完成时进度不到 100%）
+  - **触发**：用户测试发现批量压缩多个压缩包时，一个压缩包完成时其文件进度条停留在最后一个文件完成前的进度，而不是 100%
+  - **UI 层兜底**：`ProgressViewModel.UpdateBatchItemStatus` 在批处理项 Completed/Skipped 且为当前项时同步 `FilePercentComplete = 100`（此前只置列表行 `Progress = 100`，文件进度条从不补满）；`SetCurrentBatchItem` 切换压缩包时 `FilePercentComplete = 0` 重置，避免残留上一包的脏值
+  - **引擎层补漏**（见共享层条目）：加密 ZIP / 7z 压缩完成后补发最终 `PercentComplete=100, FilePercentComplete=100` 报告
+  - 涉及文件：`ViewModels/ProgressViewModel.cs`；构建 0 错误，测试 43/43 通过
+
 **2026-08-07** — `path-manifest-unification.md` 实施（A/B 数据集全链路落地，预览=实际绝对一致）
   - **B 数据集产物**：`CompressPlan.cs`（`CompressPlanItem(SourcePath, OutputArchivePath, IncludedFiles)`）+ `CompressPathPlanner.cs`（Core 唯一路径公式，目录源完整目录名语义，收敛 Bug 2）；`ResultPreviewService.BuildCompressPreview` 返回 `(PreviewTreeNode Root, CompressPlan Plan)` 双产物——过滤激活时按源收集匹配文件绝对路径（collectors 预置每源空清单）→ 构建后回填 B（目录无匹配 → 空清单非 null）；Separate 预览输出路径改取 B 的 `OutputArchivePath`（不再本地重算）
   - **执行侧消费 B**：`CompressRequest.Plan`；`CompressService.GetOutputPaths` B 优先；`CompressSeparateAsync` 逐项消费 `OutputArchivePath` + `IncludedFiles`→白名单（无 B legacy 回退）；`CompressSingleAsync` 合并全部 IncludedFiles 为单一白名单；`ArchiveOptions.FileWhitelist` + `FileScanner.CollectFiles` whitelist 参数 + Zip/TarGz 透传 + SevenZip 过滤激活改走展开路径（单目录快路径仅 `whitelist==null` 时启用）；`AddToArchiveAsync`（Zip/SevenZip）同样按白名单过滤，堵住「添加至已有压缩包」路径的预览≠实际漏洞
@@ -1112,6 +1118,11 @@
 ### 共享层（Core / ShellExt / 构建）
 
 这些变更影响两项目共用代码，按时间从新到旧排列。
+
+#### v0.4.5 (2026-08-07) 压缩引擎进度收尾报告补全（加密 ZIP / 7z 完成时进度不到 100%）
+  - **加密 ZIP**：`ZipEngine.CompressAsync` 的 SharpSevenZip 分支在 `CompressFilesEncrypted` 后补发最终 `ArchiveProgress { PercentComplete=100, FilePercentComplete=100 }`——此前 `Compressing` 事件的 `s7zAccumPct` delta 累积通常到不了 100 且压缩后无收尾报告，进度条停在最后一个文件中间值
+  - **7z**：`SevenZipEngine.CompressAsync` 最终报告（`PercentComplete=100`）补 `FilePercentComplete=100`，此前漏设导致文件进度条停在 accumulatedPercent
+  - 涉及文件：`src/MantisZip.Core/Engines/ZipEngine.cs`、`src/MantisZip.Core/Engines/SevenZipEngine.cs`；Core 0 警告 0 错误，测试 253/253 通过
 
 #### v0.4.5 (2026-08-07) 路径清单统一 Core 侧（A/B 数据集：压缩计划唯一事实来源 + 文件白名单）
   - 新增 `Core/Abstractions/CompressPlan.cs`（`CompressPlanItem(SourcePath, OutputArchivePath, IncludedFiles)`）与 `Core/Utils/CompressPathPlanner.cs`（输出包路径**唯一**公式：ComputeArchiveName/ComputeOutputPath/PlanSeparate/PlanSingle，目录源用完整目录名）
