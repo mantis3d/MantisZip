@@ -40,6 +40,9 @@ public partial class MainWindow : Window
     /// <summary>拖拽时写入数据对象的自定义格式名（使 IDataObject 非空，避免 Explorer 显示禁止光标）</summary>
     private const string MantisZipDragFormatName = "MantisZipDragFormat";
 
+    /// <summary>文件列表图标列的持久化标识（该列无 SortMemberPath，用 Tag="Icon" 标识以便持久化列位置）</summary>
+    private const string IconColumnTag = "Icon";
+
     /// <summary>拖拽期间是否被取消（Esc 或右键取消手势，由自实现 IDropSource.QueryContinueDrag 同步置位）</summary>
     private bool _dragCancelled;
 
@@ -327,14 +330,23 @@ public partial class MainWindow : Window
             fileGrid.AddHandler(InputElement.PointerPressedEvent, (s, e) =>
             {
                 _dragStartPoint = e.GetPosition(fileGrid);
+
+                // 命中测试：仅在按下位置命中数据行时才记录拖拽起点。
+                // 列标题（调整列宽/拖拽重排列）、空白区域、滚动条等按下不启动文件拖拽
+                // （镜像 WPF FileListGrid_PreviewMouseMove 的 row 空检查语义）。
+                var pressedItem = HitTestPressedRowItem(fileGrid, _dragStartPoint);
+                if (pressedItem == null)
+                {
+                    _dragStartEvent = null;
+                    _dragPreservedSelection = null;
+                    return;
+                }
                 _dragStartEvent = e;
 
-                // 命中测试：按下行是否已属于当前选区（镜像 WPF InputHitTest 语义）。
+                // 按下行是否已属于当前选区（镜像 WPF InputHitTest 语义）。
                 // Tunnel 阶段先于 DataGrid 行自身的选中处理，此时 SelectedItems 仍是旧选区；
                 // 若按下的是未选中行，则不保留旧多选区 —— 拖拽只拖新按下的行。
-                var pressedItem = HitTestPressedRowItem(fileGrid, _dragStartPoint);
-                var pressedInSelection = pressedItem != null
-                    && fileGrid.SelectedItems.Contains(pressedItem);
+                var pressedInSelection = fileGrid.SelectedItems.Contains(pressedItem);
 
                 // Save multi-selection state at press time (before drag starts)
                 if (fileGrid.SelectedItems.Count > 1 && pressedInSelection)
@@ -552,8 +564,9 @@ public partial class MainWindow : Window
     }
 
     /// <summary>
-    /// 将 window.json 中保存的列状态应用到 FileListGrid（按 ColumnId=SortMemberPath 匹配）。
-    /// 名称列不允许隐藏；无 SortMemberPath 的列（图标列）不参与。
+    /// 将 window.json 中保存的列状态应用到 FileListGrid（按 ColumnId=SortMemberPath 或 Tag 匹配）。
+    /// 名称列不允许隐藏；图标列（Tag="Icon"）参与持久化 —— 用户可拖拽调整其位置。
+    /// 旧版 JSON（图标列未参与持久化）时：图标列固定最左，其余列按相对顺序顺延。
     /// </summary>
     private void ApplyColumnStates(List<WindowStateManager.ColumnStateDto>? states)
     {
@@ -565,25 +578,53 @@ public partial class MainWindow : Window
             var columnDict = new Dictionary<string, DataGridColumn>();
             foreach (var col in FileListGrid.Columns)
             {
-                if (!string.IsNullOrEmpty(col.SortMemberPath) && !columnDict.ContainsKey(col.SortMemberPath))
-                    columnDict[col.SortMemberPath] = col;
+                var id = GetColumnId(col);
+                if (id != null && !columnDict.ContainsKey(id))
+                    columnDict[id] = col;
             }
 
-            // 按保存的 DisplayIndex 升序应用，避免设置顺序冲突
-            foreach (var state in states.Where(s => !string.IsNullOrEmpty(s.ColumnId))
-                                        .OrderBy(s => s.DisplayIndex))
+            // 新格式 JSON（含图标列状态）：按保存的 DisplayIndex 恢复全部列位置
+            if (states.Any(s => s.ColumnId == IconColumnTag))
             {
-                if (state.ColumnId == null || !columnDict.TryGetValue(state.ColumnId, out var col))
-                    continue;
+                foreach (var state in states.Where(s => !string.IsNullOrEmpty(s.ColumnId))
+                                            .OrderBy(s => s.DisplayIndex))
+                {
+                    if (state.ColumnId == null || !columnDict.TryGetValue(state.ColumnId, out var col))
+                        continue;
 
-                if (state.Width > 0)
-                    col.Width = new DataGridLength(state.Width);
+                    if (state.Width > 0)
+                        col.Width = new DataGridLength(state.Width);
 
-                // 名称列不可隐藏
-                if (state.ColumnId != "Name")
-                    col.IsVisible = state.Visible;
+                    // 名称列与图标列不可隐藏
+                    if (state.ColumnId != "Name" && state.ColumnId != IconColumnTag)
+                        col.IsVisible = state.Visible;
 
-                col.DisplayIndex = state.DisplayIndex;
+                    col.DisplayIndex = state.DisplayIndex;
+                }
+            }
+            else
+            {
+                // 旧格式 JSON（图标列此前不参与持久化，可能已被挤到中间）：
+                // 图标列强制回最左（DisplayIndex 0），其余列按保存的相对顺序从 1 开始顺延。
+                if (columnDict.TryGetValue(IconColumnTag, out var iconCol))
+                    iconCol.DisplayIndex = 0;
+
+                int nextIndex = 1;
+                foreach (var state in states.Where(s => !string.IsNullOrEmpty(s.ColumnId))
+                                            .OrderBy(s => s.DisplayIndex))
+                {
+                    if (state.ColumnId == null || !columnDict.TryGetValue(state.ColumnId, out var col))
+                        continue;
+
+                    if (state.Width > 0)
+                        col.Width = new DataGridLength(state.Width);
+
+                    // 名称列不可隐藏
+                    if (state.ColumnId != "Name")
+                        col.IsVisible = state.Visible;
+
+                    col.DisplayIndex = nextIndex++;
+                }
             }
         }
         catch (Exception ex)
@@ -593,8 +634,19 @@ public partial class MainWindow : Window
     }
 
     /// <summary>
-    /// 捕获 FileListGrid 各列的宽度/可见性/顺序快照（仅限有 SortMemberPath 的列），
-    /// 供 WindowStateManager.Save 持久化到 window.json。
+    /// 获取列的持久化标识：优先 SortMemberPath，其次 Tag（图标列 Tag="Icon"）。
+    /// </summary>
+    private static string? GetColumnId(DataGridColumn col)
+    {
+        if (!string.IsNullOrEmpty(col.SortMemberPath))
+            return col.SortMemberPath;
+        return col.Tag as string;
+    }
+
+    /// <summary>
+    /// 捕获 FileListGrid 各列的宽度/可见性/顺序快照（标识 = SortMemberPath 或 Tag），
+    /// 供 WindowStateManager.Save 持久化到 window.json。图标列（Tag="Icon"）一并保存，
+    /// 保证用户拖拽调整后的列位置（含图标列）能被正确恢复。
     /// </summary>
     private List<WindowStateManager.ColumnStateDto>? CaptureColumnStates()
     {
@@ -603,12 +655,13 @@ public partial class MainWindow : Window
             var states = new List<WindowStateManager.ColumnStateDto>();
             foreach (var col in FileListGrid.Columns)
             {
-                if (string.IsNullOrEmpty(col.SortMemberPath))
+                var id = GetColumnId(col);
+                if (id == null)
                     continue;
 
                 states.Add(new WindowStateManager.ColumnStateDto
                 {
-                    ColumnId = col.SortMemberPath,
+                    ColumnId = id,
                     Width = col.Width.Value,
                     Visible = col.IsVisible,
                     DisplayIndex = col.DisplayIndex
