@@ -37,7 +37,7 @@ jobs:
 
       - name: Publish (framework-dependent)
         run: >
-          dotnet publish src\MantisZip.UI\MantisZip.UI.csproj
+          dotnet publish src\MantisZip.UI.Avalonia\MantisZip.UI.Avalonia.csproj
           --no-restore --configuration Release
           --output publish_output
           -p:DebugType=portable
@@ -45,7 +45,7 @@ jobs:
 
       - name: Publish (self-contained, x64)
         run: >
-          dotnet publish src\MantisZip.UI\MantisZip.UI.csproj
+          dotnet publish src\MantisZip.UI.Avalonia\MantisZip.UI.Avalonia.csproj
           --no-restore --configuration Release
           --runtime win-x64 --self-contained
           --output publish_output_selfcontained
@@ -93,10 +93,6 @@ jobs:
           & $iscc "/dMyAppVersion=$env:VERSION" installer.iss
           if ($LASTEXITCODE -ne 0) { throw "ISCC compilation failed (exit code: $LASTEXITCODE)" }
           Write-Host "Installer built successfully"
-
-      - name: Download WebView2 Runtime (for offline installer)
-        shell: pwsh
-        run: installer\download-redist.ps1
 
       - name: Build self-contained installer
         shell: pwsh

@@ -21,6 +21,9 @@
 
 ### MantisZip.UI.Avalonia（主力版）
 
+**2026-08-07** — csproj 新增 CopySevenZipDll target（publish 后自动复制 7z.dll 到 x64/x86）
+  - 此前仅 WPF csproj 有该 target（publish 后调 `scripts/copy-7z-dll.ps1`）；Avalonia csproj 缺失导致发布产物无 7z.dll，安装包 7z 压缩不可用。已对齐（详见共享层「发布管线切 Avalonia」条目）
+
 **2026-08-07** — 应用图标接入（exe + 主窗口 + 关于窗口，此前完全缺失）
   - **背景**：Avalonia 版从移植起未配置任何图标（csproj 无 `ApplicationIcon`、窗口未设 `Icon`），任务栏/标题栏一直用默认图标；WPF 版三处均有（csproj + MainWindow + AboutWindow）。两项目 `Resources\App.ico` 经 MD5 校验为同一文件，无需替换内容
   - **exe 图标**：csproj 新增 `<ApplicationIcon>Resources\App.ico</ApplicationIcon>`（已验证构建产物可提取出 32×32 图标资源）
@@ -1124,6 +1127,15 @@
 ### 共享层（Core / ShellExt / 构建）
 
 这些变更影响两项目共用代码，按时间从新到旧排列。
+
+#### v0.4.5 (2026-08-07) 发布管线切 Avalonia（release.yml + 两个 installer + 7z.dll 打包）
+  - **背景**：WPF 进入维护模式，发布产物改为 Avalonia 版（`MantisZip.UI.Avalonia.exe`）。release.yml 两个 publish 步骤切到 `src\MantisZip.UI.Avalonia\MantisZip.UI.Avalonia.csproj`
+  - **installer.iss / installer-selfcontained.iss**：exe/pdb/deps/runtimeconfig 文件名切 Avalonia；语言文件路径 `Resources\strings.*.json` → `Localization\strings.{en,zh-CN}.json`（Avalonia 输出结构差异）；移除 WPF 专属 `Resources\App.ico`/`Resources\Icons\*.ico` 引用（App.ico 仅嵌入 avares），新增 `Resources\Cursors\*.cur`（拖拽光标运行时从磁盘加载）；SetupIconFile 指到 Avalonia 的 App.ico
+  - **.NET 检测**：`Microsoft.WindowsDesktop.App` → `Microsoft.NETCore.App`，下载 URL 改 `dotnet-runtime`（Avalonia 是 `net9.0` 非 windows TFM，仅需 .NET Runtime）
+  - **移除 WebView2**：Avalonia 当前 HTML/Markdown 走 ReverseMarkdown→原生控件树，不使用 WebView2 → 删除两个 installer 的 WebView2 检测/下载/离线捆绑逻辑（含 `installer\download-redist.ps1`）与 release.yml 对应步骤
+  - **7z.dll 打包**：Avalonia csproj 新增 `CopySevenZipDll` target（publish 后调 `scripts/copy-7z-dll.ps1` 复制到 x64/x86，与 WPF csproj 对齐），installer 依赖该输出
+  - **顺手修复既有 bug**：installer.iss 的 `MsgBox(..., MB_YESNOCANCEL + MB_ICONQUESTION)` 第二参数用 Win32 常量（Inno 6 期望 `TMsgBoxType` 枚举）→ 改 `mbConfirmation`，该错误此前一直被 WPF exe 缺失错误挡住，修复后 [Code] 段可正常编译
+  - 涉及文件：`.github/workflows/release.yml`、`installer.iss`、`installer-selfcontained.iss`、`src/MantisZip.UI.Avalonia/MantisZip.UI.Avalonia.csproj`、`installer/download-redist.ps1`（删除）；本地验证：Avalonia Release publish + 两个 ISCC 编译均成功
 
 #### v0.4.5 (2026-08-07) 压缩引擎进度收尾报告补全（加密 ZIP / 7z 完成时进度不到 100%）
   - **加密 ZIP**：`ZipEngine.CompressAsync` 的 SharpSevenZip 分支在 `CompressFilesEncrypted` 后补发最终 `ArchiveProgress { PercentComplete=100, FilePercentComplete=100 }`——此前 `Compressing` 事件的 `s7zAccumPct` delta 累积通常到不了 100 且压缩后无收尾报告，进度条停在最后一个文件中间值

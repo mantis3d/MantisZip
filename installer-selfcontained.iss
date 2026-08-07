@@ -2,9 +2,6 @@
 ; This installer bundles the .NET 9 runtime — no separate runtime install needed.
 ; Derived from installer.iss for framework-dependent builds.
 ; Requires Inno Setup 6
-;
-; Before compiling, run installer\download-redist.ps1 to download the
-; WebView2 Runtime Standalone Installer (required for offline installation).
 
 #define MyAppName "MantisZip"
 #ifndef MyAppVersion
@@ -12,7 +9,7 @@
 #endif
 #define MyAppPublisher "MantisZip Contributors"
 #define MyAppURL "https://github.com/mantis3d/MantisZip"
-#define MyAppExeName "MantisZip.UI.exe"
+#define MyAppExeName "MantisZip.UI.Avalonia.exe"
 
 [Setup]
 ; Must use a different AppId from the framework-dependent installer to avoid
@@ -35,7 +32,7 @@ WizardStyle=modern
 PrivilegesRequired=admin
 ArchitecturesInstallIn64BitMode=x64compatible
 ChangesEnvironment=yes
-SetupIconFile=src\MantisZip.UI\Resources\App.ico
+SetupIconFile=src\MantisZip.UI.Avalonia\Resources\App.ico
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
@@ -70,15 +67,15 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 Source: "publish_output_selfcontained\*.dll"; DestDir: "{app}"; Flags: ignoreversion
 
 ; === Executables ===
-Source: "publish_output_selfcontained\MantisZip.UI.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "publish_output_selfcontained\MantisZip.UI.Avalonia.exe"; DestDir: "{app}"; Flags: ignoreversion
 
 ; === Debug symbols ===
 Source: "publish_output_selfcontained\MantisZip.Core.pdb"; DestDir: "{app}"; Flags: ignoreversion
-Source: "publish_output_selfcontained\MantisZip.UI.pdb"; DestDir: "{app}"; Flags: ignoreversion
+Source: "publish_output_selfcontained\MantisZip.UI.Avalonia.pdb"; DestDir: "{app}"; Flags: ignoreversion
 
 ; === Runtime config (required for .NET assembly resolution) ===
-Source: "publish_output_selfcontained\MantisZip.UI.deps.json"; DestDir: "{app}"; Flags: ignoreversion
-Source: "publish_output_selfcontained\MantisZip.UI.runtimeconfig.json"; DestDir: "{app}"; Flags: ignoreversion
+Source: "publish_output_selfcontained\MantisZip.UI.Avalonia.deps.json"; DestDir: "{app}"; Flags: ignoreversion
+Source: "publish_output_selfcontained\MantisZip.UI.Avalonia.runtimeconfig.json"; DestDir: "{app}"; Flags: ignoreversion
 
 ; === ShellExt COM host (dynamic context menu) ===
 Source: "publish_output_selfcontained\MantisZip.ShellExt.runtimeconfig.json"; DestDir: "{app}"; Flags: ignoreversion
@@ -87,12 +84,11 @@ Source: "publish_output_selfcontained\MantisZip.ShellExt.runtimeconfig.json"; De
 Source: "publish_output_selfcontained\x64\7z.dll"; DestDir: "{app}\x64"; Flags: ignoreversion
 Source: "publish_output_selfcontained\x86\7z.dll"; DestDir: "{app}\x86"; Flags: ignoreversion
 
-; === Resources (app icon, file type icons, context menu icons, localization) ===
-Source: "publish_output_selfcontained\Resources\App.ico"; DestDir: "{app}\Resources"; Flags: ignoreversion
-Source: "publish_output_selfcontained\Resources\Icons\*.ico"; DestDir: "{app}\Resources\Icons"; Flags: ignoreversion
+; === Resources (context menu icons, drag cursors, localization) ===
 Source: "publish_output_selfcontained\Resources\MenuIcons\*.ico"; DestDir: "{app}\Resources\MenuIcons"; Flags: ignoreversion
-Source: "publish_output_selfcontained\Resources\strings.en.json"; DestDir: "{app}\Resources"; Flags: ignoreversion
-Source: "publish_output_selfcontained\Resources\strings.zh.json"; DestDir: "{app}\Resources"; Flags: ignoreversion
+Source: "publish_output_selfcontained\Resources\Cursors\*.cur"; DestDir: "{app}\Resources\Cursors"; Flags: ignoreversion
+Source: "publish_output_selfcontained\Localization\strings.en.json"; DestDir: "{app}\Localization"; Flags: ignoreversion
+Source: "publish_output_selfcontained\Localization\strings.zh-CN.json"; DestDir: "{app}\Localization"; Flags: ignoreversion
 Source: "publish_output_selfcontained\Resources\languages.json"; DestDir: "{app}\Resources"; Flags: ignoreversion
 
 ; === Contributor CSV files (compiled into AboutWindow) ===
@@ -102,12 +98,6 @@ Source: "publish_output_selfcontained\contributors-financial.csv"; DestDir: "{ap
 ; === License files ===
 ; 7z.dll (SharpSevenZip) is distributed under GNU Lesser General Public License
 Source: "lgpl.txt"; DestDir: "{app}"; Flags: ignoreversion
-; Microsoft Edge WebView2 Runtime — redistributed under Microsoft Software License Terms
-Source: "WebView2-LICENSE.txt"; DestDir: "{app}"; Flags: ignoreversion
-
-; === WebView2 Runtime Standalone Installer (offline installation for systems without WebView2) ===
-; Pre-download from https://go.microsoft.com/fwlink/p/?LinkId=2124701 (x64)
-Source: "installer\redist\MicrosoftEdgeWebView2RuntimeInstallerX64.exe"; DestDir: "{tmp}"; Flags: deleteafterinstall
 
 ; === Prebuilt user settings (copied to %LOCALAPPDATA% on fresh install) ===
 ; Replace files in installer\prebuilt\ with your own settings from %LOCALAPPDATA%\MantisZip\
@@ -126,9 +116,6 @@ Filename: "{app}\{#MyAppExeName}"; Parameters: "--uninstall-shell"; Flags: runhi
 Filename: "{app}\{#MyAppExeName}"; Parameters: "--uninstall-assoc"; Flags: runhidden; WorkingDir: "{app}"
 
 [Code]
-const
-  WebView2RegKey = 'SOFTWARE\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}';
-
 var
   // Custom wizard page controls
   WPConfigPage: TWizardPage;
@@ -345,40 +332,9 @@ begin
   CreateConfigPage;
 end;
 
-// Check if WebView2 Runtime is already installed.
-// Checks multiple registry locations and confirms a version value exists (not just a key).
-// Also validates the WebView2Loader.dll file exists on disk to guard against
-// stale registry entries from aborted/corrupted installations.
-function IsWebView2Installed: Boolean;
-var
-  version: string;
-  loaderPath: string;
-begin
-  // 64-bit view (HKLM) or HKCU
-  Result := RegQueryStringValue(HKLM, WebView2RegKey, 'pv', version) or
-            RegQueryStringValue(HKCU, WebView2RegKey, 'pv', version);
-  // 32-bit (WOW6432Node) view — WebView2 installer often registers here on 64-bit Windows
-  if not Result then
-    Result := RegQueryStringValue(HKLM32, WebView2RegKey, 'pv', version);
-  if Result then
-  begin
-    // Double-check: registry key is present, but are the actual runtime files intact?
-    // WebView2 Runtime (x64) installs to {commonpf64}\Microsoft Edge WebView2 Runtime\
-    loaderPath := ExpandConstant('{commonpf64}') + '\Microsoft Edge WebView2 Runtime\WebView2Loader.dll';
-    if not FileExists(loaderPath) then
-    begin
-      Log('WebView2 registry key found but WebView2Loader.dll is missing at: ' + loaderPath + ' — treating as not installed');
-      Result := False;
-    end;
-  end;
-end;
-
-// Install WebView2 Runtime from bundled package before app starts
 // Write installer settings to AppData after install completes
 procedure CurStepChanged(CurStep: TSetupStep);
 var
-  BootstrapperPath: string;
-  ResultCode: Integer;
   Json: string;
   SettingsDir: string;
   SettingsFile: string;
@@ -386,25 +342,6 @@ var
 begin
   if CurStep = ssPostInstall then
   begin
-    // 从本地捆绑包安装 WebView2 Runtime（完全离线安装）
-    // 文件已通过 [Files] 段提取到 {tmp}
-    if not IsWebView2Installed then
-    begin
-      BootstrapperPath := ExpandConstant('{tmp}\MicrosoftEdgeWebView2RuntimeInstallerX64.exe');
-      Log('WebView2 Runtime not found. Installing from bundled package...');
-      if Exec(BootstrapperPath, '/silent /install', '', SW_SHOW, ewWaitUntilTerminated, ResultCode) then
-      begin
-        if ResultCode = 0 then
-          Log('WebView2 Runtime installed successfully.')
-        else
-          Log('WebView2 Runtime installer exited with code: ' + IntToStr(ResultCode));
-      end
-      else
-        Log('Failed to launch WebView2 installer. The system may not be supported (x64 required).');
-    end
-    else
-      Log('WebView2 Runtime is already installed.');
-
     // Shell integration deferred to first user launch (non-elevated context).
     // SHChangeNotify from an elevated (installer) process does NOT propagate
     // to the non-elevated Explorer.exe, so dynamic COM context menus appear

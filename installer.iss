@@ -7,7 +7,7 @@
 #endif
 #define MyAppPublisher "MantisZip Contributors"
 #define MyAppURL "https://github.com/mantis3d/MantisZip"
-#define MyAppExeName "MantisZip.UI.exe"
+#define MyAppExeName "MantisZip.UI.Avalonia.exe"
 
 [Setup]
 AppId={{F7A3C8E1-2D4B-4A9F-9C6E-8B5D7A3F2E1C}
@@ -28,7 +28,7 @@ WizardStyle=modern
 PrivilegesRequired=admin
 ArchitecturesInstallIn64BitMode=x64compatible
 ChangesEnvironment=yes
-SetupIconFile=src\MantisZip.UI\Resources\App.ico
+SetupIconFile=src\MantisZip.UI.Avalonia\Resources\App.ico
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
@@ -46,11 +46,11 @@ english.InstallShell=Add to Windows context menu
 english.AssocGroup=File type associations
 
 ; Download confirmation dialog (shown when dependencies are missing)
-english.DownloadConfirmMsg=MantisZip requires .NET 9 Runtime and/or WebView2 Runtime, which are not installed on your system.%n%nDo you want to download and install them automatically?%n%n• Yes — Download dependencies and continue setup%n• No — Skip download and continue setup without dependencies%n• Cancel — Exit the installer
+english.DownloadConfirmMsg=MantisZip requires .NET 9 Runtime, which is not installed on your system.%n%nDo you want to download and install it automatically?%n%n• Yes — Download dependency and continue setup%n• No — Skip download and continue setup without the dependency%n• Cancel — Exit the installer
 
 ; Download page (shown after user confirms download)
-english.DownloadPageCaption=Download required components
-english.DownloadPageDescription=MantisZip requires .NET 9 Runtime and WebView2 Runtime to run. They will be downloaded automatically.
+english.DownloadPageCaption=Download required component
+english.DownloadPageDescription=MantisZip requires .NET 9 Runtime to run. It will be downloaded automatically.
 
 ; Chinese (Simplified)
 chinese.ConfigPageTitle=安装配置
@@ -63,11 +63,11 @@ chinese.InstallShell=添加到 Windows 右键菜单
 chinese.AssocGroup=文件关联
 
 ; Download confirmation dialog (shown when dependencies are missing)
-chinese.DownloadConfirmMsg=MantisZip 需要 .NET 9 运行时和/或 WebView2 运行时，但您的系统尚未安装。%n%n是否要自动下载并安装这些依赖？%n%n• 是 — 下载依赖并继续安装%n• 否 — 跳过下载，继续安装（不安装依赖）%n• 取消 — 退出安装程序
+chinese.DownloadConfirmMsg=MantisZip 需要 .NET 9 运行时，但您的系统尚未安装。%n%n是否要自动下载并安装该依赖？%n%n• 是 — 下载依赖并继续安装%n• 否 — 跳过下载，继续安装（不安装依赖）%n• 取消 — 退出安装程序
 
 ; Download page (shown after user confirms download)
 chinese.DownloadPageCaption=正在下载必要组件
-chinese.DownloadPageDescription=MantisZip 需要 .NET 9 运行时和 WebView2 运行时才能运行。正在自动下载中。
+chinese.DownloadPageDescription=MantisZip 需要 .NET 9 运行时才能运行。正在自动下载中。
 
 [Tasks]
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"
@@ -77,15 +77,15 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 Source: "publish_output\*.dll"; DestDir: "{app}"; Flags: ignoreversion
 
 ; === Executables ===
-Source: "publish_output\MantisZip.UI.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "publish_output\MantisZip.UI.Avalonia.exe"; DestDir: "{app}"; Flags: ignoreversion
 
 ; === Debug symbols ===
 Source: "publish_output\MantisZip.Core.pdb"; DestDir: "{app}"; Flags: ignoreversion
-Source: "publish_output\MantisZip.UI.pdb"; DestDir: "{app}"; Flags: ignoreversion
+Source: "publish_output\MantisZip.UI.Avalonia.pdb"; DestDir: "{app}"; Flags: ignoreversion
 
 ; === Runtime config (required for .NET assembly resolution) ===
-Source: "publish_output\MantisZip.UI.deps.json"; DestDir: "{app}"; Flags: ignoreversion
-Source: "publish_output\MantisZip.UI.runtimeconfig.json"; DestDir: "{app}"; Flags: ignoreversion
+Source: "publish_output\MantisZip.UI.Avalonia.deps.json"; DestDir: "{app}"; Flags: ignoreversion
+Source: "publish_output\MantisZip.UI.Avalonia.runtimeconfig.json"; DestDir: "{app}"; Flags: ignoreversion
 
 ; === ShellExt COM host (dynamic context menu) — runtimeconfig.json required for COM activation ===
 Source: "publish_output\MantisZip.ShellExt.runtimeconfig.json"; DestDir: "{app}"; Flags: ignoreversion
@@ -94,12 +94,11 @@ Source: "publish_output\MantisZip.ShellExt.runtimeconfig.json"; DestDir: "{app}"
 Source: "publish_output\x64\7z.dll"; DestDir: "{app}\x64"; Flags: ignoreversion
 Source: "publish_output\x86\7z.dll"; DestDir: "{app}\x86"; Flags: ignoreversion
 
-; === Resources (app icon, file type icons, context menu icons, localization) ===
-Source: "publish_output\Resources\App.ico"; DestDir: "{app}\Resources"; Flags: ignoreversion
-Source: "publish_output\Resources\Icons\*.ico"; DestDir: "{app}\Resources\Icons"; Flags: ignoreversion
+; === Resources (file type icons, context menu icons, drag cursors, localization) ===
 Source: "publish_output\Resources\MenuIcons\*.ico"; DestDir: "{app}\Resources\MenuIcons"; Flags: ignoreversion
-Source: "publish_output\Resources\strings.en.json"; DestDir: "{app}\Resources"; Flags: ignoreversion
-Source: "publish_output\Resources\strings.zh.json"; DestDir: "{app}\Resources"; Flags: ignoreversion
+Source: "publish_output\Resources\Cursors\*.cur"; DestDir: "{app}\Resources\Cursors"; Flags: ignoreversion
+Source: "publish_output\Localization\strings.en.json"; DestDir: "{app}\Localization"; Flags: ignoreversion
+Source: "publish_output\Localization\strings.zh-CN.json"; DestDir: "{app}\Localization"; Flags: ignoreversion
 Source: "publish_output\Resources\languages.json"; DestDir: "{app}\Resources"; Flags: ignoreversion
 
 ; === Contributor CSV files (generated by GitHub Actions) ===
@@ -127,10 +126,8 @@ Filename: "{app}\{#MyAppExeName}"; Parameters: "--uninstall-assoc"; Flags: runhi
 
 [Code]
 const
-  WebView2RegKey = 'SOFTWARE\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}';
-  EvergreenBootstrapperUrl = 'https://go.microsoft.com/fwlink/p/?LinkId=2124703';
-  DotNet9RegKey = 'SOFTWARE\dotnet\Setup\InstalledVersions\x64\sharedfx\Microsoft.WindowsDesktop.App';
-  DotNet9RuntimeUrl = 'https://aka.ms/dotnet/9.0/windowsdesktop-runtime-win-x64.exe';
+  DotNet9RegKey = 'SOFTWARE\dotnet\Setup\InstalledVersions\x64\sharedfx\Microsoft.NETCore.App';
+  DotNet9RuntimeUrl = 'https://aka.ms/dotnet/9.0/dotnet-runtime-win-x64.exe';
 
 var
   // Custom wizard page controls
@@ -357,40 +354,11 @@ begin
   CreateConfigPage;
 end;
 
-// Check if WebView2 Runtime is already installed.
-// Checks multiple registry locations and confirms a version value exists (not just a key).
-// Also validates the WebView2Loader.dll file exists on disk to guard against
-// stale registry entries from aborted/corrupted installations.
-function IsWebView2Installed: Boolean;
-var
-  version: string;
-  loaderPath: string;
-begin
-  // NOTE: This installer is 32-bit. On 64-bit Windows, HKLM is
-  // redirected to WOW6432Node — use HKLM64 for the native 64-bit view.
-  // Fall back to HKLM (32-bit view) since WebView2 may register there.
-  Result := RegQueryStringValue(HKLM64, WebView2RegKey, 'pv', version) or
-            RegQueryStringValue(HKCU, WebView2RegKey, 'pv', version) or
-            RegQueryStringValue(HKLM, WebView2RegKey, 'pv', version);
-  if Result then
-  begin
-    // Double-check: registry key is present, but are the actual runtime files intact?
-    // WebView2 Runtime (x64) installs to {commonpf64}\Microsoft Edge WebView2 Runtime\
-    loaderPath := ExpandConstant('{commonpf64}') + '\Microsoft Edge WebView2 Runtime\WebView2Loader.dll';
-    if not FileExists(loaderPath) then
-    begin
-      Log('WebView2 registry key found but WebView2Loader.dll is missing at: ' + loaderPath + ' — treating as not installed');
-      Result := False;
-    end;
-  end;
-end;
-
-// Check if .NET 9 Desktop Runtime is already installed.
+// Check if .NET 9 Runtime is already installed.
 // Checks both registry (subkey-based) and filesystem (runtime directory).
 // NOTE: .NET 9 stores version info as registry *value names* (DWORD) rather
 // than subkeys, so RegGetSubkeyNames is unreliable. We fall back to checking
-// whether a "9.*" subdirectory exists under the dotnet WindowsDesktop.App
-// shared runtime folder.
+// whether a "9.*" subdirectory exists under the dotnet shared runtime folder.
 function IsDotNet9Installed: Boolean;
 var
   subkeys: TArrayOfString;
@@ -433,12 +401,12 @@ begin
   // Final fallback: check filesystem for a 9.x runtime directory.
   // .NET 9 stores version as value names (DWORD) under the sharedfx key,
   // which RegGetSubkeyNames cannot enumerate. The runtime DLLs are always
-  // present on disk under {commonpf64}\dotnet\shared\Microsoft.WindowsDesktop.App\9.*\.
+  // present on disk under {commonpf64}\dotnet\shared\Microsoft.NETCore.App\9.*\.
   if not Result then
   begin
     TmpFile := ExpandConstant('{tmp}\dotnet_ver_check.txt');
     if Exec(ExpandConstant('{cmd}'), '/c dir /b /ad "' +
-        ExpandConstant('{commonpf64}') + '\dotnet\shared\Microsoft.WindowsDesktop.App\9.*" 2>nul > "' +
+        ExpandConstant('{commonpf64}') + '\dotnet\shared\Microsoft.NETCore.App\9.*" 2>nul > "' +
         TmpFile + '"', '', SW_HIDE, ewWaitUntilTerminated, ResultCode) and (ResultCode = 0) then
     begin
       if LoadStringFromFile(TmpFile, Content) and (Trim(Content) <> '') then
@@ -462,18 +430,13 @@ begin
       DownloadPage.Add(DotNet9RuntimeUrl, 'dotnet-runtime-9.0-win-x64.exe', '');
       NeedDownload := True;
     end;
-    if not IsWebView2Installed then
-    begin
-      DownloadPage.Add(EvergreenBootstrapperUrl, 'MicrosoftEdgeWebview2Setup.exe', '');
-      NeedDownload := True;
-    end;
 
     // Only show the download page if there are items to download.
     if NeedDownload then
     begin
-      case MsgBox(CustomMessage('DownloadConfirmMsg'), MB_YESNOCANCEL + MB_ICONQUESTION) of
+      case MsgBox(CustomMessage('DownloadConfirmMsg'), mbConfirmation, MB_YESNOCANCEL) of
         IDYES: begin
-          // User chose to download dependencies — show download page
+          // User chose to download dependency — show download page
           DownloadPage.Show;
           try
             try
@@ -487,7 +450,7 @@ begin
           end;
         end;
         IDNO: begin
-          // User chose to skip download — continue installation without dependencies
+          // User chose to skip download — continue installation without dependency
           Log('User chose to skip dependency download.');
           Result := True;
         end;
@@ -502,7 +465,7 @@ begin
     Result := True;
 end;
 
-// Install runtimes (already downloaded via DownloadPage)
+// Install runtime (already downloaded via DownloadPage)
 // Write installer settings to AppData after install completes
 procedure CurStepChanged(CurStep: TSetupStep);
 var
@@ -516,19 +479,19 @@ var
 begin
   if CurStep = ssPostInstall then
   begin
-    // 1. First: .NET 9 Desktop Runtime (more critical — app won't start without it)
+    // 1. .NET 9 Runtime (more critical — app won't start without it)
     // File was already downloaded via DownloadPage before installation began.
     if not IsDotNet9Installed then
     begin
       BootstrapperPath := ExpandConstant('{tmp}\dotnet-runtime-9.0-win-x64.exe');
       if FileExists(BootstrapperPath) then
       begin
-        Log('Installing .NET 9 Desktop Runtime...');
+        Log('Installing .NET 9 Runtime...');
         if Exec(BootstrapperPath, '/quiet /install /norestart', '', SW_SHOW, ewWaitUntilTerminated, ResultCode) then
         begin
           if ResultCode = 0 then
           begin
-            Log('.NET 9 Desktop Runtime installed successfully.');
+            Log('.NET 9 Runtime installed successfully.');
             // Wait for .NET registry registration to complete before running
             // shell/assoc registration (which also launch MantisZip.exe).
             // The installer process exits before the registry is fully synced.
@@ -544,7 +507,7 @@ begin
               Log('.NET registration not detected after ~30s, proceeding anyway');
           end
           else
-            Log('.NET 9 Desktop Runtime installer exited with code: ' + IntToStr(ResultCode));
+            Log('.NET 9 Runtime installer exited with code: ' + IntToStr(ResultCode));
         end
         else
           Log('Failed to launch .NET 9 bootstrapper.');
@@ -553,32 +516,9 @@ begin
         Log('.NET 9 bootstrapper not found. Download may have failed; user may need to install manually.');
     end
     else
-      Log('.NET 9 Desktop Runtime is already installed.');
+      Log('.NET 9 Runtime is already installed.');
 
-    // 2. Then: WebView2 Runtime
-    if not IsWebView2Installed then
-    begin
-      BootstrapperPath := ExpandConstant('{tmp}\MicrosoftEdgeWebview2Setup.exe');
-      if FileExists(BootstrapperPath) then
-      begin
-        Log('Installing WebView2 Runtime...');
-        if Exec(BootstrapperPath, '/silent /install', '', SW_SHOW, ewWaitUntilTerminated, ResultCode) then
-        begin
-          if ResultCode = 0 then
-            Log('WebView2 Runtime installed successfully.')
-          else
-            Log('WebView2 Runtime installer exited with code: ' + IntToStr(ResultCode));
-        end
-        else
-          Log('Failed to launch WebView2 bootstrapper.');
-      end
-      else
-        Log('WebView2 bootstrapper not found. Download may have failed; user may need to install manually.');
-    end
-    else
-      Log('WebView2 Runtime is already installed.');
-
-    // 3. Shell integration deferred to first user launch (non-elevated context).
+    // 2. Shell integration deferred to first user launch (non-elevated context).
     //    SHChangeNotify from an elevated (installer) process does NOT propagate
     //    to the non-elevated Explorer.exe, so dynamic COM context menus appear
     //    missing until reinstalled from MantisZip's Settings window.
