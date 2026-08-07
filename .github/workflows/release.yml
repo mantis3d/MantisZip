@@ -123,6 +123,9 @@ jobs:
           # 便携版打包（两个变体：自包含 + framework-dependent）
           # 自包含：捆绑 .NET 9 运行时，开箱即用（体积大）
           # framework-dependent：需系统预装 .NET 9 Runtime（体积小）
+          # 用 7z 打包（CI 已装 7-Zip）：保持目录结构 + 排除调试符号（*.pdb，
+          # 运行时不需要，且第三方原生库符号 libSkiaSharp.pdb 等达 100MB+）
+          $sevenZipExe = "$env:ProgramFiles\7-Zip\7z.exe"
           function New-PortableZip([string]$Src, [string]$ZipName) {
             # Portable.txt sentinel file
             "" | Out-File -FilePath "$Src\Portable.txt" -Encoding ascii
@@ -136,7 +139,17 @@ jobs:
             } else {
               Write-Host "7z.dll not found, 7z compression will not be available"
             }
-            Compress-Archive -Path "$Src\*" -DestinationPath $ZipName -CompressionLevel Optimal
+            Remove-Item $ZipName -ErrorAction SilentlyContinue
+            # 进入源目录打包，避免 zip 内出现 publish_output 前缀（便携包解压即用）
+            # 先解析 zip 输出为绝对路径（当前工作目录 = 仓库根），Push-Location 后仍指向根
+            $zipFullPath = (Join-Path (Get-Location) $ZipName)
+            Push-Location $Src
+            try {
+              & $sevenZipExe a -tzip -mx=9 $zipFullPath "*" "-xr!*.pdb" | Out-Null
+              if ($LASTEXITCODE -ne 0) { throw "7z archive failed for $ZipName" }
+            } finally {
+              Pop-Location
+            }
             Write-Host "Portable zip created: $ZipName ($((Get-Item $ZipName).Length / 1MB -as [int]) MB)"
           }
 

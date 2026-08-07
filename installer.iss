@@ -79,10 +79,6 @@ Source: "publish_output\*.dll"; DestDir: "{app}"; Flags: ignoreversion
 ; === Executables ===
 Source: "publish_output\MantisZip.UI.Avalonia.exe"; DestDir: "{app}"; Flags: ignoreversion
 
-; === Debug symbols ===
-Source: "publish_output\MantisZip.Core.pdb"; DestDir: "{app}"; Flags: ignoreversion
-Source: "publish_output\MantisZip.UI.Avalonia.pdb"; DestDir: "{app}"; Flags: ignoreversion
-
 ; === Runtime config (required for .NET assembly resolution) ===
 Source: "publish_output\MantisZip.UI.Avalonia.deps.json"; DestDir: "{app}"; Flags: ignoreversion
 Source: "publish_output\MantisZip.UI.Avalonia.runtimeconfig.json"; DestDir: "{app}"; Flags: ignoreversion

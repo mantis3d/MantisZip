@@ -1133,6 +1133,13 @@
 
 这些变更影响两项目共用代码，按时间从新到旧排列。
 
+#### v0.5.0 (2026-08-07) 发布物移除调试符号（PDB）
+  - **背景**：便携包打包用 `Compress-Archive "$Src\*"` 全量打包，把 publish 生成的 PDB 全带上了（含第三方原生库 `libSkiaSharp.pdb` 80MB + `libHarfBuzzSharp.pdb` 22MB）；installer 也显式打包应用自身 `MantisZip.Core.pdb` + `MantisZip.UI.Avalonia.pdb`
+  - **结论**：PDB 运行时完全不需要；第三方原生库符号在微软 symbol server 公开（用户无价值），应用自身符号也应按现代发行惯例由开发者自留（崩溃报告用版本号匹配）
+  - **便携包**：`New-PortableZip` 改用 7z 打包（CI 已装 7-Zip）——`7z a -tzip -mx=9` + `-xr!*.pdb` 排除全部 PDB，且 `Push-Location $Src` 避免 zip 内出现 `publish_output` 前缀（解压即用）；压缩比更高（Compress-Archive Optimal → 7z -mx=9）。自包含 85.2→**53.8MB**、framework-dependent 51→**22MB**
+  - **installer**：installer.iss / installer-selfcontained.iss 移除 Debug symbols 段（两个 PDB 引用）；WebSetup 17.9→17.5MB、Offline 41.3→41.1MB
+  - 涉及文件：`.github/workflows/release.yml`、`installer.iss`、`installer-selfcontained.iss`；本地验证两便携包 PDB=0、无目录前缀、关键文件齐全；两 installer 编译成功
+
 #### v0.5.0 (2026-08-07) 便携版双变体 + WebSetup native 库缺失修复
   - **双便携版**：release.yml 的 portable 打包步骤改为生成两个——自包含（`-Portable.zip`，捆绑 .NET 9 运行时，85MB）+ framework-dependent（`-Portable-FrameworkDependent.zip`，需系统预装 .NET 9，51MB）；Create Release 资产收集通配符改 `*-Portable*.zip`
   - **修复 WebSetup 缺 native 库（既有 bug）**：release.yml 的 framework-dependent publish 原本不带 RID（`net9.0` 跨平台 TFM）→ 输出全平台 runtimes（linux/osx/arm 等 632MB 垃圾），且 native 库（libSkiaSharp.dll 等）落在 `runtimes\win-x64\native\` 子目录，而 installer.iss 的 `publish_output\*.dll` 只匹配根目录 → **WebSetup 安装包缺 SkiaSharp/HarfBuzzSharp native，装上无法运行**（11.7MB 异常偏小）。改为 `--runtime win-x64` 后 native 进根目录，通配符覆盖，WebSetup 增至 17.9MB（已用 ISCC 日志确认 libSkiaSharp.dll/libHarfBuzzSharp.dll/av_libglesv2.dll/e_sqlite3.dll 均打包）
