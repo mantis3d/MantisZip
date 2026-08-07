@@ -21,6 +21,14 @@
 
 ### MantisZip.UI.Avalonia（主力版）
 
+**2026-08-07** — `path-manifest-unification.md` 实施（A/B 数据集全链路落地，预览=实际绝对一致）
+  - **B 数据集产物**：`CompressPlan.cs`（`CompressPlanItem(SourcePath, OutputArchivePath, IncludedFiles)`）+ `CompressPathPlanner.cs`（Core 唯一路径公式，目录源完整目录名语义，收敛 Bug 2）；`ResultPreviewService.BuildCompressPreview` 返回 `(PreviewTreeNode Root, CompressPlan Plan)` 双产物——过滤激活时按源收集匹配文件绝对路径（collectors 预置每源空清单）→ 构建后回填 B（目录无匹配 → 空清单非 null）；Separate 预览输出路径改取 B 的 `OutputArchivePath`（不再本地重算）
+  - **执行侧消费 B**：`CompressRequest.Plan`；`CompressService.GetOutputPaths` B 优先；`CompressSeparateAsync` 逐项消费 `OutputArchivePath` + `IncludedFiles`→白名单（无 B legacy 回退）；`CompressSingleAsync` 合并全部 IncludedFiles 为单一白名单；`ArchiveOptions.FileWhitelist` + `FileScanner.CollectFiles` whitelist 参数 + Zip/TarGz 透传 + SevenZip 过滤激活改走展开路径（单目录快路径仅 `whitelist==null` 时启用）；`AddToArchiveAsync`（Zip/SevenZip）同样按白名单过滤，堵住「添加至已有压缩包」路径的预览≠实际漏洞
+  - **流程接线**：`CompressFlow.BuildRequest` 改消费 `vm.GetPlanForExecution()`（过滤激活丢弃空匹配项、全空 → null；SourcePaths 保持目录粒度；`KeepOriginalExtension` 改读 VM——主窗口拷贝块补此前漏拷 + 末尾 `cvm.AdoptPlan(...)` 接管 B）；CLI `--compress` 对话框 VM 自带 Plan 走同一 BuildRequest，quick/separate/combined 直构 request 无 B → 同一 planner 重算（无双轨）
+  - **按钮门禁**：压缩/解压两侧 VM 加 `IsBuildPending`（快慢构建都置位，版本号守卫 finally 清除）→ `CanExecuteStartCompress` / `CanExecuteExtract` 首查，B 未就绪时确定按钮禁用
+  - **解压侧 Bug 1 修复**：`ExtractFlow` 改 `filteredKeys != null`（空匹配列表 = 有意零解压，绝不回退全量）；`ZipEngine.ExtractEntriesAsync` 三处 key 匹配补 `ArchivePath.Normalize`（totalBytes/filteredEntries/outputPathOverrides，TarGz/SevenZip 已归一化）
+  - 涉及文件：Core（CompressPlan/CompressPathPlanner 新增；ArchiveEngine/FileScanner/ZipEngine/TarGzEngine/SevenZipEngine/CompressService）+ Avalonia（ResultPreviewService/CompressFlow/ExtractFlow/CompressSettingsViewModel/ExtractSettingsViewModel/CompressSettingsWindow/MainWindow）；全解决方案 0 错误，测试 253/253 通过
+
 **2026-08-07** — `path-manifest-unification.md` 方案重写为 A/B 数据集设计（预览=实际绝对一致）
   - **触发**：用户测试发现压缩 Separate 模式目录名含点（`project.v2`）生成 `project.zip`（预览 `project.v2.zip`）；讨论中进一步挖出过滤语义分裂根因——预览保留完整树标 `IsFilteredOut` 灰显，执行侧 `FileFilterHelper.ApplyFilter` 却把目录展开成匹配文件列表 → 10 目录/1 万文件/过滤剩 1000 时 Separate 实际生成 **1000 个压缩包**（预览显示 10 个）
   - **新设计**：A/B 数据集——A=过滤前路径数据集，B=过滤后压缩计划 `CompressPlanItem(SourcePath, OutputArchivePath, IncludedFiles)`；**过滤只算一次**，预览构建时从树派生 B 并缓存，执行只读 B（不重算输出路径、不重新过滤）；预览 A/B 切换复用现成 `ResultTreeView.ShowFilteredGhosts`（默认 false=只显示匹配，已核实）；按钮门禁 `IsBuildPending`（预览构建期间禁用确定按钮）保证 B 不过期；CLI 无 B → 同一 `CompressPathPlanner` 重算（公式同源无双轨）；输出包路径唯一实现收敛 Bug 2（目录源用完整目录名）；引擎加文件白名单（`ArchiveOptions.FileWhitelist` + `FileScanner` 透传 + SevenZip 过滤激活改走展开路径）修 Bug 3；解压侧 `FilteredEntryKeys` 即天然 B，仅修 Bug 1（ExtractFlow 空匹配降级全量 + ZipEngine key 未归一化三处，TarGz/SevenZip 已归一化）；包内条目路径=同公式保证（Phase 2 再闭环）
@@ -1105,6 +1113,13 @@
 
 这些变更影响两项目共用代码，按时间从新到旧排列。
 
+#### v0.4.5 (2026-08-07) 路径清单统一 Core 侧（A/B 数据集：压缩计划唯一事实来源 + 文件白名单）
+  - 新增 `Core/Abstractions/CompressPlan.cs`（`CompressPlanItem(SourcePath, OutputArchivePath, IncludedFiles)`）与 `Core/Utils/CompressPathPlanner.cs`（输出包路径**唯一**公式：ComputeArchiveName/ComputeOutputPath/PlanSeparate/PlanSingle，目录源用完整目录名）
+  - `ArchiveOptions.FileWhitelist`（文件白名单，过滤激活时只压匹配文件）；`FileScanner.CollectFiles` 加 whitelist 参数；ZipEngine/TarGzEngine 透传、SevenZipEngine 过滤激活改走展开路径（单目录快路径仅 whitelist==null 启用）；`AddToArchiveAsync`（Zip/SevenZip）同样按白名单过滤（堵「添加至已有压缩包」路径预览≠实际漏洞）
+  - `CompressRequest.Plan`；`CompressService.GetOutputPaths` B 优先、`CompressSeparateAsync` 逐项消费 OutputArchivePath+IncludedFiles（无 B legacy 回退）、`CompressSingleAsync` 合并白名单、`ComputeSeparateOutputPath` 委托 planner
+  - `ZipEngine.ExtractEntriesAsync` 三处 key 匹配补 `ArchivePath.Normalize`（totalBytes/filteredEntries/outputPathOverrides，TarGz/SevenZip 已归一化）修「解压过滤无效」Bug
+  - 涉及文件：`src/MantisZip.Core/Abstractions/CompressPlan.cs`（新增）、`Utils/CompressPathPlanner.cs`（新增）、`Abstractions/ArchiveEngine.cs`、`Utils/FileScanner.cs`、`Engines/ZipEngine.cs`、`Engines/TarGzEngine.cs`、`Engines/SevenZipEngine.cs`、`Services/CompressService.cs`；Core 0 警告 0 错误
+
 #### v0.4.5 (2026-08-07) ShellExt COM 右键菜单 exe 名修复（Avalonia 点击无效果）
   - `ContextMenuHandler.InvokeCommand` 硬编码查找 `MantisZip.UI.exe`（WPF 版 exe 名），而 ShellExt 为两 UI 项目共享 → Avalonia 部署目录下只有 `MantisZip.UI.Avalonia.exe`，Explorer 点击菜单时找不到 exe 返回 E_FAIL，表现为「菜单能显示但点击无反应」（WPF 正常）
   - 修复：优先探测 `MantisZip.UI.Avalonia.exe`、回退 `MantisZip.UI.exe`（部署目录只会存在其中一个，WPF 行为不变）
@@ -1264,6 +1279,7 @@
 
 | 功能 | 设计文档 | 实现版本 |
 |------|----------|:--------:|
+| 路径清单统一（A/B 数据集：预览=实际绝对一致，CompressPlan 唯一事实来源 + 压缩/解压过滤白名单 + IsBuildPending 按钮门禁） | [path-manifest-unification.md](.sisyphus/plans/path-manifest-unification.md) | v0.4.5（⏳ 交互清单待用户 GUI 验证） |
 | 统一路径快捷选择（WPF QuickPathControl + 数据层；Avalonia 演进为 Tab 式速选面板 + CustomFilePickerDialog，QuickPathBuddy 概念并入 Tab+搜索一体化，QuickPathPreDialog 过渡方案废弃） | [quickpath-unified.md](.sisyphus/plans/archived/quickpath-unified.md)（已归档，Avalonia 部分被 [quickpath-control-redesign.md](.sisyphus/plans/quickpath-control-redesign.md) 取代） | v0.4.3+（Avalonia 演进 v0.4.5） |
 | QuickPathPicker 自包含路径速选控件（Compress/Extract/Settings 三宿主，AutoCompleteBox 补全 + ⭐🕐🪟 浮层 + 目录归一化，浏览器差异经注入委托） | [2026-08-03-quickpath-picker.md](docs/superpowers/plans/2026-08-03-quickpath-picker.md) + [设计](docs/superpowers/specs/2026-08-03-quickpath-picker-design.md) | v0.4.5（⏳ 待用户 GUI 验证） |
 | 文件选择器多选（PickItems 模式：勾选累积 + 跨目录保留 + 右栏已选面板；CompressSettingsWindow 合并「添加文件/文件夹」单按钮） | [file-picker-multi-select.md](.sisyphus/plans/file-picker-multi-select.md) | v0.4.5 |

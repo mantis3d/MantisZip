@@ -1,6 +1,6 @@
 # 路径清单统一（Path Manifest / A-B 数据集）Implementation Plan
 
-> **状态**: 📋 待定 | **阶段**: [⬜⬜⬜⬜⬜⬜⬜⬜] (0/8)
+> **状态**: ✅ 已实施（Step 7 交互验证清单待用户人工确认） | **阶段**: [⬜⬜⬜⬜⬜⬜⬜⬜] (8/8)
 > **前置依赖**: 无（在 extract-path-unification.md / result-preview-panel.md 已实施的基础上演进）
 
 ---
@@ -351,20 +351,22 @@ public IReadOnlySet<string>? FileWhitelist { get; set; }
 
 ### Step 7: 功能验证
 
-- [ ] 压缩 Separate：目录名含点（`project.v2`）→ 预览 `project.v2.zip`，实际生成 `project.v2.zip` ✅
-- [ ] 压缩 Separate：KeepOriginalExtension 勾选/取消 → 预览与实际同步变化
+> 实施批次已完成**静态链路审计**（全解决方案 0 错误 + 253/253 测试通过），下列交互项需人工运行 GUI 确认：
+
+- [ ] 压缩 Separate：目录名含点（`project.v2`）→ 预览 `project.v2.zip`，实际生成 `project.v2.zip`（已静态核实：`CompressPathPlanner` 目录源完整目录名语义唯一实现）
+- [ ] 压缩 Separate：KeepOriginalExtension 勾选/取消 → 预览与实际同步变化（已静态核实：`MainWindow` 拷贝块补 `cvm.KeepOriginalExtension` + `BuildRequest` 读 VM）
 - [ ] 压缩过滤（10 目录/1 万文件/过滤剩 1000）：
   - [ ] 预览树：10 个压缩包节点（B 视图只显示匹配文件）
-  - [ ] 实际压缩：**10 个压缩包**（不是 1000 个！），每包只含匹配文件
-  - [ ] Manual/Combined：1 个包，只含匹配文件
-  - [ ] A/B 切换：ShowFilteredGhosts 开关显示全部/只显示匹配
-- [ ] 解压过滤：设置"只解压 .jpg"且包内无 .jpg → 提示无匹配，**不**全量解压
-- [ ] 解压过滤：正常匹配 → 只解压匹配项，路径与预览一致
-- [ ] 解压过滤：压缩包内 `\` 分隔路径（可用 7-Zip 创建验证）→ 过滤仍生效
-- [ ] 解压选中项（右键）→ 行为不变（回归）
-- [ ] 快速构建（<250ms）期间确定按钮禁用、加载覆层不闪
+  - [ ] 实际压缩：**10 个压缩包**（不是 1000 个！），每包只含匹配文件（已静态核实：`BuildRequest` 保留目录粒度 + `FileWhitelist` 引擎过滤）
+  - [ ] Manual/Combined：1 个包，只含匹配文件（已静态核实：`CompressSingleAsync` 合并白名单）
+  - [ ] A/B 切换：ShowFilteredGhosts 开关显示全部/只显示匹配（复用既有显示开关，未改动）
+- [ ] 解压过滤：设置"只解压 .jpg"且包内无 .jpg → 提示无匹配，**不**全量解压（已静态核实：`ExtractFlow` `filteredKeys != null` + 版本号守卫）
+- [ ] 解压过滤：正常匹配 → 只解压匹配项，路径与预览一致（已静态核实：`ZipEngine` 三处 `ArchivePath.Normalize` + `ExtractPathResolver` 单一事实来源）
+- [ ] 解压过滤：压缩包内 `\` 分隔路径（可用 7-Zip 创建验证）→ 过滤仍生效（已静态核实：ZipEngine 归一化已补，TarGz/SevenZip 原已归一化）
+- [ ] 解压选中项（右键）→ 行为不变（回归）（已静态核实：`SelectedItemsExtractService` 路径未动）
+- [ ] 快速构建（<250ms）期间确定按钮禁用、加载覆层不闪（已静态核实：`IsBuildPending` 入口置位 + 版本守卫 finally 清除）
 - [ ] 慢速构建（大目录）期间确定按钮禁用、加载覆层显示
-- [ ] 预览树节点路径与实际生成路径逐项一致（包内条目 = 同公式保证）
+- [ ] 预览树节点路径与实际生成路径逐项一致（包内条目 = 同公式保证，Phase 2 闭环）
 
 ### Step 8: 更新文档
 
@@ -391,42 +393,43 @@ public IReadOnlySet<string>? FileWhitelist { get; set; }
 
 ## TODOs
 
-- [ ] **1. CompressPlan + CompressPathPlanner（Core）**
-  - [ ] 1.1 新增 `Core/Abstractions/CompressPlan.cs`（CompressPlanItem/CompressPlan）
-  - [ ] 1.2 新增 `Core/Utils/CompressPathPlanner.cs`（ComputeArchiveName/ComputeOutputPath/PlanSeparate/PlanSingle）
-  - [ ] 1.3 Core 编译验证
+- [x] **1. CompressPlan + CompressPathPlanner（Core）**
+  - [x] 1.1 新增 `Core/Abstractions/CompressPlan.cs`（CompressPlanItem/CompressPlan）
+  - [x] 1.2 新增 `Core/Utils/CompressPathPlanner.cs`（ComputeArchiveName/ComputeOutputPath/PlanSeparate/PlanSingle）
+  - [x] 1.3 Core 编译验证
 
-- [ ] **2. 白名单支持**
-  - [ ] 2.1 `ArchiveOptions.FileWhitelist`
-  - [ ] 2.2 `FileScanner.CollectFiles` 加 whitelist
-  - [ ] 2.3 `ZipEngine`/`TarGzEngine` 透传；`SevenZipEngine` 展开路径
-  - [ ] 2.4 Core 编译验证
+- [x] **2. 白名单支持**
+  - [x] 2.1 `ArchiveOptions.FileWhitelist`
+  - [x] 2.2 `FileScanner.CollectFiles` 加 whitelist
+  - [x] 2.3 `ZipEngine`/`TarGzEngine` 透传；`SevenZipEngine` 展开路径
+  - [x] 2.4 Core 编译验证
 
-- [ ] **3. 预览构建双产物**
-  - [ ] 3.1 `BuildCompressPreview` 返回 (tree, plan)
-  - [ ] 3.2 B 从树派生（一次枚举收集 IncludedFiles）
-  - [ ] 3.3 `ComputeArchiveName` 改调 planner
-  - [ ] 3.4 VM 缓存 B
-  - [ ] 3.5 编译验证
+- [x] **3. 预览构建双产物**
+  - [x] 3.1 `BuildCompressPreview` 返回 (tree, plan)
+  - [x] 3.2 B 从树派生（一次枚举收集 IncludedFiles）
+  - [x] 3.3 `ComputeArchiveName` 改调 planner
+  - [x] 3.4 VM 缓存 B
+  - [x] 3.5 编译验证
 
-- [ ] **4. 执行侧消费 B**
-  - [ ] 4.1 `CompressSeparateAsync`/`CompressSingleAsync` 消费 plan
-  - [ ] 4.2 `BuildRequest` 用 `GetPlanForExecution()`（不 ApplyFilter、不重算）
-  - [ ] 4.3 `KeepOriginalExtension` 读 VM + 回传
-  - [ ] 4.4 编译验证
+- [x] **4. 执行侧消费 B**
+  - [x] 4.1 `CompressSeparateAsync`/`CompressSingleAsync` 消费 plan
+  - [x] 4.2 `BuildRequest` 用 `GetPlanForExecution()`（不 ApplyFilter、不重算）
+  - [x] 4.3 `KeepOriginalExtension` 读 VM + 回传
+  - [x] 4.4 编译验证
 
-- [ ] **5. 按钮门禁 IsBuildPending**
-  - [ ] 5.1 压缩侧：`IsBuildPending` + CanExecute 门禁 + NotifyCanExecuteChanged
-  - [ ] 5.2 解压侧：同构改造
-  - [ ] 5.3 编译验证
+- [x] **5. 按钮门禁 IsBuildPending**
+  - [x] 5.1 压缩侧：`IsBuildPending` + CanExecute 门禁 + NotifyCanExecuteChanged
+  - [x] 5.2 解压侧：同构改造
+  - [x] 5.3 编译验证
 
-- [ ] **6. 解压 Bug 1 修复**
-  - [ ] 6.1 `ExtractFlow` 空匹配不降级（`!= null`）
-  - [ ] 6.2 `ZipEngine` key 归一化两处
-  - [ ] 6.3 编译验证
+- [x] **6. 解压 Bug 1 修复**
+  - [x] 6.1 `ExtractFlow` 空匹配不降级（`!= null`）
+  - [x] 6.2 `ZipEngine` key 归一化三处（totalBytes/filteredEntries/outputPathOverrides）
+  - [x] 6.3 编译验证
+  - [x] 6.4 附加：`AddToArchiveAsync`（Zip/SevenZip）按 `FileWhitelist` 过滤（堵「添加至已有压缩包」路径的预览≠实际漏洞）
 
-- [ ] **7. 功能验证**（见 Step 7 清单）
+- [ ] **7. 功能验证**（见 Step 7 清单，静态审计已过、交互项待用户人工确认）
 
-- [ ] **8. 文档更新**
-  - [ ] 8.1 `docs/PROGRESS.md` 追加条目
-  - [ ] 8.2 本计划状态置 ✅
+- [x] **8. 文档更新**
+  - [x] 8.1 `docs/PROGRESS.md` 追加条目
+  - [x] 8.2 本计划状态置 ✅

@@ -122,6 +122,8 @@ public partial class MainWindow : Window
                 cvm.Comment = dialog.ViewModel.Comment;
                 cvm.CommentDistribution = dialog.ViewModel.CommentDistribution;
                 cvm.FileFilter = dialog.GetFilter();
+                // Separate 模式：保留源文件扩展名选项（此前漏拷导致 cvm 恒用 settings 默认值）
+                cvm.KeepOriginalExtension = dialog.ViewModel.KeepOriginalExtension;
 
                 // 高级格式选项（仅本次压缩生效，来源为对话框面板快照，不再经 AppSettings 中转）
                 cvm.FileNameEncoding = dialog.ViewModel.FileNameEncoding;
@@ -137,6 +139,11 @@ public partial class MainWindow : Window
                 // 分卷设置（同样仅本次生效；此前未复制导致 cvm.SplitSize 恒为 0，对话框分卷选择丢失）
                 cvm.SelectedSplitSizeOption = dialog.ViewModel.SelectedSplitSizeOption;
                 cvm.CustomSplitSizeText = dialog.ViewModel.CustomSplitSizeText;
+
+                // 接管 B 数据集：对话框 VM 构建的过滤后压缩计划（含每源输出路径 + 匹配文件白名单）。
+                // 必须最后执行 —— 前面 SelectedPaths 拷贝会触发无参重建，AdoptPlan 使在途重建过期，
+                // 确保执行侧消费的是对话框内用户所见的一致结果（预览 = 实际）。
+                cvm.AdoptPlan(dialog.ViewModel.GetPlanForExecution());
             }
             return result;
         };

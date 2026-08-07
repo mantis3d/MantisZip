@@ -22,20 +22,33 @@ public static class CompressFlow
 {
     /// <summary>
     /// 从 CompressSettingsViewModel 构建 CompressRequest。
-    /// 应用文件过滤（目录递归、逐文件匹配）；过滤后无文件时返回 null，由调用方决定提示/退出。
+    /// 消费预览构建时缓存的 B 数据集（CompressPlan）：源路径保持目录粒度，过滤由每项 IncludedFiles
+    /// 白名单表达，输出路径取自 B —— 执行侧不再重新计算路径、不再重新过滤，预览 = 实际。
+    /// B 为空（无源/路径无效/构建未完成）或过滤激活且全部无匹配时返回 null，由调用方决定提示/退出。
     /// </summary>
     public static CompressRequest? BuildRequest(CompressSettingsViewModel vm)
     {
-        var sources = vm.FileFilter?.IsActive == true
-            ? FileFilterHelper.ApplyFilter(vm.SelectedPaths.ToArray(), vm.FileFilter).ToList()
-            : vm.SelectedPaths.ToList();
-        if (sources.Count == 0)
+        var plan = vm.GetPlanForExecution();
+        if (plan == null || plan.Items.Count == 0)
             return null;
+
+        // 过滤激活时（B 中任何一项带 IncludedFiles）丢弃无匹配项的源；全部无匹配 → null
+        var items = plan.Items;
+        bool filterActive = items.Any(i => i.IncludedFiles != null);
+        if (filterActive)
+        {
+            items = items.Where(i => i.IncludedFiles is { Count: > 0 }).ToList();
+            if (items.Count == 0)
+                return null;
+        }
 
         var settings = AppSettings.Load();
         return new CompressRequest
         {
-            SourcePaths = sources,
+            // 目录粒度源（过滤语义在白名单中表达，不再扁平化为文件列表）
+            SourcePaths = items.Select(i => i.SourcePath).ToList(),
+            // B 数据集原样传入：CompressService 逐项消费 OutputArchivePath + IncludedFiles
+            Plan = new CompressPlan(plan.Mode, plan.OutputPath, items),
             Mode = vm.OutputMode,
             Format = vm.DefaultFormat,
             CompressionLevel = vm.CompressionLevel,
@@ -52,7 +65,8 @@ public static class CompressFlow
             },
             SplitSize = vm.SplitSize,
             PreserveDirectoryRoot = settings.PreserveDirectoryRoot,
-            KeepOriginalExtension = settings.KeepOriginalExtension,
+            // 从对话框 ViewModel 读取（对话框可能已修改，不再经 AppSettings 中转）
+            KeepOriginalExtension = vm.KeepOriginalExtension,
             // 高级格式选项从对话框 ViewModel 读取（仅本次压缩生效），不再从 AppSettings 中转
             FileNameEncoding = vm.FileNameEncoding,
             ZipCompressionMethod = vm.ZipCompressionMethod,

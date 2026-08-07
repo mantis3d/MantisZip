@@ -50,6 +50,13 @@ public class CompressRequest
     /// <summary>Separate 模式：是否保留源文件扩展名（如 "file.txt" → "file.txt.zip"）</summary>
     public bool KeepOriginalExtension { get; init; }
 
+    /// <summary>
+    /// 过滤后的压缩计划（B 数据集）。由 CompressFlow.BuildRequest 从预览构建结果注入。
+    /// 非 null 时：Separate 模式按逐项（SourcePath + OutputArchivePath + IncludedFiles 白名单）执行；
+    /// Manual/Combined 模式合并全部 IncludedFiles 为单一白名单。路径一律以 B 为准，不重算。
+    /// </summary>
+    public CompressPlan? Plan { get; init; }
+
     /// <summary>压缩单文件夹时是否保留外层目录根，仅 SevenZipEngine 有效</summary>
     public bool PreserveDirectoryRoot { get; init; } = true;
 
@@ -115,6 +122,22 @@ public static class CompressService
     {
         ArgumentNullException.ThrowIfNull(request);
 
+        // B 数据集存在时以 B 为准（预览 = 实际，输出路径不重算）
+        if (request.Plan != null)
+        {
+            return request.Mode switch
+            {
+                CompressOutputMode.Separate => request.Plan.Items
+                    .Select(i => i.OutputArchivePath)
+                    .ToList(),
+                CompressOutputMode.Manual or CompressOutputMode.Combined =>
+                    !string.IsNullOrEmpty(request.Plan.OutputPath)
+                        ? new List<string> { request.Plan.OutputPath }
+                        : new List<string>(), // fallback（正常不会走到）
+                _ => throw new ArgumentOutOfRangeException(nameof(request.Mode))
+            };
+        }
+
         return request.Mode switch
         {
             CompressOutputMode.Separate => request.SourcePaths
@@ -160,6 +183,8 @@ public static class CompressService
 
     /// <summary>
     /// Separate 模式：遍历 SourcePaths，每个源文件独立计算输出路径并压缩。
+    /// 当 <see cref="CompressRequest.Plan"/> 非 null 时，逐项消费 B 数据集
+    /// （SourcePath + OutputArchivePath + IncludedFiles 白名单），输出路径与预览树同源，不重算。
     /// </summary>
     private static async Task<CompressResult> CompressSeparateAsync(
         CompressRequest request,
@@ -169,13 +194,16 @@ public static class CompressService
         Action<int, BatchItemStatus>? onItemStatus = null)
     {
         int succeeded = 0, failed = 0, skipped = 0;
-        int total = request.SourcePaths.Count;
+
+        // B 数据集提供 (sourcePath, outputPath, whitelist) 三元组；无 B 时退化为 (sourcePath, ComputeSeparateOutputPath, null)
+        var planItems = request.Plan?.Items;
+        int total = planItems?.Count ?? request.SourcePaths.Count;
 
         for (int i = 0; i < total; i++)
         {
             ct.ThrowIfCancellationRequested();
 
-            var sourcePath = request.SourcePaths[i];
+            var sourcePath = planItems != null ? planItems[i].SourcePath : request.SourcePaths[i];
             CoreLog.Info($"CompressService: processing item {i + 1}/{total}: {sourcePath}");
 
             // 1. 验证源文件/目录存在
@@ -188,8 +216,15 @@ public static class CompressService
                 continue;
             }
 
-            // 2. 计算输出路径
-            var outputPath = ComputeSeparateOutputPath(request, sourcePath);
+            // 2. 计算输出路径（B 优先，否则本地公式）
+            var outputPath = planItems != null
+                ? planItems[i].OutputArchivePath
+                : ComputeSeparateOutputPath(request, sourcePath);
+
+            // 2b. 该源的文件白名单（过滤激活时 B 提供匹配文件清单；null = 不过滤）
+            IReadOnlySet<string>? whitelist = planItems?[i].IncludedFiles != null
+                ? new HashSet<string>(planItems[i].IncludedFiles!, StringComparer.OrdinalIgnoreCase)
+                : null;
 
             // 3. 获取引擎
             var engine = ArchiveEngineFactory.GetEngineByExtension(outputPath, new ZipEngine());
@@ -222,7 +257,7 @@ public static class CompressService
 
             // 6. 构造 ArchiveOptions
             bool isAdd = resolution.Action == CompressConflictAction.Add;
-            var options = BuildOptions(request, comment, isAdd);
+            var options = BuildOptions(request, comment, isAdd, whitelist);
 
             // 7. 执行
             try
@@ -294,7 +329,20 @@ public static class CompressService
 
         var comment = GetCommentForIndex(request, 0);
         bool isAdd = resolution.Action == CompressConflictAction.Add;
-        var options = BuildOptions(request, comment, isAdd);
+
+        // B 数据集：合并全部源的白名单（过滤激活时只压匹配文件；null = 不过滤）
+        IReadOnlySet<string>? whitelist = null;
+        if (request.Plan?.Items is { Count: > 0 } planItems)
+        {
+            var matched = planItems
+                .Where(i => i.IncludedFiles != null)
+                .SelectMany(i => i.IncludedFiles!)
+                .ToArray();
+            if (matched.Length > 0)
+                whitelist = new HashSet<string>(matched, StringComparer.OrdinalIgnoreCase);
+        }
+
+        var options = BuildOptions(request, comment, isAdd, whitelist);
 
         var sourceArray = request.SourcePaths.ToArray();
 
@@ -325,34 +373,11 @@ public static class CompressService
 
     /// <summary>
     /// Separate 模式：为单个源文件计算输出路径。
+    /// 唯一实现收敛到 <see cref="CompressPathPlanner"/>（目录源用完整目录名，忽略 keepOriginalExt）。
+    /// 仅无 B 数据集时（如 CLI）退化使用；有 B 时路径一律取 B 的 OutputArchivePath。
     /// </summary>
     private static string ComputeSeparateOutputPath(CompressRequest request, string sourcePath)
-    {
-        // 父目录
-        string parent;
-        if (Directory.Exists(sourcePath))
-        {
-            // 对目录要去掉末尾分隔符再取父目录
-            parent = Path.GetDirectoryName(sourcePath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar))
-                     ?? ".";
-        }
-        else
-        {
-            parent = Path.GetDirectoryName(sourcePath) ?? ".";
-        }
-
-        // 基础文件名
-        var baseName = request.KeepOriginalExtension
-            ? Path.GetFileName(sourcePath)
-            : Path.GetFileNameWithoutExtension(sourcePath);
-
-        // 扩展名
-        var ext = string.Equals(request.Format, "tar.gz", StringComparison.OrdinalIgnoreCase)
-            ? ".tar.gz"
-            : "." + request.Format;
-
-        return Path.Combine(parent, baseName + ext);
-    }
+        => CompressPathPlanner.ComputeOutputPath(sourcePath, request.Format, request.KeepOriginalExtension);
 
     /// <summary>
     /// 根据冲突处理结果计算新的输出路径。
@@ -401,7 +426,7 @@ public static class CompressService
     /// Add 分支忽略 SplitSize。
     /// CommentDistribution 已由 Service 解析为具体注释文本，options 中设为 AllSame。
     /// </summary>
-    private static ArchiveOptions BuildOptions(CompressRequest request, string? resolvedComment, bool isAdd)
+    private static ArchiveOptions BuildOptions(CompressRequest request, string? resolvedComment, bool isAdd, IReadOnlySet<string>? whitelist = null)
     {
         return new ArchiveOptions
         {
@@ -422,6 +447,7 @@ public static class CompressService
             ZipCompressionMethod = request.ZipCompressionMethod,
             ZipEncryptionMethod = request.ZipEncryptionMethod,
             SevenZipEncryptHeaders = request.SevenZipEncryptHeaders,
+            FileWhitelist = whitelist,
         };
     }
 

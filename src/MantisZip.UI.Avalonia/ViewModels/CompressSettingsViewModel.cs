@@ -309,6 +309,16 @@ public partial class CompressSettingsViewModel : ObservableObject
     [ObservableProperty]
     private bool _isPreviewBuilding;
 
+    /// <summary>
+    /// 预览树构建是否进行中（无论快慢，构建开始即置位，驱动"开始压缩"按钮门禁）。
+    /// 与 <see cref="IsPreviewBuilding"/>（仅慢构建 ≥250ms 置位，驱动加载覆层）不同：
+    /// 快构建也会短暂置位，保证 B 数据集未就绪时用户无法点击压缩（预览 = 实际 的守卫）。
+    /// </summary>
+    [ObservableProperty]
+    private bool _isBuildPending;
+
+    partial void OnIsBuildPendingChanged(bool value) => UpdateCanCompress();
+
     /// <summary>预览树构建进度（0–100，-1 表示不确定进度/不定进度条）。</summary>
     [ObservableProperty]
     private double _previewBuildProgress = -1;
@@ -318,6 +328,27 @@ public partial class CompressSettingsViewModel : ObservableObject
 
     /// <summary>文件过滤条件（由 View 在对话框关闭时从 FileFilterEditor 获取并设置）。</summary>
     public FileFilterCriteria? FileFilter { get; set; }
+
+    /// <summary>缓存的上一次构建的压缩计划（B 数据集）。由预览构建派生，执行侧只读消费。</summary>
+    public CompressPlan? Plan { get; private set; }
+
+    /// <summary>
+    /// 获取供压缩执行使用的计划（B）。调用方（CompressFlow.BuildRequest / CompressService）只读消费，
+    /// 不重算路径、不重新过滤 —— 预览 = 实际的唯一事实来源。null 表示尚未构建成功或输入无效。
+    /// </summary>
+    public CompressPlan? GetPlanForExecution() => Plan;
+
+    /// <summary>
+    /// 外部接管 B 数据集（对话框 ViewModel → 主窗口 ViewModel 的拷贝路径）。
+    /// 同时使在途重建过期，防止拷贝 SelectedPaths 触发的异步重建覆盖接管结果。
+    /// </summary>
+    public void AdoptPlan(CompressPlan? plan)
+    {
+        _previewBuildVersion++; // 作废在途重建
+        Plan = plan;
+        IsBuildPending = false; // 在途重建已作废，其 finally 不会再清标志；这里显式解除门禁
+        UpdateCanCompress();
+    }
 
     /// <summary>密码与确认密码是否匹配。</summary>
     public bool PasswordsMatch => Password == ConfirmPassword;
@@ -494,18 +525,22 @@ public partial class CompressSettingsViewModel : ObservableObject
     /// 构建压缩预览树。由构造函数自动调用，也可在源文件变更或过滤条件变化后重新调用。
     /// 原始树构建在后台线程执行，快速操作时通过版本号丢弃过期结果。
     /// </summary>
-    /// <param name="filter">文件过滤条件，不为空且 IsActive 时对文件节点标记 IsFilteredOut。</param>
+    /// <param name="filter">文件过滤条件，不为空且 IsActive 时对文件节点标记 IsFilteredOut；
+    /// null 时回退到 <see cref="FileFilter"/>（保持 CollectionChanged 等无参调用不丢失过滤）。</param>
     public void BuildCompressPreview(FileFilterCriteria? filter = null)
-        => _ = BuildCompressPreviewCoreAsync(filter);
+        => _ = BuildCompressPreviewCoreAsync(filter ?? FileFilter);
 
     private async Task BuildCompressPreviewCoreAsync(FileFilterCriteria? filter)
     {
         var version = ++_previewBuildVersion;
+        IsBuildPending = true; // 快慢构建都置位，B 未就绪时禁用"开始压缩"
 
         if (SelectedPaths.Count == 0)
         {
             PreviewRoot = null;
             IsPreviewBuilding = false;
+            IsBuildPending = false;
+            Plan = null; // 无源 → B 无效
             return;
         }
 
@@ -520,6 +555,8 @@ public partial class CompressSettingsViewModel : ObservableObject
                 IsExpanded = true
             };
             IsPreviewBuilding = false;
+            IsBuildPending = false;
+            Plan = null; // 路径无效 → B 无效
             return;
         }
 
@@ -552,10 +589,11 @@ public partial class CompressSettingsViewModel : ObservableObject
                 IsPreviewBuilding = true;
             }
 
-            var root = await buildTask;
+            var (root, plan) = await buildTask;
             if (version != _previewBuildVersion) return; // 过期结果丢弃
 
             PreviewRoot = root;
+            Plan = plan; // 缓存 B（执行侧只读消费，预览 = 实际）
         }
         catch (Exception ex)
         {
@@ -564,7 +602,10 @@ public partial class CompressSettingsViewModel : ObservableObject
         finally
         {
             if (version == _previewBuildVersion)
+            {
                 IsPreviewBuilding = false;
+                IsBuildPending = false;
+            }
         }
     }
 
@@ -996,6 +1037,8 @@ public partial class CompressSettingsViewModel : ObservableObject
 
     private bool CanExecuteStartCompress()
     {
+        // 预览树构建期间禁用"开始压缩"：B 数据集未就绪时不允许执行（预览 = 实际的守卫）
+        if (IsBuildPending) return false;
         if (SelectedPaths.Count == 0) return false;
         return IsOutputPathValid();
     }

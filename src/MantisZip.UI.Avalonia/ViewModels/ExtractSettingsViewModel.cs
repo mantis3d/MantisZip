@@ -59,6 +59,16 @@ public partial class ExtractSettingsViewModel : ObservableObject
     [ObservableProperty]
     private bool _isPreviewBuilding;
 
+    /// <summary>
+    /// 预览树构建是否进行中（无论快慢，构建开始即置位，驱动"开始解压"按钮门禁）。
+    /// 与 <see cref="IsPreviewBuilding"/>（仅慢构建 ≥250ms 置位，驱动加载覆层）不同：
+    /// 快构建也会短暂置位，保证过滤结果（FilteredEntryKeys 读取的预览）就绪前无法点击解压。
+    /// </summary>
+    [ObservableProperty]
+    private bool _isBuildPending;
+
+    partial void OnIsBuildPendingChanged(bool value) => ExtractCommand.NotifyCanExecuteChanged();
+
     /// <summary>预览树构建进度（0–100，-1 表示不确定进度/不定进度条）。</summary>
     [ObservableProperty]
     private double _previewBuildProgress = -1;
@@ -147,12 +157,14 @@ public partial class ExtractSettingsViewModel : ObservableObject
     private async Task BuildExtractPreviewCoreAsync(IEnumerable<ArchiveItem> entries, FileFilterCriteria? filter, bool checkExists)
     {
         var version = ++_previewBuildVersion;
+        IsBuildPending = true; // 快慢构建都置位，过滤结果就绪前禁用"开始解压"
         PreviewBuildProgress = -1;
 
         if (string.IsNullOrWhiteSpace(DestinationPath))
         {
             PreviewRoot = null;
             IsPreviewBuilding = false;
+            IsBuildPending = false;
             return;
         }
 
@@ -201,13 +213,17 @@ public partial class ExtractSettingsViewModel : ObservableObject
         finally
         {
             if (version == _previewBuildVersion)
+            {
                 IsPreviewBuilding = false;
+                IsBuildPending = false;
+            }
         }
     }
 
     partial void OnDestinationPathChanged(string value)
     {
-        // When destination path changes, update the preview tree if we have entries
+        // 目标路径变化 → 刷新"开始解压"按钮状态（CanExecuteExtract 依赖非空目标）
+        ExtractCommand.NotifyCanExecuteChanged();
         // The caller should call BuildExtractPreview again
     }
 
@@ -222,7 +238,14 @@ public partial class ExtractSettingsViewModel : ObservableObject
         }
     }
 
-    [RelayCommand]
+    private bool CanExecuteExtract()
+    {
+        // 预览树构建期间禁用"开始解压"：过滤结果（FilteredEntryKeys 读取的预览树）未就绪时不允许执行
+        if (IsBuildPending) return false;
+        return !string.IsNullOrWhiteSpace(DestinationPath);
+    }
+
+    [RelayCommand(CanExecute = nameof(CanExecuteExtract))]
     private async Task Extract()
     {
         if (string.IsNullOrWhiteSpace(DestinationPath)) return;

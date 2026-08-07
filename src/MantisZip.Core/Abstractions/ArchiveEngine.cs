@@ -147,6 +147,12 @@ public class ArchiveOptions
     /// 仅当 <see cref="Encrypt"/> 为 true 且格式为 7z 时有效。
     /// </summary>
     public bool SevenZipEncryptHeaders { get; set; } = true;
+
+    /// <summary>
+    /// 压缩文件白名单（绝对路径集合）；null = 全量压缩。
+    /// 非 null 时引擎只打包白名单内的文件（过滤场景：预览构建时算好的 B 数据集 IncludedFiles）。
+    /// </summary>
+    public IReadOnlySet<string>? FileWhitelist { get; set; }
 }
 
 /// <summary>

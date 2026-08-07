@@ -192,7 +192,7 @@ public class TarGzEngine : IArchiveEngine
             var isTarGz = ext == ".tgz" || outputPath.EndsWith(".tar.gz");
             CoreLog.Info($"CompressAsync: format=tar.gz={isTarGz}");
 
-            var (files, _) = FileScanner.CollectFiles(sourcePaths, progress, cancellationToken);
+            var (files, _) = FileScanner.CollectFiles(sourcePaths, progress, cancellationToken, options.FileWhitelist);
             CoreLog.Info($"CompressAsync: {files.Count} files to compress");
 
             if (isTarGz || ext == ".tar")

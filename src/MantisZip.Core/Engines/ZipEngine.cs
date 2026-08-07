@@ -357,10 +357,12 @@ public class ZipEngine : IArchiveEngine
         {
             using var archive = OpenArchiveWithEncodingFallback(archivePath, password);
             var entries = archive.Entries.ToList();
-            var totalBytes = entries.Where(e => entryKeys.Contains(e.Key)).Sum(e => e.Size);
+            // entryKeys（来自预览树 FilteredEntryKeys）以 '/' 分隔；SharpCompress 在 Windows 下
+            // 可能返回 '\' 分隔的 Key，统一归一化后再匹配（预览 = 实际 的保证）
+            var totalBytes = entries.Where(e => entryKeys.Contains(ArchivePath.Normalize(e.Key))).Sum(e => e.Size);
             var processedBytes = 0L;
             var processedFiles = 0;
-            var filteredEntries = entries.Where(e => entryKeys.Contains(e.Key)).ToList();
+            var filteredEntries = entries.Where(e => entryKeys.Contains(ArchivePath.Normalize(e.Key))).ToList();
 
             CoreLog.Info($"ExtractEntriesAsync: {filteredEntries.Count} matching entries");
 
@@ -369,17 +371,18 @@ public class ZipEngine : IArchiveEngine
                 cancellationToken.ThrowIfCancellationRequested();
 
                 var entryKey = entry.Key ?? string.Empty;
+                var normalizedKey = ArchivePath.Normalize(entryKey);
 
                 if (entry.IsDirectory)
                 {
-                    var dirPath = FileConflictHelper.GetSafePath(destinationPath, entryKey);
+                    var dirPath = FileConflictHelper.GetSafePath(destinationPath, normalizedKey);
                     if (!Directory.Exists(dirPath))
                         Directory.CreateDirectory(dirPath);
                     continue;
                 }
 
-                var outputPath = outputPathOverrides?.GetValueOrDefault(entryKey)
-                    ?? FileConflictHelper.GetSafePath(destinationPath, entryKey);
+                var outputPath = outputPathOverrides?.GetValueOrDefault(normalizedKey)
+                    ?? FileConflictHelper.GetSafePath(destinationPath, normalizedKey);
                 var outputDir = Path.GetDirectoryName(outputPath);
                 if (!string.IsNullOrEmpty(outputDir) && !Directory.Exists(outputDir))
                     Directory.CreateDirectory(outputDir);
@@ -457,7 +460,7 @@ public class ZipEngine : IArchiveEngine
         await Task.Run(() =>
         {
             // 收集所有文件（使用 FileScanner 共享工具，边发现边报告进度）
-            var (files, totalBytes) = FileScanner.CollectFiles(sourcePaths, progress, cancellationToken);
+            var (files, totalBytes) = FileScanner.CollectFiles(sourcePaths, progress, cancellationToken, options.FileWhitelist);
 
             if (files.Count == 0)
             {
@@ -792,6 +795,10 @@ public class ZipEngine : IArchiveEngine
                     var dirName = ArchivePath.GetFileName(sourcePath);
                     foreach (var file in Directory.GetFiles(sourcePath, "*", SearchOption.AllDirectories))
                     {
+                        // FileWhitelist（来自压缩预览过滤 B）命中时只添加匹配文件，保证 预览=实际。
+                        // 白名单值为预览收集的原始绝对路径（\ 分隔），与 FileScanner 匹配方式一致，勿 Normalize。
+                        if (options.FileWhitelist != null && !options.FileWhitelist.Contains(file))
+                            continue;
                         var relativePath = Path.Combine(dirName, Path.GetRelativePath(sourcePath, file));
                         var entryName = string.IsNullOrEmpty(entryBasePath) ? relativePath : entryBasePath + "/" + relativePath;
                         newFiles.Add((file, entryName));

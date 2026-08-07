@@ -472,9 +472,9 @@ public class SevenZipEngine : IArchiveEngine
             ConfigureCompressor(compr, options);
             AttachCompressorProgress(compr, progress);
 
-            if (sourcePaths.Length == 1 && Directory.Exists(sourcePaths[0]))
+            if (sourcePaths.Length == 1 && Directory.Exists(sourcePaths[0]) && options.FileWhitelist == null)
             {
-                // 单一目录 — 使用 CompressDirectory
+                // 单一目录且无文件白名单 — 使用 CompressDirectory
                 compr.PreserveDirectoryRoot = options.PreserveDirectoryRoot;
                 compr.CompressDirectory(
                     sourcePaths[0],
@@ -485,8 +485,11 @@ public class SevenZipEngine : IArchiveEngine
             }
             else
             {
-                // 多个文件或混合 — 展开后使用 CompressFilesEncrypted
+                // 多个文件、混合源、或存在文件白名单（过滤激活，CompressDirectory 无法排除文件）—
+                // 展开后按白名单过滤，再使用 CompressFilesEncrypted
                 var files = ExpandSourcePaths(sourcePaths);
+                if (options.FileWhitelist != null)
+                    files = files.Where(f => options.FileWhitelist.Contains(f)).ToArray();
                 compr.CompressFilesEncrypted(
                     outputPath,
                     options.Encrypt ? options.Password ?? "" : "",
@@ -952,6 +955,20 @@ public class SevenZipEngine : IArchiveEngine
 
             // 展开源路径，追加到归档
             var files = ExpandSourcePaths(sourcePaths);
+            // FileWhitelist（来自压缩预览过滤 B）命中时只添加匹配文件，保证 预览=实际。
+            // 白名单值为预览收集的原始绝对路径（\ 分隔），与 FileScanner 匹配方式一致，勿 Normalize。
+            if (options.FileWhitelist != null)
+            {
+                var whitelist = options.FileWhitelist;
+                files = files
+                    .Where(p => !File.Exists(p) || whitelist.Contains(p))
+                    .ToArray();
+            }
+            if (files.Length == 0)
+            {
+                CoreLog.Info("AddToArchiveAsync: no files to add (whitelist filtered)");
+                return;
+            }
             compr.CompressFilesEncrypted(
                 archivePath,
                 options.Encrypt ? options.Password ?? "" : "",

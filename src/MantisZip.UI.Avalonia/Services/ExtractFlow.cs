@@ -24,7 +24,9 @@ public static class ExtractFlow
     /// <param name="archivePath">压缩包路径。</param>
     /// <param name="dest">目标目录。</param>
     /// <param name="conflictAction">冲突策略字符串（AppSettings.FileConflictAction 值）。</param>
-    /// <param name="filteredKeys">过滤后需实际解压的条目 key 列表；null/空 = 全量解压。</param>
+    /// <param name="filteredKeys">过滤后需实际解压的条目 key 列表；null = 全量解压（未开过滤）。
+    /// 注意：非 null 即走 ExtractEntriesAsync，空列表 = 有意零匹配（什么都不解压），
+    /// 绝不回退全量 —— 这是「预览 = 实际」的边界保证（Bug 1 修复）。</param>
     /// <param name="password">密码（可为 null）。</param>
     /// <param name="conflictDialog">Ask 冲突弹窗回调（null 时 Ask 降级为引擎默认处理）。</param>
     /// <param name="progress">进度回调。</param>
@@ -42,8 +44,10 @@ public static class ExtractFlow
     {
         var options = SelectedItemsExtractService.CreateExtractOptions(conflictAction, conflictDialog);
 
-        // 有过滤条件：仅解压匹配条目（统一入口；无 pathOverrides = 保留完整路径）
-        if (filteredKeys is { Count: > 0 })
+        // 有过滤条件：仅解压匹配条目（统一入口；无 pathOverrides = 保留完整路径）。
+        // 注意用 `!= null` 而非 `is { Count: > 0 }`：过滤激活但零匹配（空列表）也必须走
+        // ExtractEntriesAsync —— 空列表 = 什么都不解压，若误走 else 全量解压会泄露全部文件。
+        if (filteredKeys != null)
         {
             var engine = ArchiveEngineFactory.GetEngineByExtension(archivePath);
             if (engine == null)

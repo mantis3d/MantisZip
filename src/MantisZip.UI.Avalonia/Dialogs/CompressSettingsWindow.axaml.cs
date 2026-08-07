@@ -221,6 +221,8 @@ DataContext = ViewModel;
     private void BuildPreview()
     {
         var filter = GetFilter();
+        // 记住过滤条件到 VM：后续 SelectedPaths 变更触发的无参重建不丢失过滤
+        ViewModel.FileFilter = filter;
         ViewModel.BuildCompressPreview(filter);
     }
 
