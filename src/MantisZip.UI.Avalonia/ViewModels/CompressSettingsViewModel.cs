@@ -411,6 +411,7 @@ public partial class CompressSettingsViewModel : ObservableObject
         LocalizedStrings["Compress_OutputMode_Separate"] = LocalizationManager.T("Compress_OutputMode_Separate");
         LocalizedStrings["Compress_OutputMode_Combined"] = LocalizationManager.T("Compress_OutputMode_Combined");
         LocalizedStrings["Compress_OutputPath"] = LocalizationManager.T("Compress_OutputPath");
+        LocalizedStrings["Compress_OutputFileName"] = LocalizationManager.T("Compress_OutputFileName");
         LocalizedStrings["Compress_OutputPlaceholder"] = LocalizationManager.T("Compress_OutputPlaceholder");
         LocalizedStrings["Compress_SourceFiles"] = LocalizationManager.T("Compress_SourceFiles");
         LocalizedStrings["Compress_Archive_Group"] = LocalizationManager.T("Compress_Archive_Group");

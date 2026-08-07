@@ -192,7 +192,7 @@ public partial class MainWindowViewModel : ObservableObject
         {
             "Menu_File", "Menu_OpenArchive", "Menu_CloseArchive", "Menu_Refresh", "Menu_Settings", "Menu_Exit",
             "Menu_Edit", "Menu_View", "Menu_ToggleTheme", "Menu_Language", "Menu_LangChinese", "Menu_LangEnglish",
-            "Menu_Help",
+            "Menu_Help", "Menu_Tools",
             "Menu_ExtractArchive", "Menu_ExtractHere", "Menu_ExtractToName",
             "Menu_NewArchive", "Menu_Compress", "Menu_PasswordManager", "Menu_About",
             "Toolbar_New", "Toolbar_Open", "Toolbar_Extract", "Toolbar_Compress",
@@ -226,7 +226,7 @@ public partial class MainWindowViewModel : ObservableObject
             "Toolbar_Password", "Tooltip_Password",
             "Menu_Test",
             "Tree_ExpandAll", "Tree_CollapseAll", "Tree_ExpandToCurrent", "Tree_Filter",
-            "Nav_GoRoot", "Nav_GoBack", "Nav_GoForward", "Nav_AddressBar",
+            "Nav_GoRoot", "Nav_GoBack", "Nav_GoForward", "Nav_AddressBar", "Nav_GoUp",
             "Toolbar_CopyName", "Toolbar_Refresh",
             "Toolbar_SelectAll", "Toolbar_InvertSelection", "Toolbar_ViewMode",
             "ViewMode_All", "ViewMode_Files", "ViewMode_Dirs",

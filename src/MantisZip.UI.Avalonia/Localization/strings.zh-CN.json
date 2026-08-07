@@ -1,4 +1,5 @@
 {
+  "Menu_Tools": "工具",
   "Settings_Preview_ShowInfoPanel": "显示信息面板",
   "Menu_ShowInfoPanel": "显示信息面板",
   "App_CompressCollecting": "正在收集文件...",
@@ -621,6 +622,8 @@
   "Settings_Assoc_CustomAlreadyExists": "该扩展名已存在",
   "Settings_Assoc_CustomMaxReached": "自定义扩展名已达到上限",
   "Settings_Assoc_AddFailed": "添加扩展名失败：{0}",
+  "Settings_Assoc_InstallDone": "文件关联已安装",
+  "Settings_Assoc_UninstallDone": "文件关联已卸载",
 
   "Settings_Assoc_PlatformUnsupported": "当前平台不支持文件关联",
   "Settings_Assoc_Remove": "删除",
