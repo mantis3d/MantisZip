@@ -21,6 +21,18 @@
 
 ### MantisZip.UI.Avalonia（主力版）
 
+**2026-08-08** — 文件列表图标列位置修复 + 拖拽列标题误触发文件拖拽
+  - **背景**：① 图标列被挤到中间：`ApplyColumnStates` 仅处理有 `SortMemberPath` 的列，图标列（无 SortMemberPath）被排除；旧版 `window.json` 的 DisplayIndex 序列缺失图标列位置，Name 列抢占 0 后图标列被挤到中间 ② 拖列标题调宽时误触发拖拽解压：Avalonia `PointerPressed`（Tunnel）无条件记录拖拽起点，列头按下也进入拖拽流程（WPF 版有 `FindVisualParent<DataGridRow>` 空检查保护，Avalonia 版缺失）
+  - **方案**：`CanUserReorderColumns="True"` 开启列重排；图标列加 `Tag="Icon"`，新增 `GetColumnId()`（SortMemberPath 优先、Tag 兜底）使图标列纳入 `CaptureColumnStates`/`ApplyColumnStates` 持久化；`ApplyColumnStates` 双轨兼容——新版 JSON（含 Icon 状态）按 DisplayIndex 恢复全部列，旧版 JSON 强制图标列 `DisplayIndex=0` 其余顺延自愈
+  - **拖拽检测**：`PointerPressed` 先 `HitTestPressedRowItem` 命中测试，列标题/空白/滚动条按下则清空 `_dragStartEvent` 并 return，不启动文件拖拽
+  - 涉及文件：`Views/MainWindow.axaml`（L1022 `CanUserReorderColumns="True"`、L1061 图标列 `Tag="Icon"`）、`Views/MainWindow.axaml.cs`；构建 0 错误
+
+**2026-08-08** — 主菜单重构：新增「工具」菜单（密码管理器/收藏夹/设置迁移）
+  - **背景**：设置、收藏夹、密码管理器散落在文件/编辑菜单，入口不集中
+  - **方案**：新增 `Menu_Tools`（「工具」）菜单，密码管理器（IconKey）、收藏夹管理器（IconStar）、设置（IconSettings）迁入；从文件菜单移除设置/收藏夹项、从编辑菜单移除密码管理器项；localization 新增 `Menu_Tools`（zh/en），`MainWindowViewModel` 菜单 key 注册同步 `Menu_Tools`、`Nav_GoUp`
+  - **文件关联提示**：localization 新增 `Settings_Assoc_InstallDone` / `Settings_Assoc_UninstallDone`
+  - 涉及文件：`Views/MainWindow.axaml`、`ViewModels/MainWindowViewModel.cs`、`Localization/strings.zh-CN.json`、`Localization/strings.en.json`
+
 **2026-08-07** — 测试菜单仅 Debug 构建显示（Release 自动隐藏）
   - **背景**：主菜单「测试」菜单（图标测试、各对话框预览入口）此前在所有构建中可见，正式发布不应暴露测试入口
   - **方案**：`AppConstants.ShowTestMenu` 常量（`#if DEBUG` → true/false）；`MainWindow.axaml` 测试菜单加 `x:Name="TestMenu"`；`MainWindow` 构造函数 `TestMenu.IsVisible = AppConstants.ShowTestMenu`
