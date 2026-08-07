@@ -7,7 +7,7 @@
 - **技术栈**: .NET 9 + WPF → Avalonia 迁移中 + SharpCompress + SharpSevenZip
 
 ## 版本
-- **当前版本**: 0.4.5
+- **当前版本**: 0.5.0
 - **发布日期**: 2026-07-22
 
 ## 版本历史
@@ -20,6 +20,8 @@
 ---
 
 ### MantisZip.UI.Avalonia（主力版）
+
+**2026-08-07** — 版本号更新到 0.5.0（AppConstants.cs + csproj，此前 csproj 落后为 0.4.4）
 
 **2026-08-07** — csproj 新增 CopySevenZipDll target（publish 后自动复制 7z.dll 到 x64/x86）
   - 此前仅 WPF csproj 有该 target（publish 后调 `scripts/copy-7z-dll.ps1`）；Avalonia csproj 缺失导致发布产物无 7z.dll，安装包 7z 压缩不可用。已对齐（详见共享层「发布管线切 Avalonia」条目）
@@ -929,6 +931,9 @@
 
 ### MantisZip.UI（WPF 遗留版）
 
+#### v0.5.0 (2026-08-07)
+  - 版本号从 0.4.5 更新到 0.5.0（AppConstants.cs + csproj，与 Avalonia 版同步）
+
 #### v0.4.5 (2026-07-14)
   - **冲突对话框暂停/取消功能** — CompressConflictDialog/ConflictDialog 新增暂停/取消按钮；CompressSettingsWindow 和 App 层新增 PauseFromConflict 重入路径
   - **预设显示 + 筛选统计文字常显** — 修复预设配置和过滤统计文字始终可见
@@ -1127,6 +1132,10 @@
 ### 共享层（Core / ShellExt / 构建）
 
 这些变更影响两项目共用代码，按时间从新到旧排列。
+
+#### v0.5.0 (2026-08-07) 版本号 0.5.0 + 安装包重新生成
+  - 版本号同步更新到 0.5.0（两个 UI 项目 AppConstants.cs + csproj，Avalonia csproj 从落后的 0.4.4 对齐）；docs/PLAN.md、docs/PROGRESS.md 顶部当前版本同步
+  - 重新生成 Avalonia 安装包：framework-dependent + self-contained publish（exe FileVersion 0.5.0.0）→ ISCC 编译 `MantisZip-0.5.0-Setup-WebSetup.exe` / `MantisZip-0.5.0-Setup-Offline.exe`，ProductVersion 验证 0.5.0
 
 #### v0.4.5 (2026-08-07) 发布管线切 Avalonia（release.yml + 两个 installer + 7z.dll 打包）
   - **背景**：WPF 进入维护模式，发布产物改为 Avalonia 版（`MantisZip.UI.Avalonia.exe`）。release.yml 两个 publish 步骤切到 `src\MantisZip.UI.Avalonia\MantisZip.UI.Avalonia.csproj`

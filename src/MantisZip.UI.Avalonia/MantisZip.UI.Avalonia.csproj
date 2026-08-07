@@ -9,7 +9,7 @@
     <BuiltInComInteropSupport>true</BuiltInComInteropSupport>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationIcon>Resources\App.ico</ApplicationIcon>
-    <Version>0.4.4</Version>
+    <Version>0.5.0</Version>
   </PropertyGroup>
 
   <ItemGroup>
