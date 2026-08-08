@@ -83,6 +83,14 @@ DataContext = ViewModel;
         // 返回目录（QuickPathPicker 只收目录）；文件名落在独立 OutputFileName 控件。
         OutputPathPicker.BrowseAction = BrowseOutputPathAsync;
 
+        // 消息提示回调（弹窗以本窗口为 owner）
+        ViewModel.ShowMessage = (msg, title) =>
+            AppMessageBox.Show(msg, title, MessageBoxButton.OK, MessageBoxImage.Warning, this);
+
+        // 过滤控件事件订阅提前到构造函数（原在 OnLoaded）：窗口刚弹出时用户操作过滤会导致
+        // FilterChanged 未订阅、预览不重建、Plan 保持 null → 点击压缩静默退出。
+        InitFileFilter();
+
         Loaded += OnLoaded;
     }
 
@@ -145,7 +153,6 @@ DataContext = ViewModel;
         AdjustWindowPosition();
         FormatOptionsPanel.LoadDefaults();
         LoadSplitSizeFromSettings();
-        InitFileFilter();
     }
 
     private void OnTabSelectionChanged(object? sender, SelectionChangedEventArgs e)

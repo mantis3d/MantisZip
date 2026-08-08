@@ -1,3 +1,4 @@
+using System.IO;
 using MantisZip.Core.Abstractions;
 using MantisZip.UI.Avalonia.Models;
 using MantisZip.UI.Avalonia.ViewModels;
@@ -181,11 +182,22 @@ public class CompressSettingsViewModelTests
     [Fact]
     public async Task StartCompressCommand_WithoutEncrypt_CallsCloseAction()
     {
-        var vm = new CompressSettingsViewModel(Array.Empty<string>());
-        var closeCalled = false;
-        vm.CloseAction = async (result) => { closeCalled = true; await Task.CompletedTask; };
-        await vm.StartCompressCommand.ExecuteAsync(null);
-        Assert.True(closeCalled);
+        // 用有源路径构造（无源时 CanExecute 禁用按钮，StartCompress 不会执行；
+        // 新实现里 EnsurePlanReadyAsync 对空源返回 false，也不应触发 CloseAction）
+        var dir = Path.Combine(Path.GetTempPath(), "MantisZipTest_" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(dir);
+        try
+        {
+            var vm = new CompressSettingsViewModel(new[] { dir });
+            var closeCalled = false;
+            vm.CloseAction = async (result) => { closeCalled = true; await Task.CompletedTask; };
+            await vm.StartCompressCommand.ExecuteAsync(null);
+            Assert.True(closeCalled);
+        }
+        finally
+        {
+            Directory.Delete(dir, true);
+        }
     }
 
     [Fact]

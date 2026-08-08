@@ -43,6 +43,9 @@ public partial class CompressSettingsViewModel : ObservableObject
     /// <summary>由 View 设置的关闭回调。参数 true=确认压缩，false=取消。</summary>
     public Func<bool, Task>? CloseAction { get; set; }
 
+    /// <summary>由 View 设置的提示消息回调（弹窗以窗口为 owner）。参数 (消息, 标题)。</summary>
+    public Func<string, string, Task>? ShowMessage { get; set; }
+
     // ── Output mode ──
 
     /// <summary>Manual 模式下的输出路径缓存，切换模式不丢失。</summary>
@@ -319,6 +322,30 @@ public partial class CompressSettingsViewModel : ObservableObject
 
     partial void OnIsBuildPendingChanged(bool value) => UpdateCanCompress();
 
+    /// <summary>当前在途预览构建任务（供 StartCompress 等待 B 数据集就绪）。</summary>
+    private Task<CompressPlan?>? _pendingBuildTask;
+
+    /// <summary>等待准备期间用户取消的标记（防「已取消仍启动压缩」竞态）。</summary>
+    private bool _compressCancelled;
+
+    /// <summary>最近一次预览构建的错误信息（构建失败时记录，供准备失败提示）；null = 无错误。</summary>
+    public string? LastBuildError { get; private set; }
+
+    /// <summary>是否正在等待压缩准备（B 数据集构建中）：驱动按钮文案与防重入。</summary>
+    [ObservableProperty]
+    private bool _isPreparingCompress;
+
+    partial void OnIsPreparingCompressChanged(bool value)
+    {
+        OnPropertyChanged(nameof(StartCompressText));
+        UpdateCanCompress();
+    }
+
+    /// <summary>"开始压缩"按钮文案：等待准备时显示"正在准备…"。</summary>
+    public string StartCompressText => IsPreparingCompress
+        ? LocalizationManager.T("Compress_Preparing")
+        : LocalizationManager.T("Compress_Start");
+
     /// <summary>预览树构建进度（0–100，-1 表示不确定进度/不定进度条）。</summary>
     [ObservableProperty]
     private double _previewBuildProgress = -1;
@@ -509,9 +536,6 @@ public partial class CompressSettingsViewModel : ObservableObject
         }
         catch { /* 使用默认值 */ }
 
-        // Build initial compress preview from source paths
-        BuildCompressPreview();
-
         // Auto-generate initial password rules from output mode + source paths
         // Must be called after SelectedPaths is populated (the CollectionChanged
         // handler won't fire for items added before it was attached).
@@ -520,6 +544,12 @@ public partial class CompressSettingsViewModel : ObservableObject
         // 自动填充输出路径：CollectionChanged 不会为构造时已添加的路径触发，
         // 需显式调用（对齐 WPF ShowCompressWindow 自动填充输出路径；CLI --compress 依赖此逻辑）
         TryAutoFillOutputPath();
+
+        // Build initial compress preview from source paths。
+        // 必须在 TryAutoFillOutputPath 之后调用（旧顺序：BuildCompressPreview 在 TryAutoFillOutputPath
+        // 之前，构造时 OutputPath 为空导致 IsOutputPathValid 早退、Plan=null，且路径填充后不再触发重建，
+        // 产生「窗口打开但 B 数据集未就绪、按钮却可点」的竞态 → 点击压缩静默退出）。
+        BuildCompressPreview();
     }
 
     /// <summary>
@@ -529,12 +559,16 @@ public partial class CompressSettingsViewModel : ObservableObject
     /// <param name="filter">文件过滤条件，不为空且 IsActive 时对文件节点标记 IsFilteredOut；
     /// null 时回退到 <see cref="FileFilter"/>（保持 CollectionChanged 等无参调用不丢失过滤）。</param>
     public void BuildCompressPreview(FileFilterCriteria? filter = null)
-        => _ = BuildCompressPreviewCoreAsync(filter ?? FileFilter);
+    {
+        // 保存当前构建任务，供 StartCompress 等待 B 数据集就绪（点击后等待在途构建完成再压缩）
+        _pendingBuildTask = BuildCompressPreviewCoreAsync(filter ?? FileFilter);
+    }
 
-    private async Task BuildCompressPreviewCoreAsync(FileFilterCriteria? filter)
+    private async Task<CompressPlan?> BuildCompressPreviewCoreAsync(FileFilterCriteria? filter)
     {
         var version = ++_previewBuildVersion;
         IsBuildPending = true; // 快慢构建都置位，B 未就绪时禁用"开始压缩"
+        LastBuildError = null;
 
         if (SelectedPaths.Count == 0)
         {
@@ -542,7 +576,7 @@ public partial class CompressSettingsViewModel : ObservableObject
             IsPreviewBuilding = false;
             IsBuildPending = false;
             Plan = null; // 无源 → B 无效
-            return;
+            return null;
         }
 
         if (!IsOutputPathValid())
@@ -558,7 +592,7 @@ public partial class CompressSettingsViewModel : ObservableObject
             IsPreviewBuilding = false;
             IsBuildPending = false;
             Plan = null; // 路径无效 → B 无效
-            return;
+            return null;
         }
 
         try
@@ -585,20 +619,26 @@ public partial class CompressSettingsViewModel : ObservableObject
             var delayTask = Task.Delay(250);
             if (await Task.WhenAny(buildTask, delayTask) == delayTask)
             {
-                if (version != _previewBuildVersion) return; // 已有更新的构建
+                if (version != _previewBuildVersion) return null; // 已有更新的构建
                 PreviewBuildProgress = -1;
                 IsPreviewBuilding = true;
             }
 
             var (root, plan) = await buildTask;
-            if (version != _previewBuildVersion) return; // 过期结果丢弃
+            if (version != _previewBuildVersion) return null; // 过期结果丢弃
 
             PreviewRoot = root;
             Plan = plan; // 缓存 B（执行侧只读消费，预览 = 实际）
+            return plan;
         }
         catch (Exception ex)
         {
+            // 构建失败：记录错误供 StartCompress 提示（不再静默吞掉）；同时失效 B，
+            // 避免重建失败后用旧输入的 Plan 压缩（预览 = 实际 的守卫）
             App.DebugLog($"BuildCompressPreview failed: {ex.Message}");
+            LastBuildError = ex.Message;
+            Plan = null;
+            return null;
         }
         finally
         {
@@ -1038,6 +1078,8 @@ public partial class CompressSettingsViewModel : ObservableObject
 
     private bool CanExecuteStartCompress()
     {
+        // 等待准备期间禁用（防重入：B 就绪前的等待窗口内再点一次）
+        if (IsPreparingCompress) return false;
         // 预览树构建期间禁用"开始压缩"：B 数据集未就绪时不允许执行（预览 = 实际的守卫）
         if (IsBuildPending) return false;
         if (SelectedPaths.Count == 0) return false;
@@ -1053,13 +1095,74 @@ public partial class CompressSettingsViewModel : ObservableObject
             return;
         }
 
-        if (CloseAction != null)
-            await CloseAction(true);
+        // 等待 B 数据集就绪（预览=实际 的守卫）：点击后如有在途构建则等待其完成；
+        // 无在途构建且 Plan 无效则补建一次；就绪后才关闭窗口并执行压缩，
+        // 避免「窗口直接关闭却无压缩生成」的静默失败。
+        IsPreparingCompress = true;
+        try
+        {
+            var ready = await EnsurePlanReadyAsync();
+            if (_compressCancelled) return; // 等待期间用户已取消 → 不再启动压缩
+            if (!ready)
+            {
+                // 无法准备（构建失败等）：窗口保持打开并提示，用户可调整后重试
+                await ShowPrepareFailedAsync();
+                return;
+            }
+
+            if (CloseAction != null)
+                await CloseAction(true);
+        }
+        finally
+        {
+            IsPreparingCompress = false;
+            _compressCancelled = false;
+        }
+    }
+
+    /// <summary>
+    /// 确保 B 数据集（<see cref="Plan"/>）就绪。等待当前在途构建完成；若 Plan 仍无效
+    /// 且输入有效则补建一次（覆盖构造时序残留/构建失败后无在途构建的状态）。
+    /// 返回 false 表示无法准备（构建失败或输入无效）。
+    /// 注：等待期间用户持续变更输入会持续等待新构建（活锁由用户操作驱动，语义合理），
+    /// 取消始终可用（见 <see cref="Cancel"/> 的 _compressCancelled 标记）。
+    /// </summary>
+    private async Task<bool> EnsurePlanReadyAsync()
+    {
+        bool attemptedRebuild = false;
+        while (true)
+        {
+            var task = _pendingBuildTask;
+            if (task != null)
+            {
+                try { await task; } catch { /* 构建内部已吞异常，以 Plan 状态为准 */ }
+                if (_pendingBuildTask != task) continue; // 等待期间有新构建 → 重等最新
+            }
+
+            if (Plan != null) return true;
+            if (SelectedPaths.Count == 0 || !IsOutputPathValid()) return false;
+
+            // Plan 仍无效且无在途构建：补建一次（不无限重试，避免构建持续失败时死循环）
+            if (attemptedRebuild) return false;
+            attemptedRebuild = true;
+            BuildCompressPreview();
+        }
+    }
+
+    /// <summary>压缩准备失败提示（窗口保持打开，用户可调整后重试）。</summary>
+    private async Task ShowPrepareFailedAsync()
+    {
+        if (ShowMessage != null)
+            await ShowMessage(LocalizationManager.T("Compress_PrepareFailed"), LocalizationManager.T("Compress_Title"));
     }
 
     [RelayCommand]
     private async Task Cancel()
     {
+        // 等待 B 数据集准备期间用户取消：标记取消，StartCompress 恢复执行时不再启动压缩
+        if (IsPreparingCompress)
+            _compressCancelled = true;
+
         if (CloseAction != null)
             await CloseAction(false);
     }

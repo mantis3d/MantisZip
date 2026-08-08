@@ -21,6 +21,11 @@
 
 ### MantisZip.UI.Avalonia（主力版）
 
+**2026-08-08** — 修复压缩对话框「点击压缩窗口直接关闭却无压缩生成」的静默失败（B 数据集未就绪）
+  - **背景**：右键 `--compress`（CLI）路径下 `CompressFlow.BuildRequest` 返回 null 时 `desktop.Shutdown()` 静默退出无提示；且构造时序缺陷（`BuildCompressPreview()` 先于 `TryAutoFillOutputPath()`）导致窗口打开时 B 数据集（Plan）为 null 而「开始压缩」按钮未禁用 → 用户点击后窗口关闭、无压缩包、无任何反馈（便携版新机首次运行偶发，JIT/初始化延迟放大竞态窗口）
+  - **方案**：① `CompressSettingsViewModel`：初始 `BuildCompressPreview()` 移至 `TryAutoFillOutputPath()` 之后；`StartCompress` 点击后等待 B 数据集就绪（`EnsurePlanReadyAsync`：等在途构建/补建一次，就绪后才关闭窗口执行压缩），`IsPreparingCompress` 驱动按钮「正在准备…」文案与防重入，`Cancel` 等待期间设 `_compressCancelled` 标记防「已取消仍启动压缩」；构建失败置 `Plan=null`（失效旧输入 B）+ 记录 `LastBuildError` ② `CompressSettingsWindow`：`InitFileFilter()` 提前到构造函数（消除 OnLoaded 竞态：窗口刚弹出时操作过滤导致 FilterChanged 未订阅、Plan 不重建）+ 注入 `ShowMessage` 回调 ③ `App.axaml.cs` CLI：`BuildRequest==null` 时保持窗口打开并弹 `Compress_FilteredAllSkipped` 提示（对齐主窗口路径），不再静默 `Shutdown` ④ localization 新增 `Compress_Preparing`/`Compress_PrepareFailed`（zh/en 成对）
+  - 涉及文件：`ViewModels/CompressSettingsViewModel.cs`、`Dialogs/CompressSettingsWindow.axaml(.cs)`、`App.axaml.cs`、`Localization/strings.zh-CN.json`、`Localization/strings.en.json`、`tests/MantisZip.UI.Avalonia.Tests/CompressSettingsViewModelTests.cs`（空源用例改为有源路径，适配新语义）；构建 0 错误，Avalonia 测试 43/43 通过
+
 **2026-08-08** — CLI 压缩/解压取消链路修复（X 关闭不再产生损坏压缩包）
   - **背景**：CLI 模式（`--compress-quick` 等）进度窗口是唯一窗口，默认 `ShutdownMode.OnLastWindowClose` 导致用户点击 X 立即退出进程，后台压缩被强杀留下损坏的半成品压缩包
   - **方案**：① `ProgressWindow` 重写 `OnClosing`（`CloseReason == WindowClosing` 且 `IsCancelEnabled` 时调用新增的 `ProgressViewModel.CancelOperation()` 仅触发取消、不关窗口；程序化 `Close()`/`ApplicationShutdown` 不受影响）② 压缩三条 CLI 路径（Quick/Separate/Combined）与解压两条路径（`RunCliExtractWithProgressAsync`/`RunCliExtractBatchWithProgressAsync`）入口设 `ShutdownMode.OnExplicitShutdown`，退出时机改由 `desktop.Shutdown()` 显式控制

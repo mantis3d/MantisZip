@@ -1394,19 +1394,28 @@ public partial class App : Application
         {
             if (result)
             {
-                compressStarted = true;
                 // 此入口覆盖了窗口内部 CloseAction，需显式快照高级选项（仅本次压缩生效）
                 dlg.SnapshotFormatOptionsToViewModel();
-                dlg.Close();
                 var vm = dlg.ViewModel;
 
-                // 统一构建（含文件过滤），与主窗口 ExecuteCompressFromSettings 共用 CompressFlow
+                // 统一构建（含文件过滤），与主窗口 ExecuteCompressFromSettings 共用 CompressFlow。
+                // StartCompress 已等待 B 数据集就绪，但 BuildRequest 仍可能返回 null（如过滤后全部无匹配）：
+                // 此时保持窗口打开并提示（对齐主窗口路径的 Compress_FilteredAllSkipped 提示），
+                // 而不是静默关闭窗口并退出进程（原 bug：request==null → desktop.Shutdown() 无任何反馈）。
                 var request = CompressFlow.BuildRequest(vm);
                 if (request == null)
                 {
-                    desktop.Shutdown();
+                    await AppMessageBox.Show(
+                        LocalizationManager.T("Compress_FilteredAllSkipped"),
+                        LocalizationManager.T("Compress_Title"),
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Warning,
+                        dlg);
                     return;
                 }
+
+                compressStarted = true;
+                dlg.Close();
 
                 await CompressWithProgress(request, LocalizationManager.T("Cli_Compress"), desktop);
             }
