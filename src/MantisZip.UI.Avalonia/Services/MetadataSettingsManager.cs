@@ -3,16 +3,16 @@ using System.IO;
 using System.Text.Json;
 using MantisZip.Core.Models;
 using MantisZip.Core.Utils;
+using MantisZip.UI.Avalonia.Models;
 
 namespace MantisZip.UI.Avalonia.Services;
 
 /// <summary>
-/// 元数据面板配置的持久化管理。与 AppSettings 共享同一目录，独立文件。
+/// 元数据面板配置的持久化管理。与 AppSettings 共享同一目录（便携模式：exe 旁 Data/），独立文件。
 /// </summary>
 public static class MetadataSettingsManager
 {
-    private static readonly string SettingsDir =
-        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "MantisZip");
+    private static readonly string SettingsDir = AppSettings.DataDir;
     private static readonly string SettingsFile =
         Path.Combine(SettingsDir, "metadata-panel.json");
 

@@ -502,8 +502,7 @@ public partial class App : Application
         try
         {
             var logPath = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                "MantisZip", "debug.log");
+                AppSettings.DataDir, "debug.log");
             var dir = Path.GetDirectoryName(logPath);
             if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
                 Directory.CreateDirectory(dir);

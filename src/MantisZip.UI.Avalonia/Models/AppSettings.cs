@@ -1,10 +1,12 @@
 using System.Text.Json;
+using MantisZip.Core;
 using MantisZip.Core.FileFilter;
+using MantisZip.Core.Utils;
 
 namespace MantisZip.UI.Avalonia.Models;
 
 /// <summary>
-/// 应用设置（存储在 %LOCALAPPDATA%\MantisZip\settings.json）
+/// 应用设置（存储于 %LOCALAPPDATA%\MantisZip\settings.json，便携模式为 exe 旁 Data/settings.json）
 /// JSON 格式与 WPF 版本兼容，但仅保留 Avalonia 版本使用的字段。
 /// </summary>
 public class AppSettings
@@ -99,6 +101,8 @@ public class AppSettings
     public string Language { get; set; } = "zh";
     public bool ShowProgressBars { get; set; } = true;
     public bool SeparateDirBaseline { get; set; } = false;
+    /// <summary>目录树：切换目录时自动展开到当前目录并收起其他分支。</summary>
+    public bool AutoExpandTreeToCurrent { get; set; } = false;
 
     // ===== 文件关联 =====
     public bool AssocZip { get; set; } = true;
@@ -141,10 +145,36 @@ public class AppSettings
     public string LogPrivacyMode { get; set; } = "extension";
 
     // ===== 持久化 =====
-    private static readonly string SettingsDir =
-        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "MantisZip");
-    private static readonly string SettingsFile =
-        Path.Combine(SettingsDir, "settings.json");
+    /// <summary>便携模式：exe 同级存在 Portable.txt 时启用，设置路径重定向到 exe 旁 Data/ 目录。</summary>
+    public static bool IsPortableMode { get; private set; }
+
+    /// <summary>应用数据目录：便携模式 = exe 旁 Data/，否则 = %LOCALAPPDATA%\MantisZip。</summary>
+    public static string DataDir { get; private set; } = "";
+
+    private static readonly string SettingsDir;
+    private static readonly string SettingsFile;
+
+    static AppSettings()
+    {
+        IsPortableMode = File.Exists(Path.Combine(AppContext.BaseDirectory, "Portable.txt"));
+
+        if (IsPortableMode)
+        {
+            var dataDir = Path.Combine(AppContext.BaseDirectory, "Data");
+            Directory.CreateDirectory(dataDir);
+            DataDir = dataDir;
+            SettingsDir = dataDir;
+            SettingsFile = Path.Combine(dataDir, "settings.json");
+            PasswordManager.CustomDataDir = dataDir;
+        }
+        else
+        {
+            DataDir = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "MantisZip");
+            SettingsDir = DataDir;
+            SettingsFile = Path.Combine(SettingsDir, "settings.json");
+        }
+    }
 
     public static AppSettings Load()
     {

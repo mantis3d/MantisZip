@@ -677,8 +677,7 @@ public partial class SettingsWindowViewModel : ObservableObject
     public string LogPrivacyHelpText => LocalizationManager.T("Settings_Debug_LogPrivacyHelp");
     public string LogPathText => LocalizationManager.T("Settings_Debug_LogPath");
     public string LogFilePath => Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-        "MantisZip", "debug.log");
+        AppSettings.DataDir, "debug.log");
 
     // ── New tab headers ──
     public string TabLanguageHeader => LocalizationManager.T("Settings_Tab_Language");

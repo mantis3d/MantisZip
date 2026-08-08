@@ -21,6 +21,12 @@
 
 ### MantisZip.UI.Avalonia（主力版）
 
+**2026-08-08** — 目录树「自动展开」开关 + Avalonia 便携模式（Portable.txt → Data/）
+  - **自动展开**：目录树工具栏 `ExpandToCurrent` 右侧新增 ToggleButton（IconLocationCheckmark，ToolTip 绑 `Tree_AutoExpand`），`MainWindowViewModel` 新增 `[ObservableProperty] AutoExpandTree`（构造读取 `AppSettings.AutoExpandTreeToCurrent`，`OnAutoExpandTreeChanged` 写回保存 + 开启时立即执行一次）；`OnCurrentFolderChanged` 钩子（仅 `value == null` 跳过）→ 抽出 `ExpandTreeToPath(path)` 共用方法（CollapseAll + 根展开 + 祖先链），`ExpandToCurrent()` 复用之；根目录（`CurrentFolder == ""`）同样执行收起，修复返回根目录不收起分支的 bug；localization 新增 `Tree_AutoExpand`（zh/en）
+  - **便携模式**：此前 Avalonia 版缺失 WPF 版的 `IsPortableMode`（`Portable.txt` → exe 旁 `Data/` 目录重定向）。`AppSettings` 新增静态构造检测 + `IsPortableMode`/`DataDir` 静态属性，便携时 `PasswordManager.CustomDataDir = DataDir`；`RecentFilesManager`（recent.json）/`WindowStateManager`（window.json）/`MetadataSettingsManager`（metadata-panel.json）/debug.log×3（App.axaml.cs、SettingsWindowViewModel.LogFilePath、MainWindow.axaml.cs WritePickerTrace）统一改用 `AppSettings.DataDir`
+  - **新用户默认激活（设置侧）**：`installer/prebuilt/settings.json` 加 `AutoExpandTreeToCurrent: true`，安装器全新安装自动带入；便携版打包侧见共享层线索条目
+  - 涉及文件：`Models/AppSettings.cs`、`Models/RecentFilesManager.cs`、`Models/WindowStateManager.cs`、`Services/MetadataSettingsManager.cs`、`ViewModels/MainWindowViewModel.cs`、`ViewModels/SettingsWindowViewModel.cs`、`Views/MainWindow.axaml`、`Views/MainWindow.axaml.cs`、`App.axaml.cs`、`Localization/strings.zh-CN.json`、`Localization/strings.en.json`、`installer/prebuilt/settings.json`；构建 0 错误
+
 **2026-08-08** — 文件列表图标列位置修复 + 拖拽列标题误触发文件拖拽
   - **背景**：① 图标列被挤到中间：`ApplyColumnStates` 仅处理有 `SortMemberPath` 的列，图标列（无 SortMemberPath）被排除；旧版 `window.json` 的 DisplayIndex 序列缺失图标列位置，Name 列抢占 0 后图标列被挤到中间 ② 拖列标题调宽时误触发拖拽解压：Avalonia `PointerPressed`（Tunnel）无条件记录拖拽起点，列头按下也进入拖拽流程（WPF 版有 `FindVisualParent<DataGridRow>` 空检查保护，Avalonia 版缺失）
   - **方案**：`CanUserReorderColumns="True"` 开启列重排；图标列加 `Tag="Icon"`，新增 `GetColumnId()`（SortMemberPath 优先、Tag 兜底）使图标列纳入 `CaptureColumnStates`/`ApplyColumnStates` 持久化；`ApplyColumnStates` 双轨兼容——新版 JSON（含 Icon 状态）按 DisplayIndex 恢复全部列，旧版 JSON 强制图标列 `DisplayIndex=0` 其余顺延自愈
@@ -1150,6 +1156,11 @@
 ### 共享层（Core / ShellExt / 构建）
 
 这些变更影响两项目共用代码，按时间从新到旧排列。
+
+#### v0.5.0 (2026-08-08) 便携包预置默认设置（release.yml New-PortableZip）
+  - **背景**：便携版此前不含任何默认设置（Avalonia 版 `AppSettings` 不写默认文件，缺失即全部默认值）；新增"自动展开"开关需新用户默认激活
+  - **方案**：`New-PortableZip` 打包时复制 `installer\prebuilt\settings.json` 为 zip 内 `Data\settings.json`，并替换安装向导占位符 `__LANG__`→`zh`、`__THEME__`→`System`（UTF-8 无 BOM 写出，避免 PS5.1 编码问题）；prebuilt settings.json 同步加 `AutoExpandTreeToCurrent: true`。Avalonia 便携模式读取 exe 旁 `Data/settings.json`（见 Avalonia 线索条目）
+  - 涉及文件：`.github/workflows/release.yml`、`installer/prebuilt/settings.json`
 
 #### v0.5.0 (2026-08-07) 发布物移除调试符号（PDB）
   - **背景**：便携包打包用 `Compress-Archive "$Src\*"` 全量打包，把 publish 生成的 PDB 全带上了（含第三方原生库 `libSkiaSharp.pdb` 80MB + `libHarfBuzzSharp.pdb` 22MB）；installer 也显式打包应用自身 `MantisZip.Core.pdb` + `MantisZip.UI.Avalonia.pdb`

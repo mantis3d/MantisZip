@@ -225,7 +225,7 @@ public partial class MainWindowViewModel : ObservableObject
             "Main_Favorites", "Main_IconTestTitle",
             "Toolbar_Password", "Tooltip_Password",
             "Menu_Test",
-            "Tree_ExpandAll", "Tree_CollapseAll", "Tree_ExpandToCurrent", "Tree_Filter",
+            "Tree_ExpandAll", "Tree_CollapseAll", "Tree_ExpandToCurrent", "Tree_AutoExpand", "Tree_Filter",
             "Nav_GoRoot", "Nav_GoBack", "Nav_GoForward", "Nav_AddressBar", "Nav_GoUp",
             "Toolbar_CopyName", "Toolbar_Refresh",
             "Toolbar_SelectAll", "Toolbar_InvertSelection", "Toolbar_ViewMode",
@@ -466,6 +466,12 @@ public partial class MainWindowViewModel : ObservableObject
     [ObservableProperty]
     private string? _currentFolder;
 
+    /// <summary>
+    /// 目录树"自动展开"开关：开启后每次切换目录自动展开到当前目录并收起其他分支。
+    /// </summary>
+    [ObservableProperty]
+    private bool _autoExpandTree;
+
     public ObservableCollection<ArchiveItemModel> CurrentEntries { get; } = [];
 
     public ObservableCollection<ArchiveItemModel> Entries { get; } = [];
@@ -655,6 +661,7 @@ public partial class MainWindowViewModel : ObservableObject
         // Load settings
         ShowProgressBars = _appSettings.ShowProgressBars;
         SeparateDirBaseline = _appSettings.SeparateDirBaseline;
+        AutoExpandTree = _appSettings.AutoExpandTreeToCurrent;
         Preview.ShowInfoPanel = _appSettings.ShowPreviewInfoPanel;
 
         // 主题（三态）：初始化菜单按钮暗色状态显示
@@ -1488,12 +1495,48 @@ public partial class MainWindowViewModel : ObservableObject
     private void ExpandToCurrent()
     {
         if (FolderTreeRoot == null || SelectedFolder == null) return;
+        ExpandTreeToPath(SelectedFolder.FullPath);
+    }
+
+    /// <summary>
+    /// 收起整棵树（保留根展开），仅展开到指定路径的祖先链。
+    /// 手动"定位到当前目录"与"自动展开"开关共用同一实现。
+    /// </summary>
+    private void ExpandTreeToPath(string path)
+    {
+        if (FolderTreeRoot == null) return;
         // Collapse all first
         FolderTreeRoot.CollapseAll();
         // Expand root
         FolderTreeRoot.IsExpanded = true;
-        // Then expand ancestors of current selection
-        ExpandAncestorsOf(FolderTreeRoot, SelectedFolder.FullPath);
+        // 根目录（空路径）：收起所有分支即可，无需展开祖先链
+        if (string.IsNullOrEmpty(path)) return;
+        // Then expand ancestors of the target path
+        ExpandAncestorsOf(FolderTreeRoot, path);
+    }
+
+    /// <summary>
+    /// 切换目录时若开启"自动展开"，收起其他分支并展开到新目录的祖先链。
+    /// 挂在 CurrentFolder 变化上，天然覆盖树点击 / 文件列表双击 / 地址栏 / 前进后退等所有导航路径。
+    /// 仅 null（清空压缩包，树将重置）跳过；空字符串（根目录）也执行收起。
+    /// </summary>
+    partial void OnCurrentFolderChanged(string? value)
+    {
+        if (!AutoExpandTree) return;
+        if (value == null) return;
+        ExpandTreeToPath(value);
+    }
+
+    /// <summary>
+    /// 自动展开开关变化时持久化到 AppSettings。
+    /// </summary>
+    partial void OnAutoExpandTreeChanged(bool value)
+    {
+        _appSettings.AutoExpandTreeToCurrent = value;
+        _ = _appSettings.Save();
+        // 开启时立即执行一次，让当前目录立刻在树中定位
+        if (value)
+            ExpandTreeToPath(CurrentFolder ?? "");
     }
 
     private static void ExpandAncestorsOf(FolderNode node, string targetPath)

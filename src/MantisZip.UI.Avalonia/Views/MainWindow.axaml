@@ -821,6 +821,12 @@
                       ToolTip.Tip="{Binding LocalizedStrings[Tree_ExpandToCurrent]}">
                 <PathIcon Data="{StaticResource IconLocation}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
               </Button>
+              <ToggleButton Classes="ToolbarButton ToolbarIcon"
+                            IsChecked="{Binding AutoExpandTree}"
+                            IsEnabled="{Binding IsArchiveLoaded}"
+                            ToolTip.Tip="{Binding LocalizedStrings[Tree_AutoExpand]}">
+                <PathIcon Data="{StaticResource IconLocationCheckmark}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+              </ToggleButton>
             </StackPanel>
           </Border>
           <!-- Header -->

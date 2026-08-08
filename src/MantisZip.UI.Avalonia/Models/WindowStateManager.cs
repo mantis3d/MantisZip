@@ -7,8 +7,8 @@ namespace MantisZip.UI.Avalonia.Models;
 
 /// <summary>
 /// 窗口状态持久化管理器。
-/// 将窗口的大小、位置、状态保存到 %LOCALAPPDATA%\MantisZip\window.json，
-/// 跨会话恢复窗口布局。
+/// 将窗口的大小、位置、状态保存到 %LOCALAPPDATA%\MantisZip\window.json
+/// （便携模式：exe 旁 Data/window.json），跨会话恢复窗口布局。
 /// 
 /// 用法：
 ///   WindowStateManager.LoadAsync(window)      // 启动时
@@ -16,8 +16,7 @@ namespace MantisZip.UI.Avalonia.Models;
 /// </summary>
 internal static class WindowStateManager
 {
-    private static readonly string BaseDir =
-        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "MantisZip");
+    private static readonly string BaseDir = AppSettings.DataDir;
 
     private static readonly string ConfigFile =
         Path.Combine(BaseDir, "window.json");

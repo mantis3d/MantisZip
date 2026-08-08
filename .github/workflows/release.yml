@@ -129,6 +129,19 @@ jobs:
           function New-PortableZip([string]$Src, [string]$ZipName) {
             # Portable.txt sentinel file
             "" | Out-File -FilePath "$Src\Portable.txt" -Encoding ascii
+            # Copy default settings into Data/ (portable mode reads exe-adjacent Data/settings.json)
+            # prebuilt/settings.json 含安装向导占位符 __LANG__/__THEME__，便携版无向导 → 替换为默认值
+            $prebuiltSettings = "installer\prebuilt\settings.json"
+            if (Test-Path $prebuiltSettings) {
+              $dataDir = "$Src\Data"
+              New-Item -ItemType Directory -Path $dataDir -Force | Out-Null
+              $settingsJson = Get-Content $prebuiltSettings -Raw
+              $settingsJson = $settingsJson.Replace('__LANG__', 'zh').Replace('__THEME__', 'System')
+              [System.IO.File]::WriteAllText("$dataDir\settings.json", $settingsJson, [System.Text.UTF8Encoding]::new($false))
+              Write-Host "Default settings.json copied to $dataDir\settings.json"
+            } else {
+              Write-Host "prebuilt/settings.json not found, portable default settings skipped"
+            }
             # Copy 7z.dll for 7z compression support
             $sevenZ = "$env:ProgramFiles\7-Zip\7z.dll"
             if (Test-Path $sevenZ) {

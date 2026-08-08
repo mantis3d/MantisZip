@@ -4,12 +4,11 @@ namespace MantisZip.UI.Avalonia.Models;
 
 /// <summary>
 /// Manages recently opened archive file paths.
-/// Persisted to a JSON file in %APPDATA%/MantisZip/recent.json.
+/// Persisted to a JSON file in %APPDATA%/MantisZip/recent.json (portable: exe 旁 Data/recent.json).
 /// </summary>
 public static class RecentFilesManager
 {
-    private static readonly string SettingsDir = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "MantisZip");
+    private static readonly string SettingsDir = AppSettings.DataDir;
     private static readonly string RecentFile = Path.Combine(SettingsDir, "recent.json");
     private const int MaxEntries = 10;
 

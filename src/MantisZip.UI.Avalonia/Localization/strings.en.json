@@ -879,6 +879,7 @@
   "Tree_ExpandAll": "Expand All",
   "Tree_CollapseAll": "Collapse All",
   "Tree_ExpandToCurrent": "Expand to Current",
+  "Tree_AutoExpand": "Auto Expand to Current",
   "Tree_Filter": "Filter tree...",
   "Nav_GoRoot": "Root",
   "Nav_GoUp": "Parent",

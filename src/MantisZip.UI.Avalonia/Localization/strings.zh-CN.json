@@ -877,6 +877,7 @@
   "Tree_ExpandAll": "展开所有",
   "Tree_CollapseAll": "收起所有",
   "Tree_ExpandToCurrent": "展开到当前",
+  "Tree_AutoExpand": "自动展开到当前目录",
   "Tree_Filter": "过滤目录...",
   "Nav_GoRoot": "根目录",
   "Nav_GoUp": "父目录",

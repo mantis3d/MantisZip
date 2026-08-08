@@ -948,8 +948,7 @@ public partial class MainWindow : Window
     private static void WritePickerTrace(string msg)
     {
         var logPath = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "MantisZip", "debug.log");
+            AppSettings.DataDir, "debug.log");
         try
         {
             var dir = Path.GetDirectoryName(logPath);

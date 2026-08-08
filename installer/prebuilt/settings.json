@@ -41,6 +41,7 @@
   "MaxRecentFiles": 25,
   "ShowProgressBars": true,
   "SeparateDirBaseline": true,
+  "AutoExpandTreeToCurrent": true,
   "Language": "__LANG__",
   "Theme": "__THEME__",
   "EnableDebugLogging": false,
