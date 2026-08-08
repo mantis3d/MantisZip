@@ -21,6 +21,11 @@
 
 ### MantisZip.UI.Avalonia（主力版）
 
+**2026-08-08** — CLI 压缩/解压取消链路修复（X 关闭不再产生损坏压缩包）
+  - **背景**：CLI 模式（`--compress-quick` 等）进度窗口是唯一窗口，默认 `ShutdownMode.OnLastWindowClose` 导致用户点击 X 立即退出进程，后台压缩被强杀留下损坏的半成品压缩包
+  - **方案**：① `ProgressWindow` 重写 `OnClosing`（`CloseReason == WindowClosing` 且 `IsCancelEnabled` 时调用新增的 `ProgressViewModel.CancelOperation()` 仅触发取消、不关窗口；程序化 `Close()`/`ApplicationShutdown` 不受影响）② 压缩三条 CLI 路径（Quick/Separate/Combined）与解压两条路径（`RunCliExtractWithProgressAsync`/`RunCliExtractBatchWithProgressAsync`）入口设 `ShutdownMode.OnExplicitShutdown`，退出时机改由 `desktop.Shutdown()` 显式控制
+  - 涉及文件：`Dialogs/ProgressWindow.axaml.cs`、`ViewModels/ProgressViewModel.cs`、`App.axaml.cs`；Core 引擎取消清理见共享层条目；构建 0 错误（ShellExt.dll 被 Explorer 锁定的复制警告与本次改动无关）
+
 **2026-08-08** — 设置窗口调试面板新增「打开日志文件」按钮（对齐 WPF）
   - **背景**：WPF 版设置窗口调试面板有 `Settings_Advanced_OpenLog` 按钮（`OpenLogFolder_Click` → `explorer.exe /select,"路径"`），Avalonia 版仅有日志路径显示无按钮
   - **方案**：`SettingsWindowViewModel` 新增 `[RelayCommand] OpenLogFolder`（`LogFilePath` → `explorer.exe /select,"<日志路径>"` 选中 debug.log，含目录存在性检查 + 异常 Debug.WriteLine 记录）+ `OpenLogFolderText` 属性；调试面板日志路径卡片（LogPath 区）路径文本下方新增按钮，主题资源键（ThemeButtonBgBrush/ThemeTextPrimaryBrush/ThemeBorderBrush）；localization 新增 `Settings_Advanced_OpenLog`（zh/en，与 WPF 同名同文案）
@@ -1161,6 +1166,11 @@
 ### 共享层（Core / ShellExt / 构建）
 
 这些变更影响两项目共用代码，按时间从新到旧排列。
+
+#### v0.5.0 (2026-08-08) 引擎压缩取消时清理部分输出文件
+  - **背景**：CLI 压缩被取消（用户点 X 或取消按钮）后，`TarGzEngine`/`SevenZipEngine` 的 `CompressAsync` 直接抛 `OperationCanceledException`，部分写入的输出文件残留在磁盘上，与 `ZipEngine` 既有取消清理（`CleanupSplitFiles`/`File.Delete`）行为不一致
+  - **方案**：两引擎 `CompressAsync` 的 `Task.Run` lambda 外包 try-catch `OperationCanceledException` → 删除 `outputPath`（清理失败仅记 `CoreLog.Error` 不吞异常）→ rethrow；`ZipEngine` 加密分支（SharpSevenZip）确认已被既有 catch 覆盖无需改动
+  - 涉及文件：`Engines/TarGzEngine.cs`、`Engines/SevenZipEngine.cs`；构建 0 错误
 
 #### v0.5.0 (2026-08-08) 便携包预置默认设置（release.yml New-PortableZip）
   - **背景**：便携版此前不含任何默认设置（Avalonia 版 `AppSettings` 不写默认文件，缺失即全部默认值）；新增"自动展开"开关需新用户默认激活

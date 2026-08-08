@@ -155,8 +155,18 @@ public partial class ProgressViewModel : ObservableObject
     [RelayCommand]
     private void Cancel()
     {
-        _cts?.Cancel();
+        CancelOperation();
         RequestClose?.Invoke();
+    }
+
+    /// <summary>
+    /// Cancel the underlying operation without requesting a window close.
+    /// Used by the window's X button (OnClosing): the window is already closing,
+    /// so only the cancellation token needs to be triggered.
+    /// </summary>
+    public void CancelOperation()
+    {
+        _cts?.Cancel();
     }
 
     /// <summary>

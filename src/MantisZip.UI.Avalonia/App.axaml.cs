@@ -839,6 +839,10 @@ public partial class App : Application
         string[] originalArgs,
         IClassicDesktopStyleApplicationLifetime desktop)
     {
+        // 显式管理退出：进度窗口是 CLI 模式下唯一窗口，默认 OnLastWindowClose 会在用户
+        // 点击 X 时立即退出进程，后台解压被强杀中断（对齐 WPF 的 OnExplicitShutdown 用法）
+        desktop.ShutdownMode = ShutdownMode.OnExplicitShutdown;
+
         var progressWindow = new ProgressWindow(LocalizationManager.T("Progress_Title_Extract"));
         progressWindow.InitCancellation();
         progressWindow.Show();
@@ -947,6 +951,10 @@ public partial class App : Application
         List<string>? filteredEntryKeys,
         IClassicDesktopStyleApplicationLifetime desktop)
     {
+        // 显式管理退出：进度窗口是 CLI 模式下唯一窗口，默认 OnLastWindowClose 会在用户
+        // 点击 X 时立即退出进程，后台解压被强杀中断（对齐 WPF 的 OnExplicitShutdown 用法）
+        desktop.ShutdownMode = ShutdownMode.OnExplicitShutdown;
+
         var progressWindow = new ProgressWindow(LocalizationManager.T("Progress_Title_Extract"));
         progressWindow.InitCancellation();
         progressWindow.Show();
@@ -1423,6 +1431,10 @@ public partial class App : Application
         var myPaths = paths.Where(p => File.Exists(p) || Directory.Exists(p)).ToList();
         if (myPaths.Count == 0) { desktop.Shutdown(); return; }
 
+        // 显式管理退出：进度窗口是 CLI 模式下唯一窗口，默认 OnLastWindowClose 会在用户
+        // 点击 X 时立即退出进程，后台压缩被强杀留下损坏的压缩包（对齐 WPF 的 OnExplicitShutdown 用法）
+        desktop.ShutdownMode = ShutdownMode.OnExplicitShutdown;
+
         var settings = AppSettings.Load();
 
         // Auto-determine output path from first source
@@ -1456,6 +1468,10 @@ public partial class App : Application
     {
         var myPaths = paths.Where(p => File.Exists(p) || Directory.Exists(p)).ToList();
         if (myPaths.Count == 0) { desktop.Shutdown(); return; }
+
+        // 显式管理退出：进度窗口是 CLI 模式下唯一窗口，默认 OnLastWindowClose 会在用户
+        // 点击 X 时立即退出进程，后台压缩被强杀留下损坏的压缩包（对齐 WPF 的 OnExplicitShutdown 用法）
+        desktop.ShutdownMode = ShutdownMode.OnExplicitShutdown;
 
         if (OperatingSystem.IsWindows())
         {
@@ -1542,6 +1558,10 @@ public partial class App : Application
     {
         var myPaths = paths.Where(p => File.Exists(p) || Directory.Exists(p)).ToList();
         if (myPaths.Count == 0) { desktop.Shutdown(); return; }
+
+        // 显式管理退出：进度窗口是 CLI 模式下唯一窗口，默认 OnLastWindowClose 会在用户
+        // 点击 X 时立即退出进程，后台压缩被强杀留下损坏的压缩包（对齐 WPF 的 OnExplicitShutdown 用法）
+        desktop.ShutdownMode = ShutdownMode.OnExplicitShutdown;
 
         if (OperatingSystem.IsWindows())
         {
@@ -1632,6 +1652,14 @@ public partial class App : Application
         IClassicDesktopStyleApplicationLifetime desktop,
         ProgressWindow? existingWindow = null)
     {
+        // IPC 收集阶段用户已点 X 关闭窗口：不再启动压缩，直接退出（OnExplicitShutdown 下进程不会被
+        // OnLastWindowClose 自动终止，必须显式 Shutdown，否则后台压缩会继续在不可见窗口上运行）
+        if (existingWindow != null && !existingWindow.IsVisible)
+        {
+            desktop.Shutdown();
+            return;
+        }
+
         var progressWindow = existingWindow ?? new ProgressWindow(title);
         if (existingWindow == null)
         {

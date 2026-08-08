@@ -35,6 +35,18 @@ jobs:
           --filter "FullyQualifiedName!~SevenZipEngine"
           --logger "console;verbosity=normal"
 
+      # dotnet publish 的清理是增量式的（_IncrementalCleanPublishDirectory）——只删除
+      # 本项目上次 publish 记录过、本次未产生的文件。若 publish_output 目录存在遗留文件
+      # （如旧版 WPF 发布产物），它们不在记录清单里会被保留并混入安装包/便携包。
+      # CI 全新 checkout 本不会触发，但本地复跑或自托管 runner 复用工作区时可能残留，
+      # 故在 publish 前显式删除旧输出目录，保证发布输出纯净（只含 Avalonia 产物）。
+      - name: Clean publish output directories
+        shell: pwsh
+        run: |
+          Remove-Item -Path publish_output, publish_output_selfcontained -Recurse -Force -ErrorAction SilentlyContinue
+          Write-Host "publish_output exists: $(Test-Path publish_output)"
+          Write-Host "publish_output_selfcontained exists: $(Test-Path publish_output_selfcontained)"
+
       - name: Publish (framework-dependent, x64)
         run: >
           dotnet publish src\MantisZip.UI.Avalonia\MantisZip.UI.Avalonia.csproj

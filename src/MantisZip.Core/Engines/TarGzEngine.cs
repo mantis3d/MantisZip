@@ -188,76 +188,88 @@ public class TarGzEngine : IArchiveEngine
 
         await Task.Run(() =>
         {
-            var ext = Path.GetExtension(outputPath).ToLowerInvariant();
-            var isTarGz = ext == ".tgz" || outputPath.EndsWith(".tar.gz");
-            CoreLog.Info($"CompressAsync: format=tar.gz={isTarGz}");
-
-            var (files, _) = FileScanner.CollectFiles(sourcePaths, progress, cancellationToken, options.FileWhitelist);
-            CoreLog.Info($"CompressAsync: {files.Count} files to compress");
-
-            if (isTarGz || ext == ".tar")
+            try
             {
-                using var fileStream = File.Create(outputPath);
-                var compressionType = isTarGz ? CompressionType.GZip : CompressionType.None;
-                using SharpCompress.Writers.IWriter writer = TarWriter.OpenWriter(fileStream, new TarWriterOptions(compressionType, true)
+                var ext = Path.GetExtension(outputPath).ToLowerInvariant();
+                var isTarGz = ext == ".tgz" || outputPath.EndsWith(".tar.gz");
+                CoreLog.Info($"CompressAsync: format=tar.gz={isTarGz}");
+
+                var (files, _) = FileScanner.CollectFiles(sourcePaths, progress, cancellationToken, options.FileWhitelist);
+                CoreLog.Info($"CompressAsync: {files.Count} files to compress");
+
+                if (isTarGz || ext == ".tar")
                 {
-                    CompressionLevel = options.CompressionLevel
+                    using var fileStream = File.Create(outputPath);
+                    var compressionType = isTarGz ? CompressionType.GZip : CompressionType.None;
+                    using SharpCompress.Writers.IWriter writer = TarWriter.OpenWriter(fileStream, new TarWriterOptions(compressionType, true)
+                    {
+                        CompressionLevel = options.CompressionLevel
+                    });
+
+                    int processedFiles = 0;
+                    int totalFiles = files.Count;
+                    foreach (var (fullPath, relativePath) in files)
+                    {
+                        cancellationToken.ThrowIfCancellationRequested();
+
+                        progress?.Report(new ArchiveProgress
+                        {
+                            CurrentFile = relativePath,
+                            PercentComplete = totalFiles > 0 ? (double)processedFiles / totalFiles * 100 : 0,
+                            FilePercentComplete = 0,
+                            TotalFiles = totalFiles,
+                            ProcessedFiles = processedFiles
+                        });
+
+                        if (!TarWriteFileWithRetry(fullPath, relativePath, options, writer, cancellationToken))
+                        {
+                            if (cancellationToken.IsCancellationRequested) break;
+                            continue;
+                        }
+                        processedFiles++;
+
+                        progress?.Report(new ArchiveProgress
+                        {
+                            CurrentFile = relativePath,
+                            PercentComplete = totalFiles > 0 ? (double)processedFiles / totalFiles * 100 : 0,
+                            FilePercentComplete = 100,
+                            TotalFiles = totalFiles,
+                            ProcessedFiles = processedFiles
+                        });
+                    }
+                }
+                else if (ext == ".gz")
+                {
+                    // 单纯 GZip 压缩（单文件）
+                    if (files.Count > 0)
+                    {
+                        using var outputStream = File.Create(outputPath);
+                        using var gzipWriter = GZipWriter.OpenWriter(outputStream, new GZipWriterOptions(options.CompressionLevel));
+
+                        using var input = File.OpenRead(files[0].FullPath);
+                        gzipWriter.Write(Path.GetFileName(files[0].FullPath), input, null);
+                    }
+                }
+
+                progress?.Report(new ArchiveProgress
+                {
+                    CurrentFile = string.Empty,
+                    PercentComplete = 100,
+                    TotalFiles = files.Count,
+                    ProcessedFiles = files.Count
                 });
 
-                int processedFiles = 0;
-                int totalFiles = files.Count;
-                foreach (var (fullPath, relativePath) in files)
-                {
-                    cancellationToken.ThrowIfCancellationRequested();
-
-                    progress?.Report(new ArchiveProgress
-                    {
-                        CurrentFile = relativePath,
-                        PercentComplete = totalFiles > 0 ? (double)processedFiles / totalFiles * 100 : 0,
-                        FilePercentComplete = 0,
-                        TotalFiles = totalFiles,
-                        ProcessedFiles = processedFiles
-                    });
-
-                    if (!TarWriteFileWithRetry(fullPath, relativePath, options, writer, cancellationToken))
-                    {
-                        if (cancellationToken.IsCancellationRequested) break;
-                        continue;
-                    }
-                    processedFiles++;
-
-                    progress?.Report(new ArchiveProgress
-                    {
-                        CurrentFile = relativePath,
-                        PercentComplete = totalFiles > 0 ? (double)processedFiles / totalFiles * 100 : 0,
-                        FilePercentComplete = 100,
-                        TotalFiles = totalFiles,
-                        ProcessedFiles = processedFiles
-                    });
-                }
+                CoreLog.Info($"CompressAsync: done, {sw.ElapsedMilliseconds}ms");
             }
-            else if (ext == ".gz")
+            catch (OperationCanceledException)
             {
-                // 单纯 GZip 压缩（单文件）
-                if (files.Count > 0)
+                CoreLog.Info("CompressAsync: cancelled, cleaning up partial output");
+                if (File.Exists(outputPath))
                 {
-                    using var outputStream = File.Create(outputPath);
-                    using var gzipWriter = GZipWriter.OpenWriter(outputStream, new GZipWriterOptions(options.CompressionLevel));
-
-                    using var input = File.OpenRead(files[0].FullPath);
-                    gzipWriter.Write(Path.GetFileName(files[0].FullPath), input, null);
+                    try { File.Delete(outputPath); } catch (Exception cleanupEx) { CoreLog.Error("CompressAsync: failed to clean up partial output", cleanupEx); }
                 }
+                throw;
             }
-
-            progress?.Report(new ArchiveProgress
-            {
-                CurrentFile = string.Empty,
-                PercentComplete = 100,
-                TotalFiles = files.Count,
-                ProcessedFiles = files.Count
-            });
-
-            CoreLog.Info($"CompressAsync: done, {sw.ElapsedMilliseconds}ms");
         }, cancellationToken).ConfigureAwait(false);
 
         CoreLog.Exit();

@@ -398,6 +398,20 @@ if (_vm.IsPaused)
     //  Window Lifecycle
     // ════════════════════════════════════════════
 
+    /// <summary>
+    /// 用户点击窗口右上角 X（CloseReason = WindowClosing）时触发取消，
+    /// 与取消按钮行为一致，避免压缩/解压被强行终止留下损坏的压缩包。
+    /// 程序化关闭（Close()/ApplicationShutdown）不触发取消。
+    /// </summary>
+    protected override void OnClosing(WindowClosingEventArgs e)
+    {
+        if (e.CloseReason == WindowCloseReason.WindowClosing && _vm.IsCancelEnabled)
+        {
+            _vm.CancelOperation();
+        }
+        base.OnClosing(e);
+    }
+
     protected override void OnClosed(EventArgs e)
     {
         _vm.PauseEvent.Set();

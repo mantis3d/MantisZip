@@ -468,43 +468,55 @@ public class SevenZipEngine : IArchiveEngine
 
         await Task.Run(() =>
         {
-            var compr = new SharpSevenZipCompressor();
-            ConfigureCompressor(compr, options);
-            AttachCompressorProgress(compr, progress);
-
-            if (sourcePaths.Length == 1 && Directory.Exists(sourcePaths[0]) && options.FileWhitelist == null)
+            try
             {
-                // 单一目录且无文件白名单 — 使用 CompressDirectory
-                compr.PreserveDirectoryRoot = options.PreserveDirectoryRoot;
-                compr.CompressDirectory(
-                    sourcePaths[0],
-                    outputPath,
-                    options.Encrypt ? options.Password ?? "" : "",
-                    "*",
-                    recursion: true);
+                var compr = new SharpSevenZipCompressor();
+                ConfigureCompressor(compr, options);
+                AttachCompressorProgress(compr, progress);
+
+                if (sourcePaths.Length == 1 && Directory.Exists(sourcePaths[0]) && options.FileWhitelist == null)
+                {
+                    // 单一目录且无文件白名单 — 使用 CompressDirectory
+                    compr.PreserveDirectoryRoot = options.PreserveDirectoryRoot;
+                    compr.CompressDirectory(
+                        sourcePaths[0],
+                        outputPath,
+                        options.Encrypt ? options.Password ?? "" : "",
+                        "*",
+                        recursion: true);
+                }
+                else
+                {
+                    // 多个文件、混合源、或存在文件白名单（过滤激活，CompressDirectory 无法排除文件）—
+                    // 展开后按白名单过滤，再使用 CompressFilesEncrypted
+                    var files = ExpandSourcePaths(sourcePaths);
+                    if (options.FileWhitelist != null)
+                        files = files.Where(f => options.FileWhitelist.Contains(f)).ToArray();
+                    compr.CompressFilesEncrypted(
+                        outputPath,
+                        options.Encrypt ? options.Password ?? "" : "",
+                        files);
+                }
+
+                // 压缩完成后必须把文件进度条也置满（仅 PercentComplete=100 时文件进度条会停在 accumulatedPercent）
+                progress?.Report(new ArchiveProgress
+                {
+                    CurrentFile = string.Empty,
+                    PercentComplete = 100,
+                    FilePercentComplete = 100,
+                });
+
+                CoreLog.Info($"CompressAsync: done, {sw.ElapsedMilliseconds}ms");
             }
-            else
+            catch (OperationCanceledException)
             {
-                // 多个文件、混合源、或存在文件白名单（过滤激活，CompressDirectory 无法排除文件）—
-                // 展开后按白名单过滤，再使用 CompressFilesEncrypted
-                var files = ExpandSourcePaths(sourcePaths);
-                if (options.FileWhitelist != null)
-                    files = files.Where(f => options.FileWhitelist.Contains(f)).ToArray();
-                compr.CompressFilesEncrypted(
-                    outputPath,
-                    options.Encrypt ? options.Password ?? "" : "",
-                    files);
+                CoreLog.Info("CompressAsync: cancelled, cleaning up partial output");
+                if (File.Exists(outputPath))
+                {
+                    try { File.Delete(outputPath); } catch (Exception cleanupEx) { CoreLog.Error("CompressAsync: failed to clean up partial output", cleanupEx); }
+                }
+                throw;
             }
-
-            // 压缩完成后必须把文件进度条也置满（仅 PercentComplete=100 时文件进度条会停在 accumulatedPercent）
-            progress?.Report(new ArchiveProgress
-            {
-                CurrentFile = string.Empty,
-                PercentComplete = 100,
-                FilePercentComplete = 100,
-            });
-
-            CoreLog.Info($"CompressAsync: done, {sw.ElapsedMilliseconds}ms");
         }, cancellationToken).ConfigureAwait(false);
 
         CoreLog.Exit();
