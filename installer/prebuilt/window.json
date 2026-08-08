@@ -1,55 +1,45 @@
 {
-  "Width": 1370,
-  "Height": 830,
-  "TreeColumnWidth": 228,
-  "PreviewRowHeight": 340,
-  "PreviewColumnWidth": 466,
-  "PreviewTreeHeight": 416,
-  "PreviewFilesHeight": 479,
+  "Width": 1831,
+  "Height": 968,
+  "X": 144,
+  "Y": 256,
+  "State": 0,
   "ColumnStates": [
     {
-      "ColumnId": "Name",
-      "Width": 273,
+      "ColumnId": "Icon",
+      "Width": 22,
       "Visible": true,
       "DisplayIndex": 0
     },
     {
-      "ColumnId": "Size",
-      "Width": 100,
+      "ColumnId": "Name",
+      "Width": 289,
       "Visible": true,
       "DisplayIndex": 1
     },
     {
-      "ColumnId": "CompressedSize",
-      "Width": 100,
-      "Visible": false,
+      "ColumnId": "Size",
+      "Width": 110,
+      "Visible": true,
       "DisplayIndex": 2
     },
     {
-      "ColumnId": "RatioSort",
-      "Width": 80,
+      "ColumnId": "CompressedSize",
+      "Width": 111,
       "Visible": true,
       "DisplayIndex": 3
     },
     {
-      "ColumnId": "Crc32",
-      "Width": 110,
-      "Visible": false,
+      "ColumnId": "RatioSort",
+      "Width": 73,
+      "Visible": true,
       "DisplayIndex": 4
     },
     {
       "ColumnId": "LastModified",
-      "Width": 122,
+      "Width": 149,
       "Visible": true,
       "DisplayIndex": 5
-    },
-    {
-      "ColumnId": "IsEncrypted",
-      "Width": 38,
-      "Visible": true,
-      "DisplayIndex": 6
     }
-  ],
-  "SortColumnPath": null,
-  "SortDirection": 0
+  ]
 }

@@ -1086,6 +1086,13 @@
                            FontSize="12"
                            Foreground="{DynamicResource ThemeTextSecondaryBrush}"
                            TextWrapping="Wrap" />
+                <Button Content="{Binding OpenLogFolderText}"
+                        Command="{Binding OpenLogFolderCommand}"
+                        HorizontalAlignment="Left"
+                        Padding="8,4"
+                        Background="{DynamicResource ThemeButtonBgBrush}"
+                        Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                        BorderBrush="{DynamicResource ThemeBorderBrush}" />
               </StackPanel>
             </Border>
           </StackPanel>

@@ -678,6 +678,7 @@ public partial class SettingsWindowViewModel : ObservableObject
     public string LogPathText => LocalizationManager.T("Settings_Debug_LogPath");
     public string LogFilePath => Path.Combine(
         AppSettings.DataDir, "debug.log");
+    public string OpenLogFolderText => LocalizationManager.T("Settings_Advanced_OpenLog");
 
     // ── New tab headers ──
     public string TabLanguageHeader => LocalizationManager.T("Settings_Tab_Language");
@@ -1521,6 +1522,32 @@ public partial class SettingsWindowViewModel : ObservableObject
     {
         var dialog = new LogPrivacyHelpDialog();
         dialog.Show();
+    }
+
+    /// <summary>
+    /// 打开日志文件所在路径（Explorer 中选中日志文件），与 WPF 版行为一致。
+    /// </summary>
+    [RelayCommand]
+    private void OpenLogFolder()
+    {
+        try
+        {
+            var logPath = LogFilePath;
+            var dir = Path.GetDirectoryName(logPath);
+            if (!string.IsNullOrEmpty(dir) && Directory.Exists(dir))
+            {
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = "explorer.exe",
+                    Arguments = $"/select,\"{logPath}\"",
+                    UseShellExecute = true
+                });
+            }
+        }
+        catch (Exception logEx)
+        {
+            System.Diagnostics.Debug.WriteLine($"[Settings] OpenLogFolder failed: {logEx.Message}");
+        }
     }
 
     [RelayCommand]

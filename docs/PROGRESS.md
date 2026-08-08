@@ -21,6 +21,11 @@
 
 ### MantisZip.UI.Avalonia（主力版）
 
+**2026-08-08** — 设置窗口调试面板新增「打开日志文件」按钮（对齐 WPF）
+  - **背景**：WPF 版设置窗口调试面板有 `Settings_Advanced_OpenLog` 按钮（`OpenLogFolder_Click` → `explorer.exe /select,"路径"`），Avalonia 版仅有日志路径显示无按钮
+  - **方案**：`SettingsWindowViewModel` 新增 `[RelayCommand] OpenLogFolder`（`LogFilePath` → `explorer.exe /select,"<日志路径>"` 选中 debug.log，含目录存在性检查 + 异常 Debug.WriteLine 记录）+ `OpenLogFolderText` 属性；调试面板日志路径卡片（LogPath 区）路径文本下方新增按钮，主题资源键（ThemeButtonBgBrush/ThemeTextPrimaryBrush/ThemeBorderBrush）；localization 新增 `Settings_Advanced_OpenLog`（zh/en，与 WPF 同名同文案）
+  - 涉及文件：`ViewModels/SettingsWindowViewModel.cs`、`Views/SettingsWindow.axaml`、`Localization/strings.zh-CN.json`、`Localization/strings.en.json`；构建 0 错误
+
 **2026-08-08** — 目录树「自动展开」开关 + Avalonia 便携模式（Portable.txt → Data/）
   - **自动展开**：目录树工具栏 `ExpandToCurrent` 右侧新增 ToggleButton（IconLocationCheckmark，ToolTip 绑 `Tree_AutoExpand`），`MainWindowViewModel` 新增 `[ObservableProperty] AutoExpandTree`（构造读取 `AppSettings.AutoExpandTreeToCurrent`，`OnAutoExpandTreeChanged` 写回保存 + 开启时立即执行一次）；`OnCurrentFolderChanged` 钩子（仅 `value == null` 跳过）→ 抽出 `ExpandTreeToPath(path)` 共用方法（CollapseAll + 根展开 + 祖先链），`ExpandToCurrent()` 复用之；根目录（`CurrentFolder == ""`）同样执行收起，修复返回根目录不收起分支的 bug；localization 新增 `Tree_AutoExpand`（zh/en）
   - **便携模式**：此前 Avalonia 版缺失 WPF 版的 `IsPortableMode`（`Portable.txt` → exe 旁 `Data/` 目录重定向）。`AppSettings` 新增静态构造检测 + `IsPortableMode`/`DataDir` 静态属性，便携时 `PasswordManager.CustomDataDir = DataDir`；`RecentFilesManager`（recent.json）/`WindowStateManager`（window.json）/`MetadataSettingsManager`（metadata-panel.json）/debug.log×3（App.axaml.cs、SettingsWindowViewModel.LogFilePath、MainWindow.axaml.cs WritePickerTrace）统一改用 `AppSettings.DataDir`
