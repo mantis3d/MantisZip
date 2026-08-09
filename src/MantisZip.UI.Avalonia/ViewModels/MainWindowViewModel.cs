@@ -21,6 +21,7 @@ public partial class MainWindowViewModel : ObservableObject
 {
     private readonly ArchiveService _archiveService = new();
     private ArchiveFormat _currentFormat;
+    private string? _archiveComment;   // 压缩包注释（ZIP EOCD / RAR5 归档注释），根目录预览展示
     private IReadOnlyList<ArchiveItem>? _allRawItems;
     private int _previewLoadVersion;
     private bool _isProgrammaticFilter;
@@ -874,6 +875,12 @@ public partial class MainWindowViewModel : ObservableObject
 
             if (result.IsSuccess && result.Entries != null)
             {
+                // 先于 SelectedFolder 赋值（其触发链会读取 _archiveComment/CurrentArchivePath）：
+                // 确保打开压缩包后根目录预览能立即显示注释
+                CurrentArchivePath = path;
+                _currentFormat = ArchiveFormatHelper.GetFormat(path);
+                _archiveComment = ArchiveCommentReader.ReadComment(path, _currentFormat, _currentPassword);
+
                 foreach (var entry in result.Entries)
                 {
                     Entries.Add(entry);
@@ -909,8 +916,6 @@ public partial class MainWindowViewModel : ObservableObject
                         FolderPaths.Add(p);
                 }
 
-                CurrentArchivePath = path;
-                _currentFormat = ArchiveFormatHelper.GetFormat(path);
                 IsArchiveLoaded = true;
                 RecentFilesManager.AddPath(path);
                 RecentFiles.Clear();
@@ -1188,6 +1193,7 @@ public partial class MainWindowViewModel : ObservableObject
 
         CurrentFolder = path;
         PopulateEntries();
+        UpdatePreviewForFolder();
 
         var node = FindNode(FolderTreeRoot, path);
         if (node != null)
@@ -1209,8 +1215,29 @@ public partial class MainWindowViewModel : ObservableObject
 
         CurrentFolder = node.FullPath;
         PopulateEntries();
+        UpdatePreviewForFolder();
 
         NotifyNavigationState();
+    }
+
+    /// <summary>
+    /// 目录导航后同步预览区：根目录且有压缩包注释时展示注释；
+    /// 否则若文件列表无选中项则清空预览（避免残留上个目录的内容）。
+    /// 注释展示覆盖一切（文件列表选中条目时由 ShowPreviewAsync 覆盖注释）。
+    /// </summary>
+    private void UpdatePreviewForFolder()
+    {
+        if (string.IsNullOrEmpty(CurrentFolder) && !string.IsNullOrEmpty(_archiveComment))
+        {
+            Preview.ShowArchiveComment(_archiveComment,
+                Path.GetFileName(CurrentArchivePath ?? string.Empty));
+            return;
+        }
+
+        if (SelectedEntry == null)
+        {
+            Preview.Clear();
+        }
     }
 
     /// <summary>
@@ -1229,6 +1256,7 @@ public partial class MainWindowViewModel : ObservableObject
         {
             CurrentFolder = path;
             PopulateEntries();
+            UpdatePreviewForFolder();
             // 同步选中目录树中的对应节点
             var node = FindNode(FolderTreeRoot, path);
             if (node != null)
@@ -1604,6 +1632,7 @@ public partial class MainWindowViewModel : ObservableObject
         CurrentFolder = null;
         FolderTreeRoot = null;
         _allRawItems = null;
+        _archiveComment = null;
         DirStats = string.Empty;
         FilterStats = string.Empty;
         EncodingInfo = string.Empty;

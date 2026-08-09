@@ -21,6 +21,18 @@
 
 ### MantisZip.UI.Avalonia（主力版）
 
+**2026-08-09** — 压缩包注释展示修复：打开即显示 + ZIP 注释编码兼容
+  - **问题 1（ZIP 注释乱码）**：EOCD 注释字段无编码标志，中文 Windows 旧工具多用本地代码页（GBK）写注释，此前固定 UTF-8 解码 → 乱码。`ZipCommentHelper.ReadComment` 改用 `TextEncodingDetector.DecodeText`（UTF-8 BOM → 严格 UTF-8 失败回退 → 系统 ANSI 代码页）。真实文件 `testPreview (2).zip`（GBK 注释）验证读出「这个压缩包用来测试 MantisZip。…」不再乱码
+  - **问题 2（打开不显示注释）**：根因是 `LoadArchiveAsync` 中 `SelectedFolder = FolderTreeRoot`（触发 `UpdatePreviewForFolder`）**早于** `_archiveComment` 读取赋值 → 触发链执行时注释为 null，之后无导航事件不再刷新。修复：`CurrentArchivePath`/`_currentFormat`/`_archiveComment` 赋值提前到 `SelectedFolder` 赋值之前
+  - **回归测试**：新增 `MainWindowViewModelCommentTests`（打开带注释 ZIP 即显示注释、GBK 注释不乱码两例），Avalonia 测试 45/45 通过（另 2 跳过为原有）
+  - 涉及文件：`ViewModels/MainWindowViewModel.cs`、`tests/MantisZip.UI.Avalonia.Tests/MainWindowViewModelCommentTests.cs`；Core 侧变更见共享层条目
+
+**2026-08-09** — 压缩包注释读取展示（ZIP + RAR5，根目录预览）
+  - **背景**：此前注释仅 ZIP 可读写（编辑菜单），且 Avalonia 版无任何注释展示界面；RAR5 归档注释（7z.dll 的 kpidComment）完全未读取
+  - **方案**：① Core 新增 `ArchiveCommentReader`（见共享层条目）② `PreviewViewModel` 新增 `ShowArchiveComment(comment, archiveName)`：以文本预览方式展示注释（字号/字体跟随文本预览设置），信息面板显示压缩包名，标题 `Preview_ArchiveCommentTitle` ③ `MainWindowViewModel` 加载归档成功后读取注释（`_archiveComment`，密码归档传会话密码），新增 `UpdatePreviewForFolder()` 挂到三个目录导航入口：根目录且有注释 → 预览面板展示注释；导航到子目录且列表无选中 → 清空预览防残留
+  - **限制**：RAR4（旧格式）注释 7z.dll 不解析（CMT 块被跳过），无法读取；7z.dll 对 RAR 只读不写，注释不支持编辑（ZIP 不受影响）
+  - 涉及文件：`Utils/ArchiveCommentReader.cs`（Core）、`ViewModels/PreviewViewModel.cs`、`ViewModels/MainWindowViewModel.cs`、`Localization/strings.zh-CN.json`、`Localization/strings.en.json`；实测 RAR5（中文 GBK 注释）+ ZIP 注释读取正确，构建 0 错误
+
 **2026-08-08** — 修复压缩对话框「点击压缩窗口直接关闭却无压缩生成」的静默失败（B 数据集未就绪）
   - **背景**：右键 `--compress`（CLI）路径下 `CompressFlow.BuildRequest` 返回 null 时 `desktop.Shutdown()` 静默退出无提示；且构造时序缺陷（`BuildCompressPreview()` 先于 `TryAutoFillOutputPath()`）导致窗口打开时 B 数据集（Plan）为 null 而「开始压缩」按钮未禁用 → 用户点击后窗口关闭、无压缩包、无任何反馈（便携版新机首次运行偶发，JIT/初始化延迟放大竞态窗口）
   - **方案**：① `CompressSettingsViewModel`：初始 `BuildCompressPreview()` 移至 `TryAutoFillOutputPath()` 之后；`StartCompress` 点击后等待 B 数据集就绪（`EnsurePlanReadyAsync`：等在途构建/补建一次，就绪后才关闭窗口执行压缩），`IsPreparingCompress` 驱动按钮「正在准备…」文案与防重入，`Cancel` 等待期间设 `_compressCancelled` 标记防「已取消仍启动压缩」；构建失败置 `Plan=null`（失效旧输入 B）+ 记录 `LastBuildError` ② `CompressSettingsWindow`：`InitFileFilter()` 提前到构造函数（消除 OnLoaded 竞态：窗口刚弹出时操作过滤导致 FilterChanged 未订阅、Plan 不重建）+ 注入 `ShowMessage` 回调 ③ `App.axaml.cs` CLI：`BuildRequest==null` 时保持窗口打开并弹 `Compress_FilteredAllSkipped` 提示（对齐主窗口路径），不再静默 `Shutdown` ④ localization 新增 `Compress_Preparing`/`Compress_PrepareFailed`（zh/en 成对）
@@ -1172,6 +1184,15 @@
 
 这些变更影响两项目共用代码，按时间从新到旧排列。
 
+#### v0.5.0 (2026-08-09) Core 新增 ArchiveCommentReader（ZIP + RAR5 注释统一读取）
+  - **背景**：RAR 注释此前完全未读取（仅 ZIP 经 `ZipCommentHelper` 读写）；实测验证 7z.dll 26.00 的 RAR5 handler 通过 kpidComment 提供归档注释（UTF-8 → UTF-16 转换正确），RAR4（旧格式）CMT 注释块 7z.dll 不解析无法读取
+  - **方案**：新增 `Utils/ArchiveCommentReader.cs`——`ReadComment(path, format, password?)`：ZIP → `ZipCommentHelper`（Trim）；RAR → `SevenZipEngine.EnsureLibraryPath()` + `SharpSevenZipExtractor.ArchiveProperties` 中 `Name=="Comment"` 项；其他格式/失败返回 null（容错不抛）
+  - 涉及文件：`Utils/ArchiveCommentReader.cs`（新增）；构建 0 错误，实测 RAR5 中文注释/ZIP 注释/不支持格式/缺失文件四种场景正确
+
+#### v0.5.0 (2026-08-09) ZIP 注释编码兼容（GBK 回退）+ TextEncodingDetector.DecodeText
+  - **背景**：ZIP EOCD 注释字段无编码标志，中文 Windows 上旧工具（WinRAR 旧版、Windows 压缩文件夹等）多用本地代码页（GBK）写注释，`ZipCommentHelper.ReadComment` 固定 UTF-8 解码导致乱码（真实案例 `testPreview (2).zip` 注释「这个压缩包用来测试 MantisZip。…」）
+  - **方案**：`TextEncodingDetector` 新增 `DecodeText(byte[], systemFallbackCodePage=0)`（探测顺序：UTF-8 BOM → 严格 UTF-8 解码（`UTF8Encoding(false,true)` 抛 `DecoderFallbackException` 则回退）→ 系统 ANSI 代码页，含 `RegisterProvider`）；`ZipCommentHelper.ReadCommentFromStream` 改用之。UTF-8 注释（现代工具）不受影响
+  - 涉及文件：`Utils/TextEncodingDetector.cs`、`Utils/ZipCommentHelper.cs`；实测 GBK 注释 ZIP 读出正确中文、UTF-8 注释回归正常
 #### v0.5.0 (2026-08-08) 引擎压缩取消时清理部分输出文件
   - **背景**：CLI 压缩被取消（用户点 X 或取消按钮）后，`TarGzEngine`/`SevenZipEngine` 的 `CompressAsync` 直接抛 `OperationCanceledException`，部分写入的输出文件残留在磁盘上，与 `ZipEngine` 既有取消清理（`CleanupSplitFiles`/`File.Delete`）行为不一致
   - **方案**：两引擎 `CompressAsync` 的 `Task.Run` lambda 外包 try-catch `OperationCanceledException` → 删除 `outputPath`（清理失败仅记 `CoreLog.Error` 不吞异常）→ rethrow；`ZipEngine` 加密分支（SharpSevenZip）确认已被既有 catch 覆盖无需改动

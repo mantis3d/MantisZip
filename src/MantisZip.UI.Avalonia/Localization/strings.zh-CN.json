@@ -1,4 +1,5 @@
 {
+  "Preview_ArchiveCommentTitle": "压缩包注释",
   "Compress_Preparing": "正在准备…",
   "Compress_PrepareFailed": "无法准备压缩，请重试。",
   "Settings_Advanced_OpenLog": "打开日志文件",

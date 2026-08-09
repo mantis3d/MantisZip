@@ -730,6 +730,41 @@ public partial class PreviewViewModel : ObservableObject
     }
 
     /// <summary>
+    /// 在预览面板显示压缩包注释（ZIP EOCD 注释 / RAR5 归档注释）。
+    /// 注释直接以文本预览方式展示，信息面板显示压缩包名。
+    /// </summary>
+    /// <param name="comment">注释文本（已去除首尾空白）</param>
+    /// <param name="archiveName">压缩包文件名（含扩展名），用于信息面板</param>
+    public void ShowArchiveComment(string comment, string archiveName)
+    {
+        Clear();
+
+        // 与 ShowText 一致：从设置加载文本预览字号和字体
+        var settings = AppSettings.Load();
+        FontSize = settings.TextPreviewFontSize;
+        var fontFamilyName = settings.TextPreviewFontFamily;
+        try
+        {
+            TextPreviewFontFamily = !string.IsNullOrEmpty(fontFamilyName)
+                ? new global::Avalonia.Media.FontFamily(fontFamilyName)
+                : global::Avalonia.Media.FontFamily.Default;
+        }
+        catch
+        {
+            TextPreviewFontFamily = global::Avalonia.Media.FontFamily.Default;
+        }
+
+        TextContent = comment;
+        PreviewType = PreviewType.Text;
+        IsPreviewVisible = true;
+        IsToolbarVisible = true;
+        PreviewHeaderText = LocalizationManager.T("Preview_ArchiveCommentTitle");
+
+        // 信息面板：显示压缩包名（其余通用字段留空）
+        UpdateCommonMetadata(archiveName, string.Empty, string.Empty, string.Empty, string.Empty);
+    }
+
+    /// <summary>
     /// 显示 CSV 表格预览。
     /// </summary>
     public void ShowCsv(string filePath)
