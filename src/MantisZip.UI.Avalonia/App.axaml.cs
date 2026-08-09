@@ -176,7 +176,7 @@ public partial class App : Application
                             switch (action)
                             {
                                 case "extract-here":
-                                    _ = RunExtractCliAsync(path, Directory.GetCurrentDirectory(), args, desktop);
+                                    _ = RunExtractCliAsync(path, Path.GetDirectoryName(path) ?? ".", args, desktop);
                                     break;
                                 case "smart-extract":
                                     _ = RunExtractSmartCliAsync(path, args, desktop);
@@ -204,35 +204,49 @@ public partial class App : Application
                         break;
 
                     case "--extract-here":
-                        // Extract to current directory
-                        if (!string.IsNullOrEmpty(path) && File.Exists(path))
-                            _ = RunExtractCliAsync(path, Directory.GetCurrentDirectory(), args, desktop);
-                        else
-                            desktop.Shutdown();
+                        // Extract to each archive's directory (压缩包所在目录), not the process working directory
+                        // 单文件走原流程（含提权预检）；多文件走批处理（ShellExt 多选时一次传入全部路径）
+                        {
+                            var herePaths = cmdPaths.Where(p => !string.IsNullOrEmpty(p) && File.Exists(p)).ToList();
+                            if (herePaths.Count == 0)
+                                desktop.Shutdown();
+                            else if (herePaths.Count == 1)
+                                _ = RunExtractCliAsync(herePaths[0], Path.GetDirectoryName(herePaths[0]) ?? ".", args, desktop);
+                            else
+                                _ = RunCliDirectExtractBatchAsync(herePaths, "here", desktop);
+                        }
                         break;
 
                     case "--extract-to-name":
                         // Extract to subfolder named after archive (no extension)
-                        if (!string.IsNullOrEmpty(path) && File.Exists(path))
                         {
-                            var dirName = Path.GetFileNameWithoutExtension(path);
-                            // Handle .tar.gz double extension
-                            if (path.EndsWith(".tar.gz", StringComparison.OrdinalIgnoreCase))
-                                dirName = Path.GetFileNameWithoutExtension(Path.GetFileNameWithoutExtension(path));
-                            var targetDir = Path.Combine(Path.GetDirectoryName(path) ?? ".", dirName);
-                            Directory.CreateDirectory(targetDir);
-                            _ = RunExtractCliAsync(path, targetDir, args, desktop);
+                            var toNamePaths = cmdPaths.Where(p => !string.IsNullOrEmpty(p) && File.Exists(p)).ToList();
+                            if (toNamePaths.Count == 0)
+                                desktop.Shutdown();
+                            else if (toNamePaths.Count == 1)
+                            {
+                                var toNameTarget = Path.Combine(
+                                    Path.GetDirectoryName(toNamePaths[0]) ?? ".",
+                                    GetArchiveBaseName(toNamePaths[0]));
+                                Directory.CreateDirectory(toNameTarget);
+                                _ = RunExtractCliAsync(toNamePaths[0], toNameTarget, args, desktop);
+                            }
+                            else
+                                _ = RunCliDirectExtractBatchAsync(toNamePaths, "toname", desktop);
                         }
-                        else
-                            desktop.Shutdown();
                         break;
 
                     case "--extract-smart":
                         // Smart extract: analyze archive structure and choose extraction mode
-                        if (!string.IsNullOrEmpty(path) && File.Exists(path))
-                            _ = RunExtractSmartCliAsync(path, args, desktop);
-                        else
-                            desktop.Shutdown();
+                        {
+                            var smartPaths = cmdPaths.Where(p => !string.IsNullOrEmpty(p) && File.Exists(p)).ToList();
+                            if (smartPaths.Count == 0)
+                                desktop.Shutdown();
+                            else if (smartPaths.Count == 1)
+                                _ = RunExtractSmartCliAsync(smartPaths[0], args, desktop);
+                            else
+                                _ = RunCliDirectExtractBatchAsync(smartPaths, "smart", desktop);
+                        }
                         break;
 
                     case "--compress":
@@ -642,26 +656,8 @@ public partial class App : Application
                 return false;
             }
 
-            // List entries to analyze structure
-            var items = await engine.ListEntriesAsync(archivePath);
-            var hasSingleRoot = ArchiveStructureAnalyzer.HasSingleRootDirectory(items);
-
-            if (hasSingleRoot)
-            {
-                // Single root folder: extract to current directory
-                targetDir = Directory.GetCurrentDirectory();
-                Console.WriteLine("SmartExtract: single root detected, extracting to current directory");
-            }
-            else
-            {
-                // Dispersed files: extract to named subfolder
-                var dirName = Path.GetFileNameWithoutExtension(archivePath);
-                if (archivePath.EndsWith(".tar.gz", StringComparison.OrdinalIgnoreCase))
-                    dirName = Path.GetFileNameWithoutExtension(Path.GetFileNameWithoutExtension(archivePath));
-                targetDir = Path.Combine(Path.GetDirectoryName(archivePath) ?? ".", dirName);
-                Directory.CreateDirectory(targetDir);
-                Console.WriteLine($"SmartExtract: dispersed structure, extracting to {targetDir}");
-            }
+            // 分析压缩包结构并确定目标目录（单根 → 压缩包所在目录；散列 → 命名子目录）
+            targetDir = await ResolveSmartDestCliAsync(archivePath, engine);
 
             // Check writability before extraction
             var unwritable = new List<string>();
@@ -686,6 +682,32 @@ public partial class App : Application
             Console.Error.WriteLine($"Smart extraction failed: {ex.Message}");
             return false;
         }
+    }
+
+    /// <summary>
+    /// 智能解压目标目录计算（单文件与批处理共用）：
+    /// 单根目录结构 → 压缩包所在目录；散列结构 → 压缩包名命名的子目录（自动创建）。
+    /// 语义与 WPF ResolveSmartDestAsync 一致。
+    /// </summary>
+    private static async Task<string> ResolveSmartDestCliAsync(string archivePath, IArchiveEngine engine)
+    {
+        var items = await engine.ListEntriesAsync(archivePath);
+        var hasSingleRoot = ArchiveStructureAnalyzer.HasSingleRootDirectory(items);
+
+        if (hasSingleRoot)
+        {
+            // Single root folder: extract to the archive's directory (压缩包所在目录), not the process working directory
+            Console.WriteLine("SmartExtract: single root detected, extracting to archive directory");
+            return Path.GetDirectoryName(archivePath) ?? ".";
+        }
+
+        // Dispersed files: extract to named subfolder
+        var targetDir = Path.Combine(
+            Path.GetDirectoryName(archivePath) ?? ".",
+            GetArchiveBaseName(archivePath));
+        Directory.CreateDirectory(targetDir);
+        Console.WriteLine($"SmartExtract: dispersed structure, extracting to {targetDir}");
+        return targetDir;
     }
 
     /// <summary>
@@ -865,7 +887,14 @@ public partial class App : Application
                 var rawProgress = progressWindow.CreatePauseAwareProgress(
                     ProgressWindow.CreateBackgroundProgress(progressWindow));
 
-                var extractResult = await engine.ExtractAsync(archivePath, targetDir, password, rawProgress, ct);
+                // 冲突策略来自 AppSettings.FileConflictAction（默认 ask）；
+                // Ask 弹 ConflictDialog（owner=进度窗口，与 --extract 弹窗批处理同逻辑）
+                var settings = AppSettings.Load();
+                var options = SelectedItemsExtractService.CreateExtractOptions(
+                    settings.FileConflictAction,
+                    info => ExtractFlow.ShowConflictDialogAsync(progressWindow, info));
+
+                var extractResult = await engine.ExtractAsync(archivePath, targetDir, password, rawProgress, ct, options);
 
                 progressWindow.FinalizeBatch();
                 await Dispatcher.UIThread.InvokeAsync(() =>
@@ -1049,6 +1078,148 @@ public partial class App : Application
             progressWindow.UpdateBatchItemStatus(0, BatchItemStatus.Failed, captureException.Message);
             await Dispatcher.UIThread.InvokeAsync(() =>
             {
+                progressWindow.SetErrorSummary(captureException!.Message);
+                progressWindow.CompleteWithErrors();
+            });
+            await WaitForWindowCloseAsync(progressWindow);
+            desktop.Shutdown();
+            return;
+        }
+
+        // 成功：自动关闭（2.5s）或等待用户手动关闭后退出
+        await progressWindow.AutoCloseOrWaitAsync(2500, () => desktop.Shutdown());
+    }
+
+    /// <summary>
+    /// 压缩包基名（不含扩展名），处理 .tar.gz 双扩展名。
+    /// </summary>
+    private static string GetArchiveBaseName(string archivePath)
+    {
+        var name = Path.GetFileNameWithoutExtension(archivePath);
+        if (archivePath.EndsWith(".tar.gz", StringComparison.OrdinalIgnoreCase))
+            name = Path.GetFileNameWithoutExtension(Path.GetFileNameWithoutExtension(archivePath));
+        return name;
+    }
+
+    /// <summary>
+    /// CLI 直接解压批处理（--extract-here / --extract-to-name / --extract-smart 多文件）：
+    /// ShellExt 多选压缩包时一次传入全部路径，此前只取第一个解压，其余被忽略。
+    /// 本方法用一个进度窗口逐文件解压，每文件按 mode 独立计算目标目录
+    /// （here → 压缩包所在目录；toname → 命名子目录；smart → 结构分析）。
+    /// 冲突策略来自 AppSettings.FileConflictAction（Ask 弹 ConflictDialog，owner=进度窗口）。
+    /// </summary>
+    private static async Task RunCliDirectExtractBatchAsync(
+        List<string> archivePaths,
+        string mode,
+        IClassicDesktopStyleApplicationLifetime desktop)
+    {
+        desktop.ShutdownMode = ShutdownMode.OnExplicitShutdown;
+
+        var progressWindow = new ProgressWindow(LocalizationManager.T("Progress_Title_Extract"));
+        progressWindow.InitCancellation();
+        progressWindow.Show();
+        desktop.MainWindow = progressWindow;
+        progressWindow.InitBatchMode(archivePaths);
+
+        var ct = progressWindow.CancellationToken;
+        var doneEvent = new ManualResetEventSlim(false);
+        Exception? captureException = null;
+        bool cancelled = false;
+
+        var settings = AppSettings.Load();
+        var conflictOptions = SelectedItemsExtractService.CreateExtractOptions(
+            settings.FileConflictAction,
+            info => ExtractFlow.ShowConflictDialogAsync(progressWindow, info));
+
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                for (int i = 0; i < archivePaths.Count; i++)
+                {
+                    ct.ThrowIfCancellationRequested();
+                    var archivePath = archivePaths[i];
+                    await Dispatcher.UIThread.InvokeAsync(() => progressWindow.SetCurrentBatchItem(i));
+
+                    try
+                    {
+                        var engine = ArchiveEngineFactory.GetEngineByExtension(archivePath);
+                        if (engine == null)
+                        {
+                            await Dispatcher.UIThread.InvokeAsync(() =>
+                                progressWindow.UpdateBatchItemStatus(i, BatchItemStatus.Failed,
+                                    LocalizationManager.T("Error_UnsupportedArchiveFormat")));
+                            continue;
+                        }
+
+                        // 每文件独立计算目标目录（与单文件 CLI 流程/WPF 语义一致）
+                        string targetDir = mode switch
+                        {
+                            "toname" => Path.Combine(
+                                Path.GetDirectoryName(archivePath) ?? ".",
+                                GetArchiveBaseName(archivePath)),
+                            "smart" => await ResolveSmartDestCliAsync(archivePath, engine),
+                            _ => Path.GetDirectoryName(archivePath) ?? "."
+                        };
+                        if (mode == "toname")
+                            Directory.CreateDirectory(targetDir);
+
+                        var password = ResolveCliPassword(archivePath, engine);
+                        var progress = progressWindow.CreatePauseAwareProgress(
+                            ProgressWindow.CreateBackgroundProgress(progressWindow));
+
+                        await engine.ExtractAsync(archivePath, targetDir, password, progress, ct, conflictOptions);
+
+                        TryDeleteArchiveAfterExtract(archivePath);
+
+                        await Dispatcher.UIThread.InvokeAsync(() =>
+                            progressWindow.UpdateBatchItemStatus(i, BatchItemStatus.Completed));
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        throw;
+                    }
+                    catch (Exception ex)
+                    {
+                        await Dispatcher.UIThread.InvokeAsync(() =>
+                            progressWindow.UpdateBatchItemStatus(i, BatchItemStatus.Failed, ex.Message));
+                    }
+                }
+
+                progressWindow.FinalizeBatch();
+                await Dispatcher.UIThread.InvokeAsync(() =>
+                    progressWindow.SetComplete(LocalizationManager.T("Cli_StatusDone")));
+            }
+            catch (OperationCanceledException)
+            {
+                cancelled = true;
+            }
+            catch (Exception ex)
+            {
+                captureException = ex;
+                Console.Error.WriteLine($"Extraction failed: {ex.Message}");
+            }
+            finally
+            {
+                doneEvent.Set();
+            }
+        });
+
+        await Task.Run(() => doneEvent.Wait());
+
+        if (cancelled)
+        {
+            await Dispatcher.UIThread.InvokeAsync(() => progressWindow.Close());
+            desktop.Shutdown();
+            return;
+        }
+
+        if (captureException != null)
+        {
+            // 失败：标记首项为 Failed 并显示错误汇总（对齐 RunCliExtractBatchWithProgressAsync）
+            await Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                progressWindow.UpdateBatchItemStatus(0, BatchItemStatus.Failed, captureException!.Message);
                 progressWindow.SetErrorSummary(captureException!.Message);
                 progressWindow.CompleteWithErrors();
             });

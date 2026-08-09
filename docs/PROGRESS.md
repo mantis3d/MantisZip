@@ -21,6 +21,13 @@
 
 ### MantisZip.UI.Avalonia（主力版）
 
+**2026-08-09** — 修复右键原地解压/智能原地解压解压到桌面 + CLI 直接解压补齐冲突处理与多文件批处理
+  - **问题 1（解压到桌面）**：ShellExt 启动子进程时固定 `WorkingDirectory = Desktop`，Avalonia `App.axaml.cs` 用 `Directory.GetCurrentDirectory()` 作为解压目标 → 右键「原地解压/智能原地解压」解压到桌面而非压缩包所在目录。修复：CLI 解压目标改为 `Path.GetDirectoryName(path) ?? "."`（`--open-dispatch` extract-here、`--extract-here` 两处），智能解压目标目录计算抽为 `ResolveSmartDestCliAsync`（单根→压缩包目录，散列→命名子目录）供单文件/批处理共用
+  - **问题 2（无冲突处理）**：`--extract-here`/`--extract-smart`/`--extract-to-name` 直接 CLI 解压此前裸调 `engine.ExtractAsync` 无 options → `FileConflictHelper` 默认 Overwrite 静默覆盖。修复：经 `SelectedItemsExtractService.CreateExtractOptions(FileConflictAction, info => ExtractFlow.ShowConflictDialogAsync(...))` 传入，与 `--extract` 弹窗流程一致
+  - **问题 3（多选只解压第一个）**：ShellExt 多选时一次传全部路径，Avalonia 原只取 `cmdPaths[0]`。修复：新增 `RunCliDirectExtractBatchAsync` 批处理入口（逐文件独立算目标目录 + 冲突处理 + `TryDeleteArchiveAfterExtract` 完成后删除压缩包 + 错误汇总/取消/自动关闭），三个 CLI case 单文件走原流程（保留提权预检）、多文件走批处理
+  - 涉及文件：`App.axaml.cs`；ShellExt `WorkingDirectory = Desktop` 保持不动（多选跨目录无法取单一目录，handler 修正后已无影响）；WPF 版无此 bug 未改动
+  - 验证：临时输出目录 build 0 错误、lsp 无诊断
+
 **2026-08-09** — 压缩包注释展示修复：打开即显示 + ZIP 注释编码兼容
   - **问题 1（ZIP 注释乱码）**：EOCD 注释字段无编码标志，中文 Windows 旧工具多用本地代码页（GBK）写注释，此前固定 UTF-8 解码 → 乱码。`ZipCommentHelper.ReadComment` 改用 `TextEncodingDetector.DecodeText`（UTF-8 BOM → 严格 UTF-8 失败回退 → 系统 ANSI 代码页）。真实文件 `testPreview (2).zip`（GBK 注释）验证读出「这个压缩包用来测试 MantisZip。…」不再乱码
   - **问题 2（打开不显示注释）**：根因是 `LoadArchiveAsync` 中 `SelectedFolder = FolderTreeRoot`（触发 `UpdatePreviewForFolder`）**早于** `_archiveComment` 读取赋值 → 触发链执行时注释为 null，之后无导航事件不再刷新。修复：`CurrentArchivePath`/`_currentFormat`/`_archiveComment` 赋值提前到 `SelectedFolder` 赋值之前
