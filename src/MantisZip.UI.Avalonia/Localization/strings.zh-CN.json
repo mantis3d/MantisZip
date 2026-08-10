@@ -1,4 +1,6 @@
 {
+  "Ctx_CopyPath": "复制路径",
+  "Menu_Donate": "捐赠",
   "Preview_ArchiveCommentTitle": "压缩包注释",
   "Compress_Preparing": "正在准备…",
   "Compress_PrepareFailed": "无法准备压缩，请重试。",

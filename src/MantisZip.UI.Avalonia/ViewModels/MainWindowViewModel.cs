@@ -102,6 +102,11 @@ public partial class MainWindowViewModel : ObservableObject
     public Func<Task>? ShowAboutDialog { get; set; }
 
     /// <summary>
+    /// 捐赠对话框回调。
+    /// </summary>
+    public Func<Task>? ShowDonateDialog { get; set; }
+
+    /// <summary>
     /// 收藏管理器窗口回调。
     /// </summary>
     public Func<Task>? ShowFavoritesDialog { get; set; }
@@ -195,7 +200,7 @@ public partial class MainWindowViewModel : ObservableObject
             "Menu_Edit", "Menu_View", "Menu_ToggleTheme", "Menu_Language", "Menu_LangChinese", "Menu_LangEnglish",
             "Menu_Help", "Menu_Tools",
             "Menu_ExtractArchive", "Menu_ExtractHere", "Menu_ExtractToName",
-            "Menu_NewArchive", "Menu_Compress", "Menu_PasswordManager", "Menu_About",
+            "Menu_NewArchive", "Menu_Compress", "Menu_PasswordManager", "Menu_About", "Menu_Donate",
             "Toolbar_New", "Toolbar_Open", "Toolbar_Extract", "Toolbar_Compress",
             "Toolbar_Filter", "Toolbar_Preview",
             "Menu_Toolbar", "Menu_FilterBar",
@@ -2291,6 +2296,13 @@ public partial class MainWindowViewModel : ObservableObject
     {
         if (ShowAboutDialog != null)
             await ShowAboutDialog();
+    }
+
+    [RelayCommand]
+    private async Task OpenDonate()
+    {
+        if (ShowDonateDialog != null)
+            await ShowDonateDialog();
     }
 
     [RelayCommand]

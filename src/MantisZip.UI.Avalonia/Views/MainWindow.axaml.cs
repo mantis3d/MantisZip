@@ -178,6 +178,12 @@ public partial class MainWindow : Window
             await dialog.ShowDialog(this);
         };
 
+        vm.ShowDonateDialog = async () =>
+        {
+            var dialog = new DonationDialog();
+            await dialog.ShowDialog(this);
+        };
+
         vm.ShowFavoritesDialog = async () =>
         {
             var dialog = new FavoriteManagerWindow();

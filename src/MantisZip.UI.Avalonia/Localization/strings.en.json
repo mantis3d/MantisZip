@@ -1,4 +1,6 @@
 {
+  "Ctx_CopyPath": "Copy Path",
+  "Menu_Donate": "Donate",
   "Preview_ArchiveCommentTitle": "Archive Comment",
   "Compress_Preparing": "Preparing...",
   "Compress_PrepareFailed": "Failed to prepare compression. Please try again.",
