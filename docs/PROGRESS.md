@@ -21,6 +21,12 @@
 
 ### MantisZip.UI.Avalonia（主力版）
 
+**2026-08-10** — 帮助菜单新增捐赠入口 + 文件右键菜单新增复制路径
+  - **捐赠入口**：帮助菜单新增「捐赠」项（IconHeart 图标）→ DonationDialog；`OpenDonate` 命令 + `ShowDonateDialog` 回调注入（MainWindow.axaml.cs），i18n 补充 `Menu_Donate`
+  - **复制路径**：文件右键菜单新增「复制路径」，`CopyFilePath` 命令支持多选（换行分隔），与 `CopyFileName` 共用多选逻辑，i18n 补充 `Ctx_CopyPath`
+  - **无文字 bug 修复**：新增 key 漏加 `UpdateLocalizedStrings()` 硬编码 key 列表导致 `LocalizedStrings[Key]` 绑定返回 null 菜单无文字；已补入 `Menu_Donate`/`Ctx_CopyPath`，并全量校验 119 个绑定 key 均在列表中
+  - 涉及文件：`MainWindow.axaml`、`MainWindow.axaml.cs`、`MainWindowViewModel.cs`、`strings.zh-CN.json`、`strings.en.json`
+
 **2026-08-09** — 修复右键原地解压/智能原地解压解压到桌面 + CLI 直接解压补齐冲突处理与多文件批处理
   - **问题 1（解压到桌面）**：ShellExt 启动子进程时固定 `WorkingDirectory = Desktop`，Avalonia `App.axaml.cs` 用 `Directory.GetCurrentDirectory()` 作为解压目标 → 右键「原地解压/智能原地解压」解压到桌面而非压缩包所在目录。修复：CLI 解压目标改为 `Path.GetDirectoryName(path) ?? "."`（`--open-dispatch` extract-here、`--extract-here` 两处），智能解压目标目录计算抽为 `ResolveSmartDestCliAsync`（单根→压缩包目录，散列→命名子目录）供单文件/批处理共用
   - **问题 2（无冲突处理）**：`--extract-here`/`--extract-smart`/`--extract-to-name` 直接 CLI 解压此前裸调 `engine.ExtractAsync` 无 options → `FileConflictHelper` 默认 Overwrite 静默覆盖。修复：经 `SelectedItemsExtractService.CreateExtractOptions(FileConflictAction, info => ExtractFlow.ShowConflictDialogAsync(...))` 传入，与 `--extract` 弹窗流程一致
