@@ -1064,6 +1064,8 @@
                 <Separator />
                 <MenuItem Header="{Binding LocalizedStrings[Ctx_CopyName]}"
                           Command="{Binding CopyFileNameCommand}" />
+                <MenuItem Header="{Binding LocalizedStrings[Ctx_CopyPath]}"
+                          Command="{Binding CopyFilePathCommand}" />
                 <MenuItem Header="{Binding LocalizedStrings[Ctx_Test]}"
                           Command="{Binding TestEntryCommand}" />
                 <Separator />
