@@ -456,6 +456,8 @@ public static class ResultPreviewService
 
     /// <summary>
     /// 递归统计每个节点的 TotalDescendantCount、TotalDescendantSize 和 MaxChildDepth。
+    /// TotalDescendantCount 只统计文件节点（不含目录条目），TotalDescendantSize 为子树内文件大小之和。
+    /// 被过滤（IsFilteredOut）的节点整棵跳过：过滤掉的文件不会实际解压/压缩，不计入目录统计（与摘要栏语义一致）。
     /// </summary>
     private static int CalculateDescendantStats(PreviewTreeNode node, int depth = 0)
     {
@@ -467,7 +469,14 @@ public static class ResultPreviewService
         {
             if (child is PreviewTreeNode previewChild)
             {
-                count++;
+                // 跳过被过滤的节点（其子树亦不会实际处理）
+                if (previewChild.IsFilteredOut)
+                    continue;
+
+                // 只统计文件节点，目录条目自身不计入数量
+                if (!previewChild.IsDirectory)
+                    count++;
+
                 var childDescendantCount = CalculateDescendantStats(previewChild, depth + 1);
                 count += childDescendantCount;
                 totalSize += previewChild.TotalDescendantSize;

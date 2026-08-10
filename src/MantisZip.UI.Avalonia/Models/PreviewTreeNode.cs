@@ -41,8 +41,8 @@ public class PreviewTreeNode : FolderNode
     /// <summary>是否为目录节点（由构建代码在创建时标记，区别于文件节点）。</summary>
     public bool IsDirectory { get; set; }
 
-    /// <summary>是否为空目录（目录类型且无子节点）。</summary>
-    public bool IsEmptyDirectory => IsDirectory && Children.Count == 0;
+    /// <summary>是否为空目录（递归语义：整棵子树无文件，仅含目录或空无内容均算空；被过滤文件不计数）。</summary>
+    public bool IsEmptyDirectory => IsDirectory && TotalDescendantCount == 0;
 
     /// <summary>缩进深度（0 为顶级）。由 RebuildDisplayTree 的 SetIndentGuides 设置。</summary>
     public int IndentDepth { get; set; }
@@ -50,18 +50,18 @@ public class PreviewTreeNode : FolderNode
     /// <summary>每层祖先是否有下一兄弟节点（用于绘制缩进竖线）。</summary>
     public bool[] AncestorHasNextSibling { get; set; } = [];
 
-    /// <summary>子孙节点总数（含所有层级的文件和目录）。</summary>
+    /// <summary>子孙文件节点数量（不含目录条目与被过滤项；由 ResultPreviewService.CalculateDescendantStats 填充）。</summary>
     public int TotalDescendantCount { get; set; }
 
-    /// <summary>子孙节点文件大小总和（字节）。</summary>
+    /// <summary>子孙文件大小总和（字节，不含被过滤项）。</summary>
     public long TotalDescendantSize { get; set; }
 
     /// <summary>子孙最大深度（用于截断判断）。</summary>
     public int MaxChildDepth { get; set; }
 
-    /// <summary>目录统计摘要文本，仅目录节点有值。</summary>
+    /// <summary>目录统计摘要文本，仅目录节点有值（空目录不显示统计行）。</summary>
     public string DirectoryInfoText =>
-        Children.Count > 0 && !string.IsNullOrEmpty(FullPath)
+        !IsEmptyDirectory && Children.Count > 0 && !string.IsNullOrEmpty(FullPath)
             ? LocalizationManager.T("Preview_Result_DirInfo", TotalDescendantCount, FormatUtil.FormatSize(TotalDescendantSize))
             : string.Empty;
 
@@ -80,7 +80,7 @@ public class PreviewTreeNode : FolderNode
     /// <summary>是否为目录节点。</summary>
     public bool IsDirectoryNode => IsDirectory || Children.Count > 0 || string.IsNullOrEmpty(FullPath);
 
-    /// <summary>图标资源键（IconFolder / IconDocument / IconWarning / IconArchive），用于 PathIcon 绑定。</summary>
+    /// <summary>图标资源键（IconEmptyFolder / IconFolder / IconDocument / IconWarning / IconArchive），用于 PathIcon 绑定。</summary>
     public string? IconKey
     {
         get
@@ -88,7 +88,8 @@ public class PreviewTreeNode : FolderNode
             if (IsArchiveNode) return "IconArchive";
             if (IsTruncated) return null;
             if (ExistsAtDestination && !IsDirectory && !string.IsNullOrEmpty(FullPath)) return "IconWarning";
-            if (IsEmptyDirectory || Children.Count > 0 || string.IsNullOrEmpty(FullPath)) return "IconFolder";
+            if (IsEmptyDirectory) return "IconEmptyFolder";
+            if (Children.Count > 0 || string.IsNullOrEmpty(FullPath)) return "IconFolder";
             return "IconDocument";
         }
     }

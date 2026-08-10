@@ -201,6 +201,8 @@ public partial class IconTestViewModel : ObservableObject
         // ═══════════════════════════════════════════════════════════
         Add("文件列表", "文件夹节点", null, "IconFolder", IconStatus.Converted,
             "Models/PreviewTreeNode.cs:51", "PreviewTreeNode.IconKey 返回 IconFolder");
+        Add("文件列表", "空目录", null, "IconEmptyFolder", IconStatus.Converted,
+            "Models/PreviewTreeNode.cs:91", "PreviewTreeNode.IconKey 对空目录返回 IconEmptyFolder");
         Add("文件列表", "文件节点", null, "IconDocument", IconStatus.Converted,
             "Models/PreviewTreeNode.cs:52", "PreviewTreeNode.IconKey 返回 IconDocument");
         Add("文件列表", "冲突文件", null, "IconWarning", IconStatus.Converted,

@@ -96,7 +96,7 @@ MantisZip.Core ──────┤                                     ├─�
 - `Count` **仅统计文件**（跳过目录条目）
 - `NewestModified` = 子树内最新文件修改时间，`DateTime.MinValue` 文件不参与
 - **消费者**：Avalonia `MainWindowViewModel.PopulateEntries`（基于过滤后的 `filteredSource` 计算，目录行的大小/日期/压缩后大小由聚合填充）
-- **注意**：ResultTreeView 的 `CalculateDescendantStats`（`Services/ResultPreviewService.cs`）是独立的树状聚合，`TotalDescendantCount` 含目录、无压缩后大小/日期 —— 与 `DirStats` 语义不同，勿混用
+- **注意**：ResultTreeView 的 `CalculateDescendantStats`（`Services/ResultPreviewService.cs`）是独立的树状聚合，`TotalDescendantCount` 只统计文件节点（不含目录条目）、跳过 `IsFilteredOut` 被过滤项、无压缩后大小/日期 —— 与 `DirStats` 语义不同，勿混用
 
 ### Extract path resolution — ExtractPathResolver
 

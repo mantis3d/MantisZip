@@ -3,6 +3,7 @@ using System.Linq;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
+using MantisZip.Core.Services;
 using MantisZip.UI.Avalonia.Models;
 using MantisZip.UI.Avalonia.Services;
 
@@ -221,9 +222,19 @@ public partial class ResultTreeView : UserControl
         if (_originalRoot == null)
             return;
 
-        // Deep-clone the original tree and apply display rules
+        // Deep-clone the original tree
         var displayRoot = DeepCloneNode(_originalRoot);
-        ApplyDisplayRules(displayRoot, 0);
+
+        // 数据层：先彻底完成文件过滤（移除被过滤项 + 空目录裁剪），
+        // 得到与真实操作数据一致的干净树。精简模式只是显示效果，必须作用于过滤完成后的数据。
+        if (!ShowFilteredGhosts)
+        {
+            RemoveFilteredNodes(displayRoot);
+            PruneEmptyDirectories(displayRoot);
+        }
+
+        // 显示层：精简截断（深度/数量）只作用于已过滤/已裁剪的干净树
+        ApplyCompactRules(displayRoot, 0);
 
         // 恢复展开状态
         RestoreExpandedPaths(displayRoot, expandedPaths);
@@ -276,32 +287,28 @@ public partial class ResultTreeView : UserControl
     }
 
     /// <summary>
-    /// 递归应用显示规则：先移除过滤项（不占截断计数），再深度/数量截断。
+    /// 递归应用精简显示规则（深度/数量截断）。
+    /// 调用前树必须已过滤 + 已裁剪空目录（见 <see cref="RebuildDisplayTree"/> 的数据层），
+    /// 因此子节点均为可见项，截断计数直接可用，不会出现"还有 0 层"之类的幽灵标签。
     /// </summary>
-    private void ApplyDisplayRules(PreviewTreeNode node, int depth)
+    private void ApplyCompactRules(PreviewTreeNode node, int depth)
     {
-        // 0. 先移除过滤项（不受 CompactMode 影响，Full 模式也递归生效）
-        if (!ShowFilteredGhosts)
-        {
-            node.Children = node.Children.Where(c => !(c is PreviewTreeNode pt && pt.IsFilteredOut)).ToList();
-        }
-
         if (!CompactMode)
         {
-            // Full mode: 仅递归过滤子目录，跳过截断
+            // Full mode: 仅递归，跳过截断
             foreach (var child in node.Children.ToList())
             {
                 if (child is PreviewTreeNode pt && !pt.IsTruncated)
-                    ApplyDisplayRules(pt, depth + 1);
+                    ApplyCompactRules(pt, depth + 1);
             }
             return;
         }
 
-        // 1. 深度截断 (CompactMode 且超过 MaxDepth)
+        // 1. 深度截断 (CompactMode 且超过 MaxDepth)。
+        //    树已干净：Children.Count > 0 即确实有可见内容，计数不会为 0
         if (depth >= MaxDepth && node.Children.Count > 0)
         {
             var totalDeep = CountDeepDescendants(node);
-            var totalFiles = CountTotalFiles(node);
 
             node.Children.Clear();
             var depthLabel = LocalizationManager.T("Preview_Result_TruncatedDepth", totalDeep);
@@ -316,10 +323,10 @@ public partial class ResultTreeView : UserControl
             return;
         }
 
-        // 2. 文件数截断 (CompactMode 且子节点超过 MaxItemsPerDirectory)
+        // 2. 文件数截断 (CompactMode 且子节点超过 MaxItemsPerDirectory)。
+        //    树已干净：子节点均为可见项（无过滤项/空目录），计数直接可用
         if (node.Children.Count > MaxItemsPerDirectory)
         {
-            var excess = node.Children.Count - MaxItemsPerDirectory;
             var truncated = node.Children.Skip(MaxItemsPerDirectory).ToList();
 
             node.Children = node.Children.Take(MaxItemsPerDirectory).ToList();
@@ -328,15 +335,15 @@ public partial class ResultTreeView : UserControl
             var extraDirs = truncated.Count(c => c is PreviewTreeNode pt && pt.Children.Count > 0);
 
             var label = extraDirs > 0
-                ? LocalizationManager.T("Preview_Result_TruncatedMixed", excess, extraDirs, extraFiles)
-                : LocalizationManager.T("Preview_Result_TruncatedItems", excess);
+                ? LocalizationManager.T("Preview_Result_TruncatedMixed", truncated.Count, extraDirs, extraFiles)
+                : LocalizationManager.T("Preview_Result_TruncatedItems", truncated.Count);
 
             node.Children.Add(new PreviewTreeNode
             {
                 Name = label,
                 DisplayLabel = label,
                 IsTruncated = true,
-                TruncatedCount = excess,
+                TruncatedCount = truncated.Count,
                 FullPath = node.FullPath + "/..."
             });
         }
@@ -346,13 +353,13 @@ public partial class ResultTreeView : UserControl
         {
             if (child is PreviewTreeNode pt && !pt.IsTruncated)
             {
-                ApplyDisplayRules(pt, depth + 1);
+                ApplyCompactRules(pt, depth + 1);
             }
         }
     }
 
     /// <summary>
-    /// 计算深层子孙总数（跳过中间层级的计数）。
+    /// 计算深层子孙总数（跳过中间层级的计数）。幽灵模式（ShowFilteredGhosts=true）下全部节点可见。
     /// </summary>
     private static int CountDeepDescendants(PreviewTreeNode node)
     {
@@ -369,6 +376,17 @@ public partial class ResultTreeView : UserControl
     }
 
     /// <summary>
+    /// 数据层：全树递归移除被过滤的节点（IsFilteredOut）。
+    /// 与真实操作数据一致——过滤掉的文件/目录不参与实际解压/压缩，也不应出现在任何显示模式。
+    /// </summary>
+    private static void RemoveFilteredNodes(PreviewTreeNode node)
+    {
+        node.Children = node.Children.Where(c => !(c is PreviewTreeNode pt && pt.IsFilteredOut)).ToList();
+        foreach (var child in node.Children.OfType<PreviewTreeNode>().ToList())
+            RemoveFilteredNodes(child);
+    }
+
+    /// <summary>
     /// 统计节点下所有文件（非目录项）的数量。
     /// </summary>
     /// <param name="includeFiltered">为 true 时包括 IsFilteredOut 节点，false 时跳过。</param>
@@ -382,12 +400,62 @@ public partial class ResultTreeView : UserControl
         {
             if (child is PreviewTreeNode pt)
             {
-                if (pt.Children.Count == 0 && !pt.IsTruncated)
+                // 被过滤的文件必须在父层计数前跳过——旧实现只在递归入口查
+                // IsFilteredOut，叶子文件（Children.Count==0）永远走不到那里，导致
+                // includeFiltered:false 时过滤项仍被计入总数
+                if (!includeFiltered && pt.IsFilteredOut)
+                    continue;
+                // 只计文件：空目录（IsDirectory 且无子节点）不是文件，不计入
+                if (!pt.IsDirectory && pt.Children.Count == 0 && !pt.IsTruncated)
                     files++;
                 files += CountTotalFiles(pt, includeFiltered);
             }
         }
         return files;
+    }
+
+    /// <summary>
+    /// 递归移除空目录（子树无文件），bottom-up 使隐藏向上传播：
+    /// 子目录被移除后父目录若因此也无文件，一并移除，直到有文件的祖先。
+    /// 返回 true 表示本节点是空目录、应从父节点移除。
+    /// </summary>
+    private static bool PruneEmptyDirectories(PreviewTreeNode node)
+    {
+        var kept = new List<FolderNode>();
+        foreach (var child in node.Children)
+        {
+            if (child is PreviewTreeNode pt)
+            {
+                if (pt.IsTruncated)
+                {
+                    // 截断占位（… 还有 N 层/项）意味着下层仍有内容，保留
+                    kept.Add(pt);
+                    continue;
+                }
+                if (!PruneEmptyDirectories(pt))
+                    kept.Add(pt);
+            }
+        }
+        node.Children = kept;
+
+        return node.IsDirectory && !SubtreeHasFiles(node);
+    }
+
+    /// <summary>
+    /// 显示克隆中子树是否含文件。截断占位视为有内容（其下层可能有文件）。
+    /// </summary>
+    private static bool SubtreeHasFiles(PreviewTreeNode node)
+    {
+        foreach (var child in node.Children)
+        {
+            if (child is PreviewTreeNode pt)
+            {
+                if (pt.IsTruncated) return true;
+                if (!pt.IsDirectory) return true;
+                if (SubtreeHasFiles(pt)) return true;
+            }
+        }
+        return false;
     }
 
     /// <summary>

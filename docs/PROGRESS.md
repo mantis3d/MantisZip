@@ -21,6 +21,15 @@
 
 ### MantisZip.UI.Avalonia（主力版）
 
+**2026-08-10** — 预览树（ResultTreeView）过滤统计修复 + 精简模式按过滤后数据工作
+  - **目录统计不受过滤影响（修复 1）**：`ResultPreviewService.CalculateDescendantStats` 递归时跳过 `IsFilteredOut` 节点、文件计数只统计非目录节点（此前目录行统计把被过滤文件算进去）。同步更新 `PreviewTreeNode` 文档注释与 AGENTS.md 语义说明
+  - **空目录语义（修复 2）**：`IsEmptyDirectory` 改为递归定义（子树无文件即空，含只含空目录/文件全被过滤）；新增 `IconEmptyFolder` 图标（AppIcons.axaml + IconTestViewModel 注册，规则 8）；可见度复用「显示过滤项」开关（`ShowFilteredGhosts`），关闭时递归裁剪空目录（`PruneEmptyDirectories`，bottom-up 传播），打开时连空目录一起显示
+  - **精简模式管线重构（修复 3）**：原实现边截断边猜可见性，深度截断跑在空目录裁剪之前，子树全空目录的目录被截成「还有 0 层」幽灵占位符。重构为两阶段：数据层（`RemoveFilteredNodes` 全树移除过滤项 + `PruneEmptyDirectories` 空目录裁剪）彻底完成后，显示层（`ApplyCompactRules` 深度/数量截断）才作用其上——截断计数直接基于干净树，不会出现 0 层/虚高标签
+  - **摘要文件总数不受过滤影响（修复 4）**：`CountTotalFiles` 旧实现只在递归入口查 `IsFilteredOut`，叶子文件在父层循环被无条件计入（大小统计 `CalculateTotalSize` 因逐节点检查一直正确）。改为子节点级跳过过滤项 + 空目录（`IsDirectory`）不计文件
+  - **测试**：新增 `ResultTreeViewFilterTests.cs`（9 例无头测试）：精简模式移除过滤项/裁剪空目录/模式切换保持过滤/幽灵模式保留、深度截断标签只计可见、数量截断不计空目录、无「还有 0 层」幽灵标签、摘要文件总数排除过滤项与空目录
+  - 涉及文件：`Controls/ResultTreeView.axaml.cs`、`Models/PreviewTreeNode.cs`、`Services/ResultPreviewService.cs`、`Resources/Icons/AppIcons.axaml`、`ViewModels/IconTestViewModel.cs`、`tests/MantisZip.UI.Avalonia.Tests/ResultTreeViewFilterTests.cs`、`AGENTS.md`
+  - 验证：Avalonia 测试 9/9 通过、`dotnet build` 0 警告 0 错误、lsp 无诊断
+
 **2026-08-10** — 帮助菜单新增捐赠入口 + 文件右键菜单新增复制路径
   - **捐赠入口**：帮助菜单新增「捐赠」项（IconHeart 图标）→ DonationDialog；`OpenDonate` 命令 + `ShowDonateDialog` 回调注入（MainWindow.axaml.cs），i18n 补充 `Menu_Donate`
   - **复制路径**：文件右键菜单新增「复制路径」，`CopyFilePath` 命令支持多选（换行分隔），与 `CopyFileName` 共用多选逻辑，i18n 补充 `Ctx_CopyPath`
