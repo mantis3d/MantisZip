@@ -790,35 +790,24 @@ public partial class App : Application
                 return;
             }
 
-            // 尝试获取第一个压缩包的条目列表（供过滤/预览树），3 秒超时，失败则无过滤支持
-            IReadOnlyList<ArchiveItem>? entries = null;
-            try
-            {
-                var engine = ArchiveEngineFactory.GetEngineByExtension(existing[0]);
-                if (engine != null)
-                {
-                    var listTask = engine.ListEntriesAsync(existing[0], null);
-                    if (await Task.WhenAny(listTask, Task.Delay(3000)) == listTask && listTask.IsCompletedSuccessfully)
-                        entries = listTask.Result;
-                }
-            }
-            catch (Exception listEx)
-            {
-                DebugLog($"RunExtractDialogCliAsync: ListEntriesAsync failed: {listEx.Message}");
-            }
-
+            // 立即显示设置窗口，消除弹窗前条目列表读取（最长 3s）的空白期：
+            // 窗口秒现，条目在后台加载，完成后 SetEntries 填充过滤统计与预览树
+            // （ExtractSettingsViewModel.BuildExtractPreview 异步构建 + IsBuildPending 加载状态）。
             var dialog = new ExtractSettingsWindow(existing);
-            if (entries is { Count: > 0 })
-                dialog.SetEntries(entries);
 
             // CLI 模式没有主窗口，无法用 ShowDialog(owner)，改用非模态 Show + Closed 事件等待结果。
             // 同时必须把 ShutdownMode 改为 OnExplicitShutdown：默认 OnLastWindowClose 会在弹窗
             // （唯一窗口）关闭瞬间同步触发应用退出，导致确认后的解压 continuation 来不及执行。
             // 退出时机改由我们显式控制：取消 → 立即退出；确认 → 批处理解压完成后退出。
             desktop.ShutdownMode = ShutdownMode.OnExplicitShutdown;
+            desktop.MainWindow = dialog;
             var closeTcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
             dialog.Closed += (_, _) => closeTcs.TrySetResult(dialog.DialogResult == true);
             dialog.Show();
+
+            // 后台加载第一个压缩包的条目列表（供过滤/预览树），失败则无过滤支持（与旧 3s 超时语义一致）
+            _ = LoadExtractDialogEntriesAsync(existing[0], dialog);
+
             var ok = await closeTcs.Task;
             if (!ok)
             {
@@ -844,6 +833,29 @@ public partial class App : Application
         {
             Console.Error.WriteLine($"Extract dialog failed: {ex.Message}");
             desktop.Shutdown();
+        }
+    }
+
+    /// <summary>
+    /// 后台加载压缩包条目列表并填充到解压设置窗口（过滤统计 + 预览树）。
+    /// 在 UI 线程上下文启动，await 返回后仍在 UI 线程，SetEntries 安全；
+    /// 窗口已关闭时不填充；失败仅记录日志，保持无过滤/预览支持（与旧 3s 超时语义一致）。
+    /// </summary>
+    private static async Task LoadExtractDialogEntriesAsync(
+        string archivePath,
+        ExtractSettingsWindow dialog)
+    {
+        try
+        {
+            var engine = ArchiveEngineFactory.GetEngineByExtension(archivePath);
+            if (engine == null) return;
+            var entries = await engine.ListEntriesAsync(archivePath, null);
+            if (entries is { Count: > 0 } && dialog.IsVisible)
+                dialog.SetEntries(entries);
+        }
+        catch (Exception listEx)
+        {
+            DebugLog($"RunExtractDialogCliAsync: ListEntriesAsync failed: {listEx.Message}");
         }
     }
 
@@ -1514,6 +1526,13 @@ public partial class App : Application
             {
                 var allPaths = new List<string>(myPaths);
                 var cts = new CancellationTokenSource();
+
+                // 立即显示「正在收集文件」纯文字弹窗，避免 IPC 收集期间用户无反馈。
+                // 不用 ProgressWindow：其按钮/进度条/批处理列表会让用户误以为压缩已开始
+                var collectingWindow = new CollectingWindow();
+                collectingWindow.Show();
+                desktop.MainWindow = collectingWindow;
+
                 var pipeReady = new ManualResetEventSlim(false);
                 StartPipeServer(allPaths, cts.Token, CompressPipeName, pipeReady);
                 pipeReady.Wait(3000);
@@ -1524,7 +1543,11 @@ public partial class App : Application
                     mutex.Dispose();
                     Dispatcher.UIThread.Post(async () =>
                     {
-                        try { await ShowCompressDialogAndRun(allPaths, desktop); }
+                        try
+                        {
+                            collectingWindow.Close();
+                            await ShowCompressDialogAndRun(allPaths, desktop);
+                        }
                         catch (Exception ex) { App.DebugLog($"HandleCompress: ShowCompressDialogAndRun 异常: {ex.Message}"); desktop.Shutdown(); }
                     });
                 });

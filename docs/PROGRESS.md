@@ -21,6 +21,13 @@
 
 ### MantisZip.UI.Avalonia（主力版）
 
+**2026-08-11** — 压缩/解压启动即时反馈：收集弹窗、主窗口加载遮罩、解压设置弹窗秒现
+  - **右键压缩 `--compress` IPC 收集期间显示纯文字弹窗**：新增 `CollectingWindow`（无边框、无按钮、单行文案「正在收集文件…」），消除多文件收集 800ms 空白期。不用 ProgressWindow（避免让用户误以为压缩已开始），按 AGENTS.md 规则 4 应用主题资源、规则 5 紧凑度资源键
+  - **主窗口 `IsLoading` 加载遮罩接线**：`MainWindow.axaml` 增加「正在打开压缩包…」遮罩（绑定 `IsLoading`），`MainWindowViewModel` 补上打开大压缩包期间的反馈，新增 `Status_OpeningArchive` 本地化 key（中/英）
+  - **右键「解压到……」`--extract` 弹窗秒现**：`RunExtractDialogCliAsync` 删除弹窗前最长 3s 的 `ListEntriesAsync` 预加载，改为立即 `Show()` + 后台 `LoadExtractDialogEntriesAsync` 加载条目后 `SetEntries`（预览树异步构建 + `IsBuildPending` 加载状态已覆盖加载期间），窗口已关闭不填充
+  - **文档**：新增 `.sisyphus/plans/startup-native-splash.md`（P2 计划：原生 Win32 splash 覆盖进程冷启动 ~1-2s），PLAN.md 对应条目更新为一期 A+B+C
+  - 涉及文件：`Dialogs/CollectingWindow.axaml(.cs)`（新增）、`App.axaml.cs`、`Views/MainWindow.axaml`、`ViewModels/MainWindowViewModel.cs`、`Localization/strings.*.json`、`.sisyphus/plans/startup-native-splash.md`（新增）、`docs/PLAN.md`
+
 **2026-08-10** — 预览树（ResultTreeView）过滤统计修复 + 精简模式按过滤后数据工作
   - **目录统计不受过滤影响（修复 1）**：`ResultPreviewService.CalculateDescendantStats` 递归时跳过 `IsFilteredOut` 节点、文件计数只统计非目录节点（此前目录行统计把被过滤文件算进去）。同步更新 `PreviewTreeNode` 文档注释与 AGENTS.md 语义说明
   - **空目录语义（修复 2）**：`IsEmptyDirectory` 改为递归定义（子树无文件即空，含只含空目录/文件全被过滤）；新增 `IconEmptyFolder` 图标（AppIcons.axaml + IconTestViewModel 注册，规则 8）；可见度复用「显示过滤项」开关（`ShowFilteredGhosts`），关闭时递归裁剪空目录（`PruneEmptyDirectories`，bottom-up 传播），打开时连空目录一起显示

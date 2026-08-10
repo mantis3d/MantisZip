@@ -1264,5 +1264,32 @@
                    HorizontalAlignment="Right" />
       </Grid>
     </Border>
+
+    <!-- 打开压缩包加载遮罩（覆盖整个窗口，绑定 IsLoading） -->
+    <Grid Grid.RowSpan="5"
+          IsVisible="{Binding IsLoading}"
+          Background="#88000000"
+          ZIndex="1000">
+      <Border HorizontalAlignment="Center"
+              VerticalAlignment="Center"
+              Padding="{DynamicResource DialogPadding}"
+              Background="{DynamicResource ThemeSurfaceBgBrush}"
+              BorderBrush="{DynamicResource ThemeBorderBrush}"
+              BorderThickness="1"
+              CornerRadius="{DynamicResource BorderRadius}">
+        <StackPanel Spacing="{DynamicResource SpacingMd}"
+                    HorizontalAlignment="Center"
+                    MinWidth="260">
+          <TextBlock Text="{Binding LocalizedStrings[Status_OpeningArchive]}"
+                     Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                     FontSize="16"
+                     HorizontalAlignment="Center" />
+          <ProgressBar IsIndeterminate="True"
+                       Width="180"
+                       Height="6"
+                       HorizontalAlignment="Center" />
+        </StackPanel>
+      </Border>
+    </Grid>
   </Grid>
 </Window>

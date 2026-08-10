@@ -225,6 +225,7 @@ public partial class MainWindowViewModel : ObservableObject
             "Status_CommentNotSupported", "Status_ConfirmDelete",
             "Status_ExtractComplete",
             "Status_Copied", "Status_EntryTested", "Status_CommentSaveFailed", "Status_FileNotFound",
+            "Status_OpeningArchive",
             "Status_TestingEntry", "Status_TestingArchive", "Status_SmartExtracting",
             "Status_AddingFiles", "Status_DeletingFiles", "Status_Entries",
             "Main_NoRecentFiles", "Main_ClearRecentFiles", "Main_RecentFiles",
