@@ -617,6 +617,17 @@ public class SevenZipEngine : IArchiveEngine
                         continue;
                     }
 
+                    // ExtractFile 为原子调用（内部校验 CRC），无法获取单文件中间进度；
+                    // 提取前后各上报一次 0%/100% 以驱动文件进度条
+                    progress?.Report(new ArchiveProgress
+                    {
+                        CurrentFile = entries[i].FileName,
+                        PercentComplete = totalEntries > 0 ? (double)processed / totalEntries * 100 : 100,
+                        FilePercentComplete = 0,
+                        TotalFiles = totalEntries,
+                        ProcessedFiles = processed,
+                    });
+
                     // 实际解压条目到空流 — 7z.dll 在 ExtractFile 内部会校验 CRC
                     extractor.ExtractFile(entries[i].Index, Stream.Null);
 
@@ -626,6 +637,7 @@ public class SevenZipEngine : IArchiveEngine
                     {
                         CurrentFile = entries[i].FileName,
                         PercentComplete = totalEntries > 0 ? (double)processed / totalEntries * 100 : 100,
+                        FilePercentComplete = 100,
                         TotalFiles = totalEntries,
                         ProcessedFiles = processed,
                     });

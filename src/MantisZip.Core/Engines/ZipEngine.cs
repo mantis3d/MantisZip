@@ -724,7 +724,46 @@ public class ZipEngine : IArchiveEngine
                     // 完全解压每个条目以验证数据完整性
                     // SharpCompress 在读取完整流时内部会检测 CRC 等错误
                     using var stream = entry.OpenEntryStream();
-                    stream.CopyTo(Stream.Null);
+
+                    long entrySize = entry.Size;
+                    long totalRead = 0;
+                    var lastReportTime = DateTime.Now;
+                    var reportInterval = TimeSpan.FromMilliseconds(100);
+
+                    // 文件开始：文件进度条归零
+                    progress?.Report(new ArchiveProgress
+                    {
+                        CurrentFile = entry.Key ?? "",
+                        PercentComplete = totalFiles > 0 ? (double)processedFiles / totalFiles * 100 : 100,
+                        FilePercentComplete = 0,
+                        TotalFiles = totalFiles,
+                        ProcessedFiles = processedFiles,
+                    });
+
+                    // 带 per-file 进度的复制循环（100ms 节流，末尾强制上报 100%）
+                    var buffer = new byte[CopyBufferSize];
+                    while (true)
+                    {
+                        cancellationToken.ThrowIfCancellationRequested();
+                        var read = stream.Read(buffer, 0, buffer.Length);
+                        if (read <= 0) break;
+                        totalRead += read;
+
+                        var now = DateTime.Now;
+                        if (now - lastReportTime >= reportInterval || totalRead >= entrySize)
+                        {
+                            var filePct = entrySize > 0 ? (double)totalRead / entrySize * 100 : 100;
+                            progress?.Report(new ArchiveProgress
+                            {
+                                CurrentFile = entry.Key ?? "",
+                                PercentComplete = totalFiles > 0 ? (double)processedFiles / totalFiles * 100 : 100,
+                                FilePercentComplete = filePct,
+                                TotalFiles = totalFiles,
+                                ProcessedFiles = processedFiles,
+                            });
+                            lastReportTime = now;
+                        }
+                    }
 
                     processedFiles++;
 
@@ -732,6 +771,7 @@ public class ZipEngine : IArchiveEngine
                     {
                         CurrentFile = entry.Key ?? "",
                         PercentComplete = totalFiles > 0 ? (double)processedFiles / totalFiles * 100 : 100,
+                        FilePercentComplete = 100,
                         TotalFiles = totalFiles,
                         ProcessedFiles = processedFiles,
                     });

@@ -438,16 +438,57 @@ public class TarGzEngine : IArchiveEngine
                         cancellationToken.ThrowIfCancellationRequested();
                         if (reader.Entry.IsDirectory) continue;
 
-                        using var entryStream = reader.OpenEntryStream();
-                        // 完全解压条目以验证数据完整性
-                        entryStream.CopyTo(Stream.Null);
+                        var entryKey = reader.Entry.Key ?? "";
+                        long entrySize = reader.Entry.Size;
 
+                        using var entryStream = reader.OpenEntryStream();
+                        // 完全解压条目以验证数据完整性（带 per-file 进度）
+
+                        // 文件开始：文件进度条归零
                         progress?.Report(new ArchiveProgress
                         {
-                            CurrentFile = reader.Entry.Key ?? "",
+                            CurrentFile = entryKey,
                             PercentComplete = totalCompressedBytes > 0
                                 ? (double)inputStream.Position / totalCompressedBytes * 100
                                 : 0,
+                            FilePercentComplete = 0,
+                        });
+
+                        // 带 per-file 进度的复制循环（100ms 节流，末尾强制上报 100%）
+                        long totalRead = 0;
+                        var lastReportTime = DateTime.Now;
+                        var reportInterval = TimeSpan.FromMilliseconds(100);
+                        var buffer = new byte[CopyBufferSize];
+                        while (true)
+                        {
+                            cancellationToken.ThrowIfCancellationRequested();
+                            var read = entryStream.Read(buffer, 0, buffer.Length);
+                            if (read <= 0) break;
+                            totalRead += read;
+
+                            var now = DateTime.Now;
+                            if (now - lastReportTime >= reportInterval || totalRead >= entrySize)
+                            {
+                                var filePct = entrySize > 0 ? (double)totalRead / entrySize * 100 : 100;
+                                progress?.Report(new ArchiveProgress
+                                {
+                                    CurrentFile = entryKey,
+                                    PercentComplete = totalCompressedBytes > 0
+                                        ? (double)inputStream.Position / totalCompressedBytes * 100
+                                        : 0,
+                                    FilePercentComplete = filePct,
+                                });
+                                lastReportTime = now;
+                            }
+                        }
+
+                        progress?.Report(new ArchiveProgress
+                        {
+                            CurrentFile = entryKey,
+                            PercentComplete = totalCompressedBytes > 0
+                                ? (double)inputStream.Position / totalCompressedBytes * 100
+                                : 0,
+                            FilePercentComplete = 100,
                         });
                     }
                 }
@@ -462,6 +503,7 @@ public class TarGzEngine : IArchiveEngine
                     {
                         CurrentFile = Path.GetFileNameWithoutExtension(archivePath),
                         PercentComplete = 100,
+                        FilePercentComplete = 100,
                     });
                 }
 

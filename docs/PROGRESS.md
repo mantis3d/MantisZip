@@ -1219,6 +1219,11 @@
 
 这些变更影响两项目共用代码，按时间从新到旧排列。
 
+#### v0.5.0 (2026-08-12) 测试压缩包时文件进度条不再停滞（TestArchiveAsync 补 FilePercentComplete）
+  - **背景**：点击「测试」时进度窗口的文件进度条（`FilePercentComplete`）从不更新——三个引擎的 `TestArchiveAsync` 上报的 `ArchiveProgress` 均未设置 `FilePercentComplete`，而 UI 侧（WPF `ProgressWindow.SetProgress` / Avalonia `ProgressViewModel.SetProgress`）只在 `HasValue` 时更新文件进度条，导致其恒为 0（总体进度条正常）。解压/压缩路径均有 per-file 上报，唯独测试路径遗漏
+  - **方案**：`ZipEngine.TestArchiveAsync` 与 `TarGzEngine.TestArchiveAsync` 将 `CopyTo(Stream.Null)` 改为 buffered 复制循环（100ms 节流，复用解压模式），上报 `FilePercentComplete` 0 → 中间值 → 100；`TarGzEngine` `.gz` 单文件分支补 `=100`；`SevenZipEngine.TestArchiveAsync` 因 `ExtractFile` 为原子调用（内部校验 CRC）无法取中间进度，在提取前后各上报一次 `FilePercentComplete = 0`/`=100`
+  - 涉及文件：`Engines/ZipEngine.cs`、`Engines/TarGzEngine.cs`、`Engines/SevenZipEngine.cs`；构建 0 错误，Core 测试 253/253 通过（WPF/Avalonia 两版同步受益）
+
 #### v0.5.0 (2026-08-09) Core 新增 ArchiveCommentReader（ZIP + RAR5 注释统一读取）
   - **背景**：RAR 注释此前完全未读取（仅 ZIP 经 `ZipCommentHelper` 读写）；实测验证 7z.dll 26.00 的 RAR5 handler 通过 kpidComment 提供归档注释（UTF-8 → UTF-16 转换正确），RAR4（旧格式）CMT 注释块 7z.dll 不解析无法读取
   - **方案**：新增 `Utils/ArchiveCommentReader.cs`——`ReadComment(path, format, password?)`：ZIP → `ZipCommentHelper`（Trim）；RAR → `SevenZipEngine.EnsureLibraryPath()` + `SharpSevenZipExtractor.ArchiveProperties` 中 `Name=="Comment"` 项；其他格式/失败返回 null（容错不抛）
