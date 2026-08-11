@@ -21,6 +21,12 @@
 
 ### MantisZip.UI.Avalonia（主力版）
 
+**2026-08-12** — 冲突对话框支持「暂停」按钮（对齐 WPF ConflictResolver 循环重入）
+  - **解压/压缩冲突对话框「暂停」按钮可用**：`ExtractFlow.ShowConflictDialogAsync` 与 `CompressFlow.ShowConflictDialogAsync` 由一次性弹窗改造为 `while(true)` 循环重入——点击「暂停」收起冲突对话框 → 找到进度窗口 → UI 线程调用 `ProgressWindow.PauseFromConflict()` 进入暂停态 → 后台线程 `PauseEvent.Wait(ct)` 等待（不阻塞 UI）→ 用户点「继续」后重新弹窗处理同一个冲突。修复此前「暂停」被当作 Overwrite（解压静默覆盖）/ Cancel（压缩静默中止）的误判
+  - **进度窗口定位**：Avalonia 无 WPF 的 `Application.Current.Windows` 全局窗口注册表，新增 `ProgressWindow.CurrentVisible` 静态入口（`OnOpened` 置位 / `OnClosed` 清除），等价替代 WPF 的 `Windows.OfType<ProgressWindow>().FirstOrDefault()` 查找；CLI 路径仍优先用 owner 直接转换
+  - 涉及文件：`Dialogs/ProgressWindow.axaml.cs`、`Services/ExtractFlow.cs`、`Services/CompressFlow.cs`
+  - 验证：`dotnet build` 0 错误 0 警告、Avalonia 测试 54 通过 2 跳过、lsp 无诊断
+
 **2026-08-11** — 压缩/解压启动即时反馈：收集弹窗、主窗口加载遮罩、解压设置弹窗秒现
   - **右键压缩 `--compress` IPC 收集期间显示纯文字弹窗**：新增 `CollectingWindow`（无边框、无按钮、单行文案「正在收集文件…」），消除多文件收集 800ms 空白期。不用 ProgressWindow（避免让用户误以为压缩已开始），按 AGENTS.md 规则 4 应用主题资源、规则 5 紧凑度资源键
   - **主窗口 `IsLoading` 加载遮罩接线**：`MainWindow.axaml` 增加「正在打开压缩包…」遮罩（绑定 `IsLoading`），`MainWindowViewModel` 补上打开大压缩包期间的反馈，新增 `Status_OpeningArchive` 本地化 key（中/英）
