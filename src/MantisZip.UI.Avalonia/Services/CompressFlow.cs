@@ -119,44 +119,77 @@ public static class CompressFlow
     }
 
     /// <summary>
-    /// 弹 CompressConflictDialog 并映射结果（无状态，供主窗口/CLI 的弹窗回调复用）。
+    /// 弹 CompressConflictDialog 并映射结果（供主窗口/CLI 的弹窗回调复用）。
     /// resolver 由 Core 在后台线程调用，本方法内部通过 Dispatcher 封送回 UI 线程弹窗。
+    /// 循环重入：用户点击"暂停"时收起冲突对话框并进入进度窗口暂停态，
+    /// 恢复后重新弹窗处理同一个冲突（对齐 WPF AppPartials/App.Compress.cs 的实现）。
     /// </summary>
-    public static Task<(MantisZip.Core.Abstractions.CompressConflictAction Action, string? CustomName, bool ApplyToAll)>
+    public static async Task<(MantisZip.Core.Abstractions.CompressConflictAction Action, string? CustomName, bool ApplyToAll)>
         ShowConflictDialogAsync(Window owner, CompressConflictInfo info)
     {
-        return Dispatcher.UIThread.InvokeAsync(async () =>
+        // 循环重入：暂停后恢复时重新弹窗（对齐 WPF AppPartials/App.Compress.cs CompressConflictResolver）
+        while (true)
         {
-            var dlg = new CompressConflictDialog(info.OutputPath, info.SuggestedName, info.CanAdd);
-            await dlg.ShowDialog(owner);
+            var result = await Dispatcher.UIThread.InvokeAsync(async () =>
+            {
+                var dlg = new CompressConflictDialog(info.OutputPath, info.SuggestedName, info.CanAdd);
+                await dlg.ShowDialog(owner);
 
-            // "取消操作"按钮：终止整个压缩（对齐解压侧 Ask 弹窗"取消整个操作"抛
-            // OperationCanceledException 的语义；Core 收到后取消剩余任务）
-            if (dlg.CancelOperation)
+                // 暂停：收起对话框，返回暂停标志由外层处理
+                if (dlg.IsPaused)
+                {
+                    return (Action: MantisZip.Core.Abstractions.CompressConflictAction.Cancel, CustomName: (string?)null, IsPaused: true, IsCancelled: false, ApplyAll: false);
+                }
+
+                // "取消操作"按钮：终止整个压缩（对齐解压侧 Ask 弹窗"取消整个操作"抛
+                // OperationCanceledException 的语义；Core 收到后取消剩余任务）
+                if (dlg.CancelOperation)
+                {
+                    return (Action: MantisZip.Core.Abstractions.CompressConflictAction.Cancel, CustomName: (string?)null, IsPaused: false, IsCancelled: true, ApplyAll: false);
+                }
+
+                MantisZip.Core.Abstractions.CompressConflictAction resultAction;
+                string? customName = null;
+                switch (dlg.ResultAction)
+                {
+                    case Dialogs.CompressConflictAction.Overwrite:
+                        resultAction = MantisZip.Core.Abstractions.CompressConflictAction.Overwrite;
+                        break;
+                    case Dialogs.CompressConflictAction.Add:
+                        resultAction = MantisZip.Core.Abstractions.CompressConflictAction.Add;
+                        break;
+                    case Dialogs.CompressConflictAction.Rename:
+                        resultAction = MantisZip.Core.Abstractions.CompressConflictAction.Rename;
+                        customName = dlg.CustomName;
+                        break;
+                    case Dialogs.CompressConflictAction.Skip:
+                    case Dialogs.CompressConflictAction.Cancel:
+                    default:
+                        resultAction = MantisZip.Core.Abstractions.CompressConflictAction.Cancel;
+                        break;
+                }
+
+                return (Action: resultAction, CustomName: customName, IsPaused: false, IsCancelled: false, ApplyAll: dlg.ApplyToAll);
+            });
+
+            if (result.IsCancelled)
                 throw new OperationCanceledException("压缩被用户取消");
 
-            MantisZip.Core.Abstractions.CompressConflictAction resultAction;
-            string? customName = null;
-            switch (dlg.ResultAction)
+            if (result.IsPaused)
             {
-                case Dialogs.CompressConflictAction.Overwrite:
-                    resultAction = MantisZip.Core.Abstractions.CompressConflictAction.Overwrite;
-                    break;
-                case Dialogs.CompressConflictAction.Add:
-                    resultAction = MantisZip.Core.Abstractions.CompressConflictAction.Add;
-                    break;
-                case Dialogs.CompressConflictAction.Rename:
-                    resultAction = MantisZip.Core.Abstractions.CompressConflictAction.Rename;
-                    customName = dlg.CustomName;
-                    break;
-                case Dialogs.CompressConflictAction.Skip:
-                case Dialogs.CompressConflictAction.Cancel:
-                default:
-                    resultAction = MantisZip.Core.Abstractions.CompressConflictAction.Cancel;
-                    break;
+                // 从 owner（CLI 直接传 ProgressWindow）或当前打开的进度窗口中找到目标，
+                // 在 UI 线程调用 PauseFromConflict 进入暂停态，然后在后台线程等待暂停事件
+                // （不阻塞 UI 线程，用户可在进度窗口点击"继续"恢复）。
+                var pw = owner as ProgressWindow ?? ProgressWindow.CurrentVisible;
+                if (pw != null)
+                {
+                    await Dispatcher.UIThread.InvokeAsync(() => pw.PauseFromConflict());
+                    pw.PauseEvent.Wait(pw.CancellationToken);
+                }
+                continue; // 恢复后重新弹窗
             }
 
-            return (resultAction, customName, dlg.ApplyToAll);
-        });
+            return (result.Action, result.CustomName, result.ApplyAll);
+        }
     }
 }

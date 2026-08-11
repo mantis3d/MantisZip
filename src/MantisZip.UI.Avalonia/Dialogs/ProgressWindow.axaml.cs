@@ -27,6 +27,16 @@ public partial class ProgressWindow : Window
 {
     private readonly ProgressViewModel _vm;
 
+    /// <summary>最近显示的进度窗口（供冲突对话框"暂停"时定位，对齐 WPF Current.Windows.OfType&lt;ProgressWindow&gt;）。</summary>
+    private static ProgressWindow? _currentVisible;
+
+    /// <summary>
+    /// 当前可见的进度窗口；无则为 null。
+    /// 冲突对话框点击"暂停"时由 ExtractFlow/CompressFlow 通过此属性找到进度窗口，
+    /// 调用 <see cref="PauseFromConflict"/> 进入暂停态（对齐 WPF App.xaml.cs ConflictResolver）。
+    /// </summary>
+    public static ProgressWindow? CurrentVisible => _currentVisible;
+
     public ProgressWindow()
     {
         InitializeComponent();
@@ -412,8 +422,16 @@ if (_vm.IsPaused)
         base.OnClosing(e);
     }
 
+    protected override void OnOpened(EventArgs e)
+    {
+        base.OnOpened(e);
+        _currentVisible = this;
+    }
+
     protected override void OnClosed(EventArgs e)
     {
+        if (ReferenceEquals(_currentVisible, this))
+            _currentVisible = null;
         _vm.PauseEvent.Set();
         base.OnClosed(e);
     }

@@ -66,24 +66,58 @@ public static class ExtractFlow
     /// <summary>
     /// 弹 ConflictDialog 处理单个文件冲突（Ask 策略），主窗口与 CLI 共用。
     /// resolver 由 Core 在后台线程调用，本方法内部通过 Dispatcher 封送回 UI 线程弹窗。
+    /// 循环重入：用户点击"暂停"时收起冲突对话框并进入进度窗口暂停态，
+    /// 恢复后重新弹窗处理同一个冲突（对齐 WPF App.xaml.cs ConflictResolver 的实现）。
     /// 用户选择"取消整个操作"时抛 <see cref="OperationCanceledException"/> 终止解压
     /// （与拖拽/主窗口原有语义一致）。Rename 时把用户自定义名写回 <paramref name="info"/>。
     /// </summary>
-    public static Task<(FileConflictAction Action, bool ApplyToAll)>
+    public static async Task<(FileConflictAction Action, bool ApplyToAll)>
         ShowConflictDialogAsync(Window owner, FileConflictInfo info)
     {
-        return Dispatcher.UIThread.InvokeAsync(async () =>
+        // 循环重入：暂停后恢复时重新弹窗（对齐 WPF App.xaml.cs ConflictResolver）
+        while (true)
         {
-            var dlg = new ConflictDialog(info);
-            await dlg.ShowDialog(owner);
+            var result = await Dispatcher.UIThread.InvokeAsync(async () =>
+            {
+                var dlg = new ConflictDialog(info);
+                await dlg.ShowDialog(owner);
 
-            if (dlg.CancelOperation)
+                // 暂停：收起对话框，返回暂停标志由外层处理
+                if (dlg.IsPaused)
+                {
+                    return (Action: FileConflictAction.Overwrite, IsPaused: true, IsCancelled: false, ApplyAll: false);
+                }
+
+                // 取消整个操作
+                if (dlg.CancelOperation)
+                {
+                    return (Action: FileConflictAction.Overwrite, IsPaused: false, IsCancelled: true, ApplyAll: false);
+                }
+
+                if (dlg.ResultAction == FileConflictAction.Rename && !string.IsNullOrEmpty(dlg.CustomName))
+                    info.CustomName = dlg.CustomName;
+
+                return (Action: dlg.ResultAction, IsPaused: false, IsCancelled: false, ApplyAll: dlg.ApplyToAll);
+            });
+
+            if (result.IsCancelled)
                 throw new OperationCanceledException("用户取消整个解压操作");
 
-            if (dlg.ResultAction == FileConflictAction.Rename && !string.IsNullOrEmpty(dlg.CustomName))
-                info.CustomName = dlg.CustomName;
+            if (result.IsPaused)
+            {
+                // 从 owner（CLI 直接传 ProgressWindow）或当前打开的进度窗口中找到目标，
+                // 在 UI 线程调用 PauseFromConflict 进入暂停态，然后在后台线程等待暂停事件
+                // （不阻塞 UI 线程，用户可在进度窗口点击"继续"恢复）。
+                var pw = owner as ProgressWindow ?? ProgressWindow.CurrentVisible;
+                if (pw != null)
+                {
+                    await Dispatcher.UIThread.InvokeAsync(() => pw.PauseFromConflict());
+                    pw.PauseEvent.Wait(pw.CancellationToken);
+                }
+                continue; // 恢复后重新弹窗
+            }
 
-            return (dlg.ResultAction, dlg.ApplyToAll);
-        });
+            return (result.Action, result.ApplyAll);
+        }
     }
 }
