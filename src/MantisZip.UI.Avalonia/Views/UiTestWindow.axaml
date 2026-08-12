@@ -1,0 +1,926 @@
+<!--
+  UI 控件测试窗口 — 开发者诊断工具。
+  内部文案（页签/标签/演示数据）按 AGENTS.md 规则 13 豁免条款不本地化（与 IconTestWindow 一致）。
+  控件外观：全部依赖 App.axaml 全局控件样式（已覆盖 TextBox/Button/ComboBox/TabControl/DataGrid/
+  DatePicker/ProgressBar/ListBox/Menu 等），与项目现有窗口惯例一致，无需逐控件设置主题资源键。
+-->
+<Window x:Class="MantisZip.UI.Avalonia.Views.UiTestWindow"
+        xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:MantisZip.UI.Avalonia.ViewModels"
+        xmlns:models="using:MantisZip.UI.Avalonia.Models"
+        xmlns:controls="using:MantisZip.UI.Avalonia.Controls"
+        x:DataType="vm:UiTestViewModel"
+        Title="UI 控件测试窗口"
+        Width="1150" Height="820" MinWidth="960" MinHeight="640"
+        WindowStartupLocation="CenterOwner"
+        Background="{DynamicResource ThemeWindowBgBrush}"
+        Foreground="{DynamicResource ThemeTextPrimaryBrush}">
+
+  <DockPanel Margin="{DynamicResource SpacingMdThk}" LastChildFill="True">
+    <!-- 顶部说明栏 -->
+    <Border DockPanel.Dock="Top" Margin="0,0,0,10" Padding="{DynamicResource SpacingSmThk}"
+            Background="{DynamicResource ThemeSurfaceBgBrush}"
+            BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
+            CornerRadius="{DynamicResource BorderRadius}">
+      <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingSm}">
+        <TextBlock Text="🧪" FontSize="14" VerticalAlignment="Center" />
+        <TextBlock Text="同一功能控件并排展示不同样式变体，便于对比与验证；初始数据为模拟压缩包内容。"
+                   FontSize="12" Foreground="{DynamicResource ThemeTextSecondaryBrush}"
+                   VerticalAlignment="Center" TextWrapping="Wrap" />
+      </StackPanel>
+    </Border>
+
+    <TabControl>
+      <!-- ═══════════ 页签 1：按钮与文本 ═══════════ -->
+      <TabItem Header="按钮与文本">
+        <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto">
+          <StackPanel Spacing="{DynamicResource SpacingLg}" Margin="{DynamicResource SpacingMdThk}">
+
+            <!-- 按钮变体 -->
+            <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
+                    CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingMdThk}">
+              <StackPanel Spacing="{DynamicResource SpacingSm}">
+                <TextBlock Text="按钮变体" FontSize="13" FontWeight="SemiBold" />
+                <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingLg}" HorizontalAlignment="Left">
+                  <StackPanel Spacing="{DynamicResource SpacingXxs}">
+                    <TextBlock FontSize="11" Foreground="{DynamicResource ThemeTextSecondaryBrush}" Text="默认按钮" />
+                    <Button Content="确定" />
+                  </StackPanel>
+                  <StackPanel Spacing="{DynamicResource SpacingXxs}">
+                    <TextBlock FontSize="11" Foreground="{DynamicResource ThemeTextSecondaryBrush}" Text="强调按钮（Accent）" />
+                    <Button Content="立即解压" Background="{DynamicResource ThemeAccentBrush}"
+                            Foreground="White" BorderThickness="0" />
+                  </StackPanel>
+                  <StackPanel Spacing="{DynamicResource SpacingXxs}">
+                    <TextBlock FontSize="11" Foreground="{DynamicResource ThemeTextSecondaryBrush}" Text="ToolbarButton" />
+                    <Button Content="工具栏按钮" Classes="ToolbarButton" />
+                  </StackPanel>
+                  <StackPanel Spacing="{DynamicResource SpacingXxs}">
+                    <TextBlock FontSize="11" Foreground="{DynamicResource ThemeTextSecondaryBrush}" Text="ToolbarButton + ToolbarIcon" />
+                    <Button Classes="ToolbarButton ToolbarIcon">
+                      <TextBlock Text="⚙" Classes="ToolbarButtonIcon" />
+                    </Button>
+                  </StackPanel>
+                  <StackPanel Spacing="{DynamicResource SpacingXxs}">
+                    <TextBlock FontSize="11" Foreground="{DynamicResource ThemeTextSecondaryBrush}" Text="ToggleButton（关）" />
+                    <ToggleButton Content="切换" />
+                  </StackPanel>
+                  <StackPanel Spacing="{DynamicResource SpacingXxs}">
+                    <TextBlock FontSize="11" Foreground="{DynamicResource ThemeTextSecondaryBrush}" Text="ToggleButton（开）" />
+                    <ToggleButton Content="切换" IsChecked="True" />
+                  </StackPanel>
+                  <StackPanel Spacing="{DynamicResource SpacingXxs}">
+                    <TextBlock FontSize="11" Foreground="{DynamicResource ThemeTextSecondaryBrush}" Text="禁用按钮" />
+                    <Button Content="不可用" IsEnabled="False" />
+                  </StackPanel>
+                </StackPanel>
+              </StackPanel>
+            </Border>
+
+            <!-- 文本框变体 -->
+            <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
+                    CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingMdThk}">
+              <StackPanel Spacing="{DynamicResource SpacingSm}">
+                <TextBlock Text="文本框变体" FontSize="13" FontWeight="SemiBold" />
+                <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingLg}" HorizontalAlignment="Left">
+                  <StackPanel Spacing="{DynamicResource SpacingXxs}">
+                    <TextBlock FontSize="11" Foreground="{DynamicResource ThemeTextSecondaryBrush}" Text="单行 + 占位符" />
+                    <TextBox Width="180" Height="{DynamicResource ControlHeight}"
+                             Watermark="输入文件名称" />
+                  </StackPanel>
+                  <StackPanel Spacing="{DynamicResource SpacingXxs}">
+                    <TextBlock FontSize="11" Foreground="{DynamicResource ThemeTextSecondaryBrush}" Text="浮动占位符" />
+                    <TextBox Width="180" Height="{DynamicResource ControlHeight}"
+                             Watermark="浮动占位符" UseFloatingWatermark="True" />
+                  </StackPanel>
+                  <StackPanel Spacing="{DynamicResource SpacingXxs}">
+                    <TextBlock FontSize="11" Foreground="{DynamicResource ThemeTextSecondaryBrush}" Text="多行（AcceptsReturn）" />
+                    <TextBox Width="220" Height="64" AcceptsReturn="True" TextWrapping="Wrap"
+                             Watermark="多行输入：支持回车换行" />
+                  </StackPanel>
+                  <StackPanel Spacing="{DynamicResource SpacingXxs}">
+                    <TextBlock FontSize="11" Foreground="{DynamicResource ThemeTextSecondaryBrush}" Text="密码（PasswordChar）" />
+                    <TextBox Width="180" Height="{DynamicResource ControlHeight}"
+                             PasswordChar="●" Text="{Binding PasswordText}" Watermark="输入密码" />
+                  </StackPanel>
+                  <StackPanel Spacing="{DynamicResource SpacingXxs}">
+                    <TextBlock FontSize="11" Foreground="{DynamicResource ThemeTextSecondaryBrush}" Text="只读" />
+                    <TextBox Width="220" Height="{DynamicResource ControlHeight}"
+                             IsReadOnly="True" Text="{Binding ReadOnlyText}" />
+                  </StackPanel>
+                  <StackPanel Spacing="{DynamicResource SpacingXxs}">
+                    <TextBlock FontSize="11" Foreground="{DynamicResource ThemeTextSecondaryBrush}" Text="禁用" />
+                    <TextBox Width="180" Height="{DynamicResource ControlHeight}"
+                             Text="禁用状态" IsEnabled="False" />
+                  </StackPanel>
+                </StackPanel>
+              </StackPanel>
+            </Border>
+
+            <!-- 文本显示变体 -->
+            <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
+                    CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingMdThk}">
+              <StackPanel Spacing="{DynamicResource SpacingSm}">
+                <TextBlock Text="文本显示变体" FontSize="13" FontWeight="SemiBold" />
+                <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingLg}" HorizontalAlignment="Left">
+                  <StackPanel Spacing="{DynamicResource SpacingXxs}">
+                    <TextBlock FontSize="11" Foreground="{DynamicResource ThemeTextSecondaryBrush}" Text="普通 TextBlock" />
+                    <TextBlock Text="普通文本" />
+                  </StackPanel>
+                  <StackPanel Spacing="{DynamicResource SpacingXxs}">
+                    <TextBlock FontSize="11" Foreground="{DynamicResource ThemeTextSecondaryBrush}" Text="次要色" />
+                    <TextBlock Text="次要文本" Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+                  </StackPanel>
+                  <StackPanel Spacing="{DynamicResource SpacingXxs}">
+                    <TextBlock FontSize="11" Foreground="{DynamicResource ThemeTextSecondaryBrush}" Text="粗体" />
+                    <TextBlock Text="粗体文本" FontWeight="Bold" />
+                  </StackPanel>
+                  <StackPanel Spacing="{DynamicResource SpacingXxs}">
+                    <TextBlock FontSize="11" Foreground="{DynamicResource ThemeTextSecondaryBrush}" Text="可选中" />
+                    <SelectableTextBlock Text="可选中复制的文本" />
+                  </StackPanel>
+                  <StackPanel Spacing="{DynamicResource SpacingXxs}">
+                    <TextBlock FontSize="11" Foreground="{DynamicResource ThemeTextSecondaryBrush}" Text="超链接样式" />
+                    <TextBlock Text="超链接样式" Foreground="{DynamicResource ThemeAccentBrush}"
+                               TextDecorations="Underline" Cursor="Hand" />
+                  </StackPanel>
+                  <StackPanel Spacing="{DynamicResource SpacingXxs}">
+                    <TextBlock FontSize="11" Foreground="{DynamicResource ThemeTextSecondaryBrush}" Text="带 ToolTip" />
+                    <TextBlock Text="悬停提示" ToolTip.Tip="这是 ToolTip 提示内容" />
+                  </StackPanel>
+                </StackPanel>
+              </StackPanel>
+            </Border>
+
+            <!-- 进度条变体 -->
+            <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
+                    CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingMdThk}">
+              <StackPanel Spacing="{DynamicResource SpacingSm}">
+                <TextBlock Text="进度条变体（确定进度与「选择与输入」页的滑块联动）" FontSize="13" FontWeight="SemiBold" />
+                <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingLg}" HorizontalAlignment="Left">
+                  <StackPanel Spacing="{DynamicResource SpacingXxs}">
+                    <TextBlock FontSize="11" Foreground="{DynamicResource ThemeTextSecondaryBrush}" Text="确定进度" />
+                    <ProgressBar Width="220" Minimum="0" Maximum="100" Value="{Binding SliderValue}" />
+                  </StackPanel>
+                  <StackPanel Spacing="{DynamicResource SpacingXxs}">
+                    <TextBlock FontSize="11" Foreground="{DynamicResource ThemeTextSecondaryBrush}" Text="带百分比文字" />
+                    <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingSm}">
+                      <ProgressBar Width="140" Minimum="0" Maximum="100" Value="{Binding SliderValue}" />
+                      <TextBlock Text="{Binding SliderValue, StringFormat={}{0:0}%}" FontSize="12"
+                                 VerticalAlignment="Center" />
+                    </StackPanel>
+                  </StackPanel>
+                  <StackPanel Spacing="{DynamicResource SpacingXxs}">
+                    <TextBlock FontSize="11" Foreground="{DynamicResource ThemeTextSecondaryBrush}" Text="不确定（Indeterminate）" />
+                    <ProgressBar Width="220" IsIndeterminate="True" />
+                  </StackPanel>
+                  <StackPanel Spacing="{DynamicResource SpacingXxs}">
+                    <TextBlock FontSize="11" Foreground="{DynamicResource ThemeTextSecondaryBrush}" Text="垂直" />
+                    <ProgressBar Height="80" Width="14" Orientation="Vertical"
+                                 Minimum="0" Maximum="100" Value="{Binding SliderValue}" />
+                  </StackPanel>
+                  <StackPanel Spacing="{DynamicResource SpacingXxs}">
+                    <TextBlock FontSize="11" Foreground="{DynamicResource ThemeTextSecondaryBrush}" Text="禁用" />
+                    <ProgressBar Width="180" Minimum="0" Maximum="100" Value="45" IsEnabled="False" />
+                  </StackPanel>
+                </StackPanel>
+              </StackPanel>
+            </Border>
+
+          </StackPanel>
+        </ScrollViewer>
+      </TabItem>
+
+      <!-- ═══════════ 页签 2：选择与输入 ═══════════ -->
+      <TabItem Header="选择与输入">
+        <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto">
+          <StackPanel Spacing="{DynamicResource SpacingLg}" Margin="{DynamicResource SpacingMdThk}">
+
+            <!-- 日期输入变体（同功能不同样式并列展示） -->
+            <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
+                    CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingMdThk}">
+              <StackPanel Spacing="{DynamicResource SpacingSm}">
+                <TextBlock Text="日期输入控件（同功能不同样式并列对比）" FontSize="13" FontWeight="SemiBold" />
+                <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingLg}" HorizontalAlignment="Left"
+                            VerticalAlignment="Top">
+                  <StackPanel Spacing="{DynamicResource SpacingXxs}">
+                    <TextBlock FontSize="11" Foreground="{DynamicResource ThemeTextSecondaryBrush}" Text="DatePicker（滚轮式）" />
+                    <DatePicker SelectedDate="{Binding PickedDate}" />
+                  </StackPanel>
+                  <StackPanel Spacing="{DynamicResource SpacingXxs}">
+                    <TextBlock FontSize="11" Foreground="{DynamicResource ThemeTextSecondaryBrush}" Text="CalendarDatePicker（文本框+日历）" />
+                    <CalendarDatePicker SelectedDate="{Binding CalendarDate}" />
+                  </StackPanel>
+                  <StackPanel Spacing="{DynamicResource SpacingXxs}">
+                    <TextBlock FontSize="11" Foreground="{DynamicResource ThemeTextSecondaryBrush}" Text="Calendar（内联月历）" />
+                    <Calendar SelectedDate="{Binding CalendarDate}" Height="248" Width="252" />
+                  </StackPanel>
+                  <StackPanel Spacing="{DynamicResource SpacingXxs}">
+                    <TextBlock FontSize="11" Foreground="{DynamicResource ThemeTextSecondaryBrush}" Text="MaskedTextBox（掩码 00/00/0000）" />
+                    <MaskedTextBox Mask="00/00/0000" Width="150" Height="{DynamicResource ControlHeight}" />
+                  </StackPanel>
+                  <StackPanel Spacing="{DynamicResource SpacingXxs}">
+                    <TextBlock FontSize="11" Foreground="{DynamicResource ThemeTextSecondaryBrush}" Text="TextBox（基线对照）" />
+                    <TextBox Width="150" Height="{DynamicResource ControlHeight}" Watermark="直接输入文本" />
+                  </StackPanel>
+                </StackPanel>
+              </StackPanel>
+            </Border>
+
+            <!-- 开关与单选 -->
+            <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
+                    CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingMdThk}">
+              <StackPanel Spacing="{DynamicResource SpacingSm}">
+                <TextBlock Text="开关与单选" FontSize="13" FontWeight="SemiBold" />
+                <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingLg}" HorizontalAlignment="Left"
+                            VerticalAlignment="Top">
+                  <StackPanel Spacing="{DynamicResource SpacingXxs}">
+                    <TextBlock FontSize="11" Foreground="{DynamicResource ThemeTextSecondaryBrush}" Text="CheckBox（两态）" />
+                    <CheckBox Content="加密文件名" IsChecked="{Binding IsCompressEncrypted}" />
+                  </StackPanel>
+                  <StackPanel Spacing="{DynamicResource SpacingXxs}">
+                    <TextBlock FontSize="11" Foreground="{DynamicResource ThemeTextSecondaryBrush}" Text="CheckBox（三态）" />
+                    <CheckBox Content="三态（可置空）" IsThreeState="True" IsChecked="{Binding ThreeStateCheck}" />
+                  </StackPanel>
+                  <StackPanel Spacing="{DynamicResource SpacingXxs}">
+                    <TextBlock FontSize="11" Foreground="{DynamicResource ThemeTextSecondaryBrush}" Text="RadioButton（纵向组）" />
+                    <StackPanel Spacing="{DynamicResource SpacingXxs}">
+                      <RadioButton Content="ZIP" GroupName="RadioFormat" IsChecked="True" />
+                      <RadioButton Content="7Z" GroupName="RadioFormat" />
+                      <RadioButton Content="TAR.GZ" GroupName="RadioFormat" />
+                    </StackPanel>
+                  </StackPanel>
+                  <StackPanel Spacing="{DynamicResource SpacingXxs}">
+                    <TextBlock FontSize="11" Foreground="{DynamicResource ThemeTextSecondaryBrush}" Text="RadioButton（横向组）" />
+                    <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingMd}">
+                      <RadioButton Content="覆盖" GroupName="RadioConflict" IsChecked="True" />
+                      <RadioButton Content="跳过" GroupName="RadioConflict" />
+                      <RadioButton Content="重命名" GroupName="RadioConflict" />
+                    </StackPanel>
+                  </StackPanel>
+                  <StackPanel Spacing="{DynamicResource SpacingXxs}">
+                    <TextBlock FontSize="11" Foreground="{DynamicResource ThemeTextSecondaryBrush}" Text="ToggleSwitch（默认）" />
+                    <ToggleSwitch IsChecked="{Binding ToggleSwitchOn}" />
+                  </StackPanel>
+                  <StackPanel Spacing="{DynamicResource SpacingXxs}">
+                    <TextBlock FontSize="11" Foreground="{DynamicResource ThemeTextSecondaryBrush}" Text="ToggleSwitch（带开关内容）" />
+                    <ToggleSwitch IsChecked="{Binding ToggleSwitchOn}" OnContent="开" OffContent="关" />
+                  </StackPanel>
+                  <StackPanel Spacing="{DynamicResource SpacingXxs}">
+                    <TextBlock FontSize="11" Foreground="{DynamicResource ThemeTextSecondaryBrush}" Text="ToggleSwitch（禁用）" />
+                    <ToggleSwitch IsEnabled="False" IsChecked="True" />
+                  </StackPanel>
+                </StackPanel>
+              </StackPanel>
+            </Border>
+
+            <!-- 下拉与滑块 -->
+            <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
+                    CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingMdThk}">
+              <StackPanel Spacing="{DynamicResource SpacingSm}">
+                <TextBlock Text="下拉与滑块" FontSize="13" FontWeight="SemiBold" />
+                <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingLg}" HorizontalAlignment="Left"
+                            VerticalAlignment="Top">
+                  <StackPanel Spacing="{DynamicResource SpacingXxs}">
+                    <TextBlock FontSize="11" Foreground="{DynamicResource ThemeTextSecondaryBrush}" Text="ComboBox（不可编辑）" />
+                    <ComboBox ItemsSource="{Binding Formats}" SelectedItem="{Binding SelectedFormat}" Width="160" />
+                  </StackPanel>
+                  <StackPanel Spacing="{DynamicResource SpacingXxs}">
+                    <TextBlock FontSize="11" Foreground="{DynamicResource ThemeTextSecondaryBrush}" Text="ComboBox（可编辑输入）" />
+                    <ComboBox ItemsSource="{Binding Encodings}" Text="{Binding EditableComboText}"
+                              IsEditable="True" Width="160" />
+                  </StackPanel>
+                  <StackPanel Spacing="{DynamicResource SpacingXxs}">
+                    <TextBlock FontSize="11" Foreground="{DynamicResource ThemeTextSecondaryBrush}" Text="AutoCompleteBox（Contains 过滤）" />
+                    <AutoCompleteBox ItemsSource="{Binding PathSuggestions}" Text="{Binding AutoCompletePath}"
+                                     FilterMode="Contains" Width="220" Height="{DynamicResource ControlHeight}" />
+                  </StackPanel>
+                  <StackPanel Spacing="{DynamicResource SpacingXxs}">
+                    <TextBlock FontSize="11" Foreground="{DynamicResource ThemeTextSecondaryBrush}" Text="Slider（默认）" />
+                    <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingSm}">
+                      <Slider Width="180" Minimum="0" Maximum="100" Value="{Binding SliderValue}" />
+                      <TextBlock Text="{Binding SliderValue, StringFormat={}{0:0}}" FontSize="12"
+                                 VerticalAlignment="Center" Width="26" />
+                    </StackPanel>
+                  </StackPanel>
+                  <StackPanel Spacing="{DynamicResource SpacingXxs}">
+                    <TextBlock FontSize="11" Foreground="{DynamicResource ThemeTextSecondaryBrush}" Text="Slider（刻度吸附 10 步进）" />
+                    <Slider Width="220" Minimum="0" Maximum="100" Value="{Binding SliderValue}"
+                            TickFrequency="10" IsSnapToTickEnabled="True" TickPlacement="Outside" />
+                  </StackPanel>
+                  <StackPanel Spacing="{DynamicResource SpacingXxs}">
+                    <TextBlock FontSize="11" Foreground="{DynamicResource ThemeTextSecondaryBrush}" Text="NumericUpDown（滚轮）" />
+                    <NumericUpDown Width="140" Minimum="0" Maximum="1000" Value="{Binding NumericValue}" />
+                  </StackPanel>
+                  <StackPanel Spacing="{DynamicResource SpacingXxs}">
+                    <TextBlock FontSize="11" Foreground="{DynamicResource ThemeTextSecondaryBrush}" Text="NumericUpDown（隐藏滚轮）" />
+                    <NumericUpDown Width="140" Minimum="0" Maximum="1000" Value="{Binding NumericValue}"
+                                   ShowButtonSpinner="False" />
+                  </StackPanel>
+                </StackPanel>
+              </StackPanel>
+            </Border>
+
+          </StackPanel>
+        </ScrollViewer>
+      </TabItem>
+
+      <!-- ═══════════ 页签 3：列表与数据 ═══════════ -->
+      <TabItem Header="列表与数据">
+        <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto">
+          <StackPanel Spacing="{DynamicResource SpacingLg}" Margin="{DynamicResource SpacingMdThk}">
+
+            <!-- ListBox 选择模式变体 -->
+            <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
+                    CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingMdThk}">
+              <StackPanel Spacing="{DynamicResource SpacingSm}">
+                <TextBlock Text="ListBox 选择模式变体（同一数据源）" FontSize="13" FontWeight="SemiBold" />
+                <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingMd}" HorizontalAlignment="Left"
+                            VerticalAlignment="Top">
+                  <StackPanel Spacing="{DynamicResource SpacingXxs}">
+                    <TextBlock FontSize="11" Foreground="{DynamicResource ThemeTextSecondaryBrush}" Text="SelectionMode=Single" />
+                    <ListBox ItemsSource="{Binding Entries}" SelectionMode="Single" Height="180" Width="170">
+                      <ListBox.Styles>
+                        <Style Selector="ListBoxItem">
+                          <Setter Property="MinHeight" Value="{DynamicResource ControlHeightMd}" />
+                        </Style>
+                      </ListBox.Styles>
+                      <ListBox.ItemTemplate>
+                        <DataTemplate x:DataType="vm:UiTestEntry">
+                          <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
+                        </DataTemplate>
+                      </ListBox.ItemTemplate>
+                    </ListBox>
+                  </StackPanel>
+                  <StackPanel Spacing="{DynamicResource SpacingXxs}">
+                    <TextBlock FontSize="11" Foreground="{DynamicResource ThemeTextSecondaryBrush}" Text="SelectionMode=Multiple" />
+                    <ListBox ItemsSource="{Binding Entries}" SelectionMode="Multiple" Height="180" Width="170">
+                      <ListBox.Styles>
+                        <Style Selector="ListBoxItem">
+                          <Setter Property="MinHeight" Value="{DynamicResource ControlHeightMd}" />
+                        </Style>
+                      </ListBox.Styles>
+                      <ListBox.ItemTemplate>
+                        <DataTemplate x:DataType="vm:UiTestEntry">
+                          <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
+                        </DataTemplate>
+                      </ListBox.ItemTemplate>
+                    </ListBox>
+                  </StackPanel>
+                  <StackPanel Spacing="{DynamicResource SpacingXxs}">
+                    <TextBlock FontSize="11" Foreground="{DynamicResource ThemeTextSecondaryBrush}" Text="SelectionMode=AlwaysSelected（Avalonia 12 新增）" />
+                    <ListBox ItemsSource="{Binding Entries}" SelectionMode="AlwaysSelected" Height="180" Width="170">
+                      <ListBox.Styles>
+                        <Style Selector="ListBoxItem">
+                          <Setter Property="MinHeight" Value="{DynamicResource ControlHeightMd}" />
+                        </Style>
+                      </ListBox.Styles>
+                      <ListBox.ItemTemplate>
+                        <DataTemplate x:DataType="vm:UiTestEntry">
+                          <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
+                        </DataTemplate>
+                      </ListBox.ItemTemplate>
+                    </ListBox>
+                  </StackPanel>
+                  <StackPanel Spacing="{DynamicResource SpacingXxs}">
+                    <TextBlock FontSize="11" Foreground="{DynamicResource ThemeTextSecondaryBrush}" Text="SelectionMode=Toggle" />
+                    <ListBox ItemsSource="{Binding Entries}" SelectionMode="Toggle" Height="180" Width="170">
+                      <ListBox.Styles>
+                        <Style Selector="ListBoxItem">
+                          <Setter Property="MinHeight" Value="{DynamicResource ControlHeightMd}" />
+                        </Style>
+                      </ListBox.Styles>
+                      <ListBox.ItemTemplate>
+                        <DataTemplate x:DataType="vm:UiTestEntry">
+                          <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
+                        </DataTemplate>
+                      </ListBox.ItemTemplate>
+                    </ListBox>
+                  </StackPanel>
+                </StackPanel>
+              </StackPanel>
+            </Border>
+
+            <!-- TreeView 目录树 -->
+            <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
+                    CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingMdThk}">
+              <StackPanel Spacing="{DynamicResource SpacingSm}">
+                <TextBlock Text="TreeView 目录树（初始展开）" FontSize="13" FontWeight="SemiBold" />
+                <TreeView ItemsSource="{Binding TreeRoots}" Height="240">
+                  <TreeView.Styles>
+                    <Style Selector="TreeViewItem">
+                      <Setter Property="MinHeight" Value="{DynamicResource ControlHeightSm}" />
+                      <Setter Property="IsExpanded" Value="True" />
+                    </Style>
+                  </TreeView.Styles>
+                  <TreeView.ItemTemplate>
+                    <TreeDataTemplate ItemsSource="{Binding Children}" x:DataType="models:PreviewTreeNode">
+                      <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
+                        <TextBlock Text="{Binding Icon}" FontSize="13" />
+                        <TextBlock Text="{Binding Name}" FontSize="13" VerticalAlignment="Center" />
+                      </StackPanel>
+                    </TreeDataTemplate>
+                  </TreeView.ItemTemplate>
+                </TreeView>
+              </StackPanel>
+            </Border>
+
+            <!-- DataGrid 文件条目 -->
+            <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
+                    CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingMdThk}">
+              <StackPanel Spacing="{DynamicResource SpacingSm}">
+                <TextBlock Text="DataGrid 文件条目（含内嵌比例条）" FontSize="13" FontWeight="SemiBold" />
+                <DataGrid ItemsSource="{Binding Entries}" Height="280"
+                          RowHeight="{DynamicResource ControlHeightMd}" AutoGenerateColumns="False"
+                          IsReadOnly="True" GridLinesVisibility="Horizontal"
+                          HeadersVisibility="Column">
+                  <DataGrid.Columns>
+                    <DataGridTextColumn Header="名称" Binding="{Binding Name}" Width="*" MinWidth="150" />
+                    <DataGridTextColumn Header="类型" Binding="{Binding Type}" Width="90" />
+                    <DataGridTextColumn Header="大小" Binding="{Binding SizeDisplay}" Width="80" />
+                    <DataGridTextColumn Header="压缩后" Binding="{Binding CompressedDisplay}" Width="80" />
+                    <DataGridTemplateColumn Header="压缩比" Width="150">
+                      <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate x:DataType="vm:UiTestEntry">
+                          <ProgressBar Value="{Binding RatioPercent}" Minimum="0" Maximum="100"
+                                       Height="8" VerticalAlignment="Center" Margin="0,0,8,0" />
+                        </DataTemplate>
+                      </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
+                    <DataGridTextColumn Header="修改时间" Binding="{Binding Modified}" Width="130" />
+                  </DataGrid.Columns>
+                </DataGrid>
+              </StackPanel>
+            </Border>
+
+            <!-- ItemsControl -->
+            <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
+                    CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingMdThk}">
+              <StackPanel Spacing="{DynamicResource SpacingSm}">
+                <TextBlock Text="ItemsControl 轻量列表" FontSize="13" FontWeight="SemiBold" />
+                <ItemsControl ItemsSource="{Binding Entries}" Width="340" HorizontalAlignment="Left">
+                  <ItemsControl.Styles>
+                    <Style Selector="ContentPresenter">
+                      <Setter Property="MinHeight" Value="{DynamicResource ControlHeightSm}" />
+                    </Style>
+                  </ItemsControl.Styles>
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:UiTestEntry">
+                      <Grid ColumnDefinitions="*,Auto">
+                        <TextBlock Text="{Binding Name}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                        <TextBlock Grid.Column="1" Text="{Binding SizeDisplay}"
+                                   Foreground="{DynamicResource ThemeTextSecondaryBrush}" VerticalAlignment="Center" />
+                      </Grid>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+              </StackPanel>
+            </Border>
+
+          </StackPanel>
+        </ScrollViewer>
+      </TabItem>
+
+      <!-- ═══════════ 页签 4：菜单与导航 ═══════════ -->
+      <TabItem Header="菜单与导航">
+        <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto">
+          <StackPanel Spacing="{DynamicResource SpacingLg}" Margin="{DynamicResource SpacingMdThk}">
+
+            <!-- Menu 菜单栏 -->
+            <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
+                    CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingMdThk}">
+              <StackPanel Spacing="{DynamicResource SpacingSm}">
+                <TextBlock Text="Menu 菜单栏（含子菜单 / 图标 / 勾选项 / 分隔符）" FontSize="13" FontWeight="SemiBold" />
+                <Menu HorizontalAlignment="Left">
+                  <MenuItem Header="文件">
+                    <MenuItem Header="新建压缩包" />
+                    <MenuItem Header="打开压缩包…" />
+                    <MenuItem Header="最近文件">
+                      <MenuItem Header="backup.zip" />
+                      <MenuItem Header="docs.zip" />
+                      <MenuItem Header="images.7z" />
+                    </MenuItem>
+                    <Separator />
+                    <MenuItem Header="退出" />
+                  </MenuItem>
+                  <MenuItem Header="编辑">
+                    <MenuItem Header="撤销">
+                      <MenuItem.Icon><TextBlock Text="↶" FontSize="13" /></MenuItem.Icon>
+                    </MenuItem>
+                    <MenuItem Header="重做">
+                      <MenuItem.Icon><TextBlock Text="↷" FontSize="13" /></MenuItem.Icon>
+                    </MenuItem>
+                    <Separator />
+                    <MenuItem Header="查找">
+                      <MenuItem.Icon><TextBlock Text="🔍" FontSize="13" /></MenuItem.Icon>
+                    </MenuItem>
+                  </MenuItem>
+                  <MenuItem Header="视图">
+                    <MenuItem Header="状态栏" IsChecked="True" />
+                    <MenuItem Header="工具栏" IsChecked="True" />
+                    <MenuItem Header="预览面板" IsChecked="False" />
+                  </MenuItem>
+                  <MenuItem Header="帮助">
+                    <MenuItem Header="关于 MantisZip" />
+                  </MenuItem>
+                </Menu>
+              </StackPanel>
+            </Border>
+
+            <!-- ContextMenu 右键菜单 -->
+            <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
+                    CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingMdThk}">
+              <StackPanel Spacing="{DynamicResource SpacingSm}">
+                <TextBlock Text="ContextMenu 右键菜单" FontSize="13" FontWeight="SemiBold" />
+                <Border Height="90" Background="{DynamicResource ThemeSurfaceBgBrush}"
+                        BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
+                        CornerRadius="{DynamicResource BorderRadius}">
+                  <Border.ContextMenu>
+                    <ContextMenu>
+                      <MenuItem Header="打开">
+                        <MenuItem.Icon><TextBlock Text="📂" FontSize="13" /></MenuItem.Icon>
+                      </MenuItem>
+                      <MenuItem Header="复制">
+                        <MenuItem.Icon><TextBlock Text="📋" FontSize="13" /></MenuItem.Icon>
+                      </MenuItem>
+                      <MenuItem Header="剪切" />
+                      <MenuItem Header="删除" />
+                      <Separator />
+                      <MenuItem Header="属性" />
+                    </ContextMenu>
+                  </Border.ContextMenu>
+                  <TextBlock Text="在此区域右键点击查看 ContextMenu" HorizontalAlignment="Center"
+                             VerticalAlignment="Center" FontSize="12"
+                             Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+                </Border>
+              </StackPanel>
+            </Border>
+
+            <!-- Expander 四方向 -->
+            <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
+                    CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingMdThk}">
+              <StackPanel Spacing="{DynamicResource SpacingSm}">
+                <TextBlock Text="Expander 展开方向变体" FontSize="13" FontWeight="SemiBold" />
+                <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingMd}" HorizontalAlignment="Left"
+                            VerticalAlignment="Top">
+                  <Expander Header="向下展开（Down）" ExpandDirection="Down" Width="160">
+                    <TextBlock Text="内容区域" Margin="8" />
+                  </Expander>
+                  <Expander Header="向上展开（Up）" ExpandDirection="Up" Width="160">
+                    <TextBlock Text="内容区域" Margin="8" />
+                  </Expander>
+                  <Expander Header="向左展开（Left）" ExpandDirection="Left" Width="170" Height="96">
+                    <TextBlock Text="内容区域" Margin="8" />
+                  </Expander>
+                  <Expander Header="向右展开（Right）" ExpandDirection="Right" Width="170" Height="96">
+                    <TextBlock Text="内容区域" Margin="8" />
+                  </Expander>
+                </StackPanel>
+              </StackPanel>
+            </Border>
+
+            <!-- 下拉按钮 -->
+            <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
+                    CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingMdThk}">
+              <StackPanel Spacing="{DynamicResource SpacingSm}">
+                <TextBlock Text="下拉 / 拆分按钮" FontSize="13" FontWeight="SemiBold" />
+                <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingMd}" HorizontalAlignment="Left">
+                  <DropDownButton Content="下拉按钮">
+                    <DropDownButton.Flyout>
+                      <MenuFlyout>
+                        <MenuItem Header="选项一" />
+                        <MenuItem Header="选项二" />
+                        <Separator />
+                        <MenuItem Header="设置…" />
+                      </MenuFlyout>
+                    </DropDownButton.Flyout>
+                  </DropDownButton>
+                  <SplitButton Content="主操作">
+                    <SplitButton.Flyout>
+                      <MenuFlyout>
+                        <MenuItem Header="保存" />
+                        <MenuItem Header="另存为…" />
+                      </MenuFlyout>
+                    </SplitButton.Flyout>
+                  </SplitButton>
+                  <ToggleSplitButton Content="切换拆分按钮" IsChecked="True">
+                    <ToggleSplitButton.Flyout>
+                      <MenuFlyout>
+                        <MenuItem Header="内容一" />
+                        <MenuItem Header="内容二" />
+                      </MenuFlyout>
+                    </ToggleSplitButton.Flyout>
+                  </ToggleSplitButton>
+                </StackPanel>
+              </StackPanel>
+            </Border>
+
+            <!-- 嵌套 TabControl -->
+            <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
+                    CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingMdThk}">
+              <StackPanel Spacing="{DynamicResource SpacingSm}">
+                <TextBlock Text="TabControl 嵌套（含禁用页）" FontSize="13" FontWeight="SemiBold" />
+                <TabControl Height="150">
+                  <TabItem Header="常规">
+                    <TextBlock Text="常规设置内容" Margin="12" />
+                  </TabItem>
+                  <TabItem Header="数据">
+                    <TextBlock Text="数据页内容" Margin="12" />
+                  </TabItem>
+                  <TabItem Header="高级" IsEnabled="False">
+                    <TextBlock Text="禁用页" Margin="12" />
+                  </TabItem>
+                </TabControl>
+              </StackPanel>
+            </Border>
+
+          </StackPanel>
+        </ScrollViewer>
+      </TabItem>
+
+      <!-- ═══════════ 页签 5：布局容器 ═══════════ -->
+      <TabItem Header="布局容器">
+        <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto">
+          <StackPanel Spacing="{DynamicResource SpacingLg}" Margin="{DynamicResource SpacingMdThk}">
+
+            <!-- Grid -->
+            <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
+                    CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingMdThk}">
+              <StackPanel Spacing="{DynamicResource SpacingSm}">
+                <TextBlock Text="Grid 3×3（行列定位）" FontSize="13" FontWeight="SemiBold" />
+                <Grid RowDefinitions="Auto,Auto,Auto" ColumnDefinitions="Auto,Auto,Auto" Width="420" Height="150">
+                  <Border Grid.Row="0" Grid.Column="0" Background="{DynamicResource ThemeButtonBgBrush}"
+                          CornerRadius="4" Margin="2">
+                    <TextBlock Text="(0,0)" FontSize="12" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                  </Border>
+                  <Border Grid.Row="0" Grid.Column="1" Background="{DynamicResource ThemeSurfaceBgBrush}"
+                          CornerRadius="4" Margin="2">
+                    <TextBlock Text="(0,1)" FontSize="12" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                  </Border>
+                  <Border Grid.Row="0" Grid.Column="2" Background="{DynamicResource ThemeButtonBgBrush}"
+                          CornerRadius="4" Margin="2">
+                    <TextBlock Text="(0,2)" FontSize="12" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                  </Border>
+                  <Border Grid.Row="1" Grid.Column="0" Background="{DynamicResource ThemeSurfaceBgBrush}"
+                          CornerRadius="4" Margin="2">
+                    <TextBlock Text="(1,0)" FontSize="12" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                  </Border>
+                  <Border Grid.Row="1" Grid.Column="1" Background="{DynamicResource ThemeAccentBrush}"
+                          CornerRadius="4" Margin="2">
+                    <TextBlock Text="(1,1) 强调" FontSize="12" Foreground="White"
+                               HorizontalAlignment="Center" VerticalAlignment="Center" />
+                  </Border>
+                  <Border Grid.Row="1" Grid.Column="2" Background="{DynamicResource ThemeSurfaceBgBrush}"
+                          CornerRadius="4" Margin="2">
+                    <TextBlock Text="(1,2)" FontSize="12" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                  </Border>
+                  <Border Grid.Row="2" Grid.Column="0" Background="{DynamicResource ThemeButtonBgBrush}"
+                          CornerRadius="4" Margin="2">
+                    <TextBlock Text="(2,0)" FontSize="12" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                  </Border>
+                  <Border Grid.Row="2" Grid.Column="1" Background="{DynamicResource ThemeSurfaceBgBrush}"
+                          CornerRadius="4" Margin="2">
+                    <TextBlock Text="(2,1)" FontSize="12" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                  </Border>
+                  <Border Grid.Row="2" Grid.Column="2" Background="{DynamicResource ThemeButtonBgBrush}"
+                          CornerRadius="4" Margin="2">
+                    <TextBlock Text="(2,2)" FontSize="12" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                  </Border>
+                </Grid>
+              </StackPanel>
+            </Border>
+
+            <!-- StackPanel 方向 -->
+            <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
+                    CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingMdThk}">
+              <StackPanel Spacing="{DynamicResource SpacingSm}">
+                <TextBlock Text="StackPanel 方向" FontSize="13" FontWeight="SemiBold" />
+                <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingLg}" HorizontalAlignment="Left">
+                  <StackPanel Spacing="{DynamicResource SpacingXxs}">
+                    <TextBlock FontSize="11" Foreground="{DynamicResource ThemeTextSecondaryBrush}" Text="横向" />
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                      <Border Width="44" Height="32" Background="{DynamicResource ThemeAccentBrush}" CornerRadius="4" />
+                      <Border Width="44" Height="32" Background="{DynamicResource ThemeButtonBgBrush}" CornerRadius="4" />
+                      <Border Width="44" Height="32" Background="{DynamicResource ThemeAccentBrush}" CornerRadius="4" />
+                    </StackPanel>
+                  </StackPanel>
+                  <StackPanel Spacing="{DynamicResource SpacingXxs}">
+                    <TextBlock FontSize="11" Foreground="{DynamicResource ThemeTextSecondaryBrush}" Text="纵向" />
+                    <StackPanel Spacing="4">
+                      <Border Width="100" Height="20" Background="{DynamicResource ThemeAccentBrush}" CornerRadius="4" />
+                      <Border Width="100" Height="20" Background="{DynamicResource ThemeButtonBgBrush}" CornerRadius="4" />
+                      <Border Width="100" Height="20" Background="{DynamicResource ThemeAccentBrush}" CornerRadius="4" />
+                    </StackPanel>
+                  </StackPanel>
+                </StackPanel>
+              </StackPanel>
+            </Border>
+
+            <!-- DockPanel -->
+            <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
+                    CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingMdThk}">
+              <StackPanel Spacing="{DynamicResource SpacingSm}">
+                <TextBlock Text="DockPanel（上/下/左/填充）" FontSize="13" FontWeight="SemiBold" />
+                <DockPanel Height="150" Width="460" HorizontalAlignment="Left">
+                  <Border DockPanel.Dock="Top" Background="{DynamicResource ThemeHeaderBgBrush}" Height="28">
+                    <TextBlock Text="Top 顶栏" FontSize="12" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                  </Border>
+                  <Border DockPanel.Dock="Bottom" Background="{DynamicResource ThemeSurfaceBgBrush}" Height="26">
+                    <TextBlock Text="Bottom 底栏" FontSize="12" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                  </Border>
+                  <Border DockPanel.Dock="Left" Background="{DynamicResource ThemeButtonBgBrush}" Width="90">
+                    <TextBlock Text="Left 侧栏" FontSize="12" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                  </Border>
+                  <Border Background="{DynamicResource ThemeListBgBrush}">
+                    <TextBlock Text="Fill 内容区" FontSize="12" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                  </Border>
+                </DockPanel>
+              </StackPanel>
+            </Border>
+
+            <!-- WrapPanel / UniformGrid -->
+            <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
+                    CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingMdThk}">
+              <StackPanel Spacing="{DynamicResource SpacingSm}">
+                <TextBlock Text="WrapPanel（自动换行）与 UniformGrid（等分）" FontSize="13" FontWeight="SemiBold" />
+                <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingLg}" HorizontalAlignment="Left"
+                            VerticalAlignment="Top">
+                  <StackPanel Spacing="{DynamicResource SpacingXxs}">
+                    <TextBlock FontSize="11" Foreground="{DynamicResource ThemeTextSecondaryBrush}" Text="WrapPanel" />
+                    <WrapPanel Width="280">
+                      <Border Width="60" Height="36" Background="{DynamicResource ThemeAccentBrush}" CornerRadius="4" Margin="0,0,6,6" />
+                      <Border Width="60" Height="36" Background="{DynamicResource ThemeButtonBgBrush}" CornerRadius="4" Margin="0,0,6,6" />
+                      <Border Width="60" Height="36" Background="{DynamicResource ThemeAccentBrush}" CornerRadius="4" Margin="0,0,6,6" />
+                      <Border Width="60" Height="36" Background="{DynamicResource ThemeButtonBgBrush}" CornerRadius="4" Margin="0,0,6,6" />
+                      <Border Width="60" Height="36" Background="{DynamicResource ThemeAccentBrush}" CornerRadius="4" Margin="0,0,6,6" />
+                      <Border Width="60" Height="36" Background="{DynamicResource ThemeButtonBgBrush}" CornerRadius="4" Margin="0,0,6,6" />
+                      <Border Width="60" Height="36" Background="{DynamicResource ThemeAccentBrush}" CornerRadius="4" Margin="0,0,6,6" />
+                      <Border Width="60" Height="36" Background="{DynamicResource ThemeButtonBgBrush}" CornerRadius="4" Margin="0,0,6,6" />
+                    </WrapPanel>
+                  </StackPanel>
+                  <StackPanel Spacing="{DynamicResource SpacingXxs}">
+                    <TextBlock FontSize="11" Foreground="{DynamicResource ThemeTextSecondaryBrush}" Text="UniformGrid（Columns=4）" />
+                    <UniformGrid Columns="4" Width="280">
+                      <Border Height="36" Background="{DynamicResource ThemeAccentBrush}" CornerRadius="4" Margin="2" />
+                      <Border Height="36" Background="{DynamicResource ThemeButtonBgBrush}" CornerRadius="4" Margin="2" />
+                      <Border Height="36" Background="{DynamicResource ThemeAccentBrush}" CornerRadius="4" Margin="2" />
+                      <Border Height="36" Background="{DynamicResource ThemeButtonBgBrush}" CornerRadius="4" Margin="2" />
+                      <Border Height="36" Background="{DynamicResource ThemeAccentBrush}" CornerRadius="4" Margin="2" />
+                      <Border Height="36" Background="{DynamicResource ThemeButtonBgBrush}" CornerRadius="4" Margin="2" />
+                      <Border Height="36" Background="{DynamicResource ThemeAccentBrush}" CornerRadius="4" Margin="2" />
+                      <Border Height="36" Background="{DynamicResource ThemeButtonBgBrush}" CornerRadius="4" Margin="2" />
+                    </UniformGrid>
+                  </StackPanel>
+                </StackPanel>
+              </StackPanel>
+            </Border>
+
+            <!-- Border / ScrollViewer -->
+            <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
+                    CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingMdThk}">
+              <StackPanel Spacing="{DynamicResource SpacingSm}">
+                <TextBlock Text="Border（圆角/背景/内边距）与 ScrollViewer（滚动）" FontSize="13" FontWeight="SemiBold" />
+                <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingLg}" HorizontalAlignment="Left"
+                            VerticalAlignment="Top">
+                  <StackPanel Spacing="{DynamicResource SpacingXxs}">
+                    <TextBlock FontSize="11" Foreground="{DynamicResource ThemeTextSecondaryBrush}" Text="Border" />
+                    <Border Width="220" Padding="16,12" Background="{DynamicResource ThemeSurfaceBgBrush}"
+                            BorderBrush="{DynamicResource ThemeAccentBrush}" BorderThickness="1.5"
+                            CornerRadius="8">
+                      <TextBlock Text="带圆角、背景、内边距与强调色边框的 Border" FontSize="12" TextWrapping="Wrap" />
+                    </Border>
+                  </StackPanel>
+                  <StackPanel Spacing="{DynamicResource SpacingXxs}">
+                    <TextBlock FontSize="11" Foreground="{DynamicResource ThemeTextSecondaryBrush}" Text="ScrollViewer（超高内容滚动）" />
+                    <ScrollViewer Width="280" Height="110" VerticalScrollBarVisibility="Auto">
+                      <StackPanel Spacing="6">
+                        <TextBlock Text="第 1 行：可滚动内容" FontSize="12" />
+                        <TextBlock Text="第 2 行：可滚动内容" FontSize="12" />
+                        <TextBlock Text="第 3 行：可滚动内容" FontSize="12" />
+                        <TextBlock Text="第 4 行：可滚动内容" FontSize="12" />
+                        <TextBlock Text="第 5 行：可滚动内容" FontSize="12" />
+                        <TextBlock Text="第 6 行：可滚动内容" FontSize="12" />
+                        <TextBlock Text="第 7 行：可滚动内容" FontSize="12" />
+                      </StackPanel>
+                    </ScrollViewer>
+                  </StackPanel>
+                </StackPanel>
+              </StackPanel>
+            </Border>
+
+            <!-- GridSplitter -->
+            <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
+                    CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingMdThk}">
+              <StackPanel Spacing="{DynamicResource SpacingSm}">
+                <TextBlock Text="GridSplitter（拖拽调整两栏宽度）" FontSize="13" FontWeight="SemiBold" />
+                <Grid ColumnDefinitions="220,3,*" Width="620" Height="110" HorizontalAlignment="Left">
+                  <Border Background="{DynamicResource ThemeSurfaceBgBrush}"
+                          BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1" CornerRadius="4">
+                    <TextBlock Text="左栏（拖拽分隔条调整宽度）" FontSize="12" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                  </Border>
+                  <GridSplitter Grid.Column="1" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" />
+                  <Border Grid.Column="2" Background="{DynamicResource ThemeListBgBrush}"
+                          BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1" CornerRadius="4">
+                    <TextBlock Text="右栏" FontSize="12" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                  </Border>
+                </Grid>
+              </StackPanel>
+            </Border>
+
+            <!-- ContentControl / ToolTip -->
+            <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
+                    CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingMdThk}">
+              <StackPanel Spacing="{DynamicResource SpacingSm}">
+                <TextBlock Text="ContentControl 与 ToolTip 方向" FontSize="13" FontWeight="SemiBold" />
+                <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingLg}" HorizontalAlignment="Left"
+                            VerticalAlignment="Top">
+                  <StackPanel Spacing="{DynamicResource SpacingXxs}">
+                    <TextBlock FontSize="11" Foreground="{DynamicResource ThemeTextSecondaryBrush}" Text="ContentControl（显示当前格式）" />
+                    <Border Width="140" Height="{DynamicResource ControlHeight}"
+                            Background="{DynamicResource ThemeSurfaceBgBrush}"
+                            BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1" CornerRadius="4">
+                      <ContentControl Content="{Binding SelectedFormat}" HorizontalContentAlignment="Center"
+                                      VerticalContentAlignment="Center" />
+                    </Border>
+                  </StackPanel>
+                  <StackPanel Spacing="{DynamicResource SpacingXxs}">
+                    <TextBlock FontSize="11" Foreground="{DynamicResource ThemeTextSecondaryBrush}" Text="ToolTip.Placement 四方向" />
+                    <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingMd}" VerticalAlignment="Top">
+                      <TextBlock Text="Top" FontSize="12" ToolTip.Tip="上方向提示" ToolTip.Placement="Top" />
+                      <TextBlock Text="Bottom" FontSize="12" ToolTip.Tip="下方向提示" ToolTip.Placement="Bottom" />
+                      <TextBlock Text="Left" FontSize="12" ToolTip.Tip="左方向提示" ToolTip.Placement="Left" />
+                      <TextBlock Text="Right" FontSize="12" ToolTip.Tip="右方向提示" ToolTip.Placement="Right" />
+                    </StackPanel>
+                  </StackPanel>
+                </StackPanel>
+              </StackPanel>
+            </Border>
+
+          </StackPanel>
+        </ScrollViewer>
+      </TabItem>
+
+      <!-- ═══════════ 页签 6：自定义控件 ═══════════ -->
+      <TabItem Header="自定义控件">
+        <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto">
+          <StackPanel Spacing="{DynamicResource SpacingLg}" Margin="{DynamicResource SpacingMdThk}">
+
+            <!-- ResultTreeView -->
+            <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
+                    CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingMdThk}">
+              <StackPanel Spacing="{DynamicResource SpacingSm}">
+                <TextBlock Text="ResultTreeView — 结果预览树（Compact/Full 模式、截断、摘要栏）"
+                           FontSize="13" FontWeight="SemiBold" />
+                <controls:ResultTreeView Root="{Binding ResultTreeRoot}" Height="300" />
+              </StackPanel>
+            </Border>
+
+            <!-- QuickPathPicker -->
+            <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
+                    CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingMdThk}">
+              <StackPanel Spacing="{DynamicResource SpacingSm}">
+                <TextBlock Text="QuickPathPicker — 路径速选器（收藏 + 浏览，Path 双向绑定）"
+                           FontSize="13" FontWeight="SemiBold" />
+                <controls:QuickPathPicker Path="{Binding QuickPath}" />
+              </StackPanel>
+            </Border>
+
+            <!-- FileFilterEditor -->
+            <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
+                    CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingMdThk}">
+              <StackPanel Spacing="{DynamicResource SpacingSm}">
+                <TextBlock Text="FileFilterEditor — 文件过滤编辑器（自包含，预设管理 + 四维过滤）"
+                           FontSize="13" FontWeight="SemiBold" />
+                <controls:FileFilterEditor />
+              </StackPanel>
+            </Border>
+
+            <!-- InfoPanel -->
+            <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
+                    CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingMdThk}">
+              <StackPanel Spacing="{DynamicResource SpacingSm}">
+                <TextBlock Text="InfoPanel — 元数据信息面板（DataContext 为 FormatMetadataItem 集合）"
+                           FontSize="13" FontWeight="SemiBold" />
+                <ScrollViewer Height="220" VerticalScrollBarVisibility="Auto">
+                  <controls:InfoPanel DataContext="{Binding MetadataItems}" />
+                </ScrollViewer>
+              </StackPanel>
+            </Border>
+
+            <!-- DynamicFormatOptionsPanel -->
+            <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
+                    CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingMdThk}">
+              <StackPanel Spacing="{DynamicResource SpacingSm}">
+                <TextBlock Text="DynamicFormatOptionsPanel — 动态压缩选项面板（按格式切换选项，默认 ZIP）"
+                           FontSize="13" FontWeight="SemiBold" />
+                <controls:DynamicFormatOptionsPanel SelectedFormat="{Binding TestFormat}" />
+              </StackPanel>
+            </Border>
+
+          </StackPanel>
+        </ScrollViewer>
+      </TabItem>
+    </TabControl>
+  </DockPanel>
+</Window>
