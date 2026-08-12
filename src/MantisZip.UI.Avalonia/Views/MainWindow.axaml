@@ -1234,6 +1234,7 @@
 
       <!-- Preview area -->
       <views:PreviewPanel Grid.Column="4"
+                          IsVisible="{Binding IsPreviewVisible}"
                           DataContext="{Binding Preview}" />
     </Grid>
     </Grid>

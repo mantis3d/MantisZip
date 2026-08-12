@@ -21,6 +21,16 @@
 
 ### MantisZip.UI.Avalonia（主力版）
 
+**2026-08-12** — 预览设置全面修复：滑条联动、保存即生效、尺寸门槛补全、彩色 Emoji 移除
+  - **三个预览滑条数值框拖动时实时更新**：`_maxTextPreviewBytes`/`_maxPreviewFileSize`/`_previewHeadSize` 补 `[NotifyPropertyChangedFor]`，计算显示属性（`MaxTextPreviewMBText`/`MaxPreviewFileSizeMBText`/`PreviewHeadSizeKBText`）随滑条联动（此前冻结不刷新）
+  - **预览设置保存即生效（无需重启）**：`SettingsWindowViewModel.Save()` 同步 8 个 `PreviewService` 静态运行时配置（PreviewHeadSize/EnableFormatDetection/EnableImagePreview/EnableTextPreview/MaxPreviewFileSize/MaxTextPreviewBytes/MaxTablePreviewRows/MaxTablePreviewCols），与 `App.axaml.cs` 启动初始化同源；修复此前改设置必须重启才生效
+  - **尺寸门槛补全（Avalonia 迁移丢失，对齐 WPF）**：`ShowPreviewAsync` 补 `MaxPreviewFileSize` 全局门槛（`MetadataOnlyExtensions` 只读头格式豁免）+ `MaxTextPreviewBytes`/`EnableTextPreview`（Text/Csv/Html/Markdown）+ `EnableImagePreview`（Image/Gif/Svg）；`PreviewService` 死代码 const（50MB/1MB）改为可同步静态；`ShowCsv` 硬编码 100 行列改为读 `MaxTablePreviewRows/Cols`。新增本地化 `Preview_TooLarge`/`Preview_TooLargeText`/`Preview_TextDisabled`/`Preview_ImageDisabled`
+  - **预览面板显隐设置生效**：`ShowPreviewPanel` 从死设置变为读/写——主 VM 构造初始化 `IsPreviewVisible`、`OnIsPreviewVisibleChanged` 持久化、MainWindow 宿主 `IsVisible` 绑定
+  - **移除彩色 Emoji 功能（Avalonia 已真图标化）**：删除 `UseColorEmoji`（AppSettings 字段 + 设置页复选框 + VM 属性 + 本地化 key）；密码区域 🔑/👁/🙈/📋 emoji 换 `IconKey`/`IconEye`/`IconEyeOff`/`IconCopy` PathIcon（新增 `BoolToIconConverter`）；新增文案去 emoji 前缀
+  - **headSize 影响实证**：新增 `FileFormatDetectorHeadSizeTests`（15 用例）验证——绝大多数魔数在 2~12 字节内识别，headSize 仅影响 ZIP 子类型细分（DOCX/XLSX/PPTX）与 PE/文本启发式，1~64KB 范围属 IO 保护参数
+  - 涉及文件：`ViewModels/SettingsWindowViewModel.cs`、`ViewModels/MainWindowViewModel.cs`、`ViewModels/PreviewViewModel.cs`、`ViewModels/ProgressViewModel.cs`、`Services/PreviewService.cs`、`Models/AppSettings.cs`、`Views/SettingsWindow.axaml`、`Views/MainWindow.axaml`、`Dialogs/ProgressWindow.axaml`、`Converters/BoolToIconConverter.cs`（新增）、`Localization/strings.*.json`、`tests/MantisZip.Tests/Utils/FileFormatDetectorHeadSizeTests.cs`（新增）
+  - 验证：`dotnet build` 0 错误、Core 测试 268 通过、Avalonia 测试 54 通过 2 跳过、lsp 无诊断
+
 **2026-08-12** — 冲突对话框支持「暂停」按钮（对齐 WPF ConflictResolver 循环重入）
   - **解压/压缩冲突对话框「暂停」按钮可用**：`ExtractFlow.ShowConflictDialogAsync` 与 `CompressFlow.ShowConflictDialogAsync` 由一次性弹窗改造为 `while(true)` 循环重入——点击「暂停」收起冲突对话框 → 找到进度窗口 → UI 线程调用 `ProgressWindow.PauseFromConflict()` 进入暂停态 → 后台线程 `PauseEvent.Wait(ct)` 等待（不阻塞 UI）→ 用户点「继续」后重新弹窗处理同一个冲突。修复此前「暂停」被当作 Overwrite（解压静默覆盖）/ Cancel（压缩静默中止）的误判
   - **进度窗口定位**：Avalonia 无 WPF 的 `Application.Current.Windows` 全局窗口注册表，新增 `ProgressWindow.CurrentVisible` 静态入口（`OnOpened` 置位 / `OnClosed` 清除），等价替代 WPF 的 `Windows.OfType<ProgressWindow>().FirstOrDefault()` 查找；CLI 路径仍优先用 owner 直接转换

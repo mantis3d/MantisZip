@@ -550,8 +550,6 @@
 
                   <CheckBox Content="{Binding EnableTextPreviewText}"
                             IsChecked="{Binding EnableTextPreview}" />
-                  <CheckBox Content="{Binding PreviewTextColorEmojiText}"
-                            IsChecked="{Binding UseColorEmoji}" />
                 </StackPanel>
               </ScrollViewer>
             </TabItem>

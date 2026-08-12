@@ -769,17 +769,20 @@ public partial class PreviewViewModel : ObservableObject
     /// </summary>
     public void ShowCsv(string filePath)
     {
+        // 行列上限来自运行时配置（App.axaml.cs 启动时 + 设置保存时同步），与 WPF 版一致
+        var maxRows = PreviewService.MaxTablePreviewRows;
+        var maxCols = PreviewService.MaxTablePreviewCols;
         var table = new DataTable();
-        var lines = File.ReadLines(filePath).Take(101).ToList();
+        var lines = File.ReadLines(filePath).Take(maxRows + 1).ToList();
 
         if (lines.Count > 0)
         {
             var rawHeaders = CsvParser.ParseCsvLine(lines[0]);
-            var headers = CsvParser.MakeUniqueColumnNames(rawHeaders.Take(100).ToArray());
+            var headers = CsvParser.MakeUniqueColumnNames(rawHeaders.Take(maxCols).ToArray());
             foreach (var h in headers)
                 table.Columns.Add(h);
 
-            foreach (var line in lines.Skip(1).Take(100))
+            foreach (var line in lines.Skip(1).Take(maxRows))
             {
                 var values = CsvParser.ParseCsvLine(line);
                 var row = table.NewRow();

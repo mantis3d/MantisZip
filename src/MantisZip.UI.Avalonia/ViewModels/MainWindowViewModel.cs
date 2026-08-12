@@ -523,6 +523,16 @@ public partial class MainWindowViewModel : ObservableObject
     [ObservableProperty]
     private bool _isPreviewVisible;
 
+    partial void OnIsPreviewVisibleChanged(bool value)
+    {
+        // 预览面板显隐持久化（与 ShowPreviewPanel 设置同步，WPF 语义对齐）
+        if (_appSettings.ShowPreviewPanel != value)
+        {
+            _appSettings.ShowPreviewPanel = value;
+            _ = _appSettings.Save();
+        }
+    }
+
     [ObservableProperty]
     private bool _isStatusBarVisible = true;
 
@@ -670,6 +680,7 @@ public partial class MainWindowViewModel : ObservableObject
         SeparateDirBaseline = _appSettings.SeparateDirBaseline;
         AutoExpandTree = _appSettings.AutoExpandTreeToCurrent;
         Preview.ShowInfoPanel = _appSettings.ShowPreviewInfoPanel;
+        IsPreviewVisible = _appSettings.ShowPreviewPanel;
 
         // 主题（三态）：初始化菜单按钮暗色状态显示
         IsDarkTheme = _appSettings.Theme switch
@@ -1048,6 +1059,17 @@ public partial class MainWindowViewModel : ObservableObject
                 return;
             }
 
+            // ── 预览大小上限检查（仅对需要加载完整内容的格式生效，只读头的格式不受限制）──
+            // 与 WPF 版 MainWindow.Preview.cs 语义一致；文本类格式另有 MaxTextPreviewBytes 上限
+            if (!PreviewService.IsMetadataOnlyExtension(ext) && entry.Size > PreviewService.MaxPreviewFileSize)
+            {
+                var limitMb = PreviewService.MaxPreviewFileSize / (1024.0 * 1024.0);
+                Preview.ShowUnsupported(LocalizationManager.T(
+                    "Preview_TooLarge", (double)entry.Size / 1024 / 1024, limitMb));
+                StatusMessage = LocalizationManager.T("Status_Unsupported", ext);
+                return;
+            }
+
             // ── Extract to temp (async, slow) ──
             var tempFile = await PreviewService.ExtractToTempAsync(
                 CurrentArchivePath, entry, _currentFormat, _currentPassword);
@@ -1071,10 +1093,38 @@ public partial class MainWindowViewModel : ObservableObject
             switch (previewType)
             {
                 case PreviewType.Text:
+                    if (!PreviewService.EnableTextPreview)
+                    {
+                        Preview.ShowUnsupported(LocalizationManager.T("Preview_TextDisabled"));
+                        StatusMessage = LocalizationManager.T("Status_Unsupported", ext);
+                        break;
+                    }
+                    if (entry.Size > PreviewService.MaxTextPreviewBytes)
+                    {
+                        var txtLimitMb = PreviewService.MaxTextPreviewBytes / (1024.0 * 1024.0);
+                        Preview.ShowUnsupported(LocalizationManager.T(
+                            "Preview_TooLargeText", (double)entry.Size / 1024 / 1024, txtLimitMb));
+                        StatusMessage = LocalizationManager.T("Status_Unsupported", ext);
+                        break;
+                    }
                     Preview.ShowText(tempFile);
                     StatusMessage = LocalizationManager.T("Preview_Text", entry.DisplayName);
                     break;
                 case PreviewType.Csv:
+                    if (!PreviewService.EnableTextPreview)
+                    {
+                        Preview.ShowUnsupported(LocalizationManager.T("Preview_TextDisabled"));
+                        StatusMessage = LocalizationManager.T("Status_Unsupported", ext);
+                        break;
+                    }
+                    if (entry.Size > PreviewService.MaxTextPreviewBytes)
+                    {
+                        var txtLimitMb = PreviewService.MaxTextPreviewBytes / (1024.0 * 1024.0);
+                        Preview.ShowUnsupported(LocalizationManager.T(
+                            "Preview_TooLargeText", (double)entry.Size / 1024 / 1024, txtLimitMb));
+                        StatusMessage = LocalizationManager.T("Status_Unsupported", ext);
+                        break;
+                    }
                     Preview.ShowCsv(tempFile);
                     StatusMessage = LocalizationManager.T("Preview_Csv", entry.DisplayName);
                     break;
@@ -1083,6 +1133,12 @@ public partial class MainWindowViewModel : ObservableObject
                     StatusMessage = LocalizationManager.T("Preview_Pe", entry.DisplayName);
                     break;
                 case PreviewType.Image:
+                    if (!PreviewService.EnableImagePreview)
+                    {
+                        Preview.ShowUnsupported(LocalizationManager.T("Preview_ImageDisabled"));
+                        StatusMessage = LocalizationManager.T("Status_Unsupported", ext);
+                        break;
+                    }
                     var icoExt = Path.GetExtension(tempFile).ToLowerInvariant();
                     if (icoExt == ".ico")
                     {
@@ -1096,10 +1152,22 @@ public partial class MainWindowViewModel : ObservableObject
                     }
                     break;
                 case PreviewType.Gif:
+                    if (!PreviewService.EnableImagePreview)
+                    {
+                        Preview.ShowUnsupported(LocalizationManager.T("Preview_ImageDisabled"));
+                        StatusMessage = LocalizationManager.T("Status_Unsupported", ext);
+                        break;
+                    }
                     Preview.ShowGif(tempFile);
                     StatusMessage = LocalizationManager.T("Preview_Gif", entry.DisplayName);
                     break;
                 case PreviewType.Svg:
+                    if (!PreviewService.EnableImagePreview)
+                    {
+                        Preview.ShowUnsupported(LocalizationManager.T("Preview_ImageDisabled"));
+                        StatusMessage = LocalizationManager.T("Status_Unsupported", ext);
+                        break;
+                    }
                     Preview.ShowSvg(tempFile);
                     StatusMessage = LocalizationManager.T("Preview_Svg", entry.DisplayName);
                     break;
@@ -1145,6 +1213,20 @@ public partial class MainWindowViewModel : ObservableObject
                     StatusMessage = LocalizationManager.T("Preview_Video", entry.DisplayName);
                     break;
                 case PreviewType.Html:
+                    if (!PreviewService.EnableTextPreview)
+                    {
+                        Preview.ShowUnsupported(LocalizationManager.T("Preview_TextDisabled"));
+                        StatusMessage = LocalizationManager.T("Status_Unsupported", ext);
+                        break;
+                    }
+                    if (entry.Size > PreviewService.MaxTextPreviewBytes)
+                    {
+                        var txtLimitMb = PreviewService.MaxTextPreviewBytes / (1024.0 * 1024.0);
+                        Preview.ShowUnsupported(LocalizationManager.T(
+                            "Preview_TooLargeText", (double)entry.Size / 1024 / 1024, txtLimitMb));
+                        StatusMessage = LocalizationManager.T("Status_Unsupported", ext);
+                        break;
+                    }
                     Preview.ShowHtmlPreview(tempFile);
                     StatusMessage = LocalizationManager.T("Preview_Html", entry.DisplayName);
                     break;
@@ -1153,6 +1235,20 @@ public partial class MainWindowViewModel : ObservableObject
                     StatusMessage = LocalizationManager.T("Preview_Pdf", entry.DisplayName);
                     break;
                 case PreviewType.Markdown:
+                    if (!PreviewService.EnableTextPreview)
+                    {
+                        Preview.ShowUnsupported(LocalizationManager.T("Preview_TextDisabled"));
+                        StatusMessage = LocalizationManager.T("Status_Unsupported", ext);
+                        break;
+                    }
+                    if (entry.Size > PreviewService.MaxTextPreviewBytes)
+                    {
+                        var txtLimitMb = PreviewService.MaxTextPreviewBytes / (1024.0 * 1024.0);
+                        Preview.ShowUnsupported(LocalizationManager.T(
+                            "Preview_TooLargeText", (double)entry.Size / 1024 / 1024, txtLimitMb));
+                        StatusMessage = LocalizationManager.T("Status_Unsupported", ext);
+                        break;
+                    }
                     Preview.ShowMarkdownPreview(tempFile);
                     StatusMessage = LocalizationManager.T("Preview_Markdown", entry.DisplayName);
                     break;

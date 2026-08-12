@@ -26,6 +26,8 @@ public partial class SettingsWindowViewModel : ObservableObject
     private bool _enableTextPreview;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(MaxTextPreviewMB))]
+    [NotifyPropertyChangedFor(nameof(MaxTextPreviewMBText))]
     private long _maxTextPreviewBytes;
 
     [ObservableProperty]
@@ -47,6 +49,8 @@ public partial class SettingsWindowViewModel : ObservableObject
     private int _maxTablePreviewCols = 100;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(MaxPreviewFileSizeMB))]
+    [NotifyPropertyChangedFor(nameof(MaxPreviewFileSizeMBText))]
     private long _maxPreviewFileSize = 15 * 1024 * 1024;
 
     [ObservableProperty]
@@ -62,12 +66,11 @@ public partial class SettingsWindowViewModel : ObservableObject
     private bool _showPreviewInfoPanel = true;
 
     [ObservableProperty]
-    private bool _useColorEmoji = true;
-
-    [ObservableProperty]
     private bool _enableFormatDetection = true;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(PreviewHeadSizeKB))]
+    [NotifyPropertyChangedFor(nameof(PreviewHeadSizeKBText))]
     private int _previewHeadSize = 4096;
 
     // ── Metadata Panel Settings ──
@@ -516,7 +519,6 @@ public partial class SettingsWindowViewModel : ObservableObject
 
     // Preview — Text sub-tab
     public string PreviewTextFontFamilyText => LocalizationManager.T("Settings_Preview_Text_FontFamily");
-    public string PreviewTextColorEmojiText => LocalizationManager.T("Settings_Preview_Text_ColorEmoji");
     public string PreviewTextMaxSizeText => LocalizationManager.T("Settings_Preview_Text_MaxSize");
 
     // Preview — Font sub-tab
@@ -740,7 +742,6 @@ public partial class SettingsWindowViewModel : ObservableObject
         _infoPanelOrientation = _settings.InfoPanelOrientation;
         _showPreviewPanel = _settings.ShowPreviewPanel;
         _showPreviewInfoPanel = _settings.ShowPreviewInfoPanel;
-        _useColorEmoji = _settings.UseColorEmoji;
         _enableFormatDetection = _settings.EnableFormatDetection;
         _previewHeadSize = _settings.PreviewHeadSize;
 
@@ -1038,7 +1039,6 @@ public partial class SettingsWindowViewModel : ObservableObject
         OnPropertyChanged(nameof(PreviewTabTableHeader));
         OnPropertyChanged(nameof(PreviewTabPositionHeader));
         OnPropertyChanged(nameof(PreviewTextFontFamilyText));
-        OnPropertyChanged(nameof(PreviewTextColorEmojiText));
         OnPropertyChanged(nameof(PreviewTextMaxSizeText));
         OnPropertyChanged(nameof(PreviewFontSampleText));
         OnPropertyChanged(nameof(PreviewFontPreviewSizeText));
@@ -1230,7 +1230,6 @@ public partial class SettingsWindowViewModel : ObservableObject
         _settings.InfoPanelOrientation = SelectedInfoPanelOrientationOption?.Value ?? InfoPanelOrientation;
         _settings.ShowPreviewPanel = ShowPreviewPanel;
         _settings.ShowPreviewInfoPanel = ShowPreviewInfoPanel;
-        _settings.UseColorEmoji = UseColorEmoji;
         _settings.EnableFormatDetection = EnableFormatDetection;
         _settings.PreviewHeadSize = PreviewHeadSize;
 
@@ -1303,6 +1302,16 @@ public partial class SettingsWindowViewModel : ObservableObject
         // Default path priority
         _settings.DefaultPathOrder = PathPriorityItems.Select(p => p.Kind).ToList();
         _settings.CustomDefaultPath = CustomPath ?? "";
+
+        // 预览运行时配置同步：保存即生效，无需重启（与 App.axaml.cs 启动初始化保持一致）
+        PreviewService.EnableFormatDetection = EnableFormatDetection;
+        PreviewService.PreviewHeadSize = PreviewHeadSize;
+        PreviewService.EnableImagePreview = EnableImagePreview;
+        PreviewService.EnableTextPreview = EnableTextPreview;
+        PreviewService.MaxPreviewFileSize = MaxPreviewFileSize;
+        PreviewService.MaxTextPreviewBytes = MaxTextPreviewBytes;
+        PreviewService.MaxTablePreviewRows = MaxTablePreviewRows;
+        PreviewService.MaxTablePreviewCols = MaxTablePreviewCols;
 
         _settings.Save();
     }
