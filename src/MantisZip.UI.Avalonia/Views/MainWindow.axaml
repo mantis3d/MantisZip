@@ -232,6 +232,18 @@
           </MenuItem.Header>
         </MenuItem>
         <Separator />
+        <MenuItem Command="{Binding TogglePreviewCommand}">
+          <MenuItem.Header>
+            <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
+              <Border Classes="ToggleIconBox"
+                      Background="{Binding IsPreviewVisible, Converter={StaticResource BoolToToggleBgBrushConverter}}">
+                <PathIcon Data="{StaticResource IconEye}" Width="12" Height="12"
+                          Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+              </Border>
+              <TextBlock Text="{Binding LocalizedStrings[Menu_ShowPreviewPanel]}" />
+            </StackPanel>
+          </MenuItem.Header>
+        </MenuItem>
         <MenuItem Command="{Binding ToggleInfoPanelVisibilityCommand}">
           <MenuItem.Header>
             <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
@@ -807,10 +819,15 @@
       </Border>
 
       <!-- Archive content (hidden when no archive loaded) -->
-      <Grid IsVisible="{Binding IsArchiveLoaded}"
-            ColumnDefinitions="1*,5,2.5*,5,3*">
+      <!-- 预览面板位置由 ApplyPreviewPosition 动态控制（1=底部, 2=目录树下方, 3=文件列表下方, 4=右侧）。
+           Row 0=内容区, Row 1=水平分隔条, Row 2=底部/树下方/列表下方的预览行（高度运行时注入） -->
+      <Grid x:Name="ArchiveContentGrid"
+            IsVisible="{Binding IsArchiveLoaded}"
+            ColumnDefinitions="1*,5,2.5*,5,3*"
+            RowDefinitions="*,0,0">
       <!-- Folder tree panel (col 0) with tree toolbar -->
-      <Border Grid.Column="0"
+      <Border x:Name="FolderTreeBorder"
+              Grid.Column="0"
               MinWidth="100"
               Background="{DynamicResource ThemeSurfaceBgBrush}">
         <Grid RowDefinitions="Auto,Auto,Auto,*">
@@ -892,11 +909,13 @@
         </Grid>
       </Border>
 
-      <GridSplitter Grid.Column="1"
+      <GridSplitter x:Name="TreeFileSplitter"
+                    Grid.Column="1"
                     Width="5" />
 
       <!-- File list panel (col 2) with file list toolbar -->
-      <Grid Grid.Column="2">
+      <Grid x:Name="FileListPanel"
+            Grid.Column="2">
         <Grid RowDefinitions="Auto,Auto,*">
           <!-- File list toolbar -->
           <Border Grid.Row="0"
@@ -1229,11 +1248,19 @@
         </Grid>
       </Grid>
 
-      <GridSplitter Grid.Column="3"
+      <GridSplitter x:Name="PreviewColSplitter"
+                    Grid.Column="3"
                     Width="5" />
 
+      <!-- 水平分隔条：位置 1/2/3 时可见（Row 1），Column/ColumnSpan 由 ApplyPreviewPosition 注入 -->
+      <GridSplitter x:Name="PreviewRowSplitter"
+                    Grid.Row="1"
+                    Height="4"
+                    IsVisible="False" />
+
       <!-- Preview area -->
-      <views:PreviewPanel Grid.Column="4"
+      <views:PreviewPanel x:Name="PreviewPanelHost"
+                          Grid.Column="4"
                           IsVisible="{Binding IsPreviewVisible}"
                           DataContext="{Binding Preview}" />
     </Grid>

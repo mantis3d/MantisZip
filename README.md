@@ -366,14 +366,3 @@ MantisZip 是一款完全免费且独立开发的开源项目。如果它提升�
 
 > 💡 **小提示**：进群请备注 “GitHub / MantisZip”。
 
-
-## Star History
-
-<a href="https://www.star-history.com/?repos=mantis3d%2FMantisZip&type=date&legend=top-left">
- <picture>
-   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=mantis3d/MantisZip&type=date&theme=dark&legend=top-left&sealed_token=YQ7DqQZHLbrXETnLiah8jEsifEVMSuHsMO8P69Gj7ByYffyfsPmiJiSKcSM1yXMGOUb35MPl0T_ylfEb57rnGRE43j2PR2dKsUXgdSI0D4kS5AZzBf_YNQ" />
-   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=mantis3d/MantisZip&type=date&legend=top-left&sealed_token=YQ7DqQZHLbrXETnLiah8jEsifEVMSuHsMO8P69Gj7ByYffyfsPmiJiSKcSM1yXMGOUb35MPl0T_ylfEb57rnGRE43j2PR2dKsUXgdSI0D4kS5AZzBf_YNQ" />
-   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=mantis3d/MantisZip&type=date&legend=top-left&sealed_token=YQ7DqQZHLbrXETnLiah8jEsifEVMSuHsMO8P69Gj7ByYffyfsPmiJiSKcSM1yXMGOUb35MPl0T_ylfEb57rnGRE43j2PR2dKsUXgdSI0D4kS5AZzBf_YNQ" />
- </picture>
-</a>
-

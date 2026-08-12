@@ -1,4 +1,5 @@
 {
+  "Menu_ShowPreviewPanel": "Show Preview Panel",
   "Preview_TooLarge": "File too large ({0:F1} MB), exceeds preview size limit ({1:F0} MB)",
   "Preview_TooLargeText": "File too large ({0:F1} MB), exceeds text preview limit ({1:F0} MB)",
   "Preview_TextDisabled": "Text preview disabled (enable in Settings)",

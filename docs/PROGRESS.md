@@ -21,6 +21,14 @@
 
 ### MantisZip.UI.Avalonia（主力版）
 
+**2026-08-13** — 预览面板位置/显隐全面修复：四种布局移植 + 三入口统一 + 旧副本覆盖磁盘的架构 bug 修复
+  - **「预览位置」四种布局实现（此前为死设置，WPF 迁移遗漏）**：`PreviewPosition`（1=底部/2=目录树下方/3=文件列表下方/4=右侧）现生效——单 Grid 附加属性切换（`ApplyPreviewPosition`，`PreviewPanel` 不搬移父容器，规避 WPF 双 Grid 搬移方案的状态残留 bug）；启动时 + 设置窗口保存后应用；各位置尺寸记忆（切换/隐藏时保存，恢复时还原）
+  - **「显示预览面板」显隐生效 + 空间释放**：`ApplyPreviewLayout` 统一入口（启动/设置保存后）从磁盘重读 `ShowPreviewPanel` 并同步 `MainWindowViewModel.IsPreviewVisible`（菜单勾选一致）；面板隐藏时压缩预览行列 + 复位 RowSpan 让树/列表撑满；菜单切换（PropertyChanged 订阅）同步布局；隐藏前记录当前尺寸保证重新打开保留拖过的宽高
+  - **修复旧内存副本整体保存覆盖用户设置（架构级）**：`MainWindowViewModel` 的 `_appSettings` 是启动时副本，`OnIsPreviewVisibleChanged` 等 6 处 `_appSettings.Save()` 会用过期值覆盖用户刚在设置窗口保存的 `PreviewPosition` 等（表现为关闭预览面板后位置被重置为右侧）；新增 `SaveSetting(Action<AppSettings>)` 磁盘合并写（Load→改单字段→Save），替换全部 6 处（ShowPreviewPanel/ShowProgressBars/SeparateDirBaseline/ShowPreviewInfoPanel/AutoExpandTreeToCurrent/Theme/Language）
+  - **菜单新增「显示预览面板」项**：`TogglePreviewCommand` + ToggleIconBox/IconEye 指示（与信息面板项同样式），本地化 `Menu_ShowPreviewPanel`；与工具栏「预览」ToggleButton、设置窗口三入口行为一致
+  - 涉及文件：`Views/MainWindow.axaml`、`Views/MainWindow.axaml.cs`（新增 `ApplyPreviewPosition`/`ApplyPreviewLayout`/`SaveCurrentPreviewSize`）、`ViewModels/MainWindowViewModel.cs`、`Localization/strings.*.json`
+  - 验证：`dotnet build` 0 错误；已实际验证位置切换、显隐压缩/恢复
+
 **2026-08-12** — 预览设置全面修复：滑条联动、保存即生效、尺寸门槛补全、彩色 Emoji 移除
   - **三个预览滑条数值框拖动时实时更新**：`_maxTextPreviewBytes`/`_maxPreviewFileSize`/`_previewHeadSize` 补 `[NotifyPropertyChangedFor]`，计算显示属性（`MaxTextPreviewMBText`/`MaxPreviewFileSizeMBText`/`PreviewHeadSizeKBText`）随滑条联动（此前冻结不刷新）
   - **预览设置保存即生效（无需重启）**：`SettingsWindowViewModel.Save()` 同步 8 个 `PreviewService` 静态运行时配置（PreviewHeadSize/EnableFormatDetection/EnableImagePreview/EnableTextPreview/MaxPreviewFileSize/MaxTextPreviewBytes/MaxTablePreviewRows/MaxTablePreviewCols），与 `App.axaml.cs` 启动初始化同源；修复此前改设置必须重启才生效

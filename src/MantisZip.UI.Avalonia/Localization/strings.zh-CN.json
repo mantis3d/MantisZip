@@ -1,4 +1,5 @@
 {
+  "Menu_ShowPreviewPanel": "显示预览面板",
   "Preview_TooLarge": "文件过大 ({0:F1} MB)，超过预览大小限制 ({1:F0} MB)",
   "Preview_TooLargeText": "文件过大 ({0:F1} MB)，超过文本预览限制 ({1:F0} MB)",
   "Preview_TextDisabled": "文本预览已禁用（可在设置中启用）",

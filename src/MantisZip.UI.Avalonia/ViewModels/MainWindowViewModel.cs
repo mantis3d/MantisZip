@@ -175,7 +175,7 @@ public partial class MainWindowViewModel : ObservableObject
 
         // Persist so the selection survives restart (AppSettings uses "zh"/"en")
         _appSettings.Language = LocalizationManager.CurrentLanguage == AppLanguage.English ? "en" : "zh";
-        _appSettings.Save();
+        SaveSetting(s => s.Language = _appSettings.Language);
 
         UpdateLocalizedStrings();
     }
@@ -529,8 +529,21 @@ public partial class MainWindowViewModel : ObservableObject
         if (_appSettings.ShowPreviewPanel != value)
         {
             _appSettings.ShowPreviewPanel = value;
-            _ = _appSettings.Save();
+            // ⚠ 不要直接 _appSettings.Save()：_appSettings 是启动时的内存副本，
+            // 整体保存会用过期值覆盖用户刚在设置窗口保存的 PreviewPosition 等设置。
+            SaveSetting(s => s.ShowPreviewPanel = value);
         }
+    }
+
+    /// <summary>
+    /// 只把指定字段同步到磁盘（合并写）：从磁盘加载最新设置、应用单个字段变更后保存，
+    /// 避免用启动时的内存副本整体覆盖用户在设置窗口保存的其他设置。
+    /// </summary>
+    private static void SaveSetting(Action<AppSettings> update)
+    {
+        var disk = AppSettings.Load();
+        update(disk);
+        disk.Save();
     }
 
     [ObservableProperty]
@@ -1663,7 +1676,7 @@ public partial class MainWindowViewModel : ObservableObject
     partial void OnAutoExpandTreeChanged(bool value)
     {
         _appSettings.AutoExpandTreeToCurrent = value;
-        _ = _appSettings.Save();
+        SaveSetting(s => s.AutoExpandTreeToCurrent = value);
         // 开启时立即执行一次，让当前目录立刻在树中定位
         if (value)
             ExpandTreeToPath(CurrentFolder ?? "");
@@ -1767,7 +1780,7 @@ public partial class MainWindowViewModel : ObservableObject
             _ => "System",
         };
         _appSettings.Theme = theme;
-        _ = _appSettings.Save();
+        SaveSetting(s => s.Theme = theme);
 
         // 立即应用（RefreshTheme 会读取 AppSettings 并设置 RequestedThemeVariant）
         App.RefreshTheme();
@@ -2440,7 +2453,7 @@ public partial class MainWindowViewModel : ObservableObject
     {
         ShowProgressBars = !ShowProgressBars;
         _appSettings.ShowProgressBars = ShowProgressBars;
-        _ = _appSettings.Save();
+        SaveSetting(s => s.ShowProgressBars = ShowProgressBars);
         // Update ProgressBarEnabled on all current items
         foreach (var item in CurrentEntries)
         {
@@ -2453,7 +2466,7 @@ public partial class MainWindowViewModel : ObservableObject
     {
         SeparateDirBaseline = !SeparateDirBaseline;
         _appSettings.SeparateDirBaseline = SeparateDirBaseline;
-        _ = _appSettings.Save();
+        SaveSetting(s => s.SeparateDirBaseline = SeparateDirBaseline);
         PopulateEntries();
     }
 
@@ -2468,7 +2481,7 @@ public partial class MainWindowViewModel : ObservableObject
     {
         Preview.ShowInfoPanel = !Preview.ShowInfoPanel;
         _appSettings.ShowPreviewInfoPanel = Preview.ShowInfoPanel;
-        _ = _appSettings.Save();
+        SaveSetting(s => s.ShowPreviewInfoPanel = Preview.ShowInfoPanel);
     }
 
     // ── Recent Files ──
