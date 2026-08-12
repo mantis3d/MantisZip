@@ -27,6 +27,19 @@
   - 涉及文件：`Dialogs/ProgressWindow.axaml.cs`、`Services/ExtractFlow.cs`、`Services/CompressFlow.cs`
   - 验证：`dotnet build` 0 错误 0 警告、Avalonia 测试 54 通过 2 跳过、lsp 无诊断
 
+**2026-08-12** — 新增面包屑地址栏计划（PathBreadcrumb）
+  - 新增 `.sisyphus/plans/path-breadcrumb.md`（P2，预估 6-8h）：三处地址栏（主窗口虚拟路径 / QuickPathPicker / CustomFilePickerDialog）统一改造为资源管理器式面包屑导航——通用 `PathBreadcrumb` 控件（段点击直达 + 点末尾空白/Ctrl+L 进编辑态 + 段数阈值折叠 + 虚拟根段 📦 + 文本响应式补全 Provider），`NavigateRequested` 事件保持宿主导航单一事实来源，第一版不做分隔符同级目录下拉
+  - **Momus 评审**：0 blocker；3 major 已修订（① 对话框保留「输入文件路径 Enter 直接确认选中」分支 ② 补全源改文本响应式 `Func<string?, IEnumerable<string>>` Provider ③ Ctrl+L 改为宿主窗口级接线 `EnterEditMode()`）+ 3 minor（折叠段行为统一忽略 / 补 `FilterMode` 属性 / 删除 3 个孤儿本地化 key）
+  - `docs/PLAN.md` P2 区新增引用行并更新最后更新日期
+
+**2026-08-12** — 调试菜单新增 UI 控件测试窗口
+  - **UiTestWindow**（`Views/` 新增）：6 页签控件陈列窗口，同功能变体并列展示——按钮与文本（按钮 6 变体/文本框 6 变体/进度条 4 变体含滑块联动）、选择与输入（DatePicker 5 变体/开关单选/下拉滑块 7 变体）、列表与数据（ListBox 选择模式 4 变体/目录树/DataGrid 含压缩比进度条列/ItemsControl）、菜单与导航（Menu/ContextMenu/Expander 四方向/三种 Split 按钮/嵌套 TabControl）、布局容器（Grid/StackPanel/DockPanel/WrapPanel/GridSplitter/ToolTip 四方向）、自定义控件（ResultTreeView/QuickPathPicker/FileFilterEditor/InfoPanel/DynamicFormatOptionsPanel）
+  - **UiTestViewModel**（`ViewModels/` 新增）：模拟压缩包数据（文件条目/目录树/元数据面板），ResultTreeRoot 供 ResultTreeView 复用
+  - **接线**：`MainWindow.axaml` 调试菜单新增「UI 控件测试」（IconGrid 图标 + `Main_UiTestTitle` key），`MainWindow.axaml.cs` switch 新增 `UiTestWindow` case
+  - **排障记录（Avalonia 12 破坏性变更）**：① `SelectionMode.Extended` 已删除（11→12 中 `Toggle` 变为 0x02、新增 `AlwaysSelected=0x04`），改用 `Single/Multiple/Toggle/AlwaysSelected`；② `{DynamicResource}` 赋 `StackPanel.Padding` 触发 AVLN2000 编译错误（改 `Margin` 规避，项目惯例）；③ `Style x:Key` + `StaticResource` 引用同样触发 AVLN2000（改内联）；④ `x:DataType` 不能放 `DataGrid` 元素上（列绑定走运行时解析，模板内单独设置）
+  - 涉及文件：`Views/UiTestWindow.axaml(.cs)`（新增）、`ViewModels/UiTestViewModel.cs`（新增）、`Views/MainWindow.axaml(.cs)`、`Localization/strings.*.json`
+  - 验证：`dotnet build` 0 警告 0 错误
+
 **2026-08-11** — 压缩/解压启动即时反馈：收集弹窗、主窗口加载遮罩、解压设置弹窗秒现
   - **右键压缩 `--compress` IPC 收集期间显示纯文字弹窗**：新增 `CollectingWindow`（无边框、无按钮、单行文案「正在收集文件…」），消除多文件收集 800ms 空白期。不用 ProgressWindow（避免让用户误以为压缩已开始），按 AGENTS.md 规则 4 应用主题资源、规则 5 紧凑度资源键
   - **主窗口 `IsLoading` 加载遮罩接线**：`MainWindow.axaml` 增加「正在打开压缩包…」遮罩（绑定 `IsLoading`），`MainWindowViewModel` 补上打开大压缩包期间的反馈，新增 `Status_OpeningArchive` 本地化 key（中/英）
