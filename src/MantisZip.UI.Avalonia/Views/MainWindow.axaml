@@ -317,6 +317,14 @@
             </StackPanel>
           </MenuItem.Header>
         </MenuItem>
+        <MenuItem Click="TestWindow_Click" Tag="UiTestWindow">
+          <MenuItem.Header>
+            <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
+              <PathIcon Data="{StaticResource IconGrid}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+              <TextBlock Text="{Binding LocalizedStrings[Main_UiTestTitle]}" />
+            </StackPanel>
+          </MenuItem.Header>
+        </MenuItem>
         <Separator />
         <MenuItem Click="TestWindow_Click" Tag="AboutWindow">
           <MenuItem.Header>
