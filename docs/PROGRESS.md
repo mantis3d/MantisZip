@@ -21,6 +21,11 @@
 
 ### MantisZip.UI.Avalonia（主力版）
 
+**2026-08-12** — 新增面包屑地址栏计划（PathBreadcrumb）
+  - 新增 `.sisyphus/plans/path-breadcrumb.md`（P2，预估 6-8h）：三处地址栏（主窗口虚拟路径 / QuickPathPicker / CustomFilePickerDialog）统一改造为资源管理器式面包屑导航——通用 `PathBreadcrumb` 控件（段点击直达 + 点末尾空白/Ctrl+L 进编辑态 + 段数阈值折叠 + 虚拟根段 📦 + 文本响应式补全 Provider），`NavigateRequested` 事件保持宿主导航单一事实来源，第一版不做分隔符同级目录下拉
+  - **Momus 评审**：0 blocker；3 major 已修订（① 对话框保留「输入文件路径 Enter 直接确认选中」分支 ② 补全源改文本响应式 `Func<string?, IEnumerable<string>>` Provider ③ Ctrl+L 改为宿主窗口级接线 `EnterEditMode()`）+ 3 minor（折叠段行为统一忽略 / 补 `FilterMode` 属性 / 删除 3 个孤儿本地化 key）
+  - `docs/PLAN.md` P2 区新增引用行并更新最后更新日期
+
 **2026-08-12** — 调试菜单新增 UI 控件测试窗口
   - **UiTestWindow**（`Views/` 新增）：6 页签控件陈列窗口，同功能变体并列展示——按钮与文本（按钮 6 变体/文本框 6 变体/进度条 4 变体含滑块联动）、选择与输入（DatePicker 5 变体/开关单选/下拉滑块 7 变体）、列表与数据（ListBox 选择模式 4 变体/目录树/DataGrid 含压缩比进度条列/ItemsControl）、菜单与导航（Menu/ContextMenu/Expander 四方向/三种 Split 按钮/嵌套 TabControl）、布局容器（Grid/StackPanel/DockPanel/WrapPanel/GridSplitter/ToolTip 四方向）、自定义控件（ResultTreeView/QuickPathPicker/FileFilterEditor/InfoPanel/DynamicFormatOptionsPanel）
   - **UiTestViewModel**（`ViewModels/` 新增）：模拟压缩包数据（文件条目/目录树/元数据面板），ResultTreeRoot 供 ResultTreeView 复用
