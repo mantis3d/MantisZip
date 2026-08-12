@@ -21,6 +21,14 @@
 
 ### MantisZip.UI.Avalonia（主力版）
 
+**2026-08-12** — 调试菜单新增 UI 控件测试窗口
+  - **UiTestWindow**（`Views/` 新增）：6 页签控件陈列窗口，同功能变体并列展示——按钮与文本（按钮 6 变体/文本框 6 变体/进度条 4 变体含滑块联动）、选择与输入（DatePicker 5 变体/开关单选/下拉滑块 7 变体）、列表与数据（ListBox 选择模式 4 变体/目录树/DataGrid 含压缩比进度条列/ItemsControl）、菜单与导航（Menu/ContextMenu/Expander 四方向/三种 Split 按钮/嵌套 TabControl）、布局容器（Grid/StackPanel/DockPanel/WrapPanel/GridSplitter/ToolTip 四方向）、自定义控件（ResultTreeView/QuickPathPicker/FileFilterEditor/InfoPanel/DynamicFormatOptionsPanel）
+  - **UiTestViewModel**（`ViewModels/` 新增）：模拟压缩包数据（文件条目/目录树/元数据面板），ResultTreeRoot 供 ResultTreeView 复用
+  - **接线**：`MainWindow.axaml` 调试菜单新增「UI 控件测试」（IconGrid 图标 + `Main_UiTestTitle` key），`MainWindow.axaml.cs` switch 新增 `UiTestWindow` case
+  - **排障记录（Avalonia 12 破坏性变更）**：① `SelectionMode.Extended` 已删除（11→12 中 `Toggle` 变为 0x02、新增 `AlwaysSelected=0x04`），改用 `Single/Multiple/Toggle/AlwaysSelected`；② `{DynamicResource}` 赋 `StackPanel.Padding` 触发 AVLN2000 编译错误（改 `Margin` 规避，项目惯例）；③ `Style x:Key` + `StaticResource` 引用同样触发 AVLN2000（改内联）；④ `x:DataType` 不能放 `DataGrid` 元素上（列绑定走运行时解析，模板内单独设置）
+  - 涉及文件：`Views/UiTestWindow.axaml(.cs)`（新增）、`ViewModels/UiTestViewModel.cs`（新增）、`Views/MainWindow.axaml(.cs)`、`Localization/strings.*.json`
+  - 验证：`dotnet build` 0 警告 0 错误
+
 **2026-08-17** — 本地化修复三连：JSON 非法转义崩溃、Metadata_Position key 大小写、Metadata_Key 字段名 i18n 补全
   - **SevenZipPath 占位符 JSON 非法转义崩溃修复**：新增的 `Settings_Advanced_SevenZipPathPlaceholder` 含原始路径 `C:\Program Files\7-Zip\7z.dll`（`\P`/`\7` 为非法 JSON 转义），启动即 `TypeInitializationException`。双文件（zh-CN/en）改为 `\\` 转义；`SettingsWindow.axaml` 的 TextBox `PlaceholderText` 由硬编码路径改为绑定 `SevenZipPathPlaceholder`（`SettingsWindowViewModel` 新增属性 + 刷新通知），顺带补上 `AppearanceAppFontFamilyText` 缺失的刷新通知
   - **Metadata_Position 下拉显示 key 原文修复**：JSON key 为 PascalCase（`Metadata_PositionInfoPanel` 等），代码却用 camelCase 原值拼接（`Metadata_PositioninfoPanel`），查不到 key 返原文。新增 `FieldEditItem.GetPositionDisplayName()`（首字母大写后查表），`PositionDisplay` 属性与 `PositionDisplayConverter` 统一走它
