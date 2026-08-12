@@ -3,7 +3,7 @@
 > 未来待开发功能规划。已实现功能请见 [docs/PROGRESS.md](docs/PROGRESS.md)，技术架构请见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)。
 
 **项目状态**: 🟢 开发中  
-**最后更新**: 2026-08-11  
+**最后更新**: 2026-08-12  
 **当前版本**: 0.5.0
 
 ---
@@ -37,6 +37,7 @@
 | **P2** | 提取日志与解压「后悔药」 | [extract-journal-undo.md](.sisyphus/plans/extract-journal-undo.md) | 🟡中 | 3-4h | 解压记录 + 一键回滚 |
 | **P2** | 目录行聚合显示（大小=子树和 / 日期=最新文件 / 压缩后大小按格式可用性） | [directory-size-date-aggregate.md](.sisyphus/plans/directory-size-date-aggregate.md) | 🟢低 | 3-5h | Core `DirStats`+`ComputeDirectoryStats` 增加 `NewestModified`（共享契约，WPF 维护模式不动）；Avalonia `ArchiveItemModel` 显示属性改派生计算属性 + 新增 `CompressedSizeAvailable`（7z/RAR/.tgz/.gz 压缩后大小列显示空，文件/目录一致，对齐 WPF `CompressedDisplayMode.Unavailable`）；`PopulateEntries` 基于过滤后 `filteredSource` 应用聚合 |
 | **P2** | 原生 Win32 启动 Splash | [startup-native-splash.md](.sisyphus/plans/startup-native-splash.md) | 🟡中 | 3-4h | 覆盖进程冷启动（Avalonia 初始化前 ~1-2s）的无反馈期；已实施一期 A+B+C：`--compress` IPC 收集期间立即显示纯文字弹窗 `CollectingWindow`「正在收集文件…」（无按钮，避免 ProgressWindow 让用户误以为压缩已开始）+ `MainWindow` 增加 `IsLoading` 加载遮罩「正在打开压缩包…」+ `--extract`（解压到…）立即弹窗、条目列表后台加载（消除弹窗前最长 3s 空白期），本计划用纯 Win32 splash（P/Invoke，独立消息泵）进一步覆盖冷启动时段 |
+| **P2** | 面包屑地址栏（PathBreadcrumb） | [path-breadcrumb.md](.sisyphus/plans/path-breadcrumb.md) | 🟡中 | 6-8h | 三处地址栏（主窗口虚拟路径 / QuickPathPicker / CustomFilePickerDialog）统一改造为资源管理器式面包屑：段点击直达 + 点末尾空白/Ctrl+L 进编辑态（保留 AutoCompleteBox 补全）+ 段数阈值折叠 + 虚拟根段 📦；通用 `PathBreadcrumb` 控件，`NavigateRequested` 事件保持宿主导航单一事实来源；第一版不做分隔符同级目录下拉（预留 `EnumerationRequested`） |
 | **P3** | 压缩包对比 (Archive Diff) | [archive-diff.md](.sisyphus/plans/archive-diff.md) | 🟡中 | 3-4h | 压缩包文件级差异对比 |
 | **P3** | 原生图标 DLL | [icon-dll.md](.sisyphus/plans/icon-dll.md) | 🟡中 | 2-3h | 将 7 个 .ico 编译进原生资源 DLL，消除路径依赖 |
 | **P3** | 可插拔预览模块体系 | [preview-modular-providers.md](.sisyphus/plans/preview-modular-providers.md) | 🟡中 | 3-4h | 格式类库独立分发 |
