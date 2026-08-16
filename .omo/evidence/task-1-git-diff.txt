@@ -1,0 +1,1 @@
+Only installer.iss modified. installer-selfcontained.iss: no changes (verified via git diff)

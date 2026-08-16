@@ -1,0 +1,1 @@
+IsDotNet9Installed: uses RegGetSubkeyNames, Copy(subkeys[i],1,2)='9.' prefix check, HKLM+HKLM32 dual-path. CurStepChanged: .NET block BEFORE WebView2. Constants: DotNet9RegKey+DotNet9RuntimeUrl. All correct.
