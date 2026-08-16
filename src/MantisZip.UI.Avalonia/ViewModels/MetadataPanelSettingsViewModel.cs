@@ -70,6 +70,29 @@ public partial class MetadataPanelSettingsViewModel : ObservableObject
             var displayName = GetTypeDisplayName(key);
             TypeOptions.Add(new TypeOption(key, displayName));
         }
+        LocalizationManager.CultureChanged += OnCultureChanged;
+    }
+
+    private void OnCultureChanged(object? sender, EventArgs e)
+    {
+        // 静态本地化文本
+        OnPropertyChanged(nameof(FieldLayoutText));
+        OnPropertyChanged(nameof(ColumnFieldText));
+        OnPropertyChanged(nameof(ColumnRowText));
+        OnPropertyChanged(nameof(ColumnOrderText));
+        OnPropertyChanged(nameof(ColumnPositionText));
+        OnPropertyChanged(nameof(PreviewTitleText));
+
+        // 类型下拉显示名
+        foreach (var opt in TypeOptions)
+            opt.DisplayName = GetTypeDisplayName(opt.TypeKey);
+
+        // 字段列表显示名 + 位置下拉显示（PositionDisplayConverter 绑定 Position，需一并通知）
+        foreach (var item in Fields)
+            item.RefreshLocalizedText();
+
+        // 预览区标题与字段名随语言变化，重建
+        RebuildPreview();
     }
 
     /// <summary>从磁盘加载配置。</summary>
@@ -236,14 +259,21 @@ public partial class MetadataPanelSettingsViewModel : ObservableObject
 }
 
 /// <summary>类型选择器的一个选项。</summary>
-public class TypeOption
+public class TypeOption : ObservableObject
 {
     public string TypeKey { get; }
-    public string DisplayName { get; }
+
+    private string _displayName;
+    public string DisplayName
+    {
+        get => _displayName;
+        set => SetProperty(ref _displayName, value);
+    }
+
     public TypeOption(string typeKey, string displayName)
     {
         TypeKey = typeKey;
-        DisplayName = displayName;
+        _displayName = displayName;
     }
 }
 
@@ -251,7 +281,19 @@ public class TypeOption
 public class FieldEditItem : ObservableObject
 {
     public string Key { get; set; } = "";
-    public string DisplayName { get; set; } = "";
+
+    private string _displayName = "";
+    /// <summary>字段显示名：优先 i18n（Metadata_Key_{Key}），fallback 到 registry 显示名。</summary>
+    public string DisplayName
+    {
+        get
+        {
+            var i18nKey = $"Metadata_Key_{Key}";
+            var localized = LocalizationManager.T(i18nKey);
+            return localized != i18nKey ? localized : _displayName;
+        }
+        set => SetProperty(ref _displayName, value);
+    }
 
     private int _row;
     public int Row
@@ -282,9 +324,25 @@ public class FieldEditItem : ObservableObject
     }
 
     /// <summary>位置的显示名，只读绑定用。</summary>
-    public string PositionDisplay => LocalizationManager.T($"Metadata_Position{_position}");
+    public string PositionDisplay => GetPositionDisplayName(_position);
+
+    /// <summary>位置值 → 本地化显示名。JSON key 为 PascalCase（Metadata_PositionInfoPanel 等），位置值为 camelCase（infoPanel 等），需首字母大写后再查表。</summary>
+    public static string GetPositionDisplayName(string pos)
+    {
+        if (string.IsNullOrEmpty(pos))
+            return pos;
+        return LocalizationManager.T($"Metadata_Position{char.ToUpperInvariant(pos[0])}{pos[1..]}");
+    }
 
     public string[] PositionOptions => ["infoPanel", "contentTop", "hidden"];
+
+    /// <summary>语言切换后刷新本地化显示（字段名 + 位置下拉，Position 走 PositionDisplayConverter 求值）。</summary>
+    public void RefreshLocalizedText()
+    {
+        OnPropertyChanged(nameof(DisplayName));
+        OnPropertyChanged(nameof(Position));
+        OnPropertyChanged(nameof(PositionDisplay));
+    }
 
     private Action? _onChanged;
     public void SetChangeCallback(Action onChanged) => _onChanged = onChanged;

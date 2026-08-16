@@ -75,7 +75,7 @@ public class PositionDisplayConverter : IValueConverter
     public object? Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
     {
         if (value is string pos)
-            return LocalizationManager.T($"Metadata_Position{pos}");
+            return FieldEditItem.GetPositionDisplayName(pos);
         return value;
     }
 
