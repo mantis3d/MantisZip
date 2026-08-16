@@ -21,6 +21,14 @@
 
 ### MantisZip.UI.Avalonia（主力版）
 
+**2026-08-17** — 本地化修复三连：JSON 非法转义崩溃、Metadata_Position key 大小写、Metadata_Key 字段名 i18n 补全
+  - **SevenZipPath 占位符 JSON 非法转义崩溃修复**：新增的 `Settings_Advanced_SevenZipPathPlaceholder` 含原始路径 `C:\Program Files\7-Zip\7z.dll`（`\P`/`\7` 为非法 JSON 转义），启动即 `TypeInitializationException`。双文件（zh-CN/en）改为 `\\` 转义；`SettingsWindow.axaml` 的 TextBox `PlaceholderText` 由硬编码路径改为绑定 `SevenZipPathPlaceholder`（`SettingsWindowViewModel` 新增属性 + 刷新通知），顺带补上 `AppearanceAppFontFamilyText` 缺失的刷新通知
+  - **Metadata_Position 下拉显示 key 原文修复**：JSON key 为 PascalCase（`Metadata_PositionInfoPanel` 等），代码却用 camelCase 原值拼接（`Metadata_PositioninfoPanel`），查不到 key 返原文。新增 `FieldEditItem.GetPositionDisplayName()`（首字母大写后查表），`PositionDisplay` 属性与 `PositionDisplayConverter` 统一走它
+  - **Metadata_Key 字段名 i18n 补全（50 字段）**：`MetadataRenderEngine.GetFieldDisplayName` 拼接 `Metadata_Key_{fieldKey}` 查找，但 zh/en JSON 中该前缀 50 个字段 key 全部缺失 → 英文界面字段名 fallback 到 registry 硬编码中文。双文件补全 50 个 `Metadata_Key_*`（FileName/Title/Author/…）；`FieldEditItem.DisplayName` 改为 getter 内 i18n 优先（与渲染端逻辑一致），设置窗口字段列表随语言切换刷新
+  - **元数据列宽微调**：设置窗口字段列表 Position 列宽 110→130、下拉宽度 100→120
+  - 涉及文件：`Localization/strings.zh-CN.json`、`Localization/strings.en.json`、`ViewModels/MetadataPanelSettingsViewModel.cs`、`ViewModels/SettingsWindowViewModel.cs`、`Views/SettingsWindow.axaml(.cs)`
+  - 验证：JSON 双文件解析合法且 key 集合对称（1086 = 1086）、`dotnet build` 0 错误
+
 **2026-08-12** — 新增面包屑地址栏计划（PathBreadcrumb）
   - 新增 `.sisyphus/plans/path-breadcrumb.md`（P2，预估 6-8h）：三处地址栏（主窗口虚拟路径 / QuickPathPicker / CustomFilePickerDialog）统一改造为资源管理器式面包屑导航——通用 `PathBreadcrumb` 控件（段点击直达 + 点末尾空白/Ctrl+L 进编辑态 + 段数阈值折叠 + 虚拟根段 📦 + 文本响应式补全 Provider），`NavigateRequested` 事件保持宿主导航单一事实来源，第一版不做分隔符同级目录下拉
   - **Momus 评审**：0 blocker；3 major 已修订（① 对话框保留「输入文件路径 Enter 直接确认选中」分支 ② 补全源改文本响应式 `Func<string?, IEnumerable<string>>` Provider ③ Ctrl+L 改为宿主窗口级接线 `EnterEditMode()`）+ 3 minor（折叠段行为统一忽略 / 补 `FilterMode` 属性 / 删除 3 个孤儿本地化 key）
