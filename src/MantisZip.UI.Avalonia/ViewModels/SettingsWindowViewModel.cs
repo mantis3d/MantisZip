@@ -656,6 +656,7 @@ public partial class SettingsWindowViewModel : ObservableObject
 
     // Advanced strings
     public string AdvancedSevenZipPathText => LocalizationManager.T("Settings_Advanced_SevenZipPath");
+    public string SevenZipPathPlaceholder => LocalizationManager.T("Settings_Advanced_SevenZipPathPlaceholder");
     public string AdvancedBrowseText => LocalizationManager.T("Settings_Advanced_Browse");
     public string AdvancedPreserveRootText => LocalizationManager.T("Settings_Advanced_PreserveRoot");
     public string AdvancedTempGroupText => LocalizationManager.T("Settings_Advanced_TempGroup");
@@ -1139,6 +1140,7 @@ public partial class SettingsWindowViewModel : ObservableObject
         RefreshShellStatus();
 
         OnPropertyChanged(nameof(AdvancedSevenZipPathText));
+        OnPropertyChanged(nameof(SevenZipPathPlaceholder));
         OnPropertyChanged(nameof(AdvancedBrowseText));
         OnPropertyChanged(nameof(AdvancedPreserveRootText));
         OnPropertyChanged(nameof(AdvancedTempGroupText));
@@ -1172,6 +1174,7 @@ public partial class SettingsWindowViewModel : ObservableObject
         OnPropertyChanged(nameof(AppearanceThemeSystemText));
         OnPropertyChanged(nameof(AppearanceThemeLightText));
         OnPropertyChanged(nameof(AppearanceThemeDarkText));
+        OnPropertyChanged(nameof(AppearanceAppFontFamilyText));
         OnPropertyChanged(nameof(AppearanceMaxRecentFilesText));
         OnPropertyChanged(nameof(AppearanceCompactnessText));
         OnPropertyChanged(nameof(AppearanceCompactnessCompactText));

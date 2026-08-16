@@ -21,6 +21,14 @@
 
 ### MantisZip.UI.Avalonia（主力版）
 
+**2026-08-17** — 本地化修复三连：JSON 非法转义崩溃、Metadata_Position key 大小写、Metadata_Key 字段名 i18n 补全
+  - **SevenZipPath 占位符 JSON 非法转义崩溃修复**：新增的 `Settings_Advanced_SevenZipPathPlaceholder` 含原始路径 `C:\Program Files\7-Zip\7z.dll`（`\P`/`\7` 为非法 JSON 转义），启动即 `TypeInitializationException`。双文件（zh-CN/en）改为 `\\` 转义；`SettingsWindow.axaml` 的 TextBox `PlaceholderText` 由硬编码路径改为绑定 `SevenZipPathPlaceholder`（`SettingsWindowViewModel` 新增属性 + 刷新通知），顺带补上 `AppearanceAppFontFamilyText` 缺失的刷新通知
+  - **Metadata_Position 下拉显示 key 原文修复**：JSON key 为 PascalCase（`Metadata_PositionInfoPanel` 等），代码却用 camelCase 原值拼接（`Metadata_PositioninfoPanel`），查不到 key 返原文。新增 `FieldEditItem.GetPositionDisplayName()`（首字母大写后查表），`PositionDisplay` 属性与 `PositionDisplayConverter` 统一走它
+  - **Metadata_Key 字段名 i18n 补全（50 字段）**：`MetadataRenderEngine.GetFieldDisplayName` 拼接 `Metadata_Key_{fieldKey}` 查找，但 zh/en JSON 中该前缀 50 个字段 key 全部缺失 → 英文界面字段名 fallback 到 registry 硬编码中文。双文件补全 50 个 `Metadata_Key_*`（FileName/Title/Author/…）；`FieldEditItem.DisplayName` 改为 getter 内 i18n 优先（与渲染端逻辑一致），设置窗口字段列表随语言切换刷新
+  - **元数据列宽微调**：设置窗口字段列表 Position 列宽 110→130、下拉宽度 100→120
+  - 涉及文件：`Localization/strings.zh-CN.json`、`Localization/strings.en.json`、`ViewModels/MetadataPanelSettingsViewModel.cs`、`ViewModels/SettingsWindowViewModel.cs`、`Views/SettingsWindow.axaml(.cs)`
+  - 验证：JSON 双文件解析合法且 key 集合对称（1086 = 1086）、`dotnet build` 0 错误
+
 **2026-08-12** — 冲突对话框支持「暂停」按钮（对齐 WPF ConflictResolver 循环重入）
   - **解压/压缩冲突对话框「暂停」按钮可用**：`ExtractFlow.ShowConflictDialogAsync` 与 `CompressFlow.ShowConflictDialogAsync` 由一次性弹窗改造为 `while(true)` 循环重入——点击「暂停」收起冲突对话框 → 找到进度窗口 → UI 线程调用 `ProgressWindow.PauseFromConflict()` 进入暂停态 → 后台线程 `PauseEvent.Wait(ct)` 等待（不阻塞 UI）→ 用户点「继续」后重新弹窗处理同一个冲突。修复此前「暂停」被当作 Overwrite（解压静默覆盖）/ Cancel（压缩静默中止）的误判
   - **进度窗口定位**：Avalonia 无 WPF 的 `Application.Current.Windows` 全局窗口注册表，新增 `ProgressWindow.CurrentVisible` 静态入口（`OnOpened` 置位 / `OnClosed` 清除），等价替代 WPF 的 `Windows.OfType<ProgressWindow>().FirstOrDefault()` 查找；CLI 路径仍优先用 owner 直接转换
