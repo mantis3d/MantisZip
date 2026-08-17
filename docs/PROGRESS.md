@@ -42,11 +42,32 @@
   - 涉及文件：`Views/UiTestWindow.axaml(.cs)`（新增）、`ViewModels/UiTestViewModel.cs`（新增）、`Views/MainWindow.axaml(.cs)`、`Localization/strings.*.json`
   - 验证：`dotnet build` 0 警告 0 错误
 
+**2026-08-17** — 本地化修复三连：JSON 非法转义崩溃、Metadata_Position key 大小写、Metadata_Key 字段名 i18n 补全
+  - **SevenZipPath 占位符 JSON 非法转义崩溃修复**：新增的 `Settings_Advanced_SevenZipPathPlaceholder` 含原始路径 `C:\Program Files\7-Zip\7z.dll`（`\P`/`\7` 为非法 JSON 转义），启动即 `TypeInitializationException`。双文件（zh-CN/en）改为 `\\` 转义；`SettingsWindow.axaml` 的 TextBox `PlaceholderText` 由硬编码路径改为绑定 `SevenZipPathPlaceholder`（`SettingsWindowViewModel` 新增属性 + 刷新通知），顺带补上 `AppearanceAppFontFamilyText` 缺失的刷新通知
+  - **Metadata_Position 下拉显示 key 原文修复**：JSON key 为 PascalCase（`Metadata_PositionInfoPanel` 等），代码却用 camelCase 原值拼接（`Metadata_PositioninfoPanel`），查不到 key 返原文。新增 `FieldEditItem.GetPositionDisplayName()`（首字母大写后查表），`PositionDisplay` 属性与 `PositionDisplayConverter` 统一走它
+  - **Metadata_Key 字段名 i18n 补全（50 字段）**：`MetadataRenderEngine.GetFieldDisplayName` 拼接 `Metadata_Key_{fieldKey}` 查找，但 zh/en JSON 中该前缀 50 个字段 key 全部缺失 → 英文界面字段名 fallback 到 registry 硬编码中文。双文件补全 50 个 `Metadata_Key_*`（FileName/Title/Author/…）；`FieldEditItem.DisplayName` 改为 getter 内 i18n 优先（与渲染端逻辑一致），设置窗口字段列表随语言切换刷新
+  - **元数据列宽微调**：设置窗口字段列表 Position 列宽 110→130、下拉宽度 100→120
+  - 涉及文件：`Localization/strings.zh-CN.json`、`Localization/strings.en.json`、`ViewModels/MetadataPanelSettingsViewModel.cs`、`ViewModels/SettingsWindowViewModel.cs`、`Views/SettingsWindow.axaml(.cs)`
+  - 验证：JSON 双文件解析合法且 key 集合对称（1086 = 1086）、`dotnet build` 0 错误
+
 **2026-08-12** — 冲突对话框支持「暂停」按钮（对齐 WPF ConflictResolver 循环重入）
   - **解压/压缩冲突对话框「暂停」按钮可用**：`ExtractFlow.ShowConflictDialogAsync` 与 `CompressFlow.ShowConflictDialogAsync` 由一次性弹窗改造为 `while(true)` 循环重入——点击「暂停」收起冲突对话框 → 找到进度窗口 → UI 线程调用 `ProgressWindow.PauseFromConflict()` 进入暂停态 → 后台线程 `PauseEvent.Wait(ct)` 等待（不阻塞 UI）→ 用户点「继续」后重新弹窗处理同一个冲突。修复此前「暂停」被当作 Overwrite（解压静默覆盖）/ Cancel（压缩静默中止）的误判
   - **进度窗口定位**：Avalonia 无 WPF 的 `Application.Current.Windows` 全局窗口注册表，新增 `ProgressWindow.CurrentVisible` 静态入口（`OnOpened` 置位 / `OnClosed` 清除），等价替代 WPF 的 `Windows.OfType<ProgressWindow>().FirstOrDefault()` 查找；CLI 路径仍优先用 owner 直接转换
   - 涉及文件：`Dialogs/ProgressWindow.axaml.cs`、`Services/ExtractFlow.cs`、`Services/CompressFlow.cs`
   - 验证：`dotnet build` 0 错误 0 警告、Avalonia 测试 54 通过 2 跳过、lsp 无诊断
+
+**2026-08-12** — 新增面包屑地址栏计划（PathBreadcrumb）
+  - 新增 `.sisyphus/plans/path-breadcrumb.md`（P2，预估 6-8h）：三处地址栏（主窗口虚拟路径 / QuickPathPicker / CustomFilePickerDialog）统一改造为资源管理器式面包屑导航——通用 `PathBreadcrumb` 控件（段点击直达 + 点末尾空白/Ctrl+L 进编辑态 + 段数阈值折叠 + 虚拟根段 📦 + 文本响应式补全 Provider），`NavigateRequested` 事件保持宿主导航单一事实来源，第一版不做分隔符同级目录下拉
+  - **Momus 评审**：0 blocker；3 major 已修订（① 对话框保留「输入文件路径 Enter 直接确认选中」分支 ② 补全源改文本响应式 `Func<string?, IEnumerable<string>>` Provider ③ Ctrl+L 改为宿主窗口级接线 `EnterEditMode()`）+ 3 minor（折叠段行为统一忽略 / 补 `FilterMode` 属性 / 删除 3 个孤儿本地化 key）
+  - `docs/PLAN.md` P2 区新增引用行并更新最后更新日期
+
+**2026-08-12** — 调试菜单新增 UI 控件测试窗口
+  - **UiTestWindow**（`Views/` 新增）：6 页签控件陈列窗口，同功能变体并列展示——按钮与文本（按钮 6 变体/文本框 6 变体/进度条 4 变体含滑块联动）、选择与输入（DatePicker 5 变体/开关单选/下拉滑块 7 变体）、列表与数据（ListBox 选择模式 4 变体/目录树/DataGrid 含压缩比进度条列/ItemsControl）、菜单与导航（Menu/ContextMenu/Expander 四方向/三种 Split 按钮/嵌套 TabControl）、布局容器（Grid/StackPanel/DockPanel/WrapPanel/GridSplitter/ToolTip 四方向）、自定义控件（ResultTreeView/QuickPathPicker/FileFilterEditor/InfoPanel/DynamicFormatOptionsPanel）
+  - **UiTestViewModel**（`ViewModels/` 新增）：模拟压缩包数据（文件条目/目录树/元数据面板），ResultTreeRoot 供 ResultTreeView 复用
+  - **接线**：`MainWindow.axaml` 调试菜单新增「UI 控件测试」（IconGrid 图标 + `Main_UiTestTitle` key），`MainWindow.axaml.cs` switch 新增 `UiTestWindow` case
+  - **排障记录（Avalonia 12 破坏性变更）**：① `SelectionMode.Extended` 已删除（11→12 中 `Toggle` 变为 0x02、新增 `AlwaysSelected=0x04`），改用 `Single/Multiple/Toggle/AlwaysSelected`；② `{DynamicResource}` 赋 `StackPanel.Padding` 触发 AVLN2000 编译错误（改 `Margin` 规避，项目惯例）；③ `Style x:Key` + `StaticResource` 引用同样触发 AVLN2000（改内联）；④ `x:DataType` 不能放 `DataGrid` 元素上（列绑定走运行时解析，模板内单独设置）
+  - 涉及文件：`Views/UiTestWindow.axaml(.cs)`（新增）、`ViewModels/UiTestViewModel.cs`（新增）、`Views/MainWindow.axaml(.cs)`、`Localization/strings.*.json`
+  - 验证：`dotnet build` 0 警告 0 错误
 
 **2026-08-11** — 压缩/解压启动即时反馈：收集弹窗、主窗口加载遮罩、解压设置弹窗秒现
   - **右键压缩 `--compress` IPC 收集期间显示纯文字弹窗**：新增 `CollectingWindow`（无边框、无按钮、单行文案「正在收集文件…」），消除多文件收集 800ms 空白期。不用 ProgressWindow（避免让用户误以为压缩已开始），按 AGENTS.md 规则 4 应用主题资源、规则 5 紧凑度资源键
