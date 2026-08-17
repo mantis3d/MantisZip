@@ -691,7 +691,7 @@
                         <DataTemplate>
                           <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="0,0,0,1"
                                   Padding="4,4">
-                            <Grid ColumnDefinitions="*,80,80,110">
+                            <Grid ColumnDefinitions="*,80,80,130">
                               <!-- Field name -->
                               <TextBlock Grid.Column="0" Text="{Binding DisplayName}"
                                          VerticalAlignment="Center"
@@ -718,7 +718,7 @@
                                         SelectedItem="{Binding Position}"
                                         Background="{DynamicResource ThemeWindowBgBrush}"
                                         Foreground="{DynamicResource ThemeTextPrimaryBrush}"
-                                        Height="24" Width="100" HorizontalAlignment="Left">
+                                        Height="24" Width="120" HorizontalAlignment="Left">
                                 <ComboBox.ItemTemplate>
                                   <DataTemplate x:DataType="x:String">
                                     <TextBlock Text="{Binding Converter={StaticResource PositionDisplayConverter}}" />
@@ -1114,7 +1114,7 @@
                 <Grid ColumnDefinitions="*,Auto">
                   <TextBox Grid.Column="0"
                            Text="{Binding SevenZipPath}"
-                           PlaceholderText="C:\Program Files\7-Zip\7z.dll"
+                           PlaceholderText="{Binding SevenZipPathPlaceholder}"
                            Margin="0,0,8,0"
                            Background="{DynamicResource ThemeWindowBgBrush}"
                            Foreground="{DynamicResource ThemeTextPrimaryBrush}"
