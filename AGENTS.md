@@ -149,7 +149,7 @@ Despite using `CommunityToolkit.Mvvm`, **all logic lives in `MainWindow.xaml.cs`
 
 - **预览类型枚举**: `PreviewType` (Services/PreviewService.cs): `None`, `Text`, `Csv`, `Pe`, `Image`, `Gif`, `Svg`, `Font`, `Audio`, `Sqlite`, `Iso`, `Torrent`, `Office`, `Video`, `Html`, `Markdown`, `Pdf`, `IcoGallery`, `Unsupported`
 - **格式分发**: `PreviewService.ClassifyPreviewByMagicAsync()`（魔数优先）→ `PreviewViewModel.ShowXxx(filePath)` 方法，扩展名回退
-- **HTML/Markdown**: 当前 HTML 走 ReverseMarkdown → Markdig → 原生控件树，Markdown 直接 Markdig AST → 控件树。**计划恢复 WebView 双轨方案**：`Avalonia.Controls.WebView`（各平台原生引擎，Win→WebView2, Mac→WKWebView, Linux→WebKit GTK），不可用时降级到 ReverseMarkdown（详见 `.sisyphus/plans/html-preview-webview-fallback.md`）
+- **HTML/Markdown**: 当前 HTML 走 ReverseMarkdown → Markdig → 原生控件树，Markdown 直接 Markdig AST → 控件树。**计划恢复 WebView 双轨方案**：`Avalonia.Controls.WebView`（各平台原生引擎，Win→WebView2, Mac→WKWebView, Linux→WebKit GTK），不可用时降级到 ReverseMarkdown（详见 `.omo/plans/html-preview-webview-fallback.md`）
 - **PDF**: `UglyToad.PdfPig` + `SkiaSharp` 逐页位图渲染 + 翻页导航（PdfPig 0.1.15 + PdfPig.Rendering.Skia 0.1.15.4）
 - **ICO 画廊**: 自实现 `IcoParser` 提取全部多帧，`WrapPanel` 画廊布局，FlattenAlpha 切换，透明背景棋盘格
 - **SVG**: `Svg.Skia` 直接栅格化 → `WriteableBitmap`（无需 WebView2）
@@ -157,7 +157,7 @@ Despite using `CommunityToolkit.Mvvm`, **all logic lives in `MainWindow.xaml.cs`
 - **GIF**: 自实现 `GifDecoder` + `DispatcherTimer` 逐帧动画（无需 `WpfAnimatedGif`）
 - **两阶段加载**: `ShowPreviewAsync` 拆分 Phase 1（同步显示加载状态+弹跳点动画+信息栏）→ Phase 2（异步提取后显示内容），`_previewLoadVersion` 版本号守卫防竞态
 - **透明背景切换**: 图片/GIF/ICO 预览的 `DrawingBrush` 棋盘格（8×8），`IsTransparencyBgShown` 绑定 🏁 按钮
-- **信息面板（可配置元数据系统）**: 已从硬编码 `FormatMetadata` 重构为可配置系统（方案见 [metadata-panel-configurable.md](.sisyphus/plans/metadata-panel-configurable.md)）：
+- **信息面板（可配置元数据系统）**: 已从硬编码 `FormatMetadata` 重构为可配置系统（方案见 [metadata-panel-configurable.md](.omo/plans/metadata-panel-configurable.md)）：
   - **存储**: `MetadataSettingsManager` 持久化到独立 `%LOCALAPPDATA%\MantisZip\metadata-panel.json`（与 AppSettings 同目录不同文件），`SettingsChanged` 事件驱动刷新，`InitializeDefaultConfig` 自动补齐注册类型默认配置
   - **注册与渲染**: `MetadataRegistry`（字段键/显示名/分类注册表）→ `MetadataRenderEngine.RenderCommon/RenderFormat` 按 `MetadataPanelSettings`（`TypeMetadataConfig.Enabled` + `FieldConfig.Position`(infoPanel/contentTop/hidden)/`Order`/`Row`）将字段分发到信息栏（`CommonSections`/`FormatSections` 分区渲染，`SectionOrder` 控制上下）与内容区顶部横条（`ContentTopItems`，随内容滚动）；PE 的旧 `PeTitle`/`PeSubtitle` 已被新系统替代
   - **接线**: `MetadataHelper.RenderCommonToViewModel/RenderFormatToViewModel` 供 `PreviewViewModel` 调用，同时同步 `FormatMetadata` 向后兼容；`UpdateCommonMetadata`（Phase 1）→ `ShowXxx`（Phase 2）两阶段填充
@@ -388,7 +388,7 @@ Uses `ArchiveItem.FullPath` for the output temp path so files from subdirectorie
 
 ### Avalonia 版
 
-已实施**拖拽直接解压**（方案见 [drag-drop-direct-extract.md](.sisyphus/plans/drag-drop-direct-extract.md)），与 WPF 的 eager-extraction 模型不同，采用"拖拽即解压到目标目录"的实时模式：
+已实施**拖拽直接解压**（方案见 [drag-drop-direct-extract.md](.omo/plans/drag-drop-direct-extract.md)），与 WPF 的 eager-extraction 模型不同，采用"拖拽即解压到目标目录"的实时模式：
 
 1. `MainWindow.axaml.cs` 文件列表 `PointerPressed` 检测拖拽起点（列标题/空白按下不触发），选中项经 `DragDropItemExpander.ExpandItems` 展开为条目集
 2. `OverlayController`（纯 Win32 独立覆层，`UpdateLayeredWindow` 后台线程渲染）显示三色状态机（检测中/可释放/不可释放）+ 呼吸动画（拖拽预览弹窗 DragPreviewPopup 待实施：`DragPreviewBitmapBuilder` 位图构建与 `OverlayController.SetPreview` 槽位已就绪但无调用者）
@@ -477,7 +477,7 @@ Build artifacts (bin/, obj/) are gitignored.
 
 ### 规则 1：Plan 变更同步
 
-每当新增或修改 `.sisyphus/plans/` 内的计划文件时，**必须同步更新** `docs/PLAN.md`：
+每当新增或修改 `.omo/plans/` 内的计划文件时，**必须同步更新** `docs/PLAN.md`：
 - 新增计划 → 在 PLAN.md 对应优先级区域（P2/P3/待实现）添加一行 `| 任务 | 说明 |` 引用新计划，保持与已存在行格式一致
 - 修改计划 → 更新 PLAN.md 中对应任务的说明、优先级或状态
 - 计划完成 → 将条目从 PLAN.md 移至 PROGRESS.md 的 【历史设计方案索引】 章节
@@ -723,4 +723,4 @@ dotnet test tests\MantisZip.Tests\MantisZip.Tests.csproj
 
 ### 待实施计划
 
-见 [docs/PLAN.md](docs/PLAN.md) 和 `.sisyphus/plans/` 下的设计文档。
+见 [docs/PLAN.md](docs/PLAN.md) 和 `.omo/plans/` 下的设计文档。

@@ -8,7 +8,7 @@
 
 **核对日期:** 2026-08-06（上次: 2026-07-20）| **版本:** v0.4.5
 
-**状态:** P0 全部完成。P1 剩余 2 项（P1-2 便携模式部分、P1-7 智能打开路径），P2 剩余 0 项。P1-6 已被 [metadata-panel-configurable.md](metadata-panel-configurable.md) 取代并实施（2026-08-06）。
+**状态:** P0 全部完成。P1 剩余 1 项（P1-7 智能打开路径），P2 剩余 0 项。P1-6 已被 [metadata-panel-configurable.md](metadata-panel-configurable.md) 取代并实施（2026-08-06）；P1-2 便携模式路径重定向已于 2026-08-08 实施（`AppSettings.IsPortableMode`/`DataDir`，settings/password/recent/window/metadata/log 全量重定向）。
 
 ---
 
@@ -16,9 +16,9 @@
 
 | 缺失类别 | 缺失项数 | 优先级分布 |
 |----------|---------|-----------|
-| AppSettings 属性 | 1 个 | P1（便携模式路径重定向） |
-| 对话框/控件 | 1 个 | P1 |
-| 功能逻辑 | 1 项 | P1 |
+| AppSettings 属性 | 0 个 | —（便携模式已实施） |
+| 对话框/控件 | 0 个 | — |
+| 功能逻辑 | 1 项 | P1（智能打开路径） |
 | Shell/COM 集成 | 整块 | P0 ✅ 已完成 |
 | 总工作量预估 | — | 约 0.5 天 |
 
@@ -106,9 +106,9 @@
 
 ---
 
-### P1-2: 便携模式（部分完成，需补齐）
+### ✅ P1-2: 便携模式（已实施）
 
-**现状:** 🟡 部分完成。`App.axaml.cs` 已有 `Portable.txt` 哨兵检测（L79），便携模式下跳过 FirstRunShell/FirstRunAssoc 注册（L80-125）。但缺少正式 `IsPortableMode` 属性、设置/密码/Temp 目录路径重定向。
+**现状:** ✅ 已完成（2026-08-08）。`Models/AppSettings.cs` 新增静态构造检测 + `IsPortableMode`/`DataDir` 静态属性（`Portable.txt` → exe 旁 `Data/` 目录重定向），便携时 `PasswordManager.CustomDataDir = DataDir`；`RecentFilesManager`（recent.json）/`WindowStateManager`（window.json）/`MetadataSettingsManager`（metadata-panel.json）/debug.log×3 统一改用 `AppSettings.DataDir`。
 
 **缺失 AppSettings 属性:** 无（WPF 通过静态 `IsPortableMode` 属性实现，无设置属性）
 
@@ -227,8 +227,8 @@
 
 ## 实现优先级建议
 
-1. **Phase 1（P1 核心）** — ~~双击行为/删除原包 + 文件过滤控件 + 默认路径优先级~~（已实现）→ 仅剩便携模式补齐（~0.5 天）
-2. **Phase 2（P1 次要 + P2）** — ~~智能打开路径 + 预览信息面板持久化 + Enable 设置 + AllowElevation~~（已实现/已取代）→ 仅剩智能打开路径（~0.5 天）
+1. **Phase 1（P1 核心）** — ~~双击行为/删除原包 + 文件过滤控件 + 默认路径优先级 + 便携模式补齐~~（已实现）→ 完成
+2. **Phase 2（P1 次要 + P2）** — ~~预览信息面板持久化 + Enable 设置 + AllowElevation~~（已实现/已取代）→ 仅剩智能打开路径（~0.5 天）
 
 ---
 

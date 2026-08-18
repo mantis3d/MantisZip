@@ -48,6 +48,8 @@ Thumbs.db
 # Agent temp files
 .sisyphus/tmp_*
 .sisyphus/run-continuation/
+.omo/tmp_*
+.omo/run-continuation/
 replace_strings.ps1
 
 # Development artifacts

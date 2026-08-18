@@ -1,1 +1,0 @@
-ISCC not available in this environment (not installed). Code compiles logically. In CI, 'iscc installer.iss' produces exit code 0.

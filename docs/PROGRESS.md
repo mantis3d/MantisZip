@@ -64,7 +64,7 @@
   - 验证：JSON 双文件解析合法且 key 集合对称（1086 = 1086）、`dotnet build` 0 错误
 
 **2026-08-12** — 新增面包屑地址栏计划（PathBreadcrumb）
-  - 新增 `.sisyphus/plans/path-breadcrumb.md`（P2，预估 6-8h）：三处地址栏（主窗口虚拟路径 / QuickPathPicker / CustomFilePickerDialog）统一改造为资源管理器式面包屑导航——通用 `PathBreadcrumb` 控件（段点击直达 + 点末尾空白/Ctrl+L 进编辑态 + 段数阈值折叠 + 虚拟根段 📦 + 文本响应式补全 Provider），`NavigateRequested` 事件保持宿主导航单一事实来源，第一版不做分隔符同级目录下拉
+  - 新增 `.omo/plans/path-breadcrumb.md`（P2，预估 6-8h）：三处地址栏（主窗口虚拟路径 / QuickPathPicker / CustomFilePickerDialog）统一改造为资源管理器式面包屑导航——通用 `PathBreadcrumb` 控件（段点击直达 + 点末尾空白/Ctrl+L 进编辑态 + 段数阈值折叠 + 虚拟根段 📦 + 文本响应式补全 Provider），`NavigateRequested` 事件保持宿主导航单一事实来源，第一版不做分隔符同级目录下拉
   - **Momus 评审**：0 blocker；3 major 已修订（① 对话框保留「输入文件路径 Enter 直接确认选中」分支 ② 补全源改文本响应式 `Func<string?, IEnumerable<string>>` Provider ③ Ctrl+L 改为宿主窗口级接线 `EnterEditMode()`）+ 3 minor（折叠段行为统一忽略 / 补 `FilterMode` 属性 / 删除 3 个孤儿本地化 key）
   - `docs/PLAN.md` P2 区新增引用行并更新最后更新日期
 
@@ -85,7 +85,7 @@
   - 验证：JSON 双文件解析合法且 key 集合对称（1086 = 1086）、`dotnet build` 0 错误
 
 **2026-08-12** — 新增面包屑地址栏计划（PathBreadcrumb）
-  - 新增 `.sisyphus/plans/path-breadcrumb.md`（P2，预估 6-8h）：三处地址栏（主窗口虚拟路径 / QuickPathPicker / CustomFilePickerDialog）统一改造为资源管理器式面包屑导航——通用 `PathBreadcrumb` 控件（段点击直达 + 点末尾空白/Ctrl+L 进编辑态 + 段数阈值折叠 + 虚拟根段 📦 + 文本响应式补全 Provider），`NavigateRequested` 事件保持宿主导航单一事实来源，第一版不做分隔符同级目录下拉
+  - 新增 `.omo/plans/path-breadcrumb.md`（P2，预估 6-8h）：三处地址栏（主窗口虚拟路径 / QuickPathPicker / CustomFilePickerDialog）统一改造为资源管理器式面包屑导航——通用 `PathBreadcrumb` 控件（段点击直达 + 点末尾空白/Ctrl+L 进编辑态 + 段数阈值折叠 + 虚拟根段 📦 + 文本响应式补全 Provider），`NavigateRequested` 事件保持宿主导航单一事实来源，第一版不做分隔符同级目录下拉
   - **Momus 评审**：0 blocker；3 major 已修订（① 对话框保留「输入文件路径 Enter 直接确认选中」分支 ② 补全源改文本响应式 `Func<string?, IEnumerable<string>>` Provider ③ Ctrl+L 改为宿主窗口级接线 `EnterEditMode()`）+ 3 minor（折叠段行为统一忽略 / 补 `FilterMode` 属性 / 删除 3 个孤儿本地化 key）
   - `docs/PLAN.md` P2 区新增引用行并更新最后更新日期
 
@@ -104,7 +104,7 @@
   - 验证：`dotnet build` 0 错误 0 警告、Avalonia 测试 54 通过 2 跳过、lsp 无诊断
 
 **2026-08-12** — 新增面包屑地址栏计划（PathBreadcrumb）
-  - 新增 `.sisyphus/plans/path-breadcrumb.md`（P2，预估 6-8h）：三处地址栏（主窗口虚拟路径 / QuickPathPicker / CustomFilePickerDialog）统一改造为资源管理器式面包屑导航——通用 `PathBreadcrumb` 控件（段点击直达 + 点末尾空白/Ctrl+L 进编辑态 + 段数阈值折叠 + 虚拟根段 📦 + 文本响应式补全 Provider），`NavigateRequested` 事件保持宿主导航单一事实来源，第一版不做分隔符同级目录下拉
+  - 新增 `.omo/plans/path-breadcrumb.md`（P2，预估 6-8h）：三处地址栏（主窗口虚拟路径 / QuickPathPicker / CustomFilePickerDialog）统一改造为资源管理器式面包屑导航——通用 `PathBreadcrumb` 控件（段点击直达 + 点末尾空白/Ctrl+L 进编辑态 + 段数阈值折叠 + 虚拟根段 📦 + 文本响应式补全 Provider），`NavigateRequested` 事件保持宿主导航单一事实来源，第一版不做分隔符同级目录下拉
   - **Momus 评审**：0 blocker；3 major 已修订（① 对话框保留「输入文件路径 Enter 直接确认选中」分支 ② 补全源改文本响应式 `Func<string?, IEnumerable<string>>` Provider ③ Ctrl+L 改为宿主窗口级接线 `EnterEditMode()`）+ 3 minor（折叠段行为统一忽略 / 补 `FilterMode` 属性 / 删除 3 个孤儿本地化 key）
   - `docs/PLAN.md` P2 区新增引用行并更新最后更新日期
 
@@ -120,8 +120,8 @@
   - **右键压缩 `--compress` IPC 收集期间显示纯文字弹窗**：新增 `CollectingWindow`（无边框、无按钮、单行文案「正在收集文件…」），消除多文件收集 800ms 空白期。不用 ProgressWindow（避免让用户误以为压缩已开始），按 AGENTS.md 规则 4 应用主题资源、规则 5 紧凑度资源键
   - **主窗口 `IsLoading` 加载遮罩接线**：`MainWindow.axaml` 增加「正在打开压缩包…」遮罩（绑定 `IsLoading`），`MainWindowViewModel` 补上打开大压缩包期间的反馈，新增 `Status_OpeningArchive` 本地化 key（中/英）
   - **右键「解压到……」`--extract` 弹窗秒现**：`RunExtractDialogCliAsync` 删除弹窗前最长 3s 的 `ListEntriesAsync` 预加载，改为立即 `Show()` + 后台 `LoadExtractDialogEntriesAsync` 加载条目后 `SetEntries`（预览树异步构建 + `IsBuildPending` 加载状态已覆盖加载期间），窗口已关闭不填充
-  - **文档**：新增 `.sisyphus/plans/startup-native-splash.md`（P2 计划：原生 Win32 splash 覆盖进程冷启动 ~1-2s），PLAN.md 对应条目更新为一期 A+B+C
-  - 涉及文件：`Dialogs/CollectingWindow.axaml(.cs)`（新增）、`App.axaml.cs`、`Views/MainWindow.axaml`、`ViewModels/MainWindowViewModel.cs`、`Localization/strings.*.json`、`.sisyphus/plans/startup-native-splash.md`（新增）、`docs/PLAN.md`
+  - **文档**：新增 `.omo/plans/startup-native-splash.md`（P2 计划：原生 Win32 splash 覆盖进程冷启动 ~1-2s），PLAN.md 对应条目更新为一期 A+B+C
+  - 涉及文件：`Dialogs/CollectingWindow.axaml(.cs)`（新增）、`App.axaml.cs`、`Views/MainWindow.axaml`、`ViewModels/MainWindowViewModel.cs`、`Localization/strings.*.json`、`.omo/plans/startup-native-splash.md`（新增）、`docs/PLAN.md`
 
 **2026-08-10** — 预览树（ResultTreeView）过滤统计修复 + 精简模式按过滤后数据工作
   - **目录统计不受过滤影响（修复 1）**：`ResultPreviewService.CalculateDescendantStats` 递归时跳过 `IsFilteredOut` 节点、文件计数只统计非目录节点（此前目录行统计把被过滤文件算进去）。同步更新 `PreviewTreeNode` 文档注释与 AGENTS.md 语义说明
@@ -224,7 +224,7 @@
 **2026-08-07** — `path-manifest-unification.md` 方案重写为 A/B 数据集设计（预览=实际绝对一致）
   - **触发**：用户测试发现压缩 Separate 模式目录名含点（`project.v2`）生成 `project.zip`（预览 `project.v2.zip`）；讨论中进一步挖出过滤语义分裂根因——预览保留完整树标 `IsFilteredOut` 灰显，执行侧 `FileFilterHelper.ApplyFilter` 却把目录展开成匹配文件列表 → 10 目录/1 万文件/过滤剩 1000 时 Separate 实际生成 **1000 个压缩包**（预览显示 10 个）
   - **新设计**：A/B 数据集——A=过滤前路径数据集，B=过滤后压缩计划 `CompressPlanItem(SourcePath, OutputArchivePath, IncludedFiles)`；**过滤只算一次**，预览构建时从树派生 B 并缓存，执行只读 B（不重算输出路径、不重新过滤）；预览 A/B 切换复用现成 `ResultTreeView.ShowFilteredGhosts`（默认 false=只显示匹配，已核实）；按钮门禁 `IsBuildPending`（预览构建期间禁用确定按钮）保证 B 不过期；CLI 无 B → 同一 `CompressPathPlanner` 重算（公式同源无双轨）；输出包路径唯一实现收敛 Bug 2（目录源用完整目录名）；引擎加文件白名单（`ArchiveOptions.FileWhitelist` + `FileScanner` 透传 + SevenZip 过滤激活改走展开路径）修 Bug 3；解压侧 `FilteredEntryKeys` 即天然 B，仅修 Bug 1（ExtractFlow 空匹配降级全量 + ZipEngine key 未归一化三处，TarGz/SevenZip 已归一化）；包内条目路径=同公式保证（Phase 2 再闭环）
-  - 涉及文件：`.sisyphus/plans/path-manifest-unification.md`（重写）、`docs/PLAN.md`（P1 行同步，~2.5h→~4.5h）（仅文档，无代码变更）
+  - 涉及文件：`.omo/plans/path-manifest-unification.md`（重写）、`docs/PLAN.md`（P1 行同步，~2.5h→~4.5h）（仅文档，无代码变更）
 
 **2026-08-07** — CLI 解压"每次询问"不弹窗修复（ExtractFlow.ShowConflictDialogAsync 统一）
   - **根因**：CLI `RunCliExtractBatchWithProgressAsync` 调 `ExtractFlow.ExtractAsync` 时 `conflictDialog` 传 null → `Ask` 无 resolver → `FileConflictHelper.ResolveByAction` 落 `_ => outputPath`（Ask 被当作 Overwrite 直接覆盖）；主窗口路径有回调所以正常，CLI 从移植起缺这半截
@@ -250,12 +250,12 @@
   - **Phase 5 修正**：文档声称"0/5 均未开始"→ 实际 **5.1/5.3/5.5 已完成**（5.1 `ExtractHeadAsync`/`ExtractHeadTailAsync` + 7z 固实降级；5.3 Avalonia 两阶段加载 + `_previewLoadVersion` 版本守卫，独立子计划 `preview-two-phase-loading.md` 已完成；5.5 `IsSevenZipSolid`）；5.2 部分（MetadataHelper 模式）；5.4 未实施
   - **插件化确认**：Phase 2D（Magick.NET）/Phase M（MediaPlayer）均未实施（`src/` 仅 4 项目，sln 无插件项目）
   - **AGENTS.md 补充**：魔数检测条目后新增「部分提取（元数据优先）」描述（`ExtractHeadAsync`/`ExtractHeadTailAsync`/`IsSevenZipSolid` 一行）
-  - 涉及文件：`.sisyphus/plans/preview-extended-formats.md`、`AGENTS.md`（仅文档，无代码变更）
+  - 涉及文件：`.omo/plans/preview-extended-formats.md`、`AGENTS.md`（仅文档，无代码变更）
 
 **2026-08-06** — `avalonia-shell-com-integration.md` 完成状态核实 + AGENTS.md Shell 图标描述修正
   - **计划核实**：文档声明全部与现状一致——3 个 ShellIntegration 文件（`Services/ShellIntegration.cs`/`.Assoc.cs`/`.Menu.cs`）存在、10 个 MenuIcons .ico 存在、csproj `CopyShellExtComhost`/`CopyShellExtComhostToPublish` target 存在、4 个 CLI 命令（`--install-shell`/`--uninstall-shell`/`--install-assoc`/`--uninstall-assoc`）齐全；头部状态更新为 ✅ Completed（原"4/5 verified, 1/5 needs Explorer visual check"，图标渲染已在实际使用中验证）
   - **AGENTS.md 图标描述修正**：L242 原写"Icons via `shell32.dll,3`"→ 实际两项目 `ShellIntegration.Menu.cs` 均用 `GetMenuIconPath()` 从输出目录 `Resources\MenuIcons\*.ico` 读取（Open/ExtractHere/ExtractSmart/ExtractToNamed/ExtractTo/CompressSeparate/CompressCombined/CompressDialog 8 个映射，无 shell32.dll 引用）
-  - 涉及文件：`.sisyphus/plans/avalonia-shell-com-integration.md`、`AGENTS.md`
+  - 涉及文件：`.omo/plans/avalonia-shell-com-integration.md`、`AGENTS.md`
 
 **2026-08-06** — AGENTS.md 同步信息面板可配置系统 + 结果预览加载覆层描述
   - **信息面板描述升级**：L160 由过时的一句话（"托管在 PreviewPanel 右侧/下方"）改为可配置元数据系统完整描述（4 子要点）——`MetadataSettingsManager` 独立 `metadata-panel.json` 持久化、`MetadataRegistry`→`MetadataRenderEngine` 字段分发（infoPanel/contentTop/hidden + Order/Row + SectionOrder）、`MetadataHelper` 接线 + `FormatMetadata` 向后兼容、全局显隐 `IsInfoPanelEffectiveVisible`（内容 && 用户偏好）持久化 + 菜单/设置双入口
@@ -267,17 +267,17 @@
 **2026-08-06** — `avalonia-wpf-diff-plan.md` 现状核实修正 + 信息面板持久化全局显隐入口实施
   - **差异计划核实**：双击行为/删除原包（P1-1）、文件过滤控件（P1-3）、默认路径优先级（P1-4，已演进为 `DefaultPathOrder` 可排序 List）、Enable 设置（P2-3）、AllowElevation（P2-4，默认值文档误记 `true` → 实际 `false`）均已实现；P1-6 信息面板持久化被 `metadata-panel-configurable.md` 取代；剩余仅便携模式路径重定向（P1-2 部分）+ 智能打开路径（P1-7）
   - **全局显隐入口实施**：`AppSettings.ShowPreviewInfoPanel`（默认 true，与 WPF 同名）+ `PreviewViewModel.ShowInfoPanel` 用户偏好 + `IsInfoPanelEffectiveVisible`（内容驱动 `IsInfoPanelVisible` && 用户偏好）；启动初始化 + `ToggleInfoPanelVisibility` 菜单切换写回保存；`MainWindow.axaml` 预览菜单新增开关项（`Menu_ShowInfoPanel`，IconPanelRight）；PreviewPanel 绑定改合并可见性；设置窗口预览→通用 Tab 同步增加"显示信息面板"开关（`Settings_Preview_ShowInfoPanel`）
-  - 涉及文件：`.sisyphus/plans/avalonia-wpf-diff-plan.md`、`docs/PLAN.md`（规则 1）、Avalonia 5 个源文件 + 2 个 i18n 文件（规则 13）；构建通过（ShellExt.dll 被 WizTree64 锁定为环境问题）
+  - 涉及文件：`.omo/plans/avalonia-wpf-diff-plan.md`、`docs/PLAN.md`（规则 1）、Avalonia 5 个源文件 + 2 个 i18n 文件（规则 13）；构建通过（ShellExt.dll 被 WizTree64 锁定为环境问题）
 
 **2026-08-06** — 计划整理：`result-preview-panel.md` 归档修正 + `preview-show-content-toggle.md` 新计划
   - **result-preview-panel 归档修正**：文末注记「未合入 AvaloniaAlpha」→ 已合入（`04229be`/`31e041e` 为 HEAD 祖先）；§2a StyledProperties 实际 7 → 9 个（补 `IsLoading`/`BuildProgress`）；§2b 布局 ToolTip 硬编码中文 → i18n 键（6 个 `Preview_Result_*`，0 残留）；冲突 ToolTip 修正（不存在的 `Preview_Result_ConflictToolTip` → 节点属性 `ConflictToolTip` = `Preview_Result_FileExists`）；§2c 补加载覆层小节；§3 `BuildExtractPreview` 签名补 3 参（`IProgress<double>?`/`preserveFullPath`/`currentFolder`）+ ExtractPathResolver 统一路径 + 恶意条目逐条跳过；变更范围表 11 key（5 未用）→ 15 key（仅 `Title`/`ConflictSuffix` 未用）
   - **preview-show-content-toggle 新计划**：预览树「显示内容」开关（ResultTreeView 工具栏）——关闭后只显示压缩包/目标路径骨架、内容彻底隐藏不可展开、跳过 `BuildDirectoryNode` 磁盘递归扫描（大型源目录预览加速）；持久化 `AppSettings.PreviewShowContent`；压缩+解压都支持（共享控件）；摘要栏隐藏时显示输出路径；i18n 4 key + IconEye 图标（规则 8/13）；工时 2-3h
-  - 涉及文件：`.sisyphus/plans/result-preview-panel.md`、`.sisyphus/plans/preview-show-content-toggle.md`、`docs/PLAN.md`（规则 1）
+  - 涉及文件：`.omo/plans/result-preview-panel.md`、`.omo/plans/preview-show-content-toggle.md`、`docs/PLAN.md`（规则 1）
 
 **2026-08-06** — 计划整理：`preview-quick-modes.md` 6 点修正 + `preview-two-phase-loading.md` 归档收尾
   - **preview-quick-modes 修正（Avalonia-first）**：①平台策略 WPF 先行 → Avalonia-only（规则 11，WPF 不做 UI 适配）；②HTML 假设校准（ReverseMarkdown→Markdig 控件树已实现，非纯文本）；③设置项整合——删除重复的 `QuickPreviewTextMaxBytes`/`QuickPreviewCsvMaxRows`，复用现有 `MaxTextPreviewBytes`/`MaxTablePreviewRows` + 快速档位（`Math.Min` 常量 2048/50）；④与已实施的两阶段加载对接（叠加在 Phase 2 内，`_progressiveCts` 效率取消 + `_previewLoadVersion` 版本守卫双机制）；⑤格式清单校准——DBF/LNK/STL/GZ/证书/VHD/VMDK/DICOM/MOBI/DXF 现状均为 `PreviewType.Unsupported`，降级为独立前置工作项；⑥缩略图 `DecodePixelWidth` → `SKBitmap` 降采样；总工时 27h → 25h（不含 🔴 前置）；DoD 同步
   - **preview-two-phase-loading 归档**：头部状态 ✅ 已完成（2026-07-16）、8 个 checkbox 勾选、修正三处与现实不符（`ShowLoading` 复用 `Clear()` 非复制重置逻辑、弹跳点动画替代 ProgressBar、`UpdateCommonMetadata` 5 参数含 `CompressedSizeDisplay`）、补 `OnPreviewTypeChanged` 自动关闭机制与对应自动化测试、文末【归档记录（2026-08-06）】差异汇总表
-  - 涉及文件：`.sisyphus/plans/preview-quick-modes.md`、`.sisyphus/plans/preview-two-phase-loading.md`、`docs/PLAN.md`（规则 1）
+  - 涉及文件：`.omo/plans/preview-quick-modes.md`、`.omo/plans/preview-two-phase-loading.md`、`docs/PLAN.md`（规则 1）
 
 **2026-08-06** — 拖拽预览弹窗实施设计确认（独立 Win32 弹窗跟随鼠标 + 预取式渲染 + 双阈值降级）
   - **背景**：预览弹窗需求明确为「完整目录树 + 拖拽过程中持续可见」；现有 `DragPreviewBitmapBuilder`（预渲染 ResultTreeView 位图）与 `OverlayController.SetPreview` 两端代码已完成但 0 调用者，仅缺接线与形态决策
@@ -286,7 +286,7 @@
   - **规格**：460×680、鼠标右下 20px 偏移、出屏自动翻转、摘要栏；双阈值降级（≤300 文件完整树 <100ms；301–2000 前 2 层 + 摘要 <250ms；>2000 纯摘要即时）
   - **文档**：`drag-drop-direct-extract.md` 新增「预览弹窗实施补充（2026-08-06）」章节（决策背景/现状盘点/时序图/降级表/任务清单/DoD 补充）+ 头部状态与决策记录同步；`docs/PLAN.md` 拖拽条目追加 2026-08-06 说明（规则 1）
 
-**2026-08-06** — quickpath 系列计划归档：`quickpath-unified.md`（WPF 阶段完成、Avalonia 部分被 redesign 取代）移入 `.sisyphus/plans/archived/` 并标注演进关系；`quickpath-control-redesign.md` / `file-picker-multi-select.md` / `path-priority-sortable.md` / `2026-08-03-quickpath-picker.md` 四份已实施计划从 PLAN.md 移除，统一登记到历史设计方案索引（QuickPathPicker 标记「⏳ 待用户 GUI 验证」）；PLAN.md 跨平台影响分析同步剔除已归档项
+**2026-08-06** — quickpath 系列计划归档：`quickpath-unified.md`（WPF 阶段完成、Avalonia 部分被 redesign 取代）移入 `.omo/plans/archived/` 并标注演进关系；`quickpath-control-redesign.md` / `file-picker-multi-select.md` / `path-priority-sortable.md` / `2026-08-03-quickpath-picker.md` 四份已实施计划从 PLAN.md 移除，统一登记到历史设计方案索引（QuickPathPicker 标记「⏳ 待用户 GUI 验证」）；PLAN.md 跨平台影响分析同步剔除已归档项
 
 **2026-08-06** — DOCX 预览表格升级：全文区控件树化（段落 TextBlock + 表格真 Grid 网格）+ 大纲精确跳转
   - **背景**：DOCX 表格此前以 `"| a | b |"` 分隔符模拟（纯文本 fallback 形态），用户要求真表格显示
@@ -303,7 +303,7 @@
   - **PPTX Canvas 定位预览**：`ShowPptx` 从平铺 `a:t` 文本升级为按原始位置渲染——读取 `ppt/presentation.xml` 的 `p:sldSz`（EMU，默认 12192000×9144000），固定 Canvas 宽 960 等比缩放（高度按 slide 比例）；每个形状提取 `a:xfrm/a:off` 坐标 + 段落文本（`a:p` → `a:t` 拼接，保留段落间换行）+ 首个 run 的 `a:rPr`（`sz/100` 字号、`b="1"` 加粗），按 Y 再按 X 排序；`PreviewPanel.axaml` 新增翻页栏（◀ 页码/总页数 ▶，`PptxPrevious/NextSlideCommand`）+ 白色 Canvas 幻灯片面板，`BuildPptxSlide` 构建 TextBlock 子控件（`Canvas.SetLeft/SetTop` 定位、`MaxWidth=400` + `TextWrapping.Wrap` 防溢出、黑字）；空演示文稿（无 slide）显示 `Preview_PptxEmpty`、有幻灯片但当前张无文字显示 `Preview_PptxSlideEmpty`
   - **命名空间 bug（实测必现）**：`ShowPptx` 用 `slideDoc.Descendants(a + "sp")` 遍历形状——`a` 是 drawingml 命名空间，但 `<sp>` 元素属于 presentationml 命名空间（`p`），drawingml 无独立 `sp` 元素 → 永远匹配不到任何形状 → 所有幻灯片只显示"此幻灯片无文字"。修复为 `Descendants(p + "sp")`（形状内部 `a:xfrm`/`a:p`/`a:t`/`a:rPr` 仍属 drawingml，保持 `a`）；用真实结构测试 PPTX（标题+正文两形状、16:9）验证坐标缩放/字号/加粗/换行全部正确
   - 清理：删除死 key `Preview_ParseFailed`/`Preview_PptxSlideHeader`（zh/en 两文件，代码已无引用）
-  - 计划同步：`.sisyphus/plans/office-content-preview-avalonia.md` 状态更新为 ✅ 已完成（Tasks 1-6 + 三个增强项），`docs/PLAN.md` P3 条目同步
+  - 计划同步：`.omo/plans/office-content-preview-avalonia.md` 状态更新为 ✅ 已完成（Tasks 1-6 + 三个增强项），`docs/PLAN.md` P3 条目同步
   - 验证：`dotnet build` 0 errors（29 个既有警告，与本次改动无关）；Avalonia 测试 43 通过 / 2 跳过（既有 IconProvider）
 
 **2026-08-06** — 预览缩放修复：适应高度受 contentTop 横条影响 + SVG 预览接入缩放系统
@@ -411,7 +411,7 @@
   - **本地化补全**：压缩 tab 内 13 处硬编码中文全部替换为 i18n 绑定；新增 15 个 key（`Settings_Compress_Tab_General`/`Settings_Compress_Tab_Format` + `Settings_Compress_Options` + `Settings_Zip_*` ×4 + `Settings_SevenZip_*` ×8），zh/en 双语；`SettingsWindowViewModel` 新增 15 个本地化属性并注册语言切换通知
   - 构建 0 errors
 
-**2026-08-03** — 拖拽解压与「解压选中项」流程统一（[drag-extract-unify.md](.sisyphus/plans/drag-extract-unify.md)）
+**2026-08-03** — 拖拽解压与「解压选中项」流程统一（[drag-extract-unify.md](.omo/plans/drag-extract-unify.md)）
   - **统一解压流程**：新建 `SelectedItemsExtractService`（Services/）统一「拿到输出路径后」的解压动作；右键「解压选中项到…/到此处」与拖拽解压差异仅剩获取输出路径的方式（文件选择器 vs 目标检测）；统一引擎批量通道（一次开包）+ `pathOverrides` 路径计算 + 统一 `ArchiveOptions` 冲突处理
   - **拖拽路径语义改与右键一致**：删除 `DragDropItemExpander.GetExtractPath`（选中目录锚点），路径计算统一走 `ExtractPreserveFullPath` + 裁剪当前浏览层（`currentFolder` 由拖拽入口传入）；拖出单文件即为文件本身、不再带路径
   - **TarGzEngine 实现按条目提取**：`ExtractEntriesAsync` 从抛 `NotSupportedException` 改为实现（tar/tar.gz 单次扫描匹配 keySet + 纯 .gz 整流解压），推翻原「降级全量」决策；右键 tar/gz 不再降级全量（选中子目录文件按条目解压，语义修正）
@@ -429,7 +429,7 @@
   - 构建 0 errors
 
 **2026-08-03** — 结果预览面板计划文档与实际实现对齐（`result-preview-panel.md` 重写为完成态）
-  - **文档重写**：`.sisyphus/plans/result-preview-panel.md` 由「待实现方案」改为「已完成」记录：实际布局（三列 Grid + 工具栏/摘要栏/树三行）、实际变更范围（复用 CustomFilePickerDialog、DragPreviewBitmapBuilder、PreviewTreeConverters、主题适配）、详细设计（PreviewTreeNode 实际属性、ResultTreeView 7 个 StyledProperty + 显示规则顺序、ResultPreviewService 无概念容器结构、窗口联动方式、3 处复用场景）
+  - **文档重写**：`.omo/plans/result-preview-panel.md` 由「待实现方案」改为「已完成」记录：实际布局（三列 Grid + 工具栏/摘要栏/树三行）、实际变更范围（复用 CustomFilePickerDialog、DragPreviewBitmapBuilder、PreviewTreeConverters、主题适配）、详细设计（PreviewTreeNode 实际属性、ResultTreeView 7 个 StyledProperty + 显示规则顺序、ResultPreviewService 无概念容器结构、窗口联动方式、3 处复用场景）
   - **PLAN.md 同步**：移除已完成任务行「解压/压缩结果预览面板」（原 6 项待做中 5 项已实现），三个未实现项保留为 P2 待实施行
   - **三个遗留项（后续可做）**：① 解压多压缩包按来源目录分组（当前 `GetAllRawItems()` 合并平铺）；② 截断占位符点击就地展开（当前静态"…"文本）；③ 快速/完整冲突检测双模式（当前固定全量 `checkExists`）
   - **i18n 清理**：`ResultTreeView` 5 处硬编码中文 ToolTip 全部本地化（复用 `Tree_ExpandAll`，新增 `Preview_Result_FileCount/DirInfo/ConflictCount/FileExists`，移除未用 `Preview_Result_Title`）；冲突计数/文件计数/目录统计文本改用 i18n key
@@ -500,7 +500,7 @@
   - **整行可点修复（8 处）**：Avalonia 命中测试规则是 `Background=null` 的控件不参与命中（透明区穿透），导致 ListBox/TreeView 项模板根元素无背景时「必须点击文字才能选中」。为 8 处项模板根元素补 `Background="Transparent"`：CustomFilePickerDialog.FileList、QuickPathControl.PathList/DirTree、ResultTreeView 预览树、CompressSettingsWindow 密码库、ProgressWindow 批量列表、MainWindow 目录树、PreviewPanel Torrent 树；hover/选中高亮同步铺满整行（也为后续 PickItems 勾选框方案铺路）
   - **主题色调整（ThemeLight）**：ThemeAccent `#0078D4→#60B8FC`、ThemeButtonHover `#D0D0D0→#AFC1FF`、ThemeListSelected `#E0F0FF→#81C6FF`、ThemeTabHover `#E4F0FF→#AAC2FF`（蓝色系）
   - **QuickPathControl 图标与格式**：收藏夹 Tab 图标 `IconHome→IconLightning`；多处缩进统一重排
-  - **文件选择器多选设计文档**：新增 `.sisyphus/plans/file-picker-multi-select.md`（PickItems 模式：勾选框累积 + 跨目录保留 + 右侧已选项目面板 + 批量添加/移除按钮，Task 1–7 全展开），同步 PLAN.md 新增 P2 条目
+  - **文件选择器多选设计文档**：新增 `.omo/plans/file-picker-multi-select.md`（PickItems 模式：勾选框累积 + 跨目录保留 + 右侧已选项目面板 + 批量添加/移除按钮，Task 1–7 全展开），同步 PLAN.md 新增 P2 条目
   - 构建 0 errors / 0 warnings
 
 **2026-07-31** — 预览树异步加载 — 解压/压缩设置窗口大量文件时不再卡 UI
@@ -787,7 +787,7 @@
     - 新增 StyleName 显示名称检测（`"标题 1"`、`"heading 1"`）
     - 新增 `OutlineLevel` 段落属性检测（跨语言区最可靠的方式）
     - 级别提取改为通用数字提取（`"Heading1"`→1、`"标题 1"`→1）
-  - `.sisyphus/plans/office-content-preview-avalonia.md` 补充两条路线：
+  - `.omo/plans/office-content-preview-avalonia.md` 补充两条路线：
     - DOCX 表格内容提取（纯文本分隔符 A / Mammoth→HtmlRenderer B）
     - Markdown 表格渲染补齐（原生 Grid B 路线 A / HtmlRenderer B）
   - 交叉引用 `html-preview-webview-fallback.md` Task 5（已有 BuildTable 方案）
@@ -841,7 +841,7 @@
   - 动作行底部样式统一：PauseBtn/CancelAllBtn 从 Horizontal 改为 Vertical 布局，图标 22×22、FontSize 11
   - AppIcons.axaml 新增 IconPause 几何图标
   - 本地化 keys 补充（9 条 EN/ZH），`dotnet build` 通过，0 错误
-  - 审计 `.sisyphus/plans/avalonia-wpf-diff-plan.md`：发现 P0-2（压缩选项 9 属性）、P0-3（魔数检测）已实现但未更新；更新汇总统计和已完成章节
+  - 审计 `.omo/plans/avalonia-wpf-diff-plan.md`：发现 P0-2（压缩选项 9 属性）、P0-3（魔数检测）已实现但未更新；更新汇总统计和已完成章节
 
 **2026-07-18** — Phase 2 emoji→PathIcon 替换：预览按钮 + 对话框 + 文件树 + 过滤栏
   - 新增 11 个 Fluent UI 图标 Geometry：IconSubtract/Play/Pause/Previous/Next/ArrowRight/ArrowFitIn/EyeOff/Document/FontDecrease/FontIncrease
@@ -859,7 +859,7 @@
   - 新增 IconTestWindow（图标测试窗口）：列出程序所有图标的位置、名称、类型（emoji/PathIcon/PathIcon-待替换）、来源文件路径和状态
   - 新增 IconTestItem 模型、IconTestViewModel（含 70+ 条图标数据）、GeometryResourceConverter / StringNotEmptyConverter
   - 通过测试菜单可打开图标测试窗口，支持按名称筛选和分类统计
-  - 为 .sisyphus/plans/emoji-to-pathicon.md 计划提供实时验证和数据补充
+  - 为 .omo/plans/emoji-to-pathicon.md 计划提供实时验证和数据补充
 
 **2026-07-18** — emoji 图标替换为 PathIcon + 文件列表行图标改用系统原生
   - Phase 1：32 个 Fluent UI System Icons 矢量路径批量提取，创建 AppIcons.axaml 资源字典
@@ -1378,7 +1378,7 @@
   - 计划重写为 9 阶段：P0 基础设施 → P1 UI 放开 TAR/GZIP → P2 BZip2 → P3 XZ → P4 Zstd（SharpCompress 0.48.1 内置）→ P5 Brotli（.NET 内置 BrotliStream，方案 B）→ P6 7z.dll 只读解锁（CAB/ARJ/LZH/CHM/CPIO/DEB/RPM/WIM/XAR/LZMA/MSI 共 11 种，纯映射零引擎改动，决策 8 已验证 6 处 extractor 构造均为自动检测）→ P7 文件关联独立开关 → P8 验证
   - 枚举扩展：`ArchiveFormat` 4→15 成员、`SevenZipEngine.CanHandle` 白名单 3→14、新增 `BrotliEngine.cs`
   - 外部库调研结论：libarchive（LibArchive.Net，重叠高）不引入、wimlib/SharpZipLib 冗余、LZH/LHA 7z.dll 已读、RAR 写入无解（保留外置 rar.exe）
-  - 涉及文件：`.sisyphus/plans/new-format-support.md`、`docs/PLAN.md`（规则 1，工时 12-20h → 11-16h）
+  - 涉及文件：`.omo/plans/new-format-support.md`、`docs/PLAN.md`（规则 1，工时 12-20h → 11-16h）
 
 #### v0.4.5 (2026-08-04) AGENTS.md 新增 session 自动执行规则 9–12
   - 规则 9：Windows 环境下禁止 Unix 风格 shell 命令（PowerShell 语法 + `rg`/内置工具优先）
@@ -1524,61 +1524,61 @@
 
 ## 历史设计方案索引
 
-以下设计方案对应功能已在过往版本中完成，对应设计文档存于 `.sisyphus/plans/` 供回溯参考：
+以下设计方案对应功能已在过往版本中完成，对应设计文档存于 `.omo/plans/` 供回溯参考：
 
 | 功能 | 设计文档 | 实现版本 |
 |------|----------|:--------:|
-| 拖拽/右键解压流程统一（`SelectedItemsExtractService` 统一解压动作、`TarGzEngine` 按条目提取、冲突统一走设置 6 策略 + 统一 Ask 弹窗、拖拽路径语义与右键一致、`MapConflictActionString` 连字符映射漏洞修复） | [drag-extract-unify.md](.sisyphus/plans/drag-extract-unify.md) | v0.4.5 |
-| 目录行聚合显示（`DirStats`+`ComputeDirectoryStats` 增加 `NewestModified`；Avalonia `ArchiveItemModel` 显示属性改派生计算属性 + `CompressedSizeAvailable`；`PopulateEntries` 基于过滤后 `filteredSource` 应用聚合） | [directory-size-date-aggregate.md](.sisyphus/plans/directory-size-date-aggregate.md) | v0.4.5 |
-| 路径清单统一（A/B 数据集：预览=实际绝对一致，CompressPlan 唯一事实来源 + 压缩/解压过滤白名单 + IsBuildPending 按钮门禁） | [path-manifest-unification.md](.sisyphus/plans/path-manifest-unification.md) | v0.4.5（⏳ 交互清单待用户 GUI 验证） |
-| 统一路径快捷选择（WPF QuickPathControl + 数据层；Avalonia 演进为 Tab 式速选面板 + CustomFilePickerDialog，QuickPathBuddy 概念并入 Tab+搜索一体化，QuickPathPreDialog 过渡方案废弃） | [quickpath-unified.md](.sisyphus/plans/archived/quickpath-unified.md)（已归档，Avalonia 部分被 [quickpath-control-redesign.md](.sisyphus/plans/quickpath-control-redesign.md) 取代） | v0.4.3+（Avalonia 演进 v0.4.5） |
+| 拖拽/右键解压流程统一（`SelectedItemsExtractService` 统一解压动作、`TarGzEngine` 按条目提取、冲突统一走设置 6 策略 + 统一 Ask 弹窗、拖拽路径语义与右键一致、`MapConflictActionString` 连字符映射漏洞修复） | [drag-extract-unify.md](.omo/plans/drag-extract-unify.md) | v0.4.5 |
+| 目录行聚合显示（`DirStats`+`ComputeDirectoryStats` 增加 `NewestModified`；Avalonia `ArchiveItemModel` 显示属性改派生计算属性 + `CompressedSizeAvailable`；`PopulateEntries` 基于过滤后 `filteredSource` 应用聚合） | [directory-size-date-aggregate.md](.omo/plans/directory-size-date-aggregate.md) | v0.4.5 |
+| 路径清单统一（A/B 数据集：预览=实际绝对一致，CompressPlan 唯一事实来源 + 压缩/解压过滤白名单 + IsBuildPending 按钮门禁） | [path-manifest-unification.md](.omo/plans/path-manifest-unification.md) | v0.4.5（⏳ 交互清单待用户 GUI 验证） |
+| 统一路径快捷选择（WPF QuickPathControl + 数据层；Avalonia 演进为 Tab 式速选面板 + CustomFilePickerDialog，QuickPathBuddy 概念并入 Tab+搜索一体化，QuickPathPreDialog 过渡方案废弃） | [quickpath-unified.md](.omo/plans/archived/quickpath-unified.md)（已归档，Avalonia 部分被 [quickpath-control-redesign.md](.omo/plans/quickpath-control-redesign.md) 取代） | v0.4.3+（Avalonia 演进 v0.4.5） |
 | QuickPathPicker 自包含路径速选控件（Compress/Extract/Settings 三宿主，AutoCompleteBox 补全 + ⭐🕐🪟 浮层 + 目录归一化，浏览器差异经注入委托） | [2026-08-03-quickpath-picker.md](docs/superpowers/plans/2026-08-03-quickpath-picker.md) + [设计](docs/superpowers/specs/2026-08-03-quickpath-picker-design.md) | v0.4.5（⏳ 待用户 GUI 验证） |
-| 文件选择器多选（PickItems 模式：勾选累积 + 跨目录保留 + 右栏已选面板；CompressSettingsWindow 合并「添加文件/文件夹」单按钮） | [file-picker-multi-select.md](.sisyphus/plans/file-picker-multi-select.md) | v0.4.5 |
-| 可排序的默认路径优先级（文件选择器初始路径 context/explorer/recent/custom） | [path-priority-sortable.md](.sisyphus/plans/path-priority-sortable.md) | v0.4.5 |
-| 解压路径统一（`ExtractEntriesAsync` + `pathOverrides`，单一事实源 `ExtractPathResolver`） | [extract-path-unification.md](.sisyphus/plans/extract-path-unification.md) | v0.4.5 |
-| 移除 WebView2 依赖（Markdown/HTML/PDF 跨平台预览） | [remove-webview2-preview.md](.sisyphus/plans/remove-webview2-preview.md) | v0.4.5 |
-| 便携版模式 | [portable-mode.md](.sisyphus/plans/portable-mode.md) | v0.4.5 |
-| 文件冲突对话框暂停/取消 | [conflict-dialog-pause-cancel.md](.sisyphus/plans/conflict-dialog-pause-cancel.md) | v0.4.5 |
-| 压缩选项增强（7z/ZIP 格式参数扩展） | [compression-options-enhancement.md](.sisyphus/plans/compression-options-enhancement.md) | v0.4.5 |
-| 上下文工具栏重构（目录树+文件列表） | [context-toolbars.md](.sisyphus/plans/context-toolbars.md) | v0.4.5 |
-| 解压/压缩结果预览面板 | [result-preview-panel.md](.sisyphus/plans/result-preview-panel.md) | v0.4.5 |
-| 元数据信息面板可配置 | [metadata-panel-configurable.md](.sisyphus/plans/metadata-panel-configurable.md) | v0.4.5 |
-| 紧凑度模式（Compactness Mode） | [compactness-mode.md](.sisyphus/plans/compactness-mode.md) | v0.4.5 |
-| 预览两阶段加载（信息栏+内容分离） | [preview-two-phase-loading.md](.sisyphus/plans/preview-two-phase-loading.md) | v0.4.5 |
-| Avalonia: Shell/COM 集成移植 | [avalonia-shell-com-integration.md](.sisyphus/plans/avalonia-shell-com-integration.md) | v0.4.5 |
-| Avalonia Phase 10: WPF 功能补齐 | [avalonia-phase10-feature-parity.md](.sisyphus/plans/avalonia-phase10-feature-parity.md) | v0.4.5 |
-| Avalonia: i18n 补齐 + 杂物清理 | [avalonia-i18n-and-cleanup.md](.sisyphus/plans/avalonia-i18n-and-cleanup.md) | v0.4.5 |
-| 压缩解压文件筛选 | [file-filter-feature.md](.sisyphus/plans/file-filter-feature.md) | v0.4.5 |
-| emoji 替换为 Fluent UI PathIcon + 文件列表行图标改用系统原生 | [emoji-to-pathicon.md](.sisyphus/plans/emoji-to-pathicon.md) | v0.4.5 |
-| 双击行为 + 解压后删原包 | [doubleclick-extract-settings.md](.sisyphus/plans/doubleclick-extract-settings.md) | v0.4.4+ |
-| 魔数检测文件真实格式 | [preview-magic-detection.md](.sisyphus/plans/preview-magic-detection.md) | v0.4.4 |
-| 密码流程统一 | [password-flow-unification.md](.sisyphus/plans/password-flow-unification.md) | v0.4.4 |
-| 致谢贡献者名单 | [contributors-panel.md](.sisyphus/plans/contributors-panel.md) | v0.4.3+ |
-| 安装程序 .NET 9 自动下载 | [installer-dotnet-autodownload.md](.sisyphus/plans/installer-dotnet-autodownload.md) | v0.4.3+ |
-| 预览格式扩展（12 种元数据格式） | [preview-extended-formats.md](.sisyphus/plans/preview-extended-formats.md) | v0.3.0 |
-| 快速压缩拆分为独立/合并两项 | [split-compress.md](.sisyphus/plans/split-compress.md) | v0.2.10 |
-| 加载大文件 overlay | [archive-loading-progress.md](.sisyphus/plans/archive-loading-progress.md) | v0.3.1 |
-| 添加到/从压缩包删除 | [archive-add-delete.md](.sisyphus/plans/archive-add-delete.md) | v0.2.9 |
-| 暗色/亮色主题 | [dark-theme.md](.sisyphus/plans/dark-theme.md) | v0.2.9 |
-| 日志隐私脱敏 | [log-privacy-redaction.md](.sisyphus/plans/log-privacy-redaction.md) | v0.2.8 |
-| 国际化 (i18n) | [i18n-localization.md](.sisyphus/plans/i18n-localization.md) | v0.2.8 |
-| 智能解压 (Smart Extract) | [smart-extract.md](.sisyphus/plans/smart-extract.md) | v0.2.10 |
-| 文件列表筛选/搜索 | [file-list-filter-search.md](.sisyphus/plans/file-list-filter-search.md) | v0.3.8 |
-| 引擎统一 (SharpZipLib→SharpCompress + 7z.exe→SharpSevenZip) | [engine-unification-sharpcompress.md](.sisyphus/plans/engine-unification-sharpcompress.md) | v0.3.4 |
-| 文件大小进度条 | [file-size-progress-bar.md](.sisyphus/plans/file-size-progress-bar.md) | v0.3.4 |
-| PNG 透明通道控制 | [png-transparency-3way.md](.sisyphus/plans/png-transparency-3way.md) | v0.3.4+ |
-| 批量进度文件列表 | [batch-progress-list.md](.sisyphus/plans/batch-progress-list.md) | v0.3.5 |
-| 解压配置面板 (ExtractSettingsWindow) | [extract-settings-window.md](.sisyphus/plans/extract-settings-window.md) | v0.3.6 |
-| COM 右键菜单 | [com-context-menu.md](.sisyphus/plans/com-context-menu.md) | v0.3.7 |
-| COM 迁移映射表 | [com-migration-mapping.md](.sisyphus/plans/com-migration-mapping.md) | v0.3.7（辅助文档） |
-| 压缩窗口密码 Tab 重设计 | [design-compress-password-tab.md](.sisyphus/plans/design-compress-password-tab.md) | v0.3.7-refined-2 |
-| 关于窗口重设计 | [about-window-redesign.md](.sisyphus/plans/about-window-redesign.md) | v0.3.7-refined-4 |
-| 文件关联 per-extension ProgId | [file-assoc-per-extension.md](.sisyphus/plans/file-assoc-per-extension.md) | v0.3.9 |
-| 移除 SharpZipLib 注释编辑耦合 | [remove-sharpziplib.md](.sisyphus/plans/remove-sharpziplib.md) | v0.3.9 |
-| ZipEngine SharpZipLib 完全迁移 (加密路径→SharpSevenZip) | [zipengine-sharpcompress-migration.md](.sisyphus/plans/zipengine-sharpcompress-migration.md) | v0.3.13 |
-| 压缩流程统一化 (CompressService) | [compress-service-unify.md](.sisyphus/plans/compress-service-unify.md) | v0.4.0 |
-| 发布 Release | [release-automation.md](.sisyphus/plans/release-automation.md) | v0.4.0 |
-| 返回上级目录 (.. 导航行) | [parent-directory-entry.md](.sisyphus/plans/parent-directory-entry.md) | v0.4.0 |
-| ZIP 压缩流直拷优化 (ZipBinaryRewriter) | [zip-copy-mode-optimization.md](.sisyphus/plans/zip-copy-mode-optimization.md) | v0.4.2 |
-| UAC 提权 + 权限不足处理 | [uac-elevation-permission.md](.sisyphus/plans/uac-elevation-permission.md) | v0.4.2 |
-| 自包含安装包发布 | [self-contained-installer.md](.sisyphus/plans/self-contained-installer.md) | v0.4.2 |
+| 文件选择器多选（PickItems 模式：勾选累积 + 跨目录保留 + 右栏已选面板；CompressSettingsWindow 合并「添加文件/文件夹」单按钮） | [file-picker-multi-select.md](.omo/plans/file-picker-multi-select.md) | v0.4.5 |
+| 可排序的默认路径优先级（文件选择器初始路径 context/explorer/recent/custom） | [path-priority-sortable.md](.omo/plans/path-priority-sortable.md) | v0.4.5 |
+| 解压路径统一（`ExtractEntriesAsync` + `pathOverrides`，单一事实源 `ExtractPathResolver`） | [extract-path-unification.md](.omo/plans/extract-path-unification.md) | v0.4.5 |
+| 移除 WebView2 依赖（Markdown/HTML/PDF 跨平台预览） | [remove-webview2-preview.md](.omo/plans/remove-webview2-preview.md) | v0.4.5 |
+| 便携版模式 | [portable-mode.md](.omo/plans/portable-mode.md) | v0.4.5 |
+| 文件冲突对话框暂停/取消 | [conflict-dialog-pause-cancel.md](.omo/plans/conflict-dialog-pause-cancel.md) | v0.4.5 |
+| 压缩选项增强（7z/ZIP 格式参数扩展） | [compression-options-enhancement.md](.omo/plans/compression-options-enhancement.md) | v0.4.5 |
+| 上下文工具栏重构（目录树+文件列表） | [context-toolbars.md](.omo/plans/context-toolbars.md) | v0.4.5 |
+| 解压/压缩结果预览面板 | [result-preview-panel.md](.omo/plans/result-preview-panel.md) | v0.4.5 |
+| 元数据信息面板可配置 | [metadata-panel-configurable.md](.omo/plans/metadata-panel-configurable.md) | v0.4.5 |
+| 紧凑度模式（Compactness Mode） | [compactness-mode.md](.omo/plans/compactness-mode.md) | v0.4.5 |
+| 预览两阶段加载（信息栏+内容分离） | [preview-two-phase-loading.md](.omo/plans/preview-two-phase-loading.md) | v0.4.5 |
+| Avalonia: Shell/COM 集成移植 | [avalonia-shell-com-integration.md](.omo/plans/avalonia-shell-com-integration.md) | v0.4.5 |
+| Avalonia Phase 10: WPF 功能补齐 | [avalonia-phase10-feature-parity.md](.omo/plans/avalonia-phase10-feature-parity.md) | v0.4.5 |
+| Avalonia: i18n 补齐 + 杂物清理 | [avalonia-i18n-and-cleanup.md](.omo/plans/avalonia-i18n-and-cleanup.md) | v0.4.5 |
+| 压缩解压文件筛选 | [file-filter-feature.md](.omo/plans/file-filter-feature.md) | v0.4.5 |
+| emoji 替换为 Fluent UI PathIcon + 文件列表行图标改用系统原生 | [emoji-to-pathicon.md](.omo/plans/emoji-to-pathicon.md) | v0.4.5 |
+| 双击行为 + 解压后删原包 | [doubleclick-extract-settings.md](.omo/plans/doubleclick-extract-settings.md) | v0.4.4+ |
+| 魔数检测文件真实格式 | [preview-magic-detection.md](.omo/plans/preview-magic-detection.md) | v0.4.4 |
+| 密码流程统一 | [password-flow-unification.md](.omo/plans/password-flow-unification.md) | v0.4.4 |
+| 致谢贡献者名单 | [contributors-panel.md](.omo/plans/contributors-panel.md) | v0.4.3+ |
+| 安装程序 .NET 9 自动下载 | [installer-dotnet-autodownload.md](.omo/plans/installer-dotnet-autodownload.md) | v0.4.3+ |
+| 预览格式扩展（12 种元数据格式） | [preview-extended-formats.md](.omo/plans/preview-extended-formats.md) | v0.3.0 |
+| 快速压缩拆分为独立/合并两项 | [split-compress.md](.omo/plans/split-compress.md) | v0.2.10 |
+| 加载大文件 overlay | [archive-loading-progress.md](.omo/plans/archive-loading-progress.md) | v0.3.1 |
+| 添加到/从压缩包删除 | [archive-add-delete.md](.omo/plans/archive-add-delete.md) | v0.2.9 |
+| 暗色/亮色主题 | [dark-theme.md](.omo/plans/dark-theme.md) | v0.2.9 |
+| 日志隐私脱敏 | [log-privacy-redaction.md](.omo/plans/log-privacy-redaction.md) | v0.2.8 |
+| 国际化 (i18n) | [i18n-localization.md](.omo/plans/i18n-localization.md) | v0.2.8 |
+| 智能解压 (Smart Extract) | [smart-extract.md](.omo/plans/smart-extract.md) | v0.2.10 |
+| 文件列表筛选/搜索 | [file-list-filter-search.md](.omo/plans/file-list-filter-search.md) | v0.3.8 |
+| 引擎统一 (SharpZipLib→SharpCompress + 7z.exe→SharpSevenZip) | [engine-unification-sharpcompress.md](.omo/plans/engine-unification-sharpcompress.md) | v0.3.4 |
+| 文件大小进度条 | [file-size-progress-bar.md](.omo/plans/file-size-progress-bar.md) | v0.3.4 |
+| PNG 透明通道控制 | [png-transparency-3way.md](.omo/plans/png-transparency-3way.md) | v0.3.4+ |
+| 批量进度文件列表 | [batch-progress-list.md](.omo/plans/batch-progress-list.md) | v0.3.5 |
+| 解压配置面板 (ExtractSettingsWindow) | [extract-settings-window.md](.omo/plans/extract-settings-window.md) | v0.3.6 |
+| COM 右键菜单 | [com-context-menu.md](.omo/plans/com-context-menu.md) | v0.3.7 |
+| COM 迁移映射表 | [com-migration-mapping.md](.omo/plans/com-migration-mapping.md) | v0.3.7（辅助文档） |
+| 压缩窗口密码 Tab 重设计 | [design-compress-password-tab.md](.omo/plans/design-compress-password-tab.md) | v0.3.7-refined-2 |
+| 关于窗口重设计 | [about-window-redesign.md](.omo/plans/about-window-redesign.md) | v0.3.7-refined-4 |
+| 文件关联 per-extension ProgId | [file-assoc-per-extension.md](.omo/plans/file-assoc-per-extension.md) | v0.3.9 |
+| 移除 SharpZipLib 注释编辑耦合 | [remove-sharpziplib.md](.omo/plans/remove-sharpziplib.md) | v0.3.9 |
+| ZipEngine SharpZipLib 完全迁移 (加密路径→SharpSevenZip) | [zipengine-sharpcompress-migration.md](.omo/plans/zipengine-sharpcompress-migration.md) | v0.3.13 |
+| 压缩流程统一化 (CompressService) | [compress-service-unify.md](.omo/plans/compress-service-unify.md) | v0.4.0 |
+| 发布 Release | [release-automation.md](.omo/plans/release-automation.md) | v0.4.0 |
+| 返回上级目录 (.. 导航行) | [parent-directory-entry.md](.omo/plans/parent-directory-entry.md) | v0.4.0 |
+| ZIP 压缩流直拷优化 (ZipBinaryRewriter) | [zip-copy-mode-optimization.md](.omo/plans/zip-copy-mode-optimization.md) | v0.4.2 |
+| UAC 提权 + 权限不足处理 | [uac-elevation-permission.md](.omo/plans/uac-elevation-permission.md) | v0.4.2 |
+| 自包含安装包发布 | [self-contained-installer.md](.omo/plans/self-contained-installer.md) | v0.4.2 |
