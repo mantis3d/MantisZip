@@ -49,7 +49,7 @@
 在 CI/CD 发布流程中同时构建并上传框架依赖和自包含两种安装包。
 
 ### Concrete Deliverables
-- `.sisyphus/plans/` → 本方案文档（已完成）
+- `.omo/plans/` → 本方案文档（已完成）
 - `installer-selfcontained.iss` → 新建的自包含 Inno Setup 脚本
 - `.github/workflows/release.yml` → 修改后的发布工作流
 - GitHub Release 产出两个安装包文件
@@ -157,7 +157,7 @@ No parallel waves needed — only 2 files to change, the release.yml changes dep
       5. grep "publish_output_selfcontained" installer-selfcontained.iss | wc -l → 确认有匹配项
       6. grep "publish_output\\\\" installer-selfcontained.iss → 确认不存在旧的 publish_output 引用
     Expected Result: GUID 不同、OutputBaseFilename 含 SelfContained、源目录已改为自包含版本
-    Evidence: .sisyphus/evidence/task-1-iss-diff.txt
+    Evidence: .omo/evidence/task-1-iss-diff.txt
 
   Scenario: 验证未意外修改现有 installer.iss
     Tool: Bash
@@ -166,7 +166,7 @@ No parallel waves needed — only 2 files to change, the release.yml changes dep
       1. grep "AppId=" installer.iss → 确认 GUID 与 git 记录一致（未变）
       2. grep "OutputBaseFilename" installer.iss → 确认不含 "SelfContained"
     Expected Result: 现有 installer.iss 完全未改动
-    Evidence: .sisyphus/evidence/task-1-iss-unchanged.txt
+    Evidence: .omo/evidence/task-1-iss-unchanged.txt
   ```
 
   **Commit**: YES
@@ -227,7 +227,7 @@ No parallel waves needed — only 2 files to change, the release.yml changes dep
       2. grep "self-contained" .github/workflows/release.yml → 确认新增的行包含 --self-contained
       3. grep "publish_output_selfcontained" .github/workflows/release.yml → 确认输出目录
     Expected Result: 2 个 publish 步骤存在，一个含 self-contained，输出到不同目录
-    Evidence: .sisyphus/evidence/task-2-yml-structure.txt
+    Evidence: .omo/evidence/task-2-yml-structure.txt
 
   Scenario: 验证 7z.dll 复制逻辑在自包含发布中同样生效
     Tool: Bash
@@ -236,7 +236,7 @@ No parallel waves needed — only 2 files to change, the release.yml changes dep
       1. 确认 copy-7z-dll.ps1 中的 $PublishDir 参数通过 PublishDir MSBuild 属性传入
       2. 确认 csproj 中的 CopySevenZipDll Target AfterTargets="Publish" 对两个 publish 都生效
     Expected Result: 7z.dll 自动复制逻辑对两种发布均生效
-    Evidence: .sisyphus/evidence/task-2-sevenzip-check.txt
+    Evidence: .omo/evidence/task-2-sevenzip-check.txt
   ```
 
   **Commit**: YES（与 Task 3 合并提交）
@@ -297,7 +297,7 @@ No parallel waves needed — only 2 files to change, the release.yml changes dep
       3. 确认 gh release create 步骤不再使用 Select-Object -First 1
       4. 确认 gh release create 使用了两个 .exe 路径
     Expected Result: 两个构建步骤各引用正确的 .iss 文件，gh 上传两个文件
-    Evidence: .sisyphus/evidence/task-3-dual-upload.txt
+    Evidence: .omo/evidence/task-3-dual-upload.txt
 
   Scenario: 模拟验证—本地构建两个安装包
     Tool: Bash
@@ -307,7 +307,7 @@ No parallel waves needed — only 2 files to change, the release.yml changes dep
       2. & $iscc installer-selfcontained.iss → 产出 installer\MantisZip-*-Setup-SelfContained.exe
       3. Get-ChildItem installer\*.exe → 确认两个文件都存在且文件名不同
     Expected Result: 两个 .exe 文件均成功构建
-    Evidence: .sisyphus/evidence/task-3-local-build.txt
+    Evidence: .omo/evidence/task-3-local-build.txt
   ```
 
   **Commit**: YES（与 Task 2 合并）

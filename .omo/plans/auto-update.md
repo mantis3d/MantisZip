@@ -111,7 +111,7 @@
 - **Mock strategy**: Manual `DelegatingHandler` subclass (no Moq dependency)
 
 ### QA Policy
-Every task MUST include agent-executed QA scenarios. Evidence saved to `.sisyphus/evidence/task-{N}-{scenario-slug}.{ext}`.
+Every task MUST include agent-executed QA scenarios. Evidence saved to `.omo/evidence/task-{N}-{scenario-slug}.{ext}`.
 
 ---
 
@@ -198,7 +198,7 @@ Wave FINAL (Verification — parallel):
     Steps:
       1. Create a simple test script or verify compilation: dotnet build src/MantisZip.Core/MantisZip.Core.csproj
     Expected Result: Build succeeds, no errors
-    Evidence: .sisyphus/evidence/task-1-build.txt
+    Evidence: .omo/evidence/task-1-build.txt
   ```
 
   **Commit**: YES
@@ -260,7 +260,7 @@ Wave FINAL (Verification — parallel):
       2. Call UpdateService.ShouldCheck(DateTime.UtcNow.AddHours(-25)) — should return true
       3. Call UpdateService.ShouldCheck(null) — should return true (never checked before)
     Expected Result: All return expected booleans
-    Evidence: .sisyphus/evidence/task-2-shouldcheck.txt
+    Evidence: .omo/evidence/task-2-shouldcheck.txt
 
   Scenario: Version comparison works correctly
     Tool: Bash (dotnet script)
@@ -270,7 +270,7 @@ Wave FINAL (Verification — parallel):
       2. Verify: "0.4.4" == "0.4.4"
       3. Verify: "v0.4.5".TrimStart('v') == "0.4.5"
     Expected Result: Semantic version comparison works correctly
-    Evidence: .sisyphus/evidence/task-2-version-compare.txt
+    Evidence: .omo/evidence/task-2-version-compare.txt
 
   Scenario: CheckForUpdateAsync fails gracefully on network error
     Tool: Bash
@@ -280,7 +280,7 @@ Wave FINAL (Verification — parallel):
       2. Call CheckForUpdateAsync("0.0.0")
       3. Assert returns null (no crash)
     Expected Result: Null returned, no exception propagated
-    Evidence: .sisyphus/evidence/task-2-network-error.txt
+    Evidence: .omo/evidence/task-2-network-error.txt
   ```
 
   **Commit**: YES
@@ -326,7 +326,7 @@ Wave FINAL (Verification — parallel):
     Steps:
       1. dotnet build src/MantisZip.UI.Avalonia/MantisZip.UI.Avalonia.csproj
     Expected Result: Build succeeds
-    Evidence: .sisyphus/evidence/task-3-build.txt
+    Evidence: .omo/evidence/task-3-build.txt
 
   Scenario: New fields serialize/deserialize correctly
     Tool: Bash
@@ -336,7 +336,7 @@ Wave FINAL (Verification — parallel):
       2. Verify LastUpdateCheckTime defaults to null
       3. Verify LastSkippedVersion defaults to null
     Expected Result: All defaults correct
-    Evidence: .sisyphus/evidence/task-3-defaults.txt
+    Evidence: .omo/evidence/task-3-defaults.txt
   ```
 
   **Commit**: YES
@@ -388,7 +388,7 @@ Wave FINAL (Verification — parallel):
     Steps:
       1. dotnet build src/MantisZip.UI.Avalonia/MantisZip.UI.Avalonia.csproj
     Expected Result: Build succeeds, 0 errors
-    Evidence: .sisyphus/evidence/task-4-build.txt
+    Evidence: .omo/evidence/task-4-build.txt
   ```
 
   **Commit**: YES
@@ -445,7 +445,7 @@ Wave FINAL (Verification — parallel):
     Steps:
       1. dotnet build src/MantisZip.UI.Avalonia/MantisZip.UI.Avalonia.csproj
     Expected Result: Build succeeds
-    Evidence: .sisyphus/evidence/task-5-build.txt
+    Evidence: .omo/evidence/task-5-build.txt
 
   Scenario: Check for updates button exists
     Tool: Bash + grep
@@ -454,7 +454,7 @@ Wave FINAL (Verification — parallel):
       1. grep "OnCheckUpdatesClick" src/MantisZip.UI.Avalonia/Dialogs/AboutWindow.axaml.cs
       2. grep "检查更新\|Check for Updates" src/MantisZip.UI.Avalonia/Dialogs/AboutWindow.axaml
     Expected Result: Both found
-    Evidence: .sisyphus/evidence/task-5-button.txt
+    Evidence: .omo/evidence/task-5-button.txt
   ```
 
   **Commit**: YES
@@ -500,7 +500,7 @@ Wave FINAL (Verification — parallel):
     Steps:
       1. dotnet build src/MantisZip.UI.Avalonia/MantisZip.UI.Avalonia.csproj
     Expected Result: Build succeeds
-    Evidence: .sisyphus/evidence/task-6-build.txt
+    Evidence: .omo/evidence/task-6-build.txt
   ```
 
   **Commit**: YES
@@ -562,7 +562,7 @@ Wave FINAL (Verification — parallel):
       1. For each "Update_" key in strings.zh-CN.json, verify same key exists in strings.en.json
       2. Verify JSON is valid (no parse errors)
     Expected Result: All keys present in both files, valid JSON
-    Evidence: .sisyphus/evidence/task-7-keys.txt
+    Evidence: .omo/evidence/task-7-keys.txt
   ```
 
   **Commit**: YES
@@ -614,7 +614,7 @@ Wave FINAL (Verification — parallel):
     Steps:
       1. dotnet test tests/MantisZip.Tests/MantisZip.Tests.csproj
     Expected Result: All tests pass (8+ tests, 0 failures)
-    Evidence: .sisyphus/evidence/task-8-tests.txt
+    Evidence: .omo/evidence/task-8-tests.txt
   ```
 
   **Commit**: YES
@@ -628,7 +628,7 @@ Wave FINAL (Verification — parallel):
 > 4 review agents run in PARALLEL. ALL must APPROVE. Present consolidated results to user and get explicit "okay" before completing.
 
 - [ ] F1. **Plan Compliance Audit** — `oracle`
-  Read the plan end-to-end. For each "Must Have": verify implementation exists. For each "Must NOT Have": search codebase for forbidden patterns. Check evidence files in .sisyphus/evidence/. Compare deliverables against plan.
+  Read the plan end-to-end. For each "Must Have": verify implementation exists. For each "Must NOT Have": search codebase for forbidden patterns. Check evidence files in .omo/evidence/. Compare deliverables against plan.
   Output: `Must Have [N/N] | Must NOT Have [N/N] | Tasks [N/N] | VERDICT: APPROVE/REJECT`
 
 - [ ] F2. **Code Quality Review** — `unspecified-high`
@@ -636,7 +636,7 @@ Wave FINAL (Verification — parallel):
   Output: `Build [PASS/FAIL] | Tests [N pass/N fail] | VERDICT`
 
 - [ ] F3. **Real Manual QA** — `unspecified-high`
-  Execute EVERY QA scenario from EVERY task. Test cross-task integration. Save to `.sisyphus/evidence/final-qa/`.
+  Execute EVERY QA scenario from EVERY task. Test cross-task integration. Save to `.omo/evidence/final-qa/`.
   Output: `Scenarios [N/N pass] | Integration [N/N] | VERDICT`
 
 - [ ] F4. **Scope Fidelity Check** — `deep`

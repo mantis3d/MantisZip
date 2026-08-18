@@ -235,7 +235,7 @@ Wave 4 (测试 — 全部后端验证):
   - **Blocked By**: None
 
   **References**:
-  - `.sisyphus/plans/archived/explorer-path-switcher.md` — 参考 COM 调用模式和 URL 解析逻辑
+  - `.omo/plans/archived/explorer-path-switcher.md` — 参考 COM 调用模式和 URL 解析逻辑
   - `src/MantisZip.UI/SystemIconHelper.cs:36-41` — 现有 P/Invoke 模式（`[DllImport]` 用法）
   - `src/MantisZip.Core/Utils/CoreLog.cs:13` — CoreLog.Trace() 日志记录
 
@@ -255,7 +255,7 @@ Wave 4 (测试 — 全部后端验证):
       1. 编写简短控制台程序调用 ExplorerWindowTracker.GetOpenExplorerWindows()
       2. 输出结果
     Expected Result: 返回非空列表，路径正确（如 D:\）
-    Evidence: .sisyphus/evidence/task-1-explorer-list.txt
+    Evidence: .omo/evidence/task-1-explorer-list.txt
 
   Scenario: COM 不可用时优雅降级
     Tool: 代码审查 + dotnet test
@@ -264,7 +264,7 @@ Wave 4 (测试 — 全部后端验证):
       1. 检查 COM 调用是否包裹在 try/catch 中
       2. 单元测试验证空列表返回
     Expected Result: COMException、SecurityException 时返回空列表
-    Evidence: .sisyphus/evidence/task-1-com-error-handling.txt
+    Evidence: .omo/evidence/task-1-com-error-handling.txt
   ```
 
   **Commit**: YES
@@ -383,7 +383,7 @@ Wave 4 (测试 — 全部后端验证):
       6. Reorder(1, 0)
       7. Remove("E:\\Photos")
     Expected Result: 所有操作成功，JSON 文件内容正确
-    Evidence: .sisyphus/evidence/task-2-favorite-crud.txt
+    Evidence: .omo/evidence/task-2-favorite-crud.txt
 
   Scenario: 系统路径隐藏/显示
     Tool: Bash (dotnet test)
@@ -396,7 +396,7 @@ Wave 4 (测试 — 全部后端验证):
       5. SetSystemPathHidden("Desktop", false) → Save()
       6. GetAll().Count → 3
     Expected Result: 隐藏状态持久化，重启后保持
-    Evidence: .sisyphus/evidence/task-2-system-path-hide.txt
+    Evidence: .omo/evidence/task-2-system-path-hide.txt
 
   Scenario: 跨重启持久化
     Tool: Bash
@@ -406,7 +406,7 @@ Wave 4 (测试 — 全部后端验证):
       2. Save()
       3. 重新 Load()
     Expected Result: 用户收藏和隐藏状态都正确持久化
-    Evidence: .sisyphus/evidence/task-2-favorite-persist.txt
+    Evidence: .omo/evidence/task-2-favorite-persist.txt
   ```
 
   **Commit**: YES
@@ -480,7 +480,7 @@ Wave 4 (测试 — 全部后端验证):
       3. Record("D:\\A") → [A, C, B]（移到顶部）
       4. 添加 52 条 → 只保留 50 条
     Expected Result: 去重正确，排序正确，数量限制正确
-    Evidence: .sisyphus/evidence/task-3-history-basic.txt
+    Evidence: .omo/evidence/task-3-history-basic.txt
   ```
 
   **Commit**: YES
@@ -631,7 +631,7 @@ Wave 4 (测试 — 全部后端验证):
       1. dotnet build
       2. 启动应用，打开压缩对话框
     Expected Result: QuickPathControl 正常显示，TextBox + [⭐][🕐][🪟][浏览] 横排
-    Evidence: .sisyphus/evidence/task-4-control-appearance.png
+    Evidence: .omo/evidence/task-4-control-appearance.png
 
   Scenario: 收藏下拉含系统路径
     Tool: Bash（启动+截图）
@@ -639,7 +639,7 @@ Wave 4 (测试 — 全部后端验证):
     Steps:
       1. 点击 [⭐] 按钮
     Expected Result: 下拉菜单显示 🔒桌面、🔒文档、🔒下载，然后「项目」「管理收藏…」
-    Evidence: .sisyphus/evidence/task-4-fav-dropdown.png
+    Evidence: .omo/evidence/task-4-fav-dropdown.png
 
   Scenario: 隐藏的系统路径不出现
     Tool: Bash（启动+截图）
@@ -647,7 +647,7 @@ Wave 4 (测试 — 全部后端验证):
     Steps:
       1. 点击 [⭐] 按钮
     Expected Result: 下拉菜单不显示桌面，只显示文档、下载和用户收藏
-    Evidence: .sisyphus/evidence/task-4-hidden-path.png
+    Evidence: .omo/evidence/task-4-hidden-path.png
 
   Scenario: 选择路径自动填入
     Tool: Bash（启动+截图）
@@ -655,7 +655,7 @@ Wave 4 (测试 — 全部后端验证):
     Steps:
       1. 点击 [⭐] → 点击「桌面」
     Expected Result: PathTextBox 内容变为 C:\Users\Admin\Desktop
-    Evidence: .sisyphus/evidence/task-4-path-filled.png
+    Evidence: .omo/evidence/task-4-path-filled.png
 
   Scenario: 浏览按钮（文件夹模式）
     Tool: Bash（启动+截图）
@@ -663,7 +663,7 @@ Wave 4 (测试 — 全部后端验证):
     Steps:
       1. 点击 [浏览]
     Expected Result: VistaFolderBrowserDialog 弹出
-    Evidence: .sisyphus/evidence/task-4-browse-folder.png
+    Evidence: .omo/evidence/task-4-browse-folder.png
 
   Scenario: 空状态显示
     Tool: Bash（启动+截图）
@@ -671,7 +671,7 @@ Wave 4 (测试 — 全部后端验证):
     Steps:
       1. 分别点击三个按钮
     Expected Result: 显示「暂无收藏」「暂无历史记录」「没有打开的文件夹」
-    Evidence: .sisyphus/evidence/task-4-empty-states.png
+    Evidence: .omo/evidence/task-4-empty-states.png
   ```
 
   **Commit**: YES
@@ -768,7 +768,7 @@ Wave 4 (测试 — 全部后端验证):
       3. 通过收藏/历史/资源管理器选择一个路径
       4. 点击确认
     Expected Result: 路径回传到调用者，对话框关闭
-    Evidence: .sisyphus/evidence/task-5-dialog-flow.png
+    Evidence: .omo/evidence/task-5-dialog-flow.png
 
   Scenario: 取消操作
     Tool: Bash
@@ -776,7 +776,7 @@ Wave 4 (测试 — 全部后端验证):
     Steps:
       1. 点击取消 / 按 Esc
     Expected Result: DialogResult=false，SelectedPath=null
-    Evidence: .sisyphus/evidence/task-5-dialog-cancel.png
+    Evidence: .omo/evidence/task-5-dialog-cancel.png
   ```
 
   **Commit**: YES
@@ -892,7 +892,7 @@ Wave 4 (测试 — 全部后端验证):
       7. 下移「照片」
       8. 再次显示桌面
     Expected Result: 每一步操作后列表和数据正确同步
-    Evidence: .sisyphus/evidence/task-6-favmanager-full.png
+    Evidence: .omo/evidence/task-6-favmanager-full.png
 
   Scenario: 系统路径不可删除
     Tool: Bash
@@ -900,7 +900,7 @@ Wave 4 (测试 — 全部后端验证):
     Steps:
       1. 选中系统路径行
     Expected Result: 没有「删除」按钮，只有「隐藏/显示」按钮，名称不可编辑
-    Evidence: .sisyphus/evidence/task-6-system-path-protected.png
+    Evidence: .omo/evidence/task-6-system-path-protected.png
 
   Scenario: 重复路径提示
     Tool: Bash
@@ -908,7 +908,7 @@ Wave 4 (测试 — 全部后端验证):
     Steps:
       1. 再次添加同名路径
     Expected Result: 提示「该路径已存在」
-    Evidence: .sisyphus/evidence/task-6-favmanager-duplicate.png
+    Evidence: .omo/evidence/task-6-favmanager-duplicate.png
   ```
 
   **Commit**: YES
@@ -1052,7 +1052,7 @@ Wave 4 (测试 — 全部后端验证):
       4. 点击 [⭐] 验证收藏下拉
       5. 点击 [浏览] 验证 SaveFileDialog
     Expected Result: 双行布局正确显示，QuickPathControl 完整功能正常
-    Evidence: .sisyphus/evidence/task-7-compress-layout.png
+    Evidence: .omo/evidence/task-7-compress-layout.png
 
   Scenario: 手动模式 → 完整保存流程
     Tool: Bash
@@ -1062,7 +1062,7 @@ Wave 4 (测试 — 全部后端验证):
       2. 文件名栏将 "archive" 改为 "mybackup"
       3. 点击压缩
     Expected Result: 压缩包保存到 D:\Output\mybackup.zip
-    Evidence: .sisyphus/evidence/task-7-compress-flow.png
+    Evidence: .omo/evidence/task-7-compress-flow.png
 
   Scenario: 分卷模式禁用
     Tool: Bash
@@ -1070,7 +1070,7 @@ Wave 4 (测试 — 全部后端验证):
     Steps:
       1. 切换输出模式为「分卷压缩」
     Expected Result: QuickPathControl 全部按钮禁用，文件名 TextBox 禁用
-    Evidence: .sisyphus/evidence/task-7-compress-readonly.png
+    Evidence: .omo/evidence/task-7-compress-readonly.png
 
   Scenario: 格式切换自动更新扩展名
     Tool: Bash
@@ -1081,7 +1081,7 @@ Wave 4 (测试 — 全部后端验证):
       3. 切换到 tar.gz → FileName 变为 "backup.tar.gz"
       4. 再切回 ZIP → FileName 变为 "backup.zip"
     Expected Result: 每次切换格式时，文件名中的扩展名自动替换，保留用户输入的文件基本名
-    Evidence: .sisyphus/evidence/task-7-format-switch.png
+    Evidence: .omo/evidence/task-7-format-switch.png
   ```
 
   **Commit**: YES
@@ -1159,7 +1159,7 @@ Wave 4 (测试 — 全部后端验证):
       3. 点击 [⭐][🕐][🪟] 验证下拉菜单
       4. 点击 [浏览] 验证 VistaFolderBrowserDialog
     Expected Result: QuickPathControl 正常工作，文件夹模式
-    Evidence: .sisyphus/evidence/task-8-extract-qpc.png
+    Evidence: .omo/evidence/task-8-extract-qpc.png
 
   Scenario: 非手动模式按钮禁用
     Tool: Bash
@@ -1167,7 +1167,7 @@ Wave 4 (测试 — 全部后端验证):
     Steps:
       1. 选择「解压到此处」
     Expected Result: QuickPathControl 按钮禁用，路径显示自动计算的同名目录
-    Evidence: .sisyphus/evidence/task-8-extract-readonly.png
+    Evidence: .omo/evidence/task-8-extract-readonly.png
   ```
 
   **Commit**: YES
@@ -1240,7 +1240,7 @@ Wave 4 (测试 — 全部后端验证):
     Steps:
       1. MainWindow → 工具栏 → 解压
     Expected Result: 弹出 QuickPathDialog 而非 VistaFolderBrowserDialog
-    Evidence: .sisyphus/evidence/task-9-extract-dialog.png
+    Evidence: .omo/evidence/task-9-extract-dialog.png
 
   Scenario: AddFolderButton 替换
     Tool: Bash（截图）
@@ -1248,7 +1248,7 @@ Wave 4 (测试 — 全部后端验证):
     Steps:
       1. 点击「添加文件夹」
     Expected Result: QuickPathDialog 弹出
-    Evidence: .sisyphus/evidence/task-9-addfolder-dialog.png
+    Evidence: .omo/evidence/task-9-addfolder-dialog.png
   ```
 
   **Commit**: YES
@@ -1324,7 +1324,7 @@ Wave 4 (测试 — 全部后端验证):
     Steps:
       1. dotnet test tests/MantisZip.Tests
     Expected Result: 全部测试通过（新增 + 原有）
-    Evidence: .sisyphus/evidence/task-10-test-results.txt
+    Evidence: .omo/evidence/task-10-test-results.txt
   ```
 
   **Commit**: YES
@@ -1377,7 +1377,7 @@ Wave 4 (测试 — 全部后端验证):
     Steps:
       1. dotnet test tests/MantisZip.Tests
     Expected Result: 全部测试通过
-    Evidence: .sisyphus/evidence/task-11-test-results.txt
+    Evidence: .omo/evidence/task-11-test-results.txt
   ```
 
   **Commit**: YES
@@ -1417,7 +1417,7 @@ Wave 4 (测试 — 全部后端验证):
 
   **References**:
   - 所有 T1-T11 的交付物
-  - `.sisyphus/evidence/` 下所有之前任务的证据
+  - `.omo/evidence/` 下所有之前任务的证据
 
   **Acceptance Criteria**:
   - [ ] 所有 QA 场景通过
@@ -1439,7 +1439,7 @@ Wave 4 (测试 — 全部后端验证):
       7. 点击浏览 → SaveFileDialog 弹出
       8. 选择路径 → 确认压缩
     Expected Result: 压缩成功，路径记入历史
-    Evidence: .sisyphus/evidence/task-12-e2e-compress.png
+    Evidence: .omo/evidence/task-12-e2e-compress.png
 
   Scenario: 端到端解压流程
     Tool: Bash（截图）
@@ -1450,7 +1450,7 @@ Wave 4 (测试 — 全部后端验证):
       3. 通过已打开窗口选择路径
       4. 确认解压
     Expected Result: 解压成功
-    Evidence: .sisyphus/evidence/task-12-e2e-extract.png
+    Evidence: .omo/evidence/task-12-e2e-extract.png
 
   Scenario: 主题切换
     Tool: Bash（截图）
@@ -1458,7 +1458,7 @@ Wave 4 (测试 — 全部后端验证):
       1. 在亮色和暗色之间切换
       2. 检查 QuickPathControl、QuickPathDialog、FavoriteManagerWindow
     Expected Result: 两种主题下 UI 均正常
-    Evidence: .sisyphus/evidence/task-12-theme-light.png + task-12-theme-dark.png
+    Evidence: .omo/evidence/task-12-theme-light.png + task-12-theme-dark.png
 
   Scenario: 收藏管理
     Tool: Bash（截图）
@@ -1467,7 +1467,7 @@ Wave 4 (测试 — 全部后端验证):
       2. 增删改排序全部操作一次
       3. 关闭窗口 → 重新打开
     Expected Result: 数据持久化正确
-    Evidence: .sisyphus/evidence/task-12-favmanager.png
+    Evidence: .omo/evidence/task-12-favmanager.png
 
   Scenario: 空状态
     Tool: Bash（截图）
@@ -1476,12 +1476,12 @@ Wave 4 (测试 — 全部后端验证):
       1. 打开压缩对话框
       2. 分别点击三个按钮
     Expected Result: 显示友好提示文字
-    Evidence: .sisyphus/evidence/task-12-empty-states.png
+    Evidence: .omo/evidence/task-12-empty-states.png
   ```
 
   **Commit**: YES
   - Message: `test: add end-to-end QA verification for QuickPathControl system`
-  - Files: `.sisyphus/evidence/task-12-*`
+  - Files: `.omo/evidence/task-12-*`
 
 ---
 

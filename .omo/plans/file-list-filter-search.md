@@ -104,7 +104,7 @@
 - **Framework**: xUnit (.NET 9)
 
 ### QA Policy
-Every task MUST include agent-executed QA scenarios. Evidence saved to `.sisyphus/evidence/`.
+Every task MUST include agent-executed QA scenarios. Evidence saved to `.omo/evidence/`.
 
 - **UI changes**: Build and launch the app (`dotnet run --project src/MantisZip.UI/MantisZip.UI.csproj`), then manually verify control rendering (MantisZip 是 WPF 桌面应用，不能使用 Playwright 等 Web 工具)
 - **Logic changes**: Use Bash to run unit tests
@@ -211,7 +211,7 @@ Wave 3 (Integration + Tests):
     Steps:
       1. dotnet build src/MantisZip.UI/MantisZip.UI.csproj
     Expected Result: Build succeeds (0 errors)
-    Evidence: .sisyphus/evidence/task-1-json-valid.txt
+    Evidence: .omo/evidence/task-1-json-valid.txt
   ```
 
   **Commit**: YES
@@ -266,7 +266,7 @@ Wave 3 (Integration + Tests):
     Steps:
       1. dotnet test tests/MantisZip.Tests/
     Expected Result: Build + test run succeeds (0 failures)
-    Evidence: .sisyphus/evidence/task-2-test-infra.txt
+    Evidence: .omo/evidence/task-2-test-infra.txt
   ```
 
   **Commit**: YES（与 Task 7 或 Task 8 合并时提交）
@@ -329,7 +329,7 @@ Wave 3 (Integration + Tests):
       1. 创建测试代码调用 FilterFiles 逻辑（showSubfolders=true）
       2. 断言结果不含 IsDirectory == true 的条目
     Expected Result: 所有返回条目的 IsDirectory == false
-    Evidence: .sisyphus/evidence/task-3-flat-view.txt
+    Evidence: .omo/evidence/task-3-flat-view.txt
 
   Scenario: 默认模式行为不变
     Tool: Bash
@@ -338,7 +338,7 @@ Wave 3 (Integration + Tests):
       1. 调用 FilterFiles 逻辑（showSubfolders=false）
       2. 检查结果包含目录条目
     Expected Result: 默认模式产生隐式目录，与现有行为一致
-    Evidence: .sisyphus/evidence/task-3-default-mode.txt
+    Evidence: .omo/evidence/task-3-default-mode.txt
   ```
 
   **Commit**: NO（随 Task 4 或 Task 7 一起提交）
@@ -418,7 +418,7 @@ Wave 3 (Integration + Tests):
       1. dotnet build
       2. 验证 XAML 中 ShowSubfoldersBtn 存在且有已定义的事件处理
     Expected Result: 构建通过，控件正确连接事件
-    Evidence: .sisyphus/evidence/task-4-toggle-btn.txt
+    Evidence: .omo/evidence/task-4-toggle-btn.txt
   ```
 
   **Commit**: YES
@@ -518,7 +518,7 @@ Wave 3 (Integration + Tests):
     Steps:
       1. dotnet build
     Expected Result: 构建通过，无 XAML 解析错误
-    Evidence: .sisyphus/evidence/task-5-filter-bar-ui.txt
+    Evidence: .omo/evidence/task-5-filter-bar-ui.txt
   ```
 
   **Commit**: NO（与 Task 6 一起提交）
@@ -635,7 +635,7 @@ Wave 3 (Integration + Tests):
       2. 断言结果包含 "src/utils/helper.cs"
       3. 断言结果不包含 "readme.txt"
     Expected Result: 仅匹配文件名的条目保留
-    Evidence: .sisyphus/evidence/task-6-text-filter.txt
+    Evidence: .omo/evidence/task-6-text-filter.txt
 
   Scenario: 日期范围过滤
     Tool: Bash
@@ -644,7 +644,7 @@ Wave 3 (Integration + Tests):
       1. 调用 ApplyFilters(items, new SearchFilters { DateFrom = 2026-01-01, DateTo = 2026-06-30 })
       2. 断言只有此区间内的文件被保留
     Expected Result: 日期过滤正确
-    Evidence: .sisyphus/evidence/task-6-date-filter.txt
+    Evidence: .omo/evidence/task-6-date-filter.txt
 
   Scenario: 大小范围过滤
     Tool: Bash
@@ -653,7 +653,7 @@ Wave 3 (Integration + Tests):
       1. 调用 ApplyFilters(items, new SearchFilters { SizeMin = 1000, SizeMax = 100000 })
       2. 断言只有此大小区间内的文件被保留
     Expected Result: 大小过滤正确
-    Evidence: .sisyphus/evidence/task-6-size-filter.txt
+    Evidence: .omo/evidence/task-6-size-filter.txt
 
   Scenario: 组合过滤（AND）
     Tool: Bash
@@ -662,7 +662,7 @@ Wave 3 (Integration + Tests):
       1. 调用 ApplyFilters(items, new SearchFilters { Text = "helper", SizeMin = 500 })
       2. 断言只有同时满足文字+大小的条目保留
     Expected Result: 组合 AND 过滤正确
-    Evidence: .sisyphus/evidence/task-6-combined-filter.txt
+    Evidence: .omo/evidence/task-6-combined-filter.txt
 
   Scenario: 空过滤返回全部
     Tool: Bash
@@ -671,7 +671,7 @@ Wave 3 (Integration + Tests):
       1. 调用 ApplyFilters(items, new SearchFilters())
       2. 断言结果数量 == 8
     Expected Result: 不设置任何过滤时返回全部
-    Evidence: .sisyphus/evidence/task-6-empty-filters.txt
+    Evidence: .omo/evidence/task-6-empty-filters.txt
   ```
 
   **Commit**: YES（与 Task 5 一起）
@@ -726,7 +726,7 @@ Wave 3 (Integration + Tests):
     Steps:
       1. dotnet test tests/MantisZip.Tests/ --filter "FullyQualifiedName~ShowSubfolders"
     Expected Result: 5 passed, 0 failed
-    Evidence: .sisyphus/evidence/task-7-subfolder-tests.txt
+    Evidence: .omo/evidence/task-7-subfolder-tests.txt
   ```
 
   **Commit**: YES（与 Task 2、3、8 一起提交→Commit 2）
@@ -791,7 +791,7 @@ Wave 3 (Integration + Tests):
     Steps:
       1. dotnet test tests/MantisZip.Tests/ --filter "FullyQualifiedName~Filter_"
     Expected Result: 15 passed, 0 failed
-    Evidence: .sisyphus/evidence/task-8-all-filter-tests.txt
+    Evidence: .omo/evidence/task-8-all-filter-tests.txt
   ```
 
   **Commit**: YES（与 Task 2、3、7 一起提交→Commit 2；不随 Task 5、6 提交，避免文件冲突）
@@ -804,7 +804,7 @@ Wave 3 (Integration + Tests):
 ## Final Verification Wave
 
 - [x] F1. **Plan Compliance Audit** — `oracle`
-  Read the plan end-to-end. For each "Must Have": verify implementation exists (read file, run command). For each "Must NOT Have": search codebase for forbidden patterns. Check evidence files exist in .sisyphus/evidence/. Compare deliverables against plan.
+  Read the plan end-to-end. For each "Must Have": verify implementation exists (read file, run command). For each "Must NOT Have": search codebase for forbidden patterns. Check evidence files exist in .omo/evidence/. Compare deliverables against plan.
   Output: `Must Have [N/N] | Must NOT Have [N/N] | Tasks [N/N] | VERDICT: APPROVE/REJECT`
 
 - [x] F2. **Code Quality Review** — `unspecified-high`
@@ -1028,7 +1028,7 @@ Wave 3 (Integration + Tests):
     Steps:
       1. dotnet build src/MantisZip.UI/MantisZip.UI.csproj
     Expected Result: Build succeeded (0 errors)
-    Evidence: .sisyphus/evidence/task-e1-ui-build.txt
+    Evidence: .omo/evidence/task-e1-ui-build.txt
 
   Scenario: 高度验证（自动适配）
     验证目标：区域 1 两行布局的总高度应与区域 2/3 一致
@@ -1039,7 +1039,7 @@ Wave 3 (Integration + Tests):
       2. 点击筛选按钮显示 FilterBar
       3. 观察文字区、日期区、大小区的行高是否对齐
     Expected Result: 三块区域的垂直高度一致（~54px），边界对齐
-    Evidence: .sisyphus/evidence/task-e1-layout.png
+    Evidence: .omo/evidence/task-e1-layout.png
   ```
 
   **Commit**: NO（与 E2 一起）
@@ -1170,7 +1170,7 @@ Wave 3 (Integration + Tests):
     Steps:
       1. 调用 ApplyFilters(items, new SearchFilters { Text = "helper", MatchMode = Substring })
     Expected Result: 结果包含 "src/utils/helper.cs"，不包含 "readme.txt"（与之前相同）
-    Evidence: .sisyphus/evidence/task-e2-substring-regression.txt
+    Evidence: .omo/evidence/task-e2-substring-regression.txt
 
   Scenario: 通配符 *.cs
     Tool: Bash
@@ -1179,7 +1179,7 @@ Wave 3 (Integration + Tests):
       1. 调用 ApplyFilters(items, new SearchFilters { Text = "*.cs", MatchMode = Wildcard })
       2. 断言结果只包含 .cs 文件
     Expected Result: main.cs, util.cs, helper.cs, converter.cs 被匹配
-    Evidence: .sisyphus/evidence/task-e2-wildcard-cs.txt
+    Evidence: .omo/evidence/task-e2-wildcard-cs.txt
 
   Scenario: 排除文字过滤
     Tool: Bash
@@ -1188,7 +1188,7 @@ Wave 3 (Integration + Tests):
       1. 调用 ApplyFilters(items, new SearchFilters { Text = "*.cs", ExcludeText = "test", MatchMode = Wildcard })
       2. 断言结果不包含名称含 "test" 的 .cs 文件
     Expected Result: 排除正确生效
-    Evidence: .sisyphus/evidence/task-e2-exclude.txt
+    Evidence: .omo/evidence/task-e2-exclude.txt
   ```
 
   **Commit**: YES（与 E1 + E3 一起）
@@ -1242,7 +1242,7 @@ Wave 3 (Integration + Tests):
     Steps:
       1. dotnet build
     Expected Result: Build succeeded
-    Evidence: .sisyphus/evidence/task-e3-json.txt
+    Evidence: .omo/evidence/task-e3-json.txt
   ```
 
   **Commit**: YES（与 E1 + E2 一起，见 E2 提交信息）
@@ -1302,7 +1302,7 @@ Wave 3 (Integration + Tests):
     Steps:
       1. dotnet test tests/MantisZip.Tests/
     Expected Result: >26 passed, 0 failed
-    Evidence: .sisyphus/evidence/task-e4-all-tests.txt
+    Evidence: .omo/evidence/task-e4-all-tests.txt
 
   Scenario: 仅通配符测试
     Tool: Bash
@@ -1310,7 +1310,7 @@ Wave 3 (Integration + Tests):
     Steps:
       1. dotnet test tests/MantisZip.Tests/ --filter "FullyQualifiedName~Wildcard"
     Expected Result: All wildcard tests pass
-    Evidence: .sisyphus/evidence/task-e4-wildcard-tests.txt
+    Evidence: .omo/evidence/task-e4-wildcard-tests.txt
 
   Scenario: 仅排除测试
     Tool: Bash
@@ -1318,7 +1318,7 @@ Wave 3 (Integration + Tests):
     Steps:
       1. dotnet test tests/MantisZip.Tests/ --filter "FullyQualifiedName~Exclude"
     Expected Result: All exclude tests pass
-    Evidence: .sisyphus/evidence/task-e4-exclude-tests.txt
+    Evidence: .omo/evidence/task-e4-exclude-tests.txt
   ```
 
   **Commit**: YES（独立提交）

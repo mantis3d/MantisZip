@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for completion tracking.
 >
-> **Design doc**: `.sisyphus/drafts/custom-columns-design.md`
+> **Design doc**: `.omo/drafts/custom-columns-design.md`
 
 ---
 
@@ -183,7 +183,7 @@ Critical Path: T1 → T4 → T8/T9/T10 → T11-T14
       3. 反序列化回对象，验证所有属性一致
       4. 测试旧的 JSON（无 ColumnId）反序列化时自动生成 GUID
     Expected Result: 序列化-反序列化 round-trip 无误
-    Evidence: .sisyphus/evidence/task-1-roundtrip.txt
+    Evidence: .omo/evidence/task-1-roundtrip.txt
 
   Scenario: MetadataKey 注册表完整性
     Tool: Bash (dotnet test)
@@ -192,7 +192,7 @@ Critical Path: T1 → T4 → T8/T9/T10 → T11-T14
       2. 验证每条有 DisplayName 和 DataType
       3. 验证没有重复的 MetadataKey
     Expected Result: 所有条目合法，无重复
-    Evidence: .sisyphus/evidence/task-1-registry.txt
+    Evidence: .omo/evidence/task-1-registry.txt
   ```
 
   **Commit**: YES
@@ -246,7 +246,7 @@ Critical Path: T1 → T4 → T8/T9/T10 → T11-T14
       4. 验证 PropertyChanged 被正确触发（订阅事件检查）
       5. 测试 MetadataLoading / MetadataFailed 跟踪
     Expected Result: 字典读写正常，PropertyChanged 事件正确触发
-    Evidence: .sisyphus/evidence/task-2-metadata.txt
+    Evidence: .omo/evidence/task-2-metadata.txt
   ```
 
   **Commit**: YES (with Task 1)
@@ -300,7 +300,7 @@ Critical Path: T1 → T4 → T8/T9/T10 → T11-T14
       5. Time: 125 → "02:05"
       6. null → "—"
     Expected Result: 所有格式符合预期
-    Evidence: .sisyphus/evidence/task-3-formats.txt
+    Evidence: .omo/evidence/task-3-formats.txt
   ```
 
   **Commit**: YES (with Task 1)
@@ -364,7 +364,7 @@ Critical Path: T1 → T4 → T8/T9/T10 → T11-T14
       3. 调用 ExtractAsync("Duration", ...) 验证路由到时长提取
       4. 调用 ExtractAsync("INVALID_KEY", ...) 验证返回 null
     Expected Result: 路由正确，无效 key 优雅降级
-    Evidence: .sisyphus/evidence/task-4-routing.txt
+    Evidence: .omo/evidence/task-4-routing.txt
 
   Scenario: 加密条目降级
     Tool: Bash
@@ -372,7 +372,7 @@ Critical Path: T1 → T4 → T8/T9/T10 → T11-T14
       1. 模拟加密条目提取抛 NotSupportedException
       2. 验证返回 null（不崩溃）
     Expected Result: null 而非异常
-    Evidence: .sisyphus/evidence/task-4-encrypted.txt
+    Evidence: .omo/evidence/task-4-encrypted.txt
   ```
 
   **Commit**: YES
@@ -417,7 +417,7 @@ Critical Path: T1 → T4 → T8/T9/T10 → T11-T14
       2. 调用 ExtractAsync("Width", ...) → 1920
       3. 调用 ExtractAsync("Height", ...) → 1080
     Expected Result: 尺寸正确
-    Evidence: .sisyphus/evidence/task-5-dimensions.txt
+    Evidence: .omo/evidence/task-5-dimensions.txt
   ```
 
   **Commit**: YES (with Task 4)
@@ -465,7 +465,7 @@ Critical Path: T1 → T4 → T8/T9/T10 → T11-T14
       2. 验证 DurationSec 返回正确的秒数（整数）
       3. 验证 Duration 在 Converter 中格式化为 MM:SS
     Expected Result: 时长提取和格式化正确
-    Evidence: .sisyphus/evidence/task-6-duration.txt
+    Evidence: .omo/evidence/task-6-duration.txt
   ```
 
   **Commit**: YES (with Task 4)
@@ -515,7 +515,7 @@ Critical Path: T1 → T4 → T8/T9/T10 → T11-T14
       2. 调用 ExtractAsync("WordCount", ...) → 100
       3. 创建 15MB 大文件 → 返回 null（跳过）
     Expected Result: 字数正确，大文件跳过
-    Evidence: .sisyphus/evidence/task-7-wordcount.txt
+    Evidence: .omo/evidence/task-7-wordcount.txt
   ```
 
   **Commit**: YES (with Task 4)
@@ -587,7 +587,7 @@ Critical Path: T1 → T4 → T8/T9/T10 → T11-T14
       3. 右键列标题 → 点击"自定义列…"
       4. 对话框弹出，布局正确
     Expected Result: 对话框正常打开，主题应用正确
-    Evidence: .sisyphus/evidence/task-8-dialog.png
+    Evidence: .omo/evidence/task-8-dialog.png
   ```
 
   **Commit**: YES
@@ -650,7 +650,7 @@ Critical Path: T1 → T4 → T8/T9/T10 → T11-T14
       7. 点 ↑ 调整顺序 → 点 × 删除第二行
       8. 点确定 → 对话框关闭，返回配置
     Expected Result: 添加/删除/排序正确
-    Evidence: .sisyphus/evidence/task-9-dialog-flow.png
+    Evidence: .omo/evidence/task-9-dialog-flow.png
   ```
 
   **Commit**: YES (with Task 8)
@@ -735,7 +735,7 @@ Critical Path: T1 → T4 → T8/T9/T10 → T11-T14
       4. 等加载完成 → 值显示
       5. 重新打开档案 → 自定义列仍在
     Expected Result: 列生成正确，值懒加载后显示，重启持久化
-    Evidence: .sisyphus/evidence/task-10-columns.png
+    Evidence: .omo/evidence/task-10-columns.png
 
   Scenario: 列右键菜单显示自定义列
     Tool: Build + run app
@@ -743,7 +743,7 @@ Critical Path: T1 → T4 → T8/T9/T10 → T11-T14
       1. 右键列标题 → 弹出菜单包含自定义列名称
       2. 可以切换显隐
     Expected Result: 右键菜单包含所有自定义列
-    Evidence: .sisyphus/evidence/task-10-contextmenu.png
+    Evidence: .omo/evidence/task-10-contextmenu.png
   ```
 
   **Commit**: YES
@@ -797,7 +797,7 @@ Critical Path: T1 → T4 → T8/T9/T10 → T11-T14
       3. 点击 → ChooseColumnsDialog 弹出
       4. 点击确定 → 列刷新
     Expected Result: 入口正常，对话框正确打开
-    Evidence: .sisyphus/evidence/task-11-menu.png
+    Evidence: .omo/evidence/task-11-menu.png
   ```
 
   **Commit**: YES (with Task 10)
@@ -845,7 +845,7 @@ Critical Path: T1 → T4 → T8/T9/T10 → T11-T14
       3. 再次点击 → 降序排列
       4. 验证排序结果正确（数值序，非字典序）
     Expected Result: 排序正确
-    Evidence: .sisyphus/evidence/task-12-sort.png
+    Evidence: .omo/evidence/task-12-sort.png
   ```
 
   **Commit**: YES (with Task 10)
@@ -907,7 +907,7 @@ Critical Path: T1 → T4 → T8/T9/T10 → T11-T14
       1. 打开含加密条目的压缩包
       2. 加密条目的自定义列显示 "—" 而非空白
     Expected Result: 降级正确
-    Evidence: .sisyphus/evidence/task-13-cleanup.txt
+    Evidence: .omo/evidence/task-13-cleanup.txt
   ```
 
   **Commit**: YES (with Task 10)
@@ -931,7 +931,7 @@ Critical Path: T1 → T4 → T8/T9/T10 → T11-T14
     - 主菜单 "查看 → 自定义列…" 工作
     - 没有内存泄漏（临时文件清理）
     - 没有 UI 线程阻塞（懒加载）
-  - 保存证据到 `.sisyphus/evidence/`
+  - 保存证据到 `.omo/evidence/`
 
   **Must NOT do**:
   - 不需要自动化 UI 测试 — 手动验证足够（当前项目无测试框架）
@@ -964,7 +964,7 @@ Critical Path: T1 → T4 → T8/T9/T10 → T11-T14
       6. 关闭应用 → 重新打开 → 自定义列还在
       7. 右键列标题 → 关闭某个自定义列 → 它隐藏了
     Expected Result: 所有功能正常
-    Evidence: .sisyphus/evidence/task-14-e2e.png
+    Evidence: .omo/evidence/task-14-e2e.png
   ```
 
   **Commit**: NO (验证任务)

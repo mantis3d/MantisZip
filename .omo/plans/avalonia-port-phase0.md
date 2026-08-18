@@ -211,7 +211,7 @@ src/MantisZip.UI.Avalonia/                    # 新目录，全是新建文件
 - [x] **7.3** `git merge master` 将 master 最新改动合并到 avalonia-port
 - [x] **7.4** 解决可能的冲突（Core/ 文件，概率低）
 - [x] **7.5** 验证：merge 后 `dotnet build` 通过，Avalonia 版仍可运行
-- [x] **7.6** 更新 `.sisyphus/plans/cross-platform-port.md` 状态标记 Phase 0 完成
+- [x] **7.6** 更新 `.omo/plans/cross-platform-port.md` 状态标记 Phase 0 完成
 
 ---
 

@@ -188,7 +188,7 @@ Wave 1 (Single task):
       2. 检查 exit code 是否为 0
       3. 检查输出文件 `installer\MantisZip-*-Setup-NoDotNet.exe` 是否存在
     Expected Result: 编译成功，exit code 0，输出 exe 存在
-    Evidence: .sisyphus/evidence/task-1-iscc-compile.txt
+    Evidence: .omo/evidence/task-1-iscc-compile.txt
 
   Scenario: git diff 确认仅更改了 installer.iss
     Tool: Bash (PowerShell)
@@ -198,7 +198,7 @@ Wave 1 (Single task):
       2. 确认只有 `installer.iss` 被改动
       3. `git diff installer-selfcontained.iss` — 确认无改动
     Expected Result: 只有 installer.iss 被修改，installer-selfcontained.iss 无变更
-    Evidence: .sisyphus/evidence/task-1-git-diff.txt
+    Evidence: .omo/evidence/task-1-git-diff.txt
 
   Scenario: .NET 检测函数逻辑验证（通过代码审查）
     Tool: Bash (PowerShell) — 正则提取函数体分析
@@ -209,7 +209,7 @@ Wave 1 (Single task):
       3. 确认同时检查了 HKLM 和 HKLM32
       4. 确认 .NET 处理在 CurStepChanged 中位于 WebView2 之前
     Expected Result: 函数结构符合预期
-    Evidence: .sisyphus/evidence/task-1-code-review.txt
+    Evidence: .omo/evidence/task-1-code-review.txt
 
   Scenario: 下载 URL 可达性验证
     Tool: Bash (PowerShell)
@@ -218,14 +218,14 @@ Wave 1 (Single task):
       1. `curl.exe -I --max-time 10 https://aka.ms/dotnet/9.0/windowsdesktop-runtime-win-x64.exe`
       2. 检查 HTTP 状态码是否为 302/301（重定向）或 200
     Expected Result: URL 可访问，返回重定向或直接下载
-    Evidence: .sisyphus/evidence/task-1-url-check.txt
+    Evidence: .omo/evidence/task-1-url-check.txt
   ```
 
   **Evidence to Capture**:
-  - [ ] `.sisyphus/evidence/task-1-iscc-compile.txt`
-  - [ ] `.sisyphus/evidence/task-1-git-diff.txt`
-  - [ ] `.sisyphus/evidence/task-1-code-review.txt`
-  - [ ] `.sisyphus/evidence/task-1-url-check.txt`
+  - [ ] `.omo/evidence/task-1-iscc-compile.txt`
+  - [ ] `.omo/evidence/task-1-git-diff.txt`
+  - [ ] `.omo/evidence/task-1-code-review.txt`
+  - [ ] `.omo/evidence/task-1-url-check.txt`
 
   **Commit**: YES
   - Message: `build(installer): add .NET 9 auto-download to framework-dependent installer`

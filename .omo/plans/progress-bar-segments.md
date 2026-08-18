@@ -111,7 +111,7 @@
 
 ### QA Policy
 Every task MUST include agent-executed QA scenarios (see TODO template below).
-Evidence saved to `.sisyphus/evidence/task-{N}-{scenario-slug}.{ext}`.
+Evidence saved to `.omo/evidence/task-{N}-{scenario-slug}.{ext}`.
 
 - **TUI/CLI**: 通过 Bash 运行 `dotnet run --project src\MantisZip.UI.Avalonia\...` + CLI 参数构造批量场景
 - **API/Backend / 类库逻辑**: 单元测试（`dotnet test`）
@@ -234,7 +234,7 @@ Max Concurrent: 3 (Wave 2)
       3. 断言 Pending→null（或调用方约定的背景语义）
     Expected Result: 4 色映射精确匹配 hex 值、alpha=255；Pending 返回 null
     Failure Indicators: 任一 hex 值不符、返回了半透明色（A<255）、Pending 返回非 null
-    Evidence: .sisyphus/evidence/task-1-color-mapping.txt（粘贴方法源码 + 断言结果）
+    Evidence: .omo/evidence/task-1-color-mapping.txt（粘贴方法源码 + 断言结果）
 
   Scenario: 构建验证
     Tool: Bash
@@ -243,7 +243,7 @@ Max Concurrent: 3 (Wave 2)
       1. 运行 dotnet build src\MantisZip.UI.Avalonia\MantisZip.UI.Avalonia.csproj
     Expected Result: Build succeeded（0 error）
     Failure Indicators: 编译错误（缺失 using、语法错误）
-    Evidence: .sisyphus/evidence/task-1-build.txt
+    Evidence: .omo/evidence/task-1-build.txt
   ```
 
   **Evidence to Capture:**
@@ -349,7 +349,7 @@ Max Concurrent: 3 (Wave 2)
       3. 演算大批次数 gap 收缩: count=100, width=476px → gap ≈ min(2, 476×0.15/99) ≈ min(2, 0.72) ≈ 0.72px（内容 ≈ 85%+）
     Expected Result: 方法与预期语义一致（含缝隙动态收缩；具体数值断言交给 Task 5 单测）
     Failure Indicators: 除零、区间重叠/跳空、count==0 抛异常、gap 未收缩（固定 2px 导致内容被挤占）
-    Evidence: .sisyphus/evidence/task-2-segments.txt
+    Evidence: .omo/evidence/task-2-segments.txt
 
   Scenario: 依赖属性与事件订阅存在
     Tool: read + lsp_symbols
@@ -359,7 +359,7 @@ Max Concurrent: 3 (Wave 2)
       2. 断言存在 ItemsSource 属性、OnCollectionChanged/OnItemPropertyChanged 处理、InvalidateVisual 调用
     Expected Result: 成员齐全、事件订阅/退订成对（DetachedFromVisualTree 清理）
     Failure Indicators: 缺事件退订（内存泄漏）、属性未定义
-    Evidence: .sisyphus/evidence/task-2-control-structure.txt
+    Evidence: .omo/evidence/task-2-control-structure.txt
 
   Scenario: 构建验证
     Tool: Bash
@@ -368,7 +368,7 @@ Max Concurrent: 3 (Wave 2)
       1. dotnet build src\MantisZip.UI.Avalonia\MantisZip.UI.Avalonia.csproj
     Expected Result: Build succeeded（0 error）
     Failure Indicators: 编译错误（DrawingContext API 误用、依赖属性注册错误）
-    Evidence: .sisyphus/evidence/task-2-build.txt
+    Evidence: .omo/evidence/task-2-build.txt
   ```
 
   **Evidence to Capture:**
@@ -449,7 +449,7 @@ Max Concurrent: 3 (Wave 2)
       3. 断言 xmlns:controls 声明存在
     Expected Result: 上述断言全部为真
     Failure Indicators: 控件类型错误、残留旧绑定、数字 TextBlock 丢失、xmlns 缺失
-    Evidence: .sisyphus/evidence/task-3-xaml.txt
+    Evidence: .omo/evidence/task-3-xaml.txt
 
   Scenario: 构建验证（XAML 编译通道）
     Tool: Bash
@@ -458,7 +458,7 @@ Max Concurrent: 3 (Wave 2)
       1. dotnet build src\MantisZip.UI.Avalonia\MantisZip.UI.Avalonia.csproj
     Expected Result: Build succeeded（0 error）——证明 XAML 中控件引用有效
     Failure Indicators: XAML 编译错误（控件类型解析失败、属性不存在）
-    Evidence: .sisyphus/evidence/task-3-build.txt
+    Evidence: .omo/evidence/task-3-build.txt
   ```
 
   **Evidence to Capture:**
@@ -532,7 +532,7 @@ Max Concurrent: 3 (Wave 2)
       2. 断言 catch(Exception) 内 failed=true 之后调用了 SetCurrentBatchItem(0) 和 UpdateBatchItemStatus(0, Failed)
     Expected Result: 两调用存在且位于 finally(pw.Close()) 之前
     Failure Indicators: 未调用、调用顺序错误（finally 之后）、参数错误
-    Evidence: .sisyphus/evidence/task-4-dragdrop.txt
+    Evidence: .omo/evidence/task-4-dragdrop.txt
 
   Scenario: 构建验证
     Tool: Bash
@@ -541,7 +541,7 @@ Max Concurrent: 3 (Wave 2)
       1. dotnet build src\MantisZip.UI.Avalonia\MantisZip.UI.Avalonia.csproj
     Expected Result: Build succeeded（0 error）
     Failure Indicators: 编译错误（BatchItemStatus using 缺失等）
-    Evidence: .sisyphus/evidence/task-4-build.txt
+    Evidence: .omo/evidence/task-4-build.txt
   ```
 
   **Evidence to Capture:**
@@ -625,7 +625,7 @@ Max Concurrent: 3 (Wave 2)
       2. 观察输出: 新增测试数量与通过率
     Expected Result: 新增用例全部 PASS，既有用例无回归失败
     Failure Indicators: 任一断言失败（颜色 hex 不符、段区间错误、count==0 异常）
-    Evidence: .sisyphus/evidence/task-5-test-run.txt（含测试计数输出）
+    Evidence: .omo/evidence/task-5-test-run.txt（含测试计数输出）
 
   Scenario: 覆盖完整性检查
     Tool: read + grep
@@ -635,7 +635,7 @@ Max Concurrent: 3 (Wave 2)
       2. 断言至少覆盖: 颜色映射(5 状态)、段区间(3/1/0)、缝隙公式(小/大/超大批量+15% 不变量)、退化(count==0/1) 四组
     Expected Result: 覆盖清单与任务要求一致
     Failure Indicators: 缺任一分组（如只有颜色没有段区间）
-    Evidence: .sisyphus/evidence/task-5-coverage.txt
+    Evidence: .omo/evidence/task-5-coverage.txt
   ```
 
   **Evidence to Capture:**
@@ -655,7 +655,7 @@ Max Concurrent: 3 (Wave 2)
 > **Never mark F1-F4 as checked before getting user's okay.** Rejection or user feedback -> fix -> re-run -> present again -> wait for okay.
 
 - [ ] F1. **Plan Compliance Audit** — `oracle`
-  Read the plan end-to-end. For each "Must Have": verify implementation exists (read file, curl endpoint, run command). For each "Must NOT Have": search codebase for forbidden patterns — reject with file:line if found. Check evidence files exist in .sisyphus/evidence/. Compare deliverables against plan.
+  Read the plan end-to-end. For each "Must Have": verify implementation exists (read file, curl endpoint, run command). For each "Must NOT Have": search codebase for forbidden patterns — reject with file:line if found. Check evidence files exist in .omo/evidence/. Compare deliverables against plan.
   Output: `Must Have [N/N] | Must NOT Have [N/N] | Tasks [N/N] | VERDICT: APPROVE/REJECT`
 
 - [ ] F2. **Code Quality Review** — `unspecified-high`
@@ -663,7 +663,7 @@ Max Concurrent: 3 (Wave 2)
   Output: `Build [PASS/FAIL] | Tests [N pass/N fail] | Files [N clean/N issues] | VERDICT`
 
 - [ ] F3. **Real Manual QA** — `unspecified-high`
-  Execute EVERY QA scenario from EVERY task — follow exact steps, capture evidence. Test cross-task integration (控件渲染 + 状态上报协同). Test edge cases: count==0, count==1, all-failed, all-skipped. Save to `.sisyphus/evidence/final-qa/`.
+  Execute EVERY QA scenario from EVERY task — follow exact steps, capture evidence. Test cross-task integration (控件渲染 + 状态上报协同). Test edge cases: count==0, count==1, all-failed, all-skipped. Save to `.omo/evidence/final-qa/`.
   Output: `Scenarios [N/N pass] | Integration [N/N] | Edge Cases [N tested] | VERDICT`
 
 - [ ] F4. **Scope Fidelity Check** — `deep`

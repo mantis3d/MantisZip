@@ -345,7 +345,7 @@ Scenario: --compress-separate with single directory
     2. Run: MantisZip.UI.exe --compress-separate C:\temp\testdir
     3. Check C:\temp\testdir.zip exists
   Expected Result: Single archive created
-  Evidence: .sisyphus/evidence/task-4-separate-single.txt
+  Evidence: .omo/evidence/task-4-separate-single.txt
 
 Scenario: --compress-separate with multiple directories
   Tool: Bash
@@ -357,7 +357,7 @@ Scenario: --compress-separate with multiple directories
        Wait 2s
     3. Check C:\temp\dir1.zip and C:\temp\dir2.zip exist
   Expected Result: Both archives created
-  Evidence: .sisyphus/evidence/task-4-separate-multi.txt
+  Evidence: .omo/evidence/task-4-separate-multi.txt
 \\\
 
 **Commit**: NO (groups with Task 5)
@@ -446,7 +446,7 @@ Scenario: --compress-combined with items in same folder
     2. Run: MantisZip.UI.exe --compress-combined C:\temp\mydata\dir1 C:\temp\mydata\dir2
     3. Check C:\temp\mydata\mydata.zip exists
   Expected Result: Combined archive created with both dirs inside
-  Evidence: .sisyphus/evidence/task-5-combined-same.txt
+  Evidence: .omo/evidence/task-5-combined-same.txt
 
 Scenario: --compress-combined with cross-drive items prompts
   Tool: Bash (scripted)
@@ -454,7 +454,7 @@ Scenario: --compress-combined with cross-drive items prompts
     1. Run with items on C: and D: → should show prompt (script would auto-close)
     2. Verify exit behavior
   Expected Result: Name input dialog appears (or graceful exit)
-  Evidence: .sisyphus/evidence/task-5-combined-cross.txt
+  Evidence: .omo/evidence/task-5-combined-cross.txt
 \\\
 
 **Commit**: YES (groups with Task 4)
@@ -515,7 +515,7 @@ Scenario: New verbs registered after --install-shell
     4. reg query HKCU\Software\Classes\*\shell\07_MantisZipCompress → exists (old 06 renumbered)
     5. reg query HKCU\Software\Classes\*\shell\05_MantisZipQuick (should NOT exist)
   Expected Result: New verbs present, old QuickVerb absent
-  Evidence: .sisyphus/evidence/task-6-verbs.txt
+  Evidence: .omo/evidence/task-6-verbs.txt
 \\\
 
 **Commit**: YES (groups with Task 3)
@@ -562,7 +562,7 @@ Scenario: Build compiles and property binding is correct
     3. grep 'EnableCompressCombined' SettingsWindow.xaml.cs → verify load/save
     4. grep 'EnableQuickCheck' SettingsWindow.xaml → should NOT exist (removed)
   Expected Result: Build clean, new checkboxes load/save correctly, old checkbox gone
-  Evidence: .sisyphus/evidence/task-7-settings.txt
+  Evidence: .omo/evidence/task-7-settings.txt
 \\\
 
 **Commit**: YES (groups with Task 2)

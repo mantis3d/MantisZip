@@ -186,7 +186,7 @@ Wave 1 (Single task):
     Steps:
       1. dotnet build src\MantisZip.UI\MantisZip.UI.csproj
     Expected Result: Build succeeds with 0 errors, 0 warnings
-    Evidence: .sisyphus/evidence/task-1-build.txt
+    Evidence: .omo/evidence/task-1-build.txt
 
   Scenario: UI smoke test — open archive shows FileListPanel
     Tool: Bash (dotnet build)
@@ -196,7 +196,7 @@ Wave 1 (Single task):
       2. Verify ArchiveLoadingOverlay.Visibility toggles exist in LoadArchiveAsync (3 locations: show at start, hide after filter, hide on error)
       3. Verify FileListPanel.Visibility and DropHint.Visibility are set correctly in both success and error paths
     Expected Result: All 3 visibility manipulation points exist in code-behind
-    Evidence: .sisyphus/evidence/task-1-code-review.txt
+    Evidence: .omo/evidence/task-1-code-review.txt
   ```
 
   **Evidence to Capture:**

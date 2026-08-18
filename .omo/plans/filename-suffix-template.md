@@ -112,7 +112,7 @@ Every task MUST include agent-executed QA scenarios.
 - **Library/Module tests**: Bash commands via `dotnet test` for unit tests
 - **UI**: Verify via code review — template text box visibility follows output mode
 - **CLI**: Verify via `dotnet run -- --compress-quick` with template set in AppSettings
-- **Evidence**: Each scenario saves output/log to `.sisyphus/evidence/task-{N}-{slug}.{ext}`
+- **Evidence**: Each scenario saves output/log to `.omo/evidence/task-{N}-{slug}.{ext}`
 
 ---
 
@@ -219,7 +219,7 @@ Task 1 → Task 2 → Task 5 → Task 9 → F1-F4
     Steps:
       1. Run: dotnet test tests\MantisZip.Tests\MantisZip.Tests.csproj --filter "FullyQualifiedName~FileNameTemplate" --configuration Release
     Expected Result: Test run succeeded (all 9 pass, 0 fail, 0 skip)
-    Evidence: .sisyphus/evidence/task-1-unit-tests.txt
+    Evidence: .omo/evidence/task-1-unit-tests.txt
   ```
 
   **Commit**: YES (groups with Task 2)
@@ -290,7 +290,7 @@ Task 1 → Task 2 → Task 5 → Task 9 → F1-F4
       2. Construct CompressRequest with Mode=Separate, FileNameSuffixTemplate="_{date}", SourcePaths=["test_doc.txt"]
       3. Call GetOutputPaths → verify result contains "test_doc_2026-07-10.zip"
     Expected Result: Output path includes the date suffix before .zip
-    Evidence: .sisyphus/evidence/task-2-output-path.txt
+    Evidence: .omo/evidence/task-2-output-path.txt
 
   Scenario: Empty template produces same path as before
     Tool: Bash
@@ -299,7 +299,7 @@ Task 1 → Task 2 → Task 5 → Task 9 → F1-F4
       1. Construct CompressRequest without FileNameSuffixTemplate
       2. Call GetOutputPaths → verify result is "test_doc.zip"
     Expected Result: Output path unchanged from existing behavior
-    Evidence: .sisyphus/evidence/task-2-empty-template.txt
+    Evidence: .omo/evidence/task-2-empty-template.txt
   ```
 
   **Commit**: YES (groups with Task 1)
@@ -345,7 +345,7 @@ Task 1 → Task 2 → Task 5 → Task 9 → F1-F4
       2. Read settings.json from %LOCALAPPDATA%\MantisZip\settings.json
       3. Verify FileNameSuffixTemplate exists with value "_{date}"
     Expected Result: Setting persisted correctly
-    Evidence: .sisyphus/evidence/task-3-settings.txt
+    Evidence: .omo/evidence/task-3-settings.txt
   ```
 
   **Commit**: YES (groups with 4-6)
@@ -411,7 +411,7 @@ Task 1 → Task 2 → Task 5 → Task 9 → F1-F4
       2. Click "每项独立的压缩包" radio → verify SuffixTemplateTextBox is enabled
       3. Click "自动（父目录名）" radio → verify SuffixTemplateTextBox is disabled
     Expected Result: TextBox IsEnabled follows output mode
-    Evidence: .sisyphus/evidence/task-4-ui-mode-switch.png
+    Evidence: .omo/evidence/task-4-ui-mode-switch.png
   ```
 
   **Commit**: NO (groups with Task 5)
@@ -472,7 +472,7 @@ Task 1 → Task 2 → Task 5 → Task 9 → F1-F4
       2. Click Compress button
       3. Verify CompressRequest passed to CompressService contains FileNameSuffixTemplate = "_{date}"
     Expected Result: Template value passed through correctly
-    Evidence: .sisyphus/evidence/task-5-request-flow.txt
+    Evidence: .omo/evidence/task-5-request-flow.txt
   ```
 
   **Commit**: YES (groups with 4)
@@ -521,7 +521,7 @@ Task 1 → Task 2 → Task 5 → Task 9 → F1-F4
       1. dotnet run --project src\MantisZip.UI\MantisZip.UI.csproj -- --compress-quick E:\temp\testfile.txt
       2. Check output path includes _2026-07-10 suffix before extension
     Expected Result: testfile_2026-07-10.zip created
-    Evidence: .sisyphus/evidence/task-6-quick-compress.txt
+    Evidence: .omo/evidence/task-6-quick-compress.txt
   ```
 
   **Commit**: YES (groups with 3-5)
@@ -590,7 +590,7 @@ Task 1 → Task 2 → Task 5 → Task 9 → F1-F4
       2. Verify dialog shows with all placeholders listed
       3. Click "知道了" button
     Expected Result: Dialog opens, shows placeholders, closes on button click
-    Evidence: .sisyphus/evidence/task-7-help-dialog.png
+    Evidence: .omo/evidence/task-7-help-dialog.png
   ```
 
   **Commit**: YES (groups with 8)
@@ -667,7 +667,7 @@ Task 1 → Task 2 → Task 5 → Task 9 → F1-F4
     Steps:
       1. Run: dotnet build src\MantisZip.UI\MantisZip.UI.csproj
     Expected Result: Build succeeds (no missing resource errors)
-    Evidence: .sisyphus/evidence/task-8-localization-build.txt
+    Evidence: .omo/evidence/task-8-localization-build.txt
   ```
 
   **Commit**: YES (groups with 7)
@@ -726,7 +726,7 @@ Task 1 → Task 2 → Task 5 → Task 9 → F1-F4
   Output: `Build [PASS/FAIL] | Tests [N pass/N fail] | Files [N clean/N issues] | VERDICT`
 
 - [ ] F3. **Real Manual QA** — `unspecified-high`
-  Start from clean state. Execute EVERY QA scenario from EVERY task. Test cross-task integration. Save to `.sisyphus/evidence/final-qa/`.
+  Start from clean state. Execute EVERY QA scenario from EVERY task. Test cross-task integration. Save to `.omo/evidence/final-qa/`.
   Output: `Scenarios [N/N pass] | Integration [N/N] | Edge Cases [N tested] | VERDICT`
 
 - [ ] F4. **Scope Fidelity Check** — `deep`

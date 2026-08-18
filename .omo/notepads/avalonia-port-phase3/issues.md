@@ -5,7 +5,7 @@
 **Date**: 2026-06-16  
 **Status**: Unresolved
 
-The remaining 19 checkboxes in `.sisyphus/plans/avalonia-port-phase3.md` are all GUI verification tasks that cannot be completed in a headless CLI environment:
+The remaining 19 checkboxes in `.omo/plans/avalonia-port-phase3.md` are all GUI verification tasks that cannot be completed in a headless CLI environment:
 
 - Task 0.3: F5 refresh / close archive behavior
 - Task 1.7: Extract ZIP/7z/tar.gz with progress display

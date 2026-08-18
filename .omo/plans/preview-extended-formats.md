@@ -7,8 +7,8 @@
 > - ⬜ **Phase 4 高难度格式**：4.3 MKV/WebM 元数据已由 `VideoParser` 实现；其余未实施
 > - ⬜ **Phase 5 元数据优先提取**：5.1/5.3/5.5 已完成；5.2 部分；5.4 未实施
 >
-> **⚠️ 2026-06-29 修正**: 本计划编写时假设全部格式在主项目中直接实现。Avalonia 迁移后，**含重大原生依赖的功能改为插件化**（见 [preview-avalonia-opportunities.md](.sisyphus/plans/preview-avalonia-opportunities.md) 第 8 节）。以下章节已据此更新：Phase 2D、Phase 3.10/3.11、Phase 4。
-> **⚠️ 2026-08-07 核实修正**: 对照实际代码修正完成度（详见各 Phase 段）：Phase 3 中 LNK/DBF/EPUB/字幕/STL 实际未实现；Phase 4 中 4.3 MKV/WebM 已实现；Phase 5 中 5.1（`ExtractHeadAsync`/`ExtractHeadTailAsync`）、5.3（两阶段加载，独立子计划 [preview-two-phase-loading.md](.sisyphus/plans/preview-two-phase-loading.md) 已完成）、5.5（`IsSevenZipSolid`）已完成。
+> **⚠️ 2026-06-29 修正**: 本计划编写时假设全部格式在主项目中直接实现。Avalonia 迁移后，**含重大原生依赖的功能改为插件化**（见 [preview-avalonia-opportunities.md](.omo/plans/preview-avalonia-opportunities.md) 第 8 节）。以下章节已据此更新：Phase 2D、Phase 3.10/3.11、Phase 4。
+> **⚠️ 2026-08-07 核实修正**: 对照实际代码修正完成度（详见各 Phase 段）：Phase 3 中 LNK/DBF/EPUB/字幕/STL 实际未实现；Phase 4 中 4.3 MKV/WebM 已实现；Phase 5 中 5.1（`ExtractHeadAsync`/`ExtractHeadTailAsync`）、5.3（两阶段加载，独立子计划 [preview-two-phase-loading.md](.omo/plans/preview-two-phase-loading.md) 已完成）、5.5（`IsSevenZipSolid`）已完成。
 
 ## TL;DR
 
@@ -597,7 +597,7 @@ private async Task ShowPdfFullContent()
 
 > **⚠️ 2026-08-07 核实**: `src/` 下无 `MantisZip.Preview.Magick` 项目，sln 无插件项目，`plugins/` 目录不存在。TGA/HDR/EXR/TIFF/PSD 预览当前不可用。
 
-> **⚠️ 2026-06-29 修正**: 原方案假设直接引用 NuGet 包 + 内联代码分支。Avalonia 迁移 + 插件化后，Magick.NET 改为**独立插件**，通过 `plugins/` 目录加载。见 [preview-avalonia-opportunities.md 第 8 节](.sisyphus/plans/preview-avalonia-opportunities.md#8-重大依赖的体积分析与分离方案)。
+> **⚠️ 2026-06-29 修正**: 原方案假设直接引用 NuGet 包 + 内联代码分支。Avalonia 迁移 + 插件化后，Magick.NET 改为**独立插件**，通过 `plugins/` 目录加载。见 [preview-avalonia-opportunities.md 第 8 节](.omo/plans/preview-avalonia-opportunities.md#8-重大依赖的体积分析与分离方案)。
 
 ### 动机
 
@@ -701,7 +701,7 @@ public class MagickPreviewProvider : IPreviewProvider
 
 > **⚠️ 2026-08-07 核实**: `src/` 下无 `MantisZip.Preview.MediaPlayer` 项目，LibVLC 音视频播放未实施。音视频**元数据**已内置实现（`VideoParser`/`RiffParser`/`FlacParser`/`Id3v2Parser` + Avalonia `ShowVideo`/`ShowAudio`）。
 
-> **⚠️ 2026-06-29 修正**: WPF 有原生 `MediaElement`，Avalonia 无此控件。音视频播放改为**独立插件** `MantisZip.Preview.MediaPlayer`（基于 LibVLCSharp），通过 `plugins/` 按需加载。详细设计见 [preview-avalonia-opportunities.md 第 4 节](.sisyphus/plans/preview-avalonia-opportunities.md#4-音视频播放替代方案)。
+> **⚠️ 2026-06-29 修正**: WPF 有原生 `MediaElement`，Avalonia 无此控件。音视频播放改为**独立插件** `MantisZip.Preview.MediaPlayer`（基于 LibVLCSharp），通过 `plugins/` 按需加载。详细设计见 [preview-avalonia-opportunities.md 第 4 节](.omo/plans/preview-avalonia-opportunities.md#4-音视频播放替代方案)。
 
 **影响格式**: MP3, WAV, FLAC, MP4, WMV
 
@@ -757,7 +757,7 @@ public class MagickPreviewProvider : IPreviewProvider
 ## Phase 5 — 元数据优先提取与两步式预览优化 [✅⬜🟡⬜✅] (3/5)
 
 > **⚠️ 2026-08-07 核实**: 5.1/5.3/5.5 已完成（见下）；5.2 部分（MetadataHelper 模式应用于各格式渲染，但未严格分解为独立 GetXxxMetadata 静态方法）；5.4 未实施（`ExtractHeadTailAsync` 已就绪但 PDF/MP4 未使用双端提取特例）。
-> **子计划**: 5.3 两阶段加载已独立成 [preview-two-phase-loading.md](.sisyphus/plans/preview-two-phase-loading.md)（✅ 已完成 2026-07-16）。
+> **子计划**: 5.3 两阶段加载已独立成 [preview-two-phase-loading.md](.omo/plans/preview-two-phase-loading.md)（✅ 已完成 2026-07-16）。
 
 - [x] 5.1 ArchiveEntryExtractor 新增部分提取方法
 - [~] 5.2 每个格式分解为 GetMetadata + ShowContent
@@ -921,7 +921,7 @@ ShowPreviewAsync(item)
 - **预估**: ~1h/格式 × 15+ 格式 = ~15h+
 
 #### 5.3 ShowPreviewAsync 两阶段编排 ✅ 已完成
-> **⚠️ 2026-08-07 核实**: Avalonia `MainWindowViewModel.ShowPreviewAsync` 已实现 Phase 1（`Preview.ShowLoading` + 内存信息面板填充）+ Phase 2（魔数检测 → 提取 → `switch(previewType)` 分发）两阶段，`_previewLoadVersion` 版本守卫防竞态。独立子计划 [preview-two-phase-loading.md](.sisyphus/plans/preview-two-phase-loading.md) 已完成（2026-07-16）。
+> **⚠️ 2026-08-07 核实**: Avalonia `MainWindowViewModel.ShowPreviewAsync` 已实现 Phase 1（`Preview.ShowLoading` + 内存信息面板填充）+ Phase 2（魔数检测 → 提取 → `switch(previewType)` 分发）两阶段，`_previewLoadVersion` 版本守卫防竞态。独立子计划 [preview-two-phase-loading.md](.omo/plans/preview-two-phase-loading.md) 已完成（2026-07-16）。
 - **文件**: `MainWindow.Preview.cs`
 - 修改入口流程为两阶段
 - 头部提取失败 → 静默降级到原全文件流程
@@ -990,8 +990,8 @@ Avalonia 迁移后:
 - [x] Phase 1：信息面板增强（动态 ItemsControl 展示所有格式信息）
 - [x] Phase 2：快速出货格式完成（Torrent/PE/PDF/WAV/FLAC/SQLite/ISO/MP3 — **STL/GZ 未实现，TGA 归入 Magick.NET 插件**）
 - [~] Phase 3：中等价值格式部分完成（SVG/字体/ICO 画廊/Office 内容预览 — **LNK/DBF/字幕/EPUB/HDR 未实现**）
-- [ ] Phase 2D 插件化：Magick.NET 统一解码 → 见 [preview-avalonia-opportunities.md](.sisyphus/plans/preview-avalonia-opportunities.md#8-重大依赖的体积分析与分离方案)
-- [ ] Phase 3.10/3.11 插件化：LibVLC 音视频播放 → 见 [preview-avalonia-opportunities.md 第 4 节](.sisyphus/plans/preview-avalonia-opportunities.md#4-音视频播放替代方案)
+- [ ] Phase 2D 插件化：Magick.NET 统一解码 → 见 [preview-avalonia-opportunities.md](.omo/plans/preview-avalonia-opportunities.md#8-重大依赖的体积分析与分离方案)
+- [ ] Phase 3.10/3.11 插件化：LibVLC 音视频播放 → 见 [preview-avalonia-opportunities.md 第 4 节](.omo/plans/preview-avalonia-opportunities.md#4-音视频播放替代方案)
 - [~] Phase 4：高难度格式（**4.3 MKV/WebM 已由 VideoParser 实现**；4.1/4.2/4.4-4.9 未实施；EXR/TIFF 已由 Magick.NET 插件覆盖）
 - [~] Phase 5：元数据优先提取与两步式优化（**5.1/5.3/5.5 已完成，5.2 部分，5.4 未实施**）
 - [x] `dotnet build` 通过

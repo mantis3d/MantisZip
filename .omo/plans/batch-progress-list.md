@@ -107,7 +107,7 @@
 Every task MUST include agent-executed QA scenarios (see TODO template below).
 - Backend logic: Bash (dotnet test)
 - UI: Playwright (if GUI testing needed)
-- Evidence saved to `.sisyphus/evidence/task-{N}-{scenario-slug}.{ext}`
+- Evidence saved to `.omo/evidence/task-{N}-{scenario-slug}.{ext}`
 
 ---
 
@@ -220,7 +220,7 @@ F1-F4           all                 —                   ✅ Done
       1. 创建 BatchItem 实例，不设置 Status
       2. 验证 Status == BatchItemStatus.Pending
     Expected Result: 默认状态正确
-    Evidence: .sisyphus/evidence/task-1-default-status.txt
+    Evidence: .omo/evidence/task-1-default-status.txt
 
   Scenario: BatchItem 状态变更触发 PropertyChanged
     Tool: Bash (dotnet test)
@@ -229,7 +229,7 @@ F1-F4           all                 —                   ✅ Done
       2. 设置 Status = BatchItemStatus.Completed
       3. 验证 PropertyChanged 被触发
     Expected Result: 属性变化通知正常工作
-    Evidence: .sisyphus/evidence/task-1-property-changed.txt
+    Evidence: .omo/evidence/task-1-property-changed.txt
   ```
 
   **Commit**: YES（实现 + 测试同一次提交）
@@ -284,7 +284,7 @@ F1-F4           all                 —                   ✅ Done
       4. 调用 L.T(L.Batch_Completed)
       5. 调用 L.T(L.Batch_Failed)
     Expected Result: 每个 key 返回非空字符串（非 "[KEY]" 标记）
-    Evidence: .sisyphus/evidence/task-2-localization.txt
+    Evidence: .omo/evidence/task-2-localization.txt
   ```
 
   **Commit**: YES
@@ -373,7 +373,7 @@ F1-F4           all                 —                   ✅ Done
       1. 编写 [WpfFact] 测试：创建 ProgressWindow，不调用 InitBatchMode
       2. 验证 BatchListSection.Visibility == Collapsed
     Expected Result: 列表不显示
-    Evidence: .sisyphus/evidence/task-3-hidden.txt
+    Evidence: .omo/evidence/task-3-hidden.txt
 
   Scenario: 批处理模式列表显示（WpfFact）
     Tool: Bash (dotnet test)
@@ -382,7 +382,7 @@ F1-F4           all                 —                   ✅ Done
       2. 验证 BatchListSection.Visibility == Visible
       3. 验证 ListBox 中 2 项
     Expected Result: 列表正确显示
-    Evidence: .sisyphus/evidence/task-3-visible.txt
+    Evidence: .omo/evidence/task-3-visible.txt
   ```
 
   **Commit**: YES
@@ -449,7 +449,7 @@ F1-F4           all                 —                   ✅ Done
       2. InitBatchMode(["a.zip", "b.zip", "c.zip"])
       3. 验证 IsBatchMode == true, Height == 450
     Expected Result: 正确初始化
-    Evidence: .sisyphus/evidence/task-4-init.txt
+    Evidence: .omo/evidence/task-4-init.txt
 
   Scenario: 更新单项状态（WpfFact）
     Tool: Bash (dotnet test)
@@ -459,7 +459,7 @@ F1-F4           all                 —                   ✅ Done
       3. UpdateBatchItemStatus(0, Completed)
       4. 验证列表项状态正确
     Expected Result: 状态正确更新
-    Evidence: .sisyphus/evidence/task-4-update.txt
+    Evidence: .omo/evidence/task-4-update.txt
   ```
 
   **Commit**: YES (groups with 3)
@@ -506,7 +506,7 @@ F1-F4           all                 —                   ✅ Done
     Steps:
       1. dotnet test tests/MantisZip.Tests/MantisZip.Tests.csproj
     Expected Result: 所有测试通过
-    Evidence: .sisyphus/evidence/task-5-test-results.txt
+    Evidence: .omo/evidence/task-5-test-results.txt
   ```
 
   **Commit**: YES
@@ -591,7 +591,7 @@ F1-F4           all                 —                   ✅ Done
       2. 运行 --compress-separate 传入这 3 个文件
       3. 验证 ProgressWindow 文件列表：3 项全部变为"已完成"
     Expected Result: CLI 批量压缩成功
-    Evidence: .sisyphus/evidence/task-6-cli-all-success.txt
+    Evidence: .omo/evidence/task-6-cli-all-success.txt
 
   Scenario: CompressSettingsWindow 选"压缩到各自名字"
     Tool: 手动操作（截图验证）
@@ -600,7 +600,7 @@ F1-F4           all                 —                   ✅ Done
       2. 通过 --compress 打开窗口，选"压缩到各自名字"
       3. 点击压缩，验证 ProgressWindow 显示 2 项文件列表
     Expected Result: GUI 批量压缩也显示列表
-    Evidence: .sisyphus/evidence/task-6-gui-batch.png
+    Evidence: .omo/evidence/task-6-gui-batch.png
 
   Scenario: 部分失败
     Tool: Bash (direct invoke)
@@ -609,7 +609,7 @@ F1-F4           all                 —                   ✅ Done
       2. 运行 --compress-separate
       3. 失败项显示"失败"，其余"已完成"，窗口保持打开
     Expected Result: 失败项正确标记
-    Evidence: .sisyphus/evidence/task-6-some-failed.txt
+    Evidence: .omo/evidence/task-6-some-failed.txt
   ```
 
   **Commit**: YES（实现 + 测试同一次提交）
@@ -828,7 +828,7 @@ F1-F4           all                 —                   ✅ Done
       2. 验证 ProgressWindow 显示 3 项
       3. 各解压到各自所在目录
     Expected Result: 所有文件解压到各自目录，列表全 Completed
-    Evidence: .sisyphus/evidence/task-7-extract-here.txt
+    Evidence: .omo/evidence/task-7-extract-here.txt
 
   Scenario: --extract-smart 批量
     Tool: Bash (direct invoke)
@@ -836,7 +836,7 @@ F1-F4           all                 —                   ✅ Done
       1. 一个有单根目录的 ZIP + 一个无根目录的 ZIP
       2. 分别解压到各自目录（单根→直接；分散→建子目录）
     Expected Result: 智能判断正确
-    Evidence: .sisyphus/evidence/task-7-extract-smart.txt
+    Evidence: .omo/evidence/task-7-extract-smart.txt
 
   Scenario: --extract 批量（弹 ExtractSettingsWindow）
     Tool: 手动操作
@@ -846,7 +846,7 @@ F1-F4           all                 —                   ✅ Done
       3. 选择"解压到压缩包名" → 确认
       4. 每个压缩包解压到各自同名子目录
     Expected Result: 窗口显示文件列表，执行后各入各子目录
-    Evidence: .sisyphus/evidence/task-7-extract-window.png
+    Evidence: .omo/evidence/task-7-extract-window.png
 
   Scenario: 混合成功/失败
     Tool: Bash (direct invoke)
@@ -854,7 +854,7 @@ F1-F4           all                 —                   ✅ Done
       1. 正常 ZIP + 损坏 ZIP
       2. good→Completed, bad→Failed, 窗口保持打开
     Expected Result: 失败标记正确
-    Evidence: .sisyphus/evidence/task-7-mixed.txt
+    Evidence: .omo/evidence/task-7-mixed.txt
 
   Scenario: 现有压缩 IPC 不受影响
     Tool: Bash (direct invoke)
@@ -862,7 +862,7 @@ F1-F4           all                 —                   ✅ Done
       1. --compress-separate 2 个文件
       2. 正常压缩，ProgressWindow 文件列表工作正常
     Expected Result: 压缩 IPC 不受 extract IPC 新增影响
-    Evidence: .sisyphus/evidence/task-7-compress-ipc.txt
+    Evidence: .omo/evidence/task-7-compress-ipc.txt
   ```
 
   **Commit**: YES
@@ -974,7 +974,7 @@ F1-F4           all                 —                   ✅ Done
       2. 验证 SelectedPaths 含 3 项
       3. 验证默认 OutputMode == ToName
     Expected Result: 窗口正确初始化
-    Evidence: .sisyphus/evidence/task-8-init.txt
+    Evidence: .omo/evidence/task-8-init.txt
 
   Scenario: 手动输入路径
     Tool: 手动操作
@@ -984,7 +984,7 @@ F1-F4           all                 —                   ✅ Done
       3. 点击 Browse，选择一个目录
       4. 验证 TextBox 显示所选路径
     Expected Result: 手动模式工作正常
-    Evidence: .sisyphus/evidence/task-8-manual.png
+    Evidence: .omo/evidence/task-8-manual.png
 
   Scenario: 移除全部文件（WpfFact）
     Tool: Bash (dotnet test)
@@ -992,7 +992,7 @@ F1-F4           all                 —                   ✅ Done
       1. [WpfFact] 测试：创建窗口含 2 项，模拟移除全部
       2. 验证 SelectedPaths 为空
     Expected Result: 空列表时按钮禁用
-    Evidence: .sisyphus/evidence/task-8-empty.txt
+    Evidence: .omo/evidence/task-8-empty.txt
   ```
 
   **Commit**: YES
@@ -1134,7 +1134,7 @@ F1-F4           all                 —                   ✅ Done
       3. 选择"手动输入"，选目标目录，点击[解压]
       4. 验证解压到目标目录
     Expected Result: 单文件也弹设置窗口
-    Evidence: .sisyphus/evidence/task-9-extract-single.txt
+    Evidence: .omo/evidence/task-9-extract-single.txt
 
   Scenario: --extract 多文件合并
     Tool: Bash (simulate IPC)
@@ -1145,7 +1145,7 @@ F1-F4           all                 —                   ✅ Done
       4. 选"解压到此处"，[解压]
       5. 各解压到各自所在目录
     Expected Result: 多文件批处理
-    Evidence: .sisyphus/evidence/task-9-extract-multi.txt
+    Evidence: .omo/evidence/task-9-extract-multi.txt
 
   Scenario: --extract-here 多文件批处理
     Tool: Bash (simulate IPC)
@@ -1155,7 +1155,7 @@ F1-F4           all                 —                   ✅ Done
       3. 直接进 ProgressWindow 不弹设置窗
       4. 各解压到各自目录
     Expected Result: here 模式不弹窗口
-    Evidence: .sisyphus/evidence/task-9-here-batch.txt
+    Evidence: .omo/evidence/task-9-here-batch.txt
 
   Scenario: --extract-here 多文件批处理
     Tool: Bash (simulate IPC)
@@ -1165,7 +1165,7 @@ F1-F4           all                 —                   ✅ Done
       3. 直接进 ProgressWindow 不弹设置窗
       4. 各解压到各自目录
     Expected Result: here 模式不弹窗口
-    Evidence: .sisyphus/evidence/task-9-here-batch.txt
+    Evidence: .omo/evidence/task-9-here-batch.txt
   ```
 
   **Commit**: YES（实现 + 测试同一次提交）

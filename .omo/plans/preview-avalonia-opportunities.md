@@ -397,7 +397,7 @@ Avalonia 迁移                  → 主力
 
 ### 8.2 `preview-modular-providers.md` 方案的局限
 
-已有计划 [preview-modular-providers.md](.sisyphus/plans/preview-modular-providers.md) 提出了将预览格式的数据读取器抽取为独立类库的方案，通过 `ITableDataProvider` 接口反射加载。
+已有计划 [preview-modular-providers.md](.omo/plans/preview-modular-providers.md) 提出了将预览格式的数据读取器抽取为独立类库的方案，通过 `ITableDataProvider` 接口反射加载。
 
 但这个方案只解决了 **managed 依赖** 的分离（如 SQLitePCLRaw ~2MB、DocumentFormat.OpenXml ~3MB），对 **原生 DLL**（Magick.NET.Native 的 20+ MB、libvlc 的 30+ MB）不够：
 

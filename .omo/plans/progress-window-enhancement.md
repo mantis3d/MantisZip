@@ -111,7 +111,7 @@ Wave 2 (UI 层 — 2 任务):
     Steps:
       1. 运行 dotnet build src\MantisZip.Core\MantisZip.Core.csproj
     Expected Result: 编译通过，无警告
-    Evidence: .sisyphus/evidence/task-1-build.txt
+    Evidence: .omo/evidence/task-1-build.txt
   ```
 
   **Commit**: NO (groups with Wave 1 at the end)
@@ -153,7 +153,7 @@ Wave 2 (UI 层 — 2 任务):
     Steps:
       1. dotnet build src\MantisZip.Core\MantisZip.Core.csproj
     Expected Result: 编译通过
-    Evidence: .sisyphus/evidence/task-2-build.txt
+    Evidence: .omo/evidence/task-2-build.txt
   ```
 
   **Commit**: NO (groups with Wave 1 at the end)
@@ -239,7 +239,7 @@ Wave 2 (UI 层 — 2 任务):
     Steps:
       1. dotnet build src\MantisZip.Core\MantisZip.Core.csproj
     Expected Result: 编译通过
-    Evidence: .sisyphus/evidence/task-3-build.txt
+    Evidence: .omo/evidence/task-3-build.txt
   ```
 
   **Commit**: NO (groups with Wave 1 at the end)
@@ -285,7 +285,7 @@ Wave 2 (UI 层 — 2 任务):
     Steps:
       1. dotnet build src\MantisZip.Core\MantisZip.Core.csproj
     Expected Result: 编译通过
-    Evidence: .sisyphus/evidence/task-4-build.txt
+    Evidence: .omo/evidence/task-4-build.txt
   ```
 
   **Commit**: NO (groups with Wave 1)
@@ -358,7 +358,7 @@ Wave 2 (UI 层 — 2 任务):
     Steps:
       1. dotnet build src\MantisZip.Core\MantisZip.Core.csproj
     Expected Result: 编译通过
-    Evidence: .sisyphus/evidence/task-5-build.txt
+    Evidence: .omo/evidence/task-5-build.txt
   ```
 
   **Commit**: NO (groups with Wave 1 — 全部 Wave 1 任务一起提交)
@@ -485,7 +485,7 @@ Wave 2 (UI 层 — 2 任务):
     Steps:
       1. dotnet build src\MantisZip.UI\MantisZip.UI.csproj
     Expected Result: 编译通过
-    Evidence: .sisyphus/evidence/task-6-build.txt
+    Evidence: .omo/evidence/task-6-build.txt
   ```
 
   **Commit**: NO (groups with Wave 2 at the end)
@@ -627,7 +627,7 @@ Wave 2 (UI 层 — 2 任务):
     Steps:
       1. dotnet build src\MantisZip.UI\MantisZip.UI.csproj
     Expected Result: 编译通过
-    Evidence: .sisyphus/evidence/task-7-build.txt
+    Evidence: .omo/evidence/task-7-build.txt
 
   Scenario: 运行验证（快速压缩场景）
     Tool: Bash
@@ -635,7 +635,7 @@ Wave 2 (UI 层 — 2 任务):
       1. 创建临时测试目录和文件
       2. dotnet run --project src\MantisZip.UI\MantisZip.UI.csproj --compress-quick <test-files> -- <output.zip>
     Expected Result: ProgressWindow 显示路径+文件名+统计栏
-    Evidence: .sisyphus/evidence/task-7-run.txt
+    Evidence: .omo/evidence/task-7-run.txt
   ```
 
   **Commit**: YES (groups with Task 6)
@@ -647,7 +647,7 @@ Wave 2 (UI 层 — 2 任务):
 ## Final Verification Wave
 
 - [ ] F1. **Plan Compliance Audit** — `oracle`
-  Read the plan end-to-end. For each task: verify the described changes exist in code. Check: ArchiveProgress has SkippedFiles/FailedFiles? FileConflictHelper calls ConflictActionCallback? Engines count skips? ProgressDisplayCalculator exists? ProgressWindow XAML has new controls? SetProgress uses ProgressDisplayCalculator? Evidence files in .sisyphus/evidence/.
+  Read the plan end-to-end. For each task: verify the described changes exist in code. Check: ArchiveProgress has SkippedFiles/FailedFiles? FileConflictHelper calls ConflictActionCallback? Engines count skips? ProgressDisplayCalculator exists? ProgressWindow XAML has new controls? SetProgress uses ProgressDisplayCalculator? Evidence files in .omo/evidence/.
   Output: `Must Have [N/N] | VERDICT: APPROVE/REJECT`
 
 - [ ] F2. **Code Quality & Build** — `unspecified-high`
@@ -661,7 +661,7 @@ Wave 2 (UI 层 — 2 任务):
   - Stats bar shows processed/skipped/failed counts
   - Batch mode: each item in the list shows summary text
   - Error summary still appears on permission errors
-  Save evidence to `.sisyphus/evidence/final-qa/`.
+  Save evidence to `.omo/evidence/final-qa/`.
   Output: `Scenarios [N/N pass] | VERDICT`
 
 - [ ] F4. **Scope Fidelity Check** — `deep`

@@ -204,7 +204,7 @@ Wave 2 (After Wave 1 — integration + test):
     Steps:
       1. grep -c '"About_' src/MantisZip.UI/Resources/strings.zh.json
     Expected Result: Returns count matching the new keys (e.g., 21)
-    Evidence: .sisyphus/evidence/task-1-zh-keys.txt
+    Evidence: .omo/evidence/task-1-zh-keys.txt
 
   Scenario: Verify all keys in zh.json also in en.json
     Tool: Bash
@@ -214,7 +214,7 @@ Wave 2 (After Wave 1 — integration + test):
       2. grep -oP '"About_[^"]+' src/MantisZip.UI/Resources/strings.en.json | sort > en.txt
       3. diff zh.txt en.txt
     Expected Result: No differences (identical key sets)
-    Evidence: .sisyphus/evidence/task-1-keys-match.txt
+    Evidence: .omo/evidence/task-1-keys-match.txt
 
   Scenario: Verify L.cs constants exist
     Tool: Bash
@@ -222,13 +222,13 @@ Wave 2 (After Wave 1 — integration + test):
     Steps:
       1. For each About_ key, grep for it in L.cs: grep "About_" src/MantisZip.UI/Localization/L.cs
     Expected Result: All keys found as public const string
-    Evidence: .sisyphus/evidence/task-1-lcs-constants.txt
+    Evidence: .omo/evidence/task-1-lcs-constants.txt
   ```
 
   **Evidence to Capture**:
-  - [ ] .sisyphus/evidence/task-1-zh-keys.txt
-  - [ ] .sisyphus/evidence/task-1-keys-match.txt
-  - [ ] .sisyphus/evidence/task-1-lcs-constants.txt
+  - [ ] .omo/evidence/task-1-zh-keys.txt
+  - [ ] .omo/evidence/task-1-keys-match.txt
+  - [ ] .omo/evidence/task-1-lcs-constants.txt
 
   **Commit**: YES
   - Message: `i18n(about): add About_* localization keys for new AboutWindow`
@@ -319,7 +319,7 @@ Wave 2 (After Wave 1 — integration + test):
     Steps:
       1. dotnet build src\MantisZip.UI\MantisZip.UI.csproj 2>&1
     Expected Result: Build succeeds (exit code 0, no errors)
-    Evidence: .sisyphus/evidence/task-2-build.txt
+    Evidence: .omo/evidence/task-2-build.txt
 
   Scenario: Verify all l:L keys in XAML correspond to L.cs constants
     Tool: Bash
@@ -328,7 +328,7 @@ Wave 2 (After Wave 1 — integration + test):
       1. grep -oP '\{l:L About_\w+' src/MantisZip.UI/AboutWindow.xaml | sed 's/{l:L //' | sort > xaml_keys.txt
       2. grep -oP 'About_\w+' xaml_keys.txt | while read k; do grep -q "About_$k" L.cs || echo "MISSING: $k"; done
     Expected Result: No "MISSING" lines (all XAML-referenced keys exist in L.cs)
-    Evidence: .sisyphus/evidence/task-2-xaml-keys.txt
+    Evidence: .omo/evidence/task-2-xaml-keys.txt
 
   Scenario: Verify Hyperlink RequestNavigate wired up
     Tool: Bash
@@ -337,13 +337,13 @@ Wave 2 (After Wave 1 — integration + test):
       1. grep "RequestNavigate" src/MantisZip.UI/AboutWindow.xaml
       2. grep "Process.Start" src/MantisZip.UI/AboutWindow.xaml.cs
     Expected Result: Both found — XAML has RequestNavigate events, CS has Process.Start handlers
-    Evidence: .sisyphus/evidence/task-2-hyperlinks.txt
+    Evidence: .omo/evidence/task-2-hyperlinks.txt
   ```
 
   **Evidence to Capture**:
-  - [ ] .sisyphus/evidence/task-2-build.txt
-  - [ ] .sisyphus/evidence/task-2-xaml-keys.txt
-  - [ ] .sisyphus/evidence/task-2-hyperlinks.txt
+  - [ ] .omo/evidence/task-2-build.txt
+  - [ ] .omo/evidence/task-2-xaml-keys.txt
+  - [ ] .omo/evidence/task-2-hyperlinks.txt
 
   **Commit**: YES (groups with Task 1)
   - Message: `feat(ui): add AboutWindow with 4 tabs (About/Author/Dependencies/Acknowledgments)`
@@ -396,7 +396,7 @@ Wave 2 (After Wave 1 — integration + test):
       1. grep -n "About_Click" src/MantisZip.UI/MainWindow.Menu.cs
       2. grep -A2 "About_Click" src/MantisZip.UI/MainWindow.Menu.cs | grep "AppMessageBox"
     Expected Result: Step 2 returns no matches (AppMessageBox removed from About_Click)
-    Evidence: .sisyphus/evidence/task-3-about-click.txt
+    Evidence: .omo/evidence/task-3-about-click.txt
 
   Scenario: Verify AboutWindow is instantiated
     Tool: Bash
@@ -404,12 +404,12 @@ Wave 2 (After Wave 1 — integration + test):
     Steps:
       1. grep "new AboutWindow" src/MantisZip.UI/MainWindow.Menu.cs
     Expected Result: Match found with `{ Owner = this }.ShowDialog()`
-    Evidence: .sisyphus/evidence/task-3-new-aboutwindow.txt
+    Evidence: .omo/evidence/task-3-new-aboutwindow.txt
   ```
 
   **Evidence to Capture**:
-  - [ ] .sisyphus/evidence/task-3-about-click.txt
-  - [ ] .sisyphus/evidence/task-3-new-aboutwindow.txt
+  - [ ] .omo/evidence/task-3-about-click.txt
+  - [ ] .omo/evidence/task-3-new-aboutwindow.txt
 
   **Commit**: YES (groups with Tasks 1, 2)
   - Message: `feat(ui): wire AboutWindow into menu About_Click`
@@ -463,7 +463,7 @@ Wave 2 (After Wave 1 — integration + test):
     Steps:
       1. Test-Path tests/MantisZip.Tests/AboutWindowTests.cs
     Expected Result: True (file exists)
-    Evidence: .sisyphus/evidence/task-4-test-exists.txt
+    Evidence: .omo/evidence/task-4-test-exists.txt
 
   Scenario: Run tests
     Tool: Bash
@@ -471,12 +471,12 @@ Wave 2 (After Wave 1 — integration + test):
     Steps:
       1. dotnet test tests/MantisZip.Tests/ 2>&1
     Expected Result: All tests pass (exit code 0)
-    Evidence: .sisyphus/evidence/task-4-test-pass.txt
+    Evidence: .omo/evidence/task-4-test-pass.txt
   ```
 
   **Evidence to Capture**:
-  - [ ] .sisyphus/evidence/task-4-test-exists.txt
-  - [ ] .sisyphus/evidence/task-4-test-pass.txt
+  - [ ] .omo/evidence/task-4-test-exists.txt
+  - [ ] .omo/evidence/task-4-test-pass.txt
 
   **Commit**: YES
   - Message: `test(about): add smoke tests for About window constants`
@@ -524,7 +524,7 @@ Wave 2 (After Wave 1 — integration + test):
     Steps:
       1. dotnet build src\MantisZip.UI\MantisZip.UI.csproj 2>&1 | tail -20
     Expected Result: Build succeeded (exit code 0, no errors)
-    Evidence: .sisyphus/evidence/task-5-build.txt
+    Evidence: .omo/evidence/task-5-build.txt
 
   Scenario: Full tests
     Tool: Bash
@@ -532,7 +532,7 @@ Wave 2 (After Wave 1 — integration + test):
     Steps:
       1. dotnet test tests/MantisZip.Tests/ 2>&1 | tail -20
     Expected Result: All tests passed (exit code 0)
-    Evidence: .sisyphus/evidence/task-5-tests.txt
+    Evidence: .omo/evidence/task-5-tests.txt
 
   Scenario: Dead key audit
     Tool: Bash
@@ -540,13 +540,13 @@ Wave 2 (After Wave 1 — integration + test):
     Steps:
       1. grep -r "Main_About_Text" src/MantisZip.UI/ --include="*.cs"
     Expected Result: No matches (key no longer referenced in code)
-    Evidence: .sisyphus/evidence/task-5-dead-key-audit.txt
+    Evidence: .omo/evidence/task-5-dead-key-audit.txt
   ```
 
   **Evidence to Capture**:
-  - [ ] .sisyphus/evidence/task-5-build.txt
-  - [ ] .sisyphus/evidence/task-5-tests.txt
-  - [ ] .sisyphus/evidence/task-5-dead-key-audit.txt
+  - [ ] .omo/evidence/task-5-build.txt
+  - [ ] .omo/evidence/task-5-tests.txt
+  - [ ] .omo/evidence/task-5-dead-key-audit.txt
 
   **Commit**: NO (verification only)
 
@@ -555,7 +555,7 @@ Wave 2 (After Wave 1 — integration + test):
 ## Final Verification Wave
 
 - [x] F1. **Plan Compliance Audit** — `oracle`
-  Read the plan end-to-end. Verify: all 5 tasks completed, all Must Have present, all Must NOT Have absent. Check evidence files exist in `.sisyphus/evidence/`. Compare deliverables against plan.
+  Read the plan end-to-end. Verify: all 5 tasks completed, all Must Have present, all Must NOT Have absent. Check evidence files exist in `.omo/evidence/`. Compare deliverables against plan.
   Output: `Must Have [N/N] | Must NOT Have [N/N] | Tasks [N/N] | VERDICT: APPROVE/REJECT`
 
 - [x] F2. **Code Quality Review** — `unspecified-high`

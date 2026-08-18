@@ -197,7 +197,7 @@ Wave FINAL (验证):
   - Blocks: T4, T5, T16
   - Blocked By: None
 
-  **References**: `.sisyphus/plans/archived/explorer-path-switcher.md` — COM 调用模式
+  **References**: `.omo/plans/archived/explorer-path-switcher.md` — COM 调用模式
 
   **QA Scenarios**:
   ```
@@ -205,7 +205,7 @@ Wave FINAL (验证):
     Tool: Bash（编写测试程序）
     Steps: 打开至少一个资源管理器窗口（如 D:\），调用 GetOpenExplorerWindows()
     Expected: 返回非空列表，路径正确
-    Evidence: .sisyphus/evidence/task-1-explorer-list.txt
+    Evidence: .omo/evidence/task-1-explorer-list.txt
 
   Scenario: COM 不可用时优雅降级
     Steps: 检查 COM 调用是否包裹在 try/catch 中
@@ -707,7 +707,7 @@ Wave FINAL (验证):
   Scenario: 所有测试通过
     Steps: dotnet test tests/MantisZip.Tests/MantisZip.Tests.csproj
     Expected: PASS (所有测试)
-    Evidence: .sisyphus/evidence/task-15-test-pass.txt
+    Evidence: .omo/evidence/task-15-test-pass.txt
   ```
 
   **Commit**: `test: add unit tests for FavoritePathManager and PathHistoryManager`
@@ -769,7 +769,7 @@ Wave FINAL (验证):
 ## Final Verification Wave
 
 - [x] F1. **计划合规审计** — `oracle`
-  Read plan end-to-end. For each Must Have: verify implementation exists. For each Must NOT Have: search codebase for forbidden patterns. Check evidence files in `.sisyphus/evidence/`.
+  Read plan end-to-end. For each Must Have: verify implementation exists. For each Must NOT Have: search codebase for forbidden patterns. Check evidence files in `.omo/evidence/`.
   Output: `Must Have [N/N] | Must NOT Have [N/N] | Tasks [N/N] | VERDICT: APPROVE/REJECT`
 
 - [x] F2. **代码质量 + 构建检查** — `unspecified-high`

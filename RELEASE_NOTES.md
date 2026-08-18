@@ -15,11 +15,11 @@ MantisZip-0.4.5-Setup-WebSetup.exe requires internet during installation. Mantis
 
 ### 更新内容 / Changelog
 
-- 完成 [压缩选项增强](.sisyphus/plans/compression-options-enhancement.md) 计划 — 7z 字典大小、固实块、Word Size、匹配器可配置；ZIP 压缩方法（Deflate/Deflate64/BZip2/LZMA/PPMd/Store）可配置；ZIP/7z 加密方式可配置，7z 支持加密文件名开关
-- Completed [Compression Options Enhancement](.sisyphus/plans/compression-options-enhancement.md) plan — configurable 7z dictionary size, solid block, word size, match finder; configurable ZIP compression method (Deflate/Deflate64/BZip2/LZMA/PPMd/Store); configurable ZIP/7z encryption method, 7z encrypt headers toggle
+- 完成 [压缩选项增强](.omo/plans/compression-options-enhancement.md) 计划 — 7z 字典大小、固实块、Word Size、匹配器可配置；ZIP 压缩方法（Deflate/Deflate64/BZip2/LZMA/PPMd/Store）可配置；ZIP/7z 加密方式可配置，7z 支持加密文件名开关
+- Completed [Compression Options Enhancement](.omo/plans/compression-options-enhancement.md) plan — configurable 7z dictionary size, solid block, word size, match finder; configurable ZIP compression method (Deflate/Deflate64/BZip2/LZMA/PPMd/Store); configurable ZIP/7z encryption method, 7z encrypt headers toggle
 - ![压缩选项增强](docs/images/version/v0.4.5/CompressionOptions.png)
-- 完成 [文件过滤功能](.sisyphus/plans/file-filter-feature.md) 计划 — 支持按扩展名、文件名、尺寸、日期过滤，可保存为命名预设
-- Completed [File Filter](.sisyphus/plans/file-filter-feature.md) plan — filter by extension, filename, size, or date range; supports named presets persisted in settings
+- 完成 [文件过滤功能](.omo/plans/file-filter-feature.md) 计划 — 支持按扩展名、文件名、尺寸、日期过滤，可保存为命名预设
+- Completed [File Filter](.omo/plans/file-filter-feature.md) plan — filter by extension, filename, size, or date range; supports named presets persisted in settings
 - ![文件过滤](docs/images/version/v0.4.5/FileFilter.png)
 - 新增便携模式，CI 自动生成 Portable 压缩包
 - Added portable mode; CI automatically generates Portable zip
@@ -52,8 +52,8 @@ MantisZip-0.4.4-Setup-WebSetup.exe requires internet during installation. Mantis
 
 ### 更新内容 / Changelog
 
-- 完成 [魔数检测预览系统](.sisyphus/plans/preview-magic-detection.md) 计划 — 通过文件内容（魔数）识别真实格式预览，不再依赖扩展名
-- Completed [Magic Detection Preview System](.sisyphus/plans/preview-magic-detection.md) plan — identifies file formats by content (magic bytes) for preview, no longer relies on file extensions
+- 完成 [魔数检测预览系统](.omo/plans/preview-magic-detection.md) 计划 — 通过文件内容（魔数）识别真实格式预览，不再依赖扩展名
+- Completed [Magic Detection Preview System](.omo/plans/preview-magic-detection.md) plan — identifies file formats by content (magic bytes) for preview, no longer relies on file extensions
 - ![魔数检测](docs/images/version/v0.4.4/MagicNumber.gif)
 - 魔数检测结果与扩展名不一致时，可在工具栏切换"按扩展名/按魔数"预览
 - When magic detection conflicts with the file extension, toggle between "by extension / by magic number" preview in the toolbar
@@ -85,8 +85,8 @@ MantisZip-0.4.3-Setup-NoDotNet.exe requires the .NET runtime to be installed. Ma
 
 ### 更新内容 / Changelog
 
-- 完成 [快速路径选择](.sisyphus/plans/quickpath-unified.md) 计划。
-- Completed [Quick Path Selection](.sisyphus/plans/quickpath-unified.md) plan.
+- 完成 [快速路径选择](.omo/plans/quickpath-unified.md) 计划。
+- Completed [Quick Path Selection](.omo/plans/quickpath-unified.md) plan.
 - 快速路径选择，在"浏览"按钮旁边加上三个用于切换路径的按钮。（灵感来自软件 Listary）
 - Quick Path Selection: added three buttons next to the "Browse" button for switching paths. (Inspired by Listary)
 - ![快速路径选择](docs/images/version/v0.4.3/QuickPath.png)
@@ -122,10 +122,10 @@ MantisZip-0.4.2-Setup-NoDotNet.exe requires the .NET runtime to be installed. Ma
 - Fixed issue where dynamic context menus sometimes flickered.
 - 修复安装时选择语言和外观无效的问题（感谢 Peiming_The_Blank）。
 - Fixed issue where language and appearance selection during installation was ineffective (thanks to Peiming_The_Blank).
-- 完成计划 [zip 复制模式](.sisyphus/plans/zipengine-sharpcompress-migration.md)，添加删除文件不再是"解压缩→重新压缩"，而改成了"复制模式"。速度极大提升。
-- Completed plan: [ZIP copy mode](.sisyphus/plans/zipengine-sharpcompress-migration.md). Adding/deleting files now uses "copy mode" instead of "decompress → recompress". Significantly faster.
-- 完成计划 [权限提升](.sisyphus/plans/uac-elevation-permission.md)，当压缩解压到无权限的目录时，会有正确的处理（感谢 xieyilin.main）。
-- Completed plan: [UAC elevation](.sisyphus/plans/uac-elevation-permission.md). Proper handling when compressing/extracting to directories without permission (thanks to xieyilin.main).
+- 完成计划 [zip 复制模式](.omo/plans/zipengine-sharpcompress-migration.md)，添加删除文件不再是"解压缩→重新压缩"，而改成了"复制模式"。速度极大提升。
+- Completed plan: [ZIP copy mode](.omo/plans/zipengine-sharpcompress-migration.md). Adding/deleting files now uses "copy mode" instead of "decompress → recompress". Significantly faster.
+- 完成计划 [权限提升](.omo/plans/uac-elevation-permission.md)，当压缩解压到无权限的目录时，会有正确的处理（感谢 xieyilin.main）。
+- Completed plan: [UAC elevation](.omo/plans/uac-elevation-permission.md). Proper handling when compressing/extracting to directories without permission (thanks to xieyilin.main).
 - ![无权限](docs/images/version/v0.4.2/NoPermission.png)
 - ![设置提升](docs/images/version/v0.4.2/SettingPermission.png)
 - ![提升权限](docs/images/version/v0.4.2/ElevationPermission.png)

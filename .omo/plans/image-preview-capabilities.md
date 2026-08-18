@@ -552,7 +552,7 @@ git commit -m "feat(avalonia): 动画预览本地化——WebP 动画与 GIF 分
 在 `docs/PLAN.md` 对应优先级区域（参照既有条目格式）添加：
 
 ```markdown
-| 图片预览能力系统（透明+动画注册表） | PreviewType 能力注册表（Zoom/Transparency/FlattenAlpha/AnimationControls）+ GIF 透明棋盘格 + Animated WebP 动画预览，新格式注册能力即可复用工具栏 | 方案见 [image-preview-capabilities.md](.sisyphus/plans/image-preview-capabilities.md) |
+| 图片预览能力系统（透明+动画注册表） | PreviewType 能力注册表（Zoom/Transparency/FlattenAlpha/AnimationControls）+ GIF 透明棋盘格 + Animated WebP 动画预览，新格式注册能力即可复用工具栏 | 方案见 [image-preview-capabilities.md](.omo/plans/image-preview-capabilities.md) |
 ```
 
 并更新 PLAN.md 头部「最后更新日期」。

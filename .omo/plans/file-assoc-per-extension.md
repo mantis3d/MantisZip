@@ -198,7 +198,7 @@ Wave 3 (Tests + Final):
       3. Verify AssocIso == false
       4. Verify CustomAssocExtensions is empty list
     Expected Result: All defaults correct
-    Evidence: .sisyphus/evidence/task-1-defaults.json
+    Evidence: .omo/evidence/task-1-defaults.json
 
   Scenario: 旧 JSON 兼容（缺失属性）
     Tool: Bash
@@ -207,7 +207,7 @@ Wave 3 (Tests + Final):
       1. Write minimal JSON without Assoc* / CustomAssocExtensions
       2. Deserialize → new AppSettings with defaults
     Expected Result: No exception, defaults applied
-    Evidence: .sisyphus/evidence/task-1-compat.json
+    Evidence: .omo/evidence/task-1-compat.json
   ```
 
   **Commit**: YES
@@ -286,7 +286,7 @@ Wave 3 (Tests + Final):
       2. Read HKCU:\Software\Classes\.zip\OpenWithProgids
       3. Assert MantisZip.Archive value exists
     Expected Result: Only .zip is associated
-    Evidence: .sisyphus/evidence/task-2-install-single.txt
+    Evidence: .omo/evidence/task-2-install-single.txt
 
   Scenario: 卸载单个扩展名
     Tool: Bash
@@ -297,7 +297,7 @@ Wave 3 (Tests + Final):
       3. Read HKCU:\Software\Classes\.zip\OpenWithProgids
       4. Assert MantisZip.Archive removed
     Expected Result: .zip no longer associated
-    Evidence: .sisyphus/evidence/task-2-uninstall-single.txt
+    Evidence: .omo/evidence/task-2-uninstall-single.txt
 
   Scenario: GetCurrentHandler returns string (no crash)
     Tool: Bash (script)
@@ -306,7 +306,7 @@ Wave 3 (Tests + Final):
       1. Call GetCurrentHandler(".zip")
       2. Ensure returns non-null string
     Expected Result: Returns something (possibly "未设置")
-    Evidence: .sisyphus/evidence/task-2-current-handler.txt
+    Evidence: .omo/evidence/task-2-current-handler.txt
 
   Scenario: tar.gz is skipped
     Tool: Bash
@@ -315,7 +315,7 @@ Wave 3 (Tests + Final):
       1. Call InstallAssociationForExtension(".tar.gz")
       2. Check OpenWithProgids for .tar.gz
     Expected Result: No entry created (skipped)
-    Evidence: .sisyphus/evidence/task-2-targz-skip.txt
+    Evidence: .omo/evidence/task-2-targz-skip.txt
   ```
 
   **Commit**: YES (groups with Task 1)
@@ -391,7 +391,7 @@ Wave 3 (Tests + Final):
       2. Set IsEnabled = true
       3. Assert event fired
     Expected Result: Event fired with "IsEnabled"
-    Evidence: .sisyphus/evidence/task-3-inpc.txt
+    Evidence: .omo/evidence/task-3-inpc.txt
   ```
 
   **Commit**: YES (groups with Tasks 1, 2)
@@ -566,7 +566,7 @@ Wave 3 (Tests + Final):
     Steps:
       1. dotnet build src\MantisZip.UI\MantisZip.UI.csproj
     Expected Result: No build errors
-    Evidence: .sisyphus/evidence/task-4-build.txt
+    Evidence: .omo/evidence/task-4-build.txt
 
   Scenario: 点击行切换勾选
     Tool: dotnet build (compile + static analysis)
@@ -575,7 +575,7 @@ Wave 3 (Tests + Final):
       1. Check FormatRow_MouseLeftButtonUp handler exists in .cs
       2. Manual code review: handler toggles the checkbox
     Expected Result: Handler exists and toggles
-    Evidence: .sisyphus/evidence/task-4-row-click.txt
+    Evidence: .omo/evidence/task-4-row-click.txt
   ```
 
   **Commit**: YES (groups with Task 5)
@@ -652,7 +652,7 @@ Wave 3 (Tests + Final):
       2. Open Settings → File Assoc tab
       3. Verify no crash, 7 items visible
     Expected Result: Panel renders
-    Evidence: .sisyphus/evidence/task-5-open-panel.txt
+    Evidence: .omo/evidence/task-5-open-panel.txt
 
   Scenario: 安装所选扩展名
     Tool: Bash (PowerShell)
@@ -663,7 +663,7 @@ Wave 3 (Tests + Final):
       3. Check HKCU:\Software\Classes\.7z\OpenWithProgids
       4. Check HKCU:\Software\Classes\.zip\OpenWithProgids (should NOT have MantisZip)
     Expected Result: Only .7z installed
-    Evidence: .sisyphus/evidence/task-5-install-selected.txt
+    Evidence: .omo/evidence/task-5-install-selected.txt
 
   Scenario: 添加自定义扩展名
     Tool: Simulated (verify dialog logic in code)
@@ -676,7 +676,7 @@ Wave 3 (Tests + Final):
       5. Input ".001" x 21 times
       6. Verify 21st rejected (max 20)
     Expected Result: Validation works
-    Evidence: .sisyphus/evidence/task-5-custom-add.txt
+    Evidence: .omo/evidence/task-5-custom-add.txt
   ```
 
   **Commit**: YES (groups with Task 4)
@@ -750,7 +750,7 @@ Wave 3 (Tests + Final):
       2. Check zh.json has all keys
       3. Check en.json has all keys
     Expected Result: All keys present in both languages
-    Evidence: .sisyphus/evidence/task-6-localization.txt
+    Evidence: .omo/evidence/task-6-localization.txt
   ```
 
   **Commit**: YES (groups with Tasks 4, 5)
@@ -881,7 +881,7 @@ Wave 3 (Tests + Final):
       1. dotnet test tests\MantisZip.Tests\MantisZip.Tests.csproj
       2. Check output for passed tests
     Expected Result: All tests pass
-    Evidence: .sisyphus/evidence/task-7-test-results.txt
+    Evidence: .omo/evidence/task-7-test-results.txt
   ```
 
   **Commit**: YES

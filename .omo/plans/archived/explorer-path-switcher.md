@@ -195,7 +195,7 @@ Wave 3 (After Wave 2 — 集成):
       1. 编写快速测试程序引用 ExplorerWindowTracker
       2. 调用 GetOpenExplorerWindows()
     Expected Result: 返回非空列表，每个元素包含有效路径
-    Evidence: .sisyphus/evidence/task-1-explorer-list.txt
+    Evidence: .omo/evidence/task-1-explorer-list.txt
 
   Scenario: 无资源管理器窗口 — 返回空列表
     Tool: 单元测试
@@ -203,7 +203,7 @@ Wave 3 (After Wave 2 — 集成):
     Steps:
       1. 调用 GetOpenExplorerWindows()
     Expected Result: 返回空列表
-    Evidence: .sisyphus/evidence/task-1-empty-list.txt
+    Evidence: .omo/evidence/task-1-empty-list.txt
   ```
 
   **Commit**: YES
@@ -262,7 +262,7 @@ Wave 3 (After Wave 2 — 集成):
       1. 在代码中添加测试按钮临时触发窗口
       2. 查看窗口尺寸、样式、主题匹配
     Expected Result: 弹窗正确显示，主题匹配
-    Evidence: .sisyphus/evidence/task-2-popup-appearance.png
+    Evidence: .omo/evidence/task-2-popup-appearance.png
   ```
 
   **Commit**: YES (groups with T3)
@@ -328,7 +328,7 @@ Wave 3 (After Wave 2 — 集成):
       1. 在压缩对话框按 Ctrl+G 打开路径选择器
       2. 在搜索框输入 "Proj"
     Expected Result: 列表过滤为只包含 "D:\Projects" 的项
-    Evidence: .sisyphus/evidence/task-3-search-filter.png
+    Evidence: .omo/evidence/task-3-search-filter.png
 
   Scenario: 高亮当前激活窗口
     Tool: Bash (启动应用 + 截图)
@@ -337,7 +337,7 @@ Wave 3 (After Wave 2 — 集成):
       1. 确保前台是某个特定资源管理器窗口
       2. 按 Ctrl+G 打开路径选择器
     Expected Result: 当前前台资源管理器路径有高亮背景 + "当前窗口" 标签
-    Evidence: .sisyphus/evidence/task-3-active-highlight.png
+    Evidence: .omo/evidence/task-3-active-highlight.png
 
   Scenario: 无窗口时显示友好提示
     Tool: Bash (启动应用 + 截图)
@@ -345,7 +345,7 @@ Wave 3 (After Wave 2 — 集成):
     Steps:
       1. 在压缩对话框按 Ctrl+G
     Expected Result: 弹窗显示 "没有打开的资源管理器窗口"
-    Evidence: .sisyphus/evidence/task-3-empty-state.png
+    Evidence: .omo/evidence/task-3-empty-state.png
   ```
 
   **Commit**: YES (groups with T2)
@@ -405,7 +405,7 @@ Wave 3 (After Wave 2 — 集成):
     Steps:
       1. 在压缩对话框中按 Ctrl+G
     Expected Result: 路径选择器弹窗出现，显示已打开的资源管理器路径
-    Evidence: .sisyphus/evidence/task-4-ctrl-g-popup.png
+    Evidence: .omo/evidence/task-4-ctrl-g-popup.png
 
   Scenario: 选择路径后自动填入
     Tool: Bash
@@ -413,7 +413,7 @@ Wave 3 (After Wave 2 — 集成):
     Steps:
       1. 双击某个路径
     Expected Result: 弹窗关闭，OutputPathTextBox 中显示所选路径
-    Evidence: .sisyphus/evidence/task-4-path-filled.png
+    Evidence: .omo/evidence/task-4-path-filled.png
 
   Scenario: 无窗口时显示提示
     Tool: Bash
@@ -421,7 +421,7 @@ Wave 3 (After Wave 2 — 集成):
     Steps:
       1. 按 Ctrl+G
     Expected Result: 弹窗显示 "没有打开的资源管理器窗口"
-    Evidence: .sisyphus/evidence/task-4-no-explorer.png
+    Evidence: .omo/evidence/task-4-no-explorer.png
   ```
 
   **Commit**: YES
@@ -531,7 +531,7 @@ Wave 3 (After Wave 2 — 集成):
       2. 观察：快速选择器自动弹出
       3. 双击 D:\Target
     Expected Result: 直接解压到 D:\Target，未弹出 VistaFolderBrowserDialog
-    Evidence: .sisyphus/evidence/task-5-extract-quickpick.png
+    Evidence: .omo/evidence/task-5-extract-quickpick.png
 
   Scenario: 无窗口时正常回退到系统对话框
     Tool: Bash + 截图
@@ -541,7 +541,7 @@ Wave 3 (After Wave 2 — 集成):
     Steps:
       1. 执行 MantisZip.UI.exe --extract "test.7z"
     Expected Result: 直接弹出 VistaFolderBrowserDialog
-    Evidence: .sisyphus/evidence/task-5-extract-fallback.png
+    Evidence: .omo/evidence/task-5-extract-fallback.png
 
   Scenario: 端到端压缩测试
     Tool: Bash + 截图
@@ -552,7 +552,7 @@ Wave 3 (After Wave 2 — 集成):
       3. 按 Ctrl+G → 选择 D:\Output
       4. 确认目标路径已填入 → 点击压缩
     Expected Result: 压缩包创建在 D:\Output
-    Evidence: .sisyphus/evidence/task-5-compress-endtoend.png
+    Evidence: .omo/evidence/task-5-compress-endtoend.png
   ```
 
   **Commit**: YES
@@ -605,7 +605,7 @@ Wave 3 (After Wave 2 — 集成):
     Steps:
       1. dotnet test tests/MantisZip.Tests
     Expected Result: 全部测试通过（新增 + 原测试）
-    Evidence: .sisyphus/evidence/task-6-test-results.txt
+    Evidence: .omo/evidence/task-6-test-results.txt
   ```
 
   **Commit**: YES

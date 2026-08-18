@@ -83,7 +83,7 @@
 - **QA 验证**: Agent-Executed QA Scenarios（每个任务自带详细步骤）
 
 ### QA Policy
-每个任务包含 Agent-Executed QA Scenarios。证据保存到 `.sisyphus/evidence/`。
+每个任务包含 Agent-Executed QA Scenarios。证据保存到 `.omo/evidence/`。
 
 - 前端/UI: 使用 Playwright / 手动检查控件可见性
 - 构建验证: `dotnet build src\MantisZip.UI\MantisZip.UI.csproj` 必须通过
@@ -147,14 +147,14 @@ Wave 2 (集成 + 最终验证):
     Steps:
       1. 运行 dotnet list src\MantisZip.UI\MantisZip.UI.csproj package
     Expected Result: 输出包含 Mammoth 和 ClosedXML 条目
-    Evidence: .sisyphus/evidence/task-1-nuget-list.txt
+    Evidence: .omo/evidence/task-1-nuget-list.txt
 
   Scenario: 构建验证
     Tool: Bash
     Steps:
       1. 运行 dotnet build src\MantisZip.UI\MantisZip.UI.csproj
     Expected Result: Build succeeded，无错误
-    Evidence: .sisyphus/evidence/task-1-build.txt
+    Evidence: .omo/evidence/task-1-build.txt
   ```
 
   **Commit**: YES
@@ -232,7 +232,7 @@ Wave 2 (集成 + 最终验证):
       1. 运行 dotnet run --project src\MantisZip.UI --open <path/to/test.pptx>
       2. 使用 Playwright 或截图确认内容
     Expected Result: PreviewTextBox 显示 3 段幻灯片文本，每段以 "── 幻灯片 N ──" 开头
-    Evidence: .sisyphus/evidence/task-2-pptx-text.txt（截图）
+    Evidence: .omo/evidence/task-2-pptx-text.txt（截图）
 
   Scenario: PPTX 空幻灯片
     Tool: Bash
@@ -240,7 +240,7 @@ Wave 2 (集成 + 最终验证):
     Steps:
       1. 打开该文件
     Expected Result: 对应幻灯片显示 "（此幻灯片无文本）" 或类似回退
-    Evidence: .sisyphus/evidence/task-2-pptx-empty.txt
+    Evidence: .omo/evidence/task-2-pptx-empty.txt
   ```
 
   **Commit**: YES
@@ -306,7 +306,7 @@ Wave 2 (集成 + 最终验证):
       1. 打开该文件
       2. 确认 PreviewCsvGrid 显示正确数据
     Expected Result: DataGrid 显示 5 行 × 3 列，表头正确
-    Evidence: .sisyphus/evidence/task-3-xlsx-normal.txt
+    Evidence: .omo/evidence/task-3-xlsx-normal.txt
 
   Scenario: XLSX 密码保护
     Tool: Bash
@@ -314,7 +314,7 @@ Wave 2 (集成 + 最终验证):
     Steps:
       1. 打开该文件
     Expected Result: 不崩溃，显示"无法预览"或类似回退，信息面板显示元数据
-    Evidence: .sisyphus/evidence/task-3-xlsx-protected.txt
+    Evidence: .omo/evidence/task-3-xlsx-protected.txt
   ```
 
   **Commit**: YES
@@ -380,7 +380,7 @@ Wave 2 (集成 + 最终验证):
     Steps:
       1. 打开该文件
     Expected Result: WebView2 显示格式化后的 HTML 内容
-    Evidence: .sisyphus/evidence/task-4-docx-normal.png（WebView2 截图）
+    Evidence: .omo/evidence/task-4-docx-normal.png（WebView2 截图）
 
   Scenario: DOCX 超大文件
     Tool: Bash
@@ -388,7 +388,7 @@ Wave 2 (集成 + 最终验证):
     Steps:
       1. 打开该文件
     Expected Result: 内容区空置，信息面板依然显示元数据
-    Evidence: .sisyphus/evidence/task-4-docx-large.txt
+    Evidence: .omo/evidence/task-4-docx-large.txt
   ```
 
   **Commit**: YES
@@ -467,28 +467,28 @@ Wave 2 (集成 + 最终验证):
     Steps:
       1. 打开一个 .docx 文件
     Expected Result: ShowDocxPreview 被调用，WebView2 显示 HTML（或 >15MB 时回退到元数据）
-    Evidence: .sisyphus/evidence/task-5-dispatch-docx.txt
+    Evidence: .omo/evidence/task-5-dispatch-docx.txt
 
   Scenario: 调度分支验证 — .xlsx
     Tool: Bash
     Steps:
       1. 打开一个 .xlsx 文件
     Expected Result: ShowXlsxPreview 被调用，DataGrid 显示表格
-    Evidence: .sisyphus/evidence/task-5-dispatch-xlsx.txt
+    Evidence: .omo/evidence/task-5-dispatch-xlsx.txt
 
   Scenario: 调度分支验证 — .pptx
     Tool: Bash
     Steps:
       1. 打开一个 .pptx 文件
     Expected Result: ShowPptxPreview 被调用，PreviewTextBox 显示幻灯片文本
-    Evidence: .sisyphus/evidence/task-5-dispatch-pptx.txt
+    Evidence: .omo/evidence/task-5-dispatch-pptx.txt
 
   Scenario: 文件切换清理
     Tool: Bash
     Steps:
       1. 打开 .docx → 选择 .xlsx → 选择 .pptx → 选择 .txt
     Expected Result: 每次切换正确清理前一个预览控件（WebView2/DataGrid/TextBox）
-    Evidence: .sisyphus/evidence/task-5-cleanup.txt
+    Evidence: .omo/evidence/task-5-cleanup.txt
   ```
 
   **Commit**: YES
@@ -540,7 +540,7 @@ Wave 2 (集成 + 最终验证):
     Steps:
       1. dotnet build src\MantisZip.UI\MantisZip.UI.csproj
     Expected Result: Build succeeded
-    Evidence: .sisyphus/evidence/task-6-build.txt
+    Evidence: .omo/evidence/task-6-build.txt
   ```
 
   **Commit**: NO (grupped with task 5)
@@ -591,7 +591,7 @@ Wave 2 (集成 + 最终验证):
     Steps:
       1. 依次打开 .docx → .xlsx → .pptx → .txt → .jpg → .pdf → .exe → .torrent → 每步观察预览区域
     Expected Result: 所有步骤无崩溃，预览区域正确切换
-    Evidence: .sisyphus/evidence/task-7-regression.txt
+    Evidence: .omo/evidence/task-7-regression.txt
   ```
 
   **Commit**: YES

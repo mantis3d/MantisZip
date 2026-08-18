@@ -174,7 +174,7 @@ Task 1: Create contributors.csv
       1. `powershell -Command "[System.IO.File]::ReadAllBytes('src/MantisZip.UI/contributors-technical.csv') | Select-Object -First 3"`
       2. `powershell -Command "[System.IO.File]::ReadAllBytes('src/MantisZip.UI/contributors-financial.csv') | Select-Object -First 3"`
     Expected Result: Both show 0xEF, 0xBB, 0xBF
-    Evidence: .sisyphus/evidence/task-1-bom-check.txt
+    Evidence: .omo/evidence/task-1-bom-check.txt
 
   Scenario: Verify .csproj Content items
     Tool: Bash
@@ -183,7 +183,7 @@ Task 1: Create contributors.csv
       1. `Select-String -Pattern 'contributors-technical\.csv' 'src/MantisZip.UI/MantisZip.UI.csproj'`
       2. `Select-String -Pattern 'contributors-financial\.csv' 'src/MantisZip.UI/MantisZip.UI.csproj'`
     Expected Result: Both found with CopyToOutputDirectory
-    Evidence: .sisyphus/evidence/task-1-csproj.txt
+    Evidence: .omo/evidence/task-1-csproj.txt
   ```
 
   **Commit**: YES
@@ -244,7 +244,7 @@ Task 1: Create contributors.csv
     Tool: Bash
     Steps: Select-String for each key in strings.zh.json
     Expected: All 3 found with non-empty values
-    Evidence: .sisyphus/evidence/task-2-zh-keys.txt
+    Evidence: .omo/evidence/task-2-zh-keys.txt
 
   Scenario: Verify en.json keys
     Preconditions: None
@@ -252,7 +252,7 @@ Task 1: Create contributors.csv
       1. `Select-String -Pattern '"About_Contributors"' 'src/MantisZip.UI/Resources/strings.en.json'`
       2. `Select-String -Pattern '"About_Contributors_None"' 'src/MantisZip.UI/Resources/strings.en.json'`
     Expected Result: Both keys found with non-empty values
-    Evidence: .sisyphus/evidence/task-2-en-keys.txt
+    Evidence: .omo/evidence/task-2-en-keys.txt
 
   Scenario: Verify L.cs constants
     Tool: Bash
@@ -260,7 +260,7 @@ Task 1: Create contributors.csv
     Steps:
       1. `Select-String -Pattern 'About_Contributors' 'src/MantisZip.UI/Localization/L.cs'`
     Expected Result: Both constants declared (2 matches)
-    Evidence: .sisyphus/evidence/task-2-lcs-keys.txt
+    Evidence: .omo/evidence/task-2-lcs-keys.txt
   ```
 
   **Commit**: YES (groups with task 3, 4)
@@ -385,13 +385,13 @@ Task 1: Create contributors.csv
       3. Select-String 'ContributorsTechnicalEmpty' AboutWindow.xaml
       4. Select-String 'ContributorsFinancialEmpty' AboutWindow.xaml
     Expected: All 4 found
-    Evidence: .sisyphus/evidence/task-3-xaml-sections.txt
+    Evidence: .omo/evidence/task-3-xaml-sections.txt
 
   Scenario: Build succeeds
     Tool: Bash
     Steps: dotnet build src\MantisZip.UI\MantisZip.UI.csproj
     Expected: Build succeeded, 0 errors
-    Evidence: .sisyphus/evidence/task-3-build.txt
+    Evidence: .omo/evidence/task-3-build.txt
   ```
 
   **Commit**: YES (groups with task 2, 4)
@@ -531,7 +531,7 @@ Task 1: Create contributors.csv
     Tool: Bash
     Steps: dotnet build src\MantisZip.UI\MantisZip.UI.csproj
     Expected: Build succeeded, 0 errors
-    Evidence: .sisyphus/evidence/task-4-build.txt
+    Evidence: .omo/evidence/task-4-build.txt
   ```
 
   **Commit**: YES (groups with task 2, 3)
@@ -588,19 +588,19 @@ Task 1: Create contributors.csv
     Tool: Bash
     Steps: Select-String "About_Contributors" in AboutWindowTests.cs
     Expected: 3 new keys found in ExpectedAboutKeys
-    Evidence: .sisyphus/evidence/task-5-test-keys.txt
+    Evidence: .omo/evidence/task-5-test-keys.txt
 
   Scenario: Count check updated
     Tool: Bash
     Steps: Select-String "count >= " in AboutWindowTests.cs
     Expected: Shows "count >= 24"
-    Evidence: .sisyphus/evidence/task-5-count.txt
+    Evidence: .omo/evidence/task-5-count.txt
 
   Scenario: Installer includes both CSVs
     Tool: Bash
     Steps: Select-String "contributors-" in installer.iss
     Expected: Both technical and financial found
-    Evidence: .sisyphus/evidence/task-5-installer.txt
+    Evidence: .omo/evidence/task-5-installer.txt
   ```
 
   **Commit**: YES
@@ -641,7 +641,7 @@ Task 1: Create contributors.csv
     Steps:
       1. `dotnet build src\MantisZip.UI\MantisZip.UI.csproj 2>&1`
     Expected Result: Build succeeded, 0 errors
-    Evidence: .sisyphus/evidence/task-6-build.txt
+    Evidence: .omo/evidence/task-6-build.txt
 
   Scenario: All tests pass
     Tool: Bash
@@ -649,7 +649,7 @@ Task 1: Create contributors.csv
     Steps:
       1. `dotnet test tests\MantisZip.Tests\MantisZip.Tests.csproj 2>&1`
     Expected Result: All tests passed, 0 failures
-    Evidence: .sisyphus/evidence/task-6-tests.txt
+    Evidence: .omo/evidence/task-6-tests.txt
   ```
 
   **Commit**: NO (verify-only task)

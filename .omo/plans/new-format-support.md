@@ -449,7 +449,7 @@ XZ 实现与 BZip2 几乎完全对称，不同点：
 
 ## 未纳入范围
 
-- **RAR 压缩** — 已有独立计划 `.sisyphus/plans/rar-compression.md`
+- **RAR 压缩** — 已有独立计划 `.omo/plans/rar-compression.md`
 - **libarchive 系格式写入（cpio/ar/xar/warc）** — 外部调研确认 LibArchive.Net 有增量但需引入第二份 native dll，与 7z.dll 重叠度高；若未来需要写入 cpio/xar 再评估
 - **NSIS (.exe) / DMG (.dmg)** — 扩展名冲突/Windows 定位不符，仅保留魔数路径（可选），不进扩展名映射
 - **WIM 写入 / 分卷 WIM** — 7z.dll 可读可写但 SharpSevenZip 压缩路径未验证，WIM 定位与压缩工具不符，只读即可

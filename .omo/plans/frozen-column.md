@@ -97,7 +97,7 @@
 - **Test type**: 序列化 round-trip 验证
 
 ### QA Policy
-Every task includes agent-executed QA scenarios. Evidence saved to `.sisyphus/evidence/task-{N}-{scenario-slug}.{ext}`.
+Every task includes agent-executed QA scenarios. Evidence saved to `.omo/evidence/task-{N}-{scenario-slug}.{ext}`.
 
 - **UI/DataGrid**: Build + run app, verify via code analysis + window.json
 - **Unit tests**: `dotnet test` 
@@ -166,7 +166,7 @@ No blocking dependencies — each task builds on the previous.
     Steps:
       1. `dotnet build src\MantisZip.UI\MantisZip.UI.csproj` → 编译成功
     Expected Result: exit code 0, no build errors
-    Evidence: .sisyphus/evidence/task-1-build.txt
+    Evidence: .omo/evidence/task-1-build.txt
 
   Scenario: 验证字符串内容
     Tool: Bash
@@ -176,7 +176,7 @@ No blocking dependencies — each task builds on the previous.
       2. `Select-String "Main_Col_FreezeToHere" src\MantisZip.UI\Resources\strings.en.json` → 找到匹配
       3. `Select-String "Main_Col_FreezeToHere" src\MantisZip.UI\Localization\L.cs` → 找到匹配
     Expected Result: 所有搜索均返回匹配结果
-    Evidence: .sisyphus/evidence/task-1-strings.txt
+    Evidence: .omo/evidence/task-1-strings.txt
   ```
 
   **Commit**: YES
@@ -235,7 +235,7 @@ No blocking dependencies — each task builds on the previous.
       1. `dotnet build src\MantisZip.UI\MantisZip.UI.csproj` → 编译成功
       2. `Select-String "FrozenColumnSeparator" src\MantisZip.UI\MainWindow\MainWindow.xaml` → 找到定义
     Expected Result: 编译通过，元素定义存在
-    Evidence: .sisyphus/evidence/task-2-xaml.txt
+    Evidence: .omo/evidence/task-2-xaml.txt
   ```
 
   **Commit**: YES (groups with Task 3-5)
@@ -306,7 +306,7 @@ No blocking dependencies — each task builds on the previous.
       1. 使用 ast_grep_search 验证菜单逻辑代码存在:
          ast_grep_search "ColumnFreezeMenuItem_Click" --lang csharp
     Expected Result: 找到事件处理方法的定义
-    Evidence: .sisyphus/evidence/task-3-menu.txt
+    Evidence: .omo/evidence/task-3-menu.txt
   ```
 
   **Commit**: YES (groups with Task 2, 4, 5)
@@ -431,7 +431,7 @@ No blocking dependencies — each task builds on the previous.
     Steps:
       1. ast_grep_search "UpdateFrozenSeparator" --lang csharp
     Expected Result: 找到方法定义
-    Evidence: .sisyphus/evidence/task-4-separator.txt
+    Evidence: .omo/evidence/task-4-separator.txt
   ```
 
   **Commit**: YES (groups with Task 2, 3, 5)
@@ -494,7 +494,7 @@ No blocking dependencies — each task builds on the previous.
     Steps:
       1. ast_grep_search "FrozenColumnCount" --lang csharp | Select-String "WindowSize"
     Expected Result: WindowSize 类中有 FrozenColumnCount 属性
-    Evidence: .sisyphus/evidence/task-5-persist.txt
+    Evidence: .omo/evidence/task-5-persist.txt
   ```
 
   **Commit**: YES (groups with Task 2, 3, 4)
@@ -564,7 +564,7 @@ No blocking dependencies — each task builds on the previous.
     Steps:
       1. `dotnet test tests\MantisZip.Tests\MantisZip.Tests.csproj` → 返回 exit code 0
     Expected Result: 所有测试通过（包括已有测试和新增测试）
-    Evidence: .sisyphus/evidence/task-6-tests.txt
+    Evidence: .omo/evidence/task-6-tests.txt
   ```
 
   **Commit**: YES

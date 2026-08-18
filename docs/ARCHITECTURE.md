@@ -117,7 +117,7 @@ MantisZip/
 │   ├── PROGRESS.md                # 版本历史
 │   ├── CLI.md                     # 命令行指南
 │   └── manual-test-checklist.md   # 手动测试清单
-├── .sisyphus/
+├── .omo/
 │   ├── notepads/                  # 功能学习笔记
 │   └── plans/                     # 设计方案
 ├── AGENTS.md

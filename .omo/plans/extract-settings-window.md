@@ -200,14 +200,14 @@ F1-F4                   all                 —
     Steps:
       1. dotnet build src/MantisZip.Core/MantisZip.Core.csproj
     Expected Result: Build succeeded, 0 errors
-    Evidence: .sisyphus/evidence/task-1-build.txt
+    Evidence: .omo/evidence/task-1-build.txt
 
   Scenario: 枚举值完整
     Tool: Bash (通过 grep 验证)
     Steps:
       1. 确认文件中包含 "Here,", "Smart,", "ToName,", "Manual"
     Expected Result: 4 个枚举值全部存在
-    Evidence: .sisyphus/evidence/task-1-enum-values.txt
+    Evidence: .omo/evidence/task-1-enum-values.txt
   ```
 
   **Commit**: YES
@@ -297,7 +297,7 @@ F1-F4                   all                 —
     Steps:
       1. dotnet build src/MantisZip.UI/MantisZip.UI.csproj
     Expected Result: Build succeeded, 0 errors
-    Evidence: .sisyphus/evidence/task-2-build.txt
+    Evidence: .omo/evidence/task-2-build.txt
 
   Scenario: 键值完整性（验证文件行数）
     Tool: Bash (grep)
@@ -306,7 +306,7 @@ F1-F4                   all                 —
       2. 确认 strings.zh.json 包含对应项
       3. 确认 strings.en.json 包含对应项
     Expected Result: 所有文件键完整
-    Evidence: .sisyphus/evidence/task-2-keys.txt
+    Evidence: .omo/evidence/task-2-keys.txt
   ```
 
   **Commit**: NO (groups with Task 3/4)
@@ -386,7 +386,7 @@ F1-F4                   all                 —
     Steps:
       1. dotnet build src/MantisZip.UI/MantisZip.UI.csproj
     Expected Result: Build succeeded, 0 errors
-    Evidence: .sisyphus/evidence/task-3-build.txt
+    Evidence: .omo/evidence/task-3-build.txt
 
   Scenario: XAML 结构校验
     Tool: Bash (grep 验证关键元素)
@@ -396,7 +396,7 @@ F1-F4                   all                 —
       3. grep -c "ListBox" → 出现
       4. grep -c "Button" → 至少 2 个（解压 + 取消）
     Expected Result: 所有关键元素存在
-    Evidence: .sisyphus/evidence/task-3-structure.txt
+    Evidence: .omo/evidence/task-3-structure.txt
   ```
 
   **Commit**: NO (groups with Task 4)
@@ -519,7 +519,7 @@ F1-F4                   all                 —
     Steps:
       1. dotnet build src/MantisZip.UI/MantisZip.UI.csproj
     Expected Result: Build succeeded, 0 errors
-    Evidence: .sisyphus/evidence/task-4-build.txt
+    Evidence: .omo/evidence/task-4-build.txt
 
   Scenario: 构造 + 属性验证（通过反射测试）
     Tool: Bash (编写简单控制台验证)
@@ -528,7 +528,7 @@ F1-F4                   all                 —
       2. 验证 SelectedPaths.Count == 2
       3. 验证默认 OutputMode == ToName
     Expected Result: 构造正确，默认值正确
-    Evidence: .sisyphus/evidence/task-4-ctor.txt
+    Evidence: .omo/evidence/task-4-ctor.txt
 
   Scenario: Radio 切换验证
     Tool: 代码审查
@@ -537,7 +537,7 @@ F1-F4                   all                 —
       2. 确认手动模式启用 TextBox+Browse
       3. 确认非手动模式禁用 TextBox
     Expected Result: 所有 Radio 分支正确处理
-    Evidence: .sisyphus/evidence/task-4-radio.txt
+    Evidence: .omo/evidence/task-4-radio.txt
   ```
 
   **Commit**: YES (groups with Task 3)

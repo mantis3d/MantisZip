@@ -2,7 +2,7 @@
 
 > **状态**: ✅ 已完成（Tasks 1-6 全部完成；后续增强项 DOCX 表格提取 / Markdown 表格渲染 / PPTX Canvas 定位预览 已实现）
 > **基于**: Avalonia 端口（`avalonia-port` 分支，Phase 0-10 已完成）
-> **替代**: `.sisyphus/plans/office-content-preview.md`（WPF 版计划，已过时）
+> **替代**: `.omo/plans/office-content-preview.md`（WPF 版计划，已过时）
 
 ## TL;DR
 
@@ -752,7 +752,7 @@ case Table t:
     return BuildTable(t, source);
 ```
 
-详见 `.sisyphus/plans/html-preview-webview-fallback.md` Task 5（第 229–283 行）已有完整的 `BuildTable` 实现方案。
+详见 `.omo/plans/html-preview-webview-fallback.md` Task 5（第 229–283 行）已有完整的 `BuildTable` 实现方案。
 
 **状态**: ✅ 已实现（`MarkdownPreviewBuilder.TryBuildBlock` 新增 `case Table` → `BuildTable`，Grid 按 `TableColumnDefinition.Width` 生成 Star/Auto 列，表头行 `ThemeHeaderBgBrush`、正文行 `ThemeSurfaceBgBrush`、周围 `ThemeBorderBrush`）
 

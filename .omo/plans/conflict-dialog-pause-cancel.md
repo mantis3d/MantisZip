@@ -617,7 +617,7 @@ conflictResolver: info =>
 在对应区域添加一行引用该计划：
 
 ```markdown
-| 文件冲突对话框暂停/取消 | 暂停和取消按钮 — 收起冲突对话框回到进度窗口暂停状态，或取消整个操作 | `.sisyphus/plans/conflict-dialog-pause-cancel.md` |
+| 文件冲突对话框暂停/取消 | 暂停和取消按钮 — 收起冲突对话框回到进度窗口暂停状态，或取消整个操作 | `.omo/plans/conflict-dialog-pause-cancel.md` |
 ```
 
 ---

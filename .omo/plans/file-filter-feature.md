@@ -199,7 +199,7 @@ Task 1 → Task 2 → Task 4 → Task 5 → Task 9 → Task 7 → Task 11 → Ta
       3. Set IncludeExtensions to [".mp3"]
       4. Assert IsActive == true
     Expected Result: All assertions pass
-    Evidence: .sisyphus/evidence/task-1-isactive.txt
+    Evidence: .omo/evidence/task-1-isactive.txt
 
   Scenario: DisplaySummary returns readable text
     Tool: Bash
@@ -208,7 +208,7 @@ Task 1 → Task 2 → Task 4 → Task 5 → Task 9 → Task 7 → Task 11 → Ta
       1. Create filter with NamePattern="*报告*", MinSize=1024
       2. Assert DisplaySummary contains "报告" and "1 KB"
     Expected Result: DisplaySummary is non-empty and descriptive
-    Evidence: .sisyphus/evidence/task-1-summary.txt
+    Evidence: .omo/evidence/task-1-summary.txt
   ```
 
   **Commit**: YES
@@ -262,7 +262,7 @@ Task 1 → Task 2 → Task 4 → Task 5 → Task 9 → Task 7 → Task 11 → Ta
       2. Assert IsMatch(filter, "test.mp3") == true
       3. Assert IsMatch(filter, "test.txt") == false
     Expected Result: Only .mp3 matches
-    Evidence: .sisyphus/evidence/task-2-ext-filter.txt
+    Evidence: .omo/evidence/task-2-ext-filter.txt
 
   Scenario: Name pattern with wildcard
     Tool: Bash
@@ -272,7 +272,7 @@ Task 1 → Task 2 → Task 4 → Task 5 → Task 9 → Task 7 → Task 11 → Ta
       2. Assert IsMatch(filter, "monthly_report_2024.xlsx") == true
       3. Assert IsMatch(filter, "readme.txt") == false
     Expected Result: Name pattern matches correctly
-    Evidence: .sisyphus/evidence/task-2-name-filter.txt
+    Evidence: .omo/evidence/task-2-name-filter.txt
 
   Scenario: Size range filter
     Tool: Bash
@@ -283,7 +283,7 @@ Task 1 → Task 2 → Task 4 → Task 5 → Task 9 → Task 7 → Task 11 → Ta
       3. Assert IsMatch(filter, medium.txt (2000 bytes)) == true
       4. Assert IsMatch(filter, large.txt (10000 bytes)) == false
     Expected Result: Size range respected
-    Evidence: .sisyphus/evidence/task-2-size-filter.txt
+    Evidence: .omo/evidence/task-2-size-filter.txt
   ```
 
   **Commit**: YES (groups with 1)
@@ -351,7 +351,7 @@ Task 1 → Task 2 → Task 4 → Task 5 → Task 9 → Task 7 → Task 11 → Ta
       4. Assert FilterPresets[0].Name == "Audio Only"
       5. Assert FilterPresets[0].Criteria.IncludeExtensions contains ".mp3"
     Expected Result: Preset survives round-trip
-    Evidence: .sisyphus/evidence/task-3-preset-persistence.txt
+    Evidence: .omo/evidence/task-3-preset-persistence.txt
 
   Scenario: Built-in presets accessible
     Tool: Bash
@@ -361,7 +361,7 @@ Task 1 → Task 2 → Task 4 → Task 5 → Task 9 → Task 7 → Task 11 → Ta
       2. Assert count == 8
       3. Assert all have IsBuiltIn == true
     Expected Result: 8 built-in presets available
-    Evidence: .sisyphus/evidence/task-3-builtin-presets.txt
+    Evidence: .omo/evidence/task-3-builtin-presets.txt
   ```
 
   **Commit**: YES (groups with 1)
@@ -630,7 +630,7 @@ Task 1 → Task 2 → Task 4 → Task 5 → Task 9 → Task 7 → Task 11 → Ta
       3. Call ApplyFilter(["a.txt", "b.mp3"], new FileFilterCriteria())
       4. Assert result contains both files (empty filter = inactive)
     Expected Result: No filtering when filter is null or inactive
-    Evidence: .sisyphus/evidence/task-9-null-filter.txt
+    Evidence: .omo/evidence/task-9-null-filter.txt
 
   Scenario: Directory recursively filtered
     Tool: Bash
@@ -641,7 +641,7 @@ Task 1 → Task 2 → Task 4 → Task 5 → Task 9 → Task 7 → Task 11 → Ta
       3. Assert result contains "a.mp3" and "sub\\c.mp3"
       4. Assert result does NOT contain "sub\\b.txt"
     Expected Result: Directory recursively filtered, relative paths preserved
-    Evidence: .sisyphus/evidence/task-9-dir-filter.txt
+    Evidence: .omo/evidence/task-9-dir-filter.txt
   ```
 
   **Commit**: YES
@@ -792,7 +792,7 @@ Task 1 → Task 2 → Task 4 → Task 5 → Task 9 → Task 7 → Task 11 → Ta
   - Extract: open archive → ExtractSettingsWindow → filter entries → verify output
   - Quick compress: set preset → quick compress → verify preset auto-applied
   - Edge cases: empty directory, all files excluded, 0-byte file, null dates, built-in presets
-  Save to `.sisyphus/evidence/final-qa/`.
+  Save to `.omo/evidence/final-qa/`.
   Output: `Scenarios [N/N pass] | Integration [N/N] | Edge Cases [N tested] | VERDICT`
 
 - [ ] F4. **Scope Fidelity Check** — `deep`
