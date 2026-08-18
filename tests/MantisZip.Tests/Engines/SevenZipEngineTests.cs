@@ -197,6 +197,7 @@ public class SevenZipEngineTests : IDisposable
 
         var entries = await _engine.ListEntriesAsync(archive);
         Assert.Contains(entries, e => e.FullPath == Path.GetFileName(newFile));
+        Assert.Contains(entries, e => e.FullPath == "hello.txt"); // 既有条目必须保留（Append 模式）
     }
 
     [Fact]
@@ -238,6 +239,31 @@ public class SevenZipEngineTests : IDisposable
         Assert.Contains(entries, e => e.FullPath == $"docs/{dirName}/subdir/nested.txt");
         // 新添加的源目录不应落在根目录（无 docs/ 前缀；根目录 hello.txt 是夹具预置的旧条目）
         Assert.DoesNotContain(entries, e => e.FullPath == $"{dirName}/hello.txt");
+    }
+
+    [Fact]
+    public async Task AddToArchiveAsync_DirectorySource_NoEntryBasePath_PrefixesDirName()
+    {
+        if (!Is7zDllAvailable()) return;
+
+        var archive = ArchiveFixtures.CreateSevenZipArchive();
+        if (archive == null) return;
+        TrackFile(archive);
+
+        // 源目录含子目录结构
+        var sourceDir = TrackDir(Path.Combine(Path.GetTempPath(), "MantisZipTest", Guid.NewGuid().ToString()));
+        var subDir = Path.Combine(sourceDir, "sub");
+        Directory.CreateDirectory(subDir);
+        var newFile = Path.Combine(subDir, "hello.txt");
+        await File.WriteAllTextAsync(newFile, "nested content");
+
+        await _engine.AddToArchiveAsync(archive, [sourceDir], new ArchiveOptions()); // entryBasePath = null
+
+        var entries = await _engine.ListEntriesAsync(archive);
+        // 目录源无 entryBasePath → 条目名带 {目录名}/ 前缀（与 ZipEngine 语义一致）
+        Assert.Contains(entries, e => e.FullPath == $"{Path.GetFileName(sourceDir)}/sub/hello.txt");
+        // 既有条目保留
+        Assert.Contains(entries, e => e.FullPath == "hello.txt");
     }
 
     // ===== Progress Reporting =====
