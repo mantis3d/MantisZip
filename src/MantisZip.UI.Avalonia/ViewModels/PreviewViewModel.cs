@@ -209,7 +209,7 @@ public partial class PreviewViewModel : ObservableObject
     partial void OnLoadingFileNameChanged(string value) =>
         OnPropertyChanged(nameof(LoadingFileDisplay));
 
-    public bool HasZoomControls => PreviewType is PreviewType.Image or PreviewType.Gif;
+    public bool HasZoomControls => PreviewType is PreviewType.Image or PreviewType.AnimatedImage;
     public bool HasFontSizeControls => PreviewType == PreviewType.Text;
 
     // Computed visibility per preview type
@@ -219,7 +219,7 @@ public partial class PreviewViewModel : ObservableObject
     public bool IsUnsupportedVisible => PreviewType == PreviewType.Unsupported || PreviewType == PreviewType.None;
 
     public bool IsImageVisible => PreviewType == PreviewType.Image;
-    public bool IsGifVisible => PreviewType == PreviewType.Gif;
+    public bool IsAnimatedImageVisible => PreviewType == PreviewType.AnimatedImage;
     public bool IsSvgVisible => PreviewType == PreviewType.Svg;
     public bool IsFontVisible => PreviewType == PreviewType.Font;
     public bool IsAudioVisible => PreviewType == PreviewType.Audio;
@@ -249,7 +249,7 @@ public partial class PreviewViewModel : ObservableObject
         OnPropertyChanged(nameof(IsCsvVisible));
         OnPropertyChanged(nameof(IsPeVisible));
         OnPropertyChanged(nameof(IsImageVisible));
-        OnPropertyChanged(nameof(IsGifVisible));
+        OnPropertyChanged(nameof(IsAnimatedImageVisible));
         OnPropertyChanged(nameof(IsSvgVisible));
         OnPropertyChanged(nameof(IsFontVisible));
         OnPropertyChanged(nameof(IsAudioVisible));
@@ -267,7 +267,7 @@ public partial class PreviewViewModel : ObservableObject
         OnPropertyChanged(nameof(IsUnsupportedVisible));
         OnPropertyChanged(nameof(HasZoomControls));
         OnPropertyChanged(nameof(HasFontSizeControls));
-        OnPropertyChanged(nameof(HasGifControls));
+        OnPropertyChanged(nameof(HasAnimationControls));
         OnPropertyChanged(nameof(HasTransparencyControls));
         OnPropertyChanged(nameof(HasFlattenAlphaControls));
         OnPropertyChanged(nameof(HasLigatureControls));
@@ -527,7 +527,7 @@ public partial class PreviewViewModel : ObservableObject
         IsInfoPanelVisible = true;
     }
 
-    public bool HasGifControls => PreviewType == PreviewType.Gif;
+    public bool HasAnimationControls => PreviewType == PreviewType.AnimatedImage;
 
     // ── Ligature toggle ──
 
@@ -1062,7 +1062,7 @@ public partial class PreviewViewModel : ObservableObject
             // 初始缩放：适应视口
             ZoomFit();
 
-            PreviewType = PreviewType.Gif;
+            PreviewType = PreviewType.AnimatedImage;
             IsPreviewVisible = true;
             IsToolbarVisible = true;
             PreviewHeaderText = LocalizationManager.T("Preview_Header_Gif");

@@ -74,7 +74,7 @@
 
         <!-- GIF controls -->
         <StackPanel Orientation="Horizontal" Spacing="2"
-                    IsVisible="{Binding HasGifControls}">
+                    IsVisible="{Binding HasAnimationControls}">
           <Button Command="{Binding PreviousGifFrameCommand}"
                   Width="32" Height="{DynamicResource ControlHeight}" Padding="0">
             <PathIcon Data="{StaticResource IconPrevious}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
@@ -267,7 +267,7 @@
         </ScrollViewer>
 
         <!-- GIF preview (same image control) -->
-        <ScrollViewer x:Name="GifPreviewScrollViewer" IsVisible="{Binding IsGifVisible}"
+        <ScrollViewer x:Name="GifPreviewScrollViewer" IsVisible="{Binding IsAnimatedImageVisible}"
                       HorizontalScrollBarVisibility="Auto"
                       VerticalScrollBarVisibility="Auto">
           <Grid>

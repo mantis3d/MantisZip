@@ -1164,7 +1164,7 @@ public partial class MainWindowViewModel : ObservableObject
                         StatusMessage = LocalizationManager.T("Preview_Image", entry.DisplayName);
                     }
                     break;
-                case PreviewType.Gif:
+                case PreviewType.AnimatedImage:
                     if (!PreviewService.EnableImagePreview)
                     {
                         Preview.ShowUnsupported(LocalizationManager.T("Preview_ImageDisabled"));

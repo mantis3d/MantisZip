@@ -14,7 +14,8 @@ public enum PreviewType
     Csv,
     Pe,
     Image,
-    Gif,
+    Gif,            // ⚠️ 已废弃：由 AnimatedImage 取代（保留枚举值避免破坏性变更，不再被任何映射产出）
+    AnimatedImage,  // 动画图像预览（GIF / Animated WebP 共用）
     Svg,
     Font,
     Audio,
@@ -176,7 +177,7 @@ public class PreviewService
         if (CsvExtensions.Contains(ext)) return PreviewType.Csv;
         if (PeExtensions.Contains(ext)) return PreviewType.Pe;
         if (ImageExtensions.Contains(ext)) return PreviewType.Image;
-        if (GifExtensions.Contains(ext)) return PreviewType.Gif;
+        if (GifExtensions.Contains(ext)) return PreviewType.AnimatedImage;
         if (SvgExtensions.Contains(ext)) return PreviewType.Svg;
         if (FontExtensions.Contains(ext)) return PreviewType.Font;
         if (AudioExtensions.Contains(ext)) return PreviewType.Audio;
@@ -261,7 +262,7 @@ public class PreviewService
         return format switch
         {
             // 图像 (GIF 单独处理，走动画预览路径)
-            FileFormat.Gif => PreviewType.Gif,
+            FileFormat.Gif => PreviewType.AnimatedImage,
 
             FileFormat.Png or FileFormat.Jpeg or FileFormat.Bmp
                 or FileFormat.WebP or FileFormat.Ico
