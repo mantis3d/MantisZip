@@ -852,6 +852,13 @@ public partial class PreviewViewModel : ObservableObject
                 fs.Position = 0;
                 bitmap = new global::Avalonia.Media.Imaging.Bitmap(fs);
             }
+            else if (codec.FrameCount > 1)
+            {
+                // 动画（当前为 Animated WebP；GIF 由分类直接走 ShowGif 不经此路径）：
+                // 复用通用动画预览——播放/暂停/帧导航 + 透明棋盘格（Task 2 已注册能力）
+                ShowGif(filePath);
+                return;
+            }
             else if (codec.Info.Width > 1920)
             {
                 fs.Position = 0;

@@ -163,4 +163,72 @@ public class PreviewViewModelTests
         File.WriteAllBytes(path, bytes);
         return path;
     }
+
+    /// <summary>
+    /// Animated WebP（多帧）经 ShowImage 必须分流到动画预览（AnimatedImage 类型 + 透明控制）。
+    /// 样本：32×32 两帧红→蓝 animated webp（base64 内嵌，用 Python Pillow 生成后转码，见下文样本说明）。
+    /// </summary>
+    [AvaloniaFact]
+    public void ShowImage_AnimatedWebP_RoutesToAnimationPreview()
+    {
+        var webpPath = CreateTestAnimatedWebP();
+        try
+        {
+            var vm = new PreviewViewModel();
+            vm.ShowImage(webpPath);
+
+            Assert.Equal(PreviewType.AnimatedImage, vm.PreviewType);
+            Assert.True(vm.HasTransparencyControls);
+            Assert.True(vm.HasAnimationControls);
+        }
+        finally
+        {
+            File.Delete(webpPath);
+        }
+    }
+
+    /// <summary>
+    /// 静态 WebP（单帧）经 ShowImage 保持 Image 预览（透明+压平能力）。
+    /// </summary>
+    [AvaloniaFact]
+    public void ShowImage_StaticWebP_StaysImagePreview()
+    {
+        var webpPath = CreateTestWebp(64, 64);
+        try
+        {
+            var vm = new PreviewViewModel();
+            vm.ShowImage(webpPath);
+
+            Assert.Equal(PreviewType.Image, vm.PreviewType);
+            Assert.True(vm.HasTransparencyControls);
+            Assert.True(vm.HasFlattenAlphaControls);
+        }
+        finally
+        {
+            File.Delete(webpPath);
+        }
+    }
+
+    /// <summary>用 SkiaSharp 生成纯色静态 WebP 测试图。</summary>
+    private static string CreateTestWebp(int width, int height)
+    {
+        using var bitmap = new SKBitmap(width, height);
+        using var canvas = new SKCanvas(bitmap);
+        canvas.Clear(SKColors.Blue);
+        using var image = SKImage.FromBitmap(bitmap);
+        using var data = image.Encode(SKEncodedImageFormat.Webp, 90);
+        var path = Path.Combine(Path.GetTempPath(), $"mantiszip_webp_test_{Guid.NewGuid():N}.webp");
+        File.WriteAllBytes(path, data.ToArray());
+        return path;
+    }
+
+    /// <summary>写 animated WebP（32×32 两帧）到临时目录。样本为 base64 内嵌常量（生成方法见下）。</summary>
+    private static string CreateTestAnimatedWebP()
+    {
+        // 样本：32×32 两帧红→蓝 animated webp（236 字节，base64 内嵌；生成方法见下注释）
+        var bytes = Convert.FromBase64String("UklGRuQAAABXRUJQVlA4WAoAAAACAAAAHwAAHwAAQU5JTQYAAAAAAAAAAABBTk1GXAAAAAAAAAAAAB8AAB8AAGQAAAJWUDggRAAAALADAJ0BKiAAIAA+bTSWR6QjIiEoCACADYllAMkCgH4AAtaQY7UAAP7wm0P/yC5YXXI1//ID/kB/yA//kB/+m9mp84AAQU5NRlQAAAAAAAAAAAAfAAAfAABkAAAAVlA4IDwAAADUAgCdASogACAAPm00lkeCgIAAANiWUAdgAExQ4dowAP75Hdv//kB//kB//kB//ID//iF3shz/9P4AAAA=");
+        var path = Path.Combine(Path.GetTempPath(), $"mantiszip_anim_webp_test_{Guid.NewGuid():N}.webp");
+        File.WriteAllBytes(path, bytes);
+        return path;
+    }
 }
