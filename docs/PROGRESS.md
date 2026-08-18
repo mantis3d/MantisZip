@@ -21,6 +21,8 @@
 
 ### MantisZip.UI.Avalonia（主力版）
 
+**2026-08-18** — 添加文件到压缩包时保留浏览目录前缀（entryBasePath），7z 改用 `CompressFileDictionary` 精确控制条目名
+
 **2026-08-18** — 图片预览能力系统：透明/动画能力注册表 + GIF 透明 + Animated WebP 预览
   - **预览能力注册表**：新增 `PreviewCapabilities`（[Flags] `PreviewCapability`：Zoom/Transparency/FlattenAlpha/AnimationControls），按 PreviewType 声明能力，`HasZoomControls`/`HasTransparencyControls`/`HasFlattenAlphaControls`/`HasAnimationControls` 全部查表（对齐 MetadataRegistry 模式）；新增格式只注册能力即可获得工具栏控件
   - **GIF 透明支持**：`AnimatedImage` 注册 Transparency——工具栏 🏁 棋盘格出现（棋盘格矩形早已接好，此前仅按钮未暴露）；🎨 压平保持静态图专用（方案 A 决策：动画帧不做全帧压平）
@@ -1307,6 +1309,9 @@
 ### 共享层（Core / ShellExt / 构建）
 
 这些变更影响两项目共用代码，按时间从新到旧排列。
+
+#### v0.5.0 (2026-08-18)
+- 添加文件到压缩包时保留浏览目录前缀（entryBasePath）：7z 改用 `CompressFileDictionary` 精确控制条目名；ZIP 传入 entryBasePath
 
 #### v0.5.0 (2026-08-12) 测试压缩包时文件进度条不再停滞（TestArchiveAsync 补 FilePercentComplete）
   - **背景**：点击「测试」时进度窗口的文件进度条（`FilePercentComplete`）从不更新——三个引擎的 `TestArchiveAsync` 上报的 `ArchiveProgress` 均未设置 `FilePercentComplete`，而 UI 侧（WPF `ProgressWindow.SetProgress` / Avalonia `ProgressViewModel.SetProgress`）只在 `HasValue` 时更新文件进度条，导致其恒为 0（总体进度条正常）。解压/压缩路径均有 per-file 上报，唯独测试路径遗漏

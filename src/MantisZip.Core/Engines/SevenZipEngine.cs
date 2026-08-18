@@ -979,26 +979,49 @@ public class SevenZipEngine : IArchiveEngine
 
             AttachCompressorProgress(compr, progress);
 
-            // 展开源路径，追加到归档
-            var files = ExpandSourcePaths(sourcePaths);
-            // FileWhitelist（来自压缩预览过滤 B）命中时只添加匹配文件，保证 预览=实际。
-            // 白名单值为预览收集的原始绝对路径（\ 分隔），与 FileScanner 匹配方式一致，勿 Normalize。
-            if (options.FileWhitelist != null)
+            // entryBasePath 前缀（与 ZipEngine 语义一致）："docs" → 条目名 "docs/<相对路径>"。
+            // 空/根目录时无前缀，条目落在归档根目录。
+            var basePath = string.IsNullOrEmpty(entryBasePath) ? "" : entryBasePath.TrimEnd('/') + "/";
+
+            // entry 名 → 源文件绝对路径的字典。
+            // CompressFileDictionary 将字典 key 原样作为归档条目名（"/" 分隔），
+            // 借此精确控制添加到当前浏览目录，取代旧的 CompressFilesEncrypted（只能按公共根推导条目名）。
+            // 注意：不添加目录条目（null 值）——SharpSevenZip 的 ArchiveUpdateCallback.GetStream
+            // 对 null 流会抛 NullReferenceException（7z.dll 在 Update 模式会对目录项调用 GetStream）。
+            // 目录结构由文件路径隐式生成，归档内/UI 目录树均能正确还原。
+            var fileDict = new Dictionary<string, string>();
+            foreach (var sourcePath in sourcePaths)
             {
-                var whitelist = options.FileWhitelist;
-                files = files
-                    .Where(p => !File.Exists(p) || whitelist.Contains(p))
-                    .ToArray();
+                cancellationToken.ThrowIfCancellationRequested();
+
+                if (Directory.Exists(sourcePath))
+                {
+                    var dirName = ArchivePath.GetFileName(sourcePath);
+                    foreach (var file in Directory.GetFiles(sourcePath, "*", SearchOption.AllDirectories))
+                    {
+                        // FileWhitelist（来自压缩预览过滤 B）命中时只添加匹配文件，保证 预览=实际。
+                        // 白名单值为预览收集的原始绝对路径（\ 分隔），与 FileScanner 匹配方式一致，勿 Normalize。
+                        if (options.FileWhitelist != null && !options.FileWhitelist.Contains(file))
+                            continue;
+                        var relativePath = Path.Combine(dirName, Path.GetRelativePath(sourcePath, file));
+                        fileDict[basePath + relativePath.Replace('\\', '/')] = file;
+                    }
+                }
+                else if (File.Exists(sourcePath))
+                {
+                    fileDict[basePath + Path.GetFileName(sourcePath)] = sourcePath;
+                }
             }
-            if (files.Length == 0)
+
+            if (fileDict.Count == 0)
             {
                 CoreLog.Info("AddToArchiveAsync: no files to add (whitelist filtered)");
                 return;
             }
-            compr.CompressFilesEncrypted(
+            compr.CompressFileDictionary(
+                fileDict,
                 archivePath,
-                options.Encrypt ? options.Password ?? "" : "",
-                files);
+                options.Encrypt ? options.Password ?? "" : "");
 
             progress?.Report(new ArchiveProgress
             {

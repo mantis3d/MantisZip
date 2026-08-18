@@ -2380,7 +2380,9 @@ public partial class MainWindowViewModel : ObservableObject
             async (progress, ct) =>
             {
                 var options = new ArchiveOptions { Password = password };
-                await engine.AddToArchiveAsync(CurrentArchivePath, files.ToArray(), options, progress, ct);
+                // entryBasePath：当前浏览的压缩包内目录，null=根目录（与 WPF 版行为一致）
+                await engine.AddToArchiveAsync(CurrentArchivePath, files.ToArray(), options, progress, ct,
+                    entryBasePath: string.IsNullOrEmpty(CurrentFolder) ? null : CurrentFolder);
             });
 
         if (completed)

@@ -1,6 +1,7 @@
 using MantisZip.Core.Abstractions;
 using MantisZip.Core.Engines;
 using MantisZip.Tests.Fixtures;
+using SharpSevenZip;
 using Xunit;
 
 namespace MantisZip.Tests.Engines;
@@ -176,6 +177,67 @@ public class SevenZipEngineTests : IDisposable
 
         var result = await _engine.TestArchiveAsync(badPath);
         Assert.False(result);
+    }
+
+    // ===== AddToArchiveAsync =====
+
+    [Fact]
+    public async Task AddToArchiveAsync_NoEntryBasePath_AddsToRoot()
+    {
+        if (!Is7zDllAvailable()) return;
+
+        var archive = ArchiveFixtures.CreateSevenZipArchive();
+        if (archive == null) return;
+        TrackFile(archive);
+
+        var newFile = TrackFile(Path.Combine(Path.GetTempPath(), "MantisZipTest", $"{Guid.NewGuid()}_added.txt"));
+        await File.WriteAllTextAsync(newFile, "root content");
+
+        await _engine.AddToArchiveAsync(archive, [newFile], new ArchiveOptions());
+
+        var entries = await _engine.ListEntriesAsync(archive);
+        Assert.Contains(entries, e => e.FullPath == Path.GetFileName(newFile));
+    }
+
+    [Fact]
+    public async Task AddToArchiveAsync_WithEntryBasePath_AddsToSubfolder()
+    {
+        if (!Is7zDllAvailable()) return;
+
+        var archive = ArchiveFixtures.CreateSevenZipArchive();
+        if (archive == null) return;
+        TrackFile(archive);
+
+        var newFile = TrackFile(Path.Combine(Path.GetTempPath(), "MantisZipTest", $"{Guid.NewGuid()}_added.txt"));
+        await File.WriteAllTextAsync(newFile, "subfolder content");
+
+        await _engine.AddToArchiveAsync(archive, [newFile], new ArchiveOptions(), entryBasePath: "docs");
+
+        var entries = await _engine.ListEntriesAsync(archive);
+        // 文件应出现在 docs/ 子目录下，而非压缩包根目录
+        Assert.Contains(entries, e => e.FullPath == "docs/" + Path.GetFileName(newFile));
+        Assert.DoesNotContain(entries, e => e.FullPath == Path.GetFileName(newFile));
+    }
+
+    [Fact]
+    public async Task AddToArchiveAsync_WithEntryBasePath_DirectorySource_KeepsFolderStructure()
+    {
+        if (!Is7zDllAvailable()) return;
+
+        var archive = ArchiveFixtures.CreateSevenZipArchive();
+        if (archive == null) return;
+        TrackFile(archive);
+
+        var srcDir = TrackDir(ArchiveFixtures.CreateSourceDirectory()); // 含 hello.txt + binary.dat + subdir/nested.txt
+
+        await _engine.AddToArchiveAsync(archive, [srcDir], new ArchiveOptions(), entryBasePath: "docs");
+
+        var entries = await _engine.ListEntriesAsync(archive);
+        var dirName = Path.GetFileName(srcDir);
+        Assert.Contains(entries, e => e.FullPath == $"docs/{dirName}/hello.txt");
+        Assert.Contains(entries, e => e.FullPath == $"docs/{dirName}/subdir/nested.txt");
+        // 新添加的源目录不应落在根目录（无 docs/ 前缀；根目录 hello.txt 是夹具预置的旧条目）
+        Assert.DoesNotContain(entries, e => e.FullPath == $"{dirName}/hello.txt");
     }
 
     // ===== Progress Reporting =====
