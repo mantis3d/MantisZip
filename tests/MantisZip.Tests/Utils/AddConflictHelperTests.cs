@@ -167,4 +167,50 @@ public class AddConflictHelperTests
         var occupied = Occupied("file.txt", "file (1).txt");
         Assert.Equal("file (2).txt", AddConflictHelper.GetUniqueEntryName("file.txt", occupied));
     }
+
+    [Fact]
+    public async Task ResolveEntryNameAsync_Ask_CustomNameCollides_FallsBackToUniqueName()
+    {
+        var occupied = Occupied("hello.txt", "my-rename.txt");
+        var options = new ArchiveOptions
+        {
+            ConflictAction = FileConflictAction.Ask,
+            ConflictResolverAsync = info =>
+            {
+                info.CustomName = "my-rename.txt"; // 与已有条目冲突
+                return Task.FromResult(FileConflictAction.Rename);
+            },
+        };
+        var result = await AddConflictHelper.ResolveEntryNameAsync(
+            "hello.txt", options, DateTime.Now.AddDays(-1), 10, DateTime.Now, 20, occupied);
+        Assert.Equal("my-rename (1).txt", result);
+    }
+
+    [Fact]
+    public void ResolveEntryName_Ask_CustomNameCollides_FallsBackToUniqueName()
+    {
+        var occupied = Occupied("hello.txt", "my-rename.txt");
+        var options = new ArchiveOptions
+        {
+            ConflictAction = FileConflictAction.Ask,
+            ConflictResolver = info =>
+            {
+                info.CustomName = "my-rename.txt";
+                return FileConflictAction.Rename;
+            },
+        };
+        var result = AddConflictHelper.ResolveEntryName(
+            "hello.txt", options, DateTime.Now.AddDays(-1), 10, DateTime.Now, 20, occupied);
+        Assert.Equal("my-rename (1).txt", result);
+    }
+
+    [Fact]
+    public void GetUniqueEntryName_AllNamesOccupied_FallsBackToUniqueGuidName()
+    {
+        var occupied = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "file.txt" };
+        for (int i = 1; i < 1000; i++)
+            occupied.Add($"file ({i}).txt");
+        var result = AddConflictHelper.GetUniqueEntryName("file.txt", occupied);
+        Assert.DoesNotContain(result, occupied);
+    }
 }

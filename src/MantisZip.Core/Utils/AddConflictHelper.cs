@@ -52,6 +52,9 @@ public static class AddConflictHelper
                 if (action == FileConflictAction.Rename && !string.IsNullOrWhiteSpace(info.CustomName))
                 {
                     var final = CombineCustomName(entryName, info.CustomName);
+                    // 用户自定义名可能与已有条目冲突：冲突时退化为自动唯一名（防重复条目）
+                    if (occupiedNames.Contains(final))
+                        final = GetUniqueEntryName(final, occupiedNames);
                     occupiedNames.Add(final);
                     return final;
                 }
@@ -91,6 +94,9 @@ public static class AddConflictHelper
             if (action == FileConflictAction.Rename && !string.IsNullOrWhiteSpace(info.CustomName))
             {
                 var final = CombineCustomName(entryName, info.CustomName);
+                // 用户自定义名可能与已有条目冲突：冲突时退化为自动唯一名（防重复条目）
+                if (occupiedNames.Contains(final))
+                    final = GetUniqueEntryName(final, occupiedNames);
                 occupiedNames.Add(final);
                 return final;
             }
@@ -195,7 +201,9 @@ public static class AddConflictHelper
             if (!occupiedNames.Contains(candidate))
                 return candidate;
         }
-        return entryName; // 999 个名字全被占用，直接使用原条目名
+        // 999 个名字全被占用（病态场景）：GUID 后缀保证唯一
+        var uniqueName = $"{bareName} ({Guid.NewGuid().ToString("N")[..8]}){ext}";
+        return string.IsNullOrEmpty(dir) ? uniqueName : $"{dir.Replace('\\', '/')}/{uniqueName}";
     }
 
     /// <summary>用户自定义名合成最终条目名：保留目录前缀 + 净化文件名（复用 FileConflictHelper.SanitizeFileName）。</summary>
