@@ -243,6 +243,117 @@ public class ZipEngineTests : IDisposable
         Assert.Contains(entries, e => e.Name == "added.txt");
     }
 
+    // ===== 冲突处理集成测试（copy-mode，默认不走加密路径） =====
+
+    private async Task<string> CreateDupFileAsync(string name, string content)
+    {
+        var file = Path.Combine(Path.GetTempPath(), "MantisZipTest", Guid.NewGuid().ToString(), name);
+        Directory.CreateDirectory(Path.GetDirectoryName(file)!);
+        await File.WriteAllTextAsync(file, content);
+        _tempFiles.Add(file);
+        return file;
+    }
+
+    [Fact]
+    public async Task AddToArchiveAsync_DuplicateName_Overwrite_ReplacesContent()
+    {
+        var archive = TrackFile(ArchiveFixtures.CreateZipArchive()); // hello.txt + subdir/nested.txt
+        var dupFile = await CreateDupFileAsync("hello.txt", "duplicate content");
+
+        await _engine.AddToArchiveAsync(archive, [dupFile], new ArchiveOptions { ConflictAction = FileConflictAction.Overwrite });
+
+        var entries = await _engine.ListEntriesAsync(archive);
+        Assert.Equal(1, entries.Count(e => e.Name == "hello.txt"));
+
+        var dest = TrackDir(Path.Combine(Path.GetTempPath(), "MantisZipTest", Guid.NewGuid().ToString()));
+        await _engine.ExtractAsync(archive, dest);
+        Assert.Equal("duplicate content", await File.ReadAllTextAsync(Path.Combine(dest, "hello.txt")));
+    }
+
+    [Fact]
+    public async Task AddToArchiveAsync_DuplicateName_Skip_KeepsOriginal()
+    {
+        var archive = TrackFile(ArchiveFixtures.CreateZipArchive());
+        var dupFile = await CreateDupFileAsync("hello.txt", "duplicate content");
+
+        await _engine.AddToArchiveAsync(archive, [dupFile], new ArchiveOptions { ConflictAction = FileConflictAction.Skip });
+
+        var entries = await _engine.ListEntriesAsync(archive);
+        Assert.Equal(1, entries.Count(e => e.Name == "hello.txt"));
+
+        var dest = TrackDir(Path.Combine(Path.GetTempPath(), "MantisZipTest", Guid.NewGuid().ToString()));
+        await _engine.ExtractAsync(archive, dest);
+        Assert.Equal(ArchiveFixtures.HelloText, await File.ReadAllTextAsync(Path.Combine(dest, "hello.txt")));
+    }
+
+    [Fact]
+    public async Task AddToArchiveAsync_DuplicateName_Rename_AddsUniqueEntry()
+    {
+        var archive = TrackFile(ArchiveFixtures.CreateZipArchive());
+        var dupFile = await CreateDupFileAsync("hello.txt", "duplicate content");
+
+        await _engine.AddToArchiveAsync(archive, [dupFile], new ArchiveOptions { ConflictAction = FileConflictAction.Rename });
+
+        var entries = await _engine.ListEntriesAsync(archive);
+        Assert.Contains(entries, e => e.Name == "hello.txt");
+        Assert.Contains(entries, e => e.Name == "hello (1).txt");
+    }
+
+    [Fact]
+    public async Task AddToArchiveAsync_DuplicateName_Ask_ResolverSkip_KeepsOriginal()
+    {
+        var archive = TrackFile(ArchiveFixtures.CreateZipArchive());
+        var dupFile = await CreateDupFileAsync("hello.txt", "duplicate content");
+
+        var options = new ArchiveOptions
+        {
+            ConflictAction = FileConflictAction.Ask,
+            ConflictResolverAsync = _ => Task.FromResult(FileConflictAction.Skip),
+        };
+        await _engine.AddToArchiveAsync(archive, [dupFile], options);
+
+        var dest = TrackDir(Path.Combine(Path.GetTempPath(), "MantisZipTest", Guid.NewGuid().ToString()));
+        await _engine.ExtractAsync(archive, dest);
+        Assert.Equal(ArchiveFixtures.HelloText, await File.ReadAllTextAsync(Path.Combine(dest, "hello.txt")));
+    }
+
+    [Fact]
+    public async Task AddToArchiveAsync_DuplicateName_Ask_ResolverCustomName()
+    {
+        var archive = TrackFile(ArchiveFixtures.CreateZipArchive());
+        var dupFile = await CreateDupFileAsync("hello.txt", "duplicate content");
+
+        var options = new ArchiveOptions
+        {
+            ConflictAction = FileConflictAction.Ask,
+            ConflictResolverAsync = info =>
+            {
+                info.CustomName = "my-rename.txt";
+                return Task.FromResult(FileConflictAction.Rename);
+            },
+        };
+        await _engine.AddToArchiveAsync(archive, [dupFile], options);
+
+        var entries = await _engine.ListEntriesAsync(archive);
+        Assert.Contains(entries, e => e.Name == "hello.txt");
+        Assert.Contains(entries, e => e.Name == "my-rename.txt");
+    }
+
+    [Fact]
+    public async Task AddToArchiveAsync_DuplicateName_Ask_Cancel_AbortsOperation()
+    {
+        var archive = TrackFile(ArchiveFixtures.CreateZipArchive());
+        var dupFile = await CreateDupFileAsync("hello.txt", "duplicate content");
+
+        var options = new ArchiveOptions
+        {
+            ConflictAction = FileConflictAction.Ask,
+            ConflictResolverAsync = _ => throw new OperationCanceledException("用户取消"),
+        };
+        await Assert.ThrowsAsync<OperationCanceledException>(
+            () => _engine.AddToArchiveAsync(archive, [dupFile], options));
+    }
+
     // ===== Progress Reporting =====
 
     [Fact]
