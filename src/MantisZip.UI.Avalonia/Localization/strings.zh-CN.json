@@ -1,4 +1,6 @@
 {
+  "Preview_AnimatedImage": "动画预览 {0}",
+  "Preview_Header_AnimatedImage": "动画图片",
   "Menu_ShowPreviewPanel": "显示预览面板",
   "Preview_TooLarge": "文件过大 ({0:F1} MB)，超过预览大小限制 ({1:F0} MB)",
   "Preview_TooLargeText": "文件过大 ({0:F1} MB)，超过文本预览限制 ({1:F0} MB)",

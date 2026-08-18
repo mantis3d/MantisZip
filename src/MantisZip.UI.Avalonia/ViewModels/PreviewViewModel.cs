@@ -1072,7 +1072,8 @@ public partial class PreviewViewModel : ObservableObject
             PreviewType = PreviewType.AnimatedImage;
             IsPreviewVisible = true;
             IsToolbarVisible = true;
-            PreviewHeaderText = LocalizationManager.T("Preview_Header_Gif");
+            var isGif = Path.GetExtension(filePath).Equals(".gif", StringComparison.OrdinalIgnoreCase);
+            PreviewHeaderText = LocalizationManager.T(isGif ? "Preview_Header_Gif" : "Preview_Header_AnimatedImage");
             var gifFormatValues = new Dictionary<string, string?>
             {
                 [MetadataKeys.Dimensions] = $"{ImageWidth} × {ImageHeight}",

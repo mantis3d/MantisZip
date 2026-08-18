@@ -1172,7 +1172,9 @@ public partial class MainWindowViewModel : ObservableObject
                         break;
                     }
                     Preview.ShowGif(tempFile);
-                    StatusMessage = LocalizationManager.T("Preview_Gif", entry.DisplayName);
+                    var isGifFile = ext.Equals(".gif", StringComparison.OrdinalIgnoreCase);
+                    StatusMessage = LocalizationManager.T(
+                        isGifFile ? "Preview_Gif" : "Preview_AnimatedImage", entry.DisplayName);
                     break;
                 case PreviewType.Svg:
                     if (!PreviewService.EnableImagePreview)
