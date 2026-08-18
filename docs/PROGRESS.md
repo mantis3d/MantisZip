@@ -21,6 +21,14 @@
 
 ### MantisZip.UI.Avalonia（主力版）
 
+**2026-08-18** — 图片预览小图放大修复：SKCodec 尺寸门槛降采样 + 真实渲染后端回归测试
+  - **修复 `DecodeToWidth` 无条件放大小图**：`ShowImage` 原用 `Bitmap.DecodeToWidth(fs, 1920)` 会把任意位图无条件缩放到目标宽度（200×150 的小图被放大成 1920×1440，且元数据面板显示错误尺寸）。改为先经 `SKCodec.Create` 读头部拿真实宽度——仅当宽 > 1920 时降采样，小图原生解码保持清晰度，与 WPF 版 `DecodePixelWidth` 门槛语义一致；codec 无法解析时回退原生解码路径
+  - **顺带修复 debug log typo**：`w{ImageWidth}xh{ImageWidth}` → `h{ImageHeight}`
+  - **测试基建升级**：`TestAppBuilder` 改用 `UseSkia()` + `UseHeadlessDrawing=false` 走真实 Skia 渲染后端（Headless stub 下 `LoadBitmap` 恒为 1×1、`Save` 为 no-op），使 `Bitmap` 解码返回真实像素尺寸
+  - **新增 2 个回归测试**：小图（200×150）保持原生分辨率、大图（3000×2000）降采样到 1920 宽
+  - 涉及文件：`ViewModels/PreviewViewModel.cs`、`tests/MantisZip.UI.Avalonia.Tests/PreviewViewModelTests.cs`、`tests/MantisZip.UI.Avalonia.Tests/TestAppBuilder.cs`
+  - 验证：`dotnet build` 0 错误 0 警告、Avalonia 测试 56 通过 2 跳过 0 失败
+
 **2026-08-13** — 预览面板位置/显隐全面修复：四种布局移植 + 三入口统一 + 旧副本覆盖磁盘的架构 bug 修复
   - **「预览位置」四种布局实现（此前为死设置，WPF 迁移遗漏）**：`PreviewPosition`（1=底部/2=目录树下方/3=文件列表下方/4=右侧）现生效——单 Grid 附加属性切换（`ApplyPreviewPosition`，`PreviewPanel` 不搬移父容器，规避 WPF 双 Grid 搬移方案的状态残留 bug）；启动时 + 设置窗口保存后应用；各位置尺寸记忆（切换/隐藏时保存，恢复时还原）
   - **「显示预览面板」显隐生效 + 空间释放**：`ApplyPreviewLayout` 统一入口（启动/设置保存后）从磁盘重读 `ShowPreviewPanel` 并同步 `MainWindowViewModel.IsPreviewVisible`（菜单勾选一致）；面板隐藏时压缩预览行列 + 复位 RowSpan 让树/列表撑满；菜单切换（PropertyChanged 订阅）同步布局；隐藏前记录当前尺寸保证重新打开保留拖过的宽高
