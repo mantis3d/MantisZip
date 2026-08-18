@@ -46,7 +46,7 @@ Avalonia 移植 Phases 0–10 已完成，当前处于功能补齐后期：
 |-------|------|------|
 | 0–9 | 项目骨架·浏览·预览·设置·压缩解压·编辑·样式·交互 | ✅ 已完成 |
 | 10 | WPF 功能补齐（进度条·信息面板·状态栏） | ✅ 已完成 |
-| UI 功能补齐 | 对话框·控件·转换器补齐 | 29/29 ✅(已完成) |
+| UI 功能补齐 | 对话框·控件·转换器补齐 | 27/29 ✅（2 项待 GUI 验证） |
 | Shell/COM 集成 | ShellIntegration·ShellExt·文件关联·CLI | ✅ 已完成 |
 | i18n + 清理 | 缺失 key 补齐·空目录清理·版本对齐 | ✅ 已完成 |
 | HTML 预览升级 | 跨平台 WebView + ReverseMarkdown 降级 | 📋 待实施（恢复 WebView 双轨方案） |
@@ -120,13 +120,13 @@ Despite using `CommunityToolkit.Mvvm`, **all logic lives in `MainWindow.xaml.cs`
 
 使用 `CommunityToolkit.Mvvm` 的 `ObservableObject` + source generators (`[ObservableProperty]`, `[RelayCommand]`)：
 
-- **ViewModels**: `MainWindowViewModel`, `PreviewViewModel`, `ProgressViewModel`, `CompressSettingsViewModel`, `ExtractSettingsViewModel`, `SettingsWindowViewModel`, `IconTestViewModel`（图标测试窗口）
-- **Services**: `ArchiveService`, `CompressService`, `ExtractService`, `SelectedItemsExtractService`（选择条目解压，消费 `ExtractPathResolver`）、`PreviewService`, `IconService`, `LocalizationManager`, `CompressionOptionData`（选项数据源）、`GifDecoder`（自实现 GIF 解码）、`IcoParser`（ICO 多帧解析）、`MarkdownPreviewBuilder`（Markdig AST→控件树）、`ResultPreviewService`（结果预览树，`BuildExtractPreview` 与解压共用 `ExtractPathResolver` 保证预览=实际）、`MetadataSettingsManager`（元数据面板配置持久化，见下方信息面板小节）、`MetadataRenderEngine`（元数据渲染引擎，见下方信息面板小节）
-- **Views**: `MainWindow.axaml`, `PreviewPanel.axaml` (UserControl), `SettingsWindow.axaml`
-- **Controls**: `ResultTreeView`（结果预览可复用控件，Compact/Full 模式、截断/过滤/冲突高亮）、`QuickPathPicker`（自包含路径速选控件，见下方「路径速选子系统」）
+- **ViewModels**: `MainWindowViewModel`, `PreviewViewModel`, `ProgressViewModel`, `CompressSettingsViewModel`, `ExtractSettingsViewModel`, `SettingsWindowViewModel`, `IconTestViewModel`（图标测试窗口）、`UiTestViewModel`（UI 控件测试窗口）、`MetadataPanelSettingsViewModel`（元数据面板设置窗口）
+- **Services**: `ArchiveService`, `CompressService`, `ExtractService`, `SelectedItemsExtractService`（选择条目解压，消费 `ExtractPathResolver`）、`CompressFlow`（压缩公共流程：BuildRequest/冲突弹窗/暂停，主窗口 VM 与 CLI 共用）、`ExtractFlow`（解压公共流程 + 冲突弹窗）、`DragDropService`（拖拽解压后置流程）+ `OverlayController`（Win32 覆层）+ `CustomOleDragDrop`（自实现 OLE 拖拽，根治光标）+ `DropTargetDetector`（目标目录检测）+ `DragDropItemExpander`（选中目录展开）+ `DragPreviewBitmapBuilder`（拖拽预览位图）、`PasswordService`（密码验证/自动匹配）、`FileFilterHelper`（文件过滤）、`NativeMethods`（Win32 P/Invoke）、`PreviewService`, `IconService`, `LocalizationManager`, `CompressionOptionData`（选项数据源）、`GifDecoder`（自实现 GIF 解码）、`IcoParser`（ICO 多帧解析）、`MarkdownPreviewBuilder`（Markdig AST→控件树）、`ResultPreviewService`（结果预览树，`BuildExtractPreview` 与解压共用 `ExtractPathResolver` 保证预览=实际）、`MetadataSettingsManager`（元数据面板配置持久化，见下方信息面板小节）、`MetadataRenderEngine`（元数据渲染引擎，见下方信息面板小节）、`ShellIntegration`（partial 拆分：`ShellIntegration.cs` + `ShellIntegration.Menu.cs` + `ShellIntegration.Assoc.cs`）
+- **Views**: `MainWindow.axaml`, `PreviewPanel.axaml` (UserControl), `SettingsWindow.axaml`, `UiTestWindow.axaml`（UI 控件测试，仅 Debug 显示）
+- **Controls**: `ResultTreeView`（结果预览可复用控件，Compact/Full 模式、截断/过滤/冲突高亮）、`QuickPathPicker`（自包含路径速选控件，见下方「路径速选子系统」）、`InfoPanel`（元数据信息面板）、`FileFilterEditor`（文件过滤条件编辑器）、`DynamicFormatOptionsPanel`（压缩格式动态选项，7z 固实块等）、`QuickPathControl`（路径速选控件）
 - **Converters**: `BrushResourceConverter`（主题色键→画刷）、`GeometryResourceConverter`（资源键→Geometry）
 - **紧凑度模式**: Compact/Normal/Loose 三档，`ApplyCompactness()` 运行时注入 12 个 `DynamicResource`（间距/控件高度/圆角），无需重启
-- **上下文工具栏**: 目录树工具栏（展开/折叠全部+过滤器+分隔符切换）+ 文件列表工具栏（选择/反选/展平/排序/地址栏），`PathIcon` 矢量按钮
+- **上下文工具栏**: 目录树工具栏（展开/折叠全部+自动展开开关+过滤器+分隔符切换）+ 文件列表工具栏（选择/反选/展平/排序/地址栏），`PathIcon` 矢量按钮
 - 对话框通过 ViewModel 的回调委托（`ShowPasswordDialog`, `ShowExtractSettingsDialog` 等）与 View 解耦
 
 ### 预览子系统
@@ -183,7 +183,7 @@ Despite using `CommunityToolkit.Mvvm`, **all logic lives in `MainWindow.xaml.cs`
 - **上下文菜单**: EnableCompressMenu, EnableOpenMenu, EnableCascadingMenu, ShowMenuIcons, EnableSmartExtractMenu, EnableExtractHereMenu, EnableExtractToNamedMenu, EnableExtractToMenu, EnableCompressSeparate, EnableCompressCombined, EnableDynamicMenu
 - **预览**: EnableImagePreview, EnableTextPreview, MaxTextPreviewBytes, ShowPreviewPanel, ShowPreviewInfoPanel, TextPreviewFontSize, TextPreviewFontFamily, TextEncodingPreference, MaxTablePreviewRows, MaxTablePreviewCols, MaxPreviewFileSize, FontPreviewFontSize, FontPreviewSampleText, FontPreviewEnableLigature, PreviewPosition, InfoPanelOrientation, UseColorEmoji, EnableFormatDetection, PreviewHeadSize
 - **密码管理**: ShowPasswordMatchNotification, PasswordRevealByDefault
-- **外观（Avalonia 新增）**: Theme (Light/Dark), MaxRecentFiles, AppFontFamily, CompactnessMode (Compact/Normal/Loose), Language, ShowProgressBars, SeparateDirBaseline
+- **外观（Avalonia 新增）**: Theme (Light/Dark), MaxRecentFiles, AppFontFamily, CompactnessMode (Compact/Normal/Loose), Language, ShowProgressBars, SeparateDirBaseline, AutoExpandTreeToCurrent（目录树自动展开）
 - **文件关联（Avalonia 新增）**: AssocZip/7z/Rar/Tar/TarGz/Gz/Iso, CustomAssocExtensions
 - **收藏夹（Avalonia 新增）**: FavoritePaths (List<string>)
 - **调试**: EnableDebugLogging, LogPrivacyMode (off/filename/full)
@@ -259,6 +259,7 @@ Open and Extract verbs use `AppliesTo` filter (archive extensions only). Icons v
 | `--extract-to-name <path>` | Extract to named folder (archive name without extension) + ProgressWindow, then exit |
 | `--extract <path>` | Direct extract with AppSettings defaults + ProgressWindow, then exit |
 | `--open <path>` | Launch MainWindow and load archive for browsing |
+| `--open-dispatch <path>` | Launch MainWindow and load archive, or dispatch to extract action per `DoubleClickAction` setting (used by file association / shell verb) |
 | _(no args)_ | Normal MainWindow launch |
 
 - **Avalonia**: `App.axaml.cs` `OnFrameworkInitializationCompleted` 中处理所有 CLI 路由
@@ -387,7 +388,13 @@ Uses `ArchiveItem.FullPath` for the output temp path so files from subdirectorie
 
 ### Avalonia 版
 
-拖拽待移植，方案见 [drag-drop-direct-extract.md](.sisyphus/plans/drag-drop-direct-extract.md)（纯 Win32 独立覆层）。
+已实施**拖拽直接解压**（方案见 [drag-drop-direct-extract.md](.sisyphus/plans/drag-drop-direct-extract.md)），与 WPF 的 eager-extraction 模型不同，采用"拖拽即解压到目标目录"的实时模式：
+
+1. `MainWindow.axaml.cs` 文件列表 `PointerPressed` 检测拖拽起点（列标题/空白按下不触发），选中项经 `DragDropItemExpander.ExpandItems` 展开为条目集
+2. `OverlayController`（纯 Win32 独立覆层，`UpdateLayeredWindow` 后台线程渲染）显示三色状态机（检测中/可释放/不可释放）+ 呼吸动画（拖拽预览弹窗 DragPreviewPopup 待实施：`DragPreviewBitmapBuilder` 位图构建与 `OverlayController.SetPreview` 槽位已就绪但无调用者）
+3. `DropTargetDetector` 用 `WindowFromPoint` + ShellWindows 枚举实时检测目标目录（`#32770` 用 `EnumChildWindows`），`IsOverOwnWindow` 用 HWND 比较防止自家窗口误判
+4. 松手后 `DragDropService` 执行后置解压流程（模态进度窗口 + 冲突处理 + 本地化状态消息），完成后清理
+5. **光标方案 C**：`CustomOleDragDrop` 自实现 OLE `IDataObject`/`IDropSource`/`IEnumFORMATETC`（`CustomDataObject`/`CustomDropSource`/`CustomEnumFormatEtc`）替代 Avalonia `DragDrop.DoDragDropAsync`（其 `OleDragSource` 固定返回 `USEDEFAULTCURSORS` 导致禁止光标无法替换）；`GiveFeedback` 返回 S_OK + 直接 `SetCursor`，光标按 overlay 状态（绿/红/金/灰）动态切换，根治光标问题；Esc/多键取消经 OLE `fEscapePressed` 检测
 
 ### Custom `IDataObject` attempt (archived)
 
