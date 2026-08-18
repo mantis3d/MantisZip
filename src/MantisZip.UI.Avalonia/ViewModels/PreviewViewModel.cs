@@ -209,7 +209,7 @@ public partial class PreviewViewModel : ObservableObject
     partial void OnLoadingFileNameChanged(string value) =>
         OnPropertyChanged(nameof(LoadingFileDisplay));
 
-    public bool HasZoomControls => PreviewType is PreviewType.Image or PreviewType.AnimatedImage;
+    public bool HasZoomControls => PreviewCapabilities.For(PreviewType).HasFlag(PreviewCapability.Zoom);
     public bool HasFontSizeControls => PreviewType == PreviewType.Text;
 
     // Computed visibility per preview type
@@ -527,13 +527,13 @@ public partial class PreviewViewModel : ObservableObject
         IsInfoPanelVisible = true;
     }
 
-    public bool HasAnimationControls => PreviewType == PreviewType.AnimatedImage;
+    public bool HasAnimationControls => PreviewCapabilities.For(PreviewType).HasFlag(PreviewCapability.AnimationControls);
 
     // ── Ligature toggle ──
 
     public bool HasLigatureControls => PreviewType == PreviewType.Font;
-    public bool HasTransparencyControls => PreviewType is PreviewType.Image or PreviewType.Svg or PreviewType.IcoGallery;
-    public bool HasFlattenAlphaControls => PreviewType is PreviewType.Image or PreviewType.Svg;
+    public bool HasTransparencyControls => PreviewCapabilities.For(PreviewType).HasFlag(PreviewCapability.Transparency);
+    public bool HasFlattenAlphaControls => PreviewCapabilities.For(PreviewType).HasFlag(PreviewCapability.FlattenAlpha);
 
     [ObservableProperty]
     private bool _isLigatureEnabled = true;

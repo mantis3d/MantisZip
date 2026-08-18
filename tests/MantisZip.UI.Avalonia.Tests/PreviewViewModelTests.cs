@@ -104,4 +104,63 @@ public class PreviewViewModelTests
         File.WriteAllBytes(path, data.ToArray());
         return path;
     }
+
+    /// <summary>
+    /// 能力注册表：Image=缩放+透明+压平；AnimatedImage=缩放+透明+动画控制（无压平，方案 A 决策）；
+    /// Svg=透明+压平；IcoGallery=仅透明；未注册类型=None。
+    /// </summary>
+    [Fact]
+    public void PreviewCapabilities_Registry_DeclaresExpectedFlags()
+    {
+        Assert.True(PreviewCapabilities.For(PreviewType.Image).HasFlag(PreviewCapability.Zoom));
+        Assert.True(PreviewCapabilities.For(PreviewType.Image).HasFlag(PreviewCapability.Transparency));
+        Assert.True(PreviewCapabilities.For(PreviewType.Image).HasFlag(PreviewCapability.FlattenAlpha));
+        Assert.False(PreviewCapabilities.For(PreviewType.Image).HasFlag(PreviewCapability.AnimationControls));
+
+        Assert.True(PreviewCapabilities.For(PreviewType.AnimatedImage).HasFlag(PreviewCapability.Zoom));
+        Assert.True(PreviewCapabilities.For(PreviewType.AnimatedImage).HasFlag(PreviewCapability.Transparency));
+        Assert.True(PreviewCapabilities.For(PreviewType.AnimatedImage).HasFlag(PreviewCapability.AnimationControls));
+        Assert.False(PreviewCapabilities.For(PreviewType.AnimatedImage).HasFlag(PreviewCapability.FlattenAlpha));
+
+        Assert.True(PreviewCapabilities.For(PreviewType.Svg).HasFlag(PreviewCapability.Transparency));
+        Assert.True(PreviewCapabilities.For(PreviewType.Svg).HasFlag(PreviewCapability.FlattenAlpha));
+
+        Assert.True(PreviewCapabilities.For(PreviewType.IcoGallery).HasFlag(PreviewCapability.Transparency));
+        Assert.False(PreviewCapabilities.For(PreviewType.IcoGallery).HasFlag(PreviewCapability.FlattenAlpha));
+
+        Assert.Equal(PreviewCapability.None, PreviewCapabilities.For(PreviewType.Text));
+    }
+
+    /// <summary>
+    /// GIF 预览必须暴露透明控制（🏁 棋盘格）且不暴露压平（🎨 为静态图专用）。
+    /// 用 1×1 透明 GIF 样本（base64 内嵌，SKCodec 可解 1 帧）。
+    /// </summary>
+    [AvaloniaFact]
+    public void ShowGif_ExposesTransparencyControls()
+    {
+        var gifPath = CreateTestGif();
+        try
+        {
+            var vm = new PreviewViewModel();
+            vm.ShowGif(gifPath);
+
+            Assert.Equal(PreviewType.AnimatedImage, vm.PreviewType);
+            Assert.True(vm.HasTransparencyControls);
+            Assert.False(vm.HasFlattenAlphaControls);
+            Assert.True(vm.HasAnimationControls);
+        }
+        finally
+        {
+            File.Delete(gifPath);
+        }
+    }
+
+    /// <summary>写一个 1×1 透明 GIF 到临时目录（经典 43 字节样本，base64）。</summary>
+    private static string CreateTestGif()
+    {
+        var bytes = Convert.FromBase64String("R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7");
+        var path = Path.Combine(Path.GetTempPath(), $"mantiszip_gif_test_{Guid.NewGuid():N}.gif");
+        File.WriteAllBytes(path, bytes);
+        return path;
+    }
 }
