@@ -769,17 +769,20 @@ public partial class PreviewViewModel : ObservableObject
     /// </summary>
     public void ShowCsv(string filePath)
     {
+        // 行列上限来自运行时配置（App.axaml.cs 启动时 + 设置保存时同步），与 WPF 版一致
+        var maxRows = PreviewService.MaxTablePreviewRows;
+        var maxCols = PreviewService.MaxTablePreviewCols;
         var table = new DataTable();
-        var lines = File.ReadLines(filePath).Take(101).ToList();
+        var lines = File.ReadLines(filePath).Take(maxRows + 1).ToList();
 
         if (lines.Count > 0)
         {
             var rawHeaders = CsvParser.ParseCsvLine(lines[0]);
-            var headers = CsvParser.MakeUniqueColumnNames(rawHeaders.Take(100).ToArray());
+            var headers = CsvParser.MakeUniqueColumnNames(rawHeaders.Take(maxCols).ToArray());
             foreach (var h in headers)
                 table.Columns.Add(h);
 
-            foreach (var line in lines.Skip(1).Take(100))
+            foreach (var line in lines.Skip(1).Take(maxRows))
             {
                 var values = CsvParser.ParseCsvLine(line);
                 var row = table.NewRow();
@@ -833,11 +836,33 @@ public partial class PreviewViewModel : ObservableObject
     public void ShowImage(string filePath)
     {
         App.DebugLog($"[IMG] ShowImage: {filePath}");
-        App.DebugLog($"[IMG] Before: PreviewType={PreviewType}, PreviewImage={(PreviewImage != null ? $"w{ImageWidth}xh{ImageWidth}" : "null")}");
+        App.DebugLog($"[IMG] Before: PreviewType={PreviewType}, PreviewImage={(PreviewImage != null ? $"w{ImageWidth}xh{ImageHeight}" : "null")}");
 
-        // 用 DecodeToWidth 替代 Bitmap(Stream)，使用不同的解码路径
-        using var fs = File.OpenRead(filePath);
-        var bitmap = global::Avalonia.Media.Imaging.Bitmap.DecodeToWidth(fs, 1920);
+        // 解码尺寸策略：DecodeToWidth 会无条件把位图缩放到目标宽度（小图也会被放大），
+        // 因此先经 SKCodec 读头部拿真实宽度，仅当宽 > 1920 时才降采样；小图原生解码保持清晰度，
+        // 与 WPF 版 ShowImage 的 DecodePixelWidth 门槛语义一致。
+        global::Avalonia.Media.Imaging.Bitmap bitmap;
+        using (var fs = File.OpenRead(filePath))
+        {
+            using var skStream = new SKManagedStream(fs, disposeManagedStream: false);
+            using var codec = SKCodec.Create(skStream);
+            if (codec == null || codec.Info.Width <= 0)
+            {
+                // codec 无法解析时退回原生解码路径（解码失败由上层异常处理）
+                fs.Position = 0;
+                bitmap = new global::Avalonia.Media.Imaging.Bitmap(fs);
+            }
+            else if (codec.Info.Width > 1920)
+            {
+                fs.Position = 0;
+                bitmap = global::Avalonia.Media.Imaging.Bitmap.DecodeToWidth(fs, 1920);
+            }
+            else
+            {
+                fs.Position = 0;
+                bitmap = new global::Avalonia.Media.Imaging.Bitmap(fs);
+            }
+        }
         App.DebugLog($"[IMG] Bitmap loaded: {bitmap.PixelSize.Width}x{bitmap.PixelSize.Height}, dpi={bitmap.Dpi.X}x{bitmap.Dpi.Y}");
 
         // 先设置 PreviewType 让 Image 控件进入可见状态，再设置 Source

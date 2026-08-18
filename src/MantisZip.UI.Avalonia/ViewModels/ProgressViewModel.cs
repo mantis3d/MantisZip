@@ -106,9 +106,6 @@ public partial class ProgressViewModel : ObservableObject
     private string? _passwordStatusText;
 
     [ObservableProperty]
-    private string? _passwordRevealButtonText = "\U0001F441"; // 👁
-
-    [ObservableProperty]
     private bool _isPasswordRevealEnabled;
 
     [ObservableProperty]
@@ -402,7 +399,6 @@ public partial class ProgressViewModel : ObservableObject
         PasswordStatusText = "";
         IsPasswordRevealEnabled = false;
         IsPasswordCopyEnabled = false;
-        PasswordRevealButtonText = "\U0001F441"; // 👁
     }
 
     /// <summary>
@@ -419,7 +415,6 @@ public partial class ProgressViewModel : ObservableObject
         PasswordMatchText = revealByDefault
             ? LocalizationManager.T("Progress_PwdMatched", password)
             : LocalizationManager.T("Progress_PwdMatchedHidden");
-        PasswordRevealButtonText = revealByDefault ? "\U0001F648" : "\U0001F441"; // 🙈 or 👁
 
         PasswordRuleText = LocalizationManager.T("Progress_PwdRule", description);
         PasswordStatusText = LocalizationManager.T("Progress_PwdVerifying");
@@ -438,7 +433,6 @@ public partial class ProgressViewModel : ObservableObject
             PasswordMatchText = LocalizationManager.T("Progress_PwdMatched", _password);
         else if (_password != null)
             PasswordMatchText = LocalizationManager.T("Progress_PwdMatchedHidden");
-        PasswordRevealButtonText = IsPasswordRevealed ? "\U0001F648" : "\U0001F441"; // 🙈 or 👁
     }
 
     /// <summary>

@@ -1,6 +1,7 @@
 using Avalonia.Headless.XUnit;
 using MantisZip.UI.Avalonia.Services;
 using MantisZip.UI.Avalonia.ViewModels;
+using SkiaSharp;
 using Xunit;
 
 namespace MantisZip.UI.Avalonia.Tests;
@@ -39,5 +40,68 @@ public class PreviewViewModelTests
         {
             File.Delete(svgPath);
         }
+    }
+
+    /// <summary>
+    /// 回归测试：小图（宽度 ≤ 1920）预览必须保持原生分辨率，禁止被放大。
+    /// DecodeToWidth 会无条件把位图缩放到目标宽度，曾导致 200×150 的小图被放大成 1920×1440。
+    /// </summary>
+    [AvaloniaFact]
+    public void ShowImage_SmallImage_KeepsNativeResolution()
+    {
+        var pngPath = CreateTestPng(200, 150);
+        try
+        {
+            var vm = new PreviewViewModel();
+            vm.ShowImage(pngPath);
+
+            Assert.Equal(PreviewType.Image, vm.PreviewType);
+            Assert.NotNull(vm.PreviewImage);
+            Assert.Equal(200, vm.PreviewImage.PixelSize.Width);
+            Assert.Equal(150, vm.PreviewImage.PixelSize.Height);
+            Assert.Equal(200, vm.ImageWidth);
+            Assert.Equal(150, vm.ImageHeight);
+        }
+        finally
+        {
+            File.Delete(pngPath);
+        }
+    }
+
+    /// <summary>
+    /// 回归测试：大图（宽度 > 1920）预览时降采样到 1920 宽，
+    /// 避免解码超大位图（如 30000×20000）的巨额内存开销。
+    /// </summary>
+    [AvaloniaFact]
+    public void ShowImage_LargeImage_DownscalesTo1920()
+    {
+        var pngPath = CreateTestPng(3000, 2000);
+        try
+        {
+            var vm = new PreviewViewModel();
+            vm.ShowImage(pngPath);
+
+            Assert.Equal(PreviewType.Image, vm.PreviewType);
+            Assert.NotNull(vm.PreviewImage);
+            Assert.Equal(1920, vm.PreviewImage.PixelSize.Width);
+            Assert.Equal(1280, vm.PreviewImage.PixelSize.Height);
+        }
+        finally
+        {
+            File.Delete(pngPath);
+        }
+    }
+
+    /// <summary>用 SkiaSharp 生成纯色 PNG 测试图。</summary>
+    private static string CreateTestPng(int width, int height)
+    {
+        using var bitmap = new SKBitmap(width, height);
+        using var canvas = new SKCanvas(bitmap);
+        canvas.Clear(SKColors.Red);
+        using var image = SKImage.FromBitmap(bitmap);
+        using var data = image.Encode(SKEncodedImageFormat.Png, 100);
+        var path = Path.Combine(Path.GetTempPath(), $"mantiszip_img_test_{Guid.NewGuid():N}.png");
+        File.WriteAllBytes(path, data.ToArray());
+        return path;
     }
 }

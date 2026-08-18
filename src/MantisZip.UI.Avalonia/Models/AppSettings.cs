@@ -84,7 +84,6 @@ public class AppSettings
     public string InfoPanelOrientation { get; set; } = "Vertical";
     public bool ShowPreviewInfoPanel { get; set; } = true;
     public bool ShowPreviewPanel { get; set; } = true;
-    public bool UseColorEmoji { get; set; } = true;
     public bool EnableFormatDetection { get; set; } = true;
     public int PreviewHeadSize { get; set; } = 4096;
 

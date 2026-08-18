@@ -12,8 +12,9 @@
         ShowInTaskbar="False"
         Background="{DynamicResource ThemeWindowBgBrush}">
   <Window.Resources>
-    <converters:BatchStatusToIconConverter x:Key="BatchStatusIconConverter"/>
-    <converters:ProgressStatusToBackgroundConverter x:Key="ProgressStatusBackgroundConverter"/>
+<converters:BatchStatusToIconConverter x:Key="BatchStatusIconConverter"/>
+<converters:ProgressStatusToBackgroundConverter x:Key="ProgressStatusBackgroundConverter"/>
+<converters:BoolToIconConverter x:Key="BoolToIconConverter"/>
   </Window.Resources>
   <Grid Margin="{DynamicResource SpacingMdThk}"
         RowSpacing="6">
@@ -112,8 +113,9 @@
             <ColumnDefinition Width="Auto"/>
           </Grid.ColumnDefinitions>
 
-          <TextBlock Grid.Column="0" Text="&#x1F511;" FontSize="14"
-                     VerticalAlignment="Center" Margin="0,0,6,0"/>
+          <PathIcon Grid.Column="0" Data="{StaticResource IconKey}" Width="14" Height="14"
+                    Foreground="{DynamicResource ThemeTextSecondaryBrush}"
+                    VerticalAlignment="Center" Margin="0,0,6,0"/>
           <TextBlock x:Name="PwdMatchText" Grid.Column="1"
                      Text="{Binding PasswordMatchText}"
                      FontSize="14" FontWeight="SemiBold"
@@ -123,24 +125,30 @@
 
           <Button x:Name="PwdRevealBtn" Grid.Column="2"
                   Width="24" Height="22" Margin="4,0,0,0"
-                  Content="{Binding PasswordRevealButtonText}"
-                  FontSize="10" Padding="0"
+                  Padding="0"
                   Command="{Binding TogglePasswordRevealCommand}"
                   IsEnabled="{Binding IsPasswordRevealEnabled}"
                   Background="{DynamicResource ThemeButtonBgBrush}"
                   BorderThickness="1"
                   BorderBrush="{DynamicResource ThemeBorderBrush}"
-                  Foreground="{DynamicResource ThemeTextSecondaryBrush}"/>
+                  Foreground="{DynamicResource ThemeTextSecondaryBrush}">
+            <PathIcon Data="{Binding IsPasswordRevealed, Converter={StaticResource BoolToIconConverter}, ConverterParameter=IconEye|IconEyeOff}"
+                      Width="14" Height="14"
+                      Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+          </Button>
 
           <Button x:Name="PwdCopyBtn" Grid.Column="3"
                   Width="24" Height="22" Margin="4,0,0,0"
-                  Content="&#x1F4CB;" FontSize="12" Padding="0"
+                  Padding="0"
                   IsEnabled="{Binding IsPasswordCopyEnabled}"
                   Background="{DynamicResource ThemeButtonBgBrush}"
                   BorderThickness="1"
                   BorderBrush="{DynamicResource ThemeBorderBrush}"
                   Foreground="{DynamicResource ThemeTextSecondaryBrush}"
-                  Click="PwdCopyBtn_Click"/>
+                  Click="PwdCopyBtn_Click">
+            <PathIcon Data="{StaticResource IconCopy}" Width="14" Height="14"
+                      Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+          </Button>
         </Grid>
 
         <!-- 第 2 行：规则描述 -->
