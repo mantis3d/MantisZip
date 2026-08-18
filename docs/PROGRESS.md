@@ -21,6 +21,14 @@
 
 ### MantisZip.UI.Avalonia（主力版）
 
+**2026-08-18** — 图片预览能力系统：透明/动画能力注册表 + GIF 透明 + Animated WebP 预览
+  - **预览能力注册表**：新增 `PreviewCapabilities`（[Flags] `PreviewCapability`：Zoom/Transparency/FlattenAlpha/AnimationControls），按 PreviewType 声明能力，`HasZoomControls`/`HasTransparencyControls`/`HasFlattenAlphaControls`/`HasAnimationControls` 全部查表（对齐 MetadataRegistry 模式）；新增格式只注册能力即可获得工具栏控件
+  - **GIF 透明支持**：`AnimatedImage` 注册 Transparency——工具栏 🏁 棋盘格出现（棋盘格矩形早已接好，此前仅按钮未暴露）；🎨 压平保持静态图专用（方案 A 决策：动画帧不做全帧压平）
+  - **Animated WebP 预览**：`PreviewType.Gif` → `PreviewType.AnimatedImage`（GIF/WebP 动画共用）；`ShowImage` 内 SKCodec 检测 `FrameCount > 1` 分流到动画路径（解码复用 `GifDecoder` 的 SKCodec 通用帧 API，零解码改造，已源码级验证 Skia WebP 帧支持）；静态 WebP 保持 Image 预览
+  - **本地化**：新增 `Preview_AnimatedImage`/`Preview_Header_AnimatedImage`，状态栏与标题按扩展名分流（.gif → GIF 文案，其余动画 → 动画文案）
+  - 涉及文件：`Services/PreviewCapabilities.cs`（新增）、`Services/PreviewService.cs`、`ViewModels/PreviewViewModel.cs`、`ViewModels/MainWindowViewModel.cs`、`Views/PreviewPanel.axaml`、`Localization/strings.*.json`、`tests/MantisZip.UI.Avalonia.Tests/PreviewViewModelTests.cs`
+  - 验证：`dotnet build` 0 错误 0 警告、Avalonia 测试全部通过（56 基线 + 4 新增）、lsp 无诊断
+
 **2026-08-18** — 图片预览小图放大修复：SKCodec 尺寸门槛降采样 + 真实渲染后端回归测试
   - **修复 `DecodeToWidth` 无条件放大小图**：`ShowImage` 原用 `Bitmap.DecodeToWidth(fs, 1920)` 会把任意位图无条件缩放到目标宽度（200×150 的小图被放大成 1920×1440，且元数据面板显示错误尺寸）。改为先经 `SKCodec.Create` 读头部拿真实宽度——仅当宽 > 1920 时降采样，小图原生解码保持清晰度，与 WPF 版 `DecodePixelWidth` 门槛语义一致；codec 无法解析时回退原生解码路径
   - **顺带修复 debug log typo**：`w{ImageWidth}xh{ImageWidth}` → `h{ImageHeight}`
