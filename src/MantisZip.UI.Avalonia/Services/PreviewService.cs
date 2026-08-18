@@ -14,7 +14,8 @@ public enum PreviewType
     Csv,
     Pe,
     Image,
-    Gif,
+    Gif,            // ⚠️ 已废弃：由 AnimatedImage 取代（保留枚举值避免破坏性变更，不再被任何映射产出）
+    AnimatedImage,  // 动画图像预览（GIF / Animated WebP 共用）
     Svg,
     Font,
     Audio,
@@ -105,19 +106,66 @@ public class PreviewService
         ".md", ".markdown", ".mdown"
     };
 
-    private const long MaxPreviewFileSize = 50 * 1024 * 1024; // 50 MB
-    private const long MaxTextPreviewBytes = 1 * 1024 * 1024;  // 1 MB
+    /// <summary>
+    /// 只需读取文件头的格式，不受 MaxPreviewFileSize 限制。
+    /// </summary>
+    private static readonly HashSet<string> MetadataOnlyExtensions = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ".exe", ".dll", ".sys", ".ocx",
+        ".pdf", ".docx", ".xlsx", ".pptx",
+        ".wav", ".flac", ".mp3",
+        ".sqlite", ".sqlite3", ".db", ".db3",
+        ".iso",
+        ".torrent",
+        ".mp4", ".mkv", ".avi",
+    };
 
     /// <summary>
-    /// 是否启用格式检测（魔数识别）。由 App.axaml.cs 在启动时从 AppSettings 设置。
+    /// 是否启用格式检测（魔数识别）。由 App.axaml.cs 在启动时、SettingsWindowViewModel.Save 在保存时同步。
     /// 启用后，ClassifyPreviewByMagicAsync 会通过魔数判断文件真实格式。
     /// </summary>
     public static bool EnableFormatDetection { get; set; } = true;
 
     /// <summary>
-    /// 格式检测时读取的文件头部字节数。由 App.axaml.cs 在启动时从 AppSettings 设置。
+    /// 格式检测时读取的文件头部字节数。由 App.axaml.cs 在启动时、SettingsWindowViewModel.Save 在保存时同步。
     /// </summary>
     public static int PreviewHeadSize { get; set; } = 4096;
+
+    /// <summary>
+    /// 是否启用图片类预览（Image/Gif/Svg/Ico）。由 App.axaml.cs 在启动时、SettingsWindowViewModel.Save 在保存时同步。
+    /// </summary>
+    public static bool EnableImagePreview { get; set; } = true;
+
+    /// <summary>
+    /// 是否启用文本类预览（Text/Csv/Html/Markdown）。由 App.axaml.cs 在启动时、SettingsWindowViewModel.Save 在保存时同步。
+    /// </summary>
+    public static bool EnableTextPreview { get; set; } = true;
+
+    /// <summary>
+    /// 预览文件大小上限（字节）。只读头的格式（见 MetadataOnlyExtensions）不受限制。
+    /// 由 App.axaml.cs 在启动时、SettingsWindowViewModel.Save 在保存时同步。
+    /// </summary>
+    public static long MaxPreviewFileSize { get; set; } = 15 * 1024 * 1024;
+
+    /// <summary>
+    /// 文本类预览大小上限（字节）。由 App.axaml.cs 在启动时、SettingsWindowViewModel.Save 在保存时同步。
+    /// </summary>
+    public static long MaxTextPreviewBytes { get; set; } = 1 * 1024 * 1024;
+
+    /// <summary>
+    /// CSV 表格预览最大行数。由 App.axaml.cs 在启动时、SettingsWindowViewModel.Save 在保存时同步。
+    /// </summary>
+    public static int MaxTablePreviewRows { get; set; } = 100;
+
+    /// <summary>
+    /// CSV 表格预览最大列数。由 App.axaml.cs 在启动时、SettingsWindowViewModel.Save 在保存时同步。
+    /// </summary>
+    public static int MaxTablePreviewCols { get; set; } = 100;
+
+    /// <summary>
+    /// 判断扩展名是否属于只读头的格式（不受 MaxPreviewFileSize 限制）。
+    /// </summary>
+    public static bool IsMetadataOnlyExtension(string ext) => MetadataOnlyExtensions.Contains(ext);
 
     /// <summary>
     /// 根据文件扩展名判断预览类型。
@@ -129,7 +177,7 @@ public class PreviewService
         if (CsvExtensions.Contains(ext)) return PreviewType.Csv;
         if (PeExtensions.Contains(ext)) return PreviewType.Pe;
         if (ImageExtensions.Contains(ext)) return PreviewType.Image;
-        if (GifExtensions.Contains(ext)) return PreviewType.Gif;
+        if (GifExtensions.Contains(ext)) return PreviewType.AnimatedImage;
         if (SvgExtensions.Contains(ext)) return PreviewType.Svg;
         if (FontExtensions.Contains(ext)) return PreviewType.Font;
         if (AudioExtensions.Contains(ext)) return PreviewType.Audio;
@@ -214,7 +262,7 @@ public class PreviewService
         return format switch
         {
             // 图像 (GIF 单独处理，走动画预览路径)
-            FileFormat.Gif => PreviewType.Gif,
+            FileFormat.Gif => PreviewType.AnimatedImage,
 
             FileFormat.Png or FileFormat.Jpeg or FileFormat.Bmp
                 or FileFormat.WebP or FileFormat.Ico

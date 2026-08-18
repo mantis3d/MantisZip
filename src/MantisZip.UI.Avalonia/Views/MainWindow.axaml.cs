@@ -46,6 +46,15 @@ public partial class MainWindow : Window
     /// <summary>拖拽期间是否被取消（Esc 或右键取消手势，由自实现 IDropSource.QueryContinueDrag 同步置位）</summary>
     private bool _dragCancelled;
 
+    /// <summary>预览位置切换时各位置（1=底部, 2=目录树下方, 3=文件列表下方, 4=右侧）的记忆尺寸，切换后恢复用</summary>
+    private readonly Dictionary<int, double> _previewSizeByPosition = new();
+
+    /// <summary>当前已应用的预览位置（切换前据此保存旧位置尺寸）</summary>
+    private int _lastAppliedPreviewPosition = 4;
+
+    /// <summary>预览面板显隐（与 AppSettings.ShowPreviewPanel 同步；false 时压缩占位行列，树/列表撑满）</summary>
+    private bool _previewPanelEnabled = true;
+
     public MainWindow()
     {
         InitializeComponent();
@@ -67,6 +76,9 @@ public partial class MainWindow : Window
         var columnStates = WindowStateManager.Load(this);
         ApplyColumnStates(columnStates);
 
+        // 应用预览面板显隐 + 位置设置（1=底部, 2=目录树下方, 3=文件列表下方, 4=右侧）
+        ApplyPreviewLayout();
+
         var vm = new MainWindowViewModel();
         vm.GetOpenFilePath = OpenFileDialogAsync;
         vm.ShowSettingsWindow = async () =>
@@ -75,6 +87,8 @@ public partial class MainWindow : Window
             await dialog.ShowDialog(this);
             // 设置窗口可能改动了主题，刷新主窗口菜单里「切换颜色模式」的当前主题文案
             vm.RefreshLocalizedStrings();
+            // 预览面板显隐/位置可能在设置窗口中修改，统一重新应用（含菜单勾选状态同步）
+            ApplyPreviewLayout();
         };
         vm.ShowPasswordDialog = async (archivePath) =>
         {
@@ -91,6 +105,16 @@ public partial class MainWindow : Window
             };
         };
         DataContext = vm;
+
+        // 菜单「显示预览面板」切换（IsPreviewVisible 变化）时同步压缩/恢复布局占位
+        vm.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(MainWindowViewModel.IsPreviewVisible))
+            {
+                _previewPanelEnabled = vm.IsPreviewVisible;
+                ApplyPreviewPosition(_lastAppliedPreviewPosition);
+            }
+        };
 
         // ── Phase 3: Wire up ViewModel dialog callbacks ──
 
@@ -636,6 +660,141 @@ public partial class MainWindow : Window
         catch (Exception ex)
         {
             App.DebugLog($"ApplyColumnStates: failed: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// 根据 AppSettings.PreviewPosition 重新布局预览面板位置（单 Grid 附加属性切换，不搬移控件）。
+    /// 1=底部, 2=目录树下方, 3=文件列表下方, 4=文件列表右侧（默认）。
+    /// 每次应用前完整重置所有相关属性再按目标位置设置，避免状态残留。
+    /// </summary>
+    private void ApplyPreviewPosition(int position)
+    {
+        if (ArchiveContentGrid == null || PreviewPanelHost == null)
+            return;
+
+        // 切换位置前保存旧位置的当前尺寸（仅 Pixel 布局记录，Star 不记录）
+        if (position != _lastAppliedPreviewPosition)
+            SaveCurrentPreviewSize(_lastAppliedPreviewPosition);
+
+        // ── 完整重置：清掉上一种布局的所有痕迹 ──
+        ArchiveContentGrid.RowDefinitions[1].Height = new GridLength(0);
+        ArchiveContentGrid.RowDefinitions[2].Height = new GridLength(0);
+        ArchiveContentGrid.ColumnDefinitions[3].Width = new GridLength(0);
+        ArchiveContentGrid.ColumnDefinitions[4].Width = new GridLength(0);
+        PreviewRowSplitter.IsVisible = false;
+        PreviewColSplitter.IsVisible = false;
+        Grid.SetRowSpan(FolderTreeBorder, 1);
+        Grid.SetRowSpan(TreeFileSplitter, 1);
+        Grid.SetRowSpan(FileListPanel, 1);
+        Grid.SetRowSpan(PreviewPanelHost, 1);
+        Grid.SetColumnSpan(PreviewPanelHost, 1);
+
+        switch (position)
+        {
+            case 1: // 底部：预览横跨全部 5 列
+                ArchiveContentGrid.RowDefinitions[1].Height = new GridLength(4);
+                ArchiveContentGrid.RowDefinitions[2].Height = _previewSizeByPosition.TryGetValue(1, out var h1)
+                    ? new GridLength(h1, GridUnitType.Pixel)
+                    : new GridLength(1, GridUnitType.Star);
+                PreviewRowSplitter.IsVisible = true;
+                Grid.SetColumn(PreviewRowSplitter, 0);
+                Grid.SetColumnSpan(PreviewRowSplitter, 5);
+                Grid.SetRow(PreviewPanelHost, 2);
+                Grid.SetColumn(PreviewPanelHost, 0);
+                Grid.SetColumnSpan(PreviewPanelHost, 5);
+                break;
+
+            case 2: // 目录树下方：文件列表跨 3 行占满底部
+                ArchiveContentGrid.RowDefinitions[1].Height = new GridLength(4);
+                ArchiveContentGrid.RowDefinitions[2].Height = _previewSizeByPosition.TryGetValue(2, out var h2)
+                    ? new GridLength(h2, GridUnitType.Pixel)
+                    : new GridLength(200);
+                Grid.SetRowSpan(FileListPanel, 3);
+                Grid.SetRowSpan(TreeFileSplitter, 3);
+                PreviewRowSplitter.IsVisible = true;
+                Grid.SetColumn(PreviewRowSplitter, 0);
+                Grid.SetColumnSpan(PreviewRowSplitter, 1);
+                Grid.SetRow(PreviewPanelHost, 2);
+                Grid.SetColumn(PreviewPanelHost, 0);
+                Grid.SetColumnSpan(PreviewPanelHost, 1);
+                break;
+
+            case 3: // 文件列表下方：目录树跨 3 行占满底部
+                ArchiveContentGrid.RowDefinitions[1].Height = new GridLength(4);
+                ArchiveContentGrid.RowDefinitions[2].Height = _previewSizeByPosition.TryGetValue(3, out var h3)
+                    ? new GridLength(h3, GridUnitType.Pixel)
+                    : new GridLength(200);
+                Grid.SetRowSpan(FolderTreeBorder, 3);
+                Grid.SetRowSpan(TreeFileSplitter, 3);
+                PreviewRowSplitter.IsVisible = true;
+                Grid.SetColumn(PreviewRowSplitter, 2);
+                Grid.SetColumnSpan(PreviewRowSplitter, 3);
+                Grid.SetRow(PreviewPanelHost, 2);
+                Grid.SetColumn(PreviewPanelHost, 2);
+                Grid.SetColumnSpan(PreviewPanelHost, 3);
+                break;
+
+            default: // 4: 文件列表右侧（默认布局）
+                ArchiveContentGrid.ColumnDefinitions[3].Width = new GridLength(5);
+                ArchiveContentGrid.ColumnDefinitions[4].Width = _previewSizeByPosition.TryGetValue(4, out var w4)
+                    ? new GridLength(w4, GridUnitType.Pixel)
+                    : new GridLength(3, GridUnitType.Star);
+                PreviewColSplitter.IsVisible = true;
+                Grid.SetRow(PreviewPanelHost, 0);
+                Grid.SetColumn(PreviewPanelHost, 4);
+                break;
+        }
+
+        // 面板隐藏时：压缩预览占位行列 + 隐藏 splitter + 复位 RowSpan，让树/列表撑满
+        if (!_previewPanelEnabled)
+        {
+            // 隐藏前记录当前 Pixel 尺寸，保证重新打开时保留用户拖过的宽度/高度
+            SaveCurrentPreviewSize(position);
+            PreviewRowSplitter.IsVisible = false;
+            PreviewColSplitter.IsVisible = false;
+            ArchiveContentGrid.RowDefinitions[1].Height = new GridLength(0);
+            ArchiveContentGrid.RowDefinitions[2].Height = new GridLength(0);
+            ArchiveContentGrid.ColumnDefinitions[3].Width = new GridLength(0);
+            ArchiveContentGrid.ColumnDefinitions[4].Width = new GridLength(0);
+            Grid.SetRowSpan(FolderTreeBorder, 1);
+            Grid.SetRowSpan(TreeFileSplitter, 1);
+            Grid.SetRowSpan(FileListPanel, 1);
+        }
+
+        _lastAppliedPreviewPosition = position;
+    }
+
+    /// <summary>
+    /// 从磁盘重读设置并统一应用预览面板的显隐与位置（启动时与设置窗口保存后调用）。
+    /// 同时把显隐同步回 MainWindowViewModel.IsPreviewVisible，保证菜单勾选状态一致。
+    /// </summary>
+    private void ApplyPreviewLayout()
+    {
+        var settings = AppSettings.Load();
+        _previewPanelEnabled = settings.ShowPreviewPanel;
+        if (DataContext is MainWindowViewModel vm)
+            vm.IsPreviewVisible = settings.ShowPreviewPanel;
+        ApplyPreviewPosition(settings.PreviewPosition);
+    }
+
+    /// <summary>保存指定预览位置的当前尺寸到记忆字典（仅在布局为 Pixel 且值有效时记录，面板隐藏压缩产生的 0 不记录）。</summary>
+    private void SaveCurrentPreviewSize(int position)
+    {
+        if (ArchiveContentGrid == null)
+            return;
+
+        if (position == 4)
+        {
+            var w = ArchiveContentGrid.ColumnDefinitions[4].Width;
+            if (w.GridUnitType == GridUnitType.Pixel && w.Value > 0)
+                _previewSizeByPosition[4] = w.Value;
+        }
+        else if (position is 1 or 2 or 3)
+        {
+            var h = ArchiveContentGrid.RowDefinitions[2].Height;
+            if (h.GridUnitType == GridUnitType.Pixel && h.Value > 0)
+                _previewSizeByPosition[position] = h.Value;
         }
     }
 

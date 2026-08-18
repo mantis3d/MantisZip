@@ -21,6 +21,40 @@
 
 ### MantisZip.UI.Avalonia（主力版）
 
+**2026-08-18** — 图片预览能力系统：透明/动画能力注册表 + GIF 透明 + Animated WebP 预览
+  - **预览能力注册表**：新增 `PreviewCapabilities`（[Flags] `PreviewCapability`：Zoom/Transparency/FlattenAlpha/AnimationControls），按 PreviewType 声明能力，`HasZoomControls`/`HasTransparencyControls`/`HasFlattenAlphaControls`/`HasAnimationControls` 全部查表（对齐 MetadataRegistry 模式）；新增格式只注册能力即可获得工具栏控件
+  - **GIF 透明支持**：`AnimatedImage` 注册 Transparency——工具栏 🏁 棋盘格出现（棋盘格矩形早已接好，此前仅按钮未暴露）；🎨 压平保持静态图专用（方案 A 决策：动画帧不做全帧压平）
+  - **Animated WebP 预览**：`PreviewType.Gif` → `PreviewType.AnimatedImage`（GIF/WebP 动画共用）；`ShowImage` 内 SKCodec 检测 `FrameCount > 1` 分流到动画路径（解码复用 `GifDecoder` 的 SKCodec 通用帧 API，零解码改造，已源码级验证 Skia WebP 帧支持）；静态 WebP 保持 Image 预览
+  - **本地化**：新增 `Preview_AnimatedImage`/`Preview_Header_AnimatedImage`，状态栏与标题按扩展名分流（.gif → GIF 文案，其余动画 → 动画文案）
+  - 涉及文件：`Services/PreviewCapabilities.cs`（新增）、`Services/PreviewService.cs`、`ViewModels/PreviewViewModel.cs`、`ViewModels/MainWindowViewModel.cs`、`Views/PreviewPanel.axaml`、`Localization/strings.*.json`、`tests/MantisZip.UI.Avalonia.Tests/PreviewViewModelTests.cs`
+  - 验证：`dotnet build` 0 错误 0 警告、Avalonia 测试全部通过（56 基线 + 4 新增）、lsp 无诊断
+
+**2026-08-18** — 图片预览小图放大修复：SKCodec 尺寸门槛降采样 + 真实渲染后端回归测试
+  - **修复 `DecodeToWidth` 无条件放大小图**：`ShowImage` 原用 `Bitmap.DecodeToWidth(fs, 1920)` 会把任意位图无条件缩放到目标宽度（200×150 的小图被放大成 1920×1440，且元数据面板显示错误尺寸）。改为先经 `SKCodec.Create` 读头部拿真实宽度——仅当宽 > 1920 时降采样，小图原生解码保持清晰度，与 WPF 版 `DecodePixelWidth` 门槛语义一致；codec 无法解析时回退原生解码路径
+  - **顺带修复 debug log typo**：`w{ImageWidth}xh{ImageWidth}` → `h{ImageHeight}`
+  - **测试基建升级**：`TestAppBuilder` 改用 `UseSkia()` + `UseHeadlessDrawing=false` 走真实 Skia 渲染后端（Headless stub 下 `LoadBitmap` 恒为 1×1、`Save` 为 no-op），使 `Bitmap` 解码返回真实像素尺寸
+  - **新增 2 个回归测试**：小图（200×150）保持原生分辨率、大图（3000×2000）降采样到 1920 宽
+  - 涉及文件：`ViewModels/PreviewViewModel.cs`、`tests/MantisZip.UI.Avalonia.Tests/PreviewViewModelTests.cs`、`tests/MantisZip.UI.Avalonia.Tests/TestAppBuilder.cs`
+  - 验证：`dotnet build` 0 错误 0 警告、Avalonia 测试 56 通过 2 跳过 0 失败
+
+**2026-08-13** — 预览面板位置/显隐全面修复：四种布局移植 + 三入口统一 + 旧副本覆盖磁盘的架构 bug 修复
+  - **「预览位置」四种布局实现（此前为死设置，WPF 迁移遗漏）**：`PreviewPosition`（1=底部/2=目录树下方/3=文件列表下方/4=右侧）现生效——单 Grid 附加属性切换（`ApplyPreviewPosition`，`PreviewPanel` 不搬移父容器，规避 WPF 双 Grid 搬移方案的状态残留 bug）；启动时 + 设置窗口保存后应用；各位置尺寸记忆（切换/隐藏时保存，恢复时还原）
+  - **「显示预览面板」显隐生效 + 空间释放**：`ApplyPreviewLayout` 统一入口（启动/设置保存后）从磁盘重读 `ShowPreviewPanel` 并同步 `MainWindowViewModel.IsPreviewVisible`（菜单勾选一致）；面板隐藏时压缩预览行列 + 复位 RowSpan 让树/列表撑满；菜单切换（PropertyChanged 订阅）同步布局；隐藏前记录当前尺寸保证重新打开保留拖过的宽高
+  - **修复旧内存副本整体保存覆盖用户设置（架构级）**：`MainWindowViewModel` 的 `_appSettings` 是启动时副本，`OnIsPreviewVisibleChanged` 等 6 处 `_appSettings.Save()` 会用过期值覆盖用户刚在设置窗口保存的 `PreviewPosition` 等（表现为关闭预览面板后位置被重置为右侧）；新增 `SaveSetting(Action<AppSettings>)` 磁盘合并写（Load→改单字段→Save），替换全部 6 处（ShowPreviewPanel/ShowProgressBars/SeparateDirBaseline/ShowPreviewInfoPanel/AutoExpandTreeToCurrent/Theme/Language）
+  - **菜单新增「显示预览面板」项**：`TogglePreviewCommand` + ToggleIconBox/IconEye 指示（与信息面板项同样式），本地化 `Menu_ShowPreviewPanel`；与工具栏「预览」ToggleButton、设置窗口三入口行为一致
+  - 涉及文件：`Views/MainWindow.axaml`、`Views/MainWindow.axaml.cs`（新增 `ApplyPreviewPosition`/`ApplyPreviewLayout`/`SaveCurrentPreviewSize`）、`ViewModels/MainWindowViewModel.cs`、`Localization/strings.*.json`
+  - 验证：`dotnet build` 0 错误；已实际验证位置切换、显隐压缩/恢复
+
+**2026-08-12** — 预览设置全面修复：滑条联动、保存即生效、尺寸门槛补全、彩色 Emoji 移除
+  - **三个预览滑条数值框拖动时实时更新**：`_maxTextPreviewBytes`/`_maxPreviewFileSize`/`_previewHeadSize` 补 `[NotifyPropertyChangedFor]`，计算显示属性（`MaxTextPreviewMBText`/`MaxPreviewFileSizeMBText`/`PreviewHeadSizeKBText`）随滑条联动（此前冻结不刷新）
+  - **预览设置保存即生效（无需重启）**：`SettingsWindowViewModel.Save()` 同步 8 个 `PreviewService` 静态运行时配置（PreviewHeadSize/EnableFormatDetection/EnableImagePreview/EnableTextPreview/MaxPreviewFileSize/MaxTextPreviewBytes/MaxTablePreviewRows/MaxTablePreviewCols），与 `App.axaml.cs` 启动初始化同源；修复此前改设置必须重启才生效
+  - **尺寸门槛补全（Avalonia 迁移丢失，对齐 WPF）**：`ShowPreviewAsync` 补 `MaxPreviewFileSize` 全局门槛（`MetadataOnlyExtensions` 只读头格式豁免）+ `MaxTextPreviewBytes`/`EnableTextPreview`（Text/Csv/Html/Markdown）+ `EnableImagePreview`（Image/Gif/Svg）；`PreviewService` 死代码 const（50MB/1MB）改为可同步静态；`ShowCsv` 硬编码 100 行列改为读 `MaxTablePreviewRows/Cols`。新增本地化 `Preview_TooLarge`/`Preview_TooLargeText`/`Preview_TextDisabled`/`Preview_ImageDisabled`
+  - **预览面板显隐设置生效**：`ShowPreviewPanel` 从死设置变为读/写——主 VM 构造初始化 `IsPreviewVisible`、`OnIsPreviewVisibleChanged` 持久化、MainWindow 宿主 `IsVisible` 绑定
+  - **移除彩色 Emoji 功能（Avalonia 已真图标化）**：删除 `UseColorEmoji`（AppSettings 字段 + 设置页复选框 + VM 属性 + 本地化 key）；密码区域 🔑/👁/🙈/📋 emoji 换 `IconKey`/`IconEye`/`IconEyeOff`/`IconCopy` PathIcon（新增 `BoolToIconConverter`）；新增文案去 emoji 前缀
+  - **headSize 影响实证**：新增 `FileFormatDetectorHeadSizeTests`（15 用例）验证——绝大多数魔数在 2~12 字节内识别，headSize 仅影响 ZIP 子类型细分（DOCX/XLSX/PPTX）与 PE/文本启发式，1~64KB 范围属 IO 保护参数
+  - 涉及文件：`ViewModels/SettingsWindowViewModel.cs`、`ViewModels/MainWindowViewModel.cs`、`ViewModels/PreviewViewModel.cs`、`ViewModels/ProgressViewModel.cs`、`Services/PreviewService.cs`、`Models/AppSettings.cs`、`Views/SettingsWindow.axaml`、`Views/MainWindow.axaml`、`Dialogs/ProgressWindow.axaml`、`Converters/BoolToIconConverter.cs`（新增）、`Localization/strings.*.json`、`tests/MantisZip.Tests/Utils/FileFormatDetectorHeadSizeTests.cs`（新增）
+  - 验证：`dotnet build` 0 错误、Core 测试 268 通过、Avalonia 测试 54 通过 2 跳过、lsp 无诊断
+
 **2026-08-17** — 本地化修复三连：JSON 非法转义崩溃、Metadata_Position key 大小写、Metadata_Key 字段名 i18n 补全
   - **SevenZipPath 占位符 JSON 非法转义崩溃修复**：新增的 `Settings_Advanced_SevenZipPathPlaceholder` 含原始路径 `C:\Program Files\7-Zip\7z.dll`（`\P`/`\7` 为非法 JSON 转义），启动即 `TypeInitializationException`。双文件（zh-CN/en）改为 `\\` 转义；`SettingsWindow.axaml` 的 TextBox `PlaceholderText` 由硬编码路径改为绑定 `SevenZipPathPlaceholder`（`SettingsWindowViewModel` 新增属性 + 刷新通知），顺带补上 `AppearanceAppFontFamilyText` 缺失的刷新通知
   - **Metadata_Position 下拉显示 key 原文修复**：JSON key 为 PascalCase（`Metadata_PositionInfoPanel` 等），代码却用 camelCase 原值拼接（`Metadata_PositioninfoPanel`），查不到 key 返原文。新增 `FieldEditItem.GetPositionDisplayName()`（首字母大写后查表），`PositionDisplay` 属性与 `PositionDisplayConverter` 统一走它

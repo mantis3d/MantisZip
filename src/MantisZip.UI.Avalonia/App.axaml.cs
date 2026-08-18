@@ -82,9 +82,15 @@ public partial class App : Application
         };
         ApplyCompactness(compactMode);
 
-        // ── Initialize magic detection settings ──
+        // ── Initialize preview settings (runtime caches; SettingsWindow.Save 同步保持即时生效) ──
         PreviewService.EnableFormatDetection = appSettings.EnableFormatDetection;
         PreviewService.PreviewHeadSize = appSettings.PreviewHeadSize;
+        PreviewService.EnableImagePreview = appSettings.EnableImagePreview;
+        PreviewService.EnableTextPreview = appSettings.EnableTextPreview;
+        PreviewService.MaxPreviewFileSize = appSettings.MaxPreviewFileSize;
+        PreviewService.MaxTextPreviewBytes = appSettings.MaxTextPreviewBytes;
+        PreviewService.MaxTablePreviewRows = appSettings.MaxTablePreviewRows;
+        PreviewService.MaxTablePreviewCols = appSettings.MaxTablePreviewCols;
 
         // ── Restore saved language (AppSettings uses "zh"/"en", LocalizationManager uses zh-CN/en) ──
         if (appSettings.Language == "en")

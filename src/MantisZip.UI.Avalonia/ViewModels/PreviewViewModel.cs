@@ -209,7 +209,7 @@ public partial class PreviewViewModel : ObservableObject
     partial void OnLoadingFileNameChanged(string value) =>
         OnPropertyChanged(nameof(LoadingFileDisplay));
 
-    public bool HasZoomControls => PreviewType is PreviewType.Image or PreviewType.Gif;
+    public bool HasZoomControls => PreviewCapabilities.For(PreviewType).HasFlag(PreviewCapability.Zoom);
     public bool HasFontSizeControls => PreviewType == PreviewType.Text;
 
     // Computed visibility per preview type
@@ -219,7 +219,7 @@ public partial class PreviewViewModel : ObservableObject
     public bool IsUnsupportedVisible => PreviewType == PreviewType.Unsupported || PreviewType == PreviewType.None;
 
     public bool IsImageVisible => PreviewType == PreviewType.Image;
-    public bool IsGifVisible => PreviewType == PreviewType.Gif;
+    public bool IsAnimatedImageVisible => PreviewType == PreviewType.AnimatedImage;
     public bool IsSvgVisible => PreviewType == PreviewType.Svg;
     public bool IsFontVisible => PreviewType == PreviewType.Font;
     public bool IsAudioVisible => PreviewType == PreviewType.Audio;
@@ -249,7 +249,7 @@ public partial class PreviewViewModel : ObservableObject
         OnPropertyChanged(nameof(IsCsvVisible));
         OnPropertyChanged(nameof(IsPeVisible));
         OnPropertyChanged(nameof(IsImageVisible));
-        OnPropertyChanged(nameof(IsGifVisible));
+        OnPropertyChanged(nameof(IsAnimatedImageVisible));
         OnPropertyChanged(nameof(IsSvgVisible));
         OnPropertyChanged(nameof(IsFontVisible));
         OnPropertyChanged(nameof(IsAudioVisible));
@@ -267,7 +267,7 @@ public partial class PreviewViewModel : ObservableObject
         OnPropertyChanged(nameof(IsUnsupportedVisible));
         OnPropertyChanged(nameof(HasZoomControls));
         OnPropertyChanged(nameof(HasFontSizeControls));
-        OnPropertyChanged(nameof(HasGifControls));
+        OnPropertyChanged(nameof(HasAnimationControls));
         OnPropertyChanged(nameof(HasTransparencyControls));
         OnPropertyChanged(nameof(HasFlattenAlphaControls));
         OnPropertyChanged(nameof(HasLigatureControls));
@@ -527,13 +527,13 @@ public partial class PreviewViewModel : ObservableObject
         IsInfoPanelVisible = true;
     }
 
-    public bool HasGifControls => PreviewType == PreviewType.Gif;
+    public bool HasAnimationControls => PreviewCapabilities.For(PreviewType).HasFlag(PreviewCapability.AnimationControls);
 
     // ── Ligature toggle ──
 
     public bool HasLigatureControls => PreviewType == PreviewType.Font;
-    public bool HasTransparencyControls => PreviewType is PreviewType.Image or PreviewType.Svg or PreviewType.IcoGallery;
-    public bool HasFlattenAlphaControls => PreviewType is PreviewType.Image or PreviewType.Svg;
+    public bool HasTransparencyControls => PreviewCapabilities.For(PreviewType).HasFlag(PreviewCapability.Transparency);
+    public bool HasFlattenAlphaControls => PreviewCapabilities.For(PreviewType).HasFlag(PreviewCapability.FlattenAlpha);
 
     [ObservableProperty]
     private bool _isLigatureEnabled = true;
@@ -769,17 +769,20 @@ public partial class PreviewViewModel : ObservableObject
     /// </summary>
     public void ShowCsv(string filePath)
     {
+        // 行列上限来自运行时配置（App.axaml.cs 启动时 + 设置保存时同步），与 WPF 版一致
+        var maxRows = PreviewService.MaxTablePreviewRows;
+        var maxCols = PreviewService.MaxTablePreviewCols;
         var table = new DataTable();
-        var lines = File.ReadLines(filePath).Take(101).ToList();
+        var lines = File.ReadLines(filePath).Take(maxRows + 1).ToList();
 
         if (lines.Count > 0)
         {
             var rawHeaders = CsvParser.ParseCsvLine(lines[0]);
-            var headers = CsvParser.MakeUniqueColumnNames(rawHeaders.Take(100).ToArray());
+            var headers = CsvParser.MakeUniqueColumnNames(rawHeaders.Take(maxCols).ToArray());
             foreach (var h in headers)
                 table.Columns.Add(h);
 
-            foreach (var line in lines.Skip(1).Take(100))
+            foreach (var line in lines.Skip(1).Take(maxRows))
             {
                 var values = CsvParser.ParseCsvLine(line);
                 var row = table.NewRow();
@@ -833,11 +836,40 @@ public partial class PreviewViewModel : ObservableObject
     public void ShowImage(string filePath)
     {
         App.DebugLog($"[IMG] ShowImage: {filePath}");
-        App.DebugLog($"[IMG] Before: PreviewType={PreviewType}, PreviewImage={(PreviewImage != null ? $"w{ImageWidth}xh{ImageWidth}" : "null")}");
+        App.DebugLog($"[IMG] Before: PreviewType={PreviewType}, PreviewImage={(PreviewImage != null ? $"w{ImageWidth}xh{ImageHeight}" : "null")}");
 
-        // 用 DecodeToWidth 替代 Bitmap(Stream)，使用不同的解码路径
-        using var fs = File.OpenRead(filePath);
-        var bitmap = global::Avalonia.Media.Imaging.Bitmap.DecodeToWidth(fs, 1920);
+        // 解码尺寸策略：DecodeToWidth 会无条件把位图缩放到目标宽度（小图也会被放大），
+        // 因此先经 SKCodec 读头部拿真实宽度，仅当宽 > 1920 时才降采样；小图原生解码保持清晰度，
+        // 与 WPF 版 ShowImage 的 DecodePixelWidth 门槛语义一致。
+        global::Avalonia.Media.Imaging.Bitmap bitmap;
+        using (var fs = File.OpenRead(filePath))
+        {
+            using var skStream = new SKManagedStream(fs, disposeManagedStream: false);
+            using var codec = SKCodec.Create(skStream);
+            if (codec == null || codec.Info.Width <= 0)
+            {
+                // codec 无法解析时退回原生解码路径（解码失败由上层异常处理）
+                fs.Position = 0;
+                bitmap = new global::Avalonia.Media.Imaging.Bitmap(fs);
+            }
+            else if (codec.FrameCount > 1)
+            {
+                // 动画（当前为 Animated WebP；GIF 由分类直接走 ShowGif 不经此路径）：
+                // 复用通用动画预览——播放/暂停/帧导航 + 透明棋盘格（Task 2 已注册能力）
+                ShowGif(filePath);
+                return;
+            }
+            else if (codec.Info.Width > 1920)
+            {
+                fs.Position = 0;
+                bitmap = global::Avalonia.Media.Imaging.Bitmap.DecodeToWidth(fs, 1920);
+            }
+            else
+            {
+                fs.Position = 0;
+                bitmap = new global::Avalonia.Media.Imaging.Bitmap(fs);
+            }
+        }
         App.DebugLog($"[IMG] Bitmap loaded: {bitmap.PixelSize.Width}x{bitmap.PixelSize.Height}, dpi={bitmap.Dpi.X}x{bitmap.Dpi.Y}");
 
         // 先设置 PreviewType 让 Image 控件进入可见状态，再设置 Source
@@ -1037,10 +1069,11 @@ public partial class PreviewViewModel : ObservableObject
             // 初始缩放：适应视口
             ZoomFit();
 
-            PreviewType = PreviewType.Gif;
+            PreviewType = PreviewType.AnimatedImage;
             IsPreviewVisible = true;
             IsToolbarVisible = true;
-            PreviewHeaderText = LocalizationManager.T("Preview_Header_Gif");
+            var isGif = Path.GetExtension(filePath).Equals(".gif", StringComparison.OrdinalIgnoreCase);
+            PreviewHeaderText = LocalizationManager.T(isGif ? "Preview_Header_Gif" : "Preview_Header_AnimatedImage");
             var gifFormatValues = new Dictionary<string, string?>
             {
                 [MetadataKeys.Dimensions] = $"{ImageWidth} × {ImageHeight}",
