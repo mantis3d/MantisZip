@@ -526,12 +526,12 @@ PROGRESS.md 分三个独立线索，根据变更影响范围选择对应线索�
 | `ToolbarButtonIcon` | `TextBlock` | FontSize 20、水平居中 | 工具栏按钮内的图标字符 |
 | `ToolbarButtonLabel` | `TextBlock` | FontSize 13、水平居中 | 工具栏按钮的文字标签 |
 | `compactTab` | `TabItem` | Padding `8,6`、MinHeight 36、FontSize 18 | 设置/对话框窗口的紧凑 tab 头 |
-| `ToggleIconBox` | `Border` | 20×20、圆角 3、边框 1.5、背景过渡动画 | 菜单切换指示图标（见下） |
+| `ToggleIconBox` | `Border` | 16×16、圆角 3、边框 1.5、背景过渡动画 | 菜单切换指示图标（见下） |
 
 **ToggleIconBox 切换图标**：开关/切换类菜单项的指示图标，用法：
 - `Background` 绑定 `{Binding <bool>, Converter={StaticResource BoolToToggleBgBrushConverter}}`（true → `ThemeToggleBrush` 强调色底，false → `Transparent` 空心）
-- 内部放 12×12 `PathIcon`，`Foreground` 用 `ThemeTextPrimaryBrush`
-- 菜单项中放在 `MenuItem.Header` 的 `StackPanel` 内（`Spacing` 用 `SpacingXxs`），**不要**放 `MenuItem.Icon` 槽位
+- 内部放 10×10 `PathIcon`，`Foreground` 用 `ThemeTextPrimaryBrush`
+- 菜单项中放在 `MenuItem.Icon` 槽位（Fluent 主题 `SharedSizeGroup="MenuItemIcon"` 自动共享列宽对齐，`FluentMenuItemIconTheme` 将 Icon 槽位内容限制在 16×16，故 ToggleIconBox 必须为 16×16），**Header 直接用文本绑定**
 - code-behind 动态构建时 `Classes = { "ToggleIconBox" }` 同样生效（继承全局样式）
 
 **PathIcon 注意**：Avalonia 的 PathIcon **不继承父控件 Foreground**，必须显式设置（App.axaml 用 `ToggleButton:checked PathIcon` 等选择器直接命中）。
@@ -703,6 +703,7 @@ dotnet test tests\MantisZip.Tests\MantisZip.Tests.csproj
 - **XAML 静态文案**：绑定到 ViewModel 属性或 `LocalizedStrings[Key]`（字典索引器绑定需要 VM 实现 `LocalizedStrings` 字典并在 `OnCultureChanged` 中刷新）
 - **Window/UserControl code-behind（DataContext=self）**：暴露 `public string XxxText => LocalizationManager.T("Key")` 属性并绑定，同时加 `x:CompileBindings="False"`
 - **新增 key 必须成对添加**到 `src/MantisZip.UI.Avalonia/Localization/strings.zh-CN.json` 和 `strings.en.json`，保持两文件 key 集完全同步；插入到文件头 `{` 之后（key 不排序），维持 UTF-8 无 BOM + CRLF + 2 空格缩进
+- **XAML 用 `LocalizedStrings[Key]` 绑定的 key 必须额外登记**到 `MainWindowViewModel.UpdateLocalizedStrings()` 的 keys 数组（`ViewModels/MainWindowViewModel.cs`，约 line 203 起的 `new[] { ... }`）。`LocalizedStrings` 字典**不是全量加载** JSON，而是由该显式数组构建——漏登记会导致菜单/工具栏文字空白（图标仍在），构建不会报错。新增 XAML 绑定 key 后必须同步补进此数组
 - 完成后自检：`dotnet build src\MantisZip.UI.Avalonia\MantisZip.UI.Avalonia.csproj` 无新增错误，并扫描确认无遗漏硬编码
 
 **豁免**（须在代码注释中注明原因）：

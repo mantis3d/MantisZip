@@ -21,6 +21,15 @@
 
 ### MantisZip.UI.Avalonia（主力版）
 
+**2026-08-19** — 菜单项统一为 Icon 槽位标准写法 + 保存布局功能
+  - **菜单项统一改写（方案 B）**：MainWindow.axaml 全部 72 个菜单项从 `Header 内 StackPanel + TextBlock` 旧模式改为 `MenuItem.Icon` 槽位 + `Header` 文本绑定标准写法——Fluent 主题 Icon 列 `SharedSizeGroup="MenuItemIcon"` + `Grid.IsSharedSizeScope` 自动共享列宽，文字天然对齐，删除所有手动对齐容器（含此前 SaveLayout 项的手动 20×20 容器）
+  - **ToggleIconBox 16×16**：`FluentMenuItemIconTheme` 将 Icon 槽位内容限制在 16×16（Viewbox DownOnly），20×20 会被压缩变形，故全局样式改为 16×16（边框 1.5、圆角 3 不变），内部 PathIcon 12→10；主菜单 6 个 toggle 项 + 列标题右键动态菜单同步更新；AGENTS.md ToggleIconBox 规则更新（16×16、放 Icon 槽位，推翻原「不要放 Icon 槽位」）
+  - **边界**：顶层菜单项（Menu_File/Edit/View/Tools/Help/Language/TestMenu）模板 `FluentTopLevelMenuItem` 无 Icon 槽位，保持 `Header` 文本绑定；TestMenu 顶层（带 IconEyedropper）保留 Header StackPanel（Debug 专用）
+  - **动态菜单**：`ColumnHeaderContextMenu_Opening` 改为 `Icon = iconBox` + `Header` 字符串；删除无调用者的死代码 `GetSpacingXxs()`
+  - **保存布局**：`Models/LayoutStateManager.cs`（新增）持久化目录树/文件列表列宽 + 预览面板四位置尺寸到独立 `layout.json`（仅手动写盘，关闭不自动写）；「查看」菜单新增「保存布局」项（`SaveLayoutCommand` + `IconSave`），启动 `ApplySavedLayout` 自动恢复；修复 XAML `LocalizedStrings[Key]` 绑定漏登记 `UpdateLocalizedStrings()` keys 数组导致菜单文字空白的 bug（构建不报错）
+  - 涉及文件：`Views/MainWindow.axaml`、`Views/MainWindow.axaml.cs`、`App.axaml`、`Models/LayoutStateManager.cs`（新增）、`ViewModels/MainWindowViewModel.cs`、`Localization/strings.*.json`、`AGENTS.md`
+  - 验证：`dotnet build` 0 错误（35 既有警告）
+
 **2026-08-19** — Tab 标题图标化：统一 compactTab 附加属性渲染「图标 + 文字」，31 个 tab 全部迁移
   - **TabIcon 附加属性**：新增 `Controls/TabItemExtensions.cs`——`TabIcon`（Geometry 资源键，`RegisterAttached<TabItem, string?>` 以 `typeof(TabItemExtensions)` 声明 owner）；`TabItem.compactTab` 类样式增强 `HeaderTemplate`：PathIcon 绑定 `$parent[TabItem].(controls:TabItemExtensions.TabIcon)` 经 `GeometryResourceConverter` 取 Geometry、`StringNotEmptyConverter` 控制显隐（未设置时回退纯文字标题），TextBlock 绑定 `{Binding}` 渲染标题文本；`GeometryResourceConverter`/`StringNotEmptyConverter` 提升注册到 App 级全局资源
   - **新增 4 个图标**：`IconImage`（预览-图片）、`IconApps`（预览-可执行文件）、`IconPerson`（About-作者）、`IconMagnet`（预览-种子，自绘马蹄形磁铁），已同步注册到 `IconTestViewModel`（规则 8）

@@ -30,288 +30,240 @@
     <!-- Menu (Row 0) -->
     <Menu Grid.Row="0">
       <MenuItem Header="{Binding LocalizedStrings[Menu_File]}">
-        <MenuItem Command="{Binding OpenArchiveCommand}" InputGesture="Ctrl+O">
-          <MenuItem.Header>
-            <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
-              <PathIcon Data="{StaticResource IconFolder}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
-              <TextBlock Text="{Binding LocalizedStrings[Menu_OpenArchive]}" />
-            </StackPanel>
-          </MenuItem.Header>
+        <MenuItem Command="{Binding OpenArchiveCommand}" InputGesture="Ctrl+O"
+                  Header="{Binding LocalizedStrings[Menu_OpenArchive]}">
+          <MenuItem.Icon>
+            <PathIcon Data="{StaticResource IconFolder}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+          </MenuItem.Icon>
         </MenuItem>
         <MenuItem Command="{Binding CloseArchiveCommand}" InputGesture="Ctrl+W"
-                  IsEnabled="{Binding IsArchiveLoaded}">
-          <MenuItem.Header>
-            <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
-              <PathIcon Data="{StaticResource IconSignOut}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
-              <TextBlock Text="{Binding LocalizedStrings[Menu_CloseArchive]}" />
-            </StackPanel>
-          </MenuItem.Header>
+                  IsEnabled="{Binding IsArchiveLoaded}"
+                  Header="{Binding LocalizedStrings[Menu_CloseArchive]}">
+          <MenuItem.Icon>
+            <PathIcon Data="{StaticResource IconSignOut}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+          </MenuItem.Icon>
         </MenuItem>
         <MenuItem ItemsSource="{Binding RecentFiles}"
-                  IsEnabled="{Binding RecentFiles.Count}">
-          <MenuItem.Header>
-            <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
-              <PathIcon Data="{StaticResource IconHistory}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
-              <TextBlock Text="{Binding LocalizedStrings[Main_RecentFiles]}" />
-            </StackPanel>
-          </MenuItem.Header>
+                  IsEnabled="{Binding RecentFiles.Count}"
+                  Header="{Binding LocalizedStrings[Main_RecentFiles]}">
+          <MenuItem.Icon>
+            <PathIcon Data="{StaticResource IconHistory}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+          </MenuItem.Icon>
           <MenuItem.ItemTemplate>
             <DataTemplate>
               <MenuItem Click="RecentFileMenuItem_Click"
-                        CommandParameter="{Binding .}">
-                <MenuItem.Header>
-                  <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
-                    <PathIcon Data="{StaticResource IconHistory}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
-                    <TextBlock Text="{Binding .}" />
-                  </StackPanel>
-                </MenuItem.Header>
+                        CommandParameter="{Binding .}"
+                        Header="{Binding .}">
+                <MenuItem.Icon>
+                  <PathIcon Data="{StaticResource IconHistory}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+                </MenuItem.Icon>
               </MenuItem>
             </DataTemplate>
           </MenuItem.ItemTemplate>
         </MenuItem>
         <Separator />
-        <MenuItem Command="{Binding ClearRecentFilesCommand}">
-          <MenuItem.Header>
-            <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
-              <PathIcon Data="{StaticResource IconDelete}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
-              <TextBlock Text="{Binding LocalizedStrings[Main_ClearRecentFiles]}" />
-            </StackPanel>
-          </MenuItem.Header>
+        <MenuItem Command="{Binding ClearRecentFilesCommand}"
+                  Header="{Binding LocalizedStrings[Main_ClearRecentFiles]}">
+          <MenuItem.Icon>
+            <PathIcon Data="{StaticResource IconDelete}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+          </MenuItem.Icon>
         </MenuItem>
         <MenuItem Command="{Binding RefreshArchiveCommand}" InputGesture="F5"
-                  IsEnabled="{Binding IsArchiveLoaded}">
-          <MenuItem.Header>
-            <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
-              <PathIcon Data="{StaticResource IconRefresh}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
-              <TextBlock Text="{Binding LocalizedStrings[Menu_Refresh]}" />
-            </StackPanel>
-          </MenuItem.Header>
+                  IsEnabled="{Binding IsArchiveLoaded}"
+                  Header="{Binding LocalizedStrings[Menu_Refresh]}">
+          <MenuItem.Icon>
+            <PathIcon Data="{StaticResource IconRefresh}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+          </MenuItem.Icon>
         </MenuItem>
         <Separator />
-        <MenuItem Command="{Binding ExitCommand}">
-          <MenuItem.Header>
-            <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
-              <PathIcon Data="{StaticResource IconSignOut}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
-              <TextBlock Text="{Binding LocalizedStrings[Menu_Exit]}" />
-            </StackPanel>
-          </MenuItem.Header>
+        <MenuItem Command="{Binding ExitCommand}"
+                  Header="{Binding LocalizedStrings[Menu_Exit]}">
+          <MenuItem.Icon>
+            <PathIcon Data="{StaticResource IconSignOut}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+          </MenuItem.Icon>
         </MenuItem>
       </MenuItem>
       <MenuItem Header="{Binding LocalizedStrings[Menu_Edit]}">
         <MenuItem Command="{Binding ExtractArchiveCommand}" InputGesture="Ctrl+E"
-                  IsEnabled="{Binding IsArchiveLoaded}">
-          <MenuItem.Header>
-            <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
-              <PathIcon Data="{StaticResource IconExport}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
-              <TextBlock Text="{Binding LocalizedStrings[Menu_ExtractArchive]}" />
-            </StackPanel>
-          </MenuItem.Header>
+                  IsEnabled="{Binding IsArchiveLoaded}"
+                  Header="{Binding LocalizedStrings[Menu_ExtractArchive]}">
+          <MenuItem.Icon>
+            <PathIcon Data="{StaticResource IconExport}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+          </MenuItem.Icon>
         </MenuItem>
         <MenuItem Command="{Binding ExtractArchiveHereCommand}"
-                  IsEnabled="{Binding IsArchiveLoaded}">
-          <MenuItem.Header>
-            <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
-              <PathIcon Data="{StaticResource IconPin}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
-              <TextBlock Text="{Binding LocalizedStrings[Menu_ExtractHere]}" />
-            </StackPanel>
-          </MenuItem.Header>
+                  IsEnabled="{Binding IsArchiveLoaded}"
+                  Header="{Binding LocalizedStrings[Menu_ExtractHere]}">
+          <MenuItem.Icon>
+            <PathIcon Data="{StaticResource IconPin}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+          </MenuItem.Icon>
         </MenuItem>
         <MenuItem Command="{Binding ExtractArchiveToNameCommand}"
-                  IsEnabled="{Binding IsArchiveLoaded}">
-          <MenuItem.Header>
-            <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
-              <PathIcon Data="{StaticResource IconFolder}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
-              <TextBlock Text="{Binding LocalizedStrings[Menu_ExtractToName]}" />
-            </StackPanel>
-          </MenuItem.Header>
+                  IsEnabled="{Binding IsArchiveLoaded}"
+                  Header="{Binding LocalizedStrings[Menu_ExtractToName]}">
+          <MenuItem.Icon>
+            <PathIcon Data="{StaticResource IconFolder}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+          </MenuItem.Icon>
         </MenuItem>
         <MenuItem Command="{Binding SmartExtractCommand}"
-                  IsEnabled="{Binding IsArchiveLoaded}">
-          <MenuItem.Header>
-            <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
-              <PathIcon Data="{StaticResource IconWand}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
-              <TextBlock Text="{Binding LocalizedStrings[Menu_SmartExtract]}" />
-            </StackPanel>
-          </MenuItem.Header>
+                  IsEnabled="{Binding IsArchiveLoaded}"
+                  Header="{Binding LocalizedStrings[Menu_SmartExtract]}">
+          <MenuItem.Icon>
+            <PathIcon Data="{StaticResource IconWand}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+          </MenuItem.Icon>
         </MenuItem>
         <Separator />
         <MenuItem Command="{Binding AddFilesCommand}"
-                  IsEnabled="{Binding IsArchiveLoaded}">
-          <MenuItem.Header>
-            <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
-              <PathIcon Data="{StaticResource IconAdd}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
-              <TextBlock Text="{Binding LocalizedStrings[Menu_AddFiles]}" />
-            </StackPanel>
-          </MenuItem.Header>
+                  IsEnabled="{Binding IsArchiveLoaded}"
+                  Header="{Binding LocalizedStrings[Menu_AddFiles]}">
+          <MenuItem.Icon>
+            <PathIcon Data="{StaticResource IconAdd}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+          </MenuItem.Icon>
         </MenuItem>
         <MenuItem Command="{Binding DeleteFilesCommand}"
-                  IsEnabled="{Binding IsArchiveLoaded}">
-          <MenuItem.Header>
-            <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
-              <PathIcon Data="{StaticResource IconDismiss}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
-              <TextBlock Text="{Binding LocalizedStrings[Menu_DeleteFiles]}" />
-            </StackPanel>
-          </MenuItem.Header>
+                  IsEnabled="{Binding IsArchiveLoaded}"
+                  Header="{Binding LocalizedStrings[Menu_DeleteFiles]}">
+          <MenuItem.Icon>
+            <PathIcon Data="{StaticResource IconDismiss}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+          </MenuItem.Icon>
         </MenuItem>
         <Separator />
         <MenuItem Command="{Binding TestArchiveCommand}"
-                  IsEnabled="{Binding IsArchiveLoaded}">
-          <MenuItem.Header>
-            <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
-              <PathIcon Data="{StaticResource IconCheckmark}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
-              <TextBlock Text="{Binding LocalizedStrings[Menu_TestArchive]}" />
-            </StackPanel>
-          </MenuItem.Header>
+                  IsEnabled="{Binding IsArchiveLoaded}"
+                  Header="{Binding LocalizedStrings[Menu_TestArchive]}">
+          <MenuItem.Icon>
+            <PathIcon Data="{StaticResource IconCheckmark}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+          </MenuItem.Icon>
         </MenuItem>
         <Separator />
         <MenuItem Command="{Binding EditCommentCommand}"
-                  IsEnabled="{Binding IsArchiveLoaded}">
-          <MenuItem.Header>
-            <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
-              <PathIcon Data="{StaticResource IconChat}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
-              <TextBlock Text="{Binding LocalizedStrings[Menu_ArchiveComment]}" />
-            </StackPanel>
-          </MenuItem.Header>
+                  IsEnabled="{Binding IsArchiveLoaded}"
+                  Header="{Binding LocalizedStrings[Menu_ArchiveComment]}">
+          <MenuItem.Icon>
+            <PathIcon Data="{StaticResource IconChat}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+          </MenuItem.Icon>
         </MenuItem>
         <Separator />
-        <MenuItem Command="{Binding NewArchiveCommand}" InputGesture="Ctrl+N">
-          <MenuItem.Header>
-            <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
-              <PathIcon Data="{StaticResource IconNewFile}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
-              <TextBlock Text="{Binding LocalizedStrings[Menu_NewArchive]}" />
-            </StackPanel>
-          </MenuItem.Header>
+        <MenuItem Command="{Binding NewArchiveCommand}" InputGesture="Ctrl+N"
+                  Header="{Binding LocalizedStrings[Menu_NewArchive]}">
+          <MenuItem.Icon>
+            <PathIcon Data="{StaticResource IconNewFile}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+          </MenuItem.Icon>
         </MenuItem>
-        <MenuItem Command="{Binding CompressSelectedCommand}" InputGesture="Ctrl+C">
-          <MenuItem.Header>
-            <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
-              <PathIcon Data="{StaticResource IconDownload}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
-              <TextBlock Text="{Binding LocalizedStrings[Menu_Compress]}" />
-            </StackPanel>
-          </MenuItem.Header>
+        <MenuItem Command="{Binding CompressSelectedCommand}" InputGesture="Ctrl+C"
+                  Header="{Binding LocalizedStrings[Menu_Compress]}">
+          <MenuItem.Icon>
+            <PathIcon Data="{StaticResource IconDownload}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+          </MenuItem.Icon>
         </MenuItem>
       </MenuItem>
       <MenuItem Header="{Binding LocalizedStrings[Menu_View]}">
-        <MenuItem Command="{Binding ToggleThemeCommand}">
-          <MenuItem.Header>
-            <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
-              <Border Classes="ToggleIconBox"
-                      Background="{Binding IsDarkTheme, Converter={StaticResource BoolToToggleBgBrushConverter}}">
-                <PathIcon Data="{StaticResource IconMoon}" Width="12" Height="12"
-                          Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
-              </Border>
-              <TextBlock Text="{Binding LocalizedStrings[Menu_ToggleTheme]}" />
-            </StackPanel>
-          </MenuItem.Header>
+        <MenuItem Command="{Binding ToggleThemeCommand}"
+                  Header="{Binding LocalizedStrings[Menu_ToggleTheme]}">
+          <MenuItem.Icon>
+            <Border Classes="ToggleIconBox"
+                    Background="{Binding IsDarkTheme, Converter={StaticResource BoolToToggleBgBrushConverter}}">
+              <PathIcon Data="{StaticResource IconMoon}" Width="10" Height="10"
+                        Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+            </Border>
+          </MenuItem.Icon>
         </MenuItem>
         <Separator />
         <MenuItem Command="{Binding ToggleProgressBarsCommand}"
-                  IsEnabled="{Binding IsArchiveLoaded}">
-          <MenuItem.Header>
-            <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
-              <Border Classes="ToggleIconBox"
-                      Background="{Binding ShowProgressBars, Converter={StaticResource BoolToToggleBgBrushConverter}}">
-                <PathIcon Data="{StaticResource IconDataBarVertical}" Width="12" Height="12"
-                          Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
-              </Border>
-              <TextBlock Text="{Binding LocalizedStrings[Menu_ProgressBars]}" />
-            </StackPanel>
-          </MenuItem.Header>
+                  IsEnabled="{Binding IsArchiveLoaded}"
+                  Header="{Binding LocalizedStrings[Menu_ProgressBars]}">
+          <MenuItem.Icon>
+            <Border Classes="ToggleIconBox"
+                    Background="{Binding ShowProgressBars, Converter={StaticResource BoolToToggleBgBrushConverter}}">
+              <PathIcon Data="{StaticResource IconDataBarVertical}" Width="10" Height="10"
+                        Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+            </Border>
+          </MenuItem.Icon>
         </MenuItem>
         <MenuItem Command="{Binding ToggleSepDirBaselineCommand}"
-                  IsEnabled="{Binding IsArchiveLoaded}">
-          <MenuItem.Header>
-            <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
-              <Border Classes="ToggleIconBox"
-                      Background="{Binding SeparateDirBaseline, Converter={StaticResource BoolToToggleBgBrushConverter}}">
-                <PathIcon Data="{StaticResource IconFolder}" Width="12" Height="12"
-                          Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
-              </Border>
-              <TextBlock Text="{Binding LocalizedStrings[Menu_SepDirBaseline]}" />
-            </StackPanel>
-          </MenuItem.Header>
+                  IsEnabled="{Binding IsArchiveLoaded}"
+                  Header="{Binding LocalizedStrings[Menu_SepDirBaseline]}">
+          <MenuItem.Icon>
+            <Border Classes="ToggleIconBox"
+                    Background="{Binding SeparateDirBaseline, Converter={StaticResource BoolToToggleBgBrushConverter}}">
+              <PathIcon Data="{StaticResource IconFolder}" Width="10" Height="10"
+                        Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+            </Border>
+          </MenuItem.Icon>
         </MenuItem>
         <Separator />
-        <MenuItem Command="{Binding TogglePreviewCommand}">
-          <MenuItem.Header>
-            <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
-              <Border Classes="ToggleIconBox"
-                      Background="{Binding IsPreviewVisible, Converter={StaticResource BoolToToggleBgBrushConverter}}">
-                <PathIcon Data="{StaticResource IconEye}" Width="12" Height="12"
-                          Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
-              </Border>
-              <TextBlock Text="{Binding LocalizedStrings[Menu_ShowPreviewPanel]}" />
-            </StackPanel>
-          </MenuItem.Header>
+        <MenuItem Command="{Binding TogglePreviewCommand}"
+                  Header="{Binding LocalizedStrings[Menu_ShowPreviewPanel]}">
+          <MenuItem.Icon>
+            <Border Classes="ToggleIconBox"
+                    Background="{Binding IsPreviewVisible, Converter={StaticResource BoolToToggleBgBrushConverter}}">
+              <PathIcon Data="{StaticResource IconEye}" Width="10" Height="10"
+                        Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+            </Border>
+          </MenuItem.Icon>
         </MenuItem>
-        <MenuItem Command="{Binding ToggleInfoPanelVisibilityCommand}">
-          <MenuItem.Header>
-            <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
-              <Border Classes="ToggleIconBox"
-                      Background="{Binding Preview.ShowInfoPanel, Converter={StaticResource BoolToToggleBgBrushConverter}}">
-                <PathIcon Data="{StaticResource IconPanelRight}" Width="12" Height="12"
-                          Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
-              </Border>
-              <TextBlock Text="{Binding LocalizedStrings[Menu_ShowInfoPanel]}" />
-            </StackPanel>
-          </MenuItem.Header>
+        <MenuItem Command="{Binding ToggleInfoPanelVisibilityCommand}"
+                  Header="{Binding LocalizedStrings[Menu_ShowInfoPanel]}">
+          <MenuItem.Icon>
+            <Border Classes="ToggleIconBox"
+                    Background="{Binding Preview.ShowInfoPanel, Converter={StaticResource BoolToToggleBgBrushConverter}}">
+              <PathIcon Data="{StaticResource IconPanelRight}" Width="10" Height="10"
+                        Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+            </Border>
+          </MenuItem.Icon>
         </MenuItem>
-        <MenuItem Command="{Binding ToggleInfoPanelOrientationCommand}">
-          <MenuItem.Header>
-            <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
-              <Border Classes="ToggleIconBox"
-                      Background="{Binding Preview.IsHorizontalInfoPanel, Converter={StaticResource BoolToToggleBgBrushConverter}}">
-                <PathIcon Data="{StaticResource IconOrientation}" Width="12" Height="12"
-                          Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
-              </Border>
-              <TextBlock Text="{Binding LocalizedStrings[Menu_InfoPanelOrientation]}" />
-            </StackPanel>
-          </MenuItem.Header>
+        <MenuItem Command="{Binding ToggleInfoPanelOrientationCommand}"
+                  Header="{Binding LocalizedStrings[Menu_InfoPanelOrientation]}">
+          <MenuItem.Icon>
+            <Border Classes="ToggleIconBox"
+                    Background="{Binding Preview.IsHorizontalInfoPanel, Converter={StaticResource BoolToToggleBgBrushConverter}}">
+              <PathIcon Data="{StaticResource IconOrientation}" Width="10" Height="10"
+                        Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+            </Border>
+          </MenuItem.Icon>
+        </MenuItem>
+        <Separator />
+        <MenuItem Command="{Binding SaveLayoutCommand}"
+                  Header="{Binding LocalizedStrings[Menu_SaveLayout]}">
+          <MenuItem.Icon>
+            <PathIcon Data="{StaticResource IconSave}" Width="14" Height="14"
+                      Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+          </MenuItem.Icon>
         </MenuItem>
       </MenuItem>
       <MenuItem Header="{Binding LocalizedStrings[Menu_Tools]}">
-        <MenuItem Command="{Binding OpenPasswordManagerCommand}">
-          <MenuItem.Header>
-            <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
-              <PathIcon Data="{StaticResource IconKey}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
-              <TextBlock Text="{Binding LocalizedStrings[Menu_PasswordManager]}" />
-            </StackPanel>
-          </MenuItem.Header>
+        <MenuItem Command="{Binding OpenPasswordManagerCommand}"
+                  Header="{Binding LocalizedStrings[Menu_PasswordManager]}">
+          <MenuItem.Icon>
+            <PathIcon Data="{StaticResource IconKey}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+          </MenuItem.Icon>
         </MenuItem>
-        <MenuItem Command="{Binding OpenFavoritesManagerCommand}">
-          <MenuItem.Header>
-            <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
-              <PathIcon Data="{StaticResource IconStar}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
-              <TextBlock Text="{Binding LocalizedStrings[FavMgr_OpenManager]}" />
-            </StackPanel>
-          </MenuItem.Header>
+        <MenuItem Command="{Binding OpenFavoritesManagerCommand}"
+                  Header="{Binding LocalizedStrings[FavMgr_OpenManager]}">
+          <MenuItem.Icon>
+            <PathIcon Data="{StaticResource IconStar}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+          </MenuItem.Icon>
         </MenuItem>
         <Separator />
-        <MenuItem Command="{Binding OpenSettingsCommand}">
-          <MenuItem.Header>
-            <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
-              <PathIcon Data="{StaticResource IconSettings}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
-              <TextBlock Text="{Binding LocalizedStrings[Menu_Settings]}" />
-            </StackPanel>
-          </MenuItem.Header>
+        <MenuItem Command="{Binding OpenSettingsCommand}"
+                  Header="{Binding LocalizedStrings[Menu_Settings]}">
+          <MenuItem.Icon>
+            <PathIcon Data="{StaticResource IconSettings}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+          </MenuItem.Icon>
         </MenuItem>
       </MenuItem>
       <MenuItem Header="{Binding LocalizedStrings[Menu_Help]}">
-        <MenuItem Command="{Binding OpenAboutCommand}">
-          <MenuItem.Header>
-            <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
-              <PathIcon Data="{StaticResource IconInfo}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
-              <TextBlock Text="{Binding LocalizedStrings[Menu_About]}" />
-            </StackPanel>
-          </MenuItem.Header>
+        <MenuItem Command="{Binding OpenAboutCommand}"
+                  Header="{Binding LocalizedStrings[Menu_About]}">
+          <MenuItem.Icon>
+            <PathIcon Data="{StaticResource IconInfo}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+          </MenuItem.Icon>
         </MenuItem>
-        <MenuItem Command="{Binding OpenDonateCommand}">
-          <MenuItem.Header>
-            <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
-              <PathIcon Data="{StaticResource IconHeart}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
-              <TextBlock Text="{Binding LocalizedStrings[Menu_Donate]}" />
-            </StackPanel>
-          </MenuItem.Header>
+        <MenuItem Command="{Binding OpenDonateCommand}"
+                  Header="{Binding LocalizedStrings[Menu_Donate]}">
+          <MenuItem.Icon>
+            <PathIcon Data="{StaticResource IconHeart}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+          </MenuItem.Icon>
         </MenuItem>
       </MenuItem>
       <MenuItem x:Name="TestMenu">
@@ -321,212 +273,162 @@
             <TextBlock Text="{Binding LocalizedStrings[Menu_Test]}" />
           </StackPanel>
         </MenuItem.Header>
-        <MenuItem Click="TestWindow_Click" Tag="IconTestWindow">
-          <MenuItem.Header>
-            <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
-              <PathIcon Data="{StaticResource IconGrid}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
-              <TextBlock Text="{Binding LocalizedStrings[Main_IconTestTitle]}" />
-            </StackPanel>
-          </MenuItem.Header>
+        <MenuItem Click="TestWindow_Click" Tag="IconTestWindow"
+                  Header="{Binding LocalizedStrings[Main_IconTestTitle]}">
+          <MenuItem.Icon>
+            <PathIcon Data="{StaticResource IconGrid}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+          </MenuItem.Icon>
         </MenuItem>
-        <MenuItem Click="TestWindow_Click" Tag="UiTestWindow">
-          <MenuItem.Header>
-            <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
-              <PathIcon Data="{StaticResource IconGrid}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
-              <TextBlock Text="{Binding LocalizedStrings[Main_UiTestTitle]}" />
-            </StackPanel>
-          </MenuItem.Header>
+        <MenuItem Click="TestWindow_Click" Tag="UiTestWindow"
+                  Header="{Binding LocalizedStrings[Main_UiTestTitle]}">
+          <MenuItem.Icon>
+            <PathIcon Data="{StaticResource IconGrid}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+          </MenuItem.Icon>
         </MenuItem>
         <Separator />
-        <MenuItem Click="TestWindow_Click" Tag="AboutWindow">
-          <MenuItem.Header>
-            <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
-              <PathIcon Data="{StaticResource IconInfo}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
-              <TextBlock Text="{Binding LocalizedStrings[Test_AboutWindow]}" />
-            </StackPanel>
-          </MenuItem.Header>
+        <MenuItem Click="TestWindow_Click" Tag="AboutWindow"
+                  Header="{Binding LocalizedStrings[Test_AboutWindow]}">
+          <MenuItem.Icon>
+            <PathIcon Data="{StaticResource IconInfo}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+          </MenuItem.Icon>
         </MenuItem>
-        <MenuItem Click="TestWindow_Click" Tag="SettingsWindow">
-          <MenuItem.Header>
-            <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
-              <PathIcon Data="{StaticResource IconSettings}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
-              <TextBlock Text="{Binding LocalizedStrings[Test_SettingsWindow]}" />
-            </StackPanel>
-          </MenuItem.Header>
+        <MenuItem Click="TestWindow_Click" Tag="SettingsWindow"
+                  Header="{Binding LocalizedStrings[Test_SettingsWindow]}">
+          <MenuItem.Icon>
+            <PathIcon Data="{StaticResource IconSettings}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+          </MenuItem.Icon>
         </MenuItem>
-        <MenuItem Click="TestWindow_Click" Tag="PasswordManagerWindow">
-          <MenuItem.Header>
-            <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
-              <PathIcon Data="{StaticResource IconKey}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
-              <TextBlock Text="{Binding LocalizedStrings[Test_PasswordManager]}" />
-            </StackPanel>
-          </MenuItem.Header>
+        <MenuItem Click="TestWindow_Click" Tag="PasswordManagerWindow"
+                  Header="{Binding LocalizedStrings[Test_PasswordManager]}">
+          <MenuItem.Icon>
+            <PathIcon Data="{StaticResource IconKey}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+          </MenuItem.Icon>
         </MenuItem>
-        <MenuItem Click="TestWindow_Click" Tag="DonationDialog">
-          <MenuItem.Header>
-            <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
-              <PathIcon Data="{StaticResource IconHeart}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
-              <TextBlock Text="{Binding LocalizedStrings[Test_DonationDialog]}" />
-            </StackPanel>
-          </MenuItem.Header>
+        <MenuItem Click="TestWindow_Click" Tag="DonationDialog"
+                  Header="{Binding LocalizedStrings[Test_DonationDialog]}">
+          <MenuItem.Icon>
+            <PathIcon Data="{StaticResource IconHeart}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+          </MenuItem.Icon>
         </MenuItem>
         <Separator />
-        <MenuItem Click="TestWindow_Click" Tag="LogPrivacyHelpDialog">
-          <MenuItem.Header>
-            <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
-              <PathIcon Data="{StaticResource IconLockClosed}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
-              <TextBlock Text="{Binding LocalizedStrings[Test_LogPrivacyHelp]}" />
-            </StackPanel>
-          </MenuItem.Header>
+        <MenuItem Click="TestWindow_Click" Tag="LogPrivacyHelpDialog"
+                  Header="{Binding LocalizedStrings[Test_LogPrivacyHelp]}">
+          <MenuItem.Icon>
+            <PathIcon Data="{StaticResource IconLockClosed}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+          </MenuItem.Icon>
         </MenuItem>
-        <MenuItem Click="TestWindow_Click" Tag="PasswordHelpDialog">
-          <MenuItem.Header>
-            <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
-              <PathIcon Data="{StaticResource IconQuestion}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
-              <TextBlock Text="{Binding LocalizedStrings[Test_PasswordHelp]}" />
-            </StackPanel>
-          </MenuItem.Header>
+        <MenuItem Click="TestWindow_Click" Tag="PasswordHelpDialog"
+                  Header="{Binding LocalizedStrings[Test_PasswordHelp]}">
+          <MenuItem.Icon>
+            <PathIcon Data="{StaticResource IconQuestion}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+          </MenuItem.Icon>
         </MenuItem>
         <Separator />
-        <MenuItem Click="TestWindow_Click" Tag="CommentDialog">
-          <MenuItem.Header>
-            <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
-              <PathIcon Data="{StaticResource IconChat}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
-              <TextBlock Text="{Binding LocalizedStrings[Test_CommentDialog]}" />
-            </StackPanel>
-          </MenuItem.Header>
+        <MenuItem Click="TestWindow_Click" Tag="CommentDialog"
+                  Header="{Binding LocalizedStrings[Test_CommentDialog]}">
+          <MenuItem.Icon>
+            <PathIcon Data="{StaticResource IconChat}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+          </MenuItem.Icon>
         </MenuItem>
-        <MenuItem Click="TestWindow_Click" Tag="PasswordEditDialog">
-          <MenuItem.Header>
-            <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
-              <PathIcon Data="{StaticResource IconEdit}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
-              <TextBlock Text="{Binding LocalizedStrings[Test_PasswordEditDialog]}" />
-            </StackPanel>
-          </MenuItem.Header>
+        <MenuItem Click="TestWindow_Click" Tag="PasswordEditDialog"
+                  Header="{Binding LocalizedStrings[Test_PasswordEditDialog]}">
+          <MenuItem.Icon>
+            <PathIcon Data="{StaticResource IconEdit}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+          </MenuItem.Icon>
         </MenuItem>
-        <MenuItem Click="TestWindow_Click" Tag="PasswordDialog">
-          <MenuItem.Header>
-            <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
-              <PathIcon Data="{StaticResource IconShieldLock}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
-              <TextBlock Text="{Binding LocalizedStrings[Test_PasswordDialog]}" />
-            </StackPanel>
-          </MenuItem.Header>
+        <MenuItem Click="TestWindow_Click" Tag="PasswordDialog"
+                  Header="{Binding LocalizedStrings[Test_PasswordDialog]}">
+          <MenuItem.Icon>
+            <PathIcon Data="{StaticResource IconShieldLock}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+          </MenuItem.Icon>
         </MenuItem>
         <Separator />
-        <MenuItem Click="TestWindow_Click" Tag="ProgressWindow">
-          <MenuItem.Header>
-            <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
-              <PathIcon Data="{StaticResource IconTimer}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
-              <TextBlock Text="{Binding LocalizedStrings[Test_ProgressWindow]}" />
-            </StackPanel>
-          </MenuItem.Header>
+        <MenuItem Click="TestWindow_Click" Tag="ProgressWindow"
+                  Header="{Binding LocalizedStrings[Test_ProgressWindow]}">
+          <MenuItem.Icon>
+            <PathIcon Data="{StaticResource IconTimer}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+          </MenuItem.Icon>
         </MenuItem>
-        <MenuItem Click="TestWindow_Click" Tag="ErrorDialog">
-          <MenuItem.Header>
-            <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
-              <PathIcon Data="{StaticResource IconWarning}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
-              <TextBlock Text="{Binding LocalizedStrings[Test_ErrorDialog]}" />
-            </StackPanel>
-          </MenuItem.Header>
+        <MenuItem Click="TestWindow_Click" Tag="ErrorDialog"
+                  Header="{Binding LocalizedStrings[Test_ErrorDialog]}">
+          <MenuItem.Icon>
+            <PathIcon Data="{StaticResource IconWarning}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+          </MenuItem.Icon>
         </MenuItem>
         <Separator />
-        <MenuItem Click="TestWindow_Click" Tag="CompressSettingsWindow">
-          <MenuItem.Header>
-            <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
-              <PathIcon Data="{StaticResource IconCompress}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
-              <TextBlock Text="{Binding LocalizedStrings[Test_CompressSettings]}" />
-            </StackPanel>
-          </MenuItem.Header>
+        <MenuItem Click="TestWindow_Click" Tag="CompressSettingsWindow"
+                  Header="{Binding LocalizedStrings[Test_CompressSettings]}">
+          <MenuItem.Icon>
+            <PathIcon Data="{StaticResource IconCompress}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+          </MenuItem.Icon>
         </MenuItem>
-        <MenuItem Click="TestWindow_Click" Tag="ExtractSettingsWindow">
-          <MenuItem.Header>
-            <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
-              <PathIcon Data="{StaticResource IconCompress}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
-              <TextBlock Text="{Binding LocalizedStrings[Test_ExtractSettings]}" />
-            </StackPanel>
-          </MenuItem.Header>
+        <MenuItem Click="TestWindow_Click" Tag="ExtractSettingsWindow"
+                  Header="{Binding LocalizedStrings[Test_ExtractSettings]}">
+          <MenuItem.Icon>
+            <PathIcon Data="{StaticResource IconCompress}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+          </MenuItem.Icon>
         </MenuItem>
-        <MenuItem Click="TestWindow_Click" Tag="CompressConflictDialog">
-          <MenuItem.Header>
-            <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
-              <PathIcon Data="{StaticResource IconRefresh}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
-              <TextBlock Text="{Binding LocalizedStrings[Test_CompressConflict]}" />
-            </StackPanel>
-          </MenuItem.Header>
+        <MenuItem Click="TestWindow_Click" Tag="CompressConflictDialog"
+                  Header="{Binding LocalizedStrings[Test_CompressConflict]}">
+          <MenuItem.Icon>
+            <PathIcon Data="{StaticResource IconRefresh}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+          </MenuItem.Icon>
         </MenuItem>
-        <MenuItem Click="TestWindow_Click" Tag="ConflictDialog">
-          <MenuItem.Header>
-            <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
-              <PathIcon Data="{StaticResource IconLightning}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
-              <TextBlock Text="{Binding LocalizedStrings[Test_ConflictDialog]}" />
-            </StackPanel>
-          </MenuItem.Header>
+        <MenuItem Click="TestWindow_Click" Tag="ConflictDialog"
+                  Header="{Binding LocalizedStrings[Test_ConflictDialog]}">
+          <MenuItem.Icon>
+            <PathIcon Data="{StaticResource IconLightning}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+          </MenuItem.Icon>
         </MenuItem>
-        <MenuItem Click="TestWindow_Click" Tag="MatchedPasswordDialog">
-          <MenuItem.Header>
-            <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
-              <PathIcon Data="{StaticResource IconLockOpen}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
-              <TextBlock Text="{Binding LocalizedStrings[Test_MatchedPassword]}" />
-            </StackPanel>
-          </MenuItem.Header>
+        <MenuItem Click="TestWindow_Click" Tag="MatchedPasswordDialog"
+                  Header="{Binding LocalizedStrings[Test_MatchedPassword]}">
+          <MenuItem.Icon>
+            <PathIcon Data="{StaticResource IconLockOpen}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+          </MenuItem.Icon>
         </MenuItem>
         <Separator />
-        <MenuItem Click="TestWindow_Click" Tag="ElevationDialog">
-          <MenuItem.Header>
-            <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
-              <PathIcon Data="{StaticResource IconShieldLock}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
-              <TextBlock Text="{Binding LocalizedStrings[Test_ElevationDialog]}" />
-            </StackPanel>
-          </MenuItem.Header>
+        <MenuItem Click="TestWindow_Click" Tag="ElevationDialog"
+                  Header="{Binding LocalizedStrings[Test_ElevationDialog]}">
+          <MenuItem.Icon>
+            <PathIcon Data="{StaticResource IconShieldLock}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+          </MenuItem.Icon>
         </MenuItem>
-        <MenuItem Click="TestWindow_Click" Tag="ElevationFailedDialog">
-          <MenuItem.Header>
-            <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
-              <PathIcon Data="{StaticResource IconWarning}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
-              <TextBlock Text="{Binding LocalizedStrings[Test_ElevationFailedDialog]}" />
-            </StackPanel>
-          </MenuItem.Header>
+        <MenuItem Click="TestWindow_Click" Tag="ElevationFailedDialog"
+                  Header="{Binding LocalizedStrings[Test_ElevationFailedDialog]}">
+          <MenuItem.Icon>
+            <PathIcon Data="{StaticResource IconWarning}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+          </MenuItem.Icon>
         </MenuItem>
-        <MenuItem Click="TestWindow_Click" Tag="ElevationInfoDialog">
-          <MenuItem.Header>
-            <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
-              <PathIcon Data="{StaticResource IconInfo}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
-              <TextBlock Text="{Binding LocalizedStrings[Test_ElevationInfoDialog]}" />
-            </StackPanel>
-          </MenuItem.Header>
+        <MenuItem Click="TestWindow_Click" Tag="ElevationInfoDialog"
+                  Header="{Binding LocalizedStrings[Test_ElevationInfoDialog]}">
+          <MenuItem.Icon>
+            <PathIcon Data="{StaticResource IconInfo}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+          </MenuItem.Icon>
         </MenuItem>
         <Separator />
-        <MenuItem Click="TestWindow_Click" Tag="AddFavoriteDialog">
-          <MenuItem.Header>
-            <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
-              <PathIcon Data="{StaticResource IconStar}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
-              <TextBlock Text="{Binding LocalizedStrings[Test_AddFavoriteDialog]}" />
-            </StackPanel>
-          </MenuItem.Header>
+        <MenuItem Click="TestWindow_Click" Tag="AddFavoriteDialog"
+                  Header="{Binding LocalizedStrings[Test_AddFavoriteDialog]}">
+          <MenuItem.Icon>
+            <PathIcon Data="{StaticResource IconStar}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+          </MenuItem.Icon>
         </MenuItem>
-        <MenuItem Click="TestWindow_Click" Tag="FavoriteManagerWindow">
-          <MenuItem.Header>
-            <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
-              <PathIcon Data="{StaticResource IconCopy}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
-              <TextBlock Text="{Binding LocalizedStrings[Test_FavoriteManagerWindow]}" />
-            </StackPanel>
-          </MenuItem.Header>
+        <MenuItem Click="TestWindow_Click" Tag="FavoriteManagerWindow"
+                  Header="{Binding LocalizedStrings[Test_FavoriteManagerWindow]}">
+          <MenuItem.Icon>
+            <PathIcon Data="{StaticResource IconCopy}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+          </MenuItem.Icon>
         </MenuItem>
-        <MenuItem Click="TestWindow_Click" Tag="ArchiveCommentDialog">
-          <MenuItem.Header>
-            <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
-              <PathIcon Data="{StaticResource IconChat}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
-              <TextBlock Text="{Binding LocalizedStrings[Test_ArchiveCommentDialog]}" />
-            </StackPanel>
-          </MenuItem.Header>
+        <MenuItem Click="TestWindow_Click" Tag="ArchiveCommentDialog"
+                  Header="{Binding LocalizedStrings[Test_ArchiveCommentDialog]}">
+          <MenuItem.Icon>
+            <PathIcon Data="{StaticResource IconChat}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+          </MenuItem.Icon>
         </MenuItem>
-        <MenuItem Click="TestWindow_Click" Tag="AppMessageBox">
-          <MenuItem.Header>
-            <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
-              <PathIcon Data="{StaticResource IconChat}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
-              <TextBlock Text="{Binding LocalizedStrings[Test_AppMessageBox]}" />
-            </StackPanel>
-          </MenuItem.Header>
+        <MenuItem Click="TestWindow_Click" Tag="AppMessageBox"
+                  Header="{Binding LocalizedStrings[Test_AppMessageBox]}">
+          <MenuItem.Icon>
+            <PathIcon Data="{StaticResource IconChat}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+          </MenuItem.Icon>
         </MenuItem>
       </MenuItem>
       <MenuItem Header="{Binding LocalizedStrings[Menu_Language]}">

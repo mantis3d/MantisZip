@@ -1,4 +1,6 @@
 {
+  "Menu_SaveLayout": "保存布局",
+  "Status_LayoutSaved": "布局已保存",
   "Preview_AnimatedImage": "动画预览 {0}",
   "Preview_Header_AnimatedImage": "动画图片",
   "Menu_ShowPreviewPanel": "显示预览面板",

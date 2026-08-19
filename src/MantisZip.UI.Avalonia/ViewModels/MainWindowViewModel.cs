@@ -51,6 +51,12 @@ public partial class MainWindowViewModel : ObservableObject
     public Func<Task>? ShowSettingsWindow { get; set; }
 
     /// <summary>
+    /// 由 View 设置的「保存布局」回调。View 负责读取内容区 Grid 的列宽与预览尺寸并写盘
+    /// （目录树/文件列表列宽 + 预览面板各位置记忆尺寸）。
+    /// </summary>
+    public Action? SaveLayoutAction { get; set; }
+
+    /// <summary>
     /// 由 View 设置的密码对话框回调。参数为压缩包路径，返回 <see cref="PasswordDialogResponse"/> 或取消时返回 null。
     /// </summary>
     public Func<string, Task<PasswordDialogResponse?>>? ShowPasswordDialog { get; set; }
@@ -205,6 +211,7 @@ public partial class MainWindowViewModel : ObservableObject
             "Toolbar_Filter", "Toolbar_Preview",
             "Menu_Toolbar", "Menu_FilterBar",
             "Menu_ProgressBars", "Menu_SepDirBaseline", "Menu_InfoPanelOrientation", "Menu_ShowInfoPanel",
+            "Menu_ShowPreviewPanel", "Menu_SaveLayout",
             "Filter_Search", "Filter_Exclude", "Filter_DateFrom", "Filter_DateTo",
             "Filter_SizeMin", "Filter_SizeMax", "Filter_ShowSubfolders",
             "Filter_MatchModeSubstring", "Filter_MatchModeWildcard",
@@ -229,7 +236,7 @@ public partial class MainWindowViewModel : ObservableObject
             "Status_TestingEntry", "Status_TestingArchive", "Status_SmartExtracting",
             "Status_AddingFiles", "Status_DeletingFiles", "Status_Entries",
             "Main_NoRecentFiles", "Main_ClearRecentFiles", "Main_RecentFiles",
-            "Main_Favorites", "Main_IconTestTitle",
+            "Main_Favorites", "Main_IconTestTitle", "Main_UiTestTitle",
             "Toolbar_Password", "Tooltip_Password",
             "Menu_Test",
             "Tree_ExpandAll", "Tree_CollapseAll", "Tree_ExpandToCurrent", "Tree_AutoExpand", "Tree_Filter",
@@ -693,6 +700,8 @@ public partial class MainWindowViewModel : ObservableObject
         SeparateDirBaseline = _appSettings.SeparateDirBaseline;
         AutoExpandTree = _appSettings.AutoExpandTreeToCurrent;
         Preview.ShowInfoPanel = _appSettings.ShowPreviewInfoPanel;
+        // 信息面板方向同样从设置初始化（此前 PreviewViewModel 硬编码默认 "Vertical"，保存的方向启动后丢失）
+        Preview.InfoPanelOrientation = _appSettings.InfoPanelOrientation;
         IsPreviewVisible = _appSettings.ShowPreviewPanel;
 
         // 主题（三态）：初始化菜单按钮暗色状态显示
@@ -2476,6 +2485,8 @@ public partial class MainWindowViewModel : ObservableObject
     private void ToggleInfoPanelOrientation()
     {
         Preview.ToggleInfoPanelOrientation();
+        // 持久化方向设置（与 ToggleInfoPanelVisibility 一致，合并写避免覆盖设置窗口的其他变更）
+        SaveSetting(s => s.InfoPanelOrientation = Preview.InfoPanelOrientation);
     }
 
     [RelayCommand]
@@ -2484,6 +2495,16 @@ public partial class MainWindowViewModel : ObservableObject
         Preview.ShowInfoPanel = !Preview.ShowInfoPanel;
         _appSettings.ShowPreviewInfoPanel = Preview.ShowInfoPanel;
         SaveSetting(s => s.ShowPreviewInfoPanel = Preview.ShowInfoPanel);
+    }
+
+    /// <summary>
+    /// 手动保存内容区布局快照（目录树/文件列表列宽 + 预览面板各位置尺寸）。
+    /// 由 View 的 SaveLayoutAction 实际读 Grid 并写盘。
+    /// </summary>
+    [RelayCommand]
+    private void SaveLayout()
+    {
+        SaveLayoutAction?.Invoke();
     }
 
     // ── Recent Files ──

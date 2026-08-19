@@ -76,11 +76,16 @@ public partial class MainWindow : Window
         var columnStates = WindowStateManager.Load(this);
         ApplyColumnStates(columnStates);
 
+        // 应用上次手动保存的布局快照（目录树/文件列表列宽 + 预览各位置记忆尺寸）。
+        // 必须在 ApplyPreviewLayout() 之前调用，保证 ApplyPreviewPosition 能读到已回填的预览尺寸。
+        ApplySavedLayout();
+
         // 应用预览面板显隐 + 位置设置（1=底部, 2=目录树下方, 3=文件列表下方, 4=右侧）
         ApplyPreviewLayout();
 
         var vm = new MainWindowViewModel();
         vm.GetOpenFilePath = OpenFileDialogAsync;
+        vm.SaveLayoutAction = SaveLayout;
         vm.ShowSettingsWindow = async () =>
         {
             var dialog = new SettingsWindow();
@@ -673,9 +678,14 @@ public partial class MainWindow : Window
         if (ArchiveContentGrid == null || PreviewPanelHost == null)
             return;
 
-        // 切换位置前保存旧位置的当前尺寸（仅 Pixel 布局记录，Star 不记录）
+        // 切换位置前保存旧位置的当前尺寸（仅 Pixel 布局记录，Star 不记录）。
+        // 位置未变化（设置窗口保存/菜单切换触发同位置重应用）时同样先记录当前尺寸：
+        // 分隔条拖拽产生的 Pixel 尺寸只存在于 Grid 定义中，若不记录，下面的完整重置
+        // 会把它丢弃，回退到默认（3* 星号 / 200px）或字典里过期的旧值 → 面板缩到最小。
         if (position != _lastAppliedPreviewPosition)
             SaveCurrentPreviewSize(_lastAppliedPreviewPosition);
+        else
+            SaveCurrentPreviewSize(position);
 
         // ── 完整重置：清掉上一种布局的所有痕迹 ──
         ArchiveContentGrid.RowDefinitions[1].Height = new GridLength(0);
@@ -774,7 +784,12 @@ public partial class MainWindow : Window
         var settings = AppSettings.Load();
         _previewPanelEnabled = settings.ShowPreviewPanel;
         if (DataContext is MainWindowViewModel vm)
+        {
             vm.IsPreviewVisible = settings.ShowPreviewPanel;
+            // 设置保存后同步信息面板显隐与方向（此前仅启动时初始化一次，设置窗口修改后不生效）
+            vm.Preview.ShowInfoPanel = settings.ShowPreviewInfoPanel;
+            vm.Preview.InfoPanelOrientation = settings.InfoPanelOrientation;
+        }
         ApplyPreviewPosition(settings.PreviewPosition);
     }
 
@@ -798,6 +813,78 @@ public partial class MainWindow : Window
         }
     }
 
+    /// <summary>
+    /// 启动时加载上次手动保存的布局快照（layout.json）：
+    /// 回填预览面板各位置记忆尺寸 + 应用目录树/文件列表列宽（像素）。
+    /// 必须在 ApplyPreviewLayout() 之前调用，保证 ApplyPreviewPosition 能读到已回填的预览尺寸。
+    /// </summary>
+    private void ApplySavedLayout()
+    {
+        var snapshot = LayoutStateManager.Load();
+        if (snapshot == null)
+            return;
+
+        try
+        {
+            if (snapshot.PreviewSizeByPosition is { Count: > 0 })
+            {
+                foreach (var kvp in snapshot.PreviewSizeByPosition)
+                {
+                    if (kvp.Value > 0)
+                        _previewSizeByPosition[kvp.Key] = kvp.Value;
+                }
+            }
+
+            if (snapshot.TreeColumnWidth is > 0)
+                ArchiveContentGrid.ColumnDefinitions[0].Width = new GridLength(snapshot.TreeColumnWidth.Value, GridUnitType.Pixel);
+            if (snapshot.FileListColumnWidth is > 0)
+                ArchiveContentGrid.ColumnDefinitions[2].Width = new GridLength(snapshot.FileListColumnWidth.Value, GridUnitType.Pixel);
+        }
+        catch (Exception ex)
+        {
+            App.DebugLog($"ApplySavedLayout: failed: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// 手动保存内容区布局快照（菜单「保存布局」触发）：
+    /// 目录树列宽（col 0）+ 文件列表列宽（col 2）+ 预览面板各位置记忆尺寸。
+    /// Star 布局的列用 ActualWidth 捕获实际像素值，保证恢复后布局与保存时一致。
+    /// </summary>
+    private void SaveLayout()
+    {
+        try
+        {
+            // 先记录当前活动预览位置的实时尺寸（分隔条拖拽值只存在于 Grid 定义中）
+            SaveCurrentPreviewSize(_lastAppliedPreviewPosition);
+
+            var snapshot = new LayoutStateManager.LayoutSnapshot
+            {
+                TreeColumnWidth = CaptureColumnActualWidth(ArchiveContentGrid, 0),
+                FileListColumnWidth = CaptureColumnActualWidth(ArchiveContentGrid, 2),
+                PreviewSizeByPosition = new Dictionary<int, double>(_previewSizeByPosition)
+            };
+
+            LayoutStateManager.Save(snapshot);
+            if (DataContext is MainWindowViewModel vm)
+                vm.StatusMessage = LocalizationManager.T("Status_LayoutSaved");
+        }
+        catch (Exception ex)
+        {
+            App.DebugLog($"SaveLayout: failed: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// 捕获指定列的实际像素宽度：Pixel 布局直接用值，Star 布局用 ActualWidth。
+    /// 返回 >0 的有效宽度；Grid 未布局（ActualWidth=0）时返回 null。
+    /// </summary>
+    private static double? CaptureColumnActualWidth(Grid grid, int index)
+    {
+        var w = grid.ColumnDefinitions[index].Width;
+        var pixel = w.GridUnitType == GridUnitType.Pixel ? w.Value : grid.ColumnDefinitions[index].ActualWidth;
+        return pixel > 0 ? pixel : null;
+    }
     /// <summary>
     /// 获取列的持久化标识：优先 SortMemberPath，其次 Tag（图标列 Tag="Icon"）。
     /// </summary>
@@ -1175,7 +1262,7 @@ public partial class MainWindow : Window
             if (header == LocalizationManager.T("DataGrid_Name") || string.IsNullOrEmpty(header))
                 continue;
 
-            // 与主菜单切换图标同构：ToggleIconBox（可见=强调色底，隐藏=透明空心）
+            // 与主菜单切换图标同构：ToggleIconBox（可见=强调色底，隐藏=透明空心），16×16 适配 Icon 槽位
             var iconBox = new Border
             {
                 Classes = { "ToggleIconBox" },
@@ -1184,26 +1271,18 @@ public partial class MainWindow : Window
                     ? new PathIcon
                     {
                         Data = iconData,
-                        Width = 12,
-                        Height = 12,
+                        Width = 10,
+                        Height = 10,
                         Foreground = GetThemeBrush("ThemeTextPrimaryBrush")
                     }
                     : null
             };
 
-            // 与主菜单切换项同构：Header 内 StackPanel（ToggleIconBox + 文字）
+            // 与主菜单切换项同构：Icon 槽位（ToggleIconBox）+ Header 字符串
             var menuItem = new MenuItem
             {
-                Header = new StackPanel
-                {
-                    Orientation = Orientation.Horizontal,
-                    Spacing = GetSpacingXxs(),
-                    Children =
-                    {
-                        iconBox,
-                        new TextBlock { Text = header }
-                    }
-                },
+                Icon = iconBox,
+                Header = header,
                 Tag = column
             };
             menuItem.Click += (s, args) =>
@@ -1240,14 +1319,6 @@ public partial class MainWindow : Window
         if (Application.Current?.TryFindResource(key, out var brush) == true && brush is IBrush b)
             return b;
         return Brushes.Gray;
-    }
-
-    /// <summary>解析紧凑度间距资源（与主菜单 Header StackPanel 的 SpacingXxs 一致）。</summary>
-    private static double GetSpacingXxs()
-    {
-        if (Application.Current?.TryFindResource("SpacingXxs", out var spacing) == true && spacing is double d)
-            return d;
-        return 4;
     }
 
     private static string GetColumnHeaderText(DataGridColumn column)

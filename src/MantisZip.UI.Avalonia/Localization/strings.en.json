@@ -1,4 +1,6 @@
 {
+  "Menu_SaveLayout": "Save Layout",
+  "Status_LayoutSaved": "Layout saved",
   "Preview_AnimatedImage": "Animated Image Preview {0}",
   "Preview_Header_AnimatedImage": "Animated Image",
   "Menu_ShowPreviewPanel": "Show Preview Panel",

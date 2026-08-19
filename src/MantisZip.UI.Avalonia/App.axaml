@@ -331,10 +331,11 @@
       <Setter Property="Foreground" Value="{DynamicResource ThemeTextPrimaryBrush}" />
     </Style>
 
-    <!-- ToggleIconBox — Total Commander-style toggle indicator for menu items -->
+    <!-- ToggleIconBox — Total Commander-style toggle indicator for menu items.
+         16×16 to match Fluent MenuItem.Icon slot (FluentMenuItemIconTheme caps content at 16×16). -->
     <Style Selector="Border.ToggleIconBox">
-      <Setter Property="Width" Value="20" />
-      <Setter Property="Height" Value="20" />
+      <Setter Property="Width" Value="16" />
+      <Setter Property="Height" Value="16" />
       <Setter Property="CornerRadius" Value="3" />
       <Setter Property="BorderThickness" Value="1.5" />
       <Setter Property="VerticalAlignment" Value="Center" />
