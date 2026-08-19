@@ -21,6 +21,13 @@
 
 ### MantisZip.UI.Avalonia（主力版）
 
+**2026-08-19** — Tab 标题图标化：统一 compactTab 附加属性渲染「图标 + 文字」，31 个 tab 全部迁移
+  - **TabIcon 附加属性**：新增 `Controls/TabItemExtensions.cs`——`TabIcon`（Geometry 资源键，`RegisterAttached<TabItem, string?>` 以 `typeof(TabItemExtensions)` 声明 owner）；`TabItem.compactTab` 类样式增强 `HeaderTemplate`：PathIcon 绑定 `$parent[TabItem].(controls:TabItemExtensions.TabIcon)` 经 `GeometryResourceConverter` 取 Geometry、`StringNotEmptyConverter` 控制显隐（未设置时回退纯文字标题），TextBlock 绑定 `{Binding}` 渲染标题文本；`GeometryResourceConverter`/`StringNotEmptyConverter` 提升注册到 App 级全局资源
+  - **新增 4 个图标**：`IconImage`（预览-图片）、`IconApps`（预览-可执行文件）、`IconPerson`（About-作者）、`IconMagnet`（预览-种子，自绘马蹄形磁铁），已同步注册到 `IconTestViewModel`（规则 8）
+  - **31 个 tab 迁移**：SettingsWindow 外层 10 tab 删除手写 `Grid` Header 统一改用附加属性（压缩/解压/外观/预览/密码管理/语言/上下文菜单/文件关联/调试/高级）+ 内嵌 10 tab（压缩-通用/格式、预览-通用/图片/文本/字体/种子/可执行文件/表格/元数据面板）；CompressSettingsWindow 5 tab（常规/高级/密码/备注/文件过滤）；ExtractSettingsWindow 2 tab（常规/文件过滤）；AboutWindow 4 tab（关于/作者/依赖库/致谢）——后者的 code-behind `TabXxxHeader.Text` 手动赋值改为 `AboutTabHeader` 等属性绑定
+  - 涉及文件：`Controls/TabItemExtensions.cs`（新增）、`App.axaml`、`Resources/Icons/AppIcons.axaml`、`ViewModels/IconTestViewModel.cs`、`Views/SettingsWindow.axaml`、`Dialogs/CompressSettingsWindow.axaml`、`Dialogs/ExtractSettingsWindow.axaml`、`Dialogs/AboutWindow.axaml`、`Dialogs/AboutWindow.axaml.cs`
+  - 验证：`dotnet build` 0 错误（35 既有警告）
+
 **2026-08-18** — 图片预览能力系统：透明/动画能力注册表 + GIF 透明 + Animated WebP 预览
   - **预览能力注册表**：新增 `PreviewCapabilities`（[Flags] `PreviewCapability`：Zoom/Transparency/FlattenAlpha/AnimationControls），按 PreviewType 声明能力，`HasZoomControls`/`HasTransparencyControls`/`HasFlattenAlphaControls`/`HasAnimationControls` 全部查表（对齐 MetadataRegistry 模式）；新增格式只注册能力即可获得工具栏控件
   - **GIF 透明支持**：`AnimatedImage` 注册 Transparency——工具栏 🏁 棋盘格出现（棋盘格矩形早已接好，此前仅按钮未暴露）；🎨 压平保持静态图专用（方案 A 决策：动画帧不做全帧压平）

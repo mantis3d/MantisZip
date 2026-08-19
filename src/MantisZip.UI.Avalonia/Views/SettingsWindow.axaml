@@ -9,9 +9,9 @@
         x:Name="SettingsWin"
         x:DataType="vm:SettingsWindowViewModel"
         Title="{Binding WindowTitle}"
-        Width="820"
+        Width="900"
         Height="640"
-        MinWidth="600"
+        MinWidth="700"
         MinHeight="400"
         WindowStartupLocation="CenterScreen"
         CanResize="True"
@@ -30,20 +30,15 @@
 
 
       <!-- ═══════ 1. 压缩 ═══════ -->
-      <TabItem Classes="compactTab">
-        <TabItem.Header>
-          <Grid ColumnDefinitions="Auto,*">
-            <PathIcon Data="{StaticResource IconCompress}" Width="18" Height="18" VerticalAlignment="Center" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
-            <TextBlock Text="{Binding TabCompressHeader}" Grid.Column="1" Margin="4,0,0,0"
-                      VerticalAlignment="Center" />
-          </Grid>
-        </TabItem.Header>
+      <TabItem Header="{Binding TabCompressHeader}" Classes="compactTab"
+               controls:TabItemExtensions.TabIcon="IconCompress">
         <Grid>
           <TabControl TabStripPlacement="Top"
                       Background="{DynamicResource ThemeSurfaceBgBrush}"
                       BorderBrush="{DynamicResource ThemeBorderBrush}">
             <!-- 通用 General -->
-            <TabItem Header="{Binding CompressTabGeneralHeader}" Classes="compactTab">
+            <TabItem Header="{Binding CompressTabGeneralHeader}" Classes="compactTab"
+              controls:TabItemExtensions.TabIcon="IconSettings">
               <ScrollViewer Background="{DynamicResource ThemeWindowBgBrush}">
                 <StackPanel Spacing="{DynamicResource SpacingSm}" Margin="{DynamicResource SpacingSmThk}">
                   <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
@@ -95,7 +90,8 @@
               </ScrollViewer>
             </TabItem>
             <!-- 格式 Format -->
-            <TabItem Header="{Binding CompressTabFormatHeader}" Classes="compactTab">
+            <TabItem Header="{Binding CompressTabFormatHeader}" Classes="compactTab"
+              controls:TabItemExtensions.TabIcon="IconArchive">
               <ScrollViewer Background="{DynamicResource ThemeWindowBgBrush}">
                 <StackPanel Spacing="{DynamicResource SpacingSm}" Margin="{DynamicResource SpacingSmThk}">
                   <!-- ZIP 默认选项 -->
@@ -228,14 +224,8 @@
       </TabItem>
 
       <!-- ═══════ 2. 解压 ═══════ -->
-      <TabItem Classes="compactTab">
-        <TabItem.Header>
-          <Grid ColumnDefinitions="Auto,*">
-            <PathIcon Data="{StaticResource IconFolder}" Width="18" Height="18" VerticalAlignment="Center" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
-            <TextBlock Text="{Binding TabExtractHeader}" Grid.Column="1" Margin="4,0,0,0"
-                       VerticalAlignment="Center" />
-          </Grid>
-        </TabItem.Header>
+      <TabItem Header="{Binding TabExtractHeader}" Classes="compactTab"
+               controls:TabItemExtensions.TabIcon="IconFolder">
         <ScrollViewer Background="{DynamicResource ThemeWindowBgBrush}">
           <StackPanel Spacing="{DynamicResource SpacingSm}" Margin="{DynamicResource SpacingSmThk}">
             <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
@@ -314,14 +304,8 @@
       </TabItem>
 
       <!-- ═══════ 3. 外观 ═══════ -->
-      <TabItem Classes="compactTab">
-        <TabItem.Header>
-          <Grid ColumnDefinitions="Auto,*">
-            <PathIcon Data="{StaticResource IconPaintBrush}" Width="18" Height="18" VerticalAlignment="Center" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
-            <TextBlock Text="{Binding TabAppearanceHeader}" Grid.Column="1" Margin="4,0,0,0"
-                       VerticalAlignment="Center" />
-          </Grid>
-        </TabItem.Header>
+      <TabItem Header="{Binding TabAppearanceHeader}" Classes="compactTab"
+               controls:TabItemExtensions.TabIcon="IconPaintBrush">
         <ScrollViewer Background="{DynamicResource ThemeWindowBgBrush}">
           <StackPanel Spacing="{DynamicResource SpacingSm}" Margin="{DynamicResource SpacingSmThk}">
             <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
@@ -388,20 +372,15 @@
       </TabItem>
 
       <!-- ═══════ 4. 预览 ═══════ -->
-      <TabItem Classes="compactTab">
-        <TabItem.Header>
-          <Grid ColumnDefinitions="Auto,*">
-            <PathIcon Data="{StaticResource IconEye}" Width="18" Height="18" VerticalAlignment="Center" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
-            <TextBlock Text="{Binding TabPreviewHeader}" Grid.Column="1" Margin="4,0,0,0"
-                       VerticalAlignment="Center" />
-          </Grid>
-        </TabItem.Header>
+      <TabItem Header="{Binding TabPreviewHeader}" Classes="compactTab"
+               controls:TabItemExtensions.TabIcon="IconEye">
         <Grid>
           <TabControl TabStripPlacement="Top"
                       Background="{DynamicResource ThemeSurfaceBgBrush}"
                       BorderBrush="{DynamicResource ThemeBorderBrush}">
             <!-- 通用 General -->
-            <TabItem Header="{Binding PreviewTabGeneralHeader}" Classes="compactTab">
+            <TabItem Header="{Binding PreviewTabGeneralHeader}" Classes="compactTab"
+              controls:TabItemExtensions.TabIcon="IconSettings">
               <ScrollViewer Background="{DynamicResource ThemeWindowBgBrush}">
                 <StackPanel Spacing="{DynamicResource SpacingSm}" Margin="{DynamicResource SpacingSmThk}">
                   <CheckBox Content="{Binding PreviewShowPanelText}"
@@ -454,7 +433,7 @@
                                 Margin="0,0,8,0" />
                         <Border Grid.Column="1" Padding="8,2">
                           <TextBlock Text="{Binding PreviewHeadSizeKBText}"
-                                     VerticalAlignment="Center" FontWeight="SemiBold" />
+                                    VerticalAlignment="Center" FontWeight="SemiBold" />
                         </Border>
                       </Grid>
                     </StackPanel>
@@ -471,7 +450,7 @@
                                 Margin="0,0,8,0" />
                         <Border Grid.Column="1" Padding="8,2">
                           <TextBlock Text="{Binding MaxPreviewFileSizeMBText}"
-                                     VerticalAlignment="Center" FontWeight="SemiBold" />
+                                    VerticalAlignment="Center" FontWeight="SemiBold" />
                         </Border>
                       </Grid>
                     </StackPanel>
@@ -481,7 +460,8 @@
             </TabItem>
 
             <!-- 图片 Image -->
-            <TabItem Header="{Binding PreviewTabImageHeader}" Classes="compactTab">
+            <TabItem Header="{Binding PreviewTabImageHeader}" Classes="compactTab"
+              controls:TabItemExtensions.TabIcon="IconImage">
               <ScrollViewer Background="{DynamicResource ThemeWindowBgBrush}">
                 <StackPanel Spacing="{DynamicResource SpacingSm}" Margin="{DynamicResource SpacingSmThk}">
                   <CheckBox Content="{Binding EnableImagePreviewText}"
@@ -491,7 +471,8 @@
             </TabItem>
 
             <!-- 文本 Text -->
-            <TabItem Header="{Binding PreviewTabTextHeader}" Classes="compactTab">
+            <TabItem Header="{Binding PreviewTabTextHeader}" Classes="compactTab"
+              controls:TabItemExtensions.TabIcon="IconDocument">
               <ScrollViewer Background="{DynamicResource ThemeWindowBgBrush}">
                 <StackPanel Spacing="{DynamicResource SpacingSm}" Margin="{DynamicResource SpacingSmThk}">
                   <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
@@ -505,7 +486,7 @@
                                 Margin="0,0,8,0" />
                         <Border Grid.Column="1" Padding="8,2">
                           <TextBlock Text="{Binding TextPreviewFontSize}"
-                                     VerticalAlignment="Center" FontWeight="SemiBold" />
+                                    VerticalAlignment="Center" FontWeight="SemiBold" />
                         </Border>
                       </Grid>
                     </StackPanel>
@@ -523,8 +504,8 @@
                         <ComboBox.ItemTemplate>
                           <DataTemplate>
                             <TextBlock Text="{Binding Display}"
-                                       Background="{DynamicResource ThemeWindowBgBrush}"
-                                       Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+                                      Background="{DynamicResource ThemeWindowBgBrush}"
+                                      Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
                           </DataTemplate>
                         </ComboBox.ItemTemplate>
                       </ComboBox>
@@ -542,7 +523,7 @@
                                 Margin="0,0,8,0" />
                         <Border Grid.Column="1" Padding="8,2">
                           <TextBlock Text="{Binding MaxTextPreviewMBText}"
-                                     VerticalAlignment="Center" FontWeight="SemiBold" />
+                                    VerticalAlignment="Center" FontWeight="SemiBold" />
                         </Border>
                       </Grid>
                     </StackPanel>
@@ -555,7 +536,8 @@
             </TabItem>
 
             <!-- 字体 Font -->
-            <TabItem Header="{Binding PreviewTabFontHeader}" Classes="compactTab">
+            <TabItem Header="{Binding PreviewTabFontHeader}" Classes="compactTab"
+              controls:TabItemExtensions.TabIcon="IconFontIncrease">
               <ScrollViewer Background="{DynamicResource ThemeWindowBgBrush}">
                 <StackPanel Spacing="{DynamicResource SpacingSm}" Margin="{DynamicResource SpacingSmThk}">
                   <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
@@ -563,12 +545,12 @@
                     <StackPanel Spacing="{DynamicResource SpacingXs}">
                       <TextBlock Text="{Binding PreviewFontSampleText}" FontWeight="SemiBold" />
                       <TextBox Text="{Binding FontPreviewSampleText}"
-                               AcceptsReturn="True"
-                               Height="120"
-                               TextWrapping="Wrap"
-                               Background="{DynamicResource ThemeWindowBgBrush}"
-                               Foreground="{DynamicResource ThemeTextPrimaryBrush}"
-                               BorderBrush="{DynamicResource ThemeBorderBrush}" />
+                              AcceptsReturn="True"
+                              Height="120"
+                              TextWrapping="Wrap"
+                              Background="{DynamicResource ThemeWindowBgBrush}"
+                              Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                              BorderBrush="{DynamicResource ThemeBorderBrush}" />
                     </StackPanel>
                   </Border>
 
@@ -583,7 +565,7 @@
                                 Margin="0,0,8,0" />
                         <Border Grid.Column="1" Padding="8,2">
                           <TextBlock Text="{Binding FontPreviewFontSize}"
-                                     VerticalAlignment="Center" FontWeight="SemiBold" />
+                                    VerticalAlignment="Center" FontWeight="SemiBold" />
                         </Border>
                       </Grid>
                     </StackPanel>
@@ -593,29 +575,32 @@
             </TabItem>
 
             <!-- 种子 Torrent -->
-            <TabItem Header="{Binding PreviewTabTorrentHeader}" Classes="compactTab">
+            <TabItem Header="{Binding PreviewTabTorrentHeader}" Classes="compactTab" IsVisible="False"
+              controls:TabItemExtensions.TabIcon="IconMagnet">
               <ScrollViewer Background="{DynamicResource ThemeWindowBgBrush}">
                 <StackPanel Spacing="{DynamicResource SpacingSm}" Margin="{DynamicResource SpacingSmThk}">
                   <TextBlock Text="{Binding TorrentComingSoonText}"
-                             Foreground="{DynamicResource ThemeTextSecondaryBrush}"
-                             FontSize="12" TextWrapping="Wrap" />
+                            Foreground="{DynamicResource ThemeTextSecondaryBrush}"
+                            FontSize="12" TextWrapping="Wrap" />
                 </StackPanel>
               </ScrollViewer>
             </TabItem>
 
             <!-- 可执行文件 PE -->
-            <TabItem Header="{Binding PreviewTabExecutableHeader}" Classes="compactTab">
+            <TabItem Header="{Binding PreviewTabExecutableHeader}" Classes="compactTab" IsVisible="False"
+              controls:TabItemExtensions.TabIcon="IconApps">
               <ScrollViewer Background="{DynamicResource ThemeWindowBgBrush}">
                 <StackPanel Spacing="{DynamicResource SpacingSm}" Margin="{DynamicResource SpacingSmThk}">
                   <TextBlock Text="{Binding PeComingSoonText}"
-                             Foreground="{DynamicResource ThemeTextSecondaryBrush}"
-                             FontSize="12" TextWrapping="Wrap" />
+                            Foreground="{DynamicResource ThemeTextSecondaryBrush}"
+                            FontSize="12" TextWrapping="Wrap" />
                 </StackPanel>
               </ScrollViewer>
             </TabItem>
 
             <!-- 数据表格 Datatable -->
-            <TabItem Header="{Binding PreviewTabTableHeader}" Classes="compactTab">
+            <TabItem Header="{Binding PreviewTabTableHeader}" Classes="compactTab"
+              controls:TabItemExtensions.TabIcon="IconGrid">
               <ScrollViewer Background="{DynamicResource ThemeWindowBgBrush}">
                 <StackPanel Spacing="{DynamicResource SpacingSm}" Margin="{DynamicResource SpacingSmThk}">
                   <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
@@ -646,7 +631,8 @@
             </TabItem>
 
             <!-- ═══════ 元数据面板 ═══════ -->
-            <TabItem Header="{Binding PreviewTabMetadataPanelHeader}" Classes="compactTab">
+            <TabItem Header="{Binding PreviewTabMetadataPanelHeader}" Classes="compactTab"
+              controls:TabItemExtensions.TabIcon="IconPanelRight">
               <Grid RowDefinitions="Auto,Auto,*,Auto" Margin="{DynamicResource SpacingSmThk}">
                 <!-- Field layout toggle -->
                 <CheckBox Grid.Row="0"
@@ -798,14 +784,8 @@
       </TabItem>
 
       <!-- ═══════ 5. 密码管理 ═══════ -->
-      <TabItem Classes="compactTab">
-        <TabItem.Header>
-          <Grid ColumnDefinitions="Auto,*">
-            <PathIcon Data="{StaticResource IconShieldLock}" Width="18" Height="18" VerticalAlignment="Center" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
-            <TextBlock Text="{Binding TabPasswordHeader}" Grid.Column="1" Margin="4,0,0,0"
-                       VerticalAlignment="Center" />
-          </Grid>
-        </TabItem.Header>
+      <TabItem Header="{Binding TabPasswordHeader}" Classes="compactTab"
+               controls:TabItemExtensions.TabIcon="IconShieldLock">
         <ScrollViewer Background="{DynamicResource ThemeWindowBgBrush}">
           <StackPanel Spacing="{DynamicResource SpacingSm}" Margin="{DynamicResource SpacingSmThk}">
             <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
@@ -823,14 +803,8 @@
       </TabItem>
 
       <!-- ═══════ 6. 语言 ═══════ -->
-      <TabItem Classes="compactTab">
-        <TabItem.Header>
-          <Grid ColumnDefinitions="Auto,*">
-            <PathIcon Data="{StaticResource IconGlobe}" Width="18" Height="18" VerticalAlignment="Center" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
-            <TextBlock Text="{Binding TabLanguageHeader}" Grid.Column="1" Margin="4,0,0,0"
-                       VerticalAlignment="Center" />
-          </Grid>
-        </TabItem.Header>
+      <TabItem Header="{Binding TabLanguageHeader}" Classes="compactTab"
+               controls:TabItemExtensions.TabIcon="IconGlobe">
         <ScrollViewer Background="{DynamicResource ThemeWindowBgBrush}">
           <StackPanel Spacing="{DynamicResource SpacingSm}" Margin="{DynamicResource SpacingSmThk}">
             <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
@@ -857,14 +831,8 @@
       </TabItem>
 
       <!-- ═══════ 7. 上下文菜单 ═══════ -->
-      <TabItem Classes="compactTab">
-        <TabItem.Header>
-          <Grid ColumnDefinitions="Auto,*">
-            <PathIcon Data="{StaticResource IconCopy}" Width="18" Height="18" VerticalAlignment="Center" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
-            <TextBlock Text="{Binding TabContextMenuHeader}" Grid.Column="1" Margin="4,0,0,0"
-                       VerticalAlignment="Center" />
-          </Grid>
-        </TabItem.Header>
+      <TabItem Header="{Binding TabContextMenuHeader}" Classes="compactTab"
+               controls:TabItemExtensions.TabIcon="IconCopy">
         <ScrollViewer Background="{DynamicResource ThemeWindowBgBrush}">
           <StackPanel Spacing="{DynamicResource SpacingSm}" Margin="{DynamicResource SpacingSmThk}">
             <!-- 菜单项目组 -->
@@ -966,14 +934,8 @@
       </TabItem>
 
       <!-- ═══════ 8. 文件关联 ═══════ -->
-      <TabItem Classes="compactTab">
-        <TabItem.Header>
-          <Grid ColumnDefinitions="Auto,*">
-            <PathIcon Data="{StaticResource IconLink}" Width="18" Height="18" VerticalAlignment="Center" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
-            <TextBlock Text="{Binding TabFileAssocHeader}" Grid.Column="1" Margin="4,0,0,0"
-                       VerticalAlignment="Center" />
-          </Grid>
-        </TabItem.Header>
+      <TabItem Header="{Binding TabFileAssocHeader}" Classes="compactTab"
+               controls:TabItemExtensions.TabIcon="IconLink">
         <ScrollViewer Background="{DynamicResource ThemeWindowBgBrush}">
           <StackPanel Spacing="{DynamicResource SpacingSm}" Margin="{DynamicResource SpacingSmThk}">
             <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
@@ -1029,14 +991,8 @@
 
     
       <!-- ═══════ 9. 调试 ═══════ -->
-      <TabItem Classes="compactTab">
-        <TabItem.Header>
-          <Grid ColumnDefinitions="Auto,*">
-            <PathIcon Data="{StaticResource IconBug}" Width="18" Height="18" VerticalAlignment="Center" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
-            <TextBlock Text="{Binding TabDebugHeader}" Grid.Column="1" Margin="4,0,0,0"
-                       VerticalAlignment="Center" />
-          </Grid>
-        </TabItem.Header>
+      <TabItem Header="{Binding TabDebugHeader}" Classes="compactTab"
+               controls:TabItemExtensions.TabIcon="IconBug">
         <ScrollViewer Background="{DynamicResource ThemeWindowBgBrush}">
           <StackPanel Spacing="{DynamicResource SpacingSm}" Margin="{DynamicResource SpacingSmThk}">
             <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
@@ -1097,14 +1053,8 @@
         </ScrollViewer>
       </TabItem>
       <!-- ═══════ 10. 高级 ═══════ -->
-      <TabItem Classes="compactTab">
-        <TabItem.Header>
-          <Grid ColumnDefinitions="Auto,*">
-            <PathIcon Data="{StaticResource IconWrench}" Width="18" Height="18" VerticalAlignment="Center" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
-            <TextBlock Text="{Binding TabAdvancedHeader}" Grid.Column="1" Margin="4,0,0,0"
-                       VerticalAlignment="Center" />
-          </Grid>
-        </TabItem.Header>
+      <TabItem Header="{Binding TabAdvancedHeader}" Classes="compactTab"
+               controls:TabItemExtensions.TabIcon="IconWrench">
         <ScrollViewer Background="{DynamicResource ThemeWindowBgBrush}">
           <StackPanel Spacing="{DynamicResource SpacingSm}" Margin="{DynamicResource SpacingSmThk}">
             <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"

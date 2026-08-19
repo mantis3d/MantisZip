@@ -5,7 +5,7 @@
           x:Class="MantisZip.UI.Avalonia.Dialogs.CompressSettingsWindow"
           x:CompileBindings="False"
           Title="{Binding WindowTitle}"
-          Width="850"
+          Width="950"
           MinWidth="700"
           MinHeight="500"
           SizeToContent="Height"
@@ -20,7 +20,7 @@
   <Grid RowDefinitions="*,Auto"
         Margin="16">
     <Grid.ColumnDefinitions>
-      <ColumnDefinition Width="450" MinWidth="400" />
+      <ColumnDefinition Width="500" MinWidth="400" />
       <ColumnDefinition Width="Auto" />
       <ColumnDefinition Width="*" />
     </Grid.ColumnDefinitions>
@@ -29,7 +29,8 @@
                 SelectionChanged="OnTabSelectionChanged">
       <!-- Tab 1: General -->
       <TabItem Header="{Binding LocalizedStrings[Compress_TabGeneral]}"
-                Classes="compactTab">
+                Classes="compactTab"
+                controls:TabItemExtensions.TabIcon="IconSettings">
         <ScrollViewer Background="{DynamicResource ThemeWindowBgBrush}"
                       TextElement.Foreground="{DynamicResource ThemeTextPrimaryBrush}">
           <StackPanel Spacing="{DynamicResource SpacingSm}"
@@ -184,7 +185,8 @@
 
       <!-- Tab 2: Advanced (format options, volume/split, etc.) -->
       <TabItem Header="{Binding LocalizedStrings[Compress_TabAdvanced]}"
-               Classes="compactTab">
+               Classes="compactTab"
+               controls:TabItemExtensions.TabIcon="IconWrench">
         <ScrollViewer Background="{DynamicResource ThemeWindowBgBrush}"
                        TextElement.Foreground="{DynamicResource ThemeTextPrimaryBrush}">
           <StackPanel Spacing="{DynamicResource SpacingSm}"
@@ -227,7 +229,8 @@
 
       <!-- Tab 3: Password -->
       <TabItem Header="{Binding LocalizedStrings[Compress_TabPassword]}"
-               Classes="compactTab">
+               Classes="compactTab"
+               controls:TabItemExtensions.TabIcon="IconKey">
         <ScrollViewer Background="{DynamicResource ThemeWindowBgBrush}"
                        TextElement.Foreground="{DynamicResource ThemeTextPrimaryBrush}">
           <StackPanel Spacing="{DynamicResource SpacingSm}"
@@ -441,7 +444,8 @@
 
       <!-- Tab 4: Comment -->
       <TabItem Header="{Binding LocalizedStrings[Compress_TabComment]}"
-               Classes="compactTab">
+               Classes="compactTab"
+               controls:TabItemExtensions.TabIcon="IconChat">
         <ScrollViewer Background="{DynamicResource ThemeWindowBgBrush}"
                        TextElement.Foreground="{DynamicResource ThemeTextPrimaryBrush}">
           <StackPanel Spacing="{DynamicResource SpacingSm}"
@@ -489,7 +493,8 @@
 
       <!-- Tab 5: File Filter -->
       <TabItem Header="{Binding LocalizedStrings[Compress_TabFilter]}"
-               Classes="compactTab">
+               Classes="compactTab"
+               controls:TabItemExtensions.TabIcon="IconFilter">
         <ScrollViewer Background="{DynamicResource ThemeWindowBgBrush}"
                        TextElement.Foreground="{DynamicResource ThemeTextPrimaryBrush}">
           <controls:FileFilterEditor x:Name="FileFilterControl" />

@@ -41,6 +41,12 @@ public partial class AboutWindow : Window
     public string AboutContributorsTechnical => LocalizationManager.T("About_Contributors_Technical");
     public string AboutContributorsNone => LocalizationManager.T("About_Contributors_None");
 
+    // Tab headers (bound via TabItemExtensions.TabIcon + compactTab HeaderTemplate)
+    public string AboutTabHeader => LocalizationManager.T("About_Tab_About");
+    public string AuthorTabHeader => LocalizationManager.T("About_Tab_Author");
+    public string DependenciesTabHeader => LocalizationManager.T("About_Tab_Dependencies");
+    public string AcknowledgmentsTabHeader => LocalizationManager.T("About_Tab_Acknowledgments");
+
     // Dependency purposes (About → Dependencies tab)
     public string AboutDepAvalonia => LocalizationManager.T("About_Dep_Avalonia");
     public string AboutDepWebView => LocalizationManager.T("About_Dep_WebView");
@@ -69,12 +75,7 @@ public partial class AboutWindow : Window
             App.DebugLog($"[AboutWindow] Failed to load window icon: {ex.Message}");
         }
 
-        // Tab headers — direct property set to avoid binding issues with dictionary indexer
-        TabAboutHeader.Text = LocalizationManager.T("About_Tab_About");
-        TabAuthorHeader.Text = LocalizationManager.T("About_Tab_Author");
-        TabDependenciesHeader.Text = LocalizationManager.T("About_Tab_Dependencies");
-        TabAcknowledgmentsHeader.Text = LocalizationManager.T("About_Tab_Acknowledgments");
-
+        // Tab headers 通过 AboutTabHeader/AuthorTabHeader 等属性绑定（compactTab HeaderTemplate）
         LoadContributors();
     }
 

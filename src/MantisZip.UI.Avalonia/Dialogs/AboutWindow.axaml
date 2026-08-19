@@ -1,5 +1,6 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:controls="clr-namespace:MantisZip.UI.Avalonia.Controls"
         x:Class="MantisZip.UI.Avalonia.Dialogs.AboutWindow"
         x:CompileBindings="False"
         Title="{Binding AboutTitle}"
@@ -27,10 +28,8 @@
     <TabControl>
 
       <!-- ─────── Tab 1: 关于 / About ─────── -->
-      <TabItem Classes="compactTab">
-        <TabItem.Header>
-          <TextBlock x:Name="TabAboutHeader" />
-        </TabItem.Header>
+      <TabItem Header="{Binding AboutTabHeader}" Classes="compactTab"
+               controls:TabItemExtensions.TabIcon="IconInfo">
         <ScrollViewer VerticalScrollBarVisibility="Auto"
                       Background="{DynamicResource ThemeWindowBgBrush}">
           <Grid Margin="24" ColumnDefinitions="Auto,*">
@@ -166,10 +165,8 @@
       </TabItem>
 
       <!-- ─────── Tab 2: 作者 / Author ─────── -->
-      <TabItem Classes="compactTab">
-        <TabItem.Header>
-          <TextBlock x:Name="TabAuthorHeader" />
-        </TabItem.Header>
+      <TabItem Header="{Binding AuthorTabHeader}" Classes="compactTab"
+               controls:TabItemExtensions.TabIcon="IconPerson">
         <Grid Margin="24,24,24,0" VerticalAlignment="Top"
               ColumnDefinitions="Auto,*"
               RowDefinitions="Auto,Auto,Auto,Auto,Auto">
@@ -261,10 +258,8 @@
       </TabItem>
 
       <!-- ─────── Tab 3: 依赖库 / Dependencies ─────── -->
-      <TabItem Classes="compactTab">
-        <TabItem.Header>
-          <TextBlock x:Name="TabDependenciesHeader" />
-        </TabItem.Header>
+      <TabItem Header="{Binding DependenciesTabHeader}" Classes="compactTab"
+               controls:TabItemExtensions.TabIcon="IconArchive">
         <ScrollViewer VerticalScrollBarVisibility="Auto"
                       Background="{DynamicResource ThemeWindowBgBrush}">
           <Grid Margin="{DynamicResource SpacingMdThk}" TextElement.FontSize="13"
@@ -345,10 +340,8 @@
       </TabItem>
 
       <!-- ─────── Tab 4: 致谢 / Acknowledgments ─────── -->
-      <TabItem Classes="compactTab">
-        <TabItem.Header>
-          <TextBlock x:Name="TabAcknowledgmentsHeader" />
-        </TabItem.Header>
+      <TabItem Header="{Binding AcknowledgmentsTabHeader}" Classes="compactTab"
+               controls:TabItemExtensions.TabIcon="IconHeart">
         <ScrollViewer VerticalScrollBarVisibility="Auto"
                       Background="{DynamicResource ThemeWindowBgBrush}">
           <StackPanel Margin="24" Spacing="0">

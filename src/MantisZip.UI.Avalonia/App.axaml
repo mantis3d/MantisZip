@@ -1,5 +1,7 @@
 <Application xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:conv="clr-namespace:MantisZip.UI.Avalonia.Converters"
+             xmlns:controls="clr-namespace:MantisZip.UI.Avalonia.Controls"
              x:Class="MantisZip.UI.Avalonia.App">
   <Application.Resources>
     <ResourceDictionary>
@@ -9,6 +11,9 @@
         <!-- PathIcon 图标资源字典 -->
         <ResourceInclude Source="avares://MantisZip.UI.Avalonia/Resources/Icons/AppIcons.axaml" />
       </ResourceDictionary.MergedDictionaries>
+      <!-- 全局转换器：compactTab 标题模板（TabIcon 附加属性）依赖 -->
+      <conv:GeometryResourceConverter x:Key="GeometryResourceConverter" />
+      <conv:StringNotEmptyConverter x:Key="StringNotEmptyConverter" />
     </ResourceDictionary>
   </Application.Resources>
   <Application.Styles>
@@ -248,11 +253,26 @@
       <Setter Property="Background" Value="{DynamicResource ThemeSurfaceBgBrush}" />
     </Style>
 
-    <!-- TabItem.compactTab — compact tab headers for settings windows -->
+    <!-- TabItem.compactTab — compact tab headers for settings windows.
+         Sets TabItemExtensions.TabIcon (Geometry resource key) to render "icon + text";
+         when unset/null the header falls back to plain text. -->
     <Style Selector="TabItem.compactTab">
       <Setter Property="Padding" Value="8,6,8,6" />
       <Setter Property="MinHeight" Value="36" />
       <Setter Property="FontSize" Value="18" />
+      <Setter Property="HeaderTemplate">
+        <Setter.Value>
+          <DataTemplate>
+            <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+              <PathIcon Data="{Binding $parent[TabItem].(controls:TabItemExtensions.TabIcon), Converter={StaticResource GeometryResourceConverter}}"
+                        IsVisible="{Binding $parent[TabItem].(controls:TabItemExtensions.TabIcon), Converter={StaticResource StringNotEmptyConverter}}"
+                        Width="18" Height="18" VerticalAlignment="Center"
+                        Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+              <TextBlock Text="{Binding}" VerticalAlignment="Center" />
+            </StackPanel>
+          </DataTemplate>
+        </Setter.Value>
+      </Setter>
     </Style>
 
     <!-- DataGrid -->

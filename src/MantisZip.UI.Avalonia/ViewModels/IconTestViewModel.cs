@@ -353,6 +353,14 @@ public partial class IconTestViewModel : ObservableObject
             "Resources/Icons/AppIcons.axaml", "Fluent UI System Icon");
         Add("资源库", "锁定多个", null, "IconLockMultiple", IconStatus.Defined,
             "Resources/Icons/AppIcons.axaml", "Fluent UI System Icon");
+        Add("资源库", "图片", null, "IconImage", IconStatus.Defined,
+            "Resources/Icons/AppIcons.axaml", "Fluent UI System Icon（tab 图标，预览-图片）");
+        Add("资源库", "应用网格", null, "IconApps", IconStatus.Defined,
+            "Resources/Icons/AppIcons.axaml", "Fluent UI System Icon（tab 图标，预览-可执行文件）");
+        Add("资源库", "用户", null, "IconPerson", IconStatus.Defined,
+            "Resources/Icons/AppIcons.axaml", "Fluent UI System Icon（tab 图标，About-作者）");
+        Add("资源库", "磁力链", null, "IconMagnet", IconStatus.Defined,
+            "Resources/Icons/AppIcons.axaml", "自绘马蹄形磁铁（tab 图标，预览-种子）");
 
         // 更新统计
         TotalCount = Icons.Count;

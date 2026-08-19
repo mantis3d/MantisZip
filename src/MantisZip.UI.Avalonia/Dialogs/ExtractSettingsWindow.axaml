@@ -25,7 +25,8 @@
                 TextElement.Foreground="{DynamicResource ThemeTextPrimaryBrush}">
       <!-- Tab: General -->
       <TabItem Header="{Binding LocalizedStrings[Extract_Title]}"
-               Classes="compactTab">
+               Classes="compactTab"
+               controls:TabItemExtensions.TabIcon="IconSettings">
         <ScrollViewer Background="{DynamicResource ThemeWindowBgBrush}"
                        TextElement.Foreground="{DynamicResource ThemeTextPrimaryBrush}">
           <StackPanel Spacing="12"
@@ -92,7 +93,8 @@
 
       <!-- Tab 2: File Filter -->
       <TabItem Header="{Binding LocalizedStrings[Extract_TabFilter]}"
-               Classes="compactTab">
+               Classes="compactTab"
+               controls:TabItemExtensions.TabIcon="IconFilter">
         <ScrollViewer Background="{DynamicResource ThemeWindowBgBrush}"
                        TextElement.Foreground="{DynamicResource ThemeTextPrimaryBrush}">
           <controls:FileFilterEditor x:Name="FileFilterControl" />
