@@ -92,6 +92,11 @@ public partial class MainWindowViewModel : ObservableObject
     public Func<FileConflictInfo, Task<(FileConflictAction Action, bool ApplyToAll)>>? ShowExtractFileConflictDialogAsync { get; set; }
 
     /// <summary>
+    /// 添加文件冲突对话框回调（添加到压缩包场景）。与解压冲突同签名，标题用「添加冲突」。
+    /// </summary>
+    public Func<FileConflictInfo, Task<(FileConflictAction Action, bool ApplyToAll)>>? ShowAddFileConflictDialogAsync { get; set; }
+
+    /// <summary>
     /// 密码管理器窗口回调。
     /// </summary>
     public Func<Task>? ShowPasswordManager { get; set; }
@@ -2379,7 +2384,12 @@ public partial class MainWindowViewModel : ObservableObject
             files.ToArray(),
             async (progress, ct) =>
             {
-                var options = new ArchiveOptions { Password = password };
+                // 复用解压冲突处理：同一 AppSettings.FileConflictAction 策略 + Ask 弹窗回调（标题区分）
+                // CreateExtractOptions 返回 null 表示 Overwrite 默认（无冲突处理），回退到仅密码的 options
+                var options = SelectedItemsExtractService.CreateExtractOptions(
+                        AppSettings.Load().FileConflictAction, ShowAddFileConflictDialogAsync)
+                    ?? new ArchiveOptions();
+                options.Password = password;
                 // entryBasePath：当前浏览的压缩包内目录，null=根目录（与 WPF 版行为一致）
                 await engine.AddToArchiveAsync(CurrentArchivePath, files.ToArray(), options, progress, ct,
                     entryBasePath: string.IsNullOrEmpty(CurrentFolder) ? null : CurrentFolder);

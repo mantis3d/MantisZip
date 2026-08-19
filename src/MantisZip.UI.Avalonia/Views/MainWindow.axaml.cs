@@ -304,6 +304,9 @@ public partial class MainWindow : Window
         // 本回调仅把 owner 窗口（MainWindow）与 VM 委托接线
         vm.ShowExtractFileConflictDialogAsync = info => ExtractFlow.ShowConflictDialogAsync(this, info);
 
+        // 添加文件冲突弹窗：复用解压弹窗循环，仅标题用「添加冲突」
+        vm.ShowAddFileConflictDialogAsync = info => ExtractFlow.ShowConflictDialogAsync(this, info, titleKey: "AddConflict_Title");
+
         // ── Wire up select-all / invert-selection callbacks ──
         vm.SelectAllEntriesAction = () =>
         {

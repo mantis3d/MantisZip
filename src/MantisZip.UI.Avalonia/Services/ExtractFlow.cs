@@ -72,14 +72,14 @@ public static class ExtractFlow
     /// （与拖拽/主窗口原有语义一致）。Rename 时把用户自定义名写回 <paramref name="info"/>。
     /// </summary>
     public static async Task<(FileConflictAction Action, bool ApplyToAll)>
-        ShowConflictDialogAsync(Window owner, FileConflictInfo info)
+        ShowConflictDialogAsync(Window owner, FileConflictInfo info, string titleKey = "Conflict_Title")
     {
         // 循环重入：暂停后恢复时重新弹窗（对齐 WPF App.xaml.cs ConflictResolver）
         while (true)
         {
             var result = await Dispatcher.UIThread.InvokeAsync(async () =>
             {
-                var dlg = new ConflictDialog(info);
+                var dlg = new ConflictDialog(info, titleKey);
                 await dlg.ShowDialog(owner);
 
                 // 暂停：收起对话框，返回暂停标志由外层处理
