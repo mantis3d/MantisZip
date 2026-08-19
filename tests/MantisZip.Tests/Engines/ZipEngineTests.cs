@@ -268,6 +268,8 @@ public class ZipEngineTests : IDisposable
         var dest = TrackDir(Path.Combine(Path.GetTempPath(), "MantisZipTest", Guid.NewGuid().ToString()));
         await _engine.ExtractAsync(archive, dest);
         Assert.Equal("duplicate content", await File.ReadAllTextAsync(Path.Combine(dest, "hello.txt")));
+        // 非冲突条目必须保留（keepEntryNames 排除逻辑的正确性验证）
+        Assert.Equal(ArchiveFixtures.NestedDirFileContent, await File.ReadAllTextAsync(Path.Combine(dest, "subdir", "nested.txt")));
     }
 
     [Fact]
@@ -297,6 +299,8 @@ public class ZipEngineTests : IDisposable
         var entries = await _engine.ListEntriesAsync(archive);
         Assert.Contains(entries, e => e.Name == "hello.txt");
         Assert.Contains(entries, e => e.Name == "hello (1).txt");
+        // 非冲突条目必须保留（keepEntryNames == null 分支仍走完整重写）
+        Assert.Contains(entries, e => e.Name == "subdir/nested.txt");
     }
 
     [Fact]
@@ -337,6 +341,8 @@ public class ZipEngineTests : IDisposable
         var entries = await _engine.ListEntriesAsync(archive);
         Assert.Contains(entries, e => e.Name == "hello.txt");
         Assert.Contains(entries, e => e.Name == "my-rename.txt");
+        // 非冲突条目必须保留（keepEntryNames == null 分支仍走完整重写）
+        Assert.Contains(entries, e => e.Name == "subdir/nested.txt");
     }
 
     [Fact]
