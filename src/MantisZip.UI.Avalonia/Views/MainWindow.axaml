@@ -15,7 +15,8 @@
         Background="{DynamicResource ThemeWindowBgBrush}"
         DragDrop.AllowDrop="True"
         DragDrop.Drop="OnWindowDrop"
-        DragDrop.DragOver="OnWindowDragOver">
+        DragDrop.DragOver="OnWindowDragOver"
+        DragDrop.DragLeave="OnWindowDragLeave">
 
   <Window.Resources>
     <conv:FileSizeConverter x:Key="FileSizeConverter" />
@@ -1165,6 +1166,49 @@
                           Grid.Column="4"
                           IsVisible="{Binding IsPreviewVisible}"
                           DataContext="{Binding Preview}" />
+
+      <!-- 拖拽添加覆层（DragOver 悬停期间显示：覆盖文件列表列，视觉对齐拖拽解压覆层——
+           状态色背景呼吸透明 alpha 40-120、8px 同色不透明边框、白色粗体文字+阴影、✓/⚠ 状态图标。
+           呼吸由 code-behind DispatcherTimer 驱动，仅背景层 Opacity 呼吸，边框/文字保持不透明） -->
+      <Border x:Name="DragAddOverlay"
+              Grid.Column="2"
+              Grid.Row="0"
+              IsVisible="False"
+              IsHitTestVisible="False"
+              BorderBrush="#6BD46B"
+              BorderThickness="8"
+              ZIndex="10">
+        <Grid>
+          <Border x:Name="DragAddOverlayBg" Background="#6BD46B" />
+          <StackPanel VerticalAlignment="Center"
+                      HorizontalAlignment="Center"
+                      Spacing="{DynamicResource SpacingMd}"
+                      Margin="40,0">
+            <TextBlock x:Name="DragAddOverlayIcon"
+                       Text="&#x2713;"
+                       FontSize="48"
+                       FontWeight="Bold"
+                       Foreground="#90E060"
+                       FontFamily="Segoe UI Symbol"
+                       HorizontalAlignment="Center">
+              <TextBlock.Effect>
+                <DropShadowEffect OffsetX="1" OffsetY="1" BlurRadius="3" Color="#B0000000" />
+              </TextBlock.Effect>
+            </TextBlock>
+            <TextBlock x:Name="DragAddOverlayText"
+                       FontSize="24"
+                       FontWeight="Bold"
+                       Foreground="White"
+                       TextAlignment="Center"
+                       TextWrapping="Wrap"
+                       MaxWidth="560">
+              <TextBlock.Effect>
+                <DropShadowEffect OffsetX="1" OffsetY="1" BlurRadius="3" Color="#B0000000" />
+              </TextBlock.Effect>
+            </TextBlock>
+          </StackPanel>
+        </Grid>
+      </Border>
     </Grid>
     </Grid>
 

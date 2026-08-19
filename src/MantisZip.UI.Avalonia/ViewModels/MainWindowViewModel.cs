@@ -98,6 +98,11 @@ public partial class MainWindowViewModel : ObservableObject
     public Func<FileConflictInfo, Task<(FileConflictAction Action, bool ApplyToAll)>>? ShowExtractFileConflictDialogAsync { get; set; }
 
     /// <summary>
+    /// 添加文件冲突对话框回调（添加到压缩包场景）。与解压冲突同签名，标题用「添加冲突」。
+    /// </summary>
+    public Func<FileConflictInfo, Task<(FileConflictAction Action, bool ApplyToAll)>>? ShowAddFileConflictDialogAsync { get; set; }
+
+    /// <summary>
     /// 密码管理器窗口回调。
     /// </summary>
     public Func<Task>? ShowPasswordManager { get; set; }
@@ -2373,13 +2378,26 @@ public partial class MainWindowViewModel : ObservableObject
     [RelayCommand]
     private async Task AddFiles()
     {
-        if (CurrentArchivePath == null || GetOpenFilePaths == null || RunWithProgress == null) return;
+        if (CurrentArchivePath == null || GetOpenFilePaths == null) return;
 
         var files = await GetOpenFilePaths();
         if (files == null || files.Count == 0) return;
 
+        await AddFilesToArchiveAsync(files);
+    }
+
+    /// <summary>
+    /// 将指定文件/文件夹添加到当前压缩包（复用解压冲突处理策略 + entryBasePath=当前浏览目录）。
+    /// 供工具栏「添加文件」命令与窗口拖拽添加共用，保证行为一致。
+    /// </summary>
+    /// <param name="files">要添加的本地文件/文件夹路径。</param>
+    /// <returns>true=添加完成（含刷新），false=无压缩包/无引擎/被取消/失败。</returns>
+    public async Task<bool> AddFilesToArchiveAsync(IReadOnlyList<string> files)
+    {
+        if (CurrentArchivePath == null || RunWithProgress == null || files.Count == 0) return false;
+
         var engine = ArchiveEngineFactory.GetEngineByExtension(CurrentArchivePath);
-        if (engine == null) return;
+        if (engine == null) return false;
 
         _sessionPasswords.TryGetValue(CurrentArchivePath, out var password);
 
@@ -2388,8 +2406,15 @@ public partial class MainWindowViewModel : ObservableObject
             files.ToArray(),
             async (progress, ct) =>
             {
-                var options = new ArchiveOptions { Password = password };
-                await engine.AddToArchiveAsync(CurrentArchivePath, files.ToArray(), options, progress, ct);
+                // 复用解压冲突处理：同一 AppSettings.FileConflictAction 策略 + Ask 弹窗回调（标题区分）
+                // CreateExtractOptions 返回 null 表示 Overwrite 默认（无冲突处理），回退到仅密码的 options
+                var options = SelectedItemsExtractService.CreateExtractOptions(
+                        AppSettings.Load().FileConflictAction, ShowAddFileConflictDialogAsync)
+                    ?? new ArchiveOptions();
+                options.Password = password;
+                // entryBasePath：当前浏览的压缩包内目录，null=根目录（与 WPF 版行为一致）
+                await engine.AddToArchiveAsync(CurrentArchivePath, files.ToArray(), options, progress, ct,
+                    entryBasePath: string.IsNullOrEmpty(CurrentFolder) ? null : CurrentFolder);
             });
 
         if (completed)
@@ -2397,6 +2422,7 @@ public partial class MainWindowViewModel : ObservableObject
             StatusMessage = LocalizationManager.T("Status_AddComplete");
             await RefreshArchive();
         }
+        return completed;
     }
 
     [RelayCommand]

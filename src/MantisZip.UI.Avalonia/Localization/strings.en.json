@@ -1,6 +1,10 @@
 {
   "Menu_SaveLayout": "Save Layout",
   "Status_LayoutSaved": "Layout saved",
+  "AddConflict_Title": "Add Conflict",
+  "Main_DragAddConfirm": "Add {0} file(s)/folders to \"{1}\"?",
+  "DragAdd_OverlayAddTo": "Add to {0}",
+  "DragAdd_OverlayUnsupported": "This format does not support adding files",
   "Preview_AnimatedImage": "Animated Image Preview {0}",
   "Preview_Header_AnimatedImage": "Animated Image",
   "Menu_ShowPreviewPanel": "Show Preview Panel",

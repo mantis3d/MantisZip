@@ -21,6 +21,22 @@
 
 ### MantisZip.UI.Avalonia（主力版）
 
+**2026-08-19** — 拖拽添加到压缩包：WPF `Window_Drop` 三分支完整移植 + 覆层视觉对齐拖拽解压
+  - **三分支移植**：已打开压缩包 + 拖入单个压缩包 → 切换打开；已打开 + 拖入文件/文件夹 → 确认框（`Main_DragAddConfirm`，复用 `CompressConflict_Add` 标题）→ `AddFilesToArchiveAsync`；未打开 + 压缩包 → 打开；未打开 + 非压缩包 → `CompressSettingsWindow` 预填源文件
+  - **文件夹支持**：`GetDroppedLocalPaths` 用 `raw is IStorageItem`（`IStorageFile`/`IStorageFolder` 统一，`TryGetLocalPath` 取路径），文件夹与文件同路添加
+  - **公共方法抽取**：`MainWindowViewModel.AddFiles` 拆出 `AddFilesToArchiveAsync(IReadOnlyList<string>)`（返回 bool，复用密码/冲突处理/`entryBasePath=CurrentFolder`/RefreshArchive），工具栏与拖拽共用
+  - **DragAddOverlay 覆层（视觉对齐 OverlayController）**：覆盖文件列表列（`ArchiveContentGrid` col 2）；状态色背景呼吸（`DispatcherTimer` 100ms + 正弦 `80+40·sin(tick·π/10)`，alpha 40-120 约 2s 周期，与拖拽解压完全同参，仅背景层 Opacity 呼吸、边框/文字不透明）+ 8px 同色不透明边框 + 白色粗体文字（FontSize 24）+ `DropShadowEffect` 阴影 + ✓（`#90E060`）/ ⚠（`#FFE020`）状态图标；绿 `#6BD46B`=可添加、红 `#F43643`=格式不支持（`DragEffects.None`）；显示时启动 timer、隐藏时停止
+  - **Avalonia 12 兼容**：`TextShadow` 简写属性已移除（AVLN2000），改用 `TextBlock.Effect` + `DropShadowEffect`
+  - 涉及文件：`.omo/plans/drag-add-overlay.md`（新增）、`docs/PLAN.md`、`ViewModels/MainWindowViewModel.cs`、`Views/MainWindow.axaml`、`Views/MainWindow.axaml.cs`、`Localization/strings.*.json`
+  - 验证：`dotnet build` 0 错误、Avalonia 测试 60/2 跳过、Core 测试 299/299 全部通过
+
+**2026-08-19** — 添加到压缩包复用解压冲突处理：同一 `AppSettings.FileConflictAction` 策略 + ConflictDialog 弹窗（新标题 key `AddConflict_Title`「添加冲突」），覆盖/跳过/重命名/覆盖旧文件/覆盖小文件/Ask 全动作集
+  - **接线**：`ConflictDialog` ctor 新增 `titleKey` 参数（默认 `"Conflict_Title"` 向后兼容解压场景）；`ExtractFlow.ShowConflictDialogAsync` 透传 `titleKey`；`MainWindowViewModel` 新增 `ShowAddFileConflictDialogAsync` 委托，`AddFiles` 改用 `SelectedItemsExtractService.CreateExtractOptions(AppSettings.FileConflictAction, 委托)`（Ask 弹窗 + ApplyToAll 记忆复用）；`MainWindow.axaml.cs` 以 `"AddConflict_Title"` 接线
+  - 涉及文件：`Dialogs/ConflictDialog.axaml.cs`、`Services/ExtractFlow.cs`、`Services/SelectedItemsExtractService.cs`（仅复用）、`ViewModels/MainWindowViewModel.cs`、`Views/MainWindow.axaml.cs`、`Localization/strings.*.json`
+  - 验证：`dotnet build` 0 错误；Avalonia 测试 60/2 跳过全部通过
+
+**2026-08-18** — 添加文件到压缩包时保留浏览目录前缀（entryBasePath），7z 改用 `CompressFileDictionary` 精确控制条目名
+
 **2026-08-19** — 菜单项统一为 Icon 槽位标准写法 + 保存布局功能
   - **菜单项统一改写（方案 B）**：MainWindow.axaml 全部 72 个菜单项从 `Header 内 StackPanel + TextBlock` 旧模式改为 `MenuItem.Icon` 槽位 + `Header` 文本绑定标准写法——Fluent 主题 Icon 列 `SharedSizeGroup="MenuItemIcon"` + `Grid.IsSharedSizeScope` 自动共享列宽，文字天然对齐，删除所有手动对齐容器（含此前 SaveLayout 项的手动 20×20 容器）
   - **ToggleIconBox 16×16**：`FluentMenuItemIconTheme` 将 Icon 槽位内容限制在 16×16（Viewbox DownOnly），20×20 会被压缩变形，故全局样式改为 16×16（边框 1.5、圆角 3 不变），内部 PathIcon 12→10；主菜单 6 个 toggle 项 + 列标题右键动态菜单同步更新；AGENTS.md ToggleIconBox 规则更新（16×16、放 Icon 槽位，推翻原「不要放 Icon 槽位」）
@@ -1324,6 +1340,12 @@
 
 这些变更影响两项目共用代码，按时间从新到旧排列。
 
+#### v0.5.0 (2026-08-19)
+- 添加到压缩包支持重名条目冲突处理：新增 `AddConflictHelper`（条目名级解析，语义方向与解压相反：新数据更新/更大→覆盖）；ZIP copy-mode `keepEntryNames` 排除被覆盖条目、legacy Phase 2 应用解析结果；7z 覆盖经 `ModifyArchive`(index→null) 删除 + `CompressFileDictionary` Append 重加
+
+#### v0.5.0 (2026-08-18)
+- 添加文件到压缩包时保留浏览目录前缀（entryBasePath）：7z 改用 `CompressFileDictionary` 精确控制条目名；ZIP 传入 entryBasePath
+
 #### v0.5.0 (2026-08-12) 测试压缩包时文件进度条不再停滞（TestArchiveAsync 补 FilePercentComplete）
   - **背景**：点击「测试」时进度窗口的文件进度条（`FilePercentComplete`）从不更新——三个引擎的 `TestArchiveAsync` 上报的 `ArchiveProgress` 均未设置 `FilePercentComplete`，而 UI 侧（WPF `ProgressWindow.SetProgress` / Avalonia `ProgressViewModel.SetProgress`）只在 `HasValue` 时更新文件进度条，导致其恒为 0（总体进度条正常）。解压/压缩路径均有 per-file 上报，唯独测试路径遗漏
   - **方案**：`ZipEngine.TestArchiveAsync` 与 `TarGzEngine.TestArchiveAsync` 将 `CopyTo(Stream.Null)` 改为 buffered 复制循环（100ms 节流，复用解压模式），上报 `FilePercentComplete` 0 → 中间值 → 100；`TarGzEngine` `.gz` 单文件分支补 `=100`；`SevenZipEngine.TestArchiveAsync` 因 `ExtractFile` 为原子调用（内部校验 CRC）无法取中间进度，在提取前后各上报一次 `FilePercentComplete = 0`/`=100`
@@ -1544,6 +1566,7 @@
 
 | 功能 | 设计文档 | 实现版本 |
 |------|----------|:--------:|
+| 添加到压缩包重名条目冲突处理（`AddConflictHelper` 条目名级解析、语义方向与解压相反：新数据更新/更大→覆盖；ZIP copy-mode `keepEntryNames` 排除被覆盖条目 + legacy Phase 2 应用解析结果；7z 覆盖经 `ModifyArchive`(index→null) 删除 + `CompressFileDictionary` Append 重加；Avalonia Ask 弹窗复用 ConflictDialog，新标题 key `AddConflict_Title`） | [add-archive-conflict-handling.md](.omo/plans/add-archive-conflict-handling.md) | v0.5.0 |
 | 拖拽/右键解压流程统一（`SelectedItemsExtractService` 统一解压动作、`TarGzEngine` 按条目提取、冲突统一走设置 6 策略 + 统一 Ask 弹窗、拖拽路径语义与右键一致、`MapConflictActionString` 连字符映射漏洞修复） | [drag-extract-unify.md](.omo/plans/drag-extract-unify.md) | v0.4.5 |
 | 目录行聚合显示（`DirStats`+`ComputeDirectoryStats` 增加 `NewestModified`；Avalonia `ArchiveItemModel` 显示属性改派生计算属性 + `CompressedSizeAvailable`；`PopulateEntries` 基于过滤后 `filteredSource` 应用聚合） | [directory-size-date-aggregate.md](.omo/plans/directory-size-date-aggregate.md) | v0.4.5 |
 | 路径清单统一（A/B 数据集：预览=实际绝对一致，CompressPlan 唯一事实来源 + 压缩/解压过滤白名单 + IsBuildPending 按钮门禁） | [path-manifest-unification.md](.omo/plans/path-manifest-unification.md) | v0.4.5（⏳ 交互清单待用户 GUI 验证） |

@@ -833,7 +833,7 @@ public class ZipEngine : IArchiveEngine
         CoreLog.Info($"AddToArchiveAsync: {archivePath}, sources=[{string.Join("; ", sourcePaths)}]");
         var sw = Stopwatch.StartNew();
 
-        await Task.Run(() =>
+        await Task.Run(async () =>
         {
             // 收集需要添加的新文件
             var newFiles = new List<(string FullPath, string EntryName)>();
@@ -868,9 +868,12 @@ public class ZipEngine : IArchiveEngine
                 return;
             }
 
-            // 计算旧条目信息（使用 SharpCompress IArchive 读取）
+            // 计算旧条目信息（使用 SharpCompress IArchive 读取）——同时收集条目名/大小/时间供冲突处理
             int oldEntryCount = 0;
             long oldTotalBytes = 0;
+            var existingNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var existingRawNames = new List<string>();
+            var existingEntryInfo = new Dictionary<string, (long Size, DateTime? Modified)>(StringComparer.OrdinalIgnoreCase);
             using (var archive = OpenArchiveWithEncodingFallback(archivePath))
             {
                 foreach (var entry in archive.Entries)
@@ -878,10 +881,43 @@ public class ZipEngine : IArchiveEngine
                     if (entry.IsDirectory) continue;
                     oldTotalBytes += entry.Size;
                     oldEntryCount++;
+                    var rawName = entry.Key ?? string.Empty;
+                    var normalized = ArchivePath.Normalize(rawName);
+                    existingNames.Add(normalized);
+                    existingRawNames.Add(rawName);
+                    existingEntryInfo[normalized] = (entry.Size, entry.LastModifiedTime);
                 }
             }
 
-            long newTotalBytes = newFiles.Sum(f => new FileInfo(f.FullPath).Length);
+            // 解析条目名冲突（复用解压冲突策略；语义方向反转见 AddConflictHelper）
+            var occupiedNames = new HashSet<string>(existingNames, StringComparer.OrdinalIgnoreCase);
+            var resolvedFiles = new List<(string FullPath, string EntryName)>();
+            var overwrittenNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var (fullPath, entryName) in newFiles)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                var normalized = ArchivePath.Normalize(entryName);
+                existingEntryInfo.TryGetValue(normalized, out var existing);
+                var fi = new FileInfo(fullPath);
+                var finalName = await AddConflictHelper.ResolveEntryNameAsync(
+                    normalized, options, existing.Modified, existing.Size, fi.LastWriteTime, fi.Length, occupiedNames);
+                if (finalName == null)
+                {
+                    CoreLog.Info($"AddToArchiveAsync: skipped '{entryName}' (conflict action)");
+                    continue;
+                }
+                if (existingNames.Contains(normalized) && finalName == normalized)
+                    overwrittenNames.Add(normalized); // 覆盖：copy-mode 需从 keepEntryNames 排除旧条目
+                resolvedFiles.Add((fullPath, finalName));
+            }
+
+            if (resolvedFiles.Count == 0)
+            {
+                CoreLog.Info("AddToArchiveAsync: all files skipped by conflict handling");
+                return;
+            }
+
+            long newTotalBytes = resolvedFiles.Sum(f => new FileInfo(f.FullPath).Length);
             // 总工作量 = 提取旧条目字节 + 压缩全部字节
             long workTotal = oldTotalBytes + oldTotalBytes + newTotalBytes;
             if (workTotal == 0) workTotal = 1;
@@ -903,7 +939,7 @@ public class ZipEngine : IArchiveEngine
                     var streamsToDispose = new List<Stream>();
                     try
                     {
-                        foreach (var (fullPath, entryName) in newFiles)
+                        foreach (var (fullPath, entryName) in resolvedFiles)
                         {
                             var fileStream = File.OpenRead(fullPath);
                             streamsToDispose.Add(fileStream);
@@ -915,10 +951,20 @@ public class ZipEngine : IArchiveEngine
                                 Size: fi.Length));
                         }
 
+                        // 覆盖重名条目时排除旧条目（keepSet 存原始名 + OrdinalIgnoreCase，与 DeleteEntriesAsync 一致）
+                        HashSet<string>? keepEntryNames = null;
+                        if (overwrittenNames.Count > 0)
+                        {
+                            keepEntryNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                            foreach (var raw in existingRawNames)
+                                if (!overwrittenNames.Contains(ArchivePath.Normalize(raw)))
+                                    keepEntryNames.Add(raw);
+                        }
+
                         var result = ZipBinaryRewriter.RewriteAsync(
                             sourcePath: archivePath,
                             destPath: tempArchiveFast,
-                            keepEntryNames: null,  // keep all existing entries
+                            keepEntryNames: keepEntryNames,
                             addEntries: newEntries,
                             encoding: encoding,
                             comment: options.Comment,  // null = preserve original comment
@@ -1061,7 +1107,7 @@ public class ZipEngine : IArchiveEngine
                 CoreLog.Trace($"[TRACE] ZipEngine.AddToArchiveAsync: Phase 1 done, extracted {processedBytes} bytes");
 
                 // === Phase 2: 复制新文件到临时目录 ===
-                foreach (var (fullPath, entryName) in newFiles)
+                foreach (var (fullPath, entryName) in resolvedFiles)
                 {
                     cancellationToken.ThrowIfCancellationRequested();
                     var outPath = Path.Combine(tempDir, entryName);

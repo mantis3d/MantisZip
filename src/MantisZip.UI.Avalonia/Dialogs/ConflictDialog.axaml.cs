@@ -20,6 +20,7 @@ public partial class ConflictDialog : Window
     private bool _resultCaptured;
     private bool _isPaused;
     private bool _cancelOperation;
+    private string _titleKey = "Conflict_Title";
 
     /// <summary>用户选择的处理方式</summary>
     public FileConflictAction ResultAction => _resultCaptured ? _capturedAction : FileConflictAction.Overwrite;
@@ -34,7 +35,7 @@ public partial class ConflictDialog : Window
     public bool CancelOperation => _cancelOperation;
 
     // ── Localized string properties ──
-    public string WinTitle => LocalizationManager.T("Conflict_Title");
+    public string WinTitle => LocalizationManager.T(_titleKey);
     public string DiskLabel => LocalizationManager.T("Conflict_DiskLabel");
     public string ArchiveLabel => LocalizationManager.T("Conflict_ArchiveLabel");
     public string SizeLabel => LocalizationManager.T("Conflict_SizeLabel");
@@ -59,8 +60,11 @@ public partial class ConflictDialog : Window
         DataContext = this;
     }
 
-    public ConflictDialog(FileConflictInfo info)
+    public ConflictDialog(FileConflictInfo info, string? titleKey = null)
     {
+        if (!string.IsNullOrEmpty(titleKey))
+            _titleKey = titleKey;
+
         InitializeComponent();
         DataContext = this;
 
