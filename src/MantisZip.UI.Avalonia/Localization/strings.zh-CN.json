@@ -1,5 +1,8 @@
 {
   "AddConflict_Title": "添加冲突",
+  "Main_DragAddConfirm": "将 {0} 个文件/文件夹添加到「{1}」？",
+  "DragAdd_OverlayAddTo": "添加到 {0}",
+  "DragAdd_OverlayUnsupported": "此格式不支持添加文件",
   "Preview_AnimatedImage": "动画预览 {0}",
   "Preview_Header_AnimatedImage": "动画图片",
   "Menu_ShowPreviewPanel": "显示预览面板",

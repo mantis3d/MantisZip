@@ -55,9 +55,22 @@ public partial class MainWindow : Window
     /// <summary>预览面板显隐（与 AppSettings.ShowPreviewPanel 同步；false 时压缩占位行列，树/列表撑满）</summary>
     private bool _previewPanelEnabled = true;
 
+    /// <summary>拖拽添加覆层呼吸动画计时器（100ms tick，正弦 alpha 40-120，与拖拽解压 OverlayController 参数一致）</summary>
+    private readonly DispatcherTimer _dragAddOverlayTimer;
+
+    /// <summary>覆层呼吸动画 tick 计数（显示时从 0 复位）</summary>
+    private int _dragAddOverlayTick;
+
     public MainWindow()
     {
         InitializeComponent();
+
+        // 拖拽添加覆层呼吸动画（与拖拽解压覆层一致：约 2s 周期，正弦 alpha 40-120，仅背景层呼吸）
+        _dragAddOverlayTimer = new DispatcherTimer(DispatcherPriority.Normal, Dispatcher.UIThread)
+        {
+            Interval = TimeSpan.FromMilliseconds(100)
+        };
+        _dragAddOverlayTimer.Tick += OnDragAddOverlayTimerTick;
 
         // 测试菜单仅 Debug 构建显示（Release 自动隐藏）
         TestMenu.IsVisible = AppConstants.ShowTestMenu;
@@ -981,34 +994,151 @@ public partial class MainWindow : Window
 
     private void OnWindowDragOver(object? sender, DragEventArgs e)
     {
-        // Accept drop if files are being dragged (check for File format)
-        if (e.DataTransfer != null && e.DataTransfer.Formats.Contains(DataFormat.File))
-            e.DragEffects = DragDropEffects.Copy;
-        else
+        if (e.DataTransfer == null || !e.DataTransfer.Formats.Contains(DataFormat.File))
+        {
             e.DragEffects = DragDropEffects.None;
+            HideDragAddOverlay();
+            return;
+        }
+
+        var vm = DataContext as MainWindowViewModel;
+        bool archiveLoaded = vm?.CurrentArchivePath != null && File.Exists(vm.CurrentArchivePath);
+
+        if (archiveLoaded)
+        {
+            // 拖入单个压缩包 → 切换打开，不显示添加覆层（与 WPF Window_Drop 行为一致）
+            var paths = GetDroppedLocalPaths(e);
+            if (paths.Count == 1 && ArchiveFormatHelper.IsArchiveFile(paths[0]))
+            {
+                e.DragEffects = DragDropEffects.Copy;
+                HideDragAddOverlay();
+                return;
+            }
+
+            var engine = ArchiveEngineFactory.GetEngineByExtension(vm!.CurrentArchivePath!);
+            bool canAdd = engine?.CanAdd(ArchiveFormatHelper.GetFormat(vm.CurrentArchivePath!)) == true;
+            if (canAdd)
+            {
+                e.DragEffects = DragDropEffects.Copy;
+                ShowDragAddOverlay(isGreen: true,
+                    LocalizationManager.T("DragAdd_OverlayAddTo", BuildTargetDisplay(vm)));
+            }
+            else
+            {
+                e.DragEffects = DragDropEffects.None;
+                ShowDragAddOverlay(isGreen: false, LocalizationManager.T("DragAdd_OverlayUnsupported"));
+            }
+            return;
+        }
+
+        e.DragEffects = DragDropEffects.Copy;
+        HideDragAddOverlay();
+    }
+
+    private void OnWindowDragLeave(object? sender, DragEventArgs e)
+    {
+        HideDragAddOverlay();
     }
 
     private async void OnWindowDrop(object? sender, DragEventArgs e)
     {
+        HideDragAddOverlay();
         if (e.DataTransfer == null) return;
 
+        var paths = GetDroppedLocalPaths(e);
+        if (paths.Count == 0) return;
+
+        var vm = DataContext as MainWindowViewModel;
+        if (vm == null) return;
+
+        if (vm.CurrentArchivePath != null && File.Exists(vm.CurrentArchivePath))
+        {
+            // 分支 1：拖入单个压缩包 → 切换打开
+            if (paths.Count == 1 && ArchiveFormatHelper.IsArchiveFile(paths[0]))
+            {
+                await vm.LoadArchiveAsync(paths[0]);
+                return;
+            }
+
+            // 分支 2：确认框 → 添加到当前压缩包（复用 WPF 文案与冲突处理）
+            var result = await AppMessageBox.Show(
+                LocalizationManager.T("Main_DragAddConfirm", paths.Count, Path.GetFileName(vm.CurrentArchivePath)),
+                LocalizationManager.T("CompressConflict_Add"),
+                MessageBoxButton.YesNo, MessageBoxImage.Question, this);
+            if (result == MessageBoxResult.Yes)
+                await vm.AddFilesToArchiveAsync(paths);
+            return;
+        }
+
+        // 未打开压缩包
+        if (ArchiveFormatHelper.IsArchiveFile(paths[0]))
+        {
+            // 分支 3a：拖入压缩包 → 打开
+            await vm.LoadArchiveAsync(paths[0]);
+        }
+        else
+        {
+            // 分支 3b：拖入非压缩包 → 压缩对话框预填源文件
+            var dialog = new CompressSettingsWindow(paths);
+            await dialog.ShowDialog(this);
+        }
+    }
+
+    /// <summary>收集拖入项的本地路径（文件 + 文件夹均支持，IStorageFolder 继承自 IStorageItem）。</summary>
+    private static List<string> GetDroppedLocalPaths(DragEventArgs e)
+    {
+        var paths = new List<string>();
         foreach (var item in e.DataTransfer.Items)
         {
             var raw = item.TryGetRaw(DataFormat.File);
-            if (raw is IStorageFile storageFile)
+            if (raw is IStorageItem storageItem)
             {
-                var path = storageFile.TryGetLocalPath();
-                if (string.IsNullOrEmpty(path)) continue;
-
-                if (ArchiveFormatHelper.IsArchiveFile(path))
-                {
-                    var vm = DataContext as MainWindowViewModel;
-                    if (vm != null)
-                        await vm.LoadArchiveAsync(path);
-                    return; // Only open the first matching archive
-                }
+                var path = storageItem.TryGetLocalPath();
+                if (!string.IsNullOrEmpty(path))
+                    paths.Add(path);
             }
         }
+        return paths;
+    }
+
+    /// <summary>构建覆层目标显示文案：压缩包名 + 当前浏览目录（如 "backup.zip/文档"）。</summary>
+    private static string BuildTargetDisplay(MainWindowViewModel vm)
+    {
+        var archiveName = Path.GetFileName(vm.CurrentArchivePath) ?? vm.CurrentArchivePath;
+        return string.IsNullOrEmpty(vm.CurrentFolder)
+            ? archiveName
+            : $"{archiveName}/{vm.CurrentFolder}";
+    }
+
+    /// <summary>覆层呼吸动画：与 OverlayController 相同的正弦公式 alpha 40-120（约 2s 周期），仅背景层 Opacity 呼吸。</summary>
+    private void OnDragAddOverlayTimerTick(object? sender, EventArgs e)
+    {
+        double breath = 80 + 40 * Math.Sin(_dragAddOverlayTick * Math.PI / 10);
+        byte alpha = (byte)Math.Clamp(breath, 40, 120);
+        DragAddOverlayBg.Opacity = alpha / 255.0;
+        _dragAddOverlayTick++;
+    }
+
+    /// <summary>显示拖拽添加覆层：绿色=可添加，红色=不可添加。视觉对齐拖拽解压覆层——
+    /// 状态色呼吸背景（#6BD46B/#F43643）+ 8px 不透明边框 + 白色粗体文字 + ✓/⚠ 图标（颜色与拖拽解压一致）。</summary>
+    private void ShowDragAddOverlay(bool isGreen, string text)
+    {
+        var color = isGreen ? Color.Parse("#6BD46B") : Color.Parse("#F43643");
+        DragAddOverlay.BorderBrush = new SolidColorBrush(color);
+        DragAddOverlayBg.Background = new SolidColorBrush(color);
+        DragAddOverlayIcon.Text = isGreen ? "\u2713" : "\u26A0";
+        DragAddOverlayIcon.Foreground = new SolidColorBrush(
+            isGreen ? Color.Parse("#90E060") : Color.Parse("#FFE020"));
+        DragAddOverlayText.Text = text;
+        DragAddOverlay.IsVisible = true;
+        _dragAddOverlayTick = 0;
+        _dragAddOverlayTimer.Start();
+    }
+
+    private void HideDragAddOverlay()
+    {
+        DragAddOverlay.IsVisible = false;
+        _dragAddOverlayTimer.Stop();
     }
 
     private void FileListGrid_SelectionChanged(object? sender, SelectionChangedEventArgs e)

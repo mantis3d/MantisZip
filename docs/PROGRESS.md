@@ -21,6 +21,15 @@
 
 ### MantisZip.UI.Avalonia（主力版）
 
+**2026-08-19** — 拖拽添加到压缩包：WPF `Window_Drop` 三分支完整移植 + 覆层视觉对齐拖拽解压
+  - **三分支移植**：已打开压缩包 + 拖入单个压缩包 → 切换打开；已打开 + 拖入文件/文件夹 → 确认框（`Main_DragAddConfirm`，复用 `CompressConflict_Add` 标题）→ `AddFilesToArchiveAsync`；未打开 + 压缩包 → 打开；未打开 + 非压缩包 → `CompressSettingsWindow` 预填源文件
+  - **文件夹支持**：`GetDroppedLocalPaths` 用 `raw is IStorageItem`（`IStorageFile`/`IStorageFolder` 统一，`TryGetLocalPath` 取路径），文件夹与文件同路添加
+  - **公共方法抽取**：`MainWindowViewModel.AddFiles` 拆出 `AddFilesToArchiveAsync(IReadOnlyList<string>)`（返回 bool，复用密码/冲突处理/`entryBasePath=CurrentFolder`/RefreshArchive），工具栏与拖拽共用
+  - **DragAddOverlay 覆层（视觉对齐 OverlayController）**：覆盖文件列表列（`ArchiveContentGrid` col 2）；状态色背景呼吸（`DispatcherTimer` 100ms + 正弦 `80+40·sin(tick·π/10)`，alpha 40-120 约 2s 周期，与拖拽解压完全同参，仅背景层 Opacity 呼吸、边框/文字不透明）+ 8px 同色不透明边框 + 白色粗体文字（FontSize 24）+ `DropShadowEffect` 阴影 + ✓（`#90E060`）/ ⚠（`#FFE020`）状态图标；绿 `#6BD46B`=可添加、红 `#F43643`=格式不支持（`DragEffects.None`）；显示时启动 timer、隐藏时停止
+  - **Avalonia 12 兼容**：`TextShadow` 简写属性已移除（AVLN2000），改用 `TextBlock.Effect` + `DropShadowEffect`
+  - 涉及文件：`.omo/plans/drag-add-overlay.md`（新增）、`docs/PLAN.md`、`ViewModels/MainWindowViewModel.cs`、`Views/MainWindow.axaml`、`Views/MainWindow.axaml.cs`、`Localization/strings.*.json`
+  - 验证：`dotnet build` 0 错误、Avalonia 测试 60/2 跳过、Core 测试 299/299 全部通过
+
 **2026-08-19** — 添加到压缩包复用解压冲突处理：同一 `AppSettings.FileConflictAction` 策略 + ConflictDialog 弹窗（新标题 key `AddConflict_Title`「添加冲突」），覆盖/跳过/重命名/覆盖旧文件/覆盖小文件/Ask 全动作集
   - **接线**：`ConflictDialog` ctor 新增 `titleKey` 参数（默认 `"Conflict_Title"` 向后兼容解压场景）；`ExtractFlow.ShowConflictDialogAsync` 透传 `titleKey`；`MainWindowViewModel` 新增 `ShowAddFileConflictDialogAsync` 委托，`AddFiles` 改用 `SelectedItemsExtractService.CreateExtractOptions(AppSettings.FileConflictAction, 委托)`（Ask 弹窗 + ApplyToAll 记忆复用）；`MainWindow.axaml.cs` 以 `"AddConflict_Title"` 接线
   - 涉及文件：`Dialogs/ConflictDialog.axaml.cs`、`Services/ExtractFlow.cs`、`Services/SelectedItemsExtractService.cs`（仅复用）、`ViewModels/MainWindowViewModel.cs`、`Views/MainWindow.axaml.cs`、`Localization/strings.*.json`
