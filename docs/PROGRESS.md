@@ -21,6 +21,11 @@
 
 ### MantisZip.UI.Avalonia（主力版）
 
+**2026-08-19** — 添加到压缩包复用解压冲突处理：同一 `AppSettings.FileConflictAction` 策略 + ConflictDialog 弹窗（新标题 key `AddConflict_Title`「添加冲突」），覆盖/跳过/重命名/覆盖旧文件/覆盖小文件/Ask 全动作集
+  - **接线**：`ConflictDialog` ctor 新增 `titleKey` 参数（默认 `"Conflict_Title"` 向后兼容解压场景）；`ExtractFlow.ShowConflictDialogAsync` 透传 `titleKey`；`MainWindowViewModel` 新增 `ShowAddFileConflictDialogAsync` 委托，`AddFiles` 改用 `SelectedItemsExtractService.CreateExtractOptions(AppSettings.FileConflictAction, 委托)`（Ask 弹窗 + ApplyToAll 记忆复用）；`MainWindow.axaml.cs` 以 `"AddConflict_Title"` 接线
+  - 涉及文件：`Dialogs/ConflictDialog.axaml.cs`、`Services/ExtractFlow.cs`、`Services/SelectedItemsExtractService.cs`（仅复用）、`ViewModels/MainWindowViewModel.cs`、`Views/MainWindow.axaml.cs`、`Localization/strings.*.json`
+  - 验证：`dotnet build` 0 错误；Avalonia 测试 60/2 跳过全部通过
+
 **2026-08-18** — 添加文件到压缩包时保留浏览目录前缀（entryBasePath），7z 改用 `CompressFileDictionary` 精确控制条目名
 
 **2026-08-18** — 图片预览能力系统：透明/动画能力注册表 + GIF 透明 + Animated WebP 预览
@@ -1310,6 +1315,9 @@
 
 这些变更影响两项目共用代码，按时间从新到旧排列。
 
+#### v0.5.0 (2026-08-19)
+- 添加到压缩包支持重名条目冲突处理：新增 `AddConflictHelper`（条目名级解析，语义方向与解压相反：新数据更新/更大→覆盖）；ZIP copy-mode `keepEntryNames` 排除被覆盖条目、legacy Phase 2 应用解析结果；7z 覆盖经 `ModifyArchive`(index→null) 删除 + `CompressFileDictionary` Append 重加
+
 #### v0.5.0 (2026-08-18)
 - 添加文件到压缩包时保留浏览目录前缀（entryBasePath）：7z 改用 `CompressFileDictionary` 精确控制条目名；ZIP 传入 entryBasePath
 
@@ -1533,6 +1541,7 @@
 
 | 功能 | 设计文档 | 实现版本 |
 |------|----------|:--------:|
+| 添加到压缩包重名条目冲突处理（`AddConflictHelper` 条目名级解析、语义方向与解压相反：新数据更新/更大→覆盖；ZIP copy-mode `keepEntryNames` 排除被覆盖条目 + legacy Phase 2 应用解析结果；7z 覆盖经 `ModifyArchive`(index→null) 删除 + `CompressFileDictionary` Append 重加；Avalonia Ask 弹窗复用 ConflictDialog，新标题 key `AddConflict_Title`） | [add-archive-conflict-handling.md](.omo/plans/add-archive-conflict-handling.md) | v0.5.0 |
 | 拖拽/右键解压流程统一（`SelectedItemsExtractService` 统一解压动作、`TarGzEngine` 按条目提取、冲突统一走设置 6 策略 + 统一 Ask 弹窗、拖拽路径语义与右键一致、`MapConflictActionString` 连字符映射漏洞修复） | [drag-extract-unify.md](.omo/plans/drag-extract-unify.md) | v0.4.5 |
 | 目录行聚合显示（`DirStats`+`ComputeDirectoryStats` 增加 `NewestModified`；Avalonia `ArchiveItemModel` 显示属性改派生计算属性 + `CompressedSizeAvailable`；`PopulateEntries` 基于过滤后 `filteredSource` 应用聚合） | [directory-size-date-aggregate.md](.omo/plans/directory-size-date-aggregate.md) | v0.4.5 |
 | 路径清单统一（A/B 数据集：预览=实际绝对一致，CompressPlan 唯一事实来源 + 压缩/解压过滤白名单 + IsBuildPending 按钮门禁） | [path-manifest-unification.md](.omo/plans/path-manifest-unification.md) | v0.4.5（⏳ 交互清单待用户 GUI 验证） |
