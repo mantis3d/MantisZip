@@ -971,7 +971,7 @@ public class SevenZipEngine : IArchiveEngine
 
         EnsureLibraryPath();
 
-        await Task.Run(() =>
+        await Task.Run(async () =>
         {
             var compr = new SharpSevenZipCompressor();
             ConfigureCompressor(compr, options);
@@ -1018,8 +1018,62 @@ public class SevenZipEngine : IArchiveEngine
                 CoreLog.Info("AddToArchiveAsync: no files to add (whitelist filtered)");
                 return;
             }
+
+            // 收集压缩包现有条目（名称/大小/时间/索引）供冲突处理
+            // 注意：加密文件名（EncryptHeaders）的 7z 需密码才能列出条目，与 AddToArchiveAsync 既有约束一致
+            var existingNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var existingEntryInfo = new Dictionary<string, (int Index, long Size, DateTime Modified)>(StringComparer.OrdinalIgnoreCase);
+            using (var extractor = string.IsNullOrEmpty(options.Password)
+                       ? new SharpSevenZipExtractor(archivePath)
+                       : new SharpSevenZipExtractor(archivePath, options.Password))
+            {
+                foreach (var e in extractor.ArchiveFileData)
+                {
+                    if (e.IsDirectory) continue;
+                    var normalized = ArchivePath.Normalize(e.FileName);
+                    existingNames.Add(normalized);
+                    existingEntryInfo[normalized] = (e.Index, (long)e.Size, e.LastWriteTime);
+                }
+            }
+
+            // 解析条目名冲突（语义方向反转见 AddConflictHelper；覆盖 = 先删旧条目再追加）
+            var occupiedNames = new HashSet<string>(existingNames, StringComparer.OrdinalIgnoreCase);
+            var finalDict = new Dictionary<string, string>();
+            var deleteIndexes = new Dictionary<int, string>();
+            foreach (var (entryName, sourcePath) in fileDict)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                var normalized = ArchivePath.Normalize(entryName);
+                existingEntryInfo.TryGetValue(normalized, out var existing);
+                var fi = new FileInfo(sourcePath);
+                var finalName = await AddConflictHelper.ResolveEntryNameAsync(
+                    normalized, options, existing.Modified, existing.Size, fi.LastWriteTime, fi.Length, occupiedNames);
+                if (finalName == null)
+                {
+                    CoreLog.Info($"AddToArchiveAsync: skipped '{entryName}' (conflict action)");
+                    continue;
+                }
+                if (existingNames.Contains(normalized) && finalName == normalized)
+                    deleteIndexes[existing.Index] = null!; // 覆盖：ModifyArchive 传 null 值 = 删除该索引条目
+                finalDict[finalName] = sourcePath;
+            }
+
+            if (finalDict.Count == 0)
+            {
+                CoreLog.Info("AddToArchiveAsync: all files skipped by conflict handling");
+                return;
+            }
+
+            // 覆盖条目先删除（探针验证：ModifyArchive(index→null) 删除有效），再追加
+            if (deleteIndexes.Count > 0)
+            {
+                CoreLog.Info($"AddToArchiveAsync: deleting {deleteIndexes.Count} overwritten entries via ModifyArchive");
+                var delCompr = new SharpSevenZipCompressor { ArchiveFormat = OutArchiveFormat.SevenZip };
+                delCompr.ModifyArchive(archivePath, deleteIndexes, options.Encrypt ? options.Password ?? "" : "");
+            }
+
             compr.CompressFileDictionary(
-                fileDict,
+                finalDict,
                 archivePath,
                 options.Encrypt ? options.Password ?? "" : "");
 

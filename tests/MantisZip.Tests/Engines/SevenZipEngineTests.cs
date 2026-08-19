@@ -266,6 +266,100 @@ public class SevenZipEngineTests : IDisposable
         Assert.Contains(entries, e => e.FullPath == "hello.txt");
     }
 
+    // ===== 冲突处理集成测试 =====
+
+    private async Task<string> CreateDupFileAsync(string name, string content)
+    {
+        var file = Path.Combine(Path.GetTempPath(), "MantisZipTest", Guid.NewGuid().ToString(), name);
+        Directory.CreateDirectory(Path.GetDirectoryName(file)!);
+        await File.WriteAllTextAsync(file, content);
+        TrackFile(file);
+        return file;
+    }
+
+    [Fact]
+    public async Task AddToArchiveAsync_DuplicateName_Overwrite_ReplacesContent()
+    {
+        if (!Is7zDllAvailable()) return;
+        var archive = ArchiveFixtures.CreateSevenZipArchive();
+        if (archive == null) return;
+        TrackFile(archive);
+
+        var dupFile = await CreateDupFileAsync("hello.txt", "duplicate content");
+
+        await _engine.AddToArchiveAsync(archive, [dupFile], new ArchiveOptions { ConflictAction = FileConflictAction.Overwrite });
+
+        var entries = await _engine.ListEntriesAsync(archive);
+        Assert.Equal(1, entries.Count(e => e.Name == "hello.txt"));
+
+        var dest = TrackDir(Path.Combine(Path.GetTempPath(), "MantisZipTest", Guid.NewGuid().ToString()));
+        await _engine.ExtractAsync(archive, dest);
+        Assert.Equal("duplicate content", await File.ReadAllTextAsync(Path.Combine(dest, "hello.txt")));
+    }
+
+    [Fact]
+    public async Task AddToArchiveAsync_DuplicateName_Skip_KeepsOriginal()
+    {
+        if (!Is7zDllAvailable()) return;
+        var archive = ArchiveFixtures.CreateSevenZipArchive();
+        if (archive == null) return;
+        TrackFile(archive);
+
+        var dupFile = await CreateDupFileAsync("hello.txt", "duplicate content");
+
+        await _engine.AddToArchiveAsync(archive, [dupFile], new ArchiveOptions { ConflictAction = FileConflictAction.Skip });
+
+        var entries = await _engine.ListEntriesAsync(archive);
+        Assert.Equal(1, entries.Count(e => e.Name == "hello.txt"));
+
+        var dest = TrackDir(Path.Combine(Path.GetTempPath(), "MantisZipTest", Guid.NewGuid().ToString()));
+        await _engine.ExtractAsync(archive, dest);
+        Assert.Equal(ArchiveFixtures.HelloText, await File.ReadAllTextAsync(Path.Combine(dest, "hello.txt")));
+    }
+
+    [Fact]
+    public async Task AddToArchiveAsync_DuplicateName_Rename_AddsUniqueEntry()
+    {
+        if (!Is7zDllAvailable()) return;
+        var archive = ArchiveFixtures.CreateSevenZipArchive();
+        if (archive == null) return;
+        TrackFile(archive);
+
+        var dupFile = await CreateDupFileAsync("hello.txt", "duplicate content");
+
+        await _engine.AddToArchiveAsync(archive, [dupFile], new ArchiveOptions { ConflictAction = FileConflictAction.Rename });
+
+        var entries = await _engine.ListEntriesAsync(archive);
+        Assert.Contains(entries, e => e.Name == "hello.txt");
+        Assert.Contains(entries, e => e.Name == "hello (1).txt");
+    }
+
+    [Fact]
+    public async Task AddToArchiveAsync_DuplicateName_Ask_ResolverCustomName()
+    {
+        if (!Is7zDllAvailable()) return;
+        var archive = ArchiveFixtures.CreateSevenZipArchive();
+        if (archive == null) return;
+        TrackFile(archive);
+
+        var dupFile = await CreateDupFileAsync("hello.txt", "duplicate content");
+
+        var options = new ArchiveOptions
+        {
+            ConflictAction = FileConflictAction.Ask,
+            ConflictResolverAsync = info =>
+            {
+                info.CustomName = "my-rename.txt";
+                return Task.FromResult(FileConflictAction.Rename);
+            },
+        };
+        await _engine.AddToArchiveAsync(archive, [dupFile], options);
+
+        var entries = await _engine.ListEntriesAsync(archive);
+        Assert.Contains(entries, e => e.Name == "hello.txt");
+        Assert.Contains(entries, e => e.Name == "my-rename.txt");
+    }
+
     // ===== Progress Reporting =====
 
     [Fact]
