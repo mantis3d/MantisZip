@@ -27,6 +27,7 @@
 
 #### 2026-08
 
+- **08-20** — XLSX 预览修复：合并大标题行不再吞列（列数按定位式 + 表头行智能检测）+ 稀疏行数据不丢失 + 遵守表格行列上限设置
 - **08-20** — 拖拽/右键「解压选中项」流程完全统一：`ExtractFlow.RunSelectedItemsExtractionAsync` 共享方法（压缩包一行批处理列表 + 状态驱动 + 失败统一弹窗）
 - **08-19** — 拖拽添加到压缩包：WPF `Window_Drop` 三分支完整移植 + 复用解压冲突处理 + `AddFilesToArchiveAsync` 公共方法 + DragAddOverlay 覆层
 - **08-18** — 图片预览能力系统：透明/动画能力注册表 + GIF 透明 + Animated WebP 预览

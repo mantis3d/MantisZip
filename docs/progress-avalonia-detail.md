@@ -6,6 +6,12 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-08-20** — XLSX 预览修复：合并大标题行吞列 + 稀疏行数据丢失
+  - **根因**：`ShowXlsx` 用 `range.FirstRow().CellsUsed()` 定列数——`CellsUsed()` 是稀疏集合（只含有内容的单元格），首行是 A1:F1 合并大标题（仅 A1 有值）时列数退化为 1，DataGrid 只剩一列；数据行循环 `i < row.CellsUsed().Count()` 在稀疏行提前截断且与 `row.Cell(i+1)` 定位取值错位，靠后列内容丢失
+  - **修复**：列数以 `range.ColumnCount()` 定位式为准（受 `MaxTablePreviewCols` 约束）；表头行智能检测——跳过非空单元格 < 2 个的合并大标题行，取第一个 ≥2 个非空单元格的行作为表头（找不到回退首行，兼容首行即表头的普通表格）；数据行按列位置 `row.Cell(i+1)` 取值、仅以列数为界，跳过表头及之前所有行，遵守 `MaxTablePreviewRows`
+  - **验证**：ClosedXML 0.105.0 实测「书香强警阅见初心活动KV需求表.xlsx」——6 列（主题/时长/文案/要求/Column5/Column6）+ 9 行数据，F 列内容（"所有视频及动图尺寸:16:9"）不再丢失；`dotnet build` 0 错误
+  - 涉及文件：`ViewModels/PreviewViewModel.cs`
+
 **2026-08-20** — 拖拽/右键「解压选中项」流程完全统一：`ExtractFlow.RunSelectedItemsExtractionAsync` 共享方法
   - **背景**：拖拽解压进度窗口文件列表显示异常——列表项全部停留在 ⏳ Pending、进度条 0%、文件计数卡在「1 / N」。根因：拖拽路径 `DragDropService.ExecuteAfterDropAsync` 从不调用 `SetCurrentBatchItem`/`UpdateBatchItemStatus`（`_currentBatchIndex` 恒为 -1，`ProgressViewModel.SetProgress` 列表项进度分支永不执行），且 `FileCountText` 整数除法 `(int)p.PercentComplete / 100 * _batchItems.Count` 恒为 0 被钳到 1
   - **统一设计**（按用户要求）：拖拽解压与右键「解压选中项到」仅在目标路径获取方式上不同（拖拽 = `DropTargetDetector` + 选择器回退；右键 = `CustomFilePickerDialog` 预览选择器），拿到目标路径后必须完全走同一流程

@@ -2137,6 +2137,10 @@ public partial class PreviewViewModel : ObservableObject
 
     /// <summary>
     /// 显示 XLSX 工作表预览（ClosedXML → DataGrid）。
+    /// 列数以 <see cref="IXLRange.ColumnCount"/> 定位式为准（不能用 <c>CellsUsed()</c>，
+    /// 它是稀疏集合，会漏掉空单元格/合并非主单元格导致列数缩水）；
+    /// 表头行智能检测：跳过非空单元格少于 2 个的合并大标题行，取第一个 ≥2 个非空单元格
+    /// 的行作为表头（找不到则回退到首行，兼容"首行即表头"的普通表格）。
     /// </summary>
     public void ShowXlsx(string filePath)
     {
@@ -2156,13 +2160,34 @@ public partial class PreviewViewModel : ObservableObject
                 return;
             }
 
-            var table = new DataTable();
-            var firstRow = range.FirstRow().CellsUsed().Take(100).ToList();
-
-            // Column headers from first row
-            for (int i = 0; i < firstRow.Count; i++)
+            var columnCount = range.ColumnCount();
+            var colsToShow = Math.Min(columnCount, PreviewService.MaxTablePreviewCols);
+            if (colsToShow == 0)
             {
-                var colName = firstRow[i].GetFormattedString();
+                TextContent = LocalizationManager.T("Preview_XlsxEmpty");
+                PreviewType = PreviewType.Xlsx;
+                IsPreviewVisible = true;
+                IsToolbarVisible = false;
+                return;
+            }
+
+            // 表头行：跳过合并大标题行（如 A1:F1 只有 1 个非空单元格）
+            var headerRow = range.FirstRow();
+            foreach (var row in range.RowsUsed())
+            {
+                if (row.CellsUsed().Count() >= 2)
+                {
+                    headerRow = row;
+                    break;
+                }
+            }
+
+            var table = new DataTable();
+
+            // Column headers from header row（按列位置取，空表头回退 Column{i+1}）
+            for (int i = 0; i < colsToShow; i++)
+            {
+                var colName = headerRow.Cell(i + 1).GetFormattedString();
                 if (string.IsNullOrWhiteSpace(colName))
                     colName = $"Column{i + 1}";
                 // Ensure unique column names
@@ -2182,13 +2207,14 @@ public partial class PreviewViewModel : ObservableObject
                 return;
             }
 
-            // Data rows (limit 100)
+            // Data rows（按列位置取值，跳过表头行及之前的标题行；遵守 MaxTablePreviewRows）
             int rowCount = 0;
-            foreach (var row in range.RowsUsed().Skip(1))
+            foreach (var row in range.RowsUsed())
             {
-                if (rowCount >= 100) break;
+                if (row.RowNumber() <= headerRow.RowNumber()) continue;
+                if (rowCount >= PreviewService.MaxTablePreviewRows) break;
                 var dataRow = table.NewRow();
-                for (int i = 0; i < table.Columns.Count && i < row.CellsUsed().Count(); i++)
+                for (int i = 0; i < table.Columns.Count; i++)
                 {
                     dataRow[i] = row.Cell(i + 1).GetFormattedString();
                 }
