@@ -51,7 +51,7 @@
 - Modify: `src/MantisZip.UI.Avalonia/ViewModels/PreviewViewModel.cs:212`、`:222`、`:252`、`:270`、`:530`、`:1065`
 - Modify: `src/MantisZip.UI.Avalonia/Views/PreviewPanel.axaml:77`、`:270`
 
-- [ ] **Step 1: 枚举新增 `AnimatedImage`（保留 `Gif` 但注释废弃）**
+- [x] **Step 1: 枚举新增 `AnimatedImage`（保留 `Gif` 但注释废弃）**
 
 `Services/PreviewService.cs` 的 `PreviewType` 枚举（约 10-34 行）：
 
@@ -84,7 +84,7 @@ public enum PreviewType
 }
 ```
 
-- [ ] **Step 2: 两处 GIF → AnimatedImage 映射**
+- [x] **Step 2: 两处 GIF → AnimatedImage 映射**
 
 `Services/PreviewService.cs:179`（扩展名回退分类）：
 
@@ -98,7 +98,7 @@ if (GifExtensions.Contains(ext)) return PreviewType.AnimatedImage;
 FileFormat.Gif => PreviewType.AnimatedImage,
 ```
 
-- [ ] **Step 3: ViewModel 属性迁移**
+- [x] **Step 3: ViewModel 属性迁移**
 
 `ViewModels/PreviewViewModel.cs`：
 
@@ -122,7 +122,7 @@ public bool HasAnimationControls => PreviewType == PreviewType.AnimatedImage;
 PreviewType = PreviewType.AnimatedImage;
 ```
 
-- [ ] **Step 4: MainWindowViewModel switch case**
+- [x] **Step 4: MainWindowViewModel switch case**
 
 `ViewModels/MainWindowViewModel.cs:1167`：
 
@@ -141,18 +141,18 @@ case PreviewType.AnimatedImage:
 
 （状态栏文案按扩展名分流在 Task 4 完成，此处先保持 `Preview_Gif` 保证编译与行为不回归。）
 
-- [ ] **Step 5: PreviewPanel.axaml 绑定改名**
+- [x] **Step 5: PreviewPanel.axaml 绑定改名**
 
 `Views/PreviewPanel.axaml:77`：`IsVisible="{Binding HasGifControls}"` → `IsVisible="{Binding HasAnimationControls}"`
 
 `Views/PreviewPanel.axaml:270`：`IsVisible="{Binding IsGifVisible}"` → `IsVisible="{Binding IsAnimatedImageVisible}"`
 
-- [ ] **Step 6: 验证构建**
+- [x] **Step 6: 验证构建**
 
 Run: `dotnet build src\MantisZip.UI.Avalonia\MantisZip.UI.Avalonia.csproj`
 Expected: 已成功生成，0 警告，0 错误（如报 `PreviewType.Gif` 残留引用，按背景事实 4 的清单排查）
 
-- [ ] **Step 7: 提交**
+- [x] **Step 7: 提交**
 
 ```bash
 git add src/MantisZip.UI.Avalonia/Services/PreviewService.cs src/MantisZip.UI.Avalonia/ViewModels/MainWindowViewModel.cs src/MantisZip.UI.Avalonia/ViewModels/PreviewViewModel.cs src/MantisZip.UI.Avalonia/Views/PreviewPanel.axaml
@@ -168,7 +168,7 @@ git commit -m "refactor(avalonia): PreviewType.Gif 迁移为 AnimatedImage——
 - Modify: `src/MantisZip.UI.Avalonia/ViewModels/PreviewViewModel.cs:212`、`:530`、`:535-536`
 - Test: `tests/MantisZip.UI.Avalonia.Tests/PreviewViewModelTests.cs`
 
-- [ ] **Step 1: 写失败测试（能力注册表 + GIF 透明按钮）**
+- [x] **Step 1: 写失败测试（能力注册表 + GIF 透明按钮）**
 
 `tests/MantisZip.UI.Avalonia.Tests/PreviewViewModelTests.cs` 追加：
 
@@ -233,12 +233,12 @@ private static string CreateTestGif()
 }
 ```
 
-- [ ] **Step 2: 运行测试验证失败**
+- [x] **Step 2: 运行测试验证失败**
 
 Run: `dotnet test tests\MantisZip.UI.Avalonia.Tests\MantisZip.UI.Avalonia.Tests.csproj --filter "FullyQualifiedName~PreviewCapabilities|FullyQualifiedName~ShowGif_ExposesTransparencyControls"`
 Expected: FAIL——`PreviewCapabilities` 类型不存在（编译错误）；若先建类则断言失败（AnimatedImage 未注册 Transparency）
 
-- [ ] **Step 3: 新建能力注册表**
+- [x] **Step 3: 新建能力注册表**
 
 `src/MantisZip.UI.Avalonia/Services/PreviewCapabilities.cs`：
 
@@ -299,7 +299,7 @@ public static class PreviewCapabilities
 }
 ```
 
-- [ ] **Step 4: ViewModel 属性查表**
+- [x] **Step 4: ViewModel 属性查表**
 
 `ViewModels/PreviewViewModel.cs`：
 
@@ -315,17 +315,17 @@ public bool HasTransparencyControls => PreviewCapabilities.For(PreviewType).HasF
 public bool HasFlattenAlphaControls => PreviewCapabilities.For(PreviewType).HasFlag(PreviewCapability.FlattenAlpha);
 ```
 
-- [ ] **Step 5: 运行测试验证通过**
+- [x] **Step 5: 运行测试验证通过**
 
 Run: `dotnet test tests\MantisZip.UI.Avalonia.Tests\MantisZip.UI.Avalonia.Tests.csproj --filter "FullyQualifiedName~PreviewCapabilities|FullyQualifiedName~ShowGif_ExposesTransparencyControls"`
 Expected: PASS（能力表 4 断言组 + ShowGif 透明 3 断言）
 
-- [ ] **Step 6: 验证构建 + 全量测试**
+- [x] **Step 6: 验证构建 + 全量测试**
 
 Run: `dotnet build src\MantisZip.UI.Avalonia\MantisZip.UI.Avalonia.csproj && dotnet test tests\MantisZip.UI.Avalonia.Tests\MantisZip.UI.Avalonia.Tests.csproj`
 Expected: 0 错误 0 警告；测试全部通过（基线 56 通过 2 跳过 + 新增）
 
-- [ ] **Step 7: 提交**
+- [x] **Step 7: 提交**
 
 ```bash
 git add src/MantisZip.UI.Avalonia/Services/PreviewCapabilities.cs src/MantisZip.UI.Avalonia/ViewModels/PreviewViewModel.cs tests/MantisZip.UI.Avalonia.Tests/PreviewViewModelTests.cs
@@ -340,7 +340,7 @@ git commit -m "feat(avalonia): 预览能力注册表——GIF 透明棋盘格支
 - Modify: `src/MantisZip.UI.Avalonia/ViewModels/PreviewViewModel.cs:836-893`（ShowImage）
 - Test: `tests/MantisZip.UI.Avalonia.Tests/PreviewViewModelTests.cs`
 
-- [ ] **Step 1: 写失败测试（animated WebP 分流到动画路径 + 静态 WebP 保持 Image）**
+- [x] **Step 1: 写失败测试（animated WebP 分流到动画路径 + 静态 WebP 保持 Image）**
 
 `tests/MantisZip.UI.Avalonia.Tests/PreviewViewModelTests.cs` 追加：
 
@@ -416,12 +416,12 @@ private static string CreateTestAnimatedWebP()
 
 > **样本来源（供复核）**：上述 base64 为 32×32 两帧（红→蓝）animated WebP，236 字节，由 Python Pillow 12.3 生成（`Image.save('anim.webp', save_all=True, append_images=[frame2], duration=100, loop=0)`）。实现时若测试失败，先验证 `SKCodec.Create` 对该样本的 `FrameCount` 是否 ≥ 2（Pillow 输出为标准 RIFF/VP8X/ANIM/ANMF，SKCodec 应返回 2）；如需重新生成，方法见上注释或 ffmpeg：`ffmpeg -f lavfi -i "color=c=red:s=32x32:d=0.1" -f lavfi -i "color=c=blue:s=32x32:d=0.1" -filter_complex "[0][1]concat=n=2:v=1" -loop 0 anim.webp`。
 
-- [ ] **Step 2: 运行测试验证失败**
+- [x] **Step 2: 运行测试验证失败**
 
 Run: `dotnet test tests\MantisZip.UI.Avalonia.Tests\MantisZip.UI.Avalonia.Tests.csproj --filter "FullyQualifiedName~AnimatedWebP|FullyQualifiedName~StaticWebP"`
 Expected: `ShowImage_AnimatedWebP_RoutesToAnimationPreview` FAIL（当前 ShowImage 把动画 WebP 当静态图，PreviewType=Image）；`ShowImage_StaticWebP_StaysImagePreview` 通过或 FAIL（视占位 base64 是否已替换——若未替换则 Convert.FromBase64String 抛异常，先把占位换成真实样本再跑）
 
-- [ ] **Step 3: ShowImage 加 FrameCount 分流**
+- [x] **Step 3: ShowImage 加 FrameCount 分流**
 
 `ViewModels/PreviewViewModel.cs` 的 `ShowImage`（836-893 行），在 SKCodec 检测块内插入动画分支：
 
@@ -457,17 +457,17 @@ using (var fs = File.OpenRead(filePath))
 }
 ```
 
-- [ ] **Step 4: 运行测试验证通过**
+- [x] **Step 4: 运行测试验证通过**
 
 Run: `dotnet test tests\MantisZip.UI.Avalonia.Tests\MantisZip.UI.Avalonia.Tests.csproj --filter "FullyQualifiedName~AnimatedWebP|FullyQualifiedName~StaticWebP|FullyQualifiedName~SmallImage|FullyQualifiedName~LargeImage"`
 Expected: 全部 PASS（含上一轮的小图/大图回归测试，确认分流未破坏 DecodeToWidth 门槛）
 
-- [ ] **Step 5: 验证构建 + 全量测试**
+- [x] **Step 5: 验证构建 + 全量测试**
 
 Run: `dotnet build src\MantisZip.UI.Avalonia\MantisZip.UI.Avalonia.csproj && dotnet test tests\MantisZip.UI.Avalonia.Tests\MantisZip.UI.Avalonia.Tests.csproj`
 Expected: 0 错误 0 警告；全部通过
 
-- [ ] **Step 6: 提交**
+- [x] **Step 6: 提交**
 
 ```bash
 git add src/MantisZip.UI.Avalonia/ViewModels/PreviewViewModel.cs tests/MantisZip.UI.Avalonia.Tests/PreviewViewModelTests.cs
@@ -484,7 +484,7 @@ git commit -m "feat(avalonia): Animated WebP 预览——ShowImage 检测 FrameC
 - Modify: `src/MantisZip.UI.Avalonia/ViewModels/PreviewViewModel.cs`（ShowGif 标题）
 - Modify: `src/MantisZip.UI.Avalonia/ViewModels/MainWindowViewModel.cs`（case 状态栏）
 
-- [ ] **Step 1: 新增本地化 key（成对，插入文件头 `{` 之后，UTF-8 无 BOM + CRLF + 2 空格缩进）**
+- [x] **Step 1: 新增本地化 key（成对，插入文件头 `{` 之后，UTF-8 无 BOM + CRLF + 2 空格缩进）**
 
 `strings.zh-CN.json`：
 
@@ -502,7 +502,7 @@ git commit -m "feat(avalonia): Animated WebP 预览——ShowImage 检测 FrameC
 
 （注意：`Preview_Gif`/`Preview_Header_Gif` 保留不动，GIF 文件仍显示 GIF 文案。）
 
-- [ ] **Step 2: ShowGif 标题按扩展名分流**
+- [x] **Step 2: ShowGif 标题按扩展名分流**
 
 `ViewModels/PreviewViewModel.cs` 的 `ShowGif` 内（约 1068 行）：
 
@@ -514,7 +514,7 @@ var isGif = Path.GetExtension(filePath).Equals(".gif", StringComparison.OrdinalI
 PreviewHeaderText = LocalizationManager.T(isGif ? "Preview_Header_Gif" : "Preview_Header_AnimatedImage");
 ```
 
-- [ ] **Step 3: MainWindowViewModel 状态栏按扩展名分流**
+- [x] **Step 3: MainWindowViewModel 状态栏按扩展名分流**
 
 `ViewModels/MainWindowViewModel.cs` 的 `case PreviewType.AnimatedImage` 内（Task 1 已改的 case）：
 
@@ -526,13 +526,13 @@ StatusMessage = LocalizationManager.T(
 break;
 ```
 
-- [ ] **Step 4: 验证**
+- [x] **Step 4: 验证**
 
 Run: `dotnet build src\MantisZip.UI.Avalonia\MantisZip.UI.Avalonia.csproj`
 Expected: 0 错误 0 警告
 Run: 检查 JSON 双文件 key 集对称（zh 与 en 的新增 key 各 2 个、一一对应）
 
-- [ ] **Step 5: 提交**
+- [x] **Step 5: 提交**
 
 ```bash
 git add src/MantisZip.UI.Avalonia/Localization/strings.zh-CN.json src/MantisZip.UI.Avalonia/Localization/strings.en.json src/MantisZip.UI.Avalonia/ViewModels/PreviewViewModel.cs src/MantisZip.UI.Avalonia/ViewModels/MainWindowViewModel.cs
@@ -547,7 +547,7 @@ git commit -m "feat(avalonia): 动画预览本地化——WebP 动画与 GIF 分
 - Modify: `docs/PLAN.md`
 - Modify: `docs/PROGRESS.md`
 
-- [ ] **Step 1: PLAN.md 引用行（规则 1）**
+- [x] **Step 1: PLAN.md 引用行（规则 1）**
 
 在 `docs/PLAN.md` 对应优先级区域（参照既有条目格式）添加：
 
@@ -557,12 +557,12 @@ git commit -m "feat(avalonia): 动画预览本地化——WebP 动画与 GIF 分
 
 并更新 PLAN.md 头部「最后更新日期」。
 
-- [ ] **Step 2: 最终验证**
+- [x] **Step 2: 最终验证**
 
 Run: `dotnet build src\MantisZip.UI.Avalonia\MantisZip.UI.Avalonia.csproj && dotnet test tests\MantisZip.UI.Avalonia.Tests\MantisZip.UI.Avalonia.Tests.csproj`
 Expected: 0 错误 0 警告；全部测试通过（基线 56 通过 2 跳过 + 新增 5 个：能力表 1 + GIF 透明 1 + 动画 WebP 1 + 静态 WebP 1 + 共 4 个新测试）
 
-- [ ] **Step 3: PROGRESS.md 条目（规则 3，提交前）**
+- [x] **Step 3: PROGRESS.md 条目（规则 3，提交前）**
 
 在 `docs/PROGRESS.md` 的 `### MantisZip.UI.Avalonia（主力版）` 区域顶部（`**2026-08-18**` 条目之上）新增：
 
@@ -576,7 +576,7 @@ Expected: 0 错误 0 警告；全部测试通过（基线 56 通过 2 跳过 + �
   - 验证：`dotnet build` 0 错误 0 警告、Avalonia 测试全部通过（56 基线 + 4 新增）、lsp 无诊断
 ```
 
-- [ ] **Step 4: 最终提交**
+- [x] **Step 4: 最终提交**
 
 ```bash
 git add docs/PLAN.md docs/PROGRESS.md

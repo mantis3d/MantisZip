@@ -3,7 +3,7 @@
 > 未来待开发功能规划。已实现功能请见 [docs/PROGRESS.md](docs/PROGRESS.md)，技术架构请见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)。
 
 **项目状态**: 🟢 开发中  
-**最后更新**: 2026-08-18  
+**最后更新**: 2026-08-20  
 **当前版本**: 0.5.0
 
 ---
@@ -17,11 +17,11 @@
 |--------|------|----------|:----:|:--------:|------|
 | **P0** | Avalonia: WPF 差异补齐总表 | [avalonia-wpf-diff-plan.md](.omo/plans/avalonia-wpf-diff-plan.md) | 🟡中 | 0.5-1天 | ☑️ 2026-08-06 核实修正：双击行为/删除原包、文件过滤控件、默认路径优先级、Enable 设置、AllowElevation 均已实现，P1-6 信息面板持久化已被 metadata-panel-configurable 取代并实施（新增持久化全局显隐入口）；☑️ 2026-08-08 便携模式已实施（Portable.txt → Data/ 重定向）；剩余仅智能打开路径 |
 | **P1** | Win11 一级右键菜单 | [win11-first-level-menu.md](.omo/plans/win11-first-level-menu.md) | 🔴高 | 1-2周 | IExplorerCommand 实现，HKLM 提权注册，双接口共存 |
-| **P1** | 新增压缩格式（BZip2/XZ/Zstd/Brotli + 7z.dll 只读解锁） | [new-format-support.md](.omo/plans/new-format-support.md) | 🟡中 | 11-16h | Avalonia-first：TAR 裸格式/GZip 单文件（Core 已实现，仅 UI 放开）→ BZip2 → XZ → Zstd（SharpCompress 0.48.1 内置，无外部依赖，原 P3 提升）→ Brotli（.NET 内置 BrotliStream，方案 B）→ 7z.dll 只读格式解锁（CAB/ARJ/LZH/CHM/CPIO/DEB/RPM/WIM/XAR/LZMA/MSI 共 11 种，自动检测零引擎改动，方案 B 扩展）→ 文件关联独立开关；外部库调研结论：libarchive 重叠度高不引入，wimlib/SharpZipLib 冗余 |
+| **P1** | 新增压缩格式（BZip2/XZ/Zstd/Brotli + 7z.dll 只读解锁） | [new-format-support.md](.omo/plans/new-format-support.md) | 🟡中 | 11-16h | ☑️ 2026-08-20 核实：Core 侧 TAR 裸格式/GZip 单文件压缩已就绪（`TarGzEngine.CompressAsync` 按扩展名分流 `.tar`→无压缩层、`.gz`→单文件 GZipWriter）+ 文件关联 AssocTar/AssocGz 默认 true 已放开；**UI 压缩格式下拉未放开**（`ArchiveFormatValues = ["zip","7z","tar.gz"]`，TAR 裸格式/GZ 单文件待 UI 放开关）。Avalonia-first：TAR 裸格式/GZip 单文件（UI 放开）→ BZip2 → XZ → Zstd（SharpCompress 0.48.1 内置，无外部依赖，原 P3 提升）→ Brotli（.NET 内置 BrotliStream，方案 B）→ 7z.dll 只读格式解锁（CAB/ARJ/LZH/CHM/CPIO/DEB/RPM/WIM/XAR/LZMA/MSI 共 11 种，自动检测零引擎改动，方案 B 扩展）→ 文件关联独立开关；外部库调研结论：libarchive 重叠度高不引入，wimlib/SharpZipLib 冗余 |
 | **P1** | 自包含体积优化（Avalonia 迁移后） | [selfcontained-size-optimization.md](.omo/plans/selfcontained-size-optimization.md) | 🟡中 | 4-6h | 三步渐进：InvariantGlobalization → 保守修剪 → 激进修剪，目标降至 20–25 MB |
 | **P1** | Avalonia 拖拽直接解压 | [drag-drop-direct-extract.md](.omo/plans/drag-drop-direct-extract.md) | 🟡中 | 5-7h | 纯 Win32 独立线程覆盖层（三色状态机 + 呼吸动画）+ WindowFromPoint+ShellWindows 检测目标路径；#32770 用 Win32 EnumChildWindows（方案 A，方案 B UIA 为未来可选项）；☑️ 2026-07-23 计划审查完成，Avalonia 分支 API 已确认；☑️ 2026-07-31 高危修复（Esc 取消/ask 冲突/DebugLog）+ 光标临时方案 A（SetSystemCursor）；☑️ 2026-08-06 光标方案 C（自实现 OLE 拖拽，根治光标）已实施 + 预览弹窗实施补充（独立 Win32 弹窗跟随鼠标 460×680 + PointerPressed 预取式渲染 + 双阈值降级，**待实施**，详见计划文末章节） |
 | **P1** | HTML 预览升级：跨平台 WebView + 降级 | [html-preview-webview-fallback.md](.omo/plans/html-preview-webview-fallback.md) | 🟡中 | 4-6h | 用 `Avalonia.Controls.WebView`（各平台原生引擎）替代当前 ReverseMarkdown 有损管线；WebView 不可用时自动降级到 ReverseMarkdown + 修 MarkdownPreviewBuilder table 支持；加工具栏和源码切换 |
-| **P1** | Avalonia 拖拽添加（拖入窗口→添加到压缩包） | [drag-add-overlay.md](.omo/plans/drag-add-overlay.md) | 🟡中 | 3-4h | WPF `MainWindow.DragDrop.cs` 三分支完整移植：已打开压缩包时拖入非压缩包文件/文件夹→确认框→`AddFilesToArchiveAsync`（复用冲突处理）+ 窗口内两色覆层（绿=添加到 {CurrentFolder} / 红=格式不支持）；单个压缩包→切换打开；未打开→压缩对话框预填。WPF 已支持、Avalonia 缺失 |
+| **P1** | Avalonia 拖拽添加（拖入窗口→添加到压缩包） | [drag-add-overlay.md](.omo/plans/drag-add-overlay.md) | 🟡中 | 3-4h | ✅ 已完成（2026-08-19）：`MainWindowViewModel.AddFilesToArchiveAsync` 抽取 + WPF `Window_Drop` 三分支移植（已打开+压缩包→切换打开；已打开+文件/文件夹→确认框→添加到 `CurrentFolder`；未打开+压缩包→打开；未打开+非压缩包→`CompressSettingsWindow` 预填）+ `DragAddOverlay` 窗口内两色覆层（绿=可添加/红=格式不支持，呼吸动画对齐拖拽解压）+ 文件夹拖入支持 |
 | **P2** | 压缩预估 (Compression Estimator) | [compression-estimator.md](.omo/plans/compression-estimator.md) | 🟡中 | 4-5h | 压缩前估算大小/耗时 |
 | **P2** | Winget 发布 | [winget-publishing.md](.omo/plans/winget-publishing.md) | 🟢低 | 1-2h | 发布到 Windows Package Manager 社区仓库；首次手动提交后 CI 自动化 |
 | **P2** | MSI 安装包 (WiX) | [msi-packaging-wix.md](.omo/plans/msi-packaging-wix.md) | 🟡中 | 2-3h | Inno Setup → WiX MSI 迁移 |
@@ -32,14 +32,14 @@
 | **P2** | 进度窗口增强改造 | [progress-window-enhancement.md](.omo/plans/progress-window-enhancement.md) | 🟡中 | 3-4h | 路径/文件名分离三行显示、文件级计数、实时统计栏、批处理每包摘要；计算逻辑抽到 Core 层 |
 | **P2** | 压缩文件名后缀模板 | [filename-suffix-template.md](.omo/plans/filename-suffix-template.md) | 🟢低 | 2-3h | `{date}`/`{datetime}`/`{seq}` 占位符替换，防同名覆盖 |
 | **P2** | 嵌入缩略图预览 | [embedded-thumbnail-preview.md](.omo/plans/embedded-thumbnail-preview.md) | 🟢低 | 2-3天 | MetadataExtractor(RAW) + Shell API(通用) 两层提取嵌入缩略图；完成后可扩展文件列表缩略图模式 |
-| **P2** | 字体预览连字效果开关 | [font-preview-ligature.md](.omo/plans/font-preview-ligature.md) | 🟡中 | 3-4h | HarfBuzzSharp shaping + `liga` feature toggle，工具栏按钮 |
+| **P2** | 字体预览连字效果开关 | [font-preview-ligature.md](.omo/plans/font-preview-ligature.md) | 🟡中 | 3-4h | ✅ 已完成（2026-07-05，v0.4.4）：HarfBuzzSharp shaping + `CheckFontSupportsLigature` 连字检测（liga feature 开/关 glyph 对比）+ `IsLigatureEnabled`/`ToggleLigature` 命令 + `CanLigatureToggle` 不支持时灰禁用 + 工具栏按钮 + `AppSettings.FontPreviewEnableLigature` 持久化 |
 | **P2** | 预览"显示内容"开关 | [preview-show-content-toggle.md](.omo/plans/preview-show-content-toggle.md) | 🟡中 | 2-3h | 压缩/解压预览树新增"显示内容"开关（ResultTreeView 工具栏）：关闭后只显示压缩包/目标路径骨架，内容彻底隐藏不可展开，同时跳过 `BuildDirectoryNode` 磁盘递归扫描（大型源目录预览加速）；持久化 `AppSettings.PreviewShowContent`；摘要栏隐藏时显示输出路径 |
 | **P2** | 提取日志与解压「后悔药」 | [extract-journal-undo.md](.omo/plans/extract-journal-undo.md) | 🟡中 | 3-4h | 解压记录 + 一键回滚 |
 | **P2** | 原生 Win32 启动 Splash | [startup-native-splash.md](.omo/plans/startup-native-splash.md) | 🟡中 | 3-4h | 覆盖进程冷启动（Avalonia 初始化前 ~1-2s）的无反馈期；已实施一期 A+B+C：`--compress` IPC 收集期间立即显示纯文字弹窗 `CollectingWindow`「正在收集文件…」（无按钮，避免 ProgressWindow 让用户误以为压缩已开始）+ `MainWindow` 增加 `IsLoading` 加载遮罩「正在打开压缩包…」+ `--extract`（解压到…）立即弹窗、条目列表后台加载（消除弹窗前最长 3s 空白期），本计划用纯 Win32 splash（P/Invoke，独立消息泵）进一步覆盖冷启动时段 |
 | **P2** | 面包屑地址栏（PathBreadcrumb） | [path-breadcrumb.md](.omo/plans/path-breadcrumb.md) | 🟡中 | 6-8h | 三处地址栏（主窗口虚拟路径 / QuickPathPicker / CustomFilePickerDialog）统一改造为资源管理器式面包屑：段点击直达 + 点末尾空白/Ctrl+L 进编辑态（保留 AutoCompleteBox 补全）+ 段数阈值折叠 + 虚拟根段 📦；通用 `PathBreadcrumb` 控件，`NavigateRequested` 事件保持宿主导航单一事实来源；第一版不做分隔符同级目录下拉（预留 `EnumerationRequested`） |
-| **P2** | 图片预览能力系统（透明/动画注册表） | [image-preview-capabilities.md](.omo/plans/image-preview-capabilities.md) | 🟡中 | 3-5h | `PreviewType` 能力注册表（Zoom/Transparency/FlattenAlpha/AnimationControls，对齐 MetadataRegistry 模式）取代 `HasXxxControls` 硬编码；`PreviewType.Gif` → `AnimatedImage`；GIF 透明棋盘格（🏁）+ Animated WebP 动画预览（SKCodec `FrameCount>1` 分流，解码零改造）；新增格式注册能力即可复用工具栏 |
+| **P2** | 图片预览能力系统（透明/动画注册表） | [image-preview-capabilities.md](.omo/plans/image-preview-capabilities.md) | 🟡中 | 3-5h | ✅ 已完成（2026-08-18）：`PreviewCapabilities` 能力注册表（[Flags] `PreviewCapability`：Zoom/Transparency/FlattenAlpha/AnimationControls，对齐 MetadataRegistry 模式）取代 `HasXxxControls` 硬编码；`PreviewType.Gif` → `AnimatedImage`（GIF/WebP 动画共用）；GIF 透明棋盘格（🏁）+ Animated WebP 动画预览（SKCodec `FrameCount>1` 分流，解码零改造） |
 | **P3** | 压缩包对比 (Archive Diff) | [archive-diff.md](.omo/plans/archive-diff.md) | 🟡中 | 3-4h | 压缩包文件级差异对比 |
-| **P3** | 原生图标 DLL | [icon-dll.md](.omo/plans/icon-dll.md) | 🟡中 | 2-3h | 将 7 个 .ico 编译进原生资源 DLL，消除路径依赖 |
+| **P3** | 原生图标 DLL | [icon-dll.md](.omo/plans/icon-dll.md) | 🟡中 | 2-3h | ☑️ 2026-08-20 核实：部分实现（机制不同）——图标已嵌入 `MantisZip.ShellExt.dll` 托管资源（11 个 .ico EmbeddedResource，`GetIconForCommand` 运行时读取，无路径依赖）；计划的「原生 .rc 资源 DLL（MantisZip.Icons.vcxproj）」方案未实施，效果已达成 |
 | **P3** | 可插拔预览模块体系 | [preview-modular-providers.md](.omo/plans/preview-modular-providers.md) | 🟡中 | 3-4h | 格式类库独立分发 |
 | **P3** | 文件列表自定义列 | [custom-columns.md](.omo/plans/custom-columns.md) | 🟡中 | 4-6h | 可自定义显示文件元数据列（文档标题、图片尺寸等） |
 | **P3** | 冻结列（水平滚动时列固定） | [frozen-column.md](.omo/plans/frozen-column.md) | 🟢低 | 1-2h | 右键列标题冻结/取消冻结，分隔线，设置持久化 |

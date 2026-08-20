@@ -147,7 +147,7 @@ Despite using `CommunityToolkit.Mvvm`, **all logic lives in `MainWindow.xaml.cs`
 
 预览系统在独立的 `PreviewPanel.axaml` (UserControl) + `PreviewViewModel` + `PreviewService`，MVVM 模式：
 
-- **预览类型枚举**: `PreviewType` (Services/PreviewService.cs): `None`, `Text`, `Csv`, `Pe`, `Image`, `Gif`, `Svg`, `Font`, `Audio`, `Sqlite`, `Iso`, `Torrent`, `Office`, `Video`, `Html`, `Markdown`, `Pdf`, `IcoGallery`, `Unsupported`
+- **预览类型枚举**: `PreviewType` (Services/PreviewService.cs): `None`, `Text`, `Csv`, `Pe`, `Image`, `AnimatedImage`（GIF / Animated WebP 共用，`Gif` 保留但废弃），`Svg`, `Font`, `Audio`, `Sqlite`, `Iso`, `Torrent`, `Office`, `Docx`, `Xlsx`, `Pptx`, `Video`, `Html`, `Markdown`, `Pdf`, `IcoGallery`, `Unsupported`
 - **格式分发**: `PreviewService.ClassifyPreviewByMagicAsync()`（魔数优先）→ `PreviewViewModel.ShowXxx(filePath)` 方法，扩展名回退
 - **HTML/Markdown**: 当前 HTML 走 ReverseMarkdown → Markdig → 原生控件树，Markdown 直接 Markdig AST → 控件树。**计划恢复 WebView 双轨方案**：`Avalonia.Controls.WebView`（各平台原生引擎，Win→WebView2, Mac→WKWebView, Linux→WebKit GTK），不可用时降级到 ReverseMarkdown（详见 `.omo/plans/html-preview-webview-fallback.md`）
 - **PDF**: `UglyToad.PdfPig` + `SkiaSharp` 逐页位图渲染 + 翻页导航（PdfPig 0.1.15 + PdfPig.Rendering.Skia 0.1.15.4）
@@ -155,6 +155,8 @@ Despite using `CommunityToolkit.Mvvm`, **all logic lives in `MainWindow.xaml.cs`
 - **SVG**: `Svg.Skia` 直接栅格化 → `WriteableBitmap`（无需 WebView2）
 - **字体预览**: `HarfBuzzSharp` shaping + `SkiaSharp` 位图渲染 + 自动折行 + 连字检测（`CheckFontSupportsLigature` 自动检测，`IsLigatureEnabled` 可开关）
 - **GIF**: 自实现 `GifDecoder` + `DispatcherTimer` 逐帧动画（无需 `WpfAnimatedGif`）
+- **动画图像（AnimatedImage）**: `PreviewType.AnimatedImage` 取代废弃的 `Gif`，GIF 与 Animated WebP 共用（`ShowImage` 内 SKCodec `FrameCount>1` 分流到动画路径，静态 WebP 保持 Image 预览）
+- **预览能力注册表**: `PreviewCapabilities`（[Flags] `PreviewCapability`：Zoom/Transparency/FlattenAlpha/AnimationControls，对齐 MetadataRegistry 模式）按 PreviewType 声明能力，`HasZoomControls`/`HasTransparencyControls`/`HasFlattenAlphaControls`/`HasAnimationControls` 全部查表取代 `HasXxxControls` 硬编码；新增格式注册能力即可复用工具栏
 - **两阶段加载**: `ShowPreviewAsync` 拆分 Phase 1（同步显示加载状态+弹跳点动画+信息栏）→ Phase 2（异步提取后显示内容），`_previewLoadVersion` 版本号守卫防竞态
 - **透明背景切换**: 图片/GIF/ICO 预览的 `DrawingBrush` 棋盘格（8×8），`IsTransparencyBgShown` 绑定 🏁 按钮
 - **信息面板（可配置元数据系统）**: 已从硬编码 `FormatMetadata` 重构为可配置系统（方案见 [metadata-panel-configurable.md](.omo/plans/metadata-panel-configurable.md)）：
@@ -208,12 +210,12 @@ Multi-file selection changes text dynamically: "打开压缩包 等 {N} 个文�
 
 #### Icon system
 
-Three `.ico` files (`Open.ico`, `Extract.ico`, `Compress.ico`) from `src\MantisZip.UI\Resources\MenuIcons\` are embedded as managed resources in `MantisZip.ShellExt.dll`. Loaded at runtime via `GetIconForCommand()`:
+11 `.ico` files (`App.ico`, `Open.ico`, `Extract.ico`, `ExtractHere.ico`, `ExtractSmart.ico`, `ExtractToNamed.ico`, `ExtractTo.ico`, `Compress.ico`, `CompressSeparate.ico`, `CompressCombined.ico`, `CompressDialog.ico`) from `src\MantisZip.UI\Resources\MenuIcons\` are embedded as managed resources in `MantisZip.ShellExt.dll` (`MantisZip.ShellExt.csproj` EmbeddedResource, lines 30-41). Loaded at runtime via `GetIconForCommand()`:
 
 1. Read .ico header → find 16×16 entry → extract raw image data
 2. `CreateIconFromResourceEx` → get HICON
 3. `ConvertIconToBitmap`: `CreateDIBSection` (32-bit DIB, top-down, alpha channel) → `DrawIconEx` → HBITMAP
-4. HBITMAPs cached per command type (`_cachedIconOpen`, `_cachedIconExtract`, `_cachedIconCompress`)
+4. HBITMAPs cached per command type (11 static fields: `_cachedIconMantisZip`, `_cachedIconOpen`, `_cachedIconExtract`, `_cachedIconExtractHere`, `_cachedIconSmartExtract`, `_cachedIconExtractToNamed`, `_cachedIconExtractTo`, `_cachedIconCompress`, `_cachedIconCompressSeparate`, `_cachedIconCompressCombined`, `_cachedIconCompressDialog`)
 5. `CleanupIconCache` called at the **start** of each `QueryContextMenu` (not the end, because Explorer draws asynchronously after `QueryContextMenu` returns)
 
 Uses pure Win32 API — no `System.Drawing` dependency (COM host can't use it).
@@ -396,6 +398,16 @@ Uses `ArchiveItem.FullPath` for the output temp path so files from subdirectorie
 4. 松手后 `DragDropService` 执行后置解压流程（模态进度窗口 + 冲突处理 + 本地化状态消息），完成后清理
 5. **光标方案 C**：`CustomOleDragDrop` 自实现 OLE `IDataObject`/`IDropSource`/`IEnumFORMATETC`（`CustomDataObject`/`CustomDropSource`/`CustomEnumFormatEtc`）替代 Avalonia `DragDrop.DoDragDropAsync`（其 `OleDragSource` 固定返回 `USEDEFAULTCURSORS` 导致禁止光标无法替换）；`GiveFeedback` 返回 S_OK + 直接 `SetCursor`，光标按 overlay 状态（绿/红/金/灰）动态切换，根治光标问题；Esc/多键取消经 OLE `fEscapePressed` 检测
 
+### 拖拽添加（drag-in to archive）
+
+已实施（方案见 [drag-add-overlay.md](.omo/plans/drag-add-overlay.md)）。与拖拽解压相反方向：从资源管理器拖文件/文件夹到 MantisZip 窗口 → 添加到当前压缩包。三分支拖入行为（对齐 WPF `Window_Drop`）：
+
+1. **已打开压缩包 + 拖入单个压缩包** → 切换打开
+2. **已打开压缩包 + 拖入文件/文件夹** → `Main_DragAddConfirm` 确认框（复用 `CompressConflict_Add` 标题）→ `MainWindowViewModel.AddFilesToArchiveAsync`（从 `AddFiles()` 抽取的公共方法：引擎获取、密码、`CreateExtractOptions` 冲突处理、`entryBasePath`、进度、刷新）
+3. **未打开压缩包**：拖入压缩包 → 打开；拖入非压缩包 → 打开 `CompressSettingsWindow` 预填源文件
+
+窗口内覆层 `DragAddOverlay`（方案 A：固定显示 `CurrentFolder`，跟随目录行悬停的方案 B 留作后续）：`DragOver`/`DragLeave` 事件驱动，Avalonia 原生 Border 覆层（不用 Win32 `OverlayController`，与拖拽解压的目标在外部 Explorer 窗口不同）；绿色 `#6BD46B` = 可添加「添加到 {CurrentFolder}」，红色 `#F43643` = 格式不支持（`DragEffects.None`）；呼吸动画与拖拽解压完全同参（`DispatcherTimer` 100ms + 正弦 `80+40·sin(tick·π/10)`，alpha 40-120 约 2s 周期，仅背景层 Opacity 呼吸、边框/文字不透明）+ 8px 同色边框 + 白色粗体文字 + ✓/⚠ 状态图标
+
 ### Custom `IDataObject` attempt (archived)
 
 **Tried**: `System.Windows.IDataObject` (`DragDropDataObject` nested class) for delayed rendering — extraction in `GetData()` at drop time so ProgressWindow would show only after mouse release. **Result**: crashes Explorer.
@@ -447,7 +459,7 @@ When releasing a new version, update the version string in ALL of these location
 | 3 | `src/MantisZip.UI/MantisZip.UI.csproj` | `<Version>x.y.z</Version>` | WPF 版 assembly version |
 | 4 | `src/MantisZip.UI.Avalonia/MantisZip.UI.Avalonia.csproj` | `<Version>x.y.z</Version>` | Avalonia 版 assembly version |
 | 5 | `docs/PLAN.md` | `**当前版本**: x.y.z` | Plan document header |
-| 6 | `docs/PROGRESS.md` | `**当前版本**: x.y.z` | 顶部版本号（三轨制：Avalonia 以日期为标识、WPF 以版本号为标识、共享层以版本号为标识） |
+| 6 | `docs/PROGRESS.md` | `**当前版本**: x.y.z` | 顶部版本号（里程碑总览；细节版本号以 `progress-avalonia-detail.md` / `progress-wpf.md` 为准） |
 
 WPF 废弃后，#1 和 #3 将移除。
 
@@ -486,22 +498,26 @@ Build artifacts (bin/, obj/) are gitignored.
 - 只有在用户明确说明变更版本号时才会变更，不要未经用户允许擅自变更版本号。如果你觉得应该变更版本号，需要向用户询问。
 - 当变更版本号时，需遵循 Version bump checklist 的部分全部更新。
 
-### 规则 3：提交前更新 PROGRESS.md（三轨制）
+### 规则 3：提交前更新进度文档（里程碑 + 细节双轨）
 
-在每次执行 `git commit` 之前（也就是在 commit 相关的操作中），**必须先更新** `docs/PROGRESS.md`。
+在每次执行 `git commit` 之前（也就是在 commit 相关的操作中），**必须先更新**进度文档。
 
-PROGRESS.md 分三个独立线索，根据变更影响范围选择对应线索追加条目：
+进度文档采用「里程碑 + 细节」双轨结构：
 
-- **Avalonia 版**（`### MantisZip.UI.Avalonia（主力版）`）— 以日期为标识，格式 `**2026-07-16** — 标题`
+- **里程碑**（`docs/PROGRESS.md`）— 仅记录新功能上线、架构级变更、重大 bug 修复：
+  - **Avalonia 版**（`### MantisZip.UI.Avalonia（主力版）`）— 按月分组（`#### 2026-08`），条目格式 `- **08-19** — 标题`（同月多条按从新到旧排列）
+  - **共享层**（`### 共享层（Core / ShellExt / 构建）`）— 按版本分组（`#### v0.5.0`），条目格式同上
+  - **WPF 版**（`### MantisZip.UI（WPF 遗留版）`）— 只保留一行引用指向 `progress-wpf.md`，不在此追加
+- **细节**（`docs/progress-avalonia-detail.md` + `docs/progress-wpf.md`）— 逐条详细变更（小 bugfix / i18n / 样式 / 测试 / 计划类）：
+  - Avalonia + 共享层细节 → `progress-avalonia-detail.md`，Avalonia 以日期为标识（`**2026-07-16**`）、共享层以版本号为标识（`#### v0.x.x (2026-07-16)`）
+  - WPF 细节 → `progress-wpf.md`，以版本号为标识
   - 多条同一日期时按时间从晚到早排列（同一日期下最新的在最上方）
-- **WPF 版**（`### MantisZip.UI（WPF 遗留版）`）— 以版本号为标识，格式 `#### v0.x.x (2026-07-16)`
-  - 如果当前版本号已有条目，追加到该条目下；否则创建新版本条目
-- **共享层**（`### 共享层（Core / ShellExt / 构建）`）— 以版本号为标识，与 WPF 规则一致
 
 通用规则：
 - 条目排序均是 **从新到旧**
+- 里程碑与细节同步追加：一次变更若属里程碑级，在 PROGRESS.md 对应月份/版本下加一行，同时其详细内容追加到细节文档
 - 如果本次变更属于某个已有规划任务，在该任务后标注进度
-- 如果变更涉及多个线索（例如 Core 引擎变更同时影响 WPF 和 Avalonia），在对应线索下各加一条
+- 如果变更涉及多个领域（例如 Core 引擎变更同时影响 WPF 和 Avalonia），在对应文档下各加一条
 
 ### 规则 4：新 UI 控件必须应用主题样式（跨框架适用）
 

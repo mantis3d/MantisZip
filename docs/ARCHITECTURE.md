@@ -114,7 +114,9 @@ MantisZip/
 ├── docs/
 │   ├── PLAN.md                    # 未来开发计划
 │   ├── ARCHITECTURE.md            # 本文件
-│   ├── PROGRESS.md                # 版本历史
+│   ├── PROGRESS.md                # 进度里程碑总览（双轨：详情见 progress-*）
+│   ├── progress-avalonia-detail.md # Avalonia + 共享层详细变更记录
+│   ├── progress-wpf.md            # WPF 遗留版完整历史
 │   ├── CLI.md                     # 命令行指南
 │   └── manual-test-checklist.md   # 手动测试清单
 ├── .omo/
