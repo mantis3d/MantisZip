@@ -2140,8 +2140,8 @@ public partial class PreviewViewModel : ObservableObject
     /// 显示 XLSX 工作表预览（ClosedXML → DataGrid）。
     /// 列数以 <see cref="IXLRange.ColumnCount"/> 定位式为准（不能用 <c>CellsUsed()</c>，
     /// 它是稀疏集合，会漏掉空单元格/合并非主单元格导致列数缩水）；
-    /// 表头行智能检测：跳过非空单元格少于 2 个的合并大标题行，取第一个 ≥2 个非空单元格
-    /// 的行作为表头（找不到则回退到首行，兼容"首行即表头"的普通表格）。
+    /// 不提取列标题——列名统一为 Column{i+1}，所有行（含合并大标题行）按列位置原样还原，
+    /// 遵守 MaxTablePreviewRows / MaxTablePreviewCols 上限。
     /// </summary>
     public void ShowXlsx(string filePath)
     {
@@ -2172,32 +2172,11 @@ public partial class PreviewViewModel : ObservableObject
                 return;
             }
 
-            // 表头行：跳过合并大标题行（如 A1:F1 只有 1 个非空单元格）
-            var headerRow = range.FirstRow();
-            foreach (var row in range.RowsUsed())
-            {
-                if (row.CellsUsed().Count() >= 2)
-                {
-                    headerRow = row;
-                    break;
-                }
-            }
-
             var table = new DataTable();
 
-            // Column headers from header row（按列位置取，空表头回退 Column{i+1}）
+            // 通用列名 Column1..ColumnN（不提取列标题）
             for (int i = 0; i < colsToShow; i++)
-            {
-                var colName = headerRow.Cell(i + 1).GetFormattedString();
-                if (string.IsNullOrWhiteSpace(colName))
-                    colName = $"Column{i + 1}";
-                // Ensure unique column names
-                var uniqueName = colName;
-                int suffix = 1;
-                while (table.Columns.Contains(uniqueName))
-                    uniqueName = $"{colName}_{suffix++}";
-                table.Columns.Add(uniqueName);
-            }
+                table.Columns.Add($"Column{i + 1}");
 
             if (table.Columns.Count == 0)
             {
@@ -2208,11 +2187,10 @@ public partial class PreviewViewModel : ObservableObject
                 return;
             }
 
-            // Data rows（按列位置取值，跳过表头行及之前的标题行；遵守 MaxTablePreviewRows）
+            // 所有行（含合并标题行）按列位置原样还原；遵守 MaxTablePreviewRows
             int rowCount = 0;
             foreach (var row in range.RowsUsed())
             {
-                if (row.RowNumber() <= headerRow.RowNumber()) continue;
                 if (rowCount >= PreviewService.MaxTablePreviewRows) break;
                 var dataRow = table.NewRow();
                 for (int i = 0; i < table.Columns.Count; i++)

@@ -15,10 +15,10 @@
   - **验证**：探针工程复刻新逻辑实测「实习汇报表20250517.pptx」——15 页顺序 slide1→slide15 正确（UI 第 10 页 = 取得成果、第 15 页 = 谢谢观看）；每页标题恢复渲染（实习汇报表 54pt 粗体等）；章节页 slide3/6/9/12/15 各显示「大标题 36pt + 正文 20pt」两项；分组内容坐标正确（slide4「1」等）；`dotnet build` 0 错误（37 既有警告）
   - 涉及文件：`ViewModels/PreviewViewModel.cs`
 
-**2026-08-20** — XLSX 预览修复：合并大标题行吞列 + 稀疏行数据丢失
-  - **根因**：`ShowXlsx` 用 `range.FirstRow().CellsUsed()` 定列数——`CellsUsed()` 是稀疏集合（只含有内容的单元格），首行是 A1:F1 合并大标题（仅 A1 有值）时列数退化为 1，DataGrid 只剩一列；数据行循环 `i < row.CellsUsed().Count()` 在稀疏行提前截断且与 `row.Cell(i+1)` 定位取值错位，靠后列内容丢失
-  - **修复**：列数以 `range.ColumnCount()` 定位式为准（受 `MaxTablePreviewCols` 约束）；表头行智能检测——跳过非空单元格 < 2 个的合并大标题行，取第一个 ≥2 个非空单元格的行作为表头（找不到回退首行，兼容首行即表头的普通表格）；数据行按列位置 `row.Cell(i+1)` 取值、仅以列数为界，跳过表头及之前所有行，遵守 `MaxTablePreviewRows`
-  - **验证**：ClosedXML 0.105.0 实测「书香强警阅见初心活动KV需求表.xlsx」——6 列（主题/时长/文案/要求/Column5/Column6）+ 9 行数据，F 列内容（"所有视频及动图尺寸:16:9"）不再丢失；`dotnet build` 0 错误
+**2026-08-20** — XLSX 预览改为纯表格还原（用户调整需求）：不提取列标题，所有行原样展示
+  - **背景**：先前修复实现"表头行智能检测"——跳过合并大标题行、提取首个 ≥2 非空单元格的行作为 DataGrid 列标题。用户改主意：不要提取列标题，单纯还原表格内容
+  - **调整**：`ShowXlsx` 删除表头智能检测与跳过逻辑——列名统一 `Column{i+1}`，所有行（含合并大标题行）按列位置 `row.Cell(i+1).GetFormattedString()` 原样还原；保留定位式列数（`range.ColumnCount()` 防稀疏集合吞列）与 `MaxTablePreviewRows/Cols` 上限
+  - **验证**：ClosedXML 0.105.0 实测「书香强警阅见初心活动KV需求表.xlsx」——6 列（Column1..Column6）+ 11 行全部显示（第 1 行合并大标题仅 A 列有值，第 2 行 主题|时长|文案|要求|… 作为数据行，F 列"所有视频及动图尺寸"不再丢失）；`dotnet build` 0 错误
   - 涉及文件：`ViewModels/PreviewViewModel.cs`
 
 **2026-08-20** — 拖拽/右键「解压选中项」流程完全统一：`ExtractFlow.RunSelectedItemsExtractionAsync` 共享方法
