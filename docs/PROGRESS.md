@@ -27,6 +27,7 @@
 
 #### 2026-08
 
+- **08-20** — PPTX 预览修复：幻灯片顺序改用 presentation.xml 权威播放顺序（字典序错位修复）+ 占位符无 xfrm 时从 slideLayout 借位几何（标题/章节页不再空白）+ 分组形状坐标递归变换
 - **08-20** — XLSX 预览修复：合并大标题行不再吞列（列数按定位式 + 表头行智能检测）+ 稀疏行数据不丢失 + 遵守表格行列上限设置
 - **08-20** — 拖拽/右键「解压选中项」流程完全统一：`ExtractFlow.RunSelectedItemsExtractionAsync` 共享方法（压缩包一行批处理列表 + 状态驱动 + 失败统一弹窗）
 - **08-19** — 拖拽添加到压缩包：WPF `Window_Drop` 三分支完整移植 + 复用解压冲突处理 + `AddFilesToArchiveAsync` 公共方法 + DragAddOverlay 覆层

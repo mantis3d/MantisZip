@@ -4,6 +4,7 @@ using System.Data;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Text.RegularExpressions;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Media;
@@ -2250,6 +2251,8 @@ public partial class PreviewViewModel : ObservableObject
     /// 每张幻灯片一个 <see cref="PptxSlideModel"/>，文本项按 a:sp 形状的 xfrm 坐标
     /// 缩放映射到固定宽度 Canvas（比例来自 presentation.xml 的 sldSz，默认 16:9）。
     /// 翻页通过 PptxCurrentSlide / PptxPreviousSlideCommand / PptxNextSlideCommand 控制。
+    /// 幻灯片顺序以 presentation.xml 的 sldIdLst 权威播放顺序为准（字典序会错位）；
+    /// 占位符形状无 xfrm 时从 slideLayout 借几何；分组形状坐标经 grpSp 变换换算（见 <see cref="PptxParser"/>）。
     /// </summary>
     public void ShowPptx(string filePath)
     {
@@ -2259,7 +2262,6 @@ public partial class PreviewViewModel : ObservableObject
             var slideEntries = archive.Entries
                 .Where(e => e.FullName.StartsWith("ppt/slides/slide", StringComparison.OrdinalIgnoreCase)
                          && e.FullName.EndsWith(".xml", StringComparison.OrdinalIgnoreCase))
-                .OrderBy(e => e.FullName)
                 .ToList();
 
             if (slideEntries.Count == 0)
@@ -2275,7 +2277,6 @@ public partial class PreviewViewModel : ObservableObject
                 return;
             }
 
-            XNamespace a = "http://schemas.openxmlformats.org/drawingml/2006/main";
             XNamespace p = "http://schemas.openxmlformats.org/presentationml/2006/main";
 
             // 读取幻灯片尺寸（EMU）。默认 10" × 7.5" (12192000 × 9144000 EMU)
@@ -2307,10 +2308,13 @@ public partial class PreviewViewModel : ObservableObject
             double scaleX = canvasWidth / slideWidthEmu;
             double canvasHeight = Math.Round(slideHeightEmu * scaleX);
 
+            // 权威播放顺序：presentation.xml sldIdLst → rels（字典序会把 slide10 排在 slide2 前）
+            var orderedSlides = PptxParser.OrderSlidesByPresentation(archive, slideEntries);
+
             var slides = new List<PptxSlideModel>();
             int slideNumber = 0;
 
-            foreach (var entry in slideEntries)
+            foreach (var entry in orderedSlides)
             {
                 slideNumber++;
                 var model = new PptxSlideModel { SlideNumber = slideNumber };
@@ -2319,48 +2323,14 @@ public partial class PreviewViewModel : ObservableObject
                     using var stream = entry.Open();
                     var slideDoc = XDocument.Load(stream);
 
-                    // 每个 p:sp 形状：位置 (xfrm/off) + 文本 (a:t)
-                    // 注意：形状元素 sp 属于 presentationml 命名空间（p），
-                    // 其内部属性 xfrm/p/t/rPr 才属于 drawingml（a）
-                    foreach (var shape in slideDoc.Descendants(p + "sp"))
+                    // 布局占位符几何：无 xfrm 的 ph 形状（标题/章节页）从 slideLayout 借位
+                    var layoutGeometries = PptxParser.LoadPlaceholderGeometries(archive, entry);
+
+                    var spTree = slideDoc.Descendants(p + "spTree").FirstOrDefault();
+                    if (spTree != null)
                     {
-                        var xfrm = shape.Descendants(a + "xfrm").FirstOrDefault();
-                        if (xfrm == null) continue;
-
-                        var off = xfrm.Descendants(a + "off").FirstOrDefault();
-                        double x = 0, y = 0;
-                        if (off != null)
-                        {
-                            double.TryParse(off.Attribute("x")?.Value, out x);
-                            double.TryParse(off.Attribute("y")?.Value, out y);
-                        }
-
-                        // 形状内所有 a:t 文本（保留段落间换行）
-                        var text = string.Join("\n",
-                            shape.Descendants(a + "p")
-                                .Select(pPara => string.Concat(pPara.Descendants(a + "t").Select(t => t.Value)))
-                                .Where(v => !string.IsNullOrWhiteSpace(v)));
-                        if (string.IsNullOrWhiteSpace(text)) continue;
-
-                        // 字体属性：首个 run 的 rPr（sz 单位 = 1/100 pt，b="1" 加粗）
-                        double fontSize = 14;
-                        bool isBold = false;
-                        var rPr = shape.Descendants(a + "rPr").FirstOrDefault();
-                        if (rPr != null)
-                        {
-                            if (double.TryParse(rPr.Attribute("sz")?.Value, out var sz) && sz > 0)
-                                fontSize = sz / 100.0;
-                            isBold = rPr.Attribute("b")?.Value == "1";
-                        }
-
-                        model.TextItems.Add(new PptxTextItem
-                        {
-                            Text = text,
-                            X = Math.Round(x * scaleX),
-                            Y = Math.Round(y * scaleX),
-                            FontSize = Math.Clamp(fontSize, 8, 72),
-                            IsBold = isBold,
-                        });
+                        PptxParser.WalkShapes(spTree, 0, 0, 1, 1, slideWidthEmu, slideHeightEmu, scaleX,
+                            layoutGeometries, model);
                     }
 
                     // 按 y（从上到下）再按 x（从左到右）排序
@@ -2856,4 +2826,248 @@ public class PptxTextItem
     public double Y { get; set; }
     public double FontSize { get; set; } = 14;
     public bool IsBold { get; set; }
+}
+
+/// <summary>
+/// PPTX 幻灯片文本解析器（<see cref="PreviewViewModel.ShowPptx"/> 专用）：
+/// <list type="bullet">
+/// <item><description>幻灯片顺序：以 presentation.xml 的 sldIdLst → rels 为权威播放顺序，兜底文件名数值序
+/// （字符串字典序会把 slide10 排在 slide2 前面导致页码错位）。</description></item>
+/// <item><description>占位符几何：slide 的 sp 无 xfrm 时，从引用的 slideLayout 中按 ph(type, idx) 匹配借位；
+/// 布局中也没有则按 ph 类型给默认位置（标题靠上、正文下移）。只借几何，不渲染布局里的提示文字。</description></item>
+/// <item><description>分组坐标：递归遍历 spTree/grpSp，累积 grpSp 变换
+/// （<c>parent = off + (child - chOff) × ext/chExt</c>）把子形状坐标换算到幻灯片坐标。</description></item>
+/// </list>
+/// </summary>
+internal static class PptxParser
+{
+    private static readonly XNamespace A = "http://schemas.openxmlformats.org/drawingml/2006/main";
+    private static readonly XNamespace P = "http://schemas.openxmlformats.org/presentationml/2006/main";
+    private static readonly XNamespace Rel = "http://schemas.openxmlformats.org/package/2006/relationships";
+    private static readonly XNamespace R = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
+
+    /// <summary>按 presentation.xml sldIdLst 顺序排列幻灯片条目；解析失败回退文件名数值序。</summary>
+    public static List<ZipArchiveEntry> OrderSlidesByPresentation(ZipArchive archive, List<ZipArchiveEntry> slideEntries)
+    {
+        try
+        {
+            var presEntry = archive.GetEntry("ppt/presentation.xml");
+            var relsEntry = archive.GetEntry("ppt/_rels/presentation.xml.rels");
+            if (presEntry == null || relsEntry == null) return FallbackOrder(slideEntries);
+
+            XDocument presDoc, relsDoc;
+            using (var s = presEntry.Open()) presDoc = XDocument.Load(s);
+            using (var s = relsEntry.Open()) relsDoc = XDocument.Load(s);
+
+            // rels: rId → 幻灯片文件（只保留 slide 类型，排除 slideMaster/slideLayout）
+            var targets = relsDoc.Root!.Elements(Rel + "Relationship")
+                .Where(e => e.Attribute("Type")?.Value.EndsWith("/slide") == true)
+                .ToDictionary(e => e.Attribute("Id")?.Value ?? "", e => e.Attribute("Target")?.Value ?? "");
+
+            var ordered = new List<ZipArchiveEntry>();
+            foreach (var sldId in presDoc.Descendants(P + "sldId"))
+            {
+                var rid = sldId.Attribute(R + "id")?.Value;
+                if (rid == null || !targets.TryGetValue(rid, out var target) || string.IsNullOrEmpty(target)) continue;
+                var fileName = target.Contains('/') ? target[(target.LastIndexOf('/') + 1)..] : target;
+                var entry = slideEntries.FirstOrDefault(e => e.Name.Equals(fileName, StringComparison.OrdinalIgnoreCase));
+                if (entry != null && !ordered.Contains(entry)) ordered.Add(entry);
+            }
+            if (ordered.Count > 0) return ordered;
+        }
+        catch (Exception ex)
+        {
+            App.DebugLog($"ShowPptx: failed to read presentation slide order: {ex.Message}");
+        }
+        return FallbackOrder(slideEntries);
+    }
+
+    /// <summary>解析 slide 引用的 slideLayout 中所有占位符几何（键 = ph type+idx，值 = xfrm/off 位置 EMU）。</summary>
+    public static Dictionary<string, (double X, double Y)> LoadPlaceholderGeometries(ZipArchive archive, ZipArchiveEntry slideEntry)
+    {
+        var result = new Dictionary<string, (double X, double Y)>();
+        try
+        {
+            var relsEntry = archive.GetEntry($"ppt/slides/_rels/{slideEntry.Name}.rels");
+            if (relsEntry == null) return result;
+
+            XDocument relsDoc;
+            using (var s = relsEntry.Open()) relsDoc = XDocument.Load(s);
+            var layoutTarget = relsDoc.Root!.Elements(Rel + "Relationship")
+                .FirstOrDefault(e => e.Attribute("Type")?.Value.EndsWith("/slideLayout") == true)
+                ?.Attribute("Target")?.Value;
+            if (string.IsNullOrEmpty(layoutTarget)) return result;
+
+            var layoutEntry = archive.GetEntry(ResolveRelative("ppt/slides/", layoutTarget));
+            if (layoutEntry == null) return result;
+
+            XDocument layoutDoc;
+            using (var s = layoutEntry.Open()) layoutDoc = XDocument.Load(s);
+
+            foreach (var sp in layoutDoc.Descendants(P + "sp"))
+            {
+                var ph = sp.Descendants(P + "ph").FirstOrDefault();
+                if (ph == null) continue;
+                var off = sp.Descendants(A + "xfrm").FirstOrDefault()?.Descendants(A + "off").FirstOrDefault();
+                if (off == null) continue;
+                if (double.TryParse(off.Attribute("x")?.Value, out var x) &&
+                    double.TryParse(off.Attribute("y")?.Value, out var y))
+                {
+                    result[PlaceholderKey(ph)] = (x, y);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            App.DebugLog($"ShowPptx: failed to load layout placeholder geometry: {ex.Message}");
+        }
+        return result;
+    }
+
+    /// <summary>
+    /// 递归遍历 spTree/grpSp，提取文本形状并换算到幻灯片坐标。
+    /// baseX/baseY/baseScaleX/baseScaleY 为祖先分组累积的变换（slide = base + child × baseScale）。
+    /// </summary>
+    public static void WalkShapes(XElement container, double baseX, double baseY, double baseScaleX, double baseScaleY,
+        long slideWidthEmu, long slideHeightEmu, double pxScale,
+        Dictionary<string, (double X, double Y)> layoutGeometries, PptxSlideModel model)
+    {
+        foreach (var sp in container.Elements(P + "sp"))
+        {
+            // 形状内所有 a:t 文本（保留段落间换行）
+            var text = string.Join("\n",
+                sp.Descendants(A + "p")
+                    .Select(pPara => string.Concat(pPara.Descendants(A + "t").Select(t => t.Value)))
+                    .Where(v => !string.IsNullOrWhiteSpace(v)));
+            if (string.IsNullOrWhiteSpace(text)) continue;
+
+            // 坐标：自身 xfrm 优先；无则尝试 layout 占位符几何；再无按 ph 类型给默认位置
+            double emuX, emuY;
+            if (!TryGetShapeOffset(sp, out emuX, out emuY))
+            {
+                var ph = sp.Descendants(P + "ph").FirstOrDefault();
+                if (ph != null)
+                {
+                    var key = PlaceholderKey(ph);
+                    if (layoutGeometries.TryGetValue(key, out var geom))
+                    {
+                        emuX = geom.X;
+                        emuY = geom.Y;
+                    }
+                    else
+                    {
+                        // 布局中也找不到：按占位符类型给默认位置，保证文字可见
+                        var phType = ph.Attribute("type")?.Value;
+                        emuX = slideWidthEmu * 0.06;
+                        emuY = slideHeightEmu * (phType == "title" ? 0.05 : 0.35);
+                    }
+                }
+                else continue; // 无 xfrm 且非占位符，无法定位，跳过
+            }
+
+            // 分组变换累积后映射到幻灯片坐标
+            double slideX = baseX + emuX * baseScaleX;
+            double slideY = baseY + emuY * baseScaleY;
+
+            // 字体属性：首个 run 的 rPr（sz 单位 = 1/100 pt，b="1" 加粗）
+            double fontSize = 14;
+            bool isBold = false;
+            var rPr = sp.Descendants(A + "rPr").FirstOrDefault();
+            if (rPr != null)
+            {
+                if (double.TryParse(rPr.Attribute("sz")?.Value, out var sz) && sz > 0)
+                    fontSize = sz / 100.0;
+                isBold = rPr.Attribute("b")?.Value == "1";
+            }
+
+            model.TextItems.Add(new PptxTextItem
+            {
+                Text = text,
+                X = Math.Round(slideX * pxScale),
+                Y = Math.Round(slideY * pxScale),
+                FontSize = Math.Clamp(fontSize, 8, 72),
+                IsBold = isBold,
+            });
+        }
+
+        // 递归进入分组：累积 grpSp 变换（child 坐标 → 父坐标 → 幻灯片坐标）
+        foreach (var grp in container.Elements(P + "grpSp"))
+        {
+            var xfrm = grp.Descendants(A + "xfrm").FirstOrDefault();
+            if (xfrm == null) continue;
+            var off = xfrm.Descendants(A + "off").FirstOrDefault();
+            var ext = xfrm.Descendants(A + "ext").FirstOrDefault();
+            var chOff = xfrm.Descendants(A + "chOff").FirstOrDefault();
+            var chExt = xfrm.Descendants(A + "chExt").FirstOrDefault();
+            double goffX = 0, goffY = 0, gextCX = 0, gextCY = 0, chOffX = 0, chOffY = 0, chExtCX = 0, chExtCY = 0;
+            double.TryParse(off?.Attribute("x")?.Value, out goffX);
+            double.TryParse(off?.Attribute("y")?.Value, out goffY);
+            double.TryParse(ext?.Attribute("cx")?.Value, out gextCX);
+            double.TryParse(ext?.Attribute("cy")?.Value, out gextCY);
+            double.TryParse(chOff?.Attribute("x")?.Value, out chOffX);
+            double.TryParse(chOff?.Attribute("y")?.Value, out chOffY);
+            double.TryParse(chExt?.Attribute("cx")?.Value, out chExtCX);
+            double.TryParse(chExt?.Attribute("cy")?.Value, out chExtCY);
+
+            double sX = chExtCX > 0 ? gextCX / chExtCX : 1;
+            double sY = chExtCY > 0 ? gextCY / chExtCY : 1;
+            double nextBaseX = baseX + (goffX - chOffX * sX) * baseScaleX;
+            double nextBaseY = baseY + (goffY - chOffY * sY) * baseScaleY;
+
+            WalkShapes(grp, nextBaseX, nextBaseY, baseScaleX * sX, baseScaleY * sY,
+                slideWidthEmu, slideHeightEmu, pxScale, layoutGeometries, model);
+        }
+    }
+
+    private static bool TryGetShapeOffset(XElement sp, out double x, out double y)
+    {
+        x = 0;
+        y = 0;
+        var off = sp.Descendants(A + "xfrm").FirstOrDefault()?.Descendants(A + "off").FirstOrDefault();
+        if (off == null) return false;
+        bool okX = double.TryParse(off.Attribute("x")?.Value, out x);
+        bool okY = double.TryParse(off.Attribute("y")?.Value, out y);
+        return okX && okY;
+    }
+
+    /// <summary>占位符匹配键：type + idx（空 idx 与空 idx 匹配，如标题占位符）。</summary>
+    private static string PlaceholderKey(XElement ph)
+    {
+        var type = ph.Attribute("type")?.Value ?? "";
+        var idx = ph.Attribute("idx")?.Value ?? "";
+        return $"{type}\u0001{idx}";
+    }
+
+    private static List<ZipArchiveEntry> FallbackOrder(List<ZipArchiveEntry> slideEntries)
+        => slideEntries
+            .OrderBy(e => TryParseSlideNumber(e.Name))
+            .ThenBy(e => e.Name, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+    private static int TryParseSlideNumber(string name)
+    {
+        var m = Regex.Match(name, @"slide(\d+)\.xml", RegexOptions.IgnoreCase);
+        return m.Success && int.TryParse(m.Groups[1].Value, out var n) ? n : int.MaxValue;
+    }
+
+    /// <summary>把相对 rels Target（如 ../slideLayouts/slideLayout4.xml）解析为压缩包内绝对路径。</summary>
+    private static string ResolveRelative(string baseDir, string relative)
+    {
+        var segments = new List<string>();
+        foreach (var part in $"{baseDir}/{relative}".Split('/'))
+        {
+            switch (part)
+            {
+                case ".." when segments.Count > 0: segments.RemoveAt(segments.Count - 1); break;
+                case "..":
+                case ".":
+                case "":
+                    break;
+                default:
+                    segments.Add(part);
+                    break;
+            }
+        }
+        return string.Join('/', segments);
+    }
 }

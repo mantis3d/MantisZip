@@ -6,6 +6,15 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-08-20** — PPTX 预览修复：幻灯片顺序错位 + 标题/章节页文字丢失 + 分组坐标变换
+  - **根因**：① `ShowPptx` 用 `OrderBy(e => e.FullName)` 字符串字典序排列幻灯片——`slide10~15` 排在 `slide2~9` 前面，第 2 页起全部错位（15 页 deck 中 14 页页码不对）；② `if (xfrm == null) continue` 直接跳过无 xfrm 的占位符形状——PowerPoint 的标题/章节页占位符通常把几何放在 slideLayout 而 slide 只存 ph 引用，导致每页标题全丢、封面空白、章节页整页空白；③ 分组形状（grpSp）子形状坐标是相对坐标，未换算会整体偏移（本测试文件恰好恒等变换未暴露）
+  - **修复**（新增 `PptxParser` 静态类，`ViewModels/PreviewViewModel.cs`）：
+    - 幻灯片顺序：解析 `presentation.xml` 的 `sldIdLst`（r:id）→ `ppt/_rels/presentation.xml.rels`（Type 以 `/slide` 结尾）得到权威播放顺序；解析失败回退 `slide(\d+).xml` 文件名数值排序
+    - 占位符几何：读 `ppt/slides/_rels/{slide}.xml.rels` 找 slideLayout Target（`ResolveRelative` 处理 `../` 相对路径），解析布局内 `p:ph`（type + idx 匹配键）的 xfrm/off 作为借用位置；布局中也无则按 ph 类型给默认位置（title 靠上、body 下移）——只借几何，不渲染布局提示文字
+    - 分组变换：`WalkShapes` 递归遍历 `spTree`/`grpSp`，累积 `parent = base + (grpOff - chOff × scale) × baseScale`、`scale = grpExt/chExt`（chExt 为 0 时 scale=1），子形状坐标换算到幻灯片坐标
+  - **验证**：探针工程复刻新逻辑实测「实习汇报表20250517.pptx」——15 页顺序 slide1→slide15 正确（UI 第 10 页 = 取得成果、第 15 页 = 谢谢观看）；每页标题恢复渲染（实习汇报表 54pt 粗体等）；章节页 slide3/6/9/12/15 各显示「大标题 36pt + 正文 20pt」两项；分组内容坐标正确（slide4「1」等）；`dotnet build` 0 错误（37 既有警告）
+  - 涉及文件：`ViewModels/PreviewViewModel.cs`
+
 **2026-08-20** — XLSX 预览修复：合并大标题行吞列 + 稀疏行数据丢失
   - **根因**：`ShowXlsx` 用 `range.FirstRow().CellsUsed()` 定列数——`CellsUsed()` 是稀疏集合（只含有内容的单元格），首行是 A1:F1 合并大标题（仅 A1 有值）时列数退化为 1，DataGrid 只剩一列；数据行循环 `i < row.CellsUsed().Count()` 在稀疏行提前截断且与 `row.Cell(i+1)` 定位取值错位，靠后列内容丢失
   - **修复**：列数以 `range.ColumnCount()` 定位式为准（受 `MaxTablePreviewCols` 约束）；表头行智能检测——跳过非空单元格 < 2 个的合并大标题行，取第一个 ≥2 个非空单元格的行作为表头（找不到回退首行，兼容首行即表头的普通表格）；数据行按列位置 `row.Cell(i+1)` 取值、仅以列数为界，跳过表头及之前所有行，遵守 `MaxTablePreviewRows`
