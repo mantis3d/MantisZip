@@ -6,6 +6,18 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-08-20** — AGENTS.md 同步 SmartOpenPathResolver + 3 个缺口立项
+  - **AGENTS.md**：`Extract path resolution` 小节后新增 `Smart open path — SmartOpenPathResolver` 小节（100% 严格公共根语义、`ResolveSmartOpenPathAsync`、3 处接线、范围边界含 CLI 差异引用）
+  - **缺口立项**（来自 diff-plan 待决策，均为非 diff 差异/既有缺口）：① `core-temp-root-injectable.md` — Core 层 6 处 `%TEMP%\MantisZip` 硬编码（ZipEngine×2、SevenZipEngine×2、ArchiveEntryExtractor、FontParser）便携模式可注入 `TempPaths.TempRootOverride`（方案 A，对齐 `CoreLog.RedactOverride`）；② `clean-temp-on-startup-avalonia.md` — `CleanTempOnStartup` 设置无消费方（WPF `App.xaml.cs:141-152` 有），方案为启动早期清理；③ `cli-extract-open-folder.md` — WPF CLI `--extract-here`/`--extract-to-name` 单文件模式 `OpenFolderAfterExtract` 时智能打开文件夹，Avalonia CLI 只解压不打开，方案为 `RunExtractCliAsync` 复用 `SmartOpenPathResolver`
+  - **PLAN.md**：P2 区域登记 3 个新计划条目（规则 1 同步），P0 diff-plan 条目已移入 PROGRESS.md 历史设计方案索引
+  - 涉及文件：`AGENTS.md`、`.omo/plans/core-temp-root-injectable.md`（新增）、`.omo/plans/clean-temp-on-startup-avalonia.md`（新增）、`.omo/plans/cli-extract-open-folder.md`（新增）、`docs/PLAN.md`
+
+**2026-08-20** — WPF 差异补齐 P1-7 智能打开路径 + P1-2 便携 Temp 重定向（avalonia-wpf-diff-plan 清零）
+  - **P1-7 智能打开路径**（方案 A）：新建 `Services/SmartOpenPathResolver.cs`（`GetCommonRootDirectory` 100% 严格公共根 + `ResolveSmartOpenPathAsync`，移植自 WPF `App.Extract.cs:662-701`，失败兜底 dest）；3 处接线——`OpenExtractedFolderAsync`（选中条目解压，签名含 archivePath/password）、`DragDropService`（拖拽解压）、`ExtractArchive` 死代码修复（`vm.OpenFolderAfterExtract` 读出后从未使用 → 解压后按设置智能打开）；`ExtractArchiveHere`/`ExtractArchiveToName` 核对 WPF 应用内流程不开文件夹，无需补齐（WPF CLI 批处理会打开，已记录待决策）；新增 `SmartOpenPathResolverTests.cs` 7 用例全过
+  - **P1-2 便携 Temp 重定向**：`AppSettings.GetTempDir()`（便携 → `DataDir/Temp`，普通 → `%TEMP%\MantisZip`，普通模式路径逐字节不变），替换 4 处 `Path.GetTempPath()` 硬编码（PreviewService.cs:347、SettingsWindowViewModel.cs:1570/1585、MainWindowViewModel.cs:395）
+  - 涉及文件：`Services/SmartOpenPathResolver.cs`（新增）、`tests/MantisZip.UI.Avalonia.Tests/SmartOpenPathResolverTests.cs`（新增）、`Models/AppSettings.cs`、`Services/DragDropService.cs`、`Services/PreviewService.cs`、`ViewModels/SettingsWindowViewModel.cs`、`ViewModels/MainWindowViewModel.cs`
+  - 验证：`dotnet build` 0 错误 + Avalonia 测试 67 通过 / 2 跳过 / 0 失败 + lsp 无诊断
+
 **2026-08-20** — PPTX 预览修复：幻灯片顺序错位 + 标题/章节页文字丢失 + 分组坐标变换
   - **根因**：① `ShowPptx` 用 `OrderBy(e => e.FullName)` 字符串字典序排列幻灯片——`slide10~15` 排在 `slide2~9` 前面，第 2 页起全部错位（15 页 deck 中 14 页页码不对）；② `if (xfrm == null) continue` 直接跳过无 xfrm 的占位符形状——PowerPoint 的标题/章节页占位符通常把几何放在 slideLayout 而 slide 只存 ph 引用，导致每页标题全丢、封面空白、章节页整页空白；③ 分组形状（grpSp）子形状坐标是相对坐标，未换算会整体偏移（本测试文件恰好恒等变换未暴露）
   - **修复**（新增 `PptxParser` 静态类，`ViewModels/PreviewViewModel.cs`）：

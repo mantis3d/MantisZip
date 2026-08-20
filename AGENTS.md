@@ -110,6 +110,18 @@ MantisZip.Core ──────┤                                     ├─�
 - **入口**：`MainWindowViewModel.ExtractSelectedTo` 把 `CurrentFolder` + 设置传给 `CustomFilePickerDialog.ShowExtractFolderAsync`（→ 预览）与实际解压，输入相同故结果必然一致
 - **文件过滤**：Avalonia 版 `ExtractSettingsWindow` 过滤后，`MainWindowViewModel.ExtractArchive` 在 `FilteredEntryKeys` 非空时改走 `engine.ExtractEntriesAsync` 只解压匹配项；否则保持 `ExtractService.ExtractAsync` 全量
 
+### Smart open path — SmartOpenPathResolver
+
+`SmartOpenPathResolver`（`MantisZip.UI.Avalonia/Services/SmartOpenPathResolver.cs`，移植自 WPF `App.Extract.cs:662-701`）是**解压完成后打开资源管理器文件夹**的智能路径判断，避免用户多点一次：
+
+- **语义**：`GetCommonRootDirectory` 采用 **100% 严格公共根**——仅当所有**非目录**条目共享同一顶层目录时返回该目录（逐条取 `FullPath` 首个 `/` 前段，任一缺 `/` 或不同即返回 null）；**不**复用 Core 的 `ArchiveStructureAnalyzer.HasSingleRootDirectory`（≥60% 阈值，语义不同，会造成与 WPF 行为不一致）
+- **方法**：`ResolveSmartOpenPathAsync(archivePath, dest, password)`（`ListEntriesAsync` → `GetCommonRootDirectory` → `Path.Combine(dest, commonRoot)`，任何异常/空列表兜底返回 dest）
+- **消费者**（3 处接线，全部传本次解压实际使用的密码——加密包解压成功后 `ListEntriesAsync` 同密码必然成功）：
+  - `MainWindowViewModel.OpenExtractedFolderAsync`（选中条目解压后，`ExtractSelectedEntriesCoreAsync` 调用）
+  - `MainWindowViewModel.ExtractArchive`（主对话框全量解压后，按 `OpenFolderAfterExtract` 开关调用——曾因死代码从不打开，已修复）
+  - `DragDropService`（拖拽解压后）
+- **范围边界**：`ExtractArchiveHere`/`ExtractArchiveToName`（应用内）与 WPF 一致不开文件夹；WPF CLI `--extract-here`/`--extract-to-name` 批处理会打开（`App.Extract.cs:614-619`），Avalonia CLI 是否对齐见 `.omo/plans/cli-extract-open-folder.md`
+
 ### UI 模式：项目间差异
 
 #### WPF（遗留版）：code-behind

@@ -150,6 +150,15 @@ public class AppSettings
     /// <summary>应用数据目录：便携模式 = exe 旁 Data/，否则 = %LOCALAPPDATA%\MantisZip。</summary>
     public static string DataDir { get; private set; } = "";
 
+    /// <summary>
+    /// 临时文件根目录：便携模式 = exe 旁 Data/Temp/，普通模式 = %TEMP%/MantisZip/。
+    /// 仅返回路径，不创建目录（调用点各自负责 <see cref="Directory.CreateDirectory"/>）。
+    /// </summary>
+    public static string GetTempDir() =>
+        IsPortableMode
+            ? Path.Combine(DataDir, "Temp")
+            : Path.Combine(Path.GetTempPath(), "MantisZip");
+
     private static readonly string SettingsDir;
     private static readonly string SettingsFile;
 

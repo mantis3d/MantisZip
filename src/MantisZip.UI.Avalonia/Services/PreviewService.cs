@@ -344,7 +344,7 @@ public class PreviewService
         string? password = null,
         CancellationToken ct = default)
     {
-        var tempDir = Path.Combine(Path.GetTempPath(), "MantisZip", "Preview");
+        var tempDir = Path.Combine(AppSettings.GetTempDir(), "Preview");
         Directory.CreateDirectory(tempDir);
 
         // 清理旧临时文件

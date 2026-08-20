@@ -27,6 +27,7 @@
 
 #### 2026-08
 
+- **08-20** — WPF 差异补齐 P1 清零：智能打开路径（`SmartOpenPathResolver` + 选中条目/拖拽/主流程三处接线 + `ExtractArchive` 死代码修复）+ 便携模式 Temp 目录重定向（`AppSettings.GetTempDir` + 4 处替换）
 - **08-20** — PPTX 预览修复：幻灯片顺序改用 presentation.xml 权威播放顺序（字典序错位修复）+ 占位符无 xfrm 时从 slideLayout 借位几何（标题/章节页不再空白）+ 分组形状坐标递归变换
 - **08-20** — XLSX 预览改为纯表格还原：不提取列标题（列名统一 Column1..N），所有行（含合并大标题行）原样展示，保留定位式列数与行列上限
 - **08-20** — 拖拽/右键「解压选中项」流程完全统一：`ExtractFlow.RunSelectedItemsExtractionAsync` 共享方法（压缩包一行批处理列表 + 状态驱动 + 失败统一弹窗）
@@ -117,6 +118,7 @@
 
 | 功能 | 设计文档 | 实现版本 |
 |------|----------|:--------:|
+| Avalonia: WPF 差异补齐总表（P0–P2 全部清零：双击行为/删除原包、便携模式（含 Temp 重定向）、文件过滤控件、默认路径优先级、信息面板持久化、智能打开路径（含 `ExtractArchive` 死代码修复）、冲突对话框暂停/取消、密码导入导出、收藏夹、Enable 设置、AllowElevation 等） | [avalonia-wpf-diff-plan.md](.omo/plans/avalonia-wpf-diff-plan.md) | v0.5.0 |
 | 添加到压缩包重名条目冲突处理（`AddConflictHelper` 条目名级解析、语义方向与解压相反：新数据更新/更大→覆盖；ZIP copy-mode `keepEntryNames` 排除被覆盖条目 + legacy Phase 2 应用解析结果；7z 覆盖经 `ModifyArchive`(index→null) 删除 + `CompressFileDictionary` Append 重加；Avalonia Ask 弹窗复用 ConflictDialog，新标题 key `AddConflict_Title`） | [add-archive-conflict-handling.md](.omo/plans/add-archive-conflict-handling.md) | v0.5.0 |
 | Avalonia 拖拽添加（`MainWindowViewModel.AddFilesToArchiveAsync` 抽取 + WPF `Window_Drop` 三分支移植：已打开+压缩包→切换打开 / 已打开+文件→确认框→添加到 `CurrentFolder` / 未打开→打开或 `CompressSettingsWindow` 预填 + `DragAddOverlay` 窗口内两色覆层（绿=可添加/红=格式不支持，呼吸动画对齐拖拽解压）+ 文件夹拖入支持） | [drag-add-overlay.md](.omo/plans/drag-add-overlay.md) | v0.5.0 |
 | 图片预览能力系统（`PreviewCapabilities` 能力注册表 [Flags]：Zoom/Transparency/FlattenAlpha/AnimationControls 取代 `HasXxxControls` 硬编码 + `PreviewType.Gif`→`AnimatedImage`（GIF/WebP 动画共用）+ GIF 透明棋盘格 + Animated WebP 分流（SKCodec `FrameCount>1`）） | [image-preview-capabilities.md](.omo/plans/image-preview-capabilities.md) | v0.5.0 |
