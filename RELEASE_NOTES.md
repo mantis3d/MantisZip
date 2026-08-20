@@ -1,7 +1,60 @@
 ## v0.5.0
 
+### 文件说明 / File Description
+
+MantisZip-0.5.0-Setup-WebSetup.exe 是需要联网才能安装的。MantisZip-0.5.0-Setup-Offline.exe 是离线安装包。MantisZip-0.5.0-Portable.zip 是便携版，解压即用。MantisZip-0.5.0-Portable-Web.zip 是无依赖便携版，需要电脑安装有 dotnet9 运行时才能正常使用。
+
+MantisZip-0.5.0-Setup-WebSetup.exe requires internet during installation. MantisZip-0.5.0-Setup-Offline.exe is a fully offline installer. MantisZip-0.5.0-Portable.zip is the portable version, extract and run.
+
+
+
 ### 更新内容 / Changelog
 
+- 核心框架从 WPF 迁移到 Avalonia（.NET 9 跨平台就绪，MVVM 架构重构），WPF 版进入维护模式
+- Core framework migrated from WPF to Avalonia (.NET 9, cross-platform ready, MVVM architecture); WPF version enters maintenance mode
+- ![主窗口](docs/images/version/v0.5.0/MainWindow.png)
+- 移除 WebView2 依赖 — HTML/Markdown 改为原生控件树渲染（ReverseMarkdown→Markdig），PDF 改为 PdfPig+SkiaSharp 逐页位图，SVG 改为 Svg.Skia 栅格化；安装不再需要 WebView2 Runtime
+- Removed WebView2 dependency — HTML/Markdown rendered as native control trees (ReverseMarkdown→Markdig), PDF rendered page-by-page via PdfPig+SkiaSharp, SVG rasterized via Svg.Skia; no WebView2 Runtime required
+- ![HTML 预览](docs/images/version/v0.5.0/HtmlPreview.png)
+- 自实现 GIF 解码器与字体预览引擎 — GIF 动画不再依赖 WpfAnimatedGif；字体预览改用 HarfBuzzSharp+SkiaSharp 位图渲染（含自动连字检测）
+- Self-implemented GIF decoder and font preview engine — GIF animation no longer relies on WpfAnimatedGif; font preview uses HarfBuzzSharp+SkiaSharp bitmap rendering (with automatic ligature detection)
+- ![字体预览](docs/images/version/v0.5.0/FontPreview.png)
+- 新增 Animated WebP 动画预览 — 与 GIF 动画统一处理，静态 WebP 保持图片预览
+- Added Animated WebP preview — unified with GIF animation handling; static WebP stays as image preview
+- GIF/动画透明棋盘格切换 — 🏁 按钮切换透明背景显示
+- GIF/animated transparency checkerboard toggle — 🏁 button switches transparent background display
+- 新增 Office 文档内容预览 — DOCX 大纲导航+全文+真 Grid 表格、XLSX DataGrid 表格、PPTX 原始坐标定位预览（WPF 版仅显示元数据）
+- Added Office document content preview — DOCX outline navigation + full text + real Grid tables, XLSX DataGrid tables, PPTX original-coordinate positioned preview (WPF version only showed metadata)
+- ![DOCX 预览](docs/images/version/v0.5.0/OfficeDocx.png)
+- ![XLSX 预览](docs/images/version/v0.5.0/OfficeXlsx.png)
+- ![PPTX 预览](docs/images/version/v0.5.0/OfficePptx.png)
+- 打开压缩包自动展示注释 — 支持 ZIP 注释（GBK/UTF-8 编码兼容）与 RAR5 注释读取
+- Archive comments shown automatically on open — supports ZIP comments (GBK/UTF-8 compatible) and RAR5 comment reading
+- 新增紧凑度模式 — Compact/Normal/Loose 三档间距与控件高度，运行时切换无需重启
+- Added compactness mode — Compact/Normal/Loose spacing and control heights, switchable at runtime without restart
+- 新增全局界面字体设置
+- Added global UI font setting
+- 主题三态化 — 跟随系统 / 亮色 / 暗色（WPF 版仅亮/暗）
+- Theme tri-state — System / Light / Dark (WPF version only had Light/Dark)
+- ![外观设置](docs/images/version/v0.5.0/AppView.png)
+- 新增结果预览面板 — 压缩/解压设置窗口实时文件树预览，冲突高亮、过滤灰显、精简模式、异步加载
+- Added result preview panel — real-time file tree preview in compress/extract dialogs with conflict highlighting, filtered ghosting, compact mode, async loading
+- ![结果预览面板](docs/images/version/v0.5.0/ResultPreviewPanel.png)
+- 元数据信息面板可配置 — 字段排布自定义（信息栏/内容区顶部/隐藏+行+顺序），独立配置文件持久化
+- Configurable metadata info panel — custom field layout (info panel / content top / hidden + row + order), persisted in a separate config file
+- ![元数据面板设置](docs/images/version/v0.5.0/MetadataPanelSettings.png)
+- 自定义文件选择器 — 多选累积、目录树、收藏/历史/窗口速选、盘符下拉、文件类型筛选，替代系统对话框
+- Custom file picker — multi-select accumulation, directory tree, favorites/history/windows quick-pick, drive dropdown, file type filter; replaces system dialogs
+- ![自定义文件选择器](docs/images/version/v0.5.0/CustomFilePicker.png)
+- 可排序默认路径优先级 — context/explorer/recent/custom 四来源可排序，支持手动路径与桌面兜底
+- Sortable default path priority — context/explorer/recent/custom sources sortable, with manual path and desktop fallback
+- ![路径优先级设置](docs/images/version/v0.5.0/PathPriority.png)
+- 拖拽直接解压新模型 — 拖出压缩包到 Explorer 目标目录实时解压，Win32 覆层三色状态指示 + 动态光标 + Esc 取消
+- New drag-to-extract model — drag archive onto an Explorer target directory to extract in real time; Win32 overlay three-color state indicator + dynamic cursor + Esc cancel
+- ![拖拽直接解压](docs/images/version/v0.5.0/DragExtractOverlay.png)
+- 新增目录树自动展开开关 — 自动展开到当前浏览位置
+- Added auto-expand directory tree toggle — automatically expands to the currently browsed location
+- ![目录树自动展开](docs/images/version/v0.5.0/AutoExpandTree.png)
 
 
 ## v0.4.5

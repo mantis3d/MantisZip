@@ -53,6 +53,12 @@
   - 涉及文件：`Controls/TabItemExtensions.cs`（新增）、`App.axaml`、`Resources/Icons/AppIcons.axaml`、`ViewModels/IconTestViewModel.cs`、`Views/SettingsWindow.axaml`、`Dialogs/CompressSettingsWindow.axaml`、`Dialogs/ExtractSettingsWindow.axaml`、`Dialogs/AboutWindow.axaml`、`Dialogs/AboutWindow.axaml.cs`
   - 验证：`dotnet build` 0 错误（35 既有警告）
 
+**2026-08-19** — v0.5.0 发布说明补写：RELEASE_NOTES 新功能章节 + 13 张发布截图
+  - **RELEASE_NOTES.md v0.5.0 章节**：按用户确认的 20 项清单精简为 16 条中英成对条目，仅收录 WPF 版没有的新功能（框架迁移/移除 WebView2/自实现 GIF 解码器与字体引擎/Animated WebP/透明棋盘格/Office 内容预览/压缩包注释自动展示/紧凑度模式/全局字体/主题三态/结果预览面板/元数据面板可配置/自定义文件选择器/可排序路径优先级/拖拽直接解压/目录树自动展开）；每项均经 WPF 源码 grep 核实确为迁移新功能；用户手动删除次要条目（透明棋盘格截图、收集弹窗等）后由代理删除对应缺失图片引用行避免坏链
+  - **发布截图**：`docs/images/version/v0.5.0/` 新增 13 张截图（主窗口/HTML/字体/Office 三件套/外观设置/结果预览/元数据面板/文件选择器/路径优先级/拖拽覆层/自动展开），经尺寸元数据核验与各自 UI 类型吻合，全部引用有效无坏链
+  - 涉及文件：`RELEASE_NOTES.md`、`docs/images/version/v0.5.0/*.png`（13 张新增）
+  - 验证：13 张图片引用全部指向存在文件；缺失图（AnimatedWebP/GifCheckerboard）引用行已删除保留文字条目
+
 **2026-08-18** — 图片预览能力系统：透明/动画能力注册表 + GIF 透明 + Animated WebP 预览
   - **预览能力注册表**：新增 `PreviewCapabilities`（[Flags] `PreviewCapability`：Zoom/Transparency/FlattenAlpha/AnimationControls），按 PreviewType 声明能力，`HasZoomControls`/`HasTransparencyControls`/`HasFlattenAlphaControls`/`HasAnimationControls` 全部查表（对齐 MetadataRegistry 模式）；新增格式只注册能力即可获得工具栏控件
   - **GIF 透明支持**：`AnimatedImage` 注册 Transparency——工具栏 🏁 棋盘格出现（棋盘格矩形早已接好，此前仅按钮未暴露）；🎨 压平保持静态图专用（方案 A 决策：动画帧不做全帧压平）
