@@ -2,9 +2,26 @@ using Avalonia.Controls;
 using Avalonia.Threading;
 using MantisZip.Core.Abstractions;
 using MantisZip.Core.Engines;
+using MantisZip.Core.Models;
 using MantisZip.UI.Avalonia.Dialogs;
+using MantisZip.UI.Avalonia.ViewModels;
 
 namespace MantisZip.UI.Avalonia.Services;
+
+/// <summary>
+/// 选中条目解压的执行结果。
+/// </summary>
+public enum SelectedItemsExtractStatus
+{
+    Success,
+    Failed,
+    Cancelled
+}
+
+/// <summary>
+/// 选中条目解压的结果载荷。
+/// </summary>
+public sealed record SelectedItemsExtractResult(SelectedItemsExtractStatus Status, string? ErrorMessage);
 
 /// <summary>
 /// 解压流程公共逻辑（主窗口与 CLI 右键菜单共用，消除两套实现漂移）。
@@ -18,6 +35,103 @@ namespace MantisZip.UI.Avalonia.Services;
 /// </summary>
 public static class ExtractFlow
 {
+    /// <summary>
+    /// 选中条目解压统一执行入口（拖拽解压与右键「解压选中项到」在拿到目标路径后共用的同一流程）。
+    ///
+    /// 两个入口的唯一差异是目标路径获取方式（拖拽 = DropTargetDetector + 选择器回退，
+    /// 右键 = CustomFilePickerDialog 预览选择器）；拿到目标路径后必须完全走同一段代码，
+    /// 防止进度窗口行为（批处理列表内容、状态驱动、失败弹窗）再次漂移。
+    ///
+    /// 本方法统一：
+    /// - 创建进度窗口，批处理列表 = 压缩包一行（对齐右键路径语义；预留未来扩展为
+    ///   「压缩包列表 + 包内文件列表」两个列表）
+    /// - 状态驱动：SetCurrentBatchItem(0) + 成功 Completed / 失败 Failed（修复拖拽路径
+    ///   从不驱动状态导致列表项全部停留在 ⏳ Pending 的问题）
+    /// - 冲突策略映射 + Ask 弹窗回调（可选）、取消处理
+    /// - 失败统一弹窗（拖拽与右键选中解压均无确认环节，必须弹窗提示）
+    /// - 成功时 SetComplete + AutoCloseOrWaitAsync（尊重 KeepOpenOnComplete 图钉）
+    ///
+    /// 调用方负责：设置状态栏消息（拖拽/右键文案不同）与 OpenFolderAfterExtract 打开目标目录。
+    /// </summary>
+    /// <param name="archivePath">压缩包路径（同时作为批处理列表的唯一行）。</param>
+    /// <param name="password">密码（可为 null）。</param>
+    /// <param name="entries">待解压条目（已由 DragDropItemExpander / 右键选择展开为文件集）。</param>
+    /// <param name="destinationPath">目标目录。</param>
+    /// <param name="currentFolder">当前浏览层（用于裁剪路径前缀，与预览一致）。</param>
+    /// <param name="preserveFullPath">是否保留完整路径。</param>
+    /// <param name="conflictAction">冲突策略字符串（AppSettings.FileConflictAction 值）。</param>
+    /// <param name="conflictDialog">Ask 冲突弹窗回调（null 时 Ask 降级为引擎默认处理）。</param>
+    /// <param name="progressTitle">进度窗口标题（拖拽 = Status_DragExtractingTo，右键 = Status_Extracting）。</param>
+    public static async Task<SelectedItemsExtractResult> RunSelectedItemsExtractionAsync(
+        string archivePath,
+        string? password,
+        IReadOnlyList<ArchiveItem> entries,
+        string destinationPath,
+        string currentFolder,
+        bool preserveFullPath,
+        string conflictAction,
+        Func<FileConflictInfo, Task<(FileConflictAction Action, bool ApplyToAll)>>? conflictDialog,
+        string progressTitle)
+    {
+        var pw = new ProgressWindow(progressTitle);
+        pw.InitCancellation();
+
+        var status = SelectedItemsExtractStatus.Success;
+        string? errorMessage = null;
+        try
+        {
+            pw.Show();
+            // 批处理列表 = 压缩包一行（对齐右键路径语义，非展开文件列表；
+            // 未来扩展为「压缩包列表 + 包内文件列表」两个列表时在此调整数据源）
+            pw.InitBatchMode(new[] { archivePath });
+            pw.SetCurrentBatchItem(0);
+
+            var progress = pw.CreatePauseAwareProgress(
+                ProgressViewModel.CreateBackgroundProgress(pw, p => pw.SetProgress(p)));
+
+            await new SelectedItemsExtractService().ExtractEntriesAsync(
+                archivePath, password, entries, destinationPath,
+                conflictAction, currentFolder, preserveFullPath,
+                conflictDialog, progress, pw.CancellationToken);
+
+            // 成功：标记批处理行完成 + 尊重 KeepOpenOnComplete 图钉（对齐 RunWithProgress 语义）
+            pw.UpdateBatchItemStatus(0, BatchItemStatus.Completed);
+            pw.SetComplete(LocalizationManager.T("Cli_StatusDone"));
+            await pw.AutoCloseOrWaitAsync(0, () => pw.Close());
+        }
+        catch (OperationCanceledException)
+        {
+            status = SelectedItemsExtractStatus.Cancelled;
+        }
+        catch (Exception ex)
+        {
+            pw.UpdateBatchItemStatus(0, BatchItemStatus.Failed, ex.Message);
+            status = SelectedItemsExtractStatus.Failed;
+            errorMessage = ex.Message;
+        }
+        finally
+        {
+            pw.Close();
+        }
+
+        // 失败统一弹窗：拖拽与右键选中解压均无确认环节，用户容易忽略状态栏小字
+        if (status == SelectedItemsExtractStatus.Failed)
+        {
+            try
+            {
+                await AppMessageBox.Show(
+                    LocalizationManager.T("Main_Status_ExtractFailed", errorMessage),
+                    LocalizationManager.T("App_ErrorTitle"),
+                    MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+            catch (Exception dlgEx)
+            {
+                App.DebugLog($"[ExtractFlow] Failed to show error dialog: {dlgEx.Message}");
+            }
+        }
+
+        return new SelectedItemsExtractResult(status, errorMessage);
+    }
     /// <summary>
     /// 执行一次解压（单压缩包）。目标目录、冲突策略、过滤条件、密码均已解析完毕。
     /// </summary>

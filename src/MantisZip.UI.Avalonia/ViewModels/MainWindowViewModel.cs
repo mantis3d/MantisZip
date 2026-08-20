@@ -1979,35 +1979,39 @@ public partial class MainWindowViewModel : ObservableObject
     }
 
     /// <summary>
-    /// 执行选中条目的解压（统一走 <see cref="SelectedItemsExtractService"/>，模态进度窗口）。
+    /// 执行选中条目的解压（统一走 <see cref="ExtractFlow.RunSelectedItemsExtractionAsync"/>，
+    /// 与拖拽解压拿到目标路径后完全同一流程：进度窗口、压缩包一行批处理列表、状态驱动、失败弹窗）。
     /// 冲突策略与打开文件夹行为使用 AppSettings 默认值。
     /// </summary>
     private async Task ExtractSelectedEntriesCoreAsync(List<ArchiveItem> entries, string destinationPath)
     {
-        if (RunWithProgress == null || CurrentArchivePath == null) return;
+        if (CurrentArchivePath == null) return;
 
         _sessionPasswords.TryGetValue(CurrentArchivePath, out var password);
 
         var settings = AppSettings.Load();
 
-        var completed = await RunWithProgress(
-            LocalizationManager.T("Status_Extracting"),
-            new[] { CurrentArchivePath! },
-            async (progress, ct) =>
-            {
-                await new SelectedItemsExtractService().ExtractEntriesAsync(
-                    CurrentArchivePath!, password, entries, destinationPath,
-                    settings.FileConflictAction, CurrentFolder ?? "", settings.ExtractPreserveFullPath,
-                    ShowExtractFileConflictDialogAsync, progress, ct);
-            });
+        var result = await ExtractFlow.RunSelectedItemsExtractionAsync(
+            CurrentArchivePath, password, entries, destinationPath,
+            CurrentFolder ?? "", settings.ExtractPreserveFullPath, settings.FileConflictAction,
+            ShowExtractFileConflictDialogAsync,
+            LocalizationManager.T("Status_Extracting"));
 
-        if (completed)
+        switch (result.Status)
         {
-            StatusMessage = LocalizationManager.T("Status_ExtractComplete");
-            if (settings.OpenFolderAfterExtract)
-            {
-                await OpenExtractedFolderAsync(destinationPath);
-            }
+            case SelectedItemsExtractStatus.Success:
+                StatusMessage = LocalizationManager.T("Status_ExtractComplete");
+                if (settings.OpenFolderAfterExtract)
+                {
+                    await OpenExtractedFolderAsync(destinationPath);
+                }
+                break;
+            case SelectedItemsExtractStatus.Failed:
+                StatusMessage = LocalizationManager.T("Main_Status_ExtractFailed", result.ErrorMessage);
+                break;
+            case SelectedItemsExtractStatus.Cancelled:
+                StatusMessage = LocalizationManager.T("Status_Cancelled");
+                break;
         }
     }
 

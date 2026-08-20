@@ -2,12 +2,10 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
-using System.Linq;
 using System.Threading.Tasks;
 using Avalonia.Controls;
 using Avalonia.Platform.Storage;
 using MantisZip.Core.Abstractions;
-using MantisZip.UI.Avalonia.Dialogs;
 using MantisZip.UI.Avalonia.Models;
 using MantisZip.UI.Avalonia.ViewModels;
 
@@ -15,7 +13,9 @@ namespace MantisZip.UI.Avalonia.Services;
 
 /// <summary>
 /// Orchestrates the post-drop extraction workflow:
-/// detect target directory → expand items → 统一走 <see cref="SelectedItemsExtractService"/>（模态进度，与右键同模式）。
+/// detect target directory → expand items → 统一走 <see cref="ExtractFlow.RunSelectedItemsExtractionAsync"/>
+/// （与右键「解压选中项到」完全同一流程：进度窗口、批处理列表、状态驱动、冲突、取消、失败弹窗）。
+/// 拿到目标路径后与右键不再有独立逻辑。
 /// </summary>
 internal class DragDropService
 {
@@ -81,95 +81,56 @@ internal class DragDropService
             return;
         }
 
-        // 4. 统一走 SelectedItemsExtractService：
-        //    模态进度窗口（与右键同模式）、冲突走设置 6 策略 + 统一 Ask 弹窗、
-        //    路径语义与右键一致（ExtractPreserveFullPath + 裁剪当前浏览层）
+        // 4. 统一走 ExtractFlow.RunSelectedItemsExtractionAsync（与右键「解压选中项到」完全同一流程）：
+        //    进度窗口 + 压缩包一行批处理列表 + 状态驱动（SetCurrentBatchItem/UpdateBatchItemStatus）+
+        //    冲突处理 + 取消 + 失败弹窗。拿到目标路径后此处与右键不再有独立逻辑。
         // 盘根目录（如 C:\）的 GetFileName 为空 → 回退用完整路径
         var folderName = Path.GetFileName(targetDir);
         if (string.IsNullOrEmpty(folderName))
             folderName = targetDir;
 
-        var pw = new ProgressWindow(LocalizationManager.T("Status_DragExtractingTo", folderName));
-        pw.InitCancellation();
+        var result = await ExtractFlow.RunSelectedItemsExtractionAsync(
+            _archivePath, _password, itemsToExtract, targetDir,
+            _currentFolder, _settings.ExtractPreserveFullPath, _settings.FileConflictAction,
+            vm?.ShowExtractFileConflictDialogAsync,
+            LocalizationManager.T("Status_DragExtractingTo", folderName));
 
-        bool completed = false;
-        bool failed = false;
-        string? failureMessage = null;
+        // 5. Post-extraction: status message, optionally open target folder
+        //    失败弹窗已由共享方法统一处理（拖拽与右键一致），此处仅设置状态栏消息
+        switch (result.Status)
+        {
+            case SelectedItemsExtractStatus.Failed:
+                App.DebugLog($"[DragDropService] Extraction failed: {result.ErrorMessage}");
+                if (vm != null)
+                    vm.StatusMessage = LocalizationManager.T("Status_DragFailed", result.ErrorMessage);
+                break;
 
-        try
-        {
-            pw.Show();
-            // 始终显示文件列表（单文件拖出也显示）：列表项 = 待解压条目
-            pw.InitBatchMode(itemsToExtract.Select(i => i.FullPath ?? i.Name ?? string.Empty).ToList());
-            var progress = pw.CreatePauseAwareProgress(
-                ProgressViewModel.CreateBackgroundProgress(pw, p => pw.SetProgress(p)));
+            case SelectedItemsExtractStatus.Success:
+                App.DebugLog($"[DragDropService] Extraction complete: {itemsToExtract.Count} files to {targetDir}");
+                if (vm != null)
+                    vm.StatusMessage = LocalizationManager.T("Status_DragDone", itemsToExtract.Count, itemsToExtract.Count, folderName);
 
-            await new SelectedItemsExtractService().ExtractEntriesAsync(
-                _archivePath, _password, itemsToExtract, targetDir,
-                _settings.FileConflictAction, _currentFolder, _settings.ExtractPreserveFullPath,
-                vm?.ShowExtractFileConflictDialogAsync, progress, pw.CancellationToken);
-
-            completed = true;
-        }
-        catch (OperationCanceledException)
-        {
-            App.DebugLog("[DragDropService] Extraction cancelled by user");
-        }
-        catch (Exception ex)
-        {
-            failed = true;
-            failureMessage = ex.Message;
-            App.DebugLog($"[DragDropService] Extraction failed: {ex.GetType().Name}: {ex.Message}");
-        }
-        finally
-        {
-            pw.Close();
-        }
-
-        // 5. Post-extraction: status message, error dialog, optional folder open
-        if (failed)
-        {
-            // 失败必须弹窗提示——拖拽解压无确认环节，用户容易忽略状态栏小字
-            if (vm != null)
-                vm.StatusMessage = LocalizationManager.T("Status_DragFailed", failureMessage);
-            try
-            {
-                await AppMessageBox.Show(
-                    LocalizationManager.T("Status_DragFailed", failureMessage),
-                    LocalizationManager.T("App_ErrorTitle"),
-                    MessageBoxButton.OK, MessageBoxImage.Error, _ownerWindow);
-            }
-            catch (Exception dlgEx)
-            {
-                App.DebugLog($"[DragDropService] Failed to show error dialog: {dlgEx.Message}");
-            }
-        }
-        else if (completed)
-        {
-            App.DebugLog($"[DragDropService] Extraction complete: {itemsToExtract.Count} files to {targetDir}");
-            if (vm != null)
-                vm.StatusMessage = LocalizationManager.T("Status_DragDone", itemsToExtract.Count, itemsToExtract.Count, folderName);
-
-            if (_settings.OpenFolderAfterExtract)
-            {
-                try
+                if (_settings.OpenFolderAfterExtract)
                 {
-                    Process.Start(new ProcessStartInfo
+                    try
                     {
-                        FileName = targetDir,
-                        UseShellExecute = true
-                    });
+                        Process.Start(new ProcessStartInfo
+                        {
+                            FileName = targetDir,
+                            UseShellExecute = true
+                        });
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine($"[DragDropService] Failed to open folder: {ex.Message}");
+                    }
                 }
-                catch (Exception ex)
-                {
-                    Debug.WriteLine($"[DragDropService] Failed to open folder: {ex.Message}");
-                }
-            }
-        }
-        else
-        {
-            if (vm != null)
-                vm.StatusMessage = LocalizationManager.T("Status_DragCancelled");
+                break;
+
+            case SelectedItemsExtractStatus.Cancelled:
+                if (vm != null)
+                    vm.StatusMessage = LocalizationManager.T("Status_DragCancelled");
+                break;
         }
     }
 

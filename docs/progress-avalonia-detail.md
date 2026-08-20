@@ -6,6 +6,16 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-08-20** — 拖拽/右键「解压选中项」流程完全统一：`ExtractFlow.RunSelectedItemsExtractionAsync` 共享方法
+  - **背景**：拖拽解压进度窗口文件列表显示异常——列表项全部停留在 ⏳ Pending、进度条 0%、文件计数卡在「1 / N」。根因：拖拽路径 `DragDropService.ExecuteAfterDropAsync` 从不调用 `SetCurrentBatchItem`/`UpdateBatchItemStatus`（`_currentBatchIndex` 恒为 -1，`ProgressViewModel.SetProgress` 列表项进度分支永不执行），且 `FileCountText` 整数除法 `(int)p.PercentComplete / 100 * _batchItems.Count` 恒为 0 被钳到 1
+  - **统一设计**（按用户要求）：拖拽解压与右键「解压选中项到」仅在目标路径获取方式上不同（拖拽 = `DropTargetDetector` + 选择器回退；右键 = `CustomFilePickerDialog` 预览选择器），拿到目标路径后必须完全走同一流程
+  - **共享方法**：`ExtractFlow.RunSelectedItemsExtractionAsync(archivePath, password, entries, destinationPath, currentFolder, preserveFullPath, conflictAction, conflictDialog, progressTitle)` 统一——创建进度窗口、批处理列表 = 压缩包一行（`InitBatchMode(new[] { archivePath })`，对齐右键语义；预留未来「压缩包列表 + 包内文件列表」双列表扩展点）、`SetCurrentBatchItem(0)` + 状态驱动（成功 `Completed` / 失败 `Failed`）、冲突 Ask 弹窗、取消处理、成功 `SetComplete` + `AutoCloseOrWaitAsync`（尊重 KeepOpenOnComplete 图钉）、失败统一弹窗（拖拽与右键均无确认环节，必须弹窗）；返回 `SelectedItemsExtractResult(Status, ErrorMessage)`，调用方各自设置状态栏消息
+  - **DragDropService 改造**：删除内联 `ProgressWindow`/`InitBatchMode`/状态驱动代码（第 92–127 行），改为调用共享方法；目标路径检测/选择器回退/打开文件夹逻辑保留；失败弹窗交由共享方法统一，本文件仅设置状态栏消息（`Status_DragDone`/`Status_DragFailed`/`Status_DragCancelled`）
+  - **MainWindowViewModel 改造**：`ExtractSelectedEntriesCoreAsync` 从 `RunWithProgress` 改为调用共享方法（不再依赖 `RunWithProgress`）；右键失败新增弹窗（与拖拽一致）+ 状态栏 `Main_Status_ExtractFailed`，取消设置 `Status_Cancelled`，成功沿用 `Status_ExtractComplete` + `OpenExtractedFolderAsync`
+  - 涉及文件：`Services/ExtractFlow.cs`（共享方法 + `SelectedItemsExtractStatus` 枚举 + `SelectedItemsExtractResult` record）、`Services/DragDropService.cs`、`ViewModels/MainWindowViewModel.cs`
+  - 本地化：全部复用现有 key（`Status_Extracting`/`Status_ExtractComplete`/`Main_Status_ExtractFailed`/`Status_Cancelled`/`Cli_StatusDone`/`Status_Drag*`），无新增
+  - 验证：`dotnet build` 0 错误（无新增警告）+ 用户 GUI 实测通过
+
 **2026-08-20** — 计划/进度/AGENTS 文档交叉核对同步
   - **PLAN.md 完成标记**：交叉核对 `.omo/plans/` 与实际代码，3 项已完成但 PLAN.md 未更新的计划补标 ✅——`drag-add-overlay`（08-19 拖拽添加，L24）、`font-preview-ligature`（07-05 连字开关，v0.4.4，L35）、`image-preview-capabilities`（08-18 图片能力注册表，L40）；`new-format-support`（L20）补核实说明（Core 侧 TAR/GZ 已就绪 + 文件关联已放开，UI 压缩格式下拉未放开）；`icon-dll`（L42）标注部分实现（图标已嵌 ShellExt.dll 托管资源，原生 .rc 资源 DLL 未做）；头部最后更新日期 → 2026-08-20
   - **PROGRESS.md 索引补齐**：历史设计方案索引新增 3 行——drag-add-overlay / image-preview-capabilities（v0.5.0）、font-preview-ligature（v0.4.4）
