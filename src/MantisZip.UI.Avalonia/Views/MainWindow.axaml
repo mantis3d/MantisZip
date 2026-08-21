@@ -1020,6 +1020,7 @@
                     <StackPanel Orientation="Horizontal" Spacing="3">
                         <PathIcon Data="{StaticResource IconCopy}" Width="13" Height="13" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
                         <TextBlock Text="{Binding LocalizedStrings[DataGrid_Name]}" />
+                        <TextBlock x:Name="NameHeaderArrow" Width="12" FontSize="10" VerticalAlignment="Center" Text="" />
                     </StackPanel>
                 </DataGridTextColumn.Header>
                 <DataGridTextColumn.Binding>
@@ -1034,6 +1035,7 @@
                     <StackPanel Orientation="Horizontal" Spacing="3">
                         <PathIcon Data="{StaticResource IconRuler}" Width="13" Height="13" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
                         <TextBlock Text="{Binding LocalizedStrings[DataGrid_Size]}" />
+                        <TextBlock x:Name="SizeHeaderArrow" Width="12" FontSize="10" VerticalAlignment="Center" Text="" />
                     </StackPanel>
                 </DataGridTemplateColumn.Header>
                 <DataGridTemplateColumn.CellTemplate>
@@ -1064,6 +1066,7 @@
                     <StackPanel Orientation="Horizontal" Spacing="3">
                         <PathIcon Data="{StaticResource IconCompress}" Width="13" Height="13" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
                         <TextBlock Text="{Binding LocalizedStrings[DataGrid_Compressed]}" />
+                        <TextBlock x:Name="CompressedSizeHeaderArrow" Width="12" FontSize="10" VerticalAlignment="Center" Text="" />
                     </StackPanel>
                 </DataGridTemplateColumn.Header>
                 <DataGridTemplateColumn.CellTemplate>
@@ -1094,6 +1097,7 @@
                     <StackPanel Orientation="Horizontal" Spacing="3">
                         <PathIcon Data="{StaticResource IconDataBarVertical}" Width="13" Height="13" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
                         <TextBlock Text="{Binding LocalizedStrings[DataGrid_Ratio]}" />
+                        <TextBlock x:Name="RatioHeaderArrow" Width="12" FontSize="10" VerticalAlignment="Center" Text="" />
                     </StackPanel>
                 </DataGridTemplateColumn.Header>
                 <DataGridTemplateColumn.CellTemplate>
@@ -1124,6 +1128,7 @@
                     <StackPanel Orientation="Horizontal" Spacing="3">
                         <PathIcon Data="{StaticResource IconCalendar}" Width="13" Height="13" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
                         <TextBlock Text="{Binding LocalizedStrings[DataGrid_Modified]}" />
+                        <TextBlock x:Name="LastModifiedHeaderArrow" Width="12" FontSize="10" VerticalAlignment="Center" Text="" />
                     </StackPanel>
                 </DataGridTemplateColumn.Header>
                 <DataGridTemplateColumn.CellTemplate>

@@ -25,9 +25,13 @@ internal static class WindowStateManager
     /// 从 JSON 恢复窗口状态。
     /// 仅在 Width/Height > 0 时恢复；忽略 Position 为默认值的情况。
     /// 返回保存的列状态（可能为 null，表示无列数据或加载失败）。
+    /// sortColumnPath/sortDirection 输出持久化的列排序状态（0=无, 1=升序, 2=降序，与 WPF window.json 兼容）。
     /// </summary>
-    public static List<ColumnStateDto>? Load(Window window)
+    public static List<ColumnStateDto>? Load(Window window, out string? sortColumnPath, out int sortDirection)
     {
+        sortColumnPath = null;
+        sortDirection = 0;
+
         if (!File.Exists(ConfigFile))
             return null;
 
@@ -37,6 +41,9 @@ internal static class WindowStateManager
             var snapshot = JsonSerializer.Deserialize<WindowStateSnapshot>(json);
             if (snapshot == null)
                 return null;
+
+            sortColumnPath = snapshot.SortColumnPath;
+            sortDirection = snapshot.SortDirection;
 
             if (snapshot.Width > 0 && snapshot.Height > 0)
             {
@@ -74,7 +81,10 @@ internal static class WindowStateManager
     /// </summary>
     /// <param name="window">目标窗口。</param>
     /// <param name="columnStates">DataGrid 列状态快照（可为 null，兼容仅窗口尺寸的旧格式）。</param>
-    public static void Save(Window window, IReadOnlyList<ColumnStateDto>? columnStates = null)
+    /// <param name="sortColumnPath">当前排序列的 SortMemberPath（null = 未排序）。</param>
+    /// <param name="sortDirection">排序方向编码（0=无, 1=升序, 2=降序，与 WPF window.json 兼容）。</param>
+    public static void Save(Window window, IReadOnlyList<ColumnStateDto>? columnStates = null,
+        string? sortColumnPath = null, int sortDirection = 0)
     {
         try
         {
@@ -90,6 +100,8 @@ internal static class WindowStateManager
                 Y = window.Position.Y,
                 State = (int)window.WindowState,
                 ColumnStates = columnStates?.ToList() ?? new List<ColumnStateDto>(),
+                SortColumnPath = sortColumnPath,
+                SortDirection = sortDirection,
             };
 
             if (!Directory.Exists(BaseDir))
@@ -124,5 +136,9 @@ internal static class WindowStateManager
         public int Y { get; set; }
         public int State { get; set; } = (int)WindowState.Normal;
         public List<ColumnStateDto> ColumnStates { get; set; } = new();
+        /// <summary>当前排序列的 SortMemberPath（null = 未排序）。字段与 WPF window.json 兼容。</summary>
+        public string? SortColumnPath { get; set; }
+        /// <summary>排序方向编码：0=无, 1=升序, 2=降序。字段与 WPF window.json 兼容。</summary>
+        public int SortDirection { get; set; }
     }
 }

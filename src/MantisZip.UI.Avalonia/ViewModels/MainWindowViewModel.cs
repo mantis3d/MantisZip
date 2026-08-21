@@ -495,6 +495,9 @@ public partial class MainWindowViewModel : ObservableObject
 
     public ObservableCollection<ArchiveItemModel> Entries { get; } = [];
 
+    /// <summary>CurrentEntries 重新填充完成后触发（供视图重应用列排序等后置逻辑）。</summary>
+    public event EventHandler? EntriesRefreshed;
+
     // ── Filter / Toolbar / Status properties ──
 
     /// <summary>选择统计："已选: N 个, X MB"。</summary>
@@ -1481,6 +1484,9 @@ public partial class MainWindowViewModel : ObservableObject
             {
                 ComputeProgressBarRatios();
             }
+
+            // 条目重填完成，通知视图重应用列排序
+            EntriesRefreshed?.Invoke(this, EventArgs.Empty);
         }
         finally
         {
@@ -1491,43 +1497,73 @@ public partial class MainWindowViewModel : ObservableObject
     /// <summary>
     /// 当前格式是否能提供逐项压缩后大小。
     /// Zip 可用；ISO/.tar 未压缩（引擎以原大小填充，等价可用）；
-    /// 7z/RAR/.tgz/.tar.gz/.gz 无法获得逐项压缩后大小（不可用，压缩后大小列显示空）。
+    /// .tgz/.tar.gz/.gz 有压缩但无法获得逐项压缩后大小（不可用，压缩后大小列显示空）；
+    /// 7z/RAR 同样不可用。与 WPF 版 GetCompressedDisplayMode 语义对齐。
     /// </summary>
-    private static bool GetCompressedSizeAvailable(ArchiveFormat format)
+    private bool GetCompressedSizeAvailable(ArchiveFormat format)
     {
         if (format == ArchiveFormat.Zip) return true;
         if (format == ArchiveFormat.Iso) return true;
-        if (format == ArchiveFormat.Tar) return true; // .tar 未压缩，引擎用原大小
-        return false; // 7z, RAR, .tgz/.gz
+        if (format == ArchiveFormat.Tar)
+        {
+            // .tar 是未压缩的容器格式；.tgz/.tar.gz/.gz 有压缩但引擎只填原大小（TarGzEngine ListEntriesAsync
+            // 对所有 tar 系条目填 CompressedSize = Size），视为不可用以免显示误导性的"压缩后=原大小"
+            var ext = Path.GetExtension(CurrentArchivePath ?? string.Empty).ToLowerInvariant();
+            return ext == ".tar";
+        }
+        return false; // 7z, RAR, .tgz/.tar.gz/.gz
     }
 
     /// <summary>
     /// 计算所有条目的进度条比例值（相对大小、压缩比、日期分布等）。
+    /// 基准语义与 WPF 版 FilterFiles 对齐：
+    /// - 目录独立基准开：文件组、目录组各自取组内最大值做基准，两组各有满格代表；
+    /// - 关：全部条目（含目录）统一取最大值做基准。
     /// </summary>
     private void ComputeProgressBarRatios()
     {
         if (CurrentEntries.Count == 0) return;
 
-        var sizeItems = SeparateDirBaseline
-            ? CurrentEntries.ToList()
-            : CurrentEntries.Where(e => !e.IsDirectory).ToList();
+        long maxSize, maxCompressed;
+        long maxDirSize = 0, maxDirCompressed = 0;
 
-        if (sizeItems.Count == 0) return;
+        if (SeparateDirBaseline)
+        {
+            var files = CurrentEntries.Where(e => !e.IsDirectory).ToList();
+            var dirs = CurrentEntries.Where(e => e.IsDirectory).ToList();
+            maxSize = files.Count > 0 ? files.Max(e => (long)e.Size) : 0;
+            maxCompressed = files.Count > 0 ? files.Max(e => (long)e.CompressedSize) : 0;
+            maxDirSize = dirs.Count > 0 ? dirs.Max(e => (long)e.Size) : 0;
+            maxDirCompressed = dirs.Count > 0 ? dirs.Max(e => (long)e.CompressedSize) : 0;
+        }
+        else
+        {
+            maxSize = CurrentEntries.Max(e => (long)e.Size);
+            maxCompressed = CurrentEntries.Max(e => (long)e.CompressedSize);
+        }
 
-        var maxSize = sizeItems.Max(e => (long)e.Size);
-        var maxCompressed = sizeItems.Max(e => (long)e.CompressedSize);
-
-        var fileItems = CurrentEntries.Where(e => !e.IsDirectory && e.LastModified > DateTime.MinValue).ToList();
-        var minDate = fileItems.Count > 0 ? fileItems.Min(e => e.LastModified) : DateTime.Now;
-        var maxDate = fileItems.Count > 0 ? fileItems.Max(e => e.LastModified) : DateTime.Now;
+        // 日期条与 WPF 一致：全部条目（含目录）参与 min/max；仅一条有效日期时满格
+        var datedItems = CurrentEntries.Where(e => e.LastModified > DateTime.MinValue).ToList();
+        var minDate = datedItems.Count > 0 ? datedItems.Min(e => e.LastModified) : DateTime.Now;
+        var maxDate = datedItems.Count > 0 ? datedItems.Max(e => e.LastModified) : DateTime.Now;
         var dateRange = (maxDate - minDate).TotalSeconds;
 
         foreach (var item in CurrentEntries)
         {
-            item.SizeRatio = maxSize > 0 ? (double)item.Size / maxSize : 0;
-            item.CompressedSizeRatio = maxCompressed > 0 ? (double)item.CompressedSize / maxCompressed : 0;
-            item.DateRatio = dateRange > 0 ? (item.LastModified - minDate).TotalSeconds / dateRange : 0;
-            item.RatioBarValue = item.Size > 0 ? Math.Min((double)item.CompressedSize / item.Size, 1.0) : 0;
+            bool useDirBase = SeparateDirBaseline && item.IsDirectory;
+            long baseSize = useDirBase ? maxDirSize : maxSize;
+            long baseCompressed = useDirBase ? maxDirCompressed : maxCompressed;
+
+            item.SizeRatio = baseSize > 0 ? (double)item.Size / baseSize : 0;
+            item.CompressedSizeRatio = baseCompressed > 0 ? (double)item.CompressedSize / baseCompressed : 0;
+            item.DateRatio = dateRange > 0
+                ? (item.LastModified - minDate).TotalSeconds / dateRange
+                : (datedItems.Count == 1 ? 1.0 : 0);
+            // 压缩率条（绝对比例）：目录与文件一视同仁显示聚合压缩率（与 RatioDisplay 文本一致，
+            // Avalonia 对 WPF 的有意差异）；格式无法提供逐项压缩后大小时为 0
+            item.RatioBarValue = item.Size > 0 && item.CompressedSizeAvailable
+                ? Math.Min((double)item.CompressedSize / item.Size, 1.0)
+                : 0;
             item.UseDirProgressColor = item.IsDirectory && SeparateDirBaseline;
         }
     }

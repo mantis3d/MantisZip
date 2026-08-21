@@ -6,6 +6,17 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-08-21** — 文件列表列排序增强：三态切换 + 箭头显示 + 持久化 + 两处 bug 修复
+  - **背景**：① 列头箭头从不显示——5 个可排序列头是 StackPanel（PathIcon+TextBlock），旧代码 `col.Header is string` 永不匹配，且 `e.Handled=true` 杀掉 Avalonia DataGrid 原生箭头（原生箭头依赖 DataConnection.SortDescriptions，手动排序时为空）；② 两态循环（升⇄降）无法回到未排序；③ 排序状态不持久化（WPF 版 window.json 有 SortColumnPath/SortDirection）；④ 列表重填（切目录/过滤/重新打开）后排序丢失；⑤ 压缩率列 `SortMemberPath="RatioSort"` 但 GetSortValue 只有 "CompressionRatio" 分支，实际按名称排序
+  - **三态循环**：新列→升序；同列升→降；同列降→未排序（清空 `_lastSortMemberPath`，恢复压缩包原始顺序）
+  - **ApplyCurrentSort 抽取**：`..` 导航行置顶（防御性保留）+ SeparateDirBaseline 开启时目录置顶分组（用 VM 缓存属性，避免 AppSettings.Load() 读盘）+ 已排序列按列值稳定排序；行为变化：SeparateDirBaseline 关闭时排序不再强制目录在前（对齐 WPF NavigationEntryFirstComparer 语义）
+  - **重填后重排**：MainWindowViewModel 新增 `EntriesRefreshed` 事件（PopulateEntries 末尾触发），视图订阅后 ApplyCurrentSort + UpdateSortArrows
+  - **持久化**：WindowStateManager Load/Save 增加 sortColumnPath/sortDirection 参数（0=无/1=升/2=降，与 WPF window.json 兼容），启动恢复 + 关闭保存
+  - **箭头显示**：5 个列头 StackPanel 各加固定槽位 TextBlock（Width=12 防布局跳动），UpdateSortArrows/SetSortArrow 按 `_lastSortMemberPath` 显示 ▲/▼
+  - **bug 修复**：GetSortValue 补 "RatioSort" 分支（映射 item.RatioSort，目录 -1）；图标列空 SortMemberPath 点击不再误触发名称排序
+  - 涉及文件：`Views/MainWindow.axaml`、`Views/MainWindow.axaml.cs`、`Models/WindowStateManager.cs`、`ViewModels/MainWindowViewModel.cs`
+  - 验证：`dotnet build` 0 错误；Avalonia 测试 60 通过 / 2 跳过（既有）/ 0 失败
+
 **2026-08-20** — PPTX 预览修复：幻灯片顺序错位 + 标题/章节页文字丢失 + 分组坐标变换
   - **根因**：① `ShowPptx` 用 `OrderBy(e => e.FullName)` 字符串字典序排列幻灯片——`slide10~15` 排在 `slide2~9` 前面，第 2 页起全部错位（15 页 deck 中 14 页页码不对）；② `if (xfrm == null) continue` 直接跳过无 xfrm 的占位符形状——PowerPoint 的标题/章节页占位符通常把几何放在 slideLayout 而 slide 只存 ph 引用，导致每页标题全丢、封面空白、章节页整页空白；③ 分组形状（grpSp）子形状坐标是相对坐标，未换算会整体偏移（本测试文件恰好恒等变换未暴露）
   - **修复**（新增 `PptxParser` 静态类，`ViewModels/PreviewViewModel.cs`）：

@@ -86,8 +86,13 @@ public partial class MainWindow : Window
             App.DebugLog($"[MainWindow] Failed to load window icon: {ex.Message}");
         }
 
-        var columnStates = WindowStateManager.Load(this);
+        var columnStates = WindowStateManager.Load(this, out var savedSortColumnPath, out var savedSortDirection);
         ApplyColumnStates(columnStates);
+
+        // 恢复持久化的列排序状态（方向编码与 WPF window.json 兼容：0=无, 1=升序, 2=降序）
+        _lastSortMemberPath = string.IsNullOrEmpty(savedSortColumnPath) ? null : savedSortColumnPath;
+        _lastSortDescending = savedSortDirection == 2;
+        UpdateSortArrows();
 
         // 应用上次手动保存的布局快照（目录树/文件列表列宽 + 预览各位置记忆尺寸）。
         // 必须在 ApplyPreviewLayout() 之前调用，保证 ApplyPreviewPosition 能读到已回填的预览尺寸。
@@ -123,6 +128,13 @@ public partial class MainWindow : Window
             };
         };
         DataContext = vm;
+
+        // 条目重填后重应用列排序（进入目录/刷新/过滤后保持排序状态）
+        vm.EntriesRefreshed += (_, _) =>
+        {
+            ApplyCurrentSort();
+            UpdateSortArrows();
+        };
 
         // 菜单「显示预览面板」切换（IsPreviewVisible 变化）时同步压缩/恢复布局占位
         vm.PropertyChanged += (_, e) =>
@@ -611,7 +623,8 @@ public partial class MainWindow : Window
         });
 
         // Persist window position/size/state + column widths on close
-        Closing += (_, _) => WindowStateManager.Save(this, CaptureColumnStates());
+        Closing += (_, _) => WindowStateManager.Save(this, CaptureColumnStates(), _lastSortMemberPath,
+            _lastSortMemberPath == null ? 0 : (_lastSortDescending ? 2 : 1));
     }
 
     /// <summary>
@@ -1008,62 +1021,84 @@ public partial class MainWindow : Window
     {
         if (sender is not DataGrid grid) return;
 
-        // 清除所有列标题上的排序标记，恢复原始文字
-        foreach (var column in grid.Columns)
-        {
-            if (column.Header is string headerText)
-                column.Header = headerText.TrimEnd('▲', '▼', ' ').TrimEnd();
-        }
-
-        var col = e.Column;
-        var sortMemberPath = col.SortMemberPath;
-
-        // 推算新方向：切换同一列时翻转，新列默认为升序
-        if (_lastSortMemberPath != sortMemberPath)
-        {
-            _lastSortDescending = false;
-        }
-        else
-        {
-            _lastSortDescending = !_lastSortDescending;
-        }
-        _lastSortMemberPath = sortMemberPath;
+        var sortMemberPath = e.Column.SortMemberPath;
 
         // 阻止默认排序（改用自定义手动排序）
         e.Handled = true;
 
-        // 更新列头箭头
-        if (col.Header is string header)
+        // 图标列（无 SortMemberPath）不参与排序
+        if (string.IsNullOrEmpty(sortMemberPath))
+            return;
+
+        // 三态循环：新列 → 升序；同列升序 → 降序；同列降序 → 未排序（恢复原始顺序）
+        if (_lastSortMemberPath != sortMemberPath)
         {
-            var clean = header.TrimEnd('▲', '▼', ' ').TrimEnd();
-            col.Header = _lastSortDescending ? clean + " ▼" : clean + " ▲";
+            _lastSortMemberPath = sortMemberPath;
+            _lastSortDescending = false;
+        }
+        else if (!_lastSortDescending)
+        {
+            _lastSortDescending = true;
+        }
+        else
+        {
+            _lastSortMemberPath = null;
+            _lastSortDescending = false;
         }
 
-        // 手动排序：.. 导航行 → 目录 → 文件，组内排序
-        if (DataContext is MainWindowViewModel vm)
+        ApplyCurrentSort();
+        UpdateSortArrows();
+    }
+
+    /// <summary>
+    /// 按当前排序状态重排 CurrentEntries：
+    /// - .. 导航行永远置顶（防御性保留，Avalonia 列表暂无导航行）
+    /// - SeparateDirBaseline 开启时目录排在文件前
+    /// - 已排序列：按列值排序（组内保持原始顺序）；未排序：保持压缩包原始顺序
+    /// </summary>
+    private void ApplyCurrentSort()
+    {
+        if (DataContext is not MainWindowViewModel vm) return;
+
+        // 用 VM 缓存的设置（AppSettings.Load() 每次读磁盘，不在此调用）
+        var separateDirBaseline = vm.SeparateDirBaseline;
+        var entries = vm.CurrentEntries.ToList();
+        var path = _lastSortMemberPath;
+
+        IOrderedEnumerable<ArchiveItemModel> sorted = entries
+            .OrderBy(e => e.Name == ".." ? 0 : 1)
+            .ThenBy(e => separateDirBaseline ? (e.IsDirectory ? 0 : 1) : 0);
+
+        if (!string.IsNullOrEmpty(path))
         {
-            var entries = vm.CurrentEntries.ToList();
-
-            List<ArchiveItemModel> sorted;
-            if (_lastSortDescending)
-            {
-                sorted = entries
-                    .OrderBy(e => e.Name == ".." ? 0 : e.IsDirectory ? 1 : 2)
-                    .ThenByDescending(e => GetSortValue(e, sortMemberPath))
-                    .ToList();
-            }
-            else
-            {
-                sorted = entries
-                    .OrderBy(e => e.Name == ".." ? 0 : e.IsDirectory ? 1 : 2)
-                    .ThenBy(e => GetSortValue(e, sortMemberPath))
-                    .ToList();
-            }
-
-            vm.CurrentEntries.Clear();
-            foreach (var item in sorted)
-                vm.CurrentEntries.Add(item);
+            sorted = _lastSortDescending
+                ? sorted.ThenByDescending(e => GetSortValue(e, path))
+                : sorted.ThenBy(e => GetSortValue(e, path));
         }
+
+        vm.CurrentEntries.Clear();
+        foreach (var item in sorted)
+            vm.CurrentEntries.Add(item);
+    }
+
+    /// <summary>
+    /// 更新各列头排序箭头：激活列显示 ▲/▼，其余列清空。
+    /// </summary>
+    private void UpdateSortArrows()
+    {
+        var path = _lastSortMemberPath;
+        var desc = _lastSortDescending;
+        SetSortArrow(NameHeaderArrow, path == "Name", desc);
+        SetSortArrow(SizeHeaderArrow, path == "Size", desc);
+        SetSortArrow(CompressedSizeHeaderArrow, path == "CompressedSize", desc);
+        SetSortArrow(RatioHeaderArrow, path == "RatioSort", desc);
+        SetSortArrow(LastModifiedHeaderArrow, path == "LastModified", desc);
+    }
+
+    private static void SetSortArrow(TextBlock? arrow, bool isActive, bool descending)
+    {
+        if (arrow == null) return;
+        arrow.Text = isActive ? (descending ? "▼" : "▲") : "";
     }
 
     private static IComparable GetSortValue(ArchiveItemModel item, string memberPath)
@@ -1074,7 +1109,7 @@ public partial class MainWindow : Window
             "Size" => item.Size,
             "CompressedSize" => item.CompressedSize,
             "LastModified" => item.LastModified,
-            "CompressionRatio" => item.CompressionRatio,
+            "RatioSort" or "CompressionRatio" => item.RatioSort,
             _ => item.NameDisplay
         };
     }
