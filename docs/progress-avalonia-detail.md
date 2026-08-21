@@ -6,6 +6,14 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-08-21** — 合并重复菜单项「新建压缩包」与「压缩文件」
+  - 编辑菜单中「新建压缩包」（NewArchive, Ctrl+N）和「压缩文件」（CompressSelected, Ctrl+C）功能完全一致（均打开压缩设置对话框，用户从文件系统选择文件），属 WPF 迁移遗留冗余
+  - 删除「压缩文件」菜单项及工具栏已隐藏的「新建」按钮（`IsVisible="False"`），统一保留「新建压缩包」
+  - 删除 `CompressSelected` 命令及方法，工具栏「压缩」按钮改绑 `NewArchiveCommand`
+  - 清理废弃本地化 key：`Menu_Compress`、`Toolbar_New`、`Tooltip_New`、`Tooltip_Compress`，新增 `Tooltip_NewArchive`
+  - 涉及文件：`Views/MainWindow.axaml`、`ViewModels/MainWindowViewModel.cs`、`Localization/strings.zh-CN.json`、`Localization/strings.en.json`
+  - 验证：`dotnet build` 0 错误
+
 **2026-08-21** — 文件列表列排序增强：三态切换 + 箭头显示 + 持久化 + 两处 bug 修复
   - **背景**：① 列头箭头从不显示——5 个可排序列头是 StackPanel（PathIcon+TextBlock），旧代码 `col.Header is string` 永不匹配，且 `e.Handled=true` 杀掉 Avalonia DataGrid 原生箭头（原生箭头依赖 DataConnection.SortDescriptions，手动排序时为空）；② 两态循环（升⇄降）无法回到未排序；③ 排序状态不持久化（WPF 版 window.json 有 SortColumnPath/SortDirection）；④ 列表重填（切目录/过滤/重新打开）后排序丢失；⑤ 压缩率列 `SortMemberPath="RatioSort"` 但 GetSortValue 只有 "CompressionRatio" 分支，实际按名称排序
   - **三态循环**：新列→升序；同列升→降；同列降→未排序（清空 `_lastSortMemberPath`，恢复压缩包原始顺序）

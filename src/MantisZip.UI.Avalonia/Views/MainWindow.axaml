@@ -151,12 +151,7 @@
             <PathIcon Data="{StaticResource IconNewFile}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
           </MenuItem.Icon>
         </MenuItem>
-        <MenuItem Command="{Binding CompressSelectedCommand}" InputGesture="Ctrl+C"
-                  Header="{Binding LocalizedStrings[Menu_Compress]}">
-          <MenuItem.Icon>
-            <PathIcon Data="{StaticResource IconDownload}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
-          </MenuItem.Icon>
-        </MenuItem>
+
       </MenuItem>
       <MenuItem Header="{Binding LocalizedStrings[Menu_View]}">
         <MenuItem Command="{Binding ToggleThemeCommand}"
@@ -446,16 +441,6 @@
             Background="{DynamicResource ThemeHeaderBgBrush}">
       <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
         <Button Classes="ToolbarButton"
-                Command="{Binding NewArchiveCommand}"
-                IsVisible="False"
-                ToolTip.Tip="{Binding LocalizedStrings[Tooltip_New]}">
-          <StackPanel >
-            <PathIcon Data="{StaticResource IconNewFile}" Classes="ToolbarButtonIcon" Width="14" Height="14" />
-            <TextBlock Text="{Binding LocalizedStrings[Toolbar_New]}"
-                      Classes="ToolbarButtonLabel" />
-          </StackPanel>
-        </Button>
-        <Button Classes="ToolbarButton"
                 Command="{Binding OpenArchiveCommand}"
                 ToolTip.Tip="{Binding LocalizedStrings[Tooltip_Open]}">
           <StackPanel >
@@ -465,8 +450,8 @@
           </StackPanel>
         </Button>
         <Button Classes="ToolbarButton"
-                Command="{Binding CompressSelectedCommand}"
-                ToolTip.Tip="{Binding LocalizedStrings[Tooltip_Compress]}">
+                Command="{Binding NewArchiveCommand}"
+                ToolTip.Tip="{Binding LocalizedStrings[Tooltip_NewArchive]}">
           <StackPanel >
             <PathIcon Data="{StaticResource IconDownload}" Classes="ToolbarButtonIcon" Width="14" Height="14" />
             <TextBlock Text="{Binding LocalizedStrings[Toolbar_Compress]}"

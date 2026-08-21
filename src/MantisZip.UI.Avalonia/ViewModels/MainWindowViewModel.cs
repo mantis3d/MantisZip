@@ -211,8 +211,8 @@ public partial class MainWindowViewModel : ObservableObject
             "Menu_Edit", "Menu_View", "Menu_ToggleTheme", "Menu_Language", "Menu_LangChinese", "Menu_LangEnglish",
             "Menu_Help", "Menu_Tools",
             "Menu_ExtractArchive", "Menu_ExtractHere", "Menu_ExtractToName",
-            "Menu_NewArchive", "Menu_Compress", "Menu_PasswordManager", "Menu_About", "Menu_Donate",
-            "Toolbar_New", "Toolbar_Open", "Toolbar_Extract", "Toolbar_Compress",
+            "Menu_NewArchive", "Menu_PasswordManager", "Menu_About", "Menu_Donate",
+            "Toolbar_Open", "Toolbar_Extract", "Toolbar_Compress",
             "Toolbar_Filter", "Toolbar_Preview",
             "Menu_Toolbar", "Menu_FilterBar",
             "Menu_ProgressBars", "Menu_SepDirBaseline", "Menu_InfoPanelOrientation", "Menu_ShowInfoPanel",
@@ -229,7 +229,7 @@ public partial class MainWindowViewModel : ObservableObject
             "Ctx_CopyName", "Ctx_CopyPath", "Ctx_Test", "Ctx_Delete",
             "Menu_SmartExtract", "Menu_TestArchive", "Menu_AddFiles", "Menu_DeleteFiles", "Menu_ArchiveComment",
             "Toolbar_SmartExtract", "Toolbar_Test", "Toolbar_AddFiles", "Toolbar_DeleteFiles",
-            "Tooltip_New", "Tooltip_Open", "Tooltip_Extract", "Tooltip_ExtractSelectedHere", "Tooltip_ExtractSelectedTo", "Tooltip_Compress",
+            "Tooltip_Open", "Tooltip_Extract", "Tooltip_ExtractSelectedHere", "Tooltip_ExtractSelectedTo", "Tooltip_NewArchive",
             "Tooltip_Filter", "Tooltip_Preview", "Tooltip_SmartExtract", "Tooltip_Test",
             "Tooltip_AddFiles", "Tooltip_DeleteFiles", "Tooltip_Subfolders",
             "Status_AddComplete", "Status_DeleteComplete", "Status_TestOK", "Status_TestFailed",
@@ -2113,18 +2113,6 @@ public partial class MainWindowViewModel : ObservableObject
     private async Task NewArchive()
     {
         if (ShowCompressSettingsDialog == null || RunWithProgress == null) return;
-        var vm = new CompressSettingsViewModel(Array.Empty<string>());
-        var result = await ShowCompressSettingsDialog(vm);
-        if (result != true || vm.SelectedPaths.Count == 0) return;
-
-        await ExecuteCompressFromSettings(vm);
-    }
-
-    [RelayCommand]
-    private async Task CompressSelected()
-    {
-        if (ShowCompressSettingsDialog == null || RunWithProgress == null) return;
-        // Opens compress dialog with empty list — user picks files from filesystem in dialog
         var vm = new CompressSettingsViewModel(Array.Empty<string>());
         var result = await ShowCompressSettingsDialog(vm);
         if (result != true || vm.SelectedPaths.Count == 0) return;
