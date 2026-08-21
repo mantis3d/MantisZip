@@ -1567,7 +1567,7 @@ public partial class SettingsWindowViewModel : ObservableObject
     {
         try
         {
-            var tempDir = Path.Combine(Path.GetTempPath(), "MantisZip", "Preview");
+            var tempDir = Path.Combine(AppSettings.GetTempDir(), "Preview");
             if (Directory.Exists(tempDir))
                 Directory.Delete(tempDir, true);
         }
@@ -1582,7 +1582,7 @@ public partial class SettingsWindowViewModel : ObservableObject
     {
         try
         {
-            var tempDir = Path.Combine(Path.GetTempPath(), "MantisZip");
+            var tempDir = AppSettings.GetTempDir();
             if (Directory.Exists(tempDir))
                 Directory.Delete(tempDir, true);
         }

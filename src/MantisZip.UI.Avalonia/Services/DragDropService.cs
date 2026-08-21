@@ -114,9 +114,13 @@ internal class DragDropService
                 {
                     try
                     {
+                        var engine = ArchiveEngineFactory.GetEngineByExtension(_archivePath);
+                        var openPath = engine == null
+                            ? targetDir
+                            : await SmartOpenPathResolver.ResolveSmartOpenPathAsync(_archivePath, targetDir, engine, _password);
                         Process.Start(new ProcessStartInfo
                         {
-                            FileName = targetDir,
+                            FileName = openPath,
                             UseShellExecute = true
                         });
                     }

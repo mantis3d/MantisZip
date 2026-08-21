@@ -392,7 +392,7 @@ public partial class MainWindowViewModel : ObservableObject
         }
 
         // 临时目录（独立于预览临时目录，避免被 ClearPreviewTemp 清理）
-        var tempDir = Path.Combine(Path.GetTempPath(), "MantisZip", "OpenWith", Guid.NewGuid().ToString());
+        var tempDir = Path.Combine(AppSettings.GetTempDir(), "OpenWith", Guid.NewGuid().ToString());
         Directory.CreateDirectory(tempDir);
         var tempFile = Path.Combine(tempDir, entry.Name);
 
@@ -1917,6 +1917,10 @@ public partial class MainWindowViewModel : ObservableObject
         if (completed)
         {
             StatusMessage = LocalizationManager.T("Status_ExtractComplete");
+            if (openFolder)
+            {
+                await OpenExtractedFolderAsync(dest, CurrentArchivePath!, password);
+            }
         }
     }
 
@@ -2039,7 +2043,7 @@ public partial class MainWindowViewModel : ObservableObject
                 StatusMessage = LocalizationManager.T("Status_ExtractComplete");
                 if (settings.OpenFolderAfterExtract)
                 {
-                    await OpenExtractedFolderAsync(destinationPath);
+                    await OpenExtractedFolderAsync(destinationPath, CurrentArchivePath!, password);
                 }
                 break;
             case SelectedItemsExtractStatus.Failed:
@@ -2075,27 +2079,34 @@ public partial class MainWindowViewModel : ObservableObject
     }
 
     /// <summary>
-    /// 打开解压后的文件夹（智能选择：单个文件夹则进入，否则打开父目录）。
+    /// 打开解压后的文件夹（智能选择：若压缩包内所有条目共享一个公共根目录，
+    /// 则打开 dest/公共根目录，否则直接打开 dest）。
     /// </summary>
-    private async Task OpenExtractedFolderAsync(string dest)
+    private async Task OpenExtractedFolderAsync(string dest, string archivePath, string? password)
     {
         if (ShowOpenFolderDialog == null) return;
 
-        // 简单实现：直接打开目标目录
-        // 后续可增强：检测是否只有一个顶层文件夹
         try
         {
+            var engine = ArchiveEngineFactory.GetEngineByExtension(archivePath);
+            var openPath = engine == null
+                ? dest
+                : await SmartOpenPathResolver.ResolveSmartOpenPathAsync(archivePath, dest, engine, password);
+
             if (OperatingSystem.IsWindows())
             {
                 System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
                 {
-                    FileName = dest,
+                    FileName = openPath,
                     UseShellExecute = true,
                     Verb = "open"
                 });
             }
         }
-        catch { }
+        catch (Exception ex)
+        {
+            App.DebugLog($"OpenExtractedFolderAsync: failed to open folder: {ex.Message}");
+        }
     }
 
     [RelayCommand]
