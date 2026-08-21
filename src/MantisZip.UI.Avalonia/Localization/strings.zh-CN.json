@@ -388,6 +388,7 @@
   "Menu_AddFiles": "添加文件",
   "Menu_ArchiveComment": "压缩包注释",
   "Menu_CloseArchive": "关闭压缩包",
+  "Menu_OpenArchiveLocation": "打开压缩包所在目录",
   "Menu_DeleteFiles": "删除",
   "Menu_Edit": "编辑",
   "Menu_Exit": "退出",

@@ -390,6 +390,7 @@
   "Menu_AddFiles": "Add Files",
   "Menu_ArchiveComment": "Comment",
   "Menu_CloseArchive": "Close Archive",
+  "Menu_OpenArchiveLocation": "Open Archive Location",
   "Menu_DeleteFiles": "Delete",
   "Menu_Edit": "Edit",
   "Menu_Exit": "Exit",

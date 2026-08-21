@@ -6,6 +6,12 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-08-21** — 文件菜单新增「打开压缩包所在目录」
+  - 文件菜单中「关闭压缩包」前新增菜单项，点击后以 `explorer.exe /select` 打开资源管理器并选中当前压缩包文件
+  - 仅当已打开压缩包时可用（`IsArchiveLoaded`）
+  - 涉及文件：`Views/MainWindow.axaml`、`ViewModels/MainWindowViewModel.cs`、`Localization/strings.zh-CN.json`、`Localization/strings.en.json`
+  - 验证：`dotnet build` 0 错误
+
 **2026-08-21** — 合并重复菜单项「新建压缩包」与「压缩文件」
   - 编辑菜单中「新建压缩包」（NewArchive, Ctrl+N）和「压缩文件」（CompressSelected, Ctrl+C）功能完全一致（均打开压缩设置对话框，用户从文件系统选择文件），属 WPF 迁移遗留冗余
   - 删除「压缩文件」菜单项及工具栏已隐藏的「新建」按钮（`IsVisible="False"`），统一保留「新建压缩包」

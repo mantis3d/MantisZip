@@ -207,7 +207,7 @@ public partial class MainWindowViewModel : ObservableObject
         var newDict = new Dictionary<string, string>();
         var keys = new[]
         {
-            "Menu_File", "Menu_OpenArchive", "Menu_CloseArchive", "Menu_Refresh", "Menu_Settings", "Menu_Exit",
+            "Menu_File", "Menu_OpenArchive", "Menu_CloseArchive", "Menu_OpenArchiveLocation", "Menu_Refresh", "Menu_Settings", "Menu_Exit",
             "Menu_Edit", "Menu_View", "Menu_ToggleTheme", "Menu_Language", "Menu_LangChinese", "Menu_LangEnglish",
             "Menu_Help", "Menu_Tools",
             "Menu_ExtractArchive", "Menu_ExtractHere", "Menu_ExtractToName",
@@ -1850,6 +1850,20 @@ public partial class MainWindowViewModel : ObservableObject
     }
 
     // ── Phase 3: Archive commands ──
+
+    [RelayCommand]
+    private void OpenArchiveLocation()
+    {
+        if (CurrentArchivePath == null) return;
+        var dir = Path.GetDirectoryName(CurrentArchivePath);
+        if (string.IsNullOrEmpty(dir)) return;
+        System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+        {
+            FileName = "explorer.exe",
+            Arguments = $"/select,\"{CurrentArchivePath}\"",
+            UseShellExecute = true
+        });
+    }
 
     [RelayCommand]
     private void CloseArchive()

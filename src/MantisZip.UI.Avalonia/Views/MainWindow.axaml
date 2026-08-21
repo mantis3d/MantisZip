@@ -37,6 +37,13 @@
             <PathIcon Data="{StaticResource IconFolder}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
           </MenuItem.Icon>
         </MenuItem>
+        <MenuItem Command="{Binding OpenArchiveLocationCommand}"
+                  IsEnabled="{Binding IsArchiveLoaded}"
+                  Header="{Binding LocalizedStrings[Menu_OpenArchiveLocation]}">
+          <MenuItem.Icon>
+            <PathIcon Data="{StaticResource IconLocate}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+          </MenuItem.Icon>
+        </MenuItem>
         <MenuItem Command="{Binding CloseArchiveCommand}" InputGesture="Ctrl+W"
                   IsEnabled="{Binding IsArchiveLoaded}"
                   Header="{Binding LocalizedStrings[Menu_CloseArchive]}">
