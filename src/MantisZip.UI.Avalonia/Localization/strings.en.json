@@ -1,4 +1,8 @@
 {
+  "Preview_Result_Reading": "Reading archive entries…",
+  "Extract_Preview_LoadFailed": "Unable to read this archive",
+  "Extract_Preview_NeedsPassword": "This archive is encrypted and requires a password",
+  "Extract_Source_MultiFilterHint": "File filter applies to the first archive only",
   "Menu_SaveLayout": "Save Layout",
   "Status_LayoutSaved": "Layout saved",
   "AddConflict_Title": "Add Conflict",

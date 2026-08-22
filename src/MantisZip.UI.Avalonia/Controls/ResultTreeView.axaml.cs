@@ -59,6 +59,22 @@ public partial class ResultTreeView : UserControl
     public static readonly StyledProperty<double> BuildProgressProperty =
         AvaloniaProperty.Register<ResultTreeView, double>(nameof(BuildProgress), -1);
 
+    /// <summary>压缩包条目列表正在后台读取（区别于树构建的 IsLoading；Root 尚未就绪前的空白期提示）。</summary>
+    public static readonly StyledProperty<bool> IsListingPendingProperty =
+        AvaloniaProperty.Register<ResultTreeView, bool>(nameof(IsListingPending), false);
+
+    /// <summary>加载失败标题（空串 = 非错误态；本地化后的文案由宿主传入）。</summary>
+    public static readonly StyledProperty<string> LoadFailedTitleProperty =
+        AvaloniaProperty.Register<ResultTreeView, string>(nameof(LoadFailedTitle), "");
+
+    /// <summary>加载失败详情（异常原因原文，可为空）。</summary>
+    public static readonly StyledProperty<string> LoadFailedDetailProperty =
+        AvaloniaProperty.Register<ResultTreeView, string>(nameof(LoadFailedDetail), "");
+
+    /// <summary>失败是否因需要密码（图标在 🔒 / ⚠️ 间切换）。</summary>
+    public static readonly StyledProperty<bool> LoadFailedNeedsPasswordProperty =
+        AvaloniaProperty.Register<ResultTreeView, bool>(nameof(LoadFailedNeedsPassword), false);
+
     // ── Observable collection for display tree ──
 
     /// <summary>显示树节点集合（已应用精简/过滤规则）。</summary>
@@ -120,6 +136,30 @@ public partial class ResultTreeView : UserControl
         set => SetValue(BuildProgressProperty, value);
     }
 
+    public bool IsListingPending
+    {
+        get => GetValue(IsListingPendingProperty);
+        set => SetValue(IsListingPendingProperty, value);
+    }
+
+    public string LoadFailedTitle
+    {
+        get => GetValue(LoadFailedTitleProperty);
+        set => SetValue(LoadFailedTitleProperty, value);
+    }
+
+    public string LoadFailedDetail
+    {
+        get => GetValue(LoadFailedDetailProperty);
+        set => SetValue(LoadFailedDetailProperty, value);
+    }
+
+    public bool LoadFailedNeedsPassword
+    {
+        get => GetValue(LoadFailedNeedsPasswordProperty);
+        set => SetValue(LoadFailedNeedsPasswordProperty, value);
+    }
+
     /// <summary>
     /// 静态构造函数：注册属性变更回调。
     /// </summary>
@@ -139,6 +179,14 @@ public partial class ResultTreeView : UserControl
             view.OnIsLoadingChanged(e.NewValue is true));
         BuildProgressProperty.Changed.AddClassHandler<ResultTreeView>((view, e) =>
             view.OnBuildProgressChanged(e.NewValue as double? ?? -1));
+        IsListingPendingProperty.Changed.AddClassHandler<ResultTreeView>((view, _) =>
+            view.UpdateStateOverlay());
+        LoadFailedTitleProperty.Changed.AddClassHandler<ResultTreeView>((view, _) =>
+            view.UpdateStateOverlay());
+        LoadFailedDetailProperty.Changed.AddClassHandler<ResultTreeView>((view, _) =>
+            view.UpdateStateOverlay());
+        LoadFailedNeedsPasswordProperty.Changed.AddClassHandler<ResultTreeView>((view, _) =>
+            view.UpdateStateOverlay());
     }
 
     /// <summary>
@@ -170,6 +218,42 @@ public partial class ResultTreeView : UserControl
         LoadingProgressBar.Value = Math.Clamp(progress, 0, 100);
     }
 
+    /// <summary>读取中覆层文案（本地化，与 LoadingText 同模式）。</summary>
+    public string ReadingText => LocalizationManager.T("Preview_Result_Reading");
+
+    /// <summary>
+    /// 条目读取/加载失败状态覆层联动。
+    /// 错误态优先于读取中；两者互斥于 IsLoading（树构建覆层由宿主 VM 保证不同时出现）。
+    /// </summary>
+    private void UpdateStateOverlay()
+    {
+        if (StateOverlay == null || StateIconText == null
+            || StateTitleText == null || StateDetailText == null || StateProgressBar == null)
+            return;
+
+        var hasError = !string.IsNullOrEmpty(LoadFailedTitle);
+        var pending = !hasError && IsListingPending;
+
+        StateOverlay.IsVisible = hasError || pending;
+        if (!StateOverlay.IsVisible) return;
+
+        if (hasError)
+        {
+            StateIconText.Text = LoadFailedNeedsPassword ? "🔒" : "⚠️";
+            StateTitleText.Text = LoadFailedTitle;
+            StateDetailText.Text = LoadFailedDetail;
+            StateDetailText.IsVisible = !string.IsNullOrEmpty(LoadFailedDetail);
+            StateProgressBar.IsVisible = false;
+        }
+        else
+        {
+            StateIconText.Text = "⏳";
+            StateTitleText.Text = ReadingText;
+            StateDetailText.IsVisible = false;
+            StateProgressBar.IsVisible = true;
+        }
+    }
+
     public ResultTreeView()
     {
         InitializeComponent();
@@ -178,6 +262,7 @@ public partial class ResultTreeView : UserControl
         ToolTip.SetTip(LocateButton, LocalizationManager.T("Preview_Result_Locate"));
         ToolTip.SetTip(FilterToggle, LocalizationManager.T(FilterToggle.IsChecked == true ? "Preview_Result_HideFiltered" : "Preview_Result_ShowFiltered"));
         LoadingTextBlock.Text = LocalizationManager.T("Preview_Result_Building");
+        StateTitleText.Text = ReadingText;
 
         // 主题切换时刷新 ForegroundKey 绑定，使转换器重新解析新版主题画刷
         ActualThemeVariantChanged += OnActualThemeVariantChanged;

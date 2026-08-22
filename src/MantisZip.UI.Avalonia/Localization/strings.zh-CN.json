@@ -1,4 +1,8 @@
 {
+  "Preview_Result_Reading": "正在读取压缩包条目…",
+  "Extract_Preview_LoadFailed": "无法读取此压缩包",
+  "Extract_Preview_NeedsPassword": "此压缩包已加密，需要密码",
+  "Extract_Source_MultiFilterHint": "文件过滤仅对第一个压缩包生效",
   "Menu_SaveLayout": "保存布局",
   "Status_LayoutSaved": "布局已保存",
   "AddConflict_Title": "添加冲突",
