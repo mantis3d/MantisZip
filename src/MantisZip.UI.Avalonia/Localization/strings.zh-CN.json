@@ -825,7 +825,7 @@
   "Status_LoadFailed": "加载失败: {0}",
   "Status_Loading": "正在加载压缩包...",
   "Status_NoArchive": "未打开压缩包",
-  "Status_OpenArchiveFailed": "无法打开压缩包",
+  "Status_OpenArchiveFailedGeneric": "无法打开压缩包",
   "Status_Encrypted": "已加密",
   "Status_PasswordCancelled": "已取消 - 需要密码",
   "Status_PasswordMatched": "密码已匹配",

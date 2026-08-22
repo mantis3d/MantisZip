@@ -827,7 +827,7 @@
   "Status_LoadFailed": "Load failed: {0}",
   "Status_Loading": "Loading archive...",
   "Status_NoArchive": "No archive open",
-  "Status_OpenArchiveFailed": "Unable to open archive",
+  "Status_OpenArchiveFailedGeneric": "Unable to open archive",
   "Status_Encrypted": "Encrypted",
   "Status_PasswordCancelled": "Cancelled - password required",
   "Status_PasswordMatched": "Password matched",

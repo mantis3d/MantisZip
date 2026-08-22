@@ -983,12 +983,24 @@ public partial class MainWindowViewModel : ObservableObject
             }
             else if (!result.IsPasswordRequired) // Don't override password-related messages
             {
-                StatusMessage = result.ErrorMessage ?? LocalizationManager.T("Status_OpenArchiveFailed");
+                // 打开失败（如压缩包损坏）：状态栏 + 模态弹窗双提示（对齐 WPF 行为）
+                var errorMessage = result.ErrorMessage ?? LocalizationManager.T("Status_OpenArchiveFailedGeneric");
+                StatusMessage = errorMessage;
+                await AppMessageBox.Show(
+                    errorMessage,
+                    LocalizationManager.T("App_ErrorTitle"),
+                    MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
         catch (Exception ex)
         {
-            StatusMessage = LocalizationManager.T("Status_LoadFailed", ex.Message);
+            App.DebugLog($"LoadArchiveAsync: unexpected failure: {ex.Message}");
+            var errorMessage = LocalizationManager.T("Status_LoadFailed", ex.Message);
+            StatusMessage = errorMessage;
+            await AppMessageBox.Show(
+                errorMessage,
+                LocalizationManager.T("App_ErrorTitle"),
+                MessageBoxButton.OK, MessageBoxImage.Error);
         }
         finally
         {
