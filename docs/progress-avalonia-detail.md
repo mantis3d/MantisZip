@@ -6,6 +6,17 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-08-23** — 解压设置窗口多压缩包损坏提示 + 合并预览树
+  - **背景**：CLI `--extract` 多选压缩包弹出的 ExtractSettingsWindow，源列表为纯字符串无任何校验；预览树只绑定第一个包，且首包 ListEntriesAsync 失败被静默吞掉（仅 DebugLog）——损坏包在配置阶段零提示，直到解压阶段才在进度窗标红。顺带发现潜伏 bug：`ExtractSettingsViewModel.FilteredEntryKeys` 从未被赋值（恒 null），CLI 批量解压的文件过滤一直静默失效。
+  - **修复**：
+    - **逐包后台校验**：Loaded 后对全部源包并发跑 ListEntriesAsync（只读头部索引、SemaphoreSlim 限流 3、窗口关闭经 CTS 取消），行内徽标 ⏳→✅/🔒/⚠️ 实时回写；密码类异常归类「需密码」而非「损坏」（加密文件名的 7z 无密码列不出条目属正常现象），启发式抽取为 `ArchiveService.IsPasswordRelatedError` 公共方法与浏览加载共用
+    - **预览树合并展示所有压缩包**：合并根=目标目录，健康包为归档节点（IsArchiveNode 归档图标+粗体）下挂条目子树，冲突高亮基于共享目标目录（Avalonia 版此窗口全部包解压到同一目录，语义正确）；损坏/需密码/未就绪为 emoji 占位节点（🔒/⚠️/⏳ + 原因副文本）；任一包校验完成即增量刷新（版本号守卫 + <250ms 防闪烁）；单包场景退化为原单树语义不多套层级
+    - **ResultTreeView 三态能力**：新增 IsListingPending / LoadFailedTitle / LoadFailedDetail / LoadFailedNeedsPassword 四个 StyledProperty + 状态覆层，照既有 IsLoading/BuildProgress 模式
+    - **FilteredEntryKeys 修复**：Extract 命令执行前基于首包条目计算回填（提取语义保持绑定首包，对齐 WPF「过滤仅对 i==0 生效」），CLI 批量解压过滤恢复生效
+    - 多包场景列表下方提示「文件过滤仅对第一个压缩包生效」；点击列表行仅高亮不再切换树
+  - 涉及文件：`ViewModels/SourceArchiveItem.cs`（新增）、`Services/ArchiveService.cs`、`Services/ResultPreviewService.cs`、`Controls/ResultTreeView.axaml(.cs)`、`ViewModels/ExtractSettingsViewModel.cs`、`Dialogs/ExtractSettingsWindow.axaml(.cs)`、`App.axaml.cs`、`Localization/strings.zh-CN.json`、`Localization/strings.en.json`、`tests/MantisZip.UI.Avalonia.Tests/SourceArchiveValidationTests.cs`（新增）
+  - 验证：`dotnet build` 0 错误；Avalonia 测试 76 通过 / 0 失败 / 2 跳过（含新增分类器与行模型用例）；lsp 无诊断；双语 key 1101/1101 对齐
+
 **2026-08-22** — 打开压缩包失败弹模态错误框 + 修复 Status_OpenArchiveFailed 重复 key
   - **背景**：Avalonia 版打开损坏压缩包时唯一反馈是底部状态栏一行字（`MainWindowViewModel.LoadArchiveAsync` 失败分支仅设 `StatusMessage`），而界面已被 `ClearArchiveInternal()` 清空，用户几乎无感知——WPF 版（`MainWindow.xaml.cs` catch 块）有模态 MessageBox，属迁移行为回退；且 `Status_OpenArchiveFailed` 在两个语言文件中各重复定义两次（:113 带 `{0}` 占位符、:828 无占位符），JSON 后者覆盖前者导致 `ArchiveService` 传入的异常详情被静默丢弃，用户连失败原因都看不到
   - **修复**：失败分支与外层 catch 各增加 `AppMessageBox.Show` 模态错误弹窗（❌ 图标 + `App_ErrorTitle` 标题 + 具体原因，状态栏文字保留），对齐 WPF 行为；外层 catch 补 `App.DebugLog`（原静默吞异常）；无参重复 key 改名为 `Status_OpenArchiveFailedGeneric`（zh/en 同步），带 `{0}` 的详细版保留原名供 `ArchiveService` 继续使用
