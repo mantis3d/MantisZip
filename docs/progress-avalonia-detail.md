@@ -6,6 +6,13 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-08-22** — 打开压缩包失败弹模态错误框 + 修复 Status_OpenArchiveFailed 重复 key
+  - **背景**：Avalonia 版打开损坏压缩包时唯一反馈是底部状态栏一行字（`MainWindowViewModel.LoadArchiveAsync` 失败分支仅设 `StatusMessage`），而界面已被 `ClearArchiveInternal()` 清空，用户几乎无感知——WPF 版（`MainWindow.xaml.cs` catch 块）有模态 MessageBox，属迁移行为回退；且 `Status_OpenArchiveFailed` 在两个语言文件中各重复定义两次（:113 带 `{0}` 占位符、:828 无占位符），JSON 后者覆盖前者导致 `ArchiveService` 传入的异常详情被静默丢弃，用户连失败原因都看不到
+  - **修复**：失败分支与外层 catch 各增加 `AppMessageBox.Show` 模态错误弹窗（❌ 图标 + `App_ErrorTitle` 标题 + 具体原因，状态栏文字保留），对齐 WPF 行为；外层 catch 补 `App.DebugLog`（原静默吞异常）；无参重复 key 改名为 `Status_OpenArchiveFailedGeneric`（zh/en 同步），带 `{0}` 的详细版保留原名供 `ArchiveService` 继续使用
+  - 密码流程 / 用户取消不弹窗，不受影响；拖拽解压与 CLI `--open` 路径同样生效（共用 LoadArchiveAsync）
+  - 涉及文件：`ViewModels/MainWindowViewModel.cs`、`Localization/strings.zh-CN.json`、`Localization/strings.en.json`
+  - 验证：`dotnet build` 0 错误 0 警告（ShellExt.dll 被 Explorer 进程锁定，改用 bin\verify 输出目录验证）；lsp 无诊断；双语 JSON 合法且 key 集合一致（1097/1097）
+
 **2026-08-21** — 文件菜单新增「打开压缩包所在目录」
   - 文件菜单中「关闭压缩包」前新增菜单项，点击后以 `explorer.exe /select` 打开资源管理器并选中当前压缩包文件
   - 仅当已打开压缩包时可用（`IsArchiveLoaded`）
