@@ -9,6 +9,19 @@ namespace MantisZip.UI.Avalonia.Services;
 public class ArchiveService
 {
     /// <summary>
+    /// 判断异常是否为密码相关（加密包未提供密码 / 密码错误）。
+    /// 浏览加载与解压设置窗口的逐包校验共用此启发式，避免分类逻辑分叉
+    /// ——加密文件名的 7z 包无密码时 ListEntriesAsync 抛密码类异常，不能误报为「损坏」。
+    /// </summary>
+    public static bool IsPasswordRelatedError(Exception ex)
+    {
+        var message = ex.Message;
+        return message.Contains("password", StringComparison.OrdinalIgnoreCase)
+            || message.Contains("encrypted", StringComparison.OrdinalIgnoreCase)
+            || message.Contains("密码", StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
     /// 打开压缩包并列出所有条目。
     /// </summary>
     public async Task<ArchiveLoadResult> LoadArchiveAsync(
@@ -58,10 +71,7 @@ public class ArchiveService
         }
         catch (Exception ex)
         {
-            var message = ex.Message;
-            if (message.Contains("password", StringComparison.OrdinalIgnoreCase)
-                || message.Contains("encrypted", StringComparison.OrdinalIgnoreCase)
-                || message.Contains("密码", StringComparison.OrdinalIgnoreCase))
+            if (IsPasswordRelatedError(ex))
             {
                 return ArchiveLoadResult.PasswordRequired();
             }
