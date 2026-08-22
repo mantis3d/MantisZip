@@ -796,9 +796,9 @@ public partial class App : Application
                 return;
             }
 
-            // 立即显示设置窗口，消除弹窗前条目列表读取（最长 3s）的空白期：
-            // 窗口秒现，条目在后台加载，完成后 SetEntries 填充过滤统计与预览树
-            // （ExtractSettingsViewModel.BuildExtractPreview 异步构建 + IsBuildPending 加载状态）。
+            // 立即显示设置窗口，消除弹窗前条目列表读取的空白期：
+            // 窗口秒现后由窗口自身在 Loaded 逐包后台校验（ListEntriesAsync 只读头部索引），
+            // 行内徽标实时回写 ✓/🔒/⚠️；预览树跟随选中行，损坏/需密码包显示对应占位。
             var dialog = new ExtractSettingsWindow(existing);
 
             // CLI 模式没有主窗口，无法用 ShowDialog(owner)，改用非模态 Show + Closed 事件等待结果。
@@ -810,9 +810,6 @@ public partial class App : Application
             var closeTcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
             dialog.Closed += (_, _) => closeTcs.TrySetResult(dialog.DialogResult == true);
             dialog.Show();
-
-            // 后台加载第一个压缩包的条目列表（供过滤/预览树），失败则无过滤支持（与旧 3s 超时语义一致）
-            _ = LoadExtractDialogEntriesAsync(existing[0], dialog);
 
             var ok = await closeTcs.Task;
             if (!ok)
@@ -839,29 +836,6 @@ public partial class App : Application
         {
             Console.Error.WriteLine($"Extract dialog failed: {ex.Message}");
             desktop.Shutdown();
-        }
-    }
-
-    /// <summary>
-    /// 后台加载压缩包条目列表并填充到解压设置窗口（过滤统计 + 预览树）。
-    /// 在 UI 线程上下文启动，await 返回后仍在 UI 线程，SetEntries 安全；
-    /// 窗口已关闭时不填充；失败仅记录日志，保持无过滤/预览支持（与旧 3s 超时语义一致）。
-    /// </summary>
-    private static async Task LoadExtractDialogEntriesAsync(
-        string archivePath,
-        ExtractSettingsWindow dialog)
-    {
-        try
-        {
-            var engine = ArchiveEngineFactory.GetEngineByExtension(archivePath);
-            if (engine == null) return;
-            var entries = await engine.ListEntriesAsync(archivePath, null);
-            if (entries is { Count: > 0 } && dialog.IsVisible)
-                dialog.SetEntries(entries);
-        }
-        catch (Exception listEx)
-        {
-            DebugLog($"RunExtractDialogCliAsync: ListEntriesAsync failed: {listEx.Message}");
         }
     }
 

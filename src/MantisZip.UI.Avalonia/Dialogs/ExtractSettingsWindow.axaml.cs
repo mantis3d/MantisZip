@@ -20,7 +20,9 @@ namespace MantisZip.UI.Avalonia.Dialogs;
 public partial class ExtractSettingsWindow : Window
 {
     private bool _loaded;
-    private IReadOnlyList<ArchiveItem>? _entries;
+
+    /// <summary>后台逐包校验的取消源（窗口关闭时取消，避免无谓 IO）。</summary>
+    private CancellationTokenSource? _validationCts;
 
     /// <summary>
     /// 对话框结果（true=确认解压，false=取消）。CLI 无 owner 场景下配合
@@ -49,12 +51,14 @@ public partial class ExtractSettingsWindow : Window
 
         ViewModel = new ExtractSettingsViewModel(archivePaths);
 
-        // 设置文件夹浏览回调（解压模式：弹窗内建 ResultTreeView 实时冲突检测）
+        // 设置文件夹浏览回调（解压模式：弹窗内建 ResultTreeView 实时冲突检测）。
+        // 冲突预览语义绑定首包条目（与提取一致），无首包条目时无法预览。
         ViewModel.BrowseFolder = async () =>
         {
-            if (_entries == null)
+            var first = ViewModel.FirstArchiveEntries;
+            if (first == null)
                 return null;
-            return await CustomFilePickerDialog.ShowExtractFolderAsync(this, _entries, ViewModel.DestinationPath);
+            return await CustomFilePickerDialog.ShowExtractFolderAsync(this, first, ViewModel.DestinationPath);
         };
 
         // 设置关闭回调
@@ -67,33 +71,26 @@ public partial class ExtractSettingsWindow : Window
 
         DataContext = ViewModel;
 
-        // 绑定文件列表
-        FileListBox.ItemsSource = archivePaths;
+        // 窗口关闭时取消后台逐包校验
+        Closed += (_, _) => _validationCts?.Cancel();
 
         // 浏览回调：解压模式文件夹对话框（内建 ResultTreeView 实时冲突检测）。
         // QuickPathPicker 只收目录，此处返回目录即可。
         DestinationPicker.BrowseAction = (owner, current) =>
-            _entries == null
+            ViewModel.FirstArchiveEntries == null
                 ? Task.FromResult<string?>(null)
-                : CustomFilePickerDialog.ShowExtractFolderAsync(owner ?? this, _entries, ViewModel.DestinationPath);
+                : CustomFilePickerDialog.ShowExtractFolderAsync(
+                    owner ?? this, ViewModel.FirstArchiveEntries, ViewModel.DestinationPath);
 
         Loaded += OnLoaded;
     }
 
-    /// <summary>设置压缩包条目列表，用于过滤统计和预览树构建。</summary>
+    /// <summary>
+    /// 注入首包（当前打开压缩包）的条目列表——MainWindow 单包路径使用：
+    /// 条目已在内存，跳过对首包的重复读取；过滤统计与冲突预览立即就绪。
+    /// </summary>
     public void SetEntries(IReadOnlyList<ArchiveItem> entries)
-    {
-        _entries = entries;
-        BuildPreview();
-    }
-
-    /// <summary>根据当前 entries、DestinationPath 和过滤条件构建预览树。</summary>
-    private void BuildPreview()
-    {
-        if (_entries == null) return;
-        var filter = GetFilter();
-        ViewModel.BuildExtractPreview(_entries, filter, checkExists: true);
-    }
+        => ViewModel.SetFirstArchiveEntries(entries);
 
     /// <summary>获取当前过滤条件。仅当启用过滤且 filter.IsActive 时有效。</summary>
     public FileFilterCriteria? GetFilter()
@@ -105,18 +102,11 @@ public partial class ExtractSettingsWindow : Window
     }
 
     /// <summary>
-    /// 对 _entries 应用过滤条件，返回匹配条目的 key 列表。
+    /// 过滤后需实际解压的条目 key 列表。提取语义始终绑定首包
+    /// （对齐 WPF HandleExtractBatchCore「过滤仅对 i==0 生效」），与预览展示的选中项解耦。
     /// </summary>
     public List<string>? GetFilteredEntryKeys()
-    {
-        var filter = GetFilter();
-        if (filter == null || _entries == null) return null;
-
-        return _entries
-            .Where(e => FileFilterMatcher.IsMatch(filter, e))
-            .Select(e => e.FullPath)
-            .ToList();
-    }
+        => ViewModel.ComputeFilteredEntryKeys(GetFilter());
 
     private void OnLoaded(object? sender, RoutedEventArgs e)
     {
@@ -125,19 +115,28 @@ public partial class ExtractSettingsWindow : Window
 
         InitFileFilter();
 
+        // 注入过滤条件读取器（选中切换重建 / FilteredEntryKeys 计算共用）
+        ViewModel.FilterProvider = () => GetFilter();
+
         // Subscribe to DestinationPath changes for preview rebuild
         ViewModel.PropertyChanged += OnViewModelPropertyChanged;
 
-        // Build initial preview if entries are already set (e.g., via SetEntries before ShowDialog)
-        if (_entries != null && !string.IsNullOrWhiteSpace(ViewModel.DestinationPath))
-            BuildPreview();
+        // 首包条目已由外部注入（MainWindow 单包路径）时立即构建冲突预览；
+        // 否则 ValidateAllAsync 完成首包校验后自动填充 ⏳→树
+        if (ViewModel.FirstArchiveEntries != null && !string.IsNullOrWhiteSpace(ViewModel.DestinationPath))
+            ViewModel.RebuildMergedPreview();
+
+        // 逐包后台校验（损坏 / 需密码 → 行内徽标 + 预览占位；窗口关闭时经 CTS 取消）
+        _validationCts = new CancellationTokenSource();
+        _ = ViewModel.ValidateAllAsync(_validationCts.Token);
     }
 
     private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
         if (e.PropertyName == nameof(ExtractSettingsViewModel.DestinationPath))
         {
-            BuildPreview();
+            // 目标路径变化 → 当前选中项的冲突高亮需要重算
+            ViewModel.RebuildMergedPreview();
         }
     }
 
@@ -188,13 +187,14 @@ public partial class ExtractSettingsWindow : Window
 
     private void UpdateFilterStats()
     {
-        if (_entries == null) return;
+        var entries = ViewModel.FirstArchiveEntries;
+        if (entries == null) return;
 
         var filter = GetFilter();
         if (filter != null)
         {
-            var matched = _entries.Count(e => !e.IsDirectory && FileFilterMatcher.IsMatch(filter, e));
-            var total = _entries.Count(e => !e.IsDirectory);
+            var matched = entries.Count(e => !e.IsDirectory && FileFilterMatcher.IsMatch(filter, e));
+            var total = entries.Count(e => !e.IsDirectory);
             FileFilterControl.SetFilterStats(LocalizationManager.T("Extract_FilterStatsFormat", matched, total));
         }
         else
@@ -206,6 +206,6 @@ public partial class ExtractSettingsWindow : Window
     private void OnFileFilterChanged()
     {
         UpdateFilterStats();
-        BuildPreview();
+        ViewModel.RebuildMergedPreview();
     }
 }

@@ -455,6 +455,12 @@ public static class ResultPreviewService
     }
 
     /// <summary>
+    /// 对已组装完成的树根重算子孙统计（合并多压缩包预览在 VM 侧组装子树后调用，
+    /// 供摘要栏显示全树文件数/总大小）。
+    /// </summary>
+    public static void RecalculateDescendantStats(PreviewTreeNode root) => CalculateDescendantStats(root);
+
+    /// <summary>
     /// 递归统计每个节点的 TotalDescendantCount、TotalDescendantSize 和 MaxChildDepth。
     /// TotalDescendantCount 只统计文件节点（不含目录条目），TotalDescendantSize 为子树内文件大小之和。
     /// 被过滤（IsFilteredOut）的节点整棵跳过：过滤掉的文件不会实际解压/压缩，不计入目录统计（与摘要栏语义一致）。

@@ -40,7 +40,9 @@
                            FontWeight="SemiBold" />
                 <ListBox x:Name="FileListBox"
                          Height="100"
-                         BorderBrush="{DynamicResource ThemeBorderBrush}">
+                         BorderBrush="{DynamicResource ThemeBorderBrush}"
+                         ItemsSource="{Binding SourceItems}"
+                         SelectedItem="{Binding SelectedSourceItem}">
                   <ListBox.ItemContainerTheme>
                     <ControlTheme TargetType="ListBoxItem">
                       <Setter Property="MinHeight" Value="{DynamicResource ControlHeightMd}" />
@@ -48,12 +50,26 @@
                   </ListBox.ItemContainerTheme>
                   <ListBox.ItemTemplate>
                     <DataTemplate>
-                      <TextBlock Text="{Binding}"
-                                 TextTrimming="CharacterEllipsis"
-                                 ToolTip.Tip="{Binding}" />
+                      <StackPanel Orientation="Horizontal"
+                                  Spacing="6"
+                                  Background="Transparent">
+                        <TextBlock Text="{Binding StatusIcon}"
+                                   FontSize="12"
+                                   VerticalAlignment="Center" />
+                        <TextBlock Text="{Binding DisplayName}"
+                                   VerticalAlignment="Center"
+                                   TextTrimming="CharacterEllipsis"
+                                   ToolTip.Tip="{Binding RowToolTip}" />
+                      </StackPanel>
                     </DataTemplate>
                   </ListBox.ItemTemplate>
                 </ListBox>
+                <!-- 多包场景提示：过滤/预览统计语义绑定首包 -->
+                <TextBlock Text="{Binding LocalizedStrings[Extract_Source_MultiFilterHint]}"
+                           FontSize="11"
+                           TextWrapping="Wrap"
+                           Foreground="{DynamicResource ThemeTextSecondaryBrush}"
+                           IsVisible="{Binding HasMultipleArchives}" />
               </StackPanel>
             </Border>
 
@@ -119,6 +135,10 @@
                               ShowFilteredGhosts="{Binding ShowFilteredGhosts}"
                               IsLoading="{Binding IsPreviewBuilding}"
                               BuildProgress="{Binding PreviewBuildProgress}"
+                              IsListingPending="{Binding IsListingPending}"
+                              LoadFailedTitle="{Binding PreviewErrorTitle}"
+                              LoadFailedDetail="{Binding PreviewErrorDetail}"
+                              LoadFailedNeedsPassword="{Binding PreviewNeedsPassword}"
                               MinWidth="200" />
 
     <!-- ═══════ Bottom buttons (span all columns) ═══════ -->
