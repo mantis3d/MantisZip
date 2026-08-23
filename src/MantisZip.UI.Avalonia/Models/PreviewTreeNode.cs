@@ -98,7 +98,13 @@ public class PreviewTreeNode : FolderNode
     public bool IsTruncatedNode => IsTruncated;
 
     /// <summary>
-    /// 节点前景色状态键：空存档(紫) > 文件冲突(红) > 默认(null 回退主题色)。
+    /// 占位节点状态前景色键（合并预览中损坏="ConflictRed"、需密码="Blue"）。
+    /// 优先级：空存档(紫) > 文件冲突(红) > 状态色 > 默认主题色。
+    /// </summary>
+    public string? StatusForegroundKey { get; set; }
+
+    /// <summary>
+    /// 节点前景色状态键：空存档(紫) > 文件冲突(红) > 占位状态色 > 默认(null 回退主题色)。
     /// </summary>
     public string? ForegroundKey
     {
@@ -106,6 +112,7 @@ public class PreviewTreeNode : FolderNode
         {
             if (IsArchiveEmpty) return "Purple";
             if (ExistsAtDestination) return "ConflictRed";
+            if (!string.IsNullOrEmpty(StatusForegroundKey)) return StatusForegroundKey;
             return null;
         }
     }
@@ -150,6 +157,7 @@ public class PreviewTreeNode : FolderNode
             IsFilteredOut = IsFilteredOut,
             IsArchiveNode = IsArchiveNode,
             IsArchiveEmpty = IsArchiveEmpty,
+            StatusForegroundKey = StatusForegroundKey,
             IsDirectory = IsDirectory,
             IndentDepth = IndentDepth,
             AncestorHasNextSibling = AncestorHasNextSibling,

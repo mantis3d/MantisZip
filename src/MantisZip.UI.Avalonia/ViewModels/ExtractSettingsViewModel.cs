@@ -370,8 +370,10 @@ public partial class ExtractSettingsViewModel : ObservableObject
         var version = ++_previewBuildVersion;
         var sources = SourceItems.ToList();
 
-        // 全部未就绪 → ⏳ 读取中占位
-        if (sources.All(i => !_entriesCache.ContainsKey(i.Path)))
+        // 全部尚未得出结论（仍在排队/校验中）→ ⏳ 读取中占位。
+        // 注意不能用「缓存为空」判断：损坏/需密码的包永远不会入缓存，
+        // 否则单加密包场景会永远卡在读取中。
+        if (sources.All(i => i.Status is SourceArchiveStatus.Pending or SourceArchiveStatus.Validating))
         {
             IsListingPending = true;
             PreviewErrorTitle = "";
@@ -447,21 +449,29 @@ public partial class ExtractSettingsViewModel : ObservableObject
                     }
                     else
                     {
-                        // 占位节点：emoji 前缀携带状态，副文本为原因文案
-                        var (icon, statusText) = item.Status switch
+                        // 占位节点：与正常压缩包相同的归档图标 + 状态色文字（损坏红/加密蓝），副文本为原因文案
+                        var statusText = item.Status switch
                         {
                             SourceArchiveStatus.NeedsPassword =>
-                                ("🔒", LocalizationManager.T("Extract_Preview_NeedsPassword")),
+                                LocalizationManager.T("Extract_Preview_NeedsPassword"),
                             SourceArchiveStatus.Failed =>
-                                ("⚠️", LocalizationManager.T("Extract_Preview_LoadFailed")),
-                            _ => ("⏳", LocalizationManager.T("Preview_Result_Reading")),
+                                LocalizationManager.T("Extract_Preview_LoadFailed"),
+                            _ => LocalizationManager.T("Preview_Result_Reading"),
+                        };
+                        var statusKey = item.Status switch
+                        {
+                            SourceArchiveStatus.NeedsPassword => "Blue",
+                            SourceArchiveStatus.Failed => "ConflictRed",
+                            _ => (string?)null,
                         };
                         root.Children.Add(new PreviewTreeNode
                         {
                             Name = displayName,
-                            DisplayLabel = $"{icon} {displayName}",
+                            DisplayLabel = displayName,
                             SizeDisplay = statusText,
                             FullPath = item.Path,
+                            IsArchiveNode = true,
+                            StatusForegroundKey = statusKey,
                         });
                     }
                 }
