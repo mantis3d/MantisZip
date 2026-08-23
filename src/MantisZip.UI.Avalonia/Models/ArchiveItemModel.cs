@@ -36,6 +36,10 @@ public partial class ArchiveItemModel : ObservableObject
     [ObservableProperty]
     private bool _isDirectory;
 
+    /// <summary>条目是否加密（决定预览/双击时是否提示需要密码）。</summary>
+    [ObservableProperty]
+    private bool _isEncrypted;
+
     /// <summary>
     /// 当前压缩格式是否能提供逐项压缩后大小。
     /// false（如 7z/RAR/.tgz/.gz）时，文件与目录的压缩后大小列均显示空。
@@ -137,7 +141,8 @@ public partial class ArchiveItemModel : ObservableObject
             Size = item.Size,
             CompressedSize = item.CompressedSize,
             LastModified = item.LastModified,
-            IsDirectory = item.IsDirectory
+            IsDirectory = item.IsDirectory,
+            IsEncrypted = item.IsEncrypted
         };
     }
 
@@ -154,7 +159,7 @@ public partial class ArchiveItemModel : ObservableObject
             CompressedSize = CompressedSize,
             LastModified = LastModified,
             IsDirectory = IsDirectory,
-            IsEncrypted = IsDirectory ? false : false
+            IsEncrypted = IsEncrypted
         };
     }
 
