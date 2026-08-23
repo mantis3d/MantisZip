@@ -82,6 +82,38 @@ public partial class ExtractSettingsWindow : Window
                 : CustomFilePickerDialog.ShowExtractFolderAsync(
                     owner ?? this, ViewModel.FirstArchiveEntries, ViewModel.DestinationPath);
 
+        // ── 手动解锁（自动匹配失败后的补救）：复用主流程 PasswordDialog ──
+        ViewModel.ShowUnlockDialog = async (archivePath) =>
+        {
+            var pwdDialog = new Views.PasswordDialog(System.IO.Path.GetFileName(archivePath));
+            var ok = await pwdDialog.ShowDialog<bool>(this);
+            if (!ok) return null;
+            return new PasswordDialogResponse
+            {
+                Password = pwdDialog.Password,
+                RememberInSession = pwdDialog.RememberInSession,
+                SavePermanently = pwdDialog.SavePermanently,
+                Description = pwdDialog.Description,
+                Patterns = pwdDialog.Patterns
+            };
+        };
+
+        // 双击列表中的锁定/加密未匹配行 → 手动输密码
+        FileListBox.DoubleTapped += async (_, _) =>
+        {
+            if (ExtractSettingsViewModel.IsUnlockable(ViewModel.SelectedSourceItem) && ViewModel.SelectedSourceItem != null)
+                await ViewModel.UnlockManuallyAsync(ViewModel.SelectedSourceItem);
+        };
+
+        // 双击树上 🔒 占位节点 → 同上（占位节点 FullPath = 源包路径）
+        PreviewTree.NodeDoubleTapped += async (_, node) =>
+        {
+            var item = ViewModel.SourceItems.FirstOrDefault(i =>
+                string.Equals(i.Path, node.FullPath, StringComparison.OrdinalIgnoreCase));
+            if (ExtractSettingsViewModel.IsUnlockable(item))
+                await ViewModel.UnlockManuallyAsync(item!);
+        };
+
         Loaded += OnLoaded;
     }
 

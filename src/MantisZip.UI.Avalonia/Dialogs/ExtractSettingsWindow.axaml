@@ -1,6 +1,7 @@
 <Window xmlns="https://github.com/avaloniaui"
          xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
          xmlns:controls="clr-namespace:MantisZip.UI.Avalonia.Controls"
+         xmlns:conv="clr-namespace:MantisZip.UI.Avalonia.Converters"
          x:Class="MantisZip.UI.Avalonia.Dialogs.ExtractSettingsWindow"
          x:CompileBindings="False"
          Title="{Binding LocalizedStrings[Extract_Title]}"
@@ -11,6 +12,11 @@
          WindowStartupLocation="CenterOwner"
          CanResize="True"
          Background="{DynamicResource ThemeWindowBgBrush}">
+
+  <Window.Resources>
+    <conv:GeometryResourceConverter x:Key="GeometryResourceConverter" />
+    <conv:NodeForegroundConverter x:Key="NodeForegroundConverter" />
+  </Window.Resources>
 
   <Grid RowDefinitions="*,Auto"
         Margin="16">
@@ -53,9 +59,10 @@
                       <StackPanel Orientation="Horizontal"
                                   Spacing="6"
                                   Background="Transparent">
-                        <TextBlock Text="{Binding StatusIcon}"
-                                   FontSize="12"
-                                   VerticalAlignment="Center" />
+                        <PathIcon Data="{Binding StatusIconKey, Converter={StaticResource GeometryResourceConverter}}"
+                                  Width="14" Height="14"
+                                  VerticalAlignment="Center"
+                                  Foreground="{Binding StatusForegroundKey, Converter={StaticResource NodeForegroundConverter}}" />
                         <TextBlock Text="{Binding DisplayName}"
                                    VerticalAlignment="Center"
                                    TextTrimming="CharacterEllipsis"
@@ -70,6 +77,19 @@
                            TextWrapping="Wrap"
                            Foreground="{DynamicResource ThemeTextSecondaryBrush}"
                            IsVisible="{Binding HasMultipleArchives}" />
+                <!-- 手动解锁：选中锁定/加密未匹配行时出现 -->
+                <Button Command="{Binding UnlockSelectedCommand}"
+                        IsVisible="{Binding CanUnlockSelected}"
+                        HorizontalAlignment="Left"
+                        Classes="ToolbarButton">
+                  <StackPanel Orientation="Horizontal" Spacing="6">
+                    <PathIcon Data="{StaticResource IconKey}"
+                              Width="14" Height="14"
+                              Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+                    <TextBlock Text="{Binding LocalizedStrings[Extract_UnlockButton]}"
+                               VerticalAlignment="Center" />
+                  </StackPanel>
+                </Button>
               </StackPanel>
             </Border>
 

@@ -179,9 +179,10 @@
                     HorizontalAlignment="Center"
                     Spacing="{DynamicResource SpacingSm}"
                     MaxWidth="360">
-          <TextBlock x:Name="StateIconText"
-                     FontSize="28"
-                     HorizontalAlignment="Center" />
+          <PathIcon x:Name="StateIconPath"
+                    Width="28" Height="28"
+                    HorizontalAlignment="Center"
+                    Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
           <TextBlock x:Name="StateTitleText"
                      FontSize="14"
                      FontWeight="SemiBold"

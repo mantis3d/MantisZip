@@ -830,7 +830,8 @@ public partial class App : Application
             }
 
             await RunCliExtractBatchWithProgressAsync(
-                existing, dest, conflictAction, filteredKeys, desktop);
+                existing, dest, conflictAction, filteredKeys, desktop,
+                dialog.ViewModel.MatchedPasswords);
         }
         catch (Exception ex)
         {
@@ -970,7 +971,8 @@ public partial class App : Application
         string targetDir,
         string conflictAction,
         List<string>? filteredEntryKeys,
-        IClassicDesktopStyleApplicationLifetime desktop)
+        IClassicDesktopStyleApplicationLifetime desktop,
+        IReadOnlyDictionary<string, string>? matchedPasswords = null)
     {
         // 显式管理退出：进度窗口是 CLI 模式下唯一窗口，默认 OnLastWindowClose 会在用户
         // 点击 X 时立即退出进程，后台解压被强杀中断（对齐 WPF 的 OnExplicitShutdown 用法）
@@ -1008,7 +1010,12 @@ public partial class App : Application
                             continue;
                         }
 
-                        var password = ResolveCliPassword(archivePath, engine);
+                        // 解压设置窗口校验/手动解锁阶段已确定的密码优先复用（免重复验证与弹窗）；
+                        // 未命中再走密码库扫描 + ResolveCliPassword 流程
+                        var password =
+                            matchedPasswords != null && matchedPasswords.TryGetValue(archivePath, out var preUnlocked)
+                                ? preUnlocked
+                                : ResolveCliPassword(archivePath, engine);
                         var progress = progressWindow.CreatePauseAwareProgress(
                             ProgressWindow.CreateBackgroundProgress(progressWindow));
 

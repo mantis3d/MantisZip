@@ -80,6 +80,11 @@ public partial class ResultTreeView : UserControl
     /// <summary>显示树节点集合（已应用精简/过滤规则）。</summary>
     public ObservableCollection<PreviewTreeNode> DisplayNodes { get; } = new();
 
+    /// <summary>
+    /// 节点被双击（解压设置窗口用于触发锁定压缩包的手动解锁）。
+    /// </summary>
+    public event EventHandler<PreviewTreeNode>? NodeDoubleTapped;
+
     // ── .NET Properties ──
 
     public PreviewTreeNode? Root
@@ -222,12 +227,22 @@ public partial class ResultTreeView : UserControl
     public string ReadingText => LocalizationManager.T("Preview_Result_Reading");
 
     /// <summary>
+    /// 节点双击：直接传出显示节点（克隆体与原树节点同值，
+    /// 宿主用 FullPath 等字段映射回自己的数据即可）。
+    /// </summary>
+    private void OnPreviewTreeDoubleTapped(object? sender, global::Avalonia.Input.TappedEventArgs e)
+    {
+        if (PreviewTreeView.SelectedItem is Models.PreviewTreeNode node)
+            NodeDoubleTapped?.Invoke(this, node);
+    }
+
+    /// <summary>
     /// 条目读取/加载失败状态覆层联动。
     /// 错误态优先于读取中；两者互斥于 IsLoading（树构建覆层由宿主 VM 保证不同时出现）。
     /// </summary>
     private void UpdateStateOverlay()
     {
-        if (StateOverlay == null || StateIconText == null
+        if (StateOverlay == null || StateIconPath == null
             || StateTitleText == null || StateDetailText == null || StateProgressBar == null)
             return;
 
@@ -237,9 +252,14 @@ public partial class ResultTreeView : UserControl
         StateOverlay.IsVisible = hasError || pending;
         if (!StateOverlay.IsVisible) return;
 
+        // 矢量图标与树节点体系一致：损坏 ⚠ / 需密码 🔒(线框) / 读取中 归档+时钟
+        StateIconPath.Data = this.FindResource(
+            hasError
+                ? (LoadFailedNeedsPassword ? "IconLockClosed" : "IconWarning")
+                : "IconArchiveClock") as global::Avalonia.Media.Geometry;
+
         if (hasError)
         {
-            StateIconText.Text = LoadFailedNeedsPassword ? "🔒" : "⚠️";
             StateTitleText.Text = LoadFailedTitle;
             StateDetailText.Text = LoadFailedDetail;
             StateDetailText.IsVisible = !string.IsNullOrEmpty(LoadFailedDetail);
@@ -247,7 +267,6 @@ public partial class ResultTreeView : UserControl
         }
         else
         {
-            StateIconText.Text = "⏳";
             StateTitleText.Text = ReadingText;
             StateDetailText.IsVisible = false;
             StateProgressBar.IsVisible = true;
@@ -263,6 +282,9 @@ public partial class ResultTreeView : UserControl
         ToolTip.SetTip(FilterToggle, LocalizationManager.T(FilterToggle.IsChecked == true ? "Preview_Result_HideFiltered" : "Preview_Result_ShowFiltered"));
         LoadingTextBlock.Text = LocalizationManager.T("Preview_Result_Building");
         StateTitleText.Text = ReadingText;
+
+        // 节点双击事件（解压设置窗口锁定包手动解锁入口之一）
+        PreviewTreeView.DoubleTapped += OnPreviewTreeDoubleTapped;
 
         // 主题切换时刷新 ForegroundKey 绑定，使转换器重新解析新版主题画刷
         ActualThemeVariantChanged += OnActualThemeVariantChanged;

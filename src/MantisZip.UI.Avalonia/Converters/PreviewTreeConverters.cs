@@ -65,6 +65,8 @@ public class NodeForegroundConverter : IValueConverter
     private static readonly SolidColorBrush PurpleBrush = new(0xFF9C27B0);
     private static readonly SolidColorBrush RedBrush = new(0xFFD32F2F);
     private static readonly SolidColorBrush BlueBrush = new(0xFF2196F3);
+    private static readonly SolidColorBrush GreenBrush = new(0xFF4CAF50);
+    private static readonly SolidColorBrush YellowBrush = new(0xFFFFB300);
 
     public object? Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
     {
@@ -75,6 +77,8 @@ public class NodeForegroundConverter : IValueConverter
                 "Purple" => PurpleBrush,
                 "ConflictRed" => RedBrush,
                 "Blue" => BlueBrush,
+                "Green" => GreenBrush,
+                "Yellow" => YellowBrush,
                 _ => GetThemeBrush(),
             };
         }

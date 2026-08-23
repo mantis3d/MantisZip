@@ -1,10 +1,12 @@
 using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using MantisZip.Core;
 using MantisZip.Core.Abstractions;
 using MantisZip.Core.FileFilter;
 using MantisZip.UI.Avalonia.Models;
 using MantisZip.UI.Avalonia.Services;
+using MantisZip.UI.Avalonia.Dialogs;
 
 namespace MantisZip.UI.Avalonia.ViewModels;
 
@@ -120,6 +122,36 @@ public partial class ExtractSettingsViewModel : ObservableObject
     /// <summary>由窗口注入当前过滤条件读取器（FileFilterControl.GetFilter 封装）。</summary>
     public Func<FileFilterCriteria?>? FilterProvider { get; set; }
 
+    /// <summary>
+    /// 由 View 注入：弹出密码输入对话框（复用主流程 PasswordDialog），取消返回 null。
+    /// 用于自动匹配失败后的手动解锁。
+    /// </summary>
+    public Func<string, Task<PasswordDialogResponse?>>? ShowUnlockDialog { get; set; }
+
+    private readonly PasswordService _passwordService = new();
+
+    /// <summary>校验/手动解锁阶段确定的密码（path→pwd）。窗口确认后随结果传出，解压阶段直接复用免弹窗。</summary>
+    private readonly Dictionary<string, string> _matchedPasswords = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>已确定的密码字典只读视图（调用方回传解压流程）。</summary>
+    public IReadOnlyDictionary<string, string> MatchedPasswords => _matchedPasswords;
+
+    /// <summary>当前选中行是否可手动输密码（🔒 无法列出 / 🔑 加密未匹配）。</summary>
+    [ObservableProperty]
+    private bool _canUnlockSelected;
+
+    partial void OnCanUnlockSelectedChanged(bool value) => UnlockSelectedCommand.NotifyCanExecuteChanged();
+
+    private void UpdateCanUnlockSelected()
+        => CanUnlockSelected = IsUnlockable(SelectedSourceItem);
+
+    /// <summary>该行是否处于可手动输密码的状态。</summary>
+    public static bool IsUnlockable(SourceArchiveItem? item)
+        => item is { Status: SourceArchiveStatus.NeedsPassword }
+        || item is { Status: SourceArchiveStatus.Ok, IsEncrypted: true, MatchedPassword: null };
+
+    partial void OnSelectedSourceItemChanged(SourceArchiveItem? value) => UpdateCanUnlockSelected();
+
     public ExtractSettingsViewModel(IReadOnlyList<string> archivePaths)
     {
         ArchivePaths = archivePaths;
@@ -166,7 +198,8 @@ public partial class ExtractSettingsViewModel : ObservableObject
             "Extract_Start",
             "Extract_Cancel",
             "Extract_TabFilter",
-            "Extract_Source_MultiFilterHint"
+            "Extract_Source_MultiFilterHint",
+            "Extract_UnlockButton"
         };
         var dict = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         foreach (var key in keys)
@@ -321,8 +354,44 @@ public partial class ExtractSettingsViewModel : ObservableObject
                     return;
                 }
 
-                var entries = await engine.ListEntriesAsync(item.Path, null, ct);
+                IReadOnlyList<ArchiveItem> entries;
+                bool lockedType = false;   // A 类：加密文件名等，无密码列不出条目
+
+                try
+                {
+                    entries = await engine.ListEntriesAsync(item.Path, null, ct);
+                }
+                catch (Exception ex) when (ArchiveService.IsPasswordRelatedError(ex))
+                {
+                    // ── A 类：自动尝试密码库，命中后用密码重新列出条目 ──
+                    entries = await TryAutoUnlockAsync(item, engine, relist: true, ct);
+                    if (entries == null)
+                    {
+                        int candidates = 0;
+                        try
+                        {
+                            candidates = PasswordManager.Instance.FindMatchingPasswords(item.Path).Count;
+                        }
+                        catch (Exception cntEx)
+                        {
+                            App.DebugLog($"count candidates failed: {cntEx.Message}");
+                        }
+                        item.ErrorMessage = LocalizationManager.T("Extract_Preview_NoPasswordMatch", candidates);
+                        item.Status = SourceArchiveStatus.NeedsPassword;
+                        return;
+                    }
+                    lockedType = true;
+                }
+
                 _entriesCache[item.Path] = entries.ToList();
+                item.IsEncrypted = lockedType || entries.Any(e => e.IsEncrypted);
+
+                // ── B 类：能列出但内容加密 → 自动尝试密码库；未命中保持可浏览（🔑）──
+                if (item.IsEncrypted && !lockedType && item.MatchedPassword == null)
+                {
+                    await TryAutoUnlockAsync(item, engine, relist: false, ct);
+                }
+
                 item.ErrorMessage = null;
                 item.Status = SourceArchiveStatus.Ok;
 
@@ -348,14 +417,120 @@ public partial class ExtractSettingsViewModel : ObservableObject
         catch (Exception ex)
         {
             item.ErrorMessage = ex.Message;
-            // 密码类异常 ≠ 损坏：加密文件名的 7z 无密码时无法列出条目
-            item.Status = ArchiveService.IsPasswordRelatedError(ex)
-                ? SourceArchiveStatus.NeedsPassword
-                : SourceArchiveStatus.Failed;
+            item.Status = SourceArchiveStatus.Failed;
         }
 
-        // 任一包校验完成即增量刷新合并树（健康包子树就位 / 占位节点转正）
-        global::Avalonia.Threading.Dispatcher.UIThread.Post(RebuildMergedPreview);
+        // 任一包校验完成即增量刷新合并树 + 刷新解锁按钮可用性
+        global::Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+        {
+            UpdateCanUnlockSelected();
+            RebuildMergedPreview();
+        });
+    }
+
+    /// <summary>
+    /// 自动尝试密码库。relist=true（A 类）用候选密码重新列条目验证；
+    /// relist=false（B 类）依赖 TryMatchPassword 内部的 QuickVerify。
+    /// 命中返回条目并记录密码/描述；未命中返回 null（不改 Status，由调用方决定终态）。
+    /// </summary>
+    private async Task<IReadOnlyList<ArchiveItem>?> TryAutoUnlockAsync(
+        SourceArchiveItem item, IArchiveEngine engine, bool relist, CancellationToken ct)
+    {
+        var match = _passwordService.TryMatchPassword(item.Path, engine);
+        if (match == null) return null;
+
+        IReadOnlyList<ArchiveItem> entries;
+        if (relist)
+        {
+            entries = (await engine.ListEntriesAsync(item.Path, match.Value.Password, ct)).ToList();
+        }
+        else
+        {
+            entries = _entriesCache.TryGetValue(item.Path, out var cached)
+                ? cached
+                : (await engine.ListEntriesAsync(item.Path, match.Value.Password, ct)).ToList();
+        }
+
+        item.SetMatched(match.Value.Password, match.Value.Description);
+        item.ErrorMessage = null;
+        item.IsEncrypted = true;
+        item.Status = SourceArchiveStatus.Ok;
+        _matchedPasswords[item.Path] = match.Value.Password;
+        return entries;
+    }
+
+    /// <summary>
+    /// 手动输入密码解锁（自动匹配失败后的补救）：验证循环直到正确或取消。
+    /// 成功后缓存条目、记录密码、按用户选择入库，并刷新合并树。
+    /// </summary>
+    [RelayCommand(CanExecute = nameof(CanUnlockSelected))]
+    private async Task UnlockSelected()
+    {
+        if (SelectedSourceItem != null)
+            await UnlockManuallyAsync(SelectedSourceItem);
+    }
+
+    public async Task UnlockManuallyAsync(SourceArchiveItem item)
+    {
+        if (ShowUnlockDialog == null) return;
+
+        var engine = ArchiveEngineFactory.GetEngineByExtension(item.Path);
+        if (engine == null) return;
+
+        while (true)
+        {
+            var resp = await ShowUnlockDialog(item.Path);
+            if (resp?.Password == null) return;   // 用户取消：维持现状，解压阶段走现有弹窗兜底
+
+            bool ok;
+            if (item.Status == SourceArchiveStatus.NeedsPassword)
+            {
+                // A 类：重列条目即验证
+                try
+                {
+                    var entries = (await engine.ListEntriesAsync(item.Path, resp.Password)).ToList();
+                    _entriesCache[item.Path] = entries;
+                    item.IsEncrypted = true;
+                    if (_firstArchiveEntries == null &&
+                        string.Equals(item.Path, SourceItems[0].Path, StringComparison.OrdinalIgnoreCase))
+                    {
+                        _firstArchiveEntries = entries;
+                    }
+                    ok = true;
+                }
+                catch (Exception ex)
+                {
+                    App.DebugLog($"manual unlock relist failed: {ex.Message}");
+                    ok = false;
+                }
+            }
+            else
+            {
+                // B 类：快速验证首个加密条目
+                ok = _passwordService.QuickVerifyPassword(item.Path, resp.Password, engine);
+            }
+
+            if (!ok)
+            {
+                await AppMessageBox.Show(
+                    LocalizationManager.T("Extract_Unlock_WrongPassword"),
+                    LocalizationManager.T("App_ErrorTitle"),
+                    MessageBoxButton.OK, MessageBoxImage.Warning);
+                continue;
+            }
+
+            item.SetMatched(resp.Password, resp.Description);
+            item.ErrorMessage = null;
+            item.Status = SourceArchiveStatus.Ok;
+            _matchedPasswords[item.Path] = resp.Password;
+
+            if (resp.SavePermanently)
+                _passwordService.TrySavePassword(resp.Password, item.Path, resp.Patterns, resp.Description);
+
+            UpdateCanUnlockSelected();
+            RebuildMergedPreview();
+            return;
+        }
     }
 
     /// <summary>
@@ -445,24 +620,34 @@ public partial class ExtractSettingsViewModel : ObservableObject
                         sub.Name = displayName;
                         sub.DisplayLabel = displayName;
                         sub.IsArchiveNode = true;
+                        // 图标与文字颜色跟随列表行徽标（Checkmark绿/Key蓝/LockOpen黄…）
+                        sub.IconKeyOverride = item.StatusIconKey;
+                        sub.StatusForegroundKey = item.StatusForegroundKey;
+
+                        // 加密切态副文本：🔓 已匹配密码（描述）/ 🔑 内容加密·密码未匹配
+                        if (item.IsEncrypted)
+                        {
+                            sub.SizeDisplay = item.MatchedPassword == null
+                                ? LocalizationManager.T("Extract_Preview_EncryptedNoMatch")
+                                : string.IsNullOrEmpty(item.MatchedDescription)
+                                    ? LocalizationManager.T("Extract_Preview_Unlocked")
+                                    : LocalizationManager.T("Extract_Preview_UnlockedDesc", item.MatchedDescription);
+                        }
+
                         root.Children.Add(sub);
                     }
                     else
                     {
-                        // 占位节点：与正常压缩包相同的归档图标 + 状态色文字（损坏红/加密蓝），副文本为原因文案
+                        // 占位节点：图标/颜色与列表徽标一致（LockClosed红 / Warning红 / ArchiveClock），副文本为原因文案
                         var statusText = item.Status switch
                         {
                             SourceArchiveStatus.NeedsPassword =>
-                                LocalizationManager.T("Extract_Preview_NeedsPassword"),
+                                string.IsNullOrEmpty(item.ErrorMessage)
+                                    ? LocalizationManager.T("Extract_Preview_NeedsPassword")
+                                    : item.ErrorMessage,
                             SourceArchiveStatus.Failed =>
                                 LocalizationManager.T("Extract_Preview_LoadFailed"),
                             _ => LocalizationManager.T("Preview_Result_Reading"),
-                        };
-                        var statusKey = item.Status switch
-                        {
-                            SourceArchiveStatus.NeedsPassword => "Blue",
-                            SourceArchiveStatus.Failed => "ConflictRed",
-                            _ => (string?)null,
                         };
                         root.Children.Add(new PreviewTreeNode
                         {
@@ -471,7 +656,8 @@ public partial class ExtractSettingsViewModel : ObservableObject
                             SizeDisplay = statusText,
                             FullPath = item.Path,
                             IsArchiveNode = true,
-                            StatusForegroundKey = statusKey,
+                            IconKeyOverride = item.StatusIconKey,
+                            StatusForegroundKey = item.StatusForegroundKey,
                         });
                     }
                 }

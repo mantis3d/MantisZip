@@ -35,6 +35,12 @@ public class PreviewTreeNode : FolderNode
     /// <summary>是否为压缩包节点（显示归档图标）。</summary>
     public bool IsArchiveNode { get; set; }
 
+    /// <summary>
+    /// 图标覆盖键（如合并预览的压缩包节点按状态显示 Checkmark/Key/LockOpen 等）。
+    /// 非 null 时优先于 <see cref="IconKey"/> 的自动推导。
+    /// </summary>
+    public string? IconKeyOverride { get; set; }
+
     /// <summary>压缩包内所有文件均被过滤，该压缩包不会生成。</summary>
     public bool IsArchiveEmpty { get; set; }
 
@@ -85,6 +91,7 @@ public class PreviewTreeNode : FolderNode
     {
         get
         {
+            if (!string.IsNullOrEmpty(IconKeyOverride)) return IconKeyOverride;
             if (IsArchiveNode) return "IconArchive";
             if (IsTruncated) return null;
             if (ExistsAtDestination && !IsDirectory && !string.IsNullOrEmpty(FullPath)) return "IconWarning";
@@ -157,6 +164,7 @@ public class PreviewTreeNode : FolderNode
             IsFilteredOut = IsFilteredOut,
             IsArchiveNode = IsArchiveNode,
             IsArchiveEmpty = IsArchiveEmpty,
+            IconKeyOverride = IconKeyOverride,
             StatusForegroundKey = StatusForegroundKey,
             IsDirectory = IsDirectory,
             IndentDepth = IndentDepth,
