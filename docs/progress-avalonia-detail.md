@@ -6,6 +6,22 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-08-23** — 预览加密条目改为明确提示需要密码
+  - **背景**：取消密码进入浏览模式后点击加密文件，预览流程仍照常发起条目提取——魔数检测异常被吞掉后走扩展名分类，`ExtractToTempAsync` 抛出库级密码异常落到外层 catch，显示「预览失败: <SharpCompress/SharpSevenZip 原始消息>」，用户无法理解；WPF 版信息栏有「🔒 已加密」标记语义更清晰
+  - **修复**：`ShowPreviewAsync` 入口处拦截——`entry.IsEncrypted && _currentPassword == null` 时跳过魔数检测与提取，直接 `ShowUnsupported(Preview_EntryNeedsPassword)`（"🔒 此文件已加密，请先输入密码再预览"）+ 状态栏"已加密"；按条目判断，混合压缩包中未加密文件照常预览
+  - **顺带修复**：`ArchiveItemModel` 此前未携带 `IsEncrypted`（`FromCore` 漏拷、`ToCoreItem` 写死 false），补全字段透传
+  - 涉及文件：`Models/ArchiveItemModel.cs`、`ViewModels/MainWindowViewModel.cs`、`Localization/strings.zh-CN.json`、`Localization/strings.en.json`
+  - 验证：`dotnet build` 0 错误；lsp 无诊断
+
+**2026-08-23** — 工具栏「密码」按钮三态化 + 可列出加密包取消密码后仍可浏览（全面对齐 WPF）
+  - **背景一（按钮功能接错）**：Avalonia 工具栏密码按钮绑的是 `OpenPasswordManagerCommand`，与菜单「密码管理器」完全重复；WPF 的 `EnterPasswordBtn` 是针对当前压缩包的三态状态按钮
+  - **背景二（打开流程偏差）**：`ArchiveService.LoadArchiveAsync` 在条目列出成功但含加密条目时人为转成 `PasswordRequired`，VM 对话框循环中用户取消即整体不打开；WPF 仅在 `ListEntriesAsync` 本身抛密码异常（7z 加密文件名）时才强制要密码，可列出的加密包（ZIP/RAR/EncryptHeaders=false 7z）取消密码后照常打开仅浏览
+  - **按钮三态**（复刻 WPF `UpdateEnterPasswordBtnState`）：无包/无加密→禁用钥匙图标；已加密未匹配→红 `IconLockClosed`；已匹配→绿 `IconLockOpen` + 绿底高亮（新增 `ThemeStatusSuccessBgBrush` 资源，Light/Dark 成对）；tooltip 三态文案。点击：已匹配→`MatchedPasswordDialog` 查看/复制（会话级记录描述与规则，自动匹配场景回查密码库补齐）；未匹配→`PasswordDialog` 输入 → `QuickVerifyPassword` → 存入 `_currentPassword` + 会话缓存，可选保存到密码库。语言切换、开关包、加载完成后均刷新状态（`CurrentArchivePath` 在密码流程后才赋值，赋值点补一次刷新）
+  - **打开流程重构**（对齐 WPF `ResolvePasswordAsync` 语义）：统一两场景——A. 条目无法列出→试密码库→对话框循环→取消不打开；B. 可列出但含加密条目→会话缓存有效直接视为已匹配（现状保留），否则静默试密码库→弹对话框循环验证，**取消则仅浏览打开**（底部"已加密"+ 工具栏红锁，可随时补输密码）；错密码提示后重试
+  - 清理废弃 key：`Tooltip_Password`（zh/en + VM keys 数组），新增按钮三态 tooltip 与 `Preview_EntryNeedsPassword` 共 4 组双语 key
+  - 涉及文件：`Themes/ThemeLight.axaml`、`Themes/ThemeDark.axaml`、`Views/MainWindow.axaml(.cs)`、`ViewModels/MainWindowViewModel.cs`、`Services/ArchiveService.cs`、`Localization/strings.zh-CN.json`、`Localization/strings.en.json`
+  - 验证：`dotnet build` 0 错误（应用实例锁定 DLL，改用独立输出目录验证）；lsp 无诊断
+
 **2026-08-23** — 解压设置窗口多压缩包损坏提示 + 合并预览树
   - **背景**：CLI `--extract` 多选压缩包弹出的 ExtractSettingsWindow，源列表为纯字符串无任何校验；预览树只绑定第一个包，且首包 ListEntriesAsync 失败被静默吞掉（仅 DebugLog）——损坏包在配置阶段零提示，直到解压阶段才在进度窗标红。顺带发现潜伏 bug：`ExtractSettingsViewModel.FilteredEntryKeys` 从未被赋值（恒 null），CLI 批量解压的文件过滤一直静默失效。
   - **修复**：
