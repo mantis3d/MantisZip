@@ -19,6 +19,7 @@
     - **密码库自动尝试**：校验阶段对加密包自动跑 `TryMatchPassword`（≤100 候选，ZIP 读首加密条目 1 字节 / 7z 提最小条目前 8KB 快速验证）。A 类（无法列条目）命中后用密码重列 → 🔓 完整子树；B 类（能列出但内容加密）命中转 🔓、未命中保持可浏览标 🔑。确定密码存入 `MatchedPasswords` 字典随窗口确认传出，CLI 批量解压循环优先复用（跳过重复扫描与弹窗）——库内有记录的包全程零弹窗
     - **手动解锁**：自动失败后的补救入口三个——选中锁定行的内联按钮「输入密码解锁…」/ 双击列表行 / 双击树占位节点（ResultTreeView 新增 NodeDoubleTapped 事件）；复用主流程 PasswordDialog 验证循环（错误弹提示继续输），可选保存到密码库（默认不勾，与主流程一致）；取消则解压阶段走现有 ResolveCliPassword 流程兜底
     - **矢量图标化 + 状态配色体系**：列表徽标/解锁按钮/树状态覆层的 emoji 全部换成 AppIcons 矢量图标（Timer/ArchiveClock/Checkmark/Key/LockOpen/LockClosed/Warning，零新增资源）；配色 损坏红/锁定红/未匹配蓝/解锁黄/正常绿（NodeForegroundConverter 新增 Blue/Green/Yellow 键）；`PreviewTreeNode` 新增 `IconKeyOverride` 图标覆盖键与 `StatusForegroundKey` 均补进 ShallowClone，合并树的压缩包节点与列表徽标同源驱动永不失同步
+    - **骨架式增量预览**：树从首帧起全量展示骨架——所有压缩包以占位节点（未开始 IconTimer / 读取中）立即上屏，随校验与子树构建逐个「原位转正」，已显示部分零闪烁零重排；子树按包缓存复用（重建只处理增量），构建期间新请求不再作废当前工作而是标记 dirty 完成后补一轮；目标路径/过滤变化整体失效、手动解锁定点失效；多包增量子树构建阶段移除整树进度条覆层（占位节点即进度表达）；修复 DecorateSubTree 未回写 FullPath 导致子树缓存键全部互撞、所有包卡「正在读取」的问题；清理旧 VM 级 BuildExtractPreview/CoreAsync 死代码与版本号守卫
   - 涉及文件：`ViewModels/SourceArchiveItem.cs`（新增）、`Services/ArchiveService.cs`、`Services/ResultPreviewService.cs`、`Controls/ResultTreeView.axaml(.cs)`、`ViewModels/ExtractSettingsViewModel.cs`、`Dialogs/ExtractSettingsWindow.axaml(.cs)`、`App.axaml.cs`、`Localization/strings.zh-CN.json`、`Localization/strings.en.json`、`tests/MantisZip.UI.Avalonia.Tests/SourceArchiveValidationTests.cs`（新增）
   - 验证：`dotnet build` 0 错误；Avalonia 测试 76 通过 / 0 失败 / 2 跳过（含新增分类器与行模型用例）；lsp 无诊断；双语 key 1101/1101 对齐
 
