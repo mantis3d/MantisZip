@@ -98,17 +98,25 @@ internal static partial class ShellIntegration
         var exePath = GetExePath();
         var progIdKey = $@"Software\Classes\{progId}";
 
-        // 只有需要创建时才写入，避免覆盖用户的自定义设置
-        using var check = Registry.CurrentUser.OpenSubKey(progIdKey);
-        if (check != null) return;
+        bool isNew;
+        using (var check = Registry.CurrentUser.OpenSubKey(progIdKey))
+        {
+            isNew = check == null;
+        }
 
-        // 友好名称
-        var displayName = LocalizationManager.T("Shell_ProgIdDesc") + " — " + ext.TrimStart('.');
-        SetRegistryValue(progIdKey, null, displayName);
-        SetRegistryValue($@"{progIdKey}\shell\open", null, LocalizationManager.T("Shell_OpenVerb"));
+        if (isNew)
+        {
+            // 友好名称与动词标签仅首次创建时写入，避免覆盖用户的自定义设置
+            var displayName = LocalizationManager.T("Shell_ProgIdDesc") + " — " + ext.TrimStart('.');
+            SetRegistryValue(progIdKey, null, displayName);
+            SetRegistryValue($@"{progIdKey}\shell\open", null, LocalizationManager.T("Shell_OpenVerb"));
+        }
+
+        // 打开命令与图标每次安装都刷新（自愈）：
+        // 1) 旧版本在格式图标文件缺失时写入的是 exe 兜底图标，补齐文件后重装关联即可更新；
+        // 2) 便携版换目录后 command 指向的旧路径失效，重新安装关联即可修复。
         SetRegistryValue($@"{progIdKey}\shell\open\command", null, $@"""{exePath}"" --open-dispatch ""%1""");
 
-        // 具体格式图标
         var iconPath = GetIconPath(ext);
         if (iconPath != null)
             SetRegistryValue($@"{progIdKey}\DefaultIcon", null, iconPath);
