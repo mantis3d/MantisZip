@@ -228,7 +228,7 @@ public partial class MainWindowViewModel : ObservableObject
             "Ctx_Extract", "Ctx_ExtractSelectedHere", "Ctx_ExtractSelectedTo", "Ctx_SmartExtract", "Ctx_ExtractTo",
             "Ctx_CopyName", "Ctx_CopyPath", "Ctx_Test", "Ctx_Delete",
             "Menu_SmartExtract", "Menu_TestArchive", "Menu_AddFiles", "Menu_DeleteFiles", "Menu_ArchiveComment",
-            "Toolbar_SmartExtract", "Toolbar_Test", "Toolbar_AddFiles", "Toolbar_DeleteFiles",
+            "Toolbar_SmartExtract", "Toolbar_Test", "Toolbar_AddFiles", "Toolbar_DeleteFiles","Toolbar_ExtractSelected","Toolbar_ExtractArchive",
             "Tooltip_Open", "Tooltip_Extract", "Tooltip_ExtractSelectedHere", "Tooltip_ExtractSelectedTo", "Tooltip_NewArchive",
             "Tooltip_Filter", "Tooltip_Preview", "Tooltip_SmartExtract", "Tooltip_Test",
             "Tooltip_AddFiles", "Tooltip_DeleteFiles", "Tooltip_Subfolders",

@@ -886,6 +886,8 @@
   "Toolbar_Compress": "Compress",
   "Toolbar_DeleteFiles": "Del",
   "Toolbar_Extract": "Extract",
+  "Toolbar_ExtractArchive": "Extract Archive",
+  "Toolbar_ExtractSelected": "Extract Selected",
   "Toolbar_Filter": "Filter",
   "Toolbar_Open": "Open",
   "Toolbar_Password": "Password",

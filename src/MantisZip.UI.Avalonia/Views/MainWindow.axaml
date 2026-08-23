@@ -451,7 +451,7 @@
                 Command="{Binding OpenArchiveCommand}"
                 ToolTip.Tip="{Binding LocalizedStrings[Tooltip_Open]}">
           <StackPanel >
-            <PathIcon Data="{StaticResource IconFolder}" Classes="ToolbarButtonIcon" Width="14" Height="14" />
+            <PathIcon Data="{StaticResource IconFolder}" Classes="ToolbarButtonIcon" Width="22" Height="22" />
             <TextBlock Text="{Binding LocalizedStrings[Toolbar_Open]}"
                       Classes="ToolbarButtonLabel" />
           </StackPanel>
@@ -460,7 +460,7 @@
                 Command="{Binding NewArchiveCommand}"
                 ToolTip.Tip="{Binding LocalizedStrings[Tooltip_NewArchive]}">
           <StackPanel >
-            <PathIcon Data="{StaticResource IconDownload}" Classes="ToolbarButtonIcon" Width="14" Height="14" />
+            <PathIcon Data="{StaticResource IconDownload}" Classes="ToolbarButtonIcon" Width="22" Height="22" />
             <TextBlock Text="{Binding LocalizedStrings[Toolbar_Compress]}"
                       Classes="ToolbarButtonLabel" />
           </StackPanel>
@@ -470,8 +470,18 @@
                 IsEnabled="{Binding IsArchiveLoaded}"
                 ToolTip.Tip="{Binding LocalizedStrings[Tooltip_Extract]}">
           <StackPanel >
-            <PathIcon Data="{StaticResource IconExport}" Classes="ToolbarButtonIcon" Width="14" Height="14" />
-            <TextBlock Text="{Binding LocalizedStrings[Toolbar_Extract]}"
+            <PathIcon Data="{StaticResource IconExport}" Classes="ToolbarButtonIcon" Width="22" Height="22" />
+            <TextBlock Text="{Binding LocalizedStrings[Toolbar_ExtractArchive]}"
+                      Classes="ToolbarButtonLabel" />
+          </StackPanel>
+        </Button>
+        <Button Classes="ToolbarButton"
+                Command="{Binding ExtractSelectedToCommand}"
+                IsEnabled="{Binding IsArchiveLoaded}"
+                ToolTip.Tip="{Binding LocalizedStrings[Tooltip_ExtractSelectedTo]}">
+          <StackPanel >
+            <PathIcon Data="{StaticResource IconExport}" Classes="ToolbarButtonIcon" Width="22" Height="22" />
+            <TextBlock Text="{Binding LocalizedStrings[Toolbar_ExtractSelected]}"
                       Classes="ToolbarButtonLabel" />
           </StackPanel>
         </Button>
@@ -480,7 +490,7 @@
                 IsEnabled="{Binding IsArchiveLoaded}"
                 ToolTip.Tip="{Binding LocalizedStrings[Tooltip_SmartExtract]}">
           <StackPanel >
-            <PathIcon Data="{StaticResource IconWand}" Classes="ToolbarButtonIcon" Width="14" Height="14" />
+            <PathIcon Data="{StaticResource IconWand}" Classes="ToolbarButtonIcon" Width="22" Height="22" />
             <TextBlock Text="{Binding LocalizedStrings[Toolbar_SmartExtract]}"
                       Classes="ToolbarButtonLabel" />
           </StackPanel>
@@ -496,7 +506,7 @@
                 IsEnabled="{Binding IsArchiveLoaded}"
                 ToolTip.Tip="{Binding LocalizedStrings[Tooltip_AddFiles]}">
           <StackPanel >
-            <PathIcon Data="{StaticResource IconAdd}" Classes="ToolbarButtonIcon" Width="14" Height="14" />
+            <PathIcon Data="{StaticResource IconAdd}" Classes="ToolbarButtonIcon" Width="22" Height="22" />
             <TextBlock Text="{Binding LocalizedStrings[Toolbar_AddFiles]}"
                       Classes="ToolbarButtonLabel" />
           </StackPanel>
@@ -506,7 +516,7 @@
                 IsEnabled="{Binding IsArchiveLoaded}"
                 ToolTip.Tip="{Binding LocalizedStrings[Tooltip_DeleteFiles]}">
           <StackPanel >
-            <PathIcon Data="{StaticResource IconDismiss}" Classes="ToolbarButtonIcon" Width="14" Height="14" />
+            <PathIcon Data="{StaticResource IconDismiss}" Classes="ToolbarButtonIcon" Width="22" Height="22" />
             <TextBlock Text="{Binding LocalizedStrings[Toolbar_DeleteFiles]}"
                       Classes="ToolbarButtonLabel" />
           </StackPanel>
@@ -516,7 +526,7 @@
                 IsEnabled="{Binding IsArchiveLoaded}"
                 ToolTip.Tip="{Binding LocalizedStrings[Tooltip_Test]}">
           <StackPanel >
-            <PathIcon Data="{StaticResource IconCheckmark}" Classes="ToolbarButtonIcon" Width="14" Height="14" />
+            <PathIcon Data="{StaticResource IconCheckmark}" Classes="ToolbarButtonIcon" Width="22" Height="22" />
             <TextBlock Text="{Binding LocalizedStrings[Toolbar_Test]}"
                       Classes="ToolbarButtonLabel" />
           </StackPanel>
@@ -530,7 +540,7 @@
                       IsChecked="{Binding IsPreviewVisible}"
                       ToolTip.Tip="{Binding LocalizedStrings[Tooltip_Preview]}">
           <StackPanel >
-            <PathIcon Data="{StaticResource IconEye}" Classes="ToolbarButtonIcon" Width="14" Height="14" />
+            <PathIcon Data="{StaticResource IconEye}" Classes="ToolbarButtonIcon" Width="22" Height="22" />
             <TextBlock Text="{Binding LocalizedStrings[Toolbar_Preview]}"
                       Classes="ToolbarButtonLabel" />
           </StackPanel>
@@ -544,7 +554,7 @@
                 Command="{Binding OpenPasswordManagerCommand}"
                 ToolTip.Tip="{Binding LocalizedStrings[Tooltip_Password]}">
           <StackPanel >
-            <PathIcon Data="{StaticResource IconKey}" Classes="ToolbarButtonIcon" Width="14" Height="14" />
+            <PathIcon Data="{StaticResource IconKey}" Classes="ToolbarButtonIcon" Width="22" Height="22" />
             <TextBlock Text="{Binding LocalizedStrings[Toolbar_Password]}"
                       Classes="ToolbarButtonLabel" />
           </StackPanel>
@@ -888,12 +898,14 @@
               <!-- Extract Selected To... -->
               <Button Classes="ToolbarButton ToolbarIcon"
                       Command="{Binding ExtractSelectedToCommand}"
+                      IsVisible="False"
                       IsEnabled="{Binding IsArchiveLoaded}"
                       ToolTip.Tip="{Binding LocalizedStrings[Tooltip_ExtractSelectedTo]}">
                 <PathIcon Data="{StaticResource IconExport}" Width="13" Height="13" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
               </Button>
               <Button Classes="ToolbarButton ToolbarIcon"
                       Command="{Binding ExtractSelectedHereCommand}"
+                      IsVisible="False"
                       IsEnabled="{Binding IsArchiveLoaded}"
                       ToolTip.Tip="{Binding LocalizedStrings[Tooltip_ExtractSelectedHere]}">
                 <PathIcon Data="{StaticResource IconPin}" Width="13" Height="13" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
