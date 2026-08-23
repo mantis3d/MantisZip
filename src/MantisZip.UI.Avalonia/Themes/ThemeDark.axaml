@@ -143,6 +143,8 @@
   <SolidColorBrush x:Key="ThemeStatusWarningBrush" Color="{StaticResource ThemeStatusWarning}" />
   <SolidColorBrush x:Key="ThemeStatusSuccessBrush" Color="{StaticResource ThemeStatusSuccess}" />
   <SolidColorBrush x:Key="ThemeStatusErrorBrush" Color="{StaticResource ThemeStatusError}" />
+  <!-- 密码已匹配高亮底色（对齐 WPF Theme_StatusSuccessBg） -->
+  <SolidColorBrush x:Key="ThemeStatusSuccessBgBrush" Color="{StaticResource ThemeStatusSuccess}" Opacity="0.15" />
   <!-- Progress bar foreground/background for progress window -->
   <SolidColorBrush x:Key="ThemeProgressFillBrush" Color="#FF64B5F6" />
   <SolidColorBrush x:Key="ThemeProgressBgBrush" Color="#FF424242" />
