@@ -9,6 +9,7 @@
   "Extract_Preview_Unlocked": "Password matched",
   "Extract_Preview_UnlockedDesc": "Password matched: {0}",
   "Extract_Preview_EncryptedNoMatch": "Encrypted · no matching password",
+  "Extract_Preview_NotStarted": "Not started",
   "Menu_SaveLayout": "Save Layout",
   "Status_LayoutSaved": "Layout saved",
   "AddConflict_Title": "Add Conflict",

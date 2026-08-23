@@ -167,7 +167,8 @@ public partial class ExtractSettingsWindow : Window
     {
         if (e.PropertyName == nameof(ExtractSettingsViewModel.DestinationPath))
         {
-            // 目标路径变化 → 当前选中项的冲突高亮需要重算
+            // 目标路径变化 → 冲突高亮全量失效，重建所有子树
+            ViewModel.InvalidatePreviewCache();
             ViewModel.RebuildMergedPreview();
         }
     }
@@ -238,6 +239,8 @@ public partial class ExtractSettingsWindow : Window
     private void OnFileFilterChanged()
     {
         UpdateFilterStats();
+        // 过滤灰显标记全量失效
+        ViewModel.InvalidatePreviewCache();
         ViewModel.RebuildMergedPreview();
     }
 }

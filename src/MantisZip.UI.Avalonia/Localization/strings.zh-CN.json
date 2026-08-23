@@ -9,6 +9,7 @@
   "Extract_Preview_Unlocked": "已匹配密码",
   "Extract_Preview_UnlockedDesc": "已匹配密码：{0}",
   "Extract_Preview_EncryptedNoMatch": "内容已加密·密码未匹配",
+  "Extract_Preview_NotStarted": "未开始",
   "Menu_SaveLayout": "保存布局",
   "Status_LayoutSaved": "布局已保存",
   "AddConflict_Title": "添加冲突",

@@ -75,8 +75,6 @@ public partial class ExtractSettingsViewModel : ObservableObject
     [ObservableProperty]
     private double _previewBuildProgress = -1;
 
-    /// <summary>预览树构建版本号，用于丢弃过期异步结果。</summary>
-    private int _previewBuildVersion;
 
     // ── 逐包校验与预览跟随选中 ──
 
@@ -90,6 +88,19 @@ public partial class ExtractSettingsViewModel : ObservableObject
     /// <summary>条目缓存：校验成功的包把条目存这里，点击行切换预览零额外 IO。</summary>
     private readonly Dictionary<string, IReadOnlyList<ArchiveItem>> _entriesCache =
         new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// 已构建子树缓存（path→归档节点）。重建时只构建增量，
+    /// 目标路径/过滤变化整体失效（InvalidatePreviewCache），解锁等单包变化定点失效。
+    /// </summary>
+    private readonly Dictionary<string, PreviewTreeNode> _subTreeCache =
+        new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>合并重建进行中标记（UI 线程串行；期间新请求合并为完成后补一轮）。</summary>
+    private bool _isRebuilding;
+
+    /// <summary>dirty 标记：重建期间收到新请求，当前轮结束后补一轮。</summary>
+    private bool _rebuildPending;
 
     /// <summary>
     /// 第一个压缩包的条目。过滤统计与实际提取语义保持绑定首包
@@ -230,82 +241,6 @@ public partial class ExtractSettingsViewModel : ObservableObject
             ConflictAction = value.Value;
     }
 
-    /// <summary>
-    /// 构建解压预览树。由窗口在加载完成后调用。
-    /// 原始树构建在后台线程执行，快速操作时通过版本号丢弃过期结果。
-    /// </summary>
-    /// <param name="entries">压缩包内的条目列表。</param>
-    /// <param name="filter">文件过滤条件，传递到服务层标记 IsFilteredOut。</param>
-    /// <param name="checkExists">是否逐文件检查目标位置是否存在。</param>
-    public void BuildExtractPreview(IEnumerable<ArchiveItem> entries, FileFilterCriteria? filter = null, bool checkExists = false)
-        => _ = BuildExtractPreviewCoreAsync(entries, filter, checkExists);
-
-    private async Task BuildExtractPreviewCoreAsync(IEnumerable<ArchiveItem> entries, FileFilterCriteria? filter, bool checkExists)
-    {
-        var version = ++_previewBuildVersion;
-        IsBuildPending = true; // 快慢构建都置位，过滤结果就绪前禁用"开始解压"
-        PreviewBuildProgress = -1;
-
-        if (string.IsNullOrWhiteSpace(DestinationPath))
-        {
-            PreviewRoot = null;
-            IsPreviewBuilding = false;
-            IsBuildPending = false;
-            return;
-        }
-
-        // 快照输入（后台构建期间 DestinationPath 等可能被用户修改）
-        var snapshot = entries.ToList();
-        var destDir = DestinationPath;
-
-        // Progress<T> 捕获构造时的 SynchronizationContext（UI 线程），自动封送回 UI；
-        // 版本号守卫丢弃过期构建的进度回调
-        var progress = new Progress<double>(v =>
-        {
-            if (version == _previewBuildVersion)
-                PreviewBuildProgress = v;
-        });
-
-        try
-        {
-            var rootName = Path.GetFileName(destDir);
-
-            var buildTask = Task.Run(() => ResultPreviewService.BuildExtractPreview(
-                snapshot,
-                destDir,
-                rootName: rootName,
-                checkExists: checkExists,
-                filter: filter,
-                progress: progress));
-
-            // 快速构建（<250ms）不显示加载态，避免切换目标路径时预览树闪烁；
-            // 慢构建显示确定性进度条（服务按条目数上报 0–100）
-            var delayTask = Task.Delay(250);
-            if (await Task.WhenAny(buildTask, delayTask) == delayTask)
-            {
-                if (version != _previewBuildVersion) return; // 已有更新的构建
-                IsPreviewBuilding = true;
-            }
-
-            var root = await buildTask;
-            if (version != _previewBuildVersion) return; // 过期结果丢弃
-
-            PreviewRoot = root;
-        }
-        catch (Exception ex)
-        {
-            App.DebugLog($"BuildExtractPreview failed: {ex.Message}");
-        }
-        finally
-        {
-            if (version == _previewBuildVersion)
-            {
-                IsPreviewBuilding = false;
-                IsBuildPending = false;
-            }
-        }
-    }
-
     // ── 逐包校验与合并预览树 ──
 
     /// <summary>
@@ -354,7 +289,7 @@ public partial class ExtractSettingsViewModel : ObservableObject
                     return;
                 }
 
-                IReadOnlyList<ArchiveItem> entries;
+                IReadOnlyList<ArchiveItem>? entries;
                 bool lockedType = false;   // A 类：加密文件名等，无密码列不出条目
 
                 try
@@ -520,6 +455,7 @@ public partial class ExtractSettingsViewModel : ObservableObject
             }
 
             item.SetMatched(resp.Password, resp.Description);
+            _subTreeCache.Remove(item.Path);   // 手动解锁后该包子树定点重建
             item.ErrorMessage = null;
             item.Status = SourceArchiveStatus.Ok;
             _matchedPasswords[item.Path] = resp.Password;
@@ -534,166 +470,245 @@ public partial class ExtractSettingsViewModel : ObservableObject
     }
 
     /// <summary>
-    /// 重建合并预览树：所有压缩包并列展示——健康包为归档节点（下挂条目子树），
-    /// 损坏/需密码/未就绪的包为占位节点。校验逐个完成时增量刷新。
+    /// 重建合并预览树（增量骨架式）：
+    /// 骨架立即上屏——所有压缩包从一开始就以占位节点（未开始/读取中）全部可见，
+    /// 随校验与子树构建逐个「原位转正」，已显示部分零闪烁零重排。
+    /// 已建子树按包缓存复用，重建只处理增量；目标路径/过滤变化时整体失效。
+    /// 构建期间的新请求不丢弃当前工作，仅标记 dirty，完成后补一轮（请求合并）。
     /// 单包场景退化为原有单树（目标目录根 + 条目结构，无多余层级）。
     /// </summary>
-    public void RebuildMergedPreview() => _ = RebuildMergedPreviewCoreAsync();
-
-    private async Task RebuildMergedPreviewCoreAsync()
+    public void RebuildMergedPreview()
     {
-        var version = ++_previewBuildVersion;
-        var sources = SourceItems.ToList();
-
-        // 全部尚未得出结论（仍在排队/校验中）→ ⏳ 读取中占位。
-        // 注意不能用「缓存为空」判断：损坏/需密码的包永远不会入缓存，
-        // 否则单加密包场景会永远卡在读取中。
-        if (sources.All(i => i.Status is SourceArchiveStatus.Pending or SourceArchiveStatus.Validating))
+        if (_isRebuilding)
         {
-            IsListingPending = true;
-            PreviewErrorTitle = "";
-            PreviewRoot = null;
-            IsPreviewBuilding = false;
-            IsBuildPending = false;
+            _rebuildPending = true;
             return;
         }
-        IsListingPending = false;
-        PreviewErrorTitle = "";
+        _ = RunRebuildLoopAsync();
+    }
+
+    private async Task RunRebuildLoopAsync()
+    {
+        _isRebuilding = true;
+        try
+        {
+            do
+            {
+                _rebuildPending = false;
+                await RebuildOnceAsync();
+            } while (_rebuildPending);   // 补建期间又有新结论 → 再来一轮（每轮只处理增量）
+        }
+        finally
+        {
+            _isRebuilding = false;
+        }
+    }
+
+    private async Task RebuildOnceAsync()
+    {
+        var sources = SourceItems.ToList();
 
         if (string.IsNullOrWhiteSpace(DestinationPath))
         {
             PreviewRoot = null;
             IsPreviewBuilding = false;
             IsBuildPending = false;
+            IsListingPending = false;
             return;
         }
 
-        IsBuildPending = true;
-        PreviewBuildProgress = -1;
-
         var destDir = DestinationPath;
         var filter = FilterProvider?.Invoke();
-        // 缓存快照：后台构建期间新完成的校验由下一次增量刷新呈现
-        var cache = new Dictionary<string, IReadOnlyList<ArchiveItem>>(
-            _entriesCache, StringComparer.OrdinalIgnoreCase);
 
-        var progress = new Progress<double>(v =>
+        // ── 单包退化：保持原语义（目标目录根 + 条目结构，无中间归档层、无骨架阶段）──
+        if (sources.Count == 1)
         {
-            if (version == _previewBuildVersion)
-                PreviewBuildProgress = v;
-        });
+            if (!_entriesCache.TryGetValue(sources[0].Path, out var onlyEntries))
+            {
+                // MainWindow 路径注入前的短暂瞬间 / 校验中
+                IsListingPending = true;
+                PreviewRoot = null;
+                IsPreviewBuilding = false;
+                IsBuildPending = false;
+                return;
+            }
+            await BuildAndAssignSingleAsync(onlyEntries, destDir, filter);
+            return;
+        }
+
+        // ── 多包：Phase 1 骨架立即上屏（缓存子树挂载，其余占位），用户一眼看到全量与差距 ──
+        var root = AssembleSkeleton(sources, destDir);
+        PreviewRoot = root;
+        IsListingPending = false;
+
+        var toBuild = sources
+            .Where(i => !_subTreeCache.ContainsKey(i.Path) && _entriesCache.TryGetValue(i.Path, out _))
+            .Select(i => (Item: i, Entries: _entriesCache[i.Path]))
+            .ToList();
+
+        if (toBuild.Count > 0)
+        {
+            // ── Phase 2 后台构建缺失子树 ──
+            // 不显示整树加载覆层：骨架上的占位节点本身就是进度表达
+            // （读取中 → 原位转正），整树覆盖层会遮蔽这一过程。
+            // IsBuildPending 仅保留门禁作用：「开始解压」在过滤结果就绪前禁用。
+            IsBuildPending = true;
+
+            try
+            {
+                var builtNodes = await Task.Run(() =>
+                {
+                    var built = new List<PreviewTreeNode>();
+                    for (int i = 0; i < toBuild.Count; i++)
+                    {
+                        var sub = ResultPreviewService.BuildExtractPreview(
+                            toBuild[i].Entries, destDir,
+                            checkExists: true, filter: filter);
+                        DecorateSubTree(sub, toBuild[i].Item);
+                        built.Add(sub);
+                    }
+                    return built;
+                });
+
+                foreach (var node in builtNodes)
+                    _subTreeCache[node.FullPath] = node;
+            }
+            catch (Exception ex)
+            {
+                App.DebugLog($"RebuildMergedPreview build failed: {ex.Message}");
+            }
+            finally
+            {
+                IsBuildPending = false;
+            }
+
+            // ── Phase 3 最终装配（新建根对象触发视图刷新；占位原位转正为子树）──
+            var final = AssembleSkeleton(sources, destDir);
+            ResultPreviewService.RecalculateDescendantStats(final);
+            PreviewRoot = final;
+        }
+    }
+
+    /// <summary>
+    /// 组装合并骨架：目标目录为根；已缓存子树的包直接挂载（装饰同步到最新状态），
+    /// 其余包为状态占位节点（未开始/读取中/需密码/损坏）。纯同步、低成本。
+    /// </summary>
+    private PreviewTreeNode AssembleSkeleton(List<SourceArchiveItem> sources, string destDir)
+    {
+        var root = new PreviewTreeNode
+        {
+            Name = Path.GetFileName(destDir.TrimEnd(Path.DirectorySeparatorChar)),
+            FullPath = destDir,
+            DisplayLabel = destDir,
+            IsExpanded = true
+        };
+
+        foreach (var item in sources)
+        {
+            if (_subTreeCache.TryGetValue(item.Path, out var cached))
+            {
+                DecorateSubTree(cached, item);   // 状态可能因解锁等变化，装饰每次装配时刷新
+                root.Children.Add(cached);
+            }
+            else
+            {
+                root.Children.Add(CreatePlaceholderNode(item));
+            }
+        }
+        return root;
+    }
+
+    /// <summary>把行模型当前状态（图标键/颜色键/加密副文本）应用到压缩包子树节点上。
+    /// 注意 FullPath 必须写回压缩包自身路径——它同时是 <see cref="_subTreeCache"/> 的键，
+    /// 构建服务默认填的是共享目标目录，不覆盖会导致所有包互相同名覆盖、永远无法命中缓存。</summary>
+    private static void DecorateSubTree(PreviewTreeNode sub, SourceArchiveItem item)
+    {
+        var displayName = Path.GetFileName(item.Path);
+        sub.Name = displayName;
+        sub.DisplayLabel = displayName;
+        sub.FullPath = item.Path;
+        sub.IsArchiveNode = true;
+        sub.IconKeyOverride = item.StatusIconKey;
+        sub.StatusForegroundKey = item.StatusForegroundKey;
+
+        if (item.IsEncrypted)
+        {
+            sub.SizeDisplay = item.MatchedPassword == null
+                ? LocalizationManager.T("Extract_Preview_EncryptedNoMatch")
+                : string.IsNullOrEmpty(item.MatchedDescription)
+                    ? LocalizationManager.T("Extract_Preview_Unlocked")
+                    : LocalizationManager.T("Extract_Preview_UnlockedDesc", item.MatchedDescription);
+        }
+    }
+
+    /// <summary>
+    /// 创建状态占位节点：图标/颜色与列表徽标一致，
+    /// 副文本为 未开始 / 读取中 / 需密码原因 / 损坏原因。
+    /// </summary>
+    private PreviewTreeNode CreatePlaceholderNode(SourceArchiveItem item)
+    {
+        var statusText = item.Status switch
+        {
+            SourceArchiveStatus.Pending => LocalizationManager.T("Extract_Preview_NotStarted"),
+            SourceArchiveStatus.Validating => LocalizationManager.T("Preview_Result_Reading"),
+            SourceArchiveStatus.NeedsPassword =>
+                string.IsNullOrEmpty(item.ErrorMessage)
+                    ? LocalizationManager.T("Extract_Preview_NeedsPassword")
+                    : item.ErrorMessage,
+            SourceArchiveStatus.Failed =>
+                LocalizationManager.T("Extract_Preview_LoadFailed"),
+            _ => LocalizationManager.T("Preview_Result_Reading"),
+        };
+
+        return new PreviewTreeNode
+        {
+            Name = Path.GetFileName(item.Path),
+            DisplayLabel = Path.GetFileName(item.Path),
+            SizeDisplay = statusText,
+            FullPath = item.Path,
+            IsArchiveNode = true,
+            IconKeyOverride = item.StatusIconKey,
+            StatusForegroundKey = item.StatusForegroundKey,
+        };
+    }
+
+    /// <summary>单包路径：直接构建条目结构为根（无归档层），沿用 250ms 防闪烁加载态。</summary>
+    private async Task BuildAndAssignSingleAsync(
+        IReadOnlyList<ArchiveItem> entries, string destDir, FileFilterCriteria? filter)
+    {
+        IsListingPending = false;
+        IsBuildPending = true;
+        PreviewBuildProgress = -1;
+        var progress = new Progress<double>(v => PreviewBuildProgress = v);
 
         try
         {
-            // 单包：保持原语义（目标目录根 + 条目结构，无中间归档层）
-            bool single = sources.Count == 1 && cache.ContainsKey(sources[0].Path);
+            var buildTask = Task.Run(() => ResultPreviewService.BuildExtractPreview(
+                entries, destDir, checkExists: true, filter: filter, progress: progress));
 
-            var buildTask = Task.Run(() =>
-            {
-                if (single)
-                {
-                    return ResultPreviewService.BuildExtractPreview(
-                        cache[sources[0].Path], destDir,
-                        checkExists: true, filter: filter, progress: progress);
-                }
-
-                // 合并根 = 目标目录本身；每个压缩包为其直接子节点
-                var root = new PreviewTreeNode
-                {
-                    Name = Path.GetFileName(destDir.TrimEnd(Path.DirectorySeparatorChar)),
-                    FullPath = destDir,
-                    DisplayLabel = destDir,
-                    IsExpanded = true
-                };
-
-                foreach (var item in sources)
-                {
-                    var displayName = Path.GetFileName(item.Path);
-
-                    if (cache.TryGetValue(item.Path, out var entries))
-                    {
-                        // 健康包：独立子树（冲突高亮/过滤灰显基于同一共享目标目录），
-                        // 组装后改挂到合并根下并标记为归档节点（归档图标 + 粗体标签）
-                        var sub = ResultPreviewService.BuildExtractPreview(
-                            entries, destDir,
-                            checkExists: true, filter: filter, progress: progress);
-                        sub.Name = displayName;
-                        sub.DisplayLabel = displayName;
-                        sub.IsArchiveNode = true;
-                        // 图标与文字颜色跟随列表行徽标（Checkmark绿/Key蓝/LockOpen黄…）
-                        sub.IconKeyOverride = item.StatusIconKey;
-                        sub.StatusForegroundKey = item.StatusForegroundKey;
-
-                        // 加密切态副文本：🔓 已匹配密码（描述）/ 🔑 内容加密·密码未匹配
-                        if (item.IsEncrypted)
-                        {
-                            sub.SizeDisplay = item.MatchedPassword == null
-                                ? LocalizationManager.T("Extract_Preview_EncryptedNoMatch")
-                                : string.IsNullOrEmpty(item.MatchedDescription)
-                                    ? LocalizationManager.T("Extract_Preview_Unlocked")
-                                    : LocalizationManager.T("Extract_Preview_UnlockedDesc", item.MatchedDescription);
-                        }
-
-                        root.Children.Add(sub);
-                    }
-                    else
-                    {
-                        // 占位节点：图标/颜色与列表徽标一致（LockClosed红 / Warning红 / ArchiveClock），副文本为原因文案
-                        var statusText = item.Status switch
-                        {
-                            SourceArchiveStatus.NeedsPassword =>
-                                string.IsNullOrEmpty(item.ErrorMessage)
-                                    ? LocalizationManager.T("Extract_Preview_NeedsPassword")
-                                    : item.ErrorMessage,
-                            SourceArchiveStatus.Failed =>
-                                LocalizationManager.T("Extract_Preview_LoadFailed"),
-                            _ => LocalizationManager.T("Preview_Result_Reading"),
-                        };
-                        root.Children.Add(new PreviewTreeNode
-                        {
-                            Name = displayName,
-                            DisplayLabel = displayName,
-                            SizeDisplay = statusText,
-                            FullPath = item.Path,
-                            IsArchiveNode = true,
-                            IconKeyOverride = item.StatusIconKey,
-                            StatusForegroundKey = item.StatusForegroundKey,
-                        });
-                    }
-                }
-
-                // 重算合并根统计供摘要栏显示全树文件数 / 总大小
-                ResultPreviewService.RecalculateDescendantStats(root);
-                ((IProgress<double>)progress).Report(100);
-                return root;
-            });
-
-            // 快速构建（<250ms）不显示加载态；慢构建显示进度条（沿用既有防闪烁策略）
             var delayTask = Task.Delay(250);
             if (await Task.WhenAny(buildTask, delayTask) == delayTask)
-            {
-                if (version != _previewBuildVersion) return;
                 IsPreviewBuilding = true;
-            }
 
-            var built = await buildTask;
-            if (version != _previewBuildVersion) return;
-
-            PreviewRoot = built;
+            PreviewRoot = await buildTask;
         }
         catch (Exception ex)
         {
-            App.DebugLog($"RebuildMergedPreview failed: {ex.Message}");
+            App.DebugLog($"single preview build failed: {ex.Message}");
         }
         finally
         {
-            if (version == _previewBuildVersion)
-            {
-                IsPreviewBuilding = false;
-                IsBuildPending = false;
-            }
+            IsPreviewBuilding = false;
+            IsBuildPending = false;
         }
     }
+
+    /// <summary>清空全部子树缓存（目标路径 / 过滤条件变化时调用，冲突高亮与灰显标记需全量重算）。</summary>
+    public void InvalidatePreviewCache() => _subTreeCache.Clear();
+
+    /// <summary>单个包的子树失效（如手动解锁后条目集/注解变化，仅重刷该包）。</summary>
+    public void InvalidateArchivePreview(string archivePath) => _subTreeCache.Remove(archivePath);
+
 
     /// <summary>
     /// 基于首包条目计算过滤后的提取 key 列表（提取语义始终绑定首包，与预览展示解耦）。
