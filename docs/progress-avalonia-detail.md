@@ -16,6 +16,9 @@
     - 多包场景列表下方提示「文件过滤仅对第一个压缩包生效」；点击列表行仅高亮不再切换树
     - **占位节点样式**（实测反馈）：与正常压缩包同款归档图标（IsArchiveNode）+ 状态色文字——损坏红（复用 ConflictRed）/ 加密蓝（NodeForegroundConverter 新增 Blue #2196F3 键），移除 emoji 前缀避免视觉重复；新增 `PreviewTreeNode.StatusForegroundKey` 并补进 ShallowClone（显示树为克隆体，漏拷会丢色）
     - **修复单加密包卡「正在读取」**：合并树就绪判断由「缓存为空」改为「全部仍在排队/校验中」——损坏/需密码的包永远不会入缓存，原条件恒真导致单加密包永远停在 ⏳；同族修复全坏包场景（现正确显示整列红色占位）
+    - **密码库自动尝试**：校验阶段对加密包自动跑 `TryMatchPassword`（≤100 候选，ZIP 读首加密条目 1 字节 / 7z 提最小条目前 8KB 快速验证）。A 类（无法列条目）命中后用密码重列 → 🔓 完整子树；B 类（能列出但内容加密）命中转 🔓、未命中保持可浏览标 🔑。确定密码存入 `MatchedPasswords` 字典随窗口确认传出，CLI 批量解压循环优先复用（跳过重复扫描与弹窗）——库内有记录的包全程零弹窗
+    - **手动解锁**：自动失败后的补救入口三个——选中锁定行的内联按钮「输入密码解锁…」/ 双击列表行 / 双击树占位节点（ResultTreeView 新增 NodeDoubleTapped 事件）；复用主流程 PasswordDialog 验证循环（错误弹提示继续输），可选保存到密码库（默认不勾，与主流程一致）；取消则解压阶段走现有 ResolveCliPassword 流程兜底
+    - **矢量图标化 + 状态配色体系**：列表徽标/解锁按钮/树状态覆层的 emoji 全部换成 AppIcons 矢量图标（Timer/ArchiveClock/Checkmark/Key/LockOpen/LockClosed/Warning，零新增资源）；配色 损坏红/锁定红/未匹配蓝/解锁黄/正常绿（NodeForegroundConverter 新增 Blue/Green/Yellow 键）；`PreviewTreeNode` 新增 `IconKeyOverride` 图标覆盖键与 `StatusForegroundKey` 均补进 ShallowClone，合并树的压缩包节点与列表徽标同源驱动永不失同步
   - 涉及文件：`ViewModels/SourceArchiveItem.cs`（新增）、`Services/ArchiveService.cs`、`Services/ResultPreviewService.cs`、`Controls/ResultTreeView.axaml(.cs)`、`ViewModels/ExtractSettingsViewModel.cs`、`Dialogs/ExtractSettingsWindow.axaml(.cs)`、`App.axaml.cs`、`Localization/strings.zh-CN.json`、`Localization/strings.en.json`、`tests/MantisZip.UI.Avalonia.Tests/SourceArchiveValidationTests.cs`（新增）
   - 验证：`dotnet build` 0 错误；Avalonia 测试 76 通过 / 0 失败 / 2 跳过（含新增分类器与行模型用例）；lsp 无诊断；双语 key 1101/1101 对齐
 
