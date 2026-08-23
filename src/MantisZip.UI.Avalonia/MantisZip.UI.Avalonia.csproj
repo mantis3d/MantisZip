@@ -61,6 +61,11 @@
     <None Include="Resources\MenuIcons\**">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+    <!-- 文件关联格式图标（zip/7z/rar/tar/tgz/gz/iso）：ShellIntegration.GetIconPath
+         按输出目录相对路径引用，缺失时关联图标退化为应用通用图标 -->
+    <None Include="Resources\Icons\*.ico">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
     <!-- 拖拽光标：按 overlay 状态加载的不同 .cur（DragCursor/Ok/Warn/Self），构建时复制到输出目录 -->
     <None Include="Resources\Cursors\**">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
