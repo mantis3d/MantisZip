@@ -27,6 +27,13 @@
     <conv:BoolToToggleBgBrushConverter x:Key="BoolToToggleBgBrushConverter" />
   </Window.Resources>
 
+  <Window.Styles>
+    <!-- 工具栏密码按钮：密码已匹配时绿色高亮底（对齐 WPF Theme_StatusSuccessBg） -->
+    <Style Selector="Button.passwordMatched">
+      <Setter Property="Background" Value="{DynamicResource ThemeStatusSuccessBgBrush}" />
+    </Style>
+  </Window.Styles>
+
   <Grid RowDefinitions="Auto,Auto,Auto,*,Auto">
     <!-- Menu (Row 0) -->
     <Menu Grid.Row="0">
@@ -550,13 +557,16 @@
                 VerticalAlignment="Center"
                 Background="{DynamicResource ThemeBorderBrush}"
                 Margin="4,0" />
+        <!-- 工具栏密码按钮：针对当前压缩包（对齐 WPF EnterPasswordBtn 三态：无加密禁用 / 未匹配红锁 / 已匹配绿开锁） -->
         <Button Classes="ToolbarButton"
-                Command="{Binding OpenPasswordManagerCommand}"
-                ToolTip.Tip="{Binding LocalizedStrings[Tooltip_Password]}">
+                Classes.passwordMatched="{Binding HasMatchedPassword}"
+                Command="{Binding EnterPasswordCommand}"
+                ToolTip.Tip="{Binding ToolbarPasswordTooltip}">
           <StackPanel >
-            <PathIcon Data="{StaticResource IconKey}" Classes="ToolbarButtonIcon" Width="22" Height="22" />
+            <PathIcon Data="{Binding ToolbarPasswordIcon}" Classes="ToolbarButtonIcon" Width="22" Height="22"
+                      Foreground="{Binding ToolbarPasswordForeground}" />
             <TextBlock Text="{Binding LocalizedStrings[Toolbar_Password]}"
-                      Classes="ToolbarButtonLabel" />
+                       Classes="ToolbarButtonLabel" />
           </StackPanel>
         </Button>
       </StackPanel>

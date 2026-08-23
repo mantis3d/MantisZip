@@ -127,6 +127,12 @@ public partial class MainWindow : Window
                 Patterns = dialog.Patterns
             };
         };
+        // 工具栏「密码」按钮（已匹配态）：查看/复制当前压缩包的密码与规则
+        vm.ShowMatchedPasswordDialog = async (entry, archiveName) =>
+        {
+            var dialog = new MatchedPasswordDialog(entry, archiveName);
+            await dialog.ShowDialog<bool>(this);
+        };
         DataContext = vm;
 
         // 条目重填后重应用列排序（进入目录/刷新/过滤后保持排序状态）

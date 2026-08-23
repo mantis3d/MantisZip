@@ -1,4 +1,8 @@
 {
+  "Preview_EntryNeedsPassword": "🔒 此文件已加密，请先输入密码再预览",
+  "Toolbar_PasswordTooltip": "输入压缩包密码",
+  "Toolbar_PasswordMissingTooltip": "🔒 压缩包已加密，点击输入密码",
+  "Toolbar_PasswordMatchedTooltip": "🔓 密码已匹配，点击查看或复制",
   "Preview_Result_Reading": "正在读取压缩包条目…",
   "Extract_Preview_LoadFailed": "无法读取此压缩包",
   "Extract_Preview_NeedsPassword": "此压缩包已加密，需要密码",
@@ -900,7 +904,6 @@
   "Tooltip_Filter": "显示/隐藏筛选栏",
   "Tooltip_NewArchive": "新建压缩包 (Ctrl+N)",
   "Tooltip_Open": "打开压缩包 (Ctrl+O)",
-  "Tooltip_Password": "打开密码管理器",
   "Tooltip_Preview": "显示/隐藏预览面板",
   "Tooltip_SmartExtract": "智能解压",
   "Tooltip_Subfolders": "显示子文件夹内容",

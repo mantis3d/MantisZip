@@ -62,6 +62,11 @@ public partial class MainWindowViewModel : ObservableObject
     public Func<string, Task<PasswordDialogResponse?>>? ShowPasswordDialog { get; set; }
 
     /// <summary>
+    /// 由 View 设置的「查看已匹配密码」对话框回调。参数为密码条目与压缩包文件名（仅展示用），无返回值。
+    /// </summary>
+    public Func<Core.PasswordEntry, string, Task>? ShowMatchedPasswordDialog { get; set; }
+
+    /// <summary>
     /// 解压设置对话框回调。传入 ExtractSettingsViewModel，返回 true=确认，false=取消。
     /// </summary>
     public Func<ExtractSettingsViewModel, Task<bool?>>? ShowExtractSettingsDialog { get; set; }
@@ -162,6 +167,10 @@ public partial class MainWindowViewModel : ObservableObject
     private readonly AppSettings _appSettings = AppSettings.Load();
     private string? _currentPassword;
     private bool _hasEncryptedArchive;
+    /// <summary>当前已匹配密码的描述（供 MatchedPasswordDialog 展示，会话级）。</summary>
+    private string? _currentPasswordDescription;
+    /// <summary>当前已匹配密码的匹配规则（供 MatchedPasswordDialog 展示，会话级）。</summary>
+    private List<string>? _currentPasswordPatterns;
 
     // ── i18n ──
 
@@ -203,6 +212,8 @@ public partial class MainWindowViewModel : ObservableObject
         {
             Title = $"{LocalizationManager.T("App_Title")} - {Path.GetFileName(CurrentArchivePath)}";
         }
+        // 工具栏密码按钮 tooltip 跟随语言切换（三态文案）
+        UpdateToolbarPasswordState();
 
         var newDict = new Dictionary<string, string>();
         var keys = new[]
@@ -242,7 +253,7 @@ public partial class MainWindowViewModel : ObservableObject
             "Status_AddingFiles", "Status_DeletingFiles", "Status_Entries",
             "Main_NoRecentFiles", "Main_ClearRecentFiles", "Main_RecentFiles",
             "Main_Favorites", "Main_IconTestTitle", "Main_UiTestTitle",
-            "Toolbar_Password", "Tooltip_Password",
+            "Toolbar_Password",
             "Menu_Test",
             "Tree_ExpandAll", "Tree_CollapseAll", "Tree_ExpandToCurrent", "Tree_AutoExpand", "Tree_Filter",
             "Nav_GoRoot", "Nav_GoBack", "Nav_GoForward", "Nav_AddressBar", "Nav_GoUp",
@@ -828,46 +839,64 @@ public partial class MainWindowViewModel : ObservableObject
                 result = await _archiveService.LoadArchiveAsync(path, null);
             }
 
-            // ── Password resolution flow ──
-            if (result.IsPasswordRequired)
+            // ── 密码解析流程（对齐 WPF ResolvePasswordAsync + LoadArchiveAsync 组合语义）──
+            // 场景 A（unlistable）：条目无法列出（如 EncryptHeaders=true 的 7z，ListEntriesAsync 抛密码异常）
+            //   → 必须取得密码才能打开，用户取消则不打开（WPF 同样中止）。
+            // 场景 B（hasEncryptedEntries）：条目可列出但含加密条目（ZIP 加密 / RAR / EncryptHeaders=false 的 7z，
+            //   文件名可见）→ 先试密码库、无匹配弹对话框；用户取消仍打开仅浏览（未匹配状态），预览/解压按需失败。
+            bool unlistable = result.IsPasswordRequired;
+            bool hasEncryptedEntries = !unlistable && result.RawItems?.Any(i => i.IsEncrypted) == true;
+
+            if (unlistable || hasEncryptedEntries)
             {
-                // Phase A: Try PasswordManager saved passwords
-                if (engine != null)
+                _hasEncryptedArchive = true;
+
+                if (password != null)
                 {
-                    var match = _passwordService.TryMatchPassword(path, engine);
-                    if (match != null)
+                    // 会话缓存密码已在上方通过 QuickVerify → 直接视为已匹配
+                    _sessionPasswords[path] = password;
+                    _currentPassword = password;
+                    var cachedEntry = FindSavedPasswordEntry(path, password);
+                    _currentPasswordDescription = cachedEntry?.Description;
+                    _currentPasswordPatterns = cachedEntry != null ? new List<string>(cachedEntry.Patterns) : null;
+                    UpdatePasswordStatus(isMatched: true);
+                }
+                else
+                {
+                    // Phase A: 已保存密码静默自动匹配（内部含快速验证）
+                    if (engine != null)
                     {
-                        password = match.Value.Password;
-                        result = await _archiveService.LoadArchiveAsync(path, password);
-                        if (!result.IsPasswordRequired)
+                        var match = _passwordService.TryMatchPassword(path, engine);
+                        if (match != null)
                         {
-                            _sessionPasswords[path] = password;
-                            _currentPassword = password;
-                            _hasEncryptedArchive = true;
-                            UpdatePasswordStatus(isMatched: true);
+                            password = match.Value.Password;
+                            if (unlistable)
+                                result = await _archiveService.LoadArchiveAsync(path, password);
+                            if (!result.IsPasswordRequired)
+                            {
+                                _sessionPasswords[path] = password;
+                                _currentPassword = password;
+                                var savedEntry = FindSavedPasswordEntry(path, password);
+                                _currentPasswordDescription = savedEntry?.Description;
+                                _currentPasswordPatterns = savedEntry != null ? new List<string>(savedEntry.Patterns) : null;
+                                UpdatePasswordStatus(isMatched: true);
+                            }
                         }
                     }
-                }
 
-                // Phase B: Dialog loop (still need password after saved attempts)
-                if (result.IsPasswordRequired)
-                {
-                    if (ShowPasswordDialog == null)
+                    // Phase B: 密码对话框循环（无已保存匹配时弹出；错密码提示后重试直到正确或取消）
+                    while (_currentPassword == null && (!unlistable || result.IsPasswordRequired))
                     {
-                        StatusMessage = LocalizationManager.T("Status_PasswordRequired");
-                        IsLoading = false;
-                        return;
-                    }
-
-                    while (result.IsPasswordRequired)
-                    {
-                        var dialogResponse = await ShowPasswordDialog(path);
-                        if (dialogResponse?.Password == null)
+                        if (ShowPasswordDialog == null)
                         {
-                            StatusMessage = LocalizationManager.T("Status_PasswordCancelled");
+                            StatusMessage = LocalizationManager.T("Status_PasswordRequired");
                             IsLoading = false;
                             return;
                         }
+
+                        var dialogResponse = await ShowPasswordDialog(path);
+                        if (dialogResponse?.Password == null)
+                            break; // 用户取消：不可列出→下方中止不打开；可列出→仅浏览打开
 
                         password = dialogResponse.Password;
 
@@ -878,7 +907,7 @@ public partial class MainWindowViewModel : ObservableObject
                             continue;
                         }
 
-                        // Full retry with password
+                        // 用密码完整加载一次（可列出场景同样重载以统一加载状态；条目内容一致）
                         result = await _archiveService.LoadArchiveAsync(path, password);
 
                         if (!result.IsPasswordRequired)
@@ -886,7 +915,9 @@ public partial class MainWindowViewModel : ObservableObject
                             // Success
                             _sessionPasswords[path] = password;
                             _currentPassword = password;
-                            _hasEncryptedArchive = true;
+                            // 会话级记录描述/规则，供工具栏「查看已匹配密码」对话框展示
+                            _currentPasswordDescription = dialogResponse.Description;
+                            _currentPasswordPatterns = dialogResponse.Patterns is { Count: > 0 } ? dialogResponse.Patterns.ToList() : null;
 
                             if (dialogResponse.SavePermanently)
                             {
@@ -902,22 +933,28 @@ public partial class MainWindowViewModel : ObservableObject
                         }
                     }
                 }
-            }
-            else
-            {
-                // No password required: still check for encrypted entries (password may be from cache)
-                if (result.RawItems != null && result.RawItems.Any(i => i.IsEncrypted))
+
+                // 收尾：仍未取得密码
+                if (_currentPassword == null)
                 {
-                    _hasEncryptedArchive = true;
-                    _currentPassword = password;
-                    UpdatePasswordStatus(isMatched: password != null);
-                }
-                else
-                {
-                    _hasEncryptedArchive = false;
+                    if (unlistable)
+                    {
+                        // 无法列出条目且用户取消 → 不打开
+                        StatusMessage = LocalizationManager.T("Status_PasswordCancelled");
+                        IsLoading = false;
+                        return;
+                    }
+
+                    // 可列出 → 仅浏览模式打开（未匹配：底部"已加密" + 工具栏红锁，可后续补输密码）
                     _currentPassword = null;
                     UpdatePasswordStatus(isMatched: false);
                 }
+            }
+            else
+            {
+                _hasEncryptedArchive = false;
+                _currentPassword = null;
+                UpdatePasswordStatus(isMatched: false);
             }
 
             if (result.IsSuccess && result.Entries != null)
@@ -968,6 +1005,8 @@ public partial class MainWindowViewModel : ObservableObject
                 RecentFiles.Clear();
                 foreach (var rp in RecentFilesManager.GetPaths())
                     RecentFiles.Add(rp);
+                // CurrentArchivePath 在密码解析流程之后才赋值，此处补一次工具栏密码按钮状态刷新
+                UpdateToolbarPasswordState();
                 StatusMessage = LocalizationManager.T("Status_Loaded", result.Entries.Count);
                 Title = $"{LocalizationManager.T("App_Title")} - {Path.GetFileName(path)} ({_allRawItems?.Count ?? 0} {LocalizationManager.T("Status_Entries")})";
                 OnPropertyChanged(nameof(ArchiveStats));
@@ -1009,7 +1048,7 @@ public partial class MainWindowViewModel : ObservableObject
     }
 
     /// <summary>
-    /// 更新密码状态 UI（锁图标 + 状态文字）。
+    /// 更新密码状态 UI（锁图标 + 状态文字 + 工具栏密码按钮三态）。
     /// </summary>
     private void UpdatePasswordStatus(bool isMatched)
     {
@@ -1017,6 +1056,7 @@ public partial class MainWindowViewModel : ObservableObject
         {
             PasswordStatusMessage = null;
             PasswordStatusIcon = null;
+            UpdateToolbarPasswordState();
             return;
         }
 
@@ -1026,6 +1066,139 @@ public partial class MainWindowViewModel : ObservableObject
         PasswordStatusMessage = isMatched
             ? LocalizationManager.T("Status_PasswordMatched")
             : LocalizationManager.T("Status_Encrypted");
+        UpdateToolbarPasswordState();
+    }
+
+    // ── 工具栏密码按钮（对齐 WPF EnterPasswordBtn 三态：无加密禁用 / 未匹配红锁 / 已匹配绿开锁） ──
+
+    /// <summary>工具栏密码按钮图标 Geometry。</summary>
+    [ObservableProperty]
+    private object? _toolbarPasswordIcon;
+
+    /// <summary>工具栏密码按钮前景色（默认主题色 / 错误红 / 成功绿）。</summary>
+    [ObservableProperty]
+    private global::Avalonia.Media.IBrush? _toolbarPasswordForeground;
+
+    /// <summary>工具栏密码按钮 tooltip（三态文案）。</summary>
+    [ObservableProperty]
+    private string? _toolbarPasswordTooltip;
+
+    /// <summary>当前压缩包密码已匹配（驱动按钮绿色高亮 Classes.passwordMatched）。</summary>
+    [ObservableProperty]
+    private bool _hasMatchedPassword;
+
+    private bool CanEnterPassword() => !string.IsNullOrEmpty(CurrentArchivePath) && _hasEncryptedArchive;
+
+    /// <summary>
+    /// 更新工具栏密码按钮三态显示并刷新命令可用性。
+    /// </summary>
+    private void UpdateToolbarPasswordState()
+    {
+        var app = Application.Current;
+        if (string.IsNullOrEmpty(CurrentArchivePath) || !_hasEncryptedArchive)
+        {
+            // 无加密 → 禁用，默认钥匙图标
+            ToolbarPasswordIcon = app?.FindResource("IconKey");
+            ToolbarPasswordForeground = app?.FindResource("ThemeTextPrimaryBrush") as global::Avalonia.Media.IBrush;
+            HasMatchedPassword = false;
+            ToolbarPasswordTooltip = LocalizationManager.T("Toolbar_PasswordTooltip");
+        }
+        else if (_currentPassword == null)
+        {
+            // 已加密未匹配 → 红色闭锁
+            ToolbarPasswordIcon = app?.FindResource("IconLockClosed");
+            ToolbarPasswordForeground = app?.FindResource("ThemeStatusErrorBrush") as global::Avalonia.Media.IBrush;
+            HasMatchedPassword = false;
+            ToolbarPasswordTooltip = LocalizationManager.T("Toolbar_PasswordMissingTooltip");
+        }
+        else
+        {
+            // 已匹配 → 绿色开锁 + 绿底高亮
+            ToolbarPasswordIcon = app?.FindResource("IconLockOpen");
+            ToolbarPasswordForeground = app?.FindResource("ThemeStatusSuccessBrush") as global::Avalonia.Media.IBrush;
+            HasMatchedPassword = true;
+            ToolbarPasswordTooltip = LocalizationManager.T("Toolbar_PasswordMatchedTooltip");
+        }
+        EnterPasswordCommand.NotifyCanExecuteChanged();
+    }
+
+    /// <summary>
+    /// 在密码库中查找与 (archivePath, password) 匹配的已保存条目（供展示描述/规则）。
+    /// </summary>
+    private static Core.PasswordEntry? FindSavedPasswordEntry(string archivePath, string password)
+    {
+        try
+        {
+            return PasswordManager.Instance.FindMatchingPasswords(archivePath)
+                .FirstOrDefault(e => e.Password == password);
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// 获取当前已匹配密码的描述与规则：优先取会话记录（手动输入），否则回查密码库（自动匹配）。
+    /// </summary>
+    private (string? Description, List<string> Patterns) GetMatchedPasswordInfo()
+    {
+        if (_currentPasswordDescription != null || _currentPasswordPatterns != null)
+            return (_currentPasswordDescription, _currentPasswordPatterns ?? new List<string>());
+
+        var saved = FindSavedPasswordEntry(CurrentArchivePath ?? "", _currentPassword ?? "");
+        return (saved?.Description, saved != null ? new List<string>(saved.Patterns) : new List<string>());
+    }
+
+    /// <summary>
+    /// 工具栏「密码」按钮：针对当前压缩包输入/查看密码（对齐 WPF EnterPassword_Click）。
+    /// 已匹配 → 打开查看/复制对话框；未匹配 → 输入密码并快速验证，可选保存到密码库。
+    /// </summary>
+    [RelayCommand(CanExecute = nameof(CanEnterPassword))]
+    private async Task EnterPasswordAsync()
+    {
+        if (string.IsNullOrEmpty(CurrentArchivePath)) return;
+
+        // 已匹配 → 查看/复制对话框
+        if (_currentPassword != null)
+        {
+            if (ShowMatchedPasswordDialog == null) return;
+            var (desc, patterns) = GetMatchedPasswordInfo();
+            await ShowMatchedPasswordDialog(new Core.PasswordEntry
+            {
+                Password = _currentPassword,
+                Description = desc ?? "",
+                Patterns = patterns
+            }, Path.GetFileName(CurrentArchivePath));
+            return;
+        }
+
+        // 未匹配 → 密码输入对话框
+        if (ShowPasswordDialog == null) return;
+        var response = await ShowPasswordDialog(CurrentArchivePath);
+        if (response?.Password == null) return;
+
+        var engine = ArchiveEngineFactory.GetEngineByExtension(CurrentArchivePath);
+        if (engine != null && !_passwordService.QuickVerifyPassword(CurrentArchivePath, response.Password, engine))
+        {
+            StatusMessage = LocalizationManager.T("Status_WrongPassword");
+            await AppMessageBox.Show(
+                LocalizationManager.T("Status_WrongPassword"),
+                LocalizationManager.T("App_ErrorTitle"),
+                MessageBoxButton.OK, MessageBoxImage.Error);
+            return;
+        }
+
+        _sessionPasswords[CurrentArchivePath] = response.Password;
+        _currentPassword = response.Password;
+        _currentPasswordDescription = response.Description;
+        _currentPasswordPatterns = response.Patterns is { Count: > 0 } ? response.Patterns.ToList() : null;
+
+        if (response.SavePermanently)
+            _passwordService.TrySavePassword(response.Password, CurrentArchivePath, response.Patterns, response.Description);
+
+        UpdatePasswordStatus(isMatched: true);
+        StatusMessage = LocalizationManager.T("Status_PasswordMatched");
     }
 
     private async Task ShowPreviewAsync(ArchiveItemModel entry)
@@ -1048,6 +1221,15 @@ public partial class MainWindowViewModel : ObservableObject
         try
         {
             var ext = Path.GetExtension(entry.Name);
+
+            // 加密条目且当前无匹配密码：不发起提取，直接提示需要密码。
+            // 按条目判断——混合压缩包中未加密的文件仍可正常预览。
+            if (entry.IsEncrypted && string.IsNullOrEmpty(_currentPassword))
+            {
+                Preview.ShowUnsupported(LocalizationManager.T("Preview_EntryNeedsPassword"));
+                StatusMessage = LocalizationManager.T("Status_Encrypted");
+                return;
+            }
 
             // ── Magic detection ──
             var previewType = PreviewType.Unsupported;
@@ -1817,9 +1999,12 @@ public partial class MainWindowViewModel : ObservableObject
         EncodingInfo = string.Empty;
         Preview.Clear();
         _currentPassword = null;
+        _currentPasswordDescription = null;
+        _currentPasswordPatterns = null;
         _hasEncryptedArchive = false;
         PasswordStatusMessage = null;
         PasswordStatusIcon = null;
+        UpdateToolbarPasswordState();
         FolderPaths.Clear();
         _backStack.Clear();
         _forwardStack.Clear();

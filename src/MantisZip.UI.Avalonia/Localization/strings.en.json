@@ -1,4 +1,8 @@
 {
+  "Preview_EntryNeedsPassword": "🔒 This file is encrypted. Enter the password to preview it",
+  "Toolbar_PasswordTooltip": "Enter archive password",
+  "Toolbar_PasswordMissingTooltip": "🔒 Archive encrypted, click to enter password",
+  "Toolbar_PasswordMatchedTooltip": "🔓 Password matched, click to view or copy",
   "Preview_Result_Reading": "Reading archive entries…",
   "Extract_Preview_LoadFailed": "Unable to read this archive",
   "Extract_Preview_NeedsPassword": "This archive is encrypted and requires a password",
@@ -902,7 +906,6 @@
   "Tooltip_Filter": "Toggle filter bar",
   "Tooltip_NewArchive": "New archive (Ctrl+N)",
   "Tooltip_Open": "Open archive (Ctrl+O)",
-  "Tooltip_Password": "Open password manager",
   "Tooltip_Preview": "Toggle preview panel",
   "Tooltip_SmartExtract": "Smart extract",
   "Tooltip_Subfolders": "Show subfolder contents",

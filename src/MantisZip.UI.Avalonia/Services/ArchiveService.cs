@@ -40,12 +40,10 @@ public class ArchiveService
             var items = await engine.ListEntriesAsync(archivePath, password, cancellationToken);
             var itemsList = items.ToList();
 
-            // 检查加密条目：ZIP 格式在无密码时也能列出条目（标记 IsEncrypted=true），
-            // 此时需要提示用户输入密码。
-            if (string.IsNullOrEmpty(password) && itemsList.Any(i => i.IsEncrypted))
-            {
-                return ArchiveLoadResult.PasswordRequired();
-            }
+            // 注意：条目列出成功即视为加载成功——即使含加密条目（ZIP/RAR/EncryptHeaders=false 的 7z
+            // 在无密码时也能列出文件名）。是否提示密码、取消后是否仍打开仅浏览，
+            // 由 MainWindowViewModel 的密码解析流程决定（对齐 WPF ResolvePasswordAsync 语义）。
+            // IsPasswordRequired 仅在 ListEntriesAsync 本身抛出密码类异常时出现（如 EncryptHeaders=true 的 7z）。
 
             var models = itemsList.Select(ArchiveItemModel.FromCore).ToList();
 
