@@ -14,6 +14,8 @@
     - **ResultTreeView 三态能力**：新增 IsListingPending / LoadFailedTitle / LoadFailedDetail / LoadFailedNeedsPassword 四个 StyledProperty + 状态覆层，照既有 IsLoading/BuildProgress 模式
     - **FilteredEntryKeys 修复**：Extract 命令执行前基于首包条目计算回填（提取语义保持绑定首包，对齐 WPF「过滤仅对 i==0 生效」），CLI 批量解压过滤恢复生效
     - 多包场景列表下方提示「文件过滤仅对第一个压缩包生效」；点击列表行仅高亮不再切换树
+    - **占位节点样式**（实测反馈）：与正常压缩包同款归档图标（IsArchiveNode）+ 状态色文字——损坏红（复用 ConflictRed）/ 加密蓝（NodeForegroundConverter 新增 Blue #2196F3 键），移除 emoji 前缀避免视觉重复；新增 `PreviewTreeNode.StatusForegroundKey` 并补进 ShallowClone（显示树为克隆体，漏拷会丢色）
+    - **修复单加密包卡「正在读取」**：合并树就绪判断由「缓存为空」改为「全部仍在排队/校验中」——损坏/需密码的包永远不会入缓存，原条件恒真导致单加密包永远停在 ⏳；同族修复全坏包场景（现正确显示整列红色占位）
   - 涉及文件：`ViewModels/SourceArchiveItem.cs`（新增）、`Services/ArchiveService.cs`、`Services/ResultPreviewService.cs`、`Controls/ResultTreeView.axaml(.cs)`、`ViewModels/ExtractSettingsViewModel.cs`、`Dialogs/ExtractSettingsWindow.axaml(.cs)`、`App.axaml.cs`、`Localization/strings.zh-CN.json`、`Localization/strings.en.json`、`tests/MantisZip.UI.Avalonia.Tests/SourceArchiveValidationTests.cs`（新增）
   - 验证：`dotnet build` 0 错误；Avalonia 测试 76 通过 / 0 失败 / 2 跳过（含新增分类器与行模型用例）；lsp 无诊断；双语 key 1101/1101 对齐
 
