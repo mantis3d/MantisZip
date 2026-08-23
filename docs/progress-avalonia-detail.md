@@ -6,6 +6,13 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-08-23** — 文件关联图标修复：格式图标资源补齐 + ProgId 自愈刷新
+  - **背景**：Avalonia 版安装文件关联后，Explorer 显示的是应用通用图标而非 zip/7z/rar 各自的专属图标。注册表写入逻辑（per-format ProgId + DefaultIcon + OpenWithProgids）与 WPF 逐行一致，差异在资源侧——WPF 的 `Resources\Icons\` 有 7 个格式 .ico 且 csproj 有输出复制规则；Avalonia 两边都缺（Icons 目录只有 .gitkeep 与 AppIcons.axaml），`GetIconPath()` 的 `File.Exists` 恒 false，全部退化为 `"exePath",0` 兜底
+  - **修复一（资源补齐）**：从 WPF 复制 zip/sevenz/rar/tar/tgz/gz/iso 共 7 个 .ico 到 Avalonia `Resources\Icons\`；csproj 照 MenuIcons 同款模式补 `<None Include="Resources\Icons\*.ico">` 输出复制规则（精确 *.ico 不带出 .gitkeep/AppIcons.axaml）
+  - **修复二（自愈刷新，与 WPF 有意的增强偏离）**：原 `EnsureProgIdRegistered` 对已存在的 ProgId 直接早退，导致已装机器的 `DefaultIcon`/`shell\open\command` 永不更新——重构为友好名称与动词标签仍仅首次创建写入，打开命令与图标**每次安装强制刷新**：旧安装的 exe 兜底图标重装一次关联即自愈；便携版换目录后 command 指向旧路径失效的问题同步受益
+  - 涉及文件：`Resources/Icons/*.ico` ×7（新增）、`MantisZip.UI.Avalonia.csproj`、`Services/ShellIntegration.Assoc.cs`
+  - 验证：`dotnet build` 0 错误；构建输出目录确认含全部 7 个 .ico；lsp 无诊断
+
 **2026-08-23** — 预览加密条目改为明确提示需要密码
   - **背景**：取消密码进入浏览模式后点击加密文件，预览流程仍照常发起条目提取——魔数检测异常被吞掉后走扩展名分类，`ExtractToTempAsync` 抛出库级密码异常落到外层 catch，显示「预览失败: <SharpCompress/SharpSevenZip 原始消息>」，用户无法理解；WPF 版信息栏有「🔒 已加密」标记语义更清晰
   - **修复**：`ShowPreviewAsync` 入口处拦截——`entry.IsEncrypted && _currentPassword == null` 时跳过魔数检测与提取，直接 `ShowUnsupported(Preview_EntryNeedsPassword)`（"🔒 此文件已加密，请先输入密码再预览"）+ 状态栏"已加密"；按条目判断，混合压缩包中未加密文件照常预览
