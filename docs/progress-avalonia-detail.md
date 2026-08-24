@@ -6,6 +6,18 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-08-24** — 迁移遗漏审计补齐：7z.dll 运行时引导接线 + CLI `--help`/`--test`
+  - **背景**：WPF↔Avalonia 全面对比审计（对话框清单 / AppSettings 属性 / CLI 参数三轴）发现三处真实缺口：
+    - **7z.dll 引导缺失**：Core 的 `SevenZipDllResolveCallback` 挂钩仍在（`SevenZipEngine.cs:122` 会调用），但 Avalonia 从未注册回调；更严重的是启动时从未把设置里的 `SevenZipPath` 灌入引擎（WPF `InitializeApp` 有对应逻辑）——设置窗口「浏览」选好的路径实际**从未生效**
+    - **CLI 缺 `--help`/`-h`/`--test`**，且未知参数静默打开主窗口（WPF 有告警日志）
+    - `UseColorEmoji` 仅 WPF 存在：确认废弃（Avalonia 走 emoji→PathIcon 替代方案），仅修文档
+  - **实现**：
+    - `App.axaml.cs` 启动早期对齐 WPF `InitializeApp`：加载设置 `SevenZipPath` → `SevenZipEngine.SevenZipDllPath` + 注册 `ResolveSevenZipDllViaDialog` 回调。线程编排：引擎在后台线程锁内同步调用回调 → `Dispatcher.UIThread.Post` + TaskCompletionSource 阻塞等待结果；若恰在 UI 线程触发则跳过弹窗退回设置值防死锁。弹窗流程 = 原因说明（OKCancel）→ `CustomFilePickerDialog.ShowOpenFileAsync(*.dll)` → 存回设置
+    - CLI 新增 `ShowCliHelpThenShutdown`（`AttachConsole` 有父控制台走控制台输出、否则 AppMessageBox）与 `ShowStartupTestThenShutdown`（版本+安装目录自检）；default 分支补未知参数 DebugLog
+    - 本地化：strings.zh-CN/en 头部各加 6 key（`SevenZipDll_Missing*` / `App_StartupTest*` / `App_CliHelp*`）；帮助文本修正 WPF 版错误（WPF 写了 `--open, -o` 但代码并无 `-o` 别名）
+  - 涉及文件：`App.axaml.cs`、`Localization/strings.zh-CN.json`、`Localization/strings.en.json`、AGENTS.md（UseColorEmoji 标注 WPF 专属废弃 + CLI 表格补两行）
+  - 验证：`dotnet build` 0 错误（新增代码无警告）；双语言 JSON node 解析通过且 key 数完全一致（1119=1119）
+
 **2026-08-24** — 进程退出诊断器：窗口生命周期与僵尸状态取证（lifecycle.log）
   - **背景**：用户反馈「点击关闭后界面消失但后台仍残留进程」，右键菜单操作后高发、间歇性出现。静态审计覆盖全部 `OnExplicitShutdown` 流程的显式 `Shutdown()` 配对、ProgressWindow X 取消链路、IPC 双实例与覆层后台线程均未发现确定性泄漏；11 个端到端自动化场景（CLI 全参数 × 正常启动/中途取消/对话框关闭/UIA 点击确认）全部干净退出——黑盒无法复现，转入现场取证路线
   - **实现**（纯观察、零行为变更）：新增 `LifetimeDiagnostics` 诊断器，DispatcherTimer 每 2s 做窗口列表差分（含不可见窗口，如拖拽覆层/提权 tempOwner）；订阅 `ShutdownRequested` 记录每次显式退出请求；僵尸状态检测——「无任何可见窗口 且 （OnExplicitShutdown 或 主窗口已关）」持续 ≥6s 时写入完整窗口转储并每 ~16s 重申；记录 UI 线程 / AppDomain / 未观察任务异常（不改 Handled/Observed）。日志无条件写入 `%LOCALAPPDATA%\MantisZip\lifecycle.log`（LogRedactor 脱敏 + 5MB 轮转），不受 EnableDebugLogging 门控
@@ -1070,6 +1082,13 @@
 
 ## 共享层（Core / ShellExt / 构建）
 这些变更影响两项目共用代码，按时间从新到旧排列。
+
+#### v0.5.0 (2026-08-24) 发布脚本 copy-7z-dll 按 PE 头校验架构，x86 不再误拷 64 位 7z.dll
+- **背景**：用户反馈安装包内 `x64\7z.dll` 与 `x86\7z.dll` 是相同文件——实证属实（两目录 SHA256 完全一致）。根因：`scripts/copy-7z-dll.ps1` 的 fallback 分支基于错误注释「现代 7-Zip 分发通用二进制」，在构建机只装 64 位 7-Zip 时把 64 位 dll 复制进 `x86\` 目录；GitHub Actions runner 同样只有 64 位，**历届官方发布包的 x86\7z.dll 全是假货**。附带反向 bug：只装 32 位 7-Zip 的构建机会把 32 位 dll 当 `$found64` 塞进 `x64\`
+- **影响面**：官方包仅发 win-x64（`Is64BitProcess` 恒真）故无实际故障，仅 ~1.9MB 死重；自建 win-x86（csproj `RuntimeIdentifiers: win-x64;win-x86` 设计内场景）会加载假 dll 导致 7z/RAR/ISO 全部不可用
+- **修复**：候选文件逐一读 PE 头 COFF Machine 字段判定真实架构（0x8664→x64 / 0x014C→x86 / 0xAA64→ARM64 跳过），每架构仅从真实匹配源复制；缺失架构警告跳过、不建目录（宁缺毋假）；删除错误 fallback
+- **配套**：`installer.iss` + `installer-selfcontained.iss` 的 x86 行加 `skipifsourcedoesntexist`（脚本跳过复制时安装包照常编译）；x64 行保持必需，缺失时让打包大声失败
+- 验证：AST 提取 `Get-PEMachine` 单测（真 dll→'x64'，垃圾文件→拒识）；本机完整跑脚本——x64 复制哈希一致、x86 警告跳过不建目录、ExitCode=0
 
 #### v0.5.0 (2026-08-19)
 - 添加到压缩包支持重名条目冲突处理：新增 `AddConflictHelper`（条目名级解析，语义方向与解压相反：新数据更新/更大→覆盖）；ZIP copy-mode `keepEntryNames` 排除被覆盖条目、legacy Phase 2 应用解析结果；7z 覆盖经 `ModifyArchive`(index→null) 删除 + `CompressFileDictionary` Append 重加

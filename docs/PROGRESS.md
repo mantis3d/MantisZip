@@ -27,6 +27,7 @@
 
 #### 2026-08
 
+- **08-24** — WPF 对比审计补齐：7z.dll 运行时缺失引导弹窗（含启动接线修复——设置里的 SevenZipPath 此前从未灌入引擎）+ CLI 补 `--help`/`--test`/未知参数告警
 - **08-23** — 加密压缩包交互对齐 WPF：工具栏「密码」按钮三态化（禁用钥匙/红锁待输入/绿开锁已匹配，点击输入或查看当前包密码）+ 可列出加密包取消密码后仍可浏览（未匹配状态，补输密码后解锁）+ 加密条目预览直接提示需要密码
 - **08-21** — 文件列表列排序增强：三态循环（升→降→未排序恢复原始顺序）+ 列头箭头状态显示 + 排序状态持久化（window.json 与 WPF 兼容）+ 重填后自动重排 + 压缩率列排序 bug 修复
 - **08-20** — WPF 差异补齐 P1 清零：智能打开路径（`SmartOpenPathResolver` + 选中条目/拖拽/主流程三处接线 + `ExtractArchive` 死代码修复）+ 便携模式 Temp 目录重定向（`AppSettings.GetTempDir` + 4 处替换）
@@ -81,6 +82,7 @@
 
 #### v0.5.0
 
+- **08-24** — 发布脚本 copy-7z-dll 按 PE 头校验架构：x86 目录不再误拷 64 位 7z.dll（历届安装包均受影响），缺失架构警告跳过 + installer x86 行 skipifsourcedoesntexist
 - **08-19** — 添加到压缩包重名条目冲突处理（AddConflictHelper 条目名级解析）+ 保留浏览目录前缀（entryBasePath）
 - **08-09** — Core 新增 ArchiveCommentReader（ZIP + RAR5 注释统一读取）+ ZIP 注释编码兼容（GBK 回退）
 - **08-07** — 发布管线切 Avalonia + 便携版双变体 + WebSetup + 移除调试符号
