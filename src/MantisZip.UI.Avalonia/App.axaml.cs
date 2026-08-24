@@ -148,6 +148,9 @@ public partial class App : Application
 
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
+            // 进程退出诊断（纯观察）：窗口生命周期 + 僵尸状态 + 异常记录 → %LOCALAPPDATA%\MantisZip\lifecycle.log
+            Services.LifetimeDiagnostics.Install(desktop);
+
             var args = Environment.GetCommandLineArgs().Skip(1).ToArray();
 
             if (args.Length == 0)

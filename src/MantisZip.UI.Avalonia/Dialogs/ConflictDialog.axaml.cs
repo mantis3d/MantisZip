@@ -68,6 +68,8 @@ public partial class ConflictDialog : Window
         InitializeComponent();
         DataContext = this;
 
+        Services.LifetimeDiagnostics.Log($"ConflictDialog OPEN file='{Path.GetFileName(info.FilePath)}' existing={info.ExistingSize} entry={info.EntrySize}");
+
         HeaderText.Text = string.Format(LocalizationManager.T("Conflict_Header"), $"\"{Path.GetFileName(info.FilePath)}\"");
 
         // 预填重命名的建议名
@@ -80,7 +82,11 @@ public partial class ConflictDialog : Window
         this.Closing += (_, _) =>
         {
             if (!_resultCaptured)
+            {
+                // 诊断：非按钮路径关闭（Alt+F4/系统/程序化 Close）——默认按覆盖捕获
+                Services.LifetimeDiagnostics.Log($"ConflictDialog CLOSING without button (default Overwrite captured) file='{Path.GetFileName(info.FilePath)}' stack:\n{Environment.StackTrace}");
                 CaptureResult(FileConflictAction.Overwrite, false, null);
+            }
         };
 
         // 已有文件信息
@@ -124,42 +130,50 @@ public partial class ConflictDialog : Window
 
     private void Overwrite_Click(object? sender, RoutedEventArgs e)
     {
+        var b = sender as Button;
+        Services.LifetimeDiagnostics.Log($"ConflictDialog btn=Overwrite ptrOver={b?.IsPointerOver} focused={b?.IsFocused}");
         CaptureResult(FileConflictAction.Overwrite, ApplyAllCheck.IsChecked == true, RenameTextBox.Text);
         Close(true);
     }
 
     private void Rename_Click(object? sender, RoutedEventArgs e)
     {
+        Services.LifetimeDiagnostics.Log("ConflictDialog btn=Rename");
         CaptureResult(FileConflictAction.Rename, ApplyAllCheck.IsChecked == true, RenameTextBox.Text);
         Close(true);
     }
 
     private void Skip_Click(object? sender, RoutedEventArgs e)
     {
+        Services.LifetimeDiagnostics.Log("ConflictDialog btn=Skip");
         CaptureResult(FileConflictAction.Skip, ApplyAllCheck.IsChecked == true, RenameTextBox.Text);
         Close(true);
     }
 
     private void OverwriteIfOlder_Click(object? sender, RoutedEventArgs e)
     {
+        Services.LifetimeDiagnostics.Log("ConflictDialog btn=OverwriteIfOlder");
         CaptureResult(FileConflictAction.OverwriteIfOlder, ApplyAllCheck.IsChecked == true, RenameTextBox.Text);
         Close(true);
     }
 
     private void OverwriteIfSmaller_Click(object? sender, RoutedEventArgs e)
     {
+        Services.LifetimeDiagnostics.Log("ConflictDialog btn=OverwriteIfSmaller");
         CaptureResult(FileConflictAction.OverwriteIfSmaller, ApplyAllCheck.IsChecked == true, RenameTextBox.Text);
         Close(true);
     }
 
     private void Pause_Click(object? sender, RoutedEventArgs e)
     {
+        Services.LifetimeDiagnostics.Log("ConflictDialog btn=Pause");
         _isPaused = true;
         Close(false);
     }
 
     private void CancelOperation_Click(object? sender, RoutedEventArgs e)
     {
+        Services.LifetimeDiagnostics.Log("ConflictDialog btn=CancelOperation");
         _cancelOperation = true;
         CaptureResult(FileConflictAction.Overwrite, false, null);
         Close(false);
