@@ -2157,6 +2157,8 @@ public partial class MainWindowViewModel : ObservableObject
         if (completed)
         {
             StatusMessage = LocalizationManager.T("Status_ExtractComplete");
+            // 成功后把目标目录写入路径历史（原地解压到压缩包所在目录）
+            PathHistoryManager.Record(dest);
         }
     }
 
@@ -2184,6 +2186,8 @@ public partial class MainWindowViewModel : ObservableObject
         if (completed)
         {
             StatusMessage = LocalizationManager.T("Status_ExtractComplete");
+            // 成功后把目标目录写入路径历史（解压到同名子目录）
+            PathHistoryManager.Record(dest);
         }
     }
 
@@ -2368,6 +2372,9 @@ public partial class MainWindowViewModel : ObservableObject
         if (completed)
         {
             StatusMessage = LocalizationManager.T("Status_Compressed");
+
+            // 压缩成功后把输出目录写入路径历史（覆盖手输地址栏直接点压缩等此前不入史的场景）
+            CompressFlow.RecordOutputHistory(request);
 
             // Save or update password in the password library (matches WPF SavePasswordAfterCompress logic).
             // Must run after compress succeeds, before the dialog closes.

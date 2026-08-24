@@ -6,6 +6,13 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-08-24** — 压缩/解压成功后自动记录目标目录到路径历史
+  - **背景**：路径历史（`PathHistoryManager`，持久化 `%LOCALAPPDATA%\MantisZip\path-history.json`，上限 50 条大小写不敏感去重）此前只由选择器交互写入——地址栏 Enter、📁 浏览按钮、CustomFilePickerDialog 导航（含构造即 Record 初始目录，取消也留痕）、QuickPathControl 条目点击。最常见场景「压缩/解压设置窗口手输路径 → 直接点确认」反而不入史，历史语义是「做过显式导航动作」而非「实际用过的目录」
+  - **实现**（8 个成功点）：压缩侧新增 `CompressFlow.RecordOutputHistory(request)` 共享辅助——取 `AvaloniaCompressService.GetOutputPaths` 各输出文件的父目录去重后逐条 `Record`（Manual/Combined = 输出文件所在目录；Separate = 各源条目所在目录），自身 try-catch 仅记日志绝不影响压缩结果；主窗口 `ExecuteCompressFromSettings` completed 分支 + CLI `CompressWithProgress` 成功尾部接线（覆盖 `--compress` 对话框确认 / `--compress-quick` / `-separate` / `-combined` 全部 CLI 压缩模式）。解压侧：`ExtractFlow.ExtractAsync` 末尾（取消/异常向上抛时不执行）、`RunSelectedItemsExtractionAsync` 成功分支（拖拽解压 + 右键解压选中项共用入口）、主窗口 `ExtractArchiveHere`/`ExtractArchiveToName` completed 分支、CLI `RunCliExtractWithProgressAsync` 与 `RunCliDirectExtractBatchAsync` 逐项成功后（`--extract-here` / `--extract-to-name` / `--extract-smart` 单文件与多文件直解）
+  - **语义约定**：只在操作成功后记录——用户取消、引擎抛异常零痕迹；CLI 部分条目失败但输出已落盘仍记录；重复路径由既有去重逻辑置顶刷新时间戳
+  - 涉及文件：`Services/CompressFlow.cs`、`Services/ExtractFlow.cs`、`ViewModels/MainWindowViewModel.cs`、`App.axaml.cs`
+  - 验证：`dotnet build` 0 错误（36 个警告均为改动前已存在）
+
 **2026-08-24** — 进程退出诊断器：窗口生命周期与僵尸状态取证（lifecycle.log）
   - **背景**：用户反馈「点击关闭后界面消失但后台仍残留进程」，右键菜单操作后高发、间歇性出现。静态审计覆盖全部 `OnExplicitShutdown` 流程的显式 `Shutdown()` 配对、ProgressWindow X 取消链路、IPC 双实例与覆层后台线程均未发现确定性泄漏；11 个端到端自动化场景（CLI 全参数 × 正常启动/中途取消/对话框关闭/UIA 点击确认）全部干净退出——黑盒无法复现，转入现场取证路线
   - **实现**（纯观察、零行为变更）：新增 `LifetimeDiagnostics` 诊断器，DispatcherTimer 每 2s 做窗口列表差分（含不可见窗口，如拖拽覆层/提权 tempOwner）；订阅 `ShutdownRequested` 记录每次显式退出请求；僵尸状态检测——「无任何可见窗口 且 （OnExplicitShutdown 或 主窗口已关）」持续 ≥6s 时写入完整窗口转储并每 ~16s 重申；记录 UI 线程 / AppDomain / 未观察任务异常（不改 Handled/Observed）。日志无条件写入 `%LOCALAPPDATA%\MantisZip\lifecycle.log`（LogRedactor 脱敏 + 5MB 轮转），不受 EnableDebugLogging 门控

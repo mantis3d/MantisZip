@@ -2,6 +2,7 @@ using Avalonia.Controls;
 using Avalonia.Threading;
 using MantisZip.Core.Abstractions;
 using MantisZip.Core.Services;
+using MantisZip.Core.Utils;
 using MantisZip.UI.Avalonia.Dialogs;
 using MantisZip.UI.Avalonia.Models;
 using MantisZip.UI.Avalonia.ViewModels;
@@ -190,6 +191,33 @@ public static class CompressFlow
             }
 
             return (result.Action, result.CustomName, result.ApplyAll);
+        }
+    }
+
+    /// <summary>
+    /// 压缩成功后把输出目录写入路径历史（<see cref="PathHistoryManager"/>，
+    /// QuickPathPicker 地址栏 / CustomFilePickerDialog 历史建议的数据源）。
+    /// 目录取自 GetOutputPaths 各输出文件的父目录并去重（Manual/Combined = 输出文件所在目录；
+    /// Separate = 各源条目所在目录）。失败仅记日志，不影响压缩结果。
+    /// 由调用方在压缩确认成功后调用（主窗口 ExecuteCompressFromSettings / CLI CompressWithProgress）。
+    /// </summary>
+    public static void RecordOutputHistory(CompressRequest request)
+    {
+        try
+        {
+            var dirs = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var output in AvaloniaCompressService.GetOutputPaths(request))
+            {
+                var dir = Path.GetDirectoryName(output);
+                if (!string.IsNullOrEmpty(dir))
+                    dirs.Add(dir);
+            }
+            foreach (var dir in dirs)
+                PathHistoryManager.Record(dir);
+        }
+        catch (Exception ex)
+        {
+            App.DebugLog($"[CompressFlow] RecordOutputHistory failed: {ex.Message}");
         }
     }
 }

@@ -904,6 +904,8 @@ public partial class App : Application
                     progressWindow.SetComplete(LocalizationManager.T("Cli_StatusDone"));
                 });
                 Console.WriteLine($"Extracted: {archivePath} -> {targetDir}");
+                // 成功后把目标目录写入路径历史（--extract-here / --extract-to-name / --extract-smart 单文件直解）
+                PathHistoryManager.Record(targetDir);
                 TryDeleteArchiveAfterExtract(archivePath);
             }
             catch (OperationCanceledException)
@@ -1171,6 +1173,9 @@ public partial class App : Application
                             ProgressWindow.CreateBackgroundProgress(progressWindow));
 
                         await engine.ExtractAsync(archivePath, targetDir, password, progress, ct, conflictOptions);
+
+                        // 成功后把目标目录写入路径历史（多文件直解批处理逐项记录，重复路径由去重置顶）
+                        PathHistoryManager.Record(targetDir);
 
                         TryDeleteArchiveAfterExtract(archivePath);
 
@@ -1960,6 +1965,8 @@ public partial class App : Application
         }
 
         // 成功：自动关闭（2.5s）或等待（📌 KeepOpenOnComplete 生效），窗口关闭后退出进程
+        // 压缩完成后把输出目录写入路径历史（含部分条目失败——输出已落盘；取消/异常路径不会走到此处）
+        CompressFlow.RecordOutputHistory(request);
         await progressWindow.AutoCloseOrWaitAsync(2500, () => desktop.Shutdown());
     }
 
