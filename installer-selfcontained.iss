@@ -77,8 +77,10 @@ Source: "publish_output_selfcontained\MantisZip.UI.Avalonia.runtimeconfig.json";
 Source: "publish_output_selfcontained\MantisZip.ShellExt.runtimeconfig.json"; DestDir: "{app}"; Flags: ignoreversion
 
 ; === 7z.dll (SharpSevenZip): architecture-specific subdirectories ===
+; x86 uses skipifsourcedoesntexist: copy-7z-dll.ps1 only bundles a real 32-bit
+; 7z.dll when a 32-bit 7-Zip is present on the build machine — never a fake copy.
 Source: "publish_output_selfcontained\x64\7z.dll"; DestDir: "{app}\x64"; Flags: ignoreversion
-Source: "publish_output_selfcontained\x86\7z.dll"; DestDir: "{app}\x86"; Flags: ignoreversion
+Source: "publish_output_selfcontained\x86\7z.dll"; DestDir: "{app}\x86"; Flags: ignoreversion skipifsourcedoesntexist
 
 ; === Resources (context menu icons, drag cursors, localization) ===
 Source: "publish_output_selfcontained\Resources\MenuIcons\*.ico"; DestDir: "{app}\Resources\MenuIcons"; Flags: ignoreversion
