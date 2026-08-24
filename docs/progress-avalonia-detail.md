@@ -1078,6 +1078,10 @@
 ## 共享层（Core / ShellExt / 构建）
 这些变更影响两项目共用代码，按时间从新到旧排列。
 
+#### v0.5.0 (2026-08-25) 压缩源文件共享读打开——修复被占用文件导致整个压缩终止
+  - **背景**：压缩时遇到正被 Word/Excel 等编辑器打开的文件必失败——`File.OpenRead` 隐含 `FileShare.Read`（禁止他人写），在 Windows 内核双向共享契约下与编辑器已持有的 ReadWrite 权限冲突（新句柄的共享声明必须覆盖已有句柄的已授权限），抛 IOException「文件正由另一进程使用」；引擎的 3 次瞬时重试撞同一把锁全部无效，最终整个压缩任务终止。Core 的 ErrorResolver（重试/跳过/中止）机制仅 WPF 版接线（`App.CreateCompressOptions`），Avalonia 版迁移时遗漏
+  - **方案**（治本层，零交互）：新增 `Utils/SharedReadStream.cs`——`OpenRead(path)` 以 `FileShare.ReadWrite | FileShare.Delete` 打开（7-Zip 同款语义：只读不排斥写入方），替换压缩侧 4 处用户源文件读取：`ZipEngine.ReadFileWithRetry`（ZIP 明文压缩主路径）、`ZipEngine.AddToArchiveAsync` copy-mode 源文件流、`TarGzEngine.TarWriteFileWithRetry`、TarGz `.gz` 单文件分支。读取压缩包本身与临时目录副本保持原行为；7z 与加密 ZIP 走 SharpSevenZip 原生一次性调用无法逐文件容错，另行规划；ErrorResolver 兜底层（真·独占锁场景）亦待后续
+  - 涉及文件：`Utils/SharedReadStream.cs`（新增）、`Engines/ZipEngine.cs`、`Engines/TarGzEngine.cs`、`tests/MantisZip.Tests/SharedReadStreamTests.cs`（新增：模拟编辑器以 ReadWrite+ShareRead 持有源文件，同时锁定新旧行为防回退）；构建 0 错误，Core 测试 301/301 通过（两版 UI 同步受益）
 #### v0.5.0 (2026-08-19)
 - 添加到压缩包支持重名条目冲突处理：新增 `AddConflictHelper`（条目名级解析，语义方向与解压相反：新数据更新/更大→覆盖）；ZIP copy-mode `keepEntryNames` 排除被覆盖条目、legacy Phase 2 应用解析结果；7z 覆盖经 `ModifyArchive`(index→null) 删除 + `CompressFileDictionary` Append 重加
 #### v0.5.0 (2026-08-18)
