@@ -246,7 +246,8 @@ public class TarGzEngine : IArchiveEngine
                         using var outputStream = File.Create(outputPath);
                         using var gzipWriter = GZipWriter.OpenWriter(outputStream, new GZipWriterOptions(options.CompressionLevel));
 
-                        using var input = File.OpenRead(files[0].FullPath);
+                        // 共享读：源文件可能正被编辑器以写权限持有
+                        using var input = SharedReadStream.OpenRead(files[0].FullPath);
                         gzipWriter.Write(Path.GetFileName(files[0].FullPath), input, null);
                     }
                 }
@@ -288,7 +289,8 @@ public class TarGzEngine : IArchiveEngine
             {
                 ct.ThrowIfCancellationRequested();
                 var fi = new FileInfo(fullPath);
-                using var sourceStream = File.OpenRead(fullPath);
+                // 共享读：源文件可能正被 Word 等编辑器以写权限持有，File.OpenRead 会直接冲突
+                using var sourceStream = SharedReadStream.OpenRead(fullPath);
                 writer.Write(relativePath, sourceStream, fi.LastWriteTime);
                 return true;
             }
