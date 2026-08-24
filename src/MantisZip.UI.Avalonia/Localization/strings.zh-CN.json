@@ -1,4 +1,10 @@
 {
+  "SevenZipDll_MissingTitle": "找不到 7z.dll",
+  "SevenZipDll_MissingMessage": "未在默认位置找到 7z.dll，7z/RAR/ISO 相关功能将无法使用。\n\n点击「确定」手动指定 7z.dll 位置，或「取消」跳过。",
+  "App_StartupTestTitle": "启动测试",
+  "App_StartupTestMessage": "MantisZip {0} 启动测试成功。\n\n安装目录：{1}",
+  "App_CliHelpTitle": "MantisZip 命令行帮助",
+  "App_CliHelp": "MantisZip {0} - 压缩/解压工具\n\n用法: MantisZip.exe [命令] [参数]\n\n命令:\n  (无参数)              启动主窗口浏览界面\n  --open <路径>         打开压缩包并浏览压缩包内文件\n  --compress <路径...>  显示压缩对话框，支持多选 IPC 合并\n  --compress-quick <路径...>  使用默认设置直接压缩\n  --compress-separate <路径...>  分别压缩每个选中项\n  --compress-combined <路径...>  合并压缩所有选中项\n  --extract <路径>      显示解压设置窗口\n  --extract-here <路径>  解压到当前目录\n  --extract-smart <路径>  智能解压（自动检测顶层文件夹）\n  --extract-to-name <路径>  解压到压缩包同名目录\n  --install-shell       安装 Shell 右键菜单\n  --uninstall-shell     卸载 Shell 右键菜单\n  --install-assoc       安装文件关联\n  --uninstall-assoc     卸载文件关联\n  --test                启动测试模式\n  --help, -h            显示本帮助信息",
   "Preview_EntryNeedsPassword": "🔒 此文件已加密，请先输入密码再预览",
   "Toolbar_PasswordTooltip": "输入压缩包密码",
   "Toolbar_PasswordMissingTooltip": "🔒 压缩包已加密，点击输入密码",

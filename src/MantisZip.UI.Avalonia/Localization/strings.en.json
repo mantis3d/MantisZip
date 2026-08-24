@@ -1,4 +1,10 @@
 {
+  "SevenZipDll_MissingTitle": "7z.dll Not Found",
+  "SevenZipDll_MissingMessage": "7z.dll was not found in the default locations. 7z/RAR/ISO features will not work.\n\nClick OK to locate 7z.dll manually, or Cancel to skip.",
+  "App_StartupTestTitle": "Startup Test",
+  "App_StartupTestMessage": "MantisZip {0} startup test succeeded.\n\nInstall directory: {1}",
+  "App_CliHelpTitle": "MantisZip Command Line Help",
+  "App_CliHelp": "MantisZip {0} - Archive Utility\n\nUsage: MantisZip.exe [command] [arguments]\n\nCommands:\n  (no argument)         Launch main window\n  --open <path>         Open archive in main window\n  --compress <paths...> Show compress dialog (multi-instance IPC merge)\n  --compress-quick <paths...>  Quick compress with default settings\n  --compress-separate <paths...>  Compress each item separately\n  --compress-combined <paths...>  Compress all items into a combined archive\n  --extract <path>      Show extract settings window\n  --extract-here <path> Extract to source directory\n  --extract-smart <path> Smart extract (auto-detect top folder)\n  --extract-to-name <path>  Extract to named subfolder\n  --install-shell       Install Shell context menu\n  --uninstall-shell     Uninstall Shell context menu\n  --install-assoc       Install file associations\n  --uninstall-assoc     Uninstall file associations\n  --test                Launch test mode\n  --help, -h            Show this help message",
   "Preview_EntryNeedsPassword": "🔒 This file is encrypted. Enter the password to preview it",
   "Toolbar_PasswordTooltip": "Enter archive password",
   "Toolbar_PasswordMissingTooltip": "🔒 Archive encrypted, click to enter password",

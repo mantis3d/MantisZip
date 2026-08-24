@@ -96,6 +96,24 @@ public partial class App : Application
         if (appSettings.Language == "en")
             LocalizationManager.CurrentLanguage = AppLanguage.English;
 
+        // ── 7z.dll 路径接线 + 用户解析回调（对齐 WPF InitializeApp，App.xaml.cs:46-68）──
+        // 从用户设置加载 7z.dll 路径，覆盖 SevenZipEngine 的默认值
+        try
+        {
+            if (!string.IsNullOrEmpty(appSettings.SevenZipPath))
+            {
+                SevenZipEngine.SevenZipDllPath = appSettings.SevenZipPath;
+                DebugLog($"OnFrameworkInitializationCompleted: SevenZipDllPath set to {appSettings.SevenZipPath}");
+            }
+        }
+        catch (Exception sevenZipInitEx)
+        {
+            DebugLog($"OnFrameworkInitializationCompleted: failed to apply SevenZipPath setting: {sevenZipInitEx.Message}");
+        }
+
+        // 注册 7z.dll 解析回调 — 默认位置找不到时弹出对话框让用户手动指定
+        SevenZipEngine.SevenZipDllResolveCallback = ResolveSevenZipDllViaDialog;
+
         // ── 首次运行：Shell 集成安装（延迟到用户进程，非提权）──
         // 安装程序会写入 FirstRunShell=1 / FirstRunAssoc=1 到注册表，首次启动时处理
         var isPortable = File.Exists(Path.Combine(AppContext.BaseDirectory, "Portable.txt"));
@@ -285,8 +303,20 @@ public partial class App : Application
                         HandleShellCommand(command, desktop);
                         break;
 
+                    case "--help":
+                    case "-h":
+                        // Show CLI help (console output if launched from terminal, dialog otherwise), then exit
+                        _ = ShowCliHelpThenShutdown(desktop);
+                        break;
+
+                    case "--test":
+                        // Startup self-test: show success dialog, then exit
+                        _ = ShowStartupTestThenShutdown(desktop);
+                        break;
+
                     default:
                         // Unknown args: just show UI
+                        DebugLog($"警告: 无法识别的命令行参数 '{command}'。使用 --help 查看可用命令。");
                         desktop.MainWindow = new MainWindow();
                         break;
                 }
@@ -294,6 +324,158 @@ public partial class App : Application
         }
 
         base.OnFrameworkInitializationCompleted();
+    }
+
+    // ════════════════════════════════════════════════════════════════
+    //  CLI helpers (--help / --test) + 7z.dll resolve callback
+    // ════════════════════════════════════════════════════════════════
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern bool AttachConsole(int dwProcessId);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern bool FreeConsole();
+
+    private const int ATTACH_PARENT_PROCESS = -1;
+
+    /// <summary>
+    /// 显示 CLI 帮助信息后退出。优先输出到父控制台（从 cmd/powershell 调用时），否则弹窗显示。
+    /// （移植自 WPF App.ShowHelp，App.xaml.cs:927）
+    /// </summary>
+    private static async Task ShowCliHelpThenShutdown(IClassicDesktopStyleApplicationLifetime desktop)
+    {
+        var helpText = LocalizationManager.T("App_CliHelp", AppConstants.Version);
+
+        if (AttachConsole(ATTACH_PARENT_PROCESS))
+        {
+            Console.WriteLine(helpText);
+            FreeConsole();
+            desktop.Shutdown();
+            return;
+        }
+
+        await AppMessageBox.Show(helpText, LocalizationManager.T("App_CliHelpTitle"),
+            MessageBoxButton.OK, MessageBoxImage.Information);
+        desktop.Shutdown();
+    }
+
+    /// <summary>
+    /// 显示启动测试成功弹窗后退出（--test 模式，对齐 WPF case "--test"）。
+    /// </summary>
+    private static async Task ShowStartupTestThenShutdown(IClassicDesktopStyleApplicationLifetime desktop)
+    {
+        DebugLog("--test 模式：启动测试成功");
+        await AppMessageBox.Show(
+            LocalizationManager.T("App_StartupTestMessage",
+                AppConstants.Version, AppContext.BaseDirectory),
+            LocalizationManager.T("App_StartupTestTitle"),
+            MessageBoxButton.OK, MessageBoxImage.Information);
+        desktop.Shutdown();
+    }
+
+    /// <summary>
+    /// 7z.dll 用户解析回调（SevenZipEngine.SevenZipDllResolveCallback）：
+    /// 弹窗说明原因 + 文件选择框让用户手动定位 7z.dll，选择后保存到设置。
+    /// 引擎在后台线程锁内同步调用本回调，经 UI 线程 Post + TCS 阻塞等待结果；
+    /// 若恰好在 UI 线程触发则放弃弹窗（无法阻塞等待模态框），退回设置值避免死锁。
+    /// </summary>
+    private static string? ResolveSevenZipDllViaDialog()
+    {
+        var dispatcher = Dispatcher.UIThread;
+        if (dispatcher.CheckAccess())
+        {
+            DebugLog("ShowSevenZipDllDialog: invoked on UI thread, skipping dialog to avoid deadlock");
+            return TryGetConfiguredSevenZipDllPath();
+        }
+
+        var tcs = new TaskCompletionSource<string?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        dispatcher.Post(() => _ = ResolveSevenZipDllViaDialogCore(tcs));
+        try
+        {
+            tcs.Task.Wait();
+        }
+        catch (AggregateException ex)
+        {
+            DebugLog($"ShowSevenZipDllDialog: wait failed: {ex.GetBaseException().Message}");
+            return null;
+        }
+        return tcs.Task.Result;
+    }
+
+    private static async Task ResolveSevenZipDllViaDialogCore(TaskCompletionSource<string?> tcs)
+    {
+        try
+        {
+            // 先说明原因（对齐 WPF QuickPathPreDialog 文件模式的引导语义）
+            var confirm = await AppMessageBox.Show(
+                LocalizationManager.T("SevenZipDll_MissingMessage"),
+                LocalizationManager.T("SevenZipDll_MissingTitle"),
+                MessageBoxButton.OKCancel, MessageBoxImage.Warning);
+            if (confirm != MessageBoxResult.OK)
+            {
+                tcs.TrySetResult(null);
+                return;
+            }
+
+            var owner = (Application.Current?.ApplicationLifetime as IClassicDesktopStyleApplicationLifetime)?.MainWindow;
+            if (owner == null)
+            {
+                DebugLog("ShowSevenZipDllDialog: no main window available, cannot open file picker");
+                tcs.TrySetResult(null);
+                return;
+            }
+
+            var picked = await CustomFilePickerDialog.ShowOpenFileAsync(
+                owner,
+                initialPath: TryGetConfiguredSevenZipDllPath(),
+                fileExtensions: ["*.dll"]);
+            if (!string.IsNullOrEmpty(picked))
+            {
+                SaveSevenZipPath(picked);
+                tcs.TrySetResult(picked);
+                return;
+            }
+
+            tcs.TrySetResult(null);
+        }
+        catch (Exception ex)
+        {
+            DebugLog($"ShowSevenZipDllDialog failed: {ex.Message}");
+            tcs.TrySetResult(null);
+        }
+    }
+
+    /// <summary>读取设置中的 7z.dll 路径（仅当文件存在时返回）。</summary>
+    private static string? TryGetConfiguredSevenZipDllPath()
+    {
+        try
+        {
+            var p = AppSettings.Load().SevenZipPath;
+            return !string.IsNullOrEmpty(p) && File.Exists(p) ? p : null;
+        }
+        catch (Exception ex)
+        {
+            DebugLog($"TryGetConfiguredSevenZipDllPath failed: {ex.Message}");
+            return null;
+        }
+    }
+
+    /// <summary>保存用户指定的 7z.dll 路径到设置。</summary>
+    private static void SaveSevenZipPath(string path)
+    {
+        try
+        {
+            var settings = AppSettings.Load();
+            settings.SevenZipPath = path;
+            if (!settings.Save())
+                DebugLog("ShowSevenZipDllDialog: settings.Save() returned false");
+            else
+                DebugLog($"ShowSevenZipDllDialog: saved 7z.dll path to settings: {path}");
+        }
+        catch (Exception ex)
+        {
+            DebugLog($"ShowSevenZipDllDialog: failed to save settings: {ex.Message}");
+        }
     }
 
     // ════════════════════════════════════════════════════════════════
