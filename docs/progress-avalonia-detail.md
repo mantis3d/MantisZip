@@ -6,6 +6,19 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-08-24** — 进程退出诊断器：窗口生命周期与僵尸状态取证（lifecycle.log）
+  - **背景**：用户反馈「点击关闭后界面消失但后台仍残留进程」，右键菜单操作后高发、间歇性出现。静态审计覆盖全部 `OnExplicitShutdown` 流程的显式 `Shutdown()` 配对、ProgressWindow X 取消链路、IPC 双实例与覆层后台线程均未发现确定性泄漏；11 个端到端自动化场景（CLI 全参数 × 正常启动/中途取消/对话框关闭/UIA 点击确认）全部干净退出——黑盒无法复现，转入现场取证路线
+  - **实现**（纯观察、零行为变更）：新增 `LifetimeDiagnostics` 诊断器，DispatcherTimer 每 2s 做窗口列表差分（含不可见窗口，如拖拽覆层/提权 tempOwner）；订阅 `ShutdownRequested` 记录每次显式退出请求；僵尸状态检测——「无任何可见窗口 且 （OnExplicitShutdown 或 主窗口已关）」持续 ≥6s 时写入完整窗口转储并每 ~16s 重申；记录 UI 线程 / AppDomain / 未观察任务异常（不改 Handled/Observed）。日志无条件写入 `%LOCALAPPDATA%\MantisZip\lifecycle.log`（LogRedactor 脱敏 + 5MB 轮转），不受 EnableDebugLogging 门控
+  - **ConflictDialog 取证**：构造器打开日志（文件名+大小对比）、七个按钮出口逐一留痕、非按钮关闭（Alt+F4/程序化 Close）附调用栈——验证期间已捕获真实输入指纹（ptrOver/focused）与非按钮关闭栈
+  - 涉及文件：`Services/LifetimeDiagnostics.cs`（新增）、`App.axaml.cs`（desktop 分支一行接线）、`Dialogs/ConflictDialog.axaml.cs`
+  - 验证：`dotnet build` 0 错误；正常启动→关闭、CLI 解压冒烟均干净退出且 lifecycle.log 完整留痕（app start/WINDOW OPEN-CLOSE/ShutdownRequested）
+  - 配套文档：[zombie-process-troubleshooting.md](zombie-process-troubleshooting.md)（复发排查三步操作）
+
+**2026-08-24** — 手动测试清单按 Avalonia 现状全面重写
+  - **背景**：`manual-test-checklist.md` 为 WPF 时代产物——HTML/Markdown/PDF/SVG 仍描述 WebView2 渲染、「加密 7z 单项预览不支持」（现已全面支持）、指向 WPF exe 与 net9.0-windows 路径，且缺失大量新功能项、章节编号错乱、历史 ✅ 未清零
+  - **重写要点**：以 v0.5.0 Avalonia 版为准重建 14 章——预览系统改原生渲染描述并补齐魔数检测（含扩展名误导用例）/ICO 画廊 FlattenAlpha/动画 WebP/字体连字检测/CSV 表格/可配置元数据面板（字段位置·显隐·持久化）；交互补齐拖拽直接解压全链路（四态覆层+四态光标+Esc 取消）、拖入添加覆层、收藏夹地址栏、目录树自动展开；解压补结果预览树/密码库徽标与手动解锁/提权流程/📌 图钉/删除原包选项；压缩补 7z 高级选项面板/ZIP 编码与加密方式/自定义分卷；新增「文件关联与打开分发」章（per-format 关联、自定义扩展名、DoubleClickAction 分发）；CLI 补 `--open-dispatch`、移除已不存在的 `--test`、新增「流程结束无残留进程」检查项（交叉引用 zombie-process-troubleshooting.md）；章节编号重排、标注约定扩充 `[drag-on]` `[assoc]` `[pwd-lib]` `[debug]`、历史 ✅ 清零作为全新回归基线
+  - 涉及文件：`docs/manual-test-checklist.md`（重写）、`docs/zombie-process-troubleshooting.md`（新增）
+
 **2026-08-23** — 文件关联图标修复：格式图标资源补齐 + ProgId 自愈刷新
   - **背景**：Avalonia 版安装文件关联后，Explorer 显示的是应用通用图标而非 zip/7z/rar 各自的专属图标。注册表写入逻辑（per-format ProgId + DefaultIcon + OpenWithProgids）与 WPF 逐行一致，差异在资源侧——WPF 的 `Resources\Icons\` 有 7 个格式 .ico 且 csproj 有输出复制规则；Avalonia 两边都缺（Icons 目录只有 .gitkeep 与 AppIcons.axaml），`GetIconPath()` 的 `File.Exists` 恒 false，全部退化为 `"exePath",0` 兜底
   - **修复一（资源补齐）**：从 WPF 复制 zip/sevenz/rar/tar/tgz/gz/iso 共 7 个 .ico 到 Avalonia `Resources\Icons\`；csproj 照 MenuIcons 同款模式补 `<None Include="Resources\Icons\*.ico">` 输出复制规则（精确 *.ico 不带出 .gitkeep/AppIcons.axaml）
