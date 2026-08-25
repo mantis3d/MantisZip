@@ -6,7 +6,16 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
-**2026-08-24** — 迁移遗漏审计补齐：7z.dll 运行时引导接线 + CLI `--help`/`--test`
+**2026-08-25** — 文件筛选栏交互重构（开关迁主工具栏 + 收起停用 + 清除全部 + 单位切换修复）
+  - **开关搬家**：筛选栏 ToggleButton 从文件列表小工具栏移至主工具栏「测试」之后，与其他主工具栏按钮同款外观（22×22 `IconSearch` PathIcon + 「筛选」文字标签，选中态走全局样式）；小工具栏旧的小放大镜按钮删除
+  - **收起即停用**（用户语义，与 WPF 清空式为有意的偏离）：`IsFilterBarVisible` 兼作筛选总开关——收起时 `GetFilteredSource()` 直接返回未过滤的 `_allRawItems`、`FilterStats` 计数隐藏，但全部条件保留在输入框中，重新展开立即按原条件恢复过滤；`OnIsFilterBarVisibleChanged → ApplyFilter()` 接线保证切换瞬间列表即时刷新
+  - **清除全部按钮**：筛选栏大小区之后新增分隔线 + ✕ 按钮（24×24 矢量 `IconDismiss`，尺寸对齐 WPF `ClearFiltersBtn`），`ClearFiltersCommand` 清空搜索词/排除词/日期起止/大小上下限并把单位复位默认 KB、匹配模式复位子串——各属性 `OnXxxChanged` 自动链式触发恢复全量；新增 `Filter_ClearAll` 双语 key 并登记 keys 数组
+  - **修复大小单位下拉无效**：`FilterSizeUnit` 缺少 `OnFilterSizeUnitChanged → ApplyFilter()` 接线（WPF `SizeMinUnit/SizeMaxUnit SelectionChanged → RefreshFilter` 移植时遗漏），切换单位后乘数要等再动其它条件才生效；补一行修复
+  - **死代码清理**：删除无任何绑定的 `ToggleFilterBarCommand`；`Menu_FilterBar` 死 key 从 zh/en 语言文件与 keys 数组移除
+  - 涉及文件：`Views/MainWindow.axaml`、`ViewModels/MainWindowViewModel.cs`、`Localization/strings.zh-CN.json`、`Localization/strings.en.json`
+  - 验证：`dotnet build` 0 错误；全局搜索确认 `Menu_FilterBar` / `ToggleFilterBar` 无残留引用
+
+**2026-08-25** — 压缩/解压成功后自动记录目标目录到路径历史
   - **背景**：WPF↔Avalonia 全面对比审计（对话框清单 / AppSettings 属性 / CLI 参数三轴）发现三处真实缺口：
     - **7z.dll 引导缺失**：Core 的 `SevenZipDllResolveCallback` 挂钩仍在（`SevenZipEngine.cs:122` 会调用），但 Avalonia 从未注册回调；更严重的是启动时从未把设置里的 `SevenZipPath` 灌入引擎（WPF `InitializeApp` 有对应逻辑）——设置窗口「浏览」选好的路径实际**从未生效**
     - **CLI 缺 `--help`/`-h`/`--test`**，且未知参数静默打开主窗口（WPF 有告警日志）
@@ -18,7 +27,7 @@
   - 涉及文件：`App.axaml.cs`、`Localization/strings.zh-CN.json`、`Localization/strings.en.json`、AGENTS.md（UseColorEmoji 标注 WPF 专属废弃 + CLI 表格补两行）
   - 验证：`dotnet build` 0 错误（新增代码无警告）；双语言 JSON node 解析通过且 key 数完全一致（1119=1119）
 
-**2026-08-24** — 压缩/解压成功后自动记录目标目录到路径历史
+**2026-08-25** — 压缩/解压成功后自动记录目标目录到路径历史
   - **背景**：路径历史（`PathHistoryManager`，持久化 `%LOCALAPPDATA%\MantisZip\path-history.json`，上限 50 条大小写不敏感去重）此前只由选择器交互写入——地址栏 Enter、📁 浏览按钮、CustomFilePickerDialog 导航（含构造即 Record 初始目录，取消也留痕）、QuickPathControl 条目点击。最常见场景「压缩/解压设置窗口手输路径 → 直接点确认」反而不入史，历史语义是「做过显式导航动作」而非「实际用过的目录」
   - **实现**（8 个成功点）：压缩侧新增 `CompressFlow.RecordOutputHistory(request)` 共享辅助——取 `AvaloniaCompressService.GetOutputPaths` 各输出文件的父目录去重后逐条 `Record`（Manual/Combined = 输出文件所在目录；Separate = 各源条目所在目录），自身 try-catch 仅记日志绝不影响压缩结果；主窗口 `ExecuteCompressFromSettings` completed 分支 + CLI `CompressWithProgress` 成功尾部接线（覆盖 `--compress` 对话框确认 / `--compress-quick` / `-separate` / `-combined` 全部 CLI 压缩模式）。解压侧：`ExtractFlow.ExtractAsync` 末尾（取消/异常向上抛时不执行）、`RunSelectedItemsExtractionAsync` 成功分支（拖拽解压 + 右键解压选中项共用入口）、主窗口 `ExtractArchiveHere`/`ExtractArchiveToName` completed 分支、CLI `RunCliExtractWithProgressAsync` 与 `RunCliDirectExtractBatchAsync` 逐项成功后（`--extract-here` / `--extract-to-name` / `--extract-smart` 单文件与多文件直解）
   - **语义约定**：只在操作成功后记录——用户取消、引擎抛异常零痕迹；CLI 部分条目失败但输出已落盘仍记录；重复路径由既有去重逻辑置顶刷新时间戳

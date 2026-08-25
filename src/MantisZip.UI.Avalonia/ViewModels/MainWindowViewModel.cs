@@ -225,11 +225,11 @@ public partial class MainWindowViewModel : ObservableObject
             "Menu_NewArchive", "Menu_PasswordManager", "Menu_About", "Menu_Donate",
             "Toolbar_Open", "Toolbar_Extract", "Toolbar_Compress",
             "Toolbar_Filter", "Toolbar_Preview",
-            "Menu_Toolbar", "Menu_FilterBar",
+            "Menu_Toolbar",
             "Menu_ProgressBars", "Menu_SepDirBaseline", "Menu_InfoPanelOrientation", "Menu_ShowInfoPanel",
             "Menu_ShowPreviewPanel", "Menu_SaveLayout",
             "Filter_Search", "Filter_Exclude", "Filter_DateFrom", "Filter_DateTo",
-            "Filter_SizeMin", "Filter_SizeMax", "Filter_ShowSubfolders",
+            "Filter_SizeMin", "Filter_SizeMax", "Filter_ShowSubfolders", "Filter_ClearAll",
             "Filter_MatchModeSubstring", "Filter_MatchModeWildcard",
             "Status_Selected", "Status_ArchiveStats",
             "Tree_Browse",
@@ -785,12 +785,33 @@ public partial class MainWindowViewModel : ObservableObject
     partial void OnFilterDateToChanged(DateTime? value) => ApplyFilter();
     partial void OnFilterSizeMinChanged(long? value) => ApplyFilter();
     partial void OnFilterSizeMaxChanged(long? value) => ApplyFilter();
+    // 大小单位切换需立即重新过滤（对齐 WPF SizeMinUnit/SizeMaxUnit SelectionChanged → RefreshFilter）
+    partial void OnFilterSizeUnitChanged(string? value) => ApplyFilter();
     partial void OnShowSubfoldersChanged(bool value) => ApplyFilter();
+    // 筛选栏显隐 = 筛选功能总开关：收起时停用筛选（条件保留），重新展开即自动恢复生效
+    partial void OnIsFilterBarVisibleChanged(bool value) => ApplyFilter();
 
     private void ApplyFilter()
     {
         if (_allRawItems == null || _isProgrammaticFilter) return;
         PopulateEntries();
+    }
+
+    /// <summary>
+    /// 清除全部筛选条件（对齐 WPF ClearFiltersBtn_Click）：搜索词/排除词/日期起止/大小上下限清空，
+    /// 单位下拉复位默认 KB、匹配模式复位子串。各属性 OnXxxChanged 自动触发重新过滤，列表恢复全量。
+    /// </summary>
+    [RelayCommand]
+    private void ClearFilters()
+    {
+        FilterText = null;
+        FilterExcludeText = null;
+        FilterDateFrom = null;
+        FilterDateTo = null;
+        FilterSizeMin = null;
+        FilterSizeMax = null;
+        FilterSizeUnit = "KB";
+        SelectedMatchModeOption = MatchModeOptions.FirstOrDefault(o => o.Value == FilterMatchMode.Substring);
     }
 
     [RelayCommand]
@@ -1660,10 +1681,11 @@ public partial class MainWindowViewModel : ObservableObject
             var fileCount = CurrentEntries.Count - dirCount;
             DirStats = $"{dirCount} dirs, {fileCount} files";
 
-            // Populate FilterStats — only show when filters are active
-            if (!string.IsNullOrWhiteSpace(FilterText) || !string.IsNullOrWhiteSpace(FilterExcludeText) ||
-                FilterDateFrom.HasValue || FilterDateTo.HasValue ||
-                FilterSizeMin.HasValue || FilterSizeMax.HasValue)
+            // Populate FilterStats — only show when filter bar is open AND conditions are active
+            if (IsFilterBarVisible &&
+                (!string.IsNullOrWhiteSpace(FilterText) || !string.IsNullOrWhiteSpace(FilterExcludeText) ||
+                 FilterDateFrom.HasValue || FilterDateTo.HasValue ||
+                 FilterSizeMin.HasValue || FilterSizeMax.HasValue))
             {
                 var totalItems = _allRawItems?.Count ?? 0;
                 FilterStats = $"{CurrentEntries.Count}/{totalItems}";
@@ -1768,6 +1790,9 @@ public partial class MainWindowViewModel : ObservableObject
     private IReadOnlyList<ArchiveItem> GetFilteredSource()
     {
         if (_allRawItems == null) return Array.Empty<ArchiveItem>();
+
+        // 筛选栏收起 = 筛选整体停用：条件保留在输入框中不丢失，重新展开即自动恢复生效
+        if (!IsFilterBarVisible) return _allRawItems;
 
         IEnumerable<ArchiveItem> filtered = _allRawItems;
 
@@ -2728,12 +2753,6 @@ public partial class MainWindowViewModel : ObservableObject
     {
         if (ShowDonateDialog != null)
             await ShowDonateDialog();
-    }
-
-    [RelayCommand]
-    private void ToggleFilterBar()
-    {
-        IsFilterBarVisible = !IsFilterBarVisible;
     }
 
     [RelayCommand]
