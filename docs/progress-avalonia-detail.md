@@ -18,6 +18,13 @@
   - 涉及文件：`App.axaml.cs`、`Localization/strings.zh-CN.json`、`Localization/strings.en.json`、AGENTS.md（UseColorEmoji 标注 WPF 专属废弃 + CLI 表格补两行）
   - 验证：`dotnet build` 0 错误（新增代码无警告）；双语言 JSON node 解析通过且 key 数完全一致（1119=1119）
 
+**2026-08-24** — 压缩/解压成功后自动记录目标目录到路径历史
+  - **背景**：路径历史（`PathHistoryManager`，持久化 `%LOCALAPPDATA%\MantisZip\path-history.json`，上限 50 条大小写不敏感去重）此前只由选择器交互写入——地址栏 Enter、📁 浏览按钮、CustomFilePickerDialog 导航（含构造即 Record 初始目录，取消也留痕）、QuickPathControl 条目点击。最常见场景「压缩/解压设置窗口手输路径 → 直接点确认」反而不入史，历史语义是「做过显式导航动作」而非「实际用过的目录」
+  - **实现**（8 个成功点）：压缩侧新增 `CompressFlow.RecordOutputHistory(request)` 共享辅助——取 `AvaloniaCompressService.GetOutputPaths` 各输出文件的父目录去重后逐条 `Record`（Manual/Combined = 输出文件所在目录；Separate = 各源条目所在目录），自身 try-catch 仅记日志绝不影响压缩结果；主窗口 `ExecuteCompressFromSettings` completed 分支 + CLI `CompressWithProgress` 成功尾部接线（覆盖 `--compress` 对话框确认 / `--compress-quick` / `-separate` / `-combined` 全部 CLI 压缩模式）。解压侧：`ExtractFlow.ExtractAsync` 末尾（取消/异常向上抛时不执行）、`RunSelectedItemsExtractionAsync` 成功分支（拖拽解压 + 右键解压选中项共用入口）、主窗口 `ExtractArchiveHere`/`ExtractArchiveToName` completed 分支、CLI `RunCliExtractWithProgressAsync` 与 `RunCliDirectExtractBatchAsync` 逐项成功后（`--extract-here` / `--extract-to-name` / `--extract-smart` 单文件与多文件直解）
+  - **语义约定**：只在操作成功后记录——用户取消、引擎抛异常零痕迹；CLI 部分条目失败但输出已落盘仍记录；重复路径由既有去重逻辑置顶刷新时间戳
+  - 涉及文件：`Services/CompressFlow.cs`、`Services/ExtractFlow.cs`、`ViewModels/MainWindowViewModel.cs`、`App.axaml.cs`
+  - 验证：`dotnet build` 0 错误（36 个警告均为改动前已存在）
+
 **2026-08-24** — 进程退出诊断器：窗口生命周期与僵尸状态取证（lifecycle.log）
   - **背景**：用户反馈「点击关闭后界面消失但后台仍残留进程」，右键菜单操作后高发、间歇性出现。静态审计覆盖全部 `OnExplicitShutdown` 流程的显式 `Shutdown()` 配对、ProgressWindow X 取消链路、IPC 双实例与覆层后台线程均未发现确定性泄漏；11 个端到端自动化场景（CLI 全参数 × 正常启动/中途取消/对话框关闭/UIA 点击确认）全部干净退出——黑盒无法复现，转入现场取证路线
   - **实现**（纯观察、零行为变更）：新增 `LifetimeDiagnostics` 诊断器，DispatcherTimer 每 2s 做窗口列表差分（含不可见窗口，如拖拽覆层/提权 tempOwner）；订阅 `ShutdownRequested` 记录每次显式退出请求；僵尸状态检测——「无任何可见窗口 且 （OnExplicitShutdown 或 主窗口已关）」持续 ≥6s 时写入完整窗口转储并每 ~16s 重申；记录 UI 线程 / AppDomain / 未观察任务异常（不改 Handled/Observed）。日志无条件写入 `%LOCALAPPDATA%\MantisZip\lifecycle.log`（LogRedactor 脱敏 + 5MB 轮转），不受 EnableDebugLogging 门控
@@ -1090,6 +1097,10 @@
 - **配套**：`installer.iss` + `installer-selfcontained.iss` 的 x86 行加 `skipifsourcedoesntexist`（脚本跳过复制时安装包照常编译）；x64 行保持必需，缺失时让打包大声失败
 - 验证：AST 提取 `Get-PEMachine` 单测（真 dll→'x64'，垃圾文件→拒识）；本机完整跑脚本——x64 复制哈希一致、x86 警告跳过不建目录、ExitCode=0
 
+#### v0.5.0 (2026-08-25) 压缩源文件共享读打开——修复被占用文件导致整个压缩终止
+  - **背景**：压缩时遇到正被 Word/Excel 等编辑器打开的文件必失败——`File.OpenRead` 隐含 `FileShare.Read`（禁止他人写），在 Windows 内核双向共享契约下与编辑器已持有的 ReadWrite 权限冲突（新句柄的共享声明必须覆盖已有句柄的已授权限），抛 IOException「文件正由另一进程使用」；引擎的 3 次瞬时重试撞同一把锁全部无效，最终整个压缩任务终止。Core 的 ErrorResolver（重试/跳过/中止）机制仅 WPF 版接线（`App.CreateCompressOptions`），Avalonia 版迁移时遗漏
+  - **方案**（治本层，零交互）：新增 `Utils/SharedReadStream.cs`——`OpenRead(path)` 以 `FileShare.ReadWrite | FileShare.Delete` 打开（7-Zip 同款语义：只读不排斥写入方），替换压缩侧 4 处用户源文件读取：`ZipEngine.ReadFileWithRetry`（ZIP 明文压缩主路径）、`ZipEngine.AddToArchiveAsync` copy-mode 源文件流、`TarGzEngine.TarWriteFileWithRetry`、TarGz `.gz` 单文件分支。读取压缩包本身与临时目录副本保持原行为；7z 与加密 ZIP 走 SharpSevenZip 原生一次性调用无法逐文件容错，另行规划；ErrorResolver 兜底层（真·独占锁场景）亦待后续
+  - 涉及文件：`Utils/SharedReadStream.cs`（新增）、`Engines/ZipEngine.cs`、`Engines/TarGzEngine.cs`、`tests/MantisZip.Tests/SharedReadStreamTests.cs`（新增：模拟编辑器以 ReadWrite+ShareRead 持有源文件，同时锁定新旧行为防回退）；构建 0 错误，Core 测试 301/301 通过（两版 UI 同步受益）
 #### v0.5.0 (2026-08-19)
 - 添加到压缩包支持重名条目冲突处理：新增 `AddConflictHelper`（条目名级解析，语义方向与解压相反：新数据更新/更大→覆盖）；ZIP copy-mode `keepEntryNames` 排除被覆盖条目、legacy Phase 2 应用解析结果；7z 覆盖经 `ModifyArchive`(index→null) 删除 + `CompressFileDictionary` Append 重加
 #### v0.5.0 (2026-08-18)

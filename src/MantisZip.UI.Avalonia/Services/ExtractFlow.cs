@@ -3,6 +3,7 @@ using Avalonia.Threading;
 using MantisZip.Core.Abstractions;
 using MantisZip.Core.Engines;
 using MantisZip.Core.Models;
+using MantisZip.Core.Utils;
 using MantisZip.UI.Avalonia.Dialogs;
 using MantisZip.UI.Avalonia.ViewModels;
 
@@ -97,6 +98,8 @@ public static class ExtractFlow
             // 成功：标记批处理行完成 + 尊重 KeepOpenOnComplete 图钉（对齐 RunWithProgress 语义）
             pw.UpdateBatchItemStatus(0, BatchItemStatus.Completed);
             pw.SetComplete(LocalizationManager.T("Cli_StatusDone"));
+            // 成功后把目标目录写入路径历史（拖拽解压 / 右键解压选中项共用本入口；取消/失败不记录）
+            PathHistoryManager.Record(destinationPath);
             await pw.AutoCloseOrWaitAsync(0, () => pw.Close());
         }
         catch (OperationCanceledException)
@@ -175,6 +178,10 @@ public static class ExtractFlow
             await new ExtractService().ExtractAsync(
                 archivePath, dest, password, progress, ct, options);
         }
+
+        // 成功后把目标目录写入路径历史（主窗口对话框解压 / CLI 弹窗批处理共用本入口；
+        // 取消/异常向上抛出时不会执行到此处）
+        PathHistoryManager.Record(dest);
     }
 
     /// <summary>

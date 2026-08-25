@@ -941,7 +941,8 @@ public class ZipEngine : IArchiveEngine
                     {
                         foreach (var (fullPath, entryName) in resolvedFiles)
                         {
-                            var fileStream = File.OpenRead(fullPath);
+                            // 共享读：源文件可能正被编辑器以写权限持有
+                            var fileStream = SharedReadStream.OpenRead(fullPath);
                             streamsToDispose.Add(fileStream);
                             var fi = new FileInfo(fullPath);
                             newEntries.Add(new NewEntry(
@@ -1721,7 +1722,8 @@ public class ZipEngine : IArchiveEngine
 
                 var entryPath = ArchivePath.Normalize(relativePath);
                 using (var entryStream = zipWriter.WriteToStream(entryPath, entryOptions))
-                using (var fsInput = File.OpenRead(fullPath))
+                // 共享读：源文件可能正被 Word 等编辑器以写权限持有，File.OpenRead 会直接冲突
+                using (var fsInput = SharedReadStream.OpenRead(fullPath))
                 {
                     var buffer = new byte[CopyBufferSize];
                     long totalRead = 0;
