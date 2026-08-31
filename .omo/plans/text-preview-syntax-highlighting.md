@@ -292,7 +292,7 @@ ThemeManager.ThemeChanged += (_, theme) =>
 
 | 风险 | 概率 | 影响 | 缓解 |
 |------|:----:|:----:|------|
-| AvalonEdit 与 .NET 9 兼容性 | 🟢 低 | 🔴 高 | 先创建测试项目验证 NuGet 包可安装 |
+| AvalonEdit 与 .NET 10 兼容性 | 🟢 低 | 🔴 高 | 先创建测试项目验证 NuGet 包可安装 |
 | 大文件性能退化 | 🟢 低 | 🟡 中 | 已有 `MaxTextPreviewBytes` 限制（默认 5MB） |
 | 主题切换不刷新颜色 | 🟡 中 | 🟡 中 | 用 `ThemeChanged` 事件重新应用高亮定义 |
 | 自定义 XSHD 颜色在暗色下不可读 | 🟡 中 | 🟡 中 | 主题映射策略 B 解决 |

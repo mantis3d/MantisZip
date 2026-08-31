@@ -62,7 +62,7 @@
 **变更说明（对比旧计划）**：
 - ~~Zstd 需引入 `ZstdNet`/`ZstdSharp` 外部依赖~~ → **SharpCompress 0.48.1 已内置完整 Zstandard 实现**（`CompressionType.ZStandard` + `SharpCompress.Compressors.ZStandard` 公开类），零外部依赖，优先级从 P3 提升到 P1
 - ~~CAB 用 SharpCompress `CabArchive`~~ → **SharpCompress 0.48.1 无 CAB 支持**（`ArchiveType` 枚举无 Cab 成员），改走现有 `SevenZipEngine` 只读分支（7z.dll 支持 CAB 读取，与 RAR/ISO 同路）
-- ~~Brotli 排除~~ → **方案 B 采用 .NET 内置 `System.IO.Compression.BrotliStream`**（net9.0 自带，零依赖），SharpCompress 无需支持
+- ~~Brotli 排除~~ → **方案 B 采用 .NET 内置 `System.IO.Compression.BrotliStream`**（net10.0 自带，零依赖），SharpCompress 无需支持
 - ~~ARJ / LZH / CPIO 排除~~ → **方案 B 复用 7z.dll 自动检测解锁只读**（已确认 `SharpSevenZipExtractor(archivePath)` 单参构造自动检测格式，无需显式 `InArchiveFormat`）
 
 ### 依赖核验记录（2026-08-06，反编译 SharpCompress 0.48.1 + 外部库生态调研）
@@ -75,7 +75,7 @@
 | `ArchiveType` 枚举 | `Rar, Zip, Tar, SevenZip, GZip, Arc, Arj, Ace, Lzw` — **无 Cab** ❌（CAB 走 7z.dll） |
 | `BZip2Stream` / `XZStream` | 存在（SharpCompress.Compressors.BZip2 / LZMA）✅ |
 | 魔数检测 `FileFormatDetector` | 已支持 XZ (`FD 37 7A 58 5A 00`) 与 Zstd (`28 B5 2F FD`) ✅；BZip2 (`BZh`) 与 CAB (`MSCF`) 未检测（可后续补充） |
-| **Brotli（方案 B）** | `System.IO.Compression.BrotliStream` — .NET 9 内置，`CompressionMode.Compress/Decompress`，quality 0–11。SharpCompress **无** `CompressionType.Brotli`，tar.br 需手动包装外层流 ✅ |
+| **Brotli（方案 B）** | `System.IO.Compression.BrotliStream` — .NET 10 内置，`CompressionMode.Compress/Decompress`，quality 0–11。SharpCompress **无** `CompressionType.Brotli`，tar.br 需手动包装外层流 ✅ |
 | **7z.dll 只读解锁（方案 B）** | `SevenZipEngine` 所有 extractor 构造均为 `new SharpSevenZipExtractor(archivePath[, password])` — **自动格式检测**，无需显式 `InArchiveFormat`。已确认 7z.dll 26.00 的 `InArchiveFormat` 枚举含 Arj/BZip2/Cab/Chm/Cpio/Deb/GZip/Iso/Lzh/Lzma/Nsis/Rpm/Tar/Wim/Xar/Udf/Msi/SquashFS/Dmg 等 49 项 ✅ |
 | **外部库调研** | libarchive 绑定 (LibArchive.Net) 有增量（cpio/ar/xar 写入）但与 7z.dll 重叠高、多一份 native dll → **不引入**；wimlib/SharpZipLib/ZstdSharp 均冗余 ❌ |
 

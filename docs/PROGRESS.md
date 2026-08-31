@@ -4,7 +4,7 @@
 - **项目名称**: MantisZip
 - **类型**: Windows 压缩/解压软件 (WPF → Avalonia 迁移中)
 - **目标**: 替代 Bandizip 的开源压缩软件
-- **技术栈**: .NET 9 + WPF → Avalonia 迁移中 + SharpCompress + SharpSevenZip
+- **技术栈**: .NET 10 + WPF → Avalonia 迁移中 + SharpCompress + SharpSevenZip
 
 ## 版本
 - **当前版本**: 0.5.0
@@ -82,6 +82,7 @@
 
 #### v0.5.0
 
+- **08-31** — .NET 9 → .NET 10 升级（LTS，支持至 2028-11）：全部 7 个项目 TargetFramework 更新 + 移除废弃 `Avalonia.Diagnostics` 包 + `System.Drawing.Common` 升级至 10.0.8
 - **08-31** — 卸载/更新文件占用修复：`CloseApplications=yes`（Restart Manager 检测用户关闭占用进程）+ `ShellIntegration.Uninstall` 重启 Explorer 释放 comhost.dll 句柄
 - **08-24** — 发布脚本 copy-7z-dll 按 PE 头校验架构：x86 目录不再误拷 64 位 7z.dll（历届安装包均受影响），缺失架构警告跳过 + installer x86 行 skipifsourcedoesntexist
 - **08-19** — 添加到压缩包重名条目冲突处理（AddConflictHelper 条目名级解析）+ 保留浏览目录前缀（entryBasePath）

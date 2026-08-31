@@ -2,7 +2,7 @@
 
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
-    <TargetFramework>net9.0</TargetFramework>
+    <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <NoWarn>CA1416</NoWarn>
@@ -28,16 +28,12 @@
     <PackageReference Include="Markdig" Version="0.40.0" />
     <PackageReference Include="ReverseMarkdown" Version="4.7.0" />
     <PackageReference Include="SkiaSharp" Version="3.119.4" />
-    <PackageReference Include="System.Drawing.Common" Version="9.0.4" />
+    <PackageReference Include="System.Drawing.Common" Version="10.0.8" />
     <PackageReference Include="PdfPig" Version="0.1.15" />
     <PackageReference Include="PdfPig.Rendering.Skia" Version="0.1.15.4" />
   </ItemGroup>
 
-  <ItemGroup Condition="'$(Configuration)' == 'Debug'">
-    <PackageReference Include="Avalonia.Diagnostics" Version="11.3.18" />
-  </ItemGroup>
-
-  <ItemGroup>
+<ItemGroup>
     <!-- 非 XAML 资源 + AppIcons.axaml：AppIcons.axaml 由 App 在运行时用 avares:// URI 显式加载
          （App.OnFrameworkInitializationCompleted），必须作为 AvaloniaResource 嵌入原始 xaml；
          Resources 下其余为非 axaml 资源（图标/光标等） -->
@@ -79,7 +75,7 @@
   <Target Name="CopyShellExtComhost" AfterTargets="Build" Condition="'$(SkipShellExtCopy)' != 'true'">
     <MSBuild Projects="..\MantisZip.ShellExt\MantisZip.ShellExt.csproj" Targets="Build" Properties="Configuration=$(Configuration)" />
     <PropertyGroup>
-      <_ShellExtDir>..\MantisZip.ShellExt\bin\$(Configuration)\net9.0-windows10.0.17763.0</_ShellExtDir>
+      <_ShellExtDir>..\MantisZip.ShellExt\bin\$(Configuration)\net10.0-windows10.0.17763.0</_ShellExtDir>
     </PropertyGroup>
     <ItemGroup>
       <_ShellExtFiles Include="$(_ShellExtDir)\MantisZip.ShellExt.comhost.dll" />
@@ -93,7 +89,7 @@
   <Target Name="CopyShellExtComhostToPublish" AfterTargets="Publish">
     <MSBuild Projects="..\MantisZip.ShellExt\MantisZip.ShellExt.csproj" Targets="Build" Properties="Configuration=$(Configuration)" />
     <PropertyGroup>
-      <_ShellExtDir>..\MantisZip.ShellExt\bin\$(Configuration)\net9.0-windows10.0.17763.0</_ShellExtDir>
+      <_ShellExtDir>..\MantisZip.ShellExt\bin\$(Configuration)\net10.0-windows10.0.17763.0</_ShellExtDir>
     </PropertyGroup>
     <ItemGroup>
       <_ShellExtPublishFiles Include="$(_ShellExtDir)\MantisZip.ShellExt.comhost.dll" />

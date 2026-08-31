@@ -1,5 +1,5 @@
 ; MantisZip Self-Contained Installer Script
-; This installer bundles the .NET 9 runtime — no separate runtime install needed.
+; This installer bundles the .NET 10 runtime — no separate runtime install needed.
 ; Derived from installer.iss for framework-dependent builds.
 ; Requires Inno Setup 6
 

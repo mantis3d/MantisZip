@@ -6,6 +6,17 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-08-31** — .NET 9 → .NET 10 升级
+  - **背景**：.NET 9 (STS) 将于 2026-11-10 停止支持，.NET 10 (LTS) 支持至 2028-11-14；Avalonia 12 官方推荐 .NET 10
+  - **变更**：
+    - 全部 7 个项目 `TargetFramework` 更新：`net9.0` → `net10.0`、`net9.0-windows10.0.17763.0` → `net10.0-windows10.0.17763.0`
+    - Avalonia UI 项目移除废弃的 `Avalonia.Diagnostics` 11.3.18 包（Avalonia 12 已弃用旧 F12 DevTools，代码中无 `AttachDevTools` 调用，仅为无用引用）
+    - `System.Drawing.Common` 从 9.0.4 升级至 10.0.8（对齐其他 Microsoft.Data.Sqlite 等 10.x 包）
+    - Avalonia UI 项目 ShellExt 复制路径中硬编码的 `net9.0-windows10.0.17763.0` 同步更新为 `net10.0-windows10.0.17763.0`
+  - 涉及文件：全部 7 个 `.csproj` 文件
+  - 验证：`dotnet build` 全部 4 个主项目 0 错误；`dotnet test` Avalonia 测试 78 passed + WPF 测试 301 passed，全部通过
+  - 注意：构建时出现 Avalonia 12 废弃警告（`SystemDecorations`→`WindowDecorations`、`Watermark`→`PlaceholderText`），属 Avalonia 12 迁移后续清理项，非本次升级引入
+
 **2026-08-31** — 卸载/更新时文件被占用删除失败修复
   - **背景**：Inno Setup 卸载 `comhost.dll` 时因 Explorer 持有 COM in-process 句柄而删除失败，Everything 等第三方进程也可能锁定 DLL
   - **C# 侧**（`ShellIntegration.Uninstall`）：清完 COM 注册表后调用新增的 `RestartExplorerForUnload()` — Kill 所有 Explorer 进程 → `WaitForExit(3000)` + `Thread.Sleep(500)` 等句柄释放 → `Process.Start("explorer.exe")` 重启桌面；整个过程 try-catch 兜底，失败不影响卸载
