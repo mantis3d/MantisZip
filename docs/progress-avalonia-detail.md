@@ -6,6 +6,13 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-08-31** — 卸载/更新时文件被占用删除失败修复
+  - **背景**：Inno Setup 卸载 `comhost.dll` 时因 Explorer 持有 COM in-process 句柄而删除失败，Everything 等第三方进程也可能锁定 DLL
+  - **C# 侧**（`ShellIntegration.Uninstall`）：清完 COM 注册表后调用新增的 `RestartExplorerForUnload()` — Kill 所有 Explorer 进程 → `WaitForExit(3000)` + `Thread.Sleep(500)` 等句柄释放 → `Process.Start("explorer.exe")` 重启桌面；整个过程 try-catch 兜底，失败不影响卸载
+  - **Installer 侧**：两个 `.iss` 文件（`installer.iss` + `installer-selfcontained.iss`）添加 `CloseApplications=yes`，启用 Windows Restart Manager 检测所有占用进程（Explorer / Everything / 杀软等），卸载/更新/安装三个阶段均生效——弹出对话框列出锁定进程让用户确认关闭
+  - 涉及文件：`Services/ShellIntegration.Menu.cs`、`installer.iss`、`installer-selfcontained.iss`
+  - 验证：`dotnet build` 0 错误
+
 **2026-08-25** — 文件筛选栏交互重构（开关迁主工具栏 + 收起停用 + 清除全部 + 单位切换修复）
   - **开关搬家**：筛选栏 ToggleButton 从文件列表小工具栏移至主工具栏「测试」之后，与其他主工具栏按钮同款外观（22×22 `IconSearch` PathIcon + 「筛选」文字标签，选中态走全局样式）；小工具栏旧的小放大镜按钮删除
   - **收起即停用**（用户语义，与 WPF 清空式为有意的偏离）：`IsFilterBarVisible` 兼作筛选总开关——收起时 `GetFilteredSource()` 直接返回未过滤的 `_allRawItems`、`FilterStats` 计数隐藏，但全部条件保留在输入框中，重新展开立即按原条件恢复过滤；`OnIsFilterBarVisibleChanged → ApplyFilter()` 接线保证切换瞬间列表即时刷新

@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.IO;
+using System.Threading;
 using Microsoft.Win32;
 using MantisZip.UI.Avalonia.Models;
 
@@ -81,6 +82,8 @@ internal static partial class ShellIntegration
 
     /// <summary>
     /// 卸载所有 MantisZip 右键菜单注册。
+    /// 卸载 COM 注册后重启 Explorer，确保 comhost.dll 句柄释放，
+    /// 避免 Inno Setup 卸载时因文件被占用而删除失败。
     /// </summary>
     public static void Uninstall()
     {
@@ -88,8 +91,53 @@ internal static partial class ShellIntegration
         UninstallStaticMenus();
         UninstallCom();
         DeleteRegistryKey(ContextMenuRegPath);
+        RestartExplorerForUnload();
         SHChangeNotify(SHCNE_ASSOCCHANGED, SHCNF_IDLIST, IntPtr.Zero, IntPtr.Zero);
         App.DebugLog("ShellIntegration.Uninstall: done");
+    }
+
+    /// <summary>
+    /// 重启 Explorer 进程以卸载已加载的 COM DLL（comhost.dll）。
+    /// 在静默卸载（Inno Setup [UninstallRun]）场景下，Explorer 可能仍持有
+    /// comhost.dll 的文件句柄，导致卸载程序无法删除安装目录下的文件。
+    /// </summary>
+    private static void RestartExplorerForUnload()
+    {
+        try
+        {
+            var explorerProcesses = Process.GetProcessesByName("explorer");
+            if (explorerProcesses.Length == 0)
+            {
+                App.DebugLog("RestartExplorer: no Explorer process found, skipping");
+                return;
+            }
+
+            App.DebugLog($"RestartExplorer: terminating {explorerProcesses.Length} Explorer process(es)");
+
+            foreach (var proc in explorerProcesses)
+            {
+                try { proc.Kill(); }
+                catch { /* process may have already exited */ }
+            }
+
+            // Wait for processes to fully exit (DLL handles released)
+            foreach (var proc in explorerProcesses)
+            {
+                try { proc.WaitForExit(3000); }
+                catch { /* already exited or inaccessible */ }
+            }
+
+            // Brief delay for OS to release file handles
+            Thread.Sleep(500);
+
+            // Restart Explorer (Windows auto-recreates the desktop shell)
+            Process.Start(new ProcessStartInfo("explorer.exe") { UseShellExecute = true });
+            App.DebugLog("RestartExplorer: Explorer restarted successfully");
+        }
+        catch (Exception ex)
+        {
+            App.DebugLog($"RestartExplorer: failed ({ex.Message}), proceeding anyway");
+        }
     }
 
     /// <summary>

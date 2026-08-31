@@ -32,6 +32,7 @@ WizardStyle=modern
 PrivilegesRequired=admin
 ArchitecturesInstallIn64BitMode=x64compatible
 ChangesEnvironment=yes
+CloseApplications=yes
 SetupIconFile=src\MantisZip.UI.Avalonia\Resources\App.ico
 
 [Languages]
