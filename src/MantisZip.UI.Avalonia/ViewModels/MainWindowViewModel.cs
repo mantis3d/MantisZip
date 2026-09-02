@@ -2694,6 +2694,8 @@ public partial class MainWindowViewModel : ObservableObject
                         AppSettings.Load().FileConflictAction, ShowAddFileConflictDialogAsync)
                     ?? new ArchiveOptions();
                 options.Password = password;
+                // 源文件读取错误（被占用等）→ 弹 ErrorDialog（重试/跳过/中止）
+                options.ErrorResolver = CompressFlow.CreateErrorResolver();
                 // entryBasePath：当前浏览的压缩包内目录，null=根目录（与 WPF 版行为一致）
                 await engine.AddToArchiveAsync(CurrentArchivePath, files.ToArray(), options, progress, ct,
                     entryBasePath: string.IsNullOrEmpty(CurrentFolder) ? null : CurrentFolder);

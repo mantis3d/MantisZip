@@ -6,6 +6,14 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-09-01** — 压缩源文件读取错误（被占用）接线 ErrorResolver 弹窗（补迁移遗漏）
+  - **背景**：压缩侧遇正被 Word/Excel 等编辑器以写权限独占锁定的文件时，`SharedReadStream` 治本层打不开，引擎 3 次重试后只能直接抛异常终止整个压缩。Core 的 `ArchiveOptions.ErrorResolver`（重试/跳过/中止）机制在 WPF 有接线（`App.CreateCompressOptions`→`ErrorDialog`），Avalonia 迁移时遗漏——`ErrorDialog`/`FileErrorAction`/`FileErrorInfo` 类早已写好却从未被任何流程调用（仅一个测试命令引用）
+  - **变更**：
+    - **Core**：`CompressRequest` 新增 `ErrorResolver`（`Func<FileErrorInfo, FileErrorAction>?`）属性，`CompressService.BuildOptions` 透传到 `ArchiveOptions.ErrorResolver`——主窗口/CLI/添加文件三条 `new CompressRequest` 路径统一受益
+    - **Avalonia**：`Services/CompressFlow.cs` 新增 `CreateErrorResolver()`（对齐 WPF `App.CreateCompressOptions` 语义：封送回 UI 线程弹 `ErrorDialog` 阻塞等待选择 + ApplyToAll 记忆；Owner 取当前活跃窗口回退主窗口）；接线到 `CompressFlow.BuildRequest`、`AddFilesToArchiveAsync`（拖拽添加）、CLI `--compress-quick`/`--compress-separate`/`--compress-combined` 三条 CompressRequest 构造
+  - 涉及文件：`Core/Services/CompressService.cs`、`UI.Avalonia/Services/CompressFlow.cs`、`UI.Avalonia/ViewModels/MainWindowViewModel.cs`、`UI.Avalonia/App.axaml.cs`
+  - 验证：`dotnet build` Core 0 错误 0 警告、Avalonia 0 错误（36 个警告均为 pre-existing）；`dotnet test` Core 301 passed + Avalonia 78 passed 全部通过
+
 **2026-08-31** — .NET 9 → .NET 10 升级
   - **背景**：.NET 9 (STS) 将于 2026-11-10 停止支持，.NET 10 (LTS) 支持至 2028-11-14；Avalonia 12 官方推荐 .NET 10
   - **变更**：
