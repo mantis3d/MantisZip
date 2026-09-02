@@ -6,6 +6,12 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-09-02** — 修复 ShellExt 复制目标 RID 路径 bug（阻断发布构建）
+  - **背景**：.NET 10 升级（69d1f66）后 ShellExt 项目声明 `RuntimeIdentifiers=win-x64;win-x86`，UI publish 时 `--runtime win-x64` 传播给 ShellExt，使其构建输出落到 RID 子目录 `net10.0-windows10.0.17763.0\win-x64\`；但 UI 的 `CopyShellExtComhost` / `CopyShellExtComhostToPublish` 两个目标写死的 `_ShellExtDir` 指向无 RID 的父目录，导致 publish 报 `MSB3030`（找不到 comhost.dll / dll / runtimeconfig.json），阻断 release 流水线（CI 尚未在 .NET 10 构建上跑过，首个 tag 即暴露）
+  - **变更**：`UI.Avalonia/MantisZip.UI.Avalonia.csproj` 两个复制目标——向 ShellExt 显式传 `RuntimeIdentifier=$(RuntimeIdentifier)`，并在 `$(RuntimeIdentifier)` 非空时把 `_ShellExtDir` 追加 `\$(RuntimeIdentifier)`；用同一路径约定的 `CopyShellExtComhostToPublish`（Publish）同步修正
+  - 涉及文件：`src/MantisZip.UI.Avalonia/MantisZip.UI.Avalonia.csproj`
+  - 验证：framework-dependent + self-contained 两个 `dotnet publish` 均成功，发布目录含 ShellExt comhost/dll/runtimeconfig 与 x64/x86 7z.dll；ISCC 两个安装器 + 7z 两个便携包全部生成
+
 **2026-09-01** — 压缩源文件读取错误（被占用）接线 ErrorResolver 弹窗（补迁移遗漏）
   - **背景**：压缩侧遇正被 Word/Excel 等编辑器以写权限独占锁定的文件时，`SharedReadStream` 治本层打不开，引擎 3 次重试后只能直接抛异常终止整个压缩。Core 的 `ArchiveOptions.ErrorResolver`（重试/跳过/中止）机制在 WPF 有接线（`App.CreateCompressOptions`→`ErrorDialog`），Avalonia 迁移时遗漏——`ErrorDialog`/`FileErrorAction`/`FileErrorInfo` 类早已写好却从未被任何流程调用（仅一个测试命令引用）
   - **变更**：

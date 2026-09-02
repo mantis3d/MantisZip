@@ -73,9 +73,11 @@
 
   <!-- 构建后将 ShellExt 输出（comhost.dll + DLL + runtimeconfig.json）复制到 UI 输出目录 -->
   <Target Name="CopyShellExtComhost" AfterTargets="Build" Condition="'$(SkipShellExtCopy)' != 'true'">
-    <MSBuild Projects="..\MantisZip.ShellExt\MantisZip.ShellExt.csproj" Targets="Build" Properties="Configuration=$(Configuration)" />
+    <MSBuild Projects="..\MantisZip.ShellExt\MantisZip.ShellExt.csproj" Targets="Build" Properties="Configuration=$(Configuration);RuntimeIdentifier=$(RuntimeIdentifier)" />
     <PropertyGroup>
+      <!-- ShellExt 声明 RuntimeIdentifiers=win-x64;win-x86，指定 RID 构建时输出到 RID 子目录 -->
       <_ShellExtDir>..\MantisZip.ShellExt\bin\$(Configuration)\net10.0-windows10.0.17763.0</_ShellExtDir>
+      <_ShellExtDir Condition="'$(RuntimeIdentifier)' != ''">$(_ShellExtDir)\$(RuntimeIdentifier)</_ShellExtDir>
     </PropertyGroup>
     <ItemGroup>
       <_ShellExtFiles Include="$(_ShellExtDir)\MantisZip.ShellExt.comhost.dll" />
@@ -87,9 +89,10 @@
 
   <!-- Publish 后复制 ShellExt 输出（comhost.dll + DLL + runtimeconfig.json）到发布目录 -->
   <Target Name="CopyShellExtComhostToPublish" AfterTargets="Publish">
-    <MSBuild Projects="..\MantisZip.ShellExt\MantisZip.ShellExt.csproj" Targets="Build" Properties="Configuration=$(Configuration)" />
+    <MSBuild Projects="..\MantisZip.ShellExt\MantisZip.ShellExt.csproj" Targets="Build" Properties="Configuration=$(Configuration);RuntimeIdentifier=$(RuntimeIdentifier)" />
     <PropertyGroup>
       <_ShellExtDir>..\MantisZip.ShellExt\bin\$(Configuration)\net10.0-windows10.0.17763.0</_ShellExtDir>
+      <_ShellExtDir Condition="'$(RuntimeIdentifier)' != ''">$(_ShellExtDir)\$(RuntimeIdentifier)</_ShellExtDir>
     </PropertyGroup>
     <ItemGroup>
       <_ShellExtPublishFiles Include="$(_ShellExtDir)\MantisZip.ShellExt.comhost.dll" />
