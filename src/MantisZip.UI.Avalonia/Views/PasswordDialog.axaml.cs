@@ -28,6 +28,7 @@ public partial class PasswordDialog : Window
     public string NewPasswordOptionText => LocalizationManager.T("Password_NewPasswordOption");
     public string OkText => LocalizationManager.T("Password_Ok");
     public string CancelText => LocalizationManager.T("Password_Cancel");
+    public string RevealTooltip => LocalizationManager.T("Password_RevealTooltip");
 
     private bool _isUpdatingPasswordSelection;
 

@@ -23,6 +23,8 @@ public partial class MatchedPasswordDialog : Window
     public string WinTitle => LocalizationManager.T("PwdMatched_Title");
     public string UseText => LocalizationManager.T("PwdMatched_Use");
     public string CancelText => LocalizationManager.T("PwdMatched_Cancel");
+    public string RevealTooltip => LocalizationManager.T("PwdMatched_RevealTooltip");
+    public string CopyTooltip => LocalizationManager.T("PwdMatched_CopyTooltip");
 
     /// <summary>
     /// 设计时 / XAML 编译器需要的无参构造函数

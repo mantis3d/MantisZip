@@ -230,6 +230,7 @@ public partial class MainWindowViewModel : ObservableObject
             "Menu_ShowPreviewPanel", "Menu_SaveLayout",
             "Filter_Search", "Filter_Exclude", "Filter_DateFrom", "Filter_DateTo",
             "Filter_SizeMin", "Filter_SizeMax", "Filter_ShowSubfolders", "Filter_ClearAll",
+            "Filter_PickDateFrom", "Filter_PickDateTo", "Filter_PickSizeMin", "Filter_PickSizeMax",
             "Filter_MatchModeSubstring", "Filter_MatchModeWildcard",
             "Status_Selected", "Status_ArchiveStats",
             "Tree_Browse",

@@ -29,6 +29,11 @@
       <Setter Property="FontFamily" Value="{DynamicResource AppGlobalFont}" />
     </Style>
 
+    <!-- ToolTip — 全局显示延迟 100ms（覆盖默认 400ms），使图标按钮的悬停提示更跟手 -->
+    <Style Selector="Control">
+      <Setter Property="ToolTip.ShowDelay" Value="100" />
+    </Style>
+
     <!-- TextBlock — 不设 Foreground（继承父控件），避免覆盖 emoji 彩色渲染 -->
     <Style Selector="TextBlock">
       <!-- Foreground left unset — inherits from parent; setting it here would

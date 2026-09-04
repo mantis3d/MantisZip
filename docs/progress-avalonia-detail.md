@@ -6,6 +6,25 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-09-04** — 纯图标按钮补齐 ToolTip + 全局显示延迟 100ms
+  - **背景**：UI 功能补齐 27/29 中 2 项待 GUI 验证的其中之一——纯图标按钮（无文字标签、仅图标）此前多缺 ToolTip，用户悬停无提示。全量审计 33 个含按钮文件，定位 31 个缺失 ToolTip 的纯图标按钮
+  - **变更**：
+    - **31 个按钮补 ToolTip**（全走本地化，规则 13）：
+      - `Views/MainWindow.axaml` 4（日期/大小的拾色器按钮，`Filter_PickDateFrom/To`、`Filter_PickSizeMin/Max`）
+      - `Views/PreviewPanel.axaml` 15（缩放/字体/GIF 翻页播放/透明棋盘格/FlattenAlpha/PPTX·PDF 翻页，`Preview_Tooltip_*` 共 15 个 key）
+      - `Views/SettingsWindow.axaml` 5（元数据上下移/文件关联删除/路径上下移，经 `$parent[Window].((vm:SettingsWindowViewModel)DataContext).*`）
+      - `Dialogs/CustomFilePickerDialog.axaml` 1（系统浏览，`Picker_BrowseSystemTooltip`）
+      - `Dialogs/PasswordManagerWindow.axaml` 1（编辑区👁，`PasswordManager_EditRevealTooltip`）
+      - `Views/PasswordDialog.axaml` 1（👁，`Password_RevealTooltip`）
+      - `Dialogs/MatchedPasswordDialog.axaml` 2（👁/复制，`PwdMatched_RevealTooltip`/`PwdMatched_CopyTooltip`）
+      - `Dialogs/ProgressWindow.axaml` 2（👁/复制，`Progress_RevealTooltip`/`Progress_CopyTooltip`）
+    - 绑定方式两类：对话框 code-behind 本地化属性 + `ToolTip.Tip`；MVVM 页走 `LocalizedStrings[Key]` 字典索引器（MainWindow/PreviewPanel/ProgressWindow）
+    - **ViewModel/注册**：`MainWindowViewModel.UpdateLocalizedStrings` 登记 4 个 `Filter_Pick*`、`PreviewViewModel.UpdateLocalizedStrings` 登记 15 个 `Preview_Tooltip_*`、`SettingsWindowViewModel` 新增 5 个 tooltip 属性、`ProgressViewModel.LocalizedStrings` 新增 2 个 `Progress_*` key
+    - **本地化**：`strings.zh-CN.json` + `strings.en.json` 成对新增 27 个 key（zh/en 完全同步，各 1150 个）
+    - **全局延迟**：`App.axaml` 全局样式区新增 `<Style Selector="Control">` 设 `ToolTip.ShowDelay=100`，覆盖所有控件（含将来新增），取代框架默认 400ms
+  - 涉及文件：`App.axaml`、`Views/MainWindow.axaml`、`Views/PreviewPanel.axaml`、`Views/SettingsWindow.axaml`、`Views/PasswordDialog.axaml(.cs)`、`Dialogs/{CustomFilePickerDialog,PasswordManagerWindow,MatchedPasswordDialog,ProgressWindow}.axaml(.cs)`、`ViewModels/{MainWindowViewModel,PreviewViewModel,SettingsWindowViewModel,ProgressViewModel}.cs`、`Localization/strings.{zh-CN,en}.json`
+  - 验证：`dotnet build` Avalonia 0 错误；zh/en key 集合完全一致无缺失
+
 **2026-09-04** — 安装包缺失 `Resources\Icons` 格式图标修复
   - **背景**：`src/MantisZip.UI.Avalonia/Resources/Icons/` 下的文件关联格式图标（`zip.ico`/`sevenz.ico`/`rar.ico`/`tar.ico`/`tgz.ico`/`gz.ico`/`iso.ico`）由 csproj（`MantisZip.UI.Avalonia.csproj` line 62-64 `<None Include="Resources\Icons\*.ico" CopyToOutputDirectory>`）复制到发布目录 `publish_output\Resources\Icons\`，但两个 Inno Setup 脚本的 `[Files]` 段只打包了 `MenuIcons` 与 `Cursors`，漏掉 `Icons` 目录——安装后 `ShellIntegration.GetIconPath` 按输出目录相对路径引用这些图标时缺失，文件关联图标退化为应用通用图标
   - **变更**：`installer.iss`（line 97）与 `installer-selfcontained.iss`（line 87）`[Files]` 段各新增 `Source: "...\Resources\Icons\*.ico"; DestDir: "{app}\Resources\Icons"`，并将注释从「(context menu icons...)」统一为「(file type icons, context menu icons...)」

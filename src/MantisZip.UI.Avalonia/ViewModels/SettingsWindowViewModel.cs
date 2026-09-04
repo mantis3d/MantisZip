@@ -494,6 +494,11 @@ public partial class SettingsWindowViewModel : ObservableObject
     // ── Localized strings ──
 
     public string WindowTitle => LocalizationManager.T("Settings_Title");
+    public string MetadataMoveUpTooltip => LocalizationManager.T("Settings_Metadata_MoveUpTooltip");
+    public string MetadataMoveDownTooltip => LocalizationManager.T("Settings_Metadata_MoveDownTooltip");
+    public string AssocDeleteTooltip => LocalizationManager.T("Settings_Assoc_DeleteTooltip");
+    public string PathMoveUpTooltip => LocalizationManager.T("Settings_Path_MoveUpTooltip");
+    public string PathMoveDownTooltip => LocalizationManager.T("Settings_Path_MoveDownTooltip");
     public string TabPreviewHeader => LocalizationManager.T("Settings_TabPreview");
     public string TabCompressHeader => LocalizationManager.T("Settings_TabCompress");
     public string TabExtractHeader => LocalizationManager.T("Settings_TabExtract");

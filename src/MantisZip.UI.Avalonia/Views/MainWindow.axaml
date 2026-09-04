@@ -642,6 +642,7 @@
           <StackPanel Orientation="Vertical" VerticalAlignment="Center">
             <StackPanel Orientation="Horizontal" Margin="0,0,0,2">
               <Button Width="20" Height="20" Padding="0" Margin="0,0,2,0" Click="PickDateFrom_Click"
+                      ToolTip.Tip="{Binding LocalizedStrings[Filter_PickDateFrom]}"
                       Background="{DynamicResource ThemeButtonBgBrush}"
                       Foreground="{DynamicResource ThemeTextPrimaryBrush}"
                       BorderBrush="{DynamicResource ThemeBorderBrush}">
@@ -658,6 +659,7 @@
             </StackPanel>
             <StackPanel Orientation="Horizontal">
               <Button Width="20" Height="20" Padding="0" Margin="0,0,2,0" Click="PickDateTo_Click"
+                      ToolTip.Tip="{Binding LocalizedStrings[Filter_PickDateTo]}"
                       Background="{DynamicResource ThemeButtonBgBrush}"
                       Foreground="{DynamicResource ThemeTextPrimaryBrush}"
                       BorderBrush="{DynamicResource ThemeBorderBrush}">
@@ -683,6 +685,7 @@
           <StackPanel Orientation="Vertical" VerticalAlignment="Center">
             <StackPanel Orientation="Horizontal" Margin="0,0,0,2">
               <Button Width="20" Height="20" Padding="0" Margin="0,0,2,0" Click="PickSizeMin_Click"
+                      ToolTip.Tip="{Binding LocalizedStrings[Filter_PickSizeMin]}"
                       Background="{DynamicResource ThemeButtonBgBrush}"
                       Foreground="{DynamicResource ThemeTextPrimaryBrush}"
                       BorderBrush="{DynamicResource ThemeBorderBrush}">
@@ -707,6 +710,7 @@
             </StackPanel>
             <StackPanel Orientation="Horizontal">
               <Button Width="20" Height="20" Padding="0" Margin="0,0,2,0" Click="PickSizeMax_Click"
+                      ToolTip.Tip="{Binding LocalizedStrings[Filter_PickSizeMax]}"
                       Background="{DynamicResource ThemeButtonBgBrush}"
                       Foreground="{DynamicResource ThemeTextPrimaryBrush}"
                       BorderBrush="{DynamicResource ThemeBorderBrush}">
