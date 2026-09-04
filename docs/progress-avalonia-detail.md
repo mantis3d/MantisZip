@@ -6,6 +6,12 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-09-04** — 安装包缺失 `Resources\Icons` 格式图标修复
+  - **背景**：`src/MantisZip.UI.Avalonia/Resources/Icons/` 下的文件关联格式图标（`zip.ico`/`sevenz.ico`/`rar.ico`/`tar.ico`/`tgz.ico`/`gz.ico`/`iso.ico`）由 csproj（`MantisZip.UI.Avalonia.csproj` line 62-64 `<None Include="Resources\Icons\*.ico" CopyToOutputDirectory>`）复制到发布目录 `publish_output\Resources\Icons\`，但两个 Inno Setup 脚本的 `[Files]` 段只打包了 `MenuIcons` 与 `Cursors`，漏掉 `Icons` 目录——安装后 `ShellIntegration.GetIconPath` 按输出目录相对路径引用这些图标时缺失，文件关联图标退化为应用通用图标
+  - **变更**：`installer.iss`（line 97）与 `installer-selfcontained.iss`（line 87）`[Files]` 段各新增 `Source: "...\Resources\Icons\*.ico"; DestDir: "{app}\Resources\Icons"`，并将注释从「(context menu icons...)」统一为「(file type icons, context menu icons...)」
+  - 涉及文件：`installer.iss`、`installer-selfcontained.iss`
+  - 验证：逐项对照 csproj 全部 `CopyToOutputDirectory` 资源条目与两个 iss 打包项（Localization/MenuIcons/Icons/Cursors/contributors 全部对齐）；`publish_output` 与 `publish_output_selfcontained` 均确认含 `Resources\Icons` 7 个 ico，无其他遗漏（`Portable.txt`/`Data\settings.json` 仅属便携包由 release.yml `New-PortableZip` 显式生成，安装包本就不含；`*.pdb` 按设计排除）
+
 **2026-09-02** — 修复 ShellExt 复制目标 RID 路径 bug（阻断发布构建）
   - **背景**：.NET 10 升级（69d1f66）后 ShellExt 项目声明 `RuntimeIdentifiers=win-x64;win-x86`，UI publish 时 `--runtime win-x64` 传播给 ShellExt，使其构建输出落到 RID 子目录 `net10.0-windows10.0.17763.0\win-x64\`；但 UI 的 `CopyShellExtComhost` / `CopyShellExtComhostToPublish` 两个目标写死的 `_ShellExtDir` 指向无 RID 的父目录，导致 publish 报 `MSB3030`（找不到 comhost.dll / dll / runtimeconfig.json），阻断 release 流水线（CI 尚未在 .NET 10 构建上跑过，首个 tag 即暴露）
   - **变更**：`UI.Avalonia/MantisZip.UI.Avalonia.csproj` 两个复制目标——向 ShellExt 显式传 `RuntimeIdentifier=$(RuntimeIdentifier)`，并在 `$(RuntimeIdentifier)` 非空时把 `_ShellExtDir` 追加 `\$(RuntimeIdentifier)`；用同一路径约定的 `CopyShellExtComhostToPublish`（Publish）同步修正

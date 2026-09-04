@@ -94,6 +94,7 @@ Source: "publish_output\x64\7z.dll"; DestDir: "{app}\x64"; Flags: ignoreversion
 Source: "publish_output\x86\7z.dll"; DestDir: "{app}\x86"; Flags: ignoreversion skipifsourcedoesntexist
 
 ; === Resources (file type icons, context menu icons, drag cursors, localization) ===
+Source: "publish_output\Resources\Icons\*.ico"; DestDir: "{app}\Resources\Icons"; Flags: ignoreversion
 Source: "publish_output\Resources\MenuIcons\*.ico"; DestDir: "{app}\Resources\MenuIcons"; Flags: ignoreversion
 Source: "publish_output\Resources\Cursors\*.cur"; DestDir: "{app}\Resources\Cursors"; Flags: ignoreversion
 Source: "publish_output\Localization\strings.en.json"; DestDir: "{app}\Localization"; Flags: ignoreversion

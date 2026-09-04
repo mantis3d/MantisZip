@@ -83,7 +83,8 @@ Source: "publish_output_selfcontained\MantisZip.ShellExt.runtimeconfig.json"; De
 Source: "publish_output_selfcontained\x64\7z.dll"; DestDir: "{app}\x64"; Flags: ignoreversion
 Source: "publish_output_selfcontained\x86\7z.dll"; DestDir: "{app}\x86"; Flags: ignoreversion skipifsourcedoesntexist
 
-; === Resources (context menu icons, drag cursors, localization) ===
+; === Resources (file type icons, context menu icons, drag cursors, localization) ===
+Source: "publish_output_selfcontained\Resources\Icons\*.ico"; DestDir: "{app}\Resources\Icons"; Flags: ignoreversion
 Source: "publish_output_selfcontained\Resources\MenuIcons\*.ico"; DestDir: "{app}\Resources\MenuIcons"; Flags: ignoreversion
 Source: "publish_output_selfcontained\Resources\Cursors\*.cur"; DestDir: "{app}\Resources\Cursors"; Flags: ignoreversion
 Source: "publish_output_selfcontained\Localization\strings.en.json"; DestDir: "{app}\Localization"; Flags: ignoreversion

@@ -27,6 +27,7 @@
 
 #### 2026-09
 
+- **09-04** — 修复安装包缺失 `Resources\Icons` 格式图标：两个 `.iss`（`installer.iss` + `installer-selfcontained.iss`）`[Files]` 段仅打包 MenuIcons/Cursors，漏掉文件关联格式图标目录（zip/7z/rar/tar/tgz/gz/iso），安装后文件关联图标退化为应用通用图标
 - **09-02** — 修复 ShellExt 复制目标 RID 路径 bug（阻断发布构建：.NET 10 RID 传播使 ShellExt 输出落入 `win-x64` 子目录，publish 报 MSB3030）
 
 #### 2026-08
