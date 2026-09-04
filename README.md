@@ -28,7 +28,7 @@
 
  ⏱️ 3 秒总览：在压缩包内无缝切换、指哪打哪的极速预览体验
 
-> 免费开源  / 基于 .NET 9 + WPF   
+> 免费开源  / 基于 .NET 9 + Avalonia   
 > 🤖 由 [OpenCode](https://opencode.ai) 及 [Reasonix](https://reasonix.io) 辅助开发
 </div>
 
@@ -42,16 +42,16 @@
 
 ## 📚 简介
 
-MantisZip 是一款面向 Windows 的免费开源压缩/解压工具，主打**文件内预览**和**密码管理器**等便捷功能。无需解压即可直接查看压缩包内的图片、文本、Markdown、HTML 文件内容。
+MantisZip 是一款面向 Windows 的免费开源压缩/解压工具，主打**文件内预览**和**密码管理器**等便捷功能。无需解压即可直接查看压缩包内的图片、文本、Markdown、HTML、Office 文档、PDF、SVG、字体、ICO 多帧画廊等内容。
 
 
 ## ✨ 功能亮点与专项特写
 
 ### 👁️ 文件内预览
 
-可以在压缩包内直接预览 **图片**、**文本**、**HTML/Markdown**、**SVG**、**字体** 等内容。
+可以在压缩包内直接预览 **图片**、**文本**、**HTML/Markdown**、**PDF**、**SVG**、**Office 文档（DOCX/XLSX/PPTX）**、**字体**、**ICO 多帧画廊**、**动画图片（GIF / Animated WebP）**、**CSV 表格** 等内容。
 
-从v0.4.4版本开始，是以内容识别实际格式，不需要担心扩展名不对预览不了的问题。
+从 v0.4.4 版本开始，是以内容（魔数）识别实际格式，不需要担心扩展名不对预览不了的问题。
 
 #### 🔍 深度探索：各类型高级预览特写
 
@@ -59,12 +59,12 @@ MantisZip 是一款面向 Windows 的免费开源压缩/解压工具，主打**�
   <tr>
     <td width="50%" valign="top">
       <b>🖼️ 媒体与图片类预览</b><br>
-      支持 PNG 透明通道展示、压缩包内 GIF 动画直接嵌套播放。
+      支持 PNG 透明通道展示、压缩包内 GIF / Animated WebP 动画直接播放、ICO 多帧画廊。
       <img src="docs/images/preview-media.gif" alt="图片与媒体预览" width="100%"/>
     </td>
     <td width="50%" valign="top">
       <b>📄 文档与排版类预览</b><br>
-      无缝切换纯文本、Markdown 实时渲染、HTML 及 PDF，以及字体字形预览。
+      无缝切换纯文本、Markdown 实时渲染、HTML（原生控件树）、PDF（逐页渲染）、SVG（栅格化）、Office 文档（DOCX/XLSX/PPTX）、字体字形预览。
       <img src="docs/images/preview-docs.gif" alt="文档预览" width="100%"/>
     </td>
   </tr>
@@ -73,18 +73,20 @@ MantisZip 是一款面向 Windows 的免费开源压缩/解压工具，主打**�
 #### 部分格式支持**元数据展示**（无需加载完整文件）：
 
 <details>
-<summary><b>📊 点击展开：查看硬核数据类预览（SQLite 数据库、CSV、BT 种子、ISO）</b></summary>
+<summary><b>📊 点击展开：查看硬核数据类预览（Office 文档、SQLite 数据库、CSV、BT 种子、ISO）</b></summary>
 
 | 预览类型 | 展示信息 |
 |----------|----------|
 | PE 可执行文件（exe/dll） | 公司、产品名、文件版本、架构、子系统、描述 |
-| PDF 文档 | 版本、页数、标题、作者、加密状态 |
-| Office 文档（docx/xlsx/pptx） | 标题、作者、页数/幻灯片数/工作表数 |
+| PDF 文档 | 逐页渲染 + 版本、页数、标题、作者、加密状态 |
+| Office 文档（docx/xlsx/pptx） | DOCX：大纲导航 + 全文 + 真表格；XLSX：DataGrid 表格；PPTX：原始坐标定位预览 |
 | 音频（WAV / FLAC） | 时长、采样率、位深、声道、码率 |
 | 视频（MP4 / MKV / AVI） | 分辨率、时长、编码 |
 | 数据库（SQLite） | 编码、页面大小、表数量 |
 | 光盘映像（ISO） | 卷标、格式、大小 |
 | BT 种子 | InfoHash、文件树、Magnet 链接、Tracker、创建者 |
+| ICO 多帧画廊 | 全部帧提取、FlattenAlpha 切换、透明背景棋盘格 |
+| CSV 表格 | DataGrid 表格化展示（可配置行列上限） |
 </details>
 
 ----
@@ -169,19 +171,11 @@ MantisZip 是一款面向 Windows 的免费开源压缩/解压工具，主打**�
 
 ----
 
-c
-
-![调试日志设置](docs/images/SettingDebug.png)
-
----
-
 ## 🤔 已知问题
 - 本软件亮点是功能和易用性，所以性能上稍逊于主流压缩软件。将来会逐渐优化。
-- **拖拽导出**功能使用 7‑Zip 的 eager-extraction 模式（先全部解压到临时目录再发起拖拽），大文件较多时会有延迟。该功能默认关闭，可在设置里打开。未来会将 WPF 界面替换为 Avalonia 以原生解决该平台的延迟渲染限制。
-- 预览 Markdown、HTML、SVG、PDF 目前使用 WebView2 控件，已拦截所有外部网络请求（仅允许 `file://` 本地访问）。未来迁移至 Avalonia 后架构将进一步轻量化。
 - 有些格式的压缩包**不支持**单项预览，预览时会有提示。
 - RAR 格式不支持压缩（只读解压）。
-- 目前只支持 Windows 平台，跨平台支持已在计划中。
+- 目前只支持 Windows 平台，跨平台支持已在计划中（框架已迁移至 Avalonia，.NET 9 跨平台就绪）。
 
 
 ---
@@ -203,7 +197,6 @@ c
 
 - **操作系统**: Windows 10 (1809+) / Windows 11 （跨平台支持已在计划中）
 - **运行时**: [.NET 9 Runtime](https://dotnet.microsoft.com/download/dotnet/9.0)
-- **WebView2 Runtime**: HTML/Markdown/SVG/PDF 预览依赖 [WebView2 Runtime](https://developer.microsoft.com/microsoft-edge/webview2/)
 
 ---
 
@@ -211,20 +204,23 @@ c
 
 ```powershell
 # 克隆仓库
-git clone [https://github.com/mantis3d/MantisZip.git](https://github.com/mantis3d/MantisZip.git)
+git clone https://github.com/mantis3d/MantisZip.git
 cd MantisZip
 
-# 构建
-dotnet build src\MantisZip.UI\MantisZip.UI.csproj
+# 构建 Avalonia 主力版
+dotnet build src\MantisZip.UI.Avalonia\MantisZip.UI.Avalonia.csproj
 
 # 运行
-dotnet run --project src\MantisZip.UI\MantisZip.UI.csproj
+dotnet run --project src\MantisZip.UI.Avalonia\MantisZip.UI.Avalonia.csproj
 
-# 运行测试
+# 运行 Core 层测试
 dotnet test tests\MantisZip.Tests\MantisZip.Tests.csproj
+
+# 运行 Avalonia 测试
+dotnet test tests\MantisZip.UI.Avalonia.Tests\MantisZip.UI.Avalonia.Tests.csproj
 ```
 
-**输出路径**: `src/MantisZip.UI/bin/Debug/net9.0-windows/MantisZip.UI.exe`
+**输出路径**: `src/MantisZip.UI.Avalonia/bin/Debug/net9.0/MantisZip.UI.Avalonia.exe`
 
 ---
 
@@ -234,10 +230,10 @@ MantisZip 支持强大的命令行调用（例如右键菜单集成）。
 
 ```powershell
 # 打开压缩包浏览
-MantisZip.UI.exe --open "D:\文档.zip"
+MantisZip.UI.Avalonia.exe --open "D:\文档.zip"
 
 # 快速压缩（默认设置直接压缩）
-MantisZip.UI.exe --compress-quick "D:\照片" -- "D:\备份.zip"
+MantisZip.UI.Avalonia.exe --compress-quick "D:\照片" -- "D:\备份.zip"
 ```
 
 完整参数列表见 [命令行使用指南](docs/CLI.md)。
@@ -273,26 +269,29 @@ MantisZip 的诞生离不开全球开源社区的无私奉献。在此，对本�
 
 ### 📦 核心第三方依赖库
 
-
 #### MantisZip.Core
 
 | 包名 | 版本 | 用途 | 许可证 |
 |------|------|------|--------|
-| [SharpCompress](https://github.com/adamhathcock/sharpcompress) | 0.48.1 | ZIP/TAR/GZ 压缩和解压核心引擎（替代 SharpZipLib）| MIT |
+| [SharpCompress](https://github.com/adamhathcock/sharpcompress) | 0.48.1 | ZIP/TAR/GZ 压缩和解压核心引擎 | MIT |
 | [SharpSevenZip](https://github.com/sevenzipsharp/SevenZipSharp) | 2.0.45 | 7z/RAR/ISO 压缩和解压（封装 7z.dll）| LGPL-2.1 |
-| [SharpZipLib](https://github.com/icsharpcode/SharpZipLib) | 1.4.2 | 测试用（仅 test 项目） | MIT |
-| [System.Security.Cryptography.ProtectedData](https://github.com/dotnet/runtime) | 10.0.8 | DPAPI 加密存储密码 | MIT |
+| [Microsoft.Data.Sqlite](https://www.nuget.org/packages/Microsoft.Data.Sqlite/) | 10.0.8 | SQLite 预览读取 | MIT |
 
-#### MantisZip.UI
+#### MantisZip.UI.Avalonia
 
 | 包名 | 版本 | 用途 | 许可证 |
 |------|------|------|--------|
-| [CommunityToolkit.Mvvm](https://github.com/CommunityToolkit/dotnet) | 8.4.2 | MVVM 辅助（仅用部分基类） | MIT |
-| [Markdig](https://github.com/xoofx/markdig) | 1.2.0 | Markdown → HTML 渲染 | BSD-2-Clause |
-| [Ookii.Dialogs.Wpf](https://github.com/ookii-dialogs/ookii-dialogs-wpf) | 5.0.1 | Vista 风格文件夹选择对话框 | BSD-3-Clause |
+| [Avalonia](https://github.com/AvaloniaUI/Avalonia) | 12.0.4 | 跨平台 UI 框架（替代 WPF）| MIT |
+| [CommunityToolkit.Mvvm](https://github.com/CommunityToolkit/dotnet) | 8.4.2 | MVVM 辅助（ObservableObject + source generators） | MIT |
+| [Markdig](https://github.com/xoofx/markdig) | 0.40.0 | Markdown 解析（AST → 原生控件树） | BSD-2-Clause |
+| [ReverseMarkdown](https://github.com/magicmousen/ReverseMarkdown) | 4.7.0 | HTML → Markdown 转换（预览 HTML 降级路径） | MIT |
+| [PdfPig](https://github.com/UglyToad/PdfPig) | 0.1.15 | PDF 解析与逐页渲染 | Apache-2.0 |
+| [Svg.Skia](https://github.com/nickspag/Svg.Skia) | 2.0.0.5 | SVG 栅格化（无需 WebView2）| MIT |
+| [SkiaSharp](https://github.com/nickspag/SkiaSharp) | 3.119.4 | 2D 图形渲染（PDF/SVG/字体位图）| MIT |
+| [HarfBuzzSharp](https://github.com/nickspag/HarfBuzzSharp) | 14.2.0 | 字体预览字形布局与连字检测 | MIT |
+| [ClosedXML](https://github.com/ClosedXML/ClosedXML) | 0.105.0 | XLSX 表格预览 | MIT |
+| [DocumentFormat.OpenXml](https://github.com/nickspag/DocumentFormat.OpenXml) | 3.5.1 | DOCX/PPTX 文档解析 | MIT |
 | [Ude.NetStandard](https://github.com/jehugaleahsa/udetector) | 1.2.0 | Mozilla 字符编码检测（文本预览） | MIT |
-| [WpfAnimatedGif](https://github.com/XamlAnimatedGif/WpfAnimatedGif) | 2.0.2 | GIF 动画支持 | MIT |
-| [Microsoft.Web.WebView2](https://developer.microsoft.com/microsoft-edge/webview2/) | 1.0.3967.48 | HTML/Markdown/SVG/PDF 预览（替代 WPF WebBrowser）| BSD-3-Clause |
 
 #### 外部工具（运行时依赖）
 
@@ -300,7 +299,6 @@ MantisZip 的诞生离不开全球开源社区的无私奉献。在此，对本�
 |------|------|--------|------|
 | [7z.dll](https://www.7-zip.org/) | 7z/RAR 原生解析（SharpSevenZip 绑定） | GNU LGPL | 随应用分发，动态链接 |
 
----
 ---
 
 ### 🤖 智能化开发辅助
@@ -358,7 +356,7 @@ MantisZip 是一款完全免费且独立开发的开源项目。如果它提升�
 
 ### 💬 交流与反馈 (Community)
 
-如果你在体验《MantisZip》的过程中遇到了 Bug、有新的功能想法，或者单纯想和同行切磋 WPF/.NET 独立开发技术，欢迎加入我们的开发者社区：
+如果你在体验《MantisZip》的过程中遇到了 Bug、有新的功能想法，或者单纯想和同行切磋 .NET/Avalonia 独立开发技术，欢迎加入我们的开发者社区：
 
 * **QQ 交流群**：`778347352`（👉 [点击一键加入群聊](https://qm.qq.com/cgi-bin/qm/qr?k=778347352)）
 * **代码库提交**：[提交 Bug 或 Feature Request](../../issues)

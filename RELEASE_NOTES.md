@@ -1,12 +1,46 @@
 ## v0.5.0
 
+### 版本介绍
+
+这是 MantisZip 的一次**大版本更新**，核心框架从 WPF 完全迁移到 Avalonia，界面全面重构，安装包大幅精简。主要更新内容：
+
+**框架与架构**
+- **核心框架从 WPF 迁移到 Avalonia**（.NET 9），界面全面重构，WPF 版进入维护模式
+- **去除 WebView2 依赖** — HTML/Markdown/PDF/SVG 全部改为原生渲染，安装包大幅精简，安装不再需要额外运行时
+- **自实现 GIF 解码器与字体预览引擎** — GIF 动画不再依赖 WpfAnimatedGif；字体预览改用 HarfBuzzSharp+SkiaSharp，支持自动连字检测
+- 新增 **Animated WebP** 动画预览，与 GIF 统一处理
+
+**预览能力**
+- 新增 **Office 文档内容预览** — DOCX 大纲导航+全文+表格、XLSX DataGrid 表格、PPTX 原始坐标定位预览（WPF 版仅显示元数据）
+- **预览面板位置四档布局** — 右下 / 文件列表下方 / 目录树下方 / 侧边四种摆放位置，可独立显隐，切换实时生效并记忆尺寸
+- 打开压缩包自动展示**注释**（ZIP GBK/UTF-8 编码兼容 + RAR5）
+- **元数据信息面板可配置** — 字段排布自定义，独立配置文件持久化
+- **透明棋盘格切换** — 🏁 按钮切换 GIF/动画透明背景显示
+
+**交互**
+- **拖拽双向** — 从窗口拖文件到资源管理器**实时解压**（Win32 覆层三色指示+动态光标+Esc 取消）；从资源管理器拖文件**添加到压缩包**（绿色覆层即时提示）
+- **自定义文件选择器** — 多选累积、目录树、收藏/历史/窗口速选、盘符下拉、文件类型筛选，替代系统对话框
+- **加密压缩包密码交互对齐** — 工具栏「密码」按钮三态化（禁用/红锁/绿锁）；可列出条目的加密包取消密码后仍可浏览，随时补输解锁
+- **文件列表列排序增强** — 三态循环（升序→降序→原始顺序）+ 列头箭头 + 排序状态跨会话持久化
+- **目录行聚合显示** — 目录行大小/日期/压缩后大小由子树聚合得出，一眼看清目录内容规模
+
+**外观**
+- **紧凑度模式** — Compact/Normal/Loose 三档间距与控件高度，运行时切换无需重启
+- **主题三态化** — 跟随系统 / 亮色 / 暗色（WPF 版仅亮/暗），新增全局界面字体设置
+- **保存布局** — 拖动列宽/预览面板调整后可一键保存，下次启动自动恢复
+- 新增**目录树自动展开**开关 — 自动展开到当前浏览位置
+
 ### 文件说明 / File Description
 
-MantisZip-0.5.0-Setup-WebSetup.exe 是需要联网才能安装的。MantisZip-0.5.0-Setup-Offline.exe 是离线安装包。MantisZip-0.5.0-Portable.zip 是便携版，解压即用。MantisZip-0.5.0-Portable-Web.zip 是无依赖便携版，需要电脑安装有 dotnet9 运行时才能正常使用。
+- MantisZip-0.5.0-Setup-WebSetup.exe 是需要联网才能安装的。
+- MantisZip-0.5.0-Setup-Offline.exe 是离线安装包。
+- MantisZip-0.5.0-Portable.zip 是便携版，解压即用。
+- MantisZip-0.5.0-Portable-Web.zip 是无依赖便携版，需要电脑安装有 dotnet9 运行时才能正常使用。
 
-MantisZip-0.5.0-Setup-WebSetup.exe requires internet during installation. MantisZip-0.5.0-Setup-Offline.exe is a fully offline installer. MantisZip-0.5.0-Portable.zip is the portable version, extract and run.
-
-
+- MantisZip-0.5.0-Setup-WebSetup.exe requires internet during installation. 
+- MantisZip-0.5.0-Setup-Offline.exe is a fully offline installer. 
+- MantisZip-0.5.0-Portable.zip is the portable version, extract and run. 
+- MantisZip-0.5.0-Portable-Web.zip is a dependency-free portable version that requires the .NET 9 runtime to be installed on your computer.
 
 ### 更新内容 / Changelog
 
@@ -55,6 +89,17 @@ MantisZip-0.5.0-Setup-WebSetup.exe requires internet during installation. Mantis
 - 新增目录树自动展开开关 — 自动展开到当前浏览位置
 - Added auto-expand directory tree toggle — automatically expands to the currently browsed location
 - ![目录树自动展开](docs/images/version/v0.5.0/AutoExpandTree.png)
+- 拖拽添加到压缩包 — 从资源管理器拖文件/文件夹到 MantisZip 窗口即可添加到当前目录，拖入压缩包一键切换打开，窗口内绿色覆层即时提示可添加状态
+- Added drag-to-add — drag files/folders from Explorer onto the MantisZip window to add them to the current folder; dropping an archive switches to it; a green in-window overlay instantly shows addable state
+- ![拖拽添加到压缩包](docs/images/version/v0.5.0/DragAddOverlay.png)
+- 文件列表列排序增强 — 点击列头三态循环（升序→降序→恢复原始顺序）+ 列头箭头指示 + 排序状态跨会话持久化
+- Enhanced file list column sorting — clicking a column header cycles ascending → descending → original order, with header arrow indicator and cross-session sort persistence
+- ![列排序增强](docs/images/version/v0.5.0/ColumnSort.png)
+- 目录行聚合显示 — 目录行大小/日期/压缩后大小由子树聚合得出（大小=子树文件之和、日期=最新文件时间），一眼看清目录内容规模
+- Directory row aggregation — directory rows show aggregated size/date/compressed size from their subtree (size = sum of contained files, date = newest file), so folder sizes are visible at a glance
+- 保存布局 — 拖动列宽/预览面板调整后可一键保存，「查看」菜单保留布局项，下次启动自动恢复
+- Save layout — after resizing columns or the preview panel, save once and it restores automatically on next launch (View menu → "Save Layout")
+- ![保存布局](docs/images/version/v0.5.0/SaveLayout.png)
 
 
 ## v0.4.5
