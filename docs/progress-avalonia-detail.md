@@ -1156,6 +1156,16 @@
 ## 共享层（Core / ShellExt / 构建）
 这些变更影响两项目共用代码，按时间从新到旧排列。
 
+#### v0.5.0 (2026-09-04) 压缩/解压 文件读写错误处理补齐（对齐 ErrorResolver 语义）
+  - **背景**：`SharedReadStream` 治本层修复后（2026-08-25），仍有两类文件读写失败缺口：
+    - **压缩侧（7z / 加密 ZIP）**：走 SharpSevenZip 原生 `CompressFilesEncrypted` 一次性调用，遇被编辑器独占锁定的文件只能直接抛异常，整个压缩任务终止、不产出压缩包（Zip 明文/TarGz 走 `SharedReadStream` 已治本，故缺口仅在 7z 与加密 ZIP 路径）
+    - **解压侧（全部三引擎）**：写目标文件时被占用/只读/AV 锁定抛 `IOException`（最常见「正由另一进程使用」），三引擎 currently 只捕获 `UnauthorizedAccessException` 不捕获 `IOException`；且 Zip/7z 的 `ExtractEntriesAsync` 完全无 per-entry 异常防护，单个条目写失败会中止整个解压
+  - **方案**：
+    - **压缩侧预检**：新增 `Utils/ReadErrorHandler.cs`——`FilterUnreadableFiles(IEnumerable<string>, ArchiveOptions?, CancellationToken) -> List<string>`，用 `SharedReadStream.OpenRead` 探测读权限；失败重试 3 次；有 `ErrorResolver` 时弹窗（Skip 剔除 / Abort 抛异常 / Retry 重探），无则重试 3 次后抛异常；目录条目（`File.Exists` false）跳过校验、原样保留。接线到 `SevenZipEngine.CompressAsync`（`ExpandSourcePaths` → 白名单 → 预检 → `singleDirClean` 走 `CompressDirectory` 保 `PreserveDirectoryRoot` 语义，否则 `CompressFilesEncrypted`；全部跳过时记日志不生成包）与 `ZipEngine` 加密路径
+    - **解压侧 per-entry 兜底**：三引擎 `ExtractAsync` 的 catch 从仅 `UnauthorizedAccessException` 扩展为 `IOException or UnauthorizedAccessException`（TAR 循环 / `.gz` 单文件 / 7z 全量分别补齐）；`ExtractEntriesAsync` 新增 per-entry try/catch（`OperationCanceledException` 直抛，UA/IO 跳过该条目继续），`failedEntries` 计数并写入完成日志（Zip/7z/TarGz 全部对齐，`.gz` 单文件分支亦补 try/catch）
+  - 涉及文件：`Utils/ReadErrorHandler.cs`（新增）、`Engines/ZipEngine.cs`、`Engines/SevenZipEngine.cs`、`Engines/TarGzEngine.cs`
+  - 验证：`dotnet build` Core / Avalonia 均 0 错误；`dotnet test` Core 301 通过 + Avalonia 78 通过 / 2 既有 SKIP（两版 UI 同步受益）；解压 `ExtractAsync` 的 `FailedEntries` 经 `ExtractResult` 流向 CLI/全量解压摘要，`ExtractEntriesAsync` 受 `Task` 返回类型所限仅日志体现（不改共享接口签名）
+
 #### v0.5.0 (2026-08-24) 发布脚本 copy-7z-dll 按 PE 头校验架构，x86 不再误拷 64 位 7z.dll
 - **背景**：用户反馈安装包内 `x64\7z.dll` 与 `x86\7z.dll` 是相同文件——实证属实（两目录 SHA256 完全一致）。根因：`scripts/copy-7z-dll.ps1` 的 fallback 分支基于错误注释「现代 7-Zip 分发通用二进制」，在构建机只装 64 位 7-Zip 时把 64 位 dll 复制进 `x86\` 目录；GitHub Actions runner 同样只有 64 位，**历届官方发布包的 x86\7z.dll 全是假货**。附带反向 bug：只装 32 位 7-Zip 的构建机会把 32 位 dll 当 `$found64` 塞进 `x64\`
 - **影响面**：官方包仅发 win-x64（`Is64BitProcess` 恒真）故无实际故障，仅 ~1.9MB 死重；自建 win-x86（csproj `RuntimeIdentifiers: win-x64;win-x86` 设计内场景）会加载假 dll 导致 7z/RAR/ISO 全部不可用
