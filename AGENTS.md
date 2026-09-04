@@ -6,8 +6,8 @@ WPF→Avalonia 迁移中的压缩/解压桌面应用。当前存在两个 UI 项
 
 | 项目 | 框架 | 状态 | 目标 |
 |------|------|------|------|
-| `MantisZip.UI` | WPF (`net9.0-windows`) | 🟡 维护模式，迁移完成后废弃 | 遗留版本 |
-| `MantisZip.UI.Avalonia` | Avalonia (`net9.0`) | 🟢 主力开发 | 迁移目标，完成后废弃 WPF |
+| `MantisZip.UI` | WPF (`net10.0-windows`) | 🟡 维护模式，迁移完成后废弃 | 遗留版本 |
+| `MantisZip.UI.Avalonia` | Avalonia (`net10.0`) | 🟢 主力开发 | 迁移目标，完成后废弃 WPF |
 
 三个项目共享：`MantisZip.Core` (class library) + `MantisZip.ShellExt` (COM 组件 class library)。
 
@@ -55,12 +55,12 @@ Avalonia 移植 Phases 0–10 已完成，当前处于功能补齐后期：
 
 ```
                     ┌─── MantisZip.UI (WPF) ──reference──┐
-                    │   (net9.0-windows, 待废弃)          │
+                    │   (net10.0-windows, 待废弃)          │
                     │                                     │
 MantisZip.Core ──────┤                                     ├── MantisZip.ShellExt (COM)
-(net9.0)            │                                     │   (Explorer.exe 宿主)
+(net10.0)            │                                     │   (Explorer.exe 宿主)
                     │   MantisZip.UI.Avalonia ──reference─┘
-                    │   (net9.0, 主力开发)
+                    │   (net10.0, 主力开发)
                     │
                ZipEngine    SevenZipEngine    TarGzEngine
               (SharpCompress) (SharpSevenZip) (SharpCompress)
@@ -303,7 +303,7 @@ Open and Extract verbs use `AppliesTo` filter (archive extensions only). Icons v
 | 对话框 | `Ookii.Dialogs.Wpf` | 原生 Avalonia + system dialogs |
 | DataGrid | `System.Windows.Controls.DataGrid` | `Avalonia.Controls.DataGrid` |
 | 主题资源 | `SolidColorBrush` 在 `Themes/Light.xaml` / `Dark.xaml` | 类似结构，但资源键名略有差异 |
-| 目标框架 | `net9.0-windows` | `net9.0` (跨平台就绪) |
+| 目标框架 | `net10.0-windows` | `net10.0` (跨平台就绪) |
 
 ## 关键注意事项
 
@@ -485,10 +485,10 @@ WPF 废弃后，#1 和 #3 将移除。
 
 ```powershell
 # WPF（遗留）
-src/MantisZip.UI/bin/Debug/net9.0-windows/MantisZip.UI.exe
+src/MantisZip.UI/bin/Debug/net10.0-windows/MantisZip.UI.exe
 
 # Avalonia（主力）
-src/MantisZip.UI.Avalonia/bin/Debug/net9.0/MantisZip.UI.Avalonia.exe
+src/MantisZip.UI.Avalonia/bin/Debug/net10.0/MantisZip.UI.Avalonia.exe
 ```
 
 Build artifacts (bin/, obj/) are gitignored.

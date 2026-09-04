@@ -15,7 +15,7 @@
 
 **Why 可排序而非 WPF 四档预设：** WPF 版 `DefaultPathPriority` 只有 4 个固定档位（context/explorer/recent/desktop），每档是写死的优先级链，用户只能选档不能自定义顺序。可排序链让用户精确控制探测顺序，且可插入手动路径。
 
-**Tech Stack:** .NET 9, Avalonia 12.x（无新增依赖）
+**Tech Stack:** .NET 10, Avalonia 12.x（无新增依赖）
 
 **新增依赖：** 无（`ExplorerWindowTracker` / `PathHistoryManager` 均在 Core，已引用）
 
@@ -151,7 +151,7 @@
 
 ## 风险与注意
 
-1. **ExplorerWindowTracker 是 Windows-only**（P/Invoke + COM，CA1416 suppress）——Avalonia 当前 net9.0 跨平台目标，非 Windows 平台该调用应返回 null（跳过该链项），不崩溃
+1. **ExplorerWindowTracker 是 Windows-only**（P/Invoke + COM，CA1416 suppress）——Avalonia 当前 net10.0 跨平台目标，非 Windows 平台该调用应返回 null（跳过该链项），不崩溃
 2. **PathHistoryManager** 记录的是浏览历史（QuickPathControl/文件选择器导航时写入），recent 项可能为空 → 跳过即可
 3. **旧 settings.json 兼容**：无新字段时走默认值，无需迁移
 4. **WPF 版同步**：本计划不改 WPF（维护模式），但 `Settings_DefaultPath_*` key 文案已在 WPF strings 存在，Avalonia 侧复用需核对 key 命名

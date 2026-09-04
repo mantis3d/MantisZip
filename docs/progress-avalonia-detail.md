@@ -6,7 +6,73 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
-**2026-08-24** — 迁移遗漏审计补齐：7z.dll 运行时引导接线 + CLI `--help`/`--test`
+**2026-09-04** — 纯图标按钮补齐 ToolTip + 全局显示延迟 100ms
+  - **背景**：UI 功能补齐 27/29 中 2 项待 GUI 验证的其中之一——纯图标按钮（无文字标签、仅图标）此前多缺 ToolTip，用户悬停无提示。全量审计 33 个含按钮文件，定位 31 个缺失 ToolTip 的纯图标按钮
+  - **变更**：
+    - **31 个按钮补 ToolTip**（全走本地化，规则 13）：
+      - `Views/MainWindow.axaml` 4（日期/大小的拾色器按钮，`Filter_PickDateFrom/To`、`Filter_PickSizeMin/Max`）
+      - `Views/PreviewPanel.axaml` 15（缩放/字体/GIF 翻页播放/透明棋盘格/FlattenAlpha/PPTX·PDF 翻页，`Preview_Tooltip_*` 共 15 个 key）
+      - `Views/SettingsWindow.axaml` 5（元数据上下移/文件关联删除/路径上下移，经 `$parent[Window].((vm:SettingsWindowViewModel)DataContext).*`）
+      - `Dialogs/CustomFilePickerDialog.axaml` 1（系统浏览，`Picker_BrowseSystemTooltip`）
+      - `Dialogs/PasswordManagerWindow.axaml` 1（编辑区👁，`PasswordManager_EditRevealTooltip`）
+      - `Views/PasswordDialog.axaml` 1（👁，`Password_RevealTooltip`）
+      - `Dialogs/MatchedPasswordDialog.axaml` 2（👁/复制，`PwdMatched_RevealTooltip`/`PwdMatched_CopyTooltip`）
+      - `Dialogs/ProgressWindow.axaml` 2（👁/复制，`Progress_RevealTooltip`/`Progress_CopyTooltip`）
+    - 绑定方式两类：对话框 code-behind 本地化属性 + `ToolTip.Tip`；MVVM 页走 `LocalizedStrings[Key]` 字典索引器（MainWindow/PreviewPanel/ProgressWindow）
+    - **ViewModel/注册**：`MainWindowViewModel.UpdateLocalizedStrings` 登记 4 个 `Filter_Pick*`、`PreviewViewModel.UpdateLocalizedStrings` 登记 15 个 `Preview_Tooltip_*`、`SettingsWindowViewModel` 新增 5 个 tooltip 属性、`ProgressViewModel.LocalizedStrings` 新增 2 个 `Progress_*` key
+    - **本地化**：`strings.zh-CN.json` + `strings.en.json` 成对新增 27 个 key（zh/en 完全同步，各 1150 个）
+    - **全局延迟**：`App.axaml` 全局样式区新增 `<Style Selector="Control">` 设 `ToolTip.ShowDelay=100`，覆盖所有控件（含将来新增），取代框架默认 400ms
+  - 涉及文件：`App.axaml`、`Views/MainWindow.axaml`、`Views/PreviewPanel.axaml`、`Views/SettingsWindow.axaml`、`Views/PasswordDialog.axaml(.cs)`、`Dialogs/{CustomFilePickerDialog,PasswordManagerWindow,MatchedPasswordDialog,ProgressWindow}.axaml(.cs)`、`ViewModels/{MainWindowViewModel,PreviewViewModel,SettingsWindowViewModel,ProgressViewModel}.cs`、`Localization/strings.{zh-CN,en}.json`
+  - 验证：`dotnet build` Avalonia 0 错误；zh/en key 集合完全一致无缺失
+
+**2026-09-04** — 安装包缺失 `Resources\Icons` 格式图标修复
+  - **背景**：`src/MantisZip.UI.Avalonia/Resources/Icons/` 下的文件关联格式图标（`zip.ico`/`sevenz.ico`/`rar.ico`/`tar.ico`/`tgz.ico`/`gz.ico`/`iso.ico`）由 csproj（`MantisZip.UI.Avalonia.csproj` line 62-64 `<None Include="Resources\Icons\*.ico" CopyToOutputDirectory>`）复制到发布目录 `publish_output\Resources\Icons\`，但两个 Inno Setup 脚本的 `[Files]` 段只打包了 `MenuIcons` 与 `Cursors`，漏掉 `Icons` 目录——安装后 `ShellIntegration.GetIconPath` 按输出目录相对路径引用这些图标时缺失，文件关联图标退化为应用通用图标
+  - **变更**：`installer.iss`（line 97）与 `installer-selfcontained.iss`（line 87）`[Files]` 段各新增 `Source: "...\Resources\Icons\*.ico"; DestDir: "{app}\Resources\Icons"`，并将注释从「(context menu icons...)」统一为「(file type icons, context menu icons...)」
+  - 涉及文件：`installer.iss`、`installer-selfcontained.iss`
+  - 验证：逐项对照 csproj 全部 `CopyToOutputDirectory` 资源条目与两个 iss 打包项（Localization/MenuIcons/Icons/Cursors/contributors 全部对齐）；`publish_output` 与 `publish_output_selfcontained` 均确认含 `Resources\Icons` 7 个 ico，无其他遗漏（`Portable.txt`/`Data\settings.json` 仅属便携包由 release.yml `New-PortableZip` 显式生成，安装包本就不含；`*.pdb` 按设计排除）
+
+**2026-09-02** — 修复 ShellExt 复制目标 RID 路径 bug（阻断发布构建）
+  - **背景**：.NET 10 升级（69d1f66）后 ShellExt 项目声明 `RuntimeIdentifiers=win-x64;win-x86`，UI publish 时 `--runtime win-x64` 传播给 ShellExt，使其构建输出落到 RID 子目录 `net10.0-windows10.0.17763.0\win-x64\`；但 UI 的 `CopyShellExtComhost` / `CopyShellExtComhostToPublish` 两个目标写死的 `_ShellExtDir` 指向无 RID 的父目录，导致 publish 报 `MSB3030`（找不到 comhost.dll / dll / runtimeconfig.json），阻断 release 流水线（CI 尚未在 .NET 10 构建上跑过，首个 tag 即暴露）
+  - **变更**：`UI.Avalonia/MantisZip.UI.Avalonia.csproj` 两个复制目标——向 ShellExt 显式传 `RuntimeIdentifier=$(RuntimeIdentifier)`，并在 `$(RuntimeIdentifier)` 非空时把 `_ShellExtDir` 追加 `\$(RuntimeIdentifier)`；用同一路径约定的 `CopyShellExtComhostToPublish`（Publish）同步修正
+  - 涉及文件：`src/MantisZip.UI.Avalonia/MantisZip.UI.Avalonia.csproj`
+  - 验证：framework-dependent + self-contained 两个 `dotnet publish` 均成功，发布目录含 ShellExt comhost/dll/runtimeconfig 与 x64/x86 7z.dll；ISCC 两个安装器 + 7z 两个便携包全部生成
+
+**2026-09-01** — 压缩源文件读取错误（被占用）接线 ErrorResolver 弹窗（补迁移遗漏）
+  - **背景**：压缩侧遇正被 Word/Excel 等编辑器以写权限独占锁定的文件时，`SharedReadStream` 治本层打不开，引擎 3 次重试后只能直接抛异常终止整个压缩。Core 的 `ArchiveOptions.ErrorResolver`（重试/跳过/中止）机制在 WPF 有接线（`App.CreateCompressOptions`→`ErrorDialog`），Avalonia 迁移时遗漏——`ErrorDialog`/`FileErrorAction`/`FileErrorInfo` 类早已写好却从未被任何流程调用（仅一个测试命令引用）
+  - **变更**：
+    - **Core**：`CompressRequest` 新增 `ErrorResolver`（`Func<FileErrorInfo, FileErrorAction>?`）属性，`CompressService.BuildOptions` 透传到 `ArchiveOptions.ErrorResolver`——主窗口/CLI/添加文件三条 `new CompressRequest` 路径统一受益
+    - **Avalonia**：`Services/CompressFlow.cs` 新增 `CreateErrorResolver()`（对齐 WPF `App.CreateCompressOptions` 语义：封送回 UI 线程弹 `ErrorDialog` 阻塞等待选择 + ApplyToAll 记忆；Owner 取当前活跃窗口回退主窗口）；接线到 `CompressFlow.BuildRequest`、`AddFilesToArchiveAsync`（拖拽添加）、CLI `--compress-quick`/`--compress-separate`/`--compress-combined` 三条 CompressRequest 构造
+  - 涉及文件：`Core/Services/CompressService.cs`、`UI.Avalonia/Services/CompressFlow.cs`、`UI.Avalonia/ViewModels/MainWindowViewModel.cs`、`UI.Avalonia/App.axaml.cs`
+  - 验证：`dotnet build` Core 0 错误 0 警告、Avalonia 0 错误（36 个警告均为 pre-existing）；`dotnet test` Core 301 passed + Avalonia 78 passed 全部通过
+
+**2026-08-31** — .NET 9 → .NET 10 升级
+  - **背景**：.NET 9 (STS) 将于 2026-11-10 停止支持，.NET 10 (LTS) 支持至 2028-11-14；Avalonia 12 官方推荐 .NET 10
+  - **变更**：
+    - 全部 7 个项目 `TargetFramework` 更新：`net9.0` → `net10.0`、`net9.0-windows10.0.17763.0` → `net10.0-windows10.0.17763.0`
+    - Avalonia UI 项目移除废弃的 `Avalonia.Diagnostics` 11.3.18 包（Avalonia 12 已弃用旧 F12 DevTools，代码中无 `AttachDevTools` 调用，仅为无用引用）
+    - `System.Drawing.Common` 从 9.0.4 升级至 10.0.8（对齐其他 Microsoft.Data.Sqlite 等 10.x 包）
+    - Avalonia UI 项目 ShellExt 复制路径中硬编码的 `net9.0-windows10.0.17763.0` 同步更新为 `net10.0-windows10.0.17763.0`
+  - 涉及文件：全部 7 个 `.csproj` 文件
+  - 验证：`dotnet build` 全部 4 个主项目 0 错误；`dotnet test` Avalonia 测试 78 passed + WPF 测试 301 passed，全部通过
+  - 注意：构建时出现 Avalonia 12 废弃警告（`SystemDecorations`→`WindowDecorations`、`Watermark`→`PlaceholderText`），属 Avalonia 12 迁移后续清理项，非本次升级引入
+
+**2026-08-31** — 卸载/更新时文件被占用删除失败修复
+  - **背景**：Inno Setup 卸载 `comhost.dll` 时因 Explorer 持有 COM in-process 句柄而删除失败，Everything 等第三方进程也可能锁定 DLL
+  - **C# 侧**（`ShellIntegration.Uninstall`）：清完 COM 注册表后调用新增的 `RestartExplorerForUnload()` — Kill 所有 Explorer 进程 → `WaitForExit(3000)` + `Thread.Sleep(500)` 等句柄释放 → `Process.Start("explorer.exe")` 重启桌面；整个过程 try-catch 兜底，失败不影响卸载
+  - **Installer 侧**：两个 `.iss` 文件（`installer.iss` + `installer-selfcontained.iss`）添加 `CloseApplications=yes`，启用 Windows Restart Manager 检测所有占用进程（Explorer / Everything / 杀软等），卸载/更新/安装三个阶段均生效——弹出对话框列出锁定进程让用户确认关闭
+  - 涉及文件：`Services/ShellIntegration.Menu.cs`、`installer.iss`、`installer-selfcontained.iss`
+  - 验证：`dotnet build` 0 错误
+
+**2026-08-25** — 文件筛选栏交互重构（开关迁主工具栏 + 收起停用 + 清除全部 + 单位切换修复）
+  - **开关搬家**：筛选栏 ToggleButton 从文件列表小工具栏移至主工具栏「测试」之后，与其他主工具栏按钮同款外观（22×22 `IconSearch` PathIcon + 「筛选」文字标签，选中态走全局样式）；小工具栏旧的小放大镜按钮删除
+  - **收起即停用**（用户语义，与 WPF 清空式为有意的偏离）：`IsFilterBarVisible` 兼作筛选总开关——收起时 `GetFilteredSource()` 直接返回未过滤的 `_allRawItems`、`FilterStats` 计数隐藏，但全部条件保留在输入框中，重新展开立即按原条件恢复过滤；`OnIsFilterBarVisibleChanged → ApplyFilter()` 接线保证切换瞬间列表即时刷新
+  - **清除全部按钮**：筛选栏大小区之后新增分隔线 + ✕ 按钮（24×24 矢量 `IconDismiss`，尺寸对齐 WPF `ClearFiltersBtn`），`ClearFiltersCommand` 清空搜索词/排除词/日期起止/大小上下限并把单位复位默认 KB、匹配模式复位子串——各属性 `OnXxxChanged` 自动链式触发恢复全量；新增 `Filter_ClearAll` 双语 key 并登记 keys 数组
+  - **修复大小单位下拉无效**：`FilterSizeUnit` 缺少 `OnFilterSizeUnitChanged → ApplyFilter()` 接线（WPF `SizeMinUnit/SizeMaxUnit SelectionChanged → RefreshFilter` 移植时遗漏），切换单位后乘数要等再动其它条件才生效；补一行修复
+  - **死代码清理**：删除无任何绑定的 `ToggleFilterBarCommand`；`Menu_FilterBar` 死 key 从 zh/en 语言文件与 keys 数组移除
+  - 涉及文件：`Views/MainWindow.axaml`、`ViewModels/MainWindowViewModel.cs`、`Localization/strings.zh-CN.json`、`Localization/strings.en.json`
+  - 验证：`dotnet build` 0 错误；全局搜索确认 `Menu_FilterBar` / `ToggleFilterBar` 无残留引用
+
+**2026-08-25** — 压缩/解压成功后自动记录目标目录到路径历史
   - **背景**：WPF↔Avalonia 全面对比审计（对话框清单 / AppSettings 属性 / CLI 参数三轴）发现三处真实缺口：
     - **7z.dll 引导缺失**：Core 的 `SevenZipDllResolveCallback` 挂钩仍在（`SevenZipEngine.cs:122` 会调用），但 Avalonia 从未注册回调；更严重的是启动时从未把设置里的 `SevenZipPath` 灌入引擎（WPF `InitializeApp` 有对应逻辑）——设置窗口「浏览」选好的路径实际**从未生效**
     - **CLI 缺 `--help`/`-h`/`--test`**，且未知参数静默打开主窗口（WPF 有告警日志）
@@ -18,7 +84,7 @@
   - 涉及文件：`App.axaml.cs`、`Localization/strings.zh-CN.json`、`Localization/strings.en.json`、AGENTS.md（UseColorEmoji 标注 WPF 专属废弃 + CLI 表格补两行）
   - 验证：`dotnet build` 0 错误（新增代码无警告）；双语言 JSON node 解析通过且 key 数完全一致（1119=1119）
 
-**2026-08-24** — 压缩/解压成功后自动记录目标目录到路径历史
+**2026-08-25** — 压缩/解压成功后自动记录目标目录到路径历史
   - **背景**：路径历史（`PathHistoryManager`，持久化 `%LOCALAPPDATA%\MantisZip\path-history.json`，上限 50 条大小写不敏感去重）此前只由选择器交互写入——地址栏 Enter、📁 浏览按钮、CustomFilePickerDialog 导航（含构造即 Record 初始目录，取消也留痕）、QuickPathControl 条目点击。最常见场景「压缩/解压设置窗口手输路径 → 直接点确认」反而不入史，历史语义是「做过显式导航动作」而非「实际用过的目录」
   - **实现**（8 个成功点）：压缩侧新增 `CompressFlow.RecordOutputHistory(request)` 共享辅助——取 `AvaloniaCompressService.GetOutputPaths` 各输出文件的父目录去重后逐条 `Record`（Manual/Combined = 输出文件所在目录；Separate = 各源条目所在目录），自身 try-catch 仅记日志绝不影响压缩结果；主窗口 `ExecuteCompressFromSettings` completed 分支 + CLI `CompressWithProgress` 成功尾部接线（覆盖 `--compress` 对话框确认 / `--compress-quick` / `-separate` / `-combined` 全部 CLI 压缩模式）。解压侧：`ExtractFlow.ExtractAsync` 末尾（取消/异常向上抛时不执行）、`RunSelectedItemsExtractionAsync` 成功分支（拖拽解压 + 右键解压选中项共用入口）、主窗口 `ExtractArchiveHere`/`ExtractArchiveToName` completed 分支、CLI `RunCliExtractWithProgressAsync` 与 `RunCliDirectExtractBatchAsync` 逐项成功后（`--extract-here` / `--extract-to-name` / `--extract-smart` 单文件与多文件直解）
   - **语义约定**：只在操作成功后记录——用户取消、引擎抛异常零痕迹；CLI 部分条目失败但输出已落盘仍记录；重复路径由既有去重逻辑置顶刷新时间戳
@@ -1089,6 +1155,16 @@
 
 ## 共享层（Core / ShellExt / 构建）
 这些变更影响两项目共用代码，按时间从新到旧排列。
+
+#### v0.5.0 (2026-09-04) 压缩/解压 文件读写错误处理补齐（对齐 ErrorResolver 语义）
+  - **背景**：`SharedReadStream` 治本层修复后（2026-08-25），仍有两类文件读写失败缺口：
+    - **压缩侧（7z / 加密 ZIP）**：走 SharpSevenZip 原生 `CompressFilesEncrypted` 一次性调用，遇被编辑器独占锁定的文件只能直接抛异常，整个压缩任务终止、不产出压缩包（Zip 明文/TarGz 走 `SharedReadStream` 已治本，故缺口仅在 7z 与加密 ZIP 路径）
+    - **解压侧（全部三引擎）**：写目标文件时被占用/只读/AV 锁定抛 `IOException`（最常见「正由另一进程使用」），三引擎 currently 只捕获 `UnauthorizedAccessException` 不捕获 `IOException`；且 Zip/7z 的 `ExtractEntriesAsync` 完全无 per-entry 异常防护，单个条目写失败会中止整个解压
+  - **方案**：
+    - **压缩侧预检**：新增 `Utils/ReadErrorHandler.cs`——`FilterUnreadableFiles(IEnumerable<string>, ArchiveOptions?, CancellationToken) -> List<string>`，用 `SharedReadStream.OpenRead` 探测读权限；失败重试 3 次；有 `ErrorResolver` 时弹窗（Skip 剔除 / Abort 抛异常 / Retry 重探），无则重试 3 次后抛异常；目录条目（`File.Exists` false）跳过校验、原样保留。接线到 `SevenZipEngine.CompressAsync`（`ExpandSourcePaths` → 白名单 → 预检 → `singleDirClean` 走 `CompressDirectory` 保 `PreserveDirectoryRoot` 语义，否则 `CompressFilesEncrypted`；全部跳过时记日志不生成包）与 `ZipEngine` 加密路径
+    - **解压侧 per-entry 兜底**：三引擎 `ExtractAsync` 的 catch 从仅 `UnauthorizedAccessException` 扩展为 `IOException or UnauthorizedAccessException`（TAR 循环 / `.gz` 单文件 / 7z 全量分别补齐）；`ExtractEntriesAsync` 新增 per-entry try/catch（`OperationCanceledException` 直抛，UA/IO 跳过该条目继续），`failedEntries` 计数并写入完成日志（Zip/7z/TarGz 全部对齐，`.gz` 单文件分支亦补 try/catch）
+  - 涉及文件：`Utils/ReadErrorHandler.cs`（新增）、`Engines/ZipEngine.cs`、`Engines/SevenZipEngine.cs`、`Engines/TarGzEngine.cs`
+  - 验证：`dotnet build` Core / Avalonia 均 0 错误；`dotnet test` Core 301 通过 + Avalonia 78 通过 / 2 既有 SKIP（两版 UI 同步受益）；解压 `ExtractAsync` 的 `FailedEntries` 经 `ExtractResult` 流向 CLI/全量解压摘要，`ExtractEntriesAsync` 受 `Task` 返回类型所限仅日志体现（不改共享接口签名）
 
 #### v0.5.0 (2026-08-24) 发布脚本 copy-7z-dll 按 PE 头校验架构，x86 不再误拷 64 位 7z.dll
 - **背景**：用户反馈安装包内 `x64\7z.dll` 与 `x86\7z.dll` 是相同文件——实证属实（两目录 SHA256 完全一致）。根因：`scripts/copy-7z-dll.ps1` 的 fallback 分支基于错误注释「现代 7-Zip 分发通用二进制」，在构建机只装 64 位 7-Zip 时把 64 位 dll 复制进 `x86\` 目录；GitHub Actions runner 同样只有 64 位，**历届官方发布包的 x86\7z.dll 全是假货**。附带反向 bug：只装 32 位 7-Zip 的构建机会把 32 位 dll 当 `$found64` 塞进 `x64\`

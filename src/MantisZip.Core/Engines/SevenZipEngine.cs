@@ -433,6 +433,12 @@ public class SevenZipEngine : IArchiveEngine
                     CoreLog.Info($"ExtractAsync: permission denied for '{fileName}': {uax.Message}");
                     failedEntries++;
                 }
+                catch (IOException iox)
+                {
+                    // 目标文件被其他进程占用等 IO 失败：跳过该条目继续，避免单个文件中止整个解压
+                    CoreLog.Info($"ExtractAsync: write failed for '{fileName}': {iox.Message}");
+                    failedEntries++;
+                }
             }
 
             progress?.Report(new ArchiveProgress
@@ -474,7 +480,20 @@ public class SevenZipEngine : IArchiveEngine
                 ConfigureCompressor(compr, options);
                 AttachCompressorProgress(compr, progress);
 
-                if (sourcePaths.Length == 1 && Directory.Exists(sourcePaths[0]) && options.FileWhitelist == null)
+                // 预检：7z 原生压缩是单次调用，无法逐文件恢复。先展开待压缩文件集，
+                // 统一做读权限预检（文件被占用/权限不足 → ErrorResolver 弹窗 重试/跳过/中止），
+                // 跳过则从文件集中剔除，避免单个不可读文件导致整个压缩直接中止。
+                var files = ExpandSourcePaths(sourcePaths);
+                if (options.FileWhitelist != null)
+                    files = files.Where(f => options.FileWhitelist.Contains(f)).ToArray();
+                var validated = ReadErrorHandler.FilterUnreadableFiles(files, options, cancellationToken);
+
+                // 单一目录·无白名单·且无文件被跳过 → 保留 CompressDirectory 的 PreserveDirectoryRoot 语义
+                bool singleDirClean = sourcePaths.Length == 1
+                    && Directory.Exists(sourcePaths[0])
+                    && options.FileWhitelist == null
+                    && validated.Count == files.Length;
+                if (singleDirClean)
                 {
                     // 单一目录且无文件白名单 — 使用 CompressDirectory
                     compr.PreserveDirectoryRoot = options.PreserveDirectoryRoot;
@@ -485,17 +504,19 @@ public class SevenZipEngine : IArchiveEngine
                         "*",
                         recursion: true);
                 }
-                else
+                else if (validated.Count > 0)
                 {
-                    // 多个文件、混合源、或存在文件白名单（过滤激活，CompressDirectory 无法排除文件）—
-                    // 展开后按白名单过滤，再使用 CompressFilesEncrypted
-                    var files = ExpandSourcePaths(sourcePaths);
-                    if (options.FileWhitelist != null)
-                        files = files.Where(f => options.FileWhitelist.Contains(f)).ToArray();
+                    // 多个文件、混合源、存在文件白名单、或预检跳过了不可读文件 —
+                    // 展开后按白名单过滤并经预检剔除，再使用 CompressFilesEncrypted
                     compr.CompressFilesEncrypted(
                         outputPath,
                         options.Encrypt ? options.Password ?? "" : "",
-                        files);
+                        validated.ToArray());
+                }
+                else
+                {
+                    // 所有文件均不可读且被跳过 → 无内容可压缩
+                    CoreLog.Info("SevenZipEngine.CompressAsync: all files skipped due to read errors, nothing to compress");
                 }
 
                 // 压缩完成后必须把文件进度条也置满（仅 PercentComplete=100 时文件进度条会停在 accumulatedPercent）
@@ -688,6 +709,7 @@ public class SevenZipEngine : IArchiveEngine
             var allEntries = extractor.ArchiveFileData.ToList();
             int totalTarget = allEntries.Count(e => !e.IsDirectory && keySet.Contains(ArchivePath.Normalize(e.FileName)));
             int processed = 0;
+            int failedEntries = 0;
             var lastReportTime = DateTime.Now;
             var reportInterval = TimeSpan.FromMilliseconds(100);
 
@@ -731,52 +753,67 @@ public class SevenZipEngine : IArchiveEngine
 
                 // 使用 WriteProgressStream 在 ExtractFile 写入过程中获得逐块进度
                 var lastFileReport = DateTime.Now;
-                using (var fileStream = new FileStream(resolvedPath, FileMode.Create, FileAccess.Write))
-                using (var progressStream = new WriteProgressStream(fileStream, bytesWritten =>
+                try
                 {
+                    using (var fileStream = new FileStream(resolvedPath, FileMode.Create, FileAccess.Write))
+                    using (var progressStream = new WriteProgressStream(fileStream, bytesWritten =>
+                    {
+                        var now = DateTime.Now;
+                        if (now - lastFileReport < reportInterval && bytesWritten < entrySize)
+                            return;
+
+                        var filePct = entrySize > 0 ? (double)bytesWritten / entrySize * 100 : 100;
+                        var overallPct = totalTarget > 0
+                            ? (double)(processed + (double)bytesWritten / entrySize) / totalTarget * 100
+                            : 0;
+
+                        progress?.Report(new ArchiveProgress
+                        {
+                            CurrentFile = fileName,
+                            PercentComplete = Math.Min(overallPct, 100),
+                            FilePercentComplete = Math.Min(filePct, 100),
+                            TotalFiles = totalTarget,
+                            ProcessedFiles = processed,
+                        });
+                        lastFileReport = now;
+                    }))
+                    {
+                        extractor.ExtractFile(entry.Index, progressStream);
+                    }
+
+                    try { File.SetLastWriteTime(resolvedPath, entry.LastWriteTime); }
+                    catch (Exception tsEx)
+                    {
+                        CoreLog.Info($"ExtractEntriesAsync: failed to set timestamp on {resolvedPath}: {tsEx.Message}");
+                    }
+
+                    processed++;
+
                     var now = DateTime.Now;
-                    if (now - lastFileReport < reportInterval && bytesWritten < entrySize)
-                        return;
-
-                    var filePct = entrySize > 0 ? (double)bytesWritten / entrySize * 100 : 100;
-                    var overallPct = totalTarget > 0
-                        ? (double)(processed + (double)bytesWritten / entrySize) / totalTarget * 100
-                        : 0;
-
-                    progress?.Report(new ArchiveProgress
+                    if (now - lastReportTime >= reportInterval || processed == totalTarget)
                     {
-                        CurrentFile = fileName,
-                        PercentComplete = Math.Min(overallPct, 100),
-                        FilePercentComplete = Math.Min(filePct, 100),
-                        TotalFiles = totalTarget,
-                        ProcessedFiles = processed,
-                    });
-                    lastFileReport = now;
-                }))
-                {
-                    extractor.ExtractFile(entry.Index, progressStream);
+                        progress?.Report(new ArchiveProgress
+                        {
+                            CurrentFile = fileName,
+                            PercentComplete = totalTarget > 0 ? (double)processed / totalTarget * 100 : 100,
+                            FilePercentComplete = 100,
+                            TotalFiles = totalTarget,
+                            ProcessedFiles = processed,
+                        });
+                        lastReportTime = now;
+                    }
                 }
-
-                try { File.SetLastWriteTime(resolvedPath, entry.LastWriteTime); }
-                catch (Exception tsEx)
+                catch (OperationCanceledException) { throw; }
+                catch (UnauthorizedAccessException uax)
                 {
-                    CoreLog.Info($"ExtractEntriesAsync: failed to set timestamp on {resolvedPath}: {tsEx.Message}");
+                    CoreLog.Info($"ExtractEntriesAsync: permission denied for '{fileName}': {uax.Message}");
+                    failedEntries++;
                 }
-
-                processed++;
-
-                var now = DateTime.Now;
-                if (now - lastReportTime >= reportInterval || processed == totalTarget)
+                catch (IOException iox)
                 {
-                    progress?.Report(new ArchiveProgress
-                    {
-                        CurrentFile = fileName,
-                        PercentComplete = totalTarget > 0 ? (double)processed / totalTarget * 100 : 100,
-                        FilePercentComplete = 100,
-                        TotalFiles = totalTarget,
-                        ProcessedFiles = processed,
-                    });
-                    lastReportTime = now;
+                    // 目标文件被其他进程占用等 IO 失败：跳过该条目继续，避免单个文件中止整个解压
+                    CoreLog.Info($"ExtractEntriesAsync: write failed for '{fileName}': {iox.Message}");
+                    failedEntries++;
                 }
             }
 
@@ -788,7 +825,7 @@ public class SevenZipEngine : IArchiveEngine
                 ProcessedFiles = processed,
             });
 
-            CoreLog.Info($"ExtractEntriesAsync: done, {sw.ElapsedMilliseconds}ms");
+            CoreLog.Info($"ExtractEntriesAsync: done, {sw.ElapsedMilliseconds}ms, failedEntries={failedEntries}");
         }, cancellationToken).ConfigureAwait(false);
 
         CoreLog.Exit();

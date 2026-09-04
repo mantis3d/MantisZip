@@ -89,6 +89,14 @@ public class CompressRequest
 
     /// <summary>7z 加密文件名（EncryptHeaders），默认 true</summary>
     public bool SevenZipEncryptHeaders { get; init; } = true;
+
+    /// <summary>
+    /// 源文件读取错误回调（如文件正被占用无法读取）。引擎在逐文件读取失败时
+    /// 重试并调用此回调让用户选择 重试/跳过/中止；null 表示重试耗尽后直接中止整个压缩。
+    /// 由调用方注入（Avalonia 经 CompressFlow.CreateErrorResolver 弹 ErrorDialog）。
+    /// 回调在后台线程被调用，实现需自行处理 UI 线程调度。
+    /// </summary>
+    public Func<FileErrorInfo, FileErrorAction>? ErrorResolver { get; init; }
 }
 
 /// <summary>
@@ -448,6 +456,7 @@ public static class CompressService
             ZipEncryptionMethod = request.ZipEncryptionMethod,
             SevenZipEncryptHeaders = request.SevenZipEncryptHeaders,
             FileWhitelist = whitelist,
+            ErrorResolver = request.ErrorResolver,
         };
     }
 

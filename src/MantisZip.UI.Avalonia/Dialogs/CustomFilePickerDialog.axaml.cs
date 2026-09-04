@@ -98,6 +98,7 @@ public partial class CustomFilePickerDialog : Window
     public string BackText => LocalizationManager.T("Picker_Back");
     public string ForwardText => LocalizationManager.T("Picker_Forward");
     public string UpText => LocalizationManager.T("Picker_Up");
+    public string BrowseSystemTooltip => LocalizationManager.T("Picker_BrowseSystemTooltip");
     public string FileNameLabel => LocalizationManager.T("Picker_FileName");
     public string FileTypeLabel => LocalizationManager.T("Picker_FileType");
     public string ExtractPreviewTitle => LocalizationManager.T("Picker_ExtractPreviewTitle");

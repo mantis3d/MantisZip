@@ -323,6 +323,13 @@ public class ZipEngine : IArchiveEngine
                     CoreLog.Info($"ExtractAsync: permission denied for '{entryKey}': {uax.Message}");
                     failedEntries++;
                 }
+                catch (IOException iox)
+                {
+                    // 目标文件被其他进程占用（如正被 Word 打开）等 IO 失败：
+                    // 跳过该条目继续，避免单个文件导致整个解压中止（对齐 UnauthorizedAccessException 分支）
+                    CoreLog.Info($"ExtractAsync: write failed for '{entryKey}': {iox.Message}");
+                    failedEntries++;
+                }
             }
 
             progress?.Report(new ArchiveProgress
@@ -362,6 +369,7 @@ public class ZipEngine : IArchiveEngine
             var totalBytes = entries.Where(e => entryKeys.Contains(ArchivePath.Normalize(e.Key))).Sum(e => e.Size);
             var processedBytes = 0L;
             var processedFiles = 0;
+            var failedEntries = 0;
             var filteredEntries = entries.Where(e => entryKeys.Contains(ArchivePath.Normalize(e.Key))).ToList();
 
             CoreLog.Info($"ExtractEntriesAsync: {filteredEntries.Count} matching entries");
@@ -396,47 +404,62 @@ public class ZipEngine : IArchiveEngine
                 }
 
                 var entrySize = entry.Size;
-                using (var entryStream = entry.OpenEntryStream())
-                using (var outputStream = File.Create(resolvedPath))
+                try
                 {
-                    var buffer = new byte[CopyBufferSize];
-                    long entryProcessed = 0;
-                    var lastReportTime = DateTime.Now;
-                    var reportInterval = TimeSpan.FromMilliseconds(100);
-
-                    while (true)
+                    using (var entryStream = entry.OpenEntryStream())
+                    using (var outputStream = File.Create(resolvedPath))
                     {
-                        cancellationToken.ThrowIfCancellationRequested();
-                        var read = entryStream.Read(buffer, 0, buffer.Length);
-                        if (read <= 0) break;
+                        var buffer = new byte[CopyBufferSize];
+                        long entryProcessed = 0;
+                        var lastReportTime = DateTime.Now;
+                        var reportInterval = TimeSpan.FromMilliseconds(100);
 
-                        outputStream.Write(buffer, 0, read);
-                        entryProcessed += read;
-
-                        var now = DateTime.Now;
-                        if (now - lastReportTime >= reportInterval || entryProcessed >= entrySize)
+                        while (true)
                         {
-                            var filePct = entrySize > 0 ? (double)entryProcessed / entrySize * 100 : 100;
-                            var overallPct = totalBytes > 0 ? (double)(processedBytes + entryProcessed) / totalBytes * 100 : 0;
-                            progress?.Report(new ArchiveProgress
+                            cancellationToken.ThrowIfCancellationRequested();
+                            var read = entryStream.Read(buffer, 0, buffer.Length);
+                            if (read <= 0) break;
+
+                            outputStream.Write(buffer, 0, read);
+                            entryProcessed += read;
+
+                            var now = DateTime.Now;
+                            if (now - lastReportTime >= reportInterval || entryProcessed >= entrySize)
                             {
-                                CurrentFile = entryKey,
-                                TotalFiles = filteredEntries.Count,
-                                ProcessedFiles = processedFiles,
-                                TotalBytes = totalBytes,
-                                ProcessedBytes = processedBytes + entryProcessed,
-                                PercentComplete = overallPct,
-                                FilePercentComplete = filePct
-                            });
-                            lastReportTime = now;
+                                var filePct = entrySize > 0 ? (double)entryProcessed / entrySize * 100 : 100;
+                                var overallPct = totalBytes > 0 ? (double)(processedBytes + entryProcessed) / totalBytes * 100 : 0;
+                                progress?.Report(new ArchiveProgress
+                                {
+                                    CurrentFile = entryKey,
+                                    TotalFiles = filteredEntries.Count,
+                                    ProcessedFiles = processedFiles,
+                                    TotalBytes = totalBytes,
+                                    ProcessedBytes = processedBytes + entryProcessed,
+                                    PercentComplete = overallPct,
+                                    FilePercentComplete = filePct
+                                });
+                                lastReportTime = now;
+                            }
                         }
                     }
+
+                    try { File.SetLastWriteTime(resolvedPath, entryModified); } catch { CoreLog.Trace("ZipEngine.ExtractAsync: failed to set last write time for '{0}'", resolvedPath); }
+
+                    processedBytes += entrySize;
+                    processedFiles++;
                 }
-
-                try { File.SetLastWriteTime(resolvedPath, entryModified); } catch { CoreLog.Trace("ZipEngine.ExtractAsync: failed to set last write time for '{0}'", resolvedPath); }
-
-                processedBytes += entrySize;
-                processedFiles++;
+                catch (OperationCanceledException) { throw; }
+                catch (UnauthorizedAccessException uax)
+                {
+                    CoreLog.Info($"ExtractEntriesAsync: permission denied for '{entryKey}': {uax.Message}");
+                    failedEntries++;
+                }
+                catch (IOException iox)
+                {
+                    // 目标文件被其他进程占用等 IO 失败：跳过该条目继续，避免单个文件中止整个解压
+                    CoreLog.Info($"ExtractEntriesAsync: write failed for '{entryKey}': {iox.Message}");
+                    failedEntries++;
+                }
             }
 
             progress?.Report(new ArchiveProgress
@@ -445,7 +468,7 @@ public class ZipEngine : IArchiveEngine
                 PercentComplete = 100
             });
 
-            CoreLog.Info($"ExtractEntriesAsync: done, {processedFiles} files, {sw.ElapsedMilliseconds}ms");
+            CoreLog.Info($"ExtractEntriesAsync: done, {processedFiles} files, failedEntries={failedEntries}, {sw.ElapsedMilliseconds}ms");
         }, cancellationToken).ConfigureAwait(false);
 
         CoreLog.Exit();
@@ -547,9 +570,17 @@ public class ZipEngine : IArchiveEngine
                     };
 
                     var sourceFilePaths = files.Select(f => f.FullPath).Distinct().ToArray();
-                    if (sourceFilePaths.Length > 0)
+                    // 加密 ZIP 走 SharpSevenZip 单次原生调用，无法逐文件恢复读取错误。
+                    // 调用前预检读权限（被占用/权限 → ErrorResolver 弹窗 重试/跳过/中止），
+                    // 跳过则剔除，避免单个不可读文件导致整个加密压缩直接中止。
+                    var validated = ReadErrorHandler.FilterUnreadableFiles(sourceFilePaths, options, cancellationToken);
+                    if (validated.Count > 0)
                     {
-                        s7zCompressor.CompressFilesEncrypted(outputPath, options.Password ?? "", sourceFilePaths);
+                        s7zCompressor.CompressFilesEncrypted(outputPath, options.Password ?? "", validated.ToArray());
+                    }
+                    else
+                    {
+                        CoreLog.Info("ZipEngine.CompressAsync: all files skipped due to read errors, nothing to compress");
                     }
 
                     // SharpSevenZip 的 Compressing 事件 delta 累积通常达不到 100，

@@ -19,7 +19,7 @@
   
   <a href="https://buy.polar.sh/polar_cl_VaCaW2l2nWkob5CyHe4dOlhL6HrQDK4ueMA9n1JyhNc"><img src="https://img.shields.io/badge/Polar-Sponsor-pink?style=flat-square" alt="Polar Sponsor"></a>
   <a href="https://afdian.com/a/MantisZen"><img src="https://img.shields.io/badge/爱发电-赞助-blue?style=flat-square" alt="爱发电"></a>
-  [![.NET 9](https://img.shields.io/badge/.NET-9.0-purple?style=flat-square)](https://dotnet.microsoft.com/)
+  [![.NET 10](https://img.shields.io/badge/.NET-10.0-purple?style=flat-square)](https://dotnet.microsoft.com/)
 </p>
 
 ----
@@ -28,7 +28,7 @@
 
  ⏱️ 3 秒总览：在压缩包内无缝切换、指哪打哪的极速预览体验
 
-> 免费开源  / 基于 .NET 9 + Avalonia   
+> 免费开源  / 基于 .NET 10 + Avalonia  
 > 🤖 由 [OpenCode](https://opencode.ai) 及 [Reasonix](https://reasonix.io) 辅助开发
 </div>
 
@@ -196,7 +196,8 @@ MantisZip 是一款面向 Windows 的免费开源压缩/解压工具，主打**�
 ## 📋 系统要求
 
 - **操作系统**: Windows 10 (1809+) / Windows 11 （跨平台支持已在计划中）
-- **运行时**: [.NET 9 Runtime](https://dotnet.microsoft.com/download/dotnet/9.0)
+- **运行时**: [.NET 10 Runtime](https://dotnet.microsoft.com/download/dotnet/10.0)
+- **WebView2 Runtime**: HTML/Markdown/SVG/PDF 预览依赖 [WebView2 Runtime](https://developer.microsoft.com/microsoft-edge/webview2/)
 
 ---
 
@@ -207,20 +208,17 @@ MantisZip 是一款面向 Windows 的免费开源压缩/解压工具，主打**�
 git clone https://github.com/mantis3d/MantisZip.git
 cd MantisZip
 
-# 构建 Avalonia 主力版
+# 构建（Avalonia 主力版）
 dotnet build src\MantisZip.UI.Avalonia\MantisZip.UI.Avalonia.csproj
 
 # 运行
 dotnet run --project src\MantisZip.UI.Avalonia\MantisZip.UI.Avalonia.csproj
 
-# 运行 Core 层测试
-dotnet test tests\MantisZip.Tests\MantisZip.Tests.csproj
-
-# 运行 Avalonia 测试
+# 运行测试
 dotnet test tests\MantisZip.UI.Avalonia.Tests\MantisZip.UI.Avalonia.Tests.csproj
 ```
 
-**输出路径**: `src/MantisZip.UI.Avalonia/bin/Debug/net9.0/MantisZip.UI.Avalonia.exe`
+**输出路径**: `src/MantisZip.UI.Avalonia/bin/Debug/net10.0/MantisZip.UI.Avalonia.exe`
 
 ---
 
@@ -305,7 +303,7 @@ MantisZip 的诞生离不开全球开源社区的无私奉献。在此，对本�
 
 本项目在敏捷开发与重构过程中，深度借助了以下先进的 AI 编程智能体，实现了独立开发生产力的跨越式飞跃：
 
-- [OpenCode](https://opencode.ai) 负责底层核心异步架构的搭建与 .NET 9 高级特性重构。
+- [OpenCode](https://opencode.ai) 负责底层核心异步架构的搭建与 .NET 高级特性重构。
 - [Reasonix](https://reasonix.io) 负责核心业务功能（如免解压文件预览、智能密码管理器）的高效开发、深度联调与 Bug 修复。
 - [DeepSeek](https://www.deepseek.com) 全程提供底层硬核编程大语言模型的能力支撑。
 

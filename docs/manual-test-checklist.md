@@ -423,7 +423,7 @@
 
 ## 10. CLI 命令行
 
-**路径**：`src\MantisZip.UI.Avalonia\bin\Debug\net9.0\MantisZip.UI.Avalonia.exe`
+**路径**：`src\MantisZip.UI.Avalonia\bin\Debug\net10.0\MantisZip.UI.Avalonia.exe`
 
 | # | 命令 | 预期结果 | 实际结果 | 状态 |
 |---|---|---|---|---|

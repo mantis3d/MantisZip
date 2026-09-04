@@ -4,7 +4,7 @@
 - **项目名称**: MantisZip
 - **类型**: Windows 压缩/解压软件 (WPF → Avalonia 迁移中)
 - **目标**: 替代 Bandizip 的开源压缩软件
-- **技术栈**: .NET 9 + WPF → Avalonia 迁移中 + SharpCompress + SharpSevenZip
+- **技术栈**: .NET 10 + WPF → Avalonia 迁移中 + SharpCompress + SharpSevenZip
 
 ## 版本
 - **当前版本**: 0.5.0
@@ -24,6 +24,12 @@
 ### MantisZip.UI.Avalonia（主力版）— 里程碑
 
 按月分组，每月按日期从新到旧排列。
+
+#### 2026-09
+
+- **09-04** — 纯图标按钮补齐 ToolTip（31 个按钮全本地化，8 个文件）+ 全局 ToolTip 显示延迟调至 100ms（覆盖默认 400ms）
+- **09-04** — 修复安装包缺失 `Resources\Icons` 格式图标：两个 `.iss`（`installer.iss` + `installer-selfcontained.iss`）`[Files]` 段仅打包 MenuIcons/Cursors，漏掉文件关联格式图标目录（zip/7z/rar/tar/tgz/gz/iso），安装后文件关联图标退化为应用通用图标
+- **09-02** — 修复 ShellExt 复制目标 RID 路径 bug（阻断发布构建：.NET 10 RID 传播使 ShellExt 输出落入 `win-x64` 子目录，publish 报 MSB3030）
 
 #### 2026-08
 
@@ -82,6 +88,9 @@
 
 #### v0.5.0
 
+- **09-04** — 压缩/解压 文件读写错误处理补齐：压缩侧 7z/加密 ZIP 新增 `ReadErrorHandler.FilterUnreadableFiles` 预检（错误弹窗 / 跳过 / 中止，对齐 ErrorResolver）；解压侧三引擎 `ExtractAsync`+`ExtractEntriesAsync` 补 `IOException` 捕获与 per-entry 兜底（被占用条目跳过继续，不再让单个文件中止整个解压）
+- **08-31** — .NET 9 → .NET 10 升级（LTS，支持至 2028-11）：全部 7 个项目 TargetFramework 更新 + 移除废弃 `Avalonia.Diagnostics` 包 + `System.Drawing.Common` 升级至 10.0.8
+- **08-31** — 卸载/更新文件占用修复：`CloseApplications=yes`（Restart Manager 检测用户关闭占用进程）+ `ShellIntegration.Uninstall` 重启 Explorer 释放 comhost.dll 句柄
 - **08-24** — 发布脚本 copy-7z-dll 按 PE 头校验架构：x86 目录不再误拷 64 位 7z.dll（历届安装包均受影响），缺失架构警告跳过 + installer x86 行 skipifsourcedoesntexist
 - **08-19** — 添加到压缩包重名条目冲突处理（AddConflictHelper 条目名级解析）+ 保留浏览目录前缀（entryBasePath）
 - **08-09** — Core 新增 ArchiveCommentReader（ZIP + RAR5 注释统一读取）+ ZIP 注释编码兼容（GBK 回退）

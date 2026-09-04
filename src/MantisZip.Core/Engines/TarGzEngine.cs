@@ -135,6 +135,12 @@ public class TarGzEngine : IArchiveEngine
                         CoreLog.Info($"ExtractAsync: permission denied for '{entryKey}': {uax.Message}");
                         failedEntries++;
                     }
+                    catch (IOException iox)
+                    {
+                        // 目标文件被其他进程占用等 IO 失败：跳过该条目继续，避免单个文件中止整个解压
+                        CoreLog.Info($"ExtractAsync: write failed for '{entryKey}': {iox.Message}");
+                        failedEntries++;
+                    }
                 }
             }
             else if (ext == ".gz")
@@ -155,6 +161,11 @@ public class TarGzEngine : IArchiveEngine
                     catch (UnauthorizedAccessException uax)
                     {
                         CoreLog.Info($"ExtractAsync: permission denied for '{outputPath}': {uax.Message}");
+                        failedEntries = 1;
+                    }
+                    catch (IOException iox)
+                    {
+                        CoreLog.Info($"ExtractAsync: write failed for '{outputPath}': {iox.Message}");
                         failedEntries = 1;
                     }
                 }
@@ -548,6 +559,7 @@ public class TarGzEngine : IArchiveEngine
             var ext = Path.GetExtension(archivePath).ToLowerInvariant();
             var isTarGz = ext == ".tgz" || archivePath.EndsWith(".tar.gz");
             CoreLog.Info($"ExtractEntriesAsync: format=tar.gz={isTarGz}, ext={ext}");
+            int failedEntries = 0;
 
             if (isTarGz || ext == ".tar")
             {
@@ -657,6 +669,13 @@ public class TarGzEngine : IArchiveEngine
                     catch (UnauthorizedAccessException uax)
                     {
                         CoreLog.Info($"ExtractEntriesAsync: permission denied for '{entryKey}': {uax.Message}");
+                        failedEntries++;
+                    }
+                    catch (IOException iox)
+                    {
+                        // 目标文件被其他进程占用等 IO 失败：跳过该条目继续，避免单个文件中止整个解压
+                        CoreLog.Info($"ExtractEntriesAsync: write failed for '{entryKey}': {iox.Message}");
+                        failedEntries++;
                     }
                 }
 
@@ -681,10 +700,23 @@ public class TarGzEngine : IArchiveEngine
                 var resolved = await FileConflictHelper.ResolvePathAsync(outputPath, options);
                 if (resolved != null)
                 {
-                    using var inputStream = File.OpenRead(archivePath);
-                    using var gzipStream = new GZipStream(inputStream, CompressionMode.Decompress);
-                    using var output = File.Create(resolved);
-                    gzipStream.CopyTo(output);
+                    try
+                    {
+                        using var inputStream = File.OpenRead(archivePath);
+                        using var gzipStream = new GZipStream(inputStream, CompressionMode.Decompress);
+                        using var output = File.Create(resolved);
+                        gzipStream.CopyTo(output);
+                    }
+                    catch (UnauthorizedAccessException uax)
+                    {
+                        CoreLog.Info($"ExtractEntriesAsync: permission denied for '{outputPath}': {uax.Message}");
+                        failedEntries++;
+                    }
+                    catch (IOException iox)
+                    {
+                        CoreLog.Info($"ExtractEntriesAsync: write failed for '{outputPath}': {iox.Message}");
+                        failedEntries++;
+                    }
                 }
 
                 progress?.Report(new ArchiveProgress
@@ -694,7 +726,7 @@ public class TarGzEngine : IArchiveEngine
                 });
             }
 
-            CoreLog.Info($"ExtractEntriesAsync: done, {sw.ElapsedMilliseconds}ms");
+            CoreLog.Info($"ExtractEntriesAsync: done, {sw.ElapsedMilliseconds}ms, failedEntries={failedEntries}");
         }, cancellationToken).ConfigureAwait(false);
 
         CoreLog.Exit();

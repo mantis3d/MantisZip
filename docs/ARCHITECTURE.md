@@ -4,7 +4,7 @@
 
 | 决策项 | 选择 | 日期 |
 |--------|------|------|
-| 开发语言 | C# (.NET 9, Windows) | 2026-04-23 |
+| 开发语言 | C# (.NET 10, Windows) | 2026-04-23 |
 | UI 框架 | WPF | 2026-04-23 |
 | 架构模式 | Code-behind（非 MVVM） | 2026-04-23 |
 | 目标用户 | 普通用户 | 2026-04-23 |
@@ -12,7 +12,7 @@
 | 加密 | AES-256 | 2026-04-23 |
 | 界面语言 | 中文（支持英文切换） | 2026-04-23 |
 | 发布形式 | 安装包 + 便携版 | 2026-04-23 |
-| 最低系统 | Windows 10 (1809+) | .NET 9 支持的最低版本 |
+| 最低系统 | Windows 10 (1809+) | .NET 10 支持的最低版本 |
 | 界面风格 | 现代风格，亮色/暗色主题 | 2026-04-23 |
 | 默认压缩级 | 5（平衡） | 2026-04-23 |
 | 预览系统 | 内容检测（魔数）+ 扩展名回退 | 2026-04-23 |
@@ -46,11 +46,11 @@ MantisZip/
 │   │       ├── IsoParser.cs / OfficeParser.cs / TorrentParser.cs  # 文档/映像解析
 │   │       ├── SQLiteParser.cs / SqliteDataReader.cs  # SQLite 解析
 │   │       └── ...（其他格式解析器）
-│   ├── MantisZip.ShellExt/          # COM 组件（.NET 9 comhost，Explorer 右键菜单）
+│   ├── MantisZip.ShellExt/          # COM 组件（.NET 10 comhost，Explorer 右键菜单）
 │   │   ├── ContextMenuHandler.cs    # IShellExtInit + IContextMenu 实现
 │   │   ├── ShellExtLog.cs           # 日志（OutputDebugString）
 │   │   └── NativeMethods.cs         # Win32 P/Invoke
-│   └── MantisZip.UI/                # WPF 桌面应用（net9.0-windows）
+│   └── MantisZip.UI/                # WPF 桌面应用（net10.0-windows）
 │       ├── App.xaml / .cs                   # 应用入口
 │       ├── AppConstants.cs                  # 版本号常量
 │       ├── AppSettings.cs                   # 设置（JSON 持久化）
@@ -141,7 +141,7 @@ MantisZip/
 | 层次 | 技术 |
 |------|------|
 | 语言 | C# 13 |
-| 运行时 | .NET 9 |
+| 运行时 | .NET 10 |
 | UI 框架 | WPF（Windows only） |
 | 压缩引擎 | SharpCompress (ZIP/TAR/GZ) + SharpSevenZip (7z/RAR) |
 | 测试框架 | xUnit + Microsoft.NET.Test.Sdk |
@@ -214,7 +214,7 @@ MantisZip/
 ## 技术说明
 
 ### 中文编码支持
-- .NET 9+ 需要显式注册 GBK 编码：`Encoding.RegisterProvider(CodePagesEncodingProvider.Instance)`
+- .NET 10+ 需要显式注册 GBK 编码：`Encoding.RegisterProvider(CodePagesEncodingProvider.Instance)`
 - SharpCompress 通过 ReaderOptions 按实例设置编码，无全局 `ZipStrings.CodePage`
 
 ### 快速密码验证

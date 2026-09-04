@@ -45,7 +45,7 @@
 - AppSettings 存储到 `%LOCALAPPDATA%\MantisZip\settings.json`
 - 本地化使用 `LocalizationManager.T(key)` 模式，字符串在 `strings.zh-CN.json` / `strings.en.json`
 - 测试项目使用 xUnit，无 mock 库
-- Core 层无 HTTP 客户端使用先例（但 `System.Net.Http` 是 .NET 9 内置）
+- Core 层无 HTTP 客户端使用先例（但 `System.Net.Http` 是 .NET 10 内置）
 
 ### Metis Review
 **Identified Gaps** (addressed):

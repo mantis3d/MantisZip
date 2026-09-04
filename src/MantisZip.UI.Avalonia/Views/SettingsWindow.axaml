@@ -752,6 +752,7 @@
                                                       Background="{DynamicResource ThemeSurfaceBgBrush}"
                                                       Foreground="{DynamicResource ThemeTextSecondaryBrush}"
                                                       BorderBrush="{DynamicResource ThemeBorderBrush}"
+                                                      ToolTip.Tip="{Binding $parent[Window].((vm:SettingsWindowViewModel)DataContext).MetadataMoveUpTooltip}"
                                                       Click="OnPreviewFieldMoveUp">
                                                 <PathIcon Data="{StaticResource IconArrowUp}" Width="10" Height="10" />
                                               </Button>
@@ -760,6 +761,7 @@
                                                       Background="{DynamicResource ThemeSurfaceBgBrush}"
                                                       Foreground="{DynamicResource ThemeTextSecondaryBrush}"
                                                       BorderBrush="{DynamicResource ThemeBorderBrush}"
+                                                      ToolTip.Tip="{Binding $parent[Window].((vm:SettingsWindowViewModel)DataContext).MetadataMoveDownTooltip}"
                                                       Click="OnPreviewFieldMoveDown">
                                                 <PathIcon Data="{StaticResource IconArrowDown}" Width="10" Height="10" />
                                               </Button>
@@ -962,7 +964,8 @@
                           </StackPanel>
                           <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
                             <TextBlock Text="{Binding CurrentHandler}" FontSize="11" Foreground="{DynamicResource ThemeTextSecondaryBrush}" VerticalAlignment="Center" />
-                            <Button Width="28" Height="28" Command="{Binding DeleteCommand}" IsVisible="{Binding IsCustom}" Background="{DynamicResource ThemeButtonBgBrush}" BorderBrush="{DynamicResource ThemeBorderBrush}" Padding="4">
+                            <Button Width="28" Height="28" Command="{Binding DeleteCommand}" IsVisible="{Binding IsCustom}" Background="{DynamicResource ThemeButtonBgBrush}" BorderBrush="{DynamicResource ThemeBorderBrush}" Padding="4"
+                                    ToolTip.Tip="{Binding $parent[Window].((vm:SettingsWindowViewModel)DataContext).AssocDeleteTooltip}">
                                 <PathIcon Data="{StaticResource IconDelete}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
                               </Button>
                           </StackPanel>
@@ -1104,6 +1107,7 @@
                                 IsEnabled="{Binding CanMoveUp}"
                                 Command="{Binding $parent[ItemsControl].((vm:SettingsWindowViewModel)DataContext).MovePathUpCommand}"
                                 CommandParameter="{Binding}"
+                                ToolTip.Tip="{Binding $parent[Window].((vm:SettingsWindowViewModel)DataContext).PathMoveUpTooltip}"
                                 HorizontalAlignment="Center"
                                 VerticalAlignment="Center"
                                 Background="{DynamicResource ThemeButtonBgBrush}"
@@ -1115,6 +1119,7 @@
                                 IsEnabled="{Binding CanMoveDown}"
                                 Command="{Binding $parent[ItemsControl].((vm:SettingsWindowViewModel)DataContext).MovePathDownCommand}"
                                 CommandParameter="{Binding}"
+                                ToolTip.Tip="{Binding $parent[Window].((vm:SettingsWindowViewModel)DataContext).PathMoveDownTooltip}"
                                 HorizontalAlignment="Center"
                                 VerticalAlignment="Center"
                                 Background="{DynamicResource ThemeButtonBgBrush}"

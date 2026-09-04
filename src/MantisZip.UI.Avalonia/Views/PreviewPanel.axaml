@@ -46,15 +46,18 @@
         <StackPanel Orientation="Horizontal" Spacing="2"
                     IsVisible="{Binding HasZoomControls}">
           <Button Command="{Binding ZoomOutCommand}"
-                  Width="32" Height="{DynamicResource ControlHeight}" Padding="0">
+                  Width="32" Height="{DynamicResource ControlHeight}" Padding="0"
+                  ToolTip.Tip="{Binding LocalizedStrings[Preview_Tooltip_ZoomOut]}">
             <PathIcon Data="{StaticResource IconSubtract}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
           </Button>
           <Button Command="{Binding ZoomInCommand}"
-                  Width="32" Height="{DynamicResource ControlHeight}" Padding="0">
+                  Width="32" Height="{DynamicResource ControlHeight}" Padding="0"
+                  ToolTip.Tip="{Binding LocalizedStrings[Preview_Tooltip_ZoomIn]}">
             <PathIcon Data="{StaticResource IconAdd}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
           </Button>
           <Button Command="{Binding ZoomFitCommand}"
-                  Width="32" Height="{DynamicResource ControlHeight}" Padding="0">
+                  Width="32" Height="{DynamicResource ControlHeight}" Padding="0"
+                  ToolTip.Tip="{Binding LocalizedStrings[Preview_Tooltip_ZoomFit]}">
             <PathIcon Data="{StaticResource IconArrowFitIn}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
           </Button>
         </StackPanel>
@@ -63,11 +66,13 @@
         <StackPanel Orientation="Horizontal" Spacing="2"
                     IsVisible="{Binding HasFontSizeControls}">
           <Button Command="{Binding DecreaseFontSizeCommand}"
-                  Width="36" Height="{DynamicResource ControlHeight}" Padding="0">
+                  Width="36" Height="{DynamicResource ControlHeight}" Padding="0"
+                  ToolTip.Tip="{Binding LocalizedStrings[Preview_Tooltip_FontDecrease]}">
             <PathIcon Data="{StaticResource IconFontDecrease}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
           </Button>
           <Button Command="{Binding IncreaseFontSizeCommand}"
-                  Width="36" Height="{DynamicResource ControlHeight}" Padding="0">
+                  Width="36" Height="{DynamicResource ControlHeight}" Padding="0"
+                  ToolTip.Tip="{Binding LocalizedStrings[Preview_Tooltip_FontIncrease]}">
             <PathIcon Data="{StaticResource IconFontIncrease}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
           </Button>
         </StackPanel>
@@ -76,15 +81,18 @@
         <StackPanel Orientation="Horizontal" Spacing="2"
                     IsVisible="{Binding HasAnimationControls}">
           <Button Command="{Binding PreviousGifFrameCommand}"
-                  Width="32" Height="{DynamicResource ControlHeight}" Padding="0">
+                  Width="32" Height="{DynamicResource ControlHeight}" Padding="0"
+                  ToolTip.Tip="{Binding LocalizedStrings[Preview_Tooltip_GifPrev]}">
             <PathIcon Data="{StaticResource IconPrevious}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
           </Button>
           <Button Command="{Binding PlayPauseGifCommand}"
-                  Width="32" Height="{DynamicResource ControlHeight}" Padding="0">
+                  Width="32" Height="{DynamicResource ControlHeight}" Padding="0"
+                  ToolTip.Tip="{Binding LocalizedStrings[Preview_Tooltip_GifPlayPause]}">
             <PathIcon Data="{StaticResource IconPlay}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
           </Button>
           <Button Command="{Binding NextGifFrameCommand}"
-                  Width="32" Height="{DynamicResource ControlHeight}" Padding="0">
+                  Width="32" Height="{DynamicResource ControlHeight}" Padding="0"
+                  ToolTip.Tip="{Binding LocalizedStrings[Preview_Tooltip_GifNext]}">
             <PathIcon Data="{StaticResource IconNext}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
           </Button>
           <TextBox Text="{Binding CurrentFrame}"
@@ -101,11 +109,13 @@
         <StackPanel Orientation="Horizontal" Spacing="2"
                     IsVisible="{Binding HasTransparencyControls}">
           <Button Width="32" Height="{DynamicResource ControlHeight}" Padding="0"
-                  Command="{Binding ToggleTransparencyBgCommand}">
+                  Command="{Binding ToggleTransparencyBgCommand}"
+                  ToolTip.Tip="{Binding LocalizedStrings[Preview_Tooltip_TransparencyBg]}">
             <PathIcon Data="{StaticResource IconGrid}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
           </Button>
           <Button Width="32" Height="{DynamicResource ControlHeight}" Padding="0"
                   Command="{Binding ToggleFlattenAlphaCommand}"
+                  ToolTip.Tip="{Binding LocalizedStrings[Preview_Tooltip_FlattenAlpha]}"
                   IsVisible="{Binding HasFlattenAlphaControls}">
             <PathIcon Data="{StaticResource IconPaintBrush}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
           </Button>
@@ -115,7 +125,8 @@
         <StackPanel Orientation="Horizontal" Spacing="2"
                     IsVisible="{Binding IsIcoGalleryVisible}">
           <Button Width="32" Height="{DynamicResource ControlHeight}" Padding="0"
-                  Command="{Binding ToggleIcoFlattenAlphaCommand}">
+                  Command="{Binding ToggleIcoFlattenAlphaCommand}"
+                  ToolTip.Tip="{Binding LocalizedStrings[Preview_Tooltip_IcoFlattenAlpha]}">
             <PathIcon Data="{StaticResource IconPaintBrush}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
           </Button>
         </StackPanel>
@@ -487,14 +498,16 @@
                         HorizontalAlignment="Center" Spacing="{DynamicResource SpacingXs}"
                         IsVisible="{Binding HasPptxNavigation}">
               <Button Content="◀" Command="{Binding PptxPreviousSlideCommand}"
-                      Width="28" Height="26" FontSize="14" Padding="0" />
+                      Width="28" Height="26" FontSize="14" Padding="0"
+                      ToolTip.Tip="{Binding LocalizedStrings[Preview_Tooltip_PptxPrev]}" />
               <TextBlock Text="{Binding PptxCurrentSlide}"
                          VerticalAlignment="Center" />
               <TextBlock Text="/" VerticalAlignment="Center" />
               <TextBlock Text="{Binding PptxTotalSlides}"
                          VerticalAlignment="Center" />
               <Button Content="▶" Command="{Binding PptxNextSlideCommand}"
-                      Width="28" Height="26" FontSize="14" Padding="0" />
+                      Width="28" Height="26" FontSize="14" Padding="0"
+                      ToolTip.Tip="{Binding LocalizedStrings[Preview_Tooltip_PptxNext]}" />
             </StackPanel>
             <!-- 幻灯片 Canvas（固定宽高，超出滚动） -->
             <ScrollViewer Grid.Row="1"
@@ -548,7 +561,8 @@
                         HorizontalAlignment="Center" Spacing="{DynamicResource SpacingXs}"
                         IsVisible="{Binding HasPdfNavigation}">
               <Button Content="◀" Command="{Binding PdfPreviousPageCommand}"
-                      Width="28" Height="26" FontSize="14" Padding="0" />
+                      Width="28" Height="26" FontSize="14" Padding="0"
+                      ToolTip.Tip="{Binding LocalizedStrings[Preview_Tooltip_PdfPrev]}" />
               <TextBox Text="{Binding PdfCurrentPage}"
                        Width="50" Height="26"
                        HorizontalContentAlignment="Center"
@@ -556,7 +570,8 @@
               <TextBlock Text="{Binding PdfPageInfo}"
                          VerticalAlignment="Center" />
               <Button Content="▶" Command="{Binding PdfNextPageCommand}"
-                      Width="28" Height="26" FontSize="14" Padding="0" />
+                      Width="28" Height="26" FontSize="14" Padding="0"
+                      ToolTip.Tip="{Binding LocalizedStrings[Preview_Tooltip_PdfNext]}" />
             </StackPanel>
             <!-- PDF 页内容（缩放联动 ImagePreview 的 ScrollViewer） -->
             <ScrollViewer Grid.Row="1"

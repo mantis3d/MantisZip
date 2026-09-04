@@ -67,6 +67,7 @@
               Width="32"
               MinHeight="{DynamicResource ControlHeightSm}"
               Click="SystemBrowse_Click"
+              ToolTip.Tip="{Binding BrowseSystemTooltip}"
               Background="{DynamicResource ThemeButtonBgBrush}"
               Foreground="{DynamicResource ThemeTextPrimaryBrush}"
               BorderBrush="{DynamicResource ThemeBorderBrush}">

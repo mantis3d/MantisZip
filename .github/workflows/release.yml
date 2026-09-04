@@ -15,10 +15,10 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - name: Setup .NET 9
+      - name: Setup .NET 10
         uses: actions/setup-dotnet@v5
         with:
-          dotnet-version: 9.0.x
+          dotnet-version: 10.0.x
 
       - name: Install 7-Zip (for 7z.dll bundling)
         run: choco install 7zip --no-progress -y
@@ -133,8 +133,8 @@ jobs:
         shell: pwsh
         run: |
           # 便携版打包（两个变体：自包含 + framework-dependent）
-          # 自包含：捆绑 .NET 9 运行时，开箱即用（体积大）
-          # framework-dependent：需系统预装 .NET 9 Runtime（体积小）
+          # 自包含：捆绑 .NET 10 运行时，开箱即用（体积大）
+          # framework-dependent：需系统预装 .NET 10 Runtime（体积小）
           # 用 7z 打包（CI 已装 7-Zip）：保持目录结构 + 排除调试符号（*.pdb，
           # 运行时不需要，且第三方原生库符号 libSkiaSharp.pdb 等达 100MB+）
           $sevenZipExe = "$env:ProgramFiles\7-Zip\7z.exe"

@@ -1,4 +1,11 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Threading.Tasks;
+using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Threading;
 using MantisZip.Core.Abstractions;
 using MantisZip.Core.Services;
@@ -79,7 +86,67 @@ public static class CompressFlow
             SevenZipNumFastBytes = vm.SevenZipNumFastBytes,
             SevenZipMatchFinder = vm.SevenZipMatchFinder,
             SevenZipEncryptHeaders = vm.SevenZipEncryptHeaders,
+            // 源文件读取错误（被占用等）→ 弹 ErrorDialog（重试/跳过/中止），补上 Avalonia 迁移时遗漏的接线
+            ErrorResolver = CreateErrorResolver(),
         };
+    }
+
+    /// <summary>
+    /// 创建源文件读取错误 resolver（文件被占用等）。
+    /// 引擎在后台线程调用（重试耗尽后），本方法将其封送回 UI 线程弹 <see cref="ErrorDialog"/>
+    /// 让用户选择 重试/跳过/中止，并统一「ApplyToAll 记忆」逻辑（对齐 WPF App.CreateCompressOptions）。
+    /// 返回 Abort 时引擎重抛异常使整个压缩失败；Skip 跳过该文件继续；Retry 重新尝试读取。
+    /// </summary>
+    public static Func<FileErrorInfo, FileErrorAction> CreateErrorResolver()
+    {
+        bool applyToAll = false;
+        FileErrorAction? chosenAction = null;
+
+        return info =>
+        {
+            // 已勾选"应用到全部" → 直接返回记忆的选择
+            if (applyToAll && chosenAction.HasValue)
+                return chosenAction.Value;
+
+            // 封送回 UI 线程弹窗并阻塞等待用户选择（错误回调在后台线程，无 UI 死锁风险）
+            var result = Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                var dlg = new ErrorDialog(info);
+                dlg.ShowDialog(ResolveOwnerWindow()).GetAwaiter().GetResult();
+                return (Action: dlg.ResultAction, All: dlg.ApplyToAll);
+            }).Result;
+
+            if (result.All)
+            {
+                applyToAll = true;
+                chosenAction = result.Action;
+            }
+
+            return result.Action;
+        };
+    }
+
+    /// <summary>
+    /// 解析错误/冲突对话框的 Owner 窗口：优先当前活跃窗口，否则回退到主窗口。
+    /// 避免弹窗出现在主窗口之后。
+    /// </summary>
+    private static Window? ResolveOwnerWindow()
+    {
+        try
+        {
+            if (Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
+            {
+                return desktop.Windows
+                    .OfType<Window>()
+                    .FirstOrDefault(w => w.IsActive)
+                    ?? desktop.MainWindow;
+            }
+            return null;
+        }
+        catch
+        {
+            return null;
+        }
     }
 
     /// <summary>

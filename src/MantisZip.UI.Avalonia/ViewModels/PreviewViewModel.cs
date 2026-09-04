@@ -68,6 +68,21 @@ public partial class PreviewViewModel : ObservableObject
         LocalizedStrings["Preview_Ligature"] = LocalizationManager.T("Preview_Ligature");
         LocalizedStrings["Preview_FileListLabel"] = LocalizationManager.T("Preview_FileListLabel");
         LocalizedStrings["Preview_OutlineLabel"] = LocalizationManager.T("Preview_OutlineLabel");
+        LocalizedStrings["Preview_Tooltip_ZoomOut"] = LocalizationManager.T("Preview_Tooltip_ZoomOut");
+        LocalizedStrings["Preview_Tooltip_ZoomIn"] = LocalizationManager.T("Preview_Tooltip_ZoomIn");
+        LocalizedStrings["Preview_Tooltip_ZoomFit"] = LocalizationManager.T("Preview_Tooltip_ZoomFit");
+        LocalizedStrings["Preview_Tooltip_FontDecrease"] = LocalizationManager.T("Preview_Tooltip_FontDecrease");
+        LocalizedStrings["Preview_Tooltip_FontIncrease"] = LocalizationManager.T("Preview_Tooltip_FontIncrease");
+        LocalizedStrings["Preview_Tooltip_GifPrev"] = LocalizationManager.T("Preview_Tooltip_GifPrev");
+        LocalizedStrings["Preview_Tooltip_GifPlayPause"] = LocalizationManager.T("Preview_Tooltip_GifPlayPause");
+        LocalizedStrings["Preview_Tooltip_GifNext"] = LocalizationManager.T("Preview_Tooltip_GifNext");
+        LocalizedStrings["Preview_Tooltip_TransparencyBg"] = LocalizationManager.T("Preview_Tooltip_TransparencyBg");
+        LocalizedStrings["Preview_Tooltip_FlattenAlpha"] = LocalizationManager.T("Preview_Tooltip_FlattenAlpha");
+        LocalizedStrings["Preview_Tooltip_IcoFlattenAlpha"] = LocalizationManager.T("Preview_Tooltip_IcoFlattenAlpha");
+        LocalizedStrings["Preview_Tooltip_PptxPrev"] = LocalizationManager.T("Preview_Tooltip_PptxPrev");
+        LocalizedStrings["Preview_Tooltip_PptxNext"] = LocalizationManager.T("Preview_Tooltip_PptxNext");
+        LocalizedStrings["Preview_Tooltip_PdfPrev"] = LocalizationManager.T("Preview_Tooltip_PdfPrev");
+        LocalizedStrings["Preview_Tooltip_PdfNext"] = LocalizationManager.T("Preview_Tooltip_PdfNext");
         OnPropertyChanged(nameof(LocalizedStrings));
         OnPropertyChanged(nameof(LoadingFileDisplay));
     }

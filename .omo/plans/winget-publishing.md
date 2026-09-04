@@ -29,10 +29,10 @@ winget 提交需要选一个安装程序 URL。MantisZip 有两个版本：
 
 | 版本 | 文件 | 优点 | 缺点 |
 |------|------|------|------|
-| **WebSetup（框架依赖）** | `MantisZip-{version}-Setup-WebSetup.exe` | 体积小 (~3MB) | 需安装 .NET 9 Runtime + WebView2 —— 静默安装链可能超时 |
-| **Offline（自包含）** 🔸 | `MantisZip-{version}-Setup-Offline.exe` | 自带 .NET 9，不依赖额外运行时下载 | 体积大 (~60MB) |
+| **WebSetup（框架依赖）** | `MantisZip-{version}-Setup-WebSetup.exe` | 体积小 (~3MB) | 需安装 .NET 10 Runtime + WebView2 —— 静默安装链可能超时 |
+| **Offline（自包含）** 🔸 | `MantisZip-{version}-Setup-Offline.exe` | 自带 .NET 10，不依赖额外运行时下载 | 体积大 (~60MB) |
 
-**推荐用 Offline（自包含）版本**，因为 winget 验证环境不一定有 .NET 9 Runtime，自包含版通过率更高。
+**推荐用 Offline（自包含）版本**，因为 winget 验证环境不一定有 .NET 10 Runtime，自包含版通过率更高。
 
 ## 任务清单
 

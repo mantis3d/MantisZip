@@ -9,7 +9,7 @@
 - 新增 `ProgressDisplayCalculator` 将显示计算逻辑抽到 Core 层，WPF/Avalonia 共享
 - UI 层仅做 XAML 布局调整和控件赋值（最薄的一层）
 
-**Tech Stack:** .NET 9, WPF, SharpCompress, SharpSevenZip
+**Tech Stack:** .NET 10, WPF, SharpCompress, SharpSevenZip
 
 ---
 

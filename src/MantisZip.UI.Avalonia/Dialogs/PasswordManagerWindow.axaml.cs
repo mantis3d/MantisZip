@@ -43,6 +43,7 @@ public partial class PasswordManagerWindow : Window
     public string CancelText => LocalizationManager.T("PasswordManager_Cancel");
     public string TipText => LocalizationManager.T("PasswordManager_Tip");
     public string HelpTooltip => LocalizationManager.T("PasswordManager_HelpTooltip");
+    public string EditRevealTooltip => LocalizationManager.T("PasswordManager_EditRevealTooltip");
 
     public PasswordManagerWindow()
     {

@@ -22,7 +22,7 @@ ShowHtmlPreview(filePath)
 
 **Why not pure WebView:** 跨平台（macOS 用 WKWebView，Linux 用 WPE WebKit，Windows 用 WebView2），无外部运行时强制依赖。
 
-**Tech Stack:** .NET 9, Avalonia 12.0.4, Avalonia.Controls.WebView 12.0.1, ReverseMarkdown 4.7.0, Markdig 0.40.0
+**Tech Stack:** .NET 10, Avalonia 12.0.4, Avalonia.Controls.WebView 12.0.1, ReverseMarkdown 4.7.0, Markdig 0.40.0
 
 **新增依赖：**
 | 包 | 版本 | 用途 | 许可证 |

@@ -1835,6 +1835,8 @@ public partial class App : Application
             CompressionLevel = settings.DefaultLevel,
             OutputPath = outputPath,
             PreserveDirectoryRoot = true,
+            // 源文件读取错误（被占用等）→ 弹 ErrorDialog（重试/跳过/中止）
+            ErrorResolver = CompressFlow.CreateErrorResolver(),
         };
 
         _ = CompressWithProgress(request, LocalizationManager.T("Cli_QuickCompress"), desktop);
@@ -1920,6 +1922,8 @@ public partial class App : Application
             CompressionLevel = settings.DefaultLevel,
             KeepOriginalExtension = false,
             PreserveDirectoryRoot = true,
+            // 源文件读取错误（被占用等）→ 弹 ErrorDialog（重试/跳过/中止）
+            ErrorResolver = CompressFlow.CreateErrorResolver(),
         };
 
         // 标题用批处理专用标题（InitBatchMode 不再覆盖标题，由调用方传入）
@@ -2017,6 +2021,8 @@ public partial class App : Application
             CompressionLevel = settings.DefaultLevel,
             OutputPath = outputPath,
             PreserveDirectoryRoot = true,
+            // 源文件读取错误（被占用等）→ 弹 ErrorDialog（重试/跳过/中止）
+            ErrorResolver = CompressFlow.CreateErrorResolver(),
         };
 
         await CompressWithProgress(request, LocalizationManager.T("Cli_CombinedCompress"), desktop);

@@ -45,6 +45,8 @@ public partial class ProgressViewModel : ObservableObject
             ["Progress_Paused"] = LocalizationManager.T("Progress_Paused"),
             ["Progress_Resuming"] = LocalizationManager.T("Progress_Resuming"),
             ["MsgBox_Cancel"] = LocalizationManager.T("MsgBox_Cancel"),
+            ["Progress_RevealTooltip"] = LocalizationManager.T("Progress_RevealTooltip"),
+            ["Progress_CopyTooltip"] = LocalizationManager.T("Progress_CopyTooltip"),
         };
     }
 

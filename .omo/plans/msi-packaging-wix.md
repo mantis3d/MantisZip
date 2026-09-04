@@ -143,7 +143,7 @@ MantisZip 在首次启动时通过 `ShellIntegration.Install()` 注册右键菜�
 
 ### 3. .NET 运行时依赖
 
-当前使用 `--self-contained false`（依赖系统已安装的 .NET 9 Runtime）。如需离线安装：
+当前使用 `--self-contained false`（依赖系统已安装的 .NET 10 Runtime）。如需离线安装：
 
 ```powershell
 dotnet publish -c Release -o publish_output --self-contained true
@@ -172,7 +172,7 @@ msiexec /i MantisZip-0.2.7.msi /log install.log
 
 ## 可选增强：WiX Bundle（自动装 .NET）
 
-创建一个 `.wixproj` Bundle 项目，用 `ExePackage` 引导 .NET 9 Runtime 安装：
+创建一个 `.wixproj` Bundle 项目，用 `ExePackage` 引导 .NET 10 Runtime 安装：
 
 ```xml
 <Bundle Name="MantisZip" Version="0.2.7" ...>
@@ -194,7 +194,7 @@ MantisZip.ShellExt 包含两个关键文件需纳入 MSI：
 | 文件 | 说明 |
 |------|------|
 | `MantisZip.ShellExt.dll` | COM 类库（含 `ContextMenuHandler` COM 类） |
-| `MantisZip.ShellExt.comhost.dll` | .NET 9 生成的 COM host DLL（注册入口） |
+| `MantisZip.ShellExt.comhost.dll` | .NET 10 生成的 COM host DLL（注册入口） |
 
 MSI 需：
 1. 将上述两个文件部署到 `INSTALLDIR`
@@ -223,7 +223,7 @@ MSI 需：
 | 企业分发 | ❌ | ✅ |
 | 学习曲线 | 低 | 中 |
 | 社区生态 | 活跃 | 活跃（Microsoft 维护） |
-| 与 .NET 9 兼容性 | ✅ 无问题 | ✅ 无问题 |
+| 与 .NET 10 兼容性 | ✅ 无问题 | ✅ 无问题 |
 
 ---
 
