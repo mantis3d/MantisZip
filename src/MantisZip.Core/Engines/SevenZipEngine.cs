@@ -564,6 +564,9 @@ public class SevenZipEngine : IArchiveEngine
                 ? new SharpSevenZipExtractor(archivePath)
                 : new SharpSevenZipExtractor(archivePath, password);
 
+            // 预先确定格式，供 lambda 中使用
+            var format = ArchiveEngineFactory.GetFormatByExtension(archivePath);
+
             var items = extractor.ArchiveFileData
                 .Where(entry =>
                 {
@@ -575,6 +578,9 @@ public class SevenZipEngine : IArchiveEngine
                     string fileName = ArchivePath.Normalize(entry.FileName);
                     bool isDir = entry.IsDirectory;
 
+                    // ISO 格式不支持加密，entry.Encrypted 可能误报（如加密分区），强制置 false
+                    bool isEncrypted = isDir ? false : (entry.Encrypted && format != ArchiveFormat.Iso);
+
                     return new ArchiveItem
                     {
                         Name = fileName,
@@ -583,7 +589,7 @@ public class SevenZipEngine : IArchiveEngine
                         CompressedSize = 0, // SharpSevenZip 不提供逐项压缩后大小
                         LastModified = entry.LastWriteTime,
                         IsDirectory = isDir,
-                        IsEncrypted = entry.Encrypted,
+                        IsEncrypted = isEncrypted,
                         Crc32 = isDir ? 0 : (int)entry.Crc,
                     };
                 })

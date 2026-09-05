@@ -160,9 +160,23 @@ public partial class MainWindowViewModel : ObservableObject
     public Func<string, Task<bool>>? ShowOpenFolderDialog { get; set; }
 
     /// <summary>
-    /// 会话密码缓存：压缩包路径 → 密码（仅内存，不持久化）。
+    /// 会话密码缓存：压缩包路径|格式 → 密码（仅内存，不持久化）。
+    /// Key 格式: "{path}|{format}"，防止同名不同格式压缩包（如 test.zip / test.7z）密码冲突。
     /// </summary>
     private readonly Dictionary<string, string> _sessionPasswords = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// 生成会话密码缓存键（路径 + 格式）。
+    /// </summary>
+    private static string GetSessionPasswordKey(string path, ArchiveFormat format)
+        => $"{path}|{format}";
+
+    /// <summary>
+    /// 从路径获取会话密码缓存键（自动推断格式）。
+    /// </summary>
+    private string GetSessionPasswordKey(string path)
+        => GetSessionPasswordKey(path, ArchiveFormatHelper.GetFormat(path));
+
     private readonly PasswordService _passwordService = new();
     private readonly AppSettings _appSettings = AppSettings.Load();
     private string? _currentPassword;
@@ -356,7 +370,7 @@ public partial class MainWindowViewModel : ObservableObject
     /// </summary>
     public string? GetSessionPassword(string archivePath)
     {
-        _sessionPasswords.TryGetValue(archivePath, out var pwd);
+        _sessionPasswords.TryGetValue(GetSessionPasswordKey(archivePath), out var pwd);
         return pwd;
     }
 
@@ -842,7 +856,9 @@ public partial class MainWindowViewModel : ObservableObject
         {
             // Check session password cache first
             string? password = null;
-            if (_sessionPasswords.TryGetValue(path, out var cachedPwd))
+            var formatForCache = ArchiveFormatHelper.GetFormat(path);
+            var cacheKey = GetSessionPasswordKey(path, formatForCache);
+            if (_sessionPasswords.TryGetValue(cacheKey, out var cachedPwd))
                 password = cachedPwd;
 
             var result = await _archiveService.LoadArchiveAsync(path, password);
@@ -856,7 +872,7 @@ public partial class MainWindowViewModel : ObservableObject
                 && result.RawItems?.Any(i => i.IsEncrypted) == true
                 && !_passwordService.QuickVerifyPassword(path, password, engine))
             {
-                _sessionPasswords.Remove(path);
+                _sessionPasswords.Remove(cacheKey);
                 password = null;
                 result = await _archiveService.LoadArchiveAsync(path, null);
             }
@@ -876,7 +892,7 @@ public partial class MainWindowViewModel : ObservableObject
                 if (password != null)
                 {
                     // 会话缓存密码已在上方通过 QuickVerify → 直接视为已匹配
-                    _sessionPasswords[path] = password;
+                    _sessionPasswords[cacheKey] = password;
                     _currentPassword = password;
                     var cachedEntry = FindSavedPasswordEntry(path, password);
                     _currentPasswordDescription = cachedEntry?.Description;
@@ -896,7 +912,7 @@ public partial class MainWindowViewModel : ObservableObject
                                 result = await _archiveService.LoadArchiveAsync(path, password);
                             if (!result.IsPasswordRequired)
                             {
-                                _sessionPasswords[path] = password;
+                                _sessionPasswords[cacheKey] = password;
                                 _currentPassword = password;
                                 var savedEntry = FindSavedPasswordEntry(path, password);
                                 _currentPasswordDescription = savedEntry?.Description;
@@ -935,7 +951,7 @@ public partial class MainWindowViewModel : ObservableObject
                         if (!result.IsPasswordRequired)
                         {
                             // Success
-                            _sessionPasswords[path] = password;
+                            _sessionPasswords[cacheKey] = password;
                             _currentPassword = password;
                             // 会话级记录描述/规则，供工具栏「查看已匹配密码」对话框展示
                             _currentPasswordDescription = dialogResponse.Description;
@@ -1211,7 +1227,7 @@ public partial class MainWindowViewModel : ObservableObject
             return;
         }
 
-        _sessionPasswords[CurrentArchivePath] = response.Password;
+        _sessionPasswords[GetSessionPasswordKey(CurrentArchivePath, _currentFormat)] = response.Password;
         _currentPassword = response.Password;
         _currentPasswordDescription = response.Description;
         _currentPasswordPatterns = response.Patterns is { Count: > 0 } ? response.Patterns.ToList() : null;
@@ -1261,7 +1277,7 @@ public partial class MainWindowViewModel : ObservableObject
             {
                 try
                 {
-                    _sessionPasswords.TryGetValue(CurrentArchivePath, out var pwd);
+                    _sessionPasswords.TryGetValue(GetSessionPasswordKey(CurrentArchivePath, _currentFormat), out var pwd);
                     var (magicType, format, displayName) = await PreviewService.ClassifyPreviewByMagicAsync(
                         CurrentArchivePath, entry, _currentFormat,
                         PreviewService.PreviewHeadSize, pwd);
@@ -2137,7 +2153,7 @@ public partial class MainWindowViewModel : ObservableObject
 
         if (RunWithProgress == null) return;
 
-        _sessionPasswords.TryGetValue(CurrentArchivePath, out var password);
+        _sessionPasswords.TryGetValue(GetSessionPasswordKey(CurrentArchivePath, _currentFormat), out var password);
         var filteredKeys = vm.FilteredEntryKeys;
 
         var completed = await RunWithProgress(
@@ -2169,7 +2185,7 @@ public partial class MainWindowViewModel : ObservableObject
         var dest = Path.GetDirectoryName(CurrentArchivePath)
                    ?? Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
 
-        _sessionPasswords.TryGetValue(CurrentArchivePath, out var password);
+        _sessionPasswords.TryGetValue(GetSessionPasswordKey(CurrentArchivePath, _currentFormat), out var password);
 
         var completed = await RunWithProgress(
             LocalizationManager.T("Status_Extracting"),
@@ -2198,7 +2214,7 @@ public partial class MainWindowViewModel : ObservableObject
         var folderName = Path.GetFileNameWithoutExtension(CurrentArchivePath);
         var dest = Path.Combine(parentDir, folderName);
 
-        _sessionPasswords.TryGetValue(CurrentArchivePath, out var password);
+        _sessionPasswords.TryGetValue(GetSessionPasswordKey(CurrentArchivePath, _currentFormat), out var password);
 
         var completed = await RunWithProgress(
             LocalizationManager.T("Status_Extracting"),
@@ -2268,7 +2284,7 @@ public partial class MainWindowViewModel : ObservableObject
     {
         if (CurrentArchivePath == null) return;
 
-        _sessionPasswords.TryGetValue(CurrentArchivePath, out var password);
+        _sessionPasswords.TryGetValue(GetSessionPasswordKey(CurrentArchivePath, _currentFormat), out var password);
 
         var settings = AppSettings.Load();
 
@@ -2548,7 +2564,7 @@ public partial class MainWindowViewModel : ObservableObject
         var result = await ShowExtractSettingsDialog(vm);
         if (result != true) return;
 
-        _sessionPasswords.TryGetValue(CurrentArchivePath, out var password);
+        _sessionPasswords.TryGetValue(GetSessionPasswordKey(CurrentArchivePath, _currentFormat), out var password);
         if (RunWithProgress == null) return;
 
         var completed = await RunWithProgress(
@@ -2578,7 +2594,7 @@ public partial class MainWindowViewModel : ObservableObject
             ? parentDir
             : Path.Combine(parentDir, Path.GetFileNameWithoutExtension(CurrentArchivePath));
 
-        _sessionPasswords.TryGetValue(CurrentArchivePath, out var password);
+        _sessionPasswords.TryGetValue(GetSessionPasswordKey(CurrentArchivePath, _currentFormat), out var password);
 
         var completed = await RunWithProgress(
             LocalizationManager.T("Status_SmartExtracting"),
@@ -2602,7 +2618,7 @@ public partial class MainWindowViewModel : ObservableObject
     {
         if (CurrentArchivePath == null || RunWithProgress == null) return;
 
-        _sessionPasswords.TryGetValue(CurrentArchivePath, out var password);
+        _sessionPasswords.TryGetValue(GetSessionPasswordKey(CurrentArchivePath, _currentFormat), out var password);
 
         var engine = ArchiveEngineFactory.GetEngineByExtension(CurrentArchivePath);
         if (engine == null) return;
@@ -2682,7 +2698,7 @@ public partial class MainWindowViewModel : ObservableObject
         var engine = ArchiveEngineFactory.GetEngineByExtension(CurrentArchivePath);
         if (engine == null) return false;
 
-        _sessionPasswords.TryGetValue(CurrentArchivePath, out var password);
+        _sessionPasswords.TryGetValue(GetSessionPasswordKey(CurrentArchivePath, _currentFormat), out var password);
 
         var completed = await RunWithProgress(
             LocalizationManager.T("Status_AddingFiles"),
@@ -2720,7 +2736,7 @@ public partial class MainWindowViewModel : ObservableObject
         var engine = ArchiveEngineFactory.GetEngineByExtension(CurrentArchivePath);
         if (engine == null) return;
 
-        _sessionPasswords.TryGetValue(CurrentArchivePath, out var password);
+        _sessionPasswords.TryGetValue(GetSessionPasswordKey(CurrentArchivePath, _currentFormat), out var password);
 
         var completed = await RunWithProgress(
             LocalizationManager.T("Status_DeletingFiles"),

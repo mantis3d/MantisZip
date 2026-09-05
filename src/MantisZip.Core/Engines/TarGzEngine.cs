@@ -25,6 +25,8 @@ public class TarGzEngine : IArchiveEngine
     public async Task<ExtractResult> ExtractAsync(string archivePath, string destinationPath, string? password = null, IProgress<ArchiveProgress>? progress = null, CancellationToken cancellationToken = default, ArchiveOptions? options = null)
     {
         CoreLog.Entry();
+        if (!string.IsNullOrEmpty(password))
+            CoreLog.Info($"WARN: TarGzEngine.ExtractAsync: password provided but TAR/GZ format does not support encryption (archive: {archivePath})");
         CoreLog.Info($"ExtractAsync: {archivePath} -> {destinationPath}");
         var sw = Stopwatch.StartNew();
 
@@ -334,6 +336,8 @@ public class TarGzEngine : IArchiveEngine
     public async Task<IReadOnlyList<ArchiveItem>> ListEntriesAsync(string archivePath, string? password = null, CancellationToken cancellationToken = default)
     {
         CoreLog.Entry();
+        if (!string.IsNullOrEmpty(password))
+            CoreLog.Info($"WARN: TarGzEngine.ListEntriesAsync: password provided but TAR/GZ format does not support encryption (archive: {archivePath})");
         CoreLog.Info($"ListEntriesAsync: {archivePath}");
         var sw = Stopwatch.StartNew();
 
@@ -396,6 +400,8 @@ public class TarGzEngine : IArchiveEngine
     public async Task DeleteEntriesAsync(string archivePath, string[] entryPaths, string? password = null, IProgress<ArchiveProgress>? progress = null, CancellationToken cancellationToken = default)
     {
         CoreLog.Entry();
+        if (!string.IsNullOrEmpty(password))
+            CoreLog.Info($"WARN: TarGzEngine.DeleteEntriesAsync: password provided but TAR/GZ format does not support encryption (archive: {archivePath})");
         CoreLog.Info($"DeleteEntriesAsync: {archivePath} — NotSupportedException");
         try
         {
@@ -413,6 +419,8 @@ public class TarGzEngine : IArchiveEngine
     public async Task AddToArchiveAsync(string archivePath, string[] sourcePaths, ArchiveOptions options, IProgress<ArchiveProgress>? progress = null, CancellationToken cancellationToken = default, string? entryBasePath = null)
     {
         CoreLog.Entry();
+        if (!string.IsNullOrEmpty(options.Password))
+            CoreLog.Info($"WARN: TarGzEngine.AddToArchiveAsync: password provided but TAR/GZ format does not support encryption (archive: {archivePath})");
         CoreLog.Info($"AddToArchiveAsync: {archivePath} — NotSupportedException");
         try
         {
@@ -430,6 +438,8 @@ public class TarGzEngine : IArchiveEngine
     public async Task<bool> TestArchiveAsync(string archivePath, string? password = null, IProgress<ArchiveProgress>? progress = null, CancellationToken cancellationToken = default)
     {
         CoreLog.Entry();
+        if (!string.IsNullOrEmpty(password))
+            CoreLog.Info($"WARN: TarGzEngine.TestArchiveAsync: password provided but TAR/GZ format does not support encryption (archive: {archivePath})");
         CoreLog.Info($"TestArchiveAsync: {archivePath}");
 
         try
@@ -547,6 +557,8 @@ public class TarGzEngine : IArchiveEngine
         // TAR/GZ 为顺序流式格式，通过单次扫描匹配目标条目实现按条目提取
         // （不需要重新打开压缩包，与 ArchiveEntryExtractor.ExtractTarGzEntry 同思路）
         CoreLog.Entry();
+        if (!string.IsNullOrEmpty(password))
+            CoreLog.Info($"WARN: TarGzEngine.ExtractEntriesAsync: password provided but TAR/GZ format does not support encryption (archive: {archivePath})");
         CoreLog.Info($"ExtractEntriesAsync: {archivePath}, {entryKeys.Count} entries -> {destinationPath}");
         var sw = Stopwatch.StartNew();
 
