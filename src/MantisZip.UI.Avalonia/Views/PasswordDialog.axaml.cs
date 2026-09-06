@@ -25,6 +25,7 @@ public partial class PasswordDialog : Window
     public string DescriptionWatermark => LocalizationManager.T("Password_DescriptionWatermark");
     public string MatchRulesLabelText => LocalizationManager.T("Password_MatchRulesLabel");
     public string MatchRulesWatermark => LocalizationManager.T("Password_MatchRulesWatermark");
+    public string AutoGenerateRulesText => LocalizationManager.T("Compress_Pwd_AutoRules");
     public string NewPasswordOptionText => LocalizationManager.T("Password_NewPasswordOption");
     public string OkText => LocalizationManager.T("Password_Ok");
     public string CancelText => LocalizationManager.T("Password_Cancel");
@@ -108,6 +109,29 @@ public partial class PasswordDialog : Window
     private void OnRememberChanged(object? sender, RoutedEventArgs e)
     {
         // 「保存到密码库」与「记住会话中」完全独立——取消会话记忆不影响持久化保存
+    }
+
+    private void OnSavePermanentlyChanged(object? sender, RoutedEventArgs e)
+    {
+        if (SavePermanentlyCheck.IsChecked == true && AutoGenerateRulesCheck.IsChecked == true)
+            RefreshAutoRules();
+        else if (SavePermanentlyCheck.IsChecked != true)
+            PatternsTextBox.Text = "";
+    }
+
+    private void OnAutoGenerateRulesChanged(object? sender, RoutedEventArgs e)
+    {
+        if (AutoGenerateRulesCheck.IsChecked == true && SavePermanentlyCheck.IsChecked == true)
+            RefreshAutoRules();
+        PatternsTextBox.IsReadOnly = AutoGenerateRulesCheck.IsChecked == true;
+    }
+
+    private void RefreshAutoRules()
+    {
+        if (string.IsNullOrEmpty(FileName)) return;
+        var nameWithoutExt = Path.GetFileNameWithoutExtension(FileName);
+        if (!string.IsNullOrEmpty(nameWithoutExt))
+            PatternsTextBox.Text = $"{nameWithoutExt}*";
     }
 
     private void PasswordBox_KeyDown(object? sender, KeyEventArgs e)
