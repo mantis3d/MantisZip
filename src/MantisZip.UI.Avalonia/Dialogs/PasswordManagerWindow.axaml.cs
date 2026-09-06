@@ -256,9 +256,9 @@ public partial class PasswordManagerWindow : Window
         ResetEditPanel();
         _isDeleteConfirm = true;
         _editingId = entry.Id;
-        EditDesc.Text = "";
-        EditPasswordBox.Text = "";
-        EditRules.Text = "";
+        EditDesc.Text = entry.Description;
+        EditPasswordBox.Text = entry.Password;
+        EditRules.Text = entry.PatternDisplay;
         EditDesc.IsEnabled = false;
         EditPasswordBox.IsEnabled = false;
         EditRules.IsEnabled = false;
