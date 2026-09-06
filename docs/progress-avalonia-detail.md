@@ -6,6 +6,14 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-09-06** — 修复 AboutWindowTests 指向已废弃的 WPF 本地化路径
+  - **根因**：`AboutWindowTests` 硬编码路径 `src\MantisZip.UI\Resources\strings.{zh,en}.json`（WPF 项目），迁移后源文件不存在；Avalonia 本地化位于 `src\MantisZip.UI.Avalonia\Localization\strings.{zh-CN,en}.json`
+  - **变更**：
+    - 修正 `ZhJsonPath`/`EnJsonPath` 指向 Avalonia `Localization/` 目录
+    - `ExpectedAboutKeys` 中 WPF 时代的 `About_Author_*` 键改为 Avalonia 的 `About_Label_*`
+    - 移除引用不存在的 `Main_About_Text`/`Main_About_Title` 向后兼容测试，改为 `About_Title`/`About_Description` 存在性测试
+  - 验证：`dotnet test --filter AboutWindowTests` 13/13 通过
+
 **2026-09-05** — 修复「保存到密码库」不生效
   - **根因**：
     1. `PreviewViewModel.EnterPasswordCommandExecuted`（预览面板「输入密码」按钮）：用户在密码对话框勾选「保存到密码库」后，`SavePermanently`/`Patterns`/`Description` 字段被完全忽略——密码仅缓存到会话内存（`SessionPasswordCache`），从未调用 `TrySavePassword` 写入密码库
