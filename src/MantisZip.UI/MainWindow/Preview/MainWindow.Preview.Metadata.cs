@@ -7,7 +7,6 @@ using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
-using System.Runtime.InteropServices;
 using Microsoft.Web.WebView2.Core;
 using MantisZip.Core;
 using MantisZip.Core.Abstractions;
@@ -85,67 +84,77 @@ public partial class MainWindow
 
             var fontFilePath = info.FontDecompressedPath ?? filePath;
             var familyName = info.FontName ?? Path.GetFileNameWithoutExtension(filePath);
+            bool isCffOtf = info.AdditionalInfo == "OpenType (CFF)";
 
-            App.LogDebug("ShowFontPreview: fontFilePath={0}, familyName={1}", fontFilePath, familyName);
+            App.LogDebug("ShowFontPreview: fontFilePath={0}, familyName={1}, isCffOtf={2}",
+                fontFilePath, familyName, isCffOtf);
 
-            // 三层回退策略：
-            //   1. "path#FamilyName" — TrueType TTF 支持，无需额外依赖
-            //   2. FontFamily(directory, name) — WPF 通过 DirectWrite 扫描目录加载，支持 CFF-OTF
-            //   3. GlyphTypeface → GlyphRun → RenderTargetBitmap — 绝对兼容的纯渲染回退
+            // CFF-OTF 字体：WPF FontFamily(path#name) 会导致 DirectWrite 原生崩溃（不可捕获），
+            // 直接跳转到 GlyphTypeface 渲染。
+            // TrueType 字体：尝试 FontFamily(path#name) → TextBlock 矢量渲染。
             bool fontLoaded = false;
             bool glyphRendered = false;
 
-            // ─── 尝试 1：path#FamilyName ───
-            try
+            if (!isCffOtf)
             {
-                var ff = new FontFamily(fontFilePath + "#" + familyName);
-                var testTypeface = new Typeface(ff, FontStyles.Normal, FontWeights.Normal, FontStretches.Normal);
-                fontLoaded = testTypeface.FontFamily.FamilyNames.Values
-                    .Any(v => v.ToString().IndexOf(familyName, StringComparison.OrdinalIgnoreCase) >= 0);
-                App.LogDebug("ShowFontPreview: tier 1 (# syntax) result={0}", fontLoaded);
-            }
-            catch (Exception ex1) { App.LogDebug("ShowFontPreview: tier 1 exception: {0}", ex1.Message); }
-
-            if (fontLoaded)
-            {
-                PreviewTextBox.FontFamily = new FontFamily(fontFilePath + "#" + familyName);
-            }
-            else
-            {
-                // ─── 尝试 2：基于目录的 DirectWrite 加载 ───
+                // ─── 尝试 1：path#FamilyName（仅 TTF）───
                 try
                 {
-                    var fontDir = Path.GetDirectoryName(fontFilePath);
-                    if (fontDir != null)
-                    {
-                        var baseUri = new Uri(fontDir + "\\", UriKind.Absolute);
-                        var ff2 = new FontFamily(baseUri, familyName);
-                        var testTypeface2 = new Typeface(ff2, FontStyles.Normal, FontWeights.Normal, FontStretches.Normal);
-                        if (testTypeface2.FontFamily.FamilyNames.Values
-                            .Any(v => v.ToString().IndexOf(familyName, StringComparison.OrdinalIgnoreCase) >= 0))
-                        {
-                            PreviewTextBox.FontFamily = ff2;
-                            fontLoaded = true;
-                        }
-                        App.LogDebug("ShowFontPreview: tier 2 (dir scan) result={0}", fontLoaded);
-                    }
+                    var ff = new FontFamily(fontFilePath + "#" + familyName);
+                    var testTypeface = new Typeface(ff, FontStyles.Normal, FontWeights.Normal, FontStretches.Normal);
+                    fontLoaded = testTypeface.FontFamily.FamilyNames.Values
+                        .Any(v => v.ToString().IndexOf(familyName, StringComparison.OrdinalIgnoreCase) >= 0);
+                    App.LogDebug("ShowFontPreview: tier 1 (# syntax) result={0}", fontLoaded);
                 }
-                catch (Exception ex2) { App.LogDebug("ShowFontPreview: tier 2 exception: {0}", ex2.Message); }
+                catch (Exception ex1) { App.LogDebug("ShowFontPreview: tier 1 exception: {0}", ex1.Message); }
 
-                // ─── 尝试 3：GlyphTypeface 渲染位图（绝对兼容） ───
-                if (!fontLoaded)
+                if (fontLoaded)
                 {
-                    glyphRendered = ShowFontPreviewGlyphRender(fontFilePath, familyName, sampleText);
-                    App.LogDebug("ShowFontPreview: tier 3 (GlyphRun) result={0}", glyphRendered);
+                    PreviewTextBox.FontFamily = new FontFamily(fontFilePath + "#" + familyName);
+                }
+                else
+                {
+                    // ─── 尝试 2：基于目录的 DirectWrite 加载 ───
+                    try
+                    {
+                        var fontDir = Path.GetDirectoryName(fontFilePath);
+                        if (fontDir != null)
+                        {
+                            var baseUri = new Uri(fontDir + "\\", UriKind.Absolute);
+                            var ff2 = new FontFamily(baseUri, familyName);
+                            var testTypeface2 = new Typeface(ff2, FontStyles.Normal, FontWeights.Normal, FontStretches.Normal);
+                            if (testTypeface2.FontFamily.FamilyNames.Values
+                                .Any(v => v.ToString().IndexOf(familyName, StringComparison.OrdinalIgnoreCase) >= 0))
+                            {
+                                PreviewTextBox.FontFamily = ff2;
+                                fontLoaded = true;
+                            }
+                            App.LogDebug("ShowFontPreview: tier 2 (dir scan) result={0}", fontLoaded);
+                        }
+                    }
+                    catch (Exception ex2) { App.LogDebug("ShowFontPreview: tier 2 exception: {0}", ex2.Message); }
                 }
             }
 
+            // ─── 回退：GlyphTypeface + DrawGlyphRun 渲染 ───
+            if (!fontLoaded)
+            {
+                glyphRendered = ShowFontPreviewGlyphRender(fontFilePath, familyName, sampleText);
+                App.LogDebug("ShowFontPreview: glyph fallback result={0}", glyphRendered);
+            }
+
+            // 设置样本文字（仅在 TextBlock 模式下需要，GlyphRender 自带样本文字）
             PreviewTextBox.Text = sampleText;
-            PreviewTextBox.FontSize = AppSettings.Instance.FontPreviewFontSize; PreviewTextBox.TextAlignment = TextAlignment.Left;
+            PreviewTextBox.FontSize = AppSettings.Instance.FontPreviewFontSize;
+            PreviewTextBox.TextAlignment = TextAlignment.Left;
             HideAllPreviewControls();
             if (glyphRendered)
             {
                 PreviewImageScroll.Visibility = Visibility.Visible;
+            }
+            else if (fontLoaded)
+            {
+                PreviewTextBox.Visibility = Visibility.Visible;
             }
             else
             {
@@ -168,98 +177,83 @@ public partial class MainWindow
     }
 
     /// <summary>
-    /// 最终回退：通过 GlyphTypeface + GlyphRun 直接渲染字体样本到位图，
+    /// 通过 GlyphTypeface + DrawGlyphRun 渲染字体样本到位图，
     /// 绕过 WPF FontFamily 对 CFF 轮廓 OpenType 字体的限制。
+    /// 使用 WPF 自身的 DirectWrite 管道渲染（不是 GDI+/SkiaSharp），
+    /// 矢量质量，再捕获到 RenderTargetBitmap 显示。
     /// </summary>
     private bool ShowFontPreviewGlyphRender(string fontFilePath, string familyName, string sampleText)
     {
         try
         {
-            var glyphTypeface = new GlyphTypeface(new Uri(fontFilePath));
+            var uri = new Uri(fontFilePath, UriKind.Absolute);
+            var glyphTypeface = new GlyphTypeface(uri);
             App.LogDebug("GlyphRender: loaded glyphTypeface, glyphCount={0}",
                 glyphTypeface.GlyphCount);
+
+            // ── CJK 支持检测 ──
+            string filteredText = FilterFontSampleText(sampleText, glyphTypeface);
+
             double fontSize = AppSettings.Instance.FontPreviewFontSize;
-            double totalWidth = 0;
 
-            var glyphIndices = new ushort[sampleText.Length];
-            var advanceWidths = new double[sampleText.Length];
-            for (int i = 0; i < sampleText.Length; i++)
+            // ── 构建字形数组 ──
+            var chars = filteredText.ToCharArray();
+            var glyphIndices = new ushort[filteredText.Length];
+            var advanceWidths = new double[filteredText.Length];
+            for (int i = 0; i < filteredText.Length; i++)
             {
-                ushort glyphIndex = glyphTypeface.CharacterToGlyphMap.TryGetValue(sampleText[i], out ushort idx)
-                    ? (ushort)idx : (ushort)0;
+                ushort glyphIndex = glyphTypeface.CharacterToGlyphMap.TryGetValue(filteredText[i], out ushort idx)
+                    ? idx : (ushort)0;
                 glyphIndices[i] = glyphIndex;
-                // AdvanceWidths 单位为 em，乘以 fontSize 即得 DIP
                 advanceWidths[i] = glyphTypeface.AdvanceWidths[glyphIndex] * fontSize;
-                totalWidth += advanceWidths[i];
             }
 
-            App.LogDebug("GlyphRender: glyphIndices.Length={0}, totalWidth={1:F1}", glyphIndices.Length, totalWidth);
+            App.LogDebug("GlyphRender: chars={0}, filteredGlyphs={1}",
+                filteredText.Length, glyphIndices.Length);
 
-            // GlyphRun 在 .NET 9 中内部 COM 对象未初始化导致构造失败，
-            // 改用 GDI+ PrivateFontCollection 加载 CFF-OTF，绘制到 Bitmap 后转为 WPF ImageSource。
-            try
+            // ── 主题文字色 ──
+            var foreground = Brushes.White;
+            if (TryFindResource("Theme_TextPrimary") is System.Windows.Media.SolidColorBrush wpfFg)
+                foreground = wpfFg;
+
+            // ── 通过 DrawingVisual + DrawGlyphRun 渲染（WPF 原生 DirectWrite 管道） ──
+            var visual = new DrawingVisual();
+            using (var ctx = visual.RenderOpen())
             {
-                float fsize = (float)fontSize;
-                using var fontColl = new System.Drawing.Text.PrivateFontCollection();
-                fontColl.AddFontFile(fontFilePath);
-                if (fontColl.Families.Length == 0)
-                {
-                    App.LogDebug("GlyphRender: GDI+ PrivateFontCollection returned 0 families");
-                    return false;
-                }
-                using var font = new System.Drawing.Font(fontColl.Families[0], fsize,
-                    System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Pixel);
-
-                // 测量文本尺寸
-                using var tmpBmp = new System.Drawing.Bitmap(1, 1);
-                using var tmpG = System.Drawing.Graphics.FromImage(tmpBmp);
-                var textSize = tmpG.MeasureString(sampleText, font);
-
-                int bmpW = Math.Max((int)textSize.Width + 20, 200);
-                int bmpH = Math.Max((int)textSize.Height + 20, 50);
-
-                using var bmp = new System.Drawing.Bitmap(bmpW, bmpH,
-                    System.Drawing.Imaging.PixelFormat.Format32bppArgb);
-                using var g = System.Drawing.Graphics.FromImage(bmp);
-                g.Clear(System.Drawing.Color.Transparent);
-                g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAlias;
-
-                // 使用主题文字色（Theme_TextPrimary），在 GDI+ 中绘制
-                System.Drawing.Color textColor = System.Drawing.Color.White;
-                if (TryFindResource("Theme_TextPrimary") is System.Windows.Media.SolidColorBrush wpfFg)
-                {
-                    textColor = System.Drawing.Color.FromArgb(
-                        wpfFg.Color.A, wpfFg.Color.R, wpfFg.Color.G, wpfFg.Color.B);
-                }
-                using var brush = new System.Drawing.SolidBrush(textColor);
-                g.DrawString(sampleText, font, brush, 10, 10);
-
-                // GDI+ Bitmap → WPF BitmapSource
-                IntPtr hbitmap = bmp.GetHbitmap();
-                try
-                {
-                    var src = System.Windows.Interop.Imaging.CreateBitmapSourceFromHBitmap(
-                        hbitmap, IntPtr.Zero,
-                        new Int32Rect(0, 0, bmp.Width, bmp.Height),
-                        System.Windows.Media.Imaging.BitmapSizeOptions.FromEmptyOptions());
-                    PreviewImage.Source = src;
-                    PreviewImage.Stretch = System.Windows.Media.Stretch.None;
-                    PreviewImage.HorizontalAlignment = System.Windows.HorizontalAlignment.Left;
-                    PreviewImage.VerticalAlignment = System.Windows.VerticalAlignment.Top;
-                }
-                finally
-                {
-                    DeleteObject(hbitmap);
-                }
-
-                App.LogDebug("GlyphRender: GDI+ render OK, bmp={0}x{1}", bmpW, bmpH);
-                return true;
+                var glyphRun = new GlyphRun(
+                    glyphTypeface,
+                    0,              // bidiLevel
+                    false,          // isSideways
+                    fontSize,       // renderingEmSize
+                    96f,            // pixelsPerDip (default 96 DPI)
+                    glyphIndices,   // glyphIndices
+                    new Point(10, 10), // baselineOrigin
+                    advanceWidths,  // advanceWidths
+                    null,           // glyphOffsets
+                    chars,          // characters
+                    null,           // deviceFontName
+                    null,           // clusterMap
+                    null,           // isInsideWord
+                    null);          // isInlineObject
+                ctx.DrawGlyphRun(foreground, glyphRun);
             }
-            catch (Exception ex)
-            {
-                App.LogDebug("GlyphRender: GDI+ render failed: {0} — {1}", ex.GetType().Name, ex.Message);
-                return false;
-            }
+
+            // ── 捕获到 RenderTargetBitmap ──
+            var bounds = visual.ContentBounds;
+            int w = Math.Max(200, (int)Math.Ceiling(bounds.Width) + 20);
+            int h = Math.Max(50, (int)Math.Ceiling(bounds.Height) + 20);
+
+            var bitmap = new RenderTargetBitmap(w, h, 96, 96, PixelFormats.Pbgra32);
+            bitmap.Render(visual);
+            bitmap.Freeze();
+
+            PreviewImage.Source = bitmap;
+            PreviewImage.Stretch = Stretch.None;
+            PreviewImage.HorizontalAlignment = HorizontalAlignment.Left;
+            PreviewImage.VerticalAlignment = VerticalAlignment.Top;
+
+            App.LogDebug("GlyphRender: WPF GlyphRun OK, bmp={0}x{1}", w, h);
+            return true;
         }
         catch (Exception ex)
         {
@@ -268,8 +262,45 @@ public partial class MainWindow
         }
     }
 
-    [DllImport("gdi32.dll", SetLastError = true)]
-    private static extern bool DeleteObject(IntPtr hObject);
+    /// <summary>
+    /// 根据字体实际支持的字形过滤样本文字：
+    /// - 如果字体没有 CJK 字形，移除 CJK 字符
+    /// - 其他 Unicde 范围字符若无字形也移除
+    /// </summary>
+    private static string FilterFontSampleText(string sampleText, GlyphTypeface glyphTypeface)
+    {
+        var sb = new StringBuilder(sampleText.Length);
+        bool hasAnyCjkGlyph = false;
+
+        // 先检查字体是否有 CJK 字形
+        foreach (char c in sampleText)
+        {
+            if (c >= 0x4E00 && c <= 0x9FFF)
+            {
+                if (glyphTypeface.CharacterToGlyphMap.TryGetValue(c, out ushort g) && g != 0)
+                {
+                    hasAnyCjkGlyph = true;
+                }
+                break; // 只检查第一个 CJK 字符即可
+            }
+        }
+
+        // 如果字体有 CJK 字形，保留所有字符；否则移除 CJK/FW/HW 区字符
+        if (hasAnyCjkGlyph)
+            return sampleText;
+
+        foreach (char c in sampleText)
+        {
+            if (c >= 0x4E00 && c <= 0x9FFF) continue;  // CJK Unified
+            if (c >= 0x3000 && c <= 0x303F) continue;  // CJK Symbols
+            if (c >= 0xFF00 && c <= 0xFFEF) continue;  // Fullwidth / Halfwidth
+            if (c >= 0x2E80 && c <= 0x2EFF) continue;  // CJK Radicals
+            sb.Append(c);
+        }
+
+        string result = sb.ToString().Trim();
+        return result.Length > 0 ? result : sampleText; // 如果全被过滤了，保留原文
+    }
 
     /// <summary>
     /// 根据字体文件扩展名推断预览加载失败的原因，用于在信息面板显示。

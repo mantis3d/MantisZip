@@ -14,7 +14,7 @@
 
 ### 1️⃣ 便携版模式 — 🟢 小投入，高回报
 
-**计划文件**: `.sisyphus/plans/portable-mode.md`
+**计划文件**: `.omo/plans/portable-mode.md`
 **任务数**: 5 | **预估工时**: 1-2h
 
 最简单、独立、无依赖，改动范围清晰：
@@ -27,7 +27,7 @@
 
 ### 2️⃣ 压缩配置预设 — 🟡 中投入，用户粘性提升
 
-**计划文件**: `.sisyphus/plans/compress-preset.md`
+**计划文件**: `.omo/plans/compress-preset.md`
 **任务数**: 9（Phase 1 独立 5 个任务）
 
 Phase 1（无 COM 依赖）可以立即做：
@@ -40,7 +40,7 @@ Phase 1（无 COM 依赖）可以立即做：
 
 ### 3️⃣ 文件过滤 — 🟡 中投入，差异化功能
 
-**计划文件**: `.sisyphus/plans/file-filter-feature.md`
+**计划文件**: `.omo/plans/file-filter-feature.md`
 **任务数**: 11
 
 按扩展名/大小/日期过滤后再压缩或解压。工作量较大（ExtractSettingsWindow 加 Tab、8 个内置预设、UI 控件联动）。
@@ -49,28 +49,28 @@ Phase 1（无 COM 依赖）可以立即做：
 
 ### 4️⃣ 压缩预估 — 🟡 中投入，解决核心痛点
 
-**计划文件**: `.sisyphus/plans/compression-estimator.md`
+**计划文件**: `.omo/plans/compression-estimator.md`
 **任务数**: 5
 
 "选 ZIP 还是 7z？级别 5 还是 9？"——用户每次压缩都在盲选。四级精度策略设计，可先做前两级。
 
 ### 5️⃣ 魔数检测 — 🔴 大投入，但对体验提升大
 
-**计划文件**: `.sisyphus/plans/preview-magic-detection.md`
+**计划文件**: `.omo/plans/preview-magic-detection.md`
 **任务数**: 6
 
 改名/无后缀的文件也能正确预览。改动链条长（Core 检测引擎 + UI 集成 + 回退逻辑）。
 
 ### 6️⃣ 重命名/移动条目 — 🟢 小投入
 
-**计划文件**: `.sisyphus/plans/archive-rename-entry.md`
+**计划文件**: `.omo/plans/archive-rename-entry.md`
 **任务数**: 6 | **预估工时**: 3-4h
 
 纯增量功能，提取→删除→添加的模式已经很成熟。F2 重命名 + 右键菜单。
 
 ### 7️⃣ Explorer 路径快速选择 — 🟢 小投入
 
-**计划文件**: `.sisyphus/plans/explorer-path-switcher.md`
+**计划文件**: `.omo/plans/explorer-path-switcher.md`
 **任务数**: 6
 
 Ctrl+G 唤起资源管理器路径列表，压缩/解压时快速填路径。独立功能，不依赖其他模块。

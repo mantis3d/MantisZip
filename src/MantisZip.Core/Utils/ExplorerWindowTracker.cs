@@ -1,6 +1,8 @@
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 
+#pragma warning disable CA1416 // This class is Windows-only (P/Invoke + COM)
+
 namespace MantisZip.Core.Utils;
 
 public record ExplorerWindowInfo(string Path, string DisplayName, IntPtr HWND, bool IsActive);
@@ -84,8 +86,8 @@ public static class ExplorerWindowTracker
 
         try
         {
-            var count = (int)shellWindowsType.InvokeMember("Count",
-                System.Reflection.BindingFlags.GetProperty, null, shellWindows, null);
+            var count = shellWindowsType.InvokeMember("Count",
+                System.Reflection.BindingFlags.GetProperty, null, shellWindows, null) is int c ? c : 0;
 
             for (int i = 0; i < count; i++)
             {
@@ -222,7 +224,12 @@ public static class ExplorerWindowTracker
         try
         {
             var windows = GetOpenExplorerWindows();
-            return windows.FirstOrDefault(w => w.IsActive)?.Path;
+            // 优先前台活动窗口；否则返回枚举到的第一个资源管理器窗口。
+            // 注意：MantisZip 打开对话框时前台窗口是 MantisZip 自己，资源管理器已不可能是 IsActive，
+            // 因此此处不能只认 IsActive —— 否则该来源永远返回 null。
+            var active = windows.FirstOrDefault(w => w.IsActive);
+            if (active != null) return active.Path;
+            return windows.FirstOrDefault()?.Path;
         }
         catch { return null; }
     }

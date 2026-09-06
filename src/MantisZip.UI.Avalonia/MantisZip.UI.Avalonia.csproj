@@ -1,0 +1,112 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <NoWarn>CA1416</NoWarn>
+    <BuiltInComInteropSupport>true</BuiltInComInteropSupport>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>Resources\App.ico</ApplicationIcon>
+    <Version>0.5.0</Version>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Avalonia" Version="12.0.4" />
+    <PackageReference Include="Avalonia.Controls.DataGrid" Version="12.0.0" />
+    <PackageReference Include="Avalonia.Desktop" Version="12.0.4" />
+    <PackageReference Include="Avalonia.Themes.Fluent" Version="12.0.4" />
+    <PackageReference Include="ClosedXML" Version="0.105.0" />
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
+    <PackageReference Include="DocumentFormat.OpenXml" Version="3.5.1" />
+    <PackageReference Include="HarfBuzzSharp" Version="14.2.0" />
+    <PackageReference Include="HarfBuzzSharp.NativeAssets.Win32" Version="14.2.0" />
+    <PackageReference Include="Svg.Skia" Version="2.0.0.5" />
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.8" />
+    <PackageReference Include="Ude.NetStandard" Version="1.2.0" />
+    <PackageReference Include="Markdig" Version="0.40.0" />
+    <PackageReference Include="ReverseMarkdown" Version="4.7.0" />
+    <PackageReference Include="SkiaSharp" Version="3.119.4" />
+    <PackageReference Include="System.Drawing.Common" Version="10.0.8" />
+    <PackageReference Include="PdfPig" Version="0.1.15" />
+    <PackageReference Include="PdfPig.Rendering.Skia" Version="0.1.15.4" />
+  </ItemGroup>
+
+<ItemGroup>
+    <!-- 非 XAML 资源 + AppIcons.axaml：AppIcons.axaml 由 App 在运行时用 avares:// URI 显式加载
+         （App.OnFrameworkInitializationCompleted），必须作为 AvaloniaResource 嵌入原始 xaml；
+         Resources 下其余为非 axaml 资源（图标/光标等） -->
+    <AvaloniaResource Include="Resources\**" />
+    <!-- .axaml 交给 Avalonia XamlIl 预编译（生成 .g.cs）。先 Remove 清掉包内默认 glob 收集的条目
+         （默认 glob 带 Exclude/SubType 元数据，与自定义 Include pattern 不同不会去重，会导致
+         AVLN2002 duplicate x:Class），再按本规则重新 Include；Resources\** 下的 axaml
+         （AppIcons.axaml）留在 AvaloniaResource 供运行时 avares:// 加载 -->
+    <AvaloniaXaml Remove="**\*.axaml" />
+    <AvaloniaXaml Include="**\*.axaml" Exclude="Resources\**\*.axaml" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\MantisZip.Core\MantisZip.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="Localization\*.json;Resources\languages.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="Resources\MenuIcons\**">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <!-- 文件关联格式图标（zip/7z/rar/tar/tgz/gz/iso）：ShellIntegration.GetIconPath
+         按输出目录相对路径引用，缺失时关联图标退化为应用通用图标 -->
+    <None Include="Resources\Icons\*.ico">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <!-- 拖拽光标：按 overlay 状态加载的不同 .cur（DragCursor/Ok/Warn/Self），构建时复制到输出目录 -->
+    <None Include="Resources\Cursors\**">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="contributors-*.csv">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+  <!-- 构建后将 ShellExt 输出（comhost.dll + DLL + runtimeconfig.json）复制到 UI 输出目录 -->
+  <Target Name="CopyShellExtComhost" AfterTargets="Build" Condition="'$(SkipShellExtCopy)' != 'true'">
+    <MSBuild Projects="..\MantisZip.ShellExt\MantisZip.ShellExt.csproj" Targets="Build" Properties="Configuration=$(Configuration);RuntimeIdentifier=$(RuntimeIdentifier)" />
+    <PropertyGroup>
+      <!-- ShellExt 声明 RuntimeIdentifiers=win-x64;win-x86，指定 RID 构建时输出到 RID 子目录 -->
+      <_ShellExtDir>..\MantisZip.ShellExt\bin\$(Configuration)\net10.0-windows10.0.17763.0</_ShellExtDir>
+      <_ShellExtDir Condition="'$(RuntimeIdentifier)' != ''">$(_ShellExtDir)\$(RuntimeIdentifier)</_ShellExtDir>
+    </PropertyGroup>
+    <ItemGroup>
+      <_ShellExtFiles Include="$(_ShellExtDir)\MantisZip.ShellExt.comhost.dll" />
+      <_ShellExtFiles Include="$(_ShellExtDir)\MantisZip.ShellExt.dll" />
+      <_ShellExtFiles Include="$(_ShellExtDir)\MantisZip.ShellExt.runtimeconfig.json" />
+    </ItemGroup>
+    <Copy SourceFiles="@(_ShellExtFiles)" DestinationFolder="$(OutputPath)" SkipUnchangedFiles="true" />
+  </Target>
+
+  <!-- Publish 后复制 ShellExt 输出（comhost.dll + DLL + runtimeconfig.json）到发布目录 -->
+  <Target Name="CopyShellExtComhostToPublish" AfterTargets="Publish">
+    <MSBuild Projects="..\MantisZip.ShellExt\MantisZip.ShellExt.csproj" Targets="Build" Properties="Configuration=$(Configuration);RuntimeIdentifier=$(RuntimeIdentifier)" />
+    <PropertyGroup>
+      <_ShellExtDir>..\MantisZip.ShellExt\bin\$(Configuration)\net10.0-windows10.0.17763.0</_ShellExtDir>
+      <_ShellExtDir Condition="'$(RuntimeIdentifier)' != ''">$(_ShellExtDir)\$(RuntimeIdentifier)</_ShellExtDir>
+    </PropertyGroup>
+    <ItemGroup>
+      <_ShellExtPublishFiles Include="$(_ShellExtDir)\MantisZip.ShellExt.comhost.dll" />
+      <_ShellExtPublishFiles Include="$(_ShellExtDir)\MantisZip.ShellExt.dll" />
+      <_ShellExtPublishFiles Include="$(_ShellExtDir)\MantisZip.ShellExt.runtimeconfig.json" />
+    </ItemGroup>
+    <Copy SourceFiles="@(_ShellExtPublishFiles)" DestinationFolder="$(PublishDir.TrimEnd('\\'))" SkipUnchangedFiles="true" />
+  </Target>
+
+  <!-- Publish 后自动从 7-Zip 安装目录复制 7z.dll 到发布目录（x64/x86 子目录，installer 依赖） -->
+  <Target Name="CopySevenZipDll" AfterTargets="Publish">
+    <Exec Command="powershell -ExecutionPolicy Bypass -File &quot;$(MSBuildProjectDirectory)\..\..\scripts\copy-7z-dll.ps1&quot; -PublishDir &quot;$(PublishDir.TrimEnd('\\'))&quot;"
+          Condition="'$(PublishDir)' != '' And Exists('$(MSBuildProjectDirectory)\..\..\scripts\copy-7z-dll.ps1')"
+          IgnoreExitCode="true" />
+  </Target>
+
+</Project>

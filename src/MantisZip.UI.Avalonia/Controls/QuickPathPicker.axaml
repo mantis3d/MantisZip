@@ -1,0 +1,129 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+            xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+            xmlns:controls="clr-namespace:MantisZip.UI.Avalonia.Controls"
+            x:Class="MantisZip.UI.Avalonia.Controls.QuickPathPicker"
+            x:Name="RootControl">
+  <Panel>
+    <Grid RowDefinitions="Auto,Auto"
+          RowSpacing="{DynamicResource SpacingXxs}">
+
+      <!-- ═══════ Row 0: Path input (AutoCompleteBox, owns full row) ═══════ -->
+      <AutoCompleteBox x:Name="PathInput"
+                       Grid.Row="0"
+                       MinHeight="{DynamicResource ControlHeightMd}"
+                       FilterMode="Contains"
+                       MinimumPrefixLength="0"
+                       TextChanged="PathInput_TextChanged"
+                       KeyDown="PathInput_KeyDown"
+                       Background="{DynamicResource ThemeSurfaceBgBrush}"
+                       Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                       BorderBrush="{DynamicResource ThemeBorderBrush}" />
+
+      <!-- ═══════ Row 1: Quick buttons + browse ═══════ -->
+      <Grid Grid.Row="1"
+            ColumnDefinitions="Auto,Auto,Auto,*,Auto"
+            ColumnSpacing="{DynamicResource SpacingXxs}">
+        <!-- ⭐ 收藏 -->
+        <Button x:Name="QuickFavButton"
+                Grid.Column="0"
+                MinHeight="{DynamicResource ControlHeightSm}"
+                Padding="{DynamicResource SpacingXsThk}"
+                Click="QuickFavButton_Click"
+                Background="{DynamicResource ThemeButtonBgBrush}"
+                Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                BorderBrush="{DynamicResource ThemeBorderBrush}">
+          <PathIcon Data="{StaticResource IconStar}"
+                    Width="14" Height="14"
+                    Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+        </Button>
+        <!-- 🕐 历史 -->
+        <Button x:Name="QuickHistButton"
+                Grid.Column="1"
+                MinHeight="{DynamicResource ControlHeightSm}"
+                Padding="{DynamicResource SpacingXsThk}"
+                Click="QuickHistButton_Click"
+                Background="{DynamicResource ThemeButtonBgBrush}"
+                Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                BorderBrush="{DynamicResource ThemeBorderBrush}">
+          <PathIcon Data="{StaticResource IconHistory}"
+                    Width="14" Height="14"
+                    Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+        </Button>
+        <!-- 🪟 窗口 -->
+        <Button x:Name="QuickWinButton"
+                Grid.Column="2"
+                MinHeight="{DynamicResource ControlHeightSm}"
+                Padding="{DynamicResource SpacingXsThk}"
+                Click="QuickWinButton_Click"
+                Background="{DynamicResource ThemeButtonBgBrush}"
+                Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                BorderBrush="{DynamicResource ThemeBorderBrush}">
+          <PathIcon Data="{StaticResource IconLightning}"
+                    Width="14" Height="14"
+                    Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+        </Button>
+        <!-- 📁 浏览 -->
+        <Button x:Name="QuickBrowseButton"
+                Grid.Column="4"
+                MinHeight="{DynamicResource ControlHeightSm}"
+                Padding="{DynamicResource SpacingXsThk}"
+                Click="QuickBrowseButton_Click"
+                Background="{DynamicResource ThemeButtonBgBrush}"
+                Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                BorderBrush="{DynamicResource ThemeBorderBrush}">
+          <PathIcon Data="{StaticResource IconFolder}"
+                    Width="14" Height="14"
+                    Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+        </Button>
+      </Grid>
+    </Grid>
+
+    <!-- ⭐ Favorites popup -->
+    <Popup x:Name="FavPopup"
+           PlacementTarget="{Binding #QuickFavButton}"
+           Placement="Bottom"
+           IsLightDismissEnabled="False">
+      <Border Background="{DynamicResource ThemeWindowBgBrush}"
+              BorderBrush="{DynamicResource ThemeBorderBrush}"
+              BorderThickness="1" CornerRadius="4" Padding="6"
+              Width="320" MaxHeight="420"
+              BoxShadow="0 2 8 0 #40000000">
+        <controls:QuickPathControl x:Name="FavControl"
+                                   Width="308"
+                                   PathSelected="FavControl_PathSelected" />
+      </Border>
+    </Popup>
+
+    <!-- 🕐 History popup -->
+    <Popup x:Name="HistPopup"
+           PlacementTarget="{Binding #QuickHistButton}"
+           Placement="Bottom"
+           IsLightDismissEnabled="False">
+      <Border Background="{DynamicResource ThemeWindowBgBrush}"
+              BorderBrush="{DynamicResource ThemeBorderBrush}"
+              BorderThickness="1" CornerRadius="4" Padding="6"
+              Width="320" MaxHeight="420"
+              BoxShadow="0 2 8 0 #40000000">
+        <controls:QuickPathControl x:Name="HistControl"
+                                   Width="308"
+                                   PathSelected="HistControl_PathSelected" />
+      </Border>
+    </Popup>
+
+    <!-- 🪟 Windows popup -->
+    <Popup x:Name="WinPopup"
+           PlacementTarget="{Binding #QuickWinButton}"
+           Placement="Bottom"
+           IsLightDismissEnabled="False">
+      <Border Background="{DynamicResource ThemeWindowBgBrush}"
+              BorderBrush="{DynamicResource ThemeBorderBrush}"
+              BorderThickness="1" CornerRadius="4" Padding="6"
+              Width="320" MaxHeight="420"
+              BoxShadow="0 2 8 0 #40000000">
+        <controls:QuickPathControl x:Name="WinControl"
+                                   Width="308"
+                                   PathSelected="WinControl_PathSelected" />
+      </Border>
+    </Popup>
+  </Panel>
+</UserControl>

@@ -1,0 +1,123 @@
+using MantisZip.Core.Abstractions;
+using MantisZip.UI.Avalonia.Models;
+
+namespace MantisZip.UI.Avalonia.Services;
+
+/// <summary>
+/// 封装 Core 的 ArchiveEngineFactory，提供压缩包浏览服务。
+/// </summary>
+public class ArchiveService
+{
+    /// <summary>
+    /// 判断异常是否为密码相关（加密包未提供密码 / 密码错误）。
+    /// 浏览加载与解压设置窗口的逐包校验共用此启发式，避免分类逻辑分叉
+    /// ——加密文件名的 7z 包无密码时 ListEntriesAsync 抛密码类异常，不能误报为「损坏」。
+    /// </summary>
+    public static bool IsPasswordRelatedError(Exception ex)
+    {
+        var message = ex.Message;
+        return message.Contains("password", StringComparison.OrdinalIgnoreCase)
+            || message.Contains("encrypted", StringComparison.OrdinalIgnoreCase)
+            || message.Contains("密码", StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    /// 打开压缩包并列出所有条目。
+    /// </summary>
+    public async Task<ArchiveLoadResult> LoadArchiveAsync(
+        string archivePath,
+        string? password = null,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var engine = ArchiveEngineFactory.GetEngineByExtension(archivePath);
+            if (engine == null)
+            {
+                return ArchiveLoadResult.Failure(LocalizationManager.T("Status_UnsupportedFormat", Path.GetExtension(archivePath)));
+            }
+
+            var items = await engine.ListEntriesAsync(archivePath, password, cancellationToken);
+            var itemsList = items.ToList();
+
+            // 注意：条目列出成功即视为加载成功——即使含加密条目（ZIP/RAR/EncryptHeaders=false 的 7z
+            // 在无密码时也能列出文件名）。是否提示密码、取消后是否仍打开仅浏览，
+            // 由 MainWindowViewModel 的密码解析流程决定（对齐 WPF ResolvePasswordAsync 语义）。
+            // IsPasswordRequired 仅在 ListEntriesAsync 本身抛出密码类异常时出现（如 EncryptHeaders=true 的 7z）。
+
+            var models = itemsList.Select(ArchiveItemModel.FromCore).ToList();
+
+            // Load file type icons (folder vs file)
+            foreach (var model in models)
+            {
+                if (model.IsDirectory)
+                {
+                    model.IconSource = IconService.GetFolderIcon();
+                }
+                else
+                {
+                    var ext = Path.GetExtension(model.Name);
+                    model.IconSource = IconService.GetFileIcon(ext);
+                }
+            }
+
+            return ArchiveLoadResult.Success(models, itemsList);
+        }
+        catch (OperationCanceledException)
+        {
+            return ArchiveLoadResult.Cancelled();
+        }
+        catch (Exception ex)
+        {
+            if (IsPasswordRelatedError(ex))
+            {
+                return ArchiveLoadResult.PasswordRequired();
+            }
+
+            return ArchiveLoadResult.Failure(LocalizationManager.T("Status_OpenArchiveFailed", ex.Message));
+        }
+    }
+}
+
+/// <summary>
+/// 打开压缩包的结果。
+/// </summary>
+public class ArchiveLoadResult
+{
+    public bool IsSuccess { get; private init; }
+    public bool IsPasswordRequired { get; private init; }
+    public bool IsCancelled { get; private init; }
+    public string? ErrorMessage { get; private init; }
+    public IReadOnlyList<ArchiveItemModel>? Entries { get; private init; }
+
+    /// <summary>
+    /// 原始 ArchiveItem 列表（用于文件夹树构建等需要原始数据的场景）。
+    /// </summary>
+    public IReadOnlyList<ArchiveItem>? RawItems { get; private init; }
+
+    public static ArchiveLoadResult Success(List<ArchiveItemModel> entries, IReadOnlyList<ArchiveItem>? rawItems = null) => new()
+    {
+        IsSuccess = true,
+        Entries = entries,
+        RawItems = rawItems
+    };
+
+    public static ArchiveLoadResult Failure(string message) => new()
+    {
+        IsSuccess = false,
+        ErrorMessage = message
+    };
+
+    public static ArchiveLoadResult PasswordRequired() => new()
+    {
+        IsSuccess = false,
+        IsPasswordRequired = true,
+        ErrorMessage = LocalizationManager.T("Error_ArchiveEncrypted")
+    };
+
+    public static ArchiveLoadResult Cancelled() => new()
+    {
+        IsSuccess = false,
+        IsCancelled = true
+    };
+}

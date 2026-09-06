@@ -1,0 +1,1575 @@
+using Avalonia;
+using Avalonia.Controls;
+using Avalonia.Input;
+using Avalonia.Input.Platform;
+using Avalonia.Interactivity;
+using Avalonia.Platform.Storage;
+using Avalonia.Platform;
+using Avalonia.Threading;
+using Avalonia.VisualTree;
+using MantisZip.Core.Abstractions;
+using MantisZip.Core.Models;
+using MantisZip.Core.Utils;
+using MantisZip.UI.Avalonia.Converters;
+using MantisZip.UI.Avalonia.Dialogs;
+using MantisZip.UI.Avalonia.Models;
+using MantisZip.UI.Avalonia.ViewModels;
+using MantisZip.Core;
+using System.Collections.Generic;
+using System.ComponentModel;
+using System.Globalization;
+using System.Linq;
+using System.Runtime.InteropServices;
+using System.Threading;
+using Avalonia.Layout;
+using Avalonia.Media;
+using MantisZip.UI.Avalonia.Services;
+using System.ComponentModel;
+
+namespace MantisZip.UI.Avalonia.Views;
+
+public partial class MainWindow : Window
+{
+    private bool _isOwnDrag;
+    private PointerPressedEventArgs? _dragStartEvent;
+    private Point _dragStartPoint;
+    private List<ArchiveItem>? _dragPreservedSelection;
+    private string? _lastSortMemberPath;
+    private bool _lastSortDescending;
+
+    /// <summary>拖拽时写入数据对象的自定义格式名（使 IDataObject 非空，避免 Explorer 显示禁止光标）</summary>
+    private const string MantisZipDragFormatName = "MantisZipDragFormat";
+
+    /// <summary>文件列表图标列的持久化标识（该列无 SortMemberPath，用 Tag="Icon" 标识以便持久化列位置）</summary>
+    private const string IconColumnTag = "Icon";
+
+    /// <summary>拖拽期间是否被取消（Esc 或右键取消手势，由自实现 IDropSource.QueryContinueDrag 同步置位）</summary>
+    private bool _dragCancelled;
+
+    /// <summary>预览位置切换时各位置（1=底部, 2=目录树下方, 3=文件列表下方, 4=右侧）的记忆尺寸，切换后恢复用</summary>
+    private readonly Dictionary<int, double> _previewSizeByPosition = new();
+
+    /// <summary>当前已应用的预览位置（切换前据此保存旧位置尺寸）</summary>
+    private int _lastAppliedPreviewPosition = 4;
+
+    /// <summary>预览面板显隐（与 AppSettings.ShowPreviewPanel 同步；false 时压缩占位行列，树/列表撑满）</summary>
+    private bool _previewPanelEnabled = true;
+
+    /// <summary>拖拽添加覆层呼吸动画计时器（100ms tick，正弦 alpha 40-120，与拖拽解压 OverlayController 参数一致）</summary>
+    private readonly DispatcherTimer _dragAddOverlayTimer;
+
+    /// <summary>覆层呼吸动画 tick 计数（显示时从 0 复位）</summary>
+    private int _dragAddOverlayTick;
+
+    public MainWindow()
+    {
+        InitializeComponent();
+
+        // 拖拽添加覆层呼吸动画（与拖拽解压覆层一致：约 2s 周期，正弦 alpha 40-120，仅背景层呼吸）
+        _dragAddOverlayTimer = new DispatcherTimer(DispatcherPriority.Normal, Dispatcher.UIThread)
+        {
+            Interval = TimeSpan.FromMilliseconds(100)
+        };
+        _dragAddOverlayTimer.Tick += OnDragAddOverlayTimerTick;
+
+        // 测试菜单仅 Debug 构建显示（Release 自动隐藏）
+        TestMenu.IsVisible = AppConstants.ShowTestMenu;
+
+        // 窗口图标：从嵌入资源加载（与 WPF 版 Icon="/Resources/App.ico" 一致）
+        try
+        {
+            using var iconStream = AssetLoader.Open(new Uri("avares://MantisZip.UI.Avalonia/Resources/App.ico"));
+            Icon = new WindowIcon(iconStream);
+        }
+        catch (Exception ex)
+        {
+            App.DebugLog($"[MainWindow] Failed to load window icon: {ex.Message}");
+        }
+
+        var columnStates = WindowStateManager.Load(this, out var savedSortColumnPath, out var savedSortDirection);
+        ApplyColumnStates(columnStates);
+
+        // 恢复持久化的列排序状态（方向编码与 WPF window.json 兼容：0=无, 1=升序, 2=降序）
+        _lastSortMemberPath = string.IsNullOrEmpty(savedSortColumnPath) ? null : savedSortColumnPath;
+        _lastSortDescending = savedSortDirection == 2;
+        UpdateSortArrows();
+
+        // 应用上次手动保存的布局快照（目录树/文件列表列宽 + 预览各位置记忆尺寸）。
+        // 必须在 ApplyPreviewLayout() 之前调用，保证 ApplyPreviewPosition 能读到已回填的预览尺寸。
+        ApplySavedLayout();
+
+        // 应用预览面板显隐 + 位置设置（1=底部, 2=目录树下方, 3=文件列表下方, 4=右侧）
+        ApplyPreviewLayout();
+
+        var vm = new MainWindowViewModel();
+        vm.GetOpenFilePath = OpenFileDialogAsync;
+        vm.SaveLayoutAction = SaveLayout;
+        vm.ShowSettingsWindow = async () =>
+        {
+            var dialog = new SettingsWindow();
+            await dialog.ShowDialog(this);
+            // 设置窗口可能改动了主题，刷新主窗口菜单里「切换颜色模式」的当前主题文案
+            vm.RefreshLocalizedStrings();
+            // 预览面板显隐/位置可能在设置窗口中修改，统一重新应用（含菜单勾选状态同步）
+            ApplyPreviewLayout();
+        };
+        vm.ShowPasswordDialog = async (archivePath) =>
+        {
+            var dialog = new PasswordDialog(Path.GetFileName(archivePath));
+            var result = await dialog.ShowDialog<bool>(this);
+            if (!result) return null;
+            return new PasswordDialogResponse
+            {
+                Password = dialog.Password,
+                RememberInSession = dialog.RememberInSession,
+                SavePermanently = dialog.SavePermanently,
+                Description = dialog.Description,
+                Patterns = dialog.Patterns
+            };
+        };
+        // 预览面板「输入密码」按钮共享同一密码对话框回调
+        vm.Preview.ShowPasswordDialog = vm.ShowPasswordDialog;
+        // 密码输入成功后重新触发当前条目的预览
+        vm.Preview.PasswordEntered = vm.RePreviewCurrentEntry;
+        // 预览面板密码持久化（保存到密码库）
+        vm.Preview.PasswordService = vm.PasswordService;
+        // 工具栏「密码」按钮（已匹配态）：查看/复制当前压缩包的密码与规则
+        vm.ShowMatchedPasswordDialog = async (entry, archiveName) =>
+        {
+            var dialog = new MatchedPasswordDialog(entry, archiveName);
+            await dialog.ShowDialog<bool>(this);
+        };
+        DataContext = vm;
+
+        // 条目重填后重应用列排序（进入目录/刷新/过滤后保持排序状态）
+        vm.EntriesRefreshed += (_, _) =>
+        {
+            ApplyCurrentSort();
+            UpdateSortArrows();
+        };
+
+        // 菜单「显示预览面板」切换（IsPreviewVisible 变化）时同步压缩/恢复布局占位
+        vm.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(MainWindowViewModel.IsPreviewVisible))
+            {
+                _previewPanelEnabled = vm.IsPreviewVisible;
+                ApplyPreviewPosition(_lastAppliedPreviewPosition);
+            }
+        };
+
+        // ── Phase 3: Wire up ViewModel dialog callbacks ──
+
+        vm.ShowExtractSettingsDialog = async (evm) =>
+        {
+            var dialog = new ExtractSettingsWindow(evm.ArchivePaths);
+
+            // Pass archive entries for preview tree
+            var allItems = vm.GetAllRawItems();
+            if (allItems.Count > 0)
+                dialog.SetEntries(allItems);
+
+            var result = await dialog.ShowDialog<bool>(this);
+            if (result)
+            {
+                evm.DestinationPath = dialog.ViewModel.DestinationPath;
+                evm.ConflictAction = dialog.ViewModel.ConflictAction;
+                evm.OpenFolderAfterExtract = dialog.ViewModel.OpenFolderAfterExtract;
+                // 文件过滤：仅当启用过滤且有条目时，将匹配条目 key 回传，供实际解压只解压匹配项
+                evm.FilteredEntryKeys = dialog.GetFilteredEntryKeys();
+            }
+            return result;
+        };
+
+        vm.ShowExtractFolderPicker = (entries, initialPath, currentFolder, preserveFullPath) =>
+            CustomFilePickerDialog.ShowExtractFolderAsync(this, entries, initialPath, currentFolder, preserveFullPath);
+
+        vm.ShowCompressSettingsDialog = async (cvm) =>
+        {
+            var dialog = new CompressSettingsWindow(cvm.SelectedPaths);
+            var result = await dialog.ShowDialog<bool>(this);
+            if (result)
+            {
+                // 复制 SelectedPaths：对话框有自己的 ViewModel，用户添加的文件仅存在 dialog.ViewModel 中
+                cvm.SelectedPaths.Clear();
+                foreach (var p in dialog.ViewModel.SelectedPaths)
+                    cvm.SelectedPaths.Add(p);
+
+                cvm.DefaultFormat = dialog.ViewModel.DefaultFormat;
+                cvm.CompressionLevel = dialog.ViewModel.CompressionLevel;
+                cvm.OutputMode = dialog.ViewModel.OutputMode;
+                cvm.OutputPath = dialog.ViewModel.OutputPath;
+                cvm.Password = dialog.ViewModel.Password;
+                cvm.Encrypt = dialog.ViewModel.Encrypt;
+                cvm.IsPasswordLibraryMode = dialog.ViewModel.IsPasswordLibraryMode;
+                cvm.SelectedPasswordEntry = dialog.ViewModel.SelectedPasswordEntry;
+                cvm.Comment = dialog.ViewModel.Comment;
+                cvm.CommentDistribution = dialog.ViewModel.CommentDistribution;
+                cvm.FileFilter = dialog.GetFilter();
+                // Separate 模式：保留源文件扩展名选项（此前漏拷导致 cvm 恒用 settings 默认值）
+                cvm.KeepOriginalExtension = dialog.ViewModel.KeepOriginalExtension;
+
+                // 高级格式选项（仅本次压缩生效，来源为对话框面板快照，不再经 AppSettings 中转）
+                cvm.FileNameEncoding = dialog.ViewModel.FileNameEncoding;
+                cvm.ZipCompressionMethod = dialog.ViewModel.ZipCompressionMethod;
+                cvm.ZipEncryptionMethod = dialog.ViewModel.ZipEncryptionMethod;
+                cvm.SevenZipCompressionMethod = dialog.ViewModel.SevenZipCompressionMethod;
+                cvm.SevenZipSolid = dialog.ViewModel.SevenZipSolid;
+                cvm.SevenZipSolidBlockSize = dialog.ViewModel.SevenZipSolidBlockSize;
+                cvm.SevenZipDictionarySize = dialog.ViewModel.SevenZipDictionarySize;
+                cvm.SevenZipNumFastBytes = dialog.ViewModel.SevenZipNumFastBytes;
+                cvm.SevenZipMatchFinder = dialog.ViewModel.SevenZipMatchFinder;
+                cvm.SevenZipEncryptHeaders = dialog.ViewModel.SevenZipEncryptHeaders;
+                // 分卷设置（同样仅本次生效；此前未复制导致 cvm.SplitSize 恒为 0，对话框分卷选择丢失）
+                cvm.SelectedSplitSizeOption = dialog.ViewModel.SelectedSplitSizeOption;
+                cvm.CustomSplitSizeText = dialog.ViewModel.CustomSplitSizeText;
+
+                // 接管 B 数据集：对话框 VM 构建的过滤后压缩计划（含每源输出路径 + 匹配文件白名单）。
+                // 必须最后执行 —— 前面 SelectedPaths 拷贝会触发无参重建，AdoptPlan 使在途重建过期，
+                // 确保执行侧消费的是对话框内用户所见的一致结果（预览 = 实际）。
+                cvm.AdoptPlan(dialog.ViewModel.GetPlanForExecution());
+            }
+            return result;
+        };
+
+        vm.ShowPasswordManager = async () =>
+        {
+            var dialog = new PasswordManagerWindow();
+            await dialog.ShowDialog(this);
+        };
+
+        vm.ShowAboutDialog = async () =>
+        {
+            var dialog = new AboutWindow();
+            await dialog.ShowDialog(this);
+        };
+
+        vm.ShowDonateDialog = async () =>
+        {
+            var dialog = new DonationDialog();
+            await dialog.ShowDialog(this);
+        };
+
+        vm.ShowFavoritesDialog = async () =>
+        {
+            var dialog = new FavoriteManagerWindow();
+            await dialog.ShowDialog(this);
+        };
+
+        vm.RunWithProgress = async (title, filePaths, operation) =>
+        {
+            var pw = new ProgressWindow(title);
+            pw.InitCancellation();
+            var hasFileList = filePaths is { Count: > 0 };
+
+            // 批处理状态上报：操作闭包内经 BatchStatusReporter 传给引擎 onItemStatus
+            vm.BatchStatusReporter = (index, status) =>
+            {
+                pw.SetCurrentBatchItem(index);
+                pw.UpdateBatchItemStatus(index, status);
+            };
+
+            try
+            {
+                pw.Show();
+                if (hasFileList)
+                {
+                    pw.InitBatchMode(filePaths!);
+                    pw.SetCurrentBatchItem(0);
+                }
+
+                var progress = pw.CreatePauseAwareProgress(
+                    ProgressViewModel.CreateBackgroundProgress(pw, p => pw.SetProgress(p)));
+                await operation(progress, pw.CancellationToken);
+
+                if (hasFileList)
+                    pw.UpdateBatchItemStatus(0, BatchItemStatus.Completed);
+
+                // 成功：标记完成态 + 尊重 📌 KeepOpenOnComplete（对齐 WPF MainWindow.Menu.cs AutoCloseOrWaitAsync(0, ...)）
+                pw.SetComplete(LocalizationManager.T("Cli_StatusDone"));
+                await pw.AutoCloseOrWaitAsync(0, () => pw.Close());
+                return true;
+            }
+            catch (OperationCanceledException)
+            {
+                return false;
+            }
+            catch (Exception)
+            {
+                if (hasFileList)
+                    pw.UpdateBatchItemStatus(0, BatchItemStatus.Failed);
+                return false;
+            }
+            finally
+            {
+                pw.Close();
+                vm.BatchStatusReporter = null;
+            }
+        };
+
+        vm.CopyToClipboard = async (text) =>
+        {
+            try
+            {
+                var topLevel = TopLevel.GetTopLevel(this);
+                if (topLevel?.Clipboard != null)
+                {
+                    var transfer = new global::Avalonia.Input.DataTransfer();
+                    var item = new global::Avalonia.Input.DataTransferItem();
+                    item.SetText(text);
+                    transfer.Add(item);
+                    await topLevel.Clipboard.SetDataAsync(transfer);
+                }
+            }
+            catch
+            {
+                // Clipboard not available in this environment
+            }
+        };
+
+        vm.ShowCommentDialog = async (existingComment) =>
+        {
+            var dialog = new CommentDialog(existingComment);
+            var result = await dialog.ShowDialog<bool>(this);
+            return result ? dialog.Comment : null;
+        };
+
+        // ════════════════════════════════════════════════
+        //  压缩/解压冲突对话框回调（从后台线程调用）
+        // ════════════════════════════════════════════════
+
+        // 弹窗逻辑统一走 CompressFlow.ShowConflictDialogAsync（与 CLI 右键菜单共用），
+        // 本回调仅把 owner 窗口（MainWindow）与 VM 委托接线
+        vm.ShowCompressConflictDialog = info => CompressFlow.ShowConflictDialogAsync(this, info);
+
+        // 弹窗逻辑统一走 ExtractFlow.ShowConflictDialogAsync（与 CLI 右键菜单共用），
+        // 本回调仅把 owner 窗口（MainWindow）与 VM 委托接线
+        vm.ShowExtractFileConflictDialogAsync = info => ExtractFlow.ShowConflictDialogAsync(this, info);
+
+        // 添加文件冲突弹窗：复用解压弹窗循环，仅标题用「添加冲突」
+        vm.ShowAddFileConflictDialogAsync = info => ExtractFlow.ShowConflictDialogAsync(this, info, titleKey: "AddConflict_Title");
+
+        // ── Wire up select-all / invert-selection callbacks ──
+        vm.SelectAllEntriesAction = () =>
+        {
+            FileListGrid.SelectedItems.Clear();
+            if (FileListGrid.ItemsSource is System.Collections.IList source)
+            {
+                foreach (var item in source)
+                {
+                    if (item is ArchiveItemModel)
+                        FileListGrid.SelectedItems.Add(item);
+                }
+            }
+        };
+        vm.InvertSelectionAction = () =>
+        {
+            var selected = new HashSet<object>();
+            foreach (var item in FileListGrid.SelectedItems)
+                selected.Add(item);
+            var allItems = new List<object>();
+            if (FileListGrid.ItemsSource is System.Collections.IList source)
+            {
+                foreach (var item in source)
+                    allItems.Add(item);
+            }
+            FileListGrid.SelectedItems.Clear();
+            foreach (var item in allItems)
+            {
+                if (!selected.Contains(item))
+                    FileListGrid.SelectedItems.Add(item);
+            }
+        };
+
+        vm.GetOpenFilePaths = async () =>
+        {
+            var result = await StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+            {
+                Title = LocalizationManager.T("Main_SelectFilesTitle"),
+                AllowMultiple = true
+            });
+            return result.Count > 0 ? result.Select(f => f.TryGetLocalPath()).Where(p => p != null).Cast<string>().ToList() : null;
+        };
+
+        // ── Wire up metadata panel settings → open Settings window ──
+        vm.Preview.OpenSettingsToMetadataTab = async () =>
+        {
+            if (vm.ShowSettingsWindow != null)
+                await vm.ShowSettingsWindow();
+        };
+
+        // Setup drag-drop from file list
+        var fileGrid = this.FindControl<DataGrid>("FileListGrid");
+        if (fileGrid != null)
+        {
+            fileGrid.AddHandler(InputElement.PointerPressedEvent, (s, e) =>
+            {
+                _dragStartPoint = e.GetPosition(fileGrid);
+
+                // 命中测试：仅在按下位置命中数据行时才记录拖拽起点。
+                // 列标题（调整列宽/拖拽重排列）、空白区域、滚动条等按下不启动文件拖拽
+                // （镜像 WPF FileListGrid_PreviewMouseMove 的 row 空检查语义）。
+                var pressedItem = HitTestPressedRowItem(fileGrid, _dragStartPoint);
+                if (pressedItem == null)
+                {
+                    _dragStartEvent = null;
+                    _dragPreservedSelection = null;
+                    return;
+                }
+                _dragStartEvent = e;
+
+                // 按下行是否已属于当前选区（镜像 WPF InputHitTest 语义）。
+                // Tunnel 阶段先于 DataGrid 行自身的选中处理，此时 SelectedItems 仍是旧选区；
+                // 若按下的是未选中行，则不保留旧多选区 —— 拖拽只拖新按下的行。
+                var pressedInSelection = fileGrid.SelectedItems.Contains(pressedItem);
+
+                // Save multi-selection state at press time (before drag starts)
+                if (fileGrid.SelectedItems.Count > 1 && pressedInSelection)
+                {
+                    _dragPreservedSelection = fileGrid.SelectedItems
+                        .OfType<ArchiveItemModel>()
+                        .Select(m => m.ToCoreItem())
+                        .ToList();
+                }
+                else
+                {
+                    _dragPreservedSelection = null;
+                }
+            }, RoutingStrategies.Tunnel);
+
+            // Clear drag state on release to prevent click-selection from triggering drag
+            fileGrid.AddHandler(InputElement.PointerReleasedEvent, (s, e) =>
+            {
+                _dragStartEvent = null;
+                _dragPreservedSelection = null;
+            }, RoutingStrategies.Tunnel);
+
+            fileGrid.PointerMoved += async (s, e) =>
+            {
+                if (_dragStartEvent == null) return;
+
+                var pos = e.GetPosition(fileGrid);
+                var delta = pos - _dragStartPoint;
+                // 拖拽启动阈值：镜像 WPF SystemParameters.MinimumHorizontalDragDistance (~4px)，
+                // 避免 32px 造成的"拖起来黏手"感
+                if (Math.Abs(delta.X) < 4 && Math.Abs(delta.Y) < 4)
+                    return;
+
+                // 设置开关：EnableDragExtract = false 时不启动拖拽（与 WPF MainWindow.DragDrop.cs 行为一致）
+                if (!AppSettings.Load().EnableDragExtract)
+                {
+                    App.DebugLog("[MainWindow] EnableDragExtract off — drag skipped");
+                    _dragStartEvent = null;
+                    _dragPreservedSelection = null;
+                    return;
+                }
+
+                // Save trigger event before nulling (Avalonia DragDrop.DoDragDropAsync needs it)
+                var triggerEvent = _dragStartEvent;
+                _dragStartEvent = null; // Prevent re-entry
+
+                var vm2 = DataContext as MainWindowViewModel;
+                if (vm2?.SelectedEntry == null) return;
+                var archivePath = vm2.CurrentArchivePath;
+                if (string.IsNullOrEmpty(archivePath)) return;
+
+                // Get selected items (support multi-select)
+                var selectedItems = _dragPreservedSelection
+                    ?? new List<ArchiveItem> { vm2.SelectedEntry.ToCoreItem() };
+                var allItems = vm2.GetAllRawItems();
+
+                var password = vm2.GetSessionPassword(archivePath);
+
+                // Expand items: directories become their contained files (flat list)
+                var expandedItems = DragDropItemExpander.ExpandItems(selectedItems, allItems);
+                if (expandedItems.Count == 0)
+                    return;
+
+                _isOwnDrag = true;
+                vm2.StatusMessage = LocalizationManager.T("Status_DragHint");
+
+                // ── Create Avalonia overlay window (works on UI thread, controlled via Win32 from background) ──
+                var overlayWin = new Window
+                {
+                    ShowInTaskbar = false,
+                    Background = Brushes.Transparent,
+                    Width = 1,
+                    Height = 1,
+                    Topmost = true,
+                    ShowActivated = false,
+                };
+                overlayWin.Show();
+
+                var overlayHwnd = overlayWin.TryGetPlatformHandle()?.Handle ?? nint.Zero;
+                App.DebugLog($"[MainWindow] Overlay HWND=0x{overlayHwnd:X}");
+                if (overlayHwnd != nint.Zero)
+                {
+                    var exStyle = NativeMethods.GetWindowLong(overlayHwnd, NativeMethods.GWL_EXSTYLE);
+                    NativeMethods.SetWindowLong(overlayHwnd, NativeMethods.GWL_EXSTYLE,
+                        exStyle | NativeMethods.WS_EX_LAYERED | NativeMethods.WS_EX_TRANSPARENT
+                                | NativeMethods.WS_EX_NOACTIVATE | NativeMethods.WS_EX_TOOLWINDOW);
+
+                    // Remove title bar via Win32 (avoids Avalonia 12 enum compatibility issues)
+                    var overlayStyle = NativeMethods.GetWindowLong(overlayHwnd, NativeMethods.GWL_STYLE);
+                    NativeMethods.SetWindowLong(overlayHwnd, NativeMethods.GWL_STYLE,
+                        overlayStyle & ~0x00C00000u); // clear WS_CAPTION (title bar)
+
+                }
+
+                var mainHwnd = this.TryGetPlatformHandle()?.Handle ?? nint.Zero;
+                App.DebugLog($"[MainWindow] Main HWND=0x{mainHwnd:X}");
+                using var controller = new OverlayController(overlayHwnd, mainHwnd);
+                controller.Start();
+
+                // 拖拽光标：按 overlay 状态加载不同 .cur，源文件位于项目 Resources\Cursors\，
+                // 构建时复制到输出目录的 Resources\Cursors\ 下（与 MenuIcons 同模式）。
+                // 状态→文件约定：
+                //   None/默认        → DragCursor.cur     （金色）
+                //   Success(可放置)  → DragCursorOk.cur   （绿色）
+                //   Warning(警告)    → DragCursorWarn.cur （红色）
+                //   自家窗口         → DragCursorSelf.cur （灰色）
+                // 缺失文件回退基础 DragCursor.cur，再回退系统标准箭头（共享句柄，不可销毁）。
+                // 仅从文件加载的自定义句柄在拖拽结束后销毁。
+                var cursorHandles = new HashSet<nint>();
+                var cursorsDir = Path.Combine(AppContext.BaseDirectory, "Resources", "Cursors");
+
+                nint LoadStateCursor(string fileName, nint fallback)
+                {
+                    var path = Path.Combine(cursorsDir, fileName);
+                    if (File.Exists(path))
+                    {
+                        var h = NativeMethods.LoadCursorFromFile(path);
+                        if (h != nint.Zero)
+                        {
+                            cursorHandles.Add(h);
+                            return h;
+                        }
+                    }
+                    return fallback;
+                }
+
+                var baseCursor = LoadStateCursor("DragCursor.cur", nint.Zero);
+                if (baseCursor == nint.Zero)
+                    baseCursor = NativeMethods.LoadCursor(nint.Zero, new nint(NativeMethods.OCR_NORMAL));
+                var okCursor = LoadStateCursor("DragCursorOk.cur", baseCursor);
+                var warnCursor = LoadStateCursor("DragCursorWarn.cur", baseCursor);
+                var selfCursor = LoadStateCursor("DragCursorSelf.cur", baseCursor);
+
+                // 每次 GiveFeedback 按 overlay 当前状态动态选光标（与覆层颜色同一状态源）
+                Func<nint> cursorProvider = () =>
+                {
+                    if (controller.IsOverOwnWindow)
+                        return selfCursor;
+                    return controller.CurrentStatus switch
+                    {
+                        DropTargetDetector.DropTargetStatus.Success => okCursor,
+                        DropTargetDetector.DropTargetStatus.Warning => warnCursor,
+                        _ => baseCursor
+                    };
+                };
+
+                try
+                {
+                    // 自实现 OLE 拖拽：GiveFeedback 返回 S_OK 并直接 SetCursor 自定义光标。
+                    // Avalonia 的 DoDragDropAsync 内部固定返回 USEDEFAULTCURSORS，会让系统用
+                    // LoadCursor(OCR_NO) 显示禁止光标，而替换 OCR_NO 资源表在本机无效（已实证），
+                    // 因此绕开它自行控制光标。Esc 由 QueryContinueDrag 的 fEscapePressed 处理。
+                    App.DebugLog("[MainWindow] Custom OLE DoDragDrop START");
+                    _dragCancelled = false;
+                    var result = CustomOleDragDrop.PerformDragDrop(
+                        triggerEvent, MantisZipDragFormatName, archivePath,
+                        cursorProvider, DragDropEffects.Copy,
+                        () => _dragCancelled = true);
+                    App.DebugLog($"[MainWindow] Custom OLE DoDragDrop DONE: result={result}");
+
+                    // Close overlay IMMEDIATELY after drag completes, before dialog processing
+                    controller.Stop();
+                    overlayWin.Close();
+                    App.DebugLog("[MainWindow] Overlay closed");
+
+                    if (_dragCancelled)
+                    {
+                        // 用户按 Esc 或右键取消拖拽 → 不执行解压
+                        App.DebugLog("[MainWindow] Drag cancelled during drag — extraction skipped");
+                        if (vm2 != null)
+                            vm2.StatusMessage = LocalizationManager.T("Status_DragDragCancelled");
+                    }
+                    else
+                    {
+                        NativeMethods.GetCursorPos(out var dropPt);
+                        App.DebugLog($"[MainWindow] Drop point captured: ({dropPt.X}, {dropPt.Y})");
+
+                        if (vm2 != null && !string.IsNullOrEmpty(archivePath))
+                        {
+                            vm2.StatusMessage = LocalizationManager.T("Status_DragDetectingTarget");
+                            var dragService = new DragDropService(
+                                archivePath, password, this, vm2.CurrentFolder ?? "");
+                            await dragService.ExecuteAfterDropAsync(
+                                selectedItems, allItems, vm2);
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    App.DebugLog($"[MainWindow] DragDrop EXCEPTION: {ex.GetType().Name}: {ex.Message}");
+                }
+                finally
+                {
+                    // 释放自定义光标句柄（仅从文件加载的；共享标准箭头不销毁）
+                    foreach (var h in cursorHandles)
+                        NativeMethods.DestroyIcon(h);
+                    // Safety net: ensure overlay is closed even if early close was skipped
+                    try { overlayWin.Close(); } catch { }
+                    try { controller.Stop(); } catch { }
+                    _isOwnDrag = false;
+                    App.DebugLog("[MainWindow] DragDrop cleanup done");
+                }
+            };
+        }
+
+        // Prevent reacting to our own drag-drop
+        this.AddHandler(DragDrop.DropEvent, (s, e) =>
+        {
+            if (_isOwnDrag)
+                e.Handled = true;
+        });
+
+        // Persist window position/size/state + column widths on close
+        Closing += (_, _) => WindowStateManager.Save(this, CaptureColumnStates(), _lastSortMemberPath,
+            _lastSortMemberPath == null ? 0 : (_lastSortDescending ? 2 : 1));
+    }
+
+    /// <summary>
+    /// 将 window.json 中保存的列状态应用到 FileListGrid（按 ColumnId=SortMemberPath 或 Tag 匹配）。
+    /// 名称列不允许隐藏；图标列（Tag="Icon"）参与持久化 —— 用户可拖拽调整其位置。
+    /// 旧版 JSON（图标列未参与持久化）时：图标列固定最左，其余列按相对顺序顺延。
+    /// </summary>
+    private void ApplyColumnStates(List<WindowStateManager.ColumnStateDto>? states)
+    {
+        if (states == null || states.Count == 0)
+            return;
+
+        try
+        {
+            var columnDict = new Dictionary<string, DataGridColumn>();
+            foreach (var col in FileListGrid.Columns)
+            {
+                var id = GetColumnId(col);
+                if (id != null && !columnDict.ContainsKey(id))
+                    columnDict[id] = col;
+            }
+
+            // 新格式 JSON（含图标列状态）：按保存的 DisplayIndex 恢复全部列位置
+            if (states.Any(s => s.ColumnId == IconColumnTag))
+            {
+                foreach (var state in states.Where(s => !string.IsNullOrEmpty(s.ColumnId))
+                                            .OrderBy(s => s.DisplayIndex))
+                {
+                    if (state.ColumnId == null || !columnDict.TryGetValue(state.ColumnId, out var col))
+                        continue;
+
+                    if (state.Width > 0)
+                        col.Width = new DataGridLength(state.Width);
+
+                    // 名称列与图标列不可隐藏
+                    if (state.ColumnId != "Name" && state.ColumnId != IconColumnTag)
+                        col.IsVisible = state.Visible;
+
+                    col.DisplayIndex = state.DisplayIndex;
+                }
+            }
+            else
+            {
+                // 旧格式 JSON（图标列此前不参与持久化，可能已被挤到中间）：
+                // 图标列强制回最左（DisplayIndex 0），其余列按保存的相对顺序从 1 开始顺延。
+                if (columnDict.TryGetValue(IconColumnTag, out var iconCol))
+                    iconCol.DisplayIndex = 0;
+
+                int nextIndex = 1;
+                foreach (var state in states.Where(s => !string.IsNullOrEmpty(s.ColumnId))
+                                            .OrderBy(s => s.DisplayIndex))
+                {
+                    if (state.ColumnId == null || !columnDict.TryGetValue(state.ColumnId, out var col))
+                        continue;
+
+                    if (state.Width > 0)
+                        col.Width = new DataGridLength(state.Width);
+
+                    // 名称列不可隐藏
+                    if (state.ColumnId != "Name")
+                        col.IsVisible = state.Visible;
+
+                    col.DisplayIndex = nextIndex++;
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            App.DebugLog($"ApplyColumnStates: failed: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// 根据 AppSettings.PreviewPosition 重新布局预览面板位置（单 Grid 附加属性切换，不搬移控件）。
+    /// 1=底部, 2=目录树下方, 3=文件列表下方, 4=文件列表右侧（默认）。
+    /// 每次应用前完整重置所有相关属性再按目标位置设置，避免状态残留。
+    /// </summary>
+    private void ApplyPreviewPosition(int position)
+    {
+        if (ArchiveContentGrid == null || PreviewPanelHost == null)
+            return;
+
+        // 切换位置前保存旧位置的当前尺寸（仅 Pixel 布局记录，Star 不记录）。
+        // 位置未变化（设置窗口保存/菜单切换触发同位置重应用）时同样先记录当前尺寸：
+        // 分隔条拖拽产生的 Pixel 尺寸只存在于 Grid 定义中，若不记录，下面的完整重置
+        // 会把它丢弃，回退到默认（3* 星号 / 200px）或字典里过期的旧值 → 面板缩到最小。
+        if (position != _lastAppliedPreviewPosition)
+            SaveCurrentPreviewSize(_lastAppliedPreviewPosition);
+        else
+            SaveCurrentPreviewSize(position);
+
+        // ── 完整重置：清掉上一种布局的所有痕迹 ──
+        ArchiveContentGrid.RowDefinitions[1].Height = new GridLength(0);
+        ArchiveContentGrid.RowDefinitions[2].Height = new GridLength(0);
+        ArchiveContentGrid.ColumnDefinitions[3].Width = new GridLength(0);
+        ArchiveContentGrid.ColumnDefinitions[4].Width = new GridLength(0);
+        PreviewRowSplitter.IsVisible = false;
+        PreviewColSplitter.IsVisible = false;
+        Grid.SetRowSpan(FolderTreeBorder, 1);
+        Grid.SetRowSpan(TreeFileSplitter, 1);
+        Grid.SetRowSpan(FileListPanel, 1);
+        Grid.SetRowSpan(PreviewPanelHost, 1);
+        Grid.SetColumnSpan(PreviewPanelHost, 1);
+
+        switch (position)
+        {
+            case 1: // 底部：预览横跨全部 5 列
+                ArchiveContentGrid.RowDefinitions[1].Height = new GridLength(4);
+                ArchiveContentGrid.RowDefinitions[2].Height = _previewSizeByPosition.TryGetValue(1, out var h1)
+                    ? new GridLength(h1, GridUnitType.Pixel)
+                    : new GridLength(1, GridUnitType.Star);
+                PreviewRowSplitter.IsVisible = true;
+                Grid.SetColumn(PreviewRowSplitter, 0);
+                Grid.SetColumnSpan(PreviewRowSplitter, 5);
+                Grid.SetRow(PreviewPanelHost, 2);
+                Grid.SetColumn(PreviewPanelHost, 0);
+                Grid.SetColumnSpan(PreviewPanelHost, 5);
+                break;
+
+            case 2: // 目录树下方：文件列表跨 3 行占满底部
+                ArchiveContentGrid.RowDefinitions[1].Height = new GridLength(4);
+                ArchiveContentGrid.RowDefinitions[2].Height = _previewSizeByPosition.TryGetValue(2, out var h2)
+                    ? new GridLength(h2, GridUnitType.Pixel)
+                    : new GridLength(200);
+                Grid.SetRowSpan(FileListPanel, 3);
+                Grid.SetRowSpan(TreeFileSplitter, 3);
+                PreviewRowSplitter.IsVisible = true;
+                Grid.SetColumn(PreviewRowSplitter, 0);
+                Grid.SetColumnSpan(PreviewRowSplitter, 1);
+                Grid.SetRow(PreviewPanelHost, 2);
+                Grid.SetColumn(PreviewPanelHost, 0);
+                Grid.SetColumnSpan(PreviewPanelHost, 1);
+                break;
+
+            case 3: // 文件列表下方：目录树跨 3 行占满底部
+                ArchiveContentGrid.RowDefinitions[1].Height = new GridLength(4);
+                ArchiveContentGrid.RowDefinitions[2].Height = _previewSizeByPosition.TryGetValue(3, out var h3)
+                    ? new GridLength(h3, GridUnitType.Pixel)
+                    : new GridLength(200);
+                Grid.SetRowSpan(FolderTreeBorder, 3);
+                Grid.SetRowSpan(TreeFileSplitter, 3);
+                PreviewRowSplitter.IsVisible = true;
+                Grid.SetColumn(PreviewRowSplitter, 2);
+                Grid.SetColumnSpan(PreviewRowSplitter, 3);
+                Grid.SetRow(PreviewPanelHost, 2);
+                Grid.SetColumn(PreviewPanelHost, 2);
+                Grid.SetColumnSpan(PreviewPanelHost, 3);
+                break;
+
+            default: // 4: 文件列表右侧（默认布局）
+                ArchiveContentGrid.ColumnDefinitions[3].Width = new GridLength(5);
+                ArchiveContentGrid.ColumnDefinitions[4].Width = _previewSizeByPosition.TryGetValue(4, out var w4)
+                    ? new GridLength(w4, GridUnitType.Pixel)
+                    : new GridLength(3, GridUnitType.Star);
+                PreviewColSplitter.IsVisible = true;
+                Grid.SetRow(PreviewPanelHost, 0);
+                Grid.SetColumn(PreviewPanelHost, 4);
+                break;
+        }
+
+        // 面板隐藏时：压缩预览占位行列 + 隐藏 splitter + 复位 RowSpan，让树/列表撑满
+        if (!_previewPanelEnabled)
+        {
+            // 隐藏前记录当前 Pixel 尺寸，保证重新打开时保留用户拖过的宽度/高度
+            SaveCurrentPreviewSize(position);
+            PreviewRowSplitter.IsVisible = false;
+            PreviewColSplitter.IsVisible = false;
+            ArchiveContentGrid.RowDefinitions[1].Height = new GridLength(0);
+            ArchiveContentGrid.RowDefinitions[2].Height = new GridLength(0);
+            ArchiveContentGrid.ColumnDefinitions[3].Width = new GridLength(0);
+            ArchiveContentGrid.ColumnDefinitions[4].Width = new GridLength(0);
+            Grid.SetRowSpan(FolderTreeBorder, 1);
+            Grid.SetRowSpan(TreeFileSplitter, 1);
+            Grid.SetRowSpan(FileListPanel, 1);
+        }
+
+        _lastAppliedPreviewPosition = position;
+    }
+
+    /// <summary>
+    /// 从磁盘重读设置并统一应用预览面板的显隐与位置（启动时与设置窗口保存后调用）。
+    /// 同时把显隐同步回 MainWindowViewModel.IsPreviewVisible，保证菜单勾选状态一致。
+    /// </summary>
+    private void ApplyPreviewLayout()
+    {
+        var settings = AppSettings.Load();
+        _previewPanelEnabled = settings.ShowPreviewPanel;
+        if (DataContext is MainWindowViewModel vm)
+        {
+            vm.IsPreviewVisible = settings.ShowPreviewPanel;
+            // 设置保存后同步信息面板显隐与方向（此前仅启动时初始化一次，设置窗口修改后不生效）
+            vm.Preview.ShowInfoPanel = settings.ShowPreviewInfoPanel;
+            vm.Preview.InfoPanelOrientation = settings.InfoPanelOrientation;
+        }
+        ApplyPreviewPosition(settings.PreviewPosition);
+    }
+
+    /// <summary>保存指定预览位置的当前尺寸到记忆字典（仅在布局为 Pixel 且值有效时记录，面板隐藏压缩产生的 0 不记录）。</summary>
+    private void SaveCurrentPreviewSize(int position)
+    {
+        if (ArchiveContentGrid == null)
+            return;
+
+        if (position == 4)
+        {
+            var w = ArchiveContentGrid.ColumnDefinitions[4].Width;
+            if (w.GridUnitType == GridUnitType.Pixel && w.Value > 0)
+                _previewSizeByPosition[4] = w.Value;
+        }
+        else if (position is 1 or 2 or 3)
+        {
+            var h = ArchiveContentGrid.RowDefinitions[2].Height;
+            if (h.GridUnitType == GridUnitType.Pixel && h.Value > 0)
+                _previewSizeByPosition[position] = h.Value;
+        }
+    }
+
+    /// <summary>
+    /// 启动时加载上次手动保存的布局快照（layout.json）：
+    /// 回填预览面板各位置记忆尺寸 + 应用目录树/文件列表列宽（像素）。
+    /// 必须在 ApplyPreviewLayout() 之前调用，保证 ApplyPreviewPosition 能读到已回填的预览尺寸。
+    /// </summary>
+    private void ApplySavedLayout()
+    {
+        var snapshot = LayoutStateManager.Load();
+        if (snapshot == null)
+            return;
+
+        try
+        {
+            if (snapshot.PreviewSizeByPosition is { Count: > 0 })
+            {
+                foreach (var kvp in snapshot.PreviewSizeByPosition)
+                {
+                    if (kvp.Value > 0)
+                        _previewSizeByPosition[kvp.Key] = kvp.Value;
+                }
+            }
+
+            if (snapshot.TreeColumnWidth is > 0)
+                ArchiveContentGrid.ColumnDefinitions[0].Width = new GridLength(snapshot.TreeColumnWidth.Value, GridUnitType.Pixel);
+            if (snapshot.FileListColumnWidth is > 0)
+                ArchiveContentGrid.ColumnDefinitions[2].Width = new GridLength(snapshot.FileListColumnWidth.Value, GridUnitType.Pixel);
+        }
+        catch (Exception ex)
+        {
+            App.DebugLog($"ApplySavedLayout: failed: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// 手动保存内容区布局快照（菜单「保存布局」触发）：
+    /// 目录树列宽（col 0）+ 文件列表列宽（col 2）+ 预览面板各位置记忆尺寸。
+    /// Star 布局的列用 ActualWidth 捕获实际像素值，保证恢复后布局与保存时一致。
+    /// </summary>
+    private void SaveLayout()
+    {
+        try
+        {
+            // 先记录当前活动预览位置的实时尺寸（分隔条拖拽值只存在于 Grid 定义中）
+            SaveCurrentPreviewSize(_lastAppliedPreviewPosition);
+
+            var snapshot = new LayoutStateManager.LayoutSnapshot
+            {
+                TreeColumnWidth = CaptureColumnActualWidth(ArchiveContentGrid, 0),
+                FileListColumnWidth = CaptureColumnActualWidth(ArchiveContentGrid, 2),
+                PreviewSizeByPosition = new Dictionary<int, double>(_previewSizeByPosition)
+            };
+
+            LayoutStateManager.Save(snapshot);
+            if (DataContext is MainWindowViewModel vm)
+                vm.StatusMessage = LocalizationManager.T("Status_LayoutSaved");
+        }
+        catch (Exception ex)
+        {
+            App.DebugLog($"SaveLayout: failed: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// 捕获指定列的实际像素宽度：Pixel 布局直接用值，Star 布局用 ActualWidth。
+    /// 返回 >0 的有效宽度；Grid 未布局（ActualWidth=0）时返回 null。
+    /// </summary>
+    private static double? CaptureColumnActualWidth(Grid grid, int index)
+    {
+        var w = grid.ColumnDefinitions[index].Width;
+        var pixel = w.GridUnitType == GridUnitType.Pixel ? w.Value : grid.ColumnDefinitions[index].ActualWidth;
+        return pixel > 0 ? pixel : null;
+    }
+    /// <summary>
+    /// 获取列的持久化标识：优先 SortMemberPath，其次 Tag（图标列 Tag="Icon"）。
+    /// </summary>
+    private static string? GetColumnId(DataGridColumn col)
+    {
+        if (!string.IsNullOrEmpty(col.SortMemberPath))
+            return col.SortMemberPath;
+        return col.Tag as string;
+    }
+
+    /// <summary>
+    /// 捕获 FileListGrid 各列的宽度/可见性/顺序快照（标识 = SortMemberPath 或 Tag），
+    /// 供 WindowStateManager.Save 持久化到 window.json。图标列（Tag="Icon"）一并保存，
+    /// 保证用户拖拽调整后的列位置（含图标列）能被正确恢复。
+    /// </summary>
+    private List<WindowStateManager.ColumnStateDto>? CaptureColumnStates()
+    {
+        try
+        {
+            var states = new List<WindowStateManager.ColumnStateDto>();
+            foreach (var col in FileListGrid.Columns)
+            {
+                var id = GetColumnId(col);
+                if (id == null)
+                    continue;
+
+                states.Add(new WindowStateManager.ColumnStateDto
+                {
+                    ColumnId = id,
+                    Width = col.Width.Value,
+                    Visible = col.IsVisible,
+                    DisplayIndex = col.DisplayIndex
+                });
+            }
+            return states;
+        }
+        catch (Exception ex)
+        {
+            App.DebugLog($"CaptureColumnStates: failed: {ex.Message}");
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// 命中测试：返回按下位置所在行的数据项（ArchiveItemModel）；未命中任何行时返回 null。
+    /// 镜像 WPF MainWindow.DragDrop.cs 的 InputHitTest 语义：判断按下的行是否已在当前选区中。
+    /// </summary>
+    private static ArchiveItemModel? HitTestPressedRowItem(DataGrid grid, Point position)
+    {
+        var hit = grid.InputHitTest(position);
+        for (var v = hit as Visual; v != null; v = v.GetVisualParent())
+        {
+            if (v is DataGridRow row && row.DataContext is ArchiveItemModel model)
+                return model;
+        }
+        return null;
+    }
+
+    private async void FileListGrid_DoubleTapped(object? sender, TappedEventArgs e)
+    {
+        if (sender is not DataGrid grid) return;
+        if (grid.SelectedItem is not ArchiveItemModel item) return;
+        if (DataContext is not MainWindowViewModel vm) return;
+
+        if (item.IsDirectory)
+        {
+            vm.NavigateToFolderPath(item.FullPath);
+            return;
+        }
+
+        // 文件双击：提取到临时目录并用系统默认方式打开
+        if (!string.IsNullOrEmpty(vm.CurrentArchivePath))
+            await vm.OpenEntryWithDefaultAppAsync(item);
+    }
+
+    private void FileListGrid_KeyDown(object? sender, global::Avalonia.Input.KeyEventArgs e)
+    {
+        if (sender is not DataGrid grid) return;
+        if (grid.SelectedItem is not ArchiveItemModel item) return;
+        if (DataContext is not MainWindowViewModel vm) return;
+
+        switch (e.Key)
+        {
+            case global::Avalonia.Input.Key.Enter:
+                if (item.IsDirectory)
+                {
+                    vm.NavigateToFolderPath(item.FullPath);
+                    e.Handled = true;
+                }
+                break;
+
+            case global::Avalonia.Input.Key.Back:
+                vm.GoUpCommand.Execute(null);
+                e.Handled = true;
+                break;
+
+            case global::Avalonia.Input.Key.Delete:
+                vm.DeleteFilesCommand.Execute(null);
+                e.Handled = true;
+                break;
+        }
+    }
+
+    private void FileListGrid_Sorting(object? sender, DataGridColumnEventArgs e)
+    {
+        if (sender is not DataGrid grid) return;
+
+        var sortMemberPath = e.Column.SortMemberPath;
+
+        // 阻止默认排序（改用自定义手动排序）
+        e.Handled = true;
+
+        // 图标列（无 SortMemberPath）不参与排序
+        if (string.IsNullOrEmpty(sortMemberPath))
+            return;
+
+        // 三态循环：新列 → 升序；同列升序 → 降序；同列降序 → 未排序（恢复原始顺序）
+        if (_lastSortMemberPath != sortMemberPath)
+        {
+            _lastSortMemberPath = sortMemberPath;
+            _lastSortDescending = false;
+        }
+        else if (!_lastSortDescending)
+        {
+            _lastSortDescending = true;
+        }
+        else
+        {
+            _lastSortMemberPath = null;
+            _lastSortDescending = false;
+        }
+
+        ApplyCurrentSort();
+        UpdateSortArrows();
+    }
+
+    /// <summary>
+    /// 按当前排序状态重排 CurrentEntries：
+    /// - .. 导航行永远置顶（防御性保留，Avalonia 列表暂无导航行）
+    /// - SeparateDirBaseline 开启时目录排在文件前
+    /// - 已排序列：按列值排序（组内保持原始顺序）；未排序：保持压缩包原始顺序
+    /// </summary>
+    private void ApplyCurrentSort()
+    {
+        if (DataContext is not MainWindowViewModel vm) return;
+
+        // 用 VM 缓存的设置（AppSettings.Load() 每次读磁盘，不在此调用）
+        var separateDirBaseline = vm.SeparateDirBaseline;
+        var entries = vm.CurrentEntries.ToList();
+        var path = _lastSortMemberPath;
+
+        IOrderedEnumerable<ArchiveItemModel> sorted = entries
+            .OrderBy(e => e.Name == ".." ? 0 : 1)
+            .ThenBy(e => separateDirBaseline ? (e.IsDirectory ? 0 : 1) : 0);
+
+        if (!string.IsNullOrEmpty(path))
+        {
+            sorted = _lastSortDescending
+                ? sorted.ThenByDescending(e => GetSortValue(e, path))
+                : sorted.ThenBy(e => GetSortValue(e, path));
+        }
+
+        vm.CurrentEntries.Clear();
+        foreach (var item in sorted)
+            vm.CurrentEntries.Add(item);
+    }
+
+    /// <summary>
+    /// 更新各列头排序箭头：激活列显示 ▲/▼，其余列清空。
+    /// </summary>
+    private void UpdateSortArrows()
+    {
+        var path = _lastSortMemberPath;
+        var desc = _lastSortDescending;
+        SetSortArrow(NameHeaderArrow, path == "Name", desc);
+        SetSortArrow(SizeHeaderArrow, path == "Size", desc);
+        SetSortArrow(CompressedSizeHeaderArrow, path == "CompressedSize", desc);
+        SetSortArrow(RatioHeaderArrow, path == "RatioSort", desc);
+        SetSortArrow(LastModifiedHeaderArrow, path == "LastModified", desc);
+    }
+
+    private static void SetSortArrow(TextBlock? arrow, bool isActive, bool descending)
+    {
+        if (arrow == null) return;
+        arrow.Text = isActive ? (descending ? "▼" : "▲") : "";
+    }
+
+    private static IComparable GetSortValue(ArchiveItemModel item, string memberPath)
+    {
+        return memberPath switch
+        {
+            "Name" or "NameDisplay" => item.NameDisplay,
+            "Size" => item.Size,
+            "CompressedSize" => item.CompressedSize,
+            "LastModified" => item.LastModified,
+            "RatioSort" or "CompressionRatio" => item.RatioSort,
+            _ => item.NameDisplay
+        };
+    }
+
+    private void OnWindowDragOver(object? sender, DragEventArgs e)
+    {
+        if (e.DataTransfer == null || !e.DataTransfer.Formats.Contains(DataFormat.File))
+        {
+            e.DragEffects = DragDropEffects.None;
+            HideDragAddOverlay();
+            return;
+        }
+
+        var vm = DataContext as MainWindowViewModel;
+        bool archiveLoaded = vm?.CurrentArchivePath != null && File.Exists(vm.CurrentArchivePath);
+
+        if (archiveLoaded)
+        {
+            // 拖入单个压缩包 → 切换打开，不显示添加覆层（与 WPF Window_Drop 行为一致）
+            var paths = GetDroppedLocalPaths(e);
+            if (paths.Count == 1 && ArchiveFormatHelper.IsArchiveFile(paths[0]))
+            {
+                e.DragEffects = DragDropEffects.Copy;
+                HideDragAddOverlay();
+                return;
+            }
+
+            var engine = ArchiveEngineFactory.GetEngineByExtension(vm!.CurrentArchivePath!);
+            bool canAdd = engine?.CanAdd(ArchiveFormatHelper.GetFormat(vm.CurrentArchivePath!)) == true;
+            if (canAdd)
+            {
+                e.DragEffects = DragDropEffects.Copy;
+                ShowDragAddOverlay(isGreen: true,
+                    LocalizationManager.T("DragAdd_OverlayAddTo", BuildTargetDisplay(vm)));
+            }
+            else
+            {
+                e.DragEffects = DragDropEffects.None;
+                ShowDragAddOverlay(isGreen: false, LocalizationManager.T("DragAdd_OverlayUnsupported"));
+            }
+            return;
+        }
+
+        e.DragEffects = DragDropEffects.Copy;
+        HideDragAddOverlay();
+    }
+
+    private void OnWindowDragLeave(object? sender, DragEventArgs e)
+    {
+        HideDragAddOverlay();
+    }
+
+    private async void OnWindowDrop(object? sender, DragEventArgs e)
+    {
+        HideDragAddOverlay();
+        if (e.DataTransfer == null) return;
+
+        var paths = GetDroppedLocalPaths(e);
+        if (paths.Count == 0) return;
+
+        var vm = DataContext as MainWindowViewModel;
+        if (vm == null) return;
+
+        if (vm.CurrentArchivePath != null && File.Exists(vm.CurrentArchivePath))
+        {
+            // 分支 1：拖入单个压缩包 → 切换打开
+            if (paths.Count == 1 && ArchiveFormatHelper.IsArchiveFile(paths[0]))
+            {
+                await vm.LoadArchiveAsync(paths[0]);
+                return;
+            }
+
+            // 分支 2：确认框 → 添加到当前压缩包（复用 WPF 文案与冲突处理）
+            var result = await AppMessageBox.Show(
+                LocalizationManager.T("Main_DragAddConfirm", paths.Count, Path.GetFileName(vm.CurrentArchivePath)),
+                LocalizationManager.T("CompressConflict_Add"),
+                MessageBoxButton.YesNo, MessageBoxImage.Question, this);
+            if (result == MessageBoxResult.Yes)
+                await vm.AddFilesToArchiveAsync(paths);
+            return;
+        }
+
+        // 未打开压缩包
+        if (ArchiveFormatHelper.IsArchiveFile(paths[0]))
+        {
+            // 分支 3a：拖入压缩包 → 打开
+            await vm.LoadArchiveAsync(paths[0]);
+        }
+        else
+        {
+            // 分支 3b：拖入非压缩包 → 压缩对话框预填源文件
+            var dialog = new CompressSettingsWindow(paths);
+            await dialog.ShowDialog(this);
+        }
+    }
+
+    /// <summary>收集拖入项的本地路径（文件 + 文件夹均支持，IStorageFolder 继承自 IStorageItem）。</summary>
+    private static List<string> GetDroppedLocalPaths(DragEventArgs e)
+    {
+        var paths = new List<string>();
+        foreach (var item in e.DataTransfer.Items)
+        {
+            var raw = item.TryGetRaw(DataFormat.File);
+            if (raw is IStorageItem storageItem)
+            {
+                var path = storageItem.TryGetLocalPath();
+                if (!string.IsNullOrEmpty(path))
+                    paths.Add(path);
+            }
+        }
+        return paths;
+    }
+
+    /// <summary>构建覆层目标显示文案：压缩包名 + 当前浏览目录（如 "backup.zip/文档"）。</summary>
+    private static string BuildTargetDisplay(MainWindowViewModel vm)
+    {
+        var archiveName = Path.GetFileName(vm.CurrentArchivePath) ?? vm.CurrentArchivePath;
+        return string.IsNullOrEmpty(vm.CurrentFolder)
+            ? archiveName
+            : $"{archiveName}/{vm.CurrentFolder}";
+    }
+
+    /// <summary>覆层呼吸动画：与 OverlayController 相同的正弦公式 alpha 40-120（约 2s 周期），仅背景层 Opacity 呼吸。</summary>
+    private void OnDragAddOverlayTimerTick(object? sender, EventArgs e)
+    {
+        double breath = 80 + 40 * Math.Sin(_dragAddOverlayTick * Math.PI / 10);
+        byte alpha = (byte)Math.Clamp(breath, 40, 120);
+        DragAddOverlayBg.Opacity = alpha / 255.0;
+        _dragAddOverlayTick++;
+    }
+
+    /// <summary>显示拖拽添加覆层：绿色=可添加，红色=不可添加。视觉对齐拖拽解压覆层——
+    /// 状态色呼吸背景（#6BD46B/#F43643）+ 8px 不透明边框 + 白色粗体文字 + ✓/⚠ 图标（颜色与拖拽解压一致）。</summary>
+    private void ShowDragAddOverlay(bool isGreen, string text)
+    {
+        var color = isGreen ? Color.Parse("#6BD46B") : Color.Parse("#F43643");
+        DragAddOverlay.BorderBrush = new SolidColorBrush(color);
+        DragAddOverlayBg.Background = new SolidColorBrush(color);
+        DragAddOverlayIcon.Text = isGreen ? "\u2713" : "\u26A0";
+        DragAddOverlayIcon.Foreground = new SolidColorBrush(
+            isGreen ? Color.Parse("#90E060") : Color.Parse("#FFE020"));
+        DragAddOverlayText.Text = text;
+        DragAddOverlay.IsVisible = true;
+        _dragAddOverlayTick = 0;
+        _dragAddOverlayTimer.Start();
+    }
+
+    private void HideDragAddOverlay()
+    {
+        DragAddOverlay.IsVisible = false;
+        _dragAddOverlayTimer.Stop();
+    }
+
+    private void FileListGrid_SelectionChanged(object? sender, SelectionChangedEventArgs e)
+    {
+        if (DataContext is not MainWindowViewModel vm) return;
+        vm.SelectedEntries.Clear();
+        foreach (var item in FileListGrid.SelectedItems)
+        {
+            if (item is ArchiveItemModel model)
+                vm.SelectedEntries.Add(model);
+        }
+    }
+
+    public async void LoadArchiveOnStartup(string path)
+    {
+        // Wait for window to be ready
+        await Task.Delay(100); // Small delay to let the window initialize
+        var vm = DataContext as MainWindowViewModel;
+        if (vm != null)
+        {
+            await vm.LoadArchiveAsync(path);
+        }
+    }
+
+    private async Task<string?> OpenFileDialogAsync()
+    {
+        // 以当前已打开压缩包的所在目录作为「场景相关路径」初值（无则 null → 走优先级链其它来源）
+        var contextPath = (DataContext as MainWindowViewModel)?.CurrentArchivePath is { } c
+            ? Path.GetDirectoryName(c)
+            : null;
+        return await CustomFilePickerDialog.ShowOpenFileAsync(
+            this,
+            initialPath: contextPath,
+            fileExtensions:
+            [
+                "*.zip", "*.7z", "*.rar", "*.tar", "*.tgz", "*.tar.gz", "*.gz", "*.iso"
+            ]);
+    }
+
+    // ── Filter picker buttons (🧪 pick from selected items) ──
+
+    private void PickDateFrom_Click(object? sender, RoutedEventArgs e)
+    {
+        var vm = DataContext as MainWindowViewModel;
+        if (vm == null) return;
+        try
+        {
+            if (vm.SelectedEntries.Count == 0)
+            {
+                WritePickerTrace("PickDateFrom: SelectedEntries is empty");
+                return;
+            }
+            var dates = vm.SelectedEntries
+                .Where(i => !i.IsDirectory && i.LastModified > DateTime.MinValue)
+                .Select(i => i.LastModified)
+                .ToList();
+            if (dates.Count == 0)
+            {
+                WritePickerTrace("PickDateFrom: no valid dates, entries=" + vm.SelectedEntries.Count);
+                return;
+            }
+            var minDate = dates.Min();
+            WritePickerTrace($"PickDateFrom: minDate={minDate:O}, picker.IsNull={FilterDateFromPicker == null}, vm.IsNull={vm == null}");
+            vm.FilterDateFrom = minDate;
+            if (FilterDateFromPicker != null)
+                FilterDateFromPicker.SelectedDate = minDate;
+        }
+        catch (Exception ex)
+        {
+            WritePickerTrace($"PickDateFrom ERROR: {ex}");
+        }
+    }
+
+    private void PickDateTo_Click(object? sender, RoutedEventArgs e)
+    {
+        var vm = DataContext as MainWindowViewModel;
+        if (vm == null) return;
+        try
+        {
+            if (vm.SelectedEntries.Count == 0)
+            {
+                WritePickerTrace("PickDateTo: SelectedEntries is empty");
+                return;
+            }
+            var dates = vm.SelectedEntries
+                .Where(i => !i.IsDirectory && i.LastModified > DateTime.MinValue)
+                .Select(i => i.LastModified)
+                .ToList();
+            if (dates.Count == 0)
+            {
+                WritePickerTrace("PickDateTo: no valid dates");
+                return;
+            }
+            var maxDate = dates.Max();
+            vm.FilterDateTo = maxDate;
+            if (FilterDateToPicker != null)
+                FilterDateToPicker.SelectedDate = maxDate;
+        }
+        catch (Exception ex)
+        {
+            WritePickerTrace($"PickDateTo ERROR: {ex}");
+        }
+    }
+
+    private static void WritePickerTrace(string msg)
+    {
+        var logPath = Path.Combine(
+            AppSettings.DataDir, "debug.log");
+        try
+        {
+            var dir = Path.GetDirectoryName(logPath);
+            if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
+                Directory.CreateDirectory(dir);
+            File.AppendAllText(logPath, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}] [PN] {msg}\n");
+        }
+        catch { }
+    }
+
+    private void PickSizeMin_Click(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is not MainWindowViewModel vm) return;
+        if (vm.SelectedEntries.Count == 0) return;
+        var sizes = vm.SelectedEntries
+            .Where(i => !i.IsDirectory)
+            .Select(i => i.Size)
+            .ToList();
+        if (sizes.Count == 0) return;
+        vm.FilterSizeMin = sizes.Min();
+        vm.FilterSizeUnit = "B";
+    }
+
+    private void PickSizeMax_Click(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is not MainWindowViewModel vm) return;
+        if (vm.SelectedEntries.Count == 0) return;
+        var sizes = vm.SelectedEntries
+            .Where(i => !i.IsDirectory)
+            .Select(i => i.Size)
+            .ToList();
+        if (sizes.Count == 0) return;
+        vm.FilterSizeMax = sizes.Max();
+        vm.FilterSizeUnit = "B";
+    }
+
+    private void AddressBar_KeyDown(object? sender, global::Avalonia.Input.KeyEventArgs e)
+    {
+        if (e.Key == global::Avalonia.Input.Key.Enter)
+        {
+            if (sender is AutoCompleteBox box)
+            {
+                var vm = DataContext as MainWindowViewModel;
+                vm?.NavigateToFolderPath(box.Text ?? "");
+            }
+            e.Handled = true;
+        }
+    }
+
+    private void ColumnHeaderContextMenu_Opening(object? sender, CancelEventArgs e)
+    {
+        if (sender is not ContextMenu menu) return;
+        menu.Items.Clear();
+
+        foreach (var column in FileListGrid.Columns)
+        {
+            var header = GetColumnHeaderText(column);
+            // 名称列不允许隐藏（图标列无表头文字，同样跳过）
+            if (header == LocalizationManager.T("DataGrid_Name") || string.IsNullOrEmpty(header))
+                continue;
+
+            // 与主菜单切换图标同构：ToggleIconBox（可见=强调色底，隐藏=透明空心），16×16 适配 Icon 槽位
+            var iconBox = new Border
+            {
+                Classes = { "ToggleIconBox" },
+                Background = ToggleIconBackground(column.IsVisible),
+                Child = GetColumnHeaderIcon(column) is { } iconData
+                    ? new PathIcon
+                    {
+                        Data = iconData,
+                        Width = 10,
+                        Height = 10,
+                        Foreground = GetThemeBrush("ThemeTextPrimaryBrush")
+                    }
+                    : null
+            };
+
+            // 与主菜单切换项同构：Icon 槽位（ToggleIconBox）+ Header 字符串
+            var menuItem = new MenuItem
+            {
+                Icon = iconBox,
+                Header = header,
+                Tag = column
+            };
+            menuItem.Click += (s, args) =>
+            {
+                column.IsVisible = !column.IsVisible;
+                iconBox.Background = ToggleIconBackground(column.IsVisible);
+            };
+            menu.Items.Add(menuItem);
+        }
+    }
+
+    /// <summary>可见 → ThemeToggleBrush（强调色底），隐藏 → Transparent（空心），与主菜单切换图标一致。</summary>
+    private static IBrush ToggleIconBackground(bool isVisible)
+    {
+        return new BoolToToggleBgBrushConverter().Convert(isVisible, typeof(IBrush), null, CultureInfo.InvariantCulture) as IBrush
+            ?? Brushes.Transparent;
+    }
+
+    /// <summary>从列标题的 StackPanel 中提取 PathIcon 的几何，与列头图标同款，保证视觉一致。</summary>
+    private static Geometry? GetColumnHeaderIcon(DataGridColumn column)
+    {
+        if (column.Header is StackPanel panel)
+        {
+            var icon = panel.Children.OfType<PathIcon>().FirstOrDefault();
+            if (icon != null)
+                return icon.Data;
+        }
+        return null;
+    }
+
+    /// <summary>从当前应用资源中取主题画刷（主题切换后动态解析）。</summary>
+    private static IBrush GetThemeBrush(string key)
+    {
+        if (Application.Current?.TryFindResource(key, out var brush) == true && brush is IBrush b)
+            return b;
+        return Brushes.Gray;
+    }
+
+    private static string GetColumnHeaderText(DataGridColumn column)
+    {
+        if (column.Header is string s)
+            return s.TrimEnd('▲', '▼', ' ').TrimEnd();
+        if (column.Header is StackPanel panel)
+        {
+            var tb = panel.Children.OfType<TextBlock>().LastOrDefault();
+            if (tb != null)
+                return tb.Text ?? "";
+        }
+        return "";
+    }
+
+    private async void RecentFileMenuItem_Click(object? sender, RoutedEventArgs e)
+    {
+        if (sender is MenuItem mi && mi.DataContext is string filePath)
+        {
+            if (DataContext is MainWindowViewModel vm && vm.OpenRecentFileCommand.CanExecute(filePath))
+            {
+                vm.OpenRecentFileCommand.Execute(filePath);
+            }
+        }
+    }
+
+    private async void TestWindow_Click(object? sender, RoutedEventArgs e)
+    {
+        if (sender is not MenuItem mi || mi.Tag is not string tag)
+            return;
+
+        // AppMessageBox uses static Show() — handle separately
+        if (tag == "AppMessageBox")
+        {
+            await AppMessageBox.Show("这是一个测试消息框\n可用于测试消息弹窗的显示效果。",
+                "测试", MessageBoxButton.OKCancel, MessageBoxImage.Information, this);
+            return;
+        }
+
+        Window? window = tag switch
+        {
+            "IconTestWindow" => new Dialogs.IconTestWindow(),
+            "UiTestWindow" => new Views.UiTestWindow(),
+            "AboutWindow" => new AboutWindow(),
+            "SettingsWindow" => new Views.SettingsWindow(),
+            "PasswordManagerWindow" => new PasswordManagerWindow(),
+            "DonationDialog" => new DonationDialog(),
+            "LogPrivacyHelpDialog" => new LogPrivacyHelpDialog(),
+            "PasswordHelpDialog" => new PasswordHelpDialog(),
+            "CommentDialog" => new CommentDialog(),
+            "PasswordEditDialog" => new PasswordEditDialog(),
+            "PasswordDialog" => new PasswordDialog("test.7z"),
+            "ProgressWindow" => new ProgressWindow("测试进度窗口"),
+            "ErrorDialog" => new ErrorDialog(new FileErrorInfo { FilePath = @"C:\test\test.zip", ErrorMessage = "这是一个测试错误信息\n可用于测试错误对话框的显示效果。" }),
+            "CompressSettingsWindow" => new CompressSettingsWindow(),
+            "ExtractSettingsWindow" => new ExtractSettingsWindow(),
+            "CompressConflictDialog" => new CompressConflictDialog(@"C:\test\file.txt", "file.txt"),
+            "ConflictDialog" => new ConflictDialog(new FileConflictInfo { FilePath = @"C:\existing\file.txt" }),
+            "MatchedPasswordDialog" => new MatchedPasswordDialog(new PasswordEntry { Description = "测试密码", Patterns = { "*.zip" }, Password = "test123" }, "test.zip"),
+            "ElevationDialog" => new ElevationDialog(new[] { @"C:\Protected\Dir" }),
+            "ElevationFailedDialog" => new ElevationFailedDialog(new[] { @"C:\Protected\Dir" }),
+            "ElevationInfoDialog" => new ElevationInfoDialog(new[] { @"C:\Protected\Dir" }),
+            "AddFavoriteDialog" => new AddFavoriteDialog(),
+            "FavoriteManagerWindow" => new FavoriteManagerWindow(),
+            "ArchiveCommentDialog" => new ArchiveCommentDialog(@"C:\test.zip", ArchiveFormat.Zip, "测试注释"),
+            _ => null
+        };
+
+        if (window != null)
+        {
+            await window.ShowDialog(this);
+        }
+    }
+}

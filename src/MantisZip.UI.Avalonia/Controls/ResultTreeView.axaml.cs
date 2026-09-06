@@ -1,0 +1,744 @@
+using System.Collections.ObjectModel;
+using System.Linq;
+using Avalonia;
+using Avalonia.Controls;
+using Avalonia.Interactivity;
+using MantisZip.Core.Services;
+using MantisZip.UI.Avalonia.Models;
+using MantisZip.UI.Avalonia.Services;
+
+namespace MantisZip.UI.Avalonia.Controls;
+
+/// <summary>
+/// 可复用的结果预览树控件。
+/// 显示压缩/解压后的文件目录树，支持精简/完整模式切换、冲突标记、过滤项灰显。
+/// </summary>
+public partial class ResultTreeView : UserControl
+{
+    /// <summary>原始树的根节点（未应用显示规则）。</summary>
+    private PreviewTreeNode? _originalRoot;
+
+    // ── StyledProperties ──
+
+    /// <summary>根节点（树的起点，含所有子节点）。</summary>
+    public static readonly StyledProperty<PreviewTreeNode?> RootProperty =
+        AvaloniaProperty.Register<ResultTreeView, PreviewTreeNode?>(nameof(Root));
+
+    /// <summary>每个目录最多平铺文件数（超出的折叠成 … 还有 N 个）。</summary>
+    public static readonly StyledProperty<int> MaxItemsPerDirectoryProperty =
+        AvaloniaProperty.Register<ResultTreeView, int>(nameof(MaxItemsPerDirectory), 5);
+
+    /// <summary>最大显示深度（超出的折叠成 … 还有 N 层）。</summary>
+    public static readonly StyledProperty<int> MaxDepthProperty =
+        AvaloniaProperty.Register<ResultTreeView, int>(nameof(MaxDepth), 5);
+
+    /// <summary>是否启用精简模式。</summary>
+    public static readonly StyledProperty<bool> CompactModeProperty =
+        AvaloniaProperty.Register<ResultTreeView, bool>(nameof(CompactMode), true);
+
+    /// <summary>是否显示被过滤排除的文件（灰色显示）。</summary>
+    public static readonly StyledProperty<bool> ShowFilteredGhostsProperty =
+        AvaloniaProperty.Register<ResultTreeView, bool>(nameof(ShowFilteredGhosts), false);
+
+    /// <summary>摘要文本（由控件内部计算）。</summary>
+    public static readonly StyledProperty<string> SummaryTextProperty =
+        AvaloniaProperty.Register<ResultTreeView, string>(nameof(SummaryText), "");
+
+    /// <summary>加载提示文案（本地化）。</summary>
+    public string LoadingText => LocalizationManager.T("Preview_Result_Building");
+
+    /// <summary>是否显示摘要栏。</summary>
+    public static readonly StyledProperty<bool> ShowSummaryBarProperty =
+        AvaloniaProperty.Register<ResultTreeView, bool>(nameof(ShowSummaryBar), true);
+
+    /// <summary>预览树是否正在后台构建（显示加载覆层）。</summary>
+    public static readonly StyledProperty<bool> IsLoadingProperty =
+        AvaloniaProperty.Register<ResultTreeView, bool>(nameof(IsLoading), false);
+
+    /// <summary>预览树构建进度（0–100，-1 表示不确定进度/不定进度条）。</summary>
+    public static readonly StyledProperty<double> BuildProgressProperty =
+        AvaloniaProperty.Register<ResultTreeView, double>(nameof(BuildProgress), -1);
+
+    /// <summary>压缩包条目列表正在后台读取（区别于树构建的 IsLoading；Root 尚未就绪前的空白期提示）。</summary>
+    public static readonly StyledProperty<bool> IsListingPendingProperty =
+        AvaloniaProperty.Register<ResultTreeView, bool>(nameof(IsListingPending), false);
+
+    /// <summary>加载失败标题（空串 = 非错误态；本地化后的文案由宿主传入）。</summary>
+    public static readonly StyledProperty<string> LoadFailedTitleProperty =
+        AvaloniaProperty.Register<ResultTreeView, string>(nameof(LoadFailedTitle), "");
+
+    /// <summary>加载失败详情（异常原因原文，可为空）。</summary>
+    public static readonly StyledProperty<string> LoadFailedDetailProperty =
+        AvaloniaProperty.Register<ResultTreeView, string>(nameof(LoadFailedDetail), "");
+
+    /// <summary>失败是否因需要密码（图标在 🔒 / ⚠️ 间切换）。</summary>
+    public static readonly StyledProperty<bool> LoadFailedNeedsPasswordProperty =
+        AvaloniaProperty.Register<ResultTreeView, bool>(nameof(LoadFailedNeedsPassword), false);
+
+    // ── Observable collection for display tree ──
+
+    /// <summary>显示树节点集合（已应用精简/过滤规则）。</summary>
+    public ObservableCollection<PreviewTreeNode> DisplayNodes { get; } = new();
+
+    /// <summary>
+    /// 节点被双击（解压设置窗口用于触发锁定压缩包的手动解锁）。
+    /// </summary>
+    public event EventHandler<PreviewTreeNode>? NodeDoubleTapped;
+
+    // ── .NET Properties ──
+
+    public PreviewTreeNode? Root
+    {
+        get => GetValue(RootProperty);
+        set => SetValue(RootProperty, value);
+    }
+
+    public int MaxItemsPerDirectory
+    {
+        get => GetValue(MaxItemsPerDirectoryProperty);
+        set => SetValue(MaxItemsPerDirectoryProperty, value);
+    }
+
+    public int MaxDepth
+    {
+        get => GetValue(MaxDepthProperty);
+        set => SetValue(MaxDepthProperty, value);
+    }
+
+    public bool CompactMode
+    {
+        get => GetValue(CompactModeProperty);
+        set => SetValue(CompactModeProperty, value);
+    }
+
+    public bool ShowFilteredGhosts
+    {
+        get => GetValue(ShowFilteredGhostsProperty);
+        set => SetValue(ShowFilteredGhostsProperty, value);
+    }
+
+    public string SummaryText
+    {
+        get => GetValue(SummaryTextProperty);
+        set => SetValue(SummaryTextProperty, value);
+    }
+
+    public bool ShowSummaryBar
+    {
+        get => GetValue(ShowSummaryBarProperty);
+        set => SetValue(ShowSummaryBarProperty, value);
+    }
+
+    public bool IsLoading
+    {
+        get => GetValue(IsLoadingProperty);
+        set => SetValue(IsLoadingProperty, value);
+    }
+
+    public double BuildProgress
+    {
+        get => GetValue(BuildProgressProperty);
+        set => SetValue(BuildProgressProperty, value);
+    }
+
+    public bool IsListingPending
+    {
+        get => GetValue(IsListingPendingProperty);
+        set => SetValue(IsListingPendingProperty, value);
+    }
+
+    public string LoadFailedTitle
+    {
+        get => GetValue(LoadFailedTitleProperty);
+        set => SetValue(LoadFailedTitleProperty, value);
+    }
+
+    public string LoadFailedDetail
+    {
+        get => GetValue(LoadFailedDetailProperty);
+        set => SetValue(LoadFailedDetailProperty, value);
+    }
+
+    public bool LoadFailedNeedsPassword
+    {
+        get => GetValue(LoadFailedNeedsPasswordProperty);
+        set => SetValue(LoadFailedNeedsPasswordProperty, value);
+    }
+
+    /// <summary>
+    /// 静态构造函数：注册属性变更回调。
+    /// </summary>
+    static ResultTreeView()
+    {
+        RootProperty.Changed.AddClassHandler<ResultTreeView>((view, e) =>
+            view.OnRootChanged(e.NewValue as PreviewTreeNode));
+        CompactModeProperty.Changed.AddClassHandler<ResultTreeView>((view, _) =>
+            view.RebuildDisplayTree());
+        MaxItemsPerDirectoryProperty.Changed.AddClassHandler<ResultTreeView>((view, _) =>
+            view.RebuildDisplayTree());
+        MaxDepthProperty.Changed.AddClassHandler<ResultTreeView>((view, _) =>
+            view.RebuildDisplayTree());
+        ShowFilteredGhostsProperty.Changed.AddClassHandler<ResultTreeView>((view, _) =>
+            view.RebuildDisplayTree());
+        IsLoadingProperty.Changed.AddClassHandler<ResultTreeView>((view, e) =>
+            view.OnIsLoadingChanged(e.NewValue is true));
+        BuildProgressProperty.Changed.AddClassHandler<ResultTreeView>((view, e) =>
+            view.OnBuildProgressChanged(e.NewValue as double? ?? -1));
+        IsListingPendingProperty.Changed.AddClassHandler<ResultTreeView>((view, _) =>
+            view.UpdateStateOverlay());
+        LoadFailedTitleProperty.Changed.AddClassHandler<ResultTreeView>((view, _) =>
+            view.UpdateStateOverlay());
+        LoadFailedDetailProperty.Changed.AddClassHandler<ResultTreeView>((view, _) =>
+            view.UpdateStateOverlay());
+        LoadFailedNeedsPasswordProperty.Changed.AddClassHandler<ResultTreeView>((view, _) =>
+            view.UpdateStateOverlay());
+    }
+
+    /// <summary>
+    /// 加载覆层显示状态变化：隐藏时进度条复位，避免下次出现残留进度。
+    /// </summary>
+    private void OnIsLoadingChanged(bool isLoading)
+    {
+        if (LoadingOverlay == null || LoadingProgressBar == null) return;
+        LoadingOverlay.IsVisible = isLoading;
+        if (!isLoading)
+        {
+            LoadingProgressBar.Value = 0;
+            LoadingProgressBar.IsIndeterminate = false;
+        }
+    }
+
+    /// <summary>
+    /// 构建进度变化：-1 显示不定进度条，否则更新确定进度（0–100）。
+    /// </summary>
+    private void OnBuildProgressChanged(double progress)
+    {
+        if (LoadingProgressBar == null) return;
+        if (progress < 0)
+        {
+            LoadingProgressBar.IsIndeterminate = true;
+            return;
+        }
+        LoadingProgressBar.IsIndeterminate = false;
+        LoadingProgressBar.Value = Math.Clamp(progress, 0, 100);
+    }
+
+    /// <summary>读取中覆层文案（本地化，与 LoadingText 同模式）。</summary>
+    public string ReadingText => LocalizationManager.T("Preview_Result_Reading");
+
+    /// <summary>
+    /// 节点双击：直接传出显示节点（克隆体与原树节点同值，
+    /// 宿主用 FullPath 等字段映射回自己的数据即可）。
+    /// </summary>
+    private void OnPreviewTreeDoubleTapped(object? sender, global::Avalonia.Input.TappedEventArgs e)
+    {
+        if (PreviewTreeView.SelectedItem is Models.PreviewTreeNode node)
+            NodeDoubleTapped?.Invoke(this, node);
+    }
+
+    /// <summary>
+    /// 条目读取/加载失败状态覆层联动。
+    /// 错误态优先于读取中；两者互斥于 IsLoading（树构建覆层由宿主 VM 保证不同时出现）。
+    /// </summary>
+    private void UpdateStateOverlay()
+    {
+        if (StateOverlay == null || StateIconPath == null
+            || StateTitleText == null || StateDetailText == null || StateProgressBar == null)
+            return;
+
+        var hasError = !string.IsNullOrEmpty(LoadFailedTitle);
+        var pending = !hasError && IsListingPending;
+
+        StateOverlay.IsVisible = hasError || pending;
+        if (!StateOverlay.IsVisible) return;
+
+        // 矢量图标与树节点体系一致：损坏 ⚠ / 需密码 🔒(线框) / 读取中 归档+时钟
+        StateIconPath.Data = this.FindResource(
+            hasError
+                ? (LoadFailedNeedsPassword ? "IconLockClosed" : "IconWarning")
+                : "IconArchiveClock") as global::Avalonia.Media.Geometry;
+
+        if (hasError)
+        {
+            StateTitleText.Text = LoadFailedTitle;
+            StateDetailText.Text = LoadFailedDetail;
+            StateDetailText.IsVisible = !string.IsNullOrEmpty(LoadFailedDetail);
+            StateProgressBar.IsVisible = false;
+        }
+        else
+        {
+            StateTitleText.Text = ReadingText;
+            StateDetailText.IsVisible = false;
+            StateProgressBar.IsVisible = true;
+        }
+    }
+
+    public ResultTreeView()
+    {
+        InitializeComponent();
+        ToolTip.SetTip(CompactToggle, LocalizationManager.T("Preview_Result_Compact"));
+        ToolTip.SetTip(ExpandAllButton, LocalizationManager.T("Tree_ExpandAll"));
+        ToolTip.SetTip(LocateButton, LocalizationManager.T("Preview_Result_Locate"));
+        ToolTip.SetTip(FilterToggle, LocalizationManager.T(FilterToggle.IsChecked == true ? "Preview_Result_HideFiltered" : "Preview_Result_ShowFiltered"));
+        LoadingTextBlock.Text = LocalizationManager.T("Preview_Result_Building");
+        StateTitleText.Text = ReadingText;
+
+        // 节点双击事件（解压设置窗口锁定包手动解锁入口之一）
+        PreviewTreeView.DoubleTapped += OnPreviewTreeDoubleTapped;
+
+        // 主题切换时刷新 ForegroundKey 绑定，使转换器重新解析新版主题画刷
+        ActualThemeVariantChanged += OnActualThemeVariantChanged;
+    }
+
+    /// <summary>
+    /// 主题切换时刷新所有节点 ForegroundKey 绑定。
+    /// 使 NodeForegroundConverter 重新求值，返回新版主题画刷。
+    /// </summary>
+    private void OnActualThemeVariantChanged(object? sender, EventArgs e)
+    {
+        _originalRoot?.RaiseForegroundKeyChangedRecursive();
+    }
+
+    /// <summary>
+    /// 强制刷新显示树（展开状态等非 Root 变更场景）。
+    /// </summary>
+    public void RefreshDisplay() => RebuildDisplayTree();
+
+    /// <summary>
+    /// 当 Root 属性变化时，保存原始树引用并重建显示树。
+    /// </summary>
+    private void OnRootChanged(PreviewTreeNode? root)
+    {
+        _originalRoot = root;
+        RebuildDisplayTree();
+    }
+
+    /// <summary>
+    /// 重建显示树，应用精简/过滤规则。
+    /// 重建前后自动保存/恢复用户展开状态（从 DisplayNodes 中读取，因为用户操作的是克隆体）。
+    /// </summary>
+    private void RebuildDisplayTree()
+    {
+        // 保存当前显示树的展开状态（用户手动展开的节点）
+        var expandedPaths = new HashSet<string>();
+        foreach (var node in DisplayNodes)
+            CollectExpandedPaths(node, expandedPaths);
+
+        DisplayNodes.Clear();
+
+        if (_originalRoot == null)
+            return;
+
+        // Deep-clone the original tree
+        var displayRoot = DeepCloneNode(_originalRoot);
+
+        // 数据层：先彻底完成文件过滤（移除被过滤项 + 空目录裁剪），
+        // 得到与真实操作数据一致的干净树。精简模式只是显示效果，必须作用于过滤完成后的数据。
+        if (!ShowFilteredGhosts)
+        {
+            RemoveFilteredNodes(displayRoot);
+            PruneEmptyDirectories(displayRoot);
+        }
+
+        // 显示层：精简截断（深度/数量）只作用于已过滤/已裁剪的干净树
+        ApplyCompactRules(displayRoot, 0);
+
+        // 恢复展开状态
+        RestoreExpandedPaths(displayRoot, expandedPaths);
+
+        // 虚拟根节点（空 DisplayLabel）不显示自身，其子节点直接作为顶级项
+        if (string.IsNullOrEmpty(displayRoot.DisplayLabel))
+        {
+            foreach (var child in displayRoot.Children.OfType<PreviewTreeNode>())
+                DisplayNodes.Add(child);
+        }
+        else
+        {
+            DisplayNodes.Add(displayRoot);
+        }
+
+        // 汇总统计使用原始树（_originalRoot），避免 CompactMode 截断导致计数偏小
+        UpdateSummary();
+        UpdateConflictCount();
+    }
+
+    private static void CollectExpandedPaths(PreviewTreeNode node, HashSet<string> paths)
+    {
+        if (node.IsExpanded) paths.Add(node.FullPath);
+        foreach (var child in node.Children.OfType<PreviewTreeNode>())
+            CollectExpandedPaths(child, paths);
+    }
+
+    private static void RestoreExpandedPaths(PreviewTreeNode root, HashSet<string> paths)
+    {
+        if (paths.Contains(root.FullPath))
+            root.IsExpanded = true;
+        foreach (var child in root.Children.OfType<PreviewTreeNode>())
+            RestoreExpandedPaths(child, paths);
+    }
+
+    /// <summary>
+    /// 深拷贝整个树（递归）。
+    /// </summary>
+    private static PreviewTreeNode DeepCloneNode(PreviewTreeNode source)
+    {
+        var clone = source.ShallowClone();
+        foreach (var child in source.Children)
+        {
+            if (child is PreviewTreeNode previewChild)
+            {
+                clone.Children.Add(DeepCloneNode(previewChild));
+            }
+        }
+        return clone;
+    }
+
+    /// <summary>
+    /// 递归应用精简显示规则（深度/数量截断）。
+    /// 调用前树必须已过滤 + 已裁剪空目录（见 <see cref="RebuildDisplayTree"/> 的数据层），
+    /// 因此子节点均为可见项，截断计数直接可用，不会出现"还有 0 层"之类的幽灵标签。
+    /// </summary>
+    private void ApplyCompactRules(PreviewTreeNode node, int depth)
+    {
+        if (!CompactMode)
+        {
+            // Full mode: 仅递归，跳过截断
+            foreach (var child in node.Children.ToList())
+            {
+                if (child is PreviewTreeNode pt && !pt.IsTruncated)
+                    ApplyCompactRules(pt, depth + 1);
+            }
+            return;
+        }
+
+        // 1. 深度截断 (CompactMode 且超过 MaxDepth)。
+        //    树已干净：Children.Count > 0 即确实有可见内容，计数不会为 0
+        if (depth >= MaxDepth && node.Children.Count > 0)
+        {
+            var totalDeep = CountDeepDescendants(node);
+
+            node.Children.Clear();
+            var depthLabel = LocalizationManager.T("Preview_Result_TruncatedDepth", totalDeep);
+            node.Children.Add(new PreviewTreeNode
+            {
+                Name = depthLabel,
+                DisplayLabel = depthLabel,
+                IsTruncated = true,
+                TruncatedDepth = totalDeep,
+                FullPath = node.FullPath + "/..."
+            });
+            return;
+        }
+
+        // 2. 文件数截断 (CompactMode 且子节点超过 MaxItemsPerDirectory)。
+        //    树已干净：子节点均为可见项（无过滤项/空目录），计数直接可用
+        if (node.Children.Count > MaxItemsPerDirectory)
+        {
+            var truncated = node.Children.Skip(MaxItemsPerDirectory).ToList();
+
+            node.Children = node.Children.Take(MaxItemsPerDirectory).ToList();
+
+            var extraFiles = truncated.Count(c => c is PreviewTreeNode pt && pt.Children.Count == 0);
+            var extraDirs = truncated.Count(c => c is PreviewTreeNode pt && pt.Children.Count > 0);
+
+            var label = extraDirs > 0
+                ? LocalizationManager.T("Preview_Result_TruncatedMixed", truncated.Count, extraDirs, extraFiles)
+                : LocalizationManager.T("Preview_Result_TruncatedItems", truncated.Count);
+
+            node.Children.Add(new PreviewTreeNode
+            {
+                Name = label,
+                DisplayLabel = label,
+                IsTruncated = true,
+                TruncatedCount = truncated.Count,
+                FullPath = node.FullPath + "/..."
+            });
+        }
+
+        // 3. 递归处理子节点
+        foreach (var child in node.Children.ToList())
+        {
+            if (child is PreviewTreeNode pt && !pt.IsTruncated)
+            {
+                ApplyCompactRules(pt, depth + 1);
+            }
+        }
+    }
+
+    /// <summary>
+    /// 计算深层子孙总数（跳过中间层级的计数）。幽灵模式（ShowFilteredGhosts=true）下全部节点可见。
+    /// </summary>
+    private static int CountDeepDescendants(PreviewTreeNode node)
+    {
+        int count = 0;
+        foreach (var child in node.Children)
+        {
+            count++; // count the child
+            if (child is PreviewTreeNode pt)
+            {
+                count += CountDeepDescendants(pt);
+            }
+        }
+        return count;
+    }
+
+    /// <summary>
+    /// 数据层：全树递归移除被过滤的节点（IsFilteredOut）。
+    /// 与真实操作数据一致——过滤掉的文件/目录不参与实际解压/压缩，也不应出现在任何显示模式。
+    /// </summary>
+    private static void RemoveFilteredNodes(PreviewTreeNode node)
+    {
+        node.Children = node.Children.Where(c => !(c is PreviewTreeNode pt && pt.IsFilteredOut)).ToList();
+        foreach (var child in node.Children.OfType<PreviewTreeNode>().ToList())
+            RemoveFilteredNodes(child);
+    }
+
+    /// <summary>
+    /// 统计节点下所有文件（非目录项）的数量。
+    /// </summary>
+    /// <param name="includeFiltered">为 true 时包括 IsFilteredOut 节点，false 时跳过。</param>
+    private static int CountTotalFiles(PreviewTreeNode node, bool includeFiltered = true)
+    {
+        if (!includeFiltered && node.IsFilteredOut)
+            return 0;
+
+        int files = 0;
+        foreach (var child in node.Children)
+        {
+            if (child is PreviewTreeNode pt)
+            {
+                // 被过滤的文件必须在父层计数前跳过——旧实现只在递归入口查
+                // IsFilteredOut，叶子文件（Children.Count==0）永远走不到那里，导致
+                // includeFiltered:false 时过滤项仍被计入总数
+                if (!includeFiltered && pt.IsFilteredOut)
+                    continue;
+                // 只计文件：空目录（IsDirectory 且无子节点）不是文件，不计入
+                if (!pt.IsDirectory && pt.Children.Count == 0 && !pt.IsTruncated)
+                    files++;
+                files += CountTotalFiles(pt, includeFiltered);
+            }
+        }
+        return files;
+    }
+
+    /// <summary>
+    /// 递归移除空目录（子树无文件），bottom-up 使隐藏向上传播：
+    /// 子目录被移除后父目录若因此也无文件，一并移除，直到有文件的祖先。
+    /// 返回 true 表示本节点是空目录、应从父节点移除。
+    /// </summary>
+    private static bool PruneEmptyDirectories(PreviewTreeNode node)
+    {
+        var kept = new List<FolderNode>();
+        foreach (var child in node.Children)
+        {
+            if (child is PreviewTreeNode pt)
+            {
+                if (pt.IsTruncated)
+                {
+                    // 截断占位（… 还有 N 层/项）意味着下层仍有内容，保留
+                    kept.Add(pt);
+                    continue;
+                }
+                if (!PruneEmptyDirectories(pt))
+                    kept.Add(pt);
+            }
+        }
+        node.Children = kept;
+
+        return node.IsDirectory && !SubtreeHasFiles(node);
+    }
+
+    /// <summary>
+    /// 显示克隆中子树是否含文件。截断占位视为有内容（其下层可能有文件）。
+    /// </summary>
+    private static bool SubtreeHasFiles(PreviewTreeNode node)
+    {
+        foreach (var child in node.Children)
+        {
+            if (child is PreviewTreeNode pt)
+            {
+                if (pt.IsTruncated) return true;
+                if (!pt.IsDirectory) return true;
+                if (SubtreeHasFiles(pt)) return true;
+            }
+        }
+        return false;
+    }
+
+    /// <summary>
+    /// 从原始树（_originalRoot）统计实际文件数和总大小，更新摘要文本。
+    /// 使用原始树而非显示树，避免 CompactMode 截断导致计数偏小。
+    /// </summary>
+    private void UpdateSummary()
+    {
+        if (_originalRoot == null) return;
+
+        int totalFiles;
+        long totalSize;
+
+        // 始终排除过滤项：过滤掉的文件/目录不参与实际解压/压缩，不应计入总量
+        if (string.IsNullOrEmpty(_originalRoot.DisplayLabel))
+        {
+            // 虚拟根节点：子节点直接作为顶级项
+            totalFiles = _originalRoot.Children.OfType<PreviewTreeNode>()
+                .Sum(n => CountTotalFiles(n, includeFiltered: false));
+            totalSize = _originalRoot.Children.OfType<PreviewTreeNode>()
+                .Sum(n => CalculateTotalSize(n, includeFiltered: false));
+        }
+        else
+        {
+            totalFiles = CountTotalFiles(_originalRoot, includeFiltered: false);
+            totalSize = CalculateTotalSize(_originalRoot, includeFiltered: false);
+        }
+
+        SummaryText = LocalizationManager.T("Preview_Result_Summary", totalFiles, FormatSize(totalSize));
+
+        SetText(FileCountText, LocalizationManager.T("Preview_Result_FileCount", totalFiles));
+        SetText(TotalSizeText, FormatSize(totalSize));
+    }
+
+    /// <summary>
+    /// 安全设置文本（控件可能尚未在构造函数中初始化完成时为 null）。
+    /// </summary>
+    private static void SetText(TextBlock? textBlock, string? text)
+    {
+        if (textBlock != null) textBlock.Text = text;
+    }
+
+    /// <summary>
+    /// 统计冲突文件数并更新 UI。
+    /// </summary>
+    private void UpdateConflictCount()
+    {
+        if (_originalRoot == null) return;
+
+        var conflictCount = CountConflicts(_originalRoot);
+        if (ConflictCountText != null)
+        {
+            if (conflictCount > 0)
+            {
+                ConflictCountText.Text = LocalizationManager.T("Preview_Result_ConflictCount", conflictCount);
+                ConflictCountText.IsVisible = true;
+            }
+            else
+            {
+                ConflictCountText.IsVisible = false;
+            }
+        }
+    }
+
+    /// <summary>
+    /// 递归统计所有 ExistsAtDestination=true 的节点。
+    /// </summary>
+    private static int CountConflicts(PreviewTreeNode node)
+    {
+        // 过滤掉的节点不计入冲突（用户看不到它们，数了也无意义）
+        if (node.IsFilteredOut)
+            return 0;
+
+        int count = node.ExistsAtDestination ? 1 : 0;
+        foreach (var child in node.Children)
+        {
+            if (child is PreviewTreeNode pt)
+                count += CountConflicts(pt);
+        }
+        return count;
+    }
+
+    /// <summary>
+    /// 计算节点下所有文件的总大小。
+    /// </summary>
+    /// <param name="includeFiltered">为 true 时包括 IsFilteredOut 节点，false 时跳过。</param>
+    private static long CalculateTotalSize(PreviewTreeNode node, bool includeFiltered = true)
+    {
+        if (!includeFiltered && node.IsFilteredOut)
+            return 0;
+
+        long size = node.Size;
+        foreach (var child in node.Children)
+        {
+            if (child is PreviewTreeNode pt)
+                size += CalculateTotalSize(pt, includeFiltered);
+        }
+        return size;
+    }
+
+    /// <summary>
+    /// Compact/Full 模式切换按钮事件：同步更新 CompactToggle 的动态工具提示。
+    /// </summary>
+    private void OnCompactToggleChanged(object? sender, RoutedEventArgs e)
+    {
+        CompactMode = CompactToggle?.IsChecked ?? true;
+        if (CompactToggle != null)
+            ToolTip.SetTip(CompactToggle, LocalizationManager.T(CompactMode ? "Preview_Result_Full" : "Preview_Result_Compact"));
+        RebuildDisplayTree();
+    }
+
+    /// <summary>
+    /// 过滤项显示开关切换事件：同步更新 FilterToggle 的动态工具提示。
+    /// </summary>
+    private void OnFilterToggleChanged(object? sender, RoutedEventArgs e)
+    {
+        if (FilterToggle == null) return;
+        ToolTip.SetTip(FilterToggle, LocalizationManager.T(FilterToggle.IsChecked == true
+            ? "Preview_Result_HideFiltered"
+            : "Preview_Result_ShowFiltered"));
+    }
+
+    private static string FormatSize(long bytes) => Core.Utils.FormatUtil.FormatSize(bytes);
+
+    private void OnExpandAllClick(object? sender, RoutedEventArgs e)
+    {
+        if (_originalRoot == null) return;
+        _originalRoot.ExpandAll();
+        RebuildDisplayTree();
+    }
+
+    /// <summary>
+    /// 树选中项变化时更新定位按钮状态。
+    /// </summary>
+    private void OnTreeSelectionChanged(object? sender, SelectionChangedEventArgs e)
+    {
+        if (LocateButton != null)
+            LocateButton.IsEnabled = PreviewTreeView?.SelectedItems?.Count > 0;
+    }
+
+    /// <summary>
+    /// 定位到选中项：折叠全部，然后展开所有选中项的祖先路径。
+    /// </summary>
+    private void OnLocateClick(object? sender, RoutedEventArgs e)
+    {
+        var displayRoot = DisplayNodes.FirstOrDefault();
+        if (displayRoot == null || PreviewTreeView?.SelectedItems == null) return;
+
+        // 1. 折叠全部，保留根展开
+        displayRoot.CollapseAll();
+        displayRoot.IsExpanded = true;
+
+        // 2. 展开每个选中项的祖先路径
+        foreach (var item in PreviewTreeView.SelectedItems)
+        {
+            if (item is PreviewTreeNode pt && !string.IsNullOrEmpty(pt.FullPath))
+                ExpandAncestors(displayRoot, pt.FullPath);
+        }
+    }
+
+    /// <summary>
+    /// 从根节点开始，按 FullPath 的分段逐层展开祖先节点。
+    /// 如果某层节点因截断不存在则停止（不报错）。
+    /// </summary>
+    private static void ExpandAncestors(PreviewTreeNode root, string fullPath)
+    {
+        var parts = fullPath.Split('/', StringSplitOptions.RemoveEmptyEntries);
+        var current = root;
+        foreach (var part in parts)
+        {
+            var child = current.Children
+                .OfType<PreviewTreeNode>()
+                .FirstOrDefault(c => c.Name == part && !c.IsTruncated);
+            if (child == null) break;
+            child.IsExpanded = true;
+            current = child;
+        }
+    }
+}

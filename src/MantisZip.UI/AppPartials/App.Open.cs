@@ -149,7 +149,7 @@ public partial class App : Application
 
                     var result = await CompressService.CompressAsync(
                         request,
-                        conflictResolver: info =>
+                        conflictResolver: async info =>
                         {
                             return progressWindow.Dispatcher.Invoke(() =>
                             {

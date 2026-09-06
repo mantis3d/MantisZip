@@ -7,7 +7,6 @@ default_model = "deepseek-flash"
 # language      = "zh"   # ui/model language; empty = auto-detect from $LANG / $REASONIX_LANG
 
 [agent]
-cold_resume_prune = true
 
 [[providers]]
 name        = "deepseek-flash"

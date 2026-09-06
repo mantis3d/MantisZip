@@ -1,0 +1,127 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="clr-namespace:MantisZip.UI.Avalonia.ViewModels"
+        xmlns:models="clr-namespace:MantisZip.UI.Avalonia.Models"
+        xmlns:conv="clr-namespace:MantisZip.UI.Avalonia.Converters"
+        x:Class="MantisZip.UI.Avalonia.Dialogs.IconTestWindow"
+        x:DataType="vm:IconTestViewModel"
+        Title="图标测试窗口 — emoji → PathIcon 替换验证"
+        Width="1000" Height="700"
+        MinWidth="800" MinHeight="500"
+        WindowStartupLocation="CenterOwner"
+        Background="{DynamicResource ThemeWindowBgBrush}">
+
+  <Window.Resources>
+    <conv:GeometryResourceConverter x:Key="GeometryResourceConverter" />
+    <conv:StringNotEmptyConverter x:Key="StringNotEmptyConverter" />
+  </Window.Resources>
+
+  <DockPanel Margin="{DynamicResource SpacingMdThk}">
+    <!-- ═══════ Top: Toolbar with filter + stats ═══════ -->
+    <Border DockPanel.Dock="Top"
+            Padding="0,0,0,8">
+      <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto">
+        <!-- Stats -->
+        <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
+          <TextBlock FontSize="12" Foreground="{DynamicResource ThemeTextSecondaryBrush}">
+            <Run Text="总计:" /><Run Text="{Binding TotalCount}" FontWeight="SemiBold" />
+          </TextBlock>
+          <Border Background="#4CAF50" CornerRadius="3" Padding="5,2">
+            <TextBlock FontSize="11" Foreground="White">
+              <Run Text="✅ 已替换: " /><Run Text="{Binding ConvertedCount}" FontWeight="SemiBold" />
+            </TextBlock>
+          </Border>
+          <Border Background="#FF9800" CornerRadius="3" Padding="5,2">
+            <TextBlock FontSize="11" Foreground="White">
+              <Run Text="⏳ 待替换: " /><Run Text="{Binding PendingCount}" FontWeight="SemiBold" />
+            </TextBlock>
+          </Border>
+        </StackPanel>
+
+        <!-- Filter -->
+        <TextBox Grid.Column="1"
+                 Text="{Binding FilterText}"
+                 PlaceholderText="搜索图标名称、资源键、位置…"
+                 Margin="16,0,0,0"
+                 Height="{DynamicResource ControlHeight}"
+                 FontSize="12"
+                 Background="{DynamicResource ThemeSurfaceBgBrush}"
+                 Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                 BorderBrush="{DynamicResource ThemeBorderBrush}"
+                 Padding="6,2" />
+
+        <!-- Close button -->
+        <Button Grid.Column="4" Content="关闭"
+                Width="72" Height="{DynamicResource ControlHeight}"
+                Margin="8,0,0,0"
+                Click="OnCloseClick"
+                Background="{DynamicResource ThemeAccentBrush}"
+                Foreground="White"
+                BorderThickness="0" />
+      </Grid>
+    </Border>
+
+    <!-- ═══════ Main: DataGrid listing all icons ═══════ -->
+    <DataGrid x:Name="IconGrid"
+              x:DataType="models:IconTestItem"
+              AutoGenerateColumns="False"
+              IsReadOnly="True"
+              GridLinesVisibility="Horizontal"
+              BorderBrush="{DynamicResource ThemeBorderBrush}"
+              BorderThickness="1"
+              Background="{DynamicResource ThemeSurfaceBgBrush}"
+              RowBackground="{DynamicResource ThemeSurfaceBgBrush}"
+              SelectionMode="Single"
+              FontSize="12">
+      <DataGrid.Columns>
+        <!-- Icons column: show emoji + PathIcon side by side -->
+        <DataGridTemplateColumn Header="图标" Width="80">
+          <DataTemplate DataType="models:IconTestItem">
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="4">
+              <!-- Emoji display (shown when EmojiChar is not empty) -->
+              <TextBlock Text="{Binding EmojiChar}"
+                         FontSize="18"
+                         VerticalAlignment="Center"
+                         IsVisible="{Binding EmojiChar, Converter={StaticResource StringNotEmptyConverter}}" />
+              <!-- PathIcon display (shown when ResourceKey is not empty) -->
+              <PathIcon Data="{Binding ResourceKey, Converter={StaticResource GeometryResourceConverter}}"
+                        Width="18" Height="18"
+                        Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                        IsVisible="{Binding ResourceKey, Converter={StaticResource StringNotEmptyConverter}}" />
+            </StackPanel>
+          </DataTemplate>
+        </DataGridTemplateColumn>
+
+        <!-- Category -->
+        <DataGridTextColumn Header="分类"
+                            Binding="{Binding Category}"
+                            Width="70" />
+
+        <!-- Semantic Name -->
+        <DataGridTextColumn Header="语义名称"
+                            Binding="{Binding SemanticName}"
+                            Width="120" />
+
+        <!-- Resource Key -->
+        <DataGridTextColumn Header="PathIcon 资源键"
+                            Binding="{Binding ResourceKey}"
+                            Width="130" />
+
+        <!-- Status -->
+        <DataGridTextColumn Header="状态"
+                            Binding="{Binding StatusText}"
+                            Width="90" />
+
+        <!-- Location (short) -->
+        <DataGridTextColumn Header="使用位置"
+                            Binding="{Binding ShortLocation}"
+                            Width="170" />
+
+        <!-- Notes -->
+        <DataGridTextColumn Header="备注"
+                            Binding="{Binding Notes}"
+                             Width="*" />
+      </DataGrid.Columns>
+    </DataGrid>
+  </DockPanel>
+</Window>

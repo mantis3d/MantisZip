@@ -1,0 +1,72 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="MantisZip.UI.Avalonia.Dialogs.LogPrivacyHelpDialog"
+        x:CompileBindings="False"
+        Title="{Binding WinTitle}"
+        Width="520"
+        Height="500"
+        WindowStartupLocation="CenterOwner"
+        Background="{DynamicResource ThemeWindowBgBrush}"
+        Padding="{DynamicResource SpacingMdThk}">
+  <DockPanel>
+    <!-- 关闭按钮 - 底部，不在 ScrollViewer 内，滚动时固定可见 -->
+    <Button Content="{Binding CloseText}"
+            DockPanel.Dock="Bottom"
+            HorizontalAlignment="Right"
+            Width="100"
+            Height="{DynamicResource ControlHeight}"
+            IsDefault="True"
+            Click="OnCloseClick"
+            Background="{DynamicResource ThemeAccentBrush}"
+            Foreground="White"
+            Margin="0,8,0,0" />
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto"
+                  TextElement.Foreground="{DynamicResource ThemeTextPrimaryBrush}">
+      <StackPanel Margin="20,20,20,0" Spacing="{DynamicResource SpacingMd}">
+
+        <!-- 标题 -->
+        <TextBlock Text="{Binding WinTitle}"
+                   FontSize="18"
+                   FontWeight="Bold" />
+
+        <!-- 简介 -->
+        <TextBlock Text="{Binding IntroText}"
+                   TextWrapping="Wrap"
+                   LineHeight="22" />
+
+        <!-- 四种模式说明 -->
+        <Border Background="{DynamicResource ThemeSurfaceBgBrush}"
+                CornerRadius="{DynamicResource BorderRadius}"
+                Padding="14"
+                BorderBrush="{DynamicResource ThemeBorderBrush}"
+                BorderThickness="1">
+          <StackPanel Spacing="10">
+            <TextBlock Text="{Binding ModeOffText}"
+                       TextWrapping="Wrap"
+                       LineHeight="20" />
+            <TextBlock Text="{Binding ModeFilenameText}"
+                       TextWrapping="Wrap"
+                       LineHeight="20" />
+            <TextBlock Text="{Binding ModeExtensionText}"
+                       TextWrapping="Wrap"
+                       LineHeight="20" />
+            <TextBlock Text="{Binding ModeFullText}"
+                       TextWrapping="Wrap"
+                       LineHeight="20" />
+          </StackPanel>
+        </Border>
+
+        <!-- 影响范围 -->
+        <TextBlock Text="{Binding WhatText}"
+                   TextWrapping="Wrap"
+                   LineHeight="22" />
+        <TextBlock Text="{Binding WhatNotText}"
+                   TextWrapping="Wrap"
+                   LineHeight="22" />
+
+      </StackPanel>
+    </ScrollViewer>
+  </DockPanel>
+  
+</Window>

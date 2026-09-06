@@ -1,0 +1,92 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="MantisZip.UI.Avalonia.Dialogs.DonationDialog"
+        x:CompileBindings="False"
+        Title="{Binding WinTitle}"
+        Width="520"
+        SizeToContent="Height"
+        WindowStartupLocation="CenterOwner"
+        Background="{DynamicResource ThemeWindowBgBrush}"
+        Padding="{DynamicResource SpacingMdThk}">
+
+  <Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto"
+        Margin="{DynamicResource SpacingLgThk}">
+    <!-- Row 0: Header -->
+    <TextBlock Grid.Row="0"
+               Text="{Binding HeaderText}"
+               FontSize="18"
+               FontWeight="Bold"
+               Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+               HorizontalAlignment="Center"
+               Margin="0,0,0,16" />
+
+    <!-- Row 1: QR code section -->
+    <Border Grid.Row="1"
+            Background="{DynamicResource ThemeSurfaceBgBrush}"
+            BorderBrush="{DynamicResource ThemeBorderBrush}"
+            BorderThickness="1"
+            CornerRadius="{DynamicResource BorderRadius}"
+            Padding="20"
+            Margin="0,0,0,16"
+            HorizontalAlignment="Center">
+      <StackPanel Spacing="10">
+        <Image Width="400"
+               Height="400"
+               Source="avares://MantisZip.UI.Avalonia/Resources/DonateQr.png"
+               Stretch="Uniform" />
+        <TextBlock Text="{Binding QrHintText}"
+                   FontSize="14"
+                   Foreground="{DynamicResource ThemeTextSecondaryBrush}"
+                   HorizontalAlignment="Center" />
+      </StackPanel>
+    </Border>
+
+    <!-- Row 2: Platform hint -->
+    <TextBlock Grid.Row="2"
+               Text="{Binding PlatformsHintText}"
+               FontSize="14"
+               Foreground="{DynamicResource ThemeTextSecondaryBrush}"
+               HorizontalAlignment="Center"
+               Margin="0,0,0,12" />
+
+    <!-- Row 3: Platform link buttons -->
+    <StackPanel Grid.Row="3"
+                Spacing="{DynamicResource SpacingXs}"
+                Margin="0,0,0,20"
+                HorizontalAlignment="Center">
+      <Button Content="{Binding AfdianText}"
+              Height="{DynamicResource ControlHeightXl}"
+              Width="440"
+              Background="{DynamicResource ThemeSurfaceBgBrush}"
+              BorderBrush="{DynamicResource ThemeBorderBrush}"
+              BorderThickness="1"
+              Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+              FontSize="18"
+              HorizontalContentAlignment="Center"
+              Click="OpenAfdian_Click" />
+      <Button Content="{Binding PolarText}"
+              Height="{DynamicResource ControlHeightXl}"
+              Width="440"
+              Background="{DynamicResource ThemeSurfaceBgBrush}"
+              BorderBrush="{DynamicResource ThemeBorderBrush}"
+              BorderThickness="1"
+              Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+              FontSize="18"
+              HorizontalContentAlignment="Center"
+              Click="Polar_Click" />
+    </StackPanel>
+
+    <!-- Row 4: Close button -->
+    <Button Grid.Row="4"
+            Content="{Binding CloseText}"
+            Width="80"
+            Height="{DynamicResource ControlHeightMd}"
+            HorizontalAlignment="Right"
+            IsDefault="True"
+            IsCancel="True"
+            Background="{DynamicResource ThemeButtonBgBrush}"
+            Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+            BorderBrush="{DynamicResource ThemeBorderBrush}"
+            Click="Close_Click" />
+  </Grid>
+</Window>

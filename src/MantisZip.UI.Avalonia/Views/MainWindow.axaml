@@ -1,0 +1,1319 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="clr-namespace:MantisZip.UI.Avalonia.ViewModels"
+        xmlns:models="clr-namespace:MantisZip.UI.Avalonia.Models"
+        xmlns:conv="clr-namespace:MantisZip.UI.Avalonia.Converters"
+        xmlns:views="clr-namespace:MantisZip.UI.Avalonia.Views"
+        x:Class="MantisZip.UI.Avalonia.Views.MainWindow"
+         x:Name="ThisWindow"
+         x:DataType="vm:MainWindowViewModel"
+        Title="{Binding Title}"
+        Width="1200"
+        Height="800"
+        MinWidth="800"
+        MinHeight="500"
+        Background="{DynamicResource ThemeWindowBgBrush}"
+        DragDrop.AllowDrop="True"
+        DragDrop.Drop="OnWindowDrop"
+        DragDrop.DragOver="OnWindowDragOver"
+        DragDrop.DragLeave="OnWindowDragLeave">
+
+  <Window.Resources>
+    <conv:FileSizeConverter x:Key="FileSizeConverter" />
+    <conv:BoolInvertConverter x:Key="BoolInvertConverter" />
+    <conv:DateTimeToOffsetConverter x:Key="DateTimeToOffsetConverter" />
+    <conv:NullableLongConverter x:Key="NullableLongConverter" />
+    <conv:RatioToWidthConverter x:Key="RatioToWidthConverter" />
+    <conv:BoolToToggleBgBrushConverter x:Key="BoolToToggleBgBrushConverter" />
+  </Window.Resources>
+
+  <Window.Styles>
+    <!-- 工具栏密码按钮：密码已匹配时绿色高亮底（对齐 WPF Theme_StatusSuccessBg） -->
+    <Style Selector="Button.passwordMatched">
+      <Setter Property="Background" Value="{DynamicResource ThemeStatusSuccessBgBrush}" />
+    </Style>
+  </Window.Styles>
+
+  <Grid RowDefinitions="Auto,Auto,Auto,*,Auto">
+    <!-- Menu (Row 0) -->
+    <Menu Grid.Row="0">
+      <MenuItem Header="{Binding LocalizedStrings[Menu_File]}">
+        <MenuItem Command="{Binding OpenArchiveCommand}" InputGesture="Ctrl+O"
+                  Header="{Binding LocalizedStrings[Menu_OpenArchive]}">
+          <MenuItem.Icon>
+            <PathIcon Data="{StaticResource IconFolder}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+          </MenuItem.Icon>
+        </MenuItem>
+        <MenuItem Command="{Binding OpenArchiveLocationCommand}"
+                  IsEnabled="{Binding IsArchiveLoaded}"
+                  Header="{Binding LocalizedStrings[Menu_OpenArchiveLocation]}">
+          <MenuItem.Icon>
+            <PathIcon Data="{StaticResource IconLocate}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+          </MenuItem.Icon>
+        </MenuItem>
+        <MenuItem Command="{Binding CloseArchiveCommand}" InputGesture="Ctrl+W"
+                  IsEnabled="{Binding IsArchiveLoaded}"
+                  Header="{Binding LocalizedStrings[Menu_CloseArchive]}">
+          <MenuItem.Icon>
+            <PathIcon Data="{StaticResource IconSignOut}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+          </MenuItem.Icon>
+        </MenuItem>
+        <MenuItem ItemsSource="{Binding RecentFiles}"
+                  IsEnabled="{Binding RecentFiles.Count}"
+                  Header="{Binding LocalizedStrings[Main_RecentFiles]}">
+          <MenuItem.Icon>
+            <PathIcon Data="{StaticResource IconHistory}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+          </MenuItem.Icon>
+          <MenuItem.ItemTemplate>
+            <DataTemplate>
+              <MenuItem Click="RecentFileMenuItem_Click"
+                        CommandParameter="{Binding .}"
+                        Header="{Binding .}">
+                <MenuItem.Icon>
+                  <PathIcon Data="{StaticResource IconHistory}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+                </MenuItem.Icon>
+              </MenuItem>
+            </DataTemplate>
+          </MenuItem.ItemTemplate>
+        </MenuItem>
+        <Separator />
+        <MenuItem Command="{Binding ClearRecentFilesCommand}"
+                  Header="{Binding LocalizedStrings[Main_ClearRecentFiles]}">
+          <MenuItem.Icon>
+            <PathIcon Data="{StaticResource IconDelete}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+          </MenuItem.Icon>
+        </MenuItem>
+        <MenuItem Command="{Binding RefreshArchiveCommand}" InputGesture="F5"
+                  IsEnabled="{Binding IsArchiveLoaded}"
+                  Header="{Binding LocalizedStrings[Menu_Refresh]}">
+          <MenuItem.Icon>
+            <PathIcon Data="{StaticResource IconRefresh}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+          </MenuItem.Icon>
+        </MenuItem>
+        <Separator />
+        <MenuItem Command="{Binding ExitCommand}"
+                  Header="{Binding LocalizedStrings[Menu_Exit]}">
+          <MenuItem.Icon>
+            <PathIcon Data="{StaticResource IconSignOut}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+          </MenuItem.Icon>
+        </MenuItem>
+      </MenuItem>
+      <MenuItem Header="{Binding LocalizedStrings[Menu_Edit]}">
+        <MenuItem Command="{Binding ExtractArchiveCommand}" InputGesture="Ctrl+E"
+                  IsEnabled="{Binding IsArchiveLoaded}"
+                  Header="{Binding LocalizedStrings[Menu_ExtractArchive]}">
+          <MenuItem.Icon>
+            <PathIcon Data="{StaticResource IconExport}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+          </MenuItem.Icon>
+        </MenuItem>
+        <MenuItem Command="{Binding ExtractArchiveHereCommand}"
+                  IsEnabled="{Binding IsArchiveLoaded}"
+                  Header="{Binding LocalizedStrings[Menu_ExtractHere]}">
+          <MenuItem.Icon>
+            <PathIcon Data="{StaticResource IconPin}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+          </MenuItem.Icon>
+        </MenuItem>
+        <MenuItem Command="{Binding ExtractArchiveToNameCommand}"
+                  IsEnabled="{Binding IsArchiveLoaded}"
+                  Header="{Binding LocalizedStrings[Menu_ExtractToName]}">
+          <MenuItem.Icon>
+            <PathIcon Data="{StaticResource IconFolder}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+          </MenuItem.Icon>
+        </MenuItem>
+        <MenuItem Command="{Binding SmartExtractCommand}"
+                  IsEnabled="{Binding IsArchiveLoaded}"
+                  Header="{Binding LocalizedStrings[Menu_SmartExtract]}">
+          <MenuItem.Icon>
+            <PathIcon Data="{StaticResource IconWand}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+          </MenuItem.Icon>
+        </MenuItem>
+        <Separator />
+        <MenuItem Command="{Binding AddFilesCommand}"
+                  IsEnabled="{Binding IsArchiveLoaded}"
+                  Header="{Binding LocalizedStrings[Menu_AddFiles]}">
+          <MenuItem.Icon>
+            <PathIcon Data="{StaticResource IconAdd}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+          </MenuItem.Icon>
+        </MenuItem>
+        <MenuItem Command="{Binding DeleteFilesCommand}"
+                  IsEnabled="{Binding IsArchiveLoaded}"
+                  Header="{Binding LocalizedStrings[Menu_DeleteFiles]}">
+          <MenuItem.Icon>
+            <PathIcon Data="{StaticResource IconDismiss}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+          </MenuItem.Icon>
+        </MenuItem>
+        <Separator />
+        <MenuItem Command="{Binding TestArchiveCommand}"
+                  IsEnabled="{Binding IsArchiveLoaded}"
+                  Header="{Binding LocalizedStrings[Menu_TestArchive]}">
+          <MenuItem.Icon>
+            <PathIcon Data="{StaticResource IconCheckmark}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+          </MenuItem.Icon>
+        </MenuItem>
+        <Separator />
+        <MenuItem Command="{Binding EditCommentCommand}"
+                  IsEnabled="{Binding IsArchiveLoaded}"
+                  Header="{Binding LocalizedStrings[Menu_ArchiveComment]}">
+          <MenuItem.Icon>
+            <PathIcon Data="{StaticResource IconChat}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+          </MenuItem.Icon>
+        </MenuItem>
+        <Separator />
+        <MenuItem Command="{Binding NewArchiveCommand}" InputGesture="Ctrl+N"
+                  Header="{Binding LocalizedStrings[Menu_NewArchive]}">
+          <MenuItem.Icon>
+            <PathIcon Data="{StaticResource IconNewFile}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+          </MenuItem.Icon>
+        </MenuItem>
+
+      </MenuItem>
+      <MenuItem Header="{Binding LocalizedStrings[Menu_View]}">
+        <MenuItem Command="{Binding ToggleThemeCommand}"
+                  Header="{Binding LocalizedStrings[Menu_ToggleTheme]}">
+          <MenuItem.Icon>
+            <Border Classes="ToggleIconBox"
+                    Background="{Binding IsDarkTheme, Converter={StaticResource BoolToToggleBgBrushConverter}}">
+              <PathIcon Data="{StaticResource IconMoon}" Width="10" Height="10"
+                        Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+            </Border>
+          </MenuItem.Icon>
+        </MenuItem>
+        <Separator />
+        <MenuItem Command="{Binding ToggleProgressBarsCommand}"
+                  IsEnabled="{Binding IsArchiveLoaded}"
+                  Header="{Binding LocalizedStrings[Menu_ProgressBars]}">
+          <MenuItem.Icon>
+            <Border Classes="ToggleIconBox"
+                    Background="{Binding ShowProgressBars, Converter={StaticResource BoolToToggleBgBrushConverter}}">
+              <PathIcon Data="{StaticResource IconDataBarVertical}" Width="10" Height="10"
+                        Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+            </Border>
+          </MenuItem.Icon>
+        </MenuItem>
+        <MenuItem Command="{Binding ToggleSepDirBaselineCommand}"
+                  IsEnabled="{Binding IsArchiveLoaded}"
+                  Header="{Binding LocalizedStrings[Menu_SepDirBaseline]}">
+          <MenuItem.Icon>
+            <Border Classes="ToggleIconBox"
+                    Background="{Binding SeparateDirBaseline, Converter={StaticResource BoolToToggleBgBrushConverter}}">
+              <PathIcon Data="{StaticResource IconFolder}" Width="10" Height="10"
+                        Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+            </Border>
+          </MenuItem.Icon>
+        </MenuItem>
+        <Separator />
+        <MenuItem Command="{Binding TogglePreviewCommand}"
+                  Header="{Binding LocalizedStrings[Menu_ShowPreviewPanel]}">
+          <MenuItem.Icon>
+            <Border Classes="ToggleIconBox"
+                    Background="{Binding IsPreviewVisible, Converter={StaticResource BoolToToggleBgBrushConverter}}">
+              <PathIcon Data="{StaticResource IconEye}" Width="10" Height="10"
+                        Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+            </Border>
+          </MenuItem.Icon>
+        </MenuItem>
+        <MenuItem Command="{Binding ToggleInfoPanelVisibilityCommand}"
+                  Header="{Binding LocalizedStrings[Menu_ShowInfoPanel]}">
+          <MenuItem.Icon>
+            <Border Classes="ToggleIconBox"
+                    Background="{Binding Preview.ShowInfoPanel, Converter={StaticResource BoolToToggleBgBrushConverter}}">
+              <PathIcon Data="{StaticResource IconPanelRight}" Width="10" Height="10"
+                        Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+            </Border>
+          </MenuItem.Icon>
+        </MenuItem>
+        <MenuItem Command="{Binding ToggleInfoPanelOrientationCommand}"
+                  Header="{Binding LocalizedStrings[Menu_InfoPanelOrientation]}">
+          <MenuItem.Icon>
+            <Border Classes="ToggleIconBox"
+                    Background="{Binding Preview.IsHorizontalInfoPanel, Converter={StaticResource BoolToToggleBgBrushConverter}}">
+              <PathIcon Data="{StaticResource IconOrientation}" Width="10" Height="10"
+                        Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+            </Border>
+          </MenuItem.Icon>
+        </MenuItem>
+        <Separator />
+        <MenuItem Command="{Binding SaveLayoutCommand}"
+                  Header="{Binding LocalizedStrings[Menu_SaveLayout]}">
+          <MenuItem.Icon>
+            <PathIcon Data="{StaticResource IconSave}" Width="14" Height="14"
+                      Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+          </MenuItem.Icon>
+        </MenuItem>
+      </MenuItem>
+      <MenuItem Header="{Binding LocalizedStrings[Menu_Tools]}">
+        <MenuItem Command="{Binding OpenPasswordManagerCommand}"
+                  Header="{Binding LocalizedStrings[Menu_PasswordManager]}">
+          <MenuItem.Icon>
+            <PathIcon Data="{StaticResource IconKey}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+          </MenuItem.Icon>
+        </MenuItem>
+        <MenuItem Command="{Binding OpenFavoritesManagerCommand}"
+                  Header="{Binding LocalizedStrings[FavMgr_OpenManager]}">
+          <MenuItem.Icon>
+            <PathIcon Data="{StaticResource IconStar}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+          </MenuItem.Icon>
+        </MenuItem>
+        <Separator />
+        <MenuItem Command="{Binding OpenSettingsCommand}"
+                  Header="{Binding LocalizedStrings[Menu_Settings]}">
+          <MenuItem.Icon>
+            <PathIcon Data="{StaticResource IconSettings}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+          </MenuItem.Icon>
+        </MenuItem>
+      </MenuItem>
+      <MenuItem Header="{Binding LocalizedStrings[Menu_Help]}">
+        <MenuItem Command="{Binding OpenAboutCommand}"
+                  Header="{Binding LocalizedStrings[Menu_About]}">
+          <MenuItem.Icon>
+            <PathIcon Data="{StaticResource IconInfo}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+          </MenuItem.Icon>
+        </MenuItem>
+        <MenuItem Command="{Binding OpenDonateCommand}"
+                  Header="{Binding LocalizedStrings[Menu_Donate]}">
+          <MenuItem.Icon>
+            <PathIcon Data="{StaticResource IconHeart}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+          </MenuItem.Icon>
+        </MenuItem>
+      </MenuItem>
+      <MenuItem x:Name="TestMenu">
+        <MenuItem.Header>
+          <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
+            <PathIcon Data="{StaticResource IconEyedropper}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+            <TextBlock Text="{Binding LocalizedStrings[Menu_Test]}" />
+          </StackPanel>
+        </MenuItem.Header>
+        <MenuItem Click="TestWindow_Click" Tag="IconTestWindow"
+                  Header="{Binding LocalizedStrings[Main_IconTestTitle]}">
+          <MenuItem.Icon>
+            <PathIcon Data="{StaticResource IconGrid}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+          </MenuItem.Icon>
+        </MenuItem>
+        <MenuItem Click="TestWindow_Click" Tag="UiTestWindow"
+                  Header="{Binding LocalizedStrings[Main_UiTestTitle]}">
+          <MenuItem.Icon>
+            <PathIcon Data="{StaticResource IconGrid}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+          </MenuItem.Icon>
+        </MenuItem>
+        <Separator />
+        <MenuItem Click="TestWindow_Click" Tag="AboutWindow"
+                  Header="{Binding LocalizedStrings[Test_AboutWindow]}">
+          <MenuItem.Icon>
+            <PathIcon Data="{StaticResource IconInfo}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+          </MenuItem.Icon>
+        </MenuItem>
+        <MenuItem Click="TestWindow_Click" Tag="SettingsWindow"
+                  Header="{Binding LocalizedStrings[Test_SettingsWindow]}">
+          <MenuItem.Icon>
+            <PathIcon Data="{StaticResource IconSettings}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+          </MenuItem.Icon>
+        </MenuItem>
+        <MenuItem Click="TestWindow_Click" Tag="PasswordManagerWindow"
+                  Header="{Binding LocalizedStrings[Test_PasswordManager]}">
+          <MenuItem.Icon>
+            <PathIcon Data="{StaticResource IconKey}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+          </MenuItem.Icon>
+        </MenuItem>
+        <MenuItem Click="TestWindow_Click" Tag="DonationDialog"
+                  Header="{Binding LocalizedStrings[Test_DonationDialog]}">
+          <MenuItem.Icon>
+            <PathIcon Data="{StaticResource IconHeart}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+          </MenuItem.Icon>
+        </MenuItem>
+        <Separator />
+        <MenuItem Click="TestWindow_Click" Tag="LogPrivacyHelpDialog"
+                  Header="{Binding LocalizedStrings[Test_LogPrivacyHelp]}">
+          <MenuItem.Icon>
+            <PathIcon Data="{StaticResource IconLockClosed}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+          </MenuItem.Icon>
+        </MenuItem>
+        <MenuItem Click="TestWindow_Click" Tag="PasswordHelpDialog"
+                  Header="{Binding LocalizedStrings[Test_PasswordHelp]}">
+          <MenuItem.Icon>
+            <PathIcon Data="{StaticResource IconQuestion}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+          </MenuItem.Icon>
+        </MenuItem>
+        <Separator />
+        <MenuItem Click="TestWindow_Click" Tag="CommentDialog"
+                  Header="{Binding LocalizedStrings[Test_CommentDialog]}">
+          <MenuItem.Icon>
+            <PathIcon Data="{StaticResource IconChat}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+          </MenuItem.Icon>
+        </MenuItem>
+        <MenuItem Click="TestWindow_Click" Tag="PasswordEditDialog"
+                  Header="{Binding LocalizedStrings[Test_PasswordEditDialog]}">
+          <MenuItem.Icon>
+            <PathIcon Data="{StaticResource IconEdit}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+          </MenuItem.Icon>
+        </MenuItem>
+        <MenuItem Click="TestWindow_Click" Tag="PasswordDialog"
+                  Header="{Binding LocalizedStrings[Test_PasswordDialog]}">
+          <MenuItem.Icon>
+            <PathIcon Data="{StaticResource IconShieldLock}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+          </MenuItem.Icon>
+        </MenuItem>
+        <Separator />
+        <MenuItem Click="TestWindow_Click" Tag="ProgressWindow"
+                  Header="{Binding LocalizedStrings[Test_ProgressWindow]}">
+          <MenuItem.Icon>
+            <PathIcon Data="{StaticResource IconTimer}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+          </MenuItem.Icon>
+        </MenuItem>
+        <MenuItem Click="TestWindow_Click" Tag="ErrorDialog"
+                  Header="{Binding LocalizedStrings[Test_ErrorDialog]}">
+          <MenuItem.Icon>
+            <PathIcon Data="{StaticResource IconWarning}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+          </MenuItem.Icon>
+        </MenuItem>
+        <Separator />
+        <MenuItem Click="TestWindow_Click" Tag="CompressSettingsWindow"
+                  Header="{Binding LocalizedStrings[Test_CompressSettings]}">
+          <MenuItem.Icon>
+            <PathIcon Data="{StaticResource IconCompress}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+          </MenuItem.Icon>
+        </MenuItem>
+        <MenuItem Click="TestWindow_Click" Tag="ExtractSettingsWindow"
+                  Header="{Binding LocalizedStrings[Test_ExtractSettings]}">
+          <MenuItem.Icon>
+            <PathIcon Data="{StaticResource IconCompress}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+          </MenuItem.Icon>
+        </MenuItem>
+        <MenuItem Click="TestWindow_Click" Tag="CompressConflictDialog"
+                  Header="{Binding LocalizedStrings[Test_CompressConflict]}">
+          <MenuItem.Icon>
+            <PathIcon Data="{StaticResource IconRefresh}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+          </MenuItem.Icon>
+        </MenuItem>
+        <MenuItem Click="TestWindow_Click" Tag="ConflictDialog"
+                  Header="{Binding LocalizedStrings[Test_ConflictDialog]}">
+          <MenuItem.Icon>
+            <PathIcon Data="{StaticResource IconLightning}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+          </MenuItem.Icon>
+        </MenuItem>
+        <MenuItem Click="TestWindow_Click" Tag="MatchedPasswordDialog"
+                  Header="{Binding LocalizedStrings[Test_MatchedPassword]}">
+          <MenuItem.Icon>
+            <PathIcon Data="{StaticResource IconLockOpen}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+          </MenuItem.Icon>
+        </MenuItem>
+        <Separator />
+        <MenuItem Click="TestWindow_Click" Tag="ElevationDialog"
+                  Header="{Binding LocalizedStrings[Test_ElevationDialog]}">
+          <MenuItem.Icon>
+            <PathIcon Data="{StaticResource IconShieldLock}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+          </MenuItem.Icon>
+        </MenuItem>
+        <MenuItem Click="TestWindow_Click" Tag="ElevationFailedDialog"
+                  Header="{Binding LocalizedStrings[Test_ElevationFailedDialog]}">
+          <MenuItem.Icon>
+            <PathIcon Data="{StaticResource IconWarning}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+          </MenuItem.Icon>
+        </MenuItem>
+        <MenuItem Click="TestWindow_Click" Tag="ElevationInfoDialog"
+                  Header="{Binding LocalizedStrings[Test_ElevationInfoDialog]}">
+          <MenuItem.Icon>
+            <PathIcon Data="{StaticResource IconInfo}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+          </MenuItem.Icon>
+        </MenuItem>
+        <Separator />
+        <MenuItem Click="TestWindow_Click" Tag="AddFavoriteDialog"
+                  Header="{Binding LocalizedStrings[Test_AddFavoriteDialog]}">
+          <MenuItem.Icon>
+            <PathIcon Data="{StaticResource IconStar}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+          </MenuItem.Icon>
+        </MenuItem>
+        <MenuItem Click="TestWindow_Click" Tag="FavoriteManagerWindow"
+                  Header="{Binding LocalizedStrings[Test_FavoriteManagerWindow]}">
+          <MenuItem.Icon>
+            <PathIcon Data="{StaticResource IconCopy}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+          </MenuItem.Icon>
+        </MenuItem>
+        <MenuItem Click="TestWindow_Click" Tag="ArchiveCommentDialog"
+                  Header="{Binding LocalizedStrings[Test_ArchiveCommentDialog]}">
+          <MenuItem.Icon>
+            <PathIcon Data="{StaticResource IconChat}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+          </MenuItem.Icon>
+        </MenuItem>
+        <MenuItem Click="TestWindow_Click" Tag="AppMessageBox"
+                  Header="{Binding LocalizedStrings[Test_AppMessageBox]}">
+          <MenuItem.Icon>
+            <PathIcon Data="{StaticResource IconChat}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+          </MenuItem.Icon>
+        </MenuItem>
+      </MenuItem>
+      <MenuItem Header="{Binding LocalizedStrings[Menu_Language]}">
+        <MenuItem Header="{Binding LocalizedStrings[Menu_LangChinese]}"
+                  Command="{Binding SwitchLanguageCommand}" CommandParameter="zh-CN" />
+        <MenuItem Header="{Binding LocalizedStrings[Menu_LangEnglish]}"
+                  Command="{Binding SwitchLanguageCommand}" CommandParameter="en" />
+      </MenuItem>
+    </Menu>
+
+    <!-- Toolbar (Row 1) — simplified: archive operations only -->
+    <Border Grid.Row="1"
+            Padding="6,4"
+            Background="{DynamicResource ThemeHeaderBgBrush}">
+      <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
+        <Button Classes="ToolbarButton"
+                Command="{Binding OpenArchiveCommand}"
+                ToolTip.Tip="{Binding LocalizedStrings[Tooltip_Open]}">
+          <StackPanel >
+            <PathIcon Data="{StaticResource IconFolder}" Classes="ToolbarButtonIcon" Width="22" Height="22" />
+            <TextBlock Text="{Binding LocalizedStrings[Toolbar_Open]}"
+                      Classes="ToolbarButtonLabel" />
+          </StackPanel>
+        </Button>
+        <Button Classes="ToolbarButton"
+                Command="{Binding NewArchiveCommand}"
+                ToolTip.Tip="{Binding LocalizedStrings[Tooltip_NewArchive]}">
+          <StackPanel >
+            <PathIcon Data="{StaticResource IconDownload}" Classes="ToolbarButtonIcon" Width="22" Height="22" />
+            <TextBlock Text="{Binding LocalizedStrings[Toolbar_Compress]}"
+                      Classes="ToolbarButtonLabel" />
+          </StackPanel>
+        </Button>
+        <Button Classes="ToolbarButton"
+                Command="{Binding ExtractArchiveCommand}"
+                IsEnabled="{Binding IsArchiveLoaded}"
+                ToolTip.Tip="{Binding LocalizedStrings[Tooltip_Extract]}">
+          <StackPanel >
+            <PathIcon Data="{StaticResource IconExport}" Classes="ToolbarButtonIcon" Width="22" Height="22" />
+            <TextBlock Text="{Binding LocalizedStrings[Toolbar_ExtractArchive]}"
+                      Classes="ToolbarButtonLabel" />
+          </StackPanel>
+        </Button>
+        <Button Classes="ToolbarButton"
+                Command="{Binding ExtractSelectedToCommand}"
+                IsEnabled="{Binding IsArchiveLoaded}"
+                ToolTip.Tip="{Binding LocalizedStrings[Tooltip_ExtractSelectedTo]}">
+          <StackPanel >
+            <PathIcon Data="{StaticResource IconExport}" Classes="ToolbarButtonIcon" Width="22" Height="22" />
+            <TextBlock Text="{Binding LocalizedStrings[Toolbar_ExtractSelected]}"
+                      Classes="ToolbarButtonLabel" />
+          </StackPanel>
+        </Button>
+        <Button Classes="ToolbarButton"
+                Command="{Binding SmartExtractCommand}"
+                IsEnabled="{Binding IsArchiveLoaded}"
+                ToolTip.Tip="{Binding LocalizedStrings[Tooltip_SmartExtract]}">
+          <StackPanel >
+            <PathIcon Data="{StaticResource IconWand}" Classes="ToolbarButtonIcon" Width="22" Height="22" />
+            <TextBlock Text="{Binding LocalizedStrings[Toolbar_SmartExtract]}"
+                      Classes="ToolbarButtonLabel" />
+          </StackPanel>
+        </Button>
+        
+        <Border Width="1"
+                Height="24"
+                VerticalAlignment="Center"
+                Background="{DynamicResource ThemeBorderBrush}"
+                Margin="4,0" />
+        <Button Classes="ToolbarButton"
+                Command="{Binding AddFilesCommand}"
+                IsEnabled="{Binding IsArchiveLoaded}"
+                ToolTip.Tip="{Binding LocalizedStrings[Tooltip_AddFiles]}">
+          <StackPanel >
+            <PathIcon Data="{StaticResource IconAdd}" Classes="ToolbarButtonIcon" Width="22" Height="22" />
+            <TextBlock Text="{Binding LocalizedStrings[Toolbar_AddFiles]}"
+                      Classes="ToolbarButtonLabel" />
+          </StackPanel>
+        </Button>
+        <Button Classes="ToolbarButton"
+                Command="{Binding DeleteFilesCommand}"
+                IsEnabled="{Binding IsArchiveLoaded}"
+                ToolTip.Tip="{Binding LocalizedStrings[Tooltip_DeleteFiles]}">
+          <StackPanel >
+            <PathIcon Data="{StaticResource IconDismiss}" Classes="ToolbarButtonIcon" Width="22" Height="22" />
+            <TextBlock Text="{Binding LocalizedStrings[Toolbar_DeleteFiles]}"
+                      Classes="ToolbarButtonLabel" />
+          </StackPanel>
+        </Button>
+        <Button Classes="ToolbarButton"
+                Command="{Binding TestArchiveCommand}"
+                IsEnabled="{Binding IsArchiveLoaded}"
+                ToolTip.Tip="{Binding LocalizedStrings[Toolbar_Test]}">
+          <StackPanel >
+            <PathIcon Data="{StaticResource IconCheckmark}" Classes="ToolbarButtonIcon" Width="22" Height="22" />
+            <TextBlock Text="{Binding LocalizedStrings[Toolbar_Test]}"
+                       Classes="ToolbarButtonLabel" />
+          </StackPanel>
+        </Button>
+        <!-- 筛选栏开关：收起时筛选功能整体停用（条件保留，重新展开即恢复） -->
+        <ToggleButton Classes="ToolbarButton"
+                      IsChecked="{Binding IsFilterBarVisible}"
+                      IsEnabled="{Binding IsArchiveLoaded}"
+                      ToolTip.Tip="{Binding LocalizedStrings[Tooltip_Filter]}">
+          <StackPanel >
+            <PathIcon Data="{StaticResource IconSearch}" Classes="ToolbarButtonIcon" Width="22" Height="22" />
+            <TextBlock Text="{Binding LocalizedStrings[Toolbar_Filter]}"
+                       Classes="ToolbarButtonLabel" />
+          </StackPanel>
+        </ToggleButton>
+        <Border Width="1"
+                Height="24"
+                VerticalAlignment="Center"
+                Background="{DynamicResource ThemeBorderBrush}"
+                Margin="4,0" />
+        <ToggleButton Classes="ToolbarButton"
+                      IsChecked="{Binding IsPreviewVisible}"
+                      ToolTip.Tip="{Binding LocalizedStrings[Tooltip_Preview]}">
+          <StackPanel >
+            <PathIcon Data="{StaticResource IconEye}" Classes="ToolbarButtonIcon" Width="22" Height="22" />
+            <TextBlock Text="{Binding LocalizedStrings[Toolbar_Preview]}"
+                      Classes="ToolbarButtonLabel" />
+          </StackPanel>
+        </ToggleButton>
+        <Border Width="1"
+                Height="24"
+                VerticalAlignment="Center"
+                Background="{DynamicResource ThemeBorderBrush}"
+                Margin="4,0" />
+        <!-- 工具栏密码按钮：针对当前压缩包（对齐 WPF EnterPasswordBtn 三态：无加密禁用 / 未匹配红锁 / 已匹配绿开锁） -->
+        <Button Classes="ToolbarButton"
+                Classes.passwordMatched="{Binding HasMatchedPassword}"
+                Command="{Binding EnterPasswordCommand}"
+                ToolTip.Tip="{Binding ToolbarPasswordTooltip}">
+          <StackPanel >
+            <PathIcon Data="{Binding ToolbarPasswordIcon}" Classes="ToolbarButtonIcon" Width="22" Height="22"
+                      Foreground="{Binding ToolbarPasswordForeground}" />
+            <TextBlock Text="{Binding LocalizedStrings[Toolbar_Password]}"
+                       Classes="ToolbarButtonLabel" />
+          </StackPanel>
+        </Button>
+      </StackPanel>
+    </Border>
+
+    <!-- Filter bar (Row 2, collapsible) — WPF consistent layout -->
+    <Border Grid.Row="2"
+            IsVisible="{Binding IsFilterBarVisible}"
+            Padding="8,4"
+            Background="{DynamicResource ThemeSurfaceBgBrush}"
+            BorderBrush="{DynamicResource ThemeBorderBrush}"
+            BorderThickness="0,0,0,1">
+      <StackPanel Orientation="Horizontal"
+                  VerticalAlignment="Center">
+        <!-- Section 1: 文字搜索 + 匹配模式 + 排除 -->
+        <Grid VerticalAlignment="Center" Margin="0,0,4,0">
+          <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+          </Grid.RowDefinitions>
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="Auto" />
+            <ColumnDefinition Width="160" />
+            <ColumnDefinition Width="100" />
+          </Grid.ColumnDefinitions>
+          <!-- Row 0: search icon + search box + match mode -->
+          <PathIcon Grid.Row="0" Grid.Column="0" Data="{StaticResource IconSearch}" Width="14" Height="14" Margin="2,0,4,2" VerticalAlignment="Center" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+          <TextBox Grid.Row="0" Grid.Column="1" Height="{DynamicResource ControlHeightXs}" FontSize="11"
+                    Text="{Binding FilterText}" Margin="0,0,0,2"
+                    Background="{DynamicResource ThemeWindowBgBrush}"
+                    Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                    BorderBrush="{DynamicResource ThemeBorderBrush}" />
+          <ComboBox Grid.Row="0" Grid.Column="2" Height="{DynamicResource ControlHeightXs}" FontSize="11" Margin="2,0,0,2"
+                    ItemsSource="{Binding MatchModeOptions}"
+                    SelectedItem="{Binding SelectedMatchModeOption}"
+                    Background="{DynamicResource ThemeWindowBgBrush}"
+                    Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                    BorderBrush="{DynamicResource ThemeBorderBrush}">
+            <ComboBox.ItemTemplate>
+              <DataTemplate>
+                <TextBlock Text="{Binding Display}" FontSize="11"
+                            Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+              </DataTemplate>
+            </ComboBox.ItemTemplate>
+          </ComboBox>
+          <!-- Row 1: exclude icon + exclude box -->
+          <PathIcon Grid.Row="1" Grid.Column="0" Data="{StaticResource IconProhibited}" Width="14" Height="14" Margin="2,0,4,0" VerticalAlignment="Center" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+          <TextBox Grid.Row="1" Grid.Column="1" Height="{DynamicResource ControlHeightXs}" FontSize="11"
+                   Text="{Binding FilterExcludeText}"
+                   ToolTip.Tip="{Binding LocalizedStrings[Filter_Exclude]}"
+                   PlaceholderText="{Binding LocalizedStrings[Filter_Exclude]}"
+                   Background="{DynamicResource ThemeWindowBgBrush}"
+                   Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                   BorderBrush="{DynamicResource ThemeBorderBrush}" />
+        </Grid>
+        <Border Width="1" Height="24" VerticalAlignment="Center"
+                Background="{DynamicResource ThemeBorderBrush}" Margin="4,0" />
+
+        <!-- Section 2: 日期范围 + 🧪 picker buttons -->
+        <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="4,0">
+          <PathIcon Data="{StaticResource IconCalendar}" Width="14" Height="14" Margin="0,0,4,0" VerticalAlignment="Center" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+          <StackPanel Orientation="Vertical" VerticalAlignment="Center">
+            <StackPanel Orientation="Horizontal" Margin="0,0,0,2">
+              <Button Width="20" Height="20" Padding="0" Margin="0,0,2,0" Click="PickDateFrom_Click"
+                      ToolTip.Tip="{Binding LocalizedStrings[Filter_PickDateFrom]}"
+                      Background="{DynamicResource ThemeButtonBgBrush}"
+                      Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                      BorderBrush="{DynamicResource ThemeBorderBrush}">
+                <PathIcon Data="{StaticResource IconEyedropper}" Width="11" Height="11" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+              </Button>
+              <TextBlock Text="{Binding LocalizedStrings[Filter_DateFrom]}"
+                         FontSize="11" VerticalAlignment="Center" Margin="0,0,2,0"
+                         Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+              <DatePicker x:Name="FilterDateFromPicker" Width="105" Height="{DynamicResource ControlHeightXs}"
+                          SelectedDate="{Binding FilterDateFrom, Converter={StaticResource DateTimeToOffsetConverter}}"
+                          Background="{DynamicResource ThemeWindowBgBrush}"
+                          Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                          BorderBrush="{DynamicResource ThemeBorderBrush}" />
+            </StackPanel>
+            <StackPanel Orientation="Horizontal">
+              <Button Width="20" Height="20" Padding="0" Margin="0,0,2,0" Click="PickDateTo_Click"
+                      ToolTip.Tip="{Binding LocalizedStrings[Filter_PickDateTo]}"
+                      Background="{DynamicResource ThemeButtonBgBrush}"
+                      Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                      BorderBrush="{DynamicResource ThemeBorderBrush}">
+                <PathIcon Data="{StaticResource IconEyedropper}" Width="11" Height="11" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+              </Button>
+              <TextBlock Text="{Binding LocalizedStrings[Filter_DateTo]}"
+                         FontSize="11" VerticalAlignment="Center" Margin="0,0,2,0"
+                         Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+              <DatePicker x:Name="FilterDateToPicker" Width="105" Height="{DynamicResource ControlHeightXs}"
+                          SelectedDate="{Binding FilterDateTo, Converter={StaticResource DateTimeToOffsetConverter}}"
+                          Background="{DynamicResource ThemeWindowBgBrush}"
+                          Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                          BorderBrush="{DynamicResource ThemeBorderBrush}" />
+            </StackPanel>
+          </StackPanel>
+        </StackPanel>
+        <Border Width="1" Height="24" VerticalAlignment="Center"
+                Background="{DynamicResource ThemeBorderBrush}" Margin="4,0" />
+
+        <!-- Section 3: 大小范围 + 🧪 picker buttons -->
+        <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="4,0">
+          <PathIcon Data="{StaticResource IconRuler}" Width="14" Height="14" Margin="0,0,4,0" VerticalAlignment="Center" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+          <StackPanel Orientation="Vertical" VerticalAlignment="Center">
+            <StackPanel Orientation="Horizontal" Margin="0,0,0,2">
+              <Button Width="20" Height="20" Padding="0" Margin="0,0,2,0" Click="PickSizeMin_Click"
+                      ToolTip.Tip="{Binding LocalizedStrings[Filter_PickSizeMin]}"
+                      Background="{DynamicResource ThemeButtonBgBrush}"
+                      Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                      BorderBrush="{DynamicResource ThemeBorderBrush}">
+                <PathIcon Data="{StaticResource IconEyedropper}" Width="11" Height="11" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+              </Button>
+              <TextBlock Text="{Binding LocalizedStrings[Filter_SizeMin]}"
+                         FontSize="11" VerticalAlignment="Center" Margin="0,0,2,0"
+                         Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+              <TextBox Width="60" Height="{DynamicResource ControlHeightXs}"
+                       Text="{Binding FilterSizeMin, Converter={StaticResource NullableLongConverter}}"
+                       Background="{DynamicResource ThemeWindowBgBrush}"
+                       Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                       BorderBrush="{DynamicResource ThemeBorderBrush}"
+                       Padding="2,0" BorderThickness="1" />
+              <ComboBox Width="65" Height="{DynamicResource ControlHeightXs}" Margin="2,0,0,0"
+                         ItemsSource="{Binding SizeUnitOptions}"
+                         SelectedItem="{Binding FilterSizeUnit}"
+                         Background="{DynamicResource ThemeWindowBgBrush}"
+                         Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                         BorderBrush="{DynamicResource ThemeBorderBrush}"
+                         Padding="2,0" BorderThickness="1" />
+            </StackPanel>
+            <StackPanel Orientation="Horizontal">
+              <Button Width="20" Height="20" Padding="0" Margin="0,0,2,0" Click="PickSizeMax_Click"
+                      ToolTip.Tip="{Binding LocalizedStrings[Filter_PickSizeMax]}"
+                      Background="{DynamicResource ThemeButtonBgBrush}"
+                      Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                      BorderBrush="{DynamicResource ThemeBorderBrush}">
+                <PathIcon Data="{StaticResource IconEyedropper}" Width="11" Height="11" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+              </Button>
+              <TextBlock Text="{Binding LocalizedStrings[Filter_SizeMax]}"
+                         FontSize="11" VerticalAlignment="Center" Margin="0,0,2,0"
+                         Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+              <TextBox Width="60" Height="{DynamicResource ControlHeightXs}"
+                       Text="{Binding FilterSizeMax, Converter={StaticResource NullableLongConverter}}"
+                       Background="{DynamicResource ThemeWindowBgBrush}"
+                       Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                       BorderBrush="{DynamicResource ThemeBorderBrush}"
+                       Padding="2,0" BorderThickness="1" />
+            </StackPanel>
+          </StackPanel>
+        </StackPanel>
+
+        <!-- Section 4: 清除全部（对齐 WPF ClearFiltersBtn：清空搜索/排除/匹配模式/日期/大小并复位单位） -->
+        <Border Width="1" Height="24" VerticalAlignment="Center"
+                Background="{DynamicResource ThemeBorderBrush}" Margin="4,0" />
+        <Button Width="24" Height="24" Padding="0" Margin="4,0"
+                VerticalAlignment="Center"
+                Command="{Binding ClearFiltersCommand}"
+                ToolTip.Tip="{Binding LocalizedStrings[Filter_ClearAll]}"
+                Background="{DynamicResource ThemeButtonBgBrush}"
+                Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                BorderBrush="{DynamicResource ThemeBorderBrush}">
+          <PathIcon Data="{StaticResource IconDismiss}" Width="12" Height="12"
+                    Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+        </Button>
+      </StackPanel>
+    </Border>
+
+    <!-- Main content: TreeView | file list | preview (Row 3) -->
+    <Grid Grid.Row="3">
+      <!-- Drop hint overlay (shown when no archive loaded) -->
+      <Border IsVisible="{Binding IsArchiveLoaded, Converter={StaticResource BoolInvertConverter}}"
+              Background="{DynamicResource ThemeWindowBgBrush}">
+        <StackPanel VerticalAlignment="Center"
+                    HorizontalAlignment="Center"
+                    Spacing="{DynamicResource SpacingXs}">
+          <PathIcon Data="{StaticResource IconFolder}" Width="64" Height="64" HorizontalAlignment="Center" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+          <TextBlock Text="{Binding LocalizedStrings[Main_DropHint]}"
+                     FontSize="16"
+                     Foreground="{DynamicResource ThemeTextSecondaryBrush}"
+                     TextWrapping="Wrap"
+                     HorizontalAlignment="Center" />
+        </StackPanel>
+      </Border>
+
+      <!-- Archive content (hidden when no archive loaded) -->
+      <!-- 预览面板位置由 ApplyPreviewPosition 动态控制（1=底部, 2=目录树下方, 3=文件列表下方, 4=右侧）。
+           Row 0=内容区, Row 1=水平分隔条, Row 2=底部/树下方/列表下方的预览行（高度运行时注入） -->
+      <Grid x:Name="ArchiveContentGrid"
+            IsVisible="{Binding IsArchiveLoaded}"
+            ColumnDefinitions="1*,5,2.5*,5,3*"
+            RowDefinitions="*,0,0">
+      <!-- Folder tree panel (col 0) with tree toolbar -->
+      <Border x:Name="FolderTreeBorder"
+              Grid.Column="0"
+              MinWidth="100"
+              Background="{DynamicResource ThemeSurfaceBgBrush}">
+        <Grid RowDefinitions="Auto,Auto,Auto,*">
+          <!-- Tree toolbar -->
+          <Border Grid.Row="0"
+                  Padding="4,2"
+                  Background="{DynamicResource ThemeHeaderBgBrush}">
+            <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
+              <Button Classes="ToolbarButton ToolbarIcon"
+                      Command="{Binding ExpandAllCommand}"
+                      IsEnabled="{Binding IsArchiveLoaded}"
+                      ToolTip.Tip="{Binding LocalizedStrings[Tree_ExpandAll]}">
+                <PathIcon Data="{StaticResource IconArrowExpandAll}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+              </Button>
+              <Button Classes="ToolbarButton ToolbarIcon"
+                      Command="{Binding CollapseAllCommand}"
+                      IsEnabled="{Binding IsArchiveLoaded}"
+                      ToolTip.Tip="{Binding LocalizedStrings[Tree_CollapseAll]}">
+                <PathIcon Data="{StaticResource IconArrowCollapseAll}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+              </Button>
+              <Button Classes="ToolbarButton ToolbarIcon"
+                      Command="{Binding ExpandToCurrentCommand}"
+                      IsEnabled="{Binding IsArchiveLoaded}"
+                      ToolTip.Tip="{Binding LocalizedStrings[Tree_ExpandToCurrent]}">
+                <PathIcon Data="{StaticResource IconLocation}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+              </Button>
+              <ToggleButton Classes="ToolbarButton ToolbarIcon"
+                            IsChecked="{Binding AutoExpandTree}"
+                            IsEnabled="{Binding IsArchiveLoaded}"
+                            ToolTip.Tip="{Binding LocalizedStrings[Tree_AutoExpand]}">
+                <PathIcon Data="{StaticResource IconLocationCheckmark}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+              </ToggleButton>
+            </StackPanel>
+          </Border>
+          <!-- Header -->
+          <TextBlock Grid.Row="1"
+                     Text="{Binding LocalizedStrings[Tree_Browse]}"
+                     Margin="8,4"
+                     FontWeight="SemiBold"
+                     Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+          <!-- Tree search -->
+          <TextBox Grid.Row="2"
+                   MinHeight="{DynamicResource ControlHeightSm}"
+                   x:Name="TreeSearchBox"
+                   Text="{Binding TreeFilterText}"
+                   PlaceholderText="{Binding LocalizedStrings[Tree_Filter]}"
+                   Margin="4,0,4,2"
+                   Background="{DynamicResource ThemeWindowBgBrush}"
+                   Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                   BorderBrush="{DynamicResource ThemeBorderBrush}" />
+          <!-- TreeView with IsExpanded/IsVisible bindings -->
+          <TreeView Grid.Row="3"
+                    ItemsSource="{Binding FolderTreeItems}"
+                    SelectedItem="{Binding SelectedFolder}"
+                    BorderThickness="0"
+                    Background="Transparent">
+            <TreeView.Styles>
+              <Style Selector="TreeViewItem" x:CompileBindings="False">
+                <Setter Property="IsExpanded" Value="{Binding IsExpanded}" />
+                <Setter Property="IsVisible" Value="{Binding IsVisible}" />
+                <Setter Property="MinHeight" Value="{DynamicResource ControlHeightSm}" />
+              </Style>
+            </TreeView.Styles>
+            <TreeView.ItemTemplate>
+              <TreeDataTemplate ItemsSource="{Binding Children}">
+                <!-- Background=Transparent：让整行参与命中测试，点击行内任意位置均可选中 -->
+                <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}"
+                            Margin="4,2"
+                            Background="Transparent">
+                  <PathIcon Data="{StaticResource IconFolder}"
+                            Width="14" Height="14"
+                            Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+                  <TextBlock Text="{Binding Name}"
+                             Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+                </StackPanel>
+              </TreeDataTemplate>
+            </TreeView.ItemTemplate>
+          </TreeView>
+        </Grid>
+      </Border>
+
+      <GridSplitter x:Name="TreeFileSplitter"
+                    Grid.Column="1"
+                    Width="5" />
+
+      <!-- File list panel (col 2) with file list toolbar -->
+      <Grid x:Name="FileListPanel"
+            Grid.Column="2">
+        <Grid RowDefinitions="Auto,Auto,*">
+          <!-- File list toolbar -->
+          <Border Grid.Row="0"
+                  Padding="4,2"
+                  Background="{DynamicResource ThemeHeaderBgBrush}">
+            <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
+              <!-- Navigation group -->
+              <Button Classes="ToolbarButton ToolbarIcon"
+                      Command="{Binding GoRootCommand}"
+                      IsEnabled="{Binding IsArchiveLoaded}"
+                      ToolTip.Tip="{Binding LocalizedStrings[Nav_GoRoot]}">
+                <PathIcon Data="{StaticResource IconHome}" Width="13" Height="13" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+              </Button>
+              <Button Classes="ToolbarButton ToolbarIcon"
+                      Command="{Binding GoUpCommand}"
+                      IsEnabled="{Binding IsArchiveLoaded}"
+                       ToolTip.Tip="{Binding LocalizedStrings[Nav_GoUp]}">
+                <PathIcon Data="{StaticResource IconArrowUp}" Width="13" Height="13" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+              </Button>
+              <Button Classes="ToolbarButton ToolbarIcon"
+                      Command="{Binding GoBackCommand}"
+                      IsEnabled="{Binding CanGoBack}"
+                      ToolTip.Tip="{Binding LocalizedStrings[Nav_GoBack]}">
+                <PathIcon Data="{StaticResource IconChevronLeft}" Width="13" Height="13" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+              </Button>
+              <Button Classes="ToolbarButton ToolbarIcon"
+                      Command="{Binding GoForwardCommand}"
+                      IsEnabled="{Binding CanGoForward}"
+                      ToolTip.Tip="{Binding LocalizedStrings[Nav_GoForward]}">
+                <PathIcon Data="{StaticResource IconChevronRight}" Width="13" Height="13" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+              </Button>
+
+              <!-- Copy name -->
+              <Button Classes="ToolbarButton ToolbarIcon"
+                      Command="{Binding CopyFileNameCommand}"
+                      IsEnabled="{Binding IsArchiveLoaded}"
+                      ToolTip.Tip="{Binding LocalizedStrings[Toolbar_CopyName]}">
+                <PathIcon Data="{StaticResource IconCopy}" Width="13" Height="13" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+              </Button>
+
+              <!-- View mode toggle -->
+              <Button Classes="ToolbarButton ToolbarIcon"
+                      Command="{Binding CycleViewModeCommand}"
+                      IsEnabled="{Binding IsArchiveLoaded}"
+                      ToolTip.Tip="{Binding LocalizedStrings[Toolbar_ViewMode]}">
+                <PathIcon Data="{StaticResource IconGrid}" Width="13" Height="13" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+              </Button>
+              <TextBlock Text="{Binding ViewModeLabel}"
+                         FontSize="10"
+                         Foreground="{DynamicResource ThemeTextSecondaryBrush}"
+                         VerticalAlignment="Center" />
+
+              <Border Width="1" Height="20" Margin="2,0"
+                      VerticalAlignment="Center"
+                      Background="{DynamicResource ThemeBorderBrush}" />
+
+              <!-- Select All / Invert -->
+              <Button Classes="ToolbarButton ToolbarIcon"
+                      Command="{Binding SelectAllCommand}"
+                      IsEnabled="{Binding IsArchiveLoaded}"
+                      ToolTip.Tip="{Binding LocalizedStrings[Toolbar_SelectAll]}">
+                <PathIcon Data="{StaticResource IconSelectAll}" Width="13" Height="13" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+              </Button>
+              <Button Classes="ToolbarButton ToolbarIcon"
+                      Command="{Binding InvertSelectionCommand}"
+                      IsEnabled="{Binding IsArchiveLoaded}"
+                      ToolTip.Tip="{Binding LocalizedStrings[Toolbar_InvertSelection]}">
+                <PathIcon Data="{StaticResource IconProhibited}" Width="13" Height="13" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+              </Button>
+
+              <Border Width="1" Height="20" Margin="2,0"
+                      VerticalAlignment="Center"
+                      Background="{DynamicResource ThemeBorderBrush}" />
+
+              <!-- Extract Selected To... -->
+              <Button Classes="ToolbarButton ToolbarIcon"
+                      Command="{Binding ExtractSelectedToCommand}"
+                      IsVisible="False"
+                      IsEnabled="{Binding IsArchiveLoaded}"
+                      ToolTip.Tip="{Binding LocalizedStrings[Tooltip_ExtractSelectedTo]}">
+                <PathIcon Data="{StaticResource IconExport}" Width="13" Height="13" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+              </Button>
+              <Button Classes="ToolbarButton ToolbarIcon"
+                      Command="{Binding ExtractSelectedHereCommand}"
+                      IsVisible="False"
+                      IsEnabled="{Binding IsArchiveLoaded}"
+                      ToolTip.Tip="{Binding LocalizedStrings[Tooltip_ExtractSelectedHere]}">
+                <PathIcon Data="{StaticResource IconPin}" Width="13" Height="13" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+              </Button>
+
+              <Border Width="1" Height="20" Margin="2,0"
+                      VerticalAlignment="Center"
+                      Background="{DynamicResource ThemeBorderBrush}" />
+
+              <!-- Refresh -->
+              <Button Classes="ToolbarButton ToolbarIcon"
+                      Command="{Binding RefreshArchiveCommand}"
+                      IsEnabled="{Binding IsArchiveLoaded}"
+                      ToolTip.Tip="{Binding LocalizedStrings[Toolbar_Refresh]}">
+                <PathIcon Data="{StaticResource IconRefresh}" Width="13" Height="13" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+              </Button>
+
+              <Border Width="1" Height="20" Margin="2,0"
+                      VerticalAlignment="Center"
+                      Background="{DynamicResource ThemeBorderBrush}" />
+
+              <!-- Flatten toggle (moved from global toolbar) -->
+              <ToggleButton Classes="ToolbarButton ToolbarIcon"
+                            IsChecked="{Binding ShowSubfolders}"
+                            IsEnabled="{Binding IsArchiveLoaded}"
+                            ToolTip.Tip="{Binding LocalizedStrings[Tooltip_Subfolders]}">
+                <PathIcon Data="{StaticResource IconFolder}" Width="13" Height="13" />
+              </ToggleButton>
+            </StackPanel>
+          </Border>
+
+          <!-- Address bar row -->
+          <Border Grid.Row="1"
+                  Padding="6,3"
+                  Background="{DynamicResource ThemeHeaderBgBrush}">
+            <AutoCompleteBox Height="{DynamicResource ControlHeightSm}"
+                             x:Name="AddressBar"
+                             Text="{Binding CurrentFolder}"
+                             ItemsSource="{Binding FolderPaths}"
+                             FilterMode="StartsWith"
+                             PlaceholderText="{Binding LocalizedStrings[Nav_AddressBar]}"
+                             KeyDown="AddressBar_KeyDown"
+                             Background="{DynamicResource ThemeWindowBgBrush}"
+                             Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                             BorderBrush="{DynamicResource ThemeBorderBrush}" />
+          </Border>
+
+          <!-- DataGrid -->
+          <DataGrid x:Name="FileListGrid"
+                    Grid.Row="2"
+                    ItemsSource="{Binding CurrentEntries}"
+                    SelectedItem="{Binding SelectedEntry}"
+                    AutoGenerateColumns="False"
+                    CanUserSortColumns="True"
+                    CanUserResizeColumns="True"
+                    CanUserReorderColumns="True"
+                    IsReadOnly="True"
+                    RowHeight="{DynamicResource ControlHeightMd}"
+                    SelectionChanged="FileListGrid_SelectionChanged"
+                    DoubleTapped="FileListGrid_DoubleTapped"
+                    KeyDown="FileListGrid_KeyDown"
+                    Sorting="FileListGrid_Sorting">
+            <DataGrid.Styles>
+              <!-- 列标题右键菜单：切换列显隐（菜单项在 Opening 事件中动态构建，见 ColumnHeaderContextMenu_Opening） -->
+              <Style Selector="DataGridColumnHeader">
+                <Setter Property="ContextMenu">
+                  <ContextMenu Opening="ColumnHeaderContextMenu_Opening" />
+                </Setter>
+              </Style>
+            </DataGrid.Styles>
+            <DataGrid.ContextMenu>
+              <ContextMenu>
+                <MenuItem Header="{Binding LocalizedStrings[Ctx_Extract]}"
+                          Command="{Binding ExtractArchiveCommand}" />
+                <MenuItem Header="{Binding LocalizedStrings[Ctx_ExtractSelectedHere]}"
+                          Command="{Binding ExtractSelectedHereCommand}" />
+                <MenuItem Header="{Binding LocalizedStrings[Ctx_ExtractSelectedTo]}"
+                          Command="{Binding ExtractSelectedToCommand}" />
+                <Separator />
+                <MenuItem Header="{Binding LocalizedStrings[Ctx_SmartExtract]}"
+                          Command="{Binding SmartExtractCommand}" />
+                <MenuItem Header="{Binding LocalizedStrings[Ctx_ExtractTo]}"
+                          Command="{Binding ExtractToCommand}" />
+                <Separator />
+                <MenuItem Header="{Binding LocalizedStrings[Ctx_CopyName]}"
+                          Command="{Binding CopyFileNameCommand}" />
+                <MenuItem Header="{Binding LocalizedStrings[Ctx_CopyPath]}"
+                          Command="{Binding CopyFilePathCommand}" />
+                <MenuItem Header="{Binding LocalizedStrings[Ctx_Test]}"
+                          Command="{Binding TestEntryCommand}" />
+                <Separator />
+                <MenuItem Header="{Binding LocalizedStrings[Ctx_Delete]}"
+                          Command="{Binding DeleteFilesCommand}" />
+              </ContextMenu>
+            </DataGrid.ContextMenu>
+            <DataGrid.Columns>
+              <DataGridTemplateColumn Header="" Width="22" Tag="Icon">
+                <DataTemplate>
+                  <Image Source="{Binding IconSource}"
+                         Width="16" Height="16"
+                         VerticalAlignment="Center"
+                         HorizontalAlignment="Center" />
+                </DataTemplate>
+              </DataGridTemplateColumn>
+              <DataGridTextColumn SortMemberPath="Name"
+                                  Width="250"
+                                  MinWidth="120"
+                                  MaxWidth="800">
+                <DataGridTextColumn.Header>
+                    <StackPanel Orientation="Horizontal" Spacing="3">
+                        <PathIcon Data="{StaticResource IconCopy}" Width="13" Height="13" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+                        <TextBlock Text="{Binding LocalizedStrings[DataGrid_Name]}" />
+                        <TextBlock x:Name="NameHeaderArrow" Width="12" FontSize="10" VerticalAlignment="Center" Text="" />
+                    </StackPanel>
+                </DataGridTextColumn.Header>
+                <DataGridTextColumn.Binding>
+                  <Binding Path="NameDisplay" />
+                </DataGridTextColumn.Binding>
+              </DataGridTextColumn>
+              <DataGridTemplateColumn SortMemberPath="Size"
+                                      Width="80"
+                                      MinWidth="60"
+                                      MaxWidth="400">
+                <DataGridTemplateColumn.Header>
+                    <StackPanel Orientation="Horizontal" Spacing="3">
+                        <PathIcon Data="{StaticResource IconRuler}" Width="13" Height="13" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+                        <TextBlock Text="{Binding LocalizedStrings[DataGrid_Size]}" />
+                        <TextBlock x:Name="SizeHeaderArrow" Width="12" FontSize="10" VerticalAlignment="Center" Text="" />
+                    </StackPanel>
+                </DataGridTemplateColumn.Header>
+                <DataGridTemplateColumn.CellTemplate>
+                  <DataTemplate>
+                    <Grid>
+                      <Rectangle Fill="{DynamicResource ProgressBarSizeBrush}"
+                                 HorizontalAlignment="Left">
+                        <Rectangle.Width>
+                          <MultiBinding Converter="{StaticResource RatioToWidthConverter}">
+                            <Binding Path="SizeRatio" />
+                            <Binding Path="Bounds.Width"
+                                     RelativeSource="{RelativeSource AncestorType=ContentPresenter}" />
+                          </MultiBinding>
+                        </Rectangle.Width>
+                      </Rectangle>
+                      <TextBlock Text="{Binding SizeDisplay}"
+                                 VerticalAlignment="Center"
+                                 Margin="4,0" />
+                    </Grid>
+                  </DataTemplate>
+                </DataGridTemplateColumn.CellTemplate>
+              </DataGridTemplateColumn>
+              <DataGridTemplateColumn SortMemberPath="CompressedSize"
+                                      Width="70"
+                                      MinWidth="60"
+                                      MaxWidth="400">
+                <DataGridTemplateColumn.Header>
+                    <StackPanel Orientation="Horizontal" Spacing="3">
+                        <PathIcon Data="{StaticResource IconCompress}" Width="13" Height="13" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+                        <TextBlock Text="{Binding LocalizedStrings[DataGrid_Compressed]}" />
+                        <TextBlock x:Name="CompressedSizeHeaderArrow" Width="12" FontSize="10" VerticalAlignment="Center" Text="" />
+                    </StackPanel>
+                </DataGridTemplateColumn.Header>
+                <DataGridTemplateColumn.CellTemplate>
+                  <DataTemplate>
+                    <Grid>
+                      <Rectangle Fill="{DynamicResource ProgressBarCompressedSizeBrush}"
+                                 HorizontalAlignment="Left">
+                        <Rectangle.Width>
+                          <MultiBinding Converter="{StaticResource RatioToWidthConverter}">
+                            <Binding Path="CompressedSizeRatio" />
+                            <Binding Path="Bounds.Width"
+                                     RelativeSource="{RelativeSource AncestorType=ContentPresenter}" />
+                          </MultiBinding>
+                        </Rectangle.Width>
+                      </Rectangle>
+                      <TextBlock Text="{Binding CompressedSizeDisplay}"
+                                 VerticalAlignment="Center"
+                                 Margin="4,0" />
+                    </Grid>
+                  </DataTemplate>
+                </DataGridTemplateColumn.CellTemplate>
+              </DataGridTemplateColumn>
+              <DataGridTemplateColumn SortMemberPath="RatioSort"
+                                      Width="70"
+                                      MinWidth="60"
+                                      MaxWidth="300">
+                <DataGridTemplateColumn.Header>
+                    <StackPanel Orientation="Horizontal" Spacing="3">
+                        <PathIcon Data="{StaticResource IconDataBarVertical}" Width="13" Height="13" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+                        <TextBlock Text="{Binding LocalizedStrings[DataGrid_Ratio]}" />
+                        <TextBlock x:Name="RatioHeaderArrow" Width="12" FontSize="10" VerticalAlignment="Center" Text="" />
+                    </StackPanel>
+                </DataGridTemplateColumn.Header>
+                <DataGridTemplateColumn.CellTemplate>
+                  <DataTemplate>
+                    <Grid>
+                      <Rectangle Fill="{DynamicResource ProgressBarRatioBrush}"
+                                 HorizontalAlignment="Left">
+                        <Rectangle.Width>
+                          <MultiBinding Converter="{StaticResource RatioToWidthConverter}">
+                            <Binding Path="RatioBarValue" />
+                            <Binding Path="Bounds.Width"
+                                     RelativeSource="{RelativeSource AncestorType=ContentPresenter}" />
+                          </MultiBinding>
+                        </Rectangle.Width>
+                      </Rectangle>
+                      <TextBlock Text="{Binding RatioDisplay}"
+                                 VerticalAlignment="Center"
+                                 Margin="4,0" />
+                    </Grid>
+                  </DataTemplate>
+                </DataGridTemplateColumn.CellTemplate>
+              </DataGridTemplateColumn>
+              <DataGridTemplateColumn SortMemberPath="LastModified"
+                                      Width="100"
+                                      MinWidth="80"
+                                      MaxWidth="400">
+                <DataGridTemplateColumn.Header>
+                    <StackPanel Orientation="Horizontal" Spacing="3">
+                        <PathIcon Data="{StaticResource IconCalendar}" Width="13" Height="13" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+                        <TextBlock Text="{Binding LocalizedStrings[DataGrid_Modified]}" />
+                        <TextBlock x:Name="LastModifiedHeaderArrow" Width="12" FontSize="10" VerticalAlignment="Center" Text="" />
+                    </StackPanel>
+                </DataGridTemplateColumn.Header>
+                <DataGridTemplateColumn.CellTemplate>
+                  <DataTemplate>
+                    <Grid>
+                      <Rectangle Fill="{DynamicResource ProgressBarDateBrush}"
+                                 HorizontalAlignment="Left">
+                        <Rectangle.Width>
+                          <MultiBinding Converter="{StaticResource RatioToWidthConverter}">
+                            <Binding Path="DateRatio" />
+                            <Binding Path="Bounds.Width"
+                                     RelativeSource="{RelativeSource AncestorType=ContentPresenter}" />
+                          </MultiBinding>
+                        </Rectangle.Width>
+                      </Rectangle>
+                      <TextBlock Text="{Binding LastModifiedDisplay}"
+                                 VerticalAlignment="Center"
+                                 Margin="4,0" />
+                    </Grid>
+                  </DataTemplate>
+                </DataGridTemplateColumn.CellTemplate>
+              </DataGridTemplateColumn>
+            </DataGrid.Columns>
+          </DataGrid>
+        </Grid>
+      </Grid>
+
+      <GridSplitter x:Name="PreviewColSplitter"
+                    Grid.Column="3"
+                    Width="5" />
+
+      <!-- 水平分隔条：位置 1/2/3 时可见（Row 1），Column/ColumnSpan 由 ApplyPreviewPosition 注入 -->
+      <GridSplitter x:Name="PreviewRowSplitter"
+                    Grid.Row="1"
+                    Height="4"
+                    IsVisible="False" />
+
+      <!-- Preview area -->
+      <views:PreviewPanel x:Name="PreviewPanelHost"
+                          Grid.Column="4"
+                          IsVisible="{Binding IsPreviewVisible}"
+                          DataContext="{Binding Preview}" />
+
+      <!-- 拖拽添加覆层（DragOver 悬停期间显示：覆盖文件列表列，视觉对齐拖拽解压覆层——
+           状态色背景呼吸透明 alpha 40-120、8px 同色不透明边框、白色粗体文字+阴影、✓/⚠ 状态图标。
+           呼吸由 code-behind DispatcherTimer 驱动，仅背景层 Opacity 呼吸，边框/文字保持不透明） -->
+      <Border x:Name="DragAddOverlay"
+              Grid.Column="2"
+              Grid.Row="0"
+              IsVisible="False"
+              IsHitTestVisible="False"
+              BorderBrush="#6BD46B"
+              BorderThickness="8"
+              ZIndex="10">
+        <Grid>
+          <Border x:Name="DragAddOverlayBg" Background="#6BD46B" />
+          <StackPanel VerticalAlignment="Center"
+                      HorizontalAlignment="Center"
+                      Spacing="{DynamicResource SpacingMd}"
+                      Margin="40,0">
+            <TextBlock x:Name="DragAddOverlayIcon"
+                       Text="&#x2713;"
+                       FontSize="48"
+                       FontWeight="Bold"
+                       Foreground="#90E060"
+                       FontFamily="Segoe UI Symbol"
+                       HorizontalAlignment="Center">
+              <TextBlock.Effect>
+                <DropShadowEffect OffsetX="1" OffsetY="1" BlurRadius="3" Color="#B0000000" />
+              </TextBlock.Effect>
+            </TextBlock>
+            <TextBlock x:Name="DragAddOverlayText"
+                       FontSize="24"
+                       FontWeight="Bold"
+                       Foreground="White"
+                       TextAlignment="Center"
+                       TextWrapping="Wrap"
+                       MaxWidth="560">
+              <TextBlock.Effect>
+                <DropShadowEffect OffsetX="1" OffsetY="1" BlurRadius="3" Color="#B0000000" />
+              </TextBlock.Effect>
+            </TextBlock>
+          </StackPanel>
+        </Grid>
+      </Border>
+    </Grid>
+    </Grid>
+
+    <!-- Status bar (Row 4) -->
+    <Border Grid.Row="4"
+            Padding="8,4"
+            Background="{DynamicResource ThemeHeaderBgBrush}">
+      <Grid ColumnDefinitions="Auto,*,Auto,Auto">
+        <TextBlock Grid.Column="0"
+                   Text="{Binding SelectionStats}"
+                   Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                   FontSize="12" />
+        <TextBlock Grid.Column="1"
+                   Text="{Binding ArchiveStats}"
+                   Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                   FontSize="12"
+                   HorizontalAlignment="Center" />
+        <!-- Password status -->
+        <StackPanel Grid.Column="2"
+                    Orientation="Horizontal"
+                    Spacing="4"
+                    IsVisible="{Binding HasPasswordStatus}"
+                    Margin="0,0,8,0">
+          <PathIcon Data="{Binding PasswordStatusIcon}"
+                    Width="14" Height="14"
+                    Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+          <TextBlock Text="{Binding PasswordStatusMessage}"
+                     Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                     FontSize="12" />
+        </StackPanel>
+        <TextBlock Grid.Column="3"
+                   Text="{Binding StatusMessage}"
+                   Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                   FontSize="12"
+                   HorizontalAlignment="Right" />
+      </Grid>
+    </Border>
+
+    <!-- 打开压缩包加载遮罩（覆盖整个窗口，绑定 IsLoading） -->
+    <Grid Grid.RowSpan="5"
+          IsVisible="{Binding IsLoading}"
+          Background="#88000000"
+          ZIndex="1000">
+      <Border HorizontalAlignment="Center"
+              VerticalAlignment="Center"
+              Padding="{DynamicResource DialogPadding}"
+              Background="{DynamicResource ThemeSurfaceBgBrush}"
+              BorderBrush="{DynamicResource ThemeBorderBrush}"
+              BorderThickness="1"
+              CornerRadius="{DynamicResource BorderRadius}">
+        <StackPanel Spacing="{DynamicResource SpacingMd}"
+                    HorizontalAlignment="Center"
+                    MinWidth="260">
+          <TextBlock Text="{Binding LocalizedStrings[Status_OpeningArchive]}"
+                     Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                     FontSize="16"
+                     HorizontalAlignment="Center" />
+          <ProgressBar IsIndeterminate="True"
+                       Width="180"
+                       Height="6"
+                       HorizontalAlignment="Center" />
+        </StackPanel>
+      </Border>
+    </Grid>
+  </Grid>
+</Window>

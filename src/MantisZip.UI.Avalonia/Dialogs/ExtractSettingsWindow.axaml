@@ -1,0 +1,187 @@
+<Window xmlns="https://github.com/avaloniaui"
+         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+         xmlns:controls="clr-namespace:MantisZip.UI.Avalonia.Controls"
+         xmlns:conv="clr-namespace:MantisZip.UI.Avalonia.Converters"
+         x:Class="MantisZip.UI.Avalonia.Dialogs.ExtractSettingsWindow"
+         x:CompileBindings="False"
+         Title="{Binding LocalizedStrings[Extract_Title]}"
+         Width="850"
+         MinWidth="700"
+          MinHeight="500"
+         SizeToContent="Height"
+         WindowStartupLocation="CenterOwner"
+         CanResize="True"
+         Background="{DynamicResource ThemeWindowBgBrush}">
+
+  <Window.Resources>
+    <conv:GeometryResourceConverter x:Key="GeometryResourceConverter" />
+    <conv:NodeForegroundConverter x:Key="NodeForegroundConverter" />
+  </Window.Resources>
+
+  <Grid RowDefinitions="*,Auto"
+        Margin="16">
+    <Grid.ColumnDefinitions>
+      <ColumnDefinition Width="450" MinWidth="400" />
+      <ColumnDefinition Width="Auto" />
+      <ColumnDefinition Width="*" />
+    </Grid.ColumnDefinitions>
+    <!-- ═══════ Left: TabControl with settings ═══════ -->
+    <TabControl Grid.Column="0" Grid.Row="0"
+                Background="{DynamicResource ThemeWindowBgBrush}"
+                TextElement.Foreground="{DynamicResource ThemeTextPrimaryBrush}">
+      <!-- Tab: General -->
+      <TabItem Header="{Binding LocalizedStrings[Extract_Title]}"
+               Classes="compactTab"
+               controls:TabItemExtensions.TabIcon="IconSettings">
+        <ScrollViewer Background="{DynamicResource ThemeWindowBgBrush}"
+                       TextElement.Foreground="{DynamicResource ThemeTextPrimaryBrush}">
+          <StackPanel Spacing="12"
+                       Margin="0,8,0,0">
+            <!-- Source archives -->
+            <Border BorderBrush="{DynamicResource ThemeBorderBrush}"
+                    BorderThickness="1" CornerRadius="4" Padding="12"
+                    Background="{DynamicResource ThemeSurfaceBgBrush}">
+              <StackPanel Spacing="8">
+                <TextBlock Text="{Binding LocalizedStrings[Extract_SourceArchives]}"
+                           FontWeight="SemiBold" />
+                <ListBox x:Name="FileListBox"
+                         Height="100"
+                         BorderBrush="{DynamicResource ThemeBorderBrush}"
+                         ItemsSource="{Binding SourceItems}"
+                         SelectedItem="{Binding SelectedSourceItem}">
+                  <ListBox.ItemContainerTheme>
+                    <ControlTheme TargetType="ListBoxItem">
+                      <Setter Property="MinHeight" Value="{DynamicResource ControlHeightMd}" />
+                    </ControlTheme>
+                  </ListBox.ItemContainerTheme>
+                  <ListBox.ItemTemplate>
+                    <DataTemplate>
+                      <StackPanel Orientation="Horizontal"
+                                  Spacing="6"
+                                  Background="Transparent">
+                        <PathIcon Data="{Binding StatusIconKey, Converter={StaticResource GeometryResourceConverter}}"
+                                  Width="14" Height="14"
+                                  VerticalAlignment="Center"
+                                  Foreground="{Binding StatusForegroundKey, Converter={StaticResource NodeForegroundConverter}}" />
+                        <TextBlock Text="{Binding DisplayName}"
+                                   VerticalAlignment="Center"
+                                   TextTrimming="CharacterEllipsis"
+                                   ToolTip.Tip="{Binding RowToolTip}" />
+                      </StackPanel>
+                    </DataTemplate>
+                  </ListBox.ItemTemplate>
+                </ListBox>
+                <!-- 多包场景提示：过滤/预览统计语义绑定首包 -->
+                <TextBlock Text="{Binding LocalizedStrings[Extract_Source_MultiFilterHint]}"
+                           FontSize="11"
+                           TextWrapping="Wrap"
+                           Foreground="{DynamicResource ThemeTextSecondaryBrush}"
+                           IsVisible="{Binding HasMultipleArchives}" />
+                <!-- 手动解锁：选中锁定/加密未匹配行时出现 -->
+                <Button Command="{Binding UnlockSelectedCommand}"
+                        IsVisible="{Binding CanUnlockSelected}"
+                        HorizontalAlignment="Left"
+                        Classes="ToolbarButton">
+                  <StackPanel Orientation="Horizontal" Spacing="6">
+                    <PathIcon Data="{StaticResource IconKey}"
+                              Width="14" Height="14"
+                              Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+                    <TextBlock Text="{Binding LocalizedStrings[Extract_UnlockButton]}"
+                               VerticalAlignment="Center" />
+                  </StackPanel>
+                </Button>
+              </StackPanel>
+            </Border>
+
+            <!-- Destination path -->
+            <Border BorderBrush="{DynamicResource ThemeBorderBrush}"
+                    BorderThickness="1" CornerRadius="4" Padding="12"
+                    Background="{DynamicResource ThemeSurfaceBgBrush}">
+              <StackPanel Spacing="8">
+                <TextBlock Text="{Binding LocalizedStrings[Extract_Destination]}"
+                           FontWeight="SemiBold" />
+                <!-- Path input + quick buttons + browse (QuickPathPicker) -->
+                <controls:QuickPathPicker x:Name="DestinationPicker"
+                                          Path="{Binding DestinationPath}" />
+              </StackPanel>
+            </Border>
+
+            <!-- Conflict action -->
+            <Border BorderBrush="{DynamicResource ThemeBorderBrush}"
+                    BorderThickness="1" CornerRadius="4" Padding="12"
+                    Background="{DynamicResource ThemeSurfaceBgBrush}">
+              <StackPanel Spacing="8">
+                <TextBlock Text="{Binding LocalizedStrings[Extract_WhenFileExists]}"
+                           FontWeight="SemiBold" />
+                <ComboBox ItemsSource="{Binding ConflictActionOptions}"
+                          SelectedItem="{Binding SelectedConflictActionOption}"
+                          DisplayMemberBinding="{Binding Display}"
+                          HorizontalAlignment="Stretch" />
+                <CheckBox IsChecked="{Binding OpenFolderAfterExtract}">
+                  <TextBlock Text="{Binding LocalizedStrings[Extract_OpenFolder]}"
+                             TextWrapping="Wrap" />
+                </CheckBox>
+              </StackPanel>
+            </Border>
+          </StackPanel>
+        </ScrollViewer>
+      </TabItem>
+
+      <!-- Tab 2: File Filter -->
+      <TabItem Header="{Binding LocalizedStrings[Extract_TabFilter]}"
+               Classes="compactTab"
+               controls:TabItemExtensions.TabIcon="IconFilter">
+        <ScrollViewer Background="{DynamicResource ThemeWindowBgBrush}"
+                       TextElement.Foreground="{DynamicResource ThemeTextPrimaryBrush}">
+          <controls:FileFilterEditor x:Name="FileFilterControl" />
+        </ScrollViewer>
+      </TabItem>
+    </TabControl>
+
+    <!-- ═══════ GridSplitter ═══════ -->
+    <GridSplitter Grid.Column="1" Grid.Row="0"
+                  Width="5"
+                  Background="{DynamicResource ThemeSplitterBgBrush}"
+                  ResizeBehavior="PreviousAndNext"
+                  ResizeDirection="Auto" />
+
+    <!-- ═══════ Right: Preview panel ═══════ -->
+    <controls:ResultTreeView Grid.Column="2" Grid.Row="0"
+                              x:Name="PreviewTree"
+                              Root="{Binding PreviewRoot}"
+                              CompactMode="{Binding PreviewCompactMode}"
+                              MaxItemsPerDirectory="5"
+                              MaxDepth="5"
+                              ShowFilteredGhosts="{Binding ShowFilteredGhosts}"
+                              IsLoading="{Binding IsPreviewBuilding}"
+                              BuildProgress="{Binding PreviewBuildProgress}"
+                              IsListingPending="{Binding IsListingPending}"
+                              LoadFailedTitle="{Binding PreviewErrorTitle}"
+                              LoadFailedDetail="{Binding PreviewErrorDetail}"
+                              LoadFailedNeedsPassword="{Binding PreviewNeedsPassword}"
+                              MinWidth="200" />
+
+    <!-- ═══════ Bottom buttons (span all columns) ═══════ -->
+    <StackPanel Grid.Row="1"
+                Grid.ColumnSpan="3"
+                Orientation="Horizontal"
+                HorizontalAlignment="Right"
+                Spacing="8"
+                Margin="0,16,0,0">
+      <Button Content="{Binding LocalizedStrings[Extract_Start]}"
+              Padding="16"
+              Command="{Binding ExtractCommand}"
+              Background="{DynamicResource ThemeAccentBrush}"
+              Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+              BorderThickness="0">
+      </Button>
+      <Button Content="{Binding LocalizedStrings[Extract_Cancel]}"
+              Padding="16"
+              Command="{Binding CancelCommand}"
+              Background="{DynamicResource ThemeButtonBgBrush}"
+              Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+              BorderBrush="{DynamicResource ThemeBorderBrush}">
+      </Button>
+    </StackPanel>
+  </Grid>
+</Window>

@@ -64,6 +64,14 @@ public class ArchiveOptions
     public Func<FileConflictInfo, FileConflictAction>? ConflictResolver { get; set; }
 
     /// <summary>
+    /// 异步的文件冲突回调。与 <see cref="ConflictResolver"/> 功能相同，
+    /// 但调用时可使用 <c>await</c>，适用于需要在后台异步等待 UI 的场景（如 Avalonia 的异步对话框）。
+    /// 当 <see cref="ConflictAction"/> 为 <see cref="FileConflictAction.Ask"/> 时优先使用此回调，
+    /// 其次退回到 <see cref="ConflictResolver"/>。
+    /// </summary>
+    public Func<FileConflictInfo, Task<FileConflictAction>>? ConflictResolverAsync { get; set; }
+
+    /// <summary>
     /// 文件读取错误时的回调（如文件被占用无法读取）。
     /// </summary>
     public Func<FileErrorInfo, FileErrorAction>? ErrorResolver { get; set; }
@@ -139,6 +147,12 @@ public class ArchiveOptions
     /// 仅当 <see cref="Encrypt"/> 为 true 且格式为 7z 时有效。
     /// </summary>
     public bool SevenZipEncryptHeaders { get; set; } = true;
+
+    /// <summary>
+    /// 压缩文件白名单（绝对路径集合）；null = 全量压缩。
+    /// 非 null 时引擎只打包白名单内的文件（过滤场景：预览构建时算好的 B 数据集 IncludedFiles）。
+    /// </summary>
+    public IReadOnlySet<string>? FileWhitelist { get; set; }
 }
 
 /// <summary>

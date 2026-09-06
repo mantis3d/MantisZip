@@ -1,0 +1,374 @@
+<Application xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:conv="clr-namespace:MantisZip.UI.Avalonia.Converters"
+             xmlns:controls="clr-namespace:MantisZip.UI.Avalonia.Controls"
+             x:Class="MantisZip.UI.Avalonia.App">
+  <Application.Resources>
+    <ResourceDictionary>
+      <ResourceDictionary.MergedDictionaries>
+        <!-- 默认 light 主题，运行时由 App.axaml.cs 根据系统设置切换为 Dark -->
+        <ResourceInclude Source="avares://MantisZip.UI.Avalonia/Themes/ThemeLight.axaml" />
+        <!-- PathIcon 图标资源字典 -->
+        <ResourceInclude Source="avares://MantisZip.UI.Avalonia/Resources/Icons/AppIcons.axaml" />
+      </ResourceDictionary.MergedDictionaries>
+      <!-- 全局转换器：compactTab 标题模板（TabIcon 附加属性）依赖 -->
+      <conv:GeometryResourceConverter x:Key="GeometryResourceConverter" />
+      <conv:StringNotEmptyConverter x:Key="StringNotEmptyConverter" />
+    </ResourceDictionary>
+  </Application.Resources>
+  <Application.Styles>
+    <FluentTheme />
+    <StyleInclude Source="avares://Avalonia.Controls.DataGrid/Themes/Fluent.xaml"/>
+
+    <!-- ════════════════════════════════════════════ -->
+    <!-- GLOBAL CONTROL STYLES (applied app-wide)    -->
+    <!-- ════════════════════════════════════════════ -->
+
+    <!-- Window — 字体由 App.axaml.cs 根据设置动态设置为 {DynamicResource AppGlobalFont} -->
+    <Style Selector="Window">
+      <Setter Property="FontFamily" Value="{DynamicResource AppGlobalFont}" />
+    </Style>
+
+    <!-- ToolTip — 全局显示延迟 100ms（覆盖默认 400ms），使图标按钮的悬停提示更跟手 -->
+    <Style Selector="Control">
+      <Setter Property="ToolTip.ShowDelay" Value="100" />
+    </Style>
+
+    <!-- TextBlock — 不设 Foreground（继承父控件），避免覆盖 emoji 彩色渲染 -->
+    <Style Selector="TextBlock">
+      <!-- Foreground left unset — inherits from parent; setting it here would
+           flatten emoji to theme color instead of native multicolor. -->
+    </Style>
+
+    <!-- TextBox
+         Note: Use /template/ selectors targeting PART_BorderElement directly for normal state,
+         because Fluent theme's Default theme-dictionary resources (TextControlBackground,
+         TextControlBorderBrush) shadow Application.Resources overrides in Light mode.
+         Pointerover/focus/disabled states are handled by Fluent ControlTheme with our
+         TextControl* resource overrides (which work via the different resolution path).  -->
+    <Style Selector="TextBox">
+      <Setter Property="Foreground" Value="{DynamicResource ThemeTextPrimaryBrush}" />
+      <Setter Property="CornerRadius" Value="{DynamicResource BorderRadius}" />
+      <!-- Use a dedicated TextControlPadding resource so horizontal padding stays reasonable
+           even in Loose compactness mode (avoid overly large left/right padding that
+           reduces the editable area). -->
+      <Setter Property="Padding" Value="{DynamicResource TextControlPadding}" />
+      <Setter Property="Transitions">
+        <Setter.Value>
+          <Transitions>
+            <BrushTransition Property="BorderBrush" Duration="0:0:0.15" />
+          </Transitions>
+        </Setter.Value>
+      </Setter>
+    </Style>
+    <Style Selector="TextBox:not(:pointerover):not(:focus-within):not(:disabled) /template/ Border#PART_BorderElement">
+      <Setter Property="Background" Value="{DynamicResource ThemeSurfaceBgBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource ThemeBorderBrush}" />
+    </Style>
+    <Style Selector="TextBox:focus-within /template/ Border#PART_BorderElement">
+      <Setter Property="BorderBrush" Value="{DynamicResource ThemeAccentBrush}" />
+    </Style>
+
+    <!-- Button -->
+    <Style Selector="Button">
+      <Setter Property="Background" Value="{DynamicResource ThemeButtonBgBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource ThemeTextPrimaryBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource ThemeBorderBrush}" />
+      <Setter Property="CornerRadius" Value="{DynamicResource BorderRadius}" />
+      <Setter Property="Padding" Value="8,4" />
+      <Setter Property="MinHeight" Value="{DynamicResource ControlHeightSm}" />
+      <Setter Property="Transitions">
+        <Setter.Value>
+          <Transitions>
+            <BrushTransition Property="Background" Duration="0:0:0.15" />
+            <BrushTransition Property="Foreground" Duration="0:0:0.15" />
+          </Transitions>
+        </Setter.Value>
+      </Setter>
+    </Style>
+    <Style Selector="Button:pointerover">
+      <Setter Property="Background" Value="{DynamicResource ThemeButtonHoverBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource ThemeTextPrimaryBrush}" />
+    </Style>
+    <Style Selector="Button:pressed">
+      <Setter Property="Background" Value="{DynamicResource ThemeButtonPressedBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource ThemeTextPrimaryBrush}" />
+    </Style>
+
+    <!-- ToggleButton -->
+    <Style Selector="ToggleButton">
+      <Setter Property="Background" Value="{DynamicResource ThemeButtonBgBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource ThemeTextPrimaryBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource ThemeBorderBrush}" />
+      <Setter Property="CornerRadius" Value="{DynamicResource BorderRadius}" />
+      <Setter Property="Padding" Value="8,4" />
+      <Setter Property="MinHeight" Value="{DynamicResource ControlHeightSm}" />
+      <Setter Property="Transitions">
+        <Setter.Value>
+          <Transitions>
+            <BrushTransition Property="Background" Duration="0:0:0.15" />
+            <BrushTransition Property="Foreground" Duration="0:0:0.15" />
+          </Transitions>
+        </Setter.Value>
+      </Setter>
+    </Style>
+    <Style Selector="ToggleButton:pointerover">
+      <Setter Property="Background" Value="{DynamicResource ThemeButtonHoverBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource ThemeTextPrimaryBrush}" />
+    </Style>
+    <Style Selector="ToggleButton:pressed">
+      <Setter Property="Background" Value="{DynamicResource ThemeButtonPressedBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource ThemeTextPrimaryBrush}" />
+    </Style>
+    <Style Selector="ToggleButton:checked">
+      <Setter Property="Background" Value="{DynamicResource ThemeAccentBrush}" />
+      <Setter Property="Foreground" Value="White" />
+    </Style>
+    <!--
+      PathIcon in Avalonia does NOT inherit Foreground from parent controls,
+      so we must target it directly. This selector covers all PathIcon children
+      (including those nested in StackPanel) via descendant combinator.
+    -->
+    <Style Selector="ToggleButton:checked PathIcon">
+      <Setter Property="Foreground" Value="White" />
+    </Style>
+    <Style Selector="ToggleButton:checked:pointerover">
+      <Setter Property="Foreground" Value="White" />
+      <Setter Property="Background" Value="{DynamicResource ThemeAccentBrush}" />
+    </Style>
+    <Style Selector="ToggleButton:checked:pressed">
+      <Setter Property="Foreground" Value="White" />
+    </Style>
+
+    <!-- ════════════════════════════════════════════ -->
+    <!-- TOOLBAR BUTTON STYLES                       -->
+    <!-- ════════════════════════════════════════════ -->
+
+    <Style Selector="Button.ToolbarButton, ToggleButton.ToolbarButton">
+      <Setter Property="Height" Value="{DynamicResource ControlHeightLg}" />
+      <Setter Property="Padding" Value="8,2" />
+      <Setter Property="Background" Value="{DynamicResource ThemeHeaderBgBrush}" />
+    </Style>
+
+    <!-- Compact square toolbar buttons for tree/file-list toolbars -->
+    <Style Selector="Button.ToolbarIcon, ToggleButton.ToolbarIcon">
+      <Setter Property="Width" Value="{DynamicResource ControlHeightSm}" />
+      <Setter Property="Height" Value="{DynamicResource ControlHeightSm}" />
+      <Setter Property="Padding" Value="6" />
+      <Setter Property="Background" Value="{DynamicResource ThemeHeaderBgBrush}" />
+    </Style>
+
+    <Style Selector="Button.ToolbarButton > StackPanel, ToggleButton.ToolbarButton > StackPanel">
+      <Setter Property="Spacing" Value="2" />
+    </Style>
+
+    <Style Selector="TextBlock.ToolbarButtonIcon">
+      <Setter Property="FontSize" Value="20" />
+      <Setter Property="HorizontalAlignment" Value="Center" />
+      <Setter Property="Foreground" Value="{DynamicResource ThemeTextPrimaryBrush}" />
+    </Style>
+
+    <Style Selector="TextBlock.ToolbarButtonLabel">
+      <Setter Property="FontSize" Value="13" />
+      <Setter Property="HorizontalAlignment" Value="Center" />
+    </Style>
+
+    <!-- ComboBox -->
+    <Style Selector="ComboBox">
+      <Setter Property="Background" Value="{DynamicResource ThemeComboBoxBgBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource ThemeTextPrimaryBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource ThemeComboBoxBorderBrush}" />
+      <Setter Property="CornerRadius" Value="{DynamicResource BorderRadius}" />
+      <Setter Property="Padding" Value="8,6" />
+      <Setter Property="Transitions">
+        <Setter.Value>
+          <Transitions>
+            <BrushTransition Property="BorderBrush" Duration="0:0:0.15" />
+          </Transitions>
+        </Setter.Value>
+      </Setter>
+    </Style>
+    <Style Selector="ComboBox:focus-within">
+      <Setter Property="BorderBrush" Value="{DynamicResource ThemeAccentBrush}" />
+    </Style>
+    <Style Selector="ComboBoxItem">
+      <Setter Property="Background" Value="{DynamicResource ThemeComboBoxBgBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource ThemeTextPrimaryBrush}" />
+    </Style>
+    <Style Selector="ComboBoxItem:selected">
+      <Setter Property="Background" Value="{DynamicResource ThemeListSelectedBrush}" />
+    </Style>
+
+    <!-- CheckBox -->
+    <Style Selector="CheckBox">
+      <Setter Property="Foreground" Value="{DynamicResource ThemeTextPrimaryBrush}" />
+    </Style>
+
+    <!-- RadioButton -->
+    <Style Selector="RadioButton">
+      <Setter Property="Foreground" Value="{DynamicResource ThemeTextPrimaryBrush}" />
+    </Style>
+
+    <!-- TabControl & TabItem -->
+    <Style Selector="TabControl">
+      <Setter Property="Background" Value="{DynamicResource ThemeSurfaceBgBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource ThemeBorderBrush}" />
+      <Setter Property="Padding" Value="0" />
+      <!-- Template override: wrap ItemsPresenter in a Border to set tab strip background -->
+      <Setter Property="Template">
+        <ControlTemplate>
+          <Border BorderBrush="{TemplateBinding BorderBrush}"
+                  BorderThickness="{TemplateBinding BorderThickness}"
+                  CornerRadius="{TemplateBinding CornerRadius}"
+                  Background="{TemplateBinding Background}"
+                  HorizontalAlignment="{TemplateBinding HorizontalAlignment}"
+                  VerticalAlignment="{TemplateBinding VerticalAlignment}">
+            <DockPanel>
+              <Border Background="{DynamicResource ThemeHeaderBgBrush}"
+                      DockPanel.Dock="{TemplateBinding TabStripPlacement}">
+                <ItemsPresenter Name="PART_ItemsPresenter"
+                                ItemsPanel="{TemplateBinding ItemsPanel}" />
+              </Border>
+              <Panel ClipToBounds="True"
+                     Background="{DynamicResource ThemeSurfaceBgBrush}">
+                <ContentPresenter Name="PART_SelectedContentHost2"
+                                  Margin="{TemplateBinding Padding}"
+                                  HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                  VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}"
+                                  IsVisible="False" />
+                <ContentPresenter Name="PART_SelectedContentHost"
+                                  Margin="{TemplateBinding Padding}"
+                                  HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                  VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}" />
+              </Panel>
+            </DockPanel>
+          </Border>
+        </ControlTemplate>
+      </Setter>
+    </Style>
+    <Style Selector="TabItem">
+      <Setter Property="Foreground" Value="{DynamicResource ThemeTextPrimaryBrush}" />
+      <Setter Property="Background" Value="{DynamicResource ThemeHeaderBgBrush}" />
+      <Setter Property="BorderThickness" Value="0" />
+    </Style>
+    <Style Selector="TabItem:pointerover /template/ Border#PART_LayoutRoot">
+      <Setter Property="Background" Value="{DynamicResource ThemeTabHoverBrush}" />
+    </Style>
+    <Style Selector="TabItem:selected">
+      <Setter Property="Background" Value="{DynamicResource ThemeSurfaceBgBrush}" />
+    </Style>
+
+    <!-- TabItem.compactTab — compact tab headers for settings windows.
+         Sets TabItemExtensions.TabIcon (Geometry resource key) to render "icon + text";
+         when unset/null the header falls back to plain text. -->
+    <Style Selector="TabItem.compactTab">
+      <Setter Property="Padding" Value="8,6,8,6" />
+      <Setter Property="MinHeight" Value="36" />
+      <Setter Property="FontSize" Value="18" />
+      <Setter Property="HeaderTemplate">
+        <Setter.Value>
+          <DataTemplate>
+            <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+              <PathIcon Data="{Binding $parent[TabItem].(controls:TabItemExtensions.TabIcon), Converter={StaticResource GeometryResourceConverter}}"
+                        IsVisible="{Binding $parent[TabItem].(controls:TabItemExtensions.TabIcon), Converter={StaticResource StringNotEmptyConverter}}"
+                        Width="18" Height="18" VerticalAlignment="Center"
+                        Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+              <TextBlock Text="{Binding}" VerticalAlignment="Center" />
+            </StackPanel>
+          </DataTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+
+    <!-- DataGrid -->
+    <Style Selector="DataGrid">
+      <Setter Property="Background" Value="{DynamicResource ThemeListBgBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource ThemeTextPrimaryBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource ThemeBorderBrush}" />
+    </Style>
+    <Style Selector="DataGridColumnHeader">
+      <Setter Property="Background" Value="{DynamicResource ThemeHeaderBgBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource ThemeTextPrimaryBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource ThemeBorderBrush}" />
+    </Style>
+    <Style Selector="DataGridRow">
+      <Setter Property="Background" Value="{DynamicResource ThemeListBgBrush}" />
+    </Style>
+    <Style Selector="DataGridRow:selected /template/ DataGridCell">
+      <Setter Property="Background" Value="{DynamicResource ThemeListSelectedBrush}" />
+    </Style>
+    <Style Selector="DataGridRow:pointerover /template/ DataGridCell">
+      <Setter Property="Background" Value="{DynamicResource ThemeButtonHoverBrush}" />
+    </Style>
+
+    <!-- DatePicker -->
+    <Style Selector="DatePicker">
+      <Setter Property="Background" Value="{DynamicResource ThemeSurfaceBgBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource ThemeTextPrimaryBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource ThemeBorderBrush}" />
+    </Style>
+
+    <!-- ProgressBar -->
+    <Style Selector="ProgressBar">
+      <Setter Property="Foreground" Value="{DynamicResource ThemeAccentBrush}" />
+      <Setter Property="Background" Value="{DynamicResource ThemeBorderBrush}" />
+      <Setter Property="CornerRadius" Value="{DynamicResource BorderRadius}" />
+    </Style>
+
+    <!-- ScrollViewer -->
+    <Style Selector="ScrollViewer">
+      <Setter Property="Background" Value="{DynamicResource ThemeWindowBgBrush}" />
+    </Style>
+    <Style Selector="ScrollBar Thumb">
+      <Setter Property="CornerRadius" Value="{DynamicResource BorderRadius}" />
+    </Style>
+
+    <!-- Menu / MenuItem -->
+    <Style Selector="Menu">
+      <Setter Property="Background" Value="{DynamicResource ThemeHeaderBgBrush}" />
+    </Style>
+    <Style Selector="MenuItem">
+      <Setter Property="Foreground" Value="{DynamicResource ThemeTextPrimaryBrush}" />
+      <Setter Property="Background" Value="Transparent" />
+    </Style>
+    <Style Selector="MenuItem:pointerover">
+      <Setter Property="Background" Value="{DynamicResource ThemeButtonHoverBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource ThemeTextPrimaryBrush}" />
+    </Style>
+
+    <!-- ToggleIconBox — Total Commander-style toggle indicator for menu items.
+         16×16 to match Fluent MenuItem.Icon slot (FluentMenuItemIconTheme caps content at 16×16). -->
+    <Style Selector="Border.ToggleIconBox">
+      <Setter Property="Width" Value="16" />
+      <Setter Property="Height" Value="16" />
+      <Setter Property="CornerRadius" Value="3" />
+      <Setter Property="BorderThickness" Value="1.5" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+      <Setter Property="BorderBrush" Value="{DynamicResource ThemeBorderBrush}" />
+      <Setter Property="Transitions">
+        <Setter.Value>
+          <Transitions>
+            <BrushTransition Property="Background" Duration="0:0:0.15" />
+          </Transitions>
+        </Setter.Value>
+      </Setter>
+    </Style>
+
+    <!-- GridSplitter -->
+    <Style Selector="GridSplitter">
+      <Setter Property="Background" Value="{DynamicResource ThemeSplitterBgBrush}" />
+    </Style>
+
+    <!-- ListBox -->
+    <Style Selector="ListBox">
+      <Setter Property="Background" Value="{DynamicResource ThemeSurfaceBgBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource ThemeTextPrimaryBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource ThemeBorderBrush}" />
+    </Style>
+    <Style Selector="ListBoxItem">
+      <Setter Property="Foreground" Value="{DynamicResource ThemeTextPrimaryBrush}" />
+    </Style>
+
+
+  </Application.Styles>
+</Application>

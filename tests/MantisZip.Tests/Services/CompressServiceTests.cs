@@ -103,7 +103,7 @@ public class CompressServiceTests : IDisposable
         await File.WriteAllTextAsync(outputPath, "pre-existing junk");
 
         int resolverCalls = 0;
-        CompressConflictResolver resolver = info =>
+        CompressConflictResolver resolver = async info =>
         {
             resolverCalls++;
             return new CompressConflictResolution(CompressConflictAction.Overwrite, null);
@@ -141,7 +141,7 @@ public class CompressServiceTests : IDisposable
         TrackFile(outputPath);
         await File.WriteAllTextAsync(outputPath, "preserved content");
 
-        CompressConflictResolver resolver = _ =>
+        CompressConflictResolver resolver = async _ =>
             new CompressConflictResolution(CompressConflictAction.Cancel, null);
 
         var request = new CompressRequest
@@ -172,7 +172,7 @@ public class CompressServiceTests : IDisposable
         TrackFile(outputPath);
         await File.WriteAllTextAsync(outputPath, "original");
 
-        CompressConflictResolver resolver = _ =>
+        CompressConflictResolver resolver = async _ =>
             new CompressConflictResolution(CompressConflictAction.Rename, null);
 
         var request = new CompressRequest
@@ -210,7 +210,7 @@ public class CompressServiceTests : IDisposable
         await File.WriteAllTextAsync(outputPath, "original");
 
         var customName = "custom-output.zip";
-        CompressConflictResolver resolver = _ =>
+        CompressConflictResolver resolver = async _ =>
             new CompressConflictResolution(CompressConflictAction.Rename, customName);
 
         var request = new CompressRequest
@@ -257,7 +257,7 @@ public class CompressServiceTests : IDisposable
             zos.CloseEntry();
         }
 
-        CompressConflictResolver resolver = _ =>
+        CompressConflictResolver resolver = async _ =>
             new CompressConflictResolution(CompressConflictAction.Add, null);
 
         var request = new CompressRequest
@@ -404,7 +404,7 @@ public class CompressServiceTests : IDisposable
         await File.WriteAllTextAsync(outputPath, "junk");
 
         int resolverCalls = 0;
-        CompressConflictResolver resolver = info =>
+        CompressConflictResolver resolver = async info =>
         {
             resolverCalls++;
             return new CompressConflictResolution(CompressConflictAction.Overwrite, null);

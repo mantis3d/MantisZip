@@ -1,0 +1,36 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="MantisZip.UI.Avalonia.Dialogs.CommentDialog"
+        x:CompileBindings="False"
+        Title="{Binding DialogTitle}"
+        Width="450"
+        SizeToContent="Height"
+        WindowStartupLocation="CenterOwner"
+        Background="{DynamicResource ThemeWindowBgBrush}"
+        Padding="{DynamicResource SpacingMdThk}">
+  <Grid RowDefinitions="*,Auto"
+        Margin="{DynamicResource SpacingMdThk}">
+    <TextBox Grid.Row="0"
+             x:Name="CommentTextBox"
+             AcceptsReturn="True"
+             TextWrapping="Wrap"
+             MinHeight="150"
+             MaxHeight="300"
+             Margin="0,0,0,12"
+             PlaceholderText="{Binding PlaceholderText}" />
+
+    <StackPanel Grid.Row="1"
+                Orientation="Horizontal"
+                HorizontalAlignment="Right"
+                Spacing="{DynamicResource SpacingXs}">
+      <Button Content="{Binding SaveText}"
+              Width="80"
+              Height="{DynamicResource ControlHeight}"
+              Click="OnSaveClick" />
+      <Button Content="{Binding CancelText}"
+              Width="80"
+              Height="{DynamicResource ControlHeight}"
+              Click="OnCancelClick" />
+    </StackPanel>
+  </Grid>
+</Window>

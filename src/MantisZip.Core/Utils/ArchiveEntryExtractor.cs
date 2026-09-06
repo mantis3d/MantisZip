@@ -5,6 +5,7 @@ using MantisZip.Core.Abstractions;
 using MantisZip.Core.Engines;
 using MantisZip.Core.Utils;
 using SharpCompress.Archives;
+using SharpCompress.Compressors.Deflate;
 using SharpCompress.Readers;
 using SharpSevenZip;
 using SharpSevenZip.Exceptions;
@@ -16,6 +17,14 @@ namespace MantisZip.Core.Utils;
 /// </summary>
 public static class ArchiveEntryExtractor
 {
+    /// <summary>
+    /// 当加密文件名压缩包（EncryptHeaders=true）无密码时尝试读取条目头部，抛出此异常。
+    /// 调用方（如 ClassifyPreviewByMagicAsync）可捕获并返回 PreviewType.NeedsPassword。
+    /// </summary>
+    public sealed class PasswordRequiredException : Exception
+    {
+        public PasswordRequiredException(string message) : base(message) { }
+    }
     /// <summary>
     /// 将压缩包中的指定条目提取到目标文件
     /// </summary>
@@ -43,12 +52,19 @@ public static class ArchiveEntryExtractor
 
                 case ArchiveFormat.SevenZip:
                 case ArchiveFormat.Rar:
+                case ArchiveFormat.Iso:
                     ExtractSevenZipEntry(archivePath, entryName, outputPath, password);
                     break;
 
                 case ArchiveFormat.Tar:
+                    if (IsPlainGZipFile(archivePath))
+                        ExtractGZipEntry(archivePath, entryName, outputPath);
+                    else
+                        ExtractTarGzEntry(archivePath, entryName, outputPath);
+                    break;
+
                 case ArchiveFormat.GZip:
-                    ExtractTarGzEntry(archivePath, entryName, outputPath);
+                    ExtractGZipEntry(archivePath, entryName, outputPath);
                     break;
 
                 default:
@@ -121,6 +137,41 @@ public static class ArchiveEntryExtractor
         CoreLog.Info($"ExtractSevenZipEntry: done");
     }
 
+    /// <summary>
+    /// 判断是否为纯 GZip 单文件（.gz，非 .tar.gz / .tgz）。
+    /// 纯 GZip 无 tar 容器，TarReader 无法解析，需走 GZipStream 直接解压。
+    /// 与 <see cref="TarGzEngine.ExtractAsync"/> 的 .gz 分支保持一致。
+    /// </summary>
+    private static bool IsPlainGZipFile(string archivePath)
+    {
+        var ext = Path.GetExtension(archivePath).ToLowerInvariant();
+        return ext == ".gz" && !archivePath.EndsWith(".tar.gz", StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    /// 提取纯 GZip 单文件（.gz）：将压缩包内容直接解压到输出文件。
+    /// 条目名（解压后的文件名）仅用于匹配，实际内容来自整个 gzip 流。
+    /// </summary>
+    private static void ExtractGZipEntry(string archivePath, string entryName, string outputPath)
+    {
+        CoreLog.Info($"ExtractGZipEntry: archive={archivePath}, entry={entryName}");
+
+        // 最终路径安全检查
+        ValidateOutputPath(outputPath);
+
+        var dir = Path.GetDirectoryName(outputPath);
+        if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
+        {
+            Directory.CreateDirectory(dir);
+        }
+
+        using var inputStream = File.OpenRead(archivePath);
+        using var gzipStream = new GZipStream(inputStream, SharpCompress.Compressors.CompressionMode.Decompress);
+        using var outStream = File.Create(outputPath);
+        gzipStream.CopyTo(outStream);
+        CoreLog.Info($"ExtractGZipEntry: done");
+    }
+
     private static void ExtractTarGzEntry(string archivePath, string entryName, string outputPath)
     {
         CoreLog.Info($"ExtractTarGzEntry: archive={archivePath}, entry={entryName}");
@@ -185,6 +236,7 @@ public static class ArchiveEntryExtractor
 
                 case ArchiveFormat.SevenZip:
                 case ArchiveFormat.Rar:
+                case ArchiveFormat.Iso:
                     using (var extractor = string.IsNullOrEmpty(password)
                         ? new SharpSevenZipExtractor(archivePath)
                         : new SharpSevenZipExtractor(archivePath, password))
@@ -193,6 +245,11 @@ public static class ArchiveEntryExtractor
                         {
                             CoreLog.Info("ExtractHeadAsync: 7z is solid, falling back to full temp extract");
                             return await ExtractHeadViaFullExtractAsync(archivePath, entryName, maxBytes, format, password, ct);
+                        }
+                        // 检测加密文件名：EncryptHeaders=true 且无密码时无法读取条目数据
+                        if (format == ArchiveFormat.SevenZip && string.IsNullOrEmpty(password) && IsSevenZipEncryptHeaders(extractor))
+                        {
+                            throw new PasswordRequiredException("加密文件名 7z 压缩包需要密码才能读取条目数据");
                         }
                         return ExtractSevenZipHeadToMemory(extractor, entryName, maxBytes);
                     }
@@ -290,6 +347,25 @@ public static class ArchiveEntryExtractor
     }
 
     /// <summary>
+    /// 检测 7z 压缩包是否启用了加密文件名。
+    /// 无密码时尝试访问 ArchiveFileData，若抛出异常则视为加密文件名。
+    /// </summary>
+    private static bool IsSevenZipEncryptHeaders(SharpSevenZipExtractor extractor)
+    {
+        try
+        {
+            // 尝试访问条目列表——加密文件名的 7z 在无密码时会抛出 SharpSevenZipArchiveException
+            _ = extractor.ArchiveFileData.Count;
+            return false;
+        }
+        catch (Exception ex) when (ex is SharpSevenZipArchiveException or InvalidOperationException)
+        {
+            CoreLog.Trace("IsSevenZipEncryptHeaders: exception accessing ArchiveFileData, assuming encrypted headers: {0}", ex.Message);
+            return true;
+        }
+    }
+
+    /// <summary>
     /// 通过完整提取到临时文件的方式读取头部（用于固实 7z 或 Tar/Gz）。
     /// </summary>
     private static async Task<byte[]> ExtractHeadViaFullExtractAsync(
@@ -345,6 +421,7 @@ public static class ArchiveEntryExtractor
 
             case ArchiveFormat.SevenZip:
             case ArchiveFormat.Rar:
+            case ArchiveFormat.Iso:
             {
                 using var extractor = string.IsNullOrEmpty(password)
                     ? new SharpSevenZipExtractor(archivePath)

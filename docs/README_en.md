@@ -11,7 +11,7 @@ Lightweight full-featured Windows compression/decompression tool
 <p align="center">
   <a href="https://buy.polar.sh/polar_cl_VaCaW2l2nWkob5CyHe4dOlhL6HrQDK4ueMA9n1JyhNc"><img src="https://img.shields.io/badge/Polar-Sponsor-pink?style=flat-square" alt="Polar Sponsor"></a>
   <a href="https://afdian.com/a/MantisZen"><img src="https://img.shields.io/badge/%E7%88%B1%E5%8F%91%E7%94%B5-%E8%B5%9E%E5%8A%A9-blue?style=flat-square" alt="爱发电"></a>
-  <a href="https://dotnet.microsoft.com/"><img src="https://img.shields.io/badge/.NET-9.0-purple?style=flat-square" alt=".NET 9"></a>
+  <a href="https://dotnet.microsoft.com/"><img src="https://img.shields.io/badge/.NET-10.0-purple?style=flat-square" alt=".NET 10"></a>
 
   [![QQ Group](https://img.shields.io/badge/QQ%20Group-778347352-blue?style=flat-square&logo=tencent-qq&logoColor=white)](https://qm.qq.com/cgi-bin/qm/qr?k=778347352) 
   [![discord](https://img.shields.io/badge/discord-Join-blue?style=flat-square&logo=discord&logoColor=white)](https://discord.gg/PpuyhceJpZ)
@@ -24,7 +24,7 @@ Lightweight full-featured Windows compression/decompression tool
 
  ⏱️ 3-second overview: seamless switching and instant preview inside archives
 
-> Free & Open Source / Built on .NET 9 + WPF   
+> Free & Open Source / Built on .NET 10 + Avalonia   
 > 🤖 AI-assisted development by [OpenCode](https://opencode.ai) and [Reasonix](https://reasonix.io)
 </div>
 
@@ -193,7 +193,7 @@ The file list now includes a size ratio bar, directory flattening, and filtering
 ## 📋 System Requirements
 
 - **OS**: Windows 10 (1809+) / Windows 11 (cross-platform support is planned)
-- **Runtime**: [.NET 9 Runtime](https://dotnet.microsoft.com/download/dotnet/9.0)
+- **Runtime**: [.NET 10 Runtime](https://dotnet.microsoft.com/download/dotnet/10.0)
 - **WebView2 Runtime**: HTML/Markdown/SVG/PDF preview requires [WebView2 Runtime](https://developer.microsoft.com/microsoft-edge/webview2/)
 
 ---
@@ -205,17 +205,17 @@ The file list now includes a size ratio bar, directory flattening, and filtering
 git clone https://github.com/mantis3d/MantisZip.git
 cd MantisZip
 
-# Build
-dotnet build src\MantisZip.UI\MantisZip.UI.csproj
+# Build (Avalonia primary)
+dotnet build src\MantisZip.UI.Avalonia\MantisZip.UI.Avalonia.csproj
 
 # Run
-dotnet run --project src\MantisZip.UI\MantisZip.UI.csproj
+dotnet run --project src\MantisZip.UI.Avalonia\MantisZip.UI.Avalonia.csproj
 
 # Run tests
-dotnet test tests\MantisZip.Tests\MantisZip.Tests.csproj
+dotnet test tests\MantisZip.UI.Avalonia.Tests\MantisZip.UI.Avalonia.Tests.csproj
 ```
 
-**Output path**: `src/MantisZip.UI/bin/Debug/net9.0-windows/MantisZip.UI.exe`
+**Output path**: `src/MantisZip.UI.Avalonia/bin/Debug/net10.0/MantisZip.UI.Avalonia.exe`
 
 ---
 
@@ -295,7 +295,7 @@ MantisZip would not exist without the generous contributions of the global open-
 
 During agile development and refactoring, this project deeply leveraged the following advanced AI coding agents, achieving a leap in independent development productivity:
 
-- [OpenCode](https://opencode.ai) — Responsible for the foundational core async architecture and .NET 9 advanced feature refactoring.
+- [OpenCode](https://opencode.ai) — Responsible for the foundational core async architecture and .NET advanced feature refactoring.
 - [Reasonix](https://reasonix.io) — Responsible for efficient development, deep debugging, and bug fixing of core business features (e.g., in-archive preview, smart password manager).
 - [DeepSeek](https://www.deepseek.com) — Provided underlying hardcore programming large language model support throughout the project.
 

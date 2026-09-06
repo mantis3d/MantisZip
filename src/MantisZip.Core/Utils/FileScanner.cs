@@ -13,17 +13,22 @@ internal static class FileScanner
     /// 从源路径集合中收集所有文件（递归目录），返回相对路径映射及字节总数。
     /// 边扫描边通过 <paramref name="progress"/> 报告进度（每 100ms 节流）。
     /// </summary>
+    /// <param name="sourcePaths">源路径集合（文件或目录）。</param>
+    /// <param name="progress">扫描进度回调。</param>
+    /// <param name="cancellationToken">取消令牌。</param>
+    /// <param name="whitelist">文件白名单（绝对路径，大小写不敏感）；null = 收集全部。</param>
     public static (List<(string FullPath, string RelativePath)> Files, long TotalBytes) CollectFiles(
         string[] sourcePaths,
         IProgress<ArchiveProgress>? progress,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        IReadOnlySet<string>? whitelist = null)
     {
         var files = new List<(string FullPath, string RelativePath)>();
         long totalBytes = 0;
         var lastReportTime = DateTime.Now;
         var reportInterval = TimeSpan.FromMilliseconds(100);
 
-        CoreLog.Info($"FileScanner.CollectFiles: scanning {sourcePaths.Length} source paths");
+        CoreLog.Info($"FileScanner.CollectFiles: scanning {sourcePaths.Length} source paths, whitelist={(whitelist != null ? $"{whitelist.Count} files" : "null")}");
 
         foreach (var sourcePath in sourcePaths)
         {
@@ -34,6 +39,8 @@ internal static class FileScanner
                 foreach (var file in Directory.EnumerateFiles(sourcePath, "*", SearchOption.AllDirectories))
                 {
                     cancellationToken.ThrowIfCancellationRequested();
+                    if (whitelist != null && !whitelist.Contains(file))
+                        continue;
                     var relativePath = Path.Combine(dirName, Path.GetRelativePath(sourcePath, file));
                     files.Add((file, relativePath));
 
@@ -46,6 +53,8 @@ internal static class FileScanner
             }
             else if (File.Exists(sourcePath))
             {
+                if (whitelist != null && !whitelist.Contains(sourcePath))
+                    continue;
                 files.Add((sourcePath, Path.GetFileName(sourcePath)));
                 try { totalBytes += new FileInfo(sourcePath).Length; } catch { /* 跳过无法读取的文件 */ }
             }

@@ -1,0 +1,20 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:models="clr-namespace:MantisZip.UI.Avalonia.Models"
+             x:Class="MantisZip.UI.Avalonia.Controls.InfoPanel"
+             x:DataType="models:FormatMetadataItem">
+  <ItemsControl ItemsSource="{Binding}">
+    <ItemsControl.ItemTemplate>
+      <DataTemplate x:DataType="models:FormatMetadataItem">
+        <Grid ColumnDefinitions="Auto,8,*" Margin="0,3">
+          <TextBlock Text="{Binding Key}"
+                     FontWeight="Bold"
+                     Foreground="{DynamicResource ThemeTextSecondary}" />
+          <TextBlock Grid.Column="2"
+                     Text="{Binding Value}"
+                     Foreground="{DynamicResource ThemeTextPrimary}" />
+        </Grid>
+      </DataTemplate>
+    </ItemsControl.ItemTemplate>
+  </ItemsControl>
+</UserControl>

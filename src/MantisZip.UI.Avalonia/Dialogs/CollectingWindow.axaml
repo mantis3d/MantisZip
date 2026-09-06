@@ -1,0 +1,23 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="MantisZip.UI.Avalonia.Dialogs.CollectingWindow"
+        x:CompileBindings="False"
+        Width="320"
+        Height="100"
+        WindowStartupLocation="CenterScreen"
+        SystemDecorations="None"
+        CanResize="False"
+        ShowInTaskbar="False"
+        Background="{DynamicResource ThemeSurfaceBgBrush}">
+  <Border Background="{DynamicResource ThemeSurfaceBgBrush}"
+          BorderBrush="{DynamicResource ThemeBorderBrush}"
+          BorderThickness="1"
+          CornerRadius="{DynamicResource BorderRadius}">
+    <TextBlock Text="{Binding CollectingText}"
+               Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+               FontSize="16"
+               HorizontalAlignment="Center"
+               VerticalAlignment="Center"
+               Margin="{DynamicResource DialogPadding}" />
+  </Border>
+</Window>

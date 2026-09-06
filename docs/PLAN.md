@@ -3,47 +3,61 @@
 > 未来待开发功能规划。已实现功能请见 [docs/PROGRESS.md](docs/PROGRESS.md)，技术架构请见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)。
 
 **项目状态**: 🟢 开发中  
-**最后更新**: 2026-07-14  
-**当前版本**: 0.4.5
+**最后更新**: 2026-08-20  
+**当前版本**: 0.5.0
 
 ---
 
 
 ## 待实现设计方案
 
-以下功能已有独立方案设计文档（`.sisyphus/plans/`），按优先级排序。
+以下功能已有独立方案设计文档（`.omo/plans/`），按优先级排序。
 
 | 优先级 | 功能 | 设计文档 | 难度 | 预估工时 | 说明 |
 |--------|------|----------|:----:|:--------:|------|
-| **P1** | 统一路径快捷选择 (QuickPathControl → Avalonia) | [quickpath-unified.md](.sisyphus/plans/quickpath-unified.md) | 🟡中 | 4-6h | WPF 已完成数据层 + QuickPathControl 组件 + CompressSettingsWindow 嵌入；WPF 新增 QuickPathPreDialog 前置窗（系统对话框前先选路径）；Avalonia 阶段以 CustomFilePickerDialog + QuickPathBuddy 统一替换 |
-| **P1** | Win11 一级右键菜单 | [win11-first-level-menu.md](.sisyphus/plans/win11-first-level-menu.md) | 🔴高 | 1-2周 | IExplorerCommand 实现，HKLM 提权注册，双接口共存 |
-| **P1** | 解压路径统一（前置：文件筛选） | [extract-path-unification.md](.sisyphus/plans/extract-path-unification.md) | 🟢低 | 1.5h | 三路解压合并为 `ExtractEntriesAsync` + `pathOverrides`，消除重复循环 |
-| **P1** | 文件冲突对话框暂停/取消 | [conflict-dialog-pause-cancel.md](.sisyphus/plans/conflict-dialog-pause-cancel.md) | 🟡中 | 3-4h | 压缩和解压冲突对话框添加暂停/取消按钮 — 暂停收起对话框回到进度窗口、取消终止整个操作 |
-| **P1** | 压缩解压文件筛选 | [file-filter-feature.md](.sisyphus/plans/file-filter-feature.md) | 🟢低 | 1-2h | ✅ 已完成 |
-| **P1** | 新增压缩格式（BZip2/XZ/CAB 等） | [new-format-support.md](.sisyphus/plans/new-format-support.md) | 🟡中 | 12-20h | 6 阶段渐进：TAR 裸格式/GZip 单文件 → BZip2 → XZ → CAB 只读 → UI 统一化 → Zstandard（需依赖） |
-| **P1** | 自包含体积优化（Avalonia 迁移后） | [selfcontained-size-optimization.md](.sisyphus/plans/selfcontained-size-optimization.md) | 🟡中 | 4-6h | 三步渐进：InvariantGlobalization → 保守修剪 → 激进修剪，目标降至 20–25 MB |
-| **P1** | Avalonia 拖拽直接解压 | [drag-drop-direct-extract.md](.sisyphus/plans/drag-drop-direct-extract.md) | 🟡中 | 5-7h | 纯 Win32 独立线程覆盖层（三色状态机 + 呼吸动画）+ WindowFromPoint+ShellWindows 检测目标路径；UIA 降级支持；需等 Avalonia 移植基本就绪后实施 |
-| **P2** | 魔数识别（内容检测替代扩展名检测） | [preview-magic-detection.md](.sisyphus/plans/preview-magic-detection.md) | 🟡中 | 4-5h | Phase1 Core 可立即执行（FileFormatDetector + ExtractHeadAsync + ZIP子类型 + MP4 tail），Phase2 UI 等 Avalonia<br>📋 **新增**: 文本子类型检测（DetectTextSubtype — HTML/XML/JSON/Markdown/CSV/INI 内容启发式判别）
-| **P2** | 压缩预估 (Compression Estimator) | [compression-estimator.md](.sisyphus/plans/compression-estimator.md) | 🟡中 | 4-5h | 压缩前估算大小/耗时 |
-| **P2** | Winget 发布 | [winget-publishing.md](.sisyphus/plans/winget-publishing.md) | 🟢低 | 1-2h | 发布到 Windows Package Manager 社区仓库；首次手动提交后 CI 自动化 |
-| **P2** | MSI 安装包 (WiX) | [msi-packaging-wix.md](.sisyphus/plans/msi-packaging-wix.md) | 🟡中 | 2-3h | Inno Setup → WiX MSI 迁移 |
-| **P2** | RAR 压缩（外置 rar.exe） | [rar-compression.md](.sisyphus/plans/rar-compression.md) | 🟡中 | 8-10h | 通过已安装的 WinRAR 实现 RAR 压缩（含 SevenZipEngine 注册冲突处理） |
-| **P2** | 快速预览与渐进式加载 | [preview-quick-modes.md](.sisyphus/plans/preview-quick-modes.md) | 🟡中 | ~27h | 三种模式（快速/渐进/完整），所有格式分段消费。WPF 先行，Avalonia 迁移时只改 UI 层 |
-| **P2** | 压缩包内重命名/移动条目 | [archive-rename-entry.md](.sisyphus/plans/archive-rename-entry.md) | 🟡中 | 3-4h | 右键重命名(F2)/移动到… |
-| **P2** | 压缩/解压配置预设 | [compress-preset.md](.sisyphus/plans/compress-preset.md) | 🟡中 | 3-4h | 命名预设保存全部设置 |
-| **P2** | 嵌入缩略图预览 | [embedded-thumbnail-preview.md](.sisyphus/plans/embedded-thumbnail-preview.md) | 🟢低 | 2-3天 | MetadataExtractor(RAW) + Shell API(通用) 两层提取嵌入缩略图；完成后可扩展文件列表缩略图模式 |
-| **P2** | 提取日志与解压「后悔药」 | [extract-journal-undo.md](.sisyphus/plans/extract-journal-undo.md) | 🟡中 | 3-4h | 解压记录 + 一键回滚 |
-| **P3** | 压缩包对比 (Archive Diff) | [archive-diff.md](.sisyphus/plans/archive-diff.md) | 🟡中 | 3-4h | 压缩包文件级差异对比 |
-| **P3** | 原生图标 DLL | [icon-dll.md](.sisyphus/plans/icon-dll.md) | 🟡中 | 2-3h | 将 7 个 .ico 编译进原生资源 DLL，消除路径依赖 |
-| **P3** | 可插拔预览模块体系 | [preview-modular-providers.md](.sisyphus/plans/preview-modular-providers.md) | 🟡中 | 3-4h | 格式类库独立分发 |
-| **P3** | 文件列表自定义列 | [custom-columns.md](.sisyphus/plans/custom-columns.md) | 🟡中 | 4-6h | 可自定义显示文件元数据列（文档标题、图片尺寸等） |
-| **P3** | 冻结列（水平滚动时列固定） | [frozen-column.md](.sisyphus/plans/frozen-column.md) | 🟢低 | 1-2h | 右键列标题冻结/取消冻结，分隔线，设置持久化 |
-| **P3** | Office 文档内容预览增强 | [office-content-preview.md](.sisyphus/plans/office-content-preview.md) | 🟡中 | 6-8h | docx/xlsx/pptx 从仅元数据扩展到富文本/表格/幻灯片文本渲染 |
-| **P3** | ICO 文件自身图标显示 | [ico-file-icon-extract.md](.sisyphus/plans/ico-file-icon-extract.md) | 🟢低 | 2-3h | ico 文件列表显示自身嵌入图标 |
-| **P3** | 右键菜单目录结构预览 | [context-menu-tree-preview.md](.sisyphus/plans/context-menu-tree-preview.md) | 🔴高 | 6-8h | COM 菜单中展示压缩包顶层文件树 |
+| **P1** | Win11 一级右键菜单 | [win11-first-level-menu.md](.omo/plans/win11-first-level-menu.md) | 🔴高 | 1-2周 | IExplorerCommand 实现，HKLM 提权注册，双接口共存 |
+| **P1** | 新增压缩格式（BZip2/XZ/Zstd/Brotli + 7z.dll 只读解锁） | [new-format-support.md](.omo/plans/new-format-support.md) | 🟡中 | 11-16h | ☑️ 2026-08-20 核实：Core 侧 TAR 裸格式/GZip 单文件压缩已就绪（`TarGzEngine.CompressAsync` 按扩展名分流 `.tar`→无压缩层、`.gz`→单文件 GZipWriter）+ 文件关联 AssocTar/AssocGz 默认 true 已放开；**UI 压缩格式下拉未放开**（`ArchiveFormatValues = ["zip","7z","tar.gz"]`，TAR 裸格式/GZ 单文件待 UI 放开关）。Avalonia-first：TAR 裸格式/GZip 单文件（UI 放开）→ BZip2 → XZ → Zstd（SharpCompress 0.48.1 内置，无外部依赖，原 P3 提升）→ Brotli（.NET 内置 BrotliStream，方案 B）→ 7z.dll 只读格式解锁（CAB/ARJ/LZH/CHM/CPIO/DEB/RPM/WIM/XAR/LZMA/MSI 共 11 种，自动检测零引擎改动，方案 B 扩展）→ 文件关联独立开关；外部库调研结论：libarchive 重叠度高不引入，wimlib/SharpZipLib 冗余 |
+| **P1** | 自包含体积优化（Avalonia 迁移后） | [selfcontained-size-optimization.md](.omo/plans/selfcontained-size-optimization.md) | 🟡中 | 4-6h | 三步渐进：InvariantGlobalization → 保守修剪 → 激进修剪，目标降至 20–25 MB |
+| **P1** | Avalonia 拖拽直接解压 | [drag-drop-direct-extract.md](.omo/plans/drag-drop-direct-extract.md) | 🟡中 | 5-7h | 纯 Win32 独立线程覆盖层（三色状态机 + 呼吸动画）+ WindowFromPoint+ShellWindows 检测目标路径；#32770 用 Win32 EnumChildWindows（方案 A，方案 B UIA 为未来可选项）；☑️ 2026-07-23 计划审查完成，Avalonia 分支 API 已确认；☑️ 2026-07-31 高危修复（Esc 取消/ask 冲突/DebugLog）+ 光标临时方案 A（SetSystemCursor）；☑️ 2026-08-06 光标方案 C（自实现 OLE 拖拽，根治光标）已实施 + 预览弹窗实施补充（独立 Win32 弹窗跟随鼠标 460×680 + PointerPressed 预取式渲染 + 双阈值降级，**待实施**，详见计划文末章节） |
+| **P1** | 加密文件名 7z 魔数检测修复 | [encrypted-filename-magic-detection.md](.omo/plans/encrypted-filename-magic-detection.md) | 🟡中 | 3-4h | `EncryptHeaders=true` 7z 无密码时无法读取文件列表，魔数检测失败回退扩展名；方案：ExtractHeadAsync 抛 PasswordRequiredException → ClassifyPreviewByMagicAsync 返回 NeedsPassword → Preview 显示"需密码预览"锁图标 + 输入密码按钮 |
+| **P1** | 密码错误 vs 文件损坏精准分类 | [password-error-classification.md](.omo/plans/password-error-classification.md) | 🟡中 | 3-4h | 现有仅字符串匹配无法区分；引入 PasswordVerificationResult 三态 + HRESULT/异常类型分类；损坏文件不再误报"密码错误"，密码库匹配遇损坏立即停止 |
+| **P1** | HTML 预览升级：跨平台 WebView + 降级 | [html-preview-webview-fallback.md](.omo/plans/html-preview-webview-fallback.md) | 🟡中 | 4-6h | 用 `Avalonia.Controls.WebView`（各平台原生引擎）替代当前 ReverseMarkdown 有损管线；WebView 不可用时自动降级到 ReverseMarkdown + 修 MarkdownPreviewBuilder table 支持；加工具栏和源码切换 |
+| **P1** | Avalonia 拖拽添加（拖入窗口→添加到压缩包） | [drag-add-overlay.md](.omo/plans/drag-add-overlay.md) | 🟡中 | 3-4h | ✅ 已完成（2026-08-19）：`MainWindowViewModel.AddFilesToArchiveAsync` 抽取 + WPF `Window_Drop` 三分支移植（已打开+压缩包→切换打开；已打开+文件/文件夹→确认框→添加到 `CurrentFolder`；未打开+压缩包→打开；未打开+非压缩包→`CompressSettingsWindow` 预填）+ `DragAddOverlay` 窗口内两色覆层（绿=可添加/红=格式不支持，呼吸动画对齐拖拽解压）+ 文件夹拖入支持 |
+| **P2** | 压缩预估 (Compression Estimator) | [compression-estimator.md](.omo/plans/compression-estimator.md) | 🟡中 | 4-5h | 压缩前估算大小/耗时 |
+| **P2** | Winget 发布 | [winget-publishing.md](.omo/plans/winget-publishing.md) | 🟢低 | 1-2h | 发布到 Windows Package Manager 社区仓库；首次手动提交后 CI 自动化 |
+| **P2** | MSI 安装包 (WiX) | [msi-packaging-wix.md](.omo/plans/msi-packaging-wix.md) | 🟡中 | 2-3h | Inno Setup → WiX MSI 迁移 |
+| **P2** | RAR 压缩（外置 rar.exe） | [rar-compression.md](.omo/plans/rar-compression.md) | 🟡中 | 8-10h | 通过已安装的 WinRAR 实现 RAR 压缩（含 SevenZipEngine 注册冲突处理） |
+| **P2** | 快速预览与渐进式加载 | [preview-quick-modes.md](.omo/plans/preview-quick-modes.md) | 🟡中 | ~25h | 三种模式（快速/渐进/完整），叠加在已实施的两阶段加载（Phase 2）之上。**Avalonia-first（规则 11，WPF 不做 UI 适配）**；☑️ 2026-08-06 计划修正：WPF 先行→Avalonia-only、HTML 现状（ReverseMarkdown→Markdig 已实现）校准、设置项与现有 `MaxTextPreviewBytes`/`MaxTablePreviewRows` 整合（不新增重复字段）、CTS+`_previewLoadVersion` 双取消机制、DBF/LNK/STL/GZ 等 Unsupported 格式降级为独立前置、Markdown 渐进降为 ~2h（控件树渲染已实现）、总工时 27h→25h（不含 🔴 格式基础预览前置） |
+| **P2** | 压缩包内重命名/移动条目 | [archive-rename-entry.md](.omo/plans/archive-rename-entry.md) | 🟡中 | 3-4h | 右键重命名(F2)/移动到… |
+| **P2** | 压缩/解压配置预设 | [compress-preset.md](.omo/plans/compress-preset.md) | 🟡中 | 3-4h | 命名预设保存全部设置 |
+| **P2** | 进度窗口增强改造 | [progress-window-enhancement.md](.omo/plans/progress-window-enhancement.md) | 🟡中 | 3-4h | 路径/文件名分离三行显示、文件级计数、实时统计栏、批处理每包摘要；计算逻辑抽到 Core 层 |
+| **P2** | 压缩文件名后缀模板 | [filename-suffix-template.md](.omo/plans/filename-suffix-template.md) | 🟢低 | 2-3h | `{date}`/`{datetime}`/`{seq}` 占位符替换，防同名覆盖 |
+| **P2** | 嵌入缩略图预览 | [embedded-thumbnail-preview.md](.omo/plans/embedded-thumbnail-preview.md) | 🟢低 | 2-3天 | MetadataExtractor(RAW) + Shell API(通用) 两层提取嵌入缩略图；完成后可扩展文件列表缩略图模式 |
+| **P2** | 字体预览连字效果开关 | [font-preview-ligature.md](.omo/plans/font-preview-ligature.md) | 🟡中 | 3-4h | ✅ 已完成（2026-07-05，v0.4.4）：HarfBuzzSharp shaping + `CheckFontSupportsLigature` 连字检测（liga feature 开/关 glyph 对比）+ `IsLigatureEnabled`/`ToggleLigature` 命令 + `CanLigatureToggle` 不支持时灰禁用 + 工具栏按钮 + `AppSettings.FontPreviewEnableLigature` 持久化 |
+| **P2** | 预览"显示内容"开关 | [preview-show-content-toggle.md](.omo/plans/preview-show-content-toggle.md) | 🟡中 | 2-3h | 压缩/解压预览树新增"显示内容"开关（ResultTreeView 工具栏）：关闭后只显示压缩包/目标路径骨架，内容彻底隐藏不可展开，同时跳过 `BuildDirectoryNode` 磁盘递归扫描（大型源目录预览加速）；持久化 `AppSettings.PreviewShowContent`；摘要栏隐藏时显示输出路径 |
+| **P2** | 提取日志与解压「后悔药」 | [extract-journal-undo.md](.omo/plans/extract-journal-undo.md) | 🟡中 | 3-4h | 解压记录 + 一键回滚 |
+| **P2** | 原生 Win32 启动 Splash | [startup-native-splash.md](.omo/plans/startup-native-splash.md) | 🟡中 | 3-4h | 覆盖进程冷启动（Avalonia 初始化前 ~1-2s）的无反馈期；已实施一期 A+B+C：`--compress` IPC 收集期间立即显示纯文字弹窗 `CollectingWindow`「正在收集文件…」（无按钮，避免 ProgressWindow 让用户误以为压缩已开始）+ `MainWindow` 增加 `IsLoading` 加载遮罩「正在打开压缩包…」+ `--extract`（解压到…）立即弹窗、条目列表后台加载（消除弹窗前最长 3s 空白期），本计划用纯 Win32 splash（P/Invoke，独立消息泵）进一步覆盖冷启动时段 |
+| **P2** | 面包屑地址栏（PathBreadcrumb） | [path-breadcrumb.md](.omo/plans/path-breadcrumb.md) | 🟡中 | 6-8h | 三处地址栏（主窗口虚拟路径 / QuickPathPicker / CustomFilePickerDialog）统一改造为资源管理器式面包屑：段点击直达 + 点末尾空白/Ctrl+L 进编辑态（保留 AutoCompleteBox 补全）+ 段数阈值折叠 + 虚拟根段 📦；通用 `PathBreadcrumb` 控件，`NavigateRequested` 事件保持宿主导航单一事实来源；第一版不做分隔符同级目录下拉（预留 `EnumerationRequested`） |
+| **P2** | 图片预览能力系统（透明/动画注册表） | [image-preview-capabilities.md](.omo/plans/image-preview-capabilities.md) | 🟡中 | 3-5h | ✅ 已完成（2026-08-18）：`PreviewCapabilities` 能力注册表（[Flags] `PreviewCapability`：Zoom/Transparency/FlattenAlpha/AnimationControls，对齐 MetadataRegistry 模式）取代 `HasXxxControls` 硬编码；`PreviewType.Gif` → `AnimatedImage`（GIF/WebP 动画共用）；GIF 透明棋盘格（🏁）+ Animated WebP 动画预览（SKCodec `FrameCount>1` 分流，解码零改造） |
+| **P2** | Core 层临时目录根可注入（便携模式延伸） | [core-temp-root-injectable.md](.omo/plans/core-temp-root-injectable.md) | 🟡中 | 2-3h | 📋 2026-08-20 立项：Core 层 6 处 `%TEMP%\MantisZip` 硬编码（ZipEngine×2、SevenZipEngine×2、ArchiveEntryExtractor、FontParser）便携模式下仍写系统 TEMP；方案 A：`TempPaths` 静态类 + `TempRootOverride` 注入（对齐 `CoreLog.RedactOverride` 模式），UI 启动时注入 `AppSettings.GetTempDir()`，未注入时路径逐字节不变 |
+| **P2** | CleanTempOnStartup 消费方（Avalonia 启动清理） | [clean-temp-on-startup-avalonia.md](.omo/plans/clean-temp-on-startup-avalonia.md) | 🟢低 | 1-2h | 📋 2026-08-20 立项：Avalonia 设置开关存在但启动从不清理（WPF 有 `App.xaml.cs:141-152`）；方案：`OnFrameworkInitializationCompleted` 启动早期用 `AppSettings.GetTempDir()` 清理，失败仅记日志；依赖 core-temp-root-injectable 实施后 Core 层一并覆盖 |
+| **P2** | Avalonia CLI 解压后打开文件夹对齐 WPF | [cli-extract-open-folder.md](.omo/plans/cli-extract-open-folder.md) | 🟡中 | 2-3h | 📋 2026-08-20 立项：WPF CLI `--extract-here`/`--extract-to-name` 单文件模式 `OpenFolderAfterExtract` 时经 `ResolveSmartOpenPathAsync` 打开文件夹（`App.Extract.cs:614-619`），Avalonia CLI 只解压不打开；方案：`RunExtractCliAsync` 解压成功后复用 `SmartOpenPathResolver` 打开；多文件批处理保持不开；实施前需确认 WPF `--extract`/`--extract-smart` 是否同样打开 |
+| **P3** | 压缩包对比 (Archive Diff) | [archive-diff.md](.omo/plans/archive-diff.md) | 🟡中 | 3-4h | 压缩包文件级差异对比 |
+| **P3** | 原生图标 DLL | [icon-dll.md](.omo/plans/icon-dll.md) | 🟡中 | 2-3h | ☑️ 2026-08-20 核实：部分实现（机制不同）——图标已嵌入 `MantisZip.ShellExt.dll` 托管资源（11 个 .ico EmbeddedResource，`GetIconForCommand` 运行时读取，无路径依赖）；计划的「原生 .rc 资源 DLL（MantisZip.Icons.vcxproj）」方案未实施，效果已达成 |
+| **P3** | 可插拔预览模块体系 | [preview-modular-providers.md](.omo/plans/preview-modular-providers.md) | 🟡中 | 3-4h | 格式类库独立分发 |
+| **P3** | 文件列表自定义列 | [custom-columns.md](.omo/plans/custom-columns.md) | 🟡中 | 4-6h | 可自定义显示文件元数据列（文档标题、图片尺寸等） |
+| **P3** | 冻结列（水平滚动时列固定） | [frozen-column.md](.omo/plans/frozen-column.md) | 🟢低 | 1-2h | 右键列标题冻结/取消冻结，分隔线，设置持久化 |
+| **P3** | Office 文档内容预览增强（Avalonia） | [office-content-preview-avalonia.md](.omo/plans/office-content-preview-avalonia.md) | 🟡中 | 6-8h | ✅ 已完成（DOCX 纯文本大纲+全文+表格提取、XLSX 表格、PPTX 文本 + Canvas 定位预览、Markdown 表格渲染）。剩余：WebView 优先统一渲染管线（DOCX→Mammoth→HTML、Markdown→HTML）📋（复用 [html-preview-webview-fallback.md](.omo/plans/html-preview-webview-fallback.md) 的 WebView 初始化/降级基建） |
+| **P3** | ICO 文件自身图标显示 | [ico-file-icon-extract.md](.omo/plans/ico-file-icon-extract.md) | 🟢低 | 2-3h | ico 文件列表显示自身嵌入图标 |
+| **P3** | 右键菜单目录结构预览 | [context-menu-tree-preview.md](.omo/plans/context-menu-tree-preview.md) | 🔴高 | 6-8h | COM 菜单中展示压缩包顶层文件树 |
+| **P1** | Avalonia: UI 功能补齐 | [avalonia-ui-feature-parity.md](.omo/plans/avalonia-ui-feature-parity.md) | 🟡中 | 27/29 完成，2 项待 GUI 验证 | Elevation×3、Favorites×2、QuickPath×2 等 11 个对话框、2 个控件、1 个转换器（2 项阻塞于 GUI 测试） |
+| **P1** | 自动更新检测 | [auto-update.md](.omo/plans/auto-update.md) | 🟡中 | 4-6h | GitHub Releases API 版本检查、AboutWindow 更新 Tab、UpdateAvailableDialog、设置开关、单元测试 |
+| **P2** | 解压多压缩包按来源目录分组 | [result-preview-panel.md](.omo/plans/result-preview-panel.md) | 🟡中 | 2-4h | 结果预览面板遗留①：当前多压缩包条目合并平铺，改为按来源目录分组 + 压缩包壳节点（详见文档「未实现项（后续可做）」） |
+| **P2** | 结果预览截断占位符点击展开 | [result-preview-panel.md](.omo/plans/result-preview-panel.md) | 🟢低 | 1-2h | 结果预览面板遗留②：当前截断为静态"…"文本，改为点击就地展开完整子节点 |
+| **P2** | 结果预览冲突检测双模式 | [result-preview-panel.md](.omo/plans/result-preview-panel.md) | 🟡中 | 2-3h | 结果预览面板遗留③：当前固定全量 File.Exists 检测，改为快速（目录级）/完整（逐文件）可切换 |
 | **P4** | 外部工具视频元数据 | — | 🟢低 | 2-3h | ffprobe 集成 |
-| **🔍调研** | 跨平台移植可行性 | [cross-platform-port.md](.sisyphus/plans/cross-platform-port.md) | 🟡中大 | 2-3月 | 砍 ShellExt，WPF→Avalonia，WebView2→WebKit，SharpSevenZip→SharpCompress/p7zip，DPAPI→AES-GCM |
-| **🔍调研** | Avalonia 预览机会分析 | [preview-avalonia-opportunities.md](.sisyphus/plans/preview-avalonia-opportunities.md) | 🟡中 | — | 分析 Avalonia 迁移对预览系统的影响：SVG/HDR/PSD/AI 新能力、音视频替代方案、HDR 全景 360° 查看器方案 |
+| **🔍调研** | 跨平台移植可行性 | [cross-platform-port.md](.omo/plans/cross-platform-port.md) | 🟡中大 | 2-3月 | 砍 ShellExt，WPF→Avalonia，WebView2→WebKit，SharpSevenZip→SharpCompress/p7zip，DPAPI→AES-GCM |
+| **🔍调研** | Avalonia 预览机会分析 | [preview-avalonia-opportunities.md](.omo/plans/preview-avalonia-opportunities.md) | 🟡中 | — | 分析 Avalonia 迁移对预览系统的影响：SVG/HDR/PSD/AI 新能力、音视频替代方案、HDR 全景 360° 查看器方案 |
 
 
 ---
@@ -53,15 +67,15 @@
 
 | 优先级 | 功能 | 设计文档 | 难度 | 预估工时 | 说明 |废弃原因 |
 |--------|------|----------|:----:|:--------:|------|------|
-| **P3** | VirtualFileDataObject | [virtual-file-data-object.md](.sisyphus/plans/virtual-file-data-object.md) | 🔴高 | 6-8h | COM 原生 IDataObject 替代 WPF OLE 桥 | 跨平台移植（Avalonia）后不再依赖 WPF OLE 桥，无 OLE CF_HDROP bug，VFDO 无存在必要 |
-| **P2** | 文本预览语法高亮 | [text-preview-syntax-highlighting.md](.sisyphus/plans/text-preview-syntax-highlighting.md) | 🟡中 | 5-7h | AvalonEdit 替换 TextBox，支持 20+ 语言语法高亮 | AvalonEdit 是 WPF-only 控件，跨平台移植（Avalonia）后需使用 AvaloniaEdit 完全重写 |
-| **P4** | 拖拽提取目标检测 | [drag-drop-marker-target.md](.sisyphus/plans/drag-drop-marker-target.md) | 🟡中 | 1-3h | Marker 文件探测拖放目标目录 | 被 [drag-drop-direct-extract.md](.sisyphus/plans/drag-drop-direct-extract.md) 取代——WindowFromPoint+ShellWindows 更直接可靠 |
+| **P3** | VirtualFileDataObject | [virtual-file-data-object.md](.omo/plans/virtual-file-data-object.md) | 🔴高 | 6-8h | COM 原生 IDataObject 替代 WPF OLE 桥 | 跨平台移植（Avalonia）后不再依赖 WPF OLE 桥，无 OLE CF_HDROP bug，VFDO 无存在必要 |
+| **P2** | 文本预览语法高亮 | [text-preview-syntax-highlighting.md](.omo/plans/text-preview-syntax-highlighting.md) | 🟡中 | 5-7h | AvalonEdit 替换 TextBox，支持 20+ 语言语法高亮 | AvalonEdit 是 WPF-only 控件，跨平台移植（Avalonia）后需使用 AvaloniaEdit 完全重写 |
+| **P4** | 拖拽提取目标检测 | [drag-drop-marker-target.md](.omo/plans/drag-drop-marker-target.md) | 🟡中 | 1-3h | Marker 文件探测拖放目标目录 | 被 [drag-drop-direct-extract.md](.omo/plans/drag-drop-direct-extract.md) 取代——WindowFromPoint+ShellWindows 更直接可靠 |
 
 ---
 
 ## 跨平台移植影响分析
 
-> 对 `docs/PLAN.md` 待实现全部 23 个计划进行的 WPF→Avalonia 兼容性评估（不含调研计划本身）。（2026-06-22）
+> 对 `docs/PLAN.md` 待实现全部 32 个计划进行的 WPF→Avalonia 兼容性评估。（2026-07-22）
 >
 > **注意**: 已完成方案（见 `docs/PROGRESS.md` 历史设计方案索引）不再列入本分析。已废弃方案仅作参考。
 
@@ -70,27 +84,27 @@
 | 影响等级 | 数量 | 含义 |
 |---------|:----:|------|
 | 🟢 无影响 | 3 | Core 层纯 C# 逻辑，开箱即用 |
-| 🟡 需调整 | 11 | Core 逻辑可复用，UI 层（XAML/控件）需移植到 Avalonia |
+| 🟡 需调整 | 20 | Core 逻辑可复用，UI 层（XAML/控件）需移植到 Avalonia |
 | 🔴 冲突 | 9 | 依赖 COM/注册表/Shell API/WPF 独占控件，需完全重写或平台替代方案 |
 
-### 🟢 无影响（4 个）
+### 🟢 无影响（3 个）
 
-`preview-modular-providers.md`、`selfcontained-size-optimization.md`
+`preview-modular-providers.md`、`selfcontained-size-optimization.md`、`winget-publishing.md`
 
-### 🟡 需调整 — Core 可复用，UI 需移植（11 个）
+### 🟡 需调整 — Core 可复用，UI 需移植（19 个）
 
-`archive-diff.md`、`archive-rename-entry.md`、`compress-preset.md`、`compression-estimator.md`、`custom-columns.md`、`extract-journal-undo.md`、`ico-file-icon-extract.md`、`office-content-preview.md`、`preview-magic-detection.md`（Phase1 Core 🟢 可先行）、`外部工具视频元数据（无计划文件）`
+`archive-diff.md`、`archive-rename-entry.md`、`auto-update.md`、`compress-preset.md`、`compression-estimator.md`、`custom-columns.md`、`extract-journal-undo.md`、`filename-suffix-template.md`、`font-preview-ligature.md`、`html-preview-webview-fallback.md`、`ico-file-icon-extract.md`、`metadata-panel-configurable.md`、`new-format-support.md`、`office-content-preview-avalonia.md`、`preview-quick-modes.md`、`progress-window-enhancement.md`、`avalonia-ui-feature-parity.md`、`avalonia-wpf-diff-plan.md`、`外部工具视频元数据（无计划文件）`
 
 ### 🔴 冲突 — 需完全重写或废弃（9 个）
 
-`drag-drop-direct-extract.md`（Win32 Shell API）、`embedded-thumbnail-preview.md`（Shell 缩略图 API）、`frozen-column.md`（DataGrid 冻结列）、`icon-dll.md`（原生资源 DLL）、`msi-packaging-wix.md`（Windows Installer）、`quickpath-unified.md`（WPF UserControl 体系）、`rar-compression.md`（Windows 外置 rar.exe）、`win11-first-level-menu.md`（COM IExplorerCommand）、`context-menu-tree-preview.md`（COM HMENU）
+`drag-drop-direct-extract.md`（Win32 Shell API）、`embedded-thumbnail-preview.md`（Shell 缩略图 API）、`frozen-column.md`（DataGrid 冻结列）、`icon-dll.md`（原生资源 DLL）、`msi-packaging-wix.md`（Windows Installer）、`rar-compression.md`（Windows 外置 rar.exe）、`win11-first-level-menu.md`（COM IExplorerCommand）、`context-menu-tree-preview.md`（COM HMENU）
 
 ### 关键发现
 
 1. **🔴 的共性**：全部依赖 Windows Shell API（COM/注册表/P/Invoke/Shell32）或 WPF 独占控件/DataGrid 特定行为。跨平台后这些功能要么砍掉（COM 右键菜单、UAC 提权），要么需要 OS 级不同实现（Linux `.desktop` actions / macOS `NSExtension`）。
 2. **🟡 的规律一致**：Core 层的解析器/算法/模型全是纯 C# 可复用，只有 UI 渲染层（WPF XAML + 控件）需要移植到 Avalonia 等价物。
 3. **🟢 的 3 个计划**：基本是纯工具代码（正则、IO、字节操作）或发布配置，开箱即跨平台。
-4. **最值得跨平台前实现的计划**：优先完成 `compress-preset.md`（设置持久化）等 🟢/🟡 计划（`file-filter-feature.md` 已实现），积累跨平台经验后再攻坚 🔴 计划。
+4. **最值得跨平台前实现的计划**：优先完成 🟢/🟡 计划（已有 `file-filter-feature.md` 等完成先例），积累跨平台经验后再攻坚 🔴 计划。
 5. **Core 层遗留问题**：`PasswordManager`（DPAPI → 已实现 `AesGcmDataProtector` 抽象）和 `SevenZipEngine`（7z.dll Windows-only）已在跨平台准备中。
 
 *此文档将随开发进度持续更新*

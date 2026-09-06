@@ -15,10 +15,10 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - name: Setup .NET 9
+      - name: Setup .NET 10
         uses: actions/setup-dotnet@v5
         with:
-          dotnet-version: 9.0.x
+          dotnet-version: 10.0.x
 
       - name: Install 7-Zip (for 7z.dll bundling)
         run: choco install 7zip --no-progress -y
@@ -35,9 +35,21 @@ jobs:
           --filter "FullyQualifiedName!~SevenZipEngine"
           --logger "console;verbosity=normal"
 
-      - name: Publish (framework-dependent, win-x64)
+      # dotnet publish 的清理是增量式的（_IncrementalCleanPublishDirectory）——只删除
+      # 本项目上次 publish 记录过、本次未产生的文件。若 publish_output 目录存在遗留文件
+      # （如旧版 WPF 发布产物），它们不在记录清单里会被保留并混入安装包/便携包。
+      # CI 全新 checkout 本不会触发，但本地复跑或自托管 runner 复用工作区时可能残留，
+      # 故在 publish 前显式删除旧输出目录，保证发布输出纯净（只含 Avalonia 产物）。
+      - name: Clean publish output directories
+        shell: pwsh
+        run: |
+          Remove-Item -Path publish_output, publish_output_selfcontained -Recurse -Force -ErrorAction SilentlyContinue
+          Write-Host "publish_output exists: $(Test-Path publish_output)"
+          Write-Host "publish_output_selfcontained exists: $(Test-Path publish_output_selfcontained)"
+
+      - name: Publish (framework-dependent, x64)
         run: >
-          dotnet publish src\MantisZip.UI\MantisZip.UI.csproj
+          dotnet publish src\MantisZip.UI.Avalonia\MantisZip.UI.Avalonia.csproj
           --no-restore --configuration Release
           --runtime win-x64
           --output publish_output
@@ -46,7 +58,7 @@ jobs:
 
       - name: Publish (self-contained, x64)
         run: >
-          dotnet publish src\MantisZip.UI\MantisZip.UI.csproj
+          dotnet publish src\MantisZip.UI.Avalonia\MantisZip.UI.Avalonia.csproj
           --no-restore --configuration Release
           --runtime win-x64 --self-contained
           --output publish_output_selfcontained
@@ -95,10 +107,6 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "ISCC compilation failed (exit code: $LASTEXITCODE)" }
           Write-Host "Installer built successfully"
 
-      - name: Download WebView2 Runtime (for offline installer)
-        shell: pwsh
-        run: installer\download-redist.ps1
-
       - name: Build self-contained installer
         shell: pwsh
         run: |
@@ -121,35 +129,59 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "ISCC compilation failed (exit code: $LASTEXITCODE)" }
           Write-Host "Self-contained installer built successfully"
 
-      - name: Package portable zip (self-contained)
+      - name: Package portable zips
         shell: pwsh
         run: |
-          $src = "publish_output_selfcontained"
-          # Portable.txt sentinel file
-          "" | Out-File -FilePath "$src\Portable.txt" -Encoding ascii
-          # Copy 7z.dll for 7z compression support
-          $sevenZ = "$env:ProgramFiles\7-Zip\7z.dll"
-          if (Test-Path $sevenZ) {
-            $x64Dir = "$src\x64"
-            New-Item -ItemType Directory -Path $x64Dir -Force | Out-Null
-            Copy-Item $sevenZ "$x64Dir\7z.dll"
-            Write-Host "7z.dll copied to x64 subdirectory"
-          } else {
-            Write-Host "7z.dll not found, 7z compression will not be available"
-          }
-          # Strip .NET runtime satellite assemblies (cs, de, es, fr, it, ja, ko,
-          # pl, pt-BR, ru, tr) — they're unused by MantisZip's JSON-based i18n
-          $runtimeLocales = @("cs","de","es","fr","it","ja","ko","pl","pt-BR","ru","tr")
-          foreach ($locale in $runtimeLocales) {
-            $localeDir = Join-Path $src $locale
-            if (Test-Path $localeDir) {
-              Remove-Item -Recurse -Force $localeDir
-              Write-Host "Stripped runtime locale: $locale"
+          # 便携版打包（两个变体：自包含 + framework-dependent）
+          # 自包含：捆绑 .NET 10 运行时，开箱即用（体积大）
+          # framework-dependent：需系统预装 .NET 10 Runtime（体积小）
+          # 用 7z 打包（CI 已装 7-Zip）：保持目录结构 + 排除调试符号（*.pdb，
+          # 运行时不需要，且第三方原生库符号 libSkiaSharp.pdb 等达 100MB+）
+          $sevenZipExe = "$env:ProgramFiles\7-Zip\7z.exe"
+          function New-PortableZip([string]$Src, [string]$ZipName) {
+            # Portable.txt sentinel file
+            "" | Out-File -FilePath "$Src\Portable.txt" -Encoding ascii
+            # Copy default settings into Data/ (portable mode reads exe-adjacent Data/settings.json)
+            # prebuilt/settings.json 含安装向导占位符 __LANG__/__THEME__，便携版无向导 → 替换为默认值
+            $prebuiltSettings = "installer\prebuilt\settings.json"
+            if (Test-Path $prebuiltSettings) {
+              $dataDir = "$Src\Data"
+              New-Item -ItemType Directory -Path $dataDir -Force | Out-Null
+              $settingsJson = Get-Content $prebuiltSettings -Raw
+              $settingsJson = $settingsJson.Replace('__LANG__', 'zh').Replace('__THEME__', 'System')
+              [System.IO.File]::WriteAllText("$dataDir\settings.json", $settingsJson, [System.Text.UTF8Encoding]::new($false))
+              Write-Host "Default settings.json copied to $dataDir\settings.json"
+            } else {
+              Write-Host "prebuilt/settings.json not found, portable default settings skipped"
             }
+            # Copy 7z.dll for 7z compression support
+            $sevenZ = "$env:ProgramFiles\7-Zip\7z.dll"
+            if (Test-Path $sevenZ) {
+              $x64Dir = "$Src\x64"
+              New-Item -ItemType Directory -Path $x64Dir -Force | Out-Null
+              Copy-Item $sevenZ "$x64Dir\7z.dll"
+              Write-Host "7z.dll copied to $Src\x64 subdirectory"
+            } else {
+              Write-Host "7z.dll not found, 7z compression will not be available"
+            }
+            Remove-Item $ZipName -ErrorAction SilentlyContinue
+            # 进入源目录打包，避免 zip 内出现 publish_output 前缀（便携包解压即用）
+            # 先解析 zip 输出为绝对路径（当前工作目录 = 仓库根），Push-Location 后仍指向根
+            $zipFullPath = (Join-Path (Get-Location) $ZipName)
+            Push-Location $Src
+            try {
+              & $sevenZipExe a -tzip -mx=9 $zipFullPath "*" "-xr!*.pdb" | Out-Null
+              if ($LASTEXITCODE -ne 0) { throw "7z archive failed for $ZipName" }
+            } finally {
+              Pop-Location
+            }
+            Write-Host "Portable zip created: $ZipName ($((Get-Item $ZipName).Length / 1MB -as [int]) MB)"
           }
-          $zipName = "MantisZip-$env:VERSION-Portable.zip"
-          Compress-Archive -Path "$src\*" -DestinationPath $zipName -CompressionLevel Optimal
-          Write-Host "Portable zip created: $zipName ($((Get-Item $zipName).Length / 1MB -as [int]) MB)"
+
+          # 自包含便携版（保持原名，向后兼容）
+          New-PortableZip -Src "publish_output_selfcontained" -ZipName "MantisZip-$env:VERSION-Portable.zip"
+          # framework-dependent 便携版
+          New-PortableZip -Src "publish_output" -ZipName "MantisZip-$env:VERSION-Portable-Web.zip"
 
       - name: Package portable web zip (framework-dependent)
         shell: pwsh
@@ -202,8 +234,8 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           $installers = Get-ChildItem -Path installer -Filter "*.exe" | ForEach-Object FullName
-          $portableZip = Get-ChildItem -Filter "*-Portable*.zip" | ForEach-Object FullName
-          $assets = $installers + $portableZip
+          $portableZips = Get-ChildItem -Filter "*-Portable*.zip" | ForEach-Object FullName
+          $assets = $installers + $portableZips
           if (-not $assets) { throw "No release assets found" }
           $notes = Get-Content release_notes.txt -Raw
           gh release create "${{ github.ref_name }}" `

@@ -1,0 +1,1378 @@
+using System.Collections.ObjectModel;
+using System.Collections.Specialized;
+using System.IO;
+using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
+using MantisZip.Core;
+using MantisZip.Core.Abstractions;
+using MantisZip.Core.FileFilter;
+using MantisZip.Core.Utils;
+using MantisZip.UI.Avalonia;
+using MantisZip.UI.Avalonia.Dialogs;
+using MantisZip.UI.Avalonia.Models;
+using MantisZip.UI.Avalonia.Services;
+
+namespace MantisZip.UI.Avalonia.ViewModels;
+
+/// <summary>
+/// 压缩设置对话框的 ViewModel。
+/// 用户选择格式、压缩级别、输出路径、密码和注释，通过 CloseAction 回调返回结果。
+/// </summary>
+public partial class CompressSettingsViewModel : ObservableObject
+{
+    /// <summary>源文件/目录路径列表（可修改，显示用）。</summary>
+    public ObservableCollection<string> SelectedPaths { get; } = new();
+
+    /// <summary>本地化字符串字典，XAML 通过 {Binding LocalizedStrings[Key]} 访问。</summary>
+    public Dictionary<string, string> LocalizedStrings { get; } = new();
+
+    /// <summary>支持的格式选项列表，绑定到格式 ComboBox。来自 <see cref="CompressionOptionData"/> 共享数据源。</summary>
+    public List<string> FormatOptions { get; } = new(CompressionOptionData.ArchiveFormatValues);
+
+    /// <summary>源文件摘要文字，用于界面显示。</summary>
+    public string SelectedPathsSummary => SelectedPaths.Count > 0
+        ? LocalizationManager.T("Compress_NItemsSelected", SelectedPaths.Count)
+        : LocalizationManager.T("Compress_NoFilesSelected");
+
+    /// <summary>由 View 设置的文件保存选择回调。返回选择的路径，取消返回 null。</summary>
+    public Func<Task<string?>>? BrowseOutput { get; set; }
+
+    /// <summary>由 View 设置的文件选择回调。返回选择的文件路径列表，取消返回 null。</summary>
+    public Func<Task<IReadOnlyList<string>?>>? PickFiles { get; set; }
+
+    /// <summary>由 View 设置的关闭回调。参数 true=确认压缩，false=取消。</summary>
+    public Func<bool, Task>? CloseAction { get; set; }
+
+    /// <summary>由 View 设置的提示消息回调（弹窗以窗口为 owner）。参数 (消息, 标题)。</summary>
+    public Func<string, string, Task>? ShowMessage { get; set; }
+
+    // ── Output mode ──
+
+    /// <summary>Manual 模式下的输出路径缓存，切换模式不丢失。</summary>
+    private string? _cachedManualPath;
+
+    [ObservableProperty]
+    private CompressOutputMode _outputMode = CompressOutputMode.Manual;
+
+    /// <summary>输出路径在非 Manual 模式下只读。</summary>
+    public bool IsOutputPathReadOnly => OutputMode != CompressOutputMode.Manual;
+
+    /// <summary>浏览按钮仅在 Manual 模式下显示。</summary>
+    public bool IsBrowseButtonVisible => OutputMode == CompressOutputMode.Manual;
+
+    /// <summary>文件名 / 扩展名区域仅在 Manual/Combined 模式下可见。</summary>
+    public bool IsFileNameSectionVisible => OutputMode != CompressOutputMode.Separate;
+
+    /// <summary>内嵌 QuickPathControl 仅在 Manual 模式下可见（Separate/Combined 自动计算路径）。</summary>
+    public bool IsQuickPathVisible => OutputMode == CompressOutputMode.Manual;
+
+    /// <summary>输出文件扩展名标签（跟随格式）。</summary>
+    public string OutputExtensionLabel => GetFormatExtension();
+
+    /// <summary>输出路径标签文字随模式变化。</summary>
+    public string OutputPathLabel => OutputMode switch
+    {
+        CompressOutputMode.Separate => LocalizationManager.T("Compress_OutputMode_Separate"),
+        CompressOutputMode.Combined => LocalizationManager.T("Compress_OutputMode_Combined"),
+        _ => LocalizationManager.T("Compress_OutputPath"),
+    };
+
+    /// <summary>RadioButton 绑定：Manual 模式。</summary>
+    public bool IsManualMode
+    {
+        get => OutputMode == CompressOutputMode.Manual;
+        set { if (value) OutputMode = CompressOutputMode.Manual; }
+    }
+
+    /// <summary>RadioButton 绑定：Separate 模式。</summary>
+    public bool IsSeparateMode
+    {
+        get => OutputMode == CompressOutputMode.Separate;
+        set { if (value) OutputMode = CompressOutputMode.Separate; }
+    }
+
+    /// <summary>RadioButton 绑定：Combined 模式。</summary>
+    public bool IsCombinedMode
+    {
+        get => OutputMode == CompressOutputMode.Combined;
+        set { if (value) OutputMode = CompressOutputMode.Combined; }
+    }
+
+    [ObservableProperty]
+    private string _defaultFormat = "zip";
+
+    /// <summary>Separate 模式下是否保留源文件扩展名（如 "file.txt" → "file.txt.zip"）。</summary>
+    [ObservableProperty]
+    private bool _keepOriginalExtension;
+
+    /// <summary>当前格式是否为 ZIP。</summary>
+    public bool IsZipFormat => DefaultFormat == "zip";
+
+    /// <summary>当前格式是否为 7z。</summary>
+    public bool IsSevenZipFormat => DefaultFormat == "7z";
+
+    /// <summary>当前格式是否支持加密（tar.gz 不支持）。</summary>
+    public bool IsFormatEncryptionSupported => DefaultFormat != "tar.gz";
+
+    /// <summary>压缩级别下拉列表（来自共享数据源 CompressionOptionData）。</summary>
+    public List<CompressionOptionData.ComboOption> CompressionLevelOptions { get; }
+
+    [ObservableProperty]
+    private int _compressionLevel = 5;
+
+    [ObservableProperty]
+    private CompressionOptionData.ComboOption? _selectedLevelOption;
+
+    [ObservableProperty]
+    private string? _outputPath;
+
+    /// <summary>输出路径的目录部分（内嵌 QuickPathControl 选择）。仅 Manual 模式使用。</summary>
+    [ObservableProperty]
+    private string? _outputDirectory;
+
+    /// <summary>输出文件名（不含扩展名，扩展名由格式决定）。仅 Manual 模式使用。</summary>
+    [ObservableProperty]
+    private string? _outputFileName;
+
+    /// <summary>防重入标记：OutputPath ↔ (OutputDirectory+OutputFileName) 双向同步。</summary>
+    private bool _isSyncingOutputPath;
+
+    [ObservableProperty]
+    private string? _password;
+
+    [ObservableProperty]
+    private string? _confirmPassword;
+
+    [ObservableProperty]
+    private bool _encrypt;
+
+    [ObservableProperty]
+    private string? _comment;
+
+    [ObservableProperty]
+    private CommentDistribution _commentDistribution = CommentDistribution.AllSame;
+
+    /// <summary>ZIP 加密方法（共享数据源）。</summary>
+    public List<CompressionOptionData.ComboOption> ZipEncryptionMethodOptions { get; }
+
+    [ObservableProperty]
+    private string _zipEncryptionMethod = "aes256";
+
+    [ObservableProperty]
+    private CompressionOptionData.ComboOption? _selectedZipEncryptionMethodOption;
+
+    [ObservableProperty]
+    private bool _sevenZipEncryptHeaders;
+
+    // ── 高级格式选项（仅本次压缩生效）──
+    // 由 View 在对话框关闭时从 DynamicFormatOptionsPanel 快照到此处；
+    // 构造函数中从 AppSettings 读取当前默认值，保证对话框初始值与设置窗口一致。
+    // 不再写回 AppSettings —— 避免压缩设置污染设置窗口的全局默认值。
+
+    /// <summary>ZIP 文件名编码："utf-8" / "gbk" / "default"。</summary>
+    public string FileNameEncoding { get; set; } = "utf-8";
+
+    /// <summary>ZIP 压缩方法：""=默认（Deflate），或 "deflate64" / "bzip2" / "lzma" / "ppmd" / "store"。</summary>
+    public string ZipCompressionMethod { get; set; } = "deflate";
+
+    /// <summary>7z 压缩方法："LZMA" / "LZMA2" / "PPMd" / "BZip2" / "Deflate"。</summary>
+    public string SevenZipCompressionMethod { get; set; } = "LZMA2";
+
+    /// <summary>7z 固实压缩标志。</summary>
+    public bool SevenZipSolid { get; set; } = true;
+
+    /// <summary>7z 固实块大小：""=默认，或 "64m" / "256m" / "512m" / "1g"。</summary>
+    public string SevenZipSolidBlockSize { get; set; } = "";
+
+    /// <summary>7z 字典大小（字节），0 表示引擎默认。</summary>
+    public int SevenZipDictionarySize { get; set; }
+
+    /// <summary>7z Word Size（快速字节数），0 表示引擎默认。</summary>
+    public int SevenZipNumFastBytes { get; set; }
+
+    /// <summary>7z 匹配器：""=默认，或 "bt2" / "bt3" / "bt4"。</summary>
+    public string SevenZipMatchFinder { get; set; } = "";
+
+    // ── 分卷 ──
+
+    /// <summary>分卷大小选项（共享数据源）。</summary>
+    public List<CompressionOptionData.ComboOption> SplitSizeOptions { get; }
+
+    [ObservableProperty]
+    private CompressionOptionData.ComboOption? _selectedSplitSizeOption;
+
+    /// <summary>自定义分卷大小文本（仅自定义模式可用）。</summary>
+    [ObservableProperty]
+    private string _customSplitSizeText = "";
+
+    /// <summary>是否显示自定义分卷大小输入框。</summary>
+    public bool IsCustomSplitSizeVisible => SelectedSplitSizeOption?.Tag == "-1";
+
+    /// <summary>当前分卷大小（字节），0 表示不分卷。</summary>
+    public long SplitSize
+    {
+        get
+        {
+            if (SelectedSplitSizeOption == null) return 0;
+            var tag = SelectedSplitSizeOption.Tag;
+            if (tag == "0") return 0;
+            if (tag == "-1")
+            {
+                if (long.TryParse(CustomSplitSizeText, out var mb) && mb > 0)
+                    return mb * 1024L * 1024L;
+                return 0;
+            }
+            if (long.TryParse(tag, out var bytes))
+                return bytes;
+            return 0;
+        }
+    }
+
+    // -- Password mode (library vs new password)
+
+    [ObservableProperty]
+    private bool _isPasswordLibraryMode = true;
+
+    [ObservableProperty]
+    private string _passwordSearchText = "";
+
+    [ObservableProperty]
+    private Core.PasswordEntry? _selectedPasswordEntry;
+
+    [ObservableProperty]
+    private bool _saveToLibrary = true;
+
+    [ObservableProperty]
+    private string _passwordDescription = "";
+
+    [ObservableProperty]
+    private bool _autoGenerateRules = true;
+
+    [ObservableProperty]
+    private string _rulesText = "";
+
+    [ObservableProperty]
+    private bool _isPasswordRevealed;
+
+    /// <summary>Filtered list of password library entries.</summary>
+    public ObservableCollection<Core.PasswordEntry> FilteredPasswordEntries { get; } = new();
+
+    /// <summary>Password strength as numeric value 0-4 for visual indicator.</summary>
+    public int PasswordStrengthValue
+    {
+        get
+        {
+            if (string.IsNullOrEmpty(Password))
+                return -1;
+            return GetPasswordStrength(Password);
+        }
+    }
+
+    /// <summary>Visual password strength indicator (●●●●).</summary>
+    public string PasswordStrengthIndicator
+    {
+        get
+        {
+            if (string.IsNullOrEmpty(Password))
+                return "○○○○";
+            int strength = GetPasswordStrength(Password);
+            return new string('●', Math.Max(1, strength)).PadRight(4, '○');
+        }
+    }
+
+    [ObservableProperty]
+    private string _windowTitle = LocalizationManager.T("Compress_Title");
+
+    // -- Comment radio button backing (sync via partial methods)
+
+    [ObservableProperty]
+    private bool _commentAllSame = true;
+
+    [ObservableProperty]
+    private bool _commentFirstOnly;
+
+    [ObservableProperty]
+    private bool _commentPerLine;
+
+    // ── Preview tree ──
+
+    /// <summary>预览树的根节点。</summary>
+    [ObservableProperty]
+    private PreviewTreeNode? _previewRoot;
+
+    /// <summary>预览面板是否启用精简模式。</summary>
+    [ObservableProperty]
+    private bool _previewCompactMode = true;
+
+    /// <summary>是否显示过滤项。</summary>
+    [ObservableProperty]
+    private bool _showFilteredGhosts;
+
+    /// <summary>预览树是否正在后台构建（构建超过阈值后置 true，驱动加载覆层显示）。</summary>
+    [ObservableProperty]
+    private bool _isPreviewBuilding;
+
+    /// <summary>
+    /// 预览树构建是否进行中（无论快慢，构建开始即置位，驱动"开始压缩"按钮门禁）。
+    /// 与 <see cref="IsPreviewBuilding"/>（仅慢构建 ≥250ms 置位，驱动加载覆层）不同：
+    /// 快构建也会短暂置位，保证 B 数据集未就绪时用户无法点击压缩（预览 = 实际 的守卫）。
+    /// </summary>
+    [ObservableProperty]
+    private bool _isBuildPending;
+
+    partial void OnIsBuildPendingChanged(bool value) => UpdateCanCompress();
+
+    /// <summary>当前在途预览构建任务（供 StartCompress 等待 B 数据集就绪）。</summary>
+    private Task<CompressPlan?>? _pendingBuildTask;
+
+    /// <summary>等待准备期间用户取消的标记（防「已取消仍启动压缩」竞态）。</summary>
+    private bool _compressCancelled;
+
+    /// <summary>最近一次预览构建的错误信息（构建失败时记录，供准备失败提示）；null = 无错误。</summary>
+    public string? LastBuildError { get; private set; }
+
+    /// <summary>是否正在等待压缩准备（B 数据集构建中）：驱动按钮文案与防重入。</summary>
+    [ObservableProperty]
+    private bool _isPreparingCompress;
+
+    partial void OnIsPreparingCompressChanged(bool value)
+    {
+        OnPropertyChanged(nameof(StartCompressText));
+        UpdateCanCompress();
+    }
+
+    /// <summary>"开始压缩"按钮文案：等待准备时显示"正在准备…"。</summary>
+    public string StartCompressText => IsPreparingCompress
+        ? LocalizationManager.T("Compress_Preparing")
+        : LocalizationManager.T("Compress_Start");
+
+    /// <summary>预览树构建进度（0–100，-1 表示不确定进度/不定进度条）。</summary>
+    [ObservableProperty]
+    private double _previewBuildProgress = -1;
+
+    /// <summary>预览树构建版本号，用于丢弃过期异步结果。</summary>
+    private int _previewBuildVersion;
+
+    /// <summary>文件过滤条件（由 View 在对话框关闭时从 FileFilterEditor 获取并设置）。</summary>
+    public FileFilterCriteria? FileFilter { get; set; }
+
+    /// <summary>缓存的上一次构建的压缩计划（B 数据集）。由预览构建派生，执行侧只读消费。</summary>
+    public CompressPlan? Plan { get; private set; }
+
+    /// <summary>
+    /// 获取供压缩执行使用的计划（B）。调用方（CompressFlow.BuildRequest / CompressService）只读消费，
+    /// 不重算路径、不重新过滤 —— 预览 = 实际的唯一事实来源。null 表示尚未构建成功或输入无效。
+    /// </summary>
+    public CompressPlan? GetPlanForExecution() => Plan;
+
+    /// <summary>
+    /// 外部接管 B 数据集（对话框 ViewModel → 主窗口 ViewModel 的拷贝路径）。
+    /// 同时使在途重建过期，防止拷贝 SelectedPaths 触发的异步重建覆盖接管结果。
+    /// </summary>
+    public void AdoptPlan(CompressPlan? plan)
+    {
+        _previewBuildVersion++; // 作废在途重建
+        Plan = plan;
+        IsBuildPending = false; // 在途重建已作废，其 finally 不会再清标志；这里显式解除门禁
+        UpdateCanCompress();
+    }
+
+    /// <summary>密码与确认密码是否匹配。</summary>
+    public bool PasswordsMatch => Password == ConfirmPassword;
+
+    /// <summary>密码强度描述（None / Weak / Medium / Strong）。</summary>
+    public string PasswordStrength
+    {
+        get
+        {
+            if (string.IsNullOrEmpty(Password))
+                return LocalizationManager.T("Compress_Strength_None");
+
+            if (Password.Length < 4)
+                return LocalizationManager.T("Compress_Strength_Weak");
+
+            bool hasUpper = Password.Any(char.IsUpper);
+            bool hasLower = Password.Any(char.IsLower);
+            bool hasDigit = Password.Any(char.IsDigit);
+            bool hasSpecial = Password.Any(c => !char.IsLetterOrDigit(c));
+
+            int types = (hasUpper ? 1 : 0) + (hasLower ? 1 : 0) + (hasDigit ? 1 : 0) + (hasSpecial ? 1 : 0);
+
+            if (Password.Length >= 12 && types >= 3)
+                return LocalizationManager.T("Compress_Strength_Strong");
+
+            if (Password.Length >= 8 && types >= 2)
+                return LocalizationManager.T("Compress_Strength_Medium");
+
+            return LocalizationManager.T("Compress_Strength_Weak");
+        }
+    }
+
+    public CompressSettingsViewModel(IReadOnlyList<string> sourcePaths)
+    {
+        foreach (var p in sourcePaths)
+            SelectedPaths.Add(p);
+        SelectedPaths.CollectionChanged += (_, _) =>
+        {
+            OnPropertyChanged(nameof(SelectedPathsSummary));
+            UpdateAutoRules();
+            BuildCompressPreview();
+            if (OutputMode != CompressOutputMode.Manual)
+                RefreshOutputPathState();
+            else
+                TryAutoFillOutputPath();
+            UpdateCanCompress();
+        };
+
+        // Populate localized strings
+        LocalizedStrings["Compress_TabGeneral"] = LocalizationManager.T("Compress_TabGeneral");
+        LocalizedStrings["Compress_TabAdvanced"] = LocalizationManager.T("Compress_TabAdvanced");
+        LocalizedStrings["Compress_VolumeSize"] = LocalizationManager.T("Compress_VolumeSize");
+        LocalizedStrings["Compress_TabPassword"] = LocalizationManager.T("Compress_TabPassword");
+        LocalizedStrings["Compress_TabComment"] = LocalizationManager.T("Compress_TabComment");
+        LocalizedStrings["Compress_TabFilter"] = LocalizationManager.T("Compress_TabFilter");
+        LocalizedStrings["Compress_Format"] = LocalizationManager.T("Compress_Format");
+        LocalizedStrings["Compress_Level"] = LocalizationManager.T("Compress_Level");
+        LocalizedStrings["Compress_OutputMode"] = LocalizationManager.T("Compress_OutputMode");
+        LocalizedStrings["Compress_OutputMode_Manual"] = LocalizationManager.T("Compress_OutputMode_Manual");
+        LocalizedStrings["Compress_OutputMode_Separate"] = LocalizationManager.T("Compress_OutputMode_Separate");
+        LocalizedStrings["Compress_OutputMode_Combined"] = LocalizationManager.T("Compress_OutputMode_Combined");
+        LocalizedStrings["Compress_OutputPath"] = LocalizationManager.T("Compress_OutputPath");
+        LocalizedStrings["Compress_OutputFileName"] = LocalizationManager.T("Compress_OutputFileName");
+        LocalizedStrings["Compress_OutputPlaceholder"] = LocalizationManager.T("Compress_OutputPlaceholder");
+        LocalizedStrings["Compress_SourceFiles"] = LocalizationManager.T("Compress_SourceFiles");
+        LocalizedStrings["Compress_Archive_Group"] = LocalizationManager.T("Compress_Archive_Group");
+        LocalizedStrings["Compress_AddItems"] = LocalizationManager.T("Compress_AddItems");
+        LocalizedStrings["Compress_Remove"] = LocalizationManager.T("Compress_Remove");
+        LocalizedStrings["Compress_Browse"] = LocalizationManager.T("Compress_Browse");
+        LocalizedStrings["Compress_Password"] = LocalizationManager.T("Compress_Password");
+        LocalizedStrings["Compress_PasswordPlaceholder"] = LocalizationManager.T("Compress_PasswordPlaceholder");
+        LocalizedStrings["Compress_ConfirmPassword"] = LocalizationManager.T("Compress_ConfirmPassword");
+        LocalizedStrings["Compress_ConfirmPlaceholder"] = LocalizationManager.T("Compress_ConfirmPlaceholder");
+        LocalizedStrings["Compress_ShowPassword"] = LocalizationManager.T("Compress_ShowPassword");
+        LocalizedStrings["Compress_EncryptArchive"] = LocalizationManager.T("Compress_EncryptArchive");
+        LocalizedStrings["Compress_EncryptionMethod"] = LocalizationManager.T("Compress_EncryptionMethod");
+        LocalizedStrings["Compress_ZipEncryption"] = LocalizationManager.T("Compress_ZipEncryption");
+        LocalizedStrings["Compress_EncryptHeaders"] = LocalizationManager.T("Compress_EncryptHeaders");
+        LocalizedStrings["Compress_Strength"] = LocalizationManager.T("Compress_Strength");
+        LocalizedStrings["Compress_Comment"] = LocalizationManager.T("Compress_Comment");
+        LocalizedStrings["Compress_CommentPlaceholder"] = LocalizationManager.T("Compress_CommentPlaceholder");
+        LocalizedStrings["Compress_CommentHint"] = LocalizationManager.T("Compress_CommentHint");
+        LocalizedStrings["Compress_Distribution"] = LocalizationManager.T("Compress_Distribution");
+        LocalizedStrings["Compress_Distribute_AllSame"] = LocalizationManager.T("Compress_Distribute_AllSame");
+        LocalizedStrings["Compress_Distribute_FirstOnly"] = LocalizationManager.T("Compress_Distribute_FirstOnly");
+        LocalizedStrings["Compress_Distribute_PerLine"] = LocalizationManager.T("Compress_Distribute_PerLine");
+        LocalizedStrings["Compress_Pwd_Library"] = LocalizationManager.T("Compress_Pwd_Library");
+        LocalizedStrings["Compress_Pwd_NewPassword"] = LocalizationManager.T("Compress_Pwd_NewPassword");
+        LocalizedStrings["Compress_Pwd_Search"] = LocalizationManager.T("Compress_Pwd_Search");
+        LocalizedStrings["Compress_Pwd_NoEntry"] = LocalizationManager.T("Compress_Pwd_NoEntry");
+        LocalizedStrings["Compress_Pwd_Selected"] = LocalizationManager.T("Compress_Pwd_Selected");
+        LocalizedStrings["Compress_Pwd_EnterPwd"] = LocalizationManager.T("Compress_Pwd_EnterPwd");
+        LocalizedStrings["Compress_Pwd_ConfirmPwd"] = LocalizationManager.T("Compress_Pwd_ConfirmPwd");
+        LocalizedStrings["Compress_Pwd_Match"] = LocalizationManager.T("Compress_Pwd_Match");
+        LocalizedStrings["Compress_Pwd_NoMatch"] = LocalizationManager.T("Compress_Pwd_NoMatch");
+        LocalizedStrings["Compress_Pwd_SaveToLibrary"] = LocalizationManager.T("Compress_Pwd_SaveToLibrary");
+        LocalizedStrings["Compress_Pwd_UpdateRules"] = LocalizationManager.T("Compress_Pwd_UpdateRules");
+        LocalizedStrings["Compress_Pwd_Description"] = LocalizationManager.T("Compress_Pwd_Description");
+        LocalizedStrings["Compress_Pwd_DescWatermark"] = LocalizationManager.T("Compress_Pwd_DescWatermark");
+        LocalizedStrings["Compress_Pwd_AutoRules"] = LocalizationManager.T("Compress_Pwd_AutoRules");
+        LocalizedStrings["Compress_Pwd_Rules"] = LocalizationManager.T("Compress_Pwd_Rules");
+        LocalizedStrings["Compress_Pwd_RulesWatermark"] = LocalizationManager.T("Compress_Pwd_RulesWatermark");
+        LocalizedStrings["Compress_Start"] = LocalizationManager.T("Compress_Start");
+        LocalizedStrings["Compress_Cancel"] = LocalizationManager.T("Compress_Cancel");
+
+        // 初始化压缩级别下拉选项（共享数据源，本地化 Display）
+        CompressionLevelOptions = CompressionOptionData.LevelOptions
+            .Select(o => new CompressionOptionData.ComboOption(o.Tag, LocalizationManager.T("Compress_Level_" + o.Tag switch
+            {
+                "0" => "Store",
+                "3" => "Fast",
+                "5" => "Normal",
+                "9" => "Max",
+                _ => "Normal",
+            })))
+            .ToList();
+        SelectedLevelOption = CompressionLevelOptions.FirstOrDefault(
+            o => o.Tag == CompressionLevel.ToString());
+
+        // 初始化 ZIP 加密方式下拉选项（共享数据源）
+        ZipEncryptionMethodOptions = CompressionOptionData.ZipEncryptionMethods
+            .Select(o => new CompressionOptionData.ComboOption(o.Tag, o.Display))
+            .ToList();
+        SelectedZipEncryptionMethodOption = ZipEncryptionMethodOptions.FirstOrDefault(
+            o => o.Tag == ZipEncryptionMethod);
+
+        // 初始化分卷大小下拉选项
+        SplitSizeOptions = CompressionOptionData.SplitSizeOptions
+            .Select(o => new CompressionOptionData.ComboOption(
+                o.Tag,
+                o.Tag switch
+                {
+                    "0" => LocalizationManager.T("Compress_Volume_None"),
+                    "-1" => LocalizationManager.T("Compress_Volume_Custom"),
+                    _ => o.Display,
+                }))
+            .ToList();
+        SelectedSplitSizeOption = SplitSizeOptions.FirstOrDefault(o => o.Tag == "0");
+
+        // Load password library
+        LoadPasswordLibrary();
+
+        // 从 AppSettings 加载默认值
+        try
+        {
+            var settings = AppSettings.Load();
+            KeepOriginalExtension = settings.KeepOriginalExtension;
+            FileNameEncoding = settings.ZipEncoding ?? "utf-8";
+            ZipCompressionMethod = settings.ZipCompressionMethod ?? "deflate";
+            SevenZipCompressionMethod = settings.SevenZipCompressionMethod ?? "LZMA2";
+            SevenZipSolid = settings.SevenZipSolid;
+            SevenZipSolidBlockSize = settings.SevenZipSolidBlockSize ?? "";
+            SevenZipDictionarySize = settings.SevenZipDictionarySize;
+            SevenZipNumFastBytes = settings.SevenZipNumFastBytes;
+            SevenZipMatchFinder = settings.SevenZipMatchFinder ?? "";
+            ZipEncryptionMethod = settings.ZipEncryptionMethod ?? "aes256";
+            SevenZipEncryptHeaders = settings.SevenZipEncryptHeaders;
+        }
+        catch { /* 使用默认值 */ }
+
+        // Auto-generate initial password rules from output mode + source paths
+        // Must be called after SelectedPaths is populated (the CollectionChanged
+        // handler won't fire for items added before it was attached).
+        UpdateAutoRules();
+
+        // 自动填充输出路径：CollectionChanged 不会为构造时已添加的路径触发，
+        // 需显式调用（对齐 WPF ShowCompressWindow 自动填充输出路径；CLI --compress 依赖此逻辑）
+        TryAutoFillOutputPath();
+
+        // Build initial compress preview from source paths。
+        // 必须在 TryAutoFillOutputPath 之后调用（旧顺序：BuildCompressPreview 在 TryAutoFillOutputPath
+        // 之前，构造时 OutputPath 为空导致 IsOutputPathValid 早退、Plan=null，且路径填充后不再触发重建，
+        // 产生「窗口打开但 B 数据集未就绪、按钮却可点」的竞态 → 点击压缩静默退出）。
+        BuildCompressPreview();
+    }
+
+    /// <summary>
+    /// 构建压缩预览树。由构造函数自动调用，也可在源文件变更或过滤条件变化后重新调用。
+    /// 原始树构建在后台线程执行，快速操作时通过版本号丢弃过期结果。
+    /// </summary>
+    /// <param name="filter">文件过滤条件，不为空且 IsActive 时对文件节点标记 IsFilteredOut；
+    /// null 时回退到 <see cref="FileFilter"/>（保持 CollectionChanged 等无参调用不丢失过滤）。</param>
+    public void BuildCompressPreview(FileFilterCriteria? filter = null)
+    {
+        // 保存当前构建任务，供 StartCompress 等待 B 数据集就绪（点击后等待在途构建完成再压缩）
+        _pendingBuildTask = BuildCompressPreviewCoreAsync(filter ?? FileFilter);
+    }
+
+    private async Task<CompressPlan?> BuildCompressPreviewCoreAsync(FileFilterCriteria? filter)
+    {
+        var version = ++_previewBuildVersion;
+        IsBuildPending = true; // 快慢构建都置位，B 未就绪时禁用"开始压缩"
+        LastBuildError = null;
+
+        if (SelectedPaths.Count == 0)
+        {
+            PreviewRoot = null;
+            IsPreviewBuilding = false;
+            IsBuildPending = false;
+            Plan = null; // 无源 → B 无效
+            return null;
+        }
+
+        if (!IsOutputPathValid())
+        {
+            // 路径无效时显示"路径无效"节点，不调用 ResultPreviewService
+            PreviewRoot = new PreviewTreeNode
+            {
+                Name = LocalizationManager.T("Compress_OutputPathInvalid"),
+                FullPath = "",
+                DisplayLabel = LocalizationManager.T("Compress_OutputPathInvalid"),
+                IsExpanded = true
+            };
+            IsPreviewBuilding = false;
+            IsBuildPending = false;
+            Plan = null; // 路径无效 → B 无效
+            return null;
+        }
+
+        try
+        {
+            // 快照输入（后台构建期间 SelectedPaths/OutputPath 等可能被用户修改）
+            var paths = SelectedPaths.ToList();
+            var outputMode = OutputMode;
+            var outputPath = OutputPath;
+            var format = DefaultFormat;
+            var keepOriginalExtension = KeepOriginalExtension;
+            var rootName = LocalizationManager.T("Compress_Title");
+
+            var buildTask = Task.Run(() => ResultPreviewService.BuildCompressPreview(
+                paths,
+                rootName: rootName,
+                filter: filter,
+                outputMode: outputMode,
+                outputPath: outputPath,
+                format: format,
+                keepOriginalExtension: keepOriginalExtension));
+
+            // 快速构建（<250ms）不显示加载态，避免输入时预览树闪烁；
+            // 慢构建显示不定进度加载覆层（压缩树无法预估条目总数）
+            var delayTask = Task.Delay(250);
+            if (await Task.WhenAny(buildTask, delayTask) == delayTask)
+            {
+                if (version != _previewBuildVersion) return null; // 已有更新的构建
+                PreviewBuildProgress = -1;
+                IsPreviewBuilding = true;
+            }
+
+            var (root, plan) = await buildTask;
+            if (version != _previewBuildVersion) return null; // 过期结果丢弃
+
+            PreviewRoot = root;
+            Plan = plan; // 缓存 B（执行侧只读消费，预览 = 实际）
+            return plan;
+        }
+        catch (Exception ex)
+        {
+            // 构建失败：记录错误供 StartCompress 提示（不再静默吞掉）；同时失效 B，
+            // 避免重建失败后用旧输入的 Plan 压缩（预览 = 实际 的守卫）
+            App.DebugLog($"BuildCompressPreview failed: {ex.Message}");
+            LastBuildError = ex.Message;
+            Plan = null;
+            return null;
+        }
+        finally
+        {
+            if (version == _previewBuildVersion)
+            {
+                IsPreviewBuilding = false;
+                IsBuildPending = false;
+            }
+        }
+    }
+
+    partial void OnCompressionLevelChanged(int value)
+    {
+        // Sync the ComboBox selection when CompressionLevel is set programmatically
+        if (CompressionLevelOptions is { } options)
+            SelectedLevelOption = options.FirstOrDefault(o => o.Tag == value.ToString());
+    }
+
+    partial void OnSelectedLevelOptionChanged(CompressionOptionData.ComboOption? value)
+    {
+        if (value != null && int.TryParse(value.Tag, out var level))
+            CompressionLevel = level;
+    }
+
+    partial void OnSelectedZipEncryptionMethodOptionChanged(CompressionOptionData.ComboOption? value)
+    {
+        if (value != null)
+            ZipEncryptionMethod = value.Tag;
+    }
+
+    partial void OnZipEncryptionMethodChanged(string value)
+    {
+        if (ZipEncryptionMethodOptions is { } options)
+            SelectedZipEncryptionMethodOption = options.FirstOrDefault(o => o.Tag == value);
+    }
+
+    partial void OnConfirmPasswordChanged(string? value)
+    {
+        OnPropertyChanged(nameof(PasswordsMatch));
+    }
+
+    partial void OnOutputModeChanged(CompressOutputMode value)
+    {
+        // Notify all dependent properties (including RadioButton bindings)
+        OnPropertyChanged(nameof(IsOutputPathReadOnly));
+        OnPropertyChanged(nameof(IsBrowseButtonVisible));
+        OnPropertyChanged(nameof(IsFileNameSectionVisible));
+        OnPropertyChanged(nameof(IsQuickPathVisible));
+        OnPropertyChanged(nameof(OutputPathLabel));
+        OnPropertyChanged(nameof(IsManualMode));
+        OnPropertyChanged(nameof(IsSeparateMode));
+        OnPropertyChanged(nameof(IsCombinedMode));
+        RefreshOutputPathState();
+        UpdateCanCompress();
+        if (AutoGenerateRules)
+            RefreshAutoRules();
+        // 切换输出方式时刷新预览树（不同模式树结构不同）
+        BuildCompressPreview();
+    }
+
+    partial void OnOutputPathChanged(string? value)
+    {
+        StartCompressCommand.NotifyCanExecuteChanged();
+        if (AutoGenerateRules)
+            RefreshAutoRules();
+        BuildCompressPreview();
+
+        // 外部设置完整路径（如自动填充/Combined 合成）时，拆分为目录 + 文件名供 UI 展示
+        if (!_isSyncingOutputPath && OutputMode == CompressOutputMode.Manual)
+        {
+            SplitOutputPath(value);
+        }
+    }
+
+    /// <summary>QuickPathControl 选择目录 → 合成完整输出路径。</summary>
+    partial void OnOutputDirectoryChanged(string? value)
+    {
+        ComposeManualOutputPath();
+    }
+
+    /// <summary>文件名输入 → 合成完整输出路径。</summary>
+    partial void OnOutputFileNameChanged(string? value)
+    {
+        ComposeManualOutputPath();
+    }
+
+    /// <summary>格式切换 → 重新合成（扩展名变化）。</summary>
+    private void OnOutputFileNameOrFormatChanged()
+    {
+        if (OutputMode == CompressOutputMode.Manual)
+            ComposeManualOutputPath();
+    }
+
+    /// <summary>
+    /// 将完整输出路径拆分为目录 + 文件名（不含扩展名）。
+    /// </summary>
+    private void SplitOutputPath(string? fullPath)
+    {
+        if (string.IsNullOrWhiteSpace(fullPath)) return;
+
+        _isSyncingOutputPath = true;
+        try
+        {
+            // 去掉扩展名（含 .tar.gz 双段）
+            var dir = Path.GetDirectoryName(fullPath) ?? string.Empty;
+            var fileName = Path.GetFileName(fullPath);
+            foreach (var ext in new[] { ".tar.gz", ".7z", ".zip" })
+            {
+                if (fileName.EndsWith(ext, StringComparison.OrdinalIgnoreCase))
+                {
+                    fileName = fileName[..^ext.Length];
+                    break;
+                }
+            }
+            if (!string.IsNullOrEmpty(fileName))
+                OutputFileName = fileName;
+            if (!string.IsNullOrEmpty(dir))
+                OutputDirectory = dir;
+        }
+        finally
+        {
+            _isSyncingOutputPath = false;
+        }
+    }
+
+    /// <summary>
+    /// Manual 模式：由目录 + 文件名 + 格式扩展名合成完整输出路径。
+    /// </summary>
+    private void ComposeManualOutputPath()
+    {
+        if (_isSyncingOutputPath) return;
+        if (OutputMode != CompressOutputMode.Manual) return;
+
+        var dir = OutputDirectory;
+        var name = OutputFileName;
+        if (string.IsNullOrEmpty(dir) || string.IsNullOrEmpty(name))
+            return;
+
+        _isSyncingOutputPath = true;
+        try
+        {
+            var ext = GetFormatExtension();
+            OutputPath = Path.Combine(dir, name + ext);
+        }
+        finally
+        {
+            _isSyncingOutputPath = false;
+        }
+    }
+
+    partial void OnDefaultFormatChanged(string value)
+    {
+        if (OutputMode == CompressOutputMode.Combined)
+            RefreshCombinedPath();
+
+        // tar.gz 不支持加密，切过去时自动取消加密
+        if (value == "tar.gz")
+            Encrypt = false;
+
+        // Manual 模式：格式切换 → 重新合成输出路径（扩展名变化）
+        if (OutputMode == CompressOutputMode.Manual)
+            ComposeManualOutputPath();
+
+        OnPropertyChanged(nameof(IsZipFormat));
+        OnPropertyChanged(nameof(IsSevenZipFormat));
+        OnPropertyChanged(nameof(OutputExtensionLabel));
+        if (AutoGenerateRules)
+            RefreshAutoRules();
+        OnPropertyChanged(nameof(IsFormatEncryptionSupported));
+        // 切换格式时刷新预览树（压缩包扩展名变化）
+        BuildCompressPreview();
+    }
+
+    partial void OnIsPasswordLibraryModeChanged(bool value)
+    {
+        if (!value)
+        {
+            // Switching to new password mode — clear selected entry
+            SelectedPasswordEntry = null;
+        }
+        else
+        {
+            // Switching to library mode — refresh list
+            ApplyPasswordFilter();
+        }
+        OnPropertyChanged(nameof(IsPasswordLibraryMode));
+        OnPropertyChanged(nameof(SaveCheckLabel));
+    }
+
+    /// <summary>
+    /// 密码库状态文本：未选中时显示"未选定密码"，选中后显示"已选定: {description}"。
+    /// </summary>
+    public string PasswordLibraryStatusText =>
+        SelectedPasswordEntry != null
+            ? string.Format(LocalizationManager.T("Compress_Pwd_Selected"), SelectedPasswordEntry.Description)
+            : LocalizationManager.T("Compress_Pwd_NoEntry");
+
+    /// <summary>
+    /// 保存复选框标签：密码库模式显示"更新匹配规则"，新密码模式显示"保存到密码库"。
+    /// 对标 WPF CompressSettingsWindow.Password.cs UpdatePasswordSourceUI。
+    /// </summary>
+    public string SaveCheckLabel =>
+        IsPasswordLibraryMode
+            ? LocalizationManager.T("Compress_Pwd_UpdateRules")
+            : LocalizationManager.T("Compress_Pwd_SaveToLibrary");
+
+    partial void OnSelectedPasswordEntryChanged(Core.PasswordEntry? value)
+    {
+        if (value != null)
+        {
+            // 库模式下密码来自 SelectedPasswordEntry.Password，不写入 Password 属性
+            // （对标 WPF: PasswordBox.Password = "" 且 GetActivePassword 返回 _selectedLibraryEntry?.Password）
+            PasswordDescription = value.Description;
+            // RulesText 不由条目规则覆盖: WPF 在选中条目时不写 PwdRulesBox.Text，
+            // 规则始终来自自动规则（AutoGenerateRules 为 true 时由 RefreshAutoRules 生成）
+            // 或用户手动输入。选中条目后若 AutoGenerateRules 为 true 则重新生成。
+            if (AutoGenerateRules)
+                RefreshAutoRules();
+        }
+        OnPropertyChanged(nameof(PasswordLibraryStatusText));
+    }
+
+    partial void OnPasswordChanged(string? value)
+    {
+        OnPropertyChanged(nameof(PasswordStrength));
+        OnPropertyChanged(nameof(PasswordStrengthValue));
+        OnPropertyChanged(nameof(PasswordStrengthIndicator));
+        OnPropertyChanged(nameof(PasswordsMatch));
+
+        // 用户手动输入密码时，清除密码库选中并自动切换到新密码模式
+        // 对标 WPF OnPasswordContentChanged
+        if (!string.IsNullOrEmpty(value) && IsPasswordLibraryMode)
+        {
+            SelectedPasswordEntry = null;
+            IsPasswordLibraryMode = false;
+        }
+    }
+
+    partial void OnAutoGenerateRulesChanged(bool value)
+    {
+        if (value)
+            RefreshAutoRules();
+    }
+
+    partial void OnPasswordSearchTextChanged(string value)
+    {
+        ApplyPasswordFilter();
+    }
+
+    partial void OnCommentAllSameChanged(bool value)
+    {
+        if (value)
+        {
+            CommentFirstOnly = false;
+            CommentPerLine = false;
+            CommentDistribution = CommentDistribution.AllSame;
+        }
+    }
+
+    partial void OnCommentFirstOnlyChanged(bool value)
+    {
+        if (value)
+        {
+            CommentAllSame = false;
+            CommentPerLine = false;
+            CommentDistribution = CommentDistribution.FirstOnly;
+        }
+    }
+
+    partial void OnCommentPerLineChanged(bool value)
+    {
+        if (value)
+        {
+            CommentAllSame = false;
+            CommentFirstOnly = false;
+            CommentDistribution = CommentDistribution.PerLine;
+        }
+    }
+
+    partial void OnSelectedSplitSizeOptionChanged(CompressionOptionData.ComboOption? value)
+    {
+        OnPropertyChanged(nameof(IsCustomSplitSizeVisible));
+        OnPropertyChanged(nameof(SplitSize));
+    }
+
+    partial void OnCustomSplitSizeTextChanged(string value)
+    {
+        OnPropertyChanged(nameof(SplitSize));
+    }
+
+    /// <summary>
+    /// Load all password entries from PasswordManager into the filtered list.
+    /// </summary>
+    public void LoadPasswordLibrary()
+    {
+        FilteredPasswordEntries.Clear();
+        var entries = PasswordManager.Instance.GetAllPasswords()
+            .OrderByDescending(e => e.LastUsed ?? DateTime.MinValue)
+            .ToList();
+        foreach (var entry in entries)
+        {
+            FilteredPasswordEntries.Add(entry);
+        }
+    }
+
+    /// <summary>
+    /// Apply search text filter to the password library.
+    /// </summary>
+    public void ApplyPasswordFilter()
+    {
+        var allEntries = PasswordManager.Instance.GetAllPasswords()
+            .OrderByDescending(e => e.LastUsed ?? DateTime.MinValue);
+
+        FilteredPasswordEntries.Clear();
+        foreach (var entry in allEntries)
+        {
+            if (string.IsNullOrEmpty(PasswordSearchText) ||
+                entry.Description.Contains(PasswordSearchText, StringComparison.OrdinalIgnoreCase) ||
+                entry.PatternsDisplay.Contains(PasswordSearchText, StringComparison.OrdinalIgnoreCase))
+            {
+                FilteredPasswordEntries.Add(entry);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Refresh auto-rules from output mode + source file paths.
+    /// Matches WPF CompressSettingsWindow.Password.cs RefreshAutoRules logic.
+    /// Generates rules that match expected output archive file names (e.g. "document*.zip"),
+    /// not source file extensions.
+    /// </summary>
+    public void RefreshAutoRules()
+    {
+        if (!AutoGenerateRules) return;
+
+        var ext = DefaultFormat == "tar.gz" ? ".tar.gz" : "." + DefaultFormat;
+
+        switch (OutputMode)
+        {
+            case CompressOutputMode.Manual:
+                if (!string.IsNullOrEmpty(OutputPath))
+                {
+                    var manualName = Path.GetFileNameWithoutExtension(OutputPath);
+                    if (!string.IsNullOrEmpty(manualName))
+                        RulesText = $"{manualName}*{ext}";
+                }
+                break;
+
+            case CompressOutputMode.Separate:
+                var rules = new List<string>();
+                foreach (var src in SelectedPaths)
+                {
+                    string baseName;
+                    if (File.Exists(src))
+                        baseName = Path.GetFileNameWithoutExtension(src);
+                    else if (Directory.Exists(src))
+                        baseName = ArchivePath.GetFileName(src);
+                    else
+                        continue;
+                    rules.Add($"{baseName}*{ext}");
+                }
+                RulesText = string.Join("\r\n", rules);
+                break;
+
+            case CompressOutputMode.Combined:
+                var commonParent = App.FindCommonParent(SelectedPaths.ToList());
+                if (commonParent != null && !App.IsDriveRoot(commonParent))
+                {
+                    var archiveName = ArchivePath.GetFileName(commonParent);
+                    RulesText = $"{archiveName}*{ext}";
+                }
+                else if (AllPathsSameDrive(SelectedPaths))
+                {
+                    // 同盘符但无公共子目录：压缩包名与盘符相同（如 C.zip）
+                    var root = Path.GetPathRoot(SelectedPaths[0]) ?? "C:\\";
+                    var driveLetter = root.TrimEnd('\\', '/').TrimEnd(':');
+                    RulesText = $"{driveLetter}*{ext}";
+                }
+                break;
+        }
+    }
+
+    /// <summary>
+    /// Get password strength as numeric value 0-4.
+    /// </summary>
+    public static int GetPasswordStrength(string? pwd)
+    {
+        if (string.IsNullOrEmpty(pwd)) return -1;
+        int score = 0;
+        if (pwd.Length >= 8) score++;
+        if (pwd.Any(char.IsUpper) && pwd.Any(char.IsLower)) score++;
+        if (pwd.Any(char.IsDigit)) score++;
+        if (pwd.Any(c => !char.IsLetterOrDigit(c))) score++;
+        return Math.Min(score, 4);
+    }
+
+    /// <summary>
+    /// 获取当前激活的密码（无论库模式还是新密码模式）。
+    /// 库模式且选中条目时返回条目密码，否则返回 Password 属性值。
+    /// </summary>
+    public string? GetActivePassword()
+    {
+        if (!Encrypt) return null;
+        if (IsPasswordLibraryMode && SelectedPasswordEntry != null)
+            return SelectedPasswordEntry.Password;
+        return Password;
+    }
+
+    [RelayCommand]
+    private void TogglePasswordMode()
+    {
+        IsPasswordLibraryMode = !IsPasswordLibraryMode;
+    }
+
+    [RelayCommand]
+    private void TogglePasswordReveal()
+    {
+        IsPasswordRevealed = !IsPasswordRevealed;
+    }
+
+    [RelayCommand]
+    private void ClearPasswordSearch()
+    {
+        PasswordSearchText = "";
+    }
+
+    [RelayCommand]
+    private async Task BrowseOutputPath()
+    {
+        if (BrowseOutput == null) return;
+        var path = await BrowseOutput();
+        if (!string.IsNullOrEmpty(path))
+        {
+            OutputPath = path;
+        }
+    }
+
+    private bool CanExecuteStartCompress()
+    {
+        // 等待准备期间禁用（防重入：B 就绪前的等待窗口内再点一次）
+        if (IsPreparingCompress) return false;
+        // 预览树构建期间禁用"开始压缩"：B 数据集未就绪时不允许执行（预览 = 实际的守卫）
+        if (IsBuildPending) return false;
+        if (SelectedPaths.Count == 0) return false;
+        return IsOutputPathValid();
+    }
+
+    [RelayCommand]
+    private async Task StartCompress()
+    {
+        // Validate passwords match if encrypting
+        if (Encrypt && !PasswordsMatch)
+        {
+            return;
+        }
+
+        // 等待 B 数据集就绪（预览=实际 的守卫）：点击后如有在途构建则等待其完成；
+        // 无在途构建且 Plan 无效则补建一次；就绪后才关闭窗口并执行压缩，
+        // 避免「窗口直接关闭却无压缩生成」的静默失败。
+        IsPreparingCompress = true;
+        try
+        {
+            var ready = await EnsurePlanReadyAsync();
+            if (_compressCancelled) return; // 等待期间用户已取消 → 不再启动压缩
+            if (!ready)
+            {
+                // 无法准备（构建失败等）：窗口保持打开并提示，用户可调整后重试
+                await ShowPrepareFailedAsync();
+                return;
+            }
+
+            if (CloseAction != null)
+                await CloseAction(true);
+        }
+        finally
+        {
+            IsPreparingCompress = false;
+            _compressCancelled = false;
+        }
+    }
+
+    /// <summary>
+    /// 确保 B 数据集（<see cref="Plan"/>）就绪。等待当前在途构建完成；若 Plan 仍无效
+    /// 且输入有效则补建一次（覆盖构造时序残留/构建失败后无在途构建的状态）。
+    /// 返回 false 表示无法准备（构建失败或输入无效）。
+    /// 注：等待期间用户持续变更输入会持续等待新构建（活锁由用户操作驱动，语义合理），
+    /// 取消始终可用（见 <see cref="Cancel"/> 的 _compressCancelled 标记）。
+    /// </summary>
+    private async Task<bool> EnsurePlanReadyAsync()
+    {
+        bool attemptedRebuild = false;
+        while (true)
+        {
+            var task = _pendingBuildTask;
+            if (task != null)
+            {
+                try { await task; } catch { /* 构建内部已吞异常，以 Plan 状态为准 */ }
+                if (_pendingBuildTask != task) continue; // 等待期间有新构建 → 重等最新
+            }
+
+            if (Plan != null) return true;
+            if (SelectedPaths.Count == 0 || !IsOutputPathValid()) return false;
+
+            // Plan 仍无效且无在途构建：补建一次（不无限重试，避免构建持续失败时死循环）
+            if (attemptedRebuild) return false;
+            attemptedRebuild = true;
+            BuildCompressPreview();
+        }
+    }
+
+    /// <summary>压缩准备失败提示（窗口保持打开，用户可调整后重试）。</summary>
+    private async Task ShowPrepareFailedAsync()
+    {
+        if (ShowMessage != null)
+            await ShowMessage(LocalizationManager.T("Compress_PrepareFailed"), LocalizationManager.T("Compress_Title"));
+    }
+
+    [RelayCommand]
+    private async Task Cancel()
+    {
+        // 等待 B 数据集准备期间用户取消：标记取消，StartCompress 恢复执行时不再启动压缩
+        if (IsPreparingCompress)
+            _compressCancelled = true;
+
+        if (CloseAction != null)
+            await CloseAction(false);
+    }
+
+    // ── Source file management ──
+
+    [RelayCommand]
+    private async Task AddFiles()
+    {
+        if (PickFiles == null) return;
+        var files = await PickFiles();
+        if (files != null)
+        {
+            foreach (var f in files)
+            {
+                if (!SelectedPaths.Contains(f))
+                    SelectedPaths.Add(f);
+            }
+        }
+    }
+
+    [RelayCommand]
+    private void RemoveSelected(object? selectedItem)
+    {
+        if (selectedItem is string path)
+        {
+            SelectedPaths.Remove(path);
+        }
+    }
+
+    private void UpdateAutoRules()
+    {
+        // Delegate to RefreshAutoRules for output-mode-based rule generation.
+        if (AutoGenerateRules)
+            RefreshAutoRules();
+    }
+
+    // ── Output mode helpers ──
+
+    /// <summary>
+    /// 根据当前模式刷新输出路径的显示内容（路径 + 可编辑状态）。
+    /// </summary>
+    private void RefreshOutputPathState()
+    {
+        switch (OutputMode)
+        {
+            case CompressOutputMode.Manual:
+                // 回到 Manual：恢复缓存路径；无缓存则清空（避免残留其他模式的说明文本）
+                OutputPath = _cachedManualPath;
+                _cachedManualPath = null;
+                break;
+
+            case CompressOutputMode.Separate:
+                // 首次离开 Manual 时缓存路径；之后不再覆盖（避免转两次模式后丢失原始路径）
+                _cachedManualPath ??= OutputPath;
+                OutputPath = LocalizationManager.T("Compress_SeparateSummary", SelectedPaths.Count);
+                break;
+
+            case CompressOutputMode.Combined:
+                // 首次离开 Manual 时缓存路径；之后不再覆盖
+                _cachedManualPath ??= OutputPath;
+                RefreshCombinedPath();
+                break;
+        }
+    }
+
+    /// <summary>
+    /// Manual 模式下输出路径为空时，根据源文件自动生成默认路径。
+    /// 行为与 <see cref="RefreshCombinedPath"/> 一致但不弹跨盘符警告（保持空路径让用户手动设置）。
+    /// </summary>
+    private void TryAutoFillOutputPath()
+    {
+        if (OutputMode != CompressOutputMode.Manual) return;
+        if (!string.IsNullOrEmpty(OutputPath)) return;
+        if (SelectedPaths.Count == 0) return;
+
+        var commonParent = App.FindCommonParent(SelectedPaths.ToList());
+        if (commonParent != null && !App.IsDriveRoot(commonParent))
+        {
+            var archiveName = ArchivePath.GetFileName(commonParent);
+            var ext = GetFormatExtension();
+            OutputPath = System.IO.Path.Combine(commonParent, archiveName + ext);
+        }
+        else if (AllPathsSameDrive(SelectedPaths))
+        {
+            var root = Path.GetPathRoot(SelectedPaths[0]) ?? "C:\\";
+            var driveLetter = root.TrimEnd('\\', '/').TrimEnd(':');
+            var ext = GetFormatExtension();
+            OutputPath = System.IO.Path.Combine(root, driveLetter + ext);
+        }
+        // 跨盘符：保持空路径，用户手动设置
+    }
+
+    /// <summary>
+    /// 计算 Combined 模式的输出路径：公共父目录下的合并压缩包。
+    /// </summary>
+    private void RefreshCombinedPath()
+    {
+        if (SelectedPaths.Count == 0)
+        {
+            OutputPath = "";
+            return;
+        }
+
+        var commonParent = App.FindCommonParent(SelectedPaths.ToList());
+        if (commonParent != null && !App.IsDriveRoot(commonParent))
+        {
+            var archiveName = ArchivePath.GetFileName(commonParent);
+            var ext = GetFormatExtension();
+            OutputPath = System.IO.Path.Combine(commonParent, archiveName + ext);
+        }
+        else if (AllPathsSameDrive(SelectedPaths))
+        {
+            // 同盘符但无公共子目录 — 输出到盘符根目录，压缩包名与盘符相同（如 C:\C.zip）
+            var root = Path.GetPathRoot(SelectedPaths[0]) ?? "C:\\";
+            var driveLetter = root.TrimEnd('\\', '/').TrimEnd(':');
+            var ext = GetFormatExtension();
+            OutputPath = System.IO.Path.Combine(root, driveLetter + ext);
+        }
+        else
+        {
+            // 跨驱动器 — 回退到手动模式
+            OutputMode = CompressOutputMode.Manual;
+            // 通知用户
+            _ = AppMessageBox.Show(
+                LocalizationManager.T("Compress_CombinedUnavailable"),
+                LocalizationManager.T("Compress_Title"),
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+        }
+    }
+
+    /// <summary>
+    /// 判断所有源路径是否在同一个盘符下。
+    /// </summary>
+    private static bool AllPathsSameDrive(IEnumerable<string> paths)
+    {
+        string? drive = null;
+        foreach (var p in paths)
+        {
+            var d = Path.GetPathRoot(p);
+            if (string.IsNullOrEmpty(d)) return false;
+            if (drive == null)
+                drive = d;
+            else if (!string.Equals(drive, d, StringComparison.OrdinalIgnoreCase))
+                return false;
+        }
+        return drive != null;
+    }
+
+    /// <summary>
+    /// 从当前选择的格式推断文件扩展名。
+    /// </summary>
+    private string GetFormatExtension()
+    {
+        return DefaultFormat switch
+        {
+            "tar.gz" => ".tar.gz",
+            _ => "." + DefaultFormat,
+        };
+    }
+
+    /// <summary>
+    /// 根据源路径推断默认文件名。
+    /// </summary>
+    private string GetDefaultFileName()
+    {
+        if (SelectedPaths.Count == 0) return "archive";
+        if (SelectedPaths.Count == 1 && File.Exists(SelectedPaths[0]))
+            return Path.GetFileNameWithoutExtension(SelectedPaths[0]);
+        if (SelectedPaths.Count == 1 && Directory.Exists(SelectedPaths[0]))
+            return ArchivePath.GetFileName(SelectedPaths[0]);
+        return $"archive_{DateTime.Now:yyyyMMddHHmmss}";
+    }
+
+    /// <summary>
+    /// 检查输出路径在当前模式下是否有效。
+    /// Manual：路径不能为空且父目录必须存在。
+    /// Combined：路径非空即有效（由源文件推导）。
+    /// Separate：输出到源文件所在目录，始终有效。
+    /// </summary>
+    private bool IsOutputPathValid()
+    {
+        switch (OutputMode)
+        {
+            case CompressOutputMode.Manual:
+                if (string.IsNullOrEmpty(OutputPath))
+                    return false;
+                var dir = Path.GetDirectoryName(OutputPath);
+                return !string.IsNullOrEmpty(dir) && Directory.Exists(dir);
+
+            case CompressOutputMode.Combined:
+                return !string.IsNullOrEmpty(OutputPath);
+
+            case CompressOutputMode.Separate:
+                return true;
+
+            default:
+                return true;
+        }
+    }
+
+    /// <summary>
+    /// 更新"开始压缩"按钮的启用状态。由模式切换和源文件变化时调用。
+    /// </summary>
+    private void UpdateCanCompress()
+    {
+        // 通知 CloseAction 调用方重新评估按钮状态
+        // 实际按钮启用由 Command 的 CanExecute 决定，
+        // 这里触发 CanExecuteChanged 刷新
+        StartCompressCommand.NotifyCanExecuteChanged();
+    }
+}

@@ -1,6 +1,7 @@
 using MantisZip.Core.Abstractions;
 using MantisZip.Core.Engines;
 using MantisZip.Tests.Fixtures;
+using SharpSevenZip;
 using Xunit;
 
 namespace MantisZip.Tests.Engines;
@@ -176,6 +177,187 @@ public class SevenZipEngineTests : IDisposable
 
         var result = await _engine.TestArchiveAsync(badPath);
         Assert.False(result);
+    }
+
+    // ===== AddToArchiveAsync =====
+
+    [Fact]
+    public async Task AddToArchiveAsync_NoEntryBasePath_AddsToRoot()
+    {
+        if (!Is7zDllAvailable()) return;
+
+        var archive = ArchiveFixtures.CreateSevenZipArchive();
+        if (archive == null) return;
+        TrackFile(archive);
+
+        var newFile = TrackFile(Path.Combine(Path.GetTempPath(), "MantisZipTest", $"{Guid.NewGuid()}_added.txt"));
+        await File.WriteAllTextAsync(newFile, "root content");
+
+        await _engine.AddToArchiveAsync(archive, [newFile], new ArchiveOptions());
+
+        var entries = await _engine.ListEntriesAsync(archive);
+        Assert.Contains(entries, e => e.FullPath == Path.GetFileName(newFile));
+        Assert.Contains(entries, e => e.FullPath == "hello.txt"); // 既有条目必须保留（Append 模式）
+    }
+
+    [Fact]
+    public async Task AddToArchiveAsync_WithEntryBasePath_AddsToSubfolder()
+    {
+        if (!Is7zDllAvailable()) return;
+
+        var archive = ArchiveFixtures.CreateSevenZipArchive();
+        if (archive == null) return;
+        TrackFile(archive);
+
+        var newFile = TrackFile(Path.Combine(Path.GetTempPath(), "MantisZipTest", $"{Guid.NewGuid()}_added.txt"));
+        await File.WriteAllTextAsync(newFile, "subfolder content");
+
+        await _engine.AddToArchiveAsync(archive, [newFile], new ArchiveOptions(), entryBasePath: "docs");
+
+        var entries = await _engine.ListEntriesAsync(archive);
+        // 文件应出现在 docs/ 子目录下，而非压缩包根目录
+        Assert.Contains(entries, e => e.FullPath == "docs/" + Path.GetFileName(newFile));
+        Assert.DoesNotContain(entries, e => e.FullPath == Path.GetFileName(newFile));
+    }
+
+    [Fact]
+    public async Task AddToArchiveAsync_WithEntryBasePath_DirectorySource_KeepsFolderStructure()
+    {
+        if (!Is7zDllAvailable()) return;
+
+        var archive = ArchiveFixtures.CreateSevenZipArchive();
+        if (archive == null) return;
+        TrackFile(archive);
+
+        var srcDir = TrackDir(ArchiveFixtures.CreateSourceDirectory()); // 含 hello.txt + binary.dat + subdir/nested.txt
+
+        await _engine.AddToArchiveAsync(archive, [srcDir], new ArchiveOptions(), entryBasePath: "docs");
+
+        var entries = await _engine.ListEntriesAsync(archive);
+        var dirName = Path.GetFileName(srcDir);
+        Assert.Contains(entries, e => e.FullPath == $"docs/{dirName}/hello.txt");
+        Assert.Contains(entries, e => e.FullPath == $"docs/{dirName}/subdir/nested.txt");
+        // 新添加的源目录不应落在根目录（无 docs/ 前缀；根目录 hello.txt 是夹具预置的旧条目）
+        Assert.DoesNotContain(entries, e => e.FullPath == $"{dirName}/hello.txt");
+    }
+
+    [Fact]
+    public async Task AddToArchiveAsync_DirectorySource_NoEntryBasePath_PrefixesDirName()
+    {
+        if (!Is7zDllAvailable()) return;
+
+        var archive = ArchiveFixtures.CreateSevenZipArchive();
+        if (archive == null) return;
+        TrackFile(archive);
+
+        // 源目录含子目录结构
+        var sourceDir = TrackDir(Path.Combine(Path.GetTempPath(), "MantisZipTest", Guid.NewGuid().ToString()));
+        var subDir = Path.Combine(sourceDir, "sub");
+        Directory.CreateDirectory(subDir);
+        var newFile = Path.Combine(subDir, "hello.txt");
+        await File.WriteAllTextAsync(newFile, "nested content");
+
+        await _engine.AddToArchiveAsync(archive, [sourceDir], new ArchiveOptions()); // entryBasePath = null
+
+        var entries = await _engine.ListEntriesAsync(archive);
+        // 目录源无 entryBasePath → 条目名带 {目录名}/ 前缀（与 ZipEngine 语义一致）
+        Assert.Contains(entries, e => e.FullPath == $"{Path.GetFileName(sourceDir)}/sub/hello.txt");
+        // 既有条目保留
+        Assert.Contains(entries, e => e.FullPath == "hello.txt");
+    }
+
+    // ===== 冲突处理集成测试 =====
+
+    private async Task<string> CreateDupFileAsync(string name, string content)
+    {
+        var file = Path.Combine(Path.GetTempPath(), "MantisZipTest", Guid.NewGuid().ToString(), name);
+        Directory.CreateDirectory(Path.GetDirectoryName(file)!);
+        await File.WriteAllTextAsync(file, content);
+        TrackFile(file);
+        return file;
+    }
+
+    [Fact]
+    public async Task AddToArchiveAsync_DuplicateName_Overwrite_ReplacesContent()
+    {
+        if (!Is7zDllAvailable()) return;
+        var archive = ArchiveFixtures.CreateSevenZipArchive();
+        if (archive == null) return;
+        TrackFile(archive);
+
+        var dupFile = await CreateDupFileAsync("hello.txt", "duplicate content");
+
+        await _engine.AddToArchiveAsync(archive, [dupFile], new ArchiveOptions { ConflictAction = FileConflictAction.Overwrite });
+
+        var entries = await _engine.ListEntriesAsync(archive);
+        Assert.Equal(1, entries.Count(e => e.Name == "hello.txt"));
+
+        var dest = TrackDir(Path.Combine(Path.GetTempPath(), "MantisZipTest", Guid.NewGuid().ToString()));
+        await _engine.ExtractAsync(archive, dest);
+        Assert.Equal("duplicate content", await File.ReadAllTextAsync(Path.Combine(dest, "hello.txt")));
+    }
+
+    [Fact]
+    public async Task AddToArchiveAsync_DuplicateName_Skip_KeepsOriginal()
+    {
+        if (!Is7zDllAvailable()) return;
+        var archive = ArchiveFixtures.CreateSevenZipArchive();
+        if (archive == null) return;
+        TrackFile(archive);
+
+        var dupFile = await CreateDupFileAsync("hello.txt", "duplicate content");
+
+        await _engine.AddToArchiveAsync(archive, [dupFile], new ArchiveOptions { ConflictAction = FileConflictAction.Skip });
+
+        var entries = await _engine.ListEntriesAsync(archive);
+        Assert.Equal(1, entries.Count(e => e.Name == "hello.txt"));
+
+        var dest = TrackDir(Path.Combine(Path.GetTempPath(), "MantisZipTest", Guid.NewGuid().ToString()));
+        await _engine.ExtractAsync(archive, dest);
+        Assert.Equal(ArchiveFixtures.HelloText, await File.ReadAllTextAsync(Path.Combine(dest, "hello.txt")));
+    }
+
+    [Fact]
+    public async Task AddToArchiveAsync_DuplicateName_Rename_AddsUniqueEntry()
+    {
+        if (!Is7zDllAvailable()) return;
+        var archive = ArchiveFixtures.CreateSevenZipArchive();
+        if (archive == null) return;
+        TrackFile(archive);
+
+        var dupFile = await CreateDupFileAsync("hello.txt", "duplicate content");
+
+        await _engine.AddToArchiveAsync(archive, [dupFile], new ArchiveOptions { ConflictAction = FileConflictAction.Rename });
+
+        var entries = await _engine.ListEntriesAsync(archive);
+        Assert.Contains(entries, e => e.Name == "hello.txt");
+        Assert.Contains(entries, e => e.Name == "hello (1).txt");
+    }
+
+    [Fact]
+    public async Task AddToArchiveAsync_DuplicateName_Ask_ResolverCustomName()
+    {
+        if (!Is7zDllAvailable()) return;
+        var archive = ArchiveFixtures.CreateSevenZipArchive();
+        if (archive == null) return;
+        TrackFile(archive);
+
+        var dupFile = await CreateDupFileAsync("hello.txt", "duplicate content");
+
+        var options = new ArchiveOptions
+        {
+            ConflictAction = FileConflictAction.Ask,
+            ConflictResolverAsync = info =>
+            {
+                info.CustomName = "my-rename.txt";
+                return Task.FromResult(FileConflictAction.Rename);
+            },
+        };
+        await _engine.AddToArchiveAsync(archive, [dupFile], options);
+
+        var entries = await _engine.ListEntriesAsync(archive);
+        Assert.Contains(entries, e => e.Name == "hello.txt");
+        Assert.Contains(entries, e => e.Name == "my-rename.txt");
     }
 
     // ===== Progress Reporting =====

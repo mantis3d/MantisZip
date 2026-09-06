@@ -1,0 +1,209 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:conv="clr-namespace:MantisZip.UI.Avalonia.Converters"
+             x:Class="MantisZip.UI.Avalonia.Controls.ResultTreeView"
+             x:CompileBindings="False">
+  <UserControl.Resources>
+    <conv:GeometryResourceConverter x:Key="GeometryResourceConverter" />
+    <conv:BoolToBoldConverter x:Key="BoolToBoldConverter" />
+    <conv:NodeForegroundConverter x:Key="NodeForegroundConverter" />
+    <conv:BoolToArchiveFontSizeConverter x:Key="BoolToArchiveFontSizeConverter" />
+    <conv:BoolToConflictBrushConverter x:Key="BoolToConflictBrushConverter" />
+    <conv:BoolToEmptyDirOpacityConverter x:Key="BoolToEmptyDirOpacityConverter" />
+  </UserControl.Resources>
+  <Grid RowDefinitions="Auto,Auto,*">
+    <!-- Row 0: Top toolbar (compact/full toggle + summary) -->
+    <Border Grid.Row="0"
+            Padding="8,4"
+            Background="{DynamicResource ThemeHeaderBgBrush}">
+      <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
+        <ToggleButton x:Name="CompactToggle"
+                      IsChecked="{Binding CompactMode, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                      Width="28" Height="{DynamicResource ControlHeightXs}"
+                      FontSize="12"
+                      Padding="4,0"
+                      Background="{DynamicResource ThemeButtonBgBrush}"
+                      BorderBrush="{DynamicResource ThemeBorderBrush}"
+                      IsCheckedChanged="OnCompactToggleChanged">
+          <PathIcon Data="{StaticResource IconChevronDownUp}" Width="14" Height="14" />
+        </ToggleButton>
+        <Button x:Name="ExpandAllButton"
+                Width="28" Height="{DynamicResource ControlHeightXs}"
+                FontSize="16" FontWeight="Bold"
+                Padding="0"
+                Background="{DynamicResource ThemeButtonBgBrush}"
+                Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                BorderBrush="{DynamicResource ThemeBorderBrush}"
+                Click="OnExpandAllClick">
+          <PathIcon Data="{StaticResource IconArrowExpandAll}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+        </Button>
+        <Button x:Name="LocateButton"
+                Width="28" Height="{DynamicResource ControlHeightXs}"
+                Padding="2,0"
+                IsEnabled="False"
+                Background="{DynamicResource ThemeButtonBgBrush}"
+                Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                BorderBrush="{DynamicResource ThemeBorderBrush}"
+                Click="OnLocateClick">
+          <PathIcon Data="{StaticResource IconLocation}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+        </Button>
+        <ToggleButton x:Name="FilterToggle"
+                      IsChecked="{Binding ShowFilteredGhosts, RelativeSource={RelativeSource AncestorType=UserControl}, Mode=TwoWay}"
+                      Width="28" Height="{DynamicResource ControlHeightXs}"
+                      Padding="2,0"
+                      Background="{DynamicResource ThemeButtonBgBrush}"
+                      BorderBrush="{DynamicResource ThemeBorderBrush}"
+                      IsCheckedChanged="OnFilterToggleChanged">
+          <PathIcon Data="{StaticResource IconFilter}" Width="14" Height="14" />
+        </ToggleButton>
+        <TextBlock x:Name="SummaryTextBlock"
+                   FontSize="12"
+                   VerticalAlignment="Center"
+                   Foreground="{DynamicResource ThemeTextSecondaryBrush}"
+                   Text="{Binding SummaryText, RelativeSource={RelativeSource AncestorType=UserControl}}" />
+      </StackPanel>
+    </Border>
+
+    <!-- Row 1: Summary bar (file count + total size with conflict highlight) -->
+    <Border Grid.Row="1"
+            Padding="8,2"
+            Background="{DynamicResource ThemeSurfaceBgBrush}"
+            BorderBrush="{DynamicResource ThemeBorderBrush}"
+            BorderThickness="0,0,0,1"
+            IsVisible="{Binding ShowSummaryBar, RelativeSource={RelativeSource AncestorType=UserControl}}">
+      <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXs}">
+        <TextBlock x:Name="FileCountText"
+                   FontSize="11"
+                   Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+        <TextBlock x:Name="TotalSizeText"
+                   FontSize="11"
+                   Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+        <TextBlock x:Name="ConflictCountText"
+                   FontSize="11"
+                   Foreground="#FFD32F2F"
+                   IsVisible="False" />
+      </StackPanel>
+    </Border>
+
+    <!-- Row 2: Tree + loading overlay -->
+    <Grid Grid.Row="2">
+      <ScrollViewer Background="{DynamicResource ThemeSurfaceBgBrush}">
+        <TreeView x:Name="PreviewTreeView"
+                  ItemsSource="{Binding DisplayNodes, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                  SelectionMode="Multiple"
+                  BorderThickness="0"
+                  Background="Transparent"
+                  SelectionChanged="OnTreeSelectionChanged">
+        <TreeView.Styles>
+          <Style Selector="TreeViewItem">
+            <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}" />
+          </Style>
+        </TreeView.Styles>
+        <TreeView.ItemTemplate>
+          <TreeDataTemplate ItemsSource="{Binding Children}">
+            <!-- Background=Transparent：让整行参与命中测试，点击行内任意位置均可选中 -->
+            <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}"
+                        Margin="2,1"
+                        Background="Transparent"
+                        Opacity="{Binding TextOpacity}">
+                <!-- PathIcon for folder/file/warning -->
+                <PathIcon Data="{Binding IconKey, Converter={StaticResource GeometryResourceConverter}}"
+                          Width="14" Height="14"
+                          VerticalAlignment="Center"
+                          Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                          Opacity="{Binding IsEmptyDirectory, Converter={StaticResource BoolToEmptyDirOpacityConverter}}" />
+                <TextBlock Text="…" FontSize="13" VerticalAlignment="Center"
+                          IsVisible="{Binding IsTruncatedNode}" />
+                <TextBlock Text="{Binding DisplayLabel}"
+                            VerticalAlignment="Center"
+                            FontWeight="{Binding IsArchiveNode, Converter={StaticResource BoolToBoldConverter}}"
+                            FontSize="{Binding IsArchiveNode, Converter={StaticResource BoolToArchiveFontSizeConverter}}"
+                            Foreground="{Binding ForegroundKey, Converter={StaticResource NodeForegroundConverter}}" />
+                <TextBlock Text="{Binding SizeDisplay}"
+                          FontSize="11"
+                          VerticalAlignment="Center"
+                          Margin="4,0,0,0"
+                          Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+                <TextBlock Text="{Binding DirectoryInfoText}"
+                          FontSize="11"
+                          VerticalAlignment="Center"
+                          Margin="4,0,0,0"
+                          Foreground="{DynamicResource ThemeTextSecondaryBrush}"
+                          IsVisible="{Binding IsDirectoryNode}" />
+                <!-- Conflict suffix - warning icon for existing files -->
+                <PathIcon Data="{StaticResource IconWarning}"
+                          Width="12" Height="12"
+                          VerticalAlignment="Center"
+                          Foreground="#FFD32F2F"
+                          IsVisible="{Binding ExistsAtDestination}"
+                          ToolTip.Tip="{Binding ConflictToolTip}" />
+            </StackPanel>
+          </TreeDataTemplate>
+        </TreeView.ItemTemplate>
+      </TreeView>
+      </ScrollViewer>
+
+      <!-- Loading overlay: shown while the raw tree builds on the background thread -->
+      <Border x:Name="LoadingOverlay"
+              IsVisible="False"
+              Background="{DynamicResource ThemeSurfaceBgBrush}"
+              Opacity="0.95"
+              Padding="{DynamicResource SpacingLgThk}">
+        <StackPanel VerticalAlignment="Center"
+                    HorizontalAlignment="Center"
+                    Spacing="{DynamicResource SpacingSm}">
+          <ProgressBar x:Name="LoadingProgressBar"
+                       Width="220"
+                       Height="12"
+                       Minimum="0"
+                       Maximum="100"
+                       Value="0"
+                       IsIndeterminate="False"
+                       Foreground="{DynamicResource ThemeAccentBrush}"
+                       Background="{DynamicResource ThemeBorderBrush}" />
+          <TextBlock x:Name="LoadingTextBlock"
+                     Text="{Binding LoadingText, RelativeSource={RelativeSource Self}}"
+                     FontSize="12"
+                     HorizontalAlignment="Center"
+                     Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+        </StackPanel>
+      </Border>
+
+      <!-- State overlay: reading entries pending / load failed (corrupted or needs password) -->
+      <Border x:Name="StateOverlay"
+              IsVisible="False"
+              Background="{DynamicResource ThemeSurfaceBgBrush}"
+              Opacity="0.95"
+              Padding="{DynamicResource SpacingLgThk}">
+        <StackPanel VerticalAlignment="Center"
+                    HorizontalAlignment="Center"
+                    Spacing="{DynamicResource SpacingSm}"
+                    MaxWidth="360">
+          <PathIcon x:Name="StateIconPath"
+                    Width="28" Height="28"
+                    HorizontalAlignment="Center"
+                    Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+          <TextBlock x:Name="StateTitleText"
+                     FontSize="14"
+                     FontWeight="SemiBold"
+                     TextWrapping="Wrap"
+                     TextAlignment="Center"
+                     HorizontalAlignment="Center"
+                     Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+          <TextBlock x:Name="StateDetailText"
+                     FontSize="12"
+                     TextWrapping="Wrap"
+                     TextAlignment="Center"
+                     HorizontalAlignment="Center"
+                     Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+          <ProgressBar x:Name="StateProgressBar"
+                       Width="220"
+                       Height="12"
+                       IsIndeterminate="True"
+                       Foreground="{DynamicResource ThemeAccentBrush}"
+                       Background="{DynamicResource ThemeBorderBrush}" />
+        </StackPanel>
+      </Border>
+    </Grid>
+  </Grid>
+</UserControl>
