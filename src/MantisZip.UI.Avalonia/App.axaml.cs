@@ -766,10 +766,16 @@ public partial class App : Application
                 if (string.IsNullOrEmpty(pwd)) continue;
 
                 var service = new PasswordService();
-                if (service.QuickVerifyPassword(archivePath, pwd, engine))
+                var verifyInfo = service.QuickVerifyPasswordEx(archivePath, pwd, engine);
+                if (verifyInfo.Result == PasswordVerificationResult.Success)
                 {
                     DebugLog($"CLI extract: saved password matched for '{archivePath}'");
                     return pwd;
+                }
+                if (verifyInfo.Result == PasswordVerificationResult.CorruptedOrInvalid)
+                {
+                    DebugLog($"CLI extract: archive corrupted, stopping password attempts for '{archivePath}'");
+                    break;
                 }
             }
         }

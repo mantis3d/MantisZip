@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using MantisZip.Core;
 using MantisZip.Core.Abstractions;
 using MantisZip.Core.Engines;
@@ -5,8 +6,41 @@ using MantisZip.Core.Utils;
 using SharpCompress.Archives;
 using SharpCompress.Readers;
 using SharpSevenZip;
+using SharpSevenZip.Exceptions;
 
 namespace MantisZip.UI.Avalonia.Services;
+
+/// <summary>
+/// 密码验证/匹配结果的精确分类
+/// </summary>
+public enum PasswordVerificationResult
+{
+    /// <summary>验证通过，密码正确</summary>
+    Success,
+
+    /// <summary>密码错误（或无密码但需要密码）</summary>
+    WrongPassword,
+
+    /// <summary>文件损坏/非加密格式/其他不可恢复错误——非密码问题</summary>
+    CorruptedOrInvalid,
+
+    /// <summary>无法确定（异常类型未知，建议重试或用户决定）</summary>
+    Unknown,
+}
+
+/// <summary>
+/// 密码验证详细结果
+/// </summary>
+public readonly record struct PasswordVerifyInfo(
+    PasswordVerificationResult Result,
+    string? DetailMessage = null,
+    Exception? OriginalException = null)
+{
+    public static PasswordVerifyInfo Success() => new(PasswordVerificationResult.Success);
+    public static PasswordVerifyInfo WrongPassword(string? detail = null) => new(PasswordVerificationResult.WrongPassword, detail);
+    public static PasswordVerifyInfo CorruptedOrInvalid(string? detail = null) => new(PasswordVerificationResult.CorruptedOrInvalid, detail);
+    public static PasswordVerifyInfo Unknown(string? detail = null) => new(PasswordVerificationResult.Unknown, detail);
+}
 
 /// <summary>
 /// 密码验证与匹配服务 — 对标 WPF 的 App.Password.cs。
@@ -167,6 +201,135 @@ public class PasswordService
             var toWrite = Math.Min(count, _maxBytes - _written);
             _written += toWrite;
         }
+    }
+
+    // ── 新增：精确分类方法 ──
+
+    /// <summary>
+    /// 快速验证密码，返回精确分类结果。
+    /// </summary>
+    public PasswordVerifyInfo QuickVerifyPasswordEx(string archivePath, string password, IArchiveEngine engine)
+    {
+        try
+        {
+            bool ok = QuickVerifyPassword(archivePath, password, engine);
+            return ok ? PasswordVerifyInfo.Success() : PasswordVerifyInfo.WrongPassword();
+        }
+        catch (Exception ex)
+        {
+            return ClassifyException(ex, engine, hasEncrypted: true);
+        }
+    }
+
+    /// <summary>
+    /// 从已保存密码匹配并验证，返回精确结果。
+    /// 关键优化：如果是文件损坏，直接返回，不再尝试其他密码。
+    /// </summary>
+    public (string Password, string Description, PasswordVerifyInfo VerifyInfo)? TryMatchPasswordEx(
+        string archivePath,
+        IArchiveEngine engine)
+    {
+        const int maxAttempts = 100;
+        var allMatches = PasswordManager.Instance.FindMatchingPasswords(archivePath);
+        var candidatePasswords = allMatches.Count > maxAttempts
+            ? allMatches.Take(maxAttempts).ToList()
+            : allMatches;
+        var tried = new HashSet<string>();
+
+        foreach (var entry in candidatePasswords)
+        {
+            var pwd = entry.Password;
+            if (!tried.Add(pwd)) continue;
+
+            var desc = !string.IsNullOrEmpty(entry.Description) ? entry.Description : pwd;
+            var verifyInfo = QuickVerifyPasswordEx(archivePath, pwd, engine);
+
+            if (verifyInfo.Result == PasswordVerificationResult.Success)
+                return (pwd, desc, verifyInfo);
+
+            // 关键优化：如果是文件损坏，直接返回，不再尝试其他密码
+            if (verifyInfo.Result == PasswordVerificationResult.CorruptedOrInvalid)
+                return (pwd, desc, verifyInfo);
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// 异常分类核心逻辑——根据引擎类型选择最精确的分类器。
+    /// </summary>
+    public static PasswordVerifyInfo ClassifyException(Exception ex, IArchiveEngine engine, bool hasEncrypted)
+    {
+        // 1. SharpCompress (ZIP/TAR/GZ)
+        if (engine is ZipEngine)
+            return ClassifySharpCompressException(ex);
+
+        // 2. SharpSevenZip (7z/RAR/ISO)
+        if (engine is SevenZipEngine)
+            return ClassifySharpSevenZipException(ex);
+
+        // 3. 通用兜底
+        return ClassifyGenericException(ex, hasEncrypted);
+    }
+
+    /// <summary>
+    /// SharpCompress 异常分类——CryptographicException = 密码错误，InvalidDataException = 文件损坏。
+    /// </summary>
+    public static PasswordVerifyInfo ClassifySharpCompressException(Exception ex)
+    {
+        return ex switch
+        {
+            CryptographicException => PasswordVerifyInfo.WrongPassword("密码错误"),
+            InvalidDataException ide when ide.Message.Contains("password", StringComparison.OrdinalIgnoreCase)
+                => PasswordVerifyInfo.WrongPassword("密码错误"),
+            InvalidDataException => PasswordVerifyInfo.CorruptedOrInvalid("文件损坏或格式无效"),
+            IOException => PasswordVerifyInfo.CorruptedOrInvalid("读取文件失败"),
+            _ => ClassifyGenericException(ex, hasEncrypted: true)
+        };
+    }
+
+    /// <summary>
+    /// SharpSevenZip 异常分类——优先用 HRESULT 判断，回退到 Message 解析。
+    /// </summary>
+    public static PasswordVerifyInfo ClassifySharpSevenZipException(Exception ex)
+    {
+        // SharpSevenZipArchiveException 包含 HRESULT 和 Message
+        if (ex is SharpSevenZipArchiveException szEx)
+        {
+            // HRESULT 分类（最准确）
+            uint hresult = (uint)szEx.HResult;
+            if (hresult == 0x80090005) // NTE_BAD_DATA - 密码错误
+                return PasswordVerifyInfo.WrongPassword("密码错误");
+            if (hresult == 0x80004005) // E_FAIL - 通用失败，结合 Message 判断
+            {
+                var msg = szEx.Message.ToLowerInvariant();
+                if (msg.Contains("wrong password") || msg.Contains("password"))
+                    return PasswordVerifyInfo.WrongPassword("密码错误");
+                if (msg.Contains("data error") || msg.Contains("crc") || msg.Contains("corrupt"))
+                    return PasswordVerifyInfo.CorruptedOrInvalid("文件损坏或数据错误");
+            }
+        }
+
+        // 兜底：Message 解析
+        var message = ex.Message.ToLowerInvariant();
+        if (message.Contains("wrong password") || message.Contains("password"))
+            return PasswordVerifyInfo.WrongPassword("密码错误");
+        if (message.Contains("data error") || message.Contains("crc error") || message.Contains("corrupt"))
+            return PasswordVerifyInfo.CorruptedOrInvalid("文件损坏");
+
+        return PasswordVerifyInfo.Unknown(ex.Message);
+    }
+
+    /// <summary>
+    /// 通用异常分类——基于 Message 关键词判断。
+    /// </summary>
+    public static PasswordVerifyInfo ClassifyGenericException(Exception ex, bool hasEncrypted)
+    {
+        var msg = ex.Message.ToLowerInvariant();
+        if (msg.Contains("password") || msg.Contains("encrypted") || msg.Contains("decrypt"))
+            return PasswordVerifyInfo.WrongPassword("密码错误");
+        if (hasEncrypted && (msg.Contains("data error") || msg.Contains("corrupt")))
+            return PasswordVerifyInfo.CorruptedOrInvalid("文件损坏");
+        return PasswordVerifyInfo.Unknown(ex.Message);
     }
 }
 

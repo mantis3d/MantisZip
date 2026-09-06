@@ -93,6 +93,7 @@ public static class FileFormatHelper
             FileFormat.Xps => "XPS 文档",
             FileFormat.Fits => "FITS 天文数据",
             FileFormat.Parquet => "Parquet 列式数据",
+            FileFormat.Encrypted => "加密文件名",
             _ => format.ToString(),
         };
     }

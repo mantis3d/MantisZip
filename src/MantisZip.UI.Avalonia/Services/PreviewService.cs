@@ -31,7 +31,9 @@ public enum PreviewType
     Markdown,
     Pdf,
     IcoGallery,
-    Unsupported
+    Unsupported,
+    /// <summary>加密文件名压缩包（EncryptHeaders=true）需输入密码才能识别格式</summary>
+    NeedsPassword = 99
 }
 
 /// <summary>
@@ -245,6 +247,11 @@ public class PreviewService
             var displayName = FileFormatHelper.GetDisplayName(detectedFormat);
 
             return (previewType, detectedFormat, displayName);
+        }
+        catch (ArchiveEntryExtractor.PasswordRequiredException)
+        {
+            // 加密文件名压缩包：无密码无法读取条目数据
+            return (PreviewType.NeedsPassword, FileFormat.Encrypted, "加密文件名");
         }
         catch (Exception ex)
         {

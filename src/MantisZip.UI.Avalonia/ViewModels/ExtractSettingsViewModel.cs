@@ -371,8 +371,17 @@ public partial class ExtractSettingsViewModel : ObservableObject
     private async Task<IReadOnlyList<ArchiveItem>?> TryAutoUnlockAsync(
         SourceArchiveItem item, IArchiveEngine engine, bool relist, CancellationToken ct)
     {
-        var match = _passwordService.TryMatchPassword(item.Path, engine);
+        var match = _passwordService.TryMatchPasswordEx(item.Path, engine);
         if (match == null) return null;
+
+        // 文件损坏：直接报错，不再尝试其他密码
+        if (match.Value.VerifyInfo.Result == PasswordVerificationResult.CorruptedOrInvalid)
+        {
+            item.ErrorMessage = LocalizationManager.T("Status_ArchiveCorrupted");
+            item.Status = SourceArchiveStatus.Failed;
+            UpdateCanUnlockSelected();
+            return null;
+        }
 
         IReadOnlyList<ArchiveItem> entries;
         if (relist)
@@ -442,7 +451,19 @@ public partial class ExtractSettingsViewModel : ObservableObject
             else
             {
                 // B 类：快速验证首个加密条目
-                ok = _passwordService.QuickVerifyPassword(item.Path, resp.Password, engine);
+                var verifyInfo = _passwordService.QuickVerifyPasswordEx(item.Path, resp.Password, engine);
+                if (verifyInfo.Result == PasswordVerificationResult.CorruptedOrInvalid)
+                {
+                    await AppMessageBox.Show(
+                        LocalizationManager.T("Status_ArchiveCorrupted"),
+                        LocalizationManager.T("App_ErrorTitle"),
+                        MessageBoxButton.OK, MessageBoxImage.Warning);
+                    item.ErrorMessage = LocalizationManager.T("Status_ArchiveCorrupted");
+                    item.Status = SourceArchiveStatus.Failed;
+                    UpdateCanUnlockSelected();
+                    return;
+                }
+                ok = verifyInfo.Result == PasswordVerificationResult.Success;
             }
 
             if (!ok)

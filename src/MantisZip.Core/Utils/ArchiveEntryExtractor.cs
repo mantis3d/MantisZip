@@ -18,6 +18,14 @@ namespace MantisZip.Core.Utils;
 public static class ArchiveEntryExtractor
 {
     /// <summary>
+    /// 当加密文件名压缩包（EncryptHeaders=true）无密码时尝试读取条目头部，抛出此异常。
+    /// 调用方（如 ClassifyPreviewByMagicAsync）可捕获并返回 PreviewType.NeedsPassword。
+    /// </summary>
+    public sealed class PasswordRequiredException : Exception
+    {
+        public PasswordRequiredException(string message) : base(message) { }
+    }
+    /// <summary>
     /// 将压缩包中的指定条目提取到目标文件
     /// </summary>
     public static Task ExtractEntryAsync(
@@ -238,6 +246,11 @@ public static class ArchiveEntryExtractor
                             CoreLog.Info("ExtractHeadAsync: 7z is solid, falling back to full temp extract");
                             return await ExtractHeadViaFullExtractAsync(archivePath, entryName, maxBytes, format, password, ct);
                         }
+                        // 检测加密文件名：EncryptHeaders=true 且无密码时无法读取条目数据
+                        if (format == ArchiveFormat.SevenZip && string.IsNullOrEmpty(password) && IsSevenZipEncryptHeaders(extractor))
+                        {
+                            throw new PasswordRequiredException("加密文件名 7z 压缩包需要密码才能读取条目数据");
+                        }
                         return ExtractSevenZipHeadToMemory(extractor, entryName, maxBytes);
                     }
 
@@ -329,6 +342,25 @@ public static class ArchiveEntryExtractor
         catch (Exception ex) when (ex is InvalidOperationException or SharpSevenZipArchiveException)
         {
             CoreLog.Trace("IsSevenZipSolid: exception checking IsSolid, assuming solid: {0}", ex.Message);
+            return true;
+        }
+    }
+
+    /// <summary>
+    /// 检测 7z 压缩包是否启用了加密文件名。
+    /// 无密码时尝试访问 ArchiveFileData，若抛出异常则视为加密文件名。
+    /// </summary>
+    private static bool IsSevenZipEncryptHeaders(SharpSevenZipExtractor extractor)
+    {
+        try
+        {
+            // 尝试访问条目列表——加密文件名的 7z 在无密码时会抛出 SharpSevenZipArchiveException
+            _ = extractor.ArchiveFileData.Count;
+            return false;
+        }
+        catch (Exception ex) when (ex is SharpSevenZipArchiveException or InvalidOperationException)
+        {
+            CoreLog.Trace("IsSevenZipEncryptHeaders: exception accessing ArchiveFileData, assuming encrypted headers: {0}", ex.Message);
             return true;
         }
     }

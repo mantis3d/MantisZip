@@ -214,6 +214,31 @@
                    TextWrapping="Wrap"
                    IsVisible="{Binding IsUnsupportedVisible}" />
 
+        <!-- Needs Password state (encrypted filename archive) -->
+        <StackPanel IsVisible="{Binding IsNeedsPasswordVisible}"
+                    VerticalAlignment="Center"
+                    HorizontalAlignment="Center"
+                    Spacing="16"
+                    x:CompileBindings="False">
+          <PathIcon Data="{StaticResource IconLockClosed}"
+                    Width="48" Height="48"
+                    Foreground="{DynamicResource ThemeAccentBrush}" />
+          <TextBlock Text="{Binding TextContent}"
+                     TextWrapping="Wrap"
+                     FontSize="14"
+                     Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                     HorizontalAlignment="Center"
+                     MaxWidth="400"
+                     TextAlignment="Center" />
+          <Button Content="{Binding LocalizedStrings[Extract_UnlockButton]}"
+                  Command="{Binding EnterPasswordCommand}"
+                  Width="180" Height="{DynamicResource ControlHeightLg}"
+                  HorizontalAlignment="Center"
+                  Background="{DynamicResource ThemeAccentBrush}"
+                  Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                  BorderThickness="0" />
+        </StackPanel>
+
         <!-- Text preview -->
         <ScrollViewer IsVisible="{Binding IsTextVisible}">
           <TextBox Text="{Binding TextContent}"

@@ -321,6 +321,12 @@ public partial class MainWindowViewModel : ObservableObject
     [ObservableProperty]
     private string? _currentArchivePath;
 
+    partial void OnCurrentArchivePathChanged(string? value)
+    {
+        // 同步预览面板当前压缩包路径，供「输入密码」按钮的 CanExecute 判断使用
+        Preview.CurrentPreviewFilePath = value;
+    }
+
     [ObservableProperty]
     private bool _isArchiveLoaded;
 
@@ -767,6 +773,18 @@ public partial class MainWindowViewModel : ObservableObject
         }
     }
 
+    /// <summary>
+    /// 供 PreviewViewModel.PasswordEntered 回调：密码输入成功后重新触发当前条目的预览。
+    /// </summary>
+    public void RePreviewCurrentEntry()
+    {
+        if (SelectedEntry != null && CurrentArchivePath != null)
+        {
+            App.DebugLog("[PRV] RePreviewCurrentEntry: re-triggering preview after password entry");
+            _ = ShowPreviewAsync(SelectedEntry);
+        }
+    }
+
     partial void OnSelectedFolderChanged(FolderNode? value)
     {
         if (value != null)
@@ -904,10 +922,21 @@ public partial class MainWindowViewModel : ObservableObject
                     // Phase A: 已保存密码静默自动匹配（内部含快速验证）
                     if (engine != null)
                     {
-                        var match = _passwordService.TryMatchPassword(path, engine);
+                        var match = _passwordService.TryMatchPasswordEx(path, engine);
                         if (match != null)
                         {
-                            password = match.Value.Password;
+                            var (matchedPwd, matchedDesc, verifyInfo) = match.Value;
+
+                            // 文件损坏：直接报告错误，不再尝试其他密码
+                            if (verifyInfo.Result == PasswordVerificationResult.CorruptedOrInvalid)
+                            {
+                                App.DebugLog($"[PRV] Archive corrupted during auto-match: {verifyInfo.DetailMessage}");
+                                StatusMessage = LocalizationManager.T("Status_ArchiveCorrupted");
+                                IsLoading = false;
+                                return;
+                            }
+
+                            password = matchedPwd;
                             if (unlistable)
                                 result = await _archiveService.LoadArchiveAsync(path, password);
                             if (!result.IsPasswordRequired)
@@ -939,10 +968,17 @@ public partial class MainWindowViewModel : ObservableObject
                         password = dialogResponse.Password;
 
                         // QuickVerify before full retry (fast path)
-                        if (engine != null && !_passwordService.QuickVerifyPassword(path, password, engine))
+                        var verifyInfo = _passwordService.QuickVerifyPasswordEx(path, password, engine);
+                        if (verifyInfo.Result == PasswordVerificationResult.WrongPassword)
                         {
                             StatusMessage = LocalizationManager.T("Status_WrongPassword");
                             continue;
+                        }
+                        if (verifyInfo.Result == PasswordVerificationResult.CorruptedOrInvalid)
+                        {
+                            StatusMessage = LocalizationManager.T("Status_ArchiveCorrupted");
+                            IsLoading = false;
+                            return;
                         }
 
                         // 用密码完整加载一次（可列出场景同样重载以统一加载状态；条目内容一致）
@@ -1217,14 +1253,27 @@ public partial class MainWindowViewModel : ObservableObject
         if (response?.Password == null) return;
 
         var engine = ArchiveEngineFactory.GetEngineByExtension(CurrentArchivePath);
-        if (engine != null && !_passwordService.QuickVerifyPassword(CurrentArchivePath, response.Password, engine))
+        if (engine != null)
         {
-            StatusMessage = LocalizationManager.T("Status_WrongPassword");
-            await AppMessageBox.Show(
-                LocalizationManager.T("Status_WrongPassword"),
-                LocalizationManager.T("App_ErrorTitle"),
-                MessageBoxButton.OK, MessageBoxImage.Error);
-            return;
+            var verifyInfo = _passwordService.QuickVerifyPasswordEx(CurrentArchivePath, response.Password, engine);
+            if (verifyInfo.Result == PasswordVerificationResult.WrongPassword)
+            {
+                StatusMessage = LocalizationManager.T("Status_WrongPassword");
+                await AppMessageBox.Show(
+                    LocalizationManager.T("Status_WrongPassword"),
+                    LocalizationManager.T("App_ErrorTitle"),
+                    MessageBoxButton.OK, MessageBoxImage.Error);
+                return;
+            }
+            if (verifyInfo.Result == PasswordVerificationResult.CorruptedOrInvalid)
+            {
+                StatusMessage = LocalizationManager.T("Status_ArchiveCorrupted");
+                await AppMessageBox.Show(
+                    LocalizationManager.T("Status_ArchiveCorrupted"),
+                    LocalizationManager.T("App_ErrorTitle"),
+                    MessageBoxButton.OK, MessageBoxImage.Error);
+                return;
+            }
         }
 
         _sessionPasswords[GetSessionPasswordKey(CurrentArchivePath, _currentFormat)] = response.Password;
@@ -1515,6 +1564,11 @@ public partial class MainWindowViewModel : ObservableObject
                     }
                     Preview.ShowMarkdownPreview(tempFile);
                     StatusMessage = LocalizationManager.T("Preview_Markdown", entry.DisplayName);
+                    break;
+                case PreviewType.NeedsPassword:
+                    // 加密文件名压缩包：提示需输入密码
+                    Preview.ShowNeedsPassword(entry.NameDisplay ?? entry.Name);
+                    StatusMessage = LocalizationManager.T("Preview_EntryNeedsPassword");
                     break;
             }
 

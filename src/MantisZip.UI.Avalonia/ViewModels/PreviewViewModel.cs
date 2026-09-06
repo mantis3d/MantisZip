@@ -36,6 +36,17 @@ public partial class PreviewViewModel : ObservableObject
     /// <summary>本地化字符串字典，XAML 通过 {Binding LocalizedStrings[Key]} 访问。</summary>
     public Dictionary<string, string> LocalizedStrings { get; } = new();
 
+    /// <summary>
+    /// 由 MainWindowViewModel 设置的密码对话框回调。参数为压缩包路径，返回 <see cref="PasswordDialogResponse"/> 或取消时返回 null。
+    /// 用于预览面板的"输入密码"按钮。
+    /// </summary>
+    public Func<string, Task<PasswordDialogResponse?>>? ShowPasswordDialog { get; set; }
+
+    /// <summary>
+    /// 密码输入成功后回调，通知 MainWindowViewModel 重新触发 ShowPreviewAsync。
+    /// </summary>
+    public Action? PasswordEntered { get; set; }
+
     [ObservableProperty]
     private PreviewType _previewType = PreviewType.None;
 
@@ -83,6 +94,7 @@ public partial class PreviewViewModel : ObservableObject
         LocalizedStrings["Preview_Tooltip_PptxNext"] = LocalizationManager.T("Preview_Tooltip_PptxNext");
         LocalizedStrings["Preview_Tooltip_PdfPrev"] = LocalizationManager.T("Preview_Tooltip_PdfPrev");
         LocalizedStrings["Preview_Tooltip_PdfNext"] = LocalizationManager.T("Preview_Tooltip_PdfNext");
+        LocalizedStrings["Extract_UnlockButton"] = LocalizationManager.T("Extract_UnlockButton");
         OnPropertyChanged(nameof(LocalizedStrings));
         OnPropertyChanged(nameof(LoadingFileDisplay));
     }
@@ -233,6 +245,7 @@ public partial class PreviewViewModel : ObservableObject
     public bool IsCsvVisible => PreviewType == PreviewType.Csv;
     public bool IsPeVisible => PreviewType == PreviewType.Pe;
     public bool IsUnsupportedVisible => PreviewType == PreviewType.Unsupported || PreviewType == PreviewType.None;
+    public bool IsNeedsPasswordVisible => PreviewType == PreviewType.NeedsPassword;
 
     public bool IsImageVisible => PreviewType == PreviewType.Image;
     public bool IsAnimatedImageVisible => PreviewType == PreviewType.AnimatedImage;
@@ -281,6 +294,7 @@ public partial class PreviewViewModel : ObservableObject
         OnPropertyChanged(nameof(PptxPageInfo));
         OnPropertyChanged(nameof(IsVideoVisible));
         OnPropertyChanged(nameof(IsUnsupportedVisible));
+        OnPropertyChanged(nameof(IsNeedsPasswordVisible));
         OnPropertyChanged(nameof(HasZoomControls));
         OnPropertyChanged(nameof(HasFontSizeControls));
         OnPropertyChanged(nameof(HasAnimationControls));
@@ -333,6 +347,8 @@ public partial class PreviewViewModel : ObservableObject
     [ObservableProperty]
     private System.Data.DataView? _csvData;
 
+    private bool EnterPasswordCommandCanExecute() => ShowPasswordDialog != null && CurrentPreviewFilePath != null && IsNeedsPasswordVisible;
+
     // ── PE ──
 
     [ObservableProperty]
@@ -381,6 +397,19 @@ public partial class PreviewViewModel : ObservableObject
     private System.Data.DataTable? _currentSqliteTable;
     /// <summary>供代码后置访问原始 DataTable 以设置 DataGrid 列。</summary>
     public System.Data.DataTable? CurrentSqliteTable => _currentSqliteTable;
+
+    /// <summary>当前正在预览的压缩包文件完整路径。</summary>
+    public string? CurrentPreviewFilePath
+    {
+        get => _lastPreviewFilePath;
+        set
+        {
+            if (SetProperty(ref _lastPreviewFilePath, value))
+            {
+                OnPropertyChanged(nameof(EnterPasswordCommandCanExecute));
+            }
+        }
+    }
 
     // ── DOCX ──
 
@@ -2613,6 +2642,19 @@ public partial class PreviewViewModel : ObservableObject
     }
 
     /// <summary>
+    /// 显示加密文件名压缩包需输入密码提示。
+    /// 显示锁图标 + "需输入密码预览" 文案 + "输入密码" 按钮。
+    /// </summary>
+    public void ShowNeedsPassword(string fileName)
+    {
+        TextContent = LocalizationManager.T("Preview_EncryptedFilename", fileName);
+        PreviewType = PreviewType.NeedsPassword;
+        IsPreviewVisible = true;
+        IsToolbarVisible = false;
+        // IsPasswordRequired = true; // 可选：用于 UI 绑定显示"输入密码"按钮
+    }
+
+    /// <summary>
     /// Phase 1 填充通用文件信息。只渲染通用 section，不碰格式 section。
     /// 格式 section 留空并设置 IsFormatPending=true，等 Phase 2 的 ShowXxx 填充。
     /// </summary>
@@ -2745,7 +2787,32 @@ public partial class PreviewViewModel : ObservableObject
         }
     }
 
+    // ── 预览面板「输入密码」按钮 ──
 
+    [RelayCommand(CanExecute = nameof(EnterPasswordCommandCanExecute))]
+    private async Task EnterPasswordCommandExecuted()
+    {
+        if (ShowPasswordDialog == null) return;
+
+        var response = await ShowPasswordDialog(CurrentPreviewFilePath);
+        if (response?.Password != null)
+        {
+            // 保存密码到会话缓存，后续自动重试
+            var sessionKey = GetSessionPasswordKey(CurrentPreviewFilePath, PreviewType.None);
+            SessionPasswordCache[sessionKey] = response.Password;
+
+            // 通知 MainWindowViewModel 用新密码重新触发预览
+            PasswordEntered?.Invoke();
+        }
+    }
+
+    private static string? GetSessionPasswordKey(string? filePath, PreviewType format)
+    {
+        return filePath != null ? $"{filePath}|{format}" : null;
+    }
+
+    /// <summary>会话级密码缓存，避免重复输入相同压缩包的密码。</summary>
+    internal static Dictionary<string, string> SessionPasswordCache { get; } = new();
 
 }
 

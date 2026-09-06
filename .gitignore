@@ -28,6 +28,8 @@ nul
 # Logs
 *.log
 debug.log
+build_log.txt
+build_output.txt
 
 # Test
 TestResults/
