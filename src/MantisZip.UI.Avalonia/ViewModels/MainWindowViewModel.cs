@@ -1000,8 +1000,9 @@ public partial class MainWindowViewModel : ObservableObject
 
                             if (dialogResponse.SavePermanently)
                             {
-                                _passwordService.TrySavePassword(password, path,
+                                var saved = _passwordService.TrySavePassword(password, path,
                                     dialogResponse.Patterns, dialogResponse.Description);
+                                App.DebugLog($"TrySavePassword (Phase B): savePermanently=true, result={saved}, path={path}");
                             }
 
                             UpdatePasswordStatus(isMatched: true);
@@ -1287,7 +1288,10 @@ public partial class MainWindowViewModel : ObservableObject
         _currentPasswordPatterns = response.Patterns is { Count: > 0 } ? response.Patterns.ToList() : null;
 
         if (response.SavePermanently)
-            _passwordService.TrySavePassword(response.Password, CurrentArchivePath, response.Patterns, response.Description);
+        {
+            var saved = _passwordService.TrySavePassword(response.Password, CurrentArchivePath, response.Patterns, response.Description);
+            App.DebugLog($"TrySavePassword (toolbar): savePermanently=true, result={saved}, path={CurrentArchivePath}");
+        }
 
         UpdatePasswordStatus(isMatched: true);
         StatusMessage = LocalizationManager.T("Status_PasswordMatched");

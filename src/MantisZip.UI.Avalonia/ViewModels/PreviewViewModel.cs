@@ -2809,11 +2809,18 @@ public partial class PreviewViewModel : ObservableObject
             // 持久化到密码库（用户勾选了"保存到密码库"）
             if (response.SavePermanently && PasswordService != null)
             {
-                PasswordService.TrySavePassword(
+                var saved = PasswordService.TrySavePassword(
                     response.Password,
                     CurrentPreviewFilePath,
                     response.Patterns,
                     response.Description);
+                System.Diagnostics.Debug.WriteLine(
+                    $"TrySavePassword (PreviewPanel): savePermanently=true, result={saved}, path={CurrentPreviewFilePath}");
+            }
+            else if (response.SavePermanently && PasswordService == null)
+            {
+                System.Diagnostics.Debug.WriteLine(
+                    $"TrySavePassword (PreviewPanel): savePermanently=true but PasswordService is NULL — cannot save");
             }
 
             // 通知 MainWindowViewModel 用新密码重新触发预览
