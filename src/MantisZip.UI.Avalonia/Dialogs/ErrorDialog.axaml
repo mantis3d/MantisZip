@@ -4,6 +4,7 @@
         x:CompileBindings="False"
         Title="{Binding WinTitle}"
         Width="420"
+        Topmost="True"
         WindowStartupLocation="CenterOwner"
         SizeToContent="Height"
         CanResize="False"

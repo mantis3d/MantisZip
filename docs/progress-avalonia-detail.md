@@ -6,6 +6,12 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-09-07** — ErrorDialog 设置 Topmost 避免被进度窗口遮挡
+  - **根因**：压缩过程文件读取错误（被占用等）弹出的重试/跳过/中止对话框被进度条窗口挡住、按钮无法点击。`ProgressWindow`（`Topmost="True"`）置顶显示时，`ErrorDialog` 未设 `Topmost`（Avalonia 迁移时丢失——WPF 版 `ErrorDialog.xaml` 本有 `Topmost="True"`），非 Topmost 对话框无法压过 Topmost 的进度窗口。对照 `CompressConflictDialog`/`ConflictDialog`（同为操作过程弹窗）均设 `Topmost="True"`，仅 ErrorDialog 遗漏
+  - **变更**：`Dialogs/ErrorDialog.axaml` 添加 `Topmost="True"`，与 WPF 版及两侧冲突对话框保持一致
+  - 涉及文件：`src/MantisZip.UI.Avalonia/Dialogs/ErrorDialog.axaml`
+  - 验证：`dotnet build` 0 错误（39 预存 warning）
+
 **2026-09-06** — 修复 AboutWindowTests 指向已废弃的 WPF 本地化路径
   - **根因**：`AboutWindowTests` 硬编码路径 `src\MantisZip.UI\Resources\strings.{zh,en}.json`（WPF 项目），迁移后源文件不存在；Avalonia 本地化位于 `src\MantisZip.UI.Avalonia\Localization\strings.{zh-CN,en}.json`
   - **变更**：
