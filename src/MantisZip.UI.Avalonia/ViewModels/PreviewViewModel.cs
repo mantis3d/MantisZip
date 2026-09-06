@@ -47,6 +47,11 @@ public partial class PreviewViewModel : ObservableObject
     /// </summary>
     public Action? PasswordEntered { get; set; }
 
+    /// <summary>
+    /// 由 MainWindowViewModel 设置，用于密码持久化（保存到密码库）。
+    /// </summary>
+    public PasswordService? PasswordService { get; set; }
+
     [ObservableProperty]
     private PreviewType _previewType = PreviewType.None;
 
@@ -2800,6 +2805,16 @@ public partial class PreviewViewModel : ObservableObject
             // 保存密码到会话缓存，后续自动重试
             var sessionKey = GetSessionPasswordKey(CurrentPreviewFilePath, PreviewType.None);
             SessionPasswordCache[sessionKey] = response.Password;
+
+            // 持久化到密码库（用户勾选了"保存到密码库"）
+            if (response.SavePermanently && PasswordService != null)
+            {
+                PasswordService.TrySavePassword(
+                    response.Password,
+                    CurrentPreviewFilePath,
+                    response.Patterns,
+                    response.Description);
+            }
 
             // 通知 MainWindowViewModel 用新密码重新触发预览
             PasswordEntered?.Invoke();

@@ -143,10 +143,13 @@ public class PasswordService
         try
         {
             PasswordManager.Instance.AddPassword(password, saveDesc, savePatterns);
+            System.Diagnostics.Debug.WriteLine(
+                $"TrySavePassword: saved (desc='{saveDesc}', patterns=[{string.Join("; ", savePatterns)}])");
             return true;
         }
-        catch
+        catch (Exception ex)
         {
+            System.Diagnostics.Debug.WriteLine($"TrySavePassword: failed: {ex.Message}");
             return false;
         }
     }

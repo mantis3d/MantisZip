@@ -131,6 +131,8 @@ public partial class MainWindow : Window
         vm.Preview.ShowPasswordDialog = vm.ShowPasswordDialog;
         // 密码输入成功后重新触发当前条目的预览
         vm.Preview.PasswordEntered = vm.RePreviewCurrentEntry;
+        // 预览面板密码持久化（保存到密码库）
+        vm.Preview.PasswordService = vm.PasswordService;
         // 工具栏「密码」按钮（已匹配态）：查看/复制当前压缩包的密码与规则
         vm.ShowMatchedPasswordDialog = async (entry, archiveName) =>
         {

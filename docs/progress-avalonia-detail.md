@@ -6,6 +6,17 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-09-05** — 修复「保存到密码库」不生效
+  - **根因**：
+    1. `PreviewViewModel.EnterPasswordCommandExecuted`（预览面板「输入密码」按钮）：用户在密码对话框勾选「保存到密码库」后，`SavePermanently`/`Patterns`/`Description` 字段被完全忽略——密码仅缓存到会话内存（`SessionPasswordCache`），从未调用 `TrySavePassword` 写入密码库
+    2. `PasswordService.TrySavePassword` 的 `catch` 块为裸 `catch`（无异常变量、无日志），静默吞掉所有异常（磁盘满、权限不足、AES-GCM 加密失败等），调用方亦不检查返回值
+  - **变更**：
+    - `PreviewViewModel.cs`：新增 `PasswordService` 属性（由 MainWindowViewModel 注入）；`EnterPasswordCommandExecuted` 在 `SavePermanently=true` 时调用 `TrySavePassword` 持久化
+    - `MainWindowViewModel.cs`：新增 `public PasswordService PasswordService` 属性（暴露私有 `_passwordService` 给预览面板使用）
+    - `MainWindow.axaml.cs`：在 `ShowPasswordDialog`/`PasswordEntered` 旁边新增 `vm.Preview.PasswordService = vm.PasswordService` 接线
+    - `PasswordService.cs`：`TrySavePassword` 的裸 `catch` 改为 `catch (Exception ex)` + `Debug.WriteLine` 日志，成功/失败路径均输出诊断信息
+  - **验证**：`dotnet build` 0 错误（39 预存 warning），`dotnet test` 301/301 通过
+
 **2026-09-04** — 纯图标按钮补齐 ToolTip + 全局显示延迟 100ms
   - **背景**：UI 功能补齐 27/29 中 2 项待 GUI 验证的其中之一——纯图标按钮（无文字标签、仅图标）此前多缺 ToolTip，用户悬停无提示。全量审计 33 个含按钮文件，定位 31 个缺失 ToolTip 的纯图标按钮
   - **变更**：

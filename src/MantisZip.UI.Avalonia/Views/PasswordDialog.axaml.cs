@@ -82,7 +82,6 @@ public partial class PasswordDialog : Window
                 PasswordBox.PasswordChar = '●';
                 SavePermanentlyCheck.IsChecked = true;
                 RememberCheck.IsChecked = true;
-                SaveOptionsPanel.IsVisible = true;
                 DescTextBox.Text = entry.Description ?? "";
                 PatternsTextBox.Text = string.Join(", ", entry.Patterns);
                 _isUpdatingPasswordSelection = false;
@@ -108,7 +107,7 @@ public partial class PasswordDialog : Window
 
     private void OnRememberChanged(object? sender, RoutedEventArgs e)
     {
-        SaveOptionsPanel.IsVisible = RememberCheck.IsChecked == true;
+        // 不记住会话时，取消勾选"保存到密码库"（持久化依赖会话记忆）
         if (RememberCheck.IsChecked != true)
         {
             SavePermanentlyCheck.IsChecked = false;

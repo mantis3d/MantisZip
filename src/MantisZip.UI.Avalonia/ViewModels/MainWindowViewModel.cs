@@ -178,6 +178,11 @@ public partial class MainWindowViewModel : ObservableObject
         => GetSessionPasswordKey(path, ArchiveFormatHelper.GetFormat(path));
 
     private readonly PasswordService _passwordService = new();
+
+    /// <summary>
+    /// 密码服务（供预览面板密码持久化使用）。
+    /// </summary>
+    public PasswordService PasswordService => _passwordService;
     private readonly AppSettings _appSettings = AppSettings.Load();
     private string? _currentPassword;
     private bool _hasEncryptedArchive;
