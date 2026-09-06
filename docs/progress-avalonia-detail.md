@@ -6,10 +6,13 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
-**2026-09-07** — ErrorDialog 设置 Topmost 避免被进度窗口遮挡
-  - **根因**：压缩过程文件读取错误（被占用等）弹出的重试/跳过/中止对话框被进度条窗口挡住、按钮无法点击。`ProgressWindow`（`Topmost="True"`）置顶显示时，`ErrorDialog` 未设 `Topmost`（Avalonia 迁移时丢失——WPF 版 `ErrorDialog.xaml` 本有 `Topmost="True"`），非 Topmost 对话框无法压过 Topmost 的进度窗口。对照 `CompressConflictDialog`/`ConflictDialog`（同为操作过程弹窗）均设 `Topmost="True"`，仅 ErrorDialog 遗漏
-  - **变更**：`Dialogs/ErrorDialog.axaml` 添加 `Topmost="True"`，与 WPF 版及两侧冲突对话框保持一致
-  - 涉及文件：`src/MantisZip.UI.Avalonia/Dialogs/ErrorDialog.axaml`
+**2026-09-07** — 操作期对话框 Topmost 补齐（ErrorDialog + Elevation 系列）
+  - **根因**：操作过程中弹出的对话框若未设 `Topmost="True"`，会被 `ProgressWindow`（`Topmost="True"`）遮挡无法点击。逐项审计 Avalonia 全部窗口类并按 WPF 版（98ca7d4 删除前）Topmost 设置对照，发现 4 个在迁移时丢失 `Topmost`：
+    - `ErrorDialog`（压缩文件读取错误重试/跳过/中止，在 ProgressWindow 存活期弹出）
+    - `ElevationDialog` / `ElevationFailedDialog` / `ElevationInfoDialog`（写保护目录提权确认/失败/信息，CI 解压运行期可能弹出，WPF 均为 `Topmost="True"`）
+  - 其余窗口（PasswordDialog / MatchedPasswordDialog / AppMessageBox / 各设置窗口等）WPF 与 Avalonia 均非 Topmost——它们在操作开始前/后弹出（无置顶窗口存活），保持不动，且全部经 `ShowDialog(owner)` 从属 owner 天然置于其上方
+  - **变更**：`Dialogs/{ErrorDialog, ElevationDialog, ElevationFailedDialog, ElevationInfoDialog}.axaml` 各添加 `Topmost="True"`（对照 WPF 版与 `CompressConflictDialog`/`ConflictDialog`）
+  - 涉及文件：`src/MantisZip.UI.Avalonia/Dialogs/{ErrorDialog, ElevationDialog, ElevationFailedDialog, ElevationInfoDialog}.axaml`
   - 验证：`dotnet build` 0 错误（39 预存 warning）
 
 **2026-09-06** — 修复 AboutWindowTests 指向已废弃的 WPF 本地化路径
