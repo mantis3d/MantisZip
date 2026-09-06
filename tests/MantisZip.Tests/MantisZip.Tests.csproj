@@ -21,7 +21,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\MantisZip.Core\MantisZip.Core.csproj" />
-    <ProjectReference Include="..\..\src\MantisZip.UI\MantisZip.UI.csproj" />
+    <ProjectReference Include="..\..\src\MantisZip.UI.Avalonia\MantisZip.UI.Avalonia.csproj" />
   </ItemGroup>
 
 </Project>

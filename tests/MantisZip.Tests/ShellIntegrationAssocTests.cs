@@ -1,4 +1,4 @@
-using MantisZip.UI;
+using MantisZip.UI.Avalonia.Services;
 using Xunit;
 
 namespace MantisZip.Tests;

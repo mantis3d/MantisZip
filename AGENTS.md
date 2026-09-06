@@ -2,17 +2,13 @@
 
 ## Project overview
 
-WPF→Avalonia 迁移中的压缩/解压桌面应用。当前存在两个 UI 项目并存：
+基于 Avalonia 的跨平台压缩/解压桌面应用。
 
-| 项目 | 框架 | 状态 | 目标 |
-|------|------|------|------|
-| `MantisZip.UI` | WPF (`net10.0-windows`) | 🟡 维护模式，迁移完成后废弃 | 遗留版本 |
-| `MantisZip.UI.Avalonia` | Avalonia (`net10.0`) | 🟢 主力开发 | 迁移目标，完成后废弃 WPF |
+| 项目 | 框架 | 状态 |
+|------|------|------|
+| `MantisZip.UI.Avalonia` | Avalonia (`net10.0`) | 🟢 主力开发 |
 
-三个项目共享：`MantisZip.Core` (class library) + `MantisZip.ShellExt` (COM 组件 class library)。
-
-**迁移完成后的计划**：
-- 废弃 `MantisZip.UI`（WPF）项目
+两个共享库：`MantisZip.Core` (class library) + `MantisZip.ShellExt` (COM 组件 class library)。
 
 ## Quick start
 
@@ -22,12 +18,6 @@ dotnet build src\MantisZip.UI.Avalonia\MantisZip.UI.Avalonia.csproj
 
 # 运行 Avalonia 版（Windows）
 dotnet run --project src\MantisZip.UI.Avalonia\MantisZip.UI.Avalonia.csproj
-
-# 构建 WPF 版（遗留）
-dotnet build src\MantisZip.UI\MantisZip.UI.csproj
-
-# 运行 WPF 版
-dotnet run --project src\MantisZip.UI\MantisZip.UI.csproj
 
 # Tests（Core 层测试，与 UI 框架无关）
 dotnet test tests\MantisZip.Tests\MantisZip.Tests.csproj
@@ -54,16 +44,11 @@ Avalonia 移植 Phases 0–10 已完成，当前处于功能补齐后期：
 ### 依赖流向
 
 ```
-                    ┌─── MantisZip.UI (WPF) ──reference──┐
-                    │   (net10.0-windows, 待废弃)          │
-                    │                                     │
-MantisZip.Core ──────┤                                     ├── MantisZip.ShellExt (COM)
-(net10.0)            │                                     │   (Explorer.exe 宿主)
-                    │   MantisZip.UI.Avalonia ──reference─┘
-                    │   (net10.0, 主力开发)
-                    │
-               ZipEngine    SevenZipEngine    TarGzEngine
-              (SharpCompress) (SharpSevenZip) (SharpCompress)
+MantisZip.Core ──────┬── MantisZip.UI.Avalonia ──reference── MantisZip.ShellExt (COM)
+(net10.0)            │   (net10.0, 主力开发)                  (Explorer.exe 宿主)
+                     │
+                ZipEngine    SevenZipEngine    TarGzEngine
+               (SharpCompress) (SharpSevenZip) (SharpCompress)
 ```
 
 ### Engine pattern (strategy + factory)
@@ -85,7 +70,6 @@ MantisZip.Core ──────┤                                     ├─�
 ### ArchiveItem duality
 
 - **Core**: `MantisZip.Core.Abstractions.ArchiveItem` — engines produce these
-- **WPF UI**: `MainWindow.xaml.cs` defines a subclass `ArchiveItem : Core.Abstractions.ArchiveItem` adding `DisplayName`, `SizeDisplay`, `NameDisplay`, `SortOrder`
 - **Avalonia UI**: `ArchiveItemModel` (Models/) wraps `ArchiveItem` with `IconSource`, display properties, `SizeRatio` (progress bar width), `SortOrder`
 
 ### Directory aggregation — ComputeDirectoryStats
@@ -122,13 +106,7 @@ MantisZip.Core ──────┤                                     ├─�
   - `DragDropService`（拖拽解压后）
 - **范围边界**：`ExtractArchiveHere`/`ExtractArchiveToName`（应用内）与 WPF 一致不开文件夹；WPF CLI `--extract-here`/`--extract-to-name` 批处理会打开（`App.Extract.cs:614-619`），Avalonia CLI 是否对齐见 `.omo/plans/cli-extract-open-folder.md`
 
-### UI 模式：项目间差异
-
-#### WPF（遗留版）：code-behind
-
-Despite using `CommunityToolkit.Mvvm`, **all logic lives in `MainWindow.xaml.cs`**. No ViewModel classes exist. The `FolderNode` class at the bottom of that file implements `INotifyPropertyChanged` for TreeView binding only.
-
-#### Avalonia（主力版）：MVVM
+### UI 模式：MVVM
 
 使用 `CommunityToolkit.Mvvm` 的 `ObservableObject` + source generators (`[ObservableProperty]`, `[RelayCommand]`)：
 
@@ -142,20 +120,6 @@ Despite using `CommunityToolkit.Mvvm`, **all logic lives in `MainWindow.xaml.cs`
 - 对话框通过 ViewModel 的回调委托（`ShowPasswordDialog`, `ShowExtractSettingsDialog` 等）与 View 解耦
 
 ### 预览子系统
-
-#### WPF 版（遗留）
-
-预览入口在 `MainWindow/Preview/` 的多个 partial 文件，code-behind 模式：
-
-- `MainWindow.Preview.cs` — 入口 + 格式分发
-- `MainWindow.Preview.Image.cs` — 图片/GIF（`WpfAnimatedGif`）
-- `MainWindow.Preview.Metadata.cs` — PE/PDF/字体/音视频等元数据
-- `MainWindow.Preview.Text.cs` — 文本/CSV
-- `MainWindow.Preview.Web.cs` — HTML/Markdown/SVG（WebView2）
-- WebView2 用于 HTML/Markdown/SVG/PDF 渲染（网络请求已拦截），Avalonia 版已移除 WPF 的 WebView2 依赖
-- `PreviewWebView2` 控件名
-
-#### Avalonia 版（主力）
 
 预览系统在独立的 `PreviewPanel.axaml` (UserControl) + `PreviewViewModel` + `PreviewService`，MVVM 模式：
 
@@ -183,11 +147,7 @@ Despite using `CommunityToolkit.Mvvm`, **all logic lives in `MainWindow.xaml.cs`
 
 ### 设置系统
 
-`AppSettings` singleton 存在于两个 UI 项目中，格式兼容但各自独立序列化：
-
-- **WPF**: `MantisZip.UI/AppSettings.cs` → `%LOCALAPPDATA%\MantisZip\settings.json`
-- **Avalonia**: `MantisZip.UI.Avalonia/Models/AppSettings.cs` → 相同路径
-- 两边的 `AppSettings` 字段定义保持同步
+`AppSettings` singleton 存在于 `MantisZip.UI.Avalonia/Models/AppSettings.cs`，序列化到 `%LOCALAPPDATA%\MantisZip\settings.json`。
 
 设置包含以下分类：
 - **压缩**: DefaultFormat (zip/7z/tar.gz), DefaultLevel (1–9), CloseAfterCompress, KeepOriginalExtension, ZipEncoding, ZipCompressionMethod, ZipEncryptionMethod, SevenZipCompressionMethod, SevenZipSolid, SevenZipSolidBlockSize, SevenZipDictionarySize, SevenZipNumFastBytes, SevenZipMatchFinder, SevenZipEncryptHeaders
@@ -197,17 +157,15 @@ Despite using `CommunityToolkit.Mvvm`, **all logic lives in `MainWindow.xaml.cs`
 - **上下文菜单**: EnableCompressMenu, EnableOpenMenu, EnableCascadingMenu, ShowMenuIcons, EnableSmartExtractMenu, EnableExtractHereMenu, EnableExtractToNamedMenu, EnableExtractToMenu, EnableCompressSeparate, EnableCompressCombined, EnableDynamicMenu
 - **预览**: EnableImagePreview, EnableTextPreview, MaxTextPreviewBytes, ShowPreviewPanel, ShowPreviewInfoPanel, TextPreviewFontSize, TextPreviewFontFamily, TextEncodingPreference, MaxTablePreviewRows, MaxTablePreviewCols, MaxPreviewFileSize, FontPreviewFontSize, FontPreviewSampleText, FontPreviewEnableLigature, PreviewPosition, InfoPanelOrientation, EnableFormatDetection, PreviewHeadSize
 - **密码管理**: ShowPasswordMatchNotification, PasswordRevealByDefault
-
-> 注：`UseColorEmoji` 为 WPF 专属设置（已确认废弃，Avalonia 采用 emoji→PathIcon 替代方案，不实现该开关）。
-- **外观（Avalonia 新增）**: Theme (Light/Dark), MaxRecentFiles, AppFontFamily, CompactnessMode (Compact/Normal/Loose), Language, ShowProgressBars, SeparateDirBaseline, AutoExpandTreeToCurrent（目录树自动展开）
+- **外观**: Theme (Light/Dark), MaxRecentFiles, AppFontFamily, CompactnessMode (Compact/Normal/Loose), Language, ShowProgressBars, SeparateDirBaseline, AutoExpandTreeToCurrent（目录树自动展开）
 - **文件关联（Avalonia 新增）**: AssocZip/7z/Rar/Tar/TarGz/Gz/Iso, CustomAssocExtensions
 - **收藏夹（Avalonia 新增）**: FavoritePaths (List<string>)
 - **调试**: EnableDebugLogging, LogPrivacyMode (off/filename/full)
 - **高级**: SevenZipPath, PreserveDirectoryRoot, CleanTempOnStartup
 
-### Shell integration（两项目均有）
+### Shell integration
 
-`ShellIntegration` (static class) 已移植到 Avalonia，两项目均实现。CLI 全部原生化（`--install-shell`/`--uninstall-shell` 等直接调用 ShellIntegration，不再委托 WPF exe）。
+`ShellIntegration` (static class) 实现 Windows Explorer 上下文菜单集成。CLI 全部原生化（`--install-shell`/`--uninstall-shell` 等直接调用 ShellIntegration）。
 
 安装 Windows Explorer 上下文菜单条目 via `HKCU\Software\Classes` — no admin required.
 
@@ -260,8 +218,6 @@ Open and Extract verbs use `AppliesTo` filter (archive extensions only). Icons v
 
 ### CLI entry points
 
-两套 UI 项目各自实现 CLI 入口，行为一致：
-
 | Argument | Behavior |
 |---|---|
 | `--install-shell` | Install context menu, then exit |
@@ -280,30 +236,11 @@ Open and Extract verbs use `AppliesTo` filter (archive extensions only). Icons v
 | `--test` | 启动自检：显示启动测试成功弹窗（含版本与安装目录），然后退出 |
 | _(no args)_ | Normal MainWindow launch |
 
-- **Avalonia**: `App.axaml.cs` `OnFrameworkInitializationCompleted` 中处理所有 CLI 路由
-- **WPF**: `App.OnStartup` + `AppPartials/App.Cli.cs` 等 partial 文件
+- `App.axaml.cs` `OnFrameworkInitializationCompleted` 中处理所有 CLI 路由
 
 ### System icon helper
 
-`SystemIconHelper` (WPF) / `IconService` + `IconProvider` (Avalonia) uses `SHGetFileInfo` (Windows Shell API) to retrieve 16x16 file type icons by extension. Supports virtual/nonexistent files via `SHGFI_USEFILEATTRIBUTES`. Results cached in `ConcurrentDictionary`. Folder icon support included. Used in file list to show native Windows icons for archive entries.
-
-## 迁移关键差异对照
-
-| 维度 | WPF (MantisZip.UI) | Avalonia (MantisZip.UI.Avalonia) |
-|------|-------------------|---------------------------------|
-| UI 模式 | Code-behind | MVVM (ObservableObject) |
-| 命名空间 | `System.Windows.*` | `Avalonia.*` |
-| XAML 扩展名 | `.xaml` | `.axaml` |
-| 数据绑定 | `{Binding}` | `{Binding}` + compiled bindings (`x:DataType`) |
-| 图片 | `BitmapImage` | `Avalonia.Media.Imaging.Bitmap` |
-| SVG | WebView2 | `Svg.Skia` → WriteableBitmap |
-| GIF | `WpfAnimatedGif` | 自实现 `GifDecoder` + `DispatcherTimer` |
-| 字体预览 | WPF GlyphTypeface + RenderTargetBitmap | HarfBuzzSharp + SkiaSharp 位图渲染 |
-| HTML/Markdown | WebView2 (Microsoft.Web.WebView2) | 双轨：`Avalonia.Controls.WebView`（各平台原生，Win/Mac/Linux 各不同后端），不可用时降级到 ReverseMarkdown → Markdig → 控件树 |
-| 对话框 | `Ookii.Dialogs.Wpf` | 原生 Avalonia + system dialogs |
-| DataGrid | `System.Windows.Controls.DataGrid` | `Avalonia.Controls.DataGrid` |
-| 主题资源 | `SolidColorBrush` 在 `Themes/Light.xaml` / `Dark.xaml` | 类似结构，但资源键名略有差异 |
-| 目标框架 | `net10.0-windows` | `net10.0` (跨平台就绪) |
+`IconService` + `IconProvider` uses `SHGetFileInfo` (Windows Shell API) to retrieve 16x16 file type icons by extension. Supports virtual/nonexistent files via `SHGFI_USEFILEATTRIBUTES`. Results cached in `ConcurrentDictionary`. Folder icon support included. Used in file list to show native Windows icons for archive entries.
 
 ## 关键注意事项
 
@@ -383,15 +320,6 @@ Triggered via `--extract-smart` CLI or smart extract context menu item.
 
 Implements the **7-Zip eager-extraction model**: extract files to temp before `DoDragDrop`, show `ProgressWindow` during extraction + drag.
 
-### WPF 版实现
-
-1. `FileListGrid_PreviewMouseMove` detects drag start (threshold: `MinimumHorizontalDragDistance`)
-2. Creates temp dir at `%TEMP%\MantisZip\DragDrop\{GUID}\`
-3. Opens `ProgressWindow` and extracts files (all engines supported: ZIP/7z via `ArchiveEntryExtractor`, Tar/Gz via `TarInputStream`)
-4. Creates standard `DataObject(FileDrop, paths)` — no custom `IDataObject`
-5. Sets `_isOwnDrag = true`, starts `DoDragDrop`, keeps ProgressWindow with "正在拖拽 — 放到目标位置以复制文件"
-6. After drop: closes ProgressWindow, cleans up temp dir, resets `_isOwnDrag = false`
-
 ### Own-window drop protection
 
 `_isOwnDrag` flag prevents `Window_Drop` from reacting to files dragged out of and back into the app window (the temp paths are meaningless for add-to-archive).
@@ -404,9 +332,9 @@ Uses `ArchiveItem.FullPath` for the output temp path so files from subdirectorie
 
 `ProgressWindow` provides cancel via `CancellationToken`. If cancelled before extraction finishes, `DoDragDrop` is skipped entirely.
 
-### Avalonia 版
+### Avalonia 实现
 
-已实施**拖拽直接解压**（方案见 [drag-drop-direct-extract.md](.omo/plans/drag-drop-direct-extract.md)），与 WPF 的 eager-extraction 模型不同，采用"拖拽即解压到目标目录"的实时模式：
+已实施**拖拽直接解压**（方案见 [drag-drop-direct-extract.md](.omo/plans/drag-drop-direct-extract.md)），采用"拖拽即解压到目标目录"的实时模式：
 
 1. `MainWindow.axaml.cs` 文件列表 `PointerPressed` 检测拖拽起点（列标题/空白按下不触发），选中项经 `DragDropItemExpander.ExpandItems` 展开为条目集
 2. `OverlayController`（纯 Win32 独立覆层，`UpdateLayeredWindow` 后台线程渲染）显示三色状态机（检测中/可释放/不可释放）+ 呼吸动画（拖拽预览弹窗 DragPreviewPopup 待实施：`DragPreviewBitmapBuilder` 位图构建与 `OverlayController.SetPreview` 槽位已就绪但无调用者）
@@ -416,21 +344,13 @@ Uses `ArchiveItem.FullPath` for the output temp path so files from subdirectorie
 
 ### 拖拽添加（drag-in to archive）
 
-已实施（方案见 [drag-add-overlay.md](.omo/plans/drag-add-overlay.md)）。与拖拽解压相反方向：从资源管理器拖文件/文件夹到 MantisZip 窗口 → 添加到当前压缩包。三分支拖入行为（对齐 WPF `Window_Drop`）：
+已实施（方案见 [drag-add-overlay.md](.omo/plans/drag-add-overlay.md)）。与拖拽解压相反方向：从资源管理器拖文件/文件夹到 MantisZip 窗口 → 添加到当前压缩包。三分支拖入行为：
 
 1. **已打开压缩包 + 拖入单个压缩包** → 切换打开
 2. **已打开压缩包 + 拖入文件/文件夹** → `Main_DragAddConfirm` 确认框（复用 `CompressConflict_Add` 标题）→ `MainWindowViewModel.AddFilesToArchiveAsync`（从 `AddFiles()` 抽取的公共方法：引擎获取、密码、`CreateExtractOptions` 冲突处理、`entryBasePath`、进度、刷新）
 3. **未打开压缩包**：拖入压缩包 → 打开；拖入非压缩包 → 打开 `CompressSettingsWindow` 预填源文件
 
 窗口内覆层 `DragAddOverlay`（方案 A：固定显示 `CurrentFolder`，跟随目录行悬停的方案 B 留作后续）：`DragOver`/`DragLeave` 事件驱动，Avalonia 原生 Border 覆层（不用 Win32 `OverlayController`，与拖拽解压的目标在外部 Explorer 窗口不同）；绿色 `#6BD46B` = 可添加「添加到 {CurrentFolder}」，红色 `#F43643` = 格式不支持（`DragEffects.None`）；呼吸动画与拖拽解压完全同参（`DispatcherTimer` 100ms + 正弦 `80+40·sin(tick·π/10)`，alpha 40-120 约 2s 周期，仅背景层 Opacity 呼吸、边框/文字不透明）+ 8px 同色边框 + 白色粗体文字 + ✓/⚠ 状态图标
-
-### Custom `IDataObject` attempt (archived)
-
-**Tried**: `System.Windows.IDataObject` (`DragDropDataObject` nested class) for delayed rendering — extraction in `GetData()` at drop time so ProgressWindow would show only after mouse release. **Result**: crashes Explorer.
-
-**Root cause**: WPF OLE bridge (`IComDataObject`) has an internal bug when converting `string[]` → `CF_HDROP` for non-`DataStore` `_innerData` implementations. Confirmed by WPF source code (v8.0.1). Not fixable from app side.
-
-**Status**: Abandoned. Code removed. Avalonia 迁移后不再依赖 WPF OLE 桥，此 bug 不复存在。
 
 ### Log privacy redaction
 
@@ -448,7 +368,7 @@ Four modes controlled by `AppSettings.LogPrivacyMode` (defaults to `"extension"`
 
 **Help dialog**: `LogPrivacyHelpDialog` opened from Settings → Debug tab's `[?]` button, matching the PasswordManager help dialog style.
 
-**Key files**: `Core/Utils/LogRedactor.cs` (framework-agnostic), `UI/LogPrivacyHelpDialog.xaml/.cs` (WPF), `UI.Avalonia/Dialogs/LogPrivacyHelpDialog.axaml/.cs` (Avalonia).
+**Key files**: `Core/Utils/LogRedactor.cs` (framework-agnostic), `UI.Avalonia/Dialogs/LogPrivacyHelpDialog.axaml/.cs` (Avalonia).
 
 ## Known issues (already fixed)
 
@@ -470,23 +390,16 @@ When releasing a new version, update the version string in ALL of these location
 
 | # | File | Line | Content |
 |---|------|------|---------|
-| 1 | `src/MantisZip.UI/AppConstants.cs` | `public const string Version = "x.y.z"` | WPF 版 |
-| 2 | `src/MantisZip.UI.Avalonia/AppConstants.cs` | `public const string Version = "x.y.z"` | Avalonia 版 |
-| 3 | `src/MantisZip.UI/MantisZip.UI.csproj` | `<Version>x.y.z</Version>` | WPF 版 assembly version |
-| 4 | `src/MantisZip.UI.Avalonia/MantisZip.UI.Avalonia.csproj` | `<Version>x.y.z</Version>` | Avalonia 版 assembly version |
-| 5 | `docs/PLAN.md` | `**当前版本**: x.y.z` | Plan document header |
-| 6 | `docs/PROGRESS.md` | `**当前版本**: x.y.z` | 顶部版本号（里程碑总览；细节版本号以 `progress-avalonia-detail.md` / `progress-wpf.md` 为准） |
-
-WPF 废弃后，#1 和 #3 将移除。
+| 1 | `src/MantisZip.UI.Avalonia/AppConstants.cs` | `public const string Version = "x.y.z"` | Avalonia 版 |
+| 2 | `src/MantisZip.UI.Avalonia/MantisZip.UI.Avalonia.csproj` | `<Version>x.y.z</Version>` | Avalonia 版 assembly version |
+| 3 | `docs/PLAN.md` | `**当前版本**: x.y.z` | Plan document header |
+| 4 | `docs/PROGRESS.md` | `**当前版本**: x.y.z` | 顶部版本号（里程碑总览；细节版本号以 `progress-avalonia-detail.md` 为准） |
 
 **Note:** `installer.iss` no longer requires manual version bumps. The release workflow (`release.yml`) passes the version from the git tag via `/dMyAppVersion=${{ env.VERSION }}` to ISCC at compile time. The `#define MyAppVersion` in `installer.iss` is wrapped in `#ifndef` and serves only as a fallback default for local builds — update it occasionally but it is no longer a release-blocking item.
 
 ## Build output
 
 ```powershell
-# WPF（遗留）
-src/MantisZip.UI/bin/Debug/net10.0-windows/MantisZip.UI.exe
-
 # Avalonia（主力）
 src/MantisZip.UI.Avalonia/bin/Debug/net10.0/MantisZip.UI.Avalonia.exe
 ```
@@ -523,23 +436,21 @@ Build artifacts (bin/, obj/) are gitignored.
 - **里程碑**（`docs/PROGRESS.md`）— 仅记录新功能上线、架构级变更、重大 bug 修复：
   - **Avalonia 版**（`### MantisZip.UI.Avalonia（主力版）`）— 按月分组（`#### 2026-08`），条目格式 `- **08-19** — 标题`（同月多条按从新到旧排列）
   - **共享层**（`### 共享层（Core / ShellExt / 构建）`）— 按版本分组（`#### v0.5.0`），条目格式同上
-  - **WPF 版**（`### MantisZip.UI（WPF 遗留版）`）— 只保留一行引用指向 `progress-wpf.md`，不在此追加
-- **细节**（`docs/progress-avalonia-detail.md` + `docs/progress-wpf.md`）— 逐条详细变更（小 bugfix / i18n / 样式 / 测试 / 计划类）：
+- **细节**（`docs/progress-avalonia-detail.md`）— 逐条详细变更（小 bugfix / i18n / 样式 / 测试 / 计划类）：
   - Avalonia + 共享层细节 → `progress-avalonia-detail.md`，Avalonia 以日期为标识（`**2026-07-16**`）、共享层以版本号为标识（`#### v0.x.x (2026-07-16)`）
-  - WPF 细节 → `progress-wpf.md`，以版本号为标识
   - 多条同一日期时按时间从晚到早排列（同一日期下最新的在最上方）
 
 通用规则：
 - 条目排序均是 **从新到旧**
 - 里程碑与细节同步追加：一次变更若属里程碑级，在 PROGRESS.md 对应月份/版本下加一行，同时其详细内容追加到细节文档
 - 如果本次变更属于某个已有规划任务，在该任务后标注进度
-- 如果变更涉及多个领域（例如 Core 引擎变更同时影响 WPF 和 Avalonia），在对应文档下各加一条
+- 如果变更涉及多个领域（例如 Core 引擎变更），在对应文档下各加一条
 
-### 规则 4：新 UI 控件必须应用主题样式（跨框架适用）
+### 规则 4：新 UI 控件必须应用主题样式
 
-新增任何 UI 控件（WPF 或 Avalonia），**必须显式设置主题样式键**，禁止使用系统默认颜色：
+新增任何 UI 控件，**必须显式设置主题样式键**，禁止使用系统默认颜色：
 
-#### Avalonia（主力—优先遵循）
+#### Avalonia
 - `Background` 绑定 `"{DynamicResource ThemeSurfaceBgBrush}"` 或对应语义色
 - `Foreground` 绑定 `"{DynamicResource ThemeTextPrimaryBrush}"` 或 `ThemeTextSecondaryBrush`
 - `BorderBrush` 绑定 `"{DynamicResource ThemeBorderBrush}"` 或 `ThemeBorderLightBrush`
@@ -745,14 +656,6 @@ dotnet test tests\MantisZip.Tests\MantisZip.Tests.csproj
 - `App.DebugLog` 日志与仅作控制流用的异常消息（非用户可见）
 
 ## 未来工作
-
-### 迁移完成后的清理
-
-1. **废弃 WPF 项目**: 删除 `src/MantisZip.UI/` 目录
-2. **清理 WebView 依赖**: `Avalonia.Controls.WebView` 保留为跨平台 WebView 抽象（Win→WebView2，Mac→WKWebView，Linux→WPE WebKit），不需要清理。仅在 WPF 废弃时清理 WPF 项目的 WebView2 引用。
-3. **Sln 文件更新**: 从解决方案中移除 WPF 项目
-4. **构建脚本更新**: 移除 WPF 构建命令
-5. **README 更新**: 更新为 WebView 跨平台说明（Win→WebView2，Mac→WKWebView，Linux→WPE WebKit，非 Windows 平台无需额外安装）
 
 ### 待实施计划
 
