@@ -107,11 +107,7 @@ public partial class PasswordDialog : Window
 
     private void OnRememberChanged(object? sender, RoutedEventArgs e)
     {
-        // 不记住会话时，取消勾选"保存到密码库"（持久化依赖会话记忆）
-        if (RememberCheck.IsChecked != true)
-        {
-            SavePermanentlyCheck.IsChecked = false;
-        }
+        // 「保存到密码库」与「记住会话中」完全独立——取消会话记忆不影响持久化保存
     }
 
     private void PasswordBox_KeyDown(object? sender, KeyEventArgs e)
@@ -126,7 +122,7 @@ public partial class PasswordDialog : Window
     {
         Password = PasswordBox.Text;
         RememberInSession = RememberCheck.IsChecked == true;
-        SavePermanently = SavePermanentlyCheck.IsChecked == true && RememberInSession;
+        SavePermanently = SavePermanentlyCheck.IsChecked == true;
         Description = SavePermanently ? DescTextBox.Text?.Trim() : null;
         var patternsText = SavePermanently ? PatternsTextBox.Text?.Trim() : null;
         Patterns = !string.IsNullOrEmpty(patternsText)
