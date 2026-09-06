@@ -362,3 +362,6 @@ MantisZip 是一款完全免费且独立开发的开源项目。如果它提升�
 
 > 💡 **小提示**：进群请备注 “GitHub / MantisZip”。
 
+## Star History
+
+[![Star History Chart](https://api.star-history.com/chart?repos=mantis3d/MantisZip&type=date&legend=top-left)](https://www.star-history.com/?repos=mantis3d%2FMantisZip&type=date&legend=top-left)
