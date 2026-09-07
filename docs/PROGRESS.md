@@ -132,62 +132,62 @@
 
 | 功能 | 设计文档 | 实现版本 |
 |------|----------|:--------:|
-| Avalonia: WPF 差异补齐总表（P0–P2 全部清零：双击行为/删除原包、便携模式（含 Temp 重定向）、文件过滤控件、默认路径优先级、信息面板持久化、智能打开路径（含 `ExtractArchive` 死代码修复）、冲突对话框暂停/取消、密码导入导出、收藏夹、Enable 设置、AllowElevation 等） | [avalonia-wpf-diff-plan.md](.omo/plans/avalonia-wpf-diff-plan.md) | v0.5.0 |
-| 添加到压缩包重名条目冲突处理（`AddConflictHelper` 条目名级解析、语义方向与解压相反：新数据更新/更大→覆盖；ZIP copy-mode `keepEntryNames` 排除被覆盖条目 + legacy Phase 2 应用解析结果；7z 覆盖经 `ModifyArchive`(index→null) 删除 + `CompressFileDictionary` Append 重加；Avalonia Ask 弹窗复用 ConflictDialog，新标题 key `AddConflict_Title`） | [add-archive-conflict-handling.md](.omo/plans/add-archive-conflict-handling.md) | v0.5.0 |
-| Avalonia 拖拽添加（`MainWindowViewModel.AddFilesToArchiveAsync` 抽取 + WPF `Window_Drop` 三分支移植：已打开+压缩包→切换打开 / 已打开+文件→确认框→添加到 `CurrentFolder` / 未打开→打开或 `CompressSettingsWindow` 预填 + `DragAddOverlay` 窗口内两色覆层（绿=可添加/红=格式不支持，呼吸动画对齐拖拽解压）+ 文件夹拖入支持） | [drag-add-overlay.md](.omo/plans/drag-add-overlay.md) | v0.5.0 |
-| 图片预览能力系统（`PreviewCapabilities` 能力注册表 [Flags]：Zoom/Transparency/FlattenAlpha/AnimationControls 取代 `HasXxxControls` 硬编码 + `PreviewType.Gif`→`AnimatedImage`（GIF/WebP 动画共用）+ GIF 透明棋盘格 + Animated WebP 分流（SKCodec `FrameCount>1`）） | [image-preview-capabilities.md](.omo/plans/image-preview-capabilities.md) | v0.5.0 |
-| 拖拽/右键解压流程统一（`SelectedItemsExtractService` 统一解压动作、`TarGzEngine` 按条目提取、冲突统一走设置 6 策略 + 统一 Ask 弹窗、拖拽路径语义与右键一致、`MapConflictActionString` 连字符映射漏洞修复） | [drag-extract-unify.md](.omo/plans/drag-extract-unify.md) | v0.4.5 |
-| 目录行聚合显示（`DirStats`+`ComputeDirectoryStats` 增加 `NewestModified`；Avalonia `ArchiveItemModel` 显示属性改派生计算属性 + `CompressedSizeAvailable`；`PopulateEntries` 基于过滤后 `filteredSource` 应用聚合） | [directory-size-date-aggregate.md](.omo/plans/directory-size-date-aggregate.md) | v0.4.5 |
-| 路径清单统一（A/B 数据集：预览=实际绝对一致，CompressPlan 唯一事实来源 + 压缩/解压过滤白名单 + IsBuildPending 按钮门禁） | [path-manifest-unification.md](.omo/plans/path-manifest-unification.md) | v0.4.5（⏳ 交互清单待用户 GUI 验证） |
-| 统一路径快捷选择（WPF QuickPathControl + 数据层；Avalonia 演进为 Tab 式速选面板 + CustomFilePickerDialog，QuickPathBuddy 概念并入 Tab+搜索一体化，QuickPathPreDialog 过渡方案废弃） | [quickpath-unified.md](.omo/plans/archived/quickpath-unified.md)（已归档，Avalonia 部分被 [quickpath-control-redesign.md](.omo/plans/quickpath-control-redesign.md) 取代） | v0.4.3+（Avalonia 演进 v0.4.5） |
+| Avalonia: WPF 差异补齐总表（P0–P2 全部清零：双击行为/删除原包、便携模式（含 Temp 重定向）、文件过滤控件、默认路径优先级、信息面板持久化、智能打开路径（含 `ExtractArchive` 死代码修复）、冲突对话框暂停/取消、密码导入导出、收藏夹、Enable 设置、AllowElevation 等） | [avalonia-wpf-diff-plan.md](.omo/plans/已完成/avalonia-wpf-diff-plan.md) | v0.5.0 |
+| 添加到压缩包重名条目冲突处理（`AddConflictHelper` 条目名级解析、语义方向与解压相反：新数据更新/更大→覆盖；ZIP copy-mode `keepEntryNames` 排除被覆盖条目 + legacy Phase 2 应用解析结果；7z 覆盖经 `ModifyArchive`(index→null) 删除 + `CompressFileDictionary` Append 重加；Avalonia Ask 弹窗复用 ConflictDialog，新标题 key `AddConflict_Title`） | [add-archive-conflict-handling.md](.omo/plans/已完成/add-archive-conflict-handling.md) | v0.5.0 |
+| Avalonia 拖拽添加（`MainWindowViewModel.AddFilesToArchiveAsync` 抽取 + WPF `Window_Drop` 三分支移植：已打开+压缩包→切换打开 / 已打开+文件→确认框→添加到 `CurrentFolder` / 未打开→打开或 `CompressSettingsWindow` 预填 + `DragAddOverlay` 窗口内两色覆层（绿=可添加/红=格式不支持，呼吸动画对齐拖拽解压）+ 文件夹拖入支持） | [drag-add-overlay.md](.omo/plans/已完成/drag-add-overlay.md) | v0.5.0 |
+| 图片预览能力系统（`PreviewCapabilities` 能力注册表 [Flags]：Zoom/Transparency/FlattenAlpha/AnimationControls 取代 `HasXxxControls` 硬编码 + `PreviewType.Gif`→`AnimatedImage`（GIF/WebP 动画共用）+ GIF 透明棋盘格 + Animated WebP 分流（SKCodec `FrameCount>1`）） | [image-preview-capabilities.md](.omo/plans/已完成/image-preview-capabilities.md) | v0.5.0 |
+| 拖拽/右键解压流程统一（`SelectedItemsExtractService` 统一解压动作、`TarGzEngine` 按条目提取、冲突统一走设置 6 策略 + 统一 Ask 弹窗、拖拽路径语义与右键一致、`MapConflictActionString` 连字符映射漏洞修复） | [drag-extract-unify.md](.omo/plans/已完成/drag-extract-unify.md) | v0.4.5 |
+| 目录行聚合显示（`DirStats`+`ComputeDirectoryStats` 增加 `NewestModified`；Avalonia `ArchiveItemModel` 显示属性改派生计算属性 + `CompressedSizeAvailable`；`PopulateEntries` 基于过滤后 `filteredSource` 应用聚合） | [directory-size-date-aggregate.md](.omo/plans/已完成/directory-size-date-aggregate.md) | v0.4.5 |
+| 路径清单统一（A/B 数据集：预览=实际绝对一致，CompressPlan 唯一事实来源 + 压缩/解压过滤白名单 + IsBuildPending 按钮门禁） | [path-manifest-unification.md](.omo/plans/已归档/path-manifest-unification.md) | v0.4.5（⏳ 交互清单待用户 GUI 验证） |
+| 统一路径快捷选择（WPF QuickPathControl + 数据层；Avalonia 演进为 Tab 式速选面板 + CustomFilePickerDialog，QuickPathBuddy 概念并入 Tab+搜索一体化，QuickPathPreDialog 过渡方案废弃） | [quickpath-unified.md](.omo/plans/已归档/quickpath-unified.md)（已归档，Avalonia 部分被 [quickpath-control-redesign.md](.omo/plans/已归档/quickpath-control-redesign.md) 取代） | v0.4.3+（Avalonia 演进 v0.4.5） |
 | QuickPathPicker 自包含路径速选控件（Compress/Extract/Settings 三宿主，AutoCompleteBox 补全 + ⭐🕐🪟 浮层 + 目录归一化，浏览器差异经注入委托） | [2026-08-03-quickpath-picker.md](docs/superpowers/plans/2026-08-03-quickpath-picker.md) + [设计](docs/superpowers/specs/2026-08-03-quickpath-picker-design.md) | v0.4.5（⏳ 待用户 GUI 验证） |
-| 文件选择器多选（PickItems 模式：勾选累积 + 跨目录保留 + 右栏已选面板；CompressSettingsWindow 合并「添加文件/文件夹」单按钮） | [file-picker-multi-select.md](.omo/plans/file-picker-multi-select.md) | v0.4.5 |
-| 可排序的默认路径优先级（文件选择器初始路径 context/explorer/recent/custom） | [path-priority-sortable.md](.omo/plans/path-priority-sortable.md) | v0.4.5 |
-| 解压路径统一（`ExtractEntriesAsync` + `pathOverrides`，单一事实源 `ExtractPathResolver`） | [extract-path-unification.md](.omo/plans/extract-path-unification.md) | v0.4.5 |
-| 移除 WebView2 依赖（Markdown/HTML/PDF 跨平台预览） | [remove-webview2-preview.md](.omo/plans/remove-webview2-preview.md) | v0.4.5 |
-| 便携版模式 | [portable-mode.md](.omo/plans/portable-mode.md) | v0.4.5 |
-| 文件冲突对话框暂停/取消 | [conflict-dialog-pause-cancel.md](.omo/plans/conflict-dialog-pause-cancel.md) | v0.4.5 |
-| 压缩选项增强（7z/ZIP 格式参数扩展） | [compression-options-enhancement.md](.omo/plans/compression-options-enhancement.md) | v0.4.5 |
-| 上下文工具栏重构（目录树+文件列表） | [context-toolbars.md](.omo/plans/context-toolbars.md) | v0.4.5 |
-| 解压/压缩结果预览面板 | [result-preview-panel.md](.omo/plans/result-preview-panel.md) | v0.4.5 |
-| 元数据信息面板可配置 | [metadata-panel-configurable.md](.omo/plans/metadata-panel-configurable.md) | v0.4.5 |
-| 紧凑度模式（Compactness Mode） | [compactness-mode.md](.omo/plans/compactness-mode.md) | v0.4.5 |
-| 预览两阶段加载（信息栏+内容分离） | [preview-two-phase-loading.md](.omo/plans/preview-two-phase-loading.md) | v0.4.5 |
-| Avalonia: Shell/COM 集成移植 | [avalonia-shell-com-integration.md](.omo/plans/avalonia-shell-com-integration.md) | v0.4.5 |
-| Avalonia Phase 10: WPF 功能补齐 | [avalonia-phase10-feature-parity.md](.omo/plans/avalonia-phase10-feature-parity.md) | v0.4.5 |
-| Avalonia: i18n 补齐 + 杂物清理 | [avalonia-i18n-and-cleanup.md](.omo/plans/avalonia-i18n-and-cleanup.md) | v0.4.5 |
-| 压缩解压文件筛选 | [file-filter-feature.md](.omo/plans/file-filter-feature.md) | v0.4.5 |
-| emoji 替换为 Fluent UI PathIcon + 文件列表行图标改用系统原生 | [emoji-to-pathicon.md](.omo/plans/emoji-to-pathicon.md) | v0.4.5 |
-| 双击行为 + 解压后删原包 | [doubleclick-extract-settings.md](.omo/plans/doubleclick-extract-settings.md) | v0.4.4+ |
-| 魔数检测文件真实格式 | [preview-magic-detection.md](.omo/plans/preview-magic-detection.md) | v0.4.4 |
-| 密码流程统一 | [password-flow-unification.md](.omo/plans/password-flow-unification.md) | v0.4.4 |
-| 字体预览连字效果开关（HarfBuzzSharp shaping + `CheckFontSupportsLigature` 连字检测 + `IsLigatureEnabled`/`ToggleLigature` 命令 + `CanLigatureToggle` 灰禁用 + 工具栏按钮 + `FontPreviewEnableLigature` 持久化） | [font-preview-ligature.md](.omo/plans/font-preview-ligature.md) | v0.4.4 |
-| 致谢贡献者名单 | [contributors-panel.md](.omo/plans/contributors-panel.md) | v0.4.3+ |
-| 安装程序 .NET 9 自动下载 | [installer-dotnet-autodownload.md](.omo/plans/installer-dotnet-autodownload.md) | v0.4.3+ |
-| 预览格式扩展（12 种元数据格式） | [preview-extended-formats.md](.omo/plans/preview-extended-formats.md) | v0.3.0 |
-| 快速压缩拆分为独立/合并两项 | [split-compress.md](.omo/plans/split-compress.md) | v0.2.10 |
-| 加载大文件 overlay | [archive-loading-progress.md](.omo/plans/archive-loading-progress.md) | v0.3.1 |
-| 添加到/从压缩包删除 | [archive-add-delete.md](.omo/plans/archive-add-delete.md) | v0.2.9 |
-| 暗色/亮色主题 | [dark-theme.md](.omo/plans/dark-theme.md) | v0.2.9 |
-| 日志隐私脱敏 | [log-privacy-redaction.md](.omo/plans/log-privacy-redaction.md) | v0.2.8 |
-| 国际化 (i18n) | [i18n-localization.md](.omo/plans/i18n-localization.md) | v0.2.8 |
-| 智能解压 (Smart Extract) | [smart-extract.md](.omo/plans/smart-extract.md) | v0.2.10 |
-| 文件列表筛选/搜索 | [file-list-filter-search.md](.omo/plans/file-list-filter-search.md) | v0.3.8 |
-| 引擎统一 (SharpZipLib→SharpCompress + 7z.exe→SharpSevenZip) | [engine-unification-sharpcompress.md](.omo/plans/engine-unification-sharpcompress.md) | v0.3.4 |
-| 文件大小进度条 | [file-size-progress-bar.md](.omo/plans/file-size-progress-bar.md) | v0.3.4 |
-| PNG 透明通道控制 | [png-transparency-3way.md](.omo/plans/png-transparency-3way.md) | v0.3.4+ |
-| 批量进度文件列表 | [batch-progress-list.md](.omo/plans/batch-progress-list.md) | v0.3.5 |
-| 解压配置面板 (ExtractSettingsWindow) | [extract-settings-window.md](.omo/plans/extract-settings-window.md) | v0.3.6 |
-| COM 右键菜单 | [com-context-menu.md](.omo/plans/com-context-menu.md) | v0.3.7 |
-| COM 迁移映射表 | [com-migration-mapping.md](.omo/plans/com-migration-mapping.md) | v0.3.7（辅助文档） |
-| 压缩窗口密码 Tab 重设计 | [design-compress-password-tab.md](.omo/plans/design-compress-password-tab.md) | v0.3.7-refined-2 |
-| 关于窗口重设计 | [about-window-redesign.md](.omo/plans/about-window-redesign.md) | v0.3.7-refined-4 |
-| 文件关联 per-extension ProgId | [file-assoc-per-extension.md](.omo/plans/file-assoc-per-extension.md) | v0.3.9 |
-| 移除 SharpZipLib 注释编辑耦合 | [remove-sharpziplib.md](.omo/plans/remove-sharpziplib.md) | v0.3.9 |
-| ZipEngine SharpZipLib 完全迁移 (加密路径→SharpSevenZip) | [zipengine-sharpcompress-migration.md](.omo/plans/zipengine-sharpcompress-migration.md) | v0.3.13 |
-| 压缩流程统一化 (CompressService) | [compress-service-unify.md](.omo/plans/compress-service-unify.md) | v0.4.0 |
-| 发布 Release | [release-automation.md](.omo/plans/release-automation.md) | v0.4.0 |
-| 返回上级目录 (.. 导航行) | [parent-directory-entry.md](.omo/plans/parent-directory-entry.md) | v0.4.0 |
-| ZIP 压缩流直拷优化 (ZipBinaryRewriter) | [zip-copy-mode-optimization.md](.omo/plans/zip-copy-mode-optimization.md) | v0.4.2 |
-| UAC 提权 + 权限不足处理 | [uac-elevation-permission.md](.omo/plans/uac-elevation-permission.md) | v0.4.2 |
-| 自包含安装包发布 | [self-contained-installer.md](.omo/plans/self-contained-installer.md) | v0.4.2 |
+| 文件选择器多选（PickItems 模式：勾选累积 + 跨目录保留 + 右栏已选面板；CompressSettingsWindow 合并「添加文件/文件夹」单按钮） | [file-picker-multi-select.md](.omo/plans/已完成/file-picker-multi-select.md) | v0.4.5 |
+| 可排序的默认路径优先级（文件选择器初始路径 context/explorer/recent/custom） | [path-priority-sortable.md](.omo/plans/已完成/path-priority-sortable.md) | v0.4.5 |
+| 解压路径统一（`ExtractEntriesAsync` + `pathOverrides`，单一事实源 `ExtractPathResolver`） | [extract-path-unification.md](.omo/plans/已完成/extract-path-unification.md) | v0.4.5 |
+| 移除 WebView2 依赖（Markdown/HTML/PDF 跨平台预览） | [remove-webview2-preview.md](.omo/plans/已完成/remove-webview2-preview.md) | v0.4.5 |
+| 便携版模式 | [portable-mode.md](.omo/plans/已完成/portable-mode.md) | v0.4.5 |
+| 文件冲突对话框暂停/取消 | [conflict-dialog-pause-cancel.md](.omo/plans/已完成/conflict-dialog-pause-cancel.md) | v0.4.5 |
+| 压缩选项增强（7z/ZIP 格式参数扩展） | [compression-options-enhancement.md](.omo/plans/已完成/compression-options-enhancement.md) | v0.4.5 |
+| 上下文工具栏重构（目录树+文件列表） | [context-toolbars.md](.omo/plans/已完成/context-toolbars.md) | v0.4.5 |
+| 解压/压缩结果预览面板 | [result-preview-panel.md](.omo/plans/已完成/result-preview-panel.md) | v0.4.5 |
+| 元数据信息面板可配置 | [metadata-panel-configurable.md](.omo/plans/已完成/metadata-panel-configurable.md) | v0.4.5 |
+| 紧凑度模式（Compactness Mode） | [compactness-mode.md](.omo/plans/已完成/compactness-mode.md) | v0.4.5 |
+| 预览两阶段加载（信息栏+内容分离） | [preview-two-phase-loading.md](.omo/plans/已完成/preview-two-phase-loading.md) | v0.4.5 |
+| Avalonia: Shell/COM 集成移植 | [avalonia-shell-com-integration.md](.omo/plans/已完成/avalonia-shell-com-integration.md) | v0.4.5 |
+| Avalonia Phase 10: WPF 功能补齐 | [avalonia-phase10-feature-parity.md](.omo/plans/已完成/avalonia-phase10-feature-parity.md) | v0.4.5 |
+| Avalonia: i18n 补齐 + 杂物清理 | [avalonia-i18n-and-cleanup.md](.omo/plans/已完成/avalonia-i18n-and-cleanup.md) | v0.4.5 |
+| 压缩解压文件筛选 | [file-filter-feature.md](.omo/plans/已完成/file-filter-feature.md) | v0.4.5 |
+| emoji 替换为 Fluent UI PathIcon + 文件列表行图标改用系统原生 | [emoji-to-pathicon.md](.omo/plans/已完成/emoji-to-pathicon.md) | v0.4.5 |
+| 双击行为 + 解压后删原包 | [doubleclick-extract-settings.md](.omo/plans/已完成/doubleclick-extract-settings.md) | v0.4.4+ |
+| 魔数检测文件真实格式 | [preview-magic-detection.md](.omo/plans/已完成/preview-magic-detection.md) | v0.4.4 |
+| 密码流程统一 | [password-flow-unification.md](.omo/plans/已完成/password-flow-unification.md) | v0.4.4 |
+| 字体预览连字效果开关（HarfBuzzSharp shaping + `CheckFontSupportsLigature` 连字检测 + `IsLigatureEnabled`/`ToggleLigature` 命令 + `CanLigatureToggle` 灰禁用 + 工具栏按钮 + `FontPreviewEnableLigature` 持久化） | [font-preview-ligature.md](.omo/plans/已完成/font-preview-ligature.md) | v0.4.4 |
+| 致谢贡献者名单 | [contributors-panel.md](.omo/plans/已完成/contributors-panel.md) | v0.4.3+ |
+| 安装程序 .NET 9 自动下载 | [installer-dotnet-autodownload.md](.omo/plans/已完成/installer-dotnet-autodownload.md) | v0.4.3+ |
+| 预览格式扩展（12 种元数据格式） | [preview-extended-formats.md](.omo/plans/已完成/preview-extended-formats.md) | v0.3.0 |
+| 快速压缩拆分为独立/合并两项 | [split-compress.md](.omo/plans/已完成/split-compress.md) | v0.2.10 |
+| 加载大文件 overlay | [archive-loading-progress.md](.omo/plans/已完成/archive-loading-progress.md) | v0.3.1 |
+| 添加到/从压缩包删除 | [archive-add-delete.md](.omo/plans/已完成/archive-add-delete.md) | v0.2.9 |
+| 暗色/亮色主题 | [dark-theme.md](.omo/plans/已完成/dark-theme.md) | v0.2.9 |
+| 日志隐私脱敏 | [log-privacy-redaction.md](.omo/plans/已完成/log-privacy-redaction.md) | v0.2.8 |
+| 国际化 (i18n) | [i18n-localization.md](.omo/plans/已完成/i18n-localization.md) | v0.2.8 |
+| 智能解压 (Smart Extract) | [smart-extract.md](.omo/plans/已完成/smart-extract.md) | v0.2.10 |
+| 文件列表筛选/搜索 | [file-list-filter-search.md](.omo/plans/已完成/file-list-filter-search.md) | v0.3.8 |
+| 引擎统一 (SharpZipLib→SharpCompress + 7z.exe→SharpSevenZip) | [engine-unification-sharpcompress.md](.omo/plans/已完成/engine-unification-sharpcompress.md) | v0.3.4 |
+| 文件大小进度条 | [file-size-progress-bar.md](.omo/plans/已完成/file-size-progress-bar.md) | v0.3.4 |
+| PNG 透明通道控制 | [png-transparency-3way.md](.omo/plans/已完成/png-transparency-3way.md) | v0.3.4+ |
+| 批量进度文件列表 | [batch-progress-list.md](.omo/plans/已完成/batch-progress-list.md) | v0.3.5 |
+| 解压配置面板 (ExtractSettingsWindow) | [extract-settings-window.md](.omo/plans/已完成/extract-settings-window.md) | v0.3.6 |
+| COM 右键菜单 | [com-context-menu.md](.omo/plans/已完成/com-context-menu.md) | v0.3.7 |
+| COM 迁移映射表 | [com-migration-mapping.md](.omo/plans/已完成/com-migration-mapping.md) | v0.3.7（辅助文档） |
+| 压缩窗口密码 Tab 重设计 | [design-compress-password-tab.md](.omo/plans/已完成/design-compress-password-tab.md) | v0.3.7-refined-2 |
+| 关于窗口重设计 | [about-window-redesign.md](.omo/plans/已完成/about-window-redesign.md) | v0.3.7-refined-4 |
+| 文件关联 per-extension ProgId | [file-assoc-per-extension.md](.omo/plans/已完成/file-assoc-per-extension.md) | v0.3.9 |
+| 移除 SharpZipLib 注释编辑耦合 | [remove-sharpziplib.md](.omo/plans/已完成/remove-sharpziplib.md) | v0.3.9 |
+| ZipEngine SharpZipLib 完全迁移 (加密路径→SharpSevenZip) | [zipengine-sharpcompress-migration.md](.omo/plans/已完成/zipengine-sharpcompress-migration.md) | v0.3.13 |
+| 压缩流程统一化 (CompressService) | [compress-service-unify.md](.omo/plans/已完成/compress-service-unify.md) | v0.4.0 |
+| 发布 Release | [release-automation.md](.omo/plans/已完成/release-automation.md) | v0.4.0 |
+| 返回上级目录 (.. 导航行) | [parent-directory-entry.md](.omo/plans/已完成/parent-directory-entry.md) | v0.4.0 |
+| ZIP 压缩流直拷优化 (ZipBinaryRewriter) | [zip-copy-mode-optimization.md](.omo/plans/已完成/zip-copy-mode-optimization.md) | v0.4.2 |
+| UAC 提权 + 权限不足处理 | [uac-elevation-permission.md](.omo/plans/已完成/uac-elevation-permission.md) | v0.4.2 |
+| 自包含安装包发布 | [self-contained-installer.md](.omo/plans/已完成/self-contained-installer.md) | v0.4.2 |

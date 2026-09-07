@@ -104,7 +104,7 @@ MantisZip.Core ──────┬── MantisZip.UI.Avalonia ──reference
   - `MainWindowViewModel.OpenExtractedFolderAsync`（选中条目解压后，`ExtractSelectedEntriesCoreAsync` 调用）
   - `MainWindowViewModel.ExtractArchive`（主对话框全量解压后，按 `OpenFolderAfterExtract` 开关调用——曾因死代码从不打开，已修复）
   - `DragDropService`（拖拽解压后）
-- **范围边界**：`ExtractArchiveHere`/`ExtractArchiveToName`（应用内）与 WPF 一致不开文件夹；WPF CLI `--extract-here`/`--extract-to-name` 批处理会打开（`App.Extract.cs:614-619`），Avalonia CLI 是否对齐见 `.omo/plans/cli-extract-open-folder.md`
+- **范围边界**：`ExtractArchiveHere`/`ExtractArchiveToName`（应用内）与 WPF 一致不开文件夹；WPF CLI `--extract-here`/`--extract-to-name` 批处理会打开（`App.Extract.cs:614-619`），Avalonia CLI 是否对齐见 `.omo/plans/未开始/cli-extract-open-folder.md`
 
 ### UI 模式：MVVM
 
@@ -125,7 +125,7 @@ MantisZip.Core ──────┬── MantisZip.UI.Avalonia ──reference
 
 - **预览类型枚举**: `PreviewType` (Services/PreviewService.cs): `None`, `Text`, `Csv`, `Pe`, `Image`, `AnimatedImage`（GIF / Animated WebP 共用，`Gif` 保留但废弃），`Svg`, `Font`, `Audio`, `Sqlite`, `Iso`, `Torrent`, `Office`, `Docx`, `Xlsx`, `Pptx`, `Video`, `Html`, `Markdown`, `Pdf`, `IcoGallery`, `Unsupported`
 - **格式分发**: `PreviewService.ClassifyPreviewByMagicAsync()`（魔数优先）→ `PreviewViewModel.ShowXxx(filePath)` 方法，扩展名回退
-- **HTML/Markdown**: 当前 HTML 走 ReverseMarkdown → Markdig → 原生控件树，Markdown 直接 Markdig AST → 控件树。**计划恢复 WebView 双轨方案**：`Avalonia.Controls.WebView`（各平台原生引擎，Win→WebView2, Mac→WKWebView, Linux→WebKit GTK），不可用时降级到 ReverseMarkdown（详见 `.omo/plans/html-preview-webview-fallback.md`）
+- **HTML/Markdown**: 当前 HTML 走 ReverseMarkdown → Markdig → 原生控件树，Markdown 直接 Markdig AST → 控件树。**计划恢复 WebView 双轨方案**：`Avalonia.Controls.WebView`（各平台原生引擎，Win→WebView2, Mac→WKWebView, Linux→WebKit GTK），不可用时降级到 ReverseMarkdown（详见 `.omo/plans/未开始/html-preview-webview-fallback.md`）
 - **PDF**: `UglyToad.PdfPig` + `SkiaSharp` 逐页位图渲染 + 翻页导航（PdfPig 0.1.15 + PdfPig.Rendering.Skia 0.1.15.4）
 - **ICO 画廊**: 自实现 `IcoParser` 提取全部多帧，`WrapPanel` 画廊布局，FlattenAlpha 切换，透明背景棋盘格
 - **SVG**: `Svg.Skia` 直接栅格化 → `WriteableBitmap`（无需 WebView2）
@@ -135,7 +135,7 @@ MantisZip.Core ──────┬── MantisZip.UI.Avalonia ──reference
 - **预览能力注册表**: `PreviewCapabilities`（[Flags] `PreviewCapability`：Zoom/Transparency/FlattenAlpha/AnimationControls，对齐 MetadataRegistry 模式）按 PreviewType 声明能力，`HasZoomControls`/`HasTransparencyControls`/`HasFlattenAlphaControls`/`HasAnimationControls` 全部查表取代 `HasXxxControls` 硬编码；新增格式注册能力即可复用工具栏
 - **两阶段加载**: `ShowPreviewAsync` 拆分 Phase 1（同步显示加载状态+弹跳点动画+信息栏）→ Phase 2（异步提取后显示内容），`_previewLoadVersion` 版本号守卫防竞态
 - **透明背景切换**: 图片/GIF/ICO 预览的 `DrawingBrush` 棋盘格（8×8），`IsTransparencyBgShown` 绑定 🏁 按钮
-- **信息面板（可配置元数据系统）**: 已从硬编码 `FormatMetadata` 重构为可配置系统（方案见 [metadata-panel-configurable.md](.omo/plans/metadata-panel-configurable.md)）：
+- **信息面板（可配置元数据系统）**: 已从硬编码 `FormatMetadata` 重构为可配置系统（方案见 [metadata-panel-configurable.md](.omo/plans/已完成/metadata-panel-configurable.md)）：
   - **存储**: `MetadataSettingsManager` 持久化到独立 `%LOCALAPPDATA%\MantisZip\metadata-panel.json`（与 AppSettings 同目录不同文件），`SettingsChanged` 事件驱动刷新，`InitializeDefaultConfig` 自动补齐注册类型默认配置
   - **注册与渲染**: `MetadataRegistry`（字段键/显示名/分类注册表）→ `MetadataRenderEngine.RenderCommon/RenderFormat` 按 `MetadataPanelSettings`（`TypeMetadataConfig.Enabled` + `FieldConfig.Position`(infoPanel/contentTop/hidden)/`Order`/`Row`）将字段分发到信息栏（`CommonSections`/`FormatSections` 分区渲染，`SectionOrder` 控制上下）与内容区顶部横条（`ContentTopItems`，随内容滚动）；PE 的旧 `PeTitle`/`PeSubtitle` 已被新系统替代
   - **接线**: `MetadataHelper.RenderCommonToViewModel/RenderFormatToViewModel` 供 `PreviewViewModel` 调用，同时同步 `FormatMetadata` 向后兼容；`UpdateCommonMetadata`（Phase 1）→ `ShowXxx`（Phase 2）两阶段填充
@@ -334,7 +334,7 @@ Uses `ArchiveItem.FullPath` for the output temp path so files from subdirectorie
 
 ### Avalonia 实现
 
-已实施**拖拽直接解压**（方案见 [drag-drop-direct-extract.md](.omo/plans/drag-drop-direct-extract.md)），采用"拖拽即解压到目标目录"的实时模式：
+已实施**拖拽直接解压**（方案见 [drag-drop-direct-extract.md](.omo/plans/未开始/drag-drop-direct-extract.md)），采用"拖拽即解压到目标目录"的实时模式：
 
 1. `MainWindow.axaml.cs` 文件列表 `PointerPressed` 检测拖拽起点（列标题/空白按下不触发），选中项经 `DragDropItemExpander.ExpandItems` 展开为条目集
 2. `OverlayController`（纯 Win32 独立覆层，`UpdateLayeredWindow` 后台线程渲染）显示三色状态机（检测中/可释放/不可释放）+ 呼吸动画（拖拽预览弹窗 DragPreviewPopup 待实施：`DragPreviewBitmapBuilder` 位图构建与 `OverlayController.SetPreview` 槽位已就绪但无调用者）
@@ -344,7 +344,7 @@ Uses `ArchiveItem.FullPath` for the output temp path so files from subdirectorie
 
 ### 拖拽添加（drag-in to archive）
 
-已实施（方案见 [drag-add-overlay.md](.omo/plans/drag-add-overlay.md)）。与拖拽解压相反方向：从资源管理器拖文件/文件夹到 MantisZip 窗口 → 添加到当前压缩包。三分支拖入行为：
+已实施（方案见 [drag-add-overlay.md](.omo/plans/已完成/drag-add-overlay.md)）。与拖拽解压相反方向：从资源管理器拖文件/文件夹到 MantisZip 窗口 → 添加到当前压缩包。三分支拖入行为：
 
 1. **已打开压缩包 + 拖入单个压缩包** → 切换打开
 2. **已打开压缩包 + 拖入文件/文件夹** → `Main_DragAddConfirm` 确认框（复用 `CompressConflict_Add` 标题）→ `MainWindowViewModel.AddFilesToArchiveAsync`（从 `AddFiles()` 抽取的公共方法：引擎获取、密码、`CreateExtractOptions` 冲突处理、`entryBasePath`、进度、刷新）
