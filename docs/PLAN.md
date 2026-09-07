@@ -56,8 +56,8 @@
 | **P2** | 结果预览截断占位符点击展开 | [result-preview-panel.md](.omo/plans/result-preview-panel.md) | 🟢低 | 1-2h | 结果预览面板遗留②：当前截断为静态"…"文本，改为点击就地展开完整子节点 |
 | **P2** | 结果预览冲突检测双模式 | [result-preview-panel.md](.omo/plans/result-preview-panel.md) | 🟡中 | 2-3h | 结果预览面板遗留③：当前固定全量 File.Exists 检测，改为快速（目录级）/完整（逐文件）可切换 |
 | **P4** | 外部工具视频元数据 | — | 🟢低 | 2-3h | ffprobe 集成 |
-| **🔍调研** | 跨平台移植可行性 | [cross-platform-port.md](.omo/plans/cross-platform-port.md) | 🟡中大 | 2-3月 | 砍 ShellExt，WPF→Avalonia，WebView2→WebKit，SharpSevenZip→SharpCompress/p7zip，DPAPI→AES-GCM |
-| **🔍调研** | Avalonia 预览机会分析 | [preview-avalonia-opportunities.md](.omo/plans/preview-avalonia-opportunities.md) | 🟡中 | — | 分析 Avalonia 迁移对预览系统的影响：SVG/HDR/PSD/AI 新能力、音视频替代方案、HDR 全景 360° 查看器方案 |
+| **P2** | 跨平台移植（macOS / Linux） | [cross-platform-port.md](.omo/plans/cross-platform-port.md) | 🟡中大 | 6-8周 | ✅ WPF→Avalonia 迁移已完成（Phases 0-10）；实施计划含 Phase 0 基础设施（CI+路径适配）→ Phase 1 引擎适配（7z/RAR 跨平台）→ Phase 2 UI 适配（macOS/Linux 专项）→ Phase 3 打磨发布；需要决策：7z 压缩策略（禁用/p7zip CLI）、拖拽解压降级、右键菜单取舍 |
+| ~~🔍调研~~ | ~~Avalonia 预览机会分析~~ | [preview-avalonia-opportunities.md](.omo/plans/preview-avalonia-opportunities.md) | — | — | ✅ 已完成：Office 内容预览、SkiaSharp 渲染（PDF/SVG/字体）、Animated WebP、自实现 GIF 解码器均已实施 |
 
 
 ---
@@ -73,11 +73,11 @@
 
 ---
 
-## 跨平台移植影响分析
+## 跨平台移植影响分析（已完成，仅供参考）
 
-> 对 `docs/PLAN.md` 待实现全部 32 个计划进行的 WPF→Avalonia 兼容性评估。（2026-07-22）
+> ⚠️ WPF→Avalonia 迁移已于 2026-08 完成（Phases 0-10），以下为迁移前的兼容性评估（2026-07-22），保留供参考。
 >
-> **注意**: 已完成方案（见 `docs/PROGRESS.md` 历史设计方案索引）不再列入本分析。已废弃方案仅作参考。
+> 跨平台（macOS / Linux）实施计划见 [.omo/plans/cross-platform-port.md](../.omo/plans/cross-platform-port.md)。
 
 跨平台移植（WPF→Avalonia + 砍 ShellExt）对现有计划的影响分三类：
 

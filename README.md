@@ -5,8 +5,7 @@
 # MantisZip
 ![Logo](docs/images/Logo.png)
 
-轻量级全功能 Windows 压缩/解压软件
-</p>
+轻量级全功能压缩/解压软件
 
 <p align="center">
 
@@ -24,7 +23,7 @@
 
 ----
 
-![MantisZip 极速预览总览](docs/images/preview-overview.gif)
+![MantisZip 主窗口](docs/images/version/v0.5.0/MainWindow.png)
 
  ⏱️ 3 秒总览：在压缩包内无缝切换、指哪打哪的极速预览体验
 
@@ -35,14 +34,14 @@
 ----
 
 <p align="center">
-  <b>👁 预览</b> &nbsp;·&nbsp; <b>🔑 密码管理器</b> &nbsp;·&nbsp; <b>⚙️ 高级解压选项</b>
+  <b>👁 预览</b> &nbsp;·&nbsp; <b>🔑 密码管理器</b> &nbsp;·&nbsp; <b>🔀 拖拽交互</b> &nbsp;·&nbsp; <b>⚙️ 高级解压选项</b>
 </p>
 
 ---
 
 ## 📚 简介
 
-MantisZip 是一款面向 Windows 的免费开源压缩/解压工具，主打**文件内预览**和**密码管理器**等便捷功能。无需解压即可直接查看压缩包内的图片、文本、Markdown、HTML、Office 文档、PDF、SVG、字体、ICO 多帧画廊等内容。
+MantisZip 是一款免费开源的压缩/解压工具，基于 .NET 10 + Avalonia 构建。主打**文件内预览**和**密码管理器**等便捷功能。无需解压即可直接查看压缩包内的图片、文本、Markdown、HTML、Office 文档、PDF、SVG、字体、ICO 多帧画廊等内容。
 
 
 ## ✨ 功能亮点与专项特写
@@ -51,7 +50,7 @@ MantisZip 是一款面向 Windows 的免费开源压缩/解压工具，主打**�
 
 可以在压缩包内直接预览 **图片**、**文本**、**HTML/Markdown**、**PDF**、**SVG**、**Office 文档（DOCX/XLSX/PPTX）**、**字体**、**ICO 多帧画廊**、**动画图片（GIF / Animated WebP）**、**CSV 表格** 等内容。
 
-从 v0.4.4 版本开始，是以内容（魔数）识别实际格式，不需要担心扩展名不对预览不了的问题。
+以内容（魔数）识别实际格式，不需要担心扩展名不对预览不了的问题。
 
 #### 🔍 深度探索：各类型高级预览特写
 
@@ -60,11 +59,13 @@ MantisZip 是一款面向 Windows 的免费开源压缩/解压工具，主打**�
     <td width="50%" valign="top">
       <b>🖼️ 媒体与图片类预览</b><br>
       支持 PNG 透明通道展示、压缩包内 GIF / Animated WebP 动画直接播放、ICO 多帧画廊。
+      <!-- TODO: 替换为 Avalonia 版截图 -->
       <img src="docs/images/preview-media.gif" alt="图片与媒体预览" width="100%"/>
     </td>
     <td width="50%" valign="top">
       <b>📄 文档与排版类预览</b><br>
       无缝切换纯文本、Markdown 实时渲染、HTML（原生控件树）、PDF（逐页渲染）、SVG（栅格化）、Office 文档（DOCX/XLSX/PPTX）、字体字形预览。
+      <!-- TODO: 替换为 Avalonia 版截图 -->
       <img src="docs/images/preview-docs.gif" alt="文档预览" width="100%"/>
     </td>
   </tr>
@@ -88,6 +89,31 @@ MantisZip 是一款面向 Windows 的免费开源压缩/解压工具，主打**�
 | ICO 多帧画廊 | 全部帧提取、FlattenAlpha 切换、透明背景棋盘格 |
 | CSV 表格 | DataGrid 表格化展示（可配置行列上限） |
 </details>
+
+----
+
+### 🔀 拖拽交互
+
+#### 从压缩包拖出 → 实时解压
+
+从窗口拖文件到资源管理器，自动解压到目标目录。Win32 覆层三色状态指示（检测中 / 可释放 / 不可释放）+ 动态光标 + Esc 取消。
+
+![拖拽直接解压](docs/images/version/v0.5.0/DragExtractOverlay.png)
+
+#### 从资源管理器拖入 → 添加到压缩包
+
+从资源管理器拖文件/文件夹到 MantisZip 窗口，即可添加到当前目录。窗口内绿色覆层即时提示可添加状态。
+
+<!-- TODO: 截图 — DragAddOverlay（拖入文件时窗口内绿色覆层） -->
+![拖拽添加到压缩包](docs/images/version/v0.5.0/DragAddOverlay.png)
+
+----
+
+### 🗂 自定义文件选择器
+
+替代系统对话框，支持多选累积、目录树、收藏/历史/窗口速选、盘符下拉、文件类型筛选。
+
+![自定义文件选择器](docs/images/version/v0.5.0/CustomFilePicker.png)
 
 ----
 
@@ -129,53 +155,47 @@ MantisZip 是一款面向 Windows 的免费开源压缩/解压工具，主打**�
 
 除了其他软件的「覆盖」「跳过」和「自动重命名」之外，还增加了「覆盖旧文件」和「覆盖小文件」，「自动重命名」也可无缝切换至手动重命名。
 
-![解压文件冲突](docs\images\version\v0.4.5\CancelOnConflictCompress.png)
+![解压文件冲突](docs/images/version/v0.4.5/CancelOnConflictCompress.png)
 
-![压缩文件冲突](docs\images\version\v0.4.5\CancelOnConflictExtract.png)
-
-----
-
-### 文件列表增强
-
-文件列表增加尺寸比例条，展平目录与过滤工具。工具虽小，却能提升效率。
-
-<details>
-<summary><b>📊 点击展开：展平目录与过滤工具</b></summary>
-<p align="center">
-  <br>
-
-尺寸比例条，可以直观展示当前目录下的文件和日期的比例，让你一目了然。
-
-![未展平目录](docs/images/FlieListNotFlat.png)
+![压缩文件冲突](docs/images/version/v0.4.5/CancelOnConflictExtract.png)
 
 ----
 
-展平目录可以显示当前目录以及其下所有子目录的文件。
+### 📁 结果预览面板
 
-![展平目录](docs/images/FlieListFlat.png)
+压缩/解压设置窗口实时文件树预览，冲突高亮、过滤灰显、精简模式、异步加载。
 
-----
-
-列排序可以按照列数据对列表进行排序。
-
-![列排序](docs/images/FlieListSizeSort.png)
+![结果预览面板](docs/images/version/v0.5.0/ResultPreviewPanel.png)
 
 ----
 
-文件列表过滤可以按照规则只显示需要的文件。
+### 🎨 紧凑度与主题
 
-![文件列表过滤](docs/images/FlieListSizeFilter.png)
+**紧凑度模式** — Compact / Normal / Loose 三档间距与控件高度，运行时切换无需重启。
 
-</p>
-</details>
+**主题三态化** — 跟随系统 / 亮色 / 暗色，全局界面字体可设置。
+
+![外观设置](docs/images/version/v0.5.0/AppView.png)
+
+----
+
+### 📄 文件列表增强
+
+文件列表增加尺寸比例条、展平目录与过滤工具。目录行聚合显示子树大小与日期，列排序三态循环（升序→降序→恢复原始顺序），排序状态跨会话持久化。
+
+<!-- TODO: 截图 — FileList（Avalonia 版文件列表，含目录树 + 文件列表 + 工具栏） -->
+![文件列表](docs/images/version/v0.5.0/FileList.png)
+
+<!-- TODO: 截图 — ColumnSort（列排序三态循环 + 列头箭头指示） -->
+![列排序增强](docs/images/version/v0.5.0/ColumnSort.png)
 
 ----
 
 ## 🤔 已知问题
-- 本软件亮点是功能和易用性，所以性能上稍逊于主流压缩软件。将来会逐渐优化。
+
 - 有些格式的压缩包**不支持**单项预览，预览时会有提示。
 - RAR 格式不支持压缩（只读解压）。
-- 目前只支持 Windows 平台，跨平台支持已在计划中（框架已迁移至 Avalonia，.NET 9 跨平台就绪）。
+- 目前仅支持 Windows 平台。基于 Avalonia 框架构建，跨平台支持已在计划中。
 
 
 ---
@@ -195,9 +215,9 @@ MantisZip 是一款面向 Windows 的免费开源压缩/解压工具，主打**�
 
 ## 📋 系统要求
 
-- **操作系统**: Windows 10 (1809+) / Windows 11 （跨平台支持已在计划中）
+- **操作系统**: Windows 10 (1809+) / Windows 11
 - **运行时**: [.NET 10 Runtime](https://dotnet.microsoft.com/download/dotnet/10.0)
-- **WebView2 Runtime**: HTML/Markdown/SVG/PDF 预览依赖 [WebView2 Runtime](https://developer.microsoft.com/microsoft-edge/webview2/)
+- **备注**: 基于 Avalonia 框架构建，跨平台支持计划中
 
 ---
 
@@ -279,7 +299,7 @@ MantisZip 的诞生离不开全球开源社区的无私奉献。在此，对本�
 
 | 包名 | 版本 | 用途 | 许可证 |
 |------|------|------|--------|
-| [Avalonia](https://github.com/AvaloniaUI/Avalonia) | 12.0.4 | 跨平台 UI 框架（替代 WPF）| MIT |
+| [Avalonia](https://github.com/AvaloniaUI/Avalonia) | 12.0.4 | 跨平台 UI 框架 | MIT |
 | [CommunityToolkit.Mvvm](https://github.com/CommunityToolkit/dotnet) | 8.4.2 | MVVM 辅助（ObservableObject + source generators） | MIT |
 | [Markdig](https://github.com/xoofx/markdig) | 0.40.0 | Markdown 解析（AST → 原生控件树） | BSD-2-Clause |
 | [ReverseMarkdown](https://github.com/magicmousen/ReverseMarkdown) | 4.7.0 | HTML → Markdown 转换（预览 HTML 降级路径） | MIT |
@@ -360,7 +380,7 @@ MantisZip 是一款完全免费且独立开发的开源项目。如果它提升�
 * **代码库提交**：[提交 Bug 或 Feature Request](../../issues)
 * **Discord 交流群**: （👉 [点击一键加入群聊](https://discord.gg/PpuyhceJpZ)）
 
-> 💡 **小提示**：进群请备注 “GitHub / MantisZip”。
+> 💡 **小提示**：进群请备注 "GitHub / MantisZip"。
 
 ## Star History
 

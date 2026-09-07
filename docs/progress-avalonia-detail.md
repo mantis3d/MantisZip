@@ -6,6 +6,19 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-09-07** — README.md 全面更新，反映 Avalonia 迁移后现状
+  - 项目定位从"Windows"改为"跨平台框架就绪，当前以 Windows 为主"
+  - 新增 v0.5.0 功能板块（拖拽交互、自定义文件选择器、结果预览面板、紧凑度与主题）
+  - 删除 WebView2 Runtime 系统要求（v0.5.0 已移除）
+  - 已知问题更新（删除过时条目，新增右键菜单 COM 依赖说明）
+  - 依赖表版本号与 csproj 核对一致
+  - 修复孤立 `</p>` HTML 标签 bug
+
+**2026-09-07** — 跨平台移植实施计划（Phase: 调研→实施）
+  - 原 `.omo/plans/cross-platform-port.md`（2026-06-11 可行性研究）重命名为 `cross-platform-port-research.md`
+  - 新建 `.omo/plans/cross-platform-port.md` 实施计划：4 阶段（基础设施→引擎适配→UI 适配→打磨发布），含 Windows 代码平台依赖清单（95 P/Invoke、注册表、System.Drawing 分布）、策略决策点（7z 压缩/拖拽解压/右键菜单）、工作量估算（单平台 4-6 周，双平台 6-8 周）
+  - `docs/PLAN.md` 跨平台条目从 `🔍调研` 升级为 `P2` 实施计划，Avalonia 预览机会分析标记完成
+
 **2026-09-07** — 操作期对话框 Topmost 补齐（ErrorDialog + Elevation 系列）
   - **根因**：操作过程中弹出的对话框若未设 `Topmost="True"`，会被 `ProgressWindow`（`Topmost="True"`）遮挡无法点击。逐项审计 Avalonia 全部窗口类并按 WPF 版（98ca7d4 删除前）Topmost 设置对照，发现 4 个在迁移时丢失 `Topmost`：
     - `ErrorDialog`（压缩文件读取错误重试/跳过/中止，在 ProgressWindow 存活期弹出）
