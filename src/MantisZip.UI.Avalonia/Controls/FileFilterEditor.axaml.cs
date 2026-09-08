@@ -181,8 +181,8 @@ public partial class FileFilterEditor : UserControl
             NamePattern = string.IsNullOrWhiteSpace(NamePatternBox.Text) ? null : NamePatternBox.Text.Trim(),
             MinSize = ParseNullableSize(MinSizeBox.Text),
             MaxSize = ParseNullableSize(MaxSizeBox.Text),
-            MinDate = StartDatePicker.SelectedDate?.DateTime,
-            MaxDate = EndDatePicker.SelectedDate?.DateTime,
+            MinDate = StartDatePicker.SelectedDate,
+            MaxDate = EndDatePicker.SelectedDate,
         };
         return filter;
     }
@@ -224,12 +224,8 @@ public partial class FileFilterEditor : UserControl
         else
             MaxSizeBox.Text = "";
 
-        StartDatePicker.SelectedDate = filter.MinDate.HasValue
-            ? new DateTimeOffset(filter.MinDate.Value, TimeSpan.Zero)
-            : null;
-        EndDatePicker.SelectedDate = filter.MaxDate.HasValue
-            ? new DateTimeOffset(filter.MaxDate.Value, TimeSpan.Zero)
-            : null;
+        StartDatePicker.SelectedDate = filter.MinDate;
+        EndDatePicker.SelectedDate = filter.MaxDate;
 
         _isInternalUpdate = false;
     }
@@ -574,13 +570,13 @@ public partial class FileFilterEditor : UserControl
         NotifyFilterChanged();
     }
 
-    private void StartDatePicker_SelectedDateChanged(object? sender, DatePickerSelectedValueChangedEventArgs e)
+    private void StartDatePicker_SelectedDateChanged(object? sender, SelectionChangedEventArgs e)
     {
         if (_isInternalUpdate) return;
         NotifyFilterChanged();
     }
 
-    private void EndDatePicker_SelectedDateChanged(object? sender, DatePickerSelectedValueChangedEventArgs e)
+    private void EndDatePicker_SelectedDateChanged(object? sender, SelectionChangedEventArgs e)
     {
         if (_isInternalUpdate) return;
         NotifyFilterChanged();

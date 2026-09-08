@@ -6,6 +6,17 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-09-08** — 日期输入控件 DatePicker → CalendarDatePicker 全量替换
+  - **背景**：滚轮式 DatePicker 不好用，替换为文本框+弹出日历的 CalendarDatePicker（可在文本框直接键入或点日历选择）
+  - **变更**（7 文件）：
+    - `Views/MainWindow.axaml`：过滤栏起止日期 2 个替换，`SelectedDate` 直接绑 `DateTime?`（`CalendarDatePicker.SelectedDate` 为 `DateTime?`），移除 `DateTimeToOffsetConverter` converter 绑定与资源声明，宽度 105→110
+    - `Controls/FileFilterEditor.axaml` + `.axaml.cs`：起止日期 2 个替换，`SelectedDate?.DateTime` 简化为 `SelectedDate`，删除 `new DateTimeOffset(...)` 包装，事件签名 `DatePickerSelectedValueChangedEventArgs` → `SelectionChangedEventArgs`
+    - `App.axaml`：样式选择器合并为 `DatePicker, CalendarDatePicker`，复用主题三色
+    - `Views/UiTestWindow.axaml` + `ViewModels/UiTestViewModel.cs`：删除 DatePicker 演示行与死代码 `_pickedDate`
+    - `Converters/DateTimeConverter.cs`：删除废弃的 `DateTimeToOffsetConverter` 类
+  - `MainWindow.axaml.cs` 零改动（吸管回填 `DateTime` → `DateTime?` 隐式转换天然匹配）
+  - 验证：`dotnet build` 0 错误（38 预存 warning），`dotnet test` 78/78 通过
+
 **2026-09-07** — README.md 全面更新，反映 Avalonia 迁移后现状
   - 项目定位从"Windows"改为"跨平台框架就绪，当前以 Windows 为主"
   - 新增 v0.5.0 功能板块（拖拽交互、自定义文件选择器、结果预览面板、紧凑度与主题）

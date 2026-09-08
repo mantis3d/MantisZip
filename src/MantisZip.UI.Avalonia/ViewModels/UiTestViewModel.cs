@@ -39,7 +39,6 @@ public partial class UiTestViewModel : ObservableObject
     [ObservableProperty] private decimal _numericValue = 42;
     [ObservableProperty] private DateTimeOffset? _filterDateFrom = new(DateTime.Today.AddDays(-7));
     [ObservableProperty] private DateTimeOffset? _filterDateTo = new(DateTime.Today);
-    [ObservableProperty] private DateTimeOffset? _pickedDate = new(DateTime.Today);
     [ObservableProperty] private DateTime? _calendarDate = DateTime.Today;
     [ObservableProperty] private string _autoCompletePath = @"D:\";
     [ObservableProperty] private string _quickPath = @"D:\下载";

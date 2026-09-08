@@ -168,7 +168,7 @@
             <TextBlock Grid.Column="0" x:Name="StartDateLabel"
                        VerticalAlignment="Center" Margin="0,0,6,0"
                        Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
-            <DatePicker x:Name="StartDatePicker" Grid.Column="1"
+            <CalendarDatePicker x:Name="StartDatePicker" Grid.Column="1"
                         Margin="0,0,6,0"
                         SelectedDateChanged="StartDatePicker_SelectedDateChanged"
                         Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
@@ -177,7 +177,7 @@
             <TextBlock Grid.Column="0" x:Name="EndDateLabel"
                        VerticalAlignment="Center" Margin="0,0,6,0"
                        Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
-            <DatePicker x:Name="EndDatePicker" Grid.Column="1"
+            <CalendarDatePicker x:Name="EndDatePicker" Grid.Column="1"
                         SelectedDateChanged="EndDatePicker_SelectedDateChanged"
                         Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
           </Grid>

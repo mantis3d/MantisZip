@@ -21,7 +21,6 @@
   <Window.Resources>
     <conv:FileSizeConverter x:Key="FileSizeConverter" />
     <conv:BoolInvertConverter x:Key="BoolInvertConverter" />
-    <conv:DateTimeToOffsetConverter x:Key="DateTimeToOffsetConverter" />
     <conv:NullableLongConverter x:Key="NullableLongConverter" />
     <conv:RatioToWidthConverter x:Key="RatioToWidthConverter" />
     <conv:BoolToToggleBgBrushConverter x:Key="BoolToToggleBgBrushConverter" />
@@ -651,8 +650,8 @@
               <TextBlock Text="{Binding LocalizedStrings[Filter_DateFrom]}"
                          FontSize="11" VerticalAlignment="Center" Margin="0,0,2,0"
                          Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
-              <DatePicker x:Name="FilterDateFromPicker" Width="105" Height="{DynamicResource ControlHeightXs}"
-                          SelectedDate="{Binding FilterDateFrom, Converter={StaticResource DateTimeToOffsetConverter}}"
+              <CalendarDatePicker x:Name="FilterDateFromPicker" Width="110" Height="{DynamicResource ControlHeightXs}"
+                          SelectedDate="{Binding FilterDateFrom}"
                           Background="{DynamicResource ThemeWindowBgBrush}"
                           Foreground="{DynamicResource ThemeTextPrimaryBrush}"
                           BorderBrush="{DynamicResource ThemeBorderBrush}" />
@@ -668,8 +667,8 @@
               <TextBlock Text="{Binding LocalizedStrings[Filter_DateTo]}"
                          FontSize="11" VerticalAlignment="Center" Margin="0,0,2,0"
                          Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
-              <DatePicker x:Name="FilterDateToPicker" Width="105" Height="{DynamicResource ControlHeightXs}"
-                          SelectedDate="{Binding FilterDateTo, Converter={StaticResource DateTimeToOffsetConverter}}"
+              <CalendarDatePicker x:Name="FilterDateToPicker" Width="110" Height="{DynamicResource ControlHeightXs}"
+                          SelectedDate="{Binding FilterDateTo}"
                           Background="{DynamicResource ThemeWindowBgBrush}"
                           Foreground="{DynamicResource ThemeTextPrimaryBrush}"
                           BorderBrush="{DynamicResource ThemeBorderBrush}" />

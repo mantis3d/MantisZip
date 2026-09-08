@@ -205,10 +205,6 @@
                 <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingLg}" HorizontalAlignment="Left"
                             VerticalAlignment="Top">
                   <StackPanel Spacing="{DynamicResource SpacingXxs}">
-                    <TextBlock FontSize="11" Foreground="{DynamicResource ThemeTextSecondaryBrush}" Text="DatePicker（滚轮式）" />
-                    <DatePicker SelectedDate="{Binding PickedDate}" />
-                  </StackPanel>
-                  <StackPanel Spacing="{DynamicResource SpacingXxs}">
                     <TextBlock FontSize="11" Foreground="{DynamicResource ThemeTextSecondaryBrush}" Text="CalendarDatePicker（文本框+日历）" />
                     <CalendarDatePicker SelectedDate="{Binding CalendarDate}" />
                   </StackPanel>

@@ -1326,7 +1326,7 @@ public partial class MainWindow : Window
                 return;
             }
             var dates = vm.SelectedEntries
-                .Where(i => !i.IsDirectory && i.LastModified > DateTime.MinValue)
+                .Where(i => i.LastModified > DateTime.MinValue)
                 .Select(i => i.LastModified)
                 .ToList();
             if (dates.Count == 0)
@@ -1358,7 +1358,7 @@ public partial class MainWindow : Window
                 return;
             }
             var dates = vm.SelectedEntries
-                .Where(i => !i.IsDirectory && i.LastModified > DateTime.MinValue)
+                .Where(i => i.LastModified > DateTime.MinValue)
                 .Select(i => i.LastModified)
                 .ToList();
             if (dates.Count == 0)
