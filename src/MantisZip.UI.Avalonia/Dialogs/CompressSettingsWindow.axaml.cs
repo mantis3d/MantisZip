@@ -286,7 +286,7 @@ DataContext = ViewModel;
     /// </summary>
     private void RemoveSelected_Click(object? sender, RoutedEventArgs e)
     {
-        var toRemove = SourceFilesList.SelectedItems.Cast<string>().ToList();
+        var toRemove = SourceFilesList.SelectedItems?.Cast<string>().ToList() ?? new List<string>();
         foreach (var path in toRemove)
         {
             ViewModel.SelectedPaths.Remove(path);

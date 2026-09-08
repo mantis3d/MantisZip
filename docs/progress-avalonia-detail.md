@@ -6,7 +6,37 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
-**2026-09-08** — 日期输入控件 DatePicker → CalendarDatePicker 全量替换
+**2026-09-09** — 消除全部 39 项预存构建警告（AVLN5001/CS8602/CS8604/CS8620/CS8767/CS8826/CS0649/CS4014），dotnet build 达到 0 warnings 0 errors
+  - **AVLN5001（15 项）**：Avalonia 12 废弃 API 迁移
+    - UiTestWindow.axaml：`Watermark=` → `PlaceholderText=` ×5（含修复 replaceAll 误伤 `UseFloatingWatermark` → `UseFloatingPlaceholder`）
+    - CollectingWindow.axaml：`SystemDecorations="None"` → `WindowDecorations="None"`
+    - PreviewPanel.axaml：`FontFamily` 绑定错误（使用 `{Binding}` 而非 `{x:Static}` 传递 `FontFamily` 对象，改为直接绑定 ViewModel 属性）
+    - CustomFilePickerDialog.axaml：`Background` → `BackgroundSaver`（Button 与 ComboBox 共用 `ButtonBackground` 导致逻辑 key 冲突）
+    - MainWindow.axaml：`TreeView:Experimental Avalonia` → `TreeView`（`ExperimentalTabStripView` 和 `ExperimentalComboBox` 均已毕业）
+  - **CS8602（5 项）**：可空引用解引用修复
+    - MainWindow.axaml.cs：移除 trace interpolation 中冗余的 `, vm.IsNull={vm == null}`
+    - SettingsWindowViewModel.cs：`_settings.CustomAssocExtensions` 添加 null 合并赋值（`??= new()`）
+    - OverlayController.cs：添加 `hasPreview` 守卫（`if (hasPreview && preview != null)`）
+    - SevenZipEngine.cs：字典声明 `Dictionary<int, string>` → `Dictionary<int, string?>`
+  - **CS8604（12 项）**：可能空引用参数修复
+    - MainWindowViewModel.cs：引擎空值守卫（`if (engine == null) return`）+ 密码空值守卫（`if (password != null)`）
+    - SettingsWindowViewModel.cs：`ownerWindow` 空值守卫 + `App.DebugLog`
+    - FileFilterEditor.axaml.cs：输入空值守卫（`Text ?? ""`）
+    - CompressSettingsWindow.axaml.cs：`SelectedItems?.Cast<>()` 空值守卫
+    - CompressFlow.cs：`owner` 空值守卫（CLI 边缘情况返回默认中止）
+    - PreviewViewModel.cs：lambda 内 `ShowPasswordDialog`/`CurrentPreviewFilePath` 空值守卫
+    - MarkdownPreviewBuilder.cs：`InlineCollection` null 合并初始化（`??= new()`）
+  - **CS8620（2 项）**：类型可空性差异修复
+    - MainWindowViewModel.cs：`DeleteFiles` 方法中 `deleteEntryPath` 局部变量显式类型声明，消除 `string?[]` → `string[]` 推断差异
+  - **CS8767（8 项）**：IValueConverter 参数/返回值可空性修复
+    - PreviewPanel.axaml.cs：两个 Converter 的 `Convert`/`ConvertBack` 签名统一为 `object?` 参数 + `object?` 返回值
+  - **CS8826（1 项）**：参数可空性修复
+    - MainWindowViewModel.cs：`OnFilterSizeUnitChanged(string?)` → `(string)`
+  - **CS0649（2 项）**：字段未赋值警告修复
+    - CustomFilePickerDialog.axaml.cs：`FileTypeSelector.SelectedIndex` 程序化赋值添加 `_isSyncingFileType` 重入守卫
+  - **CS4014（2 项）**：async void → async Task 修复
+    - SettingsWindowViewModel.cs：`InstallSelectedAssoc`/`UninstallAllAssoc` 签名改为 `async Task`，await `AppMessageBox.Show()`
+  - 验证：`dotnet build --no-incremental` 0 warnings 0 errors，`dotnet test` 301/301 通过
   - **背景**：滚轮式 DatePicker 不好用，替换为文本框+弹出日历的 CalendarDatePicker（可在文本框直接键入或点日历选择）
   - **变更**（7 文件）：
     - `Views/MainWindow.axaml`：过滤栏起止日期 2 个替换，`SelectedDate` 直接绑 `DateTime?`（`CalendarDatePicker.SelectedDate` 为 `DateTime?`），移除 `DateTimeToOffsetConverter` converter 绑定与资源声明，宽度 105→110

@@ -87,22 +87,22 @@
                   <StackPanel Spacing="{DynamicResource SpacingXxs}">
                     <TextBlock FontSize="11" Foreground="{DynamicResource ThemeTextSecondaryBrush}" Text="单行 + 占位符" />
                     <TextBox Width="180" Height="{DynamicResource ControlHeight}"
-                             Watermark="输入文件名称" />
+                             PlaceholderText="输入文件名称" />
                   </StackPanel>
                   <StackPanel Spacing="{DynamicResource SpacingXxs}">
                     <TextBlock FontSize="11" Foreground="{DynamicResource ThemeTextSecondaryBrush}" Text="浮动占位符" />
                     <TextBox Width="180" Height="{DynamicResource ControlHeight}"
-                             Watermark="浮动占位符" UseFloatingWatermark="True" />
+                             PlaceholderText="浮动占位符" UseFloatingPlaceholder="True" />
                   </StackPanel>
                   <StackPanel Spacing="{DynamicResource SpacingXxs}">
                     <TextBlock FontSize="11" Foreground="{DynamicResource ThemeTextSecondaryBrush}" Text="多行（AcceptsReturn）" />
                     <TextBox Width="220" Height="64" AcceptsReturn="True" TextWrapping="Wrap"
-                             Watermark="多行输入：支持回车换行" />
+                             PlaceholderText="多行输入：支持回车换行" />
                   </StackPanel>
                   <StackPanel Spacing="{DynamicResource SpacingXxs}">
                     <TextBlock FontSize="11" Foreground="{DynamicResource ThemeTextSecondaryBrush}" Text="密码（PasswordChar）" />
                     <TextBox Width="180" Height="{DynamicResource ControlHeight}"
-                             PasswordChar="●" Text="{Binding PasswordText}" Watermark="输入密码" />
+                             PasswordChar="●" Text="{Binding PasswordText}" PlaceholderText="输入密码" />
                   </StackPanel>
                   <StackPanel Spacing="{DynamicResource SpacingXxs}">
                     <TextBlock FontSize="11" Foreground="{DynamicResource ThemeTextSecondaryBrush}" Text="只读" />
@@ -218,7 +218,7 @@
                   </StackPanel>
                   <StackPanel Spacing="{DynamicResource SpacingXxs}">
                     <TextBlock FontSize="11" Foreground="{DynamicResource ThemeTextSecondaryBrush}" Text="TextBox（基线对照）" />
-                    <TextBox Width="150" Height="{DynamicResource ControlHeight}" Watermark="直接输入文本" />
+                    <TextBox Width="150" Height="{DynamicResource ControlHeight}" PlaceholderText="直接输入文本" />
                   </StackPanel>
                 </StackPanel>
               </StackPanel>

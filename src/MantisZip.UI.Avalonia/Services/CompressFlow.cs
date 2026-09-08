@@ -112,7 +112,14 @@ public static class CompressFlow
             var result = Dispatcher.UIThread.InvokeAsync(() =>
             {
                 var dlg = new ErrorDialog(info);
-                dlg.ShowDialog(ResolveOwnerWindow()).GetAwaiter().GetResult();
+                var owner = ResolveOwnerWindow();
+                if (owner == null)
+                {
+                    // 极端边缘情况：无可用父窗口（非桌面模式），无法弹窗，返回默认中止
+                    System.Diagnostics.Debug.WriteLine("ErrorDialog skipped: no owner window available");
+                    return (Action: FileErrorAction.Abort, All: false);
+                }
+                dlg.ShowDialog(owner).GetAwaiter().GetResult();
                 return (Action: dlg.ResultAction, All: dlg.ApplyToAll);
             }).Result;
 

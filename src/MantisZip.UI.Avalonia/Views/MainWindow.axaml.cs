@@ -24,7 +24,6 @@ using System.Threading;
 using Avalonia.Layout;
 using Avalonia.Media;
 using MantisZip.UI.Avalonia.Services;
-using System.ComponentModel;
 
 namespace MantisZip.UI.Avalonia.Views;
 
@@ -1238,7 +1237,7 @@ public partial class MainWindow : Window
     /// <summary>构建覆层目标显示文案：压缩包名 + 当前浏览目录（如 "backup.zip/文档"）。</summary>
     private static string BuildTargetDisplay(MainWindowViewModel vm)
     {
-        var archiveName = Path.GetFileName(vm.CurrentArchivePath) ?? vm.CurrentArchivePath;
+        var archiveName = Path.GetFileName(vm.CurrentArchivePath) ?? vm.CurrentArchivePath ?? string.Empty;
         return string.IsNullOrEmpty(vm.CurrentFolder)
             ? archiveName
             : $"{archiveName}/{vm.CurrentFolder}";
@@ -1335,7 +1334,7 @@ public partial class MainWindow : Window
                 return;
             }
             var minDate = dates.Min();
-            WritePickerTrace($"PickDateFrom: minDate={minDate:O}, picker.IsNull={FilterDateFromPicker == null}, vm.IsNull={vm == null}");
+            WritePickerTrace($"PickDateFrom: minDate={minDate:O}, picker.IsNull={FilterDateFromPicker == null}");
             vm.FilterDateFrom = minDate;
             if (FilterDateFromPicker != null)
                 FilterDateFromPicker.SelectedDate = minDate;

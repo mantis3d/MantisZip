@@ -5,7 +5,7 @@
         Width="320"
         Height="100"
         WindowStartupLocation="CenterScreen"
-        SystemDecorations="None"
+        WindowDecorations="None"
         CanResize="False"
         ShowInTaskbar="False"
         Background="{DynamicResource ThemeSurfaceBgBrush}">

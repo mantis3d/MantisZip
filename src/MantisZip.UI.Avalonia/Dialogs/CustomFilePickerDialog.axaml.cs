@@ -269,12 +269,20 @@ public partial class CustomFilePickerDialog : Window
                 "*.7z",
                 "*.tar.gz"
             };
-            FileTypeSelector.SelectedIndex = _defaultExtension switch
+            _isSyncingFileType = true;
+            try
             {
-                ".7z" => 1,
-                ".tar.gz" => 2,
-                _ => 0
-            };
+                FileTypeSelector.SelectedIndex = _defaultExtension switch
+                {
+                    ".7z" => 1,
+                    ".tar.gz" => 2,
+                    _ => 0
+                };
+            }
+            finally
+            {
+                _isSyncingFileType = false;
+            }
 
             // 预填文件名（来自 initialPath 的末尾，或默认扩展名）
             FileNameBox.Text = _defaultExtension == null
@@ -288,7 +296,15 @@ public partial class CustomFilePickerDialog : Window
                 LocalizationManager.T("Picker_FileTypeArchive"),
                 LocalizationManager.T("Picker_FileTypeAll")
             };
-            FileTypeSelector.SelectedIndex = 0;
+            _isSyncingFileType = true;
+            try
+            {
+                FileTypeSelector.SelectedIndex = 0;
+            }
+            finally
+            {
+                _isSyncingFileType = false;
+            }
         }
     }
 

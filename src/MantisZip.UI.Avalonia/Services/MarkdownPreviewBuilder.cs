@@ -90,6 +90,7 @@ public static class MarkdownPreviewBuilder
             FontWeight = fontWeight,
             TextWrapping = TextWrapping.Wrap,
         };
+        tb.Inlines ??= new InlineCollection();
         BuildInlines(heading.Inline, tb.Inlines);
         return tb;
     }
@@ -100,6 +101,7 @@ public static class MarkdownPreviewBuilder
         {
             TextWrapping = TextWrapping.Wrap,
         };
+        tb.Inlines ??= new InlineCollection();
         BuildInlines(paragraph.Inline, tb.Inlines);
         return tb;
     }

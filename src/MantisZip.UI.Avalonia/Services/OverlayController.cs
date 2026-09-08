@@ -395,7 +395,7 @@ internal class OverlayController : IDisposable
             }
 
             // ── Preview image (composited below text when available) ──
-            if (hasPreview)
+            if (hasPreview && preview != null)
             {
                 CompositeImage(pixels, w, h, preview.Pixels, preview.Width, preview.Height,
                     previewX, previewY, iconSize, iconSize);

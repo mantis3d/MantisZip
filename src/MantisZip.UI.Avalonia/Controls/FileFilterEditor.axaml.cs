@@ -179,8 +179,8 @@ public partial class FileFilterEditor : UserControl
             IncludeExtensions = GetSelectedExtensions(),
             ExcludeExtensions = new List<string>(),
             NamePattern = string.IsNullOrWhiteSpace(NamePatternBox.Text) ? null : NamePatternBox.Text.Trim(),
-            MinSize = ParseNullableSize(MinSizeBox.Text),
-            MaxSize = ParseNullableSize(MaxSizeBox.Text),
+            MinSize = ParseNullableSize(MinSizeBox.Text ?? ""),
+            MaxSize = ParseNullableSize(MaxSizeBox.Text ?? ""),
             MinDate = StartDatePicker.SelectedDate,
             MaxDate = EndDatePicker.SelectedDate,
         };

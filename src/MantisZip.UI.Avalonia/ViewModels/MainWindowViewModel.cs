@@ -824,7 +824,7 @@ public partial class MainWindowViewModel : ObservableObject
     partial void OnFilterSizeMinChanged(long? value) => ApplyFilter();
     partial void OnFilterSizeMaxChanged(long? value) => ApplyFilter();
     // 大小单位切换需立即重新过滤（对齐 WPF SizeMinUnit/SizeMaxUnit SelectionChanged → RefreshFilter）
-    partial void OnFilterSizeUnitChanged(string? value) => ApplyFilter();
+    partial void OnFilterSizeUnitChanged(string value) => ApplyFilter();
     partial void OnShowSubfoldersChanged(bool value) => ApplyFilter();
     // 筛选栏显隐 = 筛选功能总开关：收起时停用筛选（条件保留），重新展开即自动恢复生效
     partial void OnIsFilterBarVisibleChanged(bool value) => ApplyFilter();
@@ -959,6 +959,13 @@ public partial class MainWindowViewModel : ObservableObject
                     // Phase B: 密码对话框循环（无已保存匹配时弹出；错密码提示后重试直到正确或取消）
                     while (_currentPassword == null && (!unlistable || result.IsPasswordRequired))
                     {
+                        if (engine == null)
+                        {
+                            StatusMessage = LocalizationManager.T("Status_UnsupportedFormat", path);
+                            IsLoading = false;
+                            return;
+                        }
+
                         if (ShowPasswordDialog == null)
                         {
                             StatusMessage = LocalizationManager.T("Status_PasswordRequired");
@@ -2528,8 +2535,11 @@ public partial class MainWindowViewModel : ObservableObject
                         if (string.IsNullOrEmpty(desc))
                             desc = $"Compressed on {DateTime.Now:yyyy-MM-dd HH:mm}";
 
-                        PasswordManager.Instance.AddPassword(password, desc, rules);
-                        App.DebugLog($"Password saved to library: {desc}");
+                        if (password != null)
+                        {
+                            PasswordManager.Instance.AddPassword(password, desc, rules);
+                            App.DebugLog($"Password saved to library: {desc}");
+                        }
                     }
                 }
                 catch (Exception ex)
@@ -2608,7 +2618,7 @@ public partial class MainWindowViewModel : ObservableObject
             {
                 // Simulate test by checking entry exists in archive
                 await Task.Delay(100, ct);
-                progress.Report(new ArchiveProgress { PercentComplete = 100, CurrentFile = SelectedEntry.Name });
+                progress.Report(new ArchiveProgress { PercentComplete = 100, CurrentFile = SelectedEntry.Name ?? string.Empty });
             });
 
         if (completed)
@@ -2795,6 +2805,8 @@ public partial class MainWindowViewModel : ObservableObject
         if (CurrentArchivePath == null || SelectedEntry == null || RunWithProgress == null) return;
 
         var entryPath = SelectedEntry.FullPath ?? SelectedEntry.Name;
+        if (entryPath == null) return;
+        string deleteEntryPath = entryPath; // guard narrows to non-null; explicit string type for array inference
 
         var engine = ArchiveEngineFactory.GetEngineByExtension(CurrentArchivePath);
         if (engine == null) return;
@@ -2803,10 +2815,10 @@ public partial class MainWindowViewModel : ObservableObject
 
         var completed = await RunWithProgress(
             LocalizationManager.T("Status_DeletingFiles"),
-            new[] { entryPath ?? string.Empty },
+            new[] { deleteEntryPath },
             async (progress, ct) =>
             {
-                await engine.DeleteEntriesAsync(CurrentArchivePath, new[] { entryPath }, password, progress, ct);
+                await engine.DeleteEntriesAsync(CurrentArchivePath, new[] { deleteEntryPath }, password, progress, ct);
             });
 
         if (completed)

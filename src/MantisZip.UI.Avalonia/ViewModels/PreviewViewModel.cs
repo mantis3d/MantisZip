@@ -1349,6 +1349,7 @@ public partial class PreviewViewModel : ObservableObject
         if (PreviewType != PreviewType.Font) return;
         global::Avalonia.Threading.Dispatcher.UIThread.Post(() =>
         {
+            if (_fontPreviewCachedData == null) return;
             _fontPreviewIsDark = Application.Current?.RequestedThemeVariant == ThemeVariant.Dark;
             RenderFontPreview(_fontPreviewCachedData, _fontPreviewSampleText, _fontPreviewIsDark);
         });
@@ -2797,13 +2798,13 @@ public partial class PreviewViewModel : ObservableObject
     [RelayCommand(CanExecute = nameof(EnterPasswordCommandCanExecute))]
     private async Task EnterPasswordCommandExecuted()
     {
-        if (ShowPasswordDialog == null) return;
+        if (ShowPasswordDialog == null || CurrentPreviewFilePath == null) return;
 
         var response = await ShowPasswordDialog(CurrentPreviewFilePath);
         if (response?.Password != null)
         {
             // 保存密码到会话缓存，后续自动重试
-            var sessionKey = GetSessionPasswordKey(CurrentPreviewFilePath, PreviewType.None);
+            var sessionKey = GetSessionPasswordKey(CurrentPreviewFilePath, PreviewType.None) ?? string.Empty;
             SessionPasswordCache[sessionKey] = response.Password;
 
             // 持久化到密码库（用户勾选了"保存到密码库"）

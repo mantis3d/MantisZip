@@ -27,6 +27,7 @@
 
 #### 2026-09
 
+- **09-09** — 消除全部 39 项预存构建警告（AVLN5001/CS8602/CS8604/CS8620/CS8767/CS8826/CS0649/CS4014），dotnet build 达到 0 warnings 0 errors（301 测试通过）
 - **09-05** — 修复「保存到密码库」不生效：PreviewViewModel 预览面板密码输入忽略 SavePermanently 标志 + TrySavePassword 静默吞异常
 - **09-04** — 纯图标按钮补齐 ToolTip（31 个按钮全本地化，8 个文件）+ 全局 ToolTip 显示延迟调至 100ms（覆盖默认 400ms）
 - **09-04** — 修复安装包缺失 `Resources\Icons` 格式图标：两个 `.iss`（`installer.iss` + `installer-selfcontained.iss`）`[Files]` 段仅打包 MenuIcons/Cursors，漏掉文件关联格式图标目录（zip/7z/rar/tar/tgz/gz/iso），安装后文件关联图标退化为应用通用图标

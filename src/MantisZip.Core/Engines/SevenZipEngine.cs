@@ -1082,7 +1082,7 @@ public class SevenZipEngine : IArchiveEngine
             // 解析条目名冲突（语义方向反转见 AddConflictHelper；覆盖 = 先删旧条目再追加）
             var occupiedNames = new HashSet<string>(existingNames, StringComparer.OrdinalIgnoreCase);
             var finalDict = new Dictionary<string, string>();
-            var deleteIndexes = new Dictionary<int, string>();
+            var deleteIndexes = new Dictionary<int, string?>();
             foreach (var (entryName, sourcePath) in fileDict)
             {
                 cancellationToken.ThrowIfCancellationRequested();
@@ -1097,7 +1097,7 @@ public class SevenZipEngine : IArchiveEngine
                     continue;
                 }
                 if (existingNames.Contains(normalized) && finalName == normalized)
-                    deleteIndexes[existing.Index] = null!; // 覆盖：ModifyArchive 传 null 值 = 删除该索引条目
+                    deleteIndexes[existing.Index] = null; // 覆盖：ModifyArchive 传 null 值 = 删除该索引条目
                 finalDict[finalName] = sourcePath;
             }
 

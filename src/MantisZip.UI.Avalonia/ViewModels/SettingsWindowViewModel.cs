@@ -282,6 +282,11 @@ public partial class SettingsWindowViewModel : ObservableObject
 
             // Prefer owning dialog to MainWindow to avoid null-owner dialog issues
             var ownerWindow = (global::Avalonia.Application.Current?.ApplicationLifetime as global::Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime)?.MainWindow;
+            if (ownerWindow == null)
+            {
+                App.DebugLog("AddCustomAssoc skipped: no owner window available");
+                return;
+            }
             var result = await dlg.ShowDialog<bool?>(ownerWindow);
             if (result != true) return;
             var ext = dlg.Extension;
@@ -297,6 +302,7 @@ public partial class SettingsWindowViewModel : ObservableObject
                 await AppMessageBox.Show(LocalizationManager.T("Settings_Assoc_CustomMaxReached"), "", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
+            _settings.CustomAssocExtensions ??= new();
             _settings.CustomAssocExtensions.Add(ext);
             var item = CreateAssocItem(ext, isCustom: true);
             item.DeleteCommand = new RelayCommand(() => DeleteCustomExtension(item));
@@ -318,7 +324,7 @@ public partial class SettingsWindowViewModel : ObservableObject
     }
 
     [RelayCommand]
-    private void InstallSelectedAssoc()
+    private async Task InstallSelectedAssoc()
     {
         // Install only checked items
         var selected = AssocItems.Where(i => i.IsEnabled).Select(i => i.Extension).ToList();
@@ -328,7 +334,7 @@ public partial class SettingsWindowViewModel : ObservableObject
             ShellIntegration.PrepareAssocRegistration();
             ShellIntegration.InstallAssociations(selected);
             RefreshAssocStatus();
-            AppMessageBox.Show(LocalizationManager.T("Settings_Assoc_InstallDone"), LocalizationManager.T("Settings_Title"), MessageBoxButton.OK, MessageBoxImage.Information);
+            await AppMessageBox.Show(LocalizationManager.T("Settings_Assoc_InstallDone"), LocalizationManager.T("Settings_Title"), MessageBoxButton.OK, MessageBoxImage.Information);
         }
         catch (Exception ex)
         {
@@ -337,13 +343,13 @@ public partial class SettingsWindowViewModel : ObservableObject
     }
 
     [RelayCommand]
-    private void UninstallAllAssoc()
+    private async Task UninstallAllAssoc()
     {
         try
         {
             ShellIntegration.UninstallAssociations();
             RefreshAssocStatus();
-            AppMessageBox.Show(LocalizationManager.T("Settings_Assoc_UninstallDone"), LocalizationManager.T("Settings_Title"), MessageBoxButton.OK, MessageBoxImage.Information);
+            await AppMessageBox.Show(LocalizationManager.T("Settings_Assoc_UninstallDone"), LocalizationManager.T("Settings_Title"), MessageBoxButton.OK, MessageBoxImage.Information);
         }
         catch (Exception ex)
         {
