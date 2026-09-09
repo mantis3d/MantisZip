@@ -35,6 +35,7 @@ public static class PathHelper
             if (!File.Exists(candidate))
                 return candidate;
         }
+        System.Diagnostics.Debug.WriteLine($"PathHelper.GetUniquePath: all 999 candidates occupied for '{path}', returning original (will overwrite)");
         return path; // 999 个名字全被占用了，直接覆盖原文件
     }
 }

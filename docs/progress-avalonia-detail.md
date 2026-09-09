@@ -18,6 +18,7 @@
     - `ArchivePathTests.cs`（21 测试）：`Normalize`/`TrimEndSeparator`/`GetFileName`/`GetDirectoryName`/`GetFileNameWithoutExtension` 共 5 个路径工具方法
     - `LogRedactorTests.cs`（23 测试）：`RedactPaths` 四种脱敏模式（Off/FilenameOnly/ExtensionOnly/Full）+ `ParseMode` 解析 + `Reset` 状态清理 + 混合内容/多次调用 ID 一致性
   - 总测试数从 301 → 370，全部通过
+  - **PathHelper.GetUniquePath 999 溢出警告**：当所有 999 个候选名均被占用时，添加 `Debug.WriteLine` 警告日志（此前静默返回原路径将覆盖文件）
 
 **2026-09-09** — 消除全部 39 项预存构建警告（AVLN5001/CS8602/CS8604/CS8620/CS8767/CS8826/CS0649/CS4014），dotnet build 达到 0 warnings 0 errors
   - **AVLN5001（15 项）**：Avalonia 12 废弃 API 迁移
