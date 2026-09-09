@@ -6,6 +6,10 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-09-09** — 修复设置窗口文件关联「全选」/「取消全选」按钮无效
+  - 根因：`SelectAllAssoc`/`DeselectAllAssoc` 仅修改旧的 `AssocXxx` bool 属性，但 UI CheckBox 绑定的是 `AssocItems` 集合中 `FormatAssocItemModel.IsEnabled`，两者未同步
+  - 修复：两个方法末尾追加 `RefreshAssocStatus()` 调用，将 `AssocXxx` 新值同步到 UI 模型
+
 **2026-09-09** — 代码质量修复 + 补充 Core 层单元测试 69 个
   - **ZipEngine sync-over-async 修正**：`AddToArchiveAsync` 和 `DeleteEntriesAsync` 均为 `async Task` 方法，内部却用 `GetAwaiter().GetResult()` 调用 `ZipBinaryRewriter.RewriteAsync`；改为 `await` 并将 `DeleteEntriesAsync` 的 `Task.Run(() => ...)` 改为 `Task.Run(async () => ...)` 以支持 await
   - **空 catch 块补充异常日志**（4 处）：

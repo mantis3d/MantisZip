@@ -1613,6 +1613,7 @@ public partial class SettingsWindowViewModel : ObservableObject
         AssocTarGz = true;
         AssocGz = true;
         AssocIso = true;
+        RefreshAssocStatus();
     }
 
     [RelayCommand]
@@ -1625,6 +1626,7 @@ public partial class SettingsWindowViewModel : ObservableObject
         AssocTarGz = false;
         AssocGz = false;
         AssocIso = false;
+        RefreshAssocStatus();
     }
 }
 
