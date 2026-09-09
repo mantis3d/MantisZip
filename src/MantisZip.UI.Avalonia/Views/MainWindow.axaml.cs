@@ -1387,7 +1387,10 @@ public partial class MainWindow : Window
                 Directory.CreateDirectory(dir);
             File.AppendAllText(logPath, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}] [PN] {msg}\n");
         }
-        catch { }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"MainWindow log write failed: {ex.Message}");
+        }
     }
 
     private void PickSizeMin_Click(object? sender, RoutedEventArgs e)

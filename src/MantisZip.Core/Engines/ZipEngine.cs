@@ -993,7 +993,7 @@ public class ZipEngine : IArchiveEngine
                                     keepEntryNames.Add(raw);
                         }
 
-                        var result = ZipBinaryRewriter.RewriteAsync(
+                        var result = await ZipBinaryRewriter.RewriteAsync(
                             sourcePath: archivePath,
                             destPath: tempArchiveFast,
                             keepEntryNames: keepEntryNames,
@@ -1001,7 +1001,7 @@ public class ZipEngine : IArchiveEngine
                             encoding: encoding,
                             comment: options.Comment,  // null = preserve original comment
                             progress: progress,
-                            cancellationToken: cancellationToken).GetAwaiter().GetResult();
+                            cancellationToken: cancellationToken);
 
                         // Atomic replace (same retry pattern as legacy path)
                         for (int retry = 0; ; retry++)
@@ -1330,7 +1330,7 @@ public class ZipEngine : IArchiveEngine
         CoreLog.Info($"DeleteEntriesAsync: {archivePath}, entries=[{string.Join("; ", entryPaths)}]");
         var sw = Stopwatch.StartNew();
 
-        await Task.Run(() =>
+        await Task.Run(async () =>
         {
             var deletedSet = new HashSet<string>(entryPaths.Select(p => ArchivePath.Normalize(p)), StringComparer.OrdinalIgnoreCase);
             if (entryPaths.Length == 0)
@@ -1372,7 +1372,7 @@ public class ZipEngine : IArchiveEngine
                         return;
                     }
 
-                    var result = ZipBinaryRewriter.RewriteAsync(
+                    var result = await ZipBinaryRewriter.RewriteAsync(
                         sourcePath: archivePath,
                         destPath: tempArchiveFast,
                         keepEntryNames: keepSet,
@@ -1380,7 +1380,7 @@ public class ZipEngine : IArchiveEngine
                         encoding: encoding,
                         comment: null,  // preserve original comment
                         progress: progress,
-                        cancellationToken: cancellationToken).GetAwaiter().GetResult();
+                        cancellationToken: cancellationToken);
 
                     // Atomic replace
                     for (int retry = 0; ; retry++)

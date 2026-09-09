@@ -718,7 +718,10 @@ public partial class App : Application
             var redacted = LogRedactor.RedactPaths(msg, LogRedactor.ParseMode(_debugLogPrivacyMode));
             File.AppendAllText(logPath, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}] {redacted}\n");
         }
-        catch { }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"App.DebugLog write failed: {ex.Message}");
+        }
     }
 
     /// <summary>

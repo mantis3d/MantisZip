@@ -538,7 +538,10 @@ public static class ArchiveEntryExtractor
                     return (double)duration / timescale;
             }
         }
-        catch { }
+        catch (Exception ex)
+        {
+            CoreLog.Info($"ParseMvhdBox failed: {ex.Message}");
+        }
         return null;
     }
 
@@ -582,7 +585,10 @@ public static class ArchiveEntryExtractor
             if (width > 0 && height > 0)
                 return (width, height);
         }
-        catch { }
+        catch (Exception ex)
+        {
+            CoreLog.Info($"ParseTkhdBox failed: {ex.Message}");
+        }
         return null;
     }
 

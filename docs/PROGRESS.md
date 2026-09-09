@@ -27,6 +27,7 @@
 
 #### 2026-09
 
+- **09-09** — 代码质量修复：ZipEngine sync-over-async 修正（async lambda 内 `GetAwaiter().GetResult()` → `await`）+ 4 处空 catch 块补充异常日志 + 补充 Core 层单元测试 69 个（FileConflictHelper/PathHelper/ArchivePath/LogRedactor，总计 370 测试全绿）
 - **09-09** — 消除全部 39 项预存构建警告（AVLN5001/CS8602/CS8604/CS8620/CS8767/CS8826/CS0649/CS4014），dotnet build 达到 0 warnings 0 errors（301 测试通过）
 - **09-05** — 修复「保存到密码库」不生效：PreviewViewModel 预览面板密码输入忽略 SavePermanently 标志 + TrySavePassword 静默吞异常
 - **09-04** — 纯图标按钮补齐 ToolTip（31 个按钮全本地化，8 个文件）+ 全局 ToolTip 显示延迟调至 100ms（覆盖默认 400ms）

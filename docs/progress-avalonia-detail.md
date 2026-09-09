@@ -6,6 +6,19 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-09-09** — 代码质量修复 + 补充 Core 层单元测试 69 个
+  - **ZipEngine sync-over-async 修正**：`AddToArchiveAsync` 和 `DeleteEntriesAsync` 均为 `async Task` 方法，内部却用 `GetAwaiter().GetResult()` 调用 `ZipBinaryRewriter.RewriteAsync`；改为 `await` 并将 `DeleteEntriesAsync` 的 `Task.Run(() => ...)` 改为 `Task.Run(async () => ...)` 以支持 await
+  - **空 catch 块补充异常日志**（4 处）：
+    - `App.axaml.cs`：`DebugLog` 写入失败的空 catch → `Debug.WriteLine`
+    - `MainWindow.axaml.cs`：日志写入失败的空 catch → `Debug.WriteLine`
+    - `ArchiveEntryExtractor.cs`：`ParseMvhdBox`/`ParseTkhdBox` MP4 元数据解析失败的空 catch → `CoreLog.Info`
+  - **新增测试文件 4 个，共 69 个测试**：
+    - `FileConflictHelperTests.cs`（18 测试）：`GetSafePath` Zip Slip 防护 8 项 + `SanitizeEntryPath` 路径净化 9 项 + `ResolvePath` 冲突策略 1 项
+    - `PathHelperTests.cs`（7 测试）：`GetUniquePath` 路径唯一性生成、双扩展名 `.tar.gz` 处理、999 溢出回退
+    - `ArchivePathTests.cs`（21 测试）：`Normalize`/`TrimEndSeparator`/`GetFileName`/`GetDirectoryName`/`GetFileNameWithoutExtension` 共 5 个路径工具方法
+    - `LogRedactorTests.cs`（23 测试）：`RedactPaths` 四种脱敏模式（Off/FilenameOnly/ExtensionOnly/Full）+ `ParseMode` 解析 + `Reset` 状态清理 + 混合内容/多次调用 ID 一致性
+  - 总测试数从 301 → 370，全部通过
+
 **2026-09-09** — 消除全部 39 项预存构建警告（AVLN5001/CS8602/CS8604/CS8620/CS8767/CS8826/CS0649/CS4014），dotnet build 达到 0 warnings 0 errors
   - **AVLN5001（15 项）**：Avalonia 12 废弃 API 迁移
     - UiTestWindow.axaml：`Watermark=` → `PlaceholderText=` ×5（含修复 replaceAll 误伤 `UseFloatingWatermark` → `UseFloatingPlaceholder`）
