@@ -102,10 +102,18 @@
                             Binding="{Binding SemanticName}"
                             Width="120" />
 
-        <!-- Resource Key -->
-        <DataGridTextColumn Header="PathIcon 资源键"
-                            Binding="{Binding ResourceKey}"
-                            Width="130" />
+        <!-- Resource Key (TextBox for copy support) -->
+        <DataGridTemplateColumn Header="PathIcon 资源键" Width="130">
+          <DataTemplate DataType="models:IconTestItem">
+            <TextBox Text="{Binding ResourceKey}"
+                     IsReadOnly="True"
+                     Background="Transparent"
+                     FontSize="12"
+                     Margin="0" Padding="0"
+                     BorderThickness="0"
+                     VerticalAlignment="Center" />
+          </DataTemplate>
+        </DataGridTemplateColumn>
 
         <!-- Status -->
         <DataGridTextColumn Header="状态"

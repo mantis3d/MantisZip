@@ -27,6 +27,7 @@
 
 #### 2026-09
 
+- **09-10** — 收藏相关 UI 图标统一：新增 FluentUI Bookmark 图标系列（Bookmark / BookmarkAdd / BookmarkMultiple / BookmarkOff）替换原星标，覆盖收藏管理器按钮、工具菜单、路径速选控件与文件选择器；图标测试窗口 PathIcon 资源键改为可复制
 - **09-10** — 文件过滤编辑器布局优化：文件大小（最小值/最大值）和日期（起始/截止）从纵向排列改为水平排列，提升空间利用率
 - **09-10** — 修复设置窗口语言面板「翻译贡献者{0}」占位符未被替换：`LanguageTranslatorText` 属性未传递翻译者名称参数给 `LocalizationManager.T()`，改为从 `AvailableLanguages` 获取当前语言的 `TranslatorText` 并格式化
 - **09-09** — 代码质量修复：ZipEngine sync-over-async 修正（async lambda 内 `GetAwaiter().GetResult()` → `await`）+ 4 处空 catch 块补充异常日志 + 补充 Core 层单元测试 69 个（FileConflictHelper/PathHelper/ArchivePath/LogRedactor，总计 370 测试全绿）

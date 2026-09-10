@@ -6,6 +6,19 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-09-10** — 收藏相关 UI 图标统一 + 图标测试窗口资源键可复制
+  - 新增 FluentUI Bookmark 图标系列（`Resources/Icons/AppIcons.axaml`）：
+    - `IconBookmark`（收藏）、`IconBookmarkAdd`（添加到收藏）、`IconBookmarkMultiple`（收藏管理器）、`IconBookmarkOff`（取消收藏）
+    - 路径数据取自 FluentUI System Icons 24×24 regular 变体
+  - 应用图标（替换原 `IconStar`）：
+    - `Dialogs/FavoriteManagerWindow.axaml`：添加/编辑/删除/上移/下移按钮改为图标+文字（BookmarkAdd / Bookmark / BookmarkOff / ArrowUp / ArrowDown）
+    - `Views/MainWindow.axaml`：工具→收藏夹管理菜单 → `IconBookmarkMultiple`；测试→添加收藏对话框 → `IconBookmarkAdd`；工具→密码管理器菜单 `IconKey` → `IconKeyMultiple`
+    - `Controls/QuickPathPicker.axaml` / `Controls/QuickPathControl.axaml`：收藏快捷按钮 / 收藏 Tab → `IconBookmark`
+    - `Dialogs/CustomFilePickerDialog.axaml`：添加收藏按钮 → `IconBookmarkAdd`
+  - `ViewModels/IconTestViewModel.cs`：`收藏夹管理` 条目改用 `IconBookmarkMultiple`；资源库新增 4 条 Bookmark 记录 + `IconStar` 备用记录（AGENTS.md 规则 8）
+  - `Dialogs/IconTestWindow.axaml`：`PathIcon 资源键` 列由 `DataGridTextColumn` 改为 `DataGridTemplateColumn` + 只读 `TextBox`（`IsReadOnly=True`、无边框透明背景），支持选中复制资源键
+  - 验证：`dotnet build` 0 警告 0 错误；运行时启动无 XAML 资源解析异常
+
 **2026-09-10** — 文件过滤编辑器布局优化：文件大小和日期筛选条件改为水平排列
   - 修改文件：`FileFilterEditor.axaml`
   - 文件大小部分：将最小值和最大值从两行纵向排列改为一行水平排列

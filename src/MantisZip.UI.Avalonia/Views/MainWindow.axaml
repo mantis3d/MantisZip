@@ -244,13 +244,13 @@
         <MenuItem Command="{Binding OpenPasswordManagerCommand}"
                   Header="{Binding LocalizedStrings[Menu_PasswordManager]}">
           <MenuItem.Icon>
-            <PathIcon Data="{StaticResource IconKey}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+            <PathIcon Data="{StaticResource IconKeyMultiple}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
           </MenuItem.Icon>
         </MenuItem>
         <MenuItem Command="{Binding OpenFavoritesManagerCommand}"
                   Header="{Binding LocalizedStrings[FavMgr_OpenManager]}">
           <MenuItem.Icon>
-            <PathIcon Data="{StaticResource IconStar}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+            <PathIcon Data="{StaticResource IconBookmarkMultiple}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
           </MenuItem.Icon>
         </MenuItem>
         <Separator />
@@ -418,7 +418,7 @@
         <MenuItem Click="TestWindow_Click" Tag="AddFavoriteDialog"
                   Header="{Binding LocalizedStrings[Test_AddFavoriteDialog]}">
           <MenuItem.Icon>
-            <PathIcon Data="{StaticResource IconStar}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+            <PathIcon Data="{StaticResource IconBookmarkAdd}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
           </MenuItem.Icon>
         </MenuItem>
         <MenuItem Click="TestWindow_Click" Tag="FavoriteManagerWindow"
