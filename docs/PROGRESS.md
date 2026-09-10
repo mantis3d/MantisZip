@@ -27,6 +27,7 @@
 
 #### 2026-09
 
+- **09-10** — 解压预览冲突检测优化：ApplyConflictMarkers ①②③ 短路（destDir 不存在/过滤项/父目录短路）+ BuildExtractPreview 删除内联冲突 + MarkDirectoryConflicts 废弃；单包两阶段冲突检测（depth 2 快速上屏 → 全量后台补全）+ _conflictCts 取消 + PreviewTreeInvalidated 事件；ExtractSettingsWindow 订阅刷新 + 关闭取消；8 个单测全绿（86 通过/0 失败）
 - **09-09** — 代码质量修复：ZipEngine sync-over-async 修正（async lambda 内 `GetAwaiter().GetResult()` → `await`）+ 4 处空 catch 块补充异常日志 + 补充 Core 层单元测试 69 个（FileConflictHelper/PathHelper/ArchivePath/LogRedactor，总计 370 测试全绿）
 - **09-09** — 消除全部 39 项预存构建警告（AVLN5001/CS8602/CS8604/CS8620/CS8767/CS8826/CS0649/CS4014），dotnet build 达到 0 warnings 0 errors（301 测试通过）
 - **09-05** — 修复「保存到密码库」不生效：PreviewViewModel 预览面板密码输入忽略 SavePermanently 标志 + TrySavePassword 静默吞异常

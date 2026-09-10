@@ -54,7 +54,7 @@
 | **P1** | 自动更新检测 | [auto-update.md](.omo/plans/未开始/auto-update.md) | 🟡中 | 4-6h | GitHub Releases API 版本检查、AboutWindow 更新 Tab、UpdateAvailableDialog、设置开关、单元测试 |
 | **P2** | 解压多压缩包按来源目录分组 | [result-preview-panel.md](.omo/plans/已完成/result-preview-panel.md) | 🟡中 | 2-4h | 结果预览面板遗留①：当前多压缩包条目合并平铺，改为按来源目录分组 + 压缩包壳节点（详见文档「未实现项（后续可做）」） |
 | **P2** | 结果预览截断占位符点击展开 | [result-preview-panel.md](.omo/plans/已完成/result-preview-panel.md) | 🟢低 | 1-2h | 结果预览面板遗留②：当前截断为静态"…"文本，改为点击就地展开完整子节点 |
-| **P2** | 结果预览冲突检测双模式 | [result-preview-panel.md](.omo/plans/已完成/result-preview-panel.md) | 🟡中 | 2-3h | 结果预览面板遗留③：当前固定全量 File.Exists 检测，改为快速（目录级）/完整（逐文件）可切换 |
+| **P2** | ~~结果预览冲突检测双模式~~ | [extract-preview-conflict-detection-optimization.md](.omo/plans/未开始/extract-preview-conflict-detection-optimization.md) | ✅已完 | 2-3h | ✅ 已实施：①②③ 短路优化 + 两阶段冲突检测（depth 2 快速上屏 + 全量后台补全）+ PreviewTreeInvalidated 事件 |
 | **P4** | 外部工具视频元数据 | — | 🟢低 | 2-3h | ffprobe 集成 |
 | **P2** | 跨平台移植（macOS / Linux） | [cross-platform-port.md](.omo/plans/未开始/cross-platform-port.md) | 🟡中大 | 6-8周 | ✅ WPF→Avalonia 迁移已完成（Phases 0-10）；实施计划含 Phase 0 基础设施（CI+路径适配）→ Phase 1 引擎适配（7z/RAR 跨平台）→ Phase 2 UI 适配（macOS/Linux 专项）→ Phase 3 打磨发布；需要决策：7z 压缩策略（禁用/p7zip CLI）、拖拽解压降级、右键菜单取舍 |
 | ~~🔍调研~~ | ~~Avalonia 预览机会分析~~ | [preview-avalonia-opportunities.md](.omo/plans/已归档/preview-avalonia-opportunities.md) | — | — | ✅ 已完成：Office 内容预览、SkiaSharp 渲染（PDF/SVG/字体）、Animated WebP、自实现 GIF 解码器均已实施 |

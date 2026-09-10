@@ -6,6 +6,13 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-09-10** — 解压预览冲突检测优化（extract-preview-conflict-detection-optimization）
+  - **ResultPreviewService**：新增 `ApplyConflictMarkers` + `MarkConflicts` 静态方法，实现三项优化（① destDir 不存在整批跳过零 I/O、② 被过滤项不检查、③ 父目录不存在子树短路）；重构 `BuildExtractPreview` 删除内联冲突检测块，改用 `ApplyConflictMarkers(destNode, destDir)` 一次调用；废弃并删除 `MarkDirectoryConflicts` 私有方法
+  - **ExtractSettingsViewModel**：单包路径 `BuildAndAssignSingleAsync` 改为两阶段冲突检测（depth 2 快速上屏 → 全量后台补全），新增 `_conflictCts` 取消令牌（新请求到达时终止前一轮），新增 `PreviewTreeInvalidated` 事件 + `CancelConflictScan()` 公开方法
+  - **ExtractSettingsWindow**：`OnLoaded` 订阅 `PreviewTreeInvalidated` → `PreviewTree.RefreshDisplay()`，`Closed` 事件追加 `ViewModel.CancelConflictScan()`
+  - **ExtractConflictMarkerTests**（8 个测试）：destDir 不存在/null 全 false、过滤文件/目录跳过检查、父目录不存在子树短路、depth 2/1/全量深度验证
+  - 回归：86 通过 / 0 失败 / 2 跳过（原有 IconProvider），零回归
+
 **2026-09-09** — 修复设置窗口文件关联「全选」/「取消全选」按钮无效
   - 根因：`SelectAllAssoc`/`DeselectAllAssoc` 仅修改旧的 `AssocXxx` bool 属性，但 UI CheckBox 绑定的是 `AssocItems` 集合中 `FormatAssocItemModel.IsEnabled`，两者未同步
   - 修复：两个方法末尾追加 `RefreshAssocStatus()` 调用，将 `AssocXxx` 新值同步到 UI 模型

@@ -122,13 +122,6 @@ public static class ResultPreviewService
                 IsExpanded = false
             };
 
-            // Check if file exists at destination
-            if (checkExists)
-            {
-                var realPath = Path.Combine(destDir, fullPath.Replace('/', Path.DirectorySeparatorChar));
-                fileNode.ExistsAtDestination = File.Exists(realPath);
-            }
-
             // Apply file filter: mark non-matching files as filtered out
             if (filter != null && filter.IsActive && !FileFilterMatcher.IsMatch(filter, item))
                 fileNode.IsFilteredOut = true;
@@ -139,10 +132,10 @@ public static class ResultPreviewService
             ReportProgress();
         }
 
-        // Phase 2: Check directory existence at destination
+        // Phase 2: Check file/directory existence at destination
         if (checkExists)
         {
-            MarkDirectoryConflicts(destNode, destDir);
+            ApplyConflictMarkers(destNode, destDir);
         }
 
         // Phase 3: Calculate descendant counts (destNode is now the root)
@@ -625,17 +618,50 @@ public static class ResultPreviewService
     }
 
     /// <summary>
-    /// 递归标记目录节点在目标路径是否已存在。
+    /// 目标位置冲突检测：设置树中各节点的 <see cref="PreviewTreeNode.ExistsAtDestination"/>。
+    /// 优化：① destDir 不存在则整批跳过；② 被过滤项不检查；③ 自顶向下、父目录不存在则子树短路。
     /// </summary>
-    private static void MarkDirectoryConflicts(PreviewTreeNode node, string destDir)
+    /// <param name="root">预览树根节点。</param>
+    /// <param name="destDir">目标解压目录。</param>
+    /// <param name="maxDepth">相对 root 的最大检查深度。1=仅直接子项；2=直接子项+孙辈；int.MaxValue=全量。</param>
+    /// <param name="ct">取消令牌。</param>
+    public static void ApplyConflictMarkers(
+        PreviewTreeNode root, string destDir, int maxDepth = int.MaxValue, CancellationToken ct = default)
     {
+        // ① 目标根不存在 → 所有 ExistsAtDestination 保持默认 false，零 I/O
+        if (string.IsNullOrEmpty(destDir) || !Directory.Exists(destDir))
+            return;
+
+        MarkConflicts(root, destDir, parentExists: true, depth: 0, maxDepth, ct);
+    }
+
+    private static void MarkConflicts(
+        PreviewTreeNode node, string destDir, bool parentExists, int depth, int maxDepth, CancellationToken ct)
+    {
+        if (depth >= maxDepth) return;
+
         foreach (var child in node.Children.OfType<PreviewTreeNode>())
         {
-            if (child.IsDirectory && !child.IsTruncated)
+            ct.ThrowIfCancellationRequested();
+
+            // ② 被过滤项不检查（视图会移除、CountConflicts 也跳过）
+            if (child.IsFilteredOut)
             {
-                var realPath = Path.Combine(destDir, child.FullPath.Replace('/', Path.DirectorySeparatorChar));
-                child.ExistsAtDestination = Directory.Exists(realPath);
-                MarkDirectoryConflicts(child, destDir);
+                child.ExistsAtDestination = false;
+                continue;
+            }
+
+            var realPath = Path.Combine(destDir, child.FullPath.Replace('/', Path.DirectorySeparatorChar));
+
+            if (child.IsDirectory)
+            {
+                // ③ 父不存在 → 子树短路
+                child.ExistsAtDestination = parentExists && Directory.Exists(realPath);
+                MarkConflicts(child, destDir, child.ExistsAtDestination, depth + 1, maxDepth, ct);
+            }
+            else
+            {
+                child.ExistsAtDestination = parentExists && File.Exists(realPath);
             }
         }
     }

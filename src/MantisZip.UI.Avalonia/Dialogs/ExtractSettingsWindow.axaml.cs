@@ -71,8 +71,12 @@ public partial class ExtractSettingsWindow : Window
 
         DataContext = ViewModel;
 
-        // 窗口关闭时取消后台逐包校验
-        Closed += (_, _) => _validationCts?.Cancel();
+        // 窗口关闭时取消后台逐包校验 + 冲突扫描
+        Closed += (_, _) =>
+        {
+            _validationCts?.Cancel();
+            ViewModel.CancelConflictScan();
+        };
 
         // 浏览回调：解压模式文件夹对话框（内建 ResultTreeView 实时冲突检测）。
         // QuickPathPicker 只收目录，此处返回目录即可。
@@ -152,6 +156,12 @@ public partial class ExtractSettingsWindow : Window
 
         // Subscribe to DestinationPath changes for preview rebuild
         ViewModel.PropertyChanged += OnViewModelPropertyChanged;
+
+        // 冲突标记全量完成后刷新视图（冲突计数、高亮等）
+        ViewModel.PreviewTreeInvalidated += (_, _) =>
+        {
+            Dispatcher.UIThread.Post(() => PreviewTree.RefreshDisplay());
+        };
 
         // 首包条目已由外部注入（MainWindow 单包路径）时立即构建冲突预览；
         // 否则 ValidateAllAsync 完成首包校验后自动填充 ⏳→树
