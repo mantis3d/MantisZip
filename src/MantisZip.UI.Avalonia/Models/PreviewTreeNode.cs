@@ -75,7 +75,7 @@ public class PreviewTreeNode : FolderNode
             : string.Empty;
 
     private bool HasLoadingPlaceholderChild =>
-        Children.OfType<PreviewTreeNode>().Any(c => c.IsLoadingPlaceholder);
+        Children.OfType<PreviewTreeNode>().Any(c => c.IsLoadingPlaceholder || c.HasLoadingPlaceholderChild);
 
     /// <summary>冲突标记（⚠️）的工具提示文本。</summary>
     public string ConflictToolTip => LocalizationManager.T("Preview_Result_FileExists");
