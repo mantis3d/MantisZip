@@ -1,4 +1,5 @@
 {
+  "Preview_Result_LoadingMore": "Loading",
   "Filter_PickDateFrom": "Use the selected entry's date as the start date",
   "Filter_PickDateTo": "Use the selected entry's date as the end date",
   "Filter_PickSizeMin": "Use the selected entry's size as the minimum",

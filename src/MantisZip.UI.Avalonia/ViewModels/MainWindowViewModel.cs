@@ -263,6 +263,7 @@ public partial class MainWindowViewModel : ObservableObject
             "Tooltip_Open", "Tooltip_Extract", "Tooltip_ExtractSelectedHere", "Tooltip_ExtractSelectedTo", "Tooltip_NewArchive",
             "Tooltip_Filter", "Tooltip_Preview", "Tooltip_SmartExtract", "Tooltip_Test",
             "Tooltip_AddFiles", "Tooltip_DeleteFiles", "Tooltip_Subfolders",
+            "Preview_Result_LoadingMore",
             "Status_AddComplete", "Status_DeleteComplete", "Status_TestOK", "Status_TestFailed",
             "Status_CommentSaved", "Status_SmartExtractSingleRoot", "Status_SmartExtractNamed",
             "Status_CommentNotSupported", "Status_ConfirmDelete",

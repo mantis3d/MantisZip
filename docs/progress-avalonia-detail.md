@@ -6,6 +6,14 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-09-10** — 压缩预览渐进式加载（compress-preview-progressive-loading）
+  - **PreviewTreeNode**：新增 `IsLoadingPlaceholder`/`IsTruncatedNode`/`DisplayLabel`（`IsLoadingPlaceholder` 时返回本地化「加载中」文案）/`ShallowClone`；`DirectoryInfoText` 增加 `HasLoadingPlaceholderChild` 判空保护（占位子节点时返回空，避免显示误导的文件计数）；`IsEmptyDirectory` 增加 `!HasLoadingPlaceholderChild` 条件（含占位视为非空）
+  - **ResultPreviewService**：新增 `SourceSubtree` record（Node+IsFull）；`BuildSourceSubtree` 公开方法（maxDepth/maxWidthPerDir/CT）+ `AssembleCompressPreview` 装配方法；`BuildDirectoryNode` 重构（`depth>=maxDepth` 时子目录挂占位、文件仍枚举 + `HasAnyEntry` 语义不变）+ `CreateLoadingPlaceholder` 工厂；`BuildCompressPreview` 简化为调用 `BuildSourceSubtree` + `AssembleCompressPreview`；`BuildSeparateArchivesPreview` 改为消费 `BuildSourceSubtree` 结果
+  - **CompressSettingsViewModel**：`BuildCompressPreviewCoreAsync` 改为两阶段——Phase A 浅层扫描所有源（maxDepth=1）→ Phase B 串行全量重建（每源 250ms 节流调用 `AssembleCompressPreview` 渐进替换子树）→ Phase C 最终装配（Plan 输出路径/模式）；新增 `_sourceCache`（Dictionary<path, SourceSubtree>）+ `FilterSignature` 签名失效检测 + `_previewCts` 异步取消 + `AdoptPlan` 时取消旧 CTS
+  - **ResultTreeView.axaml/.axaml.cs**：ScrollViewer 添加 `x:Name="TreeScrollViewer"`；`RebuildDisplayTree` 在 `DispatcherPriority.Loaded` 保存/恢复滚动偏移
+  - **CompressPreviewProgressiveTests**（9 个测试）：浅层深度截断、空目录无占位、宽度上限截断+目录优先、占位属性验证、父目录含占位不判空、全量无占位、取消穿透、过滤一致性浅层+全量、装配等价
+  - 回归：96 通过 / 0 失败 / 2 跳过
+
 **2026-09-10** — 解压预览冲突检测优化（extract-preview-conflict-detection-optimization）
   - **ResultPreviewService**：新增 `ApplyConflictMarkers` + `MarkConflicts` 静态方法，实现三项优化（① destDir 不存在整批跳过零 I/O、② 被过滤项不检查、③ 父目录不存在子树短路）；重构 `BuildExtractPreview` 删除内联冲突检测块，改用 `ApplyConflictMarkers(destNode, destDir)` 一次调用；废弃并删除 `MarkDirectoryConflicts` 私有方法
   - **ExtractSettingsViewModel**：单包路径 `BuildAndAssignSingleAsync` 改为两阶段冲突检测（depth 2 快速上屏 → 全量后台补全），新增 `_conflictCts` 取消令牌（新请求到达时终止前一轮），新增 `PreviewTreeInvalidated` 事件 + `CancelConflictScan()` 公开方法

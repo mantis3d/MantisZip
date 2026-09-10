@@ -15,7 +15,9 @@ public class PreviewTreeNode : FolderNode
     /// <summary>自定义显示名称（截断节点等场景用覆盖默认 Name）。未显式设置时回退到 Name。</summary>
     public string DisplayLabel
     {
-        get => string.IsNullOrEmpty(_displayLabel) ? Name : _displayLabel;
+        get => IsLoadingPlaceholder
+            ? LocalizationManager.T("Preview_Result_LoadingMore")
+            : (string.IsNullOrEmpty(_displayLabel) ? Name : _displayLabel);
         set => _displayLabel = value;
     }
     private string _displayLabel = string.Empty;
@@ -47,8 +49,9 @@ public class PreviewTreeNode : FolderNode
     /// <summary>是否为目录节点（由构建代码在创建时标记，区别于文件节点）。</summary>
     public bool IsDirectory { get; set; }
 
-    /// <summary>是否为空目录（递归语义：整棵子树无文件，仅含目录或空无内容均算空；被过滤文件不计数）。</summary>
-    public bool IsEmptyDirectory => IsDirectory && TotalDescendantCount == 0;
+    /// <summary>是否为空目录（递归语义：整棵子树无文件，仅含目录或空无内容均算空；被过滤文件不计数）。
+    /// 含占位子节点时视为非空（有待加载内容）。</summary>
+    public bool IsEmptyDirectory => IsDirectory && TotalDescendantCount == 0 && !HasLoadingPlaceholderChild;
 
     /// <summary>缩进深度（0 为顶级）。由 RebuildDisplayTree 的 SetIndentGuides 设置。</summary>
     public int IndentDepth { get; set; }
@@ -67,15 +70,21 @@ public class PreviewTreeNode : FolderNode
 
     /// <summary>目录统计摘要文本，仅目录节点有值（空目录不显示统计行）。</summary>
     public string DirectoryInfoText =>
-        !IsEmptyDirectory && Children.Count > 0 && !string.IsNullOrEmpty(FullPath)
+        !IsEmptyDirectory && Children.Count > 0 && !string.IsNullOrEmpty(FullPath) && !HasLoadingPlaceholderChild
             ? LocalizationManager.T("Preview_Result_DirInfo", TotalDescendantCount, FormatUtil.FormatSize(TotalDescendantSize))
             : string.Empty;
+
+    private bool HasLoadingPlaceholderChild =>
+        Children.OfType<PreviewTreeNode>().Any(c => c.IsLoadingPlaceholder);
 
     /// <summary>冲突标记（⚠️）的工具提示文本。</summary>
     public string ConflictToolTip => LocalizationManager.T("Preview_Result_FileExists");
 
     /// <summary>是否被截断显示（超过 MaxItemsPerDirectory 或 MaxDepth）。</summary>
     public bool IsTruncated { get; set; }
+
+    /// <summary>是否为「深层未加载」占位节点（浅层先行阶段的 "… 加载中"）。</summary>
+    public bool IsLoadingPlaceholder { get; set; }
 
     /// <summary>被截断的额外条目数。</summary>
     public int TruncatedCount { get; set; }
@@ -93,7 +102,7 @@ public class PreviewTreeNode : FolderNode
         {
             if (!string.IsNullOrEmpty(IconKeyOverride)) return IconKeyOverride;
             if (IsArchiveNode) return "IconArchive";
-            if (IsTruncated) return null;
+            if (IsTruncated || IsLoadingPlaceholder) return null;
             if (ExistsAtDestination && !IsDirectory && !string.IsNullOrEmpty(FullPath)) return "IconWarning";
             if (IsEmptyDirectory) return "IconEmptyFolder";
             if (Children.Count > 0 || string.IsNullOrEmpty(FullPath)) return "IconFolder";
@@ -102,7 +111,7 @@ public class PreviewTreeNode : FolderNode
     }
 
     /// <summary>是否为截断节点（显示 … 文本）。</summary>
-    public bool IsTruncatedNode => IsTruncated;
+    public bool IsTruncatedNode => IsTruncated || IsLoadingPlaceholder;
 
     /// <summary>
     /// 占位节点状态前景色键（合并预览中损坏="ConflictRed"、需密码="Blue"）。
@@ -173,6 +182,7 @@ public class PreviewTreeNode : FolderNode
             TotalDescendantSize = TotalDescendantSize,
             MaxChildDepth = MaxChildDepth,
             IsTruncated = IsTruncated,
+            IsLoadingPlaceholder = IsLoadingPlaceholder,
             TruncatedCount = TruncatedCount,
             TruncatedDepth = TruncatedDepth,
             IsExpanded = IsExpanded,
