@@ -117,6 +117,7 @@
               Padding="20,6"
               HorizontalAlignment="Right"
               Click="Ok_Click"
+              IsVisible="False"
               Background="{DynamicResource ThemeAccentBrush}"
               Foreground="{DynamicResource ThemeTextOnAccentBrush}"
               BorderThickness="0" />

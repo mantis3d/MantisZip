@@ -754,16 +754,16 @@
                     Spacing="{DynamicResource SpacingXs}">
           <PathIcon Data="{StaticResource IconFolder}" Width="64" Height="64" HorizontalAlignment="Center" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
           <TextBlock Text="{Binding LocalizedStrings[Main_DropHint]}"
-                     FontSize="16"
-                     Foreground="{DynamicResource ThemeTextSecondaryBrush}"
-                     TextWrapping="Wrap"
-                     HorizontalAlignment="Center" />
+                    FontSize="16"
+                    Foreground="{DynamicResource ThemeTextSecondaryBrush}"
+                    TextWrapping="Wrap"
+                    HorizontalAlignment="Center" />
         </StackPanel>
       </Border>
 
       <!-- Archive content (hidden when no archive loaded) -->
       <!-- 预览面板位置由 ApplyPreviewPosition 动态控制（1=底部, 2=目录树下方, 3=文件列表下方, 4=右侧）。
-           Row 0=内容区, Row 1=水平分隔条, Row 2=底部/树下方/列表下方的预览行（高度运行时注入） -->
+          Row 0=内容区, Row 1=水平分隔条, Row 2=底部/树下方/列表下方的预览行（高度运行时注入） -->
       <Grid x:Name="ArchiveContentGrid"
             IsVisible="{Binding IsArchiveLoaded}"
             ColumnDefinitions="1*,5,2.5*,5,3*"
@@ -844,7 +844,7 @@
                             Width="14" Height="14"
                             Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
                   <TextBlock Text="{Binding Name}"
-                             Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+                            Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
                 </StackPanel>
               </TreeDataTemplate>
             </TreeView.ItemTemplate>
@@ -1209,8 +1209,8 @@
                           DataContext="{Binding Preview}" />
 
       <!-- 拖拽添加覆层（DragOver 悬停期间显示：覆盖文件列表列，视觉对齐拖拽解压覆层——
-           状态色背景呼吸透明 alpha 40-120、8px 同色不透明边框、白色粗体文字+阴影、✓/⚠ 状态图标。
-           呼吸由 code-behind DispatcherTimer 驱动，仅背景层 Opacity 呼吸，边框/文字保持不透明） -->
+            状态色背景呼吸透明 alpha 40-120、8px 同色不透明边框、白色粗体文字+阴影、✓/⚠ 状态图标。
+            呼吸由 code-behind DispatcherTimer 驱动，仅背景层 Opacity 呼吸，边框/文字保持不透明） -->
       <Border x:Name="DragAddOverlay"
               Grid.Column="2"
               Grid.Row="0"
@@ -1226,23 +1226,23 @@
                       Spacing="{DynamicResource SpacingMd}"
                       Margin="40,0">
             <TextBlock x:Name="DragAddOverlayIcon"
-                       Text="&#x2713;"
-                       FontSize="48"
-                       FontWeight="Bold"
-                       Foreground="#90E060"
-                       FontFamily="Segoe UI Symbol"
-                       HorizontalAlignment="Center">
+                      Text="&#x2713;"
+                      FontSize="48"
+                      FontWeight="Bold"
+                      Foreground="#90E060"
+                      FontFamily="Segoe UI Symbol"
+                      HorizontalAlignment="Center">
               <TextBlock.Effect>
                 <DropShadowEffect OffsetX="1" OffsetY="1" BlurRadius="3" Color="#B0000000" />
               </TextBlock.Effect>
             </TextBlock>
             <TextBlock x:Name="DragAddOverlayText"
-                       FontSize="24"
-                       FontWeight="Bold"
-                       Foreground="White"
-                       TextAlignment="Center"
-                       TextWrapping="Wrap"
-                       MaxWidth="560">
+                      FontSize="24"
+                      FontWeight="Bold"
+                      Foreground="White"
+                      TextAlignment="Center"
+                      TextWrapping="Wrap"
+                      MaxWidth="560">
               <TextBlock.Effect>
                 <DropShadowEffect OffsetX="1" OffsetY="1" BlurRadius="3" Color="#B0000000" />
               </TextBlock.Effect>
@@ -1259,14 +1259,14 @@
             Background="{DynamicResource ThemeHeaderBgBrush}">
       <Grid ColumnDefinitions="Auto,*,Auto,Auto">
         <TextBlock Grid.Column="0"
-                   Text="{Binding SelectionStats}"
-                   Foreground="{DynamicResource ThemeTextPrimaryBrush}"
-                   FontSize="12" />
+                    Text="{Binding SelectionStats}"
+                    Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                    FontSize="12" />
         <TextBlock Grid.Column="1"
-                   Text="{Binding ArchiveStats}"
-                   Foreground="{DynamicResource ThemeTextPrimaryBrush}"
-                   FontSize="12"
-                   HorizontalAlignment="Center" />
+                    Text="{Binding ArchiveStats}"
+                    Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                    FontSize="12"
+                    HorizontalAlignment="Center" />
         <!-- Password status -->
         <StackPanel Grid.Column="2"
                     Orientation="Horizontal"
@@ -1277,14 +1277,14 @@
                     Width="14" Height="14"
                     Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
           <TextBlock Text="{Binding PasswordStatusMessage}"
-                     Foreground="{DynamicResource ThemeTextPrimaryBrush}"
-                     FontSize="12" />
+                    Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                    FontSize="12" />
         </StackPanel>
         <TextBlock Grid.Column="3"
-                   Text="{Binding StatusMessage}"
-                   Foreground="{DynamicResource ThemeTextPrimaryBrush}"
-                   FontSize="12"
-                   HorizontalAlignment="Right" />
+                  Text="{Binding StatusMessage}"
+                  Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                  FontSize="12"
+                  HorizontalAlignment="Right" />
       </Grid>
     </Border>
 
@@ -1304,13 +1304,13 @@
                     HorizontalAlignment="Center"
                     MinWidth="260">
           <TextBlock Text="{Binding LocalizedStrings[Status_OpeningArchive]}"
-                     Foreground="{DynamicResource ThemeTextPrimaryBrush}"
-                     FontSize="16"
-                     HorizontalAlignment="Center" />
+                    Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                    FontSize="16"
+                    HorizontalAlignment="Center" />
           <ProgressBar IsIndeterminate="True"
-                       Width="180"
-                       Height="6"
-                       HorizontalAlignment="Center" />
+                      Width="180"
+                      Height="6"
+                      HorizontalAlignment="Center" />
         </StackPanel>
       </Border>
     </Grid>

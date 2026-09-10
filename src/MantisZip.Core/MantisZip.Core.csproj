@@ -8,7 +8,7 @@
 
   <ItemGroup>
     <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
-      <_Parameter1>MantisZip.UI</_Parameter1>
+      <_Parameter1>MantisZip.UI.Avalonia</_Parameter1>
     </AssemblyAttribute>
   </ItemGroup>
 

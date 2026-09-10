@@ -2,9 +2,9 @@
 
 ## 项目概述
 - **项目名称**: MantisZip
-- **类型**: Windows 压缩/解压软件 (WPF → Avalonia 迁移中)
+- **类型**: Windows 压缩/解压软件 (基于 Avalonia)
 - **目标**: 替代 Bandizip 的开源压缩软件
-- **技术栈**: .NET 10 + WPF → Avalonia 迁移中 + SharpCompress + SharpSevenZip
+- **技术栈**: .NET 10 + Avalonia 12 + SharpCompress + SharpSevenZip
 
 ## 版本
 - **当前版本**: 0.5.0

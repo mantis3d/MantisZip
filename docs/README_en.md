@@ -167,9 +167,8 @@ The file list now includes a size ratio bar, directory flattening, and filtering
 ---
 
 ## 🤔 Known Issues
-- This software prioritizes features and usability, so performance may lag behind mainstream compression tools. Optimization will come in future releases.
-- **Drag-and-drop export** uses 7-Zip's eager-extraction model (extracts all files to temp before initiating drag), causing delays with many large files. This feature is off by default and can be enabled in settings. Future migration from WPF to Avalonia will natively resolve this platform's deferred rendering limitation.
-- Markdown, HTML, SVG, and PDF preview currently use the WebView2 control, with all external network requests blocked (only `file://` local access allowed). The architecture will be further streamlined after migrating to Avalonia.
+- **Drag-and-drop export** uses 7-Zip's eager-extraction model (extracts all files to temp before initiating drag), causing delays with many large files. This feature is off by default and can be enabled in settings.
+- Markdown, HTML, SVG, and PDF preview use native .NET controls (Markdig, ReverseMarkdown, PdfPig, Svg.Skia), with all external network requests blocked (only `file://` local access allowed).
 - Some archive formats do **not** support single-entry preview — a prompt will be shown in such cases.
 - RAR format does not support compression (read-only extraction).
 - Currently only supports Windows; cross-platform support is planned.
@@ -194,7 +193,6 @@ The file list now includes a size ratio bar, directory flattening, and filtering
 
 - **OS**: Windows 10 (1809+) / Windows 11 (cross-platform support is planned)
 - **Runtime**: [.NET 10 Runtime](https://dotnet.microsoft.com/download/dotnet/10.0)
-- **WebView2 Runtime**: HTML/Markdown/SVG/PDF preview requires [WebView2 Runtime](https://developer.microsoft.com/microsoft-edge/webview2/)
 
 ---
 
@@ -225,10 +223,10 @@ MantisZip supports powerful command-line invocation (e.g., for context menu inte
 
 ```powershell
 # Open an archive for browsing
-MantisZip.UI.exe --open "D:\Documents.zip"
+MantisZip.UI.Avalonia.exe --open "D:\Documents.zip"
 
 # Quick compress (default settings)
-MantisZip.UI.exe --compress-quick "D:\Photos" -- "D:\backup.zip"
+MantisZip.UI.Avalonia.exe --compress-quick "D:\Photos" -- "D:\backup.zip"
 ```
 
 See the [CLI Guide](CLI.md) for the full parameter list.
