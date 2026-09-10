@@ -6,6 +6,16 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-09-10** — 文件过滤编辑器布局优化：文件大小和日期筛选条件改为水平排列
+  - 修改文件：`FileFilterEditor.axaml`
+  - 文件大小部分：将最小值和最大值从两行纵向排列改为一行水平排列
+    - 布局：`最小值标签` + `最小值输入框` + `单位选择框` + `最大值标签` + `最大值输入框`
+    - 使用6列Grid实现水平对齐，单位选择框占据剩余空间
+  - 日期部分：将起始日期和截止日期从两行纵向排列改为一行水平排列
+    - 布局：`起始日期标签` + `起始日期选择器` + `截止日期标签` + `截止日期选择器`
+    - 使用6列Grid实现水平对齐
+  - 效果：筛选面板更加紧凑，减少垂直空间占用
+
 **2026-09-10** — 修复设置窗口语言面板「翻译贡献者{0}」占位符未被替换
   - 根因：`SettingsWindowViewModel.LanguageTranslatorText` 属性调用 `LocalizationManager.T("Settings_Language_Translator")` 时未传递翻译者名称参数，导致 `{0}` 占位符未被替换
   - 修复：将 `LanguageTranslatorText` 从表达式主体属性改为完整属性，从 `LocalizationManager.AvailableLanguages` 获取当前语言的 `TranslatorText`，并传递给 `T("Settings_Language_Translator", translator)` 进行格式化
