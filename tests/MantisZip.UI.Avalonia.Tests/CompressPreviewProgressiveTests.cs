@@ -136,7 +136,7 @@ public class CompressPreviewProgressiveTests : IDisposable
         var placeholder = dirANode.Children.OfType<PreviewTreeNode>().First(c => c.IsLoadingPlaceholder);
 
         Assert.True(placeholder.IsTruncatedNode);
-        Assert.Null(placeholder.IconKey);
+        Assert.Equal("IconFolderSync", placeholder.IconKey);
         Assert.False(placeholder.IsTruncated);
         Assert.Equal(placeholder.DisplayLabel, LocalizationManager.T("Preview_Result_LoadingMore"));
 

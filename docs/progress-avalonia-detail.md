@@ -6,6 +6,11 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-09-10** — 骨架状态目录图标区分（FluentUI folder_sync）
+  - **AppIcons.axaml**：新增 `IconFolderSync` Geometry 资源（FluentUI `folder_sync_20_regular` SVG 路径数据）
+  - **PreviewTreeNode**：`IconKey` getter 在 `IsLoadingPlaceholder` 时返回 `"IconFolderSync"`（原返回 `null`），骨架状态目录节点显示同步图标而非空白
+  - **IconTestViewModel**：`LoadAllIcons()` 注册 `IconFolderSync`（资源库→文件夹同步）
+
 **2026-09-10** — 压缩预览渐进式加载（compress-preview-progressive-loading）
   - **PreviewTreeNode**：新增 `IsLoadingPlaceholder`/`IsTruncatedNode`/`DisplayLabel`（`IsLoadingPlaceholder` 时返回本地化「加载中」文案）/`ShallowClone`；`DirectoryInfoText` 增加 `HasLoadingPlaceholderChild` 判空保护（占位子节点时返回空，避免显示误导的文件计数）；`IsEmptyDirectory` 增加 `!HasLoadingPlaceholderChild` 条件（含占位视为非空）
   - **ResultPreviewService**：新增 `SourceSubtree` record（Node+IsFull）；`BuildSourceSubtree` 公开方法（maxDepth/maxWidthPerDir/CT）+ `AssembleCompressPreview` 装配方法；`BuildDirectoryNode` 重构（`depth>=maxDepth` 时子目录挂占位、文件仍枚举 + `HasAnyEntry` 语义不变）+ `CreateLoadingPlaceholder` 工厂；`BuildCompressPreview` 简化为调用 `BuildSourceSubtree` + `AssembleCompressPreview`；`BuildSeparateArchivesPreview` 改为消费 `BuildSourceSubtree` 结果
