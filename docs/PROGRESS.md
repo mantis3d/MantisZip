@@ -30,6 +30,8 @@
 - **09-10** — 收藏相关 UI 图标统一：新增 FluentUI Bookmark 图标系列（Bookmark / BookmarkAdd / BookmarkMultiple / BookmarkOff）替换原星标，覆盖收藏管理器按钮、工具菜单、路径速选控件与文件选择器；图标测试窗口 PathIcon 资源键改为可复制
 - **09-10** — 文件过滤编辑器布局优化：文件大小（最小值/最大值）和日期（起始/截止）从纵向排列改为水平排列，提升空间利用率
 - **09-10** — 修复设置窗口语言面板「翻译贡献者{0}」占位符未被替换：`LanguageTranslatorText` 属性未传递翻译者名称参数给 `LocalizationManager.T()`，改为从 `AvailableLanguages` 获取当前语言的 `TranslatorText` 并格式化
+- **09-10** — 压缩预览渐进式加载 + 骨架状态图标区分（FluentUI folder_sync）：`BuildSourceSubtree` 两阶段（浅层先行→全量逐源重建）、`AssembleCompressPreview` 装配、`SourceSubtree` 按源缓存 + `FilterSignature` 失效检测；`BuildDirectoryNode` 深度边界重构（`depth≥maxDepth` 子目录挂占位、文件仍枚举）+ `IsEmptyDirectory` 含占位视为非空；`PreviewTreeNode` 占位属性（`IsLoadingPlaceholder`/`DisplayLabel`/`IsTruncatedNode`/`ShallowClone`）；`ResultTreeView` 滚动位置保持；`CompressSettingsViewModel` 异步取消 + 250ms 节流渐进装配；9 个单测全绿（96 通过/0 失败）
+- **09-10** — 解压预览冲突检测优化：ApplyConflictMarkers ①②③ 短路（destDir 不存在/过滤项/父目录短路）+ BuildExtractPreview 删除内联冲突 + MarkDirectoryConflicts 废弃；单包两阶段冲突检测（depth 2 快速上屏 → 全量后台补全）+ _conflictCts 取消 + PreviewTreeInvalidated 事件；ExtractSettingsWindow 订阅刷新 + 关闭取消；8 个单测全绿（86 通过/0 失败）
 - **09-09** — 代码质量修复：ZipEngine sync-over-async 修正（async lambda 内 `GetAwaiter().GetResult()` → `await`）+ 4 处空 catch 块补充异常日志 + 补充 Core 层单元测试 69 个（FileConflictHelper/PathHelper/ArchivePath/LogRedactor，总计 370 测试全绿）
 - **09-09** — 消除全部 39 项预存构建警告（AVLN5001/CS8602/CS8604/CS8620/CS8767/CS8826/CS0649/CS4014），dotnet build 达到 0 warnings 0 errors（301 测试通过）
 - **09-05** — 修复「保存到密码库」不生效：PreviewViewModel 预览面板密码输入忽略 SavePermanently 标志 + TrySavePassword 静默吞异常

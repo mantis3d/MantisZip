@@ -1,3 +1,4 @@
+using System.Threading;
 using MantisZip.Core.Abstractions;
 using MantisZip.Core.FileFilter;
 using MantisZip.Core.Services;
@@ -12,6 +13,11 @@ namespace MantisZip.UI.Avalonia.Services;
 /// </summary>
 public static class ResultPreviewService
 {
+    /// <summary>单个源（文件或目录）的构建结果。</summary>
+    /// <param name="Node">该源的子树节点（浅层或全量）。</param>
+    /// <param name="IncludedFiles">该源内经过滤的匹配文件绝对路径清单（供 B 数据集白名单回填）。</param>
+    /// <param name="IsFull">是否为全量构建（false = 浅层阶段产物，后续需被全量替换）。</param>
+    public sealed record SourceSubtree(PreviewTreeNode Node, List<string> IncludedFiles, bool IsFull);
     /// <summary>
     /// 构建解压预览树。
     /// </summary>
@@ -122,13 +128,6 @@ public static class ResultPreviewService
                 IsExpanded = false
             };
 
-            // Check if file exists at destination
-            if (checkExists)
-            {
-                var realPath = Path.Combine(destDir, fullPath.Replace('/', Path.DirectorySeparatorChar));
-                fileNode.ExistsAtDestination = File.Exists(realPath);
-            }
-
             // Apply file filter: mark non-matching files as filtered out
             if (filter != null && filter.IsActive && !FileFilterMatcher.IsMatch(filter, item))
                 fileNode.IsFilteredOut = true;
@@ -139,10 +138,10 @@ public static class ResultPreviewService
             ReportProgress();
         }
 
-        // Phase 2: Check directory existence at destination
+        // Phase 2: Check file/directory existence at destination
         if (checkExists)
         {
-            MarkDirectoryConflicts(destNode, destDir);
+            ApplyConflictMarkers(destNode, destDir);
         }
 
         // Phase 3: Calculate descendant counts (destNode is now the root)
@@ -157,26 +156,61 @@ public static class ResultPreviewService
     }
 
     /// <summary>
-    /// 构建压缩预览树（双产物）：同时产出预览树与过滤后的压缩计划（B 数据集）。
-    /// 树 = A 数据（完整结构 + IsFilteredOut 标记）；Plan = B 数据（每源输出包路径 + 匹配文件清单）。
-    /// 执行侧（CompressService）消费 Plan，保证预览 = 实际。
+    /// 构建单个源（文件或目录）的子树。不存在路径返回 null。
     /// </summary>
-    /// <param name="sourcePaths">用户选择的源路径列表（文件或目录）。</param>
-    /// <param name="rootName">根节点显示名称。</param>
-    /// <param name="filter">文件过滤条件，不为空且 IsActive 时对文件节点标记 IsFilteredOut。</param>
-    /// <param name="outputMode">输出模式（Manual / Separate / Combined）。</param>
-    /// <param name="outputPath">Manual/Combined 模式下的输出路径。</param>
-    /// <param name="format">压缩格式（"zip" / "7z" / "tar.gz"）。</param>
-    /// <param name="keepOriginalExtension">Separate 模式下是否保留源文件扩展名。</param>
-    /// <returns>根节点与压缩计划（B 数据集）。</returns>
-    public static (PreviewTreeNode Root, CompressPlan Plan) BuildCompressPreview(
-        IReadOnlyList<string> sourcePaths,
-        string? rootName = null,
+    /// <param name="sourcePath">源文件或目录的绝对路径。</param>
+    /// <param name="filter">文件过滤条件。</param>
+    /// <param name="maxDepth">最大递归深度（int.MaxValue=全量）。</param>
+    /// <param name="maxWidthPerDir">每个目录最多平铺的子项数（int.MaxValue=不限）。</param>
+    /// <param name="ct">取消令牌。</param>
+    public static SourceSubtree? BuildSourceSubtree(
+        string sourcePath,
         FileFilterCriteria? filter = null,
-        CompressOutputMode outputMode = CompressOutputMode.Manual,
-        string? outputPath = null,
-        string format = "zip",
-        bool keepOriginalExtension = false)
+        int maxDepth = int.MaxValue,
+        int maxWidthPerDir = int.MaxValue,
+        CancellationToken ct = default)
+    {
+        ct.ThrowIfCancellationRequested();
+        var included = new List<string>();
+
+        if (Directory.Exists(sourcePath))
+        {
+            var node = BuildDirectoryNode(sourcePath, sourcePath, filter, included, maxDepth, maxWidthPerDir, ct);
+            return new SourceSubtree(node, included, IsFull: maxDepth == int.MaxValue && maxWidthPerDir == int.MaxValue);
+        }
+
+        if (File.Exists(sourcePath))
+        {
+            var fi = new FileInfo(sourcePath);
+            var isFiltered = filter != null && filter.IsActive && !FileFilterMatcher.IsMatch(filter, sourcePath);
+            var fileNode = new PreviewTreeNode
+            {
+                Name = fi.Name,
+                FullPath = fi.Name,
+                Size = fi.Length,
+                SizeDisplay = FormatUtil.FormatSize(fi.Length),
+                IsExpanded = false,
+                IsFilteredOut = isFiltered
+            };
+            if (!isFiltered) included.Add(sourcePath);
+            return new SourceSubtree(fileNode, included, IsFull: true);
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// 装配压缩预览树：消费已构建的 subtrees（与 sourcePaths 同序，可含 null），
+    /// 产出预览根节点与压缩计划。
+    /// </summary>
+    public static (PreviewTreeNode Root, CompressPlan Plan) AssembleCompressPreview(
+        IReadOnlyList<string> sourcePaths,
+        IReadOnlyList<SourceSubtree?> subtrees,
+        CompressOutputMode outputMode,
+        string? outputPath,
+        string format,
+        bool keepOriginalExtension,
+        FileFilterCriteria? filter)
     {
         PreviewTreeNode root;
         IReadOnlyList<CompressPlanItem> planItems;
@@ -184,11 +218,15 @@ public static class ResultPreviewService
 
         // 过滤激活时：为每个源准备匹配文件收集器（树构建时填入，构建后回填 B）
         bool filterActive = filter != null && filter.IsActive;
-        var collectors = new Dictionary<string, List<string>>();
+        var includedBySource = new Dictionary<string, List<string>>();
         if (filterActive)
         {
-            foreach (var p in sourcePaths)
-                collectors[p] = new List<string>();
+            for (int i = 0; i < sourcePaths.Count; i++)
+            {
+                var st = subtrees[i];
+                if (st != null)
+                    includedBySource[sourcePaths[i]] = st.IncludedFiles;
+            }
         }
 
         switch (outputMode)
@@ -221,7 +259,27 @@ public static class ResultPreviewService
                 planItems = CompressPathPlanner.PlanSingle(sourcePaths, effectiveOutputPath, format);
                 planOutputPath = effectiveOutputPath;
 
-                BuildSingleArchivePreview(root, sourcePaths, effectiveOutputPath, format, filter, planItems, collectors);
+                // 输出压缩包节点
+                var archiveNode = new PreviewTreeNode
+                {
+                    Name = Path.GetFileName(effectiveOutputPath),
+                    FullPath = effectiveOutputPath,
+                    DisplayLabel = Path.GetFileName(effectiveOutputPath),
+                    IsArchiveNode = true,
+                    IsExpanded = true,
+                    ExistsAtDestination = File.Exists(effectiveOutputPath)
+                };
+
+                // 挂载各源子树
+                for (int i = 0; i < sourcePaths.Count; i++)
+                {
+                    var st = subtrees[i];
+                    if (st != null)
+                        archiveNode.Children.Add(st.Node);
+                }
+
+                archiveNode.IsArchiveEmpty = !NodeHasVisibleContent(archiveNode);
+                root.Children.Add(archiveNode);
                 break;
             }
 
@@ -239,7 +297,7 @@ public static class ResultPreviewService
                 // B 数据集：每源一个输出包（Bug 2 语义：目录源用完整目录名）
                 planItems = CompressPathPlanner.PlanSeparate(sourcePaths, format, keepOriginalExtension);
 
-                BuildSeparateArchivesPreview(root, sourcePaths, format, keepOriginalExtension, filter, planItems, collectors);
+                BuildSeparateArchivesPreview(root, sourcePaths, subtrees, planItems, format, keepOriginalExtension);
                 break;
             }
 
@@ -262,7 +320,7 @@ public static class ResultPreviewService
         if (filterActive)
         {
             planItems = planItems
-                .Select(item => collectors.TryGetValue(item.SourcePath, out var list)
+                .Select(item => includedBySource.TryGetValue(item.SourcePath, out var list)
                     ? item with { IncludedFiles = list }
                     : item)
                 .ToList();
@@ -272,78 +330,27 @@ public static class ResultPreviewService
     }
 
     /// <summary>
+    /// 构建压缩预览树（双产物）：同时产出预览树与过滤后的压缩计划（B 数据集）。
+    /// 薄包装：逐源构建子树 → 装配。
+    /// </summary>
+    public static (PreviewTreeNode Root, CompressPlan Plan) BuildCompressPreview(
+        IReadOnlyList<string> sourcePaths,
+        string? rootName = null,
+        FileFilterCriteria? filter = null,
+        CompressOutputMode outputMode = CompressOutputMode.Manual,
+        string? outputPath = null,
+        string format = "zip",
+        bool keepOriginalExtension = false)
+    {
+        var subtrees = sourcePaths.Select(p => BuildSourceSubtree(p, filter)).ToList();
+        return AssembleCompressPreview(sourcePaths, subtrees, outputMode, outputPath, format, keepOriginalExtension, filter);
+    }
+
+    /// <summary>
     /// 计算压缩包名称（唯一实现收敛到 Core 层 <see cref="CompressPathPlanner"/>）。
     /// </summary>
     private static string ComputeArchiveName(string sourcePath, string format, bool keepOriginalExt)
         => CompressPathPlanner.ComputeArchiveName(sourcePath, format, keepOriginalExt);
-
-    /// <summary>
-    /// 构建 Manual/Combined 模式的单压缩包预览。
-    /// </summary>
-    private static void BuildSingleArchivePreview(
-        PreviewTreeNode root,
-        IReadOnlyList<string> sourcePaths,
-        string? outputPath,
-        string format,
-        FileFilterCriteria? filter,
-        IReadOnlyList<CompressPlanItem> planItems,
-        Dictionary<string, List<string>> collectors)
-    {
-        // 确定输出路径：未指定时用第一个源文件所在目录
-        if (string.IsNullOrEmpty(outputPath))
-        {
-            var first = sourcePaths[0];
-            var dir = Directory.Exists(first)
-                ? first.TrimEnd(Path.DirectorySeparatorChar)
-                : Path.GetDirectoryName(first) ?? "";
-            outputPath = Path.Combine(dir, ComputeArchiveName(first, format, keepOriginalExt: false));
-        }
-
-        // 输出压缩包节点
-        var archiveNode = new PreviewTreeNode
-        {
-            Name = Path.GetFileName(outputPath),
-            FullPath = outputPath,
-            DisplayLabel = Path.GetFileName(outputPath),
-            IsArchiveNode = true,
-            IsExpanded = true,
-            ExistsAtDestination = File.Exists(outputPath)
-        };
-
-        // 添加源文件/目录作为子节点，同时收集匹配文件绝对路径（填入 B）
-        foreach (var path in sourcePaths)
-        {
-            // 该源对应的匹配文件收集器（仅过滤激活时收集）
-            collectors.TryGetValue(path, out var included);
-            if (Directory.Exists(path))
-            {
-                var dirNode = BuildDirectoryNode(path, path, filter, included);
-                archiveNode.Children.Add(dirNode);
-            }
-            else if (File.Exists(path))
-            {
-                var fi = new FileInfo(path);
-                var isFiltered = filter != null && filter.IsActive && !FileFilterMatcher.IsMatch(filter, path);
-                var fileNode = new PreviewTreeNode
-                {
-                    Name = fi.Name,
-                    FullPath = fi.Name,
-                    Size = fi.Length,
-                    SizeDisplay = FormatUtil.FormatSize(fi.Length),
-                    IsExpanded = false,
-                    IsFilteredOut = isFiltered
-                };
-                if (!isFiltered && included != null)
-                    included.Add(path);
-                archiveNode.Children.Add(fileNode);
-            }
-        }
-
-        // 检查压缩包内所有文件是否均被过滤（空存档标记）
-        archiveNode.IsArchiveEmpty = !NodeHasVisibleContent(archiveNode);
-
-        root.Children.Add(archiveNode);
-    }
 
     /// <summary>
     /// 递归检查节点及其所有子节点中是否有未被过滤的可见节点。
@@ -357,27 +364,27 @@ public static class ResultPreviewService
 
     /// <summary>
     /// 构建 Separate 模式的多压缩包预览。
-    /// 输出路径取自已规划的 B（planItems，每源一个 OutputArchivePath），预览与实际压缩同源。
+    /// 消费已构建的 subtrees（与 sourcePaths 同序，可含 null）。
     /// </summary>
     private static void BuildSeparateArchivesPreview(
         PreviewTreeNode root,
         IReadOnlyList<string> sourcePaths,
-        string format,
-        bool keepOriginalExtension,
-        FileFilterCriteria? filter,
+        IReadOnlyList<SourceSubtree?> subtrees,
         IReadOnlyList<CompressPlanItem> planItems,
-        Dictionary<string, List<string>> collectors)
+        string format,
+        bool keepOriginalExtension)
     {
-        // 源 → 计划项查找表（B 提供输出包路径，不再本地重算）
+        // 源 → 计划项查找表（B 提供输出包路径）
         var itemBySource = new Dictionary<string, CompressPlanItem>();
         foreach (var item in planItems)
             itemBySource[item.SourcePath] = item;
 
         // 按输出父目录分组
-        var groups = new Dictionary<string, List<(string sourcePath, string archivePath)>>();
+        var groups = new Dictionary<string, List<(int index, string sourcePath, string archivePath)>>();
 
-        foreach (var path in sourcePaths)
+        for (int i = 0; i < sourcePaths.Count; i++)
         {
+            var path = sourcePaths[i];
             var archivePath = itemBySource.TryGetValue(path, out var item)
                 ? item.OutputArchivePath
                 : CompressPathPlanner.ComputeOutputPath(path, format, keepOriginalExtension);
@@ -385,16 +392,15 @@ public static class ResultPreviewService
 
             if (!groups.TryGetValue(parentDir, out var list))
             {
-                list = new List<(string, string)>();
+                list = new List<(int, string, string)>();
                 groups[parentDir] = list;
             }
-            list.Add((path, archivePath));
+            list.Add((i, path, archivePath));
         }
 
         foreach (var kvp in groups)
         {
             var groupDir = kvp.Key;
-            // 分组目录节点（显示完整路径）
             var groupNode = new PreviewTreeNode
             {
                 Name = Path.GetFileName(groupDir),
@@ -403,11 +409,9 @@ public static class ResultPreviewService
                 IsExpanded = true
             };
 
-            foreach (var (sourcePath, archivePath) in kvp.Value)
+            foreach (var (index, sourcePath, archivePath) in kvp.Value)
             {
                 var archiveName = Path.GetFileName(archivePath);
-
-                // 压缩包节点
                 var archiveNode = new PreviewTreeNode
                 {
                     Name = archiveName,
@@ -418,34 +422,11 @@ public static class ResultPreviewService
                     ExistsAtDestination = File.Exists(archivePath)
                 };
 
-                // 该源对应的匹配文件收集器（仅过滤激活时收集）
-                collectors.TryGetValue(sourcePath, out var included);
+                // 挂载已构建的子树（替换原有的 BuildDirectoryNode/文件节点）
+                var st = subtrees[index];
+                if (st != null)
+                    archiveNode.Children.Add(st.Node);
 
-                // 源文件作为子节点
-                if (Directory.Exists(sourcePath))
-                {
-                    var dirNode = BuildDirectoryNode(sourcePath, sourcePath, filter, included);
-                    archiveNode.Children.Add(dirNode);
-                }
-                else if (File.Exists(sourcePath))
-                {
-                    var fi = new FileInfo(sourcePath);
-                    var isFiltered = filter != null && filter.IsActive && !FileFilterMatcher.IsMatch(filter, sourcePath);
-                    var fileNode = new PreviewTreeNode
-                    {
-                        Name = fi.Name,
-                        FullPath = fi.Name,
-                        Size = fi.Length,
-                        SizeDisplay = FormatUtil.FormatSize(fi.Length),
-                        IsExpanded = false,
-                        IsFilteredOut = isFiltered
-                    };
-                    if (!isFiltered && included != null)
-                        included.Add(sourcePath);
-                    archiveNode.Children.Add(fileNode);
-                }
-
-                // 检查压缩包内所有文件是否均被过滤
                 archiveNode.IsArchiveEmpty = !NodeHasVisibleContent(archiveNode);
                 groupNode.Children.Add(archiveNode);
             }
@@ -503,8 +484,16 @@ public static class ResultPreviewService
     /// <param name="currentPath">当前目录绝对路径。</param>
     /// <param name="filter">文件过滤条件，不为空且 IsActive 时对文件节点标记 IsFilteredOut。</param>
     /// <param name="includedFiles">匹配过滤条件的文件绝对路径收集器（过滤激活时传入，未匹配则跳过）；null 时不收集。</param>
-    private static PreviewTreeNode BuildDirectoryNode(string rootPath, string currentPath, FileFilterCriteria? filter = null, List<string>? includedFiles = null)
+    /// <param name="maxDepth">最大递归深度（int.MaxValue=全量）。</param>
+    /// <param name="maxWidthPerDir">每个目录最多平铺的子项数（int.MaxValue=不限）。</param>
+    /// <param name="ct">取消令牌。</param>
+    /// <param name="depth">当前递归深度（由调用方控制）。</param>
+    private static PreviewTreeNode BuildDirectoryNode(
+        string rootPath, string currentPath, FileFilterCriteria? filter, List<string>? includedFiles,
+        int maxDepth = int.MaxValue, int maxWidthPerDir = int.MaxValue, CancellationToken ct = default, int depth = 0)
     {
+        ct.ThrowIfCancellationRequested();
+
         var dirInfo = new DirectoryInfo(currentPath);
         var relativePath = currentPath.Length >= rootPath.Length
             ? currentPath[rootPath.Length..].TrimStart(Path.DirectorySeparatorChar).Replace(Path.DirectorySeparatorChar, '/')
@@ -520,20 +509,39 @@ public static class ResultPreviewService
 
         try
         {
-            foreach (var subDir in dirInfo.GetDirectories())
+            var capped = maxWidthPerDir != int.MaxValue;
+            int added = 0;
+
+            // 深度边界：不再下钻子目录（挂占位）；但当前层的文件仍然枚举
+            bool atBoundary = depth >= maxDepth;
+
+            // 子目录优先（保证目录结构不被海量文件挤占）
+            foreach (var subDir in dirInfo.EnumerateDirectories())
             {
-                var childNode = BuildDirectoryNode(rootPath, subDir.FullName, filter, includedFiles);
-                node.Children.Add(childNode);
+                ct.ThrowIfCancellationRequested();
+                if (capped && added >= maxWidthPerDir) { node.Children.Add(CreateLoadingPlaceholder(node.FullPath)); break; }
+
+                if (atBoundary)
+                {
+                    // 深度边界：非空子目录挂占位，不再递归
+                    if (HasAnyEntry(subDir))
+                        node.Children.Add(CreateLoadingPlaceholder(node.FullPath));
+                }
+                else
+                {
+                    node.Children.Add(BuildDirectoryNode(rootPath, subDir.FullName, filter, includedFiles, maxDepth, maxWidthPerDir, ct, depth + 1));
+                }
+                added++;
             }
 
-            foreach (var file in dirInfo.GetFiles())
+            // 文件（在剩余宽度预算内；深度边界时也枚举当前层文件）
+            foreach (var file in dirInfo.EnumerateFiles())
             {
-                var fileRelPath = string.IsNullOrEmpty(relativePath)
-                    ? file.Name
-                    : $"{relativePath}/{file.Name}";
-
+                ct.ThrowIfCancellationRequested();
+                if (capped && added >= maxWidthPerDir) { node.Children.Add(CreateLoadingPlaceholder(node.FullPath)); break; }
+                var fileRelPath = string.IsNullOrEmpty(relativePath) ? file.Name : $"{relativePath}/{file.Name}";
                 var isFiltered = filter != null && filter.IsActive && !FileFilterMatcher.IsMatch(filter, file.FullName);
-                var fileNode = new PreviewTreeNode
+                node.Children.Add(new PreviewTreeNode
                 {
                     Name = file.Name,
                     FullPath = fileRelPath,
@@ -541,11 +549,14 @@ public static class ResultPreviewService
                     SizeDisplay = FormatUtil.FormatSize(file.Length),
                     IsExpanded = false,
                     IsFilteredOut = isFiltered
-                };
-                if (!isFiltered && includedFiles != null)
-                    includedFiles.Add(file.FullName);
-                node.Children.Add(fileNode);
+                });
+                if (!isFiltered && includedFiles != null) includedFiles.Add(file.FullName);
+                added++;
             }
+        }
+        catch (OperationCanceledException)
+        {
+            throw; // 取消必须向上传播，不能被"跳过不可访问目录"吞掉
         }
         catch
         {
@@ -554,6 +565,19 @@ public static class ResultPreviewService
 
         return node;
     }
+
+    private static bool HasAnyEntry(DirectoryInfo dir)
+    {
+        try { return dir.EnumerateFileSystemInfos().Any(); }
+        catch { return false; }
+    }
+
+    private static PreviewTreeNode CreateLoadingPlaceholder(string parentFullPath) => new()
+    {
+        Name = string.Empty,
+        FullPath = parentFullPath + "/…",
+        IsLoadingPlaceholder = true
+    };
 
     /// <summary>
     /// 在预览树中添加一个目录节点。
@@ -625,17 +649,50 @@ public static class ResultPreviewService
     }
 
     /// <summary>
-    /// 递归标记目录节点在目标路径是否已存在。
+    /// 目标位置冲突检测：设置树中各节点的 <see cref="PreviewTreeNode.ExistsAtDestination"/>。
+    /// 优化：① destDir 不存在则整批跳过；② 被过滤项不检查；③ 自顶向下、父目录不存在则子树短路。
     /// </summary>
-    private static void MarkDirectoryConflicts(PreviewTreeNode node, string destDir)
+    /// <param name="root">预览树根节点。</param>
+    /// <param name="destDir">目标解压目录。</param>
+    /// <param name="maxDepth">相对 root 的最大检查深度。1=仅直接子项；2=直接子项+孙辈；int.MaxValue=全量。</param>
+    /// <param name="ct">取消令牌。</param>
+    public static void ApplyConflictMarkers(
+        PreviewTreeNode root, string destDir, int maxDepth = int.MaxValue, CancellationToken ct = default)
     {
+        // ① 目标根不存在 → 所有 ExistsAtDestination 保持默认 false，零 I/O
+        if (string.IsNullOrEmpty(destDir) || !Directory.Exists(destDir))
+            return;
+
+        MarkConflicts(root, destDir, parentExists: true, depth: 0, maxDepth, ct);
+    }
+
+    private static void MarkConflicts(
+        PreviewTreeNode node, string destDir, bool parentExists, int depth, int maxDepth, CancellationToken ct)
+    {
+        if (depth >= maxDepth) return;
+
         foreach (var child in node.Children.OfType<PreviewTreeNode>())
         {
-            if (child.IsDirectory && !child.IsTruncated)
+            ct.ThrowIfCancellationRequested();
+
+            // ② 被过滤项不检查（视图会移除、CountConflicts 也跳过）
+            if (child.IsFilteredOut)
             {
-                var realPath = Path.Combine(destDir, child.FullPath.Replace('/', Path.DirectorySeparatorChar));
-                child.ExistsAtDestination = Directory.Exists(realPath);
-                MarkDirectoryConflicts(child, destDir);
+                child.ExistsAtDestination = false;
+                continue;
+            }
+
+            var realPath = Path.Combine(destDir, child.FullPath.Replace('/', Path.DirectorySeparatorChar));
+
+            if (child.IsDirectory)
+            {
+                // ③ 父不存在 → 子树短路
+                child.ExistsAtDestination = parentExists && Directory.Exists(realPath);
+                MarkConflicts(child, destDir, child.ExistsAtDestination, depth + 1, maxDepth, ct);
+            }
+            else
+            {
+                child.ExistsAtDestination = parentExists && File.Exists(realPath);
             }
         }
     }

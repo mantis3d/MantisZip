@@ -87,7 +87,7 @@
 
     <!-- Row 2: Tree + loading overlay -->
     <Grid Grid.Row="2">
-      <ScrollViewer Background="{DynamicResource ThemeSurfaceBgBrush}">
+      <ScrollViewer x:Name="TreeScrollViewer" Background="{DynamicResource ThemeSurfaceBgBrush}">
         <TreeView x:Name="PreviewTreeView"
                   ItemsSource="{Binding DisplayNodes, RelativeSource={RelativeSource AncestorType=UserControl}}"
                   SelectionMode="Multiple"

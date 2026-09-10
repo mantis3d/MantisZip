@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using System.IO;
+using System.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using MantisZip.Core;
@@ -353,6 +354,21 @@ public partial class CompressSettingsViewModel : ObservableObject
     /// <summary>预览树构建版本号，用于丢弃过期异步结果。</summary>
     private int _previewBuildVersion;
 
+    private const int ShallowMaxDepth = 1;
+    private const int ShallowMaxWidthPerDir = 20;
+
+    /// <summary>按源缓存：源路径 → 最近一次构建结果（浅层或全量）。</summary>
+    private readonly Dictionary<string, ResultPreviewService.SourceSubtree> _sourceCache = new();
+
+    /// <summary>缓存对应的过滤条件签名；变化则整表失效。</summary>
+    private string _cacheFilterSignature = string.Empty;
+
+    /// <summary>在途构建的取消源（新构建取消旧构建）。</summary>
+    private CancellationTokenSource? _previewCts;
+
+    /// <summary>上次渐进重组的时刻（节流用）。</summary>
+    private DateTime _lastProgressiveAssemble = DateTime.MinValue;
+
     /// <summary>文件过滤条件（由 View 在对话框关闭时从 FileFilterEditor 获取并设置）。</summary>
     public FileFilterCriteria? FileFilter { get; set; }
 
@@ -371,10 +387,32 @@ public partial class CompressSettingsViewModel : ObservableObject
     /// </summary>
     public void AdoptPlan(CompressPlan? plan)
     {
-        _previewBuildVersion++; // 作废在途重建
+        _previewBuildVersion++;      // 作废在途重建
+        _previewCts?.Cancel();       // 停止在途枚举
+        InvalidateSourceCache();     // 接管后源集可能已变
         Plan = plan;
-        IsBuildPending = false; // 在途重建已作废，其 finally 不会再清标志；这里显式解除门禁
+        IsBuildPending = false;
         UpdateCanCompress();
+    }
+
+    private static string FilterSignature(FileFilterCriteria? f)
+    {
+        if (f == null || !f.IsActive) return string.Empty;
+        return string.Join("|",
+            string.Join(",", f.IncludeExtensions.OrderBy(x => x, StringComparer.OrdinalIgnoreCase)),
+            string.Join(",", f.ExcludeExtensions.OrderBy(x => x, StringComparer.OrdinalIgnoreCase)),
+            f.NamePattern ?? string.Empty,
+            f.MinSize?.ToString() ?? string.Empty,
+            f.MaxSize?.ToString() ?? string.Empty,
+            f.MinDate?.Ticks.ToString() ?? string.Empty,
+            f.MaxDate?.Ticks.ToString() ?? string.Empty);
+    }
+
+    /// <summary>清空按源缓存（过滤变化 / 接管 Plan 时调用）。</summary>
+    public void InvalidateSourceCache()
+    {
+        _sourceCache.Clear();
+        _cacheFilterSignature = string.Empty;
     }
 
     /// <summary>密码与确认密码是否匹配。</summary>
@@ -567,74 +605,108 @@ public partial class CompressSettingsViewModel : ObservableObject
     private async Task<CompressPlan?> BuildCompressPreviewCoreAsync(FileFilterCriteria? filter)
     {
         var version = ++_previewBuildVersion;
-        IsBuildPending = true; // 快慢构建都置位，B 未就绪时禁用"开始压缩"
+        IsBuildPending = true;
         LastBuildError = null;
+
+        // 取消上一次在途构建（已完成源已在 _sourceCache 中保留）
+        _previewCts?.Cancel();
+        _previewCts = new CancellationTokenSource();
+        var ct = _previewCts.Token;
 
         if (SelectedPaths.Count == 0)
         {
-            PreviewRoot = null;
-            IsPreviewBuilding = false;
-            IsBuildPending = false;
-            Plan = null; // 无源 → B 无效
+            PreviewRoot = null; IsPreviewBuilding = false; IsBuildPending = false; Plan = null;
             return null;
         }
 
         if (!IsOutputPathValid())
         {
-            // 路径无效时显示"路径无效"节点，不调用 ResultPreviewService
             PreviewRoot = new PreviewTreeNode
             {
                 Name = LocalizationManager.T("Compress_OutputPathInvalid"),
-                FullPath = "",
-                DisplayLabel = LocalizationManager.T("Compress_OutputPathInvalid"),
-                IsExpanded = true
+                FullPath = "", DisplayLabel = LocalizationManager.T("Compress_OutputPathInvalid"), IsExpanded = true
             };
-            IsPreviewBuilding = false;
-            IsBuildPending = false;
-            Plan = null; // 路径无效 → B 无效
+            IsPreviewBuilding = false; IsBuildPending = false; Plan = null;
             return null;
         }
 
+        // 快照输入
+        var paths = SelectedPaths.ToList();
+        var outputMode = OutputMode;
+        var outputPath = OutputPath;
+        var format = DefaultFormat;
+        var keepOriginalExtension = KeepOriginalExtension;
+
+        // 过滤签名变化 → 整表失效；源集变化 → 清理已移除源的缓存
+        var sig = FilterSignature(filter);
+        if (sig != _cacheFilterSignature) InvalidateSourceCache();
+        _cacheFilterSignature = sig;
+        foreach (var stale in _sourceCache.Keys.Where(k => !paths.Contains(k)).ToList())
+            _sourceCache.Remove(stale);
+
         try
         {
-            // 快照输入（后台构建期间 SelectedPaths/OutputPath 等可能被用户修改）
-            var paths = SelectedPaths.ToList();
-            var outputMode = OutputMode;
-            var outputPath = OutputPath;
-            var format = DefaultFormat;
-            var keepOriginalExtension = KeepOriginalExtension;
-            var rootName = LocalizationManager.T("Compress_Title");
-
-            var buildTask = Task.Run(() => ResultPreviewService.BuildCompressPreview(
-                paths,
-                rootName: rootName,
-                filter: filter,
-                outputMode: outputMode,
-                outputPath: outputPath,
-                format: format,
-                keepOriginalExtension: keepOriginalExtension));
-
-            // 快速构建（<250ms）不显示加载态，避免输入时预览树闪烁；
-            // 慢构建显示不定进度加载覆层（压缩树无法预估条目总数）
-            var delayTask = Task.Delay(250);
-            if (await Task.WhenAny(buildTask, delayTask) == delayTask)
+            // ── Phase A：浅层（所有源 maxDepth=1 / width=20；已完成源直接命中缓存）──
+            var shallowTask = Task.Run(() =>
             {
-                if (version != _previewBuildVersion) return null; // 已有更新的构建
+                foreach (var p in paths)
+                {
+                    ct.ThrowIfCancellationRequested();
+                    if (_sourceCache.TryGetValue(p, out var cached)) continue; // 已有（浅或全）
+                    var st = ResultPreviewService.BuildSourceSubtree(p, filter, ShallowMaxDepth, ShallowMaxWidthPerDir, ct);
+                    if (st != null) _sourceCache[p] = st;
+                }
+            }, ct);
+
+            var delayTask = Task.Delay(250);
+            if (await Task.WhenAny(shallowTask, delayTask) == delayTask)
+            {
+                if (version != _previewBuildVersion) return null;
                 PreviewBuildProgress = -1;
-                IsPreviewBuilding = true;
+                IsPreviewBuilding = true; // 浅层慢时才显示覆层；浅层上屏后立即关闭
+            }
+            await shallowTask;
+            if (version != _previewBuildVersion) return null;
+
+            var assembled = await AssembleAsync(paths, outputMode, outputPath, format, keepOriginalExtension, filter, ct);
+            if (version != _previewBuildVersion) return null;
+            PreviewRoot = assembled.Root;
+            IsPreviewBuilding = false;
+            _lastProgressiveAssemble = DateTime.UtcNow;
+
+            // ── Phase B：全量（串行逐源；每源完成即渐进上屏）──
+            foreach (var p in paths)
+            {
+                ct.ThrowIfCancellationRequested();
+                if (_sourceCache.TryGetValue(p, out var c) && c.IsFull) continue; // 已全量
+
+                var full = await Task.Run(() => ResultPreviewService.BuildSourceSubtree(p, filter, int.MaxValue, int.MaxValue, ct), ct);
+                if (version != _previewBuildVersion) return null;
+                if (full != null) _sourceCache[p] = full;
+
+                // 节流：250ms 内的中间重组跳过（最后一次组装必然执行，不丢源）
+                if ((DateTime.UtcNow - _lastProgressiveAssemble).TotalMilliseconds >= 250)
+                {
+                    var progressive = await AssembleAsync(paths, outputMode, outputPath, format, keepOriginalExtension, filter, ct);
+                    if (version != _previewBuildVersion) return null;
+                    PreviewRoot = progressive.Root;
+                    _lastProgressiveAssemble = DateTime.UtcNow;
+                }
             }
 
-            var (root, plan) = await buildTask;
-            if (version != _previewBuildVersion) return null; // 过期结果丢弃
-
-            PreviewRoot = root;
-            Plan = plan; // 缓存 B（执行侧只读消费，预览 = 实际）
-            return plan;
+            // ── Phase C：最终组装（含完整 Plan）──
+            var final = await AssembleAsync(paths, outputMode, outputPath, format, keepOriginalExtension, filter, ct);
+            if (version != _previewBuildVersion) return null;
+            PreviewRoot = final.Root;
+            Plan = final.Plan;
+            return final.Plan;
+        }
+        catch (OperationCanceledException)
+        {
+            return null; // 被新构建取代：静默退出，不做任何赋值
         }
         catch (Exception ex)
         {
-            // 构建失败：记录错误供 StartCompress 提示（不再静默吞掉）；同时失效 B，
-            // 避免重建失败后用旧输入的 Plan 压缩（预览 = 实际 的守卫）
             App.DebugLog($"BuildCompressPreview failed: {ex.Message}");
             LastBuildError = ex.Message;
             Plan = null;
@@ -648,6 +720,16 @@ public partial class CompressSettingsViewModel : ObservableObject
                 IsBuildPending = false;
             }
         }
+    }
+
+    /// <summary>后台装配预览树（含 stats）+ Plan，仅把结果赋值切回 UI 线程。</summary>
+    private async Task<(PreviewTreeNode Root, CompressPlan Plan)> AssembleAsync(
+        List<string> paths, CompressOutputMode outputMode, string? outputPath,
+        string format, bool keepOriginalExtension, FileFilterCriteria? filter, CancellationToken ct)
+    {
+        var subtrees = paths.Select(p => _sourceCache.TryGetValue(p, out var st) ? st : (ResultPreviewService.SourceSubtree?)null).ToList();
+        return await Task.Run(() => ResultPreviewService.AssembleCompressPreview(
+            paths, subtrees, outputMode, outputPath, format, keepOriginalExtension, filter), ct);
     }
 
     partial void OnCompressionLevelChanged(int value)

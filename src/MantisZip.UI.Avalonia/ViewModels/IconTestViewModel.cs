@@ -343,6 +343,8 @@ public partial class IconTestViewModel : ObservableObject
             "Resources/Icons/AppIcons.axaml", "Fluent UI System Icon");
         Add("资源库", "文件夹打开", null, "IconFolderOpen", IconStatus.Defined,
             "Resources/Icons/AppIcons.axaml", "Fluent UI System Icon");
+        Add("资源库", "文件夹同步", null, "IconFolderSync", IconStatus.Defined,
+            "Resources/Icons/AppIcons.axaml", "FluentUI folder_sync_20_regular — 骨架状态目录图标");
         Add("资源库", "钥匙多个", null, "IconKeyMultiple", IconStatus.Defined,
             "Resources/Icons/AppIcons.axaml", "Fluent UI System Icon");
         Add("资源库", "位置勾选", null, "IconLocationCheckmark", IconStatus.Defined,

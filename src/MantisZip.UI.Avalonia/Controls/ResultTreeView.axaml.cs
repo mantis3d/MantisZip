@@ -3,6 +3,7 @@ using System.Linq;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
+using Avalonia.Threading;
 using MantisZip.Core.Services;
 using MantisZip.UI.Avalonia.Models;
 using MantisZip.UI.Avalonia.Services;
@@ -324,6 +325,9 @@ public partial class ResultTreeView : UserControl
         foreach (var node in DisplayNodes)
             CollectExpandedPaths(node, expandedPaths);
 
+        // 保存滚动位置（渐进式上屏会多次重组，不保留会反复回顶）
+        var savedOffset = TreeScrollViewer?.Offset ?? default;
+
         DisplayNodes.Clear();
 
         if (_originalRoot == null)
@@ -360,6 +364,13 @@ public partial class ResultTreeView : UserControl
         // 汇总统计使用原始树（_originalRoot），避免 CompactMode 截断导致计数偏小
         UpdateSummary();
         UpdateConflictCount();
+
+        // 恢复滚动位置：布局完成后（Loaded 优先级）设置，避免被 TreeView 重建覆盖
+        if (TreeScrollViewer != null && savedOffset != default)
+        {
+            var target = savedOffset;
+            Dispatcher.UIThread.Post(() => TreeScrollViewer.Offset = target, DispatcherPriority.Loaded);
+        }
     }
 
     private static void CollectExpandedPaths(PreviewTreeNode node, HashSet<string> paths)

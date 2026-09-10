@@ -147,6 +147,25 @@ public partial class ExtractSettingsViewModel : ObservableObject
     /// <summary>已确定的密码字典只读视图（调用方回传解压流程）。</summary>
     public IReadOnlyDictionary<string, string> MatchedPasswords => _matchedPasswords;
 
+    /// <summary>单包/逐包冲突扫描的取消令牌。</summary>
+    private CancellationTokenSource? _conflictCts;
+
+    /// <summary>
+    /// 取消正在进行的冲突扫描（窗口关闭时调用，避免无谓 I/O）。
+    /// </summary>
+    public void CancelConflictScan()
+    {
+        _conflictCts?.Cancel();
+        _conflictCts?.Dispose();
+        _conflictCts = null;
+    }
+
+    /// <summary>
+    /// 冲突标记已完成一轮扫描（含两阶段），View 收到后调用 RefreshDisplay 更新计数。
+    /// 仅当该轮扫描未被取消时触发。
+    /// </summary>
+    public event EventHandler? PreviewTreeInvalidated;
+
     /// <summary>当前选中行是否可手动输密码（🔒 无法列出 / 🔑 加密未匹配）。</summary>
     [ObservableProperty]
     private bool _canUnlockSelected;
@@ -693,10 +712,17 @@ public partial class ExtractSettingsViewModel : ObservableObject
         };
     }
 
-    /// <summary>单包路径：直接构建条目结构为根（无归档层），沿用 250ms 防闪烁加载态。</summary>
+    /// <summary>单包路径：直接构建条目结构为根（无归档层），沿用 250ms 防闪烁加载态。
+    /// 冲突检测分两阶段：depth 2 快速上屏 → 全量后台补全。</summary>
     private async Task BuildAndAssignSingleAsync(
         IReadOnlyList<ArchiveItem> entries, string destDir, FileFilterCriteria? filter)
     {
+        // 取消前一轮冲突扫描（目标路径变化时快速终止无用 I/O）
+        _conflictCts?.Cancel();
+        _conflictCts?.Dispose();
+        _conflictCts = new CancellationTokenSource();
+        var ct = _conflictCts.Token;
+
         IsListingPending = false;
         IsBuildPending = true;
         PreviewBuildProgress = -1;
@@ -704,14 +730,36 @@ public partial class ExtractSettingsViewModel : ObservableObject
 
         try
         {
+            // Phase 1：构建树（不含冲突检测）+ 250ms 防闪烁
             var buildTask = Task.Run(() => ResultPreviewService.BuildExtractPreview(
-                entries, destDir, checkExists: true, filter: filter, progress: progress));
+                entries, destDir, checkExists: false, filter: filter, progress: progress));
 
             var delayTask = Task.Delay(250);
             if (await Task.WhenAny(buildTask, delayTask) == delayTask)
                 IsPreviewBuilding = true;
 
-            PreviewRoot = await buildTask;
+            var root = await buildTask;
+
+            // Phase 2a：深度 2 快速冲突标记（直接子项 + 孙辈，即时上屏）
+            ct.ThrowIfCancellationRequested();
+            ResultPreviewService.ApplyConflictMarkers(root, destDir, maxDepth: 2, ct);
+            PreviewRoot = root;
+
+            // Phase 2b：全量冲突标记（后台线程）
+            await Task.Run(() =>
+            {
+                ct.ThrowIfCancellationRequested();
+                ResultPreviewService.ApplyConflictMarkers(root, destDir, maxDepth: int.MaxValue, ct);
+            }, ct);
+
+            // 全量完成：再次上屏 + 触发 View 刷新冲突计数
+            ct.ThrowIfCancellationRequested();
+            PreviewRoot = root;
+            PreviewTreeInvalidated?.Invoke(this, EventArgs.Empty);
+        }
+        catch (OperationCanceledException)
+        {
+            // 被新请求取消：静默丢弃，由新一轮接管
         }
         catch (Exception ex)
         {
