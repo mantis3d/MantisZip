@@ -101,6 +101,7 @@ public class PreviewTreeNode : FolderNode
         get
         {
             if (!string.IsNullOrEmpty(IconKeyOverride)) return IconKeyOverride;
+            if (IsLoadingPlaceholder && IsArchiveNode) return "IconArchiveClock";
             if (IsArchiveNode) return "IconArchive";
             if (IsLoadingPlaceholder) return "IconFolderSync";
             if (IsTruncated) return null;
