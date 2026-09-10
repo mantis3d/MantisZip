@@ -27,6 +27,7 @@
 
 #### 2026-09
 
+- **09-10** — 修复设置窗口语言面板「翻译贡献者{0}」占位符未被替换：`LanguageTranslatorText` 属性未传递翻译者名称参数给 `LocalizationManager.T()`，改为从 `AvailableLanguages` 获取当前语言的 `TranslatorText` 并格式化
 - **09-09** — 代码质量修复：ZipEngine sync-over-async 修正（async lambda 内 `GetAwaiter().GetResult()` → `await`）+ 4 处空 catch 块补充异常日志 + 补充 Core 层单元测试 69 个（FileConflictHelper/PathHelper/ArchivePath/LogRedactor，总计 370 测试全绿）
 - **09-09** — 消除全部 39 项预存构建警告（AVLN5001/CS8602/CS8604/CS8620/CS8767/CS8826/CS0649/CS4014），dotnet build 达到 0 warnings 0 errors（301 测试通过）
 - **09-05** — 修复「保存到密码库」不生效：PreviewViewModel 预览面板密码输入忽略 SavePermanently 标志 + TrySavePassword 静默吞异常

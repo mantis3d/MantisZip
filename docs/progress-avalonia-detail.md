@@ -6,6 +6,11 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-09-10** — 修复设置窗口语言面板「翻译贡献者{0}」占位符未被替换
+  - 根因：`SettingsWindowViewModel.LanguageTranslatorText` 属性调用 `LocalizationManager.T("Settings_Language_Translator")` 时未传递翻译者名称参数，导致 `{0}` 占位符未被替换
+  - 修复：将 `LanguageTranslatorText` 从表达式主体属性改为完整属性，从 `LocalizationManager.AvailableLanguages` 获取当前语言的 `TranslatorText`，并传递给 `T("Settings_Language_Translator", translator)` 进行格式化
+  - 影响：设置窗口语言面板现在正确显示「翻译贡献者: 螳螂卜禅 & AI 助手 — 简体中文翻译」（中文）或「Translator: MantisZen & AI Assistant — English Translation」（英文）
+
 **2026-09-09** — 修复设置窗口文件关联「全选」/「取消全选」按钮无效
   - 根因：`SelectAllAssoc`/`DeselectAllAssoc` 仅修改旧的 `AssocXxx` bool 属性，但 UI CheckBox 绑定的是 `AssocItems` 集合中 `FormatAssocItemModel.IsEnabled`，两者未同步
   - 修复：两个方法末尾追加 `RefreshAssocStatus()` 调用，将 `AssocXxx` 新值同步到 UI 模型
