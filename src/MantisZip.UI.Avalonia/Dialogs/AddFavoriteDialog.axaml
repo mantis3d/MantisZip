@@ -13,7 +13,7 @@
   <Grid RowDefinitions="Auto,Auto,Auto"
         Margin="{DynamicResource SpacingXsThk}">
 
-    <!-- Row 0: Name input -->
+    <!-- 第 0 行：收藏名称输入 -->
     <Grid Grid.Row="0"
           ColumnDefinitions="60,*"
           Margin="0,0,0,8">
@@ -28,7 +28,7 @@
                BorderBrush="{DynamicResource ThemeBorderBrush}" />
     </Grid>
 
-    <!-- Row 1: Path input + Browse -->
+    <!-- 第 1 行：路径输入 + 浏览按钮 -->
     <Grid Grid.Row="1"
           ColumnDefinitions="60,*,Auto"
           Margin="0,0,0,12">
@@ -51,7 +51,7 @@
               BorderBrush="{DynamicResource ThemeBorderBrush}" />
     </Grid>
 
-    <!-- Row 2: OK/Cancel buttons -->
+    <!-- 第 2 行：确定 / 取消按钮 -->
     <StackPanel Grid.Row="2"
                 Orientation="Horizontal"
                 HorizontalAlignment="Right"

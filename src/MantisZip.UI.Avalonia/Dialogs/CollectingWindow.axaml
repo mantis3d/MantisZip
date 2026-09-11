@@ -9,10 +9,12 @@
         CanResize="False"
         ShowInTaskbar="False"
         Background="{DynamicResource ThemeSurfaceBgBrush}">
+  <!-- 无标题栏的轻量级等待窗口，用于多实例 IPC 收集阶段 -->
   <Border Background="{DynamicResource ThemeSurfaceBgBrush}"
           BorderBrush="{DynamicResource ThemeBorderBrush}"
           BorderThickness="1"
           CornerRadius="{DynamicResource BorderRadius}">
+    <!-- 提示文本：正在收集文件路径... -->
     <TextBlock Text="{Binding CollectingText}"
                Foreground="{DynamicResource ThemeTextPrimaryBrush}"
                FontSize="16"

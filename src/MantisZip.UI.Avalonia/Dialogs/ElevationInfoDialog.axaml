@@ -14,7 +14,7 @@
   <Grid RowDefinitions="Auto,Auto,Auto"
         Margin="{DynamicResource SpacingXsThk}">
 
-    <!-- Row 0: Message -->
+    <!-- 主提示消息 -->
     <TextBlock Grid.Row="0"
                Text="{Binding MessageText}"
                FontSize="13"
@@ -22,7 +22,7 @@
                Foreground="{DynamicResource ThemeTextPrimaryBrush}"
                TextWrapping="Wrap" />
 
-    <!-- Row 1: Directory list -->
+    <!-- 目录列表 -->
     <ItemsControl Grid.Row="1"
                   x:Name="DirectoryList"
                   Foreground="{DynamicResource ThemeTextSecondaryBrush}"
@@ -38,15 +38,17 @@
       </ItemsControl.ItemTemplate>
     </ItemsControl>
 
-    <!-- Row 2: Hint + OK button -->
+    <!-- 提示文字 + 确定按钮 -->
     <StackPanel Grid.Row="2"
                 Margin="0,16,0,0">
+      <!-- 说明文字 -->
       <TextBlock Text="{Binding HintText}"
                  Foreground="{DynamicResource ThemeTextSecondaryBrush}"
                  FontSize="11"
                  TextWrapping="Wrap"
                  Margin="0,0,0,16" />
 
+      <!-- 确定按钮 -->
       <Button Content="{Binding OkText}"
               Width="100"
               Height="{DynamicResource ControlHeightMd}"

@@ -14,14 +14,14 @@
         RowDefinitions="Auto,Auto"
         Margin="{DynamicResource SpacingMdThk}">
 
-    <!-- Icon -->
+    <!-- 图标区域（根据消息类型显示不同图标，默认隐藏） -->
     <TextBlock Grid.Row="0" Grid.Column="0"
                x:Name="IconText"
                FontSize="32"
                VerticalAlignment="Top"
                IsVisible="False" />
 
-    <!-- Message -->
+    <!-- 消息文本区域 -->
     <TextBlock Grid.Row="0" Grid.Column="2"
                x:Name="MessageText"
                TextWrapping="Wrap"
@@ -29,14 +29,14 @@
                Foreground="{DynamicResource ThemeTextPrimaryBrush}"
                VerticalAlignment="Center" />
 
-    <!-- Buttons panel -->
+    <!-- 底部按钮面板（根据消息框类型动态显示不同按钮组合） -->
     <StackPanel Grid.Row="1" Grid.ColumnSpan="3"
                 x:Name="ButtonPanel"
                 Orientation="Horizontal"
                 HorizontalAlignment="Center"
                 Spacing="{DynamicResource SpacingXs}"
                 Margin="0,16,0,0">
-      <!-- Action button (for ShowWithAction) -->
+      <!-- 自定义操作按钮（用于 ShowWithAction） -->
       <Button x:Name="ActionBtn"
               Width="110"
               Height="{DynamicResource ControlHeight}"
@@ -45,7 +45,7 @@
               Background="{DynamicResource ThemeAccentBrush}"
               Foreground="White"
               BorderThickness="0" />
-      <!-- OK -->
+      <!-- 确定按钮 -->
       <Button x:Name="OkBtn"
               Content="{Binding OkText}"
               Width="80"
@@ -55,7 +55,7 @@
               Background="{DynamicResource ThemeAccentBrush}"
               Foreground="White"
               BorderThickness="0" />
-      <!-- Cancel -->
+      <!-- 取消按钮 -->
       <Button x:Name="CancelBtn"
               Content="{Binding CancelText}"
               Width="80"
@@ -66,7 +66,7 @@
               Background="{DynamicResource ThemeButtonBgBrush}"
               Foreground="{DynamicResource ThemeTextPrimaryBrush}"
               BorderBrush="{DynamicResource ThemeBorderBrush}" />
-      <!-- Yes -->
+      <!-- 是按钮 -->
       <Button x:Name="YesBtn"
               Content="{Binding YesText}"
               Width="80"
@@ -76,7 +76,7 @@
               Background="{DynamicResource ThemeButtonBgBrush}"
               Foreground="{DynamicResource ThemeTextPrimaryBrush}"
               BorderBrush="{DynamicResource ThemeBorderBrush}" />
-      <!-- No -->
+      <!-- 否按钮 -->
       <Button x:Name="NoBtn"
               Content="{Binding NoText}"
               Width="80"

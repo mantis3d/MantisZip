@@ -152,11 +152,11 @@
       </StackPanel>
     </Border>
 
-    <!-- Preview content area -->
+    <!-- 预览内容滚动区域：包含内容顶部元数据、各格式预览内容、加载状态 -->
     <ScrollViewer x:Name="PreviewContentScroller" Grid.Row="1" Grid.Column="0"
                   Background="{DynamicResource ThemeSurfaceBgBrush}">
       <StackPanel>
-        <!-- Content-top metadata items -->
+        <!-- 内容顶部元数据区域：显示格式特定的元数据（如 PE 信息、PDF 属性等），随内容滚动 -->
         <Border x:Name="ContentTopBorder" Padding="{DynamicResource SpacingSmThk}"
                 Background="{DynamicResource ThemeSurfaceBgBrush}"
                 BorderBrush="{DynamicResource ThemeBorderBrush}"
@@ -207,14 +207,14 @@
         </Border>
 
         <Grid>
-        <!-- Unsupported / empty state -->
+        <!-- 不支持/空状态提示：当预览类型为 Unsupported 或无内容时显示 -->
         <TextBlock Text="{Binding TextContent}"
                    VerticalAlignment="Center"
                    HorizontalAlignment="Center"
                    TextWrapping="Wrap"
                    IsVisible="{Binding IsUnsupportedVisible}" />
 
-        <!-- Needs Password state (encrypted filename archive) -->
+        <!-- 需要密码状态：加密文件名的压缩包，提示用户输入密码解锁 -->
         <StackPanel IsVisible="{Binding IsNeedsPasswordVisible}"
                     VerticalAlignment="Center"
                     HorizontalAlignment="Center"
@@ -239,7 +239,7 @@
                   BorderThickness="0" />
         </StackPanel>
 
-        <!-- Text preview -->
+        <!-- 文本预览：支持自定义字体、字号，只读显示 -->
         <ScrollViewer IsVisible="{Binding IsTextVisible}">
           <TextBox Text="{Binding TextContent}"
                    IsReadOnly="True"
@@ -251,7 +251,7 @@
                    BorderThickness="0" />
         </ScrollViewer>
 
-        <!-- CSV preview -->
+        <!-- CSV 表格预览：使用 DataGrid 显示，支持排序和列调整 -->
         <DataGrid x:Name="CsvDataGrid"
                   IsVisible="{Binding IsCsvVisible}"
                   ItemsSource="{Binding CsvData}"
@@ -262,7 +262,7 @@
                   RowHeight="{DynamicResource ControlHeightMd}"
                   GridLinesVisibility="All" />
 
-        <!-- PE preview -->
+        <!-- PE 可执行文件预览：显示标题、副标题、元数据键值对 -->
         <StackPanel IsVisible="{Binding IsPeVisible}"
                     Spacing="{DynamicResource SpacingXs}">
           <TextBlock Text="{Binding PeTitle}"
@@ -288,7 +288,7 @@
           </ItemsControl>
         </StackPanel>
 
-        <!-- Image preview -->
+        <!-- 图片预览：支持缩放、透明背景棋盘格切换 -->
         <ScrollViewer x:Name="ImagePreviewScrollViewer" IsVisible="{Binding IsImageVisible}"
                       HorizontalScrollBarVisibility="Auto"
                       VerticalScrollBarVisibility="Auto">
@@ -302,7 +302,7 @@
           </Grid>
         </ScrollViewer>
 
-        <!-- GIF preview (same image control) -->
+        <!-- GIF/动画图片预览：支持帧控制（上一帧/播放暂停/下一帧） -->
         <ScrollViewer x:Name="GifPreviewScrollViewer" IsVisible="{Binding IsAnimatedImageVisible}"
                       HorizontalScrollBarVisibility="Auto"
                       VerticalScrollBarVisibility="Auto">
@@ -316,7 +316,7 @@
           </Grid>
         </ScrollViewer>
 
-        <!-- ICO gallery -->
+        <!-- ICO 多帧画廊：显示所有帧，支持 FlattenAlpha 切换和透明背景棋盘格 -->
         <ScrollViewer IsVisible="{Binding IsIcoGalleryVisible}"
                       HorizontalScrollBarVisibility="Disabled"
                       VerticalScrollBarVisibility="Auto">
@@ -358,7 +358,7 @@
           </ItemsControl>
         </ScrollViewer>
 
-        <!-- SVG preview -->
+        <!-- SVG 预览：使用 Svg.Skia 栅格化渲染，支持缩放和透明背景 -->
         <ScrollViewer IsVisible="{Binding IsSvgVisible}"
                       HorizontalScrollBarVisibility="Auto"
                       VerticalScrollBarVisibility="Auto">
@@ -372,7 +372,7 @@
           </Grid>
         </ScrollViewer>
 
-        <!-- Font preview -->
+        <!-- 字体预览：显示字体名称、样本位图（SkiaSharp 渲染）、回退文本 -->
         <ScrollViewer x:Name="FontPreviewScrollViewer" IsVisible="{Binding IsFontVisible}">
           <StackPanel Spacing="{DynamicResource SpacingSm}">
             <TextBlock Text="{Binding PreviewHeaderText}"
@@ -393,14 +393,14 @@
           </StackPanel>
         </ScrollViewer>
 
-        <!-- Audio preview (metadata only) -->
+        <!-- 音频预览：仅显示元数据（时长、采样率、位深等） -->
         <StackPanel IsVisible="{Binding IsAudioVisible}"
                     Spacing="{DynamicResource SpacingXs}">
           <TextBlock Text="{Binding PreviewHeaderText}"
                      FontSize="20"
                      FontWeight="Bold" />
         </StackPanel>
-        <!-- SQLite preview -->
+        <!-- SQLite 数据库预览：TabControl 显示表名，DataGrid 显示表数据 -->
         <Grid IsVisible="{Binding IsSqliteVisible}"
               RowDefinitions="Auto,*">
           <TabControl Grid.Row="0"
@@ -423,7 +423,7 @@
                     GridLinesVisibility="All" />
         </Grid>
 
-        <!-- ISO preview (metadata only) -->
+        <!-- ISO 光盘映像预览：仅显示元数据（卷标、格式、大小） -->
         <StackPanel IsVisible="{Binding IsIsoVisible}"
                     Spacing="{DynamicResource SpacingXs}">
           <TextBlock Text="{Binding PreviewHeaderText}"
@@ -431,7 +431,7 @@
                      FontWeight="Bold" />
         </StackPanel>
         
-        <!-- Torrent preview -->
+        <!-- BT 种子预览：显示文件树、Magnet 链接、Tracker 等信息 -->
         <StackPanel IsVisible="{Binding IsTorrentVisible}"
                     Spacing="{DynamicResource SpacingXs}">
           <TextBlock Text="{Binding PreviewHeaderText}"
@@ -455,7 +455,7 @@
           </TreeView>
         </StackPanel>
 
-        <!-- DOCX preview: 大纲（左）+ GridSplitter + 全文（右） -->
+        <!-- DOCX 文档预览：左侧大纲导航 + GridSplitter + 右侧全文内容（控件树） -->
         <Grid IsVisible="{Binding IsDocxVisible}"
               ColumnDefinitions="Auto,4,*">
           <!-- 大纲 -->
@@ -504,7 +504,7 @@
           </Border>
         </Grid>
 
-        <!-- XLSX preview -->
+        <!-- XLSX 表格预览：使用 DataGrid 显示，支持排序和列调整 -->
         <DataGrid x:Name="XlsxDataGrid"
                   IsVisible="{Binding IsXlsxVisible}"
                   ItemsSource="{Binding XlsxData}"
@@ -514,7 +514,7 @@
                   CanUserSortColumns="True"
                   GridLinesVisibility="All" />
 
-        <!-- PPTX preview: 翻页栏 + Canvas 按形状位置渲染 -->
+        <!-- PPTX 演示文稿预览：翻页栏 + Canvas 按形状位置渲染幻灯片 -->
         <Border IsVisible="{Binding IsPptxVisible}"
                 Background="{DynamicResource ThemeSurfaceBgBrush}">
           <Grid RowDefinitions="Auto,*">
@@ -553,7 +553,7 @@
           </Grid>
         </Border>
 
-        <!-- Office preview (metadata only, legacy fallback) -->
+        <!-- Office 其他格式预览（旧版回退）：仅显示元数据 -->
         <StackPanel IsVisible="{Binding IsOfficeVisible}"
                     Spacing="{DynamicResource SpacingXs}">
           <TextBlock Text="{Binding PreviewHeaderText}"
@@ -561,7 +561,7 @@
                      FontWeight="Bold" />
         </StackPanel>
         
-        <!-- Video preview (metadata only) -->
+        <!-- 视频预览：仅显示元数据（分辨率、时长、编码） -->
         <StackPanel IsVisible="{Binding IsVideoVisible}"
                     Spacing="{DynamicResource SpacingXs}">
           <TextBlock Text="{Binding PreviewHeaderText}"
@@ -569,7 +569,7 @@
                      FontWeight="Bold" />
         </StackPanel>
         
-        <!-- Markdown 预览（控件树） -->
+        <!-- Markdown/HTML 预览：使用 Markdig AST → 原生控件树渲染 -->
         <ScrollViewer IsVisible="{Binding IsMarkdownOrHtmlVisible}"
                       Background="{DynamicResource ThemeSurfaceBgBrush}"
                       Padding="{DynamicResource SpacingMdThk}">
@@ -577,7 +577,7 @@
         </ScrollViewer>
 
 
-        <!-- PDF 预览（PdfPig + SkiaSharp 逐页位图渲染） -->
+        <!-- PDF 预览：PdfPig + SkiaSharp 逐页位图渲染，支持翻页和缩放 -->
         <ScrollViewer IsVisible="{Binding IsPdfVisible}"
                       Background="{DynamicResource ThemeSurfaceBgBrush}">
           <Grid RowDefinitions="Auto,*">
@@ -610,7 +610,7 @@
           </Grid>
         </ScrollViewer>
 
-        <!-- Loading page (Phase 1 — replaces preview content area entirely) -->
+        <!-- 加载页面（Phase 1）：异步加载预览内容时显示弹跳点动画 + 文件名 -->
         <StackPanel IsVisible="{Binding IsLoadingPreview}"
                     VerticalAlignment="Center"
                     HorizontalAlignment="Center"
@@ -702,7 +702,7 @@
       </StackPanel>
     </ScrollViewer>
 
-    <!-- Preview Info Panel (placed dynamically by ApplyInfoPanelOrientation) -->
+    <!-- 预览信息面板：显示文件元数据（格式特定信息 + 通用信息），位置由 ApplyInfoPanelOrientation 动态控制 -->
     <Border x:Name="PreviewInfoBorder"
             Grid.Row="0" Grid.Column="1" Grid.RowSpan="2"
             Width="220"

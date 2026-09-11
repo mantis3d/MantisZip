@@ -4,19 +4,26 @@
              x:Class="MantisZip.UI.Avalonia.Controls.ResultTreeView"
              x:CompileBindings="False">
   <UserControl.Resources>
+    <!-- 几何图标转换器：将资源键转换为 PathIcon 可用的 Geometry -->
     <conv:GeometryResourceConverter x:Key="GeometryResourceConverter" />
+    <!-- 布尔转粗体转换器：用于压缩包节点加粗显示 -->
     <conv:BoolToBoldConverter x:Key="BoolToBoldConverter" />
+    <!-- 节点前景色转换器：根据节点类型/状态返回对应前景色 -->
     <conv:NodeForegroundConverter x:Key="NodeForegroundConverter" />
+    <!-- 布尔转压缩包字体大小转换器：压缩包节点使用更大字体 -->
     <conv:BoolToArchiveFontSizeConverter x:Key="BoolToArchiveFontSizeConverter" />
+    <!-- 布尔转冲突画刷转换器：冲突项显示警告色 -->
     <conv:BoolToConflictBrushConverter x:Key="BoolToConflictBrushConverter" />
+    <!-- 布尔转空目录透明度转换器：空目录降低不透明度 -->
     <conv:BoolToEmptyDirOpacityConverter x:Key="BoolToEmptyDirOpacityConverter" />
   </UserControl.Resources>
   <Grid RowDefinitions="Auto,Auto,*">
-    <!-- Row 0: Top toolbar (compact/full toggle + summary) -->
+    <!-- Row 0: 顶部工具栏（精简/完整模式切换 + 摘要） -->
     <Border Grid.Row="0"
             Padding="8,4"
             Background="{DynamicResource ThemeHeaderBgBrush}">
       <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
+        <!-- 精简/完整模式切换：切换树形视图的显示密度 -->
         <ToggleButton x:Name="CompactToggle"
                       IsChecked="{Binding CompactMode, RelativeSource={RelativeSource AncestorType=UserControl}}"
                       Width="28" Height="{DynamicResource ControlHeightXs}"
@@ -27,6 +34,7 @@
                       IsCheckedChanged="OnCompactToggleChanged">
           <PathIcon Data="{StaticResource IconChevronDownUp}" Width="14" Height="14" />
         </ToggleButton>
+        <!-- 全部展开按钮：递归展开所有树节点 -->
         <Button x:Name="ExpandAllButton"
                 Width="28" Height="{DynamicResource ControlHeightXs}"
                 FontSize="16" FontWeight="Bold"
@@ -37,6 +45,7 @@
                 Click="OnExpandAllClick">
           <PathIcon Data="{StaticResource IconArrowExpandAll}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
         </Button>
+        <!-- 定位按钮：在树中定位到当前选中项（当前禁用，预留功能） -->
         <Button x:Name="LocateButton"
                 Width="28" Height="{DynamicResource ControlHeightXs}"
                 Padding="2,0"
@@ -47,6 +56,7 @@
                 Click="OnLocateClick">
           <PathIcon Data="{StaticResource IconLocation}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
         </Button>
+        <!-- 过滤切换：显示/隐藏被过滤的灰显节点 -->
         <ToggleButton x:Name="FilterToggle"
                       IsChecked="{Binding ShowFilteredGhosts, RelativeSource={RelativeSource AncestorType=UserControl}, Mode=TwoWay}"
                       Width="28" Height="{DynamicResource ControlHeightXs}"
@@ -56,6 +66,7 @@
                       IsCheckedChanged="OnFilterToggleChanged">
           <PathIcon Data="{StaticResource IconFilter}" Width="14" Height="14" />
         </ToggleButton>
+        <!-- 摘要文本：显示文件数、总大小等统计信息 -->
         <TextBlock x:Name="SummaryTextBlock"
                    FontSize="12"
                    VerticalAlignment="Center"
@@ -64,7 +75,7 @@
       </StackPanel>
     </Border>
 
-    <!-- Row 1: Summary bar (file count + total size with conflict highlight) -->
+    <!-- Row 1: 摘要栏（文件数 + 总大小，冲突高亮） -->
     <Border Grid.Row="1"
             Padding="8,2"
             Background="{DynamicResource ThemeSurfaceBgBrush}"
@@ -72,12 +83,15 @@
             BorderThickness="0,0,0,1"
             IsVisible="{Binding ShowSummaryBar, RelativeSource={RelativeSource AncestorType=UserControl}}">
       <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXs}">
+        <!-- 文件数量统计 -->
         <TextBlock x:Name="FileCountText"
                    FontSize="11"
                    Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+        <!-- 总大小统计 -->
         <TextBlock x:Name="TotalSizeText"
                    FontSize="11"
                    Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+        <!-- 冲突计数：目标已存在同名文件的数量，红色高亮 -->
         <TextBlock x:Name="ConflictCountText"
                    FontSize="11"
                    Foreground="#FFD32F2F"
@@ -85,7 +99,7 @@
       </StackPanel>
     </Border>
 
-    <!-- Row 2: Tree + loading overlay -->
+    <!-- Row 2: 树形图 + 加载覆层 -->
     <Grid Grid.Row="2">
       <ScrollViewer x:Name="TreeScrollViewer" Background="{DynamicResource ThemeSurfaceBgBrush}">
         <TreeView x:Name="PreviewTreeView"
@@ -94,56 +108,61 @@
                   BorderThickness="0"
                   Background="Transparent"
                   SelectionChanged="OnTreeSelectionChanged">
-        <TreeView.Styles>
-          <Style Selector="TreeViewItem">
-            <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}" />
-          </Style>
-        </TreeView.Styles>
-        <TreeView.ItemTemplate>
-          <TreeDataTemplate ItemsSource="{Binding Children}">
-            <!-- Background=Transparent：让整行参与命中测试，点击行内任意位置均可选中 -->
-            <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}"
-                        Margin="2,1"
-                        Background="Transparent"
-                        Opacity="{Binding TextOpacity}">
-                <!-- PathIcon for folder/file/warning -->
+          <TreeView.Styles>
+            <Style Selector="TreeViewItem">
+              <!-- 双向绑定节点展开状态，保持用户展开/折叠操作 -->
+              <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}" />
+            </Style>
+          </TreeView.Styles>
+          <TreeView.ItemTemplate>
+            <TreeDataTemplate ItemsSource="{Binding Children}">
+              <!-- Background=Transparent：让整行参与命中测试，点击行内任意位置均可选中 -->
+              <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}"
+                          Margin="2,1"
+                          Background="Transparent"
+                          Opacity="{Binding TextOpacity}">
+                <!-- 文件夹/文件/警告图标：通过 GeometryResourceConverter 从资源键获取 Geometry -->
                 <PathIcon Data="{Binding IconKey, Converter={StaticResource GeometryResourceConverter}}"
                           Width="14" Height="14"
                           VerticalAlignment="Center"
                           Foreground="{DynamicResource ThemeTextPrimaryBrush}"
                           Opacity="{Binding IsEmptyDirectory, Converter={StaticResource BoolToEmptyDirOpacityConverter}}" />
+                <!-- 截断节点指示符：子节点过多时显示省略号 -->
                 <TextBlock Text="…" FontSize="13" VerticalAlignment="Center"
                           IsVisible="{Binding IsTruncatedNode}" />
+                <!-- 节点显示名称：压缩包节点加粗、放大；颜色由 NodeForegroundConverter 根据类型决定 -->
                 <TextBlock Text="{Binding DisplayLabel}"
                             VerticalAlignment="Center"
                             FontWeight="{Binding IsArchiveNode, Converter={StaticResource BoolToBoldConverter}}"
                             FontSize="{Binding IsArchiveNode, Converter={StaticResource BoolToArchiveFontSizeConverter}}"
                             Foreground="{Binding ForegroundKey, Converter={StaticResource NodeForegroundConverter}}" />
+                <!-- 文件大小显示 -->
                 <TextBlock Text="{Binding SizeDisplay}"
                           FontSize="11"
                           VerticalAlignment="Center"
                           Margin="4,0,0,0"
                           Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+                <!-- 目录信息文本：仅目录节点显示，包含子项数量等 -->
                 <TextBlock Text="{Binding DirectoryInfoText}"
                           FontSize="11"
                           VerticalAlignment="Center"
                           Margin="4,0,0,0"
                           Foreground="{DynamicResource ThemeTextSecondaryBrush}"
                           IsVisible="{Binding IsDirectoryNode}" />
-                <!-- Conflict suffix - warning icon for existing files -->
+                <!-- 冲突后缀：目标路径已存在同名文件时显示警告图标，悬停显示冲突详情 -->
                 <PathIcon Data="{StaticResource IconWarning}"
                           Width="12" Height="12"
                           VerticalAlignment="Center"
                           Foreground="#FFD32F2F"
                           IsVisible="{Binding ExistsAtDestination}"
                           ToolTip.Tip="{Binding ConflictToolTip}" />
-            </StackPanel>
-          </TreeDataTemplate>
-        </TreeView.ItemTemplate>
-      </TreeView>
+              </StackPanel>
+            </TreeDataTemplate>
+          </TreeView.ItemTemplate>
+        </TreeView>
       </ScrollViewer>
 
-      <!-- Loading overlay: shown while the raw tree builds on the background thread -->
+      <!-- 加载覆层：后台线程构建原始树时显示，含确定进度条 -->
       <Border x:Name="LoadingOverlay"
               IsVisible="False"
               Background="{DynamicResource ThemeSurfaceBgBrush}"
@@ -169,7 +188,7 @@
         </StackPanel>
       </Border>
 
-      <!-- State overlay: reading entries pending / load failed (corrupted or needs password) -->
+      <!-- 状态覆层：条目读取待处理 / 加载失败（损坏或需密码） -->
       <Border x:Name="StateOverlay"
               IsVisible="False"
               Background="{DynamicResource ThemeSurfaceBgBrush}"

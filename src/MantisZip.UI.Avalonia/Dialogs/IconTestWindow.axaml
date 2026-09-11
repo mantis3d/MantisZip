@@ -12,16 +12,18 @@
         Background="{DynamicResource ThemeWindowBgBrush}">
 
   <Window.Resources>
+    <!-- 几何资源转换器：将资源键转换为 PathIcon 可用的 Geometry -->
     <conv:GeometryResourceConverter x:Key="GeometryResourceConverter" />
+    <!-- 字符串非空转换器：用于控制控件可见性 -->
     <conv:StringNotEmptyConverter x:Key="StringNotEmptyConverter" />
   </Window.Resources>
 
   <DockPanel Margin="{DynamicResource SpacingMdThk}">
-    <!-- ═══════ Top: Toolbar with filter + stats ═══════ -->
+    <!-- 顶部工具栏：统计信息 + 搜索框 + 关闭按钮 -->
     <Border DockPanel.Dock="Top"
             Padding="0,0,0,8">
       <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto">
-        <!-- Stats -->
+        <!-- 统计信息区域：总计、已替换、待替换 -->
         <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
           <TextBlock FontSize="12" Foreground="{DynamicResource ThemeTextSecondaryBrush}">
             <Run Text="总计:" /><Run Text="{Binding TotalCount}" FontWeight="SemiBold" />
@@ -38,7 +40,7 @@
           </Border>
         </StackPanel>
 
-        <!-- Filter -->
+        <!-- 搜索框：支持按图标名称、资源键、使用位置筛选 -->
         <TextBox Grid.Column="1"
                  Text="{Binding FilterText}"
                  PlaceholderText="搜索图标名称、资源键、位置…"
@@ -50,7 +52,7 @@
                  BorderBrush="{DynamicResource ThemeBorderBrush}"
                  Padding="6,2" />
 
-        <!-- Close button -->
+        <!-- 关闭按钮 -->
         <Button Grid.Column="4" Content="关闭"
                 Width="72" Height="{DynamicResource ControlHeight}"
                 Margin="8,0,0,0"
@@ -61,7 +63,7 @@
       </Grid>
     </Border>
 
-    <!-- ═══════ Main: DataGrid listing all icons ═══════ -->
+    <!-- 主体区域：图标列表 DataGrid -->
     <DataGrid x:Name="IconGrid"
               x:DataType="models:IconTestItem"
               AutoGenerateColumns="False"
@@ -74,16 +76,16 @@
               SelectionMode="Single"
               FontSize="12">
       <DataGrid.Columns>
-        <!-- Icons column: show emoji + PathIcon side by side -->
+        <!-- 图标列：并排显示 emoji 和 PathIcon -->
         <DataGridTemplateColumn Header="图标" Width="80">
           <DataTemplate DataType="models:IconTestItem">
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="4">
-              <!-- Emoji display (shown when EmojiChar is not empty) -->
+              <!-- Emoji 显示：当 EmojiChar 不为空时可见 -->
               <TextBlock Text="{Binding EmojiChar}"
                          FontSize="18"
                          VerticalAlignment="Center"
                          IsVisible="{Binding EmojiChar, Converter={StaticResource StringNotEmptyConverter}}" />
-              <!-- PathIcon display (shown when ResourceKey is not empty) -->
+              <!-- PathIcon 显示：当 ResourceKey 不为空时可见，通过转换器解析资源键 -->
               <PathIcon Data="{Binding ResourceKey, Converter={StaticResource GeometryResourceConverter}}"
                         Width="18" Height="18"
                         Foreground="{DynamicResource ThemeTextPrimaryBrush}"
@@ -92,17 +94,17 @@
           </DataTemplate>
         </DataGridTemplateColumn>
 
-        <!-- Category -->
+        <!-- 分类列 -->
         <DataGridTextColumn Header="分类"
                             Binding="{Binding Category}"
                             Width="70" />
 
-        <!-- Semantic Name -->
+        <!-- 语义名称列 -->
         <DataGridTextColumn Header="语义名称"
                             Binding="{Binding SemanticName}"
                             Width="120" />
 
-        <!-- Resource Key (TextBox for copy support) -->
+        <!-- PathIcon 资源键列：使用只读 TextBox 支持复制 -->
         <DataGridTemplateColumn Header="PathIcon 资源键" Width="130">
           <DataTemplate DataType="models:IconTestItem">
             <TextBox Text="{Binding ResourceKey}"
@@ -115,17 +117,17 @@
           </DataTemplate>
         </DataGridTemplateColumn>
 
-        <!-- Status -->
+        <!-- 状态列：显示替换状态（已替换/待替换/不适用） -->
         <DataGridTextColumn Header="状态"
                             Binding="{Binding StatusText}"
                             Width="90" />
 
-        <!-- Location (short) -->
+        <!-- 使用位置列：显示图标在代码中的使用位置（简短路径） -->
         <DataGridTextColumn Header="使用位置"
                             Binding="{Binding ShortLocation}"
                             Width="170" />
 
-        <!-- Notes -->
+        <!-- 备注列：自动填充剩余宽度 -->
         <DataGridTextColumn Header="备注"
                             Binding="{Binding Notes}"
                              Width="*" />

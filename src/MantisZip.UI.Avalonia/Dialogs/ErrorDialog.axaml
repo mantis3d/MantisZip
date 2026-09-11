@@ -14,7 +14,7 @@
   <Grid RowDefinitions="Auto,Auto,Auto,Auto"
         Margin="{DynamicResource SpacingXsThk}">
 
-    <!-- Row 0: Header -->
+    <!-- 标题/头部信息 -->
     <TextBlock Grid.Row="0"
                x:Name="HeaderText"
                FontSize="13"
@@ -22,7 +22,7 @@
                TextWrapping="Wrap"
                Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
 
-    <!-- Row 1: Error message -->
+    <!-- 错误详细消息 -->
     <TextBlock Grid.Row="1"
                x:Name="ErrorMsgText"
                TextWrapping="Wrap"
@@ -30,7 +30,7 @@
                Foreground="{DynamicResource ThemeTextSecondaryBrush}"
                Margin="0,8,0,0" />
 
-    <!-- Row 2: Buttons -->
+    <!-- 操作按钮行：重试/跳过/中止 -->
     <StackPanel Grid.Row="2"
                 Orientation="Horizontal"
                 HorizontalAlignment="Center"
@@ -62,7 +62,7 @@
               Click="Abort_Click" />
     </StackPanel>
 
-    <!-- Row 3: Apply to all -->
+    <!-- 应用到所有复选框 -->
     <CheckBox Grid.Row="3"
               x:Name="ApplyAllCheck"
               Content="{Binding ApplyAllText}"

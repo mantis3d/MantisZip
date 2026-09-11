@@ -14,7 +14,7 @@
   <Grid RowDefinitions="Auto,*,Auto"
         Margin="{DynamicResource SpacingXsThk}">
 
-    <!-- Row 0: Header -->
+    <!-- 标题栏 -->
     <TextBlock Grid.Row="0"
                Text="{Binding WinTitle}"
                FontSize="16"
@@ -22,7 +22,7 @@
                Margin="0,0,0,8"
                Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
 
-    <!-- Row 1: DataGrid -->
+    <!-- 收藏夹列表 DataGrid -->
     <DataGrid Grid.Row="1"
               x:Name="FavoritesGrid"
               AutoGenerateColumns="False"
@@ -31,26 +31,30 @@
               RowHeight="{DynamicResource ControlHeightMd}"
               SelectionChanged="FavoritesGrid_SelectionChanged">
       <DataGrid.Columns>
+        <!-- 名称列 -->
         <DataGridTextColumn Header="{Binding NameColumnHeader}"
                             Binding="{Binding Name}"
                             Width="*" />
+        <!-- 路径列 -->
         <DataGridTextColumn Header="{Binding PathColumnHeader}"
                             Binding="{Binding PathDisplay}"
                             Width="2*" />
+        <!-- 类型列 -->
         <DataGridTextColumn Header="{Binding TypeColumnHeader}"
                             Binding="{Binding TypeLabel}"
                             Width="80" />
       </DataGrid.Columns>
     </DataGrid>
 
-    <!-- Row 2: Button rows -->
+    <!-- 底部按钮区域 -->
     <Grid Grid.Row="2"
           Margin="0,8,0,0">
 
-      <!-- Left buttons -->
+      <!-- 左侧按钮组 -->
       <StackPanel Orientation="Horizontal"
                   Spacing="6"
                   HorizontalAlignment="Left">
+        <!-- 添加收藏 -->
         <Button x:Name="AddButton"
                 Padding="12,6"
                 Click="AddButton_Click"
@@ -62,6 +66,7 @@
             <TextBlock Text="{Binding AddText}" VerticalAlignment="Center" />
           </StackPanel>
         </Button>
+        <!-- 编辑收藏 -->
         <Button x:Name="EditButton"
                 Padding="12,6"
                 IsEnabled="False"
@@ -74,6 +79,7 @@
             <TextBlock Text="{Binding EditText}" VerticalAlignment="Center" />
           </StackPanel>
         </Button>
+        <!-- 删除收藏 -->
         <Button x:Name="DeleteButton"
                 Padding="12,6"
                 IsEnabled="False"
@@ -86,6 +92,7 @@
             <TextBlock Text="{Binding DeleteText}" VerticalAlignment="Center" />
           </StackPanel>
         </Button>
+        <!-- 上移 -->
         <Button x:Name="MoveUpButton"
                 Padding="12,6"
                 IsEnabled="False"
@@ -98,6 +105,7 @@
             <TextBlock Text="{Binding MoveUpText}" VerticalAlignment="Center" />
           </StackPanel>
         </Button>
+        <!-- 下移 -->
         <Button x:Name="MoveDownButton"
                 Padding="12,6"
                 IsEnabled="False"
@@ -112,7 +120,7 @@
         </Button>
       </StackPanel>
 
-      <!-- Right button -->
+      <!-- 右侧确定按钮（默认隐藏） -->
       <Button Content="{Binding OkText}"
               Padding="20,6"
               HorizontalAlignment="Right"

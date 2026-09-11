@@ -11,10 +11,11 @@
         Background="{DynamicResource ThemeWindowBgBrush}"
         Padding="{DynamicResource SpacingMdThk}">
 
+  <!-- 主布局网格：8 行自动高度，分别对应标题、对比面板、对比结果、操作按钮、重命名输入、应用到全部、分隔线、暂停/取消 -->
   <Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto"
         Margin="{DynamicResource SpacingXsThk}">
 
-    <!-- Row 0: Header -->
+    <!-- 第 0 行：标题文本，显示冲突提示信息（如"文件已存在"） -->
     <TextBlock Grid.Row="0"
                x:Name="HeaderText"
                FontSize="13"
@@ -22,7 +23,7 @@
                TextWrapping="Wrap"
                Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
 
-    <!-- Row 1: Comparison panel (disk vs archive) -->
+    <!-- 第 1 行：对比面板（磁盘文件 vs 压缩包条目） -->
     <Border Grid.Row="1"
             Margin="0,8,0,0"
             Padding="{DynamicResource SpacingSmThk}"
@@ -31,7 +32,7 @@
             BorderThickness="1"
             CornerRadius="{DynamicResource BorderRadius}">
       <Grid ColumnDefinitions="*,Auto,*">
-        <!-- Left: Disk file info -->
+        <!-- 左侧：磁盘上已存在的文件信息 -->
         <StackPanel Grid.Column="0">
           <TextBlock Text="{Binding DiskLabel}"
                      FontWeight="SemiBold"
@@ -52,7 +53,7 @@
           </TextBlock>
         </StackPanel>
 
-        <!-- Center: VS badge -->
+        <!-- 中间：VS 标识，视觉分隔左右两侧 -->
         <Border Grid.Column="1"
                 Width="32"
                 Height="{DynamicResource ControlHeightXs}"
@@ -69,7 +70,7 @@
                      VerticalAlignment="Center" />
         </Border>
 
-        <!-- Right: Archive entry info -->
+        <!-- 右侧：压缩包内待解压条目的信息 -->
         <StackPanel Grid.Column="2">
           <TextBlock Text="{Binding ArchiveLabel}"
                      FontWeight="SemiBold"
@@ -94,7 +95,7 @@
       </Grid>
     </Border>
 
-    <!-- Row 2: Comparison result -->
+    <!-- 第 2 行：对比结果提示文本（如"压缩包内文件较新"），居中显示 -->
     <TextBlock Grid.Row="2"
                x:Name="CompareResultText"
                FontSize="11"
@@ -103,10 +104,11 @@
                HorizontalAlignment="Center"
                Margin="0,4,0,0" />
 
-    <!-- Row 3: Buttons -->
+    <!-- 第 3 行：冲突处理操作按钮组，水平排列 -->
     <WrapPanel Grid.Row="3"
                HorizontalAlignment="Center"
                Margin="0,10,0,0">
+      <!-- 覆盖：直接用压缩包文件替换磁盘文件 -->
       <Button MinWidth="70"
               Padding="6,4"
               Margin="0,0,4,4"
@@ -120,6 +122,7 @@
                      Margin="0,2,0,0" />
         </StackPanel>
       </Button>
+      <!-- 覆盖旧文件：仅当压缩包文件比磁盘文件新时才覆盖 -->
       <Button MinWidth="70"
               Padding="6,4"
               Margin="4,0,4,4"
@@ -133,6 +136,7 @@
                      Margin="0,2,0,0" />
         </StackPanel>
       </Button>
+      <!-- 覆盖小文件：仅当压缩包文件比磁盘文件大时才覆盖 -->
       <Button MinWidth="70"
               Padding="6,4"
               Margin="4,0,4,4"
@@ -146,6 +150,7 @@
                      Margin="0,2,0,0" />
         </StackPanel>
       </Button>
+      <!-- 重命名：弹出输入框让用户指定新文件名 -->
       <Button MinWidth="70"
               Padding="6,4"
               Margin="4,0,4,4"
@@ -159,6 +164,7 @@
                      Margin="0,2,0,0" />
         </StackPanel>
       </Button>
+      <!-- 跳过：保留磁盘文件，不解压该条目 -->
       <Button MinWidth="70"
               Padding="6,4"
               Margin="4,0,4,4"
@@ -174,7 +180,7 @@
       </Button>
     </WrapPanel>
 
-    <!-- Row 4: Custom rename input -->
+    <!-- 第 4 行：自定义重命名输入框，点击"重命名"按钮后显示 -->
     <Grid Grid.Row="4"
           ColumnDefinitions="Auto,*"
           Margin="30,4,30,0">
@@ -190,7 +196,7 @@
                PlaceholderText="{Binding RenameHint}" />
     </Grid>
 
-    <!-- Row 5: Apply to all -->
+    <!-- 第 5 行："应用到全部"复选框，勾选后后续冲突自动使用当前选择 -->
     <CheckBox Grid.Row="5"
               x:Name="ApplyAllCheck"
               Content="{Binding ApplyAllText}"
@@ -198,16 +204,17 @@
               Foreground="{DynamicResource ThemeTextSecondaryBrush}"
                HorizontalAlignment="Center" />
 
-    <!-- Row 6: Separator -->
+    <!-- 第 6 行：分隔线，视觉上分隔操作按钮与暂停/取消按钮 -->
     <Rectangle Grid.Row="6"
                Height="1"
                Fill="{DynamicResource ThemeBorderBrush}"
                Margin="0,6,0,6" />
 
-    <!-- Row 7: Pause / Cancel operation -->
+    <!-- 第 7 行：暂停/取消整个操作的按钮组 -->
     <StackPanel Grid.Row="7"
                 Orientation="Horizontal"
                 HorizontalAlignment="Center">
+      <!-- 暂停按钮：暂停当前解压/压缩操作 -->
       <Button x:Name="PauseBtn"
               MinWidth="80"
               Padding="10,5"
@@ -221,6 +228,7 @@
                      Margin="0,2,0,0" />
         </StackPanel>
       </Button>
+      <!-- 取消全部按钮：取消整个解压/压缩任务 -->
       <Button x:Name="CancelAllBtn"
               MinWidth="80"
               Padding="10,5"

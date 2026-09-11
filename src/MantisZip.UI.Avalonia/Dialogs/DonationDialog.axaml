@@ -11,7 +11,7 @@
 
   <Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto"
         Margin="{DynamicResource SpacingLgThk}">
-    <!-- Row 0: Header -->
+    <!-- 标题区域 -->
     <TextBlock Grid.Row="0"
                Text="{Binding HeaderText}"
                FontSize="18"
@@ -20,7 +20,7 @@
                HorizontalAlignment="Center"
                Margin="0,0,0,16" />
 
-    <!-- Row 1: QR code section -->
+    <!-- 二维码区域 -->
     <Border Grid.Row="1"
             Background="{DynamicResource ThemeSurfaceBgBrush}"
             BorderBrush="{DynamicResource ThemeBorderBrush}"
@@ -30,10 +30,12 @@
             Margin="0,0,0,16"
             HorizontalAlignment="Center">
       <StackPanel Spacing="10">
+        <!-- 捐赠二维码图片 -->
         <Image Width="400"
                Height="400"
                Source="avares://MantisZip.UI.Avalonia/Resources/DonateQr.png"
                Stretch="Uniform" />
+        <!-- 二维码提示文字 -->
         <TextBlock Text="{Binding QrHintText}"
                    FontSize="14"
                    Foreground="{DynamicResource ThemeTextSecondaryBrush}"
@@ -41,7 +43,7 @@
       </StackPanel>
     </Border>
 
-    <!-- Row 2: Platform hint -->
+    <!-- 平台提示文字 -->
     <TextBlock Grid.Row="2"
                Text="{Binding PlatformsHintText}"
                FontSize="14"
@@ -49,11 +51,12 @@
                HorizontalAlignment="Center"
                Margin="0,0,0,12" />
 
-    <!-- Row 3: Platform link buttons -->
+    <!-- 平台链接按钮 -->
     <StackPanel Grid.Row="3"
                 Spacing="{DynamicResource SpacingXs}"
                 Margin="0,0,0,20"
                 HorizontalAlignment="Center">
+      <!-- 爱发电按钮 -->
       <Button Content="{Binding AfdianText}"
               Height="{DynamicResource ControlHeightXl}"
               Width="440"
@@ -64,6 +67,7 @@
               FontSize="18"
               HorizontalContentAlignment="Center"
               Click="OpenAfdian_Click" />
+      <!-- Polar 按钮 -->
       <Button Content="{Binding PolarText}"
               Height="{DynamicResource ControlHeightXl}"
               Width="440"
@@ -76,7 +80,7 @@
               Click="Polar_Click" />
     </StackPanel>
 
-    <!-- Row 4: Close button -->
+    <!-- 关闭按钮 -->
     <Button Grid.Row="4"
             Content="{Binding CloseText}"
             Width="80"

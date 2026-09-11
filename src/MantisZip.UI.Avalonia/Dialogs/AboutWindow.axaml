@@ -11,7 +11,7 @@
         Background="{DynamicResource ThemeWindowBgBrush}"
         Padding="{DynamicResource SpacingMdThk}">
   <DockPanel>
-    <!-- ═══════ Close button (outside TabControl, always visible) ═══════ -->
+    <!-- 底部关闭按钮（始终可见，不在 TabControl 内） -->
     <Button Content="{Binding AboutClose}"
             DockPanel.Dock="Bottom"
             Width="80" Height="{DynamicResource ControlHeight}"
@@ -24,17 +24,17 @@
             Foreground="White"
             BorderThickness="0" />
 
-    <!-- ═══════ Tabs ═══════ -->
+    <!-- 选项卡容器：关于、作者、依赖库、致谢 -->
     <TabControl>
 
-      <!-- ─────── Tab 1: 关于 / About ─────── -->
+      <!-- 选项卡 1：关于 -->
       <TabItem Header="{Binding AboutTabHeader}" Classes="compactTab"
                controls:TabItemExtensions.TabIcon="IconInfo">
         <ScrollViewer VerticalScrollBarVisibility="Auto"
                       Background="{DynamicResource ThemeWindowBgBrush}">
           <Grid Margin="24" ColumnDefinitions="Auto,*">
 
-            <!-- Left: Icon + Name + Version -->
+            <!-- 左侧：Logo + 产品名 + 版本号 -->
             <StackPanel Grid.Column="0"
                         VerticalAlignment="Center"
                         HorizontalAlignment="Center"
@@ -53,12 +53,12 @@
                          Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
             </StackPanel>
 
-            <!-- Right: Info Grid -->
+            <!-- 右侧：信息网格（标签 + 值） -->
             <Grid Grid.Column="1" VerticalAlignment="Center"
                   ColumnDefinitions="Auto,*"
                   RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto">
 
-              <!-- 介绍 / Introduction -->
+              <!-- 介绍标签与内容 -->
               <TextBlock Grid.Row="0" Grid.Column="0"
                          Text="{Binding AboutLabelIntro}"
                          FontWeight="Bold"
@@ -70,7 +70,7 @@
                          TextWrapping="Wrap" Margin="0,0,0,8"
                          Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
 
-              <!-- 描述 / Description -->
+              <!-- 描述标签与内容 -->
               <TextBlock Grid.Row="1" Grid.Column="0"
                          Text="{Binding AboutLabelDescription}"
                          FontWeight="Bold"
@@ -82,7 +82,7 @@
                          TextWrapping="Wrap" Margin="0,0,0,8"
                          Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
 
-              <!-- 格式 / Format -->
+              <!-- 支持格式标签与内容 -->
               <TextBlock Grid.Row="2" Grid.Column="0"
                          Text="{Binding AboutLabelFormat}"
                          FontWeight="Bold"
@@ -94,7 +94,7 @@
                          TextWrapping="Wrap" Margin="0,0,0,8"
                          Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
 
-              <!-- 许可证 / License -->
+              <!-- 许可证标签与内容 -->
               <TextBlock Grid.Row="3" Grid.Column="0"
                          Text="{Binding AboutLabelLicense}"
                          FontWeight="Bold"
@@ -106,7 +106,7 @@
                          TextWrapping="Wrap" Margin="0,0,0,8"
                          Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
 
-              <!-- GitHub -->
+              <!-- GitHub 链接 -->
               <TextBlock Grid.Row="4" Grid.Column="0"
                          Text="{Binding AboutLabelGitHub}"
                          FontWeight="Bold"
@@ -124,7 +124,7 @@
                       Margin="0,0,0,8"
                       Click="OnGitHubClick" />
 
-              <!-- Gitee -->
+              <!-- Gitee 链接 -->
               <TextBlock Grid.Row="5" Grid.Column="0"
                          Text="{Binding AboutLabelGitee}"
                          FontWeight="Bold"
@@ -142,7 +142,7 @@
                       Margin="0,0,0,8"
                       Click="OnGiteeClick" />
 
-              <!-- QQ group -->
+              <!-- QQ 群号 -->
               <TextBlock Grid.Row="6" Grid.Column="0"
                          Text="{Binding AboutLabelQQ}"
                          FontWeight="Bold"
@@ -164,13 +164,13 @@
         </ScrollViewer>
       </TabItem>
 
-      <!-- ─────── Tab 2: 作者 / Author ─────── -->
+      <!-- 选项卡 2：作者信息 -->
       <TabItem Header="{Binding AuthorTabHeader}" Classes="compactTab"
                controls:TabItemExtensions.TabIcon="IconPerson">
         <Grid Margin="24,24,24,0" VerticalAlignment="Top"
               ColumnDefinitions="Auto,*"
               RowDefinitions="Auto,Auto,Auto,Auto,Auto">
-          <!-- 作者 / Author Name -->
+          <!-- 作者姓名 -->
           <TextBlock Grid.Row="0" Grid.Column="0"
                      Text="{Binding AboutLabelAuthorName}"
                      FontWeight="Bold"
@@ -183,7 +183,7 @@
                      Foreground="{DynamicResource ThemeTextPrimaryBrush}"
                      Margin="0,0,0,12" />
 
-          <!-- 邮箱 / Email -->
+          <!-- 邮箱地址（可点击发送邮件） -->
           <TextBlock Grid.Row="1" Grid.Column="0"
                      Text="{Binding AboutLabelEmail}"
                      FontWeight="Bold"
@@ -201,7 +201,7 @@
                   Margin="0,0,0,8"
                   Click="OnEmailClick" />
 
-          <!-- GitHub -->
+          <!-- 作者 GitHub -->
           <TextBlock Grid.Row="2" Grid.Column="0"
                      Text="{Binding AboutLabelGitHub}"
                      FontWeight="Bold"
@@ -219,7 +219,7 @@
                   Margin="0,0,0,8"
                   Click="OnAuthorGitHubClick" />
 
-          <!-- Gitee -->
+          <!-- 作者 Gitee -->
           <TextBlock Grid.Row="3" Grid.Column="0"
                      Text="{Binding AboutLabelGitee}"
                      FontWeight="Bold"
@@ -237,7 +237,7 @@
                   Margin="0,0,0,8"
                   Click="OnAuthorGiteeClick" />
 
-          <!-- Bilibili -->
+          <!-- 作者 Bilibili -->
           <TextBlock Grid.Row="4" Grid.Column="0"
                      Text="{Binding AboutLabelBilibili}"
                      FontWeight="Bold"
@@ -257,7 +257,7 @@
         </Grid>
       </TabItem>
 
-      <!-- ─────── Tab 3: 依赖库 / Dependencies ─────── -->
+      <!-- 选项卡 3：依赖库列表 -->
       <TabItem Header="{Binding DependenciesTabHeader}" Classes="compactTab"
                controls:TabItemExtensions.TabIcon="IconArchive">
         <ScrollViewer VerticalScrollBarVisibility="Auto"
@@ -266,7 +266,7 @@
                 TextElement.Foreground="{DynamicResource ThemeTextPrimaryBrush}"
                 ColumnDefinitions="2*,*,*,2*"
                 RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto">
-            <!-- Header row -->
+            <!-- 表头行 -->
             <TextBlock Grid.Row="0" Grid.Column="0"
                        Text="{Binding AboutLibraryName}"
                        FontWeight="Bold" Padding="4,2" />
@@ -280,57 +280,66 @@
                        Text="{Binding AboutLibraryPurpose}"
                        FontWeight="Bold" Padding="4,2" />
 
-            <!-- Separator -->
+            <!-- 分隔线 -->
             <Rectangle Grid.Row="1" Grid.ColumnSpan="4"
                        Height="1" Margin="0,2,0,4"
                        Fill="{DynamicResource ThemeBorderBrush}" />
 
-            <!-- Data rows -->
+            <!-- 数据行：Avalonia -->
             <TextBlock Grid.Row="2" Grid.Column="0" Text="Avalonia" Padding="4,3" />
             <TextBlock Grid.Row="2" Grid.Column="1" Text="12.0.4" Padding="8,3" />
             <TextBlock Grid.Row="2" Grid.Column="2" Text="MIT" Padding="8,3" />
             <TextBlock Grid.Row="2" Grid.Column="3" Text="{Binding AboutDepAvalonia}" Padding="4,3" />
 
+            <!-- 数据行：Avalonia.Controls.WebView -->
             <TextBlock Grid.Row="3" Grid.Column="0" Text="Avalonia.Controls.WebView" Padding="4,3" />
             <TextBlock Grid.Row="3" Grid.Column="1" Text="12.0.1" Padding="8,3" />
             <TextBlock Grid.Row="3" Grid.Column="2" Text="BSD-3-Clause" Padding="8,3" />
             <TextBlock Grid.Row="3" Grid.Column="3" Text="{Binding AboutDepWebView}" Padding="4,3" />
 
+            <!-- 数据行：Avalonia.Controls.DataGrid -->
             <TextBlock Grid.Row="4" Grid.Column="0" Text="Avalonia.Controls.DataGrid" Padding="4,3" />
             <TextBlock Grid.Row="4" Grid.Column="1" Text="12.0.0" Padding="8,3" />
             <TextBlock Grid.Row="4" Grid.Column="2" Text="MIT" Padding="8,3" />
             <TextBlock Grid.Row="4" Grid.Column="3" Text="{Binding AboutDepDataGrid}" Padding="4,3" />
 
+            <!-- 数据行：CommunityToolkit.Mvvm -->
             <TextBlock Grid.Row="5" Grid.Column="0" Text="CommunityToolkit.Mvvm" Padding="4,3" />
             <TextBlock Grid.Row="5" Grid.Column="1" Text="8.4.2" Padding="8,3" />
             <TextBlock Grid.Row="5" Grid.Column="2" Text="MIT" Padding="8,3" />
             <TextBlock Grid.Row="5" Grid.Column="3" Text="{Binding AboutDepMvvm}" Padding="4,3" />
 
+            <!-- 数据行：SharpCompress -->
             <TextBlock Grid.Row="6" Grid.Column="0" Text="SharpCompress" Padding="4,3" />
             <TextBlock Grid.Row="6" Grid.Column="1" Text="0.48.1" Padding="8,3" />
             <TextBlock Grid.Row="6" Grid.Column="2" Text="MIT" Padding="8,3" />
             <TextBlock Grid.Row="6" Grid.Column="3" Text="{Binding AboutDepSharpCompress}" Padding="4,3" />
 
+            <!-- 数据行：SharpSevenZip -->
             <TextBlock Grid.Row="7" Grid.Column="0" Text="SharpSevenZip" Padding="4,3" />
             <TextBlock Grid.Row="7" Grid.Column="1" Text="2.0.45" Padding="8,3" />
             <TextBlock Grid.Row="7" Grid.Column="2" Text="LGPL-2.1" Padding="8,3" />
             <TextBlock Grid.Row="7" Grid.Column="3" Text="{Binding AboutDepSevenZip}" Padding="4,3" />
 
+            <!-- 数据行：Microsoft.Data.Sqlite -->
             <TextBlock Grid.Row="8" Grid.Column="0" Text="Microsoft.Data.Sqlite" Padding="4,3" />
             <TextBlock Grid.Row="8" Grid.Column="1" Text="10.0.8" Padding="8,3" />
             <TextBlock Grid.Row="8" Grid.Column="2" Text="MIT" Padding="8,3" />
             <TextBlock Grid.Row="8" Grid.Column="3" Text="{Binding AboutDepSqlite}" Padding="4,3" />
 
+            <!-- 数据行：SkiaSharp -->
             <TextBlock Grid.Row="9" Grid.Column="0" Text="SkiaSharp" Padding="4,3" />
             <TextBlock Grid.Row="9" Grid.Column="1" Text="3.119.4" Padding="8,3" />
             <TextBlock Grid.Row="9" Grid.Column="2" Text="MIT" Padding="8,3" />
             <TextBlock Grid.Row="9" Grid.Column="3" Text="{Binding AboutDepSkia}" Padding="4,3" />
 
+            <!-- 数据行：Markdig -->
             <TextBlock Grid.Row="10" Grid.Column="0" Text="Markdig" Padding="4,3" />
             <TextBlock Grid.Row="10" Grid.Column="1" Text="0.40.0" Padding="8,3" />
             <TextBlock Grid.Row="10" Grid.Column="2" Text="BSD-2-Clause" Padding="8,3" />
             <TextBlock Grid.Row="10" Grid.Column="3" Text="{Binding AboutDepMarkdig}" Padding="4,3" />
 
+            <!-- 数据行：Ude.NetStandard -->
             <TextBlock Grid.Row="11" Grid.Column="0" Text="Ude.NetStandard" Padding="4,3" />
             <TextBlock Grid.Row="11" Grid.Column="1" Text="1.2.0" Padding="8,3" />
             <TextBlock Grid.Row="11" Grid.Column="2" Text="MIT" Padding="8,3" />
@@ -339,7 +348,7 @@
         </ScrollViewer>
       </TabItem>
 
-      <!-- ─────── Tab 4: 致谢 / Acknowledgments ─────── -->
+      <!-- 选项卡 4：致谢 -->
       <TabItem Header="{Binding AcknowledgmentsTabHeader}" Classes="compactTab"
                controls:TabItemExtensions.TabIcon="IconHeart">
         <ScrollViewer VerticalScrollBarVisibility="Auto"
@@ -355,7 +364,7 @@
                        TextWrapping="Wrap" FontSize="13" Margin="0,12,0,0"
                        Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
 
-            <!-- ─── 资金支持者 / Financial Supporters ─── -->
+            <!-- ─── 资金支持者 ─── -->
             <Rectangle Height="1" Margin="0,16,0,8"
                        Fill="{DynamicResource ThemeBorderBrush}" />
             <TextBlock Text="{Binding AboutContributorsFinancial}"
@@ -386,7 +395,7 @@
                        IsVisible="False"
                        Margin="0,4,0,0" />
 
-            <!-- ─── 技术贡献者 / Technical Contributors ─── -->
+            <!-- ─── 技术贡献者 ─── -->
             <Rectangle Height="1" Margin="0,16,0,8"
                        Fill="{DynamicResource ThemeBorderBrush}" />
             <TextBlock Text="{Binding AboutContributorsTechnical}"

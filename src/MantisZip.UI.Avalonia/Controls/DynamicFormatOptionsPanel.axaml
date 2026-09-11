@@ -3,6 +3,7 @@
              x:Class="MantisZip.UI.Avalonia.Controls.DynamicFormatOptionsPanel"
              x:CompileBindings="False"
              Background="{DynamicResource ThemeWindowBgBrush}">
+  <!-- 压缩格式动态选项面板：根据选中的压缩格式（ZIP/7z/TAR.GZ）动态显示对应的高级选项 -->
   <Border BorderBrush="{DynamicResource ThemeBorderBrush}"
           BorderThickness="1"
           Padding="{DynamicResource SpacingXsThk}"
@@ -10,14 +11,14 @@
           MinHeight="100"
           Background="{DynamicResource ThemeSurfaceBgBrush}">
     <Grid>
-      <!-- ═══════ ZIP panel ═══════ -->
+      <!-- ═══════ ZIP 选项面板 ═══════ -->
       <StackPanel x:Name="ZipPanel" IsVisible="True">
         <TextBlock Text="{Binding ZipPanelTitle, RelativeSource={RelativeSource AncestorType=UserControl}}"
                    FontWeight="SemiBold"
                    Margin="0,0,0,6"
                    Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
 
-        <!-- ZIP encoding -->
+        <!-- ZIP 编码设置：用于处理中文文件名编码问题 -->
         <Grid Margin="0,0,0,6">
           <Grid.ColumnDefinitions>
             <ColumnDefinition Width="80" />
@@ -35,7 +36,7 @@
                     BorderBrush="{DynamicResource ThemeComboBoxBorderBrush}" />
         </Grid>
 
-        <!-- ZIP compression method -->
+        <!-- ZIP 压缩方法：Store/Deflate 等 -->
         <Grid>
           <Grid.ColumnDefinitions>
             <ColumnDefinition Width="80" />
@@ -54,14 +55,14 @@
         </Grid>
       </StackPanel>
 
-      <!-- ═══════ 7z panel ═══════ -->
+      <!-- ═══════ 7z 选项面板 ═══════ -->
       <StackPanel x:Name="SevenZPanel" IsVisible="False">
         <TextBlock Text="{Binding SevenZPanelTitle, RelativeSource={RelativeSource AncestorType=UserControl}}"
                    FontWeight="SemiBold"
                    Margin="0,0,0,6"
                    Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
 
-        <!-- 7z compression method -->
+        <!-- 7z 压缩方法：LZMA/LZMA2/PPMd/BZip2 等 -->
         <Grid Margin="0,0,0,6">
           <Grid.ColumnDefinitions>
             <ColumnDefinition Width="80" />
@@ -79,14 +80,14 @@
                     BorderBrush="{DynamicResource ThemeComboBoxBorderBrush}" />
         </Grid>
 
-        <!-- 7z solid checkbox -->
+        <!-- 7z 固实压缩复选框：启用后将所有文件作为单个数据块压缩，压缩率更高但随机访问变慢 -->
         <CheckBox x:Name="SolidCheck"
                   Content="{Binding SolidLabel, RelativeSource={RelativeSource AncestorType=UserControl}}"
                   IsChecked="True"
                   IsCheckedChanged="SolidCheck_IsCheckedChanged"
                   Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
 
-        <!-- 7z solid block size -->
+        <!-- 7z 固实块大小：固实压缩时的数据块大小 -->
         <Grid Margin="0,6,0,0">
           <Grid.ColumnDefinitions>
             <ColumnDefinition Width="80" />
@@ -104,7 +105,7 @@
                     BorderBrush="{DynamicResource ThemeComboBoxBorderBrush}" />
         </Grid>
 
-        <!-- 7z dictionary size -->
+        <!-- 7z 字典大小：压缩时使用的滑动窗口大小，越大压缩率越高但内存占用越大 -->
         <Grid Margin="0,6,0,0">
           <Grid.ColumnDefinitions>
             <ColumnDefinition Width="80" />
@@ -122,7 +123,7 @@
                     BorderBrush="{DynamicResource ThemeComboBoxBorderBrush}" />
         </Grid>
 
-        <!-- 7z word size (num fast bytes) -->
+        <!-- 7z 字长/快速字节数：匹配查找时的最大匹配长度，影响压缩速度与压缩率的平衡 -->
         <Grid Margin="0,6,0,0">
           <Grid.ColumnDefinitions>
             <ColumnDefinition Width="80" />
@@ -140,7 +141,7 @@
                     BorderBrush="{DynamicResource ThemeComboBoxBorderBrush}" />
         </Grid>
 
-        <!-- 7z match finder -->
+        <!-- 7z 匹配查找器：匹配算法选择，影响压缩速度与压缩率 -->
         <Grid Margin="0,6,0,0">
           <Grid.ColumnDefinitions>
             <ColumnDefinition Width="80" />
@@ -159,7 +160,7 @@
         </Grid>
       </StackPanel>
 
-      <!-- ═══════ TAR.GZ placeholder panel ═══════ -->
+      <!-- ═══════ TAR.GZ 占位面板（暂无高级选项）═══════ -->
       <StackPanel x:Name="TarGzPanel" IsVisible="False">
         <TextBlock Text="{Binding TarGzPlaceholder, RelativeSource={RelativeSource AncestorType=UserControl}}"
                    Foreground="{DynamicResource ThemeTextSecondaryBrush}"

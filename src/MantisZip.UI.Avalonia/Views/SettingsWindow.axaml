@@ -21,15 +21,16 @@
     <local:PositionDisplayConverter x:Key="PositionDisplayConverter" />
   </Window.Resources>
 
-  <Grid RowDefinitions="*,Auto"
-        Margin="16">
-    <!-- Tabs -->
+    <!-- 主布局网格：内容区（*） + 底部按钮栏（Auto） -->
+    <Grid RowDefinitions="*,Auto"
+          Margin="16">
+    <!-- 左侧选项卡：压缩/解压/外观/预览/密码管理/语言/调试/高级 -->
     <TabControl Grid.Row="0" TabStripPlacement="Left"
                 Background="{DynamicResource ThemeSurfaceBgBrush}"
                 BorderBrush="{DynamicResource ThemeBorderBrush}">
 
 
-      <!-- ═══════ 1. 压缩 ═══════ -->
+      <!-- 压缩设置选项卡：包含通用设置和格式设置两个子选项卡 -->
       <TabItem Header="{Binding TabCompressHeader}" Classes="compactTab"
                controls:TabItemExtensions.TabIcon="IconCompress">
         <Grid>
@@ -223,7 +224,7 @@
         </Grid>
       </TabItem>
 
-      <!-- ═══════ 2. 解压 ═══════ -->
+      <!-- 解压设置选项卡：默认目标路径、冲突处理、打开文件夹、拖拽解压、双击行为等 -->
       <TabItem Header="{Binding TabExtractHeader}" Classes="compactTab"
                controls:TabItemExtensions.TabIcon="IconFolder">
         <ScrollViewer Background="{DynamicResource ThemeWindowBgBrush}">
@@ -303,7 +304,7 @@
         </ScrollViewer>
       </TabItem>
 
-      <!-- ═══════ 3. 外观 ═══════ -->
+      <!-- 外观设置选项卡：主题、紧凑度、最近文件数、界面字体 -->
       <TabItem Header="{Binding TabAppearanceHeader}" Classes="compactTab"
                controls:TabItemExtensions.TabIcon="IconPaintBrush">
         <ScrollViewer Background="{DynamicResource ThemeWindowBgBrush}">
@@ -371,7 +372,7 @@
         </ScrollViewer>
       </TabItem>
 
-      <!-- ═══════ 4. 预览 ═══════ -->
+      <!-- 预览设置选项卡：包含通用/图片/文本/字体/种子/可执行文件/数据表格/元数据面板子选项卡 -->
       <TabItem Header="{Binding TabPreviewHeader}" Classes="compactTab"
                controls:TabItemExtensions.TabIcon="IconEye">
         <Grid>
@@ -785,7 +786,7 @@
         </Grid>
       </TabItem>
 
-      <!-- ═══════ 5. 密码管理 ═══════ -->
+      <!-- 密码管理设置选项卡：密码匹配通知、默认显示密码等选项 -->
       <TabItem Header="{Binding TabPasswordHeader}" Classes="compactTab"
                controls:TabItemExtensions.TabIcon="IconShieldLock">
         <ScrollViewer Background="{DynamicResource ThemeWindowBgBrush}">
@@ -804,7 +805,7 @@
         </ScrollViewer>
       </TabItem>
 
-      <!-- ═══════ 6. 语言 ═══════ -->
+      <!-- 语言设置选项卡：切换界面语言（中文/英文） -->
       <TabItem Header="{Binding TabLanguageHeader}" Classes="compactTab"
                controls:TabItemExtensions.TabIcon="IconGlobe">
         <ScrollViewer Background="{DynamicResource ThemeWindowBgBrush}">

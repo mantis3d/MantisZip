@@ -8,8 +8,30 @@
         WindowStartupLocation="CenterOwner"
         Background="{DynamicResource ThemeWindowBgBrush}"
         Padding="{DynamicResource SpacingMdThk}">
+
+  <!-- 
+    窗口根容器：注释编辑对话框
+    - 宽度固定 450px，高度自适应内容
+    - 居中显示在父窗口上方
+    - 使用主题背景色和内边距，适配紧凑度模式
+  -->
+  
+  <!-- 主布局网格：两行结构
+       Row 0 (*) - 注释输入区域，占据剩余空间
+       Row 1 (Auto) - 底部按钮区域，高度自适应
+       整体外边距使用紧凑度感知的 SpacingMdThk -->
   <Grid RowDefinitions="*,Auto"
         Margin="{DynamicResource SpacingMdThk}">
+
+    <!-- 
+      Row 0: 注释输入文本框
+      - AcceptsReturn=True: 允许输入换行符（多行文本）
+      - TextWrapping=Wrap: 文本自动换行显示
+      - MinHeight=150 / MaxHeight=300: 限制输入区高度范围，防止过大或过小
+      - 底部 Margin 12px 与按钮区分隔
+      - PlaceholderText 绑定 VM 属性，提示用户输入内容
+      - x:Name="CommentTextBox" 供代码后台引用（如聚焦、获取文本）
+    -->
     <TextBox Grid.Row="0"
              x:Name="CommentTextBox"
              AcceptsReturn="True"
@@ -19,14 +41,31 @@
              Margin="0,0,0,12"
              PlaceholderText="{Binding PlaceholderText}" />
 
+    <!-- 
+      Row 1: 底部按钮面板 - 水平排列，右对齐
+      - Orientation=Horizontal: 按钮横向排列
+      - HorizontalAlignment=Right: 整组靠右，符合 Windows 对话框习惯
+      - Spacing 使用紧凑度感知的 SpacingXs，按钮间距自适应
+    -->
     <StackPanel Grid.Row="1"
                 Orientation="Horizontal"
                 HorizontalAlignment="Right"
                 Spacing="{DynamicResource SpacingXs}">
+      
+      <!-- 保存按钮：确认输入的注释内容
+           - Width=80: 固定宽度，保持与取消按钮一致
+           - Height 使用紧凑度感知的 ControlHeight
+           - Content 绑定 VM 的 SaveText（本地化文本）
+           - Click 事件在代码后台处理，关闭对话框并返回结果 -->
       <Button Content="{Binding SaveText}"
               Width="80"
               Height="{DynamicResource ControlHeight}"
               Click="OnSaveClick" />
+      
+      <!-- 取消按钮：放弃编辑，关闭对话框
+           - 样式与保存按钮一致
+           - Content 绑定 VM 的 CancelText
+           - Click 事件在代码后台处理，关闭对话框不返回结果 -->
       <Button Content="{Binding CancelText}"
               Width="80"
               Height="{DynamicResource ControlHeight}"

@@ -13,13 +13,13 @@
   <Grid RowDefinitions="Auto,*,Auto,Auto,Auto"
         Margin="{DynamicResource SpacingMdThk}">
 
-    <!-- Row 0: Prompt text -->
+    <!-- 第 0 行：提示文本 -->
     <TextBlock Grid.Row="0"
                Text="{Binding PromptText}"
                Margin="0,0,0,8"
                Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
 
-    <!-- Row 1: Comment multi-line editor -->
+    <!-- 第 1 行：注释多行编辑框 -->
     <TextBox Grid.Row="1"
              x:Name="CommentTextBox"
              AcceptsReturn="True"
@@ -32,14 +32,14 @@
              BorderBrush="{DynamicResource ThemeBorderBrush}"
              BorderThickness="1" />
 
-    <!-- Row 2: Format hint -->
+    <!-- 第 2 行：格式提示（仅 ZIP 支持注释） -->
     <TextBlock Grid.Row="2"
                Text="{Binding ZipOnlyHint}"
                Foreground="{DynamicResource ThemeTextDisabledBrush}"
                FontSize="12"
                Margin="0,8,0,0" />
 
-    <!-- Row 3: Saving status text (hidden by default) -->
+    <!-- 第 3 行：保存状态文本（默认隐藏，保存时显示） -->
     <TextBlock Grid.Row="3"
                x:Name="SavingStatusBlock"
                Text="{Binding SavingStatusText}"
@@ -49,7 +49,7 @@
                IsVisible="False"
                Margin="0,12,0,0" />
 
-    <!-- Row 4: Button panel -->
+    <!-- 第 4 行：按钮面板（取消 / 保存） -->
     <StackPanel Grid.Row="4"
                 x:Name="ButtonPanel"
                 Orientation="Horizontal"

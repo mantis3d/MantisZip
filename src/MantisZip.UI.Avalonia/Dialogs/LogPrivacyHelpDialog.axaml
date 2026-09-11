@@ -9,7 +9,7 @@
         Background="{DynamicResource ThemeWindowBgBrush}"
         Padding="{DynamicResource SpacingMdThk}">
   <DockPanel>
-    <!-- 关闭按钮 - 底部，不在 ScrollViewer 内，滚动时固定可见 -->
+    <!-- 关闭按钮：固定在底部，不随 ScrollViewer 滚动 -->
     <Button Content="{Binding CloseText}"
             DockPanel.Dock="Bottom"
             HorizontalAlignment="Right"
@@ -30,34 +30,38 @@
                    FontSize="18"
                    FontWeight="Bold" />
 
-        <!-- 简介 -->
+        <!-- 简介：说明日志隐私保护的目的 -->
         <TextBlock Text="{Binding IntroText}"
                    TextWrapping="Wrap"
                    LineHeight="22" />
 
-        <!-- 四种模式说明 -->
+        <!-- 四种隐私模式说明区域 -->
         <Border Background="{DynamicResource ThemeSurfaceBgBrush}"
                 CornerRadius="{DynamicResource BorderRadius}"
                 Padding="14"
                 BorderBrush="{DynamicResource ThemeBorderBrush}"
                 BorderThickness="1">
           <StackPanel Spacing="10">
+            <!-- 关闭模式：不脱敏 -->
             <TextBlock Text="{Binding ModeOffText}"
                        TextWrapping="Wrap"
                        LineHeight="20" />
+            <!-- 文件名模式：仅保留文件名 -->
             <TextBlock Text="{Binding ModeFilenameText}"
                        TextWrapping="Wrap"
                        LineHeight="20" />
+            <!-- 扩展名模式：保留扩展名，路径用占位符 -->
             <TextBlock Text="{Binding ModeExtensionText}"
                        TextWrapping="Wrap"
                        LineHeight="20" />
+            <!-- 完全模式：全部替换为占位符 -->
             <TextBlock Text="{Binding ModeFullText}"
                        TextWrapping="Wrap"
                        LineHeight="20" />
           </StackPanel>
         </Border>
 
-        <!-- 影响范围 -->
+        <!-- 影响范围说明 -->
         <TextBlock Text="{Binding WhatText}"
                    TextWrapping="Wrap"
                    LineHeight="22" />
