@@ -102,6 +102,7 @@ public class PreviewTreeNode : FolderNode
         {
             if (!string.IsNullOrEmpty(IconKeyOverride)) return IconKeyOverride;
             if (IsArchiveNode) return HasLoadingPlaceholderChild ? "IconArchiveClock" : "IconArchive";
+            if (HasLoadingPlaceholderChild) return "IconFolderSync";
             if (IsLoadingPlaceholder) return "IconFolderSync";
             if (IsTruncated) return null;
             if (ExistsAtDestination && !IsDirectory && !string.IsNullOrEmpty(FullPath)) return "IconWarning";

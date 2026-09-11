@@ -6,6 +6,8 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-09-11** — 骨架目录图标根因修复：`IconKey` getter 在 `IsArchiveNode` 之后新增 `HasLoadingPlaceholderChild` 检查，含占位子节点的目录节点返回 `IconFolderSync`（此前仅有 archive 节点走该分支，普通目录节点始终返回 `IconFolder`，根因：骨架占位节点是目录的子节点而非自身，`IsLoadingPlaceholder` 分支永远不会命中）
+
 **2026-09-10** — 骨架状态目录图标区分（FluentUI folder_sync）
   - **AppIcons.axaml**：新增 `IconFolderSync` Geometry 资源（FluentUI `folder_sync_20_regular` SVG 路径数据）
   - **PreviewTreeNode**：`IconKey` getter 在 `IsLoadingPlaceholder` 时返回 `"IconFolderSync"`（原返回 `null`），骨架状态目录节点显示同步图标而非空白
