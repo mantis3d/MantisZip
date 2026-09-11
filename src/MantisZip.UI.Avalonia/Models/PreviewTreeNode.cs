@@ -68,11 +68,14 @@ public class PreviewTreeNode : FolderNode
     /// <summary>子孙最大深度（用于截断判断）。</summary>
     public int MaxChildDepth { get; set; }
 
-    /// <summary>目录统计摘要文本，仅目录节点有值（空目录不显示统计行）。</summary>
+    /// <summary>目录统计摘要文本，仅目录节点有值（空目录不显示统计行）。
+    /// 含占位子节点时显示「加载中」。</summary>
     public string DirectoryInfoText =>
-        !IsEmptyDirectory && Children.Count > 0 && !string.IsNullOrEmpty(FullPath) && !HasLoadingPlaceholderChild
-            ? LocalizationManager.T("Preview_Result_DirInfo", TotalDescendantCount, FormatUtil.FormatSize(TotalDescendantSize))
-            : string.Empty;
+        HasLoadingPlaceholderChild
+            ? LocalizationManager.T("Preview_Result_LoadingMore")
+            : !IsEmptyDirectory && Children.Count > 0 && !string.IsNullOrEmpty(FullPath)
+                ? LocalizationManager.T("Preview_Result_DirInfo", TotalDescendantCount, FormatUtil.FormatSize(TotalDescendantSize))
+                : string.Empty;
 
     private bool HasLoadingPlaceholderChild =>
         Children.OfType<PreviewTreeNode>().Any(c => c.IsLoadingPlaceholder || c.HasLoadingPlaceholderChild);
