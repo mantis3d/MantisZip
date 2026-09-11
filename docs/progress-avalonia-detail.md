@@ -28,6 +28,34 @@
   - **ExtractConflictMarkerTests**（8 个测试）：destDir 不存在/null 全 false、过滤文件/目录跳过检查、父目录不存在子树短路、depth 2/1/全量深度验证
   - 回归：86 通过 / 0 失败 / 2 跳过（原有 IconProvider），零回归
 
+**2026-09-10** — 收藏相关 UI 图标统一 + 图标测试窗口资源键可复制
+  - 新增 FluentUI Bookmark 图标系列（`Resources/Icons/AppIcons.axaml`）：
+    - `IconBookmark`（收藏）、`IconBookmarkAdd`（添加到收藏）、`IconBookmarkMultiple`（收藏管理器）、`IconBookmarkOff`（取消收藏）
+    - 路径数据取自 FluentUI System Icons 24×24 regular 变体
+  - 应用图标（替换原 `IconStar`）：
+    - `Dialogs/FavoriteManagerWindow.axaml`：添加/编辑/删除/上移/下移按钮改为图标+文字（BookmarkAdd / Bookmark / BookmarkOff / ArrowUp / ArrowDown）
+    - `Views/MainWindow.axaml`：工具→收藏夹管理菜单 → `IconBookmarkMultiple`；测试→添加收藏对话框 → `IconBookmarkAdd`；工具→密码管理器菜单 `IconKey` → `IconKeyMultiple`
+    - `Controls/QuickPathPicker.axaml` / `Controls/QuickPathControl.axaml`：收藏快捷按钮 / 收藏 Tab → `IconBookmark`
+    - `Dialogs/CustomFilePickerDialog.axaml`：添加收藏按钮 → `IconBookmarkAdd`
+  - `ViewModels/IconTestViewModel.cs`：`收藏夹管理` 条目改用 `IconBookmarkMultiple`；资源库新增 4 条 Bookmark 记录 + `IconStar` 备用记录（AGENTS.md 规则 8）
+  - `Dialogs/IconTestWindow.axaml`：`PathIcon 资源键` 列由 `DataGridTextColumn` 改为 `DataGridTemplateColumn` + 只读 `TextBox`（`IsReadOnly=True`、无边框透明背景），支持选中复制资源键
+  - 验证：`dotnet build` 0 警告 0 错误；运行时启动无 XAML 资源解析异常
+
+**2026-09-10** — 文件过滤编辑器布局优化：文件大小和日期筛选条件改为水平排列
+  - 修改文件：`FileFilterEditor.axaml`
+  - 文件大小部分：将最小值和最大值从两行纵向排列改为一行水平排列
+    - 布局：`最小值标签` + `最小值输入框` + `单位选择框` + `最大值标签` + `最大值输入框`
+    - 使用6列Grid实现水平对齐，单位选择框占据剩余空间
+  - 日期部分：将起始日期和截止日期从两行纵向排列改为一行水平排列
+    - 布局：`起始日期标签` + `起始日期选择器` + `截止日期标签` + `截止日期选择器`
+    - 使用6列Grid实现水平对齐
+  - 效果：筛选面板更加紧凑，减少垂直空间占用
+
+**2026-09-10** — 修复设置窗口语言面板「翻译贡献者{0}」占位符未被替换
+  - 根因：`SettingsWindowViewModel.LanguageTranslatorText` 属性调用 `LocalizationManager.T("Settings_Language_Translator")` 时未传递翻译者名称参数，导致 `{0}` 占位符未被替换
+  - 修复：将 `LanguageTranslatorText` 从表达式主体属性改为完整属性，从 `LocalizationManager.AvailableLanguages` 获取当前语言的 `TranslatorText`，并传递给 `T("Settings_Language_Translator", translator)` 进行格式化
+  - 影响：设置窗口语言面板现在正确显示「翻译贡献者: 螳螂卜禅 & AI 助手 — 简体中文翻译」（中文）或「Translator: MantisZen & AI Assistant — English Translation」（英文）
+
 **2026-09-09** — 修复设置窗口文件关联「全选」/「取消全选」按钮无效
   - 根因：`SelectAllAssoc`/`DeselectAllAssoc` 仅修改旧的 `AssocXxx` bool 属性，但 UI CheckBox 绑定的是 `AssocItems` 集合中 `FormatAssocItemModel.IsEnabled`，两者未同步
   - 修复：两个方法末尾追加 `RefreshAssocStatus()` 调用，将 `AssocXxx` 新值同步到 UI 模型

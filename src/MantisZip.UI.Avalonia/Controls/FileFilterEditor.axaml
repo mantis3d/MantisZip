@@ -124,7 +124,7 @@
           <TextBlock x:Name="SizeLabel"
                      FontWeight="SemiBold"
                      Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
-          <Grid ColumnDefinitions="Auto,Auto,*,Auto">
+          <Grid ColumnDefinitions="Auto,Auto,*,Auto,Auto,Auto">
             <TextBlock Grid.Column="0" x:Name="MinSizeLabel"
                        VerticalAlignment="Center" Margin="0,0,6,0"
                        Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
@@ -141,12 +141,10 @@
                       Background="{DynamicResource ThemeSurfaceBgBrush}"
                       Foreground="{DynamicResource ThemeTextPrimaryBrush}"
                       BorderBrush="{DynamicResource ThemeBorderBrush}" />
-          </Grid>
-          <Grid ColumnDefinitions="Auto,Auto,*,Auto">
-            <TextBlock Grid.Column="0" x:Name="MaxSizeLabel"
-                       VerticalAlignment="Center" Margin="0,0,6,0"
+            <TextBlock Grid.Column="3" x:Name="MaxSizeLabel"
+                       VerticalAlignment="Center" Margin="12,0,6,0"
                        Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
-            <TextBox x:Name="MaxSizeBox" Grid.Column="1"
+            <TextBox x:Name="MaxSizeBox" Grid.Column="4"
                      Width="100" MinHeight="22"
                      TextChanged="SizeBox_TextChanged"
                      Background="{DynamicResource ThemeSurfaceBgBrush}"
@@ -164,20 +162,18 @@
           <TextBlock x:Name="DateRangeLabel"
                      FontWeight="SemiBold"
                      Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
-          <Grid ColumnDefinitions="Auto,Auto,*">
+          <Grid ColumnDefinitions="Auto,Auto,*,Auto,Auto,*">
             <TextBlock Grid.Column="0" x:Name="StartDateLabel"
                        VerticalAlignment="Center" Margin="0,0,6,0"
                        Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
             <CalendarDatePicker x:Name="StartDatePicker" Grid.Column="1"
-                        Margin="0,0,6,0"
+                        Margin="0,0,12,0"
                         SelectedDateChanged="StartDatePicker_SelectedDateChanged"
                         Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
-          </Grid>
-          <Grid ColumnDefinitions="Auto,Auto,*">
-            <TextBlock Grid.Column="0" x:Name="EndDateLabel"
+            <TextBlock Grid.Column="2" x:Name="EndDateLabel"
                        VerticalAlignment="Center" Margin="0,0,6,0"
                        Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
-            <CalendarDatePicker x:Name="EndDatePicker" Grid.Column="1"
+            <CalendarDatePicker x:Name="EndDatePicker" Grid.Column="3"
                         SelectedDateChanged="EndDatePicker_SelectedDateChanged"
                         Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
           </Grid>

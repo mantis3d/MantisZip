@@ -73,7 +73,7 @@ public partial class IconTestViewModel : ObservableObject
             "Views/MainWindow.axaml:79", "菜单栏「文件→刷新」");
         Add("菜单", "设置", null, "IconSettings", IconStatus.Converted,
             "Views/MainWindow.axaml:88", "菜单栏「文件→设置」");
-        Add("菜单", "收藏夹管理", null, "IconStar", IconStatus.Converted,
+        Add("菜单", "收藏夹管理", null, "IconBookmarkMultiple", IconStatus.Converted,
             "Views/MainWindow.axaml:107", "菜单栏「文件→收藏夹→管理」");
         Add("菜单", "解压到……", null, "IconExport", IconStatus.Converted,
             "Views/MainWindow.axaml:119", "菜单栏「编辑→解压到……」");
@@ -363,6 +363,16 @@ public partial class IconTestViewModel : ObservableObject
             "Resources/Icons/AppIcons.axaml", "Fluent UI System Icon（tab 图标，About-作者）");
         Add("资源库", "磁力链", null, "IconMagnet", IconStatus.Defined,
             "Resources/Icons/AppIcons.axaml", "自绘马蹄形磁铁（tab 图标，预览-种子）");
+        Add("资源库", "收藏", null, "IconBookmark", IconStatus.Defined,
+            "Resources/Icons/AppIcons.axaml", "Fluent UI System Icon（收藏按钮，QuickPathPicker/QuickPathControl）");
+        Add("资源库", "添加到收藏", null, "IconBookmarkAdd", IconStatus.Defined,
+            "Resources/Icons/AppIcons.axaml", "Fluent UI System Icon（添加到收藏按钮，CustomFilePickerDialog）");
+        Add("资源库", "收藏管理器", null, "IconBookmarkMultiple", IconStatus.Defined,
+            "Resources/Icons/AppIcons.axaml", "Fluent UI System Icon（收藏管理器，MainWindow 菜单）");
+        Add("资源库", "取消收藏", null, "IconBookmarkOff", IconStatus.Defined,
+            "Resources/Icons/AppIcons.axaml", "Fluent UI System Icon（取消收藏，FavoriteManagerWindow 删除）");
+        Add("资源库", "星标", null, "IconStar", IconStatus.Defined,
+            "Resources/Icons/AppIcons.axaml", "星形图标（备用，收藏相关 UI 已改用 Bookmark 系列）");
 
         // 更新统计
         TotalCount = Icons.Count;

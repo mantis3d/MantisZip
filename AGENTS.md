@@ -10,6 +10,8 @@
 
 两个共享库：`MantisZip.Core` (class library) + `MantisZip.ShellExt` (COM 组件 class library)。
 
+> **注意**: WPF 版本 (`MantisZip.UI`) 已在迁移完成后删除，仅保留 Avalonia 版本。
+
 ## Quick start
 
 ```powershell
@@ -481,14 +483,7 @@ Build artifacts (bin/, obj/) are gitignored.
 
 **TextBlock 注意**：全局 `TextBlock` 样式**故意不设 Foreground**（继承父控件，避免把 emoji 压成单色）——新增 TextBlock 时除非有明确理由，不要显式设置 Foreground。
 
-#### WPF（遗留维护）
-- `Background` 绑定 `"{DynamicResource Theme_WindowBg}"`
-- `Foreground` 绑定 `"{DynamicResource Theme_TextPrimary}"`
-- `BorderBrush` 绑定 `"{DynamicResource Theme_Border}"`
-- 按钮用 `Theme_ButtonBg` / `Theme_ButtonHover` / `Theme_ButtonPressed`
-- 新增资源在 `Themes/Light.xaml` 和 `Dark.xaml` 中成对添加
-
-#### 通用约束（两框架均适用）
+#### 通用约束
 - 不设置 `Height` 固定值除非有充分理由（已有统一高度可按需复用）
 - **迁移期特别注意**：在 Avalonia 中新增控件时，优先使用 Avalonia 的资源键名（以 `Brush` 结尾）；不要混用 WPF 风格的下划线资源键名
 
@@ -603,20 +598,16 @@ Build artifacts (bin/, obj/) are gitignored.
 
 ### 规则 10：提交信息必须使用 conventional commits 风格
 
-提交信息遵循仓库既有风格：`<type>(<scope>): 中文描述`，`type` 使用 `feat`/`fix`/`docs`/`refactor`/`test`/`chore` 等，`scope` 标明影响项目（`core`/`avalonia`/`wpf`/`shell` 等，可组合如 `core,avalonia`）。
+提交信息遵循仓库既有风格：`<type>(<scope>): 中文描述`，`type` 使用 `feat`/`fix`/`docs`/`refactor`/`test`/`chore` 等，`scope` 标明影响项目（`core`/`avalonia`/`shell` 等，可组合如 `core,avalonia`）。
 
 示例（来自仓库 git log）：
 - `feat(avalonia): 文件选择器地址栏新增收藏当前路径入口`
 - `fix(core,avalonia): 拖拽/右键解压流程统一`
 - `docs: AGENTS.md 新增 ComputeDirectoryStats 目录聚合契约说明`
 
-### 规则 11：新功能默认只改 Avalonia，WPF 仅在修复 bug 时动
+### 规则 11：新功能只在 Avalonia 开发
 
-`MantisZip.UI`（WPF）处于**维护模式**，迁移完成后将废弃。因此：
-
-- **新功能**：默认只添加到 `MantisZip.UI.Avalonia`（主力版），不要在 WPF 项目中实现新功能
-- **Bug 修复**：如果 bug 存在于两个 UI 项目，修复 Avalonia 即可；只有用户明确要求或 bug 只在 WPF 中出现时才修改 WPF
-- **共享层**（`MantisZip.Core`/`MantisZip.ShellExt`）不受此限制，但改动会影响两个 UI，需评估兼容性（如 `AppSettings` 字段两边保持同步）
+WPF 版本已在迁移完成后删除。所有新功能仅在 `MantisZip.UI.Avalonia` 中实现。共享层（`MantisZip.Core`/`MantisZip.ShellExt`）改动需评估兼容性。
 
 ### 规则 12：修改后必须构建验证
 
@@ -626,14 +617,12 @@ Build artifacts (bin/, obj/) are gitignored.
 # Avalonia 版（主力）
 dotnet build src\MantisZip.UI.Avalonia\MantisZip.UI.Avalonia.csproj
 
-# WPF 版（仅当修改了它）
-dotnet build src\MantisZip.UI\MantisZip.UI.csproj
-
 # Core 层（仅当修改了 Core）
 dotnet build src\MantisZip.Core\MantisZip.Core.csproj
 
 # 测试
 dotnet test tests\MantisZip.Tests\MantisZip.Tests.csproj
+dotnet test tests\MantisZip.UI.Avalonia.Tests\MantisZip.UI.Avalonia.Tests.csproj
 ```
 
 只有构建通过、`lsp_diagnostics` 无错误后，任务才算完成。

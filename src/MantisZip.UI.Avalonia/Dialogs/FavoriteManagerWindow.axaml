@@ -52,44 +52,64 @@
                   Spacing="6"
                   HorizontalAlignment="Left">
         <Button x:Name="AddButton"
-                Content="{Binding AddText}"
                 Padding="12,6"
                 Click="AddButton_Click"
                 Background="{DynamicResource ThemeButtonBgBrush}"
                 Foreground="{DynamicResource ThemeTextPrimaryBrush}"
-                BorderBrush="{DynamicResource ThemeBorderBrush}" />
+                BorderBrush="{DynamicResource ThemeBorderBrush}">
+          <StackPanel Orientation="Horizontal" Spacing="6">
+            <PathIcon Data="{StaticResource IconBookmarkAdd}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+            <TextBlock Text="{Binding AddText}" VerticalAlignment="Center" />
+          </StackPanel>
+        </Button>
         <Button x:Name="EditButton"
-                Content="{Binding EditText}"
                 Padding="12,6"
                 IsEnabled="False"
                 Click="EditButton_Click"
                 Background="{DynamicResource ThemeButtonBgBrush}"
                 Foreground="{DynamicResource ThemeTextPrimaryBrush}"
-                BorderBrush="{DynamicResource ThemeBorderBrush}" />
+                BorderBrush="{DynamicResource ThemeBorderBrush}">
+          <StackPanel Orientation="Horizontal" Spacing="6">
+            <PathIcon Data="{StaticResource IconBookmark}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+            <TextBlock Text="{Binding EditText}" VerticalAlignment="Center" />
+          </StackPanel>
+        </Button>
         <Button x:Name="DeleteButton"
-                Content="{Binding DeleteText}"
                 Padding="12,6"
                 IsEnabled="False"
                 Click="DeleteButton_Click"
                 Background="{DynamicResource ThemeButtonBgBrush}"
                 Foreground="{DynamicResource ThemeTextPrimaryBrush}"
-                BorderBrush="{DynamicResource ThemeBorderBrush}" />
+                BorderBrush="{DynamicResource ThemeBorderBrush}">
+          <StackPanel Orientation="Horizontal" Spacing="6">
+            <PathIcon Data="{StaticResource IconBookmarkOff}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+            <TextBlock Text="{Binding DeleteText}" VerticalAlignment="Center" />
+          </StackPanel>
+        </Button>
         <Button x:Name="MoveUpButton"
-                Content="{Binding MoveUpText}"
                 Padding="12,6"
                 IsEnabled="False"
                 Click="MoveUpButton_Click"
                 Background="{DynamicResource ThemeButtonBgBrush}"
                 Foreground="{DynamicResource ThemeTextPrimaryBrush}"
-                BorderBrush="{DynamicResource ThemeBorderBrush}" />
+                BorderBrush="{DynamicResource ThemeBorderBrush}">
+          <StackPanel Orientation="Horizontal" Spacing="6">
+            <PathIcon Data="{StaticResource IconArrowUp}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+            <TextBlock Text="{Binding MoveUpText}" VerticalAlignment="Center" />
+          </StackPanel>
+        </Button>
         <Button x:Name="MoveDownButton"
-                Content="{Binding MoveDownText}"
                 Padding="12,6"
                 IsEnabled="False"
                 Click="MoveDownButton_Click"
                 Background="{DynamicResource ThemeButtonBgBrush}"
                 Foreground="{DynamicResource ThemeTextPrimaryBrush}"
-                BorderBrush="{DynamicResource ThemeBorderBrush}" />
+                BorderBrush="{DynamicResource ThemeBorderBrush}">
+          <StackPanel Orientation="Horizontal" Spacing="6">
+            <PathIcon Data="{StaticResource IconArrowDown}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+            <TextBlock Text="{Binding MoveDownText}" VerticalAlignment="Center" />
+          </StackPanel>
+        </Button>
       </StackPanel>
 
       <!-- Right button -->
@@ -97,6 +117,7 @@
               Padding="20,6"
               HorizontalAlignment="Right"
               Click="Ok_Click"
+              IsVisible="False"
               Background="{DynamicResource ThemeAccentBrush}"
               Foreground="{DynamicResource ThemeTextOnAccentBrush}"
               BorderThickness="0" />

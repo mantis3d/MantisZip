@@ -93,7 +93,7 @@
               Background="{DynamicResource ThemeButtonBgBrush}"
               Foreground="{DynamicResource ThemeTextPrimaryBrush}"
               BorderBrush="{DynamicResource ThemeBorderBrush}">
-        <PathIcon Data="{StaticResource IconStar}"
+        <PathIcon Data="{StaticResource IconBookmarkAdd}"
                   Width="14"
                   Height="14"
                   Foreground="{DynamicResource ThemeTextPrimaryBrush}" />

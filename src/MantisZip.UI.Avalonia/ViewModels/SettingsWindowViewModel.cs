@@ -6,6 +6,7 @@ using MantisZip.UI.Avalonia.Services;
 using System.Diagnostics;
 using System.IO;
 using System.Collections.ObjectModel;
+using System.Linq;
 
 namespace MantisZip.UI.Avalonia.ViewModels;
 
@@ -702,7 +703,16 @@ public partial class SettingsWindowViewModel : ObservableObject
 
     // ── Language strings ──
     public string LanguageText => LocalizationManager.T("Settings_Language");
-    public string LanguageTranslatorText => LocalizationManager.T("Settings_Language_Translator");
+    public string LanguageTranslatorText
+    {
+        get
+        {
+            var translator = LocalizationManager.AvailableLanguages
+                .FirstOrDefault(l => l.Code == LocalizationManager.CurrentLanguageCode)?
+                .TranslatorText ?? string.Empty;
+            return LocalizationManager.T("Settings_Language_Translator", translator);
+        }
+    }
 
     // ── Appearance strings ──
     public string AppearanceThemeText => LocalizationManager.T("Settings_Appearance_Theme");
