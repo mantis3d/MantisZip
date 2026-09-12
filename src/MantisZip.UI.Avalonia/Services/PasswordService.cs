@@ -4,6 +4,7 @@ using MantisZip.Core.Abstractions;
 using MantisZip.Core.Engines;
 using MantisZip.Core.Utils;
 using SharpCompress.Archives;
+using SharpCompress.Archives.Zip;
 using SharpCompress.Readers;
 using SharpSevenZip;
 using SharpSevenZip.Exceptions;
@@ -60,7 +61,9 @@ public class PasswordService
             if (engine is ZipEngine)
             {
                 using var fs = File.Open(archivePath, FileMode.Open, FileAccess.Read, FileShare.Read | FileShare.Delete);
-                using var archive = ArchiveFactory.OpenArchive(fs, new ReaderOptions { Password = password });
+                // 严格 ZIP 解析：ArchiveFactory.OpenArchive 的魔数嗅探会把损坏/全零文件误判为 Tar，
+                // 导致密码验证静默通过。ZipArchive.OpenArchive 对非 ZIP 抛 ArchiveException（外层分类为未知/损坏）。
+                using var archive = ZipArchive.OpenArchive(fs, new ReaderOptions { Password = password });
                 var entry = archive.Entries.FirstOrDefault(e => e.IsEncrypted);
                 if (entry == null)
                     return true;

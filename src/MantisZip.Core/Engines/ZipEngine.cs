@@ -47,13 +47,15 @@ public class ZipEngine : IArchiveEngine
                     Default = Encoding.GetEncoding("gbk")
                 }
             };
-            return ArchiveFactory.OpenArchive(fs2, gbkOptions);
+            // 严格 ZIP 解析（不用 ArchiveFactory.OpenArchive 魔数嗅探——
+            // 损坏/全零文件会被误判为 Tar 静默返回 0 条目，吞掉损坏信号）
+            return ZipArchive.OpenArchive(fs2, gbkOptions);
         }
 
         IArchive archive;
         try
         {
-            archive = ArchiveFactory.OpenArchive(fs, options);
+            archive = ZipArchive.OpenArchive(fs, options);
         }
         catch (Exception ex)
         {
