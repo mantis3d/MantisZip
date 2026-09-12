@@ -86,6 +86,17 @@
               Background="{DynamicResource ThemeButtonBgBrush}"
               Foreground="{DynamicResource ThemeTextPrimaryBrush}"
               BorderBrush="{DynamicResource ThemeBorderBrush}" />
+      <!-- Copy error info (Error/Warning 弹窗才显示) -->
+      <Button x:Name="CopyBtn"
+              Content="{Binding CopyText}"
+              Width="110"
+              Height="{DynamicResource ControlHeight}"
+              IsVisible="False"
+              Click="OnCopyBtnClick"
+              Background="{DynamicResource ThemeButtonBgBrush}"
+              Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+              BorderBrush="{DynamicResource ThemeBorderBrush}"
+              Margin="{DynamicResource SpacingSmThk},0,0,0" />
     </StackPanel>
   </Grid>
 </Window>
