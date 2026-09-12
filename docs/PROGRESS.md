@@ -146,7 +146,9 @@
 | 添加到压缩包重名条目冲突处理（`AddConflictHelper` 条目名级解析、语义方向与解压相反：新数据更新/更大→覆盖；ZIP copy-mode `keepEntryNames` 排除被覆盖条目 + legacy Phase 2 应用解析结果；7z 覆盖经 `ModifyArchive`(index→null) 删除 + `CompressFileDictionary` Append 重加；Avalonia Ask 弹窗复用 ConflictDialog，新标题 key `AddConflict_Title`） | [add-archive-conflict-handling.md](.omo/plans/已完成/add-archive-conflict-handling.md) | v0.5.0 |
 | Avalonia 拖拽添加（`MainWindowViewModel.AddFilesToArchiveAsync` 抽取 + WPF `Window_Drop` 三分支移植：已打开+压缩包→切换打开 / 已打开+文件→确认框→添加到 `CurrentFolder` / 未打开→打开或 `CompressSettingsWindow` 预填 + `DragAddOverlay` 窗口内两色覆层（绿=可添加/红=格式不支持，呼吸动画对齐拖拽解压）+ 文件夹拖入支持） | [drag-add-overlay.md](.omo/plans/已完成/drag-add-overlay.md) | v0.5.0 |
 | Avalonia 拖拽直接解压（纯 Win32 独立线程覆盖层三色状态机 + 呼吸动画 + WindowFromPoint/ShellWindows 目标检测 + #32770 EnumChildWindows + 自实现 OLE 拖拽光标方案 C + DragPreviewBitmapBuilder 预渲染位图） | [drag-drop-direct-extract.md](.omo/plans/已完成/drag-drop-direct-extract.md) | v0.5.0 |
+| 解压预览冲突检测优化（①目标根不存在短路 ②过滤项跳过 ③父目录短路 + `ApplyConflictMarkers` 共享服务 + ④单包两阶段：depth 2 快速上屏 → 全量后台补全 + `PreviewTreeInvalidated` 事件刷新） | [extract-preview-conflict-detection-optimization.md](.omo/plans/已完成/extract-preview-conflict-detection-optimization.md) | v0.5.0 |
 | 密码错误 vs 文件损坏精准分类（`PasswordVerificationResult` 四态 + `PasswordVerifyInfo` + `TryMatchPasswordEx` 按 HRESULT/异常类型分类，损坏文件不再误报"密码错误"，密码库匹配遇损坏立即停止） | [password-error-classification.md](.omo/plans/已完成/password-error-classification.md) | v0.5.0 |
+| 压缩预览渐进式加载（浅层先行→全量逐源重建装配 + `SourceSubtree` 按源缓存 + `FilterSignature` 失效 + `ResultTreeView` 滚动位置保持 + 占位节点属性 + `BuildDirectoryNode` 深度边界重构 + 9 单测） | [compress-preview-progressive-loading.md](.omo/plans/已完成/compress-preview-progressive-loading.md) | v0.5.0 |
 | 图片预览能力系统（`PreviewCapabilities` 能力注册表 [Flags]：Zoom/Transparency/FlattenAlpha/AnimationControls 取代 `HasXxxControls` 硬编码 + `PreviewType.Gif`→`AnimatedImage`（GIF/WebP 动画共用）+ GIF 透明棋盘格 + Animated WebP 分流（SKCodec `FrameCount>1`）） | [image-preview-capabilities.md](.omo/plans/已完成/image-preview-capabilities.md) | v0.5.0 |
 | 拖拽/右键解压流程统一（`SelectedItemsExtractService` 统一解压动作、`TarGzEngine` 按条目提取、冲突统一走设置 6 策略 + 统一 Ask 弹窗、拖拽路径语义与右键一致、`MapConflictActionString` 连字符映射漏洞修复） | [drag-extract-unify.md](.omo/plans/已完成/drag-extract-unify.md) | v0.4.5 |
 | 目录行聚合显示（`DirStats`+`ComputeDirectoryStats` 增加 `NewestModified`；Avalonia `ArchiveItemModel` 显示属性改派生计算属性 + `CompressedSizeAvailable`；`PopulateEntries` 基于过滤后 `filteredSource` 应用聚合） | [directory-size-date-aggregate.md](.omo/plans/已完成/directory-size-date-aggregate.md) | v0.4.5 |
@@ -176,7 +178,6 @@
 | 字体预览连字效果开关（HarfBuzzSharp shaping + `CheckFontSupportsLigature` 连字检测 + `IsLigatureEnabled`/`ToggleLigature` 命令 + `CanLigatureToggle` 灰禁用 + 工具栏按钮 + `FontPreviewEnableLigature` 持久化） | [font-preview-ligature.md](.omo/plans/已完成/font-preview-ligature.md) | v0.4.4 |
 | 致谢贡献者名单 | [contributors-panel.md](.omo/plans/已完成/contributors-panel.md) | v0.4.3+ |
 | 安装程序 .NET 9 自动下载 | [installer-dotnet-autodownload.md](.omo/plans/已完成/installer-dotnet-autodownload.md) | v0.4.3+ |
-| 预览格式扩展（12 种元数据格式） | [preview-extended-formats.md](.omo/plans/已完成/preview-extended-formats.md) | v0.3.0 |
 | 快速压缩拆分为独立/合并两项 | [split-compress.md](.omo/plans/已完成/split-compress.md) | v0.2.10 |
 | 加载大文件 overlay | [archive-loading-progress.md](.omo/plans/已完成/archive-loading-progress.md) | v0.3.1 |
 | 添加到/从压缩包删除 | [archive-add-delete.md](.omo/plans/已完成/archive-add-delete.md) | v0.2.9 |
