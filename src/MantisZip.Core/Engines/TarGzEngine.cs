@@ -349,29 +349,24 @@ public class TarGzEngine : IArchiveEngine
 
             if (ext == ".tar" || isTarGz)
             {
-                try
+                // 注意：解析异常必须向上传播（不移除 catch 曾吞掉损坏 tar 的 IncorrectArchiveException，
+                // 导致损坏包静默打开为空）。TarReader 对合法 tar 与空 tar 均能正常返回。
+                using var inputStream = File.OpenRead(archivePath);
+                using var reader = TarReader.OpenReader(inputStream, new ReaderOptions { LookForHeader = true });
+                while (reader.MoveToNextEntry())
                 {
-                    using var inputStream = File.OpenRead(archivePath);
-                    using var reader = TarReader.OpenReader(inputStream, new ReaderOptions { LookForHeader = true });
-                    while (reader.MoveToNextEntry())
+                    var entry = reader.Entry;
+                    var entryKey = entry.Key ?? string.Empty;
+                    items.Add(new ArchiveItem
                     {
-                        var entry = reader.Entry;
-                        var entryKey = entry.Key ?? string.Empty;
-                        items.Add(new ArchiveItem
-                        {
-                            Name = entryKey,
-                            FullPath = entry.IsDirectory ? entryKey.TrimEnd('/') : entryKey,
-                            Size = entry.Size,
-                            CompressedSize = entry.Size,
-                            LastModified = entry.LastModifiedTime ?? DateTime.MinValue,
-                            IsDirectory = entry.IsDirectory,
-                            IsEncrypted = false
-                        });
-                    }
-                }
-                catch (Exception ex)
-                {
-                    CoreLog.Trace($"ListEntriesAsync: parse error: {ex.Message}");
+                        Name = entryKey,
+                        FullPath = entry.IsDirectory ? entryKey.TrimEnd('/') : entryKey,
+                        Size = entry.Size,
+                        CompressedSize = entry.Size,
+                        LastModified = entry.LastModifiedTime ?? DateTime.MinValue,
+                        IsDirectory = entry.IsDirectory,
+                        IsEncrypted = false
+                    });
                 }
             }
             else if (ext == ".gz")

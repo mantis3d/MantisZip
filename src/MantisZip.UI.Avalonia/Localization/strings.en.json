@@ -1,4 +1,6 @@
 {
+  "MsgBox_Copy": "Copy error info",
+  "MsgBox_Copied": "Copied ✓",
   "Preview_Result_LoadingMore": "Loading",
   "Filter_PickDateFrom": "Use the selected entry's date as the start date",
   "Filter_PickDateTo": "Use the selected entry's date as the end date",
