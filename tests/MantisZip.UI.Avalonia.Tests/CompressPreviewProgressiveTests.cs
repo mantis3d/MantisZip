@@ -166,8 +166,8 @@ public class CompressPreviewProgressiveTests : IDisposable
 
         // 含占位子节点 → 不是空目录
         Assert.False(dirANode.IsEmptyDirectory);
-        // HasLoadingPlaceholderChild 生效 → DirectoryInfoText 为空
-        Assert.Equal("", dirANode.DirectoryInfoText);
+        // HasLoadingPlaceholderChild 生效 → DirectoryInfoText 显示"加载中"
+        Assert.Equal(LocalizationManager.T("Preview_Result_LoadingMore"), dirANode.DirectoryInfoText);
     }
 
     #endregion

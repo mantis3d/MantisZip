@@ -16,6 +16,7 @@
   - **MainWindowViewModel.TestArchive**：捕获 `TestArchiveAsync` 的 bool 结果——`RunWithProgress` 的 completed 仅表示「未取消/未抛异常」，此前损坏包也会显示「压缩包完整性验证通过 ✅」；现 `completed && testOk` 才显示通过，否则 `Status_TestFailed`（连带修复：TarGz 测试失败此前同样被吞）
   - **PasswordService.QuickVerifyPassword**：改用严格 `ZipArchive.OpenArchive`（与 ZipEngine 一致，避免损坏包被魔数误判为 Tar 后密码验证静默通过），同步补 `using SharpCompress.Archives.Zip`
   - 回归：Build 0 警告 0 错误；UI 测试 96 通过 / 0 失败 / 2 跳过
+**2026-09-11** — 骨架目录图标根因修复 + 骨架态统计文本：`IconKey` getter 在 `IsArchiveNode` 之后新增 `HasLoadingPlaceholderChild` 检查，含占位子节点的目录节点返回 `IconFolderSync`（此前仅有 archive 节点走该分支，普通目录节点始终返回 `IconFolder`，根因：骨架占位节点是目录的子节点而非自身，`IsLoadingPlaceholder` 分支永远不会命中）；`DirectoryInfoText` 含占位子节点时显示「加载中」替代空白
 
 **2026-09-10** — 骨架状态目录图标区分（FluentUI folder_sync）
   - **AppIcons.axaml**：新增 `IconFolderSync` Geometry 资源（FluentUI `folder_sync_20_regular` SVG 路径数据）
