@@ -27,6 +27,8 @@
 
 #### 2026-09
 
+- **09-12** — 报错信息一键复制：AppMessageBox 统一复制按钮（Error/Warning 弹窗显示，复制内容含版本号+时间戳+完整消息，一处改动覆盖全部弹窗）+ 主窗口状态栏错误文本改用只读 TextBox 可选中复制
+- **09-12** — 修复损坏压缩包测试静默通过：TestArchive 捕获 TestArchiveAsync bool 结果（RunWithProgress 的 completed 仅表示未取消/未抛异常，损坏判定此前被丢弃）+ PasswordService QuickVerifyPassword 改用严格 ZipArchive.OpenArchive
 - **09-10** — 收藏相关 UI 图标统一：新增 FluentUI Bookmark 图标系列（Bookmark / BookmarkAdd / BookmarkMultiple / BookmarkOff）替换原星标，覆盖收藏管理器按钮、工具菜单、路径速选控件与文件选择器；图标测试窗口 PathIcon 资源键改为可复制
 - **09-10** — 文件过滤编辑器布局优化：文件大小（最小值/最大值）和日期（起始/截止）从纵向排列改为水平排列，提升空间利用率
 - **09-10** — 修复设置窗口语言面板「翻译贡献者{0}」占位符未被替换：`LanguageTranslatorText` 属性未传递翻译者名称参数给 `LocalizationManager.T()`，改为从 `AvailableLanguages` 获取当前语言的 `TranslatorText` 并格式化
@@ -96,6 +98,7 @@
 
 #### v0.5.0
 
+- **09-12** — 修复损坏压缩包打开静默无报错（Core）：ZipEngine 打开改用严格 ZipArchive.OpenArchive（全零/垃圾 .zip 此前被 ArchiveFactory 魔数嗅探误判为 Tar、0 条目静默打开，现抛 ArchiveException）+ TarGzEngine.ListEntriesAsync 移除静默 catch（损坏 .tar 抛错不再静默空列表）+ 新增 3 个回归测试
 - **09-04** — 压缩/解压 文件读写错误处理补齐：压缩侧 7z/加密 ZIP 新增 `ReadErrorHandler.FilterUnreadableFiles` 预检（错误弹窗 / 跳过 / 中止，对齐 ErrorResolver）；解压侧三引擎 `ExtractAsync`+`ExtractEntriesAsync` 补 `IOException` 捕获与 per-entry 兜底（被占用条目跳过继续，不再让单个文件中止整个解压）
 - **08-31** — .NET 9 → .NET 10 升级（LTS，支持至 2028-11）：全部 7 个项目 TargetFramework 更新 + 移除废弃 `Avalonia.Diagnostics` 包 + `System.Drawing.Common` 升级至 10.0.8
 - **08-31** — 卸载/更新文件占用修复：`CloseApplications=yes`（Restart Manager 检测用户关闭占用进程）+ `ShellIntegration.Uninstall` 重启 Explorer 释放 comhost.dll 句柄

@@ -1,9 +1,11 @@
 using System;
 using System.Linq;
+using System.Text;
 using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
+using Avalonia.Input;
 using Avalonia.Interactivity;
 using MantisZip.UI.Avalonia.Services;
 
@@ -57,6 +59,8 @@ public partial class AppMessageBox : Window
     public string YesText => LocalizationManager.T("MsgBox_Yes");
     public string NoText => LocalizationManager.T("MsgBox_No");
     public string OkText => LocalizationManager.T("MsgBox_Ok");
+    public string CopyText => LocalizationManager.T("MsgBox_Copy");
+    public string CopiedText => LocalizationManager.T("MsgBox_Copied");
     public string WinTitle => "MantisZip";
 
     /// <summary>
@@ -112,6 +116,12 @@ public partial class AppMessageBox : Window
                 CancelBtn.IsVisible = true;
                 CancelBtn.Focus();
                 break;
+        }
+
+        // 错误/警告弹窗信息需可复制（含库英文异常细节），便于反馈/排错
+        if (icon == MessageBoxImage.Error || icon == MessageBoxImage.Warning)
+        {
+            CopyBtn.IsVisible = true;
         }
     }
 
@@ -237,5 +247,45 @@ public partial class AppMessageBox : Window
     {
         _action?.Invoke();
         Close(MessageBoxResult.OK);
+    }
+
+    /// <summary>
+    /// 组装可粘贴的错误信息：版本 + 时间戳 + 标题（如有）+ 消息正文。
+    /// </summary>
+    private string BuildCopyText()
+    {
+        var sb = new StringBuilder();
+        sb.Append("MantisZip ").Append(AppConstants.Version).Append('\n');
+        sb.Append(DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss")).Append("\n\n");
+        if (!string.IsNullOrEmpty(Title))
+        {
+            sb.Append(Title).Append('\n');
+        }
+        sb.Append(MessageText.Text);
+        return sb.ToString();
+    }
+
+    private async void OnCopyBtnClick(object? sender, RoutedEventArgs e)
+    {
+        try
+        {
+            var clipboard = TopLevel.GetTopLevel(this)?.Clipboard;
+            if (clipboard == null)
+            {
+                return;
+            }
+            var transfer = new DataTransfer();
+            var item = new DataTransferItem();
+            item.SetText(BuildCopyText());
+            transfer.Add(item);
+            await clipboard.SetDataAsync(transfer);
+            CopyBtn.Content = CopiedText;
+            await Task.Delay(1500);
+            CopyBtn.Content = CopyText;
+        }
+        catch (Exception ex)
+        {
+            App.DebugLog($"AppMessageBox: copy to clipboard failed: {ex.Message}");
+        }
     }
 }

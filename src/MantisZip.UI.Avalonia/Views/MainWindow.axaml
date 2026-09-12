@@ -1342,11 +1342,18 @@
                     Foreground="{DynamicResource ThemeTextPrimaryBrush}"
                     FontSize="12" />
         </StackPanel>
-        <TextBlock Grid.Column="3"
-                  Text="{Binding StatusMessage}"
-                  Foreground="{DynamicResource ThemeTextPrimaryBrush}"
-                  FontSize="12"
-                  HorizontalAlignment="Right" />
+        <!-- 状态栏错误文本：用只读 TextBox 以便鼠标选中 + Ctrl+C 复制 -->
+        <TextBox Grid.Column="3"
+                 Text="{Binding StatusMessage}"
+                 IsReadOnly="True"
+                 Background="Transparent"
+                 Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                 BorderThickness="0"
+                 Padding="0"
+                 MinHeight="0"
+                 VerticalContentAlignment="Center"
+                 HorizontalContentAlignment="Right"
+                 FontSize="12" />
       </Grid>
     </Border>
 

@@ -2697,15 +2697,18 @@ public partial class MainWindowViewModel : ObservableObject
         var engine = ArchiveEngineFactory.GetEngineByExtension(CurrentArchivePath);
         if (engine == null) return;
 
+        // 捕获 TestArchiveAsync 的完整性结果：RunWithProgress 的 completed 只表示
+        // "未取消/未抛异常"，不代表测试通过——不捕获的话损坏包也会显示"测试通过"
+        bool testOk = false;
         var completed = await RunWithProgress(
             LocalizationManager.T("Status_TestingArchive"),
             new[] { CurrentArchivePath! },
             async (progress, ct) =>
             {
-                await engine.TestArchiveAsync(CurrentArchivePath, password, progress, ct);
+                testOk = await engine.TestArchiveAsync(CurrentArchivePath, password, progress, ct);
             });
 
-        if (completed)
+        if (completed && testOk)
             StatusMessage = LocalizationManager.T("Status_TestOK");
         else
             StatusMessage = LocalizationManager.T("Status_TestFailed");

@@ -78,6 +78,46 @@ public class ZipEngineTests : IDisposable
         Assert.Single(entries, e => e.Name == "secret.txt");
     }
 
+    [Fact]
+    public async Task ListEntriesAsync_CorruptZeroFilledFile_Throws()
+    {
+        // 全零填充的损坏 .zip（下载失败/复制中断产物）：必须报错，而不是静默返回空列表。
+        // 回归：OpenArchiveWithEncodingFallback 曾用 ArchiveFactory.OpenArchive 魔数嗅探，
+        // 全零文件被误判为 Tar（0 条目）导致损坏被吞掉。
+        var corrupt = TrackFile(Path.Combine(Path.GetTempPath(), "MantisZipTest", $"{Guid.NewGuid():N}.zip"));
+        Directory.CreateDirectory(Path.GetDirectoryName(corrupt)!);
+        File.WriteAllBytes(corrupt, new byte[4096]); // all zeros
+
+        await Assert.ThrowsAsync<SharpCompress.Common.ArchiveException>(() => _engine.ListEntriesAsync(corrupt));
+    }
+
+    [Fact]
+    public async Task TestArchiveAsync_CorruptZeroFilledFile_ReturnsFalse()
+    {
+        var corrupt = TrackFile(Path.Combine(Path.GetTempPath(), "MantisZipTest", $"{Guid.NewGuid():N}.zip"));
+        Directory.CreateDirectory(Path.GetDirectoryName(corrupt)!);
+        File.WriteAllBytes(corrupt, new byte[4096]); // all zeros
+
+        var ok = await _engine.TestArchiveAsync(corrupt);
+
+        Assert.False(ok, "损坏的压缩包测试必须返回 false，不能瞬时通过");
+    }
+
+    [Fact]
+    public async Task ListEntriesAsync_ValidEmptyZip_ReturnsEmpty()
+    {
+        // 合法空压缩包（仅 EOCD，无条目）不应被严格解析误伤。
+        var empty = TrackFile(Path.Combine(Path.GetTempPath(), "MantisZipTest", $"{Guid.NewGuid():N}.zip"));
+        Directory.CreateDirectory(Path.GetDirectoryName(empty)!);
+        // EOCD 签名 PK\x05\x06 + 18 字节其余字段 = 22 字节
+        byte[] eocd = { 0x50, 0x4B, 0x05, 0x06, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+        File.WriteAllBytes(empty, eocd);
+
+        var entries = await _engine.ListEntriesAsync(empty);
+
+        Assert.Empty(entries);
+    }
+
     // ===== ExtractAsync =====
 
     [Fact]
