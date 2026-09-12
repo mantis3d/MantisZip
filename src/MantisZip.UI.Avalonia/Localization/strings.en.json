@@ -984,6 +984,8 @@
   "Preview_Result_DirInfo": "{0} items · {1}",
   "Preview_Result_ConflictCount": "⚠️ {0} conflicts",
   "Preview_Result_FileExists": "Same-name file already exists",
+  "Preview_HtmlFallbackNotification": "Install WebView Runtime for better HTML preview",
+  "Preview_HtmlSourceToggle": "Source/Render Toggle",
 
   "App_MantisZipTitle": "MantisZip",
 

@@ -67,6 +67,35 @@ public partial class PreviewViewModel : ObservableObject
     [ObservableProperty]
     private ObservableCollection<FormatMetadataItem> _formatMetadata = [];
 
+    [ObservableProperty]
+    private string _htmlWebViewUri = string.Empty;
+
+    [ObservableProperty]
+    private bool _isWebViewVisible;
+
+    [ObservableProperty]
+    private bool _isFallbackActive;
+
+    [ObservableProperty]
+    private bool _isHtmlSourceVisible;
+
+    [ObservableProperty]
+    private string _htmlSourceContent = string.Empty;
+
+    [ObservableProperty]
+    private bool _isHtmlSourceMode;
+
+    private string? _currentHtmlTempPath;
+
+    private void CleanupHtmlTempFile()
+    {
+        if (!string.IsNullOrEmpty(_currentHtmlTempPath) && File.Exists(_currentHtmlTempPath))
+        {
+            try { File.Delete(_currentHtmlTempPath); } catch { }
+            _currentHtmlTempPath = null;
+        }
+    }
+
     public PreviewViewModel()
     {
         MetadataSettingsManager.SettingsChanged += OnMetadataSettingsChanged;
@@ -100,6 +129,7 @@ public partial class PreviewViewModel : ObservableObject
         LocalizedStrings["Preview_Tooltip_PdfPrev"] = LocalizationManager.T("Preview_Tooltip_PdfPrev");
         LocalizedStrings["Preview_Tooltip_PdfNext"] = LocalizationManager.T("Preview_Tooltip_PdfNext");
         LocalizedStrings["Extract_UnlockButton"] = LocalizationManager.T("Extract_UnlockButton");
+        LocalizedStrings["Preview_HtmlSourceToggle"] = LocalizationManager.T("Preview_HtmlSourceToggle");
         OnPropertyChanged(nameof(LocalizedStrings));
         OnPropertyChanged(nameof(LoadingFileDisplay));
     }
@@ -243,7 +273,7 @@ public partial class PreviewViewModel : ObservableObject
         OnPropertyChanged(nameof(LoadingFileDisplay));
 
     public bool HasZoomControls => PreviewCapabilities.For(PreviewType).HasFlag(PreviewCapability.Zoom);
-    public bool HasFontSizeControls => PreviewType == PreviewType.Text;
+    public bool HasFontSizeControls => PreviewType == PreviewType.Text || (PreviewType == PreviewType.Html && IsFallbackActive);
 
     // Computed visibility per preview type
     public bool IsTextVisible => PreviewType == PreviewType.Text;
@@ -265,9 +295,10 @@ public partial class PreviewViewModel : ObservableObject
     public bool IsXlsxVisible => PreviewType == PreviewType.Xlsx;
     public bool IsPptxVisible => PreviewType == PreviewType.Pptx;
     public bool IsVideoVisible => PreviewType == PreviewType.Video;
-    public bool IsHtmlVisible => PreviewType == PreviewType.Html;
+    public bool IsHtmlVisible => PreviewType == PreviewType.Html && !IsWebViewVisible;
+    public bool IsWebViewHtmlVisible => PreviewType == PreviewType.Html && IsWebViewVisible;
     public bool IsMarkdownVisible => PreviewType == PreviewType.Markdown;
-    public bool IsMarkdownOrHtmlVisible => PreviewType is PreviewType.Markdown or PreviewType.Html;
+    public bool IsMarkdownOrHtmlVisible => PreviewType == PreviewType.Markdown || (PreviewType == PreviewType.Html && !IsWebViewVisible);
     public bool IsPdfVisible => PreviewType == PreviewType.Pdf;
     public bool HasPdfNavigation => IsPdfVisible && _pdfTotalPages > 1;
     public bool IsIcoGalleryVisible => PreviewType == PreviewType.IcoGallery;
@@ -307,6 +338,7 @@ public partial class PreviewViewModel : ObservableObject
         OnPropertyChanged(nameof(HasFlattenAlphaControls));
         OnPropertyChanged(nameof(HasLigatureControls));
         OnPropertyChanged(nameof(IsHtmlVisible));
+        OnPropertyChanged(nameof(IsWebViewHtmlVisible));
         OnPropertyChanged(nameof(IsMarkdownVisible));
         OnPropertyChanged(nameof(IsMarkdownOrHtmlVisible));
         OnPropertyChanged(nameof(IsPdfVisible));
@@ -319,6 +351,28 @@ public partial class PreviewViewModel : ObservableObject
         // All other PreviewType values represent actual content — hide the overlay.
         if (value != PreviewType.None)
             IsLoadingPreview = false;
+    }
+
+    partial void OnIsWebViewVisibleChanged(bool value)
+    {
+        OnPropertyChanged(nameof(IsHtmlVisible));
+        OnPropertyChanged(nameof(IsWebViewHtmlVisible));
+        OnPropertyChanged(nameof(IsMarkdownOrHtmlVisible));
+        OnPropertyChanged(nameof(HasFontSizeControls));
+    }
+
+    partial void OnIsHtmlSourceModeChanged(bool value)
+    {
+        if (value)
+        {
+            // Show source mode: hide WebView, show source TextBox
+            IsHtmlSourceVisible = true;
+        }
+        else
+        {
+            // Show rendered mode: show WebView, hide source TextBox
+            IsHtmlSourceVisible = false;
+        }
     }
 
     partial void OnZoomLevelChanged(double value)
@@ -742,6 +796,12 @@ public partial class PreviewViewModel : ObservableObject
         settings.Save();
         // 重新渲染
         ReRenderFontPreview();
+    }
+
+    [RelayCommand]
+    private void ToggleHtmlSourceMode()
+    {
+        IsHtmlSourceMode = !IsHtmlSourceMode;
     }
 
     partial void OnCurrentFrameChanged(int value)
@@ -2607,18 +2667,72 @@ public partial class PreviewViewModel : ObservableObject
     }
 
     /// <summary>
-    /// 显示 HTML 预览（通过 ReverseMarkdown → Markdown → 控件树）。
+    /// 显示 HTML 预览：优先 WebView 渲染，失败则降级到 ReverseMarkdown → 控件树。
     /// </summary>
-    public void ShowHtmlPreview(string filePath)
+    public async Task ShowHtmlPreview(string filePath)
     {
-        var html = File.ReadAllText(filePath);
+        var html = await File.ReadAllTextAsync(filePath);
+
+        // Pre-compute fallback markdown in parallel
+        var fallbackMarkdownTask = Task.Run(() =>
+        {
+            var converter = new Converter();
+            return converter.Convert(html);
+        });
+
+        // Write HTML to temp file for WebView navigation
+        // (NativeWebView doesn't support data: URIs)
+        CleanupHtmlTempFile();
+        var tempHtmlPath = Path.Combine(
+            Path.GetTempPath(), "MantisZip", "Preview",
+            $"preview_{Guid.NewGuid():N}.html");
+        try
+        {
+            var dir = Path.GetDirectoryName(tempHtmlPath);
+            if (dir != null && !Directory.Exists(dir))
+                Directory.CreateDirectory(dir);
+            await File.WriteAllTextAsync(tempHtmlPath, html);
+            _currentHtmlTempPath = tempHtmlPath;
+
+            HtmlWebViewUri = tempHtmlPath;
+            IsWebViewVisible = true;
+            IsFallbackActive = false;
+            PreviewType = PreviewType.Html;
+            IsPreviewVisible = true;
+            IsToolbarVisible = true;
+        }
+        catch (Exception ex)
+        {
+            App.DebugLog($"ShowHtmlPreview: WebView failed ({ex.Message}), falling back to ReverseMarkdown");
+            CleanupHtmlTempFile();
+            var markdown = await fallbackMarkdownTask;
+            var panel = MarkdownPreviewBuilder.Build(markdown);
+            MarkdownPreviewPanel = panel;
+            IsWebViewVisible = false;
+            IsFallbackActive = true;
+            PreviewType = PreviewType.Html;
+            IsPreviewVisible = true;
+            IsToolbarVisible = true;
+        }
+    }
+
+    /// <summary>
+    /// HTML preview fallback: ReverseMarkdown → Markdown → 控件树.
+    /// Called when WebView initialization fails.
+    /// </summary>
+    public async Task ShowHtmlFallback(string filePath)
+    {
+        CleanupHtmlTempFile(); // temp file no longer needed for WebView
+        var html = await File.ReadAllTextAsync(filePath);
         var converter = new Converter();
         var markdown = converter.Convert(html);
         var panel = MarkdownPreviewBuilder.Build(markdown);
         MarkdownPreviewPanel = panel;
+        IsWebViewVisible = false;
+        IsFallbackActive = true;
         PreviewType = PreviewType.Html;
         IsPreviewVisible = true;
-        IsToolbarVisible = false;
+        IsToolbarVisible = true;
     }
 
     /// <summary>
@@ -2733,6 +2847,13 @@ public partial class PreviewViewModel : ObservableObject
         PdfCurrentPage = 1;
         PdfPageInfo = string.Empty;
         MarkdownPreviewPanel = null;
+        HtmlWebViewUri = string.Empty;
+        CleanupHtmlTempFile();
+        IsWebViewVisible = false;
+        IsFallbackActive = false;
+        IsHtmlSourceVisible = false;
+        HtmlSourceContent = string.Empty;
+        IsHtmlSourceMode = false;
         DocxOutline.Clear();
         DocxContentPanel = null;
         DocxNoOutlineText = string.Empty;

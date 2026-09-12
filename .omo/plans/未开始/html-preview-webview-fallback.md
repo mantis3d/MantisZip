@@ -45,7 +45,7 @@ ShowHtmlPreview(filePath)
 
 ---
 
-### Task 1: 添加 WebView NuGet 依赖
+### Task 1: ✅ 添加 WebView NuGet 依赖
 
 **文件：** `MantisZip.UI.Avalonia.csproj`
 
@@ -58,7 +58,7 @@ ShowHtmlPreview(filePath)
 
 ---
 
-### Task 2: 修改 PreviewViewModel — 新增属性与方法
+### Task 2: ✅ 修改 PreviewViewModel — 新增属性与方法
 
 **文件：** `ViewModels/PreviewViewModel.cs`
 
@@ -159,7 +159,7 @@ partial void OnIsHtmlSourceModeChanged(bool value)
 
 ---
 
-### Task 3: 修改 PreviewPanel.axaml — 添加 WebView
+### Task 3: ✅ 修改 PreviewPanel.axaml — 添加 WebView
 
 **文件：** `Views/PreviewPanel.axaml`
 
@@ -185,7 +185,7 @@ partial void OnIsHtmlSourceModeChanged(bool value)
 
 ---
 
-### Task 4: 修改 PreviewPanel.axaml.cs — WebView 初始化和 fallback 处理
+### Task 4: ✅ 修改 PreviewPanel.axaml.cs — WebView 初始化和 fallback 处理
 
 **文件：** `Views/PreviewPanel.axaml.cs`
 
@@ -232,7 +232,7 @@ private static bool IsWebViewAvailable()
 
 ---
 
-### Task 5: 工具栏支持
+### Task 5: ✅ 工具栏支持
 
 **文件：** `ViewModels/PreviewViewModel.cs` + `Views/PreviewPanel.axaml`
 
@@ -248,7 +248,7 @@ private static bool IsWebViewAvailable()
 
 ---
 
-### Task 6: 清理与验证
+### Task 6: ✅ 清理与验证
 
 1. `dotnet build` 0 errors 0 warnings
 2. 测试 HTML 文件预览（含 tables/images/css）

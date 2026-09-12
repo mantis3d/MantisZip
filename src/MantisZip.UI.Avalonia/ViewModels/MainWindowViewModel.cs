@@ -1556,7 +1556,7 @@ public partial class MainWindowViewModel : ObservableObject
                         StatusMessage = LocalizationManager.T("Status_Unsupported", ext);
                         break;
                     }
-                    Preview.ShowHtmlPreview(tempFile);
+                    await Preview.ShowHtmlPreview(tempFile);
                     StatusMessage = LocalizationManager.T("Preview_Html", entry.DisplayName);
                     break;
                 case PreviewType.Pdf:

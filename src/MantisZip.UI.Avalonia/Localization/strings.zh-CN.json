@@ -982,6 +982,8 @@
   "Preview_Result_DirInfo": "{0} 项 · {1}",
   "Preview_Result_ConflictCount": "⚠️ {0} 个冲突",
   "Preview_Result_FileExists": "同名文件已存在",
+  "Preview_HtmlFallbackNotification": "安装 WebView Runtime 可获得更好的 HTML 预览效果",
+  "Preview_HtmlSourceToggle": "源码/渲染切换",
 
   "App_MantisZipTitle": "MantisZip",
 

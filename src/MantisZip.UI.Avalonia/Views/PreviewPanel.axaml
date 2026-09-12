@@ -4,6 +4,7 @@
              xmlns:models="clr-namespace:MantisZip.UI.Avalonia.Models"
              xmlns:services="clr-namespace:MantisZip.UI.Avalonia.Services"
              xmlns:local="clr-namespace:MantisZip.UI.Avalonia.Views"
+             xmlns:ac="clr-namespace:Avalonia.Controls;assembly=Avalonia.Controls.WebView"
 
              x:Class="MantisZip.UI.Avalonia.Views.PreviewPanel"
              x:Name="ThisPanel"
@@ -130,6 +131,15 @@
             <PathIcon Data="{StaticResource IconPaintBrush}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
           </Button>
         </StackPanel>
+
+        <!-- HTML source/render toggle (WebView mode only) -->
+        <Button IsVisible="{Binding IsWebViewHtmlVisible}"
+                Width="36" Height="{DynamicResource ControlHeight}" Padding="0"
+                Command="{Binding ToggleHtmlSourceModeCommand}"
+                ToolTip.Tip="{Binding LocalizedStrings[Preview_HtmlSourceToggle]}">
+          <TextBlock Text="&lt;/&gt;" FontSize="13" FontWeight="Bold"
+                     Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+        </Button>
 
         <!-- Ligature toggle (font preview) -->
         <StackPanel Orientation="Horizontal" Spacing="2"
@@ -569,11 +579,30 @@
                      FontWeight="Bold" />
         </StackPanel>
         
-        <!-- Markdown 预览（控件树） -->
+        <!-- Markdown 预览（控件树）— 仅 Markdown 或降级模式的 HTML -->
         <ScrollViewer IsVisible="{Binding IsMarkdownOrHtmlVisible}"
                       Background="{DynamicResource ThemeSurfaceBgBrush}"
                       Padding="{DynamicResource SpacingMdThk}">
           <ContentControl Content="{Binding MarkdownPreviewPanel}" />
+        </ScrollViewer>
+
+        <!-- HTML WebView 预览 -->
+        <ac:NativeWebView x:Name="HtmlPreviewWebView"
+                          IsVisible="{Binding IsWebViewHtmlVisible}"
+                          Source="{Binding HtmlWebViewUri}"
+                          Background="{DynamicResource ThemeSurfaceBgBrush}" />
+
+        <!-- HTML 源码预览（WebView 模式下切换源码显示） -->
+        <ScrollViewer IsVisible="{Binding IsHtmlSourceVisible}"
+                      Background="{DynamicResource ThemeSurfaceBgBrush}"
+                      Padding="{DynamicResource SpacingMdThk}">
+          <TextBox Text="{Binding HtmlSourceContent}"
+                   IsReadOnly="True"
+                   AcceptsReturn="True"
+                   TextWrapping="Wrap"
+                   FontFamily="Consolas"
+                   Background="{DynamicResource ThemeSurfaceBgBrush}"
+                   BorderThickness="0" />
         </ScrollViewer>
 
 
