@@ -296,7 +296,7 @@ public partial class PreviewViewModel : ObservableObject
     public bool IsPptxVisible => PreviewType == PreviewType.Pptx;
     public bool IsVideoVisible => PreviewType == PreviewType.Video;
     public bool IsHtmlVisible => PreviewType == PreviewType.Html && !IsWebViewVisible;
-    public bool IsWebViewHtmlVisible => PreviewType == PreviewType.Html && IsWebViewVisible;
+    public bool IsWebViewHtmlVisible => PreviewType == PreviewType.Html && IsWebViewVisible && !IsHtmlSourceMode;
     public bool IsMarkdownVisible => PreviewType == PreviewType.Markdown;
     public bool IsMarkdownOrHtmlVisible => PreviewType == PreviewType.Markdown || (PreviewType == PreviewType.Html && !IsWebViewVisible);
     public bool IsPdfVisible => PreviewType == PreviewType.Pdf;
@@ -363,16 +363,9 @@ public partial class PreviewViewModel : ObservableObject
 
     partial void OnIsHtmlSourceModeChanged(bool value)
     {
-        if (value)
-        {
-            // Show source mode: hide WebView, show source TextBox
-            IsHtmlSourceVisible = true;
-        }
-        else
-        {
-            // Show rendered mode: show WebView, hide source TextBox
-            IsHtmlSourceVisible = false;
-        }
+        // 切换源码/渲染模式时，WebView 和源码 TextBox 互斥显示
+        OnPropertyChanged(nameof(IsWebViewHtmlVisible));
+        OnPropertyChanged(nameof(IsHtmlSourceVisible));
     }
 
     partial void OnZoomLevelChanged(double value)
