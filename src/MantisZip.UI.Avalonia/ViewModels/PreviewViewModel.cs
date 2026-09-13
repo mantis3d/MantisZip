@@ -367,9 +367,9 @@ public partial class PreviewViewModel : ObservableObject
 
     partial void OnIsHtmlSourceModeChanged(bool value)
     {
-        // 切换源码/渲染模式时，WebView 和源码 TextBox 互斥显示
+        // 源码模式：隐藏 WebView，显示源码 TextBox；渲染模式反之
+        IsHtmlSourceVisible = value;
         OnPropertyChanged(nameof(IsWebViewHtmlVisible));
-        OnPropertyChanged(nameof(IsHtmlSourceVisible));
     }
 
     partial void OnIsFallbackActiveChanged(bool value)
