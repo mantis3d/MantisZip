@@ -456,6 +456,20 @@
                       </Grid>
                     </StackPanel>
                   </Border>
+
+                  <!-- HTML 预览安全 -->
+                  <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
+                          CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}" Background="{DynamicResource ThemeSurfaceBgBrush}">
+                    <StackPanel Spacing="{DynamicResource SpacingXs}">
+                      <TextBlock Text="{Binding HtmlSecuritySectionText}" FontWeight="SemiBold" />
+                      <CheckBox Content="{Binding AllowJavaScriptText}"
+                                IsChecked="{Binding AllowJavaScript}" />
+                      <CheckBox Content="{Binding AllowExternalResourcesText}"
+                                IsChecked="{Binding AllowExternalResources}" />
+                      <CheckBox Content="{Binding AllowNavigationText}"
+                                IsChecked="{Binding AllowNavigation}" />
+                    </StackPanel>
+                  </Border>
                 </StackPanel>
               </ScrollViewer>
             </TabItem>

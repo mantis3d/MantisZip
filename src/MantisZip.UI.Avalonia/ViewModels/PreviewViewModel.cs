@@ -2701,7 +2701,15 @@ public partial class PreviewViewModel : ObservableObject
             var dir = Path.GetDirectoryName(tempHtmlPath);
             if (dir != null && !Directory.Exists(dir))
                 Directory.CreateDirectory(dir);
-            await File.WriteAllTextAsync(tempHtmlPath, html);
+            // 根据安全设置注入 CSP
+            var settings = AppSettings.Load();
+            var cspParts = new List<string>();
+            cspParts.Add(settings.AllowExternalResources ? "default-src * data: blob:" : "default-src 'self' data: blob:");
+            cspParts.Add(settings.AllowJavaScript ? "script-src 'self' 'unsafe-inline'" : "script-src 'none'");
+            cspParts.Add("frame-src 'none'");
+            var csp = string.Join("; ", cspParts);
+            var secureHtml = $"""<meta http-equiv="Content-Security-Policy" content="{csp}">{html}""";
+            await File.WriteAllTextAsync(tempHtmlPath, secureHtml);
             _currentHtmlTempPath = tempHtmlPath;
 
             HtmlWebViewUri = tempHtmlPath;
