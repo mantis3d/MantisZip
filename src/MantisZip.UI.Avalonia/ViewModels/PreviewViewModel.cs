@@ -299,8 +299,12 @@ public partial class PreviewViewModel : ObservableObject
     public bool IsWebViewHtmlVisible => PreviewType == PreviewType.Html && IsWebViewVisible && !IsHtmlSourceMode;
     /// <summary>HTML 预览处于激活状态（WebView 或降级模式均可），用于工具栏按钮可见性。</summary>
     public bool IsHtmlPreviewActive => PreviewType == PreviewType.Html && (IsWebViewVisible || IsFallbackActive);
+    /// <summary>Markdown 预览处于激活状态，用于工具栏源码切换按钮可见性。</summary>
+    public bool IsMarkdownPreviewActive => PreviewType == PreviewType.Markdown;
+    /// <summary>HTML 或 Markdown 预览处于激活状态，用于源码/渲染切换按钮可见性。</summary>
+    public bool IsSourcePreviewActive => IsHtmlPreviewActive || IsMarkdownPreviewActive;
     public bool IsMarkdownVisible => PreviewType == PreviewType.Markdown;
-    public bool IsMarkdownOrHtmlVisible => PreviewType == PreviewType.Markdown || (PreviewType == PreviewType.Html && !IsWebViewVisible);
+    public bool IsMarkdownOrHtmlVisible => !IsHtmlSourceMode && (PreviewType == PreviewType.Markdown || (PreviewType == PreviewType.Html && !IsWebViewVisible));
     public bool IsPdfVisible => PreviewType == PreviewType.Pdf;
     public bool HasPdfNavigation => IsPdfVisible && _pdfTotalPages > 1;
     public bool IsIcoGalleryVisible => PreviewType == PreviewType.IcoGallery;
@@ -341,6 +345,8 @@ public partial class PreviewViewModel : ObservableObject
         OnPropertyChanged(nameof(HasLigatureControls));
         OnPropertyChanged(nameof(IsHtmlVisible));
         OnPropertyChanged(nameof(IsHtmlPreviewActive));
+        OnPropertyChanged(nameof(IsMarkdownPreviewActive));
+        OnPropertyChanged(nameof(IsSourcePreviewActive));
         OnPropertyChanged(nameof(IsWebViewHtmlVisible));
         OnPropertyChanged(nameof(IsMarkdownVisible));
         OnPropertyChanged(nameof(IsMarkdownOrHtmlVisible));
@@ -367,9 +373,10 @@ public partial class PreviewViewModel : ObservableObject
 
     partial void OnIsHtmlSourceModeChanged(bool value)
     {
-        // 源码模式：隐藏 WebView，显示源码 TextBox；渲染模式反之
+        // 源码模式：隐藏渲染内容，显示源码 TextBox；渲染模式反之
         IsHtmlSourceVisible = value;
         OnPropertyChanged(nameof(IsWebViewHtmlVisible));
+        OnPropertyChanged(nameof(IsMarkdownOrHtmlVisible));
     }
 
     partial void OnIsFallbackActiveChanged(bool value)
@@ -2749,6 +2756,7 @@ public partial class PreviewViewModel : ObservableObject
         var markdown = File.ReadAllText(filePath);
         var panel = MarkdownPreviewBuilder.Build(markdown);
         MarkdownPreviewPanel = panel;
+        HtmlSourceContent = markdown;
         PreviewType = PreviewType.Markdown;
         IsPreviewVisible = true;
         IsToolbarVisible = false;

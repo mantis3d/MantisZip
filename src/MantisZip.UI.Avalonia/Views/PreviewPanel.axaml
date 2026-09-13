@@ -132,8 +132,8 @@
           </Button>
         </StackPanel>
 
-        <!-- HTML source/render toggle (visible during HTML preview, both modes) -->
-        <Button IsVisible="{Binding IsHtmlPreviewActive}"
+        <!-- Source/render toggle (visible during HTML or Markdown preview) -->
+        <Button IsVisible="{Binding IsSourcePreviewActive}"
                 Width="36" Height="{DynamicResource ControlHeight}" Padding="0"
                 Command="{Binding ToggleHtmlSourceModeCommand}"
                 ToolTip.Tip="{Binding LocalizedStrings[Preview_HtmlSourceToggle]}">
