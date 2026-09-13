@@ -165,9 +165,9 @@
     <!-- Preview content area -->
     <ScrollViewer x:Name="PreviewContentScroller" Grid.Row="1" Grid.Column="0"
                   Background="{DynamicResource ThemeSurfaceBgBrush}">
-      <StackPanel>
+      <Grid RowDefinitions="Auto,*">
         <!-- Content-top metadata items -->
-        <Border x:Name="ContentTopBorder" Padding="{DynamicResource SpacingSmThk}"
+        <Border x:Name="ContentTopBorder" Grid.Row="0" Padding="{DynamicResource SpacingSmThk}"
                 Background="{DynamicResource ThemeSurfaceBgBrush}"
                 BorderBrush="{DynamicResource ThemeBorderBrush}"
                 BorderThickness="0,0,0,1">
@@ -216,7 +216,7 @@
           </ItemsControl>
         </Border>
 
-        <Grid>
+        <Grid Grid.Row="1">
         <!-- Unsupported / empty state -->
         <TextBlock Text="{Binding TextContent}"
                    VerticalAlignment="Center"
@@ -586,25 +586,6 @@
           <ContentControl Content="{Binding MarkdownPreviewPanel}" />
         </ScrollViewer>
 
-        <!-- HTML WebView 预览 -->
-        <ac:NativeWebView x:Name="HtmlPreviewWebView"
-                          IsVisible="{Binding IsWebViewHtmlVisible}"
-                          Source="{Binding HtmlWebViewUri}"
-                          Background="{DynamicResource ThemeSurfaceBgBrush}" />
-
-        <!-- HTML 源码预览（WebView 模式下切换源码显示） -->
-        <ScrollViewer IsVisible="{Binding IsHtmlSourceVisible}"
-                      Background="{DynamicResource ThemeSurfaceBgBrush}"
-                      Padding="{DynamicResource SpacingMdThk}">
-          <TextBox Text="{Binding HtmlSourceContent}"
-                   IsReadOnly="True"
-                   AcceptsReturn="True"
-                   TextWrapping="Wrap"
-                   FontFamily="Consolas"
-                   Background="{DynamicResource ThemeSurfaceBgBrush}"
-                   BorderThickness="0" />
-        </ScrollViewer>
-
 
         <!-- PDF 预览（PdfPig + SkiaSharp 逐页位图渲染） -->
         <ScrollViewer IsVisible="{Binding IsPdfVisible}"
@@ -728,7 +709,28 @@
                      TextAlignment="Center" />
         </StackPanel>
       </Grid>
-      </StackPanel>
+
+        <!-- HTML WebView 预览 (placed in outer Grid Row=1 for proper height) -->
+        <ac:NativeWebView x:Name="HtmlPreviewWebView" Grid.Row="1"
+                          IsVisible="{Binding IsWebViewHtmlVisible}"
+                          Source="{Binding HtmlWebViewUri}"
+                          Background="{DynamicResource ThemeSurfaceBgBrush}" />
+
+        <!-- HTML 源码预览（WebView 模式下切换源码显示，同样在 Grid.Row=1） -->
+        <ScrollViewer Grid.Row="1"
+                      IsVisible="{Binding IsHtmlSourceVisible}"
+                      Background="{DynamicResource ThemeSurfaceBgBrush}"
+                      Padding="{DynamicResource SpacingMdThk}">
+          <TextBox Text="{Binding HtmlSourceContent}"
+                   IsReadOnly="True"
+                   AcceptsReturn="True"
+                   TextWrapping="Wrap"
+                   FontFamily="Consolas"
+                   Background="{DynamicResource ThemeSurfaceBgBrush}"
+                   BorderThickness="0" />
+        </ScrollViewer>
+
+      </Grid>
     </ScrollViewer>
 
     <!-- Preview Info Panel (placed dynamically by ApplyInfoPanelOrientation) -->

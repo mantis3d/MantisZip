@@ -2695,6 +2695,7 @@ public partial class PreviewViewModel : ObservableObject
             _currentHtmlTempPath = tempHtmlPath;
 
             HtmlWebViewUri = tempHtmlPath;
+            HtmlSourceContent = html;
             IsWebViewVisible = true;
             IsFallbackActive = false;
             PreviewType = PreviewType.Html;
