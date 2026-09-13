@@ -340,6 +340,7 @@ public partial class PreviewViewModel : ObservableObject
         OnPropertyChanged(nameof(HasFlattenAlphaControls));
         OnPropertyChanged(nameof(HasLigatureControls));
         OnPropertyChanged(nameof(IsHtmlVisible));
+        OnPropertyChanged(nameof(IsHtmlPreviewActive));
         OnPropertyChanged(nameof(IsWebViewHtmlVisible));
         OnPropertyChanged(nameof(IsMarkdownVisible));
         OnPropertyChanged(nameof(IsMarkdownOrHtmlVisible));
