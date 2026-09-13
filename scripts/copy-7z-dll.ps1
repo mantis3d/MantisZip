@@ -115,6 +115,11 @@ foreach ($arch in @('x64', 'x86')) {
     $targetDir = Join-Path $PublishDir $arch
 
     if (-not $found.ContainsKey($arch)) {
+        # Remove stale directory from previous builds
+        if (Test-Path $targetDir) {
+            Remove-Item $targetDir -Recurse -Force -ErrorAction SilentlyContinue
+            Write-Info "Removed stale $arch directory (no matching 7z.dll found on this machine)"
+        }
         Write-Warn "No ${arch} 7z.dll found on this machine — '$targetDir' will not be bundled."
         Write-Warn "${arch} builds of MantisZip will need 7-Zip (${arch}) installed on the user's system, or the user must locate 7z.dll via the in-app dialog."
         continue
