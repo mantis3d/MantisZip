@@ -4,6 +4,7 @@
              xmlns:models="clr-namespace:MantisZip.UI.Avalonia.Models"
              xmlns:services="clr-namespace:MantisZip.UI.Avalonia.Services"
              xmlns:local="clr-namespace:MantisZip.UI.Avalonia.Views"
+             xmlns:ac="clr-namespace:Avalonia.Controls;assembly=Avalonia.Controls.WebView"
 
              x:Class="MantisZip.UI.Avalonia.Views.PreviewPanel"
              x:Name="ThisPanel"
@@ -131,6 +132,15 @@
           </Button>
         </StackPanel>
 
+        <!-- Source/render toggle (visible during HTML or Markdown preview) -->
+        <Button IsVisible="{Binding IsSourcePreviewActive}"
+                Width="36" Height="{DynamicResource ControlHeight}" Padding="0"
+                Command="{Binding ToggleHtmlSourceModeCommand}"
+                ToolTip.Tip="{Binding LocalizedStrings[Preview_HtmlSourceToggle]}">
+          <TextBlock Text="&lt;/&gt;" FontSize="13" FontWeight="Bold"
+                     Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+        </Button>
+
         <!-- Ligature toggle (font preview) -->
         <StackPanel Orientation="Horizontal" Spacing="2"
                     IsVisible="{Binding HasLigatureControls}">
@@ -155,9 +165,9 @@
     <!-- 预览内容滚动区域：包含内容顶部元数据、各格式预览内容、加载状态 -->
     <ScrollViewer x:Name="PreviewContentScroller" Grid.Row="1" Grid.Column="0"
                   Background="{DynamicResource ThemeSurfaceBgBrush}">
-      <StackPanel>
+      <Grid RowDefinitions="Auto,*">
         <!-- 内容顶部元数据区域：显示格式特定的元数据（如 PE 信息、PDF 属性等），随内容滚动 -->
-        <Border x:Name="ContentTopBorder" Padding="{DynamicResource SpacingSmThk}"
+        <Border x:Name="ContentTopBorder" Grid.Row="0" Padding="{DynamicResource SpacingSmThk}"
                 Background="{DynamicResource ThemeSurfaceBgBrush}"
                 BorderBrush="{DynamicResource ThemeBorderBrush}"
                 BorderThickness="0,0,0,1">
@@ -206,7 +216,7 @@
           </ItemsControl>
         </Border>
 
-        <Grid>
+        <Grid Grid.Row="1">
         <!-- 不支持/空状态提示：当预览类型为 Unsupported 或无内容时显示 -->
         <TextBlock Text="{Binding TextContent}"
                    VerticalAlignment="Center"
@@ -569,7 +579,7 @@
                      FontWeight="Bold" />
         </StackPanel>
         
-        <!-- Markdown/HTML 预览：使用 Markdig AST → 原生控件树渲染 -->
+        <!-- Markdown/HTML 预览：使用 Markdig AST → 原生控件树渲染— 仅 Markdown 或降级模式的 HTML -->
         <ScrollViewer IsVisible="{Binding IsMarkdownOrHtmlVisible}"
                       Background="{DynamicResource ThemeSurfaceBgBrush}"
                       Padding="{DynamicResource SpacingMdThk}">
@@ -699,7 +709,28 @@
                      TextAlignment="Center" />
         </StackPanel>
       </Grid>
-      </StackPanel>
+
+        <!-- HTML WebView 预览 (placed in outer Grid Row=1 for proper height) -->
+        <ac:NativeWebView x:Name="HtmlPreviewWebView" Grid.Row="1"
+                          IsVisible="{Binding IsWebViewHtmlVisible}"
+                          Source="{Binding HtmlWebViewUri}"
+                          Background="{DynamicResource ThemeSurfaceBgBrush}" />
+
+        <!-- HTML 源码预览（WebView 模式下切换源码显示，同样在 Grid.Row=1） -->
+        <ScrollViewer Grid.Row="1"
+                      IsVisible="{Binding IsHtmlSourceVisible}"
+                      Background="{DynamicResource ThemeSurfaceBgBrush}"
+                      Padding="{DynamicResource SpacingMdThk}">
+          <TextBox Text="{Binding HtmlSourceContent}"
+                   IsReadOnly="True"
+                   AcceptsReturn="True"
+                   TextWrapping="Wrap"
+                   FontFamily="Consolas"
+                   Background="{DynamicResource ThemeSurfaceBgBrush}"
+                   BorderThickness="0" />
+        </ScrollViewer>
+
+      </Grid>
     </ScrollViewer>
 
     <!-- 预览信息面板：显示文件元数据（格式特定信息 + 通用信息），位置由 ApplyInfoPanelOrientation 动态控制 -->

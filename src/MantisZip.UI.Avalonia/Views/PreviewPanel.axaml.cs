@@ -38,6 +38,11 @@ public partial class PreviewPanel : UserControl
         // 外层 ScrollViewer 的 SizeChanged，但会改变图像的可用视口高度，必须单独重算
         if (ContentTopBorder != null)
             ContentTopBorder.SizeChanged += OnContentTopSizeChanged;
+
+        // WebView 初始化安全检测：WebView2 Runtime 缺失时 NavigationCompleted 会触发
+        // 且 IsSuccess=false，此时降级到 ReverseMarkdown 控件树预览
+        if (HtmlPreviewWebView != null)
+            HtmlPreviewWebView.NavigationCompleted += OnWebViewNavigationCompleted;
     }
 
     private void OnDataContextChanged(object? sender, EventArgs e)
@@ -176,6 +181,21 @@ public partial class PreviewPanel : UserControl
     private void OnContentTopSizeChanged(object? sender, SizeChangedEventArgs e)
     {
         UpdateViewportSize();
+    }
+
+    /// <summary>
+    /// WebView NavigationCompleted 事件：WebView2 Runtime 缺失或导航失败时触发，
+    /// IsSuccess=false 说明 WebView 无法渲染，降级到 ReverseMarkdown 控件树预览。
+    /// </summary>
+    private void OnWebViewNavigationCompleted(object? sender, WebViewNavigationCompletedEventArgs e)
+    {
+        if (e.IsSuccess) return;
+
+        var vm = _vm;
+        if (vm == null || !vm.IsWebViewVisible || vm.IsFallbackActive) return;
+
+        App.DebugLog($"WebView navigation failed (IsSuccess=false), falling back to ReverseMarkdown");
+        _ = vm.ShowHtmlFallback(vm.CurrentPreviewFilePath ?? "");
     }
 
     /// <summary>
