@@ -457,6 +457,15 @@
                     </StackPanel>
                   </Border>
 
+                </StackPanel>
+              </ScrollViewer>
+            </TabItem>
+
+            <!-- HTML -->
+            <TabItem Header="{Binding PreviewTabHtmlHeader}" Classes="compactTab"
+              controls:TabItemExtensions.TabIcon="IconHtml">
+              <ScrollViewer Background="{DynamicResource ThemeWindowBgBrush}">
+                <StackPanel Spacing="{DynamicResource SpacingSm}" Margin="{DynamicResource SpacingSmThk}">
                   <!-- HTML 预览安全 -->
                   <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
                           CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingMdThk}" Background="{DynamicResource ThemeSurfaceBgBrush}">

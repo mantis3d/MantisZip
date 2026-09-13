@@ -570,6 +570,7 @@ public partial class SettingsWindowViewModel : ObservableObject
 
     // Preview sub-tab headers (General / Image / Torrent / Executable / Metadata Panel)
     public string PreviewTabGeneralHeader => LocalizationManager.T("Settings_Preview_Tab_General");
+    public string PreviewTabHtmlHeader => LocalizationManager.T("Settings_Preview_Tab_Html");
     public string PreviewTabImageHeader => LocalizationManager.T("Settings_Preview_Tab_Image");
     public string PreviewTabTorrentHeader => LocalizationManager.T("Settings_Preview_Tab_Torrent");
     public string PreviewTabExecutableHeader => LocalizationManager.T("Settings_Preview_Tab_Executable");
@@ -1107,6 +1108,7 @@ public partial class SettingsWindowViewModel : ObservableObject
         OnPropertyChanged(nameof(PreviewHeadSizeKBText));
 
         OnPropertyChanged(nameof(PreviewTabGeneralHeader));
+        OnPropertyChanged(nameof(PreviewTabHtmlHeader));
         OnPropertyChanged(nameof(PreviewTabImageHeader));
         OnPropertyChanged(nameof(PreviewTabTorrentHeader));
         OnPropertyChanged(nameof(PreviewTabExecutableHeader));
