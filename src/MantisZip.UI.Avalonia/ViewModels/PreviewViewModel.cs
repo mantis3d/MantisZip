@@ -297,6 +297,8 @@ public partial class PreviewViewModel : ObservableObject
     public bool IsVideoVisible => PreviewType == PreviewType.Video;
     public bool IsHtmlVisible => PreviewType == PreviewType.Html && !IsWebViewVisible;
     public bool IsWebViewHtmlVisible => PreviewType == PreviewType.Html && IsWebViewVisible && !IsHtmlSourceMode;
+    /// <summary>HTML 预览处于激活状态（WebView 或降级模式均可），用于工具栏按钮可见性。</summary>
+    public bool IsHtmlPreviewActive => PreviewType == PreviewType.Html && (IsWebViewVisible || IsFallbackActive);
     public bool IsMarkdownVisible => PreviewType == PreviewType.Markdown;
     public bool IsMarkdownOrHtmlVisible => PreviewType == PreviewType.Markdown || (PreviewType == PreviewType.Html && !IsWebViewVisible);
     public bool IsPdfVisible => PreviewType == PreviewType.Pdf;
@@ -359,6 +361,7 @@ public partial class PreviewViewModel : ObservableObject
         OnPropertyChanged(nameof(IsWebViewHtmlVisible));
         OnPropertyChanged(nameof(IsMarkdownOrHtmlVisible));
         OnPropertyChanged(nameof(HasFontSizeControls));
+        OnPropertyChanged(nameof(IsHtmlPreviewActive));
     }
 
     partial void OnIsHtmlSourceModeChanged(bool value)
@@ -366,6 +369,12 @@ public partial class PreviewViewModel : ObservableObject
         // 切换源码/渲染模式时，WebView 和源码 TextBox 互斥显示
         OnPropertyChanged(nameof(IsWebViewHtmlVisible));
         OnPropertyChanged(nameof(IsHtmlSourceVisible));
+    }
+
+    partial void OnIsFallbackActiveChanged(bool value)
+    {
+        OnPropertyChanged(nameof(IsHtmlPreviewActive));
+        OnPropertyChanged(nameof(HasFontSizeControls));
     }
 
     partial void OnZoomLevelChanged(double value)
