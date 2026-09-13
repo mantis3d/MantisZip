@@ -6,6 +6,29 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-09-13** — HTML 预览安全设置独立子标签页
+  - **SettingsWindow.axaml**：预览 tab 新增「HTML」子标签页（`IconHtml` 图标），将 HTML 预览安全设置（3 个 CheckBox）从「通用」tab 迁移至独立子 tab；新增 `PreviewTabHtmlHeader` 属性 + `OnCultureChanged` 刷新
+  - **AppIcons.axaml**：新增 `IconHtml` Geometry（`<>` 尖括号矢量图标）
+  - 本地化：新增 `Settings_Preview_Tab_Html`（HTML / HTML），zh + en 成对
+  - 回归：Build 0 警告 0 错误
+
+**2026-09-13** — HTML 安全设置子面板美化
+  - 安全设置 Border 新增标题栏（`HtmlSecuritySectionText`，SemiBold 14px）、描述文字（`ThemeTextSecondaryBrush`，12px Wrap）、分隔线 + 选项区域间距优化
+
+**2026-09-13** — HTML 预览安全设置（JS/外部资源/导航三开关）
+  - **AppSettings.cs**：新增 `AllowJavaScript`、`AllowExternalResources`、`AllowNavigation`（均默认 `false`）
+  - **SettingsWindowViewModel.cs**：新增 `[ObservableProperty]` + load/save + `OnCultureChanged` 刷新（14 处匹配）
+  - **PreviewViewModel.cs**：`ShowHtmlPreview` 注入 CSP `<meta>` 标签（按 3 个开关控制 `script-src`/`img-src`/`style-src`/`font-src`）
+  - **PreviewPanel.axaml.cs**：`NavigationStarting` 事件拦截非 `file://` 导航
+  - 本地化：新增 7 个安全设置 key（`Settings_Security_Title`/`Description`/`AllowJavaScript`/`AllowExternalResources`/`AllowNavigation`/`Warning_Text` + `Settings_Preview_SecuritySection`），zh + en 成对
+  - 回归：Build 0 警告 0 错误
+
+**2026-09-13** — Markdown 预览支持源码/渲染切换
+  - **PreviewViewModel.cs**：新增 `IsMarkdownPreviewActive` 属性，`</>` 按钮绑定 `IsSourcePreviewActive`（HTML & Markdown 共用）；`OnPreviewTypeChanged` 中补充 `IsHtmlPreviewActive` 通知
+  - **PreviewPanel.axaml**：Markdown 源码 TextBox 绑定 `IsMarkdownSourceVisible`
+  - 本地化：无需新增 key（复用已有 `Preview_Source`/`Preview_Render`）
+  - 回归：Build 0 警告 0 错误
+
 **2026-09-12** — 报错信息一键复制
   - **AppMessageBox**：新增「复制错误信息」按钮（仅 Error/Warning 图标弹窗显示，一处改动覆盖全部 49 处弹窗调用点），点击经 `DataTransfer`/`SetDataAsync`（Avalonia 12 新剪贴板 API，`SetTextAsync` 已移除）复制「MantisZip {版本} + yyyy-MM-dd HH:mm:ss 时间戳 + 标题（如有）+ 完整消息」到剪贴板，按钮短暂显示「已复制 ✓」1.5s 反馈；剪贴板失败写 `App.DebugLog` 不静默
   - **主窗口状态栏**：`StatusMessage` 由 TextBlock 改为视觉一致的只读 TextBox（透明背景 / `BorderThickness=0` / `Padding=0` / `MinHeight=0` / 右对齐），支持鼠标选中 + Ctrl+C 复制错误文本

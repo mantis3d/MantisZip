@@ -19,7 +19,7 @@
 | **P1** | 新增压缩格式（BZip2/XZ/Zstd/Brotli + 7z.dll 只读解锁） | [new-format-support.md](.omo/plans/进行中/new-format-support.md) | 🟡中 | 11-16h | 🟡 部分完成（2026-08-20 核实）：Core 侧 TAR 裸格式/GZip 单文件压缩已就绪（`TarGzEngine.CompressAsync` 按扩展名分流 `.tar`→无压缩层、`.gz`→单文件 GZipWriter）+ 文件关联 AssocTar/AssocGz 默认 true 已放开；**UI 压缩格式下拉未放开**（`ArchiveFormatValues = ["zip","7z","tar.gz"]`，TAR 裸格式/GZ 单文件待 UI 放开关）。后续：BZip2 → XZ → Zstd（SharpCompress 0.48.1 内置）→ Brotli（.NET 内置 BrotliStream）→ 7z.dll 只读格式解锁（11 种） |
 | **P1** | 自包含体积优化（Avalonia 迁移后） | [selfcontained-size-optimization.md](.omo/plans/未开始/selfcontained-size-optimization.md) | 🟡中 | 4-6h | 三步渐进：InvariantGlobalization → 保守修剪 → 激进修剪，目标降至 20–25 MB |
 | **P1** | 加密文件名 7z 魔数检测修复 | [encrypted-filename-magic-detection.md](.omo/plans/进行中/encrypted-filename-magic-detection.md) | 🟡中 | 3-4h | 🟡 部分完成（2026-08-20 核实）：`ClassifyPreviewByMagicAsync` 捕获 `PasswordRequiredException` → 返回 `PreviewType.NeedsPassword`，`PreviewViewModel.ShowNeedsPassword()` 显示锁图标+文案。**待补**：预览 UI 需添加"输入密码"按钮绑定密码输入流程 |
-| **P1** | HTML 预览升级：跨平台 WebView + 降级 | [html-preview-webview-fallback.md](.omo/plans/未开始/html-preview-webview-fallback.md) | 🟡中 | 4-6h | 用 `Avalonia.Controls.WebView`（各平台原生引擎）替代当前 ReverseMarkdown 有损管线；WebView 不可用时自动降级到 ReverseMarkdown + 修 MarkdownPreviewBuilder table 支持；加工具栏和源码切换 |
+| **P1** | ~~HTML 预览升级：跨平台 WebView + 降级~~ | [html-preview-webview-fallback.md](.omo/plans/已完成/html-preview-webview-fallback.md) | ✅已完 | 4-6h | ✅ 已完成（2026-09-13）：NativeWebView 双轨（WebView 主体 + ReverseMarkdown 降级）、源码/渲染切换（`</>` 按钮，HTML & Markdown 共用）、HTML 预览安全设置（JS/外部资源/导航三开关 + CSP 注入 + NavigationStarting 拦截）、独立 HTML 子标签页（IconHtml 图标） |
 | **P2** | 压缩预估 (Compression Estimator) | [compression-estimator.md](.omo/plans/未开始/compression-estimator.md) | 🟡中 | 4-5h | 压缩前估算大小/耗时 |
 | **P2** | Winget 发布 | [winget-publishing.md](.omo/plans/未开始/winget-publishing.md) | 🟢低 | 1-2h | 发布到 Windows Package Manager 社区仓库；首次手动提交后 CI 自动化 |
 | **P2** | MSI 安装包 (WiX) | [msi-packaging-wix.md](.omo/plans/未开始/msi-packaging-wix.md) | 🟡中 | 2-3h | Inno Setup → WiX MSI 迁移 |
@@ -45,7 +45,7 @@
 | **P3** | 可插拔预览模块体系 | [preview-modular-providers.md](.omo/plans/未开始/preview-modular-providers.md) | 🟡中 | 3-4h | 格式类库独立分发 |
 | **P3** | 文件列表自定义列 | [custom-columns.md](.omo/plans/未开始/custom-columns.md) | 🟡中 | 4-6h | 可自定义显示文件元数据列（文档标题、图片尺寸等） |
 | **P3** | 冻结列（水平滚动时列固定） | [frozen-column.md](.omo/plans/未开始/frozen-column.md) | 🟢低 | 1-2h | 右键列标题冻结/取消冻结，分隔线，设置持久化 |
-| **P3** | Office 文档内容预览增强（Avalonia） | [office-content-preview-avalonia.md](.omo/plans/进行中/office-content-preview-avalonia.md) | 🟡中 | 6-8h | 🟡 部分完成：纯文本 fallback 已实现（DOCX 大纲+全文+表格、XLSX DataGrid、PPTX Canvas 定位、Markdown 控件树表格）。核心 WebView 管线（DOCX→Mammoth→HTML、Markdown→HTML）待 [html-preview-webview-fallback.md](.omo/plans/未开始/html-preview-webview-fallback.md) 基建就绪后接入 |
+| **P3** | Office 文档内容预览增强（Avalonia） | [office-content-preview-avalonia.md](.omo/plans/进行中/office-content-preview-avalonia.md) | 🟡中 | 6-8h | 🟡 部分完成：纯文本 fallback 已实现（DOCX 大纲+全文+表格、XLSX DataGrid、PPTX Canvas 定位、Markdown 控件树表格）。核心 WebView 管线（DOCX→Mammoth→HTML、Markdown→HTML）待 [html-preview-webview-fallback.md](.omo/plans/已完成/html-preview-webview-fallback.md) 基建就绪后接入（基建已于 2026-09-13 完成） |
 | **P3** | ICO 文件自身图标显示 | [ico-file-icon-extract.md](.omo/plans/未开始/ico-file-icon-extract.md) | 🟢低 | 2-3h | ico 文件列表显示自身嵌入图标 |
 | **P3** | 右键菜单目录结构预览 | [context-menu-tree-preview.md](.omo/plans/未开始/context-menu-tree-preview.md) | 🔴高 | 6-8h | COM 菜单中展示压缩包顶层文件树 |
 | **P1** | Avalonia: UI 功能补齐 | [avalonia-ui-feature-parity.md](.omo/plans/已完成/avalonia-ui-feature-parity.md) | 🟡中 | 27/29 完成，2 项待 GUI 验证 | Elevation×3、Favorites×2、QuickPath×2 等 11 个对话框、2 个控件、1 个转换器（2 项阻塞于 GUI 测试） |
@@ -89,9 +89,9 @@
 
 `preview-modular-providers.md`、`selfcontained-size-optimization.md`、`winget-publishing.md`
 
-### 🟡 需调整 — Core 可复用，UI 需移植（19 个）
+### 🟡 需调整 — Core 可复用，UI 需移植（18 个）
 
-`archive-diff.md`、`archive-rename-entry.md`、`auto-update.md`、`compress-preset.md`、`compression-estimator.md`、`custom-columns.md`、`extract-journal-undo.md`、`filename-suffix-template.md`、`font-preview-ligature.md`、`html-preview-webview-fallback.md`、`ico-file-icon-extract.md`、`metadata-panel-configurable.md`、`new-format-support.md`、`office-content-preview-avalonia.md`、`preview-quick-modes.md`、`progress-window-enhancement.md`、`avalonia-ui-feature-parity.md`、`avalonia-wpf-diff-plan.md`、`外部工具视频元数据（无计划文件）`
+`archive-diff.md`、`archive-rename-entry.md`、`auto-update.md`、`compress-preset.md`、`compression-estimator.md`、`custom-columns.md`、`extract-journal-undo.md`、`filename-suffix-template.md`、`font-preview-ligature.md`、`ico-file-icon-extract.md`、`metadata-panel-configurable.md`、`new-format-support.md`、`office-content-preview-avalonia.md`、`preview-quick-modes.md`、`progress-window-enhancement.md`、`avalonia-ui-feature-parity.md`、`avalonia-wpf-diff-plan.md`、`外部工具视频元数据（无计划文件）`
 
 ### 🔴 冲突 — 需完全重写或废弃（9 个）
 
