@@ -207,6 +207,36 @@ using IWriter writer = TarWriter.OpenWriter(brStream, new TarWriterOptions(Compr
 
 `ListEntriesAsync` / `ExtractAsync` / `TestArchiveAsync` / 密码流程零改动。风险点：7z.dll 自动检测对某格式可能误判 → 扩展名 case 直接定格式后，engine 侧对**魔数路径**仍走检测，若魔数与扩展名冲突，按既有 `_currentFormat` 逻辑（扩展名优先）处理。
 
+### 决策 9：新引擎复用性能优化（缓冲区 + 并行声明）
+
+**背景**：性能优化计划（`compression-performance-optimization.md`）将 ZipEngine/TarGzEngine 的 `CopyBufferSize` 从 256KB 提升至 4MB，并为 `IArchiveEngine` 新增 `SupportsParallelExtract` 属性。新引擎应遵循相同规范，保持全引擎行为一致。
+
+**要求**：
+
+| 项目 | 规范 | 说明 |
+|------|------|------|
+| `CopyBufferSize` | `4194304`（4MB） | 所有新引擎统一使用 4MB 缓冲区 |
+| `SupportsParallelExtract` | `true`（BZip2/XZ/Zstd/Brotli） | 多条目可并行解压（条目独立） |
+| `SupportsParallelExtract` | `false`（只读格式走 SevenZipEngine） | 7z.dll 单实例，不支持并发 |
+
+**模板**：
+
+```csharp
+// 所有新引擎（BZip2Engine / XzEngine / ZstdEngine / BrotliEngine）
+public class XxxEngine : IArchiveEngine
+{
+    // 性能优化：4MB 缓冲区（与 ZipEngine 一致）
+    private const int CopyBufferSize = 4194304; // 4MB
+    
+    // 性能优化：声明并行能力
+    public bool SupportsParallelExtract => true; // 多条目可并行
+    
+    // ... 其他实现
+}
+```
+
+**参考**：`compression-performance-optimization.md` 中的缓冲区优化章节与并行解压实现。
+
 ---
 
 ## 分阶段实现
