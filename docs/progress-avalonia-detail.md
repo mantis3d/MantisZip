@@ -6,6 +6,9 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-09-15** — 压缩预估计划文档更新：SharpCompress per-entry 级别分析与选项联动矩阵
+  - `.omo/plans/未开始/compression-estimator.md`：引擎分析重写（SharpCompress 0.49.0+ per-entry 支持）、ZIP 库生态表更新、`CompressService` 路径移除、限制章节（压缩模式/加密/文件大小）、选项联动矩阵（5 种组合）、UI 提示建议、`canPerEntry` + `ComputeMajorityLevel` 实现伪代码、DoD 更新
+
 **2026-09-13** — HTML 预览安全设置独立子标签页
   - **SettingsWindow.axaml**：预览 tab 新增「HTML」子标签页（`IconHtml` 图标），将 HTML 预览安全设置（3 个 CheckBox）从「通用」tab 迁移至独立子 tab；新增 `PreviewTabHtmlHeader` 属性 + `OnCultureChanged` 刷新
   - **AppIcons.axaml**：新增 `IconHtml` Geometry（`<>` 尖括号矢量图标）
