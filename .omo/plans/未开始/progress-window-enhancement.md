@@ -504,7 +504,7 @@ Wave 2 (UI 层 — 5 任务):
 
   **下方区域 - 三种密度模式显示内容**：
   ```xml
-  <!-- 统计栏（完整模式：四项统计） -->
+  <!-- 统计栏（完整模式：五项统计） -->
   <StackPanel x:Name="StatsBar" Grid.Row="2" Orientation="Horizontal"
               JustifyContent="SpaceAround" IsVisible="False">
       <StackPanel Orientation="Vertical" HorizontalAlignment="Center">
@@ -527,9 +527,14 @@ Wave 2 (UI 层 — 5 任务):
           <TextBlock Text="已覆盖" FontSize="11"/>
           <TextBlock Text="5" FontSize="16" FontWeight="SemiBold"/>
       </StackPanel>
+      <StackPanel Orientation="Vertical" HorizontalAlignment="Center">
+          <TextBlock Text="⚙️" FontSize="18"/>
+          <TextBlock Text="进程" FontSize="11"/>
+          <TextBlock Text="8 线程" FontSize="16" FontWeight="SemiBold"/>
+      </StackPanel>
   </StackPanel>
 
-  <!-- 中等模式：已处理+速度（单行） -->
+  <!-- 中等模式：已处理+速度+进程数（单行） -->
   <StackPanel x:Name="MediumStats" Grid.Row="2" Orientation="Horizontal"
               JustifyContent="SpaceBetween" IsVisible="False"
               Padding="8,4" Background="...">
@@ -540,6 +545,10 @@ Wave 2 (UI 层 — 5 任务):
       <TextBlock FontSize="12">
           <Run Text="速度:" Foreground="..."/>
           <Run Text="12.5 MB/s" FontWeight="SemiBold"/>
+      </TextBlock>
+      <TextBlock FontSize="12">
+          <Run Text="进程:" Foreground="..."/>
+          <Run Text="8 线程" FontWeight="SemiBold"/>
       </TextBlock>
   </StackPanel>
 
@@ -1041,12 +1050,12 @@ Wave 2 (UI 层 — 5 任务):
               TimeDisplay.IsVisible = true;
               break;
           case DensityMode.Medium:
-              // 中：已处理+速度（单行） + 进度条 + 时间
+              // 中：已处理+速度+进程数（单行） + 进度条 + 时间
               MediumStats.IsVisible = true;
               TimeDisplay.IsVisible = true;
               break;
           case DensityMode.Full:
-              // 完整：统计栏(四项) + 进度条 + 时间
+              // 完整：统计栏(五项: 已处理/跳过/出错/已覆盖/进程数) + 进度条 + 时间
               StatsBar.IsVisible = true;
               TimeDisplay.IsVisible = true;
               break;

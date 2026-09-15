@@ -175,6 +175,26 @@
             background: #252540;
         }
         
+        /* 密度切换 */
+        .density-switcher {
+            display: flex;
+            gap: 4px;
+            margin-bottom: 12px;
+        }
+        .density-btn {
+            flex: 1;
+            padding: 6px;
+            border: none;
+            background: #3d3d5c;
+            color: #888;
+            cursor: pointer;
+            border-radius: 4px;
+            font-size: 12px;
+            transition: all 0.2s;
+        }
+        .density-btn.active { background: #6bd46b; color: #1a1a2e; }
+        .density-btn:hover:not(.active) { background: #4a4a6a; }
+        
         /* 统计栏 */
         .stats-bar {
             display: flex;
@@ -192,21 +212,39 @@
         .stats-value.skipped { color: #ffd93d; }
         .stats-value.failed { color: #ff6b6b; }
         
+        /* 速度显示 */
+        .speed-display {
+            display: flex;
+            justify-content: space-between;
+            font-size: 12px;
+            color: #888;
+            margin-bottom: 8px;
+        }
+        .speed-value { color: #6bd46b; font-weight: 500; }
+        
+        /* 中等模式统计 */
+        .medium-stats {
+            display: flex;
+            justify-content: space-between;
+            font-size: 12px;
+            color: #888;
+            margin-bottom: 8px;
+            padding: 8px 12px;
+            background: #3d3d5c;
+            border-radius: 4px;
+        }
+        .medium-value { color: #eaeaea; font-weight: 500; }
+        
         /* 时间显示 */
         .time-display {
             display: flex;
             justify-content: space-between;
-            margin-top: 12px;
-            padding-top: 12px;
+            padding-top: 8px;
             border-top: 1px solid #3d3d5c;
             font-size: 13px;
             color: #888;
         }
         .time-value { color: #eaeaea; font-weight: 500; }
-        
-        /* 吞吐速度 */
-        .throughput { text-align: center; margin-top: 8px; font-size: 12px; color: #888; }
-        .throughput-value { color: #6bd46b; font-weight: 500; }
         
         /* 隐藏 */
         .hidden { display: none !important; }
@@ -375,6 +413,13 @@
             
             <!-- 下方 - 整体信息区 -->
             <div class="overall-info-section">
+                <!-- 密度模式切换 -->
+                <div class="density-switcher">
+                    <button class="density-btn" data-mode="minimal">少</button>
+                    <button class="density-btn active" data-mode="medium">中</button>
+                    <button class="density-btn" data-mode="full">完整</button>
+                </div>
+                
                 <!-- 统计栏（完整模式） -->
                 <div id="statsBar" class="stats-bar hidden">
                     <div class="stats-item">
@@ -382,16 +427,33 @@
                         <span class="stats-label">已处理</span>
                         <span class="stats-value processed">60/100</span>
                     </div>
-                    <div class="stats-item">
+                    <div class="stats-item" id="skippedStat">
                         <span class="stats-icon">⏭</span>
                         <span class="stats-label">跳过</span>
                         <span class="stats-value skipped">3</span>
                     </div>
-                    <div class="stats-item">
+                    <div class="stats-item" id="failedStat">
                         <span class="stats-icon">❌</span>
                         <span class="stats-label">出错</span>
                         <span class="stats-value failed">1</span>
                     </div>
+                    <div class="stats-item" id="overwrittenStat">
+                        <span class="stats-icon">🔄</span>
+                        <span class="stats-label">已覆盖</span>
+                        <span class="stats-value processed">5</span>
+                    </div>
+                    <div class="stats-item" id="threadStat">
+                        <span class="stats-icon">⚙️</span>
+                        <span class="stats-label">进程</span>
+                        <span class="stats-value processed">8 线程</span>
+                    </div>
+                </div>
+                
+                <!-- 中等模式：已处理 + 速度 + 进程数（单行） -->
+                <div id="mediumStats" class="medium-stats hidden">
+                    <span>已处理: <span class="medium-value">60/100</span></span>
+                    <span>速度: <span class="medium-value">12.5 MB/s</span></span>
+                    <span>进程: <span class="medium-value">8 线程</span></span>
                 </div>
                 
                 <!-- 总进度条 -->
@@ -405,15 +467,10 @@
                     </div>
                 </div>
                 
-                <!-- 时间显示（中等/完整模式） -->
+                <!-- 时间显示 -->
                 <div id="timeDisplay" class="time-display">
-                    <span>已用时间: <span class="time-value">00:00:12</span></span>
-                    <span>预计剩余: <span class="time-value">00:00:08</span></span>
-                </div>
-                
-                <!-- 吞吐速度（完整模式） -->
-                <div id="throughput" class="throughput hidden">
-                    速度: <span class="throughput-value">12.5 MB/s</span>
+                    <span>已用: <span class="time-value">00:00:12</span></span>
+                    <span>剩余: <span class="time-value">00:00:08</span></span>
                 </div>
             </div>
         </div>
@@ -422,7 +479,7 @@
         <div class="mode-description">
             <strong>上方批处理列表</strong>：固定显示，始终可见<br>
             <strong>上方模式</strong>：简约（文件概览）| 详细（线程进度）| 列表（文件追踪）<br>
-            <strong>下方模式</strong>：少（仅进度条）| 中（进度+时间）| 完整（统计+进度+时间+速度）
+            <strong>下方密度</strong>：少（进度+时间）| 中（+已处理+速度）| 完整（+已覆盖+线程数）
         </div>
     </div>
 
@@ -441,27 +498,38 @@
         });
         
         // 下方密度模式切换
-        document.getElementById('bottomModeSwitcher').addEventListener('click', (e) => {
-            const btn = e.target.closest('.mode-btn');
+        document.querySelector('.density-switcher').addEventListener('click', (e) => {
+            const btn = e.target.closest('.density-btn');
             if (!btn) return;
             
             const mode = btn.dataset.mode;
-            document.querySelectorAll('#bottomModeSwitcher .mode-btn').forEach(b => b.classList.remove('active'));
+            document.querySelectorAll('.density-btn').forEach(b => b.classList.remove('active'));
             btn.classList.add('active');
             
             const statsBar = document.getElementById('statsBar');
+            const mediumStats = document.getElementById('mediumStats');
             const timeDisplay = document.getElementById('timeDisplay');
-            const throughput = document.getElementById('throughput');
             
+            // 全部隐藏
             statsBar.classList.add('hidden');
+            mediumStats.classList.add('hidden');
             timeDisplay.classList.add('hidden');
-            throughput.classList.add('hidden');
             
-            if (mode === 'medium') timeDisplay.classList.remove('hidden');
-            if (mode === 'full') {
-                statsBar.classList.remove('hidden');
-                timeDisplay.classList.remove('hidden');
-                throughput.classList.remove('hidden');
+            switch(mode) {
+                case 'minimal':
+                    // 少：进度条 + 时间
+                    timeDisplay.classList.remove('hidden');
+                    break;
+                case 'medium':
+                    // 中：已处理+速度（单行） + 进度条 + 时间
+                    mediumStats.classList.remove('hidden');
+                    timeDisplay.classList.remove('hidden');
+                    break;
+                case 'full':
+                    // 完整：统计栏(全部) + 进度条 + 速度+线程数 + 时间
+                    statsBar.classList.remove('hidden');
+                    timeDisplay.classList.remove('hidden');
+                    break;
             }
         });
         
