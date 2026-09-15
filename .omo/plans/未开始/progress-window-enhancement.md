@@ -373,160 +373,149 @@ Wave 2 (UI 层 — 5 任务):
 
 ### Wave 2: UI 层（5 任务）
 
-- [ ] 6. **ProgressWindow XAML 布局改动 + 模式切换**
+- [ ] 6. **ProgressWindow XAML 布局改动 + 双模式切换**
 
   **What to do**:
-  修改 `ProgressWindow.xaml`，调整 Grid 行布局，新增控件和模式切换功能：
+  修改 `ProgressWindow.xaml`，采用上下两区域布局，支持独立模式切换：
 
-  **Grid 行调整**（当前→改动后）：
+  **布局结构**：
   ```
-  Row 0: BatchFileList
-  Row 1: PasswordSection
-  Row 2: ModeSwitcher (NEW - ComboBox 切换简约/详细/列表)
-  Row 3: DirPathText (NEW)
-  Row 4: FileNameText (Moved from Row 2)
-  Row 5: FileProgressBar + FilePercentText
-  Row 6: FileProgressCountText (NEW)
-  Row 7: TotalProgressBar + PercentText
-  Row 8: StatsBar (NEW)
-  Row 9: TimeDisplay (NEW - 已用时间 + 预计剩余)
-  Row 10: FileCountText
-  Row 11: ErrorSummaryBox
-  Row 12: ThreadProgressList (NEW - 详细模式显示)
-  Row 13: FileListPanel (NEW - 列表模式显示)
-  Row 14: 弹性填充 (Auto/*)
-  Row 15: 按钮行
+  ┌─────────────────────────────────────┐
+  │ 标题栏                [少|中|完整]   │ ← 下方密度切换
+  ├─────────────────────────────────────┤
+  │ 【上方 - 文件信息区】                │
+  │  • 批处理列表（固定显示）            │
+  │  • 显示: [简约]|详细|列表            │ ← 上方内容切换
+  │  • 模式切换内容                     │
+  ├─────────────────────────────────────┤
+  │ 【下方 - 整体信息区】（深色背景）     │
+  │  • 统计栏（完整模式）               │
+  │  • 总体进度条                       │
+  │  • 时间显示（中等/完整模式）         │
+  │  • 吞吐速度（完整模式）             │
+  └─────────────────────────────────────┘
   ```
 
-  **新增控件**：
+  **Grid 行调整**：
+  ```
+  Row 0: TitleBar + BottomModeSwitcher (标题栏 + 密度切换)
+  Row 1: FileInfoSection (上方区域)
+    ├── BatchFileList (固定显示)
+    ├── TopModeSwitcher (内联切换: 简约/详细/列表)
+    ├── TopSimpleContent (简约模式: 当前文件+进度条)
+    ├── TopDetailedContent (详细模式: 线程进度列表)
+    └── TopListContent (列表模式: 文件列表+状态标记)
+  Row 2: OverallInfoSection (下方区域)
+    ├── StatsBar (完整模式)
+    ├── TotalProgressBar
+    ├── TimeDisplay (中等/完整模式)
+    └── ThroughputDisplay (完整模式)
+  Row 3: ErrorSummaryBox
+  Row 4: 弹性填充
+  Row 5: 按钮行
+  ```
 
-  Row 2（模式切换器）：
+  **上方区域 - 批处理列表（固定显示）**：
   ```xml
-  <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,4,0,8">
-      <TextBlock Text="显示模式:" VerticalAlignment="Center" Margin="0,0,8,0"
-                 Foreground="{StaticResource Theme_TextSecondary}" FontSize="12"/>
-      <ComboBox x:Name="ModeComboBox" Width="120" SelectedIndex="0"
-                SelectionChanged="OnModeChanged">
-          <ComboBoxItem Content="简约"/>
-          <ComboBoxItem Content="详细"/>
-          <ComboBoxItem Content="列表"/>
-      </ComboBox>
+  <!-- 批处理列表 - 始终可见 -->
+  <StackPanel Grid.Row="1" Margin="0,0,0,8">
+      <TextBlock Text="压缩包列表" FontSize="11" Foreground="{StaticResource Theme_TextSecondary}"
+                 Margin="0,0,0,4"/>
+      <ListBox x:Name="BatchFileList" MaxHeight="120"
+               ItemsSource="{Binding BatchItems}">
+          <ListBox.ItemTemplate>
+              <DataTemplate>
+                  <StackPanel Orientation="Horizontal">
+                      <TextBlock Text="{Binding StatusIcon}" Width="20"/>
+                      <TextBlock Text="{Binding Name}" Width="200" TextTrimming="CharacterEllipsis"/>
+                      <TextBlock Text="{Binding ProgressText}" Width="60" HorizontalAlignment="Right"/>
+                  </StackPanel>
+              </DataTemplate>
+          </ListBox.ItemTemplate>
+      </ListBox>
   </StackPanel>
   ```
 
-  Row 3（目录路径）：
+  **上方区域 - 内联模式切换器**：
   ```xml
-  <TextBlock x:Name="DirPathText" Grid.Row="3"
-             Text="" FontSize="12"
-             Foreground="{StaticResource Theme_TextSecondary}"
-             TextTrimming="PathEllipsis"/>
-  ```
-
-  Row 4（文件名——原 FileNameText 移过来）：
-  ```xml
-  <TextBlock x:Name="FileNameText" Grid.Row="4"
-             Text="{l:L Progress_Processing}"
-             TextTrimming="CharacterEllipsis"
-             Foreground="{StaticResource Theme_TextPrimary}"/>
-  ```
-
-  Row 6（文件级计数，放在文件进度条下方）：
-  ```xml
-  <TextBlock x:Name="FileProgressCountText" Grid.Row="6"
-             Text="" FontSize="12"
-             Foreground="{StaticResource Theme_TextSecondary}"
-             Margin="0,0,0,4"/>
-  ```
-
-  Row 8（统计栏，放在总进度条下方）：
-  ```xml
-  <Border x:Name="StatsBar" Grid.Row="8"
-          Background="{StaticResource Theme_SurfaceBg}"
-          CornerRadius="4" Padding="8,4" Margin="0,4,0,4"
-          Visibility="Visible">
-      <TextBlock x:Name="StatsBarText" Text=""
-                 FontSize="12"
-                 Foreground="{StaticResource Theme_TextPrimary}"/>
-  </Border>
-  ```
-
-  Row 9（时间显示）：
-  ```xml
-  <StackPanel Grid.Row="9" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,4,0,4">
-      <TextBlock x:Name="ElapsedTimeText" Text="已用 00:00:00"
-                 FontSize="11" Foreground="{StaticResource Theme_TextSecondary}" Margin="0,0,16,0"/>
-      <TextBlock x:Name="EstimatedTimeText" Text="预计剩余 00:00:00"
-                 FontSize="11" Foreground="{StaticResource Theme_TextSecondary}"/>
+  <!-- 内联模式切换 - 紧凑按钮组 -->
+  <StackPanel Orientation="Horizontal" Margin="0,4,0,8">
+      <TextBlock Text="显示:" VerticalAlignment="Center" FontSize="11"
+                 Foreground="{StaticResource Theme_TextSecondary}" Margin="0,0,6,0"/>
+      <Button Content="简约" Tag="Simple" Click="OnTopModeChanged"
+              Classes="ModeButton" />
+      <Button Content="详细" Tag="Detailed" Click="OnTopModeChanged"
+              Classes="ModeButton"/>
+      <Button Content="列表" Tag="List" Click="OnTopModeChanged"
+              Classes="ModeButton"/>
   </StackPanel>
   ```
 
-  Row 12（线程进度列表——详细模式）：
+  **上方区域 - 列表模式（虚拟化 + 状态标记）**：
   ```xml
-  <ItemsControl x:Name="ThreadProgressList" Grid.Row="12"
-                Visibility="Collapsed" Margin="0,4,0,4">
-      <ItemsControl.ItemTemplate>
+  <ListBox x:Name="FileListPanel" Grid.Row="1"
+           Visibility="Collapsed" MaxHeight="150"
+           ItemsSource="{Binding FileListItems}">
+      <!-- 虚拟化支持 -->
+      <ListBox.ItemsPanel>
+          <ItemsPanelTemplate>
+              <VirtualizingStackPanel />
+          </ItemsPanelTemplate>
+      </ListBox.ItemsPanel>
+      <ListBox.ItemTemplate>
           <DataTemplate>
               <StackPanel Orientation="Horizontal" Margin="0,2">
-                  <TextBlock Text="{Binding ThreadId}" Width="60" FontSize="11"
-                             Foreground="{StaticResource Theme_TextSecondary}"/>
+                  <!-- 状态图标 -->
+                  <TextBlock Text="{Binding StatusIcon}" Width="20" FontSize="12"
+                             Foreground="{Binding StatusBrush}"/>
+                  <!-- 文件名 -->
                   <TextBlock Text="{Binding FileName}" Width="200" FontSize="12"
                              TextTrimming="CharacterEllipsis"
                              Foreground="{StaticResource Theme_TextPrimary}"/>
-                  <ProgressBar Value="{Binding Progress}" Width="100" Height="8"
-                               Minimum="0" Maximum="100"/>
-                  <TextBlock Text="{Binding PercentText}" Width="40" FontSize="11"
-                             Foreground="{StaticResource Theme_AccentBrush}"/>
-              </StackPanel>
-          </DataTemplate>
-      </ItemsControl.ItemTemplate>
-  </ItemsControl>
-  ```
-
-  Row 13（文件列表——列表模式）：
-  ```xml
-  <ListBox x:Name="FileListPanel" Grid.Row="13"
-           Visibility="Collapsed" MaxHeight="200"
-           BorderBrush="{StaticResource Theme_BorderBrush}"
-           BorderThickness="1">
-      <ListBox.ItemTemplate>
-          <DataTemplate>
-              <StackPanel Orientation="Horizontal" Margin="4,4">
-                  <TextBlock Text="{Binding StatusIcon}" Width="20" FontSize="12"
-                             Foreground="{Binding StatusBrush}"/>
-                  <TextBlock Text="{Binding FileName}" Width="250" FontSize="12"
-                             TextTrimming="CharacterEllipsis"
-                             Foreground="{StaticResource Theme_TextPrimary}"/>
-                  <TextBlock Text="{Binding StatusText}" FontSize="11"
+                  <!-- 文件大小 -->
+                  <TextBlock Text="{Binding SizeText}" Width="60" FontSize="11"
+                             HorizontalAlignment="Right"
                              Foreground="{StaticResource Theme_TextSecondary}"/>
+                  <!-- 状态文本 -->
+                  <TextBlock Text="{Binding StatusText}" Width="50" FontSize="11"
+                             HorizontalAlignment="Right"
+                             Foreground="{Binding StatusBrush}"/>
               </StackPanel>
           </DataTemplate>
       </ListBox.ItemTemplate>
   </ListBox>
   ```
 
-  **BatchFileList DataTemplate 扩展**（在现有 3 列基础上，第 2 列增加摘要文字）：
-  列 2 的 TextBlock 外面包一个 StackPanel：
+  **下方区域 - 密度模式切换器（标题栏）**：
   ```xml
-  <!-- 第 2 列: 文件名 + 进度条底色 + 摘要 -->
-  <StackPanel Grid.Column="1" VerticalAlignment="Center">
-      <TextBlock Text="{Binding Name}"
-                 TextTrimming="CharacterEllipsis"
-                 Foreground="{StaticResource Theme_TextPrimary}"
-                 Padding="4,2,4,0">
-          <TextBlock.Background> ...现有 MultiBinding... </TextBlock.Background>
-      </TextBlock>
-      <TextBlock Text="{Binding SummaryText}"
-                 FontSize="11"
-                 Foreground="{StaticResource Theme_TextSecondary}"
-                 Padding="4,0,4,2"
-                 Visibility="{Binding SummaryText, Converter={StaticResource StringNotEmptyToVisibilityConverter}}"/>
+  <StackPanel Grid.Row="0" Orientation="Horizontal" HorizontalAlignment="Right">
+      <TextBlock Text="少" VerticalAlignment="Center" FontSize="11"
+                 Foreground="{StaticResource Theme_TextSecondary}" Margin="0,0,4,0"/>
+      <ToggleButton x:Name="DensityToggle" IsChecked="False"
+                    Click="OnDensityChanged"/>
+      <TextBlock Text="完整" VerticalAlignment="Center" FontSize="11"
+                 Foreground="{StaticResource Theme_TextSecondary}" Margin="4,0,0,0"/>
   </StackPanel>
   ```
 
-  **模式切换逻辑**：
-  - 简约模式：隐藏 ThreadProgressList + FileListPanel，显示单个进度条
-  - 详细模式：显示 ThreadProgressList，隐藏 FileListPanel
-  - 列表模式：显示 FileListPanel，隐藏 ThreadProgressList
+  **文件列表项状态样式**：
+  ```xml
+  <Style Selector="ListBoxItem">
+      <Setter Property="MinHeight" Value="{DynamicResource ControlHeightSm}"/>
+  </Style>
+  
+  <!-- 状态颜色 -->
+  <Style Selector="TextBlock.StatusCompleted">
+      <Setter Property="Foreground" Value="#6bd46b"/>
+  </Style>
+  <Style Selector="TextBlock.StatusError">
+      <Setter Property="Foreground" Value="#ff6b6b"/>
+  </Style>
+  <Style Selector="TextBlock.StatusSkipped">
+      <Setter Property="Foreground" Value="#888"/>
+      <Setter Property="Opacity" Value="0.6"/>
+  </Style>
+  ```
 
   **Must NOT do**:
   - 不要修改现有控件的除 `Grid.Row` 外的属性
@@ -534,7 +523,7 @@ Wave 2 (UI 层 — 5 任务):
 
   **Recommended Agent Profile**:
   - **Category**: `visual-engineering`
-    - WPF XAML 布局调整 + 模式切换
+    - Avalonia XAML 布局调整 + 模式切换
   - **Skills**: `[]`
 
   **Parallelization**:
@@ -544,14 +533,15 @@ Wave 2 (UI 层 — 5 任务):
   - **Blocked By**: None
 
   **References**:
-  - `src/MantisZip.UI/Dialogs/ProgressWindow.xaml` — 现有布局
+  - `src/MantisZip.UI.Avalonia/Dialogs/ProgressWindow.axaml` — 现有布局
+  - HTML 原型: `docs/prototypes/progress-window-enhancement.html`
 
   **QA Scenarios**:
   ```
   Scenario: 编译验证
     Tool: Bash
     Steps:
-      1. dotnet build src\MantisZip.UI\MantisZip.UI.csproj
+      1. dotnet build src\MantisZip.UI.Avalonia\MantisZip.UI.Avalonia.csproj
     Expected Result: 编译通过
     Evidence: .omo/evidence/task-6-build.txt
 
@@ -559,10 +549,20 @@ Wave 2 (UI 层 — 5 任务):
     Tool: Manual
     Steps:
       1. 启动应用，触发压缩/解压操作
-      2. 在 ProgressWindow 中切换模式（简约→详细→列表）
-      3. 验证各模式下显示正确的控件
-    Expected Result: 三种模式正确切换，显示对应内容
+      2. 在 ProgressWindow 中切换上方模式（简约→详细→列表）
+      3. 在 ProgressWindow 中切换下方密度（少→中→完整）
+      4. 验证各模式下显示正确的控件
+    Expected Result: 两组模式独立切换，显示对应内容
     Evidence: .omo/evidence/task-6-mode-switch.png
+
+  Scenario: 文件列表性能验证
+    Tool: Manual
+    Steps:
+      1. 选择包含 1000+ 文件的压缩包解压
+      2. 切换到列表模式
+      3. 滚动列表，观察性能
+    Expected Result: 滚动流畅，无卡顿
+    Evidence: .omo/evidence/task-6-list-perf.png
   ```
 
   **Commit**: NO (groups with Wave 2 at the end)
@@ -913,40 +913,58 @@ Wave 2 (UI 层 — 5 任务):
 
   **9c. 模式切换方法**：
   ```csharp
-  private void OnModeChanged(object sender, SelectionChangedEventArgs e)
+  // 上方内容模式切换（简约/详细/列表）
+  private void OnTopModeChanged(object sender, RoutedEventArgs e)
   {
-      if (ModeComboBox == null) return;
-      
-      _currentMode = ModeComboBox.SelectedIndex switch
+      if (sender is Button btn && btn.Tag is string tag)
       {
-          0 => DisplayMode.Simple,
-          1 => DisplayMode.Detailed,
-          2 => DisplayMode.List,
-          _ => DisplayMode.Simple
-      };
-      
-      UpdateModeVisibility();
+          _currentTopMode = tag switch
+          {
+              "Simple" => TopDisplayMode.Simple,
+              "Detailed" => TopDisplayMode.Detailed,
+              "List" => TopDisplayMode.List,
+              _ => TopDisplayMode.Simple
+          };
+          UpdateTopModeVisibility();
+      }
   }
 
-  private void UpdateModeVisibility()
+  private void UpdateTopModeVisibility()
   {
-      // 简约模式：隐藏 ThreadProgressList + FileListPanel
-      ThreadProgressList.Visibility = _currentMode == DisplayMode.Detailed 
-          ? Visibility.Visible 
-          : Visibility.Collapsed;
+      // 隐藏所有模式内容
+      TopSimpleContent.IsVisible = false;
+      TopDetailedContent.IsVisible = false;
+      TopListContent.IsVisible = false;
       
-      FileListPanel.Visibility = _currentMode == DisplayMode.List 
-          ? Visibility.Visible 
-          : Visibility.Collapsed;
-      
-      // 简约模式下的额外控件
-      DirPathText.Visibility = _currentMode != DisplayMode.Simple 
-          ? Visibility.Visible 
-          : Visibility.Collapsed;
-      
-      FileProgressCountText.Visibility = _currentMode != DisplayMode.Simple 
-          ? Visibility.Visible 
-          : Visibility.Collapsed;
+      // 显示当前模式内容
+      switch (_currentTopMode)
+      {
+          case TopDisplayMode.Simple:
+              TopSimpleContent.IsVisible = true;
+              break;
+          case TopDisplayMode.Detailed:
+              TopDetailedContent.IsVisible = true;
+              break;
+          case TopDisplayMode.List:
+              TopListContent.IsVisible = true;
+              break;
+      }
+  }
+
+  // 下方密度模式切换（少/中/完整）
+  private void OnDensityChanged(object sender, RoutedEventArgs e)
+  {
+      _currentDensityMode = DensityToggle.IsChecked == true 
+          ? DensityMode.Full 
+          : DensityMode.Medium;
+      UpdateDensityVisibility();
+  }
+
+  private void UpdateDensityVisibility()
+  {
+      StatsBar.IsVisible = _currentDensityMode == DensityMode.Full;
+      TimeDisplay.IsVisible = _currentDensityMode != DensityMode.Minimal;
+      ThroughputDisplay.IsVisible = _currentDensityMode == DensityMode.Full;
   }
   ```
 
@@ -1190,16 +1208,15 @@ dotnet test tests\MantisZip.Tests\MantisZip.Tests.csproj
 ```
 
 ### Final Checklist
-- [ ] `ProgressWindow` 显示目录路径（第一行）+ 纯文件名（第二行）
-- [ ] `FileProgressCountText` 显示当前包的文件计数（文件 50/200）
-- [ ] `StatsBar` 显示实时统计（✅ 已处理 N  ⏭跳过 N  ❌出错 N）
-- [ ] 批处理模式下，BatchFileList 每项显示摘要文字
-- [ ] 错误摘要（ErrorSummaryBox）在权限不足时仍正常显示
-- [ ] 非批处理模式下统计栏也正常显示
-- [ ] `ConflictActionCallback` 在 `FileConflictHelper.ResolvePath` 中触发
-- [ ] 三个引擎正确累计跳过计数并返回 `ExtractResult.SkippedEntries`
+- [ ] `ProgressWindow` 显示批处理压缩包列表（固定在上方顶部）
+- [ ] 上方区域支持模式切换（简约/详细/列表）
+- [ ] 下方区域支持密度切换（少/中/完整）
+- [ ] 简约模式：显示当前文件 + 文件进度条
+- [ ] 详细模式：显示线程进度列表
+- [ ] 列表模式：显示文件列表 + 状态标记（✓⏳○✗⏭）
+- [ ] 列表模式使用虚拟化，支持大量文件
+- [ ] 完整模式：显示统计栏（已处理/跳过/出错）
+- [ ] 中等/完整模式：显示时间显示（已用+预计剩余）
+- [ ] 完整模式：显示吞吐速度
 - [ ] `ProgressDisplayCalculator` 无任何 WPF/Avalonia 依赖
-- [ ] 模式切换功能正常（简约→详细→列表三档切换）
-- [ ] 时间显示功能正常（已用时间 + 预计剩余时间）
-- [ ] 详细模式下显示线程进度列表
-- [ ] 列表模式下显示文件列表（含状态图标和状态文本）
+- [ ] 所有计算逻辑抽到 Core 层
