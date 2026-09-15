@@ -381,7 +381,7 @@ Wave 2 (UI 层 — 5 任务):
   **布局结构**：
   ```
   ┌─────────────────────────────────────┐
-  │ 标题栏                [少|中|完整]   │ ← 下方密度切换
+  │ 标题栏                              │
   ├─────────────────────────────────────┤
   │ 【上方 - 文件信息区】                │
   │  • 批处理列表（固定显示）            │
@@ -389,16 +389,17 @@ Wave 2 (UI 层 — 5 任务):
   │  • 模式切换内容                     │
   ├─────────────────────────────────────┤
   │ 【下方 - 整体信息区】（深色背景）     │
+  │  【少】|中|完整                      │ ← 下方密度切换
   │  • 统计栏（完整模式）               │
+  │  • 中等模式: 已处理+速度（单行）     │
   │  • 总体进度条                       │
-  │  • 时间显示（中等/完整模式）         │
-  │  • 吞吐速度（完整模式）             │
+  │  • 时间显示                         │
   └─────────────────────────────────────┘
   ```
 
   **Grid 行调整**：
   ```
-  Row 0: TitleBar + BottomModeSwitcher (标题栏 + 密度切换)
+  Row 0: TitleBar (标题栏)
   Row 1: FileInfoSection (上方区域)
     ├── BatchFileList (固定显示)
     ├── TopModeSwitcher (内联切换: 简约/详细/列表)
@@ -406,10 +407,11 @@ Wave 2 (UI 层 — 5 任务):
     ├── TopDetailedContent (详细模式: 线程进度列表)
     └── TopListContent (列表模式: 文件列表+状态标记)
   Row 2: OverallInfoSection (下方区域)
-    ├── StatsBar (完整模式)
+    ├── DensitySwitcher (少/中/完整 三按钮)
+    ├── StatsBar (完整模式: 已处理/跳过/出错/已覆盖 四项)
+    ├── MediumStats (中等模式: 已处理+速度 单行)
     ├── TotalProgressBar
-    ├── TimeDisplay (中等/完整模式)
-    └── ThroughputDisplay (完整模式)
+    └── TimeDisplay (所有模式)
   Row 3: ErrorSummaryBox
   Row 4: 弹性填充
   Row 5: 按钮行
@@ -486,15 +488,73 @@ Wave 2 (UI 层 — 5 任务):
   </ListBox>
   ```
 
-  **下方区域 - 密度模式切换器（标题栏）**：
+  **下方区域 - 密度模式切换器（下方区域顶部）**：
   ```xml
-  <StackPanel Grid.Row="0" Orientation="Horizontal" HorizontalAlignment="Right">
-      <TextBlock Text="少" VerticalAlignment="Center" FontSize="11"
-                 Foreground="{StaticResource Theme_TextSecondary}" Margin="0,0,4,0"/>
-      <ToggleButton x:Name="DensityToggle" IsChecked="False"
-                    Click="OnDensityChanged"/>
-      <TextBlock Text="完整" VerticalAlignment="Center" FontSize="11"
-                 Foreground="{StaticResource Theme_TextSecondary}" Margin="4,0,0,0"/>
+  <!-- 密度切换按钮组 - 在下方区域内部 -->
+  <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Center"
+              Margin="0,0,0,8">
+      <Button Content="少" Tag="Minimal" Click="OnDensityChanged"
+              Classes="ModeButton"/>
+      <Button Content="中" Tag="Medium" Click="OnDensityChanged"
+              Classes="ModeButton"/>
+      <Button Content="完整" Tag="Full" Click="OnDensityChanged"
+              Classes="ModeButton"/>
+  </StackPanel>
+  ```
+
+  **下方区域 - 三种密度模式显示内容**：
+  ```xml
+  <!-- 统计栏（完整模式：四项统计） -->
+  <StackPanel x:Name="StatsBar" Grid.Row="2" Orientation="Horizontal"
+              JustifyContent="SpaceAround" IsVisible="False">
+      <StackPanel Orientation="Vertical" HorizontalAlignment="Center">
+          <TextBlock Text="✅" FontSize="18"/>
+          <TextBlock Text="已处理" FontSize="11" Foreground="..."/>
+          <TextBlock Text="60/100" FontSize="16" FontWeight="SemiBold"/>
+      </StackPanel>
+      <StackPanel Orientation="Vertical" HorizontalAlignment="Center">
+          <TextBlock Text="⏭" FontSize="18"/>
+          <TextBlock Text="跳过" FontSize="11"/>
+          <TextBlock Text="3" FontSize="16" FontWeight="SemiBold"/>
+      </StackPanel>
+      <StackPanel Orientation="Vertical" HorizontalAlignment="Center">
+          <TextBlock Text="❌" FontSize="18"/>
+          <TextBlock Text="出错" FontSize="11"/>
+          <TextBlock Text="1" FontSize="16" FontWeight="SemiBold"/>
+      </StackPanel>
+      <StackPanel Orientation="Vertical" HorizontalAlignment="Center">
+          <TextBlock Text="🔄" FontSize="18"/>
+          <TextBlock Text="已覆盖" FontSize="11"/>
+          <TextBlock Text="5" FontSize="16" FontWeight="SemiBold"/>
+      </StackPanel>
+  </StackPanel>
+
+  <!-- 中等模式：已处理+速度（单行） -->
+  <StackPanel x:Name="MediumStats" Grid.Row="2" Orientation="Horizontal"
+              JustifyContent="SpaceBetween" IsVisible="False"
+              Padding="8,4" Background="...">
+      <TextBlock FontSize="12">
+          <Run Text="已处理:" Foreground="..."/>
+          <Run Text="60/100" FontWeight="SemiBold"/>
+      </TextBlock>
+      <TextBlock FontSize="12">
+          <Run Text="速度:" Foreground="..."/>
+          <Run Text="12.5 MB/s" FontWeight="SemiBold"/>
+      </TextBlock>
+  </StackPanel>
+
+  <!-- 时间显示（所有模式） -->
+  <StackPanel x:Name="TimeDisplay" Grid.Row="2" Orientation="Horizontal"
+              JustifyContent="SpaceBetween" Margin="0,8,0,0"
+              Padding="0,8,0,0" BorderBrush="..." BorderThickness="0,1,0,0">
+      <TextBlock FontSize="13" Foreground="...">
+          <Run Text="已用:"/>
+          <Run Text="00:00:12" FontWeight="SemiBold"/>
+      </TextBlock>
+      <TextBlock FontSize="13" Foreground="...">
+          <Run Text="剩余:"/>
+          <Run Text="00:00:08" FontWeight="SemiBold"/>
+      </TextBlock>
   </StackPanel>
   ```
 
@@ -951,20 +1011,46 @@ Wave 2 (UI 层 — 5 任务):
       }
   }
 
-  // 下方密度模式切换（少/中/完整）
+  // 下方密度模式切换（少/中/完整 三按钮）
   private void OnDensityChanged(object sender, RoutedEventArgs e)
   {
-      _currentDensityMode = DensityToggle.IsChecked == true 
-          ? DensityMode.Full 
-          : DensityMode.Medium;
-      UpdateDensityVisibility();
+      if (sender is Button btn && btn.Tag is string tag)
+      {
+          _currentDensityMode = tag switch
+          {
+              "Minimal" => DensityMode.Minimal,
+              "Medium" => DensityMode.Medium,
+              "Full" => DensityMode.Full,
+              _ => DensityMode.Medium
+          };
+          UpdateDensityVisibility();
+      }
   }
 
   private void UpdateDensityVisibility()
   {
-      StatsBar.IsVisible = _currentDensityMode == DensityMode.Full;
-      TimeDisplay.IsVisible = _currentDensityMode != DensityMode.Minimal;
-      ThroughputDisplay.IsVisible = _currentDensityMode == DensityMode.Full;
+      // 全部隐藏
+      StatsBar.IsVisible = false;
+      MediumStats.IsVisible = false;
+      TimeDisplay.IsVisible = false;
+
+      switch (_currentDensityMode)
+      {
+          case DensityMode.Minimal:
+              // 少：进度条 + 时间
+              TimeDisplay.IsVisible = true;
+              break;
+          case DensityMode.Medium:
+              // 中：已处理+速度（单行） + 进度条 + 时间
+              MediumStats.IsVisible = true;
+              TimeDisplay.IsVisible = true;
+              break;
+          case DensityMode.Full:
+              // 完整：统计栏(四项) + 进度条 + 时间
+              StatsBar.IsVisible = true;
+              TimeDisplay.IsVisible = true;
+              break;
+      }
   }
   ```
 
@@ -1215,8 +1301,8 @@ dotnet test tests\MantisZip.Tests\MantisZip.Tests.csproj
 - [ ] 详细模式：显示线程进度列表
 - [ ] 列表模式：显示文件列表 + 状态标记（✓⏳○✗⏭）
 - [ ] 列表模式使用虚拟化，支持大量文件
-- [ ] 完整模式：显示统计栏（已处理/跳过/出错）
-- [ ] 中等/完整模式：显示时间显示（已用+预计剩余）
-- [ ] 完整模式：显示吞吐速度
+- [ ] 少模式：进度条 + 时间
+- [ ] 中模式：已处理+速度（单行） + 进度条 + 时间
+- [ ] 完整模式：统计栏（已处理/跳过/出错/已覆盖） + 进度条 + 时间
 - [ ] `ProgressDisplayCalculator` 无任何 WPF/Avalonia 依赖
 - [ ] 所有计算逻辑抽到 Core 层
