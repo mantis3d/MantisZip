@@ -16,11 +16,12 @@
         RowDefinitions="Auto,*,Auto,Auto"
         Margin="{DynamicResource SpacingMdThk}">
 
-    <!-- ═══════ Row 0: Address bar + navigation ═══════ -->
+    <!-- ═══════ Row 0: 地址栏 + 导航按钮 ═══════ -->
     <Grid Grid.Row="0"
           ColumnDefinitions="Auto,Auto,Auto,Auto,*,Auto"
           ColumnSpacing="{DynamicResource SpacingXxs}"
           Margin="0,0,0,8">
+      <!-- 后退按钮 -->
       <Button x:Name="BackButton"
               Width="32"
               MinHeight="{DynamicResource ControlHeightSm}"
@@ -34,6 +35,7 @@
                   Height="14"
                   Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
       </Button>
+      <!-- 前进按钮 -->
       <Button Grid.Column="1"
               x:Name="ForwardButton"
               Width="32"
@@ -48,6 +50,7 @@
                   Height="14"
                   Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
       </Button>
+      <!-- 向上一级目录按钮 -->
       <Button Grid.Column="2"
               x:Name="UpButton"
               Width="32"
@@ -62,6 +65,7 @@
                   Height="14"
                   Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
       </Button>
+      <!-- 系统浏览按钮（打开系统文件夹选择器） -->
       <Button Grid.Column="3"
               x:Name="SystemBrowseButton"
               Width="32"
@@ -76,6 +80,7 @@
                   Height="14"
                   Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
       </Button>
+      <!-- 路径输入框（支持自动补全） -->
       <AutoCompleteBox Grid.Column="4"
                        x:Name="PathAutoComplete"
                        MinHeight="{DynamicResource ControlHeightSm}"
@@ -85,6 +90,7 @@
                        Background="{DynamicResource ThemeSurfaceBgBrush}"
                        Foreground="{DynamicResource ThemeTextPrimaryBrush}"
                        BorderBrush="{DynamicResource ThemeBorderBrush}" />
+      <!-- 添加收藏按钮 -->
       <Button Grid.Column="5"
               x:Name="AddFavoriteButton"
               Width="32"
@@ -100,7 +106,7 @@
       </Button>
     </Grid>
 
-    <!-- ═══════ Row 1: QuickPath | file browser | right panel ═══════ -->
+    <!-- ═══════ Row 1: 左侧快速路径 | 中间文件浏览器 | 右侧面板 ═══════ -->
     <Grid x:Name="BrowserGrid"
           Grid.Row="1"
           ColumnSpacing="0">
@@ -111,6 +117,7 @@
         <ColumnDefinition Width="5" />
         <ColumnDefinition Width="Auto" />
       </Grid.ColumnDefinitions>
+      <!-- 左侧：快速路径面板（收藏夹、历史、驱动器等） -->
       <Border BorderBrush="{DynamicResource ThemeBorderBrush}"
               BorderThickness="1"
               CornerRadius="4"
@@ -120,26 +127,28 @@
                                    PathSelected="QuickPath_PathSelected" />
       </Border>
 
+      <!-- 分割器：左侧面板宽度可调 -->
       <GridSplitter Grid.Column="1"
                     Width="5"
                     Background="{DynamicResource ThemeSplitterBgBrush}"
                     ResizeBehavior="PreviousAndNext"
                     ResizeDirection="Auto" />
 
+      <!-- 中间：文件/目录列表区域 -->
       <Border Grid.Column="2"
               BorderBrush="{DynamicResource ThemeBorderBrush}"
               BorderThickness="1"
               CornerRadius="4"
               Background="{DynamicResource ThemeSurfaceBgBrush}">
         <Grid RowDefinitions="Auto,*">
-          <!-- Current path header -->
+          <!-- 当前路径显示 -->
           <TextBlock x:Name="CurrentPathText"
                      Grid.Row="0"
                      Margin="8,6"
                      FontSize="11"
                      Foreground="{DynamicResource ThemeTextSecondaryBrush}"
                      TextTrimming="CharacterEllipsis" />
-          <!-- File/dir list -->
+          <!-- 文件/目录列表 -->
           <ListBox x:Name="FileList"
                    Grid.Row="1"
                    Background="Transparent"
@@ -152,13 +161,15 @@
               <ControlTheme TargetType="ListBoxItem">
                 <Setter Property="MinHeight" Value="{DynamicResource ControlHeightMd}" />
                 <Setter Property="Padding" Value="{DynamicResource SpacingXxsThk}" />
-                <!-- 选中/悬停高亮 -->
+                <!-- 悬停高亮 -->
                 <Style Selector="^:pointerover /template/ ContentPresenter#PART_ContentPresenter">
                   <Setter Property="Background" Value="{DynamicResource ThemeTabHoverBrush}" />
                 </Style>
+                <!-- 选中高亮 -->
                 <Style Selector="^:selected /template/ ContentPresenter#PART_ContentPresenter">
                   <Setter Property="Background" Value="{DynamicResource ThemeListSelectedBrush}" />
                 </Style>
+                <!-- 选中+悬停高亮 -->
                 <Style Selector="^:selected:pointerover /template/ ContentPresenter#PART_ContentPresenter">
                   <Setter Property="Background" Value="{DynamicResource ThemeListSelectedBrush}" />
                 </Style>
@@ -168,15 +179,18 @@
               <DataTemplate>
                 <!-- Background=Transparent：让整行参与命中测试，点击行内任意位置均可选中 -->
                 <Grid ColumnDefinitions="24,20,*,80,110" Background="Transparent">
+                  <!-- 复选框：用于多选，仅当 CanCheck=true 时显示 -->
                   <CheckBox Grid.Column="0"
                             IsChecked="{Binding IsSelected, Mode=TwoWay}"
                             IsVisible="{Binding CanCheck}"
                             VerticalAlignment="Center" />
+                  <!-- 文件/文件夹图标 -->
                   <Image Grid.Column="1"
                          Source="{Binding Icon}"
                          Width="16"
                          Height="16"
                          VerticalAlignment="Center" />
+                  <!-- 名称 + 子文本（类型/大小等） -->
                   <StackPanel Grid.Column="2" Orientation="Vertical" Spacing="0">
                     <TextBlock Text="{Binding DisplayName}"
                                Foreground="{DynamicResource ThemeTextPrimaryBrush}"
@@ -187,6 +201,7 @@
                                TextTrimming="CharacterEllipsis"
                                IsVisible="{Binding ShowSubText}" />
                   </StackPanel>
+                  <!-- 文件大小 -->
                   <TextBlock Grid.Column="3"
                              Text="{Binding SizeText}"
                              FontSize="11"
@@ -194,6 +209,7 @@
                              Margin="0,0,8,0"
                              Foreground="{DynamicResource ThemeTextSecondaryBrush}"
                              VerticalAlignment="Center" />
+                  <!-- 修改时间 -->
                   <TextBlock Grid.Column="4"
                              Text="{Binding ModifiedText}"
                              FontSize="11"
@@ -208,6 +224,7 @@
         </Grid>
       </Border>
 
+      <!-- 分割器：右侧面板宽度可调 -->
       <GridSplitter x:Name="RightSplitter"
                     Grid.Column="3"
                     Width="5"
@@ -215,8 +232,8 @@
                     ResizeBehavior="PreviousAndNext"
                     ResizeDirection="Auto" />
 
-      <!-- ═══════ Column 4: right panel (PickItems 累积 / ExtractFolder 解压预览) ═══════ -->
-      <!-- 宽度：去掉固定 Width，由 MinWidth/MaxWidth 约束 + Stretch 填满列，随 RightSplitter 拖拽实时变化 -->
+      <!-- ═══════ 右侧面板：PickItems 累积选择 / ExtractFolder 解压预览 ═══════ -->
+      <!-- 宽度：由 MinWidth/MaxWidth 约束 + Stretch 填满列，随 RightSplitter 拖拽实时变化 -->
       <Grid x:Name="PickItemsPanel"
             Grid.Row="1"
             Grid.Column="4"
@@ -232,10 +249,12 @@
           <RowDefinition Height="Auto"/>
           <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
+        <!-- 标题：已选择的项目 -->
         <TextBlock Grid.Row="0"
                    x:Name="PickTitleText"
                    FontWeight="SemiBold"
                    Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+        <!-- 操作按钮行：添加选中项、移除选中项 -->
         <StackPanel Grid.Row="1"
                     Orientation="Horizontal"
                     Spacing="{DynamicResource SpacingXs}"
@@ -266,11 +285,13 @@
             </StackPanel>
           </Button>
         </StackPanel>
+        <!-- 统计信息：已累积的项目数量 -->
         <TextBlock Grid.Row="2"
                    x:Name="PickActionCountText"
                    Margin="0,4,0,0"
                    TextWrapping="Wrap"
                    Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+        <!-- 清空累积列表按钮 -->
         <Button Grid.Row="3"
                 x:Name="ClearAccumulatedButton"
                 Margin="0,4,0,0"
@@ -286,10 +307,12 @@
             <TextBlock x:Name="ClearAccumulatedButtonText" VerticalAlignment="Center" />
           </StackPanel>
         </Button>
+        <!-- 空状态提示文本 -->
         <TextBlock Grid.Row="4"
                    x:Name="PickEmptyText"
                    Margin="0,12,0,0"
                    Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+        <!-- 累积项目列表 -->
         <Border Grid.Row="5"
                 Margin="0,8,0,0"
                 BorderBrush="{DynamicResource ThemeBorderBrush}"
@@ -326,6 +349,7 @@
         </Border>
       </Grid>
 
+      <!-- 解压预览面板（ExtractFolder 模式） -->
       <Grid x:Name="ExtractFolderPanel"
             Grid.Row="1"
             Grid.Column="4"
@@ -338,11 +362,13 @@
           <RowDefinition Height="Auto"/>
           <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
+        <!-- 预览标题 -->
         <TextBlock Grid.Row="0"
                    x:Name="ExtractPreviewTitleText"
                    FontWeight="SemiBold"
                    Text="{Binding ExtractPreviewTitle}"
                    Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+        <!-- 分割器：可调整预览树高度 -->
         <GridSplitter x:Name="PreviewSplitter"
                       Grid.Row="1"
                       Height="5"
@@ -350,6 +376,7 @@
                       Background="{DynamicResource ThemeSplitterBgBrush}"
                       ResizeBehavior="PreviousAndNext"
                       ResizeDirection="Auto" />
+        <!-- 结果预览树（紧凑模式） -->
         <Border Grid.Row="2"
                 BorderBrush="{DynamicResource ThemeBorderBrush}"
                 BorderThickness="1"
@@ -365,15 +392,17 @@
       </Grid>
     </Grid>
 
-    <!-- ═══════ Row 2: File name + File type (SaveFile/OpenFile modes) ═══════ -->
+    <!-- ═══════ Row 2: 文件名 + 文件类型（保存/打开模式） ═══════ -->
     <Grid x:Name="FileNameArea"
           Grid.Row="2"
           ColumnDefinitions="60,*,60,110"
           ColumnSpacing="{DynamicResource SpacingXs}"
           Margin="0,12,0,0">
+      <!-- 文件名标签 -->
       <TextBlock Text="{Binding FileNameLabel}"
                  VerticalAlignment="Center"
                  Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+      <!-- 文件名输入框 -->
       <TextBox Grid.Column="1"
                x:Name="FileNameBox"
                MinHeight="{DynamicResource ControlHeightSm}"
@@ -381,10 +410,12 @@
                Background="{DynamicResource ThemeSurfaceBgBrush}"
                Foreground="{DynamicResource ThemeTextPrimaryBrush}"
                BorderBrush="{DynamicResource ThemeBorderBrush}" />
+      <!-- 文件类型标签 -->
       <TextBlock Grid.Column="2"
                  Text="{Binding FileTypeLabel}"
                  VerticalAlignment="Center"
                  Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+      <!-- 文件类型下拉选择器 -->
       <ComboBox Grid.Column="3"
                 x:Name="FileTypeSelector"
                 MinHeight="{DynamicResource ControlHeightSm}"
@@ -394,7 +425,7 @@
                 BorderBrush="{DynamicResource ThemeBorderBrush}" />
     </Grid>
 
-    <!-- ═══════ Row 3: OK/Cancel ═══════ -->
+    <!-- ═══════ Row 3: 确定/取消按钮 ═══════ -->
     <StackPanel Grid.Row="3"
                 Orientation="Horizontal"
                 HorizontalAlignment="Right"

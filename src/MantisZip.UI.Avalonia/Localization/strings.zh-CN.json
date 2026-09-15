@@ -1,4 +1,13 @@
 {
+  "Settings_HtmlSecurity": "HTML 预览安全",
+  "Settings_AllowJavaScript": "允许 JavaScript 执行",
+  "Settings_AllowJavaScript_Desc": "允许预览的 HTML 页面执行脚本代码",
+  "Settings_AllowExternalResources": "允许加载外部资源",
+  "Settings_AllowExternalResources_Desc": "允许从远程服务器加载图片、CSS、字体等资源",
+  "Settings_AllowNavigation": "允许链接导航",
+  "Settings_AllowNavigation_Desc": "允许点击页面中的链接跳转到其他页面",
+  "MsgBox_Copy": "复制错误信息",
+  "MsgBox_Copied": "已复制 ✓",
   "Preview_Result_LoadingMore": "加载中",
   "Filter_PickDateFrom": "从当前条目取日期作为起始日期",
   "Filter_PickDateTo": "从当前条目取日期作为截止日期",
@@ -159,6 +168,7 @@
   "Settings_Preview_PeComingSoon": "PE 文件预览设置将在后续版本中添加。",
   "Settings_Preview_Tab_Executable": "可执行文件",
   "Settings_Preview_Tab_General": "通用",
+  "Settings_Preview_Tab_Html": "HTML",
   "Settings_Preview_Tab_Image": "图片",
   "Settings_Preview_Tab_MetadataPanel": "元数据面板",
   "Settings_Preview_Tab_Torrent": "种子",
@@ -983,6 +993,8 @@
   "Preview_Result_DirInfo": "{0} 项 · {1}",
   "Preview_Result_ConflictCount": "⚠️ {0} 个冲突",
   "Preview_Result_FileExists": "同名文件已存在",
+  "Preview_HtmlFallbackNotification": "安装 WebView Runtime 可获得更好的 HTML 预览效果",
+  "Preview_HtmlSourceToggle": "源码/渲染切换",
 
   "App_MantisZipTitle": "MantisZip",
 

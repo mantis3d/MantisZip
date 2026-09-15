@@ -644,6 +644,48 @@ dotnet test tests\MantisZip.UI.Avalonia.Tests\MantisZip.UI.Avalonia.Tests.csproj
 - 内容数据（字体预览示例文本）与语言本族原生名（如「中文」）
 - `App.DebugLog` 日志与仅作控制流用的异常消息（非用户可见）
 
+### 规则 14：新增 AXAML 控件必须添加中文注释
+
+新增任何 `.axaml` 文件（Controls/、Dialogs/、Views/ 目录下）时，**必须为所有主要控件/区域添加中文注释**，便于用户排查 UI 问题：
+
+#### 注释规范
+- **格式**：`<!-- 注释内容 -->` XML 注释
+- **语言**：中文
+- **位置**：每个主要控件/区域上方
+- **内容**：说明该控件/区域的用途、功能、关键属性含义
+
+#### 注释范围（必须覆盖）
+- 窗口/用户控件的根容器和主布局
+- 每个功能分区（TabControl 的 TabItem、GroupBox、分隔区域等）
+- 数据绑定控件（说明绑定目标和关键属性）
+- 转换器（说明转换逻辑）
+- 覆层/弹窗（说明显示条件和用途）
+- 工具栏按钮（说明功能）
+- 菜单项（说明功能）
+
+#### 注释示例
+```xml
+<!-- 文件名标签：显示当前需要输入密码的压缩包名称 -->
+<TextBlock x:Name="FileNameText" FontWeight="Bold" FontSize="14" />
+
+<!-- 密码输入框 + 显示/隐藏切换按钮 -->
+<Grid ColumnDefinitions="*,Auto">
+  <TextBox x:Name="PasswordBox" PasswordChar="●" />
+  <Button Grid.Column="1" x:Name="PwdRevealBtn" Click="OnRevealToggle" />
+</Grid>
+
+<!-- 扩展保存选项区域：永久保存、自动生成匹配规则、描述、匹配规则 -->
+<StackPanel x:Name="SaveOptionsPanel" Spacing="{DynamicResource SpacingSm}">
+  <!-- 永久保存到密码库复选框 -->
+  <CheckBox x:Name="SavePermanentlyCheck" />
+  <!-- 自动生成匹配规则复选框：根据文件名自动生成 glob/regex 规则 -->
+  <CheckBox x:Name="AutoGenerateRulesCheck" />
+</StackPanel>
+```
+
+#### 验证
+完成注释后，运行 `dotnet build src\MantisZip.UI.Avalonia\MantisZip.UI.Avalonia.csproj` 确保无编译错误。
+
 ## 未来工作
 
 ### 待实施计划

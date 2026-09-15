@@ -14,14 +14,14 @@
   <Grid RowDefinitions="Auto,Auto,Auto,Auto"
         Margin="{DynamicResource SpacingXsThk}">
 
-    <!-- Row 0: Title -->
+    <!-- 标题 -->
     <TextBlock Grid.Row="0"
                Text="{Binding TitleText}"
                FontSize="15"
                FontWeight="Bold"
                Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
 
-    <!-- Row 1: Message -->
+    <!-- 错误消息 -->
     <TextBlock Grid.Row="1"
                Text="{Binding MessageText}"
                FontSize="12"
@@ -29,7 +29,7 @@
                TextWrapping="Wrap"
                Margin="0,12,0,0" />
 
-    <!-- Row 2: Directory list with bullet items -->
+    <!-- 失败的目录列表（带项目符号） -->
     <ItemsControl Grid.Row="2"
                   x:Name="DirectoryList"
                   Foreground="{DynamicResource ThemeTextSecondaryBrush}"
@@ -47,15 +47,17 @@
       </ItemsControl.ItemTemplate>
     </ItemsControl>
 
-    <!-- Row 3: Possible reasons + OK button -->
+    <!-- 可能原因说明 + 确定按钮 -->
     <StackPanel Grid.Row="3"
                 Margin="0,16,0,0">
+      <!-- 可能原因提示文字 -->
       <TextBlock Text="{Binding ReasonsText}"
                  Foreground="{DynamicResource ThemeTextSecondaryBrush}"
                  FontSize="11"
                  TextWrapping="Wrap"
                  Margin="0,0,0,16" />
 
+      <!-- 确定按钮 -->
       <Button Content="{Binding OkText}"
               Width="100"
               Height="{DynamicResource ControlHeightMd}"

@@ -1,4 +1,13 @@
 {
+  "Settings_HtmlSecurity": "HTML Preview Security",
+  "Settings_AllowJavaScript": "Allow JavaScript execution",
+  "Settings_AllowJavaScript_Desc": "Allow scripts to execute in HTML preview",
+  "Settings_AllowExternalResources": "Allow external resources",
+  "Settings_AllowExternalResources_Desc": "Allow loading images, CSS, fonts from remote servers",
+  "Settings_AllowNavigation": "Allow link navigation",
+  "Settings_AllowNavigation_Desc": "Allow clicking links to navigate to other pages",
+  "MsgBox_Copy": "Copy error info",
+  "MsgBox_Copied": "Copied ✓",
   "Preview_Result_LoadingMore": "Loading",
   "Filter_PickDateFrom": "Use the selected entry's date as the start date",
   "Filter_PickDateTo": "Use the selected entry's date as the end date",
@@ -159,6 +168,7 @@
   "Settings_Preview_PeComingSoon": "PE preview settings will be added in a future version.",
   "Settings_Preview_Tab_Executable": "Executable",
   "Settings_Preview_Tab_General": "General",
+  "Settings_Preview_Tab_Html": "HTML",
   "Settings_Preview_Tab_Image": "Image",
   "Settings_Preview_Tab_MetadataPanel": "Metadata Panel",
   "Settings_Preview_Tab_Torrent": "Torrent",
@@ -985,6 +995,8 @@
   "Preview_Result_DirInfo": "{0} items · {1}",
   "Preview_Result_ConflictCount": "⚠️ {0} conflicts",
   "Preview_Result_FileExists": "Same-name file already exists",
+  "Preview_HtmlFallbackNotification": "Install WebView Runtime for better HTML preview",
+  "Preview_HtmlSourceToggle": "Source/Render Toggle",
 
   "App_MantisZipTitle": "MantisZip",
 

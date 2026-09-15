@@ -1,13 +1,13 @@
 <UserControl xmlns="https://github.com/avaloniaui"
-            xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-            xmlns:controls="clr-namespace:MantisZip.UI.Avalonia.Controls"
-            x:Class="MantisZip.UI.Avalonia.Controls.QuickPathPicker"
-            x:Name="RootControl">
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:controls="clr-namespace:MantisZip.UI.Avalonia.Controls"
+             x:Class="MantisZip.UI.Avalonia.Controls.QuickPathPicker"
+             x:Name="RootControl">
   <Panel>
     <Grid RowDefinitions="Auto,Auto"
           RowSpacing="{DynamicResource SpacingXxs}">
 
-      <!-- ═══════ Row 0: Path input (AutoCompleteBox, owns full row) ═══════ -->
+      <!-- Row 0: 路径输入框（AutoCompleteBox，支持历史记录自动补全） -->
       <AutoCompleteBox x:Name="PathInput"
                        Grid.Row="0"
                        MinHeight="{DynamicResource ControlHeightMd}"
@@ -19,11 +19,11 @@
                        Foreground="{DynamicResource ThemeTextPrimaryBrush}"
                        BorderBrush="{DynamicResource ThemeBorderBrush}" />
 
-      <!-- ═══════ Row 1: Quick buttons + browse ═══════ -->
+      <!-- Row 1: 快速操作按钮栏（收藏/历史/窗口/浏览） -->
       <Grid Grid.Row="1"
             ColumnDefinitions="Auto,Auto,Auto,*,Auto"
             ColumnSpacing="{DynamicResource SpacingXxs}">
-        <!-- ⭐ 收藏 -->
+        <!-- ⭐ 收藏按钮：打开收藏路径弹出面板 -->
         <Button x:Name="QuickFavButton"
                 Grid.Column="0"
                 MinHeight="{DynamicResource ControlHeightSm}"
@@ -36,7 +36,7 @@
                     Width="14" Height="14"
                     Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
         </Button>
-        <!-- 🕐 历史 -->
+        <!-- 🕐 历史按钮：打开最近使用路径弹出面板 -->
         <Button x:Name="QuickHistButton"
                 Grid.Column="1"
                 MinHeight="{DynamicResource ControlHeightSm}"
@@ -49,7 +49,7 @@
                     Width="14" Height="14"
                     Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
         </Button>
-        <!-- 🪟 窗口 -->
+        <!-- 🪟 窗口按钮：打开当前打开的资源管理器窗口路径弹出面板 -->
         <Button x:Name="QuickWinButton"
                 Grid.Column="2"
                 MinHeight="{DynamicResource ControlHeightSm}"
@@ -62,7 +62,7 @@
                     Width="14" Height="14"
                     Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
         </Button>
-        <!-- 📁 浏览 -->
+        <!-- 📁 浏览按钮：打开系统文件夹选择对话框 -->
         <Button x:Name="QuickBrowseButton"
                 Grid.Column="4"
                 MinHeight="{DynamicResource ControlHeightSm}"
@@ -78,7 +78,7 @@
       </Grid>
     </Grid>
 
-    <!-- ⭐ Favorites popup -->
+    <!-- ⭐ 收藏弹出面板：包含 QuickPathControl，显示用户收藏的路径 -->
     <Popup x:Name="FavPopup"
            PlacementTarget="{Binding #QuickFavButton}"
            Placement="Bottom"
@@ -94,7 +94,7 @@
       </Border>
     </Popup>
 
-    <!-- 🕐 History popup -->
+    <!-- 🕐 历史弹出面板：包含 QuickPathControl，显示最近访问的路径 -->
     <Popup x:Name="HistPopup"
            PlacementTarget="{Binding #QuickHistButton}"
            Placement="Bottom"
@@ -110,7 +110,7 @@
       </Border>
     </Popup>
 
-    <!-- 🪟 Windows popup -->
+    <!-- 🪟 窗口弹出面板：包含 QuickPathControl，显示当前打开的资源管理器窗口路径 -->
     <Popup x:Name="WinPopup"
            PlacementTarget="{Binding #QuickWinButton}"
            Placement="Bottom"

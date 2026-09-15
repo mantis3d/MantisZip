@@ -12,9 +12,12 @@
         ShowInTaskbar="False"
         Background="{DynamicResource ThemeWindowBgBrush}">
   <Window.Resources>
-<converters:BatchStatusToIconConverter x:Key="BatchStatusIconConverter"/>
-<converters:ProgressStatusToBackgroundConverter x:Key="ProgressStatusBackgroundConverter"/>
-<converters:BoolToIconConverter x:Key="BoolToIconConverter"/>
+    <!-- 批处理状态转图标转换器 -->
+    <converters:BatchStatusToIconConverter x:Key="BatchStatusIconConverter"/>
+    <!-- 进度状态转背景色转换器 -->
+    <converters:ProgressStatusToBackgroundConverter x:Key="ProgressStatusBackgroundConverter"/>
+    <!-- 布尔值转图标转换器 -->
+    <converters:BoolToIconConverter x:Key="BoolToIconConverter"/>
   </Window.Resources>
   <Grid Margin="{DynamicResource SpacingMdThk}"
         RowSpacing="6">
@@ -57,12 +60,12 @@
               <ColumnDefinition Width="50"/>
             </Grid.ColumnDefinitions>
 
-            <!-- 第 1 列: 状态图标 -->
+            <!-- 第 1 列: 状态图标（通过转换器显示对应图标） -->
             <TextBlock Grid.Column="0"
                        Text="{Binding Status, Converter={StaticResource BatchStatusIconConverter}}"
                        FontSize="14" VerticalAlignment="Center" HorizontalAlignment="Center"/>
 
-            <!-- 第 2 列: 文件名 + 进度条背景 -->
+            <!-- 第 2 列: 文件名 + 进度条背景（背景色随进度/状态变化） -->
             <TextBlock Grid.Column="1"
                        Text="{Binding Name}"
                        TextTrimming="CharacterEllipsis"
@@ -104,7 +107,7 @@
           <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <!-- 第 1 行：图标 + 密码文本 + 按钮 -->
+        <!-- 第 1 行：钥匙图标 + 密码文本 + 显示切换按钮 + 复制按钮 -->
         <Grid Grid.Row="0">
           <Grid.ColumnDefinitions>
             <ColumnDefinition Width="Auto"/>
@@ -123,6 +126,7 @@
                      VerticalAlignment="Center"
                      TextTrimming="CharacterEllipsis"/>
 
+          <!-- 密码显示/隐藏切换按钮 -->
           <Button x:Name="PwdRevealBtn" Grid.Column="2"
                   Width="24" Height="22" Margin="4,0,0,0"
                   Padding="0"
@@ -138,6 +142,7 @@
                       Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
           </Button>
 
+          <!-- 复制密码按钮 -->
           <Button x:Name="PwdCopyBtn" Grid.Column="3"
                   Width="24" Height="22" Margin="4,0,0,0"
                   Padding="0"
@@ -153,13 +158,13 @@
           </Button>
         </Grid>
 
-        <!-- 第 2 行：规则描述 -->
+        <!-- 第 2 行：匹配规则描述 -->
         <TextBlock Grid.Row="1"
                    Text="{Binding PasswordRuleText}"
                    FontSize="12" Foreground="{DynamicResource ThemeTextSecondaryBrush}"
                    Margin="22,2,0,0"/>
 
-        <!-- 第 3 行：状态（验证通过 / 正在尝试） -->
+        <!-- 第 3 行：密码验证状态（验证通过 / 正在尝试） -->
         <TextBlock Grid.Row="2"
                    Text="{Binding PasswordStatusText}"
                    FontSize="12" Foreground="{DynamicResource ThemeTextSecondaryBrush}"
@@ -167,13 +172,13 @@
       </Grid>
     </Border>
 
-    <!-- Row 2: 当前文件名 -->
+    <!-- Row 2: 当前处理的文件名 -->
     <TextBlock Grid.Row="2"
                Text="{Binding FileName}"
                TextTrimming="CharacterEllipsis"
                Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
 
-    <!-- Row 3: 文件进度条 -->
+    <!-- Row 3: 当前文件进度条 -->
     <Grid Grid.Row="3" Margin="0,6,0,2">
       <Grid.ColumnDefinitions>
         <ColumnDefinition Width="*"/>
@@ -193,7 +198,7 @@
                  FontSize="12"/>
     </Grid>
 
-    <!-- Row 4: 总体进度条 -->
+    <!-- Row 4: 总体进度条（支持不定进度模式） -->
     <Grid Grid.Row="4" Margin="0,4,0,2">
       <Grid.ColumnDefinitions>
         <ColumnDefinition Width="*"/>
@@ -213,14 +218,14 @@
                  Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
     </Grid>
 
-    <!-- Row 5: 文件计数 -->
+    <!-- Row 5: 文件计数（已处理/总数） -->
     <TextBlock x:Name="FileCountText" Grid.Row="5"
                Text="{Binding FileCountText}"
                FontSize="12"
                Foreground="{DynamicResource ThemeTextSecondaryBrush}"
                Margin="0,0,0,4"/>
 
-    <!-- Row 6: 状态消息（暂停/恢复/完成/失败状态文字） -->
+    <!-- Row 6: 状态消息（暂停/恢复/完成/失败等状态文字） -->
     <TextBlock Grid.Row="6"
                Text="{Binding StatusMessage}"
                FontSize="12"
@@ -229,7 +234,7 @@
                Margin="0,0,0,4"
                TextTrimming="CharacterEllipsis"/>
 
-    <!-- Row 7: 错误摘要 -->
+    <!-- Row 7: 错误摘要（仅有错误时可见） -->
     <TextBox x:Name="ErrorSummaryBox" Grid.Row="7"
              Text="{Binding ErrorSummaryText}"
              IsReadOnly="True"
@@ -244,7 +249,7 @@
              Focusable="False"
              Cursor="Arrow"/>
 
-    <!-- Row 9: 按钮行 -->
+    <!-- Row 9: 底部按钮行：保持打开 / 暂停 / 取消 -->
     <Grid Grid.Row="9" Margin="0,4,0,2">
       <Grid.ColumnDefinitions>
         <ColumnDefinition Width="Auto"/>
@@ -252,6 +257,7 @@
         <ColumnDefinition Width="Auto"/>
         <ColumnDefinition Width="Auto"/>
       </Grid.ColumnDefinitions>
+      <!-- 保持打开切换按钮（完成后不自动关闭） -->
       <ToggleButton x:Name="KeepOpenToggle" Grid.Column="0"
                Height="34" Width="44"
                IsChecked="{Binding KeepOpenOnComplete}"
@@ -262,6 +268,7 @@
                BorderThickness="1">
         <PathIcon Data="{StaticResource IconPin}" Width="16" Height="16" />
       </ToggleButton>
+      <!-- 暂停/继续按钮 -->
       <Button x:Name="PauseButton" Grid.Column="2"
               Width="80" Height="34" Margin="0,0,8,0"
               Click="PauseButton_Click"
@@ -273,6 +280,7 @@
           <TextBlock x:Name="PauseButtonText" Text="{Binding LocalizedStrings[Progress_Button_Pause]}" />
         </StackPanel>
       </Button>
+      <!-- 取消按钮 -->
       <Button x:Name="CancelButton" Grid.Column="3"
               Width="80" Height="34"
               Command="{Binding CancelCommand}"

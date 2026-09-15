@@ -114,30 +114,37 @@ public static class CompressionCoefficients
         { (ArchiveFormat.Zip, "text"),      0.15 },
         { (ArchiveFormat.SevenZip, "text"), 0.08 },
         { (ArchiveFormat.Tar, "text"),      1.00 }, // Tar 不压缩
+        { (ArchiveFormat.GZip, "text"),     0.15 }, // GZip 压缩率 ≈ ZIP
 
         // 代码/脚本
         { (ArchiveFormat.Zip, "code"),      0.25 },
         { (ArchiveFormat.SevenZip, "code"), 0.12 },
+        { (ArchiveFormat.GZip, "code"),     0.25 },
 
         // 图片（无损压缩格式 = PNG/BMP）
         { (ArchiveFormat.Zip, "image_lossless"),  0.85 },
         { (ArchiveFormat.SevenZip, "image_lossless"), 0.80 },
+        { (ArchiveFormat.GZip, "image_lossless"), 0.85 },
 
         // 图片（有损 = JPG/WebP — 基本压不动）
         { (ArchiveFormat.Zip, "image_lossy"),     0.99 },
         { (ArchiveFormat.SevenZip, "image_lossy"), 0.98 },
+        { (ArchiveFormat.GZip, "image_lossy"),    0.99 },
 
         // 已压缩多媒体（MP4/MP3 — 压不动）
         { (ArchiveFormat.Zip, "media"),     1.00 },
         { (ArchiveFormat.SevenZip, "media"), 0.99 },
+        { (ArchiveFormat.GZip, "media"),    1.00 },
 
         // 二进制/可执行
         { (ArchiveFormat.Zip, "binary"),    0.60 },
         { (ArchiveFormat.SevenZip, "binary"), 0.45 },
+        { (ArchiveFormat.GZip, "binary"),   0.60 },
 
         // 压缩包（已压缩数据 — 压不动）
         { (ArchiveFormat.Zip, "archive"),   1.00 },
         { (ArchiveFormat.SevenZip, "archive"), 0.99 },
+        { (ArchiveFormat.GZip, "archive"),  1.00 },
     };
 
     /// <summary>根据文件扩展名判定类型。</summary>
@@ -176,13 +183,13 @@ public static class CompressionCoefficients
 | `Core/Models/FormatDefinition.cs` | 🆕 新增 — `FormatDefinition` 模型 | 15min |
 | `Core/Models/AdaptiveOverrideRule.cs` | 🆕 新增 — `AdaptiveOverrideRule` + `AdaptiveLevel` 枚举 | 30min |
 | `Core/Services/FormatCatalog.cs` | 🆕 新增 — 格式目录注册/查询/匹配 | 1h |
-| `UI/AppSettings.cs` | 新增 `CustomFormats` + `AdaptiveOverrides` 属性 + 预设默认规则初始化 | 30min |
-| `UI/SettingsWindow.xaml` + `.cs` | 格式目录列表 + 自定义格式编辑器 + 规则列表 + 规则编辑器 | 3h |
-| `UI/CompressSettingsWindow.xaml` | 添加预估面板 UI | 30min |
-| `UI/CompressSettingsWindow.xaml.cs` | 集成预估逻辑 + 刷新按钮 | 1h |
-| `UI/ProgressWindow.xaml` | 添加时间信息行 UI | 30min |
-| `UI/ProgressWindow.xaml.cs` | 集成 RuntimeEstimator、时间格式化、防抖 | 1.5h |
-| `UI/AppPartials/App.Compress.cs` 或 `Core/Services/CompressService.cs` | 传递预估值到 ProgressWindow | 30min |
+| `UI.Avalonia/Models/AppSettings.cs` | 新增 `CustomFormats` + `AdaptiveOverrides` 属性 + 预设默认规则初始化 | 30min |
+| `UI.Avalonia/Views/SettingsWindow.axaml` + `.cs` | 格式目录列表 + 自定义格式编辑器 + 规则列表 + 规则编辑器 | 3h |
+| `UI.Avalonia/Dialogs/CompressSettingsWindow.axaml` | 添加预估面板 UI | 30min |
+| `UI.Avalonia/Dialogs/CompressSettingsWindow.axaml.cs` | 集成预估逻辑 + 刷新按钮 | 1h |
+| `UI.Avalonia/Dialogs/ProgressWindow.axaml` | 添加时间信息行 UI | 30min |
+| `UI.Avalonia/Dialogs/ProgressWindow.axaml.cs` | 集成 RuntimeEstimator、时间格式化、防抖 | 1.5h |
+| `Core/Services/CompressService.cs` | 传递预估值到 ProgressWindow + 自适应级别决策 | 30min |
 | 测试项目 | 全部 3 个测试文件 | 2h |
 
 **运行时依赖变更：** 无（JSON 文件写入，不需要外部数据库）
@@ -543,23 +550,11 @@ var initialSpeed = estimate.AverageTotalBytes / estimate.AverageDuration.TotalSe
 var runtimeEstimator = new RuntimeEstimator(totalBytes: estimate.TotalSize, initialSpeed);
 ```
 
-`RuntimeEstimator` 实例由 `CompressService`（或 `App.Compress.cs`/`App.Extract.cs`）创建，传递给 `ProgressWindow`。
+`RuntimeEstimator` 实例由 `CompressService` 创建，传递给 `ProgressWindow`。
 
-### ArchiveProgress 扩展
+### ArchiveProgress（无需修改）
 
-`ArchiveProgress` 增加一个可选字段，用于引擎报告更精确的进度预估值（如 7z 引擎知道整个压缩包的总输入大小）：
-
-```csharp
-public class ArchiveProgress
-{
-    // ... 现有字段 ...
-
-    /// <summary>压缩引擎预估的剩余时间（可选），由 RuntimeEstimator 在 UI 层计算后填入显示。</summary>
-    // 注：此字段不由引擎设置，由 ProgressWindow 的 RuntimeEstimator 在 UI 层计算
-}
-```
-
-实际上 `RuntimeEstimator` 在 UI 层运行即可，无需引擎参与。`ArchiveProgress` 已有 `TotalBytes`/`ProcessedBytes`，`RuntimeEstimator` 只需这两个值 + `_startTime` + `_initialSpeed`。
+`ArchiveProgress` 已有 `TotalBytes`/`ProcessedBytes`/`TotalFiles`/`ProcessedFiles`/`PercentComplete`/`FilePercentComplete`，足够 `RuntimeEstimator` 在 UI 层计算 ETA，**无需修改 `ArchiveProgress`**。
 
 ### 批处理模式时间预估
 
@@ -648,7 +643,7 @@ JPG/PNG/MP4/ZIP/7z 等已压缩格式，使用高压缩级别几乎不减小体�
 
 **魔数检测实现**：>64KB 大文件的魔数识别复用 `preview-magic-detection.md` 中的 `FileFormatDetector`。
 
-> ⚠️ 注意：这里无需使用 `ArchiveEntryExtractor.ExtractHeadAsync`——压缩预估操作的是**磁盘上的源文件**（不是压缩包内的条目），直接 `File.Read` 前 4KB 即可。采样试压阶段才需要读更多字节（~1MB）。
+> ⚠️ 注意：这里无需使用 `ArchiveEntryExtractor.ExtractHeadAsync`——压缩预估操作的是**磁盘上的源文件**（不是压缩包内的条目），直接 `File.Read` 前 1KB 即可（`FileFormatDetector.Detect()` 签名为 `Detect(byte[] head, int length, byte[]? tail = null)`，至少需要 64 字节，推荐 256-1024 字节覆盖多数魔数）。采样试压阶段才需要读更多字节（~1MB）。
 
 **检测流程**：
 
@@ -679,7 +674,7 @@ Jpeg, WebP, DjVu                                              → image_lossy (�
 Png, Gif, Bmp, Ico, Tga, Hdr, Exr, Svg                       → image_lossless (可压, 压缩率 ~0.85)
 Mp4, Mkv, WebM, Wmv, Mov, Avi, Flv                           → media (压不动, 压缩率 ~1.00)
 Wav, Flac, Mp3, Ogg                                           → media (已压缩, 压缩率 ~0.99)
-Zip, SevenZip, Rar, Tar, Gz, Bz2, Xz, Zstd                   → archive (已压缩, 压缩率 ~1.00)
+Zip, SevenZip, Rar, Tar, Gz, Bz2, Xz, Zstd, Encrypted             → archive (已压缩, 压缩率 ~1.00)
 Pdf, Docx, Xlsx, Pptx, Epub, Mobi, Azw3                       → binary (可压, 压缩率 ~0.60)
 Odt, Ods, Odp                                                 → binary (ZIP-based OOXML 等价, 压缩率 ~0.60)
 Xps                                                           → binary (ZIP-based, 压缩率 ~0.60)
@@ -953,14 +948,315 @@ new AdaptiveOverrideRule
 | `ZipEngine` / `TarGzEngine` | 压缩时按文件查规则表决定最终级别 |
 | `SevenZipEngine` | 同上；按级别分组打包 |
 | `AppSettings` | 新增 `CustomFormats` + `AdaptiveOverrides` 属性 |
-| `SettingsWindow.xaml` + `.cs` | 格式目录列表 + 自定义格式编辑器 + 规则列表 + 规则编辑器 |
+| `SettingsWindow.axaml` + `.cs` | 格式目录列表 + 自定义格式编辑器 + 规则列表 + 规则编辑器 |
 
-### 引擎改动
+### 引擎改动与 per-file 级别可行性分析
 
-- `ArchiveOptions` 增加 `AdaptiveCompressionLevel`（三态枚举）
-- `ZipEngine`：`PutNextEntry` 前按文件切换 `SetLevel`
-- `TarGzEngine`：同上，`SetLevel` 前切换
-- `SevenZipEngine`：按级别分组文件，多次 `7z u` 增量更新
+> ⚠️ **重要修正**（2026-09-14 代码审查）：原计划假设引擎支持"按文件切换压缩级别"，但经实际代码验证，**当前三个引擎均不支持 per-file level**。以下为详细分析。
+
+#### 格式 vs 引擎：per-file 级别支持矩阵
+
+| 格式 | 格式本身支持 per-file? | 当前引擎支持? | 换引擎可解决? |
+|------|----------------------|-------------|-------------|
+| ZIP | ✅ 是（每个 entry 有独立 local file header） | ❌ SharpCompress `ZipWriterOptions.CompressionLevel` 全局一次 | ⚠️ 需升级 SharpCompress 到 0.49.0+（见下方） |
+| 7z | ✅ 是（每个文件可有独立压缩方法/级别） | ❌ `SharpSevenZipCompressor` 原子调用 | ⚠️ 需直接调 7z.dll COM 低层接口，复杂度高 |
+| Tar/GZip | ❌ 否（GZip 压缩整个 tar 流，非 per-file） | ❌ | ❌ 格式设计限制，任何引擎都无法做到 |
+
+#### .NET ZIP 库生态分析（per-file level 可用库）
+
+| 库 | 最新版本 | 最后更新 | 下载量 | 维护状态 | per-entry 1-9 级别 |
+|---|---|---|---|---|---|
+| **SharpCompress** | 0.50.3 | 2026-08（活跃维护） | 高 | ✅ 活跃维护，向 1.0 迈进 | ✅ **0.49.0+ 支持**（见下方） |
+| **SharpZipLib** | 1.4.2 | 2023-01（~3.5 年前） | 高 | ⛔ 基本停更，health 34/100，唯一维护者已失联，OpenSSF 报告 unmaintained | ✅ |
+| **DotNetZip** | 1.16.0 | 2021-11（~4.5 年前） | 2800 万 | ⛔ 官方 deprecated，高危漏洞 CVE-2024-48510（CVSS 9.8） | ✅ |
+| **System.IO.Compression** | 内置 | 持续维护 | — | ✅ 微软维护 | ⚠️ 仅 Optimal/Fastest/NoCompression/SmallestSize，**无 1-9 数值** |
+
+#### 🔑 关键发现：SharpCompress 0.49.0+ 已支持 per-entry 压缩级别
+
+> **2026-09-14 新发现**：SharpCompress 在 0.49.0 版本（2026-05-28）通过 PR #934 添加了
+> `ZipWriterEntryOptions.CompressionLevel` 属性，支持 per-entry 压缩级别控制。
+
+**项目当前版本**：0.48.1  
+**升级目标版本**：0.50.3（最新稳定版）
+
+##### SharpCompress per-entry 级别 API
+
+```csharp
+// SharpCompress 0.49.0+ — per-entry 压缩级别
+var writerOptions = new ZipWriterOptions(CompressionType.Deflate)
+{
+    CompressionLevel = 5,  // 全局默认级别
+};
+using var writer = new ZipWriter(stream, writerOptions);
+
+// 每个 entry 可以单独设置级别
+writer.Write("already_compressed.jpg", jpegStream, new ZipWriterEntryOptions
+{
+    CompressionLevel = 0,  // Store — 不压缩（已压缩文件）
+});
+
+writer.Write("text.txt", textStream, new ZipWriterEntryOptions
+{
+    CompressionLevel = 9,  // 最高压缩级别（文本文件）
+});
+```
+
+##### 升级影响评估
+
+| 维度 | 影响 |
+|------|------|
+| **改动量** | 极小 — 只需改 `.csproj` 版本号 + 适配少量 Breaking Changes |
+| **Breaking Changes** | 0.49.0 有 API 变更（`DeflateCompressionLevel` → `CompressionLevel`），但 MantisZip 代码中用的是 `ZipWriterOptions.CompressionLevel`（archive 级别），不受影响 |
+| **测试** | 需要验证 ZIP 读写、加密 ZIP、分卷等功能正常 |
+| **风险** | 低 — SharpCompress 是成熟库，0.49.0 已发布 3 个月，社区在用 |
+
+##### 升级后的能力对比
+
+| 能力 | ZIP 格式本身 | SharpCompress 0.48.1（当前） | SharpCompress 0.50.3（升级后） |
+|------|------------|---------------------------|------------------------------|
+| per-entry 压缩级别 | ✅ | ❌ 全局一次 | ✅ **0-9 数值级别** |
+| 压缩算法 | Deflate/BZip2/LZMA/PPMd | ✅ 全部 | ✅ 全部 + ZStandard |
+| 密码加密 | ✅ | ✅ AES-256 | ✅ AES-256 |
+| ZIP64 大文件 | ✅ | ✅ | ✅ |
+
+##### 自适应引擎选择策略（修正版）
+
+```
+用户点击「压缩」
+  │
+  ├─ 需要密码加密？
+  │   ├─ 是 → SharpSevenZip（7z）或 SharpCompress（ZIP+加密）
+  │   │       → 全局级别，不支持 per-entry（引擎限制，非格式限制）
+  │   └─ 否 → 继续判断
+  │
+  ├─ 需要 BZip2/LZMA/PPMd 算法？
+  │   ├─ 是 → SharpCompress（对应算法）
+  │   │       → 全局级别
+  │   └─ 否 → 继续判断
+  │
+  ├─ 格式是 ZIP？
+  │   ├─ 是 → SharpCompress 0.49.0+（per-entry 级别，0-9 数值）
+  │   │       → 可混合 Store(0) + 用户选定级别（自适应核心需求）
+  │   └─ 否 → 继续判断
+  │
+  └─ 7z/Tar/GZip → 对应引擎，全局级别
+```
+
+##### 为什么升级 SharpCompress 是最优方案
+
+| 方案 | 优点 | 缺点 |
+|------|------|------|
+| **升级 SharpCompress 到 0.50.3** | ✅ 零新依赖（项目已在用）<br>✅ 0-9 完整数值级别<br>✅ 活跃维护<br>✅ 已有 ZIP 读写代码无需重写 | ⚠️ 需适配少量 Breaking Changes |
+| System.IO.Compression | ✅ .NET 内置 | ❌ 仅 4 档（NoCompression/Optimal/Fastest/SmallestSize）<br>❌ 需重写 ZIP 写入逻辑<br>❌ 加密/特殊算法需回退 |
+| Fork SharpCompress 自定义 | ✅ 完全控制 | ❌ 维护成本高<br>❌ 需持续跟进上游 |
+
+**结论**：升级 SharpCompress 是最务实的方案——零新依赖、完整功能、最小改动。
+
+##### 引擎共存架构（升级后）
+
+| 场景 | 引擎 | per-entry? | 原因 |
+|------|------|-----------|------|
+| ZIP + 无加密 | SharpCompress 0.49.0+ | ✅ 0-9 数值级别 | 自适应核心路径 |
+| ZIP + 加密 | `SharpSevenZip` 或 `SharpCompress` | ❌ 全局级别 | 加密需要这些库 |
+| 7z | `SharpSevenZip` | ❌ 全局级别 | COM API 原子调用 |
+| Tar | `SharpCompress` | ❌ 全局级别 | 格式不支持 per-file |
+| GZip | `SharpCompress` | ❌ 全局级别 | 格式不支持 per-file |
+
+**优势**：
+- ✅ 零新依赖（SharpCompress 已在项目中）
+- ✅ 0-9 完整数值级别（比 System.IO.Compression 的 4 档更精细）
+- ✅ 最常见场景（非加密 ZIP）有 per-entry 能力
+- ✅ 活跃维护，持续获得 bug 修复和新功能
+
+**劣势**：
+- ⚠️ 需适配 0.49.0 Breaking Changes（`DeflateCompressionLevel` → `CompressionLevel`）
+- ⚠️ 加密 ZIP 不支持 per-entry（必须全局级别）
+- ⚠️ 仅 ZIP 格式，7z/Tar/GZip 做不了 per-entry
+
+#### 本次修正后的引擎改动计划
+
+| 引擎/组件 | 改动 | 说明 |
+|----------|------|------|
+| `MantisZip.Core.csproj` | SharpCompress 版本从 0.48.1 升级到 0.50.3 | 启用 per-entry 级别支持 |
+| `ArchiveOptions` | 新增 `AdaptiveCompressionLevel`（三态枚举：Disabled/StoreForCompressed/SmartDetect） | 自适应开关 |
+| `ZipEngine` | 非加密 ZIP 路径使用 `ZipWriterEntryOptions.CompressionLevel` per-entry 控制 | 自适应核心路径 |
+| `SevenZipEngine` | 根据自适应设置决定全局 CompressionLevel（加密/非加密均走此引擎时） | 全局级别 |
+| `TarGzEngine` | 根据自适应设置决定全局 CompressionLevel | GZip 不支持 per-file |
+| `CompressService.BuildOptions` | 新增文件分类逻辑，根据 `CompressionCoefficients.ClassifyByExtension` 决定是否降级 | 分类中枢 |
+
+> **实现要点**：`ZipEngine.CompressAsync` 中，当 `!options.Encrypt && options.Format == ArchiveFormat.Zip` 时，
+> 使用 `ZipWriterEntryOptions.CompressionLevel` per-entry 控制（SharpCompress 0.49.0+）；
+> 否则保持现有 SharpSevenZip 路径（加密）或全局级别路径。
+> 两条路径共存，通过 `ArchiveOptions` 条件分发，不影响现有加密/特殊算法功能。
+
+### SharpCompress per-entry 级别的完整限制
+
+#### 压缩模式限制
+
+SharpCompress 的 `ZipWriterEntryOptions.CompressionLevel` 注释明确说明：
+
+> **Note: BZip2 and LZMA do not support compression levels in this implementation.**
+
+| 压缩类型 | per-entry 级别? | 有效范围 | 说明 |
+|---------|----------------|---------|------|
+| **Deflate** | ✅ 支持 | 0-9 | MantisZip 默认，自适应完整支持 |
+| **Deflate64** | ✅ 支持 | 0-9 | 同上 |
+| **GZip** | ✅ 支持 | 0-9 | |
+| **ZStandard** | ✅ 支持 | 1-22 | SharpCompress 0.49.0+ 新增 |
+| **BZip2** | ❌ 不支持 | 固定级别 | 注释明确说明 |
+| **LZMA** | ❌ 不支持 | 固定级别 | 注释明确说明 |
+| **PPMd** | ❌ 不支持 | 固定级别 | 同上 |
+| **Store/None** | N/A | 无压缩 | |
+
+`ZipWriterOptions` 构造函数的默认级别映射也印证了这一点：
+
+```csharp
+CompressionLevel = compressionType switch
+{
+    CompressionType.ZStandard => 3,
+    CompressionType.Deflate => (int)D.CompressionLevel.Default,
+    CompressionType.Deflate64 => (int)D.CompressionLevel.Default,
+    CompressionType.GZip => (int)D.CompressionLevel.Default,
+    _ => 0,  // BZip2, LZMA, PPMd → 固定 0
+};
+```
+
+#### 加密限制
+
+SharpCompress ZipWriter **不支持写入加密 ZIP**。`ZipWriterOptions` 没有 `Password` 属性。MantisZip 代码注释也明确写了：
+
+```csharp
+// SharpSevenZip 支持 ZIP + AES-256 加密（SharpCompress ZipWriter 不支持加密）
+```
+
+加密 ZIP 必须走 SharpSevenZip 路径，而 SharpSevenZip 是原子调用，不支持 per-entry 级别。
+
+#### 文件大小限制（ZIP64）
+
+| 限制 | 条件 | 影响 |
+|------|------|------|
+| ZIP64 需要 Seekable 流 | `UseZip64 = true` + 非 Seekable 流 | 抛 `NotSupportedException` |
+| 单条目 > 4GB 需要 ZIP64 | 非 Seekable 流 | 不支持 |
+| Post-data descriptor 无 64 位变体 | ZIP 规范限制 | 非 Seekable 流无法用 ZIP64 |
+
+**对 MantisZip 无实际影响**：`File.Create` 返回 `FileStream`（Seekable），`MemoryStream` 也是 Seekable。MantisZip 不使用非 Seekable 流写入。
+
+#### 其他格式限制
+
+| 限制 | 说明 |
+|------|------|
+| 加密 LZMA 不支持 | FORMATS.md: "encrypted LZMA is not supported" |
+| Deflate64/Shrink/Reduce/Implode/XZ | 仅支持读取，不支持写入 |
+| 分卷 ZIP | 需要 Seekable 流（ZipArchive API） |
+
+### 选项联动矩阵
+
+#### 完整联动表
+
+| 选项组合 | 引擎 | per-entry? | 自适应效果 |
+|---------|------|-----------|-----------|
+| 非加密 ZIP + Deflate/Deflate64 | SharpCompress | ✅ | **完整** — 已压缩文件 Store(0)，文本走用户级别 |
+| 非加密 ZIP + BZip2/LZMA/PPMd | SharpCompress | ❌ | **降级** — 所有文件用同一级别 |
+| 加密 ZIP（任意方法） | SharpSevenZip | ❌ | **降级** — 所有文件用同一级别 |
+| 7z（任意方法） | SharpSevenZip | ❌ | **降级** — 所有文件用同一级别 |
+| Tar/GZip | SharpCompress | ❌ | **不适用** — 格式本身不支持 per-file |
+
+#### 自适应 + 加密的联动行为
+
+用户同时启用「自适应压缩」+「加密」时，自适应压缩仍然生效，但**降级为 archive-level 粒度**：
+
+```
+用户设置：自适应压缩=启用 + 加密=AES-256 + 级别=5
+  │
+  ├─ 引擎选择：isEncrypted=true → SharpSevenZip（不支持 per-entry）
+  │
+  ├─ 自适应仍可工作，但粒度变粗：
+  │   ├─ 方案 A：全部用级别 5（忽略自适应）— 简单但浪费
+  │   └─ 方案 B：按文件分类后取多数决定全局级别 — 更智能
+  │       例：100 个文件中 80 个是 JPEG(应 Store) + 20 个是 TXT(应级别 5)
+  │       → 全局级别设为 5（JPEG 多但 Store 对 JPEG 无害，只是多花点 CPU）
+  │       → 或全局级别设为 0（Store，牺牲 TXT 的压缩率换取速度）
+  │
+  └─ UI 建议：显示提示「加密模式下自适应压缩效果有限」
+```
+
+#### 自适应 + 特殊算法的联动行为
+
+用户选择 BZip2/LZMA/PPMd 算法时，即使非加密 ZIP 也无法 per-entry 级别：
+
+```
+用户设置：自适应压缩=启用 + 算法=BZip2 + 级别=5
+  │
+  ├─ 引擎选择：SharpCompress ZipWriter（BZip2 不支持 per-entry）
+  │
+  └─ 自适应降级为 archive-level：
+      → 所有文件用同一级别（BZip2 的固定级别）
+      → 自适应压缩在此场景下无效
+```
+
+### UI 提示建议
+
+| 条件 | 提示文案 |
+|------|---------|
+| 自适应 + 加密 | 「加密模式下自适应压缩效果有限」 |
+| 自适应 + BZip2/LZMA/PPMd | 「当前压缩算法不支持逐文件级别调整」 |
+| 自适应 + 非加密 ZIP + Deflate | 无提示（完整支持） |
+| 自适应 + 7z | 「7z 格式不支持逐文件级别调整」 |
+| 自适应 + Tar/GZip | 「GZip 格式不支持逐文件级别调整」 |
+
+### 实现建议：联动逻辑
+
+在 `CompressService.BuildOptions` 中增加压缩方法判断：
+
+```csharp
+// 判断是否支持 per-entry 级别
+bool canPerEntry = format == ArchiveFormat.Zip 
+    && !isEncrypted
+    && (options.ZipCompressionMethod is null 
+        or "deflate" 
+        or "deflate64");
+
+// 自适应级别决策
+if (options.AdaptiveCompressionLevel != Disabled)
+{
+    if (canPerEntry)
+    {
+        // 完整 per-entry 自适应
+        // 在 ZipWriter 写入时逐文件设置 ZipWriterEntryOptions.CompressionLevel
+    }
+    else
+    {
+        // 降级：取多数文件类型的推荐级别作为全局级别
+        var majorityLevel = ComputeMajorityLevel(files, globalLevel);
+        options.CompressionLevel = majorityLevel;
+    }
+}
+```
+
+`ComputeMajorityLevel` 逻辑：
+
+```csharp
+int ComputeMajorityLevel(List<FileInfo> files, int globalLevel)
+{
+    // 统计文件类型分布
+    int storeCount = 0;  // 应 Store 的文件（image_lossy/media/archive）
+    int normalCount = 0; // 应正常压缩的文件（text/code/binary）
+
+    foreach (var file in files)
+    {
+        var category = ClassifyByExtension(file.Name);
+        if (category is "image_lossy" or "media" or "archive")
+            storeCount++;
+        else
+            normalCount++;
+    }
+
+    // 多数决定全局级别
+    // 如果大多数文件应 Store → 全局用 Store（牺牲少数文本的压缩率）
+    // 如果大多数文件应正常压缩 → 全局用用户级别（牺牲少数图片的 CPU）
+    return storeCount > normalCount ? 0 : globalLevel;
+}
+```
 
 ### 与预估器的关系
 
@@ -973,7 +1269,7 @@ new AdaptiveOverrideRule
 
 ### 压缩前预估
 - [ ] `CompressionEstimator` 三级预估算法完成
-- [ ] `CompressionCoefficients` 经验系数表覆盖所有常见文件类型
+- [ ] `CompressionCoefficients` 经验系数表覆盖所有常见文件类型（含 GZip 格式）
 - [ ] `CompressSettingsWindow` 预估面板 UI 完成
 - [ ] 自动预估 + 手动刷新交互正常
 - [ ] 预估值不阻塞 UI（async 后台）
@@ -986,6 +1282,19 @@ new AdaptiveOverrideRule
 - [ ] ETA 防抖：前 3 秒「估算中」、暂停时「已暂停」、即将完成提示
 - [ ] 预估值从 CompressionEstimator → RuntimeEstimator 的传递链路打通
 
+### 自适应压缩
+- [ ] `ArchiveOptions` 新增 `AdaptiveCompressionLevel` 枚举字段
+- [ ] `CompressService.BuildOptions` 根据文件分类决定最终 CompressionLevel
+- [ ] 非加密 ZIP + Deflate/Deflate64 使用 SharpCompress 0.49.0+ `ZipWriterEntryOptions.CompressionLevel` 实现 per-entry 自适应（0-9 数值）
+- [ ] 加密 ZIP / BZip2 / LZMA / PPMd / 7z / Tar / GZip 降级为全局级别自适应（`ComputeMajorityLevel`）
+- [ ] 已压缩格式（image_lossy/media/archive）自动降级为 Store(0)
+- [ ] `FileFormat` 映射表包含 `Encrypted` 类型（→ archive）
+- [ ] `CompressService.BuildOptions` 中 `canPerEntry` 判断逻辑（格式=ZIP + 非加密 + Deflate/Deflate64）
+- [ ] `ComputeMajorityLevel` 逻辑：统计文件类型分布，多数决定全局级别
+- [ ] SettingsWindow 自适应压缩级别三选一 UI 完成
+- [ ] 选项联动提示：自适应 + 加密时显示「加密模式下自适应压缩效果有限」
+- [ ] 选项联动提示：自适应 + BZip2/LZMA/PPMd 时显示「当前压缩算法不支持逐文件级别调整」
+
 ### Final Checklist
 
 #### 压缩前预估
@@ -996,7 +1305,7 @@ new AdaptiveOverrideRule
 - [ ] 自适应感知：表格自适应列根据 AppSettings 联动显示/隐藏
 - [ ] 自适应感知：启用自适应后，image_lossy/media/archive 文件的系数正确使用 Store 级别
 - [ ] 自适应感知：耗时列也反映自适应降级后的速度提升
-- [ ] 自适应压缩级别（后续扩展）接口已预留
+- [ ] 自适应压缩级别（格式级）正常工作
 
 #### 运行时 ETA
 - [ ] 压缩/解压进度窗口显示 ETA（已用时间、剩余时间、总时间）

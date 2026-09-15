@@ -87,6 +87,14 @@ public class AppSettings
     public bool EnableFormatDetection { get; set; } = true;
     public int PreviewHeadSize { get; set; } = 4096;
 
+    // ===== HTML 预览安全 =====
+    /// <summary>允许 HTML 预览中执行 JavaScript（默认禁止）。</summary>
+    public bool AllowJavaScript { get; set; }
+    /// <summary>允许 HTML 预览中加载外部资源（图片/CSS/字体等，默认禁止）。</summary>
+    public bool AllowExternalResources { get; set; }
+    /// <summary>允许 HTML 预览中点击链接导航到其他页面（默认禁止）。</summary>
+    public bool AllowNavigation { get; set; }
+
     // ===== 密码管理 =====
     public bool ShowPasswordMatchNotification { get; set; } = true;
     public bool PasswordRevealByDefault { get; set; } = false;

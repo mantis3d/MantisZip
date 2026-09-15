@@ -11,17 +11,51 @@
         Background="{DynamicResource ThemeWindowBgBrush}"
         Padding="{DynamicResource SpacingMdThk}">
 
+  <!-- 
+    窗口根容器：压缩文件冲突处理对话框
+    - 宽度固定 600px，高度自适应内容
+    - 居中显示在父窗口上方，不可调整大小
+    - Topmost=True 确保始终置顶，防止被主窗口遮挡
+    - 使用主题背景色和内边距，适配紧凑度模式
+  -->
+
+  <!-- 
+    主布局网格：8 行结构，垂直堆叠各功能区
+    Row 0 (Auto) - 标题栏：冲突提示文本
+    Row 1 (Auto) - 目标文件信息面板：显示已存在文件的详细信息
+    Row 2 (Auto) - 主操作按钮行：覆盖/添加/重命名/跳过
+    Row 3 (Auto) - 重命名输入框：点击重命名后显示，输入新文件名
+    Row 4 (Auto) - 应用到全部复选框：将当前选择应用到后续所有冲突
+    Row 5 (Auto) - 分隔线：视觉分隔操作区与控制区
+    Row 6 (Auto) - 暂停/取消按钮行：控制整个压缩任务
+    Row 7 (Auto) - 预留行（当前未使用，保留扩展性）
+    整体外边距使用紧凑度感知的 SpacingXsThk
+  -->
   <Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto"
         Margin="{DynamicResource SpacingXsThk}">
 
-    <!-- Row 0: Header -->
+    <!-- 
+      Row 0: 标题栏 - 显示冲突提示文本
+      - x:Name="HeaderText" 供代码后台动态设置文本（如"文件已存在：xxx.zip"）
+      - FontSize=13: 标准标题字号
+      - TextWrapping=Wrap: 长文本自动换行
+      - 前景色使用主题主文本色，适配深/浅色主题
+    -->
     <TextBlock Grid.Row="0"
                x:Name="HeaderText"
                FontSize="13"
                TextWrapping="Wrap"
                Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
 
-    <!-- Row 1: Target file info panel -->
+    <!-- 
+      Row 1: 目标文件信息面板 - 显示已存在文件的大小、日期、路径
+      - Border 包裹，提供背景、边框、圆角，视觉上区别于其他区域
+      - Margin 顶部 8px 与标题分隔
+      - Padding 使用紧凑度感知的 SpacingSmThk
+      - 背景色 ThemeSurfaceBgBrush（卡片/面板背景），边框色 ThemeBorderBrush
+      - 圆角使用紧凑度感知的 BorderRadius
+      - 内部 StackPanel 垂直堆叠各信息行，SpacingXxs 紧凑间距
+    -->
     <Border Grid.Row="1"
             Margin="0,8,0,0"
             Padding="{DynamicResource SpacingSmThk}"
@@ -30,22 +64,26 @@
             BorderThickness="1"
             CornerRadius="{DynamicResource BorderRadius}">
       <StackPanel Spacing="{DynamicResource SpacingXxs}">
+        <!-- 标签行："目标文件" 等标题，半粗体、次要文本色 -->
         <TextBlock Text="{Binding TargetLabel}"
                    FontWeight="SemiBold"
                    FontSize="12"
                    Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+        <!-- 大小行：标签(主色) + 数值(次要色)，Run 分离便于样式控制 -->
         <TextBlock FontSize="11"
                    Foreground="{DynamicResource ThemeTextPrimaryBrush}">
           <Run Text="{Binding SizeLabel}" />
           <Run x:Name="TargetSizeText"
                Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
         </TextBlock>
+        <!-- 日期行：标签(主色) + 数值(次要色) -->
         <TextBlock FontSize="11"
                    Foreground="{DynamicResource ThemeTextPrimaryBrush}">
           <Run Text="{Binding DateLabel}" />
           <Run x:Name="TargetDateText"
                Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
         </TextBlock>
+        <!-- 路径行：完整路径，次要色、自动换行、顶部 4px 间距 -->
         <TextBlock x:Name="TargetPathBlock"
                    FontSize="11"
                    Foreground="{DynamicResource ThemeTextSecondaryBrush}"
@@ -54,11 +92,25 @@
       </StackPanel>
     </Border>
 
-    <!-- Row 2: Buttons -->
+    <!-- 
+      Row 2: 主操作按钮行 - 四个核心冲突处理选项，水平居中排列
+      - Orientation=Horizontal: 按钮横向排列
+      - HorizontalAlignment=Center: 整组居中
+      - 顶部 Margin 10px 与上方信息面板分隔
+      - 每个按钮：MinWidth=80 保证最小宽度，Padding=6,4 内边距，图标+文字垂直堆叠
+    -->
     <StackPanel Grid.Row="2"
                 Orientation="Horizontal"
                 HorizontalAlignment="Center"
                 Margin="0,10,0,0">
+      
+      <!-- 
+        覆盖按钮：替换现有文件（压缩/解压通用）
+        - x:Name="OverwriteBtn" 供代码后台控制启用/禁用
+        - 右侧 Margin 6px 与下一按钮间距
+        - 图标：IconRefresh（刷新/替换语义），24x24，主文本色
+        - 文字：绑定 VM OverwriteText，字号 11，居中，图标下方 2px
+      -->
       <Button x:Name="OverwriteBtn"
               MinWidth="80"
               Padding="6,4"
@@ -73,6 +125,15 @@
                      Margin="0,2,0,0" />
         </StackPanel>
       </Button>
+      
+      <!-- 
+        添加按钮：保留两个文件（仅解压时可用，压缩时禁用）
+        - x:Name="AddBtn" 供代码后台控制 IsEnabled
+        - IsEnabled="False" 默认禁用，解压场景下由 VM 动态启用
+        - 左右 Margin 6px 两侧间距
+        - 图标：IconAdd（添加语义），24x24
+        - 文字：绑定 VM AddText
+      -->
       <Button x:Name="AddBtn"
               MinWidth="80"
               Padding="6,4"
@@ -88,6 +149,14 @@
                      Margin="0,2,0,0" />
         </StackPanel>
       </Button>
+      
+      <!-- 
+        重命名按钮：为新文件指定新名称
+        - x:Name="RenameBtn" 供代码后台控制
+        - 点击后显示 Row 3 的 RenameTextBox
+        - 图标：IconEdit（编辑语义），22x22
+        - 文字：x:Name="RenameBtnLabel" 绑定 VM RenameText，代码后台可动态修改文本（如切换为"自动重命名"）
+      -->
       <Button x:Name="RenameBtn"
               MinWidth="80"
               Padding="6,4"
@@ -103,6 +172,14 @@
                      Margin="0,2,0,0" />
         </StackPanel>
       </Button>
+      
+      <!-- 
+        跳过按钮：不处理当前冲突文件，继续下一个
+        - 无 x:Name（无需代码后台动态控制）
+        - 右侧 Margin 6px（最后一个按钮也保留，保持对称）
+        - 图标：IconArrowRight（跳过/前进语义），22x22
+        - 文字：绑定 VM SkipText
+      -->
       <Button MinWidth="80"
               Padding="6,4"
               Margin="6,0,6,0"
@@ -118,7 +195,14 @@
       </Button>
     </StackPanel>
 
-    <!-- Row 3: Custom rename input -->
+    <!-- 
+      Row 3: 自定义重命名输入框 - 点击"重命名"按钮后显示
+      - x:Name="RenameTextBox" 供代码后台显示/隐藏、获取输入值
+      - FontSize=12，Padding=3,2 紧凑内边距
+      - 左右 Margin 14px 与窗口边缘留白，顶部 8px 与按钮行分隔
+      - PlaceholderText 绑定 VM RenameHint（如"请输入新文件名"）
+      - 可见性由代码后台根据 RenameBtn 点击状态控制
+    -->
     <TextBox Grid.Row="3"
              x:Name="RenameTextBox"
              FontSize="12"
@@ -126,7 +210,14 @@
              Margin="14,8,14,0"
              PlaceholderText="{Binding RenameHint}" />
 
-    <!-- Row 4: Apply to all -->
+    <!-- 
+      Row 4: 应用到全部复选框 - 将当前选择应用到后续所有冲突
+      - x:Name="ApplyAllCheck" 供代码后台读取 IsChecked 状态
+      - Content 绑定 VM ApplyAllText（如"应用到全部"）
+      - FontSize=12，前景色次要文本色，居中显示
+      - 顶部 Margin 8px 与上方输入框分隔
+      - 勾选后，后续冲突不再弹窗，直接复用当前选择
+    -->
     <CheckBox Grid.Row="4"
               x:Name="ApplyAllCheck"
               Content="{Binding ApplyAllText}"
@@ -135,17 +226,34 @@
               HorizontalAlignment="Center"
               Margin="0,8,0,0" />
 
-    <!-- Row 5: Separator -->
+    <!-- 
+      Row 5: 分隔线 - 视觉分隔操作区（上）与任务控制区（下）
+      - Height=1px 细线
+      - Fill 使用主题边框色 ThemeBorderBrush
+      - 上下 Margin 6px 留白
+    -->
     <Rectangle Grid.Row="5"
                Height="1"
                Fill="{DynamicResource ThemeBorderBrush}"
                Margin="0,6,0,6" />
 
-    <!-- Row 6: Pause / Cancel buttons -->
+    <!-- 
+      Row 6: 暂停/取消操作按钮行 - 控制整个压缩任务，水平居中
+      - Orientation=Horizontal，HorizontalAlignment=Center
+      - 顶部 Margin 4px 与分隔线分隔
+      - 按钮 Padding=10,5 比主操作按钮稍大，强调功能重要性
+    -->
     <StackPanel Grid.Row="6"
                 Orientation="Horizontal"
                 HorizontalAlignment="Center"
                 Margin="0,4,0,0">
+      
+      <!-- 
+        暂停按钮：暂停当前压缩操作，可随后恢复
+        - x:Name="PauseBtn" 供代码后台动态切换文本/图标（暂停↔继续）
+        - 图标：IconPause（暂停语义），22x22
+        - 文字：绑定 VM PauseText
+      -->
       <Button x:Name="PauseBtn"
               MinWidth="80"
               Padding="10,5"
@@ -159,6 +267,14 @@
                      Margin="0,2,0,0" />
         </StackPanel>
       </Button>
+      
+      <!-- 
+        取消全部按钮：取消整个压缩任务，不再处理后续文件
+        - x:Name="CancelAllBtn" 供代码后台控制
+        - 左侧 Margin 8px 与暂停按钮间距
+        - 图标：IconDismiss（关闭/取消语义），22x22
+        - 文字：绑定 VM CancelOpText
+      -->
       <Button x:Name="CancelAllBtn"
               MinWidth="80"
               Padding="10,5"

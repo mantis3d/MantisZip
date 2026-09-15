@@ -87,11 +87,8 @@ Source: "publish_output\MantisZip.UI.Avalonia.runtimeconfig.json"; DestDir: "{ap
 ; === ShellExt COM host (dynamic context menu) — runtimeconfig.json required for COM activation ===
 Source: "publish_output\MantisZip.ShellExt.runtimeconfig.json"; DestDir: "{app}"; Flags: ignoreversion
 
-; === 7z.dll (SharpSevenZip): architecture-specific subdirectories ===
-; x86 uses skipifsourcedoesntexist: copy-7z-dll.ps1 only bundles a real 32-bit
-; 7z.dll when a 32-bit 7-Zip is present on the build machine — never a fake copy.
+; === 7z.dll (SharpSevenZip): x64 only (app is win-x64) ===
 Source: "publish_output\x64\7z.dll"; DestDir: "{app}\x64"; Flags: ignoreversion
-Source: "publish_output\x86\7z.dll"; DestDir: "{app}\x86"; Flags: ignoreversion skipifsourcedoesntexist
 
 ; === Resources (file type icons, context menu icons, drag cursors, localization) ===
 Source: "publish_output\Resources\Icons\*.ico"; DestDir: "{app}\Resources\Icons"; Flags: ignoreversion

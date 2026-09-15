@@ -6,6 +6,42 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-09-15** — 压缩预估计划文档更新：SharpCompress per-entry 级别分析与选项联动矩阵
+  - `.omo/plans/未开始/compression-estimator.md`：引擎分析重写（SharpCompress 0.49.0+ per-entry 支持）、ZIP 库生态表更新、`CompressService` 路径移除、限制章节（压缩模式/加密/文件大小）、选项联动矩阵（5 种组合）、UI 提示建议、`canPerEntry` + `ComputeMajorityLevel` 实现伪代码、DoD 更新
+
+**2026-09-13** — HTML 预览安全设置独立子标签页
+  - **SettingsWindow.axaml**：预览 tab 新增「HTML」子标签页（`IconHtml` 图标），将 HTML 预览安全设置（3 个 CheckBox）从「通用」tab 迁移至独立子 tab；新增 `PreviewTabHtmlHeader` 属性 + `OnCultureChanged` 刷新
+  - **AppIcons.axaml**：新增 `IconHtml` Geometry（`<>` 尖括号矢量图标）
+  - 本地化：新增 `Settings_Preview_Tab_Html`（HTML / HTML），zh + en 成对
+  - 回归：Build 0 警告 0 错误
+
+**2026-09-13** — HTML 安全设置子面板美化
+  - 安全设置 Border 新增标题栏（`HtmlSecuritySectionText`，SemiBold 14px）、描述文字（`ThemeTextSecondaryBrush`，12px Wrap）、分隔线 + 选项区域间距优化
+
+**2026-09-13** — HTML 预览安全设置（JS/外部资源/导航三开关）
+  - **AppSettings.cs**：新增 `AllowJavaScript`、`AllowExternalResources`、`AllowNavigation`（均默认 `false`）
+  - **SettingsWindowViewModel.cs**：新增 `[ObservableProperty]` + load/save + `OnCultureChanged` 刷新（14 处匹配）
+  - **PreviewViewModel.cs**：`ShowHtmlPreview` 注入 CSP `<meta>` 标签（按 3 个开关控制 `script-src`/`img-src`/`style-src`/`font-src`）
+  - **PreviewPanel.axaml.cs**：`NavigationStarting` 事件拦截非 `file://` 导航
+  - 本地化：新增 7 个安全设置 key（`Settings_Security_Title`/`Description`/`AllowJavaScript`/`AllowExternalResources`/`AllowNavigation`/`Warning_Text` + `Settings_Preview_SecuritySection`），zh + en 成对
+  - 回归：Build 0 警告 0 错误
+
+**2026-09-13** — Markdown 预览支持源码/渲染切换
+  - **PreviewViewModel.cs**：新增 `IsMarkdownPreviewActive` 属性，`</>` 按钮绑定 `IsSourcePreviewActive`（HTML & Markdown 共用）；`OnPreviewTypeChanged` 中补充 `IsHtmlPreviewActive` 通知
+  - **PreviewPanel.axaml**：Markdown 源码 TextBox 绑定 `IsMarkdownSourceVisible`
+  - 本地化：无需新增 key（复用已有 `Preview_Source`/`Preview_Render`）
+  - 回归：Build 0 警告 0 错误
+
+**2026-09-12** — 报错信息一键复制
+  - **AppMessageBox**：新增「复制错误信息」按钮（仅 Error/Warning 图标弹窗显示，一处改动覆盖全部 49 处弹窗调用点），点击经 `DataTransfer`/`SetDataAsync`（Avalonia 12 新剪贴板 API，`SetTextAsync` 已移除）复制「MantisZip {版本} + yyyy-MM-dd HH:mm:ss 时间戳 + 标题（如有）+ 完整消息」到剪贴板，按钮短暂显示「已复制 ✓」1.5s 反馈；剪贴板失败写 `App.DebugLog` 不静默
+  - **主窗口状态栏**：`StatusMessage` 由 TextBlock 改为视觉一致的只读 TextBox（透明背景 / `BorderThickness=0` / `Padding=0` / `MinHeight=0` / 右对齐），支持鼠标选中 + Ctrl+C 复制错误文本
+  - 本地化：新增 `MsgBox_Copy`（复制错误信息 / Copy error info）、`MsgBox_Copied`（已复制 ✓ / Copied ✓），zh + en 成对插入文件头（规则 13）
+  - 回归：Build 0 警告 0 错误；96 通过 / 0 失败 / 2 跳过（既有 IconProvider）
+
+**2026-09-12** — 损坏压缩包打开/测试静默通过修复（Avalonia 侧）
+  - **MainWindowViewModel.TestArchive**：捕获 `TestArchiveAsync` 的 bool 结果——`RunWithProgress` 的 completed 仅表示「未取消/未抛异常」，此前损坏包也会显示「压缩包完整性验证通过 ✅」；现 `completed && testOk` 才显示通过，否则 `Status_TestFailed`（连带修复：TarGz 测试失败此前同样被吞）
+  - **PasswordService.QuickVerifyPassword**：改用严格 `ZipArchive.OpenArchive`（与 ZipEngine 一致，避免损坏包被魔数误判为 Tar 后密码验证静默通过），同步补 `using SharpCompress.Archives.Zip`
+  - 回归：Build 0 警告 0 错误；UI 测试 96 通过 / 0 失败 / 2 跳过
 **2026-09-11** — 骨架目录图标根因修复 + 骨架态统计文本：`IconKey` getter 在 `IsArchiveNode` 之后新增 `HasLoadingPlaceholderChild` 检查，含占位子节点的目录节点返回 `IconFolderSync`（此前仅有 archive 节点走该分支，普通目录节点始终返回 `IconFolder`，根因：骨架占位节点是目录的子节点而非自身，`IsLoadingPlaceholder` 分支永远不会命中）；`DirectoryInfoText` 含占位子节点时显示「加载中」替代空白；骨架实时进度计数器方案已写入 `.omo/plans/未开始/skeleton-progress-counter.md`（P2，待实施）
 
 **2026-09-10** — 骨架状态目录图标区分（FluentUI folder_sync）
@@ -1305,6 +1341,12 @@
 
 ## 共享层（Core / ShellExt / 构建）
 这些变更影响两项目共用代码，按时间从新到旧排列。
+
+#### v0.5.0 (2026-09-12) 损坏压缩包打开静默无报错修复（ZipEngine 严格解析 + TarGzEngine 移除静默 catch）
+  - **ZipEngine**：`OpenArchiveWithEncodingFallback` 主路径 + GBK 回退两处改用 `ZipArchive.OpenArchive`（严格 ZIP 解析）——原 `ArchiveFactory.OpenArchive` 魔数嗅探会把全零/垃圾文件误判为 Tar（0 条目，损坏信号被吞），TestPreview/testZip 的全零 zip1.zip 实测原行为「打开成功但 0 内容、测试 8ms 通过」；修复后抛 `ArchiveException: Failed to locate the Zip Header`
+  - **TarGzEngine**：`ListEntriesAsync` 移除整段 try/catch 静默吞异常——随机垃圾 .tar 实测 TarReader 抛 `IncompleteArchiveException: Unexpected EOF`，此前被吞成「打开成功但空列表」；合法 tar 与空 tar（全部按块读入无异常）行为不变
+  - **ZipEngineTests**：新增 3 个回归测试——全零 zip → ListEntries 抛 ArchiveException + TestArchive 返回 false；合法空 zip（仅 EOCD）→ 0 条目不误伤
+  - 验证：MantisZip.Tests 373 通过 / 0 失败（含新增 3 个）
 
 #### v0.5.0 (2026-09-04) 压缩/解压 文件读写错误处理补齐（对齐 ErrorResolver 语义）
   - **背景**：`SharedReadStream` 治本层修复后（2026-08-25），仍有两类文件读写失败缺口：

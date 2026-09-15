@@ -6,8 +6,11 @@
         CanResize="False"
         Title="{Binding AddTitle}">
   <StackPanel Margin="12" Spacing="8">
+    <!-- 提示文本：请输入要关联的扩展名 -->
     <TextBlock Text="{Binding AddPrompt}" />
+    <!-- 扩展名输入框（如 .zip、.7z 等） -->
     <TextBox x:Name="InputTextBox" />
+    <!-- 底部按钮区域：取消 / 确定 -->
     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
       <Button Content="{Binding CancelText}" Click="Cancel_Click" />
       <Button Content="{Binding OkText}" Click="Ok_Click" />

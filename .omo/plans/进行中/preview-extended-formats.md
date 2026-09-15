@@ -707,6 +707,23 @@ public class MagickPreviewProvider : IPreviewProvider
 
 **元数据仍内置**: 音视频的**元数据解析**（时长、采样率、分辨率、编码等）是纯 C# 代码，保持内置在主程序中，不依赖插件。即使没有安装 MediaPlayer 插件，信息面板也能正常显示文件信息。
 
+**视频缩略图提取（压缩包内不全量解压）**:
+> **核心问题**: 预览压缩包内 1GB 视频时，生成缩略图（如 5s 处截帧）**不需要完整解压**，取决于压缩格式：
+>
+> | 压缩格式 | 固实压缩 | 能否流式取帧 | 方案 |
+> |---------|---------|-------------|------|
+> | **ZIP (非固实)** | ❌ | ✅ **能** | `ArchiveEngine.OpenEntryStream` → ffmpeg stdin 管道，只读关键帧区间(~1-5MB) |
+> | **TAR** | ❌ | ✅ **能** | 直接 seek 条目偏移 + 顺序读到关键帧停 |
+> | **7z / RAR (非固实)** | ❌ | ✅ **能** | 同 ZIP |
+> | **7z / RAR (固实)** | ✅ | ❌ **不能** | 必须从固实块头解起，妥协全量提取该条目 |
+>
+> **实现路径**:
+> 1. `ArchiveEngine` 新增 `Stream OpenEntryStream(string entryName)`（非固实格式）
+> 2. `VideoThumbnailExtractor.ExtractAsync(Stream, TimeSpan)` — 管道喂 ffmpeg stdin，输出 PNG
+> 3. 固实格式检测 → 自动回退全量提取后再取帧
+>
+> **预估工作量**: `OpenEntryStream` ~1天 + `VideoThumbnailExtractor` ~半天 + 固实回退 ~几小时
+
 **内容区变更**（有插件时）:
 
 ```
@@ -942,6 +959,23 @@ ShowPreviewAsync(item)
 - 固实时跳过部分提取，使用扩展名分支逻辑
 - **预估**: ~2h
 
+#### 5.6 视频缩略图流式提取（压缩包内不全量解压） ⬜ 未实施
+> **核心场景**: 预览压缩包内 1GB+ 视频时，生成缩略图（如 5s 截帧）**不需完整解压**，取决于压缩格式：
+>
+> | 压缩格式 | 固实 | 能否流式取帧 | 方案 |
+> |---------|------|-------------|------|
+> | **ZIP (非固实)** | ❌ | ✅ **能** | `ArchiveEngine.OpenEntryStream` → ffmpeg stdin 管道，只读关键帧区间(~1-5MB) |
+> | **TAR** | ❌ | ✅ **能** | 直接 seek 条目偏移 + 顺序读到关键帧停 |
+> | **7z / RAR (非固实)** | ❌ | ✅ **能** | 同 ZIP |
+> | **7z / RAR (固实)** | ✅ | ❌ **不能** | 必须从固实块头解起，妥协全量提取该条目 |
+>
+> **实现路径**:
+> 1. `ArchiveEngine` 新增 `Stream OpenEntryStream(string entryName)`（非固实格式）
+> 2. `VideoThumbnailExtractor.ExtractAsync(Stream, TimeSpan)` — 管道喂 ffmpeg stdin，输出 PNG
+> 3. 固实格式检测 → 自动回退全量提取后再取帧
+>
+> **预估工作量**: `OpenEntryStream` ~1天 + `VideoThumbnailExtractor` ~半天 + 固实回退 ~几小时 = **~12h**
+
 ### 总计预估
 
 | 工作项 | 预估 |
@@ -951,7 +985,8 @@ ShowPreviewAsync(item)
 | 5.3 两阶段编排 | ~4h |
 | 5.4 PDF/MP4 特殊处理 | ~3h |
 | 5.5 7z 固实检测 | ~2h |
-| **合计** | **~27h** |
+| 5.6 视频缩略图流式提取 | ~12h |
+| **合计** | **~39h** |
 
 ### 风险与备选
 
@@ -959,6 +994,7 @@ ShowPreviewAsync(item)
 2. **7z 固实无法优化** — 固实 7z 永远需要完整提取，这是压缩算法限制，无法绕过
 3. **简化路径** — 如果 Phase 2/3/4 工作量已经很大，Phase 5 可推迟到下一迭代。纯元数据格式当前已经只提取一次，用户体验上差别不大
 4. **PDF 双端提取的代价** — Deflate ZIP 中的 PDF 提取尾部需要解压完整流，实际效果等同于全量提取。Store ZIP 可以优化
+5. **视频缩略图依赖 ffmpeg 子进程** — 需内嵌或系统装 ffmpeg；固实 7z/RAR 无法优化，必须全量提取后取帧
 
 ---
 
@@ -993,7 +1029,7 @@ Avalonia 迁移后:
 - [ ] Phase 2D 插件化：Magick.NET 统一解码 → 见 [preview-avalonia-opportunities.md](.omo/plans/preview-avalonia-opportunities.md#8-重大依赖的体积分析与分离方案)
 - [ ] Phase 3.10/3.11 插件化：LibVLC 音视频播放 → 见 [preview-avalonia-opportunities.md 第 4 节](.omo/plans/preview-avalonia-opportunities.md#4-音视频播放替代方案)
 - [~] Phase 4：高难度格式（**4.3 MKV/WebM 已由 VideoParser 实现**；4.1/4.2/4.4-4.9 未实施；EXR/TIFF 已由 Magick.NET 插件覆盖）
-- [~] Phase 5：元数据优先提取与两步式优化（**5.1/5.3/5.5 已完成，5.2 部分，5.4 未实施**）
+- [~] Phase 5：元数据优先提取与两步式优化（**5.1/5.3/5.5 已完成，5.2 部分，5.4/5.6 未实施**）
 - [x] `dotnet build` 通过
 
 ### Final Checklist
@@ -1016,4 +1052,4 @@ Avalonia 迁移后:
 - [x] SVG/Markdown/HTML 渲染正常（Avalonia：Svg.Skia 栅格化 + ReverseMarkdown→Markdig 控件树；WebView2 仅 WPF 遗留）
 - [x] 视频元数据展示分辨率/时长/编码（含 MKV/WebM — 见 Phase 4.3）
 - [ ] **Magick.NET 插件**: `MantisZip.Preview.Magick` 独立项目，覆盖 TGA/HDR/EXR/TIFF/PSD 等
-- [ ] **MediaPlayer 插件**: `MantisZip.Preview.MediaPlayer` 独立项目，LibVLC 音视频播放
+- [ ] **视频缩略图流式提取**: `OpenEntryStream` + `VideoThumbnailExtractor`，压缩包内大视频不全量解压生成缩略图

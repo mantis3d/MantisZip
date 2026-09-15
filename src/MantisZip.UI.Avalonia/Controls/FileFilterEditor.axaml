@@ -7,12 +7,12 @@
                  Background="{DynamicResource ThemeWindowBgBrush}">
     <StackPanel Margin="0,0,0,4" Spacing="{DynamicResource SpacingSm}">
 
-      <!-- ═══════ 启用过滤 ═══════ -->
+      <!-- ═══════ 启用过滤复选框 ═══════ -->
       <CheckBox x:Name="EnableFilterCheck"
                  IsCheckedChanged="OnEnableFilterChanged"
                  Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
 
-      <!-- ═══════ 过滤内容（启用时显示，未启用时隐藏）═══════ -->
+      <!-- ═══════ 过滤内容面板（启用时显示，未启用时隐藏）═══════ -->
       <StackPanel x:Name="FilterContentPanel"
                   Spacing="{DynamicResource SpacingSm}">
         <!-- ═══════ 预设栏 ═══════ -->
@@ -24,6 +24,7 @@
                      FontWeight="SemiBold"
                      Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
           <Grid ColumnDefinitions="*,Auto,Auto,Auto">
+            <!-- 预设下拉框：选择已保存的过滤预设 -->
             <ComboBox x:Name="PresetCombo" Grid.Column="0"
                       Margin="0,0,6,0"
                       DisplayMemberBinding="{Binding DisplayName}"
@@ -32,18 +33,21 @@
                       Foreground="{DynamicResource ThemeTextPrimaryBrush}"
                       BorderBrush="{DynamicResource ThemeBorderBrush}"
                       MinHeight="26" />
+            <!-- 保存预设按钮：将当前过滤条件保存为新预设 -->
             <Button x:Name="SavePresetBtn" Grid.Column="1"
                     MinWidth="50" Height="26" Margin="0,0,4,0"
                     Click="SavePresetBtn_Click"
                     Background="{DynamicResource ThemeButtonBgBrush}"
                     Foreground="{DynamicResource ThemeTextPrimaryBrush}"
                     BorderBrush="{DynamicResource ThemeBorderBrush}" />
+            <!-- 重命名预设按钮：修改选中预设的名称 -->
             <Button x:Name="RenamePresetBtn" Grid.Column="2"
                     MinWidth="50" Height="26" Margin="0,0,4,0"
                     Click="RenamePresetBtn_Click"
                     Background="{DynamicResource ThemeButtonBgBrush}"
                     Foreground="{DynamicResource ThemeTextPrimaryBrush}"
                     BorderBrush="{DynamicResource ThemeBorderBrush}" />
+            <!-- 删除预设按钮：删除选中的预设 -->
             <Button x:Name="DeletePresetBtn" Grid.Column="3"
                     MinWidth="50" Height="26"
                     Click="DeletePresetBtn_Click"
@@ -51,12 +55,13 @@
                     Foreground="{DynamicResource ThemeTextPrimaryBrush}"
                     BorderBrush="{DynamicResource ThemeBorderBrush}" />
           </Grid>
+          <!-- 过滤统计文本：显示当前过滤条件匹配的文件数量 -->
           <TextBlock x:Name="FilterStatsText"
                      Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
         </StackPanel>
       </Border>
 
-      <!-- ═══════ 扩展名 ═══════ -->
+      <!-- ═══════ 扩展名过滤 ═══════ -->
       <Border BorderBrush="{DynamicResource ThemeBorderBrush}"
               BorderThickness="1" CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}"
               Background="{DynamicResource ThemeSurfaceBgBrush}">
@@ -65,18 +70,23 @@
                      FontWeight="SemiBold"
                      Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
           <WrapPanel>
+            <!-- 音频文件扩展名复选框 -->
             <CheckBox x:Name="ExtAudioCheck" Margin="0,0,12,0"
                       IsCheckedChanged="OnExtCheckChanged"
                       Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+            <!-- 视频文件扩展名复选框 -->
             <CheckBox x:Name="ExtVideoCheck" Margin="0,0,12,0"
                       IsCheckedChanged="OnExtCheckChanged"
                       Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+            <!-- 图片文件扩展名复选框 -->
             <CheckBox x:Name="ExtImageCheck" Margin="0,0,12,0"
                       IsCheckedChanged="OnExtCheckChanged"
                       Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+            <!-- 文档文件扩展名复选框 -->
             <CheckBox x:Name="ExtDocumentCheck" Margin="0,0,12,0"
                       IsCheckedChanged="OnExtCheckChanged"
                       Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+            <!-- 压缩包文件扩展名复选框 -->
             <CheckBox x:Name="ExtArchiveCheck" Margin="0,0,0,0"
                       IsCheckedChanged="OnExtCheckChanged"
                       Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
@@ -86,6 +96,7 @@
             <TextBlock Grid.Column="0" x:Name="CustomExtLabel"
                        VerticalAlignment="Center" Margin="0,0,8,0"
                        Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+            <!-- 自定义扩展名输入框：支持多个扩展名，用分号分隔 -->
             <TextBox x:Name="CustomExtTextBox" Grid.Column="1"
                      TextChanged="CustomExtTextBox_TextChanged"
                      MinHeight="22"
@@ -96,7 +107,7 @@
         </StackPanel>
       </Border>
 
-      <!-- ═══════ 文件名 ═══════ -->
+      <!-- ═══════ 文件名模式过滤 ═══════ -->
       <Border BorderBrush="{DynamicResource ThemeBorderBrush}"
               BorderThickness="1" CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}"
               Background="{DynamicResource ThemeSurfaceBgBrush}">
@@ -104,19 +115,21 @@
           <TextBlock x:Name="NamePatternLabel"
                      FontWeight="SemiBold"
                      Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+          <!-- 文件名模式输入框：支持通配符 * 和 ? -->
           <TextBox x:Name="NamePatternBox"
                    TextChanged="NamePatternBox_TextChanged"
                    MinHeight="22"
                    Background="{DynamicResource ThemeSurfaceBgBrush}"
                    Foreground="{DynamicResource ThemeTextPrimaryBrush}"
                    BorderBrush="{DynamicResource ThemeBorderBrush}" />
+          <!-- 文件名模式提示文本 -->
           <TextBlock x:Name="NamePatternHint"
                      FontSize="11"
                      Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
         </StackPanel>
       </Border>
 
-      <!-- ═══════ 大小 ═══════ -->
+      <!-- ═══════ 文件大小过滤 ═══════ -->
       <Border BorderBrush="{DynamicResource ThemeBorderBrush}"
               BorderThickness="1" CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}"
               Background="{DynamicResource ThemeSurfaceBgBrush}">
@@ -128,12 +141,14 @@
             <TextBlock Grid.Column="0" x:Name="MinSizeLabel"
                        VerticalAlignment="Center" Margin="0,0,6,0"
                        Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+            <!-- 最小文件大小输入框 -->
             <TextBox x:Name="MinSizeBox" Grid.Column="1"
                      Width="100" MinHeight="22"
                      TextChanged="SizeBox_TextChanged"
                      Background="{DynamicResource ThemeSurfaceBgBrush}"
                      Foreground="{DynamicResource ThemeTextPrimaryBrush}"
                      BorderBrush="{DynamicResource ThemeBorderBrush}" />
+            <!-- 大小单位下拉框：B/KB/MB/GB -->
             <ComboBox x:Name="SizeUnitCombo" Grid.Column="2"
                       Margin="6,0,0,0"
                       MinHeight="22" Width="80"
@@ -144,6 +159,7 @@
             <TextBlock Grid.Column="3" x:Name="MaxSizeLabel"
                        VerticalAlignment="Center" Margin="12,0,6,0"
                        Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+            <!-- 最大文件大小输入框 -->
             <TextBox x:Name="MaxSizeBox" Grid.Column="4"
                      Width="100" MinHeight="22"
                      TextChanged="SizeBox_TextChanged"
@@ -154,7 +170,7 @@
         </StackPanel>
       </Border>
 
-      <!-- ═══════ 日期 ═══════ -->
+      <!-- ═══════ 日期范围过滤 ═══════ -->
       <Border BorderBrush="{DynamicResource ThemeBorderBrush}"
               BorderThickness="1" CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}"
               Background="{DynamicResource ThemeSurfaceBgBrush}">
@@ -166,6 +182,7 @@
             <TextBlock Grid.Column="0" x:Name="StartDateLabel"
                        VerticalAlignment="Center" Margin="0,0,6,0"
                        Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+            <!-- 开始日期选择器 -->
             <CalendarDatePicker x:Name="StartDatePicker" Grid.Column="1"
                         Margin="0,0,12,0"
                         SelectedDateChanged="StartDatePicker_SelectedDateChanged"
@@ -173,6 +190,7 @@
             <TextBlock Grid.Column="2" x:Name="EndDateLabel"
                        VerticalAlignment="Center" Margin="0,0,6,0"
                        Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+            <!-- 结束日期选择器 -->
             <CalendarDatePicker x:Name="EndDatePicker" Grid.Column="3"
                         SelectedDateChanged="EndDatePicker_SelectedDateChanged"
                         Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
@@ -180,7 +198,7 @@
         </StackPanel>
       </Border>
 
-      <!-- ═══════ /过滤内容 ═══════ -->
+      <!-- ═══════ /过滤内容面板 ═══════ -->
     </StackPanel>
     </StackPanel>
   </ScrollViewer>

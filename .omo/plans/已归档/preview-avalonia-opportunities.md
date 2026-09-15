@@ -1,6 +1,6 @@
 # Avalonia 迁移下的预览系统机会分析
 
-> **状态**: 🔍 调研 | **创建日期**: 2026-06-29
+> **状态**: 🔍 调研 | **创建日期**: 2026-06-29 | **最近更新**: 2026-09-12
 > **前置依赖**: `preview-extended-formats.md`（所有 Phase 0–5 已完成或已规划）
 > **关联计划**: `cross-platform-port.md`（WPF→Avalonia 整体迁移策略）
 
@@ -255,47 +255,125 @@ half4 main(float2 fragCoord) {
 
 ---
 
-## 4. 音视频播放替代方案
+## 4. 音视频播放替代方案（2026-09 更新）
 
-这是迁移到 Avalonia 损失最大的功能。**需要外部依赖**。
+> **⚠️ 原文档 2026-06-29 写作时 Avalonia 无内置播放器，现已过时。**  
+> **2026 年发生重大变化**：Avalonia 12 (2026-09) 正式随 Accelerate 合并入主产品线，官方 `MediaPlayer` 成为 Pro 套餐组件；社区涌现 **GPU 无 airspace 免费方案** (wieslawsoltes/MediaPlayer)、**FFmpegVideoPlayer 3.0** (FFmpeg 9.0 + Avalonia 12.1)。下表为 2026 年 9 月最新对比。
 
-### 4.1 方案对比
+### 4.1 方案对比（2026-09 现状）
 
-| 方案 | 格式覆盖 | 额外依赖 | 集成难度 | 跨平台 |
-|------|---------|---------|---------|--------|
-| **LibVLCSharp** | 几乎所有格式（VLC 引擎） | +~30MB（libvlc native） | 🟡 中（控件 + 事件） | ✅ Linux/macOS/Win |
-| **FFMpegCore** | 几乎所有格式 | FFmpeg 二进制 | 🟡 中（进程外） | ✅（需自带 ffmpeg） |
-| **WinRT MediaPlayer**（仅 Windows） | 系统解码器 | 无 | 🟢 低 | ❌ 仅 Win10+ |
-| **Avalonia.MediaPlayer**（不存在） | — | — | — | — |
+| 方案 | 核心特点 | 格式覆盖 | 依赖体积 | 许可/价格 | 跨平台 | 成熟度 | 推荐指数 |
+|------|---------|---------|---------|----------|--------|--------|----------|
+| **MediaPlayer (wieslawsoltes)** 🆕 | GPU 合成、无 airspace、原生后端(Win=MF/Mac=AVFoundation)+ FFmpeg/LibVLC 回退、trim/split/export workflow | 极广 | ~15MB | **MIT 免费** | ✅ Win/Mac/Linux | 🟡 v0.1 活跃 (2026-03~, 30⭐) | ⭐⭐⭐⭐⭐ **免费首选** |
+| **FFmpegVideoPlayer.Avalonia 3.0** 🆕 | Avalonia 12.1+、.NET 8、FFmpeg 9.0、内置控件、DASH/YouTube/HTTP 流 | 极广 | ~15MB | **MIT 免费** | ✅ Win/Mac/Linux/ARM64 | 🟢 3.0.2 (2026-09 活跃) | ⭐⭐⭐⭐⭐ **免费简易首选** |
+| **官方 MediaPlayer (Avalonia 12/Accelerate)** | 官方核心组件，平台原生后端 (Win=MF, Mac=AVFoundation, Linux=LibVLC, Android=ExoPlayer) | 主流格式 | **0** (系统自带) | **Pro €899/年/席位** (含 6 高级控件+70+图表) | ✅ Win/Mac/Linux/Android/iOS | 🟢 官方维护 | ⭐⭐⭐⭐⭐ (预算允许首选) |
+| **LibVLCSharp.Avalonia** | 封装 libvlc 3.x/4.x | 最全 (VLC 同级) | ~30MB | LGPL-2.1 | ✅ 全平台 | 🟢 最成熟 | ⭐⭐⭐⭐ (极致格式/字幕/流) |
+| **AvaloniaMediaPlayer (crucifix86)** | Kodi 架构，4 线程解码 | 极广 | ~15MB | MIT | ✅ 全平台 | 🟡 生产就绪 | ⭐⭐⭐⭐ (高性能/多线程/覆盖层) |
+| **WinRT MediaPlayer** | 仅 Win10+，Media Foundation | 系统支持格式 | 0 | 免费 | ❌ 仅 Windows | 🟢 系统级 | ⭐⭐ (仅 Windows) |
+| **FFMpegCore** | 进程外 FFmpeg 调用 | 极广 | FFmpeg 二进制 | MIT | ✅ (自带 ffmpeg) | 🟢 成熟 | ⭐⭐ (非嵌入式，仅转码/元数据) |
 
-### 4.2 建议：LibVLCSharp
+> **关键区别 (2026)**：  
+> - **MediaPlayer (wieslawsoltes)** — **免费、MIT、GPU 无 airspace、原生后端 + FFmpeg/LibVLC 回退、workflow 服务**，功能最全的免费方案  
+> - **FFmpegVideoPlayer 3.0** — **免费、MIT、FFmpeg 9.0、Avalonia 12.1+、内置控件、DASH/YouTube 支持**，最简易的免费方案  
+> - **官方 MediaPlayer** — **零依赖、原生性能**，但**仅 Pro 套餐 €899/年/席位** (含 Media Player + 6 高级控件 + 70+ 图表)  
+> - **LibVLCSharp** — 格式最全、硬解/字幕/流媒体最好，但 ~30MB 且 LGPL 需动态链接合规  
+> - Linux 上官方 MediaPlayer 依赖系统装 VLC (libvlc)，不装则回退失败
 
-LibVLCSharp + Avalonia 集成的示例：
+### 4.2 推荐决策树 (2026)
 
-```csharp
-// LibVLCSharp 有 Avalonia 支持
-using LibVLCSharp.Shared;
-
-var libVlc = new LibVLC();
-var mediaPlayer = new MediaPlayer(libVlc);
-mediaPlayer.Play(new Media(libVlc, tempFilePath));
-
-// Avalonia 集成：VideoView 控件
-// <vlc:VideoView Name="MyVideoView" />
+```
+需要完全免费开源、MIT、GPU 无 airspace、功能最全？
+├─ 是 → **MediaPlayer (wieslawsoltes)** 🆕
+│       - GPU 合成、无 airspace、原生后端 (Win=MF, Mac=AVFoundation)
+│       - FFmpeg/LibVLC 回退、trim/split/export workflow 服务
+│       - MIT、.NET 9、Avalonia 11、~38 commits、30⭐
+├─ 否 → 只要简单播放、MIT、体积小、快速接入？
+│       ├─ 是 → **FFmpegVideoPlayer.Avalonia 3.0** 🆕
+│       │       - Avalonia 12.1+、.NET 8、FFmpeg 9.0、内置播放控件
+│       │       - 6 天前 3.0.2、支持 DASH/YouTube/HTTP 流
+│       └─ 否
+│           ├─ 有预算、求稳、零依赖？→ **官方 MediaPlayer (Avalonia 12/Accelerate, Pro €899/年)**
+│           ├─ 极致格式/字幕/流媒体？→ **LibVLCSharp**
+│           └─ 高性能多线程/复杂覆盖层？→ **AvaloniaMediaPlayer (crucifix86)**
 ```
 
-已有 NuGet 包 `LibVLCSharp.Avalonia`，提供 `VideoView` 控件。
+### 4.3 接入代码示例
 
-**初步预估**：
+#### A. MediaPlayer (wieslawsoltes) — 免费首选 🆕
+```xml
+<mp:GpuMediaPlayer x:Name="Player" ShowControls="True" 
+                   xmlns:mp="clr-namespace:MediaPlayer.Controls;assembly=MediaPlayer.Controls" />
+```
+```csharp
+// Program.cs 注册 workflow 服务
+services.AddMediaPlayerWorkflows(options => 
+{
+    options.PreferNativePlatformServices = true;
+});
 
-| 工作项 | 预估 |
-|--------|------|
-| LibVLCSharp 集成 + NuGet 引用 | ~1h |
-| 音频预览模式（UI 简化版：播放/暂停/进度条/音量） | ~4h |
-| 视频预览模式（VideoView + 控制条） | ~6h |
-| 压缩包内大文件渐进式提取 + 播放（流式处理） | ~4h |
-| 工具栏按钮 + 状态管理 | ~1h |
-| **合计** | **~16h** |
+Player.Source = new UriSource("file:///path/to/video.mp4");
+await Player.PlayAsync();
+```
+
+#### B. 官方 MediaPlayer (Avalonia 12/Accelerate, Pro)
+```xml
+<!-- Avalonia 12+ -->
+<mp:MediaPlayerControl x:Name="Player" ShowControls="True" 
+                       xmlns:mp="clr-namespace:Avalonia.Controls.MediaPlayer;assembly=Avalonia.Controls.MediaPlayer" />
+```
+```csharp
+// .csproj 需包含 <AvaloniaUILicenseKey Include="YOUR_LICENSE_KEY" />
+Player.Source = new UriSource("file:///path/to/video.mp4");
+await Player.PlayAsync();
+```
+
+#### C. FFmpegVideoPlayer.Avalonia 3.0 — 免费简易首选 🆕
+```xml
+<ffmpeg:VideoPlayerControl Source="file.mp4" ShowControls="True" 
+                           xmlns:ffmpeg="clr-namespace:Avalonia.FFmpegVideoPlayer;assembly=Avalonia.FFmpegVideoPlayer" />
+```
+```csharp
+// Program.cs 启动时初始化
+using FFmpegVideoPlayer.Core;
+FFmpegInitializer.Initialize(); // macOS 自动装 Homebrew ffmpeg
+```
+
+#### D. LibVLCSharp.Avalonia (最全格式)
+```xml
+<vlc:VideoView x:Name="VideoView" 
+               xmlns:vlc="clr-namespace:LibVLCSharp.Avalonia;assembly=LibVLCSharp.Avalonia" />
+```
+```csharp
+using LibVLCSharp.Shared;
+using LibVLCSharp.Avalonia;
+
+var libVlc = new LibVLC("--no-video-title-show");
+VideoView.MediaPlayer = new MediaPlayer(libVlc);
+VideoView.MediaPlayer.Play(new Media(libVlc, "file.mp4", FromType.FromPath));
+```
+
+#### E. AvaloniaMediaPlayer (高性能/覆盖层)
+```xml
+<amp:VideoPresenter Player="{Binding Player}" 
+                    xmlns:amp="clr-namespace:Avalonia.MediaPlayer.Controls;assembly=Avalonia.MediaPlayer" />
+```
+```csharp
+var player = new MediaPlayer();
+await player.OpenAsync("file.mp4");
+player.Play();
+```
+
+### 4.4 工时预估对比（含 UI、压缩包流式播放、工具栏）
+
+| 方案 | 基础接入 | 音频模式 | 视频模式 | 流式/压缩包内播放 | 工具栏/状态 | 合计 |
+|------|---------|---------|---------|------------------|------------|------|
+| **MediaPlayer (wieslawsoltes)** 🆕 | ~2h | ~1h | ~2h | ~2h | ~1h | **~8h** |
+| **官方 MediaPlayer (Pro)** | ~1h | ~1h | ~2h | ~3h | ~1h | **~8h** |
+| **FFmpegVideoPlayer 3.0** 🆕 | ~1h | ~1h | ~2h | ~3h | ~1h | **~8h** |
+| **LibVLCSharp** | ~1h | ~3h | ~5h | ~4h | ~1h | **~14h** |
+| **AvaloniaMediaPlayer** | ~2h | ~2h | ~4h | ~4h | ~1h | **~13h** |
+
+> **结论 (2026)**：免费项目首选 **MediaPlayer (wieslawsoltes)** 功能最全 或 **FFmpegVideoPlayer 3.0** 最简易；预算允许且求稳选 **官方 MediaPlayer (Pro €899/年)**；极致格式/流媒体选 **LibVLCSharp**。
 
 ---
 
@@ -351,20 +429,23 @@ WPF Phase 5（元数据优先提取）   → Core 层可先行（纯 C#，框架
 Avalonia 迁移                  → 主力
    ├── Phase A: 基础框架迁移    → SVG 原生支持 + Magick.NET 集成（Phase 2D Avalonia 版）
    ├── Phase B: 高难度格式      → PE 图标、ICL、证书等（原 Phase 4）
-   ├── Phase C: 音视频播放      → LibVLCSharp 集成
+   ├── Phase C: 音视频播放      → FFmpegVideoPlayer.Avalonia (免费首选) / 官方 MediaPlayer (Pro) / LibVLCSharp (极致格式)
    ├── Phase D: HDR 全景查看器  → Three.js 快速版（4h）→ Skia 进阶版（12h）
    └── Phase E: Phase 5        → 元数据优先提取（Core 层已完成，UI 适配）
 ```
 
-### 7.2 新功能的优先级建议
+### 7.2 新功能的优先级建议 (2026-09 更新)
 
 | 优先级 | 功能 | 难度 | 预估 | 说明 |
 |--------|------|:----:|:----:|------|
 | **P1** | SVG 原生预览 (`Avalonia.Svg.Skia`) | 🟢 低 | ~1h | 替换 WebView2，降低开销 |
 | **P1** | Magick.NET 统一解码（Avalonia 适配） | 🟢 低 | ~2h | 包含 PSD + HDR 等 |
+| **P1** | 音视频播放 — **MediaPlayer (wieslawsoltes)** 🆕 | 🟡 中 | ~8h | **免费首选**：GPU 无 airspace、原生后端+FFmpeg/LibVLC 回退、workflow 服务、MIT |
 | **P2** | GIF 动画 (`Avalonia.Labs.Gif`) | 🟢 低 | ~1h | 替换 WpfAnimatedGif |
 | **P2** | HDR 全景查看器 WebView2 版 | 🟡 中 | ~4h | 快速出货，Three.js |
-| **P3** | 音视频播放 (LibVLCSharp) | 🔴 高 | ~16h | 损失最大的功能，最晚落地 |
+| **P2** | 音视频播放 — **FFmpegVideoPlayer 3.0** 🆕 | 🟡 中 | ~6h | 免费简易首选：Avalonia 12.1+、FFmpeg 9.0、内置控件、DASH/YouTube |
+| **P2** | 音视频播放 — 官方 MediaPlayer (Pro €899/年) | 🟡 中 | ~6h | 预算允许首选：零依赖、原生后端、官方维护 |
+| **P3** | 音视频播放 — LibVLCSharp | 🟡 中 | ~12h | 极致格式/字幕/流媒体备选 |
 | **P4** | HDR 全景查看器 Skia 自渲染版 | 🔴 高 | ~12h | 替代 WebView2 版，更好的体验 |
 | **P4** | PSD 图层预览 (PsdSharp) | 🟡 中 | ~6h | Magick.NET 之外的可选增强 |
 
@@ -380,20 +461,22 @@ Avalonia 迁移                  → 主力
 
 ## 8. 重大依赖的体积分析与分离方案
 
-### 8.1 依赖规模总览
+### 8.1 依赖规模总览 (2026-09 更新)
 
 迁移到 Avalonia 后，预览系统涉及的第三方依赖按体积分级：
 
 | 依赖 | NuGet 包 | 体积 | 涉及格式 | 类型 |
 |------|---------|:----:|---------|------|
 | **Magick.NET** | `Magick.NET-Q16-HDRI-AnyCPU` + `Magick.NET.AvaloniaMediaImaging` | ~28MB | TGA/HDR/EXR/TIFF/PSD + 200+ 其他格式 | 原生 DLL |
+| **MediaPlayer (wieslawsoltes)** 🆕 | `MediaPlayer.Controls` + `MediaPlayer.Native.Interop` | ~15MB | 音视频播放 (GPU 无 airspace、原生后端+FFmpeg/LibVLC 回退) | 原生 DLL |
+| **FFmpegVideoPlayer.Avalonia 3.0** 🆕 | `FFmpegVideoPlayer.Avalonia` | ~15MB | 音视频播放 (FFmpeg 9.0、DASH/YouTube) | 原生 DLL |
 | **LibVLC** | `LibVLCSharp` + `libvlc` native 包 | ~30MB | 音视频播放（MP4/MP3/WAV/FLAC 等） | 原生 DLL |
 | **SkiaSharp** | `SkiaSharp` | ~5MB | 已在 Avalonia 内置 | 原生 DLL |
 | **Ghostscript** | 外部安装，非 NuGet | ~30MB | AI/EPS/PDF 渲染 | 外部 EXE |
 | **Avalonia.WebView** | `Avalonia.WebView` | ~1MB | HTML/Markdown/SVG/PDF | 托管 DLL |
 | 预览元数据解析器 | （纯 C# 自研） | 零额外 | PE/Torrent/SQLite/ISO/Office 等 | 托管代码 |
 
-**主要矛盾**：Magick.NET + LibVLC 合计 **~60MB** 原生 DLL。如果直接捆绑，安装包体积从当前的 ~10MB 膨胀到 ~70MB+，远超用户可接受范围。
+**主要矛盾**：Magick.NET + LibVLC + MediaPlayer 合计 **~75MB** 原生 DLL。如果直接捆绑，安装包体积从当前的 ~10MB 膨胀到 ~85MB+，远超用户可接受范围。
 
 ### 8.2 `preview-modular-providers.md` 方案的局限
 

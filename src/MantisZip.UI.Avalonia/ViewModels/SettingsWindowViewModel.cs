@@ -74,6 +74,16 @@ public partial class SettingsWindowViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(PreviewHeadSizeKBText))]
     private int _previewHeadSize = 4096;
 
+    // ── HTML Preview Security ──
+    [ObservableProperty]
+    private bool _allowJavaScript;
+
+    [ObservableProperty]
+    private bool _allowExternalResources;
+
+    [ObservableProperty]
+    private bool _allowNavigation;
+
     // ── Metadata Panel Settings ──
     public MetadataPanelSettingsViewModel MetadataPanelSettings { get; }
 
@@ -560,6 +570,7 @@ public partial class SettingsWindowViewModel : ObservableObject
 
     // Preview sub-tab headers (General / Image / Torrent / Executable / Metadata Panel)
     public string PreviewTabGeneralHeader => LocalizationManager.T("Settings_Preview_Tab_General");
+    public string PreviewTabHtmlHeader => LocalizationManager.T("Settings_Preview_Tab_Html");
     public string PreviewTabImageHeader => LocalizationManager.T("Settings_Preview_Tab_Image");
     public string PreviewTabTorrentHeader => LocalizationManager.T("Settings_Preview_Tab_Torrent");
     public string PreviewTabExecutableHeader => LocalizationManager.T("Settings_Preview_Tab_Executable");
@@ -569,6 +580,13 @@ public partial class SettingsWindowViewModel : ObservableObject
     public string FormatDetectionSectionText => LocalizationManager.T("Settings_FormatDetection");
     public string TorrentComingSoonText => LocalizationManager.T("Settings_Preview_TorrentComingSoon");
     public string PeComingSoonText => LocalizationManager.T("Settings_Preview_PeComingSoon");
+
+    // HTML preview security
+    public string HtmlSecuritySectionText => LocalizationManager.T("Settings_HtmlSecurity");
+    public string AllowJavaScriptText => LocalizationManager.T("Settings_AllowJavaScript");
+    public string AllowExternalResourcesText => LocalizationManager.T("Settings_AllowExternalResources");
+    public string AllowNavigationText => LocalizationManager.T("Settings_AllowNavigation");
+
     public string PasswordOptionsSectionText => LocalizationManager.T("Settings_Pwd_Options");
     public string AssocSectionText => LocalizationManager.T("Settings_Assoc_Title");
     public string DebugSectionText => LocalizationManager.T("Settings_Debug_Title");
@@ -766,6 +784,11 @@ public partial class SettingsWindowViewModel : ObservableObject
         _showPreviewInfoPanel = _settings.ShowPreviewInfoPanel;
         _enableFormatDetection = _settings.EnableFormatDetection;
         _previewHeadSize = _settings.PreviewHeadSize;
+
+        // HTML preview security
+        _allowJavaScript = _settings.AllowJavaScript;
+        _allowExternalResources = _settings.AllowExternalResources;
+        _allowNavigation = _settings.AllowNavigation;
 
         // Debug
         _enableDebugLogging = _settings.EnableDebugLogging;
@@ -1085,6 +1108,7 @@ public partial class SettingsWindowViewModel : ObservableObject
         OnPropertyChanged(nameof(PreviewHeadSizeKBText));
 
         OnPropertyChanged(nameof(PreviewTabGeneralHeader));
+        OnPropertyChanged(nameof(PreviewTabHtmlHeader));
         OnPropertyChanged(nameof(PreviewTabImageHeader));
         OnPropertyChanged(nameof(PreviewTabTorrentHeader));
         OnPropertyChanged(nameof(PreviewTabExecutableHeader));
@@ -1092,6 +1116,10 @@ public partial class SettingsWindowViewModel : ObservableObject
         OnPropertyChanged(nameof(FormatDetectionSectionText));
         OnPropertyChanged(nameof(TorrentComingSoonText));
         OnPropertyChanged(nameof(PeComingSoonText));
+        OnPropertyChanged(nameof(HtmlSecuritySectionText));
+        OnPropertyChanged(nameof(AllowJavaScriptText));
+        OnPropertyChanged(nameof(AllowExternalResourcesText));
+        OnPropertyChanged(nameof(AllowNavigationText));
         OnPropertyChanged(nameof(PasswordOptionsSectionText));
         OnPropertyChanged(nameof(AssocSectionText));
         OnPropertyChanged(nameof(DebugSectionText));
@@ -1256,6 +1284,11 @@ public partial class SettingsWindowViewModel : ObservableObject
         _settings.ShowPreviewInfoPanel = ShowPreviewInfoPanel;
         _settings.EnableFormatDetection = EnableFormatDetection;
         _settings.PreviewHeadSize = PreviewHeadSize;
+
+        // HTML preview security
+        _settings.AllowJavaScript = AllowJavaScript;
+        _settings.AllowExternalResources = AllowExternalResources;
+        _settings.AllowNavigation = AllowNavigation;
 
         // Debug
         _settings.EnableDebugLogging = EnableDebugLogging;

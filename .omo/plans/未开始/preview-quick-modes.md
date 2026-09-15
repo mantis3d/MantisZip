@@ -206,7 +206,96 @@ public interface IQuickPreviewProvider
 
 各格式的 `ShowXxxAsync`（`PreviewViewModel` 现有方法）实现此接口，或在 `PreviewService.ClassifyPreview` 分发后按 `PreviewType` switch 分支。
 
-### 3.3 渐进加载管理器
+### 3.3 提取策略：内存 vs 硬盘
+
+#### 决策原则
+
+快速预览追求**速度**，应优先使用 `MemoryStream`（无磁盘 I/O）；完整预览追求**稳定性**，大文件应提取到硬盘（内存效率）。
+
+| 因素 | 内存优先 | 硬盘优先 |
+|------|---------|---------|
+| 文件大小 | < 50MB | > 50MB |
+| 预览模式 | 快速预览 | 完整预览 |
+| 并发预览数 | 少（1-2 个） | 多（同时预览多个） |
+| 格式特性 | 流式解码 | 需要随机访问 / 文件路径 |
+
+#### 各格式策略
+
+| 格式 | 快速预览 | 完整预览 | 说明 |
+|------|---------|---------|------|
+| 文本 | ✅ 内存 | ⚠️ 看大小 | `StreamReader` 支持流 |
+| 图片 | ✅ 内存 | ⚠️ 看大小 | `SKBitmap.Decode(stream)` |
+| PDF | ✅ 内存 | ⚠️ 看大小 | `PdfDocument.Open(stream)` |
+| Office | ✅ 内存 | ⚠️ 看大小 | `XmlReader` 支持流 |
+| CSV | ✅ 内存 | ⚠️ 看大小 | `StreamReader` 支持流 |
+| SQLite | ⚠️ 仅元数据 | ❌ 必须硬盘 | SQLite 需要文件路径随机访问 |
+| 视频 | ⚠️ 仅元数据 | ❌ 必须硬盘 | 播放器需要文件路径 |
+| 音频 | ⚠️ 仅元数据 | ❌ 必须硬盘 | 播放器需要文件路径 |
+
+#### 阈值与决策逻辑
+
+```csharp
+// 阈值（与 MantisZip 现有 MaxPreviewFileSize = 15MB 对齐）
+const long MemoryThreshold = 50 * 1024 * 1024;  // 50MB
+
+public async Task<Stream> ExtractForPreviewAsync(
+    IArchiveEntry entry, PreviewMode mode, bool needsFilePath)
+{
+    // 格式要求文件路径（SQLite/视频/音频）→ 必须硬盘
+    if (needsFilePath)
+        return await ExtractToFileAsync(entry);
+    
+    // 快速预览 + 小文件 → 内存（秒开）
+    if (mode == PreviewMode.Quick && entry.Size <= MemoryThreshold)
+        return await ExtractToStreamAsync(entry);
+    
+    // 完整预览 或 大文件 → 硬盘（内存友好）
+    return await ExtractToFileAsync(entry);
+}
+```
+
+#### 快速预览的内存优化
+
+```csharp
+// ArchiveEntryExtractor 新增方法
+public static async Task<MemoryStream> ExtractToStreamAsync(
+    IArchive archive, string entryKey, string? password = null)
+{
+    var entry = archive.Entries.First(e => e.Key == entryKey);
+    var stream = new MemoryStream();
+    
+    using var entryStream = entry.OpenEntryStream();
+    await entryStream.CopyToAsync(stream);
+    
+    stream.Position = 0;  // 重置位置供读取
+    return stream;
+}
+```
+
+#### 预览流程改造
+
+```
+ShowPreviewAsync(item):
+  │
+  ├── Phase 1（已实现，不动）: ShowLoading + UpdateCommonMetadata + 版本号++
+  │
+  └── Phase 2（改造点）: 提取策略选择
+        │
+        ├── mode == 快速 + 小文件:
+        │     └── 提取到 MemoryStream → ShowXxxQuick → 显示（秒开）
+        │
+        ├── mode == 快速 + 大文件:
+        │     └── 只读元数据（内存）→ 显示"完整预览需加载"
+        │
+        ├── mode == 渐进:
+        │     ├── 提取到 MemoryStream → ShowXxxQuick → 显示（同快速）
+        │     └── _progressiveCts.Token → 后台 ShowXxxFull → 完成后无缝替换
+        │
+        └── mode == 完整:
+              └── 提取到 temp 文件（硬盘）→ ShowXxx → 全部加载 → 显示
+```
+
+### 3.4 渐进加载管理器
 
 ```csharp
 public class ProgressiveLoadManager : IDisposable
@@ -242,7 +331,7 @@ public class ProgressiveLoadManager : IDisposable
 }
 ```
 
-### 3.4 各格式关键改造点
+### 3.5 各格式关键改造点
 
 #### 图片
 

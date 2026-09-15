@@ -3,13 +3,16 @@
              xmlns:models="clr-namespace:MantisZip.UI.Avalonia.Models"
              x:Class="MantisZip.UI.Avalonia.Controls.InfoPanel"
              x:DataType="models:FormatMetadataItem">
+  <!-- 元数据信息面板：以键值对列表形式显示文件格式元数据（如文件大小、修改时间、压缩率等） -->
   <ItemsControl ItemsSource="{Binding}">
     <ItemsControl.ItemTemplate>
       <DataTemplate x:DataType="models:FormatMetadataItem">
         <Grid ColumnDefinitions="Auto,8,*" Margin="0,3">
+          <!-- 元数据键名（如"文件大小"、"修改时间"），加粗、次要色 -->
           <TextBlock Text="{Binding Key}"
                      FontWeight="Bold"
                      Foreground="{DynamicResource ThemeTextSecondary}" />
+          <!-- 元数据值（如"1.2 MB"、"2024-01-15 10:30"），主色 -->
           <TextBlock Grid.Column="2"
                      Text="{Binding Value}"
                      Foreground="{DynamicResource ThemeTextPrimary}" />

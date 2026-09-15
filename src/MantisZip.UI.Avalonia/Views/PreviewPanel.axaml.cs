@@ -13,6 +13,7 @@ using Avalonia.Layout;
 using Avalonia.Media;
 using MantisZip.UI.Avalonia.Services;
 using MantisZip.UI.Avalonia.ViewModels;
+using MantisZip.UI.Avalonia.Models;
 
 namespace MantisZip.UI.Avalonia.Views;
 
@@ -38,6 +39,15 @@ public partial class PreviewPanel : UserControl
         // 外层 ScrollViewer 的 SizeChanged，但会改变图像的可用视口高度，必须单独重算
         if (ContentTopBorder != null)
             ContentTopBorder.SizeChanged += OnContentTopSizeChanged;
+
+        // WebView 初始化安全检测：WebView2 Runtime 缺失时 NavigationCompleted 会触发
+        // 且 IsSuccess=false，此时降级到 ReverseMarkdown 控件树预览
+        if (HtmlPreviewWebView != null)
+            HtmlPreviewWebView.NavigationCompleted += OnWebViewNavigationCompleted;
+
+        // 导航拦截：根据设置阻止外部链接跳转
+        if (HtmlPreviewWebView != null)
+            HtmlPreviewWebView.NavigationStarted += OnWebViewNavigationStarted;
     }
 
     private void OnDataContextChanged(object? sender, EventArgs e)
@@ -176,6 +186,38 @@ public partial class PreviewPanel : UserControl
     private void OnContentTopSizeChanged(object? sender, SizeChangedEventArgs e)
     {
         UpdateViewportSize();
+    }
+
+    /// <summary>
+    /// WebView NavigationCompleted 事件：WebView2 Runtime 缺失或导航失败时触发，
+    /// IsSuccess=false 说明 WebView 无法渲染，降级到 ReverseMarkdown 控件树预览。
+    /// </summary>
+    private void OnWebViewNavigationCompleted(object? sender, WebViewNavigationCompletedEventArgs e)
+    {
+        if (e.IsSuccess) return;
+
+        var vm = _vm;
+        if (vm == null || !vm.IsWebViewVisible || vm.IsFallbackActive) return;
+
+        App.DebugLog($"WebView navigation failed (IsSuccess=false), falling back to ReverseMarkdown");
+        _ = vm.ShowHtmlFallback(vm.CurrentPreviewFilePath ?? "");
+    }
+
+    /// <summary>
+    /// WebView NavigationStarted 事件：根据安全设置拦截非本地导航。
+    /// AllowNavigation=false 时阻止跳转到外部 URL。
+    /// </summary>
+    private void OnWebViewNavigationStarted(object? sender, WebViewNavigationStartingEventArgs e)
+    {
+        // 如果用户允许导航，放行
+        if (AppSettings.Load().AllowNavigation) return;
+
+        // 否则阻止非文件导航（本地 HTML 文件间的跳转放行）
+        if (e.Request != null && !e.Request.IsFile)
+        {
+            e.Cancel = true;
+            App.DebugLog($"WebView navigation blocked: {e.Request}");
+        }
     }
 
     /// <summary>
