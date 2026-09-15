@@ -6,6 +6,13 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-09-15** — Office 图片预览计划新增：三方案渐进式设计
+  - `.omo/plans/已完成/office-content-preview-avalonia.md`：新增「Office 图片预览」章节（现状分析 + 方案 A/B/C + 推荐实施顺序）
+    - 方案 A（PPTX 图片，~50 行）：复用 Canvas 坐标系统，`p:pic` → `a:xfrm` 定位 + `r:embed` 图片提取
+    - 方案 B（+DOCX 行内图片，~150 行）：`w:drawing/wp:inline` 检测 + `word/media/` 提取
+    - 方案 C（浮动定位，不推荐）：DOCX `w:anchor` / XLSX `xdr:twoCellAnchor`，需重构布局系统
+  - `docs/PLAN.md`：待实现表格新增 P2 条目「Office 图片预览」
+
 **2026-09-15** — 压缩预估计划文档更新：SharpCompress per-entry 级别分析与选项联动矩阵
   - `.omo/plans/未开始/compression-estimator.md`：引擎分析重写（SharpCompress 0.49.0+ per-entry 支持）、ZIP 库生态表更新、`CompressService` 路径移除、限制章节（压缩模式/加密/文件大小）、选项联动矩阵（5 种组合）、UI 提示建议、`canPerEntry` + `ComputeMajorityLevel` 实现伪代码、DoD 更新
 

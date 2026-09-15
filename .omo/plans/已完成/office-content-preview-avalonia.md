@@ -889,6 +889,141 @@ partial void OnPptxCurrentSlideChanged(int value)
 
 **状态**: ✅ 已实现（`ShowPptx` 从 `presentation.xml` 读取 `p:sldSz` EMU 尺寸，固定 Canvas 宽 960 等比缩放；每个 `a:sp` 提取 `a:xfrm/a:off` 坐标 + 段落文本 + `a:rPr` 字号/加粗，按 Y 再按 X 排序；翻页栏 ◀ 页码/总页数 ▶ + `BuildPptxSlide` 在 `PreviewPanel.axaml.cs` 构建 TextBlock 子控件，空演示文稿显示 `Preview_PptxEmpty`、无文字幻灯片显示 `Preview_PptxSlideEmpty`）
 
+---
+
+### Office 图片预览
+
+当前 Office 预览仅支持文本内容，图片被完全忽略。本节定义三个渐进式方案，按复杂度从低到高排列，待后续决定实施哪个。
+
+#### 现状分析
+
+| 格式 | 图片存储位置 | 图片引用方式 | 当前处理 |
+|------|-------------|-------------|---------|
+| DOCX | `word/media/imageN.ext` | `w:drawing` → `r:embed` 关系ID | ❌ 忽略 |
+| PPTX | `ppt/media/imageN.ext` | `p:pic`（图片形状）或背景 | ❌ 忽略 |
+| XLSX | `xl/media/imageN.ext` | drawing 元素（浮在单元格上） | ❌ 忽略 |
+
+**核心难点**：图片预览的主要挑战不在"提取图片"，而在**布局还原**。
+
+- DOCX 图片有两种布局模式：Inline（行内，嵌入文本流）和 Anchor（浮动，绝对定位）
+- PPTX 图片相对简单：已有 Canvas 坐标定位系统
+- XLSX 图片最复杂：图片浮在单元格上方，没有明确的行列归属
+
+#### 方案 A：最小改动 — 仅 PPTX 图片（推荐起步）
+
+**改动量**：小（~50 行代码）
+
+**做法**：
+- 在 `PptxParser.WalkShapes` 中增加 `p:pic` 处理分支
+- `p:pic` 内的 `a:xfrm` 提供位置/尺寸，`r:embed` 指向图片文件
+- 提取图片字节 → `WriteableBitmap` → 放到 Canvas 对应坐标
+
+**布局处理**：图片按 `a:xfrm` 的 `off` (x,y) + `ext` (cx,cy) 缩放到 Canvas，与文本形状完全一致。
+
+**优点**：
+- 复用现有 Canvas 定位系统，改动最小
+- PPTX 图片通常就是用来展示的，价值最高
+- 不涉及文本流布局问题
+
+**技术要点**：
+```csharp
+// PptxParser.WalkShapes 中新增 p:pic 分支
+foreach (var pic in container.Elements(P + "pic"))
+{
+    // 1. 提取位置/尺寸
+    var xfrm = pic.Descendants(A + "xfrm").FirstOrDefault();
+    var off = xfrm?.Descendants(A + "off").FirstOrDefault();
+    var ext = xfrm?.Descendants(A + "ext").FirstOrDefault();
+    
+    // 2. 获取图片关系ID
+    var blipFill = pic.Descendants(A + "blipFill").FirstOrDefault();
+    var blip = blipFill?.Descendants(A + "blip").FirstOrDefault();
+    var embedId = blip?.Attribute(R + "embed")?.Value;
+    
+    // 3. 通过关系ID找到图片文件路径
+    // 4. 提取图片字节并渲染
+}
+```
+
+**状态**: 📋 待实施
+
+---
+
+#### 方案 B：中等改动 — PPTX 图片 + DOCX 行内图片
+
+**改动量**：中等（~150 行代码）
+
+**在方案 A 基础上增加**：
+- DOCX 中检测 `w:drawing/wp:inline`（行内图片）
+- 从 `word/media/` 提取图片字节
+- 在 `DocxContentPanel` 的对应段落位置插入 `Image` 控件
+
+**布局处理**：
+- 行内图片直接插入段落 TextBlock 位置（作为 InlineUIContainer）
+- **不做浮动图片**（Anchor/Position absolute）— 那是完整排版引擎的工作
+
+**优点**：
+- 覆盖 DOCX 最常见的图片场景（文档内嵌图）
+- 保持当前 StackPanel 线性布局，不破坏现有结构
+
+**技术要点**：
+```csharp
+// ShowDocx 中处理 w:drawing
+foreach (var element in body.ChildElements)
+{
+    if (element is Paragraph para)
+    {
+        // 检查段落内是否包含 w:drawing
+        var drawings = para.Descendants<Drawing>();
+        foreach (var drawing in drawings)
+        {
+            var inline = drawing.Descendants<Inline>().FirstOrDefault();
+            if (inline != null)
+            {
+                // 行内图片：提取 r:embed → 找到图片 → 插入到内容面板
+            }
+        }
+        // 原有文本处理逻辑
+        AppendDocxParagraph(para, headingStyleIds, outline, content);
+    }
+}
+```
+
+**状态**: 📋 待实施
+
+---
+
+#### 方案 C：完整但复杂 — 全格式图片 + 浮动定位
+
+**改动量**：大（~300+ 行代码，可能需要重构布局系统）
+
+**不推荐**，原因：
+- DOCX 浮动图片需要类似 WPF/Avalonia 的 `Canvas` + `ZIndex` 层叠
+- XLSX 图片需要检测所属单元格并计算相对位置
+- 这本质上是在造一个排版引擎
+
+**如果要实现**，需要：
+- DOCX: 解析 `w:anchor` 的 `simplePos`/`positionH`/`positionV` 属性
+- XLSX: 解析 `xdr:twoCellAnchor`/`xdr:oneCellAnchor` 的 `from`/`to` 单元格引用
+- 两种格式都需要将绝对坐标转换为相对布局
+
+**状态**: 📋 待定（除非有强烈需求，否则不实施）
+
+---
+
+#### 推荐实施顺序
+
+**先做方案 A（PPTX 图片）**，理由：
+
+1. **投入产出比最高** — PPTX 的图片通常是幻灯片的核心内容（截图、图表、照片），文字反而是辅助
+2. **技术风险最低** — 复用现有 Canvas 坐标系统，不需要新的布局策略
+3. **用户感知强** — 纯图片幻灯片目前显示"无文字"，加上图片支持后体验提升明显
+4. **为后续铺路** — 积累图片提取/渲染经验，再扩展到 DOCX
+
+如果方案 A 效果好，再追加 DOCX 行内图片（方案 B）。
+
+---
+
 ## 未来可复用方向
 
 左右分栏的 `OutlineItem + FullText` 模型天然适配：
