@@ -1,7 +1,7 @@
 # 自研 ZIP 引擎（Per-entry 压缩 + 多线程）
 
 > 支持 per-entry 压缩级别/方法控制 + 多线程并行压缩的纯 .NET ZIP 引擎
-> **状态**: 📋 待实施 | **阶段**: [⬜⬜⬜⬜⬜] (0/5)
+> **状态**: 📋 待实施 | **阶段**: [⬜⬜⬜⬜⬜⬜] (0/6，Phase 6 可选)
 > **前置依赖**: 无
 > **适用范围**: Core 层（MantisZip.Core）
 
@@ -26,7 +26,6 @@
 2. **Per-entry 压缩方法**：Store（不压缩）/ Deflate（标准压缩）可选
 3. **多线程压缩**：利用多核 CPU 并行压缩多个文件
 4. **零外部依赖**：纯 .NET 实现，便于跨平台和开源
-5. **AES-256 加密**：ZIP 格式标准加密
 
 ### 收益
 
@@ -180,24 +179,49 @@ WriteCentralDirectory(results);
 
 ---
 
-### Phase 5: 加密 + 测试 + 集成
+### Phase 5: 测试 + 集成
 
-**目标**：AES-256 加密 + 完整测试 + MantisZip 集成
+**目标**：完整测试 + MantisZip 集成
 
 **任务**：
-1. 实现 AES-256 加密（ZIP 格式标准）
-2. 密码验证
-3. 与 `ArchiveEngineFactory` 集成
-4. 替换 `ZipEngine` 的压缩路径
-5. 端到端测试
-6. 性能对比（vs SharpCompress）
+1. 与 `ArchiveEngineFactory` 集成（路由逻辑）
+2. 在 `AppSettings` 中添加配置选项
+3. 端到端测试
+4. 性能对比（vs SharpCompress）
+5. 代码审查
 
 **验收标准**：
-- 加密 ZIP 可被 7-Zip / Windows Explorer 正确解密
 - 所有现有测试通过
+- 新引擎可通过配置启用/禁用
 - 性能不低于 SharpCompress
 
-**预计耗时**：1-2 天
+**预计耗时**：1 天
+
+---
+
+### Phase 6（可选）: 加密支持
+
+**目标**：AES-256 加密支持（后续扩展）
+
+**前置条件**：Phase 1-5 完成且稳定运行
+
+**任务**：
+1. 评估加密实现方案（集成 SharpZipLib / 继续使用 SharpSevenZip / 自实现）
+2. 实现 per-entry 加密控制（可选加密/不加密）
+3. 密码验证
+4. 端到端测试（与 7-Zip / Windows Explorer 兼容性）
+
+**验收标准**：
+- 加密 ZIP 可被主流工具正确解密
+- per-entry 加密控制正常工作
+- 性能影响可接受
+
+**预计耗时**：2-3 天（取决于方案选择）
+
+**备注**：
+- 延迟原因：SharpZipLib 维护活跃度不高，自实现复杂度大
+- 推荐方案：继续使用 SharpSevenZip（当前已集成），或评估更活跃的替代库
+- 优先级：相对较低，per-entry 压缩控制是更核心的需求
 
 ---
 
@@ -316,9 +340,11 @@ private static CompressionMethod GetSmartMethod(string fileName)
 | `Core/Models/ZipEntry.cs` | 新增 | 条目配置模型 |
 | `Core/Utils/Crc32Calculator.cs` | 新增 | CRC32 计算 |
 | `Core/Utils/CentralDirectoryBuilder.cs` | 新增 | 中央目录组装 |
-| `Core/Abstractions/IArchiveEngine.cs` | 修改 | 新增 `SupportsPerEntryCompression` 属性 |
-| `Core/Services/CompressService.cs` | 修改 | 路由到 CustomZipEngine |
+| `Core/Engines/ArchiveEngineFactory.cs` | 修改 | 添加路由逻辑（per-entry 压缩时返回 CustomZipEngine） |
+| `Models/AppSettings.cs` | 修改 | 添加配置选项 |
 | `tests/MantisZip.Tests/Engines/CustomZipEngineTests.cs` | 新增 | 单元测试 |
+
+> **注意**：不修改 `IArchiveEngine` 接口，通过引擎类型判断是否支持 per-entry 压缩。`CompressService` 无需直接修改，通过 `ArchiveEngineFactory` 路由。
 
 ---
 
@@ -365,15 +391,49 @@ custom-zip-engine.md（本计划）
 
 ---
 
+## 配置选项
+
+在 `AppSettings` 中添加：
+
+```csharp
+/// <summary>
+/// 使用自定义 ZIP 引擎（支持 per-entry 压缩控制）。默认 false。
+/// 启用后，ZIP 压缩将使用 CustomZipEngine 替代 ZipEngine。
+/// </summary>
+public bool UseCustomZipEngine { get; set; } = false;
+
+/// <summary>
+/// 自定义 ZIP 引擎并行压缩线程数。默认 0（使用 Environment.ProcessorCount）。
+/// </summary>
+public int CustomZipEngineThreads { get; set; } = 0;
+```
+
+### 集成路径
+
+```csharp
+// ArchiveEngineFactory.GetEngineByExtension 中添加路由逻辑
+if (ext == ".zip" && AppSettings.Instance.UseCustomZipEngine)
+    return new CustomZipEngine();
+
+// 原有逻辑保持不变
+return ext switch
+{
+    ".zip" => GetEngine(ArchiveFormat.Zip),
+    // ...
+};
+```
+
+---
+
 ## 成功标准
 
 ### 功能验收
 - [ ] Per-entry 压缩级别（0-9 独立控制）
 - [ ] Per-entry 压缩方法（Store/Deflate）
 - [ ] 多线程压缩（加速比 ≥ 2x @ 8核）
-- [ ] AES-256 加密
 - [ ] 生成的 ZIP 被主流工具正确读取
 - [ ] 所有现有测试通过
+- [ ] 可通过配置启用/禁用新引擎
 
 ### 性能验收
 - [ ] 单线程性能不低于 SharpCompress
