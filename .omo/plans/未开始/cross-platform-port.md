@@ -4,6 +4,7 @@
 > **历史调研**: [cross-platform-port-research.md](cross-platform-port-research.md)（2026-06-11 迁移前可行性研究）
 > **状态**: 📋 待实施 | **当前版本**: 0.5.0
 > **创建日期**: 2026-09-07
+> **前置依赖**: `nuget-dependency-upgrade`（SharpCompress 升级到 0.50.x 后需在 macOS/Linux 验证 API 兼容性，Phase 1 的 7z/RAR 读取验证任务应基于升级后的版本执行）
 
 ---
 
@@ -93,7 +94,7 @@
 
 | 任务 | 说明 | 工作量 |
 |------|------|--------|
-| 7z 读取验证 | 测试 `SharpCompress.SevenZipArchive` 在 macOS/Linux 上读取 7z 文件（加密/固实/非固实），记录兼容性差异 | 3 天 |
+| 7z 读取验证 | 测试 `SharpCompress.SevenZipArchive` 在 macOS/Linux 上读取 7z 文件（加密/固实/非固实），记录兼容性差异。**注意**：需基于 `nuget-dependency-upgrade` 升级后的 SharpCompress 0.50.x 版本验证 | 3 天 |
 | 7z 写入策略 | 选项 A: UI 标注"macOS/Linux 7z 压缩需安装 p7zip" + CLI 调用；选项 B: 禁用 7z 压缩（只支持 ZIP+tar.gz）。**需要决策** | 1 天决策 + 2 天实现 |
 | RAR 读取验证 | 测试 `SharpCompress.RarArchive` 在非 Windows 上的 RAR5/RAR4/加密兼容性 | 2 天 |
 | `ArchiveEntryExtractor` 平台分支 | 7z/RAR 单项提取的 SharpSevenZip 调用改为 SharpCompress 分支 | 2 天 |

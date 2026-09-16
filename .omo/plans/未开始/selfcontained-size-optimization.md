@@ -12,6 +12,7 @@
 > **Estimated Effort**: Medium（~4–6h，含测试验证）
 > **Parallel Execution**: NO（严格顺序，每步验证通过才进下一步）
 > **Critical Path**: InvariantGlobalization → Trimming(partial) → Trimming(full)
+> **注意**: 若先执行 `nuget-dependency-upgrade`（SharpCompress 0.48→0.50），csproj 中的 `TrimmerRootAssembly Include="SharpCompress"` 可能需要更新版本号或调整排除规则，需在升级后重新验证 trimming 兼容性。
 
 ---
 

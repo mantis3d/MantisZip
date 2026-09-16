@@ -60,6 +60,8 @@
 | **P4** | 外部工具视频元数据 | — | 🟢低 | 2-3h | ffprobe 集成 |
 | **P2** | 跨平台移植（macOS / Linux） | [cross-platform-port.md](.omo/plans/未开始/cross-platform-port.md) | 🟡中大 | 6-8周 | ✅ WPF→Avalonia 迁移已完成（Phases 0-10）；实施计划含 Phase 0 基础设施（CI+路径适配）→ Phase 1 引擎适配（7z/RAR 跨平台）→ Phase 2 UI 适配（macOS/Linux 专项）→ Phase 3 打磨发布；需要决策：7z 压缩策略（禁用/p7zip CLI）、拖拽解压降级、右键菜单取舍 |
 
+> **执行顺序**（5 项计划有依赖链）：`nuget-dependency-upgrade`（SharpCompress ≥0.49.0）→ `compression-performance-optimization` + `compression-estimator`（可并行，均依赖升级后的 per-entry 级别/多实例并行）→ `progress-window-enhancement`（ProgressWindow 布局重构）→ `progress-bar-segments`（在重构后的 Row 4 上替换 SegmentProgressBar）。时间估算可在 progress-window-enhancement 中先用简单实时速度方案，compression-estimator 完成后再升级为加权融合方案，零返工。额外受影响计划：`cross-platform-port`（依赖 SharpCompress 升级后跨平台验证）、`selfcontained-size-optimization`（TrimmerRootAssembly 需随升级更新）、`context-menu-tree-preview`（SharpCompress API 升级后需验证条目列出兼容性）。`archive-rename-entry`/`rar-compression`/`startup-native-splash` 为软依赖，ProgressWindow 增强会自动改善体验。
+
 
 ---
 

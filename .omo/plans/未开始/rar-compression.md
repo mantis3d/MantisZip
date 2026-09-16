@@ -1,7 +1,7 @@
 # RAR 压缩（外置 rar.exe / WinRAR.exe）
 
 > **状态**: 📋 待定（已修订 2026-07-08）| **阶段**: [⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜] (0/10)
-> **前置依赖**: 无
+> **前置依赖**: 无硬依赖。若 `progress-window-enhancement` 先行实施，RAR 压缩进度上报的 ProgressWindow 将自动获得路径分离、统计栏、模式切换等增强。
 >
 > **修订说明**：补充了 SevenZipEngine 注册冲突处理、RarCompressionMethod 映射修正（缺 -m0）、CompressRequest/BuildOptions 数据链、DynamicFormatOptionsPanel 集成、取消清理、CLI 守卫等。
 
