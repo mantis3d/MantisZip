@@ -6,6 +6,12 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-09-16** — 计划文档维护：清理过时 WPF 引用，核实当前状态
+  - `selfcontained-size-optimization.md`：重写，移除所有 WPF 引用，.NET 9 → .NET 10，项目路径改为 MantisZip.UI.Avalonia，移除 WPF→Avalonia 迁移前置条件
+  - `cross-platform-port.md`：移除 `nuget-dependency-upgrade` 前置依赖，更新已完成表格（WPF 版本已删除）
+  - `cli-extract-open-folder.md`：补充当前核实结论（CLI 路径仍无打开文件夹逻辑）
+  - `compression-performance-optimization.md`：补充当前状态（缓冲区仍为 256KB）
+
 **2026-09-15** — Office 图片预览计划新增：三方案渐进式设计
   - `.omo/plans/已完成/office-content-preview-avalonia.md`：新增「Office 图片预览」章节（现状分析 + 方案 A/B/C + 推荐实施顺序）
     - 方案 A（PPTX 图片，~50 行）：复用 Canvas 坐标系统，`p:pic` → `a:xfrm` 定位 + `r:embed` 图片提取

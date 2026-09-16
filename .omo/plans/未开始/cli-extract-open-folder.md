@@ -2,6 +2,7 @@
 
 > **状态**: 📋 待实施 | **创建**: 2026-08-20 | **优先级**: P2 | **预估工时**: 2-3h
 > **来源**: [avalonia-wpf-diff-plan.md](avalonia-wpf-diff-plan.md) 待决策 #3
+> **当前核实**: CLI 路径（`RunExtractCliAsync`）仍无打开文件夹逻辑，`SmartOpenPathResolver` 仅在 UI 路径使用
 
 ## 背景
 

@@ -1,10 +1,10 @@
 # 跨平台移植实施计划
 
-> WPF→Avalonia 迁移已完成（Phases 0-10），本文档规划 macOS / Linux 平台支持的实施路径。
+> Avalonia 迁移已完成（Phases 0-10），WPF 版本已删除，本文档规划 macOS / Linux 平台支持的实施路径。
 > **历史调研**: [cross-platform-port-research.md](cross-platform-port-research.md)（2026-06-11 迁移前可行性研究）
 > **状态**: 📋 待实施 | **当前版本**: 0.5.0
 > **创建日期**: 2026-09-07
-> **前置依赖**: `nuget-dependency-upgrade`（SharpCompress 升级到 0.50.x 后需在 macOS/Linux 验证 API 兼容性，Phase 1 的 7z/RAR 读取验证任务应基于升级后的版本执行）
+> **前置依赖**: 无（WPF 已删除，Avalonia 为唯一主力项目）
 
 ---
 
@@ -14,7 +14,7 @@
 
 | 项目 | 状态 | 说明 |
 |------|------|------|
-| WPF → Avalonia UI 迁移 | ✅ 完成 | 21 个窗口全部迁移，Phases 0-10 |
+| Avalonia UI 迁移 | ✅ 完成 | WPF 版本已删除，Avalonia 为唯一主力项目 |
 | WebView2 → 原生渲染 | ✅ 完成 | HTML→Markdig 控件树；PDF→PdfPig+SkiaSharp；SVG→Svg.Skia |
 | GIF 动画 | ✅ 完成 | 自实现 `GifDecoder`，无第三方依赖 |
 | DPAPI → AES-GCM | ✅ 完成 | `AesGcmDataProtector` + `IDataProtector` 接口 |

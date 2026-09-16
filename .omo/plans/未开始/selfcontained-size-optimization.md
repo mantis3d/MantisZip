@@ -1,8 +1,8 @@
-# 自包含体积优化（Avalonia 迁移后）
+# 自包含体积优化
 
 ## TL;DR
 
-> **Quick Summary**: 当前 WPF + .NET 9 自包含安装包 ~50 MB。迁移到 Avalonia 后叠加修剪（trimming）和全球化精简，目标降至 **~20–25 MB**。本计划在 Avalonia 迁移完成后执行，按渐进式三步走，每步可独立发布验证。
+> **Quick Summary**: 当前 Avalonia + .NET 10 自包含安装包约 42–45 MB。通过叠加修剪（trimming）和全球化精简，目标降至 **~20–25 MB**。按渐进式三步走，每步可独立发布验证。
 >
 > **Deliverables**:
 > - 三步配置变更，逐步激进
@@ -22,21 +22,19 @@
 > "自包含能不能再小一些？还是说只能是这么大？"
 
 ### Discussion Summary
-当前 WPF 自包含 ~50 MB 的原因是：
+当前 Avalonia + .NET 10 自包含 ~42–45 MB 的原因是：
 - .NET 运行时核心（coreclr/hostfxr/hostpolicy）~15–20 MB
-- WPF 框架程序集 ~10–12 MB
+- Avalonia + SkiaSharp 框架 ~6–8 MB
 - 基类库 ~10–15 MB
 - 应用 + NuGet 依赖 ~5–8 MB
 - PDB 调试符号 ~3–5 MB
 
-WPF → Avalonia 迁移后的影响：
-- 去掉 WPF 框架（-10~12 MB），加上 Avalonia + SkiaSharp（+6~8 MB），**净省 ~5 MB**
-- **真正的质变**：Avalonia 天生对 trimming 友好（WPF 深度依赖反射，trimmable 很差）
+Avalonia 的优势：
+- **Avalonia 天生对 trimming 友好**（WPF 深度依赖反射，trimmable 很差）
 - Avalonia + PublishTrimmed + InvariantGlobalization 可将体积降至 **~20–25 MB**
 
 ### Research Findings
-- .NET 9 的 `PublishTrimmed` 支持 `TrimMode=partial`（保守）和 `TrimMode=full`（激进）
-- WPF 在 trimming 下容易损坏，因为 PresentationFramework 大量使用反射
+- .NET 10 的 `PublishTrimmed` 支持 `TrimMode=partial`（保守）和 `TrimMode=full`（激进）
 - Avalonia 从设计上支持 trimming/AOT，但仍需验证第三方库（SharpCompress、SharpSevenZip）的兼容性
 - `InvariantGlobalization=true` 可移除 ICU 数据文件（~10 MB），但影响全球化排序/格式
 - `PublishReadyToRun` 会增大体积（预生成本地代码），不应使用
@@ -47,7 +45,7 @@ WPF → Avalonia 迁移后的影响：
 ## Work Objectives
 
 ### Core Objective
-把 Avalonia 迁移后的自包含安装包从 ~45 MB 降至 ~20–25 MB，同时确保所有功能正常。
+把 Avalonia + .NET 10 自包含安装包从 ~42–45 MB 降至 ~20–25 MB，同时确保所有功能正常。
 
 ### Concrete Deliverables
 - 本方案文档（✅ 已完成）
@@ -69,7 +67,6 @@ WPF → Avalonia 迁移后的影响：
 - 预览：文本、图片、PDF、PE、字体、音频、SQLite、Office、ISO、Torrent、SVG、视频
 - 拖拽导出
 - ShellExt COM 右键菜单（`--install-shell` 后）
-- WebView2 预览（HTML/Markdown/PDF）
 
 ### Must NOT Have (Guardrails)
 - 不加 `PublishReadyToRun`（增大体积）
@@ -95,7 +92,7 @@ WPF → Avalonia 迁移后的影响：
 ### QA Policy
 - 每步在本地 `dotnet publish` 验证后，对比发布目录大小
 - 检查 `publish_output_selfcontained` 中的文件清单，确认关键 DLL 未被修剪掉
-- 运行 `MantisZip.UI.exe --open test.zip` 验证基本功能
+- 运行 `MantisZip.UI.Avalonia.exe --open test.zip` 验证基本功能
 
 ---
 
@@ -113,7 +110,7 @@ Wave 1: InvariantGlobalization (安全无副作用)
 
 **目标**：去掉 ICU 数据文件，预计节省 ~10 MB
 
-**修改内容**：在 `MantisZip.UI.csproj` 中添加：
+**修改内容**：在 `MantisZip.UI.Avalonia.csproj` 中添加：
 
 ```xml
 <PropertyGroup Condition="'$(RuntimeIdentifier)' != ''">
@@ -136,15 +133,15 @@ Wave 1: InvariantGlobalization (安全无副作用)
 **回滚方式**：删除或注释 `InvariantGlobalization` 行。
 
 **预估效果**：
-| 项目 | 当前（WPF） | Avalonia 迁移后（无修剪） | Wave 1 后 |
-|------|------------|-------------------------|-----------|
-| 安装包体积 | ~50 MB | ~42–45 MB | ~32–35 MB |
+| 项目 | 当前（Avalonia + .NET 10） | Wave 1 后 |
+|------|---------------------------|-----------|
+| 安装包体积 | ~42–45 MB | ~32–35 MB |
 
 ### Wave 2 — 保守修剪（TrimMode=partial）
 
 **目标**：启用修剪但采用保守模式，预计再节省 ~5–8 MB
 
-**修改内容**：在 `MantisZip.UI.csproj` 添加：
+**修改内容**：在 `MantisZip.UI.Avalonia.csproj` 添加：
 
 ```xml
 <PropertyGroup Condition="'$(RuntimeIdentifier)' != ''">
@@ -176,7 +173,7 @@ Wave 1: InvariantGlobalization (安全无副作用)
 - SharpSevenZip 2.0.45：P/Invoke 方式调用 7z.dll，修剪不影响
 - CommunityToolkit.Mvvm 8.4.2：用源生成器，修剪安全
 - Microsoft.Data.Sqlite 10.0.8：ADO.NET 反射，需排除
-- Markdig 1.2.0：需排除
+- Markdig 0.40.0：需排除
 
 **预估效果**：
 | 项目 | Wave 1 后 | Wave 2 后 |
@@ -225,22 +222,15 @@ Wave 1: InvariantGlobalization (安全无副作用)
 
 ## Relation to existing plans
 
-本计划 **不能在前端进行 Avalonia 迁移完成前执行**，它假设：
-- `MantisZip.UI` 已从 WPF 完全迁移到 Avalonia
-- `TargetFramework` 已改为纯 `net9.0`（而非 `net9.0-windows*`）
-- `UseWPF` 已移除
-- 所有 WPF 特定依赖（PresentationFramework 等）已移除
-- WpfAnimatedGif、Emoji.Wpf 等 WPF 专用包已替换
-
-否则 `PublishTrimmed` 会严重破坏 WPF 的反射功能。
+本计划 **在 Avalonia 迁移完成后执行**，前提条件已满足：
+- ✅ `MantisZip.UI.Avalonia` 已是主力项目
+- ✅ `TargetFramework` 已改为纯 `net10.0`
+- ✅ WPF 版本已删除
+- ✅ 所有 WPF 特定依赖已移除
 
 ### 依赖关系图
 
 ```
-┌─────────────────────┐
-│ Avalonia 迁移       │ (外部计划：cross-platform-port.md)
-└────────┬────────────┘
-         ▼
 ┌─────────────────────┐
 │ 本计划 Wave 1        │ InvariantGlobalization
 └────────┬────────────┘
@@ -261,13 +251,13 @@ Wave 1: InvariantGlobalization (安全无副作用)
 ### Wave 1: InvariantGlobalization
 
 **What to do**:
-1. 在 `MantisZip.UI.csproj` 中添加条件属性（仅 RID 不为空时生效）
+1. 在 `MantisZip.UI.Avalonia.csproj` 中添加条件属性（仅 RID 不为空时生效）
 2. 本地运行 `dotnet publish -r win-x64 --self-contained -c Release -o publish_size_test`
 3. 对比 `publish_size_test` 文件夹大小与 baseline
-4. 运行 `publish_size_test\MantisZip.UI.exe` 确认基本功能
+4. 运行 `publish_size_test\MantisZip.UI.Avalonia.exe` 确认基本功能
 5. 提交：`feat: enable InvariantGlobalization for self-contained builds`
 
-**Files to modify**: `src/MantisZip.UI/MantisZip.UI.csproj`
+**Files to modify**: `src/MantisZip.UI.Avalonia/MantisZip.UI.Avalonia.csproj`
 
 **Acceptance Criteria**:
 - [ ] csproj 中新增 `InvariantGlobalization=true` 条件属性
@@ -278,12 +268,12 @@ Wave 1: InvariantGlobalization (安全无副作用)
 ### Wave 2: TrimMode=partial
 
 **What to do**:
-1. 在 `MantisZip.UI.csproj` 中的 RID 条件块添加 `PublishTrimmed=true` + `TrimMode=partial`
+1. 在 `MantisZip.UI.Avalonia.csproj` 中的 RID 条件块添加 `PublishTrimmed=true` + `TrimMode=partial`
 2. 添加 `TrimmerRootAssembly` 排除 SharpCompress、SharpSevenZip、Microsoft.Data.Sqlite、Markdig
 3. 本地 publish + 冒烟测试
 4. 提交：`feat: enable partial trimming for self-contained builds`
 
-**Files to modify**: `src/MantisZip.UI/MantisZip.UI.csproj`
+**Files to modify**: `src/MantisZip.UI.Avalonia/MantisZip.UI.Avalonia.csproj`
 
 **Acceptance Criteria**:
 - [ ] csproj 中新增 `PublishTrimmed=true` + `TrimMode=partial`
@@ -300,7 +290,7 @@ Wave 1: InvariantGlobalization (安全无副作用)
 4. 完整手动测试所有功能
 5. 提交：`feat: enable full trimming for self-contained builds`
 
-**Files to modify**: `src/MantisZip.UI/MantisZip.UI.csproj`
+**Files to modify**: `src/MantisZip.UI.Avalonia/MantisZip.UI.Avalonia.csproj`
 
 **Acceptance Criteria**:
 - [ ] `TrimMode=full` 生效
