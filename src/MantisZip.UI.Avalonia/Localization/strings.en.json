@@ -383,6 +383,7 @@
   "Extract_DestinationPlaceholder": "Select destination folder",
   "Extract_Header": "Extract To",
   "Extract_OpenFolder": "Open folder after extract",
+  "Extract_ParallelDegree": "Parallel extract threads (1=serial)",
   "Extract_Options": "Extract Options",
   "Extract_PreserveRoot": "Preserve Directory Structure",
   "Extract_SourceArchives": "Source Archives",

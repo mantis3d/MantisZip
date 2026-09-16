@@ -381,6 +381,7 @@
   "Extract_DestinationPlaceholder": "选择目标文件夹",
   "Extract_Header": "解压到",
   "Extract_OpenFolder": "解压后打开文件夹",
+  "Extract_ParallelDegree": "并行解压线程数 (1=串行)",
   "Extract_Options": "解压选项",
   "Extract_PreserveRoot": "保留目录结构",
   "Extract_SourceArchives": "源压缩包",
