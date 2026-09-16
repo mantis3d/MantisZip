@@ -385,7 +385,7 @@ public class ZipEngine : IArchiveEngine
     }
 
     /// <summary>
-    /// 并行解压实现（每个线程独立打开 archive 实例，线程安全）。
+    /// 并行解压实现（批次复用 archive 实例，Round-Robin 分批，线程安全）。
     /// </summary>
     private async Task<ExtractResult> ExtractAsyncParallel(
         string archivePath,
@@ -400,7 +400,7 @@ public class ZipEngine : IArchiveEngine
         CoreLog.Info($"ExtractAsyncParallel: {archivePath} -> {destinationPath}, parallelism={maxParallelism}");
         var sw = Stopwatch.StartNew();
 
-        // 1. 获取所有条目键和文件大小（单线程打开 archive）
+        // 1. 获取所有条目键和文件大小（单线程打开 archive 一次）
         var entryInfos = new List<(string Key, long Size, DateTime? Modified)>();
         long totalBytes = 0;
 
@@ -448,118 +448,144 @@ public class ZipEngine : IArchiveEngine
             .OrderByDescending(info => info.Size)
             .ToList();
 
-        // 4. 并行解压
+        // 4. Round-Robin 分批：将排序后的文件均匀分配到 N 个批次
+        //    大文件自动分散到不同批次，实现天然负载均衡
+        var batches = new List<(string Key, long Size, DateTime? Modified)>[maxParallelism];
+        for (int i = 0; i < maxParallelism; i++)
+            batches[i] = new List<(string Key, long Size, DateTime? Modified)>();
+
+        for (int i = 0; i < sortedInfos.Count; i++)
+        {
+            batches[i % maxParallelism].Add(sortedInfos[i]);
+        }
+
+        // 过滤空批次（文件数少于并行度时）
+        var nonEmptyBatches = batches.Where(b => b.Count > 0).ToList();
+        int actualParallelism = nonEmptyBatches.Count;
+
+        // 5. 并行解压：每批次一个线程，复用 1 个 archive 实例
         int processedFiles = 0;
         long processedBytes = 0;
         int failedEntries = 0;
         var syncLock = new object();
-        var lastReportTime = DateTime.Now;
         var reportInterval = TimeSpan.FromMilliseconds(100);
 
-        await Parallel.ForEachAsync(sortedInfos, new ParallelOptions
+        await Parallel.ForEachAsync(nonEmptyBatches, new ParallelOptions
         {
-            MaxDegreeOfParallelism = maxParallelism,
+            MaxDegreeOfParallelism = actualParallelism,
             CancellationToken = cancellationToken
-        }, async (info, ct) =>
+        }, async (batch, ct) =>
         {
-            cancellationToken.ThrowIfCancellationRequested();
+            // ★ 每线程只打开 1 次 archive，处理整批文件
+            using var archive = OpenArchiveWithEncodingFallback(archivePath, password);
 
-            var (entryKey, entrySize, entryModified) = info;
-            var outputPath = FileConflictHelper.GetSafePath(destinationPath, entryKey);
-
-            // 冲突处理（需要同步）
-            string? resolvedPath;
-            lock (syncLock)
+            foreach (var (entryKey, entrySize, entryModified) in batch)
             {
-                resolvedPath = FileConflictHelper.ResolvePath(outputPath, options, entryModified, entrySize);
-            }
+                ct.ThrowIfCancellationRequested();
 
-            if (resolvedPath == null)
-            {
+                var outputPath = FileConflictHelper.GetSafePath(destinationPath, entryKey);
+
+                // 冲突处理（需要同步）
+                string? resolvedPath;
                 lock (syncLock)
                 {
-                    processedBytes += entrySize;
-                }
-                return;
-            }
-
-            try
-            {
-                // 每个线程独立打开 archive（线程安全的关键）
-                using var archive = OpenArchiveWithEncodingFallback(archivePath, password);
-                var entry = archive.Entries.FirstOrDefault(e => e.Key == entryKey);
-                if (entry == null)
-                {
-                    lock (syncLock) Interlocked.Increment(ref failedEntries);
-                    return;
+                    resolvedPath = FileConflictHelper.ResolvePath(
+                        FileConflictHelper.GetSafePath(destinationPath, entryKey),
+                        options, entryModified, entrySize);
                 }
 
-                using var entryStream = entry.OpenEntryStream();
-                using var outputStream = File.Create(resolvedPath);
-                var buffer = new byte[CopyBufferSize];
-                long entryProcessed = 0;
-                var entryLastReportTime = DateTime.Now;
-
-                while (true)
+                if (resolvedPath == null)
                 {
-                    ct.ThrowIfCancellationRequested();
-                    var read = await entryStream.ReadAsync(buffer, 0, buffer.Length, ct);
-                    if (read <= 0) break;
-
-                    await outputStream.WriteAsync(buffer, 0, read, ct);
-                    entryProcessed += read;
-
-                    // 报告当前文件进度（节流）
-                    var now = DateTime.Now;
-                    if (now - entryLastReportTime >= reportInterval || entryProcessed >= entrySize)
+                    lock (syncLock)
                     {
-                        lock (syncLock)
+                        processedBytes += entrySize;
+                    }
+                    continue;
+                }
+
+                try
+                {
+                    var entry = archive.Entries.FirstOrDefault(e => e.Key == entryKey);
+                    if (entry == null)
+                    {
+                        lock (syncLock) Interlocked.Increment(ref failedEntries);
+                        continue;
+                    }
+
+                    using var entryStream = entry.OpenEntryStream();
+                    using var outputStream = File.Create(resolvedPath);
+                    var buffer = new byte[CopyBufferSize];
+                    long entryProcessed = 0;
+                    var entryLastReportTime = DateTime.Now;
+
+while (true)
                         {
-                            var filePct = entrySize > 0 ? (double)entryProcessed / entrySize * 100 : 100;
-                            var overallPct = totalBytes > 0 ? (double)(processedBytes + entryProcessed) / totalBytes * 100 : 0;
-                            progress?.Report(new ArchiveProgress
+                            ct.ThrowIfCancellationRequested();
+                            var read = await entryStream.ReadAsync(buffer, 0, buffer.Length, ct);
+                            if (read <= 0) break;
+
+                            await outputStream.WriteAsync(buffer, 0, read, ct);
+                            entryProcessed += read;
+
+                            // 报告当前文件进度（节流）
+                            var now = DateTime.Now;
+                            if (now - entryLastReportTime >= TimeSpan.FromMilliseconds(100) || entryProcessed >= entrySize)
                             {
-                                CurrentFile = entryKey,
-                                TotalFiles = entryInfos.Count,
-                                ProcessedFiles = processedFiles,
-                                TotalBytes = totalBytes,
-                                ProcessedBytes = processedBytes + entryProcessed,
-                                PercentComplete = overallPct,
-                                FilePercentComplete = filePct
-                            });
+                                // 先在锁内拷贝共享变量，释放锁后再上报进度，避免锁竞争
+                                int localProcessedFiles;
+                                long localProcessedBytes;
+                                lock (syncLock)
+                                {
+                                    localProcessedFiles = processedFiles;
+                                    localProcessedBytes = processedBytes;
+                                }
+
+                                var filePct = entrySize > 0 ? (double)entryProcessed / entrySize * 100 : 100;
+                                var overallPct = totalBytes > 0 ? (double)(localProcessedBytes + entryProcessed) / totalBytes * 100 : 0;
+                                progress?.Report(new ArchiveProgress
+                                {
+                                    CurrentFile = entryKey,
+                                    TotalFiles = entryInfos.Count,
+                                    ProcessedFiles = localProcessedFiles,
+                                    TotalBytes = totalBytes,
+                                    ProcessedBytes = localProcessedBytes + entryProcessed,
+                                    PercentComplete = overallPct,
+                                    FilePercentComplete = filePct
+                                });
+
+                                entryLastReportTime = now;
+                            }
                         }
-                        entryLastReportTime = now;
+
+                    // 恢复文件原始修改时间
+                    try { File.SetLastWriteTime(resolvedPath, entryModified ?? DateTime.MinValue); }
+                    catch (Exception tsEx) { CoreLog.Info($"ExtractAsyncParallel: failed to set timestamp on {resolvedPath}: {tsEx.Message}"); }
+
+                    lock (syncLock)
+                    {
+                        processedBytes += entrySize;
+                        Interlocked.Increment(ref processedFiles);
                     }
                 }
-
-                // 恢复文件原始修改时间
-                try { File.SetLastWriteTime(resolvedPath, entryModified ?? DateTime.MinValue); }
-                catch (Exception tsEx) { CoreLog.Info($"ExtractAsyncParallel: failed to set timestamp on {resolvedPath}: {tsEx.Message}"); }
-
-                lock (syncLock)
+                catch (OperationCanceledException)
                 {
-                    processedBytes += entrySize;
-                    Interlocked.Increment(ref processedFiles);
+                    throw;
                 }
-            }
-            catch (OperationCanceledException)
-            {
-                throw;
-            }
-            catch (UnauthorizedAccessException uax)
-            {
-                CoreLog.Info($"ExtractAsyncParallel: permission denied for '{entryKey}': {uax.Message}");
-                lock (syncLock) Interlocked.Increment(ref failedEntries);
-            }
-            catch (IOException iox)
-            {
-                CoreLog.Info($"ExtractAsyncParallel: write failed for '{entryKey}': {iox.Message}");
-                lock (syncLock) Interlocked.Increment(ref failedEntries);
-            }
-            catch (Exception ex)
-            {
-                CoreLog.Info($"ExtractAsyncParallel: unexpected error for '{entryKey}': {ex.Message}");
-                lock (syncLock) Interlocked.Increment(ref failedEntries);
+                catch (UnauthorizedAccessException uax)
+                {
+                    CoreLog.Info($"ExtractAsyncParallel: permission denied for '{entryKey}': {uax.Message}");
+                    lock (syncLock) Interlocked.Increment(ref failedEntries);
+                }
+                catch (IOException iox)
+                {
+                    CoreLog.Info($"ExtractAsyncParallel: write failed for '{entryKey}': {iox.Message}");
+                    lock (syncLock) Interlocked.Increment(ref failedEntries);
+                }
+                catch (Exception ex)
+                {
+                    CoreLog.Info($"ExtractAsyncParallel: unexpected error for '{entryKey}': {ex.Message}");
+                    lock (syncLock) Interlocked.Increment(ref failedEntries);
+                }
             }
         });
 

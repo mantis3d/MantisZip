@@ -144,7 +144,7 @@ public class ParallelExtractTests : IDisposable
     /// 性能基准测试：验证并行解压比串行有显著加速（针对多小文件场景，100 个 1MB 文件）。
     /// 注意：实际加速比取决于硬件环境（CPU核心数、SSD性能等），CI环境可能较低。
     /// 计划中的 6.32x 基于 8核 CPU + NVMe SSD 理想环境。
-    /// 已知问题：当前实现每文件打开一次 archive，对小文件(1MB)开销较大，实际加速需更大文件或更多文件。
+    /// 已优化：批次复用 archive 实例（每线程1实例处理多文件），减少 OpenArchive 开销。
     /// </summary>
     [Fact(Skip = "性能基准测试，环境依赖强，需手动运行验证")]
     public async Task Benchmark_ParallelVsSequential_Speedup()
