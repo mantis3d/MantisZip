@@ -1,8 +1,8 @@
 # 压缩/解压性能优化 (Compression Performance Optimization)
 
 > 通过并行化和缓冲区优化，将 ZIP 解压速度提升 5-10 倍
-> **状态**: 🟢 解压并行已完成 · 🟢 7z 多线程压缩已完成 | **阶段**: [✅✅✅✅⬜] (4/5)
-> **注**: 并行解压为自研实现（SharpCompress 官方不支持）；7z 多线程经实测验证可行（4.63x）；ZIP 分组并行压缩暂缓
+> **状态**: 🟢 解压并行已完成 · 🟢 7z 多线程压缩已完成 | **阶段**: [✅✅✅✅] (4/4)
+> **注**: 并行解压为自研实现（SharpCompress 官方不支持）；7z 多线程经实测验证可行（4.63x）；ZIP 并行压缩已移至 [custom-zip-engine.md](custom-zip-engine.md)（自研 ZIP 引擎，含 per-entry 压缩控制）
 
 ---
 
