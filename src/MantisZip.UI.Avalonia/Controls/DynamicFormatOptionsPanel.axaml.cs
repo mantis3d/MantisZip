@@ -36,6 +36,7 @@ public partial class DynamicFormatOptionsPanel : UserControl
     public string DictSizeLabel => LocalizationManager.T("FormatOptions_7z_DictionarySize");
     public string WordSizeLabel => LocalizationManager.T("FormatOptions_7z_WordSize");
     public string MatchFinderLabel => LocalizationManager.T("FormatOptions_7z_MatchFinder");
+    public string MultiThreadLabel => LocalizationManager.T("FormatOptions_7z_MultiThread");
     public string TarGzPlaceholder => LocalizationManager.T("FormatOptions_TarGz_Placeholder");
 
     // ── CLR Properties ─────────────────────────────────────────────────────
@@ -136,6 +137,18 @@ public partial class DynamicFormatOptionsPanel : UserControl
         }
     }
 
+    /// <summary>
+    /// 7z 多线程压缩（mt=on）。仅对 7z 格式有效；非 7z 格式返回 true（引擎侧忽略）。
+    /// </summary>
+    public bool SevenZipMultithreaded
+    {
+        get
+        {
+            if (SelectedFormat != "7z") return true;
+            return MultiThreadCheck.IsChecked == true;
+        }
+    }
+
     // ── Constructor ────────────────────────────────────────────────────────
 
     public DynamicFormatOptionsPanel()
@@ -165,6 +178,15 @@ public partial class DynamicFormatOptionsPanel : UserControl
             SolidBlockSizeCombo.IsEnabled = SolidCheck.IsChecked == true;
     }
 
+    /// <summary>
+    /// 多线程压缩复选框变更 — 当前无联动控件（仅影响引擎侧 mt=on 参数），
+    /// 保留事件以便后续扩展（如线程数选择）。
+    /// </summary>
+    private void MultiThreadCheck_IsCheckedChanged(object? sender, RoutedEventArgs e)
+    {
+        // 无需联动控件；占位以便未来添加线程数控件时启用/禁用
+    }
+
     // ── Public Methods ─────────────────────────────────────────────────────
 
     /// <summary>
@@ -192,6 +214,8 @@ public partial class DynamicFormatOptionsPanel : UserControl
 
         SolidCheck.IsChecked = s.SevenZipSolid;
         SolidBlockSizeCombo.IsEnabled = s.SevenZipSolid;
+
+        MultiThreadCheck.IsChecked = s.SevenZipMultithreaded;
 
         SelectComboByTag(SolidBlockSizeCombo, s.SevenZipSolidBlockSize ?? "");
         SelectComboByIntValue(DictSizeCombo, s.SevenZipDictionarySize);

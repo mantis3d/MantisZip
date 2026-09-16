@@ -194,6 +194,9 @@ public partial class CompressSettingsViewModel : ObservableObject
     /// <summary>7z 匹配器：""=默认，或 "bt2" / "bt3" / "bt4"。</summary>
     public string SevenZipMatchFinder { get; set; } = "";
 
+    /// <summary>7z 多线程压缩（mt=on）。默认 true，利用多核 CPU 并行压缩。</summary>
+    public bool SevenZipMultithreaded { get; set; } = true;
+
     // ── 分卷 ──
 
     /// <summary>分卷大小选项（共享数据源）。</summary>
@@ -569,6 +572,7 @@ public partial class CompressSettingsViewModel : ObservableObject
             SevenZipDictionarySize = settings.SevenZipDictionarySize;
             SevenZipNumFastBytes = settings.SevenZipNumFastBytes;
             SevenZipMatchFinder = settings.SevenZipMatchFinder ?? "";
+            SevenZipMultithreaded = settings.SevenZipMultithreaded;
             ZipEncryptionMethod = settings.ZipEncryptionMethod ?? "aes256";
             SevenZipEncryptHeaders = settings.SevenZipEncryptHeaders;
         }

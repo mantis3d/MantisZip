@@ -6,6 +6,21 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-09-16** — 压缩/解压性能优化（解压并行调度 + 7z 多线程压缩 UI）
+  - **7z 多线程压缩接线**：
+    - `Controls/DynamicFormatOptionsPanel.axaml(.cs)`：7z 面板新增「多线程压缩」复选框（`MultiThreadCheck`）+ `SevenZipMultithreaded` 只读属性 + `MultiThreadCheck_IsCheckedChanged`
+    - `ViewModels/CompressSettingsViewModel.cs`：新增 `SevenZipMultithreaded` 属性 + 从 AppSettings 加载初始值
+    - `Dialogs/CompressSettingsWindow.axaml.cs`：`SnapshotFormatOptionsToViewModel` 快照面板值
+    - `Services/CompressFlow.cs`：`BuildRequest` 映射到 `CompressRequest.SevenZipMultithreaded`
+    - `Views/MainWindow.axaml.cs`：对话框 VM → 执行 VM 拷贝
+    - `Views/SettingsWindow.axaml` + `ViewModels/SettingsWindowViewModel.cs`：设置窗口 7z 默认选项新增全局开关（`SevenZipMultithreaded` 字段/文本/加载/保存/OnPropertyChanged）
+    - `Models/AppSettings.cs`：`SevenZipMultithreaded`（默认 true）
+  - **解压并行调度**（`ParallelExtractDegree` 1-16，默认 CPU 核心数）：
+    - `Dialogs/ExtractSettingsWindow.axaml` 解压标签页 NumericUpDown + `ViewModels/ExtractSettingsViewModel.cs` 绑定
+    - `Services/ExtractFlow.cs` / `SelectedItemsExtractService.cs` 传递并行度到引擎
+  - **i18n**：新增 `FormatOptions_7z_MultiThread`（压缩对话框）+ `Settings_SevenZip_MultiThread`（设置窗口），zh-CN/en 成对同步（1168 keys 对齐）
+  - 验证：Core 380 + Avalonia 96 测试全绿，0 构建错误 0 警告
+
 **2026-09-16** — Avalonia 12.0.4 → 12.1.2 全栈升级
   - **MantisZip.UI.Avalonia.csproj**：
     - Avalonia 12.0.4 → 12.1.2
@@ -1369,6 +1384,23 @@
 
 ## 共享层（Core / ShellExt / 构建）
 这些变更影响两项目共用代码，按时间从新到旧排列。
+
+#### v0.5.0 (2026-09-16) 压缩/解压性能优化 — 并行解压（批次复用）+ 7z 多线程压缩
+  - **`Core/Engines/ZipEngine.cs`**：
+    - `CopyBufferSize` 256KB → 4MB（`4194304`）
+    - 新增 `ExtractAsyncParallel`：Round-Robin 分批（`i % N`，大文件降序后自动分散到不同批次）→ `Parallel.ForEachAsync` 每批次**复用 1 个 archive 实例**处理整批（减少 80-90% OpenArchive 开销）
+    - 进度报告先在锁内拷贝共享变量（`processedFiles`/`processedBytes`），**释放锁后**再 `progress?.Report()` —— 修复锁内上报导致的 8 线程争用（100×1MB 解压 0.3s → 8.5s，25x 回退）
+    - `ExtractAsync` 按文件数 + `ParallelExtractDegree` 自动选择串行（`ExtractAsyncSequential`）/并行
+  - **`Core/Engines/TarGzEngine.cs`**、**`Core/Utils/ZipBinaryRewriter.cs`**：`CopyBufferSize` 256KB → 4MB
+  - **`Core/Abstractions/ArchiveEngine.cs`**：`IArchiveEngine.SupportsParallelExtract`（仅 ZipEngine 返回 true）+ `ArchiveOptions.ParallelExtractDegree`（1=串行，0=默认 CPU 核心数）
+  - **`Core/Engines/SevenZipEngine.cs`**：`ConfigureCompressor` 新增 `compr.CustomParameters["mt"] = options.SevenZipMultithreaded ? "on" : "off"`（7z.dll 原生多线程，`SharpSevenZipCompressor` 无 `mt` 属性只能走 CustomParameters）
+  - **`Core/Abstractions/ArchiveEngine.cs`**：`ArchiveOptions.SevenZipMultithreaded`（默认 true）
+  - **`Core/Services/CompressService.cs`**：`CompressRequest.SevenZipMultithreaded`（init 属性）+ `BuildOptions` 映射到 `ArchiveOptions`
+  - **测试**：
+    - `ParallelExtractTests`（5 用例：并行正确性/线程安全/度=1 退化串行/取消/单文件走串行）+ `Benchmark_ParallelVsSequential_Speedup`（Skip，环境依赖）
+    - `SevenZipEngineTests.CompressAsync_MultiThreaded_CreatesValidArchive`：mt=on 压缩 → 解压**逐字节比对** → `TestArchiveAsync` 完整性校验（+`CompressAsync_SingleThreaded_CreatesValidArchive` 基线 + `Benchmark_CompressMTVsST`）
+  - **实测**（100 × 1MB 随机数据，8 核）：7z 单线程 38745ms → 多线程 8370ms（**4.63x**）；ZIP 解压 100×1MB 小文件 1.04x（小文件开销占主导，大文件/NVMe 收益明显）
+  - 验证：Core 380 通过 / 2 跳过，Avalonia 96 通过 / 2 跳过，0 构建错误
 
 #### v0.5.0 (2026-09-12) 损坏压缩包打开静默无报错修复（ZipEngine 严格解析 + TarGzEngine 移除静默 catch）
   - **ZipEngine**：`OpenArchiveWithEncodingFallback` 主路径 + GBK 回退两处改用 `ZipArchive.OpenArchive`（严格 ZIP 解析）——原 `ArchiveFactory.OpenArchive` 魔数嗅探会把全零/垃圾文件误判为 Tar（0 条目，损坏信号被吞），TestPreview/testZip 的全零 zip1.zip 实测原行为「打开成功但 0 内容、测试 8ms 通过」；修复后抛 `ArchiveException: Failed to locate the Zip Header`

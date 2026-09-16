@@ -23,6 +23,11 @@ public class AppSettings
     public int SevenZipDictionarySize { get; set; } = 0;
     public int SevenZipNumFastBytes { get; set; } = 0;
     public string SevenZipMatchFinder { get; set; } = "";
+    /// <summary>
+    /// 7z 多线程压缩（mt=on）。默认 true，利用多核 CPU 并行压缩。
+    /// 仅对 7z 格式有效。
+    /// </summary>
+    public bool SevenZipMultithreaded { get; set; } = true;
     public string ZipCompressionMethod { get; set; } = "deflate";
     public string ZipEncryptionMethod { get; set; } = "aes256";
     public bool SevenZipEncryptHeaders { get; set; } = true;

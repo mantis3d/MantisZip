@@ -1,8 +1,8 @@
 # 压缩/解压性能优化 (Compression Performance Optimization)
 
 > 通过并行化和缓冲区优化，将 ZIP 解压速度提升 5-10 倍
-> **状态**: 🟢 解压并行已完成 | **阶段**: [✅✅✅⬜⬜] (3/5)
-> **注**: 并行解压为自研实现（SharpCompress 官方不支持）；压缩并行暂缓，待 SharpSevenZip 验证
+> **状态**: 🟢 解压并行已完成 · 🟢 7z 多线程压缩已完成 | **阶段**: [✅✅✅✅⬜] (4/5)
+> **注**: 并行解压为自研实现（SharpCompress 官方不支持）；7z 多线程经实测验证可行（4.63x）；ZIP 分组并行压缩暂缓
 
 ---
 
@@ -57,6 +57,17 @@
 | SharpCompress 多实例并行 | ✅ 6.32x | 已验证可行 |
 | 缓冲区 256KB → 4MB | ✅ 1.7x | 已验证可行 |
 | **组合优化** | **~10x** | 最佳方案 |
+| **7z mt=on 多线程压缩** | **✅ 4.63x** | 已验证可行 |
+
+### 测试 4: 7z 多线程压缩（mt=on，100 × 1MB 随机数据，8 核）
+
+```
+单线程 (mt=off): 38745 ms
+多线程 (mt=on):   8370 ms
+加速比: 4.63x
+```
+
+验证方式：生成的 7z 归档解压后与源文件**逐字节比对** + `TestArchiveAsync` 完整性校验，确保多线程不会产出损坏归档。
 
 ---
 
@@ -156,17 +167,25 @@ await Parallel.ForEachAsync(entryKeys, async (key, ct) => {
 
 ### Phase 3: 并行压缩（待验证/可选）
 
-- [ ] **6. 研究 SharpSevenZip 多线程压缩**
+- [x] **6. 研究 SharpSevenZip 多线程压缩** ✅ 已完成
   - 目标: 验证 7z 压缩是否原生支持多线程 (`mt=on`)
-  - 方法: 测试 `compr.CustomParameters["mt"] = "on"`
-  - 如果可行: 直接启用，无需代码改动
-  - 状态: ⏳ 待验证（风险最低，优先级最高）
+  - 方法: `compr.CustomParameters["mt"] = "on"`
+  - **结论: ✅ 可行** — 生成的 7z 归档经解压逐字节比对 + `TestArchiveAsync` 完整性校验通过
+  - **实测性能**（100 × 1MB 随机数据，8 核）:
+    ```
+    单线程: 38745 ms
+    多线程:  8370 ms
+    加速比: 4.63x
+    ```
+  - 实现: `ArchiveOptions.SevenZipMultithreaded`（默认 true）→ `SevenZipEngine.ConfigureCompressor` 设置 `mt=on/off`
+  - UI: 压缩对话框 7z 面板复选框 + 设置窗口全局默认值
+  - 状态: ✅ 已完成（含单元测试 2 例 + 基准测试 1 例）
 
 - [ ] **7. 实现 ZipEngine 分组并行压缩**
   - 思路: 将文件分成 N 组，每组压缩到临时文件，最后合并中央目录
   - 适用场景: 大量小文件（每个文件压缩独立）
   - 注意: 合并阶段需串行写入中央目录，需自研合并器
-  - 状态: ⏸️ 暂缓（风险较高，待 Task 6 结果后决定）
+  - 状态: ⏸️ 暂缓（风险高：需自研 ZIP 中央目录合并器，收益/风险比低于 7z mt=on）
 
 ### Phase 4: 测试与验证 ✅ 解压部分已完成
 
@@ -220,11 +239,21 @@ await Parallel.ForEachAsync(entryKeys, async (key, ct) => {
 | `UI/Dialogs/ExtractSettingsWindow.axaml` | 新增 | 设置 UI (NumericUpDown 1-16) | ✅ |
 | `UI/ViewModels/ExtractSettingsViewModel.cs` | 新增 | `ParallelExtractDegree` 属性绑定 | ✅ |
 | `tests/MantisZip.Tests/Engines/ParallelExtractTests.cs` | 新增 | 单元测试 (5用例+基准) | ✅ |
+| `Core/Engines/SevenZipEngine.cs` | 修改 | `mt=on` 多线程压缩（`CustomParameters["mt"]`） | ✅ |
+| `Core/Abstractions/ArchiveEngine.cs` | 新增 | `ArchiveOptions.SevenZipMultithreaded`（默认 true） | ✅ |
+| `Core/Services/CompressService.cs` | 修改 | `CompressRequest.SevenZipMultithreaded` + `BuildOptions` 映射 | ✅ |
+| `UI/Models/AppSettings.cs` | 新增 | `SevenZipMultithreaded` 全局默认 | ✅ |
+| `UI/Controls/DynamicFormatOptionsPanel.axaml(.cs)` | 新增 | 7z 多线程复选框 | ✅ |
+| `UI/Services/CompressFlow.cs` | 修改 | VM → CompressRequest 映射 | ✅ |
+| `UI/Dialogs/CompressSettingsWindow.axaml.cs` | 修改 | 面板快照到 ViewModel | ✅ |
+| `UI/ViewModels/CompressSettingsViewModel.cs` | 新增 | `SevenZipMultithreaded` 属性 + 设置加载 | ✅ |
+| `UI/Views/SettingsWindow.axaml` + `SettingsWindowViewModel.cs` | 新增 | 全局默认值复选框 | ✅ |
+| `tests/MantisZip.Tests/Engines/SevenZipEngineTests.cs` | 新增 | mt=on 验证 (2用例+基准) | ✅ |
 
 ### 不涉及的文件
 
-- `SevenZipEngine.cs`: 7z 并行需要 SharpSevenZip 原生支持，暂不改动
 - `TarGzEngine.cs` 并行: TAR 格式是顺序流，无法并行，仅优化缓冲区
+- ZIP 分组并行压缩（Task 7）: 需自研中央目录合并器，暂缓
 
 ---
 
@@ -457,18 +486,21 @@ UI: 设置窗口 → 解压标签页 → 新增滑块 "并行解压线程数 (1-
 
 ## Definition of Done
 
-### 功能完成 ✅ 解压并行已达标
+### 功能完成 ✅ 解压并行 + 7z 多线程已达标
 - [x] ZIP 解压支持并行模式 (`SupportsParallelExtract` + `ExtractAsyncParallel`)
 - [x] 缓冲区从 256KB 优化到 4MB (ZipEngine/TarGzEngine/ZipBinaryRewriter)
 - [x] 设置窗口可配置并行度 (1-16, 默认 CPU核心数)
 - [x] 串行模式保留为回退选项 (文件数<2 或 并行度=1 自动回退)
+- [x] 7z 多线程压缩 (`SevenZipMultithreaded` → `mt=on`，实测 4.63x)
+- [x] 7z 多线程 UI 开关（压缩对话框 + 设置窗口全局默认）
 
 ### 质量保证 ✅ 解压部分达标
 - [x] 单元测试覆盖并行解压逻辑 (5用例全部通过)
-- [x] 性能基准测试有实测数据 (1.8x 小文件, 理论 5x+ 大文件/NVMe)
+- [x] 单元测试覆盖 7z 多线程压缩正确性 (2用例：mt on/off 均验证归档有效)
+- [x] 性能基准测试有实测数据 (解压 1.8x 小文件 / 压缩 7z 4.63x)
 - [ ] 压力测试通过（1000 文件无 OOM） ⏳ 可选
 - [x] `dotnet build` 无错误
-- [x] `dotnet test` 全部通过 (Core 378 + Avalonia 96)
+- [x] `dotnet test` 全部通过 (Core 380 + Avalonia 96)
 
 ### 文档 ✅
 - [x] AGENTS.md 更新并行解压架构说明
@@ -478,11 +510,12 @@ UI: 设置窗口 → 解压标签页 → 新增滑块 "并行解压线程数 (1-
 
 ## 后续扩展
 
-- **并行压缩**: 将文件分组并行压缩，最后合并（Phase 3）
-- **7z 多线程**: 启用 SharpSevenZip 原生多线程压缩
+- **ZIP 分组并行压缩**: 将文件分组并行压缩，最后合并中央目录（Task 7，暂缓）
+- ~~**7z 多线程**: 启用 SharpSevenZip 原生多线程压缩~~ ✅ 已完成（4.63x）
 - **流水线优化**: 解压与写入重叠（Level 3 优化）
 - **自适应并行度**: 根据文件大小和数量自动调整并行度
 - **进度增强**: 并行解压时显示每个线程的进度
+- **7z 线程数精细控制**: 目前仅 on/off，可扩展 `mt=N` 指定线程数（受字典大小限制）
 
 ---
 

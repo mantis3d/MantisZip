@@ -159,6 +159,13 @@ public class ArchiveOptions
     /// 仅当引擎 SupportsParallelExtract 为 true 时有效。
     /// </summary>
     public int ParallelExtractDegree { get; set; } = 0;
+
+    /// <summary>
+    /// 7z 多线程压缩（mt=on）。默认 true。
+    /// 启用时 7z.dll 自动利用多核 CPU 并行压缩，压缩率可能略有下降。
+    /// 仅对 7z 格式有效，ZIP/TAR/GZ 无此选项。
+    /// </summary>
+    public bool SevenZipMultithreaded { get; set; } = true;
 }
 
 /// <summary>

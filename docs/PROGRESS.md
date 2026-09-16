@@ -27,6 +27,7 @@
 
 #### 2026-09
 
+- **09-16** — 压缩/解压性能优化（ZIP 解压并行 + 7z 多线程压缩）：① **ZIP 并行解压**自研多实例实现（SharpCompress 单实例线程不安全）——Round-Robin 分批 + **每批次复用 1 个 archive 实例**（减少 80-90% OpenArchive 开销）+ 进度报告锁竞争修复（曾因锁内 `progress.Report()` 导致 8 线程争用、100×1MB 解压从 0.3s 劣化到 8.5s 的 25x 回退）；② 缓冲区 256KB→4MB（ZipEngine/TarGzEngine/ZipBinaryRewriter）；③ `ParallelExtractDegree` 设置项（1-16，默认 CPU 核心数，1=串行回退）；④ **7z 多线程压缩 `mt=on` 实测 4.63x**（100×1MB/8核：38.7s→8.4s），压缩对话框 7z 面板 + 设置窗口全局默认值双开关；Core 380 + Avalonia 96 测试全绿
 - **09-16** — NuGet 核心依赖全面升级：Markdig 0.40.0→1.3.2、SharpCompress 0.48.1→0.50.4、SkiaSharp 3.119.4→4.152.0、Svg.Skia 2.0.0.5→5.2.1、HarfBuzzSharp 14.2.0→14.2.1.3；96 Avalonia + 373 Core 测试全绿，0 构建错误（24 项 CS0618 SkiaSharp 4.x deprecation warning 为非阻塞技术债）
 - **09-16** — Avalonia 12.0.4→12.1.2 全栈升级（Avalonia/Avalonia.Controls.DataGrid/Avalonia.Controls.WebView/Avalonia.Desktop/Avalonia.Themes.Fluent）；96 Avalonia + 373 Core 测试全绿，0 构建错误（新增 2 项 CS0618）
 - **09-13** — HTML 预览 WebView 双轨升级 + 安全设置：NativeWebView 主体渲染 + ReverseMarkdown 降级路径（WebView 不可用时自动 fallback）；`</>` 源码/渲染切换按钮（HTML & Markdown 共用）；HTML 预览安全设置三开关（允许 JavaScript / 外部资源 / 导航，默认全关）+ CSP meta 注入 + NavigationStarting 拦截；设置窗口预览 tab 新增 HTML 子标签页（IconHtml 图标）
@@ -101,6 +102,7 @@
 
 #### v0.5.0
 
+- **09-16** — 并行解压 + 7z 多线程压缩基础设施（Core）：`IArchiveEngine.SupportsParallelExtract` 属性 + `ArchiveOptions.ParallelExtractDegree`；`ZipEngine.ExtractAsyncParallel` 多实例并行（Round-Robin 分批、每批次复用 1 个 archive 实例、进度报告锁外上报）；`CopyBufferSize` 256KB→4MB（ZipEngine/TarGzEngine/ZipBinaryRewriter）；`ArchiveOptions.SevenZipMultithreaded`（默认 true）+ `SevenZipEngine.ConfigureCompressor` 写入 `CustomParameters["mt"]` + `CompressRequest`/`CompressService.BuildOptions` 映射；新增 `ParallelExtractTests`（5 用例）+ `SevenZipEngineTests` mt=on 验证（2 用例）
 - **09-12** — 修复损坏压缩包打开静默无报错（Core）：ZipEngine 打开改用严格 ZipArchive.OpenArchive（全零/垃圾 .zip 此前被 ArchiveFactory 魔数嗅探误判为 Tar、0 条目静默打开，现抛 ArchiveException）+ TarGzEngine.ListEntriesAsync 移除静默 catch（损坏 .tar 抛错不再静默空列表）+ 新增 3 个回归测试
 - **09-04** — 压缩/解压 文件读写错误处理补齐：压缩侧 7z/加密 ZIP 新增 `ReadErrorHandler.FilterUnreadableFiles` 预检（错误弹窗 / 跳过 / 中止，对齐 ErrorResolver）；解压侧三引擎 `ExtractAsync`+`ExtractEntriesAsync` 补 `IOException` 捕获与 per-entry 兜底（被占用条目跳过继续，不再让单个文件中止整个解压）
 - **08-31** — .NET 9 → .NET 10 升级（LTS，支持至 2028-11）：全部 7 个项目 TargetFramework 更新 + 移除废弃 `Avalonia.Diagnostics` 包 + `System.Drawing.Common` 升级至 10.0.8

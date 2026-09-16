@@ -71,16 +71,18 @@ MantisZip.Core ──────┬── MantisZip.UI.Avalonia ──reference
 
 ### 并行解压架构
 
-ZIP 解压支持并行模式（`ZipEngine.SupportsParallelExtract = true`），通过**多实例并行**实现线程安全：
+ZIP 解压支持并行模式（`ZipEngine.SupportsParallelExtract = true`），通过**多实例并行 + 批次复用**实现线程安全与低开销：
 
-**核心原理**：SharpCompress 的 `IArchive` 内部维护共享解压状态（字典、滑动窗口），并发访问会导致 `ZlibException`。解决方案是**每个线程独立打开 archive 实例**，无共享状态。
+**核心原理**：SharpCompress 的 `IArchive` 内部维护共享解压状态（字典、滑动窗口），并发访问会导致 `ZlibException`。解决方案是**每个批次独占一个 archive 实例**，无共享状态。
 
 ```csharp
-// ✅ 安全：每个线程独立打开
-await Parallel.ForEachAsync(entryKeys, new ParallelOptions { MaxDegreeOfParallelism = 8 }, async (key, ct) => {
+// ✅ 安全：每批次独立打开一次 archive，处理整批文件（Round-Robin 分配）
+await Parallel.ForEachAsync(batches, new ParallelOptions { MaxDegreeOfParallelism = N }, async (batch, ct) => {
     using var archive = OpenArchiveWithEncodingFallback(archivePath, password);
-    var entry = archive.Entries.First(e => e.Key == key);
-    // ... 解压逻辑
+    foreach (var key in batch) {
+        var entry = archive.Entries.First(e => e.Key == key);
+        // ... 解压逻辑
+    }
 });
 ```
 
@@ -91,9 +93,12 @@ await Parallel.ForEachAsync(entryKeys, new ParallelOptions { MaxDegreeOfParallel
   1. 单线程获取所有条目键和大小（预读 archive 一次）
   2. 单线程创建所有目标目录（避免竞态）
   3. 按文件大小**降序排列**（大文件优先，避免长尾效应）
-  4. `Parallel.ForEachAsync` 并行解压，每线程独立打开 archive
-  3. 冲突处理用 `lock` 同步，进度用 `Interlocked` 原子计数
-  4. 4MB 缓冲区 (`CopyBufferSize = 4MB`) 配合 `Stream.CopyToAsync`
+  4. **Round-Robin 分批**（`i % N`）：大文件自动分散到不同批次，天然负载均衡
+  5. `Parallel.ForEachAsync` 并行处理各批次，**每批次仅打开 1 次 archive**（减少 80-90% OpenArchive 开销）
+  6. 冲突处理用 `lock` 同步；进度报告先在锁内拷贝共享变量、**释放锁后**再 `Report`（避免 8 线程锁竞争）
+  7. 4MB 缓冲区 (`CopyBufferSize = 4MB`) 配合 `Stream.CopyToAsync`
+
+> ⚠️ 进度报告锁竞争是性能陷阱：曾在锁内直接调用 `progress?.Report()`，8 线程争用导致 100×1MB 解压从 0.3s 劣化到 8.5s（25x 回退）。
 
 **配置** (`AppSettings.ParallelExtractDegree`)：
 - 默认 `Environment.ProcessorCount`（可在设置窗口 1-16 调整）
@@ -108,6 +113,17 @@ await Parallel.ForEachAsync(entryKeys, new ParallelOptions { MaxDegreeOfParallel
 - 缓冲区 256KB → 4MB：+70% 吞吐
 - 多实例并行：理想环境 6x+ 加速（8核 NVMe）
 - 组合优化：~10x 理论峰值
+
+### 7z 多线程压缩（mt=on）
+
+`SevenZipEngine` 通过 `CustomParameters["mt"]` 启用 7z.dll 原生多线程压缩：
+
+- **配置**：`ArchiveOptions.SevenZipMultithreaded`（默认 `true`）→ `ConfigureCompressor` 写入 `mt=on/off`
+- **UI 入口**：压缩对话框 7z 面板复选框（`DynamicFormatOptionsPanel`）+ 设置窗口全局默认值（`SettingsWindowViewModel`）
+- **传递链**：`DynamicFormatOptionsPanel` → `CompressSettingsWindow.SnapshotFormatOptionsToViewModel` → `CompressSettingsViewModel` → `CompressFlow.BuildRequest` → `CompressRequest.SevenZipMultithreaded` → `CompressService.BuildOptions` → `ArchiveOptions.SevenZipMultithreaded`
+- **实测性能**（100 × 1MB 随机数据，8 核）：单线程 38.7s → 多线程 8.4s，**4.63x 加速**（压缩率可能略有下降）
+- **验证**：`SevenZipEngineTests.CompressAsync_MultiThreaded_CreatesValidArchive`（解压逐字节比对 + `TestArchiveAsync` 完整性校验）
+- **仅 7z 有效**：ZIP/TAR/GZ 无此参数；`SharpSevenZipCompressor` 无 `mt` 属性，只能走 `CustomParameters`
 
 ### ArchiveItem duality
 
@@ -192,7 +208,7 @@ await Parallel.ForEachAsync(entryKeys, new ParallelOptions { MaxDegreeOfParallel
 `AppSettings` singleton 存在于 `MantisZip.UI.Avalonia/Models/AppSettings.cs`，序列化到 `%LOCALAPPDATA%\MantisZip\settings.json`。
 
 设置包含以下分类：
-- **压缩**: DefaultFormat (zip/7z/tar.gz), DefaultLevel (1–9), CloseAfterCompress, KeepOriginalExtension, ZipEncoding, ZipCompressionMethod, ZipEncryptionMethod, SevenZipCompressionMethod, SevenZipSolid, SevenZipSolidBlockSize, SevenZipDictionarySize, SevenZipNumFastBytes, SevenZipMatchFinder, SevenZipEncryptHeaders
+- **压缩**: DefaultFormat (zip/7z/tar.gz), DefaultLevel (1–9), CloseAfterCompress, KeepOriginalExtension, ZipEncoding, ZipCompressionMethod, ZipEncryptionMethod, SevenZipCompressionMethod, SevenZipSolid, SevenZipSolidBlockSize, SevenZipDictionarySize, SevenZipNumFastBytes, SevenZipMatchFinder, SevenZipMultithreaded, SevenZipEncryptHeaders
 - **分卷**: SplitSizeTag (0=不分卷/1MB/10MB/…), CustomSplitSizeMB
 - **解压**: ExtractDestination (ask/same-dir/desktop), FileConflictAction (ask/overwrite/rename/skip), OpenFolderAfterExtract
 - **解压扩展**: EnableDragExtract, ExtractPreserveFullPath
