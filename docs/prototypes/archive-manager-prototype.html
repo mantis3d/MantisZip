@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>压缩包管理器 — 原型</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif; background: #1e1e2e; color: #cdd6f4; height: 100vh; overflow: hidden; }
+
+  .topbar { display: flex; align-items: center; height: 48px; padding: 0 16px; background: #181825; border-bottom: 1px solid #313244; }
+  .topbar-title { font-size: 15px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+  .topbar-title span { font-size: 18px; }
+  .topbar-right { margin-left: auto; display: flex; align-items: center; gap: 12px; }
+  .search-box { background: #313244; border: 1px solid #45475a; border-radius: 6px; padding: 5px 12px; color: #cdd6f4; font-size: 13px; width: 220px; outline: none; }
+  .search-box::placeholder { color: #6c7086; }
+  .search-box:focus { border-color: #89b4fa; }
+  .icon-btn { background: none; border: none; color: #6c7086; font-size: 16px; cursor: pointer; padding: 4px 6px; border-radius: 4px; }
+  .icon-btn:hover { background: #313244; color: #cdd6f4; }
+
+  .main { display: flex; height: calc(100vh - 48px - 32px); }
+
+  .sidebar { width: 200px; min-width: 200px; background: #181825; border-right: 1px solid #313244; padding: 8px 0; overflow-y: auto; }
+  .nav-section { margin-bottom: 8px; }
+  .nav-section-title { font-size: 11px; color: #6c7086; padding: 8px 16px 4px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .nav-item { display: flex; align-items: center; gap: 8px; padding: 6px 16px; cursor: pointer; font-size: 13px; color: #a6adc8; transition: background 0.15s; }
+  .nav-item:hover { background: #313244; }
+  .nav-item.active { background: #313244; color: #cdd6f4; border-left: 3px solid #89b4fa; padding-left: 13px; }
+  .nav-item .icon { font-size: 14px; width: 18px; text-align: center; }
+  .nav-item .count { margin-left: auto; font-size: 11px; color: #6c7086; background: #313244; padding: 1px 6px; border-radius: 8px; }
+  .nav-divider { height: 1px; background: #313244; margin: 8px 12px; }
+  .tag-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+
+  .content { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+
+  .toolbar { display: flex; align-items: center; padding: 8px 16px; gap: 8px; border-bottom: 1px solid #313244; background: #1e1e2e; }
+  .view-toggle { display: flex; background: #313244; border-radius: 6px; overflow: hidden; }
+  .view-btn { padding: 5px 10px; border: none; background: none; color: #6c7086; cursor: pointer; font-size: 13px; }
+  .view-btn.active { background: #45475a; color: #cdd6f4; }
+  .toolbar-sep { width: 1px; height: 20px; background: #313244; }
+  .sort-btn { background: none; border: 1px solid #45475a; border-radius: 6px; padding: 4px 10px; color: #a6adc8; font-size: 12px; cursor: pointer; }
+  .sort-btn:hover { border-color: #89b4fa; color: #89b4fa; }
+
+  .list-view { flex: 1; overflow-y: auto; padding: 8px; }
+  .list-header { display: grid; grid-template-columns: 32px 1fr 90px 80px 100px 120px 100px; padding: 6px 12px; font-size: 11px; color: #6c7086; border-bottom: 1px solid #313244; position: sticky; top: 0; background: #1e1e2e; z-index: 1; }
+  .list-row { display: grid; grid-template-columns: 32px 1fr 90px 80px 100px 120px 100px; padding: 8px 12px; border-radius: 6px; cursor: pointer; align-items: center; font-size: 13px; transition: background 0.12s; }
+  .list-row:hover { background: #313244; }
+  .list-row.selected { background: #313244; border: 1px solid #45475a; }
+  .list-row.hidden { display: none; }
+  .format-icon { font-size: 18px; text-align: center; }
+  .file-name { font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .file-path { color: #6c7086; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .tag-badge { display: inline-block; padding: 1px 8px; border-radius: 10px; font-size: 11px; margin-right: 4px; }
+  .encrypted { color: #f9e2af; font-size: 12px; }
+  .text-secondary { color: #6c7086; }
+  .text-right { text-align: right; }
+
+  .thumb-view { flex: 1; overflow-y: auto; padding: 16px; display: none; }
+  .thumb-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 12px; }
+  .thumb-card { background: #181825; border: 1px solid #313244; border-radius: 8px; overflow: hidden; cursor: pointer; transition: border-color 0.15s, transform 0.15s; }
+  .thumb-card:hover { border-color: #89b4fa; transform: translateY(-2px); }
+  .thumb-card.selected { border-color: #89b4fa; }
+  .thumb-card.hidden { display: none; }
+  .thumb-img { width: 100%; height: 110px; background: #313244; display: flex; align-items: center; justify-content: center; font-size: 40px; }
+  .thumb-info { padding: 8px 10px; }
+  .thumb-name { font-size: 12px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .thumb-meta { font-size: 11px; color: #6c7086; margin-top: 2px; }
+  .thumb-tags { padding: 0 10px 8px; display: flex; gap: 4px; flex-wrap: wrap; }
+
+  .detail-panel { width: 340px; min-width: 340px; background: #181825; border-left: 1px solid #313244; padding: 20px; overflow-y: auto; display: none; }
+  .detail-panel.show { display: block; }
+  .detail-header { text-align: center; margin-bottom: 20px; }
+  .detail-icon { font-size: 48px; margin-bottom: 8px; }
+  .detail-name { font-size: 16px; font-weight: 600; }
+  .detail-tags { margin-top: 8px; display: flex; justify-content: center; gap: 6px; flex-wrap: wrap; }
+  .detail-section { margin-bottom: 16px; }
+  .detail-section-title { font-size: 11px; color: #6c7086; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; padding-bottom: 4px; border-bottom: 1px solid #313244; }
+  .detail-row { display: flex; justify-content: space-between; padding: 4px 0; font-size: 13px; }
+  .detail-label { color: #a6adc8; }
+  .detail-value { color: #cdd6f4; text-align: right; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .op-list { list-style: none; }
+  .op-item { padding: 6px 0; border-bottom: 1px solid #313244; font-size: 12px; }
+  .op-item:last-child { border-bottom: none; }
+  .op-type { display: inline-block; padding: 1px 6px; border-radius: 4px; font-size: 11px; margin-right: 6px; }
+  .op-extract { background: #1e3a2f; color: #a6e3a1; }
+  .op-compress { background: #3a2e1e; color: #f9e2af; }
+  .op-time { color: #6c7086; }
+  .op-dest { color: #a6adc8; display: block; margin-top: 2px; word-break: break-all; }
+  .detail-actions { display: flex; gap: 8px; margin-top: 16px; }
+  .detail-btn { flex: 1; padding: 8px; border: 1px solid #45475a; border-radius: 6px; background: #313244; color: #cdd6f4; font-size: 12px; cursor: pointer; text-align: center; transition: background 0.15s; }
+  .detail-btn:hover { background: #45475a; }
+  .detail-btn.primary { background: #89b4fa; color: #1e1e2e; border-color: #89b4fa; font-weight: 600; }
+  .detail-btn.primary:hover { background: #74c7ec; }
+
+  .statusbar { height: 32px; display: flex; align-items: center; padding: 0 16px; background: #181825; border-top: 1px solid #313244; font-size: 12px; color: #6c7086; gap: 16px; }
+  .statusbar .sep { width: 1px; height: 14px; background: #313244; }
+
+  .tree { padding: 0; }
+  .tree-item { user-select: none; }
+  .tree-row { display: flex; align-items: center; gap: 4px; padding: 3px 16px; cursor: pointer; font-size: 13px; color: #a6adc8; transition: background 0.12s; white-space: nowrap; }
+  .tree-row:hover { background: #313244; }
+  .tree-row.active { background: #313244; color: #cdd6f4; border-left: 3px solid #89b4fa; padding-left: 13px; }
+  .tree-toggle { width: 14px; text-align: center; font-size: 10px; color: #6c7086; flex-shrink: 0; }
+  .tree-toggle.empty { visibility: hidden; }
+  .tree-icon { font-size: 14px; flex-shrink: 0; }
+  .tree-label { overflow: hidden; text-overflow: ellipsis; }
+  .tree-count { margin-left: auto; font-size: 11px; color: #6c7086; background: #313244; padding: 1px 6px; border-radius: 8px; flex-shrink: 0; }
+  .tree-children { display: none; }
+  .tree-children.open { display: block; }
+  .tree-indent { padding-left: 16px; }
+
+  .empty-msg { text-align: center; padding: 60px 20px; color: #6c7086; font-size: 14px; display: none; }
+  .empty-msg.show { display: block; }
+
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: #45475a; border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: #585b70; }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-title"><span>🗂</span> 压缩包管理器</div>
+  <div class="topbar-right">
+    <input class="search-box" placeholder="搜索压缩包..." oninput="applyFilters()" id="searchBox" />
+    <button class="icon-btn" title="设置">⚙</button>
+    <button class="icon-btn" title="刷新">↻</button>
+  </div>
+</div>
+
+<div class="main">
+  <div class="sidebar">
+    <div class="nav-section">
+      <div class="nav-item active" data-filter="all" onclick="setFilter('all',this)"><span class="icon">📁</span> 全部 <span class="count" id="countAll">8</span></div>
+      <div class="nav-item" data-filter="recent" onclick="setFilter('recent',this)"><span class="icon">⏱</span> 最近 7 天 <span class="count" id="countRecent">3</span></div>
+      <div class="nav-item" data-filter="frequent" onclick="setFilter('frequent',this)"><span class="icon">⭐</span> 常用 (≥3次) <span class="count" id="countFrequent">4</span></div>
+    </div>
+    <div class="nav-divider"></div>
+    <div class="nav-section">
+      <div class="nav-section-title">标签</div>
+      <div class="nav-item" data-filter="tag:工作" onclick="setFilter('tag:工作',this)"><span class="tag-dot" style="background:#89b4fa"></span> 工作 <span class="count" id="countTagWork">4</span></div>
+      <div class="nav-item" data-filter="tag:备份" onclick="setFilter('tag:备份',this)"><span class="tag-dot" style="background:#a6e3a1"></span> 备份 <span class="count" id="countTagBackup">4</span></div>
+      <div class="nav-item" data-filter="tag:照片" onclick="setFilter('tag:照片',this)"><span class="tag-dot" style="background:#f9e2af"></span> 照片 <span class="count" id="countTagPhoto">2</span></div>
+      <div class="nav-item" data-filter="tag:重要" onclick="setFilter('tag:重要',this)"><span class="tag-dot" style="background:#f38ba8"></span> 重要 <span class="count" id="countTagImportant">2</span></div>
+      <div class="nav-item" style="color:#6c7086; font-style:italic;"><span class="icon">+</span> 新建标签...</div>
+    </div>
+    <div class="nav-divider"></div>
+    <div class="nav-section">
+      <div class="nav-section-title">格式</div>
+      <div class="nav-item" data-filter="fmt:ZIP" onclick="setFilter('fmt:ZIP',this)"><span class="icon">📦</span> ZIP <span class="count" id="countFmtZip">6</span></div>
+      <div class="nav-item" data-filter="fmt:7z" onclick="setFilter('fmt:7z',this)"><span class="icon">📦</span> 7z <span class="count" id="countFmt7z">1</span></div>
+      <div class="nav-item" data-filter="fmt:RAR" onclick="setFilter('fmt:RAR',this)"><span class="icon">📦</span> RAR <span class="count" id="countFmtRar">1</span></div>
+    </div>
+    <div class="nav-divider"></div>
+    <div class="nav-section">
+      <div class="nav-section-title">目录</div>
+      <div class="tree" id="dirTree">
+        <div class="tree-item">
+          <div class="tree-row" onclick="toggleTree(this)">
+            <span class="tree-toggle">▶</span><span class="tree-icon">💾</span><span class="tree-label">D:\</span><span class="tree-count">5</span>
+          </div>
+          <div class="tree-children tree-indent">
+            <div class="tree-item"><div class="tree-row" data-filter="dir:D:\\Downloads" onclick="setFilter('dir:D:\\\\Downloads',this)"><span class="tree-toggle empty"></span><span class="tree-icon">📁</span><span class="tree-label">Downloads</span><span class="tree-count">1</span></div></div>
+            <div class="tree-item"><div class="tree-row" data-filter="dir:D:\\Backups" onclick="setFilter('dir:D:\\\\Backups',this)"><span class="tree-toggle empty"></span><span class="tree-icon">📁</span><span class="tree-label">Backups</span><span class="tree-count">1</span></div></div>
+            <div class="tree-item">
+              <div class="tree-row" onclick="toggleTree(this)"><span class="tree-toggle">▶</span><span class="tree-icon">📁</span><span class="tree-label">Projects</span><span class="tree-count">1</span></div>
+              <div class="tree-children tree-indent">
+                <div class="tree-item"><div class="tree-row" data-filter="dir:D:\\Projects\\releases" onclick="setFilter('dir:D:\\\\Projects\\\\releases',this)"><span class="tree-toggle empty"></span><span class="tree-icon">📁</span><span class="tree-label">releases</span><span class="tree-count">1</span></div></div>
+              </div>
+            </div>
+            <div class="tree-item"><div class="tree-row" data-filter="dir:D:\\Archive" onclick="setFilter('dir:D:\\\\Archive',this)"><span class="tree-toggle empty"></span><span class="tree-icon">📁</span><span class="tree-label">Archive</span><span class="tree-count">1</span></div></div>
+            <div class="tree-item"><div class="tree-row" data-filter="dir:D:\\Releases" onclick="setFilter('dir:D:\\\\Releases',this)"><span class="tree-toggle empty"></span><span class="tree-icon">📁</span><span class="tree-label">Releases</span><span class="tree-count">1</span></div></div>
+          </div>
+        </div>
+        <div class="tree-item">
+          <div class="tree-row" onclick="toggleTree(this)">
+            <span class="tree-toggle">▶</span><span class="tree-icon">💾</span><span class="tree-label">E:\</span><span class="tree-count">2</span>
+          </div>
+          <div class="tree-children tree-indent">
+            <div class="tree-item"><div class="tree-row" data-filter="dir:E:\\Backup" onclick="setFilter('dir:E:\\\\Backup',this)"><span class="tree-toggle empty"></span><span class="tree-icon">📁</span><span class="tree-label">Backup</span><span class="tree-count">1</span></div></div>
+            <div class="tree-item"><div class="tree-row" data-filter="dir:E:\\Work" onclick="setFilter('dir:E:\\\\Work',this)"><span class="tree-toggle empty"></span><span class="tree-icon">📁</span><span class="tree-label">Work</span><span class="tree-count">1</span></div></div>
+          </div>
+        </div>
+        <div class="tree-item">
+          <div class="tree-row" onclick="toggleTree(this)">
+            <span class="tree-toggle">▶</span><span class="tree-icon">💾</span><span class="tree-label">F:\</span><span class="tree-count">1</span>
+          </div>
+          <div class="tree-children tree-indent">
+            <div class="tree-item"><div class="tree-row" data-filter="dir:F:\\Photos" onclick="setFilter('dir:F:\\\\Photos',this)"><span class="tree-toggle empty"></span><span class="tree-icon">📁</span><span class="tree-label">Photos</span><span class="tree-count">1</span></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="content">
+    <div class="toolbar">
+      <div class="view-toggle">
+        <button class="view-btn active" onclick="switchView('list')">☰ 详情</button>
+        <button class="view-btn" onclick="switchView('thumb')">⊞ 缩略图</button>
+      </div>
+      <div class="toolbar-sep"></div>
+      <button class="sort-btn">↕ 名称</button>
+      <button class="sort-btn">↕ 大小</button>
+      <button class="sort-btn">↕ 最近打开</button>
+      <button class="sort-btn">↕ 打开次数</button>
+      <div style="flex:1"></div>
+      <button class="sort-btn" style="border-color:#89b4fa;color:#89b4fa;">+ 添加到管理器</button>
+    </div>
+
+    <div class="list-view" id="listView">
+      <div class="list-header">
+        <div></div><div>文件名</div><div>大小</div><div>格式</div><div>标签</div><div>最近打开</div><div class="text-right">打开次数</div>
+      </div>
+      <div id="listBody"></div>
+      <div class="empty-msg" id="emptyMsg">没有匹配的压缩包</div>
+    </div>
+
+    <div class="thumb-view" id="thumbView">
+      <div class="thumb-grid" id="thumbGrid"></div>
+      <div class="empty-msg" id="emptyMsgThumb">没有匹配的压缩包</div>
+    </div>
+  </div>
+
+  <div class="detail-panel show" id="detailPanel">
+    <div class="detail-header">
+      <div class="detail-icon" id="detailIcon">📦</div>
+      <div class="detail-name" id="detailName">project-v2.0-final.zip</div>
+      <div class="detail-tags" id="detailTags"></div>
+    </div>
+    <div class="detail-section">
+      <div class="detail-section-title">文件信息</div>
+      <div class="detail-row"><span class="detail-label">路径</span><span class="detail-value" id="detailPath"></span></div>
+      <div class="detail-row"><span class="detail-label">大小</span><span class="detail-value" id="detailSize"></span></div>
+      <div class="detail-row"><span class="detail-label">格式</span><span class="detail-value" id="detailFormat"></span></div>
+      <div class="detail-row"><span class="detail-label">加密</span><span class="detail-value" id="detailEncrypted"></span></div>
+      <div class="detail-row"><span class="detail-label">打开次数</span><span class="detail-value" id="detailOpens"></span></div>
+      <div class="detail-row"><span class="detail-label">首次打开</span><span class="detail-value" id="detailFirst"></span></div>
+      <div class="detail-row"><span class="detail-label">最近打开</span><span class="detail-value" id="detailLast"></span></div>
+    </div>
+    <div class="detail-section">
+      <div class="detail-section-title">操作记录</div>
+      <ul class="op-list" id="detailOps"></ul>
+    </div>
+    <div class="detail-section">
+      <div class="detail-section-title">编辑标签</div>
+      <div class="detail-tags" style="justify-content:flex-start;" id="detailEditTags"></div>
+    </div>
+    <div class="detail-actions">
+      <button class="detail-btn primary">📂 打开</button>
+      <button class="detail-btn">📁 资源管理器</button>
+      <button class="detail-btn" style="color:#f38ba8;">🗑 删除记录</button>
+    </div>
+  </div>
+</div>
+
+<div class="statusbar">
+  <span id="statusCount">8 个压缩包</span>
+  <span class="sep"></span>
+  <span id="statusSize">总大小: 5.2 GB</span>
+  <span class="sep"></span>
+  <span id="statusFilter">筛选: 全部</span>
+  <span class="sep"></span>
+  <span>排序: 最近打开 ↓</span>
+</div>
+
+<script>
+// === 数据 ===
+const archives = [
+  { id:0, name:"project-v2.0-final.zip", path:"D:\\Downloads\\project-v2.0-final.zip", dir:"D:\\Downloads", size:"45.2 MB", sizeBytes:47400000, format:"ZIP", encrypted:true, tags:["工作","备份"], opens:3, first:"2026-09-01", last:"2026-09-15", recent:true,
+    ops:[{type:"extract",time:"2026-09-15 14:30",dest:"→ D:\\Projects\\current"},{type:"extract",time:"2026-09-10 09:15",dest:"→ D:\\Projects\\review"},{type:"compress",time:"2026-09-01 16:45",dest:"← D:\\Projects\\src (142 个文件)"}] },
+  { id:1, name:"photos-2026-summer.zip", path:"E:\\Backup\\photos-2026-summer.zip", dir:"E:\\Backup", size:"1.8 GB", sizeBytes:1932700000, format:"ZIP", encrypted:false, tags:["照片"], opens:5, first:"2026-09-05", last:"2026-09-12", recent:true,
+    ops:[{type:"extract",time:"2026-09-12 10:00",dest:"→ E:\\Photos\\summer"}] },
+  { id:2, name:"database-backup.7z", path:"D:\\Backups\\database-backup.7z", dir:"D:\\Backups", size:"230 MB", sizeBytes:241200000, format:"7z", encrypted:true, tags:["备份","重要"], opens:8, first:"2026-08-15", last:"2026-09-10", recent:true,
+    ops:[{type:"extract",time:"2026-09-10 08:00",dest:"→ D:\\Restore\\db"}] },
+  { id:3, name:"source-code-v1.5.zip", path:"D:\\Projects\\releases\\source-code-v1.5.zip", dir:"D:\\Projects\\releases", size:"12.4 MB", sizeBytes:13000000, format:"ZIP", encrypted:false, tags:["工作"], opens:2, first:"2026-09-08", last:"2026-09-08", recent:true,
+    ops:[{type:"compress",time:"2026-09-08 17:00",dest:"← D:\\Projects\\src (89 个文件)"}] },
+  { id:4, name:"design-assets.rar", path:"E:\\Work\\design-assets.rar", dir:"E:\\Work", size:"567 MB", sizeBytes:594400000, format:"RAR", encrypted:true, tags:["工作"], opens:1, first:"2026-09-05", last:"2026-09-05", recent:false,
+    ops:[{type:"extract",time:"2026-09-05 11:30",dest:"→ E:\\Work\\assets"}] },
+  { id:5, name:"documents-2025.zip", path:"D:\\Archive\\documents-2025.zip", dir:"D:\\Archive", size:"89.3 MB", sizeBytes:93600000, format:"ZIP", encrypted:false, tags:["备份"], opens:12, first:"2026-01-10", last:"2026-08-20", recent:false,
+    ops:[{type:"extract",time:"2026-08-20 15:00",dest:"→ D:\\Archive\\extracted"}] },
+  { id:6, name:"installer-v3.2.1.7z", path:"D:\\Releases\\installer-v3.2.1.7z", dir:"D:\\Releases", size:"156 MB", sizeBytes:163500000, format:"7z", encrypted:false, tags:[], opens:4, first:"2026-08-10", last:"2026-08-15", recent:false,
+    ops:[{type:"compress",time:"2026-08-15 09:00",dest:"← D:\\Build\\output (203 个文件)"}] },
+  { id:7, name:"wedding-photos.zip", path:"F:\\Photos\\wedding-photos.zip", dir:"F:\\Photos", size:"2.3 GB", sizeBytes:2470000000, format:"ZIP", encrypted:true, tags:["照片","重要"], opens:7, first:"2026-07-20", last:"2026-08-01", recent:false,
+    ops:[{type:"extract",time:"2026-08-01 12:00",dest:"→ F:\\Photos\\wedding"}] }
+];
+
+let currentFilter = 'all';
+let selectedIdx = 0;
+
+// === 渲染列表 ===
+function renderList() {
+  const body = document.getElementById('listBody');
+  const grid = document.getElementById('thumbGrid');
+  body.innerHTML = '';
+  grid.innerHTML = '';
+  const q = document.getElementById('searchBox').value.toLowerCase();
+  let visible = 0;
+  let totalSize = 0;
+
+  archives.forEach((a, i) => {
+    if (!matchFilter(a)) return;
+    if (q && !a.name.toLowerCase().includes(q) && !a.path.toLowerCase().includes(q) && !a.tags.some(t => t.includes(q))) return;
+    visible++;
+    totalSize += a.sizeBytes;
+
+    // list row
+    const row = document.createElement('div');
+    row.className = 'list-row' + (i === selectedIdx ? ' selected' : '');
+    row.onclick = () => selectArchive(i);
+    row.innerHTML = `
+      <div class="format-icon">📦</div>
+      <div><div class="file-name">${a.name}</div><div class="file-path">${a.path}</div></div>
+      <div>${a.size}</div>
+      <div>${a.format} ${a.encrypted ? '<span class="encrypted">🔒</span>' : ''}</div>
+      <div>${a.tags.map(t => tagHTML(t)).join('')}</div>
+      <div class="text-secondary">${a.last}</div>
+      <div class="text-right">${a.opens}</div>`;
+    body.appendChild(row);
+
+    // thumb card
+    const card = document.createElement('div');
+    card.className = 'thumb-card' + (i === selectedIdx ? ' selected' : '');
+    card.onclick = () => selectArchive(i);
+    card.innerHTML = `
+      <div class="thumb-img" style="background:linear-gradient(135deg,#${a.format==='ZIP'?'1e3a5f':a.format==='7z'?'1e3a2f':'3a2e1e'},#313244);">📦</div>
+      <div class="thumb-info"><div class="thumb-name">${a.name}</div><div class="thumb-meta">${a.size} · ${a.format} ${a.encrypted?'· 🔒':''}</div></div>
+      <div class="thumb-tags">${a.tags.map(t => tagHTML(t)).join('')}</div>`;
+    grid.appendChild(card);
+  });
+
+  document.getElementById('emptyMsg').className = 'empty-msg' + (visible === 0 ? ' show' : '');
+  document.getElementById('emptyMsgThumb').className = 'empty-msg' + (visible === 0 ? ' show' : '');
+  document.getElementById('statusCount').textContent = visible + ' 个压缩包';
+  document.getElementById('statusSize').textContent = '总大小: ' + formatSize(totalSize);
+}
+
+function tagHTML(t) {
+  const colors = {工作:'1e3a5f,#89b4fa', 备份:'1e3a2f,#a6e3a1', 照片:'3a2e1e,#f9e2af', 重要:'3a1e2e,#f38ba8'};
+  const c = colors[t] || '313244,#a6adc8';
+  return `<span class="tag-badge" style="background:#${c.split(',')[0]};color:#${c.split(',')[1]}">${t}</span>`;
+}
+
+function formatSize(b) {
+  if (b >= 1e9) return (b/1e9).toFixed(1) + ' GB';
+  if (b >= 1e6) return (b/1e6).toFixed(0) + ' MB';
+  return (b/1e3).toFixed(0) + ' KB';
+}
+
+// === 过滤逻辑 ===
+function matchFilter(a) {
+  if (currentFilter === 'all') return true;
+  if (currentFilter === 'recent') return a.recent;
+  if (currentFilter === 'frequent') return a.opens >= 3;
+  if (currentFilter.startsWith('tag:')) return a.tags.includes(currentFilter.slice(4));
+  if (currentFilter.startsWith('fmt:')) return a.format === currentFilter.slice(4);
+  if (currentFilter.startsWith('dir:')) return a.dir.startsWith(currentFilter.slice(4));
+  return true;
+}
+
+function setFilter(filter, el) {
+  currentFilter = filter;
+  // 清除所有 active
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.querySelectorAll('.tree-row').forEach(n => n.classList.remove('active'));
+  if (el) el.classList.add('active');
+  // 状态栏
+  const labels = {all:'全部',recent:'最近 7 天',frequent:'常用 (≥3次)'};
+  let label = labels[filter] || filter.replace('tag:','标签: ').replace('fmt:','格式: ').replace('dir:','目录: ');
+  document.getElementById('statusFilter').textContent = '筛选: ' + label;
+  renderList();
+}
+
+// === 详情面板 ===
+function selectArchive(idx) {
+  selectedIdx = idx;
+  const a = archives[idx];
+  document.getElementById('detailIcon').textContent = '📦';
+  document.getElementById('detailName').textContent = a.name;
+  document.getElementById('detailTags').innerHTML = a.tags.map(t => tagHTML(t)).join('');
+  document.getElementById('detailPath').textContent = a.path;
+  document.getElementById('detailPath').title = a.path;
+  document.getElementById('detailSize').textContent = a.size;
+  document.getElementById('detailFormat').textContent = a.format;
+  document.getElementById('detailEncrypted').textContent = a.encrypted ? '🔒 AES-256' : '无';
+  document.getElementById('detailOpens').textContent = a.opens + ' 次';
+  document.getElementById('detailFirst').textContent = a.first;
+  document.getElementById('detailLast').textContent = a.last;
+  document.getElementById('detailOps').innerHTML = a.ops.map(o =>
+    `<li class="op-item"><span class="op-type ${o.type==='extract'?'op-extract':'op-compress'}">${o.type==='extract'?'解压':'压缩'}</span><span class="op-time">${o.time}</span><span class="op-dest">${o.dest}</span></li>`
+  ).join('');
+  document.getElementById('detailEditTags').innerHTML = a.tags.map(t =>
+    `<span class="tag-badge" style="background:#${({工作:'1e3a5f',备份:'1e3a2f',照片:'3a2e1e',重要:'3a1e2e'})[t]||'313244'};color:#${({工作:'89b4fa',备份:'a6e3a1',照片:'f9e2af',重要:'f38ba8'})[t]||'a6adc8'}">${t} ✕</span>`
+  ).join('') + '<span class="tag-badge" style="background:#313244;color:#6c7086;cursor:pointer;">+ 添加</span>';
+  renderList();
+}
+
+// === 视图切换 ===
+function switchView(view) {
+  document.querySelectorAll('.view-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('listView').style.display = view === 'list' ? 'block' : 'none';
+  document.getElementById('thumbView').style.display = view === 'thumb' ? 'block' : 'none';
+  document.querySelectorAll('.view-btn')[view === 'list' ? 0 : 1].classList.add('active');
+}
+
+// === 目录树展开/折叠 ===
+function toggleTree(row) {
+  const children = row.nextElementSibling;
+  if (!children || !children.classList.contains('tree-children')) return;
+  const toggle = row.querySelector('.tree-toggle');
+  if (toggle.classList.contains('empty')) return;
+  const isOpen = children.classList.contains('open');
+  children.classList.toggle('open');
+  toggle.textContent = isOpen ? '▶' : '▼';
+}
+
+// === 初始化 ===
+renderList();
+selectArchive(0);
+</script>
+</body>
+</html>

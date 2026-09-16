@@ -420,6 +420,7 @@ Build artifacts (bin/, obj/) are gitignored.
 
 ### 规则 1：Plan 变更同步
 
+新增计划文本需要放在 `.omo/plans/未开始` 内，格式与同目录计划相同
 每当新增或修改 `.omo/plans/` 内的计划文件时，**必须同步更新** `docs/PLAN.md`：
 - 新增计划 → 在 PLAN.md 对应优先级区域（P2/P3/待实现）添加一行 `| 任务 | 说明 |` 引用新计划，保持与已存在行格式一致
 - 修改计划 → 更新 PLAN.md 中对应任务的说明、优先级或状态
