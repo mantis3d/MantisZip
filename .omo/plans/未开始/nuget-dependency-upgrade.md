@@ -1,6 +1,6 @@
 # NuGet 依赖升级计划
 
-> **状态**: 📋 待定 | **阶段**: [⬜⬜⬜⬜] (0/4)
+> **状态**: ✅ 已完成 | **阶段**: [✅✅✅✅] (4/4)
 > **前置依赖**: 无
 > **适用范围**: Core + Avalonia（依赖升级影响全局，需逐库验证）
 
@@ -50,10 +50,10 @@
 
 **验证项**：
 
-- [ ] `MarkdownPreviewBuilder.TryBuildBlock` 的 AST 节点类型是否变化
-- [ ] `UsePipeTables()` 扩展是否正常工作
-- [ ] `markdig.ToHtml()` 输出是否一致
-- [ ] Markdown → Avalonia 控件树渲染管线是否正常
+- [x] `MarkdownPreviewBuilder.TryBuildBlock` 的 AST 节点类型是否变化
+- [x] `UsePipeTables()` 扩展是否正常工作
+- [x] `markdig.ToHtml()` 输出是否一致
+- [x] Markdown → Avalonia 控件树渲染管线是否正常
 
 **涉及文件**：
 - `src/MantisZip.UI.Avalonia/Services/MarkdownPreviewBuilder.cs`
@@ -75,13 +75,13 @@ dotnet test tests/MantisZip.UI.Avalonia.Tests/MantisZip.UI.Avalonia.Tests.csproj
 
 **验证项**：
 
-- [ ] `ZipArchive.OpenArchive()` API 是否变化
-- [ ] `TarReader.OpenReader()` API 是否变化
-- [ ] `TarWriter.OpenWriter()` API 是否变化
-- [ ] `CompressionType.ZStandard` 是否仍可用
-- [ ] `BZip2Stream`、`XZStream` 是否仍可用
-- [ ] `IEntry.Size`、`LastModifiedTime` 等属性是否变化
-- [ ] RAR5 异步解压修复（0.50.3）是否影响现有行为
+- [x] `ZipArchive.OpenArchive()` API 是否变化
+- [x] `TarReader.OpenReader()` API 是否变化
+- [x] `TarWriter.OpenWriter()` API 是否变化
+- [x] `CompressionType.ZStandard` 是否仍可用
+- [x] `BZip2Stream`、`XZStream` 是否仍可用
+- [x] `IEntry.Size`、`LastModifiedTime` 等属性是否变化
+- [x] RAR5 异步解压修复（0.50.3）是否影响现有行为
 
 **涉及文件**：
 - `src/MantisZip.Core/Engines/ZipEngine.cs`
@@ -104,17 +104,20 @@ dotnet test tests/MantisZip.Tests/MantisZip.Tests.csproj
 
 **前置条件**：
 
-- [ ] 确认 `PdfPig.Rendering.Skia` 是否已适配 SkiaSharp 4.x
-- [ ] 确认 `Svg.Skia` 5.x 是否已适配 SkiaSharp 4.x
-- [ ] 如果上游库未适配，暂时保持 3.x / 2.x
+- [x] 确认 `PdfPig.Rendering.Skia` 是否已适配 SkiaSharp 4.x
+- [x] 确认 `Svg.Skia` 5.x 是否已适配 SkiaSharp 4.x
+- [x] 如果上游库未适配，暂时保持 3.x / 2.x
+- [x] SkiaSharp 3.119.4 → 4.152.0 升级完成
 
 **验证项**：
 
-- [ ] PDF 渲染是否正常（`PdfPig.Rendering.Skia`）
-- [ ] SVG 渲染是否正常（`Svg.Skia`）
-- [ ] 字体预览是否正常（`HarfBuzzSharp` + `SKCanvas`）
-- [ ] GIF/Animated WebP 解码是否正常（`SKCodec`）
-- [ ] 图片解码是否正常（`SKBitmap`、`SKImage`）
+- [x] PDF 渲染是否正常（`PdfPig.Rendering.Skia`）
+- [x] SVG 渲染是否正常（`Svg.Skia`）
+- [x] Svg.Skia 2.0.0.5 → 5.2.1 升级完成
+- [x] 字体预览是否正常（`HarfBuzzSharp` + `SKCanvas`）
+- [x] HarfBuzzSharp 升级完成
+- [x] GIF/Animated WebP 解码是否正常（`SKCodec`）
+- [x] 图片解码是否正常（`SKBitmap`、`SKImage`）
 
 **涉及文件**：
 - `src/MantisZip.UI.Avalonia/Services/PreviewService.cs`（PDF/SVG/GIF/字体预览）

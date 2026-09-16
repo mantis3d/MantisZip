@@ -81,6 +81,9 @@ public class CompressRequest
     /// <summary>7z 匹配器：null/""=默认，或 "bt2" / "bt3" / "bt4"</summary>
     public string? SevenZipMatchFinder { get; init; }
 
+    /// <summary>7z 多线程压缩（mt=on）。默认 true，利用多核 CPU 并行压缩。</summary>
+    public bool SevenZipMultithreaded { get; init; } = true;
+
     /// <summary>ZIP 压缩方法：null/""=默认（Deflate），或 "deflate64" / "bzip2" / "lzma" / "ppmd" / "store"</summary>
     public string? ZipCompressionMethod { get; init; }
 
@@ -452,6 +455,7 @@ public static class CompressService
             SevenZipDictionarySize = request.SevenZipDictionarySize,
             SevenZipNumFastBytes = request.SevenZipNumFastBytes,
             SevenZipMatchFinder = request.SevenZipMatchFinder,
+            SevenZipMultithreaded = request.SevenZipMultithreaded,
             ZipCompressionMethod = request.ZipCompressionMethod,
             ZipEncryptionMethod = request.ZipEncryptionMethod,
             SevenZipEncryptHeaders = request.SevenZipEncryptHeaders,

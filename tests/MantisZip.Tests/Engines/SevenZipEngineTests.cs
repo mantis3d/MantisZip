@@ -360,6 +360,129 @@ public class SevenZipEngineTests : IDisposable
         Assert.Contains(entries, e => e.Name == "my-rename.txt");
     }
 
+    // ===== Multi-threaded Compression (mt=on) =====
+
+    /// <summary>
+    /// 验证 SharpSevenZip mt=on 多线程压缩生成的 7z 归档可正常解压和验证。
+    /// 测试内容：压缩 → 解压 → 逐字节比对 → TestArchiveAsync 完整性校验。
+    /// </summary>
+    [Fact]
+    public async Task CompressAsync_MultiThreaded_CreatesValidArchive()
+    {
+        if (!Is7zDllAvailable()) return;
+
+        var srcDir = TrackDir(ArchiveFixtures.CreateSourceDirectory());
+        var outputPath = TrackFile(Path.Combine(Path.GetTempPath(), "MantisZipTest", $"{Guid.NewGuid()}_mt.7z"));
+
+        // 多文件多级目录压缩（利用 mt=on）
+        var options = new ArchiveOptions
+        {
+            PreserveDirectoryRoot = false,
+            SevenZipMultithreaded = true,
+        };
+
+        await _engine.CompressAsync([srcDir], outputPath, options);
+
+        Assert.True(File.Exists(outputPath));
+
+        // 解压并逐字节比对
+        var dest = TrackDir(Path.Combine(Path.GetTempPath(), "MantisZipTest", Guid.NewGuid().ToString()));
+        await _engine.ExtractAsync(outputPath, dest);
+
+        var srcFiles = Directory.GetFiles(srcDir, "*", SearchOption.AllDirectories).OrderBy(f => f).ToList();
+        var dstFiles = Directory.GetFiles(dest, "*", SearchOption.AllDirectories).OrderBy(f => f).ToList();
+        Assert.Equal(srcFiles.Count, dstFiles.Count);
+
+        for (int i = 0; i < srcFiles.Count; i++)
+        {
+            var relativePath = Path.GetRelativePath(srcDir, srcFiles[i]);
+            var dstFile = Path.Combine(dest, relativePath);
+            Assert.True(File.Exists(dstFile), $"Missing file: {relativePath}");
+            Assert.Equal(await File.ReadAllBytesAsync(srcFiles[i]), await File.ReadAllBytesAsync(dstFile));
+        }
+
+        // 7z.dll 完整性校验
+        var valid = await _engine.TestArchiveAsync(outputPath);
+        Assert.True(valid, "7z.dll integrity check failed for multi-threaded archive");
+    }
+
+    /// <summary>
+    /// 对比：无 mt=on 压缩的 7z 归档也能正常解压（基线对照）。
+    /// </summary>
+    [Fact]
+    public async Task CompressAsync_SingleThreaded_CreatesValidArchive()
+    {
+        if (!Is7zDllAvailable()) return;
+
+        var srcDir = TrackDir(ArchiveFixtures.CreateSourceDirectory());
+        var outputPath = TrackFile(Path.Combine(Path.GetTempPath(), "MantisZipTest", $"{Guid.NewGuid()}_st.7z"));
+
+        var options = new ArchiveOptions
+        {
+            PreserveDirectoryRoot = false,
+            SevenZipMultithreaded = false, // 单线程
+        };
+
+        await _engine.CompressAsync([srcDir], outputPath, options);
+
+        Assert.True(File.Exists(outputPath));
+
+        // 解压并比对
+        var dest = TrackDir(Path.Combine(Path.GetTempPath(), "MantisZipTest", Guid.NewGuid().ToString()));
+        await _engine.ExtractAsync(outputPath, dest);
+        Assert.True(File.Exists(Path.Combine(dest, "hello.txt")));
+        Assert.Equal(ArchiveFixtures.HelloText, await File.ReadAllTextAsync(Path.Combine(dest, "hello.txt")));
+
+        var valid = await _engine.TestArchiveAsync(outputPath);
+        Assert.True(valid, "7z.dll integrity check failed for single-threaded archive");
+    }
+
+    /// <summary>
+    /// 基准测试：单线程 vs 多线程压缩耗时对比（需手动取消 Skip 运行）。
+    /// </summary>
+    [Fact(Skip = "性能基准测试，环境依赖强，需手动运行验证")]
+    public async Task Benchmark_CompressMTVsST()
+    {
+        if (!Is7zDllAvailable()) return;
+
+        // 创建 100 × 1MB 测试数据
+        var srcDir = TrackDir(Path.Combine(Path.GetTempPath(), "MantisZipBench", Guid.NewGuid().ToString()));
+        Directory.CreateDirectory(srcDir);
+        var rng = new Random(42);
+        for (int i = 0; i < 100; i++)
+        {
+            var data = new byte[1024 * 1024]; // 1MB
+            rng.NextBytes(data);
+            await File.WriteAllBytesAsync(Path.Combine(srcDir, $"file_{i:D3}.bin"), data);
+        }
+
+        var stPath = TrackFile(Path.Combine(Path.GetTempPath(), "MantisZipBench", $"{Guid.NewGuid()}_st.7z"));
+        var mtPath = TrackFile(Path.Combine(Path.GetTempPath(), "MantisZipBench", $"{Guid.NewGuid()}_mt.7z"));
+
+        // 单线程
+        var stSw = System.Diagnostics.Stopwatch.StartNew();
+        await _engine.CompressAsync([srcDir], stPath, new ArchiveOptions
+        {
+            PreserveDirectoryRoot = false,
+            SevenZipMultithreaded = false,
+        });
+        stSw.Stop();
+
+        // 多线程
+        var mtSw = System.Diagnostics.Stopwatch.StartNew();
+        await _engine.CompressAsync([srcDir], mtPath, new ArchiveOptions
+        {
+            PreserveDirectoryRoot = false,
+            SevenZipMultithreaded = true,
+        });
+        mtSw.Stop();
+
+        Console.WriteLine($"=== 7z Compression Benchmark (100×1MB) ===");
+        Console.WriteLine($"  Single-thread: {stSw.ElapsedMilliseconds}ms");
+        Console.WriteLine($"  Multi-thread:  {mtSw.ElapsedMilliseconds}ms");
+        Console.WriteLine($"  Speedup: {(double)stSw.ElapsedMilliseconds / mtSw.ElapsedMilliseconds:F2}x");
+    }
+
     // ===== Progress Reporting =====
 
     [Fact]

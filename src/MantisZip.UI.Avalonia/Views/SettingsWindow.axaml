@@ -162,6 +162,8 @@
                       </Grid>
       
                       <CheckBox Content="{Binding SevenZipSolidText}" IsChecked="{Binding SevenZipSolid}" />
+                      <!-- 7z 多线程压缩：利用多核 CPU 并行压缩以提升速度（压缩率可能略有下降） -->
+                      <CheckBox Content="{Binding SevenZipMultithreadedText}" IsChecked="{Binding SevenZipMultithreaded}" />
                       <CheckBox Content="{Binding SevenZipEncryptHeadersText}" IsChecked="{Binding SevenZipEncryptHeaders}" />
       
                       <Grid ColumnDefinitions="120,*">

@@ -258,6 +258,9 @@ public class SevenZipEngine : IArchiveEngine
         }
         // 默认（固实开启但无块大小）→ 不设 s，7z.dll 使用默认固实行为
 
+        // 多线程压缩（mt=on）— 利用多核 CPU 并行压缩，提升压缩速度
+        compr.CustomParameters["mt"] = options.SevenZipMultithreaded ? "on" : "off";
+
         // 字典大小（仅 LZMA/LZMA2 有效，但设了也无害）
         // 在 SharpSevenZip 中这些是静态属性（全局生效于 7z.dll 上下文）
         if (options.SevenZipDictionarySize.HasValue)

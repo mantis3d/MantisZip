@@ -23,6 +23,11 @@ public class AppSettings
     public int SevenZipDictionarySize { get; set; } = 0;
     public int SevenZipNumFastBytes { get; set; } = 0;
     public string SevenZipMatchFinder { get; set; } = "";
+    /// <summary>
+    /// 7z 多线程压缩（mt=on）。默认 true，利用多核 CPU 并行压缩。
+    /// 仅对 7z 格式有效。
+    /// </summary>
+    public bool SevenZipMultithreaded { get; set; } = true;
     public string ZipCompressionMethod { get; set; } = "deflate";
     public string ZipEncryptionMethod { get; set; } = "aes256";
     public bool SevenZipEncryptHeaders { get; set; } = true;
@@ -36,6 +41,11 @@ public class AppSettings
     public string FileConflictAction { get; set; } = "ask"; // overwrite / rename / skip / ask
     public bool OpenFolderAfterExtract { get; set; } = false;
     public bool ExtractPreserveFullPath { get; set; } = false;
+    /// <summary>
+    /// 并行解压线程数（1 = 串行，>1 = 并行线程数）。
+    /// 默认值 = Environment.ProcessorCount。
+    /// </summary>
+    public int ParallelExtractDegree { get; set; } = Environment.ProcessorCount;
 
     // ===== 交互 =====
     public bool EnableDragExtract { get; set; } = true;

@@ -5,6 +5,7 @@ using MantisZip.Core.Engines;
 using MantisZip.Core.Models;
 using MantisZip.Core.Utils;
 using MantisZip.UI.Avalonia.Dialogs;
+using MantisZip.UI.Avalonia.Models;
 using MantisZip.UI.Avalonia.ViewModels;
 
 namespace MantisZip.UI.Avalonia.Services;
@@ -160,6 +161,8 @@ public static class ExtractFlow
         CancellationToken ct)
     {
         var options = SelectedItemsExtractService.CreateExtractOptions(conflictAction, conflictDialog);
+        // 传递并行解压线程数（引擎 SupportsParallelExtract 时生效）
+        options.ParallelExtractDegree = AppSettings.Load()?.ParallelExtractDegree ?? 0;
 
         // 有过滤条件：仅解压匹配条目（统一入口；无 pathOverrides = 保留完整路径）。
         // 注意用 `!= null` 而非 `is { Count: > 0 }`：过滤激活但零匹配（空列表）也必须走

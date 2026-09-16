@@ -104,6 +104,9 @@ public partial class SettingsWindowViewModel : ObservableObject
     private bool _sevenZipSolid = true;
 
     [ObservableProperty]
+    private bool _sevenZipMultithreaded = true;
+
+    [ObservableProperty]
     private string _sevenZipSolidBlockSize = "";
 
     [ObservableProperty]
@@ -631,6 +634,7 @@ public partial class SettingsWindowViewModel : ObservableObject
     public string SevenZipDefaultOptionsText => LocalizationManager.T("Settings_SevenZip_DefaultOptions");
     public string SevenZipCompressionMethodText => LocalizationManager.T("Settings_SevenZip_CompressionMethod");
     public string SevenZipSolidText => LocalizationManager.T("Settings_SevenZip_Solid");
+    public string SevenZipMultithreadedText => LocalizationManager.T("Settings_SevenZip_MultiThread");
     public string SevenZipEncryptHeadersText => LocalizationManager.T("Settings_SevenZip_EncryptHeaders");
     public string SevenZipSolidBlockSizeText => LocalizationManager.T("Settings_SevenZip_SolidBlockSize");
     public string SevenZipDictionarySizeText => LocalizationManager.T("Settings_SevenZip_DictionarySize");
@@ -801,6 +805,7 @@ public partial class SettingsWindowViewModel : ObservableObject
         // Compression advanced
         _sevenZipCompressionMethod = _settings.SevenZipCompressionMethod;
         _sevenZipSolid = _settings.SevenZipSolid;
+        _sevenZipMultithreaded = _settings.SevenZipMultithreaded;
         _sevenZipSolidBlockSize = _settings.SevenZipSolidBlockSize;
         _sevenZipDictionarySize = _settings.SevenZipDictionarySize;
         _sevenZipNumFastBytes = _settings.SevenZipNumFastBytes;
@@ -1137,6 +1142,7 @@ public partial class SettingsWindowViewModel : ObservableObject
         OnPropertyChanged(nameof(SevenZipDefaultOptionsText));
         OnPropertyChanged(nameof(SevenZipCompressionMethodText));
         OnPropertyChanged(nameof(SevenZipSolidText));
+        OnPropertyChanged(nameof(SevenZipMultithreadedText));
         OnPropertyChanged(nameof(SevenZipEncryptHeadersText));
         OnPropertyChanged(nameof(SevenZipSolidBlockSizeText));
         OnPropertyChanged(nameof(SevenZipDictionarySizeText));
@@ -1258,6 +1264,7 @@ public partial class SettingsWindowViewModel : ObservableObject
         // Compression advanced
         _settings.SevenZipCompressionMethod = SelectedSevenZipCompressionMethodOption?.Value ?? SevenZipCompressionMethod;
         _settings.SevenZipSolid = SevenZipSolid;
+        _settings.SevenZipMultithreaded = SevenZipMultithreaded;
         _settings.SevenZipSolidBlockSize = SelectedSevenZipSolidBlockSizeOption?.Value ?? SevenZipSolidBlockSize;
         _settings.SevenZipDictionarySize = int.Parse(SelectedSevenZipDictionarySizeOption?.Value ?? SevenZipDictionarySize.ToString());
         _settings.SevenZipNumFastBytes = int.Parse(SelectedSevenZipNumFastBytesOption?.Value ?? SevenZipNumFastBytes.ToString());

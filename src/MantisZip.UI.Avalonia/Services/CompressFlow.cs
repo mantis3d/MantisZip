@@ -85,6 +85,7 @@ public static class CompressFlow
             SevenZipDictionarySize = vm.SevenZipDictionarySize,
             SevenZipNumFastBytes = vm.SevenZipNumFastBytes,
             SevenZipMatchFinder = vm.SevenZipMatchFinder,
+            SevenZipMultithreaded = vm.SevenZipMultithreaded,
             SevenZipEncryptHeaders = vm.SevenZipEncryptHeaders,
             // 源文件读取错误（被占用等）→ 弹 ErrorDialog（重试/跳过/中止），补上 Avalonia 迁移时遗漏的接线
             ErrorResolver = CreateErrorResolver(),
