@@ -6,6 +6,16 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-09-16** — Avalonia 12.0.4 → 12.1.2 全栈升级
+  - **MantisZip.UI.Avalonia.csproj**：
+    - Avalonia 12.0.4 → 12.1.2
+    - Avalonia.Controls.DataGrid 12.0.0 → 12.1.2
+    - Avalonia.Controls.WebView 12.0.1 → 12.1.0
+    - Avalonia.Desktop 12.0.4 → 12.1.2
+    - Avalonia.Themes.Fluent 12.0.4 → 12.1.2
+  - 验证：96 Avalonia + 373 Core 测试全绿，0 构建错误
+  - 新增 CS0618：`Bitmap.Save(Stream, int?)` → `BitmapEncoderOptions` 重载（PreviewViewModel.cs 2 处）
+
 **2026-09-16** — NuGet 核心依赖全面升级
   - **MantisZip.UI.Avalonia.csproj**：
     - Markdig 0.40.0 → 1.3.2（大版本升级，API 全向兼容，无需代码改动）
