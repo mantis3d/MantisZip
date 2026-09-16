@@ -20,7 +20,7 @@ namespace MantisZip.Core.Engines;
 /// </summary>
 public class ZipEngine : IArchiveEngine
 {
-    private const int CopyBufferSize = 262144;
+    private const int CopyBufferSize = 4194304;
 
     /// <summary>
     /// 使用 SharpCompress 打开 ZIP 文件，自动检测编码（UTF-8 → GBK 回退）。
@@ -218,10 +218,46 @@ public class ZipEngine : IArchiveEngine
 
     public bool CanDelete(ArchiveFormat format) => format == ArchiveFormat.Zip;
 
+    /// <summary>
+    /// ZIP 引擎支持并行解压（多实例模式，每个线程独立打开 archive）。
+    /// </summary>
+    public bool SupportsParallelExtract => true;
+
     public async Task<ExtractResult> ExtractAsync(string archivePath, string destinationPath, string? password = null, IProgress<ArchiveProgress>? progress = null, CancellationToken cancellationToken = default, ArchiveOptions? options = null)
     {
         CoreLog.Entry();
         CoreLog.Info($"ExtractAsync: {archivePath} -> {destinationPath}, password={(password != null ? "***" : "null")}");
+
+        // 读取并行度设置（0 = 默认 Environment.ProcessorCount，1 = 串行，>1 = 并行）
+        int maxParallelism = options?.ParallelExtractDegree ?? 0;
+        if (maxParallelism <= 0) maxParallelism = Environment.ProcessorCount;
+        if (maxParallelism > 16) maxParallelism = 16;
+
+        // 先快速检查文件数量决定是否走并行
+        int fileCount;
+        using (var quickArchive = OpenArchiveWithEncodingFallback(archivePath, password))
+        {
+            fileCount = quickArchive.Entries.Count(e => !e.IsDirectory);
+        }
+
+        // 文件数少于2或并行度为1时走串行
+        if (fileCount < 2 || maxParallelism <= 1)
+        {
+            CoreLog.Info($"ExtractAsync: fileCount={fileCount}, parallelism={maxParallelism} -> using sequential mode");
+            return await ExtractAsyncSequential(archivePath, destinationPath, password, progress, cancellationToken, options);
+        }
+
+        CoreLog.Info($"ExtractAsync: fileCount={fileCount}, parallelism={maxParallelism} -> using parallel mode");
+        return await ExtractAsyncParallel(archivePath, destinationPath, password, progress, cancellationToken, options, maxParallelism);
+    }
+
+    /// <summary>
+    /// 串行解压实现（原有逻辑，保留作为回退）
+    /// </summary>
+    private async Task<ExtractResult> ExtractAsyncSequential(string archivePath, string destinationPath, string? password, IProgress<ArchiveProgress>? progress, CancellationToken cancellationToken, ArchiveOptions? options)
+    {
+        CoreLog.Entry();
+        CoreLog.Info($"ExtractAsyncSequential: {archivePath} -> {destinationPath}, password={(password != null ? "***" : "null")}");
         var sw = Stopwatch.StartNew();
 
         var result = await Task.Run(async () =>
@@ -243,7 +279,7 @@ public class ZipEngine : IArchiveEngine
             var processedFiles = 0;
             int failedEntries = 0;
 
-            CoreLog.Info($"ExtractAsync: {entries.Count} entries, {totalBytes} total bytes");
+            CoreLog.Info($"ExtractAsyncSequential: {entries.Count} entries, {totalBytes} total bytes");
 
             foreach (var entry in allEntries)
             {
@@ -315,21 +351,21 @@ public class ZipEngine : IArchiveEngine
                         }
                     }
                     // 恢复文件原始修改时间
-                    try { File.SetLastWriteTime(resolvedPath, entryModified); } catch (Exception tsEx) { CoreLog.Info($"ExtractAsync: failed to set timestamp on {resolvedPath}: {tsEx.Message}"); }
+                    try { File.SetLastWriteTime(resolvedPath, entryModified); } catch (Exception tsEx) { CoreLog.Info($"ExtractAsyncSequential: failed to set timestamp on {resolvedPath}: {tsEx.Message}"); }
 
                     processedBytes += entrySize;
                     processedFiles++;
                 }
                 catch (UnauthorizedAccessException uax)
                 {
-                    CoreLog.Info($"ExtractAsync: permission denied for '{entryKey}': {uax.Message}");
+                    CoreLog.Info($"ExtractAsyncSequential: permission denied for '{entryKey}': {uax.Message}");
                     failedEntries++;
                 }
                 catch (IOException iox)
                 {
                     // 目标文件被其他进程占用（如正被 Word 打开）等 IO 失败：
                     // 跳过该条目继续，避免单个文件导致整个解压中止（对齐 UnauthorizedAccessException 分支）
-                    CoreLog.Info($"ExtractAsync: write failed for '{entryKey}': {iox.Message}");
+                    CoreLog.Info($"ExtractAsyncSequential: write failed for '{entryKey}': {iox.Message}");
                     failedEntries++;
                 }
             }
@@ -340,12 +376,201 @@ public class ZipEngine : IArchiveEngine
                 PercentComplete = 100
             });
 
-            CoreLog.Info($"ExtractAsync: done, {processedFiles} files, {processedBytes} bytes, {sw.ElapsedMilliseconds}ms, failedEntries={failedEntries}");
+            CoreLog.Info($"ExtractAsyncSequential: done, {processedFiles} files, {processedBytes} bytes, {sw.ElapsedMilliseconds}ms, failedEntries={failedEntries}");
             return new ExtractResult { SucceededEntries = processedFiles, FailedEntries = failedEntries };
         }, cancellationToken).ConfigureAwait(false);
 
         CoreLog.Exit();
         return result;
+    }
+
+    /// <summary>
+    /// 并行解压实现（每个线程独立打开 archive 实例，线程安全）。
+    /// </summary>
+    private async Task<ExtractResult> ExtractAsyncParallel(
+        string archivePath,
+        string destinationPath,
+        string? password,
+        IProgress<ArchiveProgress>? progress,
+        CancellationToken cancellationToken,
+        ArchiveOptions? options,
+        int maxParallelism)
+    {
+        CoreLog.Entry();
+        CoreLog.Info($"ExtractAsyncParallel: {archivePath} -> {destinationPath}, parallelism={maxParallelism}");
+        var sw = Stopwatch.StartNew();
+
+        // 1. 获取所有条目键和文件大小（单线程打开 archive）
+        var entryInfos = new List<(string Key, long Size, DateTime? Modified)>();
+        long totalBytes = 0;
+
+        using (var archive = OpenArchiveWithEncodingFallback(archivePath, password))
+        {
+            var hasEncrypted = archive.Entries.Any(e => e.IsEncrypted);
+            if (hasEncrypted && string.IsNullOrEmpty(password))
+            {
+                throw new InvalidOperationException("此压缩包已加密，请输入密码 (This archive is encrypted, password required)");
+            }
+
+            var allEntries = archive.Entries.ToList();
+            foreach (var entry in allEntries)
+            {
+                if (!entry.IsDirectory)
+                {
+                    var key = entry.Key ?? string.Empty;
+                    var size = entry.Size;
+                    var modified = entry.LastModifiedTime ?? DateTime.MinValue;
+                    entryInfos.Add((key, size, modified));
+                    totalBytes += size;
+                }
+            }
+        }
+
+        if (entryInfos.Count == 0)
+        {
+            progress?.Report(new ArchiveProgress { PercentComplete = 100 });
+            return new ExtractResult { SucceededEntries = 0, FailedEntries = 0 };
+        }
+
+        // 2. 创建所有目标目录（单线程，避免竞态）
+        var dirs = entryInfos
+            .Select(info => Path.GetDirectoryName(FileConflictHelper.GetSafePath(destinationPath, info.Key)))
+            .Where(d => !string.IsNullOrEmpty(d))
+            .Distinct();
+
+        foreach (var dir in dirs)
+        {
+            Directory.CreateDirectory(dir!);
+        }
+
+        // 3. 按文件大小降序排列（大文件优先，避免长尾效应）
+        var sortedInfos = entryInfos
+            .OrderByDescending(info => info.Size)
+            .ToList();
+
+        // 4. 并行解压
+        int processedFiles = 0;
+        long processedBytes = 0;
+        int failedEntries = 0;
+        var syncLock = new object();
+        var lastReportTime = DateTime.Now;
+        var reportInterval = TimeSpan.FromMilliseconds(100);
+
+        await Parallel.ForEachAsync(sortedInfos, new ParallelOptions
+        {
+            MaxDegreeOfParallelism = maxParallelism,
+            CancellationToken = cancellationToken
+        }, async (info, ct) =>
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            var (entryKey, entrySize, entryModified) = info;
+            var outputPath = FileConflictHelper.GetSafePath(destinationPath, entryKey);
+
+            // 冲突处理（需要同步）
+            string? resolvedPath;
+            lock (syncLock)
+            {
+                resolvedPath = FileConflictHelper.ResolvePath(outputPath, options, entryModified, entrySize);
+            }
+
+            if (resolvedPath == null)
+            {
+                lock (syncLock)
+                {
+                    processedBytes += entrySize;
+                }
+                return;
+            }
+
+            try
+            {
+                // 每个线程独立打开 archive（线程安全的关键）
+                using var archive = OpenArchiveWithEncodingFallback(archivePath, password);
+                var entry = archive.Entries.FirstOrDefault(e => e.Key == entryKey);
+                if (entry == null)
+                {
+                    lock (syncLock) Interlocked.Increment(ref failedEntries);
+                    return;
+                }
+
+                using var entryStream = entry.OpenEntryStream();
+                using var outputStream = File.Create(resolvedPath);
+                var buffer = new byte[CopyBufferSize];
+                long entryProcessed = 0;
+                var entryLastReportTime = DateTime.Now;
+
+                while (true)
+                {
+                    ct.ThrowIfCancellationRequested();
+                    var read = await entryStream.ReadAsync(buffer, 0, buffer.Length, ct);
+                    if (read <= 0) break;
+
+                    await outputStream.WriteAsync(buffer, 0, read, ct);
+                    entryProcessed += read;
+
+                    // 报告当前文件进度（节流）
+                    var now = DateTime.Now;
+                    if (now - entryLastReportTime >= reportInterval || entryProcessed >= entrySize)
+                    {
+                        lock (syncLock)
+                        {
+                            var filePct = entrySize > 0 ? (double)entryProcessed / entrySize * 100 : 100;
+                            var overallPct = totalBytes > 0 ? (double)(processedBytes + entryProcessed) / totalBytes * 100 : 0;
+                            progress?.Report(new ArchiveProgress
+                            {
+                                CurrentFile = entryKey,
+                                TotalFiles = entryInfos.Count,
+                                ProcessedFiles = processedFiles,
+                                TotalBytes = totalBytes,
+                                ProcessedBytes = processedBytes + entryProcessed,
+                                PercentComplete = overallPct,
+                                FilePercentComplete = filePct
+                            });
+                        }
+                        entryLastReportTime = now;
+                    }
+                }
+
+                // 恢复文件原始修改时间
+                try { File.SetLastWriteTime(resolvedPath, entryModified ?? DateTime.MinValue); }
+                catch (Exception tsEx) { CoreLog.Info($"ExtractAsyncParallel: failed to set timestamp on {resolvedPath}: {tsEx.Message}"); }
+
+                lock (syncLock)
+                {
+                    processedBytes += entrySize;
+                    Interlocked.Increment(ref processedFiles);
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (UnauthorizedAccessException uax)
+            {
+                CoreLog.Info($"ExtractAsyncParallel: permission denied for '{entryKey}': {uax.Message}");
+                lock (syncLock) Interlocked.Increment(ref failedEntries);
+            }
+            catch (IOException iox)
+            {
+                CoreLog.Info($"ExtractAsyncParallel: write failed for '{entryKey}': {iox.Message}");
+                lock (syncLock) Interlocked.Increment(ref failedEntries);
+            }
+            catch (Exception ex)
+            {
+                CoreLog.Info($"ExtractAsyncParallel: unexpected error for '{entryKey}': {ex.Message}");
+                lock (syncLock) Interlocked.Increment(ref failedEntries);
+            }
+        });
+
+        progress?.Report(new ArchiveProgress
+        {
+            CurrentFile = string.Empty,
+            PercentComplete = 100
+        });
+
+        CoreLog.Info($"ExtractAsyncParallel: done, {processedFiles} files, {processedBytes} bytes, {sw.ElapsedMilliseconds}ms, failedEntries={failedEntries}");
+        return new ExtractResult { SucceededEntries = processedFiles, FailedEntries = failedEntries };
     }
 
     public async Task ExtractEntriesAsync(

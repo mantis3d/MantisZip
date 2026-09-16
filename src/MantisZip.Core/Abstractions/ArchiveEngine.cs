@@ -153,6 +153,12 @@ public class ArchiveOptions
     /// 非 null 时引擎只打包白名单内的文件（过滤场景：预览构建时算好的 B 数据集 IncludedFiles）。
     /// </summary>
     public IReadOnlySet<string>? FileWhitelist { get; set; }
+
+    /// <summary>
+    /// 并行解压线程数（1 = 串行，>1 = 并行线程数，0 = 使用默认值 Environment.ProcessorCount）。
+    /// 仅当引擎 SupportsParallelExtract 为 true 时有效。
+    /// </summary>
+    public int ParallelExtractDegree { get; set; } = 0;
 }
 
 /// <summary>
@@ -353,6 +359,11 @@ public class ExtractResult
         /// 此引擎是否支持从压缩包删除文件。
         /// </summary>
         bool CanDelete(ArchiveFormat format) => false;
+
+        /// <summary>
+        /// 此引擎是否支持并行解压。
+        /// </summary>
+        bool SupportsParallelExtract => false;
     }
 
 /// <summary>

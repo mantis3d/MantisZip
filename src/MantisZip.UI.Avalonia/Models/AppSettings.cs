@@ -36,6 +36,11 @@ public class AppSettings
     public string FileConflictAction { get; set; } = "ask"; // overwrite / rename / skip / ask
     public bool OpenFolderAfterExtract { get; set; } = false;
     public bool ExtractPreserveFullPath { get; set; } = false;
+    /// <summary>
+    /// 并行解压线程数（1 = 串行，>1 = 并行线程数）。
+    /// 默认值 = Environment.ProcessorCount。
+    /// </summary>
+    public int ParallelExtractDegree { get; set; } = Environment.ProcessorCount;
 
     // ===== 交互 =====
     public bool EnableDragExtract { get; set; } = true;
