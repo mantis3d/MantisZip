@@ -6,6 +6,17 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-09-16** — NuGet 核心依赖全面升级
+  - **MantisZip.UI.Avalonia.csproj**：
+    - Markdig 0.40.0 → 1.3.2（大版本升级，API 全向兼容，无需代码改动）
+    - SkiaSharp 3.119.4 → 4.152.0（大版本升级，24 项 CS0618 deprecation warning 为非阻塞技术债：`SKPath.MoveTo/LineTo/Close` → `SKPathBuilder`、`SKCanvas.DrawBitmap` → 新 `SKSamplingOptions` 重载）
+    - Svg.Skia 2.0.0.5 → 5.2.1（大版本升级，依赖 SkiaSharp ≥4.148.0，SVG 渲染 API 无破坏性变更）
+    - HarfBuzzSharp 14.2.0 → 14.2.1.3（次版本升级，与 SkiaSharp 无交叉依赖）
+  - **MantisZip.Core.csproj**：
+    - SharpCompress 0.48.1 → 0.50.4（次版本升级，ZipArchive.OpenArchive/TarReader/TarWriter/IEntry 属性全部兼容，无代码改动）
+  - 验证：96 Avalonia + 373 Core 测试全绿，0 构建错误
+  - 技术债：IconProvider.cs（18 项 SKPath）、IcoParser.cs（1 项 DrawBitmap）、PreviewViewModel.cs（1 项 DrawBitmap）的 deprecation warning 待后续清理
+
 **2026-09-15** — Office 图片预览计划新增：三方案渐进式设计
   - `.omo/plans/已完成/office-content-preview-avalonia.md`：新增「Office 图片预览」章节（现状分析 + 方案 A/B/C + 推荐实施顺序）
     - 方案 A（PPTX 图片，~50 行）：复用 Canvas 坐标系统，`p:pic` → `a:xfrm` 定位 + `r:embed` 图片提取

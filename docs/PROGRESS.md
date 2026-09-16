@@ -27,6 +27,7 @@
 
 #### 2026-09
 
+- **09-16** — NuGet 核心依赖全面升级：Markdig 0.40.0→1.3.2、SharpCompress 0.48.1→0.50.4、SkiaSharp 3.119.4→4.152.0、Svg.Skia 2.0.0.5→5.2.1、HarfBuzzSharp 14.2.0→14.2.1.3；96 Avalonia + 373 Core 测试全绿，0 构建错误（24 项 CS0618 SkiaSharp 4.x deprecation warning 为非阻塞技术债）
 - **09-13** — HTML 预览 WebView 双轨升级 + 安全设置：NativeWebView 主体渲染 + ReverseMarkdown 降级路径（WebView 不可用时自动 fallback）；`</>` 源码/渲染切换按钮（HTML & Markdown 共用）；HTML 预览安全设置三开关（允许 JavaScript / 外部资源 / 导航，默认全关）+ CSP meta 注入 + NavigationStarting 拦截；设置窗口预览 tab 新增 HTML 子标签页（IconHtml 图标）
 - **09-12** — 报错信息一键复制：AppMessageBox 统一复制按钮（Error/Warning 弹窗显示，复制内容含版本号+时间戳+完整消息，一处改动覆盖全部弹窗）+ 主窗口状态栏错误文本改用只读 TextBox 可选中复制
 - **09-12** — 修复损坏压缩包测试静默通过：TestArchive 捕获 TestArchiveAsync bool 结果（RunWithProgress 的 completed 仅表示未取消/未抛异常，损坏判定此前被丢弃）+ PasswordService QuickVerifyPassword 改用严格 ZipArchive.OpenArchive
