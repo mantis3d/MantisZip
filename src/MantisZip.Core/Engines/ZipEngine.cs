@@ -1508,6 +1508,12 @@ while (true)
                                 if (string.IsNullOrEmpty(method) || method == "deflate" || method == "deflate64")
                                 {
                                     entryLevel = ZipEntryClassifier.GetAdaptiveLevel(fullPath, options.CompressionLevel, true);
+                                    CoreLog.Trace("ZipEngine.CompressAsync: adaptive entry '{0}' level={1} (global={2}, mode={3})",
+                                        entryPath, entryLevel ?? options.CompressionLevel, options.CompressionLevel, options.AdaptiveCompressionMode);
+                                }
+                                else
+                                {
+                                    CoreLog.Trace("ZipEngine.CompressAsync: adaptive skipped for '{0}' (method={1}, not deflate)", entryPath, method);
                                 }
                             }
                             var entryOptions = new ZipWriterEntryOptions
@@ -2019,6 +2025,12 @@ while (true)
                     if (string.IsNullOrEmpty(method) || method == "deflate" || method == "deflate64")
                     {
                         entryLevel = ZipEntryClassifier.GetAdaptiveLevel(fullPath, options.CompressionLevel, true);
+                        CoreLog.Trace("ZipEngine.AddToArchiveAsync: adaptive entry '{0}' level={1} (global={2}, mode={3})",
+                            relativePath, entryLevel ?? options.CompressionLevel, options.CompressionLevel, options.AdaptiveCompressionMode);
+                    }
+                    else
+                    {
+                        CoreLog.Trace("ZipEngine.AddToArchiveAsync: adaptive skipped for '{0}' (method={1}, not deflate)", relativePath, method);
                     }
                 }
                 var entryOptions = new ZipWriterEntryOptions

@@ -25,8 +25,14 @@ public static class AdaptiveRuleMatcher
         List<AdaptiveOverrideRule>? rules = null,
         List<FormatDefinition>? customFormats = null)
     {
+        CoreLog.Trace("AdaptiveRuleMatcher.ResolveLevel: file={0}, globalLevel={1}, mode={2}, rules={3}",
+            filePath, globalLevel, mode, rules?.Count ?? 0);
+
         if (mode == AdaptiveCompressionMode.Disabled)
+        {
+            CoreLog.Trace("AdaptiveRuleMatcher.ResolveLevel: disabled → return globalLevel={0}", globalLevel);
             return globalLevel;
+        }
 
         // 1. 检查用户自定义规则（优先级最高）
         if (rules != null)
@@ -41,7 +47,10 @@ public static class AdaptiveRuleMatcher
                     if (def == null) continue;
                     if (def.Extensions.Contains(ext, StringComparer.OrdinalIgnoreCase))
                     {
-                        return ResolveAdaptiveLevel(rule.Level, rule.CustomLevel, globalLevel);
+                        var resolved = ResolveAdaptiveLevel(rule.Level, rule.CustomLevel, globalLevel);
+                        CoreLog.Trace("AdaptiveRuleMatcher.ResolveLevel: rule '{0}' matched (format={1}, ext={2}, level={3}) → {4}",
+                            rule.Name, formatId, ext, rule.Level, resolved);
+                        return resolved;
                     }
                 }
             }
@@ -49,17 +58,27 @@ public static class AdaptiveRuleMatcher
 
         // 2. 内置分类
         var category = CompressionCoefficients.ClassifyByExtension(filePath);
+        CoreLog.Trace("AdaptiveRuleMatcher.ResolveLevel: category={0} for {1}", category, filePath);
+
         if (mode == AdaptiveCompressionMode.StoreForCompressed)
         {
             // 仅对已知的已压缩格式降级为 Store
             if (category is "image_lossy" or "media" or "archive")
+            {
+                CoreLog.Trace("AdaptiveRuleMatcher.ResolveLevel: StoreForCompressed → Store (category={0})", category);
                 return 0; // Store
+            }
+            CoreLog.Trace("AdaptiveRuleMatcher.ResolveLevel: StoreForCompressed → globalLevel={0} (category={1})", globalLevel, category);
             return globalLevel;
         }
 
         // SmartDetect: 大文件走魔数检测（这里简化为扩展名分类）
         if (category is "image_lossy" or "media" or "archive")
+        {
+            CoreLog.Trace("AdaptiveRuleMatcher.ResolveLevel: SmartDetect → Store (category={0})", category);
             return 0;
+        }
+        CoreLog.Trace("AdaptiveRuleMatcher.ResolveLevel: SmartDetect → globalLevel={0} (category={1})", globalLevel, category);
         return globalLevel;
     }
 
@@ -107,6 +126,9 @@ public static class AdaptiveRuleMatcher
                 normalCount++;
         }
 
-        return storeCount > normalCount ? 0 : globalLevel;
+        var result = storeCount > normalCount ? 0 : globalLevel;
+        CoreLog.Trace("AdaptiveRuleMatcher.ComputeMajorityLevel: files={0}, store={1}, normal={2} → {3}",
+            filePaths.Count, storeCount, normalCount, result);
+        return result;
     }
 }

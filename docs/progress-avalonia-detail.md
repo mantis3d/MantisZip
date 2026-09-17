@@ -46,6 +46,11 @@
   - `ViewModels/SettingsWindowViewModel.cs`：新增 `CompressTabAdaptiveHeader` 属性 + `OnPropertyChanged` 注册
   - i18n：新增 `Settings_Compress_Tab_Adaptive`（zh-CN: "自适应" / en: "Adaptive"）
 
+**2026-09-17** — 自适应压缩调试日志
+  - `Core/Utils/AdaptiveRuleMatcher.cs`：`ResolveLevel` 全路径日志（mode / file / category / rule match / final level）；`ComputeMajorityLevel` 统计日志
+  - `Core/Engines/ZipEngine.cs`：两处 per-entry 自适应决策日志（`CompressAsync` + `AddToArchiveAsync`），含 entry level / global level / mode / skip reason
+  - `UI/Services/CompressFlow.cs`：`BuildRequest` 模式解析日志（per-session bool + global enum → final mode）
+
 **2026-09-17** — 构建警告清理（28 warnings → 0）
   - `Models/IconProvider.cs`：22 处 `SKPath.MoveTo/LineTo/Close` 弃用警告 → 迁移到 `SKPathBuilder` + `Detach()`（4 个路径：folder back、folder tab、music note、play triangle）
   - `ViewModels/PreviewViewModel.cs`：2 处 `Bitmap.Save(ms)` → `Bitmap.Save(ms, new PngBitmapEncoderOptions())`；1 处 `DrawBitmap(src, 0, 0)` → `DrawBitmap(src, 0, 0, new SKSamplingOptions())`

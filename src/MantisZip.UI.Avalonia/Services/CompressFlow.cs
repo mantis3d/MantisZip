@@ -52,7 +52,7 @@ public static class CompressFlow
         }
 
         var settings = AppSettings.Load();
-        return new CompressRequest
+        var result = new CompressRequest
         {
             // 目录粒度源（过滤语义在白名单中表达，不再扁平化为文件列表）
             SourcePaths = items.Select(i => i.SourcePath).ToList(),
@@ -95,6 +95,10 @@ public static class CompressFlow
             // 源文件读取错误（被占用等）→ 弹 ErrorDialog（重试/跳过/中止），补上 Avalonia 迁移时遗漏的接线
             ErrorResolver = CreateErrorResolver(),
         };
+
+        CoreLog.Trace("CompressFlow.BuildRequest: adaptiveMode={0}, vm.AdaptiveCompression={1}, globalMode={2}",
+            result.AdaptiveCompressionMode, vm.AdaptiveCompression, (AppSettings.Load()?.AdaptiveCompressionMode).ToString());
+        return result;
     }
 
     /// <summary>
