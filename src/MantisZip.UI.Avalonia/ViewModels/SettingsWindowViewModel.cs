@@ -1,5 +1,7 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Avalonia.Controls;
+using Avalonia.Controls.ApplicationLifetimes;
 using MantisZip.Core.Models;
 using MantisZip.Core.Services;
 using MantisZip.UI.Avalonia.Dialogs;
@@ -1819,17 +1821,85 @@ public partial class SettingsWindowViewModel : ObservableObject
     }
 
     [RelayCommand]
-    private void AddCustomFormat()
+    private async Task AddCustomFormat(Window? owner)
     {
-        // 添加一个占位自定义格式条目，用户可后续编辑
-        var newFmt = new FormatDefinitionViewModel
+        var dialog = new AddCustomFormatDialog();
+        if (owner != null) dialog.WindowStartupLocation = WindowStartupLocation.CenterOwner;
+        var result = await dialog.ShowDialog<bool?>(owner ?? (App.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop ? desktop.MainWindow : null));
+        if (result == true)
         {
-            Id = $"Custom_{DateTime.Now:yyyyMMddHHmmss}",
-            DisplayName = LocalizationManager.T("Settings_FormatCatalog_NewFormat"),
-            Extensions = new List<string>(),
-            IsBuiltIn = false,
-        };
-        CustomFormats.Add(newFmt);
+            var newFmt = new FormatDefinitionViewModel
+            {
+                Id = $"Custom_{DateTime.Now:yyyyMMddHHmmss}",
+                DisplayName = dialog.FormatName,
+                Extensions = dialog.ExtensionsRaw.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Select(e => e.StartsWith(".") ? e.ToLowerInvariant() : "." + e.ToLowerInvariant()).ToList(),
+                MagicHex = string.IsNullOrWhiteSpace(dialog.MagicHex) ? null : dialog.MagicHex.Trim(),
+                IsBuiltIn = false,
+            };
+            CustomFormats.Add(newFmt);
+        }
+    }
+
+    public async void EditCustomFormat(FormatDefinitionViewModel fmt, Window? owner)
+    {
+        var dialog = new AddCustomFormatDialog();
+        dialog.Title = LocalizationManager.T("Settings_FormatCatalog_EditTitle");
+        dialog.SetExistingValues(fmt.DisplayName, fmt.Extensions, fmt.MagicHex);
+        if (owner != null) dialog.WindowStartupLocation = WindowStartupLocation.CenterOwner;
+        var result = await dialog.ShowDialog<bool?>(owner ?? (App.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop ? desktop.MainWindow : null));
+        if (result == true)
+        {
+            fmt.DisplayName = dialog.FormatName;
+            fmt.Extensions = dialog.ExtensionsRaw.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Select(e => e.StartsWith(".") ? e.ToLowerInvariant() : "." + e.ToLowerInvariant()).ToList();
+            fmt.MagicHex = string.IsNullOrWhiteSpace(dialog.MagicHex) ? null : dialog.MagicHex.Trim();
+        }
+    }
+
+    public void DeleteCustomFormat(FormatDefinitionViewModel fmt)
+    {
+        CustomFormats.Remove(fmt);
+    }
+
+    [RelayCommand]
+    private async Task AddRule(Window? owner)
+    {
+        var dialog = new EditAdaptiveRuleDialog();
+        if (owner != null) dialog.WindowStartupLocation = WindowStartupLocation.CenterOwner;
+        var result = await dialog.ShowDialog<bool?>(owner ?? (App.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop ? desktop.MainWindow : null));
+        if (result == true)
+        {
+            AdaptiveOverrides.Add(new AdaptiveOverrideRuleViewModel
+            {
+                Name = dialog.RuleName,
+                Level = dialog.SelectedLevel,
+                Enabled = true,
+            });
+        }
+    }
+
+    public async void EditRule(AdaptiveOverrideRuleViewModel rule, Window? owner)
+    {
+        var dialog = new EditAdaptiveRuleDialog();
+        dialog.SetExistingValues(rule.Name, rule.Level);
+        if (owner != null) dialog.WindowStartupLocation = WindowStartupLocation.CenterOwner;
+        var result = await dialog.ShowDialog<bool?>(owner ?? (App.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop ? desktop.MainWindow : null));
+        if (result == true)
+        {
+            rule.Name = dialog.RuleName;
+            rule.Level = dialog.SelectedLevel;
+        }
+    }
+
+    public void DeleteRule(AdaptiveOverrideRuleViewModel rule)
+    {
+        AdaptiveOverrides.Remove(rule);
+    }
+
+    [RelayCommand]
+    private void ResetDefaults()
+    {
+        foreach (var rule in AdaptiveOverrides)
+            rule.Enabled = false;
     }
 }
 

@@ -51,6 +51,14 @@
   - `Core/Engines/ZipEngine.cs`：两处 per-entry 自适应决策日志（`CompressAsync` + `AddToArchiveAsync`），含 entry level / global level / mode / skip reason
   - `UI/Services/CompressFlow.cs`：`BuildRequest` 模式解析日志（per-session bool + global enum → final mode）
 
+**2026-09-17** — 自适应压缩设置交互完善（格式/规则 CRUD）
+  - `Dialogs/AddCustomFormatDialog.axaml(.cs)`（新）：添加/编辑自定义格式对话框（名称 + 扩展名 + 魔数 hex），支持 `SetExistingValues` 编辑模式
+  - `Dialogs/EditAdaptiveRuleDialog.axaml(.cs)`（新）：添加/编辑规则对话框（名称 + AdaptiveLevel 下拉），支持 `SetExistingValues` 编辑模式
+  - `Views/SettingsWindow.axaml`：自定义格式行添加 ✏/✕ 编辑删除按钮；规则行添加 ✏/✕ 编辑删除按钮；Add/Reset 按钮接线 Command
+  - `Views/SettingsWindow.axaml.cs`：4 个 click handler（EditCustomFormat / DeleteCustomFormat / EditRule / DeleteRule）
+  - `ViewModels/SettingsWindowViewModel.cs`：AddCustomFormat 改为 async + 弹窗；新增 EditCustomFormat / DeleteCustomFormat / AddRule / EditRule / DeleteRule / ResetDefaults（禁用所有规则）
+  - i18n：7 个新增 key（对话框标题/提示）
+
 **2026-09-17** — 构建警告清理（28 warnings → 0）
   - `Models/IconProvider.cs`：22 处 `SKPath.MoveTo/LineTo/Close` 弃用警告 → 迁移到 `SKPathBuilder` + `Detach()`（4 个路径：folder back、folder tab、music note、play triangle）
   - `ViewModels/PreviewViewModel.cs`：2 处 `Bitmap.Save(ms)` → `Bitmap.Save(ms, new PngBitmapEncoderOptions())`；1 处 `DrawBitmap(src, 0, 0)` → `DrawBitmap(src, 0, 0, new SKSamplingOptions())`

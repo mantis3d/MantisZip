@@ -3,6 +3,7 @@ using Avalonia.Controls;
 using Avalonia.Data.Converters;
 using Avalonia.Input;
 using Avalonia.Interactivity;
+using MantisZip.UI.Avalonia.Dialogs;
 using MantisZip.UI.Avalonia.Models;
 using MantisZip.UI.Avalonia.Services;
 using MantisZip.UI.Avalonia.ViewModels;
@@ -67,6 +68,46 @@ public partial class SettingsWindow : Window
     private void OnPreviewFieldTapped(object sender, TappedEventArgs e)
     {
         // Kept for future use
+    }
+
+    // 自定义格式：编辑
+    private void EditCustomFormat_Click(object? sender, RoutedEventArgs e)
+    {
+        if (sender is Button btn && btn.Tag is FormatDefinitionViewModel fmt)
+        {
+            var vm = DataContext as SettingsWindowViewModel;
+            vm?.EditCustomFormat(fmt, this);
+        }
+    }
+
+    // 自定义格式：删除
+    private void DeleteCustomFormat_Click(object? sender, RoutedEventArgs e)
+    {
+        if (sender is Button btn && btn.Tag is FormatDefinitionViewModel fmt)
+        {
+            var vm = DataContext as SettingsWindowViewModel;
+            vm?.DeleteCustomFormat(fmt);
+        }
+    }
+
+    // 自适应规则：编辑
+    private void EditRule_Click(object? sender, RoutedEventArgs e)
+    {
+        if (sender is Button btn && btn.Tag is AdaptiveOverrideRuleViewModel rule)
+        {
+            var vm = DataContext as SettingsWindowViewModel;
+            vm?.EditRule(rule, this);
+        }
+    }
+
+    // 自适应规则：删除
+    private void DeleteRule_Click(object? sender, RoutedEventArgs e)
+    {
+        if (sender is Button btn && btn.Tag is AdaptiveOverrideRuleViewModel rule)
+        {
+            var vm = DataContext as SettingsWindowViewModel;
+            vm?.DeleteRule(rule);
+        }
     }
 }
 
