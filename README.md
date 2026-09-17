@@ -73,9 +73,14 @@ MantisZip 是一款免费开源的压缩/解压工具，基于 .NET 10 + Avaloni
 
 **Office 文档内容预览效果：**
 
+<details>
+<summary><b>📊 点击展开：Office 文档可预览文字与表格排版</b></summary>
+
 ![DOCX 预览](docs/images/version/v0.5.0/OfficeDocx.png)
 ![XLSX 预览](docs/images/version/v0.5.0/OfficeXlsx.png)
 ![PPTX 预览](docs/images/version/v0.5.0/OfficePptx.png)
+
+</details>
 
 
 #### 部分格式支持**元数据展示**（无需加载完整文件）：
