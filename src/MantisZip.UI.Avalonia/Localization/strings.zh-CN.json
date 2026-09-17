@@ -733,6 +733,7 @@
   "Settings_Compress_PreserveRoot": "压缩文件夹时保留外层目录",
   "Settings_CompressionLevel": "压缩级别",
   "Settings_Compress_Tab_General": "通用",
+  "Settings_Compress_Tab_Adaptive": "自适应",
   "Settings_Compress_Tab_Format": "格式",
   "Settings_Compress_Options": "选项",
   "Settings_Zip_DefaultOptions": "ZIP 默认选项",

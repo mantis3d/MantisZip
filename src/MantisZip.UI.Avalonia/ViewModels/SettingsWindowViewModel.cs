@@ -618,6 +618,7 @@ public partial class SettingsWindowViewModel : ObservableObject
 
     // Compress sub-tab headers
     public string CompressTabGeneralHeader => LocalizationManager.T("Settings_Compress_Tab_General");
+    public string CompressTabAdaptiveHeader => LocalizationManager.T("Settings_Compress_Tab_Adaptive");
     public string CompressTabFormatHeader => LocalizationManager.T("Settings_Compress_Tab_Format");
 
     // Preview strings
@@ -1187,6 +1188,7 @@ public partial class SettingsWindowViewModel : ObservableObject
         OnPropertyChanged(nameof(TabAdvancedHeader));
         OnPropertyChanged(nameof(TabDebugHeader));
         OnPropertyChanged(nameof(CompressTabGeneralHeader));
+        OnPropertyChanged(nameof(CompressTabAdaptiveHeader));
         OnPropertyChanged(nameof(CompressTabFormatHeader));
 
         OnPropertyChanged(nameof(EnableImagePreviewText));

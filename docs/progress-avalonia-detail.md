@@ -41,6 +41,11 @@
   - **Tests**：`AdaptiveCompressionTests.cs` — 22 项单元测试（CompressionCoefficients 7 + FormatCatalog 6 + AdaptiveRuleMatcher 9）
   - 验证：Core 424 + Avalonia 96 测试通过；构建 0 warnings / 0 errors
 
+**2026-09-17** — SettingsWindow 自适应压缩独立子 tab
+  - `Views/SettingsWindow.axaml`：压缩选项卡内「自适应压缩」三面板（模式选择/格式目录/规则管理）从「通用」子 tab 移至独立「自适应」子 tab
+  - `ViewModels/SettingsWindowViewModel.cs`：新增 `CompressTabAdaptiveHeader` 属性 + `OnPropertyChanged` 注册
+  - i18n：新增 `Settings_Compress_Tab_Adaptive`（zh-CN: "自适应" / en: "Adaptive"）
+
 **2026-09-17** — 构建警告清理（28 warnings → 0）
   - `Models/IconProvider.cs`：22 处 `SKPath.MoveTo/LineTo/Close` 弃用警告 → 迁移到 `SKPathBuilder` + `Detach()`（4 个路径：folder back、folder tab、music note、play triangle）
   - `ViewModels/PreviewViewModel.cs`：2 处 `Bitmap.Save(ms)` → `Bitmap.Save(ms, new PngBitmapEncoderOptions())`；1 处 `DrawBitmap(src, 0, 0)` → `DrawBitmap(src, 0, 0, new SKSamplingOptions())`

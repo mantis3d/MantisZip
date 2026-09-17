@@ -735,6 +735,7 @@
   "Settings_Compress_PreserveRoot": "Preserve directory root",
   "Settings_CompressionLevel": "Compression Level",
   "Settings_Compress_Tab_General": "General",
+  "Settings_Compress_Tab_Adaptive": "Adaptive",
   "Settings_Compress_Tab_Format": "Format",
   "Settings_Compress_Options": "Options",
   "Settings_Zip_DefaultOptions": "ZIP Default Options",

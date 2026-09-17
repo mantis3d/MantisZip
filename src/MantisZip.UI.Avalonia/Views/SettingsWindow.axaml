@@ -86,7 +86,15 @@
                                 IsChecked="{Binding PreserveDirectoryRoot}" />
                     </StackPanel>
                   </Border>
-
+      
+                </StackPanel>
+              </ScrollViewer>
+            </TabItem>
+            <!-- 自适应 Adaptive -->
+            <TabItem Header="{Binding CompressTabAdaptiveHeader}" Classes="compactTab"
+              controls:TabItemExtensions.TabIcon="IconSettings">
+              <ScrollViewer Background="{DynamicResource ThemeWindowBgBrush}">
+                <StackPanel Spacing="{DynamicResource SpacingSm}" Margin="{DynamicResource SpacingSmThk}">
                   <!-- 自适应压缩级别：模式选择 -->
                   <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
                           CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}" Background="{DynamicResource ThemeSurfaceBgBrush}">
@@ -169,7 +177,6 @@
                       </StackPanel>
                     </StackPanel>
                   </Border>
-      
                 </StackPanel>
               </ScrollViewer>
             </TabItem>
