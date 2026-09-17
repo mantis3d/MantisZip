@@ -1,6 +1,7 @@
 using System.Text.Json;
 using MantisZip.Core;
 using MantisZip.Core.FileFilter;
+using MantisZip.Core.Models;
 using MantisZip.Core.Utils;
 
 namespace MantisZip.UI.Avalonia.Models;
@@ -34,6 +35,16 @@ public class AppSettings
     /// 仅对 ZIP + Deflate/Deflate64 有效。
     /// </summary>
     public bool AdaptiveCompression { get; set; }
+
+    // ===== 自适应压缩级别 =====
+    /// <summary>自适应压缩模式（Disabled / StoreForCompressed / SmartDetect）。</summary>
+    public AdaptiveCompressionMode AdaptiveCompressionMode { get; set; } = AdaptiveCompressionMode.StoreForCompressed;
+
+    /// <summary>用户自定义格式列表。</summary>
+    public List<FormatDefinition> CustomFormats { get; set; } = new();
+
+    /// <summary>用户自定义压缩级别覆盖规则。</summary>
+    public List<AdaptiveOverrideRule> AdaptiveOverrides { get; set; } = new();
 
     public string ZipCompressionMethod { get; set; } = "deflate";
     public string ZipEncryptionMethod { get; set; } = "aes256";
@@ -213,9 +224,15 @@ public class AppSettings
     {
         try
         {
-            if (!File.Exists(SettingsFile)) return new AppSettings();
+            if (!File.Exists(SettingsFile)) return CreateWithDefaults();
             var json = File.ReadAllText(SettingsFile);
-            return JsonSerializer.Deserialize<AppSettings>(json) ?? new AppSettings();
+            var settings = JsonSerializer.Deserialize<AppSettings>(json) ?? CreateWithDefaults();
+            // 首次安装时填充默认规则
+            if (settings.AdaptiveOverrides.Count == 0)
+            {
+                settings.AdaptiveOverrides = GetDefaultAdaptiveOverrides();
+            }
+            return settings;
         }
         catch
         {
@@ -238,4 +255,21 @@ public class AppSettings
             return false;
         }
     }
+
+    /// <summary>创建带默认自适应规则的新实例。</summary>
+    private static AppSettings CreateWithDefaults()
+    {
+        var settings = new AppSettings();
+        settings.AdaptiveOverrides = GetDefaultAdaptiveOverrides();
+        return settings;
+    }
+
+    /// <summary>返回默认自适应压缩覆盖规则。</summary>
+    private static List<AdaptiveOverrideRule> GetDefaultAdaptiveOverrides() => new()
+    {
+        new() { Name = "图片类", FormatIds = new() { "Jpeg", "Png", "WebP", "Bmp", "Gif", "Ico", "Tga", "Hdr", "Exr", "Svg" }, Level = AdaptiveLevel.Store, Enabled = true },
+        new() { Name = "视频类", FormatIds = new() { "Mp4", "Mkv", "WebM", "Wmv", "Mov", "Avi", "Flv" }, Level = AdaptiveLevel.Store, Enabled = true },
+        new() { Name = "音频类", FormatIds = new() { "Mp3", "Flac", "Wav", "Ogg" }, Level = AdaptiveLevel.Store, Enabled = true },
+        new() { Name = "压缩包类", FormatIds = new() { "Zip", "SevenZip", "Rar", "Tar", "Gz", "Bz2", "Xz", "Zstd", "Iso" }, Level = AdaptiveLevel.Store, Enabled = true },
+    };
 }

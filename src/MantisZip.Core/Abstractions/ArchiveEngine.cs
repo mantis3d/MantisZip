@@ -1,3 +1,4 @@
+using MantisZip.Core.Models;
 using MantisZip.Core.Utils;
 
 namespace MantisZip.Core.Abstractions;
@@ -168,10 +169,23 @@ public class ArchiveOptions
     public bool SevenZipMultithreaded { get; set; } = true;
 
     /// <summary>
-    /// 自适应压缩。启用时对已压缩文件（图片/音视频/字体/归档等）自动 Store（不压缩），
-    /// 其余文件保持用户选定的压缩级别。仅对 ZIP + Deflate/Deflate64 有效。
+    /// 自适应压缩模式（三态）。
+    /// Disabled = 禁用，始终使用选定级别；
+    /// StoreForCompressed = 仅对已知格式自动降级（默认推荐）；
+    /// SmartDetect = 智能检测（大文件魔数 + 采样试压）。
     /// </summary>
-    public bool AdaptiveCompression { get; set; }
+    public AdaptiveCompressionMode AdaptiveCompressionMode { get; set; } = AdaptiveCompressionMode.Disabled;
+
+    /// <summary>
+    /// 自适应压缩开关（简写属性，与 <see cref="AdaptiveCompressionMode"/> 联动）。
+    /// true = StoreForCompressed，false = Disabled。
+    /// 保持向后兼容：现有代码可继续使用此属性。
+    /// </summary>
+    public bool AdaptiveCompression
+    {
+        get => AdaptiveCompressionMode != AdaptiveCompressionMode.Disabled;
+        set => AdaptiveCompressionMode = value ? AdaptiveCompressionMode.StoreForCompressed : AdaptiveCompressionMode.Disabled;
+    }
 }
 
 /// <summary>

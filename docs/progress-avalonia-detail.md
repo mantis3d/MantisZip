@@ -21,6 +21,26 @@
   - **i18n**：`FormatOptions_ZIP_AdaptiveCompression`（zh-CN + en）
   - 验证：18 项可行性探测全绿；Core 398 + Avalonia 96 测试通过
 
+**2026-09-17** — 自适应压缩级别升级（三模式 + 格式目录 + 用户规则）
+  - **Core 层**（5 新文件 + 1 修改）：
+    - `Models/FormatDefinition.cs`（新）：格式定义模型（Id / DisplayName / Extensions / MagicHex / IsBuiltIn）
+    - `Models/AdaptiveOverrideRule.cs`（新）：`AdaptiveLevel` 枚举（Store/Fast/Normal/Max/Global/GlobalPlusOne/GlobalMinusOne/Custom）、`AdaptiveCompressionMode` 枚举（Disabled/StoreForCompressed/SmartDetect）、`AdaptiveOverrideRule` 规则模型
+    - `Utils/CompressionCoefficients.cs`（新）：经验系数表 — 7 分类（text/code/image_lossy/image_lossless/media/binary/archive）× 7 级别 × ZIP/7z 双表；`ClassifyByExtension`、`GetRate` 方法
+    - `Services/FormatCatalog.cs`（新）：格式目录 — 内置 40+ 格式定义（从静态映射表初始化），`GetAll` / `GetById` / `GetByExtension` 查询接口
+    - `Utils/AdaptiveRuleMatcher.cs`（新）：规则匹配器 — 优先级：用户自定义规则 → 内置分类；`ResolveLevel` / `ResolveAdaptiveLevel` / `ComputeMajorityLevel` 方法
+    - `Abstractions/ArchiveEngine.cs`：`ArchiveOptions` 新增 `AdaptiveCompressionMode` 枚举属性 + `AdaptiveCompression` bool 向后兼容包装
+  - **Engine 层**（3 文件修改）：
+    - `Engines/ZipEngine.cs`：两处 `AdaptiveCompression == true` → `AdaptiveCompressionMode != Disabled`（null-safe）
+    - `Services/CompressService.cs`：`CompressRequest.AdaptiveCompression`（bool）→ `AdaptiveCompressionMode`（enum）；`BuildOptions` 映射到 `ArchiveOptions.AdaptiveCompressionMode`
+    - `UI/Services/CompressFlow.cs`：per-session bool + 全局 enum → 解析为 `AdaptiveCompressionMode` 传给 CompressRequest
+  - **UI 层**（3 文件修改）：
+    - `Views/SettingsWindow.axaml`：新增 3 个 Border 面板（自适应模式三选一 RadioButton + 格式目录 ItemsControl + 规则列表 ItemsControl）
+    - `ViewModels/SettingsWindowViewModel.cs`：新增 `AdaptiveCompressionMode` / `AdaptiveOverrides` / `CustomFormats` / `BuiltInFormats` 属性 + 加载/保存/增删改逻辑 + `FormatDefinitionViewModel` / `AdaptiveOverrideRuleViewModel` 子 VM
+    - `Models/AppSettings.cs`：新增 `AdaptiveCompressionMode`（默认 StoreForCompressed）、`CustomFormats`（List<FormatDefinition>）、`AdaptiveOverrides`（List<AdaptiveOverrideRule>）+ 默认规则初始化
+  - **i18n**：32 个新增 key（zh-CN + en）— Settings_AdaptiveCompression_*, Settings_FormatCatalog_*, Settings_AdaptiveOverrides_*
+  - **Tests**：`AdaptiveCompressionTests.cs` — 22 项单元测试（CompressionCoefficients 7 + FormatCatalog 6 + AdaptiveRuleMatcher 9）
+  - 验证：Core 424 + Avalonia 96 测试通过；构建 0 warnings / 0 errors
+
 **2026-09-17** — 构建警告清理（28 warnings → 0）
   - `Models/IconProvider.cs`：22 处 `SKPath.MoveTo/LineTo/Close` 弃用警告 → 迁移到 `SKPathBuilder` + `Detach()`（4 个路径：folder back、folder tab、music note、play triangle）
   - `ViewModels/PreviewViewModel.cs`：2 处 `Bitmap.Save(ms)` → `Bitmap.Save(ms, new PngBitmapEncoderOptions())`；1 处 `DrawBitmap(src, 0, 0)` → `DrawBitmap(src, 0, 0, new SKSamplingOptions())`

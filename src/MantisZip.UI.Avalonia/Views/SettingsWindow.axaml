@@ -86,6 +86,89 @@
                                 IsChecked="{Binding PreserveDirectoryRoot}" />
                     </StackPanel>
                   </Border>
+
+                  <!-- 自适应压缩级别：模式选择 -->
+                  <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
+                          CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}" Background="{DynamicResource ThemeSurfaceBgBrush}">
+                    <StackPanel Spacing="{DynamicResource SpacingXs}">
+                      <TextBlock Text="{Binding AdaptiveCompressionSectionText}" FontWeight="SemiBold" FontSize="14"
+                                 Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
+                      <TextBlock Text="{Binding AdaptiveCompressionDescText}"
+                                 Foreground="{DynamicResource ThemeTextSecondaryBrush}" FontSize="12" TextWrapping="Wrap"/>
+
+                      <!-- 三选一模式 -->
+                      <RadioButton Content="{Binding AdaptiveModeDisabledText}"
+                                   IsChecked="{Binding AdaptiveModeDisabled}"
+                                   GroupName="AdaptiveMode"/>
+                      <RadioButton Content="{Binding AdaptiveModeStoreForCompressedText}"
+                                   IsChecked="{Binding AdaptiveModeStoreForCompressed}"
+                                   GroupName="AdaptiveMode"/>
+                      <RadioButton Content="{Binding AdaptiveModeSmartDetectText}"
+                                   IsChecked="{Binding AdaptiveModeSmartDetect}"
+                                   GroupName="AdaptiveMode"/>
+                    </StackPanel>
+                  </Border>
+
+                  <!-- 格式目录 -->
+                  <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
+                          CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}" Background="{DynamicResource ThemeSurfaceBgBrush}">
+                    <StackPanel Spacing="{DynamicResource SpacingXs}">
+                      <TextBlock Text="{Binding FormatCatalogSectionText}" FontWeight="SemiBold" FontSize="14"
+                                 Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
+
+                      <!-- 内置格式列表 -->
+                      <TextBlock Text="{Binding BuiltInFormatsText}" Foreground="{DynamicResource ThemeTextSecondaryBrush}" FontSize="12"/>
+                      <ItemsControl ItemsSource="{Binding BuiltInFormats}">
+                        <ItemsControl.ItemTemplate>
+                          <DataTemplate x:DataType="vm:FormatDefinitionViewModel">
+                            <Border Padding="4,2" Background="{DynamicResource ThemeSurfaceBgBrush}">
+                              <StackPanel Orientation="Horizontal" Spacing="4">
+                                <TextBlock Text="{Binding DisplayName}" Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
+                                <TextBlock Text="{Binding ExtensionsDisplay}" Foreground="{DynamicResource ThemeTextSecondaryBrush}"/>
+                              </StackPanel>
+                            </Border>
+                          </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                      </ItemsControl>
+
+                      <!-- 自定义格式列表 -->
+                      <TextBlock Text="{Binding CustomFormatsText}" Foreground="{DynamicResource ThemeTextSecondaryBrush}" FontSize="12" Margin="0,8,0,0"/>
+                      <Button Content="{Binding AddCustomFormatText}" Command="{Binding AddCustomFormatCommand}" Classes="ToolbarButton" HorizontalAlignment="Left"/>
+                    </StackPanel>
+                  </Border>
+
+                  <!-- 自适应规则 -->
+                  <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
+                          CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}" Background="{DynamicResource ThemeSurfaceBgBrush}">
+                    <StackPanel Spacing="{DynamicResource SpacingXs}">
+                      <TextBlock Text="{Binding AdaptiveOverridesSectionText}" FontWeight="SemiBold" FontSize="14"
+                                 Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
+                      <TextBlock Text="{Binding AdaptiveOverridesDescText}"
+                                 Foreground="{DynamicResource ThemeTextSecondaryBrush}" FontSize="12" TextWrapping="Wrap"/>
+
+                      <!-- 规则列表 -->
+                      <ItemsControl ItemsSource="{Binding AdaptiveOverrides}">
+                        <ItemsControl.ItemTemplate>
+                          <DataTemplate x:DataType="vm:AdaptiveOverrideRuleViewModel">
+                            <Border Padding="4,2" Background="{DynamicResource ThemeSurfaceBgBrush}">
+                              <StackPanel Orientation="Horizontal" Spacing="8">
+                                <CheckBox IsChecked="{Binding Enabled}" />
+                                <TextBlock Text="{Binding Name}" FontWeight="SemiBold" Foreground="{DynamicResource ThemeTextPrimaryBrush}" VerticalAlignment="Center"/>
+                                <TextBlock Text="{Binding FormatIdsDisplay}" Foreground="{DynamicResource ThemeTextSecondaryBrush}" VerticalAlignment="Center"/>
+                                <TextBlock Text="→" Foreground="{DynamicResource ThemeTextSecondaryBrush}" VerticalAlignment="Center"/>
+                                <TextBlock Text="{Binding LevelDisplay}" Foreground="{DynamicResource ThemeTextPrimaryBrush}" VerticalAlignment="Center"/>
+                              </StackPanel>
+                            </Border>
+                          </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                      </ItemsControl>
+
+                      <StackPanel Orientation="Horizontal" Spacing="8">
+                        <Button Content="{Binding AddRuleText}" Classes="ToolbarButton"/>
+                        <Button Content="{Binding ResetDefaultsText}" Classes="ToolbarButton"/>
+                      </StackPanel>
+                    </StackPanel>
+                  </Border>
       
                 </StackPanel>
               </ScrollViewer>

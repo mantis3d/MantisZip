@@ -8,6 +8,7 @@ using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Threading;
 using MantisZip.Core.Abstractions;
+using MantisZip.Core.Models;
 using MantisZip.Core.Services;
 using MantisZip.Core.Utils;
 using MantisZip.UI.Avalonia.Dialogs;
@@ -86,7 +87,10 @@ public static class CompressFlow
             SevenZipNumFastBytes = vm.SevenZipNumFastBytes,
             SevenZipMatchFinder = vm.SevenZipMatchFinder,
             SevenZipMultithreaded = vm.SevenZipMultithreaded,
-            AdaptiveCompression = vm.AdaptiveCompression,
+            // 自适应压缩：per-session 开关 + 全局模式
+            AdaptiveCompressionMode = vm.AdaptiveCompression
+                ? (AppSettings.Load()?.AdaptiveCompressionMode ?? AdaptiveCompressionMode.StoreForCompressed)
+                : AdaptiveCompressionMode.Disabled,
             SevenZipEncryptHeaders = vm.SevenZipEncryptHeaders,
             // 源文件读取错误（被占用等）→ 弹 ErrorDialog（重试/跳过/中止），补上 Avalonia 迁移时遗漏的接线
             ErrorResolver = CreateErrorResolver(),

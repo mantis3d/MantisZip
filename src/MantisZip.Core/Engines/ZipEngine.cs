@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text;
 using SharpSevenZip;
 using MantisZip.Core.Abstractions;
+using MantisZip.Core.Models;
 using MantisZip.Core.Utils;
 using SharpCompress.Archives;
 using SharpCompress.Archives.Zip;
@@ -1501,7 +1502,7 @@ while (true)
                             var entryPath = ArchivePath.Normalize(relPath);
                             // 自适应压缩：已压缩文件自动 Store（仅 Deflate/Deflate64 归档适用）
                             int? entryLevel = null;
-                            if (options?.AdaptiveCompression == true && !options.Encrypt)
+                            if (options != null && options.AdaptiveCompressionMode != AdaptiveCompressionMode.Disabled && !options.Encrypt)
                             {
                                 var method = options.ZipCompressionMethod?.ToLowerInvariant();
                                 if (string.IsNullOrEmpty(method) || method == "deflate" || method == "deflate64")
@@ -2012,7 +2013,7 @@ while (true)
                 var fi = new FileInfo(fullPath);
                 // 自适应压缩：已压缩文件自动 Store（仅 Deflate/Deflate64 归档适用）
                 int? entryLevel = null;
-                if (options?.AdaptiveCompression == true && !options.Encrypt)
+                if (options != null && options.AdaptiveCompressionMode != AdaptiveCompressionMode.Disabled && !options.Encrypt)
                 {
                     var method = options.ZipCompressionMethod?.ToLowerInvariant();
                     if (string.IsNullOrEmpty(method) || method == "deflate" || method == "deflate64")

@@ -1,5 +1,7 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using MantisZip.Core.Models;
+using MantisZip.Core.Services;
 using MantisZip.UI.Avalonia.Dialogs;
 using MantisZip.UI.Avalonia.Models;
 using MantisZip.UI.Avalonia.Services;
@@ -129,6 +131,45 @@ public partial class SettingsWindowViewModel : ObservableObject
 
     [ObservableProperty]
     private bool _sevenZipEncryptHeaders = true;
+
+    // ── Adaptive Compression ──
+    [ObservableProperty]
+    private AdaptiveCompressionMode _adaptiveCompressionMode = AdaptiveCompressionMode.StoreForCompressed;
+
+    /// <summary>内置格式（只读，供 UI 展示）。</summary>
+    public ObservableCollection<FormatDefinitionViewModel> BuiltInFormats { get; } = new();
+
+    /// <summary>用户自定义格式（ObservableCollection for UI binding）。</summary>
+    public ObservableCollection<FormatDefinitionViewModel> CustomFormats { get; } = new();
+
+    /// <summary>用户自定义规则（ObservableCollection for UI binding）。</summary>
+    public ObservableCollection<AdaptiveOverrideRuleViewModel> AdaptiveOverrides { get; } = new();
+
+    // Adaptive mode radio button states
+    public bool AdaptiveModeDisabled
+    {
+        get => AdaptiveCompressionMode == AdaptiveCompressionMode.Disabled;
+        set { if (value) AdaptiveCompressionMode = AdaptiveCompressionMode.Disabled; OnPropertyChanged(); UpdateAdaptiveModeButtons(); }
+    }
+
+    public bool AdaptiveModeStoreForCompressed
+    {
+        get => AdaptiveCompressionMode == AdaptiveCompressionMode.StoreForCompressed;
+        set { if (value) AdaptiveCompressionMode = AdaptiveCompressionMode.StoreForCompressed; OnPropertyChanged(); UpdateAdaptiveModeButtons(); }
+    }
+
+    public bool AdaptiveModeSmartDetect
+    {
+        get => AdaptiveCompressionMode == AdaptiveCompressionMode.SmartDetect;
+        set { if (value) AdaptiveCompressionMode = AdaptiveCompressionMode.SmartDetect; OnPropertyChanged(); UpdateAdaptiveModeButtons(); }
+    }
+
+    private void UpdateAdaptiveModeButtons()
+    {
+        OnPropertyChanged(nameof(AdaptiveModeDisabled));
+        OnPropertyChanged(nameof(AdaptiveModeStoreForCompressed));
+        OnPropertyChanged(nameof(AdaptiveModeSmartDetect));
+    }
 
     [ObservableProperty]
     private string _logPrivacyMode = "extension";
@@ -422,6 +463,55 @@ public partial class SettingsWindowViewModel : ObservableObject
         }
     }
 
+    private void PopulateBuiltInFormats()
+    {
+        BuiltInFormats.Clear();
+        var allFormats = FormatCatalog.GetAll();
+        foreach (var fmt in allFormats.Where(f => f.IsBuiltIn))
+        {
+            BuiltInFormats.Add(new FormatDefinitionViewModel
+            {
+                Id = fmt.Id,
+                DisplayName = fmt.DisplayName,
+                Extensions = fmt.Extensions,
+                IsBuiltIn = true,
+            });
+        }
+
+        // 用户自定义格式
+        CustomFormats.Clear();
+        if (_settings.CustomFormats != null)
+        {
+            foreach (var fmt in _settings.CustomFormats.Where(f => !f.IsBuiltIn))
+            {
+                CustomFormats.Add(new FormatDefinitionViewModel
+                {
+                    Id = fmt.Id,
+                    DisplayName = fmt.DisplayName,
+                    Extensions = fmt.Extensions,
+                    MagicHex = fmt.MagicHex,
+                    IsBuiltIn = false,
+                });
+            }
+        }
+    }
+
+    private void PopulateAdaptiveOverrides()
+    {
+        AdaptiveOverrides.Clear();
+        foreach (var rule in _settings.AdaptiveOverrides)
+        {
+            AdaptiveOverrides.Add(new AdaptiveOverrideRuleViewModel
+            {
+                Name = rule.Name,
+                FormatIds = rule.FormatIds,
+                Level = rule.Level,
+                Enabled = rule.Enabled,
+                CustomLevel = rule.CustomLevel,
+            });
+        }
+    }
+
     private void PopulateAssocItems()
     {
         AssocItems.Clear();
@@ -640,6 +730,21 @@ public partial class SettingsWindowViewModel : ObservableObject
     public string SevenZipDictionarySizeText => LocalizationManager.T("Settings_SevenZip_DictionarySize");
     public string SevenZipNumFastBytesText => LocalizationManager.T("Settings_SevenZip_NumFastBytes");
     public string SevenZipMatchFinderText => LocalizationManager.T("Settings_SevenZip_MatchFinder");
+
+    // Adaptive Compression strings
+    public string AdaptiveCompressionSectionText => LocalizationManager.T("Settings_AdaptiveCompression");
+    public string AdaptiveCompressionDescText => LocalizationManager.T("Settings_AdaptiveCompression_Desc");
+    public string AdaptiveModeDisabledText => LocalizationManager.T("Settings_AdaptiveMode_Disabled");
+    public string AdaptiveModeStoreForCompressedText => LocalizationManager.T("Settings_AdaptiveMode_StoreForCompressed");
+    public string AdaptiveModeSmartDetectText => LocalizationManager.T("Settings_AdaptiveMode_SmartDetect");
+    public string FormatCatalogSectionText => LocalizationManager.T("Settings_FormatCatalog");
+    public string BuiltInFormatsText => LocalizationManager.T("Settings_FormatCatalog_BuiltIn");
+    public string CustomFormatsText => LocalizationManager.T("Settings_FormatCatalog_Custom");
+    public string AddCustomFormatText => LocalizationManager.T("Settings_FormatCatalog_AddCustom");
+    public string AdaptiveOverridesSectionText => LocalizationManager.T("Settings_AdaptiveOverrides");
+    public string AdaptiveOverridesDescText => LocalizationManager.T("Settings_AdaptiveOverrides_Desc");
+    public string AddRuleText => LocalizationManager.T("Settings_AdaptiveOverrides_AddRule");
+    public string ResetDefaultsText => LocalizationManager.T("Settings_AdaptiveOverrides_ResetDefaults");
 
     // Extract strings
     public string ExtractDefaultDestText => LocalizationManager.T("Settings_Extract_DefaultDest");
@@ -874,6 +979,11 @@ public partial class SettingsWindowViewModel : ObservableObject
         _assocTarGz = _settings.AssocTarGz;
         _assocGz = _settings.AssocGz;
         _assocIso = _settings.AssocIso;
+
+        // Adaptive Compression
+        _adaptiveCompressionMode = _settings.AdaptiveCompressionMode;
+        PopulateBuiltInFormats();
+        PopulateAdaptiveOverrides();
 
         PopulateComboOptions();
         SetSelectedOptions();
@@ -1148,6 +1258,19 @@ public partial class SettingsWindowViewModel : ObservableObject
         OnPropertyChanged(nameof(SevenZipDictionarySizeText));
         OnPropertyChanged(nameof(SevenZipNumFastBytesText));
         OnPropertyChanged(nameof(SevenZipMatchFinderText));
+        OnPropertyChanged(nameof(AdaptiveCompressionSectionText));
+        OnPropertyChanged(nameof(AdaptiveCompressionDescText));
+        OnPropertyChanged(nameof(AdaptiveModeDisabledText));
+        OnPropertyChanged(nameof(AdaptiveModeStoreForCompressedText));
+        OnPropertyChanged(nameof(AdaptiveModeSmartDetectText));
+        OnPropertyChanged(nameof(FormatCatalogSectionText));
+        OnPropertyChanged(nameof(BuiltInFormatsText));
+        OnPropertyChanged(nameof(CustomFormatsText));
+        OnPropertyChanged(nameof(AddCustomFormatText));
+        OnPropertyChanged(nameof(AdaptiveOverridesSectionText));
+        OnPropertyChanged(nameof(AdaptiveOverridesDescText));
+        OnPropertyChanged(nameof(AddRuleText));
+        OnPropertyChanged(nameof(ResetDefaultsText));
 
         OnPropertyChanged(nameof(ExtractDefaultDestText));
         OnPropertyChanged(nameof(ExtractConflictActionText));
@@ -1260,6 +1383,20 @@ public partial class SettingsWindowViewModel : ObservableObject
         _settings.DefaultLevel = int.TryParse(SelectedDefaultLevelOption?.Value, out var l) ? l : 5;
         _settings.CloseAfterCompress = CloseAfterCompress;
         _settings.KeepOriginalExtension = KeepOriginalExtension;
+
+        // Adaptive Compression
+        _settings.AdaptiveCompressionMode = AdaptiveCompressionMode;
+        _settings.AdaptiveOverrides = AdaptiveOverrides.Select(vm => new AdaptiveOverrideRule
+        {
+            Name = vm.Name,
+            FormatIds = vm.FormatIds,
+            Level = vm.Level,
+            Enabled = vm.Enabled,
+            CustomLevel = vm.CustomLevel,
+        }).ToList();
+
+        // Custom formats
+        _settings.CustomFormats = CustomFormats.Select(vm => vm.ToFormatDefinition()).ToList();
 
         // Compression advanced
         _settings.SevenZipCompressionMethod = SelectedSevenZipCompressionMethodOption?.Value ?? SevenZipCompressionMethod;
@@ -1678,6 +1815,89 @@ public partial class SettingsWindowViewModel : ObservableObject
         AssocIso = false;
         RefreshAssocStatus();
     }
+
+    [RelayCommand]
+    private void AddCustomFormat()
+    {
+        // 添加一个占位自定义格式条目，用户可后续编辑
+        var newFmt = new FormatDefinitionViewModel
+        {
+            Id = $"Custom_{DateTime.Now:yyyyMMddHHmmss}",
+            DisplayName = LocalizationManager.T("Settings_FormatCatalog_NewFormat"),
+            Extensions = new List<string>(),
+            IsBuiltIn = false,
+        };
+        CustomFormats.Add(newFmt);
+    }
 }
 
 public record Option(string Display, string Value);
+
+/// <summary>
+/// 格式定义 ViewModel — 用于设置窗口中格式目录的展示。
+/// </summary>
+public partial class FormatDefinitionViewModel : ObservableObject
+{
+    [ObservableProperty] private string _id = "";
+    [ObservableProperty] private string _displayName = "";
+    [ObservableProperty] private List<string> _extensions = new();
+    [ObservableProperty] private string? _magicHex;
+    [ObservableProperty] private bool _isBuiltIn = true;
+
+    public string ExtensionsDisplay => string.Join(" ", Extensions.Select(e => e));
+    public string MagicHexDisplay => string.IsNullOrEmpty(MagicHex) ? "" : $"[{MagicHex}]";
+
+    /// <summary>将 ViewModel 转换为 FormatDefinition 模型，用于持久化保存。</summary>
+    public FormatDefinition ToFormatDefinition() => new()
+    {
+        Id = Id,
+        DisplayName = DisplayName,
+        Extensions = Extensions?.ToList() ?? new(),
+        MagicHex = MagicHex,
+        IsBuiltIn = IsBuiltIn,
+    };
+}
+
+/// <summary>
+/// 自适应覆盖规则 ViewModel — 用于设置窗口中规则列表的展示和编辑。
+/// </summary>
+public partial class AdaptiveOverrideRuleViewModel : ObservableObject
+{
+    [ObservableProperty] private string _name = "";
+    [ObservableProperty] private bool _enabled = true;
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(LevelDisplay))]
+    [NotifyPropertyChangedFor(nameof(FormatIdsDisplay))]
+    private AdaptiveLevel _level = AdaptiveLevel.Store;
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(LevelDisplay))]
+    private int? _customLevel;
+
+    /// <summary>格式 ID 列表（逗号分隔显示）。</summary>
+    public string FormatIdsDisplay => string.Join(", ", FormatIds);
+
+    public List<string> FormatIds { get; set; } = new();
+
+    partial void OnLevelChanged(AdaptiveLevel value)
+    {
+        OnPropertyChanged(nameof(LevelDisplay));
+    }
+
+    partial void OnCustomLevelChanged(int? value)
+    {
+        OnPropertyChanged(nameof(LevelDisplay));
+    }
+
+    public string LevelDisplay => Level switch
+    {
+        AdaptiveLevel.Store => "存储",
+        AdaptiveLevel.Fast => "快速",
+        AdaptiveLevel.Normal => "正常",
+        AdaptiveLevel.Max => "最大",
+        AdaptiveLevel.Global => "跟随全局",
+        AdaptiveLevel.GlobalPlusOne => "全局+1",
+        AdaptiveLevel.GlobalMinusOne => "全局-1",
+        AdaptiveLevel.Custom => $"自定义({CustomLevel})",
+        _ => "未知"
+    };
+}
