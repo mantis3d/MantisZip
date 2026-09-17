@@ -97,7 +97,7 @@ public static class CompressFlow
         };
 
         CoreLog.Trace("CompressFlow.BuildRequest: adaptiveMode={0}, vm.AdaptiveCompression={1}, globalMode={2}",
-            result.AdaptiveCompressionMode, vm.AdaptiveCompression, (AppSettings.Load()?.AdaptiveCompressionMode).ToString());
+            result.AdaptiveCompressionMode, vm.AdaptiveCompression, (AppSettings.Load()?.AdaptiveCompressionMode).ToString() ?? "null");
         return result;
     }
 

@@ -1825,7 +1825,7 @@ public partial class SettingsWindowViewModel : ObservableObject
     {
         var dialog = new AddCustomFormatDialog();
         if (owner != null) dialog.WindowStartupLocation = WindowStartupLocation.CenterOwner;
-        var result = await dialog.ShowDialog<bool?>(owner ?? (App.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop ? desktop.MainWindow : null));
+        var result = await dialog.ShowDialog<bool?>((owner ?? (App.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop ? desktop.MainWindow : null))!);
         if (result == true)
         {
             var newFmt = new FormatDefinitionViewModel
@@ -1846,7 +1846,7 @@ public partial class SettingsWindowViewModel : ObservableObject
         dialog.Title = LocalizationManager.T("Settings_FormatCatalog_EditTitle");
         dialog.SetExistingValues(fmt.DisplayName, fmt.Extensions, fmt.MagicHex);
         if (owner != null) dialog.WindowStartupLocation = WindowStartupLocation.CenterOwner;
-        var result = await dialog.ShowDialog<bool?>(owner ?? (App.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop ? desktop.MainWindow : null));
+        var result = await dialog.ShowDialog<bool?>((owner ?? (App.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop ? desktop.MainWindow : null))!);
         if (result == true)
         {
             fmt.DisplayName = dialog.FormatName;
@@ -1868,7 +1868,7 @@ public partial class SettingsWindowViewModel : ObservableObject
         var allFormats = FormatCatalog.GetAll().Concat(CustomFormats.Select(f => f.ToFormatDefinition())).ToList();
         dialog.PopulateFormats(allFormats);
         if (owner != null) dialog.WindowStartupLocation = WindowStartupLocation.CenterOwner;
-        var result = await dialog.ShowDialog<bool?>(owner ?? (App.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop ? desktop.MainWindow : null));
+        var result = await dialog.ShowDialog<bool?>((owner ?? (App.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop ? desktop.MainWindow : null))!);
         if (result == true)
         {
             AdaptiveOverrides.Add(new AdaptiveOverrideRuleViewModel
@@ -1888,7 +1888,7 @@ public partial class SettingsWindowViewModel : ObservableObject
         dialog.PopulateFormats(allFormats, rule.FormatIds);
         dialog.SetExistingValues(rule.Name, rule.Level, rule.FormatIds);
         if (owner != null) dialog.WindowStartupLocation = WindowStartupLocation.CenterOwner;
-        var result = await dialog.ShowDialog<bool?>(owner ?? (App.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop ? desktop.MainWindow : null));
+        var result = await dialog.ShowDialog<bool?>((owner ?? (App.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop ? desktop.MainWindow : null))!);
         if (result == true)
         {
             rule.Name = dialog.RuleName;
