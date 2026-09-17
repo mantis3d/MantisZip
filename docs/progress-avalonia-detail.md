@@ -18,9 +18,16 @@
     - `Dialogs/CompressSettingsWindow.axaml.cs`：`SnapshotFormatOptionsToViewModel` 快照面板值
     - `Services/CompressFlow.cs`：`BuildRequest` 映射到 `CompressRequest.AdaptiveCompression`
     - `Core/Services/CompressService.cs`：`CompressRequest` 新增 `AdaptiveCompression` + `BuildOptions` 映射到 `ArchiveOptions`
-    - `Views/MainWindow.axaml.cs`：对话框 VM → 执行 VM 拷贝
-  - **i18n**：新增 `FormatOptions_ZIP_AdaptiveCompression`（zh-CN: 自适应压缩（已压缩文件自动 Store）/ en: Adaptive Compression (Store already-compressed files)）
-  - 验证：Core 398 + Avalonia 96 测试全绿，0 构建错误
+  - **i18n**：`FormatOptions_ZIP_AdaptiveCompression`（zh-CN + en）
+  - 验证：18 项可行性探测全绿；Core 398 + Avalonia 96 测试通过
+
+**2026-09-17** — 构建警告清理（28 warnings → 0）
+  - `Models/IconProvider.cs`：22 处 `SKPath.MoveTo/LineTo/Close` 弃用警告 → 迁移到 `SKPathBuilder` + `Detach()`（4 个路径：folder back、folder tab、music note、play triangle）
+  - `ViewModels/PreviewViewModel.cs`：2 处 `Bitmap.Save(ms)` → `Bitmap.Save(ms, new PngBitmapEncoderOptions())`；1 处 `DrawBitmap(src, 0, 0)` → `DrawBitmap(src, 0, 0, new SKSamplingOptions())`
+  - `Services/IcoParser.cs`：1 处 `DrawBitmap` 同上修复
+  - `Services/ExtractFlow.cs`：1 处 CS8602 nullable 解引用 → `CreateExtractOptions(...)!`
+  - `Services/SelectedItemsExtractService.cs`：1 处 CS8602 同上修复
+  - 构建结果：0 warnings / 0 errors
 
 **2026-09-16** — 压缩/解压性能优化（解压并行调度 + 7z 多线程压缩 UI）
   - **7z 多线程压缩接线**：

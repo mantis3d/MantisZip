@@ -1075,7 +1075,7 @@ public partial class PreviewViewModel : ObservableObject
         byte[] srcBytes;
         using (var ms = new MemoryStream())
         {
-            source.Save(ms);
+            source.Save(ms, new PngBitmapEncoderOptions());
             srcBytes = ms.ToArray();
         }
         using var srcSk = SkiaSharp.SKBitmap.Decode(srcBytes);
@@ -1086,7 +1086,7 @@ public partial class PreviewViewModel : ObservableObject
         using var dstSk = new SkiaSharp.SKBitmap(srcSk.Width, srcSk.Height);
         using (var canvas = new SkiaSharp.SKCanvas(dstSk))
         {
-            canvas.DrawBitmap(srcSk, 0, 0);
+            canvas.DrawBitmap(srcSk, 0, 0, new SKSamplingOptions());
         }
         for (int y = 0; y < dstSk.Height; y++)
         {
@@ -1111,7 +1111,7 @@ public partial class PreviewViewModel : ObservableObject
         byte[] bytes;
         using (var ms = new MemoryStream())
         {
-            source.Save(ms);
+            source.Save(ms, new PngBitmapEncoderOptions());
             bytes = ms.ToArray();
         }
         return SkiaSharp.SKBitmap.Decode(bytes);

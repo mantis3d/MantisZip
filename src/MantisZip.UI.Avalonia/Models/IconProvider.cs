@@ -186,15 +186,18 @@ public static class IconProvider
         };
 
         // Folder back
-        var backPath = new SKPath();
-        backPath.MoveTo(0, 4);
-        backPath.LineTo(6, 4);
-        backPath.LineTo(8, 6);
-        backPath.LineTo(16, 6);
-        backPath.LineTo(16, 14);
-        backPath.LineTo(0, 14);
-        backPath.Close();
-        canvas.DrawPath(backPath, paint);
+        using (var backBuilder = new SKPathBuilder())
+        {
+            backBuilder.MoveTo(0, 4);
+            backBuilder.LineTo(6, 4);
+            backBuilder.LineTo(8, 6);
+            backBuilder.LineTo(16, 6);
+            backBuilder.LineTo(16, 14);
+            backBuilder.LineTo(0, 14);
+            backBuilder.Close();
+            using var backPath = backBuilder.Detach();
+            canvas.DrawPath(backPath, paint);
+        }
 
         // Folder tab
         using var tabPaint = new SKPaint
@@ -203,13 +206,16 @@ public static class IconProvider
             IsAntialias = true,
             Style = SKPaintStyle.Fill
         };
-        using var tabPath = new SKPath();
-        tabPath.MoveTo(0, 2);
-        tabPath.LineTo(6, 2);
-        tabPath.LineTo(7, 4);
-        tabPath.LineTo(0, 4);
-        tabPath.Close();
-        canvas.DrawPath(tabPath, tabPaint);
+        using (var tabBuilder = new SKPathBuilder())
+        {
+            tabBuilder.MoveTo(0, 2);
+            tabBuilder.LineTo(6, 2);
+            tabBuilder.LineTo(7, 4);
+            tabBuilder.LineTo(0, 4);
+            tabBuilder.Close();
+            using var tabPath = tabBuilder.Detach();
+            canvas.DrawPath(tabPath, tabPaint);
+        }
 
         using var image = surface.Snapshot();
         using var data = image.Encode(SKEncodedImageFormat.Png, 100);
@@ -302,14 +308,17 @@ public static class IconProvider
                 })
                 {
                     canvas.DrawCircle(cx - 1, cy + 2, 2, notePaint);
-                    var notePath = new SKPath();
-                    notePath.MoveTo(cx - 1, cy + 2);
-                    notePath.LineTo(cx - 1, cy - 4);
-                    notePath.LineTo(cx + 4, cy - 3);
-                    notePath.LineTo(cx + 4, cy - 1);
-                    notePath.LineTo(cx - 1, cy - 2);
-                    notePath.Close();
-                    canvas.DrawPath(notePath, notePaint);
+                    using (var noteBuilder = new SKPathBuilder())
+                    {
+                        noteBuilder.MoveTo(cx - 1, cy + 2);
+                        noteBuilder.LineTo(cx - 1, cy - 4);
+                        noteBuilder.LineTo(cx + 4, cy - 3);
+                        noteBuilder.LineTo(cx + 4, cy - 1);
+                        noteBuilder.LineTo(cx - 1, cy - 2);
+                        noteBuilder.Close();
+                        using var notePath = noteBuilder.Detach();
+                        canvas.DrawPath(notePath, notePaint);
+                    }
                     canvas.DrawCircle(cx + 4, cy, 2, notePaint);
                 }
                 break;
@@ -323,12 +332,15 @@ public static class IconProvider
                     Style = SKPaintStyle.Fill
                 })
                 {
-                    var playPath = new SKPath();
-                    playPath.MoveTo(cx - 2, cy - 3);
-                    playPath.LineTo(cx + 3, cy);
-                    playPath.LineTo(cx - 2, cy + 3);
-                    playPath.Close();
-                    canvas.DrawPath(playPath, playPaint);
+                    using (var playBuilder = new SKPathBuilder())
+                    {
+                        playBuilder.MoveTo(cx - 2, cy - 3);
+                        playBuilder.LineTo(cx + 3, cy);
+                        playBuilder.LineTo(cx - 2, cy + 3);
+                        playBuilder.Close();
+                        using var playPath = playBuilder.Detach();
+                        canvas.DrawPath(playPath, playPaint);
+                    }
                 }
                 break;
 

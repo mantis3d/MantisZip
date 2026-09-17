@@ -52,7 +52,7 @@ public sealed class SelectedItemsExtractService
             pathOverrides[key] = FileConflictHelper.GetSafePath(destinationPath, safeEntryPath);
         }
 
-        var options = CreateExtractOptions(conflictAction, conflictDialog);
+        var options = CreateExtractOptions(conflictAction, conflictDialog)!;
         // 传递并行解压线程数（引擎 SupportsParallelExtract 时生效）
         options.ParallelExtractDegree = AppSettings.Load()?.ParallelExtractDegree ?? 0;
 

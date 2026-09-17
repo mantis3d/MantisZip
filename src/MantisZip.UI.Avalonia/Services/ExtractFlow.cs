@@ -160,7 +160,7 @@ public static class ExtractFlow
         IProgress<ArchiveProgress> progress,
         CancellationToken ct)
     {
-        var options = SelectedItemsExtractService.CreateExtractOptions(conflictAction, conflictDialog);
+        var options = SelectedItemsExtractService.CreateExtractOptions(conflictAction, conflictDialog)!;
         // 传递并行解压线程数（引擎 SupportsParallelExtract 时生效）
         options.ParallelExtractDegree = AppSettings.Load()?.ParallelExtractDegree ?? 0;
 
