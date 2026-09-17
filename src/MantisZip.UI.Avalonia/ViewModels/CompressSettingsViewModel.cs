@@ -197,6 +197,9 @@ public partial class CompressSettingsViewModel : ObservableObject
     /// <summary>7z 多线程压缩（mt=on）。默认 true，利用多核 CPU 并行压缩。</summary>
     public bool SevenZipMultithreaded { get; set; } = true;
 
+    /// <summary>自适应压缩。启用时对已压缩文件自动 Store，其余保持用户选定级别。</summary>
+    public bool AdaptiveCompression { get; set; }
+
     // ── 分卷 ──
 
     /// <summary>分卷大小选项（共享数据源）。</summary>
@@ -573,6 +576,7 @@ public partial class CompressSettingsViewModel : ObservableObject
             SevenZipNumFastBytes = settings.SevenZipNumFastBytes;
             SevenZipMatchFinder = settings.SevenZipMatchFinder ?? "";
             SevenZipMultithreaded = settings.SevenZipMultithreaded;
+            AdaptiveCompression = settings.AdaptiveCompression;
             ZipEncryptionMethod = settings.ZipEncryptionMethod ?? "aes256";
             SevenZipEncryptHeaders = settings.SevenZipEncryptHeaders;
         }

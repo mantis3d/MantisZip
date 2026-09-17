@@ -1499,9 +1499,20 @@ while (true)
                             cancellationToken.ThrowIfCancellationRequested();
                             var fi = new FileInfo(fullPath);
                             var entryPath = ArchivePath.Normalize(relPath);
+                            // 自适应压缩：已压缩文件自动 Store（仅 Deflate/Deflate64 归档适用）
+                            int? entryLevel = null;
+                            if (options?.AdaptiveCompression == true && !options.Encrypt)
+                            {
+                                var method = options.ZipCompressionMethod?.ToLowerInvariant();
+                                if (string.IsNullOrEmpty(method) || method == "deflate" || method == "deflate64")
+                                {
+                                    entryLevel = ZipEntryClassifier.GetAdaptiveLevel(fullPath, options.CompressionLevel, true);
+                                }
+                            }
                             var entryOptions = new ZipWriterEntryOptions
                             {
                                 ModificationDateTime = fi.LastWriteTime,
+                                CompressionLevel = entryLevel,
                             };
 
                             using (var entryStream = zipWriter.WriteToStream(entryPath, entryOptions))
@@ -1999,9 +2010,20 @@ while (true)
             try
             {
                 var fi = new FileInfo(fullPath);
+                // 自适应压缩：已压缩文件自动 Store（仅 Deflate/Deflate64 归档适用）
+                int? entryLevel = null;
+                if (options?.AdaptiveCompression == true && !options.Encrypt)
+                {
+                    var method = options.ZipCompressionMethod?.ToLowerInvariant();
+                    if (string.IsNullOrEmpty(method) || method == "deflate" || method == "deflate64")
+                    {
+                        entryLevel = ZipEntryClassifier.GetAdaptiveLevel(fullPath, options.CompressionLevel, true);
+                    }
+                }
                 var entryOptions = new ZipWriterEntryOptions
                 {
                     ModificationDateTime = fi.LastWriteTime,
+                    CompressionLevel = entryLevel,
                 };
 
                 var entryPath = ArchivePath.Normalize(relativePath);

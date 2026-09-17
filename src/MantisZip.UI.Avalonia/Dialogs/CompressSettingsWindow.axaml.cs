@@ -270,6 +270,7 @@ DataContext = ViewModel;
         ViewModel.SevenZipNumFastBytes = FormatOptionsPanel.SevenZipNumFastBytes;
         ViewModel.SevenZipMatchFinder = FormatOptionsPanel.SevenZipMatchFinder ?? "";
         ViewModel.SevenZipMultithreaded = FormatOptionsPanel.SevenZipMultithreaded;
+        ViewModel.AdaptiveCompression = FormatOptionsPanel.AdaptiveCompression;
         // ZipEncryptionMethod / SevenZipEncryptHeaders 已通过 XAML 双向绑定到 ViewModel，无需快照
     }
 

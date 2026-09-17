@@ -53,6 +53,12 @@
                     Foreground="{DynamicResource ThemeTextPrimaryBrush}"
                     BorderBrush="{DynamicResource ThemeComboBoxBorderBrush}" />
         </Grid>
+
+        <!-- ZIP 自适应压缩复选框：已压缩文件（图片/音视频等）自动 Store，其余保持用户选定级别 -->
+        <CheckBox x:Name="AdaptiveCompressionCheck"
+                  Content="{Binding AdaptiveCompressionLabel, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                  IsChecked="False"
+                  Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
       </StackPanel>
 
       <!-- ═══════ 7z 选项面板 ═══════ -->

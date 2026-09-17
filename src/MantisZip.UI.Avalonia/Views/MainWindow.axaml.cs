@@ -219,6 +219,7 @@ public partial class MainWindow : Window
                 cvm.SevenZipNumFastBytes = dialog.ViewModel.SevenZipNumFastBytes;
                 cvm.SevenZipMatchFinder = dialog.ViewModel.SevenZipMatchFinder;
                 cvm.SevenZipMultithreaded = dialog.ViewModel.SevenZipMultithreaded;
+                cvm.AdaptiveCompression = dialog.ViewModel.AdaptiveCompression;
                 cvm.SevenZipEncryptHeaders = dialog.ViewModel.SevenZipEncryptHeaders;
                 // 分卷设置（同样仅本次生效；此前未复制导致 cvm.SplitSize 恒为 0，对话框分卷选择丢失）
                 cvm.SelectedSplitSizeOption = dialog.ViewModel.SelectedSplitSizeOption;

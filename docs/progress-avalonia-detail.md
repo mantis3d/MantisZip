@@ -6,6 +6,22 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-09-17** — ZIP 自适应压缩（per-entry Store 已压缩文件）
+  - **Core 层**：
+    - `Abstractions/ArchiveEngine.cs`：`ArchiveOptions` 新增 `AdaptiveCompression`（bool，默认 false）
+    - `Utils/ZipEntryClassifier.cs`（新文件）：按扩展名分类已压缩文件（图片/音视频/字体/归档/已压缩文档等 60+ 扩展名），`GetAdaptiveLevel(filePath, userLevel, adaptive)` 返回实际压缩级别
+    - `Engines/ZipEngine.cs`：`ReadFileWithRetry`（主压缩路径）和 `AddToArchiveAsync` 接入自适应级别 —— 仅 Deflate/Deflate64 归档 + 非加密时生效，自动为已压缩文件设置 `CompressionLevel = 0`（Store）
+  - **UI 层**：
+    - `Models/AppSettings.cs`：新增 `AdaptiveCompression`（默认 false）
+    - `Controls/DynamicFormatOptionsPanel.axaml(.cs)`：ZIP 面板新增「自适应压缩」复选框 + `AdaptiveCompression` 只读属性 + `AdaptiveCompressionLabel` 本地化标签 + `LoadDefaults` 加载
+    - `ViewModels/CompressSettingsViewModel.cs`：新增 `AdaptiveCompression` 属性 + 从 AppSettings 加载
+    - `Dialogs/CompressSettingsWindow.axaml.cs`：`SnapshotFormatOptionsToViewModel` 快照面板值
+    - `Services/CompressFlow.cs`：`BuildRequest` 映射到 `CompressRequest.AdaptiveCompression`
+    - `Core/Services/CompressService.cs`：`CompressRequest` 新增 `AdaptiveCompression` + `BuildOptions` 映射到 `ArchiveOptions`
+    - `Views/MainWindow.axaml.cs`：对话框 VM → 执行 VM 拷贝
+  - **i18n**：新增 `FormatOptions_ZIP_AdaptiveCompression`（zh-CN: 自适应压缩（已压缩文件自动 Store）/ en: Adaptive Compression (Store already-compressed files)）
+  - 验证：Core 398 + Avalonia 96 测试全绿，0 构建错误
+
 **2026-09-16** — 压缩/解压性能优化（解压并行调度 + 7z 多线程压缩 UI）
   - **7z 多线程压缩接线**：
     - `Controls/DynamicFormatOptionsPanel.axaml(.cs)`：7z 面板新增「多线程压缩」复选框（`MultiThreadCheck`）+ `SevenZipMultithreaded` 只读属性 + `MultiThreadCheck_IsCheckedChanged`

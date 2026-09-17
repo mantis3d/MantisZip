@@ -28,6 +28,13 @@ public class AppSettings
     /// 仅对 7z 格式有效。
     /// </summary>
     public bool SevenZipMultithreaded { get; set; } = true;
+
+    /// <summary>
+    /// 自适应压缩。启用时对已压缩文件（图片/音视频/字体/归档等）自动 Store，其余保持用户选定级别。
+    /// 仅对 ZIP + Deflate/Deflate64 有效。
+    /// </summary>
+    public bool AdaptiveCompression { get; set; }
+
     public string ZipCompressionMethod { get; set; } = "deflate";
     public string ZipEncryptionMethod { get; set; } = "aes256";
     public bool SevenZipEncryptHeaders { get; set; } = true;

@@ -37,6 +37,8 @@ public partial class DynamicFormatOptionsPanel : UserControl
     public string WordSizeLabel => LocalizationManager.T("FormatOptions_7z_WordSize");
     public string MatchFinderLabel => LocalizationManager.T("FormatOptions_7z_MatchFinder");
     public string MultiThreadLabel => LocalizationManager.T("FormatOptions_7z_MultiThread");
+
+    public string AdaptiveCompressionLabel => LocalizationManager.T("FormatOptions_ZIP_AdaptiveCompression");
     public string TarGzPlaceholder => LocalizationManager.T("FormatOptions_TarGz_Placeholder");
 
     // ── CLR Properties ─────────────────────────────────────────────────────
@@ -149,6 +151,18 @@ public partial class DynamicFormatOptionsPanel : UserControl
         }
     }
 
+    /// <summary>
+    /// 自适应压缩。仅对 ZIP 格式有效；非 ZIP 格式返回 false。
+    /// </summary>
+    public bool AdaptiveCompression
+    {
+        get
+        {
+            if (SelectedFormat != "zip") return false;
+            return AdaptiveCompressionCheck.IsChecked == true;
+        }
+    }
+
     // ── Constructor ────────────────────────────────────────────────────────
 
     public DynamicFormatOptionsPanel()
@@ -216,6 +230,7 @@ public partial class DynamicFormatOptionsPanel : UserControl
         SolidBlockSizeCombo.IsEnabled = s.SevenZipSolid;
 
         MultiThreadCheck.IsChecked = s.SevenZipMultithreaded;
+        AdaptiveCompressionCheck.IsChecked = s.AdaptiveCompression;
 
         SelectComboByTag(SolidBlockSizeCombo, s.SevenZipSolidBlockSize ?? "");
         SelectComboByIntValue(DictSizeCombo, s.SevenZipDictionarySize);

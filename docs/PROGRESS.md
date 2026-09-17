@@ -27,6 +27,7 @@
 
 #### 2026-09
 
+- **09-17** — ZIP 自适应压缩：按文件扩展名自动判断已压缩文件（60+ 格式：图片/音视频/字体/归档/已压缩文档），已压缩文件 Store（不压缩），其余保持用户选定级别；仅 Deflate/Deflate64 + 非加密 ZIP 有效；压缩对话框 ZIP 面板新增「自适应压缩」复选框；12 文件 +69 行
 - **09-16** — 压缩/解压性能优化（ZIP 解压并行 + 7z 多线程压缩）：① **ZIP 并行解压**自研多实例实现（SharpCompress 单实例线程不安全）——Round-Robin 分批 + **每批次复用 1 个 archive 实例**（减少 80-90% OpenArchive 开销）+ 进度报告锁竞争修复（曾因锁内 `progress.Report()` 导致 8 线程争用、100×1MB 解压从 0.3s 劣化到 8.5s 的 25x 回退）；② 缓冲区 256KB→4MB（ZipEngine/TarGzEngine/ZipBinaryRewriter）；③ `ParallelExtractDegree` 设置项（1-16，默认 CPU 核心数，1=串行回退）；④ **7z 多线程压缩 `mt=on` 实测 4.63x**（100×1MB/8核：38.7s→8.4s），压缩对话框 7z 面板 + 设置窗口全局默认值双开关；Core 380 + Avalonia 96 测试全绿
 - **09-16** — NuGet 核心依赖全面升级：Markdig 0.40.0→1.3.2、SharpCompress 0.48.1→0.50.4、SkiaSharp 3.119.4→4.152.0、Svg.Skia 2.0.0.5→5.2.1、HarfBuzzSharp 14.2.0→14.2.1.3；96 Avalonia + 373 Core 测试全绿，0 构建错误（24 项 CS0618 SkiaSharp 4.x deprecation warning 为非阻塞技术债）
 - **09-16** — Avalonia 12.0.4→12.1.2 全栈升级（Avalonia/Avalonia.Controls.DataGrid/Avalonia.Controls.WebView/Avalonia.Desktop/Avalonia.Themes.Fluent）；96 Avalonia + 373 Core 测试全绿，0 构建错误（新增 2 项 CS0618）

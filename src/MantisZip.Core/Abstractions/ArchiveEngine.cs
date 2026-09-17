@@ -166,6 +166,12 @@ public class ArchiveOptions
     /// 仅对 7z 格式有效，ZIP/TAR/GZ 无此选项。
     /// </summary>
     public bool SevenZipMultithreaded { get; set; } = true;
+
+    /// <summary>
+    /// 自适应压缩。启用时对已压缩文件（图片/音视频/字体/归档等）自动 Store（不压缩），
+    /// 其余文件保持用户选定的压缩级别。仅对 ZIP + Deflate/Deflate64 有效。
+    /// </summary>
+    public bool AdaptiveCompression { get; set; }
 }
 
 /// <summary>

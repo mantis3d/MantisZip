@@ -434,6 +434,7 @@
   "FormatOptions_Zip_Encoding": "文件编码:",
   "FormatOptions_Zip_EncodingDefault": "保持原始",
   "FormatOptions_Zip_Title": "ZIP 选项",
+  "FormatOptions_ZIP_AdaptiveCompression": "自适应压缩（已压缩文件自动 Store）",
   "Main_ArchiveComment_NotSupported": "仅 ZIP 格式支持注释",
   "Main_ArchiveComment_Prompt": "编辑压缩包注释：",
   "Main_ArchiveComment_Save": "保存",

@@ -436,6 +436,7 @@
   "FormatOptions_Zip_Encoding": "Filename Encoding:",
   "FormatOptions_Zip_EncodingDefault": "Keep Original",
   "FormatOptions_Zip_Title": "ZIP Options",
+  "FormatOptions_ZIP_AdaptiveCompression": "Adaptive Compression (Store already-compressed files)",
   "Main_ArchiveComment_NotSupported": "Comments are only supported for ZIP archives",
   "Main_ArchiveComment_Prompt": "Edit archive comment:",
   "Main_ArchiveComment_Save": "Save",
