@@ -21,6 +21,17 @@
   - **i18n**：新增 `FormatOptions_7z_MultiThread`（压缩对话框）+ `Settings_SevenZip_MultiThread`（设置窗口），zh-CN/en 成对同步（1168 keys 对齐）
   - 验证：Core 380 + Avalonia 96 测试全绿，0 构建错误 0 警告
 
+**2026-09-17** — 自适应压缩可行性验证（18 条探针，全绿）
+  - 新增 `AdaptiveCompressionFeasibilityTests.cs`：验证 per-entry 压缩级别、Store 配方、格式限制、7z.dll 互操作、内存压缩能力
+  - 发现 3 个计划未覆盖的陷阱：
+    1. `CompressionLevel = 0` 不是通用 Store — ZStandard level=0 抛异常（有效范围 1-22）
+    2. per-entry `CompressionType = None` 单独设置会抛异常 — 必须配对 `CompressionLevel = 0`
+    3. 不支持的级别是「抛异常」而非「静默忽略」— `canPerEntry` 门控是硬性要求
+  - 意外收获：BZip2/LZMA/PPMd 归档**可逐条目 Store**（`type=None,lvl=0`），自适应在这些格式里仍然有效（跳过已压缩文件）
+  - 验证 SharpSevenZip `CompressStream(in, out, pwd)` 纯内存压缩可用（预估器采样路径）
+  - `SevenZipEngineTests.cs` 新增 ZIP mt=on 探针测试（Skip）
+  - 全量：Core 398 通过 / 3 跳过，Avalonia 96 通过 / 2 跳过
+
 **2026-09-16** — Avalonia 12.0.4 → 12.1.2 全栈升级
   - **MantisZip.UI.Avalonia.csproj**：
     - Avalonia 12.0.4 → 12.1.2

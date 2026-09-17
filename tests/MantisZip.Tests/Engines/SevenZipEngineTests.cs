@@ -483,6 +483,92 @@ public class SevenZipEngineTests : IDisposable
         Console.WriteLine($"  Speedup: {(double)stSw.ElapsedMilliseconds / mtSw.ElapsedMilliseconds:F2}x");
     }
 
+    // ===== 探针：7z.dll 的 ZIP 输出是否支持 mt 并行 =====
+
+    /// <summary>
+    /// 探针测试：用 SharpSevenZip 的 OutArchiveFormat.Zip + Deflate 输出 ZIP，
+    /// 对比 mt=off / mt=on 的墙钟时间与 CPU 时间，判断 7z.dll 的 ZIP 编码器是否并行。
+    /// 判据：CPU时间/墙钟时间 ≈ 1 → 单线程；> 1 → 已并行（约等于并发核数）。
+    /// 场景 A（100×1MB 多文件）探测「文件级并行」，场景 B（1×100MB 单文件）探测「文件内并行」。
+    /// </summary>
+    [Fact(Skip = "性能探针，环境依赖强，需手动运行验证；结论：多文件 6.75-7.29x，单文件无收益")]
+    public async Task Probe_SevenZip_Zip_MultiThread()
+    {
+        if (!Is7zDllAvailable()) return;
+
+        static byte[] MakeCompressible(int size)
+        {
+            var pattern = System.Text.Encoding.UTF8.GetBytes(
+                "MantisZip zip mt probe data 0123456789 abcdefghijklmnopqrstuvwxyz ");
+            var buf = new byte[size];
+            for (int i = 0; i < size; i++) buf[i] = pattern[i % pattern.Length];
+            return buf;
+        }
+
+        var root = TrackDir(Path.Combine(Path.GetTempPath(), "MantisZipZipMtProbe", Guid.NewGuid().ToString("N")));
+
+        // 场景 A：100 × 1MB 多文件（可探测跨文件并行）
+        var manyDir = Path.Combine(root, "many");
+        Directory.CreateDirectory(manyDir);
+        for (int i = 0; i < 100; i++)
+            await File.WriteAllBytesAsync(Path.Combine(manyDir, $"f{i:D3}.bin"), MakeCompressible(1024 * 1024));
+
+        // 场景 B：1 × 100MB 单文件（可探测文件内并行）
+        var singleDir = Path.Combine(root, "single");
+        Directory.CreateDirectory(singleDir);
+        await File.WriteAllBytesAsync(Path.Combine(singleDir, "big.bin"), MakeCompressible(100 * 1024 * 1024));
+
+        var proc = System.Diagnostics.Process.GetCurrentProcess();
+
+        (long Wall, double Cpu, long Size) Run(string dir, bool mt, string tag)
+        {
+            var outPath = Path.Combine(root, $"{tag}.zip");
+            if (File.Exists(outPath)) File.Delete(outPath);
+
+            var c = new SharpSevenZipCompressor
+            {
+                ArchiveFormat = OutArchiveFormat.Zip,
+                CompressionMethod = CompressionMethod.Deflate,
+                CompressionLevel = CompressionLevel.Normal,
+                IncludeEmptyDirectories = true,
+                DirectoryStructure = true,
+            };
+            c.CustomParameters["mt"] = mt ? "on" : "off";
+
+            var cpu0 = proc.TotalProcessorTime;
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            c.CompressDirectory(dir, outPath);
+            sw.Stop();
+            var cpu1 = proc.TotalProcessorTime;
+
+            return (sw.ElapsedMilliseconds, (cpu1 - cpu0).TotalMilliseconds, new FileInfo(outPath).Length);
+        }
+
+        var aOff = Run(manyDir, false, "a_off");
+        var aOn = Run(manyDir, true, "a_on");
+        var bOff = Run(singleDir, false, "b_off");
+        var bOn = Run(singleDir, true, "b_on");
+
+        Console.WriteLine("=== PROBE: 7z.dll ZIP + mt (Deflate Normal) ===");
+        Console.WriteLine($"A 100x1MB  off: wall={aOff.Wall}ms cpu={aOff.Cpu:F0}ms size={aOff.Size}");
+        Console.WriteLine($"A 100x1MB  on : wall={aOn.Wall}ms cpu={aOn.Cpu:F0}ms size={aOn.Size}");
+        Console.WriteLine($"A          speedup={(double)aOff.Wall / aOn.Wall:F2}x  parallelism(cpu/wall)={aOn.Cpu / aOn.Wall:F2}");
+        Console.WriteLine($"B 1x100MB  off: wall={bOff.Wall}ms cpu={bOff.Cpu:F0}ms size={bOff.Size}");
+        Console.WriteLine($"B 1x100MB  on : wall={bOn.Wall}ms cpu={bOn.Cpu:F0}ms size={bOn.Size}");
+        Console.WriteLine($"B          speedup={(double)bOff.Wall / bOn.Wall:F2}x  parallelism(cpu/wall)={bOn.Cpu / bOn.Wall:F2}");
+
+        // 正确性校验：mt=on 产物必须可正常解压（7z.dll 解压时校验 CRC）且文件数一致
+        var verifyDir = Path.Combine(root, "verify");
+        Directory.CreateDirectory(verifyDir);
+        using (var ex = new SharpSevenZipExtractor(Path.Combine(root, "a_on.zip")))
+        {
+            ex.ExtractArchive(verifyDir);
+        }
+        var srcCount = Directory.GetFiles(manyDir).Length;
+        var outCount = Directory.GetFiles(verifyDir, "*", SearchOption.AllDirectories).Length;
+        Console.WriteLine($"VERIFY     src={srcCount} extracted={outCount} match={srcCount == outCount}");
+    }
+
     // ===== Progress Reporting =====
 
     [Fact]
