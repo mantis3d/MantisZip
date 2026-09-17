@@ -59,6 +59,11 @@
   - `ViewModels/SettingsWindowViewModel.cs`：AddCustomFormat 改为 async + 弹窗；新增 EditCustomFormat / DeleteCustomFormat / AddRule / EditRule / DeleteRule / ResetDefaults（禁用所有规则）
   - i18n：7 个新增 key（对话框标题/提示）
 
+**2026-09-17** — EditAdaptiveRuleDialog 补充格式多选
+  - `Dialogs/EditAdaptiveRuleDialog.axaml`：新增适用格式 CheckBox 多选列表区域
+  - `Dialogs/EditAdaptiveRuleDialog.axaml.cs`：新增 `PopulateFormats(allFormats, selectedIds)` 方法（内置+自定义格式填充），`SetExistingValues` 扩展 `formatIds` 预选参数，`SelectedFormatIds` 属性输出选中结果
+  - `ViewModels/SettingsWindowViewModel.cs`：AddRule/EditRule 传入 `FormatCatalog.GetAll() + CustomFormats`，编辑模式传入已有 FormatIds
+
 **2026-09-17** — 构建警告清理（28 warnings → 0）
   - `Models/IconProvider.cs`：22 处 `SKPath.MoveTo/LineTo/Close` 弃用警告 → 迁移到 `SKPathBuilder` + `Detach()`（4 个路径：folder back、folder tab、music note、play triangle）
   - `ViewModels/PreviewViewModel.cs`：2 处 `Bitmap.Save(ms)` → `Bitmap.Save(ms, new PngBitmapEncoderOptions())`；1 处 `DrawBitmap(src, 0, 0)` → `DrawBitmap(src, 0, 0, new SKSamplingOptions())`

@@ -847,6 +847,8 @@
   "Settings_AdaptiveRules_EditTitle": "Edit Rule",
   "Settings_AdaptiveRules_NamePrompt": "Rule name:",
   "Settings_AdaptiveRules_LevelPrompt": "Compression level:",
+  "Settings_AdaptiveRules_Formats": "Applicable formats:",
+  "Settings_AdaptiveRules_FormatsHint": "Leave empty to apply to all formats",
   "Settings_Language": "Language",
   "Settings_Language_Chinese": "Chinese",
   "Settings_Language_English": "English",

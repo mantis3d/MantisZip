@@ -1864,6 +1864,9 @@ public partial class SettingsWindowViewModel : ObservableObject
     private async Task AddRule(Window? owner)
     {
         var dialog = new EditAdaptiveRuleDialog();
+        // 合并内置 + 自定义格式，传给对话框
+        var allFormats = FormatCatalog.GetAll().Concat(CustomFormats.Select(f => f.ToFormatDefinition())).ToList();
+        dialog.PopulateFormats(allFormats);
         if (owner != null) dialog.WindowStartupLocation = WindowStartupLocation.CenterOwner;
         var result = await dialog.ShowDialog<bool?>(owner ?? (App.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop ? desktop.MainWindow : null));
         if (result == true)
@@ -1872,6 +1875,7 @@ public partial class SettingsWindowViewModel : ObservableObject
             {
                 Name = dialog.RuleName,
                 Level = dialog.SelectedLevel,
+                FormatIds = dialog.SelectedFormatIds,
                 Enabled = true,
             });
         }
@@ -1880,13 +1884,16 @@ public partial class SettingsWindowViewModel : ObservableObject
     public async void EditRule(AdaptiveOverrideRuleViewModel rule, Window? owner)
     {
         var dialog = new EditAdaptiveRuleDialog();
-        dialog.SetExistingValues(rule.Name, rule.Level);
+        var allFormats = FormatCatalog.GetAll().Concat(CustomFormats.Select(f => f.ToFormatDefinition())).ToList();
+        dialog.PopulateFormats(allFormats, rule.FormatIds);
+        dialog.SetExistingValues(rule.Name, rule.Level, rule.FormatIds);
         if (owner != null) dialog.WindowStartupLocation = WindowStartupLocation.CenterOwner;
         var result = await dialog.ShowDialog<bool?>(owner ?? (App.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop ? desktop.MainWindow : null));
         if (result == true)
         {
             rule.Name = dialog.RuleName;
             rule.Level = dialog.SelectedLevel;
+            rule.FormatIds = dialog.SelectedFormatIds;
         }
     }
 
