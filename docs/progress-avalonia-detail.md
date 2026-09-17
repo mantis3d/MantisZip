@@ -6,6 +6,12 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-09-17** — 修复文本预览 936 编码报错 + 种子文件 GBK 中文乱码
+  - **App.axaml.cs**：`OnFrameworkInitializationCompleted` 开头注册 `CodePagesEncodingProvider`（此前 Avalonia 迁移遗漏，AGENTS.md 声称已注册但代码无）。未注册时 `Encoding.GetEncoding(936)` 抛 `NotSupportedException`，文本预览 fallback 到系统 ANSI 代码页（中文系统 936）时提示 "coding 936 无法预览"
+  - **TorrentParser.cs**（共享层）：`DetectDecodingEncoding` 探测 root dict 的 `encoding` 字段（BitComet 1.x 老种子声明 `encoding=GBK`），普通字符串按声明编码解码而非硬编码 UTF-8；`ParseString`/`ParseDictionary`/`ParseList`/`ParseValue` 增加解码编码参数，`.utf-8` 后缀字段（`name.utf-8`/`path.utf-8`/`comment.utf-8`）值恒按 UTF-8 解码（BEP 惯例，不受 encoding 字段影响）；name/path/comment 读取优先 `.utf-8` 后缀字段
+  - 实测验证：100DVD.rar 内 BitComet 1.15 种子（encoding=GBK + path.utf-8 并存），修复前 path 中文满屏 U+FFFD，修复后 0/9 乱码条目（`100部最新DVD大片种子…` 等全部正确）
+  - 回归：Build 0 错误（6 条预存 NU1903 依赖审计警告）
+
 **2026-09-17** — 文件列表列标题右键菜单空白修复
   - **MainWindow.axaml.cs**：`GetColumnHeaderText` 改取列头 StackPanel 中第一个 TextBlock（列标题文字）；原 `LastOrDefault` 误取到排序箭头 TextBlock（`NameHeaderArrow` 等，初始 `Text=""`），导致 `ColumnHeaderContextMenu_Opening` 对全部列判定为空跳过、菜单空白（排序箭头功能 ca67db5 在列选择菜单 d1c0537 之后引入，打破旧假设）
   - 回归：Build 0 错误（6 条预存 NU1903 依赖审计警告）
