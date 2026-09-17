@@ -71,6 +71,13 @@ MantisZip 是一款免费开源的压缩/解压工具，基于 .NET 10 + Avaloni
   </tr>
 </table>
 
+**Office 文档内容预览效果：**
+
+![DOCX 预览](docs/images/version/v0.5.0/OfficeDocx.png)
+![XLSX 预览](docs/images/version/v0.5.0/OfficeXlsx.png)
+![PPTX 预览](docs/images/version/v0.5.0/OfficePptx.png)
+
+
 #### 部分格式支持**元数据展示**（无需加载完整文件）：
 
 <details>
@@ -88,7 +95,16 @@ MantisZip 是一款免费开源的压缩/解压工具，基于 .NET 10 + Avaloni
 | BT 种子 | InfoHash、文件树、Magnet 链接、Tracker、创建者 |
 | ICO 多帧画廊 | 全部帧提取、FlattenAlpha 切换、透明背景棋盘格 |
 | CSV 表格 | DataGrid 表格化展示（可配置行列上限） |
+
 </details>
+
+----
+
+### 📁 结果预览面板
+
+压缩/解压设置窗口实时文件树预览，冲突高亮、过滤灰显、精简模式、异步加载。
+
+![结果预览面板](docs/images/version/v0.5.0/ResultPreviewPanel.png)
 
 ----
 
@@ -118,7 +134,7 @@ MantisZip 是一款免费开源的压缩/解压工具，基于 .NET 10 + Avaloni
 ----
 
 ### 🔑 智能密码管理器
-
+<!-- TODO: 截图 — 0.5.0 -->
 ![压缩密码设置](docs/images/PasswordManager.png)
 
 保存常用密码，可以根据规则自动尝试匹配密码。
@@ -155,19 +171,12 @@ MantisZip 是一款免费开源的压缩/解压工具，基于 .NET 10 + Avaloni
 
 除了其他软件的「覆盖」「跳过」和「自动重命名」之外，还增加了「覆盖旧文件」和「覆盖小文件」，「自动重命名」也可无缝切换至手动重命名。
 
-![解压文件冲突](docs/images/version/v0.4.5/CancelOnConflictCompress.png)
+![解压文件冲突](docs/images/version/v0.5.0/ConflictCompress.png)
 
-![压缩文件冲突](docs/images/version/v0.4.5/CancelOnConflictExtract.png)
-
-----
-
-### 📁 结果预览面板
-
-压缩/解压设置窗口实时文件树预览，冲突高亮、过滤灰显、精简模式、异步加载。
-
-![结果预览面板](docs/images/version/v0.5.0/ResultPreviewPanel.png)
+![压缩文件冲突](docs/images/version/v0.5.0/ConflictExtract.png)
 
 ----
+
 
 ### 🎨 紧凑度与主题
 
