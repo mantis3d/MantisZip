@@ -150,6 +150,8 @@ public partial class SettingsWindowViewModel : ObservableObject
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsAdaptiveContentVisible))]
     [NotifyPropertyChangedFor(nameof(IsStoreFormatSectionVisible))]
+    [NotifyPropertyChangedFor(nameof(IsUserRulesSectionVisible))]
+    [NotifyPropertyChangedFor(nameof(IsFormatCatalogSectionVisible))]
     private bool _multiThreadedCompression;
 
     /// <summary>魔数检测开关是否可见（仅自适应开启时可见）。</summary>
