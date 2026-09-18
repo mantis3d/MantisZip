@@ -6,6 +6,19 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-09-18** — 自适应压缩级别：多线程模式（第四选项）+ 统一帮助弹窗
+  - **Core 层**：
+    - `Models/AdaptiveOverrideRule.cs`：`AdaptiveCompressionMode` 新增 `MultiThreaded` 枚举值（基础模式 + 需压缩文件多线程加速）
+    - `Engines/ZipEngine.cs`：`CompressAsync` + `AddToArchiveAsync` 非加密路径新增 MultiThreaded 分流 —— 文件按 `ZipEntryClassifier.GetAdaptiveLevel()` 分为 StoreGroup（level=0）和 CompressGroup（level>0），StoreGroup 走 ZipWriter Store，CompressGroup 走 `CompressGroupWithSevenZip`（SharpSevenZip `mt=on`）+ `MergeTempZipToWriter` 合并回 ZipWriter
+  - **UI 层**：
+    - `ViewModels/SettingsWindowViewModel.cs`：新增 `AdaptiveModeMultiThreaded` 属性 + `IsMultiThreadedMode` / `IsFormatCatalogVisible` / `IsUserRulesVisible` / `IsMultiThreadedHintVisible` 计算属性 + `UpdateAdaptiveModeButtons()` 更新 + `AdaptiveModeMultiThreadedText` 本地化文本
+    - `Views/SettingsWindow.axaml`：自适应标题改为 Grid（文字 + 橙色「实验性」标签 + [?] 帮助按钮）+ 第四个 RadioButton（自适应 + 多线程）+ 多线程提示 TextBlock + 格式目录/用户规则 `IsVisible` 绑定
+    - `Views/SettingsWindow.axaml.cs`：新增 `OnAdaptiveHelpClick` 事件处理
+    - `Dialogs/HelpDialog.axaml(.cs)`（新文件）：统一帮助弹窗外壳（HelpTitle + HelpContent + 关闭按钮）
+    - `Dialogs/AdaptiveHelpContent.axaml(.cs)`（新文件）：自适应压缩级别帮助内容（四个模式介绍 + 多线程警告）
+  - **i18n**：新增 11 个 key（`Settings_AdaptiveMode_MultiThreaded` / `Settings_AdaptiveMode_MultiThreaded_Hint` / `MsgBox_Close` / `Adaptive_Help_*`），zh-CN + en 成对
+  - 验证：0 errors / 0 warnings，424 测试通过
+
 **2026-09-17** — ZIP 自适应压缩（per-entry Store 已压缩文件）
   - **Core 层**：
     - `Abstractions/ArchiveEngine.cs`：`ArchiveOptions` 新增 `AdaptiveCompression`（bool，默认 false）

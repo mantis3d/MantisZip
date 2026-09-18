@@ -1,0 +1,73 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="MantisZip.UI.Avalonia.Dialogs.AdaptiveHelpContent"
+             x:CompileBindings="False">
+  <!-- 自适应压缩级别帮助内容 -->
+  <ScrollViewer VerticalScrollBarVisibility="Auto"
+                TextElement.Foreground="{DynamicResource ThemeTextPrimaryBrush}">
+    <StackPanel Margin="20" Spacing="{DynamicResource SpacingMd}">
+
+      <!-- 标题 -->
+      <TextBlock Text="{Binding TitleText}"
+                 FontSize="18" FontWeight="Bold"/>
+
+      <!-- 简介 -->
+      <TextBlock Text="{Binding IntroText}"
+                 TextWrapping="Wrap" LineHeight="22"/>
+
+      <!-- 禁用模式说明 -->
+      <Border Background="{DynamicResource ThemeSurfaceBgBrush}"
+              CornerRadius="{DynamicResource BorderRadius}"
+              Padding="14"
+              BorderBrush="{DynamicResource ThemeBorderBrush}"
+              BorderThickness="1">
+        <StackPanel Spacing="{DynamicResource SpacingXs}">
+          <TextBlock Text="{Binding DisabledTitle}" FontWeight="SemiBold" FontSize="15"/>
+          <TextBlock Text="{Binding DisabledDesc}" TextWrapping="Wrap" LineHeight="22"/>
+        </StackPanel>
+      </Border>
+
+      <!-- 基础模式说明 -->
+      <Border Background="{DynamicResource ThemeSurfaceBgBrush}"
+              CornerRadius="{DynamicResource BorderRadius}"
+              Padding="14"
+              BorderBrush="{DynamicResource ThemeBorderBrush}"
+              BorderThickness="1">
+        <StackPanel Spacing="{DynamicResource SpacingXs}">
+          <TextBlock Text="{Binding BasicTitle}" FontWeight="SemiBold" FontSize="15"/>
+          <TextBlock Text="{Binding BasicDesc}" TextWrapping="Wrap" LineHeight="22"/>
+        </StackPanel>
+      </Border>
+
+      <!-- 智能模式说明 -->
+      <Border Background="{DynamicResource ThemeSurfaceBgBrush}"
+              CornerRadius="{DynamicResource BorderRadius}"
+              Padding="14"
+              BorderBrush="{DynamicResource ThemeBorderBrush}"
+              BorderThickness="1">
+        <StackPanel Spacing="{DynamicResource SpacingXs}">
+          <TextBlock Text="{Binding SmartTitle}" FontWeight="SemiBold" FontSize="15"/>
+          <TextBlock Text="{Binding SmartDesc}" TextWrapping="Wrap" LineHeight="22"/>
+        </StackPanel>
+      </Border>
+
+      <!-- 多线程模式说明 -->
+      <Border Background="{DynamicResource ThemeSurfaceBgBrush}"
+              CornerRadius="{DynamicResource BorderRadius}"
+              Padding="14"
+              BorderBrush="{DynamicResource ThemeBorderBrush}"
+              BorderThickness="1">
+        <StackPanel Spacing="{DynamicResource SpacingXs}">
+          <TextBlock Text="{Binding MultiThreadedTitle}" FontWeight="SemiBold" FontSize="15"/>
+          <TextBlock Text="{Binding MultiThreadedDesc}" TextWrapping="Wrap" LineHeight="22"/>
+          <!-- 警告：用户规则不生效 -->
+          <TextBlock Text="{Binding MultiThreadedWarning}"
+                     TextWrapping="Wrap" LineHeight="22"
+                     Foreground="{DynamicResource ThemeWarningBrush}"
+                     FontWeight="SemiBold"/>
+        </StackPanel>
+      </Border>
+
+    </StackPanel>
+  </ScrollViewer>
+</UserControl>

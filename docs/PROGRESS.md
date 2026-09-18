@@ -27,6 +27,7 @@
 
 #### 2026-09
 
+- **09-18** — 自适应压缩级别新增「多线程」模式（实验性）：SharpSevenZip `mt=on` 多线程压缩需压缩文件，Store 类文件直写 ZipWriter；统一帮助弹窗（HelpDialog 外壳 + AdaptiveHelpContent）；标题栏「实验性」橙色标签 + 帮助按钮；格式目录/用户规则 UI 可见性联动（Disabled 隐藏全部、MultiThreaded 隐藏用户规则）；11 个本地化 key
 - **09-17** — ZIP 自适应压缩：按文件扩展名自动判断已压缩文件（60+ 格式：图片/音视频/字体/归档/已压缩文档），已压缩文件 Store（不压缩），其余保持用户选定级别；仅 Deflate/Deflate64 + 非加密 ZIP 有效；压缩对话框 ZIP 面板新增「自适应压缩」复选框；12 文件 +69 行
 - **09-17** — 自适应压缩级别升级：三模式系统（Disabled / StoreForCompressed / SmartDetect）+ 格式目录（FormatCatalog 内置 40+ 格式 + 用户自定义）+ 用户规则覆盖（AdaptiveOverrideRule 8 级）+ 经验系数表（CompressionCoefficients 7 分类 × 7 级别 × ZIP/7z 双表）；SettingsWindow 新增自适应压缩模式选择 + 格式目录 + 规则管理面板；22 项单元测试；32 个本地化 key
 - **09-16** — 压缩/解压性能优化（ZIP 解压并行 + 7z 多线程压缩）：① **ZIP 并行解压**自研多实例实现（SharpCompress 单实例线程不安全）——Round-Robin 分批 + **每批次复用 1 个 archive 实例**（减少 80-90% OpenArchive 开销）+ 进度报告锁竞争修复（曾因锁内 `progress.Report()` 导致 8 线程争用、100×1MB 解压从 0.3s 劣化到 8.5s 的 25x 回退）；② 缓冲区 256KB→4MB（ZipEngine/TarGzEngine/ZipBinaryRewriter）；③ `ParallelExtractDegree` 设置项（1-16，默认 CPU 核心数，1=串行回退）；④ **7z 多线程压缩 `mt=on` 实测 4.63x**（100×1MB/8核：38.7s→8.4s），压缩对话框 7z 面板 + 设置窗口全局默认值双开关；Core 380 + Avalonia 96 测试全绿

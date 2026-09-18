@@ -34,6 +34,8 @@ public enum AdaptiveCompressionMode
     StoreForCompressed,
     /// <summary>智能检测（大文件魔数 + 采样试压）。</summary>
     SmartDetect,
+    /// <summary>基础模式 + 需压缩文件多线程加速（用户规则不生效）。</summary>
+    MultiThreaded,
 }
 
 /// <summary>

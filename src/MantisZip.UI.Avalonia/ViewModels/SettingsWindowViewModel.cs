@@ -166,11 +166,35 @@ public partial class SettingsWindowViewModel : ObservableObject
         set { if (value) AdaptiveCompressionMode = AdaptiveCompressionMode.SmartDetect; OnPropertyChanged(); UpdateAdaptiveModeButtons(); }
     }
 
+    public bool AdaptiveModeMultiThreaded
+    {
+        get => AdaptiveCompressionMode == AdaptiveCompressionMode.MultiThreaded;
+        set { if (value) AdaptiveCompressionMode = AdaptiveCompressionMode.MultiThreaded; OnPropertyChanged(); UpdateAdaptiveModeButtons(); }
+    }
+
+    /// <summary>是否为多线程模式（控制 UI 可见性）。</summary>
+    public bool IsMultiThreadedMode => AdaptiveCompressionMode == AdaptiveCompressionMode.MultiThreaded;
+
+    /// <summary>格式目录区域是否可见（Disabled 时隐藏）。</summary>
+    public bool IsFormatCatalogVisible => AdaptiveCompressionMode != AdaptiveCompressionMode.Disabled;
+
+    /// <summary>用户规则区域是否可见（Disabled 或 MultiThreaded 时隐藏）。</summary>
+    public bool IsUserRulesVisible => AdaptiveCompressionMode != AdaptiveCompressionMode.Disabled
+                                     && AdaptiveCompressionMode != AdaptiveCompressionMode.MultiThreaded;
+
+    /// <summary>多线程提示是否可见（仅 MultiThreaded 时显示）。</summary>
+    public bool IsMultiThreadedHintVisible => AdaptiveCompressionMode == AdaptiveCompressionMode.MultiThreaded;
+
     private void UpdateAdaptiveModeButtons()
     {
         OnPropertyChanged(nameof(AdaptiveModeDisabled));
         OnPropertyChanged(nameof(AdaptiveModeStoreForCompressed));
         OnPropertyChanged(nameof(AdaptiveModeSmartDetect));
+        OnPropertyChanged(nameof(AdaptiveModeMultiThreaded));
+        OnPropertyChanged(nameof(IsMultiThreadedMode));
+        OnPropertyChanged(nameof(IsFormatCatalogVisible));
+        OnPropertyChanged(nameof(IsUserRulesVisible));
+        OnPropertyChanged(nameof(IsMultiThreadedHintVisible));
     }
 
     [ObservableProperty]
@@ -740,6 +764,8 @@ public partial class SettingsWindowViewModel : ObservableObject
     public string AdaptiveModeDisabledText => LocalizationManager.T("Settings_AdaptiveMode_Disabled");
     public string AdaptiveModeStoreForCompressedText => LocalizationManager.T("Settings_AdaptiveMode_StoreForCompressed");
     public string AdaptiveModeSmartDetectText => LocalizationManager.T("Settings_AdaptiveMode_SmartDetect");
+    public string AdaptiveModeMultiThreadedText => LocalizationManager.T("Settings_AdaptiveMode_MultiThreaded");
+    public string AdaptiveMultiThreadedHintText => LocalizationManager.T("Settings_AdaptiveMode_MultiThreaded_Hint");
     public string FormatCatalogSectionText => LocalizationManager.T("Settings_FormatCatalog");
     public string BuiltInFormatsText => LocalizationManager.T("Settings_FormatCatalog_BuiltIn");
     public string CustomFormatsText => LocalizationManager.T("Settings_FormatCatalog_Custom");
@@ -1267,6 +1293,8 @@ public partial class SettingsWindowViewModel : ObservableObject
         OnPropertyChanged(nameof(AdaptiveModeDisabledText));
         OnPropertyChanged(nameof(AdaptiveModeStoreForCompressedText));
         OnPropertyChanged(nameof(AdaptiveModeSmartDetectText));
+        OnPropertyChanged(nameof(AdaptiveModeMultiThreadedText));
+        OnPropertyChanged(nameof(AdaptiveMultiThreadedHintText));
         OnPropertyChanged(nameof(FormatCatalogSectionText));
         OnPropertyChanged(nameof(BuiltInFormatsText));
         OnPropertyChanged(nameof(CustomFormatsText));

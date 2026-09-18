@@ -1,0 +1,27 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="MantisZip.UI.Avalonia.Dialogs.HelpDialog"
+        x:CompileBindings="False"
+        Title="{Binding HelpTitle}"
+        Width="520" Height="500"
+        WindowStartupLocation="CenterOwner"
+        CanResize="True"
+        Background="{DynamicResource ThemeWindowBgBrush}"
+        Padding="{DynamicResource SpacingMdThk}">
+  <!-- 统一帮助弹窗外壳：标题 + 内容区域 + 关闭按钮 -->
+  <DockPanel>
+    <!-- 关闭按钮：固定在底部 -->
+    <Button DockPanel.Dock="Bottom"
+            Content="{Binding CloseText}"
+            HorizontalAlignment="Right"
+            Width="100"
+            Height="{DynamicResource ControlHeight}"
+            IsDefault="True"
+            Click="OnCloseClick"
+            Background="{DynamicResource ThemeAccentBrush}"
+            Foreground="White"
+            Margin="0,8,0,0"/>
+    <!-- 内容区域：由调用方通过 HelpContent 属性注入 -->
+    <ContentPresenter Content="{Binding HelpContent}"/>
+  </DockPanel>
+</Window>

@@ -109,6 +109,16 @@ public partial class SettingsWindow : Window
             vm?.DeleteRule(rule);
         }
     }
+
+    private void OnAdaptiveHelpClick(object? sender, RoutedEventArgs e)
+    {
+        var dialog = new HelpDialog
+        {
+            HelpTitle = LocalizationManager.T("Adaptive_Help_Title"),
+            HelpContent = new AdaptiveHelpContent(),
+        };
+        dialog.ShowDialog(this);
+    }
 }
 
 public class PositionDisplayConverter : IValueConverter
