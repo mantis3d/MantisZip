@@ -119,15 +119,15 @@ MantisZip 是一款免费开源的压缩/解压工具，基于 .NET 10 + Avaloni
 
 从窗口拖文件到资源管理器，自动解压到目标目录。Win32 覆层三色状态指示（检测中 / 可释放 / 不可释放）+ 动态光标 + Esc 取消。
 
-![拖拽直接解压](docs/images/version/v0.5.0/DragExtractOverlay.png)
+- ![拖拽直接解压](docs/images/version/v0.5.0/DragExtract.gif)
 
 #### 从资源管理器拖入 → 添加到压缩包
 
 从资源管理器拖文件/文件夹到 MantisZip 窗口，即可添加到当前目录。窗口内绿色覆层即时提示可添加状态。
 
 <!-- TODO: 截图 — DragAddOverlay（拖入文件时窗口内绿色覆层） -->
-![拖拽添加到压缩包](docs/images/version/v0.5.0/DragAddOverlay.png)
 
+![拖拽添加到压缩包](docs/images/version/v0.5.0/DragAdd.gif)
 ----
 
 ### 🗂 自定义文件选择器
