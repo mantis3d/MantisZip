@@ -25,23 +25,16 @@ internal static class DropTargetDetector
     /// </returns>
     public static (string? Path, DropTargetStatus Status) DetectTargetDirectory()
     {
-        // 1. Get cursor position
-        if (!NativeMethods.GetCursorPos(out var pt))
-        {
-            App.DebugLog("[DropTargetDetector] GetCursorPos failed");
-            return (null, DropTargetStatus.None);
-        }
-
-        // 2. Find window at cursor position
-        var hWnd = NativeMethods.WindowFromPoint(pt);
-        App.DebugLog($"[DropTargetDetector] Cursor ({pt.X}, {pt.Y}) → hWnd=0x{hWnd:X}");
+        // 1. Find window at cursor position
+        var hWnd = NativeMethods.GetWindowUnderCursor();
+        App.DebugLog($"[DropTargetDetector] Window under cursor: hWnd=0x{hWnd:X}");
         if (hWnd == nint.Zero)
         {
-            App.DebugLog("[DropTargetDetector] WindowFromPoint returned null");
+            App.DebugLog("[DropTargetDetector] No window under cursor");
             return (null, DropTargetStatus.None);
         }
 
-        // 3. Find recognized ancestor and extract path
+        // 2. Find recognized ancestor and extract path
         return TryGetExplorerPath(hWnd);
     }
 
@@ -81,12 +74,10 @@ internal static class DropTargetDetector
     /// <returns>The recognized window handle and class name, or null if not found.</returns>
     internal static (nint HWnd, string ClassName)? FindRecognizedAncestor(nint hWnd)
     {
-        var sb = new StringBuilder(256);
         int maxWalk = 10;
         while (hWnd != nint.Zero && maxWalk-- > 0)
         {
-            NativeMethods.GetClassName(hWnd, sb, sb.Capacity);
-            var cls = sb.ToString();
+            var cls = NativeMethods.GetWindowClassName(hWnd);
             if (cls is "CabinetWClass" or "#32770" or "Progman" or "WorkerW")
                 return (hWnd, cls);
             hWnd = NativeMethods.GetParent(hWnd);
@@ -182,19 +173,14 @@ internal static class DropTargetDetector
 
         NativeMethods.EnumChildProc callback = (nint childHwnd, nint lParam) =>
         {
-            var classNameSb = new StringBuilder(256);
-            NativeMethods.GetClassName(childHwnd, classNameSb, classNameSb.Capacity);
-            var childClass = classNameSb.ToString();
+            var childClass = NativeMethods.GetWindowClassName(childHwnd);
 
             if (childClass is "ToolbarWindow32" or "ComboBox32")
             {
                 // Enumerate grandchildren for Edit controls
                 NativeMethods.EnumChildWindows(childHwnd, (nint grandChild, nint _) =>
                 {
-                    var gcName = new StringBuilder(256);
-                    NativeMethods.GetClassName(grandChild, gcName, gcName.Capacity);
-
-                    if (gcName.ToString() == "Edit")
+                    if (NativeMethods.GetWindowClassName(grandChild) == "Edit")
                     {
                         var text = new StringBuilder(260);
                         NativeMethods.GetWindowText(grandChild, text, text.Capacity);

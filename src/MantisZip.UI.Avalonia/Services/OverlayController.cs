@@ -130,16 +130,9 @@ internal class OverlayController : IDisposable
             return;
         }
 
-        // Get cursor position
-        if (!NativeMethods.GetCursorPos(out var pt))
-        {
-            App.DebugLog("[Overlay] GetCursorPos failed");
-            return;
-        }
-
         // Find window under cursor
-        var target = NativeMethods.WindowFromPoint(pt);
-        // If WindowFromPoint returned null or our overlay, skip this frame
+        var target = NativeMethods.GetWindowUnderCursor();
+        // If no window under cursor or our overlay, skip this frame
         // (don't fall back to _lastTargetHwnd — that causes position oscillation)
         if (target == nint.Zero || target == _hwnd)
         {

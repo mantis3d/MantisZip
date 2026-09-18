@@ -172,9 +172,7 @@ internal class DragDropService
     /// </summary>
     private bool IsOverOwnWindow()
     {
-        if (!NativeMethods.GetCursorPos(out var pt))
-            return false;
-        var hWnd = NativeMethods.WindowFromPoint(pt);
+        var hWnd = NativeMethods.GetWindowUnderCursor();
         if (hWnd == nint.Zero)
             return false;
         var rootTarget = NativeMethods.GetAncestor(hWnd, 2); // GA_ROOT = 2
