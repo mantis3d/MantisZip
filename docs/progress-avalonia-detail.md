@@ -6,6 +6,19 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-09-18** — 拖拽目标路径检测：修复工具栏松手失败 + 抽取共享方法
+  - **DropTargetDetector.cs**：`TryGetExplorerPath` default 分支原来返回 `(null, None)`，未处理 `ToolbarWindow32`、`SysListView32` 等 Explorer 子窗口；新增 `FindRecognizedAncestor(hWnd)` 共享方法，向上遍历父窗口链查找 `CabinetWClass` / `#32770` / `Progman` / `WorkerW`；`TryGetExplorerPath` 改为调用 `FindRecognizedAncestor` 后按类名分发；删除冗余 `TryGetDesktopPath`
+  - **OverlayController.cs**：`ClassifyWindow` 改为调用 `DropTargetDetector.FindRecognizedAncestor`，拆分为 `ClassifyCabinetWindow` / `ClassifyDialogWindow` 辅助方法；与松手后检测共用同一套父窗口链遍历逻辑，杜绝 overlay 显示路径但松手后识别失败的不一致问题
+  - 回归：Build 0 错误
+
+**2026-09-18** — Win32 P/Invoke 辅助方法抽取：消除重复模式
+  - **NativeMethods.cs**：新增 `GetWindowUnderCursor()`（封装 `GetCursorPos` + `WindowFromPoint`）、`GetWindowClassName(hWnd)`（封装 `GetClassName` + `StringBuilder`）
+  - **DropTargetDetector.cs**：`DetectTargetDirectory` 改用 `GetWindowUnderCursor()`；`FindRecognizedAncestor` 改用 `GetWindowClassName()`；`TryGetDialogPathViaWin32` 回调内改用 `GetWindowClassName()`
+  - **OverlayController.cs**：`UpdatePosition` 改用 `GetWindowUnderCursor()`
+  - **DragDropService.cs**：`IsOverOwnWindow` 改用 `GetWindowUnderCursor()`
+  - 消除 3 处 `GetCursorPos` + `WindowFromPoint` 重复、5+ 处 `GetClassName` + `StringBuilder` 重复
+  - 回归：Build 0 错误
+
 **2026-09-17** — 修复文本预览 936 编码报错 + 种子文件 GBK 中文乱码
   - **App.axaml.cs**：`OnFrameworkInitializationCompleted` 开头注册 `CodePagesEncodingProvider`（此前 Avalonia 迁移遗漏，AGENTS.md 声称已注册但代码无）。未注册时 `Encoding.GetEncoding(936)` 抛 `NotSupportedException`，文本预览 fallback 到系统 ANSI 代码页（中文系统 936）时提示 "coding 936 无法预览"
   - **TorrentParser.cs**（共享层）：`DetectDecodingEncoding` 探测 root dict 的 `encoding` 字段（BitComet 1.x 老种子声明 `encoding=GBK`），普通字符串按声明编码解码而非硬编码 UTF-8；`ParseString`/`ParseDictionary`/`ParseList`/`ParseValue` 增加解码编码参数，`.utf-8` 后缀字段（`name.utf-8`/`path.utf-8`/`comment.utf-8`）值恒按 UTF-8 解码（BEP 惯例，不受 encoding 字段影响）；name/path/comment 读取优先 `.utf-8` 后缀字段

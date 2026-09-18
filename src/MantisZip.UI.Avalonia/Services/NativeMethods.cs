@@ -1,9 +1,35 @@
 using System.Runtime.InteropServices;
+using System.Text;
 
 namespace MantisZip.UI.Avalonia.Services;
 
 internal static class NativeMethods
 {
+    // ── Helper methods ──
+
+    /// <summary>
+    /// Gets the window handle under the current cursor position.
+    /// Wraps GetCursorPos + WindowFromPoint.
+    /// </summary>
+    /// <returns>The window handle, or nint.Zero if the cursor position cannot be determined.</returns>
+    public static nint GetWindowUnderCursor()
+    {
+        if (!GetCursorPos(out var pt))
+            return nint.Zero;
+        return WindowFromPoint(pt);
+    }
+
+    /// <summary>
+    /// Gets the window class name for the given window handle.
+    /// Wraps GetClassName with a reusable StringBuilder.
+    /// </summary>
+    public static string GetWindowClassName(nint hWnd)
+    {
+        var sb = new StringBuilder(256);
+        GetClassName(hWnd, sb, sb.Capacity);
+        return sb.ToString();
+    }
+
     // ── user32.dll ──
 
     [DllImport("user32.dll")]
