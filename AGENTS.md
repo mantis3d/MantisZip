@@ -177,6 +177,38 @@ await Parallel.ForEachAsync(batches, new ParallelOptions { MaxDegreeOfParallelis
 - **上下文工具栏**: 目录树工具栏（展开/折叠全部+自动展开开关+过滤器+分隔符切换）+ 文件列表工具栏（选择/反选/展平/排序/地址栏），`PathIcon` 矢量按钮
 - 对话框通过 ViewModel 的回调委托（`ShowPasswordDialog`, `ShowExtractSettingsDialog` 等）与 View 解耦
 
+#### 派生属性通知：集中通知模式
+
+当多个计算属性依赖同一组源属性时，**禁止**在每个 `[ObservableProperty]` 字段上逐个标注 `[NotifyPropertyChangedFor]`（容易漏、难维护）。改用 `partial void OnXxxChanged` + 集中通知方法：
+
+```csharp
+// ✅ 正确：集中通知
+[ObservableProperty]
+private bool _optionA;
+
+[ObservableProperty]
+private bool _optionB;
+
+partial void OnOptionAChanged(bool value) => NotifyXxxProperties();
+partial void OnOptionBChanged(bool value) => NotifyXxxProperties();
+
+private void NotifyXxxProperties()
+{
+    OnPropertyChanged(nameof(IsVisibleA));
+    OnPropertyChanged(nameof(IsVisibleB));
+    OnPropertyChanged(nameof(SummaryText));
+}
+
+// ❌ 错误：逐个标注，容易漏
+[ObservableProperty]
+[NotifyPropertyChangedFor(nameof(IsVisibleA))]
+[NotifyPropertyChangedFor(nameof(IsVisibleB))]
+[NotifyPropertyChangedFor(nameof(SummaryText))]
+private bool _optionA;
+```
+
+原则：新增派生属性只需改 `NotifyXxxProperties()` 一处，源字段保持干净。
+
 ### 预览子系统
 
 预览系统在独立的 `PreviewPanel.axaml` (UserControl) + `PreviewViewModel` + `PreviewService`，MVVM 模式：
