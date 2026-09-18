@@ -136,23 +136,26 @@ public partial class SettingsWindowViewModel : ObservableObject
 
     // ── Adaptive Compression (三个独立开关) ──
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsSmartDetectVisible))]
-    [NotifyPropertyChangedFor(nameof(IsAdaptiveContentVisible))]
-    [NotifyPropertyChangedFor(nameof(IsStoreFormatSectionVisible))]
-    [NotifyPropertyChangedFor(nameof(IsUserRulesSectionVisible))]
-    [NotifyPropertyChangedFor(nameof(IsFormatCatalogSectionVisible))]
     private bool _adaptiveCompression;
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsSmartDetectVisible))]
     private bool _adaptiveSmartDetect;
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsAdaptiveContentVisible))]
-    [NotifyPropertyChangedFor(nameof(IsStoreFormatSectionVisible))]
-    [NotifyPropertyChangedFor(nameof(IsUserRulesSectionVisible))]
-    [NotifyPropertyChangedFor(nameof(IsFormatCatalogSectionVisible))]
     private bool _multiThreadedCompression;
+
+    partial void OnAdaptiveCompressionChanged(bool value) => NotifyAdaptiveProperties();
+    partial void OnAdaptiveSmartDetectChanged(bool value) => NotifyAdaptiveProperties();
+    partial void OnMultiThreadedCompressionChanged(bool value) => NotifyAdaptiveProperties();
+
+    private void NotifyAdaptiveProperties()
+    {
+        OnPropertyChanged(nameof(IsSmartDetectVisible));
+        OnPropertyChanged(nameof(IsAdaptiveContentVisible));
+        OnPropertyChanged(nameof(IsStoreFormatSectionVisible));
+        OnPropertyChanged(nameof(IsUserRulesSectionVisible));
+        OnPropertyChanged(nameof(IsFormatCatalogSectionVisible));
+    }
 
     /// <summary>魔数检测开关是否可见（仅自适应开启时可见）。</summary>
     public bool IsSmartDetectVisible => AdaptiveCompression;
