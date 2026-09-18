@@ -147,6 +147,9 @@ public partial class SettingsWindowViewModel : ObservableObject
     /// <summary>用户自定义规则（ObservableCollection for UI binding）。</summary>
     public ObservableCollection<AdaptiveOverrideRuleViewModel> AdaptiveOverrides { get; } = new();
 
+    /// <summary>多线程模式下仅存储格式选择（ObservableCollection for UI binding）。</summary>
+    public ObservableCollection<StoreFormatItemViewModel> MultiThreadedStoreFormats { get; } = new();
+
     // Adaptive mode radio button states
     public bool AdaptiveModeDisabled
     {
@@ -538,6 +541,32 @@ public partial class SettingsWindowViewModel : ObservableObject
         }
     }
 
+    private void PopulateMultiThreadedStoreFormats()
+    {
+        MultiThreadedStoreFormats.Clear();
+        var allFormats = FormatCatalog.GetAll(_settings.CustomFormats);
+        var selectedIds = new HashSet<string>(_settings.MultiThreadedStoreFormatIds);
+        foreach (var fmt in allFormats)
+        {
+            MultiThreadedStoreFormats.Add(new StoreFormatItemViewModel
+            {
+                Id = fmt.Id,
+                DisplayName = fmt.DisplayName,
+                Extensions = fmt.Extensions,
+                IsSelected = selectedIds.Contains(fmt.Id),
+            });
+        }
+    }
+
+    /// <summary>将多线程仅存储格式选择同步回 AppSettings。</summary>
+    private void SaveMultiThreadedStoreFormats()
+    {
+        _settings.MultiThreadedStoreFormatIds = MultiThreadedStoreFormats
+            .Where(f => f.IsSelected)
+            .Select(f => f.Id)
+            .ToList();
+    }
+
     private void PopulateAssocItems()
     {
         AssocItems.Clear();
@@ -767,6 +796,8 @@ public partial class SettingsWindowViewModel : ObservableObject
     public string AdaptiveModeMultiThreadedText => LocalizationManager.T("Settings_AdaptiveMode_MultiThreaded");
     public string AdaptiveMultiThreadedHintText => LocalizationManager.T("Settings_AdaptiveMode_MultiThreaded_Hint");
     public string FormatCatalogSectionText => LocalizationManager.T("Settings_FormatCatalog");
+    public string StoreFormatSectionText => LocalizationManager.T("Settings_StoreFormat_Section");
+    public string StoreFormatDescText => LocalizationManager.T("Settings_StoreFormat_Desc");
     public string BuiltInFormatsText => LocalizationManager.T("Settings_FormatCatalog_BuiltIn");
     public string CustomFormatsText => LocalizationManager.T("Settings_FormatCatalog_Custom");
     public string AddCustomFormatText => LocalizationManager.T("Settings_FormatCatalog_AddCustom");
@@ -1013,6 +1044,7 @@ public partial class SettingsWindowViewModel : ObservableObject
         _adaptiveCompressionMode = _settings.AdaptiveCompressionMode;
         PopulateBuiltInFormats();
         PopulateAdaptiveOverrides();
+        PopulateMultiThreadedStoreFormats();
 
         PopulateComboOptions();
         SetSelectedOptions();
@@ -1296,6 +1328,8 @@ public partial class SettingsWindowViewModel : ObservableObject
         OnPropertyChanged(nameof(AdaptiveModeMultiThreadedText));
         OnPropertyChanged(nameof(AdaptiveMultiThreadedHintText));
         OnPropertyChanged(nameof(FormatCatalogSectionText));
+        OnPropertyChanged(nameof(StoreFormatSectionText));
+        OnPropertyChanged(nameof(StoreFormatDescText));
         OnPropertyChanged(nameof(BuiltInFormatsText));
         OnPropertyChanged(nameof(CustomFormatsText));
         OnPropertyChanged(nameof(AddCustomFormatText));
@@ -1535,6 +1569,9 @@ public partial class SettingsWindowViewModel : ObservableObject
         // Default path priority
         _settings.DefaultPathOrder = PathPriorityItems.Select(p => p.Kind).ToList();
         _settings.CustomDefaultPath = CustomPath ?? "";
+
+        // 多线程仅存储格式
+        SaveMultiThreadedStoreFormats();
 
         // 预览运行时配置同步：保存即生效，无需重启（与 App.axaml.cs 启动初始化保持一致）
         PreviewService.EnableFormatDetection = EnableFormatDetection;
@@ -2007,4 +2044,18 @@ public partial class AdaptiveOverrideRuleViewModel : ObservableObject
         AdaptiveLevel.Custom => $"自定义({CustomLevel})",
         _ => "未知"
     };
+}
+
+/// <summary>
+/// 多线程模式下仅存储格式选择项 ViewModel。
+/// 用户可勾选/取消格式目录中的格式，控制哪些格式在多线程压缩时走 Store 路径。
+/// </summary>
+public partial class StoreFormatItemViewModel : ObservableObject
+{
+    [ObservableProperty] private string _id = "";
+    [ObservableProperty] private string _displayName = "";
+    [ObservableProperty] private List<string> _extensions = new();
+    [ObservableProperty] private bool _isSelected = true;
+
+    public string ExtensionsDisplay => string.Join(" ", Extensions.Select(e => e));
 }

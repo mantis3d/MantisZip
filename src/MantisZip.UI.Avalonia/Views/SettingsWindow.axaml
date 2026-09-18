@@ -146,50 +146,73 @@
                           CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}" Background="{DynamicResource ThemeSurfaceBgBrush}"
                           IsVisible="{Binding IsFormatCatalogVisible}">
                     <StackPanel Spacing="{DynamicResource SpacingXs}">
-                      <TextBlock Text="{Binding FormatCatalogSectionText}" FontWeight="SemiBold" FontSize="14"
-                                 Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
+                      <!-- StoreForCompressed/SmartDetect 模式：只读格式展示 -->
+                      <StackPanel IsVisible="{Binding !IsMultiThreadedMode}" Spacing="{DynamicResource SpacingXs}">
+                        <TextBlock Text="{Binding FormatCatalogSectionText}" FontWeight="SemiBold" FontSize="14"
+                                   Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
 
-                      <!-- 内置格式列表 -->
-                      <TextBlock Text="{Binding BuiltInFormatsText}" Foreground="{DynamicResource ThemeTextSecondaryBrush}" FontSize="12"/>
-                      <ItemsControl ItemsSource="{Binding BuiltInFormats}">
-                        <ItemsControl.ItemTemplate>
-                          <DataTemplate x:DataType="vm:FormatDefinitionViewModel">
-                            <Border Padding="4,2" Background="{DynamicResource ThemeSurfaceBgBrush}">
-                              <StackPanel Orientation="Horizontal" Spacing="4">
-                                <TextBlock Text="{Binding DisplayName}" Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
-                                <TextBlock Text="{Binding ExtensionsDisplay}" Foreground="{DynamicResource ThemeTextSecondaryBrush}"/>
-                              </StackPanel>
-                            </Border>
-                          </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                      </ItemsControl>
-
-                      <!-- 自定义格式列表 -->
-                      <TextBlock Text="{Binding CustomFormatsText}" Foreground="{DynamicResource ThemeTextSecondaryBrush}" FontSize="12" Margin="0,8,0,0"/>
-                      <ItemsControl ItemsSource="{Binding CustomFormats}">
-                        <ItemsControl.ItemTemplate>
-                          <DataTemplate x:DataType="vm:FormatDefinitionViewModel">
-                            <Border Padding="4,2" Background="{DynamicResource ThemeSurfaceBgBrush}">
-                              <Grid ColumnDefinitions="*,Auto,Auto">
-                                <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+                        <!-- 内置格式列表 -->
+                        <TextBlock Text="{Binding BuiltInFormatsText}" Foreground="{DynamicResource ThemeTextSecondaryBrush}" FontSize="12"/>
+                        <ItemsControl ItemsSource="{Binding BuiltInFormats}">
+                          <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:FormatDefinitionViewModel">
+                              <Border Padding="4,2" Background="{DynamicResource ThemeSurfaceBgBrush}">
+                                <StackPanel Orientation="Horizontal" Spacing="4">
                                   <TextBlock Text="{Binding DisplayName}" Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
                                   <TextBlock Text="{Binding ExtensionsDisplay}" Foreground="{DynamicResource ThemeTextSecondaryBrush}"/>
-                                  <TextBlock Text="{Binding MagicHexDisplay}" Foreground="{DynamicResource ThemeTextSecondaryBrush}"/>
                                 </StackPanel>
-                                <!-- 编辑按钮 -->
-                                <Button Grid.Column="1" Content="✏" Classes="ToolbarIcon"
-                                        Tag="{Binding}" Click="EditCustomFormat_Click"
-                                        ToolTip.Tip="编辑"/>
-                                <!-- 删除按钮 -->
-                                <Button Grid.Column="2" Content="✕" Classes="ToolbarIcon"
-                                        Tag="{Binding}" Click="DeleteCustomFormat_Click"
-                                        ToolTip.Tip="删除"/>
-                              </Grid>
-                            </Border>
-                          </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                      </ItemsControl>
-                      <Button Content="{Binding AddCustomFormatText}" Command="{Binding AddCustomFormatCommand}" CommandParameter="{Binding #SettingsWin}" Classes="ToolbarButton" HorizontalAlignment="Left"/>
+                              </Border>
+                            </DataTemplate>
+                          </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+
+                        <!-- 自定义格式列表 -->
+                        <TextBlock Text="{Binding CustomFormatsText}" Foreground="{DynamicResource ThemeTextSecondaryBrush}" FontSize="12" Margin="0,8,0,0"/>
+                        <ItemsControl ItemsSource="{Binding CustomFormats}">
+                          <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:FormatDefinitionViewModel">
+                              <Border Padding="4,2" Background="{DynamicResource ThemeSurfaceBgBrush}">
+                                <Grid ColumnDefinitions="*,Auto,Auto">
+                                  <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+                                    <TextBlock Text="{Binding DisplayName}" Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
+                                    <TextBlock Text="{Binding ExtensionsDisplay}" Foreground="{DynamicResource ThemeTextSecondaryBrush}"/>
+                                    <TextBlock Text="{Binding MagicHexDisplay}" Foreground="{DynamicResource ThemeTextSecondaryBrush}"/>
+                                  </StackPanel>
+                                  <!-- 编辑按钮 -->
+                                  <Button Grid.Column="1" Content="✏" Classes="ToolbarIcon"
+                                          Tag="{Binding}" Click="EditCustomFormat_Click"
+                                          ToolTip.Tip="编辑"/>
+                                  <!-- 删除按钮 -->
+                                  <Button Grid.Column="2" Content="✕" Classes="ToolbarIcon"
+                                          Tag="{Binding}" Click="DeleteCustomFormat_Click"
+                                          ToolTip.Tip="删除"/>
+                                </Grid>
+                              </Border>
+                            </DataTemplate>
+                          </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                        <Button Content="{Binding AddCustomFormatText}" Command="{Binding AddCustomFormatCommand}" CommandParameter="{Binding #SettingsWin}" Classes="ToolbarButton" HorizontalAlignment="Left"/>
+                      </StackPanel>
+
+                      <!-- MultiThreaded 模式：可交互的仅存储格式选择 -->
+                      <StackPanel IsVisible="{Binding IsMultiThreadedMode}" Spacing="{DynamicResource SpacingXs}">
+                        <TextBlock Text="{Binding StoreFormatSectionText}" FontWeight="SemiBold" FontSize="14"
+                                   Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
+                        <TextBlock Text="{Binding StoreFormatDescText}"
+                                   Foreground="{DynamicResource ThemeTextSecondaryBrush}" FontSize="12" TextWrapping="Wrap"/>
+                        <ItemsControl ItemsSource="{Binding MultiThreadedStoreFormats}">
+                          <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:StoreFormatItemViewModel">
+                              <CheckBox IsChecked="{Binding IsSelected}" Margin="0,2">
+                                <StackPanel Orientation="Horizontal" Spacing="4">
+                                  <TextBlock Text="{Binding DisplayName}" Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
+                                  <TextBlock Text="{Binding ExtensionsDisplay}" Foreground="{DynamicResource ThemeTextSecondaryBrush}"/>
+                                </StackPanel>
+                              </CheckBox>
+                            </DataTemplate>
+                          </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                      </StackPanel>
                     </StackPanel>
                   </Border>
 

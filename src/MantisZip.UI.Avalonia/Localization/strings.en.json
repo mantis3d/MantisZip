@@ -835,6 +835,8 @@
   "Settings_AdaptiveMode_MultiThreaded": "Adaptive + Multithreaded",
   "Settings_AdaptiveMode_MultiThreaded_Hint": "Compressible files will use the global level with multithreaded acceleration",
   "Settings_FormatCatalog": "Format Catalog",
+  "Settings_StoreFormat_Section": "Store-Only Formats",
+  "Settings_StoreFormat_Desc": "Checked formats will be stored without compression in multithreaded mode. Unchecked formats will participate in multithreaded compression.",
   "Settings_FormatCatalog_BuiltIn": "Built-in formats (cannot be deleted)",
   "Settings_FormatCatalog_Custom": "Custom formats",
   "Settings_FormatCatalog_AddCustom": "+ Add custom format",

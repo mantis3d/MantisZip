@@ -6,17 +6,23 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
-**2026-09-18** — 自适应压缩级别：多线程模式（第四选项）+ 统一帮助弹窗
+**2026-09-18** — 自适应压缩级别：多线程模式（第四选项）+ 统一帮助弹窗 + 仅存储格式自定义
   - **Core 层**：
     - `Models/AdaptiveOverrideRule.cs`：`AdaptiveCompressionMode` 新增 `MultiThreaded` 枚举值（基础模式 + 需压缩文件多线程加速）
-    - `Engines/ZipEngine.cs`：`CompressAsync` + `AddToArchiveAsync` 非加密路径新增 MultiThreaded 分流 —— 文件按 `ZipEntryClassifier.GetAdaptiveLevel()` 分为 StoreGroup（level=0）和 CompressGroup（level>0），StoreGroup 走 ZipWriter Store，CompressGroup 走 `CompressGroupWithSevenZip`（SharpSevenZip `mt=on`）+ `MergeTempZipToWriter` 合并回 ZipWriter
+    - `Abstractions/ArchiveEngine.cs`：`ArchiveOptions` 新增 `MultiThreadedStoreFormatIds`（HashSet&lt;string&gt;，多线程模式下用户自定义仅存储格式 ID 列表）
+    - `Utils/ZipEntryClassifier.cs`：新增 `GetAdaptiveLevel` 重载（支持自定义 Store 格式列表），MultiThreaded 模式下内置已压缩扩展名 + 用户自定义格式 → Store
+    - `Services/CompressService.cs`：`CompressRequest` 新增 `MultiThreadedStoreFormatIds` + `BuildOptions` 映射到 `ArchiveOptions`
+    - `Engines/ZipEngine.cs`：`CompressAsync` + `AddToArchiveAsync` 非加密路径新增 MultiThreaded 分流 —— 文件按 `ZipEntryClassifier.GetAdaptiveLevel()` 分为 StoreGroup（level=0）和 CompressGroup（level>0），StoreGroup 走 ZipWriter Store，CompressGroup 走 `CompressGroupWithSevenZip`（SharpSevenZip `mt=on`）+ `MergeTempZipToWriter` 合并回 ZipWriter；两处调用均传入 `options.MultiThreadedStoreFormatIds`
   - **UI 层**：
-    - `ViewModels/SettingsWindowViewModel.cs`：新增 `AdaptiveModeMultiThreaded` 属性 + `IsMultiThreadedMode` / `IsFormatCatalogVisible` / `IsUserRulesVisible` / `IsMultiThreadedHintVisible` 计算属性 + `UpdateAdaptiveModeButtons()` 更新 + `AdaptiveModeMultiThreadedText` 本地化文本
-    - `Views/SettingsWindow.axaml`：自适应标题改为 Grid（文字 + 橙色「实验性」标签 + [?] 帮助按钮）+ 第四个 RadioButton（自适应 + 多线程）+ 多线程提示 TextBlock + 格式目录/用户规则 `IsVisible` 绑定
+    - `Models/AppSettings.cs`：新增 `MultiThreadedStoreFormatIds`（List&lt;string&gt;）+ `GetDefaultMultiThreadedStoreFormatIds()`（内置 37 个已压缩格式 ID）
+    - `ViewModels/SettingsWindowViewModel.cs`：新增 `AdaptiveModeMultiThreaded` 属性 + `IsMultiThreadedMode` / `IsFormatCatalogVisible` / `IsUserRulesVisible` / `IsMultiThreadedHintVisible` 计算属性 + `MultiThreadedStoreFormats`（ObservableCollection&lt;StoreFormatItemViewModel&gt;）+ `PopulateMultiThreadedStoreFormats` / `SaveMultiThreadedStoreFormats` + `AdaptiveModeMultiThreadedText` 本地化文本
+    - `ViewModels/SettingsWindowViewModel.cs`（新 VM）：`StoreFormatItemViewModel`（Id / DisplayName / Extensions / IsSelected）用于多线程模式下格式选择复选框
+    - `Views/SettingsWindow.axaml`：自适应标题改为 Grid（文字 + 橙色「实验性」标签 + [?] 帮助按钮）+ 第四个 RadioButton（自适应 + 多线程）+ 多线程提示 TextBlock + 格式目录/用户规则 `IsVisible` 绑定；格式目录区域 SplitPanel 模式切换（StoreForCompressed/SmartDetect = 只读格式展示，MultiThreaded = 可交互 CheckBox 列表）
     - `Views/SettingsWindow.axaml.cs`：新增 `OnAdaptiveHelpClick` 事件处理
     - `Dialogs/HelpDialog.axaml(.cs)`（新文件）：统一帮助弹窗外壳（HelpTitle + HelpContent + 关闭按钮）
     - `Dialogs/AdaptiveHelpContent.axaml(.cs)`（新文件）：自适应压缩级别帮助内容（四个模式介绍 + 多线程警告）
-  - **i18n**：新增 11 个 key（`Settings_AdaptiveMode_MultiThreaded` / `Settings_AdaptiveMode_MultiThreaded_Hint` / `MsgBox_Close` / `Adaptive_Help_*`），zh-CN + en 成对
+    - `Services/CompressFlow.cs`：`BuildRequest` 传递 `MultiThreadedStoreFormatIds` 到 `CompressRequest`
+  - **i18n**：新增 13 个 key（`Settings_AdaptiveMode_MultiThreaded` / `Settings_AdaptiveMode_MultiThreaded_Hint` / `MsgBox_Close` / `Adaptive_Help_*` / `Settings_StoreFormat_Section` / `Settings_StoreFormat_Desc`），zh-CN + en 成对
   - 验证：0 errors / 0 warnings，424 测试通过
 
 **2026-09-17** — ZIP 自适应压缩（per-entry Store 已压缩文件）

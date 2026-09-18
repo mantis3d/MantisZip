@@ -893,7 +893,7 @@ while (true)
                             var compressGroup = new List<(string FullPath, string RelativePath)>();
                             foreach (var file in files)
                             {
-                                var level = ZipEntryClassifier.GetAdaptiveLevel(file.FullPath, options.CompressionLevel, true);
+                                var level = ZipEntryClassifier.GetAdaptiveLevel(file.FullPath, options.CompressionLevel, true, options.MultiThreadedStoreFormatIds);
                                 if (level == 0) storeGroup.Add(file);
                                 else compressGroup.Add(file);
                             }
@@ -1548,7 +1548,7 @@ while (true)
                                 var compressGroup = new List<(string FullPath, string RelativePath)>();
                                 foreach (var file in compressFiles)
                                 {
-                                    var level = ZipEntryClassifier.GetAdaptiveLevel(file.FullPath, options.CompressionLevel, true);
+                                    var level = ZipEntryClassifier.GetAdaptiveLevel(file.FullPath, options.CompressionLevel, true, options.MultiThreadedStoreFormatIds);
                                     if (level == 0) storeGroup.Add(file);
                                     else compressGroup.Add(file);
                                 }

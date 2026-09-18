@@ -60,4 +60,36 @@ internal static class ZipEntryClassifier
         var ext = System.IO.Path.GetExtension(filePath);
         return IsCompressed(ext) ? 0 : userLevel;
     }
+
+    /// <summary>
+    /// 根据自适应设置计算条目压缩级别（支持自定义 Store 格式列表）。
+    /// 用于多线程模式：内置已压缩格式 + 用户自定义仅存储格式 → Store。
+    /// </summary>
+    /// <param name="filePath">文件完整路径</param>
+    /// <param name="userLevel">用户选定的压缩级别</param>
+    /// <param name="adaptive">是否启用自适应</param>
+    /// <param name="customStoreFormatIds">用户自定义仅存储格式 ID 列表（来自 FormatCatalog）</param>
+    /// <returns>实际应使用的压缩级别（0 = Store）</returns>
+    public static int GetAdaptiveLevel(string filePath, int userLevel, bool adaptive, HashSet<string>? customStoreFormatIds)
+    {
+        if (!adaptive) return userLevel;
+
+        // 先检查内置已压缩扩展名
+        var ext = System.IO.Path.GetExtension(filePath);
+        if (IsCompressed(ext)) return 0;
+
+        // 再检查用户自定义 Store 格式列表（通过 FormatCatalog 查扩展名）
+        if (customStoreFormatIds != null && customStoreFormatIds.Count > 0)
+        {
+            var allFormats = Services.FormatCatalog.GetAll();
+            foreach (var formatId in customStoreFormatIds)
+            {
+                var format = allFormats.FirstOrDefault(f => f.Id == formatId);
+                if (format != null && format.Extensions.Contains(ext, StringComparer.OrdinalIgnoreCase))
+                    return 0;
+            }
+        }
+
+        return userLevel;
+    }
 }

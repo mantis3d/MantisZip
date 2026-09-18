@@ -177,6 +177,12 @@ public class ArchiveOptions
     public AdaptiveCompressionMode AdaptiveCompressionMode { get; set; } = AdaptiveCompressionMode.Disabled;
 
     /// <summary>
+    /// 多线程模式下用户自定义仅存储格式 ID 列表。
+    /// 仅在 <see cref="AdaptiveCompressionMode"/> == MultiThreaded 时生效。
+    /// </summary>
+    public HashSet<string> MultiThreadedStoreFormatIds { get; set; } = new();
+
+    /// <summary>
     /// 自适应压缩开关（简写属性，与 <see cref="AdaptiveCompressionMode"/> 联动）。
     /// true = StoreForCompressed，false = Disabled。
     /// 保持向后兼容：现有代码可继续使用此属性。

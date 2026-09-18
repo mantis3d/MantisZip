@@ -37,8 +37,11 @@ public class AppSettings
     public bool AdaptiveCompression { get; set; }
 
     // ===== 自适应压缩级别 =====
-    /// <summary>自适应压缩模式（Disabled / StoreForCompressed / SmartDetect）。</summary>
+    /// <summary>自适应压缩模式（Disabled / StoreForCompressed / SmartDetect / MultiThreaded）。</summary>
     public AdaptiveCompressionMode AdaptiveCompressionMode { get; set; } = AdaptiveCompressionMode.StoreForCompressed;
+
+    /// <summary>多线程模式下用户自定义仅存储格式 ID 列表（不可删除的唯一规则）。</summary>
+    public List<string> MultiThreadedStoreFormatIds { get; set; } = new();
 
     /// <summary>用户自定义格式列表。</summary>
     public List<FormatDefinition> CustomFormats { get; set; } = new();
@@ -232,6 +235,11 @@ public class AppSettings
             {
                 settings.AdaptiveOverrides = GetDefaultAdaptiveOverrides();
             }
+            // 首次安装时填充默认仅存储格式（多线程模式用）
+            if (settings.MultiThreadedStoreFormatIds.Count == 0)
+            {
+                settings.MultiThreadedStoreFormatIds = GetDefaultMultiThreadedStoreFormatIds();
+            }
             return settings;
         }
         catch
@@ -261,6 +269,7 @@ public class AppSettings
     {
         var settings = new AppSettings();
         settings.AdaptiveOverrides = GetDefaultAdaptiveOverrides();
+        settings.MultiThreadedStoreFormatIds = GetDefaultMultiThreadedStoreFormatIds();
         return settings;
     }
 
@@ -271,5 +280,22 @@ public class AppSettings
         new() { Name = "视频类", FormatIds = new() { "Mp4", "Mkv", "WebM", "Wmv", "Mov", "Avi", "Flv" }, Level = AdaptiveLevel.Store, Enabled = true },
         new() { Name = "音频类", FormatIds = new() { "Mp3", "Flac", "Wav", "Ogg" }, Level = AdaptiveLevel.Store, Enabled = true },
         new() { Name = "压缩包类", FormatIds = new() { "Zip", "SevenZip", "Rar", "Tar", "Gz", "Bz2", "Xz", "Zstd", "Iso" }, Level = AdaptiveLevel.Store, Enabled = true },
+    };
+
+    /// <summary>返回多线程模式默认仅存储格式 ID（内置已压缩格式）。</summary>
+    private static List<string> GetDefaultMultiThreadedStoreFormatIds() => new()
+    {
+        // 图片
+        "Jpeg", "Png", "WebP", "Bmp", "Gif", "Ico", "Tga", "Hdr", "Exr", "Svg",
+        // 视频
+        "Mp4", "Mkv", "WebM", "Wmv", "Mov", "Avi", "Flv",
+        // 音频
+        "Mp3", "Flac", "Wav", "Ogg",
+        // 压缩包
+        "Zip", "SevenZip", "Rar", "Tar", "Gz", "Bz2", "Xz", "Zstd", "Iso",
+        // 字体
+        "Ttf", "Otf", "Woff", "Woff2",
+        // 文档
+        "Pdf", "Docx", "Xlsx", "Pptx", "Epub",
     };
 }

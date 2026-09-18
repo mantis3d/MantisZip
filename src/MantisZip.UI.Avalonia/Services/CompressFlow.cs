@@ -91,6 +91,9 @@ public static class CompressFlow
             AdaptiveCompressionMode = vm.AdaptiveCompression
                 ? (AppSettings.Load()?.AdaptiveCompressionMode ?? AdaptiveCompressionMode.StoreForCompressed)
                 : AdaptiveCompressionMode.Disabled,
+            // 多线程模式：传递用户自定义仅存储格式列表
+            MultiThreadedStoreFormatIds = new HashSet<string>(
+                AppSettings.Load()?.MultiThreadedStoreFormatIds ?? new List<string>()),
             SevenZipEncryptHeaders = vm.SevenZipEncryptHeaders,
             // 源文件读取错误（被占用等）→ 弹 ErrorDialog（重试/跳过/中止），补上 Avalonia 迁移时遗漏的接线
             ErrorResolver = CreateErrorResolver(),

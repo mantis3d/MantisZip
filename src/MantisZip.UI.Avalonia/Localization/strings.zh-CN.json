@@ -833,6 +833,8 @@
   "Settings_AdaptiveMode_MultiThreaded": "自适应 + 多线程",
   "Settings_AdaptiveMode_MultiThreaded_Hint": "需压缩文件将统一使用全局压缩级别，并通过多线程加速",
   "Settings_FormatCatalog": "格式目录",
+  "Settings_StoreFormat_Section": "仅存储格式",
+  "Settings_StoreFormat_Desc": "勾选的格式在多线程压缩时不压缩，直接存储。取消勾选则这些格式也会参与多线程压缩。",
   "Settings_FormatCatalog_BuiltIn": "内置格式（不可删除）",
   "Settings_FormatCatalog_Custom": "自定义格式",
   "Settings_FormatCatalog_AddCustom": "+ 添加自定义格式",
