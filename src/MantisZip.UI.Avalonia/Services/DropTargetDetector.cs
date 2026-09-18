@@ -41,77 +41,57 @@ internal static class DropTargetDetector
             return (null, DropTargetStatus.None);
         }
 
-        // 3. Check if it's the desktop
-        var desktopPath = TryGetDesktopPath(hWnd);
-        if (desktopPath is not null)
-        {
-            App.DebugLog($"[DropTargetDetector] Desktop detected: {desktopPath}");
-            return (desktopPath, DropTargetStatus.Success);
-        }
-
-        // 4. Check if it's an Explorer or dialog window
+        // 3. Find recognized ancestor and extract path
         return TryGetExplorerPath(hWnd);
     }
 
     /// <summary>
-    /// Checks if the given window handle belongs to the desktop
-    /// (Progman or WorkerW class).
-    /// </summary>
-    private static string? TryGetDesktopPath(nint hWnd)
-    {
-        var sb = new StringBuilder(256);
-        NativeMethods.GetClassName(hWnd, sb, sb.Capacity);
-
-        var className = sb.ToString();
-        if (className is "Progman" or "WorkerW")
-        {
-            return Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
-        }
-
-        return null;
-    }
-
-    /// <summary>
-    /// Checks if the given window is an Explorer window (CabinetWClass)
-    /// or a dialog (#32770) and attempts to extract its directory path.
+    /// Attempts to extract the directory path from the given window,
+    /// walking up the parent chain if needed to find a recognized window type.
     /// </summary>
     private static (string? Path, DropTargetStatus Status) TryGetExplorerPath(nint hWnd)
     {
-        var sb = new StringBuilder(256);
-        NativeMethods.GetClassName(hWnd, sb, sb.Capacity);
-        var className = sb.ToString();
+        App.DebugLog($"[DropTargetDetector] TryGetExplorerPath: hWnd=0x{hWnd:X}");
 
-        App.DebugLog($"[DropTargetDetector] Window class: {className}");
+        var ancestor = FindRecognizedAncestor(hWnd);
+        if (ancestor is null)
+        {
+            App.DebugLog("[DropTargetDetector] No recognized ancestor found");
+            return (null, DropTargetStatus.None);
+        }
+
+        var (ancestorHwnd, className) = ancestor.Value;
+        App.DebugLog($"[DropTargetDetector] Ancestor: 0x{ancestorHwnd:X} -> {className}");
 
         return className switch
         {
-            "CabinetWClass" => TryGetExplorerPathFromShell(hWnd),
-            "DirectUIHWND" => TryGetExplorerPathFromChild(hWnd),
-            "#32770" => TryGetDialogPath(hWnd),
+            "CabinetWClass" => TryGetExplorerPathFromShell(ancestorHwnd),
+            "#32770" => TryGetDialogPath(ancestorHwnd),
+            "Progman" or "WorkerW" => (Environment.GetFolderPath(Environment.SpecialFolder.Desktop), DropTargetStatus.Success),
             _ => (null, DropTargetStatus.None)
         };
     }
 
     /// <summary>
-    /// When WindowFromPoint returns a DirectUIHWND (modern Explorer's content area),
-    /// walk up to the parent CabinetWClass and get the path.
+    /// Walks up the parent chain from the given window to find a recognized
+    /// Explorer window type (CabinetWClass, #32770, Progman/WorkerW).
+    /// This is the shared logic used by both OverlayController and DragDropService.
     /// </summary>
-    private static (string? Path, DropTargetStatus Status) TryGetExplorerPathFromChild(nint hWnd)
+    /// <param name="hWnd">Starting window handle.</param>
+    /// <returns>The recognized window handle and class name, or null if not found.</returns>
+    internal static (nint HWnd, string ClassName)? FindRecognizedAncestor(nint hWnd)
     {
-        // Walk up the parent chain to find CabinetWClass
-        var parent = NativeMethods.GetParent(hWnd);
         var sb = new StringBuilder(256);
         int maxWalk = 10;
-        while (parent != nint.Zero && maxWalk-- > 0)
+        while (hWnd != nint.Zero && maxWalk-- > 0)
         {
-            NativeMethods.GetClassName(parent, sb, sb.Capacity);
+            NativeMethods.GetClassName(hWnd, sb, sb.Capacity);
             var cls = sb.ToString();
-            App.DebugLog($"[DropTargetDetector] Walk parent: 0x{parent:X} -> {cls}");
-            if (cls == "CabinetWClass")
-                return TryGetExplorerPathFromShell(parent);
-            parent = NativeMethods.GetParent(parent);
+            if (cls is "CabinetWClass" or "#32770" or "Progman" or "WorkerW")
+                return (hWnd, cls);
+            hWnd = NativeMethods.GetParent(hWnd);
         }
-        return (null, DropTargetStatus.Warning);
+        return null;
     }
 
     /// <summary>

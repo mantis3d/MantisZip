@@ -245,43 +245,46 @@ internal class OverlayController : IDisposable
 
     private static (DropTargetDetector.DropTargetStatus Status, string ClassName, string DisplayPath) ClassifyWindow(nint hWnd)
     {
-        var sb = new System.Text.StringBuilder(256);
-        int maxWalk = 10;
-        while (hWnd != nint.Zero && maxWalk-- > 0)
+        var ancestor = DropTargetDetector.FindRecognizedAncestor(hWnd);
+        if (ancestor is null)
+            return (DropTargetDetector.DropTargetStatus.None, "", "");
+
+        var (ancestorHwnd, className) = ancestor.Value;
+
+        return className switch
         {
-            NativeMethods.GetClassName(hWnd, sb, sb.Capacity);
-            var cls = sb.ToString();
-            if (cls == "CabinetWClass")
-            {
-                // Get full folder path via ShellWindows COM (not just window title)
-                var (fullPath, shellStatus) = DropTargetDetector.TryGetExplorerPathFromShell(hWnd);
-                if (!string.IsNullOrEmpty(fullPath))
-                    return (DropTargetDetector.DropTargetStatus.Success, cls, fullPath);
-                // Virtual folders (This PC, Quick Access) → return Warning status
-                return (shellStatus, cls, LocalizationManager.T("DragOverlay_Explorer"));
-            }
-            if (cls == "Progman" || cls == "WorkerW")
-            {
-                var desktopPath = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
-                return (DropTargetDetector.DropTargetStatus.Success, cls, desktopPath);
-            }
-            if (cls == "#32770")
-            {
-                // Try to get full path via child window enumeration
-                var (dlgPath, dlgStatus) = DropTargetDetector.TryGetDialogPath(hWnd);
-                if (!string.IsNullOrEmpty(dlgPath))
-                    return (dlgStatus, cls, dlgPath);
-                // Fallback: show dialog title with notice
-                var title = new System.Text.StringBuilder(512);
-                NativeMethods.GetWindowText(hWnd, title, title.Capacity);
-                var windowTitle = title.ToString();
-                if (!string.IsNullOrEmpty(windowTitle))
-                    return (DropTargetDetector.DropTargetStatus.Warning, cls, LocalizationManager.T("DragOverlay_DialogUnknownPath", windowTitle));
-                return (DropTargetDetector.DropTargetStatus.Warning, cls, LocalizationManager.T("DragOverlay_NoPath"));
-            }
-            hWnd = NativeMethods.GetParent(hWnd);
-        }
-        return (DropTargetDetector.DropTargetStatus.None, "", "");
+            "CabinetWClass" => ClassifyCabinetWindow(ancestorHwnd, className),
+            "Progman" or "WorkerW" => (
+                DropTargetDetector.DropTargetStatus.Success,
+                className,
+                Environment.GetFolderPath(Environment.SpecialFolder.Desktop)
+            ),
+            "#32770" => ClassifyDialogWindow(ancestorHwnd, className),
+            _ => (DropTargetDetector.DropTargetStatus.None, "", "")
+        };
+    }
+
+    private static (DropTargetDetector.DropTargetStatus Status, string ClassName, string DisplayPath) ClassifyCabinetWindow(nint hWnd, string className)
+    {
+        var (fullPath, shellStatus) = DropTargetDetector.TryGetExplorerPathFromShell(hWnd);
+        if (!string.IsNullOrEmpty(fullPath))
+            return (DropTargetDetector.DropTargetStatus.Success, className, fullPath);
+        // Virtual folders (This PC, Quick Access) → return Warning status
+        return (shellStatus, className, LocalizationManager.T("DragOverlay_Explorer"));
+    }
+
+    private static (DropTargetDetector.DropTargetStatus Status, string ClassName, string DisplayPath) ClassifyDialogWindow(nint hWnd, string className)
+    {
+        var (dlgPath, dlgStatus) = DropTargetDetector.TryGetDialogPath(hWnd);
+        if (!string.IsNullOrEmpty(dlgPath))
+            return (dlgStatus, className, dlgPath);
+        // Fallback: show dialog title with notice
+        var title = new System.Text.StringBuilder(512);
+        NativeMethods.GetWindowText(hWnd, title, title.Capacity);
+        var windowTitle = title.ToString();
+        if (!string.IsNullOrEmpty(windowTitle))
+            return (DropTargetDetector.DropTargetStatus.Warning, className, LocalizationManager.T("DragOverlay_DialogUnknownPath", windowTitle));
+        return (DropTargetDetector.DropTargetStatus.Warning, className, LocalizationManager.T("DragOverlay_NoPath"));
     }
 
     /// <summary>
