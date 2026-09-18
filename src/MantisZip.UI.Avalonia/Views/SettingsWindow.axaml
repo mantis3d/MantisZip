@@ -161,20 +161,22 @@
                         <TextBlock Text="{Binding FormatCatalogSectionText}" FontWeight="SemiBold" FontSize="14"
                                    Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
 
-                        <!-- 内置格式列表 -->
-                        <TextBlock Text="{Binding BuiltInFormatsText}" Foreground="{DynamicResource ThemeTextSecondaryBrush}" FontSize="12"/>
-                        <ItemsControl ItemsSource="{Binding BuiltInFormats}">
-                          <ItemsControl.ItemTemplate>
-                            <DataTemplate x:DataType="vm:FormatDefinitionViewModel">
-                              <Border Padding="4,2" Background="{DynamicResource ThemeSurfaceBgBrush}">
-                                <StackPanel Orientation="Horizontal" Spacing="4">
-                                  <TextBlock Text="{Binding DisplayName}" Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
-                                  <TextBlock Text="{Binding ExtensionsDisplay}" Foreground="{DynamicResource ThemeTextSecondaryBrush}"/>
-                                </StackPanel>
-                              </Border>
-                            </DataTemplate>
-                          </ItemsControl.ItemTemplate>
-                        </ItemsControl>
+                        <!-- 内置格式列表（默认折叠，节省空间） -->
+                        <Expander Header="{Binding BuiltInFormatsText}" IsExpanded="False"
+                                  Margin="0,8,0,0">
+                          <ItemsControl ItemsSource="{Binding BuiltInFormats}">
+                            <ItemsControl.ItemTemplate>
+                              <DataTemplate x:DataType="vm:FormatDefinitionViewModel">
+                                <Border Padding="4,2" Background="{DynamicResource ThemeSurfaceBgBrush}">
+                                  <StackPanel Orientation="Horizontal" Spacing="4">
+                                    <TextBlock Text="{Binding DisplayName}" Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
+                                    <TextBlock Text="{Binding ExtensionsDisplay}" Foreground="{DynamicResource ThemeTextSecondaryBrush}"/>
+                                  </StackPanel>
+                                </Border>
+                              </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                          </ItemsControl>
+                        </Expander>
 
                         <!-- 自定义格式列表 -->
                         <TextBlock Text="{Binding CustomFormatsText}" Foreground="{DynamicResource ThemeTextSecondaryBrush}" FontSize="12" Margin="0,8,0,0"/>
