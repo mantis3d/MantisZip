@@ -181,9 +181,14 @@ MantisZip 是一款免费开源的压缩/解压工具，基于 .NET 10 + Avaloni
 ![压缩文件冲突](docs/images/version/v0.5.0/ConflictExtract.png)
 
 ----
+### 界面增强
 
+<details>
+<summary><b>📊 点击展开：界面增强</b></summary>
+ 🎨 紧凑度与主题
+<p align="center">
+  <br>
 
-### 🎨 紧凑度与主题
 
 **紧凑度模式** — Compact / Normal / Loose 三档间距与控件高度，运行时切换无需重启。
 
@@ -193,7 +198,7 @@ MantisZip 是一款免费开源的压缩/解压工具，基于 .NET 10 + Avaloni
 
 ----
 
-### 📄 文件列表增强
+ 📄 文件列表增强
 
 文件列表增加尺寸比例条、展平目录与过滤工具。目录行聚合显示子树大小与日期，列排序三态循环（升序→降序→恢复原始顺序），排序状态跨会话持久化。
 
@@ -202,6 +207,8 @@ MantisZip 是一款免费开源的压缩/解压工具，基于 .NET 10 + Avaloni
 
 <!-- TODO: 截图 — ColumnSort（列排序三态循环 + 列头箭头指示） -->
 ![列排序增强](docs/images/version/v0.5.0/ColumnSort.png)
+</p>
+</details>
 
 ----
 
