@@ -87,10 +87,10 @@ public static class CompressFlow
             SevenZipNumFastBytes = vm.SevenZipNumFastBytes,
             SevenZipMatchFinder = vm.SevenZipMatchFinder,
             SevenZipMultithreaded = vm.SevenZipMultithreaded,
-            // 自适应压缩：per-session 开关 + 全局模式
-            AdaptiveCompressionMode = vm.AdaptiveCompression
-                ? (AppSettings.Load()?.AdaptiveCompressionMode ?? AdaptiveCompressionMode.StoreForCompressed)
-                : AdaptiveCompressionMode.Disabled,
+            // 自适应压缩：三个独立开关
+            AdaptiveCompression = vm.AdaptiveCompression,
+            AdaptiveSmartDetect = AppSettings.Load()?.AdaptiveSmartDetect ?? false,
+            MultiThreadedCompression = AppSettings.Load()?.MultiThreadedCompression ?? false,
             // 多线程模式：传递用户自定义仅存储格式列表
             MultiThreadedStoreFormatIds = new HashSet<string>(
                 AppSettings.Load()?.MultiThreadedStoreFormatIds ?? new List<string>()),
@@ -99,8 +99,8 @@ public static class CompressFlow
             ErrorResolver = CreateErrorResolver(),
         };
 
-        CoreLog.Trace("CompressFlow.BuildRequest: adaptiveMode={0}, vm.AdaptiveCompression={1}, globalMode={2}",
-            result.AdaptiveCompressionMode, vm.AdaptiveCompression, (AppSettings.Load()?.AdaptiveCompressionMode).ToString() ?? "null");
+        CoreLog.Trace("CompressFlow.BuildRequest: adaptive={0}, smartDetect={1}, multiThreaded={2}, vm.AdaptiveCompression={3}",
+            result.AdaptiveCompression, result.AdaptiveSmartDetect, result.MultiThreadedCompression, vm.AdaptiveCompression);
         return result;
     }
 

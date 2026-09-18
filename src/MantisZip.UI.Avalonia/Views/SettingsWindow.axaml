@@ -95,10 +95,10 @@
               controls:TabItemExtensions.TabIcon="IconSettings">
               <ScrollViewer Background="{DynamicResource ThemeWindowBgBrush}">
                 <StackPanel Spacing="{DynamicResource SpacingSm}" Margin="{DynamicResource SpacingSmThk}">
-                  <!-- 自适应压缩级别：模式选择 -->
+                  <!-- 压缩优化区：三个独立开关 -->
                   <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
                           CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}" Background="{DynamicResource ThemeSurfaceBgBrush}">
-                    <StackPanel Spacing="{DynamicResource SpacingXs}">
+                    <StackPanel Spacing="{DynamicResource SpacingSm}">
                       <!-- 标题行：文字 + 实验性标签 + 帮助按钮 -->
                       <Grid ColumnDefinitions="Auto,Auto,Auto,*">
                         <TextBlock Grid.Column="0" Text="{Binding AdaptiveCompressionSectionText}"
@@ -117,37 +117,47 @@
                                 Margin="6,0,0,0" Click="OnAdaptiveHelpClick"
                                 ToolTip.Tip="自适应压缩级别介绍"/>
                       </Grid>
-                      <TextBlock Text="{Binding AdaptiveCompressionDescText}"
-                                 Foreground="{DynamicResource ThemeTextSecondaryBrush}" FontSize="12" TextWrapping="Wrap"/>
 
-                      <!-- 四选一模式 -->
-                      <RadioButton Content="{Binding AdaptiveModeDisabledText}"
-                                   IsChecked="{Binding AdaptiveModeDisabled}"
-                                   GroupName="AdaptiveMode"/>
-                      <RadioButton Content="{Binding AdaptiveModeStoreForCompressedText}"
-                                   IsChecked="{Binding AdaptiveModeStoreForCompressed}"
-                                   GroupName="AdaptiveMode"/>
-                      <RadioButton Content="{Binding AdaptiveModeSmartDetectText}"
-                                   IsChecked="{Binding AdaptiveModeSmartDetect}"
-                                   GroupName="AdaptiveMode"/>
-                      <RadioButton Content="{Binding AdaptiveModeMultiThreadedText}"
-                                   IsChecked="{Binding AdaptiveModeMultiThreaded}"
-                                   GroupName="AdaptiveMode"/>
-                      <!-- 多线程模式提示 -->
-                      <TextBlock Text="{Binding AdaptiveMultiThreadedHintText}"
-                                 IsVisible="{Binding IsMultiThreadedHintVisible}"
-                                 Foreground="{DynamicResource ThemeTextSecondaryBrush}"
-                                 FontSize="11" TextWrapping="Wrap" Margin="16,0,0,0"/>
+                      <!-- 开关1：自适应压缩 -->
+                      <CheckBox IsChecked="{Binding AdaptiveCompression}" Margin="0,4,0,0">
+                        <StackPanel Spacing="2">
+                          <TextBlock Text="{Binding AdaptiveCompressionText}" FontWeight="SemiBold"
+                                     Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
+                          <TextBlock Text="{Binding AdaptiveCompressionDescText}"
+                                     Foreground="{DynamicResource ThemeTextSecondaryBrush}" FontSize="11" TextWrapping="Wrap"/>
+                        </StackPanel>
+                      </CheckBox>
+
+                      <!-- 开关1.5：魔数检测（仅自适应开启时可见） -->
+                      <CheckBox IsChecked="{Binding AdaptiveSmartDetect}"
+                                IsVisible="{Binding IsSmartDetectVisible}" Margin="16,0,0,0">
+                        <StackPanel Spacing="2">
+                          <TextBlock Text="{Binding AdaptiveSmartDetectText}" FontWeight="SemiBold"
+                                     Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
+                          <TextBlock Text="{Binding AdaptiveSmartDetectDescText}"
+                                     Foreground="{DynamicResource ThemeTextSecondaryBrush}" FontSize="11" TextWrapping="Wrap"/>
+                        </StackPanel>
+                      </CheckBox>
+
+                      <!-- 开关2：多线程压缩 -->
+                      <CheckBox IsChecked="{Binding MultiThreadedCompression}" Margin="0,4,0,0">
+                        <StackPanel Spacing="2">
+                          <TextBlock Text="{Binding MultiThreadedCompressionText}" FontWeight="SemiBold"
+                                     Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
+                          <TextBlock Text="{Binding MultiThreadedCompressionDescText}"
+                                     Foreground="{DynamicResource ThemeTextSecondaryBrush}" FontSize="11" TextWrapping="Wrap"/>
+                        </StackPanel>
+                      </CheckBox>
                     </StackPanel>
                   </Border>
 
-                  <!-- 格式目录（Disabled 时隐藏） -->
+                  <!-- 格式目录（仅自适应开启、多线程关闭时可见） -->
                   <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
                           CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}" Background="{DynamicResource ThemeSurfaceBgBrush}"
-                          IsVisible="{Binding IsFormatCatalogVisible}">
+                          IsVisible="{Binding IsFormatCatalogSectionVisible}">
                     <StackPanel Spacing="{DynamicResource SpacingXs}">
-                      <!-- StoreForCompressed/SmartDetect 模式：只读格式展示 -->
-                      <StackPanel IsVisible="{Binding !IsMultiThreadedMode}" Spacing="{DynamicResource SpacingXs}">
+                      <!-- 自适应模式：只读格式展示 -->
+                      <StackPanel Spacing="{DynamicResource SpacingXs}">
                         <TextBlock Text="{Binding FormatCatalogSectionText}" FontWeight="SemiBold" FontSize="14"
                                    Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
 
@@ -193,33 +203,37 @@
                         </ItemsControl>
                         <Button Content="{Binding AddCustomFormatText}" Command="{Binding AddCustomFormatCommand}" CommandParameter="{Binding #SettingsWin}" Classes="ToolbarButton" HorizontalAlignment="Left"/>
                       </StackPanel>
-
-                      <!-- MultiThreaded 模式：可交互的仅存储格式选择 -->
-                      <StackPanel IsVisible="{Binding IsMultiThreadedMode}" Spacing="{DynamicResource SpacingXs}">
-                        <TextBlock Text="{Binding StoreFormatSectionText}" FontWeight="SemiBold" FontSize="14"
-                                   Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
-                        <TextBlock Text="{Binding StoreFormatDescText}"
-                                   Foreground="{DynamicResource ThemeTextSecondaryBrush}" FontSize="12" TextWrapping="Wrap"/>
-                        <ItemsControl ItemsSource="{Binding MultiThreadedStoreFormats}">
-                          <ItemsControl.ItemTemplate>
-                            <DataTemplate x:DataType="vm:StoreFormatItemViewModel">
-                              <CheckBox IsChecked="{Binding IsSelected}" Margin="0,2">
-                                <StackPanel Orientation="Horizontal" Spacing="4">
-                                  <TextBlock Text="{Binding DisplayName}" Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
-                                  <TextBlock Text="{Binding ExtensionsDisplay}" Foreground="{DynamicResource ThemeTextSecondaryBrush}"/>
-                                </StackPanel>
-                              </CheckBox>
-                            </DataTemplate>
-                          </ItemsControl.ItemTemplate>
-                        </ItemsControl>
-                      </StackPanel>
                     </StackPanel>
                   </Border>
 
-                  <!-- 自适应规则（Disabled 或 MultiThreaded 时隐藏） -->
+                  <!-- 仅存储格式选择（自适应+多线程同时开启时可见） -->
                   <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
                           CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}" Background="{DynamicResource ThemeSurfaceBgBrush}"
-                          IsVisible="{Binding IsUserRulesVisible}">
+                          IsVisible="{Binding IsStoreFormatSectionVisible}">
+                    <StackPanel Spacing="{DynamicResource SpacingXs}">
+                      <TextBlock Text="{Binding StoreFormatSectionText}" FontWeight="SemiBold" FontSize="14"
+                                 Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
+                      <TextBlock Text="{Binding StoreFormatDescText}"
+                                 Foreground="{DynamicResource ThemeTextSecondaryBrush}" FontSize="12" TextWrapping="Wrap"/>
+                      <ItemsControl ItemsSource="{Binding MultiThreadedStoreFormats}">
+                        <ItemsControl.ItemTemplate>
+                          <DataTemplate x:DataType="vm:StoreFormatItemViewModel">
+                            <CheckBox IsChecked="{Binding IsSelected}" Margin="0,2">
+                              <StackPanel Orientation="Horizontal" Spacing="4">
+                                <TextBlock Text="{Binding DisplayName}" Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
+                                <TextBlock Text="{Binding ExtensionsDisplay}" Foreground="{DynamicResource ThemeTextSecondaryBrush}"/>
+                              </StackPanel>
+                            </CheckBox>
+                          </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                      </ItemsControl>
+                    </StackPanel>
+                  </Border>
+
+                  <!-- 自适应规则（仅自适应开启、多线程关闭时可见） -->
+                  <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
+                          CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}" Background="{DynamicResource ThemeSurfaceBgBrush}"
+                          IsVisible="{Binding IsUserRulesSectionVisible}">
                     <StackPanel Spacing="{DynamicResource SpacingXs}">
                       <TextBlock Text="{Binding AdaptiveOverridesSectionText}" FontWeight="SemiBold" FontSize="14"
                                  Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>

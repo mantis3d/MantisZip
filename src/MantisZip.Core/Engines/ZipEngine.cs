@@ -884,7 +884,7 @@ while (true)
                     using var zipWriter = new ZipWriter(fsOut, writerOptions);
 
                     // ── MultiThreaded 自适应压缩：已压缩文件 Store + 可压缩文件 7z mt=on ──
-                    if (options.AdaptiveCompressionMode == AdaptiveCompressionMode.MultiThreaded && !options.Encrypt)
+                    if (options.MultiThreadedCompression && !options.Encrypt)
                     {
                         var method = options.ZipCompressionMethod?.ToLowerInvariant();
                         if (string.IsNullOrEmpty(method) || method == "deflate" || method == "deflate64")
@@ -893,7 +893,7 @@ while (true)
                             var compressGroup = new List<(string FullPath, string RelativePath)>();
                             foreach (var file in files)
                             {
-                                var level = ZipEntryClassifier.GetAdaptiveLevel(file.FullPath, options.CompressionLevel, true, options.MultiThreadedStoreFormatIds);
+                                var level = ZipEntryClassifier.GetAdaptiveLevel(file.FullPath, options.CompressionLevel, options.AdaptiveCompression, options.MultiThreadedStoreFormatIds);
                                 if (level == 0) storeGroup.Add(file);
                                 else compressGroup.Add(file);
                             }
@@ -1539,7 +1539,7 @@ while (true)
                         using var zipWriter = new ZipWriter(fsOut, writerOptions);
 
                         // ── MultiThreaded 自适应压缩：已压缩文件 Store + 可压缩文件 7z mt=on ──
-                        if (options.AdaptiveCompressionMode == AdaptiveCompressionMode.MultiThreaded && !options.Encrypt)
+                        if (options.MultiThreadedCompression && !options.Encrypt)
                         {
                             var mtMethod = options.ZipCompressionMethod?.ToLowerInvariant();
                             if (string.IsNullOrEmpty(mtMethod) || mtMethod == "deflate" || mtMethod == "deflate64")
@@ -1548,7 +1548,7 @@ while (true)
                                 var compressGroup = new List<(string FullPath, string RelativePath)>();
                                 foreach (var file in compressFiles)
                                 {
-                                    var level = ZipEntryClassifier.GetAdaptiveLevel(file.FullPath, options.CompressionLevel, true, options.MultiThreadedStoreFormatIds);
+                                    var level = ZipEntryClassifier.GetAdaptiveLevel(file.FullPath, options.CompressionLevel, options.AdaptiveCompression, options.MultiThreadedStoreFormatIds);
                                     if (level == 0) storeGroup.Add(file);
                                     else compressGroup.Add(file);
                                 }
@@ -1609,14 +1609,14 @@ while (true)
                             var entryPath = ArchivePath.Normalize(relPath);
                             // 自适应压缩：已压缩文件自动 Store（仅 Deflate/Deflate64 归档适用）
                             int? entryLevel = null;
-                            if (options != null && options.AdaptiveCompressionMode != AdaptiveCompressionMode.Disabled && !options.Encrypt)
+                            if (options != null && options.AdaptiveCompression && !options.Encrypt)
                             {
                                 var method = options.ZipCompressionMethod?.ToLowerInvariant();
                                 if (string.IsNullOrEmpty(method) || method == "deflate" || method == "deflate64")
                                 {
                                     entryLevel = ZipEntryClassifier.GetAdaptiveLevel(fullPath, options.CompressionLevel, true);
-                                    CoreLog.Trace("ZipEngine.CompressAsync: adaptive entry '{0}' level={1} (global={2}, mode={3})",
-                                        entryPath, entryLevel ?? options.CompressionLevel, options.CompressionLevel, options.AdaptiveCompressionMode);
+                                    CoreLog.Trace("ZipEngine.CompressAsync: adaptive entry '{0}' level={1} (global={2}, adaptive={3})",
+                                        entryPath, entryLevel ?? options.CompressionLevel, options.CompressionLevel, options.AdaptiveCompression);
                                 }
                                 else
                                 {
@@ -2127,14 +2127,14 @@ while (true)
                 var fi = new FileInfo(fullPath);
                 // 自适应压缩：已压缩文件自动 Store（仅 Deflate/Deflate64 归档适用）
                 int? entryLevel = null;
-                if (options != null && options.AdaptiveCompressionMode != AdaptiveCompressionMode.Disabled && !options.Encrypt)
+                if (options != null && options.AdaptiveCompression && !options.Encrypt)
                 {
                     var method = options.ZipCompressionMethod?.ToLowerInvariant();
                     if (string.IsNullOrEmpty(method) || method == "deflate" || method == "deflate64")
                     {
                         entryLevel = ZipEntryClassifier.GetAdaptiveLevel(fullPath, options.CompressionLevel, true);
-                        CoreLog.Trace("ZipEngine.AddToArchiveAsync: adaptive entry '{0}' level={1} (global={2}, mode={3})",
-                            relativePath, entryLevel ?? options.CompressionLevel, options.CompressionLevel, options.AdaptiveCompressionMode);
+                        CoreLog.Trace("ZipEngine.AddToArchiveAsync: adaptive entry '{0}' level={1} (global={2}, adaptive={3})",
+                            relativePath, entryLevel ?? options.CompressionLevel, options.CompressionLevel, options.AdaptiveCompression);
                     }
                     else
                     {
@@ -2218,7 +2218,7 @@ while (true)
 
     /// <summary>
     /// 使用 SharpSevenZip 多线程压缩一组文件到临时 ZIP。
-    /// 用于 AdaptiveCompressionMode.MultiThreaded 模式：将需要压缩的文件通过 7z.dll mt=on 多线程压缩。
+    /// 用于 MultiThreadedCompression 模式：将需要压缩的文件通过 7z.dll mt=on 多线程压缩。
     /// </summary>
     /// <param name="files">待压缩的文件列表（FullPath + RelativePath）。</param>
     /// <param name="tempPath">临时 ZIP 输出路径。</param>

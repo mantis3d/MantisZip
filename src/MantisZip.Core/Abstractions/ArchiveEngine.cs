@@ -169,29 +169,25 @@ public class ArchiveOptions
     public bool SevenZipMultithreaded { get; set; } = true;
 
     /// <summary>
-    /// 自适应压缩模式（三态）。
-    /// Disabled = 禁用，始终使用选定级别；
-    /// StoreForCompressed = 仅对已知格式自动降级（默认推荐）；
-    /// SmartDetect = 智能检测（大文件魔数 + 采样试压）。
+    /// 自适应压缩：已压缩文件自动 Store。
     /// </summary>
-    public AdaptiveCompressionMode AdaptiveCompressionMode { get; set; } = AdaptiveCompressionMode.Disabled;
+    public bool AdaptiveCompression { get; set; }
+
+    /// <summary>
+    /// 魔数检测：自适应开启时，对大文件做魔数增强识别。自适应关闭时无效。
+    /// </summary>
+    public bool AdaptiveSmartDetect { get; set; }
+
+    /// <summary>
+    /// 多线程压缩：所有可压缩文件走 SharpSevenZip mt=on。可与自适应同时开启。
+    /// </summary>
+    public bool MultiThreadedCompression { get; set; }
 
     /// <summary>
     /// 多线程模式下用户自定义仅存储格式 ID 列表。
-    /// 仅在 <see cref="AdaptiveCompressionMode"/> == MultiThreaded 时生效。
+    /// 仅在 <see cref="MultiThreadedCompression"/> 为 true 时生效。
     /// </summary>
     public HashSet<string> MultiThreadedStoreFormatIds { get; set; } = new();
-
-    /// <summary>
-    /// 自适应压缩开关（简写属性，与 <see cref="AdaptiveCompressionMode"/> 联动）。
-    /// true = StoreForCompressed，false = Disabled。
-    /// 保持向后兼容：现有代码可继续使用此属性。
-    /// </summary>
-    public bool AdaptiveCompression
-    {
-        get => AdaptiveCompressionMode != AdaptiveCompressionMode.Disabled;
-        set => AdaptiveCompressionMode = value ? AdaptiveCompressionMode.StoreForCompressed : AdaptiveCompressionMode.Disabled;
-    }
 }
 
 /// <summary>

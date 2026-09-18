@@ -158,7 +158,7 @@ public class AdaptiveCompressionTests
     public void ResolveLevel_Disabled_ReturnsGlobalLevel()
     {
         var level = AdaptiveRuleMatcher.ResolveLevel(
-            "photo.jpg", 5, AdaptiveCompressionMode.Disabled);
+            "photo.jpg", 5, adaptiveCompression: false);
         Assert.Equal(5, level);
     }
 
@@ -166,7 +166,7 @@ public class AdaptiveCompressionTests
     public void ResolveLevel_StoreForCompressed_ImageLossy_ReturnsStore()
     {
         var level = AdaptiveRuleMatcher.ResolveLevel(
-            "photo.jpg", 5, AdaptiveCompressionMode.StoreForCompressed);
+            "photo.jpg", 5, adaptiveCompression: true);
         Assert.Equal(0, level);
     }
 
@@ -174,7 +174,7 @@ public class AdaptiveCompressionTests
     public void ResolveLevel_StoreForCompressed_Text_ReturnsGlobalLevel()
     {
         var level = AdaptiveRuleMatcher.ResolveLevel(
-            "readme.txt", 5, AdaptiveCompressionMode.StoreForCompressed);
+            "readme.txt", 5, adaptiveCompression: true);
         Assert.Equal(5, level);
     }
 
@@ -192,7 +192,7 @@ public class AdaptiveCompressionTests
             }
         };
         var level = AdaptiveRuleMatcher.ResolveLevel(
-            "photo.jpg", 5, AdaptiveCompressionMode.SmartDetect, rules);
+            "photo.jpg", 5, adaptiveCompression: true, adaptiveSmartDetect: true, rules: rules);
         Assert.Equal(0, level);
     }
 
@@ -211,7 +211,7 @@ public class AdaptiveCompressionTests
         };
         // 规则被禁用，应走内置分类（image_lossy → Store）
         var level = AdaptiveRuleMatcher.ResolveLevel(
-            "photo.jpg", 5, AdaptiveCompressionMode.SmartDetect, rules);
+            "photo.jpg", 5, adaptiveCompression: true, adaptiveSmartDetect: true, rules: rules);
         Assert.Equal(0, level); // 内置分类 image_lossy 也是 Store
     }
 
@@ -230,7 +230,7 @@ public class AdaptiveCompressionTests
             }
         };
         var level = AdaptiveRuleMatcher.ResolveLevel(
-            "photo.jpg", 7, AdaptiveCompressionMode.SmartDetect, rules);
+            "photo.jpg", 7, adaptiveCompression: true, adaptiveSmartDetect: true, rules: rules);
         Assert.Equal(5, level); // 规则优先于内置分类
     }
 

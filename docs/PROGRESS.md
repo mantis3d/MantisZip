@@ -27,6 +27,7 @@
 
 #### 2026-09
 
+- **09-18** — 自适应压缩重构为三开关正交设计：移除 `AdaptiveCompressionMode` 四选一枚举，替换为三个独立开关（自适应压缩 / 魔数检测 / 多线程压缩）；魔数检测仅自适应开启时可见；组合行为：仅自适应=用户规则列表+格式目录、仅多线程=无设置界面、自适应+多线程=仅存储格式选择；向后兼容旧设置文件自动迁移；6 个 i18n key
 - **09-18** — 自适应压缩级别新增「多线程」模式（实验性）：SharpSevenZip `mt=on` 多线程压缩需压缩文件，Store 类文件直写 ZipWriter；统一帮助弹窗（HelpDialog 外壳 + AdaptiveHelpContent）；标题栏「实验性」橙色标签 + 帮助按钮；格式目录/用户规则 UI 可见性联动（Disabled 隐藏全部、MultiThreaded 隐藏用户规则）；11 个本地化 key
 - **09-17** — ZIP 自适应压缩：按文件扩展名自动判断已压缩文件（60+ 格式：图片/音视频/字体/归档/已压缩文档），已压缩文件 Store（不压缩），其余保持用户选定级别；仅 Deflate/Deflate64 + 非加密 ZIP 有效；压缩对话框 ZIP 面板新增「自适应压缩」复选框；12 文件 +69 行
 - **09-17** — 自适应压缩级别升级：三模式系统（Disabled / StoreForCompressed / SmartDetect）+ 格式目录（FormatCatalog 内置 40+ 格式 + 用户自定义）+ 用户规则覆盖（AdaptiveOverrideRule 8 级）+ 经验系数表（CompressionCoefficients 7 分类 × 7 级别 × ZIP/7z 双表）；SettingsWindow 新增自适应压缩模式选择 + 格式目录 + 规则管理面板；22 项单元测试；32 个本地化 key

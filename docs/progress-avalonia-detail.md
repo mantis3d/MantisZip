@@ -6,6 +6,22 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-09-18** — 自适应压缩重构：三开关正交设计（自适应/魔数/多线程独立开关）
+  - **Core 层**：
+    - `Models/AdaptiveOverrideRule.cs`：`AdaptiveCompressionMode` 枚举标记 `[Obsolete]`，保留用于旧设置文件反序列化兼容
+    - `Abstractions/ArchiveEngine.cs`：`ArchiveOptions` 移除 `AdaptiveCompressionMode` 和旧 `AdaptiveCompression` shim 属性，替换为 3 个独立 bool（`AdaptiveCompression` / `AdaptiveSmartDetect` / `MultiThreadedCompression`）
+    - `Services/CompressService.cs`：`CompressRequest` 同步替换为 3 个 bool + `BuildOptions` 映射更新
+    - `Utils/AdaptiveRuleMatcher.cs`：`ResolveLevel` 签名从 `AdaptiveCompressionMode` 枚举改为 3 个 bool 参数
+    - `Engines/ZipEngine.cs`：5 处枚举引用全部替换为 bool 检查（`MultiThreadedCompression` / `AdaptiveCompression`），日志同步更新
+    - `UI.Avalonia/Models/AppSettings.cs`：新增 `AdaptiveSmartDetect` / `MultiThreadedCompression` 两个 bool 属性 + `Load()` 中旧枚举值自动迁移逻辑
+  - **UI 层**：
+    - `ViewModels/SettingsWindowViewModel.cs`：移除 4 个 RadioButton 状态属性 + `UpdateAdaptiveModeButtons()`，替换为 3 个 `[ObservableProperty]` bool + 5 个计算可见性属性（`IsSmartDetectVisible` / `IsAdaptiveContentVisible` / `IsStoreFormatSectionVisible` / `IsUserRulesSectionVisible` / `IsFormatCatalogSectionVisible`）
+    - `Views/SettingsWindow.axaml`：4 个 RadioButton 替换为 3 个 CheckBox 开关（自适应压缩 / 魔数检测 / 多线程压缩），魔数仅自适应开启时可见；格式目录/用户规则/仅存储格式区域 `IsVisible` 绑定更新
+    - `Services/CompressFlow.cs`：`BuildRequest` 从读取 `AdaptiveCompressionMode` 枚举改为传递 3 个 bool
+  - **i18n**：新增 6 个 key（`Settings_AdaptiveCompression` / `_Desc` / `Settings_AdaptiveSmartDetect` / `_Desc` / `Settings_MultiThreadedCompression` / `_Desc`），zh-CN + en 成对
+  - **测试**：`AdaptiveCompressionTests` 6 处调用更新为新 API
+  - 验证：0 errors / 0 warnings，424 测试通过
+
 **2026-09-18** — 自适应压缩级别：多线程模式（第四选项）+ 统一帮助弹窗 + 仅存储格式自定义
   - **Core 层**：
     - `Models/AdaptiveOverrideRule.cs`：`AdaptiveCompressionMode` 新增 `MultiThreaded` 枚举值（基础模式 + 需压缩文件多线程加速）

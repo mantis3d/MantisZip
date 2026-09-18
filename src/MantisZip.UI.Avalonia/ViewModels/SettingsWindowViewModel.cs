@@ -134,9 +134,38 @@ public partial class SettingsWindowViewModel : ObservableObject
     [ObservableProperty]
     private bool _sevenZipEncryptHeaders = true;
 
-    // ── Adaptive Compression ──
+    // ── Adaptive Compression (三个独立开关) ──
     [ObservableProperty]
-    private AdaptiveCompressionMode _adaptiveCompressionMode = AdaptiveCompressionMode.StoreForCompressed;
+    [NotifyPropertyChangedFor(nameof(IsSmartDetectVisible))]
+    [NotifyPropertyChangedFor(nameof(IsAdaptiveContentVisible))]
+    [NotifyPropertyChangedFor(nameof(IsStoreFormatSectionVisible))]
+    [NotifyPropertyChangedFor(nameof(IsUserRulesSectionVisible))]
+    [NotifyPropertyChangedFor(nameof(IsFormatCatalogSectionVisible))]
+    private bool _adaptiveCompression;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsSmartDetectVisible))]
+    private bool _adaptiveSmartDetect;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsAdaptiveContentVisible))]
+    [NotifyPropertyChangedFor(nameof(IsStoreFormatSectionVisible))]
+    private bool _multiThreadedCompression;
+
+    /// <summary>魔数检测开关是否可见（仅自适应开启时可见）。</summary>
+    public bool IsSmartDetectVisible => AdaptiveCompression;
+
+    /// <summary>自适应内容区域是否可见（自适应或多线程任一开启）。</summary>
+    public bool IsAdaptiveContentVisible => AdaptiveCompression || MultiThreadedCompression;
+
+    /// <summary>仅存储格式选择区域是否可见（自适应+多线程同时开启）。</summary>
+    public bool IsStoreFormatSectionVisible => AdaptiveCompression && MultiThreadedCompression;
+
+    /// <summary>用户自定义规则区域是否可见（仅自适应开启，多线程关闭）。</summary>
+    public bool IsUserRulesSectionVisible => AdaptiveCompression && !MultiThreadedCompression;
+
+    /// <summary>格式目录区域是否可见（仅自适应开启，多线程关闭）。</summary>
+    public bool IsFormatCatalogSectionVisible => AdaptiveCompression && !MultiThreadedCompression;
 
     /// <summary>内置格式（只读，供 UI 展示）。</summary>
     public ObservableCollection<FormatDefinitionViewModel> BuiltInFormats { get; } = new();
@@ -149,56 +178,6 @@ public partial class SettingsWindowViewModel : ObservableObject
 
     /// <summary>多线程模式下仅存储格式选择（ObservableCollection for UI binding）。</summary>
     public ObservableCollection<StoreFormatItemViewModel> MultiThreadedStoreFormats { get; } = new();
-
-    // Adaptive mode radio button states
-    public bool AdaptiveModeDisabled
-    {
-        get => AdaptiveCompressionMode == AdaptiveCompressionMode.Disabled;
-        set { if (value) AdaptiveCompressionMode = AdaptiveCompressionMode.Disabled; OnPropertyChanged(); UpdateAdaptiveModeButtons(); }
-    }
-
-    public bool AdaptiveModeStoreForCompressed
-    {
-        get => AdaptiveCompressionMode == AdaptiveCompressionMode.StoreForCompressed;
-        set { if (value) AdaptiveCompressionMode = AdaptiveCompressionMode.StoreForCompressed; OnPropertyChanged(); UpdateAdaptiveModeButtons(); }
-    }
-
-    public bool AdaptiveModeSmartDetect
-    {
-        get => AdaptiveCompressionMode == AdaptiveCompressionMode.SmartDetect;
-        set { if (value) AdaptiveCompressionMode = AdaptiveCompressionMode.SmartDetect; OnPropertyChanged(); UpdateAdaptiveModeButtons(); }
-    }
-
-    public bool AdaptiveModeMultiThreaded
-    {
-        get => AdaptiveCompressionMode == AdaptiveCompressionMode.MultiThreaded;
-        set { if (value) AdaptiveCompressionMode = AdaptiveCompressionMode.MultiThreaded; OnPropertyChanged(); UpdateAdaptiveModeButtons(); }
-    }
-
-    /// <summary>是否为多线程模式（控制 UI 可见性）。</summary>
-    public bool IsMultiThreadedMode => AdaptiveCompressionMode == AdaptiveCompressionMode.MultiThreaded;
-
-    /// <summary>格式目录区域是否可见（Disabled 时隐藏）。</summary>
-    public bool IsFormatCatalogVisible => AdaptiveCompressionMode != AdaptiveCompressionMode.Disabled;
-
-    /// <summary>用户规则区域是否可见（Disabled 或 MultiThreaded 时隐藏）。</summary>
-    public bool IsUserRulesVisible => AdaptiveCompressionMode != AdaptiveCompressionMode.Disabled
-                                     && AdaptiveCompressionMode != AdaptiveCompressionMode.MultiThreaded;
-
-    /// <summary>多线程提示是否可见（仅 MultiThreaded 时显示）。</summary>
-    public bool IsMultiThreadedHintVisible => AdaptiveCompressionMode == AdaptiveCompressionMode.MultiThreaded;
-
-    private void UpdateAdaptiveModeButtons()
-    {
-        OnPropertyChanged(nameof(AdaptiveModeDisabled));
-        OnPropertyChanged(nameof(AdaptiveModeStoreForCompressed));
-        OnPropertyChanged(nameof(AdaptiveModeSmartDetect));
-        OnPropertyChanged(nameof(AdaptiveModeMultiThreaded));
-        OnPropertyChanged(nameof(IsMultiThreadedMode));
-        OnPropertyChanged(nameof(IsFormatCatalogVisible));
-        OnPropertyChanged(nameof(IsUserRulesVisible));
-        OnPropertyChanged(nameof(IsMultiThreadedHintVisible));
-    }
 
     [ObservableProperty]
     private string _logPrivacyMode = "extension";
@@ -787,14 +766,14 @@ public partial class SettingsWindowViewModel : ObservableObject
     public string SevenZipNumFastBytesText => LocalizationManager.T("Settings_SevenZip_NumFastBytes");
     public string SevenZipMatchFinderText => LocalizationManager.T("Settings_SevenZip_MatchFinder");
 
-    // Adaptive Compression strings
+    // Adaptive Compression strings (三个独立开关)
     public string AdaptiveCompressionSectionText => LocalizationManager.T("Settings_AdaptiveCompression");
+    public string AdaptiveCompressionText => LocalizationManager.T("Settings_AdaptiveCompression");
     public string AdaptiveCompressionDescText => LocalizationManager.T("Settings_AdaptiveCompression_Desc");
-    public string AdaptiveModeDisabledText => LocalizationManager.T("Settings_AdaptiveMode_Disabled");
-    public string AdaptiveModeStoreForCompressedText => LocalizationManager.T("Settings_AdaptiveMode_StoreForCompressed");
-    public string AdaptiveModeSmartDetectText => LocalizationManager.T("Settings_AdaptiveMode_SmartDetect");
-    public string AdaptiveModeMultiThreadedText => LocalizationManager.T("Settings_AdaptiveMode_MultiThreaded");
-    public string AdaptiveMultiThreadedHintText => LocalizationManager.T("Settings_AdaptiveMode_MultiThreaded_Hint");
+    public string AdaptiveSmartDetectText => LocalizationManager.T("Settings_AdaptiveSmartDetect");
+    public string AdaptiveSmartDetectDescText => LocalizationManager.T("Settings_AdaptiveSmartDetect_Desc");
+    public string MultiThreadedCompressionText => LocalizationManager.T("Settings_MultiThreadedCompression");
+    public string MultiThreadedCompressionDescText => LocalizationManager.T("Settings_MultiThreadedCompression_Desc");
     public string FormatCatalogSectionText => LocalizationManager.T("Settings_FormatCatalog");
     public string StoreFormatSectionText => LocalizationManager.T("Settings_StoreFormat_Section");
     public string StoreFormatDescText => LocalizationManager.T("Settings_StoreFormat_Desc");
@@ -1040,8 +1019,10 @@ public partial class SettingsWindowViewModel : ObservableObject
         _assocGz = _settings.AssocGz;
         _assocIso = _settings.AssocIso;
 
-        // Adaptive Compression
-        _adaptiveCompressionMode = _settings.AdaptiveCompressionMode;
+        // Adaptive Compression (三个独立开关)
+        _adaptiveCompression = _settings.AdaptiveCompression;
+        _adaptiveSmartDetect = _settings.AdaptiveSmartDetect;
+        _multiThreadedCompression = _settings.MultiThreadedCompression;
         PopulateBuiltInFormats();
         PopulateAdaptiveOverrides();
         PopulateMultiThreadedStoreFormats();
@@ -1322,11 +1303,12 @@ public partial class SettingsWindowViewModel : ObservableObject
         OnPropertyChanged(nameof(SevenZipMatchFinderText));
         OnPropertyChanged(nameof(AdaptiveCompressionSectionText));
         OnPropertyChanged(nameof(AdaptiveCompressionDescText));
-        OnPropertyChanged(nameof(AdaptiveModeDisabledText));
-        OnPropertyChanged(nameof(AdaptiveModeStoreForCompressedText));
-        OnPropertyChanged(nameof(AdaptiveModeSmartDetectText));
-        OnPropertyChanged(nameof(AdaptiveModeMultiThreadedText));
-        OnPropertyChanged(nameof(AdaptiveMultiThreadedHintText));
+        OnPropertyChanged(nameof(AdaptiveCompressionText));
+        OnPropertyChanged(nameof(AdaptiveCompressionDescText));
+        OnPropertyChanged(nameof(AdaptiveSmartDetectText));
+        OnPropertyChanged(nameof(AdaptiveSmartDetectDescText));
+        OnPropertyChanged(nameof(MultiThreadedCompressionText));
+        OnPropertyChanged(nameof(MultiThreadedCompressionDescText));
         OnPropertyChanged(nameof(FormatCatalogSectionText));
         OnPropertyChanged(nameof(StoreFormatSectionText));
         OnPropertyChanged(nameof(StoreFormatDescText));
@@ -1450,8 +1432,10 @@ public partial class SettingsWindowViewModel : ObservableObject
         _settings.CloseAfterCompress = CloseAfterCompress;
         _settings.KeepOriginalExtension = KeepOriginalExtension;
 
-        // Adaptive Compression
-        _settings.AdaptiveCompressionMode = AdaptiveCompressionMode;
+        // Adaptive Compression (三个独立开关)
+        _settings.AdaptiveCompression = AdaptiveCompression;
+        _settings.AdaptiveSmartDetect = AdaptiveSmartDetect;
+        _settings.MultiThreadedCompression = MultiThreadedCompression;
         _settings.AdaptiveOverrides = AdaptiveOverrides.Select(vm => new AdaptiveOverrideRule
         {
             Name = vm.Name,

@@ -84,8 +84,14 @@ public class CompressRequest
     /// <summary>7z 多线程压缩（mt=on）。默认 true，利用多核 CPU 并行压缩。</summary>
     public bool SevenZipMultithreaded { get; init; } = true;
 
-    /// <summary>自适应压缩模式。启用时对已压缩文件自动 Store，其余保持用户选定级别。仅 ZIP+Deflate。</summary>
-    public AdaptiveCompressionMode AdaptiveCompressionMode { get; init; }
+    /// <summary>自适应压缩：已压缩文件自动 Store。仅 ZIP+Deflate。</summary>
+    public bool AdaptiveCompression { get; init; }
+
+    /// <summary>魔数检测：自适应开启时增强识别。</summary>
+    public bool AdaptiveSmartDetect { get; init; }
+
+    /// <summary>多线程压缩：可压缩文件走 SharpSevenZip mt=on。</summary>
+    public bool MultiThreadedCompression { get; init; }
 
     /// <summary>多线程模式下用户自定义仅存储格式 ID 列表。</summary>
     public HashSet<string> MultiThreadedStoreFormatIds { get; init; } = new();
@@ -462,7 +468,9 @@ public static class CompressService
             SevenZipNumFastBytes = request.SevenZipNumFastBytes,
             SevenZipMatchFinder = request.SevenZipMatchFinder,
             SevenZipMultithreaded = request.SevenZipMultithreaded,
-            AdaptiveCompressionMode = request.AdaptiveCompressionMode,
+            AdaptiveCompression = request.AdaptiveCompression,
+            AdaptiveSmartDetect = request.AdaptiveSmartDetect,
+            MultiThreadedCompression = request.MultiThreadedCompression,
             MultiThreadedStoreFormatIds = request.MultiThreadedStoreFormatIds,
             ZipCompressionMethod = request.ZipCompressionMethod,
             ZipEncryptionMethod = request.ZipEncryptionMethod,

@@ -30,15 +30,21 @@ public class AppSettings
     /// </summary>
     public bool SevenZipMultithreaded { get; set; } = true;
 
-    /// <summary>
-    /// 自适应压缩。启用时对已压缩文件（图片/音视频/字体/归档等）自动 Store，其余保持用户选定级别。
-    /// 仅对 ZIP + Deflate/Deflate64 有效。
-    /// </summary>
+    // ===== 自适应压缩（三个独立开关） =====
+    /// <summary>自适应压缩：已压缩文件自动 Store。仅对 ZIP + Deflate/Deflate64 有效。</summary>
     public bool AdaptiveCompression { get; set; }
 
-    // ===== 自适应压缩级别 =====
-    /// <summary>自适应压缩模式（Disabled / StoreForCompressed / SmartDetect / MultiThreaded）。</summary>
-    public AdaptiveCompressionMode AdaptiveCompressionMode { get; set; } = AdaptiveCompressionMode.StoreForCompressed;
+    /// <summary>魔数检测：自适应开启时，对大文件做魔数增强识别。自适应关闭时无效。</summary>
+    public bool AdaptiveSmartDetect { get; set; }
+
+    /// <summary>多线程压缩：所有可压缩文件走 SharpSevenZip mt=on。可与自适应同时开启。</summary>
+    public bool MultiThreadedCompression { get; set; }
+
+    /// <summary>
+    /// 旧版自适应压缩模式（向后兼容反序列化）。
+    /// 已废弃：新代码应使用 <see cref="AdaptiveCompression"/> + <see cref="AdaptiveSmartDetect"/> + <see cref="MultiThreadedCompression"/>。
+    /// </summary>
+    public AdaptiveCompressionMode AdaptiveCompressionMode { get; set; } = AdaptiveCompressionMode.Disabled;
 
     /// <summary>多线程模式下用户自定义仅存储格式 ID 列表（不可删除的唯一规则）。</summary>
     public List<string> MultiThreadedStoreFormatIds { get; set; } = new();
@@ -230,6 +236,14 @@ public class AppSettings
             if (!File.Exists(SettingsFile)) return CreateWithDefaults();
             var json = File.ReadAllText(SettingsFile);
             var settings = JsonSerializer.Deserialize<AppSettings>(json) ?? CreateWithDefaults();
+            // 向后兼容：从旧 AdaptiveCompressionMode 枚举迁移为三个独立开关
+            if (settings.AdaptiveCompressionMode != AdaptiveCompressionMode.Disabled)
+            {
+                settings.AdaptiveCompression = true;
+                settings.AdaptiveSmartDetect = settings.AdaptiveCompressionMode == AdaptiveCompressionMode.SmartDetect;
+                settings.MultiThreadedCompression = settings.AdaptiveCompressionMode == AdaptiveCompressionMode.MultiThreaded;
+                settings.AdaptiveCompressionMode = AdaptiveCompressionMode.Disabled;
+            }
             // 首次安装时填充默认规则
             if (settings.AdaptiveOverrides.Count == 0)
             {

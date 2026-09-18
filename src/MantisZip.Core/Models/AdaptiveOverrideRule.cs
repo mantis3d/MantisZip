@@ -24,17 +24,19 @@ public enum AdaptiveLevel
 }
 
 /// <summary>
-/// 自适应压缩级别模式。
+/// 旧版自适应压缩模式（已废弃，仅用于 settings.json 反序列化迁移）。
+/// 新代码应使用 <c>AdaptiveCompression</c> + <c>AdaptiveSmartDetect</c> + <c>MultiThreadedCompression</c> 三个独立开关。
 /// </summary>
+[Obsolete("已废弃。使用 AdaptiveCompression + AdaptiveSmartDetect + MultiThreadedCompression 替代。")]
 public enum AdaptiveCompressionMode
 {
     /// <summary>禁用（始终使用选定级别）。</summary>
     Disabled,
-    /// <summary>仅对已知格式自动降级（扩展名查表）— 默认推荐。</summary>
+    /// <summary>仅对已知格式自动降级（扩展名查表）。</summary>
     StoreForCompressed,
     /// <summary>智能检测（大文件魔数 + 采样试压）。</summary>
     SmartDetect,
-    /// <summary>基础模式 + 需压缩文件多线程加速（用户规则不生效）。</summary>
+    /// <summary>基础模式 + 需压缩文件多线程加速。</summary>
     MultiThreaded,
 }
 

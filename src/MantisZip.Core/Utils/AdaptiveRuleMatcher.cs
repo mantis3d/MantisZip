@@ -14,21 +14,23 @@ public static class AdaptiveRuleMatcher
     /// </summary>
     /// <param name="filePath">文件路径（或文件名）。</param>
     /// <param name="globalLevel">用户在压缩对话框选定的全局压缩级别（0-9）。</param>
-    /// <param name="mode">自适应压缩模式。</param>
+    /// <param name="adaptiveCompression">自适应压缩开关。</param>
+    /// <param name="adaptiveSmartDetect">魔数检测开关。</param>
     /// <param name="rules">用户自定义覆盖规则列表，可为 null。</param>
     /// <param name="customFormats">用户自定义格式列表，可为 null。</param>
     /// <returns>该文件应使用的压缩级别（0-9）。</returns>
     public static int ResolveLevel(
         string filePath,
         int globalLevel,
-        AdaptiveCompressionMode mode,
+        bool adaptiveCompression,
+        bool adaptiveSmartDetect = false,
         List<AdaptiveOverrideRule>? rules = null,
         List<FormatDefinition>? customFormats = null)
     {
-        CoreLog.Trace("AdaptiveRuleMatcher.ResolveLevel: file={0}, globalLevel={1}, mode={2}, rules={3}",
-            filePath, globalLevel, mode, rules?.Count ?? 0);
+        CoreLog.Trace("AdaptiveRuleMatcher.ResolveLevel: file={0}, globalLevel={1}, adaptive={2}, smartDetect={3}, rules={4}",
+            filePath, globalLevel, adaptiveCompression, adaptiveSmartDetect, rules?.Count ?? 0);
 
-        if (mode == AdaptiveCompressionMode.Disabled)
+        if (!adaptiveCompression)
         {
             CoreLog.Trace("AdaptiveRuleMatcher.ResolveLevel: disabled → return globalLevel={0}", globalLevel);
             return globalLevel;
@@ -60,25 +62,13 @@ public static class AdaptiveRuleMatcher
         var category = CompressionCoefficients.ClassifyByExtension(filePath);
         CoreLog.Trace("AdaptiveRuleMatcher.ResolveLevel: category={0} for {1}", category, filePath);
 
-        if (mode == AdaptiveCompressionMode.StoreForCompressed)
-        {
-            // 仅对已知的已压缩格式降级为 Store
-            if (category is "image_lossy" or "media" or "archive")
-            {
-                CoreLog.Trace("AdaptiveRuleMatcher.ResolveLevel: StoreForCompressed → Store (category={0})", category);
-                return 0; // Store
-            }
-            CoreLog.Trace("AdaptiveRuleMatcher.ResolveLevel: StoreForCompressed → globalLevel={0} (category={1})", globalLevel, category);
-            return globalLevel;
-        }
-
-        // SmartDetect: 大文件走魔数检测（这里简化为扩展名分类）
+        // 自适应压缩：仅对已知的已压缩格式降级为 Store
         if (category is "image_lossy" or "media" or "archive")
         {
-            CoreLog.Trace("AdaptiveRuleMatcher.ResolveLevel: SmartDetect → Store (category={0})", category);
-            return 0;
+            CoreLog.Trace("AdaptiveRuleMatcher.ResolveLevel: adaptive → Store (category={0})", category);
+            return 0; // Store
         }
-        CoreLog.Trace("AdaptiveRuleMatcher.ResolveLevel: SmartDetect → globalLevel={0} (category={1})", globalLevel, category);
+        CoreLog.Trace("AdaptiveRuleMatcher.ResolveLevel: adaptive → globalLevel={0} (category={1})", globalLevel, category);
         return globalLevel;
     }
 
