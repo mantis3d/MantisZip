@@ -6,6 +6,14 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-09-20** — 预览工具栏编码选择 ComboBox + 本地化（Task 4/5）
+  - **PreviewPanel.axaml**：字体大小按钮之后插入编码选择 ComboBox（`ItemsSource=EncodingOptions` / `SelectedItem=SelectedEncoding` / `IsVisible=HasEncodingSelector`），带 `ItemContainerTheme`（`MinHeight=ControlHeightSm`）；紧随其后添加检测编码显示 TextBlock（`IsVisible=HasDetectedEncoding` / `Text=DetectedEncodingDisplay`）
+  - **PreviewViewModel.cs**：`EncodingOptions` 改为 `private set` 支持语言切换重建；新增 `RefreshEncodingOptions()` 方法（重建整个列表 + `OnPropertyChanged` + 恢复当前选中项，直接赋值字段避免触发 `OnSelectedEncodingChanged` 副作用）；新增 `HasDetectedEncoding`（`bool`，null→Collapsed）和 `DetectedEncodingDisplay`（格式化字符串 `string.Format(T("Preview_Encoding_Detected"), name)`）；`OnCultureChanged` 调用 `RefreshEncodingOptions()`；`UpdateLocalizedStrings()` 新增 4 个 `Preview_Encoding_*` / `Preview_Tooltip_Encoding` 条目；`ApplyEncodingRefresh()` / `ShowText` 新增 `HasDetectedEncoding` / `DetectedEncodingDisplay` PropertyChanged 通知
+  - **strings.zh-CN.json** + **strings.en.json**：新增 `Preview_Encoding_Auto`、`Preview_Encoding_SystemAnsi`（`{0}` 格式）、`Preview_Encoding_Detected`（`{0}` 格式）、`Preview_Tooltip_Encoding` 四个 key，zh/en 成对
+  - **MainWindowViewModel.UpdateLocalizedStrings() keys 数组**：未添加（与现有 `Preview_*` 系列 key 不在此数组中的模式一致——预览绑定解析到 PreviewViewModel 自身的 `LocalizedStrings` 字典）
+  - 检测编码 TextBlock 可见性方案：无现有 NullToVisibility 转换器，采用 `HasDetectedEncoding` bool 计算属性 + `IsVisible` 绑定（最简方案，无需新增转换器）
+  - 回归：Build 0 错误，Tests 378/378 通过
+
 **2026-09-20** — 文本预览编码选择器：ViewModel 状态与解码管线（Task 2/5）
   - **PreviewViewModel.cs**：新增 `EncodingOption` 记录类型（Key/DisplayName）、`EncodingOptions` 下拉数据源（固定 9 项：auto + 7 种常用编码 + system ANSI）、`[ObservableProperty] SelectedEncoding`、`HasEncodingSelector`（Text/Markdown/Html 三类）、`CurrentDetectedEncodingName`
   - 新增解码管线：`DecodePreviewBytes()`（按 _currentEncodingKey 分发 auto→DetectAndDecodeText / system→DecodeText(null) / explicit→DecodeText(name)）、`OnSelectedEncodingChanged` partial method（切换+持久化+刷新）、`ApplyEncodingRefresh()`（按 PreviewType 刷新 TextContent/RebuildMarkdown/RebuildHtmlAsync）、`PersistEncodingPreference()`（写入 AppSettings.TextEncodingPreference）

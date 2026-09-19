@@ -96,8 +96,8 @@ public partial class PreviewViewModel : ObservableObject
     private string? _currentEncodingKey;               // 当前生效：null=未初始化, "auto", "system", 或具体编码名
     private string? _currentDetectedEncodingName;      // auto 模式下 Ude 检测结果（如 "GB18030"）
 
-    /// <summary>编码下拉数据源（固定，首项为自动检测）。</summary>
-    public IReadOnlyList<EncodingOption> EncodingOptions { get; } = BuildEncodingOptions();
+    /// <summary>编码下拉数据源（首项为自动检测，语言切换后重建 DisplayName）。</summary>
+    public IReadOnlyList<EncodingOption> EncodingOptions { get; private set; } = BuildEncodingOptions();
 
     [ObservableProperty]
     private EncodingOption? _selectedEncoding;
@@ -108,6 +108,15 @@ public partial class PreviewViewModel : ObservableObject
 
     /// <summary>auto 模式下实际检测到的编码名（供 UI 显示「自动检测: GBK」）。</summary>
     public string? CurrentDetectedEncodingName => _currentDetectedEncodingName;
+
+    /// <summary>是否有检测到的编码名（供 XAML IsVisible 绑定，null→Collapsed）。</summary>
+    public bool HasDetectedEncoding => _currentDetectedEncodingName != null;
+
+    /// <summary>格式化后的检测编码显示文本（如「检测到: GBK」）。</summary>
+    public string DetectedEncodingDisplay =>
+        string.IsNullOrEmpty(_currentDetectedEncodingName)
+            ? string.Empty
+            : string.Format(LocalizationManager.T("Preview_Encoding_Detected"), _currentDetectedEncodingName);
 
     /// <summary>构建编码下拉选项。首项为自动检测；其余为常用单字节/中文字符编码。</summary>
     private static List<EncodingOption> BuildEncodingOptions()
@@ -126,6 +135,17 @@ public partial class PreviewViewModel : ObservableObject
         int ansiCp = System.Globalization.CultureInfo.CurrentCulture.TextInfo.ANSICodePage;
         list.Add(new("system", LocalizationManager.T("Preview_Encoding_SystemAnsi", ansiCp)));
         return list;
+    }
+
+    /// <summary>语言切换后重建编码下拉 DisplayName，保持当前选中项不变。</summary>
+    private void RefreshEncodingOptions()
+    {
+        var prevKey = _currentEncodingKey;
+        EncodingOptions = BuildEncodingOptions();
+        OnPropertyChanged(nameof(EncodingOptions));
+        // 恢复之前选中的编码（直接赋值字段，避免触发 OnSelectedEncodingChanged 的持久化/解码副作用）
+        _selectedEncoding = EncodingOptions.FirstOrDefault(o => o.Key == (prevKey ?? "auto"));
+        OnPropertyChanged(nameof(SelectedEncoding));
     }
 
     private void CleanupHtmlTempFile()
@@ -150,6 +170,7 @@ public partial class PreviewViewModel : ObservableObject
     private void OnCultureChanged(object? sender, EventArgs e)
     {
         UpdateLocalizedStrings();
+        RefreshEncodingOptions();
     }
 
     private void UpdateLocalizedStrings()
@@ -172,6 +193,11 @@ public partial class PreviewViewModel : ObservableObject
         LocalizedStrings["Preview_Tooltip_PptxNext"] = LocalizationManager.T("Preview_Tooltip_PptxNext");
         LocalizedStrings["Preview_Tooltip_PdfPrev"] = LocalizationManager.T("Preview_Tooltip_PdfPrev");
         LocalizedStrings["Preview_Tooltip_PdfNext"] = LocalizationManager.T("Preview_Tooltip_PdfNext");
+        LocalizedStrings["Preview_Encoding_Auto"] = LocalizationManager.T("Preview_Encoding_Auto");
+        LocalizedStrings["Preview_Encoding_SystemAnsi"] = LocalizationManager.T("Preview_Encoding_SystemAnsi",
+            System.Globalization.CultureInfo.CurrentCulture.TextInfo.ANSICodePage);
+        LocalizedStrings["Preview_Encoding_Detected"] = LocalizationManager.T("Preview_Encoding_Detected");
+        LocalizedStrings["Preview_Tooltip_Encoding"] = LocalizationManager.T("Preview_Tooltip_Encoding");
         LocalizedStrings["Extract_UnlockButton"] = LocalizationManager.T("Extract_UnlockButton");
         LocalizedStrings["Preview_HtmlSourceToggle"] = LocalizationManager.T("Preview_HtmlSourceToggle");
         OnPropertyChanged(nameof(LocalizedStrings));
@@ -903,6 +929,8 @@ public partial class PreviewViewModel : ObservableObject
     {
         var (text, _) = DecodePreviewBytes();
         OnPropertyChanged(nameof(CurrentDetectedEncodingName));
+        OnPropertyChanged(nameof(HasDetectedEncoding));
+        OnPropertyChanged(nameof(DetectedEncodingDisplay));
         switch (PreviewType)
         {
             case PreviewType.Text:
@@ -994,6 +1022,8 @@ public partial class PreviewViewModel : ObservableObject
         IsPreviewVisible = true;
         IsToolbarVisible = true;
         OnPropertyChanged(nameof(CurrentDetectedEncodingName));
+        OnPropertyChanged(nameof(HasDetectedEncoding));
+        OnPropertyChanged(nameof(DetectedEncodingDisplay));
         // 从设置加载文本预览字号和字体
         var settings = AppSettings.Load();
         FontSize = settings.TextPreviewFontSize;

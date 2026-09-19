@@ -27,7 +27,7 @@
 
 #### 2026-09
 
-- **09-20** — 文本预览编码选择器：Text/Markdown/HTML 预览统一接入 `File.ReadAllBytes` + `DecodePreviewBytes()` 字节级编码检测管线，支持用户手动切换编码（auto/UTF-8/GBK/GB18030/Shift_JIS 等 9 项），切换即时重渲染
+- **09-20** — 文本预览编码选择器：Text/Markdown/HTML 预览统一接入 `File.ReadAllBytes` + `DecodePreviewBytes()` 字节级编码检测管线，支持用户手动切换编码（auto/UTF-8/GBK/GB18030/Shift_JIS 等 9 项），切换即时重渲染；预览工具栏新增编码选择 ComboBox + 本地化（zh/en 成对，4 key），语言切换自动重建下拉 DisplayName
 - **09-17** — 修复文本预览 936 编码报错 + GBK 种子中文乱码：Avalonia 启动注册 CodePagesEncodingProvider（此前迁移遗漏导致 `Encoding.GetEncoding(936)` 抛 NotSupportedException，文本预览提示 "coding 936 无法预览"）；TorrentParser 尊重种子 `encoding` 字段（BitComet GBK 种子）+ 优先读取 `name.utf-8`/`path.utf-8`/`comment.utf-8` 后缀字段（BEP 惯例），实测 100DVD.rar 内中文种子 0/9 乱码
 - **09-13** — HTML 预览 WebView 双轨升级 + 安全设置：NativeWebView 主体渲染 + ReverseMarkdown 降级路径（WebView 不可用时自动 fallback）；`</>` 源码/渲染切换按钮（HTML & Markdown 共用）；HTML 预览安全设置三开关（允许 JavaScript / 外部资源 / 导航，默认全关）+ CSP meta 注入 + NavigationStarting 拦截；设置窗口预览 tab 新增 HTML 子标签页（IconHtml 图标）
 - **09-12** — 报错信息一键复制：AppMessageBox 统一复制按钮（Error/Warning 弹窗显示，复制内容含版本号+时间戳+完整消息，一处改动覆盖全部弹窗）+ 主窗口状态栏错误文本改用只读 TextBox 可选中复制
