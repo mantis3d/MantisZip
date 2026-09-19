@@ -81,6 +81,7 @@
         <!-- 编码选择下拉：文本/Markdown/HTML 预览时可用，切换立即按所选编码重解码渲染 -->
         <ComboBox ItemsSource="{Binding EncodingOptions}"
                   SelectedItem="{Binding SelectedEncoding}"
+                  DisplayMemberBinding="{Binding DisplayName}"
                   IsVisible="{Binding HasEncodingSelector}"
                   MinWidth="110" MaxWidth="180"
                   Height="{DynamicResource ControlHeight}"

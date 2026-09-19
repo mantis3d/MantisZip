@@ -12,6 +12,7 @@
   - **strings.zh-CN.json** + **strings.en.json**：新增 `Preview_Encoding_Auto`、`Preview_Encoding_SystemAnsi`（`{0}` 格式）、`Preview_Encoding_Detected`（`{0}` 格式）、`Preview_Tooltip_Encoding` 四个 key，zh/en 成对
   - **MainWindowViewModel.UpdateLocalizedStrings() keys 数组**：未添加（与现有 `Preview_*` 系列 key 不在此数组中的模式一致——预览绑定解析到 PreviewViewModel 自身的 `LocalizedStrings` 字典）
   - 检测编码 TextBlock 可见性方案：无现有 NullToVisibility 转换器，采用 `HasDetectedEncoding` bool 计算属性 + `IsVisible` 绑定（最简方案，无需新增转换器）
+  - Patch: ComboBox 新增 `DisplayMemberBinding="{Binding DisplayName}"` 避免 record ToString 显示；ShowHtmlPreview/ShowHtmlFallback/ShowMarkdownPreview 补齐 `HasDetectedEncoding` + `DetectedEncodingDisplay` PropertyChanged 通知
   - 回归：Build 0 错误，Tests 378/378 通过
 
 **2026-09-20** — 文本预览编码选择器：ViewModel 状态与解码管线（Task 2/5）

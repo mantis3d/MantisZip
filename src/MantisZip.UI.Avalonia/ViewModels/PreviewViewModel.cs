@@ -2875,6 +2875,8 @@ public partial class PreviewViewModel : ObservableObject
         _textPreviewBytes = await File.ReadAllBytesAsync(filePath);
         var (html, _) = DecodePreviewBytes();
         OnPropertyChanged(nameof(CurrentDetectedEncodingName));
+        OnPropertyChanged(nameof(HasDetectedEncoding));
+        OnPropertyChanged(nameof(DetectedEncodingDisplay));
 
         // Pre-compute fallback markdown in parallel
         var fallbackMarkdownTask = Task.Run(() =>
@@ -2938,6 +2940,8 @@ public partial class PreviewViewModel : ObservableObject
         _textPreviewBytes = await File.ReadAllBytesAsync(filePath);
         var (html, _) = DecodePreviewBytes();
         OnPropertyChanged(nameof(CurrentDetectedEncodingName));
+        OnPropertyChanged(nameof(HasDetectedEncoding));
+        OnPropertyChanged(nameof(DetectedEncodingDisplay));
         var converter = new Converter();
         var markdown = converter.Convert(html);
         RebuildMarkdown(markdown);
@@ -2959,6 +2963,8 @@ public partial class PreviewViewModel : ObservableObject
         var (markdown, _) = DecodePreviewBytes();
         RebuildMarkdown(markdown);
         OnPropertyChanged(nameof(CurrentDetectedEncodingName));
+        OnPropertyChanged(nameof(HasDetectedEncoding));
+        OnPropertyChanged(nameof(DetectedEncodingDisplay));
         PreviewType = PreviewType.Markdown;
         IsPreviewVisible = true;
         IsToolbarVisible = true;
