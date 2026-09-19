@@ -101,4 +101,60 @@ public static class TextEncodingDetector
             System.Globalization.CultureInfo.CurrentCulture.TextInfo.ANSICodePage;
         return Encoding.GetEncoding(cp).GetString(data);
     }
+
+    /// <summary>Ude 检测编码名与置信度。空数据返回 (null, 0)。</summary>
+    public static (string? Name, double Confidence) DetectEncoding(byte[] data)
+    {
+        if (data.Length == 0) return (null, 0);
+        var detector = new CharsetDetector();
+        detector.Feed(data, 0, data.Length);
+        detector.DataEnd();
+        return (string.IsNullOrEmpty(detector.Charset) ? null : detector.Charset, detector.Confidence);
+    }
+
+    /// <summary>自动检测并解码字节，返回 (文本, 实际生效编码名)。</summary>
+    public static (string Text, string? EncodingName) DetectAndDecodeText(byte[] data, int systemFallbackCodePage = 0)
+    {
+        if (data.Length == 0) return (string.Empty, null);
+
+        var (detected, confidence) = DetectEncoding(data);
+        CoreLog.Trace("DetectAndDecodeText: detected={0}, confidence={1:P1}", detected, confidence);
+
+        // 置信度 >= 50% 且编码名有效 → 用检测到的编码解码
+        if (confidence >= 0.5 && !string.IsNullOrEmpty(detected))
+        {
+            try
+            {
+                var enc = Encoding.GetEncoding(detected);
+                return (enc.GetString(data), detected);
+            }
+            catch (Exception ex)
+            {
+                CoreLog.Trace("DetectAndDecodeText: detected encoding {0} failed: {1}", detected, ex.Message);
+            }
+        }
+
+        // 回退链：BOM → 严格 UTF-8 → 系统 ANSI（复用现有 DecodeText 逻辑）
+        return (DecodeText(data, systemFallbackCodePage), null);
+    }
+
+    /// <summary>按显式编码名解码字节。null / "auto" / 无效名 → 走自动回退链。</summary>
+    public static string DecodeText(byte[] data, string? encodingName, int systemFallbackCodePage = 0)
+    {
+        if (data.Length == 0) return string.Empty;
+
+        if (!string.IsNullOrEmpty(encodingName) &&
+            !encodingName.Equals("auto", StringComparison.OrdinalIgnoreCase))
+        {
+            try
+            {
+                return Encoding.GetEncoding(encodingName).GetString(data);
+            }
+            catch (Exception ex)
+            {
+                CoreLog.Trace("DecodeText: explicit encoding {0} invalid: {1}", encodingName, ex.Message);
+            }
+        }
+        return DecodeText(data, systemFallbackCodePage);
+    }
 }
