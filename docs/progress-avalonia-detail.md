@@ -12,6 +12,7 @@
   - `ShowText` 改为 `File.ReadAllBytes` + `DecodePreviewBytes()`，不再直接调用 `DetectAndReadText`
   - `RebuildMarkdown` / `RebuildHtmlAsync` 辅助方法（编码切换时重建控件树/WebView）
   - `OnPreviewTypeChanged` 新增 `HasEncodingSelector` 属性变更通知
+  - Patch: 构造函数初始化 `SelectedEncoding`（从 `AppSettings.TextEncodingPreference` 恢复上次选择）；`PersistEncodingPreference` 跳过 "auto" 避免冗余写入；`RebuildHtmlAsync` 降级路径加 try/catch 防 fire-and-forget 未观察异常
   - 回归：Build 0 错误，Tests 378/378 通过
 
 **2026-09-18** — 拖拽目标路径检测：修复工具栏松手失败 + 抽取共享方法

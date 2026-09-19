@@ -142,6 +142,9 @@ public partial class PreviewViewModel : ObservableObject
         MetadataSettingsManager.SettingsChanged += OnMetadataSettingsChanged;
         LocalizationManager.CultureChanged += OnCultureChanged;
         UpdateLocalizedStrings();
+        var savedEncodingKey = AppSettings.Load().TextEncodingPreference;
+        SelectedEncoding = EncodingOptions.FirstOrDefault(o => o.Key == savedEncodingKey)
+                           ?? EncodingOptions.FirstOrDefault(o => o.Key == "auto");
     }
 
     private void OnCultureChanged(object? sender, EventArgs e)
@@ -917,6 +920,7 @@ public partial class PreviewViewModel : ObservableObject
     /// <summary>持久化编码偏好到 AppSettings.TextEncodingPreference（规则：auto 以外的选择记住）。</summary>
     private static void PersistEncodingPreference(string key)
     {
+        if (key == "auto") return; // auto 是默认值，无需持久化
         var settings = AppSettings.Load();
         settings.TextEncodingPreference = key;
         settings.Save();
@@ -965,11 +969,18 @@ public partial class PreviewViewModel : ObservableObject
         else if (IsFallbackActive)
         {
             // 降级路径：ReverseMarkdown → Markdown → 控件树
-            var converter = new Converter();
-            var markdown = converter.Convert(html);
-            var panel = MarkdownPreviewBuilder.Build(markdown);
-            MarkdownPreviewPanel = panel;
-            HtmlSourceContent = html;
+            try
+            {
+                var converter = new Converter();
+                var markdown = converter.Convert(html);
+                var panel = MarkdownPreviewBuilder.Build(markdown);
+                MarkdownPreviewPanel = panel;
+                HtmlSourceContent = html;
+            }
+            catch (Exception ex)
+            {
+                App.DebugLog($"RebuildHtmlAsync: ReverseMarkdown 重建失败 ({ex.Message})");
+            }
         }
     }
 
