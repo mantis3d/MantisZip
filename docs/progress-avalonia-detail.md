@@ -15,6 +15,12 @@
   - Patch: 构造函数初始化 `SelectedEncoding`（从 `AppSettings.TextEncodingPreference` 恢复上次选择）；`PersistEncodingPreference` 跳过 "auto" 避免冗余写入；`RebuildHtmlAsync` 降级路径加 try/catch 防 fire-and-forget 未观察异常
   - 回归：Build 0 错误，Tests 378/378 通过
 
+**2026-09-20** — Markdown/HTML 预览接入编码解码管线（Task 3/5）
+  - **PreviewViewModel.cs**：`ShowMarkdownPreview` / `ShowHtmlPreview` / `ShowHtmlFallback` 三个入口方法从 `File.ReadAllText(Async)`（隐式 UTF-8）改为 `File.ReadAllBytes(Async)` + `DecodePreviewBytes()` 字节级解码，与 `ShowText` 共享同一编码检测管线
+  - `ShowMarkdownPreview` 改为 `RebuildMarkdown()` 复用控件树重建，`IsToolbarVisible` 改为 `true`（显示编码选择器）；`ShowHtmlFallback` 同样改用 `RebuildMarkdown()`
+  - 三个方法均调用 `OnPropertyChanged(nameof(CurrentDetectedEncodingName))` 通知 UI 刷新自动检测编码显示
+  - 回归：Build 0 错误，Tests 378/378 通过
+
 **2026-09-18** — 拖拽目标路径检测：修复工具栏松手失败 + 抽取共享方法
   - **DropTargetDetector.cs**：`TryGetExplorerPath` default 分支原来返回 `(null, None)`，未处理 `ToolbarWindow32`、`SysListView32` 等 Explorer 子窗口；新增 `FindRecognizedAncestor(hWnd)` 共享方法，向上遍历父窗口链查找 `CabinetWClass` / `#32770` / `Progman` / `WorkerW`；`TryGetExplorerPath` 改为调用 `FindRecognizedAncestor` 后按类名分发；删除冗余 `TryGetDesktopPath`
   - **OverlayController.cs**：`ClassifyWindow` 改为调用 `DropTargetDetector.FindRecognizedAncestor`，拆分为 `ClassifyCabinetWindow` / `ClassifyDialogWindow` 辅助方法；与松手后检测共用同一套父窗口链遍历逻辑，杜绝 overlay 显示路径但松手后识别失败的不一致问题

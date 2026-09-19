@@ -2842,7 +2842,9 @@ public partial class PreviewViewModel : ObservableObject
     /// </summary>
     public async Task ShowHtmlPreview(string filePath)
     {
-        var html = await File.ReadAllTextAsync(filePath);
+        _textPreviewBytes = await File.ReadAllBytesAsync(filePath);
+        var (html, _) = DecodePreviewBytes();
+        OnPropertyChanged(nameof(CurrentDetectedEncodingName));
 
         // Pre-compute fallback markdown in parallel
         var fallbackMarkdownTask = Task.Run(() =>
@@ -2902,12 +2904,13 @@ public partial class PreviewViewModel : ObservableObject
     /// </summary>
     public async Task ShowHtmlFallback(string filePath)
     {
-        CleanupHtmlTempFile(); // temp file no longer needed for WebView
-        var html = await File.ReadAllTextAsync(filePath);
+        CleanupHtmlTempFile();
+        _textPreviewBytes = await File.ReadAllBytesAsync(filePath);
+        var (html, _) = DecodePreviewBytes();
+        OnPropertyChanged(nameof(CurrentDetectedEncodingName));
         var converter = new Converter();
         var markdown = converter.Convert(html);
-        var panel = MarkdownPreviewBuilder.Build(markdown);
-        MarkdownPreviewPanel = panel;
+        RebuildMarkdown(markdown);
         IsWebViewVisible = false;
         IsFallbackActive = true;
         PreviewType = PreviewType.Html;
@@ -2922,13 +2925,14 @@ public partial class PreviewViewModel : ObservableObject
     /// </summary>
     public void ShowMarkdownPreview(string filePath)
     {
-        var markdown = File.ReadAllText(filePath);
-        var panel = MarkdownPreviewBuilder.Build(markdown);
-        MarkdownPreviewPanel = panel;
-        HtmlSourceContent = markdown;
+        _textPreviewBytes = File.ReadAllBytes(filePath);
+        var (markdown, _) = DecodePreviewBytes();
+        RebuildMarkdown(markdown);
+        OnPropertyChanged(nameof(CurrentDetectedEncodingName));
         PreviewType = PreviewType.Markdown;
         IsPreviewVisible = true;
-        IsToolbarVisible = false;
+        IsToolbarVisible = true;
+        IsWebViewVisible = false;
     }
 
     /// <summary>
