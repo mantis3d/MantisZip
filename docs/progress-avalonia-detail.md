@@ -6,6 +6,8 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-09-20** — 文本预览编码选择器（Task 5 收尾）：进度文档双轨更新 + PLAN.md→PROGRESS.md 历史索引迁移 + 计划文件归档（`.omo/plans/未开始/text-preview-encoding-selector.md` → `已完成/`）
+
 **2026-09-20** — 预览工具栏编码选择 ComboBox + 本地化（Task 4/5）
   - **PreviewPanel.axaml**：字体大小按钮之后插入编码选择 ComboBox（`ItemsSource=EncodingOptions` / `SelectedItem=SelectedEncoding` / `IsVisible=HasEncodingSelector`），带 `ItemContainerTheme`（`MinHeight=ControlHeightSm`）；紧随其后添加检测编码显示 TextBlock（`IsVisible=HasDetectedEncoding` / `Text=DetectedEncodingDisplay`）
   - **PreviewViewModel.cs**：`EncodingOptions` 改为 `private set` 支持语言切换重建；新增 `RefreshEncodingOptions()` 方法（重建整个列表 + `OnPropertyChanged` + 恢复当前选中项，直接赋值字段避免触发 `OnSelectedEncodingChanged` 副作用）；新增 `HasDetectedEncoding`（`bool`，null→Collapsed）和 `DetectedEncodingDisplay`（格式化字符串 `string.Format(T("Preview_Encoding_Detected"), name)`）；`OnCultureChanged` 调用 `RefreshEncodingOptions()`；`UpdateLocalizedStrings()` 新增 4 个 `Preview_Encoding_*` / `Preview_Tooltip_Encoding` 条目；`ApplyEncodingRefresh()` / `ShowText` 新增 `HasDetectedEncoding` / `DetectedEncodingDisplay` PropertyChanged 通知
