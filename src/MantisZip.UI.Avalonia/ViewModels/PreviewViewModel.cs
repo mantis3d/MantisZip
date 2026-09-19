@@ -31,6 +31,9 @@ using Avalonia.Styling;
 
 namespace MantisZip.UI.Avalonia.ViewModels;
 
+/// <summary>编码下拉选项：Key 为 .NET 编码名或 "auto"/"system", DisplayName 为本地化显示名。</summary>
+public sealed record EncodingOption(string Key, string DisplayName);
+
 public partial class PreviewViewModel : ObservableObject
 {
     /// <summary>本地化字符串字典，XAML 通过 {Binding LocalizedStrings[Key]} 访问。</summary>
@@ -86,6 +89,44 @@ public partial class PreviewViewModel : ObservableObject
     private bool _isHtmlSourceMode;
 
     private string? _currentHtmlTempPath;
+
+    // ── 编码选择器状态 ──
+
+    private byte[]? _textPreviewBytes;                 // 当前文本类预览的原始字节缓存
+    private string? _currentEncodingKey;               // 当前生效：null=未初始化, "auto", "system", 或具体编码名
+    private string? _currentDetectedEncodingName;      // auto 模式下 Ude 检测结果（如 "GB18030"）
+
+    /// <summary>编码下拉数据源（固定，首项为自动检测）。</summary>
+    public IReadOnlyList<EncodingOption> EncodingOptions { get; } = BuildEncodingOptions();
+
+    [ObservableProperty]
+    private EncodingOption? _selectedEncoding;
+
+    /// <summary>文本 / Markdown / HTML 预览显示编码选择器。</summary>
+    public bool HasEncodingSelector =>
+        PreviewType is PreviewType.Text or PreviewType.Markdown or PreviewType.Html;
+
+    /// <summary>auto 模式下实际检测到的编码名（供 UI 显示「自动检测: GBK」）。</summary>
+    public string? CurrentDetectedEncodingName => _currentDetectedEncodingName;
+
+    /// <summary>构建编码下拉选项。首项为自动检测；其余为常用单字节/中文字符编码。</summary>
+    private static List<EncodingOption> BuildEncodingOptions()
+    {
+        var list = new List<EncodingOption>
+        {
+            new("auto", LocalizationManager.T("Preview_Encoding_Auto")),
+            new("utf-8", "UTF-8"),
+            new("utf-16", "UTF-16 LE"),
+            new("gbk", "GBK (936)"),
+            new("gb18030", "GB18030 (54936)"),
+            new("big5", "Big5 (950)"),
+            new("shift-jis", "Shift-JIS (932)"),
+            new("euc-kr", "EUC-KR (949)"),
+        };
+        int ansiCp = System.Globalization.CultureInfo.CurrentCulture.TextInfo.ANSICodePage;
+        list.Add(new("system", LocalizationManager.T("Preview_Encoding_SystemAnsi", ansiCp)));
+        return list;
+    }
 
     private void CleanupHtmlTempFile()
     {
@@ -354,6 +395,7 @@ public partial class PreviewViewModel : ObservableObject
         OnPropertyChanged(nameof(HasPdfNavigation));
         OnPropertyChanged(nameof(IsIcoGalleryVisible));
         OnPropertyChanged(nameof(IsFontTextFallbackVisible));
+        OnPropertyChanged(nameof(HasEncodingSelector));
 
         // Auto-dismiss loading overlay when switching to actual preview content.
         // PreviewType.None is set by ShowLoading() — keep the overlay visible.
@@ -823,16 +865,124 @@ public partial class PreviewViewModel : ObservableObject
         PreviewImage = _gifFrames[value].Bitmap;
     }
 
-    /// <summary>
-    /// 显示文本预览。
-    /// </summary>
+    // ── 编码切换管线 ──
+
+    /// <summary>按当前选中编码解码缓存的字节并返回文本。auto/system 走自动检测/系统 ANSI。</summary>
+    private (string Text, string? DetectedName) DecodePreviewBytes()
+    {
+        if (_textPreviewBytes == null) return (string.Empty, null);
+
+        switch (_currentEncodingKey)
+        {
+            case null or "auto":
+                var (text, name) = TextEncodingDetector.DetectAndDecodeText(_textPreviewBytes);
+                _currentDetectedEncodingName = name;
+                return (text, name);
+            case "system":
+                return (TextEncodingDetector.DecodeText(_textPreviewBytes, null), null);
+            default:
+                return (TextEncodingDetector.DecodeText(_textPreviewBytes, _currentEncodingKey), null);
+        }
+    }
+
+    /// <summary>编码下拉切换处理：更新生效编码、持久化偏好、重解码当前预览。</summary>
+    partial void OnSelectedEncodingChanged(EncodingOption? value)
+    {
+        if (value == null) return;
+        _currentEncodingKey = value.Key;
+        if (_textPreviewBytes != null)
+            ApplyEncodingRefresh();
+        PersistEncodingPreference(value.Key);
+    }
+
+    /// <summary>按当前编码重解码并刷新对应预览内容。</summary>
+    private void ApplyEncodingRefresh()
+    {
+        var (text, _) = DecodePreviewBytes();
+        OnPropertyChanged(nameof(CurrentDetectedEncodingName));
+        switch (PreviewType)
+        {
+            case PreviewType.Text:
+                TextContent = text;
+                break;
+            case PreviewType.Markdown:
+                RebuildMarkdown(text);
+                break;
+            case PreviewType.Html:
+                _ = RebuildHtmlAsync(text);
+                break;
+        }
+    }
+
+    /// <summary>持久化编码偏好到 AppSettings.TextEncodingPreference（规则：auto 以外的选择记住）。</summary>
+    private static void PersistEncodingPreference(string key)
+    {
+        var settings = AppSettings.Load();
+        settings.TextEncodingPreference = key;
+        settings.Save();
+    }
+
+    /// <summary>按新文本重建 Markdown 控件树（编码切换或刷新时调用）。</summary>
+    private void RebuildMarkdown(string markdown)
+    {
+        var panel = MarkdownPreviewBuilder.Build(markdown);
+        MarkdownPreviewPanel = panel;
+        HtmlSourceContent = markdown;
+    }
+
+    /// <summary>按新 HTML 重建预览内容（WebView 刷新或降级路径重建）。</summary>
+    private async Task RebuildHtmlAsync(string html)
+    {
+        if (IsWebViewVisible)
+        {
+            // WebView 路径：写入新 HTML 到临时文件并导航
+            CleanupHtmlTempFile();
+            var tempHtmlPath = Path.Combine(
+                Path.GetTempPath(), "MantisZip", "Preview",
+                $"preview_{Guid.NewGuid():N}.html");
+            try
+            {
+                var dir = Path.GetDirectoryName(tempHtmlPath);
+                if (dir != null && !Directory.Exists(dir))
+                    Directory.CreateDirectory(dir);
+                var settings = AppSettings.Load();
+                var cspParts = new List<string>();
+                cspParts.Add(settings.AllowExternalResources ? "default-src * data: blob:" : "default-src 'self' data: blob:");
+                cspParts.Add(settings.AllowJavaScript ? "script-src 'self' 'unsafe-inline'" : "script-src 'none'");
+                cspParts.Add("frame-src 'none'");
+                var csp = string.Join("; ", cspParts);
+                var secureHtml = $"""<meta http-equiv="Content-Security-Policy" content="{csp}">{html}""";
+                await File.WriteAllTextAsync(tempHtmlPath, secureHtml);
+                _currentHtmlTempPath = tempHtmlPath;
+                HtmlWebViewUri = tempHtmlPath;
+                HtmlSourceContent = html;
+            }
+            catch
+            {
+                CleanupHtmlTempFile();
+            }
+        }
+        else if (IsFallbackActive)
+        {
+            // 降级路径：ReverseMarkdown → Markdown → 控件树
+            var converter = new Converter();
+            var markdown = converter.Convert(html);
+            var panel = MarkdownPreviewBuilder.Build(markdown);
+            MarkdownPreviewPanel = panel;
+            HtmlSourceContent = html;
+        }
+    }
+
+    /// <summary>显示文本预览。</summary>
     public void ShowText(string filePath)
     {
-        var content = TextEncodingDetector.DetectAndReadText(filePath);
-        TextContent = content;
+        _textPreviewBytes = File.ReadAllBytes(filePath);
+        var (text, _) = DecodePreviewBytes();
+        TextContent = text;
         PreviewType = PreviewType.Text;
         IsPreviewVisible = true;
         IsToolbarVisible = true;
+        OnPropertyChanged(nameof(CurrentDetectedEncodingName));
         // 从设置加载文本预览字号和字体
         var settings = AppSettings.Load();
         FontSize = settings.TextPreviewFontSize;

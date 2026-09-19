@@ -6,6 +6,14 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-09-20** — 文本预览编码选择器：ViewModel 状态与解码管线（Task 2/5）
+  - **PreviewViewModel.cs**：新增 `EncodingOption` 记录类型（Key/DisplayName）、`EncodingOptions` 下拉数据源（固定 9 项：auto + 7 种常用编码 + system ANSI）、`[ObservableProperty] SelectedEncoding`、`HasEncodingSelector`（Text/Markdown/Html 三类）、`CurrentDetectedEncodingName`
+  - 新增解码管线：`DecodePreviewBytes()`（按 _currentEncodingKey 分发 auto→DetectAndDecodeText / system→DecodeText(null) / explicit→DecodeText(name)）、`OnSelectedEncodingChanged` partial method（切换+持久化+刷新）、`ApplyEncodingRefresh()`（按 PreviewType 刷新 TextContent/RebuildMarkdown/RebuildHtmlAsync）、`PersistEncodingPreference()`（写入 AppSettings.TextEncodingPreference）
+  - `ShowText` 改为 `File.ReadAllBytes` + `DecodePreviewBytes()`，不再直接调用 `DetectAndReadText`
+  - `RebuildMarkdown` / `RebuildHtmlAsync` 辅助方法（编码切换时重建控件树/WebView）
+  - `OnPreviewTypeChanged` 新增 `HasEncodingSelector` 属性变更通知
+  - 回归：Build 0 错误，Tests 378/378 通过
+
 **2026-09-18** — 拖拽目标路径检测：修复工具栏松手失败 + 抽取共享方法
   - **DropTargetDetector.cs**：`TryGetExplorerPath` default 分支原来返回 `(null, None)`，未处理 `ToolbarWindow32`、`SysListView32` 等 Explorer 子窗口；新增 `FindRecognizedAncestor(hWnd)` 共享方法，向上遍历父窗口链查找 `CabinetWClass` / `#32770` / `Progman` / `WorkerW`；`TryGetExplorerPath` 改为调用 `FindRecognizedAncestor` 后按类名分发；删除冗余 `TryGetDesktopPath`
   - **OverlayController.cs**：`ClassifyWindow` 改为调用 `DropTargetDetector.FindRecognizedAncestor`，拆分为 `ClassifyCabinetWindow` / `ClassifyDialogWindow` 辅助方法；与松手后检测共用同一套父窗口链遍历逻辑，杜绝 overlay 显示路径但松手后识别失败的不一致问题
