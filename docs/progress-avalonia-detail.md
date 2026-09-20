@@ -6,6 +6,13 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-09-21** — CSV 预览接入编码选择器 + 修复魔数路径 CSV 被误判为纯文本
+  - **PreviewViewModel.cs**：`HasEncodingSelector`（预览面板编码选择是否显示）新增 `PreviewType.Csv`；`ShowCsv` 从 `File.ReadLines`（UTF-8 硬读 → GBK/Shift_JIS 中文 CSV 乱码）改为 `File.ReadAllBytes` + `DecodePreviewBytes()` 字节级解码，与 Text/Markdown/HTML 共享同一编码检测管线，并缓存 `_textPreviewBytes` 供编码切换复用
+  - 新增 `RebuildCsv(string text)` 辅助方法（`text.Split('\n')` + `TrimEnd('\r')` + `Take(maxRows+1)` → `CsvData = table.DefaultView`），`ApplyEncodingRefresh()` 新增 `case PreviewType.Csv: RebuildCsv(text)`，编码切换即时重建 DataGrid
+  - `ShowCsv` 补发 `CurrentDetectedEncodingName` / `HasDetectedEncoding` / `DetectedEncodingDisplay` 通知（与 ShowText 一致），编码选择器状态栏显示自动检测编码
+  - **PreviewService.cs**：`MapFileFormatToPreviewType` 将 `FileFormat.Csv` 从 Text 分组独立出来映射到 `PreviewType.Csv`——修复魔数检测下 CSV 显示为纯文本的 bug（`ClassifyPreviewByMagicAsync` 扩展名兜底已正确识别 `FileFormat.Csv`，但最后映射被压回 `PreviewType.Text` 走 ShowText）
+  - 回归：Build 0 错误，Tests 378/378 通过
+
 **2026-09-20** — 文本预览编码选择器（Task 5 收尾）：进度文档双轨更新 + PLAN.md→PROGRESS.md 历史索引迁移 + 计划文件归档（`.omo/plans/未开始/text-preview-encoding-selector.md` → `已完成/`）
 
 **2026-09-20** — 预览工具栏编码选择 ComboBox + 本地化（Task 4/5）
