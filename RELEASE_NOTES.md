@@ -85,13 +85,13 @@
 - ![路径优先级设置](docs/images/version/v0.5.0/PathPriority.png)
 - 拖拽直接解压新模型 — 拖出压缩包到 Explorer 目标目录实时解压，Win32 覆层三色状态指示 + 动态光标 + Esc 取消
 - New drag-to-extract model — drag archive onto an Explorer target directory to extract in real time; Win32 overlay three-color state indicator + dynamic cursor + Esc cancel
-- ![拖拽直接解压](docs/images/version/v0.5.0/DragExtractOverlay.png)
+- ![拖拽直接解压](docs/images/version/v0.5.0/DragExtract.gif)
 - 新增目录树自动展开开关 — 自动展开到当前浏览位置
 - Added auto-expand directory tree toggle — automatically expands to the currently browsed location
 - ![目录树自动展开](docs/images/version/v0.5.0/AutoExpandTree.png)
 - 拖拽添加到压缩包 — 从资源管理器拖文件/文件夹到 MantisZip 窗口即可添加到当前目录，拖入压缩包一键切换打开，窗口内绿色覆层即时提示可添加状态
 - Added drag-to-add — drag files/folders from Explorer onto the MantisZip window to add them to the current folder; dropping an archive switches to it; a green in-window overlay instantly shows addable state
-- ![拖拽添加到压缩包](docs/images/version/v0.5.0/DragAddOverlay.png)
+![拖拽添加到压缩包](docs/images/version/v0.5.0/DragAdd.gif)
 - 文件列表列排序增强 — 点击列头三态循环（升序→降序→恢复原始顺序）+ 列头箭头指示 + 排序状态跨会话持久化
 - Enhanced file list column sorting — clicking a column header cycles ascending → descending → original order, with header arrow indicator and cross-session sort persistence
 - ![列排序增强](docs/images/version/v0.5.0/ColumnSort.png)
@@ -99,7 +99,6 @@
 - Directory row aggregation — directory rows show aggregated size/date/compressed size from their subtree (size = sum of contained files, date = newest file), so folder sizes are visible at a glance
 - 保存布局 — 拖动列宽/预览面板调整后可一键保存，「查看」菜单保留布局项，下次启动自动恢复
 - Save layout — after resizing columns or the preview panel, save once and it restores automatically on next launch (View menu → "Save Layout")
-- ![保存布局](docs/images/version/v0.5.0/SaveLayout.png)
 
 
 ## v0.4.5
