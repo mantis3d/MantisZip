@@ -27,6 +27,7 @@
 
 #### 2026-09
 
+- **09-21** — 文本预览语法高亮计划重写为 Avalonia 方案：废弃 WPF 版 AvalonEdit+XSHD 方案（AvalonEdit WPF-only），改用 **AvaloniaEdit 12.0.0 + TextMate**（`AvaloniaEdit.TextMate`，VS Code 语法全集覆盖 `TextExtensions` 40+ 扩展名、内置 DarkPlus/LightPlus 主题 `SetTheme` 一键切换）；架构确认 PreviewType（查看器）与 Language（高亮）分离 + 扩展名→魔数→JSON/INI 结构特征三级语言识别优先级链（配合当日落地的文本内容检测）；条目从 PLAN.md 已废弃表移回正式 P2 区
 - **09-21** — CSV 预览接入编码选择器 + 修复魔数路径 CSV 被误判为纯文本：CSV 预览与 Text/Markdown/HTML 统一走 `DecodePreviewBytes()` 字节级解码管线（`RebuildCsv` 编码切换即时重建 DataGrid）；`MapFileFormatToPreviewType` 将 `FileFormat.Csv` 从 Text 组独立映射到 `PreviewType.Csv`（此前扩展名兜底已识别 Csv 却在最后映射被压回 Text，CSV 永远显示为纯文本）
 - **09-21** — 文本格式内容识别扩展（B 保守版）：`DetectTextSubtype` 新增 JSON/INI 内容启发式——INI 用 `[Section]` 段头 + key=value 结构校验，JSON 用首字符 `{`/`[` + 括号配平（容忍 head 截断）+ `"key":` 引号键/数组元素判定，误报率≈0；为扩展名缺失的格式识别提供兜底信号（为未来语法高亮 Language 识别铺路）
 - **09-20** — 文本预览编码选择器：Text/Markdown/HTML 预览统一接入 `File.ReadAllBytes` + `DecodePreviewBytes()` 字节级编码检测管线，支持用户手动切换编码（auto/UTF-8/GBK/GB18030/Shift_JIS 等 9 项），切换即时重渲染；预览工具栏新增编码选择 ComboBox + 本地化（zh/en 成对，4 key），语言切换自动重建下拉 DisplayName

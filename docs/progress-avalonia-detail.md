@@ -6,6 +6,13 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-09-21** — 文本预览语法高亮计划重写为 Avalonia 方案（AvaloniaEdit + TextMate）
+  - **背景**：原 `.omo/plans/未开始/text-preview-syntax-highlighting.md` 为 WPF 时代方案（AvalonEdit 控件 + 自研 XSHD），AvalonEdit 是 WPF-only，跨平台移植后不可用，条目位于 PLAN.md 已废弃表
+  - **调研结论**（librarian）：`Avalonia.AvaloniaEdit` 12.0.0（MIT，AvaloniaUI 官方维护，要求 Avalonia ≥12.0.0，本项目 12.0.4 满足）+ `AvaloniaEdit.TextMate` 12.0.0——TextMate 方案用 VS Code 语法全集（`TextMateSharp.Grammars`），覆盖 `PreviewService.TextExtensions` 40+ 扩展名，**无需自研 XSHD**；内置 DarkPlus/LightPlus 主题，`Installation.SetTheme(RegistryOptions.LoadTheme(...))` 一行切换；rope-based TextDocument + 行虚拟化，大文件无压力
+  - **架构确认**：PreviewType（查看器）与 Language（高亮）分离；语言识别优先级链 = 扩展名 `GetLanguageByExtension` → 魔数 `FileFormatDetector.Detect` → JSON/INI 结构特征（2026-09-21 已落地）→ 纯文本降级。Markdown 是纯文本超集无法内容识别、CSV 有独立查看器，均不需高亮
+  - **实施路径**：Phase 1 NuGet+XAML（ScrollViewer+TextBox → TextEditor，去外层 ScrollViewer，caret 隐藏）→ Phase 2 语法分发（扩展名+结构特征兜底）→ Phase 3 主题联动（复用 `ActualThemeVariantChanged` 先例）→ Phase 4 回归（编码切换/字号/字体/降级/性能）→ Phase 5 可选增强（高亮开关、WordWrap、行号、结构 .txt 高亮）
+  - **同步**：PLAN.md 条目从已废弃表移回正式 P2 区，预估 5-7h → 4-5h（免去自研 XSHD 的 ~2.5h）
+
 **2026-09-21** — 文本格式内容识别扩展（B 保守版）：JSON/INI 内容启发式
   - **Core/Utils/FileFormatDetector.cs**：`DetectTextSubtype` 在 SVG/HTML/XML 之后新增 INI、JSON 两级内容识别
   - **INI 判定 `LooksLikeIni(content)`**（前 64 行逐行）：`[Section]` 段头 + 至少一行 key=value（或 ≥2 个段头）；key 不含空格/引号/方括号以排除 JSON 数组、Markdown 引用链接等误报；`;`/`#` 注释行、空行跳过
