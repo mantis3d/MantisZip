@@ -97,7 +97,7 @@
 
 ### MantisZip.UI（WPF 遗留版）
 
-> WPF 版已进入**维护模式**（迁移完成后废弃），完整历史见 [progress-wpf.md](progress-wpf.md)。仅当修复仅存在于 WPF 的 bug 时追加。
+> WPF 版（`MantisZip.UI`）已在迁移完成后**完全删除**，不再维护；本节仅保留迁移前的历史条目。完整历史见 [progress-wpf.md](progress-wpf.md)，仅作参考，不再追加新条目。
 
 ### 共享层（Core / ShellExt / 构建）— 里程碑
 
