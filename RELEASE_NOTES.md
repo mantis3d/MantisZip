@@ -1,51 +1,61 @@
 ## v0.5.0
 
-### 版本介绍
+### 版本介绍 / Version Introduction
 
 这是 MantisZip 的一次**大版本更新**，核心框架从 WPF 完全迁移到 Avalonia，界面全面重构，安装包大幅精简。主要更新内容：
 
-**框架与架构**
-- **核心框架从 WPF 迁移到 Avalonia**（.NET 9），界面全面重构，WPF 版进入维护模式
+This is a **major version update** of MantisZip: the core framework has fully migrated from WPF to Avalonia, the UI has been completely rebuilt, and the installer has been significantly slimmed down. Key highlights:
+
+**框架与架构 / Framework & Architecture**
+- **核心框架从 WPF 迁移到 Avalonia**（.NET 10），界面全面重构，WPF 版已完全删除
+- **Core framework migrated from WPF to Avalonia** (.NET 10), UI completely rebuilt; the WPF version has been fully removed
 - **去除 WebView2 依赖** — HTML/Markdown/PDF/SVG 全部改为原生渲染，安装包大幅精简，安装不再需要额外运行时
+- **WebView2 dependency removed** — HTML/Markdown/PDF/SVG all rendered natively, installer significantly slimmed down, no extra runtime needed during installation
 - **自实现 GIF 解码器与字体预览引擎** — GIF 动画不再依赖 WpfAnimatedGif；字体预览改用 HarfBuzzSharp+SkiaSharp，支持自动连字检测
+- **Self-implemented GIF decoder and font preview engine** — GIF animation no longer relies on WpfAnimatedGif; font preview uses HarfBuzzSharp+SkiaSharp rendering with automatic ligature detection
 - 新增 **Animated WebP** 动画预览，与 GIF 统一处理
+- Added **Animated WebP** preview, handled uniformly with GIF
 
-**预览能力**
+**预览能力 / Preview Capabilities**
 - 新增 **Office 文档内容预览** — DOCX 大纲导航+全文+表格、XLSX DataGrid 表格、PPTX 原始坐标定位预览（WPF 版仅显示元数据）
-- **预览面板位置四档布局** — 右下 / 文件列表下方 / 目录树下方 / 侧边四种摆放位置，可独立显隐，切换实时生效并记忆尺寸
-- 打开压缩包自动展示**注释**（ZIP GBK/UTF-8 编码兼容 + RAR5）
+- Added **Office document content preview** — DOCX outline navigation + full text + tables, XLSX DataGrid tables, PPTX original-coordinate positioned preview (WPF version only showed metadata)
 - **元数据信息面板可配置** — 字段排布自定义，独立配置文件持久化
-- **透明棋盘格切换** — 🏁 按钮切换 GIF/动画透明背景显示
+- **Configurable metadata info panel** — custom field layout, persisted in a separate config file
+- 新增 **目标目录树预览** 控件，在压缩与解压窗口可查看将要生成的文件结构，如果有文件冲突会高亮提示。
+- Added **result preview tree** control — the compress/extract dialogs show the file structure that will be produced, with conflicts highlighted.
 
-**交互**
+
+**交互 / Interactions**
 - **拖拽双向** — 从窗口拖文件到资源管理器**实时解压**（Win32 覆层三色指示+动态光标+Esc 取消）；从资源管理器拖文件**添加到压缩包**（绿色覆层即时提示）
+- **Bidirectional drag & drop** — drag files from the window to Explorer for **real-time extraction** (Win32 overlay three-color indicator + dynamic cursor + Esc cancel); drag files from Explorer to **add them to the archive** (green overlay instant feedback)
 - **自定义文件选择器** — 多选累积、目录树、收藏/历史/窗口速选、盘符下拉、文件类型筛选，替代系统对话框
-- **加密压缩包密码交互对齐** — 工具栏「密码」按钮三态化（禁用/红锁/绿锁）；可列出条目的加密包取消密码后仍可浏览，随时补输解锁
-- **文件列表列排序增强** — 三态循环（升序→降序→原始顺序）+ 列头箭头 + 排序状态跨会话持久化
-- **目录行聚合显示** — 目录行大小/日期/压缩后大小由子树聚合得出，一眼看清目录内容规模
+- **Custom file picker** — multi-select accumulation, directory tree, favorites/history/windows quick-pick, drive dropdown, file type filter; replaces system dialogs
 
-**外观**
+
+**外观 / Appearance**
 - **紧凑度模式** — Compact/Normal/Loose 三档间距与控件高度，运行时切换无需重启
+- **Compactness mode** — Compact/Normal/Loose spacing and control heights, switchable at runtime without restart
 - **主题三态化** — 跟随系统 / 亮色 / 暗色（WPF 版仅亮/暗），新增全局界面字体设置
-- **保存布局** — 拖动列宽/预览面板调整后可一键保存，下次启动自动恢复
+- **Theme tri-state** — System / Light / Dark (WPF version only had Light/Dark); new global UI font setting
 - 新增**目录树自动展开**开关 — 自动展开到当前浏览位置
+- Added **auto-expand directory tree** toggle — automatically expands to the currently browsed location
 
 ### 文件说明 / File Description
 
 - MantisZip-0.5.0-Setup-WebSetup.exe 是需要联网才能安装的。
 - MantisZip-0.5.0-Setup-Offline.exe 是离线安装包。
 - MantisZip-0.5.0-Portable.zip 是便携版，解压即用。
-- MantisZip-0.5.0-Portable-Web.zip 是无依赖便携版，需要电脑安装有 dotnet9 运行时才能正常使用。
+- MantisZip-0.5.0-Portable-Web.zip 是无依赖便携版，需要电脑安装有 .NET 10 运行时才能正常使用。
 
 - MantisZip-0.5.0-Setup-WebSetup.exe requires internet during installation. 
 - MantisZip-0.5.0-Setup-Offline.exe is a fully offline installer. 
 - MantisZip-0.5.0-Portable.zip is the portable version, extract and run. 
-- MantisZip-0.5.0-Portable-Web.zip is a dependency-free portable version that requires the .NET 9 runtime to be installed on your computer.
+- MantisZip-0.5.0-Portable-Web.zip is a dependency-free portable version that requires the .NET 10 runtime to be installed on your computer.
 
 ### 更新内容 / Changelog
 
-- 核心框架从 WPF 迁移到 Avalonia（.NET 9 跨平台就绪，MVVM 架构重构），WPF 版进入维护模式
-- Core framework migrated from WPF to Avalonia (.NET 9, cross-platform ready, MVVM architecture); WPF version enters maintenance mode
+- 核心框架从 WPF 迁移到 Avalonia（.NET 10 跨平台就绪，MVVM 架构重构），WPF 版已完全删除
+- Core framework migrated from WPF to Avalonia (.NET 10, cross-platform ready, MVVM architecture); the WPF version has been fully removed
 - ![主窗口](docs/images/version/v0.5.0/MainWindow.png)
 - 移除 WebView2 依赖 — HTML/Markdown 改为原生控件树渲染（ReverseMarkdown→Markdig），PDF 改为 PdfPig+SkiaSharp 逐页位图，SVG 改为 Svg.Skia 栅格化；安装不再需要 WebView2 Runtime
 - Removed WebView2 dependency — HTML/Markdown rendered as native control trees (ReverseMarkdown→Markdig), PDF rendered page-by-page via PdfPig+SkiaSharp, SVG rasterized via Svg.Skia; no WebView2 Runtime required
