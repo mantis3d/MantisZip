@@ -980,10 +980,12 @@ public partial class PreviewViewModel : ObservableObject
                 var settings = AppSettings.Load();
                 var cspParts = new List<string>();
                 cspParts.Add(settings.AllowExternalResources ? "default-src * data: blob:" : "default-src 'self' data: blob:");
+                // style-src 显式放行内联样式（<style> 块与 style="" 属性）；不加此指令会回退到 default-src（无 'unsafe-inline'），导致页面自身样式全被拦
+                cspParts.Add(settings.AllowExternalResources ? "style-src 'unsafe-inline' * data: blob:" : "style-src 'unsafe-inline' 'self' data: blob:");
                 cspParts.Add(settings.AllowJavaScript ? "script-src 'self' 'unsafe-inline'" : "script-src 'none'");
                 cspParts.Add("frame-src 'none'");
                 var csp = string.Join("; ", cspParts);
-                var secureHtml = $"""<meta http-equiv="Content-Security-Policy" content="{csp}">{html}""";
+var secureHtml = InjectCspMeta(html, csp);
                 await File.WriteAllTextAsync(tempHtmlPath, secureHtml);
                 _currentHtmlTempPath = tempHtmlPath;
                 HtmlWebViewUri = tempHtmlPath;
@@ -1010,6 +1012,23 @@ public partial class PreviewViewModel : ObservableObject
                 App.DebugLog($"RebuildHtmlAsync: ReverseMarkdown 重建失败 ({ex.Message})");
             }
         }
+    }
+
+    /// <summary>
+    /// 将 CSP meta 注入到 HTML 文档中。文档以 DOCTYPE 开头时插入到其后——
+    /// 若 meta 先于 DOCTYPE（当前原始 HTML 前会被注入 meta），浏览器会忽略 DOCTYPE 进入 Quirks Mode，
+    /// 导致 CSS 布局行为异常。无 DOCTYPE 的文档保持原注入位置。
+    /// </summary>
+    private static string InjectCspMeta(string html, string csp)
+    {
+        var meta = $"""<meta http-equiv="Content-Security-Policy" content="{csp}">""";
+        if (html.StartsWith("<!DOCTYPE", StringComparison.OrdinalIgnoreCase))
+        {
+            var gt = html.IndexOf('>');
+            if (gt >= 0)
+                return html.Insert(gt + 1, meta);
+        }
+        return meta + html;
     }
 
     /// <summary>显示文本预览。</summary>
@@ -2900,10 +2919,12 @@ public partial class PreviewViewModel : ObservableObject
             var settings = AppSettings.Load();
             var cspParts = new List<string>();
             cspParts.Add(settings.AllowExternalResources ? "default-src * data: blob:" : "default-src 'self' data: blob:");
+            // style-src 显式放行内联样式（<style> 块与 style="" 属性）；不加此指令会回退到 default-src（无 'unsafe-inline'），导致页面自身样式全被拦
+            cspParts.Add(settings.AllowExternalResources ? "style-src 'unsafe-inline' * data: blob:" : "style-src 'unsafe-inline' 'self' data: blob:");
             cspParts.Add(settings.AllowJavaScript ? "script-src 'self' 'unsafe-inline'" : "script-src 'none'");
             cspParts.Add("frame-src 'none'");
             var csp = string.Join("; ", cspParts);
-            var secureHtml = $"""<meta http-equiv="Content-Security-Policy" content="{csp}">{html}""";
+            var secureHtml = InjectCspMeta(html, csp);
             await File.WriteAllTextAsync(tempHtmlPath, secureHtml);
             _currentHtmlTempPath = tempHtmlPath;
 
