@@ -6,6 +6,12 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-09-21** — 修复 HTML 预览安全设置回归三连（09-13 html-preview-webview-fallback 上线引入）
+  - **PreviewViewModel.cs**：CSP meta 拼接两处（`RebuildHtmlAsync` / `ShowHtmlPreview`）补充 `style-src` 指令——外部资源开时 `style-src 'unsafe-inline' * data: blob:`，外部资源关时 `style-src 'unsafe-inline' 'self' data: blob:`。此前仅 `default-src` 回退时内联样式（`<style>` / `style=""`）被 CSP 拦截，开满所有安全选项的 HTML 预览样式全部丢失
+  - **PreviewViewModel.cs**：新增 `InjectCspMeta(html, csp)` 私有静态方法，两处注入点改用它——文档以 `<!DOCTYPE` 开头时把 CSP meta 插入到 DOCTYPE 之后（`html.IndexOf('>')` + `Insert`），消除 meta 先于 DOCTYPE 导致的 Quirks Mode 布局异常；无 DOCTYPE 文档保持原有注入位置（meta 前置）
+  - **PreviewPanel.axaml**：NativeWebView 与 HTML 源码视图从 `PreviewContentScroller`（ScrollViewer）内部移出，置于外层 `PreviewRootGrid` 的 `Grid.Row="1" Grid.Column="0"` 与滚动区平级——修复 WebView 页面顶部一小条被（滚出视口的）元数据横条裁切的布局回归
+  - 回归：Build 0 错误
+
 **2026-09-20** — 文本预览编码选择器（Task 5 收尾）：进度文档双轨更新 + PLAN.md→PROGRESS.md 历史索引迁移 + 计划文件归档（`.omo/plans/未开始/text-preview-encoding-selector.md` → `已完成/`）
 
 **2026-09-20** — 预览工具栏编码选择 ComboBox + 本地化（Task 4/5）
