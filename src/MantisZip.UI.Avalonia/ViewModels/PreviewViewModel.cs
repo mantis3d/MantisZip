@@ -102,9 +102,9 @@ public partial class PreviewViewModel : ObservableObject
     [ObservableProperty]
     private EncodingOption? _selectedEncoding;
 
-    /// <summary>文本 / Markdown / HTML 预览显示编码选择器。</summary>
+    /// <summary>文本 / Markdown / HTML / CSV 预览显示编码选择器。</summary>
     public bool HasEncodingSelector =>
-        PreviewType is PreviewType.Text or PreviewType.Markdown or PreviewType.Html;
+        PreviewType is PreviewType.Text or PreviewType.Markdown or PreviewType.Html or PreviewType.Csv;
 
     /// <summary>auto 模式下实际检测到的编码名（供 UI 显示「自动检测: GBK」）。</summary>
     public string? CurrentDetectedEncodingName => _currentDetectedEncodingName;
@@ -942,6 +942,9 @@ public partial class PreviewViewModel : ObservableObject
             case PreviewType.Html:
                 _ = RebuildHtmlAsync(text);
                 break;
+            case PreviewType.Csv:
+                RebuildCsv(text);
+                break;
         }
     }
 
@@ -1099,11 +1102,25 @@ var secureHtml = InjectCspMeta(html, csp);
     /// </summary>
     public void ShowCsv(string filePath)
     {
+        _textPreviewBytes = File.ReadAllBytes(filePath);
+        var (text, _) = DecodePreviewBytes();
+        RebuildCsv(text);
+        PreviewType = PreviewType.Csv;
+        IsPreviewVisible = true;
+        IsToolbarVisible = false;
+        OnPropertyChanged(nameof(CurrentDetectedEncodingName));
+        OnPropertyChanged(nameof(HasDetectedEncoding));
+        OnPropertyChanged(nameof(DetectedEncodingDisplay));
+    }
+
+    /// <summary>按解码后的文本重建 CSV 表格（编码切换时复用）。</summary>
+    private void RebuildCsv(string text)
+    {
         // 行列上限来自运行时配置（App.axaml.cs 启动时 + 设置保存时同步），与 WPF 版一致
         var maxRows = PreviewService.MaxTablePreviewRows;
         var maxCols = PreviewService.MaxTablePreviewCols;
         var table = new DataTable();
-        var lines = File.ReadLines(filePath).Take(maxRows + 1).ToList();
+        var lines = text.Split('\n').Select(l => l.TrimEnd('\r')).Take(maxRows + 1).ToList();
 
         if (lines.Count > 0)
         {
@@ -1124,9 +1141,6 @@ var secureHtml = InjectCspMeta(html, csp);
 
         _csvDataTable = table;
         CsvData = table.DefaultView;  // DataView 可绑定到 ItemsControl
-        PreviewType = PreviewType.Csv;
-        IsPreviewVisible = true;
-        IsToolbarVisible = false;
     }
 
     /// <summary>

@@ -1,22 +1,27 @@
-# 文本预览语法高亮 (AvalonEdit 集成)
+# 文本预览语法高亮（AvaloniaEdit + TextMate 集成）
 
-> **状态**: 📋 计划中 | **阶段**: 方案设计完成
+> **状态**: 📋 计划中 | **阶段**: 方案设计完成（2026-09-21 重写为 Avalonia 版）
+> **原版**: WPF 时代方案（AvalonEdit + 自定义 XSHD）——AvalonEdit 是 WPF-only 控件，已废弃，本版全部重写
 
 ## TL;DR
 
-> **核心目标**: 将当前文本预览的纯 `TextBox` 替换为 AvalonEdit `TextEditor`，为 40+ 种文件扩展名提供语法高亮。
+> **核心目标**: 将当前文本预览的纯 `TextBox` 替换为 AvaloniaEdit `TextEditor`，为 `PreviewService.TextExtensions` 中 40+ 种代码/配置文件扩展名提供语法高亮，亮/暗主题联动。
+>
+> **技术选型**: **TextMate 方案**（`AvaloniaEdit.TextMate` + TextMateSharp）而非 XSHD——
+> - VS Code 同款 `.tmLanguage` 语法，覆盖面远超 AvalonEdit 内置 21 个 XSHD（TypeScript/Go/Rust/YAML/TOML 等开箱即用，**无需自研自定义 XSHD**）
+> - 内置 DarkPlus/LightPlus 主题，运行时可 `SetTheme()` 切换，天然解决亮/暗主题联动（XSHD 颜色硬编码不跟随主题，需手工映射）
 >
 > **交付物**:
-> - NuGet `AvalonEdit` 包引入，XAML `TextBox` → `TextEditor` 替换
-> - 基于扩展名的自动高亮分发（`GetDefinitionByExtension`）
-> - 自定义 XSHD 定义 10–12 种无内置高亮的语言
-> - 亮/暗主题同步（AvalonEdit 前景/背景/关键字色跟随主题切换）
-> - 字号工具栏适配（保持 A−/A+ 功能）
-> - 未找到高亮定义时降级为纯文本
+> - NuGet `Avalonia.AvaloniaEdit` 12.0.0 + `AvaloniaEdit.TextMate` 12.0.0 引入
+> - XAML `ScrollViewer+TextBox` → `TextEditor` 替换（TextMate 自带滚动，去掉外层 ScrollViewer）
+> - 基于扩展名/检测格式的语法分发（`GetLanguageByExtension` + 魔数结构特征兜底）
+> - 亮/暗主题联动（复用现有 `ActualThemeVariantChanged` 订阅模式）
+> - 编码切换兼容（`ApplyEncodingRefresh` 保持生效）
+> - 未匹配语言时降级为纯文本
 >
-> **预估**: ~7h
-> **并行执行**: 是 — 自定义 XSHD（3–4 个独立文件）可与 XAML 替换并行开发
-> **关键路径**: 主题色同步方案 → XAML 替换 → XSHD 嵌入 → 测试
+> **预估**: ~4-5h（TextMate 免去原方案自定义 XSHD 的 ~2.5h 工作量）
+> **并行执行**: 是 — 依赖确认（包版本/Avalonia 兼容）→ XAML 替换（Phase 1）→ 语法分发（Phase 2）可并行
+> **关键路径**: 包引入验证 → XAML 替换 → 语法分发 → 主题联动 → 测试
 
 ---
 
@@ -24,71 +29,93 @@
 
 ### 原始需求
 
-来自 PLAN.md P2 任务：将文本预览的 TextBox 用 AvalonEdit 替换，支持 20+ 语言语法高亮。
+来自 PLAN.md P2 任务：将文本预览的 TextBox 升级为语法高亮显示，支持 20+ 语言。重写为 Avalonia 版（规则 11：新功能只在 Avalonia 开发）。
 
-### 当前实现
+### 当前实现（Avalonia 版）
 
-- `MainWindow.xaml:660` — `PreviewTextBox` 是一个普通 `TextBox`，`IsReadOnly=True`，等宽字体
-- `ShowTextPreview`（`MainWindow.Preview.Text.cs:99`）— 将文本内容赋值给 `PreviewTextBox.Text`
-- `ChangeTextFontSize` — 通过 `PreviewTextBox.FontSize` 调节字号
-- 40+ 种扩展名在 `TextExtensions` HashSet 中定义（`.cs`/`.py`/`.js`/`.rs`/`.go`/`.xml`/`.json`/`.sql` 等）
-- 所有文件统一纯文本显示，无任何高亮
+- `PreviewService.cs:44-54` — `TextExtensions` HashSet 定义 **40+ 种文本扩展名**（`.txt .log .ini .cfg .conf .xml .json .cs .csproj .yaml .yml .toml .sh .bat .cmd .ps1 .py .js .ts .tsx .css .scss .less .sql .gitignore .editorconfig .sln .props .targets .ruleset .rc .resx .nuspec .gradle .dockerfile .env .h .c .cpp .hpp .swift .kt .java .rb .go .rs .php .vue`）
+- `PreviewService.cs:178` — `TextExtensions.Contains(ext)` → `PreviewType.Text`
+- `PreviewPanel.axaml:282-291` — 文本预览为 `<ScrollViewer IsVisible="{Binding IsTextVisible}"><TextBox Text="{Binding TextContent}" IsReadOnly="True" TextWrapping="Wrap" FontFamily/FontSize 绑定/></ScrollViewer>`
+- `PreviewViewModel.cs:1019 ShowText(filePath)` — 读取临时文件 → `DecodePreviewBytes()` 解码 → `TextContent = text`
+- `PreviewViewModel.cs:928 ApplyEncodingRefresh()` — 编码下拉切换后按 `PreviewType` 分支重解码：`Text` → `TextContent = text`
+- `PreviewViewModel.cs:1602-1618 SubscribeThemeChanged/UnsubscribeThemeChanged` — 已有 `app.ActualThemeVariantChanged += OnAppThemeChanged` 订阅先例（字体预览用）
+- `MainWindowViewModel.cs:1421-1440` — 预览分发：`case PreviewType.Text: Preview.ShowText(tempFile)`（`MaxTextPreviewBytes` 上限在此检查）
+- HTML/Markdown/CSV 走独立预览路径（`PreviewType.Html/Markdown/Csv`），不受本计划影响
 
-### 调研结论
+### 调研结论（2026-09-21，librarian)
 
-AvalonEdit （NuGet `AvalonEdit`，MIT 许可证）是 SharpDevelop/ILSpy 使用的 WPF 文本编辑器组件。
+**推荐库: AvaloniaEdit**
 
-**内置高亮语言（21 个 XSHD）**:
+| 属性 | 值 |
+|---|---|
+| NuGet 包 | `Avalonia.AvaloniaEdit` |
+| 最新稳定版 | **12.0.0**（2026-04-08 发布） |
+| 许可证 | MIT |
+| 维护者 | AvaloniaUI 官方团队（活跃） |
+| 目标框架 | `net8.0` + `net10.0` |
+| Avalonia 兼容 | **v12.0.0 要求 Avalonia ≥ 12.0.0**（本项目 12.0.4 ✅） |
 
-| XSHD 文件 | 匹配扩展名 | 在我们的 TextExtensions 中？ |
-|-----------|-----------|:---:|
-| CSharp-Mode.xshd | `.cs` | ✅ |
-| XML-Mode.xshd | `.xml`, `.csproj`, `.sln`, `.props`, `.targets`, `.ruleset`, `.resx`, `.nuspec` | ✅ |
-| JSON-Mode.xshd | `.json`, `.json5` | ✅ |
-| JavaScript-Mode.xshd | `.js` | ✅ |
-| CSS-Mode.xshd | `.css` | ✅ |
-| HTML-Mode.xshd | `.html`, `.htm` | (.htm 不在 TextExtensions) |
-| CPP-Mode.xshd | `.c`, `.cpp`, `.h`, `.hpp` | ✅ |
-| Java-Mode.xshd | `.java` | ✅ |
-| Python-Mode.xshd | `.py` | ✅ |
-| PHP-Mode.xshd | `.php` | ✅ |
-| PowerShell.xshd | `.ps1` | ✅ |
-| TSQL-Mode.xshd | `.sql` | ✅ |
-| VB-Mode.xshd | — | — |
-| ASPX.xshd | — | — |
-| Boo.xshd | — | — |
-| MarkDown-Mode.xshd | `.md`, `.markdown` | (已由 Markdown 预览处理) |
-| Patch-Mode.xshd | — | — |
-| Tex-Mode.xshd | — | — |
-| Coco-Mode.xshd | — | — |
+**TextMate 集成包**（独立安装）:
 
-**需要自定义 XSHD 的语言**（在 TextExtensions 中有但无内置）:
+| 属性 | 值 |
+|---|---|
+| NuGet 包 | `AvaloniaEdit.TextMate` 12.0.0 |
+| 依赖 | `Avalonia.AvaloniaEdit ≥ 12.0.0` + `TextMateSharp ≥ 2.0.3` + `TextMateSharp.Grammars ≥ 2.0.3` |
 
-| 扩展名 | 语言 | 优先级 | 方案 |
-|--------|------|:------:|------|
-| `.ts`, `.tsx` | TypeScript/TSX | 🔴 高 | 社区 XSHD 或基于 JavaScript-Mode 修改 |
-| `.go` | Go | 🔴 高 | 社区 XSHD |
-| `.rs` | Rust | 🟡 中 | 社区 XSHD |
-| `.sh`, `.bash` | Shell Script | 🟡 中 | 社区 XSHD（已有） |
-| `.yaml`, `.yml` | YAML | 🟡 中 | 社区 XSHD |
-| `.toml` | TOML | 🟢 低 | 简易 XSHD（只有注释 + 键值对） |
-| `.swift` | Swift | 🟢 低 | 社区 XSHD |
-| `.kt` | Kotlin | 🟢 低 | 基于 Java-Mode 修改 |
-| `.rb` | Ruby | 🟢 低 | 社区 XSHD |
-| `.bat`, `.cmd` | Batch | 🟢 低 | 简易 XSHD |
-| `.gradle` | Gradle | 🟢 低 | Groovy 风格，简易 XSHD |
-| `.dockerfile` | Dockerfile | 🟢 低 | 简易 XSHD（指令高亮） |
-| `.vue` | Vue | 🟢 低 | 基于 HTML + JS 组合 |
+**核心 API**:
 
-**基准建议**: 高优先级（4 种）必须做，中优先级（3 种）推荐做，低优先级（6 种）可延后。
+```csharp
+// 语法分发（扩展名 → 语言 → grammar scope）
+var registryOptions = new RegistryOptions(ThemeName.DarkPlus);
+var textMateInstallation = editor.InstallTextMate(registryOptions);
+var lang = registryOptions.GetLanguageByExtension(fileExtension); // 未匹配返回 null
+if (lang != null)
+    textMateInstallation.SetGrammar(registryOptions.GetScopeByLanguageId(lang.Id));
+
+// 主题切换（运行时可换）
+textMateInstallation.SetTheme(registryOptions.LoadTheme(ThemeName.LightPlus)); // 或 DarkPlus
+```
+
+**性能**: 内部 rope-based `TextDocument` + 行虚拟化（仅渲染可见行），配合现有 `MaxTextPreviewBytes`（默认 5MB）上限，大文件无压力。设置内容优先用 `editor.Document = new TextDocument(text)`（大字符串避免重复拷贝）。
+
+**Gotchas**:
+- v11→v12 断 netstandard2.0/net6.0，本项目必须用 v12（Avalonia 12.0.4）
+- TextMate 主题色不随控件 Foreground 继承——暗色模式下需 `SetTheme(DarkPlus)`，不是靠 `ThemeSurfaceBgBrush` 覆盖
+- 只读模式仍显示 caret：纯预览需 `editor.TextArea.Caret.IsHidden = true`
+- 每个 `InstallTextMate()` 调用独立主题状态；多个编辑器共享 `RegistryOptions` 但各有 `Installation`
+- `Text={"..."}` 绑定可用但每次赋值建新 Document——大文件建议 code-behind 设置 Document
+
+**备选方案**（不采用）: `SyntaxColorizer`（单人项目、功能简单）、`Huskui.Avalonia.Code`（非独立）、`TextEdit`（WIP 未生产级）。AvaloniaEdit 是唯一成熟选择。
 
 ### 关键约束
 
-- 当前 `ShowTextPreview` 接收 `extension` 参数但未使用 → 正可用于 `GetDefinitionByExtension`
-- HTML/Markdown 预览走独立路径（WebView2），不经过 `ShowTextPreview`，不受影响
-- `.md`/`.markdown` 不在 `TextExtensions` 中（在 `MarkdownExtensions` 中），AvalonEdit 内置的 MarkDown-Mode 用不上
-- `PreviewTextBox.FontSize` 调节（A−/A+ 按钮）需改为 `textEditor.FontSize`
-- 编码检测逻辑（`DetectAndReadText`）保持不变，只替换显示控件
+- `ShowText` 已接收 `filePath` 参数（temp 文件路径），`Path.GetExtension` 可取扩展名
+- `.md/.markdown/.html/.csv` 不在 `TextExtensions`（走独立预览器），TextMate 语法分发只覆盖 Text 预览路径
+- `TextPreviewFontFamily`/`FontSize` 绑定需迁移到 TextEditor（TextEditor 支持标准 `FontFamily`/`FontSize`）
+- 编码检测与选择器（`DecodePreviewBytes`/`ApplyEncodingRefresh`）保持不变，只替换显示控件
+- 新 UI 控件须应用主题样式（规则 4）——TextEditor 背景/前景绑定 `ThemeSurfaceBgBrush`/`ThemeTextPrimaryBrush`
+
+---
+
+## 架构设计（本会话已确认）
+
+### PreviewType（查看器）与 Language（高亮）分离
+
+| 层 | 职责 | 现状 |
+|----|------|------|
+| `PreviewType` | 决定**用什么查看器**（Text/Csv/Markdown/Html/...） | 已有，不变 |
+| `Language` | 决定**文本如何高亮**（只作用于 Text 预览器） | 本计划引入 |
+
+### 语言识别优先级链（Future-ready）
+
+| 优先级 | 来源 | 说明 | 状态 |
+|:---:|------|------|:---:|
+| 1 | 扩展名 | `GetLanguageByExtension(.cs → csharp)` 主路径 | 本计划 |
+| 2 | 魔数 | `FileFormatDetector.Detect`（XML/SVG 魔数 → 对应语言） | Phase 2 增强 |
+| 3 | 结构特征 | JSON/INI 内容识别（2026-09-21 已落地，`LooksLikeJson`/`LooksLikeIni`）→ `.txt` 文件实为 JSON 时也能高亮 | Phase 2 增强 |
+| 4 | 纯文本 | 无匹配 → 无高亮 | 本计划 |
+
+> 说明：Markdown 是纯文本超集、无法内容识别（已确认架构结论）；CSV 已有独立查看器 + 扩展名兜底，均不需语法高亮。
 
 ---
 
@@ -96,24 +123,24 @@ AvalonEdit （NuGet `AvalonEdit`，MIT 许可证）是 SharpDevelop/ILSpy 使用
 
 ### 核心目标
 
-将文本预览从纯文本升级为语法高亮显示，覆盖 40+ 种扩展名，支持亮/暗主题联动。
+将文本预览从纯文本升级为语法高亮显示，覆盖 `TextExtensions` 40+ 种扩展名，亮/暗主题联动。
 
 ### 可量化指标
 
 | 指标 | 目标 |
 |------|------|
-| 内置高亮覆盖 | 14/24 种有匹配内置 XSHD |
-| 自定义 XSHD 覆盖（高优） | 4 种（`.ts`/`.tsx`/`.go`/`.sh`） |
-| 主题同步 | 亮/暗色切换时编辑器颜色实时跟随 |
-| 性能 | 打开 5MB 文本文件无明显卡顿（借助现有 `MaxTextPreviewBytes`） |
-| 降级 | 未匹配高亮定义的文件仍正常显示纯文本 |
+| TextExtensions 覆盖 | 40+ 种全部命中 TextMate grammar（`GetLanguageByExtension` 预期绝大部分非 null） |
+| 主题同步 | 亮/暗切换时语法颜色实时跟随（SetTheme） |
+| 性能 | 打开 5MB 文本无卡顿（TextDocument + 行虚拟化 + 现有 MaxTextPreviewBytes） |
+| 降级 | 未匹配语言仍显示纯文本，不崩溃 |
+| 回归 | 编码选择器、A−/A+ 字号、字体切换全部保持可用 |
 
 ### 非目标
 
-- 不替换 HTML/Markdown/CSV 预览路径（它们走独立的 WebView2/DataGrid）
+- 不替换 HTML/Markdown/CSV 预览路径（独立查看器）
 - 不做编辑功能（`IsReadOnly=true` 不变）
-- 不做行号显示（预览场景不需要）
-- 不做代码折叠/自动补全等 IDE 功能
+- 不做行号/代码折叠/自动补全等 IDE 功能
+- 不引入自研 XSHD 定义（TextMate 覆盖面已足够）
 
 ---
 
@@ -121,161 +148,174 @@ AvalonEdit （NuGet `AvalonEdit`，MIT 许可证）是 SharpDevelop/ILSpy 使用
 
 ### Phase 0: 调研确认（已完成）
 
-- AvalonEdit API 确认：`TextEditor` 控件、`SyntaxHighlighting` 属性、`FontSize` 兼容
-- 内置 XSHD 列表确认（21 个）
-- 自定义 XSHD 加载方案确认：嵌入为资源 → `HighlightingLoader.Load` → `RegisterHighlighting`
+- [x] AvaloniaEdit 版本确认：12.0.0（要求 Avalonia ≥12.0.0，本项目 12.0.4 ✅）
+- [x] TextMate 方案确认：`AvaloniaEdit.TextMate` + `TextMateSharp.Grammars`（含 VS Code 语法全集）
+- [x] 主题切换 API 确认：`Installation.SetTheme(RegistryOptions.LoadTheme(ThemeName.X))`
+- [x] 现状代码梳理（TextExtensions / PreviewPanel / ShowText / ApplyEncodingRefresh / 主题订阅先例）
 
-### Phase 1: 基础集成（~2h，可并行）
+### Phase 1: 基础集成（~1.5h）
 
-#### Task 1.1 — NuGet 包引入 + XAML 替换（~1h）
+#### Task 1.1 — NuGet 包引入（~0.2h）
 
-1. 在 `MantisZip.UI.csproj` 中添加 `<PackageReference Include="AvalonEdit" Version="..." />`
-2. `MainWindow.xaml`:
-   - 在 Window 级别添加 xmlns: `xmlns:avalonEdit="http://icsharpcode.net/sharpdevelop/avalonedit"`
-   - 将 `PreviewTextBox` 的 `<TextBox>` 替换为 `<avalonEdit:TextEditor>`
-   - 映射属性：`IsReadOnly="True"`, `FontFamily`, `FontSize`, `WordWrap`, `HorizontalScrollBarVisibility`, `VerticalScrollBarVisibility`
-   - 移除 `BorderThickness`（AvalonEdit 无此属性）
-3. `MainWindow.Preview.Text.cs`: `PreviewTextBox.Text = content` → `PreviewTextBox.Document.Text = content`（或 `.Text` setter）
-
-**风险**: AvalonEdit 的 `Text` property setter 内部会创建新 Document，等价于 `Text = content` 是可用的。
-
-#### Task 1.2 — 语法高亮分发（~1h）
-
-在 `ShowTextPreview` 中，在设置内容后添加：
-
-```csharp
-var ext = Path.GetExtension(filePath); // 或使用传入的 extension 参数
-textEditor.SyntaxHighlighting = HighlightingManager.Instance.GetDefinitionByExtension(ext);
-// 未匹配到定义时 GetDefinitionByExtension 返回 null → 纯文本显示
+```xml
+<!-- MantisZip.UI.Avalonia.csproj -->
+<PackageReference Include="Avalonia.AvaloniaEdit" Version="12.0.0" />
+<PackageReference Include="AvaloniaEdit.TextMate" Version="12.0.0" />
 ```
 
-`GetDefinitionByExtension` 内部会用内置注册的扩展名匹配。对于自定义 XSHD 需先注册。
+验证：`dotnet build` 通过，确认与 Avalonia 12.0.4 无冲突。
 
-**问题**: `GetDefinitionByExtension` 只匹配 AvalonEdit 内置注册的扩展名。自定义 XSHD 注册时需指定扩展名列表，之后就可以用同一 API。
+#### Task 1.2 — XAML 替换（~0.8h）
 
-### Phase 2: 自定义 XSHD（~2.5h，可并行）
+`PreviewPanel.axaml:281-291`，`ScrollViewer+TextBox` → `TextEditor`：
 
-所有 XSHD 文件作为**嵌入资源**（`EmbeddedResource`）放在 `MainWindow/Preview/Highlighting/` 目录下。
+```xml
+<!-- 文本预览：AvaloniaEdit 只读编辑器，TextMate 语法高亮 -->
+<mvaEdit:TextEditor x:Name="PreviewTextEditor"
+                    IsVisible="{Binding IsTextVisible}"
+                    IsReadOnly="True"
+                    WordWrap="True"
+                    FontFamily="{Binding TextPreviewFontFamily}"
+                    FontSize="{Binding FontSize}"
+                    Background="{DynamicResource ThemeSurfaceBgBrush}"
+                    Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                    HorizontalScrollBarVisibility="Auto"
+                    VerticalScrollBarVisibility="Auto" />
+```
 
-启动时统一注册：
+- xmlns: `xmlns:mvaEdit="using:AvaloniaEdit"`（Avalonia 命名空间语法，非 WPF 的 URI 语法）
+- 去掉外层 ScrollViewer（TextEditor 自带滚动）
+- 新增控件须中注释（规则 14）+ 主题样式（规则 4）
+
+#### Task 1.3 — 内容设置 refactor（~0.5h）
+
+`TextEditor` 无 `TextContent` 绑定兼容层顾虑，直接 code-behind 驱动：
 
 ```csharp
-// App.OnStartup 或 MainWindow 静态构造中
-var manager = HighlightingManager.Instance;
-var assembly = typeof(MainWindow).Assembly;
-foreach (var name in assembly.GetManifestResourceNames().Where(n => n.EndsWith(".xshd")))
+// PreviewPanel.axaml.cs
+public partial class PreviewPanel : UserControl
 {
-    using var stream = assembly.GetManifestResourceStream(name);
-    using var reader = new XmlTextReader(stream);
-    var def = HighlightingLoader.Load(reader, manager);
-    // 扩展名已在 XSHD 的 extensions 属性中
-    // 如果 XSHD 没有 extensions 属性，手动调用 RegisterHighlighting
+    private TextMate.Installation? _textMateInstallation;
+    private RegistryOptions? _registryOptions;
+    private TextEditor _editor => PreviewTextEditor;
+
+    /// <summary>加载文本内容（配套 PreviewViewModel.ShowText / ApplyEncodingRefresh）。</summary>
+    public void SetPreviewText(string text)
+    {
+        _editor.Document = new TextDocument(text); // 大字符串避免重复拷贝
+        // caret 隐藏（纯预览）——TextMate.Installation 生效前调用，防闪烁
+        if (!_editor.TextArea.Caret.IsHidden) _editor.TextArea.Caret.IsHidden = true;
+    }
 }
 ```
 
-#### Task 2.1 — TypeScript/TSX（高优，~0.8h）
+在 `PreviewViewModel.TextContent` setter 与 View 建立单向桥（View 订阅 `PropertyChanged` 或 VM 暴露事件，最小侵入方案：View 监听 `DataContext` 的 `PropertyChanged`，`TextContent` 变化 → `SetPreviewText`）。
 
-- 找社区 XSHD 或基于 JavaScript-Mode 修改
-- 需覆盖：`.ts`, `.tsx` 扩展名
-- 关键字：`interface`, `type`, `enum`, `as`, `const`, `let`, `async`, `await`, `typeof` 等 TS 特有
+替代方案：保留 XAML `Text="{Binding TextContent}"` 绑定（Text setter 内部建新 Document）——接入最快，5MB 上限下可接受；若性能/闪烁不佳再切 code-behind。**建议先走绑定，Task 4.1 验证后再决定**。
 
-#### Task 2.2 — Go（高优，~0.6h）
+### Phase 2: 语法分发（~1h）
 
-- 新 XSHD：关键字（`func`, `go`, `defer`, `select`, `chan`, `struct`, `interface`, `map`, `range` 等）
-- 单行注释 `//`、多行注释 `/* */`、字符串、数字
-
-#### Task 2.3 — Shell Script（高优，~0.4h）
-
-- 覆盖 `.sh` 扩展名
-- Shebang `#!` 行高亮、关键字（`if`, `then`, `else`, `fi`, `for`, `while`, `case`, `function` 等）
-- 变量 `$VAR`、字符串
-
-#### Task 2.4 — YAML（中优，~0.4h）
-
-- 覆盖 `.yaml`, `.yml` 扩展名
-- 注释 `#`、键值对冒号高亮、字符串、数字、布尔值
-
-#### Task 2.5 — 其余低优（~0.3h，可延后）
-
-- Rust/Toml/Dockerfile/Batch/Kotlin/Ruby 各一个简易 XSHD
-
-### Phase 3: 主题集成（~1h）
-
-AvalonEdit 的语法颜色是自管理的不跟随 WPF 主题资源。需要监听主题切换并重新应用颜色。
-
-**方案**: 在 `ThemeManager.ThemeChanged` 事件中重新加载所有 XSHD 定义的颜色。
-
-实现方式：
+`ShowText` 路径中，VM 需把「检测到的 Language 标识」传给 View（如 `PreviewLanguage` 属性），View 据此设置 grammar：
 
 ```csharp
-// 在 MainWindow 中
-ThemeManager.ThemeChanged += (_, theme) =>
+// PreviewPanel.axaml.cs
+public void SetHighlightLanguage(string scopeName)  // 或 fileExtension 直接传
 {
-    if (PreviewTextBox.Visibility == Visibility.Visible && PreviewTextBox.SyntaxHighlighting != null)
-    {
-        // 重新设置高亮以刷新颜色
-        var h = PreviewTextBox.SyntaxHighlighting;
-        PreviewTextBox.SyntaxHighlighting = null;
-        PreviewTextBox.SyntaxHighlighting = h;
-    }
-    // 设置编辑器背景/前景
-    PreviewTextBox.Background = (Brush)FindResource("Theme_WindowBg");
-    // 注意：AvalonEdit 的文本前景色由 XSHD 定义控制，不直接继承 Foreground
-};
+    _registryOptions ??= new RegistryOptions(ThemeName.DarkPlus); // 初值暗色，主题联动见 Phase 3
+    _textMateInstallation ??= _editor.InstallTextMate(_registryOptions);
+
+    var lang = scopeExtensions(当前文件名扩展名);
+    if (lang == null) { _textMateInstallation.SetGrammar(null); return; } // 降级纯文本
+    _textMateInstallation.SetGrammar(_registryOptions.GetScopeByLanguageId(lang.Id));
+}
 ```
 
-更彻底的方案：为每个 XSHD 定义两套颜色（亮/暗），在注册时根据当前主题选择。
-或者：在 XSHD 中不指定具体颜色值，而在运行时通过 `HighlightingColor` 的 `Foreground`/`Background` 属性动态设置。
+优先级链实现（螺纹进 `PreviewViewModel.ShowText` 或独立 `LanguageResolver`）：
 
-**推荐方案**: 
-1. XSHD 中定义语义化颜色名（`Comment`, `String`, `Keyword`, `Number` 等）
-2. 在 `App.xaml` 中添加两套 `Theme_SyntaxHighlight_*` 资源
-3. 主题切换时遍历 `HighlightingManager.Instance.HighlightingDefinitions` 中的 `NamedHighlightingColors`，用对应主题色覆盖
+1. **扩展名**：`registryOptions.GetLanguageByExtension(Path.GetExtension(filePath))`（null → 下一步）
+2. **魔数/结构特征增强**（低优先，可后置）：若扩展名未命中但 `ClassifyPreviewByMagicAsync` 已识别 `FileFormat.Json/Xml/Ini`（含 `.txt` 实际是 JSON 的内容识别场景），用对应语法（`json`/`xml`/`ini` scope）
 
-### Phase 4: 工具栏适配 + 集成测试（~1h）
+### Phase 3: 主题联动（~0.8h）
 
-#### Task 4.1 — 字号工具栏（~0.3h）
+复用 `PreviewViewModel.cs:1602-1618` 的 `ActualThemeVariantChanged` 订阅模式（字体预览已用），或迁移到 View：
 
-- `ChangeTextFontSize` 中的 `PreviewTextBox.FontSize` → `textEditor.FontSize`
-- 字号显示/更新逻辑不变
+```csharp
+// PreviewPanel.axaml.cs — 挂载/卸载
+protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
+{
+    base.OnAttachedToVisualTree(e);
+    if (Application.Current != null) Application.Current.ActualThemeVariantChanged += OnAppThemeChanged;
+}
+protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
+{
+    Application.Current.ActualThemeVariantChanged -= OnAppThemeChanged;
+    base.OnDetachedFromVisualTree(e);
+}
 
-#### Task 4.2 — 清理旧代码引用（~0.3h）
+private void OnAppThemeChanged(object? sender, EventArgs e)
+{
+    var isDark = Application.Current?.RequestedThemeVariant == ThemeVariant.Dark;
+    if (_textMateInstallation != null && _registryOptions != null)
+    {
+        _textMateInstallation.SetTheme(_registryOptions.LoadTheme(
+            isDark ? ThemeName.DarkPlus : ThemeName.LightPlus));
+    }
+    // 编辑器底色仍走 DynamicResource ThemeSurfaceBgBrush，语法色由 TextMate 主题管理
+}
+```
 
-- 检查所有引用 `PreviewTextBox` 的代码（至少 5 处：`.cs` 中 5 个文件引用）
-- `MainWindow.Preview.cs:ClearPreviewContent` → 改为 `PreviewTextBox.Clear()` 或 `PreviewTextBox.Text = ""`
-- `MainWindow.Preview.cs:HideAllPreviewControls` → `PreviewTextBox.Visibility = Visibility.Collapsed`（属性名不变）
-- `MainWindow.Menu.cs` → 检查预览切换逻辑
+要点：语法着色由 TextMate 主题控制，不依赖控件 Foreground；背景保持 `ThemeSurfaceBgBrush` 资源。
 
-#### Task 4.3 — 测试（~0.4h）
+### Phase 4: 兼容性回归 + 集成测试（~1h）
 
-- 手动测试 10 种语言的高亮显示
-- 主题切换后颜色刷新
-- 大文件（5MB）无明显卡顿
-- 编码检测兼容性（中文 GBK 文件 + 高亮）
+#### Task 4.1 — 内容路由验证（编码切换/字号/字体）
+
+- `ApplyEncodingRefresh` Text 分支 → `TextContent` 变化 → TextEditor Document 更新（绑定方案自动生效；code-behind 方案手动桥）
+- A−/A+ 字号按钮（`FontSize` 绑定）→ TextEditor.FontSize
+- `TextPreviewFontFamily` 绑定 → TextEditor.FontFamily
+- `TextContent` 清空/`Clear()` 时 Document 清空（`PreviewType` 切换时 `TextContent = string.Empty` 正常）
+
+#### Task 4.2 — 主题切换回归
+
+亮 → 暗 → 亮循环：语法色 / 编辑器背景 / 状态栏均正确。
+
+#### Task 4.3 — 降级与性能
+
+- 未知扩展名（如 `.dat` 纯文本）→ 无高亮，纯文本显示
+- 5MB 大文件打开流畅，滚动无卡顿
+- 10+ 种语言（.cs/.py/.ts/.go/.rs/.yaml/.json/.xml/.sh/.java）抽查高亮正确
+
+### Phase 5: 计划后置增强（可选，独立立项）
+
+| 项 | 说明 |
+|----|------|
+| 高亮开关 | `AppSettings.TextPreviewHighlight`（默认 true），关闭时 SetGrammar(null) |
+| WordWrap 开关 | 代码预览默认不换行（现默认 Wrap），新增设置 |
+| 行号 | `ShowLineNumbers=true`（原计划非目标，如需再议） |
+| 结构化 .txt 高亮 | `.txt` 文件经 JSON/INI 内容识别命中时用对应 grammar（Phase 2 优先级链第 2 条） |
 
 ---
 
 ## 决策记录
 
-### 1. 自定义 XSHD 范围
+### 1. 高亮引擎（TextMate vs XSHD）
 
-| 选项 | 工作量 | 覆盖扩展名 |
-|------|:------:|:----------:|
-| A: 仅高优 4 种（推荐初始） | ~2.5h | `.ts/.tsx/.go/.sh` |
-| B: 高优 + 中优 7 种 | ~3.0h | A + `.yaml/.rs/.toml` |
-| C: 全部 13 种 | ~4.0h | B + `.swift/.kt/.rb/.bat/.gradle/.dockerfile/.vue` |
+| 选项 | 工作量 | 语言覆盖 | 主题联动 |
+|------|:------:|:--------:|:--------:|
+| A: XSHD（AvalonEdit 内置 21 个） | ~2h | 21 种内置 + 需自研自定义（TS/Go/YAML 等缺失） | 需手工映射语义色 |
+| **B: TextMate（推荐）** | **~1h** | VS Code 语法全集（TextExtensions 全覆盖，无自研） | **内置 DarkPlus/LightPlus，SetTheme 一行切换** |
+| C: 混合（TextMate 主 + XSHD 补） | ~2.5h | 全覆盖 | 混合管理复杂 |
 
-**初始建议**: 选 B（7 种），其余低优可在后续迭代中按需添加。
+**选 B**：覆盖、主题、工作量全面胜出；无 XSHD 自研负担（原 WPF 方案需自研 TS/Go/YAML 等 7-13 个 XSHD 的核心痛点消失）。
 
-### 2. 主题色同步策略
+### 2. 内容接入方式（绑定 vs code-behind）
 
-| 选项 | 工作量 | 效果 |
-|------|:------:|:----:|
-| A: XSHD 硬编码颜色，主题切换时重新赋值 | ~0.5h | 颜色固定，不跟随主题 |
-| B: XSHD 语义色 + 运行时主题映射（推荐） | ~1.0h | 完美跟随亮/暗色主题 |
-| C: XSHD 中定义两套颜色 + 运行时切换 | ~1.5h | 同上，但 XSHD 更复杂 |
+| 选项 | 工作量 | 性能 | 备注 |
+|------|:------:|:----:|------|
+| A: `Text="{Binding TextContent}"`（初始） | 极小 | 可接受（Text setter 每次建新 Document） | 5MB 上限下足够，零额外代码 |
+| B: code-behind Document 注入 | ~0.3h | 更优（复用 Document） | 需 VM→View 桥（PropertyChanged 订阅），闪烁可控 |
 
-**推荐**: B — 语义色分离，主题切换时动态映射。
+**建议**：先 A 后 B——A 快速落地验证功能，若编码切换/大文件出现性能或闪烁问题，升级 B（Task 4.1 决策点）。
 
 ---
 
@@ -285,31 +325,34 @@ ThemeManager.ThemeChanged += (_, theme) =>
 
 | 依赖 | 版本 | 许可证 | 用途 |
 |------|------|--------|------|
-| `AvalonEdit` NuGet | latest (≥6.x) | MIT | 语法高亮文本编辑器 |
-| 社区 XSHD 文件 | — | MIT/CC0 | TypeScript/Go/YAML 等的高亮定义 |
+| `Avalonia.AvaloniaEdit` | 12.0.0 | MIT | 语法高亮只读编辑器 |
+| `AvaloniaEdit.TextMate` | 12.0.0 | MIT | TextMate 语法 + 主题引擎 |
+| `TextMateSharp` + `.Grammars` | ≥2.0.3（传递） | MIT | .tmLanguage 解析 + VS Code 语法集 |
 
 ### 风险
 
 | 风险 | 概率 | 影响 | 缓解 |
 |------|:----:|:----:|------|
-| AvalonEdit 与 .NET 10 兼容性 | 🟢 低 | 🔴 高 | 先创建测试项目验证 NuGet 包可安装 |
-| 大文件性能退化 | 🟢 低 | 🟡 中 | 已有 `MaxTextPreviewBytes` 限制（默认 5MB） |
-| 主题切换不刷新颜色 | 🟡 中 | 🟡 中 | 用 `ThemeChanged` 事件重新应用高亮定义 |
-| 自定义 XSHD 颜色在暗色下不可读 | 🟡 中 | 🟡 中 | 主题映射策略 B 解决 |
-| AvalonEdit 的 `Text` setter 编码行为 | 🟢 低 | 🟢 低 | 与现有 TextBox 行为一致（字符串已解码） |
+| AvaloniaEdit 12.0.0 与 Avalonia 12.0.4 兼容问题 | 🟢 低 | 🔴 高 | Phase 1.1 先加包 build 验证再动手改 XAML |
+| 暗色主题下语法色不可读 | 🟢 低 | 🟡 中 | TextMate 内置 DarkPlus 主题为 VS Code 暗色配色，天然适配；验证走 Task 4.2 |
+| 大文件性能退化 | 🟢 低 | 🟡 中 | TextDocument + 行虚拟化 + 现有 MaxTextPreviewBytes |
+| TextMate 初始化在主题切换前用错初值主题 | 🟡 中 | 🟢 低 | 初值用 `RequestedThemeVariant==Dark ? DarkPlus : LightPlus` 而非硬编码 DarkPlus |
+| `Text` 绑定频繁换 Document 引起闪烁 | 🟡 中 | 🟢 低 | 升级 code-behind Document 注入（决策 2 的 B 方案） |
+| 安装包体积增加 | 🟢 低 | 🟢 低 | TextMateSharp.Grammars 含全部语法约数 MB，按需裁剪语法集可再议 |
 
 ---
 
 ## 验收标准
 
-- [ ] 14 种内置匹配扩展名自动获得语法高亮
-- [ ] 自定义 XSHD 覆盖的扩展名获得对应高亮
-- [ ] 无匹配扩展名降级为纯文本（不崩溃）
-- [ ] A−/A+ 字号按钮仍可调节编辑器字号
-- [ ] 切换亮/暗主题后编辑器颜色实时更新
-- [ ] 编码检测（GBK/Shift-JIS/UTF-8）仍正常工作
-- [ ] `MaxTextPreviewBytes` 限制仍然生效
-- [ ] 无 `PreviewTextBox` 引用残留导致编译错误
+- [ ] `Avalonia.AvaloniaEdit` 12.0.0 + `AvaloniaEdit.TextMate` 12.0.0 引入后 build 0 错误
+- [ ] `PreviewType.Text` 预览用 TextEditor 显示，无 ScrollViewer 残留
+- [ ] 至少 10 种代表语言（.cs/.py/.ts/.go/.rs/.yaml/.json/.xml/.sh/.java）语法高亮正确
+- [ ] 未知扩展名降级纯文本（不崩溃、无高亮）
+- [ ] 亮/暗主题切换后语法色实时更新
+- [ ] A−/A+ 字号、字体切换、编码选择器切换全部保持可用
+- [ ] `MaxTextPreviewBytes` 限制仍生效
+- [ ] 5MB 大文件打开与滚动无明显卡顿
+- [ ] 无 `PreviewTextBox`/WPF 时代引用残留
 
 ---
 
@@ -319,7 +362,7 @@ ThemeManager.ThemeChanged += (_, theme) =>
 
 | 阶段 | 内容 | 工时 |
 |:----:|------|:----:|
-| **P0** | NuGet + XAML 替换 + 内置高亮分发 | ~2h |
-| **P1** | 高优 XSHD 4 种 | ~2.5h |
-| **P2** | 主题色同步 | ~1h |
-| **P3** | 中优 XSHD 3 种 + 低优 XSHD 6 种（延后） | ~1.5h |
+| **P0** | NuGet + XAML 替换 + `Text` 绑定接入 | ~1.5h |
+| **P1** | 扩展名语法分发（TextMate 基础路径） | ~1h |
+| **P2** | 主题联动（SetTheme） | ~0.8h |
+| **P3** | 结构化 .txt 高亮（魔数/JSON/INI 兜底）+ code-behind Document 优化 | ~1h |

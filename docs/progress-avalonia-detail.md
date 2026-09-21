@@ -12,6 +12,29 @@
   - **PreviewPanel.axaml**：NativeWebView 与 HTML 源码视图从 `PreviewContentScroller`（ScrollViewer）内部移出，置于外层 `PreviewRootGrid` 的 `Grid.Row="1" Grid.Column="0"` 与滚动区平级——修复 WebView 页面顶部一小条被（滚出视口的）元数据横条裁切的布局回归
   - 回归：Build 0 错误
 
+**2026-09-21** — 文本预览语法高亮计划重写为 Avalonia 方案（AvaloniaEdit + TextMate）
+  - **背景**：原 `.omo/plans/未开始/text-preview-syntax-highlighting.md` 为 WPF 时代方案（AvalonEdit 控件 + 自研 XSHD），AvalonEdit 是 WPF-only，跨平台移植后不可用，条目位于 PLAN.md 已废弃表
+  - **调研结论**（librarian）：`Avalonia.AvaloniaEdit` 12.0.0（MIT，AvaloniaUI 官方维护，要求 Avalonia ≥12.0.0，本项目 12.0.4 满足）+ `AvaloniaEdit.TextMate` 12.0.0——TextMate 方案用 VS Code 语法全集（`TextMateSharp.Grammars`），覆盖 `PreviewService.TextExtensions` 40+ 扩展名，**无需自研 XSHD**；内置 DarkPlus/LightPlus 主题，`Installation.SetTheme(RegistryOptions.LoadTheme(...))` 一行切换；rope-based TextDocument + 行虚拟化，大文件无压力
+  - **架构确认**：PreviewType（查看器）与 Language（高亮）分离；语言识别优先级链 = 扩展名 `GetLanguageByExtension` → 魔数 `FileFormatDetector.Detect` → JSON/INI 结构特征（2026-09-21 已落地）→ 纯文本降级。Markdown 是纯文本超集无法内容识别、CSV 有独立查看器，均不需高亮
+  - **实施路径**：Phase 1 NuGet+XAML（ScrollViewer+TextBox → TextEditor，去外层 ScrollViewer，caret 隐藏）→ Phase 2 语法分发（扩展名+结构特征兜底）→ Phase 3 主题联动（复用 `ActualThemeVariantChanged` 先例）→ Phase 4 回归（编码切换/字号/字体/降级/性能）→ Phase 5 可选增强（高亮开关、WordWrap、行号、结构 .txt 高亮）
+  - **同步**：PLAN.md 条目从已废弃表移回正式 P2 区，预估 5-7h → 4-5h（免去自研 XSHD 的 ~2.5h）
+
+**2026-09-21** — 文本格式内容识别扩展（B 保守版）：JSON/INI 内容启发式
+  - **Core/Utils/FileFormatDetector.cs**：`DetectTextSubtype` 在 SVG/HTML/XML 之后新增 INI、JSON 两级内容识别
+  - **INI 判定 `LooksLikeIni(content)`**（前 64 行逐行）：`[Section]` 段头 + 至少一行 key=value（或 ≥2 个段头）；key 不含空格/引号/方括号以排除 JSON 数组、Markdown 引用链接等误报；`;`/`#` 注释行、空行跳过
+  - **JSON 判定 `LooksLikeJson(trimmed)`**（整体扫描）：首字符 `{`/`[`（计入括号配平基数）+ 括号不提前闭合（`}`/`]` 使深度为负即返回 false，容忍 head 截断未闭合）+ 对象要求含 `"key":` 引号键模式 + 数组要求含字符串或逗号分隔元素
+  - 设计定位：为扩展名缺失/错误的格式识别提供内容兜底信号（层 2 结构特征，误报率≈0），为未来语法高亮 Language 识别铺路；Markdown/CSV 弱启发式不启用（Markdown 是纯文本超集无法可靠识别，CSV 由方案 A 扩展名兜底路径处理）
+  - 预览链路验证：`ClassifyPreviewByMagicAsync` 扩展名兜底列表本已含 Json/Ini/Csv，`MapFileFormatToPreviewType` 将 Json/Xml/Ini 映射 `PreviewType.Text`（JSON/INI 按纯文本预览），Csv 已独立映射 `PreviewType.Csv`——内容识别与扩展名路径等效不冲突
+  - 新增测试 `tests/MantisZip.Tests/Utils/FileFormatDetectorTextSubtypeTests.cs`（40 用例：JSON/INI 正反例 + XML/HTML/SVG/Text 回归）；修正 `LooksLikeJson` 首字符括号未计数导致闭合深度为负的 bug
+  - 回归：Build 0 错误 0 警告，Core 403/403 通过，Avalonia 96/96 通过
+
+**2026-09-21** — CSV 预览接入编码选择器 + 修复魔数路径 CSV 被误判为纯文本
+  - **PreviewViewModel.cs**：`HasEncodingSelector`（预览面板编码选择是否显示）新增 `PreviewType.Csv`；`ShowCsv` 从 `File.ReadLines`（UTF-8 硬读 → GBK/Shift_JIS 中文 CSV 乱码）改为 `File.ReadAllBytes` + `DecodePreviewBytes()` 字节级解码，与 Text/Markdown/HTML 共享同一编码检测管线，并缓存 `_textPreviewBytes` 供编码切换复用
+  - 新增 `RebuildCsv(string text)` 辅助方法（`text.Split('\n')` + `TrimEnd('\r')` + `Take(maxRows+1)` → `CsvData = table.DefaultView`），`ApplyEncodingRefresh()` 新增 `case PreviewType.Csv: RebuildCsv(text)`，编码切换即时重建 DataGrid
+  - `ShowCsv` 补发 `CurrentDetectedEncodingName` / `HasDetectedEncoding` / `DetectedEncodingDisplay` 通知（与 ShowText 一致），编码选择器状态栏显示自动检测编码
+  - **PreviewService.cs**：`MapFileFormatToPreviewType` 将 `FileFormat.Csv` 从 Text 分组独立出来映射到 `PreviewType.Csv`——修复魔数检测下 CSV 显示为纯文本的 bug（`ClassifyPreviewByMagicAsync` 扩展名兜底已正确识别 `FileFormat.Csv`，但最后映射被压回 `PreviewType.Text` 走 ShowText）
+  - 回归：Build 0 错误，Tests 378/378 通过
+
 **2026-09-20** — 文本预览编码选择器（Task 5 收尾）：进度文档双轨更新 + PLAN.md→PROGRESS.md 历史索引迁移 + 计划文件归档（`.omo/plans/未开始/text-preview-encoding-selector.md` → `已完成/`）
 
 **2026-09-20** — 预览工具栏编码选择 ComboBox + 本地化（Task 4/5）
@@ -1396,6 +1419,14 @@
 
 ## 共享层（Core / ShellExt / 构建）
 这些变更影响两项目共用代码，按时间从新到旧排列。
+
+#### v0.5.0 (2026-09-21) 文本格式内容识别扩展：JSON/INI 启发式（DetectTextSubtype）
+  - **背景**：`DetectTextSubtype` 此前仅启用 SVG/HTML/XML 三种高精度文本子类型，JSON/INI/CSV/Markdown 仅靠扩展名兜底识别（`MAP FileFormatToPreviewType` 也把 Csv 归入 Text 组）；为扩展名缺失/错误的格式提供内容识别兜底（为未来语法高亮 Language 识别铺路，见 `.omo/plans/未开始/text-preview-syntax-highlighting.md`）
+  - **FileFormatDetector.cs**：`DetectTextSubtype` 在 XML 之后新增 `LooksLikeIni`（前 64 行逐行：`[Section]` 段头 + key=value（≥2 段头也可），key 排除空格/引号/方括号防 JSON 数组、Markdown 引用链接误报）与 `LooksLikeJson`（首字符 `{`/`[` 计入括号配平基数 + `}`/`]` 提前闭合即拒（容忍 head 截断未闭合）+ 对象需 `"key":` 引号键模式 / 数组需字符串或逗号元素）；修正初版首字符未计数导致闭合深度为负的 bug
+  - **设计约束**：Markdown 是纯文本超集无法可靠内容识别（结构性限制）；CSV 由方案 A（CSV 扩展名兜底 + PreviewType 独立映射）处理，不引入弱启发式
+  - **预览链路**：`ClassifyPreviewByMagicAsync` 扩展名兜底列表本已含 Json/Ini/Csv；Json/Xml/Ini 映射 `PreviewType.Text`（JSON/INI 按纯文本预览，合理），Csv 已独立映射 `PreviewType.Csv`——内容识别与扩展名路径等效，无冲突
+  - 涉及文件：`src/MantisZip.Core/Utils/FileFormatDetector.cs`、`tests/MantisZip.Tests/Utils/FileFormatDetectorTextSubtypeTests.cs`（新增 40 用例）
+  - 验证：`dotnet build` Core 0 错误 0 警告；MantisZip.Tests 403/403 通过（含新增 40），Avalonia 96/96 通过
 
 #### v0.5.0 (2026-09-12) 损坏压缩包打开静默无报错修复（ZipEngine 严格解析 + TarGzEngine 移除静默 catch）
   - **ZipEngine**：`OpenArchiveWithEncodingFallback` 主路径 + GBK 回退两处改用 `ZipArchive.OpenArchive`（严格 ZIP 解析）——原 `ArchiveFactory.OpenArchive` 魔数嗅探会把全零/垃圾文件误判为 Tar（0 条目，损坏信号被吞），TestPreview/testZip 的全零 zip1.zip 实测原行为「打开成功但 0 内容、测试 8ms 通过」；修复后抛 `ArchiveException: Failed to locate the Zip Header`

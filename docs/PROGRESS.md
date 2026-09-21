@@ -28,6 +28,9 @@
 #### 2026-09
 
 - **09-21** — 修复 HTML 预览安全设置回归三连：CSP 拼接缺少 `style-src` 指令导致内联样式被兜底 `default-src` 拦截（样式/脚本选项最严时预览样式全部丢失）+ CSP meta 注入在 `<!DOCTYPE>` 之前触发浏览器 Quirks Mode（布局行为异常）+ WebView 页面顶部一小条被预览滚动区裁切（WebView 移出 ScrollViewer 与预览滚动区平级）
+- **09-21** — 文本预览语法高亮计划重写为 Avalonia 方案：废弃 WPF 版 AvalonEdit+XSHD 方案（AvalonEdit WPF-only），改用 **AvaloniaEdit 12.0.0 + TextMate**（`AvaloniaEdit.TextMate`，VS Code 语法全集覆盖 `TextExtensions` 40+ 扩展名、内置 DarkPlus/LightPlus 主题 `SetTheme` 一键切换）；架构确认 PreviewType（查看器）与 Language（高亮）分离 + 扩展名→魔数→JSON/INI 结构特征三级语言识别优先级链（配合当日落地的文本内容检测）；条目从 PLAN.md 已废弃表移回正式 P2 区
+- **09-21** — CSV 预览接入编码选择器 + 修复魔数路径 CSV 被误判为纯文本：CSV 预览与 Text/Markdown/HTML 统一走 `DecodePreviewBytes()` 字节级解码管线（`RebuildCsv` 编码切换即时重建 DataGrid）；`MapFileFormatToPreviewType` 将 `FileFormat.Csv` 从 Text 组独立映射到 `PreviewType.Csv`（此前扩展名兜底已识别 Csv 却在最后映射被压回 Text，CSV 永远显示为纯文本）
+- **09-21** — 文本格式内容识别扩展（B 保守版）：`DetectTextSubtype` 新增 JSON/INI 内容启发式——INI 用 `[Section]` 段头 + key=value 结构校验，JSON 用首字符 `{`/`[` + 括号配平（容忍 head 截断）+ `"key":` 引号键/数组元素判定，误报率≈0；为扩展名缺失的格式识别提供兜底信号（为未来语法高亮 Language 识别铺路）
 - **09-20** — 文本预览编码选择器：Text/Markdown/HTML 预览统一接入 `File.ReadAllBytes` + `DecodePreviewBytes()` 字节级编码检测管线，支持用户手动切换编码（auto/UTF-8/GBK/GB18030/Shift_JIS 等 9 项），切换即时重渲染；预览工具栏新增编码选择 ComboBox + 本地化（zh/en 成对，4 key），语言切换自动重建下拉 DisplayName
 - **09-17** — 修复文本预览 936 编码报错 + GBK 种子中文乱码：Avalonia 启动注册 CodePagesEncodingProvider（此前迁移遗漏导致 `Encoding.GetEncoding(936)` 抛 NotSupportedException，文本预览提示 "coding 936 无法预览"）；TorrentParser 尊重种子 `encoding` 字段（BitComet GBK 种子）+ 优先读取 `name.utf-8`/`path.utf-8`/`comment.utf-8` 后缀字段（BEP 惯例），实测 100DVD.rar 内中文种子 0/9 乱码
 - **09-13** — HTML 预览 WebView 双轨升级 + 安全设置：NativeWebView 主体渲染 + ReverseMarkdown 降级路径（WebView 不可用时自动 fallback）；`</>` 源码/渲染切换按钮（HTML & Markdown 共用）；HTML 预览安全设置三开关（允许 JavaScript / 外部资源 / 导航，默认全关）+ CSP meta 注入 + NavigationStarting 拦截；设置窗口预览 tab 新增 HTML 子标签页（IconHtml 图标）
@@ -102,6 +105,7 @@
 
 #### v0.5.0
 
+- **09-21** — 文本格式内容识别扩展（Core）：`DetectTextSubtype` 新增 JSON/INI 内容启发式 —— INI 用 `[Section]` 段头 + key=value 结构校验，JSON 用首字符 `{`/`[` + 括号配平（容忍 head 截断）+ 引号键/数组元素判定，误报率≈0；为扩展名缺失格式提供内容兜底信号（为未来语法高亮 Language 识别铺路）
 - **09-12** — 修复损坏压缩包打开静默无报错（Core）：ZipEngine 打开改用严格 ZipArchive.OpenArchive（全零/垃圾 .zip 此前被 ArchiveFactory 魔数嗅探误判为 Tar、0 条目静默打开，现抛 ArchiveException）+ TarGzEngine.ListEntriesAsync 移除静默 catch（损坏 .tar 抛错不再静默空列表）+ 新增 3 个回归测试
 - **09-04** — 压缩/解压 文件读写错误处理补齐：压缩侧 7z/加密 ZIP 新增 `ReadErrorHandler.FilterUnreadableFiles` 预检（错误弹窗 / 跳过 / 中止，对齐 ErrorResolver）；解压侧三引擎 `ExtractAsync`+`ExtractEntriesAsync` 补 `IOException` 捕获与 per-entry 兜底（被占用条目跳过继续，不再让单个文件中止整个解压）
 - **08-31** — .NET 9 → .NET 10 升级（LTS，支持至 2028-11）：全部 7 个项目 TargetFramework 更新 + 移除废弃 `Avalonia.Diagnostics` 包 + `System.Drawing.Common` 升级至 10.0.8
