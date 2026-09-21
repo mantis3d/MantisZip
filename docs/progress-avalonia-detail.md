@@ -1420,6 +1420,11 @@
 ## 共享层（Core / ShellExt / 构建）
 这些变更影响两项目共用代码，按时间从新到旧排列。
 
+#### v0.5.0 (2026-09-22) 修复 GitHub Release 发版失败（release.yml 重复 Portable-Web 打包步骤）
+  - **背景**：推 tag 触发 release 时在 "Package portable web zip (framework-dependent)" 步骤失败——`Compress-Archive ... MantisZip-{VERSION}-Portable-Web.zip already exists`，发版中断。根因是历史遗留双步骤产出同名文件：7-19（#29）新增独立 Compress-Archive 步骤产出 `Portable-Web.zip`（当时与自包含 zip 互不冲突）；8-07 "Package portable zips" 重构为 `New-PortableZip` 函数同时产出双变体（当时名 `Portable-FrameworkDependent.zip`）；8-07 `b0c6759` 将该名改为 `Portable-Web.zip` 后与新步骤撞名，此后每次发版必挂
+  - **修复**：删除重复的 "Package portable web zip (framework-dependent)" 步骤（Compress-Archive 版且不含 PDB 排除、不含预置 settings.json 拷贝，保留反而会覆盖优质包）。Web 便携包统一由 "Package portable zips" 的 `New-PortableZip` 产出（7z `-xr!*.pdb` + Data/settings.json 预置 + x64/7z.dll 拷贝）
+  - **验证**：js-yaml 解析 18 步骤、Web zip 仅一个产出者；本机全流程模拟（模拟 VERSION → restore → Publish x2 → 逐字运行修复后打包块）双 zip 正常产出、无 already exists；包内容核对 Portable.txt / Data/settings.json / x64\7z.dll 齐全、*.pdb=0、无 publish_output 前缀
+
 #### v0.5.0 (2026-09-21) 文本格式内容识别扩展：JSON/INI 启发式（DetectTextSubtype）
   - **背景**：`DetectTextSubtype` 此前仅启用 SVG/HTML/XML 三种高精度文本子类型，JSON/INI/CSV/Markdown 仅靠扩展名兜底识别（`MAP FileFormatToPreviewType` 也把 Csv 归入 Text 组）；为扩展名缺失/错误的格式提供内容识别兜底（为未来语法高亮 Language 识别铺路，见 `.omo/plans/未开始/text-preview-syntax-highlighting.md`）
   - **FileFormatDetector.cs**：`DetectTextSubtype` 在 XML 之后新增 `LooksLikeIni`（前 64 行逐行：`[Section]` 段头 + key=value（≥2 段头也可），key 排除空格/引号/方括号防 JSON 数组、Markdown 引用链接误报）与 `LooksLikeJson`（首字符 `{`/`[` 计入括号配平基数 + `}`/`]` 提前闭合即拒（容忍 head 截断未闭合）+ 对象需 `"key":` 引号键模式 / 数组需字符串或逗号元素）；修正初版首字符未计数导致闭合深度为负的 bug

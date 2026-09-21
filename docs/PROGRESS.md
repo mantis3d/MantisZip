@@ -105,6 +105,7 @@
 
 #### v0.5.0
 
+- **09-22** — 修复 GitHub Release 发版失败（构建）：release.yml 存在重复的 Portable-Web 打包步骤——`Compress-Archive` 步骤产出 `MantisZip-*-Portable-Web.zip`，而 `New-PortableZip` 同时段也产出同名文件（8-07 改名后撞名），Compress-Archive 遇已存在文件报 already exists 导致发版中断；删除旧 Compress-Archive 步骤，Web 便携包统一由 New-PortableZip（7z 打包 + 排除 PDB + 预置默认设置）产出
 - **09-21** — 文本格式内容识别扩展（Core）：`DetectTextSubtype` 新增 JSON/INI 内容启发式 —— INI 用 `[Section]` 段头 + key=value 结构校验，JSON 用首字符 `{`/`[` + 括号配平（容忍 head 截断）+ 引号键/数组元素判定，误报率≈0；为扩展名缺失格式提供内容兜底信号（为未来语法高亮 Language 识别铺路）
 - **09-12** — 修复损坏压缩包打开静默无报错（Core）：ZipEngine 打开改用严格 ZipArchive.OpenArchive（全零/垃圾 .zip 此前被 ArchiveFactory 魔数嗅探误判为 Tar、0 条目静默打开，现抛 ArchiveException）+ TarGzEngine.ListEntriesAsync 移除静默 catch（损坏 .tar 抛错不再静默空列表）+ 新增 3 个回归测试
 - **09-04** — 压缩/解压 文件读写错误处理补齐：压缩侧 7z/加密 ZIP 新增 `ReadErrorHandler.FilterUnreadableFiles` 预检（错误弹窗 / 跳过 / 中止，对齐 ErrorResolver）；解压侧三引擎 `ExtractAsync`+`ExtractEntriesAsync` 补 `IOException` 捕获与 per-entry 兜底（被占用条目跳过继续，不再让单个文件中止整个解压）
