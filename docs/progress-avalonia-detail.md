@@ -6,7 +6,11 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
-**2026-09-18** — 自适应压缩重构：三开关正交设计（自适应/魔数/多线程独立开关）
+**2026-09-23** — 修复 CompressGroupWithSevenZip 进度停滞（MultiThreaded 模式 UI 冻结 16 秒）
+  - **Core 层**：
+    - `Engines/ZipEngine.cs`：`CompressGroupWithSevenZip` 新增进度报告——挂接 `FileCompressionStarted` 事件，每 100ms 节流报告当前文件名 + 字节进度（基于已开始文件字节数近似已处理量，fileSizeMap 匹配失败退化为文件数比例）；mt=on 多线程事件并发触发，用 `lock` 保护计数与节流；`ref lastReportTime` 提取为局部变量供 lambda 捕获，调用后写回
+  - 两处调用点（`CompressAsync` / `AddToArchiveAsync`）同步传入 progress、字节/文件数基线与 ref lastReportTime
+  - 验证：0 errors / 1 expected Obsolete warning，424 测试通过
   - **Core 层**：
     - `Models/AdaptiveOverrideRule.cs`：`AdaptiveCompressionMode` 枚举标记 `[Obsolete]`，保留用于旧设置文件反序列化兼容
     - `Abstractions/ArchiveEngine.cs`：`ArchiveOptions` 移除 `AdaptiveCompressionMode` 和旧 `AdaptiveCompression` shim 属性，替换为 3 个独立 bool（`AdaptiveCompression` / `AdaptiveSmartDetect` / `MultiThreadedCompression`）

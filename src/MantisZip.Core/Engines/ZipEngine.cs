@@ -914,7 +914,7 @@ while (true)
                                 try
                                 {
                                     CoreLog.Info($"CompressAsync: MultiThreaded mode — {storeGroup.Count} store, {compressGroup.Count} compress via 7z mt=on");
-                                    CompressGroupWithSevenZip(compressGroup, tempZip, options);
+                                    CompressGroupWithSevenZip(compressGroup, tempZip, options, progress, processedBytes, totalBytes, totalFiles, processedFiles, ref lastReportTime);
                                     MergeTempZipToWriter(tempZip, zipWriter, ref processedBytes, totalBytes, totalFiles, ref processedFiles, progress, ref lastReportTime, cancellationToken);
                                 }
                                 finally
@@ -1590,7 +1590,7 @@ while (true)
                                     try
                                     {
                                         CoreLog.Info($"AddToArchiveAsync: MultiThreaded mode — {storeGroup.Count} store, {compressGroup.Count} compress via 7z mt=on");
-                                        CompressGroupWithSevenZip(compressGroup, tempZip, options);
+                                        CompressGroupWithSevenZip(compressGroup, tempZip, options, progress, compressProcessed, compressTotalBytes, compressFiles.Count, mtProcessedFiles, ref lastReportTime);
                                         MergeTempZipToWriter(tempZip, zipWriter, ref compressProcessed, compressTotalBytes, compressFiles.Count, ref mtProcessedFiles, progress, ref lastReportTime, cancellationToken);
                                     }
                                     finally
@@ -2223,10 +2223,22 @@ while (true)
     /// <param name="files">待压缩的文件列表（FullPath + RelativePath）。</param>
     /// <param name="tempPath">临时 ZIP 输出路径。</param>
     /// <param name="options">压缩选项（压缩级别、方法等）。</param>
+    /// <param name="progress">进度报告回调（可为 null）。</param>
+    /// <param name="storeProcessedBytes">StoreGroup 已处理字节数（全局进度基线）。</param>
+    /// <param name="totalBytes">全部文件总字节数（全局进度分母）。</param>
+    /// <param name="totalFiles">全部文件总数。</param>
+    /// <param name="storeProcessedFiles">StoreGroup 已处理文件数（全局进度基线）。</param>
+    /// <param name="lastReportTime">上次进度报告时间（节流用，引用传递）。</param>
     private static void CompressGroupWithSevenZip(
         List<(string FullPath, string RelativePath)> files,
         string tempPath,
-        ArchiveOptions options)
+        ArchiveOptions options,
+        IProgress<ArchiveProgress>? progress,
+        long storeProcessedBytes,
+        long totalBytes,
+        int totalFiles,
+        int storeProcessedFiles,
+        ref DateTime lastReportTime)
     {
         SevenZipEngine.EnsureLibraryPath();
 
@@ -2252,11 +2264,61 @@ while (true)
             _ => CompressionMethod.Deflate,
         };
 
+        // 预计算每个文件的字节数，用于进度估算（按已开始文件的字节近似已处理量）。
+        var fileSizeMap = new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
+        foreach (var (fullPath, _) in files)
+        {
+            long size = 0;
+            try { size = new FileInfo(fullPath).Length; } catch { /* 无法读取大小则视为 0 */ }
+            fileSizeMap[fullPath] = size;
+        }
+
+        // 7z mt=on 多线程压缩时事件可能并发触发，用锁保护计数与节流，
+        // 避免此前「同步调用 + 无进度事件」导致的进度条长时间停滞。
+        var reportLock = new object();
+        int startedFiles = 0;
+        long startedBytes = 0;
+        var localLastReportTime = lastReportTime; // 拷贝 ref 参数供 lambda 捕获
+        compr.FileCompressionStarted += (_, e) =>
+        {
+            var name = e.FileName ?? "";
+            var displayName = string.IsNullOrEmpty(name) ? "" : Path.GetFileName(name);
+
+            lock (reportLock)
+            {
+                startedFiles++;
+                if (!string.IsNullOrEmpty(name) && fileSizeMap.TryGetValue(name, out var size))
+                    startedBytes += size;
+
+                var now = DateTime.Now;
+                if (now - localLastReportTime < TimeSpan.FromMilliseconds(100)) return;
+                localLastReportTime = now;
+
+                // 字节进度优先；若文件大小映射失败则退化为按文件数比例推进
+                var pct = totalBytes > 0
+                    ? Math.Min(100, (double)(storeProcessedBytes + startedBytes) / totalBytes * 100)
+                    : (totalFiles > 0 ? (double)(storeProcessedFiles + startedFiles) / totalFiles * 100 : 0);
+
+                progress?.Report(new ArchiveProgress
+                {
+                    CurrentFile = "正在压缩: " + displayName,
+                    PercentComplete = pct,
+                    FilePercentComplete = null,
+                    TotalBytes = totalBytes,
+                    ProcessedBytes = storeProcessedBytes + startedBytes,
+                    TotalFiles = totalFiles,
+                    ProcessedFiles = storeProcessedFiles + startedFiles,
+                });
+            }
+        };
+
         var filePaths = files.Select(f => f.FullPath).Distinct().ToArray();
         if (filePaths.Length > 0)
         {
             compr.CompressFilesEncrypted(tempPath, "", filePaths);
         }
+
+        lastReportTime = localLastReportTime; // 写回 ref 参数
     }
 
     /// <summary>
