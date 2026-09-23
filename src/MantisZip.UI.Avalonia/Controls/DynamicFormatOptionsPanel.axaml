@@ -54,9 +54,28 @@
                     BorderBrush="{DynamicResource ThemeComboBoxBorderBrush}" />
         </Grid>
 
-        <!-- ZIP 自适应压缩复选框：已压缩文件（图片/音视频等）自动 Store，其余保持用户选定级别 -->
+        <!-- ═══════ ZIP 自适应压缩三开关 ═══════ -->
+        <!-- 仅 ZIP 格式支持 per-entry 级别控制，7z/TAR 无此能力 -->
+        <TextBlock Text="{Binding ZipAdaptiveSectionTitle, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                   FontWeight="SemiBold"
+                   Margin="0,6,0,4"
+                   Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+
+        <!-- 自适应压缩：已压缩文件（图片/音视频等）自动 Store，其余保持用户选定级别 -->
         <CheckBox x:Name="AdaptiveCompressionCheck"
                   Content="{Binding AdaptiveCompressionLabel, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                  IsChecked="False"
+                  Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+
+        <!-- 魔数检测：对大文件进行魔数采样检测，更准确识别已压缩格式。会略微降低压缩速度 -->
+        <CheckBox x:Name="SmartDetectCheck"
+                  Content="{Binding SmartDetectLabel, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                  IsChecked="False"
+                  Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+
+        <!-- 多线程压缩：利用多核 CPU 并行压缩，显著提升压缩速度。仅 ZIP 支持 -->
+        <CheckBox x:Name="ZipMultiThreadCheck"
+                  Content="{Binding ZipMultiThreadLabel, RelativeSource={RelativeSource AncestorType=UserControl}}"
                   IsChecked="False"
                   Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
       </StackPanel>

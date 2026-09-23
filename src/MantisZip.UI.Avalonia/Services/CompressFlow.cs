@@ -87,10 +87,10 @@ public static class CompressFlow
             SevenZipNumFastBytes = vm.SevenZipNumFastBytes,
             SevenZipMatchFinder = vm.SevenZipMatchFinder,
             SevenZipMultithreaded = vm.SevenZipMultithreaded,
-            // 自适应压缩：三个独立开关
+            // 自适应压缩：三个独立开关，全部从对话框读取（per-operation override，不污染全局设置）
             AdaptiveCompression = vm.AdaptiveCompression,
-            AdaptiveSmartDetect = AppSettings.Load()?.AdaptiveSmartDetect ?? false,
-            MultiThreadedCompression = AppSettings.Load()?.MultiThreadedCompression ?? false,
+            AdaptiveSmartDetect = vm.AdaptiveSmartDetect,
+            MultiThreadedCompression = vm.MultiThreadedCompression,
             // 多线程模式：传递用户自定义仅存储格式列表
             MultiThreadedStoreFormatIds = new HashSet<string>(
                 AppSettings.Load()?.MultiThreadedStoreFormatIds ?? new List<string>()),

@@ -39,6 +39,9 @@ public partial class DynamicFormatOptionsPanel : UserControl
     public string MultiThreadLabel => LocalizationManager.T("FormatOptions_7z_MultiThread");
 
     public string AdaptiveCompressionLabel => LocalizationManager.T("FormatOptions_ZIP_AdaptiveCompression");
+    public string SmartDetectLabel => LocalizationManager.T("FormatOptions_ZIP_SmartDetect");
+    public string ZipMultiThreadLabel => LocalizationManager.T("FormatOptions_ZIP_MultiThread");
+    public string ZipAdaptiveSectionTitle => LocalizationManager.T("Settings_AdaptiveCompression");
     public string TarGzPlaceholder => LocalizationManager.T("FormatOptions_TarGz_Placeholder");
 
     // ── CLR Properties ─────────────────────────────────────────────────────
@@ -163,6 +166,30 @@ public partial class DynamicFormatOptionsPanel : UserControl
         }
     }
 
+    /// <summary>
+    /// 魔数检测。仅对 ZIP 格式有效；非 ZIP 格式返回 false。
+    /// </summary>
+    public bool AdaptiveSmartDetect
+    {
+        get
+        {
+            if (SelectedFormat != "zip") return false;
+            return SmartDetectCheck.IsChecked == true;
+        }
+    }
+
+    /// <summary>
+    /// ZIP 多线程压缩。仅对 ZIP 格式有效（非加密 + Deflate 方法）；非 ZIP 格式返回 false。
+    /// </summary>
+    public bool MultiThreadedCompression
+    {
+        get
+        {
+            if (SelectedFormat != "zip") return false;
+            return ZipMultiThreadCheck.IsChecked == true;
+        }
+    }
+
     // ── Constructor ────────────────────────────────────────────────────────
 
     public DynamicFormatOptionsPanel()
@@ -231,6 +258,8 @@ public partial class DynamicFormatOptionsPanel : UserControl
 
         MultiThreadCheck.IsChecked = s.SevenZipMultithreaded;
         AdaptiveCompressionCheck.IsChecked = s.AdaptiveCompression;
+        SmartDetectCheck.IsChecked = s.AdaptiveSmartDetect;
+        ZipMultiThreadCheck.IsChecked = s.MultiThreadedCompression;
 
         SelectComboByTag(SolidBlockSizeCombo, s.SevenZipSolidBlockSize ?? "");
         SelectComboByIntValue(DictSizeCombo, s.SevenZipDictionarySize);

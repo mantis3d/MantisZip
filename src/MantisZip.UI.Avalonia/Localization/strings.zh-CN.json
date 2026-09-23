@@ -435,6 +435,8 @@
   "FormatOptions_Zip_EncodingDefault": "保持原始",
   "FormatOptions_Zip_Title": "ZIP 选项",
   "FormatOptions_ZIP_AdaptiveCompression": "自适应压缩（已压缩文件自动 Store）",
+  "FormatOptions_ZIP_SmartDetect": "魔数检测（大文件魔数采样，更准确识别已压缩格式）",
+  "FormatOptions_ZIP_MultiThread": "多线程压缩（利用多核 CPU 并行压缩，仅 ZIP 支持）",
   "Main_ArchiveComment_NotSupported": "仅 ZIP 格式支持注释",
   "Main_ArchiveComment_Prompt": "编辑压缩包注释：",
   "Main_ArchiveComment_Save": "保存",
