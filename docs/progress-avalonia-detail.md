@@ -6,6 +6,21 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-09-24** — 过滤/拖拽/右键解压统一并行化 + 并行冲突弹窗修复 + 构建零警告
+  - **Core 层**：
+    - `Engines/ZipEngine.cs`：`ExtractEntriesAsync` 改造为 dispatcher（梳理命中文件、fileCount ≥2 且 `ParallelExtractDegree` >1 自动切入并行，与全量 `ExtractAsync` 决策逻辑一致）；原串行逻辑整段迁入私有 `ExtractEntriesAsyncSequential` 保持不变，新增 `ExtractEntriesAsyncParallel`（多实例并行：Round-Robin 分批 + 每批次独占一个 archive 实例 + `outputPathOverrides` 权重预读 + 目录条目预创建；冲突处理走快速短路 + `conflictGate` 信号量串行化）
+    - `Engines/ZipEngine.cs`：修复并行路径 Ask 冲突弹窗静默降级为覆盖的 bug——`ExtractAsyncParallel` 原用同步 `FileConflictHelper.ResolvePath`（只认同步回调，UI 仅注册 `ConflictResolverAsync` 时静默返回 overwrite），改为快速路径（`!File.Exists` 直通）+ 信号量 + `ResolvePathAsync`；`ExtractEntriesAsyncParallel` 同步对齐
+    - `Utils/TextEncodingDetector.cs`：`CoreLog.Trace` 可空传参 `detected ?? "null"` 修复 CS8604
+  - **UI 层**：
+    - `Services/SelectedItemsExtractService.cs`：`CreateExtractOptions` 返回类型非 null + 去除 `!` 断言，消除 NRE 隐患
+    - `Services/ExtractFlow.cs`：去除 `!` 断言
+    - `ViewModels/MainWindowViewModel.cs`：移除死分支 `?? new ArchiveOptions()`
+    - `Models/AppSettings.cs`：`AdaptiveCompressionMode` 旧枚举属性加 `#pragma warning disable CS0618`（刻意保留向后兼容反序列化）
+    - `ViewModels/PreviewViewModel.cs`：`_selectedEncoding` 字段赋值处加 `#pragma warning disable MVVMTK0034`（刻意直接写字段绕过生成属性、避免触发解码副作用）
+    - `Dialogs/ExtractSettingsWindow.axaml`：并行度 NumericUpDown 宽度 80→120（容纳 "16"）
+  - **测试**：`tests/MantisZip.Tests/Engines/ParallelExtractTests.cs` 新增 4 个——串行 vs 并行逐字节等价、并行 + `pathOverrides` 正确性、冲突处理（Ask + `ConflictResolverAsync` → Rename）全量与过滤两条路径回归
+  - 验证：0 errors / 0 warnings，458 Core + 96 Avalonia 测试全绿
+
 **2026-09-23** — 修复 CompressGroupWithSevenZip 进度停滞（MultiThreaded 模式 UI 冻结 16 秒）
   - **Core 层**：
     - `Engines/ZipEngine.cs`：`CompressGroupWithSevenZip` 新增进度报告——挂接 `FileCompressionStarted` 事件，每 100ms 节流报告当前文件名 + 字节进度（基于已开始文件字节数近似已处理量，fileSizeMap 匹配失败退化为文件数比例）；mt=on 多线程事件并发触发，用 `lock` 保护计数与节流；`ref lastReportTime` 提取为局部变量供 lambda 捕获，调用后写回

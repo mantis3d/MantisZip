@@ -130,7 +130,7 @@
                              VerticalAlignment="Center" />
                   <NumericUpDown Minimum="1" Maximum="16"
                                  Value="{Binding ParallelExtractDegree}"
-                                 Width="80" />
+                                 Width="120" />
                   <TextBlock Text="(1=串行，默认=CPU核心数)"
                              VerticalAlignment="Center"
                              Foreground="{DynamicResource ThemeTextSecondaryBrush}"

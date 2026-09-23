@@ -2783,10 +2783,8 @@ public partial class MainWindowViewModel : ObservableObject
             async (progress, ct) =>
             {
                 // 复用解压冲突处理：同一 AppSettings.FileConflictAction 策略 + Ask 弹窗回调（标题区分）
-                // CreateExtractOptions 返回 null 表示 Overwrite 默认（无冲突处理），回退到仅密码的 options
                 var options = SelectedItemsExtractService.CreateExtractOptions(
-                        AppSettings.Load().FileConflictAction, ShowAddFileConflictDialogAsync)
-                    ?? new ArchiveOptions();
+                    AppSettings.Load().FileConflictAction, ShowAddFileConflictDialogAsync);
                 options.Password = password;
                 // 源文件读取错误（被占用等）→ 弹 ErrorDialog（重试/跳过/中止）
                 options.ErrorResolver = CompressFlow.CreateErrorResolver();

@@ -52,7 +52,7 @@ public sealed class SelectedItemsExtractService
             pathOverrides[key] = FileConflictHelper.GetSafePath(destinationPath, safeEntryPath);
         }
 
-        var options = CreateExtractOptions(conflictAction, conflictDialog)!;
+        var options = CreateExtractOptions(conflictAction, conflictDialog);
         // 传递并行解压线程数（引擎 SupportsParallelExtract 时生效）
         options.ParallelExtractDegree = AppSettings.Load()?.ParallelExtractDegree ?? 0;
 
@@ -87,14 +87,14 @@ public sealed class SelectedItemsExtractService
     /// </summary>
     /// <param name="conflictAction">冲突策略字符串值。</param>
     /// <param name="conflictDialog">Ask 冲突弹窗回调（null 时 Ask 降级为直接弹引擎默认）。</param>
-    /// <returns>ArchiveOptions，Overwrite 且无 resolver 时返回 null。</returns>
-    internal static ArchiveOptions? CreateExtractOptions(
+    /// <returns>ArchiveOptions（Overwrite 也返回显式 options，调用方可直接设置 ParallelExtractDegree）。</returns>
+    internal static ArchiveOptions CreateExtractOptions(
         string conflictAction,
         Func<FileConflictInfo, Task<(FileConflictAction Action, bool ApplyToAll)>>? conflictDialog)
     {
         var action = MapConflictActionString(conflictAction);
         if (action == FileConflictAction.Overwrite)
-            return null; // 默认行为无需传 options
+            return new ArchiveOptions { ConflictAction = FileConflictAction.Overwrite }; // 默认行为即覆盖
 
         if (action != FileConflictAction.Ask || conflictDialog == null)
             return new ArchiveOptions { ConflictAction = action };
