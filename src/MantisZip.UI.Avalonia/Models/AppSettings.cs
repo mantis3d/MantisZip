@@ -44,7 +44,10 @@ public class AppSettings
     /// 旧版自适应压缩模式（向后兼容反序列化）。
     /// 已废弃：新代码应使用 <see cref="AdaptiveCompression"/> + <see cref="AdaptiveSmartDetect"/> + <see cref="MultiThreadedCompression"/>。
     /// </summary>
+    // CS0618 抑制：刻意保留旧枚举属性以读取旧 settings.json，Load() 中迁移为三个新开关
+#pragma warning disable CS0618
     public AdaptiveCompressionMode AdaptiveCompressionMode { get; set; } = AdaptiveCompressionMode.Disabled;
+#pragma warning restore CS0618
 
     /// <summary>多线程模式下用户自定义仅存储格式 ID 列表（不可删除的唯一规则）。</summary>
     public List<string> MultiThreadedStoreFormatIds { get; set; } = new();

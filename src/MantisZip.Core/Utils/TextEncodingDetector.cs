@@ -118,7 +118,7 @@ public static class TextEncodingDetector
         if (data.Length == 0) return (string.Empty, null);
 
         var (detected, confidence) = DetectEncoding(data);
-        CoreLog.Trace("DetectAndDecodeText: detected={0}, confidence={1:P1}", detected, confidence);
+        CoreLog.Trace("DetectAndDecodeText: detected={0}, confidence={1:P1}", detected ?? "null", confidence);
 
         // 置信度 >= 50% 且编码名有效 → 用检测到的编码解码
         if (confidence >= 0.5 && !string.IsNullOrEmpty(detected))

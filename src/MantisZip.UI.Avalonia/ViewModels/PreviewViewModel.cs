@@ -144,7 +144,10 @@ public partial class PreviewViewModel : ObservableObject
         EncodingOptions = BuildEncodingOptions();
         OnPropertyChanged(nameof(EncodingOptions));
         // 恢复之前选中的编码（直接赋值字段，避免触发 OnSelectedEncodingChanged 的持久化/解码副作用）
+        // MVVMTK0034 抑制：刻意直接写字段（绕过生成属性，避免触发解码副作用），随后手动通知
+#pragma warning disable MVVMTK0034
         _selectedEncoding = EncodingOptions.FirstOrDefault(o => o.Key == (prevKey ?? "auto"));
+#pragma warning restore MVVMTK0034
         OnPropertyChanged(nameof(SelectedEncoding));
     }
 
