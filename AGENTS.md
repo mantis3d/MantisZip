@@ -453,7 +453,7 @@ Four modes controlled by `AppSettings.LogPrivacyMode` (defaults to `"extension"`
 - **full**: Same → `[PATH_1]` (sequential IDs, same path → same ID, capped at 10000 entries)
 
 **Injection**: 
-- `CoreLog.RedactOverride` (internal `Func<string, string>?`) set by UI's `App.OnStartup` so CoreLog can redact without referencing AppSettings
+- `CoreLog.Initialize(diagnosticsEnabled, privacyMode)` — UI 层在 `OnFrameworkInitializationCompleted` 和 `RefreshDebugLogSettings` 中调用，统一注入诊断开关与脱敏委托。**禁止直接设置 `CoreLog.DiagnosticsEnabled` 或 `CoreLog.RedactOverride`**，必须走 `Initialize()` 方法
 - `App.Log()`, `App.LogDebug()`, and `LogStartup()` call `LogRedactor.RedactPaths()` directly (they're in UI project and have AppSettings access)
 
 **Help dialog**: `LogPrivacyHelpDialog` opened from Settings → Debug tab's `[?]` button, matching the PasswordManager help dialog style.
@@ -774,6 +774,25 @@ dotnet test tests\MantisZip.UI.Avalonia.Tests\MantisZip.UI.Avalonia.Tests.csproj
 
 #### 验证
 完成注释后，运行 `dotnet build src\MantisZip.UI.Avalonia\MantisZip.UI.Avalonia.csproj` 确保无编译错误。
+
+### 规则 15：CoreLog 初始化必须走 Initialize() 方法
+
+Core 层 `CoreLog` 的诊断开关与脱敏委托**必须**通过 `CoreLog.Initialize()` 统一注入，**禁止**直接设置 `CoreLog.DiagnosticsEnabled` 或 `CoreLog.RedactOverride`：
+
+```csharp
+// ✅ 正确：一行调用，注入诊断开关 + 路径脱敏
+CoreLog.Initialize(appSettings.EnableDebugLogging, appSettings.LogPrivacyMode);
+
+// ❌ 错误：直接设置属性，分散且容易遗漏脱敏委托
+CoreLog.DiagnosticsEnabled = appSettings.EnableDebugLogging;
+CoreLog.RedactOverride = msg => LogRedactor.RedactPaths(msg, ...);
+```
+
+**注入时机**（两处）：
+1. `OnFrameworkInitializationCompleted` — 启动时首次注入
+2. `RefreshDebugLogSettings` — SettingsWindow 保存设置后同步刷新
+
+**原因**：Core 层无法引用 AppSettings（依赖倒置），若不通过 `Initialize()` 注入，`CoreLog.Trace`/`Info`/`Error` 写入的日志不会被脱敏，导致完整文件路径泄露到 debug.log。
 
 ## 未来工作
 
