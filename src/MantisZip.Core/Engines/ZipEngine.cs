@@ -824,6 +824,9 @@ while (true)
                     };
 
                     var sourceFilePaths = files.Select(f => f.FullPath).Distinct().ToArray();
+                    CoreLog.Trace($"[TRACE] CompressAsync encrypted 7z: {sourceFilePaths.Length} files, outputPath={outputPath}");
+                    foreach (var fp in sourceFilePaths)
+                        CoreLog.Trace($"[TRACE]   7z input: {fp}");
                     // 加密 ZIP 走 SharpSevenZip 单次原生调用，无法逐文件恢复读取错误。
                     // 调用前预检读权限（被占用/权限 → ErrorResolver 弹窗 重试/跳过/中止），
                     // 跳过则剔除，避免单个不可读文件导致整个加密压缩直接中止。
@@ -899,8 +902,10 @@ while (true)
                             }
 
                             // StoreGroup：已压缩文件直接 Store 写入 ZipWriter
+                            CoreLog.Trace($"[TRACE] CompressAsync StoreGroup: {storeGroup.Count} files");
                             foreach (var (fullPath, relativePath) in storeGroup)
                             {
+                                CoreLog.Trace($"[TRACE]   StoreGroup entry: FullPath={fullPath} → RelativePath={relativePath} → ArchivePath.Normalize={ArchivePath.Normalize(relativePath)}");
                                 cancellationToken.ThrowIfCancellationRequested();
                                 ReadFileWithRetry(fullPath, relativePath, options, zipWriter,
                                     ref processedBytes, totalBytes, totalFiles, ref processedFiles,
@@ -910,6 +915,9 @@ while (true)
                             // CompressGroup：需要压缩的文件通过 7z.dll 多线程压缩
                             if (compressGroup.Count > 0)
                             {
+                                CoreLog.Trace($"[TRACE] CompressAsync CompressGroup: {compressGroup.Count} files");
+                                foreach (var (fp, rp) in compressGroup)
+                                    CoreLog.Trace($"[TRACE]   CompressGroup entry: FullPath={fp} → RelativePath={rp}");
                                 var tempZip = Path.Combine(Path.GetTempPath(), $"mantiszip_mt_{Guid.NewGuid():N}.zip");
                                 try
                                 {
@@ -1554,8 +1562,10 @@ while (true)
                                 }
 
                                 // StoreGroup：已压缩文件直接 Store 写入 ZipWriter
+                                CoreLog.Trace($"[TRACE] AddToArchiveAsync StoreGroup: {storeGroup.Count} files");
                                 foreach (var (fullPath, relPath) in storeGroup)
                                 {
+                                    CoreLog.Trace($"[TRACE]   StoreGroup entry: FullPath={fullPath} → relPath={relPath} → ArchivePath.Normalize={ArchivePath.Normalize(relPath)}");
                                     cancellationToken.ThrowIfCancellationRequested();
                                     var fi = new FileInfo(fullPath);
                                     var entryPath = ArchivePath.Normalize(relPath);
@@ -1585,6 +1595,9 @@ while (true)
                                 // CompressGroup：需要压缩的文件通过 7z.dll 多线程压缩
                                 if (compressGroup.Count > 0)
                                 {
+                                    CoreLog.Trace($"[TRACE] AddToArchiveAsync CompressGroup: {compressGroup.Count} files");
+                                    foreach (var (fp, rp) in compressGroup)
+                                        CoreLog.Trace($"[TRACE]   CompressGroup entry: FullPath={fp} → RelativePath={rp}");
                                     var tempZip = Path.Combine(Path.GetTempPath(), $"mantiszip_mt_{Guid.NewGuid():N}.zip");
                                     int mtProcessedFiles = 0;
                                     try
@@ -2312,11 +2325,42 @@ while (true)
             }
         };
 
-        var filePaths = files.Select(f => f.FullPath).Distinct().ToArray();
-        if (filePaths.Length > 0)
+        // ── 路径修复：7z CompressFilesEncrypted 会剥离所有输入文件的最长公共前缀，
+        //    当 CompressGroup 文件全在同一子目录时，整个目录被剥掉，条目只剩文件名。
+        //    解决方案：创建镜像目录结构的临时目录，用 CompressDirectory 压缩——
+        //    7z 保留目录内相对路径（如 testpath/文本/.gitignore）。
+        var tempDir = Path.Combine(Path.GetTempPath(), $"mantiszip_mt_dir_{Guid.NewGuid():N}");
+        try
         {
-            compr.CompressFilesEncrypted(tempPath, "", filePaths);
+            foreach (var (fullPath, relativePath) in files)
+            {
+                var destPath = Path.Combine(tempDir, relativePath);
+                var destDir = Path.GetDirectoryName(destPath)!;
+                Directory.CreateDirectory(destDir);
+                File.Copy(fullPath, destPath, overwrite: true);
+            }
+
+            var mirrorCount = Directory.GetFiles(tempDir, "*", SearchOption.AllDirectories).Length;
+            CoreLog.Trace($"[TRACE] CompressGroupWithSevenZip: {mirrorCount} mirror files, tempDir={tempDir}, tempZip={tempPath}");
+
+            if (mirrorCount > 0)
+            {
+                compr.CompressDirectory(tempDir, tempPath);
+            }
         }
+        finally
+        {
+            try { if (Directory.Exists(tempDir)) Directory.Delete(tempDir, true); } catch { }
+        }
+
+        // 打印 7z 生成的临时 ZIP 中的条目路径，用于排查路径翻倍问题
+        try
+        {
+            using var verifyArchive = ZipArchive.OpenArchive(tempPath);
+            foreach (var e in verifyArchive.Entries.Where(e => !e.IsDirectory))
+                CoreLog.Trace($"[TRACE]   7z tempZip entry: Key={e.Key} → Normalize={ArchivePath.Normalize(e.Key ?? "")}");
+        }
+        catch (Exception ex) { CoreLog.Trace($"[TRACE]   7z tempZip verify failed: {ex.Message}"); }
 
         lastReportTime = localLastReportTime; // 写回 ref 参数
     }
@@ -2338,12 +2382,14 @@ while (true)
     {
         using var tempArchive = ZipArchive.OpenArchive(tempZipPath);
         var entries = tempArchive.Entries.Where(e => !e.IsDirectory).ToList();
+        CoreLog.Trace($"[TRACE] MergeTempZipToWriter: {entries.Count} entries from tempZip");
 
         foreach (var entry in entries)
         {
             ct.ThrowIfCancellationRequested();
 
             var entryKey = ArchivePath.Normalize(entry.Key ?? string.Empty);
+            CoreLog.Trace($"[TRACE]   Merge entry: raw Key={entry.Key} → entryKey={entryKey}");
 
             using var entryStream = entry.OpenEntryStream();
             var entryOptions = new ZipWriterEntryOptions
