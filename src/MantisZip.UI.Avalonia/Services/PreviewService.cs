@@ -280,9 +280,12 @@ public class PreviewService
             FileFormat.Svg => PreviewType.Svg,
 
             // 文本类
-            FileFormat.Text or FileFormat.Csv or FileFormat.Json
+            FileFormat.Text or FileFormat.Json
                 or FileFormat.Xml or FileFormat.Ini
                 => PreviewType.Text,
+
+            // CSV（独立于文本：魔数检测经扩展名兜底识别后走表格预览）
+            FileFormat.Csv => PreviewType.Csv,
 
             // HTML / Markdown
             FileFormat.Html => PreviewType.Html,

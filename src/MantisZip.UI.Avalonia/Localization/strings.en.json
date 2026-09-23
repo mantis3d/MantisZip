@@ -1,4 +1,8 @@
 {
+  "Preview_Encoding_Auto": "Auto detect",
+  "Preview_Encoding_SystemAnsi": "System ANSI ({0})",
+  "Preview_Encoding_Detected": "Detected: {0}",
+  "Preview_Tooltip_Encoding": "Switch text encoding",
   "Settings_HtmlSecurity": "HTML Preview Security",
   "Settings_AllowJavaScript": "Allow JavaScript execution",
   "Settings_AllowJavaScript_Desc": "Allow scripts to execute in HTML preview",

@@ -21,6 +21,7 @@ using System.IO;
 using System.IO.Pipes;
 using System.Runtime.InteropServices;
 using System.Security.Principal;
+using System.Text;
 using System.Threading;
 using Microsoft.VisualBasic.FileIO;
 using Microsoft.Win32;
@@ -52,6 +53,11 @@ public partial class App : Application
 
     public override void OnFrameworkInitializationCompleted()
     {
+        // ── 注册代码页编码提供程序（GBK/GB2312/936 等中文编码）──
+        // 必须在所有路径（CLI/正常启动）最早执行，否则 Encoding.GetEncoding(936)
+        // 抛 NotSupportedException 导致文本预览退化为 "coding 936 无法预览"。
+        Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
+
         // ── Initialize OLE for drag-drop (required on Windows for DragDrop.DoDragDropAsync) ──
         if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
             NativeMethods.OleInitialize(nint.Zero);

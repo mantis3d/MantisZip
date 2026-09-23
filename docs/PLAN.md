@@ -44,6 +44,7 @@
 | **P2** | Core 层临时目录根可注入（便携模式延伸） | [core-temp-root-injectable.md](.omo/plans/未开始/core-temp-root-injectable.md) | 🟡中 | 2-3h | 📋 2026-08-20 立项：Core 层 **4 处** `%TEMP%\MantisZip` 硬编码（ZipEngine×2、SevenZipEngine×2）便携模式下仍写系统 TEMP；方案 A：`TempPaths` 静态类 + `TempRootOverride` 注入（对齐 `CoreLog.RedactOverride` 模式），UI 启动时注入 `AppSettings.GetTempDir()`，未注入时路径逐字节不变 |
 | **P2** | CleanTempOnStartup 消费方（Avalonia 启动清理） | [clean-temp-on-startup-avalonia.md](.omo/plans/未开始/clean-temp-on-startup-avalonia.md) | 🟢低 | 1-2h | 📋 2026-08-20 立项：Avalonia 设置开关存在但启动从不清理（WPF 有 `App.xaml.cs:141-152`）；方案：`OnFrameworkInitializationCompleted` 启动早期用 `AppSettings.GetTempDir()` 清理，失败仅记日志；依赖 core-temp-root-injectable 实施后 Core 层一并覆盖 |
 | **P2** | Avalonia CLI 解压后打开文件夹对齐 WPF | [cli-extract-open-folder.md](.omo/plans/未开始/cli-extract-open-folder.md) | 🟡中 | 2-3h | 📋 2026-08-20 立项：WPF CLI `--extract-here`/`--extract-to-name` 单文件模式 `OpenFolderAfterExtract` 时经 `ResolveSmartOpenPathAsync` 打开文件夹（`App.Extract.cs:614-619`），Avalonia CLI 只解压不打开；方案：`RunExtractCliAsync` 解压成功后复用 `SmartOpenPathResolver` 打开；多文件批处理保持不开；实施前需确认 WPF `--extract`/`--extract-smart` 是否同样打开 |
+| **P2** | 文本预览语法高亮（Avalonia） | [text-preview-syntax-highlighting.md](.omo/plans/未开始/text-preview-syntax-highlighting.md) | 🟡中 | 4-5h | ✅ 2026-09-21 重写为 Avalonia 版（原 WPF AvalonEdit 方案废弃）：AvaloniaEdit 12.0.0 + TextMate（`AvaloniaEdit.TextMate`，VS Code 语法全集覆盖 `TextExtensions` 40+ 扩展名，无需自研 XSHD），TextEditor 替换 ScrollViewer+TextBox，亮/暗主题 `SetTheme` 联动，扩展名→魔数→JSON/INI 结构特征三级语言识别（配合 2026-09-21 已落地的文本内容检测）；Phase 1 功能补齐：TextMate 语法分发 |
 | **P3** | 压缩包对比 (Archive Diff) | [archive-diff.md](.omo/plans/未开始/archive-diff.md) | 🟡中 | 3-4h | 压缩包文件级差异对比 |
 | **P3** | 原生图标 DLL | [icon-dll.md](.omo/plans/已归档/icon-dll.md) | 🟡中 | 2-3h | ☑️ 2026-08-20 核实：部分实现（机制不同）——图标已嵌入 `MantisZip.ShellExt.dll` 托管资源（11 个 .ico EmbeddedResource，`GetIconForCommand` 运行时读取，无路径依赖）；计划的「原生 .rc 资源 DLL（MantisZip.Icons.vcxproj）」方案未实施，效果已达成 |
 | **P3** | 可插拔预览模块体系 | [preview-modular-providers.md](.omo/plans/未开始/preview-modular-providers.md) | 🟡中 | 3-4h | 格式类库独立分发 |
@@ -74,7 +75,6 @@
 | 优先级 | 功能 | 设计文档 | 难度 | 预估工时 | 说明 |废弃原因 |
 |--------|------|----------|:----:|:--------:|------|------|
 | **P3** | VirtualFileDataObject | [virtual-file-data-object.md](.omo/plans/已归档/virtual-file-data-object.md) | 🔴高 | 6-8h | COM 原生 IDataObject 替代 WPF OLE 桥 | 跨平台移植（Avalonia）后不再依赖 WPF OLE 桥，无 OLE CF_HDROP bug，VFDO 无存在必要 |
-| **P2** | 文本预览语法高亮 | [text-preview-syntax-highlighting.md](.omo/plans/未开始/text-preview-syntax-highlighting.md) | 🟡中 | 5-7h | AvalonEdit 替换 TextBox，支持 20+ 语言语法高亮 | AvalonEdit 是 WPF-only 控件，跨平台移植（Avalonia）后需使用 AvaloniaEdit 完全重写 |
 | **P4** | 拖拽提取目标检测 | [drag-drop-marker-target.md](.omo/plans/已归档/drag-drop-marker-target.md) | 🟡中 | 1-3h | Marker 文件探测拖放目标目录 | 被 [drag-drop-direct-extract.md](.omo/plans/已完成/drag-drop-direct-extract.md) 取代——WindowFromPoint+ShellWindows 更直接可靠 |
 
 ---

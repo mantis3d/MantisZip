@@ -270,16 +270,21 @@ MantisZip would not exist without the generous contributions of the global open-
 | [SharpZipLib](https://github.com/icsharpcode/SharpZipLib) | 1.4.2 | Testing only (test project) | MIT |
 | [System.Security.Cryptography.ProtectedData](https://github.com/dotnet/runtime) | 10.0.8 | DPAPI-encrypted password storage | MIT |
 
-#### MantisZip.UI
+#### MantisZip.UI.Avalonia
 
 | Package | Version | Purpose | License |
 |------|------|------|--------|
-| [CommunityToolkit.Mvvm](https://github.com/CommunityToolkit/dotnet) | 8.4.2 | MVVM utilities (partial base classes only) | MIT |
-| [Markdig](https://github.com/xoofx/markdig) | 1.2.0 | Markdown → HTML rendering | BSD-2-Clause |
-| [Ookii.Dialogs.Wpf](https://github.com/ookii-dialogs/ookii-dialogs-wpf) | 5.0.1 | Vista-style folder picker dialog | BSD-3-Clause |
+| [Avalonia](https://github.com/AvaloniaUI/Avalonia) | 12.0.4 | Cross-platform UI framework | MIT |
+| [CommunityToolkit.Mvvm](https://github.com/CommunityToolkit/dotnet) | 8.4.2 | MVVM utilities (ObservableObject + source generators) | MIT |
+| [Markdig](https://github.com/xoofx/markdig) | 0.40.0 | Markdown parsing (AST → native control tree) | BSD-2-Clause |
+| [ReverseMarkdown](https://github.com/magicmousen/ReverseMarkdown) | 4.7.0 | HTML → Markdown conversion (HTML preview fallback path) | MIT |
+| [PdfPig](https://github.com/UglyToad/PdfPig) | 0.1.15 | PDF parsing and page-by-page rendering | Apache-2.0 |
+| [Svg.Skia](https://github.com/nickspag/Svg.Skia) | 2.0.0.5 | SVG rasterization (no WebView2 required) | MIT |
+| [SkiaSharp](https://github.com/nickspag/SkiaSharp) | 3.119.4 | 2D graphics rendering (PDF/SVG/font bitmaps) | MIT |
+| [HarfBuzzSharp](https://github.com/nickspag/HarfBuzzSharp) | 14.2.0 | Font preview glyph layout and ligature detection | MIT |
+| [ClosedXML](https://github.com/ClosedXML/ClosedXML) | 0.105.0 | XLSX table preview | MIT |
+| [DocumentFormat.OpenXml](https://github.com/nickspag/DocumentFormat.OpenXml) | 3.5.1 | DOCX/PPTX document parsing | MIT |
 | [Ude.NetStandard](https://github.com/jehugaleahsa/udetector) | 1.2.0 | Mozilla charset detection (text preview) | MIT |
-| [WpfAnimatedGif](https://github.com/XamlAnimatedGif/WpfAnimatedGif) | 2.0.2 | GIF animation support | MIT |
-| [Microsoft.Web.WebView2](https://developer.microsoft.com/microsoft-edge/webview2/) | 1.0.3967.48 | HTML/Markdown/SVG/PDF preview (replaces WPF WebBrowser) | BSD-3-Clause |
 
 #### External Tools (Runtime Dependencies)
 
@@ -342,7 +347,7 @@ If you are in China, you can support via **Afdian (WeChat/Alipay)** or **WeChat 
 
 ### 💬 Community & Feedback
 
-If you encounter a bug, have a feature idea, or just want to chat about WPF/.NET independent development, feel free to join our developer community:
+If you encounter a bug, have a feature idea, or just want to chat about .NET/Avalonia independent development, feel free to join our developer community:
 
 * **QQ Group**: `778347352` (👉 [Click to join](https://qm.qq.com/cgi-bin/qm/qr?k=778347352))
 * **Code Repository**: [Submit a Bug or Feature Request](../../issues)

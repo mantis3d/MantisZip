@@ -1511,7 +1511,9 @@ public partial class MainWindow : Window
             return s.TrimEnd('▲', '▼', ' ').TrimEnd();
         if (column.Header is StackPanel panel)
         {
-            var tb = panel.Children.OfType<TextBlock>().LastOrDefault();
+            // 取第一个 TextBlock（列标题文字）。最后一个 TextBlock 是排序箭头指示
+            // （NameHeaderArrow 等，初始 Text=""），LastOrDefault 会误取到空箭头导致菜单空白
+            var tb = panel.Children.OfType<TextBlock>().FirstOrDefault();
             if (tb != null)
                 return tb.Text ?? "";
         }

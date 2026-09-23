@@ -31,6 +31,9 @@ using Avalonia.Styling;
 
 namespace MantisZip.UI.Avalonia.ViewModels;
 
+/// <summary>编码下拉选项：Key 为 .NET 编码名或 "auto"/"system", DisplayName 为本地化显示名。</summary>
+public sealed record EncodingOption(string Key, string DisplayName);
+
 public partial class PreviewViewModel : ObservableObject
 {
     /// <summary>本地化字符串字典，XAML 通过 {Binding LocalizedStrings[Key]} 访问。</summary>
@@ -87,6 +90,64 @@ public partial class PreviewViewModel : ObservableObject
 
     private string? _currentHtmlTempPath;
 
+    // ── 编码选择器状态 ──
+
+    private byte[]? _textPreviewBytes;                 // 当前文本类预览的原始字节缓存
+    private string? _currentEncodingKey;               // 当前生效：null=未初始化, "auto", "system", 或具体编码名
+    private string? _currentDetectedEncodingName;      // auto 模式下 Ude 检测结果（如 "GB18030"）
+
+    /// <summary>编码下拉数据源（首项为自动检测，语言切换后重建 DisplayName）。</summary>
+    public IReadOnlyList<EncodingOption> EncodingOptions { get; private set; } = BuildEncodingOptions();
+
+    [ObservableProperty]
+    private EncodingOption? _selectedEncoding;
+
+    /// <summary>文本 / Markdown / HTML / CSV 预览显示编码选择器。</summary>
+    public bool HasEncodingSelector =>
+        PreviewType is PreviewType.Text or PreviewType.Markdown or PreviewType.Html or PreviewType.Csv;
+
+    /// <summary>auto 模式下实际检测到的编码名（供 UI 显示「自动检测: GBK」）。</summary>
+    public string? CurrentDetectedEncodingName => _currentDetectedEncodingName;
+
+    /// <summary>是否有检测到的编码名（供 XAML IsVisible 绑定，null→Collapsed）。</summary>
+    public bool HasDetectedEncoding => _currentDetectedEncodingName != null;
+
+    /// <summary>格式化后的检测编码显示文本（如「检测到: GBK」）。</summary>
+    public string DetectedEncodingDisplay =>
+        string.IsNullOrEmpty(_currentDetectedEncodingName)
+            ? string.Empty
+            : string.Format(LocalizationManager.T("Preview_Encoding_Detected"), _currentDetectedEncodingName);
+
+    /// <summary>构建编码下拉选项。首项为自动检测；其余为常用单字节/中文字符编码。</summary>
+    private static List<EncodingOption> BuildEncodingOptions()
+    {
+        var list = new List<EncodingOption>
+        {
+            new("auto", LocalizationManager.T("Preview_Encoding_Auto")),
+            new("utf-8", "UTF-8"),
+            new("utf-16", "UTF-16 LE"),
+            new("gbk", "GBK (936)"),
+            new("gb18030", "GB18030 (54936)"),
+            new("big5", "Big5 (950)"),
+            new("shift-jis", "Shift-JIS (932)"),
+            new("euc-kr", "EUC-KR (949)"),
+        };
+        int ansiCp = System.Globalization.CultureInfo.CurrentCulture.TextInfo.ANSICodePage;
+        list.Add(new("system", LocalizationManager.T("Preview_Encoding_SystemAnsi", ansiCp)));
+        return list;
+    }
+
+    /// <summary>语言切换后重建编码下拉 DisplayName，保持当前选中项不变。</summary>
+    private void RefreshEncodingOptions()
+    {
+        var prevKey = _currentEncodingKey;
+        EncodingOptions = BuildEncodingOptions();
+        OnPropertyChanged(nameof(EncodingOptions));
+        // 恢复之前选中的编码（直接赋值字段，避免触发 OnSelectedEncodingChanged 的持久化/解码副作用）
+        _selectedEncoding = EncodingOptions.FirstOrDefault(o => o.Key == (prevKey ?? "auto"));
+        OnPropertyChanged(nameof(SelectedEncoding));
+    }
+
     private void CleanupHtmlTempFile()
     {
         if (!string.IsNullOrEmpty(_currentHtmlTempPath) && File.Exists(_currentHtmlTempPath))
@@ -101,11 +162,15 @@ public partial class PreviewViewModel : ObservableObject
         MetadataSettingsManager.SettingsChanged += OnMetadataSettingsChanged;
         LocalizationManager.CultureChanged += OnCultureChanged;
         UpdateLocalizedStrings();
+        var savedEncodingKey = AppSettings.Load().TextEncodingPreference;
+        SelectedEncoding = EncodingOptions.FirstOrDefault(o => o.Key == savedEncodingKey)
+                           ?? EncodingOptions.FirstOrDefault(o => o.Key == "auto");
     }
 
     private void OnCultureChanged(object? sender, EventArgs e)
     {
         UpdateLocalizedStrings();
+        RefreshEncodingOptions();
     }
 
     private void UpdateLocalizedStrings()
@@ -128,6 +193,11 @@ public partial class PreviewViewModel : ObservableObject
         LocalizedStrings["Preview_Tooltip_PptxNext"] = LocalizationManager.T("Preview_Tooltip_PptxNext");
         LocalizedStrings["Preview_Tooltip_PdfPrev"] = LocalizationManager.T("Preview_Tooltip_PdfPrev");
         LocalizedStrings["Preview_Tooltip_PdfNext"] = LocalizationManager.T("Preview_Tooltip_PdfNext");
+        LocalizedStrings["Preview_Encoding_Auto"] = LocalizationManager.T("Preview_Encoding_Auto");
+        LocalizedStrings["Preview_Encoding_SystemAnsi"] = LocalizationManager.T("Preview_Encoding_SystemAnsi",
+            System.Globalization.CultureInfo.CurrentCulture.TextInfo.ANSICodePage);
+        LocalizedStrings["Preview_Encoding_Detected"] = LocalizationManager.T("Preview_Encoding_Detected");
+        LocalizedStrings["Preview_Tooltip_Encoding"] = LocalizationManager.T("Preview_Tooltip_Encoding");
         LocalizedStrings["Extract_UnlockButton"] = LocalizationManager.T("Extract_UnlockButton");
         LocalizedStrings["Preview_HtmlSourceToggle"] = LocalizationManager.T("Preview_HtmlSourceToggle");
         OnPropertyChanged(nameof(LocalizedStrings));
@@ -354,6 +424,7 @@ public partial class PreviewViewModel : ObservableObject
         OnPropertyChanged(nameof(HasPdfNavigation));
         OnPropertyChanged(nameof(IsIcoGalleryVisible));
         OnPropertyChanged(nameof(IsFontTextFallbackVisible));
+        OnPropertyChanged(nameof(HasEncodingSelector));
 
         // Auto-dismiss loading overlay when switching to actual preview content.
         // PreviewType.None is set by ShowLoading() — keep the overlay visible.
@@ -823,16 +894,158 @@ public partial class PreviewViewModel : ObservableObject
         PreviewImage = _gifFrames[value].Bitmap;
     }
 
+    // ── 编码切换管线 ──
+
+    /// <summary>按当前选中编码解码缓存的字节并返回文本。auto/system 走自动检测/系统 ANSI。</summary>
+    private (string Text, string? DetectedName) DecodePreviewBytes()
+    {
+        if (_textPreviewBytes == null) return (string.Empty, null);
+
+        switch (_currentEncodingKey)
+        {
+            case null or "auto":
+                var (text, name) = TextEncodingDetector.DetectAndDecodeText(_textPreviewBytes);
+                _currentDetectedEncodingName = name;
+                return (text, name);
+            case "system":
+                return (TextEncodingDetector.DecodeText(_textPreviewBytes, null), null);
+            default:
+                return (TextEncodingDetector.DecodeText(_textPreviewBytes, _currentEncodingKey), null);
+        }
+    }
+
+    /// <summary>编码下拉切换处理：更新生效编码、持久化偏好、重解码当前预览。</summary>
+    partial void OnSelectedEncodingChanged(EncodingOption? value)
+    {
+        if (value == null) return;
+        _currentEncodingKey = value.Key;
+        if (_textPreviewBytes != null)
+            ApplyEncodingRefresh();
+        PersistEncodingPreference(value.Key);
+    }
+
+    /// <summary>按当前编码重解码并刷新对应预览内容。</summary>
+    private void ApplyEncodingRefresh()
+    {
+        var (text, _) = DecodePreviewBytes();
+        OnPropertyChanged(nameof(CurrentDetectedEncodingName));
+        OnPropertyChanged(nameof(HasDetectedEncoding));
+        OnPropertyChanged(nameof(DetectedEncodingDisplay));
+        switch (PreviewType)
+        {
+            case PreviewType.Text:
+                TextContent = text;
+                break;
+            case PreviewType.Markdown:
+                RebuildMarkdown(text);
+                break;
+            case PreviewType.Html:
+                _ = RebuildHtmlAsync(text);
+                break;
+            case PreviewType.Csv:
+                RebuildCsv(text);
+                break;
+        }
+    }
+
+    /// <summary>持久化编码偏好到 AppSettings.TextEncodingPreference（规则：auto 以外的选择记住）。</summary>
+    private static void PersistEncodingPreference(string key)
+    {
+        if (key == "auto") return; // auto 是默认值，无需持久化
+        var settings = AppSettings.Load();
+        settings.TextEncodingPreference = key;
+        settings.Save();
+    }
+
+    /// <summary>按新文本重建 Markdown 控件树（编码切换或刷新时调用）。</summary>
+    private void RebuildMarkdown(string markdown)
+    {
+        var panel = MarkdownPreviewBuilder.Build(markdown);
+        MarkdownPreviewPanel = panel;
+        HtmlSourceContent = markdown;
+    }
+
+    /// <summary>按新 HTML 重建预览内容（WebView 刷新或降级路径重建）。</summary>
+    private async Task RebuildHtmlAsync(string html)
+    {
+        if (IsWebViewVisible)
+        {
+            // WebView 路径：写入新 HTML 到临时文件并导航
+            CleanupHtmlTempFile();
+            var tempHtmlPath = Path.Combine(
+                Path.GetTempPath(), "MantisZip", "Preview",
+                $"preview_{Guid.NewGuid():N}.html");
+            try
+            {
+                var dir = Path.GetDirectoryName(tempHtmlPath);
+                if (dir != null && !Directory.Exists(dir))
+                    Directory.CreateDirectory(dir);
+                var settings = AppSettings.Load();
+                var cspParts = new List<string>();
+                cspParts.Add(settings.AllowExternalResources ? "default-src * data: blob:" : "default-src 'self' data: blob:");
+                // style-src 显式放行内联样式（<style> 块与 style="" 属性）；不加此指令会回退到 default-src（无 'unsafe-inline'），导致页面自身样式全被拦
+                cspParts.Add(settings.AllowExternalResources ? "style-src 'unsafe-inline' * data: blob:" : "style-src 'unsafe-inline' 'self' data: blob:");
+                cspParts.Add(settings.AllowJavaScript ? "script-src 'self' 'unsafe-inline'" : "script-src 'none'");
+                cspParts.Add("frame-src 'none'");
+                var csp = string.Join("; ", cspParts);
+var secureHtml = InjectCspMeta(html, csp);
+                await File.WriteAllTextAsync(tempHtmlPath, secureHtml);
+                _currentHtmlTempPath = tempHtmlPath;
+                HtmlWebViewUri = tempHtmlPath;
+                HtmlSourceContent = html;
+            }
+            catch
+            {
+                CleanupHtmlTempFile();
+            }
+        }
+        else if (IsFallbackActive)
+        {
+            // 降级路径：ReverseMarkdown → Markdown → 控件树
+            try
+            {
+                var converter = new Converter();
+                var markdown = converter.Convert(html);
+                var panel = MarkdownPreviewBuilder.Build(markdown);
+                MarkdownPreviewPanel = panel;
+                HtmlSourceContent = html;
+            }
+            catch (Exception ex)
+            {
+                App.DebugLog($"RebuildHtmlAsync: ReverseMarkdown 重建失败 ({ex.Message})");
+            }
+        }
+    }
+
     /// <summary>
-    /// 显示文本预览。
+    /// 将 CSP meta 注入到 HTML 文档中。文档以 DOCTYPE 开头时插入到其后——
+    /// 若 meta 先于 DOCTYPE（当前原始 HTML 前会被注入 meta），浏览器会忽略 DOCTYPE 进入 Quirks Mode，
+    /// 导致 CSS 布局行为异常。无 DOCTYPE 的文档保持原注入位置。
     /// </summary>
+    private static string InjectCspMeta(string html, string csp)
+    {
+        var meta = $"""<meta http-equiv="Content-Security-Policy" content="{csp}">""";
+        if (html.StartsWith("<!DOCTYPE", StringComparison.OrdinalIgnoreCase))
+        {
+            var gt = html.IndexOf('>');
+            if (gt >= 0)
+                return html.Insert(gt + 1, meta);
+        }
+        return meta + html;
+    }
+
+    /// <summary>显示文本预览。</summary>
     public void ShowText(string filePath)
     {
-        var content = TextEncodingDetector.DetectAndReadText(filePath);
-        TextContent = content;
+        _textPreviewBytes = File.ReadAllBytes(filePath);
+        var (text, _) = DecodePreviewBytes();
+        TextContent = text;
         PreviewType = PreviewType.Text;
         IsPreviewVisible = true;
         IsToolbarVisible = true;
+        OnPropertyChanged(nameof(CurrentDetectedEncodingName));
+        OnPropertyChanged(nameof(HasDetectedEncoding));
+        OnPropertyChanged(nameof(DetectedEncodingDisplay));
         // 从设置加载文本预览字号和字体
         var settings = AppSettings.Load();
         FontSize = settings.TextPreviewFontSize;
@@ -889,11 +1102,25 @@ public partial class PreviewViewModel : ObservableObject
     /// </summary>
     public void ShowCsv(string filePath)
     {
+        _textPreviewBytes = File.ReadAllBytes(filePath);
+        var (text, _) = DecodePreviewBytes();
+        RebuildCsv(text);
+        PreviewType = PreviewType.Csv;
+        IsPreviewVisible = true;
+        IsToolbarVisible = false;
+        OnPropertyChanged(nameof(CurrentDetectedEncodingName));
+        OnPropertyChanged(nameof(HasDetectedEncoding));
+        OnPropertyChanged(nameof(DetectedEncodingDisplay));
+    }
+
+    /// <summary>按解码后的文本重建 CSV 表格（编码切换时复用）。</summary>
+    private void RebuildCsv(string text)
+    {
         // 行列上限来自运行时配置（App.axaml.cs 启动时 + 设置保存时同步），与 WPF 版一致
         var maxRows = PreviewService.MaxTablePreviewRows;
         var maxCols = PreviewService.MaxTablePreviewCols;
         var table = new DataTable();
-        var lines = File.ReadLines(filePath).Take(maxRows + 1).ToList();
+        var lines = text.Split('\n').Select(l => l.TrimEnd('\r')).Take(maxRows + 1).ToList();
 
         if (lines.Count > 0)
         {
@@ -914,9 +1141,6 @@ public partial class PreviewViewModel : ObservableObject
 
         _csvDataTable = table;
         CsvData = table.DefaultView;  // DataView 可绑定到 ItemsControl
-        PreviewType = PreviewType.Csv;
-        IsPreviewVisible = true;
-        IsToolbarVisible = false;
     }
 
     /// <summary>
@@ -2681,7 +2905,11 @@ public partial class PreviewViewModel : ObservableObject
     /// </summary>
     public async Task ShowHtmlPreview(string filePath)
     {
-        var html = await File.ReadAllTextAsync(filePath);
+        _textPreviewBytes = await File.ReadAllBytesAsync(filePath);
+        var (html, _) = DecodePreviewBytes();
+        OnPropertyChanged(nameof(CurrentDetectedEncodingName));
+        OnPropertyChanged(nameof(HasDetectedEncoding));
+        OnPropertyChanged(nameof(DetectedEncodingDisplay));
 
         // Pre-compute fallback markdown in parallel
         var fallbackMarkdownTask = Task.Run(() =>
@@ -2705,10 +2933,12 @@ public partial class PreviewViewModel : ObservableObject
             var settings = AppSettings.Load();
             var cspParts = new List<string>();
             cspParts.Add(settings.AllowExternalResources ? "default-src * data: blob:" : "default-src 'self' data: blob:");
+            // style-src 显式放行内联样式（<style> 块与 style="" 属性）；不加此指令会回退到 default-src（无 'unsafe-inline'），导致页面自身样式全被拦
+            cspParts.Add(settings.AllowExternalResources ? "style-src 'unsafe-inline' * data: blob:" : "style-src 'unsafe-inline' 'self' data: blob:");
             cspParts.Add(settings.AllowJavaScript ? "script-src 'self' 'unsafe-inline'" : "script-src 'none'");
             cspParts.Add("frame-src 'none'");
             var csp = string.Join("; ", cspParts);
-            var secureHtml = $"""<meta http-equiv="Content-Security-Policy" content="{csp}">{html}""";
+            var secureHtml = InjectCspMeta(html, csp);
             await File.WriteAllTextAsync(tempHtmlPath, secureHtml);
             _currentHtmlTempPath = tempHtmlPath;
 
@@ -2741,12 +2971,15 @@ public partial class PreviewViewModel : ObservableObject
     /// </summary>
     public async Task ShowHtmlFallback(string filePath)
     {
-        CleanupHtmlTempFile(); // temp file no longer needed for WebView
-        var html = await File.ReadAllTextAsync(filePath);
+        CleanupHtmlTempFile();
+        _textPreviewBytes = await File.ReadAllBytesAsync(filePath);
+        var (html, _) = DecodePreviewBytes();
+        OnPropertyChanged(nameof(CurrentDetectedEncodingName));
+        OnPropertyChanged(nameof(HasDetectedEncoding));
+        OnPropertyChanged(nameof(DetectedEncodingDisplay));
         var converter = new Converter();
         var markdown = converter.Convert(html);
-        var panel = MarkdownPreviewBuilder.Build(markdown);
-        MarkdownPreviewPanel = panel;
+        RebuildMarkdown(markdown);
         IsWebViewVisible = false;
         IsFallbackActive = true;
         PreviewType = PreviewType.Html;
@@ -2761,13 +2994,16 @@ public partial class PreviewViewModel : ObservableObject
     /// </summary>
     public void ShowMarkdownPreview(string filePath)
     {
-        var markdown = File.ReadAllText(filePath);
-        var panel = MarkdownPreviewBuilder.Build(markdown);
-        MarkdownPreviewPanel = panel;
-        HtmlSourceContent = markdown;
+        _textPreviewBytes = File.ReadAllBytes(filePath);
+        var (markdown, _) = DecodePreviewBytes();
+        RebuildMarkdown(markdown);
+        OnPropertyChanged(nameof(CurrentDetectedEncodingName));
+        OnPropertyChanged(nameof(HasDetectedEncoding));
+        OnPropertyChanged(nameof(DetectedEncodingDisplay));
         PreviewType = PreviewType.Markdown;
         IsPreviewVisible = true;
-        IsToolbarVisible = false;
+        IsToolbarVisible = true;
+        IsWebViewVisible = false;
     }
 
     /// <summary>

@@ -1,4 +1,8 @@
 {
+  "Preview_Encoding_Auto": "自动检测",
+  "Preview_Encoding_SystemAnsi": "系统 ANSI ({0})",
+  "Preview_Encoding_Detected": "检测到: {0}",
+  "Preview_Tooltip_Encoding": "切换文本编码",
   "Settings_HtmlSecurity": "HTML 预览安全",
   "Settings_AllowJavaScript": "允许 JavaScript 执行",
   "Settings_AllowJavaScript_Desc": "允许预览的 HTML 页面执行脚本代码",
