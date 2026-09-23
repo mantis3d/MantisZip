@@ -82,6 +82,12 @@ public partial class App : Application
         };
         ApplyCompactness(compactMode);
 
+        // ── CoreLog 初始化：注入诊断开关 + 路径脱敏委托 ──
+        // CoreLog.Trace/Info/Error 写入同一 debug.log，但 Core 层无法引用 AppSettings，
+        // 必须由 UI 层在启动时注入脱敏逻辑，否则 Core 日志中的路径不会被脱敏。
+        CoreLog.DiagnosticsEnabled = appSettings.EnableDebugLogging;
+        CoreLog.RedactOverride = msg => LogRedactor.RedactPaths(msg, LogRedactor.ParseMode(appSettings.LogPrivacyMode));
+
         // ── Initialize preview settings (runtime caches; SettingsWindow.Save 同步保持即时生效) ──
         PreviewService.EnableFormatDetection = appSettings.EnableFormatDetection;
         PreviewService.PreviewHeadSize = appSettings.PreviewHeadSize;
@@ -732,6 +738,9 @@ public partial class App : Application
         var settings = AppSettings.Load();
         _debugLogEnabled = settings.EnableDebugLogging;
         _debugLogPrivacyMode = settings.LogPrivacyMode;
+        // 同步刷新 CoreLog 的诊断开关与脱敏委托
+        CoreLog.DiagnosticsEnabled = settings.EnableDebugLogging;
+        CoreLog.RedactOverride = msg => LogRedactor.RedactPaths(msg, LogRedactor.ParseMode(settings.LogPrivacyMode));
     }
 
     /// <summary>
