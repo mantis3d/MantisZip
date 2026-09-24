@@ -2434,14 +2434,21 @@ while (true)
             try
             {
                 var fi = new FileInfo(fullPath);
-                // 自适应压缩：已压缩文件自动 Store（仅 Deflate/Deflate64 归档适用）
+                // 自适应压缩：已压缩文件自动 Store（仅 Deflate/Deflate64 归档适用）。
+                // 必须用 4 参重载（传入 MultiThreadedStoreFormatIds）而非 3 参：
+                //   · 3 参仅查内置已压缩扩展名列表；4 参额外合并 MultiThreadedStoreFormatIds 自定义列表。
+                //   · MT 模式的分拣（storeGroup/compressGroup 分流）在 ZIP 条目级别用 4 参判定；
+                //     若此处写入阶段用 3 参重算，自定义列表命中的文件（如 .wav）会被降级重算为
+                //     level>0 → 实际 Deflate 压缩 —— 分拣说 Store、写入却 Deflate，自打脸。
+                //   · 非 MT 的普通自适应路径同样经此方法，4 参在无自定义列表时行为与 3 参完全一致，
+                //     故统一用 4 参无副作用。
                 int? entryLevel = null;
                 if (options != null && options.AdaptiveCompression && !options.Encrypt)
                 {
                     var method = options.ZipCompressionMethod?.ToLowerInvariant();
                     if (string.IsNullOrEmpty(method) || method == "deflate" || method == "deflate64")
                     {
-                        entryLevel = ZipEntryClassifier.GetAdaptiveLevel(fullPath, options.CompressionLevel, true);
+                        entryLevel = ZipEntryClassifier.GetAdaptiveLevel(fullPath, options.CompressionLevel, true, options.MultiThreadedStoreFormatIds);
                         CoreLog.Trace("ZipEngine.AddToArchiveAsync: adaptive entry '{0}' level={1} (global={2}, adaptive={3})",
                             relativePath, entryLevel ?? options.CompressionLevel, options.CompressionLevel, options.AdaptiveCompression);
                     }

@@ -6,6 +6,17 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-09-24** — 修复 MT 自定义 Store 格式分拣/写入不一致 + 多线程/自适应压缩测试矩阵
+  - **Core 层**：
+    - `Engines/ZipEngine.cs`：`ReadFileWithRetry` 自适应入口改用 4 参 `GetAdaptiveLevel(fullPath, options.CompressionLevel, true, options.MultiThreadedStoreFormatIds)` —— 分拣阶段（`CompressAsync`/`AddToArchiveAsync` 的 StoreGroup/CompressGroup 分流）本就传 4 参，写入阶段此前用 3 参重算**忽略自定义列表**：自定义格式（如 `.wav`）被分入 StoreGroup（level=0）却在写入时退回 Deflate（自打脸 bug）。4 参在无自定义列表时行为与 3 参完全一致，统一无副作用
+    - `Utils/ZipEntryClassifier.cs`：`IsCompressed(string)` → `IsCompressed(string? extension)`（消除测试侧 CS8625 可空传参警告，无行为变化）
+    - `MantisZip.Core.csproj`：新增 `InternalsVisibleTo("MantisZip.Tests")`（测试直读 `FileScanner.CollectFiles` internal 方法）
+  - **测试**（`tests/MantisZip.Tests`）：
+    - 新增 `Utils/ZipEntryClassifierTests.cs`：A 组 13 个用例——3 参/4 参级别计算、内置已压缩扩展名分类、自定义 Store 格式列表命中、内置优先于自定义、`IsCompressed` 大小写/点号容错
+    - `Engines/ZipEngineTests.cs` 新增 B/C/D 组：B1 MT+Adaptive 混合源端到端逐字节回环；C1 仅 MT 关 Adaptive（全 CompressGroup）；C2 MT+加密走标准 7z 加密路径（条目平铺无源目录前缀 + `TestArchiveAsync` 传密码校验）；C3 MT+自定义 Store 格式（`MultiThreadedStoreFormatIds={"Wav"}`，断言改为**体积未压缩特征** `CompressedSize >= Size` —— SharpCompress `CompressionLevel=0` 产生 Deflate stored-block 方法字段恒为 Deflated，不能断言 `CompressionMethod.Stored`，见 AdaptiveCompressionFeasibilityTests 探针 2；sound.wav/hello.txt 换大体积可压缩数据增强区分度）；D1 MT 进度回归（`FileCompressionStarted` 事件触发中间进度 + 最终 100%）
+    - `AssertRoundTripAsync` 参数化 `rootPrefixInEntries`：true = FileScanner 无条件 `{源目录名}/` 根前缀（MT 非加密路径），false = `Path.GetRelativePath` 平铺预期（加密路径 7z 收绝对路径数组剥离最长公共前缀）；目录条目（`subdir` 占位）不计入文件键比对
+  - 验证：0 errors / 1 既有 CS8602 警告（`AdaptiveCompressionFeasibilityTests.cs:604`，非本轮引入），505 测试通过
+
 **2026-09-24** — 过滤/拖拽/右键解压统一并行化 + 并行冲突弹窗修复 + 构建零警告
   - **Core 层**：
     - `Engines/ZipEngine.cs`：`ExtractEntriesAsync` 改造为 dispatcher（梳理命中文件、fileCount ≥2 且 `ParallelExtractDegree` >1 自动切入并行，与全量 `ExtractAsync` 决策逻辑一致）；原串行逻辑整段迁入私有 `ExtractEntriesAsyncSequential` 保持不变，新增 `ExtractEntriesAsyncParallel`（多实例并行：Round-Robin 分批 + 每批次独占一个 archive 实例 + `outputPathOverrides` 权重预读 + 目录条目预创建；冲突处理走快速短路 + `conflictGate` 信号量串行化）

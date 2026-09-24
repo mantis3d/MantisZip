@@ -114,6 +114,7 @@
 
 #### v0.5.0
 
+- **09-24** — 修复 MT 自定义 Store 格式分拣/写入不一致（Core）：`ZipEngine.ReadFileWithRetry` 写入阶段改用 4 参 `GetAdaptiveLevel`（传 `MultiThreadedStoreFormatIds`），与分拣阶段一致——此前分拣用 4 参判 Store、写入用 3 参重算忽略自定义列表，`.wav` 等自定义格式被分入 StoreGroup 却退回 Deflate（自打脸 bug）；`ZipEntryClassifier.IsCompressed` 签名放宽可空扩展名；测试矩阵落地（A 组 13 个分类器用例 + B/C/D 组 5 个 MT 端到端含加密路径、自定义 Store 格式、进度回归）
 - **09-16** — 并行解压 + 7z 多线程压缩基础设施（Core）：`IArchiveEngine.SupportsParallelExtract` 属性 + `ArchiveOptions.ParallelExtractDegree`；`ZipEngine.ExtractAsyncParallel` 多实例并行（Round-Robin 分批、每批次复用 1 个 archive 实例、进度报告锁外上报）；`CopyBufferSize` 256KB→4MB（ZipEngine/TarGzEngine/ZipBinaryRewriter）；`ArchiveOptions.SevenZipMultithreaded`（默认 true）+ `SevenZipEngine.ConfigureCompressor` 写入 `CustomParameters["mt"]` + `CompressRequest`/`CompressService.BuildOptions` 映射；新增 `ParallelExtractTests`（5 用例）+ `SevenZipEngineTests` mt=on 验证（2 用例）
 - **09-22** — 修复 GitHub Release 发版失败（构建）：release.yml 存在重复的 Portable-Web 打包步骤——`Compress-Archive` 步骤产出 `MantisZip-*-Portable-Web.zip`，而 `New-PortableZip` 同时段也产出同名文件（8-07 改名后撞名），Compress-Archive 遇已存在文件报 already exists 导致发版中断；删除旧 Compress-Archive 步骤，Web 便携包统一由 New-PortableZip（7z 打包 + 排除 PDB + 预置默认设置）产出
 - **09-21** — 文本格式内容识别扩展（Core）：`DetectTextSubtype` 新增 JSON/INI 内容启发式 —— INI 用 `[Section]` 段头 + key=value 结构校验，JSON 用首字符 `{`/`[` + 括号配平（容忍 head 截断）+ 引号键/数组元素判定，误报率≈0；为扩展名缺失格式提供内容兜底信号（为未来语法高亮 Language 识别铺路）

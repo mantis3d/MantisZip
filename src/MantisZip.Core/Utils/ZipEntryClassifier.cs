@@ -39,7 +39,7 @@ internal static class ZipEntryClassifier
     /// </summary>
     /// <param name="extension">文件扩展名（含或不含点号均可）</param>
     /// <returns>true = 应 Store；false = 应压缩</returns>
-    public static bool IsCompressed(string extension)
+    public static bool IsCompressed(string? extension)
     {
         if (string.IsNullOrEmpty(extension)) return false;
         // 统一去掉前导点号，转小写
