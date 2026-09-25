@@ -6,6 +6,91 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-09-22** — 修正存量文档过时的技术事实（.NET 9→10、WPF 已删除、依赖表）
+  - **RELEASE_NOTES.md**：v0.5.0「版本介绍」补齐英文对照（标题/简介/四子节逐条中英成对），并将过时描述统一修正——`（.NET 9）`→`（.NET 10）`、`WPF 版进入维护模式`→`WPF 版已完全删除`（英文同步）；便携版说明 `dotnet9`/`.NET 9 runtime`→`.NET 10`
+  - **docs/PROGRESS.md**：WPF 遗留版节备注从「进入维护模式…仅当修复仅存在于 WPF 的 bug 时追加」改为「迁移完成后完全删除…仅供历史参考，不再追加新条目」
+  - **docs/progress-wpf.md**：头部追加指令同步改为「仅供历史参考，不再追加新条目」；历史条目本身如实保留
+  - **docs/README_en.md**：将已删除的 WPF 项目 `MantisZip.UI` 依赖表替换为 `MantisZip.UI.Avalonia` 当前 11 项依赖（Avalonia 12.0.4 / Markdig / ReverseMarkdown / PdfPig / Svg.Skia / SkiaSharp / HarfBuzzSharp 等）；社区段 "WPF/.NET"→".NET/Avalonia" 对齐中文版
+  - 原则：仅改「描述当前状态」的文档；带日期的历史记录（PROGRESS 带日期条目、progress-wpf 归档、progress-avalonia-detail 逐日日志）如实保留当时状态不改写
+
+**2026-09-21** — 修复 HTML 预览安全设置回归三连（09-13 html-preview-webview-fallback 上线引入）
+  - **PreviewViewModel.cs**：CSP meta 拼接两处（`RebuildHtmlAsync` / `ShowHtmlPreview`）补充 `style-src` 指令——外部资源开时 `style-src 'unsafe-inline' * data: blob:`，外部资源关时 `style-src 'unsafe-inline' 'self' data: blob:`。此前仅 `default-src` 回退时内联样式（`<style>` / `style=""`）被 CSP 拦截，开满所有安全选项的 HTML 预览样式全部丢失
+  - **PreviewViewModel.cs**：新增 `InjectCspMeta(html, csp)` 私有静态方法，两处注入点改用它——文档以 `<!DOCTYPE` 开头时把 CSP meta 插入到 DOCTYPE 之后（`html.IndexOf('>')` + `Insert`），消除 meta 先于 DOCTYPE 导致的 Quirks Mode 布局异常；无 DOCTYPE 文档保持原有注入位置（meta 前置）
+  - **PreviewPanel.axaml**：NativeWebView 与 HTML 源码视图从 `PreviewContentScroller`（ScrollViewer）内部移出，置于外层 `PreviewRootGrid` 的 `Grid.Row="1" Grid.Column="0"` 与滚动区平级——修复 WebView 页面顶部一小条被（滚出视口的）元数据横条裁切的布局回归
+  - 回归：Build 0 错误
+
+**2026-09-21** — 文本预览语法高亮计划重写为 Avalonia 方案（AvaloniaEdit + TextMate）
+  - **背景**：原 `.omo/plans/未开始/text-preview-syntax-highlighting.md` 为 WPF 时代方案（AvalonEdit 控件 + 自研 XSHD），AvalonEdit 是 WPF-only，跨平台移植后不可用，条目位于 PLAN.md 已废弃表
+  - **调研结论**（librarian）：`Avalonia.AvaloniaEdit` 12.0.0（MIT，AvaloniaUI 官方维护，要求 Avalonia ≥12.0.0，本项目 12.0.4 满足）+ `AvaloniaEdit.TextMate` 12.0.0——TextMate 方案用 VS Code 语法全集（`TextMateSharp.Grammars`），覆盖 `PreviewService.TextExtensions` 40+ 扩展名，**无需自研 XSHD**；内置 DarkPlus/LightPlus 主题，`Installation.SetTheme(RegistryOptions.LoadTheme(...))` 一行切换；rope-based TextDocument + 行虚拟化，大文件无压力
+  - **架构确认**：PreviewType（查看器）与 Language（高亮）分离；语言识别优先级链 = 扩展名 `GetLanguageByExtension` → 魔数 `FileFormatDetector.Detect` → JSON/INI 结构特征（2026-09-21 已落地）→ 纯文本降级。Markdown 是纯文本超集无法内容识别、CSV 有独立查看器，均不需高亮
+  - **实施路径**：Phase 1 NuGet+XAML（ScrollViewer+TextBox → TextEditor，去外层 ScrollViewer，caret 隐藏）→ Phase 2 语法分发（扩展名+结构特征兜底）→ Phase 3 主题联动（复用 `ActualThemeVariantChanged` 先例）→ Phase 4 回归（编码切换/字号/字体/降级/性能）→ Phase 5 可选增强（高亮开关、WordWrap、行号、结构 .txt 高亮）
+  - **同步**：PLAN.md 条目从已废弃表移回正式 P2 区，预估 5-7h → 4-5h（免去自研 XSHD 的 ~2.5h）
+
+**2026-09-21** — 文本格式内容识别扩展（B 保守版）：JSON/INI 内容启发式
+  - **Core/Utils/FileFormatDetector.cs**：`DetectTextSubtype` 在 SVG/HTML/XML 之后新增 INI、JSON 两级内容识别
+  - **INI 判定 `LooksLikeIni(content)`**（前 64 行逐行）：`[Section]` 段头 + 至少一行 key=value（或 ≥2 个段头）；key 不含空格/引号/方括号以排除 JSON 数组、Markdown 引用链接等误报；`;`/`#` 注释行、空行跳过
+  - **JSON 判定 `LooksLikeJson(trimmed)`**（整体扫描）：首字符 `{`/`[`（计入括号配平基数）+ 括号不提前闭合（`}`/`]` 使深度为负即返回 false，容忍 head 截断未闭合）+ 对象要求含 `"key":` 引号键模式 + 数组要求含字符串或逗号分隔元素
+  - 设计定位：为扩展名缺失/错误的格式识别提供内容兜底信号（层 2 结构特征，误报率≈0），为未来语法高亮 Language 识别铺路；Markdown/CSV 弱启发式不启用（Markdown 是纯文本超集无法可靠识别，CSV 由方案 A 扩展名兜底路径处理）
+  - 预览链路验证：`ClassifyPreviewByMagicAsync` 扩展名兜底列表本已含 Json/Ini/Csv，`MapFileFormatToPreviewType` 将 Json/Xml/Ini 映射 `PreviewType.Text`（JSON/INI 按纯文本预览），Csv 已独立映射 `PreviewType.Csv`——内容识别与扩展名路径等效不冲突
+  - 新增测试 `tests/MantisZip.Tests/Utils/FileFormatDetectorTextSubtypeTests.cs`（40 用例：JSON/INI 正反例 + XML/HTML/SVG/Text 回归）；修正 `LooksLikeJson` 首字符括号未计数导致闭合深度为负的 bug
+  - 回归：Build 0 错误 0 警告，Core 403/403 通过，Avalonia 96/96 通过
+
+**2026-09-21** — CSV 预览接入编码选择器 + 修复魔数路径 CSV 被误判为纯文本
+  - **PreviewViewModel.cs**：`HasEncodingSelector`（预览面板编码选择是否显示）新增 `PreviewType.Csv`；`ShowCsv` 从 `File.ReadLines`（UTF-8 硬读 → GBK/Shift_JIS 中文 CSV 乱码）改为 `File.ReadAllBytes` + `DecodePreviewBytes()` 字节级解码，与 Text/Markdown/HTML 共享同一编码检测管线，并缓存 `_textPreviewBytes` 供编码切换复用
+  - 新增 `RebuildCsv(string text)` 辅助方法（`text.Split('\n')` + `TrimEnd('\r')` + `Take(maxRows+1)` → `CsvData = table.DefaultView`），`ApplyEncodingRefresh()` 新增 `case PreviewType.Csv: RebuildCsv(text)`，编码切换即时重建 DataGrid
+  - `ShowCsv` 补发 `CurrentDetectedEncodingName` / `HasDetectedEncoding` / `DetectedEncodingDisplay` 通知（与 ShowText 一致），编码选择器状态栏显示自动检测编码
+  - **PreviewService.cs**：`MapFileFormatToPreviewType` 将 `FileFormat.Csv` 从 Text 分组独立出来映射到 `PreviewType.Csv`——修复魔数检测下 CSV 显示为纯文本的 bug（`ClassifyPreviewByMagicAsync` 扩展名兜底已正确识别 `FileFormat.Csv`，但最后映射被压回 `PreviewType.Text` 走 ShowText）
+  - 回归：Build 0 错误，Tests 378/378 通过
+
+**2026-09-20** — 文本预览编码选择器（Task 5 收尾）：进度文档双轨更新 + PLAN.md→PROGRESS.md 历史索引迁移 + 计划文件归档（`.omo/plans/未开始/text-preview-encoding-selector.md` → `已完成/`）
+
+**2026-09-20** — 预览工具栏编码选择 ComboBox + 本地化（Task 4/5）
+  - **PreviewPanel.axaml**：字体大小按钮之后插入编码选择 ComboBox（`ItemsSource=EncodingOptions` / `SelectedItem=SelectedEncoding` / `IsVisible=HasEncodingSelector`），带 `ItemContainerTheme`（`MinHeight=ControlHeightSm`）；紧随其后添加检测编码显示 TextBlock（`IsVisible=HasDetectedEncoding` / `Text=DetectedEncodingDisplay`）
+  - **PreviewViewModel.cs**：`EncodingOptions` 改为 `private set` 支持语言切换重建；新增 `RefreshEncodingOptions()` 方法（重建整个列表 + `OnPropertyChanged` + 恢复当前选中项，直接赋值字段避免触发 `OnSelectedEncodingChanged` 副作用）；新增 `HasDetectedEncoding`（`bool`，null→Collapsed）和 `DetectedEncodingDisplay`（格式化字符串 `string.Format(T("Preview_Encoding_Detected"), name)`）；`OnCultureChanged` 调用 `RefreshEncodingOptions()`；`UpdateLocalizedStrings()` 新增 4 个 `Preview_Encoding_*` / `Preview_Tooltip_Encoding` 条目；`ApplyEncodingRefresh()` / `ShowText` 新增 `HasDetectedEncoding` / `DetectedEncodingDisplay` PropertyChanged 通知
+  - **strings.zh-CN.json** + **strings.en.json**：新增 `Preview_Encoding_Auto`、`Preview_Encoding_SystemAnsi`（`{0}` 格式）、`Preview_Encoding_Detected`（`{0}` 格式）、`Preview_Tooltip_Encoding` 四个 key，zh/en 成对
+  - **MainWindowViewModel.UpdateLocalizedStrings() keys 数组**：未添加（与现有 `Preview_*` 系列 key 不在此数组中的模式一致——预览绑定解析到 PreviewViewModel 自身的 `LocalizedStrings` 字典）
+  - 检测编码 TextBlock 可见性方案：无现有 NullToVisibility 转换器，采用 `HasDetectedEncoding` bool 计算属性 + `IsVisible` 绑定（最简方案，无需新增转换器）
+  - Patch: ComboBox 新增 `DisplayMemberBinding="{Binding DisplayName}"` 避免 record ToString 显示；ShowHtmlPreview/ShowHtmlFallback/ShowMarkdownPreview 补齐 `HasDetectedEncoding` + `DetectedEncodingDisplay` PropertyChanged 通知
+  - 回归：Build 0 错误，Tests 378/378 通过
+
+**2026-09-20** — 文本预览编码选择器：ViewModel 状态与解码管线（Task 2/5）
+  - **PreviewViewModel.cs**：新增 `EncodingOption` 记录类型（Key/DisplayName）、`EncodingOptions` 下拉数据源（固定 9 项：auto + 7 种常用编码 + system ANSI）、`[ObservableProperty] SelectedEncoding`、`HasEncodingSelector`（Text/Markdown/Html 三类）、`CurrentDetectedEncodingName`
+  - 新增解码管线：`DecodePreviewBytes()`（按 _currentEncodingKey 分发 auto→DetectAndDecodeText / system→DecodeText(null) / explicit→DecodeText(name)）、`OnSelectedEncodingChanged` partial method（切换+持久化+刷新）、`ApplyEncodingRefresh()`（按 PreviewType 刷新 TextContent/RebuildMarkdown/RebuildHtmlAsync）、`PersistEncodingPreference()`（写入 AppSettings.TextEncodingPreference）
+  - `ShowText` 改为 `File.ReadAllBytes` + `DecodePreviewBytes()`，不再直接调用 `DetectAndReadText`
+  - `RebuildMarkdown` / `RebuildHtmlAsync` 辅助方法（编码切换时重建控件树/WebView）
+  - `OnPreviewTypeChanged` 新增 `HasEncodingSelector` 属性变更通知
+  - Patch: 构造函数初始化 `SelectedEncoding`（从 `AppSettings.TextEncodingPreference` 恢复上次选择）；`PersistEncodingPreference` 跳过 "auto" 避免冗余写入；`RebuildHtmlAsync` 降级路径加 try/catch 防 fire-and-forget 未观察异常
+  - 回归：Build 0 错误，Tests 378/378 通过
+
+**2026-09-20** — Markdown/HTML 预览接入编码解码管线（Task 3/5）
+  - **PreviewViewModel.cs**：`ShowMarkdownPreview` / `ShowHtmlPreview` / `ShowHtmlFallback` 三个入口方法从 `File.ReadAllText(Async)`（隐式 UTF-8）改为 `File.ReadAllBytes(Async)` + `DecodePreviewBytes()` 字节级解码，与 `ShowText` 共享同一编码检测管线
+  - `ShowMarkdownPreview` 改为 `RebuildMarkdown()` 复用控件树重建，`IsToolbarVisible` 改为 `true`（显示编码选择器）；`ShowHtmlFallback` 同样改用 `RebuildMarkdown()`
+  - 三个方法均调用 `OnPropertyChanged(nameof(CurrentDetectedEncodingName))` 通知 UI 刷新自动检测编码显示
+  - 回归：Build 0 错误，Tests 378/378 通过
+
+**2026-09-18** — 拖拽目标路径检测：修复工具栏松手失败 + 抽取共享方法
+  - **DropTargetDetector.cs**：`TryGetExplorerPath` default 分支原来返回 `(null, None)`，未处理 `ToolbarWindow32`、`SysListView32` 等 Explorer 子窗口；新增 `FindRecognizedAncestor(hWnd)` 共享方法，向上遍历父窗口链查找 `CabinetWClass` / `#32770` / `Progman` / `WorkerW`；`TryGetExplorerPath` 改为调用 `FindRecognizedAncestor` 后按类名分发；删除冗余 `TryGetDesktopPath`
+  - **OverlayController.cs**：`ClassifyWindow` 改为调用 `DropTargetDetector.FindRecognizedAncestor`，拆分为 `ClassifyCabinetWindow` / `ClassifyDialogWindow` 辅助方法；与松手后检测共用同一套父窗口链遍历逻辑，杜绝 overlay 显示路径但松手后识别失败的不一致问题
+  - 回归：Build 0 错误
+
+**2026-09-18** — Win32 P/Invoke 辅助方法抽取：消除重复模式
+  - **NativeMethods.cs**：新增 `GetWindowUnderCursor()`（封装 `GetCursorPos` + `WindowFromPoint`）、`GetWindowClassName(hWnd)`（封装 `GetClassName` + `StringBuilder`）
+  - **DropTargetDetector.cs**：`DetectTargetDirectory` 改用 `GetWindowUnderCursor()`；`FindRecognizedAncestor` 改用 `GetWindowClassName()`；`TryGetDialogPathViaWin32` 回调内改用 `GetWindowClassName()`
+  - **OverlayController.cs**：`UpdatePosition` 改用 `GetWindowUnderCursor()`
+  - **DragDropService.cs**：`IsOverOwnWindow` 改用 `GetWindowUnderCursor()`
+  - 消除 3 处 `GetCursorPos` + `WindowFromPoint` 重复、5+ 处 `GetClassName` + `StringBuilder` 重复
+  - 回归：Build 0 错误
+
+**2026-09-17** — 修复文本预览 936 编码报错 + 种子文件 GBK 中文乱码
+  - **App.axaml.cs**：`OnFrameworkInitializationCompleted` 开头注册 `CodePagesEncodingProvider`（此前 Avalonia 迁移遗漏，AGENTS.md 声称已注册但代码无）。未注册时 `Encoding.GetEncoding(936)` 抛 `NotSupportedException`，文本预览 fallback 到系统 ANSI 代码页（中文系统 936）时提示 "coding 936 无法预览"
+  - **TorrentParser.cs**（共享层）：`DetectDecodingEncoding` 探测 root dict 的 `encoding` 字段（BitComet 1.x 老种子声明 `encoding=GBK`），普通字符串按声明编码解码而非硬编码 UTF-8；`ParseString`/`ParseDictionary`/`ParseList`/`ParseValue` 增加解码编码参数，`.utf-8` 后缀字段（`name.utf-8`/`path.utf-8`/`comment.utf-8`）值恒按 UTF-8 解码（BEP 惯例，不受 encoding 字段影响）；name/path/comment 读取优先 `.utf-8` 后缀字段
+  - 实测验证：100DVD.rar 内 BitComet 1.15 种子（encoding=GBK + path.utf-8 并存），修复前 path 中文满屏 U+FFFD，修复后 0/9 乱码条目（`100部最新DVD大片种子…` 等全部正确）
+  - 回归：Build 0 错误（6 条预存 NU1903 依赖审计警告）
+
+**2026-09-17** — 文件列表列标题右键菜单空白修复
+  - **MainWindow.axaml.cs**：`GetColumnHeaderText` 改取列头 StackPanel 中第一个 TextBlock（列标题文字）；原 `LastOrDefault` 误取到排序箭头 TextBlock（`NameHeaderArrow` 等，初始 `Text=""`），导致 `ColumnHeaderContextMenu_Opening` 对全部列判定为空跳过、菜单空白（排序箭头功能 ca67db5 在列选择菜单 d1c0537 之后引入，打破旧假设）
+  - 回归：Build 0 错误（6 条预存 NU1903 依赖审计警告）
+
 **2026-09-16** — 压缩/解压性能优化（解压并行调度 + 7z 多线程压缩 UI）
   - **7z 多线程压缩接线**：
     - `Controls/DynamicFormatOptionsPanel.axaml(.cs)`：7z 面板新增「多线程压缩」复选框（`MultiThreadCheck`）+ `SevenZipMultithreaded` 只读属性 + `MultiThreadCheck_IsCheckedChanged`
@@ -1407,6 +1492,19 @@
     - `SevenZipEngineTests.CompressAsync_MultiThreaded_CreatesValidArchive`：mt=on 压缩 → 解压**逐字节比对** → `TestArchiveAsync` 完整性校验（+`CompressAsync_SingleThreaded_CreatesValidArchive` 基线 + `Benchmark_CompressMTVsST`）
   - **实测**（100 × 1MB 随机数据，8 核）：7z 单线程 38745ms → 多线程 8370ms（**4.63x**）；ZIP 解压 100×1MB 小文件 1.04x（小文件开销占主导，大文件/NVMe 收益明显）
   - 验证：Core 380 通过 / 2 跳过，Avalonia 96 通过 / 2 跳过，0 构建错误
+
+#### v0.5.0 (2026-09-22) 修复 GitHub Release 发版失败（release.yml 重复 Portable-Web 打包步骤）
+  - **背景**：推 tag 触发 release 时在 "Package portable web zip (framework-dependent)" 步骤失败——`Compress-Archive ... MantisZip-{VERSION}-Portable-Web.zip already exists`，发版中断。根因是历史遗留双步骤产出同名文件：7-19（#29）新增独立 Compress-Archive 步骤产出 `Portable-Web.zip`（当时与自包含 zip 互不冲突）；8-07 "Package portable zips" 重构为 `New-PortableZip` 函数同时产出双变体（当时名 `Portable-FrameworkDependent.zip`）；8-07 `b0c6759` 将该名改为 `Portable-Web.zip` 后与新步骤撞名，此后每次发版必挂
+  - **修复**：删除重复的 "Package portable web zip (framework-dependent)" 步骤（Compress-Archive 版且不含 PDB 排除、不含预置 settings.json 拷贝，保留反而会覆盖优质包）。Web 便携包统一由 "Package portable zips" 的 `New-PortableZip` 产出（7z `-xr!*.pdb` + Data/settings.json 预置 + x64/7z.dll 拷贝）
+  - **验证**：js-yaml 解析 18 步骤、Web zip 仅一个产出者；本机全流程模拟（模拟 VERSION → restore → Publish x2 → 逐字运行修复后打包块）双 zip 正常产出、无 already exists；包内容核对 Portable.txt / Data/settings.json / x64\7z.dll 齐全、*.pdb=0、无 publish_output 前缀
+
+#### v0.5.0 (2026-09-21) 文本格式内容识别扩展：JSON/INI 启发式（DetectTextSubtype）
+  - **背景**：`DetectTextSubtype` 此前仅启用 SVG/HTML/XML 三种高精度文本子类型，JSON/INI/CSV/Markdown 仅靠扩展名兜底识别（`MAP FileFormatToPreviewType` 也把 Csv 归入 Text 组）；为扩展名缺失/错误的格式提供内容识别兜底（为未来语法高亮 Language 识别铺路，见 `.omo/plans/未开始/text-preview-syntax-highlighting.md`）
+  - **FileFormatDetector.cs**：`DetectTextSubtype` 在 XML 之后新增 `LooksLikeIni`（前 64 行逐行：`[Section]` 段头 + key=value（≥2 段头也可），key 排除空格/引号/方括号防 JSON 数组、Markdown 引用链接误报）与 `LooksLikeJson`（首字符 `{`/`[` 计入括号配平基数 + `}`/`]` 提前闭合即拒（容忍 head 截断未闭合）+ 对象需 `"key":` 引号键模式 / 数组需字符串或逗号元素）；修正初版首字符未计数导致闭合深度为负的 bug
+  - **设计约束**：Markdown 是纯文本超集无法可靠内容识别（结构性限制）；CSV 由方案 A（CSV 扩展名兜底 + PreviewType 独立映射）处理，不引入弱启发式
+  - **预览链路**：`ClassifyPreviewByMagicAsync` 扩展名兜底列表本已含 Json/Ini/Csv；Json/Xml/Ini 映射 `PreviewType.Text`（JSON/INI 按纯文本预览，合理），Csv 已独立映射 `PreviewType.Csv`——内容识别与扩展名路径等效，无冲突
+  - 涉及文件：`src/MantisZip.Core/Utils/FileFormatDetector.cs`、`tests/MantisZip.Tests/Utils/FileFormatDetectorTextSubtypeTests.cs`（新增 40 用例）
+  - 验证：`dotnet build` Core 0 错误 0 警告；MantisZip.Tests 403/403 通过（含新增 40），Avalonia 96/96 通过
 
 #### v0.5.0 (2026-09-12) 损坏压缩包打开静默无报错修复（ZipEngine 严格解析 + TarGzEngine 移除静默 catch）
   - **ZipEngine**：`OpenArchiveWithEncodingFallback` 主路径 + GBK 回退两处改用 `ZipArchive.OpenArchive`（严格 ZIP 解析）——原 `ArchiveFactory.OpenArchive` 魔数嗅探会把全零/垃圾文件误判为 Tar（0 条目，损坏信号被吞），TestPreview/testZip 的全零 zip1.zip 实测原行为「打开成功但 0 内容、测试 8ms 通过」；修复后抛 `ArchiveException: Failed to locate the Zip Header`

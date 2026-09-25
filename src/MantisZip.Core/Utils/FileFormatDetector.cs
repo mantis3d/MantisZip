@@ -654,8 +654,9 @@ public static class FileFormatDetector
     }
 
     /// <summary>
-    /// 文本子类型检测：在 LooksLikeText 通过后，进一步区分 SVG/HTML/XML。
-    /// 仅启用高精度检测项。JSON/Markdown/CSV/INI 因误报率过高暂不启用。
+    /// 文本子类型检测：在 LooksLikeText 通过后，进一步区分 SVG/HTML/XML/INI/JSON。
+    /// 仅启用高精度检测项。JSON/INI 采用结构校验（括号配平/[Section]段头+key=value），
+    /// 误报率≈0；Markdown/CSV 因误报率过高暂不启用（CSV 由扩展名兜底 + 映射表独立处理）。
     /// </summary>
     private static FileFormat DetectTextSubtype(byte[] head, int length)
     {
@@ -706,8 +707,132 @@ public static class FileFormatDetector
             return FileFormat.Xml;
         }
 
+        // ── 4. INI（[Section] 段头 + key=value，结构特征强）──
+        if (LooksLikeIni(content))
+        {
+            CoreLog.Info("DetectTextSubtype: INI detected");
+            return FileFormat.Ini;
+        }
+
+        // ── 5. JSON（首字符 {/[ + 括号不提前闭合 + 引号键值对/数组元素）──
+        if (LooksLikeJson(trimmed))
+        {
+            CoreLog.Info("DetectTextSubtype: JSON detected");
+            return FileFormat.Json;
+        }
+
         // ── 兜底 ──
         return FileFormat.Text;
+    }
+
+    /// <summary>
+    /// INI 内容检测：存在 [Section] 段头 + 至少一行 key=value（或 ≥2 个段头）。
+    /// key 不含空格/引号/方括号以排除 JSON 数组、Markdown 引用链接等误报。
+    /// 仅分析前 64 行。
+    /// </summary>
+    private static bool LooksLikeIni(string content)
+    {
+        var lines = content.Split('\n');
+        int sectionCount = 0;
+        int kvCount = 0;
+        int total = Math.Min(lines.Length, 64);
+
+        for (int i = 0; i < total; i++)
+        {
+            string line = lines[i].Trim();
+            if (line.Length == 0 || line[0] == ';' || line[0] == '#')
+                continue;   // 空行 / 注释行
+
+            // [Section] 段头：行首 [ 且行尾 ]
+            if (line[0] == '[' && line.Length >= 3 && line.EndsWith("]"))
+            {
+                sectionCount++;
+                continue;
+            }
+
+            // key=value 行：= 号前为非空 key，且 key 不含空格/引号/方括号
+            int eq = line.IndexOf('=');
+            if (eq > 0)
+            {
+                string key = line.Substring(0, eq).Trim();
+                if (key.Length > 0 &&
+                    !key.Contains(' ') && !key.Contains('\t') &&
+                    !key.Contains('"') && !key.Contains('\'') &&
+                    !key.Contains('[') && !key.Contains(']'))
+                {
+                    kvCount++;
+                }
+            }
+        }
+
+        return (sectionCount >= 1 && kvCount >= 1) || sectionCount >= 2;
+    }
+
+    /// <summary>
+    /// JSON 内容检测：首字符为 { 或 [，括号不提前闭合（允许 head 截断未闭合），
+    /// 对象要求含 "key": 引号键模式，数组要求含字符串或逗号分隔元素。
+    /// </summary>
+    private static bool LooksLikeJson(string content)
+    {
+        if (content.Length < 2)
+            return false;
+
+        char first = content[0];
+        if (first != '{' && first != '[')
+            return false;
+
+        // 首字符即打开括号，计入配平（循环从 i=1 开始）
+        int curly = first == '{' ? 1 : 0;
+        int square = first == '[' ? 1 : 0;
+        bool inString = false;
+        bool hasString = false;
+        bool hasObjectKey = false;   // "key": 模式
+        bool hasComma = false;
+        bool escaped = false;
+
+        for (int i = 1; i < content.Length; i++)
+        {
+            char c = content[i];
+
+            if (inString)
+            {
+                if (escaped) { escaped = false; continue; }
+                if (c == '\\') { escaped = true; continue; }
+                if (c == '"')
+                {
+                    inString = false;
+                    hasString = true;
+                    // 引号串结束后的下一个非空白字符是冒号 → 对象键
+                    int k = i + 1;
+                    while (k < content.Length && char.IsWhiteSpace(content[k])) k++;
+                    if (k < content.Length && content[k] == ':')
+                        hasObjectKey = true;
+                }
+                continue;
+            }
+
+            switch (c)
+            {
+                case '"': inString = true; break;
+                case '{': curly++; break;
+                case '}':
+                    curly--;
+                    if (curly < 0) return false;   // 提前闭合 → 非 JSON
+                    break;
+                case '[': square++; break;
+                case ']':
+                    square--;
+                    if (square < 0) return false;
+                    break;
+                case ',': hasComma = true; break;
+            }
+        }
+
+        // 括号可未闭合（head 截断），但不能提前闭合
+        if (first == '{')
+            return hasObjectKey && curly >= 0 && square >= 0;
+        // 数组：含字符串元素，或含逗号分隔元素（如 [1, 2, 3]）
+        return curly >= 0 && square >= 0 && (hasString || hasComma);
     }
 
     /// <summary>

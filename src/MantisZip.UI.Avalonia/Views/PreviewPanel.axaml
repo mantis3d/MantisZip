@@ -78,6 +78,35 @@
           </Button>
         </StackPanel>
 
+        <!-- 编码选择下拉：文本/Markdown/HTML 预览时可用，切换立即按所选编码重解码渲染 -->
+        <ComboBox ItemsSource="{Binding EncodingOptions}"
+                  SelectedItem="{Binding SelectedEncoding}"
+                  DisplayMemberBinding="{Binding DisplayName}"
+                  IsVisible="{Binding HasEncodingSelector}"
+                  MinWidth="110" MaxWidth="180"
+                  Height="{DynamicResource ControlHeight}"
+                  Margin="{DynamicResource SpacingXxsThk}"
+                  VerticalAlignment="Center"
+                  Background="{DynamicResource ThemeSurfaceBgBrush}"
+                  Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                  BorderBrush="{DynamicResource ThemeBorderBrush}"
+                  ToolTip.Tip="{Binding LocalizedStrings[Preview_Tooltip_Encoding]}">
+          <ComboBox.ItemContainerTheme>
+            <ControlTheme TargetType="ComboBoxItem">
+              <Setter Property="MinHeight" Value="{DynamicResource ControlHeightSm}" />
+              <Setter Property="Padding" Value="{DynamicResource SpacingSmThk}" />
+            </ControlTheme>
+          </ComboBox.ItemContainerTheme>
+        </ComboBox>
+
+        <!-- 检测到的编码显示：auto 模式下显示实际检测结果（如「检测到: GBK」） -->
+        <TextBlock IsVisible="{Binding HasDetectedEncoding}"
+                   Text="{Binding DetectedEncodingDisplay}"
+                   FontSize="12"
+                   VerticalAlignment="Center"
+                   Foreground="{DynamicResource ThemeTextSecondaryBrush}"
+                   Margin="{DynamicResource SpacingXxsThk}" />
+
         <!-- GIF controls -->
         <StackPanel Orientation="Horizontal" Spacing="2"
                     IsVisible="{Binding HasAnimationControls}">
@@ -709,28 +738,27 @@
                      TextAlignment="Center" />
         </StackPanel>
       </Grid>
-
-        <!-- HTML WebView 预览 (placed in outer Grid Row=1 for proper height) -->
-        <ac:NativeWebView x:Name="HtmlPreviewWebView" Grid.Row="1"
-                          IsVisible="{Binding IsWebViewHtmlVisible}"
-                          Source="{Binding HtmlWebViewUri}"
-                          Background="{DynamicResource ThemeSurfaceBgBrush}" />
-
-        <!-- HTML 源码预览（WebView 模式下切换源码显示，同样在 Grid.Row=1） -->
-        <ScrollViewer Grid.Row="1"
-                      IsVisible="{Binding IsHtmlSourceVisible}"
-                      Background="{DynamicResource ThemeSurfaceBgBrush}"
-                      Padding="{DynamicResource SpacingMdThk}">
-          <TextBox Text="{Binding HtmlSourceContent}"
-                   IsReadOnly="True"
-                   AcceptsReturn="True"
-                   TextWrapping="Wrap"
-                   FontFamily="Consolas"
-                   Background="{DynamicResource ThemeSurfaceBgBrush}"
-                   BorderThickness="0" />
-        </ScrollViewer>
-
       </Grid>
+    </ScrollViewer>
+
+    <!-- HTML WebView 预览：置于外层网格 Row=1、与 PreviewContentScroller 平级（原生控件放 ScrollViewer 内会导致页面顶部被元数据横条裁切，此处获得真实视口高度，页面全幅渲染） -->
+    <ac:NativeWebView x:Name="HtmlPreviewWebView" Grid.Row="1" Grid.Column="0"
+                      IsVisible="{Binding IsWebViewHtmlVisible}"
+                      Source="{Binding HtmlWebViewUri}"
+                      Background="{DynamicResource ThemeSurfaceBgBrush}" />
+
+    <!-- HTML 源码预览（WebView 模式下切换源码显示，同样在外层 Grid.Row=1） -->
+    <ScrollViewer Grid.Row="1" Grid.Column="0"
+                  IsVisible="{Binding IsHtmlSourceVisible}"
+                  Background="{DynamicResource ThemeSurfaceBgBrush}"
+                  Padding="{DynamicResource SpacingMdThk}">
+      <TextBox Text="{Binding HtmlSourceContent}"
+               IsReadOnly="True"
+               AcceptsReturn="True"
+               TextWrapping="Wrap"
+               FontFamily="Consolas"
+               Background="{DynamicResource ThemeSurfaceBgBrush}"
+               BorderThickness="0" />
     </ScrollViewer>
 
     <!-- 预览信息面板：显示文件元数据（格式特定信息 + 通用信息），位置由 ApplyInfoPanelOrientation 动态控制 -->

@@ -30,6 +30,12 @@
 - **09-16** — 压缩/解压性能优化（ZIP 解压并行 + 7z 多线程压缩）：① **ZIP 并行解压**自研多实例实现（SharpCompress 单实例线程不安全）——Round-Robin 分批 + **每批次复用 1 个 archive 实例**（减少 80-90% OpenArchive 开销）+ 进度报告锁竞争修复（曾因锁内 `progress.Report()` 导致 8 线程争用、100×1MB 解压从 0.3s 劣化到 8.5s 的 25x 回退）；② 缓冲区 256KB→4MB（ZipEngine/TarGzEngine/ZipBinaryRewriter）；③ `ParallelExtractDegree` 设置项（1-16，默认 CPU 核心数，1=串行回退）；④ **7z 多线程压缩 `mt=on` 实测 4.63x**（100×1MB/8核：38.7s→8.4s），压缩对话框 7z 面板 + 设置窗口全局默认值双开关；Core 380 + Avalonia 96 测试全绿
 - **09-16** — NuGet 核心依赖全面升级：Markdig 0.40.0→1.3.2、SharpCompress 0.48.1→0.50.4、SkiaSharp 3.119.4→4.152.0、Svg.Skia 2.0.0.5→5.2.1、HarfBuzzSharp 14.2.0→14.2.1.3；96 Avalonia + 373 Core 测试全绿，0 构建错误（24 项 CS0618 SkiaSharp 4.x deprecation warning 为非阻塞技术债）
 - **09-16** — Avalonia 12.0.4→12.1.2 全栈升级（Avalonia/Avalonia.Controls.DataGrid/Avalonia.Controls.WebView/Avalonia.Desktop/Avalonia.Themes.Fluent）；96 Avalonia + 373 Core 测试全绿，0 构建错误（新增 2 项 CS0618）
+- **09-21** — 修复 HTML 预览安全设置回归三连：CSP 拼接缺少 `style-src` 指令导致内联样式被兜底 `default-src` 拦截（样式/脚本选项最严时预览样式全部丢失）+ CSP meta 注入在 `<!DOCTYPE>` 之前触发浏览器 Quirks Mode（布局行为异常）+ WebView 页面顶部一小条被预览滚动区裁切（WebView 移出 ScrollViewer 与预览滚动区平级）
+- **09-21** — 文本预览语法高亮计划重写为 Avalonia 方案：废弃 WPF 版 AvalonEdit+XSHD 方案（AvalonEdit WPF-only），改用 **AvaloniaEdit 12.0.0 + TextMate**（`AvaloniaEdit.TextMate`，VS Code 语法全集覆盖 `TextExtensions` 40+ 扩展名、内置 DarkPlus/LightPlus 主题 `SetTheme` 一键切换）；架构确认 PreviewType（查看器）与 Language（高亮）分离 + 扩展名→魔数→JSON/INI 结构特征三级语言识别优先级链（配合当日落地的文本内容检测）；条目从 PLAN.md 已废弃表移回正式 P2 区
+- **09-21** — CSV 预览接入编码选择器 + 修复魔数路径 CSV 被误判为纯文本：CSV 预览与 Text/Markdown/HTML 统一走 `DecodePreviewBytes()` 字节级解码管线（`RebuildCsv` 编码切换即时重建 DataGrid）；`MapFileFormatToPreviewType` 将 `FileFormat.Csv` 从 Text 组独立映射到 `PreviewType.Csv`（此前扩展名兜底已识别 Csv 却在最后映射被压回 Text，CSV 永远显示为纯文本）
+- **09-21** — 文本格式内容识别扩展（B 保守版）：`DetectTextSubtype` 新增 JSON/INI 内容启发式——INI 用 `[Section]` 段头 + key=value 结构校验，JSON 用首字符 `{`/`[` + 括号配平（容忍 head 截断）+ `"key":` 引号键/数组元素判定，误报率≈0；为扩展名缺失的格式识别提供兜底信号（为未来语法高亮 Language 识别铺路）
+- **09-20** — 文本预览编码选择器：Text/Markdown/HTML 预览统一接入 `File.ReadAllBytes` + `DecodePreviewBytes()` 字节级编码检测管线，支持用户手动切换编码（auto/UTF-8/GBK/GB18030/Shift_JIS 等 9 项），切换即时重渲染；预览工具栏新增编码选择 ComboBox + 本地化（zh/en 成对，4 key），语言切换自动重建下拉 DisplayName
+- **09-17** — 修复文本预览 936 编码报错 + GBK 种子中文乱码：Avalonia 启动注册 CodePagesEncodingProvider（此前迁移遗漏导致 `Encoding.GetEncoding(936)` 抛 NotSupportedException，文本预览提示 "coding 936 无法预览"）；TorrentParser 尊重种子 `encoding` 字段（BitComet GBK 种子）+ 优先读取 `name.utf-8`/`path.utf-8`/`comment.utf-8` 后缀字段（BEP 惯例），实测 100DVD.rar 内中文种子 0/9 乱码
 - **09-13** — HTML 预览 WebView 双轨升级 + 安全设置：NativeWebView 主体渲染 + ReverseMarkdown 降级路径（WebView 不可用时自动 fallback）；`</>` 源码/渲染切换按钮（HTML & Markdown 共用）；HTML 预览安全设置三开关（允许 JavaScript / 外部资源 / 导航，默认全关）+ CSP meta 注入 + NavigationStarting 拦截；设置窗口预览 tab 新增 HTML 子标签页（IconHtml 图标）
 - **09-12** — 报错信息一键复制：AppMessageBox 统一复制按钮（Error/Warning 弹窗显示，复制内容含版本号+时间戳+完整消息，一处改动覆盖全部弹窗）+ 主窗口状态栏错误文本改用只读 TextBox 可选中复制
 - **09-12** — 修复损坏压缩包测试静默通过：TestArchive 捕获 TestArchiveAsync bool 结果（RunWithProgress 的 completed 仅表示未取消/未抛异常，损坏判定此前被丢弃）+ PasswordService QuickVerifyPassword 改用严格 ZipArchive.OpenArchive
@@ -94,7 +100,7 @@
 
 ### MantisZip.UI（WPF 遗留版）
 
-> WPF 版已进入**维护模式**（迁移完成后废弃），完整历史见 [progress-wpf.md](progress-wpf.md)。仅当修复仅存在于 WPF 的 bug 时追加。
+> WPF 版（`MantisZip.UI`）已在迁移完成后**完全删除**，不再维护；本节仅保留迁移前的历史条目。完整历史见 [progress-wpf.md](progress-wpf.md)，仅作参考，不再追加新条目。
 
 ### 共享层（Core / ShellExt / 构建）— 里程碑
 
@@ -103,6 +109,8 @@
 #### v0.5.0
 
 - **09-16** — 并行解压 + 7z 多线程压缩基础设施（Core）：`IArchiveEngine.SupportsParallelExtract` 属性 + `ArchiveOptions.ParallelExtractDegree`；`ZipEngine.ExtractAsyncParallel` 多实例并行（Round-Robin 分批、每批次复用 1 个 archive 实例、进度报告锁外上报）；`CopyBufferSize` 256KB→4MB（ZipEngine/TarGzEngine/ZipBinaryRewriter）；`ArchiveOptions.SevenZipMultithreaded`（默认 true）+ `SevenZipEngine.ConfigureCompressor` 写入 `CustomParameters["mt"]` + `CompressRequest`/`CompressService.BuildOptions` 映射；新增 `ParallelExtractTests`（5 用例）+ `SevenZipEngineTests` mt=on 验证（2 用例）
+- **09-22** — 修复 GitHub Release 发版失败（构建）：release.yml 存在重复的 Portable-Web 打包步骤——`Compress-Archive` 步骤产出 `MantisZip-*-Portable-Web.zip`，而 `New-PortableZip` 同时段也产出同名文件（8-07 改名后撞名），Compress-Archive 遇已存在文件报 already exists 导致发版中断；删除旧 Compress-Archive 步骤，Web 便携包统一由 New-PortableZip（7z 打包 + 排除 PDB + 预置默认设置）产出
+- **09-21** — 文本格式内容识别扩展（Core）：`DetectTextSubtype` 新增 JSON/INI 内容启发式 —— INI 用 `[Section]` 段头 + key=value 结构校验，JSON 用首字符 `{`/`[` + 括号配平（容忍 head 截断）+ 引号键/数组元素判定，误报率≈0；为扩展名缺失格式提供内容兜底信号（为未来语法高亮 Language 识别铺路）
 - **09-12** — 修复损坏压缩包打开静默无报错（Core）：ZipEngine 打开改用严格 ZipArchive.OpenArchive（全零/垃圾 .zip 此前被 ArchiveFactory 魔数嗅探误判为 Tar、0 条目静默打开，现抛 ArchiveException）+ TarGzEngine.ListEntriesAsync 移除静默 catch（损坏 .tar 抛错不再静默空列表）+ 新增 3 个回归测试
 - **09-04** — 压缩/解压 文件读写错误处理补齐：压缩侧 7z/加密 ZIP 新增 `ReadErrorHandler.FilterUnreadableFiles` 预检（错误弹窗 / 跳过 / 中止，对齐 ErrorResolver）；解压侧三引擎 `ExtractAsync`+`ExtractEntriesAsync` 补 `IOException` 捕获与 per-entry 兜底（被占用条目跳过继续，不再让单个文件中止整个解压）
 - **08-31** — .NET 9 → .NET 10 升级（LTS，支持至 2028-11）：全部 7 个项目 TargetFramework 更新 + 移除废弃 `Avalonia.Diagnostics` 包 + `System.Drawing.Common` 升级至 10.0.8
@@ -156,6 +164,7 @@
 | 压缩预览渐进式加载（浅层先行→全量逐源重建装配 + `SourceSubtree` 按源缓存 + `FilterSignature` 失效 + `ResultTreeView` 滚动位置保持 + 占位节点属性 + `BuildDirectoryNode` 深度边界重构 + 9 单测） | [compress-preview-progressive-loading.md](.omo/plans/已完成/compress-preview-progressive-loading.md) | v0.5.0 |
 | 图片预览能力系统（`PreviewCapabilities` 能力注册表 [Flags]：Zoom/Transparency/FlattenAlpha/AnimationControls 取代 `HasXxxControls` 硬编码 + `PreviewType.Gif`→`AnimatedImage`（GIF/WebP 动画共用）+ GIF 透明棋盘格 + Animated WebP 分流（SKCodec `FrameCount>1`）） | [image-preview-capabilities.md](.omo/plans/已完成/image-preview-capabilities.md) | v0.5.0 |
 | Office 文档内容预览增强（DOCX 大纲+全文+表格+Markdown 表格、XLSX DataGrid、PPTX Canvas 定位+分页；WebView 双轨基建于 2026-09-13 完成） | [office-content-preview-avalonia.md](.omo/plans/已完成/office-content-preview-avalonia.md) | v0.5.0 |
+| 文本预览编码选择器（Text/Markdown/HTML 预览统一接入字节级编码检测管线，用户手动切换编码即时重渲染；预览工具栏新增编码选择 ComboBox + 自动检测编码显示 + 本地化；激活 `TextEncodingPreference` 持久化；Core `TextEncodingDetector` 新增 `DetectEncoding`/`DetectAndDecodeText`/`DecodeText(byte[], string?)` 字节级 API） | [text-preview-encoding-selector.md](.omo/plans/已完成/text-preview-encoding-selector.md) | v0.5.0 |
 | 拖拽/右键解压流程统一（`SelectedItemsExtractService` 统一解压动作、`TarGzEngine` 按条目提取、冲突统一走设置 6 策略 + 统一 Ask 弹窗、拖拽路径语义与右键一致、`MapConflictActionString` 连字符映射漏洞修复） | [drag-extract-unify.md](.omo/plans/已完成/drag-extract-unify.md) | v0.4.5 |
 | 目录行聚合显示（`DirStats`+`ComputeDirectoryStats` 增加 `NewestModified`；Avalonia `ArchiveItemModel` 显示属性改派生计算属性 + `CompressedSizeAvailable`；`PopulateEntries` 基于过滤后 `filteredSource` 应用聚合） | [directory-size-date-aggregate.md](.omo/plans/已完成/directory-size-date-aggregate.md) | v0.4.5 |
 | 路径清单统一（A/B 数据集：预览=实际绝对一致，CompressPlan 唯一事实来源 + 压缩/解压过滤白名单 + IsBuildPending 按钮门禁） | [path-manifest-unification.md](.omo/plans/已归档/path-manifest-unification.md) | v0.4.5（⏳ 交互清单待用户 GUI 验证） |

@@ -209,7 +209,10 @@ public static class CompressFlow
             var result = await Dispatcher.UIThread.InvokeAsync(async () =>
             {
                 var dlg = new CompressConflictDialog(info.OutputPath, info.SuggestedName, info.CanAdd);
-                await dlg.ShowDialog(owner);
+                // 优先使用当前可见的进度窗口作为 owner（主窗口压缩时居中于进度窗口），
+                // 回退到传入的 owner（CLI 场景显式传入 ProgressWindow）
+                var dialogOwner = ProgressWindow.CurrentVisible ?? owner;
+                await dlg.ShowDialog(dialogOwner);
 
                 // 暂停：收起对话框，返回暂停标志由外层处理
                 if (dlg.IsPaused)
