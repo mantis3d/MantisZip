@@ -135,7 +135,7 @@ public enum FileFormat
 {
     Unknown,
     // 图像
-    Jpeg, Png, Gif, Bmp, WebP, Ico, Tga, Hdr, Exr, Svg,
+    Jpeg, Png, Apng, Gif, Bmp, WebP, Ico, Tga, Hdr, Exr, Svg,
     // 音频
     Wav, Flac, Mp3,
     // 视频

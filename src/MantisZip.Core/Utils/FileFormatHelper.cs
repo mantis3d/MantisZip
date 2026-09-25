@@ -17,6 +17,7 @@ public static class FileFormatHelper
             FileFormat.Unknown => "未知格式",
             FileFormat.Jpeg => "JPEG 图像",
             FileFormat.Png => "PNG 图像",
+            FileFormat.Apng => "APNG 动画",
             FileFormat.Gif => "GIF 动画",
             FileFormat.Bmp => "BMP 位图",
             FileFormat.WebP => "WebP 图像",
