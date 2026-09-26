@@ -134,6 +134,7 @@
   "Preview_Header_Gif": "GIF 预览",
   "Preview_Header_Apng": "APNG 预览",
   "Preview_Header_Avif": "AVIF 预览",
+  "Preview_Avif_Unsupported_Decode": "当前版本暂不支持 AVIF 格式预览（依赖库暂无解码器）。请解压文件后使用系统图片查看器或其他支持 AVIF 的软件打开。",
   "Preview_Header_IcoSizes": "ICO 图标 — {0} 个尺寸",
   "Preview_Header_Image": "图片预览",
   "Preview_Header_Iso": "光盘镜像",

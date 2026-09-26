@@ -27,9 +27,6 @@ using ReverseMarkdown;
 using Microsoft.Data.Sqlite;
 using UglyToad.PdfPig;
 using UglyToad.PdfPig.Rendering.Skia;
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.PixelFormats;
-using SixLabors.ImageSharp.Formats.Png;
 using Avalonia.Styling;
 
 namespace MantisZip.UI.Avalonia.ViewModels;
@@ -1254,61 +1251,16 @@ var formatValues = new Dictionary<string, string?>
     }
 
     /// <summary>
-    /// 使用 ImageSharp 显示 AVIF 图片预览（SkiaSharp 对 AVIF 解码支持有限）。
+    /// 显示 AVIF 图片预览（当前库不支持 AVIF 解码，提示用户提取后外部查看）。
     /// </summary>
     private void ShowAvifImage(string filePath)
     {
         App.DebugLog($"[AVIF] ShowAvifImage: {filePath}");
 
-        try
-        {
-            using var image = SixLabors.ImageSharp.Image.Load<SixLabors.ImageSharp.PixelFormats.Rgba32>(filePath);
-            App.DebugLog($"[AVIF] ImageSharp loaded: {image.Width}x{image.Height}");
-
-            // Convert ImageSharp image to Avalonia Bitmap via SkiaSharp (more reliable than PNG bytes)
-            var pixelArray = new byte[image.Width * image.Height * 4];
-            image.CopyPixelDataTo(pixelArray);
-
-            using var skBitmap = new SkiaSharp.SKBitmap(image.Width, image.Height, SkiaSharp.SKColorType.Bgra8888, SkiaSharp.SKAlphaType.Premul);
-            var ptr = skBitmap.GetPixels();
-            System.Runtime.InteropServices.Marshal.Copy(pixelArray, 0, ptr, pixelArray.Length);
-
-            using var skImage = SkiaSharp.SKImage.FromBitmap(skBitmap);
-            using var skData = skImage.Encode(SkiaSharp.SKEncodedImageFormat.Png, 100);
-            using var ms = new MemoryStream(skData.ToArray());
-            var bitmap = new global::Avalonia.Media.Imaging.Bitmap(ms);
-
-            App.DebugLog($"[AVIF] Bitmap loaded: {bitmap.PixelSize.Width}x{bitmap.PixelSize.Height}, dpi={bitmap.Dpi.X}x{bitmap.Dpi.Y}");
-
-            PreviewType = PreviewType.Image;
-            PreviewImage = bitmap;
-            _originalPreviewImage = bitmap;
-
-            _skOriginalPreview?.Dispose();
-            _skOriginalPreview = BitmapToSkia(bitmap);
-
-            ImageWidth = bitmap.PixelSize.Width;
-            ImageHeight = bitmap.PixelSize.Height;
-
-            IsPreviewVisible = true;
-            IsToolbarVisible = true;
-            PreviewHeaderText = LocalizationManager.T("Preview_Header_Avif");
-
-            var formatValues = new Dictionary<string, string?>
-            {
-                [MetadataKeys.Dimensions] = $"{ImageWidth} × {ImageHeight}",
-                [MetadataKeys.ImageDpi] = $"{bitmap.Dpi.X:F0} × {bitmap.Dpi.Y:F0}",
-            };
-            MetadataHelper.RenderFormatToViewModel(this, formatValues, "image");
-
-            ZoomFit();
-            App.DebugLog($"[AVIF] ShowAvifImage done: PreviewType={PreviewType}, Zoom={ZoomLevel}, IsToolbarVisible={IsToolbarVisible}");
-        }
-        catch (Exception ex)
-        {
-            App.DebugLog($"[AVIF] ShowAvifImage error: {ex.Message}");
-            ShowUnsupported(LocalizationManager.T("Preview_ImageLoadFailed", ex.Message));
-        }
+        // 当前库限制：ImageSharp 4.1.2 / SkiaSharp 4.152.0 均不支持 AVIF 解码
+        // 显示友好提示，建议用户解压后使用外部查看器
+        var msg = LocalizationManager.T("Preview_Avif_Unsupported_Decode");
+        ShowUnsupported(msg);
     }
 
     public void ShowIcoGallery(string filePath)

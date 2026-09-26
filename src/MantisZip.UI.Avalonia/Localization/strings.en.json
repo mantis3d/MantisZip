@@ -134,6 +134,7 @@
   "Preview_Header_Gif": "GIF Preview",
   "Preview_Header_Apng": "APNG Preview",
   "Preview_Header_Avif": "AVIF Preview",
+  "Preview_Avif_Unsupported_Decode": "AVIF preview not supported in current version (decoder unavailable). Please extract the file and open with a system image viewer or other AVIF-compatible software.",
   "Preview_Header_IcoSizes": "ICO icon — {0} sizes",
   "Preview_Header_Image": "Image Preview",
   "Preview_Header_Iso": "Disc Image",
