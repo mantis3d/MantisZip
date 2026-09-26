@@ -194,7 +194,7 @@ internal static class IcoParser
             using var resultBitmap = new SkiaSharp.SKBitmap(imageInfo);
             using (var canvas = new SkiaSharp.SKCanvas(resultBitmap))
             {
-                canvas.DrawBitmap(xorBitmap, 0, 0);
+                canvas.DrawBitmap(xorBitmap, 0, 0, new SkiaSharp.SKSamplingOptions());
             }
 
             // ── 应用 AND 掩码设置透明像素 ──────────────────────────────

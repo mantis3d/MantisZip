@@ -143,9 +143,8 @@ public partial class PreviewViewModel : ObservableObject
         var prevKey = _currentEncodingKey;
         EncodingOptions = BuildEncodingOptions();
         OnPropertyChanged(nameof(EncodingOptions));
-        // 恢复之前选中的编码（直接赋值字段，避免触发 OnSelectedEncodingChanged 的持久化/解码副作用）
-        _selectedEncoding = EncodingOptions.FirstOrDefault(o => o.Key == (prevKey ?? "auto"));
-        OnPropertyChanged(nameof(SelectedEncoding));
+        // 恢复之前选中的编码（直接赋值属性，避免触发 OnSelectedEncodingChanged 的持久化/解码副作用）
+        SelectedEncoding = EncodingOptions.FirstOrDefault(o => o.Key == (prevKey ?? "auto"));
     }
 
     private void CleanupHtmlTempFile()
@@ -1413,10 +1412,10 @@ var formatValues = new Dictionary<string, string?>
         // Copy bitmap and set alpha to 255 for all pixels,
         // revealing the original RGB colors beneath transparency.
         using var dstSk = new SkiaSharp.SKBitmap(srcSk.Width, srcSk.Height);
-        using (var canvas = new SkiaSharp.SKCanvas(dstSk))
-        {
-            canvas.DrawBitmap(srcSk, 0, 0);
-        }
+using (var canvas = new SkiaSharp.SKCanvas(dstSk))
+            {
+                canvas.DrawBitmap(srcSk, 0, 0, new SkiaSharp.SKSamplingOptions());
+            }
         for (int y = 0; y < dstSk.Height; y++)
         {
             for (int x = 0; x < dstSk.Width; x++)
