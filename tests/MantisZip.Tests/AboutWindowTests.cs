@@ -14,6 +14,8 @@ public class AboutWindowTests
         GetRepoRoot(), "src", "MantisZip.UI.Avalonia", "Localization", "strings.zh-CN.json");
     private static readonly string EnJsonPath = Path.Combine(
         GetRepoRoot(), "src", "MantisZip.UI.Avalonia", "Localization", "strings.en.json");
+    private static readonly string TwJsonPath = Path.Combine(
+        GetRepoRoot(), "src", "MantisZip.UI.Avalonia", "Localization", "strings.zh-TW.json");
 
     private static string GetRepoRoot()
     {
@@ -81,6 +83,41 @@ public class AboutWindowTests
     public void EnJsonFile_Exists()
     {
         Assert.True(File.Exists(EnJsonPath));
+    }
+
+    [Fact]
+    public void TwJsonFile_Exists()
+    {
+        Assert.True(File.Exists(TwJsonPath));
+    }
+
+    // ──────────────────────────────────────────────
+    // 2.5 繁体中文（zh-TW）键集一致性（防止后续新增 key 漏更）
+    // ──────────────────────────────────────────────
+
+    [Fact]
+    public void AllThreeLanguages_HaveSameKeySet()
+    {
+        var zh = LoadJson(ZhJsonPath);
+        var en = LoadJson(EnJsonPath);
+        var tw = LoadJson(TwJsonPath);
+
+        var zhKeys = zh.Keys.OrderBy(k => k, StringComparer.Ordinal).ToArray();
+        var enKeys = en.Keys.OrderBy(k => k, StringComparer.Ordinal).ToArray();
+        var twKeys = tw.Keys.OrderBy(k => k, StringComparer.Ordinal).ToArray();
+
+        Assert.Equal(zhKeys, enKeys);
+        Assert.Equal(zhKeys, twKeys);
+    }
+
+    [Fact]
+    public void TwJson_AllValues_NonEmpty()
+    {
+        var tw = LoadJson(TwJsonPath);
+        foreach (var key in tw.Keys)
+        {
+            Assert.False(string.IsNullOrWhiteSpace(tw[key]), $"繁体中文 JSON 键 {key} 的值为空");
+        }
     }
 
     // ──────────────────────────────────────────────

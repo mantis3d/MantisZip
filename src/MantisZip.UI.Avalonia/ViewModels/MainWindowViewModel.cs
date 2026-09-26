@@ -205,15 +205,20 @@ public partial class MainWindowViewModel : ObservableObject
         LocalizationManager.CurrentLanguage = lang switch
         {
             "zh-CN" => AppLanguage.Chinese,
+            "zh-TW" => AppLanguage.TraditionalChinese,
             "en" => AppLanguage.English,
-            _ => LocalizationManager.CurrentLanguage == AppLanguage.Chinese
-                ? AppLanguage.English
-                : AppLanguage.Chinese
+            // 未知参数时在三种语言间循环
+            _ => LocalizationManager.CurrentLanguage switch
+            {
+                AppLanguage.Chinese => AppLanguage.English,
+                AppLanguage.English => AppLanguage.TraditionalChinese,
+                _ => AppLanguage.Chinese,
+            },
         };
         CurrentLanguage = LocalizationManager.CurrentLanguageCode;
 
-        // Persist so the selection survives restart (AppSettings uses "zh"/"en")
-        _appSettings.Language = LocalizationManager.CurrentLanguage == AppLanguage.English ? "en" : "zh";
+        // Persist so the selection survives restart (AppSettings uses "zh"/"en"/"zh-TW")
+        _appSettings.Language = LocalizationManager.ToSettingsCode(LocalizationManager.CurrentLanguage);
         SaveSetting(s => s.Language = _appSettings.Language);
 
         UpdateLocalizedStrings();
@@ -238,7 +243,7 @@ public partial class MainWindowViewModel : ObservableObject
         var keys = new[]
         {
             "Menu_File", "Menu_OpenArchive", "Menu_CloseArchive", "Menu_OpenArchiveLocation", "Menu_Refresh", "Menu_Settings", "Menu_Exit",
-            "Menu_Edit", "Menu_View", "Menu_ToggleTheme", "Menu_Language", "Menu_LangChinese", "Menu_LangEnglish",
+            "Menu_Edit", "Menu_View", "Menu_ToggleTheme", "Menu_Language", "Menu_LangChinese", "Menu_LangTraditionalChinese", "Menu_LangEnglish",
             "Menu_Help", "Menu_Tools",
             "Menu_ExtractArchive", "Menu_ExtractHere", "Menu_ExtractToName",
             "Menu_NewArchive", "Menu_PasswordManager", "Menu_About", "Menu_Donate",

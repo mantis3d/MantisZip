@@ -922,6 +922,8 @@ public partial class SettingsWindowViewModel : ObservableObject
 
         SelectedLanguageOptions.Clear();
         SelectedLanguageOptions.Add(new Option("中文", "zh"));
+        // 语言名显示其本族原生名（豁免本地化，与「中文」/「English」一致）
+        SelectedLanguageOptions.Add(new Option("繁體中文", "zh-TW"));
         SelectedLanguageOptions.Add(new Option("English", "en"));
 
         LogPrivacyModeOptions.Clear();
@@ -1327,7 +1329,7 @@ public partial class SettingsWindowViewModel : ObservableObject
         _settings.Language = languageCode;
         // Apply immediately so the change takes effect without restart
         // (matches WPF LanguageManager.SwitchTo behavior)
-        LocalizationManager.CurrentLanguage = languageCode == "en" ? AppLanguage.English : AppLanguage.Chinese;
+        LocalizationManager.CurrentLanguage = LocalizationManager.FromSettingsCode(languageCode);
 
         // Appearance
         _settings.Theme = SelectedThemeOption?.Value ?? Theme;

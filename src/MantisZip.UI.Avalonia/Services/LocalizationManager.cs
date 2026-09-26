@@ -5,8 +5,9 @@ namespace MantisZip.UI.Avalonia.Services;
 
 public enum AppLanguage
 {
-    Chinese,
-    English
+    Chinese,           // 简体中文（zh-CN）
+    English,           // 英语（en）
+    TraditionalChinese // 繁體中文（zh-TW）
 }
 
 public static class LocalizationManager
@@ -29,8 +30,32 @@ public static class LocalizationManager
         }
     }
 
-    public static string CurrentLanguageCode =>
-        _currentLanguage == AppLanguage.English ? "en" : "zh-CN";
+    public static string CurrentLanguageCode => _currentLanguage switch
+    {
+        AppLanguage.English => "en",
+        AppLanguage.TraditionalChinese => "zh-TW",
+        _ => "zh-CN",
+    };
+
+    /// <summary>
+    /// AppLanguage → AppSettings.Language 持久化代码（"zh" / "en" / "zh-TW"）。
+    /// </summary>
+    public static string ToSettingsCode(AppLanguage lang) => lang switch
+    {
+        AppLanguage.English => "en",
+        AppLanguage.TraditionalChinese => "zh-TW",
+        _ => "zh",
+    };
+
+    /// <summary>
+    /// AppSettings.Language → AppLanguage（未知值回退简体中文）。
+    /// </summary>
+    public static AppLanguage FromSettingsCode(string? code) => code switch
+    {
+        "en" => AppLanguage.English,
+        "zh-TW" => AppLanguage.TraditionalChinese,
+        _ => AppLanguage.Chinese,
+    };
 
     static LocalizationManager()
     {
@@ -40,7 +65,12 @@ public static class LocalizationManager
 
     private static void LoadStrings(AppLanguage lang)
     {
-        var fileName = lang == AppLanguage.English ? "strings.en.json" : "strings.zh-CN.json";
+        var fileName = lang switch
+        {
+            AppLanguage.English => "strings.en.json",
+            AppLanguage.TraditionalChinese => "strings.zh-TW.json",
+            _ => "strings.zh-CN.json",
+        };
         var path = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Localization", fileName);
 
         // Also check relative path for development
@@ -133,6 +163,7 @@ public static class LocalizationManager
         _availableLanguages = new List<LanguageInfo>
         {
             new() { Code = "zh-CN", DisplayName = "中文", TranslatorText = "MantisZip 团队" },
+            new() { Code = "zh-TW", DisplayName = "繁體中文", TranslatorText = "peter8777555" },
             new() { Code = "en", DisplayName = "English", TranslatorText = "Community Contributors" },
         };
     }

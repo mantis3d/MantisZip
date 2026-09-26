@@ -98,9 +98,9 @@ public partial class App : Application
         PreviewService.MaxTablePreviewRows = appSettings.MaxTablePreviewRows;
         PreviewService.MaxTablePreviewCols = appSettings.MaxTablePreviewCols;
 
-        // ── Restore saved language (AppSettings uses "zh"/"en", LocalizationManager uses zh-CN/en) ──
-        if (appSettings.Language == "en")
-            LocalizationManager.CurrentLanguage = AppLanguage.English;
+        // ── Restore saved language (AppSettings uses "zh"/"en"/"zh-TW") ──
+        LocalizationManager.CurrentLanguage =
+            LocalizationManager.FromSettingsCode(appSettings.Language);
 
         // ── 7z.dll 路径接线 + 用户解析回调（对齐 WPF InitializeApp，App.xaml.cs:46-68）──
         // 从用户设置加载 7z.dll 路径，覆盖 SevenZipEngine 的默认值
