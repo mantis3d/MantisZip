@@ -58,7 +58,7 @@ public class PreviewService
 
     private static readonly HashSet<string> ImageExtensions = new(StringComparer.OrdinalIgnoreCase)
     {
-        ".jpg", ".jpeg", ".png", ".bmp", ".ico", ".webp", ".avif"
+        ".jpg", ".jpeg", ".png", ".bmp", ".ico", ".webp", ".avif", ".tga"
     };
 
     private static readonly HashSet<string> GifExtensions = new(StringComparer.OrdinalIgnoreCase) { ".gif" };
