@@ -27,6 +27,9 @@ using ReverseMarkdown;
 using Microsoft.Data.Sqlite;
 using UglyToad.PdfPig;
 using UglyToad.PdfPig.Rendering.Skia;
+using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.PixelFormats;
+using SixLabors.ImageSharp.Formats.Png;
 using Avalonia.Styling;
 
 namespace MantisZip.UI.Avalonia.ViewModels;
@@ -1182,6 +1185,14 @@ var secureHtml = InjectCspMeta(html, csp);
         App.DebugLog($"[IMG] ShowImage: {filePath}");
         App.DebugLog($"[IMG] Before: PreviewType={PreviewType}, PreviewImage={(PreviewImage != null ? $"w{ImageWidth}xh{ImageHeight}" : "null")}");
 
+        // AVIF 使用 ImageSharp 解码（SkiaSharp 对 AVIF 解码支持有限）
+        var ext = Path.GetExtension(filePath).ToLowerInvariant();
+        if (ext.Equals(".avif", StringComparison.OrdinalIgnoreCase))
+        {
+            ShowAvifImage(filePath);
+            return;
+        }
+
         // 解码尺寸策略：DecodeToWidth 会无条件把位图缩放到目标宽度（小图也会被放大），
         // 因此先经 SKCodec 读头部拿真实宽度，仅当宽 > 1920 时才降采样；小图原生解码保持清晰度，
         // 与 WPF 版 ShowImage 的 DecodePixelWidth 门槛语义一致。
@@ -1227,14 +1238,13 @@ var secureHtml = InjectCspMeta(html, csp);
 
         ImageWidth = bitmap.PixelSize.Width;
         ImageHeight = bitmap.PixelSize.Height;
-        var ext = Path.GetExtension(filePath).ToLowerInvariant();
         IsPreviewVisible = true;
         IsToolbarVisible = true;
         PreviewHeaderText = LocalizationManager.T("Preview_Header_Image");
         // 初始缩放：适应视口
         ZoomFit();
 
-        var formatValues = new Dictionary<string, string?>
+var formatValues = new Dictionary<string, string?>
         {
             [MetadataKeys.Dimensions] = $"{ImageWidth} × {ImageHeight}",
             [MetadataKeys.ImageDpi] = $"{bitmap.Dpi.X:F0} × {bitmap.Dpi.Y:F0}",
@@ -1243,7 +1253,56 @@ var secureHtml = InjectCspMeta(html, csp);
         App.DebugLog($"[IMG] ShowImage done: PreviewType={PreviewType}, Zoom={ZoomLevel}, IsToolbarVisible={IsToolbarVisible}");
     }
 
-    // ── ICO Gallery ──
+    /// <summary>
+    /// 使用 ImageSharp 显示 AVIF 图片预览（SkiaSharp 对 AVIF 解码支持有限）。
+    /// </summary>
+    private void ShowAvifImage(string filePath)
+    {
+        App.DebugLog($"[AVIF] ShowAvifImage: {filePath}");
+
+        try
+        {
+            using var image = SixLabors.ImageSharp.Image.Load<SixLabors.ImageSharp.PixelFormats.Rgba32>(filePath);
+            App.DebugLog($"[AVIF] ImageSharp loaded: {image.Width}x{image.Height}");
+
+            // Convert ImageSharp image to Avalonia Bitmap
+            using var ms = new MemoryStream();
+            image.SaveAsPng(ms);
+            ms.Position = 0;
+            var bitmap = new global::Avalonia.Media.Imaging.Bitmap(ms);
+
+            App.DebugLog($"[AVIF] Bitmap loaded: {bitmap.PixelSize.Width}x{bitmap.PixelSize.Height}, dpi={bitmap.Dpi.X}x{bitmap.Dpi.Y}");
+
+            PreviewType = PreviewType.Image;
+            PreviewImage = bitmap;
+            _originalPreviewImage = bitmap;
+
+            _skOriginalPreview?.Dispose();
+            _skOriginalPreview = BitmapToSkia(bitmap);
+
+            ImageWidth = bitmap.PixelSize.Width;
+            ImageHeight = bitmap.PixelSize.Height;
+
+            IsPreviewVisible = true;
+            IsToolbarVisible = true;
+            PreviewHeaderText = LocalizationManager.T("Preview_Header_Avif");
+
+            var formatValues = new Dictionary<string, string?>
+            {
+                [MetadataKeys.Dimensions] = $"{ImageWidth} × {ImageHeight}",
+                [MetadataKeys.ImageDpi] = $"{bitmap.Dpi.X:F0} × {bitmap.Dpi.Y:F0}",
+            };
+            MetadataHelper.RenderFormatToViewModel(this, formatValues, "image");
+
+            ZoomFit();
+            App.DebugLog($"[AVIF] ShowAvifImage done: PreviewType={PreviewType}, Zoom={ZoomLevel}, IsToolbarVisible={IsToolbarVisible}");
+        }
+        catch (Exception ex)
+        {
+            App.DebugLog($"[AVIF] ShowAvifImage error: {ex.Message}");
+            ShowUnsupported(LocalizationManager.T("Preview_ImageLoadFailed", ex.Message));
+        }
+    }
 
     public void ShowIcoGallery(string filePath)
     {
