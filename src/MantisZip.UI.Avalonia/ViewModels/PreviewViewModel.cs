@@ -1282,9 +1282,20 @@ var formatValues = new Dictionary<string, string?>
             App.DebugLog($"[TGA] ImageSharp loaded: {image.Width}x{image.Height}");
 
             // Convert ImageSharp image to Avalonia Bitmap via SkiaSharp
+            // ImageSharp Rgba32 stores as R,G,B,A but SkiaSharp BGRA8888 expects B,G,R,A
+            // Need to swap R and B channels
             var pixelArray = new byte[image.Width * image.Height * 4];
             image.CopyPixelDataTo(pixelArray);
             App.DebugLog($"[TGA] Pixel array copied: {pixelArray.Length} bytes");
+
+            // Swap R and B channels (ImageSharp RGBA -> SkiaSharp BGRA)
+            for (int i = 0; i < pixelArray.Length; i += 4)
+            {
+                byte r = pixelArray[i];
+                pixelArray[i] = pixelArray[i + 2]; // B -> R position
+                pixelArray[i + 2] = r; // R -> B position
+            }
+            App.DebugLog($"[TGA] Channels swapped (R<->B)");
 
             using var skBitmap = new SkiaSharp.SKBitmap(image.Width, image.Height, SkiaSharp.SKColorType.Bgra8888, SkiaSharp.SKAlphaType.Premul);
             var ptr = skBitmap.GetPixels();
@@ -1319,9 +1330,6 @@ var formatValues = new Dictionary<string, string?>
 
             ImageWidth = bitmap.PixelSize.Width;
             ImageHeight = bitmap.PixelSize.Height;
-
-            IsPreviewVisible = true;
-            IsToolbarVisible = true;
             PreviewHeaderText = LocalizationManager.T("Preview_Header_Tga");
 
             var formatValues = new Dictionary<string, string?>
