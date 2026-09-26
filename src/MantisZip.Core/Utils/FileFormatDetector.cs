@@ -206,14 +206,6 @@ public static class FileFormatDetector
 
         // ── 视频 ──────────────────────────────────────────────────────
 
-        // 21. MP4: 'ftyp' box at offset 4 — 66 74 79 70 (4 bytes)
-        if (length >= 8 &&
-            head[4] == 0x66 && head[5] == 0x74 && head[6] == 0x79 && head[7] == 0x70)
-        {
-            CoreLog.Info("Detect: MP4 (ftyp) magic matched");
-            return FileFormat.Mp4;
-        }
-
         // 21b. AVIF: 'ftyp' box with 'avif' or 'avis' brand at offset 8
         if (length >= 12 &&
             head[4] == 0x66 && head[5] == 0x74 && head[6] == 0x79 && head[7] == 0x70 &&
@@ -222,6 +214,14 @@ public static class FileFormatDetector
         {
             CoreLog.Info("Detect: AVIF magic matched");
             return FileFormat.Avif;
+        }
+
+        // 21. MP4: 'ftyp' box at offset 4 — 66 74 79 70 (4 bytes)
+        if (length >= 8 &&
+            head[4] == 0x66 && head[5] == 0x74 && head[6] == 0x79 && head[7] == 0x70)
+        {
+            CoreLog.Info("Detect: MP4 (ftyp) magic matched");
+            return FileFormat.Mp4;
         }
 
         // 22. MKV/WebM (EBML): 1A 45 DF A3 (4 bytes)
