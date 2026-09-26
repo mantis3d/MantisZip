@@ -723,7 +723,7 @@ dotnet test tests\MantisZip.UI.Avalonia.Tests\MantisZip.UI.Avalonia.Tests.csproj
 - **C# 代码**：`LocalizationManager.T("Key")`；带占位符用 `T("Key", arg1, arg2)`（`{0}` 格式）
 - **XAML 静态文案**：绑定到 ViewModel 属性或 `LocalizedStrings[Key]`（字典索引器绑定需要 VM 实现 `LocalizedStrings` 字典并在 `OnCultureChanged` 中刷新）
 - **Window/UserControl code-behind（DataContext=self）**：暴露 `public string XxxText => LocalizationManager.T("Key")` 属性并绑定，同时加 `x:CompileBindings="False"`
-- **新增 key 必须成对添加**到 `src/MantisZip.UI.Avalonia/Localization/strings.zh-CN.json` 和 `strings.en.json`，保持两文件 key 集完全同步；插入到文件头 `{` 之后（key 不排序），维持 UTF-8 无 BOM + CRLF + 2 空格缩进
+- **新增 key 必须成对添加**到 `src/MantisZip.UI.Avalonia/Localization/strings.zh-CN.json`、`strings.en.json` 与 `strings.zh-TW.json`（三语文件 key 集必须完全同步，`AboutWindowTests.AllThreeLanguages_HaveSameKeySet` 会校验）；插入到文件头 `{` 之后（key 不排序），维持 UTF-8 无 BOM + CRLF + 2 空格缩进
 - **XAML 用 `LocalizedStrings[Key]` 绑定的 key 必须额外登记**到 `MainWindowViewModel.UpdateLocalizedStrings()` 的 keys 数组（`ViewModels/MainWindowViewModel.cs`，约 line 203 起的 `new[] { ... }`）。`LocalizedStrings` 字典**不是全量加载** JSON，而是由该显式数组构建——漏登记会导致菜单/工具栏文字空白（图标仍在），构建不会报错。新增 XAML 绑定 key 后必须同步补进此数组
 - 完成后自检：`dotnet build src\MantisZip.UI.Avalonia\MantisZip.UI.Avalonia.csproj` 无新增错误，并扫描确认无遗漏硬编码
 

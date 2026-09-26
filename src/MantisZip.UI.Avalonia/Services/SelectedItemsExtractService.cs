@@ -54,7 +54,8 @@ public sealed class SelectedItemsExtractService
 
         var options = CreateExtractOptions(conflictAction, conflictDialog);
         // 传递并行解压线程数（引擎 SupportsParallelExtract 时生效）
-        options.ParallelExtractDegree = AppSettings.Load()?.ParallelExtractDegree ?? 0;
+        if (options != null)
+            options.ParallelExtractDegree = AppSettings.Load()?.ParallelExtractDegree ?? 0;
 
         var engine = ArchiveEngineFactory.GetEngineByExtension(archivePath);
         if (engine == null) throw new NotSupportedException(LocalizationManager.T("Error_UnsupportedArchiveFormat"));

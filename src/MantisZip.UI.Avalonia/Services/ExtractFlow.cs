@@ -162,7 +162,8 @@ public static class ExtractFlow
     {
         var options = SelectedItemsExtractService.CreateExtractOptions(conflictAction, conflictDialog);
         // 传递并行解压线程数（引擎 SupportsParallelExtract 时生效）
-        options.ParallelExtractDegree = AppSettings.Load()?.ParallelExtractDegree ?? 0;
+        if (options != null)
+            options.ParallelExtractDegree = AppSettings.Load()?.ParallelExtractDegree ?? 0;
 
         // 有过滤条件：仅解压匹配条目（统一入口；无 pathOverrides = 保留完整路径）。
         // 注意用 `!= null` 而非 `is { Count: > 0 }`：过滤激活但零匹配（空列表）也必须走

@@ -504,6 +504,9 @@
         <!-- 切换到中文 -->
         <MenuItem Header="{Binding LocalizedStrings[Menu_LangChinese]}"
                   Command="{Binding SwitchLanguageCommand}" CommandParameter="zh-CN" />
+        <!-- 切换到繁體中文 -->
+        <MenuItem Header="{Binding LocalizedStrings[Menu_LangTraditionalChinese]}"
+                  Command="{Binding SwitchLanguageCommand}" CommandParameter="zh-TW" />
         <!-- 切换到英文 -->
         <MenuItem Header="{Binding LocalizedStrings[Menu_LangEnglish]}"
                   Command="{Binding SwitchLanguageCommand}" CommandParameter="en" />

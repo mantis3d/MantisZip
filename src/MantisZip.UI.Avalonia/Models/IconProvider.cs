@@ -300,14 +300,14 @@ public static class IconProvider
 
             case "audio":
                 // Music note
-                using (var notePaint = new SKPaint
+                using (var audioPaint = new SKPaint
                 {
                     Color = SKColors.White.WithAlpha(200),
                     IsAntialias = true,
                     Style = SKPaintStyle.Fill
                 })
                 {
-                    canvas.DrawCircle(cx - 1, cy + 2, 2, notePaint);
+                    canvas.DrawCircle(cx - 1, cy + 2, 2, audioPaint);
                     using (var noteBuilder = new SKPathBuilder())
                     {
                         noteBuilder.MoveTo(cx - 1, cy + 2);
@@ -317,9 +317,9 @@ public static class IconProvider
                         noteBuilder.LineTo(cx - 1, cy - 2);
                         noteBuilder.Close();
                         using var notePath = noteBuilder.Detach();
-                        canvas.DrawPath(notePath, notePaint);
+                        canvas.DrawPath(notePath, audioPaint);
                     }
-                    canvas.DrawCircle(cx + 4, cy, 2, notePaint);
+                    canvas.DrawCircle(cx + 4, cy, 2, audioPaint);
                 }
                 break;
 

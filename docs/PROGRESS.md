@@ -27,6 +27,7 @@
 
 #### 2026-09
 
+- **09-26** — **APNG 动画预览支持**：复用 `PreviewType.AnimatedImage` 管线 + ImageSharp 解码器（`SixLabors.ImageSharp 3.1.5`），修复 `FrameDelay` Rational 类型转换（`uint`→`long`）；SKCodec 原生 `FrameCount=0` 无法识别 APNG 动画，ImageSharp 兜底解码 5 帧 APNG 正常播放；集成 `ShowGif` 统一管线（播放/暂停/逐帧/缩放/透明背景/信息面板帧数），Core/Avalonia 单测 509/509 通过
 - **09-24** — 过滤/拖拽/右键解压统一并行化 + 并行冲突弹窗修复：`ExtractEntriesAsync` 改造为 dispatcher（命中文件 ≥2 且并行度 >1 自动走并行，与全量解压共用决策逻辑），原串行逻辑迁入 `ExtractEntriesAsyncSequential` 不变，新增 `ExtractEntriesAsyncParallel`（多实例并行 + 批次复用 archive + outputPathOverrides 路径覆盖 + 目录条目预创建）；修复并行路径 Ask 冲突弹窗静默降级为覆盖的 bug（同步 ResolvePath 只认同步回调 → 快速路径 + 信号量串行化 ResolvePathAsync）；`CreateExtractOptions` 返回类型非 null 消除 NRE 隐患；4 个新回归测试
 - **09-23** — 修复 MultiThreaded 压缩模式 UI 冻结：`CompressGroupWithSevenZip` 挂接 `FileCompressionStarted` 进度事件，每 100ms 节流报告当前文件名 + 字节进度；mt=on 多线程事件并发触发，lock 保护计数与节流
 - **09-18** — 自适应压缩重构为三开关正交设计：移除 `AdaptiveCompressionMode` 四选一枚举，替换为三个独立开关（自适应压缩 / 魔数检测 / 多线程压缩）；魔数检测仅自适应开启时可见；组合行为：仅自适应=用户规则列表+格式目录、仅多线程=无设置界面、自适应+多线程=仅存储格式选择；向后兼容旧设置文件自动迁移；6 个 i18n key

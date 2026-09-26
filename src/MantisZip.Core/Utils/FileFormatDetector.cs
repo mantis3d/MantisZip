@@ -28,6 +28,14 @@ public static class FileFormatDetector
             head[4] == 0x0D && head[5] == 0x0A && head[6] == 0x1A && head[7] == 0x0A)
         {
             CoreLog.Info("Detect: PNG magic matched");
+
+            // NEW: 进一步检测是否为 APNG (acTL chunk)
+            if (ScanForActlChunk(head, length))
+            {
+                CoreLog.Info("Detect: APNG magic matched (acTL chunk found)");
+                return FileFormat.Apng;
+            }
+
             return FileFormat.Png;
         }
 
@@ -62,7 +70,19 @@ public static class FileFormatDetector
             return FileFormat.Ico;
         }
 
-        // 6. WebP: RIFF (52 49 46 46) + 4 bytes + WEBP (57 45 42 50) — 12 bytes
+        // 6. TGA: ID length(1) + ColorMapType(1) + ImageType(1) = 3 bytes minimum
+        // ImageType: 1,2,3=uncompressed; 9,10,11=RLE compressed
+        if (length >= 3 &&
+            head[0] <= 1 &&  // ID length (0 or 1 typically)
+            (head[1] == 0 || head[1] == 1) &&  // ColorMapType: 0=no map, 1=has map
+            (head[2] == 1 || head[2] == 2 || head[2] == 3 ||  // Uncompressed: RGB, RGB, Grayscale
+             head[2] == 9 || head[2] == 10 || head[2] == 11)) // RLE: RGB, RGB, Grayscale
+        {
+            CoreLog.Info("Detect: TGA magic matched");
+            return FileFormat.Tga;
+        }
+
+        // 7. WebP: RIFF (52 49 46 46) + 4 bytes + WEBP (57 45 42 50) — 12 bytes
         if (length >= 12 &&
             head[0] == 0x52 && head[1] == 0x49 && head[2] == 0x46 && head[3] == 0x46 &&
             head[8] == 0x57 && head[9] == 0x45 && head[10] == 0x42 && head[11] == 0x50)
@@ -197,6 +217,16 @@ public static class FileFormatDetector
         }
 
         // ── 视频 ──────────────────────────────────────────────────────
+
+        // 21b. AVIF: 'ftyp' box with 'avif' or 'avis' brand at offset 8
+        if (length >= 12 &&
+            head[4] == 0x66 && head[5] == 0x74 && head[6] == 0x79 && head[7] == 0x70 &&
+            ((head[8] == 0x61 && head[9] == 0x76 && head[10] == 0x69 && head[11] == 0x66) || // 'avif'
+             (head[8] == 0x61 && head[9] == 0x76 && head[10] == 0x69 && head[11] == 0x73)))   // 'avis'
+        {
+            CoreLog.Info("Detect: AVIF magic matched");
+            return FileFormat.Avif;
+        }
 
         // 21. MP4: 'ftyp' box at offset 4 — 66 74 79 70 (4 bytes)
         if (length >= 8 &&
@@ -342,6 +372,41 @@ public static class FileFormatDetector
         }
 
         return FileFormat.Unknown;
+    }
+
+    /// <summary>
+    /// 扫描 PNG 数据中是否包含 acTL (Animation Control) chunk，判定为 APNG。
+    /// </summary>
+    /// <param name="head">文件头部字节数组</param>
+    /// <param name="length">有效长度</param>
+    /// <returns>true=APNG, false=静态 PNG</returns>
+    private static bool ScanForActlChunk(byte[] head, int length)
+    {
+        if (length < 33) return false; // PNG签名8 + IHDR最小25 = 33
+
+        int offset = 8; // 跳过 PNG 签名
+        int maxScan = Math.Min(length, 65536); // 最多扫描 64KB
+
+        while (offset + 8 <= maxScan)
+        {
+            int chunkLength = (head[offset] << 24) | (head[offset + 1] << 16) | (head[offset + 2] << 8) | head[offset + 3];
+            if (chunkLength < 0 || offset + 12 + chunkLength > maxScan)
+                break;
+
+            int chunkType = (head[offset + 4] << 24) | (head[offset + 5] << 16) | (head[offset + 6] << 8) | head[offset + 7];
+
+            // acTL = 0x6163544C ('a','c','T','L')
+            if (chunkType == 0x6163544C)
+                return true;
+
+            // IEND chunk 结束
+            if (chunkType == 0x49454E44) // 'I','E','N','D'
+                break;
+
+            offset += 12 + chunkLength;
+        }
+
+        return false;
     }
 
     /// <summary>

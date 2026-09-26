@@ -86,6 +86,7 @@ Source: "publish_output_selfcontained\Resources\MenuIcons\*.ico"; DestDir: "{app
 Source: "publish_output_selfcontained\Resources\Cursors\*.cur"; DestDir: "{app}\Resources\Cursors"; Flags: ignoreversion
 Source: "publish_output_selfcontained\Localization\strings.en.json"; DestDir: "{app}\Localization"; Flags: ignoreversion
 Source: "publish_output_selfcontained\Localization\strings.zh-CN.json"; DestDir: "{app}\Localization"; Flags: ignoreversion
+Source: "publish_output_selfcontained\Localization\strings.zh-TW.json"; DestDir: "{app}\Localization"; Flags: ignoreversion
 Source: "publish_output_selfcontained\Resources\languages.json"; DestDir: "{app}\Resources"; Flags: ignoreversion
 
 ; === Contributor CSV files (compiled into AboutWindow) ===

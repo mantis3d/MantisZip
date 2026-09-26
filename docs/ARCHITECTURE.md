@@ -147,8 +147,9 @@ MantisZip/
 │       ├── Themes/                  # 主题资源
 │       │   ├── ThemeLight.axaml
 │       │   └── ThemeDark.axaml
-│       ├── Localization/            # 中/英 JSON 翻译资源
+│       ├── Localization/            # 中/英/繁中 JSON 翻译资源
 │       │   ├── strings.zh-CN.json
+│       │   ├── strings.zh-TW.json
 │       │   └── strings.en.json
 │       └── Resources/               # 图标、样式、菜单图标
 ├── tests/
