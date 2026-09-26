@@ -128,6 +128,7 @@
   "Preview_FontParseFailed": "Failed to parse font file",
   "Preview_GifDecodeFailed": "Failed to decode GIF",
   "Preview_GifLoadFailed": "Failed to load GIF: {0}",
+  "Preview_ImageLoadFailed": "Failed to load image: {0}",
   "Preview_Header_Audio": "Audio Info",
   "Preview_Header_Font": "Font Preview",
   "Preview_Header_Gif": "GIF Preview",
