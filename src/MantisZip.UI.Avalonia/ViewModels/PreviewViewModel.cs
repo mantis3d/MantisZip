@@ -738,7 +738,7 @@ public partial class PreviewViewModel : ObservableObject
 
     public bool CanLigatureToggle => _fontSupportsLigature;
 
-    private List<GifFrameData>? _gifFrames;
+    private List<AnimationFrameData>? _gifFrames;
     private int _gifCurrentFrameIndex;
     private DispatcherTimer? _gifTimer;
 
@@ -1370,7 +1370,7 @@ var secureHtml = InjectCspMeta(html, csp);
     // ── GIF ──
 
     /// <summary>
-    /// 显示 GIF 预览。
+    /// 显示 GIF/APNG 动画预览。
     /// </summary>
     public void ShowGif(string filePath)
     {
@@ -1379,7 +1379,31 @@ var secureHtml = InjectCspMeta(html, csp);
 
         try
         {
-            var frames = GifDecoder.DecodeFrames(filePath);
+            List<AnimationFrameData>? frames = null;
+            var ext = Path.GetExtension(filePath).ToLowerInvariant();
+            var isApng = ext.Equals(".apng", StringComparison.OrdinalIgnoreCase) || ext.Equals(".png", StringComparison.OrdinalIgnoreCase);
+            
+            // 尝试 APNG 解码器（用于 .apng 或可能被重命名为 .png 的 APNG 文件）
+            if (isApng)
+            {
+                frames = ApngDecoder.DecodeFrames(filePath);
+            }
+            
+            // 回退到 GIF 解码器
+            if (frames == null || frames.Count == 0)
+            {
+                var gifFrames = GifDecoder.DecodeFrames(filePath);
+                if (gifFrames != null && gifFrames.Count > 0)
+                {
+                    // 转换为通用 AnimationFrameData
+                    frames = new List<AnimationFrameData>(gifFrames.Count);
+                    foreach (var gf in gifFrames)
+                    {
+                        frames.Add(new AnimationFrameData { Bitmap = gf.Bitmap, DelayMs = gf.DelayMs });
+                    }
+                }
+            }
+
             if (frames == null || frames.Count == 0)
             {
                 ShowUnsupported(LocalizationManager.T("Preview_GifDecodeFailed"));
@@ -1416,8 +1440,8 @@ var secureHtml = InjectCspMeta(html, csp);
             PreviewType = PreviewType.AnimatedImage;
             IsPreviewVisible = true;
             IsToolbarVisible = true;
-            var isGif = Path.GetExtension(filePath).Equals(".gif", StringComparison.OrdinalIgnoreCase);
-            PreviewHeaderText = LocalizationManager.T(isGif ? "Preview_Header_Gif" : "Preview_Header_AnimatedImage");
+            var isGif = ext.Equals(".gif", StringComparison.OrdinalIgnoreCase);
+            PreviewHeaderText = LocalizationManager.T(isGif ? "Preview_Header_Gif" : (isApng ? "Preview_Header_Apng" : "Preview_Header_AnimatedImage"));
             var gifFormatValues = new Dictionary<string, string?>
             {
                 [MetadataKeys.Dimensions] = $"{ImageWidth} × {ImageHeight}",
