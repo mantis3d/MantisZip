@@ -6,12 +6,16 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-09-26** — **APNG 动画预览支持正式上线**
+  - **核心变更**：复用 `PreviewType.AnimatedImage` 统一管线（GIF + Animated WebP 已就绪），新增 `ApngDecoder`（`SixLabors.ImageSharp 3.1.5`）解决 SKCodec 原生 `FrameCount=0` 无法识别 APNG 动画的问题
+  - **关键修复**：`FrameDelay` Rational 类型的 `Numerator`/`Denominator` 为 `uint`，修复强制转 `long` 抛异常的 bug（先转 `uint` 再转 `long`）
+  - **集成点**：`ShowGif` 优先尝试 `ApngDecoder.DecodeFrames(filePath)`（按扩展名 `.apng`/`.png`），失败回退 `GifDecoder`；完整复用播放/暂停/逐帧/缩放/透明背景/信息面板帧数
+  - **魔数检测**：`FileFormatDetector.ScanForActlChunk()` 扫描 PNG 后的 `acTL` chunk (0x6163544C) 区分 APNG/静态 PNG
+  - **依赖新增**：`SixLabors.ImageSharp 3.1.5`（Core 无新依赖，仅 Avalonia UI 层）
+  - **验收**：TestPreview/apng.zip (5帧 APNG) 正常预览播放；Core/Avalonia 单测 509/509 通过；零回归
+  - **同步**：PLAN.md 已更新状态；.omo/plans/已完成/apng-preview-support.md 归档
+
 **2026-09-22** — 修正存量文档过时的技术事实（.NET 9→10、WPF 已删除、依赖表）
-  - **RELEASE_NOTES.md**：v0.5.0「版本介绍」补齐英文对照（标题/简介/四子节逐条中英成对），并将过时描述统一修正——`（.NET 9）`→`（.NET 10）`、`WPF 版进入维护模式`→`WPF 版已完全删除`（英文同步）；便携版说明 `dotnet9`/`.NET 9 runtime`→`.NET 10`
-  - **docs/PROGRESS.md**：WPF 遗留版节备注从「进入维护模式…仅当修复仅存在于 WPF 的 bug 时追加」改为「迁移完成后完全删除…仅供历史参考，不再追加新条目」
-  - **docs/progress-wpf.md**：头部追加指令同步改为「仅供历史参考，不再追加新条目」；历史条目本身如实保留
-  - **docs/README_en.md**：将已删除的 WPF 项目 `MantisZip.UI` 依赖表替换为 `MantisZip.UI.Avalonia` 当前 11 项依赖（Avalonia 12.0.4 / Markdig / ReverseMarkdown / PdfPig / Svg.Skia / SkiaSharp / HarfBuzzSharp 等）；社区段 "WPF/.NET"→".NET/Avalonia" 对齐中文版
-  - 原则：仅改「描述当前状态」的文档；带日期的历史记录（PROGRESS 带日期条目、progress-wpf 归档、progress-avalonia-detail 逐日日志）如实保留当时状态不改写
 
 **2026-09-21** — 修复 HTML 预览安全设置回归三连（09-13 html-preview-webview-fallback 上线引入）
   - **PreviewViewModel.cs**：CSP meta 拼接两处（`RebuildHtmlAsync` / `ShowHtmlPreview`）补充 `style-src` 指令——外部资源开时 `style-src 'unsafe-inline' * data: blob:`，外部资源关时 `style-src 'unsafe-inline' 'self' data: blob:`。此前仅 `default-src` 回退时内联样式（`<style>` / `style=""`）被 CSP 拦截，开满所有安全选项的 HTML 预览样式全部丢失
